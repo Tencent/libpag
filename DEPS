@@ -27,7 +27,7 @@
       },
       {
         "url": "${PAG_GROUP}/swiftshader.git",
-        "commit": "36b01f11a725157be3d86a59ec0e86358303c4cf",
+        "commit": "8d781475d99e8c1582f4c0da44b54ba105f8b79a",
         "dir": "third_party/swiftshader"
       },
       {
@@ -75,7 +75,7 @@
   "files": {
     "mac": [
       {
-        "url": "${PAG_GROUP}/swiftshader/releases/download/openl-stable/mac.zip",
+        "url": "${PAG_GROUP}/swiftshader/releases/download/opengl/mac.zip",
         "dir": "third_party/out/swiftshader",
         "unzip": true
       },
@@ -87,7 +87,7 @@
     ],
     "win": [
       {
-        "url": "${PAG_GROUP}/swiftshader/releases/download/openl-stable/win.zip",
+        "url": "${PAG_GROUP}/swiftshader/releases/download/opengl/win.zip",
         "dir": "third_party/out/swiftshader",
         "unzip": true
       },
