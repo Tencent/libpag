@@ -178,6 +178,8 @@ time.
 
 After the synchronization, open the project with CLion, then you are good to go!
 
+**Note: If anything goes wrong during cmake building, please update the cmake tool to the latest version and try again.**
+
 ## License
 
 libpag is licensed under the [Apache Version 2.0 License](./LICENSE.txt)
