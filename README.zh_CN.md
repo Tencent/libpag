@@ -17,6 +17,7 @@ PAG 方案目前已经接入了腾讯系 40 余款应用，包括微信，手机
 动画、视频编辑、模板设计等场景。
 
 详细介绍可以参考相关报道：
+ 
  - [腾讯推出移动端动画组件PAG，释放设计生产力](https://mp.weixin.qq.com/s/STxOMV2lqGdGu-9mBkAz_A)
  - [王者QQ微信都在用的动画神器要开源了：把交付时间缩短90%](https://mp.weixin.qq.com/s/a8-yOp8h5LiFGKSdLE_toA)
 
@@ -106,6 +107,7 @@ depsync
 ### 编译项目
 
 第三方依赖项都同步完成后，直接使用 CLion 打开项目根目录即可开始编译。若第三方依赖项发生改变，刷新 CMakeLists.txt 文件即可自动同步。
+**如果在 CMake 编译过程中遇到报错，可以尝试更新 CMake 命令行工具到最新的版本然后重新编译。**
 
 注：由于团队日常主要都在 macOS 平台上进行开发，Windows
 平台偶尔可能会出现编译不通过的情况，如果遇到阻塞的问题欢迎通过提交 [issue](https://github.com/Tencent/libpag/issues/new/choose)
