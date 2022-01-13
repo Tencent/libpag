@@ -1,4 +1,4 @@
-<img src="resources/readme/logo.png" alt="PAG Logo" width="474" height="148"/>
+<img src="resources/readme/logo.png" alt="PAG Logo" width="474"/>
 
 [![license](https://img.shields.io/badge/license-Apache%202-blue)](https://github.com/Tencent/libpag/blob/master/LICENSE.txt) [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/Tencent/libpag/pulls) [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/Tencent/libpag)](https://github.com/Tencent/libpag/releases)
 
@@ -21,7 +21,7 @@ Tencent Video, QQ Music, and so on, reaching hundreds of millions of users.
 
 - **Highly efficient file format**
 
-<img src="resources/readme/intro_1.png" alt="intro_1" width="282" height="188"/>
+<img src="resources/readme/intro_1.png" alt="intro_1" width="282"/>
 
 Benefiting from the highly efficient binary format design, PAG files can be decoded 10x faster than
 JSON files but also are about 50% smaller in file size when exporting the same animations. Designers
@@ -30,7 +30,7 @@ easily without other attachments.
 
 - **All AE features supported**
 
-<img src="resources/readme/intro_2.png" alt="intro_2" width="281" height="189"/>
+<img src="resources/readme/intro_2.png" alt="intro_2" width="281"/>
 
 While other solutions may only support exporting limited vector-based AE features, PAG supports
 exporting all AE animations into a single file by combining vector-based exporting with raster-based
@@ -38,7 +38,7 @@ exporting techniques. Therefore, third-party plugin effects in AE can be exporte
 
 - **Measurable performance**
 
-<img src="resources/readme/intro_4.png" alt="intro_4" width="282" height="186"/>
+<img src="resources/readme/intro_4.png" alt="intro_4" width="282"/>
 
 PAG provides a monitoring panel in PAGViewer that shows normalized performance data for PAG files,
 which helps designers to examine and optimize performance easily without developers. Along with
@@ -47,7 +47,7 @@ effects and excellent performance now can be created more effectively.
 
 - **Runtime editable animations**
 
-<img src="resources/readme/intro_5.png" alt="intro_5" width="282" height="188"/>
+<img src="resources/readme/intro_5.png" alt="intro_5" width="282"/>
 
 With the flexible editing APIs from PAG SDK, developers can easily change the layer structure of a
 single PAG file, mix multiple PAG files into one composition, or replace texts and images with all
