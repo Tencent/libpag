@@ -1,0 +1,13 @@
+.DS_Store
+pag.js
+pag.worker.js
+*.wasm
+*.data
+package-lock.json
+lib
+types
+src/wasm
+dist
+api-docs
+*.js.map
+demo/index.js

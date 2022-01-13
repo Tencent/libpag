@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "lib": ["ES5", "ES6", "DOM", "DOM.Iterable"],
+    "target": "ESNext",
+    "declaration": true,
+    "declarationDir": "./types",
+    "emitDeclarationOnly": true,
+    "removeComments": false,
+    "skipLibCheck": true
+  },
+  "include": ["src/pag.ts"]
+}

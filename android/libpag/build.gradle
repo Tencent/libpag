@@ -1,0 +1,151 @@
+apply plugin: 'com.android.library'
+apply plugin: 'maven-publish'
+apply plugin: 'com.github.panpf.bintray-publish'
+
+version = '4.0.0.0'
+project.ext.artifactId = 'libpag'
+project.group = 'com.tencent.tav'
+
+android {
+    compileSdkVersion 29
+    buildToolsVersion '29.0.3'
+    ndkVersion "19.2.5345600"
+
+    defaultConfig {
+        minSdkVersion 18
+        targetSdkVersion 31
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+
+        externalNativeBuild {
+            cmake {
+                arguments "-DANDROID_STL=c++_static",
+                        "-DPAG_USE_LIBAVC=ON"
+            }
+        }
+
+        ndk {
+            abiFilters "armeabi-v7a", "arm64-v8a"
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+    externalNativeBuild {
+        cmake {
+            path '../../CMakeLists.txt'
+        }
+    }
+    publishNonDefault true
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    androidTestImplementation('com.android.support.test.espresso:espresso-core:2.2.2', {
+        exclude group: 'com.android.support', module: 'support-annotations'
+    })
+    testImplementation 'junit:junit:4.12'
+}
+
+// 发布到Jcenter配置
+publish {
+    userOrg = 'libpag'
+    groupId = 'com.tencent.tav'
+    artifactId = 'libpag'
+    publishVersion = project.version
+    desc = ' '
+    website = 'https://github.com/libpag/libpag.github.io'
+}
+
+project.afterEvaluate {
+    // 如果使用自动拷贝功能，需要保证NDK是16，否则会生成没有经过strip的包
+    transformNativeLibsWithMergeJniLibsForRelease.doLast {
+        delete {
+            delete 'build/intermediates/transforms/mergeJniLibs/release/0/lib/armeabi'
+        }
+        copy {
+            from 'build/intermediates/transforms/mergeJniLibs/release/0/lib/armeabi-v7a'
+            into 'build/intermediates/transforms/mergeJniLibs/release/0/lib/armeabi'
+            include '*.so'
+        }
+    }
+    transformNativeLibsWithStripDebugSymbolForRelease.doLast {
+        delete {
+            delete 'build/intermediates/transforms/stripDebugSymbol/release/0/lib/armeabi'
+        }
+        copy {
+            from 'build/intermediates/transforms/stripDebugSymbol/release/0/lib/armeabi-v7a'
+            into 'build/intermediates/transforms/stripDebugSymbol/release/0/lib/armeabi'
+            include '*.so'
+        }
+    }
+    // 新的Skia导致使用NDK16也无法编译armeabi版本
+    // 此处为了方便debug，保留debug版本armeabi的拷贝，方便源码接入时候的调试
+    transformNativeLibsWithMergeJniLibsForDebug.doLast {
+        delete {
+            delete 'build/intermediates/transforms/mergeJniLibs/debug/0/lib/armeabi'
+        }
+        copy {
+            from 'build/intermediates/transforms/mergeJniLibs/debug/0/lib/armeabi-v7a'
+            into 'build/intermediates/transforms/mergeJniLibs/debug/0/lib/armeabi'
+            include '*.so'
+        }
+    }
+    transformNativeLibsWithStripDebugSymbolForDebug.doLast {
+        delete {
+            delete 'build/intermediates/transforms/stripDebugSymbol/debug/0/lib/armeabi'
+        }
+        copy {
+            from 'build/intermediates/transforms/stripDebugSymbol/debug/0/lib/armeabi-v7a'
+            into 'build/intermediates/transforms/stripDebugSymbol/debug/0/lib/armeabi'
+            include '*.so'
+        }
+    }
+    publishing {
+        repositories {
+        }
+        publications {
+            aar(MavenPublication) {
+                groupId project.group
+                artifactId project.artifactId
+                version project.version
+
+                artifact bundleReleaseAar
+
+                //The publication doesn't know about our dependencies, so we have to manually add them to the pom
+                pom.withXml {
+                    // for dependencies and exclusions
+                    def dependenciesNode = asNode().appendNode('dependencies')
+                    configurations.api.allDependencies.withType(ModuleDependency) { ModuleDependency dp ->
+                        def dependencyNode = dependenciesNode.appendNode('dependency')
+                        dependencyNode.appendNode('groupId', dp.group)
+                        dependencyNode.appendNode('artifactId', dp.name)
+                        dependencyNode.appendNode('version', dp.version)
+
+                        // for exclusions
+                        if (dp.excludeRules.size() > 0) {
+                            def exclusions = dependencyNode.appendNode('exclusions')
+                            dp.excludeRules.each { ExcludeRule ex ->
+                                def exclusion = exclusions.appendNode('exclusion')
+                                exclusion.appendNode('groupId', ex.group)
+                                exclusion.appendNode('artifactId', ex.module)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+buildscript {
+    repositories {
+        maven { url "https://mirrors.tencent.com/nexus/repository/maven-public/" }
+    }
+    dependencies { classpath 'com.github.panpf.bintray-publish:bintray-publish:1.0.0' }
+}

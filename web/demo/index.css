@@ -1,0 +1,39 @@
+.container {
+  display: flex;
+  position: relative;
+}
+.canvas {
+  position: relative;
+  z-index: 999999;
+}
+.tablecloth {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  left: 0;
+  background: rgb(180, 180, 180);
+  background-image: linear-gradient(rgba(255, 255, 255, 0.3) 1px, transparent 0),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.3) 1px, transparent 0), linear-gradient(white 1px, transparent 0),
+    linear-gradient(90deg, white 1px, transparent 0);
+  background-size: 15px 15px, 15px 15px, 75px 75px, 75px 75px;
+  width: 640px;
+  height: 640px;
+}
+.ml-24 {
+  margin-left: 24px;
+}
+.mt-24 {
+  margin-top: 24px;
+}
+
+button {
+  background: #0252d9;
+  border: 0;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 16px;
+  color: #fff;
+}
+input {
+  font-size: 16px;
+}

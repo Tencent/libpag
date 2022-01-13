@@ -1,0 +1,126 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making libpag available.
+//
+//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#include "GradientCache.h"
+
+#include <utility>
+
+namespace pag {
+// Each bitmap will be 256x1.
+static constexpr size_t kMaxNumCachedGradientBitmaps = 32;
+static constexpr int kGradientTextureSize = 256;
+
+const Texture* GradientCache::find(const BytesKey& bytesKey) {
+  auto iter = textures.find(bytesKey);
+  if (iter == textures.end()) {
+    return nullptr;
+  }
+  keys.remove(bytesKey);
+  keys.push_front(bytesKey);
+  return iter->second.get();
+}
+
+void GradientCache::add(const BytesKey& bytesKey, std::shared_ptr<Texture> texture) {
+  textures[bytesKey] = std::move(texture);
+  keys.push_front(bytesKey);
+  while (keys.size() > kMaxNumCachedGradientBitmaps) {
+    auto key = keys.back();
+    keys.pop_back();
+    textures.erase(key);
+  }
+}
+
+std::unique_ptr<Bitmap> CreateGradient(const Color4f* colors, const float* positions, int count,
+                                       int resolution) {
+  auto bitmap = std::make_unique<Bitmap>();
+  if (!bitmap->allocPixels(resolution, 1)) {
+    return nullptr;
+  }
+  bitmap->eraseAll();
+  auto* pixels = reinterpret_cast<uint8_t*>(bitmap->lockPixels());
+  int prevIndex = 0;
+  for (int i = 1; i < count; ++i) {
+    int nextIndex =
+        std::min(static_cast<int>(positions[i] * static_cast<float>(resolution)), resolution - 1);
+
+    if (nextIndex > prevIndex) {
+      auto r0 = colors[i - 1].r;
+      auto g0 = colors[i - 1].g;
+      auto b0 = colors[i - 1].b;
+      auto a0 = colors[i - 1].a;
+      auto r1 = colors[i].r;
+      auto g1 = colors[i].g;
+      auto b1 = colors[i].b;
+      auto a1 = colors[i].a;
+
+      auto step = 1.0f / static_cast<float>(nextIndex - prevIndex);
+      auto deltaR = (r1 - r0) * step;
+      auto deltaG = (g1 - g0) * step;
+      auto deltaB = (b1 - b0) * step;
+      auto deltaA = (a1 - a0) * step;
+
+      for (int curIndex = prevIndex; curIndex <= nextIndex; ++curIndex) {
+        pixels[curIndex * 4] = static_cast<uint8_t>(r0 * 255.0f);
+        pixels[curIndex * 4 + 1] = static_cast<uint8_t>(g0 * 255.0f);
+        pixels[curIndex * 4 + 2] = static_cast<uint8_t>(b0 * 255.0f);
+        pixels[curIndex * 4 + 3] = static_cast<uint8_t>(a0 * 255.0f);
+        r0 += deltaR;
+        g0 += deltaG;
+        b0 += deltaB;
+        a0 += deltaA;
+      }
+    }
+    prevIndex = nextIndex;
+  }
+  bitmap->unlockPixels();
+  return bitmap;
+}
+
+const Texture* GradientCache::getGradient(const Color4f* colors, const float* positions,
+                                          int count) {
+  BytesKey bytesKey = {};
+  for (int i = 0; i < count; ++i) {
+    bytesKey.write(colors[i].r);
+    bytesKey.write(colors[i].g);
+    bytesKey.write(colors[i].b);
+    bytesKey.write(colors[i].a);
+    bytesKey.write(positions[i]);
+  }
+
+  const auto* texture = find(bytesKey);
+  if (texture) {
+    return texture;
+  }
+  auto bitmap = CreateGradient(colors, positions, count, kGradientTextureSize);
+  if (bitmap == nullptr) {
+    return nullptr;
+  }
+  auto tex = bitmap->makeTexture(context);
+  add(bytesKey, tex);
+  return tex.get();
+}
+
+void GradientCache::releaseAll() {
+  textures.clear();
+  keys.clear();
+}
+
+bool GradientCache::empty() const {
+  return textures.empty() && keys.empty();
+}
+}  // namespace pag

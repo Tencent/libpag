@@ -1,0 +1,3 @@
+#!/usr/bin/env node
+// run 'node build_vendor -h" to print help message
+require("./vendor_tools/build");

@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "lib": ["ES5", "ES6", "DOM", "DOM.Iterable"],
+    "target": "ES2017",
+    "allowJs": true,
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "moduleResolution": "Node"
+  },
+  "files": ["src/pag.ts", "demo/index.ts"],
+  "typedocOptions": {
+    "out": "./api-docs",
+    "exclude": "**/**.js",
+    "darkHighlightTheme": "dark-plus",
+    "readme": "none",
+    "sort": "visibility"
+  }
+}

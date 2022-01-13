@@ -1,0 +1,115 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making libpag available.
+//
+//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#include "TrackMatteRenderer.h"
+#include "rendering/caches/LayerCache.h"
+#include "rendering/caches/RenderCache.h"
+#include "rendering/caches/TextContent.h"
+#include "rendering/renderers/LayerRenderer.h"
+
+namespace pag {
+static std::shared_ptr<Graphic> RenderColorGlyphs(TextLayer* layer, Frame layerFrame,
+                                                  TextContent* textContent = nullptr,
+                                                  Transform* extraTransform = nullptr) {
+  if (extraTransform && !extraTransform->visible()) {
+    return nullptr;
+  }
+  auto layerCache = LayerCache::Get(layer);
+  auto contentFrame = layerFrame - layer->startTime;
+  auto content =
+      textContent ? textContent : static_cast<TextContent*>(layerCache->getContent(contentFrame));
+  if (content->colorGlyphs == nullptr) {
+    return nullptr;
+  }
+  auto layerTransform = layerCache->getTransform(contentFrame);
+  Recorder recorder = {};
+  recorder.saveLayer(layerTransform->opacity, layer->blendMode);
+  if (extraTransform) {
+    recorder.concat(extraTransform->matrix);
+  }
+  recorder.concat(layerTransform->matrix);
+  auto masks = layerCache->getMasks(contentFrame);
+  if (masks) {
+    recorder.saveClip(*masks);
+  }
+  recorder.drawGraphic(content->colorGlyphs);
+  if (masks) {
+    recorder.restore();
+  }
+  recorder.restore();
+  return recorder.makeGraphic();
+}
+
+std::unique_ptr<TrackMatte> TrackMatteRenderer::Make(PAGLayer* trackMatteOwner) {
+  if (trackMatteOwner == nullptr || trackMatteOwner->_trackMatteLayer == nullptr) {
+    return nullptr;
+  }
+  auto trackMatteLayer = trackMatteOwner->_trackMatteLayer.get();
+  auto trackMatteType = trackMatteOwner->layer->trackMatteType;
+  std::shared_ptr<Graphic> content = nullptr;
+  auto layerFrame = trackMatteLayer->contentFrame + trackMatteLayer->layer->startTime;
+  std::shared_ptr<FilterModifier> filterModifier = nullptr;
+  if (!trackMatteLayer->cacheFilters()) {
+    filterModifier = FilterModifier::Make(trackMatteLayer);
+  }
+  Recorder recorder = {};
+  Transform extraTransform = {trackMatteLayer->layerMatrix, trackMatteLayer->layerOpacity};
+  LayerRenderer::DrawLayer(&recorder, trackMatteLayer->layer, layerFrame, filterModifier, nullptr,
+                           trackMatteLayer, &extraTransform);
+  content = recorder.makeGraphic();
+
+  auto inverted = (trackMatteType == TrackMatteType::AlphaInverted ||
+                   trackMatteType == TrackMatteType::LumaInverted);
+  auto trackMatte = std::unique_ptr<TrackMatte>(new TrackMatte());
+  trackMatte->modifier = Modifier::MakeMask(content, inverted);
+  if (trackMatte->modifier == nullptr) {
+    return nullptr;
+  }
+  if (trackMatteLayer->layerType() == LayerType::Text) {
+    auto textContent = static_cast<TextContent*>(trackMatteLayer->getContent());
+    trackMatte->colorGlyphs = RenderColorGlyphs(static_cast<TextLayer*>(trackMatteLayer->layer),
+                                                layerFrame, textContent, &extraTransform);
+  }
+  return trackMatte;
+}
+
+std::unique_ptr<TrackMatte> TrackMatteRenderer::Make(Layer* trackMatteOwner, Frame layerFrame) {
+  if (trackMatteOwner == nullptr || trackMatteOwner->trackMatteLayer == nullptr) {
+    return nullptr;
+  }
+  auto trackMatteLayer = trackMatteOwner->trackMatteLayer;
+  auto trackMatteType = trackMatteOwner->trackMatteType;
+  std::shared_ptr<Graphic> content = nullptr;
+  auto filterModifier = FilterModifier::Make(trackMatteLayer, layerFrame);
+  Recorder recorder = {};
+  LayerRenderer::DrawLayer(&recorder, trackMatteLayer, layerFrame, filterModifier, nullptr);
+  content = recorder.makeGraphic();
+  auto inverted = (trackMatteType == TrackMatteType::AlphaInverted ||
+                   trackMatteType == TrackMatteType::LumaInverted);
+  auto trackMatte = std::unique_ptr<TrackMatte>(new TrackMatte());
+  trackMatte->modifier = Modifier::MakeMask(content, inverted);
+  if (trackMatte->modifier == nullptr) {
+    return nullptr;
+  }
+  if (trackMatteLayer->type() == LayerType::Text) {
+    trackMatte->colorGlyphs =
+        RenderColorGlyphs(static_cast<TextLayer*>(trackMatteLayer), layerFrame);
+  }
+  return trackMatte;
+}
+}  // namespace pag

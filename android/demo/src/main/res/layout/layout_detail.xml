@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:tools="http://schemas.android.com/tools"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        tools:context=".APIsDetailActivity">
+    <RelativeLayout
+            android:id="@+id/background_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+        <io.pag.demo.BackgroundView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+        <Button
+                android:id="@+id/export"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentBottom="true"
+                android:layout_centerHorizontal="true"
+                android:text="@string/export_video"
+                android:onClick="export" />
+
+    </RelativeLayout>
+</android.support.constraint.ConstraintLayout>

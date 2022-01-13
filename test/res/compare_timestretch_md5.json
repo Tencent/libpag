@@ -1,0 +1,38 @@
+{
+    "repeat.pag_shorten": [
+        "c94617dd0e9b183f01ea7df1e1d0c46c",
+        "01b9758cd1132d57035fd09a3ec94865",
+        "074a2de78aa864fbeb0670aff68698f3",
+        "0ed53306f47e97832f87284b9125bd24"
+    ],
+    "repeat.pag_stretch": [
+        "c94617dd0e9b183f01ea7df1e1d0c46c",
+        "4d0de2619adb52ddf1e02a3b341c72b9",
+        "c94617dd0e9b183f01ea7df1e1d0c46c",
+        "e2213befa49d40f50ac23c0330c657d4"
+    ],
+    "repeatInverted.pag_shorten": [
+        "c94617dd0e9b183f01ea7df1e1d0c46c",
+        "01b9758cd1132d57035fd09a3ec94865",
+        "074a2de78aa864fbeb0670aff68698f3",
+        "0ed53306f47e97832f87284b9125bd24"
+    ],
+    "repeatInverted.pag_stretch": [
+        "c94617dd0e9b183f01ea7df1e1d0c46c",
+        "4d0de2619adb52ddf1e02a3b341c72b9",
+        "e2213befa49d40f50ac23c0330c657d4",
+        "c94617dd0e9b183f01ea7df1e1d0c46c"
+    ],
+    "scale.pag_shorten": [
+        "c94617dd0e9b183f01ea7df1e1d0c46c",
+        "01b9758cd1132d57035fd09a3ec94865",
+        "2eeb2aad82121daa6da8d403a47f796a",
+        "e2213befa49d40f50ac23c0330c657d4"
+    ],
+    "scale.pag_stretch": [
+        "c94617dd0e9b183f01ea7df1e1d0c46c",
+        "4d0de2619adb52ddf1e02a3b341c72b9",
+        "cc0211b20ddc6575096806f1d0491a5f",
+        "e2213befa49d40f50ac23c0330c657d4"
+    ]
+}

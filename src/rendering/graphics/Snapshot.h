@@ -1,0 +1,77 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making libpag available.
+//
+//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#pragma once
+
+#include "gpu/Texture.h"
+
+namespace pag {
+class RenderCache;
+
+/**
+ * A Snapshot contains a image cache for specified Graphic, suitable for immediate drawing on the
+ * GPU.
+ */
+class Snapshot {
+ public:
+  /**
+   * Creates a new Snapshot with specified texture and matrix.
+   */
+  explicit Snapshot(std::shared_ptr<Texture> texture, const Matrix& matrix)
+      : texture(std::move(texture)), matrix(matrix) {
+  }
+
+  /**
+   * Returns the scaling factor of this snapshot to the original graphic content.
+   */
+  float scaleFactor() const {
+    return 1 / matrix.getScaleX();
+  }
+
+  Matrix getMatrix() const {
+    return matrix;
+  }
+
+  Texture* getTexture() const {
+    return texture.get();
+  }
+
+  /**
+   * Returns memory usage information for this Snapshot.
+   */
+  size_t memoryUsage() const {
+    return texture->memoryUsage();
+  }
+
+  /**
+   * Evaluates the Snapshot to see if it overlaps or intersects with the specified point. The point
+   * is in the coordinate space of the Snapshot. This method always checks against the actual pixels
+   * of the Snapshot.
+   */
+  bool hitTest(RenderCache* cache, float x, float y) const;
+
+ private:
+  std::shared_ptr<Texture> texture = nullptr;
+  Matrix matrix = Matrix::I();
+  ID assetID = 0;
+  uint64_t makerKey = 0;
+  Frame idleFrames = 0;
+
+  friend class RenderCache;
+};
+}  // namespace pag

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <link rel="stylesheet" href="./index.css" />
+  </head>
+  <body>
+    <div id="waiting">libpag加载中...</div>
+    <div id="container" class="container" style="display: none">
+      <div>
+        <canvas class="canvas" id="pag" width="640" height="640"></canvas>
+        <div class="tablecloth"></div>
+      </div>
+      <div class="ml-24">
+        <div class="mt-24">
+          <button id="btn-upload-font">加载自定义字体</button>
+          <button id="btn-test-font">加载测试字体</button>
+          <p style="display: inline" id="upload-font-text">注册字体文件(含有字体的PAG暂时需要先加载字体)</p>
+          <input id="upload-font" type="file" style="display: none" accept=".otf,.ttf,.ttc,.cid,.cff,.fon,.fnt,.pcf" />
+        </div>
+        <div class="mt-24">
+          <button id="btn-upload-pag">加载PAG文件</button>
+          <button id="btn-test-vector-pag">测试矢量文件</button>
+          <button id="btn-test-video-pag">测试视频文件</button>
+          <button id="btn-test-text-pag">测试文字文件</button>
+          <input id="upload-pag" type="file" style="display: none" accept=".pag" />
+        </div>
+        <section id="control" style="display: none">
+          <div class="mt-24">
+            设置次数
+            <input id="repeatCount" type="number" value="0" />
+            <button id="setRepeatCount">设置</button>
+          </div>
+          <div class="mt-24">
+            <button id="btn-maxFrameRate">获取最大帧率</button>
+            设置最大帧率
+            <input id="maxFrameRate" type="number" value="0" />
+            <button id="setMaxFrameRate">设置</button>
+          </div>
+          <div class="mt-24">
+            <button class="mt-24" id="btn-scaleMode">获取缩放模式</button>
+            缩放模式
+            <select id="scaleMode">
+              <option value="0">None</option>
+              <option value="1">Stretch</option>
+              <option value="2" selected>LetterBox</option>
+              <option value="3">Zoom</option>
+            </select>
+            <button id="setScaleMode" class="mt-24">设置</button>
+          </div>
+          <button class="mt-24" id="btn-play">播放</button>
+          <button class="mt-24" id="btn-pause">暂停</button>
+          <button class="mt-24" id="btn-stop">停止</button>
+          <button class="mt-24" id="btn-destroy">销毁</button>
+          <div class="mt-24">
+            <button id="btn-getProgress">获取进度</button>
+            设置进度
+            <input id="progress" type="number" value="0" />
+            <button id="setProgress">跳转</button>
+          </div>
+          <button class="mt-24" id="btn-videoEnabled">VideoEnabled status</button>
+          <button class="mt-24" id="btn-setVideoEnabled">Set videoEnabled</button>
+          <button class="mt-24" id="btn-cacheEnabled">CacheEnabled status</button>
+          <button class="mt-24" id="btn-setCacheEnabled">Set cacheEnabled</button>
+          <button class="mt-24" id="btn-freeCache">FreeCache</button>
+          <div class="mt-24">
+            <button id="btn-cacheScale">CacheScale status</button>
+            CacheScale
+            <input id="cacheScale" type="number" value="1" />
+            <button id="btn-setCacheScale">Set cacheScale</button>
+          </div>
+        </section>
+      </div>
+    </div>
+    <script src="./index.js"></script>
+  </body>
+</html>

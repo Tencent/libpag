@@ -1,0 +1,97 @@
+apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
+apply plugin: 'kotlin-android-extensions'
+android {
+    compileSdkVersion 29
+    buildToolsVersion '29.0.3'
+
+    defaultConfig {
+        applicationId "org.libpag.pagviewer"
+        minSdkVersion 18
+        targetSdkVersion 27
+        versionCode 1
+        versionName "1.0"
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+        ndk {
+            abiFilters "armeabi-v7a", "arm64-v8a"
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    lintOptions {
+        abortOnError false
+    }
+
+    sourceSets {
+        main.assets.srcDirs = ['../../assets']
+        androidTest.assets.srcDirs = ['../../resources/md5']
+    }
+
+}
+
+project.afterEvaluate {
+    // 如果使用自动拷贝功能，需要保证NDK是16，否则会生成没有经过strip的包
+    transformNativeLibsWithMergeJniLibsForRelease.doLast {
+        delete {
+            delete 'build/intermediates/transforms/mergeJniLibs/release/0/lib/armeabi'
+        }
+        copy {
+            from 'build/intermediates/transforms/mergeJniLibs/release/0/lib/armeabi-v7a'
+            into 'build/intermediates/transforms/mergeJniLibs/release/0/lib/armeabi'
+            include '*.so'
+        }
+    }
+    transformNativeLibsWithStripDebugSymbolForRelease.doLast {
+        delete {
+            delete 'build/intermediates/transforms/stripDebugSymbol/release/0/lib/armeabi'
+        }
+        copy {
+            from 'build/intermediates/transforms/stripDebugSymbol/release/0/lib/armeabi-v7a'
+            into 'build/intermediates/transforms/stripDebugSymbol/release/0/lib/armeabi'
+            include '*.so'
+        }
+    }
+    // 新的Skia导致使用NDK16也无法编译armeabi版本
+    // 此处为了方便debug，保留debug版本armeabi的拷贝，方便源码接入时候的调试
+    transformNativeLibsWithMergeJniLibsForDebug.doLast {
+        delete {
+            delete 'build/intermediates/transforms/mergeJniLibs/debug/0/lib/armeabi'
+        }
+        copy {
+            from 'build/intermediates/transforms/mergeJniLibs/debug/0/lib/armeabi-v7a'
+            into 'build/intermediates/transforms/mergeJniLibs/debug/0/lib/armeabi'
+            include '*.so'
+        }
+    }
+    transformNativeLibsWithStripDebugSymbolForDebug.doLast {
+        delete {
+            delete 'build/intermediates/transforms/stripDebugSymbol/debug/0/lib/armeabi'
+        }
+        copy {
+            from 'build/intermediates/transforms/stripDebugSymbol/debug/0/lib/armeabi-v7a'
+            into 'build/intermediates/transforms/stripDebugSymbol/debug/0/lib/armeabi'
+            include '*.so'
+        }
+    }
+}
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation "com.android.support:appcompat-v7:${supportLibVersion}"
+    debugImplementation project(':libpag')
+    releaseImplementation project(':libpag')
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+}
+
+configurations.all {
+    resolutionStrategy.eachDependency { details ->
+        if (details.requested.group == 'com.android.support'
+                && !details.requested.name.contains('multidex') ) {
+            details.useVersion '27.1.1'
+        }
+    }
+}
