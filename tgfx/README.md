@@ -10,10 +10,10 @@ TGFX is under active development and the APIs are subject to change.
 ### Platform support via backing renderers
 
 |   Raster Backend   |  GPU Backend   |      Target Platforms        |    Status     |
-|:------------------:|:--------------:|:----------------------------:|:----------- -:|
-|   FreeType         |  OpenGL        |  All                         |  complete     |
-|   CoreGraphics     |  OpenGL        |  iOS, macOS                  |  complete     |
-|   Canvas2D         |  WebGL         |  Web                         |  in progress  |
-|   CoreGraphics     |  Metal         |  iOS, macOS                  |  in progress  |
-|   FreeType         |  Vulkan        |  Android, Linux              |  planned      |
+|:------------------:|:--------------:|:----------------------------:|:-------------:|
+|      FreeType      |  OpenGL        |  All                         |   complete    |
+|    CoreGraphics    |  OpenGL        |  iOS, macOS                  |   complete    |
+|      Canvas2D      |  WebGL         |  Web                         |  in progress  |
+|    CoreGraphics    |  Metal         |  iOS, macOS                  |  in progress  |
+|      FreeType      |  Vulkan        |  Android, Linux              |    planned    |
 
