@@ -18,8 +18,8 @@ PAG 方案目前已经接入了腾讯系 40 余款应用，包括微信，手机
 
 详细介绍可以参考相关报道：
  
- - [腾讯推出移动端动画组件PAG，释放设计生产力](https://mp.weixin.qq.com/s/STxOMV2lqGdGu-9mBkAz_A)
  - [王者QQ微信都在用的动画神器要开源了：把交付时间缩短90%](https://mp.weixin.qq.com/s/a8-yOp8h5LiFGKSdLE_toA)
+ - [腾讯推出移动端动画组件PAG，释放设计生产力](https://mp.weixin.qq.com/s/STxOMV2lqGdGu-9mBkAz_A)
 
 ## PAG 优势
 
