@@ -61,7 +61,7 @@ PAG 方案目前已经接入了腾讯系 40 余款应用，包括微信，手机
 
 由于大部分平台没有统一的上层业务框架，目前我们暂时只为 iOS 和 Android 定期发布预编译的二进制库，其他平台的库需要通过源 码根据自己的实际需求调整参数进行编译。移动端最新的 release
 库可以在 [这里](https://github.com/tencent/libpag/releases) 下载。 详细的 SDK
-接入文档可以参考 [SDK 接入](https://pag.io/docs/tech/sdk.html) 。Web 平台的接入文档可以参考 [Web SDK
+接入文档可以参考 [SDK 接入](https://pag.io/docs/sdk.html) 。Web 平台的接入文档可以参考 [Web SDK
 接入](./web/README.md)
 
 API 手册：
