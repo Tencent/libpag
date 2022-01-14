@@ -81,6 +81,9 @@
                                  CVPixelBufferGetHeight(cvPixelBuffer));
         
         outputPixelBuffer = [self createPixelBufferWithSize:outSize];
+        if (inputPixelBuffer) {
+            CVPixelBufferRelease(inputPixelBuffer);
+        }
     }
     [self.context render:outputImage toCVPixelBuffer:outputPixelBuffer];
     return outputPixelBuffer;
