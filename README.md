@@ -139,8 +139,15 @@ We recommend using CLion IDE on macOS platform for development.
 
 ### Branch Management
 
-- The `main` branch is our active developing branch. After full testing, we will periodically pull the pre-release branch based on the main branch.
-- The `release` branch is our stable release branch, which is fully tested and already used in many apps.
+- The `main` branch is our active developing branch. After full testing, we will periodically pull
+  the pre-release branch based on the main branch.
+- The `release` branch is our stable release branch, which is fully tested and already used in many
+  apps.
+
+**Note: This repository only contains the code of PAG 4.0, which is still under active development.
+So there is no `release` branch yet at this moment. We are working hard to make a stable release of
+PAG 4.0 available as soon as possible. For using PAG 3.0 versions, you can download the precompiled
+libraries from [here](https://github.com/Tencent/libpag/releases).**
 
 ### Dependency Management
 
@@ -153,6 +160,7 @@ Just simply run the script in the root of libpag project:
 ```
 ./sync_deps.sh
 ```
+
 This script will automatically install necessary tools and synchronize all third-party repositories.
 
 **For other platforms：**
@@ -171,14 +179,14 @@ depsync
 ```
 
 Git account and password may be required during synchronizing. Please make sure you have enabled the
-`git-credential-store` so that `CMakeList.txt` can trigger synchronizing automatically next
-time.
+`git-credential-store` so that `CMakeList.txt` can trigger synchronizing automatically next time.
 
 ### Build
 
 After the synchronization, open the project with CLion, then you are good to go!
 
-**Note: If anything goes wrong during cmake building, please update the cmake tool to the latest version and try again.**
+**Note: If anything goes wrong during cmake building, please update the cmake tool to the latest
+version and try again.**
 
 ## License
 
@@ -186,8 +194,9 @@ libpag is licensed under the [Apache Version 2.0 License](./LICENSE.txt)
 
 ## Contribution
 
-If you have any ideas or suggestions to improve libpag, welcome to submit an [issue](https://github.com/Tencent/libpag/issues/new/choose) / [pull request](https://github.com/Tencent/libpag/pulls).
-Before making a pull request or issue, please make sure to
-read [Contributing Guide](./CONTRIBUTING.md).
+If you have any ideas or suggestions to improve libpag, welcome to submit
+an [issue](https://github.com/Tencent/libpag/issues/new/choose)
+/ [pull request](https://github.com/Tencent/libpag/pulls). Before making a pull request or issue,
+please make sure to read [Contributing Guide](./CONTRIBUTING.md).
 
 
