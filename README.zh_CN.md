@@ -1,4 +1,4 @@
-<img src="resources/readme/logo.png" alt="PAG Logo" width="474" height="148"/>
+<img src="resources/readme/logo.png" alt="PAG Logo" width="474"/>
 
 [![license](https://img.shields.io/badge/license-Apache%202-blue)](https://github.com/tencent/libpag/blob/master/LICENSE.txt) [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/tencent/libpag/pulls) [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/tencent/libpag)](https://github.com/tencent/libpag/releases)
 
@@ -25,25 +25,25 @@ PAG 方案目前已经接入了腾讯系 40 余款应用，包括微信，手机
 
 - **高效的文件格式**
 
-<img src="resources/readme/intro_1.png" alt="intro_1" width="282" height="188"/>
+<img src="resources/readme/intro_1.png" alt="intro_1" width="282"/>
 
 导出相同的 AE 动画内容，在文件解码速度和压缩率上均大幅领先于同类型方案。采用可扩展的二进制文件格式，可集成包含图片等任意设计资源的单文件。
 
 - **全 AE 特性支持**
 
-<img src="resources/readme/intro_2.png" alt="intro_2" width="281" height="189"/>
+<img src="resources/readme/intro_2.png" alt="intro_2" width="281"/>
 
 在纯矢量导出方式上支持更多 AE 特性的同时，还引入了BMP预合成结合矢量的混合导出能力，实现支持所有 AE 特性的同时又能保持动画运行时的可编辑性。
 
 - **性能监测可视化**
 
-<img src="resources/readme/intro_4.png" alt="intro_4" width="282" height="186"/>
+<img src="resources/readme/intro_4.png" alt="intro_4" width="282"/>
 
 通过导出插件内置的自动优化策略，以及预览工具集成的性能监测面板，能够直观地看到每个素材的性能状态，以帮助设计师制作效果和性能俱佳的动画特效。
 
 - **运行时可编辑**
 
-<img src="resources/readme/intro_5.png" alt="intro_5" width="282" height="188"/>
+<img src="resources/readme/intro_5.png" alt="intro_5" width="282"/>
 
 运行时，可在保留动画效果前提下，动态修改替换文本或替换占位图内容，甚至对任意子图层进行增删改及移动，轻松实现照片和视频模板等素材的批量化生产。
 
