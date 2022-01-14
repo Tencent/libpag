@@ -1,4 +1,4 @@
-**这个仓库目前仅用于问题反馈与版本发布**
+**PAG 已正式开源，请切换到 main 分支浏览，此分支仅作为历史记录存放 PAG 3.0 版本的预编译库。**
 
 # PAG
 ## 项目介绍
@@ -12,4 +12,4 @@ PAG (Portable Animation Graphics) 是一套完整的动画工作流。它提供�
 [API介绍](https://pag.io/api)
 
 ## 问题 & 反馈
-欢迎提 [issues](https://github.com/libpag/libpag/issues/new?assignees=&labels=&template=bug_report.md&title=) 提问反馈。
+欢迎提 [issues](https://github.com/Tencent/libpag/issues/new?assignees=&labels=&template=bug_report.md&title=) 提问反馈。
