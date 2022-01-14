@@ -1,6 +1,10 @@
 # libpag Web
 
-> **当前版本为 Alpha 版本，更多特性持续开发中**
+> **当前版本为 Alpha 版本，部分功能不够稳定**
+> 
+> **有问题可到[Issues](https://github.com/Tencent/libpag/issues)，会尽快修复**
+>
+> **更多特性持续开发中**
 
 ## 特性
 
@@ -70,13 +74,15 @@ await pagView.play();
 
 npm package 中提供了多种构建产物，可以阅读 [这里](./doc/develop-install.md) 了解不同目录下产物的差别。
 
-更多的API接口可以阅读 [API文档](./doc/api.md)。
+更多的API接口可以阅读 [API文档](https://pag.io/api.html#/apis/web/)。
 
 ## 浏览器兼容性
 
 | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/chrome/chrome_48x48.png" alt="Chrome" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Chrome | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/safari/safari_48x48.png" alt="Safari" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Safari |
 | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | Chrome >= 87                                                 | Safari >= 11.1                                               |
+
+Chrome 69+ 与 Firefox 等更多版本的兼容工作正在进行中
 
 ## 前置工作
 
