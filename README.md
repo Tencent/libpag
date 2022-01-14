@@ -130,6 +130,7 @@ Finally, run gradle sync and then build the project.
 
 - [iOS API Reference](https://pag.io/api.html#/apis/ios/)
 - [Android API Reference](https://pag.io/api.html#/apis/android/org/libpag/package-summary.html)
+- [Web API Reference](https://pag.io/api.html#/apis/web/)
 
 You can find other docs on [pag.io](https://pag.io/docs/sdk.html)
 
