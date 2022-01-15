@@ -54,6 +54,9 @@ void PAGTestEnvironment::SetUp() {
 }
 
 void PAGTestEnvironment::TearDown() {
+  if (DumpJson == nullptr) {
+    return;
+  }
   std::ofstream outFile(DUMP_JSON_PATH);
   outFile << std::setw(4) << DumpJson << std::endl;
   outFile.close();

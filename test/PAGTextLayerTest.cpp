@@ -389,8 +389,8 @@ PAG_TEST_F(PAGTextLayerTest, TextAnimatorsMode_ID863204817) {
   float minAscent = 0.0f;
   float maxDescent = 0.0f;
   pag::CalculateTextAscentAndDescent(text->getTextDocument(), &minAscent, &maxDescent);
-  EXPECT_LE(fabs(minAscent - (-50.88f)), 0.01f);
-  EXPECT_LE(fabs(maxDescent - 16.32), 0.01f);
+  EXPECT_LE(fabs(minAscent - (-55.68f)), 0.01f);
+  EXPECT_LE(fabs(maxDescent - 13.824f), 0.01f);
 }
 
 /**
@@ -456,8 +456,8 @@ PAG_TEST_F(PAGTextLayerTest, TextBounds) {
   pagPlayer->flush();
   auto bounds = pagPlayer->getBounds(textLayer);
 
-  auto defaultBounds = Rect::MakeXYWH(358.000000, 1469.000000, 375.000000, 335.000000);
-  EXPECT_EQ(bounds == defaultBounds, true);
+  auto defaultBounds = Rect::MakeXYWH(361, 1465, 371, 329);
+  EXPECT_TRUE(bounds == defaultBounds);
 
   textLayer->setText(
       "测试文本\n"
@@ -465,8 +465,8 @@ PAG_TEST_F(PAGTextLayerTest, TextBounds) {
       "  ");
   pagPlayer->flush();
   bounds = pagPlayer->getBounds(textLayer);
-  defaultBounds = Rect::MakeXYWH(358.000000, 1469.000000, 375.000000, 311.000000);
-  EXPECT_EQ(bounds == defaultBounds, true);
+  defaultBounds = Rect::MakeXYWH(361, 1465, 371, 310);
+  EXPECT_TRUE(bounds == defaultBounds);
 
   textLayer->setText(
       "测试文本\n"
@@ -474,13 +474,13 @@ PAG_TEST_F(PAGTextLayerTest, TextBounds) {
       "T\n");
   pagPlayer->flush();
   bounds = pagPlayer->getBounds(textLayer);
-  EXPECT_EQ(bounds == defaultBounds, true);
+  EXPECT_TRUE(bounds == defaultBounds);
 
   textLayer->setText("   ");
   pagPlayer->flush();
   bounds = pagPlayer->getBounds(textLayer);
-  defaultBounds = Rect::MakeXYWH(456.000000, 1558.000000, 172.000000, 139.000000);
-  EXPECT_EQ(bounds == defaultBounds, true);
+  defaultBounds = Rect::MakeXYWH(475, 1556, 134, 141);
+  EXPECT_TRUE(bounds == defaultBounds);
 
   delete pagPlayer;
 }
