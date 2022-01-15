@@ -455,7 +455,7 @@ PAG_TEST_F(PAGTextLayerTest, TextBounds) {
   pagPlayer->setProgress(0.5);
   pagPlayer->flush();
   auto bounds = pagPlayer->getBounds(textLayer);
-
+  bounds.round();
   auto defaultBounds = Rect::MakeXYWH(361, 1465, 371, 329);
   EXPECT_TRUE(bounds == defaultBounds);
 
@@ -465,6 +465,7 @@ PAG_TEST_F(PAGTextLayerTest, TextBounds) {
       "  ");
   pagPlayer->flush();
   bounds = pagPlayer->getBounds(textLayer);
+  bounds.round();
   defaultBounds = Rect::MakeXYWH(361, 1465, 371, 310);
   EXPECT_TRUE(bounds == defaultBounds);
 
@@ -474,11 +475,13 @@ PAG_TEST_F(PAGTextLayerTest, TextBounds) {
       "T\n");
   pagPlayer->flush();
   bounds = pagPlayer->getBounds(textLayer);
+  bounds.round();
   EXPECT_TRUE(bounds == defaultBounds);
 
   textLayer->setText("   ");
   pagPlayer->flush();
   bounds = pagPlayer->getBounds(textLayer);
+  bounds.round();
   defaultBounds = Rect::MakeXYWH(475, 1556, 134, 141);
   EXPECT_TRUE(bounds == defaultBounds);
 
@@ -493,11 +496,12 @@ PAG_TEST_F(PAGTextLayerTest, TrackMatteTextBounds) {
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0.5f);
   TestPAGPlayer->flush();
-  auto defaultBounds = Rect::MakeXYWH(219.199127, 487.624176, 442.799957, 112.499969);
+  auto defaultBounds = Rect::MakeXYWH(219, 484, 445, 112);
   for (int i = 0; i < pagFile->numTexts(); i++) {
     auto textLayers = pagFile->getLayersByEditableIndex(i, LayerType::Text);
     for (const auto& textLayer : textLayers) {
       auto bounds = TestPAGPlayer->getBounds(textLayer);
+      bounds.round();
       EXPECT_EQ(bounds == defaultBounds, true);
     }
   }

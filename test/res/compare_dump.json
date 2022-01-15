@@ -123,6 +123,11 @@
             "setCompositionMd5": "327aa874c4f4100b5e8483b2d2aa6820"
         }
     },
+    "PAGRasterizerTest": {
+        "rasterizer_glyph": "35cd4063c68ba746eaf7bfb2495d79b3",
+        "rasterizer_path": "3abb24340c1c44bff3b7f0ccab137ca7",
+        "rasterizer_path_texture": "70cd81569616fff24af2a1f9560662f5"
+    },
     "PAGSequenceTest": {
         "BitmapSequenceReader_ID82681127": "b05a43d94cbff35a60ee587fa47db33c",
         "RenderOnScreen_ID80475733": "a672c2fab3792f83374e609f2ee197ea",
