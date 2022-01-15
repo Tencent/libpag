@@ -151,10 +151,8 @@ PAG_TEST_F(PAGLayerTest, trackMatte) {
   PAGTestEnvironment::DumpJson["PAGLayerTest"]["layer"]["trackMatte"] = tmMd5;
 #ifdef COMPARE_JSON_PATH
   auto cTrackMatte = PAGTestEnvironment::CompareJson["PAGLayerTest"]["layer"]["trackMatte"];
-  if (cTrackMatte != nullptr) {
-    TraceIf(TestPAGSurface, "../test/out/trackMatte.png", cTrackMatte.get<std::string>() != tmMd5);
-    EXPECT_EQ(cTrackMatte.get<std::string>(), tmMd5);
-  }
+  TraceIf(TestPAGSurface, "../test/out/trackMatte.png", cTrackMatte.get<std::string>() != tmMd5);
+  EXPECT_EQ(cTrackMatte.get<std::string>(), tmMd5);
 #endif
 }
 
@@ -173,11 +171,9 @@ PAG_TEST_F(PAGLayerTest, visible) {
   PAGTestEnvironment::DumpJson["PAGLayerTest"]["layer"]["visible"] = visibleMd5;
 #ifdef COMPARE_JSON_PATH
   auto cTrackMatte = PAGTestEnvironment::CompareJson["PAGLayerTest"]["layer"]["visible"];
-  if (cTrackMatte != nullptr) {
-    TraceIf(TestPAGSurface, "../test/out/pag_layer_visible.png",
-            cTrackMatte.get<std::string>() != visibleMd5);
-    EXPECT_EQ(cTrackMatte.get<std::string>(), visibleMd5);
-  }
+  TraceIf(TestPAGSurface, "../test/out/pag_layer_visible.png",
+          cTrackMatte.get<std::string>() != visibleMd5);
+  EXPECT_EQ(cTrackMatte.get<std::string>(), visibleMd5);
 #endif
 }
 
@@ -205,9 +201,7 @@ PAG_TEST_F(PAGLayerTest, matrix) {
   PAGTestEnvironment::DumpJson["PAGLayerTest"]["layer"]["matrix"] = matrixMd5;
 #ifdef COMPARE_JSON_PATH
   auto cTrackMatte = PAGTestEnvironment::CompareJson["PAGLayerTest"]["layer"]["matrix"];
-  if (cTrackMatte != nullptr) {
-    EXPECT_EQ(cTrackMatte.get<std::string>(), matrixMd5);
-  }
+  EXPECT_EQ(cTrackMatte.get<std::string>(), matrixMd5);
 #endif
 }
 
@@ -223,9 +217,7 @@ PAG_TEST_F(PAGLayerTest, nextFrame) {
   PAGTestEnvironment::DumpJson["PAGLayerTest"]["layer"]["nextFrame"] = nextFrameMd5;
 #ifdef COMPARE_JSON_PATH
   auto cTrackMatte = PAGTestEnvironment::CompareJson["PAGLayerTest"]["layer"]["nextFrame"];
-  if (cTrackMatte != nullptr) {
-    EXPECT_EQ(cTrackMatte.get<std::string>(), nextFrameMd5);
-  }
+  EXPECT_EQ(cTrackMatte.get<std::string>(), nextFrameMd5);
 #endif
 }
 
@@ -241,9 +233,7 @@ PAG_TEST_F(PAGLayerTest, preFrame) {
   PAGTestEnvironment::DumpJson["PAGLayerTest"]["layer"]["preFrame"] = preFrameMd5;
 #ifdef COMPARE_JSON_PATH
   auto cTrackMatte = PAGTestEnvironment::CompareJson["PAGLayerTest"]["layer"]["preFrame"];
-  if (cTrackMatte != nullptr) {
-    EXPECT_EQ(cTrackMatte.get<std::string>(), preFrameMd5);
-  }
+  EXPECT_EQ(cTrackMatte.get<std::string>(), preFrameMd5);
 #endif
 }
 
@@ -323,10 +313,8 @@ PAG_TEST_F(PAGLayerTest, AlphaMask_ID80514761) {
   PAGTestEnvironment::DumpJson["PAGLayerTest"]["layer"]["alphaMask"] = preFrameMd5;
 #ifdef COMPARE_JSON_PATH
   auto cTrackMatte = PAGTestEnvironment::CompareJson["PAGLayerTest"]["layer"]["alphaMask"];
-  if (cTrackMatte != nullptr) {
-    TraceIf(image, "../test/out/alphaMask.png", cTrackMatte.get<std::string>() != preFrameMd5);
-    EXPECT_EQ(cTrackMatte.get<std::string>(), preFrameMd5);
-  }
+  TraceIf(image, "../test/out/alphaMask.png", cTrackMatte.get<std::string>() != preFrameMd5);
+  EXPECT_EQ(cTrackMatte.get<std::string>(), preFrameMd5);
 #endif
 }
 
@@ -359,10 +347,8 @@ PAG_TEST_F(PAGLayerTest, TextScale_81527319) {
   PAGTestEnvironment::DumpJson["PAGLayerTest"]["layer"]["textScale"] = dumpMd5;
 #ifdef COMPARE_JSON_PATH
   auto textScaleMD5 = PAGTestEnvironment::CompareJson["PAGLayerTest"]["layer"]["textScale"];
-  if (textScaleMD5 != nullptr) {
-    TraceIf(skImage, "../test/out/textScale.png", textScaleMD5.get<std::string>() != dumpMd5);
-    EXPECT_EQ(textScaleMD5.get<std::string>(), dumpMd5);
-  }
+  TraceIf(skImage, "../test/out/textScale.png", textScaleMD5.get<std::string>() != dumpMd5);
+  EXPECT_EQ(textScaleMD5.get<std::string>(), dumpMd5);
 #endif
 }
 
@@ -386,10 +372,8 @@ PAG_TEST_F(PAGLayerTest, Opacity) {
   PAGTestEnvironment::DumpJson["PAGLayerTest"]["layer"]["opacity"] = dumpMd5;
 #ifdef COMPARE_JSON_PATH
   auto opacityMD5 = PAGTestEnvironment::CompareJson["PAGLayerTest"]["layer"]["opacity"];
-  if (opacityMD5 != nullptr) {
-    TraceIf(skImage, "../test/out/opacity.png", opacityMD5.get<std::string>() != dumpMd5);
-    EXPECT_EQ(opacityMD5.get<std::string>(), dumpMd5);
-  }
+  TraceIf(skImage, "../test/out/opacity.png", opacityMD5.get<std::string>() != dumpMd5);
+  EXPECT_EQ(opacityMD5.get<std::string>(), dumpMd5);
 #endif
 }
 }  // namespace pag

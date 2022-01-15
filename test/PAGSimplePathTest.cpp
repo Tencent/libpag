@@ -41,11 +41,8 @@ PAG_TEST_F(PAGSimplePathTest, TestRRect_ID86088211) {
   PAGTestEnvironment::DumpJson["PAGSimplePathTest"]["TestRRect_ID86088211"] = md5;
 #ifdef COMPARE_JSON_PATH
   auto compareMD5 = PAGTestEnvironment::CompareJson["PAGSimplePathTest"]["TestRRect_ID86088211"];
-  if (compareMD5 != nullptr) {
-    TraceIf(pagSurface, "../test/out/TestRRect_ID86088211.png",
-            compareMD5.get<std::string>() != md5);
-    EXPECT_EQ(compareMD5.get<std::string>(), md5);
-  }
+  TraceIf(pagSurface, "../test/out/TestRRect_ID86088211.png", compareMD5.get<std::string>() != md5);
+  EXPECT_EQ(compareMD5.get<std::string>(), md5);
 #endif
 }
 }  // namespace pag

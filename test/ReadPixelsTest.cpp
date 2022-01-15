@@ -30,15 +30,13 @@
 namespace pag {
 using nlohmann::json;
 
-#define CHECK_PIXELS(info, pixels, key)                                                 \
-  {                                                                                     \
-    PixelMap pm(info, pixels);                                                          \
-    auto md5 = DumpMD5(pm);                                                             \
-    outputJson[key] = md5;                                                              \
-    if (compareJson != nullptr && compareJson[key] != nullptr) {                        \
-      TraceIf(pm, "../test/out/" + std::string(key) + ".png", compareJson[key] != md5); \
-      EXPECT_EQ(compareJson[key].get<std::string>(), md5);                              \
-    }                                                                                   \
+#define CHECK_PIXELS(info, pixels, key)                                               \
+  {                                                                                   \
+    PixelMap pm(info, pixels);                                                        \
+    auto md5 = DumpMD5(pm);                                                           \
+    outputJson[key] = md5;                                                            \
+    TraceIf(pm, "../test/out/" + std::string(key) + ".png", compareJson[key] != md5); \
+    EXPECT_EQ(compareJson[key].get<std::string>(), md5);                              \
   }
 
 /**
