@@ -82,7 +82,7 @@ PAG_TEST(PAGRasterizerTest, TestRasterizer) {
     EXPECT_EQ(textureCompareMD5.get<std::string>(), textureMD5);
   }
 
-  auto typeface = Typeface::MakeFromPath("../test/res/font/Apple Color Emoji.ttc");
+  auto typeface = Typeface::MakeFromPath("../resources/font/NotoColorEmoji.ttf");
   ASSERT_TRUE(typeface != nullptr);
   ASSERT_TRUE(typeface->hasColor());
   auto glyphID = typeface->getGlyphID("👻");
@@ -94,8 +94,8 @@ PAG_TEST(PAGRasterizerTest, TestRasterizer) {
   font.setFauxBold(true);
   auto buffer = font.getGlyphImage(glyphID, &matrix);
   ASSERT_TRUE(buffer != nullptr);
-  EXPECT_EQ(matrix.getScaleX(), 1.875f);
-  EXPECT_EQ(matrix.getSkewX(), -0.375f);
+  EXPECT_TRUE(fabsf(matrix.getScaleX() - 2.75229359f) < FLT_EPSILON);
+  EXPECT_TRUE(fabsf(matrix.getSkewX() + 0.550458729f) < FLT_EPSILON);
   bitmap = Bitmap(std::static_pointer_cast<PixelBuffer>(buffer));
   auto glyphMD5 = DumpMD5(bitmap);
   rasterizerJson["rasterizer_glyph"] = glyphMD5;
