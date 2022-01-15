@@ -45,10 +45,7 @@ PAG_TEST(PAGFontTest, TestFont) {
     compareVector = compareJson[fileName].get<std::vector<std::string>>();
   }
 
-  PAGFont::RegisterFont("../resources/apitest/AdobeHeitiStd.ttc", 0);
-  PAGFont::RegisterFont("../resources/apitest/Kai.ttc", 0);
-  PAGFont::RegisterFont("../resources/apitest/TTTGBMedium.ttc", 0);
-
+  PAGFont::RegisterFont("../resources/font/NotoSerifSC-Regular.otf", 0, "TTTGBMedium", "Regular");
   auto TestPAGFile = PAGFile::Load("../resources/apitest/test_font.pag");
   ASSERT_NE(TestPAGFile, nullptr);
   auto pagSurface = PAGSurface::MakeOffscreen(TestPAGFile->width(), TestPAGFile->height());
