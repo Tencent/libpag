@@ -461,64 +461,46 @@ PAG_TEST_F(PAGFileContainerTest, getLayersByEditableIndex) {
   auto replaceTextMd5 = getMd5FromSnap();
 
   json out = {
-      {"swapLayerMd5",       swapLayerMd5},
-      {"setLayerIndexMd5",   setLayerIndexMd5},
-      {"removeLayerMd5",     removeLayerMd5},
-      {"removeLayerAtMd5",   removeLayerAtMd5},
+      {"swapLayerMd5", swapLayerMd5},
+      {"setLayerIndexMd5", setLayerIndexMd5},
+      {"removeLayerMd5", removeLayerMd5},
+      {"removeLayerAtMd5", removeLayerAtMd5},
       {"removeAllLayersMd5", removeAllLayersMd5},
-      {"addLayerMd5",        addLayerMd5},
-      {"addLayerAt",         addLayerAtMd5},
-      {"replaceImageMd5",    replaceImageMd5},
-      {"replaceTextMd5",     replaceTextMd5},
+      {"addLayerMd5", addLayerMd5},
+      {"addLayerAt", addLayerAtMd5},
+      {"replaceImageMd5", replaceImageMd5},
+      {"replaceTextMd5", replaceTextMd5},
   };
   PAGTestEnvironment::DumpJson["PAGFileTest"]["PAGFileContainerTest"] = out;
 
 #ifdef COMPARE_JSON_PATH
   auto cAddLayerAt =
       PAGTestEnvironment::CompareJson["PAGFileTest"]["PAGFileContainerTest"]["addLayerAt"];
-  if (cAddLayerAt != nullptr) {
-    EXPECT_EQ(cAddLayerAt.get<std::string>(), addLayerAtMd5);
-  }
+  EXPECT_EQ(cAddLayerAt.get<std::string>(), addLayerAtMd5);
   auto cAddLayerMd5 =
       PAGTestEnvironment::CompareJson["PAGFileTest"]["PAGFileContainerTest"]["addLayerMd5"];
-  if (cAddLayerMd5 != nullptr) {
-    EXPECT_EQ(cAddLayerMd5.get<std::string>(), addLayerMd5);
-  }
+  EXPECT_EQ(cAddLayerMd5.get<std::string>(), addLayerMd5);
   auto cRemoveAllLayersMd5 =
       PAGTestEnvironment::CompareJson["PAGFileTest"]["PAGFileContainerTest"]["removeAllLayersMd5"];
-  if (cRemoveAllLayersMd5 != nullptr) {
-    EXPECT_EQ(cRemoveAllLayersMd5.get<std::string>(), removeAllLayersMd5);
-  }
+  EXPECT_EQ(cRemoveAllLayersMd5.get<std::string>(), removeAllLayersMd5);
   auto cRemoveLayerAtMd5 =
       PAGTestEnvironment::CompareJson["PAGFileTest"]["PAGFileContainerTest"]["removeLayerAtMd5"];
-  if (cRemoveLayerAtMd5 != nullptr) {
-    EXPECT_EQ(cRemoveLayerAtMd5.get<std::string>(), removeLayerAtMd5);
-  }
+  EXPECT_EQ(cRemoveLayerAtMd5.get<std::string>(), removeLayerAtMd5);
   auto cRemoveLayerMd5 =
       PAGTestEnvironment::CompareJson["PAGFileTest"]["PAGFileContainerTest"]["removeLayerMd5"];
-  if (cRemoveLayerMd5 != nullptr) {
-    EXPECT_EQ(cRemoveLayerMd5.get<std::string>(), removeLayerMd5);
-  }
+  EXPECT_EQ(cRemoveLayerMd5.get<std::string>(), removeLayerMd5);
   auto cSetLayerIndexMd5 =
       PAGTestEnvironment::CompareJson["PAGFileTest"]["PAGFileContainerTest"]["setLayerIndexMd5"];
-  if (cSetLayerIndexMd5 != nullptr) {
-    EXPECT_EQ(cSetLayerIndexMd5.get<std::string>(), setLayerIndexMd5);
-  }
+  EXPECT_EQ(cSetLayerIndexMd5.get<std::string>(), setLayerIndexMd5);
   auto cSwapLayerMd5 =
       PAGTestEnvironment::CompareJson["PAGFileTest"]["PAGFileContainerTest"]["swapLayerMd5"];
-  if (cSwapLayerMd5 != nullptr) {
-    EXPECT_EQ(cSwapLayerMd5.get<std::string>(), swapLayerMd5);
-  }
+  EXPECT_EQ(cSwapLayerMd5.get<std::string>(), swapLayerMd5);
   auto cReplaceImageMd5 =
       PAGTestEnvironment::CompareJson["PAGFileTest"]["PAGFileContainerTest"]["replaceImageMd5"];
-  if (cReplaceImageMd5 != nullptr) {
-    EXPECT_EQ(cReplaceImageMd5.get<std::string>(), replaceImageMd5);
-  }
+  EXPECT_EQ(cReplaceImageMd5.get<std::string>(), replaceImageMd5);
   auto cReplaceTextMd5 =
       PAGTestEnvironment::CompareJson["PAGFileTest"]["PAGFileContainerTest"]["replaceTextMd5"];
-  if (cSwapLayerMd5 != nullptr) {
-    EXPECT_EQ(cReplaceTextMd5.get<std::string>(), replaceTextMd5);
-  }
+  EXPECT_EQ(cReplaceTextMd5.get<std::string>(), replaceTextMd5);
 #endif
 }
 
@@ -661,9 +643,7 @@ PAG_TEST_F(PAGFileBaseTest, ShapeType) {
   PAGTestEnvironment::DumpJson["PAGFileTest"]["ShapeType"] = md5;
 #ifdef COMPARE_JSON_PATH
   auto cMd5 = PAGTestEnvironment::CompareJson["PAGFileTest"]["ShapeType"];
-  if (cMd5 != nullptr) {
-    EXPECT_EQ(cMd5.get<std::string>(), md5);
-  }
+  EXPECT_EQ(cMd5.get<std::string>(), md5);
 #endif
 }
 
@@ -732,9 +712,7 @@ PAG_TEST_F(PAGFileBaseTest, EllipseToPath_ID80701969) {
   PAGTestEnvironment::DumpJson["PAGFileTest"]["EllipseToPath_ID80701969"] = md5;
 #ifdef COMPARE_JSON_PATH
   auto audioMD5 = PAGTestEnvironment::CompareJson["PAGFileTest"]["EllipseToPath_ID80701969"];
-  if (audioMD5 != nullptr) {
-    EXPECT_EQ(audioMD5.get<std::string>(), md5);
-  }
+  EXPECT_EQ(audioMD5.get<std::string>(), md5);
 #endif
 }
 
@@ -750,9 +728,7 @@ PAG_TEST_F(PAGFileBaseTest, RectToPath_ID80703199) {
   PAGTestEnvironment::DumpJson["PAGFileTest"]["RectToPath_ID80703199"] = md5;
 #ifdef COMPARE_JSON_PATH
   auto audioMD5 = PAGTestEnvironment::CompareJson["PAGFileTest"]["RectToPath_ID80703199"];
-  if (audioMD5 != nullptr) {
-    EXPECT_EQ(audioMD5.get<std::string>(), md5);
-  }
+  EXPECT_EQ(audioMD5.get<std::string>(), md5);
 #endif
 }
 
@@ -768,9 +744,7 @@ PAG_TEST_F(PAGFileBaseTest, RoundRectToPath_ID80703201) {
   PAGTestEnvironment::DumpJson["PAGFileTest"]["RoundRectToPath_ID80703201"] = md5;
 #ifdef COMPARE_JSON_PATH
   auto audioMD5 = PAGTestEnvironment::CompareJson["PAGFileTest"]["RoundRectToPath_ID80703201"];
-  if (audioMD5 != nullptr) {
-    EXPECT_EQ(audioMD5.get<std::string>(), md5);
-  }
+  EXPECT_EQ(audioMD5.get<std::string>(), md5);
 #endif
 }
 
@@ -788,9 +762,7 @@ PAG_TEST_F(PAGFileBaseTest, SetStartTime) {
   PAGTestEnvironment::DumpJson["PAGFileTest"]["SetStartTime"] = md5;
 #ifdef COMPARE_JSON_PATH
   auto setStartTimeMD5 = PAGTestEnvironment::CompareJson["PAGFileTest"]["SetStartTime"];
-  if (setStartTimeMD5 != nullptr) {
-    EXPECT_EQ(setStartTimeMD5.get<std::string>(), md5);
-  }
+  EXPECT_EQ(setStartTimeMD5.get<std::string>(), md5);
 #endif
 }
 }  // namespace pag

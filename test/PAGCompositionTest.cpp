@@ -116,11 +116,8 @@ PAG_TEST_F(VideoSequenceSize, VideoSequence_ID82854769) {
 #ifdef COMPARE_JSON_PATH
   auto compareMD5 =
       PAGTestEnvironment::CompareJson["PAGCompositionTest"]["VideoSequence_ID82854769"];
-  if (compareMD5 != nullptr) {
-    TraceIf(image, "../test/out/VideoSequence_ID82854769.png",
-            compareMD5.get<std::string>() != md5);
-    EXPECT_EQ(compareMD5.get<std::string>(), md5);
-  }
+  TraceIf(image, "../test/out/VideoSequence_ID82854769.png", compareMD5.get<std::string>() != md5);
+  EXPECT_EQ(compareMD5.get<std::string>(), md5);
 #endif
 }
 

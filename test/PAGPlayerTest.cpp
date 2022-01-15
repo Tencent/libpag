@@ -74,14 +74,10 @@ PAG_TEST_F(PAGPlayerTest, pagPlayer) {
 #ifdef COMPARE_JSON_PATH
   auto cSetCompositionMd5 =
       PAGTestEnvironment::CompareJson["PAGPlayerTest"]["pagPlayer"]["setCompositionMd5"];
-  if (cSetCompositionMd5 != nullptr) {
-    EXPECT_EQ(cSetCompositionMd5.get<std::string>(), setCompositionMd5);
-  }
+  EXPECT_EQ(cSetCompositionMd5.get<std::string>(), setCompositionMd5);
   auto cSetComposition2Md5 =
       PAGTestEnvironment::CompareJson["PAGPlayerTest"]["pagPlayer"]["setComposition2Md5"];
-  if (cSetComposition2Md5 != nullptr) {
-    EXPECT_EQ(cSetComposition2Md5.get<std::string>(), setComposition2Md5);
-  }
+  EXPECT_EQ(cSetComposition2Md5.get<std::string>(), setComposition2Md5);
 #endif
 }
 
@@ -111,9 +107,7 @@ PAG_TEST_F(PAGPlayerTest, switchPAGSurface) {
 #ifdef COMPARE_JSON_PATH
   auto compareMD5 = PAGTestEnvironment::CompareJson["PAGSurfaceSwitchTest"]["switchPAGSurface"];
   std::string imagePath = "../test/out/switchPAGSurface.png";
-  if (compareMD5 != nullptr) {
-    TraceIf(skImage, imagePath, md5 != compareMD5);
-  }
+  TraceIf(skImage, imagePath, md5 != compareMD5);
   PAGTestEnvironment::DumpJson["PAGSurfaceSwitchTest"]["switchPAGSurface"] = md5;
   EXPECT_EQ(compareMD5.get<std::string>(), md5);
 #endif
@@ -151,10 +145,8 @@ PAG_TEST_F(PAGPlayerTest, autoClear) {
   auto md5 = DumpMD5(pixelMap);
   std::string key = "autoClear_false_flush0";
   outputJson[key] = md5;
-  if (compareJson != nullptr && compareJson[key] != nullptr) {
-    TraceIf(pixelMap, "../test/out/" + std::string(key) + ".png", compareJson[key] != md5);
-    EXPECT_EQ(compareJson["autoClear_false_flush0"].get<std::string>(), md5);
-  }
+  TraceIf(pixelMap, "../test/out/" + std::string(key) + ".png", compareJson[key] != md5);
+  EXPECT_EQ(compareJson["autoClear_false_flush0"].get<std::string>(), md5);
 
   pagPlayer->flush();
   result = pagSurface->readPixels(pixelMap.colorType(), pixelMap.alphaType(), lock.pixels(),

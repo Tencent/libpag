@@ -43,9 +43,7 @@ PAG_TEST_F(PAGSolidLayerTest, SolidColor) {
   PAGTestEnvironment::DumpJson["PAGSolidLayerTest"] = {{"SolidColor", md5}};
 #ifdef COMPARE_JSON_PATH
   auto colorJson = PAGTestEnvironment::CompareJson["PAGSolidLayerTest"]["SolidColor"];
-  if (colorJson != nullptr) {
-    ASSERT_EQ(colorJson.get<std::string>(), md5);
-  }
+  ASSERT_EQ(colorJson.get<std::string>(), md5);
 #endif
 }
 

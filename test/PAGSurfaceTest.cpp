@@ -20,8 +20,8 @@
 #include "framework/utils/PAGTestUtils.h"
 #include "gpu/opengl/GLCaps.h"
 #include "gpu/opengl/GLUtil.h"
-#include "rendering/Drawable.h"
 #include "platform/NativeGLDevice.h"
+#include "rendering/Drawable.h"
 
 namespace pag {
 PAG_TEST_SUIT(PAGSurfaceTest)
@@ -111,11 +111,9 @@ PAG_TEST(PAGSurfaceTest, mask_ID85767971) {
   PAGTestEnvironment::DumpJson["PAGSurfaceTest"]["mask_ID85767971"] = md5;
 #ifdef COMPARE_JSON_PATH
   auto compareMD5 = PAGTestEnvironment::CompareJson["PAGSurfaceTest"]["mask_ID85767971"];
-  if (compareMD5 != nullptr) {
-    auto path = "../test/out/mask_ID85767971.png";
-    TraceIf(pagSurface, path, compareMD5.get<std::string>() != md5);
-    EXPECT_EQ(compareMD5.get<std::string>(), md5);
-  }
+  auto path = "../test/out/mask_ID85767971.png";
+  TraceIf(pagSurface, path, compareMD5.get<std::string>() != md5);
+  EXPECT_EQ(compareMD5.get<std::string>(), md5);
 #endif
 
   context = device->lockContext();

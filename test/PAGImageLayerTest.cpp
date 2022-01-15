@@ -81,9 +81,7 @@ PAG_TEST_F(PAGImageLayerTest, imageMultiThreadReplace) {
   PAGTestEnvironment::DumpJson["PAGImageLayerTest"] = imageLayerJson;
 #ifdef COMPARE_JSON_PATH
   auto cJson = PAGTestEnvironment::CompareJson["PAGImageLayerTest"]["image"];
-  if (cJson != nullptr) {
-    ASSERT_EQ(cJson.get<std::string>(), md5);
-  }
+  ASSERT_EQ(cJson.get<std::string>(), md5);
 #endif
 }
 

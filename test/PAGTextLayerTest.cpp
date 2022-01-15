@@ -50,10 +50,9 @@ PAG_TEST_F(PAGTextLayerTest, fillColor) {
   EXPECT_TRUE((textLayer->fillColor() == Red));
   PAGTestEnvironment::DumpJson["PAGTextLayerTester"]["TextLayer"]["fillColorMd5"] = fillColorMd5;
 #ifdef COMPARE_JSON_PATH
-  auto cFillColor = PAGTestEnvironment::CompareJson["PAGTextLayerTester"]["TextLayer"]["fillColorMd5"];
-  if (cFillColor != nullptr) {
-    EXPECT_EQ(cFillColor.get<std::string>(), fillColorMd5);
-  }
+  auto cFillColor =
+      PAGTestEnvironment::CompareJson["PAGTextLayerTester"]["TextLayer"]["fillColorMd5"];
+  EXPECT_EQ(cFillColor.get<std::string>(), fillColorMd5);
 #endif
 }
 
@@ -77,10 +76,9 @@ PAG_TEST_F(PAGTextLayerTest, strokeColor) {
   PAGTestEnvironment::DumpJson["PAGTextLayerTester"]["TextLayer"]["strokeColorMd5"] =
       strokeColorMd5;
 #ifdef COMPARE_JSON_PATH
-  auto cStrokeColor = PAGTestEnvironment::CompareJson["PAGTextLayerTester"]["TextLayer"]["strokeColorMd5"];
-  if (cStrokeColor != nullptr) {
-    EXPECT_EQ(cStrokeColor.get<std::string>(), strokeColorMd5);
-  }
+  auto cStrokeColor =
+      PAGTestEnvironment::CompareJson["PAGTextLayerTester"]["TextLayer"]["strokeColorMd5"];
+  EXPECT_EQ(cStrokeColor.get<std::string>(), strokeColorMd5);
 #endif
 }
 
@@ -132,10 +130,9 @@ PAG_TEST_F(PAGTextLayerTest, textDocumentMd5) {
   PAGTestEnvironment::DumpJson["PAGTextLayerTester"]["TextLayer"]["textDocumentMd5"] =
       textDocumentMd5;
 #ifdef COMPARE_JSON_PATH
-  auto cText = PAGTestEnvironment::CompareJson["PAGTextLayerTester"]["TextLayer"]["textDocumentMd5"];
-  if (cText != nullptr) {
-    EXPECT_EQ(cText.get<std::string>(), textDocumentMd5);
-  }
+  auto cText =
+      PAGTestEnvironment::CompareJson["PAGTextLayerTester"]["TextLayer"]["textDocumentMd5"];
+  EXPECT_EQ(cText.get<std::string>(), textDocumentMd5);
 #endif
 }
 
@@ -209,11 +206,9 @@ PAG_TEST_F(PAGTextLayerTest, Emoji_ID79762747) {
   PAGTestEnvironment::DumpJson["PAGTextLayerTester"]["emoji"] = md5;
 #ifdef COMPARE_JSON_PATH
   auto emojiMd5 = PAGTestEnvironment::CompareJson["PAGTextLayerTester"]["emoji"];
-  if (emojiMd5 != nullptr) {
-    TraceIf(TestPAGSurface, "../test/out/pag_textlayer_emoji.png",
-            emojiMd5.get<std::string>() != md5);
-    EXPECT_EQ(emojiMd5.get<std::string>(), md5);
-  }
+  TraceIf(TestPAGSurface, "../test/out/pag_textlayer_emoji.png",
+          emojiMd5.get<std::string>() != md5);
+  EXPECT_EQ(emojiMd5.get<std::string>(), md5);
 #endif
 }
 
@@ -232,11 +227,9 @@ PAG_TEST_F(PAGTextLayerTest, NormalEmoji_ID79762751) {
   PAGTestEnvironment::DumpJson["PAGTextLayerTester"]["normalEmoji"] = md5;
 #ifdef COMPARE_JSON_PATH
   auto emojiMd5 = PAGTestEnvironment::CompareJson["PAGTextLayerTester"]["normalEmoji"];
-  if (emojiMd5 != nullptr) {
-    TraceIf(TestPAGSurface, "../test/out/pag_textlayer_normalEmoji.png",
-            emojiMd5.get<std::string>() != md5);
-    EXPECT_EQ(emojiMd5.get<std::string>(), md5);
-  }
+  TraceIf(TestPAGSurface, "../test/out/pag_textlayer_normalEmoji.png",
+          emojiMd5.get<std::string>() != md5);
+  EXPECT_EQ(emojiMd5.get<std::string>(), md5);
 #endif
 }
 
@@ -256,10 +249,8 @@ PAG_TEST_F(PAGTextLayerTest, text_ID83312235) {
   PAGTestEnvironment::DumpJson["PAGTextLayerTester"]["text_ID83312235"] = md5;
 #ifdef COMPARE_JSON_PATH
   auto emojiMd5 = PAGTestEnvironment::CompareJson["PAGTextLayerTester"]["text_ID83312235"];
-  if (emojiMd5 != nullptr) {
-    TraceIf(TestPAGSurface, "../test/out/text_ID83312235.png", emojiMd5.get<std::string>() != md5);
-    EXPECT_EQ(emojiMd5.get<std::string>(), md5);
-  }
+  TraceIf(TestPAGSurface, "../test/out/text_ID83312235.png", emojiMd5.get<std::string>() != md5);
+  EXPECT_EQ(emojiMd5.get<std::string>(), md5);
 #endif
 }
 
@@ -275,11 +266,9 @@ PAG_TEST_F(PAGTextLayerTest, VerticalText_ID80511765) {
   PAGTestEnvironment::DumpJson["PAGTextLayerTester"]["textDirection"] = md5;
 #ifdef COMPARE_JSON_PATH
   auto textMd5 = PAGTestEnvironment::CompareJson["PAGTextLayerTester"]["textDirection"];
-  if (textMd5 != nullptr) {
-    TraceIf(TestPAGSurface, "../test/out/pag_textlayer_textDirection.png",
-            textMd5.get<std::string>() != md5);
-    EXPECT_EQ(textMd5.get<std::string>(), md5);
-  }
+  TraceIf(TestPAGSurface, "../test/out/pag_textlayer_textDirection.png",
+          textMd5.get<std::string>() != md5);
+  EXPECT_EQ(textMd5.get<std::string>(), md5);
 #endif
 }
 
@@ -295,11 +284,9 @@ PAG_TEST_F(PAGTextLayerTest, TrackingAnimator_ID859317799) {
   PAGTestEnvironment::DumpJson["PAGTextLayerTester"]["trackingAnimator"] = md5;
 #ifdef COMPARE_JSON_PATH
   auto textMd5 = PAGTestEnvironment::CompareJson["PAGTextLayerTester"]["trackingAnimator"];
-  if (textMd5 != nullptr) {
-    TraceIf(TestPAGSurface, "../test/out/pag_textlayer_trackingAnimator.png",
-            textMd5.get<std::string>() != md5);
-    EXPECT_EQ(textMd5.get<std::string>(), md5);
-  }
+  TraceIf(TestPAGSurface, "../test/out/pag_textlayer_trackingAnimator.png",
+          textMd5.get<std::string>() != md5);
+  EXPECT_EQ(textMd5.get<std::string>(), md5);
 #endif
 }
 
@@ -315,11 +302,9 @@ PAG_TEST_F(PAGTextLayerTest, TrackingAnimatorVertical_ID859317799) {
   PAGTestEnvironment::DumpJson["PAGTextLayerTester"]["trackingAnimatorVertical"] = md5;
 #ifdef COMPARE_JSON_PATH
   auto textMd5 = PAGTestEnvironment::CompareJson["PAGTextLayerTester"]["trackingAnimatorVertical"];
-  if (textMd5 != nullptr) {
-    TraceIf(TestPAGSurface, "../test/out/pag_textlayer_trackingAnimatorVertical.png",
-            textMd5.get<std::string>() != md5);
-    EXPECT_EQ(textMd5.get<std::string>(), md5);
-  }
+  TraceIf(TestPAGSurface, "../test/out/pag_textlayer_trackingAnimatorVertical.png",
+          textMd5.get<std::string>() != md5);
+  EXPECT_EQ(textMd5.get<std::string>(), md5);
 #endif
 }
 
@@ -335,11 +320,9 @@ PAG_TEST_F(PAGTextLayerTest, PositionAnimator_ID859317799) {
   PAGTestEnvironment::DumpJson["PAGTextLayerTester"]["positionAnimator"] = md5;
 #ifdef COMPARE_JSON_PATH
   auto textMd5 = PAGTestEnvironment::CompareJson["PAGTextLayerTester"]["positionAnimator"];
-  if (textMd5 != nullptr) {
-    TraceIf(TestPAGSurface, "../test/out/pag_textlayer_positionAnimator.png",
-            textMd5.get<std::string>() != md5);
-    EXPECT_EQ(textMd5.get<std::string>(), md5);
-  }
+  TraceIf(TestPAGSurface, "../test/out/pag_textlayer_positionAnimator.png",
+          textMd5.get<std::string>() != md5);
+  EXPECT_EQ(textMd5.get<std::string>(), md5);
 #endif
 }
 
@@ -355,11 +338,9 @@ PAG_TEST_F(PAGTextLayerTest, TextAnimators_ID863204853) {
   PAGTestEnvironment::DumpJson["PAGTextLayerTester"]["textAnimators"] = md5;
 #ifdef COMPARE_JSON_PATH
   auto textMd5 = PAGTestEnvironment::CompareJson["PAGTextLayerTester"]["textAnimators"];
-  if (textMd5 != nullptr) {
-    TraceIf(TestPAGSurface, "../test/out/pag_textlayer_textAnimators.png",
-            textMd5.get<std::string>() != md5);
-    EXPECT_EQ(textMd5.get<std::string>(), md5);
-  }
+  TraceIf(TestPAGSurface, "../test/out/pag_textlayer_textAnimators.png",
+          textMd5.get<std::string>() != md5);
+  EXPECT_EQ(textMd5.get<std::string>(), md5);
 #endif
 }
 
@@ -496,7 +477,7 @@ PAG_TEST_F(PAGTextLayerTest, TrackMatteTextBounds) {
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0.5f);
   TestPAGPlayer->flush();
-  auto defaultBounds = Rect::MakeXYWH(219, 484, 445, 112);
+  auto defaultBounds = Rect::MakeXYWH(219, 485, 445, 112);
   for (int i = 0; i < pagFile->numTexts(); i++) {
     auto textLayers = pagFile->getLayersByEditableIndex(i, LayerType::Text);
     for (const auto& textLayer : textLayers) {
