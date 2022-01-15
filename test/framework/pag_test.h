@@ -25,7 +25,7 @@ namespace pag {
 // public macro
 
 #define DEFAULT_PAG_PATH "../resources/apitest/test.pag"
-#define DUMP_JSON_PATH "../test/out/dump.json"
+#define DUMP_JSON_PATH "../test/out/compare_dump.json"
 
 #ifndef SKIP_API_MD5
 #define COMPARE_JSON_PATH "../test/res/compare_dump.json"

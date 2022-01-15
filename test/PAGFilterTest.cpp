@@ -57,13 +57,13 @@ PAG_TEST(PAGFilterTest, CornerPin_ID79157693) {
   }
 #endif
   json dumpJson;
-  std::ifstream dumpInputFile("../test/out/filter_md5_dump.json");
+  std::ifstream dumpInputFile("../test/out/compare_filter_md5.json");
   if (dumpInputFile) {
     dumpInputFile >> dumpJson;
     dumpInputFile.close();
   }
   dumpJson["PAGFilterTest"]["cornerpin"] = md5;
-  std::ofstream outFile("../test/out/filter_md5_dump.json");
+  std::ofstream outFile("../test/out/compare_filter_md5.json");
   outFile << std::setw(4) << dumpJson << std::endl;
   outFile.close();
 }
@@ -99,13 +99,13 @@ PAG_TEST(PAGFilterTest, Bulge_ID79159683) {
 #endif
 
   json dumpJson;
-  std::ifstream dumpInputFile("../test/out/filter_md5_dump.json");
+  std::ifstream dumpInputFile("../test/out/compare_filter_md5.json");
   if (dumpInputFile) {
     dumpInputFile >> dumpJson;
     dumpInputFile.close();
   }
   dumpJson["PAGFilterTest"]["bulge"] = md5;
-  std::ofstream outFile("../test/out/filter_md5_dump.json");
+  std::ofstream outFile("../test/out/compare_filter_md5.json");
   outFile << std::setw(4) << dumpJson << std::endl;
   outFile.close();
 }
@@ -141,13 +141,13 @@ PAG_TEST(PAGFilterTest, MotionTile_ID79162339) {
   }
 #endif
   json dumpJson;
-  std::ifstream dumpInputFile("../test/out/filter_md5_dump.json");
+  std::ifstream dumpInputFile("../test/out/compare_filter_md5.json");
   if (dumpInputFile) {
     dumpInputFile >> dumpJson;
     dumpInputFile.close();
   }
   dumpJson["PAGFilterTest"]["motiontile"] = md5;
-  std::ofstream outFile("../test/out/filter_md5_dump.json");
+  std::ofstream outFile("../test/out/compare_filter_md5.json");
   outFile << std::setw(4) << dumpJson << std::endl;
   outFile.close();
 }
@@ -183,7 +183,7 @@ PAG_TEST(PAGFilterTest, MotionBlur_ID79162447) {
   }
 #endif
   json dumpJson;
-  std::ifstream dumpInputFile("../test/out/filter_md5_dump.json");
+  std::ifstream dumpInputFile("../test/out/compare_filter_md5.json");
   if (dumpInputFile) {
     dumpInputFile >> dumpJson;
     dumpInputFile.close();
@@ -204,7 +204,7 @@ PAG_TEST(PAGFilterTest, MotionBlur_ID79162447) {
   }
 #endif
   dumpJson["PAGFilterTest"]["motionblur_translate"] = md5;
-  std::ofstream outFile("../test/out/filter_md5_dump.json");
+  std::ofstream outFile("../test/out/compare_filter_md5.json");
   outFile << std::setw(4) << dumpJson << std::endl;
   outFile.close();
 }
@@ -240,7 +240,7 @@ PAG_TEST(PAGFilterTest, GaussBlur_ID79162977) {
   }
 #endif
   json dumpJson;
-  std::ifstream dumpInputFile("../test/out/filter_md5_dump.json");
+  std::ifstream dumpInputFile("../test/out/compare_filter_md5.json");
   if (dumpInputFile) {
     dumpInputFile >> dumpJson;
     dumpInputFile.close();
@@ -268,7 +268,7 @@ PAG_TEST(PAGFilterTest, GaussBlur_ID79162977) {
   }
 #endif
   dumpJson["PAGFilterTest"]["gaussblur_norepeat"] = md5;
-  std::ofstream outFile("../test/out/filter_md5_dump.json");
+  std::ofstream outFile("../test/out/compare_filter_md5.json");
   outFile << std::setw(4) << dumpJson << std::endl;
   outFile.close();
 }
@@ -303,13 +303,13 @@ PAG_TEST(PAGFilterTest, Glow_ID79163671) {
   }
 #endif
   json dumpJson;
-  std::ifstream dumpInputFile("../test/out/filter_md5_dump.json");
+  std::ifstream dumpInputFile("../test/out/compare_filter_md5.json");
   if (dumpInputFile) {
     dumpInputFile >> dumpJson;
     dumpInputFile.close();
   }
   dumpJson["PAGFilterTest"]["glow"] = md5;
-  std::ofstream outFile("../test/out/filter_md5_dump.json");
+  std::ofstream outFile("../test/out/compare_filter_md5.json");
   outFile << std::setw(4) << dumpJson << std::endl;
   outFile.close();
 }
@@ -345,13 +345,13 @@ PAG_TEST(PAGFilterTest, DropShadow_ID79164133) {
   }
 #endif
   json dumpJson;
-  std::ifstream dumpInputFile("../test/out/filter_md5_dump.json");
+  std::ifstream dumpInputFile("../test/out/compare_filter_md5.json");
   if (dumpInputFile) {
     dumpInputFile >> dumpJson;
     dumpInputFile.close();
   }
   dumpJson["PAGFilterTest"]["dropshadow"] = md5;
-  std::ofstream outFile("../test/out/filter_md5_dump.json");
+  std::ofstream outFile("../test/out/compare_filter_md5.json");
   outFile << std::setw(4) << dumpJson << std::endl;
   outFile.close();
 }
@@ -387,13 +387,13 @@ PAG_TEST(PAGFilterTest, DisplacementMap_ID79234919) {
   }
 #endif
   json dumpJson;
-  std::ifstream dumpInputFile("../test/out/filter_md5_dump.json");
+  std::ifstream dumpInputFile("../test/out/compare_filter_md5.json");
   if (dumpInputFile) {
     dumpInputFile >> dumpJson;
     dumpInputFile.close();
   }
   dumpJson["PAGFilterTest"]["displacementmap"] = md5;
-  std::ofstream outFile("../test/out/filter_md5_dump.json");
+  std::ofstream outFile("../test/out/compare_filter_md5.json");
   outFile << std::setw(4) << dumpJson << std::endl;
   outFile.close();
 }
@@ -429,13 +429,13 @@ PAG_TEST(PAGFilterTest, DisplacementMap_ID82637265) {
   }
 #endif
   json dumpJson;
-  std::ifstream dumpInputFile("../test/out/filter_md5_dump.json");
+  std::ifstream dumpInputFile("../test/out/compare_filter_md5.json");
   if (dumpInputFile) {
     dumpInputFile >> dumpJson;
     dumpInputFile.close();
   }
   dumpJson["PAGFilterTest"]["displacementmap_video_scale"] = md5;
-  std::ofstream outFile("../test/out/filter_md5_dump.json");
+  std::ofstream outFile("../test/out/compare_filter_md5.json");
   outFile << std::setw(4) << dumpJson << std::endl;
   outFile.close();
 }
@@ -470,13 +470,13 @@ PAG_TEST(PAGFilterTest, GaussBlur_Static) {
   }
 #endif
   json dumpJson;
-  std::ifstream dumpInputFile("../test/out/filter_md5_dump.json");
+  std::ifstream dumpInputFile("../test/out/compare_filter_md5.json");
   if (dumpInputFile) {
     dumpInputFile >> dumpJson;
     dumpInputFile.close();
   }
   dumpJson["PAGFilterTest"]["gaussblur_static"] = md5;
-  std::ofstream outFile("../test/out/filter_md5_dump.json");
+  std::ofstream outFile("../test/out/compare_filter_md5.json");
   outFile << std::setw(4) << dumpJson << std::endl;
   outFile.close();
 }
@@ -512,13 +512,13 @@ PAG_TEST(PAGFilterTest, RadialBlur) {
   }
 #endif
   json dumpJson;
-  std::ifstream dumpInputFile("../test/out/filter_md5_dump.json");
+  std::ifstream dumpInputFile("../test/out/compare_filter_md5.json");
   if (dumpInputFile) {
     dumpInputFile >> dumpJson;
     dumpInputFile.close();
   }
   dumpJson["PAGFilterTest"]["radialblur"] = md5;
-  std::ofstream outFile("../test/out/filter_md5_dump.json");
+  std::ofstream outFile("../test/out/compare_filter_md5.json");
   outFile << std::setw(4) << dumpJson << std::endl;
   outFile.close();
 }
@@ -553,13 +553,13 @@ PAG_TEST(PAGFilterTest, Mosaic) {
   }
 #endif
   json dumpJson;
-  std::ifstream dumpInputFile("../test/out/filter_md5_dump.json");
+  std::ifstream dumpInputFile("../test/out/compare_filter_md5.json");
   if (dumpInputFile) {
     dumpInputFile >> dumpJson;
     dumpInputFile.close();
   }
   dumpJson["PAGFilterTest"]["mosaic"] = md5;
-  std::ofstream outFile("../test/out/filter_md5_dump.json");
+  std::ofstream outFile("../test/out/compare_filter_md5.json");
   outFile << std::setw(4) << dumpJson << std::endl;
   outFile.close();
 }
@@ -595,7 +595,7 @@ PAG_TEST(PAGFilterTest, MultiFilter_ID79164477) {
   }
 #endif
   json dumpJson;
-  std::ifstream dumpInputFile("../test/out/filter_md5_dump.json");
+  std::ifstream dumpInputFile("../test/out/compare_filter_md5.json");
   if (dumpInputFile) {
     dumpInputFile >> dumpJson;
     dumpInputFile.close();
@@ -623,7 +623,7 @@ PAG_TEST(PAGFilterTest, MultiFilter_ID79164477) {
   }
 #endif
   dumpJson["PAGFilterTest"]["motiontile_blur"] = md5;
-  std::ofstream outFile("../test/out/filter_md5_dump.json");
+  std::ofstream outFile("../test/out/compare_filter_md5.json");
   outFile << std::setw(4) << dumpJson << std::endl;
   outFile.close();
 }
