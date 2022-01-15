@@ -54,7 +54,7 @@ single PAG file, mix multiple PAG files into one composition, or replace texts a
 pre-designed animation effects applied at runtime. It reduces tons of coding work for product
 features like video templates.
 
-## Requirements
+## System Requirements
 
 - iOS 9.0 or later
 - Android 4.4 or later
@@ -62,7 +62,6 @@ features like video templates.
 - Windows 7.0 or later
 - Chrome 87.0 or later (Web)
 - Safari 11.1 or later (Web)
-- GCC 4.9 or later (Linux)
 
 ## Getting Started
 
@@ -149,6 +148,13 @@ We recommend using CLion IDE on macOS platform for development.
 So there is no `release` branch yet at this moment. We are working hard to make a stable release of
 PAG 4.0 available as soon as possible. For using PAG 3.0 versions, you can download the precompiled
 libraries from [here](https://github.com/Tencent/libpag/releases).**
+
+### Build Prerequisites
+
+- Xcode 11.0+
+- GCC 4.9+
+- CMake 3.18+
+- NDK 19.2.5345600 （**Please use this exact version of NDK, other versions may fail.**)
 
 ### Dependency Management
 
