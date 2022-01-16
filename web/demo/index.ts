@@ -214,6 +214,7 @@ const createPAGView = async (file) => {
   document.getElementById('control').style.display = '';
   // 图层编辑
   const editableLayers = await getEditableLayer(PAG, pagFile);
+  console.log(editableLayers);
   renderEditableLayer(editableLayers);
   console.log(`已加载 ${file.name}`);
   return pagView;
@@ -243,7 +244,7 @@ const setVideoTime = (el, time) => {
   });
 };
 
-const getEditableLayer = async (PAG, pagFile) => {
+const getEditableLayer = async (PAG: PAGNamespace, pagFile) => {
   const editableImageCount = await pagFile.numImages();
   let res = [];
   for (let i = 0; i < editableImageCount; i++) {
@@ -251,9 +252,17 @@ const getEditableLayer = async (PAG, pagFile) => {
     for (let j = 0; j < vectorPagLayer.size(); j++) {
       const pagLayerWasm = vectorPagLayer.get(j);
       const pagLayer = new PAG.PAGLayer(pagLayerWasm);
-      const startTime = await pagLayer.startTime();
+      const uniqueID = await pagLayer.uniqueID();
+      const layerType = await pagLayer.layerType();
+      const layerName = await pagLayer.layerName();
+      const opacity = await pagLayer.opacity();
+      const visible = await pagLayer.visible();
+      const editableIndex = await pagLayer.editableIndex();
       const duration = await pagLayer.duration();
-      res.push({ index: i, startTime: startTime, duration: duration });
+      const frameRate = await pagLayer.frameRate();
+      const localStartTime = await pagLayer.startTime();
+      const startTime = await pagLayer.localTimeToGlobal(localStartTime);
+      res.push({ uniqueID, layerType, layerName, opacity, visible, editableIndex, frameRate, startTime, duration });
     }
   }
   return res;

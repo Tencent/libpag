@@ -1,5 +1,5 @@
 import { PAGImage } from './pag-image';
-import { PAG, TextDocument } from './types';
+import { LayerType, PAG, TextDocument } from './types';
 import { readFile } from './utils/common';
 import { ErrorCode } from './utils/error-map';
 import { Log } from './utils/log';
@@ -35,7 +35,7 @@ export class PAGFile {
     return (await PAGFile.module.webAssemblyQueue.exec(
       this.pagFileWasm._getTextData,
       this.pagFileWasm,
-      editableTextIndex
+      editableTextIndex,
     )) as TextDocument;
   }
   /**
@@ -102,7 +102,7 @@ export class PAGFile {
   /**
    * Return an array of layers by specified editable index and layer type.
    */
-  public async getLayersByEditableIndex(editableIndex, layerType): Promise<number> {
+  public async getLayersByEditableIndex(editableIndex: Number, layerType: LayerType): Promise<number> {
     return (await PAGFile.module.webAssemblyQueue.exec(
       this.pagFileWasm._getLayersByEditableIndex,
       this.pagFileWasm,
@@ -113,6 +113,5 @@ export class PAGFile {
 
   public async destroy() {
     await PAGImage.module.webAssemblyQueue.exec(this.pagFileWasm.delete, this.pagFileWasm);
-
   }
 }
