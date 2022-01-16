@@ -28,7 +28,8 @@ import { PAGInit } from 'libpag';
 PAGInit({
   locateFile: (file) => './node_modules/libpag/lib/' + file,
 }).then((PAG) => {
-  fetch('https://pag.io/file/particle_video.pag')
+  const url = 'https://pag.io/file/like.pag'
+  fetch(url)
     .then((response) => response.blob())
     .then(async (blob) => {
       const file = new window.File([blob], url.replace(/(.*\/)*([^.]+)/i, '$2'));
@@ -40,17 +41,14 @@ PAGInit({
 ### Browser
 
 ```html
-<div>
-  <canvas class="canvas" id="pag"></canvas>
-</div>
-<script src="./node_modules/libpag/lib/libpag.umd.js"></script>
+<canvas class="canvas" id="pag"></canvas>
+<script src="https://unpkg.com/libpag@latest/lib/libpag.min.js"></script>
 <script>
   window.libpag
-    .PAGInit({
-      locateFile: (file) => './node_modules/libpag/lib/' + file,
-    })
+    .PAGInit()
     .then((PAG) => {
-      fetch('https://pag.io/file/particle_video.pag')
+      const url = 'https://pag.io/file/like.pag'
+      fetch(url)
         .then((response) => response.blob())
         .then(async (blob) => {
           const file = new window.File([blob], url.replace(/(.*\/)*([^.]+)/i, '$2'));
