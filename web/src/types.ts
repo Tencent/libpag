@@ -42,6 +42,7 @@ export interface PAG extends EmscriptenModule {
   setFallbackFontNames: (fontName: any) => void;
   traceImage: (info, pixels, tag: string) => void;
   GL: any;
+  LayerType: typeof LayerType;
 }
 
 /**
@@ -95,7 +96,7 @@ export const enum ParagraphJustification {
   FullJustifyLastLineRight = 4,
   FullJustifyLastLineCenter = 5,
   FullJustifyLastLineFull = 6,
-};
+}
 
 export const enum TextDirection {
   Default = 0,
@@ -109,26 +110,22 @@ export interface Point {
 }
 
 export declare class TextDocument {
-
   /**
    * When true, the text layer shows a fill.
    */
   public applyFill: boolean;
-
   /**
    * When true, the text layer shows a stroke.
    */
   public applyStroke: boolean;
 
   public baselineShift: number;
-
   /**
    * When true, the text layer is paragraph (bounded) text.
    */
   public boxText: boolean;
 
   public boxTextPos: Readonly<Point>;
-
   /**
    * For box text, the pixel dimensions for the text bounds.
    */
@@ -143,57 +140,46 @@ export declare class TextDocument {
    * The text layer’s fill color.
    */
   public fillColor: Readonly<Color>;
-
   /**
    * A string with the name of the font family.
    **/
   public fontFamily: string;
-
   /**
    * A string with the style information — e.g., “bold”, “italic”.
    **/
   public fontStyle: string;
-
   /**
    * The text layer’s font size in pixels.
    */
   public fontSize: number;
-
   /**
    * The text layer’s stroke color.
    */
   public strokeColor: Readonly<Color>;
-
   /**
    * Indicates the rendering order for the fill and stroke of a text layer.
    */
   public strokeOverFill: boolean;
-
   /**
    * The text layer’s stroke thickness.
    */
   public strokeWidth: number;
-
   /**
    * The text layer’s Source Text value.
    */
   public text: string;
-
   /**
    * The paragraph justification for the text layer.
    */
   public justification: ParagraphJustification;
-
   /**
    * The space between lines, 0 indicates 'auto', which is fontSize * 1.2
    */
   public leading: number;
-
   /**
    * The text layer’s spacing between characters.
    */
   public tracking: number;
-
   /**
    *  The text layer’s background color
    */
@@ -204,11 +190,23 @@ export declare class TextDocument {
   public backgroundAlpha: number;
 
   public direction: TextDirection;
-  private constructor()
+  private constructor();
 }
 
 export interface Color {
   red: number;
   green: number;
   blue: number;
+}
+/**
+ * Layers are always one of the following types.
+ */
+export enum LayerType {
+  Unknown,
+  Null,
+  Solid,
+  Text,
+  Shape,
+  Image,
+  PreCompose,
 }

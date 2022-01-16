@@ -34,11 +34,30 @@ using namespace pag;
 EMSCRIPTEN_BINDINGS(pag) {
   class_<PAGLayer>("_PAGLayer")
       .smart_ptr<std::shared_ptr<PAGLayer>>("_PAGLayer")
+      .function("_uniqueID", optional_override([](PAGLayer& pagLayer) {
+                  return static_cast<int>(pagLayer.uniqueID());
+                }))
+      .function("_layerType", optional_override([](PAGLayer& pagLayer) {
+                  return static_cast<LayerType>(pagLayer.layerType());
+                }))
+      .function("_layerName", &PAGLayer::layerName)
+      .function("_opacity", &PAGLayer::opacity)
+      .function("_setOpacity", &PAGLayer::setOpacity)
+      .function("_visible", &PAGLayer::visible)
+      .function("_setVisible", &PAGLayer::setVisible)
+      .function("_editableIndex", &PAGLayer::editableIndex)
+      .function("_frameRate", &PAGLayer::frameRate)
       .function("_duration", optional_override([](PAGLayer& pagLayer) {
                   return static_cast<int>(pagLayer.duration());
                 }))
       .function("_startTime", optional_override([](PAGLayer& pagLayer) {
                   return static_cast<int>(pagLayer.startTime());
+                }))
+      .function("_localTimeToGlobal", optional_override([](PAGLayer& pagLayer, int localTime) {
+                  return static_cast<int>(pagLayer.localTimeToGlobal(localTime));
+                }))
+      .function("_globalToLocalTime", optional_override([](PAGLayer& pagLayer, int globalTime) {
+                  return static_cast<int>(pagLayer.globalToLocalTime(globalTime));
                 }));
 
   class_<PAGComposition, base<PAGLayer>>("_PAGComposition")
