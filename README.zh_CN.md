@@ -125,15 +125,15 @@ depsync
 或 [QQ](https://qm.qq.com/cgi-bin/qm/qr?k=Wa65DTnEKo2hnPsvY-1EgJOF8tvKQ-ZT&jump_from=webapi)
 群即时跟我们反馈。
 
-## License
+## 协议
 
 libpag 基于 [Apache-2.0](./LICENSE.txt) 协议开源.
 
-## Contribution
+## 贡献
 
 我们欢迎开发人员为腾讯的开源做出贡献，如果您对改进 libpag
 项目有任何的想法或建议，欢迎给我们提交 [issue](https://github.com/Tencent/libpag/issues/new/choose)
 或 [pull request](https://github.com/Tencent/libpag/pulls) 。 在发起 issue 或 pull request 前,
-请确保您已经阅读 [Contributing Guide](./CONTRIBUTING.md) 。
+请确保您已经阅读 [贡献指南](./CONTRIBUTING.md) 。
 
 
