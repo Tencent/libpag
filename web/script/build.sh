@@ -24,7 +24,7 @@ emcmake cmake -S $SOURCE_DIR -B $BUILD_DIR \
 
 cmake --build $BUILD_DIR --target pag -- -j 12
 
-emcc $RELEASE_CONF \
+emcc $RELEASE_CONF -std=c++17 \
   -I$SOURCE_DIR/include/ \
   -I$SOURCE_DIR/src/ \
   -I$SOURCE_DIR/tgfx/src/ \
