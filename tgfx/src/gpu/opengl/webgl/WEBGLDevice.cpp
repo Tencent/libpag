@@ -101,6 +101,7 @@ WEBGLDevice::WEBGLDevice(std::unique_ptr<Context> context,
 }
 
 WEBGLDevice::~WEBGLDevice() {
+  releaseAll();
   if (isAdopted) {
     return;
   }
