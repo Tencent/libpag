@@ -154,6 +154,9 @@ public class PAGSurface {
      */
     public void release() {
         nativeRelease();
+        if(surface != null){
+            surface.release()
+        }
     }
 
     private native void nativeRelease();
