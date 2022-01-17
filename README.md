@@ -152,8 +152,8 @@ libraries from [here](https://github.com/Tencent/libpag/releases).**
 ### Build Prerequisites
 
 - Xcode 11.0+
-- GCC 4.9+
-- CMake 3.18+
+- GCC 7.0+
+- CMake 3.10.2+
 - Visual Studio 2019
 - NDK 19.2.5345600 （**Please use this exact version of NDK, other versions may fail.**)
 
