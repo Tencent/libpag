@@ -61,8 +61,8 @@
         make.top.equalTo(self.view).offset(self.view.frame.size.width + 120);
     }];
     [self configButton:self.playButton];
-    [self.playButton setTitle:@"播放" forState:UIControlStateNormal];
-    [self.playButton setTitle:@"暂停" forState:UIControlStateSelected];
+    [self.playButton setTitle:@"Play" forState:UIControlStateNormal];
+    [self.playButton setTitle:@"Pause" forState:UIControlStateSelected];
     [self.playButton addTarget:self
                         action:@selector(playAction:)
               forControlEvents:UIControlEventTouchUpInside];
@@ -77,7 +77,7 @@
         make.top.equalTo(self.view).offset(self.view.frame.size.width + 120);
     }];
     [self configButton:self.exportButton];
-    [self.exportButton setTitle:@"导出" forState:UIControlStateNormal];
+    [self.exportButton setTitle:@"Export" forState:UIControlStateNormal];
     [self.exportButton addTarget:self
                           action:@selector(exportAction:)
                 forControlEvents:UIControlEventTouchUpInside];
