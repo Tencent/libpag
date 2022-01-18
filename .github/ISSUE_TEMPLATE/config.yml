@@ -4,4 +4,8 @@ contact_links:
   -
     about: "Please ask and answer usage questions on Github Discussions."
     name: Question
-    url: "https://github.com/Tencent/libpag/discussions"
+    url: "https://github.com/Tencent/libpag/discussions/new"
+  -
+    about: "Please submit feature requests on Github Discussions"
+    name: Feature request
+    url: "https://github.com/Tencent/libpag/discussions/new"

@@ -11,7 +11,7 @@ assignees: 'domchen'
 ## libpag bug
 Hello! Sorry you're having a bug! Please help us make libpag better by filling everything below out 
 with as much information as you can, so we can try to reproduce and fix the bug! 
-Please ask and answer usage questions or submit a feature request on Github Discussions: 
+Please ask and answer usage questions or submit feature requests on Github Discussions: 
 https://github.com/Tencent/libpag/discussions. We use Github Issues to track bugs only.
 -->
 
