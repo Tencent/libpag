@@ -29,6 +29,25 @@
           <input id="upload-pag" type="file" style="display: none" accept=".pag" />
         </div>
         <section id="control" style="display: none">
+          <h2>PAGFile:</h2>
+          <div class="mt-24">
+            <button id="btn-pagfile-get-duration">Get duration</button>
+            PAGFile duration
+            <input id="input-pagfile-duration" type="number" value="0" />
+            <button id="btn-pagfile-set-duration">setDuration</button>
+          </div>
+          <div class="mt-24">
+            <button id="btn-pagfile-time-stretch-mode">Get timeStretchMode</button>
+            timeStretchMode
+            <select id="select-time-stretch-mode">
+              <option value="0">None</option>
+              <option value="1">Scale</option>
+              <option value="2" selected>Repeat</option>
+              <option value="3">RepeatInverted</option>
+            </select>
+            <button id="btn-pagfile-set-time-stretch-mode">setTimeStretchMode</button>
+          </div>
+          <h2>PAGView:</h2>
           <div class="mt-24">
             设置次数
             <input id="repeatCount" type="number" value="0" />

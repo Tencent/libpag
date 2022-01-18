@@ -2,8 +2,6 @@ import esbuild from 'rollup-plugin-esbuild';
 import resolve from '@rollup/plugin-node-resolve';
 import commonJs from '@rollup/plugin-commonjs';
 
-import pkg from '../package.json';
-
 const banner = `/////////////////////////////////////////////////////////////////////////////////////////////////
 //
 //  Tencent is pleased to support the open source community by making libpag available.
@@ -23,12 +21,10 @@ const banner = `////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////////
 `;
 
-export default [{
-  input: 'src/pag.ts',
-  output: { banner, file: pkg.module, format: 'esm', sourcemap: true },
-  plugins: [esbuild({ tsconfig: 'tsconfig.json', minify: false }), resolve(), commonJs()],
-},{
-  input: 'demo/index.ts',
-  output: { banner, file: 'demo/index.js', format: 'esm', sourcemap: true },
-  plugins: [esbuild({ tsconfig: 'tsconfig.json', minify: false }), resolve(), commonJs()],
-}];
+export default [
+  {
+    input: 'demo/index.ts',
+    output: { banner, file: 'demo/index.js', format: 'esm', sourcemap: true },
+    plugins: [esbuild({ tsconfig: 'tsconfig.json', minify: false }), resolve(), commonJs()],
+  },
+];

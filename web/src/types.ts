@@ -210,3 +210,28 @@ export enum LayerType {
   Image,
   PreCompose,
 }
+
+/**
+ * Defines the rules on how to stretch the timeline of content to fit the specified duration.
+ */
+export enum PAGTimeStretchMode {
+  /**
+   * Keep the original playing speed, and display the last frame if the content's duration is less
+   * than target duration.
+   */
+  None = 0,
+  /*
+   * Change the playing speed of the content to fit target duration.
+   */
+  Scale = 1,
+  /**
+   * Keep the original playing speed, but repeat the content if the content's duration is less than
+   * target duration. This is the default mode.
+   */
+  Repeat = 2,
+  /**
+   * Keep the original playing speed, but repeat the content in reversed if the content's duration
+   * is less than target duration.
+   */
+  RepeatInverted = 3,
+}
