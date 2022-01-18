@@ -1,0 +1,7 @@
+---
+blank_issues_enabled: false
+contact_links:
+  -
+    about: "Please ask and answer usage questions on Github Discussions."
+    name: Question
+    url: "https://github.com/Tencent/libpag/discussions"
