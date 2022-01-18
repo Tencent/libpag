@@ -1,6 +1,7 @@
 ---
 name: Bug 反馈 
-about: 提交一个 Bug 帮助我们改进（中文用户专用） title: ''
+about: 提交一个 Bug 帮助我们改进（中文用户专用）
+title: ''
 labels: ''
 assignees: 'kevingpqi123'
 
