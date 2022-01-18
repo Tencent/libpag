@@ -161,7 +161,12 @@ EAGLContext* EAGLDevice::eaglContext() const {
 
 CVOpenGLESTextureCacheRef EAGLDevice::getTextureCache() {
   if (!textureCache) {
-    CVOpenGLESTextureCacheCreate(kCFAllocatorDefault, NULL, _eaglContext, NULL, &textureCache);
+    CFMutableDictionaryRef attrs = CFDictionaryCreateMutable(
+        kCFAllocatorDefault, 1, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    CFDictionarySetValue(attrs, kCVOpenGLESTextureCacheMaximumTextureAgeKey,
+                         [NSNumber numberWithFloat:0]);
+    CVOpenGLESTextureCacheCreate(kCFAllocatorDefault, attrs, _eaglContext, NULL, &textureCache);
+    CFRelease(attrs);
   }
   return textureCache;
 }
