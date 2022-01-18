@@ -13,7 +13,8 @@ assignees: 'kevingpqi123'
 		 * https://pag.io/
 	 * 已经查过现有的 Bug 列表，但是没找到相似的。
 		 * https://github.com/Tencent/libpag/issues?utf8=%E2%9C%93&q=is%3Aissue
-	 * Github Issue 只用于记录 Bug，如果想咨询使用方式或提功能需求，请使用 https://github.com/Tencent/libpag/discussions 或加入我们 QQ 群讨论。
+	 * Github Issue 只用于记录 Bug，如果想咨询使用方式或提功能需求，请使用 Github Discussions 或加入我们 QQ 群讨论。
+		 * Github Discussions: https://github.com/Tencent/libpag/discussions
 		 * QQ 群：893379574
 -->
 
