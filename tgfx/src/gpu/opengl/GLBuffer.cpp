@@ -38,9 +38,7 @@ std::shared_ptr<GLBuffer> GLBuffer::Make(Context* context, const uint16_t* buffe
     return glBuffer;
   }
   const auto* gl = GLContext::Unwrap(context);
-  glBuffer = Resource::Wrap(context, new GLBuffer());
-  glBuffer->uniqueKey = buffer;
-  glBuffer->_length = length;
+  glBuffer = Resource::Wrap(context, new GLBuffer(buffer, length));
   gl->genBuffers(1, &glBuffer->_bufferID);
   if (buffer) {
     gl->bindBuffer(GL::ELEMENT_ARRAY_BUFFER, glBuffer->_bufferID);

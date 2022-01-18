@@ -37,6 +37,9 @@ class GLBuffer : public Resource {
   void computeRecycleKey(BytesKey*) const override;
 
  private:
+  GLBuffer(const void* uniqueKey, size_t length) : uniqueKey(uniqueKey), _length(length) {
+  }
+
   void onRelease(Context* context) override;
 
   const void* uniqueKey = nullptr;
