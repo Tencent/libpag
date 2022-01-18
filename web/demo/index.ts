@@ -91,6 +91,32 @@ PAGInit({
     pagFile.replaceText(0, textDoc);
     pagView.play();
   });
+
+  // Get PAGFile duration
+  document.getElementById('btn-pagfile-get-duration').addEventListener('click', async () => {
+    const duration = await pagFile.duration();
+    console.log(`PAGFile duration ${duration}`);
+  });
+
+  // PAGFile setDuration
+  document.getElementById('btn-pagfile-set-duration').addEventListener('click', async () => {
+    const duration = Number((document.getElementById('input-pagfile-duration') as HTMLInputElement).value);
+    await pagFile.setDuration(duration);
+    console.log(`Set PAGFile duration ${duration} `);
+  });
+
+  // Get timeStretchMode
+  document.getElementById('btn-pagfile-time-stretch-mode').addEventListener('click', async () => {
+    const timeStretchMode = await pagFile.timeStretchMode();
+    console.log(`PAGFile timeStretchMode ${timeStretchMode} `);
+  });
+
+  document.getElementById('btn-pagfile-set-time-stretch-mode').addEventListener('click', () => {
+    const mode = Number((document.getElementById('select-time-stretch-mode') as HTMLSelectElement).value);
+    pagFile.setTimeStretchMode(mode);
+    console.log(`Set PAGFile timeStretchMode ${mode}`);
+  });
+
   // 控制
   document.getElementById('btn-play').addEventListener('click', () => {
     pagView.play();
@@ -145,7 +171,7 @@ PAGInit({
     console.log(`scaleMode: ${await pagView.scaleMode()}`);
   });
   document.getElementById('setScaleMode').addEventListener('click', () => {
-    let scaleMode = Number((document.getElementById('scaleMode') as HTMLInputElement).value);
+    let scaleMode = Number((document.getElementById('scaleMode') as HTMLSelectElement).value);
     pagView.setScaleMode(scaleMode);
   });
 

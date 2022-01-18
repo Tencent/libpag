@@ -69,16 +69,21 @@ EMSCRIPTEN_BINDINGS(pag) {
       .class_function("_Load", optional_override([](uintptr_t bytes, size_t length) {
                         return PAGFile::Load(reinterpret_cast<void*>(bytes), length);
                       }))
-      .function("_replaceImage", &PAGFile::replaceImage)
       .function("_numImages", &PAGFile::numImages)
       .function("_numVideos", &PAGFile::numVideos)
+      .function("_numTexts", &PAGFile::numTexts)
+      .function("_getTextData", &PAGFile::getTextData)
+      .function("_replaceText", &PAGFile::replaceText)
+      .function("_replaceImage", &PAGFile::replaceImage)
       .function("_getLayersByEditableIndex",
                 optional_override([](PAGFile& pagFile, int editableIndex, LayerType layerType) {
                   return pagFile.getLayersByEditableIndex(editableIndex, layerType);
                 }))
-      .function("_numTexts", &PAGFile::numTexts)
-      .function("_replaceText", &PAGFile::replaceText)
-      .function("_getTextData", &PAGFile::getTextData);
+      .function("_timeStretchMode", &PAGFile::timeStretchMode)
+      .function("_setTimeStretchMode", &PAGFile::setTimeStretchMode)
+      .function("_setDuration", optional_override([](PAGFile& pagFile, int duration) {
+                  return pagFile.setDuration(static_cast<int64_t>(duration));
+                }));
 
   class_<PAGSurface>("_PAGSurface")
       .smart_ptr<std::shared_ptr<PAGSurface>>("_PAGSurface")

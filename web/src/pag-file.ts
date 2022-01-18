@@ -1,5 +1,5 @@
 import { PAGImage } from './pag-image';
-import { LayerType, PAG, TextDocument } from './types';
+import { LayerType, PAG, PAGTimeStretchMode, TextDocument } from './types';
 import { readFile } from './utils/common';
 import { ErrorCode } from './utils/error-map';
 import { Log } from './utils/log';
@@ -109,6 +109,29 @@ export class PAGFile {
       editableIndex,
       layerType,
     )) as number;
+  }
+  /**
+   * Indicate how to stretch the original duration to fit target duration when file's duration is
+   * changed. The default value is PAGTimeStretchMode::Repeat.
+   */
+  public async timeStretchMode(): Promise<PAGTimeStretchMode> {
+    return (await PAGFile.module.webAssemblyQueue.exec(
+      this.pagFileWasm._timeStretchMode,
+      this.pagFileWasm,
+    )) as PAGTimeStretchMode;
+  }
+  /**
+   * Set the timeStretchMode of this file.
+   */
+  public async setTimeStretchMode(value: PAGTimeStretchMode): Promise<void> {
+    await PAGFile.module.webAssemblyQueue.exec(this.pagFileWasm._setTimeStretchMode, this.pagFileWasm, value);
+  }
+  /**
+   * Set the duration of this PAGFile. Passing a value less than or equal to 0 resets the duration
+   * to its default value.
+   */
+  public async setDuration(duration: number): Promise<void> {
+    await PAGFile.module.webAssemblyQueue.exec(this.pagFileWasm._setDuration, this.pagFileWasm, duration);
   }
 
   public async destroy() {
