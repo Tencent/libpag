@@ -1,7 +1,7 @@
 # libpag Web
 
 > **当前版本为 Alpha 版本，部分功能不够稳定**
-> 
+>
 > **有问题可到[Issues](https://github.com/Tencent/libpag/issues)，会尽快修复**
 >
 > **更多特性持续开发中**
@@ -10,11 +10,29 @@
 
 - 支持播放矢量、位图、视频序列帧 PAG 文件
 
-- 基于 WebAssembly
+- 基于 `WebAssembly`
 
 ## 快速开始
 
-可以用 locateFile 函数返回 wasm 文件的路径，默认为 libpag.js 同目录下。
+可以用 `locateFile` 函数返回 `.wasm` 文件的路径，默认为 libpag.js 文件同目录下。
+
+### Browser（推荐）
+
+```html
+<canvas class="canvas" id="pag"></canvas>
+<script src="https://unpkg.com/libpag@latest/lib/libpag.min.js"></script>
+<script>
+  window.libpag.PAGInit().then((PAG) => {
+    const url = 'https://pag.io/file/like.pag';
+    fetch(url)
+      .then((response) => response.blob())
+      .then(async (blob) => {
+        const file = new window.File([blob], url.replace(/(.*\/)*([^.]+)/i, '$2'));
+        // Do Something.
+      });
+  });
+</script>
+```
 
 ### EsModule
 
@@ -28,7 +46,7 @@ import { PAGInit } from 'libpag';
 PAGInit({
   locateFile: (file) => './node_modules/libpag/lib/' + file,
 }).then((PAG) => {
-  const url = 'https://pag.io/file/like.pag'
+  const url = 'https://pag.io/file/like.pag';
   fetch(url)
     .then((response) => response.blob())
     .then(async (blob) => {
@@ -38,25 +56,7 @@ PAGInit({
 });
 ```
 
-### Browser
-
-```html
-<canvas class="canvas" id="pag"></canvas>
-<script src="https://unpkg.com/libpag@latest/lib/libpag.min.js"></script>
-<script>
-  window.libpag
-    .PAGInit()
-    .then((PAG) => {
-      const url = 'https://pag.io/file/like.pag'
-      fetch(url)
-        .then((response) => response.blob())
-        .then(async (blob) => {
-          const file = new window.File([blob], url.replace(/(.*\/)*([^.]+)/i, '$2'));
-          // Do Something.
-        });
-    });
-</script>
-```
+ESModule 引入的方式需要打包构建的时候，需要把 node_modules 下的 libpag/lib 中的 libpag.wasm 文件打包到最终产物中。并使用 `locateFile` 函数指向 libpag.wasm 文件
 
 ### PAG Demo
 
@@ -72,17 +72,21 @@ await pagView.play();
 
 npm package 中提供了多种构建产物，可以阅读 [这里](./doc/develop-install.md) 了解不同目录下产物的差别。
 
-更多的API接口可以阅读 [API文档](https://pag.io/api.html#/apis/web/)。
+demo 文件夹中提供了简单的接入示例， 可以点击 [这里](./demo/) 查看。
+
+更多的 API 接口可以阅读 [API 文档](https://pag.io/api.html#/apis/web/)。
 
 ## 浏览器兼容性
 
 | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/chrome/chrome_48x48.png" alt="Chrome" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Chrome | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/safari/safari_48x48.png" alt="Safari" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Safari |
-| ------------------------------------------------------------ | ------------------------------------------------------------ |
-| Chrome >= 87                                                 | Safari >= 11.1                                               |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chrome >= 87                                                                                                                                                                                                  | Safari >= 11.1                                                                                                                                                                                                |
 
 Chrome 69+ 与 Firefox 等更多版本的兼容工作正在进行中
 
-## 前置工作
+## 参与开发
+
+### 前置工作
 
 需要确保已经可编译 C++ libpag 库，并且安装 [Emscripten 套件](https://emscripten.org/docs/getting_started/downloads.html) 和 Node 依赖
 
@@ -91,20 +95,7 @@ Chrome 69+ 与 Firefox 等更多版本的兼容工作正在进行中
 $ npm install
 ```
 
-## 生产流程
-
-执行 `build.sh` 脚本
-
-```bash
-// web/script目录下
-$ cd script
-// 添加执行权限
-$ chmod +x ./build.sh
-// 打包
-$ ./build.sh
-```
-
-## 开发流程
+### 开发流程
 
 删除项目根目录的 `cmake-build-debug`，执行 `build.sh debug` 打包 C++ 代码，每次改动 C++ 代码都需要重新打包新的 `libpag.wasm` 文件，执行完成之后可以通过 `Tools->CMake->Reload CMake Project` 刷新项目
 
@@ -129,4 +120,17 @@ $ npm run dev
 ```bash
 // libpag根目录下
 $ emrun --browser chrome --serve_root . --port 8081 ./web/demo/index.html
+```
+
+### 生产流程
+
+执行 `build.sh` 脚本
+
+```bash
+// web/script目录下
+$ cd script
+// 添加执行权限
+$ chmod +x ./build.sh
+// 打包
+$ ./build.sh
 ```
