@@ -17,7 +17,11 @@ public class PAGSurface {
         if (surfaceTexture == null) {
             return null;
         }
-        return FromSurface(new Surface(surfaceTexture), shareContext);
+        PAGSurface pagSurface = FromSurface(new Surface(surfaceTexture), shareContext);
+        if (pagSurface != null) {
+            pagSurface.needsReleaseSurface = true;
+        }
+        return pagSurface;
     }
 
     public static PAGSurface FromSurface(Surface surface) {
@@ -121,6 +125,7 @@ public class PAGSurface {
     }
 
     private Surface surface = null;
+    private boolean needsReleaseSurface = false;
     private int textureID = 0;
 
     /**
@@ -153,6 +158,9 @@ public class PAGSurface {
      * garbage collector to do this for you at some point in the future.
      */
     public void release() {
+        if (needsReleaseSurface && surface != null) {
+            surface.release();
+        }
         nativeRelease();
     }
 
