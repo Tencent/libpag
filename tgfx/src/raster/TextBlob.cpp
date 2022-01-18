@@ -55,11 +55,9 @@ bool TextBlob::getPath(Path* path, const Stroke* stroke) const {
       }
       glyphPath.transform(Matrix::MakeTrans(position.x, position.y));
       totalPath.addPath(glyphPath);
-    } else {
-      return false;
     }
   }
   *path = totalPath;
-  return true;
+  return !totalPath.isEmpty();
 }
 }  // namespace pag
