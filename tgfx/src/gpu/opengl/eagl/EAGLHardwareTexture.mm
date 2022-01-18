@@ -23,6 +23,9 @@ namespace pag {
 static CVOpenGLESTextureRef GetTextureRef(Context* context, CVPixelBufferRef pixelBuffer,
                                           CVOpenGLESTextureCacheRef textureCache,
                                           unsigned* sizedFormat) {
+  if (textureCache == nil) {
+    return nil;
+  }
   auto width = static_cast<int>(CVPixelBufferGetWidth(pixelBuffer));
   auto height = static_cast<int>(CVPixelBufferGetHeight(pixelBuffer));
   auto pixelFormat = CVPixelBufferGetPixelFormatType(pixelBuffer);
@@ -35,7 +38,7 @@ static CVOpenGLESTextureRef GetTextureRef(Context* context, CVPixelBufferRef pix
     // 返回的 texture 对象是一个强引用计数为 1 的对象。
     result = CVOpenGLESTextureCacheCreateTextureFromImage(
         kCFAllocatorDefault, textureCache, pixelBuffer, NULL, /* texture attributes */
-        GL::TEXTURE_2D, format.internalFormatTexImage,         /* opengl format */
+        GL::TEXTURE_2D, format.internalFormatTexImage,        /* opengl format */
         width, height, format.externalFormat,                 /* native iOS format */
         GL::UNSIGNED_BYTE, 0, &texture);
   } else {
@@ -43,8 +46,8 @@ static CVOpenGLESTextureRef GetTextureRef(Context* context, CVPixelBufferRef pix
     // 返回的 texture 对象是一个强引用计数为 1 的对象。
     result = CVOpenGLESTextureCacheCreateTextureFromImage(
         kCFAllocatorDefault, textureCache, pixelBuffer, NULL, /* texture attributes */
-        GL::TEXTURE_2D, GL::RGBA,                               /* opengl format */
-        width, height, GL::BGRA,                               /* native iOS format */
+        GL::TEXTURE_2D, GL::RGBA,                             /* opengl format */
+        width, height, GL::BGRA,                              /* native iOS format */
         GL::UNSIGNED_BYTE, 0, &texture);
   }
   if (result != kCVReturnSuccess && texture != nil) {
@@ -71,24 +74,9 @@ std::shared_ptr<EAGLHardwareTexture> EAGLHardwareTexture::MakeFrom(Context* cont
   if (eaglDevice == nullptr) {
     return nullptr;
   }
-  CVOpenGLESTextureCacheRef textureCache = nil;
-  if (adopted) {
-    // use independent texture cache here, to prevent memory leaking when binding the same
-    // CVPixelBuffer to two different texture caches.
-    CVOpenGLESTextureCacheCreate(kCFAllocatorDefault, NULL, eaglDevice->eaglContext(), NULL,
-                                 &textureCache);
-  } else {
-    textureCache = eaglDevice->getTextureCache();
-  }
-  if (textureCache == nil) {
-    return nullptr;
-  }
   unsigned sizedFormat = 0;
-  auto texture = GetTextureRef(context, pixelBuffer, textureCache, &sizedFormat);
+  auto texture = GetTextureRef(context, pixelBuffer, eaglDevice->getTextureCache(), &sizedFormat);
   if (texture == nil) {
-    if (adopted) {
-      CFRelease(textureCache);
-    }
     return nullptr;
   }
   GLTextureInfo glInfo = {};
@@ -97,11 +85,10 @@ std::shared_ptr<EAGLHardwareTexture> EAGLHardwareTexture::MakeFrom(Context* cont
   glInfo.format = sizedFormat;
   auto oneComponent8 =
       CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_OneComponent8;
-  glTexture = Resource::Wrap(context, new EAGLHardwareTexture(pixelBuffer));
+  glTexture = Resource::Wrap(context, new EAGLHardwareTexture(pixelBuffer, adopted));
   glTexture->sampler.glInfo = glInfo;
   glTexture->sampler.config = oneComponent8 ? PixelConfig::ALPHA_8 : PixelConfig::RGBA_8888;
   glTexture->texture = texture;
-  glTexture->textureCache = adopted ? textureCache : nil;
   return glTexture;
 }
 
@@ -114,10 +101,11 @@ void EAGLHardwareTexture::ComputeRecycleKey(BytesKey* recycleKey, CVPixelBufferR
   recycleKey->write(pixelBuffer);
 }
 
-EAGLHardwareTexture::EAGLHardwareTexture(CVPixelBufferRef pixelBuffer)
+EAGLHardwareTexture::EAGLHardwareTexture(CVPixelBufferRef pixelBuffer, bool adopted)
     : GLTexture(static_cast<int>(CVPixelBufferGetWidth(pixelBuffer)),
                 static_cast<int>(CVPixelBufferGetHeight(pixelBuffer)), ImageOrigin::TopLeft),
-      pixelBuffer(pixelBuffer) {
+      pixelBuffer(pixelBuffer),
+      adopted(adopted) {
   CFRetain(pixelBuffer);
 }
 
@@ -125,9 +113,6 @@ EAGLHardwareTexture::~EAGLHardwareTexture() {
   CFRelease(pixelBuffer);
   if (texture) {
     CFRelease(texture);
-  }
-  if (textureCache) {
-    CFRelease(textureCache);
   }
 }
 
@@ -137,8 +122,7 @@ size_t EAGLHardwareTexture::memoryUsage() const {
 }
 
 void EAGLHardwareTexture::computeRecycleKey(BytesKey* recycleKey) const {
-  if (textureCache == nil) {
-    // not adopted
+  if (!adopted) {
     ComputeRecycleKey(recycleKey, pixelBuffer);
   }
 }
@@ -147,17 +131,7 @@ void EAGLHardwareTexture::onRelease(Context* context) {
   if (texture == nil) {
     return;
   }
-  auto cache = textureCache;
-  if (!cache) {
-    auto eaglDevice = static_cast<EAGLDevice*>(context->getDevice());
-    cache = eaglDevice->getTextureCache();
-  }
-  CFRelease(texture);
+  static_cast<EAGLDevice*>(context->getDevice())->releaseTexture(texture);
   texture = nil;
-  CVOpenGLESTextureCacheFlush(cache, 0);
-  if (textureCache != nil) {
-    CFRelease(textureCache);
-    textureCache = nil;
-  }
 }
 }

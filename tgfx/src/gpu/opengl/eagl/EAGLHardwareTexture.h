@@ -25,9 +25,9 @@ namespace pag {
 class EAGLHardwareTexture : public GLTexture {
  public:
   static std::shared_ptr<EAGLHardwareTexture> MakeFrom(Context* context,
-      CVPixelBufferRef pixelBuffer, bool adopted);
+                                                       CVPixelBufferRef pixelBuffer, bool adopted);
 
-  explicit EAGLHardwareTexture(CVPixelBufferRef pixelBuffer);
+  EAGLHardwareTexture(CVPixelBufferRef pixelBuffer, bool adopted);
 
   ~EAGLHardwareTexture() override;
   size_t memoryUsage() const override;
@@ -38,8 +38,8 @@ class EAGLHardwareTexture : public GLTexture {
 
  private:
   CVPixelBufferRef pixelBuffer = nullptr;
-  CVOpenGLESTextureCacheRef textureCache = nil;
   CVOpenGLESTextureRef texture = nil;
+  bool adopted = false;
 
   static void ComputeRecycleKey(BytesKey* recycleKey, CVPixelBufferRef pixelBuffer);
 };
