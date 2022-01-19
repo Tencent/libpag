@@ -72,32 +72,6 @@
       }
     ]
   },
-  "files": {
-    "mac": [
-      {
-        "url": "${PAG_GROUP}/swiftshader/releases/download/opengl/mac.zip",
-        "dir": "third_party/out/swiftshader",
-        "unzip": true
-      },
-      {
-        "url": "${PAG_GROUP}/ffavc/releases/download/0.9.0/ffavc_0.9.0_release_mac_x64.zip",
-        "dir": "vendor/ffavc",
-        "unzip": true
-      }
-    ],
-    "win": [
-      {
-        "url": "${PAG_GROUP}/swiftshader/releases/download/opengl/win.zip",
-        "dir": "third_party/out/swiftshader",
-        "unzip": true
-      },
-      {
-        "url": "${PAG_GROUP}/angle/releases/download/chromium_4763/win.zip",
-        "dir": "vendor/angle",
-        "unzip": true
-      }
-    ]
-  },
   "actions": {
     "common": [
       {

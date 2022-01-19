@@ -41,7 +41,6 @@ local.properties
 
 /third_party
 /out
-/vendor
 cmake-build-debug
 cmake-build-release
 node_modules
