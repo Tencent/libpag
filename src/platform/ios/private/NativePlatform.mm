@@ -41,6 +41,6 @@ std::unique_ptr<VideoDecoder> NativePlatform::makeHardwareDecoder(const VideoCon
 }
 
 void NativePlatform::reportStatisticalData(
-    std::unordered_map<std::string, std::string>& reportMap) const {
+    std::unordered_map<std::string, std::string>&) const {
 }
 }
