@@ -301,17 +301,17 @@ const renderEditableLayer = (editableLayers) => {
   editableLayers.forEach((layer) => {
     const item = document.createElement('div');
     item.className = 'mt-24';
-    item.innerText = `index: ${layer.index} startTime: ${layer.startTime} duration: ${layer.duration}`;
+    item.innerText = `editableIndex: ${layer.editableIndex} startTime: ${layer.startTime} duration: ${layer.duration}`;
     const replaceImageBtn = document.createElement('button');
     replaceImageBtn.addEventListener('click', () => {
-      replaceImage(item, layer.index);
+      replaceImage(item, layer.editableIndex);
     });
     replaceImageBtn.style.marginLeft = '12px';
     replaceImageBtn.innerText = '替换图片';
     item.appendChild(replaceImageBtn);
     const replaceVideoBtn = document.createElement('button');
     replaceVideoBtn.addEventListener('click', () => {
-      replaceVideo(item, layer.index);
+      replaceVideo(item, layer.editableIndex);
     });
     replaceVideoBtn.style.marginLeft = '12px';
     replaceVideoBtn.innerText = '替换视频';
