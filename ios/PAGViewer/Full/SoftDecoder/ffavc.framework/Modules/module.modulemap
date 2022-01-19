@@ -1,0 +1,6 @@
+framework module ffavc {
+  umbrella header "ffavc-umbrella.h"
+
+  export *
+  module * { export * }
+}
