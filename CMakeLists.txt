@@ -200,8 +200,8 @@ if (PAG_USE_LIBAVC)
     list(APPEND PAG_INCLUDES third_party/libavc/common third_party/libavc/decoder)
 endif ()
 
-list(APPEND SWIFTSHADER_INCLUDE_DIRS third_party/swiftshader/include)
-file(GLOB SWIFTSHADER_LIBRARIES third_party/out/swiftshader/${LIBRARY_ENTRY}/*${CMAKE_SHARED_LIBRARY_SUFFIX})
+list(APPEND SWIFTSHADER_INCLUDE_DIRS vendor/swiftshader/include)
+file(GLOB SWIFTSHADER_LIBRARIES vendor/swiftshader/${LIBRARY_ENTRY}/*${CMAKE_SHARED_LIBRARY_SUFFIX})
 
 if (PAG_USE_QT)
     # need to set the CMAKE_PREFIX_PATH to local QT installation path, for example :
@@ -376,7 +376,7 @@ elseif (WIN32)
     add_definitions(-DNOMINMAX -D_USE_MATH_DEFINES)
 
     if (USE_NATIVE_PLATFORM)
-        list(APPEND PAG_PLATFORM_INCLUDES vendor/angle/${PLATFORM}/include)
+        list(APPEND PAG_PLATFORM_INCLUDES vendor/angle/include)
         file(GLOB_RECURSE PAG_PLATFORM_FILES src/platform/win/*.*)
         file(GLOB GL_PLATFORM_FILES tgfx/src/gpu/opengl/egl/*.*)
         list(APPEND PAG_PLATFORM_FILES ${GL_PLATFORM_FILES})
@@ -457,7 +457,7 @@ if (PAG_BUILD_TESTS)
 
     file(GLOB FFAVC_LIB vendor/ffavc/${LIBRARY_ENTRY}/*${CMAKE_SHARED_LIBRARY_SUFFIX})
     list(APPEND TEST_PLATFORM_LIBS ${FFAVC_LIB})
-    list(APPEND TEST_INCLUDES vendor/ffavc/${INCLUDE_ENTRY})
+    list(APPEND TEST_INCLUDES vendor/ffavc/include)
 
     add_executable(PAGUnitTest ${Test_VENDOR_TARGET} ${PAG_TEST_FILES})
     target_include_directories(PAGUnitTest PUBLIC ${TEST_INCLUDES})
