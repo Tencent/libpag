@@ -25,10 +25,6 @@
 namespace pag {
 class PAGTestEnvironment : public testing::Environment {
  public:
-  static nlohmann::json DumpJson;
-  static nlohmann::json CompareJson;
-  static std::mutex GlobalLocker;
-
   virtual ~PAGTestEnvironment() override;
 
   virtual void SetUp() override;

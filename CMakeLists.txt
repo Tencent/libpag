@@ -441,18 +441,21 @@ if (PAG_BUILD_TESTS)
     file(GLOB PAG_TEST_FILES
             test/*.*
             test/framework/*.*
+            test/framework/lzma/*.*
             test/framework/utils/*.*)
 
     file(GLOB PAG_SMOKE_TEST_FILES
             test/PAGSmokeTest.cpp
             test/TestUtils.cpp
             test/framework/*.cpp
+            test/framework/lzma/*.*
             test/framework/utils/*.cpp)
 
     file(GLOB PAG_PERFORMANCE_TEST_FILES
             test/PAGPerformanceTest.cpp
             test/TestUtils.cpp
             test/framework/*.cpp
+            test/framework/lzma/*.*
             test/framework/utils/*.cpp)
 
     file(GLOB FFAVC_LIB vendor/ffavc/${LIBRARY_ENTRY}/*${CMAKE_SHARED_LIBRARY_SUFFIX})
@@ -461,8 +464,8 @@ if (PAG_BUILD_TESTS)
 
     add_executable(PAGUnitTest ${Test_VENDOR_TARGET} ${PAG_TEST_FILES})
     target_include_directories(PAGUnitTest PUBLIC ${TEST_INCLUDES})
-    # skip all File MD5 check in PAGUnitTest
-    target_compile_definitions(PAGUnitTest PUBLIC SKIP_FILE_MD5)
+    # skip the PAGCompareFrameTest test case in PAGUnitTest
+    target_compile_definitions(PAGUnitTest PUBLIC SKIP_FRAME_COMPARE)
     target_link_libraries(PAGUnitTest ${TEST_PLATFORM_LIBS})
     set_target_properties(PAGUnitTest PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
 
@@ -474,7 +477,7 @@ if (PAG_BUILD_TESTS)
     add_executable(PAGSmokeTest ${Test_VENDOR_TARGET} ${PAG_SMOKE_TEST_FILES})
     target_include_directories(PAGSmokeTest PUBLIC ${TEST_INCLUDES})
     target_link_libraries(PAGSmokeTest ${TEST_PLATFORM_LIBS})
-    target_compile_definitions(PAGSmokeTest PUBLIC SMOKE_TEST SKIP_FILE_MD5)
+    target_compile_definitions(PAGSmokeTest PUBLIC SMOKE_TEST SKIP_FRAME_COMPARE)
 
     add_executable(PAGPerformanceTest ${Test_VENDOR_TARGET} ${PAG_PERFORMANCE_TEST_FILES})
     target_include_directories(PAGPerformanceTest PUBLIC ${TEST_INCLUDES})

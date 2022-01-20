@@ -40,7 +40,7 @@ namespace pag {
 std::shared_ptr<Image> Image::MakeFrom(const std::string& filePath) {
   std::shared_ptr<Image> image = nullptr;
   auto stream = Stream::MakeFromFile(filePath);
-  if (stream->size() <= 14) {
+  if (stream == nullptr || stream->size() <= 14) {
     return nullptr;
   }
   auto buffer = new uint8_t[14];

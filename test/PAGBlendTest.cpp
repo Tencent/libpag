@@ -29,7 +29,7 @@ PAG_TEST_CASE(PAGBlendTest)
 /**
  * 用例描述: 测试基础混合模式
  */
-PAG_TEST_F(PAGBlendTest, Blend_ID83348933) {
+PAG_TEST_F(PAGBlendTest, Blend) {
   std::vector<std::string> files;
   GetAllPAGFiles("../resources/blend", files);
   auto pagSurface = PAGSurface::MakeOffscreen(400, 400);
@@ -42,16 +42,10 @@ PAG_TEST_F(PAGBlendTest, Blend_ID83348933) {
     pagPlayer->setMatrix(Matrix::I());
     pagPlayer->setProgress(0.5);
     pagPlayer->flush();
-    auto md5 = DumpMD5(pagSurface);
     auto found = file.find_last_of("/\\");
-    auto fileName = file.substr(found + 1);
-    PAGTestEnvironment::DumpJson["PAGBlendTest"]["base"][fileName] = md5;
-#ifdef COMPARE_JSON_PATH
-    auto compareMD5 = PAGTestEnvironment::CompareJson["PAGBlendTest"]["base"][fileName];
-    auto path = "../test/out/blend_" + fileName + ".png";
-    TraceIf(pagSurface, path, compareMD5.get<std::string>() != md5);
-    EXPECT_EQ(compareMD5.get<std::string>(), md5);
-#endif
+    auto suffixIndex = file.rfind('.');
+    auto fileName = file.substr(found + 1, suffixIndex - found - 1);
+    EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGBlendTest/Blend_"+ fileName));
   }
 }
 
@@ -77,7 +71,7 @@ GLTextureInfo GetBottomLeftImage(std::shared_ptr<Device> device, int width, int 
 /**
  * 用例描述: 使用blend时，如果当前的frameBuffer是BottomLeft的，复制逻辑验证
  */
-PAG_TEST_F(PAGBlendTest, CopyDstTexture_ID83384135) {
+PAG_TEST_F(PAGBlendTest, CopyDstTexture) {
   auto width = 400;
   auto height = 400;
   auto device = NativeGLDevice::Make();
@@ -96,14 +90,7 @@ PAG_TEST_F(PAGBlendTest, CopyDstTexture_ID83384135) {
   pagPlayer->setMatrix(Matrix::I());
   pagPlayer->setProgress(0.5);
   pagPlayer->flush();
-  auto md5 = DumpMD5(pagSurface);
-  PAGTestEnvironment::DumpJson["PAGBlendTest"]["CopyDstTexture_ID83384135"] = md5;
-#ifdef COMPARE_JSON_PATH
-  auto compareMD5 = PAGTestEnvironment::CompareJson["PAGBlendTest"]["CopyDstTexture_ID83384135"];
-  auto path = "../test/out/blend_Multiply_CopyDstTexture.png";
-  TraceIf(pagSurface, path, compareMD5.get<std::string>() != md5);
-  EXPECT_EQ(compareMD5.get<std::string>(), md5);
-#endif
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGBlendTest/CopyDstTexture"));
 
   context = device->lockContext();
   gl = GLContext::Unwrap(context);
@@ -114,7 +101,7 @@ PAG_TEST_F(PAGBlendTest, CopyDstTexture_ID83384135) {
 /**
  * 用例描述: 替换的texture是BottomLeft，renderTarget是TopLeft
  */
-PAG_TEST_F(PAGBlendTest, TextureBottomLeft_ID83721303) {
+PAG_TEST_F(PAGBlendTest, TextureBottomLeft) {
   auto width = 720;
   auto height = 1280;
   auto device = NativeGLDevice::Make();
@@ -138,14 +125,7 @@ PAG_TEST_F(PAGBlendTest, TextureBottomLeft_ID83721303) {
   pagPlayer->setMatrix(Matrix::I());
   pagPlayer->setProgress(0.34);
   pagPlayer->flush();
-  auto md5 = DumpMD5(pagSurface);
-  PAGTestEnvironment::DumpJson["PAGBlendTest"]["TextureBottomLeft_ID83721303"] = md5;
-#ifdef COMPARE_JSON_PATH
-  auto compareMD5 = PAGTestEnvironment::CompareJson["PAGBlendTest"]["TextureBottomLeft_ID83721303"];
-  auto path = "../test/out/TextureBottomLeft_ID83721303.png";
-  TraceIf(pagSurface, path, compareMD5.get<std::string>() != md5);
-  EXPECT_EQ(compareMD5.get<std::string>(), md5);
-#endif
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGBlendTest/TextureBottomLeft"));
 
   context = device->lockContext();
   gl = GLContext::Unwrap(context);
@@ -157,7 +137,7 @@ PAG_TEST_F(PAGBlendTest, TextureBottomLeft_ID83721303) {
 /**
  * 用例描述: 替换的texture和renderTarget都是BottomLeft
  */
-PAG_TEST_F(PAGBlendTest, BothBottomLeft_ID83721689) {
+PAG_TEST_F(PAGBlendTest, BothBottomLeft) {
   auto width = 720;
   auto height = 1280;
   auto device = NativeGLDevice::Make();
@@ -186,14 +166,7 @@ PAG_TEST_F(PAGBlendTest, BothBottomLeft_ID83721689) {
   pagPlayer->setMatrix(Matrix::I());
   pagPlayer->setProgress(0.3);
   pagPlayer->flush();
-  auto md5 = DumpMD5(pagSurface);
-  PAGTestEnvironment::DumpJson["PAGBlendTest"]["BothBottomLeft_ID83721689"] = md5;
-#ifdef COMPARE_JSON_PATH
-  auto compareMD5 = PAGTestEnvironment::CompareJson["PAGBlendTest"]["BothBottomLeft_ID83721689"];
-  auto path = "../test/out/BothBottomLeft_ID83721689.png";
-  TraceIf(pagSurface, path, compareMD5.get<std::string>() != md5);
-  EXPECT_EQ(compareMD5.get<std::string>(), md5);
-#endif
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGBlendTest/BothBottomLeft"));
 
   context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
