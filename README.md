@@ -30,7 +30,7 @@ easily without other attachments.
 
 - **All AE features supported**
 
-<img src="resources/readme/intro_2.png" alt="intro_2" width="281"/>
+<img src="resources/readme/intro_2.png" alt="intro_2" width="282"/>
 
 While other solutions may only support exporting limited vector-based AE features, PAG supports
 exporting all AE animations into a single file by combining vector-based exporting with raster-based
