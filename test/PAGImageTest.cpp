@@ -72,13 +72,7 @@ PAG_TEST_F(PAGImageTest, image) {
   TestPAGFile->setCurrentTime(3000000);
   imageLayer->replaceImage(image);
   TestPAGPlayer->flush();
-  auto md5 = getMd5FromSnap();
-  json imageLayerJson = {{"image", md5}};
-  PAGTestEnvironment::DumpJson["PAGImageTest"] = imageLayerJson;
-#ifdef COMPARE_JSON_PATH
-  auto cJson = PAGTestEnvironment::CompareJson["PAGImageTest"]["image"];
-  ASSERT_EQ(cJson.get<std::string>(), md5);
-#endif
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGImageTest/image"));
 }
 
 /**
@@ -99,14 +93,12 @@ PAG_TEST_F(PAGImageTest, image2) {
   bitmap.unlockPixels();
   ASSERT_TRUE(result);
 
-  auto md5 = DumpMD5(bitmap);
-  json imageLayerJson = {{"image", md5}};
-  PAGTestEnvironment::DumpJson["PAGImageTester"] = imageLayerJson;
-#ifdef COMPARE_JSON_PATH
-  auto cJson = PAGTestEnvironment::CompareJson["PAGImageTester"]["image"];
-  TraceIf(bitmap, "../test/out/PAGImageTester_image.png", md5 != cJson.get<std::string>());
-  ASSERT_EQ(cJson.get<std::string>(), md5);
-#endif
+  auto pixelBuffer = PixelBuffer::Make(image->width(), image->height());
+  ASSERT_NE(pixelBuffer, nullptr);
+  result = image->readPixels(bitmap.info(), pixelBuffer->lockPixels());
+  pixelBuffer->unlockPixels();
+  ASSERT_TRUE(result);
+  EXPECT_TRUE(Baseline::Compare(pixelBuffer, "PAGImageTest/image2"));
 }
 
 /**
@@ -127,12 +119,6 @@ PAG_TEST_F(PAGImageTest, image3) {
   player->setSurface(surface);
   auto result = player->flush();
   EXPECT_TRUE(result);
-  auto md5 = DumpMD5(surface);
-  PAGTestEnvironment::DumpJson["PAGImageDecodeTest"]["image_rotation"] = md5;
-#ifdef COMPARE_JSON_PATH
-  auto cJson = PAGTestEnvironment::CompareJson["PAGImageDecodeTest"]["image_rotation"];
-  TraceIf(surface, "../test/out/test_image_rotation.png", md5 != cJson.get<std::string>());
-  ASSERT_EQ(cJson.get<std::string>(), md5);
-#endif
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGImageTest/image3"));
 }
 }  // namespace pag

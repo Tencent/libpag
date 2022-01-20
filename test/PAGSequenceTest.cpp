@@ -36,27 +36,20 @@ void pagSequenceTest() {
   pagPlayer->setProgress(0.5);
   pagPlayer->flush();
   EXPECT_EQ(static_cast<int>(pagPlayer->renderCache->sequenceCaches.size()), 1);
-  auto md5 = DumpMD5(pagSurface);
-  PAGTestEnvironment::DumpJson["PAGSequenceTest"]["RenderOnScreen_ID80475733"] = md5;
-#ifdef COMPARE_JSON_PATH
-  auto compareMD5 = PAGTestEnvironment::CompareJson["PAGSequenceTest"]["RenderOnScreen_ID80475733"];
-  TraceIf(pagSurface, "../test/out/RenderOnScreen_ID80475733.png",
-          compareMD5.get<std::string>() != md5);
-  EXPECT_EQ(compareMD5.get<std::string>(), md5);
-#endif
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGSequenceTest/pagSequenceTest"));
 }
 
 /**
  * 用例描述: 测试直接上屏
  */
-PAG_TEST_F(PAGSequenceTest, RenderOnScreen_ID80475733) {
+PAG_TEST_F(PAGSequenceTest, RenderOnScreen) {
   pagSequenceTest();
 }
 
 /**
  * 用例描述: bitmapSequence关键帧不是全屏的时候要清屏
  */
-PAG_TEST_F(PAGSequenceTest, BitmapSequenceReader_ID82681127) {
+PAG_TEST_F(PAGSequenceTest, BitmapSequenceReader) {
   auto pagFile = PAGFile::Load("../resources/apitest/ZC_mg_seky2_landscape.pag");
   auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_shared<PAGPlayer>();
@@ -66,21 +59,13 @@ PAG_TEST_F(PAGSequenceTest, BitmapSequenceReader_ID82681127) {
   pagPlayer->flush();
   pagPlayer->setProgress(0.75);
   pagPlayer->flush();
-  auto md5 = DumpMD5(pagSurface);
-  PAGTestEnvironment::DumpJson["PAGSequenceTest"]["BitmapSequenceReader_ID82681127"] = md5;
-#ifdef COMPARE_JSON_PATH
-  auto compareMD5 =
-      PAGTestEnvironment::CompareJson["PAGSequenceTest"]["BitmapSequenceReader_ID82681127"];
-  TraceIf(pagSurface, "../test/out/BitmapSequenceReader_ID82681127.png",
-          compareMD5.get<std::string>() != md5);
-  EXPECT_EQ(compareMD5.get<std::string>(), md5);
-#endif
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGSequenceTest/BitmapSequenceReader"));
 }
 
 /**
  * 用例描述: 视频序列帧作为遮罩
  */
-PAG_TEST_F(PAGSequenceTest, VideoSequenceAsMask_ID83191791) {
+PAG_TEST_F(PAGSequenceTest, VideoSequenceAsMask) {
   auto pagFile = PAGFile::Load("../resources/apitest/video_sequence_as_mask.pag");
   auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_shared<PAGPlayer>();
@@ -88,14 +73,6 @@ PAG_TEST_F(PAGSequenceTest, VideoSequenceAsMask_ID83191791) {
   pagPlayer->setComposition(pagFile);
   pagPlayer->setProgress(0.2);
   pagPlayer->flush();
-  auto md5 = DumpMD5(pagSurface);
-  PAGTestEnvironment::DumpJson["PAGSequenceTest"]["VideoSequenceAsMask_ID83191791"] = md5;
-#ifdef COMPARE_JSON_PATH
-  auto compareMD5 =
-      PAGTestEnvironment::CompareJson["PAGSequenceTest"]["VideoSequenceAsMask_ID83191791"];
-  TraceIf(pagSurface, "../test/out/VideoSequenceAsMask_ID83191791.png",
-          compareMD5.get<std::string>() != md5);
-  EXPECT_EQ(compareMD5.get<std::string>(), md5);
-#endif
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGSequenceTest/VideoSequenceAsMask"));
 }
 }  // namespace pag

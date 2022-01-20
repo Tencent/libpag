@@ -18,31 +18,15 @@
 
 #pragma once
 
+#include "Baseline.h"
+#include "base/utils/GetTimer.h"
 #include "image/Bitmap.h"
 #include "image/PixelBuffer.h"
 #include "image/PixelMap.h"
 #include "pag/pag.h"
 
 namespace pag {
-std::string DumpMD5(const void* bytes, size_t size);
-
-std::string DumpMD5(const Bitmap& bitmap);
-
-std::string DumpMD5(const PixelMap& pixelMap);
-
-std::string DumpMD5(std::shared_ptr<PixelBuffer> pixelBuffer);
-
-std::string DumpMD5(std::shared_ptr<PAGSurface> pagSurface);
-
-Bitmap MakeSnapshot(std::shared_ptr<PAGSurface> pagSurface);
-
-void TraceIf(const Bitmap& bitmap, const std::string& path, bool condition);
-
-void TraceIf(std::shared_ptr<PixelBuffer> pixelBuffer, const std::string& path, bool condition);
-
-void TraceIf(const PixelMap& pixelMap, const std::string& path, bool condition);
-
-void TraceIf(std::shared_ptr<PAGSurface> pagSurface, const std::string& path, bool condition);
+std::shared_ptr<PixelBuffer> MakeSnapshot(std::shared_ptr<PAGSurface> pagSurface);
 
 std::shared_ptr<PAGLayer> GetLayer(std::shared_ptr<PAGComposition> root, LayerType type,
                                    int& targetIndex);

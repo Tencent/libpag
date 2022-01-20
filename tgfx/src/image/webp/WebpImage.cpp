@@ -169,9 +169,7 @@ std::shared_ptr<Data> WebpImage::Encode(const ImageInfo& imageInfo, const void* 
     pic.use_argb = 1;
   } else {
     webp_config.lossless = 0;
-#ifndef SK_WEBP_ENCODER_USE_DEFAULT_METHOD
     webp_config.method = 3;
-#endif
     pic.use_argb = 0;
   }
 

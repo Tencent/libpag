@@ -94,4 +94,10 @@ void PixelBuffer::eraseAll() {
   unlockPixels();
 }
 
+void Trace(std::shared_ptr<PixelBuffer> pixelBuffer, const std::string& tag) {
+  auto pixels = pixelBuffer->lockPixels();
+  PixelMap pixelMap(pixelBuffer->info(), pixels);
+  Platform::Current()->traceImage(pixelMap, tag);
+  pixelBuffer->unlockPixels();
+}
 }  // namespace pag

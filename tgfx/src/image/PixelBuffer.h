@@ -108,4 +108,9 @@ class PixelBuffer : public TextureBuffer {
  private:
   bool hardwareBacked = false;
 };
+
+/**
+ * Trace() provides a utility to view the PixelBuffer.
+ */
+void Trace(std::shared_ptr<PixelBuffer> pixelBuffer, const std::string& tag = "");
 }  // namespace pag
