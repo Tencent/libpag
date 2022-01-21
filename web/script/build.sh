@@ -35,6 +35,7 @@ emcc $RELEASE_CONF -std=c++17 \
   --bind \
   -s WASM=1 \
   -s ASYNCIFY \
+  -s USE_WEBGL2=1 \
   -s "EXPORTED_RUNTIME_METHODS=['GL']" \
   -s ALLOW_MEMORY_GROWTH=1 \
   -s EXPORT_NAME="PAGInit" \

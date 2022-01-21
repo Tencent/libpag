@@ -17,8 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLInterface.h"
+
 #include <mutex>
 #include <unordered_map>
+
+#include "GLAssembledGLESInterface.h"
+#include "GLAssembledGLInterface.h"
+#include "GLAssembledWebGLInterface.h"
 #include "GLState.h"
 #include "GLUtil.h"
 
@@ -89,94 +94,6 @@ std::unique_ptr<const GLInterface> GLInterface::HookWithState(const GLInterface*
   return std::unique_ptr<const GLInterface>(interface);
 }
 
-static void InitFramebufferTexture2DMultisample(const GLProcGetter* getter, GLInterface* interface,
-                                                const GLInfo& info) {
-  if (info.hasExtension("GL_EXT_multisampled_render_to_texture")) {
-    interface->framebufferTexture2DMultisample =
-        reinterpret_cast<GLFramebufferTexture2DMultisample*>(
-            getter->getProcAddress("glFramebufferTexture2DMultisampleEXT"));
-  } else if (info.hasExtension("GL_IMG_multisampled_render_to_texture")) {
-    interface->framebufferTexture2DMultisample =
-        reinterpret_cast<GLFramebufferTexture2DMultisample*>(
-            getter->getProcAddress("glFramebufferTexture2DMultisampleIMG"));
-  }
-}
-
-static void InitRenderbufferStorageMultisample(const GLProcGetter* getter, GLInterface* interface,
-                                               const GLInfo& info) {
-  if (info.version >= GL_VER(3, 0)) {
-    interface->renderbufferStorageMultisample = reinterpret_cast<GLRenderbufferStorageMultisample*>(
-        getter->getProcAddress("glRenderbufferStorageMultisample"));
-  } else if (info.hasExtension("GL_CHROMIUM_framebuffer_multisample")) {
-    interface->renderbufferStorageMultisample = reinterpret_cast<GLRenderbufferStorageMultisample*>(
-        getter->getProcAddress("glRenderbufferStorageMultisampleCHROMIUM"));
-  } else if (info.hasExtension("GL_ANGLE_framebuffer_multisample")) {
-    interface->renderbufferStorageMultisample = reinterpret_cast<GLRenderbufferStorageMultisample*>(
-        getter->getProcAddress("glRenderbufferStorageMultisampleANGLE"));
-  }
-  if (info.hasExtension("GL_EXT_multisampled_render_to_texture")) {
-    interface->renderbufferStorageMultisampleEXT =
-        reinterpret_cast<GLRenderbufferStorageMultisampleEXT*>(
-            getter->getProcAddress("glRenderbufferStorageMultisampleEXT"));
-  }
-  if (info.hasExtension("GL_IMG_multisampled_render_to_texture")) {
-    interface->renderbufferStorageMultisampleEXT =
-        reinterpret_cast<GLRenderbufferStorageMultisampleEXT*>(
-            getter->getProcAddress("glRenderbufferStorageMultisampleIMG"));
-  }
-  if (info.hasExtension("GL_APPLE_framebuffer_multisample")) {
-    interface->renderbufferStorageMultisampleAPPLE =
-        reinterpret_cast<GLRenderbufferStorageMultisampleAPPLE*>(
-            getter->getProcAddress("glRenderbufferStorageMultisampleAPPLE"));
-  }
-}
-
-static void InitBlitFramebuffer(const GLProcGetter* getter, GLInterface* interface,
-                                const GLInfo& info) {
-  if (info.version >= GL_VER(3, 0)) {
-    interface->blitFramebuffer =
-        reinterpret_cast<GLBlitFramebuffer*>(getter->getProcAddress("glBlitFramebuffer"));
-  } else if (info.hasExtension("GL_CHROMIUM_framebuffer_multisample")) {
-    interface->blitFramebuffer =
-        reinterpret_cast<GLBlitFramebuffer*>(getter->getProcAddress("glBlitFramebufferCHROMIUM"));
-  } else if (info.hasExtension("GL_ANGLE_framebuffer_blit")) {
-    interface->blitFramebuffer =
-        reinterpret_cast<GLBlitFramebuffer*>(getter->getProcAddress("glBlitFramebufferANGLE"));
-  }
-}
-
-#ifdef TGFX_BUILD_FOR_WEB
-
-static unsigned GetErrorFake() {
-  return GL::NO_ERROR;
-}
-
-static void InitGetError(const GLProcGetter*, GLInterface* interface) {
-  interface->getError = reinterpret_cast<GLGetError*>(GetErrorFake);
-}
-
-static unsigned CheckFramebufferStatusFake(unsigned) {
-  return GL::FRAMEBUFFER_COMPLETE;
-}
-
-static void InitCheckFramebufferStatus(const GLProcGetter*, GLInterface* interface) {
-  interface->checkFramebufferStatus = reinterpret_cast<GLCheckFramebufferStatus*>(
-      CheckFramebufferStatusFake);
-}
-
-#else
-
-static void InitGetError(const GLProcGetter* getter, GLInterface* interface) {
-  interface->getError = reinterpret_cast<GLGetError*>(getter->getProcAddress("glGetError"));
-}
-
-static void InitCheckFramebufferStatus(const GLProcGetter* getter, GLInterface* interface) {
-  interface->checkFramebufferStatus = reinterpret_cast<GLCheckFramebufferStatus*>(
-      getter->getProcAddress("glCheckFramebufferStatus"));
-}
-
-#endif
-
 std::unique_ptr<const GLInterface> GLInterface::MakeNativeInterface(const GLProcGetter* getter) {
   if (getter == nullptr) {
     return nullptr;
@@ -207,8 +124,6 @@ std::unique_ptr<const GLInterface> GLInterface::MakeNativeInterface(const GLProc
       reinterpret_cast<GLBindRenderbuffer*>(getter->getProcAddress("glBindRenderbuffer"));
   interface->bindTexture =
       reinterpret_cast<GLBindTexture*>(getter->getProcAddress("glBindTexture"));
-  interface->bindVertexArray =
-      reinterpret_cast<GLBindVertexArray*>(getter->getProcAddress("glBindVertexArray"));
   interface->blendEquation =
       reinterpret_cast<GLBlendEquation*>(getter->getProcAddress("glBlendEquation"));
   interface->blendEquationSeparate =
@@ -239,8 +154,6 @@ std::unique_ptr<const GLInterface> GLInterface::MakeNativeInterface(const GLProc
       reinterpret_cast<GLDeleteShader*>(getter->getProcAddress("glDeleteShader"));
   interface->deleteTextures =
       reinterpret_cast<GLDeleteTextures*>(getter->getProcAddress("glDeleteTextures"));
-  interface->deleteVertexArrays =
-      reinterpret_cast<GLDeleteVertexArrays*>(getter->getProcAddress("glDeleteVertexArrays"));
   interface->depthMask = reinterpret_cast<GLDepthMask*>(getter->getProcAddress("glDepthMask"));
   interface->disable = reinterpret_cast<GLDisable*>(getter->getProcAddress("glDisable"));
   interface->disableVertexAttribArray = reinterpret_cast<GLDisableVertexAttribArray*>(
@@ -259,8 +172,6 @@ std::unique_ptr<const GLInterface> GLInterface::MakeNativeInterface(const GLProc
   interface->framebufferTexture2D =
       reinterpret_cast<GLFramebufferTexture2D*>(getter->getProcAddress("glFramebufferTexture2D"));
   interface->genBuffers = reinterpret_cast<GLGenBuffers*>(getter->getProcAddress("glGenBuffers"));
-  interface->genVertexArrays =
-      reinterpret_cast<GLGenVertexArrays*>(getter->getProcAddress("glGenVertexArrays"));
   interface->genFramebuffers =
       reinterpret_cast<GLGenFramebuffers*>(getter->getProcAddress("glGenFramebuffers"));
   interface->genRenderbuffers =
@@ -320,16 +231,22 @@ std::unique_ptr<const GLInterface> GLInterface::MakeNativeInterface(const GLProc
   interface->vertexAttribPointer =
       reinterpret_cast<GLVertexAttribPointer*>(getter->getProcAddress("glVertexAttribPointer"));
   interface->viewport = reinterpret_cast<GLViewport*>(getter->getProcAddress("glViewport"));
-  interface->textureBarrier =
-      reinterpret_cast<GLTextureBarrier*>(getter->getProcAddress("glTextureBarrier"));
   interface->fenceSync = reinterpret_cast<GLFenceSync*>(getter->getProcAddress("glFenceSync"));
   interface->waitSync = reinterpret_cast<GLWaitSync*>(getter->getProcAddress("glWaitSync"));
   interface->deleteSync = reinterpret_cast<GLDeleteSync*>(getter->getProcAddress("glDeleteSync"));
-  InitFramebufferTexture2DMultisample(getter, interface, info);
-  InitRenderbufferStorageMultisample(getter, interface, info);
-  InitBlitFramebuffer(getter, interface, info);
-  InitGetError(getter, interface);
-  InitCheckFramebufferStatus(getter, interface);
+  switch (info.standard) {
+    case GLStandard::None:
+      break;
+    case GLStandard::GL:
+      GLAssembleGLInterface(getter, interface, info);
+      break;
+    case GLStandard::GLES:
+      GLAssembleGLESInterface(getter, interface, info);
+      break;
+    case GLStandard::WebGL:
+      GLAssembleWebGLInterface(getter, interface, info);
+      break;
+  }
   interface->caps = std::shared_ptr<const GLCaps>(new GLCaps(info));
   return std::unique_ptr<const GLInterface>(interface);
 }
