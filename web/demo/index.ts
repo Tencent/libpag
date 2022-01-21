@@ -29,7 +29,7 @@ PAGInit({
   });
   // 加载测试字体
   document.getElementById('btn-test-font').addEventListener('click', () => {
-    const url = '../assets/SourceHanSansSC-Normal.otf';
+    const url = './assets/SourceHanSansSC-Normal.otf';
     fetch(url)
       .then((response) => response.blob())
       .then(async (blob) => {
@@ -47,7 +47,7 @@ PAGInit({
     createPAGView((event.target as HTMLInputElement).files[0]);
   });
   document.getElementById('btn-test-vector-pag').addEventListener('click', () => {
-    const url = '../assets/like.pag';
+    const url = './assets/like.pag';
     fetch(url)
       .then((response) => response.blob())
       .then((blob) => {
@@ -56,7 +56,7 @@ PAGInit({
       });
   });
   document.getElementById('btn-test-video-pag').addEventListener('click', () => {
-    const url = '../assets/particle_video.pag';
+    const url = './assets/particle_video.pag';
     fetch(url)
       .then((response) => response.blob())
       .then((blob) => {
@@ -65,7 +65,7 @@ PAGInit({
       });
   });
   document.getElementById('btn-test-text-pag').addEventListener('click', async () => {
-    const url = '../assets/test2.pag';
+    const url = './assets/test2.pag';
     const response = await fetch(url);
     const blob = await response.blob();
     const file = new window.File([blob], url.replace(/(.*\/)*([^.]+)/i, '$2'));
