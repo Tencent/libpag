@@ -77,6 +77,16 @@ EMSCRIPTEN_BINDINGS(pag) {
 
                         return PAGSurface::MakeFrom(glTexture, origin);
                       }))
+      .class_function("_FromFrameBuffer",
+                      optional_override([](int frameBufferID, int width, int height, bool flipY) {
+                        GLFrameBufferInfo glFrameBufferInfo = {};
+                        glFrameBufferInfo.id = static_cast<unsigned>(frameBufferID);
+                        glFrameBufferInfo.format = GL::RGBA8;
+                        BackendRenderTarget glRenderTarget(glFrameBufferInfo, width, height);
+                        auto origin = flipY ? ImageOrigin::BottomLeft : ImageOrigin::TopLeft;
+
+                        return PAGSurface::MakeFrom(glRenderTarget, origin);
+                      }))
       .function("_width", &PAGSurface::width)
       .function("_height", &PAGSurface::height)
       .function("_updateSize", &PAGSurface::updateSize);
