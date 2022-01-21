@@ -9,21 +9,30 @@ export class PAGView {
   /**
    * Create pag view.
    */
-  public static async init(file: PAGFile, canvasID: string): Promise<PAGView> {
-    const canvas = document.getElementById(canvasID.substr(1)) as HTMLCanvasElement;
-    canvas.style.width = `${canvas.width}px`;
-    canvas.style.height = `${canvas.height}px`;
-    canvas.width = canvas.width * window.devicePixelRatio;
-    canvas.height = canvas.height * window.devicePixelRatio;
+  public static async init(file: PAGFile, canvas: string | HTMLCanvasElement | OffscreenCanvas): Promise<PAGView> {
+    let canvasElement: HTMLCanvasElement;
+    if (typeof canvas === 'string') {
+      canvasElement = document.getElementById(canvas.substr(1)) as HTMLCanvasElement;
+    } else if (canvas instanceof HTMLCanvasElement) {
+      canvasElement = canvas;
+    }
+    canvasElement.style.width = `${canvasElement.width}px`;
+    canvasElement.style.height = `${canvasElement.height}px`;
+    canvasElement.width = canvasElement.width * window.devicePixelRatio;
+    canvasElement.height = canvasElement.height * window.devicePixelRatio;
     const pagPlayer = await this.module._PAGPlayer.create();
     const pagView = new PAGView(pagPlayer);
-    pagView.pagSurface = await this.module._PAGSurface.FromCanvas(canvasID);
+    const gl = canvasElement.getContext('webgl');
+    const contextID = this.module.GL.registerContext(gl, { majorVersion: 1, minorVersion: 0 });
+    this.module.GL.makeContextCurrent(contextID);
+    pagView.pagSurface = await this.module._PAGSurface.FromFrameBuffer(0, canvasElement.width, canvasElement.height, true);
     pagView.player.setSurface(pagView.pagSurface);
     pagView.player.setComposition(file);
     await pagView.setProgress(0);
     pagView.eventManager = new EventManager();
     return pagView;
   }
+
   /**
    * The repeat count of player.
    */
