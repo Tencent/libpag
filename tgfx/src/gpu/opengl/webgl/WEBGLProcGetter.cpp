@@ -18,16 +18,21 @@
 
 #include "WEBGLProcGetter.h"
 
-#include <emscripten/html5_webgl.h>
-#include <GLES2/gl2.h>
-#include <GLES3/gl3.h>
+#include <webgl/webgl1.h>
+#include <webgl/webgl2.h>
 #include <cstring>
 
 namespace pag {
+static void emscripten_glWaitSync(GLsync sync, GLbitfield flags, GLuint64 timeout) {
+  uint32_t timeoutLo = timeout;
+  uint32_t timeoutHi = timeout >> 32;
+  emscripten_glWaitSync(sync, flags, timeoutLo, timeoutHi);
+}
+
 void* WEBGLProcGetter::getProcAddress(const char* name) const {
-#define N(X)                   \
-  if (0 == strcmp(#X, name)) { \
-    return reinterpret_cast<void*>(X);           \
+#define N(X)                                        \
+  if (0 == strcmp(#X, name)) {                      \
+    return reinterpret_cast<void*>(emscripten_##X); \
   }
   N(glActiveTexture)
   N(glAttachShader)
@@ -41,19 +46,15 @@ void* WEBGLProcGetter::getProcAddress(const char* name) const {
   N(glBlendEquation)
   N(glBlendFunc)
   N(glBufferData)
-  N(glBufferSubData)
   N(glCheckFramebufferStatus)
   N(glClear)
   N(glClearColor)
   N(glClearStencil)
   N(glColorMask)
   N(glCompileShader)
-  N(glCompressedTexImage2D)
-  N(glCompressedTexSubImage2D)
   N(glCopyTexSubImage2D)
   N(glCreateProgram)
   N(glCreateShader)
-  N(glCullFace)
   N(glDeleteBuffers)
   N(glDeleteFramebuffers)
   N(glDeleteProgram)
@@ -71,12 +72,10 @@ void* WEBGLProcGetter::getProcAddress(const char* name) const {
   N(glFlush)
   N(glFramebufferRenderbuffer)
   N(glFramebufferTexture2D)
-  N(glFrontFace)
   N(glGenBuffers)
   N(glGenFramebuffers)
   N(glGenRenderbuffers)
   N(glGenTextures)
-  N(glGenerateMipmap)
   N(glGetBufferParameteriv)
   N(glGetError)
   N(glGetFramebufferAttachmentParameteriv)
@@ -88,6 +87,7 @@ void* WEBGLProcGetter::getProcAddress(const char* name) const {
   N(glGetShaderPrecisionFormat)
   N(glGetShaderiv)
   N(glGetString)
+  N(glGetStringi)
   N(glGetUniformLocation)
   N(glIsTexture)
   N(glLineWidth)
@@ -97,12 +97,6 @@ void* WEBGLProcGetter::getProcAddress(const char* name) const {
   N(glRenderbufferStorage)
   N(glScissor)
   N(glShaderSource)
-  N(glStencilFunc)
-  N(glStencilFuncSeparate)
-  N(glStencilMask)
-  N(glStencilMaskSeparate)
-  N(glStencilOp)
-  N(glStencilOpSeparate)
   N(glTexImage2D)
   N(glTexParameterf)
   N(glTexParameterfv)
@@ -135,22 +129,25 @@ void* WEBGLProcGetter::getProcAddress(const char* name) const {
   N(glVertexAttrib4fv)
   N(glVertexAttribPointer)
   N(glViewport)
-
   N(glGetAttribLocation)
-
   N(glBlendEquationSeparate)
-  N(glDrawBuffers)
-  N(glStencilOpSeparate)
-  N(glStencilFuncSeparate)
-  N(glStencilMaskSeparate)
-
   N(glBindVertexArray)
   N(glDeleteVertexArrays)
   N(glGenVertexArrays)
-
+  N(glBindVertexArrayOES)
+  N(glDeleteVertexArraysOES)
+  N(glGenVertexArraysOES)
+  N(glFenceSync)
+  N(glWaitSync)
+  N(glDeleteSync)
+  N(glBlitFramebuffer)
+  N(glRenderbufferStorageMultisample)
 #undef N
 
-  auto fun = emscripten_webgl_get_proc_address(name);
-  return reinterpret_cast<void*>(fun);
+  // We explicitly do not use GetProcAddress or something similar because its code size is quite
+  // large. We shouldn't need GetProcAddress because emscripten provides us all the valid function
+  // pointers for WebGL via the included headers.
+  // https://github.com/emscripten-core/emscripten/blob/7ba7700902c46734987585409502f3c63beb650f/system/include/emscripten/html5_webgl.h#L93
+  return nullptr;
 }
 }  // namespace pag
