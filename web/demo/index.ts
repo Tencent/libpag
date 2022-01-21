@@ -222,7 +222,7 @@ const createPAGView = async (file) => {
   const pagCanvas = document.getElementById('pag') as HTMLCanvasElement;
   pagCanvas.width = 640;
   pagCanvas.height = 640;
-  pagView = await PAG.PAGView.init(pagFile, '#pag');
+  pagView = await PAG.PAGView.init(pagFile, pagCanvas);
   pagView.setRepeatCount(0);
   // 绑定事件监听
   pagView.addListener('onAnimationStart', (event) => {

@@ -50,6 +50,10 @@ export const binding = (module: PAG) => {
     const pagSurfaceWasm = await module.webAssemblyQueue.exec(this._FromTexture, this, textureID, width, height, flipY);
     return new PAGSurface(module, pagSurfaceWasm);
   };
+  module._PAGSurface.FromFrameBuffer = async function (frameBufferID, width, height, flipY): Promise<PAGSurface> {
+    const pagSurfaceWasm = await module.webAssemblyQueue.exec(this._FromFrameBuffer, this, frameBufferID, width, height, flipY);
+    return new PAGSurface(module, pagSurfaceWasm);
+  };
   module._PAGImage.FromBytes = async function (bytes, length): Promise<PAGImage> {
     const pagImageWasm = await module.webAssemblyQueue.exec(this._FromBytes, this, bytes, length);
     return new PAGImage(pagImageWasm);

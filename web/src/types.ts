@@ -25,6 +25,7 @@ export interface PAG extends EmscriptenModule {
   _PAGSurface: {
     FromCanvas: (canvasID: string) => Promise<PAGSurface>;
     FromTexture: (textureID: number, width: number, height: number, flipY: boolean) => Promise<PAGSurface>;
+    FromFrameBuffer: (framebufferID: number, width: number, height: number, flipY: boolean) => Promise<PAGSurface>;
   };
   VectorString: any;
   webAssemblyQueue: WebAssemblyQueue;
