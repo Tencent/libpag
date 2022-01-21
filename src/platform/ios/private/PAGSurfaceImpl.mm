@@ -18,7 +18,6 @@
 
 #import "PAGSurfaceImpl.h"
 #include "GPUDrawable.h"
-#include "NativeGLDevice.h"
 #import "PAGLayer+Internal.h"
 #import "PAGLayerImpl+Internal.h"
 #import "PAGSurface+Internal.h"
