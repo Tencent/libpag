@@ -27,6 +27,8 @@ std::unique_ptr<ConstColorProcessor> ConstColorProcessor::Make(Color4f color) {
 void ConstColorProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   static auto Type = UniqueID::Next();
   bytesKey->write(Type);
+  uint32_t flag = color.a != 1.0f ? 1 : 0;
+  bytesKey->write(flag);
 }
 
 std::unique_ptr<GLFragmentProcessor> ConstColorProcessor::onCreateGLInstance() const {
