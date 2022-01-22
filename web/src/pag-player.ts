@@ -159,11 +159,11 @@ export class PAGPlayer {
    * Returns the current PAGComposition for PAGPlayer to render as content.
    */
   public async getComposition() {
-    const pagFileWasm = await PAGPlayer.module.webAssemblyQueue.exec(
+    const wasmIns = await PAGPlayer.module.webAssemblyQueue.exec(
       this.pagPlayerWasm._getComposition,
       this.pagPlayerWasm,
     );
-    return new PAGFile(pagFileWasm);
+    return new PAGFile(wasmIns);
   }
   /**
    * Sets a new PAGComposition for PAGPlayer to render as content.
@@ -172,7 +172,7 @@ export class PAGPlayer {
     return await PAGPlayer.module.webAssemblyQueue.exec(
       this.pagPlayerWasm._setComposition,
       this.pagPlayerWasm,
-      pagFile.pagFileWasm,
+      pagFile.wasmIns,
     );
   }
   public async destroy() {

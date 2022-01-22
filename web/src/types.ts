@@ -10,6 +10,7 @@ import { PAGView } from './pag-view';
 import { PAGFont } from './pag-font';
 import { PAGPlayer } from './pag-player';
 import { PAGLayer } from './pag-layer';
+import { PAGComposition } from './pag-composition';
 import { NativeImage } from './core/native-image';
 import { WebMask } from './core/web-mask';
 
@@ -35,6 +36,7 @@ export interface PAG extends EmscriptenModule {
   PAGFont: typeof PAGFont;
   PAGImage: typeof PAGImage;
   PAGLayer: typeof PAGLayer;
+  PAGComposition: typeof PAGComposition;
   NativeImage: typeof NativeImage;
   WebMask: typeof WebMask;
   ScalerContext: typeof ScalerContext;
