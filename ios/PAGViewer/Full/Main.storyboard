@@ -281,7 +281,7 @@
                             <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="r9E-LI-ruE">
                                 <rect key="frame" x="90.5" y="96" width="233" height="34"/>
                                 <subviews>
-                                    <textField opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="left" contentVerticalAlignment="center" borderStyle="roundedRect" placeholder="Placeholder Text" textAlignment="natural" minimumFontSize="17" translatesAutoresizingMaskIntoConstraints="NO" id="Nat-IO-yHW">
+                                    <textField opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="left" contentVerticalAlignment="center" borderStyle="roundedRect" placeholder="Enter replacement text" textAlignment="natural" minimumFontSize="17" translatesAutoresizingMaskIntoConstraints="NO" id="Nat-IO-yHW">
                                         <rect key="frame" x="0.0" y="0.0" width="178" height="34"/>
                                         <constraints>
                                             <constraint firstAttribute="width" constant="178" id="ni6-pf-KVP"/>

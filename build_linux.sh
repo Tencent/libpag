@@ -5,7 +5,13 @@ function make_dir() {
   mkdir -p $1
 }
 
-BUILD_DIR="linux_out"
+if [[ $(uname) == 'Darwin' ]]; then
+  BUILD_DIR="mac_out"
+  PLATFORM="mac"
+elif [[ $(uname) == 'Linux' ]]; then
+  BUILD_DIR="linux_out"
+  PLATFORM="linux"
+fi
 
 make_dir $BUILD_DIR
 
@@ -34,10 +40,14 @@ fi
 
 cd ..
 
-make_dir vendor/pag/include
-cp -a include/* vendor/pag/include
-make_dir vendor/pag/linux
-cp -a $BUILD_DIR/libpag.a vendor/pag/linux
+make_dir linux/vendor/pag/include
+cp -a include/* linux/vendor/pag/include
+
+make_dir linux/vendor/pag/$PLATFORM/x64
+cp -a $BUILD_DIR/libpag.a linux/vendor/pag/$PLATFORM/x64
+
+make_dir linux/vendor/swiftshader
+cp -a vendor/swiftshader/* linux/vendor/swiftshader
 
 rm -rf $BUILD_DIR
 
