@@ -1,7 +1,6 @@
 #!/bin/bash
 
-cp ../../LICENSE.txt ../
-
+cd ../
+cp ../LICENSE.txt ./
 npm publish
-
-rm ../LICENSE.txt
+rm ./LICENSE.txt
