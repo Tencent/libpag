@@ -1,10 +1,12 @@
+import { PAGComposition } from './pag-composition';
 import { PAGImage } from './pag-image';
 import { LayerType, PAG, PAGTimeStretchMode, TextDocument } from './types';
 import { readFile } from './utils/common';
 import { ErrorCode } from './utils/error-map';
 import { Log } from './utils/log';
 
-export class PAGFile {
+export class PAGFile extends PAGComposition {
+
   public static module: PAG;
   /**
    * Load pag file from file.
@@ -22,10 +24,8 @@ export class PAGFile {
     return pagFile;
   }
 
-  public pagFileWasm;
-
-  public constructor(pagFileWasm) {
-    this.pagFileWasm = pagFileWasm;
+  public constructor(wasmIns) {
+    super(wasmIns);
   }
   /**
    * Get a text data of the specified index. The index ranges from 0 to numTexts - 1.
@@ -33,8 +33,8 @@ export class PAGFile {
    */
   public async getTextData(editableTextIndex: number): Promise<TextDocument> {
     return (await PAGFile.module.webAssemblyQueue.exec(
-      this.pagFileWasm._getTextData,
-      this.pagFileWasm,
+      this.wasmIns._getTextData,
+      this.wasmIns,
       editableTextIndex,
     )) as TextDocument;
   }
@@ -43,12 +43,7 @@ export class PAGFile {
    * Passing in null for the textData parameter will reset it to default text data.
    */
   public async replaceText(editableTextIndex: number, textData: TextDocument) {
-    await PAGFile.module.webAssemblyQueue.exec(
-      this.pagFileWasm._replaceText,
-      this.pagFileWasm,
-      editableTextIndex,
-      textData,
-    );
+    await PAGFile.module.webAssemblyQueue.exec(this.wasmIns._replaceText, this.wasmIns, editableTextIndex, textData);
   }
   /**
    * Replace the image content of the specified index with a PAGImage object. The index ranges from
@@ -57,55 +52,43 @@ export class PAGFile {
    */
   public async replaceImage(editableImageIndex: number, pagImage: PAGImage) {
     await PAGFile.module.webAssemblyQueue.exec(
-      this.pagFileWasm._replaceImage,
-      this.pagFileWasm,
+      this.wasmIns._replaceImage,
+      this.wasmIns,
       editableImageIndex,
       pagImage.pagImageWasm,
     );
   }
   /**
-   * Returns the width of the File.
-   */
-  public async width(): Promise<number> {
-    return (await PAGFile.module.webAssemblyQueue.exec(this.pagFileWasm._width, this.pagFileWasm)) as number;
-  }
-  /**
-   * Returns the height of the File.
-   */
-  public async height(): Promise<number> {
-    return (await PAGFile.module.webAssemblyQueue.exec(this.pagFileWasm._height, this.pagFileWasm)) as number;
-  }
-  /**
    * The duration of the file in microseconds, indicates the length of the visible range.
    */
   public async duration(): Promise<number> {
-    return (await PAGFile.module.webAssemblyQueue.exec(this.pagFileWasm._duration, this.pagFileWasm)) as number;
+    return (await PAGFile.module.webAssemblyQueue.exec(this.wasmIns._duration, this.wasmIns)) as number;
   }
   /**
    * The number of replaceable texts.
    */
   public async numTexts(): Promise<number> {
-    return (await PAGFile.module.webAssemblyQueue.exec(this.pagFileWasm._numTexts, this.pagFileWasm)) as number;
+    return (await PAGFile.module.webAssemblyQueue.exec(this.wasmIns._numTexts, this.wasmIns)) as number;
   }
   /**
    * The number of replaceable images.
    */
   public async numImages(): Promise<number> {
-    return (await PAGFile.module.webAssemblyQueue.exec(this.pagFileWasm._numImages, this.pagFileWasm)) as number;
+    return (await PAGFile.module.webAssemblyQueue.exec(this.wasmIns._numImages, this.wasmIns)) as number;
   }
   /**
    * The number of video compositions.
    */
   public async numVideos(): Promise<number> {
-    return (await PAGFile.module.webAssemblyQueue.exec(this.pagFileWasm._numVideos, this.pagFileWasm)) as number;
+    return (await PAGFile.module.webAssemblyQueue.exec(this.wasmIns._numVideos, this.wasmIns)) as number;
   }
   /**
    * Return an array of layers by specified editable index and layer type.
    */
   public async getLayersByEditableIndex(editableIndex: Number, layerType: LayerType): Promise<number> {
     return (await PAGFile.module.webAssemblyQueue.exec(
-      this.pagFileWasm._getLayersByEditableIndex,
-      this.pagFileWasm,
+      this.wasmIns._getLayersByEditableIndex,
+      this.wasmIns,
       editableIndex,
       layerType,
     )) as number;
@@ -116,25 +99,25 @@ export class PAGFile {
    */
   public async timeStretchMode(): Promise<PAGTimeStretchMode> {
     return (await PAGFile.module.webAssemblyQueue.exec(
-      this.pagFileWasm._timeStretchMode,
-      this.pagFileWasm,
+      this.wasmIns._timeStretchMode,
+      this.wasmIns,
     )) as PAGTimeStretchMode;
   }
   /**
    * Set the timeStretchMode of this file.
    */
   public async setTimeStretchMode(value: PAGTimeStretchMode): Promise<void> {
-    await PAGFile.module.webAssemblyQueue.exec(this.pagFileWasm._setTimeStretchMode, this.pagFileWasm, value);
+    await PAGFile.module.webAssemblyQueue.exec(this.wasmIns._setTimeStretchMode, this.wasmIns, value);
   }
   /**
    * Set the duration of this PAGFile. Passing a value less than or equal to 0 resets the duration
    * to its default value.
    */
   public async setDuration(duration: number): Promise<void> {
-    await PAGFile.module.webAssemblyQueue.exec(this.pagFileWasm._setDuration, this.pagFileWasm, duration);
+    await PAGFile.module.webAssemblyQueue.exec(this.wasmIns._setDuration, this.wasmIns, duration);
   }
 
   public async destroy() {
-    await PAGImage.module.webAssemblyQueue.exec(this.pagFileWasm.delete, this.pagFileWasm);
+    await PAGImage.module.webAssemblyQueue.exec(this.wasmIns.delete, this.wasmIns);
   }
 }
