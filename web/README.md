@@ -88,7 +88,7 @@ Chrome 69+ 与 移动端 等更多版本的兼容工作正在进行中
 
 ## Roadmap
 
-Web SDK 未来能力支持规划可以点击 [这里](https://github.com/Tencent/libpag/discussions/53) 查看
+Web SDK 未来能力支持规划可以点击 [这里](https://github.com/Tencent/libpag/wiki/PAG-Web-roadmap) 查看
 
 ## 参与开发
 
