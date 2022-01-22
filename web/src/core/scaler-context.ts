@@ -1,7 +1,7 @@
 import { NativeImage } from './native-image';
 import { measureText } from '../utils/measure-text';
 
-interface Bounds {
+export interface Bounds {
   top: number;
   left: number;
   bottom: number;
