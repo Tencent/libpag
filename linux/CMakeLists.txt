@@ -36,7 +36,7 @@ if (APPLE)
     list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/swiftshader/mac/x64/libGLESv2.dylib)
 
 else()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${cppFlags} -D_GLIBCXX_USE_CXX11_ABI=0 -fPIC -pthread")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${cppFlags} -D_GLIBCXX_USE_CXX11_ABI=0")
     add_compile_options(-fPIC)
     add_compile_options(-pthread)
     add_definitions(-D__STDC_FORMAT_MACROS)
