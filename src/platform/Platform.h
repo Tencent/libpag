@@ -108,11 +108,6 @@ class Platform {
   virtual bool registerFallbackFonts() const;
 
   /**
-   * Reports the statistical data of pag.
-   */
-  virtual void reportStatisticalData(std::unordered_map<std::string, std::string>& reportMap) const;
-
-  /**
    * Returns the default NALU start code type of the current platform.
    */
   virtual NALUType naluType() const;
