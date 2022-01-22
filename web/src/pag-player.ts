@@ -90,7 +90,7 @@ export class PAGPlayer {
    * Set the value of cacheEnabled property.
    */
   public async setCacheEnabled(enabled: boolean) {
-    return await PAGPlayer.module.webAssemblyQueue.exec(this.pagPlayerWasm._cacheEnabled, this.pagPlayerWasm, enabled);
+    return await PAGPlayer.module.webAssemblyQueue.exec(this.pagPlayerWasm._setCacheEnabled, this.pagPlayerWasm, enabled);
   }
   /**
    * This value defines the scale factor for internal graphics caches, ranges from 0.0 to 1.0. The
@@ -121,7 +121,7 @@ export class PAGPlayer {
    * Set the maximum frame rate for rendering.
    */
   public async setMaxFrameRate(value: number) {
-    return await PAGPlayer.module.webAssemblyQueue.exec(this.pagPlayerWasm._maxFrameRate, this.pagPlayerWasm, value);
+    return await PAGPlayer.module.webAssemblyQueue.exec(this.pagPlayerWasm._setMaxFrameRate, this.pagPlayerWasm, value);
   }
   /**
    * Returns the current scale mode.
