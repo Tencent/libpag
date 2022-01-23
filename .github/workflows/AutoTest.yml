@@ -1,10 +1,10 @@
 name: AutoTest
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+#   push:
+#     branches: [ main ]
+#   pull_request:
+#     branches: [ main ]
 
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
