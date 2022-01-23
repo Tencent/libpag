@@ -22,7 +22,12 @@ jobs:
         with:
           fetch-depth: 0
           lfs: true
-      - name: Install
+      - name: Run build script
+        run: ./sync_deps.sh 
+        shell: bash 
+      - name: Run autotest script
         run: |
-          otool -L vendor/swiftshader/mac/x64/libEGL.dylib 
+         chmod +x autotest.sh 
+         ./autotest.sh 
+        shell: bash
       
