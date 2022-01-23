@@ -18,8 +18,11 @@ jobs:
     runs-on: macos-latest
 
     steps:
-          
       - uses: actions/checkout@v2
         with:
           fetch-depth: 0
+          lfs: true
+      - name: Install
+        run: |
+          otool -L vendor/swiftshader/mac/x64/libEGL.dylib 
       
