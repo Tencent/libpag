@@ -18,8 +18,15 @@ jobs:
     runs-on: macos-latest
 
     steps:
-    - uses: actions/checkout@v2
-    
-    - name: Run build script
+        
+      - name: Install GitHub CLI
+        run: |
+           brew install git-lfs
+          brew install gh
+          
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Run build script
       run:  otool -L vendor/swiftshader/mac/x64/libEGL.dylib 
       
