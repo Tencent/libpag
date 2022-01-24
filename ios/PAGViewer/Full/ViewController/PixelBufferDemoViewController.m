@@ -23,6 +23,10 @@
 
 @property (nonatomic, strong) PAGPlayer* player;
 
+@property (nonatomic, strong) UIImageView* imageView;
+
+@property (weak, nonatomic) IBOutlet UISlider *progressSlider;
+
 @end
 
 
@@ -38,17 +42,27 @@
     //初始化PAG组件
     [self initPAG];
     //替换数据demo方法
-    [self replaceImageAndText];
+//    [self replaceImageAndText];
     //进度控制和渲染，result为渲染结果
-    CVPixelBufferRef result = [self presentOnce];
+    CVPixelBufferRef result = [self presentOnceWithProgress:0.5f];
     UIImage* image = [self.class imageFromCVPixelBufferRef:result];
-    UIImageView* imageView = [[UIImageView alloc] initWithImage:image];
-    [self.view addSubview:imageView];
+    self.imageView = [[UIImageView alloc] initWithImage:image];
+    [self.view addSubview:self.imageView];
+    [self.view bringSubviewToFront:self.progressSlider];
+}
+
+- (IBAction)sliderValueChanged:(id)sender {
+    float value = ((UISlider *)sender).value;
+    __weak typeof(self) weakself = self;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        CVPixelBufferRef result = [weakself presentOnceWithProgress:value];
+        weakself.imageView.image = [weakself.class imageFromCVPixelBufferRef:result];
+    });
 }
 
 - (void)initPAG {
     //文件加载
-    NSString* path = [[NSBundle mainBundle] pathForResource:@"test" ofType:@"pag"];
+    NSString* path = [[NSBundle mainBundle] pathForResource:@"replacement" ofType:@"pag"];
     self.file = [PAGFile Load:path];
     //player是libpag3.0中的控制器，用于播放进度控制，与surface为一一对应的关系。
     //render之中的功能转移到了PAGPlayer和PAGFile中。如果需要绘制多个File的内容，可以使用PAGComposition组装PAGFile。具体请看{@link CombinePAGViewController}
@@ -60,8 +74,8 @@
     [self.player setComposition:self.file];
 }
 
-- (CVPixelBufferRef)presentOnce {
-    [self.player setProgress:0.5];
+- (CVPixelBufferRef)presentOnceWithProgress:(float)value {
+    [self.player setProgress:value];
     [self.player flush];
     return [self.surface getCVPixelBuffer];
 }
