@@ -1,5 +1,6 @@
 import { PAGImage } from './pag-image';
 import { PAG, TextDocument } from './types';
+import { isWechatMiniProgram } from './utils/ua';
 import { readFile } from './utils/common';
 import { ErrorCode } from './utils/error-map';
 import { Log } from './utils/log';
@@ -9,8 +10,13 @@ export class PAGFile {
   /**
    * Load pag file from file.
    */
-  public static async load(data: File) {
-    const buffer = (await readFile(data)) as ArrayBuffer;
+  public static async load(data: File & ArrayBuffer) {
+    let buffer: ArrayBuffer;
+    if (isWechatMiniProgram) {
+      buffer = data;
+    } else {
+      buffer = (await readFile(data)) as ArrayBuffer;
+    }
     if (!buffer || !(buffer.byteLength > 0)) Log.errorByCode(ErrorCode.PagFileDataEmpty);
     const dataUint8Array = new Uint8Array(buffer);
     const numBytes = dataUint8Array.byteLength * dataUint8Array.BYTES_PER_ELEMENT;

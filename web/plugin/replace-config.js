@@ -251,16 +251,16 @@ export const replaceFunctionConfig = [
     }).toString()
   },
   {
-    name: 'replace performance',
-    type: 'string',
-    start: 'performance.now();',
-    replaceStr: '(globalThis.isWechatMiniProgram ? wx.getPerformance().now() : performance.now())'
-  },
-  {
     name: 'replace WebAssembly Runtime error',
     type: 'string',
     start: 'var e = new WebAssembly.RuntimeError(what);',
     replaceStr: 'var e = "run time error";'
+  },
+  {
+    name: 'replace performance',
+    type: 'string',
+    start: 'performance.now();',
+    replaceStr: '(globalThis.isWechatMiniProgram ? wx.getPerformance().now() : performance.now())'
   },
 ];
 

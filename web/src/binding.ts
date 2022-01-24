@@ -6,7 +6,7 @@ import { PAGImage } from './pag-image';
 import { PAGView } from './pag-view';
 import { PAGFont } from './pag-font';
 import { PAGLayer } from './pag-layer';
-import { VideoReader } from './core/video-reader';
+import { VideoReader } from './utils/wechat-babel';
 import { ScalerContext } from './core/scaler-context';
 import { WebMask } from './core/web-mask';
 import { NativeImage } from './core/native-image';

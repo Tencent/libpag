@@ -1,19 +1,11 @@
 import { NativeImage } from './native-image';
+import { createCanvas } from '../utils/wechat-babel'
 
-const canvas = ((): HTMLCanvasElement | OffscreenCanvas => {
-  try {
-    const offscreenCanvas = new OffscreenCanvas(0, 0);
-    const context = offscreenCanvas.getContext('2d');
-    if (context?.measureText) return offscreenCanvas;
-    return document.createElement('canvas');
-  } catch (err) {
-    return document.createElement('canvas');
-  }
-})();
+const canvas = createCanvas();
 canvas.width = 10;
 canvas.height = 10;
 
-const testCanvas = document.createElement('canvas');
+const testCanvas = createCanvas();
 testCanvas.width = 1;
 testCanvas.height = 1;
 const testContext = testCanvas.getContext('2d');

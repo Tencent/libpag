@@ -9,13 +9,14 @@ export default function replaceFunc() {
       const magic = new MagicString(codeStr);
       replaceFunctionConfig.forEach(item => {
         if (item.type === 'string') {
-          codeStr = codeStr.replace(item.start, (match, offset) => {
-            magic.overwrite(offset, offset + match.length, item.replaceStr)
-          });
+          const startOffset = codeStr.indexOf(item.start);
+          if (startOffset > -1) {
+            magic.overwrite(startOffset, startOffset + item.start.length, item.replaceStr)
+          }
         } else {
           const startOffset = codeStr.indexOf(item.start);
           const endOffset = codeStr.indexOf(item.end);
-          if (startOffset > 0 && endOffset > startOffset && item.replaceStr) {
+          if (startOffset > -1 && endOffset > startOffset && item.replaceStr) {
             magic.overwrite(startOffset, endOffset, item.replaceStr)
           }
         }
