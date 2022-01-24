@@ -556,9 +556,21 @@
                     <view key="view" contentMode="scaleToFill" id="uj1-cN-Dw3">
                         <rect key="frame" x="0.0" y="0.0" width="414" height="896"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <subviews>
+                            <slider opaque="NO" contentMode="scaleToFill" fixedFrame="YES" contentHorizontalAlignment="center" contentVerticalAlignment="center" value="0.5" minValue="0.0" maxValue="1" translatesAutoresizingMaskIntoConstraints="NO" id="90I-D8-65R">
+                                <rect key="frame" x="18" y="790" width="378" height="30"/>
+                                <autoresizingMask key="autoresizingMask" widthSizable="YES" flexibleMinY="YES"/>
+                                <connections>
+                                    <action selector="sliderValueChanged:" destination="8H2-fb-z0E" eventType="valueChanged" id="6IN-My-6Ls"/>
+                                </connections>
+                            </slider>
+                        </subviews>
                         <color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                     </view>
                     <navigationItem key="navigationItem" id="41h-G7-5WM"/>
+                    <connections>
+                        <outlet property="progressSlider" destination="90I-D8-65R" id="uGK-Ju-fah"/>
+                    </connections>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="HWY-gf-anI" userLabel="First Responder" sceneMemberID="firstResponder"/>
             </objects>
