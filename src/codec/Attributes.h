@@ -21,9 +21,15 @@
 #include "AttributeHelper.h"
 
 namespace pag {
-template <typename T>
-class AttributeConfigBase {
+template <typename T, template <typename TT> class K = Keyframe>
+class AttributeConfigBase : public AttributeBase {
  public:
+  T defaultValue;
+
+  AttributeConfigBase(AttributeType attributeType, T defaultValue)
+      : AttributeBase(attributeType), defaultValue(defaultValue) {
+  }
+
   virtual ~AttributeConfigBase() {
   }
 
@@ -32,84 +38,68 @@ class AttributeConfigBase {
   }
 
   virtual Keyframe<T>* newKeyframe(const AttributeFlag&) const {
-    return new Keyframe<T>();
-  }
-};
-
-template <>
-class AttributeConfig<float> : public AttributeBase, public AttributeConfigBase<float> {
- public:
-  float defaultValue;
-
-  AttributeConfig(AttributeType attributeType, float defaultValue)
-      : AttributeBase(attributeType), defaultValue(defaultValue) {
+    return new K<T>();
   }
 
   void readAttribute(DecodeStream* stream, const AttributeFlag& flag, void* target) const override {
-    ReadAttribute(stream, flag, target, *this);
+    ReadAttribute(stream, flag, target, reinterpret_cast<const AttributeConfig<T>&>(*this));
   }
 
   void writeAttribute(EncodeStream* flagBytes, EncodeStream* stream, void* target) const override {
-    WriteAttribute(flagBytes, stream, target, *this);
+    WriteAttribute(flagBytes, stream, target, reinterpret_cast<const AttributeConfig<T>&>(*this));
   }
 
-  float readValue(DecodeStream* stream) const {
-    return stream->readFloat();
-  }
-
-  void writeValue(EncodeStream* stream, const float& value) const {
-    stream->writeFloat(value);
-  }
-
-  void readValueList(DecodeStream* stream, float* list, uint32_t count) const {
+  virtual void readValueList(DecodeStream* stream, T* list, uint32_t count) const {
     for (uint32_t i = 0; i < count; i++) {
       list[i] = readValue(stream);
     }
   }
 
-  void writeValueList(EncodeStream* stream, const float* list, uint32_t count) const {
+  virtual void writeValueList(EncodeStream* stream, const T* list, uint32_t count) const {
     for (uint32_t i = 0; i < count; i++) {
       writeValue(stream, list[i]);
     }
   }
 
-  Keyframe<float>* newKeyframe(const AttributeFlag&) const override {
-    return new SingleEaseKeyframe<float>();
+  virtual T readValue(DecodeStream* stream) const = 0;
+
+  virtual void writeValue(EncodeStream* stream, const T& value) const = 0;
+};
+
+template <>
+class AttributeConfig<float> : public AttributeConfigBase<float, SingleEaseKeyframe> {
+ public:
+  using AttributeConfigBase::AttributeConfigBase;
+
+  float readValue(DecodeStream* stream) const override {
+    return stream->readFloat();
+  }
+
+  void writeValue(EncodeStream* stream, const float& value) const override {
+    stream->writeFloat(value);
   }
 };
 
 template <>
-class AttributeConfig<bool> : public AttributeBase, public AttributeConfigBase<bool> {
+class AttributeConfig<bool> : public AttributeConfigBase<bool> {
  public:
-  bool defaultValue;
+  using AttributeConfigBase::AttributeConfigBase;
 
-  AttributeConfig(AttributeType attributeType, bool defaultValue)
-      : AttributeBase(attributeType), defaultValue(defaultValue) {
-  }
-
-  void readAttribute(DecodeStream* stream, const AttributeFlag& flag, void* target) const override {
-    ReadAttribute(stream, flag, target, *this);
-  }
-
-  void writeAttribute(EncodeStream* flagBytes, EncodeStream* stream, void* target) const override {
-    WriteAttribute(flagBytes, stream, target, *this);
-  }
-
-  bool readValue(DecodeStream* stream) const {
+  bool readValue(DecodeStream* stream) const override {
     return stream->readBoolean();
   }
 
-  void writeValue(EncodeStream* stream, const bool& value) const {
+  void writeValue(EncodeStream* stream, const bool& value) const override {
     stream->writeBoolean(value);
   }
 
-  void readValueList(DecodeStream* stream, bool* list, uint32_t count) const {
+  void readValueList(DecodeStream* stream, bool* list, uint32_t count) const override {
     for (uint32_t i = 0; i < count; i++) {
       list[i] = stream->readBitBoolean();
     }
   }
 
-  void writeValueList(EncodeStream* stream, const bool* list, uint32_t count) const {
+  void writeValueList(EncodeStream* stream, const bool* list, uint32_t count) const override {
     for (uint32_t i = 0; i < count; i++) {
       stream->writeBitBoolean(list[i]);
     }
@@ -117,31 +107,19 @@ class AttributeConfig<bool> : public AttributeBase, public AttributeConfigBase<b
 };
 
 template <>
-class AttributeConfig<uint8_t> : public AttributeBase, public AttributeConfigBase<uint8_t> {
+class AttributeConfig<uint8_t> : public AttributeConfigBase<uint8_t, SingleEaseKeyframe> {
  public:
-  uint8_t defaultValue;
+  using AttributeConfigBase::AttributeConfigBase;
 
-  AttributeConfig(AttributeType attributeType, uint8_t defaultValue)
-      : AttributeBase(attributeType), defaultValue(defaultValue) {
-  }
-
-  void readAttribute(DecodeStream* stream, const AttributeFlag& flag, void* target) const override {
-    ReadAttribute(stream, flag, target, *this);
-  }
-
-  void writeAttribute(EncodeStream* flagBytes, EncodeStream* stream, void* target) const override {
-    WriteAttribute(flagBytes, stream, target, *this);
-  }
-
-  uint8_t readValue(DecodeStream* stream) const {
+  uint8_t readValue(DecodeStream* stream) const override {
     return stream->readUint8();
   }
 
-  void writeValue(EncodeStream* stream, const uint8_t& value) const {
+  void writeValue(EncodeStream* stream, const uint8_t& value) const override {
     stream->writeUint8(value);
   }
 
-  void readValueList(DecodeStream* stream, uint8_t* list, uint32_t count) const {
+  void readValueList(DecodeStream* stream, uint8_t* list, uint32_t count) const override {
     auto valueList = new uint32_t[count];
     stream->readUint32List(valueList, count);
     for (uint32_t i = 0; i < count; i++) {
@@ -150,7 +128,7 @@ class AttributeConfig<uint8_t> : public AttributeBase, public AttributeConfigBas
     delete[] valueList;
   }
 
-  void writeValueList(EncodeStream* stream, const uint8_t* list, uint32_t count) const {
+  void writeValueList(EncodeStream* stream, const uint8_t* list, uint32_t count) const override {
     auto valueList = new uint32_t[count];
     for (uint32_t i = 0; i < count; i++) {
       valueList[i] = list[i];
@@ -158,39 +136,23 @@ class AttributeConfig<uint8_t> : public AttributeBase, public AttributeConfigBas
     stream->writeUint32List(valueList, count);
     delete[] valueList;
   }
-
-  Keyframe<uint8_t>* newKeyframe(const AttributeFlag&) const override {
-    return new SingleEaseKeyframe<uint8_t>();
-  }
 };
 
 template <>
-class AttributeConfig<uint16_t> : public AttributeBase, public AttributeConfigBase<uint16_t> {
+class AttributeConfig<uint16_t> : public AttributeConfigBase<uint16_t, SingleEaseKeyframe> {
  public:
-  uint16_t defaultValue;
+  using AttributeConfigBase::AttributeConfigBase;
 
-  AttributeConfig(AttributeType attributeType, uint16_t defaultValue)
-      : AttributeBase(attributeType), defaultValue(defaultValue) {
-  }
-
-  void readAttribute(DecodeStream* stream, const AttributeFlag& flag, void* target) const override {
-    ReadAttribute(stream, flag, target, *this);
-  }
-
-  void writeAttribute(EncodeStream* flagBytes, EncodeStream* stream, void* target) const override {
-    WriteAttribute(flagBytes, stream, target, *this);
-  }
-
-  uint16_t readValue(DecodeStream* stream) const {
+  uint16_t readValue(DecodeStream* stream) const override {
     auto value = stream->readEncodedUint32();
     return static_cast<uint16_t>(value);
   }
 
-  void writeValue(EncodeStream* stream, const uint16_t& value) const {
+  void writeValue(EncodeStream* stream, const uint16_t& value) const override {
     stream->writeEncodedUint32(static_cast<uint32_t>(value));
   }
 
-  void readValueList(DecodeStream* stream, uint16_t* list, uint32_t count) const {
+  void readValueList(DecodeStream* stream, uint16_t* list, uint32_t count) const override {
     auto valueList = new uint32_t[count];
     stream->readUint32List(valueList, count);
     for (uint32_t i = 0; i < count; i++) {
@@ -199,7 +161,7 @@ class AttributeConfig<uint16_t> : public AttributeBase, public AttributeConfigBa
     delete[] valueList;
   }
 
-  void writeValueList(EncodeStream* stream, const uint16_t* list, uint32_t count) const {
+  void writeValueList(EncodeStream* stream, const uint16_t* list, uint32_t count) const override {
     auto valueList = new uint32_t[count];
     for (uint32_t i = 0; i < count; i++) {
       valueList[i] = list[i];
@@ -207,160 +169,84 @@ class AttributeConfig<uint16_t> : public AttributeBase, public AttributeConfigBa
     stream->writeUint32List(valueList, count);
     delete[] valueList;
   }
-
-  Keyframe<uint16_t>* newKeyframe(const AttributeFlag&) const override {
-    return new SingleEaseKeyframe<uint16_t>();
-  }
 };
 
 template <>
-class AttributeConfig<uint32_t> : public AttributeBase, public AttributeConfigBase<uint32_t> {
+class AttributeConfig<uint32_t> : public AttributeConfigBase<uint32_t, SingleEaseKeyframe> {
  public:
-  uint32_t defaultValue;
+  using AttributeConfigBase::AttributeConfigBase;
 
-  AttributeConfig(AttributeType attributeType, uint32_t defaultValue)
-      : AttributeBase(attributeType), defaultValue(defaultValue) {
-  }
-
-  void readAttribute(DecodeStream* stream, const AttributeFlag& flag, void* target) const override {
-    ReadAttribute(stream, flag, target, *this);
-  }
-
-  void writeAttribute(EncodeStream* flagBytes, EncodeStream* stream, void* target) const override {
-    WriteAttribute(flagBytes, stream, target, *this);
-  }
-
-  uint32_t readValue(DecodeStream* stream) const {
+  uint32_t readValue(DecodeStream* stream) const override {
     return stream->readEncodedUint32();
   }
 
-  void writeValue(EncodeStream* stream, const uint32_t& value) const {
+  void writeValue(EncodeStream* stream, const uint32_t& value) const override {
     stream->writeEncodedUint32(value);
   }
 
-  void readValueList(DecodeStream* stream, uint32_t* list, uint32_t count) const {
+  void readValueList(DecodeStream* stream, uint32_t* list, uint32_t count) const override {
     stream->readUint32List(list, count);
   }
 
-  void writeValueList(EncodeStream* stream, const uint32_t* list, uint32_t count) const {
+  void writeValueList(EncodeStream* stream, const uint32_t* list, uint32_t count) const override {
     stream->writeUint32List(list, count);
-  }
-
-  Keyframe<uint32_t>* newKeyframe(const AttributeFlag&) const override {
-    return new SingleEaseKeyframe<uint32_t>();
   }
 };
 
 template <>
-class AttributeConfig<int32_t> : public AttributeBase, public AttributeConfigBase<int32_t> {
+class AttributeConfig<int32_t> : public AttributeConfigBase<int32_t, SingleEaseKeyframe> {
  public:
-  int32_t defaultValue;
+  using AttributeConfigBase::AttributeConfigBase;
 
-  AttributeConfig(AttributeType attributeType, int32_t defaultValue)
-      : AttributeBase(attributeType), defaultValue(defaultValue) {
-  }
-
-  void readAttribute(DecodeStream* stream, const AttributeFlag& flag, void* target) const override {
-    ReadAttribute(stream, flag, target, *this);
-  }
-
-  void writeAttribute(EncodeStream* flagBytes, EncodeStream* stream, void* target) const override {
-    WriteAttribute(flagBytes, stream, target, *this);
-  }
-
-  int32_t readValue(DecodeStream* stream) const {
+  int32_t readValue(DecodeStream* stream) const override {
     return stream->readEncodedInt32();
   }
 
-  void writeValue(EncodeStream* stream, const int32_t& value) const {
+  void writeValue(EncodeStream* stream, const int32_t& value) const override {
     stream->writeEncodedInt32(value);
   }
 
-  void readValueList(DecodeStream* stream, int32_t* list, uint32_t count) const {
+  void readValueList(DecodeStream* stream, int32_t* list, uint32_t count) const override {
     stream->readInt32List(list, count);
   }
 
-  void writeValueList(EncodeStream* stream, const int32_t* list, uint32_t count) const {
+  void writeValueList(EncodeStream* stream, const int32_t* list, uint32_t count) const override {
     stream->writeInt32List(list, count);
-  }
-
-  Keyframe<int32_t>* newKeyframe(const AttributeFlag&) const override {
-    return new SingleEaseKeyframe<int32_t>();
   }
 };
 
 template <>
-class AttributeConfig<Frame> : public AttributeBase, public AttributeConfigBase<Frame> {
+class AttributeConfig<Frame> : public AttributeConfigBase<Frame, SingleEaseKeyframe> {
  public:
-  Frame defaultValue;
+  using AttributeConfigBase::AttributeConfigBase;
 
-  AttributeConfig(AttributeType attributeType, Frame defaultValue)
-      : AttributeBase(attributeType), defaultValue(defaultValue) {
-  }
-
-  void readAttribute(DecodeStream* stream, const AttributeFlag& flag, void* target) const override {
-    ReadAttribute(stream, flag, target, *this);
-  }
-
-  void writeAttribute(EncodeStream* flagBytes, EncodeStream* stream, void* target) const override {
-    WriteAttribute(flagBytes, stream, target, *this);
-  }
-
-  Frame readValue(DecodeStream* stream) const {
+  Frame readValue(DecodeStream* stream) const override {
     return ReadTime(stream);
   }
 
-  void writeValue(EncodeStream* stream, const Frame& value) const {
+  void writeValue(EncodeStream* stream, const Frame& value) const override {
     WriteTime(stream, value);
-  }
-
-  void readValueList(DecodeStream* stream, Frame* list, uint32_t count) const {
-    for (uint32_t i = 0; i < count; i++) {
-      list[i] = readValue(stream);
-    }
-  }
-
-  void writeValueList(EncodeStream* stream, const Frame* list, uint32_t count) const {
-    for (uint32_t i = 0; i < count; i++) {
-      writeValue(stream, list[i]);
-    }
-  }
-
-  Keyframe<Frame>* newKeyframe(const AttributeFlag&) const override {
-    return new SingleEaseKeyframe<Frame>();
   }
 };
 
 template <>
-class AttributeConfig<Point> : public AttributeBase, public AttributeConfigBase<Point> {
+class AttributeConfig<Point> : public AttributeConfigBase<Point> {
  public:
-  Point defaultValue;
-
-  AttributeConfig(AttributeType attributeType, Point defaultValue)
-      : AttributeBase(attributeType), defaultValue(defaultValue) {
-  }
-
-  void readAttribute(DecodeStream* stream, const AttributeFlag& flag, void* target) const override {
-    ReadAttribute(stream, flag, target, *this);
-  }
-
-  void writeAttribute(EncodeStream* flagBytes, EncodeStream* stream, void* target) const override {
-    WriteAttribute(flagBytes, stream, target, *this);
-  }
+  using AttributeConfigBase::AttributeConfigBase;
 
   int dimensionality() const override {
     return 2;
   }
 
-  Point readValue(DecodeStream* stream) const {
+  Point readValue(DecodeStream* stream) const override {
     return ReadPoint(stream);
   }
 
-  void writeValue(EncodeStream* stream, const Point& value) const {
+  void writeValue(EncodeStream* stream, const Point& value) const override {
     WritePoint(stream, value);
   }
 
-  void readValueList(DecodeStream* stream, Point* list, uint32_t count) const {
+  void readValueList(DecodeStream* stream, Point* list, uint32_t count) const override {
     if (attributeType == AttributeType::SpatialProperty) {
       stream->readFloatList(&(list[0].x), count * 2, SPATIAL_PRECISION);
     } else {
@@ -370,7 +256,7 @@ class AttributeConfig<Point> : public AttributeBase, public AttributeConfigBase<
     }
   }
 
-  void writeValueList(EncodeStream* stream, const Point* list, uint32_t count) const {
+  void writeValueList(EncodeStream* stream, const Point* list, uint32_t count) const override {
     if (attributeType == AttributeType::SpatialProperty) {
       stream->writeFloatList(&(list[0].x), count * 2, SPATIAL_PRECISION);
     } else {
@@ -395,192 +281,71 @@ class AttributeConfig<Point> : public AttributeBase, public AttributeConfigBase<
 };
 
 template <>
-class AttributeConfig<Color> : public AttributeBase, public AttributeConfigBase<Color> {
+class AttributeConfig<Color> : public AttributeConfigBase<Color, SingleEaseKeyframe> {
  public:
-  Color defaultValue;
-
-  AttributeConfig(AttributeType attributeType, Color defaultValue)
-      : AttributeBase(attributeType), defaultValue(defaultValue) {
-  }
-
-  void readAttribute(DecodeStream* stream, const AttributeFlag& flag, void* target) const override {
-    ReadAttribute(stream, flag, target, *this);
-  }
-
-  void writeAttribute(EncodeStream* flagBytes, EncodeStream* stream, void* target) const override {
-    WriteAttribute(flagBytes, stream, target, *this);
-  }
+  using AttributeConfigBase::AttributeConfigBase;
 
   int dimensionality() const override {
     return 3;
   }
 
-  Color readValue(DecodeStream* stream) const {
+  Color readValue(DecodeStream* stream) const override {
     return ReadColor(stream);
   }
 
-  void writeValue(EncodeStream* stream, const Color& value) const {
+  void writeValue(EncodeStream* stream, const Color& value) const override {
     WriteColor(stream, value);
-  }
-
-  void readValueList(DecodeStream* stream, Color* list, uint32_t count) const {
-    for (uint32_t i = 0; i < count; i++) {
-      list[i] = readValue(stream);
-    }
-  }
-
-  void writeValueList(EncodeStream* stream, const Color* list, uint32_t count) const {
-    for (uint32_t i = 0; i < count; i++) {
-      writeValue(stream, list[i]);
-    }
-  }
-
-  Keyframe<Color>* newKeyframe(const AttributeFlag&) const override {
-    return new SingleEaseKeyframe<Color>();
   }
 };
 
 template <>
-class AttributeConfig<Ratio> : public AttributeBase, public AttributeConfigBase<Ratio> {
+class AttributeConfig<Ratio> : public AttributeConfigBase<Ratio> {
  public:
-  Ratio defaultValue;
+  using AttributeConfigBase::AttributeConfigBase;
 
-  AttributeConfig(AttributeType attributeType, Ratio defaultValue)
-      : AttributeBase(attributeType), defaultValue(defaultValue) {
-  }
-
-  void readAttribute(DecodeStream* stream, const AttributeFlag& flag, void* target) const override {
-    ReadAttribute(stream, flag, target, *this);
-  }
-
-  void writeAttribute(EncodeStream* flagBytes, EncodeStream* stream, void* target) const override {
-    WriteAttribute(flagBytes, stream, target, *this);
-  }
-
-  Ratio readValue(DecodeStream* stream) const {
+  Ratio readValue(DecodeStream* stream) const override {
     return ReadRatio(stream);
   }
 
-  void writeValue(EncodeStream* stream, const Ratio& value) const {
+  void writeValue(EncodeStream* stream, const Ratio& value) const override {
     WriteRatio(stream, value);
-  }
-
-  void readValueList(DecodeStream* stream, Ratio* list, uint32_t count) const {
-    for (uint32_t i = 0; i < count; i++) {
-      list[i] = readValue(stream);
-    }
-  }
-
-  void writeValueList(EncodeStream* stream, const Ratio* list, uint32_t count) const {
-    for (uint32_t i = 0; i < count; i++) {
-      writeValue(stream, list[i]);
-    }
   }
 };
 
 template <>
-class AttributeConfig<std::string> : public AttributeBase, public AttributeConfigBase<std::string> {
+class AttributeConfig<std::string> : public AttributeConfigBase<std::string> {
  public:
-  std::string defaultValue;
+  using AttributeConfigBase::AttributeConfigBase;
 
-  AttributeConfig(AttributeType attributeType, std::string defaultValue)
-      : AttributeBase(attributeType), defaultValue(defaultValue) {
-  }
-
-  void readAttribute(DecodeStream* stream, const AttributeFlag& flag, void* target) const override {
-    ReadAttribute(stream, flag, target, *this);
-  }
-
-  void writeAttribute(EncodeStream* flagBytes, EncodeStream* stream, void* target) const override {
-    WriteAttribute(flagBytes, stream, target, *this);
-  }
-
-  std::string readValue(DecodeStream* stream) const {
+  std::string readValue(DecodeStream* stream) const override {
     return stream->readUTF8String();
   }
 
-  void writeValue(EncodeStream* stream, const std::string& value) const {
+  void writeValue(EncodeStream* stream, const std::string& value) const override {
     stream->writeUTF8String(value);
-  }
-
-  void readValueList(DecodeStream* stream, std::string* list, uint32_t count) const {
-    for (uint32_t i = 0; i < count; i++) {
-      list[i] = readValue(stream);
-    }
-  }
-
-  void writeValueList(EncodeStream* stream, const std::string* list, uint32_t count) const {
-    for (uint32_t i = 0; i < count; i++) {
-      writeValue(stream, list[i]);
-    }
-  }
-
-  Keyframe<std::string>* newKeyframe(const AttributeFlag&) const override {
-    return new Keyframe<std::string>();
   }
 };
 
 template <>
-class AttributeConfig<PathHandle> : public AttributeBase, public AttributeConfigBase<PathHandle> {
+class AttributeConfig<PathHandle> : public AttributeConfigBase<PathHandle, SingleEaseKeyframe> {
  public:
-  PathHandle defaultValue;
+  using AttributeConfigBase::AttributeConfigBase;
 
-  AttributeConfig(AttributeType attributeType, PathHandle defaultValue)
-      : AttributeBase(attributeType), defaultValue(defaultValue) {
-  }
-
-  void readAttribute(DecodeStream* stream, const AttributeFlag& flag, void* target) const override {
-    ReadAttribute(stream, flag, target, *this);
-  }
-
-  void writeAttribute(EncodeStream* flagBytes, EncodeStream* stream, void* target) const override {
-    WriteAttribute(flagBytes, stream, target, *this);
-  }
-
-  PathHandle readValue(DecodeStream* stream) const {
+  PathHandle readValue(DecodeStream* stream) const override {
     return ReadPath(stream);
   }
 
-  void writeValue(EncodeStream* stream, const PathHandle& value) const {
+  void writeValue(EncodeStream* stream, const PathHandle& value) const override {
     WritePath(stream, value);
-  }
-
-  void readValueList(DecodeStream* stream, PathHandle* list, uint32_t count) const {
-    for (uint32_t i = 0; i < count; i++) {
-      list[i] = readValue(stream);
-    }
-  }
-
-  void writeValueList(EncodeStream* stream, const PathHandle* list, uint32_t count) const {
-    for (uint32_t i = 0; i < count; i++) {
-      writeValue(stream, list[i]);
-    }
-  }
-
-  Keyframe<PathHandle>* newKeyframe(const AttributeFlag&) const override {
-    return new SingleEaseKeyframe<PathHandle>();
   }
 };
 
 template <>
-class AttributeConfig<TextDocumentHandle> : public AttributeBase,
-                                            public AttributeConfigBase<TextDocumentHandle> {
+class AttributeConfig<TextDocumentHandle> : public AttributeConfigBase<TextDocumentHandle> {
  public:
-  TextDocumentHandle defaultValue;
+  using AttributeConfigBase::AttributeConfigBase;
 
-  AttributeConfig(AttributeType attributeType, TextDocumentHandle defaultValue)
-      : AttributeBase(attributeType), defaultValue(defaultValue) {
-  }
-
-  void readAttribute(DecodeStream* stream, const AttributeFlag& flag, void* target) const override {
-    ReadAttribute(stream, flag, target, *this);
-  }
-
-  void writeAttribute(EncodeStream* flagBytes, EncodeStream* stream, void* target) const override {
-    WriteAttribute(flagBytes, stream, target, *this);
-  }
-
-  TextDocumentHandle readValue(DecodeStream* stream) const {
+  TextDocumentHandle readValue(DecodeStream* stream) const override {
     // 外面根据 tag V1/V2/V3 设置了 defaultValue，
     // 这里根据 defaultValue 决定使用哪个 TAG 来读
     if (defaultValue->direction != TextDirection::Default) {
@@ -592,7 +357,7 @@ class AttributeConfig<TextDocumentHandle> : public AttributeBase,
     }
   }
 
-  void writeValue(EncodeStream* stream, const TextDocumentHandle& value) const {
+  void writeValue(EncodeStream* stream, const TextDocumentHandle& value) const override {
     // 外面根据 tag V1/V2/V3 设置了 defaultValue，
     // 这里根据 defaultValue 决定使用哪个 TAG 来写
     if (defaultValue->direction != TextDirection::Default) {
@@ -603,175 +368,62 @@ class AttributeConfig<TextDocumentHandle> : public AttributeBase,
       WriteTextDocument(stream, value);
     }
   }
-
-  void readValueList(DecodeStream* stream, TextDocumentHandle* list, uint32_t count) const {
-    for (uint32_t i = 0; i < count; i++) {
-      list[i] = readValue(stream);
-    }
-  }
-
-  void writeValueList(EncodeStream* stream, const TextDocumentHandle* list, uint32_t count) const {
-    for (uint32_t i = 0; i < count; i++) {
-      writeValue(stream, list[i]);
-    }
-  }
 };
 
 template <>
-class AttributeConfig<GradientColorHandle> : public AttributeBase,
-                                             public AttributeConfigBase<GradientColorHandle> {
+class AttributeConfig<GradientColorHandle>
+    : public AttributeConfigBase<GradientColorHandle, SingleEaseKeyframe> {
  public:
-  GradientColorHandle defaultValue;
+  using AttributeConfigBase::AttributeConfigBase;
 
-  AttributeConfig(AttributeType attributeType, GradientColorHandle defaultValue)
-      : AttributeBase(attributeType), defaultValue(defaultValue) {
-  }
-
-  void readAttribute(DecodeStream* stream, const AttributeFlag& flag, void* target) const override {
-    ReadAttribute(stream, flag, target, *this);
-  }
-
-  void writeAttribute(EncodeStream* flagBytes, EncodeStream* stream, void* target) const override {
-    WriteAttribute(flagBytes, stream, target, *this);
-  }
-
-  GradientColorHandle readValue(DecodeStream* stream) const {
+  GradientColorHandle readValue(DecodeStream* stream) const override {
     return ReadGradientColor(stream);
   }
 
-  void writeValue(EncodeStream* stream, const GradientColorHandle& value) const {
+  void writeValue(EncodeStream* stream, const GradientColorHandle& value) const override {
     WriteGradientColor(stream, value);
-  }
-
-  void readValueList(DecodeStream* stream, GradientColorHandle* list, uint32_t count) const {
-    for (uint32_t i = 0; i < count; i++) {
-      list[i] = readValue(stream);
-    }
-  }
-
-  void writeValueList(EncodeStream* stream, const GradientColorHandle* list, uint32_t count) const {
-    for (uint32_t i = 0; i < count; i++) {
-      writeValue(stream, list[i]);
-    }
-  }
-
-  Keyframe<GradientColorHandle>* newKeyframe(const AttributeFlag&) const override {
-    return new SingleEaseKeyframe<GradientColorHandle>();
   }
 };
 
 template <>
-class AttributeConfig<Layer*> : public AttributeBase, public AttributeConfigBase<Layer*> {
+class AttributeConfig<Layer*> : public AttributeConfigBase<Layer*> {
  public:
-  Layer* defaultValue;
+  using AttributeConfigBase::AttributeConfigBase;
 
-  AttributeConfig(AttributeType attributeType, Layer* defaultValue)
-      : AttributeBase(attributeType), defaultValue(defaultValue) {
-  }
-
-  void readAttribute(DecodeStream* stream, const AttributeFlag& flag, void* target) const override {
-    ReadAttribute(stream, flag, target, *this);
-  }
-
-  void writeAttribute(EncodeStream* flagBytes, EncodeStream* stream, void* target) const override {
-    WriteAttribute(flagBytes, stream, target, *this);
-  }
-
-  Layer* readValue(DecodeStream* stream) const {
+  Layer* readValue(DecodeStream* stream) const override {
     return ReadLayerID(stream);
   }
 
-  void writeValue(EncodeStream* stream, const Layer* value) const {
+  void writeValue(EncodeStream* stream, Layer* const& value) const override {
     WriteLayerID(stream, const_cast<Layer*>(value));
-  }
-
-  void readValueList(DecodeStream* stream, Layer** list, uint32_t count) const {
-    for (uint32_t i = 0; i < count; i++) {
-      list[i] = readValue(stream);
-    }
-  }
-
-  void writeValueList(EncodeStream* stream, Layer** list, uint32_t count) const {
-    for (uint32_t i = 0; i < count; i++) {
-      writeValue(stream, list[i]);
-    }
   }
 };
 
 template <>
-class AttributeConfig<MaskData*> : public AttributeBase, public AttributeConfigBase<MaskData*> {
+class AttributeConfig<MaskData*> : public AttributeConfigBase<MaskData*> {
  public:
-  MaskData* defaultValue;
+  using AttributeConfigBase::AttributeConfigBase;
 
-  AttributeConfig(AttributeType attributeType, MaskData* defaultValue)
-      : AttributeBase(attributeType), defaultValue(defaultValue) {
-  }
-
-  void readAttribute(DecodeStream* stream, const AttributeFlag& flag, void* target) const override {
-    ReadAttribute(stream, flag, target, *this);
-  }
-
-  void writeAttribute(EncodeStream* flagBytes, EncodeStream* stream, void* target) const override {
-    WriteAttribute(flagBytes, stream, target, *this);
-  }
-
-  MaskData* readValue(DecodeStream* stream) const {
+  MaskData* readValue(DecodeStream* stream) const override {
     return ReadMaskID(stream);
   }
 
-  void writeValue(EncodeStream* stream, const MaskData* value) const {
+  void writeValue(EncodeStream* stream, MaskData* const& value) const override {
     WriteMaskID(stream, const_cast<MaskData*>(value));
-  }
-
-  void readValueList(DecodeStream* stream, MaskData** list, uint32_t count) const {
-    for (uint32_t i = 0; i < count; i++) {
-      list[i] = readValue(stream);
-    }
-  }
-
-  void writeValueList(EncodeStream* stream, MaskData** list, uint32_t count) const {
-    for (uint32_t i = 0; i < count; i++) {
-      writeValue(stream, list[i]);
-    }
   }
 };
 
 template <>
-class AttributeConfig<Composition*> : public AttributeBase,
-                                      public AttributeConfigBase<Composition*> {
+class AttributeConfig<Composition*> : public AttributeConfigBase<Composition*> {
  public:
-  Composition* defaultValue;
+  using AttributeConfigBase::AttributeConfigBase;
 
-  AttributeConfig(AttributeType attributeType, Composition* defaultValue)
-      : AttributeBase(attributeType), defaultValue(defaultValue) {
-  }
-
-  void readAttribute(DecodeStream* stream, const AttributeFlag& flag, void* target) const override {
-    ReadAttribute(stream, flag, target, *this);
-  }
-
-  void writeAttribute(EncodeStream* flagBytes, EncodeStream* stream, void* target) const override {
-    WriteAttribute(flagBytes, stream, target, *this);
-  }
-
-  Composition* readValue(DecodeStream* stream) const {
+  Composition* readValue(DecodeStream* stream) const override {
     return ReadCompositionID(stream);
   }
 
-  void writeValue(EncodeStream* stream, const Composition* value) const {
+  void writeValue(EncodeStream* stream, Composition* const& value) const override {
     WriteCompositionID(stream, const_cast<Composition*>(value));
-  }
-
-  void readValueList(DecodeStream* stream, Composition** list, uint32_t count) const {
-    for (uint32_t i = 0; i < count; i++) {
-      list[i] = readValue(stream);
-    }
-  }
-
-  void writeValueList(EncodeStream* stream, Composition** list, uint32_t count) const {
-    for (uint32_t i = 0; i < count; i++) {
-      writeValue(stream, list[i]);
-    }
   }
 };
 
