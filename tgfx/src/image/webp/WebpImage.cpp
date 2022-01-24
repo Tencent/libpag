@@ -134,14 +134,16 @@ static int webp_reader_write_data(const uint8_t* data, size_t data_size,
 
 std::shared_ptr<Data> WebpImage::Encode(const ImageInfo& imageInfo, const void* pixels,
                                         EncodedFormat, int quality) {
-  if (imageInfo.colorType() == ColorType::ALPHA_8) return nullptr;
+  if (imageInfo.colorType() == ColorType::ALPHA_8) {
+    return nullptr;
+  }
   const uint8_t* srcPixels = static_cast<uint8_t*>(const_cast<void*>(pixels));
   const uint8_t* convertPixels = nullptr;
-  if (imageInfo.colorType() == ColorType::ALPHA_8) {
+  if (imageInfo.alphaType() == AlphaType::Premultiplied) {
     PixelMap pixelMap(imageInfo, srcPixels);
     auto dstPixels = new uint8_t[imageInfo.byteSize()];
-    auto dstInfo = ImageInfo::Make(imageInfo.width(), imageInfo.height(), ColorType::RGBA_8888,
-                                   AlphaType::Opaque);
+    auto dstInfo = ImageInfo::Make(imageInfo.width(), imageInfo.height(), imageInfo.colorType(),
+                                   AlphaType::Unpremultiplied);
     if (!pixelMap.readPixels(dstInfo, dstPixels)) {
       delete[] dstPixels;
       return nullptr;
