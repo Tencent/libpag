@@ -1,7 +1,7 @@
 /* eslint-disable */
-export default [
+export const replaceFunctionConfig = [
   {
-    name: '__emval_get_method_caller替换',
+    name: 'replace __emval_get_method_caller',
     start: 'function __emval_get_method_caller(argCount, argTypes)',
     end: 'function __emval_get_module_property(name)',
     type: 'function',
@@ -64,7 +64,7 @@ export default [
     }).toString()
   },
   {
-    name: 'craftEmvalAllocator替换',
+    name: 'replace craftEmvalAllocator',
     start: 'function craftEmvalAllocator(argCount)',
     end: 'var emval_newers = {};',
     type: 'function',
@@ -96,7 +96,7 @@ export default [
     }).toString()
   },
   {
-    name: 'craftInvokerFunction替换',
+    name: 'replace craftInvokerFunction',
     start: 'function craftInvokerFunction(humanName, argTypes, classType, cppInvokerFunc, cppTargetFunc)',
     end: 'function heap32VectorToArray(count, firstElement)',
     type: 'funtcion',
@@ -199,7 +199,7 @@ export default [
     }).toString()
   },
   {
-    name: 'createNamedFunction替换',
+    name: 'replace createNamedFunction',
     start: 'function createNamedFunction(name, body)',
     end: 'function extendError(baseErrorType, errorName)',
     replaceStr: (function createNamedFunction(name, body) {
@@ -210,9 +210,57 @@ export default [
     }).toString()
   },
   {
-    name: '替换WebAssembly Runtime error',
+    name: 'replace getBinaryPromise',
+    start: 'function getBinaryPromise()',
+    end: 'function createWasm()',
+    replaceStr: (function getBinaryPromise() {
+      if (globalThis.isWechatMiniProgram) {
+        return new Promise((resolve, reject) => {
+          if (globalThis.isWxWebAssembly) {
+            resolve('/utils/libpag/lib/libpag.wasm.br')
+          } else {
+            const fs = wx.getFileSystemManager()
+            fs.readFile({
+              filePath: `/utils/libpag/lib/libpag.wasm.br`,
+              position: 0,
+              success(res) {
+                resolve(res.data);
+              },
+              fail(res) {
+                reject(res);
+              }
+            });
+          }
+        });
+      }
+      if (!wasmBinary && (ENVIRONMENT_IS_WEB )) {
+        if (typeof fetch === "function") {
+          return fetch(wasmBinaryFile, { credentials: "same-origin" }).then(function(response) {
+            if (!response["ok"]) {
+              throw "failed to load wasm binary file at '" + wasmBinaryFile + "'";
+            }
+            return response["arrayBuffer"]();
+          }).catch(function() {
+            return getBinary(wasmBinaryFile);
+          });
+        }
+      }
+      return Promise.resolve().then(function() {
+        return getBinary(wasmBinaryFile);
+      });
+    }).toString()
+  },
+  {
+    name: 'replace performance',
+    type: 'string',
+    start: 'performance.now();',
+    replaceStr: '(globalThis.isWechatMiniProgram ? wx.getPerformance().now() : performance.now())'
+  },
+  {
+    name: 'replace WebAssembly Runtime error',
     type: 'string',
     start: 'var e = new WebAssembly.RuntimeError(what);',
     replaceStr: 'var e = "run time error";'
-  }
+  },
 ];
+
