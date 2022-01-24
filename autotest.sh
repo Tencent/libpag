@@ -46,7 +46,7 @@ cp -a ${WORKSPACE}/test/out/*.png ${WORKSPACE}/result/
 exit -1
 fi
 
-gcovr -r . -e='test/*.*' -e='vendor/*.*' --html --html-details -o ./result/coverage.html
+gcovr -r . -e='test/*.*' -e='vendor/*.*' --html -o ./result/coverage.html
 gcovr -r . -e='test/*.*' -e='vendor/*.*' --xml-pretty -o coverage.xml
 diff-cover coverage.xml --compare-branch=origin/main --exclude 'test/*.*' 'vendor/*.*' --html-report coveragediff.html>coveragediff.txt
 mv coveragediff.html ./result/coveragediff.html
