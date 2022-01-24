@@ -26,7 +26,7 @@ jobs:
         run: |
            mkdir result
            cp -a vendor.json result/
-           cp -a LICENSE.txt
+           cp -a LICENSE.txt result/
         shell: bash 
       - uses: actions/upload-artifact@v2
         with:
