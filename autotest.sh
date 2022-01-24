@@ -24,15 +24,6 @@ echo "~~~~~~~~~~~~~~~~~~~CMakeLists error~~~~~~~~~~~~~~~~~~"
 exit -1
 fi
 
-cmake --build . --target PAGUnitTest -- -j 12
-if test $? -eq 0
-then
-echo "~~~~~~~~~~~~~~~~~~~PAGUnitTest make successed~~~~~~~~~~~~~~~~~~"
-else
-echo "~~~~~~~~~~~~~~~~~~~PAGUnitTest make error~~~~~~~~~~~~~~~~~~"
-exit -1
-fi
-
 cmake --build . --target PAGFullTest -- -j 12
 if test $? -eq 0
 then
@@ -42,20 +33,24 @@ echo "~~~~~~~~~~~~~~~~~~~PAGFullTest make error~~~~~~~~~~~~~~~~~~"
 exit -1
 fi
 
-if ${FullTest}; then
 ./PAGFullTest --gtest_output=json
-else
-./PAGUnitTest --gtest_output=json
-fi
-
 if test $? -eq 0
-
 then
-echo "~~~~~~~~~~~~~~~~~~~pag-test successed~~~~~~~~~~~~~~~~~~"
+echo "~~~~~~~~~~~~~~~~~~~PAGFullTest successed~~~~~~~~~~~~~~~~~~"
 else
-echo "~~~~~~~~~~~~~~~~~~~pag-test Failed~~~~~~~~~~~~~~~~~~"
+echo "~~~~~~~~~~~~~~~~~~~PAGFullTest Failed~~~~~~~~~~~~~~~~~~"
+
 cp -a "${WORKSPACE}/test/out/md5_dump.json" "${WORKSPACE}/result/md5_dump.json"
 cp -a "${WORKSPACE}/test/out/dump.json" "${WORKSPACE}/result/dump.json"
 cp -a ${WORKSPACE}/test/out/*.png ${WORKSPACE}/result/
 exit -1
 fi
+
+gcovr -r . -e='test/*.*' -e='vendor/*.*' --html --html-details -o ./result/coverage.html
+gcovr -r . -e='test/*.*' -e='vendor/*.*' --xml-pretty -o coverage.xml
+diff-cover coverage.xml --compare-branch=origin/main --exclude 'test/*.*' 'vendor/*.*' --html-report coveragediff.html>coveragediff.txt
+mv coveragediff.html ./result/coveragediff.html
+coveragediff=`grep -E "Coverage:" coveragediff.txt | awk -F"[ ]" '{print substr($2,1,length($2)-1)}'`
+if [ ! "$coveragediff" ];then coveragediff=100;fi
+setGateValue "UnitTestLineCoverage" $coveragediff
+rm -rf coverag*
