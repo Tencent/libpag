@@ -438,6 +438,11 @@ if (PAG_BUILD_TESTS)
     set(TEST_INCLUDES third_party/googletest/googletest third_party/googletest/googletest/include third_party/json/include)
     list(APPEND TEST_INCLUDES ${PAG_INCLUDES})
 
+    if (NOT APPLE)
+        find_package(OpenSSL REQUIRED Crypto)
+        list(APPEND TEST_PLATFORM_LIBS OpenSSL::Crypto)
+    endif()
+
     file(GLOB PAG_TEST_FILES
             test/*.*
             test/framework/*.*

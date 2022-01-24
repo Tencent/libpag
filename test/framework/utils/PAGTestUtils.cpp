@@ -17,16 +17,22 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGTestUtils.h"
+#ifdef __APPLE__
+#define MD5(...) CC_MD5(__VA_ARGS__)
+#define COMMON_DIGEST_FOR_OPENSSL
 #include <CommonCrypto/CommonCrypto.h>
+#else
+#include <openssl/md5.h>
+#endif
 #include <fstream>
 #include "image/Image.h"
 
 namespace pag {
 std::string DumpMD5(const void* bytes, size_t size) {
-  unsigned char digest[CC_MD5_DIGEST_LENGTH] = {0};
+  unsigned char digest[MD5_DIGEST_LENGTH] = {0};
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
-  CC_MD5(bytes, size, digest);
+  MD5((const unsigned char*)bytes, size, digest);
 #pragma clang diagnostic pop
   char buffer[32];
   char* position = buffer;
