@@ -22,6 +22,10 @@ jobs:
         with:
           fetch-depth: 0
           lfs: true
+      - name: Install Dependencies
+        run: |
+          pip install diff_cover
+          brew install gcovr
       - name: Run build script
         run: |
            mkdir result
