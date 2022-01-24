@@ -1,8 +1,10 @@
+import { PAGLayer } from './../src/pag-layer';
 import { PAGInit } from '../src/pag';
 import { PAGFile } from '../src/pag-file';
 import { PAG as PAGNamespace, ParagraphJustification } from '../src/types';
 
 let pagView = null;
+let pagComposition = null;
 let pagFile: PAGFile = null;
 let cacheEnabled: boolean;
 let videoEnabled: boolean;
@@ -130,7 +132,7 @@ PAGInit({
     pagView.stop();
     console.log('停止');
   });
-  document.getElementById('btn-destroy').addEventListener('click', function () {
+  document.getElementById('btn-destroy').addEventListener('click', () => {
     pagView.destroy();
     console.log('销毁');
   });
@@ -213,7 +215,128 @@ PAGInit({
     }
     pagView.setCacheScale(cacheScale);
   });
+
+  // PAGComposition
+  // getRect
+  document.getElementById('btn-getRect').addEventListener('click', async () => {
+    console.log(`width: ${await pagComposition.width()}, height: ${await pagComposition.height()}`)
+  });
+  // setContentSize
+  document.getElementById('btn-setContentSize').addEventListener('click', async () => {
+    console.log(`width: ${await pagComposition.width()}, height: ${await pagComposition.height()}`)
+    console.log(`change Rect`);
+    pagComposition.setContentSize(360, 640);
+    console.log(`width: ${await pagComposition.width()}, height: ${await pagComposition.height()}`)
+  });
+  // btn-numChildren
+  document.getElementById('btn-numChildren').addEventListener('click', async () => {
+    console.log(`numChildren: ${await pagComposition.numChildren()}`)
+  });
+  // btn-getLayerAt
+  document.getElementById('btn-getLayerAt').addEventListener('click', async () => {
+    const pagLayerWasm = await pagComposition.getLayerAt(0);
+    if (!pagLayerWasm) {
+      console.log('no Layer');
+      return;
+    };
+    const pagLayer = new PAG.PAGLayer(pagLayerWasm);
+    console.log(`layerName: ${await pagLayer.layerName()}`)
+  });
+  // btn-getLayerIndex
+  document.getElementById('btn-getLayerIndex').addEventListener('click', async () => {
+    const pagLayerWasm = await pagComposition.getLayerAt(0);
+    if (!pagLayerWasm) {
+      console.log('no Layer');
+      return;
+    };
+    const index = await pagComposition.getLayerIndex(pagLayerWasm);
+    console.log('GetLayerIndex:', index);
+  });
+  // btn-getLayerIndex
+  document.getElementById('btn-swapLayerAt').addEventListener('click', async () => {
+    swapLayer('swapLayerAt');
+  });
+  // btn-getLayerIndex
+  document.getElementById('btn-swapLayer').addEventListener('click', async () => {
+    swapLayer('swapLayer');
+  });
+  // audioStartTime
+  document.getElementById('btn-audioStartTime').addEventListener('click', async () => {
+    const audioStartTime = await pagComposition.audioStartTime();
+    console.log('audioStartTime:', audioStartTime);
+  });
+  // audioStartTime
+  document.getElementById('btn-audioStartTime').addEventListener('click', async () => {
+    const audioStartTime = await pagComposition.audioStartTime();
+    console.log('audioStartTime:', audioStartTime);
+  });
+  // removeLayerAt
+  document.getElementById('btn-removeLayerAt').addEventListener('click', async () => {
+    console.log(`Layers num: ${await pagComposition.numChildren()}`)
+    console.log('start removeLayerAt index 0');
+    await pagComposition.removeLayerAt(0);
+    console.log('delete Layer[0] success: Layers num: ', await pagComposition.numChildren());
+  });
+  // removeAllLayers
+  document.getElementById('btn-removeAllLayers').addEventListener('click', async () => {
+    console.log(`Layers num: ${await pagComposition.numChildren()}`)
+    console.log('start removeAllLayers index 0');
+    await pagComposition.removeAllLayers();
+    console.log('removeAllLayers success: Layers num: ', await pagComposition.numChildren());
+  });
+
+  // addLayer
+  document.getElementById('btn-addLayer').addEventListener('click', async () => {
+    const pagLayerWasm = await pagComposition.getLayerAt(0);
+    if (!pagLayerWasm) {
+      console.log('no Layer');
+      return;
+    };
+    await pagComposition.removeLayerAt(0);
+    console.log(`Layers num: ${await pagComposition.numChildren()}`);
+    await pagComposition.addLayer(pagLayerWasm);
+    console.log(`add success Layers num: ${await pagComposition.numChildren()}`);
+  });
+  
+  // addLayerAt
+  document.getElementById('btn-addLayerAt').addEventListener('click', async () => {
+    const pagLayerWasm = await pagComposition.getLayerAt(0);
+    if (!pagLayerWasm) {
+      console.log('no Layer');
+      return;
+    };
+    await pagComposition.removeLayerAt(0);
+    const pagLayer_1 = new PAG.PAGLayer(pagLayerWasm);
+    console.log(`Layers num: ${await pagComposition.numChildren()},  template layerName: ${await pagLayer_1.layerName()}`);
+    await pagComposition.addLayerAt(pagLayerWasm, 0);
+    const pagLayerWasm_1 = await pagComposition.getLayerAt(0);
+    const pagLayer = new PAG.PAGLayer(pagLayerWasm_1);
+    console.log(`add success Layers num: ${await pagComposition.numChildren()}, add layerName: ${await pagLayer.layerName()}`);
+  });
 });
+
+const swapLayer = async (type: string) => {
+  const pagLayerWasm_0 = await pagComposition.getLayerAt(0);
+  const pagLayerWasm_1 = await pagComposition.getLayerAt(1);
+  if (!pagLayerWasm_0 || !pagLayerWasm_1) {
+    console.log('No layer switching');
+    return;
+  };
+  const pagLayer_0 = new PAG.PAGLayer(pagLayerWasm_0);
+  const pagLayer_1 = new PAG.PAGLayer(pagLayerWasm_1);
+  console.log(`layerName0 : ${await pagLayer_0.layerName()}, layerName1 : ${await pagLayer_1.layerName()}`);
+  console.log(`start ${type}...`);
+  if (type === 'swapLayer') {
+    await pagComposition.swapLayer(pagLayerWasm_0, pagLayerWasm_1);
+  } else {
+    await pagComposition.swapLayerAt(0, 1);
+  }
+  const pagLayerWasm_exch_0 = await pagComposition.getLayerAt(0);
+  const pagLayerWasm_exch_1 = await pagComposition.getLayerAt(1);
+  const pagLayer__exch_0 = new PAG.PAGLayer(pagLayerWasm_exch_0);
+  const pagLayer__exch_1 = new PAG.PAGLayer(pagLayerWasm_exch_1);
+  console.log(`layerName0 : ${await pagLayer__exch_0.layerName()}, layerName1 : ${await pagLayer__exch_1.layerName()}`);
+}
 
 const createPAGView = async (file) => {
   if (pagFile) pagFile.destroy();
@@ -240,9 +363,11 @@ const createPAGView = async (file) => {
   document.getElementById('control').style.display = '';
   // 图层编辑
   const editableLayers = await getEditableLayer(PAG, pagFile);
+  pagComposition = await pagView.getComposition();
   console.log(editableLayers);
   renderEditableLayer(editableLayers);
   console.log(`已加载 ${file.name}`);
+
   return pagView;
 };
 
@@ -288,6 +413,7 @@ const getEditableLayer = async (PAG: PAGNamespace, pagFile) => {
       const frameRate = await pagLayer.frameRate();
       const localStartTime = await pagLayer.startTime();
       const startTime = await pagLayer.localTimeToGlobal(localStartTime);
+
       res.push({ uniqueID, layerType, layerName, opacity, visible, editableIndex, frameRate, startTime, duration });
     }
   }

@@ -63,7 +63,22 @@ EMSCRIPTEN_BINDINGS(pag) {
   class_<PAGComposition, base<PAGLayer>>("_PAGComposition")
       .smart_ptr<std::shared_ptr<PAGComposition>>("_PAGComposition")
       .function("_width", &PAGComposition::width)
-      .function("_height", &PAGComposition::height);
+      .function("_height", &PAGComposition::height)
+      .function("_setContentSize", &PAGComposition::setContentSize)
+      .function("_numChildren", &PAGComposition::numChildren)
+      .function("_getLayerAt", &PAGComposition::getLayerAt)
+      .function("_getLayerIndex", &PAGComposition::getLayerIndex)
+      // .function("_audioBytes", optional_override([](PAGComposition& pagComposition) {
+      //               return dynamic_cast<ByteData *>(pagComposition.audioBytes());
+      //  }))
+      .function("_swapLayerAt", &PAGComposition::swapLayerAt)
+      .function("_swapLayer", &PAGComposition::swapLayer)
+      .function("_audioStartTime", &PAGComposition::audioStartTime)
+      .function("_removeLayerAt", &PAGComposition::removeLayerAt)
+      .function("_removeAllLayers", &PAGComposition::removeAllLayers)
+      .function("_addLayer", &PAGComposition::addLayer)
+      .function("_addLayerAt", &PAGComposition::addLayerAt);
+
   class_<PAGFile, base<PAGComposition>>("_PAGFile")
       .smart_ptr<std::shared_ptr<PAGFile>>("_PAGFile")
       .class_function("_Load", optional_override([](uintptr_t bytes, size_t length) {
@@ -126,7 +141,7 @@ EMSCRIPTEN_BINDINGS(pag) {
                       }))
       .function("_width", &PAGImage::width)
       .function("_height", &PAGImage::height);
-
+    
   class_<PAGPlayer>("_PAGPlayer")
       .smart_ptr_constructor("_PAGPlayer", &std::make_shared<PAGPlayer>)
       .function("_setProgress", &PAGPlayer::setProgress)
