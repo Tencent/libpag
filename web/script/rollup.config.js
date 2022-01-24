@@ -3,6 +3,7 @@ import commonJs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
 import { terser } from 'rollup-plugin-terser';
 import esbuild from 'rollup-plugin-esbuild';
+import replaceFunc from '../plugin/rollup-plugin-replace';
 
 import pkg from '../package.json';
 
@@ -55,6 +56,7 @@ const umdMinConfig = {
   plugins: [esbuild({ tsconfig: 'tsconfig.json', minify: false }), json(), resolve(), commonJs(), terser()],
 };
 
+
 export default [
   umdConfig,
   umdMinConfig,
@@ -64,6 +66,6 @@ export default [
       { banner, file: pkg.module, format: 'esm', sourcemap: true },
       { banner, file: pkg.main, format: 'cjs', exports: 'auto', sourcemap: true },
     ],
-    plugins: [esbuild({ tsconfig: 'tsconfig.json', minify: false }), resolve(), commonJs()],
+    plugins: [esbuild({ tsconfig: 'tsconfig.json', minify: false }), resolve(), commonJs(), replaceFunc() ],
   },
 ];

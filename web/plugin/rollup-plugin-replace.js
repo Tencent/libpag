@@ -1,5 +1,5 @@
 import MagicString from 'magic-string';
-import replaceConfig from './replace-config';
+import { replaceFunctionConfig } from './replace-config';
 
 export default function replaceFunc() {
   return {
@@ -7,7 +7,7 @@ export default function replaceFunc() {
     transform (code, id) {
       let codeStr = `${code}`;
       const magic = new MagicString(codeStr);
-      replaceConfig.forEach(item => {
+      replaceFunctionConfig.forEach(item => {
         if (item.type === 'string') {
           codeStr = codeStr.replace(item.start, (match, offset) => {
             magic.overwrite(offset, offset + match.length, item.replaceStr)
