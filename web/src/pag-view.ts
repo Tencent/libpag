@@ -1,31 +1,43 @@
 import { PAG, PAGScaleMode, PAGViewListenerEvent } from './types';
+import { isWechatMiniProgram } from './utils/ua';
+import { getWechatElementById, requestAnimationFrame, cancelAnimationFrame } from './utils/wechat-babel';
 import { PAGPlayer } from './pag-player';
 import { EventManager, Listener } from './utils/event-manager';
 import { PAGSurface } from './pag-surface';
 import { PAGFile } from './pag-file';
 
+declare const wx;
 export class PAGView {
   public static module: PAG;
   /**
    * Create pag view.
    */
-  public static async init(file: PAGFile, canvas: string | HTMLCanvasElement | OffscreenCanvas): Promise<PAGView> {
-    let canvasElement: HTMLCanvasElement;
-    if (typeof canvas === 'string') {
-      canvasElement = document.getElementById(canvas.substr(1)) as HTMLCanvasElement;
-    } else if (canvas instanceof HTMLCanvasElement) {
-      canvasElement = canvas;
+  public static async init(file: PAGFile, canvasID: string): Promise<PAGView> {
+    let canvas;
+    let pagView;
+    if (isWechatMiniProgram) {
+      canvas = await getWechatElementById(canvasID)
+      const dpr = wx.getSystemInfoSync().pixelRatio
+      canvas.width = canvas.width * dpr;
+      canvas.height = canvas.height * dpr;
+      const width = canvas.width;
+      const height = canvas.height;
+      const gl = canvas.getContext('webgl', { alpha: true });
+      const contextID = this.module.GL.registerContext(gl, { majorVersion: 2, minorVersion: 0 });
+      const pagPlayer = await this.module._PAGPlayer.create();
+      pagView = new PAGView(pagPlayer);
+      this.module.GL.makeContextCurrent(contextID);
+      pagView.pagSurface = await this.module._PAGSurface.FromFrameBuffer(0, width, height, true);
+    } else {
+      canvas = document.getElementById(canvasID.substr(1)) as HTMLCanvasElement;
+      canvas.style.width = `${canvas.width}px`;
+      canvas.style.height = `${canvas.height}px`;
+      canvas.width = canvas.width * window.devicePixelRatio;
+      canvas.height = canvas.height * window.devicePixelRatio;
+      const pagPlayer = await this.module._PAGPlayer.create();
+      pagView = new PAGView(pagPlayer);
+      pagView.pagSurface = await this.module._PAGSurface.FromCanvas(canvasID);
     }
-    canvasElement.style.width = `${canvasElement.width}px`;
-    canvasElement.style.height = `${canvasElement.height}px`;
-    canvasElement.width = canvasElement.width * window.devicePixelRatio;
-    canvasElement.height = canvasElement.height * window.devicePixelRatio;
-    const pagPlayer = await this.module._PAGPlayer.create();
-    const pagView = new PAGView(pagPlayer);
-    const gl = canvasElement.getContext('webgl');
-    const contextID = this.module.GL.registerContext(gl, { majorVersion: 1, minorVersion: 0 });
-    this.module.GL.makeContextCurrent(contextID);
-    pagView.pagSurface = await this.module._PAGSurface.FromFrameBuffer(0, canvasElement.width, canvasElement.height, true);
     pagView.player.setSurface(pagView.pagSurface);
     pagView.player.setComposition(file);
     await pagView.setProgress(0);
@@ -242,7 +254,7 @@ export class PAGView {
     if (!this.isPlaying) {
       return;
     }
-    this.timer = window.requestAnimationFrame(async () => {
+    this.timer = requestAnimationFrame(async () => {
       await this.flushLoop();
     });
     await this.flushNextFrame();
@@ -266,7 +278,7 @@ export class PAGView {
 
   private clearTimer(): void {
     if (this.timer) {
-      window.cancelAnimationFrame(this.timer);
+      cancelAnimationFrame(this.timer);
       this.timer = null;
     }
   }
