@@ -26,12 +26,14 @@ jobs:
         run: |
           pip install diff_cover
           brew install gcovr
-      - name: Run build script
-        run: |
-           mkdir result
-           cp -a vendor.json result/
-           cp -a LICENSE.txt result/
+      - name: Run sync_deps script
+        run: ./sync_deps.sh 
         shell: bash 
+      - name: Run autotest script
+        run: |
+         chmod +x autotest.sh 
+         ./autotest.sh 
+        shell: bash
       - uses: actions/upload-artifact@v2
         with:
           name: result
@@ -39,13 +41,6 @@ jobs:
         
         
         
-#       - name: Run build script
-#         run: ./sync_deps.sh 
-#         shell: bash 
-#       - name: Run autotest script
-#         run: |
-#          chmod +x autotest.sh 
-#          ./autotest.sh 
-#         shell: bash
+
 
       
