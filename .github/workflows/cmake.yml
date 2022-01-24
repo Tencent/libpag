@@ -23,11 +23,25 @@ jobs:
           fetch-depth: 0
           lfs: true
       - name: Run build script
-        run: ./sync_deps.sh 
-        shell: bash 
-      - name: Run autotest script
         run: |
-         chmod +x autotest.sh 
-         ./autotest.sh 
-        shell: bash
+           mkdir result
+           cp -a vendor.json result/
+           cp -a LICENSE.txt
+        shell: bash 
+      - uses: actions/upload-artifact@v2
+        with:
+          name: result
+          path: result
+        
+        
+        
+#       - name: Run build script
+#         run: ./sync_deps.sh 
+#         shell: bash 
+#       - name: Run autotest script
+#         run: |
+#          chmod +x autotest.sh 
+#          ./autotest.sh 
+#         shell: bash
+
       
