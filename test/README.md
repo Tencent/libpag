@@ -47,7 +47,7 @@ namespace pag {
 
 > 对于跟渲染相关的测试case，需要渲染一个图片，然后对图片做MD5，把MD5跟基准比较来确认是否渲染正确，json库的使用可以[查看手册](<https://github.com/nlohmann/json>)
 
-- 跑测试用例的时候，会在 test/out/ 目录生成dump.json文件，每次重新跑都会覆盖，只生成跟本次跑的case相关的json。
+- 跑测试用例的时候，会在 test/out/ 目录生成compare_dump.json文件，每次重新跑都会覆盖，只生成跟本次跑的case相关的json。
 
 - 对于新写的接口，是没有历史的基准MD5的，所以需要人工来确认是否正确，在执行代码中间插入截图的命令，生成一个png，然后人工来确认是否正确绘制。
 
@@ -56,7 +56,7 @@ namespace pag {
 void SnapImageToFile(PAGSurface* pagSurface, std::string fileName)
 ```
 
-- 当本次测试编写完毕，并确认所有用例通过时候，跑一次全量测试，把生成的dump.json文件放到 test/res/compare_dump.json，作为后续的基准比较文件
+- 当本次测试编写完毕，并确认所有用例通过时候，跑一次全量测试，把生成的compare_dump.json文件放到 test/res/compare_dump.json，作为后续的基准比较文件
 
 
 

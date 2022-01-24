@@ -10,6 +10,7 @@ import { PAGView } from './pag-view';
 import { PAGFont } from './pag-font';
 import { PAGPlayer } from './pag-player';
 import { PAGLayer } from './pag-layer';
+import { PAGComposition } from './pag-composition';
 import { NativeImage } from './core/native-image';
 import { WebMask } from './core/web-mask';
 
@@ -35,6 +36,7 @@ export interface PAG extends EmscriptenModule {
   PAGFont: typeof PAGFont;
   PAGImage: typeof PAGImage;
   PAGLayer: typeof PAGLayer;
+  PAGComposition: typeof PAGComposition;
   NativeImage: typeof NativeImage;
   WebMask: typeof WebMask;
   ScalerContext: typeof ScalerContext;
@@ -43,6 +45,7 @@ export interface PAG extends EmscriptenModule {
   setFallbackFontNames: (fontName: any) => void;
   traceImage: (info, pixels, tag: string) => void;
   GL: any;
+  LayerType: typeof LayerType;
 }
 
 /**
@@ -96,7 +99,7 @@ export const enum ParagraphJustification {
   FullJustifyLastLineRight = 4,
   FullJustifyLastLineCenter = 5,
   FullJustifyLastLineFull = 6,
-};
+}
 
 export const enum TextDirection {
   Default = 0,
@@ -110,26 +113,22 @@ export interface Point {
 }
 
 export declare class TextDocument {
-
   /**
    * When true, the text layer shows a fill.
    */
   public applyFill: boolean;
-
   /**
    * When true, the text layer shows a stroke.
    */
   public applyStroke: boolean;
 
   public baselineShift: number;
-
   /**
    * When true, the text layer is paragraph (bounded) text.
    */
   public boxText: boolean;
 
   public boxTextPos: Readonly<Point>;
-
   /**
    * For box text, the pixel dimensions for the text bounds.
    */
@@ -144,57 +143,46 @@ export declare class TextDocument {
    * The text layer’s fill color.
    */
   public fillColor: Readonly<Color>;
-
   /**
    * A string with the name of the font family.
    **/
   public fontFamily: string;
-
   /**
    * A string with the style information — e.g., “bold”, “italic”.
    **/
   public fontStyle: string;
-
   /**
    * The text layer’s font size in pixels.
    */
   public fontSize: number;
-
   /**
    * The text layer’s stroke color.
    */
   public strokeColor: Readonly<Color>;
-
   /**
    * Indicates the rendering order for the fill and stroke of a text layer.
    */
   public strokeOverFill: boolean;
-
   /**
    * The text layer’s stroke thickness.
    */
   public strokeWidth: number;
-
   /**
    * The text layer’s Source Text value.
    */
   public text: string;
-
   /**
    * The paragraph justification for the text layer.
    */
   public justification: ParagraphJustification;
-
   /**
    * The space between lines, 0 indicates 'auto', which is fontSize * 1.2
    */
   public leading: number;
-
   /**
    * The text layer’s spacing between characters.
    */
   public tracking: number;
-
   /**
    *  The text layer’s background color
    */
@@ -205,11 +193,48 @@ export declare class TextDocument {
   public backgroundAlpha: number;
 
   public direction: TextDirection;
-  private constructor()
+  private constructor();
 }
 
 export interface Color {
   red: number;
   green: number;
   blue: number;
+}
+/**
+ * Layers are always one of the following types.
+ */
+export enum LayerType {
+  Unknown,
+  Null,
+  Solid,
+  Text,
+  Shape,
+  Image,
+  PreCompose,
+}
+
+/**
+ * Defines the rules on how to stretch the timeline of content to fit the specified duration.
+ */
+export enum PAGTimeStretchMode {
+  /**
+   * Keep the original playing speed, and display the last frame if the content's duration is less
+   * than target duration.
+   */
+  None = 0,
+  /*
+   * Change the playing speed of the content to fit target duration.
+   */
+  Scale = 1,
+  /**
+   * Keep the original playing speed, but repeat the content if the content's duration is less than
+   * target duration. This is the default mode.
+   */
+  Repeat = 2,
+  /**
+   * Keep the original playing speed, but repeat the content in reversed if the content's duration
+   * is less than target duration.
+   */
+  RepeatInverted = 3,
 }

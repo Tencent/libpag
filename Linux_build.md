@@ -33,6 +33,9 @@
     Execute in the root directory
        ./build_linux.sh 
     You will get the library files in the vendor/pag directory
+
+## Linux demo
+    The library files that the sample project depends on come from the previous step.
      
   
  

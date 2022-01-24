@@ -35,23 +35,21 @@ export class PAGView {
       canvas.width = canvas.width * window.devicePixelRatio;
       canvas.height = canvas.height * window.devicePixelRatio;
       const pagPlayer = await this.module._PAGPlayer.create();
-      pagView = new PAGView(pagPlayer);
-      pagView.pagSurface = await this.module._PAGSurface.FromCanvas(canvasID);
+      const pagView = new PAGView(pagPlayer);
+      const gl = canvas.getContext('webgl');
+      const contextID = this.module.GL.registerContext(gl, { majorVersion: 1, minorVersion: 0 });
+      this.module.GL.makeContextCurrent(contextID);
+      pagView.pagSurface = await this.module._PAGSurface.FromFrameBuffer(0, canvas.width, canvas.height, true);
     }
     pagView.player.setSurface(pagView.pagSurface);
     pagView.player.setComposition(file);
-    pagView.duration = await pagView.player.duration();
     await pagView.setProgress(0);
     pagView.eventManager = new EventManager();
     return pagView;
   }
 
   /**
-   * The duration of current composition in microseconds.
-   */
-  public duration = 0;
-  /**
-   * The duration of current composition in microseconds.
+   * The repeat count of player.
    */
   public repeatCount = 0;
   /**
@@ -75,6 +73,12 @@ export class PAGView {
     this.player = pagPlayer;
   }
 
+  /**
+   * The duration of current composition in microseconds.
+   */
+  public async duration() {
+    return await this.player.duration();
+  }
   /**
    * Adds a listener to the set of listeners that are sent events through the life of an animation,
    * such as start, repeat, and end.
@@ -140,7 +144,7 @@ export class PAGView {
    * Set the progress of play position, the value is from 0.0 to 1.0.
    */
   public async setProgress(progress): Promise<number> {
-    this.playTime = progress * this.duration;
+    this.playTime = progress * (await this.duration());
     this.startTime = Date.now() * 1000 - this.playTime;
     if (!this.isPlaying) {
       await this.player.setProgressAndFlush(progress);
@@ -260,7 +264,8 @@ export class PAGView {
   }
 
   private async flushNextFrame() {
-    const count = Math.floor(this.playTime / this.duration);
+    const duration = await this.duration();
+    const count = Math.floor(this.playTime / duration);
     if (this.repeatCount >= 0 && count > this.repeatCount) {
       await this.stop(false);
       this.eventManager.emit(PAGViewListenerEvent.onAnimationEnd, this);
@@ -269,7 +274,7 @@ export class PAGView {
         this.eventManager.emit(PAGViewListenerEvent.onAnimationRepeat, this);
       }
       this.playTime = Date.now() * 1000 - this.startTime;
-      await this.player.setProgressAndFlush((this.playTime % this.duration) / this.duration);
+      await this.player.setProgressAndFlush((this.playTime % duration) / duration);
     }
     this.repeatedTimes = count;
   }

@@ -20,8 +20,8 @@
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
 #include "gpu/opengl/GLUtil.h"
-#include "rendering/Drawable.h"
 #include "platform/NativeGLDevice.h"
+#include "rendering/Drawable.h"
 
 namespace pag {
 PAG_TEST_CASE(PAGBlendTest)
@@ -48,11 +48,9 @@ PAG_TEST_F(PAGBlendTest, Blend_ID83348933) {
     PAGTestEnvironment::DumpJson["PAGBlendTest"]["base"][fileName] = md5;
 #ifdef COMPARE_JSON_PATH
     auto compareMD5 = PAGTestEnvironment::CompareJson["PAGBlendTest"]["base"][fileName];
-    if (compareMD5 != nullptr) {
-      auto path = "../test/out/blend_" + fileName + ".png";
-      TraceIf(pagSurface, path, compareMD5.get<std::string>() != md5);
-      EXPECT_EQ(compareMD5.get<std::string>(), md5);
-    }
+    auto path = "../test/out/blend_" + fileName + ".png";
+    TraceIf(pagSurface, path, compareMD5.get<std::string>() != md5);
+    EXPECT_EQ(compareMD5.get<std::string>(), md5);
 #endif
   }
 }
@@ -102,11 +100,9 @@ PAG_TEST_F(PAGBlendTest, CopyDstTexture_ID83384135) {
   PAGTestEnvironment::DumpJson["PAGBlendTest"]["CopyDstTexture_ID83384135"] = md5;
 #ifdef COMPARE_JSON_PATH
   auto compareMD5 = PAGTestEnvironment::CompareJson["PAGBlendTest"]["CopyDstTexture_ID83384135"];
-  if (compareMD5 != nullptr) {
-    auto path = "../test/out/blend_Multiply_CopyDstTexture.png";
-    TraceIf(pagSurface, path, compareMD5.get<std::string>() != md5);
-    EXPECT_EQ(compareMD5.get<std::string>(), md5);
-  }
+  auto path = "../test/out/blend_Multiply_CopyDstTexture.png";
+  TraceIf(pagSurface, path, compareMD5.get<std::string>() != md5);
+  EXPECT_EQ(compareMD5.get<std::string>(), md5);
 #endif
 
   context = device->lockContext();
@@ -146,11 +142,9 @@ PAG_TEST_F(PAGBlendTest, TextureBottomLeft_ID83721303) {
   PAGTestEnvironment::DumpJson["PAGBlendTest"]["TextureBottomLeft_ID83721303"] = md5;
 #ifdef COMPARE_JSON_PATH
   auto compareMD5 = PAGTestEnvironment::CompareJson["PAGBlendTest"]["TextureBottomLeft_ID83721303"];
-  if (compareMD5 != nullptr) {
-    auto path = "../test/out/TextureBottomLeft_ID83721303.png";
-    TraceIf(pagSurface, path, compareMD5.get<std::string>() != md5);
-    EXPECT_EQ(compareMD5.get<std::string>(), md5);
-  }
+  auto path = "../test/out/TextureBottomLeft_ID83721303.png";
+  TraceIf(pagSurface, path, compareMD5.get<std::string>() != md5);
+  EXPECT_EQ(compareMD5.get<std::string>(), md5);
 #endif
 
   context = device->lockContext();
@@ -196,11 +190,9 @@ PAG_TEST_F(PAGBlendTest, BothBottomLeft_ID83721689) {
   PAGTestEnvironment::DumpJson["PAGBlendTest"]["BothBottomLeft_ID83721689"] = md5;
 #ifdef COMPARE_JSON_PATH
   auto compareMD5 = PAGTestEnvironment::CompareJson["PAGBlendTest"]["BothBottomLeft_ID83721689"];
-  if (compareMD5 != nullptr) {
-    auto path = "../test/out/BothBottomLeft_ID83721689.png";
-    TraceIf(pagSurface, path, compareMD5.get<std::string>() != md5);
-    EXPECT_EQ(compareMD5.get<std::string>(), md5);
-  }
+  auto path = "../test/out/BothBottomLeft_ID83721689.png";
+  TraceIf(pagSurface, path, compareMD5.get<std::string>() != md5);
+  EXPECT_EQ(compareMD5.get<std::string>(), md5);
 #endif
 
   context = device->lockContext();

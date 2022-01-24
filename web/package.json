@@ -1,6 +1,6 @@
 {
   "name": "libpag",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Portable Animated Graphics",
   "main": "lib/libpag.cjs.js",
   "module": "lib/libpag.esm.js",
@@ -16,7 +16,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/tencent/libpag/web"
+    "url": "https://github.com/Tencent/libpag/tree/main/web"
   },
   "devDependencies": {
     "@babel/core": "^7.12.13",
@@ -50,7 +50,9 @@
     "lib",
     "types",
     "README.md",
+    "README.zh_CN.md",
     "CHANGELOG.md",
+    "CHANGELOG.zh_CN.md",
     "LICENSE.txt"
   ],
   "license": "Apache-2.0",

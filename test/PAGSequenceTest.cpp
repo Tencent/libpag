@@ -40,11 +40,9 @@ void pagSequenceTest() {
   PAGTestEnvironment::DumpJson["PAGSequenceTest"]["RenderOnScreen_ID80475733"] = md5;
 #ifdef COMPARE_JSON_PATH
   auto compareMD5 = PAGTestEnvironment::CompareJson["PAGSequenceTest"]["RenderOnScreen_ID80475733"];
-  if (compareMD5 != nullptr) {
-    TraceIf(pagSurface, "../test/out/RenderOnScreen_ID80475733.png",
-            compareMD5.get<std::string>() != md5);
-    EXPECT_EQ(compareMD5.get<std::string>(), md5);
-  }
+  TraceIf(pagSurface, "../test/out/RenderOnScreen_ID80475733.png",
+          compareMD5.get<std::string>() != md5);
+  EXPECT_EQ(compareMD5.get<std::string>(), md5);
 #endif
 }
 
@@ -73,11 +71,9 @@ PAG_TEST_F(PAGSequenceTest, BitmapSequenceReader_ID82681127) {
 #ifdef COMPARE_JSON_PATH
   auto compareMD5 =
       PAGTestEnvironment::CompareJson["PAGSequenceTest"]["BitmapSequenceReader_ID82681127"];
-  if (compareMD5 != nullptr) {
-    TraceIf(pagSurface, "../test/out/BitmapSequenceReader_ID82681127.png",
-            compareMD5.get<std::string>() != md5);
-    EXPECT_EQ(compareMD5.get<std::string>(), md5);
-  }
+  TraceIf(pagSurface, "../test/out/BitmapSequenceReader_ID82681127.png",
+          compareMD5.get<std::string>() != md5);
+  EXPECT_EQ(compareMD5.get<std::string>(), md5);
 #endif
 }
 
@@ -97,11 +93,9 @@ PAG_TEST_F(PAGSequenceTest, VideoSequenceAsMask_ID83191791) {
 #ifdef COMPARE_JSON_PATH
   auto compareMD5 =
       PAGTestEnvironment::CompareJson["PAGSequenceTest"]["VideoSequenceAsMask_ID83191791"];
-  if (compareMD5 != nullptr) {
-    TraceIf(pagSurface, "../test/out/VideoSequenceAsMask_ID83191791.png",
-            compareMD5.get<std::string>() != md5);
-    EXPECT_EQ(compareMD5.get<std::string>(), md5);
-  }
+  TraceIf(pagSurface, "../test/out/VideoSequenceAsMask_ID83191791.png",
+          compareMD5.get<std::string>() != md5);
+  EXPECT_EQ(compareMD5.get<std::string>(), md5);
 #endif
 }
 }  // namespace pag

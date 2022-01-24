@@ -12,7 +12,7 @@
       },
       {
         "url": "${PAG_GROUP}/pathkit.git",
-        "commit": "cb2e612b0fe03c56bd3b8ea3d87ceee35d438c4a",
+        "commit": "e8ba79d59c62c23669a7df0a213664239069413f",
         "dir": "third_party/pathkit"
       },
       {
@@ -69,32 +69,6 @@
         "url": "https://github.com/nlohmann/json.git",
         "commit": "fec56a1a16c6e1c1b1f4e116a20e79398282626c",
         "dir": "third_party/json"
-      }
-    ]
-  },
-  "files": {
-    "mac": [
-      {
-        "url": "${PAG_GROUP}/swiftshader/releases/download/opengl/mac.zip",
-        "dir": "third_party/out/swiftshader",
-        "unzip": true
-      },
-      {
-        "url": "${PAG_GROUP}/ffavc/releases/download/0.9.0/ffavc_0.9.0_release_mac_x64.zip",
-        "dir": "vendor/ffavc",
-        "unzip": true
-      }
-    ],
-    "win": [
-      {
-        "url": "${PAG_GROUP}/swiftshader/releases/download/opengl/win.zip",
-        "dir": "third_party/out/swiftshader",
-        "unzip": true
-      },
-      {
-        "url": "${PAG_GROUP}/angle/releases/download/chromium_4763/win.zip",
-        "dir": "vendor/angle",
-        "unzip": true
       }
     ]
   },

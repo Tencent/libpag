@@ -49,9 +49,7 @@ PAG_TEST(PAGRasterizerTest, TestRasterizer) {
   auto pathCompareMD5 = PAGTestEnvironment::CompareJson["PAGRasterizerTest"]["rasterizer_path"];
   std::string imagePath = "../test/out/rasterizer_path.png";
   TraceIf(pixelBuffer, imagePath, pathMD5 != pathCompareMD5);
-  if (pathCompareMD5 != nullptr) {
-    EXPECT_EQ(pathCompareMD5.get<std::string>(), pathMD5);
-  }
+  EXPECT_EQ(pathCompareMD5.get<std::string>(), pathMD5);
 
   auto device = NativeGLDevice::Make();
   ASSERT_TRUE(device != nullptr);
@@ -78,11 +76,9 @@ PAG_TEST(PAGRasterizerTest, TestRasterizer) {
       PAGTestEnvironment::CompareJson["PAGRasterizerTest"]["rasterizer_path_texture"];
   std::string texturePath = "../test/out/rasterizer_path_texture.png";
   TraceIf(bitmap, texturePath, textureMD5 != textureCompareMD5);
-  if (textureCompareMD5 != nullptr) {
-    EXPECT_EQ(textureCompareMD5.get<std::string>(), textureMD5);
-  }
+  EXPECT_EQ(textureCompareMD5.get<std::string>(), textureMD5);
 
-  auto typeface = Typeface::MakeFromPath("../test/res/font/Apple Color Emoji.ttc");
+  auto typeface = Typeface::MakeFromPath("../resources/font/NotoColorEmoji.ttf");
   ASSERT_TRUE(typeface != nullptr);
   ASSERT_TRUE(typeface->hasColor());
   auto glyphID = typeface->getGlyphID("👻");
@@ -94,17 +90,15 @@ PAG_TEST(PAGRasterizerTest, TestRasterizer) {
   font.setFauxBold(true);
   auto buffer = font.getGlyphImage(glyphID, &matrix);
   ASSERT_TRUE(buffer != nullptr);
-  EXPECT_EQ(matrix.getScaleX(), 1.875f);
-  EXPECT_EQ(matrix.getSkewX(), -0.375f);
+  EXPECT_TRUE(fabsf(matrix.getScaleX() - 2.75229359f) < FLT_EPSILON);
+  EXPECT_TRUE(fabsf(matrix.getSkewX() + 0.550458729f) < FLT_EPSILON);
   bitmap = Bitmap(std::static_pointer_cast<PixelBuffer>(buffer));
   auto glyphMD5 = DumpMD5(bitmap);
   rasterizerJson["rasterizer_glyph"] = glyphMD5;
   auto glyphCompareMD5 = PAGTestEnvironment::CompareJson["PAGRasterizerTest"]["rasterizer_glyph"];
   imagePath = "../test/out/rasterizer_emoji.png";
   TraceIf(bitmap, imagePath, glyphMD5 != glyphCompareMD5);
-  if (glyphCompareMD5 != nullptr) {
-    EXPECT_EQ(glyphCompareMD5.get<std::string>(), glyphMD5);
-  }
+  EXPECT_EQ(glyphCompareMD5.get<std::string>(), glyphMD5);
   PAGTestEnvironment::DumpJson["PAGRasterizerTest"] = rasterizerJson;
 }
 }  // namespace pag

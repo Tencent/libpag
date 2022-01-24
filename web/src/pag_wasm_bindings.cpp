@@ -34,11 +34,30 @@ using namespace pag;
 EMSCRIPTEN_BINDINGS(pag) {
   class_<PAGLayer>("_PAGLayer")
       .smart_ptr<std::shared_ptr<PAGLayer>>("_PAGLayer")
+      .function("_uniqueID", optional_override([](PAGLayer& pagLayer) {
+                  return static_cast<int>(pagLayer.uniqueID());
+                }))
+      .function("_layerType", optional_override([](PAGLayer& pagLayer) {
+                  return static_cast<LayerType>(pagLayer.layerType());
+                }))
+      .function("_layerName", &PAGLayer::layerName)
+      .function("_opacity", &PAGLayer::opacity)
+      .function("_setOpacity", &PAGLayer::setOpacity)
+      .function("_visible", &PAGLayer::visible)
+      .function("_setVisible", &PAGLayer::setVisible)
+      .function("_editableIndex", &PAGLayer::editableIndex)
+      .function("_frameRate", &PAGLayer::frameRate)
       .function("_duration", optional_override([](PAGLayer& pagLayer) {
                   return static_cast<int>(pagLayer.duration());
                 }))
       .function("_startTime", optional_override([](PAGLayer& pagLayer) {
                   return static_cast<int>(pagLayer.startTime());
+                }))
+      .function("_localTimeToGlobal", optional_override([](PAGLayer& pagLayer, int localTime) {
+                  return static_cast<int>(pagLayer.localTimeToGlobal(localTime));
+                }))
+      .function("_globalToLocalTime", optional_override([](PAGLayer& pagLayer, int globalTime) {
+                  return static_cast<int>(pagLayer.globalToLocalTime(globalTime));
                 }));
 
   class_<PAGComposition, base<PAGLayer>>("_PAGComposition")
@@ -50,16 +69,21 @@ EMSCRIPTEN_BINDINGS(pag) {
       .class_function("_Load", optional_override([](uintptr_t bytes, size_t length) {
                         return PAGFile::Load(reinterpret_cast<void*>(bytes), length);
                       }))
-      .function("_replaceImage", &PAGFile::replaceImage)
       .function("_numImages", &PAGFile::numImages)
       .function("_numVideos", &PAGFile::numVideos)
+      .function("_numTexts", &PAGFile::numTexts)
+      .function("_getTextData", &PAGFile::getTextData)
+      .function("_replaceText", &PAGFile::replaceText)
+      .function("_replaceImage", &PAGFile::replaceImage)
       .function("_getLayersByEditableIndex",
                 optional_override([](PAGFile& pagFile, int editableIndex, LayerType layerType) {
                   return pagFile.getLayersByEditableIndex(editableIndex, layerType);
                 }))
-      .function("_numTexts", &PAGFile::numTexts)
-      .function("_replaceText", &PAGFile::replaceText)
-      .function("_getTextData", &PAGFile::getTextData);
+      .function("_timeStretchMode", &PAGFile::timeStretchMode)
+      .function("_setTimeStretchMode", &PAGFile::setTimeStretchMode)
+      .function("_setDuration", optional_override([](PAGFile& pagFile, int duration) {
+                  return pagFile.setDuration(static_cast<int64_t>(duration));
+                }));
 
   class_<PAGSurface>("_PAGSurface")
       .smart_ptr<std::shared_ptr<PAGSurface>>("_PAGSurface")

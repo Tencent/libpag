@@ -241,23 +241,31 @@ class CTPathGeometrySink {
 };
 
 bool CGScalerContext::generatePath(GlyphID glyphID, Path* path) {
+  auto fontFormat = CTFontCopyAttribute(ctFont, kCTFontFormatAttribute);
+  if (!fontFormat) {
+    return false;
+  }
+  SInt16 format;
+  CFNumberGetValue(static_cast<CFNumberRef>(fontFormat), kCFNumberSInt16Type, &format);
+  if (format == kCTFontFormatUnrecognized || format == kCTFontFormatBitmap) {
+    return false;
+  }
   CGAffineTransform xform = transform;
   auto cgGlyph = static_cast<CGGlyph>(glyphID);
   auto cgPath = CTFontCreatePathForGlyph(ctFont, cgGlyph, &xform);
-  path->reset();
-  if (!cgPath) {
-    return false;
-  }
-
-  CTPathGeometrySink sink;
-  CGPathApply(cgPath, &sink, CTPathGeometrySink::ApplyElement);
-  *path = sink.path();
-  CFRelease(cgPath);
-  if (rec.fauxBoldSize != 0) {
-    auto strokePath = *path;
-    auto pathEffect = PathEffect::MakeStroke(Stroke(rec.fauxBoldSize));
-    pathEffect->applyTo(&strokePath);
-    path->addPath(strokePath, PathOp::Union);
+  if (cgPath) {
+    CTPathGeometrySink sink;
+    CGPathApply(cgPath, &sink, CTPathGeometrySink::ApplyElement);
+    *path = sink.path();
+    CFRelease(cgPath);
+    if (rec.fauxBoldSize != 0) {
+      auto strokePath = *path;
+      auto pathEffect = PathEffect::MakeStroke(Stroke(rec.fauxBoldSize));
+      pathEffect->applyTo(&strokePath);
+      path->addPath(strokePath, PathOp::Union);
+    }
+  } else {
+    path->reset();
   }
   return true;
 }

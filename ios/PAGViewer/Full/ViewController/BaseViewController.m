@@ -40,9 +40,6 @@
     
     //关联PAGView和PAGFile
     [self.pagView setComposition:self.pagFile];
-    //3.0中pagView中可以使用setPath直接使用file，setPath在pag中会根据path缓存pagFile，实现一次加载多个地方调用
-    //[self.pagView setPath:resourcePath];
-    //3.0中 [self.pagView setFile:self.pagFile]方法被废弃，如果使用setFile则无法通过file对替换数据进行控制;
     
     //设置循环播放，默认只播放一次
     [self.pagView setRepeatCount:-1];

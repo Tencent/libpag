@@ -77,9 +77,7 @@ PAG_TEST_F(PAGImageTest, image) {
   PAGTestEnvironment::DumpJson["PAGImageTest"] = imageLayerJson;
 #ifdef COMPARE_JSON_PATH
   auto cJson = PAGTestEnvironment::CompareJson["PAGImageTest"]["image"];
-  if (cJson != nullptr) {
-    ASSERT_EQ(cJson.get<std::string>(), md5);
-  }
+  ASSERT_EQ(cJson.get<std::string>(), md5);
 #endif
 }
 
@@ -106,10 +104,8 @@ PAG_TEST_F(PAGImageTest, image2) {
   PAGTestEnvironment::DumpJson["PAGImageTester"] = imageLayerJson;
 #ifdef COMPARE_JSON_PATH
   auto cJson = PAGTestEnvironment::CompareJson["PAGImageTester"]["image"];
-  if (cJson != nullptr) {
-    TraceIf(bitmap, "../test/out/PAGImageTester_image.png", md5 != cJson.get<std::string>());
-    ASSERT_EQ(cJson.get<std::string>(), md5);
-  }
+  TraceIf(bitmap, "../test/out/PAGImageTester_image.png", md5 != cJson.get<std::string>());
+  ASSERT_EQ(cJson.get<std::string>(), md5);
 #endif
 }
 
@@ -135,10 +131,8 @@ PAG_TEST_F(PAGImageTest, image3) {
   PAGTestEnvironment::DumpJson["PAGImageDecodeTest"]["image_rotation"] = md5;
 #ifdef COMPARE_JSON_PATH
   auto cJson = PAGTestEnvironment::CompareJson["PAGImageDecodeTest"]["image_rotation"];
-  if (cJson != nullptr) {
-    TraceIf(surface, "../test/out/test_image_rotation.png", md5 != cJson.get<std::string>());
-    ASSERT_EQ(cJson.get<std::string>(), md5);
-  }
+  TraceIf(surface, "../test/out/test_image_rotation.png", md5 != cJson.get<std::string>());
+  ASSERT_EQ(cJson.get<std::string>(), md5);
 #endif
 }
 }  // namespace pag

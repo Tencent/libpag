@@ -30,7 +30,7 @@ easily without other attachments.
 
 - **All AE features supported**
 
-<img src="resources/readme/intro_2.png" alt="intro_2" width="281"/>
+<img src="resources/readme/intro_2.png" alt="intro_2" width="282"/>
 
 While other solutions may only support exporting limited vector-based AE features, PAG supports
 exporting all AE animations into a single file by combining vector-based exporting with raster-based
@@ -54,7 +54,7 @@ single PAG file, mix multiple PAG files into one composition, or replace texts a
 pre-designed animation effects applied at runtime. It reduces tons of coding work for product
 features like video templates.
 
-## Requirements
+## System Requirements
 
 - iOS 9.0 or later
 - Android 4.4 or later
@@ -62,7 +62,6 @@ features like video templates.
 - Windows 7.0 or later
 - Chrome 87.0 or later (Web)
 - Safari 11.1 or later (Web)
-- GCC 4.9 or later (Linux)
 
 ## Getting Started
 
@@ -130,8 +129,9 @@ Finally, run gradle sync and then build the project.
 
 - [iOS API Reference](https://pag.io/api.html#/apis/ios/)
 - [Android API Reference](https://pag.io/api.html#/apis/android/org/libpag/package-summary.html)
+- [Web API Reference](https://pag.io/api.html#/apis/web/)
 
-You can find other docs on [pag.io](https://pag.io/docs/tech/sdk.html)
+You can find other docs on [pag.io](https://pag.io/docs/sdk.html)
 
 ## Development
 
@@ -148,6 +148,14 @@ We recommend using CLion IDE on macOS platform for development.
 So there is no `release` branch yet at this moment. We are working hard to make a stable release of
 PAG 4.0 available as soon as possible. For using PAG 3.0 versions, you can download the precompiled
 libraries from [here](https://github.com/Tencent/libpag/releases).**
+
+### Build Prerequisites
+
+- Xcode 11.0+
+- GCC 7.0+
+- CMake 3.10.2+
+- Visual Studio 2019
+- NDK 19.2.5345600 （**Please use this exact version of NDK, other versions may fail.**)
 
 ### Dependency Management
 

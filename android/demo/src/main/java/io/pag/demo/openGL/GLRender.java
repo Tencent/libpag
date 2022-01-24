@@ -20,6 +20,7 @@ public class GLRender implements GLSurfaceView.Renderer {
 
     private static final String TAG = "GLRender";
     private int textureId;
+    private PAGSurface pagSurface;
     private PAGPlayer pagPlayer;
     private Context context;
     private long duration;
@@ -87,6 +88,15 @@ public class GLRender implements GLSurfaceView.Renderer {
         this.context = context;
     }
 
+    public void onDestroy() {
+        if (pagPlayer != null) {
+            pagPlayer.release();
+        }
+        if (pagSurface != null) {
+            pagSurface.release();
+        }
+    }
+
     @Override
     public void onSurfaceCreated(GL10 gl, EGLConfig config) {
         GLES20.glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -97,7 +107,7 @@ public class GLRender implements GLSurfaceView.Renderer {
 
         textureId =  initRenderTarget();
 
-        PAGSurface pagSurface = PAGSurface.FromTexture(textureId, mWidth, mHeight);
+        pagSurface = PAGSurface.FromTexture(textureId, mWidth, mHeight);
         pagPlayer = new PAGPlayer();
         pagPlayer.setComposition(pagFile);
         pagPlayer.setSurface(pagSurface);
@@ -135,7 +145,7 @@ public class GLRender implements GLSurfaceView.Renderer {
     }
 
     private int initRenderTarget() {
-        int id[] = {0};
+        int[] id = {0};
         GLES20.glGenTextures(1, id, 0);
         if (id[0] == 0) {
             return 0;

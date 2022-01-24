@@ -18,7 +18,6 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     PAGComposition* composition = [self makeComposition];
-    //3.0需要使用setComposition接口
     [self.pagView setComposition:composition];
 }
 
@@ -27,7 +26,7 @@
     return nil;
 }
 
-/// 3.0组装接口Demo，用于在一个surface中展示不同的file
+
 - (PAGComposition *)makeComposition {
     PAGComposition* compostion = [PAGComposition Make:self.view.bounds.size];
     ///data-TimeStretch是一个特殊pag，pag中标记了mark，使得在duration变化后可以填充满整个时长

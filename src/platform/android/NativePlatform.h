@@ -49,9 +49,6 @@ class NativePlatform : public Platform {
 
   bool registerFallbackFonts() const override;
 
-  void reportStatisticalData(
-      std::unordered_map<std::string, std::string>& reportMap) const override;
-
   void traceImage(const PixelMap& pixelMap, const std::string& tag) const override;
 };
 }  // namespace pag

@@ -29,7 +29,7 @@ PAGInit({
   });
   // 加载测试字体
   document.getElementById('btn-test-font').addEventListener('click', () => {
-    const url = '../assets/SourceHanSansSC-Normal.otf';
+    const url = './assets/SourceHanSansSC-Normal.otf';
     fetch(url)
       .then((response) => response.blob())
       .then(async (blob) => {
@@ -47,7 +47,7 @@ PAGInit({
     createPAGView((event.target as HTMLInputElement).files[0]);
   });
   document.getElementById('btn-test-vector-pag').addEventListener('click', () => {
-    const url = '../assets/like.pag';
+    const url = './assets/like.pag';
     fetch(url)
       .then((response) => response.blob())
       .then((blob) => {
@@ -56,7 +56,7 @@ PAGInit({
       });
   });
   document.getElementById('btn-test-video-pag').addEventListener('click', () => {
-    const url = '../assets/particle_video.pag';
+    const url = './assets/particle_video.pag';
     fetch(url)
       .then((response) => response.blob())
       .then((blob) => {
@@ -65,7 +65,7 @@ PAGInit({
       });
   });
   document.getElementById('btn-test-text-pag').addEventListener('click', async () => {
-    const url = '../assets/test2.pag';
+    const url = './assets/test2.pag';
     const response = await fetch(url);
     const blob = await response.blob();
     const file = new window.File([blob], url.replace(/(.*\/)*([^.]+)/i, '$2'));
@@ -91,6 +91,32 @@ PAGInit({
     pagFile.replaceText(0, textDoc);
     pagView.play();
   });
+
+  // Get PAGFile duration
+  document.getElementById('btn-pagfile-get-duration').addEventListener('click', async () => {
+    const duration = await pagFile.duration();
+    console.log(`PAGFile duration ${duration}`);
+  });
+
+  // PAGFile setDuration
+  document.getElementById('btn-pagfile-set-duration').addEventListener('click', async () => {
+    const duration = Number((document.getElementById('input-pagfile-duration') as HTMLInputElement).value);
+    await pagFile.setDuration(duration);
+    console.log(`Set PAGFile duration ${duration} `);
+  });
+
+  // Get timeStretchMode
+  document.getElementById('btn-pagfile-time-stretch-mode').addEventListener('click', async () => {
+    const timeStretchMode = await pagFile.timeStretchMode();
+    console.log(`PAGFile timeStretchMode ${timeStretchMode} `);
+  });
+
+  document.getElementById('btn-pagfile-set-time-stretch-mode').addEventListener('click', () => {
+    const mode = Number((document.getElementById('select-time-stretch-mode') as HTMLSelectElement).value);
+    pagFile.setTimeStretchMode(mode);
+    console.log(`Set PAGFile timeStretchMode ${mode}`);
+  });
+
   // 控制
   document.getElementById('btn-play').addEventListener('click', () => {
     pagView.play();
@@ -145,7 +171,7 @@ PAGInit({
     console.log(`scaleMode: ${await pagView.scaleMode()}`);
   });
   document.getElementById('setScaleMode').addEventListener('click', () => {
-    let scaleMode = Number((document.getElementById('scaleMode') as HTMLInputElement).value);
+    let scaleMode = Number((document.getElementById('scaleMode') as HTMLSelectElement).value);
     pagView.setScaleMode(scaleMode);
   });
 
@@ -196,7 +222,7 @@ const createPAGView = async (file) => {
   const pagCanvas = document.getElementById('pag') as HTMLCanvasElement;
   pagCanvas.width = 640;
   pagCanvas.height = 640;
-  pagView = await PAG.PAGView.init(pagFile, '#pag');
+  pagView = await PAG.PAGView.init(pagFile, pagCanvas);
   pagView.setRepeatCount(0);
   // 绑定事件监听
   pagView.addListener('onAnimationStart', (event) => {
@@ -214,6 +240,7 @@ const createPAGView = async (file) => {
   document.getElementById('control').style.display = '';
   // 图层编辑
   const editableLayers = await getEditableLayer(PAG, pagFile);
+  console.log(editableLayers);
   renderEditableLayer(editableLayers);
   console.log(`已加载 ${file.name}`);
   return pagView;
@@ -243,7 +270,7 @@ const setVideoTime = (el, time) => {
   });
 };
 
-const getEditableLayer = async (PAG, pagFile) => {
+const getEditableLayer = async (PAG: PAGNamespace, pagFile) => {
   const editableImageCount = await pagFile.numImages();
   let res = [];
   for (let i = 0; i < editableImageCount; i++) {
@@ -251,9 +278,17 @@ const getEditableLayer = async (PAG, pagFile) => {
     for (let j = 0; j < vectorPagLayer.size(); j++) {
       const pagLayerWasm = vectorPagLayer.get(j);
       const pagLayer = new PAG.PAGLayer(pagLayerWasm);
-      const startTime = await pagLayer.startTime();
+      const uniqueID = await pagLayer.uniqueID();
+      const layerType = await pagLayer.layerType();
+      const layerName = await pagLayer.layerName();
+      const opacity = await pagLayer.opacity();
+      const visible = await pagLayer.visible();
+      const editableIndex = await pagLayer.editableIndex();
       const duration = await pagLayer.duration();
-      res.push({ index: i, startTime: startTime, duration: duration });
+      const frameRate = await pagLayer.frameRate();
+      const localStartTime = await pagLayer.startTime();
+      const startTime = await pagLayer.localTimeToGlobal(localStartTime);
+      res.push({ uniqueID, layerType, layerName, opacity, visible, editableIndex, frameRate, startTime, duration });
     }
   }
   return res;
@@ -266,17 +301,17 @@ const renderEditableLayer = (editableLayers) => {
   editableLayers.forEach((layer) => {
     const item = document.createElement('div');
     item.className = 'mt-24';
-    item.innerText = `index: ${layer.index} startTime: ${layer.startTime} duration: ${layer.duration}`;
+    item.innerText = `editableIndex: ${layer.editableIndex} startTime: ${layer.startTime} duration: ${layer.duration}`;
     const replaceImageBtn = document.createElement('button');
     replaceImageBtn.addEventListener('click', () => {
-      replaceImage(item, layer.index);
+      replaceImage(item, layer.editableIndex);
     });
     replaceImageBtn.style.marginLeft = '12px';
     replaceImageBtn.innerText = '替换图片';
     item.appendChild(replaceImageBtn);
     const replaceVideoBtn = document.createElement('button');
     replaceVideoBtn.addEventListener('click', () => {
-      replaceVideo(item, layer.index);
+      replaceVideo(item, layer.editableIndex);
     });
     replaceVideoBtn.style.marginLeft = '12px';
     replaceVideoBtn.innerText = '替换视频';

@@ -107,9 +107,9 @@
             "nextFrame": "f0740fc35613e7afa508471f1f7d2f3c",
             "opacity": "ebe637f93679ccd61360f75cdc13652a",
             "preFrame": "a174f444cf80122cb7dfc789f9dfb4f0",
-            "textScale": "0da0e8c95744f8d30554426bd91e2873",
+            "textScale": "2eb581b1512768a18cc9d51b132905d0",
             "trackMatte": "1b23ab2d867a2dacdfc51e0c2be90183",
-            "visible": "c9f13dd511c3a401d9ed99f200f9631b"
+            "visible": "dad51a80d0b57583880f35d0b1eb4fb8"
         }
     },
     "PAGPlayerAutoClearTest": {
@@ -124,7 +124,7 @@
         }
     },
     "PAGRasterizerTest": {
-        "rasterizer_glyph": "2dfae1d1adb7fe6310fbcd78dc922e39",
+        "rasterizer_glyph": "35cd4063c68ba746eaf7bfb2495d79b3",
         "rasterizer_path": "3abb24340c1c44bff3b7f0ccab137ca7",
         "rasterizer_path_texture": "70cd81569616fff24af2a1f9560662f5"
     },
@@ -144,25 +144,25 @@
     },
     "PAGSurfaceTest": {
         "FromTexture_ID82382683": "f0740fc35613e7afa508471f1f7d2f3c",
-        "mask_ID85767971": "a5de7ff14c9e65fd0f214f120d501035"
+        "mask_ID85767971": "d831341545d08809bfc1c06134d85e15"
     },
     "PAGTextLayerTester": {
         "TextLayer": {
-            "fillColorMd5": "d0256ad83bfeb359454b5fe87cb6662f",
-            "strokeColorMd5": "ffb8f4e58c29b85e971d5fa30830a27c",
-            "textDocumentMd5": "65ffd679e02136a4bfdbb502ef39d85e"
+            "fillColorMd5": "949b81be812e5c177b85f3b71b51cfb7",
+            "strokeColorMd5": "03a8544b46bf12e60a9e5e1755ad7791",
+            "textDocumentMd5": "88141615a16679589d7baa890e9c1262"
         },
-        "emoji": "90b89ebb257cdfa428be98b73db17137",
-        "normalEmoji": "b02da055bbf33726f0da442020a2011f",
-        "positionAnimator": "b4a46dfc7494809b82c810c1241e7042",
-        "textAnimatorMode": "999c8c9fb4a8fc04f66786121a8b41de",
-        "textAnimatorSmooth": "472f62f6bdff036097607561ac3a8468",
-        "textAnimatorX7": "0ff1dc9ff1eebefb05e455448cabf330",
-        "textAnimators": "969aa7f8610362341fc1fb8490b30e1c",
-        "textDirection": "4574228210d4eec5ed3b280c4cf98b91",
-        "text_ID83312235": "ec90297d512cde1478c92069422b0903",
-        "trackingAnimator": "03b2b7907894d9779e7a524500d43d3c",
-        "trackingAnimatorVertical": "144816e0f390b8177d4b16599acb0f65"
+        "emoji": "d3f94d83bfc85ed6e62f94dc785f358f",
+        "normalEmoji": "1d2dec515258a069d40f21838206dc5c",
+        "positionAnimator": "02c49296e5fd93b87d3c8f1096280b27",
+        "textAnimatorMode": "a0f520ed17fb8a25ad0dc86118d35ed0",
+        "textAnimatorSmooth": "27526088af883c624b4eda359fec958d",
+        "textAnimatorX7": "4ba32f6024da73f7812f6dfd62898751",
+        "textAnimators": "233fe3276a850b6c8c5eae5b33069c4d",
+        "textDirection": "99e1a9aaf940cbe64db7fcc8a1ba5b45",
+        "text_ID83312235": "8d9061de658cbf0771a90b6697e72668",
+        "trackingAnimator": "22f35f1bc77c9954222ee658975281a0",
+        "trackingAnimatorVertical": "886bd662136a36fdbe5d34d3d43edd68"
     },
     "PixelMapTest": {
         "PixelMap_BGRA_to_BGRA": "d85698f12d90eff2f9d2ecf1cc40cccc",

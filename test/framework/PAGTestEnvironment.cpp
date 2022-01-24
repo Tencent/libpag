@@ -29,33 +29,6 @@ nlohmann::json PAGTestEnvironment::DumpJson;
 PAGTestEnvironment::~PAGTestEnvironment() {
 }
 
-static void RegisterDefaultFonts(const std::string& defaultFontPath) {
-  static bool status = true;
-  if (status) {
-    std::vector<std::string> fallbackList = {};
-    DIR* dir = opendir(defaultFontPath.c_str());
-    if (dir != nullptr) {
-      struct dirent* ent;
-      while ((ent = readdir(dir)) != nullptr) {
-        if (std::strstr(ent->d_name, ".ttf") || std::strstr(ent->d_name, ".ttc")) {
-          std::string fontName = ent->d_name;
-          std::string fontFullPath = defaultFontPath;
-          fontFullPath += "/" + fontName;
-          fallbackList.push_back(fontFullPath);
-        }
-      }
-      closedir(dir);
-    }
-
-    if (fallbackList.size() > 0) {
-      std::vector<int> ttcIndices(fallbackList.size());
-      pag::PAGFont::SetFallbackFontPaths(fallbackList, ttcIndices);
-    }
-
-    status = false;
-  }
-}
-
 static void RegisterSoftwareDecoder() {
   auto factory = ffavc::DecoderFactory::GetHandle();
   pag::PAGVideoDecoder::RegisterSoftwareDecoderFactory(
@@ -63,13 +36,11 @@ static void RegisterSoftwareDecoder() {
 }
 
 void PAGTestEnvironment::SetUp() {
-  //#ifdef  __APPLE__
-  //  std::vector<std::string> fallbackList = {"PingFang SC", "Apple Color Emoji"};
-  //  FontManager::SetFallbackFontNames(fallbackList);
-  //#else
+  std::vector<std::string> fontPaths = {"../resources/font/NotoSansSC-Regular.otf",
+                                        "../resources/font/NotoColorEmoji.ttf"};
+  std::vector<int> ttcIndices = {0, 0};
+  pag::PAGFont::SetFallbackFontPaths(fontPaths, ttcIndices);
   RegisterSoftwareDecoder();
-  RegisterDefaultFonts("../test/res/font");
-  //#endif
 
 #ifdef COMPARE_JSON_PATH
   std::ifstream inputFile(COMPARE_JSON_PATH);
@@ -83,6 +54,9 @@ void PAGTestEnvironment::SetUp() {
 }
 
 void PAGTestEnvironment::TearDown() {
+  if (DumpJson == nullptr) {
+    return;
+  }
   std::ofstream outFile(DUMP_JSON_PATH);
   outFile << std::setw(4) << DumpJson << std::endl;
   outFile.close();

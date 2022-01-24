@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PAG</title>
+    <link rel="icon" href="https://pag.io/img/favicon.png" />
+    <style>
+      body {
+        padding: 12px;
+      }
+      .header {
+        height: 64px;
+        border-bottom: 1px solid rgb(193, 193, 193);
+        margin-bottom: 24px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <img src="../assets/logo.png" alt="logo" width="133" height="48" />
+    </div>
+    <div>
+      <span>before:</span>
+      <canvas class="canvas" id="before-pag"></canvas>
+      <span>after:</span>
+      <canvas class="canvas" id="after-pag"></canvas>
+    </div>
+    <script src="https://unpkg.com/libpag@latest/lib/libpag.min.js"></script>
+    <script>
+      window.onload = async () => {
+        const pagUrl = '../assets/snowman.pag';
+
+        const PAG = await window.libpag.PAGInit();
+        const fileBlob = await fetch(pagUrl).then((response) => response.blob());
+        const file = new window.File([fileBlob], pagUrl.replace(/(.*\/)*([^.]+)/i, '$2'));
+        // Before
+        const beforePagFile = await PAG.PAGFile.load(file);
+        document.getElementById('before-pag').width = 360;
+        document.getElementById('before-pag').height = 360;
+        const beforePagView = await PAG.PAGView.init(beforePagFile, '#before-pag');
+        beforePagView.setRepeatCount(0);
+        await beforePagView.play();
+        // After
+        const afterPagFile = await PAG.PAGFile.load(file);
+        const image = await loadImage('../assets/cat.png');
+        if (!image) return;
+        // Create PAGImage from ImageElement.
+        const pagImage = await PAG.PAGImage.fromSource(image);
+        // Replace Image by editableIndex.
+        // Get editableIndex demo in `editable-index.html`
+        await afterPagFile.replaceImage(1, pagImage);
+        document.getElementById('after-pag').width = 360;
+        document.getElementById('after-pag').height = 360;
+        const afterPagView = await PAG.PAGView.init(afterPagFile, '#after-pag');
+        afterPagView.setRepeatCount(0);
+        await afterPagView.play();
+      };
+
+      const loadImage = (src) => {
+        return new Promise((resolve) => {
+          const image = new Image();
+          image.onload = () => {
+            resolve(image);
+          };
+          image.onerror = () => {
+            resolve(false);
+          };
+          image.src = src;
+        });
+      };
+    </script>
+  </body>
+</html>
