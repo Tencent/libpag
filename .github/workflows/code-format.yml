@@ -11,10 +11,10 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v2
-
-    - name: clang-format (w/ diff)
-  # You may pin to the exact commit or the version.
-  # uses: egor-tensin/clang-format@fe6591af8142846dbc32460359045500c230f1c3
-      uses: egor-tensin/clang-format@v1 
+    - uses: DoozyX/clang-format-lint-action@v0.13
       with:
-       exclude: vendor/ :qt/ :mac/ :ios/ :android/ :web/ :win/
+        source: './src ./test'
+        exclude: '.'
+        extensions: 'h,cpp'
+        clangFormatVersion: 12
+        style: google
