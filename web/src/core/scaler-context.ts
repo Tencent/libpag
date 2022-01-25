@@ -1,6 +1,9 @@
 import { NativeImage } from './native-image';
 import { measureText } from '../utils/measure-text';
-import { createCanvas } from '../utils/wechat-babel'
+/* #if _WECHAT
+import { wxOffscreenManager } from '../utils/offscreen-canvas-manager'
+//#else */
+// #endif
 
 export interface Bounds {
   top: number;
@@ -9,11 +12,32 @@ export interface Bounds {
   right: number;
 }
 
-const canvas = createCanvas();
+/* #if _WECHAT
+const wxFreeNode = wxOffscreenManager.getFreeCanvas();
+const canvas = wxFreeNode.canvas;
+//#else */
+const canvas = ((): HTMLCanvasElement | OffscreenCanvas => {
+  try {
+    const offscreenCanvas = new OffscreenCanvas(0, 0);
+    const context = offscreenCanvas.getContext('2d');
+    if (context?.measureText) return offscreenCanvas;
+    return document.createElement('canvas');
+  } catch (err) {
+    return document.createElement('canvas');
+  }
+})();
+// #endif
+
 canvas.width = 10;
 canvas.height = 10;
 
-const testCanvas = createCanvas();
+/* #if _WECHAT
+const wxFreeNodeTest = wxOffscreenManager.getFreeCanvas();
+const testCanvas = wxFreeNodeTest.canvas;
+//#else */
+const testCanvas = document.createElement('canvas');
+// #endif
+
 testCanvas.width = 1;
 testCanvas.height = 1;
 const testContext = testCanvas.getContext('2d');

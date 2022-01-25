@@ -214,39 +214,22 @@ export const replaceFunctionConfig = [
     start: 'function getBinaryPromise()',
     end: 'function createWasm()',
     replaceStr: (function getBinaryPromise() {
-      if (globalThis.isWechatMiniProgram) {
-        return new Promise((resolve, reject) => {
-          if (globalThis.isWxWebAssembly) {
-            resolve('/utils/libpag/lib/libpag.wasm.br')
-          } else {
-            const fs = wx.getFileSystemManager()
-            fs.readFile({
-              filePath: `/utils/libpag/lib/libpag.wasm.br`,
-              position: 0,
-              success(res) {
-                resolve(res.data);
-              },
-              fail(res) {
-                reject(res);
-              }
-            });
-          }
-        });
-      }
-      if (!wasmBinary && (ENVIRONMENT_IS_WEB )) {
-        if (typeof fetch === "function") {
-          return fetch(wasmBinaryFile, { credentials: "same-origin" }).then(function(response) {
-            if (!response["ok"]) {
-              throw "failed to load wasm binary file at '" + wasmBinaryFile + "'";
+      return new Promise((resolve, reject) => {
+        if (globalThis.isWxWebAssembly) {
+          resolve(wasmBinaryFile)
+        } else {
+          const fs = wx.getFileSystemManager()
+          fs.readFile({
+            filePath: wasmBinaryFile,
+            position: 0,
+            success(res) {
+              resolve(res.data);
+            },
+            fail(res) {
+              reject(res);
             }
-            return response["arrayBuffer"]();
-          }).catch(function() {
-            return getBinary(wasmBinaryFile);
           });
         }
-      }
-      return Promise.resolve().then(function() {
-        return getBinary(wasmBinaryFile);
       });
     }).toString()
   },
@@ -260,7 +243,13 @@ export const replaceFunctionConfig = [
     name: 'replace performance',
     type: 'string',
     start: 'performance.now();',
-    replaceStr: '(globalThis.isWechatMiniProgram ? wx.getPerformance().now() : performance.now())'
+    replaceStr: 'wx.getPerformance().now();'
+  },
+  {
+    name: 'replace libpag.wasm name',
+    type: 'string',
+    start: 'libpag.wasm',
+    replaceStr: 'libpag.wasm.br'
   },
 ];
 
