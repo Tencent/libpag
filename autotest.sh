@@ -49,4 +49,4 @@ cp -a $WORKSPACE/test/out/*.png $WORKSPACE/result/
 exit -1
 fi
 
-cp -a $WORKSPAC/build/test_detail.json $WORKSPACE/result/
+cp -a $WORKSPACE/build/test_detail.json $WORKSPACE/result/
