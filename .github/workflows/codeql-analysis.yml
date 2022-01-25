@@ -23,7 +23,7 @@ on:
 jobs:
   analyze:
     name: Analyze
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     permissions:
       actions: read
       contents: read
@@ -39,6 +39,16 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
+      with:
+          fetch-depth: 0
+          lfs: true
+    - name: Install Dependencies
+      run: |
+          pip install diff_cover
+          brew install gcovr
+    - name: Run sync_deps script
+      run: ./sync_deps.sh 
+      shell: bash     
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
