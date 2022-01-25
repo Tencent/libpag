@@ -27,7 +27,8 @@ jobs:
         shell: bash 
       - name: Run autotest script
         run: |
-         chmod +x autotest.sh 
+         chmod +x autotest.sh
+         touch result/autotest.txt
          ./autotest.sh > result/autotest.txt
         shell: bash
       - uses: actions/upload-artifact@v2
