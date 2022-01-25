@@ -23,7 +23,7 @@ export class PAGView {
       const width = canvas.width;
       const height = canvas.height;
       const gl = canvas.getContext('webgl', { alpha: true });
-      const contextID = this.module.GL.registerContext(gl, { majorVersion: 2, minorVersion: 0 });
+      const contextID = this.module.GL.registerContext(gl, { majorVersion: 1, minorVersion: 0 });
       const pagPlayer = await this.module._PAGPlayer.create();
       pagView = new PAGView(pagPlayer);
       this.module.GL.makeContextCurrent(contextID);
@@ -35,7 +35,7 @@ export class PAGView {
       canvas.width = canvas.width * window.devicePixelRatio;
       canvas.height = canvas.height * window.devicePixelRatio;
       const pagPlayer = await this.module._PAGPlayer.create();
-      const pagView = new PAGView(pagPlayer);
+      pagView = new PAGView(pagPlayer);
       const gl = canvas.getContext('webgl');
       const contextID = this.module.GL.registerContext(gl, { majorVersion: 1, minorVersion: 0 });
       this.module.GL.makeContextCurrent(contextID);
