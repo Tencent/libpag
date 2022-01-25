@@ -1,7 +1,7 @@
 interface CanvasStackItem {
-  id: number,
-  free: boolean,
-  canvas: any
+  id: number;
+  free: boolean;
+  canvas: any;
 }
 
 declare const wx: any;
@@ -15,7 +15,7 @@ export class WXOffscreenManager {
     return this.canvasStacks.length;
   }
   public getFreeCanvas() {
-    const freeNode = this.canvasStacks.find(node => node.free);
+    const freeNode = this.canvasStacks.find((node) => node.free);
     if (!freeNode) {
       const newNode = this.createFreeCanvas();
       newNode.free = false;
@@ -27,7 +27,7 @@ export class WXOffscreenManager {
     }
   }
   public getCanvasNodeById(id = 0) {
-    return this.canvasStacks.find(node => node.id === id);
+    return this.canvasStacks.find((node) => node.id === id);
   }
   public createFreeCanvas() {
     const canvas = wx.createOffscreenCanvas({ type: '2d' });
@@ -35,12 +35,12 @@ export class WXOffscreenManager {
     const stack = {
       id,
       free: true,
-      canvas
-    }
+      canvas,
+    };
     return stack;
   }
   public freeCanvas(id) {
-    if(!isNaN(id)) {
+    if (!isNaN(id)) {
       const target = this.getCanvasNodeById(id);
       if (target) {
         target.free = true;

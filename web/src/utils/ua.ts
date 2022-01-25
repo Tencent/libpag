@@ -1,4 +1,3 @@
-
 /* #if _WECHAT
 declare const globalThis: any;
 export const ANDROID = false;
@@ -21,5 +20,3 @@ export const MOBILE = /(mobile)/i.test(nav) && ANDROID;
 export const MACOS = !(/(mobile)/i.test(nav) || MOBILE) && /Mac OS X/i.test(nav);
 export const IPHONE = /(iphone|ipad|ipod)/i.test(nav);
 // #endif
-
-
