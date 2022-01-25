@@ -1,7 +1,8 @@
 import { ScalerContext } from './scaler-context';
-import { createCanvas } from '../utils/wechat-babel';
-import { isWechatMiniProgram } from '../utils/ua';
-
+/* #if _WECHAT
+import { wxOffscreenManager } from '../utils/offscreen-canvas-manager'
+//#else */
+// #endif
 export class WebMask {
   public static module;
 
@@ -30,7 +31,12 @@ export class WebMask {
   private readonly canvas: HTMLCanvasElement | OffscreenCanvas;
 
   public constructor(width: number, height: number) {
-    this.canvas = createCanvas();
+    /* #if _WECHAT
+    this.wxFreeNode = wxOffscreenManager.getFreeCanvas();
+    this.canvas = this.wxFreeNode.canvas;
+    //#else */
+    this.canvas = document.createElement('canvas');
+    // #endif
     this.canvas.width = width;
     this.canvas.height = height;
   }
@@ -88,15 +94,15 @@ export class WebMask {
 
   public update(GL) {
     const gl = GL.currentContext.GLctx as WebGLRenderingContext;
-    if (isWechatMiniProgram) {
-      const ctx = this.canvas.getContext('2d');
-      const canvas = ctx.canvas;
-      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    /* #if _WECHAT
+    const ctx = this.canvas.getContext('2d');
+    const canvas = ctx.canvas;
+    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, imgData.width, imgData.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(imgData.data, 0, imgData.data.length));
-
-    } else {
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.ALPHA, gl.ALPHA, gl.UNSIGNED_BYTE, this.canvas as any);
-    }
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, imgData.width, imgData.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(imgData.data, 0, imgData.data.length));
+    wxOffscreenManager.freeCanvas(this.wxFreeNode.id);
+    //#else */
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.ALPHA, gl.ALPHA, gl.UNSIGNED_BYTE, this.canvas as any);
+    // #endif
   }
 }
