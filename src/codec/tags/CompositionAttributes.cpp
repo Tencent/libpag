@@ -20,19 +20,19 @@
 
 namespace pag {
 void ReadCompositionAttributes(DecodeStream* stream, Composition* composition) {
-    composition->width = stream->readEncodedInt32();
-    composition->height = stream->readEncodedInt32();
-    composition->duration = ReadTime(stream);
-    composition->frameRate = stream->readFloat();
-    composition->backgroundColor = ReadColor(stream);
+  composition->width = stream->readEncodedInt32();
+  composition->height = stream->readEncodedInt32();
+  composition->duration = ReadTime(stream);
+  composition->frameRate = stream->readFloat();
+  composition->backgroundColor = ReadColor(stream);
 }
 
 TagCode WriteCompositionAttributes(EncodeStream* stream, Composition* composition) {
-    stream->writeEncodedInt32(composition->width);
-    stream->writeEncodedInt32(composition->height);
-    WriteTime(stream, composition->duration);
-    stream->writeFloat(composition->frameRate);
-    WriteColor(stream, composition->backgroundColor);
-    return TagCode::CompositionAttributes;
+  stream->writeEncodedInt32(composition->width);
+  stream->writeEncodedInt32(composition->height);
+  WriteTime(stream, composition->duration);
+  stream->writeFloat(composition->frameRate);
+  WriteColor(stream, composition->backgroundColor);
+  return TagCode::CompositionAttributes;
 }
 }  // namespace pag

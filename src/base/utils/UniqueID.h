@@ -22,7 +22,7 @@
 
 namespace pag {
 class UniqueID {
-public:
-    static uint32_t Next();
+ public:
+  static uint32_t Next();
 };
 }  // namespace pag

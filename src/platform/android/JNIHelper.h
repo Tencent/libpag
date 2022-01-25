@@ -27,7 +27,7 @@
 #include "platform/android/JStringUtil.h"
 
 struct RectData {
-    float x, y, width, height;
+  float x, y, width, height;
 };
 
 int JniThrowException(JNIEnv* env, const char* className, const char* msg);
@@ -45,7 +45,7 @@ pag::Color ToColor(JNIEnv* env, jint color);
 RectData ToRectData(JNIEnv* env, jobject rect);
 
 std::unique_ptr<pag::ByteData> ReadBytesFromAssets(JNIEnv* env, jobject managerObj,
-        jstring pathObj);
+                                                   jstring pathObj);
 
 jobjectArray ToPAGLayerJavaObjectList(JNIEnv* env,
                                       const std::vector<std::shared_ptr<pag::PAGLayer>>& layers);
@@ -55,7 +55,7 @@ jobject ToPAGLayerJavaObject(JNIEnv* env, std::shared_ptr<pag::PAGLayer> pagLaye
 std::shared_ptr<pag::PAGLayer> ToPAGLayerNativeObject(JNIEnv* env, jobject jLayer);
 
 std::shared_ptr<pag::PAGComposition> ToPAGCompositionNativeObject(JNIEnv* env,
-        jobject jComposition);
+                                                                  jobject jComposition);
 
 jobject ToPAGMarkerObject(JNIEnv* env, const pag::Marker* marker);
 

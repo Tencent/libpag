@@ -21,41 +21,41 @@
 
 namespace pag {
 StrokeElement::~StrokeElement() {
-    delete miterLimit;
-    delete color;
-    delete opacity;
-    delete strokeWidth;
-    delete dashOffset;
-    for (auto& dash : dashes) {
-        delete dash;
-    }
+  delete miterLimit;
+  delete color;
+  delete opacity;
+  delete strokeWidth;
+  delete dashOffset;
+  for (auto& dash : dashes) {
+    delete dash;
+  }
 }
 
 void StrokeElement::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {
-    miterLimit->excludeVaryingRanges(timeRanges);
-    color->excludeVaryingRanges(timeRanges);
-    opacity->excludeVaryingRanges(timeRanges);
-    strokeWidth->excludeVaryingRanges(timeRanges);
-    if (!dashes.empty()) {
-        dashOffset->excludeVaryingRanges(timeRanges);
-        for (auto& property : dashes) {
-            property->excludeVaryingRanges(timeRanges);
-        }
+  miterLimit->excludeVaryingRanges(timeRanges);
+  color->excludeVaryingRanges(timeRanges);
+  opacity->excludeVaryingRanges(timeRanges);
+  strokeWidth->excludeVaryingRanges(timeRanges);
+  if (!dashes.empty()) {
+    dashOffset->excludeVaryingRanges(timeRanges);
+    for (auto& property : dashes) {
+      property->excludeVaryingRanges(timeRanges);
     }
+  }
 }
 
 bool StrokeElement::verify() const {
-    if (!ShapeElement::verify()) {
-        VerifyFailed();
-        return false;
+  if (!ShapeElement::verify()) {
+    VerifyFailed();
+    return false;
+  }
+  for (auto dash : dashes) {
+    if (dash == nullptr) {
+      VerifyFailed();
+      return false;
     }
-    for (auto dash : dashes) {
-        if (dash == nullptr) {
-            VerifyFailed();
-            return false;
-        }
-    }
-    VerifyAndReturn(miterLimit != nullptr && color != nullptr && opacity != nullptr &&
-                    strokeWidth != nullptr);
+  }
+  VerifyAndReturn(miterLimit != nullptr && color != nullptr && opacity != nullptr &&
+                  strokeWidth != nullptr);
 }
 }  // namespace pag

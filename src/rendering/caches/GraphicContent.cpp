@@ -25,14 +25,14 @@ GraphicContent::GraphicContent(std::shared_ptr<Graphic> graphic) : graphic(std::
 }
 
 void GraphicContent::measureBounds(Rect* bounds) {
-    if (graphic) {
-        graphic->measureBounds(bounds);
-    } else {
-        bounds->setEmpty();
-    }
+  if (graphic) {
+    graphic->measureBounds(bounds);
+  } else {
+    bounds->setEmpty();
+  }
 }
 
 void GraphicContent::draw(Recorder* recorder) {
-    recorder->drawGraphic(graphic);
+  recorder->drawGraphic(graphic);
 }
 }  // namespace pag

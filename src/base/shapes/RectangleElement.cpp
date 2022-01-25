@@ -21,22 +21,22 @@
 
 namespace pag {
 RectangleElement::~RectangleElement() {
-    delete size;
-    delete position;
-    delete roundness;
+  delete size;
+  delete position;
+  delete roundness;
 }
 
 void RectangleElement::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {
-    position->excludeVaryingRanges(timeRanges);
-    size->excludeVaryingRanges(timeRanges);
-    roundness->excludeVaryingRanges(timeRanges);
+  position->excludeVaryingRanges(timeRanges);
+  size->excludeVaryingRanges(timeRanges);
+  roundness->excludeVaryingRanges(timeRanges);
 }
 
 bool RectangleElement::verify() const {
-    if (!ShapeElement::verify()) {
-        VerifyFailed();
-        return false;
-    }
-    VerifyAndReturn(position != nullptr && size != nullptr && roundness != nullptr);
+  if (!ShapeElement::verify()) {
+    VerifyFailed();
+    return false;
+  }
+  VerifyAndReturn(position != nullptr && size != nullptr && roundness != nullptr);
 }
 }  // namespace pag

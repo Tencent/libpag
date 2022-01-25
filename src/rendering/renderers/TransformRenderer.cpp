@@ -20,21 +20,21 @@
 
 namespace pag {
 void RenderTransform(Transform* transform, Transform2D* transform2D, Frame layerFrame) {
-    auto& matrix = transform->matrix;
-    auto anchorPoint = transform2D->anchorPoint->getValueAt(layerFrame);
-    auto scale = transform2D->scale->getValueAt(layerFrame);
-    Point position = {};
-    if (transform2D->position != nullptr) {
-        position = transform2D->position->getValueAt(layerFrame);
-    } else {
-        position.x = transform2D->xPosition->getValueAt(layerFrame);
-        position.y = transform2D->yPosition->getValueAt(layerFrame);
-    }
-    auto rotation = transform2D->rotation->getValueAt(layerFrame);
-    transform->opacity = transform2D->opacity->getValueAt(layerFrame);
-    matrix.postTranslate(-anchorPoint.x, -anchorPoint.y);
-    matrix.postScale(scale.x, scale.y);
-    matrix.postRotate(rotation);
-    matrix.postTranslate(position.x, position.y);
+  auto& matrix = transform->matrix;
+  auto anchorPoint = transform2D->anchorPoint->getValueAt(layerFrame);
+  auto scale = transform2D->scale->getValueAt(layerFrame);
+  Point position = {};
+  if (transform2D->position != nullptr) {
+    position = transform2D->position->getValueAt(layerFrame);
+  } else {
+    position.x = transform2D->xPosition->getValueAt(layerFrame);
+    position.y = transform2D->yPosition->getValueAt(layerFrame);
+  }
+  auto rotation = transform2D->rotation->getValueAt(layerFrame);
+  transform->opacity = transform2D->opacity->getValueAt(layerFrame);
+  matrix.postTranslate(-anchorPoint.x, -anchorPoint.y);
+  matrix.postScale(scale.x, scale.y);
+  matrix.postRotate(rotation);
+  matrix.postTranslate(position.x, position.y);
 }
 }  // namespace pag

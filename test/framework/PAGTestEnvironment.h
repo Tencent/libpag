@@ -24,15 +24,15 @@
 
 namespace pag {
 class PAGTestEnvironment : public testing::Environment {
-public:
-    static nlohmann::json DumpJson;
-    static nlohmann::json CompareJson;
-    static std::mutex GlobalLocker;
+ public:
+  static nlohmann::json DumpJson;
+  static nlohmann::json CompareJson;
+  static std::mutex GlobalLocker;
 
-    virtual ~PAGTestEnvironment() override;
+  virtual ~PAGTestEnvironment() override;
 
-    virtual void SetUp() override;
+  virtual void SetUp() override;
 
-    virtual void TearDown() override;
+  virtual void TearDown() override;
 };
 }  // namespace pag

@@ -24,31 +24,31 @@ using namespace emscripten;
 
 namespace pag {
 std::unique_ptr<Image> NativeImage::MakeFrom(const std::shared_ptr<Data>& imageBytes) {
-    auto nativeImageClass = val::module_property("NativeImage");
-    if (!nativeImageClass.as<bool>()) {
-        return nullptr;
-    }
-    auto bytes =
-        val(typed_memory_view(imageBytes->size(), static_cast<const uint8_t*>(imageBytes->data())));
-    auto nativeImage = nativeImageClass.call<val>("createFromBytes", bytes).await();
-    return MakeFrom(nativeImage);
+  auto nativeImageClass = val::module_property("NativeImage");
+  if (!nativeImageClass.as<bool>()) {
+    return nullptr;
+  }
+  auto bytes =
+      val(typed_memory_view(imageBytes->size(), static_cast<const uint8_t*>(imageBytes->data())));
+  auto nativeImage = nativeImageClass.call<val>("createFromBytes", bytes).await();
+  return MakeFrom(nativeImage);
 }
 
 std::unique_ptr<NativeImage> NativeImage::MakeFrom(emscripten::val nativeImage) {
-    if (!nativeImage.as<bool>()) {
-        return nullptr;
-    }
-    auto width = nativeImage.call<int>("width");
-    auto height = nativeImage.call<int>("height");
-    if (width <= 0 || height <= 0) {
-        return nullptr;
-    }
-    auto image = std::unique_ptr<NativeImage>(new NativeImage(width, height));
-    image->nativeImage = std::move(nativeImage);
-    return image;
+  if (!nativeImage.as<bool>()) {
+    return nullptr;
+  }
+  auto width = nativeImage.call<int>("width");
+  auto height = nativeImage.call<int>("height");
+  if (width <= 0 || height <= 0) {
+    return nullptr;
+  }
+  auto image = std::unique_ptr<NativeImage>(new NativeImage(width, height));
+  image->nativeImage = std::move(nativeImage);
+  return image;
 }
 
 std::shared_ptr<TextureBuffer> NativeImage::makeBuffer() const {
-    return NativeTextureBuffer::Make(width(), height(), nativeImage);
+  return NativeTextureBuffer::Make(width(), height(), nativeImage);
 }
 }  // namespace pag

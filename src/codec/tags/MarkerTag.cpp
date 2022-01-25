@@ -21,41 +21,41 @@
 namespace pag {
 
 void ReadMarkerList(DecodeStream* stream, std::vector<Marker*>* markers) {
-    std::vector<bool> flagList;
+  std::vector<bool> flagList;
 
-    auto count = stream->readEncodedUint32();
-    for (size_t i = 0; i < count; i++) {
-        auto hasDuration = stream->readBitBoolean();
-        flagList.push_back(hasDuration);
-    }
+  auto count = stream->readEncodedUint32();
+  for (size_t i = 0; i < count; i++) {
+    auto hasDuration = stream->readBitBoolean();
+    flagList.push_back(hasDuration);
+  }
 
-    for (auto hasDuration : flagList) {
-        auto marker = new Marker();
-        marker->startTime = ReadTime(stream);
-        if (hasDuration) {
-            marker->duration = ReadTime(stream);
-        }
-        marker->comment = stream->readUTF8String();
-        markers->push_back(marker);
+  for (auto hasDuration : flagList) {
+    auto marker = new Marker();
+    marker->startTime = ReadTime(stream);
+    if (hasDuration) {
+      marker->duration = ReadTime(stream);
     }
+    marker->comment = stream->readUTF8String();
+    markers->push_back(marker);
+  }
 }
 
 TagCode WriteMarkerList(EncodeStream* stream, std::vector<Marker*>* markers) {
-    stream->writeEncodedUint32(static_cast<uint32_t>(markers->size()));
-    for (auto marker : *markers) {
-        bool hasDuration = (marker->duration != 0);
-        stream->writeBitBoolean(hasDuration);
-    }
+  stream->writeEncodedUint32(static_cast<uint32_t>(markers->size()));
+  for (auto marker : *markers) {
+    bool hasDuration = (marker->duration != 0);
+    stream->writeBitBoolean(hasDuration);
+  }
 
-    for (auto marker : *markers) {
-        bool hasDuration = (marker->duration != 0);
+  for (auto marker : *markers) {
+    bool hasDuration = (marker->duration != 0);
 
-        WriteTime(stream, marker->startTime);
-        if (hasDuration) {
-            WriteTime(stream, marker->duration);
-        }
-        stream->writeUTF8String(marker->comment);
+    WriteTime(stream, marker->startTime);
+    if (hasDuration) {
+      WriteTime(stream, marker->duration);
     }
-    return TagCode::MarkerList;
+    stream->writeUTF8String(marker->comment);
+  }
+  return TagCode::MarkerList;
 }
 }  // namespace pag

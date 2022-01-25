@@ -23,22 +23,22 @@
 
 namespace pag {
 class NativeGraphicBuffer : public PixelBuffer {
-public:
-    static std::shared_ptr<PixelBuffer> Make(int width, int height, bool alphaOnly);
+ public:
+  static std::shared_ptr<PixelBuffer> Make(int width, int height, bool alphaOnly);
 
-    static std::shared_ptr<NativeGraphicBuffer> MakeAdopted(android::GraphicBuffer* graphicBuffer);
+  static std::shared_ptr<NativeGraphicBuffer> MakeAdopted(android::GraphicBuffer* graphicBuffer);
 
-    ~NativeGraphicBuffer() override;
+  ~NativeGraphicBuffer() override;
 
-    void* lockPixels() override;
+  void* lockPixels() override;
 
-    void unlockPixels() override;
+  void unlockPixels() override;
 
-    std::shared_ptr<Texture> makeTexture(Context*) const override;
+  std::shared_ptr<Texture> makeTexture(Context*) const override;
 
-    NativeGraphicBuffer(android::GraphicBuffer* graphicBuffer);
+  NativeGraphicBuffer(android::GraphicBuffer* graphicBuffer);
 
-private:
-    android::GraphicBuffer* graphicBuffer = nullptr;
+ private:
+  android::GraphicBuffer* graphicBuffer = nullptr;
 };
 }  // namespace pag

@@ -29,79 +29,79 @@
 
 namespace pag {
 bool ReadEffect(DecodeStream* stream, TagCode code, Layer* layer) {
-    Effect* effect = nullptr;
-    switch (code) {
+  Effect* effect = nullptr;
+  switch (code) {
     case TagCode::MotionTileEffect:
-        effect = ReadTagBlock(stream, MotionTileEffectTag);
-        break;
+      effect = ReadTagBlock(stream, MotionTileEffectTag);
+      break;
     case TagCode::LevelsIndividualEffect:
-        effect = ReadTagBlock(stream, LevelsIndividualEffectTag);
-        break;
+      effect = ReadTagBlock(stream, LevelsIndividualEffectTag);
+      break;
     case TagCode::CornerPinEffect:
-        effect = ReadTagBlock(stream, CornerPinEffectTag);
-        break;
+      effect = ReadTagBlock(stream, CornerPinEffectTag);
+      break;
     case TagCode::BulgeEffect:
-        effect = ReadTagBlock(stream, BulgeEffectTag);
-        break;
+      effect = ReadTagBlock(stream, BulgeEffectTag);
+      break;
     case TagCode::FastBlurEffect:
-        effect = ReadTagBlock(stream, FastBlurEffectTag);
-        break;
+      effect = ReadTagBlock(stream, FastBlurEffectTag);
+      break;
     case TagCode::GlowEffect:
-        effect = ReadTagBlock(stream, GlowEffectTag);
-        break;
+      effect = ReadTagBlock(stream, GlowEffectTag);
+      break;
     case TagCode::DisplacementMapEffect:
-        effect = ReadTagBlock(stream, DisplacementMapEffectTag);
-        break;
+      effect = ReadTagBlock(stream, DisplacementMapEffectTag);
+      break;
     case TagCode::RadialBlurEffect:
-        effect = ReadTagBlock(stream, RadialBlurEffectTag);
-        break;
+      effect = ReadTagBlock(stream, RadialBlurEffectTag);
+      break;
     case TagCode::MosaicEffect:
-        effect = ReadTagBlock(stream, MosaicEffectTag);
-        break;
+      effect = ReadTagBlock(stream, MosaicEffectTag);
+      break;
     default:
-        break;
-    }
-    if (effect) {
-        layer->effects.push_back(effect);
-    }
-    return effect != nullptr;
+      break;
+  }
+  if (effect) {
+    layer->effects.push_back(effect);
+  }
+  return effect != nullptr;
 }
 
 void WriteEffects(EncodeStream* stream, const std::vector<Effect*>& effects) {
-    for (auto& effect : effects) {
-        switch (effect->type()) {
-        case EffectType::MotionTile:
-            WriteTagBlock(stream, static_cast<MotionTileEffect*>(effect), MotionTileEffectTag);
-            break;
-        case EffectType::LevelsIndividual:
-            WriteTagBlock(stream, static_cast<LevelsIndividualEffect*>(effect),
-                          LevelsIndividualEffectTag);
-            break;
-        case EffectType::CornerPin:
-            WriteTagBlock(stream, static_cast<CornerPinEffect*>(effect), CornerPinEffectTag);
-            break;
-        case EffectType::Bulge:
-            WriteTagBlock(stream, static_cast<BulgeEffect*>(effect), BulgeEffectTag);
-            break;
-        case EffectType::FastBlur:
-            WriteTagBlock(stream, static_cast<FastBlurEffect*>(effect), FastBlurEffectTag);
-            break;
-        case EffectType::Glow:
-            WriteTagBlock(stream, static_cast<GlowEffect*>(effect), GlowEffectTag);
-            break;
-        case EffectType::DisplacementMap:
-            WriteTagBlock(stream, static_cast<DisplacementMapEffect*>(effect),
-                          DisplacementMapEffectTag);
-            break;
-        case EffectType::RadialBlur:
-            WriteTagBlock(stream, static_cast<RadialBlurEffect*>(effect), RadialBlurEffectTag);
-            break;
-        case EffectType::Mosaic:
-            WriteTagBlock(stream, static_cast<MosaicEffect*>(effect), MosaicEffectTag);
-            break;
-        default:
-            break;
-        }
+  for (auto& effect : effects) {
+    switch (effect->type()) {
+      case EffectType::MotionTile:
+        WriteTagBlock(stream, static_cast<MotionTileEffect*>(effect), MotionTileEffectTag);
+        break;
+      case EffectType::LevelsIndividual:
+        WriteTagBlock(stream, static_cast<LevelsIndividualEffect*>(effect),
+                      LevelsIndividualEffectTag);
+        break;
+      case EffectType::CornerPin:
+        WriteTagBlock(stream, static_cast<CornerPinEffect*>(effect), CornerPinEffectTag);
+        break;
+      case EffectType::Bulge:
+        WriteTagBlock(stream, static_cast<BulgeEffect*>(effect), BulgeEffectTag);
+        break;
+      case EffectType::FastBlur:
+        WriteTagBlock(stream, static_cast<FastBlurEffect*>(effect), FastBlurEffectTag);
+        break;
+      case EffectType::Glow:
+        WriteTagBlock(stream, static_cast<GlowEffect*>(effect), GlowEffectTag);
+        break;
+      case EffectType::DisplacementMap:
+        WriteTagBlock(stream, static_cast<DisplacementMapEffect*>(effect),
+                      DisplacementMapEffectTag);
+        break;
+      case EffectType::RadialBlur:
+        WriteTagBlock(stream, static_cast<RadialBlurEffect*>(effect), RadialBlurEffectTag);
+        break;
+      case EffectType::Mosaic:
+        WriteTagBlock(stream, static_cast<MosaicEffect*>(effect), MosaicEffectTag);
+        break;
+      default:
+        break;
     }
+  }
 }
 }  // namespace pag

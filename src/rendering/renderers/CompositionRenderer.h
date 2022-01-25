@@ -23,8 +23,8 @@
 
 namespace pag {
 std::shared_ptr<Graphic> RenderVectorComposition(VectorComposition* composition,
-        Frame compositionFrame);
+                                                 Frame compositionFrame);
 
 std::shared_ptr<Graphic> RenderSequenceComposition(Composition* composition,
-        Frame compositionFrame);
+                                                   Frame compositionFrame);
 }  // namespace pag

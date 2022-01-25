@@ -20,9 +20,9 @@
 
 namespace pag {
 std::unique_ptr<BlockConfig> ShapePathTag(ShapePathElement* shape) {
-    auto tagConfig = new BlockConfig(TagCode::ShapePath);
-    AddAttribute(tagConfig, &shape->shapePath, AttributeType::SimpleProperty,
-                 PathHandle(new PathData()));
-    return std::unique_ptr<BlockConfig>(tagConfig);
+  auto tagConfig = new BlockConfig(TagCode::ShapePath);
+  AddAttribute(tagConfig, &shape->shapePath, AttributeType::SimpleProperty,
+               PathHandle(new PathData()));
+  return std::unique_ptr<BlockConfig>(tagConfig);
 }
 }  // namespace pag

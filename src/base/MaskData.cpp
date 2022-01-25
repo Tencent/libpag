@@ -21,18 +21,18 @@
 
 namespace pag {
 MaskData::~MaskData() {
-    delete maskPath;
-    delete maskOpacity;
-    delete maskExpansion;
+  delete maskPath;
+  delete maskOpacity;
+  delete maskExpansion;
 }
 
 void MaskData::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {
-    maskPath->excludeVaryingRanges(timeRanges);
-    maskOpacity->excludeVaryingRanges(timeRanges);
-    maskExpansion->excludeVaryingRanges(timeRanges);
+  maskPath->excludeVaryingRanges(timeRanges);
+  maskOpacity->excludeVaryingRanges(timeRanges);
+  maskExpansion->excludeVaryingRanges(timeRanges);
 }
 
 bool MaskData::verify() const {
-    VerifyAndReturn(maskPath != nullptr);
+  VerifyAndReturn(maskPath != nullptr);
 }
 }  // namespace pag

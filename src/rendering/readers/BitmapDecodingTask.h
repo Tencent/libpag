@@ -23,14 +23,14 @@
 
 namespace pag {
 class BitmapDecodingTask : public Executor {
-public:
-    static std::shared_ptr<Task> MakeAndRun(BitmapSequenceReader* reader, Frame targetFrame);
+ public:
+  static std::shared_ptr<Task> MakeAndRun(BitmapSequenceReader* reader, Frame targetFrame);
 
-private:
-    BitmapSequenceReader* reader = nullptr;
-    Frame targetFrame = 0;
+ private:
+  BitmapSequenceReader* reader = nullptr;
+  Frame targetFrame = 0;
 
-    BitmapDecodingTask(BitmapSequenceReader* reader, Frame targetFrame);
-    void execute() override;
+  BitmapDecodingTask(BitmapSequenceReader* reader, Frame targetFrame);
+  void execute() override;
 };
 }  // namespace pag

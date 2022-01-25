@@ -21,32 +21,32 @@
 
 namespace pag {
 Sequence* Sequence::Get(Composition* composition) {
-    // Currently, we use the last one for best rendering quality, ignore all others.
-    if (composition != nullptr) {
-        switch (composition->type()) {
-        case CompositionType::Video:
-            return static_cast<VideoComposition*>(composition)->sequences.back();
-        case CompositionType::Bitmap:
-            return static_cast<BitmapComposition*>(composition)->sequences.back();
-        default:
-            break;
-        }
+  // Currently, we use the last one for best rendering quality, ignore all others.
+  if (composition != nullptr) {
+    switch (composition->type()) {
+      case CompositionType::Video:
+        return static_cast<VideoComposition*>(composition)->sequences.back();
+      case CompositionType::Bitmap:
+        return static_cast<BitmapComposition*>(composition)->sequences.back();
+      default:
+        break;
     }
-    return nullptr;
+  }
+  return nullptr;
 }
 
 bool Sequence::verify() const {
-    VerifyAndReturn(composition != nullptr && width > 0 && height > 0 && frameRate > 0);
+  VerifyAndReturn(composition != nullptr && width > 0 && height > 0 && frameRate > 0);
 }
 
 Frame Sequence::toSequenceFrame(Frame compositionFrame) {
-    auto sequenceFrame =
-        ConvertFrameByStaticTimeRanges(composition->staticTimeRanges, compositionFrame);
-    double timeScale = frameRate / composition->frameRate;
-    sequenceFrame = static_cast<Frame>(round(sequenceFrame * timeScale));
-    if (sequenceFrame >= duration()) {
-        sequenceFrame = static_cast<Frame>(duration()) - 1;
-    }
-    return sequenceFrame;
+  auto sequenceFrame =
+      ConvertFrameByStaticTimeRanges(composition->staticTimeRanges, compositionFrame);
+  double timeScale = frameRate / composition->frameRate;
+  sequenceFrame = static_cast<Frame>(round(sequenceFrame * timeScale));
+  if (sequenceFrame >= duration()) {
+    sequenceFrame = static_cast<Frame>(duration()) - 1;
+  }
+  return sequenceFrame;
 }
 }  // namespace pag

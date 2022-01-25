@@ -26,57 +26,57 @@
 
 namespace pag {
 class VideoReader {
-public:
-    VideoReader(VideoConfig videoConfig, std::unique_ptr<MediaDemuxer> demuxer,
-                DecodingPolicy policy = DecodingPolicy::Hardware);
+ public:
+  VideoReader(VideoConfig videoConfig, std::unique_ptr<MediaDemuxer> demuxer,
+              DecodingPolicy policy = DecodingPolicy::Hardware);
 
-    ~VideoReader();
+  ~VideoReader();
 
-    int64_t getSampleTimeAt(int64_t targetTime);
+  int64_t getSampleTimeAt(int64_t targetTime);
 
-    /**
-     * 如果不存在有效的下一帧，返回 INT64_MAX。
-     */
-    int64_t getNextSampleTimeAt(int64_t targetTime);
+  /**
+   * 如果不存在有效的下一帧，返回 INT64_MAX。
+   */
+  int64_t getNextSampleTimeAt(int64_t targetTime);
 
-    std::shared_ptr<VideoBuffer> readSample(int64_t targetTime);
+  std::shared_ptr<VideoBuffer> readSample(int64_t targetTime);
 
-    void recordPerformance(Performance* performance, int64_t decodingTime);
+  void recordPerformance(Performance* performance, int64_t decodingTime);
 
-private:
-    std::mutex locker = {};
-    VideoConfig videoConfig = {};
-    MediaDemuxer* demuxer = nullptr;
-    std::shared_ptr<Task> gpuDecoderTask = nullptr;
-    VideoDecoder* videoDecoder = nullptr;
-    int decoderTypeIndex = 0;
+ private:
+  std::mutex locker = {};
+  VideoConfig videoConfig = {};
+  MediaDemuxer* demuxer = nullptr;
+  std::shared_ptr<Task> gpuDecoderTask = nullptr;
+  VideoDecoder* videoDecoder = nullptr;
+  int decoderTypeIndex = 0;
 
-    std::shared_ptr<VideoBuffer> outputBuffer = nullptr;
-    bool outputEndOfStream = false;
-    bool needsAdvance = false;
-    bool inputEndOfStream = false;
-    int64_t currentDecodedTime = INT64_MIN;
-    int64_t currentRenderedTime = INT64_MIN;
+  std::shared_ptr<VideoBuffer> outputBuffer = nullptr;
+  bool outputEndOfStream = false;
+  bool needsAdvance = false;
+  bool inputEndOfStream = false;
+  int64_t currentDecodedTime = INT64_MIN;
+  int64_t currentRenderedTime = INT64_MIN;
 
-    int64_t hardDecodingInitialTime = 0;
-    int64_t softDecodingInitialTime = 0;
+  int64_t hardDecodingInitialTime = 0;
+  int64_t softDecodingInitialTime = 0;
 
-    void destroyVideoDecoder();
+  void destroyVideoDecoder();
 
-    void tryMakeVideoDecoder();
+  void tryMakeVideoDecoder();
 
-    void resetParams();
+  void resetParams();
 
-    bool sendData();
+  bool sendData();
 
-    bool decodeFrame(int64_t sampleTime);
+  bool decodeFrame(int64_t sampleTime);
 
-    bool onDecodeFrame(int64_t sampleTime);
+  bool onDecodeFrame(int64_t sampleTime);
 
-    bool switchToGPUDecoderOfTask();
+  bool switchToGPUDecoderOfTask();
 
-    bool renderFrame(int64_t sampleTime);
+  bool renderFrame(int64_t sampleTime);
 
-    VideoDecoder* makeDecoder();
+  VideoDecoder* makeDecoder();
 };
 }  // namespace pag

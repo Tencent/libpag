@@ -21,20 +21,20 @@
 
 namespace pag {
 FillElement::~FillElement() {
-    delete color;
-    delete opacity;
+  delete color;
+  delete opacity;
 }
 
 void FillElement::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {
-    color->excludeVaryingRanges(timeRanges);
-    opacity->excludeVaryingRanges(timeRanges);
+  color->excludeVaryingRanges(timeRanges);
+  opacity->excludeVaryingRanges(timeRanges);
 }
 
 bool FillElement::verify() const {
-    if (!ShapeElement::verify()) {
-        VerifyFailed();
-        return false;
-    }
-    VerifyAndReturn(color != nullptr && opacity != nullptr);
+  if (!ShapeElement::verify()) {
+    VerifyFailed();
+    return false;
+  }
+  VerifyAndReturn(color != nullptr && opacity != nullptr);
 }
 }  // namespace pag

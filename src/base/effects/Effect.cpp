@@ -25,22 +25,22 @@ Effect::Effect() : uniqueID(UniqueID::Next()) {
 }
 
 Effect::~Effect() {
-    delete effectOpacity;
+  delete effectOpacity;
 }
 
 void Effect::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {
-    if (effectOpacity != nullptr) {
-        effectOpacity->excludeVaryingRanges(timeRanges);
-    }
+  if (effectOpacity != nullptr) {
+    effectOpacity->excludeVaryingRanges(timeRanges);
+  }
 }
 
 bool Effect::verify() const {
-    for (auto mask : maskReferences) {
-        if (mask == nullptr) {
-            VerifyFailed();
-            return false;
-        }
+  for (auto mask : maskReferences) {
+    if (mask == nullptr) {
+      VerifyFailed();
+      return false;
     }
-    return true;
+  }
+  return true;
 }
 }  // namespace pag

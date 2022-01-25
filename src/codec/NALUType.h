@@ -20,7 +20,7 @@
 
 namespace pag {
 enum class NALUType {
-    AnnexB,
-    AVCC,
+  AnnexB,
+  AVCC,
 };
 }  // namespace pag

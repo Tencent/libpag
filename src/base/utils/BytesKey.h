@@ -26,52 +26,52 @@ namespace pag {
  * A key used for hashing a byte stream.
  */
 class BytesKey {
-public:
-    /**
-     * Returns true if this key is invalid.
-     */
-    bool isValid() const {
-        return !values.empty();
-    }
+ public:
+  /**
+   * Returns true if this key is invalid.
+   */
+  bool isValid() const {
+    return !values.empty();
+  }
 
-    /**
-     * Writes a uint32 value into the key.
-     */
-    void write(uint32_t value);
+  /**
+   * Writes a uint32 value into the key.
+   */
+  void write(uint32_t value);
 
-    /**
-     * Writes a pointer value into the key.
-     */
-    void write(const void* value);
+  /**
+   * Writes a pointer value into the key.
+   */
+  void write(const void* value);
 
-    /**
-     * Writes a uint32 value into the key.
-     */
-    void write(const uint8_t value[4]);
+  /**
+   * Writes a uint32 value into the key.
+   */
+  void write(const uint8_t value[4]);
 
-    /**
-     * Writes a float value into the key.
-     */
-    void write(float value);
+  /**
+   * Writes a float value into the key.
+   */
+  void write(float value);
 
-    friend bool operator==(const BytesKey& a, const BytesKey& b) {
-        return a.values == b.values;
-    }
+  friend bool operator==(const BytesKey& a, const BytesKey& b) {
+    return a.values == b.values;
+  }
 
-    bool operator<(const BytesKey& key) const {
-        return values < key.values;
-    }
+  bool operator<(const BytesKey& key) const {
+    return values < key.values;
+  }
 
-private:
-    std::vector<uint32_t> values = {};
+ private:
+  std::vector<uint32_t> values = {};
 
-    friend struct BytesHasher;
+  friend struct BytesHasher;
 };
 
 /**
  * The hasher for BytesKey.
  */
 struct BytesHasher {
-    size_t operator()(const BytesKey& key) const;
+  size_t operator()(const BytesKey& key) const;
 };
 }  // namespace pag

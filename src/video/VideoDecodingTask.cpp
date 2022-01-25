@@ -20,13 +20,13 @@
 
 namespace pag {
 std::shared_ptr<Task> VideoDecodingTask::MakeAndRun(VideoReader* reader, int64_t targetTime) {
-    if (reader == nullptr) {
-        return nullptr;
-    }
-    auto task =
-        Task::Make(std::unique_ptr<VideoDecodingTask>(new VideoDecodingTask(reader, targetTime)));
-    task->run();
-    return task;
+  if (reader == nullptr) {
+    return nullptr;
+  }
+  auto task =
+      Task::Make(std::unique_ptr<VideoDecodingTask>(new VideoDecodingTask(reader, targetTime)));
+  task->run();
+  return task;
 }
 
 VideoDecodingTask::VideoDecodingTask(VideoReader* reader, int64_t targetTime)
@@ -34,7 +34,7 @@ VideoDecodingTask::VideoDecodingTask(VideoReader* reader, int64_t targetTime)
 }
 
 void VideoDecodingTask::execute() {
-    reader->readSample(targetTime);
+  reader->readSample(targetTime);
 }
 
 }  // namespace pag

@@ -25,9 +25,9 @@
 
 __attribute__((visibility("default")))
 @interface PAGPlayer : NSObject
-    /**
-     * Returns the current PAGComposition for PAGPlayer to render as content.
-     */
+/**
+ * Returns the current PAGComposition for PAGPlayer to render as content.
+ */
 - (PAGComposition*)getComposition;
 
 /**

@@ -21,39 +21,39 @@
 
 namespace pag {
 class ImageBytesCache : public Cache {
-public:
-    static ImageBytesCache* Get(ImageBytes* imageBytes) {
-        std::lock_guard<std::mutex> autoLock(imageBytes->locker);
-        if (imageBytes->cache != nullptr) {
-            return static_cast<ImageBytesCache*>(imageBytes->cache);
-        }
-        auto cache = new ImageBytesCache();
-        auto fileBytes =
-            Data::MakeWithoutCopy(imageBytes->fileBytes->data(), imageBytes->fileBytes->length());
-        cache->image = Image::MakeFrom(std::move(fileBytes));
-        auto picture = Picture::MakeFrom(imageBytes->uniqueID, cache->image);
-        auto matrix = Matrix::MakeScale(1 / imageBytes->scaleFactor);
-        matrix.postTranslate(static_cast<float>(-imageBytes->anchorX),
-                             static_cast<float>(-imageBytes->anchorY));
-        cache->graphic = Graphic::MakeCompose(picture, matrix);
-        imageBytes->cache = cache;
-        return cache;
+ public:
+  static ImageBytesCache* Get(ImageBytes* imageBytes) {
+    std::lock_guard<std::mutex> autoLock(imageBytes->locker);
+    if (imageBytes->cache != nullptr) {
+      return static_cast<ImageBytesCache*>(imageBytes->cache);
     }
+    auto cache = new ImageBytesCache();
+    auto fileBytes =
+        Data::MakeWithoutCopy(imageBytes->fileBytes->data(), imageBytes->fileBytes->length());
+    cache->image = Image::MakeFrom(std::move(fileBytes));
+    auto picture = Picture::MakeFrom(imageBytes->uniqueID, cache->image);
+    auto matrix = Matrix::MakeScale(1 / imageBytes->scaleFactor);
+    matrix.postTranslate(static_cast<float>(-imageBytes->anchorX),
+                         static_cast<float>(-imageBytes->anchorY));
+    cache->graphic = Graphic::MakeCompose(picture, matrix);
+    imageBytes->cache = cache;
+    return cache;
+  }
 
-    std::shared_ptr<Image> image = nullptr;
-    std::shared_ptr<Graphic> graphic = nullptr;
+  std::shared_ptr<Image> image = nullptr;
+  std::shared_ptr<Graphic> graphic = nullptr;
 };
 
 std::shared_ptr<Image> ImageContentCache::GetImage(ImageBytes* imageBytes) {
-    return ImageBytesCache::Get(imageBytes)->image;
+  return ImageBytesCache::Get(imageBytes)->image;
 }
 
 ImageContentCache::ImageContentCache(ImageLayer* layer) : ContentCache(layer) {
 }
 
 GraphicContent* ImageContentCache::createContent(Frame) const {
-    auto imageBytes = static_cast<ImageLayer*>(layer)->imageBytes;
-    auto graphic = ImageBytesCache::Get(imageBytes)->graphic;
-    return new GraphicContent(graphic);
+  auto imageBytes = static_cast<ImageLayer*>(layer)->imageBytes;
+  auto graphic = ImageBytesCache::Get(imageBytes)->graphic;
+  return new GraphicContent(graphic);
 }
 }  // namespace pag

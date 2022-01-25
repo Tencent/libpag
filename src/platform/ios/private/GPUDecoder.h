@@ -26,50 +26,50 @@
 
 namespace pag {
 class GPUDecoder : public VideoDecoder {
-public:
-    explicit GPUDecoder(const VideoConfig& config);
+ public:
+  explicit GPUDecoder(const VideoConfig& config);
 
-    ~GPUDecoder() override;
+  ~GPUDecoder() override;
 
-    bool isInitialized = false;
+  bool isInitialized = false;
 
-    pag::DecodingResult onSendBytes(void* bytes, size_t length, int64_t time) override;
+  pag::DecodingResult onSendBytes(void* bytes, size_t length, int64_t time) override;
 
-    pag::DecodingResult onEndOfStream() override;
+  pag::DecodingResult onEndOfStream() override;
 
-    pag::DecodingResult onDecodeFrame() override;
+  pag::DecodingResult onDecodeFrame() override;
 
-    void onFlush() override;
+  void onFlush() override;
 
-    int64_t presentationTime() override;
+  int64_t presentationTime() override;
 
-    std::shared_ptr<VideoBuffer> onRenderFrame() override;
+  std::shared_ptr<VideoBuffer> onRenderFrame() override;
 
-private:
-    VTDecompressionSessionRef session = nullptr;
-    CMFormatDescriptionRef videoFormatDescription = nullptr;
-    YUVColorSpace sourceColorSpace = YUVColorSpace::Rec601;
-    YUVColorSpace destinationColorSpace = YUVColorSpace::Rec601;
-    YUVColorRange colorRange = YUVColorRange::MPEG;
+ private:
+  VTDecompressionSessionRef session = nullptr;
+  CMFormatDescriptionRef videoFormatDescription = nullptr;
+  YUVColorSpace sourceColorSpace = YUVColorSpace::Rec601;
+  YUVColorSpace destinationColorSpace = YUVColorSpace::Rec601;
+  YUVColorRange colorRange = YUVColorRange::MPEG;
 
-    bool initVideoToolBox(const std::vector<std::shared_ptr<ByteData>>& headers,
-                          const std::string& mimeType);
-    bool resetVideoToolBox();
-    void cleanResources();
+  bool initVideoToolBox(const std::vector<std::shared_ptr<ByteData>>& headers,
+                        const std::string& mimeType);
+  bool resetVideoToolBox();
+  void cleanResources();
 
-    struct OutputFrame {
-        int64_t frameTime = 0;
-        CVPixelBufferRef outputPixelBuffer = nullptr;
-    };
+  struct OutputFrame {
+    int64_t frameTime = 0;
+    CVPixelBufferRef outputPixelBuffer = nullptr;
+  };
 
-    int64_t sendFrameTime = -1;
-    std::list<int64_t> pendingFrames{};
-    std::unordered_map<pag::Frame, OutputFrame*> outputFrameCaches{};
-    int maxNumReorder = 0;
-    bool inputEndOfStream = false;
+  int64_t sendFrameTime = -1;
+  std::list<int64_t> pendingFrames{};
+  std::unordered_map<pag::Frame, OutputFrame*> outputFrameCaches{};
+  int maxNumReorder = 0;
+  bool inputEndOfStream = false;
 
-    CMBlockBufferRef blockBuffer = nullptr;
-    CMSampleBufferRef sampleBuffer = nullptr;
-    OutputFrame* outputFrame = nullptr;
+  CMBlockBufferRef blockBuffer = nullptr;
+  CMSampleBufferRef sampleBuffer = nullptr;
+  OutputFrame* outputFrame = nullptr;
 };
 }  // namespace pag

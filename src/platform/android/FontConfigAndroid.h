@@ -23,18 +23,18 @@
 
 namespace pag {
 class FontConfigAndroid {
-public:
-    /**
-     * FindClass method will cause a crash when called in non-main thread.
-     * So must call this method in main thread before use RegisterFallbackFonts.
-     * @param env
-     */
-    static void InitJNI(JNIEnv* env);
+ public:
+  /**
+   * FindClass method will cause a crash when called in non-main thread.
+   * So must call this method in main thread before use RegisterFallbackFonts.
+   * @param env
+   */
+  static void InitJNI(JNIEnv* env);
 
-    static bool RegisterFallbackFonts();
+  static bool RegisterFallbackFonts();
 
-    static PAGFont Parse(const void* data, size_t length, int ttcIndex);
+  static PAGFont Parse(const void* data, size_t length, int ttcIndex);
 
-    static PAGFont Parse(const std::string& fontPath, int ttcIndex);
+  static PAGFont Parse(const std::string& fontPath, int ttcIndex);
 };
 }  // namespace pag

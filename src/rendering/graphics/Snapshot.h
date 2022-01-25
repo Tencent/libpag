@@ -28,50 +28,50 @@ class RenderCache;
  * GPU.
  */
 class Snapshot {
-public:
-    /**
-     * Creates a new Snapshot with specified texture and matrix.
-     */
-    explicit Snapshot(std::shared_ptr<Texture> texture, const Matrix& matrix)
-        : texture(std::move(texture)), matrix(matrix) {
-    }
+ public:
+  /**
+   * Creates a new Snapshot with specified texture and matrix.
+   */
+  explicit Snapshot(std::shared_ptr<Texture> texture, const Matrix& matrix)
+      : texture(std::move(texture)), matrix(matrix) {
+  }
 
-    /**
-     * Returns the scaling factor of this snapshot to the original graphic content.
-     */
-    float scaleFactor() const {
-        return 1 / matrix.getScaleX();
-    }
+  /**
+   * Returns the scaling factor of this snapshot to the original graphic content.
+   */
+  float scaleFactor() const {
+    return 1 / matrix.getScaleX();
+  }
 
-    Matrix getMatrix() const {
-        return matrix;
-    }
+  Matrix getMatrix() const {
+    return matrix;
+  }
 
-    Texture* getTexture() const {
-        return texture.get();
-    }
+  Texture* getTexture() const {
+    return texture.get();
+  }
 
-    /**
-     * Returns memory usage information for this Snapshot.
-     */
-    size_t memoryUsage() const {
-        return texture->memoryUsage();
-    }
+  /**
+   * Returns memory usage information for this Snapshot.
+   */
+  size_t memoryUsage() const {
+    return texture->memoryUsage();
+  }
 
-    /**
-     * Evaluates the Snapshot to see if it overlaps or intersects with the specified point. The point
-     * is in the coordinate space of the Snapshot. This method always checks against the actual pixels
-     * of the Snapshot.
-     */
-    bool hitTest(RenderCache* cache, float x, float y) const;
+  /**
+   * Evaluates the Snapshot to see if it overlaps or intersects with the specified point. The point
+   * is in the coordinate space of the Snapshot. This method always checks against the actual pixels
+   * of the Snapshot.
+   */
+  bool hitTest(RenderCache* cache, float x, float y) const;
 
-private:
-    std::shared_ptr<Texture> texture = nullptr;
-    Matrix matrix = Matrix::I();
-    ID assetID = 0;
-    uint64_t makerKey = 0;
-    Frame idleFrames = 0;
+ private:
+  std::shared_ptr<Texture> texture = nullptr;
+  Matrix matrix = Matrix::I();
+  ID assetID = 0;
+  uint64_t makerKey = 0;
+  Frame idleFrames = 0;
 
-    friend class RenderCache;
+  friend class RenderCache;
 };
 }  // namespace pag

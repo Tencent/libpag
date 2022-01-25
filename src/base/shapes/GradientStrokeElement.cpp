@@ -21,45 +21,45 @@
 
 namespace pag {
 GradientStrokeElement::~GradientStrokeElement() {
-    delete miterLimit;
-    delete startPoint;
-    delete endPoint;
-    delete colors;
-    delete opacity;
-    delete strokeWidth;
-    delete dashOffset;
-    for (auto& dash : dashes) {
-        delete dash;
-    }
+  delete miterLimit;
+  delete startPoint;
+  delete endPoint;
+  delete colors;
+  delete opacity;
+  delete strokeWidth;
+  delete dashOffset;
+  for (auto& dash : dashes) {
+    delete dash;
+  }
 }
 
 void GradientStrokeElement::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {
-    miterLimit->excludeVaryingRanges(timeRanges);
-    startPoint->excludeVaryingRanges(timeRanges);
-    endPoint->excludeVaryingRanges(timeRanges);
-    colors->excludeVaryingRanges(timeRanges);
-    opacity->excludeVaryingRanges(timeRanges);
-    strokeWidth->excludeVaryingRanges(timeRanges);
-    if (!dashes.empty()) {
-        dashOffset->excludeVaryingRanges(timeRanges);
-        for (auto& property : dashes) {
-            property->excludeVaryingRanges(timeRanges);
-        }
+  miterLimit->excludeVaryingRanges(timeRanges);
+  startPoint->excludeVaryingRanges(timeRanges);
+  endPoint->excludeVaryingRanges(timeRanges);
+  colors->excludeVaryingRanges(timeRanges);
+  opacity->excludeVaryingRanges(timeRanges);
+  strokeWidth->excludeVaryingRanges(timeRanges);
+  if (!dashes.empty()) {
+    dashOffset->excludeVaryingRanges(timeRanges);
+    for (auto& property : dashes) {
+      property->excludeVaryingRanges(timeRanges);
     }
+  }
 }
 
 bool GradientStrokeElement::verify() const {
-    if (!ShapeElement::verify()) {
-        VerifyFailed();
-        return false;
+  if (!ShapeElement::verify()) {
+    VerifyFailed();
+    return false;
+  }
+  for (auto dash : dashes) {
+    if (dash == nullptr) {
+      VerifyFailed();
+      return false;
     }
-    for (auto dash : dashes) {
-        if (dash == nullptr) {
-            VerifyFailed();
-            return false;
-        }
-    }
-    VerifyAndReturn(miterLimit != nullptr && startPoint != nullptr && endPoint != nullptr &&
-                    colors != nullptr && opacity != nullptr && strokeWidth != nullptr);
+  }
+  VerifyAndReturn(miterLimit != nullptr && startPoint != nullptr && endPoint != nullptr &&
+                  colors != nullptr && opacity != nullptr && strokeWidth != nullptr);
 }
 }  // namespace pag

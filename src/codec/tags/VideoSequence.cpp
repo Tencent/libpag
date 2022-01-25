@@ -21,90 +21,90 @@
 
 namespace pag {
 VideoSequence* ReadVideoSequence(DecodeStream* stream, bool hasAlpha) {
-    auto sequence = new VideoSequence();
-    sequence->width = stream->readEncodedInt32();
-    sequence->height = stream->readEncodedInt32();
-    sequence->frameRate = stream->readFloat();
+  auto sequence = new VideoSequence();
+  sequence->width = stream->readEncodedInt32();
+  sequence->height = stream->readEncodedInt32();
+  sequence->frameRate = stream->readFloat();
 
-    if (hasAlpha) {
-        sequence->alphaStartX = stream->readEncodedInt32();
-        sequence->alphaStartY = stream->readEncodedInt32();
-    }
+  if (hasAlpha) {
+    sequence->alphaStartX = stream->readEncodedInt32();
+    sequence->alphaStartY = stream->readEncodedInt32();
+  }
 
-    auto sps = ReadByteDataWithStartCode(stream);
-    auto pps = ReadByteDataWithStartCode(stream);
-    sequence->headers.push_back(sps.release());
-    sequence->headers.push_back(pps.release());
+  auto sps = ReadByteDataWithStartCode(stream);
+  auto pps = ReadByteDataWithStartCode(stream);
+  sequence->headers.push_back(sps.release());
+  sequence->headers.push_back(pps.release());
 
-    auto count = stream->readEncodedUint32();
+  auto count = stream->readEncodedUint32();
+  for (uint32_t i = 0; i < count; i++) {
+    auto videoFrame = new VideoFrame();
+    sequence->frames.push_back(videoFrame);
+    videoFrame->isKeyframe = stream->readBitBoolean();
+  }
+  for (uint32_t i = 0; i < count; i++) {
+    auto videoFrame = sequence->frames[i];
+    videoFrame->frame = ReadTime(stream);
+    videoFrame->fileBytes = ReadByteDataWithStartCode(stream).release();
+  }
+
+  if (stream->bytesAvailable() > 0) {
+    count = stream->readEncodedUint32();
     for (uint32_t i = 0; i < count; i++) {
-        auto videoFrame = new VideoFrame();
-        sequence->frames.push_back(videoFrame);
-        videoFrame->isKeyframe = stream->readBitBoolean();
+      TimeRange staticTimeRange = {};
+      staticTimeRange.start = ReadTime(stream);
+      staticTimeRange.end = ReadTime(stream);
+      sequence->staticTimeRanges.push_back(staticTimeRange);
     }
-    for (uint32_t i = 0; i < count; i++) {
-        auto videoFrame = sequence->frames[i];
-        videoFrame->frame = ReadTime(stream);
-        videoFrame->fileBytes = ReadByteDataWithStartCode(stream).release();
-    }
+  }
 
-    if (stream->bytesAvailable() > 0) {
-        count = stream->readEncodedUint32();
-        for (uint32_t i = 0; i < count; i++) {
-            TimeRange staticTimeRange = {};
-            staticTimeRange.start = ReadTime(stream);
-            staticTimeRange.end = ReadTime(stream);
-            sequence->staticTimeRanges.push_back(staticTimeRange);
-        }
-    }
-
-    return sequence;
+  return sequence;
 }
 
 static void WriteByteDataWithoutStartCode(EncodeStream* stream, ByteData* byteData) {
-    auto length = static_cast<uint32_t>(byteData->length());
-    if (length < 4) {
-        length = 0;
-    } else {
-        length -= 4;
-    }
-    stream->writeEncodedUint32(length);
-    // Skip Annex B Prefix
-    stream->writeBytes(byteData->data() + 4, length);
+  auto length = static_cast<uint32_t>(byteData->length());
+  if (length < 4) {
+    length = 0;
+  } else {
+    length -= 4;
+  }
+  stream->writeEncodedUint32(length);
+  // Skip Annex B Prefix
+  stream->writeBytes(byteData->data() + 4, length);
 }
 
 TagCode WriteVideoSequence(EncodeStream* stream, std::pair<VideoSequence*, bool>* parameter) {
-    auto sequence = parameter->first;
-    auto hasAlpha = parameter->second;
-    stream->writeEncodedInt32(sequence->width);
-    stream->writeEncodedInt32(sequence->height);
-    stream->writeFloat(sequence->frameRate);
+  auto sequence = parameter->first;
+  auto hasAlpha = parameter->second;
+  stream->writeEncodedInt32(sequence->width);
+  stream->writeEncodedInt32(sequence->height);
+  stream->writeFloat(sequence->frameRate);
 
-    if (hasAlpha) {
-        stream->writeEncodedInt32(sequence->alphaStartX);
-        stream->writeEncodedInt32(sequence->alphaStartY);
-    }
+  if (hasAlpha) {
+    stream->writeEncodedInt32(sequence->alphaStartX);
+    stream->writeEncodedInt32(sequence->alphaStartY);
+  }
 
-    WriteByteDataWithoutStartCode(stream, sequence->headers[0]);  // sps
-    WriteByteDataWithoutStartCode(stream, sequence->headers[1]);  // pps
+  WriteByteDataWithoutStartCode(stream, sequence->headers[0]);  // sps
+  WriteByteDataWithoutStartCode(stream, sequence->headers[1]);  // pps
 
-    auto count = static_cast<uint32_t>(sequence->frames.size());
-    stream->writeEncodedUint32(count);
-    for (uint32_t i = 0; i < count; i++) {
-        stream->writeBitBoolean(sequence->frames[i]->isKeyframe);
-    }
-    for (uint32_t i = 0; i < count; i++) {
-        auto videoFrame = sequence->frames[i];
-        WriteTime(stream, videoFrame->frame);
-        WriteByteDataWithoutStartCode(stream, videoFrame->fileBytes);
-    }
+  auto count = static_cast<uint32_t>(sequence->frames.size());
+  stream->writeEncodedUint32(count);
+  for (uint32_t i = 0; i < count; i++) {
+    stream->writeBitBoolean(sequence->frames[i]->isKeyframe);
+  }
+  for (uint32_t i = 0; i < count; i++) {
+    auto videoFrame = sequence->frames[i];
+    WriteTime(stream, videoFrame->frame);
+    WriteByteDataWithoutStartCode(stream, videoFrame->fileBytes);
+  }
 
-    stream->writeEncodedUint32(static_cast<uint32_t>(sequence->staticTimeRanges.size()));
-    for (auto staticTimeRange : sequence->staticTimeRanges) {
-        WriteTime(stream, staticTimeRange.start);
-        WriteTime(stream, staticTimeRange.end);
-    }
+  stream->writeEncodedUint32(static_cast<uint32_t>(sequence->staticTimeRanges.size()));
+  for (auto staticTimeRange : sequence->staticTimeRanges) {
+    WriteTime(stream, staticTimeRange.start);
+    WriteTime(stream, staticTimeRange.end);
+  }
 
-    return TagCode::VideoSequence;
+  return TagCode::VideoSequence;
 }
 }  // namespace pag

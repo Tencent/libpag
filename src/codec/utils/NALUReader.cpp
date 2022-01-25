@@ -21,27 +21,27 @@
 
 namespace pag {
 std::unique_ptr<ByteData> ReadByteDataWithStartCode(DecodeStream* stream) {
-    auto length = stream->readEncodedUint32();
-    auto bytes = stream->readBytes(length);
-    // must check whether the bytes is valid. otherwise memcpy will crash.
-    if (length == 0 || stream->context->hasException()) {
-        return nullptr;
-    }
-    auto data = new uint8_t[length + 4];
-    memcpy(data + 4, bytes.data(), length);
-    if (Platform::Current()->naluType() == NALUType::AVCC) {
-        // AVCC
-        data[0] = static_cast<uint8_t>((length >> 24) & 0xFF);
-        data[1] = static_cast<uint8_t>((length >> 16) & 0x00FF);
-        data[2] = static_cast<uint8_t>((length >> 8) & 0x0000FF);
-        data[3] = static_cast<uint8_t>(length & 0x000000FF);
-    } else {
-        // Annex B Prefix
-        data[0] = 0;
-        data[1] = 0;
-        data[2] = 0;
-        data[3] = 1;
-    }
-    return ByteData::MakeAdopted(data, length + 4);
+  auto length = stream->readEncodedUint32();
+  auto bytes = stream->readBytes(length);
+  // must check whether the bytes is valid. otherwise memcpy will crash.
+  if (length == 0 || stream->context->hasException()) {
+    return nullptr;
+  }
+  auto data = new uint8_t[length + 4];
+  memcpy(data + 4, bytes.data(), length);
+  if (Platform::Current()->naluType() == NALUType::AVCC) {
+    // AVCC
+    data[0] = static_cast<uint8_t>((length >> 24) & 0xFF);
+    data[1] = static_cast<uint8_t>((length >> 16) & 0x00FF);
+    data[2] = static_cast<uint8_t>((length >> 8) & 0x0000FF);
+    data[3] = static_cast<uint8_t>(length & 0x000000FF);
+  } else {
+    // Annex B Prefix
+    data[0] = 0;
+    data[1] = 0;
+    data[2] = 0;
+    data[3] = 1;
+  }
+  return ByteData::MakeAdopted(data, length + 4);
 }
 }  // namespace pag

@@ -25,9 +25,9 @@
 
 __attribute__((visibility("default")))
 @interface PAGFile : PAGComposition
-    /**
-     * The maximum tag level current SDK supports.
-     */
+/**
+ * The maximum tag level current SDK supports.
+ */
 + (uint16_t)MaxSupportedTagLevel;
 
 /***

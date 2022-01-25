@@ -22,9 +22,9 @@
 __attribute__((visibility("default")))
 @interface PAGComposition : PAGLayer
 
-    /**
-     * Make a empty PAGComposition with specified size.
-     */
+/**
+ * Make a empty PAGComposition with specified size.
+ */
 + (PAGComposition*)Make:(CGSize)size;
 
 /**

@@ -24,29 +24,29 @@
 namespace pag {
 
 struct TagHeader {
-    TagCode code;
-    uint32_t length;
+  TagCode code;
+  uint32_t length;
 };
 
 TagHeader ReadTagHeader(DecodeStream* stream);
 
 template <typename T>
 void ReadTags(DecodeStream* stream, T parameter, void (*reader)(DecodeStream*, TagCode, T)) {
-    auto header = ReadTagHeader(stream);
+  auto header = ReadTagHeader(stream);
+  if (stream->context->hasException()) {
+    return;
+  }
+  while (header.code != TagCode::End) {
+    auto tagBytes = stream->readBytes(header.length);
+    reader(&tagBytes, header.code, parameter);
     if (stream->context->hasException()) {
-        return;
+      return;
     }
-    while (header.code != TagCode::End) {
-        auto tagBytes = stream->readBytes(header.length);
-        reader(&tagBytes, header.code, parameter);
-        if (stream->context->hasException()) {
-            return;
-        }
-        header = ReadTagHeader(stream);
-        if (stream->context->hasException()) {
-            return;
-        }
+    header = ReadTagHeader(stream);
+    if (stream->context->hasException()) {
+      return;
     }
+  }
 }
 
 void WriteTagHeader(EncodeStream* stream, EncodeStream* tagBytes, TagCode code);
@@ -55,8 +55,8 @@ void WriteEndTag(EncodeStream* stream);
 
 template <typename T>
 void WriteTag(EncodeStream* stream, T parameter, TagCode (*writer)(EncodeStream*, T)) {
-    EncodeStream bytes(stream->context);
-    auto code = writer(&bytes, parameter);
-    WriteTagHeader(stream, &bytes, code);
+  EncodeStream bytes(stream->context);
+  auto code = writer(&bytes, parameter);
+  WriteTagHeader(stream, &bytes, code);
 }
 }  // namespace pag

@@ -20,14 +20,14 @@
 
 namespace pag {
 std::unique_ptr<BlockConfig> MaskTag(MaskData* mask) {
-    auto tagConfig = new BlockConfig(TagCode::MaskBlock);
-    AddAttribute(tagConfig, &mask->id, AttributeType::FixedValue, ZeroID);
-    AddAttribute(tagConfig, &mask->inverted, AttributeType::BitFlag, false);
-    AddAttribute(tagConfig, &mask->maskMode, AttributeType::Value, MaskMode::Add);
-    AddAttribute(tagConfig, &mask->maskPath, AttributeType::SimpleProperty,
-                 PathHandle(new PathData()));
-    AddAttribute(tagConfig, &mask->maskOpacity, AttributeType::SimpleProperty, Opaque);
-    AddAttribute(tagConfig, &mask->maskExpansion, AttributeType::SimpleProperty, 0.0f);
-    return std::unique_ptr<BlockConfig>(tagConfig);
+  auto tagConfig = new BlockConfig(TagCode::MaskBlock);
+  AddAttribute(tagConfig, &mask->id, AttributeType::FixedValue, ZeroID);
+  AddAttribute(tagConfig, &mask->inverted, AttributeType::BitFlag, false);
+  AddAttribute(tagConfig, &mask->maskMode, AttributeType::Value, MaskMode::Add);
+  AddAttribute(tagConfig, &mask->maskPath, AttributeType::SimpleProperty,
+               PathHandle(new PathData()));
+  AddAttribute(tagConfig, &mask->maskOpacity, AttributeType::SimpleProperty, Opaque);
+  AddAttribute(tagConfig, &mask->maskExpansion, AttributeType::SimpleProperty, 0.0f);
+  return std::unique_ptr<BlockConfig>(tagConfig);
 }
 }  // namespace pag

@@ -28,29 +28,29 @@
 
 namespace pag {
 class GLHardwareTexture : public GLTexture {
-public:
-    static std::shared_ptr<GLHardwareTexture> MakeFrom(
-        Context* context, AHardwareBuffer* hardwareBuffer);
-    static std::shared_ptr<GLHardwareTexture> MakeFrom(
-        Context* context, android::GraphicBuffer* graphicBuffer);
+ public:
+  static std::shared_ptr<GLHardwareTexture> MakeFrom(
+      Context* context, AHardwareBuffer* hardwareBuffer);
+  static std::shared_ptr<GLHardwareTexture> MakeFrom(
+      Context* context, android::GraphicBuffer* graphicBuffer);
 
-    static std::shared_ptr<GLHardwareTexture> MakeFrom(
-        Context* context, AHardwareBuffer* hardwareBuffer,
-        android::GraphicBuffer* graphicBuffer, EGLClientBuffer client_buffer, int width,
-        int height);
+  static std::shared_ptr<GLHardwareTexture> MakeFrom(
+      Context* context, AHardwareBuffer* hardwareBuffer,
+      android::GraphicBuffer* graphicBuffer, EGLClientBuffer client_buffer, int width,
+      int height);
 
-    size_t memoryUsage() const override {
-        return 0;
-    }
+  size_t memoryUsage() const override {
+    return 0;
+  }
 
-private:
-    explicit GLHardwareTexture(AHardwareBuffer* hardwareBuffer,
-                               android::GraphicBuffer* graphicBuffer, EGLImageKHR eglImage,
-                               int width, int height);
-    EGLImageKHR _eglImage = EGL_NO_IMAGE_KHR;
-    AHardwareBuffer* hardwareBuffer = nullptr;
-    android::GraphicBuffer* graphicBuffer = nullptr;
-    void onRelease(Context* context) override;
-    static void ComputeRecycleKey(BytesKey* recycleKey, void* hardware_buffer);
+ private:
+  explicit GLHardwareTexture(AHardwareBuffer* hardwareBuffer,
+                             android::GraphicBuffer* graphicBuffer, EGLImageKHR eglImage,
+                             int width, int height);
+  EGLImageKHR _eglImage = EGL_NO_IMAGE_KHR;
+  AHardwareBuffer* hardwareBuffer = nullptr;
+  android::GraphicBuffer* graphicBuffer = nullptr;
+  void onRelease(Context* context) override;
+  static void ComputeRecycleKey(BytesKey* recycleKey, void* hardware_buffer);
 };
 }  // namespace pag

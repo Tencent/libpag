@@ -24,19 +24,19 @@
 
 namespace pag {
 class CompositionCache : public Cache {
-public:
-    static CompositionCache* Get(Composition* composition);
+ public:
+  static CompositionCache* Get(Composition* composition);
 
-    std::shared_ptr<Graphic> getContent(Frame contentFrame);
+  std::shared_ptr<Graphic> getContent(Frame contentFrame);
 
-protected:
-    std::shared_ptr<Graphic> createContent(Frame compositionFrame);
+ protected:
+  std::shared_ptr<Graphic> createContent(Frame compositionFrame);
 
-private:
-    std::mutex locker = {};
-    Composition* composition = nullptr;
-    std::unordered_map<Frame, std::shared_ptr<Graphic>> frames;
+ private:
+  std::mutex locker = {};
+  Composition* composition = nullptr;
+  std::unordered_map<Frame, std::shared_ptr<Graphic>> frames;
 
-    explicit CompositionCache(Composition* composition);
+  explicit CompositionCache(Composition* composition);
 };
 }  // namespace pag

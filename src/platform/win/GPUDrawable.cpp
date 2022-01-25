@@ -23,47 +23,47 @@
 
 namespace pag {
 std::shared_ptr<GPUDrawable> GPUDrawable::FromWindow(void* nativeWindow, void* sharedContext) {
-    if (nativeWindow == nullptr) {
-        LOGE("GPUDrawable.FromWindow() The nativeWindow is invalid.");
-        return nullptr;
-    }
-    return std::shared_ptr<GPUDrawable>(new GPUDrawable(nativeWindow, sharedContext));
+  if (nativeWindow == nullptr) {
+    LOGE("GPUDrawable.FromWindow() The nativeWindow is invalid.");
+    return nullptr;
+  }
+  return std::shared_ptr<GPUDrawable>(new GPUDrawable(nativeWindow, sharedContext));
 }
 
 GPUDrawable::GPUDrawable(void* nativeWindow, void* sharedContext)
     : nativeWindow(nativeWindow), sharedContext(sharedContext) {
-    GPUDrawable::updateSize();
+  GPUDrawable::updateSize();
 }
 
 void GPUDrawable::updateSize() {
-    if (nativeWindow != nullptr) {
-        RECT rect = {};
-        if (GetWindowRect(static_cast<HWND>(nativeWindow), &rect)) {
-            _width = rect.right - rect.left;
-            _height = rect.bottom - rect.top;
-        } else {
-            _width = 0;
-            _height = 0;
-        }
+  if (nativeWindow != nullptr) {
+    RECT rect = {};
+    if (GetWindowRect(static_cast<HWND>(nativeWindow), &rect)) {
+      _width = rect.right - rect.left;
+      _height = rect.bottom - rect.top;
+    } else {
+      _width = 0;
+      _height = 0;
     }
+  }
 }
 
 std::shared_ptr<Device> GPUDrawable::getDevice() {
-    if (_width <= 0 || _height <= 0) {
-        return nullptr;
-    }
-    if (window == nullptr) {
-        window =
-            EGLWindow::MakeFrom(reinterpret_cast<EGLNativeWindowType>(nativeWindow), sharedContext);
-    }
-    return window ? window->getDevice() : nullptr;
+  if (_width <= 0 || _height <= 0) {
+    return nullptr;
+  }
+  if (window == nullptr) {
+    window =
+        EGLWindow::MakeFrom(reinterpret_cast<EGLNativeWindowType>(nativeWindow), sharedContext);
+  }
+  return window ? window->getDevice() : nullptr;
 }
 
 std::shared_ptr<Surface> GPUDrawable::createSurface(Context* context) {
-    return window ? window->createSurface(context) : nullptr;
+  return window ? window->createSurface(context) : nullptr;
 }
 
 void GPUDrawable::present(Context* context) {
-    window->present(context);
+  window->present(context);
 }
 }  // namespace pag

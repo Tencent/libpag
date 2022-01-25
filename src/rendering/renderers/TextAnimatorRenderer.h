@@ -25,45 +25,45 @@
 namespace pag {
 
 class TextAnimatorRenderer {
-public:
-    // 应用动画到Glyphs, 如果含有动画内容返回 true
-    static bool ApplyToGlyphs(std::vector<std::vector<GlyphHandle>>& glyphList,
-                              const std::vector<TextAnimator*>* animators,
-                              const TextDocument* textDocument, Frame layerFrame);
-    // 根据序号获取文本动画位置（供AE导出插件在计算firstBaseLine时调用）
-    static Point GetPositionFromAnimators(const std::vector<TextAnimator*>* animators,
-                                          const TextDocument* textDocument, Frame layerFrame,
-                                          size_t index, bool* pBiasFlag);
-    TextAnimatorRenderer(const TextAnimator* animator, const TextDocument* textDocument,
-                         size_t textCount, Frame frame);
-    ~TextAnimatorRenderer();
+ public:
+  // 应用动画到Glyphs, 如果含有动画内容返回 true
+  static bool ApplyToGlyphs(std::vector<std::vector<GlyphHandle>>& glyphList,
+                            const std::vector<TextAnimator*>* animators,
+                            const TextDocument* textDocument, Frame layerFrame);
+  // 根据序号获取文本动画位置（供AE导出插件在计算firstBaseLine时调用）
+  static Point GetPositionFromAnimators(const std::vector<TextAnimator*>* animators,
+                                        const TextDocument* textDocument, Frame layerFrame,
+                                        size_t index, bool* pBiasFlag);
+  TextAnimatorRenderer(const TextAnimator* animator, const TextDocument* textDocument,
+                       size_t textCount, Frame frame);
+  ~TextAnimatorRenderer();
 
-private:
-    // 应用文本动画
-    void apply(std::vector<std::vector<GlyphHandle>>& glyphList);
-    // 计算一行的字间距总长度
-    float calculateTrackingLen(size_t textStart, size_t textEnd);
-    // 根据字符序号计算该字符的范围因子
-    float calculateFactorByIndex(size_t index, bool* pBiasFlag);
-    // 读取字间距信息
-    void readTackingInfo(const TextAnimator* animator, Frame frame);
-    // 根据序号获取位置（供AE导出插件在计算firstBaseLine时调用）
-    Point getPositionByIndex(size_t index, bool* pBiasFlag);
+ private:
+  // 应用文本动画
+  void apply(std::vector<std::vector<GlyphHandle>>& glyphList);
+  // 计算一行的字间距总长度
+  float calculateTrackingLen(size_t textStart, size_t textEnd);
+  // 根据字符序号计算该字符的范围因子
+  float calculateFactorByIndex(size_t index, bool* pBiasFlag);
+  // 读取字间距信息
+  void readTackingInfo(const TextAnimator* animator, Frame frame);
+  // 根据序号获取位置（供AE导出插件在计算firstBaseLine时调用）
+  Point getPositionByIndex(size_t index, bool* pBiasFlag);
 
-    //
-    // 动画属性：位置、缩放、旋转、不透明度、字间距
-    //
-    Point position = Point::Zero();   // 位置
-    Point scale = Point::Make(1, 1);  // 缩放
-    float rotation = 0.0f;            // 旋转
-    Opacity opacity = Opaque;         // 不透明度，默认不透明
+  //
+  // 动画属性：位置、缩放、旋转、不透明度、字间距
+  //
+  Point position = Point::Zero();   // 位置
+  Point scale = Point::Make(1, 1);  // 缩放
+  float rotation = 0.0f;            // 旋转
+  Opacity opacity = Opaque;         // 不透明度，默认不透明
 
-    float trackingBefore = 0.0f;  // 字间距-之前
-    float trackingAfter = 0.0f;   // 字间距-之后
+  float trackingBefore = 0.0f;  // 字间距-之前
+  float trackingAfter = 0.0f;   // 字间距-之后
 
-    Enum justification = ParagraphJustification::LeftJustify;
-    Enum direction = TextDirection::Default;
+  Enum justification = ParagraphJustification::LeftJustify;
+  Enum direction = TextDirection::Default;
 
-    std::vector<TextSelectorRenderer*> selectorRenderers;
+  std::vector<TextSelectorRenderer*> selectorRenderers;
 };
 }  // namespace pag

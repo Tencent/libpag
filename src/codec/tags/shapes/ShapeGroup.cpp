@@ -22,39 +22,39 @@
 namespace pag {
 void ReadTagsOfShapeGroup(DecodeStream* stream, TagCode code,
                           std::vector<ShapeElement*>* contents) {
-    ReadShape(stream, code, contents);
+  ReadShape(stream, code, contents);
 }
 
 void ReadShapeGroupElements(DecodeStream* stream, void* target) {
-    auto shape = reinterpret_cast<ShapeGroupElement*>(target);
-    ReadTags(stream, &(shape->elements), ReadTagsOfShapeGroup);
+  auto shape = reinterpret_cast<ShapeGroupElement*>(target);
+  ReadTags(stream, &(shape->elements), ReadTagsOfShapeGroup);
 }
 
 bool WriteShapeGroupElements(EncodeStream* stream, void* target) {
-    auto shape = reinterpret_cast<ShapeGroupElement*>(target);
-    if (!shape->elements.empty()) {
-        WriteShape(stream, &(shape->elements));
-        WriteEndTag(stream);
-    }
-    return !shape->elements.empty();
+  auto shape = reinterpret_cast<ShapeGroupElement*>(target);
+  if (!shape->elements.empty()) {
+    WriteShape(stream, &(shape->elements));
+    WriteEndTag(stream);
+  }
+  return !shape->elements.empty();
 }
 
 std::unique_ptr<BlockConfig> ShapeGroupTag(ShapeGroupElement* shape) {
-    if (shape->transform == nullptr) {
-        shape->transform = new ShapeTransform();
-    }
-    auto transform = shape->transform;
-    auto tagConfig = new BlockConfig(TagCode::ShapeGroup);
-    AddAttribute(tagConfig, &shape->blendMode, AttributeType::Value, BlendMode::Normal);
-    AddAttribute(tagConfig, &transform->anchorPoint, AttributeType::SpatialProperty, Point::Zero());
-    AddAttribute(tagConfig, &transform->position, AttributeType::SpatialProperty, Point::Zero());
-    AddAttribute(tagConfig, &transform->scale, AttributeType::MultiDimensionProperty,
-                 Point::Make(1, 1));
-    AddAttribute(tagConfig, &transform->skew, AttributeType::SimpleProperty, 0.0f);
-    AddAttribute(tagConfig, &transform->skewAxis, AttributeType::SimpleProperty, 0.0f);
-    AddAttribute(tagConfig, &transform->rotation, AttributeType::SimpleProperty, 0.0f);
-    AddAttribute(tagConfig, &transform->opacity, AttributeType::SimpleProperty, Opaque);
-    AddCustomAttribute(tagConfig, shape, ReadShapeGroupElements, WriteShapeGroupElements);
-    return std::unique_ptr<BlockConfig>(tagConfig);
+  if (shape->transform == nullptr) {
+    shape->transform = new ShapeTransform();
+  }
+  auto transform = shape->transform;
+  auto tagConfig = new BlockConfig(TagCode::ShapeGroup);
+  AddAttribute(tagConfig, &shape->blendMode, AttributeType::Value, BlendMode::Normal);
+  AddAttribute(tagConfig, &transform->anchorPoint, AttributeType::SpatialProperty, Point::Zero());
+  AddAttribute(tagConfig, &transform->position, AttributeType::SpatialProperty, Point::Zero());
+  AddAttribute(tagConfig, &transform->scale, AttributeType::MultiDimensionProperty,
+               Point::Make(1, 1));
+  AddAttribute(tagConfig, &transform->skew, AttributeType::SimpleProperty, 0.0f);
+  AddAttribute(tagConfig, &transform->skewAxis, AttributeType::SimpleProperty, 0.0f);
+  AddAttribute(tagConfig, &transform->rotation, AttributeType::SimpleProperty, 0.0f);
+  AddAttribute(tagConfig, &transform->opacity, AttributeType::SimpleProperty, Opaque);
+  AddCustomAttribute(tagConfig, shape, ReadShapeGroupElements, WriteShapeGroupElements);
+  return std::unique_ptr<BlockConfig>(tagConfig);
 }
 }  // namespace pag

@@ -22,28 +22,28 @@
 
 namespace pag {
 void ReadTagsOfComposition(DecodeStream* stream, TagCode code, Composition* composition) {
-    switch (code) {
+  switch (code) {
     case TagCode::CompositionAttributes:
-        ReadCompositionAttributes(stream, composition);
-        break;
+      ReadCompositionAttributes(stream, composition);
+      break;
     case TagCode::AudioBytes:
-        ReadAudioBytes(stream, composition);
-        break;
+      ReadAudioBytes(stream, composition);
+      break;
     case TagCode::MarkerList:
-        ReadMarkerList(stream, &composition->audioMarkers);
-        break;
+      ReadMarkerList(stream, &composition->audioMarkers);
+      break;
     default:
-        break;
-    }
+      break;
+  }
 }
 
 void WriteTagsOfComposition(EncodeStream* stream, Composition* composition) {
-    WriteTag(stream, composition, WriteCompositionAttributes);
-    if (composition->audioBytes != nullptr) {
-        WriteTag(stream, composition, WriteAudioBytes);
-        if (!composition->audioMarkers.empty()) {
-            WriteTag(stream, &composition->audioMarkers, WriteMarkerList);
-        }
+  WriteTag(stream, composition, WriteCompositionAttributes);
+  if (composition->audioBytes != nullptr) {
+    WriteTag(stream, composition, WriteAudioBytes);
+    if (!composition->audioMarkers.empty()) {
+      WriteTag(stream, &composition->audioMarkers, WriteMarkerList);
     }
+  }
 }
 }  // namespace pag

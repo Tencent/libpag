@@ -21,18 +21,18 @@
 
 namespace pag {
 class ImageReplacement : public Content {
-public:
-    ImageReplacement(ImageLayer* imageLayer, PAGImageHolder* imageHolder, int editableIndex);
+ public:
+  ImageReplacement(ImageLayer* imageLayer, PAGImageHolder* imageHolder, int editableIndex);
 
-    void measureBounds(Rect* bounds) override;
-    void draw(Recorder* recorder) override;
-    Point getScaleFactor() const;
+  void measureBounds(Rect* bounds) override;
+  void draw(Recorder* recorder) override;
+  Point getScaleFactor() const;
 
-private:
-    PAGImageHolder* imageHolder = nullptr;
-    int editableIndex = 0;
-    int defaultScaleMode = PAGScaleMode::LetterBox;
-    int contentWidth = 0;
-    int contentHeight = 0;
+ private:
+  PAGImageHolder* imageHolder = nullptr;
+  int editableIndex = 0;
+  int defaultScaleMode = PAGScaleMode::LetterBox;
+  int contentWidth = 0;
+  int contentHeight = 0;
 };
 }  // namespace pag

@@ -21,22 +21,22 @@
 
 namespace pag {
 RepeaterElement::~RepeaterElement() {
-    delete copies;
-    delete offset;
-    delete transform;
+  delete copies;
+  delete offset;
+  delete transform;
 }
 
 void RepeaterElement::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {
-    copies->excludeVaryingRanges(timeRanges);
-    offset->excludeVaryingRanges(timeRanges);
-    transform->excludeVaryingRanges(timeRanges);
+  copies->excludeVaryingRanges(timeRanges);
+  offset->excludeVaryingRanges(timeRanges);
+  transform->excludeVaryingRanges(timeRanges);
 }
 
 bool RepeaterElement::verify() const {
-    if (!ShapeElement::verify()) {
-        VerifyFailed();
-        return false;
-    }
-    VerifyAndReturn(copies != nullptr && offset != nullptr && transform != nullptr);
+  if (!ShapeElement::verify()) {
+    VerifyFailed();
+    return false;
+  }
+  VerifyAndReturn(copies != nullptr && offset != nullptr && transform != nullptr);
 }
 }  // namespace pag

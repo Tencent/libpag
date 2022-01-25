@@ -40,28 +40,28 @@ TextContentCache::TextContentCache(TextLayer* layer, ID cacheID,
 }
 
 void TextContentCache::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {
-    sourceText->excludeVaryingRanges(timeRanges);
-    if (pathOption) {
-        pathOption->excludeVaryingRanges(timeRanges);
-    }
-    if (moreOption) {
-        moreOption->excludeVaryingRanges(timeRanges);
-    }
-    for (auto animator : *animators) {
-        animator->excludeVaryingRanges(timeRanges);
-    }
+  sourceText->excludeVaryingRanges(timeRanges);
+  if (pathOption) {
+    pathOption->excludeVaryingRanges(timeRanges);
+  }
+  if (moreOption) {
+    moreOption->excludeVaryingRanges(timeRanges);
+  }
+  for (auto animator : *animators) {
+    animator->excludeVaryingRanges(timeRanges);
+  }
 }
 
 ID TextContentCache::getCacheID() const {
-    return cacheID > 0 ? cacheID : layer->uniqueID;
+  return cacheID > 0 ? cacheID : layer->uniqueID;
 }
 
 GraphicContent* TextContentCache::createContent(Frame layerFrame) const {
-    auto content = RenderTexts(sourceText, pathOption, moreOption, animators, layerFrame).release();
-    if (_cacheEnabled) {
-        content->colorGlyphs = Picture::MakeFrom(getCacheID(), content->colorGlyphs);
-    }
-    return content;
+  auto content = RenderTexts(sourceText, pathOption, moreOption, animators, layerFrame).release();
+  if (_cacheEnabled) {
+    content->colorGlyphs = Picture::MakeFrom(getCacheID(), content->colorGlyphs);
+  }
+  return content;
 }
 
 }  // namespace pag

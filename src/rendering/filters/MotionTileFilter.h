@@ -22,30 +22,30 @@
 
 namespace pag {
 class MotionTileFilter : public LayerFilter {
-public:
-    explicit MotionTileFilter(Effect* effect);
-    ~MotionTileFilter() override = default;
+ public:
+  explicit MotionTileFilter(Effect* effect);
+  ~MotionTileFilter() override = default;
 
-protected:
-    std::string onBuildVertexShader() override;
+ protected:
+  std::string onBuildVertexShader() override;
 
-    std::string onBuildFragmentShader() override;
+  std::string onBuildFragmentShader() override;
 
-    void onPrepareProgram(const GLInterface* gl, unsigned program) override;
+  void onPrepareProgram(const GLInterface* gl, unsigned program) override;
 
-    void onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
-                        const Point& filterScale) override;
+  void onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
+                      const Point& filterScale) override;
 
-private:
-    Effect* effect = nullptr;
+ private:
+  Effect* effect = nullptr;
 
-    int tileCenterHandle = 0;
-    int tileWidthHandle = 0;
-    int tileHeightHandle = 0;
-    int outputWidthHandle = 0;
-    int outputHeightHandle = 0;
-    int mirrorEdgesHandle = 0;
-    int phaseHandle = 0;
-    int isHorizontalPhaseShiftHandle = 0;
+  int tileCenterHandle = 0;
+  int tileWidthHandle = 0;
+  int tileHeightHandle = 0;
+  int outputWidthHandle = 0;
+  int outputHeightHandle = 0;
+  int mirrorEdgesHandle = 0;
+  int phaseHandle = 0;
+  int isHorizontalPhaseShiftHandle = 0;
 };
 }  // namespace pag

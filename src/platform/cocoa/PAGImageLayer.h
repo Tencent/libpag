@@ -24,9 +24,9 @@
 @class PAGVideoRange;
 
 __attribute__((visibility("default"))) @interface PAGImageLayer : PAGLayer
-    /**
-     * Make a PAGImageLayer with size and duration(in microseconds).
-     */
+/**
+ * Make a PAGImageLayer with size and duration(in microseconds).
+ */
 + (instancetype)Make:(CGSize)size duration:(int64_t)duration;
 
 /**

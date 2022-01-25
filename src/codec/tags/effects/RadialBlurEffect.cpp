@@ -21,14 +21,14 @@
 
 namespace pag {
 std::unique_ptr<BlockConfig> RadialBlurEffectTag(RadialBlurEffect* effect) {
-    auto tagConfig = new BlockConfig(TagCode::RadialBlurEffect);
-    AddAttribute(tagConfig, &effect->amount, AttributeType::SimpleProperty, 10.0f);
-    AddAttribute(tagConfig, &effect->center, AttributeType::SpatialProperty,
-                 Point::Make(640.0f, 360.0f));
-    AddAttribute(tagConfig, &effect->mode, AttributeType::DiscreteProperty, RadialBlurMode::Spin);
-    AddAttribute(tagConfig, &effect->antialias, AttributeType::DiscreteProperty,
-                 RadialBlurAntialias::Low);
-    EffectCompositingOptionTag(tagConfig, effect);
-    return std::unique_ptr<BlockConfig>(tagConfig);
+  auto tagConfig = new BlockConfig(TagCode::RadialBlurEffect);
+  AddAttribute(tagConfig, &effect->amount, AttributeType::SimpleProperty, 10.0f);
+  AddAttribute(tagConfig, &effect->center, AttributeType::SpatialProperty,
+               Point::Make(640.0f, 360.0f));
+  AddAttribute(tagConfig, &effect->mode, AttributeType::DiscreteProperty, RadialBlurMode::Spin);
+  AddAttribute(tagConfig, &effect->antialias, AttributeType::DiscreteProperty,
+               RadialBlurAntialias::Low);
+  EffectCompositingOptionTag(tagConfig, effect);
+  return std::unique_ptr<BlockConfig>(tagConfig);
 }
 }  // namespace pag

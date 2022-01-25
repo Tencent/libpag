@@ -24,16 +24,16 @@
 
 namespace pag {
 class NativeTextureBuffer : public TextureBuffer {
-public:
-    static std::shared_ptr<NativeTextureBuffer> Make(int width, int height, emscripten::val source);
+ public:
+  static std::shared_ptr<NativeTextureBuffer> Make(int width, int height, emscripten::val source);
 
-    std::shared_ptr<Texture> makeTexture(Context* context) const override;
+  std::shared_ptr<Texture> makeTexture(Context* context) const override;
 
-private:
-    explicit NativeTextureBuffer(int width, int height, emscripten::val source)
-        : TextureBuffer(width, height), source(source) {
-    }
+ private:
+  explicit NativeTextureBuffer(int width, int height, emscripten::val source)
+      : TextureBuffer(width, height), source(source) {
+  }
 
-    emscripten::val source = emscripten::val::null();
+  emscripten::val source = emscripten::val::null();
 };
 }  // namespace pag

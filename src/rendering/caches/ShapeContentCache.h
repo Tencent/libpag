@@ -22,11 +22,11 @@
 
 namespace pag {
 class ShapeContentCache : public ContentCache {
-public:
-    explicit ShapeContentCache(ShapeLayer* layer);
+ public:
+  explicit ShapeContentCache(ShapeLayer* layer);
 
-protected:
-    void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const override;
-    GraphicContent* createContent(Frame layerFrame) const override;
+ protected:
+  void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const override;
+  GraphicContent* createContent(Frame layerFrame) const override;
 };
 }  // namespace pag

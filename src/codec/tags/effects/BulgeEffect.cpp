@@ -21,15 +21,15 @@
 
 namespace pag {
 std::unique_ptr<BlockConfig> BulgeEffectTag(BulgeEffect* effect) {
-    auto tagConfig = new BlockConfig(TagCode::BulgeEffect);
-    AddAttribute(tagConfig, &effect->horizontalRadius, AttributeType::SimpleProperty, 50.0f);
-    AddAttribute(tagConfig, &effect->verticalRadius, AttributeType::SimpleProperty, 50.0f);
-    AddAttribute(tagConfig, &effect->bulgeCenter, AttributeType::SpatialProperty,
-                 Point::Make(640.0f, 360.0f));
-    AddAttribute(tagConfig, &effect->bulgeHeight, AttributeType::SimpleProperty, 1.0f);
-    AddAttribute(tagConfig, &effect->taperRadius, AttributeType::SimpleProperty, 0.0f);
-    AddAttribute(tagConfig, &effect->pinning, AttributeType::DiscreteProperty, false);
-    EffectCompositingOptionTag(tagConfig, effect);
-    return std::unique_ptr<BlockConfig>(tagConfig);
+  auto tagConfig = new BlockConfig(TagCode::BulgeEffect);
+  AddAttribute(tagConfig, &effect->horizontalRadius, AttributeType::SimpleProperty, 50.0f);
+  AddAttribute(tagConfig, &effect->verticalRadius, AttributeType::SimpleProperty, 50.0f);
+  AddAttribute(tagConfig, &effect->bulgeCenter, AttributeType::SpatialProperty,
+               Point::Make(640.0f, 360.0f));
+  AddAttribute(tagConfig, &effect->bulgeHeight, AttributeType::SimpleProperty, 1.0f);
+  AddAttribute(tagConfig, &effect->taperRadius, AttributeType::SimpleProperty, 0.0f);
+  AddAttribute(tagConfig, &effect->pinning, AttributeType::DiscreteProperty, false);
+  EffectCompositingOptionTag(tagConfig, effect);
+  return std::unique_ptr<BlockConfig>(tagConfig);
 }
 }  // namespace pag

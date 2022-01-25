@@ -23,9 +23,9 @@
 __attribute__((visibility("default")))
 @interface PAGSolidLayer : PAGLayer
 
-    /**
-     * Returns the layer's solid color.
-     */
+/**
+ * Returns the layer's solid color.
+ */
 - (CocoaColor*)solidColor;
 
 /**

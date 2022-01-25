@@ -24,22 +24,22 @@
 
 namespace pag {
 class NativeHardwareBuffer : public PixelBuffer {
-public:
-    static std::shared_ptr<PixelBuffer> Make(int width, int height, bool alphaOnly);
+ public:
+  static std::shared_ptr<PixelBuffer> Make(int width, int height, bool alphaOnly);
 
-    static std::shared_ptr<NativeHardwareBuffer> MakeAdopted(AHardwareBuffer* hardwareBuffer);
+  static std::shared_ptr<NativeHardwareBuffer> MakeAdopted(AHardwareBuffer* hardwareBuffer);
 
-    ~NativeHardwareBuffer() override;
+  ~NativeHardwareBuffer() override;
 
-    void* lockPixels() override;
+  void* lockPixels() override;
 
-    void unlockPixels() override;
+  void unlockPixels() override;
 
-    std::shared_ptr<Texture> makeTexture(Context*) const override;
+  std::shared_ptr<Texture> makeTexture(Context*) const override;
 
-    NativeHardwareBuffer(AHardwareBuffer* hardwareBuffer);
+  NativeHardwareBuffer(AHardwareBuffer* hardwareBuffer);
 
-private:
-    AHardwareBuffer* hardwareBuffer = nullptr;
+ private:
+  AHardwareBuffer* hardwareBuffer = nullptr;
 };
 }  // namespace pag

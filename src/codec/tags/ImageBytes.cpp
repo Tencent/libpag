@@ -22,22 +22,22 @@
 
 namespace pag {
 ImageBytes* ReadImageBytes(DecodeStream* stream) {
-    auto imageBytes = new ImageBytes();
-    imageBytes->id = stream->readEncodedUint32();
-    imageBytes->fileBytes = stream->readByteData().release();
-    if (imageBytes->fileBytes == nullptr || imageBytes->fileBytes->length() == 0) {
-        return imageBytes;
-    }
-    if (!WebPGetInfo(imageBytes->fileBytes->data(), imageBytes->fileBytes->length(),
-                     &imageBytes->width, &imageBytes->height)) {
-        LOGE("Get webP size fail.");
-    }
+  auto imageBytes = new ImageBytes();
+  imageBytes->id = stream->readEncodedUint32();
+  imageBytes->fileBytes = stream->readByteData().release();
+  if (imageBytes->fileBytes == nullptr || imageBytes->fileBytes->length() == 0) {
     return imageBytes;
+  }
+  if (!WebPGetInfo(imageBytes->fileBytes->data(), imageBytes->fileBytes->length(),
+                   &imageBytes->width, &imageBytes->height)) {
+    LOGE("Get webP size fail.");
+  }
+  return imageBytes;
 }
 
 TagCode WriteImageBytes(EncodeStream* stream, pag::ImageBytes* imageBytes) {
-    stream->writeEncodedUint32(imageBytes->id);
-    stream->writeByteData(imageBytes->fileBytes);
-    return TagCode::ImageBytes;
+  stream->writeEncodedUint32(imageBytes->id);
+  stream->writeByteData(imageBytes->fileBytes);
+  return TagCode::ImageBytes;
 }
 }  // namespace pag

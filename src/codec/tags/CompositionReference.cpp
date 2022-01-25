@@ -20,18 +20,18 @@
 
 namespace pag {
 void ReadCompositionReference(DecodeStream* stream, PreComposeLayer* layer) {
-    auto id = stream->readEncodedUint32();
-    if (id > 0) {
-        layer->composition = new Composition();
-        layer->composition->id = id;
-    }
-    layer->compositionStartTime = ReadTime(stream);
+  auto id = stream->readEncodedUint32();
+  if (id > 0) {
+    layer->composition = new Composition();
+    layer->composition->id = id;
+  }
+  layer->compositionStartTime = ReadTime(stream);
 }
 
 TagCode WriteCompositionReference(EncodeStream* stream, PreComposeLayer* layer) {
-    auto id = layer->composition != nullptr ? layer->composition->id : static_cast<ID>(0);
-    stream->writeEncodedUint32(id);
-    WriteTime(stream, layer->compositionStartTime);
-    return TagCode::CompositionReference;
+  auto id = layer->composition != nullptr ? layer->composition->id : static_cast<ID>(0);
+  stream->writeEncodedUint32(id);
+  WriteTime(stream, layer->compositionStartTime);
+  return TagCode::CompositionReference;
 }
 }  // namespace pag

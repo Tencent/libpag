@@ -21,28 +21,28 @@
 
 namespace pag {
 ShapeTransform::~ShapeTransform() {
-    delete anchorPoint;
-    delete position;
-    delete scale;
-    delete skew;
-    delete skewAxis;
-    delete rotation;
-    delete opacity;
+  delete anchorPoint;
+  delete position;
+  delete scale;
+  delete skew;
+  delete skewAxis;
+  delete rotation;
+  delete opacity;
 }
 
 void ShapeTransform::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {
-    anchorPoint->excludeVaryingRanges(timeRanges);
-    position->excludeVaryingRanges(timeRanges);
-    scale->excludeVaryingRanges(timeRanges);
-    skew->excludeVaryingRanges(timeRanges);
-    skewAxis->excludeVaryingRanges(timeRanges);
-    rotation->excludeVaryingRanges(timeRanges);
-    opacity->excludeVaryingRanges(timeRanges);
+  anchorPoint->excludeVaryingRanges(timeRanges);
+  position->excludeVaryingRanges(timeRanges);
+  scale->excludeVaryingRanges(timeRanges);
+  skew->excludeVaryingRanges(timeRanges);
+  skewAxis->excludeVaryingRanges(timeRanges);
+  rotation->excludeVaryingRanges(timeRanges);
+  opacity->excludeVaryingRanges(timeRanges);
 }
 
 bool ShapeTransform::verify() const {
-    VerifyAndReturn(anchorPoint != nullptr && position != nullptr && scale != nullptr &&
-                    skew != nullptr && skewAxis != nullptr && rotation != nullptr &&
-                    opacity != nullptr);
+  VerifyAndReturn(anchorPoint != nullptr && position != nullptr && scale != nullptr &&
+                  skew != nullptr && skewAxis != nullptr && rotation != nullptr &&
+                  opacity != nullptr);
 }
 }  // namespace pag

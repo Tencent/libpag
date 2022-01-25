@@ -22,24 +22,24 @@
 namespace pag {
 PAGFont PAGFont::RegisterFont(const std::string& fontPath, int ttcIndex,
                               const std::string& fontFamily, const std::string& fontStyle) {
-    return FontManager::RegisterFont(fontPath, ttcIndex, fontFamily, fontStyle);
+  return FontManager::RegisterFont(fontPath, ttcIndex, fontFamily, fontStyle);
 }
 
 PAGFont PAGFont::RegisterFont(const void* data, size_t length, int ttcIndex,
                               const std::string& fontFamily, const std::string& fontStyle) {
-    return FontManager::RegisterFont(data, length, ttcIndex, fontFamily, fontStyle);
+  return FontManager::RegisterFont(data, length, ttcIndex, fontFamily, fontStyle);
 }
 
 void PAGFont::UnregisterFont(const PAGFont& font) {
-    return FontManager::UnregisterFont(font);
+  return FontManager::UnregisterFont(font);
 }
 
 void PAGFont::SetFallbackFontNames(const std::vector<std::string>& fontNames) {
-    FontManager::SetFallbackFontNames(fontNames);
+  FontManager::SetFallbackFontNames(fontNames);
 }
 
 void PAGFont::SetFallbackFontPaths(const std::vector<std::string>& fontPaths,
                                    const std::vector<int>& ttcIndices) {
-    FontManager::SetFallbackFontPaths(fontPaths, ttcIndices);
+  FontManager::SetFallbackFontPaths(fontPaths, ttcIndices);
 }
 }  // namespace pag

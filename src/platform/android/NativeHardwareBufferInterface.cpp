@@ -25,25 +25,25 @@ namespace pag {
 
 template <typename T>
 static void loadSymbol(T*& pfn, const char* symbol) {
-    pfn = (T*)dlsym(RTLD_DEFAULT, symbol);
+  pfn = (T*)dlsym(RTLD_DEFAULT, symbol);
 }
 
 NativeHardwareBufferInterface::NativeHardwareBufferInterface() {
-    // if we compile for API 26 (Oreo) and above, we're guaranteed to have AHardwareBuffer
-    // in all other cases, we need to get them at runtime.
+  // if we compile for API 26 (Oreo) and above, we're guaranteed to have AHardwareBuffer
+  // in all other cases, we need to get them at runtime.
 #ifndef PLATFORM_HAS_HARDWAREBUFFER
-    loadSymbol(AHardwareBuffer_allocate, "AHardwareBuffer_allocate");
-    loadSymbol(AHardwareBuffer_release, "AHardwareBuffer_release");
-    loadSymbol(AHardwareBuffer_lock, "AHardwareBuffer_lock");
-    loadSymbol(AHardwareBuffer_unlock, "AHardwareBuffer_unlock");
-    loadSymbol(AHardwareBuffer_describe, "AHardwareBuffer_describe");
-    loadSymbol(AHardwareBuffer_acquire, "AHardwareBuffer_acquire");
+  loadSymbol(AHardwareBuffer_allocate, "AHardwareBuffer_allocate");
+  loadSymbol(AHardwareBuffer_release, "AHardwareBuffer_release");
+  loadSymbol(AHardwareBuffer_lock, "AHardwareBuffer_lock");
+  loadSymbol(AHardwareBuffer_unlock, "AHardwareBuffer_unlock");
+  loadSymbol(AHardwareBuffer_describe, "AHardwareBuffer_describe");
+  loadSymbol(AHardwareBuffer_acquire, "AHardwareBuffer_acquire");
 #endif
 }
 
 NativeHardwareBufferInterface* NativeHardwareBufferInterface::Get() {
-    static NativeHardwareBufferInterface instance;
-    return &instance;
+  static NativeHardwareBufferInterface instance;
+  return &instance;
 }
 
 }  // namespace pag

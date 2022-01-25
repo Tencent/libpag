@@ -41,37 +41,37 @@ MosaicFilter::MosaicFilter(pag::Effect* effect) : effect(effect) {
 }
 
 std::string MosaicFilter::onBuildFragmentShader() {
-    return FRAGMENT_SHADER;
+  return FRAGMENT_SHADER;
 }
 
 void MosaicFilter::onPrepareProgram(const GLInterface* gl, unsigned int program) {
-    horizontalBlocksHandle = gl->getUniformLocation(program, "mHorizontalBlocks");
-    verticalBlocksHandle = gl->getUniformLocation(program, "mVerticalBlocks");
-    sharpColorsHandle = gl->getUniformLocation(program, "mSharpColors");
+  horizontalBlocksHandle = gl->getUniformLocation(program, "mHorizontalBlocks");
+  verticalBlocksHandle = gl->getUniformLocation(program, "mVerticalBlocks");
+  sharpColorsHandle = gl->getUniformLocation(program, "mSharpColors");
 }
 
 void MosaicFilter::onUpdateParams(const GLInterface* gl, const Rect& contentBounds, const Point&) {
-    auto* mosaicEffect = reinterpret_cast<const MosaicEffect*>(effect);
-    horizontalBlocks = 1.0f / mosaicEffect->horizontalBlocks->getValueAt(layerFrame);
-    verticalBlocks = 1.0f / mosaicEffect->verticalBlocks->getValueAt(layerFrame);
-    sharpColors = mosaicEffect->sharpColors->getValueAt(layerFrame);
+  auto* mosaicEffect = reinterpret_cast<const MosaicEffect*>(effect);
+  horizontalBlocks = 1.0f / mosaicEffect->horizontalBlocks->getValueAt(layerFrame);
+  verticalBlocks = 1.0f / mosaicEffect->verticalBlocks->getValueAt(layerFrame);
+  sharpColors = mosaicEffect->sharpColors->getValueAt(layerFrame);
 
-    auto placeHolderWidth = static_cast<int>(contentBounds.left + contentBounds.right);
-    auto placeHolderHeight = static_cast<int>(contentBounds.top + contentBounds.bottom);
-    auto placeHolderRatio = 1.0f * placeHolderWidth / placeHolderHeight;
+  auto placeHolderWidth = static_cast<int>(contentBounds.left + contentBounds.right);
+  auto placeHolderHeight = static_cast<int>(contentBounds.top + contentBounds.bottom);
+  auto placeHolderRatio = 1.0f * placeHolderWidth / placeHolderHeight;
 
-    auto contentWidth = static_cast<int>(contentBounds.width());
-    auto contentHeight = static_cast<int>(contentBounds.height());
-    auto contentRatio = 1.0f * contentWidth / contentHeight;
+  auto contentWidth = static_cast<int>(contentBounds.width());
+  auto contentHeight = static_cast<int>(contentBounds.height());
+  auto contentRatio = 1.0f * contentWidth / contentHeight;
 
-    if (placeHolderRatio > contentRatio) {
-        horizontalBlocks *= 1.0f * placeHolderWidth / contentWidth;
-    } else {
-        verticalBlocks *= 1.0f * placeHolderHeight / contentHeight;
-    }
+  if (placeHolderRatio > contentRatio) {
+    horizontalBlocks *= 1.0f * placeHolderWidth / contentWidth;
+  } else {
+    verticalBlocks *= 1.0f * placeHolderHeight / contentHeight;
+  }
 
-    gl->uniform1f(horizontalBlocksHandle, horizontalBlocks);
-    gl->uniform1f(verticalBlocksHandle, verticalBlocks);
-    gl->uniform1f(sharpColorsHandle, sharpColors);
+  gl->uniform1f(horizontalBlocksHandle, horizontalBlocks);
+  gl->uniform1f(verticalBlocksHandle, verticalBlocks);
+  gl->uniform1f(sharpColorsHandle, sharpColors);
 }
 }  // namespace pag

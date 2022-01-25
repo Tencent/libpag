@@ -22,58 +22,58 @@
 
 namespace pag {
 std::shared_ptr<Graphic> Shape::MakeFrom(const Path& path, Color color) {
-    if (path.isEmpty()) {
-        return nullptr;
-    }
-    auto fill = new SolidFill();
-    fill->color = color;
-    return std::shared_ptr<Graphic>(new Shape(path, fill));
+  if (path.isEmpty()) {
+    return nullptr;
+  }
+  auto fill = new SolidFill();
+  fill->color = color;
+  return std::shared_ptr<Graphic>(new Shape(path, fill));
 }
 
 std::shared_ptr<Graphic> Shape::MakeFrom(const Path& path, const GradientPaint& gradient) {
-    if (path.isEmpty()) {
-        return nullptr;
-    }
-    auto fill = new GradientFill();
-    fill->gradient = gradient;
-    return std::shared_ptr<Graphic>(new Shape(path, fill));
+  if (path.isEmpty()) {
+    return nullptr;
+  }
+  auto fill = new GradientFill();
+  fill->gradient = gradient;
+  return std::shared_ptr<Graphic>(new Shape(path, fill));
 }
 
 Shape::Shape(Path path, ShapeFill* fill) : path(std::move(path)), fill(fill) {
 }
 
 Shape::~Shape() {
-    delete fill;
+  delete fill;
 }
 
 void Shape::measureBounds(Rect* bounds) const {
-    *bounds = path.getBounds();
+  *bounds = path.getBounds();
 }
 
 bool Shape::hitTest(RenderCache*, float x, float y) {
-    return path.contains(x, y);
+  return path.contains(x, y);
 }
 
 bool Shape::getPath(Path* result) const {
-    if (fill->type() == ShapeFillType::Gradient) {
-        return false;
-    }
-    result->addPath(path);
-    return true;
+  if (fill->type() == ShapeFillType::Gradient) {
+    return false;
+  }
+  result->addPath(path);
+  return true;
 }
 
 void Shape::prepare(RenderCache*) const {
 }
 
 void Shape::draw(Canvas* canvas, RenderCache*) const {
-    switch (fill->type()) {
+  switch (fill->type()) {
     case ShapeFillType::Solid:
-        canvas->drawPath(path, static_cast<SolidFill*>(fill)->color);
-        break;
+      canvas->drawPath(path, static_cast<SolidFill*>(fill)->color);
+      break;
     case ShapeFillType::Gradient:
-        canvas->drawPath(path, static_cast<GradientFill*>(fill)->gradient);
-        break;
-    }
+      canvas->drawPath(path, static_cast<GradientFill*>(fill)->gradient);
+      break;
+  }
 }
 
 }  // namespace pag

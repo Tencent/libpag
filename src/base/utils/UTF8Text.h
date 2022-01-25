@@ -23,9 +23,9 @@
 
 namespace pag {
 class UTF8Text {
-public:
-    static int Count(const std::string& string);
+ public:
+  static int Count(const std::string& string);
 
-    static int32_t NextChar(const char** ptr);
+  static int32_t NextChar(const char** ptr);
 };
 }  // namespace pag

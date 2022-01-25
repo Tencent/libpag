@@ -25,10 +25,10 @@
 __attribute__((visibility("default")))
 @interface PAGSurface : NSObject
 
-    /**
-     * Creates a new PAGSurface from specified CAEAGLLayer. The GPU context will be created internally
-     * by PAGSurface.
-     */
+/**
+ * Creates a new PAGSurface from specified CAEAGLLayer. The GPU context will be created internally
+ * by PAGSurface.
+ */
 + (PAGSurface*)FromLayer:(CAEAGLLayer*)layer;
 
 /**

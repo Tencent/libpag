@@ -46,29 +46,29 @@ void PAGCpuTest::TearDown() {
 }
 
 void PAGCpuTest::PagSetUp(std::string pagPath) {
-    TestPAGFile = PAGFile::Load(pagPath);
-    ASSERT_NE(TestPAGFile, nullptr) << "pag path is:" << GetPagPath() << std::endl;
-    TestPAGSurface = PAGSurface::MakeOffscreen(TestPAGFile->width(), TestPAGFile->height());
-    TestPAGPlayer = std::make_shared<PAGPlayer>();
-    TestPAGPlayer->setSurface(TestPAGSurface);
-    TestPAGPlayer->setComposition(TestPAGFile);
+  TestPAGFile = PAGFile::Load(pagPath);
+  ASSERT_NE(TestPAGFile, nullptr) << "pag path is:" << GetPagPath() << std::endl;
+  TestPAGSurface = PAGSurface::MakeOffscreen(TestPAGFile->width(), TestPAGFile->height());
+  TestPAGPlayer = std::make_shared<PAGPlayer>();
+  TestPAGPlayer->setSurface(TestPAGSurface);
+  TestPAGPlayer->setComposition(TestPAGFile);
 }
 
 void PAGCpuTest::PagTearDown() {
-    TestPAGFile = nullptr;
-    TestPAGSurface = nullptr;
-    TestPAGPlayer = nullptr;
+  TestPAGFile = nullptr;
+  TestPAGSurface = nullptr;
+  TestPAGPlayer = nullptr;
 }
 
 std::string PAGCpuTest::GetPagPath() {
-    return DEFAULT_PAG_PATH;
+  return DEFAULT_PAG_PATH;
 }
 
 std::string PAGCpuTest::getMd5FromSnap() {
-    if (TestPAGSurface == nullptr) {
-        return "";
-    }
-    return DumpMD5(TestPAGSurface);
+  if (TestPAGSurface == nullptr) {
+    return "";
+  }
+  return DumpMD5(TestPAGSurface);
 }
 
 }  // namespace pag

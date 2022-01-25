@@ -23,6 +23,6 @@ namespace pag {
 static const char sdkVersion[] = "4.0.0.1";
 
 std::string PAG::SDKVersion() {
-    return sdkVersion;
+  return sdkVersion;
 }
 }  // namespace pag

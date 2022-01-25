@@ -21,39 +21,39 @@
 
 namespace pag {
 TextAnimatorTypographyProperties::~TextAnimatorTypographyProperties() {
-    delete trackingType;
-    delete trackingAmount;
-    delete position;
-    delete scale;
-    delete rotation;
-    delete opacity;
+  delete trackingType;
+  delete trackingAmount;
+  delete position;
+  delete scale;
+  delete rotation;
+  delete opacity;
 }
 
 void TextAnimatorTypographyProperties::excludeVaryingRanges(
     std::vector<TimeRange>* timeRanges) const {
-    if (trackingType != nullptr) {
-        trackingType->excludeVaryingRanges(timeRanges);
-    }
-    if (trackingAmount != nullptr) {
-        trackingAmount->excludeVaryingRanges(timeRanges);
-    }
-    if (position != nullptr) {
-        position->excludeVaryingRanges(timeRanges);
-    }
-    if (scale != nullptr) {
-        scale->excludeVaryingRanges(timeRanges);
-    }
-    if (rotation != nullptr) {
-        rotation->excludeVaryingRanges(timeRanges);
-    }
-    if (opacity != nullptr) {
-        opacity->excludeVaryingRanges(timeRanges);
-    }
+  if (trackingType != nullptr) {
+    trackingType->excludeVaryingRanges(timeRanges);
+  }
+  if (trackingAmount != nullptr) {
+    trackingAmount->excludeVaryingRanges(timeRanges);
+  }
+  if (position != nullptr) {
+    position->excludeVaryingRanges(timeRanges);
+  }
+  if (scale != nullptr) {
+    scale->excludeVaryingRanges(timeRanges);
+  }
+  if (rotation != nullptr) {
+    rotation->excludeVaryingRanges(timeRanges);
+  }
+  if (opacity != nullptr) {
+    opacity->excludeVaryingRanges(timeRanges);
+  }
 }
 
 bool TextAnimatorTypographyProperties::verify() const {
-    // trackingAmount is required，but trackingType could be empty.
-    VerifyAndReturn(trackingAmount != nullptr || position != nullptr || scale != nullptr ||
-                    rotation != nullptr || opacity != nullptr);
+  // trackingAmount is required，but trackingType could be empty.
+  VerifyAndReturn(trackingAmount != nullptr || position != nullptr || scale != nullptr ||
+                  rotation != nullptr || opacity != nullptr);
 }
 }  // namespace pag

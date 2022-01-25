@@ -21,34 +21,34 @@
 
 namespace pag {
 StrokeStyle::~StrokeStyle() {
-    delete blendMode;
-    delete color;
-    delete size;
-    delete opacity;
-    delete position;
+  delete blendMode;
+  delete color;
+  delete size;
+  delete opacity;
+  delete position;
 }
 
 bool StrokeStyle::visibleAt(Frame) const {
-    return false;
+  return false;
 }
 
 void StrokeStyle::transformBounds(Rect*, const Point&, Frame) const {
 }
 
 void StrokeStyle::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {
-    blendMode->excludeVaryingRanges(timeRanges);
-    color->excludeVaryingRanges(timeRanges);
-    size->excludeVaryingRanges(timeRanges);
-    opacity->excludeVaryingRanges(timeRanges);
-    position->excludeVaryingRanges(timeRanges);
+  blendMode->excludeVaryingRanges(timeRanges);
+  color->excludeVaryingRanges(timeRanges);
+  size->excludeVaryingRanges(timeRanges);
+  opacity->excludeVaryingRanges(timeRanges);
+  position->excludeVaryingRanges(timeRanges);
 }
 
 bool StrokeStyle::verify() const {
-    if (!LayerStyle::verify()) {
-        VerifyFailed();
-        return false;
-    }
-    VerifyAndReturn(blendMode != nullptr && color != nullptr && size != nullptr &&
-                    opacity != nullptr && position != nullptr);
+  if (!LayerStyle::verify()) {
+    VerifyFailed();
+    return false;
+  }
+  VerifyAndReturn(blendMode != nullptr && color != nullptr && size != nullptr &&
+                  opacity != nullptr && position != nullptr);
 }
 }  // namespace pag

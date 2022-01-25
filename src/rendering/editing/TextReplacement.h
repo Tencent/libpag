@@ -22,19 +22,19 @@
 
 namespace pag {
 class TextReplacement {
-public:
-    explicit TextReplacement(PAGTextLayer* textLayer);
-    ~TextReplacement();
+ public:
+  explicit TextReplacement(PAGTextLayer* textLayer);
+  ~TextReplacement();
 
-    Content* getContent(Frame contentFrame);
+  Content* getContent(Frame contentFrame);
 
-    TextDocument* getTextDocument();
+  TextDocument* getTextDocument();
 
-    void clearCache();
+  void clearCache();
 
-private:
-    TextContentCache* textContentCache = nullptr;
-    Property<TextDocumentHandle>* sourceText = nullptr;
-    PAGTextLayer* pagLayer = nullptr;
+ private:
+  TextContentCache* textContentCache = nullptr;
+  Property<TextDocumentHandle>* sourceText = nullptr;
+  PAGTextLayer* pagLayer = nullptr;
 };
 }  // namespace pag

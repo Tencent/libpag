@@ -82,60 +82,58 @@ DropShadowSpreadFilter::DropShadowSpreadFilter(DropShadowStyle* style, DropShado
 }
 
 std::string DropShadowSpreadFilter::onBuildFragmentShader() {
-    if (styleMode == DropShadowStyleMode::Thick) {
-        return DROPSHADOW_SPREAD_THICK_FRAGMENT_SHADER;
-    }
-    return DROPSHADOW_SPREAD_FRAGMENT_SHADER;
+  if (styleMode == DropShadowStyleMode::Thick) {
+    return DROPSHADOW_SPREAD_THICK_FRAGMENT_SHADER;
+  }
+  return DROPSHADOW_SPREAD_FRAGMENT_SHADER;
 }
 
 void DropShadowSpreadFilter::onPrepareProgram(const GLInterface* gl, unsigned program) {
-    spreadColorHandle = gl->getUniformLocation(program, "uColor");
-    spreadOpacityHandle = gl->getUniformLocation(program, "uOpacity");
-    spreadSizeHandle = gl->getUniformLocation(program, "uSize");
+  spreadColorHandle = gl->getUniformLocation(program, "uColor");
+  spreadOpacityHandle = gl->getUniformLocation(program, "uOpacity");
+  spreadSizeHandle = gl->getUniformLocation(program, "uSize");
 }
 
 void DropShadowSpreadFilter::onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
-        const Point& filterScale) {
-    auto color = layerStyle->color->getValueAt(layerFrame);
-    auto opacity = layerStyle->opacity->getValueAt(layerFrame);
-    auto spread = layerStyle->spread->getValueAt(layerFrame);
-    auto size = layerStyle->size->getValueAt(layerFrame);
-    spread *= (spread == 1.0) ? 1.0 : 0.8;
+                                            const Point& filterScale) {
+  auto color = layerStyle->color->getValueAt(layerFrame);
+  auto opacity = layerStyle->opacity->getValueAt(layerFrame);
+  auto spread = layerStyle->spread->getValueAt(layerFrame);
+  auto size = layerStyle->size->getValueAt(layerFrame);
+  spread *= (spread == 1.0) ? 1.0 : 0.8;
 
-    auto spreadSizeX = size * spread * filterScale.x;
-    auto spreadSizeY = size * spread * filterScale.y;
-    spreadSizeX = std::min(spreadSizeX, DROPSHADOW_MAX_SPREAD_SIZE);
-    spreadSizeY = std::min(spreadSizeY, DROPSHADOW_MAX_SPREAD_SIZE);
+  auto spreadSizeX = size * spread * filterScale.x;
+  auto spreadSizeY = size * spread * filterScale.y;
+  spreadSizeX = std::min(spreadSizeX, DROPSHADOW_MAX_SPREAD_SIZE);
+  spreadSizeY = std::min(spreadSizeY, DROPSHADOW_MAX_SPREAD_SIZE);
 
-    gl->uniform3f(spreadColorHandle, color.red / 255.f, color.green / 255.f, color.blue / 255.f);
-    gl->uniform1f(spreadOpacityHandle, opacity / 255.f);
-    gl->uniform2f(spreadSizeHandle, spreadSizeX / contentBounds.width(),
-                  spreadSizeY / contentBounds.height());
+  gl->uniform3f(spreadColorHandle, color.red / 255.f, color.green / 255.f, color.blue / 255.f);
+  gl->uniform1f(spreadOpacityHandle, opacity / 255.f);
+  gl->uniform2f(spreadSizeHandle, spreadSizeX / contentBounds.width(),
+                spreadSizeY / contentBounds.height());
 }
 
 std::vector<Point> DropShadowSpreadFilter::computeVertices(const Rect&, const Rect& outputBounds,
-        const Point& filterScale) {
-    std::vector<Point> vertices = {};
-    Point contentPoint[4] = {{outputBounds.left, outputBounds.bottom},
-        {outputBounds.right, outputBounds.bottom},
-        {outputBounds.left, outputBounds.top},
-        {outputBounds.right, outputBounds.top}
-    };
+                                                           const Point& filterScale) {
+  std::vector<Point> vertices = {};
+  Point contentPoint[4] = {{outputBounds.left, outputBounds.bottom},
+                           {outputBounds.right, outputBounds.bottom},
+                           {outputBounds.left, outputBounds.top},
+                           {outputBounds.right, outputBounds.top}};
 
-    auto spread = layerStyle->spread->getValueAt(layerFrame);
-    auto size = layerStyle->size->getValueAt(layerFrame);
-    auto deltaX = -size * spread * filterScale.x;
-    auto deltaY = -size * spread * filterScale.y;
+  auto spread = layerStyle->spread->getValueAt(layerFrame);
+  auto size = layerStyle->size->getValueAt(layerFrame);
+  auto deltaX = -size * spread * filterScale.x;
+  auto deltaY = -size * spread * filterScale.y;
 
-    Point texturePoints[4] = {{deltaX, (outputBounds.height() + deltaY)},
-        {(outputBounds.width() + deltaX), (outputBounds.height() + deltaY)},
-        {deltaX, deltaY},
-        {(outputBounds.width() + deltaX), deltaY}
-    };
-    for (int ii = 0; ii < 4; ii++) {
-        vertices.push_back(contentPoint[ii]);
-        vertices.push_back(texturePoints[ii]);
-    }
-    return vertices;
+  Point texturePoints[4] = {{deltaX, (outputBounds.height() + deltaY)},
+                            {(outputBounds.width() + deltaX), (outputBounds.height() + deltaY)},
+                            {deltaX, deltaY},
+                            {(outputBounds.width() + deltaX), deltaY}};
+  for (int ii = 0; ii < 4; ii++) {
+    vertices.push_back(contentPoint[ii]);
+    vertices.push_back(texturePoints[ii]);
+  }
+  return vertices;
 }
 }  // namespace pag

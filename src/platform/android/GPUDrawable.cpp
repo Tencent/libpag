@@ -21,53 +21,53 @@
 
 namespace pag {
 std::shared_ptr<GPUDrawable> GPUDrawable::FromWindow(ANativeWindow* nativeWindow,
-        EGLContext sharedContext) {
-    if (nativeWindow == nullptr) {
-        LOGE("GPUDrawable.FromWindow() The nativeWindow is invalid.");
-        return nullptr;
-    }
-    return std::shared_ptr<GPUDrawable>(new GPUDrawable(nativeWindow, sharedContext));
+                                                     EGLContext sharedContext) {
+  if (nativeWindow == nullptr) {
+    LOGE("GPUDrawable.FromWindow() The nativeWindow is invalid.");
+    return nullptr;
+  }
+  return std::shared_ptr<GPUDrawable>(new GPUDrawable(nativeWindow, sharedContext));
 }
 
 GPUDrawable::GPUDrawable(ANativeWindow* nativeWindow, EGLContext eglContext)
     : nativeWindow(nativeWindow), sharedContext(eglContext) {
-    updateSize();
+  updateSize();
 }
 
 GPUDrawable::~GPUDrawable() {
-    ANativeWindow_release(nativeWindow);
+  ANativeWindow_release(nativeWindow);
 }
 
 void GPUDrawable::updateSize() {
-    if (nativeWindow != nullptr) {
-        _width = ANativeWindow_getWidth(nativeWindow);
-        _height = ANativeWindow_getHeight(nativeWindow);
-    }
+  if (nativeWindow != nullptr) {
+    _width = ANativeWindow_getWidth(nativeWindow);
+    _height = ANativeWindow_getHeight(nativeWindow);
+  }
 }
 
 std::shared_ptr<Device> GPUDrawable::getDevice() {
-    if (_width <= 0 || _height <= 0) {
-        return nullptr;
-    }
-    if (window == nullptr) {
-        window = EGLWindow::MakeFrom(nativeWindow, sharedContext);
-    }
-    return window ? window->getDevice() : nullptr;
+  if (_width <= 0 || _height <= 0) {
+    return nullptr;
+  }
+  if (window == nullptr) {
+    window = EGLWindow::MakeFrom(nativeWindow, sharedContext);
+  }
+  return window ? window->getDevice() : nullptr;
 }
 
 std::shared_ptr<Surface> GPUDrawable::createSurface(Context* context) {
-    return window ? window->createSurface(context) : nullptr;
+  return window ? window->createSurface(context) : nullptr;
 }
 
 void GPUDrawable::present(Context* context) {
-    if (window == nullptr) {
-        return;
-    }
-    return window->present(context, currentTimeStamp);
+  if (window == nullptr) {
+    return;
+  }
+  return window->present(context, currentTimeStamp);
 }
 
 void GPUDrawable::setTimeStamp(int64_t timeStamp) {
-    currentTimeStamp = timeStamp;
+  currentTimeStamp = timeStamp;
 }
 
 }  // namespace pag

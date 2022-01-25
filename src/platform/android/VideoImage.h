@@ -24,21 +24,21 @@
 
 namespace pag {
 class VideoImage : public VideoBuffer {
-public:
-    static std::shared_ptr<VideoImage> MakeFrom(std::shared_ptr<VideoSurface> videoSurface, int width,
-            int height);
+ public:
+  static std::shared_ptr<VideoImage> MakeFrom(std::shared_ptr<VideoSurface> videoSurface, int width,
+                                              int height);
 
-    size_t planeCount() const override {
-        return 1;
-    }
+  size_t planeCount() const override {
+    return 1;
+  }
 
-protected:
-    std::shared_ptr<Texture> makeTexture(Context* context) const override;
+ protected:
+  std::shared_ptr<Texture> makeTexture(Context* context) const override;
 
-private:
-    mutable std::mutex locker = {};
-    std::shared_ptr<VideoSurface> videoSurface = nullptr;
+ private:
+  mutable std::mutex locker = {};
+  std::shared_ptr<VideoSurface> videoSurface = nullptr;
 
-    VideoImage(std::shared_ptr<VideoSurface> videoSurface, int width, int height);
+  VideoImage(std::shared_ptr<VideoSurface> videoSurface, int width, int height);
 };
 }  // namespace pag

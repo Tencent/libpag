@@ -22,6 +22,6 @@
 
 namespace pag {
 class NativePlatform : public Platform {
-public:
+ public:
 };
 }  // namespace pag

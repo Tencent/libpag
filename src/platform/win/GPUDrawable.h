@@ -24,32 +24,32 @@ namespace pag {
 class EGLWindow;
 
 class GPUDrawable : public Drawable {
-public:
-    static std::shared_ptr<GPUDrawable> FromWindow(void* nativeWindow, void* sharedContext = nullptr);
+ public:
+  static std::shared_ptr<GPUDrawable> FromWindow(void* nativeWindow, void* sharedContext = nullptr);
 
-    int width() const override {
-        return _width;
-    }
+  int width() const override {
+    return _width;
+  }
 
-    int height() const override {
-        return _height;
-    }
+  int height() const override {
+    return _height;
+  }
 
-    void updateSize() override;
+  void updateSize() override;
 
-    std::shared_ptr<Device> getDevice() override;
+  std::shared_ptr<Device> getDevice() override;
 
-    std::shared_ptr<Surface> createSurface(Context* context) override;
+  std::shared_ptr<Surface> createSurface(Context* context) override;
 
-    void present(Context* context) override;
+  void present(Context* context) override;
 
-private:
-    int _width = 0;
-    int _height = 0;
-    std::shared_ptr<EGLWindow> window = nullptr;
-    void* nativeWindow = nullptr;
-    void* sharedContext = nullptr;
+ private:
+  int _width = 0;
+  int _height = 0;
+  std::shared_ptr<EGLWindow> window = nullptr;
+  void* nativeWindow = nullptr;
+  void* sharedContext = nullptr;
 
-    GPUDrawable(void* nativeWindow, void* sharedContext);
+  GPUDrawable(void* nativeWindow, void* sharedContext);
 };
 }  // namespace pag

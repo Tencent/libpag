@@ -69,10 +69,10 @@
 __attribute__((visibility("default")))
 @interface PAGView : NSView
 
-    /**
-     * Adds a listener to the set of listeners that are sent events through the life of an animation,
-     * such as start, repeat, and end.
-     */
+/**
+ * Adds a listener to the set of listeners that are sent events through the life of an animation,
+ * such as start, repeat, and end.
+ */
 - (void)addListener:(id<PAGViewListener>)listener;
 
 /**

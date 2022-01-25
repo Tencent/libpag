@@ -22,28 +22,28 @@
 namespace pag {
 TransformCache::TransformCache(Layer* layer)
     : FrameCache<Transform>(layer->startTime, layer->duration), layer(layer) {
-    std::vector<TimeRange> timeRanges = {layer->visibleRange()};
-    layer->transform->excludeVaryingRanges(&timeRanges);
-    auto parent = layer->parent;
-    while (parent != nullptr) {
-        parent->transform->excludeVaryingRanges(&timeRanges);
-        SplitTimeRangesAt(&timeRanges, parent->startTime);
-        SplitTimeRangesAt(&timeRanges, parent->startTime + parent->duration);
-        parent = parent->parent;
-    }
-    staticTimeRanges = OffsetTimeRanges(timeRanges, -layer->startTime);
+  std::vector<TimeRange> timeRanges = {layer->visibleRange()};
+  layer->transform->excludeVaryingRanges(&timeRanges);
+  auto parent = layer->parent;
+  while (parent != nullptr) {
+    parent->transform->excludeVaryingRanges(&timeRanges);
+    SplitTimeRangesAt(&timeRanges, parent->startTime);
+    SplitTimeRangesAt(&timeRanges, parent->startTime + parent->duration);
+    parent = parent->parent;
+  }
+  staticTimeRanges = OffsetTimeRanges(timeRanges, -layer->startTime);
 }
 
 Transform* TransformCache::createCache(Frame layerFrame) {
-    auto transform = new Transform();
-    RenderTransform(transform, layer->transform, layerFrame);
-    auto parent = layer->parent;
-    while (parent != nullptr) {
-        Transform parentTransform = {};
-        RenderTransform(&parentTransform, parent->transform, layerFrame);
-        transform->matrix.postConcat(parentTransform.matrix);
-        parent = parent->parent;
-    }
-    return transform;
+  auto transform = new Transform();
+  RenderTransform(transform, layer->transform, layerFrame);
+  auto parent = layer->parent;
+  while (parent != nullptr) {
+    Transform parentTransform = {};
+    RenderTransform(&parentTransform, parent->transform, layerFrame);
+    transform->matrix.postConcat(parentTransform.matrix);
+    parent = parent->parent;
+  }
+  return transform;
 }
 }  // namespace pag

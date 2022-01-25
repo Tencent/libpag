@@ -26,47 +26,47 @@
 
 namespace pag {
 class PAGCpuTest : public testing::Test {
-public:
-    PAGCpuTest();
+ public:
+  PAGCpuTest();
 
-    ~PAGCpuTest() override;
+  ~PAGCpuTest() override;
 
-    /**
-     * Sets up the test suite.
-     */
-    static void SetUpTestSuite();
+  /**
+   * Sets up the test suite.
+   */
+  static void SetUpTestSuite();
 
-    /**
-     * Sets down the test suite.
-     */
-    static void TearDownTestSuite();
+  /**
+   * Sets down the test suite.
+   */
+  static void TearDownTestSuite();
 
-    /**
-     * Sets up the test case.
-     */
-    void SetUp() override;
+  /**
+   * Sets up the test case.
+   */
+  void SetUp() override;
 
-    /**
-     * Sets down the test case.
-     */
-    void TearDown() override;
+  /**
+   * Sets down the test case.
+   */
+  void TearDown() override;
 
-    static void PagSetUp(std::string pagPath);
+  static void PagSetUp(std::string pagPath);
 
-    static void PagTearDown();
+  static void PagTearDown();
 
-    static std::string GetPagPath();
+  static std::string GetPagPath();
 
-    static std::shared_ptr<PAGFile> TestPAGFile;
+  static std::shared_ptr<PAGFile> TestPAGFile;
 
-    static std::shared_ptr<PAGSurface> TestPAGSurface;
+  static std::shared_ptr<PAGSurface> TestPAGSurface;
 
-    static std::shared_ptr<PAGPlayer> TestPAGPlayer;
+  static std::shared_ptr<PAGPlayer> TestPAGPlayer;
 
-    static std::string getMd5FromSnap();
+  static std::string getMd5FromSnap();
 
-private:
-    GTEST_DISALLOW_COPY_AND_ASSIGN_(PAGCpuTest);
+ private:
+  GTEST_DISALLOW_COPY_AND_ASSIGN_(PAGCpuTest);
 };
 
 }  // namespace pag

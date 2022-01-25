@@ -20,16 +20,16 @@
 
 namespace pag {
 BezierEasing::BezierEasing(const Point& control1, const Point& control2) {
-    bezierPath = BezierPath::Build(Point::Zero(), control1, control2, Point::Make(1, 1), 0.005f);
+  bezierPath = BezierPath::Build(Point::Zero(), control1, control2, Point::Make(1, 1), 0.005f);
 }
 
 float BezierEasing::getInterpolation(float input) {
-    if (input <= 0) {
-        return 0;
-    }
-    if (input >= 1) {
-        return 1;
-    }
-    return bezierPath->getY(input);
+  if (input <= 0) {
+    return 0;
+  }
+  if (input >= 1) {
+    return 1;
+  }
+  return bezierPath->getY(input);
 }
 }  // namespace pag

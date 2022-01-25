@@ -21,6 +21,6 @@
 namespace pag {
 SequenceReader::SequenceReader(std::shared_ptr<File> file, Sequence* sequence)
     : file(std::move(file)), sequence(sequence) {
-    staticContent = sequence->composition->staticContent();
+  staticContent = sequence->composition->staticContent();
 }
 }  // namespace pag

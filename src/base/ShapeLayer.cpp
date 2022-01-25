@@ -22,30 +22,30 @@
 
 namespace pag {
 ShapeLayer::~ShapeLayer() {
-    for (auto& element : contents) {
-        delete element;
-    }
+  for (auto& element : contents) {
+    delete element;
+  }
 }
 
 void ShapeLayer::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) {
-    Layer::excludeVaryingRanges(timeRanges);
-    for (auto& element : contents) {
-        element->excludeVaryingRanges(timeRanges);
-    }
+  Layer::excludeVaryingRanges(timeRanges);
+  for (auto& element : contents) {
+    element->excludeVaryingRanges(timeRanges);
+  }
 }
 
 bool ShapeLayer::verify() const {
-    if (!Layer::verify()) {
-        VerifyFailed();
-        return false;
+  if (!Layer::verify()) {
+    VerifyFailed();
+    return false;
+  }
+  for (auto& element : contents) {
+    if (element == nullptr || !element->verify()) {
+      VerifyFailed();
+      return false;
     }
-    for (auto& element : contents) {
-        if (element == nullptr || !element->verify()) {
-            VerifyFailed();
-            return false;
-        }
-    }
-    return true;
+  }
+  return true;
 }
 
 }  // namespace pag

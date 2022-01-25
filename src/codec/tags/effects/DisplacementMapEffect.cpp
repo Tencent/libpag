@@ -21,20 +21,20 @@
 
 namespace pag {
 std::unique_ptr<BlockConfig> DisplacementMapEffectTag(DisplacementMapEffect* effect) {
-    auto tagConfig = new BlockConfig(TagCode::DisplacementMapEffect);
-    AddAttribute(tagConfig, &effect->displacementMapLayer, AttributeType::Value,
-                 static_cast<Layer*>(nullptr));
-    AddAttribute(tagConfig, &effect->useForHorizontalDisplacement, AttributeType::DiscreteProperty,
-                 DisplacementMapSource::Red);
-    AddAttribute(tagConfig, &effect->maxHorizontalDisplacement, AttributeType::SimpleProperty, 5.0f);
-    AddAttribute(tagConfig, &effect->useForVerticalDisplacement, AttributeType::DiscreteProperty,
-                 DisplacementMapSource::Green);
-    AddAttribute(tagConfig, &effect->maxVerticalDisplacement, AttributeType::SimpleProperty, 5.0f);
-    AddAttribute(tagConfig, &effect->displacementMapBehavior, AttributeType::DiscreteProperty,
-                 DisplacementMapBehavior::CenterMap);
-    AddAttribute(tagConfig, &effect->edgeBehavior, AttributeType::DiscreteProperty, false);
-    AddAttribute(tagConfig, &effect->expandOutput, AttributeType::DiscreteProperty, true);
-    EffectCompositingOptionTag(tagConfig, effect);
-    return std::unique_ptr<BlockConfig>(tagConfig);
+  auto tagConfig = new BlockConfig(TagCode::DisplacementMapEffect);
+  AddAttribute(tagConfig, &effect->displacementMapLayer, AttributeType::Value,
+               static_cast<Layer*>(nullptr));
+  AddAttribute(tagConfig, &effect->useForHorizontalDisplacement, AttributeType::DiscreteProperty,
+               DisplacementMapSource::Red);
+  AddAttribute(tagConfig, &effect->maxHorizontalDisplacement, AttributeType::SimpleProperty, 5.0f);
+  AddAttribute(tagConfig, &effect->useForVerticalDisplacement, AttributeType::DiscreteProperty,
+               DisplacementMapSource::Green);
+  AddAttribute(tagConfig, &effect->maxVerticalDisplacement, AttributeType::SimpleProperty, 5.0f);
+  AddAttribute(tagConfig, &effect->displacementMapBehavior, AttributeType::DiscreteProperty,
+               DisplacementMapBehavior::CenterMap);
+  AddAttribute(tagConfig, &effect->edgeBehavior, AttributeType::DiscreteProperty, false);
+  AddAttribute(tagConfig, &effect->expandOutput, AttributeType::DiscreteProperty, true);
+  EffectCompositingOptionTag(tagConfig, effect);
+  return std::unique_ptr<BlockConfig>(tagConfig);
 }
 }  // namespace pag

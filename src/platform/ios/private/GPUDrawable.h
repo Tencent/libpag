@@ -27,42 +27,42 @@ extern NSString* const kGPURenderTargetBufferPreparedNotification;
 extern NSString* const kPreparedAsync;
 
 class GPUDrawable : public Drawable {
-public:
-    static std::shared_ptr<GPUDrawable> FromLayer(CAEAGLLayer* layer);
+ public:
+  static std::shared_ptr<GPUDrawable> FromLayer(CAEAGLLayer* layer);
 
-    static std::shared_ptr<GPUDrawable> FromCVPixelBuffer(CVPixelBufferRef pixelBuffer,
-            EAGLContext* eaglContext = nil);
+  static std::shared_ptr<GPUDrawable> FromCVPixelBuffer(CVPixelBufferRef pixelBuffer,
+                                                        EAGLContext* eaglContext = nil);
 
-    ~GPUDrawable() override;
+  ~GPUDrawable() override;
 
-    int width() const override;
+  int width() const override;
 
-    int height() const override;
+  int height() const override;
 
-    void updateSize() override;
+  void updateSize() override;
 
-    std::shared_ptr<Device> getDevice() override;
+  std::shared_ptr<Device> getDevice() override;
 
-    std::shared_ptr<Surface> createSurface(Context* context) override;
+  std::shared_ptr<Surface> createSurface(Context* context) override;
 
-    void present(Context* context) override;
+  void present(Context* context) override;
 
-    CVPixelBufferRef getCVPixelBuffer();
+  CVPixelBufferRef getCVPixelBuffer();
 
-private:
-    std::weak_ptr<GPUDrawable> weakThis;
-    int _width = 0;
-    int _height = 0;
-    CAEAGLLayer* layer = nil;
-    CVPixelBufferRef pixelBuffer = nil;
-    EAGLContext* eaglContext = nil;
-    std::shared_ptr<EAGLWindow> window = nullptr;
-    std::shared_ptr<Surface> surface = nullptr;
-    std::atomic<bool> bufferPreparing;
+ private:
+  std::weak_ptr<GPUDrawable> weakThis;
+  int _width = 0;
+  int _height = 0;
+  CAEAGLLayer* layer = nil;
+  CVPixelBufferRef pixelBuffer = nil;
+  EAGLContext* eaglContext = nil;
+  std::shared_ptr<EAGLWindow> window = nullptr;
+  std::shared_ptr<Surface> surface = nullptr;
+  std::atomic<bool> bufferPreparing;
 
-    static bool IsInMainThread();
+  static bool IsInMainThread();
 
-    explicit GPUDrawable(CAEAGLLayer* layer);
-    explicit GPUDrawable(CVPixelBufferRef pixelBuffer);
+  explicit GPUDrawable(CAEAGLLayer* layer);
+  explicit GPUDrawable(CVPixelBufferRef pixelBuffer);
 };
 }  // namespace pag

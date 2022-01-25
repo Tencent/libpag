@@ -59,24 +59,24 @@ RadialBlurFilter::RadialBlurFilter(Effect* effect) : effect(effect) {
 }
 
 std::string RadialBlurFilter::onBuildFragmentShader() {
-    return RADIAL_BLUR_FRAGMENT_SHADER;
+  return RADIAL_BLUR_FRAGMENT_SHADER;
 }
 
 void RadialBlurFilter::onPrepareProgram(const GLInterface* gl, unsigned int program) {
-    amountHandle = gl->getUniformLocation(program, "uAmount");
-    centerHandle = gl->getUniformLocation(program, "uCenter");
+  amountHandle = gl->getUniformLocation(program, "uAmount");
+  centerHandle = gl->getUniformLocation(program, "uCenter");
 }
 
 void RadialBlurFilter::onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
                                       const Point&) {
-    auto* radialBlurEffect = reinterpret_cast<const RadialBlurEffect*>(effect);
-    auto amount = radialBlurEffect->amount->getValueAt(layerFrame) * 0.00625;
-    auto center = radialBlurEffect->center->getValueAt(layerFrame);
+  auto* radialBlurEffect = reinterpret_cast<const RadialBlurEffect*>(effect);
+  auto amount = radialBlurEffect->amount->getValueAt(layerFrame) * 0.00625;
+  auto center = radialBlurEffect->center->getValueAt(layerFrame);
 
-    amount = amount < 0.25 ? amount : 0.25;
+  amount = amount < 0.25 ? amount : 0.25;
 
-    gl->uniform1f(amountHandle, amount);
-    gl->uniform2f(centerHandle, (center.x - contentBounds.x()) / contentBounds.width(),
-                  (center.y - contentBounds.y()) / contentBounds.height());
+  gl->uniform1f(amountHandle, amount);
+  gl->uniform2f(centerHandle, (center.x - contentBounds.x()) / contentBounds.width(),
+                (center.y - contentBounds.y()) / contentBounds.height());
 }
 }  // namespace pag

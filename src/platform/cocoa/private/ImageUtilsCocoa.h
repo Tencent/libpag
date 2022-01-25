@@ -27,5 +27,5 @@ bool ReadPixelsFromCGImage(CGImageRef cgImage, const ImageInfo& dstInfo, void* r
                            CGImagePropertyOrientation orientation = kCGImagePropertyOrientationUp);
 
 CGAffineTransform EncodedOriginToCGAffineTransform(CGImagePropertyOrientation orientation,
-        int* width, int* height);
+                                                   int* width, int* height);
 }  // namespace pag

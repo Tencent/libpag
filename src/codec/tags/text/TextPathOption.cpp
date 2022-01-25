@@ -20,13 +20,13 @@
 
 namespace pag {
 std::unique_ptr<BlockConfig> TextPathOptionTag(TextPathOptions* pathOption) {
-    auto tagConfig = new BlockConfig(TagCode::TextPathOption);
-    AddAttribute(tagConfig, &pathOption->path, AttributeType::Value, static_cast<MaskData*>(nullptr));
-    AddAttribute(tagConfig, &pathOption->reversedPath, AttributeType::DiscreteProperty, false);
-    AddAttribute(tagConfig, &pathOption->perpendicularToPath, AttributeType::DiscreteProperty, true);
-    AddAttribute(tagConfig, &pathOption->forceAlignment, AttributeType::DiscreteProperty, false);
-    AddAttribute(tagConfig, &pathOption->firstMargin, AttributeType::SimpleProperty, 0.0f);
-    AddAttribute(tagConfig, &pathOption->lastMargin, AttributeType::SimpleProperty, 0.0f);
-    return std::unique_ptr<BlockConfig>(tagConfig);
+  auto tagConfig = new BlockConfig(TagCode::TextPathOption);
+  AddAttribute(tagConfig, &pathOption->path, AttributeType::Value, static_cast<MaskData*>(nullptr));
+  AddAttribute(tagConfig, &pathOption->reversedPath, AttributeType::DiscreteProperty, false);
+  AddAttribute(tagConfig, &pathOption->perpendicularToPath, AttributeType::DiscreteProperty, true);
+  AddAttribute(tagConfig, &pathOption->forceAlignment, AttributeType::DiscreteProperty, false);
+  AddAttribute(tagConfig, &pathOption->firstMargin, AttributeType::SimpleProperty, 0.0f);
+  AddAttribute(tagConfig, &pathOption->lastMargin, AttributeType::SimpleProperty, 0.0f);
+  return std::unique_ptr<BlockConfig>(tagConfig);
 }
 }  // namespace pag

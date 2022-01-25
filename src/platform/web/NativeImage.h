@@ -24,22 +24,22 @@
 
 namespace pag {
 class NativeImage : public Image {
-public:
-public:
-    static std::unique_ptr<Image> MakeFrom(const std::shared_ptr<Data>& imageBytes);
+ public:
+ public:
+  static std::unique_ptr<Image> MakeFrom(const std::shared_ptr<Data>& imageBytes);
 
-    static std::unique_ptr<NativeImage> MakeFrom(emscripten::val nativeImage);
+  static std::unique_ptr<NativeImage> MakeFrom(emscripten::val nativeImage);
 
-    std::shared_ptr<TextureBuffer> makeBuffer() const override;
+  std::shared_ptr<TextureBuffer> makeBuffer() const override;
 
-    bool readPixels(const ImageInfo& /*dstInfo*/, void* /*dstPixels*/) const override {
-        return false;
-    }
+  bool readPixels(const ImageInfo& /*dstInfo*/, void* /*dstPixels*/) const override {
+    return false;
+  }
 
-private:
-    emscripten::val nativeImage = emscripten::val::null();
+ private:
+  emscripten::val nativeImage = emscripten::val::null();
 
-    NativeImage(int width, int height) : Image(width, height, Orientation::TopLeft) {
-    }
+  NativeImage(int width, int height) : Image(width, height, Orientation::TopLeft) {
+  }
 };
 }  // namespace pag

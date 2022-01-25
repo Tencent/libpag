@@ -24,110 +24,110 @@
 namespace pag {
 
 static bool TransformIllegal(Transform* transform) {
-    return transform && !transform->visible();
+  return transform && !transform->visible();
 }
 
 static bool TrackMatteIsEmpty(TrackMatte* trackMatte) {
-    if (trackMatte == nullptr) {
-        return false;
-    }
-    return trackMatte->modifier->isEmpty();
+  if (trackMatte == nullptr) {
+    return false;
+  }
+  return trackMatte->modifier->isEmpty();
 }
 
 void LayerRenderer::DrawLayer(Recorder* recorder, Layer* layer, Frame layerFrame,
                               std::shared_ptr<FilterModifier> filterModifier,
                               TrackMatte* trackMatte, Content* layerContent,
                               Transform* extraTransform) {
-    if (TransformIllegal(extraTransform) || TrackMatteIsEmpty(trackMatte)) {
-        return;
-    }
-    auto contentFrame = layerFrame - layer->startTime;
-    auto layerCache = LayerCache::Get(layer);
-    if (!layerCache->contentVisible(contentFrame)) {
-        return;
-    }
-    auto content = layerContent ? layerContent : layerCache->getContent(contentFrame);
-    auto layerTransform = layerCache->getTransform(contentFrame);
-    auto opacity = layerTransform->opacity;
-    if (extraTransform) {
-        opacity = OpacityConcat(opacity, extraTransform->opacity);
-    }
-    recorder->saveLayer(opacity, layer->blendMode);
-    if (trackMatte) {
-        recorder->saveLayer(trackMatte->modifier);
-    }
-    auto saveCount = recorder->getSaveCount();
-    if (extraTransform) {
-        recorder->concat(extraTransform->matrix);
-    }
-    recorder->concat(layerTransform->matrix);
-    if (filterModifier) {
-        recorder->saveLayer(filterModifier);
-    }
-    auto masks = layerCache->getMasks(contentFrame);
-    if (masks) {
-        recorder->saveClip(*masks);
-    }
-    content->draw(recorder);
-    recorder->restoreToCount(saveCount);
-    if (trackMatte) {
-        recorder->restore();
-        // 若遮罩图层是文本图层，对内部自带颜色的字符（如 emoji ）多执行一次叠加的绘制，
-        // 让自带颜色的字符能正常显示出来。
-        recorder->drawGraphic(trackMatte->colorGlyphs);
-    }
+  if (TransformIllegal(extraTransform) || TrackMatteIsEmpty(trackMatte)) {
+    return;
+  }
+  auto contentFrame = layerFrame - layer->startTime;
+  auto layerCache = LayerCache::Get(layer);
+  if (!layerCache->contentVisible(contentFrame)) {
+    return;
+  }
+  auto content = layerContent ? layerContent : layerCache->getContent(contentFrame);
+  auto layerTransform = layerCache->getTransform(contentFrame);
+  auto opacity = layerTransform->opacity;
+  if (extraTransform) {
+    opacity = OpacityConcat(opacity, extraTransform->opacity);
+  }
+  recorder->saveLayer(opacity, layer->blendMode);
+  if (trackMatte) {
+    recorder->saveLayer(trackMatte->modifier);
+  }
+  auto saveCount = recorder->getSaveCount();
+  if (extraTransform) {
+    recorder->concat(extraTransform->matrix);
+  }
+  recorder->concat(layerTransform->matrix);
+  if (filterModifier) {
+    recorder->saveLayer(filterModifier);
+  }
+  auto masks = layerCache->getMasks(contentFrame);
+  if (masks) {
+    recorder->saveClip(*masks);
+  }
+  content->draw(recorder);
+  recorder->restoreToCount(saveCount);
+  if (trackMatte) {
     recorder->restore();
+    // 若遮罩图层是文本图层，对内部自带颜色的字符（如 emoji ）多执行一次叠加的绘制，
+    // 让自带颜色的字符能正常显示出来。
+    recorder->drawGraphic(trackMatte->colorGlyphs);
+  }
+  recorder->restore();
 }
 
 static void ApplyClipToBounds(const Path& clipPath, Rect* bounds) {
-    if (!clipPath.isInverseFillType()) {
-        auto clipBounds = clipPath.getBounds();
-        if (!bounds->intersect(clipBounds)) {
-            bounds->setEmpty();
-        }
-        return;
+  if (!clipPath.isInverseFillType()) {
+    auto clipBounds = clipPath.getBounds();
+    if (!bounds->intersect(clipBounds)) {
+      bounds->setEmpty();
     }
-    Path boundsPath = {};
-    boundsPath.addRect(*bounds);
-    boundsPath.addPath(clipPath, PathOp::Intersect);
-    *bounds = boundsPath.getBounds();
+    return;
+  }
+  Path boundsPath = {};
+  boundsPath.addRect(*bounds);
+  boundsPath.addPath(clipPath, PathOp::Intersect);
+  *bounds = boundsPath.getBounds();
 }
 
 static bool boundsIsEmpty(Rect* bounds) {
-    return bounds && bounds->isEmpty();
+  return bounds && bounds->isEmpty();
 }
 
 void LayerRenderer::MeasureLayerBounds(Rect* bounds, Layer* layer, Frame layerFrame,
                                        std::shared_ptr<FilterModifier> filterModifier,
                                        Rect* trackMatteBounds, Content* layerContent,
                                        Transform* extraTransform) {
-    bounds->setEmpty();
-    if (TransformIllegal(extraTransform) || boundsIsEmpty(trackMatteBounds)) {
-        return;
+  bounds->setEmpty();
+  if (TransformIllegal(extraTransform) || boundsIsEmpty(trackMatteBounds)) {
+    return;
+  }
+  auto contentFrame = layerFrame - layer->startTime;
+  auto layerCache = LayerCache::Get(layer);
+  if (!layerCache->contentVisible(contentFrame)) {
+    return;
+  }
+  auto content = layerContent ? layerContent : layerCache->getContent(contentFrame);
+  auto masks = layerCache->getMasks(contentFrame);
+  content->measureBounds(bounds);
+  if (masks) {
+    ApplyClipToBounds(*masks, bounds);
+  }
+  if (filterModifier) {
+    FilterRenderer::MeasureFilterBounds(bounds, filterModifier.get());
+  }
+  auto layerMatrix = layerCache->getTransform(contentFrame)->matrix;
+  if (extraTransform) {
+    layerMatrix.postConcat(extraTransform->matrix);
+  }
+  layerMatrix.mapRect(bounds);
+  if (trackMatteBounds != nullptr) {
+    if (!bounds->intersect(*trackMatteBounds)) {
+      bounds->setEmpty();
     }
-    auto contentFrame = layerFrame - layer->startTime;
-    auto layerCache = LayerCache::Get(layer);
-    if (!layerCache->contentVisible(contentFrame)) {
-        return;
-    }
-    auto content = layerContent ? layerContent : layerCache->getContent(contentFrame);
-    auto masks = layerCache->getMasks(contentFrame);
-    content->measureBounds(bounds);
-    if (masks) {
-        ApplyClipToBounds(*masks, bounds);
-    }
-    if (filterModifier) {
-        FilterRenderer::MeasureFilterBounds(bounds, filterModifier.get());
-    }
-    auto layerMatrix = layerCache->getTransform(contentFrame)->matrix;
-    if (extraTransform) {
-        layerMatrix.postConcat(extraTransform->matrix);
-    }
-    layerMatrix.mapRect(bounds);
-    if (trackMatteBounds != nullptr) {
-        if (!bounds->intersect(*trackMatteBounds)) {
-            bounds->setEmpty();
-        }
-    }
+  }
 }
 }  // namespace pag

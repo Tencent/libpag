@@ -23,37 +23,37 @@
 
 namespace pag {
 class GPUDrawable : public Drawable {
-public:
-    static std::shared_ptr<GPUDrawable> FromView(NSView* view);
+ public:
+  static std::shared_ptr<GPUDrawable> FromView(NSView* view);
 
-    static std::shared_ptr<GPUDrawable> FromCVPixelBuffer(CVPixelBufferRef pixelBuffer);
+  static std::shared_ptr<GPUDrawable> FromCVPixelBuffer(CVPixelBufferRef pixelBuffer);
 
-    ~GPUDrawable() override;
+  ~GPUDrawable() override;
 
-    int width() const override {
-        return _width;
-    }
+  int width() const override {
+    return _width;
+  }
 
-    int height() const override {
-        return _height;
-    }
+  int height() const override {
+    return _height;
+  }
 
-    void updateSize() override;
+  void updateSize() override;
 
-    std::shared_ptr<Device> getDevice() override;
+  std::shared_ptr<Device> getDevice() override;
 
-    std::shared_ptr<Surface> createSurface(Context* context) override;
+  std::shared_ptr<Surface> createSurface(Context* context) override;
 
-    void present(Context* context) override;
+  void present(Context* context) override;
 
-private:
-    int _width = 0;
-    int _height = 0;
-    NSView* view = nil;
-    CVPixelBufferRef pixelBuffer = nil;
-    std::shared_ptr<CGLWindow> window = nullptr;
+ private:
+  int _width = 0;
+  int _height = 0;
+  NSView* view = nil;
+  CVPixelBufferRef pixelBuffer = nil;
+  std::shared_ptr<CGLWindow> window = nullptr;
 
-    explicit GPUDrawable(NSView* view);
-    explicit GPUDrawable(CVPixelBufferRef pixelBuffer);
+  explicit GPUDrawable(NSView* view);
+  explicit GPUDrawable(CVPixelBufferRef pixelBuffer);
 };
 }  // namespace pag

@@ -20,35 +20,35 @@
 
 namespace pag {
 TextReplacement::TextReplacement(PAGTextLayer* pagLayer) : pagLayer(pagLayer) {
-    auto textLayer = static_cast<TextLayer*>(pagLayer->layer);
-    sourceText = new Property<TextDocumentHandle>();
-    auto textData = TextDocumentHandle(new TextDocument());
-    *textData = *(textLayer->sourceText->value);
-    sourceText->value = textData;
-    textContentCache = new TextContentCache(textLayer, pagLayer->uniqueID(), sourceText);
-    textContentCache->update();
+  auto textLayer = static_cast<TextLayer*>(pagLayer->layer);
+  sourceText = new Property<TextDocumentHandle>();
+  auto textData = TextDocumentHandle(new TextDocument());
+  *textData = *(textLayer->sourceText->value);
+  sourceText->value = textData;
+  textContentCache = new TextContentCache(textLayer, pagLayer->uniqueID(), sourceText);
+  textContentCache->update();
 }
 
 TextReplacement::~TextReplacement() {
-    delete textContentCache;
-    delete sourceText;
+  delete textContentCache;
+  delete sourceText;
 }
 
 Content* TextReplacement::getContent(Frame contentFrame) {
-    if (textContentCache == nullptr) {
-        auto textLayer = static_cast<TextLayer*>(pagLayer->layer);
-        textContentCache = new TextContentCache(textLayer, pagLayer->uniqueID(), sourceText);
-        textContentCache->update();
-    }
-    return textContentCache->getCache(contentFrame);
+  if (textContentCache == nullptr) {
+    auto textLayer = static_cast<TextLayer*>(pagLayer->layer);
+    textContentCache = new TextContentCache(textLayer, pagLayer->uniqueID(), sourceText);
+    textContentCache->update();
+  }
+  return textContentCache->getCache(contentFrame);
 }
 
 TextDocument* TextReplacement::getTextDocument() {
-    return sourceText->value.get();
+  return sourceText->value.get();
 }
 
 void TextReplacement::clearCache() {
-    delete textContentCache;
-    textContentCache = nullptr;
+  delete textContentCache;
+  textContentCache = nullptr;
 }
 }  // namespace pag

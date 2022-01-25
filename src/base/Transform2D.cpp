@@ -21,45 +21,45 @@
 
 namespace pag {
 Transform2D* Transform2D::MakeDefault() {
-    auto transform = new Transform2D();
-    transform->anchorPoint = new Property<Point>();
-    transform->anchorPoint->value = Point::Zero();
-    transform->position = new Property<Point>();
-    transform->position->value = Point::Zero();
-    transform->scale = new Property<Point>();
-    transform->scale->value = Point::Make(1, 1);
-    transform->rotation = new Property<float>();
-    transform->rotation->value = 0.0f;
-    transform->opacity = new Property<Opacity>();
-    transform->opacity->value = Opaque;
-    return transform;
+  auto transform = new Transform2D();
+  transform->anchorPoint = new Property<Point>();
+  transform->anchorPoint->value = Point::Zero();
+  transform->position = new Property<Point>();
+  transform->position->value = Point::Zero();
+  transform->scale = new Property<Point>();
+  transform->scale->value = Point::Make(1, 1);
+  transform->rotation = new Property<float>();
+  transform->rotation->value = 0.0f;
+  transform->opacity = new Property<Opacity>();
+  transform->opacity->value = Opaque;
+  return transform;
 }
 Transform2D::~Transform2D() {
-    delete anchorPoint;
-    delete position;
-    delete xPosition;
-    delete yPosition;
-    delete scale;
-    delete rotation;
-    delete opacity;
+  delete anchorPoint;
+  delete position;
+  delete xPosition;
+  delete yPosition;
+  delete scale;
+  delete rotation;
+  delete opacity;
 }
 
 void Transform2D::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {
-    anchorPoint->excludeVaryingRanges(timeRanges);
-    if (position != nullptr) {
-        position->excludeVaryingRanges(timeRanges);
-    } else {
-        xPosition->excludeVaryingRanges(timeRanges);
-        yPosition->excludeVaryingRanges(timeRanges);
-    }
-    scale->excludeVaryingRanges(timeRanges);
-    rotation->excludeVaryingRanges(timeRanges);
-    opacity->excludeVaryingRanges(timeRanges);
+  anchorPoint->excludeVaryingRanges(timeRanges);
+  if (position != nullptr) {
+    position->excludeVaryingRanges(timeRanges);
+  } else {
+    xPosition->excludeVaryingRanges(timeRanges);
+    yPosition->excludeVaryingRanges(timeRanges);
+  }
+  scale->excludeVaryingRanges(timeRanges);
+  rotation->excludeVaryingRanges(timeRanges);
+  opacity->excludeVaryingRanges(timeRanges);
 }
 
 bool Transform2D::verify() const {
-    VerifyAndReturn(anchorPoint != nullptr &&
-                    (position != nullptr || (xPosition != nullptr && yPosition != nullptr)) &&
-                    scale != nullptr && rotation != nullptr && opacity != nullptr);
+  VerifyAndReturn(anchorPoint != nullptr &&
+                  (position != nullptr || (xPosition != nullptr && yPosition != nullptr)) &&
+                  scale != nullptr && rotation != nullptr && opacity != nullptr);
 }
 }  // namespace pag

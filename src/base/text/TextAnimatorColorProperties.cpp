@@ -21,20 +21,20 @@
 
 namespace pag {
 TextAnimatorColorProperties::~TextAnimatorColorProperties() {
-    delete fillColor;
-    delete strokeColor;
+  delete fillColor;
+  delete strokeColor;
 }
 
 void TextAnimatorColorProperties::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {
-    if (fillColor != nullptr) {
-        fillColor->excludeVaryingRanges(timeRanges);
-    }
-    if (strokeColor != nullptr) {
-        strokeColor->excludeVaryingRanges(timeRanges);
-    }
+  if (fillColor != nullptr) {
+    fillColor->excludeVaryingRanges(timeRanges);
+  }
+  if (strokeColor != nullptr) {
+    strokeColor->excludeVaryingRanges(timeRanges);
+  }
 }
 
 bool TextAnimatorColorProperties::verify() const {
-    VerifyAndReturn(fillColor != nullptr || strokeColor != nullptr);
+  VerifyAndReturn(fillColor != nullptr || strokeColor != nullptr);
 }
 }  // namespace pag

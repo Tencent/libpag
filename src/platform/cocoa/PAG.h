@@ -20,9 +20,9 @@
 
 __attribute__((visibility("default")))
 @interface PAG : NSObject
-    /**
-     * Get SDK version information.
-     */
+/**
+ * Get SDK version information.
+ */
 + (NSString*)SDKVersion;
 
 @end

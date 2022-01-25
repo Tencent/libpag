@@ -83,67 +83,67 @@ static const char MOTIONBLUR_FRAGMENT_SHADER[] = R"(
     )";
 
 void MotionBlurFilter::TransformBounds(Rect* bounds, const Point&, Layer* layer, Frame layerFrame) {
-    auto contentFrame = layerFrame - layer->startTime;
-    auto layerCache = LayerCache::Get(layer);
-    auto previousMatrix = layerCache->getTransform(contentFrame > 0 ? contentFrame - 1 : 0)->matrix;
-    auto currentMatrix = layerCache->getTransform(contentFrame)->matrix;
-    if (previousMatrix != currentMatrix) {
-        auto width = bounds->width() * MOTION_BLUR_SCALE_FACTOR;
-        auto height = bounds->height() * MOTION_BLUR_SCALE_FACTOR;
-        auto x = bounds->x() + (bounds->width() - width) * 0.5f;
-        auto y = bounds->y() + (bounds->height() - height) * 0.5f;
-        bounds->setXYWH(x, y, width, height);
-    }
+  auto contentFrame = layerFrame - layer->startTime;
+  auto layerCache = LayerCache::Get(layer);
+  auto previousMatrix = layerCache->getTransform(contentFrame > 0 ? contentFrame - 1 : 0)->matrix;
+  auto currentMatrix = layerCache->getTransform(contentFrame)->matrix;
+  if (previousMatrix != currentMatrix) {
+    auto width = bounds->width() * MOTION_BLUR_SCALE_FACTOR;
+    auto height = bounds->height() * MOTION_BLUR_SCALE_FACTOR;
+    auto x = bounds->x() + (bounds->width() - width) * 0.5f;
+    auto y = bounds->y() + (bounds->height() - height) * 0.5f;
+    bounds->setXYWH(x, y, width, height);
+  }
 }
 
 MotionBlurFilter::MotionBlurFilter() {
 }
 
 std::string MotionBlurFilter::onBuildVertexShader() {
-    return MOTIONBLUR_VERTEX_SHADER;
+  return MOTIONBLUR_VERTEX_SHADER;
 }
 
 std::string MotionBlurFilter::onBuildFragmentShader() {
-    return MOTIONBLUR_FRAGMENT_SHADER;
+  return MOTIONBLUR_FRAGMENT_SHADER;
 }
 
 void MotionBlurFilter::onPrepareProgram(const GLInterface* gl, unsigned int program) {
-    prevTransformHandle = gl->getUniformLocation(program, "uPrevTransform");
-    transformHandle = gl->getUniformLocation(program, "uTransform");
-    velCenterHandle = gl->getUniformLocation(program, "uVelCenter");
-    maxDistanceHandle = gl->getUniformLocation(program, "maxDistance");
+  prevTransformHandle = gl->getUniformLocation(program, "uPrevTransform");
+  transformHandle = gl->getUniformLocation(program, "uTransform");
+  velCenterHandle = gl->getUniformLocation(program, "uVelCenter");
+  maxDistanceHandle = gl->getUniformLocation(program, "maxDistance");
 }
 
 bool MotionBlurFilter::updateLayer(Layer* targetLayer, Frame layerFrame) {
-    auto contentFrame = layerFrame - targetLayer->startTime;
-    auto layerCache = LayerCache::Get(targetLayer);
-    previousMatrix = layerCache->getTransform(contentFrame > 0 ? contentFrame - 1 : 0)->matrix;
-    currentMatrix = layerCache->getTransform(contentFrame)->matrix;
-    return previousMatrix != currentMatrix;
+  auto contentFrame = layerFrame - targetLayer->startTime;
+  auto layerCache = LayerCache::Get(targetLayer);
+  previousMatrix = layerCache->getTransform(contentFrame > 0 ? contentFrame - 1 : 0)->matrix;
+  currentMatrix = layerCache->getTransform(contentFrame)->matrix;
+  return previousMatrix != currentMatrix;
 }
 
 void MotionBlurFilter::onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
                                       const Point&) {
-    auto width = static_cast<int>(contentBounds.width());
-    auto height = static_cast<int>(contentBounds.height());
-    auto origin = ImageOrigin::BottomLeft;
+  auto width = static_cast<int>(contentBounds.width());
+  auto height = static_cast<int>(contentBounds.height());
+  auto origin = ImageOrigin::BottomLeft;
 
-    previousMatrix.preTranslate(contentBounds.left, contentBounds.top);
-    currentMatrix.preTranslate(contentBounds.left, contentBounds.top);
-    std::array<float, 9> previousGLMatrix = ToGLTextureMatrix(previousMatrix, width, height, origin);
-    std::array<float, 9> currentGLMatrix = ToGLTextureMatrix(currentMatrix, width, height, origin);
+  previousMatrix.preTranslate(contentBounds.left, contentBounds.top);
+  currentMatrix.preTranslate(contentBounds.left, contentBounds.top);
+  std::array<float, 9> previousGLMatrix = ToGLTextureMatrix(previousMatrix, width, height, origin);
+  std::array<float, 9> currentGLMatrix = ToGLTextureMatrix(currentMatrix, width, height, origin);
 
-    auto scaling = (previousMatrix.getScaleX() != currentMatrix.getScaleX() ||
-                    previousMatrix.getScaleY() != currentMatrix.getScaleY());
+  auto scaling = (previousMatrix.getScaleX() != currentMatrix.getScaleX() ||
+                  previousMatrix.getScaleY() != currentMatrix.getScaleY());
 
-    gl->uniformMatrix3fv(prevTransformHandle, 1, GL::FALSE, previousGLMatrix.data());
-    gl->uniformMatrix3fv(transformHandle, 1, GL::FALSE, currentGLMatrix.data());
-    gl->uniform1f(velCenterHandle, scaling ? 0.0f : 0.5f);
-    gl->uniform1f(maxDistanceHandle, (MOTION_BLUR_SCALE_FACTOR - 1.0) * 0.5f);
+  gl->uniformMatrix3fv(prevTransformHandle, 1, GL::FALSE, previousGLMatrix.data());
+  gl->uniformMatrix3fv(transformHandle, 1, GL::FALSE, currentGLMatrix.data());
+  gl->uniform1f(velCenterHandle, scaling ? 0.0f : 0.5f);
+  gl->uniform1f(maxDistanceHandle, (MOTION_BLUR_SCALE_FACTOR - 1.0) * 0.5f);
 }
 
 std::vector<Point> MotionBlurFilter::computeVertices(const Rect& inputBounds,
-        const Rect& outputBounds, const Point&) {
-    return ComputeVerticesForMotionBlurAndBulge(inputBounds, outputBounds);
+                                                     const Rect& outputBounds, const Point&) {
+  return ComputeVerticesForMotionBlurAndBulge(inputBounds, outputBounds);
 }
 }  // namespace pag

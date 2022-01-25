@@ -43,234 +43,229 @@ namespace pag {
   }
 
 void ReadTagsOfLayer(DecodeStream* stream, TagCode code, Layer* layer) {
-    switch (code) {
+  switch (code) {
     case TagCode::LayerAttributes:
-        ReadTagBlock(stream, layer, LayerAttributesTag);
-        if (layer->duration <= 0) {
-            layer->duration = 1;  // The duration can not be zero, fix it when the value is parsed from
-            // an old file format.
-        }
-        break;
+      ReadTagBlock(stream, layer, LayerAttributesTag);
+      if (layer->duration <= 0) {
+        layer->duration = 1;  // The duration can not be zero, fix it when the value is parsed from
+                              // an old file format.
+      }
+      break;
     case TagCode::LayerAttributesV2:
-        ReadTagBlock(stream, layer, LayerAttributesTagV2);
-        if (layer->duration <= 0) {
-            layer->duration = 1;  // The duration can not be zero, fix it when the value is parsed from
-            // an old file format.
-        }
-        break;
+      ReadTagBlock(stream, layer, LayerAttributesTagV2);
+      if (layer->duration <= 0) {
+        layer->duration = 1;  // The duration can not be zero, fix it when the value is parsed from
+                              // an old file format.
+      }
+      break;
     case TagCode::LayerAttributesV3:
-        ReadTagBlock(stream, layer, LayerAttributesTagV3);
-        if (layer->duration <= 0) {
-            layer->duration = 1;  // The duration can not be zero, fix it when the value is parsed from
-            // an old file format.
-        }
-        break;
+      ReadTagBlock(stream, layer, LayerAttributesTagV3);
+      if (layer->duration <= 0) {
+        layer->duration = 1;  // The duration can not be zero, fix it when the value is parsed from
+                              // an old file format.
+      }
+      break;
     case TagCode::LayerAttributesExtra:
-        ReadTagBlock(stream, layer, LayerAttributesExtraTag);
-        break;
+      ReadTagBlock(stream, layer, LayerAttributesExtraTag);
+      break;
     case TagCode::MaskBlock: {
-        auto mask = ReadTagBlock(stream, MaskTag);
-        layer->masks.push_back(mask);
-    }
-    break;
+      auto mask = ReadTagBlock(stream, MaskTag);
+      layer->masks.push_back(mask);
+    } break;
     case TagCode::MarkerList: {
-        ReadMarkerList(stream, &layer->markers);
-    }
-    break;
+      ReadMarkerList(stream, &layer->markers);
+    } break;
     case TagCode::Transform2D: {
-        layer->transform = new Transform2D();
-        auto transform = layer->transform;
-        ReadTagBlock(stream, transform, Transform2DTag);
-        auto hasPosition = (transform->position->animatable() ||
-                            transform->position->getValueAt(0) != Point::Zero());
-        auto hasXPosition =
-            (transform->xPosition->animatable() || transform->xPosition->getValueAt(0) != 0);
-        auto hasYPosition =
-            (transform->yPosition->animatable() || transform->yPosition->getValueAt(0) != 0);
-        if (hasPosition || (!hasXPosition && !hasYPosition)) {
-            delete transform->xPosition;
-            transform->xPosition = nullptr;
-            delete transform->yPosition;
-            transform->yPosition = nullptr;
-        } else {
-            delete transform->position;
-            transform->position = nullptr;
-        }
-    }
-    break;
+      layer->transform = new Transform2D();
+      auto transform = layer->transform;
+      ReadTagBlock(stream, transform, Transform2DTag);
+      auto hasPosition = (transform->position->animatable() ||
+                          transform->position->getValueAt(0) != Point::Zero());
+      auto hasXPosition =
+          (transform->xPosition->animatable() || transform->xPosition->getValueAt(0) != 0);
+      auto hasYPosition =
+          (transform->yPosition->animatable() || transform->yPosition->getValueAt(0) != 0);
+      if (hasPosition || (!hasXPosition && !hasYPosition)) {
+        delete transform->xPosition;
+        transform->xPosition = nullptr;
+        delete transform->yPosition;
+        transform->yPosition = nullptr;
+      } else {
+        delete transform->position;
+        transform->position = nullptr;
+      }
+    } break;
     case TagCode::CachePolicy:
-        ReadCachePolicy(stream, layer);
-        break;
+      ReadCachePolicy(stream, layer);
+      break;
     case TagCode::SolidColor:
-        Condition(layer->type() == LayerType::Solid,
-                  ReadSolidColor(stream, static_cast<SolidLayer*>(layer)));
-        break;
+      Condition(layer->type() == LayerType::Solid,
+                ReadSolidColor(stream, static_cast<SolidLayer*>(layer)));
+      break;
     case TagCode::TextSource:
-        Condition(layer->type() == LayerType::Text,
-                  ReadTagBlock(stream, static_cast<TextLayer*>(layer), TextSourceTag));
-        break;
+      Condition(layer->type() == LayerType::Text,
+                ReadTagBlock(stream, static_cast<TextLayer*>(layer), TextSourceTag));
+      break;
     case TagCode::TextSourceV2:
-        Condition(layer->type() == LayerType::Text,
-                  ReadTagBlock(stream, static_cast<TextLayer*>(layer), TextSourceTagV2));
-        break;
+      Condition(layer->type() == LayerType::Text,
+                ReadTagBlock(stream, static_cast<TextLayer*>(layer), TextSourceTagV2));
+      break;
     case TagCode::TextSourceV3:
-        Condition(layer->type() == LayerType::Text,
-                  ReadTagBlock(stream, static_cast<TextLayer*>(layer), TextSourceTagV3));
-        break;
+      Condition(layer->type() == LayerType::Text,
+                ReadTagBlock(stream, static_cast<TextLayer*>(layer), TextSourceTagV3));
+      break;
     case TagCode::TextPathOption:
-        if (layer->type() == LayerType::Text) {
-            auto textLayer = static_cast<TextLayer*>(layer);
-            textLayer->pathOption = new TextPathOptions();
-            ReadTagBlock(stream, textLayer->pathOption, TextPathOptionTag);
-        }
-        break;
+      if (layer->type() == LayerType::Text) {
+        auto textLayer = static_cast<TextLayer*>(layer);
+        textLayer->pathOption = new TextPathOptions();
+        ReadTagBlock(stream, textLayer->pathOption, TextPathOptionTag);
+      }
+      break;
     case TagCode::TextMoreOption:
-        if (layer->type() == LayerType::Text) {
-            auto textLayer = static_cast<TextLayer*>(layer);
-            textLayer->moreOption = new TextMoreOptions();
-            ReadTagBlock(stream, textLayer->moreOption, TextMoreOptionTag);
-        }
-        break;
+      if (layer->type() == LayerType::Text) {
+        auto textLayer = static_cast<TextLayer*>(layer);
+        textLayer->moreOption = new TextMoreOptions();
+        ReadTagBlock(stream, textLayer->moreOption, TextMoreOptionTag);
+      }
+      break;
     case TagCode::TextAnimator:
-        Condition(layer->type() == LayerType::Text,
-                  ReadTextAnimator(stream, static_cast<TextLayer*>(layer)));
-        break;
+      Condition(layer->type() == LayerType::Text,
+                ReadTextAnimator(stream, static_cast<TextLayer*>(layer)));
+      break;
     case TagCode::CompositionReference:
-        Condition(layer->type() == LayerType::PreCompose,
-                  ReadCompositionReference(stream, static_cast<PreComposeLayer*>(layer)));
-        break;
+      Condition(layer->type() == LayerType::PreCompose,
+                ReadCompositionReference(stream, static_cast<PreComposeLayer*>(layer)));
+      break;
     case TagCode::ImageReference:
-        Condition(layer->type() == LayerType::Image,
-                  ReadImageReference(stream, static_cast<ImageLayer*>(layer)));
-        break;
+      Condition(layer->type() == LayerType::Image,
+                ReadImageReference(stream, static_cast<ImageLayer*>(layer)));
+      break;
     case TagCode::ImageFillRule:
     case TagCode::ImageFillRuleV2:
-        Condition(layer->type() == LayerType::Image,
-                  ReadImageFillRule(stream, static_cast<ImageLayer*>(layer), code));
-        break;
+      Condition(layer->type() == LayerType::Image,
+                ReadImageFillRule(stream, static_cast<ImageLayer*>(layer), code));
+      break;
     default:
-        if (ReadEffect(stream, code, layer)) {
-            break;
-        }
-        if (ReadLayerStyles(stream, code, layer)) {
-            break;
-        }
-        if (layer->type() == LayerType::Shape &&
-                ReadShape(stream, code, &(static_cast<ShapeLayer*>(layer)->contents))) {
-            break;
-        }
+      if (ReadEffect(stream, code, layer)) {
         break;
-    }
+      }
+      if (ReadLayerStyles(stream, code, layer)) {
+        break;
+      }
+      if (layer->type() == LayerType::Shape &&
+          ReadShape(stream, code, &(static_cast<ShapeLayer*>(layer)->contents))) {
+        break;
+      }
+      break;
+  }
 }
 
 Layer* ReadLayer(DecodeStream* stream) {
-    auto layerType = static_cast<LayerType>(stream->readUint8());
-    Layer* layer = nullptr;
-    switch (layerType) {
+  auto layerType = static_cast<LayerType>(stream->readUint8());
+  Layer* layer = nullptr;
+  switch (layerType) {
     case LayerType::Null:
-        layer = new NullLayer();
-        break;
+      layer = new NullLayer();
+      break;
     case LayerType::Solid:
-        layer = new SolidLayer();
-        break;
+      layer = new SolidLayer();
+      break;
     case LayerType::Text:
-        layer = new TextLayer();
-        break;
+      layer = new TextLayer();
+      break;
     case LayerType::Shape:
-        layer = new ShapeLayer();
-        break;
+      layer = new ShapeLayer();
+      break;
     case LayerType::Image:
-        layer = new ImageLayer();
-        break;
+      layer = new ImageLayer();
+      break;
     case LayerType::PreCompose:
-        layer = new PreComposeLayer();
-        break;
+      layer = new PreComposeLayer();
+      break;
     default:
-        layer = new Layer();
-        break;
-    }
-    layer->id = stream->readEncodedUint32();
-    ReadTags(stream, layer, ReadTagsOfLayer);
-    return layer;
+      layer = new Layer();
+      break;
+  }
+  layer->id = stream->readEncodedUint32();
+  ReadTags(stream, layer, ReadTagsOfLayer);
+  return layer;
 }
 
 #undef Condition
 
 TagCode WriteLayer(EncodeStream* stream, Layer* layer) {
-    stream->writeUint8(static_cast<uint8_t>(layer->type()));
-    stream->writeEncodedUint32(layer->id);
+  stream->writeUint8(static_cast<uint8_t>(layer->type()));
+  stream->writeEncodedUint32(layer->id);
 
-    if (layer->motionBlur) {
-        WriteTagBlock(stream, layer, LayerAttributesTag);
-        WriteTagBlock(stream, layer, LayerAttributesExtraTag);
-    } else if (!layer->name.empty()) {
-        WriteTagBlock(stream, layer, LayerAttributesTagV2);
-    } else {
-        WriteTagBlock(stream, layer, LayerAttributesTag);
-    }
+  if (layer->motionBlur) {
+    WriteTagBlock(stream, layer, LayerAttributesTag);
+    WriteTagBlock(stream, layer, LayerAttributesExtraTag);
+  } else if (!layer->name.empty()) {
+    WriteTagBlock(stream, layer, LayerAttributesTagV2);
+  } else {
+    WriteTagBlock(stream, layer, LayerAttributesTag);
+  }
 
-    for (auto& mask : layer->masks) {
-        WriteTagBlock(stream, mask, MaskTag);
-    }
-    if (layer->markers.size() > 0) {
-        WriteTag(stream, &layer->markers, WriteMarkerList);
-    }
-    WriteEffects(stream, layer->effects);
-    WriteLayerStyles(stream, layer->layerStyles);
-    if (layer->transform != nullptr) {
-        WriteTagBlock(stream, layer->transform, Transform2DTag);
-    }
-    if (layer->cachePolicy != CachePolicy::Auto) {
-        WriteTag(stream, layer, WriteCachePolicy);
-    }
-    switch (layer->type()) {
+  for (auto& mask : layer->masks) {
+    WriteTagBlock(stream, mask, MaskTag);
+  }
+  if (layer->markers.size() > 0) {
+    WriteTag(stream, &layer->markers, WriteMarkerList);
+  }
+  WriteEffects(stream, layer->effects);
+  WriteLayerStyles(stream, layer->layerStyles);
+  if (layer->transform != nullptr) {
+    WriteTagBlock(stream, layer->transform, Transform2DTag);
+  }
+  if (layer->cachePolicy != CachePolicy::Auto) {
+    WriteTag(stream, layer, WriteCachePolicy);
+  }
+  switch (layer->type()) {
     case LayerType::Solid:
-        WriteTag(stream, static_cast<SolidLayer*>(layer), WriteSolidColor);
-        break;
+      WriteTag(stream, static_cast<SolidLayer*>(layer), WriteSolidColor);
+      break;
     case LayerType::Shape:
-        WriteShape(stream, &(static_cast<ShapeLayer*>(layer)->contents));
-        break;
+      WriteShape(stream, &(static_cast<ShapeLayer*>(layer)->contents));
+      break;
     case LayerType::PreCompose:
-        WriteTag(stream, static_cast<PreComposeLayer*>(layer), WriteCompositionReference);
-        break;
+      WriteTag(stream, static_cast<PreComposeLayer*>(layer), WriteCompositionReference);
+      break;
     case LayerType::Image: {
-        auto imageLayer = static_cast<ImageLayer*>(layer);
-        WriteTag(stream, imageLayer, WriteImageReference);
-        if (imageLayer->imageFillRule != nullptr &&
-                (imageLayer->imageFillRule->scaleMode != PAGScaleMode::LetterBox ||
-                 imageLayer->imageFillRule->timeRemap != nullptr)) {
-            WriteImageFillRule(stream, imageLayer->imageFillRule);
-        }
-    }
-    break;
+      auto imageLayer = static_cast<ImageLayer*>(layer);
+      WriteTag(stream, imageLayer, WriteImageReference);
+      if (imageLayer->imageFillRule != nullptr &&
+          (imageLayer->imageFillRule->scaleMode != PAGScaleMode::LetterBox ||
+           imageLayer->imageFillRule->timeRemap != nullptr)) {
+        WriteImageFillRule(stream, imageLayer->imageFillRule);
+      }
+    } break;
     case LayerType::Text: {
-        auto textLayer = static_cast<TextLayer*>(layer);
-        auto textDocument = textLayer->getTextDocument();
-        if (textDocument != nullptr && textDocument->direction != TextDirection::Default) {
-            WriteTagBlock(stream, textLayer, TextSourceTagV3);
-        } else if (textDocument != nullptr && textDocument->backgroundAlpha != 0) {
-            WriteTagBlock(stream, textLayer, TextSourceTagV2);
-        } else {
-            WriteTagBlock(stream, textLayer, TextSourceTag);
-        }
-        auto pathOption = textLayer->pathOption;
-        auto moreOption = textLayer->moreOption;
-        if (pathOption != nullptr && pathOption->path) {
-            WriteTagBlock(stream, pathOption, TextPathOptionTag);
-        }
-        if (moreOption != nullptr) {
-            WriteTagBlock(stream, moreOption, TextMoreOptionTag);
-        }
-        for (auto& animator : textLayer->animators) {
-            WriteTag(stream, animator, WriteTextAnimator);
-        }
-    }
-    break;
+      auto textLayer = static_cast<TextLayer*>(layer);
+      auto textDocument = textLayer->getTextDocument();
+      if (textDocument != nullptr && textDocument->direction != TextDirection::Default) {
+        WriteTagBlock(stream, textLayer, TextSourceTagV3);
+      } else if (textDocument != nullptr && textDocument->backgroundAlpha != 0) {
+        WriteTagBlock(stream, textLayer, TextSourceTagV2);
+      } else {
+        WriteTagBlock(stream, textLayer, TextSourceTag);
+      }
+      auto pathOption = textLayer->pathOption;
+      auto moreOption = textLayer->moreOption;
+      if (pathOption != nullptr && pathOption->path) {
+        WriteTagBlock(stream, pathOption, TextPathOptionTag);
+      }
+      if (moreOption != nullptr) {
+        WriteTagBlock(stream, moreOption, TextMoreOptionTag);
+      }
+      for (auto& animator : textLayer->animators) {
+        WriteTag(stream, animator, WriteTextAnimator);
+      }
+    } break;
     default:
-        break;
-    }
-    WriteEndTag(stream);
-    return TagCode::LayerBlock;
+      break;
+  }
+  WriteEndTag(stream);
+  return TagCode::LayerBlock;
 }
 
 }  // namespace pag

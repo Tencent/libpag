@@ -20,27 +20,27 @@
 
 namespace pag {
 MultiDimensionPointKeyframe::~MultiDimensionPointKeyframe() {
-    delete xInterpolator;
-    delete yInterpolator;
+  delete xInterpolator;
+  delete yInterpolator;
 }
 
 void MultiDimensionPointKeyframe::initialize() {
-    if (interpolationType == KeyframeInterpolationType::Bezier) {
-        xInterpolator = new BezierEasing(this->bezierOut[0], this->bezierIn[0]);
-        yInterpolator = new BezierEasing(this->bezierOut[1], this->bezierIn[1]);
-    } else {
-        xInterpolator = new Interpolator();
-        yInterpolator = new Interpolator();
-    }
+  if (interpolationType == KeyframeInterpolationType::Bezier) {
+    xInterpolator = new BezierEasing(this->bezierOut[0], this->bezierIn[0]);
+    yInterpolator = new BezierEasing(this->bezierOut[1], this->bezierIn[1]);
+  } else {
+    xInterpolator = new Interpolator();
+    yInterpolator = new Interpolator();
+  }
 }
 
 Point MultiDimensionPointKeyframe::getValueAt(Frame time) {
-    auto progress = static_cast<float>(time - this->startTime) / (this->endTime - this->startTime);
-    auto xProgress = xInterpolator->getInterpolation(progress);
-    auto yProgress = yInterpolator->getInterpolation(progress);
-    auto x = Interpolate(this->startValue.x, this->endValue.x, xProgress);
-    auto y = Interpolate(this->startValue.y, this->endValue.y, yProgress);
-    return {x, y};
+  auto progress = static_cast<float>(time - this->startTime) / (this->endTime - this->startTime);
+  auto xProgress = xInterpolator->getInterpolation(progress);
+  auto yProgress = yInterpolator->getInterpolation(progress);
+  auto x = Interpolate(this->startValue.x, this->endValue.x, xProgress);
+  auto y = Interpolate(this->startValue.y, this->endValue.y, yProgress);
+  return {x, y};
 }
 
 }  // namespace pag

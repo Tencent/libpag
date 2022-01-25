@@ -22,59 +22,59 @@
 
 namespace pag {
 TextLayer::~TextLayer() {
-    delete sourceText;
-    delete pathOption;
-    delete moreOption;
-    for (auto& animator : animators) {
-        delete animator;
-    }
+  delete sourceText;
+  delete pathOption;
+  delete moreOption;
+  for (auto& animator : animators) {
+    delete animator;
+  }
 }
 
 TextDocumentHandle TextLayer::getTextDocument() {
-    if (sourceText == nullptr) {
-        return nullptr;
-    }
-    if (sourceText->animatable()) {
-        auto keyframes =
-            reinterpret_cast<AnimatableProperty<TextDocumentHandle>*>(sourceText)->keyframes;
-        return keyframes[0]->startValue;
-    }
-    return sourceText->getValueAt(0);
+  if (sourceText == nullptr) {
+    return nullptr;
+  }
+  if (sourceText->animatable()) {
+    auto keyframes =
+        reinterpret_cast<AnimatableProperty<TextDocumentHandle>*>(sourceText)->keyframes;
+    return keyframes[0]->startValue;
+  }
+  return sourceText->getValueAt(0);
 }
 
 void TextLayer::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) {
-    Layer::excludeVaryingRanges(timeRanges);
-    sourceText->excludeVaryingRanges(timeRanges);
-    if (pathOption) {
-        pathOption->excludeVaryingRanges(timeRanges);
-    }
-    if (moreOption) {
-        moreOption->excludeVaryingRanges(timeRanges);
-    }
-    for (auto& animator : animators) {
-        animator->excludeVaryingRanges(timeRanges);
-    }
+  Layer::excludeVaryingRanges(timeRanges);
+  sourceText->excludeVaryingRanges(timeRanges);
+  if (pathOption) {
+    pathOption->excludeVaryingRanges(timeRanges);
+  }
+  if (moreOption) {
+    moreOption->excludeVaryingRanges(timeRanges);
+  }
+  for (auto& animator : animators) {
+    animator->excludeVaryingRanges(timeRanges);
+  }
 }
 
 bool TextLayer::verify() const {
-    if (!Layer::verify()) {
-        VerifyFailed();
-        return false;
+  if (!Layer::verify()) {
+    VerifyFailed();
+    return false;
+  }
+  if (sourceText == nullptr) {
+    VerifyFailed();
+    return false;
+  }
+  if (pathOption != nullptr && !pathOption->verify()) {
+    VerifyFailed();
+    return false;
+  }
+  for (auto& animator : animators) {
+    if (animator == nullptr || !animator->verify()) {
+      VerifyFailed();
+      return false;
     }
-    if (sourceText == nullptr) {
-        VerifyFailed();
-        return false;
-    }
-    if (pathOption != nullptr && !pathOption->verify()) {
-        VerifyFailed();
-        return false;
-    }
-    for (auto& animator : animators) {
-        if (animator == nullptr || !animator->verify()) {
-            VerifyFailed();
-            return false;
-        }
-    }
-    VerifyAndReturn(moreOption == nullptr || moreOption->verify());
+  }
+  VerifyAndReturn(moreOption == nullptr || moreOption->verify());
 }
 }  // namespace pag

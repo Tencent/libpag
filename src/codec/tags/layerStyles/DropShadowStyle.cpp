@@ -20,13 +20,13 @@
 
 namespace pag {
 std::unique_ptr<BlockConfig> DropShadowStyleTag(DropShadowStyle* style) {
-    auto tagConfig = new BlockConfig(TagCode::DropShadowStyle);
-    AddAttribute(tagConfig, &style->blendMode, AttributeType::DiscreteProperty, BlendMode::Normal);
-    AddAttribute(tagConfig, &style->color, AttributeType::SimpleProperty, Black);
-    AddAttribute(tagConfig, &style->opacity, AttributeType::SimpleProperty, (Opacity)191);
-    AddAttribute(tagConfig, &style->angle, AttributeType::SimpleProperty, 120.0f);
-    AddAttribute(tagConfig, &style->distance, AttributeType::SimpleProperty, 5.0f);
-    AddAttribute(tagConfig, &style->size, AttributeType::DiscreteProperty, 5.0f);
-    return std::unique_ptr<BlockConfig>(tagConfig);
+  auto tagConfig = new BlockConfig(TagCode::DropShadowStyle);
+  AddAttribute(tagConfig, &style->blendMode, AttributeType::DiscreteProperty, BlendMode::Normal);
+  AddAttribute(tagConfig, &style->color, AttributeType::SimpleProperty, Black);
+  AddAttribute(tagConfig, &style->opacity, AttributeType::SimpleProperty, (Opacity)191);
+  AddAttribute(tagConfig, &style->angle, AttributeType::SimpleProperty, 120.0f);
+  AddAttribute(tagConfig, &style->distance, AttributeType::SimpleProperty, 5.0f);
+  AddAttribute(tagConfig, &style->size, AttributeType::DiscreteProperty, 5.0f);
+  return std::unique_ptr<BlockConfig>(tagConfig);
 }
 }  // namespace pag

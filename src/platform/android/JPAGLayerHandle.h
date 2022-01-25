@@ -21,19 +21,19 @@
 #include "pag/pag.h"
 
 class JPAGLayerHandle {
-public:
-    explicit JPAGLayerHandle(std::shared_ptr<pag::PAGLayer> nativeHandle)
-        : nativeHandle(nativeHandle) {
-    }
+ public:
+  explicit JPAGLayerHandle(std::shared_ptr<pag::PAGLayer> nativeHandle)
+      : nativeHandle(nativeHandle) {
+  }
 
-    std::shared_ptr<pag::PAGLayer> get() {
-        return nativeHandle;
-    }
+  std::shared_ptr<pag::PAGLayer> get() {
+    return nativeHandle;
+  }
 
-    void reset() {
-        nativeHandle = nullptr;
-    }
+  void reset() {
+    nativeHandle = nullptr;
+  }
 
-private:
-    std::shared_ptr<pag::PAGLayer> nativeHandle;
+ private:
+  std::shared_ptr<pag::PAGLayer> nativeHandle;
 };

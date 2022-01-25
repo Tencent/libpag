@@ -22,10 +22,10 @@
 
 namespace pag {
 class NativePlatform : public CocoaPlatform {
-public:
-    std::unique_ptr<VideoDecoder> makeHardwareDecoder(const VideoConfig& config) const override;
+ public:
+  std::unique_ptr<VideoDecoder> makeHardwareDecoder(const VideoConfig& config) const override;
 
-    void reportStatisticalData(
-        std::unordered_map<std::string, std::string>& reportMap) const override;
+  void reportStatisticalData(
+      std::unordered_map<std::string, std::string>& reportMap) const override;
 };
 }  // namespace pag

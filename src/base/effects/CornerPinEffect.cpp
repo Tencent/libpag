@@ -21,48 +21,48 @@
 
 namespace pag {
 CornerPinEffect::~CornerPinEffect() {
-    delete upperLeft;
-    delete upperRight;
-    delete lowerLeft;
-    delete lowerRight;
+  delete upperLeft;
+  delete upperRight;
+  delete lowerLeft;
+  delete lowerRight;
 }
 
 bool CornerPinEffect::visibleAt(Frame) const {
-    return true;
+  return true;
 }
 
 void CornerPinEffect::transformBounds(Rect* contentBounds, const Point&, Frame layerFrame) const {
-    auto upperLeftValue = upperLeft->getValueAt(layerFrame);
-    auto upperRightValue = upperRight->getValueAt(layerFrame);
-    auto lowerLeftValue = lowerLeft->getValueAt(layerFrame);
-    auto lowerRightValue = lowerRight->getValueAt(layerFrame);
+  auto upperLeftValue = upperLeft->getValueAt(layerFrame);
+  auto upperRightValue = upperRight->getValueAt(layerFrame);
+  auto lowerLeftValue = lowerLeft->getValueAt(layerFrame);
+  auto lowerRightValue = lowerRight->getValueAt(layerFrame);
 
-    auto left = std::min(std::min(upperLeftValue.x, lowerLeftValue.x),
-                         std::min(upperRightValue.x, lowerRightValue.x));
-    auto top = std::min(std::min(upperLeftValue.y, lowerLeftValue.y),
-                        std::min(upperRightValue.y, lowerRightValue.y));
-    auto right = std::max(std::max(upperLeftValue.x, lowerLeftValue.x),
-                          std::max(upperRightValue.x, lowerRightValue.x));
-    auto bottom = std::max(std::max(upperLeftValue.y, lowerLeftValue.y),
-                           std::max(upperRightValue.y, lowerRightValue.y));
+  auto left = std::min(std::min(upperLeftValue.x, lowerLeftValue.x),
+                       std::min(upperRightValue.x, lowerRightValue.x));
+  auto top = std::min(std::min(upperLeftValue.y, lowerLeftValue.y),
+                      std::min(upperRightValue.y, lowerRightValue.y));
+  auto right = std::max(std::max(upperLeftValue.x, lowerLeftValue.x),
+                        std::max(upperRightValue.x, lowerRightValue.x));
+  auto bottom = std::max(std::max(upperLeftValue.y, lowerLeftValue.y),
+                         std::max(upperRightValue.y, lowerRightValue.y));
 
-    contentBounds->setLTRB(left, top, right, bottom);
+  contentBounds->setLTRB(left, top, right, bottom);
 }
 
 void CornerPinEffect::excludeVaryingRanges(std::vector<pag::TimeRange>* timeRanges) const {
-    Effect::excludeVaryingRanges(timeRanges);
-    upperLeft->excludeVaryingRanges(timeRanges);
-    upperRight->excludeVaryingRanges(timeRanges);
-    lowerLeft->excludeVaryingRanges(timeRanges);
-    lowerRight->excludeVaryingRanges(timeRanges);
+  Effect::excludeVaryingRanges(timeRanges);
+  upperLeft->excludeVaryingRanges(timeRanges);
+  upperRight->excludeVaryingRanges(timeRanges);
+  lowerLeft->excludeVaryingRanges(timeRanges);
+  lowerRight->excludeVaryingRanges(timeRanges);
 }
 
 bool CornerPinEffect::verify() const {
-    if (!Effect::verify()) {
-        VerifyFailed();
-        return false;
-    }
-    VerifyAndReturn(upperLeft != nullptr && upperRight != nullptr && lowerLeft != nullptr &&
-                    lowerRight != nullptr);
+  if (!Effect::verify()) {
+    VerifyFailed();
+    return false;
+  }
+  VerifyAndReturn(upperLeft != nullptr && upperRight != nullptr && lowerLeft != nullptr &&
+                  lowerRight != nullptr);
 }
 }  // namespace pag

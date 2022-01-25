@@ -23,14 +23,14 @@
 
 namespace pag {
 class VideoDecodingTask : public Executor {
-public:
-    static std::shared_ptr<Task> MakeAndRun(VideoReader* reader, int64_t targetTime);
+ public:
+  static std::shared_ptr<Task> MakeAndRun(VideoReader* reader, int64_t targetTime);
 
-private:
-    VideoReader* reader = nullptr;
-    int64_t targetTime = 0;
+ private:
+  VideoReader* reader = nullptr;
+  int64_t targetTime = 0;
 
-    VideoDecodingTask(VideoReader* reader, int64_t targetTime);
-    void execute() override;
+  VideoDecodingTask(VideoReader* reader, int64_t targetTime);
+  void execute() override;
 };
 }  // namespace pag

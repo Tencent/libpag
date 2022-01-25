@@ -20,16 +20,16 @@
 
 namespace pag {
 std::unique_ptr<BlockConfig> PolyStarTag(PolyStarElement* shape) {
-    auto tagConfig = new BlockConfig(TagCode::PolyStar);
-    AddAttribute(tagConfig, &shape->reversed, AttributeType::BitFlag, false);
-    AddAttribute(tagConfig, &shape->polyType, AttributeType::Value, PolyStarType::Star);
-    AddAttribute(tagConfig, &shape->points, AttributeType::SimpleProperty, 5.0f);
-    AddAttribute(tagConfig, &shape->position, AttributeType::SpatialProperty, Point::Zero());
-    AddAttribute(tagConfig, &shape->rotation, AttributeType::SimpleProperty, 0.0f);
-    AddAttribute(tagConfig, &shape->innerRadius, AttributeType::SimpleProperty, 50.0f);
-    AddAttribute(tagConfig, &shape->outerRadius, AttributeType::SimpleProperty, 100.0f);
-    AddAttribute(tagConfig, &shape->innerRoundness, AttributeType::SimpleProperty, 0.0f);
-    AddAttribute(tagConfig, &shape->outerRoundness, AttributeType::SimpleProperty, 0.0f);
-    return std::unique_ptr<BlockConfig>(tagConfig);
+  auto tagConfig = new BlockConfig(TagCode::PolyStar);
+  AddAttribute(tagConfig, &shape->reversed, AttributeType::BitFlag, false);
+  AddAttribute(tagConfig, &shape->polyType, AttributeType::Value, PolyStarType::Star);
+  AddAttribute(tagConfig, &shape->points, AttributeType::SimpleProperty, 5.0f);
+  AddAttribute(tagConfig, &shape->position, AttributeType::SpatialProperty, Point::Zero());
+  AddAttribute(tagConfig, &shape->rotation, AttributeType::SimpleProperty, 0.0f);
+  AddAttribute(tagConfig, &shape->innerRadius, AttributeType::SimpleProperty, 50.0f);
+  AddAttribute(tagConfig, &shape->outerRadius, AttributeType::SimpleProperty, 100.0f);
+  AddAttribute(tagConfig, &shape->innerRoundness, AttributeType::SimpleProperty, 0.0f);
+  AddAttribute(tagConfig, &shape->outerRoundness, AttributeType::SimpleProperty, 0.0f);
+  return std::unique_ptr<BlockConfig>(tagConfig);
 }
 }  // namespace pag

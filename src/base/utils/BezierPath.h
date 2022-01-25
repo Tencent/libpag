@@ -24,70 +24,70 @@
 
 namespace pag {
 struct BezierKey {
-    int32_t values[9];
+  int32_t values[9];
 
-    static BezierKey Make(const Point points[4], float precision);
+  static BezierKey Make(const Point points[4], float precision);
 
-    bool operator==(const BezierKey& other) const;
+  bool operator==(const BezierKey& other) const;
 };
 
 struct BezierHasher {
-    size_t operator()(const BezierKey& key) const;
+  size_t operator()(const BezierKey& key) const;
 };
 
 struct BezierSegment {
-    Point position;
-    /**
-     * Total distance up to this point
-     */
-    float distance;
-    /**
-     * Total t value up to this point
-     */
-    unsigned tValue;
+  Point position;
+  /**
+   * Total distance up to this point
+   */
+  float distance;
+  /**
+   * Total t value up to this point
+   */
+  unsigned tValue;
 };
 
 class BezierPath {
-public:
-    /**
-     * Creates a cubic bezier path.
-     */
-    static std::shared_ptr<BezierPath> Build(const Point& start, const Point& control1,
-            const Point& control2, const Point& end,
-            float precision);
+ public:
+  /**
+   * Creates a cubic bezier path.
+   */
+  static std::shared_ptr<BezierPath> Build(const Point& start, const Point& control1,
+                                           const Point& control2, const Point& end,
+                                           float precision);
 
-    /**
-     * Calculates a point on the curve, for a given value between 0 and 1.0 indicating the percent of
-     * the curve length where 0 represents the start and 1.0 represents the end.
-     */
-    Point getPosition(float percent) const;
+  /**
+   * Calculates a point on the curve, for a given value between 0 and 1.0 indicating the percent of
+   * the curve length where 0 represents the start and 1.0 represents the end.
+   */
+  Point getPosition(float percent) const;
 
-    /**
-     * Calculates a t value of the curve, for a given value between 0 and 1.0 indicating the percent
-     * of the curve length where 0 represents the start and 1.0 represents the end.
-     */
-    float getT(float percent) const;
+  /**
+   * Calculates a t value of the curve, for a given value between 0 and 1.0 indicating the percent
+   * of the curve length where 0 represents the start and 1.0 represents the end.
+   */
+  float getT(float percent) const;
 
-    /**
-     * Calculates a y point value on the curve, for a given x point value.
-     */
-    float getY(float x) const;
+  /**
+   * Calculates a y point value on the curve, for a given x point value.
+   */
+  float getY(float x) const;
 
-    /**
-     * Calculates a x point value on the curve, for a given y point value.
-     */
-    float getX(float y) const;
+  /**
+   * Calculates a x point value on the curve, for a given y point value.
+   */
+  float getX(float y) const;
 
-    /**
-     * Returns the length of the bezier path in pixels.
-     */
-    float getLength() const;
+  /**
+   * Returns the length of the bezier path in pixels.
+   */
+  float getLength() const;
 
-private:
-    float length = 0;
-    std::vector<BezierSegment> segments;
+ private:
+  float length = 0;
+  std::vector<BezierSegment> segments;
 
-    BezierPath() = default;
-    void findSegmentAtDistance(float distance, int& startIndex, int& endIndex, float& fraction) const;
+  BezierPath() = default;
+  void findSegmentAtDistance(float distance, int& startIndex, int& endIndex, float& fraction) const;
 };
 }  // namespace pag

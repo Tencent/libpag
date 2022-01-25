@@ -22,26 +22,26 @@
 
 namespace pag {
 class GlowMergeFilter : public LayerFilter {
-public:
-    explicit GlowMergeFilter(Effect* effect);
-    ~GlowMergeFilter() override = default;
+ public:
+  explicit GlowMergeFilter(Effect* effect);
+  ~GlowMergeFilter() override = default;
 
-    void updateTexture(unsigned blurTexture);
+  void updateTexture(unsigned blurTexture);
 
-protected:
-    std::string onBuildFragmentShader() override;
+ protected:
+  std::string onBuildFragmentShader() override;
 
-    void onPrepareProgram(const GLInterface* gl, unsigned program) override;
+  void onPrepareProgram(const GLInterface* gl, unsigned program) override;
 
-    void onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
-                        const Point& filterScale) override;
+  void onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
+                      const Point& filterScale) override;
 
-private:
-    Effect* effect = nullptr;
+ private:
+  Effect* effect = nullptr;
 
-    int inputTextureHandle = -1;
-    int blurTextureHandle = -1;
-    int progressHandle = -1;
-    unsigned blurTextureID = 0;
+  int inputTextureHandle = -1;
+  int blurTextureHandle = -1;
+  int progressHandle = -1;
+  unsigned blurTextureID = 0;
 };
 }  // namespace pag

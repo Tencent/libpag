@@ -21,18 +21,18 @@
 
 namespace pag {
 ShapePathElement::~ShapePathElement() {
-    delete shapePath;
+  delete shapePath;
 }
 
 void ShapePathElement::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {
-    shapePath->excludeVaryingRanges(timeRanges);
+  shapePath->excludeVaryingRanges(timeRanges);
 }
 
 bool ShapePathElement::verify() const {
-    if (!ShapeElement::verify()) {
-        VerifyFailed();
-        return false;
-    }
-    VerifyAndReturn(shapePath != nullptr);
+  if (!ShapeElement::verify()) {
+    VerifyFailed();
+    return false;
+  }
+  VerifyAndReturn(shapePath != nullptr);
 }
 }  // namespace pag

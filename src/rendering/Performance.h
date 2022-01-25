@@ -24,30 +24,30 @@
 
 namespace pag {
 class Performance {
-public:
-    virtual ~Performance() = default;
-    // ======= total time ==========
-    int64_t renderingTime = 0;
-    int64_t presentingTime = 0;
-    int64_t textureUploadingTime = 0;
-    int64_t programCompilingTime = 0;
-    int64_t imageDecodingTime = 0;
-    int64_t hardwareDecodingTime = 0;
-    int64_t softwareDecodingTime = 0;
-    // ======= total time ==========
+ public:
+  virtual ~Performance() = default;
+  // ======= total time ==========
+  int64_t renderingTime = 0;
+  int64_t presentingTime = 0;
+  int64_t textureUploadingTime = 0;
+  int64_t programCompilingTime = 0;
+  int64_t imageDecodingTime = 0;
+  int64_t hardwareDecodingTime = 0;
+  int64_t softwareDecodingTime = 0;
+  // ======= total time ==========
 
-    int64_t hardwareDecodingInitialTime = 0;
-    int64_t softwareDecodingInitialTime = 0;
-    int64_t totalTime = 0;
+  int64_t hardwareDecodingInitialTime = 0;
+  int64_t softwareDecodingInitialTime = 0;
+  int64_t totalTime = 0;
 
-    /**
-     * Returns the formatted  string which contains the performance data.
-     */
-    std::string getPerformanceString() const;
+  /**
+   * Returns the formatted  string which contains the performance data.
+   */
+  std::string getPerformanceString() const;
 
-    void printPerformance(Frame currentFrame) const;
+  void printPerformance(Frame currentFrame) const;
 
-protected:
-    void resetPerformance();
+ protected:
+  void resetPerformance();
 };
 }  // namespace pag

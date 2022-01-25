@@ -21,22 +21,22 @@
 
 namespace pag {
 TrimPathsElement::~TrimPathsElement() {
-    delete start;
-    delete end;
-    delete offset;
+  delete start;
+  delete end;
+  delete offset;
 }
 
 void TrimPathsElement::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {
-    start->excludeVaryingRanges(timeRanges);
-    end->excludeVaryingRanges(timeRanges);
-    offset->excludeVaryingRanges(timeRanges);
+  start->excludeVaryingRanges(timeRanges);
+  end->excludeVaryingRanges(timeRanges);
+  offset->excludeVaryingRanges(timeRanges);
 }
 
 bool TrimPathsElement::verify() const {
-    if (!ShapeElement::verify()) {
-        VerifyFailed();
-        return false;
-    }
-    VerifyAndReturn(start != nullptr && end != nullptr && offset != nullptr);
+  if (!ShapeElement::verify()) {
+    VerifyFailed();
+    return false;
+  }
+  VerifyAndReturn(start != nullptr && end != nullptr && offset != nullptr);
 }
 }  // namespace pag

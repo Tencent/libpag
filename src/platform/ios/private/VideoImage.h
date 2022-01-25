@@ -23,25 +23,25 @@
 
 namespace pag {
 class VideoImage : public VideoBuffer {
-public:
-    static std::shared_ptr<VideoImage> MakeFrom(CVPixelBufferRef pixelBuffer,
-            YUVColorSpace colorSpace,
-            YUVColorRange colorRange);
+ public:
+  static std::shared_ptr<VideoImage> MakeFrom(CVPixelBufferRef pixelBuffer,
+                                              YUVColorSpace colorSpace,
+                                              YUVColorRange colorRange);
 
-    ~VideoImage() override;
+  ~VideoImage() override;
 
-    size_t planeCount() const override;
+  size_t planeCount() const override;
 
-protected:
-    std::shared_ptr<Texture> makeTexture(Context* context) const override {
-        return GLNV12Texture::MakeFrom(context, pixelBuffer, _colorSpace, _colorRange);
-    }
+ protected:
+  std::shared_ptr<Texture> makeTexture(Context* context) const override {
+    return GLNV12Texture::MakeFrom(context, pixelBuffer, _colorSpace, _colorRange);
+  }
 
-private:
-    CVPixelBufferRef pixelBuffer = nullptr;
-    YUVColorSpace _colorSpace = YUVColorSpace::Rec601;
-    YUVColorRange _colorRange = YUVColorRange::MPEG;
+ private:
+  CVPixelBufferRef pixelBuffer = nullptr;
+  YUVColorSpace _colorSpace = YUVColorSpace::Rec601;
+  YUVColorRange _colorRange = YUVColorRange::MPEG;
 
-    VideoImage(CVPixelBufferRef pixelBuffer, YUVColorSpace colorSpace, YUVColorRange colorRange);
+  VideoImage(CVPixelBufferRef pixelBuffer, YUVColorSpace colorSpace, YUVColorRange colorRange);
 };
 }  // namespace pag

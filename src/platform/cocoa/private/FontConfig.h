@@ -22,11 +22,11 @@
 
 namespace pag {
 class FontConfig {
-public:
-    static bool RegisterFallbackFonts();
+ public:
+  static bool RegisterFallbackFonts();
 
-    static PAGFont Parse(const void* data, size_t length, int);
+  static PAGFont Parse(const void* data, size_t length, int);
 
-    static PAGFont Parse(const std::string& fontPath, int);
+  static PAGFont Parse(const std::string& fontPath, int);
 };
 }  // namespace pag

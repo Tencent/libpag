@@ -20,13 +20,13 @@
 #include "CocoaUtils.h"
 
 enum {
-    PAGJustificationLeftJustify = 0,
-    PAGJustificationCenterJustify = 1,
-    PAGJustificationRightJustify = 2,
-    PAGJustificationFullJustifyLastLineLeft = 3,
-    PAGJustificationFullJustifyLastLineRight = 4,
-    PAGJustificationFullJustifyLastLineCenter = 5,
-    PAGJustificationFullJustifyLastLineFull = 6
+  PAGJustificationLeftJustify = 0,
+  PAGJustificationCenterJustify = 1,
+  PAGJustificationRightJustify = 2,
+  PAGJustificationFullJustifyLastLineLeft = 3,
+  PAGJustificationFullJustifyLastLineRight = 4,
+  PAGJustificationFullJustifyLastLineCenter = 5,
+  PAGJustificationFullJustifyLastLineFull = 6
 };
 
 /**
@@ -35,9 +35,9 @@ enum {
 __attribute__((visibility("default")))
 @interface PAGText : NSObject
 
-    /**
-     * When true, the text layer shows a fill.
-     */
+/**
+ * When true, the text layer shows a fill.
+ */
 @property(nonatomic, assign) bool applyFill;
 
 /**

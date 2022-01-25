@@ -25,24 +25,24 @@
 
 namespace pag {
 std::shared_ptr<PAGSolidLayer> PAGSolidLayer::Make(int64_t duration, int32_t width, int32_t height,
-        Color solidColor, Opacity opacity) {
-    if (width <= 0 || height <= 0) {
-        return nullptr;
-    }
+                                                   Color solidColor, Opacity opacity) {
+  if (width <= 0 || height <= 0) {
+    return nullptr;
+  }
 
-    auto layer = new SolidLayer();
-    auto transform = Transform2D::MakeDefault();
-    transform->opacity->value = opacity;
-    layer->transform = transform;
-    layer->width = width;
-    layer->height = height;
-    layer->solidColor = solidColor;
-    layer->duration = TimeToFrame(duration, 60);
+  auto layer = new SolidLayer();
+  auto transform = Transform2D::MakeDefault();
+  transform->opacity->value = opacity;
+  layer->transform = transform;
+  layer->width = width;
+  layer->height = height;
+  layer->solidColor = solidColor;
+  layer->duration = TimeToFrame(duration, 60);
 
-    auto pagSolidLayer = std::make_shared<PAGSolidLayer>(nullptr, layer);
-    pagSolidLayer->emptySolidLayer = layer;
-    pagSolidLayer->weakThis = pagSolidLayer;
-    return pagSolidLayer;
+  auto pagSolidLayer = std::make_shared<PAGSolidLayer>(nullptr, layer);
+  pagSolidLayer->emptySolidLayer = layer;
+  pagSolidLayer->weakThis = pagSolidLayer;
+  return pagSolidLayer;
 }
 
 PAGSolidLayer::PAGSolidLayer(std::shared_ptr<pag::File> file, SolidLayer* layer)
@@ -50,45 +50,45 @@ PAGSolidLayer::PAGSolidLayer(std::shared_ptr<pag::File> file, SolidLayer* layer)
 }
 
 PAGSolidLayer::~PAGSolidLayer() {
-    delete replacement;
-    delete emptySolidLayer;
+  delete replacement;
+  delete emptySolidLayer;
 }
 
 Content* PAGSolidLayer::getContent() {
-    if (replacement != nullptr) {
-        return replacement;
-    }
-    return layerCache->getContent(contentFrame);
+  if (replacement != nullptr) {
+    return replacement;
+  }
+  return layerCache->getContent(contentFrame);
 }
 
 bool PAGSolidLayer::contentModified() const {
-    return replacement != nullptr;
+  return replacement != nullptr;
 }
 
 Color PAGSolidLayer::solidColor() {
-    LockGuard autoLock(rootLocker);
-    return _solidColor;
+  LockGuard autoLock(rootLocker);
+  return _solidColor;
 }
 
 void PAGSolidLayer::setSolidColor(const pag::Color& value) {
-    LockGuard autoLock(rootLocker);
-    if (_solidColor == value) {
-        return;
-    }
-    _solidColor = value;
-    if (replacement != nullptr) {
-        delete replacement;
-        replacement = nullptr;
-    }
-    auto solidLayer = static_cast<SolidLayer*>(layer);
-    if (solidLayer->solidColor != _solidColor) {
-        Path path = {};
-        path.addRect(0, 0, solidLayer->width, solidLayer->height);
-        auto solid = Shape::MakeFrom(path, _solidColor);
-        replacement = new GraphicContent(solid);
-    }
-    notifyModified(true);
-    invalidateCacheScale();
+  LockGuard autoLock(rootLocker);
+  if (_solidColor == value) {
+    return;
+  }
+  _solidColor = value;
+  if (replacement != nullptr) {
+    delete replacement;
+    replacement = nullptr;
+  }
+  auto solidLayer = static_cast<SolidLayer*>(layer);
+  if (solidLayer->solidColor != _solidColor) {
+    Path path = {};
+    path.addRect(0, 0, solidLayer->width, solidLayer->height);
+    auto solid = Shape::MakeFrom(path, _solidColor);
+    replacement = new GraphicContent(solid);
+  }
+  notifyModified(true);
+  invalidateCacheScale();
 }
 
 }  // namespace pag

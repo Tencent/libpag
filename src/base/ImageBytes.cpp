@@ -25,12 +25,12 @@ ImageBytes::ImageBytes() : uniqueID(UniqueID::Next()) {
 }
 
 ImageBytes::~ImageBytes() {
-    delete cache;
-    delete fileBytes;
+  delete cache;
+  delete fileBytes;
 }
 
 bool ImageBytes::verify() const {
-    VerifyAndReturn(fileBytes != nullptr && fileBytes->length() > 0 && scaleFactor > 0 && width > 0 &&
-                    height > 0);
+  VerifyAndReturn(fileBytes != nullptr && fileBytes->length() > 0 && scaleFactor > 0 && width > 0 &&
+                  height > 0);
 }
 }  // namespace pag

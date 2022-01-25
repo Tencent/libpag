@@ -20,13 +20,13 @@
 
 namespace pag {
 std::shared_ptr<VideoImage> VideoImage::MakeFrom(std::shared_ptr<VideoSurface> videoSurface,
-        int width, int height) {
-    if (videoSurface == nullptr) {
-        return nullptr;
-    }
-    auto videoImage =
-        std::shared_ptr<VideoImage>(new VideoImage(std::move(videoSurface), width, height));
-    return videoImage;
+                                                 int width, int height) {
+  if (videoSurface == nullptr) {
+    return nullptr;
+  }
+  auto videoImage =
+      std::shared_ptr<VideoImage>(new VideoImage(std::move(videoSurface), width, height));
+  return videoImage;
 }
 
 VideoImage::VideoImage(std::shared_ptr<VideoSurface> videoSurface, int width, int height)
@@ -35,13 +35,13 @@ VideoImage::VideoImage(std::shared_ptr<VideoSurface> videoSurface, int width, in
 }
 
 std::shared_ptr<Texture> VideoImage::makeTexture(Context* context) const {
-    std::lock_guard<std::mutex> autoLock(locker);
-    if (!videoSurface->attachToContext(context)) {
-        return nullptr;
-    }
-    if (!videoSurface->updateTexImage()) {
-        return nullptr;
-    }
-    return videoSurface->getTexture();
+  std::lock_guard<std::mutex> autoLock(locker);
+  if (!videoSurface->attachToContext(context)) {
+    return nullptr;
+  }
+  if (!videoSurface->updateTexImage()) {
+    return nullptr;
+  }
+  return videoSurface->getTexture();
 }
 }  // namespace pag

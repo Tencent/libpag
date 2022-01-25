@@ -20,8 +20,8 @@
 
 namespace pag {
 ByteOrder EndianTest() {
-    int i = 1;
-    auto p = static_cast<char*>(static_cast<void*>(&i));
-    return (*p == 1) ? ByteOrder::LittleEndian : ByteOrder::BigEndian;
+  int i = 1;
+  auto p = static_cast<char*>(static_cast<void*>(&i));
+  return (*p == 1) ? ByteOrder::LittleEndian : ByteOrder::BigEndian;
 }
 }  // namespace pag

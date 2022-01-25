@@ -23,27 +23,27 @@
 
 namespace pag {
 class GLNV12Texture : public GLYUVTexture {
-public:
-    static std::shared_ptr<GLNV12Texture> MakeFrom(Context* context, CVPixelBufferRef pixelBuffer,
-            YUVColorSpace colorSpace, YUVColorRange colorRange);
+ public:
+  static std::shared_ptr<GLNV12Texture> MakeFrom(Context* context, CVPixelBufferRef pixelBuffer,
+                                                 YUVColorSpace colorSpace, YUVColorRange colorRange);
 
-    GLNV12Texture(CVPixelBufferRef pixelBuffer,
-                  YUVColorSpace colorSpace, YUVColorRange colorRange);
+  GLNV12Texture(CVPixelBufferRef pixelBuffer,
+                YUVColorSpace colorSpace, YUVColorRange colorRange);
 
-    ~GLNV12Texture() override;
+  ~GLNV12Texture() override;
 
-    YUVPixelFormat pixelFormat() const override {
-        return YUVPixelFormat::NV12;
-    }
+  YUVPixelFormat pixelFormat() const override {
+    return YUVPixelFormat::NV12;
+  }
 
-    size_t memoryUsage() const override;
+  size_t memoryUsage() const override;
 
-protected:
-    void onRelease(Context* context) override;
+ protected:
+  void onRelease(Context* context) override;
 
-private:
-    CVPixelBufferRef pixelBuffer = nullptr;
-    CVOpenGLESTextureRef lumaTexture = nullptr;
-    CVOpenGLESTextureRef chromaTexture = nullptr;
+ private:
+  CVPixelBufferRef pixelBuffer = nullptr;
+  CVOpenGLESTextureRef lumaTexture = nullptr;
+  CVOpenGLESTextureRef chromaTexture = nullptr;
 };
 }  // namespace pag

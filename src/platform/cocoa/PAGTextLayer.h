@@ -25,9 +25,9 @@
 __attribute__((visibility("default")))
 @interface PAGTextLayer : PAGLayer
 
-    /**
-     * Returns the TextLayer’s fill color.
-     */
+/**
+ * Returns the TextLayer’s fill color.
+ */
 - (CocoaColor*)fillColor;
 
 /**

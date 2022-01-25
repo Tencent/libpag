@@ -29,12 +29,12 @@ namespace pag {
 #define DROPSHADOW_SPREAD_MIN_THICK_SIZE (12.0f)
 
 enum class BlurMode {
-    Picture = 0,
-    Shadow = 1,
+  Picture = 0,
+  Shadow = 1,
 };
 enum class BlurDirection {
-    Both = 0,
-    Vertical = 1,
-    Horizontal = 2,
+  Both = 0,
+  Vertical = 1,
+  Horizontal = 2,
 };
 }  // namespace pag

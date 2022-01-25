@@ -21,15 +21,15 @@
 namespace pag {
 
 std::unique_ptr<BlockConfig> Transform2DTag(Transform2D* transform) {
-    auto tagConfig = new BlockConfig(TagCode::Transform2D);
-    AddAttribute(tagConfig, &transform->anchorPoint, AttributeType::SpatialProperty, Point::Zero());
-    AddAttribute(tagConfig, &transform->position, AttributeType::SpatialProperty, Point::Zero());
-    AddAttribute(tagConfig, &transform->xPosition, AttributeType::SimpleProperty, 0.0f);
-    AddAttribute(tagConfig, &transform->yPosition, AttributeType::SimpleProperty, 0.0f);
-    AddAttribute(tagConfig, &transform->scale, AttributeType::MultiDimensionProperty,
-                 Point::Make(1, 1));
-    AddAttribute(tagConfig, &transform->rotation, AttributeType::SimpleProperty, 0.0f);
-    AddAttribute(tagConfig, &transform->opacity, AttributeType::SimpleProperty, Opaque);
-    return std::unique_ptr<BlockConfig>(tagConfig);
+  auto tagConfig = new BlockConfig(TagCode::Transform2D);
+  AddAttribute(tagConfig, &transform->anchorPoint, AttributeType::SpatialProperty, Point::Zero());
+  AddAttribute(tagConfig, &transform->position, AttributeType::SpatialProperty, Point::Zero());
+  AddAttribute(tagConfig, &transform->xPosition, AttributeType::SimpleProperty, 0.0f);
+  AddAttribute(tagConfig, &transform->yPosition, AttributeType::SimpleProperty, 0.0f);
+  AddAttribute(tagConfig, &transform->scale, AttributeType::MultiDimensionProperty,
+               Point::Make(1, 1));
+  AddAttribute(tagConfig, &transform->rotation, AttributeType::SimpleProperty, 0.0f);
+  AddAttribute(tagConfig, &transform->opacity, AttributeType::SimpleProperty, Opaque);
+  return std::unique_ptr<BlockConfig>(tagConfig);
 }
 }  // namespace pag

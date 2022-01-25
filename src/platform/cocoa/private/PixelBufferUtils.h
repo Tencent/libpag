@@ -22,7 +22,7 @@
 
 namespace pag {
 class PixelBufferUtils {
-public:
-    static CVPixelBufferRef Make(int width, int height, bool alphaOnly = false);
+ public:
+  static CVPixelBufferRef Make(int width, int height, bool alphaOnly = false);
 };
 }  // namespace pag

@@ -92,44 +92,44 @@ MotionTileFilter::MotionTileFilter(Effect* effect) : effect(effect) {
 }
 
 std::string MotionTileFilter::onBuildVertexShader() {
-    return MOTIONTILE_VERTEX_SHADER;
+  return MOTIONTILE_VERTEX_SHADER;
 }
 
 std::string MotionTileFilter::onBuildFragmentShader() {
-    return MOTIONTILE_FRAGMENT_SHADER;
+  return MOTIONTILE_FRAGMENT_SHADER;
 }
 
 void MotionTileFilter::onPrepareProgram(const GLInterface* gl, unsigned int program) {
-    tileCenterHandle = gl->getUniformLocation(program, "uTileCenter");
-    tileWidthHandle = gl->getUniformLocation(program, "uTileWidth");
-    tileHeightHandle = gl->getUniformLocation(program, "uTileHeight");
-    outputWidthHandle = gl->getUniformLocation(program, "uOutputWidth");
-    outputHeightHandle = gl->getUniformLocation(program, "uOutputHeight");
-    mirrorEdgesHandle = gl->getUniformLocation(program, "uMirrorEdges");
-    phaseHandle = gl->getUniformLocation(program, "uPhase");
-    isHorizontalPhaseShiftHandle = gl->getUniformLocation(program, "uIsHorizontalPhaseShift");
+  tileCenterHandle = gl->getUniformLocation(program, "uTileCenter");
+  tileWidthHandle = gl->getUniformLocation(program, "uTileWidth");
+  tileHeightHandle = gl->getUniformLocation(program, "uTileHeight");
+  outputWidthHandle = gl->getUniformLocation(program, "uOutputWidth");
+  outputHeightHandle = gl->getUniformLocation(program, "uOutputHeight");
+  mirrorEdgesHandle = gl->getUniformLocation(program, "uMirrorEdges");
+  phaseHandle = gl->getUniformLocation(program, "uPhase");
+  isHorizontalPhaseShiftHandle = gl->getUniformLocation(program, "uIsHorizontalPhaseShift");
 }
 
 void MotionTileFilter::onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
                                       const Point&) {
-    auto* pagEffect = reinterpret_cast<const MotionTileEffect*>(effect);
-    auto tileCenter = pagEffect->tileCenter->getValueAt(layerFrame);
-    auto tileWidth = pagEffect->tileWidth->getValueAt(layerFrame);
-    auto tileHeight = pagEffect->tileHeight->getValueAt(layerFrame);
-    auto outputWidth = pagEffect->outputWidth->getValueAt(layerFrame);
-    auto outputHeight = pagEffect->outputHeight->getValueAt(layerFrame);
-    auto mirrorEdges = pagEffect->mirrorEdges->getValueAt(layerFrame);
-    auto phase = pagEffect->phase->getValueAt(layerFrame);
-    auto isHorizontalPhaseShift = pagEffect->horizontalPhaseShift->getValueAt(layerFrame);
+  auto* pagEffect = reinterpret_cast<const MotionTileEffect*>(effect);
+  auto tileCenter = pagEffect->tileCenter->getValueAt(layerFrame);
+  auto tileWidth = pagEffect->tileWidth->getValueAt(layerFrame);
+  auto tileHeight = pagEffect->tileHeight->getValueAt(layerFrame);
+  auto outputWidth = pagEffect->outputWidth->getValueAt(layerFrame);
+  auto outputHeight = pagEffect->outputHeight->getValueAt(layerFrame);
+  auto mirrorEdges = pagEffect->mirrorEdges->getValueAt(layerFrame);
+  auto phase = pagEffect->phase->getValueAt(layerFrame);
+  auto isHorizontalPhaseShift = pagEffect->horizontalPhaseShift->getValueAt(layerFrame);
 
-    gl->uniform2f(tileCenterHandle, (tileCenter.x - contentBounds.x()) / contentBounds.width(),
-                  1.0f - (tileCenter.y - contentBounds.y()) / contentBounds.height());
-    gl->uniform1f(tileWidthHandle, tileWidth / 100.f);
-    gl->uniform1f(tileHeightHandle, tileHeight / 100.f);
-    gl->uniform1f(outputWidthHandle, outputWidth / 100.f);
-    gl->uniform1f(outputHeightHandle, outputHeight / 100.f);
-    gl->uniform1i(mirrorEdgesHandle, mirrorEdges);
-    gl->uniform1f(phaseHandle, phase);
-    gl->uniform1i(isHorizontalPhaseShiftHandle, isHorizontalPhaseShift);
+  gl->uniform2f(tileCenterHandle, (tileCenter.x - contentBounds.x()) / contentBounds.width(),
+                1.0f - (tileCenter.y - contentBounds.y()) / contentBounds.height());
+  gl->uniform1f(tileWidthHandle, tileWidth / 100.f);
+  gl->uniform1f(tileHeightHandle, tileHeight / 100.f);
+  gl->uniform1f(outputWidthHandle, outputWidth / 100.f);
+  gl->uniform1f(outputHeightHandle, outputHeight / 100.f);
+  gl->uniform1i(mirrorEdgesHandle, mirrorEdges);
+  gl->uniform1f(phaseHandle, phase);
+  gl->uniform1i(isHorizontalPhaseShiftHandle, isHorizontalPhaseShift);
 }
 }  // namespace pag

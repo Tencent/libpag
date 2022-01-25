@@ -19,8 +19,8 @@
 #include "PAGTestEnvironment.h"
 
 int main(int argc, char** argv) {
-    printf("Running main() from %s\n", __FILE__);
-    AddGlobalTestEnvironment(new pag::PAGTestEnvironment());
-    testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
+  printf("Running main() from %s\n", __FILE__);
+  AddGlobalTestEnvironment(new pag::PAGTestEnvironment());
+  testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
 }

@@ -21,31 +21,31 @@
 
 namespace pag {
 GlowEffect::~GlowEffect() {
-    delete glowThreshold;
-    delete glowRadius;
-    delete glowIntensity;
+  delete glowThreshold;
+  delete glowRadius;
+  delete glowIntensity;
 }
 
 bool GlowEffect::visibleAt(Frame layerFrame) const {
-    auto threshold = glowThreshold->getValueAt(layerFrame);
-    return threshold < 1.0f;
+  auto threshold = glowThreshold->getValueAt(layerFrame);
+  return threshold < 1.0f;
 }
 
 void GlowEffect::transformBounds(Rect*, const Point&, Frame) const {
 }
 
 void GlowEffect::excludeVaryingRanges(std::vector<pag::TimeRange>* timeRanges) const {
-    Effect::excludeVaryingRanges(timeRanges);
-    glowThreshold->excludeVaryingRanges(timeRanges);
-    glowRadius->excludeVaryingRanges(timeRanges);
-    glowIntensity->excludeVaryingRanges(timeRanges);
+  Effect::excludeVaryingRanges(timeRanges);
+  glowThreshold->excludeVaryingRanges(timeRanges);
+  glowRadius->excludeVaryingRanges(timeRanges);
+  glowIntensity->excludeVaryingRanges(timeRanges);
 }
 
 bool GlowEffect::verify() const {
-    if (!Effect::verify()) {
-        VerifyFailed();
-        return false;
-    }
-    VerifyAndReturn(glowThreshold != nullptr && glowRadius != nullptr && glowIntensity != nullptr);
+  if (!Effect::verify()) {
+    VerifyFailed();
+    return false;
+  }
+  VerifyAndReturn(glowThreshold != nullptr && glowRadius != nullptr && glowIntensity != nullptr);
 }
 }  // namespace pag

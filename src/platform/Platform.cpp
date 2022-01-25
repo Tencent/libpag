@@ -26,58 +26,58 @@
 
 namespace pag {
 bool Platform::hasHardwareDecoder() const {
-    return false;
+  return false;
 }
 
 std::unique_ptr<VideoDecoder> Platform::makeHardwareDecoder(const VideoConfig&) const {
-    return nullptr;
+  return nullptr;
 }
 
 std::shared_ptr<PixelBuffer> Platform::makeHardwareBuffer(int, int, bool) const {
-    return nullptr;
+  return nullptr;
 }
 
 std::shared_ptr<Image> Platform::makeImage(const std::string&) const {
-    return nullptr;
+  return nullptr;
 }
 
 std::shared_ptr<Image> Platform::makeImage(std::shared_ptr<Data>) const {
-    return nullptr;
+  return nullptr;
 }
 
 PAGFont Platform::parseFont(const std::string&, int) const {
-    return {"", ""};
+  return {"", ""};
 }
 
 PAGFont Platform::parseFont(const void*, size_t, int) const {
-    return {"", ""};
+  return {"", ""};
 }
 
 void Platform::printLog(const char format[], ...) const {
-    va_list args;
-    va_start(args, format);
-    vfprintf(stdout, format, args);
-    va_end(args);
-    fprintf(stdout, "\n");
+  va_list args;
+  va_start(args, format);
+  vfprintf(stdout, format, args);
+  va_end(args);
+  fprintf(stdout, "\n");
 }
 
 void Platform::printError(const char format[], ...) const {
-    va_list args;
-    va_start(args, format);
-    vfprintf(stderr, format, args);
-    va_end(args);
-    fprintf(stderr, "\n");
+  va_list args;
+  va_start(args, format);
+  vfprintf(stderr, format, args);
+  va_end(args);
+  fprintf(stderr, "\n");
 }
 
 bool Platform::registerFallbackFonts() const {
-    return false;
+  return false;
 }
 
 void Platform::reportStatisticalData(std::unordered_map<std::string, std::string>&) const {
 }
 
 NALUType Platform::naluType() const {
-    return NALUType::AnnexB;
+  return NALUType::AnnexB;
 }
 
 void Platform::traceImage(const PixelMap&, const std::string&) const {

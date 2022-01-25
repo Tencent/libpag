@@ -24,55 +24,55 @@
 
 namespace pag {
 class MemoryCalculator {
-public:
-    static void CaculateResourcesMaxScaleAndTimeRanges(
-        Layer* rootLayer, std::unordered_map<void*, Point>& resourcesMaxScaleMap,
-        std::unordered_map<void*, std::vector<TimeRange>*>& resourcesTimeRangesMap);
+ public:
+  static void CaculateResourcesMaxScaleAndTimeRanges(
+      Layer* rootLayer, std::unordered_map<void*, Point>& resourcesMaxScaleMap,
+      std::unordered_map<void*, std::vector<TimeRange>*>& resourcesTimeRangesMap);
 
-    static std::vector<int64_t> GetRootLayerGraphicsMemoriesPreFrame(
-        PreComposeLayer* rootLayer, std::unordered_map<void*, Point>& resourcesScaleMap,
-        std::unordered_map<void*, std::vector<TimeRange>*>& resourcesTimeRangesMap);
+  static std::vector<int64_t> GetRootLayerGraphicsMemoriesPreFrame(
+      PreComposeLayer* rootLayer, std::unordered_map<void*, Point>& resourcesScaleMap,
+      std::unordered_map<void*, std::vector<TimeRange>*>& resourcesTimeRangesMap);
 
-private:
-    static void FillBitmapGraphicsMemories(
-        Composition* composition, std::unordered_map<void*, Point>& resourcesScaleMap,
-        std::unordered_map<void*, std::vector<TimeRange>*>& resourcesTimeRangesMap,
-        std::vector<int64_t>& memoriesPreFrame, int64_t& graphicsMemory);
+ private:
+  static void FillBitmapGraphicsMemories(
+      Composition* composition, std::unordered_map<void*, Point>& resourcesScaleMap,
+      std::unordered_map<void*, std::vector<TimeRange>*>& resourcesTimeRangesMap,
+      std::vector<int64_t>& memoriesPreFrame, int64_t& graphicsMemory);
 
-    static void FillVideoGraphicsMemories(
-        Composition* composition,
-        std::unordered_map<void*, std::vector<TimeRange>*>& resourcesTimeRangesMap,
-        std::vector<int64_t>& memoriesPreFrame, int64_t& graphicsMemory);
+  static void FillVideoGraphicsMemories(
+      Composition* composition,
+      std::unordered_map<void*, std::vector<TimeRange>*>& resourcesTimeRangesMap,
+      std::vector<int64_t>& memoriesPreFrame, int64_t& graphicsMemory);
 
-    static void FillVectorGraphicsMemories(
-        Composition* composition, std::unordered_map<void*, Point>& resourcesScaleMap,
-        std::unordered_map<void*, std::vector<TimeRange>*>& resourcesTimeRangesMap,
-        std::vector<int64_t>& memoriesPreFrame, std::unordered_set<void*>& cachedResources);
+  static void FillVectorGraphicsMemories(
+      Composition* composition, std::unordered_map<void*, Point>& resourcesScaleMap,
+      std::unordered_map<void*, std::vector<TimeRange>*>& resourcesTimeRangesMap,
+      std::vector<int64_t>& memoriesPreFrame, std::unordered_set<void*>& cachedResources);
 
-    static int64_t FillCompositionGraphicsMemories(
-        Composition* composition, std::unordered_map<void*, Point>& resourcesScaleMap,
-        std::unordered_map<void*, std::vector<TimeRange>*>& resourcesTimeRangesMap,
-        std::vector<int64_t>& memoriesPreFrame, std::unordered_set<void*>& cachedResources);
+  static int64_t FillCompositionGraphicsMemories(
+      Composition* composition, std::unordered_map<void*, Point>& resourcesScaleMap,
+      std::unordered_map<void*, std::vector<TimeRange>*>& resourcesTimeRangesMap,
+      std::vector<int64_t>& memoriesPreFrame, std::unordered_set<void*>& cachedResources);
 
-    static void FillLayerGraphicsMemoriesPreFrame(
-        Layer* layer, std::unordered_map<void*, Point>& resourcesScaleMap,
-        std::unordered_map<void*, std::vector<TimeRange>*>& resourcesTimeRangesMap,
-        std::vector<int64_t>& memoriesPreFrame, std::unordered_set<void*>& cachedResources);
+  static void FillLayerGraphicsMemoriesPreFrame(
+      Layer* layer, std::unordered_map<void*, Point>& resourcesScaleMap,
+      std::unordered_map<void*, std::vector<TimeRange>*>& resourcesTimeRangesMap,
+      std::vector<int64_t>& memoriesPreFrame, std::unordered_set<void*>& cachedResources);
 
-    static bool UpdateMaxScaleMapIfNeed(void* resource, Point currentScale,
-                                        std::unordered_map<void*, Point>& resourcesMaxScaleMap);
-    static void UpdateTimeRangesMapIfNeed(
-        void* resource, TimeRange timeRange,
-        std::unordered_map<void*, std::vector<TimeRange>*>& resourcesTimeRangesMap,
-        bool needUnion = true);
+  static bool UpdateMaxScaleMapIfNeed(void* resource, Point currentScale,
+                                      std::unordered_map<void*, Point>& resourcesMaxScaleMap);
+  static void UpdateTimeRangesMapIfNeed(
+      void* resource, TimeRange timeRange,
+      std::unordered_map<void*, std::vector<TimeRange>*>& resourcesTimeRangesMap,
+      bool needUnion = true);
 
-    static void UpdateTimeRange(
-        Layer* layer, Frame referenceStartTime,
-        std::unordered_map<void*, std::vector<TimeRange>*>& resourcesTimeRangesMap);
+  static void UpdateTimeRange(
+      Layer* layer, Frame referenceStartTime,
+      std::unordered_map<void*, std::vector<TimeRange>*>& resourcesTimeRangesMap);
 
-    static void UpdateMaxScaleAndTimeRange(
-        Layer* layer, Point referenceScale, Frame referenceStartTime,
-        std::unordered_map<void*, Point>& resourcesMaxScaleMap,
-        std::unordered_map<void*, std::vector<TimeRange>*>& resourcesTimeRangesMap);
+  static void UpdateMaxScaleAndTimeRange(
+      Layer* layer, Point referenceScale, Frame referenceStartTime,
+      std::unordered_map<void*, Point>& resourcesMaxScaleMap,
+      std::unordered_map<void*, std::vector<TimeRange>*>& resourcesTimeRangesMap);
 };
 }  // namespace pag

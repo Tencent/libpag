@@ -21,31 +21,31 @@
 
 namespace pag {
 MosaicEffect::~MosaicEffect() {
-    delete horizontalBlocks;
-    delete verticalBlocks;
-    delete sharpColors;
+  delete horizontalBlocks;
+  delete verticalBlocks;
+  delete sharpColors;
 }
 
 bool MosaicEffect::visibleAt(Frame) const {
-    return true;
+  return true;
 }
 
 void MosaicEffect::transformBounds(Rect*, const Point&, Frame) const {
 }
 
 void MosaicEffect::excludeVaryingRanges(std::vector<pag::TimeRange>* timeRanges) const {
-    Effect::excludeVaryingRanges(timeRanges);
-    horizontalBlocks->excludeVaryingRanges(timeRanges);
-    verticalBlocks->excludeVaryingRanges(timeRanges);
-    sharpColors->excludeVaryingRanges(timeRanges);
+  Effect::excludeVaryingRanges(timeRanges);
+  horizontalBlocks->excludeVaryingRanges(timeRanges);
+  verticalBlocks->excludeVaryingRanges(timeRanges);
+  sharpColors->excludeVaryingRanges(timeRanges);
 }
 
 bool MosaicEffect::verify() const {
-    if (!Effect::verify()) {
-        VerifyFailed();
-        return false;
-    }
-    VerifyAndReturn(horizontalBlocks != nullptr && verticalBlocks != nullptr &&
-                    sharpColors != nullptr);
+  if (!Effect::verify()) {
+    VerifyFailed();
+    return false;
+  }
+  VerifyAndReturn(horizontalBlocks != nullptr && verticalBlocks != nullptr &&
+                  sharpColors != nullptr);
 }
 }  // namespace pag

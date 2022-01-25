@@ -22,15 +22,15 @@
 
 namespace pag {
 class NativePlatform : public Platform {
-public:
-    NALUType naluType() const override;
+ public:
+  NALUType naluType() const override;
 
-    void setNALUType(NALUType type) const;
+  void setNALUType(NALUType type) const;
 
-    PAGFont parseFont(const std::string& fontPath, int ttcIndex) const override;
+  PAGFont parseFont(const std::string& fontPath, int ttcIndex) const override;
 
-    PAGFont parseFont(const void* data, size_t length, int ttcIndex) const override;
+  PAGFont parseFont(const void* data, size_t length, int ttcIndex) const override;
 
-    void traceImage(const PixelMap &pixelMap, const std::string &tag) const override;
+  void traceImage(const PixelMap &pixelMap, const std::string &tag) const override;
 };
 }  // namespace pag

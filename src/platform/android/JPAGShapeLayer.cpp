@@ -24,17 +24,17 @@ static jfieldID PAGShapeLayer_nativeContext;
 using namespace pag;
 
 std::shared_ptr<PAGShapeLayer> GetPAGShapeLayer(JNIEnv* env, jobject thiz) {
-    auto nativeContext =
-        reinterpret_cast<JPAGLayerHandle*>(env->GetLongField(thiz, PAGShapeLayer_nativeContext));
-    if (nativeContext == nullptr) {
-        return nullptr;
-    }
-    return std::static_pointer_cast<PAGShapeLayer>(nativeContext->get());
+  auto nativeContext =
+      reinterpret_cast<JPAGLayerHandle*>(env->GetLongField(thiz, PAGShapeLayer_nativeContext));
+  if (nativeContext == nullptr) {
+    return nullptr;
+  }
+  return std::static_pointer_cast<PAGShapeLayer>(nativeContext->get());
 }
 
 extern "C" {
 
-    JNIEXPORT void Java_org_libpag_PAGShapeLayer_nativeInit(JNIEnv* env, jclass clazz) {
-        PAGShapeLayer_nativeContext = env->GetFieldID(clazz, "nativeContext", "J");
-    }
+JNIEXPORT void Java_org_libpag_PAGShapeLayer_nativeInit(JNIEnv* env, jclass clazz) {
+  PAGShapeLayer_nativeContext = env->GetFieldID(clazz, "nativeContext", "J");
+}
 }

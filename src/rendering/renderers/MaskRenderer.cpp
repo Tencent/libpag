@@ -23,61 +23,61 @@
 
 namespace pag {
 PathOp ToPathOp(Enum maskMode) {
-    switch (maskMode) {
+  switch (maskMode) {
     case MaskMode::Subtract:
-        return PathOp::Difference;
+      return PathOp::Difference;
     case MaskMode::Intersect:
-        return PathOp::Intersect;
+      return PathOp::Intersect;
     case MaskMode::Difference:
-        return PathOp::XOR;
+      return PathOp::XOR;
     case MaskMode::Darken:  // without the opacity blending, haven't supported it
-        return PathOp::Intersect;
+      return PathOp::Intersect;
     default:
-        return PathOp::Union;
-    }
+      return PathOp::Union;
+  }
 }
 
 static void ExpandPath(Path* path, float expansion) {
-    if (expansion == 0) {
-        return;
-    }
-    auto strokePath = *path;
-    auto effect = PathEffect::MakeStroke(Stroke(fabsf(expansion) * 2));
-    if (effect) {
-        effect->applyTo(&strokePath);
-    }
-    if (expansion < 0) {
-        path->addPath(strokePath, PathOp::Difference);
-    } else {
-        path->addPath(strokePath, PathOp::Union);
-    }
+  if (expansion == 0) {
+    return;
+  }
+  auto strokePath = *path;
+  auto effect = PathEffect::MakeStroke(Stroke(fabsf(expansion) * 2));
+  if (effect) {
+    effect->applyTo(&strokePath);
+  }
+  if (expansion < 0) {
+    path->addPath(strokePath, PathOp::Difference);
+  } else {
+    path->addPath(strokePath, PathOp::Union);
+  }
 }
 
 void RenderMasks(Path* maskContent, const std::vector<MaskData*>& masks, Frame layerFrame) {
-    bool isFirst = true;
-    for (auto& mask : masks) {
-        auto path = mask->maskPath->getValueAt(layerFrame);
-        if (path == nullptr || !path->isClosed() || mask->maskMode == MaskMode::None) {
-            continue;
-        }
-        auto maskPath = ToPath(*path);
-        auto expansion = mask->maskExpansion->getValueAt(layerFrame);
-        ExpandPath(&maskPath, expansion);
-        auto inverted = mask->inverted;
-        if (isFirst) {
-            if (mask->maskMode == MaskMode::Subtract) {
-                inverted = !inverted;
-            }
-        }
-        if (inverted) {
-            maskPath.toggleInverseFillType();
-        }
-        if (isFirst) {
-            isFirst = false;
-            *maskContent = maskPath;
-        } else {
-            maskContent->addPath(maskPath, ToPathOp(mask->maskMode));
-        }
+  bool isFirst = true;
+  for (auto& mask : masks) {
+    auto path = mask->maskPath->getValueAt(layerFrame);
+    if (path == nullptr || !path->isClosed() || mask->maskMode == MaskMode::None) {
+      continue;
     }
+    auto maskPath = ToPath(*path);
+    auto expansion = mask->maskExpansion->getValueAt(layerFrame);
+    ExpandPath(&maskPath, expansion);
+    auto inverted = mask->inverted;
+    if (isFirst) {
+      if (mask->maskMode == MaskMode::Subtract) {
+        inverted = !inverted;
+      }
+    }
+    if (inverted) {
+      maskPath.toggleInverseFillType();
+    }
+    if (isFirst) {
+      isFirst = false;
+      *maskContent = maskPath;
+    } else {
+      maskContent->addPath(maskPath, ToPathOp(mask->maskMode));
+    }
+  }
 }
 }  // namespace pag

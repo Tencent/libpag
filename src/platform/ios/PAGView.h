@@ -69,9 +69,9 @@
 __attribute__((visibility("default")))
 @interface PAGView : UIView
 
-    /**
-     * Default is NO.
-     */
+/**
+ * Default is NO.
+ */
 @property(nonatomic) BOOL sync;
 
 /**

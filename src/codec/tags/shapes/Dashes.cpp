@@ -23,41 +23,41 @@ static const AttributeConfig<float> dashOffsetConfig = {AttributeType::SimplePro
 static const AttributeConfig<float> dashConfig = {AttributeType::SimpleProperty, 10.0f};
 
 Property<float>* ReadDashes(DecodeStream* stream, std::vector<Property<float>*>& dashes) {
-    stream->alignWithBytes();
-    uint64_t dashLength = stream->readUBits(3) + 1;
-    auto dashOffsetFlag = ReadAttributeFlag(stream, &dashOffsetConfig);
-    std::vector<AttributeFlag> dashFlags;
-    for (uint64_t i = 0; i < dashLength; i++) {
-        auto flag = ReadAttributeFlag(stream, &dashConfig);
-        dashFlags.push_back(flag);
-    }
-    Property<float>* dashOffset = nullptr;
-    dashOffsetConfig.readAttribute(stream, dashOffsetFlag, &dashOffset);
-    for (uint64_t i = 0; i < dashLength; i++) {
-        Property<float>* dash = nullptr;
-        dashConfig.readAttribute(stream, dashFlags[i], &dash);
-        dashes.push_back(dash);
-    }
-    return dashOffset;
+  stream->alignWithBytes();
+  uint64_t dashLength = stream->readUBits(3) + 1;
+  auto dashOffsetFlag = ReadAttributeFlag(stream, &dashOffsetConfig);
+  std::vector<AttributeFlag> dashFlags;
+  for (uint64_t i = 0; i < dashLength; i++) {
+    auto flag = ReadAttributeFlag(stream, &dashConfig);
+    dashFlags.push_back(flag);
+  }
+  Property<float>* dashOffset = nullptr;
+  dashOffsetConfig.readAttribute(stream, dashOffsetFlag, &dashOffset);
+  for (uint64_t i = 0; i < dashLength; i++) {
+    Property<float>* dash = nullptr;
+    dashConfig.readAttribute(stream, dashFlags[i], &dash);
+    dashes.push_back(dash);
+  }
+  return dashOffset;
 }
 
 void WriteDashes(EncodeStream* stream, std::vector<Property<float>*>& dashes,
                  Property<float>* dashOffset) {
-    if (dashes.empty()) {
-        return;
-    }
-    stream->alignWithBytes();
-    EncodeStream contentBytes(stream->context);
+  if (dashes.empty()) {
+    return;
+  }
+  stream->alignWithBytes();
+  EncodeStream contentBytes(stream->context);
 
-    auto dashLength = static_cast<uint32_t>(dashes.size());
-    if (dashLength > 6) {
-        dashLength = 6;
-    }
-    stream->writeUBits(dashLength - 1, 3);
-    dashOffsetConfig.writeAttribute(stream, &contentBytes, &dashOffset);
-    for (uint32_t i = 0; i < dashLength; i++) {
-        dashConfig.writeAttribute(stream, &contentBytes, &(dashes[i]));
-    }
-    stream->writeBytes(&contentBytes);
+  auto dashLength = static_cast<uint32_t>(dashes.size());
+  if (dashLength > 6) {
+    dashLength = 6;
+  }
+  stream->writeUBits(dashLength - 1, 3);
+  dashOffsetConfig.writeAttribute(stream, &contentBytes, &dashOffset);
+  for (uint32_t i = 0; i < dashLength; i++) {
+    dashConfig.writeAttribute(stream, &contentBytes, &(dashes[i]));
+  }
+  stream->writeBytes(&contentBytes);
 }
 }  // namespace pag

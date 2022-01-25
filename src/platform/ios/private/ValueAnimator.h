@@ -33,13 +33,13 @@
 @end
 
 @interface ValueAnimator : NSObject {
-    int64_t duration;
-    int64_t startTime;
-    int64_t playTime;
-    int repeatCount;
-    int repeatedTimes;
-    NSUInteger animatorId;
-    id<ValueAnimatorListener> animatorListener;
+  int64_t duration;
+  int64_t startTime;
+  int64_t playTime;
+  int repeatCount;
+  int repeatedTimes;
+  NSUInteger animatorId;
+  id<ValueAnimatorListener> animatorListener;
 }
 
 - (void)setListener:(id)listener;

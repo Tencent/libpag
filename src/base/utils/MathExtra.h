@@ -30,28 +30,28 @@ static constexpr float FLOAT_SQRT2 = 1.41421356f;
 #define RadiansToDegrees(radians) ((radians) * (180.0f / M_PI_F))
 
 static inline bool FloatNearlyZero(float x, float tolerance = FLOAT_NEARLY_ZERO) {
-    return fabsf(x) <= tolerance;
+  return fabsf(x) <= tolerance;
 }
 
 static inline bool FloatNearlyEqual(float x, float y, float tolerance = FLOAT_NEARLY_ZERO) {
-    return fabsf(x - y) <= tolerance;
+  return fabsf(x - y) <= tolerance;
 }
 
 static inline float SinSnapToZero(float radians) {
-    float v = sinf(radians);
-    return FloatNearlyZero(v) ? 0.0f : v;
+  float v = sinf(radians);
+  return FloatNearlyZero(v) ? 0.0f : v;
 }
 
 static inline float CosSnapToZero(float radians) {
-    float v = cosf(radians);
-    return FloatNearlyZero(v) ? 0.0f : v;
+  float v = cosf(radians);
+  return FloatNearlyZero(v) ? 0.0f : v;
 }
 
 static inline bool FloatsAreFinite(const float array[], int count) {
-    float prod = 0;
-    for (int i = 0; i < count; ++i) {
-        prod *= array[i];
-    }
-    return prod == 0;
+  float prod = 0;
+  for (int i = 0; i < count; ++i) {
+    prod *= array[i];
+  }
+  return prod == 0;
 }
 }  // namespace pag

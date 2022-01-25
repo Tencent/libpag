@@ -21,14 +21,14 @@
 
 namespace pag {
 TextMoreOptions::~TextMoreOptions() {
-    delete groupingAlignment;
+  delete groupingAlignment;
 }
 
 void TextMoreOptions::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {
-    groupingAlignment->excludeVaryingRanges(timeRanges);
+  groupingAlignment->excludeVaryingRanges(timeRanges);
 }
 
 bool TextMoreOptions::verify() const {
-    VerifyAndReturn(groupingAlignment != nullptr);
+  VerifyAndReturn(groupingAlignment != nullptr);
 }
 }  // namespace pag

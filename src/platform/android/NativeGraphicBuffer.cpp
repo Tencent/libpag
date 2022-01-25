@@ -23,72 +23,72 @@
 namespace pag {
 std::shared_ptr<NativeGraphicBuffer> NativeGraphicBuffer::MakeAdopted(
     android::GraphicBuffer* graphicBuffer) {
-    if (!graphicBuffer || !NativeGraphicBufferInterface::Get()->constructor) {
-        return nullptr;
-    }
-    return std::shared_ptr<NativeGraphicBuffer>(new NativeGraphicBuffer(graphicBuffer));
+  if (!graphicBuffer || !NativeGraphicBufferInterface::Get()->constructor) {
+    return nullptr;
+  }
+  return std::shared_ptr<NativeGraphicBuffer>(new NativeGraphicBuffer(graphicBuffer));
 }
 
 std::shared_ptr<PixelBuffer> NativeGraphicBuffer::Make(int width, int height, bool alphaOnly) {
-    if (alphaOnly) {
-        return nullptr;
-    }
-    if (!NativeGraphicBufferInterface::Get()->constructor) {
-        return nullptr;
-    }
-    auto buffer = NativeGraphicBufferInterface::MakeGraphicBuffer(
-                      width, height, PIXEL_FORMAT_RGBA_8888,
-                      NativeGraphicBufferInterface::USAGE_HW_RENDER |
-                      NativeGraphicBufferInterface::USAGE_HW_TEXTURE |
-                      NativeGraphicBufferInterface::USAGE_HW_RENDER |
-                      NativeGraphicBufferInterface::USAGE_SW_READ_OFTEN |
-                      NativeGraphicBufferInterface::USAGE_SW_WRITE_OFTEN);
-    if (!buffer) {
-        return nullptr;
-    }
-    return std::shared_ptr<NativeGraphicBuffer>(new NativeGraphicBuffer(buffer));
+  if (alphaOnly) {
+    return nullptr;
+  }
+  if (!NativeGraphicBufferInterface::Get()->constructor) {
+    return nullptr;
+  }
+  auto buffer = NativeGraphicBufferInterface::MakeGraphicBuffer(
+      width, height, PIXEL_FORMAT_RGBA_8888,
+      NativeGraphicBufferInterface::USAGE_HW_RENDER |
+          NativeGraphicBufferInterface::USAGE_HW_TEXTURE |
+          NativeGraphicBufferInterface::USAGE_HW_RENDER |
+          NativeGraphicBufferInterface::USAGE_SW_READ_OFTEN |
+          NativeGraphicBufferInterface::USAGE_SW_WRITE_OFTEN);
+  if (!buffer) {
+    return nullptr;
+  }
+  return std::shared_ptr<NativeGraphicBuffer>(new NativeGraphicBuffer(buffer));
 }
 
 std::shared_ptr<Texture> NativeGraphicBuffer::makeTexture(Context* context) const {
-    return GLHardwareTexture::MakeFrom(context, graphicBuffer);
+  return GLHardwareTexture::MakeFrom(context, graphicBuffer);
 }
 
 void* NativeGraphicBuffer::lockPixels() {
-    uint8_t* readPtr = nullptr;
-    if (graphicBuffer) {
-        NativeGraphicBufferInterface::Get()->lock(
-            graphicBuffer,
-            NativeGraphicBufferInterface::USAGE_SW_READ_OFTEN |
+  uint8_t* readPtr = nullptr;
+  if (graphicBuffer) {
+    NativeGraphicBufferInterface::Get()->lock(
+        graphicBuffer,
+        NativeGraphicBufferInterface::USAGE_SW_READ_OFTEN |
             NativeGraphicBufferInterface::USAGE_SW_WRITE_OFTEN,
-            reinterpret_cast<void**>(&readPtr));
-    }
-    return readPtr;
+        reinterpret_cast<void**>(&readPtr));
+  }
+  return readPtr;
 }
 
 void NativeGraphicBuffer::unlockPixels() {
-    if (graphicBuffer) {
-        NativeGraphicBufferInterface::Get()->unlock(graphicBuffer);
-    }
+  if (graphicBuffer) {
+    NativeGraphicBufferInterface::Get()->unlock(graphicBuffer);
+  }
 }
 
 static ImageInfo GetImageInfo(android::GraphicBuffer* graphicBuffer) {
-    auto desc =
-        (android::android_native_buffer_t*)NativeGraphicBufferInterface::Get()->getNativeBuffer(
-            graphicBuffer);
-    return ImageInfo::Make(desc->width, desc->height, ColorType::RGBA_8888, AlphaType::Premultiplied,
-                           desc->stride * 4);
+  auto desc =
+      (android::android_native_buffer_t*)NativeGraphicBufferInterface::Get()->getNativeBuffer(
+          graphicBuffer);
+  return ImageInfo::Make(desc->width, desc->height, ColorType::RGBA_8888, AlphaType::Premultiplied,
+                         desc->stride * 4);
 }
 
 NativeGraphicBuffer::NativeGraphicBuffer(android::GraphicBuffer* graphicBuffer)
     : PixelBuffer(GetImageInfo(graphicBuffer)), graphicBuffer(graphicBuffer) {
-    if (graphicBuffer) {
-        NativeGraphicBufferInterface::Acquire(graphicBuffer);
-    }
+  if (graphicBuffer) {
+    NativeGraphicBufferInterface::Acquire(graphicBuffer);
+  }
 }
 
 NativeGraphicBuffer::~NativeGraphicBuffer() {
-    if (graphicBuffer) {
-        NativeGraphicBufferInterface::Release(graphicBuffer);
-    }
+  if (graphicBuffer) {
+    NativeGraphicBufferInterface::Release(graphicBuffer);
+  }
 }
 }  // namespace pag

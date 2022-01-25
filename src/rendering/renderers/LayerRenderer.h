@@ -23,16 +23,16 @@
 
 namespace pag {
 class LayerRenderer {
-public:
-    static void DrawLayer(Recorder* recorder, Layer* layer, Frame layerFrame,
-                          std::shared_ptr<FilterModifier> filterModifier = nullptr,
-                          TrackMatte* trackMatte = nullptr, Content* layerContent = nullptr,
-                          Transform* extraTransform = nullptr);
+ public:
+  static void DrawLayer(Recorder* recorder, Layer* layer, Frame layerFrame,
+                        std::shared_ptr<FilterModifier> filterModifier = nullptr,
+                        TrackMatte* trackMatte = nullptr, Content* layerContent = nullptr,
+                        Transform* extraTransform = nullptr);
 
-    static void MeasureLayerBounds(Rect* bounds, Layer* layer, Frame layerFrame,
-                                   std::shared_ptr<FilterModifier> filterModifier = nullptr,
-                                   Rect* trackMatteBounds = nullptr, Content* content = nullptr,
-                                   Transform* extraTransform = nullptr);
+  static void MeasureLayerBounds(Rect* bounds, Layer* layer, Frame layerFrame,
+                                 std::shared_ptr<FilterModifier> filterModifier = nullptr,
+                                 Rect* trackMatteBounds = nullptr, Content* content = nullptr,
+                                 Transform* extraTransform = nullptr);
 };
 
 }  // namespace pag

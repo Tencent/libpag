@@ -94,46 +94,46 @@ DisplacementMapFilter::DisplacementMapFilter(Effect* effect) : effect(effect) {
 }
 
 std::string DisplacementMapFilter::onBuildFragmentShader() {
-    return FRAGMENT_SHADER;
+  return FRAGMENT_SHADER;
 }
 
 void DisplacementMapFilter::onPrepareProgram(const GLInterface* gl, unsigned int program) {
-    useForDisplacementHandle = gl->getUniformLocation(program, "uUseForDisplacement");
-    maxDisplacementHandle = gl->getUniformLocation(program, "uMaxDisplacement");
-    displacementMapBehaviorHandle = gl->getUniformLocation(program, "uDisplacementMapBehavior");
-    edgeBehaviorHandle = gl->getUniformLocation(program, "uEdgeBehavior");
-    expandOutputHandle = gl->getUniformLocation(program, "uExpandOutput");
-    mapTextureHandle = gl->getUniformLocation(program, "mapTexture");
-    mapTextureSizeHandle = gl->getUniformLocation(program, "mapTextureSize");
+  useForDisplacementHandle = gl->getUniformLocation(program, "uUseForDisplacement");
+  maxDisplacementHandle = gl->getUniformLocation(program, "uMaxDisplacement");
+  displacementMapBehaviorHandle = gl->getUniformLocation(program, "uDisplacementMapBehavior");
+  edgeBehaviorHandle = gl->getUniformLocation(program, "uEdgeBehavior");
+  expandOutputHandle = gl->getUniformLocation(program, "uExpandOutput");
+  mapTextureHandle = gl->getUniformLocation(program, "mapTexture");
+  mapTextureSizeHandle = gl->getUniformLocation(program, "mapTextureSize");
 }
 
 void DisplacementMapFilter::updateMapTexture(RenderCache* cache, const Graphic* mapGraphic,
-        const Rect& bounds) {
-    if (mapSurface == nullptr || mapBounds.width() != bounds.width() ||
-            mapBounds.height() != bounds.height()) {
-        mapSurface = Surface::Make(cache->getContext(), static_cast<int>(bounds.width()),
-                                   static_cast<int>(bounds.height()));
-        mapBounds = bounds;
-    }
-    mapGraphic->draw(mapSurface->getCanvas(), cache);
+                                             const Rect& bounds) {
+  if (mapSurface == nullptr || mapBounds.width() != bounds.width() ||
+      mapBounds.height() != bounds.height()) {
+    mapSurface = Surface::Make(cache->getContext(), static_cast<int>(bounds.width()),
+                               static_cast<int>(bounds.height()));
+    mapBounds = bounds;
+  }
+  mapGraphic->draw(mapSurface->getCanvas(), cache);
 }
 
 void DisplacementMapFilter::onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
-        const Point&) {
-    auto* pagEffect = reinterpret_cast<const DisplacementMapEffect*>(effect);
-    auto mapTexture = GLTexture::Unwrap(mapSurface->getTexture().get());
-    ActiveTexture(gl, GL::TEXTURE1, GL::TEXTURE_2D, mapTexture.id);
-    gl->uniform2f(useForDisplacementHandle,
-                  pagEffect->useForHorizontalDisplacement->getValueAt(layerFrame),
-                  pagEffect->useForVerticalDisplacement->getValueAt(layerFrame));
-    gl->uniform2f(maxDisplacementHandle, pagEffect->maxHorizontalDisplacement->getValueAt(layerFrame),
-                  pagEffect->maxVerticalDisplacement->getValueAt(layerFrame));
-    gl->uniform1i(displacementMapBehaviorHandle,
-                  pagEffect->displacementMapBehavior->getValueAt(layerFrame));
-    gl->uniform1i(edgeBehaviorHandle, pagEffect->edgeBehavior->getValueAt(layerFrame));
-    gl->uniform1i(expandOutputHandle, pagEffect->expandOutput->getValueAt(layerFrame));
-    gl->uniform1i(mapTextureHandle, 1);
-    gl->uniform2f(mapTextureSizeHandle, mapBounds.width() / contentBounds.width(),
-                  mapBounds.height() / contentBounds.height());
+                                           const Point&) {
+  auto* pagEffect = reinterpret_cast<const DisplacementMapEffect*>(effect);
+  auto mapTexture = GLTexture::Unwrap(mapSurface->getTexture().get());
+  ActiveTexture(gl, GL::TEXTURE1, GL::TEXTURE_2D, mapTexture.id);
+  gl->uniform2f(useForDisplacementHandle,
+                pagEffect->useForHorizontalDisplacement->getValueAt(layerFrame),
+                pagEffect->useForVerticalDisplacement->getValueAt(layerFrame));
+  gl->uniform2f(maxDisplacementHandle, pagEffect->maxHorizontalDisplacement->getValueAt(layerFrame),
+                pagEffect->maxVerticalDisplacement->getValueAt(layerFrame));
+  gl->uniform1i(displacementMapBehaviorHandle,
+                pagEffect->displacementMapBehavior->getValueAt(layerFrame));
+  gl->uniform1i(edgeBehaviorHandle, pagEffect->edgeBehavior->getValueAt(layerFrame));
+  gl->uniform1i(expandOutputHandle, pagEffect->expandOutput->getValueAt(layerFrame));
+  gl->uniform1i(mapTextureHandle, 1);
+  gl->uniform2f(mapTextureSizeHandle, mapBounds.width() / contentBounds.width(),
+                mapBounds.height() / contentBounds.height());
 }
 }  // namespace pag

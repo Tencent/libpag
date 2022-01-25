@@ -20,8 +20,8 @@
 
 namespace pag {
 std::unique_ptr<BlockConfig> RoundCornersTag(RoundCornersElement* shape) {
-    auto tagConfig = new BlockConfig(TagCode::RoundCorners);
-    AddAttribute(tagConfig, &shape->radius, AttributeType::SimpleProperty, 10.0f);
-    return std::unique_ptr<BlockConfig>(tagConfig);
+  auto tagConfig = new BlockConfig(TagCode::RoundCorners);
+  AddAttribute(tagConfig, &shape->radius, AttributeType::SimpleProperty, 10.0f);
+  return std::unique_ptr<BlockConfig>(tagConfig);
 }
 }  // namespace pag

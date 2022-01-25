@@ -21,34 +21,34 @@
 
 namespace pag {
 TextRangeSelector::~TextRangeSelector() {
-    delete start;
-    delete end;
-    delete offset;
-    delete mode;
-    delete amount;
-    delete smoothness;
-    delete easeHigh;
-    delete easeLow;
-    delete randomSeed;
+  delete start;
+  delete end;
+  delete offset;
+  delete mode;
+  delete amount;
+  delete smoothness;
+  delete easeHigh;
+  delete easeLow;
+  delete randomSeed;
 }
 
 void TextRangeSelector::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {
-    start->excludeVaryingRanges(timeRanges);
-    end->excludeVaryingRanges(timeRanges);
-    offset->excludeVaryingRanges(timeRanges);
-    mode->excludeVaryingRanges(timeRanges);
-    amount->excludeVaryingRanges(timeRanges);
-    smoothness->excludeVaryingRanges(timeRanges);
-    easeHigh->excludeVaryingRanges(timeRanges);
-    easeLow->excludeVaryingRanges(timeRanges);
-    if (randomizeOrder) {
-        randomSeed->excludeVaryingRanges(timeRanges);
-    }
+  start->excludeVaryingRanges(timeRanges);
+  end->excludeVaryingRanges(timeRanges);
+  offset->excludeVaryingRanges(timeRanges);
+  mode->excludeVaryingRanges(timeRanges);
+  amount->excludeVaryingRanges(timeRanges);
+  smoothness->excludeVaryingRanges(timeRanges);
+  easeHigh->excludeVaryingRanges(timeRanges);
+  easeLow->excludeVaryingRanges(timeRanges);
+  if (randomizeOrder) {
+    randomSeed->excludeVaryingRanges(timeRanges);
+  }
 }
 
 bool TextRangeSelector::verify() const {
-    VerifyAndReturn(start != nullptr && end != nullptr && offset != nullptr && mode != nullptr &&
-                    amount != nullptr && smoothness != nullptr && easeHigh != nullptr &&
-                    easeLow != nullptr && randomSeed != nullptr);
+  VerifyAndReturn(start != nullptr && end != nullptr && offset != nullptr && mode != nullptr &&
+                  amount != nullptr && smoothness != nullptr && easeHigh != nullptr &&
+                  easeLow != nullptr && randomSeed != nullptr);
 }
 }  // namespace pag

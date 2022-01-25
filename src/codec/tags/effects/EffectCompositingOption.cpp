@@ -20,29 +20,29 @@
 
 namespace pag {
 void ReadEffectCompositingMasks(DecodeStream* stream, void* target) {
-    auto effect = reinterpret_cast<Effect*>(target);
-    auto length = stream->readEncodedUint32();
-    for (uint32_t i = 0; i < length; i++) {
-        auto mask = ReadMaskID(stream);
-        effect->maskReferences.push_back(mask);
-    }
+  auto effect = reinterpret_cast<Effect*>(target);
+  auto length = stream->readEncodedUint32();
+  for (uint32_t i = 0; i < length; i++) {
+    auto mask = ReadMaskID(stream);
+    effect->maskReferences.push_back(mask);
+  }
 }
 
 bool WriteEffectCompositingMasks(EncodeStream* stream, void* target) {
-    auto effect = reinterpret_cast<Effect*>(target);
-    auto length = static_cast<uint32_t>(effect->maskReferences.size());
-    if (length > 0) {
-        stream->writeEncodedUint32(length);
-        for (uint32_t i = 0; i < length; i++) {
-            auto mask = effect->maskReferences[i];
-            WriteMaskID(stream, mask);
-        }
+  auto effect = reinterpret_cast<Effect*>(target);
+  auto length = static_cast<uint32_t>(effect->maskReferences.size());
+  if (length > 0) {
+    stream->writeEncodedUint32(length);
+    for (uint32_t i = 0; i < length; i++) {
+      auto mask = effect->maskReferences[i];
+      WriteMaskID(stream, mask);
     }
-    return length > 0;
+  }
+  return length > 0;
 }
 
 void EffectCompositingOptionTag(BlockConfig* tagConfig, Effect* effect) {
-    AddAttribute(tagConfig, &effect->effectOpacity, AttributeType::SimpleProperty, Opaque);
-    AddCustomAttribute(tagConfig, effect, ReadEffectCompositingMasks, WriteEffectCompositingMasks);
+  AddAttribute(tagConfig, &effect->effectOpacity, AttributeType::SimpleProperty, Opaque);
+  AddCustomAttribute(tagConfig, effect, ReadEffectCompositingMasks, WriteEffectCompositingMasks);
 }
 }  // namespace pag

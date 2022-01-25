@@ -21,19 +21,19 @@
 #include <stdio.h>
 
 void GetAllPAGFiles(std::string path, std::vector<std::string>& files) {
-    struct dirent* dirp;
-    DIR* dir = opendir(path.c_str());
-    std::string p;
+  struct dirent* dirp;
+  DIR* dir = opendir(path.c_str());
+  std::string p;
 
-    while ((dirp = readdir(dir)) != nullptr) {
-        if (dirp->d_type == DT_REG) {
-            std::string str(dirp->d_name);
-            std::string::size_type idx = str.find(".pag");
-            if (idx != std::string::npos) {
-                files.push_back(p.assign(path).append("/").append(dirp->d_name));
-            }
-        }
+  while ((dirp = readdir(dir)) != nullptr) {
+    if (dirp->d_type == DT_REG) {
+      std::string str(dirp->d_name);
+      std::string::size_type idx = str.find(".pag");
+      if (idx != std::string::npos) {
+        files.push_back(p.assign(path).append("/").append(dirp->d_name));
+      }
     }
+  }
 
-    closedir(dir);
+  closedir(dir);
 }

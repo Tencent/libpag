@@ -22,25 +22,25 @@
 
 namespace pag {
 ImageBytes* ReadImageBytesV2(DecodeStream* stream) {
-    auto imageBytes = new ImageBytes();
-    imageBytes->id = stream->readEncodedUint32();
-    imageBytes->fileBytes = stream->readByteData().release();
-    imageBytes->scaleFactor = stream->readFloat();
-    int width;
-    int height;
-    if (WebPGetInfo(imageBytes->fileBytes->data(), imageBytes->fileBytes->length(), &width,
-                    &height)) {
-        imageBytes->width = static_cast<int>(round(width * 1.0 / imageBytes->scaleFactor));
-        imageBytes->height = static_cast<int>(round(height * 1.0 / imageBytes->scaleFactor));
-    } else {
-        LOGE("Get webP size fail.");
-    }
-    return imageBytes;
+  auto imageBytes = new ImageBytes();
+  imageBytes->id = stream->readEncodedUint32();
+  imageBytes->fileBytes = stream->readByteData().release();
+  imageBytes->scaleFactor = stream->readFloat();
+  int width;
+  int height;
+  if (WebPGetInfo(imageBytes->fileBytes->data(), imageBytes->fileBytes->length(), &width,
+                  &height)) {
+    imageBytes->width = static_cast<int>(round(width * 1.0 / imageBytes->scaleFactor));
+    imageBytes->height = static_cast<int>(round(height * 1.0 / imageBytes->scaleFactor));
+  } else {
+    LOGE("Get webP size fail.");
+  }
+  return imageBytes;
 }
 
 TagCode WriteImageBytesV2(EncodeStream* stream, pag::ImageBytes* imageBytes) {
-    WriteImageBytes(stream, imageBytes);
-    stream->writeFloat(imageBytes->scaleFactor);
-    return TagCode::ImageBytesV2;
+  WriteImageBytes(stream, imageBytes);
+  stream->writeFloat(imageBytes->scaleFactor);
+  return TagCode::ImageBytesV2;
 }
 }  // namespace pag

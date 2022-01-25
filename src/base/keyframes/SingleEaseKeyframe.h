@@ -24,30 +24,30 @@
 namespace pag {
 template <typename T>
 class SingleEaseKeyframe : public Keyframe<T> {
-public:
-    ~SingleEaseKeyframe() override {
-        delete interpolator;
-    }
+ public:
+  ~SingleEaseKeyframe() override {
+    delete interpolator;
+  }
 
-    void initialize() override {
-        if (this->interpolationType == KeyframeInterpolationType::Bezier) {
-            interpolator = new BezierEasing(this->bezierOut[0], this->bezierIn[0]);
-        } else {
-            interpolator = new Interpolator();
-        }
+  void initialize() override {
+    if (this->interpolationType == KeyframeInterpolationType::Bezier) {
+      interpolator = new BezierEasing(this->bezierOut[0], this->bezierIn[0]);
+    } else {
+      interpolator = new Interpolator();
     }
+  }
 
-    float getProgress(Frame time) {
-        auto progress = static_cast<float>(time - this->startTime) / (this->endTime - this->startTime);
-        return interpolator->getInterpolation(progress);
-    }
+  float getProgress(Frame time) {
+    auto progress = static_cast<float>(time - this->startTime) / (this->endTime - this->startTime);
+    return interpolator->getInterpolation(progress);
+  }
 
-    T getValueAt(Frame time) override {
-        auto progress = getProgress(time);
-        return Interpolate(this->startValue, this->endValue, progress);
-    }
+  T getValueAt(Frame time) override {
+    auto progress = getProgress(time);
+    return Interpolate(this->startValue, this->endValue, progress);
+  }
 
-private:
-    Interpolator* interpolator = nullptr;
+ private:
+  Interpolator* interpolator = nullptr;
 };
 }  // namespace pag

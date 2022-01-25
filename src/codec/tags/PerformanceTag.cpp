@@ -20,17 +20,17 @@
 
 namespace pag {
 void ReadPerformanceTag(DecodeStream* stream, PerformanceData* data) {
-    data->renderingTime = stream->readEncodedInt64();
-    data->imageDecodingTime = stream->readEncodedInt64();
-    data->presentingTime = stream->readEncodedInt64();
-    data->graphicsMemory = stream->readEncodedInt64();
+  data->renderingTime = stream->readEncodedInt64();
+  data->imageDecodingTime = stream->readEncodedInt64();
+  data->presentingTime = stream->readEncodedInt64();
+  data->graphicsMemory = stream->readEncodedInt64();
 }
 
 TagCode WritePerformanceTag(EncodeStream* stream, PerformanceData* data) {
-    stream->writeEncodedInt64(data->renderingTime);
-    stream->writeEncodedInt64(data->imageDecodingTime);
-    stream->writeEncodedInt64(data->presentingTime);
-    stream->writeEncodedInt64(data->graphicsMemory);
-    return TagCode::Performance;
+  stream->writeEncodedInt64(data->renderingTime);
+  stream->writeEncodedInt64(data->imageDecodingTime);
+  stream->writeEncodedInt64(data->presentingTime);
+  stream->writeEncodedInt64(data->graphicsMemory);
+  return TagCode::Performance;
 }
 }  // namespace pag

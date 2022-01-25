@@ -23,21 +23,21 @@
 
 namespace pag {
 class PAGImageHolder {
-public:
-    bool hasImage(int editableIndex) const;
+ public:
+  bool hasImage(int editableIndex) const;
 
-    std::shared_ptr<PAGImage> getImage(int editableIndex) const;
+  std::shared_ptr<PAGImage> getImage(int editableIndex) const;
 
-    void setImage(int editableIndex, std::shared_ptr<PAGImage> image);
+  void setImage(int editableIndex, std::shared_ptr<PAGImage> image);
 
-    void addLayer(PAGLayer* layer);
+  void addLayer(PAGLayer* layer);
 
-    void removeLayer(PAGLayer* layer);
+  void removeLayer(PAGLayer* layer);
 
-    std::vector<PAGLayer*> getLayers(int editableIndex);
+  std::vector<PAGLayer*> getLayers(int editableIndex);
 
-private:
-    std::unordered_map<int, std::shared_ptr<PAGImage>> imageMap;
-    std::vector<PAGLayer*> imageLayers;
+ private:
+  std::unordered_map<int, std::shared_ptr<PAGImage>> imageMap;
+  std::vector<PAGLayer*> imageLayers;
 };
 }  // namespace pag

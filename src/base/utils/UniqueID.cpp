@@ -23,6 +23,6 @@ namespace pag {
 static std::atomic_uint32_t IDCount = {1};
 
 uint32_t UniqueID::Next() {
-    return IDCount++;
+  return IDCount++;
 }
 }  // namespace pag

@@ -23,56 +23,56 @@
 namespace pag {
 
 inline Frame TimeToFrame(int64_t time, double frameRate) {
-    return static_cast<Frame>(floor(time * frameRate / 1000000.0));
+  return static_cast<Frame>(floor(time * frameRate / 1000000.0));
 }
 
 inline int64_t FrameToTime(Frame frame, double frameRate) {
-    return static_cast<Frame>(ceil(frame * 1000000.0 / frameRate));
+  return static_cast<Frame>(ceil(frame * 1000000.0 / frameRate));
 }
 
 inline Frame ProgressToFrame(double progress, Frame totalFrames) {
-    if (totalFrames <= 1) {
-        return 0;
-    }
-    auto percent = fmod(progress, 1.0);
-    if (percent <= 0 && progress != 0) {
-        percent += 1.0;
-    }
-    // 'progress' ranges in [0, 1], but 'frame' ranges in [frame, frame+1), so the last frame needs
-    // special handling.
-    auto currentFrame = static_cast<Frame>(floor(percent * static_cast<double>(totalFrames)));
-    return currentFrame == totalFrames ? totalFrames - 1 : currentFrame;
+  if (totalFrames <= 1) {
+    return 0;
+  }
+  auto percent = fmod(progress, 1.0);
+  if (percent <= 0 && progress != 0) {
+    percent += 1.0;
+  }
+  // 'progress' ranges in [0, 1], but 'frame' ranges in [frame, frame+1), so the last frame needs
+  // special handling.
+  auto currentFrame = static_cast<Frame>(floor(percent * static_cast<double>(totalFrames)));
+  return currentFrame == totalFrames ? totalFrames - 1 : currentFrame;
 }
 
 inline double FrameToProgress(Frame currentFrame, Frame totalFrames) {
-    if (totalFrames <= 1 || currentFrame < 0) {
-        return 0;
-    }
-    if (currentFrame >= totalFrames - 1) {
-        return 1;
-    }
-    return currentFrame * 1.0 / totalFrames;
+  if (totalFrames <= 1 || currentFrame < 0) {
+    return 0;
+  }
+  if (currentFrame >= totalFrames - 1) {
+    return 1;
+  }
+  return currentFrame * 1.0 / totalFrames;
 }
 
 inline int64_t ProgressToTime(double progress, int64_t totalTime) {
-    if (totalTime <= 1) {
-        return 0;
-    }
-    auto percent = fmod(progress, 1.0);
-    if (percent <= 0 && progress != 0) {
-        percent += 1.0;
-    }
-    auto currentTime = static_cast<int64_t>(floor(percent * static_cast<double>(totalTime)));
-    return currentTime == totalTime ? currentTime - 1 : currentTime;
+  if (totalTime <= 1) {
+    return 0;
+  }
+  auto percent = fmod(progress, 1.0);
+  if (percent <= 0 && progress != 0) {
+    percent += 1.0;
+  }
+  auto currentTime = static_cast<int64_t>(floor(percent * static_cast<double>(totalTime)));
+  return currentTime == totalTime ? currentTime - 1 : currentTime;
 }
 
 inline double TimeToProgress(Frame currentFrame, int64_t totalTime) {
-    if (totalTime <= 1 || currentFrame < 0) {
-        return 0;
-    }
-    if (currentFrame >= totalTime - 1) {
-        return 1;
-    }
-    return currentFrame * 1.0 / totalTime;
+  if (totalTime <= 1 || currentFrame < 0) {
+    return 0;
+  }
+  if (currentFrame >= totalTime - 1) {
+    return 1;
+  }
+  return currentFrame * 1.0 / totalTime;
 }
 }  // namespace pag

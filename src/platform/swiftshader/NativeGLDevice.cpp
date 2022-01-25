@@ -21,15 +21,15 @@
 
 namespace pag {
 void* NativeGLDevice::GetCurrentNativeHandle() {
-    return eglGetCurrentContext();
+  return eglGetCurrentContext();
 }
 
 std::shared_ptr<GLDevice> NativeGLDevice::Current() {
-    return EGLDevice::Current();
+  return EGLDevice::Current();
 }
 
 std::shared_ptr<GLDevice> NativeGLDevice::Make(void* sharedContext) {
-    return EGLDevice::Make(sharedContext);
+  return EGLDevice::Make(sharedContext);
 }
 
 }  // namespace pag

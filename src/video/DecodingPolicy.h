@@ -20,18 +20,18 @@
 
 namespace pag {
 enum class DecodingPolicy {
-    /**
-     * Uses hardware decoders.
-     */
-    Hardware,
-    /**
-     * Uses software decoders.
-     */
-    Software,
-    /**
-     * Uses a software decoder first, but initializes a hardware on async thread, and then switches to
-     * the hardware decoder when it is initialized.
-     */
-    SoftwareToHardware
+  /**
+   * Uses hardware decoders.
+   */
+  Hardware,
+  /**
+   * Uses software decoders.
+   */
+  Software,
+  /**
+   * Uses a software decoder first, but initializes a hardware on async thread, and then switches to
+   * the hardware decoder when it is initialized.
+   */
+  SoftwareToHardware
 };
 }  // namespace pag

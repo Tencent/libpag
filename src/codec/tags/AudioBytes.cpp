@@ -20,13 +20,13 @@
 
 namespace pag {
 void ReadAudioBytes(DecodeStream* stream, Composition* composition) {
-    composition->audioBytes = stream->readByteData().release();
-    composition->audioStartTime = ReadTime(stream);
+  composition->audioBytes = stream->readByteData().release();
+  composition->audioStartTime = ReadTime(stream);
 }
 
 TagCode WriteAudioBytes(EncodeStream* stream, Composition* composition) {
-    stream->writeByteData(composition->audioBytes);
-    WriteTime(stream, composition->audioStartTime);
-    return TagCode::AudioBytes;
+  stream->writeByteData(composition->audioBytes);
+  WriteTime(stream, composition->audioStartTime);
+  return TagCode::AudioBytes;
 }
 }  // namespace pag

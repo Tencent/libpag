@@ -22,52 +22,52 @@
 namespace pag {
 
 static std::unique_ptr<BlockConfig> ImageFillRuleTag(ImageFillRule* imageFillRule, TagCode code) {
-    auto tagConfig = new BlockConfig(code);
-    AddAttribute(tagConfig, &imageFillRule->scaleMode, AttributeType::Value, PAGScaleMode::LetterBox);
-    AddAttribute(tagConfig, &imageFillRule->timeRemap, AttributeType::SimpleProperty,
-                 static_cast<Frame>(0));
-    return std::unique_ptr<BlockConfig>(tagConfig);
+  auto tagConfig = new BlockConfig(code);
+  AddAttribute(tagConfig, &imageFillRule->scaleMode, AttributeType::Value, PAGScaleMode::LetterBox);
+  AddAttribute(tagConfig, &imageFillRule->timeRemap, AttributeType::SimpleProperty,
+               static_cast<Frame>(0));
+  return std::unique_ptr<BlockConfig>(tagConfig);
 }
 
 static std::unique_ptr<BlockConfig> ImageFillRuleTagV1(ImageFillRule* imageFillRule) {
-    return ImageFillRuleTag(imageFillRule, TagCode::ImageFillRule);
+  return ImageFillRuleTag(imageFillRule, TagCode::ImageFillRule);
 }
 
 static std::unique_ptr<BlockConfig> ImageFillRuleTagV2(ImageFillRule* imageFillRule) {
-    return ImageFillRuleTag(imageFillRule, TagCode::ImageFillRuleV2);
+  return ImageFillRuleTag(imageFillRule, TagCode::ImageFillRuleV2);
 }
 
 void ReadImageFillRule(pag::DecodeStream* stream, pag::ImageLayer* layer, TagCode code) {
-    layer->imageFillRule = new ImageFillRule();
+  layer->imageFillRule = new ImageFillRule();
 
-    if (code == TagCode::ImageFillRule) {
-        ReadTagBlock(stream, layer->imageFillRule, ImageFillRuleTagV1);
+  if (code == TagCode::ImageFillRule) {
+    ReadTagBlock(stream, layer->imageFillRule, ImageFillRuleTagV1);
 
-        // The interpolation type should be linear in v1 tag, but we store it as hold, so we need to fix
-        // it here.
-        auto timeRemap = layer->imageFillRule->timeRemap;
-        if (timeRemap != nullptr && timeRemap->animatable()) {
-            auto AnimatableTimeRemap = static_cast<AnimatableProperty<Frame>*>(timeRemap);
-            for (auto& keyFrame : AnimatableTimeRemap->keyframes) {
-                keyFrame->interpolationType = pag::KeyframeInterpolationType::Linear;
-            }
-        }
-    } else {
-        ReadTagBlock(stream, layer->imageFillRule, ImageFillRuleTagV2);
+    // The interpolation type should be linear in v1 tag, but we store it as hold, so we need to fix
+    // it here.
+    auto timeRemap = layer->imageFillRule->timeRemap;
+    if (timeRemap != nullptr && timeRemap->animatable()) {
+      auto AnimatableTimeRemap = static_cast<AnimatableProperty<Frame>*>(timeRemap);
+      for (auto& keyFrame : AnimatableTimeRemap->keyframes) {
+        keyFrame->interpolationType = pag::KeyframeInterpolationType::Linear;
+      }
     }
+  } else {
+    ReadTagBlock(stream, layer->imageFillRule, ImageFillRuleTagV2);
+  }
 }
 
 void WriteImageFillRule(pag::EncodeStream* stream, pag::ImageFillRule* imageFillRule) {
-    auto timeRemap = imageFillRule->timeRemap;
-    if (timeRemap != nullptr && timeRemap->animatable()) {
-        for (auto& keyFrame : static_cast<AnimatableProperty<Frame>*>(timeRemap)->keyframes) {
-            if (keyFrame->interpolationType != pag::KeyframeInterpolationType::Linear) {
-                WriteTagBlock(stream, imageFillRule, ImageFillRuleTagV2);
-                return;
-            }
-        }
+  auto timeRemap = imageFillRule->timeRemap;
+  if (timeRemap != nullptr && timeRemap->animatable()) {
+    for (auto& keyFrame : static_cast<AnimatableProperty<Frame>*>(timeRemap)->keyframes) {
+      if (keyFrame->interpolationType != pag::KeyframeInterpolationType::Linear) {
+        WriteTagBlock(stream, imageFillRule, ImageFillRuleTagV2);
+        return;
+      }
     }
+  }
 
-    WriteTagBlock(stream, imageFillRule, ImageFillRuleTagV1);
+  WriteTagBlock(stream, imageFillRule, ImageFillRuleTagV1);
 }
 }  // namespace pag

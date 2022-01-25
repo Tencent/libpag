@@ -23,9 +23,9 @@
 
 __attribute__((visibility("default")))
 @interface PAGImage : NSObject
-    /**
-     * Creates a PAGImage object from a CGImage object, return null if it's not valid CGImage object.
-     */
+/**
+ * Creates a PAGImage object from a CGImage object, return null if it's not valid CGImage object.
+ */
 + (PAGImage*)FromCGImage:(CGImageRef)cgImage;
 
 /**

@@ -23,13 +23,13 @@
 
 namespace pag {
 class ScopedLock {
-public:
-    ScopedLock(std::shared_ptr<std::mutex> first, std::shared_ptr<std::mutex> second);
+ public:
+  ScopedLock(std::shared_ptr<std::mutex> first, std::shared_ptr<std::mutex> second);
 
-    ~ScopedLock();
+  ~ScopedLock();
 
-private:
-    std::shared_ptr<std::mutex> firstLocker = nullptr;
-    std::shared_ptr<std::mutex> secondLocker = nullptr;
+ private:
+  std::shared_ptr<std::mutex> firstLocker = nullptr;
+  std::shared_ptr<std::mutex> secondLocker = nullptr;
 };
 }  // namespace pag

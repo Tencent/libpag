@@ -23,13 +23,13 @@
 
 namespace pag {
 class TransformCache : public FrameCache<Transform> {
-public:
-    explicit TransformCache(Layer* layer);
+ public:
+  explicit TransformCache(Layer* layer);
 
-protected:
-    Transform* createCache(Frame layerFrame) override;
+ protected:
+  Transform* createCache(Frame layerFrame) override;
 
-private:
-    Layer* layer = nullptr;
+ private:
+  Layer* layer = nullptr;
 };
 }  // namespace pag

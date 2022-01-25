@@ -27,24 +27,24 @@ PAG_TEST_CASE(PAGGradientColorTest)
  * 用例描述: 渐变
  */
 PAG_TEST_F(PAGGradientColorTest, GradientColor_ID84028439) {
-    std::vector<std::string> files;
-    GetAllPAGFiles("../resources/gradient", files);
-    for (auto& file : files) {
-        auto pagFile = PAGFile::Load(file);
-        EXPECT_NE(pagFile, nullptr);
-        TestPAGPlayer->setComposition(pagFile);
-        TestPAGPlayer->setProgress(0.5);
-        TestPAGPlayer->flush();
-        auto md5 = DumpMD5(TestPAGSurface);
-        auto found = file.find_last_of("/\\");
-        auto fileName = file.substr(found + 1);
-        PAGTestEnvironment::DumpJson["PAGGradientColorTest"][fileName] = md5;
+  std::vector<std::string> files;
+  GetAllPAGFiles("../resources/gradient", files);
+  for (auto& file : files) {
+    auto pagFile = PAGFile::Load(file);
+    EXPECT_NE(pagFile, nullptr);
+    TestPAGPlayer->setComposition(pagFile);
+    TestPAGPlayer->setProgress(0.5);
+    TestPAGPlayer->flush();
+    auto md5 = DumpMD5(TestPAGSurface);
+    auto found = file.find_last_of("/\\");
+    auto fileName = file.substr(found + 1);
+    PAGTestEnvironment::DumpJson["PAGGradientColorTest"][fileName] = md5;
 #ifdef COMPARE_JSON_PATH
-        auto compareMD5 = PAGTestEnvironment::CompareJson["PAGGradientColorTest"][fileName];
-        auto path = "../test/out/gradient_" + fileName + ".png";
-        TraceIf(TestPAGSurface, path, compareMD5.get<std::string>() != md5);
-        EXPECT_EQ(compareMD5.get<std::string>(), md5);
+    auto compareMD5 = PAGTestEnvironment::CompareJson["PAGGradientColorTest"][fileName];
+    auto path = "../test/out/gradient_" + fileName + ".png";
+    TraceIf(TestPAGSurface, path, compareMD5.get<std::string>() != md5);
+    EXPECT_EQ(compareMD5.get<std::string>(), md5);
 #endif
-    }
+  }
 }
 }  // namespace pag
