@@ -68,16 +68,22 @@ EMSCRIPTEN_BINDINGS(pag) {
       .function("_numChildren", &PAGComposition::numChildren)
       .function("_getLayerAt", &PAGComposition::getLayerAt)
       .function("_getLayerIndex", &PAGComposition::getLayerIndex)
-      // .function("_audioBytes", optional_override([](PAGComposition& pagComposition) {
-      //               return dynamic_cast<ByteData *>(pagComposition.audioBytes());
-      //  }))
       .function("_swapLayerAt", &PAGComposition::swapLayerAt)
       .function("_swapLayer", &PAGComposition::swapLayer)
-      .function("_audioStartTime", &PAGComposition::audioStartTime)
+      .function("_contains", optional_override([](PAGComposition& pagComposition, std::shared_ptr<PAGLayer> pagLayer) {
+                  return static_cast<bool>(pagComposition.contains(pagLayer));
+                }))
+      .function("_audioStartTime", optional_override([](PAGComposition& pagComposition) {
+                  return static_cast<int>(pagComposition.audioStartTime());
+                }))
       .function("_removeLayerAt", &PAGComposition::removeLayerAt)
       .function("_removeAllLayers", &PAGComposition::removeAllLayers)
-      .function("_addLayer", &PAGComposition::addLayer)
-      .function("_addLayerAt", &PAGComposition::addLayerAt);
+      .function("_addLayer", optional_override([](PAGComposition& pagComposition, std::shared_ptr<PAGLayer> pagLayer) {
+                  return static_cast<bool>(pagComposition.addLayer(pagLayer));
+                }))
+      .function("_addLayerAt", optional_override([](PAGComposition& pagComposition, std::shared_ptr<PAGLayer> pagLayer, int index) {
+                  return static_cast<bool>(pagComposition.addLayerAt(pagLayer, index));
+                }));
 
   class_<PAGFile, base<PAGComposition>>("_PAGFile")
       .smart_ptr<std::shared_ptr<PAGFile>>("_PAGFile")

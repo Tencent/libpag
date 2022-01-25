@@ -7,10 +7,15 @@ export class PAGComposition extends PAGLayer {
   public constructor(wasmIns) {
     super(wasmIns);
   }
-
+  /**
+   * Returns the width of the Composition.
+   */
   public async width(): Promise<number> {
     return (await PAGComposition.module.webAssemblyQueue.exec(this.wasmIns._width, this.wasmIns)) as number;
   }
+  /**
+   * Returns the height of the Composition.
+   */
   public async height(): Promise<number> {
     return (await PAGComposition.module.webAssemblyQueue.exec(this.wasmIns._height, this.wasmIns)) as number;
   }
@@ -42,11 +47,10 @@ export class PAGComposition extends PAGLayer {
   public async getLayerIndex(index: number): Promise<number> {
     return (await PAGComposition.module.webAssemblyQueue.exec(this.wasmIns._getLayerIndex, this.wasmIns, index)) as number;
   }
-
   /**
    * Swap the layers at the specified index.
    */
-  public async swapLayer(pagLayer1: number, pagLayer2: number): Promise<void> {
+  public async swapLayer(pagLayer1: PAGLayer, pagLayer2: PAGLayer): Promise<void> {
     await PAGComposition.module.webAssemblyQueue.exec(this.wasmIns._swapLayer, this.wasmIns, pagLayer1, pagLayer2);
   }
   /**
@@ -54,6 +58,12 @@ export class PAGComposition extends PAGLayer {
    */
   public async swapLayerAt(index1: number, index2: number): Promise<void> {
     await PAGComposition.module.webAssemblyQueue.exec(this.wasmIns._swapLayerAt, this.wasmIns, index1, index2);
+  }
+  /**
+   * Check whether current PAGComposition contains the specified pagLayer.
+   */
+  public async contains(pagLayer: PAGLayer): Promise<boolean> {
+    return (await PAGComposition.module.webAssemblyQueue.exec(this.wasmIns._contains, this.wasmIns, pagLayer)) as boolean;
   }
   /**
    * Remove the specified PAGLayer from current PAGComposition.
@@ -78,7 +88,7 @@ export class PAGComposition extends PAGLayer {
    * different PAGComposition object as a parent, the layer is removed from the other PAGComposition
    * object.
    */
-  public async addLayer(layer: any): Promise<boolean> {
+  public async addLayer(layer: PAGLayer): Promise<boolean> {
     return (await PAGComposition.module.webAssemblyQueue.exec(this.wasmIns._addLayer, this.wasmIns, layer)) as boolean;
   }
   /**
@@ -86,13 +96,7 @@ export class PAGComposition extends PAGLayer {
    * different PAGComposition object as a parent, the layer is removed from the other PAGComposition
    * object.
    */
-  public async addLayerAt(layer: any, index: number): Promise<boolean> {
+  public async addLayerAt(layer: PAGLayer, index: number): Promise<boolean> {
     return (await PAGComposition.module.webAssemblyQueue.exec(this.wasmIns._addLayerAt, this.wasmIns, layer, index)) as boolean;
-  }
-  /**
-   * The audio data of this composition.
-   */
-  public async audioBytes(): Promise<any> {
-    return (await PAGComposition.module.webAssemblyQueue.exec(this.wasmIns._audioBytes, this.wasmIns)) as any;
   }
 }

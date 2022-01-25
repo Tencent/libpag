@@ -1,6 +1,7 @@
-import { PAGLayer } from './../src/pag-layer';
 import { PAGInit } from '../src/pag';
 import { PAGFile } from '../src/pag-file';
+import { Log } from '../src/utils/log';
+
 import { PAG as PAGNamespace, ParagraphJustification } from '../src/types';
 
 let pagView = null;
@@ -217,40 +218,38 @@ PAGInit({
   });
 
   // PAGComposition
-  // getRect
-  document.getElementById('btn-getRect').addEventListener('click', async () => {
-    console.log(`width: ${await pagComposition.width()}, height: ${await pagComposition.height()}`)
+  // width
+  document.getElementById('btn-getWidth').addEventListener('click', async () => {
+     Log.log(`width: ${await pagComposition.width()}`)
   });
+    // height
+  document.getElementById('btn-getHeight').addEventListener('click', async () => {
+      Log.log(`height: ${await pagComposition.height()}`)
+    });
   // setContentSize
   document.getElementById('btn-setContentSize').addEventListener('click', async () => {
-    console.log(`width: ${await pagComposition.width()}, height: ${await pagComposition.height()}`)
-    console.log(`change Rect`);
+    Log.log(`width: ${await pagComposition.width()}, height: ${await pagComposition.height()}`)
+    Log.log(`change Rect`);
     pagComposition.setContentSize(360, 640);
-    console.log(`width: ${await pagComposition.width()}, height: ${await pagComposition.height()}`)
+    Log.log(`width: ${await pagComposition.width()}, height: ${await pagComposition.height()}`)
   });
   // btn-numChildren
   document.getElementById('btn-numChildren').addEventListener('click', async () => {
-    console.log(`numChildren: ${await pagComposition.numChildren()}`)
+    Log.log(`numChildren: ${await pagComposition.numChildren()}`)
   });
   // btn-getLayerAt
   document.getElementById('btn-getLayerAt').addEventListener('click', async () => {
     const pagLayerWasm = await pagComposition.getLayerAt(0);
-    if (!pagLayerWasm) {
-      console.log('no Layer');
-      return;
-    };
+    if(!existsLayer(pagLayerWasm)) return;
     const pagLayer = new PAG.PAGLayer(pagLayerWasm);
-    console.log(`layerName: ${await pagLayer.layerName()}`)
+    Log.log(`getLayerAt index 0, layerName: ${await pagLayer.layerName()}`)
   });
   // btn-getLayerIndex
   document.getElementById('btn-getLayerIndex').addEventListener('click', async () => {
     const pagLayerWasm = await pagComposition.getLayerAt(0);
-    if (!pagLayerWasm) {
-      console.log('no Layer');
-      return;
-    };
+    if(!existsLayer(pagLayerWasm)) return;
     const index = await pagComposition.getLayerIndex(pagLayerWasm);
-    console.log('GetLayerIndex:', index);
+    Log.log(`GetLayerIndex: ${index}`);
   });
   // btn-getLayerIndex
   document.getElementById('btn-swapLayerAt').addEventListener('click', async () => {
@@ -263,69 +262,86 @@ PAGInit({
   // audioStartTime
   document.getElementById('btn-audioStartTime').addEventListener('click', async () => {
     const audioStartTime = await pagComposition.audioStartTime();
-    console.log('audioStartTime:', audioStartTime);
+    Log.log('audioStartTime:', audioStartTime);
   });
-  // audioStartTime
-  document.getElementById('btn-audioStartTime').addEventListener('click', async () => {
-    const audioStartTime = await pagComposition.audioStartTime();
-    console.log('audioStartTime:', audioStartTime);
-  });
+  // contains
+  document.getElementById('btn-contains').addEventListener('click', async () => {
+      const pagLayerWasm = await pagComposition.getLayerAt(0);
+      if(!existsLayer(pagLayerWasm)) return;
+      const isContains = await pagComposition.contains(pagLayerWasm);
+      if(isContains){
+        Log.log('is contains');
+      }
+      await pagComposition.removeLayerAt(0);
+      const isNotContains = await pagComposition.contains(pagLayerWasm);
+      if(!isNotContains){
+        Log.log('is not Contains');
+      }
+    });
   // removeLayerAt
   document.getElementById('btn-removeLayerAt').addEventListener('click', async () => {
-    console.log(`Layers num: ${await pagComposition.numChildren()}`)
-    console.log('start removeLayerAt index 0');
+    Log.log(`Layers num: ${await pagComposition.numChildren()}`)
+    Log.log('start removeLayerAt index 0');
     await pagComposition.removeLayerAt(0);
-    console.log('delete Layer[0] success: Layers num: ', await pagComposition.numChildren());
+    Log.log('delete Layer[0] success: Layers num: ', await pagComposition.numChildren());
   });
   // removeAllLayers
   document.getElementById('btn-removeAllLayers').addEventListener('click', async () => {
-    console.log(`Layers num: ${await pagComposition.numChildren()}`)
-    console.log('start removeAllLayers index 0');
+    Log.log(`Layers num: ${await pagComposition.numChildren()}`)
+    Log.log('start removeAllLayers index 0');
     await pagComposition.removeAllLayers();
-    console.log('removeAllLayers success: Layers num: ', await pagComposition.numChildren());
+    Log.log('removeAllLayers success: Layers num: ', await pagComposition.numChildren());
   });
 
   // addLayer
   document.getElementById('btn-addLayer').addEventListener('click', async () => {
     const pagLayerWasm = await pagComposition.getLayerAt(0);
-    if (!pagLayerWasm) {
-      console.log('no Layer');
-      return;
-    };
+    if(!existsLayer(pagLayerWasm)) return;
     await pagComposition.removeLayerAt(0);
-    console.log(`Layers num: ${await pagComposition.numChildren()}`);
-    await pagComposition.addLayer(pagLayerWasm);
-    console.log(`add success Layers num: ${await pagComposition.numChildren()}`);
+    Log.log(`Layers num: ${await pagComposition.numChildren()}`);
+    const isSuccess: boolean = await pagComposition.addLayer(pagLayerWasm);
+    if(isSuccess){
+      Log.log(`addLayer success  num: ${await pagComposition.numChildren()}`);
+      return;
+    }
+    Log.log(`addLayer fail`);
   });
   
   // addLayerAt
   document.getElementById('btn-addLayerAt').addEventListener('click', async () => {
     const pagLayerWasm = await pagComposition.getLayerAt(0);
-    if (!pagLayerWasm) {
-      console.log('no Layer');
-      return;
-    };
+    if(!existsLayer(pagLayerWasm)) return;
     await pagComposition.removeLayerAt(0);
     const pagLayer_1 = new PAG.PAGLayer(pagLayerWasm);
-    console.log(`Layers num: ${await pagComposition.numChildren()},  template layerName: ${await pagLayer_1.layerName()}`);
-    await pagComposition.addLayerAt(pagLayerWasm, 0);
-    const pagLayerWasm_1 = await pagComposition.getLayerAt(0);
-    const pagLayer = new PAG.PAGLayer(pagLayerWasm_1);
-    console.log(`add success Layers num: ${await pagComposition.numChildren()}, add layerName: ${await pagLayer.layerName()}`);
+    Log.log(`numChildren : ${await pagComposition.numChildren()},  template layerName: ${await pagLayer_1.layerName()}`);
+    const isSuccess: boolean =  await pagComposition.addLayerAt(pagLayerWasm, 0);
+    if(isSuccess){
+      const pagLayerWasm_1 = await pagComposition.getLayerAt(0);
+      const pagLayer = new PAG.PAGLayer(pagLayerWasm_1);
+      Log.log(`addLayer success numChildren: ${await pagComposition.numChildren()}, add layerName: ${await pagLayer.layerName()}`);
+      return ;
+    }
+    Log.log(`addLayer fail`);
   });
 });
+
+const existsLayer = (pagLayerWasm: object) =>{
+  if(pagLayerWasm) return true;
+  Log.log('no Layer');
+  return false;
+}
 
 const swapLayer = async (type: string) => {
   const pagLayerWasm_0 = await pagComposition.getLayerAt(0);
   const pagLayerWasm_1 = await pagComposition.getLayerAt(1);
   if (!pagLayerWasm_0 || !pagLayerWasm_1) {
-    console.log('No layer switching');
+    Log.log('No layer switching');
     return;
   };
   const pagLayer_0 = new PAG.PAGLayer(pagLayerWasm_0);
   const pagLayer_1 = new PAG.PAGLayer(pagLayerWasm_1);
-  console.log(`layerName0 : ${await pagLayer_0.layerName()}, layerName1 : ${await pagLayer_1.layerName()}`);
-  console.log(`start ${type}...`);
+  Log.log(`layerName0 : ${await pagLayer_0.layerName()}, layerName1 : ${await pagLayer_1.layerName()}`);
+  Log.log(`start ${type}...`);
   if (type === 'swapLayer') {
     await pagComposition.swapLayer(pagLayerWasm_0, pagLayerWasm_1);
   } else {
@@ -335,7 +351,7 @@ const swapLayer = async (type: string) => {
   const pagLayerWasm_exch_1 = await pagComposition.getLayerAt(1);
   const pagLayer__exch_0 = new PAG.PAGLayer(pagLayerWasm_exch_0);
   const pagLayer__exch_1 = new PAG.PAGLayer(pagLayerWasm_exch_1);
-  console.log(`layerName0 : ${await pagLayer__exch_0.layerName()}, layerName1 : ${await pagLayer__exch_1.layerName()}`);
+  Log.log(`layerName0 : ${await pagLayer__exch_0.layerName()}, layerName1 : ${await pagLayer__exch_1.layerName()}`);
 }
 
 const createPAGView = async (file) => {

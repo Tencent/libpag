@@ -1,8 +1,8 @@
 import { ErrorCode, ErrorMap } from './error-map';
 
 export class Log {
-  public static log(message) {
-    console.log(message);
+  public static log(...args) {
+    console.log(...args);
   }
 
   public static error(error: string) {
