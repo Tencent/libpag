@@ -10,7 +10,6 @@ import { ErrorCode } from './utils/error-map';
 import { Log } from './utils/log';
 
 export class PAGFile extends PAGComposition {
-
   public static module: PAG;
   /**
    * Load pag file from file.

@@ -57,7 +57,6 @@ const umdMinConfig = {
   plugins: [esbuild({ tsconfig: 'tsconfig.json', minify: false }), json(), resolve(), commonJs(), terser()],
 };
 
-
 export default [
   umdConfig,
   umdMinConfig,
@@ -67,13 +66,17 @@ export default [
       { banner, file: pkg.module, format: 'esm', sourcemap: true },
       { banner, file: pkg.main, format: 'cjs', exports: 'auto', sourcemap: true },
     ],
-    plugins: [esbuild({ tsconfig: 'tsconfig.json', minify: false }), resolve(), commonJs() ],
+    plugins: [esbuild({ tsconfig: 'tsconfig.json', minify: false }), resolve(), commonJs()],
   },
   {
     input: 'src/pag.ts',
-    output: [
-      { banner, file: 'lib/libpag.wx.js', format: 'cjs', exports: 'auto', sourcemap: true },
+    output: [{ banner, file: 'lib/libpag.wx.js', format: 'cjs', exports: 'auto', sourcemap: true }],
+    plugins: [
+      jscc({ values: { _WECHAT: 1 } }),
+      esbuild({ tsconfig: 'tsconfig.json', minify: false }),
+      resolve(),
+      commonJs(),
+      replaceFunc(),
     ],
-    plugins: [jscc({ values: { _WECHAT: 1 } }), esbuild({ tsconfig: 'tsconfig.json', minify: false }), resolve(),  commonJs(),  replaceFunc()],
   },
 ];
