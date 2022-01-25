@@ -1,4 +1,9 @@
-#!/bin/bash -e
+#!/usr/bin/env bash
+
+function make_dir() {
+  rm -rf $1
+  mkdir -p $1
+}
 
 echo "shell log - autotest start begin "
 
@@ -8,12 +13,10 @@ WORKSPACE=$(pwd)
 
 cd $WORKSPACE
 
-if [ -e result ] ;then
-rm -rf result;
-fi
-mkdir result
+make_dir result
+make_dir build
 
-cd result
+cd build
 
 cmake -DcppFlags="-fprofile-arcs -ftest-coverage -g -O0" ../
 if test $? -eq 0
@@ -33,15 +36,17 @@ echo "~~~~~~~~~~~~~~~~~~~PAGFullTest make error~~~~~~~~~~~~~~~~~~"
 exit -1
 fi
 
-./PAGFullTest --gtest_output=json
+./PAGFullTest --gtest_output=json > $WORKSPACE/result/autotest.json
+
 if test $? -eq 0
+
 then
 echo "~~~~~~~~~~~~~~~~~~~PAGFullTest successed~~~~~~~~~~~~~~~~~~"
 else
 echo "~~~~~~~~~~~~~~~~~~~PAGFullTest Failed~~~~~~~~~~~~~~~~~~"
-
-cp -a "${WORKSPACE}/test/out/md5_dump.json" "${WORKSPACE}/result/md5_dump.json"
-cp -a "${WORKSPACE}/test/out/dump.json" "${WORKSPACE}/result/dump.json"
-cp -a ${WORKSPACE}/test/out/*.png ${WORKSPACE}/result/
+cp -a $WORKSPACE/test/out/*.json $WORKSPACE/result/
+cp -a $WORKSPACE/test/out/*.png $WORKSPACE/result/
 exit -1
 fi
+
+cp -a $WORKSPAC/build/test_detail.json $WORKSPACE/result/
