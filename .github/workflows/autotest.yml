@@ -1,10 +1,10 @@
-name: AutoTest
+name: autotest
 
 on:
-#   push:
-#     branches: [ main ]
-#   pull_request:
-#     branches: [ main ]
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
@@ -18,17 +18,25 @@ jobs:
     runs-on: macos-latest
 
     steps:
-    - uses: actions/checkout@v2
-    
-    - name: Run build script
-      run: ./sync_deps.sh 
-      shell: bash 
-      
-    - name: Run autotest script
-      run: |
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          lfs: true
+      - name: Run sync_deps script
+        run: ./sync_deps.sh 
+        shell: bash 
+      - name: Run autotest script
+        run: |
          chmod +x autotest.sh 
          ./autotest.sh > result/autotest.txt
-      shell: bash
+        shell: bash
+      - uses: actions/upload-artifact@v2
+        with:
+          name: result
+          path: result
+        
+        
+        
 
- 
+
       
