@@ -22,44 +22,45 @@
 
 namespace pag {
 bool ReadLayerStyles(DecodeStream* stream, TagCode code, Layer* layer) {
-  LayerStyle* style = nullptr;
-  switch (code) {
+    LayerStyle* style = nullptr;
+    switch (code) {
     case TagCode::DropShadowStyle: {
-      auto dropShadowStyle = ReadTagBlock(stream, DropShadowStyleTag);
-      dropShadowStyle->spread = new Property<Percent>();
-      dropShadowStyle->spread->value = 0.0f;  // set default value
-      style = dropShadowStyle;
-    } break;
+        auto dropShadowStyle = ReadTagBlock(stream, DropShadowStyleTag);
+        dropShadowStyle->spread = new Property<Percent>();
+        dropShadowStyle->spread->value = 0.0f;  // set default value
+        style = dropShadowStyle;
+    }
+    break;
     case TagCode::DropShadowStyleV2:
-      style = ReadTagBlock(stream, DropShadowStyleTagV2);
-      break;
+        style = ReadTagBlock(stream, DropShadowStyleTagV2);
+        break;
     default:
-      break;
-  }
-  if (style) {
-    layer->layerStyles.push_back(style);
-  }
-  return style != nullptr;
+        break;
+    }
+    if (style) {
+        layer->layerStyles.push_back(style);
+    }
+    return style != nullptr;
 }
 
 void WriteLayerStyles(EncodeStream* stream, const std::vector<LayerStyle*>& layerStyles) {
-  for (auto& style : layerStyles) {
-    switch (style->type()) {
-      case LayerStyleType::DropShadow: {
-        auto spread = static_cast<DropShadowStyle*>(style)->spread;
-        auto size = static_cast<DropShadowStyle*>(style)->size;
-        if ((size != nullptr && size->animatable()) ||
-            (spread != nullptr &&
-             (spread->animatable() || spread->value != 0.0f))) {  // if not default value
-          WriteTagBlock(stream, static_cast<DropShadowStyle*>(style), DropShadowStyleTagV2);
-        } else {
-          WriteTagBlock(stream, static_cast<DropShadowStyle*>(style), DropShadowStyleTag);
+    for (auto& style : layerStyles) {
+        switch (style->type()) {
+        case LayerStyleType::DropShadow: {
+            auto spread = static_cast<DropShadowStyle*>(style)->spread;
+            auto size = static_cast<DropShadowStyle*>(style)->size;
+            if ((size != nullptr && size->animatable()) ||
+                    (spread != nullptr &&
+                     (spread->animatable() || spread->value != 0.0f))) {  // if not default value
+                WriteTagBlock(stream, static_cast<DropShadowStyle*>(style), DropShadowStyleTagV2);
+            } else {
+                WriteTagBlock(stream, static_cast<DropShadowStyle*>(style), DropShadowStyleTag);
+            }
+            break;
         }
-        break;
-      }
-      default:
-        break;
+        default:
+            break;
+        }
     }
-  }
 }
 }  // namespace pag

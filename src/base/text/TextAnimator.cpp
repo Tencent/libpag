@@ -21,40 +21,40 @@
 
 namespace pag {
 TextAnimator::~TextAnimator() {
-  for (auto& selector : selectors) {
-    delete selector;
-  }
-  delete colorProperties;
-  delete typographyProperties;
+    for (auto& selector : selectors) {
+        delete selector;
+    }
+    delete colorProperties;
+    delete typographyProperties;
 }
 
 void TextAnimator::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {
-  for (auto& selector : selectors) {
-    selector->excludeVaryingRanges(timeRanges);
-  }
-  if (colorProperties != nullptr) {
-    colorProperties->excludeVaryingRanges(timeRanges);
-  }
-  if (typographyProperties != nullptr) {
-    typographyProperties->excludeVaryingRanges(timeRanges);
-  }
+    for (auto& selector : selectors) {
+        selector->excludeVaryingRanges(timeRanges);
+    }
+    if (colorProperties != nullptr) {
+        colorProperties->excludeVaryingRanges(timeRanges);
+    }
+    if (typographyProperties != nullptr) {
+        typographyProperties->excludeVaryingRanges(timeRanges);
+    }
 }
 
 bool TextAnimator::verify() const {
-  for (auto& selector : selectors) {
-    if (selector == nullptr || !selector->verify()) {
-      VerifyFailed();
-      return false;
+    for (auto& selector : selectors) {
+        if (selector == nullptr || !selector->verify()) {
+            VerifyFailed();
+            return false;
+        }
     }
-  }
-  if (colorProperties != nullptr && !colorProperties->verify()) {
-    VerifyFailed();
-    return false;
-  }
-  if (typographyProperties != nullptr && !typographyProperties->verify()) {
-    VerifyFailed();
-    return false;
-  }
-  return true;
+    if (colorProperties != nullptr && !colorProperties->verify()) {
+        VerifyFailed();
+        return false;
+    }
+    if (typographyProperties != nullptr && !typographyProperties->verify()) {
+        VerifyFailed();
+        return false;
+    }
+    return true;
 }
 }  // namespace pag

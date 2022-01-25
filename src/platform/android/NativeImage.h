@@ -24,22 +24,22 @@
 
 namespace pag {
 class NativeImage : public Image {
- public:
-  static void InitJNI(JNIEnv* env);
+public:
+    static void InitJNI(JNIEnv* env);
 
-  static std::shared_ptr<Image> MakeFrom(const std::string& filePath);
+    static std::shared_ptr<Image> MakeFrom(const std::string& filePath);
 
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Data> imageBytes);
+    static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Data> imageBytes);
 
-  bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
+    bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
 
- private:
-  std::string imagePath;
-  std::shared_ptr<Data> imageBytes;
+private:
+    std::string imagePath;
+    std::shared_ptr<Data> imageBytes;
 
-  NativeImage(int width, int height, Orientation orientation) : Image(width, height,
-                                                                      orientation) {};
+    NativeImage(int width, int height, Orientation orientation) : Image(width, height,
+                orientation) {};
 
-  static std::shared_ptr<NativeImage> Make(JNIEnv* env, jobject sizeObject, int orientation);
+    static std::shared_ptr<NativeImage> Make(JNIEnv* env, jobject sizeObject, int orientation);
 };
 }  // namespace pag

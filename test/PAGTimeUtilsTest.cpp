@@ -30,19 +30,19 @@ PAG_TEST_SUIT(PAGTimeUtilsTest)
  * 用例描述: 测试图层对时间的测试是否正确
  */
 PAG_TEST_F(PAGTimeUtilsTest, ConvertProgressAndFrame) {
-  auto duration = TestPAGFile->duration();
-  auto frame = TimeToFrame(duration, TestPAGFile->frameRate());
-  for (int i = 0; i <= frame * 2; i++) {
-    auto progress = i * 0.5 / frame;
-    TestPAGFile->setProgress(progress);
-    TestPAGPlayer->flush();
-    auto md5 = getMd5FromSnap();
-    progress = TestPAGFile->getProgress();
-    TestPAGFile->setProgress(progress);
-    TestPAGPlayer->flush();
-    auto md52 = getMd5FromSnap();
-    ASSERT_EQ(md52, md5);
-  }
+    auto duration = TestPAGFile->duration();
+    auto frame = TimeToFrame(duration, TestPAGFile->frameRate());
+    for (int i = 0; i <= frame * 2; i++) {
+        auto progress = i * 0.5 / frame;
+        TestPAGFile->setProgress(progress);
+        TestPAGPlayer->flush();
+        auto md5 = getMd5FromSnap();
+        progress = TestPAGFile->getProgress();
+        TestPAGFile->setProgress(progress);
+        TestPAGPlayer->flush();
+        auto md52 = getMd5FromSnap();
+        ASSERT_EQ(md52, md5);
+    }
 }
 
 }  // namespace pag

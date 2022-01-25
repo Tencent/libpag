@@ -36,490 +36,490 @@ namespace pag {
 #define MIN_HARDWARE_PREPARE_TIME 100000  // 距离当前时刻小于100ms的视频启动软解转硬解优化。
 
 class ImageTask : public Executor {
- public:
-  static std::shared_ptr<Task> MakeAndRun(std::shared_ptr<Image> image) {
-    if (image == nullptr) {
-      return nullptr;
+public:
+    static std::shared_ptr<Task> MakeAndRun(std::shared_ptr<Image> image) {
+        if (image == nullptr) {
+            return nullptr;
+        }
+        auto bitmap = new ImageTask(std::move(image));
+        auto task = Task::Make(std::unique_ptr<ImageTask>(bitmap));
+        task->run();
+        return task;
     }
-    auto bitmap = new ImageTask(std::move(image));
-    auto task = Task::Make(std::unique_ptr<ImageTask>(bitmap));
-    task->run();
-    return task;
-  }
 
-  std::shared_ptr<TextureBuffer> getBuffer() const {
-    return buffer;
-  }
+    std::shared_ptr<TextureBuffer> getBuffer() const {
+        return buffer;
+    }
 
- private:
-  std::shared_ptr<TextureBuffer> buffer = {};
-  std::shared_ptr<Image> image = nullptr;
+private:
+    std::shared_ptr<TextureBuffer> buffer = {};
+    std::shared_ptr<Image> image = nullptr;
 
-  explicit ImageTask(std::shared_ptr<Image> image) : image(std::move(image)) {
-  }
+    explicit ImageTask(std::shared_ptr<Image> image) : image(std::move(image)) {
+    }
 
-  void execute() override {
-    buffer = image->makeBuffer();
-  }
+    void execute() override {
+        buffer = image->makeBuffer();
+    }
 };
 
 RenderCache::RenderCache(PAGStage* stage) : _uniqueID(UniqueID::Next()), stage(stage) {
 }
 
 RenderCache::~RenderCache() {
-  releaseAll();
+    releaseAll();
 }
 
 uint32_t RenderCache::getContentVersion() const {
-  return stage->getContentVersion();
+    return stage->getContentVersion();
 }
 
 bool RenderCache::videoEnabled() const {
-  return _videoEnabled;
+    return _videoEnabled;
 }
 
 void RenderCache::setVideoEnabled(bool value) {
-  if (_videoEnabled == value) {
-    return;
-  }
-  _videoEnabled = value;
-  clearAllSequenceCaches();
+    if (_videoEnabled == value) {
+        return;
+    }
+    _videoEnabled = value;
+    clearAllSequenceCaches();
 }
 
 bool RenderCache::initFilter(Filter* filter) {
-  auto startTime = GetTimer();
-  auto result = filter->initialize(getContext());
-  programCompilingTime += GetTimer() - startTime;
-  return result;
+    auto startTime = GetTimer();
+    auto result = filter->initialize(getContext());
+    programCompilingTime += GetTimer() - startTime;
+    return result;
 }
 
 void RenderCache::preparePreComposeLayer(PreComposeLayer* layer, DecodingPolicy policy) {
-  auto composition = layer->composition;
-  if (composition->type() != CompositionType::Video &&
-      composition->type() != CompositionType::Bitmap) {
-    return;
-  }
-  auto timeScale = layer->containingComposition
-                       ? (composition->frameRate / layer->containingComposition->frameRate)
-                       : 1.0f;
-  auto compositionFrame = static_cast<Frame>(
-      roundf(static_cast<float>(layer->startTime - layer->compositionStartTime) * timeScale));
-  if (compositionFrame < 0) {
-    compositionFrame = 0;
-  }
-  auto sequence = Sequence::Get(composition);
-  auto sequenceFrame = sequence->toSequenceFrame(compositionFrame);
-  if (prepareSequenceReader(sequence, sequenceFrame, policy)) {
-    return;
-  }
-  auto result = sequenceCaches.find(composition->uniqueID);
-  if (result != sequenceCaches.end()) {
-    // 循环预测
-    result->second->prepareAsync(sequenceFrame);
-  }
+    auto composition = layer->composition;
+    if (composition->type() != CompositionType::Video &&
+            composition->type() != CompositionType::Bitmap) {
+        return;
+    }
+    auto timeScale = layer->containingComposition
+                     ? (composition->frameRate / layer->containingComposition->frameRate)
+                     : 1.0f;
+    auto compositionFrame = static_cast<Frame>(
+                                roundf(static_cast<float>(layer->startTime - layer->compositionStartTime) * timeScale));
+    if (compositionFrame < 0) {
+        compositionFrame = 0;
+    }
+    auto sequence = Sequence::Get(composition);
+    auto sequenceFrame = sequence->toSequenceFrame(compositionFrame);
+    if (prepareSequenceReader(sequence, sequenceFrame, policy)) {
+        return;
+    }
+    auto result = sequenceCaches.find(composition->uniqueID);
+    if (result != sequenceCaches.end()) {
+        // 循环预测
+        result->second->prepareAsync(sequenceFrame);
+    }
 }
 
 void RenderCache::prepareImageLayer(PAGImageLayer* pagLayer) {
-  auto pagImage = static_cast<PAGImageLayer*>(pagLayer)->getPAGImage();
-  if (pagImage == nullptr) {
-    auto imageBytes = static_cast<ImageLayer*>(pagLayer->layer)->imageBytes;
-    auto image = ImageContentCache::GetImage(imageBytes);
-    if (image) {
-      prepareImage(imageBytes->uniqueID, image);
+    auto pagImage = static_cast<PAGImageLayer*>(pagLayer)->getPAGImage();
+    if (pagImage == nullptr) {
+        auto imageBytes = static_cast<ImageLayer*>(pagLayer->layer)->imageBytes;
+        auto image = ImageContentCache::GetImage(imageBytes);
+        if (image) {
+            prepareImage(imageBytes->uniqueID, image);
+        }
+        return;
     }
-    return;
-  }
-  auto image = pagImage->getImage();
-  if (image) {
-    prepareImage(pagImage->uniqueID(), image);
-  }
+    auto image = pagImage->getImage();
+    if (image) {
+        prepareImage(pagImage->uniqueID(), image);
+    }
 }
 
 void RenderCache::clearExpiredSequences() {
-  std::vector<ID> expiredSequences = {};
-  for (auto& item : sequenceCaches) {
-    if (usedAssets.count(item.first) == 0) {
-      expiredSequences.push_back(item.first);
+    std::vector<ID> expiredSequences = {};
+    for (auto& item : sequenceCaches) {
+        if (usedAssets.count(item.first) == 0) {
+            expiredSequences.push_back(item.first);
+        }
     }
-  }
-  for (auto& id : expiredSequences) {
-    clearSequenceCache(id);
-  }
+    for (auto& id : expiredSequences) {
+        clearSequenceCache(id);
+    }
 }
 
 bool RenderCache::snapshotEnabled() const {
-  return _snapshotEnabled;
+    return _snapshotEnabled;
 }
 
 void RenderCache::setSnapshotEnabled(bool value) {
-  if (_snapshotEnabled == value) {
-    return;
-  }
-  _snapshotEnabled = value;
-  clearAllSnapshots();
+    if (_snapshotEnabled == value) {
+        return;
+    }
+    _snapshotEnabled = value;
+    clearAllSnapshots();
 }
 
 void RenderCache::prepareFrame() {
-  usedAssets = {};
-  resetPerformance();
-  auto layerDistances = stage->findNearlyVisibleLayersIn(DECODING_VISIBLE_DISTANCE);
-  for (auto& item : layerDistances) {
-    for (auto pagLayer : item.second) {
-      if (pagLayer->layerType() == LayerType::PreCompose) {
-        auto policy = item.first < MIN_HARDWARE_PREPARE_TIME ? DecodingPolicy::SoftwareToHardware
-                                                             : DecodingPolicy::Hardware;
-        preparePreComposeLayer(static_cast<PreComposeLayer*>(pagLayer->layer), policy);
-      } else if (pagLayer->layerType() == LayerType::Image) {
-        prepareImageLayer(static_cast<PAGImageLayer*>(pagLayer));
-      }
+    usedAssets = {};
+    resetPerformance();
+    auto layerDistances = stage->findNearlyVisibleLayersIn(DECODING_VISIBLE_DISTANCE);
+    for (auto& item : layerDistances) {
+        for (auto pagLayer : item.second) {
+            if (pagLayer->layerType() == LayerType::PreCompose) {
+                auto policy = item.first < MIN_HARDWARE_PREPARE_TIME ? DecodingPolicy::SoftwareToHardware
+                              : DecodingPolicy::Hardware;
+                preparePreComposeLayer(static_cast<PreComposeLayer*>(pagLayer->layer), policy);
+            } else if (pagLayer->layerType() == LayerType::Image) {
+                prepareImageLayer(static_cast<PAGImageLayer*>(pagLayer));
+            }
+        }
     }
-  }
 }
 
 void RenderCache::attachToContext(Context* current, bool forHitTest) {
-  if (deviceID > 0 && deviceID != current->getDevice()->uniqueID()) {
-    // Context 改变需要清理内部所有缓存，这里用 uniqueID
-    // 而不用指针比较，是因为指针析构后再创建可能会地址重合。
-    releaseAll();
-  }
-  context = current;
-  deviceID = context->getDevice()->uniqueID();
-  hitTestOnly = forHitTest;
-  if (hitTestOnly) {
-    return;
-  }
-  auto removedAssets = stage->getRemovedAssets();
-  for (auto assetID : removedAssets) {
-    removeSnapshot(assetID);
-    imageTasks.erase(assetID);
-    clearSequenceCache(assetID);
-    clearFilterCache(assetID);
-  }
+    if (deviceID > 0 && deviceID != current->getDevice()->uniqueID()) {
+        // Context 改变需要清理内部所有缓存，这里用 uniqueID
+        // 而不用指针比较，是因为指针析构后再创建可能会地址重合。
+        releaseAll();
+    }
+    context = current;
+    deviceID = context->getDevice()->uniqueID();
+    hitTestOnly = forHitTest;
+    if (hitTestOnly) {
+        return;
+    }
+    auto removedAssets = stage->getRemovedAssets();
+    for (auto assetID : removedAssets) {
+        removeSnapshot(assetID);
+        imageTasks.erase(assetID);
+        clearSequenceCache(assetID);
+        clearFilterCache(assetID);
+    }
 }
 
 void RenderCache::releaseAll() {
-  clearAllSnapshots();
-  graphicsMemory = 0;
-  clearAllSequenceCaches();
-  for (auto& item : filterCaches) {
-    delete item.second;
-  }
-  filterCaches.clear();
-  delete motionBlurFilter;
-  motionBlurFilter = nullptr;
-  deviceID = 0;
+    clearAllSnapshots();
+    graphicsMemory = 0;
+    clearAllSequenceCaches();
+    for (auto& item : filterCaches) {
+        delete item.second;
+    }
+    filterCaches.clear();
+    delete motionBlurFilter;
+    motionBlurFilter = nullptr;
+    deviceID = 0;
 }
 
 void RenderCache::detachFromContext() {
-  if (hitTestOnly) {
+    if (hitTestOnly) {
+        context = nullptr;
+        return;
+    }
+    clearExpiredSequences();
+    clearExpiredBitmaps();
+    clearExpiredSnapshots();
+    auto currentTimestamp = GetTimer();
+    context->purgeResourcesNotUsedIn(currentTimestamp - lastTimestamp);
+    lastTimestamp = currentTimestamp;
     context = nullptr;
-    return;
-  }
-  clearExpiredSequences();
-  clearExpiredBitmaps();
-  clearExpiredSnapshots();
-  auto currentTimestamp = GetTimer();
-  context->purgeResourcesNotUsedIn(currentTimestamp - lastTimestamp);
-  lastTimestamp = currentTimestamp;
-  context = nullptr;
 }
 
 Snapshot* RenderCache::getSnapshot(ID assetID) const {
-  if (!_snapshotEnabled) {
+    if (!_snapshotEnabled) {
+        return nullptr;
+    }
+    auto result = snapshotCaches.find(assetID);
+    if (result != snapshotCaches.end()) {
+        return result->second;
+    }
     return nullptr;
-  }
-  auto result = snapshotCaches.find(assetID);
-  if (result != snapshotCaches.end()) {
-    return result->second;
-  }
-  return nullptr;
 }
 
 Snapshot* RenderCache::getSnapshot(const Picture* image) {
-  if (!_snapshotEnabled) {
-    return nullptr;
-  }
-  usedAssets.insert(image->assetID);
-  auto maxScaleFactor = stage->getAssetMaxScale(image->assetID);
-  auto scaleFactor = image->getScaleFactor(maxScaleFactor);
-  auto snapshot = getSnapshot(image->assetID);
-  if (snapshot && (snapshot->makerKey != image->uniqueKey ||
-                   fabsf(snapshot->scaleFactor() - scaleFactor) > SCALE_FACTOR_PRECISION)) {
-    removeSnapshot(image->assetID);
-    snapshot = nullptr;
-  }
-  if (snapshot) {
-    snapshot->idleFrames = 0;
-    auto position = std::find(snapshotLRU.begin(), snapshotLRU.end(), snapshot);
-    if (position != snapshotLRU.end()) {
-      snapshotLRU.erase(position);
+    if (!_snapshotEnabled) {
+        return nullptr;
     }
+    usedAssets.insert(image->assetID);
+    auto maxScaleFactor = stage->getAssetMaxScale(image->assetID);
+    auto scaleFactor = image->getScaleFactor(maxScaleFactor);
+    auto snapshot = getSnapshot(image->assetID);
+    if (snapshot && (snapshot->makerKey != image->uniqueKey ||
+                     fabsf(snapshot->scaleFactor() - scaleFactor) > SCALE_FACTOR_PRECISION)) {
+        removeSnapshot(image->assetID);
+        snapshot = nullptr;
+    }
+    if (snapshot) {
+        snapshot->idleFrames = 0;
+        auto position = std::find(snapshotLRU.begin(), snapshotLRU.end(), snapshot);
+        if (position != snapshotLRU.end()) {
+            snapshotLRU.erase(position);
+        }
+        snapshotLRU.push_front(snapshot);
+        return snapshot;
+    }
+    if (scaleFactor < SCALE_FACTOR_PRECISION || graphicsMemory >= MAX_GRAPHICS_MEMORY) {
+        return nullptr;
+    }
+    auto newSnapshot = image->makeSnapshot(this, scaleFactor);
+    if (newSnapshot == nullptr) {
+        return nullptr;
+    }
+    snapshot = newSnapshot.release();
+    snapshot->assetID = image->assetID;
+    snapshot->makerKey = image->uniqueKey;
+    graphicsMemory += snapshot->memoryUsage();
     snapshotLRU.push_front(snapshot);
+    snapshotCaches[image->assetID] = snapshot;
     return snapshot;
-  }
-  if (scaleFactor < SCALE_FACTOR_PRECISION || graphicsMemory >= MAX_GRAPHICS_MEMORY) {
-    return nullptr;
-  }
-  auto newSnapshot = image->makeSnapshot(this, scaleFactor);
-  if (newSnapshot == nullptr) {
-    return nullptr;
-  }
-  snapshot = newSnapshot.release();
-  snapshot->assetID = image->assetID;
-  snapshot->makerKey = image->uniqueKey;
-  graphicsMemory += snapshot->memoryUsage();
-  snapshotLRU.push_front(snapshot);
-  snapshotCaches[image->assetID] = snapshot;
-  return snapshot;
 }
 
 void RenderCache::removeSnapshot(ID assetID) {
-  auto snapshot = snapshotCaches.find(assetID);
-  if (snapshot == snapshotCaches.end()) {
-    return;
-  }
-  auto position = std::find(snapshotLRU.begin(), snapshotLRU.end(), snapshot->second);
-  if (position != snapshotLRU.end()) {
-    snapshotLRU.erase(position);
-  }
-  graphicsMemory -= snapshot->second->memoryUsage();
-  delete snapshot->second;
-  snapshotCaches.erase(assetID);
+    auto snapshot = snapshotCaches.find(assetID);
+    if (snapshot == snapshotCaches.end()) {
+        return;
+    }
+    auto position = std::find(snapshotLRU.begin(), snapshotLRU.end(), snapshot->second);
+    if (position != snapshotLRU.end()) {
+        snapshotLRU.erase(position);
+    }
+    graphicsMemory -= snapshot->second->memoryUsage();
+    delete snapshot->second;
+    snapshotCaches.erase(assetID);
 }
 
 void RenderCache::clearAllSnapshots() {
-  for (auto& item : snapshotCaches) {
-    graphicsMemory -= item.second->memoryUsage();
-    delete item.second;
-  }
-  snapshotCaches.clear();
-  snapshotLRU.clear();
+    for (auto& item : snapshotCaches) {
+        graphicsMemory -= item.second->memoryUsage();
+        delete item.second;
+    }
+    snapshotCaches.clear();
+    snapshotLRU.clear();
 }
 
 void RenderCache::clearExpiredSnapshots() {
-  while (!snapshotLRU.empty()) {
-    auto snapshot = snapshotLRU.back();
-    // 只有 Snapshot 数量可能会比较多，使用 LRU
-    // 来避免遍历完整的列表，遇到第一个用过的就可以取消遍历。
-    if (usedAssets.count((snapshot->assetID) > 0)) {
-      break;
+    while (!snapshotLRU.empty()) {
+        auto snapshot = snapshotLRU.back();
+        // 只有 Snapshot 数量可能会比较多，使用 LRU
+        // 来避免遍历完整的列表，遇到第一个用过的就可以取消遍历。
+        if (usedAssets.count((snapshot->assetID) > 0)) {
+            break;
+        }
+        snapshot->idleFrames++;
+        if (snapshot->idleFrames < PURGEABLE_EXPIRED_FRAME &&
+                graphicsMemory < PURGEABLE_GRAPHICS_MEMORY) {
+            // 总显存占用未超过20M且所有缓存均未超过10帧未使用，跳过清理。
+            break;
+        }
+        removeSnapshot(snapshot->assetID);
     }
-    snapshot->idleFrames++;
-    if (snapshot->idleFrames < PURGEABLE_EXPIRED_FRAME &&
-        graphicsMemory < PURGEABLE_GRAPHICS_MEMORY) {
-      // 总显存占用未超过20M且所有缓存均未超过10帧未使用，跳过清理。
-      break;
-    }
-    removeSnapshot(snapshot->assetID);
-  }
 }
 
 void RenderCache::prepareImage(ID assetID, std::shared_ptr<Image> image) {
-  usedAssets.insert(assetID);
-  if (imageTasks.count(assetID) != 0 || snapshotCaches.count(assetID) != 0) {
-    return;
-  }
-  auto task = ImageTask::MakeAndRun(std::move(image));
-  if (task) {
-    imageTasks[assetID] = task;
-  }
+    usedAssets.insert(assetID);
+    if (imageTasks.count(assetID) != 0 || snapshotCaches.count(assetID) != 0) {
+        return;
+    }
+    auto task = ImageTask::MakeAndRun(std::move(image));
+    if (task) {
+        imageTasks[assetID] = task;
+    }
 }
 
 std::shared_ptr<TextureBuffer> RenderCache::getImageBuffer(ID assetID) {
-  usedAssets.insert(assetID);
-  auto result = imageTasks.find(assetID);
-  if (result != imageTasks.end()) {
-    auto executor = result->second->wait();
-    auto buffer = static_cast<ImageTask*>(executor)->getBuffer();
-    // 预测生成的 Bitmap 取了一次就应该销毁，上层会进行缓存。
-    imageTasks.erase(result);
-    return buffer;
-  }
-  return {};
+    usedAssets.insert(assetID);
+    auto result = imageTasks.find(assetID);
+    if (result != imageTasks.end()) {
+        auto executor = result->second->wait();
+        auto buffer = static_cast<ImageTask*>(executor)->getBuffer();
+        // 预测生成的 Bitmap 取了一次就应该销毁，上层会进行缓存。
+        imageTasks.erase(result);
+        return buffer;
+    }
+    return {};
 }
 
 void RenderCache::clearExpiredBitmaps() {
-  std::vector<ID> expiredBitmaps = {};
-  for (auto& item : imageTasks) {
-    if (usedAssets.count(item.first) == 0) {
-      expiredBitmaps.push_back(item.first);
+    std::vector<ID> expiredBitmaps = {};
+    for (auto& item : imageTasks) {
+        if (usedAssets.count(item.first) == 0) {
+            expiredBitmaps.push_back(item.first);
+        }
     }
-  }
-  for (auto& bitmapID : expiredBitmaps) {
-    imageTasks.erase(bitmapID);
-  }
+    for (auto& bitmapID : expiredBitmaps) {
+        imageTasks.erase(bitmapID);
+    }
 }
 
 static std::shared_ptr<SequenceReader> MakeSequenceReader(std::shared_ptr<File> file,
-                                                          Sequence* sequence,
-                                                          DecodingPolicy policy) {
-  std::shared_ptr<SequenceReader> reader = nullptr;
-  if (sequence->composition->type() == CompositionType::Video) {
-    if (sequence->composition->staticContent()) {
-      // 全静态的序列帧强制软件解码。
-      policy = DecodingPolicy::Software;
+        Sequence* sequence,
+        DecodingPolicy policy) {
+    std::shared_ptr<SequenceReader> reader = nullptr;
+    if (sequence->composition->type() == CompositionType::Video) {
+        if (sequence->composition->staticContent()) {
+            // 全静态的序列帧强制软件解码。
+            policy = DecodingPolicy::Software;
+        }
+        reader = SequenceReader::Make(std::move(file), static_cast<VideoSequence*>(sequence), policy);
+    } else {
+        reader = std::make_shared<BitmapSequenceReader>(std::move(file),
+                 static_cast<BitmapSequence*>(sequence));
     }
-    reader = SequenceReader::Make(std::move(file), static_cast<VideoSequence*>(sequence), policy);
-  } else {
-    reader = std::make_shared<BitmapSequenceReader>(std::move(file),
-                                                    static_cast<BitmapSequence*>(sequence));
-  }
-  return reader;
+    return reader;
 }
 
 //===================================== sequence caches =====================================
 
 bool RenderCache::prepareSequenceReader(Sequence* sequence, Frame targetFrame,
                                         DecodingPolicy policy) {
-  auto composition = sequence->composition;
-  if (!_videoEnabled && composition->type() == CompositionType::Video) {
-    return false;
-  }
-  usedAssets.insert(composition->uniqueID);
-  auto staticComposition = composition->staticContent();
-  if (sequenceCaches.count(composition->uniqueID) != 0) {
+    auto composition = sequence->composition;
+    if (!_videoEnabled && composition->type() == CompositionType::Video) {
+        return false;
+    }
+    usedAssets.insert(composition->uniqueID);
+    auto staticComposition = composition->staticContent();
+    if (sequenceCaches.count(composition->uniqueID) != 0) {
 #ifdef PAG_BUILD_FOR_WEB
-    sequenceCaches[composition->uniqueID]->prepareAsync(targetFrame);
+        sequenceCaches[composition->uniqueID]->prepareAsync(targetFrame);
 #endif
-    return false;
-  }
-  if (staticComposition && hasSnapshot(composition->uniqueID)) {
-    // 静态的序列帧采用位图的缓存逻辑，如果上层缓存过 Snapshot 就不需要预测。
-    return false;
-  }
-  auto file = stage->getSequenceFile(sequence);
-  auto reader = MakeSequenceReader(file, sequence, policy);
-  sequenceCaches[composition->uniqueID] = reader;
-  reader->prepareAsync(targetFrame);
-  return true;
+        return false;
+    }
+    if (staticComposition && hasSnapshot(composition->uniqueID)) {
+        // 静态的序列帧采用位图的缓存逻辑，如果上层缓存过 Snapshot 就不需要预测。
+        return false;
+    }
+    auto file = stage->getSequenceFile(sequence);
+    auto reader = MakeSequenceReader(file, sequence, policy);
+    sequenceCaches[composition->uniqueID] = reader;
+    reader->prepareAsync(targetFrame);
+    return true;
 }
 
 std::shared_ptr<SequenceReader> RenderCache::getSequenceReader(Sequence* sequence) {
-  if (sequence == nullptr) {
-    return nullptr;
-  }
-  auto composition = sequence->composition;
-  if (!_videoEnabled && composition->type() == CompositionType::Video) {
-    return nullptr;
-  }
-  auto compositionID = composition->uniqueID;
-  usedAssets.insert(compositionID);
-  auto staticComposition = sequence->composition->staticContent();
-  std::shared_ptr<SequenceReader> reader = nullptr;
-  auto result = sequenceCaches.find(compositionID);
-  if (result != sequenceCaches.end()) {
-    reader = result->second;
-    if (reader->getSequence() != sequence) {
-      clearSequenceCache(compositionID);
-      reader = nullptr;
-    } else if (staticComposition) {
-      // 完全静态的序列帧是预测生成的，第一次访问时就可以移除，上层会进行缓存。
-      sequenceCaches.erase(result);
+    if (sequence == nullptr) {
+        return nullptr;
     }
-  }
-  if (reader == nullptr) {
-    auto file = stage->getSequenceFile(sequence);
-    reader = MakeSequenceReader(file, sequence, DecodingPolicy::SoftwareToHardware);
-    if (reader && !staticComposition) {
-      // 完全静态的序列帧不用缓存。
-      sequenceCaches[compositionID] = reader;
+    auto composition = sequence->composition;
+    if (!_videoEnabled && composition->type() == CompositionType::Video) {
+        return nullptr;
     }
-  }
-  return reader;
+    auto compositionID = composition->uniqueID;
+    usedAssets.insert(compositionID);
+    auto staticComposition = sequence->composition->staticContent();
+    std::shared_ptr<SequenceReader> reader = nullptr;
+    auto result = sequenceCaches.find(compositionID);
+    if (result != sequenceCaches.end()) {
+        reader = result->second;
+        if (reader->getSequence() != sequence) {
+            clearSequenceCache(compositionID);
+            reader = nullptr;
+        } else if (staticComposition) {
+            // 完全静态的序列帧是预测生成的，第一次访问时就可以移除，上层会进行缓存。
+            sequenceCaches.erase(result);
+        }
+    }
+    if (reader == nullptr) {
+        auto file = stage->getSequenceFile(sequence);
+        reader = MakeSequenceReader(file, sequence, DecodingPolicy::SoftwareToHardware);
+        if (reader && !staticComposition) {
+            // 完全静态的序列帧不用缓存。
+            sequenceCaches[compositionID] = reader;
+        }
+    }
+    return reader;
 }
 
 void RenderCache::clearAllSequenceCaches() {
-  for (auto& item : sequenceCaches) {
-    removeSnapshot(item.first);
-  }
-  sequenceCaches.clear();
+    for (auto& item : sequenceCaches) {
+        removeSnapshot(item.first);
+    }
+    sequenceCaches.clear();
 }
 
 void RenderCache::clearSequenceCache(ID uniqueID) {
-  auto result = sequenceCaches.find(uniqueID);
-  if (result != sequenceCaches.end()) {
-    removeSnapshot(result->first);
-    sequenceCaches.erase(result);
-  }
+    auto result = sequenceCaches.find(uniqueID);
+    if (result != sequenceCaches.end()) {
+        removeSnapshot(result->first);
+        sequenceCaches.erase(result);
+    }
 }
 
 //===================================== filter caches =====================================
 
 LayerFilter* RenderCache::getFilterCache(LayerStyle* layerStyle) {
-  return getLayerFilterCache(layerStyle->uniqueID, [=]() -> LayerFilter* {
-    return LayerFilter::Make(layerStyle).release();
-  });
+    return getLayerFilterCache(layerStyle->uniqueID, [=]() -> LayerFilter* {
+        return LayerFilter::Make(layerStyle).release();
+    });
 }
 
 LayerFilter* RenderCache::getFilterCache(Effect* effect) {
-  return getLayerFilterCache(effect->uniqueID,
-                             [=]() -> LayerFilter* { return LayerFilter::Make(effect).release(); });
+    return getLayerFilterCache(effect->uniqueID,
+                               [=]() -> LayerFilter* { return LayerFilter::Make(effect).release(); });
 }
 
 LayerFilter* RenderCache::getLayerFilterCache(ID uniqueID,
-                                              const std::function<LayerFilter*()>& makeFilter) {
-  LayerFilter* filter = nullptr;
-  auto result = filterCaches.find(uniqueID);
-  if (result == filterCaches.end()) {
-    filter = makeFilter();
-    if (filter && !initFilter(filter)) {
-      delete filter;
-      filter = nullptr;
+        const std::function<LayerFilter*()>& makeFilter) {
+    LayerFilter* filter = nullptr;
+    auto result = filterCaches.find(uniqueID);
+    if (result == filterCaches.end()) {
+        filter = makeFilter();
+        if (filter && !initFilter(filter)) {
+            delete filter;
+            filter = nullptr;
+        }
+        if (filter != nullptr) {
+            filterCaches.insert(std::make_pair(uniqueID, filter));
+        }
+    } else {
+        filter = static_cast<LayerFilter*>(result->second);
     }
-    if (filter != nullptr) {
-      filterCaches.insert(std::make_pair(uniqueID, filter));
-    }
-  } else {
-    filter = static_cast<LayerFilter*>(result->second);
-  }
-  return filter;
+    return filter;
 }
 
 MotionBlurFilter* RenderCache::getMotionBlurFilter() {
-  if (motionBlurFilter == nullptr) {
-    motionBlurFilter = new MotionBlurFilter();
-    if (!initFilter(motionBlurFilter)) {
-      delete motionBlurFilter;
-      motionBlurFilter = nullptr;
+    if (motionBlurFilter == nullptr) {
+        motionBlurFilter = new MotionBlurFilter();
+        if (!initFilter(motionBlurFilter)) {
+            delete motionBlurFilter;
+            motionBlurFilter = nullptr;
+        }
     }
-  }
-  return motionBlurFilter;
+    return motionBlurFilter;
 }
 
 LayerStylesFilter* RenderCache::getLayerStylesFilter(Layer* layer) {
-  LayerStylesFilter* filter = nullptr;
-  auto result = filterCaches.find(layer->uniqueID);
-  if (result == filterCaches.end()) {
-    filter = new LayerStylesFilter(this);
-    if (initFilter(filter)) {
-      filterCaches.insert(std::make_pair(layer->uniqueID, filter));
+    LayerStylesFilter* filter = nullptr;
+    auto result = filterCaches.find(layer->uniqueID);
+    if (result == filterCaches.end()) {
+        filter = new LayerStylesFilter(this);
+        if (initFilter(filter)) {
+            filterCaches.insert(std::make_pair(layer->uniqueID, filter));
+        } else {
+            delete filter;
+            filter = nullptr;
+        }
     } else {
-      delete filter;
-      filter = nullptr;
+        filter = static_cast<LayerStylesFilter*>(result->second);
     }
-  } else {
-    filter = static_cast<LayerStylesFilter*>(result->second);
-  }
-  return filter;
+    return filter;
 }
 
 void RenderCache::clearFilterCache(ID uniqueID) {
-  auto result = filterCaches.find(uniqueID);
-  if (result != filterCaches.end()) {
-    delete result->second;
-    filterCaches.erase(result);
-  }
+    auto result = filterCaches.find(uniqueID);
+    if (result != filterCaches.end()) {
+        delete result->second;
+        filterCaches.erase(result);
+    }
 }
 
 void RenderCache::recordImageDecodingTime(int64_t decodingTime) {
-  imageDecodingTime += decodingTime;
+    imageDecodingTime += decodingTime;
 }
 
 void RenderCache::recordTextureUploadingTime(int64_t time) {
-  textureUploadingTime += time;
+    textureUploadingTime += time;
 }
 
 void RenderCache::recordProgramCompilingTime(int64_t time) {
-  programCompilingTime += time;
+    programCompilingTime += time;
 }
 }  // namespace pag

@@ -21,38 +21,40 @@
 
 namespace pag {
 BitmapRect::~BitmapRect() {
-  delete fileBytes;
+    delete fileBytes;
 }
 
 BitmapFrame::~BitmapFrame() {
-  for (auto image : bitmaps) {
-    delete image;
-  }
+    for (auto image : bitmaps) {
+        delete image;
+    }
 }
 
 bool BitmapFrame::verify() const {
-  auto bitmapNotNull = [](BitmapRect* bitmap) {
-    return bitmap != nullptr && bitmap->fileBytes != nullptr;
-  };
-  VerifyAndReturn(std::all_of(bitmaps.begin(), bitmaps.end(), bitmapNotNull));
+    auto bitmapNotNull = [](BitmapRect* bitmap) {
+        return bitmap != nullptr && bitmap->fileBytes != nullptr;
+    };
+    VerifyAndReturn(std::all_of(bitmaps.begin(), bitmaps.end(), bitmapNotNull));
 }
 
 BitmapSequence::~BitmapSequence() {
-  for (auto frame : frames) {
-    delete frame;
-  }
+    for (auto frame : frames) {
+        delete frame;
+    }
 }
 
 bool BitmapSequence::verify() const {
-  if (!Sequence::verify() || frames.empty()) {
-    VerifyFailed();
-    return false;
-  }
-  auto frameNotNull = [](BitmapFrame* frame) { return frame != nullptr && frame->verify(); };
-  if (!std::all_of(frames.begin(), frames.end(), frameNotNull)) {
-    VerifyFailed();
-    return false;
-  }
-  return true;
+    if (!Sequence::verify() || frames.empty()) {
+        VerifyFailed();
+        return false;
+    }
+    auto frameNotNull = [](BitmapFrame* frame) {
+        return frame != nullptr && frame->verify();
+    };
+    if (!std::all_of(frames.begin(), frames.end(), frameNotNull)) {
+        VerifyFailed();
+        return false;
+    }
+    return true;
 }
 }  // namespace pag

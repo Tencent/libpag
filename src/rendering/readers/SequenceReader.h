@@ -27,27 +27,27 @@ namespace pag {
 class RenderCache;
 
 class SequenceReader {
- public:
-  static std::shared_ptr<SequenceReader>
-  Make(std::shared_ptr<File> file, VideoSequence* sequence, DecodingPolicy policy);
+public:
+    static std::shared_ptr<SequenceReader>
+    Make(std::shared_ptr<File> file, VideoSequence* sequence, DecodingPolicy policy);
 
-  SequenceReader(std::shared_ptr<File> file, Sequence* sequence);
+    SequenceReader(std::shared_ptr<File> file, Sequence* sequence);
 
-  virtual ~SequenceReader() = default;
+    virtual ~SequenceReader() = default;
 
-  Sequence* getSequence() const {
-    return sequence;
-  }
+    Sequence* getSequence() const {
+        return sequence;
+    }
 
-  virtual void prepareAsync(Frame targetFrame) = 0;
+    virtual void prepareAsync(Frame targetFrame) = 0;
 
-  virtual std::shared_ptr<Texture> readTexture(Frame targetFrame, RenderCache* cache) = 0;
+    virtual std::shared_ptr<Texture> readTexture(Frame targetFrame, RenderCache* cache) = 0;
 
- protected:
-  // 持有 File 引用，防止在异步解码时 Sequence 被析构。
-  std::shared_ptr<File> file = nullptr;
-  Sequence* sequence = nullptr;
-  bool staticContent = false;
+protected:
+    // 持有 File 引用，防止在异步解码时 Sequence 被析构。
+    std::shared_ptr<File> file = nullptr;
+    Sequence* sequence = nullptr;
+    bool staticContent = false;
 };
 
 }  // namespace pag

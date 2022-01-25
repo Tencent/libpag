@@ -23,34 +23,34 @@
 
 namespace pag {
 std::shared_ptr<GPUDrawable> GPUDrawable::FromCanvasID(const std::string& canvasID) {
-  if (canvasID.empty()) {
-    LOGE("GPUDrawable.FromCanvasID() The canvasID is invalid.");
-    return nullptr;
-  }
-  return std::shared_ptr<GPUDrawable>(new GPUDrawable(canvasID));
+    if (canvasID.empty()) {
+        LOGE("GPUDrawable.FromCanvasID() The canvasID is invalid.");
+        return nullptr;
+    }
+    return std::shared_ptr<GPUDrawable>(new GPUDrawable(canvasID));
 }
 
 GPUDrawable::GPUDrawable(std::string canvasID) : canvasID(std::move(canvasID)) {
-  GPUDrawable::updateSize();
+    GPUDrawable::updateSize();
 }
 
 void GPUDrawable::updateSize() {
-  if (!canvasID.empty()) {
-    emscripten_get_canvas_element_size(canvasID.c_str(), &_width, &_height);
-  }
+    if (!canvasID.empty()) {
+        emscripten_get_canvas_element_size(canvasID.c_str(), &_width, &_height);
+    }
 }
 
 std::shared_ptr<Device> GPUDrawable::getDevice() {
-  if (_width <= 0 || _height <= 0) {
-    return nullptr;
-  }
-  if (window == nullptr) {
-    window = WEBGLWindow::MakeFrom(canvasID);
-  }
-  return window->getDevice();
+    if (_width <= 0 || _height <= 0) {
+        return nullptr;
+    }
+    if (window == nullptr) {
+        window = WEBGLWindow::MakeFrom(canvasID);
+    }
+    return window->getDevice();
 }
 
 std::shared_ptr<Surface> GPUDrawable::createSurface(Context* context) {
-  return window ? window->createSurface(context) : nullptr;
+    return window ? window->createSurface(context) : nullptr;
 }
 }  // namespace pag

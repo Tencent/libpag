@@ -26,154 +26,154 @@
 namespace pag {
 
 LayerCache* LayerCache::Get(Layer* layer) {
-  std::lock_guard<std::mutex> autoLock(layer->locker);
-  if (layer->cache == nullptr) {
-    layer->cache = new LayerCache(layer);
-  }
-  return static_cast<LayerCache*>(layer->cache);
+    std::lock_guard<std::mutex> autoLock(layer->locker);
+    if (layer->cache == nullptr) {
+        layer->cache = new LayerCache(layer);
+    }
+    return static_cast<LayerCache*>(layer->cache);
 }
 
 LayerCache::LayerCache(Layer* layer) : layer(layer) {
-  switch (layer->type()) {
+    switch (layer->type()) {
     case LayerType::Shape:
-      contentCache = new ShapeContentCache(static_cast<ShapeLayer*>(layer));
-      break;
+        contentCache = new ShapeContentCache(static_cast<ShapeLayer*>(layer));
+        break;
     case LayerType::Text:
-      contentCache = new TextContentCache(static_cast<TextLayer*>(layer));
-      break;
+        contentCache = new TextContentCache(static_cast<TextLayer*>(layer));
+        break;
     case LayerType::Solid:
-      contentCache = new SolidContentCache(static_cast<SolidLayer*>(layer));
-      break;
+        contentCache = new SolidContentCache(static_cast<SolidLayer*>(layer));
+        break;
     case LayerType::Image:
-      contentCache = new ImageContentCache(static_cast<ImageLayer*>(layer));
-      break;
+        contentCache = new ImageContentCache(static_cast<ImageLayer*>(layer));
+        break;
     case LayerType::PreCompose:
-      contentCache = new PreComposeContentCache(static_cast<PreComposeLayer*>(layer));
-      break;
+        contentCache = new PreComposeContentCache(static_cast<PreComposeLayer*>(layer));
+        break;
     default:
-      contentCache = new EmptyContentCache(layer);
-      break;
-  }
-  contentCache->update();
-  transformCache = new TransformCache(layer);
-  if (!layer->masks.empty()) {
-    maskCache = new MaskCache(layer);
-  }
-  updateStaticTimeRanges();
-  maxScaleFactor = layer->getMaxScaleFactor();
+        contentCache = new EmptyContentCache(layer);
+        break;
+    }
+    contentCache->update();
+    transformCache = new TransformCache(layer);
+    if (!layer->masks.empty()) {
+        maskCache = new MaskCache(layer);
+    }
+    updateStaticTimeRanges();
+    maxScaleFactor = layer->getMaxScaleFactor();
 }
 
 LayerCache::~LayerCache() {
-  delete transformCache;
-  delete maskCache;
-  delete contentCache;
+    delete transformCache;
+    delete maskCache;
+    delete contentCache;
 }
 
 Transform* LayerCache::getTransform(Frame contentFrame) {
-  return transformCache->getCache(contentFrame);
+    return transformCache->getCache(contentFrame);
 }
 
 Path* LayerCache::getMasks(Frame contentFrame) {
-  auto mask = maskCache ? maskCache->getCache(contentFrame) : nullptr;
-  if (mask && mask->isEmpty()) {
-    return nullptr;
-  }
-  return mask;
+    auto mask = maskCache ? maskCache->getCache(contentFrame) : nullptr;
+    if (mask && mask->isEmpty()) {
+        return nullptr;
+    }
+    return mask;
 }
 
 Content* LayerCache::getContent(Frame contentFrame) {
-  return contentCache->getCache(contentFrame);
+    return contentCache->getCache(contentFrame);
 }
 
 Layer* LayerCache::getLayer() const {
-  return layer;
+    return layer;
 }
 
 Point LayerCache::getMaxScaleFactor() const {
-  return maxScaleFactor;
+    return maxScaleFactor;
 }
 
 bool LayerCache::checkFrameChanged(Frame contentFrame, Frame lastContentFrame) {
-  if (contentFrame == lastContentFrame) {
-    return false;
-  }
-  if ((contentFrame < 0 || contentFrame >= layer->duration) &&
-      (lastContentFrame < 0 || lastContentFrame >= layer->duration)) {
-    return false;
-  }
-  contentFrame = ConvertFrameByStaticTimeRanges(staticTimeRanges, contentFrame);
-  lastContentFrame = ConvertFrameByStaticTimeRanges(staticTimeRanges, lastContentFrame);
-  return contentFrame != lastContentFrame;
+    if (contentFrame == lastContentFrame) {
+        return false;
+    }
+    if ((contentFrame < 0 || contentFrame >= layer->duration) &&
+            (lastContentFrame < 0 || lastContentFrame >= layer->duration)) {
+        return false;
+    }
+    contentFrame = ConvertFrameByStaticTimeRanges(staticTimeRanges, contentFrame);
+    lastContentFrame = ConvertFrameByStaticTimeRanges(staticTimeRanges, lastContentFrame);
+    return contentFrame != lastContentFrame;
 }
 
 bool LayerCache::contentVisible(Frame contentFrame) {
-  if (contentFrame < 0 || contentFrame >= layer->duration) {
-    return false;
-  }
-  auto layerTransform = getTransform(contentFrame);
-  return layerTransform->visible();
+    if (contentFrame < 0 || contentFrame >= layer->duration) {
+        return false;
+    }
+    auto layerTransform = getTransform(contentFrame);
+    return layerTransform->visible();
 }
 
 void LayerCache::updateStaticTimeRanges() {
-  // layer->startTime is excluded from all time ranges.
-  if (layer->type() == LayerType::PreCompose &&
-      static_cast<PreComposeLayer*>(layer)->composition->type() == CompositionType::Vector) {
-    // 矢量预合成的内容静态区间包含了子项，
-    // 这里的 staticTimeRanges 只记录 Layer 自身的静态区间，
-    // 避免在 Layer->gotoFrame() 里重复判断非真实子项的帧号变化。
-    TimeRange range = {0, layer->duration - 1};
-    staticTimeRanges.push_back(range);
-  } else {
-    staticTimeRanges = *contentCache->getStaticTimeRanges();
-  }
-  MergeTimeRanges(&staticTimeRanges, transformCache->getStaticTimeRanges());
-  if (maskCache) {
-    MergeTimeRanges(&staticTimeRanges, maskCache->getStaticTimeRanges());
-  }
-  if (layer->trackMatteLayer) {
-    auto timeRanges = getTrackMatteStaticTimeRanges();
-    MergeTimeRanges(&staticTimeRanges, &timeRanges);
-  }
-  if (!layer->layerStyles.empty() || !layer->effects.empty()) {
-    auto timeRanges = getFilterStaticTimeRanges();
-    MergeTimeRanges(&staticTimeRanges, &timeRanges);
-  }
-  if (layer->motionBlur) {
-    // MotionBlur是根据Transform来处理图像，
-    // 如果staticTransformRanges中的start帧被加上MotionBlur的效果
-    // （start - 1帧到start帧之间有Transform),但后续因为静态空间的计算，
-    // 不重新绘制该图层，导致后续静态区间里一直显示带有MotionBlur的效果，
-    // 但实际是不需要带有MotionBlur,因此需要在LayerCache的staticTimeRanges过滤掉静态区间的第一帧。
-    for (auto& timeRange : *transformCache->getStaticTimeRanges()) {
-      SplitTimeRangesAt(&staticTimeRanges, timeRange.start + 1);
+    // layer->startTime is excluded from all time ranges.
+    if (layer->type() == LayerType::PreCompose &&
+            static_cast<PreComposeLayer*>(layer)->composition->type() == CompositionType::Vector) {
+        // 矢量预合成的内容静态区间包含了子项，
+        // 这里的 staticTimeRanges 只记录 Layer 自身的静态区间，
+        // 避免在 Layer->gotoFrame() 里重复判断非真实子项的帧号变化。
+        TimeRange range = {0, layer->duration - 1};
+        staticTimeRanges.push_back(range);
+    } else {
+        staticTimeRanges = *contentCache->getStaticTimeRanges();
     }
-  }
+    MergeTimeRanges(&staticTimeRanges, transformCache->getStaticTimeRanges());
+    if (maskCache) {
+        MergeTimeRanges(&staticTimeRanges, maskCache->getStaticTimeRanges());
+    }
+    if (layer->trackMatteLayer) {
+        auto timeRanges = getTrackMatteStaticTimeRanges();
+        MergeTimeRanges(&staticTimeRanges, &timeRanges);
+    }
+    if (!layer->layerStyles.empty() || !layer->effects.empty()) {
+        auto timeRanges = getFilterStaticTimeRanges();
+        MergeTimeRanges(&staticTimeRanges, &timeRanges);
+    }
+    if (layer->motionBlur) {
+        // MotionBlur是根据Transform来处理图像，
+        // 如果staticTransformRanges中的start帧被加上MotionBlur的效果
+        // （start - 1帧到start帧之间有Transform),但后续因为静态空间的计算，
+        // 不重新绘制该图层，导致后续静态区间里一直显示带有MotionBlur的效果，
+        // 但实际是不需要带有MotionBlur,因此需要在LayerCache的staticTimeRanges过滤掉静态区间的第一帧。
+        for (auto& timeRange : *transformCache->getStaticTimeRanges()) {
+            SplitTimeRangesAt(&staticTimeRanges, timeRange.start + 1);
+        }
+    }
 }
 
 std::vector<TimeRange> LayerCache::getTrackMatteStaticTimeRanges() {
-  auto trackMatteLayer = layer->trackMatteLayer;
-  std::vector<TimeRange> timeRanges = {trackMatteLayer->visibleRange()};
-  trackMatteLayer->excludeVaryingRanges(&timeRanges);
-  SplitTimeRangesAt(&timeRanges, trackMatteLayer->startTime);
-  SplitTimeRangesAt(&timeRanges, trackMatteLayer->startTime + trackMatteLayer->duration);
-  auto parent = trackMatteLayer->parent;
-  while (parent != nullptr) {
-    parent->transform->excludeVaryingRanges(&timeRanges);
-    SplitTimeRangesAt(&timeRanges, parent->startTime);
-    SplitTimeRangesAt(&timeRanges, parent->startTime + parent->duration);
-    parent = parent->parent;
-  }
-  return OffsetTimeRanges(timeRanges, -layer->startTime);
+    auto trackMatteLayer = layer->trackMatteLayer;
+    std::vector<TimeRange> timeRanges = {trackMatteLayer->visibleRange()};
+    trackMatteLayer->excludeVaryingRanges(&timeRanges);
+    SplitTimeRangesAt(&timeRanges, trackMatteLayer->startTime);
+    SplitTimeRangesAt(&timeRanges, trackMatteLayer->startTime + trackMatteLayer->duration);
+    auto parent = trackMatteLayer->parent;
+    while (parent != nullptr) {
+        parent->transform->excludeVaryingRanges(&timeRanges);
+        SplitTimeRangesAt(&timeRanges, parent->startTime);
+        SplitTimeRangesAt(&timeRanges, parent->startTime + parent->duration);
+        parent = parent->parent;
+    }
+    return OffsetTimeRanges(timeRanges, -layer->startTime);
 }
 
 std::vector<TimeRange> LayerCache::getFilterStaticTimeRanges() {
-  std::vector<TimeRange> timeRanges = {layer->visibleRange()};
-  for (auto& layerStyle : layer->layerStyles) {
-    layerStyle->excludeVaryingRanges(&timeRanges);
-  }
-  for (auto& effect : layer->effects) {
-    effect->excludeVaryingRanges(&timeRanges);
-  }
-  return OffsetTimeRanges(timeRanges, -layer->startTime);
+    std::vector<TimeRange> timeRanges = {layer->visibleRange()};
+    for (auto& layerStyle : layer->layerStyles) {
+        layerStyle->excludeVaryingRanges(&timeRanges);
+    }
+    for (auto& effect : layer->effects) {
+        effect->excludeVaryingRanges(&timeRanges);
+    }
+    return OffsetTimeRanges(timeRanges, -layer->startTime);
 }
 }  // namespace pag

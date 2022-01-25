@@ -22,146 +22,146 @@ namespace pag {
 enum class RecordType { Matrix, Layer };
 
 class Record {
- public:
-  explicit Record(const Matrix& matrix) : matrix(matrix) {
-  }
+public:
+    explicit Record(const Matrix& matrix) : matrix(matrix) {
+    }
 
-  virtual ~Record() = default;
+    virtual ~Record() = default;
 
-  virtual RecordType type() const {
-    return RecordType::Matrix;
-  }
+    virtual RecordType type() const {
+        return RecordType::Matrix;
+    }
 
-  Matrix matrix = {};
+    Matrix matrix = {};
 };
 
 class LayerRecord : public Record {
- public:
-  LayerRecord(const Matrix& matrix, std::shared_ptr<Modifier> modifier,
-              std::vector<std::shared_ptr<Graphic>> contents)
-      : Record(matrix), modifier(std::move(modifier)), oldNodes(std::move(contents)) {
-  }
+public:
+    LayerRecord(const Matrix& matrix, std::shared_ptr<Modifier> modifier,
+                std::vector<std::shared_ptr<Graphic>> contents)
+        : Record(matrix), modifier(std::move(modifier)), oldNodes(std::move(contents)) {
+    }
 
-  RecordType type() const override {
-    return RecordType::Layer;
-  }
+    RecordType type() const override {
+        return RecordType::Layer;
+    }
 
-  std::shared_ptr<Modifier> modifier = nullptr;
-  std::vector<std::shared_ptr<Graphic>> oldNodes = {};
+    std::shared_ptr<Modifier> modifier = nullptr;
+    std::vector<std::shared_ptr<Graphic>> oldNodes = {};
 };
 
 Matrix Recorder::getMatrix() const {
-  Matrix totalMatrix = matrix;
-  for (int i = static_cast<int>(records.size() - 1); i >= 0; i--) {
-    auto& record = records[i];
-    if (record->type() == RecordType::Layer) {
-      totalMatrix.postConcat(record->matrix);
+    Matrix totalMatrix = matrix;
+    for (int i = static_cast<int>(records.size() - 1); i >= 0; i--) {
+        auto& record = records[i];
+        if (record->type() == RecordType::Layer) {
+            totalMatrix.postConcat(record->matrix);
+        }
     }
-  }
-  return totalMatrix;
+    return totalMatrix;
 }
 
 void Recorder::setMatrix(const Matrix& m) {
-  matrix = m;
-  auto count = static_cast<int>(records.size());
-  if (count > 0) {
-    auto totalMatrix = Matrix::I();
-    for (auto i = count - 1; i >= 0; i--) {
-      auto& record = records[i];
-      if (record->type() == RecordType::Layer) {
-        totalMatrix.postConcat(record->matrix);
-      }
+    matrix = m;
+    auto count = static_cast<int>(records.size());
+    if (count > 0) {
+        auto totalMatrix = Matrix::I();
+        for (auto i = count - 1; i >= 0; i--) {
+            auto& record = records[i];
+            if (record->type() == RecordType::Layer) {
+                totalMatrix.postConcat(record->matrix);
+            }
+        }
+        if (totalMatrix.invert(&totalMatrix)) {
+            matrix.postConcat(totalMatrix);
+        }
     }
-    if (totalMatrix.invert(&totalMatrix)) {
-      matrix.postConcat(totalMatrix);
-    }
-  }
 }
 
 void Recorder::concat(const Matrix& m) {
-  matrix.preConcat(m);
+    matrix.preConcat(m);
 }
 
 void Recorder::saveClip(float x, float y, float width, float height) {
-  Path path = {};
-  path.addRect(Rect::MakeXYWH(x, y, width, height));
-  saveClip(path);
+    Path path = {};
+    path.addRect(Rect::MakeXYWH(x, y, width, height));
+    saveClip(path);
 }
 
 void Recorder::saveClip(const Path& path) {
-  auto modifier = Modifier::MakeClip(path);
-  saveLayer(modifier);
+    auto modifier = Modifier::MakeClip(path);
+    saveLayer(modifier);
 }
 
 void Recorder::saveLayer(Opacity alpha, Enum blendMode) {
-  auto modifier = Modifier::MakeBlend(alpha, blendMode);
-  saveLayer(modifier);
+    auto modifier = Modifier::MakeBlend(alpha, blendMode);
+    saveLayer(modifier);
 }
 
 void Recorder::saveLayer(std::shared_ptr<Modifier> modifier) {
-  if (modifier == nullptr) {
-    save();
-    return;
-  }
-  auto record = std::make_shared<LayerRecord>(matrix, modifier, layerContents);
-  records.push_back(record);
-  matrix = Matrix::I();
-  layerContents = {};
-  layerIndex++;
+    if (modifier == nullptr) {
+        save();
+        return;
+    }
+    auto record = std::make_shared<LayerRecord>(matrix, modifier, layerContents);
+    records.push_back(record);
+    matrix = Matrix::I();
+    layerContents = {};
+    layerIndex++;
 }
 
 void Recorder::save() {
-  auto record = std::make_shared<Record>(matrix);
-  records.push_back(record);
+    auto record = std::make_shared<Record>(matrix);
+    records.push_back(record);
 }
 
 void Recorder::restore() {
-  if (records.empty()) {
-    return;
-  }
-  auto record = records.back();
-  records.pop_back();
-  matrix = record->matrix;
-  if (record->type() == RecordType::Layer) {
-    layerIndex--;
-    auto layerRecord = std::static_pointer_cast<LayerRecord>(record);
-    auto layerGraphic = Graphic::MakeCompose(layerContents);
-    layerGraphic = Graphic::MakeCompose(layerGraphic, layerRecord->modifier);
-    layerContents = layerRecord->oldNodes;
-    drawGraphic(layerGraphic);
-  }
+    if (records.empty()) {
+        return;
+    }
+    auto record = records.back();
+    records.pop_back();
+    matrix = record->matrix;
+    if (record->type() == RecordType::Layer) {
+        layerIndex--;
+        auto layerRecord = std::static_pointer_cast<LayerRecord>(record);
+        auto layerGraphic = Graphic::MakeCompose(layerContents);
+        layerGraphic = Graphic::MakeCompose(layerGraphic, layerRecord->modifier);
+        layerContents = layerRecord->oldNodes;
+        drawGraphic(layerGraphic);
+    }
 }
 
 size_t Recorder::getSaveCount() const {
-  return records.size();
+    return records.size();
 }
 
 void Recorder::restoreToCount(size_t saveCount) {
-  while (records.size() > saveCount) {
-    restore();
-  }
+    while (records.size() > saveCount) {
+        restore();
+    }
 }
 
 void Recorder::drawGraphic(std::shared_ptr<Graphic> graphic, const Matrix& m) {
-  auto oldMatrix = matrix;
-  matrix.preConcat(m);
-  drawGraphic(std::move(graphic));
-  matrix = oldMatrix;
+    auto oldMatrix = matrix;
+    matrix.preConcat(m);
+    drawGraphic(std::move(graphic));
+    matrix = oldMatrix;
 }
 
 void Recorder::drawGraphic(std::shared_ptr<Graphic> graphic) {
-  auto content = Graphic::MakeCompose(std::move(graphic), matrix);
-  if (content == nullptr) {
-    return;
-  }
-  if (layerIndex == 0) {
-    rootContents.push_back(content);
-  } else {
-    layerContents.push_back(content);
-  }
+    auto content = Graphic::MakeCompose(std::move(graphic), matrix);
+    if (content == nullptr) {
+        return;
+    }
+    if (layerIndex == 0) {
+        rootContents.push_back(content);
+    } else {
+        layerContents.push_back(content);
+    }
 }
 
 std::shared_ptr<Graphic> Recorder::makeGraphic() {
-  return Graphic::MakeCompose(rootContents);
+    return Graphic::MakeCompose(rootContents);
 }
 }  // namespace pag

@@ -24,52 +24,52 @@
 
 namespace pag {
 class LayerCache : public Cache {
- public:
-  static LayerCache* Get(Layer* layer);
+public:
+    static LayerCache* Get(Layer* layer);
 
-  ~LayerCache() override;
+    ~LayerCache() override;
 
-  Transform* getTransform(Frame contentFrame);
+    Transform* getTransform(Frame contentFrame);
 
-  Path* getMasks(Frame contentFrame);
+    Path* getMasks(Frame contentFrame);
 
-  Content* getContent(Frame contentFrame);
+    Content* getContent(Frame contentFrame);
 
-  Layer* getLayer() const;
+    Layer* getLayer() const;
 
-  Point getMaxScaleFactor() const;
+    Point getMaxScaleFactor() const;
 
-  bool checkFrameChanged(Frame contentFrame, Frame lastContentFrame);
+    bool checkFrameChanged(Frame contentFrame, Frame lastContentFrame);
 
-  bool contentVisible(Frame contentFrame);
+    bool contentVisible(Frame contentFrame);
 
-  bool contentStatic() const {
-    return contentCache->contentStatic();
-  }
+    bool contentStatic() const {
+        return contentCache->contentStatic();
+    }
 
-  bool cacheEnabled() const {
-    return contentCache->cacheEnabled();
-  }
+    bool cacheEnabled() const {
+        return contentCache->cacheEnabled();
+    }
 
-  bool hasFilters() const {
-    return contentCache->hasFilters();
-  }
+    bool hasFilters() const {
+        return contentCache->hasFilters();
+    }
 
-  bool cacheFilters() const {
-    return contentCache->cacheFilters();
-  }
+    bool cacheFilters() const {
+        return contentCache->cacheFilters();
+    }
 
- private:
-  Layer* layer = nullptr;
-  TransformCache* transformCache = nullptr;
-  MaskCache* maskCache = nullptr;
-  ContentCache* contentCache = nullptr;
-  Point maxScaleFactor = {};
-  std::vector<TimeRange> staticTimeRanges;
+private:
+    Layer* layer = nullptr;
+    TransformCache* transformCache = nullptr;
+    MaskCache* maskCache = nullptr;
+    ContentCache* contentCache = nullptr;
+    Point maxScaleFactor = {};
+    std::vector<TimeRange> staticTimeRanges;
 
-  explicit LayerCache(Layer* layer);
-  void updateStaticTimeRanges();
-  std::vector<TimeRange> getTrackMatteStaticTimeRanges();
-  std::vector<TimeRange> getFilterStaticTimeRanges();
+    explicit LayerCache(Layer* layer);
+    void updateStaticTimeRanges();
+    std::vector<TimeRange> getTrackMatteStaticTimeRanges();
+    std::vector<TimeRange> getFilterStaticTimeRanges();
 };
 }  // namespace pag

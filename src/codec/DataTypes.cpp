@@ -24,468 +24,472 @@
 namespace pag {
 
 class PathRecord {
- public:
-  static const Enum Close = 0;
-  static const Enum Move = 1;
-  static const Enum Line = 2;
-  static const Enum HLine = 3;
-  static const Enum VLine = 4;
-  static const Enum Curve01 = 5;  // has only control2 point
-  static const Enum Curve10 = 6;  // has only control1 point
-  static const Enum Curve11 = 7;  // has both control points
+public:
+    static const Enum Close = 0;
+    static const Enum Move = 1;
+    static const Enum Line = 2;
+    static const Enum HLine = 3;
+    static const Enum VLine = 4;
+    static const Enum Curve01 = 5;  // has only control2 point
+    static const Enum Curve10 = 6;  // has only control1 point
+    static const Enum Curve11 = 7;  // has both control points
 };
 
 Ratio ReadRatio(DecodeStream* stream) {
-  Ratio ratio = {};
-  ratio.numerator = stream->readEncodedInt32();
-  ratio.denominator = stream->readEncodedUint32();
-  return ratio;
+    Ratio ratio = {};
+    ratio.numerator = stream->readEncodedInt32();
+    ratio.denominator = stream->readEncodedUint32();
+    return ratio;
 }
 
 Color ReadColor(DecodeStream* stream) {
-  Color color = {};
-  color.red = stream->readUint8();
-  color.green = stream->readUint8();
-  color.blue = stream->readUint8();
-  return color;
+    Color color = {};
+    color.red = stream->readUint8();
+    color.green = stream->readUint8();
+    color.blue = stream->readUint8();
+    return color;
 }
 
 Frame ReadTime(DecodeStream* stream) {
-  return static_cast<Frame>(stream->readEncodedUint64());
+    return static_cast<Frame>(stream->readEncodedUint64());
 }
 
 float ReadFloat(DecodeStream* stream) {
-  return stream->readFloat();
+    return stream->readFloat();
 }
 
 bool ReadBoolean(DecodeStream* stream) {
-  return stream->readBoolean();
+    return stream->readBoolean();
 }
 
 Enum ReadEnum(DecodeStream* stream) {
-  return stream->readUint8();
+    return stream->readUint8();
 }
 
 ID ReadID(DecodeStream* stream) {
-  return stream->readEncodedUint32();
+    return stream->readEncodedUint32();
 }
 
 Layer* ReadLayerID(DecodeStream* stream) {
-  auto id = stream->readEncodedUint32();
-  if (id > 0) {
-    auto layer = new Layer();
-    layer->id = id;
-    return layer;
-  }
-  return nullptr;
+    auto id = stream->readEncodedUint32();
+    if (id > 0) {
+        auto layer = new Layer();
+        layer->id = id;
+        return layer;
+    }
+    return nullptr;
 }
 
 MaskData* ReadMaskID(DecodeStream* stream) {
-  auto id = stream->readEncodedUint32();
-  if (id > 0) {
-    auto mask = new MaskData();
-    mask->id = id;
-    return mask;
-  }
-  return nullptr;
+    auto id = stream->readEncodedUint32();
+    if (id > 0) {
+        auto mask = new MaskData();
+        mask->id = id;
+        return mask;
+    }
+    return nullptr;
 }
 
 Composition* ReadCompositionID(DecodeStream* stream) {
-  auto id = stream->readEncodedUint32();
-  if (id > 0) {
-    auto composition = new Composition();
-    composition->id = id;
-    return composition;
-  }
-  return nullptr;
+    auto id = stream->readEncodedUint32();
+    if (id > 0) {
+        auto composition = new Composition();
+        composition->id = id;
+        return composition;
+    }
+    return nullptr;
 }
 
 std::string ReadString(DecodeStream* stream) {
-  return stream->readUTF8String();
+    return stream->readUTF8String();
 }
 
 Opacity ReadOpacity(DecodeStream* stream) {
-  return stream->readUint8();
+    return stream->readUint8();
 }
 
 Point ReadPoint(DecodeStream* stream) {
-  Point point = {};
-  point.x = stream->readFloat();
-  point.y = stream->readFloat();
-  return point;
+    Point point = {};
+    point.x = stream->readFloat();
+    point.y = stream->readFloat();
+    return point;
 }
 
 static void ReadPathInternal(DecodeStream* stream, PathData* value, const Enum records[],
                              int64_t numVerbs) {
-  auto numBits = stream->readNumBits();
-  float lastX = 0;
-  float lastY = 0;
-  auto& verbs = value->verbs;
-  auto& points = value->points;
-  for (uint32_t i = 0; i < numVerbs; i++) {
-    auto pathRecord = records[i];
-    switch (pathRecord) {
-      case PathRecord::Close:
-        verbs.push_back(PathDataVerb::Close);
-        break;
-      case PathRecord::Move:
-        verbs.push_back(PathDataVerb::MoveTo);
-        lastX = stream->readBits(numBits) * SPATIAL_PRECISION;
-        lastY = stream->readBits(numBits) * SPATIAL_PRECISION;
-        points.push_back({lastX, lastY});
-        break;
-      case PathRecord::Line:
-        verbs.push_back(PathDataVerb::LineTo);
-        lastX = stream->readBits(numBits) * SPATIAL_PRECISION;
-        lastY = stream->readBits(numBits) * SPATIAL_PRECISION;
-        points.push_back({lastX, lastY});
-        break;
-      case PathRecord::HLine:
-        verbs.push_back(PathDataVerb::LineTo);
-        lastX = stream->readBits(numBits) * SPATIAL_PRECISION;
-        points.push_back({lastX, lastY});
-        break;
-      case PathRecord::VLine:
-        verbs.push_back(PathDataVerb::LineTo);
-        lastY = stream->readBits(numBits) * SPATIAL_PRECISION;
-        points.push_back({lastX, lastY});
-        break;
-      case PathRecord::Curve01:
-        verbs.push_back(PathDataVerb::CurveTo);
-        points.push_back({lastX, lastY});
-        lastX = stream->readBits(numBits) * SPATIAL_PRECISION;
-        lastY = stream->readBits(numBits) * SPATIAL_PRECISION;
-        points.push_back({lastX, lastY});
-        lastX = stream->readBits(numBits) * SPATIAL_PRECISION;
-        lastY = stream->readBits(numBits) * SPATIAL_PRECISION;
-        points.push_back({lastX, lastY});
-        break;
-      case PathRecord::Curve10:
-        verbs.push_back(PathDataVerb::CurveTo);
-        lastX = stream->readBits(numBits) * SPATIAL_PRECISION;
-        lastY = stream->readBits(numBits) * SPATIAL_PRECISION;
-        points.push_back({lastX, lastY});
-        lastX = stream->readBits(numBits) * SPATIAL_PRECISION;
-        lastY = stream->readBits(numBits) * SPATIAL_PRECISION;
-        points.push_back({lastX, lastY});
-        points.push_back({lastX, lastY});
-        break;
-      case PathRecord::Curve11:
-        verbs.push_back(PathDataVerb::CurveTo);
-        lastX = stream->readBits(numBits) * SPATIAL_PRECISION;
-        lastY = stream->readBits(numBits) * SPATIAL_PRECISION;
-        points.push_back({lastX, lastY});
-        lastX = stream->readBits(numBits) * SPATIAL_PRECISION;
-        lastY = stream->readBits(numBits) * SPATIAL_PRECISION;
-        points.push_back({lastX, lastY});
-        lastX = stream->readBits(numBits) * SPATIAL_PRECISION;
-        lastY = stream->readBits(numBits) * SPATIAL_PRECISION;
-        points.push_back({lastX, lastY});
-        break;
-      default:
-        break;
+    auto numBits = stream->readNumBits();
+    float lastX = 0;
+    float lastY = 0;
+    auto& verbs = value->verbs;
+    auto& points = value->points;
+    for (uint32_t i = 0; i < numVerbs; i++) {
+        auto pathRecord = records[i];
+        switch (pathRecord) {
+        case PathRecord::Close:
+            verbs.push_back(PathDataVerb::Close);
+            break;
+        case PathRecord::Move:
+            verbs.push_back(PathDataVerb::MoveTo);
+            lastX = stream->readBits(numBits) * SPATIAL_PRECISION;
+            lastY = stream->readBits(numBits) * SPATIAL_PRECISION;
+            points.push_back({lastX, lastY});
+            break;
+        case PathRecord::Line:
+            verbs.push_back(PathDataVerb::LineTo);
+            lastX = stream->readBits(numBits) * SPATIAL_PRECISION;
+            lastY = stream->readBits(numBits) * SPATIAL_PRECISION;
+            points.push_back({lastX, lastY});
+            break;
+        case PathRecord::HLine:
+            verbs.push_back(PathDataVerb::LineTo);
+            lastX = stream->readBits(numBits) * SPATIAL_PRECISION;
+            points.push_back({lastX, lastY});
+            break;
+        case PathRecord::VLine:
+            verbs.push_back(PathDataVerb::LineTo);
+            lastY = stream->readBits(numBits) * SPATIAL_PRECISION;
+            points.push_back({lastX, lastY});
+            break;
+        case PathRecord::Curve01:
+            verbs.push_back(PathDataVerb::CurveTo);
+            points.push_back({lastX, lastY});
+            lastX = stream->readBits(numBits) * SPATIAL_PRECISION;
+            lastY = stream->readBits(numBits) * SPATIAL_PRECISION;
+            points.push_back({lastX, lastY});
+            lastX = stream->readBits(numBits) * SPATIAL_PRECISION;
+            lastY = stream->readBits(numBits) * SPATIAL_PRECISION;
+            points.push_back({lastX, lastY});
+            break;
+        case PathRecord::Curve10:
+            verbs.push_back(PathDataVerb::CurveTo);
+            lastX = stream->readBits(numBits) * SPATIAL_PRECISION;
+            lastY = stream->readBits(numBits) * SPATIAL_PRECISION;
+            points.push_back({lastX, lastY});
+            lastX = stream->readBits(numBits) * SPATIAL_PRECISION;
+            lastY = stream->readBits(numBits) * SPATIAL_PRECISION;
+            points.push_back({lastX, lastY});
+            points.push_back({lastX, lastY});
+            break;
+        case PathRecord::Curve11:
+            verbs.push_back(PathDataVerb::CurveTo);
+            lastX = stream->readBits(numBits) * SPATIAL_PRECISION;
+            lastY = stream->readBits(numBits) * SPATIAL_PRECISION;
+            points.push_back({lastX, lastY});
+            lastX = stream->readBits(numBits) * SPATIAL_PRECISION;
+            lastY = stream->readBits(numBits) * SPATIAL_PRECISION;
+            points.push_back({lastX, lastY});
+            lastX = stream->readBits(numBits) * SPATIAL_PRECISION;
+            lastY = stream->readBits(numBits) * SPATIAL_PRECISION;
+            points.push_back({lastX, lastY});
+            break;
+        default:
+            break;
+        }
     }
-  }
 }
 
 PathHandle ReadPath(DecodeStream* stream) {
-  auto value = new PathData();
-  int64_t numVerbs = stream->readEncodedUint32();
-  if (numVerbs == 0) {
+    auto value = new PathData();
+    int64_t numVerbs = stream->readEncodedUint32();
+    if (numVerbs == 0) {
+        return PathHandle(value);
+    }
+    auto records = new Enum[static_cast<size_t>(numVerbs)];
+    for (uint32_t i = 0; i < numVerbs; i++) {
+        records[i] = static_cast<Enum>(stream->readUBits(3));
+    }
+    ReadPathInternal(stream, value, records, numVerbs);
+    delete[] records;
     return PathHandle(value);
-  }
-  auto records = new Enum[static_cast<size_t>(numVerbs)];
-  for (uint32_t i = 0; i < numVerbs; i++) {
-    records[i] = static_cast<Enum>(stream->readUBits(3));
-  }
-  ReadPathInternal(stream, value, records, numVerbs);
-  delete[] records;
-  return PathHandle(value);
 }
 
 void ReadFontData(DecodeStream* stream, void* target) {
-  auto textDocument = reinterpret_cast<TextDocument*>(target);
-  auto fontID = stream->readEncodedUint32();
-  auto font = static_cast<CodecContext*>(stream->context)->getFontData(fontID);
-  textDocument->fontFamily = font.fontFamily;
-  textDocument->fontStyle = font.fontStyle;
+    auto textDocument = reinterpret_cast<TextDocument*>(target);
+    auto fontID = stream->readEncodedUint32();
+    auto font = static_cast<CodecContext*>(stream->context)->getFontData(fontID);
+    textDocument->fontFamily = font.fontFamily;
+    textDocument->fontStyle = font.fontStyle;
 }
 
 bool WriteFontData(EncodeStream* stream, void* target) {
-  auto textDocument = reinterpret_cast<TextDocument*>(target);
-  auto id = static_cast<CodecContext*>(stream->context)
-                ->getFontID(textDocument->fontFamily, textDocument->fontStyle);
-  stream->writeEncodedUint32(id);
-  return true;
+    auto textDocument = reinterpret_cast<TextDocument*>(target);
+    auto id = static_cast<CodecContext*>(stream->context)
+              ->getFontID(textDocument->fontFamily, textDocument->fontStyle);
+    stream->writeEncodedUint32(id);
+    return true;
 }
 
 static std::unique_ptr<BlockConfig> TextDocumentBlockCore(TextDocument* textDocument,
-                                                          TagCode tagCode) {
-  auto blockConfig = new BlockConfig();
-  AddAttribute(blockConfig, &textDocument->applyFill, AttributeType::BitFlag, true);
-  AddAttribute(blockConfig, &textDocument->applyStroke, AttributeType::BitFlag, false);
-  AddAttribute(blockConfig, &textDocument->boxText, AttributeType::BitFlag, false);
-  AddAttribute(blockConfig, &textDocument->fauxBold, AttributeType::BitFlag, false);
-  AddAttribute(blockConfig, &textDocument->fauxItalic, AttributeType::BitFlag, false);
-  AddAttribute(blockConfig, &textDocument->strokeOverFill, AttributeType::BitFlag, true);
-  AddAttribute(blockConfig, &textDocument->baselineShift, AttributeType::Value, 0.0f);
-  AddAttribute(blockConfig, &textDocument->firstBaseLine, AttributeType::Value, 0.0f);
-  AddAttribute(blockConfig, &textDocument->boxTextPos, AttributeType::Value, Point::Zero());
-  AddAttribute(blockConfig, &textDocument->boxTextSize, AttributeType::Value, Point::Zero());
-  AddAttribute(blockConfig, &textDocument->fillColor, AttributeType::Value, Black);
-  AddAttribute(blockConfig, &textDocument->fontSize, AttributeType::Value, 24.0f);
-  AddAttribute(blockConfig, &textDocument->strokeColor, AttributeType::Value, Black);
-  AddAttribute(blockConfig, &textDocument->strokeWidth, AttributeType::Value, 1.0f);
-  AddAttribute(blockConfig, &textDocument->text, AttributeType::Value, std::string());
-  AddAttribute(blockConfig, &textDocument->justification, AttributeType::Value,
-               ParagraphJustification::LeftJustify);
-  AddAttribute(blockConfig, &textDocument->leading, AttributeType::Value, 0.0f);
-  AddAttribute(blockConfig, &textDocument->tracking, AttributeType::Value, 0.0f);
-  if (tagCode >= TagCode::TextSourceV2) {
-    AddAttribute(blockConfig, &textDocument->backgroundColor, AttributeType::Value, White);
-    AddAttribute(blockConfig, &textDocument->backgroundAlpha, AttributeType::Value, Opaque);
-  }
-  if (tagCode >= TagCode::TextSourceV3) {
-    AddAttribute(blockConfig, &textDocument->direction, AttributeType::Value,
-                 TextDirection::Vertical);
-  }
-  AddCustomAttribute(blockConfig, textDocument, ReadFontData, WriteFontData);
-  return std::unique_ptr<BlockConfig>(blockConfig);
+        TagCode tagCode) {
+    auto blockConfig = new BlockConfig();
+    AddAttribute(blockConfig, &textDocument->applyFill, AttributeType::BitFlag, true);
+    AddAttribute(blockConfig, &textDocument->applyStroke, AttributeType::BitFlag, false);
+    AddAttribute(blockConfig, &textDocument->boxText, AttributeType::BitFlag, false);
+    AddAttribute(blockConfig, &textDocument->fauxBold, AttributeType::BitFlag, false);
+    AddAttribute(blockConfig, &textDocument->fauxItalic, AttributeType::BitFlag, false);
+    AddAttribute(blockConfig, &textDocument->strokeOverFill, AttributeType::BitFlag, true);
+    AddAttribute(blockConfig, &textDocument->baselineShift, AttributeType::Value, 0.0f);
+    AddAttribute(blockConfig, &textDocument->firstBaseLine, AttributeType::Value, 0.0f);
+    AddAttribute(blockConfig, &textDocument->boxTextPos, AttributeType::Value, Point::Zero());
+    AddAttribute(blockConfig, &textDocument->boxTextSize, AttributeType::Value, Point::Zero());
+    AddAttribute(blockConfig, &textDocument->fillColor, AttributeType::Value, Black);
+    AddAttribute(blockConfig, &textDocument->fontSize, AttributeType::Value, 24.0f);
+    AddAttribute(blockConfig, &textDocument->strokeColor, AttributeType::Value, Black);
+    AddAttribute(blockConfig, &textDocument->strokeWidth, AttributeType::Value, 1.0f);
+    AddAttribute(blockConfig, &textDocument->text, AttributeType::Value, std::string());
+    AddAttribute(blockConfig, &textDocument->justification, AttributeType::Value,
+                 ParagraphJustification::LeftJustify);
+    AddAttribute(blockConfig, &textDocument->leading, AttributeType::Value, 0.0f);
+    AddAttribute(blockConfig, &textDocument->tracking, AttributeType::Value, 0.0f);
+    if (tagCode >= TagCode::TextSourceV2) {
+        AddAttribute(blockConfig, &textDocument->backgroundColor, AttributeType::Value, White);
+        AddAttribute(blockConfig, &textDocument->backgroundAlpha, AttributeType::Value, Opaque);
+    }
+    if (tagCode >= TagCode::TextSourceV3) {
+        AddAttribute(blockConfig, &textDocument->direction, AttributeType::Value,
+                     TextDirection::Vertical);
+    }
+    AddCustomAttribute(blockConfig, textDocument, ReadFontData, WriteFontData);
+    return std::unique_ptr<BlockConfig>(blockConfig);
 }
 
 static std::unique_ptr<BlockConfig> TextDocumentBlock(TextDocument* textDocument) {
-  return TextDocumentBlockCore(textDocument, TagCode::TextSource);
+    return TextDocumentBlockCore(textDocument, TagCode::TextSource);
 }
 
 static std::unique_ptr<BlockConfig> TextDocumentBlockV2(TextDocument* textDocument) {
-  return TextDocumentBlockCore(textDocument, TagCode::TextSourceV2);
+    return TextDocumentBlockCore(textDocument, TagCode::TextSourceV2);
 }
 
 static std::unique_ptr<BlockConfig> TextDocumentBlockV3(TextDocument* textDocument) {
-  return TextDocumentBlockCore(textDocument, TagCode::TextSourceV3);
+    return TextDocumentBlockCore(textDocument, TagCode::TextSourceV3);
 }
 
 TextDocumentHandle ReadTextDocument(DecodeStream* stream) {
-  auto value = new TextDocument();
-  ReadBlock(stream, value, TextDocumentBlock);
-  return TextDocumentHandle(value);
+    auto value = new TextDocument();
+    ReadBlock(stream, value, TextDocumentBlock);
+    return TextDocumentHandle(value);
 }
 
 TextDocumentHandle ReadTextDocumentV2(DecodeStream* stream) {
-  auto value = new TextDocument();
-  ReadBlock(stream, value, TextDocumentBlockV2);
-  return TextDocumentHandle(value);
+    auto value = new TextDocument();
+    ReadBlock(stream, value, TextDocumentBlockV2);
+    return TextDocumentHandle(value);
 }
 
 TextDocumentHandle ReadTextDocumentV3(DecodeStream* stream) {
-  auto value = new TextDocument();
-  ReadBlock(stream, value, TextDocumentBlockV3);
-  return TextDocumentHandle(value);
+    auto value = new TextDocument();
+    ReadBlock(stream, value, TextDocumentBlockV3);
+    return TextDocumentHandle(value);
 }
 
 GradientColorHandle ReadGradientColor(DecodeStream* stream) {
-  auto value = new GradientColor();
-  auto& alphaStops = value->alphaStops;
-  auto& colorStops = value->colorStops;
-  auto alphaCount = stream->readEncodedUint32();
-  auto colorCount = stream->readEncodedUint32();
-  for (uint32_t i = 0; i < alphaCount; i++) {
-    AlphaStop stop = {};
-    stop.position = stream->readUint16() * GRADIENT_PRECISION;
-    stop.midpoint = stream->readUint16() * GRADIENT_PRECISION;
-    stop.opacity = stream->readUint8();
-    alphaStops.push_back(stop);
-  }
-  for (uint32_t i = 0; i < colorCount; i++) {
-    ColorStop stop = {};
-    stop.position = stream->readUint16() * GRADIENT_PRECISION;
-    stop.midpoint = stream->readUint16() * GRADIENT_PRECISION;
-    stop.color = ReadColor(stream);
-    colorStops.push_back(stop);
-  }
-  std::sort(alphaStops.begin(), alphaStops.end(),
-            [](const AlphaStop& a, const AlphaStop& b) { return a.position < b.position; });
-  std::sort(colorStops.begin(), colorStops.end(),
-            [](const ColorStop& a, const ColorStop& b) { return a.position < b.position; });
-  return GradientColorHandle(value);
+    auto value = new GradientColor();
+    auto& alphaStops = value->alphaStops;
+    auto& colorStops = value->colorStops;
+    auto alphaCount = stream->readEncodedUint32();
+    auto colorCount = stream->readEncodedUint32();
+    for (uint32_t i = 0; i < alphaCount; i++) {
+        AlphaStop stop = {};
+        stop.position = stream->readUint16() * GRADIENT_PRECISION;
+        stop.midpoint = stream->readUint16() * GRADIENT_PRECISION;
+        stop.opacity = stream->readUint8();
+        alphaStops.push_back(stop);
+    }
+    for (uint32_t i = 0; i < colorCount; i++) {
+        ColorStop stop = {};
+        stop.position = stream->readUint16() * GRADIENT_PRECISION;
+        stop.midpoint = stream->readUint16() * GRADIENT_PRECISION;
+        stop.color = ReadColor(stream);
+        colorStops.push_back(stop);
+    }
+    std::sort(alphaStops.begin(), alphaStops.end(),
+    [](const AlphaStop& a, const AlphaStop& b) {
+        return a.position < b.position;
+    });
+    std::sort(colorStops.begin(), colorStops.end(),
+    [](const ColorStop& a, const ColorStop& b) {
+        return a.position < b.position;
+    });
+    return GradientColorHandle(value);
 }
 
 void WriteRatio(EncodeStream* stream, const Ratio& ratio) {
-  stream->writeEncodedInt32(ratio.numerator);
-  stream->writeEncodedUint32(ratio.denominator);
+    stream->writeEncodedInt32(ratio.numerator);
+    stream->writeEncodedUint32(ratio.denominator);
 }
 
 void WriteTime(EncodeStream* stream, Frame time) {
-  // Since most of the time values are positive (time in keyframes),
-  // just write it as uint64_t to save space (no need to write the sign bit).
-  // If it is negative time, it is also can be written and read as normal, but
-  // requires more space.
-  stream->writeEncodedUint64(static_cast<uint64_t>(time));
+    // Since most of the time values are positive (time in keyframes),
+    // just write it as uint64_t to save space (no need to write the sign bit).
+    // If it is negative time, it is also can be written and read as normal, but
+    // requires more space.
+    stream->writeEncodedUint64(static_cast<uint64_t>(time));
 }
 
 void WriteColor(EncodeStream* stream, const Color& color) {
-  stream->writeUint8(color.red);
-  stream->writeUint8(color.green);
-  stream->writeUint8(color.blue);
+    stream->writeUint8(color.red);
+    stream->writeUint8(color.green);
+    stream->writeUint8(color.blue);
 }
 
 void WriteFloat(EncodeStream* stream, float value) {
-  stream->writeFloat(value);
+    stream->writeFloat(value);
 }
 
 void WriteBoolean(EncodeStream* stream, bool value) {
-  stream->writeBoolean(value);
+    stream->writeBoolean(value);
 }
 
 void WriteEnum(EncodeStream* stream, Enum value) {
-  stream->writeUint8(value);
+    stream->writeUint8(value);
 }
 
 void WriteID(EncodeStream* stream, pag::ID value) {
-  stream->writeEncodedUint32(value);
+    stream->writeEncodedUint32(value);
 }
 
 void WriteLayerID(EncodeStream* stream, Layer* layer) {
-  if (layer != nullptr) {
-    stream->writeEncodedUint32(layer->id);
-  } else {
-    stream->writeEncodedUint32(0);
-  }
+    if (layer != nullptr) {
+        stream->writeEncodedUint32(layer->id);
+    } else {
+        stream->writeEncodedUint32(0);
+    }
 }
 
 void WriteMaskID(EncodeStream* stream, MaskData* mask) {
-  if (mask != nullptr) {
-    stream->writeEncodedUint32(mask->id);
-  } else {
-    stream->writeEncodedUint32(0);
-  }
+    if (mask != nullptr) {
+        stream->writeEncodedUint32(mask->id);
+    } else {
+        stream->writeEncodedUint32(0);
+    }
 }
 
 void WriteCompositionID(EncodeStream* stream, Composition* composition) {
-  if (composition != nullptr) {
-    stream->writeEncodedUint32(composition->id);
-  } else {
-    stream->writeEncodedUint32(0);
-  }
+    if (composition != nullptr) {
+        stream->writeEncodedUint32(composition->id);
+    } else {
+        stream->writeEncodedUint32(0);
+    }
 }
 
 void WriteString(EncodeStream* stream, std::string value) {
-  stream->writeUTF8String(value);
+    stream->writeUTF8String(value);
 }
 
 void WriteOpacity(EncodeStream* stream, pag::Opacity value) {
-  stream->writeUint8(value);
+    stream->writeUint8(value);
 }
 
 void WritePoint(EncodeStream* stream, pag::Point value) {
-  stream->writeFloat(value.x);
-  stream->writeFloat(value.y);
+    stream->writeFloat(value.x);
+    stream->writeFloat(value.y);
 }
 
 static void WritePathInternal(EncodeStream* stream, pag::PathHandle value) {
-  auto& points = value->points;
-  std::vector<float> pointList;
-  uint32_t index = 0;
-  auto lastPoint = Point::Make(0, 0);
-  Point control1{}, control2{}, point{};
-  for (auto& verb : value->verbs) {
-    switch (verb) {
-      case PathDataVerb::Close:
-        stream->writeUBits(PathRecord::Close, 3);
-        break;
-      case PathDataVerb::MoveTo:
-        lastPoint = points[index++];
-        stream->writeUBits(PathRecord::Move, 3);
-        pointList.push_back(lastPoint.x);
-        pointList.push_back(lastPoint.y);
-        break;
-      case PathDataVerb::LineTo:
-        point = points[index++];
-        if (point.x == lastPoint.x) {
-          stream->writeUBits(PathRecord::VLine, 3);
-          pointList.push_back(point.y);
-        } else if (point.y == lastPoint.y) {
-          stream->writeUBits(PathRecord::HLine, 3);
-          pointList.push_back(point.x);
-        } else {
-          stream->writeUBits(PathRecord::Line, 3);
-          pointList.push_back(point.x);
-          pointList.push_back(point.y);
+    auto& points = value->points;
+    std::vector<float> pointList;
+    uint32_t index = 0;
+    auto lastPoint = Point::Make(0, 0);
+    Point control1{}, control2{}, point{};
+    for (auto& verb : value->verbs) {
+        switch (verb) {
+        case PathDataVerb::Close:
+            stream->writeUBits(PathRecord::Close, 3);
+            break;
+        case PathDataVerb::MoveTo:
+            lastPoint = points[index++];
+            stream->writeUBits(PathRecord::Move, 3);
+            pointList.push_back(lastPoint.x);
+            pointList.push_back(lastPoint.y);
+            break;
+        case PathDataVerb::LineTo:
+            point = points[index++];
+            if (point.x == lastPoint.x) {
+                stream->writeUBits(PathRecord::VLine, 3);
+                pointList.push_back(point.y);
+            } else if (point.y == lastPoint.y) {
+                stream->writeUBits(PathRecord::HLine, 3);
+                pointList.push_back(point.x);
+            } else {
+                stream->writeUBits(PathRecord::Line, 3);
+                pointList.push_back(point.x);
+                pointList.push_back(point.y);
+            }
+            lastPoint = point;
+            break;
+        case PathDataVerb::CurveTo:
+            control1 = points[index++];
+            control2 = points[index++];
+            point = points[index++];
+            if (control1 == lastPoint) {
+                stream->writeUBits(PathRecord::Curve01, 3);
+                pointList.push_back(control2.x);
+                pointList.push_back(control2.y);
+                pointList.push_back(point.x);
+                pointList.push_back(point.y);
+                lastPoint = point;
+            } else if (control2 == point) {
+                stream->writeUBits(PathRecord::Curve10, 3);
+                pointList.push_back(control1.x);
+                pointList.push_back(control1.y);
+                pointList.push_back(point.x);
+                pointList.push_back(point.y);
+                lastPoint = point;
+            } else {
+                stream->writeUBits(PathRecord::Curve11, 3);
+                pointList.push_back(control1.x);
+                pointList.push_back(control1.y);
+                pointList.push_back(control2.x);
+                pointList.push_back(control2.y);
+                pointList.push_back(point.x);
+                pointList.push_back(point.y);
+                lastPoint = point;
+            }
+            break;
         }
-        lastPoint = point;
-        break;
-      case PathDataVerb::CurveTo:
-        control1 = points[index++];
-        control2 = points[index++];
-        point = points[index++];
-        if (control1 == lastPoint) {
-          stream->writeUBits(PathRecord::Curve01, 3);
-          pointList.push_back(control2.x);
-          pointList.push_back(control2.y);
-          pointList.push_back(point.x);
-          pointList.push_back(point.y);
-          lastPoint = point;
-        } else if (control2 == point) {
-          stream->writeUBits(PathRecord::Curve10, 3);
-          pointList.push_back(control1.x);
-          pointList.push_back(control1.y);
-          pointList.push_back(point.x);
-          pointList.push_back(point.y);
-          lastPoint = point;
-        } else {
-          stream->writeUBits(PathRecord::Curve11, 3);
-          pointList.push_back(control1.x);
-          pointList.push_back(control1.y);
-          pointList.push_back(control2.x);
-          pointList.push_back(control2.y);
-          pointList.push_back(point.x);
-          pointList.push_back(point.y);
-          lastPoint = point;
-        }
-        break;
     }
-  }
-  stream->writeFloatList(&pointList[0], static_cast<int32_t>(pointList.size()), SPATIAL_PRECISION);
+    stream->writeFloatList(&pointList[0], static_cast<int32_t>(pointList.size()), SPATIAL_PRECISION);
 }
 
 void WritePath(EncodeStream* stream, pag::PathHandle value) {
-  stream->writeEncodedUint32(static_cast<uint32_t>(value->verbs.size()));
-  if (value->verbs.empty()) {
-    return;
-  }
-  WritePathInternal(stream, value);
+    stream->writeEncodedUint32(static_cast<uint32_t>(value->verbs.size()));
+    if (value->verbs.empty()) {
+        return;
+    }
+    WritePathInternal(stream, value);
 }
 
 void WriteTextDocument(EncodeStream* stream, pag::TextDocumentHandle value) {
-  WriteBlock(stream, value.get(), TextDocumentBlock);
+    WriteBlock(stream, value.get(), TextDocumentBlock);
 }
 
 void WriteTextDocumentV2(EncodeStream* stream, pag::TextDocumentHandle value) {
-  WriteBlock(stream, value.get(), TextDocumentBlockV2);
+    WriteBlock(stream, value.get(), TextDocumentBlockV2);
 }
 
 void WriteTextDocumentV3(EncodeStream* stream, pag::TextDocumentHandle value) {
-  WriteBlock(stream, value.get(), TextDocumentBlockV3);
+    WriteBlock(stream, value.get(), TextDocumentBlockV3);
 }
 
 void WriteGradientColor(EncodeStream* stream, pag::GradientColorHandle value) {
-  auto& alphaStops = value->alphaStops;
-  auto& colorStops = value->colorStops;
-  auto alphaCount = static_cast<uint32_t>(alphaStops.size());
-  auto colorCount = static_cast<uint32_t>(colorStops.size());
-  stream->writeEncodedUint32(alphaCount);
-  stream->writeEncodedUint32(colorCount);
-  for (uint32_t i = 0; i < alphaCount; i++) {
-    auto& stop = alphaStops[i];
-    stream->writeUint16(static_cast<uint16_t>(stop.position / GRADIENT_PRECISION));
-    stream->writeUint16(static_cast<uint16_t>(stop.midpoint / GRADIENT_PRECISION));
-    stream->writeUint8(stop.opacity);
-  }
-  for (uint32_t i = 0; i < colorCount; i++) {
-    auto& stop = colorStops[i];
-    stream->writeUint16(static_cast<uint16_t>(stop.position / GRADIENT_PRECISION));
-    stream->writeUint16(static_cast<uint16_t>(stop.midpoint / GRADIENT_PRECISION));
-    WriteColor(stream, stop.color);
-  }
+    auto& alphaStops = value->alphaStops;
+    auto& colorStops = value->colorStops;
+    auto alphaCount = static_cast<uint32_t>(alphaStops.size());
+    auto colorCount = static_cast<uint32_t>(colorStops.size());
+    stream->writeEncodedUint32(alphaCount);
+    stream->writeEncodedUint32(colorCount);
+    for (uint32_t i = 0; i < alphaCount; i++) {
+        auto& stop = alphaStops[i];
+        stream->writeUint16(static_cast<uint16_t>(stop.position / GRADIENT_PRECISION));
+        stream->writeUint16(static_cast<uint16_t>(stop.midpoint / GRADIENT_PRECISION));
+        stream->writeUint8(stop.opacity);
+    }
+    for (uint32_t i = 0; i < colorCount; i++) {
+        auto& stop = colorStops[i];
+        stream->writeUint16(static_cast<uint16_t>(stop.position / GRADIENT_PRECISION));
+        stream->writeUint16(static_cast<uint16_t>(stop.midpoint / GRADIENT_PRECISION));
+        WriteColor(stream, stop.color);
+    }
 }
 }  // namespace pag

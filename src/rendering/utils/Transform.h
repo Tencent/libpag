@@ -22,19 +22,19 @@
 
 namespace pag {
 class Transform {
- public:
-  Transform() {
-    matrix.setIdentity();
-  }
+public:
+    Transform() {
+        matrix.setIdentity();
+    }
 
-  Transform(const Matrix& matrix, Opacity opacity) : matrix(matrix), opacity(opacity) {
-  }
+    Transform(const Matrix& matrix, Opacity opacity) : matrix(matrix), opacity(opacity) {
+    }
 
-  bool visible() const {
-    return matrix.invertible() && opacity > 0;
-  }
+    bool visible() const {
+        return matrix.invertible() && opacity > 0;
+    }
 
-  Matrix matrix = {};
-  Opacity opacity = Opaque;
+    Matrix matrix = {};
+    Opacity opacity = Opaque;
 };
 }  // namespace pag

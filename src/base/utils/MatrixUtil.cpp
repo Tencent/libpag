@@ -20,47 +20,47 @@
 
 namespace pag {
 bool MapPointInverted(const Matrix& matrix, Point* point) {
-  Matrix inverted = {};
-  bool canInvert = matrix.invert(&inverted);
-  if (canInvert) {
-    inverted.mapPoints(point, 1);
-    return true;
-  }
-  return false;
+    Matrix inverted = {};
+    bool canInvert = matrix.invert(&inverted);
+    if (canInvert) {
+        inverted.mapPoints(point, 1);
+        return true;
+    }
+    return false;
 }
 
 float GetMaxScaleFactor(const Matrix& matrix) {
-  auto scale = GetScaleFactor(matrix);
-  return std::max(fabsf(scale.x), fabsf(scale.y));
+    auto scale = GetScaleFactor(matrix);
+    return std::max(fabsf(scale.x), fabsf(scale.y));
 }
 
 Point GetScaleFactor(const Matrix& matrix, float contentScale, bool inverted) {
-  Point scale = {};
-  auto a = matrix.get(0);
-  auto c = matrix.get(1);
-  auto b = matrix.get(3);
-  auto d = matrix.get(4);
-  float determinant = a * d - b * c;
-  if (a == 1 && b == 0) {
-    scale.x = 1;
-  } else {
-    auto result = sqrtf(a * a + b * b);
-    scale.x = determinant < 0 ? -result : result;
-  }
-  if (c == 0 && d == 1) {
-    scale.y = 1;
-  } else {
-    auto result = sqrtf(c * c + d * d);
-    scale.y = determinant < 0 ? -result : result;
-  }
-  scale.x *= contentScale;
-  scale.y *= contentScale;
+    Point scale = {};
+    auto a = matrix.get(0);
+    auto c = matrix.get(1);
+    auto b = matrix.get(3);
+    auto d = matrix.get(4);
+    float determinant = a * d - b * c;
+    if (a == 1 && b == 0) {
+        scale.x = 1;
+    } else {
+        auto result = sqrtf(a * a + b * b);
+        scale.x = determinant < 0 ? -result : result;
+    }
+    if (c == 0 && d == 1) {
+        scale.y = 1;
+    } else {
+        auto result = sqrtf(c * c + d * d);
+        scale.y = determinant < 0 ? -result : result;
+    }
+    scale.x *= contentScale;
+    scale.y *= contentScale;
 
-  if (inverted) {
-    scale.x = scale.x == 0 ? 0 : 1 / scale.x;
-    scale.y = scale.y == 0 ? 0 : 1 / scale.y;
-  }
-  return scale;
+    if (inverted) {
+        scale.x = scale.x == 0 ? 0 : 1 / scale.x;
+        scale.y = scale.y == 0 ? 0 : 1 / scale.y;
+    }
+    return scale;
 }
 
 }  // namespace pag

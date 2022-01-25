@@ -27,50 +27,50 @@ PAGImage::PAGImage() : _uniqueID(UniqueID::Next()) {
 }
 
 ID PAGImage::uniqueID() const {
-  return _uniqueID;
+    return _uniqueID;
 }
 
 int PAGImage::width() {
-  return static_cast<int>(getContentSize().width());
+    return static_cast<int>(getContentSize().width());
 }
 
 int PAGImage::height() {
-  return static_cast<int>(getContentSize().height());
+    return static_cast<int>(getContentSize().height());
 }
 
 int PAGImage::scaleMode() {
-  std::lock_guard<std::mutex> autoLock(locker);
-  return _scaleMode;
+    std::lock_guard<std::mutex> autoLock(locker);
+    return _scaleMode;
 }
 
 void PAGImage::setScaleMode(int mode) {
-  std::lock_guard<std::mutex> autoLock(locker);
-  _scaleMode = mode;
-  _matrix.setIdentity();
-  hasSetScaleMode = true;
+    std::lock_guard<std::mutex> autoLock(locker);
+    _scaleMode = mode;
+    _matrix.setIdentity();
+    hasSetScaleMode = true;
 }
 
 Matrix PAGImage::matrix() {
-  std::lock_guard<std::mutex> autoLock(locker);
-  return _matrix;
+    std::lock_guard<std::mutex> autoLock(locker);
+    return _matrix;
 }
 
 void PAGImage::setMatrix(const Matrix& matrix) {
-  std::lock_guard<std::mutex> autoLock(locker);
-  _scaleMode = PAGScaleMode::None;
-  _matrix = matrix;
-  hasSetScaleMode = true;
+    std::lock_guard<std::mutex> autoLock(locker);
+    _scaleMode = PAGScaleMode::None;
+    _matrix = matrix;
+    hasSetScaleMode = true;
 }
 
 Matrix PAGImage::getContentMatrix(int defaultScaleMode, int contentWidth, int contentHeight) {
-  auto scaleMode = hasSetScaleMode ? _scaleMode : defaultScaleMode;
-  Matrix matrix = {};
-  if (scaleMode != PAGScaleMode::None) {
-    auto size = getContentSize();
-    matrix = ApplyScaleMode(scaleMode, size.width(), size.height(), contentWidth, contentHeight);
-  } else {
-    matrix = _matrix;
-  }
-  return matrix;
+    auto scaleMode = hasSetScaleMode ? _scaleMode : defaultScaleMode;
+    Matrix matrix = {};
+    if (scaleMode != PAGScaleMode::None) {
+        auto size = getContentSize();
+        matrix = ApplyScaleMode(scaleMode, size.width(), size.height(), contentWidth, contentHeight);
+    } else {
+        matrix = _matrix;
+    }
+    return matrix;
 }
 }  // namespace pag

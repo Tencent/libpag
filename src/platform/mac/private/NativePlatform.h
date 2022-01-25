@@ -22,11 +22,11 @@
 
 namespace pag {
 class NativePlatform : public CocoaPlatform {
- public:
-  NALUType naluType() const override;
+public:
+    NALUType naluType() const override;
 
-  void setNALUType(NALUType type) const;
+    void setNALUType(NALUType type) const;
 
-  std::unique_ptr<VideoDecoder> makeHardwareDecoder(const VideoConfig& config) const override;
+    std::unique_ptr<VideoDecoder> makeHardwareDecoder(const VideoConfig& config) const override;
 };
 }  // namespace pag

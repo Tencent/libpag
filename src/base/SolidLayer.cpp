@@ -21,10 +21,10 @@
 
 namespace pag {
 bool SolidLayer::verify() const {
-  if (!Layer::verify()) {
-    VerifyFailed();
-    return false;
-  }
-  VerifyAndReturn(width > 0 && height > 0);
+    if (!Layer::verify()) {
+        VerifyFailed();
+        return false;
+    }
+    VerifyAndReturn(width > 0 && height > 0);
 }
 }  // namespace pag

@@ -21,25 +21,25 @@
 
 namespace pag {
 RepeaterTransform::~RepeaterTransform() {
-  delete anchorPoint;
-  delete position;
-  delete scale;
-  delete rotation;
-  delete startOpacity;
-  delete endOpacity;
+    delete anchorPoint;
+    delete position;
+    delete scale;
+    delete rotation;
+    delete startOpacity;
+    delete endOpacity;
 }
 
 void RepeaterTransform::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {
-  anchorPoint->excludeVaryingRanges(timeRanges);
-  position->excludeVaryingRanges(timeRanges);
-  scale->excludeVaryingRanges(timeRanges);
-  rotation->excludeVaryingRanges(timeRanges);
-  startOpacity->excludeVaryingRanges(timeRanges);
-  endOpacity->excludeVaryingRanges(timeRanges);
+    anchorPoint->excludeVaryingRanges(timeRanges);
+    position->excludeVaryingRanges(timeRanges);
+    scale->excludeVaryingRanges(timeRanges);
+    rotation->excludeVaryingRanges(timeRanges);
+    startOpacity->excludeVaryingRanges(timeRanges);
+    endOpacity->excludeVaryingRanges(timeRanges);
 }
 
 bool RepeaterTransform::verify() const {
-  VerifyAndReturn(anchorPoint != nullptr && position != nullptr && scale != nullptr &&
-                  rotation != nullptr && startOpacity != nullptr && endOpacity != nullptr);
+    VerifyAndReturn(anchorPoint != nullptr && position != nullptr && scale != nullptr &&
+                    rotation != nullptr && startOpacity != nullptr && endOpacity != nullptr);
 }
 }  // namespace pag

@@ -81,90 +81,92 @@ SinglePassBlurFilter::SinglePassBlurFilter(BlurDirection direction) : direction(
 }
 
 std::string SinglePassBlurFilter::onBuildFragmentShader() {
-  return BLUR_FRAGMENT_SHADER;
+    return BLUR_FRAGMENT_SHADER;
 }
 
 void SinglePassBlurFilter::onPrepareProgram(const GLInterface* gl, unsigned int program) {
-  radiusHandle = gl->getUniformLocation(program, "uRadius");
-  levelHandle = gl->getUniformLocation(program, "uLevel");
-  repeatEdgeHandle = gl->getUniformLocation(program, "uRepeatEdge");
-  colorHandle = gl->getUniformLocation(program, "uColor");
-  colorValidHandle = gl->getUniformLocation(program, "uColorValid");
-  opacityHandle = gl->getUniformLocation(program, "uOpacity");
+    radiusHandle = gl->getUniformLocation(program, "uRadius");
+    levelHandle = gl->getUniformLocation(program, "uLevel");
+    repeatEdgeHandle = gl->getUniformLocation(program, "uRepeatEdge");
+    colorHandle = gl->getUniformLocation(program, "uColor");
+    colorValidHandle = gl->getUniformLocation(program, "uColorValid");
+    opacityHandle = gl->getUniformLocation(program, "uOpacity");
 }
 
 void SinglePassBlurFilter::updateParams(float blurrinessValue, float blurOpacityValue,
                                         bool repeatEdgeValue, BlurMode mode) {
-  blurriness = blurrinessValue;
-  opacity = blurOpacityValue;
-  repeatEdge = repeatEdgeValue;
-  switch (mode) {
+    blurriness = blurrinessValue;
+    opacity = blurOpacityValue;
+    repeatEdge = repeatEdgeValue;
+    switch (mode) {
     case BlurMode::Picture:
-      this->maxRadius = BLUR_MODE_PIC_MAX_RADIUS;
-      this->maxLevel = BLUR_MODE_PIC_MAX_LEVEL;
-      break;
+        this->maxRadius = BLUR_MODE_PIC_MAX_RADIUS;
+        this->maxLevel = BLUR_MODE_PIC_MAX_LEVEL;
+        break;
     case BlurMode::Shadow:
-      this->maxRadius = BLUR_MODE_SHADOW_MAX_RADIUS;
-      this->maxLevel = BLUR_MODE_SHADOW_MAX_LEVEL;
-      break;
+        this->maxRadius = BLUR_MODE_SHADOW_MAX_RADIUS;
+        this->maxLevel = BLUR_MODE_SHADOW_MAX_LEVEL;
+        break;
     default:
-      break;
-  }
+        break;
+    }
 }
 
 void SinglePassBlurFilter::enableBlurColor(Color blurColor) {
-  isColorValid = true;
-  color = blurColor;
+    isColorValid = true;
+    color = blurColor;
 }
 
 void SinglePassBlurFilter::disableBlurColor() {
-  isColorValid = false;
-  color = Black;
+    isColorValid = false;
+    color = Black;
 }
 
 void SinglePassBlurFilter::onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
-                                          const Point& filterScale) {
-  auto scale = direction == BlurDirection::Horizontal ? filterScale.x : filterScale.y;
+        const Point& filterScale) {
+    auto scale = direction == BlurDirection::Horizontal ? filterScale.x : filterScale.y;
 
-  auto blurValue = std::min(blurriness * scale, BLUR_LIMIT_BLURRINESS);
-  auto blurRadius = blurValue / BLUR_LIMIT_BLURRINESS * (maxRadius - 1.0) + 1.0;
-  auto blurLevel = blurValue / BLUR_LIMIT_BLURRINESS * (maxLevel - 1.0) + 1.0;
+    auto blurValue = std::min(blurriness * scale, BLUR_LIMIT_BLURRINESS);
+    auto blurRadius = blurValue / BLUR_LIMIT_BLURRINESS * (maxRadius - 1.0) + 1.0;
+    auto blurLevel = blurValue / BLUR_LIMIT_BLURRINESS * (maxLevel - 1.0) + 1.0;
 
-  gl->uniform1f(radiusHandle, blurRadius);
-  gl->uniform2f(levelHandle,
-                blurLevel / static_cast<float>(contentBounds.width()) *
-                    (direction == BlurDirection::Horizontal),
-                blurLevel / static_cast<float>(contentBounds.height()) *
-                    (direction == BlurDirection::Vertical));
-  gl->uniform1f(repeatEdgeHandle, repeatEdge);
-  gl->uniform3f(colorHandle, color.red / 255.f, color.green / 255.f, color.blue / 255.f);
-  gl->uniform1f(colorValidHandle, isColorValid);
-  gl->uniform1f(opacityHandle, opacity);
+    gl->uniform1f(radiusHandle, blurRadius);
+    gl->uniform2f(levelHandle,
+                  blurLevel / static_cast<float>(contentBounds.width()) *
+                  (direction == BlurDirection::Horizontal),
+                  blurLevel / static_cast<float>(contentBounds.height()) *
+                  (direction == BlurDirection::Vertical));
+    gl->uniform1f(repeatEdgeHandle, repeatEdge);
+    gl->uniform3f(colorHandle, color.red / 255.f, color.green / 255.f, color.blue / 255.f);
+    gl->uniform1f(colorValidHandle, isColorValid);
+    gl->uniform1f(opacityHandle, opacity);
 }
 
 std::vector<Point> SinglePassBlurFilter::computeVertices(const Rect& inputBounds,
-                                                         const Rect& outputBounds,
-                                                         const Point& filterScale) {
-  if (repeatEdge) {
-    return LayerFilter::computeVertices(inputBounds, outputBounds, filterScale);
-  }
-  std::vector<Point> vertices = {};
-  Point contentPoint[4] = {{outputBounds.left, outputBounds.bottom},
-                           {outputBounds.right, outputBounds.bottom},
-                           {outputBounds.left, outputBounds.top},
-                           {outputBounds.right, outputBounds.top}};
+        const Rect& outputBounds,
+        const Point& filterScale) {
+    if (repeatEdge) {
+        return LayerFilter::computeVertices(inputBounds, outputBounds, filterScale);
+    }
+    std::vector<Point> vertices = {};
+    Point contentPoint[4] = {{outputBounds.left, outputBounds.bottom},
+        {outputBounds.right, outputBounds.bottom},
+        {outputBounds.left, outputBounds.top},
+        {outputBounds.right, outputBounds.top}
+    };
 
-  auto deltaX = direction == BlurDirection::Horizontal ? -blurriness * filterScale.x : 0;
-  auto deltaY = direction == BlurDirection::Vertical ? -blurriness * filterScale.y : 0;
+    auto deltaX = direction == BlurDirection::Horizontal ? -blurriness * filterScale.x : 0;
+    auto deltaY = direction == BlurDirection::Vertical ? -blurriness * filterScale.y : 0;
 
-  Point texturePoints[4] = {{deltaX, (outputBounds.height() + deltaY)},
-                            {(outputBounds.width() + deltaX), (outputBounds.height() + deltaY)},
-                            {deltaX, deltaY},
-                            {(outputBounds.width() + deltaX), deltaY}};
-  for (int ii = 0; ii < 4; ii++) {
-    vertices.push_back(contentPoint[ii]);
-    vertices.push_back(texturePoints[ii]);
-  }
-  return vertices;
+    Point texturePoints[4] = {{deltaX, (outputBounds.height() + deltaY)},
+        {(outputBounds.width() + deltaX), (outputBounds.height() + deltaY)},
+        {deltaX, deltaY},
+        {(outputBounds.width() + deltaX), deltaY}
+    };
+    for (int ii = 0; ii < 4; ii++) {
+        vertices.push_back(contentPoint[ii]);
+        vertices.push_back(texturePoints[ii]);
+    }
+    return vertices;
 }
 }  // namespace pag

@@ -24,22 +24,22 @@ using namespace emscripten;
 
 namespace pag {
 std::shared_ptr<NativeTextureBuffer> NativeTextureBuffer::Make(int width, int height, val source) {
-  if (!source.as<bool>()) {
-    return nullptr;
-  }
-  return std::shared_ptr<NativeTextureBuffer>(
-      new NativeTextureBuffer(width, height, std::move(source)));
+    if (!source.as<bool>()) {
+        return nullptr;
+    }
+    return std::shared_ptr<NativeTextureBuffer>(
+               new NativeTextureBuffer(width, height, std::move(source)));
 }
 
 std::shared_ptr<Texture> NativeTextureBuffer::makeTexture(Context* context) const {
-  auto texture = Texture::MakeRGBA(context, width(), height(), nullptr, 0);
-  if (texture == nullptr) {
-    return nullptr;
-  }
-  auto& glInfo = std::static_pointer_cast<GLTexture>(texture)->getGLInfo();
-  const auto* gl = GLContext::Unwrap(context);
-  gl->bindTexture(glInfo.target, glInfo.id);
-  source.call<void>("upload", val::module_property("GL"));
-  return texture;
+    auto texture = Texture::MakeRGBA(context, width(), height(), nullptr, 0);
+    if (texture == nullptr) {
+        return nullptr;
+    }
+    auto& glInfo = std::static_pointer_cast<GLTexture>(texture)->getGLInfo();
+    const auto* gl = GLContext::Unwrap(context);
+    gl->bindTexture(glInfo.target, glInfo.id);
+    source.call<void>("upload", val::module_property("GL"));
+    return texture;
 }
 }  // namespace pag

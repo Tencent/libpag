@@ -21,21 +21,21 @@
 #include "pag/pag.h"
 
 class JPAGImage {
- public:
-  explicit JPAGImage(std::shared_ptr<pag::PAGImage> pagImage) : pagImage(pagImage) {
-  }
+public:
+    explicit JPAGImage(std::shared_ptr<pag::PAGImage> pagImage) : pagImage(pagImage) {
+    }
 
-  std::shared_ptr<pag::PAGImage> get() {
-    std::lock_guard<std::mutex> autoLock(locker);
-    return pagImage;
-  }
+    std::shared_ptr<pag::PAGImage> get() {
+        std::lock_guard<std::mutex> autoLock(locker);
+        return pagImage;
+    }
 
-  void clear() {
-    std::lock_guard<std::mutex> autoLock(locker);
-    pagImage = nullptr;
-  }
+    void clear() {
+        std::lock_guard<std::mutex> autoLock(locker);
+        pagImage = nullptr;
+    }
 
- private:
-  std::shared_ptr<pag::PAGImage> pagImage;
-  std::mutex locker;
+private:
+    std::shared_ptr<pag::PAGImage> pagImage;
+    std::mutex locker;
 };

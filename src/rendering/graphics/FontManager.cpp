@@ -22,203 +22,203 @@
 
 namespace pag {
 std::shared_ptr<TypefaceHolder> TypefaceHolder::MakeFromName(const std::string& fontFamily,
-                                                             const std::string& fontStyle) {
-  auto holder = new TypefaceHolder();
-  holder->fontFamily = fontFamily;
-  holder->fontStyle = fontStyle;
-  return std::shared_ptr<TypefaceHolder>(holder);
+        const std::string& fontStyle) {
+    auto holder = new TypefaceHolder();
+    holder->fontFamily = fontFamily;
+    holder->fontStyle = fontStyle;
+    return std::shared_ptr<TypefaceHolder>(holder);
 }
 
 std::shared_ptr<TypefaceHolder> TypefaceHolder::MakeFromFile(const std::string& fontPath,
-                                                             int ttcIndex) {
-  auto holder = new TypefaceHolder();
-  holder->fontPath = fontPath;
-  holder->ttcIndex = ttcIndex;
-  return std::shared_ptr<TypefaceHolder>(holder);
+        int ttcIndex) {
+    auto holder = new TypefaceHolder();
+    holder->fontPath = fontPath;
+    holder->ttcIndex = ttcIndex;
+    return std::shared_ptr<TypefaceHolder>(holder);
 }
 
 std::shared_ptr<Typeface> TypefaceHolder::getTypeface() {
-  if (typeface == nullptr) {
-    if (!fontPath.empty()) {
-      typeface = Typeface::MakeFromPath(fontPath, ttcIndex);
-    } else {
-      typeface = Typeface::MakeFromName(fontFamily, fontStyle);
+    if (typeface == nullptr) {
+        if (!fontPath.empty()) {
+            typeface = Typeface::MakeFromPath(fontPath, ttcIndex);
+        } else {
+            typeface = Typeface::MakeFromName(fontFamily, fontStyle);
+        }
     }
-  }
-  return typeface;
+    return typeface;
 }
 
 FontManager::~FontManager() {
-  std::lock_guard<std::mutex> autoLock(locker);
-  registeredFontMap.clear();
+    std::lock_guard<std::mutex> autoLock(locker);
+    registeredFontMap.clear();
 }
 
 PAGFont FontManager::registerFont(const std::string& fontPath, int ttcIndex,
                                   const std::string& fontFamily, const std::string& fontStyle) {
-  std::lock_guard<std::mutex> autoLock(locker);
-  auto font = Platform::Current()->parseFont(fontPath, ttcIndex);
-  if (font.fontFamily.empty()) {
-    return font;
-  }
-  return registerFont(font, Typeface::MakeFromPath(fontPath, ttcIndex), fontFamily, fontStyle);
+    std::lock_guard<std::mutex> autoLock(locker);
+    auto font = Platform::Current()->parseFont(fontPath, ttcIndex);
+    if (font.fontFamily.empty()) {
+        return font;
+    }
+    return registerFont(font, Typeface::MakeFromPath(fontPath, ttcIndex), fontFamily, fontStyle);
 }
 
 PAGFont FontManager::registerFont(const void* data, size_t length, int ttcIndex,
                                   const std::string& fontFamily, const std::string& fontStyle) {
-  std::lock_guard<std::mutex> autoLock(locker);
-  auto font = Platform::Current()->parseFont(data, length, ttcIndex);
-  if (font.fontFamily.empty()) {
-    return font;
-  }
-  return registerFont(font, Typeface::MakeFromBytes(data, length), fontFamily, fontStyle);
+    std::lock_guard<std::mutex> autoLock(locker);
+    auto font = Platform::Current()->parseFont(data, length, ttcIndex);
+    if (font.fontFamily.empty()) {
+        return font;
+    }
+    return registerFont(font, Typeface::MakeFromBytes(data, length), fontFamily, fontStyle);
 }
 
 static std::string PAGFontRegisterKey(const std::string& fontFamily, const std::string& fontStyle) {
-  return fontFamily + "|" + fontStyle;
+    return fontFamily + "|" + fontStyle;
 }
 
 PAGFont FontManager::registerFont(const PAGFont& font, std::shared_ptr<Typeface> typeface,
                                   const std::string& fontFamily, const std::string& fontStyle) {
-  if (font.fontFamily.empty() || typeface == nullptr) {
-    return font;
-  }
-  std::string pagFontFamily = font.fontFamily;
-  std::string pagFontStyle = font.fontStyle;
-  // 由于各个平台解析出来的 family 和 style 不一样，此处为了统一，
-  // 如果用户注册时候传入了就使用用户的值
-  if (!fontFamily.empty()) {
-    pagFontFamily = fontFamily;
-    pagFontStyle = fontStyle;
-  }
-  auto key = PAGFontRegisterKey(pagFontFamily, pagFontStyle);
-  auto iter = registeredFontMap.find(key);
-  if (iter != registeredFontMap.end()) {
-    registeredFontMap.erase(iter);
-  }
-  registeredFontMap[key] = std::move(typeface);
-  return {pagFontFamily, pagFontStyle};
+    if (font.fontFamily.empty() || typeface == nullptr) {
+        return font;
+    }
+    std::string pagFontFamily = font.fontFamily;
+    std::string pagFontStyle = font.fontStyle;
+    // 由于各个平台解析出来的 family 和 style 不一样，此处为了统一，
+    // 如果用户注册时候传入了就使用用户的值
+    if (!fontFamily.empty()) {
+        pagFontFamily = fontFamily;
+        pagFontStyle = fontStyle;
+    }
+    auto key = PAGFontRegisterKey(pagFontFamily, pagFontStyle);
+    auto iter = registeredFontMap.find(key);
+    if (iter != registeredFontMap.end()) {
+        registeredFontMap.erase(iter);
+    }
+    registeredFontMap[key] = std::move(typeface);
+    return {pagFontFamily, pagFontStyle};
 }
 
 void FontManager::unregisterFont(const PAGFont& font) {
-  if (font.fontFamily.empty()) {
-    return;
-  }
-  std::lock_guard<std::mutex> autoLock(locker);
-  auto iter = registeredFontMap.find(PAGFontRegisterKey(font.fontFamily, font.fontStyle));
-  if (iter == registeredFontMap.end()) {
-    return;
-  }
-  registeredFontMap.erase(iter);
+    if (font.fontFamily.empty()) {
+        return;
+    }
+    std::lock_guard<std::mutex> autoLock(locker);
+    auto iter = registeredFontMap.find(PAGFontRegisterKey(font.fontFamily, font.fontStyle));
+    if (iter == registeredFontMap.end()) {
+        return;
+    }
+    registeredFontMap.erase(iter);
 }
 
 static std::shared_ptr<Typeface> MakeTypefaceWithName(const std::string& fontFamily,
-                                                      const std::string& fontStyle) {
-  auto typeface = Typeface::MakeFromName(fontFamily, fontStyle);
-  if (typeface != nullptr) {
-    if (fontFamily != typeface->fontFamily()) {
-      typeface = nullptr;
+        const std::string& fontStyle) {
+    auto typeface = Typeface::MakeFromName(fontFamily, fontStyle);
+    if (typeface != nullptr) {
+        if (fontFamily != typeface->fontFamily()) {
+            typeface = nullptr;
+        }
     }
-  }
-  return typeface;
+    return typeface;
 }
 
 std::shared_ptr<Typeface> FontManager::getTypefaceWithoutFallback(const std::string& fontFamily,
-                                                                  const std::string& fontStyle) {
-  std::shared_ptr<Typeface> typeface = getTypefaceFromCache(fontFamily, fontStyle);
-  if (typeface == nullptr) {
-    typeface = MakeTypefaceWithName(fontFamily, fontStyle);
-  }
-  if (typeface == nullptr) {
-    auto index = fontFamily.find(' ');
-    if (index != std::string::npos) {
-      auto family = fontFamily.substr(0, index);
-      auto style = fontFamily.substr(index + 1);
-      typeface = MakeTypefaceWithName(family, style);
+        const std::string& fontStyle) {
+    std::shared_ptr<Typeface> typeface = getTypefaceFromCache(fontFamily, fontStyle);
+    if (typeface == nullptr) {
+        typeface = MakeTypefaceWithName(fontFamily, fontStyle);
     }
-  }
-  return typeface;
+    if (typeface == nullptr) {
+        auto index = fontFamily.find(' ');
+        if (index != std::string::npos) {
+            auto family = fontFamily.substr(0, index);
+            auto style = fontFamily.substr(index + 1);
+            typeface = MakeTypefaceWithName(family, style);
+        }
+    }
+    return typeface;
 }
 
 std::shared_ptr<Typeface> FontManager::getFallbackTypeface(const std::string& name,
-                                                           GlyphID* glyphID) {
-  std::lock_guard<std::mutex> autoLock(locker);
-  for (auto& holder : fallbackFontList) {
-    auto typeface = holder->getTypeface();
-    if (typeface != nullptr) {
-      *glyphID = typeface->getGlyphID(name);
-      if (*glyphID != 0) {
-        return typeface;
-      }
+        GlyphID* glyphID) {
+    std::lock_guard<std::mutex> autoLock(locker);
+    for (auto& holder : fallbackFontList) {
+        auto typeface = holder->getTypeface();
+        if (typeface != nullptr) {
+            *glyphID = typeface->getGlyphID(name);
+            if (*glyphID != 0) {
+                return typeface;
+            }
+        }
     }
-  }
-  return Typeface::MakeDefault();
+    return Typeface::MakeDefault();
 }
 
 void FontManager::setFallbackFontNames(const std::vector<std::string>& fontNames) {
-  std::lock_guard<std::mutex> autoLock(locker);
-  fallbackFontList.clear();
-  for (auto& fontFamily : fontNames) {
-    auto holder = TypefaceHolder::MakeFromName(fontFamily, "");
-    fallbackFontList.push_back(holder);
-  }
+    std::lock_guard<std::mutex> autoLock(locker);
+    fallbackFontList.clear();
+    for (auto& fontFamily : fontNames) {
+        auto holder = TypefaceHolder::MakeFromName(fontFamily, "");
+        fallbackFontList.push_back(holder);
+    }
 }
 
 void FontManager::setFallbackFontPaths(const std::vector<std::string>& fontPaths,
                                        const std::vector<int>& ttcIndices) {
-  std::lock_guard<std::mutex> autoLock(locker);
-  fallbackFontList.clear();
-  int index = 0;
-  for (auto& fontPath : fontPaths) {
-    auto holder = TypefaceHolder::MakeFromFile(fontPath, ttcIndices[index]);
-    fallbackFontList.push_back(holder);
-    index++;
-  }
+    std::lock_guard<std::mutex> autoLock(locker);
+    fallbackFontList.clear();
+    int index = 0;
+    for (auto& fontPath : fontPaths) {
+        auto holder = TypefaceHolder::MakeFromFile(fontPath, ttcIndices[index]);
+        fallbackFontList.push_back(holder);
+        index++;
+    }
 }
 
 std::shared_ptr<Typeface> FontManager::getTypefaceFromCache(const std::string& fontFamily,
-                                                            const std::string& fontStyle) {
-  std::lock_guard<std::mutex> autoLock(locker);
-  auto result = registeredFontMap.find(PAGFontRegisterKey(fontFamily, fontStyle));
-  if (result != registeredFontMap.end()) {
-    return result->second;
-  }
-  return nullptr;
+        const std::string& fontStyle) {
+    std::lock_guard<std::mutex> autoLock(locker);
+    auto result = registeredFontMap.find(PAGFontRegisterKey(fontFamily, fontStyle));
+    if (result != registeredFontMap.end()) {
+        return result->second;
+    }
+    return nullptr;
 }
 
 static FontManager fontManager = {};
 
 std::shared_ptr<Typeface> FontManager::GetTypefaceWithoutFallback(const std::string& fontFamily,
-                                                                  const std::string& fontStyle) {
-  static bool initialized = Platform::Current()->registerFallbackFonts();
-  USE(initialized);
-  return fontManager.getTypefaceWithoutFallback(fontFamily, fontStyle);
+        const std::string& fontStyle) {
+    static bool initialized = Platform::Current()->registerFallbackFonts();
+    USE(initialized);
+    return fontManager.getTypefaceWithoutFallback(fontFamily, fontStyle);
 }
 
 std::shared_ptr<Typeface> FontManager::GetFallbackTypeface(const std::string& name,
-                                                           GlyphID* glyphID) {
-  return fontManager.getFallbackTypeface(name, glyphID);
+        GlyphID* glyphID) {
+    return fontManager.getFallbackTypeface(name, glyphID);
 }
 
 PAGFont FontManager::RegisterFont(const std::string& fontPath, int ttcIndex,
                                   const std::string& fontFamily, const std::string& fontStyle) {
-  return fontManager.registerFont(fontPath, ttcIndex, fontFamily, fontStyle);
+    return fontManager.registerFont(fontPath, ttcIndex, fontFamily, fontStyle);
 }
 
 PAGFont FontManager::RegisterFont(const void* data, size_t length, int ttcIndex,
                                   const std::string& fontFamily, const std::string& fontStyle) {
-  return fontManager.registerFont(data, length, ttcIndex, fontFamily, fontStyle);
+    return fontManager.registerFont(data, length, ttcIndex, fontFamily, fontStyle);
 }
 
 void FontManager::UnregisterFont(const PAGFont& font) {
-  return fontManager.unregisterFont(font);
+    return fontManager.unregisterFont(font);
 }
 
 void FontManager::SetFallbackFontNames(const std::vector<std::string>& fontNames) {
-  fontManager.setFallbackFontNames(fontNames);
+    fontManager.setFallbackFontNames(fontNames);
 }
 
 void FontManager::SetFallbackFontPaths(const std::vector<std::string>& fontPaths,
                                        const std::vector<int>& ttcIndices) {
-  fontManager.setFallbackFontPaths(fontPaths, ttcIndices);
+    fontManager.setFallbackFontPaths(fontPaths, ttcIndices);
 }
 }  // namespace pag

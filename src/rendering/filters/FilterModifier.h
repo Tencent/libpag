@@ -25,47 +25,47 @@
 
 namespace pag {
 class FilterModifier : public Modifier {
- public:
-  /**
-   * Returns nullptr if trackMatteLayer is nullptr.
-   */
-  static std::shared_ptr<FilterModifier> Make(PAGLayer* pagLayer);
+public:
+    /**
+     * Returns nullptr if trackMatteLayer is nullptr.
+     */
+    static std::shared_ptr<FilterModifier> Make(PAGLayer* pagLayer);
 
-  /**
-   * Returns nullptr if trackMatteLayer is nullptr.
-   */
-  static std::shared_ptr<FilterModifier> Make(Layer* layer, Frame layerFrame);
+    /**
+     * Returns nullptr if trackMatteLayer is nullptr.
+     */
+    static std::shared_ptr<FilterModifier> Make(Layer* layer, Frame layerFrame);
 
-  ID type() const override {
-    static const auto TypeID = UniqueID::Next();
-    return TypeID;
-  }
+    ID type() const override {
+        static const auto TypeID = UniqueID::Next();
+        return TypeID;
+    }
 
-  bool isEmpty() const override {
-    return false;
-  }
+    bool isEmpty() const override {
+        return false;
+    }
 
-  bool hitTest(RenderCache*, float, float) const override {
-    return true;
-  }
+    bool hitTest(RenderCache*, float, float) const override {
+        return true;
+    }
 
-  void prepare(RenderCache*) const override {
-  }
+    void prepare(RenderCache*) const override {
+    }
 
-  void applyToBounds(Rect* bounds) const override;
+    void applyToBounds(Rect* bounds) const override;
 
-  bool applyToPath(Path*) const override {
-    return false;
-  }
+    bool applyToPath(Path*) const override {
+        return false;
+    }
 
-  void applyToGraphic(Canvas* canvas, RenderCache* cache,
-                      std::shared_ptr<Graphic> graphic) const override;
+    void applyToGraphic(Canvas* canvas, RenderCache* cache,
+                        std::shared_ptr<Graphic> graphic) const override;
 
-  std::shared_ptr<Modifier> mergeWith(const Modifier*) const override {
-    return nullptr;
-  }
+    std::shared_ptr<Modifier> mergeWith(const Modifier*) const override {
+        return nullptr;
+    }
 
-  Layer* layer = nullptr;
-  Frame layerFrame = 0;
+    Layer* layer = nullptr;
+    Frame layerFrame = 0;
 };
 }  // namespace pag

@@ -30,538 +30,538 @@
 namespace pag {
 PAGLayer::PAGLayer(std::shared_ptr<File> file, Layer* layer)
     : layer(layer), file(std::move(file)), _uniqueID(UniqueID::Next()) {
-  layerMatrix.setIdentity();
-  if (layer != nullptr) {  // could be nullptr.
-    layerCache = LayerCache::Get(layer);
-    layerVisible = layer->isActive;
-    startFrame = layer->startTime;
-  }
+    layerMatrix.setIdentity();
+    if (layer != nullptr) {  // could be nullptr.
+        layerCache = LayerCache::Get(layer);
+        layerVisible = layer->isActive;
+        startFrame = layer->startTime;
+    }
 }
 
 PAGLayer::~PAGLayer() {
-  if (_trackMatteLayer) {
-    _trackMatteLayer->detachFromTree();
-    _trackMatteLayer->trackMatteOwner = nullptr;
-  }
+    if (_trackMatteLayer) {
+        _trackMatteLayer->detachFromTree();
+        _trackMatteLayer->trackMatteOwner = nullptr;
+    }
 }
 
 uint32_t PAGLayer::uniqueID() const {
-  return _uniqueID;
+    return _uniqueID;
 }
 
 LayerType PAGLayer::layerType() const {
-  return layer->type();
+    return layer->type();
 }
 
 std::string PAGLayer::layerName() const {
-  return layer->name;
+    return layer->name;
 }
 
 Matrix PAGLayer::matrix() const {
-  LockGuard autoLock(rootLocker);
-  return layerMatrix;
+    LockGuard autoLock(rootLocker);
+    return layerMatrix;
 }
 
 void PAGLayer::setMatrix(const Matrix& value) {
-  LockGuard autoLock(rootLocker);
-  setMatrixInternal(value);
+    LockGuard autoLock(rootLocker);
+    setMatrixInternal(value);
 }
 
 void PAGLayer::resetMatrix() {
-  LockGuard autoLock(rootLocker);
-  setMatrixInternal(Matrix::I());
+    LockGuard autoLock(rootLocker);
+    setMatrixInternal(Matrix::I());
 }
 
 Matrix PAGLayer::getTotalMatrix() {
-  LockGuard autoLock(rootLocker);
-  return getTotalMatrixInternal();
+    LockGuard autoLock(rootLocker);
+    return getTotalMatrixInternal();
 }
 
 Matrix PAGLayer::getTotalMatrixInternal() {
-  auto matrix = layerCache->getTransform(contentFrame)->matrix;
-  matrix.postConcat(layerMatrix);
-  return matrix;
+    auto matrix = layerCache->getTransform(contentFrame)->matrix;
+    matrix.postConcat(layerMatrix);
+    return matrix;
 }
 
 void PAGLayer::setOpacity(const Opacity& value) {
-  LockGuard autoLock(rootLocker);
-  setOpacityInternal(value);
+    LockGuard autoLock(rootLocker);
+    setOpacityInternal(value);
 }
 
 Opacity PAGLayer::opacity() const {
-  LockGuard autoLock(rootLocker);
-  return layerOpacity;
+    LockGuard autoLock(rootLocker);
+    return layerOpacity;
 }
 
 bool PAGLayer::visible() const {
-  LockGuard autoLock(rootLocker);
-  return layerVisible;
+    LockGuard autoLock(rootLocker);
+    return layerVisible;
 }
 
 void PAGLayer::setVisible(bool value) {
-  LockGuard autoLock(rootLocker);
-  setVisibleInternal(value);
+    LockGuard autoLock(rootLocker);
+    setVisibleInternal(value);
 }
 
 void PAGLayer::setVisibleInternal(bool value) {
-  if (value == layerVisible) {
-    return;
-  }
-  layerVisible = value;
-  notifyModified();
+    if (value == layerVisible) {
+        return;
+    }
+    layerVisible = value;
+    notifyModified();
 }
 
 Rect PAGLayer::getBounds() {
-  LockGuard autoLock(rootLocker);
-  Rect bounds = {};
-  measureBounds(&bounds);
-  return bounds;
+    LockGuard autoLock(rootLocker);
+    Rect bounds = {};
+    measureBounds(&bounds);
+    return bounds;
 }
 
 int PAGLayer::editableIndex() const {
-  return _editableIndex;
+    return _editableIndex;
 }
 
 std::shared_ptr<PAGComposition> PAGLayer::parent() const {
-  LockGuard autoLock(rootLocker);
-  if (_parent) {
-    return std::static_pointer_cast<PAGComposition>(_parent->weakThis.lock());
-  }
-  return nullptr;
+    LockGuard autoLock(rootLocker);
+    if (_parent) {
+        return std::static_pointer_cast<PAGComposition>(_parent->weakThis.lock());
+    }
+    return nullptr;
 }
 
 std::vector<const Marker*> PAGLayer::markers() const {
-  std::vector<const Marker*> result = {};
-  for (auto marker : layer->markers) {
-    result.push_back(marker);
-  }
-  return result;
+    std::vector<const Marker*> result = {};
+    for (auto marker : layer->markers) {
+        result.push_back(marker);
+    }
+    return result;
 }
 
 int64_t PAGLayer::localTimeToGlobal(int64_t localTime) const {
-  LockGuard autoLock(rootLocker);
-  auto localFrame = TimeToFrame(localTime, frameRateInternal());
-  auto globalFrame = localFrameToGlobal(localFrame);
-  auto globalLayer = this;
-  while (globalLayer) {
-    auto owner = globalLayer->getTimelineOwner();
-    if (!owner) {
-      break;
+    LockGuard autoLock(rootLocker);
+    auto localFrame = TimeToFrame(localTime, frameRateInternal());
+    auto globalFrame = localFrameToGlobal(localFrame);
+    auto globalLayer = this;
+    while (globalLayer) {
+        auto owner = globalLayer->getTimelineOwner();
+        if (!owner) {
+            break;
+        }
+        globalLayer = owner;
     }
-    globalLayer = owner;
-  }
-  return FrameToTime(globalFrame, globalLayer->frameRateInternal());
+    return FrameToTime(globalFrame, globalLayer->frameRateInternal());
 }
 
 Frame PAGLayer::localFrameToGlobal(Frame localFrame) const {
-  auto parent = getTimelineOwner();
-  auto childFrameRate = frameRateInternal();
-  while (parent) {
-    localFrame = parent->childFrameToLocal(localFrame, childFrameRate);
-    childFrameRate = parent->frameRateInternal();
-    parent = parent->getTimelineOwner();
-  }
-  return localFrame;
+    auto parent = getTimelineOwner();
+    auto childFrameRate = frameRateInternal();
+    while (parent) {
+        localFrame = parent->childFrameToLocal(localFrame, childFrameRate);
+        childFrameRate = parent->frameRateInternal();
+        parent = parent->getTimelineOwner();
+    }
+    return localFrame;
 }
 
 int64_t PAGLayer::globalToLocalTime(int64_t globalTime) const {
-  LockGuard autoLock(rootLocker);
-  auto globalLayer = this;
-  while (globalLayer) {
-    auto owner = globalLayer->getTimelineOwner();
-    if (!owner) {
-      break;
+    LockGuard autoLock(rootLocker);
+    auto globalLayer = this;
+    while (globalLayer) {
+        auto owner = globalLayer->getTimelineOwner();
+        if (!owner) {
+            break;
+        }
+        globalLayer = owner;
     }
-    globalLayer = owner;
-  }
-  auto globalFrame = TimeToFrame(globalTime, globalLayer->frameRateInternal());
-  auto localFrame = globalToLocalFrame(globalFrame);
-  return FrameToTime(localFrame, frameRateInternal());
+    auto globalFrame = TimeToFrame(globalTime, globalLayer->frameRateInternal());
+    auto localFrame = globalToLocalFrame(globalFrame);
+    return FrameToTime(localFrame, frameRateInternal());
 }
 
 Frame PAGLayer::globalToLocalFrame(Frame globalFrame) const {
-  std::vector<PAGLayer*> list = {};
-  auto owner = getTimelineOwner();
-  while (owner) {
-    list.push_back(owner);
-    owner = owner->getTimelineOwner();
-  }
-  for (int i = static_cast<int>(list.size() - 1); i >= 0; i--) {
-    auto childFrameRate = i > 0 ? list[i - 1]->frameRateInternal() : frameRateInternal();
-    globalFrame = list[i]->localFrameToChild(globalFrame, childFrameRate);
-  }
-  return globalFrame;
+    std::vector<PAGLayer*> list = {};
+    auto owner = getTimelineOwner();
+    while (owner) {
+        list.push_back(owner);
+        owner = owner->getTimelineOwner();
+    }
+    for (int i = static_cast<int>(list.size() - 1); i >= 0; i--) {
+        auto childFrameRate = i > 0 ? list[i - 1]->frameRateInternal() : frameRateInternal();
+        globalFrame = list[i]->localFrameToChild(globalFrame, childFrameRate);
+    }
+    return globalFrame;
 }
 
 Frame PAGLayer::localFrameToChild(Frame localFrame, float childFrameRate) const {
-  auto timeScale = childFrameRate / frameRateInternal();
-  return static_cast<Frame>(roundf((localFrame - startFrame) * timeScale));
+    auto timeScale = childFrameRate / frameRateInternal();
+    return static_cast<Frame>(roundf((localFrame - startFrame) * timeScale));
 }
 
 Frame PAGLayer::childFrameToLocal(Frame childFrame, float childFrameRate) const {
-  auto timeScale = frameRateInternal() / childFrameRate;
-  return static_cast<Frame>(roundf(childFrame * timeScale)) + startFrame;
+    auto timeScale = frameRateInternal() / childFrameRate;
+    return static_cast<Frame>(roundf(childFrame * timeScale)) + startFrame;
 }
 
 PAGLayer* PAGLayer::getTimelineOwner() const {
-  if (_parent) {
-    return _parent;
-  }
-  if (trackMatteOwner) {
-    return trackMatteOwner->_parent;
-  }
-  return nullptr;
+    if (_parent) {
+        return _parent;
+    }
+    if (trackMatteOwner) {
+        return trackMatteOwner->_parent;
+    }
+    return nullptr;
 }
 
 int64_t PAGLayer::startTime() const {
-  LockGuard autoLock(rootLocker);
-  return startTimeInternal();
+    LockGuard autoLock(rootLocker);
+    return startTimeInternal();
 }
 
 int64_t PAGLayer::startTimeInternal() const {
-  return FrameToTime(startFrame, frameRateInternal());
+    return FrameToTime(startFrame, frameRateInternal());
 }
 
 void PAGLayer::setStartTime(int64_t time) {
-  LockGuard autoLock(rootLocker);
-  setStartTimeInternal(time);
+    LockGuard autoLock(rootLocker);
+    setStartTimeInternal(time);
 }
 
 void PAGLayer::setStartTimeInternal(int64_t time) {
-  auto targetStartFrame = TimeToFrame(time, frameRateInternal());
-  if (startFrame == targetStartFrame) {
-    return;
-  }
-  auto layerFrame = startFrame + contentFrame;
-  startFrame = targetStartFrame;
-  if (_parent && _parent->emptyComposition) {
-    _parent->updateDurationAndFrameRate();
-  }
-  gotoTimeAndNotifyChanged(FrameToTime(layerFrame, frameRateInternal()));
-  onTimelineChanged();
+    auto targetStartFrame = TimeToFrame(time, frameRateInternal());
+    if (startFrame == targetStartFrame) {
+        return;
+    }
+    auto layerFrame = startFrame + contentFrame;
+    startFrame = targetStartFrame;
+    if (_parent && _parent->emptyComposition) {
+        _parent->updateDurationAndFrameRate();
+    }
+    gotoTimeAndNotifyChanged(FrameToTime(layerFrame, frameRateInternal()));
+    onTimelineChanged();
 }
 
 int64_t PAGLayer::duration() const {
-  LockGuard autoLock(rootLocker);
-  return durationInternal();
+    LockGuard autoLock(rootLocker);
+    return durationInternal();
 }
 
 int64_t PAGLayer::durationInternal() const {
-  return FrameToTime(stretchedFrameDuration(), frameRateInternal());
+    return FrameToTime(stretchedFrameDuration(), frameRateInternal());
 }
 
 float PAGLayer::frameRate() const {
-  LockGuard autoLock(rootLocker);
-  return frameRateInternal();
+    LockGuard autoLock(rootLocker);
+    return frameRateInternal();
 }
 
 float PAGLayer::frameRateInternal() const {
-  return file ? file->frameRate() : 60;
+    return file ? file->frameRate() : 60;
 }
 
 int64_t PAGLayer::currentTime() const {
-  LockGuard autoLock(rootLocker);
-  return currentTimeInternal();
+    LockGuard autoLock(rootLocker);
+    return currentTimeInternal();
 }
 
 int64_t PAGLayer::currentTimeInternal() const {
-  return FrameToTime(currentFrameInternal(), frameRateInternal());
+    return FrameToTime(currentFrameInternal(), frameRateInternal());
 }
 
 void PAGLayer::setCurrentTime(int64_t time) {
-  LockGuard autoLock(rootLocker);
-  setCurrentTimeInternal(time);
+    LockGuard autoLock(rootLocker);
+    setCurrentTimeInternal(time);
 }
 
 bool PAGLayer::setCurrentTimeInternal(int64_t time) {
-  return gotoTimeAndNotifyChanged(time);
+    return gotoTimeAndNotifyChanged(time);
 }
 
 Frame PAGLayer::currentFrameInternal() const {
-  return startFrame + stretchedContentFrame();
+    return startFrame + stretchedContentFrame();
 }
 
 double PAGLayer::getProgress() {
-  LockGuard autoLock(rootLocker);
-  return getProgressInternal();
+    LockGuard autoLock(rootLocker);
+    return getProgressInternal();
 }
 
 double PAGLayer::getProgressInternal() {
-  return FrameToProgress(stretchedContentFrame(), stretchedFrameDuration());
+    return FrameToProgress(stretchedContentFrame(), stretchedFrameDuration());
 }
 
 void PAGLayer::setProgress(double percent) {
-  LockGuard autoLock(rootLocker);
-  setProgressInternal(percent);
+    LockGuard autoLock(rootLocker);
+    setProgressInternal(percent);
 }
 
 void PAGLayer::setProgressInternal(double percent) {
-  gotoTimeAndNotifyChanged(startTimeInternal() + ProgressToTime(percent, durationInternal()));
+    gotoTimeAndNotifyChanged(startTimeInternal() + ProgressToTime(percent, durationInternal()));
 }
 
 void PAGLayer::preFrame() {
-  LockGuard autoLock(rootLocker);
-  preFrameInternal();
+    LockGuard autoLock(rootLocker);
+    preFrameInternal();
 }
 
 void PAGLayer::preFrameInternal() {
-  auto totalFrames = stretchedFrameDuration();
-  if (totalFrames <= 1) {
-    return;
-  }
-  auto targetContentFrame = stretchedContentFrame();
-  targetContentFrame--;
-  if (targetContentFrame < 0) {
-    targetContentFrame = totalFrames - 1;
-  }
-  gotoTimeAndNotifyChanged(FrameToTime(startFrame + targetContentFrame, frameRateInternal()));
+    auto totalFrames = stretchedFrameDuration();
+    if (totalFrames <= 1) {
+        return;
+    }
+    auto targetContentFrame = stretchedContentFrame();
+    targetContentFrame--;
+    if (targetContentFrame < 0) {
+        targetContentFrame = totalFrames - 1;
+    }
+    gotoTimeAndNotifyChanged(FrameToTime(startFrame + targetContentFrame, frameRateInternal()));
 }
 
 void PAGLayer::nextFrame() {
-  LockGuard autoLock(rootLocker);
-  nextFrameInternal();
+    LockGuard autoLock(rootLocker);
+    nextFrameInternal();
 }
 
 void PAGLayer::nextFrameInternal() {
-  auto totalFrames = stretchedFrameDuration();
-  if (totalFrames <= 1) {
-    return;
-  }
-  auto targetContentFrame = stretchedContentFrame();
-  targetContentFrame++;
-  if (targetContentFrame >= totalFrames) {
-    targetContentFrame = 0;
-  }
-  gotoTimeAndNotifyChanged(FrameToTime(startFrame + targetContentFrame, frameRateInternal()));
+    auto totalFrames = stretchedFrameDuration();
+    if (totalFrames <= 1) {
+        return;
+    }
+    auto targetContentFrame = stretchedContentFrame();
+    targetContentFrame++;
+    if (targetContentFrame >= totalFrames) {
+        targetContentFrame = 0;
+    }
+    gotoTimeAndNotifyChanged(FrameToTime(startFrame + targetContentFrame, frameRateInternal()));
 }
 
 Frame PAGLayer::frameDuration() const {
-  return layer->duration;
+    return layer->duration;
 }
 
 Frame PAGLayer::stretchedFrameDuration() const {
-  return frameDuration();
+    return frameDuration();
 }
 
 Frame PAGLayer::stretchedContentFrame() const {
-  return contentFrame;
+    return contentFrame;
 }
 
 bool PAGLayer::gotoTimeAndNotifyChanged(int64_t targetTime) {
-  auto changed = gotoTime(targetTime);
-  if (changed) {
-    notifyModified();
-  }
-  return changed;
+    auto changed = gotoTime(targetTime);
+    if (changed) {
+        notifyModified();
+    }
+    return changed;
 }
 
 std::shared_ptr<PAGLayer> PAGLayer::trackMatteLayer() const {
-  return _trackMatteLayer;
+    return _trackMatteLayer;
 }
 
 Point PAGLayer::globalToLocalPoint(float stageX, float stageY) {
-  Matrix totalMatrix = Matrix::I();
-  auto pagLayer = this;
-  while (pagLayer) {
-    auto matrix = pagLayer->getTotalMatrixInternal();
-    totalMatrix.postConcat(matrix);
-    pagLayer = pagLayer->_parent;
-  }
-  Point localPoint = {stageX, stageY};
-  MapPointInverted(totalMatrix, &localPoint);
-  return localPoint;
+    Matrix totalMatrix = Matrix::I();
+    auto pagLayer = this;
+    while (pagLayer) {
+        auto matrix = pagLayer->getTotalMatrixInternal();
+        totalMatrix.postConcat(matrix);
+        pagLayer = pagLayer->_parent;
+    }
+    Point localPoint = {stageX, stageY};
+    MapPointInverted(totalMatrix, &localPoint);
+    return localPoint;
 }
 
 bool PAGLayer::excludedFromTimeline() const {
-  LockGuard autoLock(rootLocker);
-  return _excludedFromTimeline;
+    LockGuard autoLock(rootLocker);
+    return _excludedFromTimeline;
 }
 
 void PAGLayer::setExcludedFromTimeline(bool value) {
-  LockGuard autoLock(rootLocker);
-  _excludedFromTimeline = value;
+    LockGuard autoLock(rootLocker);
+    _excludedFromTimeline = value;
 }
 
 void PAGLayer::notifyModified(bool contentChanged) {
-  if (contentChanged) {
-    contentVersion++;
-  }
-  auto parentLayer = getParentOrOwner();
-  while (parentLayer) {
-    parentLayer->contentVersion++;
-    parentLayer = parentLayer->getParentOrOwner();
-  }
+    if (contentChanged) {
+        contentVersion++;
+    }
+    auto parentLayer = getParentOrOwner();
+    while (parentLayer) {
+        parentLayer->contentVersion++;
+        parentLayer = parentLayer->getParentOrOwner();
+    }
 }
 
 PAGLayer* PAGLayer::getParentOrOwner() const {
-  if (_parent) {
-    return _parent;
-  }
-  if (trackMatteOwner) {
-    return trackMatteOwner;
-  }
-  return nullptr;
+    if (_parent) {
+        return _parent;
+    }
+    if (trackMatteOwner) {
+        return trackMatteOwner;
+    }
+    return nullptr;
 }
 
 bool PAGLayer::contentModified() const {
-  return contentVersion > 0;
+    return contentVersion > 0;
 }
 
 bool PAGLayer::cacheFilters() const {
-  return layerCache->cacheFilters();
+    return layerCache->cacheFilters();
 }
 
 const Layer* PAGLayer::getLayer() const {
-  return layer;
+    return layer;
 }
 
 const PAGStage* PAGLayer::getStage() const {
-  return stage;
+    return stage;
 }
 
 bool PAGLayer::gotoTime(int64_t layerTime) {
-  auto changed = false;
-  if (_trackMatteLayer != nullptr) {
-    changed = _trackMatteLayer->gotoTime(layerTime);
-  }
-  auto layerFrame = TimeToFrame(layerTime, frameRateInternal());
-  auto oldContentFrame = contentFrame;
-  contentFrame = layerFrame - startFrame;
-  if (!changed) {
-    changed = layerCache->checkFrameChanged(contentFrame, oldContentFrame);
-  }
-  return changed;
+    auto changed = false;
+    if (_trackMatteLayer != nullptr) {
+        changed = _trackMatteLayer->gotoTime(layerTime);
+    }
+    auto layerFrame = TimeToFrame(layerTime, frameRateInternal());
+    auto oldContentFrame = contentFrame;
+    contentFrame = layerFrame - startFrame;
+    if (!changed) {
+        changed = layerCache->checkFrameChanged(contentFrame, oldContentFrame);
+    }
+    return changed;
 }
 
 void PAGLayer::draw(Recorder* recorder) {
-  getContent()->draw(recorder);
+    getContent()->draw(recorder);
 }
 
 void PAGLayer::measureBounds(Rect* bounds) {
-  getContent()->measureBounds(bounds);
+    getContent()->measureBounds(bounds);
 }
 
 bool PAGLayer::isPAGFile() const {
-  return false;
+    return false;
 }
 
 Content* PAGLayer::getContent() {
-  return layerCache->getContent(contentFrame);
+    return layerCache->getContent(contentFrame);
 }
 
 void PAGLayer::invalidateCacheScale() {
-  if (stage) {
-    stage->invalidateCacheScale(this);
-  }
+    if (stage) {
+        stage->invalidateCacheScale(this);
+    }
 }
 
 void PAGLayer::onAddToStage(PAGStage* pagStage) {
-  stage = pagStage;
-  pagStage->addReference(this);
-  if (_trackMatteLayer != nullptr) {
-    _trackMatteLayer->onAddToStage(pagStage);
-  }
+    stage = pagStage;
+    pagStage->addReference(this);
+    if (_trackMatteLayer != nullptr) {
+        _trackMatteLayer->onAddToStage(pagStage);
+    }
 }
 
 void PAGLayer::onRemoveFromStage() {
-  stage->removeReference(this);
-  stage = nullptr;
-  if (_trackMatteLayer != nullptr) {
-    _trackMatteLayer->onRemoveFromStage();
-  }
+    stage->removeReference(this);
+    stage = nullptr;
+    if (_trackMatteLayer != nullptr) {
+        _trackMatteLayer->onRemoveFromStage();
+    }
 }
 
 void PAGLayer::onAddToRootFile(PAGFile* pagFile) {
-  if (_trackMatteLayer != nullptr && _trackMatteLayer->file == file) {
-    _trackMatteLayer->onAddToRootFile(pagFile);
-  }
-  rootFile = pagFile;
+    if (_trackMatteLayer != nullptr && _trackMatteLayer->file == file) {
+        _trackMatteLayer->onAddToRootFile(pagFile);
+    }
+    rootFile = pagFile;
 }
 
 void PAGLayer::onRemoveFromRootFile() {
-  if (_trackMatteLayer != nullptr && _trackMatteLayer->file == file) {
-    _trackMatteLayer->onRemoveFromRootFile();
-  }
-  rootFile = nullptr;
+    if (_trackMatteLayer != nullptr && _trackMatteLayer->file == file) {
+        _trackMatteLayer->onRemoveFromRootFile();
+    }
+    rootFile = nullptr;
 }
 
 void PAGLayer::onTimelineChanged() {
 }
 
 void PAGLayer::updateRootLocker(std::shared_ptr<std::mutex> newLocker) {
-  if (_trackMatteLayer != nullptr) {
-    _trackMatteLayer->updateRootLocker(newLocker);
-  }
-  rootLocker = newLocker;
+    if (_trackMatteLayer != nullptr) {
+        _trackMatteLayer->updateRootLocker(newLocker);
+    }
+    rootLocker = newLocker;
 }
 
 void PAGLayer::setMatrixInternal(const Matrix& matrix) {
-  if (matrix == layerMatrix) {
-    return;
-  }
-  layerMatrix = matrix;
-  notifyModified();
-  invalidateCacheScale();
+    if (matrix == layerMatrix) {
+        return;
+    }
+    layerMatrix = matrix;
+    notifyModified();
+    invalidateCacheScale();
 }
 
 void PAGLayer::setOpacityInternal(const Opacity& opacity) {
-  if (opacity == layerOpacity) {
-    return;
-  }
-  layerOpacity = opacity;
-  notifyModified();
+    if (opacity == layerOpacity) {
+        return;
+    }
+    layerOpacity = opacity;
+    notifyModified();
 }
 
 void PAGLayer::removeFromParentOrOwner() {
-  if (_parent) {
-    auto oldIndex = _parent->getLayerIndexInternal(weakThis.lock());
-    if (oldIndex >= 0) {
-      _parent->doRemoveLayer(oldIndex);
+    if (_parent) {
+        auto oldIndex = _parent->getLayerIndexInternal(weakThis.lock());
+        if (oldIndex >= 0) {
+            _parent->doRemoveLayer(oldIndex);
+        }
     }
-  }
-  if (trackMatteOwner) {
-    detachFromTree();
-    trackMatteOwner->_trackMatteLayer = nullptr;
-    trackMatteOwner = nullptr;
-  }
+    if (trackMatteOwner) {
+        detachFromTree();
+        trackMatteOwner->_trackMatteLayer = nullptr;
+        trackMatteOwner = nullptr;
+    }
 }
 
 void PAGLayer::attachToTree(std::shared_ptr<std::mutex> newLocker, PAGStage* newStage) {
-  updateRootLocker(newLocker);
-  if (newStage) {
-    onAddToStage(newStage);
-  }
+    updateRootLocker(newLocker);
+    if (newStage) {
+        onAddToStage(newStage);
+    }
 }
 
 void PAGLayer::detachFromTree() {
-  if (stage) {
-    onRemoveFromStage();
-  }
-  auto locker = std::make_shared<std::mutex>();
-  updateRootLocker(locker);
+    if (stage) {
+        onRemoveFromStage();
+    }
+    auto locker = std::make_shared<std::mutex>();
+    updateRootLocker(locker);
 }
 
 bool PAGLayer::getTransform(Transform* transform) {
-  if (contentFrame < 0 || contentFrame >= frameDuration() || !layerMatrix.invertible() ||
-      layerOpacity == Transparent) {
-    return false;
-  }
-  auto layerTransform = layerCache->getTransform(contentFrame);
-  if (!layerTransform->visible()) {
-    return false;
-  }
-  *transform = *layerTransform;
-  transform->matrix.postConcat(layerMatrix);
-  transform->opacity = OpacityConcat(transform->opacity, layerOpacity);
-  return true;
+    if (contentFrame < 0 || contentFrame >= frameDuration() || !layerMatrix.invertible() ||
+            layerOpacity == Transparent) {
+        return false;
+    }
+    auto layerTransform = layerCache->getTransform(contentFrame);
+    if (!layerTransform->visible()) {
+        return false;
+    }
+    *transform = *layerTransform;
+    transform->matrix.postConcat(layerMatrix);
+    transform->opacity = OpacityConcat(transform->opacity, layerOpacity);
+    return true;
 }
 
 std::shared_ptr<File> PAGLayer::getFile() const {
-  return file;
+    return file;
 }
 
 bool PAGLayer::frameVisible() const {
-  return contentFrame >= 0 && contentFrame < frameDuration();
+    return contentFrame >= 0 && contentFrame < frameDuration();
 }
 
 }  // namespace pag

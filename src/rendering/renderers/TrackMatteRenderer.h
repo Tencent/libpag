@@ -24,20 +24,20 @@
 
 namespace pag {
 struct TrackMatte {
-  std::shared_ptr<Modifier> modifier = nullptr;
-  std::shared_ptr<Graphic> colorGlyphs = nullptr;
+    std::shared_ptr<Modifier> modifier = nullptr;
+    std::shared_ptr<Graphic> colorGlyphs = nullptr;
 };
 
 class TrackMatteRenderer {
- public:
-  /**
-   * Returns nullptr if trackMatteLayer is nullptr.
-   */
-  static std::unique_ptr<TrackMatte> Make(PAGLayer* trackMatteOwner);
+public:
+    /**
+     * Returns nullptr if trackMatteLayer is nullptr.
+     */
+    static std::unique_ptr<TrackMatte> Make(PAGLayer* trackMatteOwner);
 
-  /**
-   * Returns nullptr if trackMatteLayer is nullptr.
-   */
-  static std::unique_ptr<TrackMatte> Make(Layer* trackMatteOwner, Frame layerFrame);
+    /**
+     * Returns nullptr if trackMatteLayer is nullptr.
+     */
+    static std::unique_ptr<TrackMatte> Make(Layer* trackMatteOwner, Frame layerFrame);
 };
 }  // namespace pag

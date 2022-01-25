@@ -24,28 +24,28 @@
 
 namespace pag {
 class GaussBlurFilter : public LayerFilter {
- public:
-  explicit GaussBlurFilter(Effect* effect);
-  ~GaussBlurFilter() override;
+public:
+    explicit GaussBlurFilter(Effect* effect);
+    ~GaussBlurFilter() override;
 
-  bool initialize(Context* context) override;
+    bool initialize(Context* context) override;
 
-  void draw(Context* context, const FilterSource* source, const FilterTarget* target) override;
+    void draw(Context* context, const FilterSource* source, const FilterTarget* target) override;
 
-  void update(Frame frame, const Rect& contentBounds, const Rect& transformedBounds,
-              const Point& filterScale) override;
+    void update(Frame frame, const Rect& contentBounds, const Rect& transformedBounds,
+                const Point& filterScale) override;
 
- private:
-  Effect* effect = nullptr;
+private:
+    Effect* effect = nullptr;
 
-  SinglePassBlurFilter* blurFilterH = nullptr;
-  SinglePassBlurFilter* blurFilterV = nullptr;
+    SinglePassBlurFilter* blurFilterH = nullptr;
+    SinglePassBlurFilter* blurFilterV = nullptr;
 
-  std::shared_ptr<FilterBuffer> blurFilterBuffer = nullptr;
+    std::shared_ptr<FilterBuffer> blurFilterBuffer = nullptr;
 
-  bool repeatEdge = true;
-  BlurDirection blurDirection = BlurDirection::Both;
-  float blurriness = 0.0f;
-  std::vector<Rect> filtersBounds = {};
+    bool repeatEdge = true;
+    BlurDirection blurDirection = BlurDirection::Both;
+    float blurriness = 0.0f;
+    std::vector<Rect> filtersBounds = {};
 };
 }  // namespace pag

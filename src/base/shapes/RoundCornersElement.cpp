@@ -21,18 +21,18 @@
 
 namespace pag {
 RoundCornersElement::~RoundCornersElement() {
-  delete radius;
+    delete radius;
 }
 
 void RoundCornersElement::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {
-  radius->excludeVaryingRanges(timeRanges);
+    radius->excludeVaryingRanges(timeRanges);
 }
 
 bool RoundCornersElement::verify() const {
-  if (!ShapeElement::verify()) {
-    VerifyFailed();
-    return false;
-  }
-  VerifyAndReturn(radius != nullptr);
+    if (!ShapeElement::verify()) {
+        VerifyFailed();
+        return false;
+    }
+    VerifyAndReturn(radius != nullptr);
 }
 }  // namespace pag

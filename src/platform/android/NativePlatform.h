@@ -23,35 +23,35 @@
 
 namespace pag {
 class NativePlatform : public Platform {
- public:
-  static void InitJNI(JNIEnv* env);
+public:
+    static void InitJNI(JNIEnv* env);
 
-  bool hasHardwareDecoder() const override {
-    return true;
-  }
+    bool hasHardwareDecoder() const override {
+        return true;
+    }
 
-  std::shared_ptr<PixelBuffer> makeHardwareBuffer(int width, int height,
-                                                  bool alphaOnly) const override;
+    std::shared_ptr<PixelBuffer> makeHardwareBuffer(int width, int height,
+            bool alphaOnly) const override;
 
-  std::unique_ptr<VideoDecoder> makeHardwareDecoder(const VideoConfig& config) const override;
+    std::unique_ptr<VideoDecoder> makeHardwareDecoder(const VideoConfig& config) const override;
 
-  std::shared_ptr<Image> makeImage(const std::string& filePath) const override;
+    std::shared_ptr<Image> makeImage(const std::string& filePath) const override;
 
-  std::shared_ptr<Image> makeImage(std::shared_ptr<Data> imageBytes) const override;
+    std::shared_ptr<Image> makeImage(std::shared_ptr<Data> imageBytes) const override;
 
-  PAGFont parseFont(const std::string& fontPath, int ttcIndex) const override;
+    PAGFont parseFont(const std::string& fontPath, int ttcIndex) const override;
 
-  PAGFont parseFont(const void* data, size_t length, int ttcIndex) const override;
+    PAGFont parseFont(const void* data, size_t length, int ttcIndex) const override;
 
-  void printLog(const char format[], ...) const override;
+    void printLog(const char format[], ...) const override;
 
-  void printError(const char format[], ...) const override;
+    void printError(const char format[], ...) const override;
 
-  bool registerFallbackFonts() const override;
+    bool registerFallbackFonts() const override;
 
-  void reportStatisticalData(
-      std::unordered_map<std::string, std::string>& reportMap) const override;
+    void reportStatisticalData(
+        std::unordered_map<std::string, std::string>& reportMap) const override;
 
-  void traceImage(const PixelMap& pixelMap, const std::string& tag) const override;
+    void traceImage(const PixelMap& pixelMap, const std::string& tag) const override;
 };
 }  // namespace pag

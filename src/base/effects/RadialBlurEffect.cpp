@@ -21,34 +21,34 @@
 
 namespace pag {
 RadialBlurEffect::~RadialBlurEffect() {
-  delete amount;
-  delete center;
-  delete mode;
-  delete antialias;
+    delete amount;
+    delete center;
+    delete mode;
+    delete antialias;
 }
 
 bool RadialBlurEffect::visibleAt(Frame layerFrame) const {
-  auto amountValue = amount->getValueAt(layerFrame);
-  return amountValue != 0;
+    auto amountValue = amount->getValueAt(layerFrame);
+    return amountValue != 0;
 }
 
 void RadialBlurEffect::transformBounds(Rect*, const Point&, Frame) const {
 }
 
 void RadialBlurEffect::excludeVaryingRanges(std::vector<pag::TimeRange>* timeRanges) const {
-  Effect::excludeVaryingRanges(timeRanges);
-  amount->excludeVaryingRanges(timeRanges);
-  center->excludeVaryingRanges(timeRanges);
-  mode->excludeVaryingRanges(timeRanges);
-  antialias->excludeVaryingRanges(timeRanges);
+    Effect::excludeVaryingRanges(timeRanges);
+    amount->excludeVaryingRanges(timeRanges);
+    center->excludeVaryingRanges(timeRanges);
+    mode->excludeVaryingRanges(timeRanges);
+    antialias->excludeVaryingRanges(timeRanges);
 }
 
 bool RadialBlurEffect::verify() const {
-  if (!Effect::verify()) {
-    VerifyFailed();
-    return false;
-  }
-  VerifyAndReturn(amount != nullptr && center != nullptr && mode != nullptr &&
-                  antialias != nullptr);
+    if (!Effect::verify()) {
+        VerifyFailed();
+        return false;
+    }
+    VerifyAndReturn(amount != nullptr && center != nullptr && mode != nullptr &&
+                    antialias != nullptr);
 }
 }  // namespace pag

@@ -29,215 +29,215 @@
 namespace pag {
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(std::shared_ptr<Drawable> drawable) {
-  if (drawable == nullptr) {
-    return nullptr;
-  }
-  return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(drawable)));
+    if (drawable == nullptr) {
+        return nullptr;
+    }
+    return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(drawable)));
 }
 
 static std::shared_ptr<Device> GetCurrentDevice(bool forAsyncThread) {
-  if (forAsyncThread) {
-    auto sharedContext = NativeGLDevice::GetCurrentNativeHandle();
-    auto device = NativeGLDevice::Make(sharedContext);
-    if (device) {
-      return device;
+    if (forAsyncThread) {
+        auto sharedContext = NativeGLDevice::GetCurrentNativeHandle();
+        auto device = NativeGLDevice::Make(sharedContext);
+        if (device) {
+            return device;
+        }
     }
-  }
-  return NativeGLDevice::Current();
+    return NativeGLDevice::Current();
 }
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendRenderTarget& renderTarget,
-                                                 ImageOrigin origin) {
-  auto device = NativeGLDevice::Current();
-  if (device == nullptr || !renderTarget.isValid()) {
-    return nullptr;
-  }
-  auto drawable = std::make_shared<RenderTargetDrawable>(device, renderTarget, origin);
-  return MakeFrom(std::move(drawable));
+        ImageOrigin origin) {
+    auto device = NativeGLDevice::Current();
+    if (device == nullptr || !renderTarget.isValid()) {
+        return nullptr;
+    }
+    auto drawable = std::make_shared<RenderTargetDrawable>(device, renderTarget, origin);
+    return MakeFrom(std::move(drawable));
 }
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendTexture& texture, ImageOrigin origin,
-                                                 bool forAsyncThread) {
-  auto device = GetCurrentDevice(forAsyncThread);
-  if (device == nullptr || !texture.isValid()) {
-    return nullptr;
-  }
-  auto drawable = std::make_shared<TextureDrawable>(device, texture, origin);
-  return MakeFrom(std::move(drawable));
+        bool forAsyncThread) {
+    auto device = GetCurrentDevice(forAsyncThread);
+    if (device == nullptr || !texture.isValid()) {
+        return nullptr;
+    }
+    auto drawable = std::make_shared<TextureDrawable>(device, texture, origin);
+    return MakeFrom(std::move(drawable));
 }
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeOffscreen(int width, int height) {
-  auto device = NativeGLDevice::Make();
-  if (device == nullptr || width <= 0 || height <= 0) {
-    return nullptr;
-  }
-  auto drawable = std::make_shared<OffscreenDrawable>(width, height, device);
-  return std::shared_ptr<PAGSurface>(new PAGSurface(drawable));
+    auto device = NativeGLDevice::Make();
+    if (device == nullptr || width <= 0 || height <= 0) {
+        return nullptr;
+    }
+    auto drawable = std::make_shared<OffscreenDrawable>(width, height, device);
+    return std::shared_ptr<PAGSurface>(new PAGSurface(drawable));
 }
 
 PAGSurface::PAGSurface(std::shared_ptr<Drawable> drawable) : drawable(std::move(drawable)) {
-  rootLocker = std::make_shared<std::mutex>();
+    rootLocker = std::make_shared<std::mutex>();
 }
 
 int PAGSurface::width() {
-  LockGuard autoLock(rootLocker);
-  return drawable->width();
+    LockGuard autoLock(rootLocker);
+    return drawable->width();
 }
 
 int PAGSurface::height() {
-  LockGuard autoLock(rootLocker);
-  return drawable->height();
+    LockGuard autoLock(rootLocker);
+    return drawable->height();
 }
 
 void PAGSurface::updateSize() {
-  LockGuard autoLock(rootLocker);
-  surface = nullptr;
-  device = nullptr;
-  drawable->updateSize();
+    LockGuard autoLock(rootLocker);
+    surface = nullptr;
+    device = nullptr;
+    drawable->updateSize();
 }
 
 void PAGSurface::freeCache() {
-  LockGuard autoLock(rootLocker);
-  if (pagPlayer) {
-    pagPlayer->renderCache->releaseAll();
-  }
-  surface = nullptr;
-  if (device) {
-    auto context = device->lockContext();
-    if (context) {
-      context->purgeResourcesNotUsedIn(0);
-      device->unlock();
+    LockGuard autoLock(rootLocker);
+    if (pagPlayer) {
+        pagPlayer->renderCache->releaseAll();
     }
-  }
-  device = nullptr;
+    surface = nullptr;
+    if (device) {
+        auto context = device->lockContext();
+        if (context) {
+            context->purgeResourcesNotUsedIn(0);
+            device->unlock();
+        }
+    }
+    device = nullptr;
 }
 
 bool PAGSurface::clearAll() {
-  LockGuard autoLock(rootLocker);
-  if (device == nullptr) {
-    device = drawable->getDevice();
-  }
-  auto context = lockContext();
-  if (!context) {
-    return false;
-  }
-  if (surface == nullptr) {
-    surface = drawable->createSurface(context);
-  }
-  if (surface == nullptr) {
+    LockGuard autoLock(rootLocker);
+    if (device == nullptr) {
+        device = drawable->getDevice();
+    }
+    auto context = lockContext();
+    if (!context) {
+        return false;
+    }
+    if (surface == nullptr) {
+        surface = drawable->createSurface(context);
+    }
+    if (surface == nullptr) {
+        unlockContext();
+        return false;
+    }
+    contentVersion = 0;  // 清空画布后 contentVersion 还原为初始值 0.
+    auto canvas = surface->getCanvas();
+    canvas->clear();
+    canvas->flush();
+    drawable->setTimeStamp(0);
+    drawable->present(context);
     unlockContext();
-    return false;
-  }
-  contentVersion = 0;  // 清空画布后 contentVersion 还原为初始值 0.
-  auto canvas = surface->getCanvas();
-  canvas->clear();
-  canvas->flush();
-  drawable->setTimeStamp(0);
-  drawable->present(context);
-  unlockContext();
-  return true;
+    return true;
 }
 
 bool PAGSurface::readPixels(ColorType colorType, AlphaType alphaType, void* dstPixels,
                             size_t dstRowBytes) {
-  LockGuard autoLock(rootLocker);
-  auto context = lockContext();
-  if (surface == nullptr || !context) {
-    return false;
-  }
-  auto info =
-      ImageInfo::Make(surface->width(), surface->height(), colorType, alphaType, dstRowBytes);
-  auto result = surface->readPixels(info, dstPixels);
-  unlockContext();
-  return result;
+    LockGuard autoLock(rootLocker);
+    auto context = lockContext();
+    if (surface == nullptr || !context) {
+        return false;
+    }
+    auto info =
+        ImageInfo::Make(surface->width(), surface->height(), colorType, alphaType, dstRowBytes);
+    auto result = surface->readPixels(info, dstPixels);
+    unlockContext();
+    return result;
 }
 
 bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
                       BackendSemaphore* signalSemaphore, bool autoClear) {
-  if (device == nullptr) {
-    device = drawable->getDevice();
-  }
-  auto context = lockContext();
-  if (!context) {
-    return false;
-  }
-  if (surface != nullptr && autoClear && contentVersion == cache->getContentVersion()) {
+    if (device == nullptr) {
+        device = drawable->getDevice();
+    }
+    auto context = lockContext();
+    if (!context) {
+        return false;
+    }
+    if (surface != nullptr && autoClear && contentVersion == cache->getContentVersion()) {
+        unlockContext();
+        return false;
+    }
+    if (surface == nullptr) {
+        surface = drawable->createSurface(context);
+    }
+    if (surface == nullptr) {
+        unlockContext();
+        return false;
+    }
+    contentVersion = cache->getContentVersion();
+    cache->attachToContext(context);
+    auto canvas = surface->getCanvas();
+    if (autoClear) {
+        canvas->clear();
+    }
+    if (graphic) {
+        graphic->draw(canvas, cache);
+    }
+    surface->flush(signalSemaphore);
+    cache->detachFromContext();
+    drawable->setTimeStamp(pagPlayer->getTimeStampInternal());
+    drawable->present(context);
     unlockContext();
-    return false;
-  }
-  if (surface == nullptr) {
-    surface = drawable->createSurface(context);
-  }
-  if (surface == nullptr) {
-    unlockContext();
-    return false;
-  }
-  contentVersion = cache->getContentVersion();
-  cache->attachToContext(context);
-  auto canvas = surface->getCanvas();
-  if (autoClear) {
-    canvas->clear();
-  }
-  if (graphic) {
-    graphic->draw(canvas, cache);
-  }
-  surface->flush(signalSemaphore);
-  cache->detachFromContext();
-  drawable->setTimeStamp(pagPlayer->getTimeStampInternal());
-  drawable->present(context);
-  unlockContext();
-  return true;
+    return true;
 }
 
 bool PAGSurface::wait(const BackendSemaphore& waitSemaphore) {
-  if (!waitSemaphore.isInitialized()) {
-    return false;
-  }
-  if (device == nullptr) {
-    device = drawable->getDevice();
-  }
-  auto context = lockContext();
-  if (!context) {
-    return false;
-  }
-  if (surface == nullptr) {
-    surface = drawable->createSurface(context);
-  }
-  if (surface == nullptr) {
+    if (!waitSemaphore.isInitialized()) {
+        return false;
+    }
+    if (device == nullptr) {
+        device = drawable->getDevice();
+    }
+    auto context = lockContext();
+    if (!context) {
+        return false;
+    }
+    if (surface == nullptr) {
+        surface = drawable->createSurface(context);
+    }
+    if (surface == nullptr) {
+        unlockContext();
+        return false;
+    }
+    auto ret = surface->wait(waitSemaphore);
     unlockContext();
-    return false;
-  }
-  auto ret = surface->wait(waitSemaphore);
-  unlockContext();
-  return ret;
+    return ret;
 }
 
 bool PAGSurface::hitTest(RenderCache* cache, std::shared_ptr<Graphic> graphic, float x, float y) {
-  if (cache == nullptr || graphic == nullptr) {
-    return false;
-  }
-  auto context = lockContext();
-  if (!context) {
-    return false;
-  }
-  cache->attachToContext(context, true);
-  auto result = graphic->hitTest(cache, x, y);
-  cache->detachFromContext();
-  unlockContext();
-  return result;
+    if (cache == nullptr || graphic == nullptr) {
+        return false;
+    }
+    auto context = lockContext();
+    if (!context) {
+        return false;
+    }
+    cache->attachToContext(context, true);
+    auto result = graphic->hitTest(cache, x, y);
+    cache->detachFromContext();
+    unlockContext();
+    return result;
 }
 
 Context* PAGSurface::lockContext() {
-  if (device == nullptr) {
-    return nullptr;
-  }
-  return device->lockContext();
+    if (device == nullptr) {
+        return nullptr;
+    }
+    return device->lockContext();
 }
 
 void PAGSurface::unlockContext() {
-  if (device == nullptr) {
-    return;
-  }
-  device->unlock();
+    if (device == nullptr) {
+        return;
+    }
+    device->unlock();
 }
 }  // namespace pag

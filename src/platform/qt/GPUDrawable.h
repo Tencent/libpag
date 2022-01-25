@@ -30,36 +30,36 @@ namespace pag {
 class QGLWindow;
 
 class GPUDrawable : public Drawable {
- public:
-  static std::shared_ptr<GPUDrawable> MakeFrom(QQuickItem* quickItem,
-                                               QOpenGLContext* sharedContext = nullptr);
+public:
+    static std::shared_ptr<GPUDrawable> MakeFrom(QQuickItem* quickItem,
+            QOpenGLContext* sharedContext = nullptr);
 
-  int width() const override {
-    return _width;
-  }
+    int width() const override {
+        return _width;
+    }
 
-  int height() const override {
-    return _height;
-  }
+    int height() const override {
+        return _height;
+    }
 
-  void updateSize() override;
+    void updateSize() override;
 
-  std::shared_ptr<Device> getDevice() override;
+    std::shared_ptr<Device> getDevice() override;
 
-  std::shared_ptr<Surface> createSurface(Context* context) override;
+    std::shared_ptr<Surface> createSurface(Context* context) override;
 
-  void present(Context* context) override;
+    void present(Context* context) override;
 
-  void moveToThread(QThread* targetThread);
+    void moveToThread(QThread* targetThread);
 
-  QSGTexture* getTexture();
+    QSGTexture* getTexture();
 
- private:
-  int _width = 0;
-  int _height = 0;
-  QQuickItem* quickItem = nullptr;
-  std::shared_ptr<QGLWindow> window = nullptr;
+private:
+    int _width = 0;
+    int _height = 0;
+    QQuickItem* quickItem = nullptr;
+    std::shared_ptr<QGLWindow> window = nullptr;
 
-  GPUDrawable(QQuickItem* quickItem, std::shared_ptr<QGLWindow> window);
+    GPUDrawable(QQuickItem* quickItem, std::shared_ptr<QGLWindow> window);
 };
 }  // namespace pag

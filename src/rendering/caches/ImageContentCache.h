@@ -22,12 +22,12 @@
 
 namespace pag {
 class ImageContentCache : public ContentCache {
- public:
-  static std::shared_ptr<Image> GetImage(ImageBytes* imageBytes);
+public:
+    static std::shared_ptr<Image> GetImage(ImageBytes* imageBytes);
 
-  explicit ImageContentCache(ImageLayer* layer);
+    explicit ImageContentCache(ImageLayer* layer);
 
- protected:
-  GraphicContent* createContent(Frame layerFrame) const override;
+protected:
+    GraphicContent* createContent(Frame layerFrame) const override;
 };
 }  // namespace pag

@@ -21,18 +21,18 @@
 
 namespace pag {
 ImageFillRule::~ImageFillRule() {
-  delete timeRemap;
+    delete timeRemap;
 }
 
 ImageLayer::~ImageLayer() {
-  delete imageFillRule;
+    delete imageFillRule;
 }
 
 bool ImageLayer::verify() const {
-  if (!Layer::verify()) {
-    VerifyFailed();
-    return false;
-  }
-  VerifyAndReturn(imageBytes != nullptr);
+    if (!Layer::verify()) {
+        VerifyFailed();
+        return false;
+    }
+    VerifyAndReturn(imageBytes != nullptr);
 }
 }  // namespace pag

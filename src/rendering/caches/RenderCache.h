@@ -35,143 +35,143 @@
 
 namespace pag {
 class RenderCache : public Performance {
- public:
-  explicit RenderCache(PAGStage* stage);
+public:
+    explicit RenderCache(PAGStage* stage);
 
-  ~RenderCache() override;
+    ~RenderCache() override;
 
-  ID uniqueID() const {
-    return _uniqueID;
-  }
+    ID uniqueID() const {
+        return _uniqueID;
+    }
 
-  void prepareFrame();
+    void prepareFrame();
 
-  void attachToContext(Context* current, bool forHitTest = false);
+    void attachToContext(Context* current, bool forHitTest = false);
 
-  void detachFromContext();
+    void detachFromContext();
 
-  /**
-   * Returns the total memory usage of this cache.
-   */
-  size_t memoryUsage() const {
-    return graphicsMemory;
-  }
+    /**
+     * Returns the total memory usage of this cache.
+     */
+    size_t memoryUsage() const {
+        return graphicsMemory;
+    }
 
-  /**
-   * Returns the GPU context associated with this cache.
-   */
-  Context* getContext() const {
-    return context;
-  }
+    /**
+     * Returns the GPU context associated with this cache.
+     */
+    Context* getContext() const {
+        return context;
+    }
 
-  /**
-   * If set to false, the getSnapshot() always returns nullptr. The default value is true.
-   */
-  bool snapshotEnabled() const;
+    /**
+     * If set to false, the getSnapshot() always returns nullptr. The default value is true.
+     */
+    bool snapshotEnabled() const;
 
-  /**
-   * Set the value of snapshotEnabled property.
-   */
-  void setSnapshotEnabled(bool value);
+    /**
+     * Set the value of snapshotEnabled property.
+     */
+    void setSnapshotEnabled(bool value);
 
-  /**
-   * Returns true if there is snapshot cache available for specified asset ID.
-   */
-  bool hasSnapshot(ID assetID) const {
-    return snapshotCaches.count(assetID) > 0;
-  }
+    /**
+     * Returns true if there is snapshot cache available for specified asset ID.
+     */
+    bool hasSnapshot(ID assetID) const {
+        return snapshotCaches.count(assetID) > 0;
+    }
 
-  /**
-   * Returns a snapshot cache of specified asset id. Returns null if there is no associated cache
-   * available. This is a read-only query which is used usually during hit testing.
-   */
-  Snapshot* getSnapshot(ID assetID) const;
+    /**
+     * Returns a snapshot cache of specified asset id. Returns null if there is no associated cache
+     * available. This is a read-only query which is used usually during hit testing.
+     */
+    Snapshot* getSnapshot(ID assetID) const;
 
-  /**
-   * Returns a snapshot cache of specified Image. If there is no associated cache available,
-   * a new cache will be created by the image. Returns null if the image fails to make a
-   * new snapshot.
-   */
-  Snapshot* getSnapshot(const Picture* image);
+    /**
+     * Returns a snapshot cache of specified Image. If there is no associated cache available,
+     * a new cache will be created by the image. Returns null if the image fails to make a
+     * new snapshot.
+     */
+    Snapshot* getSnapshot(const Picture* image);
 
-  /**
-   * Frees the snapshot cache associated with specified asset ID immediately.
-   */
-  void removeSnapshot(ID assetID);
+    /**
+     * Frees the snapshot cache associated with specified asset ID immediately.
+     */
+    void removeSnapshot(ID assetID);
 
-  /**
-   * Prepares a bitmap task for next getImageBuffer() call.
-   */
-  void prepareImage(ID assetID, std::shared_ptr<Image> image);
+    /**
+     * Prepares a bitmap task for next getImageBuffer() call.
+     */
+    void prepareImage(ID assetID, std::shared_ptr<Image> image);
 
-  /**
-   * Returns a texture buffer cache of specified asset id. Returns null if there is no associated
-   * cache available.
-   */
-  std::shared_ptr<TextureBuffer> getImageBuffer(ID assetID);
+    /**
+     * Returns a texture buffer cache of specified asset id. Returns null if there is no associated
+     * cache available.
+     */
+    std::shared_ptr<TextureBuffer> getImageBuffer(ID assetID);
 
-  uint32_t getContentVersion() const;
+    uint32_t getContentVersion() const;
 
-  bool videoEnabled() const;
+    bool videoEnabled() const;
 
-  void setVideoEnabled(bool value);
+    void setVideoEnabled(bool value);
 
-  bool prepareSequenceReader(Sequence* sequence, Frame targetFrame, DecodingPolicy policy);
+    bool prepareSequenceReader(Sequence* sequence, Frame targetFrame, DecodingPolicy policy);
 
-  std::shared_ptr<SequenceReader> getSequenceReader(Sequence* sequence);
+    std::shared_ptr<SequenceReader> getSequenceReader(Sequence* sequence);
 
-  LayerFilter* getFilterCache(LayerStyle* layerStyle);
+    LayerFilter* getFilterCache(LayerStyle* layerStyle);
 
-  LayerFilter* getFilterCache(Effect* effect);
+    LayerFilter* getFilterCache(Effect* effect);
 
-  MotionBlurFilter* getMotionBlurFilter();
+    MotionBlurFilter* getMotionBlurFilter();
 
-  LayerStylesFilter* getLayerStylesFilter(Layer* layer);
+    LayerStylesFilter* getLayerStylesFilter(Layer* layer);
 
-  void recordImageDecodingTime(int64_t decodingTime);
+    void recordImageDecodingTime(int64_t decodingTime);
 
-  void recordTextureUploadingTime(int64_t time);
+    void recordTextureUploadingTime(int64_t time);
 
-  void recordProgramCompilingTime(int64_t time);
+    void recordProgramCompilingTime(int64_t time);
 
-  void releaseAll();
+    void releaseAll();
 
- private:
-  ID _uniqueID = 0;
-  PAGStage* stage = nullptr;
-  uint32_t deviceID = 0;
-  Context* context = nullptr;
-  int64_t lastTimestamp = 0;
-  bool hitTestOnly = false;
-  size_t graphicsMemory = 0;
-  bool _videoEnabled = true;
-  bool _snapshotEnabled = true;
-  std::unordered_set<ID> usedAssets = {};
-  std::unordered_map<ID, Snapshot*> snapshotCaches = {};
-  std::list<Snapshot*> snapshotLRU = {};
-  std::unordered_map<ID, std::shared_ptr<Task>> imageTasks;
-  std::unordered_map<ID, std::shared_ptr<SequenceReader>> sequenceCaches;
-  std::unordered_map<ID, Filter*> filterCaches;
-  MotionBlurFilter* motionBlurFilter = nullptr;
+private:
+    ID _uniqueID = 0;
+    PAGStage* stage = nullptr;
+    uint32_t deviceID = 0;
+    Context* context = nullptr;
+    int64_t lastTimestamp = 0;
+    bool hitTestOnly = false;
+    size_t graphicsMemory = 0;
+    bool _videoEnabled = true;
+    bool _snapshotEnabled = true;
+    std::unordered_set<ID> usedAssets = {};
+    std::unordered_map<ID, Snapshot*> snapshotCaches = {};
+    std::list<Snapshot*> snapshotLRU = {};
+    std::unordered_map<ID, std::shared_ptr<Task>> imageTasks;
+    std::unordered_map<ID, std::shared_ptr<SequenceReader>> sequenceCaches;
+    std::unordered_map<ID, Filter*> filterCaches;
+    MotionBlurFilter* motionBlurFilter = nullptr;
 
-  // bitmap caches:
-  void clearExpiredBitmaps();
+    // bitmap caches:
+    void clearExpiredBitmaps();
 
-  // snapshot caches:
-  void clearAllSnapshots();
-  void clearExpiredSnapshots();
+    // snapshot caches:
+    void clearAllSnapshots();
+    void clearExpiredSnapshots();
 
-  // sequence caches:
-  void clearAllSequenceCaches();
-  void clearSequenceCache(ID uniqueID);
-  void clearExpiredSequences();
+    // sequence caches:
+    void clearAllSequenceCaches();
+    void clearSequenceCache(ID uniqueID);
+    void clearExpiredSequences();
 
-  // filter caches:
-  LayerFilter* getLayerFilterCache(ID uniqueID, const std::function<LayerFilter*()>& makeFilter);
-  void clearFilterCache(ID uniqueID);
-  bool initFilter(Filter* filter);
+    // filter caches:
+    LayerFilter* getLayerFilterCache(ID uniqueID, const std::function<LayerFilter*()>& makeFilter);
+    void clearFilterCache(ID uniqueID);
+    bool initFilter(Filter* filter);
 
-  void preparePreComposeLayer(PreComposeLayer* layer, DecodingPolicy policy);
-  void prepareImageLayer(PAGImageLayer* layer);
+    void preparePreComposeLayer(PreComposeLayer* layer, DecodingPolicy policy);
+    void prepareImageLayer(PAGImageLayer* layer);
 };
 }  // namespace pag

@@ -31,7 +31,7 @@
 + (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer;
 
 + (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer
-                             context:(EAGLContext*)eaglContext;
+    context:(EAGLContext*)eaglContext;
 
 + (PAGSurfaceImpl*)MakeFromGPU:(CGSize)size;
 

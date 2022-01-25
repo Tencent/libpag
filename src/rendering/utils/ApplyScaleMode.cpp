@@ -21,37 +21,40 @@
 namespace pag {
 Matrix ApplyScaleMode(int scaleMode, int sourceWidth, int sourceHeight, int targetWidth,
                       int targetHeight) {
-  Matrix matrix = {};
-  matrix.setIdentity();
-  if (scaleMode == PAGScaleMode::None || sourceWidth <= 0 || sourceHeight <= 0 ||
-      targetWidth <= 0 || targetHeight <= 0) {
-    return matrix;
-  }
-  auto scaleX = targetWidth * 1.0 / sourceWidth;
-  auto scaleY = targetHeight * 1.0 / sourceHeight;
-  switch (scaleMode) {
+    Matrix matrix = {};
+    matrix.setIdentity();
+    if (scaleMode == PAGScaleMode::None || sourceWidth <= 0 || sourceHeight <= 0 ||
+            targetWidth <= 0 || targetHeight <= 0) {
+        return matrix;
+    }
+    auto scaleX = targetWidth * 1.0 / sourceWidth;
+    auto scaleY = targetHeight * 1.0 / sourceHeight;
+    switch (scaleMode) {
     case PAGScaleMode::Stretch: {
-      matrix.setScale(scaleX, scaleY);
-    } break;
+        matrix.setScale(scaleX, scaleY);
+    }
+    break;
     case PAGScaleMode::Zoom: {
-      auto scale = std::max(scaleX, scaleY);
-      matrix.setScale(scale, scale);
-      if (scaleX > scaleY) {
-        matrix.postTranslate(0, (targetHeight - sourceHeight * scale) * 0.5f);
-      } else {
-        matrix.postTranslate((targetWidth - sourceWidth * scale) * 0.5f, 0);
-      }
-    } break;
+        auto scale = std::max(scaleX, scaleY);
+        matrix.setScale(scale, scale);
+        if (scaleX > scaleY) {
+            matrix.postTranslate(0, (targetHeight - sourceHeight * scale) * 0.5f);
+        } else {
+            matrix.postTranslate((targetWidth - sourceWidth * scale) * 0.5f, 0);
+        }
+    }
+    break;
     default: {
-      auto scale = std::min(scaleX, scaleY);
-      matrix.setScale(scale, scale);
-      if (scaleX < scaleY) {
-        matrix.postTranslate(0, (targetHeight - sourceHeight * scale) * 0.5f);
-      } else {
-        matrix.postTranslate((targetWidth - sourceWidth * scale) * 0.5f, 0);
-      }
-    } break;
-  }
-  return matrix;
+        auto scale = std::min(scaleX, scaleY);
+        matrix.setScale(scale, scale);
+        if (scaleX < scaleY) {
+            matrix.postTranslate(0, (targetHeight - sourceHeight * scale) * 0.5f);
+        } else {
+            matrix.postTranslate((targetWidth - sourceWidth * scale) * 0.5f, 0);
+        }
+    }
+    break;
+    }
+    return matrix;
 }
 }  // namespace pag

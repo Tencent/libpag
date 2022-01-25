@@ -21,23 +21,23 @@
 
 namespace pag {
 ImageBytes* ReadImageBytesV3(DecodeStream* stream) {
-  auto imageBytes = new ImageBytes();
-  imageBytes->id = stream->readEncodedUint32();
-  imageBytes->fileBytes = stream->readByteData().release();
-  imageBytes->scaleFactor = stream->readFloat();
-  imageBytes->width = stream->readEncodedInt32();
-  imageBytes->height = stream->readEncodedInt32();
-  imageBytes->anchorX = stream->readEncodedInt32();
-  imageBytes->anchorY = stream->readEncodedInt32();
-  return imageBytes;
+    auto imageBytes = new ImageBytes();
+    imageBytes->id = stream->readEncodedUint32();
+    imageBytes->fileBytes = stream->readByteData().release();
+    imageBytes->scaleFactor = stream->readFloat();
+    imageBytes->width = stream->readEncodedInt32();
+    imageBytes->height = stream->readEncodedInt32();
+    imageBytes->anchorX = stream->readEncodedInt32();
+    imageBytes->anchorY = stream->readEncodedInt32();
+    return imageBytes;
 }
 
 TagCode WriteImageBytesV3(EncodeStream* stream, pag::ImageBytes* imageBytes) {
-  WriteImageBytesV2(stream, imageBytes);
-  stream->writeEncodedInt32(imageBytes->width);
-  stream->writeEncodedInt32(imageBytes->height);
-  stream->writeEncodedInt32(imageBytes->anchorX);
-  stream->writeEncodedInt32(imageBytes->anchorY);
-  return TagCode::ImageBytesV3;
+    WriteImageBytesV2(stream, imageBytes);
+    stream->writeEncodedInt32(imageBytes->width);
+    stream->writeEncodedInt32(imageBytes->height);
+    stream->writeEncodedInt32(imageBytes->anchorX);
+    stream->writeEncodedInt32(imageBytes->anchorY);
+    return TagCode::ImageBytesV3;
 }
 }  // namespace pag

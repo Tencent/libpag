@@ -23,32 +23,32 @@
 
 namespace pag {
 class GPUDrawable : public Drawable {
- public:
-  static std::shared_ptr<GPUDrawable> FromCanvasID(const std::string& canvasID);
+public:
+    static std::shared_ptr<GPUDrawable> FromCanvasID(const std::string& canvasID);
 
-  int width() const override {
-    return _width;
-  }
+    int width() const override {
+        return _width;
+    }
 
-  int height() const override {
-    return _height;
-  }
+    int height() const override {
+        return _height;
+    }
 
-  void updateSize() override;
+    void updateSize() override;
 
-  std::shared_ptr<Device> getDevice() override;
+    std::shared_ptr<Device> getDevice() override;
 
-  std::shared_ptr<Surface> createSurface(Context* context) override;
+    std::shared_ptr<Surface> createSurface(Context* context) override;
 
-  void present(Context*) override {
-  }
+    void present(Context*) override {
+    }
 
- private:
-  explicit GPUDrawable(std::string canvasID);
+private:
+    explicit GPUDrawable(std::string canvasID);
 
-  std::string canvasID;
-  int _width = 0;
-  int _height = 0;
-  std::shared_ptr<WEBGLWindow> window = nullptr;
+    std::string canvasID;
+    int _width = 0;
+    int _height = 0;
+    std::shared_ptr<WEBGLWindow> window = nullptr;
 };
 }  // namespace pag

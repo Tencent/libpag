@@ -24,20 +24,20 @@
 
 namespace pag {
 class VideoSequenceReader : public SequenceReader {
- public:
-  VideoSequenceReader(std::shared_ptr<File> file, VideoSequence* sequence, DecodingPolicy);
+public:
+    VideoSequenceReader(std::shared_ptr<File> file, VideoSequence* sequence, DecodingPolicy);
 
-  ~VideoSequenceReader() override;
+    ~VideoSequenceReader() override;
 
-  void prepareAsync(Frame targetFrame) override;
+    void prepareAsync(Frame targetFrame) override;
 
-  std::shared_ptr<Texture> readTexture(Frame targetFrame, RenderCache* cache) override;
+    std::shared_ptr<Texture> readTexture(Frame targetFrame, RenderCache* cache) override;
 
- private:
-  Frame lastFrame = -1;
-  emscripten::val videoReader = emscripten::val::null();
-  std::shared_ptr<Texture> texture = nullptr;
-  int32_t width = 0;
-  int32_t height = 0;
+private:
+    Frame lastFrame = -1;
+    emscripten::val videoReader = emscripten::val::null();
+    std::shared_ptr<Texture> texture = nullptr;
+    int32_t width = 0;
+    int32_t height = 0;
 };
 }  // namespace pag

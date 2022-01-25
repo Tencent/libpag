@@ -28,62 +28,62 @@
 
 namespace pag {
 class Executor {
- public:
-  virtual ~Executor() = default;
+public:
+    virtual ~Executor() = default;
 
- private:
-  virtual void execute() = 0;
+private:
+    virtual void execute() = 0;
 
-  friend class Task;
+    friend class Task;
 };
 
 class TaskGroup;
 
 class Task {
- public:
-  static std::shared_ptr<Task> Make(std::unique_ptr<Executor> executor);
-  ~Task();
+public:
+    static std::shared_ptr<Task> Make(std::unique_ptr<Executor> executor);
+    ~Task();
 
-  void run();
-  bool isRunning();
-  Executor* wait();
-  void cancel();
+    void run();
+    bool isRunning();
+    Executor* wait();
+    void cancel();
 
- private:
-  std::mutex locker = {};
-  std::condition_variable condition = {};
-  bool running = false;
-  TaskGroup* taskGroup = nullptr;
-  std::unique_ptr<Executor> executor = nullptr;
+private:
+    std::mutex locker = {};
+    std::condition_variable condition = {};
+    bool running = false;
+    TaskGroup* taskGroup = nullptr;
+    std::unique_ptr<Executor> executor = nullptr;
 
-  explicit Task(std::unique_ptr<Executor> executor);
-  void execute();
+    explicit Task(std::unique_ptr<Executor> executor);
+    void execute();
 
-  friend class TaskGroup;
+    friend class TaskGroup;
 };
 
 class TaskGroup {
- public:
-  ~TaskGroup();
+public:
+    ~TaskGroup();
 
- private:
-  std::mutex locker = {};
-  std::condition_variable condition = {};
-  int activeThreads = 0;
-  bool exited = false;
-  std::list<Task*> tasks = {};
-  std::vector<std::thread> threads = {};
+private:
+    std::mutex locker = {};
+    std::condition_variable condition = {};
+    int activeThreads = 0;
+    bool exited = false;
+    std::list<Task*> tasks = {};
+    std::vector<std::thread> threads = {};
 
-  static TaskGroup* GetInstance();
-  static void RunLoop(TaskGroup* taskGroup);
+    static TaskGroup* GetInstance();
+    static void RunLoop(TaskGroup* taskGroup);
 
-  TaskGroup();
-  void pushTask(Task* task);
-  Task* popTask();
-  bool removeTask(Task* task);
-  void exit();
+    TaskGroup();
+    void pushTask(Task* task);
+    Task* popTask();
+    bool removeTask(Task* task);
+    void exit();
 
-  friend class Task;
+    friend class Task;
 };
 }  // namespace pag
 #else
@@ -92,44 +92,44 @@ class TaskGroup {
 
 namespace pag {
 class Executor {
- public:
-  virtual ~Executor() = default;
+public:
+    virtual ~Executor() = default;
 
- private:
-  virtual void execute() = 0;
+private:
+    virtual void execute() = 0;
 
-  friend class Task;
+    friend class Task;
 };
 
 class Task {
- public:
-  static std::shared_ptr<Task> Make(std::unique_ptr<Executor> executor) {
-    return std::shared_ptr<Task>(new Task(std::move(executor)));
-  }
+public:
+    static std::shared_ptr<Task> Make(std::unique_ptr<Executor> executor) {
+        return std::shared_ptr<Task>(new Task(std::move(executor)));
+    }
 
-  void run() {
-  }
+    void run() {
+    }
 
-  bool isRunning() const {
-    return running;
-  }
+    bool isRunning() const {
+        return running;
+    }
 
-  Executor* wait() {
-    running = true;
-    executor->execute();
-    running = false;
-    return executor.get();
-  }
+    Executor* wait() {
+        running = true;
+        executor->execute();
+        running = false;
+        return executor.get();
+    }
 
-  void cancel() {
-  }
+    void cancel() {
+    }
 
- private:
-  bool running = false;
-  std::unique_ptr<Executor> executor = nullptr;
+private:
+    bool running = false;
+    std::unique_ptr<Executor> executor = nullptr;
 
-  explicit Task(std::unique_ptr<Executor> executor) : executor(std::move(executor)) {
-  }
+    explicit Task(std::unique_ptr<Executor> executor) : executor(std::move(executor)) {
+    }
 };
 }  // namespace pag
 

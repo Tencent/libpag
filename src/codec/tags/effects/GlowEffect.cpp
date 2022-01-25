@@ -21,12 +21,12 @@
 
 namespace pag {
 std::unique_ptr<BlockConfig> GlowEffectTag(GlowEffect* effect) {
-  auto tagConfig = new BlockConfig(TagCode::GlowEffect);
-  AddAttribute(tagConfig, &effect->glowThreshold, AttributeType::SimpleProperty,
-               static_cast<Percent>(1.0f));
-  AddAttribute(tagConfig, &effect->glowRadius, AttributeType::SimpleProperty, 100.0f);
-  AddAttribute(tagConfig, &effect->glowIntensity, AttributeType::SimpleProperty, 0.0f);
-  EffectCompositingOptionTag(tagConfig, effect);
-  return std::unique_ptr<BlockConfig>(tagConfig);
+    auto tagConfig = new BlockConfig(TagCode::GlowEffect);
+    AddAttribute(tagConfig, &effect->glowThreshold, AttributeType::SimpleProperty,
+                 static_cast<Percent>(1.0f));
+    AddAttribute(tagConfig, &effect->glowRadius, AttributeType::SimpleProperty, 100.0f);
+    AddAttribute(tagConfig, &effect->glowIntensity, AttributeType::SimpleProperty, 0.0f);
+    EffectCompositingOptionTag(tagConfig, effect);
+    return std::unique_ptr<BlockConfig>(tagConfig);
 }
 }  // namespace pag

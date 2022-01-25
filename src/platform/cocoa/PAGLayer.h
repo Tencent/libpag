@@ -21,13 +21,13 @@
 #import "PAGMarker.h"
 
 typedef NS_ENUM(NSInteger, PAGLayerType) {
-  PAGLayerTypeUnknown,
-  PAGLayerTypeNull,
-  PAGLayerTypeSolid,
-  PAGLayerTypeText,
-  PAGLayerTypeShape,
-  PAGLayerTypeImage,
-  PAGLayerTypePreCompose,
+    PAGLayerTypeUnknown,
+    PAGLayerTypeNull,
+    PAGLayerTypeSolid,
+    PAGLayerTypeText,
+    PAGLayerTypeShape,
+    PAGLayerTypeImage,
+    PAGLayerTypePreCompose,
 };
 
 @class PAGComposition;
@@ -36,9 +36,9 @@ typedef NS_ENUM(NSInteger, PAGLayerType) {
 __attribute__((visibility("default")))
 @interface PAGLayer : NSObject
 
-/**
- * Returns the type of layer.
- */
+    /**
+     * Returns the type of layer.
+     */
 - (PAGLayerType)layerType;
 
 /**

@@ -40,37 +40,37 @@ namespace pag {
  * SoftAVCDecoder supports the annex-b format only.
  */
 class SoftAVCDecoder : public SoftwareDecoder {
- public:
-  ~SoftAVCDecoder() override;
+public:
+    ~SoftAVCDecoder() override;
 
-  bool onConfigure(const std::vector<HeaderData>& headers, std::string mime, int width,
-                   int height) override;
+    bool onConfigure(const std::vector<HeaderData>& headers, std::string mime, int width,
+                     int height) override;
 
-  DecoderResult onSendBytes(void* bytes, size_t length, int64_t frame) override;
+    DecoderResult onSendBytes(void* bytes, size_t length, int64_t frame) override;
 
-  DecoderResult onDecodeFrame() override;
+    DecoderResult onDecodeFrame() override;
 
-  DecoderResult onEndOfStream() override;
+    DecoderResult onEndOfStream() override;
 
-  void onFlush() override;
+    void onFlush() override;
 
-  std::unique_ptr<YUVBuffer> onRenderFrame() override;
+    std::unique_ptr<YUVBuffer> onRenderFrame() override;
 
- private:
-  std::unique_ptr<ByteData> headerData = nullptr;
-  std::unique_ptr<ByteData> outputFrame = nullptr;
-  iv_obj_t* codecContext = nullptr;  // Codec context
-  ivd_video_decode_ip_t decodeInput = {};
-  ivd_video_decode_op_t decodeOutput = {};
-  bool flushed = true;
+private:
+    std::unique_ptr<ByteData> headerData = nullptr;
+    std::unique_ptr<ByteData> outputFrame = nullptr;
+    iv_obj_t* codecContext = nullptr;  // Codec context
+    ivd_video_decode_ip_t decodeInput = {};
+    ivd_video_decode_op_t decodeOutput = {};
+    bool flushed = true;
 
-  bool initDecoder();
-  bool openDecoder();
-  bool setParams(bool decodeHeader);
-  bool setNumCores();
-  bool initOutputFrame();
-  void destroyDecoder();
-  void resetDecoder();
+    bool initDecoder();
+    bool openDecoder();
+    bool setParams(bool decodeHeader);
+    bool setNumCores();
+    bool initOutputFrame();
+    void destroyDecoder();
+    void resetDecoder();
 };
 }  // namespace pag
 

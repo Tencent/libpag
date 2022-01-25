@@ -21,17 +21,17 @@
 
 namespace pag {
 std::unique_ptr<BlockConfig> MotionTileEffectTag(MotionTileEffect* effect) {
-  auto tagConfig = new BlockConfig(TagCode::MotionTileEffect);
-  AddAttribute(tagConfig, &effect->tileCenter, AttributeType::SpatialProperty,
-               Point::Make(640, 360));
-  AddAttribute(tagConfig, &effect->tileWidth, AttributeType::SimpleProperty, 100.0f);
-  AddAttribute(tagConfig, &effect->tileHeight, AttributeType::SimpleProperty, 100.0f);
-  AddAttribute(tagConfig, &effect->outputWidth, AttributeType::SimpleProperty, 100.0f);
-  AddAttribute(tagConfig, &effect->outputHeight, AttributeType::SimpleProperty, 100.0f);
-  AddAttribute(tagConfig, &effect->mirrorEdges, AttributeType::DiscreteProperty, false);
-  AddAttribute(tagConfig, &effect->phase, AttributeType::SimpleProperty, 0.0f);
-  AddAttribute(tagConfig, &effect->horizontalPhaseShift, AttributeType::DiscreteProperty, false);
-  EffectCompositingOptionTag(tagConfig, effect);
-  return std::unique_ptr<BlockConfig>(tagConfig);
+    auto tagConfig = new BlockConfig(TagCode::MotionTileEffect);
+    AddAttribute(tagConfig, &effect->tileCenter, AttributeType::SpatialProperty,
+                 Point::Make(640, 360));
+    AddAttribute(tagConfig, &effect->tileWidth, AttributeType::SimpleProperty, 100.0f);
+    AddAttribute(tagConfig, &effect->tileHeight, AttributeType::SimpleProperty, 100.0f);
+    AddAttribute(tagConfig, &effect->outputWidth, AttributeType::SimpleProperty, 100.0f);
+    AddAttribute(tagConfig, &effect->outputHeight, AttributeType::SimpleProperty, 100.0f);
+    AddAttribute(tagConfig, &effect->mirrorEdges, AttributeType::DiscreteProperty, false);
+    AddAttribute(tagConfig, &effect->phase, AttributeType::SimpleProperty, 0.0f);
+    AddAttribute(tagConfig, &effect->horizontalPhaseShift, AttributeType::DiscreteProperty, false);
+    EffectCompositingOptionTag(tagConfig, effect);
+    return std::unique_ptr<BlockConfig>(tagConfig);
 }
 }  // namespace pag

@@ -23,13 +23,13 @@
 
 namespace pag {
 class MaskCache : public FrameCache<Path> {
- public:
-  explicit MaskCache(Layer* layer);
+public:
+    explicit MaskCache(Layer* layer);
 
- protected:
-  Path* createCache(Frame layerFrame) override;
+protected:
+    Path* createCache(Frame layerFrame) override;
 
- private:
-  Layer* layer = nullptr;
+private:
+    Layer* layer = nullptr;
 };
 }  // namespace pag

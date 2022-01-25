@@ -22,16 +22,16 @@
 namespace pag {
 
 PreComposeContentCache::PreComposeContentCache(PreComposeLayer* layer) : ContentCache(layer) {
-  compositionCache = CompositionCache::Get(layer->composition);
+    compositionCache = CompositionCache::Get(layer->composition);
 }
 
 void PreComposeContentCache::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {
-  *timeRanges = static_cast<PreComposeLayer*>(layer)->getContentStaticTimeRanges();
+    *timeRanges = static_cast<PreComposeLayer*>(layer)->getContentStaticTimeRanges();
 }
 
 GraphicContent* PreComposeContentCache::createContent(Frame layerFrame) const {
-  auto compositionFrame = static_cast<PreComposeLayer*>(layer)->getCompositionFrame(layerFrame);
-  auto graphic = compositionCache->getContent(compositionFrame);
-  return new GraphicContent(graphic);
+    auto compositionFrame = static_cast<PreComposeLayer*>(layer)->getCompositionFrame(layerFrame);
+    auto graphic = compositionCache->getContent(compositionFrame);
+    return new GraphicContent(graphic);
 }
 }  // namespace pag

@@ -20,11 +20,11 @@
 
 namespace pag {
 std::unique_ptr<BlockConfig> EllipseTag(EllipseElement* shape) {
-  auto tagConfig = new BlockConfig(TagCode::Ellipse);
-  AddAttribute(tagConfig, &shape->reversed, AttributeType::BitFlag, false);
-  AddAttribute(tagConfig, &shape->size, AttributeType::MultiDimensionProperty,
-               Point::Make(100, 100));
-  AddAttribute(tagConfig, &shape->position, AttributeType::SpatialProperty, Point::Zero());
-  return std::unique_ptr<BlockConfig>(tagConfig);
+    auto tagConfig = new BlockConfig(TagCode::Ellipse);
+    AddAttribute(tagConfig, &shape->reversed, AttributeType::BitFlag, false);
+    AddAttribute(tagConfig, &shape->size, AttributeType::MultiDimensionProperty,
+                 Point::Make(100, 100));
+    AddAttribute(tagConfig, &shape->position, AttributeType::SpatialProperty, Point::Zero());
+    return std::unique_ptr<BlockConfig>(tagConfig);
 }
 }  // namespace pag

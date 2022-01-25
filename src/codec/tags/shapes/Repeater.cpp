@@ -20,22 +20,22 @@
 
 namespace pag {
 std::unique_ptr<BlockConfig> RepeaterTag(RepeaterElement* shape) {
-  if (shape->transform == nullptr) {
-    shape->transform = new RepeaterTransform();
-  }
-  auto transform = shape->transform;
-  auto tagConfig = new BlockConfig(TagCode::Repeater);
-  AddAttribute(tagConfig, &shape->composite, AttributeType::Value, RepeaterOrder::Below);
-  AddAttribute(tagConfig, &shape->copies, AttributeType::SimpleProperty, 3.0f);
-  AddAttribute(tagConfig, &shape->offset, AttributeType::SimpleProperty, 0.0f);
-  AddAttribute(tagConfig, &transform->anchorPoint, AttributeType::SpatialProperty, Point::Zero());
-  AddAttribute(tagConfig, &transform->position, AttributeType::SpatialProperty,
-               Point::Make(100, 100));
-  AddAttribute(tagConfig, &transform->scale, AttributeType::MultiDimensionProperty,
-               Point::Make(1, 1));
-  AddAttribute(tagConfig, &transform->rotation, AttributeType::SimpleProperty, 0.0f);
-  AddAttribute(tagConfig, &transform->startOpacity, AttributeType::SimpleProperty, Opaque);
-  AddAttribute(tagConfig, &transform->endOpacity, AttributeType::SimpleProperty, Opaque);
-  return std::unique_ptr<BlockConfig>(tagConfig);
+    if (shape->transform == nullptr) {
+        shape->transform = new RepeaterTransform();
+    }
+    auto transform = shape->transform;
+    auto tagConfig = new BlockConfig(TagCode::Repeater);
+    AddAttribute(tagConfig, &shape->composite, AttributeType::Value, RepeaterOrder::Below);
+    AddAttribute(tagConfig, &shape->copies, AttributeType::SimpleProperty, 3.0f);
+    AddAttribute(tagConfig, &shape->offset, AttributeType::SimpleProperty, 0.0f);
+    AddAttribute(tagConfig, &transform->anchorPoint, AttributeType::SpatialProperty, Point::Zero());
+    AddAttribute(tagConfig, &transform->position, AttributeType::SpatialProperty,
+                 Point::Make(100, 100));
+    AddAttribute(tagConfig, &transform->scale, AttributeType::MultiDimensionProperty,
+                 Point::Make(1, 1));
+    AddAttribute(tagConfig, &transform->rotation, AttributeType::SimpleProperty, 0.0f);
+    AddAttribute(tagConfig, &transform->startOpacity, AttributeType::SimpleProperty, Opaque);
+    AddAttribute(tagConfig, &transform->endOpacity, AttributeType::SimpleProperty, Opaque);
+    return std::unique_ptr<BlockConfig>(tagConfig);
 }
 }  // namespace pag

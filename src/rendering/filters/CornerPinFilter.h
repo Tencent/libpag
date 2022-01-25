@@ -22,29 +22,29 @@
 
 namespace pag {
 class CornerPinFilter : public LayerFilter {
- public:
-  explicit CornerPinFilter(Effect* effect);
-  ~CornerPinFilter() override = default;
+public:
+    explicit CornerPinFilter(Effect* effect);
+    ~CornerPinFilter() override = default;
 
- protected:
-  std::string onBuildVertexShader() override;
+protected:
+    std::string onBuildVertexShader() override;
 
-  std::string onBuildFragmentShader() override;
+    std::string onBuildFragmentShader() override;
 
-  std::vector<Point> computeVertices(const Rect& contentBounds, const Rect& transformedBounds,
-                                     const Point& filterScale) override;
+    std::vector<Point> computeVertices(const Rect& contentBounds, const Rect& transformedBounds,
+                                       const Point& filterScale) override;
 
-  void bindVertices(const GLInterface* gl, const FilterSource* source, const FilterTarget* target,
-                    const std::vector<Point>& points) override;
+    void bindVertices(const GLInterface* gl, const FilterSource* source, const FilterTarget* target,
+                      const std::vector<Point>& points) override;
 
-  bool needsMSAA() const override {
-    return true;
-  }
+    bool needsMSAA() const override {
+        return true;
+    }
 
- private:
-  void calculateVertexQs();
+private:
+    void calculateVertexQs();
 
-  Effect* effect = nullptr;
-  float vertexQs[4] = {1.0f};
+    Effect* effect = nullptr;
+    float vertexQs[4] = {1.0f};
 };
 }  // namespace pag

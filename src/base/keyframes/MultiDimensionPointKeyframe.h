@@ -23,15 +23,15 @@
 
 namespace pag {
 class MultiDimensionPointKeyframe : public Keyframe<Point> {
- public:
-  ~MultiDimensionPointKeyframe() override;
+public:
+    ~MultiDimensionPointKeyframe() override;
 
-  void initialize() override;
+    void initialize() override;
 
-  Point getValueAt(Frame time) override;
+    Point getValueAt(Frame time) override;
 
- private:
-  Interpolator* xInterpolator = nullptr;
-  Interpolator* yInterpolator = nullptr;
+private:
+    Interpolator* xInterpolator = nullptr;
+    Interpolator* yInterpolator = nullptr;
 };
 }  // namespace pag

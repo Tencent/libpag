@@ -21,49 +21,49 @@
 
 namespace pag {
 FastBlurEffect::~FastBlurEffect() {
-  delete blurriness;
-  delete blurDimensions;
-  delete repeatEdgePixels;
+    delete blurriness;
+    delete blurDimensions;
+    delete repeatEdgePixels;
 }
 
 bool FastBlurEffect::visibleAt(Frame layerFrame) const {
-  return blurriness->getValueAt(layerFrame) != 0;
+    return blurriness->getValueAt(layerFrame) != 0;
 }
 
 void FastBlurEffect::transformBounds(Rect* contentBounds, const Point& filterScale,
                                      Frame layerFrame) const {
-  auto repeatEdge = repeatEdgePixels->getValueAt(layerFrame);
-  if (repeatEdge) {
-    return;
-  }
-  auto direction = blurDimensions->getValueAt(layerFrame);
-  auto intensity = blurriness->getValueAt(layerFrame);
-  auto blurrinessX = intensity * filterScale.x;
-  auto blurrinessY = intensity * filterScale.y;
-  auto expandX = (direction == BlurDimensionsDirection::All ||
-                  direction == BlurDimensionsDirection::Horizontal)
-                     ? blurrinessX
-                     : 0.0;
-  auto expandY =
-      (direction == BlurDimensionsDirection::All || direction == BlurDimensionsDirection::Vertical)
-          ? blurrinessY
-          : 0.0;
-  contentBounds->outset(expandX, expandY);
+    auto repeatEdge = repeatEdgePixels->getValueAt(layerFrame);
+    if (repeatEdge) {
+        return;
+    }
+    auto direction = blurDimensions->getValueAt(layerFrame);
+    auto intensity = blurriness->getValueAt(layerFrame);
+    auto blurrinessX = intensity * filterScale.x;
+    auto blurrinessY = intensity * filterScale.y;
+    auto expandX = (direction == BlurDimensionsDirection::All ||
+                    direction == BlurDimensionsDirection::Horizontal)
+                   ? blurrinessX
+                   : 0.0;
+    auto expandY =
+        (direction == BlurDimensionsDirection::All || direction == BlurDimensionsDirection::Vertical)
+        ? blurrinessY
+        : 0.0;
+    contentBounds->outset(expandX, expandY);
 }
 
 void FastBlurEffect::excludeVaryingRanges(std::vector<pag::TimeRange>* timeRanges) const {
-  Effect::excludeVaryingRanges(timeRanges);
-  blurriness->excludeVaryingRanges(timeRanges);
-  blurDimensions->excludeVaryingRanges(timeRanges);
-  repeatEdgePixels->excludeVaryingRanges(timeRanges);
+    Effect::excludeVaryingRanges(timeRanges);
+    blurriness->excludeVaryingRanges(timeRanges);
+    blurDimensions->excludeVaryingRanges(timeRanges);
+    repeatEdgePixels->excludeVaryingRanges(timeRanges);
 }
 
 bool FastBlurEffect::verify() const {
-  if (!Effect::verify()) {
-    VerifyFailed();
-    return false;
-  }
-  VerifyAndReturn(blurriness != nullptr && blurDimensions != nullptr &&
-                  repeatEdgePixels != nullptr);
+    if (!Effect::verify()) {
+        VerifyFailed();
+        return false;
+    }
+    VerifyAndReturn(blurriness != nullptr && blurDimensions != nullptr &&
+                    repeatEdgePixels != nullptr);
 }
 }  // namespace pag

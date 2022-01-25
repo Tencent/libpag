@@ -24,18 +24,18 @@
 
 namespace pag {
 class StreamContext {
- public:
-  virtual ~StreamContext() = default;
+public:
+    virtual ~StreamContext() = default;
 
-  void throwException(const std::string& message) {
-    errorMessages.push_back(message);
-  }
+    void throwException(const std::string& message) {
+        errorMessages.push_back(message);
+    }
 
-  bool hasException() {
-    return !errorMessages.empty();
-  }
+    bool hasException() {
+        return !errorMessages.empty();
+    }
 
-  std::vector<std::string> errorMessages;
+    std::vector<std::string> errorMessages;
 };
 
 #ifdef DEBUG

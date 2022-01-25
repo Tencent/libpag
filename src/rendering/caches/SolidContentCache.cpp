@@ -24,10 +24,10 @@ SolidContentCache::SolidContentCache(SolidLayer* layer) : ContentCache(layer) {
 }
 
 GraphicContent* SolidContentCache::createContent(Frame) const {
-  auto solidLayer = static_cast<SolidLayer*>(layer);
-  Path path = {};
-  path.addRect(0, 0, solidLayer->width, solidLayer->height);
-  auto graphic = Shape::MakeFrom(path, solidLayer->solidColor);
-  return new GraphicContent(graphic);
+    auto solidLayer = static_cast<SolidLayer*>(layer);
+    Path path = {};
+    path.addRect(0, 0, solidLayer->width, solidLayer->height);
+    auto graphic = Shape::MakeFrom(path, solidLayer->solidColor);
+    return new GraphicContent(graphic);
 }
 }  // namespace pag

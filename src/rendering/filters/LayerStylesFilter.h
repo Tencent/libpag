@@ -28,26 +28,26 @@ class RenderCache;
 struct FilterList;
 
 class LayerStylesFilter : public Filter {
- public:
-  static void TransformBounds(Rect* bounds, const FilterList* filterList);
+public:
+    static void TransformBounds(Rect* bounds, const FilterList* filterList);
 
-  explicit LayerStylesFilter(RenderCache* renderCache);
+    explicit LayerStylesFilter(RenderCache* renderCache);
 
-  ~LayerStylesFilter() override;
+    ~LayerStylesFilter() override;
 
-  bool initialize(Context* context) override;
+    bool initialize(Context* context) override;
 
-  void update(const FilterList* filterList, const Rect& contentBounds,
-              const Rect& transformedBounds, const Point& filterScale);
+    void update(const FilterList* filterList, const Rect& contentBounds,
+                const Rect& transformedBounds, const Point& filterScale);
 
-  void draw(Context* context, const FilterSource* source, const FilterTarget* target) override;
+    void draw(Context* context, const FilterSource* source, const FilterTarget* target) override;
 
- private:
-  const FilterList* filterList = nullptr;
-  RenderCache* renderCache = nullptr;
-  LayerFilter* drawFilter = nullptr;
-  Rect contentBounds = {};
-  Rect transformedBounds = {};
-  Point filterScale = {};
+private:
+    const FilterList* filterList = nullptr;
+    RenderCache* renderCache = nullptr;
+    LayerFilter* drawFilter = nullptr;
+    Rect contentBounds = {};
+    Rect transformedBounds = {};
+    Point filterScale = {};
 };
 }  // namespace pag

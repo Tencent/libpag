@@ -25,32 +25,33 @@
 namespace pag {
 void ReadTagsOfVectorComposition(DecodeStream* stream, TagCode code,
                                  VectorComposition* composition) {
-  switch (code) {
+    switch (code) {
     case TagCode::LayerBlock: {
-      auto layer = ReadLayer(stream);
-      composition->layers.push_back(layer);
-    } break;
+        auto layer = ReadLayer(stream);
+        composition->layers.push_back(layer);
+    }
+    break;
     default:
-      ReadTagsOfComposition(stream, code, composition);
-      break;
-  }
+        ReadTagsOfComposition(stream, code, composition);
+        break;
+    }
 }
 
 VectorComposition* ReadVectorComposition(DecodeStream* stream) {
-  auto composition = new VectorComposition();
-  composition->id = stream->readEncodedUint32();
-  ReadTags(stream, composition, ReadTagsOfVectorComposition);
-  Codec::InstallReferences(composition->layers);
-  return composition;
+    auto composition = new VectorComposition();
+    composition->id = stream->readEncodedUint32();
+    ReadTags(stream, composition, ReadTagsOfVectorComposition);
+    Codec::InstallReferences(composition->layers);
+    return composition;
 }
 
 TagCode WriteVectorComposition(EncodeStream* stream, VectorComposition* composition) {
-  stream->writeEncodedUint32(composition->id);
-  WriteTagsOfComposition(stream, composition);
-  for (auto& layer : composition->layers) {
-    WriteTag(stream, layer, WriteLayer);
-  }
-  WriteEndTag(stream);
-  return TagCode::VectorCompositionBlock;
+    stream->writeEncodedUint32(composition->id);
+    WriteTagsOfComposition(stream, composition);
+    for (auto& layer : composition->layers) {
+        WriteTag(stream, layer, WriteLayer);
+    }
+    WriteEndTag(stream);
+    return TagCode::VectorCompositionBlock;
 }
 }  // namespace pag

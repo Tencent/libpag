@@ -25,36 +25,36 @@
 
 namespace pag {
 class GPUDecoder : public VideoDecoder {
- public:
-  static void InitJNI(JNIEnv* env, const std::string& className);
+public:
+    static void InitJNI(JNIEnv* env, const std::string& className);
 
-  explicit GPUDecoder(const VideoConfig& config);
+    explicit GPUDecoder(const VideoConfig& config);
 
-  ~GPUDecoder() override;
+    ~GPUDecoder() override;
 
-  bool isValid() {
-    return _isValid;
-  }
+    bool isValid() {
+        return _isValid;
+    }
 
-  DecodingResult onSendBytes(void* bytes, size_t length, int64_t time) override;
+    DecodingResult onSendBytes(void* bytes, size_t length, int64_t time) override;
 
-  DecodingResult onEndOfStream() override;
+    DecodingResult onEndOfStream() override;
 
-  DecodingResult onDecodeFrame() override;
+    DecodingResult onDecodeFrame() override;
 
-  void onFlush() override;
+    void onFlush() override;
 
-  int64_t presentationTime() override;
+    int64_t presentationTime() override;
 
-  std::shared_ptr<VideoBuffer> onRenderFrame() override;
+    std::shared_ptr<VideoBuffer> onRenderFrame() override;
 
- private:
-  bool _isValid = false;
-  int videoWidth = 0;
-  int videoHeight = 0;
-  std::shared_ptr<VideoSurface> videoSurface = nullptr;
-  Global<jobject> videoDecoder;
+private:
+    bool _isValid = false;
+    int videoWidth = 0;
+    int videoHeight = 0;
+    std::shared_ptr<VideoSurface> videoSurface = nullptr;
+    Global<jobject> videoDecoder;
 
-  bool onConfigure(jobject decoder, const VideoConfig& config);
+    bool onConfigure(jobject decoder, const VideoConfig& config);
 };
 }  // namespace pag

@@ -21,9 +21,9 @@
 __attribute__((visibility("default")))
 @interface PAGFont : NSObject
 
-/**
- * A string with the name of the font family.
- **/
+    /**
+     * A string with the name of the font family.
+     **/
 @property(nonatomic, copy) NSString* fontFamily;
 
 /**
@@ -34,15 +34,15 @@ __attribute__((visibility("default")))
 + (PAGFont*)RegisterFont:(NSString*)fontPath;
 
 + (PAGFont*)RegisterFont:(NSString*)fontPath
-                  family:(NSString*)fontFamily
-                   style:(NSString*)fontStyle;
+    family:(NSString*)fontFamily
+    style:(NSString*)fontStyle;
 
 + (PAGFont*)RegisterFont:(void*)data size:(size_t)length;
 
 + (PAGFont*)RegisterFont:(void*)data
-                    size:(size_t)length
-                  family:(NSString*)fontFamily
-                   style:(NSString*)fontStyle;
+    size:(size_t)length
+    family:(NSString*)fontFamily
+    style:(NSString*)fontStyle;
 
 + (void)UnregisterFont:(PAGFont*)font;
 

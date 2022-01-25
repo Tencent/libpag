@@ -20,13 +20,13 @@
 
 namespace pag {
 void ReadImageReference(DecodeStream* stream, ImageLayer* layer) {
-  auto id = stream->readEncodedUint32();
-  auto context = static_cast<CodecContext*>(stream->context);
-  layer->imageBytes = context->getImageBytes(id);
+    auto id = stream->readEncodedUint32();
+    auto context = static_cast<CodecContext*>(stream->context);
+    layer->imageBytes = context->getImageBytes(id);
 }
 
 TagCode WriteImageReference(EncodeStream* stream, ImageLayer* layer) {
-  stream->writeEncodedUint32(layer->imageBytes->id);
-  return TagCode::ImageReference;
+    stream->writeEncodedUint32(layer->imageBytes->id);
+    return TagCode::ImageReference;
 }
 }  // namespace pag

@@ -24,21 +24,21 @@
 namespace pag {
 
 class LockGuard {
- public:
-  explicit LockGuard(std::shared_ptr<std::mutex> locker) : mutex(std::move(locker)) {
-    if (mutex) {
-      mutex->lock();
+public:
+    explicit LockGuard(std::shared_ptr<std::mutex> locker) : mutex(std::move(locker)) {
+        if (mutex) {
+            mutex->lock();
+        }
     }
-  }
 
-  ~LockGuard() {
-    if (mutex) {
-      mutex->unlock();
+    ~LockGuard() {
+        if (mutex) {
+            mutex->unlock();
+        }
     }
-  }
 
- private:
-  std::shared_ptr<std::mutex> mutex;
+private:
+    std::shared_ptr<std::mutex> mutex;
 };
 
 }  // namespace pag

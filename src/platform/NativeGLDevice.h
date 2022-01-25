@@ -22,20 +22,20 @@
 
 namespace pag {
 class NativeGLDevice {
- public:
-  /**
-   * Returns the native handle of current OpenGL context.
-   */
-  static void* GetCurrentNativeHandle();
+public:
+    /**
+     * Returns the native handle of current OpenGL context.
+     */
+    static void* GetCurrentNativeHandle();
 
-  /**
-   * Returns a offscreen device with adopted current OpenGL context.
-   */
-  static std::shared_ptr<GLDevice> Current();
+    /**
+     * Returns a offscreen device with adopted current OpenGL context.
+     */
+    static std::shared_ptr<GLDevice> Current();
 
-  /**
-   * Creates an offscreen device with specified shared OpenGL context.
-   */
-  static std::shared_ptr<GLDevice> Make(void* sharedContext = nullptr);
+    /**
+     * Creates an offscreen device with specified shared OpenGL context.
+     */
+    static std::shared_ptr<GLDevice> Make(void* sharedContext = nullptr);
 };
 }  // namespace pag

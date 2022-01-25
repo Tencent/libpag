@@ -26,46 +26,47 @@
 namespace pag {
 void ReadTagsOfVideoComposition(DecodeStream* stream, TagCode code,
                                 std::pair<VideoComposition*, bool>* parameter) {
-  auto composition = parameter->first;
-  auto hasAlpha = parameter->second;
-  switch (code) {
+    auto composition = parameter->first;
+    auto hasAlpha = parameter->second;
+    switch (code) {
     case TagCode::VideoSequence: {
-      auto sequence = ReadVideoSequence(stream, hasAlpha);
-      sequence->composition = composition;
-      composition->sequences.push_back(sequence);
-    } break;
+        auto sequence = ReadVideoSequence(stream, hasAlpha);
+        sequence->composition = composition;
+        composition->sequences.push_back(sequence);
+    }
+    break;
     default:
-      ReadTagsOfComposition(stream, code, composition);
-      break;
-  }
+        ReadTagsOfComposition(stream, code, composition);
+        break;
+    }
 }
 
 VideoComposition* ReadVideoComposition(DecodeStream* stream) {
-  auto composition = new VideoComposition();
-  composition->id = stream->readEncodedUint32();
-  auto hasAlpha = stream->readBoolean();
-  auto parameter = std::make_pair(composition, hasAlpha);
-  ReadTags(stream, &parameter, ReadTagsOfVideoComposition);
-  return composition;
+    auto composition = new VideoComposition();
+    composition->id = stream->readEncodedUint32();
+    auto hasAlpha = stream->readBoolean();
+    auto parameter = std::make_pair(composition, hasAlpha);
+    ReadTags(stream, &parameter, ReadTagsOfVideoComposition);
+    return composition;
 }
 
 static bool lessFirst(const VideoSequence* item1, const VideoSequence* item2) {
-  return item1->width < item2->width;
+    return item1->width < item2->width;
 }
 
 TagCode WriteVideoComposition(EncodeStream* stream, VideoComposition* composition) {
-  auto sequences = composition->sequences;
-  std::sort(sequences.begin(), sequences.end(), lessFirst);
-  auto hasAlpha =
-      !sequences.empty() && (sequences[0]->alphaStartY > 0 || sequences[0]->alphaStartX > 0);
-  stream->writeEncodedUint32(composition->id);
-  stream->writeBoolean(hasAlpha);
-  WriteTagsOfComposition(stream, composition);
-  for (auto sequence : sequences) {
-    auto parameter = std::make_pair(sequence, hasAlpha);
-    WriteTag(stream, &parameter, WriteVideoSequence);
-  }
-  WriteEndTag(stream);
-  return TagCode::VideoCompositionBlock;
+    auto sequences = composition->sequences;
+    std::sort(sequences.begin(), sequences.end(), lessFirst);
+    auto hasAlpha =
+        !sequences.empty() && (sequences[0]->alphaStartY > 0 || sequences[0]->alphaStartX > 0);
+    stream->writeEncodedUint32(composition->id);
+    stream->writeBoolean(hasAlpha);
+    WriteTagsOfComposition(stream, composition);
+    for (auto sequence : sequences) {
+        auto parameter = std::make_pair(sequence, hasAlpha);
+        WriteTag(stream, &parameter, WriteVideoSequence);
+    }
+    WriteEndTag(stream);
+    return TagCode::VideoCompositionBlock;
 }
 }  // namespace pag

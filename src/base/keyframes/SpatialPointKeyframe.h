@@ -22,11 +22,11 @@
 
 namespace pag {
 class SpatialPointKeyframe : public SingleEaseKeyframe<Point> {
- public:
-  void initialize() override;
-  Point getValueAt(Frame time) override;
+public:
+    void initialize() override;
+    Point getValueAt(Frame time) override;
 
- private:
-  std::shared_ptr<BezierPath> spatialBezier = nullptr;
+private:
+    std::shared_ptr<BezierPath> spatialBezier = nullptr;
 };
 }  // namespace pag

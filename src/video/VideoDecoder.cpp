@@ -30,81 +30,81 @@ static std::atomic_int maxHardwareDecoderCount = {65535};
 static std::atomic_int globalGPUDecoderCount = {0};
 
 void PAGVideoDecoder::SetMaxHardwareDecoderCount(int count) {
-  maxHardwareDecoderCount = count;
+    maxHardwareDecoderCount = count;
 }
 
 void PAGVideoDecoder::RegisterSoftwareDecoderFactory(SoftwareDecoderFactory* decoderFactory) {
-  softwareDecoderFactory = decoderFactory;
+    softwareDecoderFactory = decoderFactory;
 }
 
 bool VideoDecoder::HasHardwareDecoder() {
-  return Platform::Current()->hasHardwareDecoder();
+    return Platform::Current()->hasHardwareDecoder();
 }
 
 int VideoDecoder::GetMaxHardwareDecoderCount() {
-  return maxHardwareDecoderCount;
+    return maxHardwareDecoderCount;
 }
 
 bool VideoDecoder::HasSoftwareDecoder() {
 #ifdef PAG_USE_LIBAVC
-  return true;
+    return true;
 #else
-  return softwareDecoderFactory != nullptr;
+    return softwareDecoderFactory != nullptr;
 #endif
 }
 
 bool VideoDecoder::HasExternalSoftwareDecoder() {
-  return softwareDecoderFactory != nullptr;
+    return softwareDecoderFactory != nullptr;
 }
 
 SoftwareDecoderFactory* VideoDecoder::GetExternalSoftwareDecoderFactory() {
-  return softwareDecoderFactory;
+    return softwareDecoderFactory;
 }
 
 std::unique_ptr<VideoDecoder> VideoDecoder::CreateHardwareDecoder(const VideoConfig& config) {
-  std::unique_ptr<VideoDecoder> videoDecoder = nullptr;
-  if (globalGPUDecoderCount < VideoDecoder::GetMaxHardwareDecoderCount()) {
-    videoDecoder = Platform::Current()->makeHardwareDecoder(config);
-  }
-  if (videoDecoder != nullptr) {
-    globalGPUDecoderCount++;
-    videoDecoder->hardwareBacked = true;
-  }
-  return videoDecoder;
+    std::unique_ptr<VideoDecoder> videoDecoder = nullptr;
+    if (globalGPUDecoderCount < VideoDecoder::GetMaxHardwareDecoderCount()) {
+        videoDecoder = Platform::Current()->makeHardwareDecoder(config);
+    }
+    if (videoDecoder != nullptr) {
+        globalGPUDecoderCount++;
+        videoDecoder->hardwareBacked = true;
+    }
+    return videoDecoder;
 }
 
 std::unique_ptr<VideoDecoder> VideoDecoder::CreateSoftwareDecoder(const VideoConfig& config) {
-  std::unique_ptr<VideoDecoder> videoDecoder = nullptr;
-  SoftwareDecoderFactory* factory = softwareDecoderFactory;
-  if (factory != nullptr) {
-    videoDecoder = SoftwareDecoderWrapper::Wrap(factory->createSoftwareDecoder(), config);
-  }
+    std::unique_ptr<VideoDecoder> videoDecoder = nullptr;
+    SoftwareDecoderFactory* factory = softwareDecoderFactory;
+    if (factory != nullptr) {
+        videoDecoder = SoftwareDecoderWrapper::Wrap(factory->createSoftwareDecoder(), config);
+    }
 
 #ifdef PAG_USE_LIBAVC
-  if (videoDecoder == nullptr) {
-    videoDecoder = SoftwareDecoderWrapper::Wrap(std::make_unique<SoftAVCDecoder>(), config);
-    if (videoDecoder != nullptr) {
-      LOGI("All other video decoders are not available, fallback to SoftAVCDecoder!");
+    if (videoDecoder == nullptr) {
+        videoDecoder = SoftwareDecoderWrapper::Wrap(std::make_unique<SoftAVCDecoder>(), config);
+        if (videoDecoder != nullptr) {
+            LOGI("All other video decoders are not available, fallback to SoftAVCDecoder!");
+        }
     }
-  }
 #endif
 
-  if (videoDecoder != nullptr) {
-    videoDecoder->hardwareBacked = false;
-  } else {
-    LOGE("Failed on creating a software video decoder!");
-  }
-  return videoDecoder;
+    if (videoDecoder != nullptr) {
+        videoDecoder->hardwareBacked = false;
+    } else {
+        LOGE("Failed on creating a software video decoder!");
+    }
+    return videoDecoder;
 }
 
 std::unique_ptr<VideoDecoder> VideoDecoder::Make(const VideoConfig& config, bool useHardware) {
-  return useHardware ? CreateHardwareDecoder(config) : CreateSoftwareDecoder(config);
+    return useHardware ? CreateHardwareDecoder(config) : CreateSoftwareDecoder(config);
 }
 
 VideoDecoder::~VideoDecoder() {
-  if (hardwareBacked) {
-    globalGPUDecoderCount--;
-  }
+    if (hardwareBacked) {
+        globalGPUDecoderCount--;
+    }
 }
 
 }  // namespace pag

@@ -22,44 +22,44 @@
 
 namespace pag {
 class LevelsIndividualFilter : public LayerFilter {
- public:
-  explicit LevelsIndividualFilter(Effect* effect);
-  ~LevelsIndividualFilter() override = default;
+public:
+    explicit LevelsIndividualFilter(Effect* effect);
+    ~LevelsIndividualFilter() override = default;
 
- protected:
-  std::string onBuildFragmentShader() override;
+protected:
+    std::string onBuildFragmentShader() override;
 
-  void onPrepareProgram(const GLInterface* gl, unsigned program) override;
+    void onPrepareProgram(const GLInterface* gl, unsigned program) override;
 
-  void onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
-                      const Point& filterScale) override;
+    void onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
+                        const Point& filterScale) override;
 
- private:
-  Effect* effect = nullptr;
+private:
+    Effect* effect = nullptr;
 
-  // Handle
-  int inputBlackHandle;
-  int inputWhiteHandle;
-  int gammaHandle;
-  int outputBlackHandle;
-  int outputWhiteHandle;
+    // Handle
+    int inputBlackHandle;
+    int inputWhiteHandle;
+    int gammaHandle;
+    int outputBlackHandle;
+    int outputWhiteHandle;
 
-  int redInputBlackHandle;
-  int redInputWhiteHandle;
-  int redGammaHandle;
-  int redOutputBlackHandle;
-  int redOutputWhiteHandle;
+    int redInputBlackHandle;
+    int redInputWhiteHandle;
+    int redGammaHandle;
+    int redOutputBlackHandle;
+    int redOutputWhiteHandle;
 
-  int blueInputBlackHandle;
-  int blueInputWhiteHandle;
-  int blueGammaHandle;
-  int blueOutputBlackHandle;
-  int blueOutputWhiteHandle;
+    int blueInputBlackHandle;
+    int blueInputWhiteHandle;
+    int blueGammaHandle;
+    int blueOutputBlackHandle;
+    int blueOutputWhiteHandle;
 
-  int greenInputBlackHandle;
-  int greenInputWhiteHandle;
-  int greenGammaHandle;
-  int greenOutputBlackHandle;
-  int greenOutputWhiteHandle;
+    int greenInputBlackHandle;
+    int greenInputWhiteHandle;
+    int greenGammaHandle;
+    int greenOutputBlackHandle;
+    int greenOutputWhiteHandle;
 };
 }  // namespace pag

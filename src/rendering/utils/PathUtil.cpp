@@ -20,31 +20,31 @@
 
 namespace pag {
 Path ToPath(const PathData& pathData) {
-  Path path = {};
-  auto& points = pathData.points;
-  uint32_t index = 0;
-  Point control1 = {}, control2 = {}, point = {};
-  for (auto& verb : pathData.verbs) {
-    switch (verb) {
-      case PathDataVerb::Close:
-        path.close();
-        break;
-      case PathDataVerb::MoveTo:
-        point = points[index++];
-        path.moveTo(point.x, point.y);
-        break;
-      case PathDataVerb::LineTo:
-        point = points[index++];
-        path.lineTo(point.x, point.y);
-        break;
-      case PathDataVerb::CurveTo:
-        control1 = points[index++];
-        control2 = points[index++];
-        point = points[index++];
-        path.cubicTo(control1.x, control1.y, control2.x, control2.y, point.x, point.y);
-        break;
+    Path path = {};
+    auto& points = pathData.points;
+    uint32_t index = 0;
+    Point control1 = {}, control2 = {}, point = {};
+    for (auto& verb : pathData.verbs) {
+        switch (verb) {
+        case PathDataVerb::Close:
+            path.close();
+            break;
+        case PathDataVerb::MoveTo:
+            point = points[index++];
+            path.moveTo(point.x, point.y);
+            break;
+        case PathDataVerb::LineTo:
+            point = points[index++];
+            path.lineTo(point.x, point.y);
+            break;
+        case PathDataVerb::CurveTo:
+            control1 = points[index++];
+            control2 = points[index++];
+            point = points[index++];
+            path.cubicTo(control1.x, control1.y, control2.x, control2.y, point.x, point.y);
+            break;
+        }
     }
-  }
-  return path;
+    return path;
 }
 }  // namespace pag

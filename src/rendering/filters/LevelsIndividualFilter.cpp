@@ -84,69 +84,69 @@ LevelsIndividualFilter::LevelsIndividualFilter(pag::Effect* effect) : effect(eff
 }
 
 std::string LevelsIndividualFilter::onBuildFragmentShader() {
-  return FRAGMENT_SHADER;
+    return FRAGMENT_SHADER;
 }
 
 void LevelsIndividualFilter::onPrepareProgram(const GLInterface* gl, unsigned int program) {
-  inputBlackHandle = gl->getUniformLocation(program, "inputBlack");
-  inputWhiteHandle = gl->getUniformLocation(program, "inputWhite");
-  gammaHandle = gl->getUniformLocation(program, "gamma");
-  outputBlackHandle = gl->getUniformLocation(program, "outputBlack");
-  outputWhiteHandle = gl->getUniformLocation(program, "outputWhite");
+    inputBlackHandle = gl->getUniformLocation(program, "inputBlack");
+    inputWhiteHandle = gl->getUniformLocation(program, "inputWhite");
+    gammaHandle = gl->getUniformLocation(program, "gamma");
+    outputBlackHandle = gl->getUniformLocation(program, "outputBlack");
+    outputWhiteHandle = gl->getUniformLocation(program, "outputWhite");
 
-  redInputBlackHandle = gl->getUniformLocation(program, "redInputBlack");
-  redInputWhiteHandle = gl->getUniformLocation(program, "redInputWhite");
-  redGammaHandle = gl->getUniformLocation(program, "redGamma");
-  redOutputBlackHandle = gl->getUniformLocation(program, "redOutputBlack");
-  redOutputWhiteHandle = gl->getUniformLocation(program, "redOutputWhite");
+    redInputBlackHandle = gl->getUniformLocation(program, "redInputBlack");
+    redInputWhiteHandle = gl->getUniformLocation(program, "redInputWhite");
+    redGammaHandle = gl->getUniformLocation(program, "redGamma");
+    redOutputBlackHandle = gl->getUniformLocation(program, "redOutputBlack");
+    redOutputWhiteHandle = gl->getUniformLocation(program, "redOutputWhite");
 
-  greenInputBlackHandle = gl->getUniformLocation(program, "greenInputBlack");
-  greenInputWhiteHandle = gl->getUniformLocation(program, "greenInputWhite");
-  greenGammaHandle = gl->getUniformLocation(program, "greenGamma");
-  greenOutputBlackHandle = gl->getUniformLocation(program, "greenOutputBlack");
-  greenOutputWhiteHandle = gl->getUniformLocation(program, "greenOutputWhite");
+    greenInputBlackHandle = gl->getUniformLocation(program, "greenInputBlack");
+    greenInputWhiteHandle = gl->getUniformLocation(program, "greenInputWhite");
+    greenGammaHandle = gl->getUniformLocation(program, "greenGamma");
+    greenOutputBlackHandle = gl->getUniformLocation(program, "greenOutputBlack");
+    greenOutputWhiteHandle = gl->getUniformLocation(program, "greenOutputWhite");
 
-  blueInputBlackHandle = gl->getUniformLocation(program, "blueInputBlack");
-  blueInputWhiteHandle = gl->getUniformLocation(program, "blueInputWhite");
-  blueGammaHandle = gl->getUniformLocation(program, "blueGamma");
-  blueOutputBlackHandle = gl->getUniformLocation(program, "blueOutputBlack");
-  blueOutputWhiteHandle = gl->getUniformLocation(program, "blueOutputWhite");
+    blueInputBlackHandle = gl->getUniformLocation(program, "blueInputBlack");
+    blueInputWhiteHandle = gl->getUniformLocation(program, "blueInputWhite");
+    blueGammaHandle = gl->getUniformLocation(program, "blueGamma");
+    blueOutputBlackHandle = gl->getUniformLocation(program, "blueOutputBlack");
+    blueOutputWhiteHandle = gl->getUniformLocation(program, "blueOutputWhite");
 }
 
 void LevelsIndividualFilter::onUpdateParams(const GLInterface* gl, const Rect&, const Point&) {
-  auto* levelsIndividualFilter = reinterpret_cast<const LevelsIndividualEffect*>(effect);
-  gl->uniform1f(inputBlackHandle, levelsIndividualFilter->inputBlack->getValueAt(layerFrame));
-  gl->uniform1f(inputWhiteHandle, levelsIndividualFilter->inputWhite->getValueAt(layerFrame));
-  gl->uniform1f(gammaHandle, levelsIndividualFilter->gamma->getValueAt(layerFrame));
-  gl->uniform1f(outputBlackHandle, levelsIndividualFilter->outputBlack->getValueAt(layerFrame));
-  gl->uniform1f(outputWhiteHandle, levelsIndividualFilter->outputWhite->getValueAt(layerFrame));
+    auto* levelsIndividualFilter = reinterpret_cast<const LevelsIndividualEffect*>(effect);
+    gl->uniform1f(inputBlackHandle, levelsIndividualFilter->inputBlack->getValueAt(layerFrame));
+    gl->uniform1f(inputWhiteHandle, levelsIndividualFilter->inputWhite->getValueAt(layerFrame));
+    gl->uniform1f(gammaHandle, levelsIndividualFilter->gamma->getValueAt(layerFrame));
+    gl->uniform1f(outputBlackHandle, levelsIndividualFilter->outputBlack->getValueAt(layerFrame));
+    gl->uniform1f(outputWhiteHandle, levelsIndividualFilter->outputWhite->getValueAt(layerFrame));
 
-  gl->uniform1f(redInputBlackHandle, levelsIndividualFilter->redInputBlack->getValueAt(layerFrame));
-  gl->uniform1f(redInputWhiteHandle, levelsIndividualFilter->redInputWhite->getValueAt(layerFrame));
-  gl->uniform1f(redGammaHandle, levelsIndividualFilter->redGamma->getValueAt(layerFrame));
-  gl->uniform1f(redOutputBlackHandle,
-                levelsIndividualFilter->redOutputBlack->getValueAt(layerFrame));
-  gl->uniform1f(redOutputWhiteHandle,
-                levelsIndividualFilter->redOutputWhite->getValueAt(layerFrame));
+    gl->uniform1f(redInputBlackHandle, levelsIndividualFilter->redInputBlack->getValueAt(layerFrame));
+    gl->uniform1f(redInputWhiteHandle, levelsIndividualFilter->redInputWhite->getValueAt(layerFrame));
+    gl->uniform1f(redGammaHandle, levelsIndividualFilter->redGamma->getValueAt(layerFrame));
+    gl->uniform1f(redOutputBlackHandle,
+                  levelsIndividualFilter->redOutputBlack->getValueAt(layerFrame));
+    gl->uniform1f(redOutputWhiteHandle,
+                  levelsIndividualFilter->redOutputWhite->getValueAt(layerFrame));
 
-  gl->uniform1f(greenInputBlackHandle,
-                levelsIndividualFilter->greenInputBlack->getValueAt(layerFrame));
-  gl->uniform1f(greenInputWhiteHandle,
-                levelsIndividualFilter->greenInputWhite->getValueAt(layerFrame));
-  gl->uniform1f(greenGammaHandle, levelsIndividualFilter->greenGamma->getValueAt(layerFrame));
-  gl->uniform1f(greenOutputBlackHandle,
-                levelsIndividualFilter->greenOutputBlack->getValueAt(layerFrame));
-  gl->uniform1f(greenOutputWhiteHandle,
-                levelsIndividualFilter->greenOutputWhite->getValueAt(layerFrame));
+    gl->uniform1f(greenInputBlackHandle,
+                  levelsIndividualFilter->greenInputBlack->getValueAt(layerFrame));
+    gl->uniform1f(greenInputWhiteHandle,
+                  levelsIndividualFilter->greenInputWhite->getValueAt(layerFrame));
+    gl->uniform1f(greenGammaHandle, levelsIndividualFilter->greenGamma->getValueAt(layerFrame));
+    gl->uniform1f(greenOutputBlackHandle,
+                  levelsIndividualFilter->greenOutputBlack->getValueAt(layerFrame));
+    gl->uniform1f(greenOutputWhiteHandle,
+                  levelsIndividualFilter->greenOutputWhite->getValueAt(layerFrame));
 
-  gl->uniform1f(blueInputBlackHandle,
-                levelsIndividualFilter->blueInputBlack->getValueAt(layerFrame));
-  gl->uniform1f(blueInputWhiteHandle,
-                levelsIndividualFilter->blueInputWhite->getValueAt(layerFrame));
-  gl->uniform1f(blueGammaHandle, levelsIndividualFilter->blueGamma->getValueAt(layerFrame));
-  gl->uniform1f(blueOutputBlackHandle,
-                levelsIndividualFilter->blueOutputBlack->getValueAt(layerFrame));
-  gl->uniform1f(blueOutputWhiteHandle,
-                levelsIndividualFilter->blueOutputWhite->getValueAt(layerFrame));
+    gl->uniform1f(blueInputBlackHandle,
+                  levelsIndividualFilter->blueInputBlack->getValueAt(layerFrame));
+    gl->uniform1f(blueInputWhiteHandle,
+                  levelsIndividualFilter->blueInputWhite->getValueAt(layerFrame));
+    gl->uniform1f(blueGammaHandle, levelsIndividualFilter->blueGamma->getValueAt(layerFrame));
+    gl->uniform1f(blueOutputBlackHandle,
+                  levelsIndividualFilter->blueOutputBlack->getValueAt(layerFrame));
+    gl->uniform1f(blueOutputWhiteHandle,
+                  levelsIndividualFilter->blueOutputWhite->getValueAt(layerFrame));
 }
 }  // namespace pag

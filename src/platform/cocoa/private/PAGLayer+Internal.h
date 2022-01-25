@@ -20,7 +20,7 @@
 #import "platform/cocoa/PAGLayer.h"
 
 @interface PAGLayer () {
-  id _impl;
+    id _impl;
 }
 
 - (instancetype)initWithImpl:(id)impl;

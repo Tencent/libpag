@@ -22,35 +22,35 @@
 
 namespace pag {
 class MotionBlurFilter : public LayerFilter {
- public:
-  static void TransformBounds(Rect* bounds, const Point& filterScale, Layer* layer,
-                              Frame layerFrame);
+public:
+    static void TransformBounds(Rect* bounds, const Point& filterScale, Layer* layer,
+                                Frame layerFrame);
 
-  MotionBlurFilter();
-  ~MotionBlurFilter() override = default;
+    MotionBlurFilter();
+    ~MotionBlurFilter() override = default;
 
-  bool updateLayer(Layer* layer, Frame layerFrame);
+    bool updateLayer(Layer* layer, Frame layerFrame);
 
- protected:
-  std::string onBuildVertexShader() override;
+protected:
+    std::string onBuildVertexShader() override;
 
-  std::string onBuildFragmentShader() override;
+    std::string onBuildFragmentShader() override;
 
-  void onPrepareProgram(const GLInterface* gl, unsigned program) override;
+    void onPrepareProgram(const GLInterface* gl, unsigned program) override;
 
-  void onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
-                      const Point& filterScale) override;
+    void onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
+                        const Point& filterScale) override;
 
-  std::vector<Point> computeVertices(const Rect& contentBounds, const Rect& transformedBounds,
-                                     const Point& filterScale) override;
+    std::vector<Point> computeVertices(const Rect& contentBounds, const Rect& transformedBounds,
+                                       const Point& filterScale) override;
 
- private:
-  Matrix previousMatrix = Matrix::I();
-  Matrix currentMatrix = Matrix::I();
+private:
+    Matrix previousMatrix = Matrix::I();
+    Matrix currentMatrix = Matrix::I();
 
-  int prevTransformHandle = 0;
-  int transformHandle = 0;
-  int velCenterHandle = 0;
-  int maxDistanceHandle = 0;
+    int prevTransformHandle = 0;
+    int transformHandle = 0;
+    int velCenterHandle = 0;
+    int maxDistanceHandle = 0;
 };
 }  // namespace pag

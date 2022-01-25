@@ -23,26 +23,26 @@
 
 namespace pag {
 class GlowBlurFilter : public LayerFilter {
- public:
-  explicit GlowBlurFilter(BlurDirection blurDirection);
-  ~GlowBlurFilter() override = default;
+public:
+    explicit GlowBlurFilter(BlurDirection blurDirection);
+    ~GlowBlurFilter() override = default;
 
-  void updateOffset(float blurOffset);
+    void updateOffset(float blurOffset);
 
- protected:
-  std::string onBuildVertexShader() override;
+protected:
+    std::string onBuildVertexShader() override;
 
-  std::string onBuildFragmentShader() override;
+    std::string onBuildFragmentShader() override;
 
-  void onPrepareProgram(const GLInterface* gl, unsigned program) override;
+    void onPrepareProgram(const GLInterface* gl, unsigned program) override;
 
-  void onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
-                      const Point& filterScale) override;
+    void onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
+                        const Point& filterScale) override;
 
- private:
-  int textureOffsetHHandle = -1;
-  int textureOffsetVHandle = -1;
-  BlurDirection blurDirection;
-  float blurOffset = 0.0f;
+private:
+    int textureOffsetHHandle = -1;
+    int textureOffsetVHandle = -1;
+    BlurDirection blurDirection;
+    float blurOffset = 0.0f;
 };
 }  // namespace pag

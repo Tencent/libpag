@@ -22,22 +22,22 @@
 
 namespace pag {
 class RadialBlurFilter : public LayerFilter {
- public:
-  explicit RadialBlurFilter(Effect* effect);
-  ~RadialBlurFilter() override = default;
+public:
+    explicit RadialBlurFilter(Effect* effect);
+    ~RadialBlurFilter() override = default;
 
- protected:
-  std::string onBuildFragmentShader() override;
+protected:
+    std::string onBuildFragmentShader() override;
 
-  void onPrepareProgram(const GLInterface* gl, unsigned program) override;
+    void onPrepareProgram(const GLInterface* gl, unsigned program) override;
 
-  void onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
-                      const Point& filterScale) override;
+    void onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
+                        const Point& filterScale) override;
 
- private:
-  Effect* effect = nullptr;
+private:
+    Effect* effect = nullptr;
 
-  int amountHandle = -1;
-  int centerHandle = -1;
+    int amountHandle = -1;
+    int centerHandle = -1;
 };
 }  // namespace pag

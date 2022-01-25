@@ -24,28 +24,28 @@
 
 namespace pag {
 struct FontDescriptor {
-  uint32_t id;
-  std::string fontFamily;
-  std::string fontStyle;
+    uint32_t id;
+    std::string fontFamily;
+    std::string fontStyle;
 };
 
 class CodecContext : public StreamContext {
- public:
-  ~CodecContext() override;
-  uint32_t getFontID(const std::string& fontFamily, const std::string& fontStyle);
-  FontData getFontData(int id);
-  ImageBytes* getImageBytes(ID imageID);
-  std::vector<Composition*> releaseCompositions();
-  std::vector<ImageBytes*> releaseImages();
+public:
+    ~CodecContext() override;
+    uint32_t getFontID(const std::string& fontFamily, const std::string& fontStyle);
+    FontData getFontData(int id);
+    ImageBytes* getImageBytes(ID imageID);
+    std::vector<Composition*> releaseCompositions();
+    std::vector<ImageBytes*> releaseImages();
 
-  std::vector<std::string> errorMessages;
-  std::unordered_map<std::string, FontDescriptor*> fontNameMap;
-  std::unordered_map<int, FontDescriptor*> fontIDMap;
-  std::vector<Composition*> compositions;
-  std::vector<ImageBytes*> images;
-  int timeStretchMode = PAGTimeStretchMode::Repeat;
-  TimeRange* scaledTimeRange = nullptr;
-  FileAttributes fileAttributes = {};
-  uint16_t tagLevel = 0;
+    std::vector<std::string> errorMessages;
+    std::unordered_map<std::string, FontDescriptor*> fontNameMap;
+    std::unordered_map<int, FontDescriptor*> fontIDMap;
+    std::vector<Composition*> compositions;
+    std::vector<ImageBytes*> images;
+    int timeStretchMode = PAGTimeStretchMode::Repeat;
+    TimeRange* scaledTimeRange = nullptr;
+    FileAttributes fileAttributes = {};
+    uint16_t tagLevel = 0;
 };
 }  // namespace pag

@@ -24,34 +24,34 @@
 
 namespace pag {
 class SoftwareDecoderWrapper : public VideoDecoder {
- public:
-  static std::unique_ptr<VideoDecoder> Wrap(std::shared_ptr<SoftwareDecoder> softwareDecoder,
-                                            const VideoConfig& config);
+public:
+    static std::unique_ptr<VideoDecoder> Wrap(std::shared_ptr<SoftwareDecoder> softwareDecoder,
+            const VideoConfig& config);
 
-  ~SoftwareDecoderWrapper() override;
+    ~SoftwareDecoderWrapper() override;
 
-  bool onConfigure(const VideoConfig& config);
+    bool onConfigure(const VideoConfig& config);
 
-  DecodingResult onSendBytes(void* bytes, size_t length, int64_t time) override;
+    DecodingResult onSendBytes(void* bytes, size_t length, int64_t time) override;
 
-  DecodingResult onEndOfStream() override;
+    DecodingResult onEndOfStream() override;
 
-  DecodingResult onDecodeFrame() override;
+    DecodingResult onDecodeFrame() override;
 
-  void onFlush() override;
+    void onFlush() override;
 
-  std::shared_ptr<VideoBuffer> onRenderFrame() override;
+    std::shared_ptr<VideoBuffer> onRenderFrame() override;
 
-  int64_t presentationTime() override;
+    int64_t presentationTime() override;
 
- private:
-  std::shared_ptr<SoftwareDecoder> softwareDecoder = nullptr;
-  VideoConfig videoConfig = {};
-  uint8_t* frameBytes = nullptr;
-  size_t frameLength = 0;
-  int64_t currentDecodedTime = -1;
-  std::list<int64_t> pendingFrames{};
+private:
+    std::shared_ptr<SoftwareDecoder> softwareDecoder = nullptr;
+    VideoConfig videoConfig = {};
+    uint8_t* frameBytes = nullptr;
+    size_t frameLength = 0;
+    int64_t currentDecodedTime = -1;
+    std::list<int64_t> pendingFrames{};
 
-  explicit SoftwareDecoderWrapper(std::shared_ptr<SoftwareDecoder> externalDecoder);
+    explicit SoftwareDecoderWrapper(std::shared_ptr<SoftwareDecoder> externalDecoder);
 };
 }  // namespace pag

@@ -21,12 +21,12 @@
 
 namespace pag {
 std::unique_ptr<BlockConfig> FastBlurEffectTag(FastBlurEffect* effect) {
-  auto tagConfig = new BlockConfig(TagCode::FastBlurEffect);
-  AddAttribute(tagConfig, &effect->blurriness, AttributeType::SimpleProperty, 0.0f);
-  AddAttribute(tagConfig, &effect->blurDimensions, AttributeType::DiscreteProperty,
-               BlurDimensionsDirection::All);
-  AddAttribute(tagConfig, &effect->repeatEdgePixels, AttributeType::DiscreteProperty, false);
-  EffectCompositingOptionTag(tagConfig, effect);
-  return std::unique_ptr<BlockConfig>(tagConfig);
+    auto tagConfig = new BlockConfig(TagCode::FastBlurEffect);
+    AddAttribute(tagConfig, &effect->blurriness, AttributeType::SimpleProperty, 0.0f);
+    AddAttribute(tagConfig, &effect->blurDimensions, AttributeType::DiscreteProperty,
+                 BlurDimensionsDirection::All);
+    AddAttribute(tagConfig, &effect->repeatEdgePixels, AttributeType::DiscreteProperty, false);
+    EffectCompositingOptionTag(tagConfig, effect);
+    return std::unique_ptr<BlockConfig>(tagConfig);
 }
 }  // namespace pag

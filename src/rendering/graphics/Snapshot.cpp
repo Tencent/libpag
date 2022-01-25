@@ -23,17 +23,17 @@
 
 namespace pag {
 bool Snapshot::hitTest(RenderCache* cache, float x, float y) const {
-  Point local = {x, y};
-  if (!MapPointInverted(matrix, &local)) {
-    return false;
-  }
-  auto surface = Surface::Make(cache->getContext(), 1, 1);
-  if (surface == nullptr) {
-    return false;
-  }
-  auto canvas = surface->getCanvas();
-  canvas->setMatrix(Matrix::MakeTrans(-local.x, -local.y));
-  canvas->drawTexture(texture.get());
-  return surface->hitTest(0, 0);
+    Point local = {x, y};
+    if (!MapPointInverted(matrix, &local)) {
+        return false;
+    }
+    auto surface = Surface::Make(cache->getContext(), 1, 1);
+    if (surface == nullptr) {
+        return false;
+    }
+    auto canvas = surface->getCanvas();
+    canvas->setMatrix(Matrix::MakeTrans(-local.x, -local.y));
+    canvas->drawTexture(texture.get());
+    return surface->hitTest(0, 0);
 }
 }  // namespace pag

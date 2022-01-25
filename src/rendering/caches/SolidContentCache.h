@@ -22,10 +22,10 @@
 
 namespace pag {
 class SolidContentCache : public ContentCache {
- public:
-  explicit SolidContentCache(SolidLayer* layer);
+public:
+    explicit SolidContentCache(SolidLayer* layer);
 
- protected:
-  GraphicContent* createContent(Frame layerFrame) const override;
+protected:
+    GraphicContent* createContent(Frame layerFrame) const override;
 };
 }  // namespace pag

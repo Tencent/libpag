@@ -22,29 +22,29 @@
 
 namespace pag {
 class HitTestCase {
- public:
-  static void HitTestPoint(std::shared_ptr<PAGPlayer> TestPAGPlayer,
-                           std::shared_ptr<PAGFile> TestPAGFile);
+public:
+    static void HitTestPoint(std::shared_ptr<PAGPlayer> TestPAGPlayer,
+                             std::shared_ptr<PAGFile> TestPAGFile);
 
-  static void VideoSequenceHitTestPoint(std::shared_ptr<PAGPlayer> TestPAGPlayer,
-                                        std::shared_ptr<PAGFile> TestPAGFile);
-
-  static void BitmapSequenceHitTestPoint(std::shared_ptr<PAGPlayer> TestPAGPlayer,
-                                         std::shared_ptr<PAGFile> TestPAGFile);
-
-  static void GetLayersUnderPointTrackMatte(std::shared_ptr<PAGPlayer> TestPAGPlayer,
-                                            std::shared_ptr<PAGFile> TestPAGFile);
-
-  static void GetLayersUnderPointImage(std::shared_ptr<PAGPlayer> TestPAGPlayer,
-                                       std::shared_ptr<PAGFile> TestPAGFile);
-
-  static void GetLayersUnderPointText(std::shared_ptr<PAGPlayer> TestPAGPlayer,
-                                      std::shared_ptr<PAGFile> TestPAGFile);
-
-  static void GetLayersUnderPointEdgeCase(std::shared_ptr<PAGPlayer> TestPAGPlayer,
+    static void VideoSequenceHitTestPoint(std::shared_ptr<PAGPlayer> TestPAGPlayer,
                                           std::shared_ptr<PAGFile> TestPAGFile);
 
-  static void GetLayersUnderPoint(std::shared_ptr<PAGPlayer> TestPAGPlayer,
-                                  std::shared_ptr<PAGFile> TestPAGFile);
+    static void BitmapSequenceHitTestPoint(std::shared_ptr<PAGPlayer> TestPAGPlayer,
+                                           std::shared_ptr<PAGFile> TestPAGFile);
+
+    static void GetLayersUnderPointTrackMatte(std::shared_ptr<PAGPlayer> TestPAGPlayer,
+            std::shared_ptr<PAGFile> TestPAGFile);
+
+    static void GetLayersUnderPointImage(std::shared_ptr<PAGPlayer> TestPAGPlayer,
+                                         std::shared_ptr<PAGFile> TestPAGFile);
+
+    static void GetLayersUnderPointText(std::shared_ptr<PAGPlayer> TestPAGPlayer,
+                                        std::shared_ptr<PAGFile> TestPAGFile);
+
+    static void GetLayersUnderPointEdgeCase(std::shared_ptr<PAGPlayer> TestPAGPlayer,
+                                            std::shared_ptr<PAGFile> TestPAGFile);
+
+    static void GetLayersUnderPoint(std::shared_ptr<PAGPlayer> TestPAGPlayer,
+                                    std::shared_ptr<PAGFile> TestPAGFile);
 };
 }  // namespace pag

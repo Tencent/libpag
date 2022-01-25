@@ -22,16 +22,16 @@
 namespace pag {
 MaskCache::MaskCache(Layer* layer)
     : FrameCache<Path>(layer->startTime, layer->duration), layer(layer) {
-  std::vector<TimeRange> timeRanges = {layer->visibleRange()};
-  for (auto& mask : layer->masks) {
-    mask->excludeVaryingRanges(&timeRanges);
-  }
-  staticTimeRanges = OffsetTimeRanges(timeRanges, -layer->startTime);
+    std::vector<TimeRange> timeRanges = {layer->visibleRange()};
+    for (auto& mask : layer->masks) {
+        mask->excludeVaryingRanges(&timeRanges);
+    }
+    staticTimeRanges = OffsetTimeRanges(timeRanges, -layer->startTime);
 }
 
 Path* MaskCache::createCache(Frame layerFrame) {
-  auto maskContent = new Path();
-  RenderMasks(maskContent, layer->masks, layerFrame);
-  return maskContent;
+    auto maskContent = new Path();
+    RenderMasks(maskContent, layer->masks, layerFrame);
+    return maskContent;
 }
 }  // namespace pag

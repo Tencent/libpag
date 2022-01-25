@@ -25,47 +25,47 @@
 
 namespace pag {
 class DropShadowFilter : public LayerFilter {
- public:
-  explicit DropShadowFilter(DropShadowStyle* layerStyle);
-  ~DropShadowFilter() override;
+public:
+    explicit DropShadowFilter(DropShadowStyle* layerStyle);
+    ~DropShadowFilter() override;
 
-  bool initialize(Context* context) override;
+    bool initialize(Context* context) override;
 
-  void update(Frame frame, const Rect& contentBounds, const Rect& transformedBounds,
-              const Point& filterScale) override;
+    void update(Frame frame, const Rect& contentBounds, const Rect& transformedBounds,
+                const Point& filterScale) override;
 
-  void draw(Context* context, const FilterSource* source, const FilterTarget* target) override;
+    void draw(Context* context, const FilterSource* source, const FilterTarget* target) override;
 
- private:
-  DropShadowStyle* layerStyle = nullptr;
+private:
+    DropShadowStyle* layerStyle = nullptr;
 
-  std::shared_ptr<FilterBuffer> spreadFilterBuffer = nullptr;
-  std::shared_ptr<FilterBuffer> blurFilterBuffer = nullptr;
+    std::shared_ptr<FilterBuffer> spreadFilterBuffer = nullptr;
+    std::shared_ptr<FilterBuffer> blurFilterBuffer = nullptr;
 
-  SinglePassBlurFilter* blurFilterV = nullptr;
-  SinglePassBlurFilter* blurFilterH = nullptr;
-  DropShadowSpreadFilter* spreadFilter = nullptr;
-  DropShadowSpreadFilter* spreadThickFilter = nullptr;
+    SinglePassBlurFilter* blurFilterV = nullptr;
+    SinglePassBlurFilter* blurFilterH = nullptr;
+    DropShadowSpreadFilter* spreadFilter = nullptr;
+    DropShadowSpreadFilter* spreadThickFilter = nullptr;
 
-  Color color = Black;
-  float opacity = 0.0f;
-  float spread = 0.0f;
-  float spreadSize = 0.0f;
-  float blurSize = 0.0f;
-  std::vector<Rect> filtersBounds = {};
+    Color color = Black;
+    float opacity = 0.0f;
+    float spread = 0.0f;
+    float spreadSize = 0.0f;
+    float blurSize = 0.0f;
+    std::vector<Rect> filtersBounds = {};
 
-  void updateParamModeNotSpread(Frame frame, const Rect& contentBounds,
-                                const Rect& transformedBounds, const Point& filterScale);
-  void updateParamModeNotFullSpread(Frame frame, const Rect& contentBounds,
-                                    const Rect& transformedBounds, const Point& filterScale);
-  void updateParamModeFullSpread(Frame frame, const Rect& contentBounds,
-                                 const Rect& transformedBounds, const Point& filterScale);
+    void updateParamModeNotSpread(Frame frame, const Rect& contentBounds,
+                                  const Rect& transformedBounds, const Point& filterScale);
+    void updateParamModeNotFullSpread(Frame frame, const Rect& contentBounds,
+                                      const Rect& transformedBounds, const Point& filterScale);
+    void updateParamModeFullSpread(Frame frame, const Rect& contentBounds,
+                                   const Rect& transformedBounds, const Point& filterScale);
 
-  void onDrawModeNotSpread(Context* context, const FilterSource* source,
-                           const FilterTarget* target);
-  void onDrawModeNotFullSpread(Context* context, const FilterSource* source,
-                               const FilterTarget* target);
-  void onDrawModeFullSpread(Context* context, const FilterSource* source,
-                            const FilterTarget* target);
+    void onDrawModeNotSpread(Context* context, const FilterSource* source,
+                             const FilterTarget* target);
+    void onDrawModeNotFullSpread(Context* context, const FilterSource* source,
+                                 const FilterTarget* target);
+    void onDrawModeFullSpread(Context* context, const FilterSource* source,
+                              const FilterTarget* target);
 };
 }  // namespace pag

@@ -22,17 +22,17 @@
 
 namespace pag {
 class Semaphore {
- public:
-  explicit Semaphore(int count) : count(count) {
-  }
+public:
+    explicit Semaphore(int count) : count(count) {
+    }
 
-  void signal();
+    void signal();
 
-  void wait();
+    void wait();
 
- private:
-  int count = 0;
-  std::mutex locker = {};
-  std::condition_variable condition = {};
+private:
+    int count = 0;
+    std::mutex locker = {};
+    std::condition_variable condition = {};
 };
 }  // namespace pag

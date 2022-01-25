@@ -30,36 +30,37 @@ PAGTestEnvironment::~PAGTestEnvironment() {
 }
 
 static void RegisterSoftwareDecoder() {
-  auto factory = ffavc::DecoderFactory::GetHandle();
-  pag::PAGVideoDecoder::RegisterSoftwareDecoderFactory(
-      reinterpret_cast<pag::SoftwareDecoderFactory*>(factory));
+    auto factory = ffavc::DecoderFactory::GetHandle();
+    pag::PAGVideoDecoder::RegisterSoftwareDecoderFactory(
+        reinterpret_cast<pag::SoftwareDecoderFactory*>(factory));
 }
 
 void PAGTestEnvironment::SetUp() {
-  std::vector<std::string> fontPaths = {"../resources/font/NotoSansSC-Regular.otf",
-                                        "../resources/font/NotoColorEmoji.ttf"};
-  std::vector<int> ttcIndices = {0, 0};
-  pag::PAGFont::SetFallbackFontPaths(fontPaths, ttcIndices);
-  RegisterSoftwareDecoder();
+    std::vector<std::string> fontPaths = {"../resources/font/NotoSansSC-Regular.otf",
+                                          "../resources/font/NotoColorEmoji.ttf"
+                                         };
+    std::vector<int> ttcIndices = {0, 0};
+    pag::PAGFont::SetFallbackFontPaths(fontPaths, ttcIndices);
+    RegisterSoftwareDecoder();
 
 #ifdef COMPARE_JSON_PATH
-  std::ifstream inputFile(COMPARE_JSON_PATH);
-  if (!inputFile) {
-    std::cout << "open " << COMPARE_JSON_PATH << " fail";
-    CompareJson = {};
-  } else {
-    inputFile >> CompareJson;
-  }
+    std::ifstream inputFile(COMPARE_JSON_PATH);
+    if (!inputFile) {
+        std::cout << "open " << COMPARE_JSON_PATH << " fail";
+        CompareJson = {};
+    } else {
+        inputFile >> CompareJson;
+    }
 #endif
 }
 
 void PAGTestEnvironment::TearDown() {
-  if (DumpJson == nullptr) {
-    return;
-  }
-  std::ofstream outFile(DUMP_JSON_PATH);
-  outFile << std::setw(4) << DumpJson << std::endl;
-  outFile.close();
+    if (DumpJson == nullptr) {
+        return;
+    }
+    std::ofstream outFile(DUMP_JSON_PATH);
+    outFile << std::setw(4) << DumpJson << std::endl;
+    outFile.close();
 }
 
 }  // namespace pag

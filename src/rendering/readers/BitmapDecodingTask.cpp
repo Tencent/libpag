@@ -20,14 +20,14 @@
 
 namespace pag {
 std::shared_ptr<Task> BitmapDecodingTask::MakeAndRun(BitmapSequenceReader* reader,
-                                                     Frame targetFrame) {
-  if (reader == nullptr) {
-    return nullptr;
-  }
-  auto executor = new BitmapDecodingTask(reader, targetFrame);
-  auto task = Task::Make(std::unique_ptr<BitmapDecodingTask>(executor));
-  task->run();
-  return task;
+        Frame targetFrame) {
+    if (reader == nullptr) {
+        return nullptr;
+    }
+    auto executor = new BitmapDecodingTask(reader, targetFrame);
+    auto task = Task::Make(std::unique_ptr<BitmapDecodingTask>(executor));
+    task->run();
+    return task;
 }
 
 BitmapDecodingTask::BitmapDecodingTask(BitmapSequenceReader* reader, Frame targetFrame)
@@ -35,6 +35,6 @@ BitmapDecodingTask::BitmapDecodingTask(BitmapSequenceReader* reader, Frame targe
 }
 
 void BitmapDecodingTask::execute() {
-  reader->decodeFrame(targetFrame);
+    reader->decodeFrame(targetFrame);
 }
 }  // namespace pag

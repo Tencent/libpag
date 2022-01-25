@@ -20,12 +20,12 @@
 
 namespace pag {
 std::unique_ptr<BlockConfig> RectangleTag(RectangleElement* shape) {
-  auto tagConfig = new BlockConfig(TagCode::Rectangle);
-  AddAttribute(tagConfig, &shape->reversed, AttributeType::BitFlag, false);
-  AddAttribute(tagConfig, &shape->size, AttributeType::MultiDimensionProperty,
-               Point::Make(100, 100));
-  AddAttribute(tagConfig, &shape->position, AttributeType::SpatialProperty, Point::Zero());
-  AddAttribute(tagConfig, &shape->roundness, AttributeType::SimpleProperty, 0.0f);
-  return std::unique_ptr<BlockConfig>(tagConfig);
+    auto tagConfig = new BlockConfig(TagCode::Rectangle);
+    AddAttribute(tagConfig, &shape->reversed, AttributeType::BitFlag, false);
+    AddAttribute(tagConfig, &shape->size, AttributeType::MultiDimensionProperty,
+                 Point::Make(100, 100));
+    AddAttribute(tagConfig, &shape->position, AttributeType::SpatialProperty, Point::Zero());
+    AddAttribute(tagConfig, &shape->roundness, AttributeType::SimpleProperty, 0.0f);
+    return std::unique_ptr<BlockConfig>(tagConfig);
 }
 }  // namespace pag

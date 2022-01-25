@@ -22,30 +22,30 @@
 
 namespace pag {
 class BulgeFilter : public LayerFilter {
- public:
-  explicit BulgeFilter(Effect* effect);
-  ~BulgeFilter() override = default;
+public:
+    explicit BulgeFilter(Effect* effect);
+    ~BulgeFilter() override = default;
 
- protected:
-  std::string onBuildVertexShader() override;
+protected:
+    std::string onBuildVertexShader() override;
 
-  std::string onBuildFragmentShader() override;
+    std::string onBuildFragmentShader() override;
 
-  void onPrepareProgram(const GLInterface* gl, unsigned program) override;
+    void onPrepareProgram(const GLInterface* gl, unsigned program) override;
 
-  void onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
-                      const Point& filterScale) override;
+    void onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
+                        const Point& filterScale) override;
 
-  std::vector<Point> computeVertices(const Rect& contentBounds, const Rect& transformedBounds,
-                                     const Point& filterScale) override;
+    std::vector<Point> computeVertices(const Rect& contentBounds, const Rect& transformedBounds,
+                                       const Point& filterScale) override;
 
- private:
-  Effect* effect = nullptr;
+private:
+    Effect* effect = nullptr;
 
-  int horizontalRadiusHandle = -1;
-  int verticalRadiusHandle = -1;
-  int bulgeCenterHandle = -1;
-  int bulgeHeightHandle = -1;
-  int pinningHandle = -1;
+    int horizontalRadiusHandle = -1;
+    int verticalRadiusHandle = -1;
+    int bulgeCenterHandle = -1;
+    int bulgeHeightHandle = -1;
+    int pinningHandle = -1;
 };
 }  // namespace pag

@@ -23,9 +23,9 @@
  */
 __attribute__((visibility("default"))) @interface PAGVideoRange : NSObject
 
-/**
- * The start time of the source video, in microseconds.
- */
+    /**
+     * The start time of the source video, in microseconds.
+     */
 @property(nonatomic) int64_t startTime;
 /**
  * The end time of the source video (not included), in microseconds.

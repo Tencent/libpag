@@ -23,32 +23,32 @@
 
 namespace pag {
 std::shared_ptr<FilterModifier> FilterModifier::Make(PAGLayer* pagLayer) {
-  if (pagLayer == nullptr || pagLayer->contentFrame < 0 ||
-      pagLayer->contentFrame >= pagLayer->layer->duration) {
-    return nullptr;
-  }
-  auto modifier = Make(pagLayer->layer, pagLayer->layer->startTime + pagLayer->contentFrame);
-  return modifier;
+    if (pagLayer == nullptr || pagLayer->contentFrame < 0 ||
+            pagLayer->contentFrame >= pagLayer->layer->duration) {
+        return nullptr;
+    }
+    auto modifier = Make(pagLayer->layer, pagLayer->layer->startTime + pagLayer->contentFrame);
+    return modifier;
 }
 
 std::shared_ptr<FilterModifier> FilterModifier::Make(Layer* layer, Frame layerFrame) {
-  if (layer == nullptr || layerFrame < layer->startTime ||
-      layerFrame >= layer->startTime + layer->duration ||
-      (!layer->motionBlur && layer->effects.empty() && layer->layerStyles.empty())) {
-    return nullptr;
-  }
-  auto modifier = std::shared_ptr<FilterModifier>(new FilterModifier());
-  modifier->layer = layer;
-  modifier->layerFrame = layerFrame;
-  return modifier;
+    if (layer == nullptr || layerFrame < layer->startTime ||
+            layerFrame >= layer->startTime + layer->duration ||
+            (!layer->motionBlur && layer->effects.empty() && layer->layerStyles.empty())) {
+        return nullptr;
+    }
+    auto modifier = std::shared_ptr<FilterModifier>(new FilterModifier());
+    modifier->layer = layer;
+    modifier->layerFrame = layerFrame;
+    return modifier;
 }
 
 void FilterModifier::applyToBounds(Rect* bounds) const {
-  FilterRenderer::MeasureFilterBounds(bounds, this);
+    FilterRenderer::MeasureFilterBounds(bounds, this);
 }
 
 void FilterModifier::applyToGraphic(Canvas* canvas, RenderCache* cache,
                                     std::shared_ptr<Graphic> graphic) const {
-  FilterRenderer::DrawWithFilter(static_cast<GLCanvas*>(canvas), cache, this, graphic);
+    FilterRenderer::DrawWithFilter(static_cast<GLCanvas*>(canvas), cache, this, graphic);
 }
 }  // namespace pag

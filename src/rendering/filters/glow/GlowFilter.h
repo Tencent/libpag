@@ -25,29 +25,29 @@
 
 namespace pag {
 class GlowFilter : public LayerFilter {
- public:
-  explicit GlowFilter(Effect* effect);
-  ~GlowFilter() override;
+public:
+    explicit GlowFilter(Effect* effect);
+    ~GlowFilter() override;
 
-  bool initialize(Context* context) override;
+    bool initialize(Context* context) override;
 
-  void draw(Context* context, const FilterSource* source, const FilterTarget* target) override;
+    void draw(Context* context, const FilterSource* source, const FilterTarget* target) override;
 
-  void update(Frame frame, const Rect& contentBounds, const Rect& transformedBounds,
-              const Point& filterScale) override;
+    void update(Frame frame, const Rect& contentBounds, const Rect& transformedBounds,
+                const Point& filterScale) override;
 
- private:
-  Effect* effect = nullptr;
+private:
+    Effect* effect = nullptr;
 
-  float resizeRatio = 1.0f;
+    float resizeRatio = 1.0f;
 
-  GlowBlurFilter* blurFilterH = nullptr;
-  GlowBlurFilter* blurFilterV = nullptr;
-  GlowMergeFilter* targetFilter = nullptr;
+    GlowBlurFilter* blurFilterH = nullptr;
+    GlowBlurFilter* blurFilterV = nullptr;
+    GlowMergeFilter* targetFilter = nullptr;
 
-  std::shared_ptr<FilterBuffer> blurFilterBufferH = nullptr;
-  std::shared_ptr<FilterBuffer> blurFilterBufferV = nullptr;
+    std::shared_ptr<FilterBuffer> blurFilterBufferH = nullptr;
+    std::shared_ptr<FilterBuffer> blurFilterBufferV = nullptr;
 
-  bool checkBuffer(Context* context, int blurWidth, int blurHeight);
+    bool checkBuffer(Context* context, int blurWidth, int blurHeight);
 };
 }  // namespace pag

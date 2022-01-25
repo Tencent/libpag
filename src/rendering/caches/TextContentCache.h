@@ -22,20 +22,20 @@
 
 namespace pag {
 class TextContentCache : public ContentCache {
- public:
-  explicit TextContentCache(TextLayer* layer);
-  TextContentCache(TextLayer* layer, ID cacheID, Property<TextDocumentHandle>* sourceText);
+public:
+    explicit TextContentCache(TextLayer* layer);
+    TextContentCache(TextLayer* layer, ID cacheID, Property<TextDocumentHandle>* sourceText);
 
- protected:
-  void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const override;
-  ID getCacheID() const override;
-  GraphicContent* createContent(Frame layerFrame) const override;
+protected:
+    void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const override;
+    ID getCacheID() const override;
+    GraphicContent* createContent(Frame layerFrame) const override;
 
- private:
-  ID cacheID = 0;
-  Property<TextDocumentHandle>* sourceText;
-  TextPathOptions* pathOption;
-  TextMoreOptions* moreOption;
-  std::vector<TextAnimator*>* animators;
+private:
+    ID cacheID = 0;
+    Property<TextDocumentHandle>* sourceText;
+    TextPathOptions* pathOption;
+    TextMoreOptions* moreOption;
+    std::vector<TextAnimator*>* animators;
 };
 }  // namespace pag

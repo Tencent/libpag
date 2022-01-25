@@ -24,31 +24,31 @@
 namespace pag {
 class RenderCache;
 class DisplacementMapFilter : public LayerFilter {
- public:
-  explicit DisplacementMapFilter(Effect* effect);
-  ~DisplacementMapFilter() override = default;
+public:
+    explicit DisplacementMapFilter(Effect* effect);
+    ~DisplacementMapFilter() override = default;
 
-  void updateMapTexture(RenderCache* cache, const Graphic* mapGraphic, const Rect& bounds);
+    void updateMapTexture(RenderCache* cache, const Graphic* mapGraphic, const Rect& bounds);
 
- protected:
-  std::string onBuildFragmentShader() override;
+protected:
+    std::string onBuildFragmentShader() override;
 
-  void onPrepareProgram(const GLInterface* gl, unsigned program) override;
+    void onPrepareProgram(const GLInterface* gl, unsigned program) override;
 
-  void onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
-                      const Point& filterScale) override;
+    void onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
+                        const Point& filterScale) override;
 
- private:
-  Effect* effect = nullptr;
-  Rect mapBounds = {};
-  std::shared_ptr<Surface> mapSurface = nullptr;
+private:
+    Effect* effect = nullptr;
+    Rect mapBounds = {};
+    std::shared_ptr<Surface> mapSurface = nullptr;
 
-  int useForDisplacementHandle = 0;
-  int maxDisplacementHandle = 0;
-  int displacementMapBehaviorHandle = 0;
-  int edgeBehaviorHandle = 0;
-  int expandOutputHandle = 0;
-  int mapTextureHandle = 0;
-  int mapTextureSizeHandle = 0;
+    int useForDisplacementHandle = 0;
+    int maxDisplacementHandle = 0;
+    int displacementMapBehaviorHandle = 0;
+    int edgeBehaviorHandle = 0;
+    int expandOutputHandle = 0;
+    int mapTextureHandle = 0;
+    int mapTextureSizeHandle = 0;
 };
 }  // namespace pag

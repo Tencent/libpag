@@ -24,52 +24,52 @@
 namespace pag {
 template <typename T>
 class FrameCache : public Cache {
- public:
-  explicit FrameCache(Frame startTime, Frame duration) : startTime(startTime), duration(duration) {
-    if (duration <= 0) {
-      this->duration = duration = 1;
+public:
+    explicit FrameCache(Frame startTime, Frame duration) : startTime(startTime), duration(duration) {
+        if (duration <= 0) {
+            this->duration = duration = 1;
+        }
+
+        TimeRange range = {0, duration - 1};
+        staticTimeRanges.push_back(range);
     }
 
-    TimeRange range = {0, duration - 1};
-    staticTimeRanges.push_back(range);
-  }
-
-  ~FrameCache() override {
-    for (auto& item : frames) {
-      delete item.second;
+    ~FrameCache() override {
+        for (auto& item : frames) {
+            delete item.second;
+        }
     }
-  }
 
-  virtual T* getCache(Frame contentFrame) {
-    contentFrame = ConvertFrameByStaticTimeRanges(staticTimeRanges, contentFrame);
-    if (contentFrame >= duration) {
-      contentFrame = duration - 1;
+    virtual T* getCache(Frame contentFrame) {
+        contentFrame = ConvertFrameByStaticTimeRanges(staticTimeRanges, contentFrame);
+        if (contentFrame >= duration) {
+            contentFrame = duration - 1;
+        }
+        if (contentFrame < 0) {
+            contentFrame = 0;
+        }
+        std::lock_guard<std::mutex> autoLock(locker);
+        auto cache = frames[contentFrame];
+        if (cache == nullptr) {
+            cache = createCache(contentFrame + startTime);
+            frames[contentFrame] = cache;
+        }
+        return cache;
     }
-    if (contentFrame < 0) {
-      contentFrame = 0;
+
+    const std::vector<TimeRange>* getStaticTimeRanges() const {
+        return &staticTimeRanges;
     }
-    std::lock_guard<std::mutex> autoLock(locker);
-    auto cache = frames[contentFrame];
-    if (cache == nullptr) {
-      cache = createCache(contentFrame + startTime);
-      frames[contentFrame] = cache;
-    }
-    return cache;
-  }
 
-  const std::vector<TimeRange>* getStaticTimeRanges() const {
-    return &staticTimeRanges;
-  }
+protected:
+    Frame startTime = 0;
+    Frame duration = 1;
+    std::vector<TimeRange> staticTimeRanges;
 
- protected:
-  Frame startTime = 0;
-  Frame duration = 1;
-  std::vector<TimeRange> staticTimeRanges;
+    virtual T* createCache(Frame layerFrame) = 0;
 
-  virtual T* createCache(Frame layerFrame) = 0;
-
- private:
-  std::mutex locker = {};
-  std::unordered_map<Frame, T*> frames;
+private:
+    std::mutex locker = {};
+    std::unordered_map<Frame, T*> frames;
 };
 }  // namespace pag

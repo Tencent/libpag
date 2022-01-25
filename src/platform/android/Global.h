@@ -22,46 +22,46 @@
 
 template<typename T>
 class Global {
- public:
-  Global() : mEnv(nullptr), mRef(nullptr) {
-  }
-
-  Global(JNIEnv* env, T ref) : mEnv(nullptr), mRef(nullptr) {
-    reset(env, ref);
-  }
-
-  ~Global() {
-    reset(nullptr, nullptr);
-  }
-
-  void reset(JNIEnv* env, T ref) {
-    if (mRef == ref) {
-      return;
+public:
+    Global() : mEnv(nullptr), mRef(nullptr) {
     }
-    if (mRef != nullptr) {
-      if (env == nullptr) {
-        env = JNIEnvironment::Current();
-        if (env == nullptr) {
-          return;
+
+    Global(JNIEnv* env, T ref) : mEnv(nullptr), mRef(nullptr) {
+        reset(env, ref);
+    }
+
+    ~Global() {
+        reset(nullptr, nullptr);
+    }
+
+    void reset(JNIEnv* env, T ref) {
+        if (mRef == ref) {
+            return;
         }
-      }
+        if (mRef != nullptr) {
+            if (env == nullptr) {
+                env = JNIEnvironment::Current();
+                if (env == nullptr) {
+                    return;
+                }
+            }
 
-      env->DeleteGlobalRef(mRef);
-      mRef = nullptr;
+            env->DeleteGlobalRef(mRef);
+            mRef = nullptr;
+        }
+        mEnv = env;
+        if (ref == nullptr) {
+            mRef = nullptr;
+        } else {
+            mRef = (T)mEnv->NewGlobalRef(ref);
+        }
     }
-    mEnv = env;
-    if (ref == nullptr) {
-      mRef = nullptr;
-    } else {
-      mRef = (T)mEnv->NewGlobalRef(ref);
+
+    T get() const {
+        return mRef;
     }
-  }
 
-  T get() const {
-    return mRef;
-  }
-
- private:
-  JNIEnv* mEnv;
-  T mRef;
+private:
+    JNIEnv* mEnv;
+    T mRef;
 };

@@ -25,106 +25,106 @@
 
 namespace pag {
 std::vector<Point> ComputeVerticesForMotionBlurAndBulge(const Rect& inputBounds,
-                                                        const Rect& outputBounds);
+        const Rect& outputBounds);
 
 class FilterProgram : public Resource {
- public:
-  static std::shared_ptr<const FilterProgram> Make(Context* context, const std::string& vertex,
-                                                   const std::string& fragment);
+public:
+    static std::shared_ptr<const FilterProgram> Make(Context* context, const std::string& vertex,
+            const std::string& fragment);
 
-  unsigned program = 0;
-  unsigned int vertexArray = 0;
-  unsigned int vertexBuffer = 0;
+    unsigned program = 0;
+    unsigned int vertexArray = 0;
+    unsigned int vertexBuffer = 0;
 
- protected:
-  void onRelease(Context* context) override;
+protected:
+    void onRelease(Context* context) override;
 
- private:
-  FilterProgram() = default;
+private:
+    FilterProgram() = default;
 };
 
 class LayerFilter : public Filter {
- public:
-  static std::unique_ptr<LayerFilter> Make(LayerStyle* layerStyle);
+public:
+    static std::unique_ptr<LayerFilter> Make(LayerStyle* layerStyle);
 
-  static std::unique_ptr<LayerFilter> Make(Effect* effect);
+    static std::unique_ptr<LayerFilter> Make(Effect* effect);
 
-  bool initialize(Context* context) override;
+    bool initialize(Context* context) override;
 
-  virtual bool needsMSAA() const override;
+    virtual bool needsMSAA() const override;
 
-  /**
-   * filter的绘制接口
-   * 单次render pass的滤镜无需重载该接口，只有滤镜需经过多次render pass时，才重载该函数的实现
-   * 具体样例参见: DropShadow、Glow、GaussBlur这几个滤镜。
-   * @param source : 滤镜的输入source,
-   * 该参数里含有纹理的ID、像素级的宽高、纹理点的matrix、以及纹理相对于layer bounds的scale信息
-   * @param target : 滤镜的输出target，该参数里含有frame buffer的ID、像素级的宽高、顶点的matrix信息
-   */
-  void draw(Context* context, const FilterSource* source, const FilterTarget* target) override;
+    /**
+     * filter的绘制接口
+     * 单次render pass的滤镜无需重载该接口，只有滤镜需经过多次render pass时，才重载该函数的实现
+     * 具体样例参见: DropShadow、Glow、GaussBlur这几个滤镜。
+     * @param source : 滤镜的输入source,
+     * 该参数里含有纹理的ID、像素级的宽高、纹理点的matrix、以及纹理相对于layer bounds的scale信息
+     * @param target : 滤镜的输出target，该参数里含有frame buffer的ID、像素级的宽高、顶点的matrix信息
+     */
+    void draw(Context* context, const FilterSource* source, const FilterTarget* target) override;
 
-  /**
-   * filter的刷新接口。
-   * 单次render pass的滤镜无需重载该接口，只有滤镜需经过多次render pass时，才重载该函数的实现
-   * 具体样例参见: DropShadow、Glow、GaussBlur这几个滤镜。
-   * @param layerFrame : 当前绘制的layerFrame, 主要用来从effect或者style中获取滤镜所需的参数
-   * @param contentBounds : 滤镜输入的基于layer bounds尺寸的矩形区域
-   * @param transformedBounds : 滤镜输出的基于layer bounds尺寸的矩形区域
-   * @param filterScale :
-   * 滤镜效果的scale，比如LayerStyle本应该在图层matrix之后应用的，但是我们为了简化渲染改到了matrix之前，
-   *                      因此需要反向排除图层matrix的缩放值
-   * 该filterScale等于反向matrix的scale，不包含source.scale，
-   *                      source.scale会整体应用到FilterTarget上屏的matrix里。
-   */
-  virtual void update(Frame layerFrame, const Rect& contentBounds, const Rect& transformedBounds,
-                      const Point& filterScale);
+    /**
+     * filter的刷新接口。
+     * 单次render pass的滤镜无需重载该接口，只有滤镜需经过多次render pass时，才重载该函数的实现
+     * 具体样例参见: DropShadow、Glow、GaussBlur这几个滤镜。
+     * @param layerFrame : 当前绘制的layerFrame, 主要用来从effect或者style中获取滤镜所需的参数
+     * @param contentBounds : 滤镜输入的基于layer bounds尺寸的矩形区域
+     * @param transformedBounds : 滤镜输出的基于layer bounds尺寸的矩形区域
+     * @param filterScale :
+     * 滤镜效果的scale，比如LayerStyle本应该在图层matrix之后应用的，但是我们为了简化渲染改到了matrix之前，
+     *                      因此需要反向排除图层matrix的缩放值
+     * 该filterScale等于反向matrix的scale，不包含source.scale，
+     *                      source.scale会整体应用到FilterTarget上屏的matrix里。
+     */
+    virtual void update(Frame layerFrame, const Rect& contentBounds, const Rect& transformedBounds,
+                        const Point& filterScale);
 
- protected:
-  Frame layerFrame = 0;
-  std::shared_ptr<const FilterProgram> filterProgram = nullptr;
+protected:
+    Frame layerFrame = 0;
+    std::shared_ptr<const FilterProgram> filterProgram = nullptr;
 
-  virtual std::string onBuildVertexShader();
+    virtual std::string onBuildVertexShader();
 
-  virtual std::string onBuildFragmentShader();
+    virtual std::string onBuildFragmentShader();
 
-  virtual void onPrepareProgram(const GLInterface* gl, unsigned program);
+    virtual void onPrepareProgram(const GLInterface* gl, unsigned program);
 
-  /**
-   * filter的给shader上传数据接口
-   * 单次render pass的滤镜需重载该接口。具体样例参见：Bulge、MotionBlur、MotionTile
-   * @param contentBounds : 滤镜输入的基于layer bounds尺寸的矩形区域，某些滤镜需要用到content
-   * bounds来计算shader中的参数，比如：bulge、MotionTile
-   * @param filterScale : 滤镜效果的scale
-   */
-  virtual void onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
-                              const Point& filterScale);
+    /**
+     * filter的给shader上传数据接口
+     * 单次render pass的滤镜需重载该接口。具体样例参见：Bulge、MotionBlur、MotionTile
+     * @param contentBounds : 滤镜输入的基于layer bounds尺寸的矩形区域，某些滤镜需要用到content
+     * bounds来计算shader中的参数，比如：bulge、MotionTile
+     * @param filterScale : 滤镜效果的scale
+     */
+    virtual void onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
+                                const Point& filterScale);
 
-  /**
-   * filter的收集顶点数据的接口
-   * 单次render pass的滤镜需重载该接口。具体样例参见：Bulge、MotionBlur、MotionTile
-   * @param contentBounds : 滤镜输入的基于layer bounds尺寸的矩形区域
-   * @param transformedBounds :  滤镜输出的基于layer bounds尺寸的矩形区域
-   * @param filterScale : 滤镜效果的scale
-   * @return : 返回顶点与纹理的point数组，顶点 + 纹理 + 顶点 +
-   * 纹理的组合方式，所有的Point都是基于layer bounds尺寸的点
-   */
-  virtual std::vector<Point> computeVertices(const Rect& contentBounds,
-                                             const Rect& transformedBounds,
-                                             const Point& filterScale);
+    /**
+     * filter的收集顶点数据的接口
+     * 单次render pass的滤镜需重载该接口。具体样例参见：Bulge、MotionBlur、MotionTile
+     * @param contentBounds : 滤镜输入的基于layer bounds尺寸的矩形区域
+     * @param transformedBounds :  滤镜输出的基于layer bounds尺寸的矩形区域
+     * @param filterScale : 滤镜效果的scale
+     * @return : 返回顶点与纹理的point数组，顶点 + 纹理 + 顶点 +
+     * 纹理的组合方式，所有的Point都是基于layer bounds尺寸的点
+     */
+    virtual std::vector<Point> computeVertices(const Rect& contentBounds,
+            const Rect& transformedBounds,
+            const Point& filterScale);
 
-  virtual void bindVertices(const GLInterface* gl, const FilterSource* source,
-                            const FilterTarget* target, const std::vector<Point>& points);
+    virtual void bindVertices(const GLInterface* gl, const FilterSource* source,
+                              const FilterTarget* target, const std::vector<Point>& points);
 
- private:
-  Rect contentBounds = {};
-  Rect transformedBounds = {};
-  Point filterScale = {};
+private:
+    Rect contentBounds = {};
+    Rect transformedBounds = {};
+    Point filterScale = {};
 
-  int vertexMatrixHandle = -1;
-  int textureMatrixHandle = -1;
-  int positionHandle = -1;
-  int textureCoordHandle = -1;
+    int vertexMatrixHandle = -1;
+    int textureMatrixHandle = -1;
+    int positionHandle = -1;
+    int textureCoordHandle = -1;
 
-  friend class CornerPinFilter;
+    friend class CornerPinFilter;
 };
 }  // namespace pag

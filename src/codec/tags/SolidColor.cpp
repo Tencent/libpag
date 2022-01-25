@@ -21,15 +21,15 @@
 
 namespace pag {
 void ReadSolidColor(DecodeStream* stream, SolidLayer* layer) {
-  layer->solidColor = ReadColor(stream);
-  layer->width = stream->readEncodedInt32();
-  layer->height = stream->readEncodedInt32();
+    layer->solidColor = ReadColor(stream);
+    layer->width = stream->readEncodedInt32();
+    layer->height = stream->readEncodedInt32();
 }
 
 TagCode WriteSolidColor(EncodeStream* stream, SolidLayer* layer) {
-  WriteColor(stream, layer->solidColor);
-  stream->writeEncodedInt32(layer->width);
-  stream->writeEncodedInt32(layer->height);
-  return TagCode::SolidColor;
+    WriteColor(stream, layer->solidColor);
+    stream->writeEncodedInt32(layer->width);
+    stream->writeEncodedInt32(layer->height);
+    return TagCode::SolidColor;
 }
 }  // namespace pag

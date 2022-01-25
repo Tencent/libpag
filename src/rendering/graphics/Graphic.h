@@ -27,11 +27,11 @@
 namespace pag {
 
 enum class GraphicType {
-  Unknown,
-  Picture,
-  Shape,
-  Text,
-  Compose,
+    Unknown,
+    Picture,
+    Shape,
+    Text,
+    Compose,
 };
 
 class Modifier;
@@ -41,61 +41,61 @@ class Modifier;
  * Graphic is thread safe.
  */
 class Graphic {
- public:
-  /**
-   * Creates a compose Graphic with specified graphic and matrix. Returns nullptr if graphic is
-   * nullptr or matrix is invisible.
-   */
-  static std::shared_ptr<Graphic> MakeCompose(std::shared_ptr<Graphic> graphic,
-                                              const Matrix& matrix);
+public:
+    /**
+     * Creates a compose Graphic with specified graphic and matrix. Returns nullptr if graphic is
+     * nullptr or matrix is invisible.
+     */
+    static std::shared_ptr<Graphic> MakeCompose(std::shared_ptr<Graphic> graphic,
+            const Matrix& matrix);
 
-  /**
-   * Creates a compose Graphic with graphic contents. Returns nullptr if contents are emtpy.
-   */
-  static std::shared_ptr<Graphic> MakeCompose(std::vector<std::shared_ptr<Graphic>> contents);
+    /**
+     * Creates a compose Graphic with graphic contents. Returns nullptr if contents are emtpy.
+     */
+    static std::shared_ptr<Graphic> MakeCompose(std::vector<std::shared_ptr<Graphic>> contents);
 
-  /**
-   * Creates a compose Graphic with specified graphic and modifier. Returns nullptr if graphic is
-   * nullptr.
-   */
-  static std::shared_ptr<Graphic> MakeCompose(std::shared_ptr<Graphic> graphic,
-                                              std::shared_ptr<Modifier> modifier);
+    /**
+     * Creates a compose Graphic with specified graphic and modifier. Returns nullptr if graphic is
+     * nullptr.
+     */
+    static std::shared_ptr<Graphic> MakeCompose(std::shared_ptr<Graphic> graphic,
+            std::shared_ptr<Modifier> modifier);
 
-  virtual ~Graphic() = default;
+    virtual ~Graphic() = default;
 
-  /**
-   * Measures the bounds of this Graphic.
-   */
-  virtual void measureBounds(Rect* bounds) const = 0;
+    /**
+     * Measures the bounds of this Graphic.
+     */
+    virtual void measureBounds(Rect* bounds) const = 0;
 
-  /**
-   * Evaluates the Graphic to see if it overlaps or intersects with the specified point. The point
-   * is in the coordinate space of the Graphic. This method always checks against the actual pixels
-   * of the Graphic.
-   */
-  virtual bool hitTest(RenderCache* cache, float x, float y) = 0;
+    /**
+     * Evaluates the Graphic to see if it overlaps or intersects with the specified point. The point
+     * is in the coordinate space of the Graphic. This method always checks against the actual pixels
+     * of the Graphic.
+     */
+    virtual bool hitTest(RenderCache* cache, float x, float y) = 0;
 
-  /**
-   * Returns the type of this graphic.
-   */
-  virtual GraphicType type() const = 0;
+    /**
+     * Returns the type of this graphic.
+     */
+    virtual GraphicType type() const = 0;
 
-  /**
-   * Gets a Path which is the filled equivalent of the Graphic contents. Returns false and
-   * leaves the path unchanged if the Graphic contents are not opaque or can not be converted to
-   * a path.
-   */
-  virtual bool getPath(Path* path) const = 0;
+    /**
+     * Gets a Path which is the filled equivalent of the Graphic contents. Returns false and
+     * leaves the path unchanged if the Graphic contents are not opaque or can not be converted to
+     * a path.
+     */
+    virtual bool getPath(Path* path) const = 0;
 
-  /**
-   * Prepares this graphic for next draw() call. It collects all CPU tasks in this Graphic and run
-   * them in parallel immediately.
-   */
-  virtual void prepare(RenderCache* cache) const = 0;
+    /**
+     * Prepares this graphic for next draw() call. It collects all CPU tasks in this Graphic and run
+     * them in parallel immediately.
+     */
+    virtual void prepare(RenderCache* cache) const = 0;
 
-  /**
-   * Draw this Graphic into specified Canvas.
-   */
-  virtual void draw(Canvas* canvas, RenderCache* cache) const = 0;
+    /**
+     * Draw this Graphic into specified Canvas.
+     */
+    virtual void draw(Canvas* canvas, RenderCache* cache) const = 0;
 };
 }  // namespace pag

@@ -20,32 +20,32 @@
 
 namespace pag {
 void ReadFontTables(DecodeStream* stream) {
-  auto count = stream->readEncodedUint32();
-  auto context = static_cast<CodecContext*>(stream->context);
-  auto fontIDMap = &(context->fontIDMap);
-  for (uint32_t id = 0; id < count; id++) {
-    auto fontData = new FontDescriptor();
-    fontData->id = id;
-    fontData->fontFamily = stream->readUTF8String();
-    fontData->fontStyle = stream->readUTF8String();
-    fontIDMap->insert(std::make_pair(id, fontData));
-  }
+    auto count = stream->readEncodedUint32();
+    auto context = static_cast<CodecContext*>(stream->context);
+    auto fontIDMap = &(context->fontIDMap);
+    for (uint32_t id = 0; id < count; id++) {
+        auto fontData = new FontDescriptor();
+        fontData->id = id;
+        fontData->fontFamily = stream->readUTF8String();
+        fontData->fontStyle = stream->readUTF8String();
+        fontIDMap->insert(std::make_pair(id, fontData));
+    }
 }
 
 TagCode WriteFontTables(EncodeStream* stream, std::vector<FontData>* fontList) {
-  auto context = static_cast<CodecContext*>(stream->context);
-  auto fontNameMap = &(context->fontNameMap);
-  stream->writeEncodedUint32(static_cast<uint32_t>(fontList->size()));
-  uint32_t id = 0;
-  for (auto& font : *fontList) {
-    stream->writeUTF8String(font.fontFamily);
-    stream->writeUTF8String(font.fontStyle);
-    auto fontData = new FontDescriptor();
-    fontData->id = id++;
-    fontData->fontFamily = font.fontFamily;
-    fontData->fontStyle = font.fontStyle;
-    fontNameMap->insert(std::make_pair(font.fontFamily + " - " + font.fontStyle, fontData));
-  }
-  return TagCode::FontTables;
+    auto context = static_cast<CodecContext*>(stream->context);
+    auto fontNameMap = &(context->fontNameMap);
+    stream->writeEncodedUint32(static_cast<uint32_t>(fontList->size()));
+    uint32_t id = 0;
+    for (auto& font : *fontList) {
+        stream->writeUTF8String(font.fontFamily);
+        stream->writeUTF8String(font.fontStyle);
+        auto fontData = new FontDescriptor();
+        fontData->id = id++;
+        fontData->fontFamily = font.fontFamily;
+        fontData->fontStyle = font.fontStyle;
+        fontNameMap->insert(std::make_pair(font.fontFamily + " - " + font.fontStyle, fontData));
+    }
+    return TagCode::FontTables;
 }
 }  // namespace pag

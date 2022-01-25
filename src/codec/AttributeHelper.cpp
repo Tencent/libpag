@@ -22,45 +22,45 @@ namespace pag {
 void AddCustomAttribute(BlockConfig* blockConfig, void* target,
                         const std::function<void(DecodeStream*, void*)> reader,
                         const std::function<bool(EncodeStream*, void*)> writer) {
-  blockConfig->targets.push_back(target);
-  blockConfig->configs.push_back(new CustomAttribute(reader, writer));
+    blockConfig->targets.push_back(target);
+    blockConfig->configs.push_back(new CustomAttribute(reader, writer));
 }
 
 AttributeFlag ReadAttributeFlag(DecodeStream* stream, const AttributeBase* config) {
-  AttributeFlag flag = {};
-  auto attributeType = config->attributeType;
-  if (attributeType == AttributeType::FixedValue) {
-    flag.exist = true;
+    AttributeFlag flag = {};
+    auto attributeType = config->attributeType;
+    if (attributeType == AttributeType::FixedValue) {
+        flag.exist = true;
+        return flag;
+    }
+    flag.exist = stream->readBitBoolean();
+    if (!flag.exist || attributeType == AttributeType::Value ||
+            attributeType == AttributeType::BitFlag || attributeType == AttributeType::Custom) {
+        return flag;
+    }
+    flag.animatable = stream->readBitBoolean();
+    if (!flag.animatable || attributeType != AttributeType::SpatialProperty) {
+        return flag;
+    }
+    flag.hasSpatial = stream->readBitBoolean();
     return flag;
-  }
-  flag.exist = stream->readBitBoolean();
-  if (!flag.exist || attributeType == AttributeType::Value ||
-      attributeType == AttributeType::BitFlag || attributeType == AttributeType::Custom) {
-    return flag;
-  }
-  flag.animatable = stream->readBitBoolean();
-  if (!flag.animatable || attributeType != AttributeType::SpatialProperty) {
-    return flag;
-  }
-  flag.hasSpatial = stream->readBitBoolean();
-  return flag;
 }
 
 void WriteAttributeFlag(EncodeStream* stream, const AttributeFlag& flag,
                         const AttributeBase* config) {
-  auto attributeType = config->attributeType;
-  if (attributeType == AttributeType::FixedValue) {
-    return;
-  }
-  stream->writeBitBoolean(flag.exist);
-  if (!flag.exist || attributeType == AttributeType::Value ||
-      attributeType == AttributeType::BitFlag || attributeType == AttributeType::Custom) {
-    return;
-  }
-  stream->writeBitBoolean(flag.animatable);
-  if (!flag.animatable || attributeType != AttributeType::SpatialProperty) {
-    return;
-  }
-  stream->writeBitBoolean(flag.hasSpatial);
+    auto attributeType = config->attributeType;
+    if (attributeType == AttributeType::FixedValue) {
+        return;
+    }
+    stream->writeBitBoolean(flag.exist);
+    if (!flag.exist || attributeType == AttributeType::Value ||
+            attributeType == AttributeType::BitFlag || attributeType == AttributeType::Custom) {
+        return;
+    }
+    stream->writeBitBoolean(flag.animatable);
+    if (!flag.animatable || attributeType != AttributeType::SpatialProperty) {
+        return;
+    }
+    stream->writeBitBoolean(flag.hasSpatial);
 }
 }  // namespace pag

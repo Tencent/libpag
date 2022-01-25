@@ -21,6 +21,6 @@
 #include <jni.h>
 
 class JNIEnvironment {
- public:
-  static JNIEnv* Current();
+public:
+    static JNIEnv* Current();
 };

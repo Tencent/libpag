@@ -25,24 +25,24 @@
 
 namespace pag {
 class BitmapSequenceReader : public SequenceReader {
- public:
-  BitmapSequenceReader(std::shared_ptr<File> file, BitmapSequence* sequence);
+public:
+    BitmapSequenceReader(std::shared_ptr<File> file, BitmapSequence* sequence);
 
-  void decodeFrame(Frame targetFrame);
+    void decodeFrame(Frame targetFrame);
 
-  void prepareAsync(Frame targetFrame) override;
+    void prepareAsync(Frame targetFrame) override;
 
-  std::shared_ptr<Texture> readTexture(Frame frame, RenderCache* cache) override;
+    std::shared_ptr<Texture> readTexture(Frame frame, RenderCache* cache) override;
 
- private:
-  std::mutex locker = {};
-  Frame lastDecodeFrame = -1;
-  Frame lastTextureFrame = -1;
-  Frame pendingFrame = -1;
-  Bitmap bitmap = {};
-  std::shared_ptr<Texture> lastTexture = nullptr;
-  std::shared_ptr<Task> lastTask = nullptr;
+private:
+    std::mutex locker = {};
+    Frame lastDecodeFrame = -1;
+    Frame lastTextureFrame = -1;
+    Frame pendingFrame = -1;
+    Bitmap bitmap = {};
+    std::shared_ptr<Texture> lastTexture = nullptr;
+    std::shared_ptr<Task> lastTask = nullptr;
 
-  Frame findStartFrame(Frame targetFrame);
+    Frame findStartFrame(Frame targetFrame);
 };
 }  // namespace pag

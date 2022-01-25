@@ -25,8 +25,8 @@
 
 namespace pag {
 std::unique_ptr<TextContent> RenderTexts(Property<TextDocumentHandle>* sourceText,
-                                         TextPathOptions* pathOption, TextMoreOptions* moreOption,
-                                         std::vector<TextAnimator*>* animators, Frame layerFrame);
+        TextPathOptions* pathOption, TextMoreOptions* moreOption,
+        std::vector<TextAnimator*>* animators, Frame layerFrame);
 
 void CalculateTextAscentAndDescent(TextDocumentHandle textDocument, float* pMinAscent,
                                    float* pMaxDescent);

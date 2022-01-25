@@ -20,13 +20,13 @@
 
 namespace pag {
 RenderTargetDrawable::RenderTargetDrawable(std::shared_ptr<Device> device,
-                                           const BackendRenderTarget& renderTarget,
-                                           ImageOrigin origin)
+        const BackendRenderTarget& renderTarget,
+        ImageOrigin origin)
     : device(std::move(device)), renderTarget(renderTarget), origin(origin) {
 }
 
 std::shared_ptr<Surface> RenderTargetDrawable::createSurface(Context* context) {
-  return Surface::MakeFrom(context, renderTarget, origin);
+    return Surface::MakeFrom(context, renderTarget, origin);
 }
 
 TextureDrawable::TextureDrawable(std::shared_ptr<Device> device, const BackendTexture& texture,
@@ -35,7 +35,7 @@ TextureDrawable::TextureDrawable(std::shared_ptr<Device> device, const BackendTe
 }
 
 std::shared_ptr<Surface> TextureDrawable::createSurface(Context* context) {
-  return Surface::MakeFrom(context, texture, origin);
+    return Surface::MakeFrom(context, texture, origin);
 }
 
 OffscreenDrawable::OffscreenDrawable(int width, int height, std::shared_ptr<Device> device)
@@ -43,6 +43,6 @@ OffscreenDrawable::OffscreenDrawable(int width, int height, std::shared_ptr<Devi
 }
 
 std::shared_ptr<Surface> OffscreenDrawable::createSurface(Context* context) {
-  return Surface::Make(context, _width, _height);
+    return Surface::Make(context, _width, _height);
 }
 }  // namespace pag

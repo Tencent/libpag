@@ -21,15 +21,15 @@
 
 namespace pag {
 void* NativeGLDevice::GetCurrentNativeHandle() {
-  return QOpenGLContext::currentContext();
+    return QOpenGLContext::currentContext();
 }
 
 std::shared_ptr<GLDevice> NativeGLDevice::Current() {
-  return QGLDevice::Current();
+    return QGLDevice::Current();
 }
 
 std::shared_ptr<GLDevice> NativeGLDevice::Make(void* sharedContext) {
-  return QGLDevice::Make(reinterpret_cast<QOpenGLContext*>(sharedContext));
+    return QGLDevice::Make(reinterpret_cast<QOpenGLContext*>(sharedContext));
 }
 
 }  // namespace pag

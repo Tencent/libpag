@@ -21,7 +21,7 @@
 namespace pag {
 
 const Platform* Platform::Current() {
-  static const NativePlatform platform = {};
-  return &platform;
+    static const NativePlatform platform = {};
+    return &platform;
 }
 }  // namespace pag

@@ -21,26 +21,26 @@
 
 namespace pag {
 TextWigglySelector::~TextWigglySelector() {
-  delete mode;
-  delete maxAmount;
-  delete minAmount;
-  delete wigglesPerSecond;
-  delete correlation;
-  delete temporalPhase;
-  delete spatialPhase;
-  delete lockDimensions;
-  delete randomSeed;
+    delete mode;
+    delete maxAmount;
+    delete minAmount;
+    delete wigglesPerSecond;
+    delete correlation;
+    delete temporalPhase;
+    delete spatialPhase;
+    delete lockDimensions;
+    delete randomSeed;
 }
 
 void TextWigglySelector::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {
-  // there are no static time ranges for TextWigglySelector
-  timeRanges->erase(timeRanges->begin(), timeRanges->end());
+    // there are no static time ranges for TextWigglySelector
+    timeRanges->erase(timeRanges->begin(), timeRanges->end());
 }
 
 bool TextWigglySelector::verify() const {
-  VerifyAndReturn(mode != nullptr && maxAmount != nullptr && minAmount != nullptr &&
-                  wigglesPerSecond != nullptr && correlation != nullptr &&
-                  temporalPhase != nullptr && spatialPhase != nullptr &&
-                  lockDimensions != nullptr && randomSeed != nullptr);
+    VerifyAndReturn(mode != nullptr && maxAmount != nullptr && minAmount != nullptr &&
+                    wigglesPerSecond != nullptr && correlation != nullptr &&
+                    temporalPhase != nullptr && spatialPhase != nullptr &&
+                    lockDimensions != nullptr && randomSeed != nullptr);
 }
 }  // namespace pag

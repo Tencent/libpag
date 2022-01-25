@@ -22,28 +22,28 @@
 
 namespace pag {
 class CocoaPlatform : public Platform {
- public:
-  bool hasHardwareDecoder() const override {
-    return true;
-  }
+public:
+    bool hasHardwareDecoder() const override {
+        return true;
+    }
 
-  std::shared_ptr<PixelBuffer> makeHardwareBuffer(int width, int height,
-                                                  bool alphaOnly) const override;
+    std::shared_ptr<PixelBuffer> makeHardwareBuffer(int width, int height,
+            bool alphaOnly) const override;
 
-  std::shared_ptr<Image> makeImage(const std::string& filePath) const override;
+    std::shared_ptr<Image> makeImage(const std::string& filePath) const override;
 
-  std::shared_ptr<Image> makeImage(std::shared_ptr<Data> imageBytes) const override;
+    std::shared_ptr<Image> makeImage(std::shared_ptr<Data> imageBytes) const override;
 
-  PAGFont parseFont(const std::string& fontPath, int ttcIndex) const override;
+    PAGFont parseFont(const std::string& fontPath, int ttcIndex) const override;
 
-  PAGFont parseFont(const void* data, size_t length, int ttcIndex) const override;
+    PAGFont parseFont(const void* data, size_t length, int ttcIndex) const override;
 
-  bool registerFallbackFonts() const override;
+    bool registerFallbackFonts() const override;
 
-  NALUType naluType() const override {
-    return NALUType::AVCC;
-  }
+    NALUType naluType() const override {
+        return NALUType::AVCC;
+    }
 
-  void traceImage(const PixelMap& pixelMap, const std::string& tag) const override;
+    void traceImage(const PixelMap& pixelMap, const std::string& tag) const override;
 };
 }  // namespace pag

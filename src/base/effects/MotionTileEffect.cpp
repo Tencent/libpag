@@ -22,49 +22,49 @@
 namespace pag {
 
 MotionTileEffect::~MotionTileEffect() {
-  delete tileCenter;
-  delete tileWidth;
-  delete tileHeight;
-  delete outputWidth;
-  delete outputHeight;
-  delete mirrorEdges;
-  delete phase;
-  delete horizontalPhaseShift;
+    delete tileCenter;
+    delete tileWidth;
+    delete tileHeight;
+    delete outputWidth;
+    delete outputHeight;
+    delete mirrorEdges;
+    delete phase;
+    delete horizontalPhaseShift;
 }
 
 bool MotionTileEffect::visibleAt(Frame) const {
-  return true;
+    return true;
 }
 
 void MotionTileEffect::transformBounds(Rect* contentBounds, const Point&, Frame layerFrame) const {
-  auto outputWidthValue = outputWidth->getValueAt(layerFrame);
-  auto outputHeightValue = outputHeight->getValueAt(layerFrame);
-  auto width = contentBounds->width() * outputWidthValue / 100.0f;
-  auto height = contentBounds->height() * outputHeightValue / 100.0f;
-  auto x = contentBounds->x() + (contentBounds->width() - width) * 0.5f;
-  auto y = contentBounds->y() + (contentBounds->height() - height) * 0.5f;
-  contentBounds->setXYWH(x, y, width, height);
+    auto outputWidthValue = outputWidth->getValueAt(layerFrame);
+    auto outputHeightValue = outputHeight->getValueAt(layerFrame);
+    auto width = contentBounds->width() * outputWidthValue / 100.0f;
+    auto height = contentBounds->height() * outputHeightValue / 100.0f;
+    auto x = contentBounds->x() + (contentBounds->width() - width) * 0.5f;
+    auto y = contentBounds->y() + (contentBounds->height() - height) * 0.5f;
+    contentBounds->setXYWH(x, y, width, height);
 }
 
 void MotionTileEffect::excludeVaryingRanges(std::vector<pag::TimeRange>* timeRanges) const {
-  Effect::excludeVaryingRanges(timeRanges);
-  tileCenter->excludeVaryingRanges(timeRanges);
-  tileWidth->excludeVaryingRanges(timeRanges);
-  tileHeight->excludeVaryingRanges(timeRanges);
-  outputWidth->excludeVaryingRanges(timeRanges);
-  outputHeight->excludeVaryingRanges(timeRanges);
-  mirrorEdges->excludeVaryingRanges(timeRanges);
-  phase->excludeVaryingRanges(timeRanges);
-  horizontalPhaseShift->excludeVaryingRanges(timeRanges);
+    Effect::excludeVaryingRanges(timeRanges);
+    tileCenter->excludeVaryingRanges(timeRanges);
+    tileWidth->excludeVaryingRanges(timeRanges);
+    tileHeight->excludeVaryingRanges(timeRanges);
+    outputWidth->excludeVaryingRanges(timeRanges);
+    outputHeight->excludeVaryingRanges(timeRanges);
+    mirrorEdges->excludeVaryingRanges(timeRanges);
+    phase->excludeVaryingRanges(timeRanges);
+    horizontalPhaseShift->excludeVaryingRanges(timeRanges);
 }
 
 bool MotionTileEffect::verify() const {
-  if (!Effect::verify()) {
-    VerifyFailed();
-    return false;
-  }
-  VerifyAndReturn(tileCenter != nullptr && tileWidth != nullptr && tileHeight != nullptr &&
-                  outputWidth != nullptr && outputHeight != nullptr && mirrorEdges != nullptr &&
-                  phase != nullptr && horizontalPhaseShift != nullptr);
+    if (!Effect::verify()) {
+        VerifyFailed();
+        return false;
+    }
+    VerifyAndReturn(tileCenter != nullptr && tileWidth != nullptr && tileHeight != nullptr &&
+                    outputWidth != nullptr && outputHeight != nullptr && mirrorEdges != nullptr &&
+                    phase != nullptr && horizontalPhaseShift != nullptr);
 }
 }  // namespace pag

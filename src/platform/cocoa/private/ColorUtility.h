@@ -20,8 +20,8 @@
 #include "platform/cocoa/CocoaUtils.h"
 
 class ColorUtility {
- public:
-  static CocoaColor* ToCocoaColor(pag::Color color);
+public:
+    static CocoaColor* ToCocoaColor(pag::Color color);
 
-  static pag::Color ToColor(CocoaColor* color);
+    static pag::Color ToColor(CocoaColor* color);
 };

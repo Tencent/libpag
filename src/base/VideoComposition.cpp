@@ -21,56 +21,56 @@
 
 namespace pag {
 VideoComposition::~VideoComposition() {
-  for (auto sequence : sequences) {
-    delete sequence;
-  }
+    for (auto sequence : sequences) {
+        delete sequence;
+    }
 }
 
 CompositionType VideoComposition::type() const {
-  return CompositionType::Video;
+    return CompositionType::Video;
 }
 
 void VideoComposition::updateStaticTimeRanges() {
-  staticTimeRanges = {};
-  if (duration <= 1) {
-    return;
-  }
-  if (!sequences.empty()) {
-    auto sequence = sequences[0];
-    for (size_t i = 1; i < sequences.size(); i++) {
-      auto item = sequences[i];
-      if (item->frameRate > sequence->frameRate) {
-        sequence = item;
-      }
+    staticTimeRanges = {};
+    if (duration <= 1) {
+        return;
     }
-    float timeScale = frameRate / sequence->frameRate;
-    for (auto timeRange : sequence->staticTimeRanges) {
-      timeRange.start = static_cast<Frame>(roundf(timeRange.start * timeScale));
-      timeRange.end = static_cast<Frame>(roundf(timeRange.end * timeScale));
-      staticTimeRanges.push_back(timeRange);
+    if (!sequences.empty()) {
+        auto sequence = sequences[0];
+        for (size_t i = 1; i < sequences.size(); i++) {
+            auto item = sequences[i];
+            if (item->frameRate > sequence->frameRate) {
+                sequence = item;
+            }
+        }
+        float timeScale = frameRate / sequence->frameRate;
+        for (auto timeRange : sequence->staticTimeRanges) {
+            timeRange.start = static_cast<Frame>(roundf(timeRange.start * timeScale));
+            timeRange.end = static_cast<Frame>(roundf(timeRange.end * timeScale));
+            staticTimeRanges.push_back(timeRange);
+        }
+    } else {
+        TimeRange range = {0, duration - 1};
+        staticTimeRanges.push_back(range);
     }
-  } else {
-    TimeRange range = {0, duration - 1};
-    staticTimeRanges.push_back(range);
-  }
 }
 
 bool VideoComposition::hasImageContent() const {
-  return true;
+    return true;
 }
 
 bool VideoComposition::verify() const {
-  if (!Composition::verify() || sequences.empty()) {
-    VerifyFailed();
-    return false;
-  }
-  auto sequenceValid = [](VideoSequence* sequence) {
-    return sequence != nullptr && sequence->verify();
-  };
-  if (!std::all_of(sequences.begin(), sequences.end(), sequenceValid)) {
-    VerifyFailed();
-    return false;
-  }
-  return true;
+    if (!Composition::verify() || sequences.empty()) {
+        VerifyFailed();
+        return false;
+    }
+    auto sequenceValid = [](VideoSequence* sequence) {
+        return sequence != nullptr && sequence->verify();
+    };
+    if (!std::all_of(sequences.begin(), sequences.end(), sequenceValid)) {
+        VerifyFailed();
+        return false;
+    }
+    return true;
 }
 }  // namespace pag

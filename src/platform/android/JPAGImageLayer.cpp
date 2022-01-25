@@ -25,67 +25,67 @@ static jfieldID PAGImageLayer_nativeContext;
 using namespace pag;
 
 std::shared_ptr<PAGImageLayer> GetPAGImageLayer(JNIEnv* env, jobject thiz) {
-  auto nativeContext =
-      reinterpret_cast<JPAGLayerHandle*>(env->GetLongField(thiz, PAGImageLayer_nativeContext));
-  if (nativeContext == nullptr) {
-    return nullptr;
-  }
-  return std::static_pointer_cast<PAGImageLayer>(nativeContext->get());
+    auto nativeContext =
+        reinterpret_cast<JPAGLayerHandle*>(env->GetLongField(thiz, PAGImageLayer_nativeContext));
+    if (nativeContext == nullptr) {
+        return nullptr;
+    }
+    return std::static_pointer_cast<PAGImageLayer>(nativeContext->get());
 }
 
 extern "C" {
 
-JNIEXPORT void Java_org_libpag_PAGImageLayer_nativeInit(JNIEnv* env, jclass clazz) {
-  PAGImageLayer_nativeContext = env->GetFieldID(clazz, "nativeContext", "J");
-}
+    JNIEXPORT void Java_org_libpag_PAGImageLayer_nativeInit(JNIEnv* env, jclass clazz) {
+        PAGImageLayer_nativeContext = env->GetFieldID(clazz, "nativeContext", "J");
+    }
 
-JNIEXPORT jlong Java_org_libpag_PAGImageLayer_nativeMake(JNIEnv*, jclass, jint width, jint height,
-                                                         jlong duration) {
-  if (width <= 0 || height <= 0 || duration <= 0) {
-    return 0;
-  }
-  auto pagImageLayer = PAGImageLayer::Make(width, height, duration);
-  if (pagImageLayer == nullptr) {
-    return 0;
-  }
-  return reinterpret_cast<jlong>(new JPAGLayerHandle(pagImageLayer));
-}
+    JNIEXPORT jlong Java_org_libpag_PAGImageLayer_nativeMake(JNIEnv*, jclass, jint width, jint height,
+            jlong duration) {
+        if (width <= 0 || height <= 0 || duration <= 0) {
+            return 0;
+        }
+        auto pagImageLayer = PAGImageLayer::Make(width, height, duration);
+        if (pagImageLayer == nullptr) {
+            return 0;
+        }
+        return reinterpret_cast<jlong>(new JPAGLayerHandle(pagImageLayer));
+    }
 
-JNIEXPORT jobjectArray Java_org_libpag_PAGImageLayer_getVideoRanges(JNIEnv* env, jobject thiz) {
-  static Global<jclass> PAGVideoRange_Class(env, env->FindClass("org/libpag/PAGVideoRange"));
-  auto pagLayer = GetPAGImageLayer(env, thiz);
-  if (pagLayer == nullptr) {
-    return env->NewObjectArray(0, PAGVideoRange_Class.get(), nullptr);
-  }
-  auto videoRanges = pagLayer->getVideoRanges();
-  if (videoRanges.empty()) {
-    return env->NewObjectArray(0, PAGVideoRange_Class.get(), nullptr);
-  }
-  int size = videoRanges.size();
-  jobjectArray rangeArray = env->NewObjectArray(size, PAGVideoRange_Class.get(), nullptr);
-  for (int i = 0; i < size; ++i) {
-    jobject jRange = ToPAGVideoRangeObject(env, videoRanges[i]);
-    env->SetObjectArrayElement(rangeArray, i, jRange);
-    env->DeleteLocalRef(jRange);
-  }
-  return rangeArray;
-}
+    JNIEXPORT jobjectArray Java_org_libpag_PAGImageLayer_getVideoRanges(JNIEnv* env, jobject thiz) {
+        static Global<jclass> PAGVideoRange_Class(env, env->FindClass("org/libpag/PAGVideoRange"));
+        auto pagLayer = GetPAGImageLayer(env, thiz);
+        if (pagLayer == nullptr) {
+            return env->NewObjectArray(0, PAGVideoRange_Class.get(), nullptr);
+        }
+        auto videoRanges = pagLayer->getVideoRanges();
+        if (videoRanges.empty()) {
+            return env->NewObjectArray(0, PAGVideoRange_Class.get(), nullptr);
+        }
+        int size = videoRanges.size();
+        jobjectArray rangeArray = env->NewObjectArray(size, PAGVideoRange_Class.get(), nullptr);
+        for (int i = 0; i < size; ++i) {
+            jobject jRange = ToPAGVideoRangeObject(env, videoRanges[i]);
+            env->SetObjectArrayElement(rangeArray, i, jRange);
+            env->DeleteLocalRef(jRange);
+        }
+        return rangeArray;
+    }
 
-JNIEXPORT void Java_org_libpag_PAGImageLayer_replaceImage(JNIEnv* env, jobject thiz,
-                                                          jlong imageObject) {
-  auto pagLayer = GetPAGImageLayer(env, thiz);
-  if (pagLayer == nullptr) {
-    return;
-  }
-  auto image = reinterpret_cast<JPAGImage*>(imageObject);
-  pagLayer->replaceImage(image == nullptr ? nullptr : image->get());
-}
+    JNIEXPORT void Java_org_libpag_PAGImageLayer_replaceImage(JNIEnv* env, jobject thiz,
+            jlong imageObject) {
+        auto pagLayer = GetPAGImageLayer(env, thiz);
+        if (pagLayer == nullptr) {
+            return;
+        }
+        auto image = reinterpret_cast<JPAGImage*>(imageObject);
+        pagLayer->replaceImage(image == nullptr ? nullptr : image->get());
+    }
 
-JNIEXPORT jlong Java_org_libpag_PAGImageLayer_contentDuration(JNIEnv* env, jobject thiz) {
-  auto pagLayer = GetPAGImageLayer(env, thiz);
-  if (pagLayer == nullptr) {
-    return 0;
-  }
-  return pagLayer->contentDuration();
-}
+    JNIEXPORT jlong Java_org_libpag_PAGImageLayer_contentDuration(JNIEnv* env, jobject thiz) {
+        auto pagLayer = GetPAGImageLayer(env, thiz);
+        if (pagLayer == nullptr) {
+            return 0;
+        }
+        return pagLayer->contentDuration();
+    }
 }

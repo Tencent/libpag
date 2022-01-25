@@ -25,41 +25,41 @@
 
 namespace pag {
 class FilterBuffer {
- public:
-  static std::shared_ptr<FilterBuffer> Make(Context* context, int width, int height,
-                                            bool usesMSAA = false);
+public:
+    static std::shared_ptr<FilterBuffer> Make(Context* context, int width, int height,
+            bool usesMSAA = false);
 
-  void clearColor(const GLInterface* gl) const;
+    void clearColor(const GLInterface* gl) const;
 
-  std::unique_ptr<FilterSource> toFilterSource(const Point& scale) const;
+    std::unique_ptr<FilterSource> toFilterSource(const Point& scale) const;
 
-  std::unique_ptr<FilterTarget> toFilterTarget(const Matrix& drawingMatrix) const;
+    std::unique_ptr<FilterTarget> toFilterTarget(const Matrix& drawingMatrix) const;
 
-  int width() const {
-    return renderTarget->width();
-  }
+    int width() const {
+        return renderTarget->width();
+    }
 
-  int height() const {
-    return renderTarget->height();
-  }
+    int height() const {
+        return renderTarget->height();
+    }
 
-  bool usesMSAA() const {
-    return renderTarget->usesMSAA();
-  }
+    bool usesMSAA() const {
+        return renderTarget->usesMSAA();
+    }
 
-  GLFrameBufferInfo getFramebuffer() const {
-    return renderTarget->getGLInfo();
-  }
+    GLFrameBufferInfo getFramebuffer() const {
+        return renderTarget->getGLInfo();
+    }
 
-  GLTextureInfo getTexture() const {
-    return texture->getGLInfo();
-  }
+    GLTextureInfo getTexture() const {
+        return texture->getGLInfo();
+    }
 
-  void resolve(Context* context);
+    void resolve(Context* context);
 
- private:
-  std::shared_ptr<GLRenderTarget> renderTarget = nullptr;
-  std::shared_ptr<GLTexture> texture = nullptr;
-  FilterBuffer() = default;
+private:
+    std::shared_ptr<GLRenderTarget> renderTarget = nullptr;
+    std::shared_ptr<GLTexture> texture = nullptr;
+    FilterBuffer() = default;
 };
 }  // namespace pag

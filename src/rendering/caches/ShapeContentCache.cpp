@@ -24,13 +24,13 @@ ShapeContentCache::ShapeContentCache(ShapeLayer* layer) : ContentCache(layer) {
 }
 
 void ShapeContentCache::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {
-  for (auto& element : static_cast<ShapeLayer*>(layer)->contents) {
-    element->excludeVaryingRanges(timeRanges);
-  }
+    for (auto& element : static_cast<ShapeLayer*>(layer)->contents) {
+        element->excludeVaryingRanges(timeRanges);
+    }
 }
 
 GraphicContent* ShapeContentCache::createContent(Frame layerFrame) const {
-  auto graphic = RenderShapes(static_cast<ShapeLayer*>(layer)->contents, layerFrame);
-  return new GraphicContent(graphic);
+    auto graphic = RenderShapes(static_cast<ShapeLayer*>(layer)->contents, layerFrame);
+    return new GraphicContent(graphic);
 }
 }  // namespace pag

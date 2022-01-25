@@ -83,39 +83,39 @@ BulgeFilter::BulgeFilter(Effect* effect) : effect(effect) {
 }
 
 std::string BulgeFilter::onBuildVertexShader() {
-  return BULGE_VERTEX_SHADER;
+    return BULGE_VERTEX_SHADER;
 }
 
 std::string BulgeFilter::onBuildFragmentShader() {
-  return BULGE_FRAGMENT_SHADER;
+    return BULGE_FRAGMENT_SHADER;
 }
 
 void BulgeFilter::onPrepareProgram(const GLInterface* gl, unsigned int program) {
-  horizontalRadiusHandle = gl->getUniformLocation(program, "uHorizontalRadius");
-  verticalRadiusHandle = gl->getUniformLocation(program, "uVerticalRadius");
-  bulgeCenterHandle = gl->getUniformLocation(program, "uBulgeCenter");
-  bulgeHeightHandle = gl->getUniformLocation(program, "uBulgeHeight");
-  pinningHandle = gl->getUniformLocation(program, "uPinning");
+    horizontalRadiusHandle = gl->getUniformLocation(program, "uHorizontalRadius");
+    verticalRadiusHandle = gl->getUniformLocation(program, "uVerticalRadius");
+    bulgeCenterHandle = gl->getUniformLocation(program, "uBulgeCenter");
+    bulgeHeightHandle = gl->getUniformLocation(program, "uBulgeHeight");
+    pinningHandle = gl->getUniformLocation(program, "uPinning");
 }
 
 void BulgeFilter::onUpdateParams(const GLInterface* gl, const Rect& contentBounds, const Point&) {
-  auto* bulgeEffect = reinterpret_cast<const BulgeEffect*>(effect);
-  auto horizontalRadius = bulgeEffect->horizontalRadius->getValueAt(layerFrame);
-  auto verticalRadius = bulgeEffect->verticalRadius->getValueAt(layerFrame);
-  auto bulgeCenter = bulgeEffect->bulgeCenter->getValueAt(layerFrame);
-  auto bulgeHeight = bulgeEffect->bulgeHeight->getValueAt(layerFrame);
-  auto pinning = bulgeEffect->pinning->getValueAt(layerFrame);
+    auto* bulgeEffect = reinterpret_cast<const BulgeEffect*>(effect);
+    auto horizontalRadius = bulgeEffect->horizontalRadius->getValueAt(layerFrame);
+    auto verticalRadius = bulgeEffect->verticalRadius->getValueAt(layerFrame);
+    auto bulgeCenter = bulgeEffect->bulgeCenter->getValueAt(layerFrame);
+    auto bulgeHeight = bulgeEffect->bulgeHeight->getValueAt(layerFrame);
+    auto pinning = bulgeEffect->pinning->getValueAt(layerFrame);
 
-  gl->uniform1f(horizontalRadiusHandle, horizontalRadius / contentBounds.width());
-  gl->uniform1f(verticalRadiusHandle, verticalRadius / contentBounds.height());
-  gl->uniform2f(bulgeCenterHandle, (bulgeCenter.x - contentBounds.x()) / contentBounds.width(),
-                1.0f - (bulgeCenter.y - contentBounds.y()) / contentBounds.height());
-  gl->uniform1f(bulgeHeightHandle, bulgeHeight);
-  gl->uniform1i(pinningHandle, pinning);
+    gl->uniform1f(horizontalRadiusHandle, horizontalRadius / contentBounds.width());
+    gl->uniform1f(verticalRadiusHandle, verticalRadius / contentBounds.height());
+    gl->uniform2f(bulgeCenterHandle, (bulgeCenter.x - contentBounds.x()) / contentBounds.width(),
+                  1.0f - (bulgeCenter.y - contentBounds.y()) / contentBounds.height());
+    gl->uniform1f(bulgeHeightHandle, bulgeHeight);
+    gl->uniform1i(pinningHandle, pinning);
 }
 
 std::vector<Point> BulgeFilter::computeVertices(const Rect& inputBounds, const Rect& outputBounds,
-                                                const Point&) {
-  return ComputeVerticesForMotionBlurAndBulge(inputBounds, outputBounds);
+        const Point&) {
+    return ComputeVerticesForMotionBlurAndBulge(inputBounds, outputBounds);
 }
 }  // namespace pag

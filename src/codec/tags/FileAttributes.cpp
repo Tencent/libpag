@@ -21,33 +21,33 @@
 namespace pag {
 
 void ReadFileAttributes(DecodeStream* stream, pag::FileAttributes* fileAttributes) {
-  fileAttributes->timestamp = stream->readEncodedInt64();
-  fileAttributes->pluginVersion = stream->readUTF8String();
-  fileAttributes->aeVersion = stream->readUTF8String();
-  fileAttributes->systemVersion = stream->readUTF8String();
-  fileAttributes->author = stream->readUTF8String();
-  fileAttributes->scene = stream->readUTF8String();
+    fileAttributes->timestamp = stream->readEncodedInt64();
+    fileAttributes->pluginVersion = stream->readUTF8String();
+    fileAttributes->aeVersion = stream->readUTF8String();
+    fileAttributes->systemVersion = stream->readUTF8String();
+    fileAttributes->author = stream->readUTF8String();
+    fileAttributes->scene = stream->readUTF8String();
 
-  auto warningCount = static_cast<int>(stream->readEncodedUint32());
-  for (int i = 0; i < warningCount; i++) {
-    auto warning = stream->readUTF8String();
-    fileAttributes->warnings.push_back(warning);
-  }
+    auto warningCount = static_cast<int>(stream->readEncodedUint32());
+    for (int i = 0; i < warningCount; i++) {
+        auto warning = stream->readUTF8String();
+        fileAttributes->warnings.push_back(warning);
+    }
 }
 
 TagCode WriteFileAttributes(EncodeStream* stream, pag::FileAttributes* fileAttributes) {
-  stream->writeEncodedInt64(fileAttributes->timestamp);
-  stream->writeUTF8String(fileAttributes->pluginVersion);
-  stream->writeUTF8String(fileAttributes->aeVersion);
-  stream->writeUTF8String(fileAttributes->systemVersion);
-  stream->writeUTF8String(fileAttributes->author);
-  stream->writeUTF8String(fileAttributes->scene);
+    stream->writeEncodedInt64(fileAttributes->timestamp);
+    stream->writeUTF8String(fileAttributes->pluginVersion);
+    stream->writeUTF8String(fileAttributes->aeVersion);
+    stream->writeUTF8String(fileAttributes->systemVersion);
+    stream->writeUTF8String(fileAttributes->author);
+    stream->writeUTF8String(fileAttributes->scene);
 
-  stream->writeEncodedUint32(static_cast<uint32_t>(fileAttributes->warnings.size()));
-  for (auto& warning : fileAttributes->warnings) {
-    stream->writeUTF8String(warning);
-  }
+    stream->writeEncodedUint32(static_cast<uint32_t>(fileAttributes->warnings.size()));
+    for (auto& warning : fileAttributes->warnings) {
+        stream->writeUTF8String(warning);
+    }
 
-  return TagCode::FileAttributes;
+    return TagCode::FileAttributes;
 }
 }  // namespace pag

@@ -22,14 +22,14 @@
 
 namespace pag {
 void* NativeGLDevice::GetCurrentNativeHandle() {
-  return reinterpret_cast<void*>(emscripten_webgl_get_current_context());
+    return reinterpret_cast<void*>(emscripten_webgl_get_current_context());
 }
 
 std::shared_ptr<GLDevice> NativeGLDevice::Current() {
-  return WEBGLDevice::Current();
+    return WEBGLDevice::Current();
 }
 
 std::shared_ptr<GLDevice> NativeGLDevice::Make(void*) {
-  return nullptr;
+    return nullptr;
 }
 }  // namespace pag

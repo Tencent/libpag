@@ -23,14 +23,14 @@
 @interface PAGFontImpl : NSObject
 
 + (PAGFont*)RegisterFont:(NSString*)fontPath
-                  family:(NSString*)fontFamily
-                   style:(NSString*)fontStyle;
+    family:(NSString*)fontFamily
+    style:(NSString*)fontStyle;
 ;
 
 + (PAGFont*)RegisterFont:(void*)data
-                    size:(size_t)length
-                  family:(NSString*)fontFamily
-                   style:(NSString*)fontStyle;
+    size:(size_t)length
+    family:(NSString*)fontFamily
+    style:(NSString*)fontStyle;
 
 + (void)UnregisterFont:(PAGFont*)font;
 

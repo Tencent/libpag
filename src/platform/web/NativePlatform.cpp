@@ -26,18 +26,18 @@ using namespace emscripten;
 
 namespace pag {
 const Platform* Platform::Current() {
-  static const NativePlatform platform = {};
-  return &platform;
+    static const NativePlatform platform = {};
+    return &platform;
 }
 
 std::shared_ptr<Image> NativePlatform::makeImage(std::shared_ptr<Data> imageBytes) const {
-  return NativeImage::MakeFrom(imageBytes);
+    return NativeImage::MakeFrom(imageBytes);
 }
 
 void NativePlatform::traceImage(const PixelMap& pixelMap, const std::string& tag) const {
-  auto traceImage = val::module_property("traceImage");
-  auto bytes = val(typed_memory_view(pixelMap.info().rowBytes() * pixelMap.info().height(),
-                                     static_cast<const uint8_t*>(pixelMap.pixels())));
-  traceImage(pixelMap.info(), bytes, tag);
+    auto traceImage = val::module_property("traceImage");
+    auto bytes = val(typed_memory_view(pixelMap.info().rowBytes() * pixelMap.info().height(),
+                                       static_cast<const uint8_t*>(pixelMap.pixels())));
+    traceImage(pixelMap.info(), bytes, tag);
 }
 }  // namespace pag

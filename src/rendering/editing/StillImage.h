@@ -24,28 +24,28 @@
 namespace pag {
 
 class StillImage : public PAGImage {
- public:
-  static std::shared_ptr<StillImage> FromBitmap(const Bitmap& bitmap);
-  static std::shared_ptr<StillImage> FromImage(std::shared_ptr<Image> image);
+public:
+    static std::shared_ptr<StillImage> FromBitmap(const Bitmap& bitmap);
+    static std::shared_ptr<StillImage> FromImage(std::shared_ptr<Image> image);
 
-  void measureBounds(Rect* bounds) override;
-  void draw(Recorder* recorder) override;
+    void measureBounds(Rect* bounds) override;
+    void draw(Recorder* recorder) override;
 
- protected:
-  Rect getContentSize() const override;
+protected:
+    Rect getContentSize() const override;
 
-  std::shared_ptr<Image> getImage() const override {
-    return image;
-  }
+    std::shared_ptr<Image> getImage() const override {
+        return image;
+    }
 
- private:
-  int width = 0;
-  int height = 0;
-  std::shared_ptr<Image> image = nullptr;
-  std::shared_ptr<Graphic> graphic = nullptr;
+private:
+    int width = 0;
+    int height = 0;
+    std::shared_ptr<Image> image = nullptr;
+    std::shared_ptr<Graphic> graphic = nullptr;
 
-  void reset(std::shared_ptr<Graphic> graphic);
+    void reset(std::shared_ptr<Graphic> graphic);
 
-  friend class PAGImage;
+    friend class PAGImage;
 };
 }  // namespace pag

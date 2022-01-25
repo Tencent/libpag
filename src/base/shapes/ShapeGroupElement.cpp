@@ -21,34 +21,34 @@
 
 namespace pag {
 ShapeGroupElement::~ShapeGroupElement() {
-  delete transform;
-  for (auto& element : elements) {
-    delete element;
-  }
+    delete transform;
+    for (auto& element : elements) {
+        delete element;
+    }
 }
 
 void ShapeGroupElement::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {
-  transform->excludeVaryingRanges(timeRanges);
-  for (auto& element : elements) {
-    element->excludeVaryingRanges(timeRanges);
-  }
+    transform->excludeVaryingRanges(timeRanges);
+    for (auto& element : elements) {
+        element->excludeVaryingRanges(timeRanges);
+    }
 }
 
 bool ShapeGroupElement::verify() const {
-  if (!ShapeElement::verify()) {
-    VerifyFailed();
-    return false;
-  }
-  if (transform == nullptr || !transform->verify()) {
-    VerifyFailed();
-    return false;
-  }
-  for (auto& element : elements) {
-    if (element == nullptr || !element->verify()) {
-      VerifyFailed();
-      return false;
+    if (!ShapeElement::verify()) {
+        VerifyFailed();
+        return false;
     }
-  }
-  return true;
+    if (transform == nullptr || !transform->verify()) {
+        VerifyFailed();
+        return false;
+    }
+    for (auto& element : elements) {
+        if (element == nullptr || !element->verify()) {
+            VerifyFailed();
+            return false;
+        }
+    }
+    return true;
 }
 }  // namespace pag

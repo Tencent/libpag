@@ -24,58 +24,58 @@
 
 namespace pag {
 class ContentCache : public FrameCache<Content> {
- public:
-  explicit ContentCache(Layer* layer);
+public:
+    explicit ContentCache(Layer* layer);
 
-  bool cacheEnabled() const {
-    return _cacheEnabled;
-  }
+    bool cacheEnabled() const {
+        return _cacheEnabled;
+    }
 
-  bool hasFilters() const {
-    return _hasFilters;
-  }
+    bool hasFilters() const {
+        return _hasFilters;
+    }
 
-  bool cacheFilters() const {
-    return _cacheFilters;
-  }
+    bool cacheFilters() const {
+        return _cacheFilters;
+    }
 
-  bool contentStatic() const {
-    return _contentStatic;
-  }
+    bool contentStatic() const {
+        return _contentStatic;
+    }
 
-  void update();
+    void update();
 
- protected:
-  Layer* layer = nullptr;
-  bool _cacheEnabled = false;
-  bool _hasFilters = false;
-  bool _cacheFilters = false;
-  bool _contentStatic = false;
+protected:
+    Layer* layer = nullptr;
+    bool _cacheEnabled = false;
+    bool _hasFilters = false;
+    bool _cacheFilters = false;
+    bool _contentStatic = false;
 
-  Content* createCache(Frame layerFrame) override;
+    Content* createCache(Frame layerFrame) override;
 
-  virtual ID getCacheID() const {
-    return layer->uniqueID;
-  }
+    virtual ID getCacheID() const {
+        return layer->uniqueID;
+    }
 
-  virtual void excludeVaryingRanges(std::vector<TimeRange>*) const {
-  }
-  virtual GraphicContent* createContent(Frame layerFrame) const = 0;
+    virtual void excludeVaryingRanges(std::vector<TimeRange>*) const {
+    }
+    virtual GraphicContent* createContent(Frame layerFrame) const = 0;
 
- private:
-  bool checkCacheFilters();
-  bool checkCacheEnabled();
+private:
+    bool checkCacheFilters();
+    bool checkCacheEnabled();
 };
 
 class EmptyContentCache : public ContentCache {
- public:
-  explicit EmptyContentCache(Layer* layer) : ContentCache(layer) {
-  }
+public:
+    explicit EmptyContentCache(Layer* layer) : ContentCache(layer) {
+    }
 
- protected:
-  GraphicContent* createContent(Frame) const override {
-    return new GraphicContent(nullptr);
-  }
+protected:
+    GraphicContent* createContent(Frame) const override {
+        return new GraphicContent(nullptr);
+    }
 };
 
 }  // namespace pag

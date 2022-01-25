@@ -23,63 +23,63 @@
 
 namespace pag {
 class OESTexture : public GLTexture {
- public:
-  OESTexture(GLTextureInfo info, int width, int height, bool hasAlpha);
+public:
+    OESTexture(GLTextureInfo info, int width, int height, bool hasAlpha);
 
-  Point getTextureCoord(float x, float y) const override;
+    Point getTextureCoord(float x, float y) const override;
 
-  size_t memoryUsage() const override {
-    return 0;
-  }
+    size_t memoryUsage() const override {
+        return 0;
+    }
 
- protected:
-  void onRelease(Context* context) override;
+protected:
+    void onRelease(Context* context) override;
 
- private:
-  void setTextureSize(int width, int height);
+private:
+    void setTextureSize(int width, int height);
 
-  void computeTransform();
+    void computeTransform();
 
-  int textureWidth = 0;
-  int textureHeight = 0;
-  bool hasAlpha = false;
-  // 持有 Java 的 Surface，确保即使 GPUDecoder 提前释放也能正常被使用。
-  Global<jobject> attachedSurface;
-  float sx = 1.0f;
-  float sy = 1.0f;
-  float tx = 0.0f;
-  float ty = 0.0f;
+    int textureWidth = 0;
+    int textureHeight = 0;
+    bool hasAlpha = false;
+    // 持有 Java 的 Surface，确保即使 GPUDecoder 提前释放也能正常被使用。
+    Global<jobject> attachedSurface;
+    float sx = 1.0f;
+    float sy = 1.0f;
+    float tx = 0.0f;
+    float ty = 0.0f;
 
-  friend class VideoSurface;
+    friend class VideoSurface;
 };
 
 class VideoSurface {
- public:
-  static void InitJNI(JNIEnv* env, const std::string& className);
+public:
+    static void InitJNI(JNIEnv* env, const std::string& className);
 
-  static std::shared_ptr<VideoSurface> Make(int width, int height, bool hasAlpha = false);
+    static std::shared_ptr<VideoSurface> Make(int width, int height, bool hasAlpha = false);
 
-  ~VideoSurface();
+    ~VideoSurface();
 
-  jobject getOutputSurface(JNIEnv* env) const;
+    jobject getOutputSurface(JNIEnv* env) const;
 
-  bool attachToContext(Context* context);
+    bool attachToContext(Context* context);
 
-  bool updateTexImage();
+    bool updateTexImage();
 
-  std::shared_ptr<OESTexture> getTexture();
+    std::shared_ptr<OESTexture> getTexture();
 
-  void markHasNewTextureImage();
+    void markHasNewTextureImage();
 
- private:
-  Global<jobject> videoSurface;
-  int width = 0;
-  int height = 0;
-  bool hasAlpha = false;
-  ID deviceID = 0;
-  std::shared_ptr<OESTexture> oesTexture = nullptr;
-  mutable std::atomic_bool hasPendingTextureImage = {false};
+private:
+    Global<jobject> videoSurface;
+    int width = 0;
+    int height = 0;
+    bool hasAlpha = false;
+    ID deviceID = 0;
+    std::shared_ptr<OESTexture> oesTexture = nullptr;
+    mutable std::atomic_bool hasPendingTextureImage = {false};
 
-  VideoSurface(JNIEnv* env, jobject surface, int width, int height, bool hasAlpha);
+    VideoSurface(JNIEnv* env, jobject surface, int width, int height, bool hasAlpha);
 };
 }  // namespace pag

@@ -30,20 +30,20 @@ PAG_TEST_SUIT(PAGSolidLayerTest)
  * 用例描述: PAGSolidLayerTest基础功能
  */
 PAG_TEST_F(PAGSolidLayerTest, SolidColor) {
-  int targetIndex = 0;
-  TestPAGFile->setCurrentTime(1.5 * 1000);
-  auto layer = GetLayer(TestPAGFile, LayerType::Solid, targetIndex);
-  ASSERT_NE(layer, nullptr) << "don't find solidLayer" << std::endl;
-  auto solidLayer = std::static_pointer_cast<PAGSolidLayer>(layer);
-  ASSERT_TRUE(solidLayer->solidColor() == Green);
-  solidLayer->setSolidColor(Red);
-  ASSERT_EQ(Red, solidLayer->solidColor());
-  TestPAGPlayer->flush();
-  auto md5 = getMd5FromSnap();
-  PAGTestEnvironment::DumpJson["PAGSolidLayerTest"] = {{"SolidColor", md5}};
+    int targetIndex = 0;
+    TestPAGFile->setCurrentTime(1.5 * 1000);
+    auto layer = GetLayer(TestPAGFile, LayerType::Solid, targetIndex);
+    ASSERT_NE(layer, nullptr) << "don't find solidLayer" << std::endl;
+    auto solidLayer = std::static_pointer_cast<PAGSolidLayer>(layer);
+    ASSERT_TRUE(solidLayer->solidColor() == Green);
+    solidLayer->setSolidColor(Red);
+    ASSERT_EQ(Red, solidLayer->solidColor());
+    TestPAGPlayer->flush();
+    auto md5 = getMd5FromSnap();
+    PAGTestEnvironment::DumpJson["PAGSolidLayerTest"] = {{"SolidColor", md5}};
 #ifdef COMPARE_JSON_PATH
-  auto colorJson = PAGTestEnvironment::CompareJson["PAGSolidLayerTest"]["SolidColor"];
-  ASSERT_EQ(colorJson.get<std::string>(), md5);
+    auto colorJson = PAGTestEnvironment::CompareJson["PAGSolidLayerTest"]["SolidColor"];
+    ASSERT_EQ(colorJson.get<std::string>(), md5);
 #endif
 }
 

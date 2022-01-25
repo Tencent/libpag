@@ -23,9 +23,9 @@
 
 namespace pag {
 class JTraceImage {
- public:
-  static void InitJNI(JNIEnv* env);
+public:
+    static void InitJNI(JNIEnv* env);
 
-  static void Trace(const PixelMap& pixelMap, const std::string& tag);
+    static void Trace(const PixelMap& pixelMap, const std::string& tag);
 };
 }  // namespace pag

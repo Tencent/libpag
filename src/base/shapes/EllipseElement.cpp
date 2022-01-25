@@ -21,20 +21,20 @@
 
 namespace pag {
 EllipseElement::~EllipseElement() {
-  delete size;
-  delete position;
+    delete size;
+    delete position;
 }
 
 void EllipseElement::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {
-  position->excludeVaryingRanges(timeRanges);
-  size->excludeVaryingRanges(timeRanges);
+    position->excludeVaryingRanges(timeRanges);
+    size->excludeVaryingRanges(timeRanges);
 }
 
 bool EllipseElement::verify() const {
-  if (!ShapeElement::verify()) {
-    VerifyFailed();
-    return false;
-  }
-  VerifyAndReturn(position != nullptr && size != nullptr);
+    if (!ShapeElement::verify()) {
+        VerifyFailed();
+        return false;
+    }
+    VerifyAndReturn(position != nullptr && size != nullptr);
 }
 }  // namespace pag

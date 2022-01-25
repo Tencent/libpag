@@ -23,18 +23,18 @@
 
 namespace pag {
 class NativeImage : public Image {
- public:
-  static std::unique_ptr<Image> MakeFrom(const std::string& filePath);
+public:
+    static std::unique_ptr<Image> MakeFrom(const std::string& filePath);
 
-  static std::unique_ptr<Image> MakeFrom(std::shared_ptr<Data> imageBytes);
+    static std::unique_ptr<Image> MakeFrom(std::shared_ptr<Data> imageBytes);
 
-  bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
+    bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
 
- private:
-  std::string imagePath;
-  std::shared_ptr<Data> imageBytes;
+private:
+    std::string imagePath;
+    std::shared_ptr<Data> imageBytes;
 
-  NativeImage(int width, int height) : Image(width, height, Orientation::TopLeft) {
-  }
+    NativeImage(int width, int height) : Image(width, height, Orientation::TopLeft) {
+    }
 };
 }  // namespace pag

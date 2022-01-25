@@ -19,9 +19,9 @@
 #pragma once
 namespace pag {
 struct EnumClassHash {
-  template <typename T>
-  size_t operator()(T t) const {
-    return static_cast<size_t>(t);
-  }
+    template <typename T>
+    size_t operator()(T t) const {
+        return static_cast<size_t>(t);
+    }
 };
 }  // namespace pag

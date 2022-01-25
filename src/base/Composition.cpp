@@ -26,36 +26,36 @@ Composition::Composition() : uniqueID(UniqueID::Next()) {
 }
 
 Composition::~Composition() {
-  delete cache;
-  delete audioBytes;
-  for (auto& marker : audioMarkers) {
-    delete marker;
-  }
+    delete cache;
+    delete audioBytes;
+    for (auto& marker : audioMarkers) {
+        delete marker;
+    }
 }
 
 bool Composition::staticContent() const {
-  return staticTimeRanges.size() == 1 && staticTimeRanges.front().start == 0 &&
-         staticTimeRanges.front().end == duration - 1;
+    return staticTimeRanges.size() == 1 && staticTimeRanges.front().start == 0 &&
+           staticTimeRanges.front().end == duration - 1;
 }
 
 bool Composition::hasImageContent() const {
-  return false;
+    return false;
 }
 
 CompositionType Composition::type() const {
-  return CompositionType::Unknown;
+    return CompositionType::Unknown;
 }
 
 void Composition::updateStaticTimeRanges() {
-  TimeRange timeRange = {0, duration - 1};
-  staticTimeRanges = {timeRange};
+    TimeRange timeRange = {0, duration - 1};
+    staticTimeRanges = {timeRange};
 }
 
 bool Composition::verify() const {
-  if (audioBytes != nullptr && audioBytes->length() == 0) {
-    VerifyFailed();
-    return false;
-  }
-  VerifyAndReturn(width > 0 && height > 0 && duration > 0 && frameRate > 0);
+    if (audioBytes != nullptr && audioBytes->length() == 0) {
+        VerifyFailed();
+        return false;
+    }
+    VerifyAndReturn(width > 0 && height > 0 && duration > 0 && frameRate > 0);
 }
 }  // namespace pag

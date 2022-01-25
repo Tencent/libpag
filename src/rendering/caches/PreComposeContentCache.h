@@ -23,14 +23,14 @@
 
 namespace pag {
 class PreComposeContentCache : public ContentCache {
- public:
-  explicit PreComposeContentCache(PreComposeLayer* layer);
+public:
+    explicit PreComposeContentCache(PreComposeLayer* layer);
 
- protected:
-  void excludeVaryingRanges(std::vector<TimeRange>*) const override;
-  GraphicContent* createContent(Frame layerFrame) const override;
+protected:
+    void excludeVaryingRanges(std::vector<TimeRange>*) const override;
+    GraphicContent* createContent(Frame layerFrame) const override;
 
- private:
-  CompositionCache* compositionCache = nullptr;
+private:
+    CompositionCache* compositionCache = nullptr;
 };
 }  // namespace pag

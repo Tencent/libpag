@@ -24,22 +24,22 @@
 
 namespace pag {
 class VideoSequenceDemuxer : public MediaDemuxer {
- public:
-  explicit VideoSequenceDemuxer(VideoSequence* sequence);
+public:
+    explicit VideoSequenceDemuxer(VideoSequence* sequence);
 
-  void seekTo(int64_t timeUs) override;
+    void seekTo(int64_t timeUs) override;
 
-  int64_t getSampleTime() override;
+    int64_t getSampleTime() override;
 
-  bool advance() override;
+    bool advance() override;
 
-  SampleData readSampleData() override;
+    SampleData readSampleData() override;
 
- private:
-  VideoSequence* sequence;
-  int seekFrameIndex = INT_MIN;
-  int currentFrameIndex = 0;
+private:
+    VideoSequence* sequence;
+    int seekFrameIndex = INT_MIN;
+    int currentFrameIndex = 0;
 
-  std::shared_ptr<PTSDetail> createPTSDetail() override;
+    std::shared_ptr<PTSDetail> createPTSDetail() override;
 };
 }  // namespace pag

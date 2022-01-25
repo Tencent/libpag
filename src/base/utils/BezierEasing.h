@@ -23,21 +23,21 @@
 
 namespace pag {
 class BezierEasing : public Interpolator {
- public:
-  BezierEasing(const Point& control1, const Point& control2);
+public:
+    BezierEasing(const Point& control1, const Point& control2);
 
-  /**
-   * Maps a value representing the elapsed fraction of an animation to a value that represents the
-   * interpolated fraction. This interpolated value is then multiplied by the change in value of an
-   * animation to derive the animated value at the current elapsed animation time.
-   * @param input input A value between 0 and 1.0 indicating our current point in the animation
-   * where 0 represents the start and 1.0 represents the end.
-   * @return The interpolation value. This value can be more than 1.0 for interpolators which
-   * overshoot their targets, or less than 0 for interpolators that undershoot their targets.
-   */
-  float getInterpolation(float input) override;
+    /**
+     * Maps a value representing the elapsed fraction of an animation to a value that represents the
+     * interpolated fraction. This interpolated value is then multiplied by the change in value of an
+     * animation to derive the animated value at the current elapsed animation time.
+     * @param input input A value between 0 and 1.0 indicating our current point in the animation
+     * where 0 represents the start and 1.0 represents the end.
+     * @return The interpolation value. This value can be more than 1.0 for interpolators which
+     * overshoot their targets, or less than 0 for interpolators that undershoot their targets.
+     */
+    float getInterpolation(float input) override;
 
- private:
-  std::shared_ptr<BezierPath> bezierPath = nullptr;
+private:
+    std::shared_ptr<BezierPath> bezierPath = nullptr;
 };
 }  // namespace pag

@@ -21,58 +21,58 @@
 
 namespace pag {
 DisplacementMapEffect::~DisplacementMapEffect() {
-  delete useForHorizontalDisplacement;
-  delete maxHorizontalDisplacement;
-  delete useForVerticalDisplacement;
-  delete maxVerticalDisplacement;
-  delete displacementMapBehavior;
-  delete edgeBehavior;
-  delete expandOutput;
+    delete useForHorizontalDisplacement;
+    delete maxHorizontalDisplacement;
+    delete useForVerticalDisplacement;
+    delete maxVerticalDisplacement;
+    delete displacementMapBehavior;
+    delete edgeBehavior;
+    delete expandOutput;
 }
 
 bool DisplacementMapEffect::visibleAt(Frame layerFrame) const {
-  if (displacementMapLayer == nullptr) {
-    return false;
-  }
-  // DisplacementMap特效只支持视频序列帧或者图片序列帧。
-  if (displacementMapLayer->type() == LayerType::PreCompose) {
-    auto preComposeLayer = static_cast<PreComposeLayer*>(displacementMapLayer);
-    auto composition = preComposeLayer->composition;
-    if (composition->type() == CompositionType::Video ||
-        composition->type() == CompositionType::Bitmap) {
-      auto mapContentFrame = layerFrame - displacementMapLayer->startTime;
-      if (mapContentFrame < 0 || mapContentFrame >= displacementMapLayer->duration) {
+    if (displacementMapLayer == nullptr) {
         return false;
-      }
-      return maxHorizontalDisplacement->getValueAt(layerFrame) != 0 ||
-             maxVerticalDisplacement->getValueAt(layerFrame) != 0;
     }
-  }
-  return false;
+    // DisplacementMap特效只支持视频序列帧或者图片序列帧。
+    if (displacementMapLayer->type() == LayerType::PreCompose) {
+        auto preComposeLayer = static_cast<PreComposeLayer*>(displacementMapLayer);
+        auto composition = preComposeLayer->composition;
+        if (composition->type() == CompositionType::Video ||
+                composition->type() == CompositionType::Bitmap) {
+            auto mapContentFrame = layerFrame - displacementMapLayer->startTime;
+            if (mapContentFrame < 0 || mapContentFrame >= displacementMapLayer->duration) {
+                return false;
+            }
+            return maxHorizontalDisplacement->getValueAt(layerFrame) != 0 ||
+                   maxVerticalDisplacement->getValueAt(layerFrame) != 0;
+        }
+    }
+    return false;
 }
 
 void DisplacementMapEffect::transformBounds(Rect*, const Point&, Frame) const {
 }
 
 void DisplacementMapEffect::excludeVaryingRanges(std::vector<pag::TimeRange>* timeRanges) const {
-  Effect::excludeVaryingRanges(timeRanges);
-  useForHorizontalDisplacement->excludeVaryingRanges(timeRanges);
-  maxHorizontalDisplacement->excludeVaryingRanges(timeRanges);
-  useForVerticalDisplacement->excludeVaryingRanges(timeRanges);
-  maxVerticalDisplacement->excludeVaryingRanges(timeRanges);
-  displacementMapBehavior->excludeVaryingRanges(timeRanges);
-  edgeBehavior->excludeVaryingRanges(timeRanges);
-  expandOutput->excludeVaryingRanges(timeRanges);
+    Effect::excludeVaryingRanges(timeRanges);
+    useForHorizontalDisplacement->excludeVaryingRanges(timeRanges);
+    maxHorizontalDisplacement->excludeVaryingRanges(timeRanges);
+    useForVerticalDisplacement->excludeVaryingRanges(timeRanges);
+    maxVerticalDisplacement->excludeVaryingRanges(timeRanges);
+    displacementMapBehavior->excludeVaryingRanges(timeRanges);
+    edgeBehavior->excludeVaryingRanges(timeRanges);
+    expandOutput->excludeVaryingRanges(timeRanges);
 }
 
 bool DisplacementMapEffect::verify() const {
-  if (!Effect::verify()) {
-    VerifyFailed();
-    return false;
-  }
-  VerifyAndReturn(useForHorizontalDisplacement != nullptr && maxHorizontalDisplacement != nullptr &&
-                  useForVerticalDisplacement != nullptr && maxVerticalDisplacement != nullptr &&
-                  displacementMapBehavior != nullptr && edgeBehavior != nullptr &&
-                  expandOutput != nullptr);
+    if (!Effect::verify()) {
+        VerifyFailed();
+        return false;
+    }
+    VerifyAndReturn(useForHorizontalDisplacement != nullptr && maxHorizontalDisplacement != nullptr &&
+                    useForVerticalDisplacement != nullptr && maxVerticalDisplacement != nullptr &&
+                    displacementMapBehavior != nullptr && edgeBehavior != nullptr &&
+                    expandOutput != nullptr);
 }
 }  // namespace pag

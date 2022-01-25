@@ -23,76 +23,76 @@
 using namespace pag;
 
 extern "C" {
-JNIEXPORT void JNICALL Java_org_libpag_PAGFont_UnregisterFont(JNIEnv* env, jclass,
-                                                              jstring font_family,
-                                                              jstring font_style) {
-  PAGFont::UnregisterFont(
-      {SafeConvertToStdString(env, font_family), SafeConvertToStdString(env, font_style)});
-}
+    JNIEXPORT void JNICALL Java_org_libpag_PAGFont_UnregisterFont(JNIEnv* env, jclass,
+            jstring font_family,
+            jstring font_style) {
+        PAGFont::UnregisterFont(
+        {SafeConvertToStdString(env, font_family), SafeConvertToStdString(env, font_style)});
+    }
 
-JNIEXPORT void Java_org_libpag_PAGFont_SetFallbackFontPaths(JNIEnv* env, jclass,
-                                                            jobjectArray fontNameList,
-                                                            jintArray ttcIndices) {
-  std::vector<std::string> fallbackList;
-  std::vector<int> ttcList;
-  auto length = env->GetArrayLength(fontNameList);
-  auto ttcLength = env->GetArrayLength(ttcIndices);
-  length = std::min(length, ttcLength);
-  auto ttcData = env->GetIntArrayElements(ttcIndices, nullptr);
-  for (int index = 0; index < length; index++) {
-    jstring fontNameObject = (jstring)env->GetObjectArrayElement(fontNameList, index);
-    auto fontFamily = SafeConvertToStdString(env, fontNameObject);
-    env->DeleteLocalRef(fontNameObject);
-    fallbackList.push_back(fontFamily);
-    ttcList.push_back(ttcData[index]);
-  }
-  env->ReleaseIntArrayElements(ttcIndices, ttcData, 0);
-  PAGFont::SetFallbackFontPaths(fallbackList, ttcList);
-}
+    JNIEXPORT void Java_org_libpag_PAGFont_SetFallbackFontPaths(JNIEnv* env, jclass,
+            jobjectArray fontNameList,
+            jintArray ttcIndices) {
+        std::vector<std::string> fallbackList;
+        std::vector<int> ttcList;
+        auto length = env->GetArrayLength(fontNameList);
+        auto ttcLength = env->GetArrayLength(ttcIndices);
+        length = std::min(length, ttcLength);
+        auto ttcData = env->GetIntArrayElements(ttcIndices, nullptr);
+        for (int index = 0; index < length; index++) {
+            jstring fontNameObject = (jstring)env->GetObjectArrayElement(fontNameList, index);
+            auto fontFamily = SafeConvertToStdString(env, fontNameObject);
+            env->DeleteLocalRef(fontNameObject);
+            fallbackList.push_back(fontFamily);
+            ttcList.push_back(ttcData[index]);
+        }
+        env->ReleaseIntArrayElements(ttcIndices, ttcData, 0);
+        PAGFont::SetFallbackFontPaths(fallbackList, ttcList);
+    }
 
-JNIEXPORT jobject JNICALL
-Java_org_libpag_PAGFont_RegisterFont__Ljava_lang_String_2ILjava_lang_String_2Ljava_lang_String_2(
-    JNIEnv* env, jclass, jstring font_path, jint ttc_index, jstring font_family,
-    jstring font_style) {
-  auto fontPath = SafeConvertToStdString(env, font_path);
-  auto font = PAGFont::RegisterFont(fontPath, ttc_index, SafeConvertToStdString(env, font_family),
-                                    SafeConvertToStdString(env, font_style));
-  if (font.fontFamily.empty()) {
-    return nullptr;
-  }
-  return MakePAGFontObject(env, font.fontFamily.c_str(), font.fontStyle.c_str());
-}
+    JNIEXPORT jobject JNICALL
+    Java_org_libpag_PAGFont_RegisterFont__Ljava_lang_String_2ILjava_lang_String_2Ljava_lang_String_2(
+        JNIEnv* env, jclass, jstring font_path, jint ttc_index, jstring font_family,
+        jstring font_style) {
+        auto fontPath = SafeConvertToStdString(env, font_path);
+        auto font = PAGFont::RegisterFont(fontPath, ttc_index, SafeConvertToStdString(env, font_family),
+                                          SafeConvertToStdString(env, font_style));
+        if (font.fontFamily.empty()) {
+            return nullptr;
+        }
+        return MakePAGFontObject(env, font.fontFamily.c_str(), font.fontStyle.c_str());
+    }
 
-JNIEXPORT jobject JNICALL
-Java_org_libpag_PAGFont_RegisterFont__Landroid_content_res_AssetManager_2Ljava_lang_String_2ILjava_lang_String_2Ljava_lang_String_2(
-    JNIEnv* env, jclass, jobject manager, jstring file_name, jint ttc_index, jstring font_family,
-    jstring font_style) {
-  auto path = SafeConvertToStdString(env, file_name);
-  auto byteData = ReadBytesFromAssets(env, manager, file_name);
-  if (byteData == nullptr) {
-    return nullptr;
-  }
-  auto font = PAGFont::RegisterFont(byteData->data(), byteData->length(), ttc_index,
-                                    SafeConvertToStdString(env, font_family),
-                                    SafeConvertToStdString(env, font_style));
-  if (font.fontFamily.empty()) {
-    return nullptr;
-  }
-  return MakePAGFontObject(env, font.fontFamily.c_str(), font.fontStyle.c_str());
-}
+    JNIEXPORT jobject JNICALL
+    Java_org_libpag_PAGFont_RegisterFont__Landroid_content_res_AssetManager_2Ljava_lang_String_2ILjava_lang_String_2Ljava_lang_String_2(
+        JNIEnv* env, jclass, jobject manager, jstring file_name, jint ttc_index, jstring font_family,
+        jstring font_style) {
+        auto path = SafeConvertToStdString(env, file_name);
+        auto byteData = ReadBytesFromAssets(env, manager, file_name);
+        if (byteData == nullptr) {
+            return nullptr;
+        }
+        auto font = PAGFont::RegisterFont(byteData->data(), byteData->length(), ttc_index,
+                                          SafeConvertToStdString(env, font_family),
+                                          SafeConvertToStdString(env, font_style));
+        if (font.fontFamily.empty()) {
+            return nullptr;
+        }
+        return MakePAGFontObject(env, font.fontFamily.c_str(), font.fontStyle.c_str());
+    }
 
-JNIEXPORT jobject Java_org_libpag_PAGFont_RegisterFontBytes(JNIEnv* env, jclass, jbyteArray bytes,
-                                                            jint length, jint ttcIndex,
-                                                            jstring font_family,
-                                                            jstring font_style) {
-  auto data = env->GetByteArrayElements(bytes, nullptr);
-  auto font = PAGFont::RegisterFont(data, static_cast<size_t>(length), ttcIndex,
-                                    SafeConvertToStdString(env, font_family),
-                                    SafeConvertToStdString(env, font_style));
-  env->ReleaseByteArrayElements(bytes, data, 0);
-  if (font.fontFamily.empty()) {
-    return nullptr;
-  }
-  return MakePAGFontObject(env, font.fontFamily.c_str(), font.fontStyle.c_str());
-}
+    JNIEXPORT jobject Java_org_libpag_PAGFont_RegisterFontBytes(JNIEnv* env, jclass, jbyteArray bytes,
+            jint length, jint ttcIndex,
+            jstring font_family,
+            jstring font_style) {
+        auto data = env->GetByteArrayElements(bytes, nullptr);
+        auto font = PAGFont::RegisterFont(data, static_cast<size_t>(length), ttcIndex,
+                                          SafeConvertToStdString(env, font_family),
+                                          SafeConvertToStdString(env, font_style));
+        env->ReleaseByteArrayElements(bytes, data, 0);
+        if (font.fontFamily.empty()) {
+            return nullptr;
+        }
+        return MakePAGFontObject(env, font.fontFamily.c_str(), font.fontStyle.c_str());
+    }
 }

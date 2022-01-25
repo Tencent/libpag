@@ -65,26 +65,26 @@ GlowBlurFilter::GlowBlurFilter(BlurDirection direction) : blurDirection(directio
 }
 
 std::string GlowBlurFilter::onBuildVertexShader() {
-  return GLOW_BLUR_VERTEX_SHADER;
+    return GLOW_BLUR_VERTEX_SHADER;
 }
 
 std::string GlowBlurFilter::onBuildFragmentShader() {
-  return GLOW_BLUR_FRAGMENT_SHADER;
+    return GLOW_BLUR_FRAGMENT_SHADER;
 }
 
 void GlowBlurFilter::onPrepareProgram(const GLInterface* gl, unsigned int program) {
-  textureOffsetHHandle = gl->getUniformLocation(program, "textureOffsetH");
-  textureOffsetVHandle = gl->getUniformLocation(program, "textureOffsetV");
+    textureOffsetHHandle = gl->getUniformLocation(program, "textureOffsetH");
+    textureOffsetVHandle = gl->getUniformLocation(program, "textureOffsetV");
 }
 
 void GlowBlurFilter::updateOffset(float offset) {
-  blurOffset = offset;
+    blurOffset = offset;
 }
 
 void GlowBlurFilter::onUpdateParams(const GLInterface* gl, const Rect&, const Point&) {
-  auto textureOffsetH = blurDirection == BlurDirection::Horizontal ? blurOffset : 0;
-  auto textureOffsetV = blurDirection == BlurDirection::Vertical ? blurOffset : 0;
-  gl->uniform1f(textureOffsetHHandle, textureOffsetH);
-  gl->uniform1f(textureOffsetVHandle, textureOffsetV);
+    auto textureOffsetH = blurDirection == BlurDirection::Horizontal ? blurOffset : 0;
+    auto textureOffsetV = blurDirection == BlurDirection::Vertical ? blurOffset : 0;
+    gl->uniform1f(textureOffsetHHandle, textureOffsetH);
+    gl->uniform1f(textureOffsetVHandle, textureOffsetV);
 }
 }  // namespace pag

@@ -26,38 +26,39 @@
 namespace pag {
 void ReadTagsOfBitmapComposition(DecodeStream* stream, TagCode code,
                                  BitmapComposition* composition) {
-  switch (code) {
+    switch (code) {
     case TagCode::BitmapSequence: {
-      auto sequence = ReadBitmapSequence(stream);
-      sequence->composition = composition;
-      composition->sequences.push_back(sequence);
-    } break;
+        auto sequence = ReadBitmapSequence(stream);
+        sequence->composition = composition;
+        composition->sequences.push_back(sequence);
+    }
+    break;
     default:
-      ReadTagsOfComposition(stream, code, composition);
-      break;
-  }
+        ReadTagsOfComposition(stream, code, composition);
+        break;
+    }
 }
 
 BitmapComposition* ReadBitmapComposition(DecodeStream* stream) {
-  auto composition = new BitmapComposition();
-  composition->id = stream->readEncodedUint32();
-  ReadTags(stream, composition, ReadTagsOfBitmapComposition);
-  return composition;
+    auto composition = new BitmapComposition();
+    composition->id = stream->readEncodedUint32();
+    ReadTags(stream, composition, ReadTagsOfBitmapComposition);
+    return composition;
 }
 
 static bool lessFirst(const BitmapSequence* item1, const BitmapSequence* item2) {
-  return item1->width < item2->width;
+    return item1->width < item2->width;
 }
 
 TagCode WriteBitmapComposition(EncodeStream* stream, BitmapComposition* composition) {
-  stream->writeEncodedUint32(composition->id);
-  WriteTagsOfComposition(stream, composition);
-  auto sequences = composition->sequences;
-  std::sort(sequences.begin(), sequences.end(), lessFirst);
-  for (auto sequence : sequences) {
-    WriteTag(stream, sequence, WriteBitmapSequence);
-  }
-  WriteEndTag(stream);
-  return TagCode::BitmapCompositionBlock;
+    stream->writeEncodedUint32(composition->id);
+    WriteTagsOfComposition(stream, composition);
+    auto sequences = composition->sequences;
+    std::sort(sequences.begin(), sequences.end(), lessFirst);
+    for (auto sequence : sequences) {
+        WriteTag(stream, sequence, WriteBitmapSequence);
+    }
+    WriteEndTag(stream);
+    return TagCode::BitmapCompositionBlock;
 }
 }  // namespace pag

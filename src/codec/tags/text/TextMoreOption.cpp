@@ -20,11 +20,11 @@
 
 namespace pag {
 std::unique_ptr<BlockConfig> TextMoreOptionTag(TextMoreOptions* moreOption) {
-  auto tagConfig = new BlockConfig(TagCode::TextPathOption);
-  AddAttribute(tagConfig, &moreOption->anchorPointGrouping, AttributeType::Value,
-               AnchorPointGrouping::Character);
-  AddAttribute(tagConfig, &moreOption->groupingAlignment, AttributeType::MultiDimensionProperty,
-               Point::Zero());
-  return std::unique_ptr<BlockConfig>(tagConfig);
+    auto tagConfig = new BlockConfig(TagCode::TextPathOption);
+    AddAttribute(tagConfig, &moreOption->anchorPointGrouping, AttributeType::Value,
+                 AnchorPointGrouping::Character);
+    AddAttribute(tagConfig, &moreOption->groupingAlignment, AttributeType::MultiDimensionProperty,
+                 Point::Zero());
+    return std::unique_ptr<BlockConfig>(tagConfig);
 }
 }  // namespace pag

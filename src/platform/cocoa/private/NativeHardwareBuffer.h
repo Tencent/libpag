@@ -23,26 +23,26 @@
 
 namespace pag {
 class NativeHardwareBuffer : public PixelBuffer {
- public:
-  static std::shared_ptr<NativeHardwareBuffer> MakeAdopted(CVPixelBufferRef pixelBuffer);
+public:
+    static std::shared_ptr<NativeHardwareBuffer> MakeAdopted(CVPixelBufferRef pixelBuffer);
 
-  ~NativeHardwareBuffer() override;
+    ~NativeHardwareBuffer() override;
 
-  void* lockPixels() override;
+    void* lockPixels() override;
 
-  void unlockPixels() override;
+    void unlockPixels() override;
 
-  std::shared_ptr<Texture> makeTexture(Context* context) const override {
-    return GLHardwareTexture::MakeFrom(context, pixelBuffer, adopted);
-  }
+    std::shared_ptr<Texture> makeTexture(Context* context) const override {
+        return GLHardwareTexture::MakeFrom(context, pixelBuffer, adopted);
+    }
 
- private:
-  CVPixelBufferRef pixelBuffer = nullptr;
-  bool adopted = false;
+private:
+    CVPixelBufferRef pixelBuffer = nullptr;
+    bool adopted = false;
 
-  NativeHardwareBuffer(CVPixelBufferRef pixelBuffer, bool adopted);
+    NativeHardwareBuffer(CVPixelBufferRef pixelBuffer, bool adopted);
 
-  friend class CocoaPlatform;
+    friend class CocoaPlatform;
 };
 
 }  // namespace pag

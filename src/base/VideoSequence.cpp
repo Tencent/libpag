@@ -21,36 +21,38 @@
 
 namespace pag {
 VideoFrame::~VideoFrame() {
-  delete fileBytes;
+    delete fileBytes;
 }
 
 VideoSequence::~VideoSequence() {
-  for (auto frame : frames) {
-    delete frame;
-  }
+    for (auto frame : frames) {
+        delete frame;
+    }
 
-  for (auto header : headers) {
-    delete header;
-  }
+    for (auto header : headers) {
+        delete header;
+    }
 }
 
 bool VideoSequence::verify() const {
-  if (!Sequence::verify() || frames.empty()) {
-    VerifyFailed();
-    return false;
-  }
-  auto frameNotNull = [](VideoFrame* frame) {
-    return frame != nullptr && frame->fileBytes != nullptr;
-  };
-  if (!std::all_of(frames.begin(), frames.end(), frameNotNull)) {
-    VerifyFailed();
-    return false;
-  }
-  auto headerNotNull = [](ByteData* header) { return header != nullptr; };
-  if (!std::all_of(headers.begin(), headers.end(), headerNotNull)) {
-    VerifyFailed();
-    return false;
-  }
-  return true;
+    if (!Sequence::verify() || frames.empty()) {
+        VerifyFailed();
+        return false;
+    }
+    auto frameNotNull = [](VideoFrame* frame) {
+        return frame != nullptr && frame->fileBytes != nullptr;
+    };
+    if (!std::all_of(frames.begin(), frames.end(), frameNotNull)) {
+        VerifyFailed();
+        return false;
+    }
+    auto headerNotNull = [](ByteData* header) {
+        return header != nullptr;
+    };
+    if (!std::all_of(headers.begin(), headers.end(), headerNotNull)) {
+        VerifyFailed();
+        return false;
+    }
+    return true;
 }
 }  // namespace pag

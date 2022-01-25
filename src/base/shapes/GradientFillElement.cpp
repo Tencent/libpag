@@ -21,25 +21,25 @@
 
 namespace pag {
 GradientFillElement::~GradientFillElement() {
-  delete startPoint;
-  delete endPoint;
-  delete colors;
-  delete opacity;
+    delete startPoint;
+    delete endPoint;
+    delete colors;
+    delete opacity;
 }
 
 void GradientFillElement::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {
-  startPoint->excludeVaryingRanges(timeRanges);
-  endPoint->excludeVaryingRanges(timeRanges);
-  colors->excludeVaryingRanges(timeRanges);
-  opacity->excludeVaryingRanges(timeRanges);
+    startPoint->excludeVaryingRanges(timeRanges);
+    endPoint->excludeVaryingRanges(timeRanges);
+    colors->excludeVaryingRanges(timeRanges);
+    opacity->excludeVaryingRanges(timeRanges);
 }
 
 bool GradientFillElement::verify() const {
-  if (!ShapeElement::verify()) {
-    VerifyFailed();
-    return false;
-  }
-  VerifyAndReturn(startPoint != nullptr && endPoint != nullptr && colors != nullptr &&
-                  opacity != nullptr);
+    if (!ShapeElement::verify()) {
+        VerifyFailed();
+        return false;
+    }
+    VerifyAndReturn(startPoint != nullptr && endPoint != nullptr && colors != nullptr &&
+                    opacity != nullptr);
 }
 }  // namespace pag

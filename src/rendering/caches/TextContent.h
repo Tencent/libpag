@@ -22,11 +22,11 @@
 
 namespace pag {
 class TextContent : public GraphicContent {
- public:
-  TextContent(std::shared_ptr<Graphic> graphic, std::shared_ptr<Graphic> colorGlyphs)
-      : GraphicContent(std::move(graphic)), colorGlyphs(std::move(colorGlyphs)) {
-  }
+public:
+    TextContent(std::shared_ptr<Graphic> graphic, std::shared_ptr<Graphic> colorGlyphs)
+        : GraphicContent(std::move(graphic)), colorGlyphs(std::move(colorGlyphs)) {
+    }
 
-  std::shared_ptr<Graphic> colorGlyphs = nullptr;
+    std::shared_ptr<Graphic> colorGlyphs = nullptr;
 };
 }  // namespace pag

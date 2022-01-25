@@ -23,94 +23,94 @@
 
 namespace pag {
 class RenderTargetDrawable : public Drawable {
- public:
-  RenderTargetDrawable(std::shared_ptr<Device> device, const BackendRenderTarget& renderTarget,
-                       ImageOrigin origin);
+public:
+    RenderTargetDrawable(std::shared_ptr<Device> device, const BackendRenderTarget& renderTarget,
+                         ImageOrigin origin);
 
-  int width() const override {
-    return renderTarget.width();
-  }
+    int width() const override {
+        return renderTarget.width();
+    }
 
-  int height() const override {
-    return renderTarget.height();
-  }
+    int height() const override {
+        return renderTarget.height();
+    }
 
-  void updateSize() override {
-  }
+    void updateSize() override {
+    }
 
-  std::shared_ptr<Device> getDevice() override {
-    return device;
-  }
+    std::shared_ptr<Device> getDevice() override {
+        return device;
+    }
 
-  std::shared_ptr<Surface> createSurface(Context* context) override;
+    std::shared_ptr<Surface> createSurface(Context* context) override;
 
-  void present(Context*) override {
-  }
+    void present(Context*) override {
+    }
 
- private:
-  std::shared_ptr<Device> device = nullptr;
-  BackendRenderTarget renderTarget = {};
-  ImageOrigin origin = ImageOrigin::TopLeft;
+private:
+    std::shared_ptr<Device> device = nullptr;
+    BackendRenderTarget renderTarget = {};
+    ImageOrigin origin = ImageOrigin::TopLeft;
 };
 
 class TextureDrawable : public Drawable {
- public:
-  TextureDrawable(std::shared_ptr<Device> device, const BackendTexture& texture,
-                  ImageOrigin origin);
+public:
+    TextureDrawable(std::shared_ptr<Device> device, const BackendTexture& texture,
+                    ImageOrigin origin);
 
-  int width() const override {
-    return texture.width();
-  }
+    int width() const override {
+        return texture.width();
+    }
 
-  int height() const override {
-    return texture.height();
-  }
+    int height() const override {
+        return texture.height();
+    }
 
-  void updateSize() override {
-  }
+    void updateSize() override {
+    }
 
-  std::shared_ptr<Device> getDevice() override {
-    return device;
-  }
+    std::shared_ptr<Device> getDevice() override {
+        return device;
+    }
 
-  std::shared_ptr<Surface> createSurface(Context* context) override;
+    std::shared_ptr<Surface> createSurface(Context* context) override;
 
-  void present(Context*) override {
-  }
+    void present(Context*) override {
+    }
 
- private:
-  std::shared_ptr<Device> device = nullptr;
-  BackendTexture texture = {};
-  ImageOrigin origin = ImageOrigin::TopLeft;
+private:
+    std::shared_ptr<Device> device = nullptr;
+    BackendTexture texture = {};
+    ImageOrigin origin = ImageOrigin::TopLeft;
 };
 
 class OffscreenDrawable : public Drawable {
- public:
-  OffscreenDrawable(int width, int height, std::shared_ptr<Device> device);
+public:
+    OffscreenDrawable(int width, int height, std::shared_ptr<Device> device);
 
-  int width() const override {
-    return _width;
-  }
+    int width() const override {
+        return _width;
+    }
 
-  int height() const override {
-    return _height;
-  }
+    int height() const override {
+        return _height;
+    }
 
-  void updateSize() override {
-  }
+    void updateSize() override {
+    }
 
-  std::shared_ptr<Device> getDevice() override {
-    return device;
-  }
+    std::shared_ptr<Device> getDevice() override {
+        return device;
+    }
 
-  std::shared_ptr<Surface> createSurface(Context* context) override;
+    std::shared_ptr<Surface> createSurface(Context* context) override;
 
-  void present(Context*) override {
-  }
+    void present(Context*) override {
+    }
 
- private:
-  int _width = 0;
-  int _height = 0;
-  std::shared_ptr<Device> device = nullptr;
+private:
+    int _width = 0;
+    int _height = 0;
+    std::shared_ptr<Device> device = nullptr;
 };
 }  // namespace pag

@@ -20,13 +20,13 @@
 
 namespace pag {
 void SpatialPointKeyframe::initialize() {
-  SingleEaseKeyframe<Point>::initialize();
-  spatialBezier =
-      BezierPath::Build(startValue, startValue + spatialOut, endValue + spatialIn, endValue, 0.05f);
+    SingleEaseKeyframe<Point>::initialize();
+    spatialBezier =
+        BezierPath::Build(startValue, startValue + spatialOut, endValue + spatialIn, endValue, 0.05f);
 }
 
 Point SpatialPointKeyframe::getValueAt(Frame time) {
-  auto progress = getProgress(time);
-  return spatialBezier->getPosition(progress);
+    auto progress = getProgress(time);
+    return spatialBezier->getPosition(progress);
 }
 }  // namespace pag

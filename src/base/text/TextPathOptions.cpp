@@ -21,23 +21,23 @@
 
 namespace pag {
 TextPathOptions::~TextPathOptions() {
-  delete reversedPath;
-  delete perpendicularToPath;
-  delete forceAlignment;
-  delete firstMargin;
-  delete lastMargin;
+    delete reversedPath;
+    delete perpendicularToPath;
+    delete forceAlignment;
+    delete firstMargin;
+    delete lastMargin;
 }
 
 void TextPathOptions::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {
-  reversedPath->excludeVaryingRanges(timeRanges);
-  perpendicularToPath->excludeVaryingRanges(timeRanges);
-  forceAlignment->excludeVaryingRanges(timeRanges);
-  firstMargin->excludeVaryingRanges(timeRanges);
-  lastMargin->excludeVaryingRanges(timeRanges);
+    reversedPath->excludeVaryingRanges(timeRanges);
+    perpendicularToPath->excludeVaryingRanges(timeRanges);
+    forceAlignment->excludeVaryingRanges(timeRanges);
+    firstMargin->excludeVaryingRanges(timeRanges);
+    lastMargin->excludeVaryingRanges(timeRanges);
 }
 
 bool TextPathOptions::verify() const {
-  VerifyAndReturn(reversedPath != nullptr && perpendicularToPath != nullptr &&
-                  forceAlignment != nullptr && firstMargin != nullptr && lastMargin != nullptr);
+    VerifyAndReturn(reversedPath != nullptr && perpendicularToPath != nullptr &&
+                    forceAlignment != nullptr && firstMargin != nullptr && lastMargin != nullptr);
 }
 }  // namespace pag

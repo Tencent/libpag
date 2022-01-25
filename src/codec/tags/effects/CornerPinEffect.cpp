@@ -21,15 +21,15 @@
 
 namespace pag {
 std::unique_ptr<BlockConfig> CornerPinEffectTag(CornerPinEffect* effect) {
-  auto tagConfig = new BlockConfig(TagCode::CornerPinEffect);
-  AddAttribute(tagConfig, &effect->upperLeft, AttributeType::SpatialProperty, Point::Zero());
-  AddAttribute(tagConfig, &effect->upperRight, AttributeType::SpatialProperty,
-               Point::Make(1280.0f, 0.0f));
-  AddAttribute(tagConfig, &effect->lowerLeft, AttributeType::SpatialProperty,
-               Point::Make(0.0f, 720.0f));
-  AddAttribute(tagConfig, &effect->lowerRight, AttributeType::SpatialProperty,
-               Point::Make(1280.0f, 720.0f));
-  EffectCompositingOptionTag(tagConfig, effect);
-  return std::unique_ptr<BlockConfig>(tagConfig);
+    auto tagConfig = new BlockConfig(TagCode::CornerPinEffect);
+    AddAttribute(tagConfig, &effect->upperLeft, AttributeType::SpatialProperty, Point::Zero());
+    AddAttribute(tagConfig, &effect->upperRight, AttributeType::SpatialProperty,
+                 Point::Make(1280.0f, 0.0f));
+    AddAttribute(tagConfig, &effect->lowerLeft, AttributeType::SpatialProperty,
+                 Point::Make(0.0f, 720.0f));
+    AddAttribute(tagConfig, &effect->lowerRight, AttributeType::SpatialProperty,
+                 Point::Make(1280.0f, 720.0f));
+    EffectCompositingOptionTag(tagConfig, effect);
+    return std::unique_ptr<BlockConfig>(tagConfig);
 }
 }  // namespace pag

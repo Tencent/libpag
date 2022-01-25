@@ -22,67 +22,67 @@
 
 namespace pag {
 VectorComposition::~VectorComposition() {
-  for (auto& layer : layers) {
-    delete layer;
-  }
+    for (auto& layer : layers) {
+        delete layer;
+    }
 }
 
 CompositionType VectorComposition::type() const {
-  return CompositionType::Vector;
+    return CompositionType::Vector;
 }
 
 void VectorComposition::updateStaticTimeRanges() {
-  staticTimeRanges = {};
-  if (duration <= 1) {
-    return;
-  }
-  TimeRange range = {0, duration - 1};
-  staticTimeRanges.push_back(range);
-  for (auto layer : layers) {
-    if (staticTimeRanges.empty()) {
-      break;
+    staticTimeRanges = {};
+    if (duration <= 1) {
+        return;
     }
-    if (layer->type() == LayerType::PreCompose) {
-      auto composition = static_cast<PreComposeLayer*>(layer)->composition;
-      if (!composition->staticTimeRangeUpdated) {
-        composition->updateStaticTimeRanges();
-        composition->staticTimeRangeUpdated = true;
-      }
+    TimeRange range = {0, duration - 1};
+    staticTimeRanges.push_back(range);
+    for (auto layer : layers) {
+        if (staticTimeRanges.empty()) {
+            break;
+        }
+        if (layer->type() == LayerType::PreCompose) {
+            auto composition = static_cast<PreComposeLayer*>(layer)->composition;
+            if (!composition->staticTimeRangeUpdated) {
+                composition->updateStaticTimeRanges();
+                composition->staticTimeRangeUpdated = true;
+            }
+        }
+        layer->excludeVaryingRanges(&staticTimeRanges);
+        SplitTimeRangesAt(&staticTimeRanges, layer->startTime);
+        SplitTimeRangesAt(&staticTimeRanges, layer->startTime + layer->duration);
     }
-    layer->excludeVaryingRanges(&staticTimeRanges);
-    SplitTimeRangesAt(&staticTimeRanges, layer->startTime);
-    SplitTimeRangesAt(&staticTimeRanges, layer->startTime + layer->duration);
-  }
 }
 
 bool VectorComposition::hasImageContent() const {
-  for (auto& layer : layers) {
-    switch (layer->type()) {
-      case LayerType::PreCompose:
-        if (static_cast<PreComposeLayer*>(layer)->composition->hasImageContent()) {
-          return true;
+    for (auto& layer : layers) {
+        switch (layer->type()) {
+        case LayerType::PreCompose:
+            if (static_cast<PreComposeLayer*>(layer)->composition->hasImageContent()) {
+                return true;
+            }
+            break;
+        case LayerType::Image:
+            return true;
+        default:
+            break;
         }
-        break;
-      case LayerType::Image:
-        return true;
-      default:
-        break;
     }
-  }
-  return false;
+    return false;
 }
 
 bool VectorComposition::verify() const {
-  if (!Composition::verify()) {
-    VerifyFailed();
-    return false;
-  }
-  for (auto layer : layers) {
-    if (layer == nullptr || !layer->verify()) {
-      VerifyFailed();
-      return false;
+    if (!Composition::verify()) {
+        VerifyFailed();
+        return false;
     }
-  }
-  return true;
+    for (auto layer : layers) {
+        if (layer == nullptr || !layer->verify()) {
+            VerifyFailed();
+            return false;
+        }
+    }
+    return true;
 }
 }  // namespace pag

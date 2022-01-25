@@ -21,13 +21,13 @@
 
 namespace pag {
 std::unique_ptr<BlockConfig> MosaicEffectTag(MosaicEffect* effect) {
-  auto tagConfig = new BlockConfig(TagCode::MosaicEffect);
-  AddAttribute(tagConfig, &effect->horizontalBlocks, AttributeType::SimpleProperty,
-               static_cast<uint16_t>(10));
-  AddAttribute(tagConfig, &effect->verticalBlocks, AttributeType::SimpleProperty,
-               static_cast<uint16_t>(10));
-  AddAttribute(tagConfig, &effect->sharpColors, AttributeType::DiscreteProperty, false);
-  EffectCompositingOptionTag(tagConfig, effect);
-  return std::unique_ptr<BlockConfig>(tagConfig);
+    auto tagConfig = new BlockConfig(TagCode::MosaicEffect);
+    AddAttribute(tagConfig, &effect->horizontalBlocks, AttributeType::SimpleProperty,
+                 static_cast<uint16_t>(10));
+    AddAttribute(tagConfig, &effect->verticalBlocks, AttributeType::SimpleProperty,
+                 static_cast<uint16_t>(10));
+    AddAttribute(tagConfig, &effect->sharpColors, AttributeType::DiscreteProperty, false);
+    EffectCompositingOptionTag(tagConfig, effect);
+    return std::unique_ptr<BlockConfig>(tagConfig);
 }
 }  // namespace pag

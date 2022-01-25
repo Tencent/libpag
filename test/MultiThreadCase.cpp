@@ -30,87 +30,87 @@ PAG_TEST_CASE(MultiThreadCase)
  * swiftshader在多线程同时创建 EGLContextExt 时候会失败，需加锁
  */
 void mockPAGView() {
-  auto file = PAGFile::Load(DEFAULT_PAG_PATH);
-  ASSERT_NE(file, nullptr) << "pag path is:" << DEFAULT_PAG_PATH << std::endl;
-  auto surface = PAGSurface::MakeOffscreen(file->width(), file->height());
-  auto player = std::make_shared<PAGPlayer>();
-  player->setSurface(surface);
-  surface->drawable->getDevice();
-  ASSERT_NE(surface, nullptr);
-  player->setComposition(file);
-  int num = 20;
-  for (int i = 0; i < num; i++) {
-    long time = file->duration() * i / num;
-    file->setCurrentTime(time);
-    player->flush();
-    DumpMD5(surface);
-    std::this_thread::sleep_for(std::chrono::milliseconds(20));
-  }
+    auto file = PAGFile::Load(DEFAULT_PAG_PATH);
+    ASSERT_NE(file, nullptr) << "pag path is:" << DEFAULT_PAG_PATH << std::endl;
+    auto surface = PAGSurface::MakeOffscreen(file->width(), file->height());
+    auto player = std::make_shared<PAGPlayer>();
+    player->setSurface(surface);
+    surface->drawable->getDevice();
+    ASSERT_NE(surface, nullptr);
+    player->setComposition(file);
+    int num = 20;
+    for (int i = 0; i < num; i++) {
+        long time = file->duration() * i / num;
+        file->setCurrentTime(time);
+        player->flush();
+        DumpMD5(surface);
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
 }
 
 /**
  * 用例描述: 使用多个PAGPlayer模拟多个PAGView同时渲染
  */
 PAG_TEST(SimpleMultiThreadCase, MultiPAGView) {
-  std::vector<std::thread> threads;
-  int num = 10;
-  for (int i = 0; i < num; i++) {
-    threads.emplace_back(std::thread(mockPAGView));
-  }
-  for (auto& mock : threads) {
-    if (mock.joinable()) mock.join();
-  }
+    std::vector<std::thread> threads;
+    int num = 10;
+    for (int i = 0; i < num; i++) {
+        threads.emplace_back(std::thread(mockPAGView));
+    }
+    for (auto& mock : threads) {
+        if (mock.joinable()) mock.join();
+    }
 }
 
 void mockAsyncFlush(int num = 30) {
-  ASSERT_NE(PAGCpuTest::TestPAGSurface, nullptr);
-  for (int i = 0; i < num; i++) {
-    PAGCpuTest::TestPAGFile->setCurrentTime(PAGCpuTest::TestPAGFile->duration() * i / num);
-    PAGCpuTest::TestPAGPlayer->flush();
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-  }
-  std::cout << "\nmockAsyncFlush finish" << std::endl;
+    ASSERT_NE(PAGCpuTest::TestPAGSurface, nullptr);
+    for (int i = 0; i < num; i++) {
+        PAGCpuTest::TestPAGFile->setCurrentTime(PAGCpuTest::TestPAGFile->duration() * i / num);
+        PAGCpuTest::TestPAGPlayer->flush();
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    std::cout << "\nmockAsyncFlush finish" << std::endl;
 }
 
 /**
  * 用例描述: 测试在A线程调用flush，B线程同时进行编辑操作
  */
 PAG_TEST_F(MultiThreadCase, AsyncFlush) {
-  auto mockThread = std::thread(mockAsyncFlush, 10);
-  std::shared_ptr<PAGComposition> pagCom =
-      std::static_pointer_cast<PAGComposition>(TestPAGFile->getLayerAt(0));
-  ASSERT_NE(pagCom, nullptr);
+    auto mockThread = std::thread(mockAsyncFlush, 10);
+    std::shared_ptr<PAGComposition> pagCom =
+        std::static_pointer_cast<PAGComposition>(TestPAGFile->getLayerAt(0));
+    ASSERT_NE(pagCom, nullptr);
 
-  for (int i = 0; i < 10; i++) {
-    pagCom->swapLayerAt(2, 3);
-    PAGCpuTest::TestPAGPlayer->flush();
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    auto layer = pagCom->getLayerAt(2);
-    PAGCpuTest::TestPAGPlayer->flush();
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    pagCom->removeLayerAt(2);
-    PAGCpuTest::TestPAGPlayer->flush();
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    pagCom->addLayerAt(layer, 2);
-    PAGCpuTest::TestPAGPlayer->flush();
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-  }
-  std::cout << "\nAsyncFlush edit" << std::endl;
-  mockThread.join();
+    for (int i = 0; i < 10; i++) {
+        pagCom->swapLayerAt(2, 3);
+        PAGCpuTest::TestPAGPlayer->flush();
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        auto layer = pagCom->getLayerAt(2);
+        PAGCpuTest::TestPAGPlayer->flush();
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        pagCom->removeLayerAt(2);
+        PAGCpuTest::TestPAGPlayer->flush();
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        pagCom->addLayerAt(layer, 2);
+        PAGCpuTest::TestPAGPlayer->flush();
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    std::cout << "\nAsyncFlush edit" << std::endl;
+    mockThread.join();
 }
 
 /**
  * 用例描述: 测试在A线程调用flush，B线程进行freeCache
  */
 PAG_TEST_F(MultiThreadCase, AsyncFlushAndFreeCache) {
-  ASSERT_NE(TestPAGFile, nullptr);
-  auto mockThread = std::thread(mockAsyncFlush, 200);
-  for (int i = 0; i < 200; i++) {
-    PAGCpuTest::TestPAGSurface->freeCache();
-    std::this_thread::sleep_for(std::chrono::milliseconds(5));
-  }
-  std::cout << "\nAsyncFlush edit" << std::endl;
-  mockThread.join();
+    ASSERT_NE(TestPAGFile, nullptr);
+    auto mockThread = std::thread(mockAsyncFlush, 200);
+    for (int i = 0; i < 200; i++) {
+        PAGCpuTest::TestPAGSurface->freeCache();
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    std::cout << "\nAsyncFlush edit" << std::endl;
+    mockThread.join();
 }
 
 /**
@@ -118,22 +118,22 @@ PAG_TEST_F(MultiThreadCase, AsyncFlushAndFreeCache) {
  * 多线程会不会引起死锁之类的问题，正确性是HitTest接口本身来保证
  */
 PAG_TEST_F(MultiThreadCase, HitTestPoint) {
-  auto mockThread = std::thread(mockAsyncFlush, 30);
-  for (int i = 0; i < 15; i++) {
-    TestPAGPlayer->hitTestPoint(TestPAGFile, 720.0 * i / 15, 1080.0 * i / 15, true);
-  }
-  mockThread.join();
+    auto mockThread = std::thread(mockAsyncFlush, 30);
+    for (int i = 0; i < 15; i++) {
+        TestPAGPlayer->hitTestPoint(TestPAGFile, 720.0 * i / 15, 1080.0 * i / 15, true);
+    }
+    mockThread.join();
 }
 
 /**
  * 用例描述: GetLayersUnderPoint功能测试
  */
 PAG_TEST_F(MultiThreadCase, GetLayersUnderPoint) {
-  auto mockThread = std::thread(mockAsyncFlush, 30);
-  for (int i = 0; i < 30; i++) {
-    TestPAGFile->getLayersUnderPoint(720.0 * i / 15, 1080.0 * i / 15);
-  }
-  mockThread.join();
+    auto mockThread = std::thread(mockAsyncFlush, 30);
+    for (int i = 0; i < 30; i++) {
+        TestPAGFile->getLayersUnderPoint(720.0 * i / 15, 1080.0 * i / 15);
+    }
+    mockThread.join();
 }
 
 PAG_TEST_CASE(MultiThreadCase_BitmapSequenceHitTest)
@@ -142,11 +142,11 @@ PAG_TEST_CASE(MultiThreadCase_BitmapSequenceHitTest)
  * 用例描述: 图片序列帧的hitTest"
  */
 PAG_TEST_F(MultiThreadCase_BitmapSequenceHitTest, BitmapSequenceHitTestPoint) {
-  auto mockThread = std::thread(mockAsyncFlush, 30);
-  for (int i = 0; i < 30; i++) {
-    TestPAGPlayer->hitTestPoint(TestPAGFile, 720.0 * i / 15, 1080.0 * i / 15, true);
-  }
-  mockThread.join();
+    auto mockThread = std::thread(mockAsyncFlush, 30);
+    for (int i = 0; i < 30; i++) {
+        TestPAGPlayer->hitTestPoint(TestPAGFile, 720.0 * i / 15, 1080.0 * i / 15, true);
+    }
+    mockThread.join();
 }
 
 PAG_TEST_CASE(MultiThreadCase_VideoSequenceHitTest)
@@ -155,10 +155,10 @@ PAG_TEST_CASE(MultiThreadCase_VideoSequenceHitTest)
  * 用例描述: 视频序列帧的hitTest
  */
 PAG_TEST_F(MultiThreadCase_VideoSequenceHitTest, VideoSequenceHitTestPoint) {
-  auto mockThread = std::thread(mockAsyncFlush, 30);
-  for (int i = 0; i < 30; i++) {
-    TestPAGPlayer->hitTestPoint(TestPAGFile, 720.0 * i / 15, 1080.0 * i / 15, true);
-  }
-  mockThread.join();
+    auto mockThread = std::thread(mockAsyncFlush, 30);
+    for (int i = 0; i < 30; i++) {
+        TestPAGPlayer->hitTestPoint(TestPAGFile, 720.0 * i / 15, 1080.0 * i / 15, true);
+    }
+    mockThread.join();
 }
 }  // namespace pag

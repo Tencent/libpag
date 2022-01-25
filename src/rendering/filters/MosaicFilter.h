@@ -22,27 +22,27 @@
 
 namespace pag {
 class MosaicFilter : public LayerFilter {
- public:
-  explicit MosaicFilter(Effect* effect);
-  ~MosaicFilter() override = default;
+public:
+    explicit MosaicFilter(Effect* effect);
+    ~MosaicFilter() override = default;
 
- protected:
-  std::string onBuildFragmentShader() override;
+protected:
+    std::string onBuildFragmentShader() override;
 
-  void onPrepareProgram(const GLInterface* gl, unsigned program) override;
+    void onPrepareProgram(const GLInterface* gl, unsigned program) override;
 
-  void onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
-                      const Point& filterScale) override;
+    void onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
+                        const Point& filterScale) override;
 
- private:
-  Effect* effect = nullptr;
-  float horizontalBlocks = 1;
-  float verticalBlocks = 1;
-  bool sharpColors = false;
+private:
+    Effect* effect = nullptr;
+    float horizontalBlocks = 1;
+    float verticalBlocks = 1;
+    bool sharpColors = false;
 
-  // Handle
-  int horizontalBlocksHandle = -1;
-  int verticalBlocksHandle = -1;
-  int sharpColorsHandle = -1;
+    // Handle
+    int horizontalBlocksHandle = -1;
+    int verticalBlocksHandle = -1;
+    int sharpColorsHandle = -1;
 };
 }  // namespace pag

@@ -23,21 +23,21 @@
 
 namespace pag {
 class VideoImage : public VideoBuffer {
- public:
-  static std::shared_ptr<VideoImage> MakeFrom(CVPixelBufferRef pixelBuffer);
+public:
+    static std::shared_ptr<VideoImage> MakeFrom(CVPixelBufferRef pixelBuffer);
 
-  ~VideoImage() override;
+    ~VideoImage() override;
 
-  size_t planeCount() const override;
+    size_t planeCount() const override;
 
- protected:
-  std::shared_ptr<Texture> makeTexture(Context* context) const override {
-    return GLHardwareTexture::MakeFrom(context, pixelBuffer, false);
-  }
+protected:
+    std::shared_ptr<Texture> makeTexture(Context* context) const override {
+        return GLHardwareTexture::MakeFrom(context, pixelBuffer, false);
+    }
 
- private:
-  CVPixelBufferRef pixelBuffer = nullptr;
+private:
+    CVPixelBufferRef pixelBuffer = nullptr;
 
-  explicit VideoImage(CVPixelBufferRef pixelBuffer);
+    explicit VideoImage(CVPixelBufferRef pixelBuffer);
 };
 }  // namespace pag

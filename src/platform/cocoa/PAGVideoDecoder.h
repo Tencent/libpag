@@ -21,9 +21,9 @@
 __attribute__((visibility("default")))
 @interface PAGVideoDecoder : NSObject
 
-/**
- * Register a software decoder factory to implement the decoder fallback mechanism.
- */
+    /**
+     * Register a software decoder factory to implement the decoder fallback mechanism.
+     */
 + (void)RegisterSoftwareDecoderFactory:(void*)decoderFactory;
 
 /**
