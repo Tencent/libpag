@@ -2,7 +2,7 @@ import { VIDEO_DECODE_WAIT_FRAME } from '../constant';
 import { convertMp4 } from '../h264/h264';
 import { addListener, removeListener, removeAllListeners } from '../utils/video-listener';
 
-export class WebVideoReader {
+export class VideoReader {
   private videoEl: HTMLVideoElement = null;
   private readonly frameRate: number;
   private lastFlush: number;

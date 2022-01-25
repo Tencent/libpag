@@ -3,6 +3,7 @@ import commonJs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
 import { terser } from 'rollup-plugin-terser';
 import esbuild from 'rollup-plugin-esbuild';
+import jscc from 'rollup-plugin-jscc';
 import replaceFunc from './plugin/rollup-plugin-replace';
 
 import pkg from '../package.json';
@@ -73,6 +74,6 @@ export default [
     output: [
       { banner, file: 'lib/libpag.wx.js', format: 'cjs', exports: 'auto', sourcemap: true },
     ],
-    plugins: [esbuild({ tsconfig: 'tsconfig.json', minify: false }), resolve(), commonJs(), replaceFunc()],
+    plugins: [jscc({ values: { _WECHAT: 1 } }), esbuild({ tsconfig: 'tsconfig.json', minify: false }), resolve(),  commonJs(),  replaceFunc()],
   },
 ];

@@ -1,24 +1,25 @@
+
+/* #if _WECHAT
 declare const globalThis: any;
-
-let ANDROID = false;
-let MOBILE = false;
-let MACOS = false;
-let IPHONE = false;
-let isWechatMiniProgram = globalThis.isWechatMiniProgram = !!globalThis.wx;
-if (!globalThis.wx) {
-    const nav = navigator.userAgent;
-    ANDROID = /android|adr/i.test(nav);
-    MOBILE = /(mobile)/i.test(nav) && ANDROID;
-    MACOS = !(/(mobile)/i.test(nav) || MOBILE) && /Mac OS X/i.test(nav);
-    IPHONE = /(iphone|ipad|ipod)/i.test(nav);
+export const ANDROID = false;
+export const MOBILE = false;
+export const MACOS = false
+export const IPHONE = false;
+export const isWechatMiniProgram = !!globalThis.wx;
+// eslint-disable-next-line
+globalThis.isWxWebAssembly = false;
+if (typeof WebAssembly !== "object" && isWechatMiniProgram) {
+  // eslint-disable-next-line
+  globalThis.isWxWebAssembly = true;
+  // eslint-disable-next-line
+  globalThis.WebAssembly = WXWebAssembly;
 }
-
-export {
-    ANDROID,
-    MOBILE,
-    MACOS,
-    IPHONE,
-    isWechatMiniProgram
-}
+//#else */
+const nav = navigator.userAgent;
+export const ANDROID = /android|adr/i.test(nav);
+export const MOBILE = /(mobile)/i.test(nav) && ANDROID;
+export const MACOS = !(/(mobile)/i.test(nav) || MOBILE) && /Mac OS X/i.test(nav);
+export const IPHONE = /(iphone|ipad|ipod)/i.test(nav);
+// #endif
 
 

@@ -4,7 +4,6 @@ import { PAGFile } from './pag-file';
 import { PAGImage } from './pag-image';
 import { PAGSurface } from './pag-surface';
 import { WebAssemblyQueue } from './utils/queue';
-import { VideoReader } from './utils/wechat-babel';
 import { ScalerContext } from './core/scaler-context';
 import { PAGView } from './pag-view';
 import { PAGFont } from './pag-font';
@@ -13,6 +12,11 @@ import { PAGLayer } from './pag-layer';
 import { PAGComposition } from './pag-composition';
 import { NativeImage } from './core/native-image';
 import { WebMask } from './core/web-mask';
+/* #if _WECHAT 
+import { VideoReader } from './core/wechat-video-reader';
+//#else */
+import { VideoReader } from './core/video-reader';
+// #endif
 
 export interface PAG extends EmscriptenModule {
   _PAGFile: {

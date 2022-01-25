@@ -1,6 +1,7 @@
 import { convertMp4 } from '../h264/h264';
 
-export class WechatVideoReader {
+declare const wx: any;
+export class VideoReader {
   private readonly frameRate: number;
   private currentFrame: number;
   private fileTarget: string;
@@ -25,14 +26,13 @@ export class WechatVideoReader {
       }
     }
     fs.writeFileSync(this.fileTarget, mp4.buffer, 'utf8');
-    // 小程序解码器
     this.videoDecoder = wx.createVideoDecoder();
     this.videoDecoderStart(this.fileTarget);
     this.videoDecoder.on("ended", async () => {
       await this.videoDecoderSeek(0);
       this.currentFrame = -1;
     });
-    this.framebuffer = new Uint8Array();
+    this.framebuffer = null;
   }
   public videoDecoderSeek(position) {
     return new Promise((resolve) => {
@@ -68,10 +68,12 @@ export class WechatVideoReader {
         if (!this.videoDecoderReady) {
           await this.videoDecoderStart(this.fileTarget);
         }
+        /*
         if (this.currentFrame !== targetFrame - 1) {
           const targetTime = Math.floor(targetFrame * this.frameRate);
           await this.videoDecoderSeek(targetTime)
         }
+        */
         this.framebuffer = await this.getFrameData();
         this.currentFrame = targetFrame;
         resolve(true);
