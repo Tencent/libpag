@@ -45,12 +45,3 @@ cp -a "${WORKSPACE}/test/out/dump.json" "${WORKSPACE}/result/dump.json"
 cp -a ${WORKSPACE}/test/out/*.png ${WORKSPACE}/result/
 exit -1
 fi
-
-gcovr -r . -e='test/*.*' -e='vendor/*.*' --html -o ./result/coverage.html
-gcovr -r . -e='test/*.*' -e='vendor/*.*' --xml-pretty -o coverage.xml
-diff-cover coverage.xml --compare-branch=origin/main --exclude 'test/*.*' 'vendor/*.*' --html-report coveragediff.html>coveragediff.txt
-mv coveragediff.html ./result/coveragediff.html
-coveragediff=`grep -E "Coverage:" coveragediff.txt | awk -F"[ ]" '{print substr($2,1,length($2)-1)}'`
-if [ ! "$coveragediff" ];then coveragediff=100;fi
-setGateValue "UnitTestLineCoverage" $coveragediff
-rm -rf coverag*

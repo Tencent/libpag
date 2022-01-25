@@ -27,7 +27,7 @@ jobs:
     - name: Run autotest script
       run: |
          chmod +x autotest.sh 
-         ./autotest.sh 
+         ./autotest.sh > result/autotest.txt
       shell: bash
 
  
