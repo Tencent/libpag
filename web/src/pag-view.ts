@@ -15,9 +15,14 @@ export class PAGView {
   /**
    * Create pag view.
    */
-  public static async init(file: PAGFile, canvasID: string): Promise<PAGView> {
+  public static async init(file: PAGFile, _canvas: string | HTMLCanvasElement | OffscreenCanvas): Promise<PAGView> {
     /* #if _WECHAT
-    const canvas = await getWechatElementById(canvasID)
+    let canvas: any;
+    if (typeof _canvas === 'string') {
+      canvas = await getWechatElementById(_canvas);
+    } else {
+      canvas = _canvas;
+    }
     const dpr = wx.getSystemInfoSync().pixelRatio
     canvas.width = canvas.width * dpr;
     canvas.height = canvas.height * dpr;
@@ -30,7 +35,12 @@ export class PAGView {
     this.module.GL.makeContextCurrent(contextID);
     pagView.pagSurface = await this.module._PAGSurface.FromFrameBuffer(0, width, height, true);
     //#else */
-    const canvas = document.getElementById(canvasID.substr(1)) as HTMLCanvasElement;
+    let canvas: HTMLCanvasElement;
+    if (typeof _canvas === 'string') {
+      canvas = document.getElementById(_canvas.substr(1)) as HTMLCanvasElement;
+    } else if (_canvas instanceof HTMLCanvasElement) {
+      canvas = _canvas;
+    }
     canvas.style.width = `${canvas.width}px`;
     canvas.style.height = `${canvas.height}px`;
     canvas.width = canvas.width * window.devicePixelRatio;
