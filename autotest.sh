@@ -18,7 +18,7 @@ make_dir build
 
 cd build
 
-cmake -DcppFlags="-fprofile-arcs -ftest-coverage -g -O0" ../
+cmake -DcppFlags="-fprofile-arcs -ftest-coverage -g -O0" -DCMAKE_BUILD_TYPE=Debug ../
 if test $? -eq 0
 then
 echo "~~~~~~~~~~~~~~~~~~~CMakeLists OK~~~~~~~~~~~~~~~~~~"
@@ -36,7 +36,7 @@ echo "~~~~~~~~~~~~~~~~~~~PAGFullTest make error~~~~~~~~~~~~~~~~~~"
 exit -1
 fi
 
-./PAGFullTest --gtest_output=json
+./PAGFullTest --gtest_output=json > $WORKSPACE/result/autotest.json
 
 if test $? -eq 0
 
