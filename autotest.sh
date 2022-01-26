@@ -36,17 +36,17 @@ echo "~~~~~~~~~~~~~~~~~~~PAGFullTest make error~~~~~~~~~~~~~~~~~~"
 exit -1
 fi
 
-./PAGFullTest --gtest_output=json > $WORKSPACE/result/autotest.json
+# ./PAGFullTest --gtest_output=json 
 
-if test $? -eq 0
+# if test $? -eq 0
 
-then
-echo "~~~~~~~~~~~~~~~~~~~PAGFullTest successed~~~~~~~~~~~~~~~~~~"
-else
-echo "~~~~~~~~~~~~~~~~~~~PAGFullTest Failed~~~~~~~~~~~~~~~~~~"
-cp -a $WORKSPACE/test/out/*.json $WORKSPACE/result/
-cp -a $WORKSPACE/test/out/*.png $WORKSPACE/result/
-exit -1
-fi
+# then
+# echo "~~~~~~~~~~~~~~~~~~~PAGFullTest successed~~~~~~~~~~~~~~~~~~"
+# else
+# echo "~~~~~~~~~~~~~~~~~~~PAGFullTest Failed~~~~~~~~~~~~~~~~~~"
+# cp -a $WORKSPACE/test/out/*.json $WORKSPACE/result/
+# cp -a $WORKSPACE/test/out/*.png $WORKSPACE/result/
+# exit -1
+# fi
 
-cp -a $WORKSPACE/build/test_detail.json $WORKSPACE/result/
+# cp -a $WORKSPACE/build/test_detail.json $WORKSPACE/result/
