@@ -36,7 +36,7 @@ echo "~~~~~~~~~~~~~~~~~~~PAGFullTest make error~~~~~~~~~~~~~~~~~~"
 exit -1
 fi
 
-./PAGFullTest --gtest_output=json > $WORKSPACE/result/autotest.json
+./PAGFullTest --gtest_output=json
 
 if test $? -eq 0
 
