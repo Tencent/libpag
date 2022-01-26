@@ -20,6 +20,19 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       
+      - name: Cache Gradle packages
+        uses: actions/cache@v2
+        with:
+         path: |
+           third_party
+           vendor
+           vendor_tools
+         key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+         restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
+      
       - name: Run sync_deps script
         run: ./sync_deps.sh 
         shell: bash 
