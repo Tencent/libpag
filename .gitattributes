@@ -17,3 +17,4 @@
 *.dll filter=lfs diff=lfs merge=lfs -text
 *.lib filter=lfs diff=lfs merge=lfs -text
 *.so filter=lfs diff=lfs merge=lfs -text
+*.lzma2 filter=lfs diff=lfs merge=lfs -text

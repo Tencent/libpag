@@ -43,7 +43,7 @@ void mockPAGView() {
     long time = file->duration() * i / num;
     file->setCurrentTime(time);
     player->flush();
-    DumpMD5(surface);
+    MakeSnapshot(surface);
     std::this_thread::sleep_for(std::chrono::milliseconds(20));
   }
 }

@@ -60,25 +60,10 @@ PAG_TEST_F(PAGPlayerTest, pagPlayer) {
   auto pagComposition2 = std::static_pointer_cast<PAGComposition>(pagFile2->getLayerAt(0));
   TestPAGPlayer->setComposition(pagComposition2);
   TestPAGPlayer->flush();
-  auto setCompositionMd5 = getMd5FromSnap();
-
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGPlayerTest/pagPlayer_setComposition"));
   TestPAGPlayer->setComposition(container);
   TestPAGPlayer->flush();
-  auto setComposition2Md5 = getMd5FromSnap();
-
-  json out = {
-      {"pagPlayer",
-       {{"setCompositionMd5", setCompositionMd5}, {"setComposition2Md5", setComposition2Md5}}}};
-  PAGTestEnvironment::DumpJson["PAGPlayerTest"] = out;
-
-#ifdef COMPARE_JSON_PATH
-  auto cSetCompositionMd5 =
-      PAGTestEnvironment::CompareJson["PAGPlayerTest"]["pagPlayer"]["setCompositionMd5"];
-  EXPECT_EQ(cSetCompositionMd5.get<std::string>(), setCompositionMd5);
-  auto cSetComposition2Md5 =
-      PAGTestEnvironment::CompareJson["PAGPlayerTest"]["pagPlayer"]["setComposition2Md5"];
-  EXPECT_EQ(cSetComposition2Md5.get<std::string>(), setComposition2Md5);
-#endif
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGPlayerTest/pagPlayer_setComposition2"));
 }
 
 /**
@@ -102,17 +87,9 @@ PAG_TEST_F(PAGPlayerTest, switchPAGSurface) {
   auto status = pagPlayer2->flush();
   ASSERT_EQ(status, true);
 
-  auto skImage = MakeSnapshot(pagSurface1);
-  std::string md5 = DumpMD5(skImage);
-#ifdef COMPARE_JSON_PATH
-  auto compareMD5 = PAGTestEnvironment::CompareJson["PAGSurfaceSwitchTest"]["switchPAGSurface"];
-  std::string imagePath = "../test/out/switchPAGSurface.png";
-  TraceIf(skImage, imagePath, md5 != compareMD5);
-  PAGTestEnvironment::DumpJson["PAGSurfaceSwitchTest"]["switchPAGSurface"] = md5;
-  EXPECT_EQ(compareMD5.get<std::string>(), md5);
-#endif
   delete pagPlayer1;
   delete pagPlayer2;
+  EXPECT_TRUE(Baseline::Compare(pagSurface1, "PAGPlayerTest/switchPAGSurface"));
 }
 
 /**
@@ -131,9 +108,6 @@ PAG_TEST_F(PAGPlayerTest, autoClear) {
   pagPlayer->setAutoClear(false);
   pagPlayer->flush();
 
-  json outputJson = {};
-  json compareJson = PAGTestEnvironment::CompareJson["PAGPlayerAutoClearTest"];
-
   Bitmap bitmap = {};
   auto result = bitmap.allocPixels(pagSurface->width(), pagSurface->height());
   ASSERT_TRUE(result);
@@ -142,38 +116,21 @@ PAG_TEST_F(PAGPlayerTest, autoClear) {
   result = pagSurface->readPixels(pixelMap.colorType(), pixelMap.alphaType(), lock.pixels(),
                                   pixelMap.rowBytes());
   ASSERT_TRUE(result);
-  auto md5 = DumpMD5(pixelMap);
-  std::string key = "autoClear_false_flush0";
-  outputJson[key] = md5;
-  TraceIf(pixelMap, "../test/out/" + std::string(key) + ".png", compareJson[key] != md5);
-  EXPECT_EQ(compareJson["autoClear_false_flush0"].get<std::string>(), md5);
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGPlayerTest/autoClear_autoClear_false_flush0"));
 
   pagPlayer->flush();
   result = pagSurface->readPixels(pixelMap.colorType(), pixelMap.alphaType(), lock.pixels(),
                                   pixelMap.rowBytes());
   ASSERT_TRUE(result);
-  md5 = DumpMD5(pixelMap);
-  key = "autoClear_false_flush1";
-  outputJson[key] = md5;
-  if (compareJson != nullptr && compareJson[key] != nullptr) {
-    TraceIf(pixelMap, "../test/out/" + std::string(key) + ".png", compareJson[key] != md5);
-    EXPECT_EQ(compareJson["autoClear_false_flush1"].get<std::string>(), md5);
-  }
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGPlayerTest/autoClear_autoClear_false_flush1"));
 
   pagPlayer->setAutoClear(true);
   pagPlayer->flush();
   result = pagSurface->readPixels(pixelMap.colorType(), pixelMap.alphaType(), lock.pixels(),
                                   pixelMap.rowBytes());
   ASSERT_TRUE(result);
-  md5 = DumpMD5(pixelMap);
-  key = "autoClear_true";
-  outputJson[key] = md5;
-  if (compareJson != nullptr && compareJson[key] != nullptr) {
-    TraceIf(pixelMap, "../test/out/" + std::string(key) + ".png", compareJson[key] != md5);
-    EXPECT_EQ(compareJson["autoClear_true"].get<std::string>(), md5);
-  }
 
-  PAGTestEnvironment::DumpJson["PAGPlayerAutoClearTest"] = outputJson;
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGPlayerTest/autoClear_autoClear_true"));
 }
 
 }  // namespace pag

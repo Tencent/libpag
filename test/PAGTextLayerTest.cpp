@@ -43,17 +43,10 @@ PAG_TEST_F(PAGTextLayerTest, fillColor) {
   auto fillColor = textLayer->fillColor();
   EXPECT_TRUE(fillColor == Blue);
   TestPAGPlayer->flush();
-  auto fillColorMd5 = getMd5FromSnap();
-  ASSERT_NE(fillColorMd5, "");
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/fillColor"));
   // 色值限定uint_8输入，天然合法
   textLayer->setFillColor(Red);
   EXPECT_TRUE((textLayer->fillColor() == Red));
-  PAGTestEnvironment::DumpJson["PAGTextLayerTester"]["TextLayer"]["fillColorMd5"] = fillColorMd5;
-#ifdef COMPARE_JSON_PATH
-  auto cFillColor =
-      PAGTestEnvironment::CompareJson["PAGTextLayerTester"]["TextLayer"]["fillColorMd5"];
-  EXPECT_EQ(cFillColor.get<std::string>(), fillColorMd5);
-#endif
 }
 
 /**
@@ -69,17 +62,9 @@ PAG_TEST_F(PAGTextLayerTest, strokeColor) {
   auto strokeColor = textLayer->strokeColor();
   EXPECT_TRUE((strokeColor == Red));
   TestPAGPlayer->flush();
-  auto strokeColorMd5 = getMd5FromSnap();
-  ASSERT_NE(strokeColorMd5, "");
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/strokeColor"));
   textLayer->setStrokeColor(Blue);
   EXPECT_TRUE((textLayer->strokeColor() == Blue));
-  PAGTestEnvironment::DumpJson["PAGTextLayerTester"]["TextLayer"]["strokeColorMd5"] =
-      strokeColorMd5;
-#ifdef COMPARE_JSON_PATH
-  auto cStrokeColor =
-      PAGTestEnvironment::CompareJson["PAGTextLayerTester"]["TextLayer"]["strokeColorMd5"];
-  EXPECT_EQ(cStrokeColor.get<std::string>(), strokeColorMd5);
-#endif
 }
 
 /**
@@ -119,21 +104,13 @@ PAG_TEST_F(PAGTextLayerTest, text) {
 }
 
 /**
- * 用例描述: PAGTextLayerTest textDocumentMd5 接口测试
+ * 用例描述: PAGTextLayerTest textDocument 接口测试
  */
-PAG_TEST_F(PAGTextLayerTest, textDocumentMd5) {
+PAG_TEST_F(PAGTextLayerTest, textDocument) {
   ASSERT_NE(TestPAGFile, nullptr);
   TestPAGFile->setCurrentTime(5 * 1000000);
   TestPAGPlayer->flush();
-  auto textDocumentMd5 = getMd5FromSnap();
-  ASSERT_NE(textDocumentMd5, "");
-  PAGTestEnvironment::DumpJson["PAGTextLayerTester"]["TextLayer"]["textDocumentMd5"] =
-      textDocumentMd5;
-#ifdef COMPARE_JSON_PATH
-  auto cText =
-      PAGTestEnvironment::CompareJson["PAGTextLayerTester"]["TextLayer"]["textDocumentMd5"];
-  EXPECT_EQ(cText.get<std::string>(), textDocumentMd5);
-#endif
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/textDocument"));
 }
 
 /**
@@ -202,20 +179,13 @@ PAG_TEST_F(PAGTextLayerTest, Emoji_ID79762747) {
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0);
   TestPAGPlayer->flush();
-  auto md5 = getMd5FromSnap();
-  PAGTestEnvironment::DumpJson["PAGTextLayerTester"]["emoji"] = md5;
-#ifdef COMPARE_JSON_PATH
-  auto emojiMd5 = PAGTestEnvironment::CompareJson["PAGTextLayerTester"]["emoji"];
-  TraceIf(TestPAGSurface, "../test/out/pag_textlayer_emoji.png",
-          emojiMd5.get<std::string>() != md5);
-  EXPECT_EQ(emojiMd5.get<std::string>(), md5);
-#endif
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/Emoji"));
 }
 
 /**
  * 用例描述: PAGTextLayer Emoji 功能测试
  */
-PAG_TEST_F(PAGTextLayerTest, NormalEmoji_ID79762751) {
+PAG_TEST_F(PAGTextLayerTest, NormalEmoji) {
   auto pagFile = PAGFile::Load("../assets/test2.pag");
   auto textData = pagFile->getTextData(0);
   textData->text = "ha ha哈哈\n哈😆哈哈哈";
@@ -223,20 +193,13 @@ PAG_TEST_F(PAGTextLayerTest, NormalEmoji_ID79762751) {
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0);
   TestPAGPlayer->flush();
-  auto md5 = getMd5FromSnap();
-  PAGTestEnvironment::DumpJson["PAGTextLayerTester"]["normalEmoji"] = md5;
-#ifdef COMPARE_JSON_PATH
-  auto emojiMd5 = PAGTestEnvironment::CompareJson["PAGTextLayerTester"]["normalEmoji"];
-  TraceIf(TestPAGSurface, "../test/out/pag_textlayer_normalEmoji.png",
-          emojiMd5.get<std::string>() != md5);
-  EXPECT_EQ(emojiMd5.get<std::string>(), md5);
-#endif
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/NormalEmoji"));
 }
 
 /**
  * 用例描述: 测试文字替换
  */
-PAG_TEST_F(PAGTextLayerTest, text_ID83312235) {
+PAG_TEST_F(PAGTextLayerTest, TextReplacement) {
   auto pagFile = PAGFile::Load("../assets/test2.pag");
   auto textData = pagFile->getTextData(0);
   textData->text = "ha ha哈哈\n哈哈哈哈";
@@ -245,13 +208,7 @@ PAG_TEST_F(PAGTextLayerTest, text_ID83312235) {
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0);
   TestPAGPlayer->flush();
-  auto md5 = getMd5FromSnap();
-  PAGTestEnvironment::DumpJson["PAGTextLayerTester"]["text_ID83312235"] = md5;
-#ifdef COMPARE_JSON_PATH
-  auto emojiMd5 = PAGTestEnvironment::CompareJson["PAGTextLayerTester"]["text_ID83312235"];
-  TraceIf(TestPAGSurface, "../test/out/text_ID83312235.png", emojiMd5.get<std::string>() != md5);
-  EXPECT_EQ(emojiMd5.get<std::string>(), md5);
-#endif
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/TextReplacement"));
 }
 
 /**
@@ -262,14 +219,7 @@ PAG_TEST_F(PAGTextLayerTest, VerticalText_ID80511765) {
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0);
   TestPAGPlayer->flush();
-  auto md5 = getMd5FromSnap();
-  PAGTestEnvironment::DumpJson["PAGTextLayerTester"]["textDirection"] = md5;
-#ifdef COMPARE_JSON_PATH
-  auto textMd5 = PAGTestEnvironment::CompareJson["PAGTextLayerTester"]["textDirection"];
-  TraceIf(TestPAGSurface, "../test/out/pag_textlayer_textDirection.png",
-          textMd5.get<std::string>() != md5);
-  EXPECT_EQ(textMd5.get<std::string>(), md5);
-#endif
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/textDirection"));
 }
 
 /**
@@ -280,14 +230,7 @@ PAG_TEST_F(PAGTextLayerTest, TrackingAnimator_ID859317799) {
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0);
   TestPAGPlayer->flush();
-  auto md5 = getMd5FromSnap();
-  PAGTestEnvironment::DumpJson["PAGTextLayerTester"]["trackingAnimator"] = md5;
-#ifdef COMPARE_JSON_PATH
-  auto textMd5 = PAGTestEnvironment::CompareJson["PAGTextLayerTester"]["trackingAnimator"];
-  TraceIf(TestPAGSurface, "../test/out/pag_textlayer_trackingAnimator.png",
-          textMd5.get<std::string>() != md5);
-  EXPECT_EQ(textMd5.get<std::string>(), md5);
-#endif
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/trackingAnimator"));
 }
 
 /**
@@ -298,32 +241,18 @@ PAG_TEST_F(PAGTextLayerTest, TrackingAnimatorVertical_ID859317799) {
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0);
   TestPAGPlayer->flush();
-  auto md5 = getMd5FromSnap();
-  PAGTestEnvironment::DumpJson["PAGTextLayerTester"]["trackingAnimatorVertical"] = md5;
-#ifdef COMPARE_JSON_PATH
-  auto textMd5 = PAGTestEnvironment::CompareJson["PAGTextLayerTester"]["trackingAnimatorVertical"];
-  TraceIf(TestPAGSurface, "../test/out/pag_textlayer_trackingAnimatorVertical.png",
-          textMd5.get<std::string>() != md5);
-  EXPECT_EQ(textMd5.get<std::string>(), md5);
-#endif
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/trackingAnimatorVertical"));
 }
 
 /**
  * 用例描述: PAGTextLayer 位置动画
  */
-PAG_TEST_F(PAGTextLayerTest, PositionAnimator_ID859317799) {
+PAG_TEST_F(PAGTextLayerTest, PositionAnimator) {
   auto pagFile = PAGFile::Load("../assets/TextPositionAnimator.pag");
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0);
   TestPAGPlayer->flush();
-  auto md5 = getMd5FromSnap();
-  PAGTestEnvironment::DumpJson["PAGTextLayerTester"]["positionAnimator"] = md5;
-#ifdef COMPARE_JSON_PATH
-  auto textMd5 = PAGTestEnvironment::CompareJson["PAGTextLayerTester"]["positionAnimator"];
-  TraceIf(TestPAGSurface, "../test/out/pag_textlayer_positionAnimator.png",
-          textMd5.get<std::string>() != md5);
-  EXPECT_EQ(textMd5.get<std::string>(), md5);
-#endif
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/PositionAnimator"));
 }
 
 /**
@@ -334,14 +263,7 @@ PAG_TEST_F(PAGTextLayerTest, TextAnimators_ID863204853) {
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0);
   TestPAGPlayer->flush();
-  auto md5 = getMd5FromSnap();
-  PAGTestEnvironment::DumpJson["PAGTextLayerTester"]["textAnimators"] = md5;
-#ifdef COMPARE_JSON_PATH
-  auto textMd5 = PAGTestEnvironment::CompareJson["PAGTextLayerTester"]["textAnimators"];
-  TraceIf(TestPAGSurface, "../test/out/pag_textlayer_textAnimators.png",
-          textMd5.get<std::string>() != md5);
-  EXPECT_EQ(textMd5.get<std::string>(), md5);
-#endif
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/textAnimators"));
 }
 
 /**
@@ -352,13 +274,8 @@ PAG_TEST_F(PAGTextLayerTest, TextAnimatorsMode_ID863204817) {
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0);
   TestPAGPlayer->flush();
-  auto md5 = getMd5FromSnap();
-  PAGTestEnvironment::DumpJson["PAGTextLayerTester"]["textAnimatorMode"] = md5;
-#ifdef COMPARE_JSON_PATH
-  auto textMd5 = PAGTestEnvironment::CompareJson["PAGTextLayerTester"]["textAnimatorMode"];
-  TraceIf(TestPAGSurface, "../test/out/textAnimatorMode.png", textMd5.get<std::string>() != md5);
-  EXPECT_EQ(textMd5.get<std::string>(), md5);
-#endif
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/textAnimatorMode"));
+
   auto file = pagFile->getFile();
   auto text = file->getTextAt(0);
   bool hasBias = false;
@@ -382,12 +299,8 @@ PAG_TEST_F(PAGTextLayerTest, TextAnimatorsX7_ID863204817) {
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0);
   TestPAGPlayer->flush();
-  auto md5 = getMd5FromSnap();
-  PAGTestEnvironment::DumpJson["PAGTextLayerTester"]["textAnimatorX7"] = md5;
-#ifdef COMPARE_JSON_PATH
-  auto textMd5 = PAGTestEnvironment::CompareJson["PAGTextLayerTester"]["textAnimatorX7"];
-  EXPECT_EQ(textMd5.get<std::string>(), md5);
-#endif
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/textAnimatorX7"));
+
   auto bytes = Codec::Encode(pagFile->getFile());
   ASSERT_NE(bytes->data(), nullptr);
   ASSERT_GT(static_cast<int>(bytes->length()), 0);
@@ -395,8 +308,7 @@ PAG_TEST_F(PAGTextLayerTest, TextAnimatorsX7_ID863204817) {
   TestPAGPlayer->setComposition(newPagFile);
   TestPAGPlayer->setProgress(0);
   TestPAGPlayer->flush();
-  auto newMd5 = getMd5FromSnap();
-  EXPECT_EQ(newMd5, md5);
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/textAnimatorX7"));
 }
 
 /**
@@ -407,13 +319,7 @@ PAG_TEST_F(PAGTextLayerTest, TextAnimatorSmooth_ID863204817) {
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0);
   TestPAGPlayer->flush();
-  auto md5 = getMd5FromSnap();
-  PAGTestEnvironment::DumpJson["PAGTextLayerTester"]["textAnimatorSmooth"] = md5;
-#ifdef COMPARE_JSON_PATH
-  auto textMd5 = PAGTestEnvironment::CompareJson["PAGTextLayerTester"]["textAnimatorSmooth"];
-  TraceIf(TestPAGSurface, "../test/out/textAnimatorSmooth.png", textMd5.get<std::string>() != md5);
-  EXPECT_EQ(textMd5.get<std::string>(), md5);
-#endif
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/textAnimatorSmooth"));
 }
 
 /**

@@ -31,7 +31,7 @@ if (APPLE)
     find_library(VIDEOTOOLBOX VideoToolbox)
     list(APPEND libs ${VIDEOTOOLBOX})
 
-    list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/pag/mac/x64/libpag.dylib)
+    list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/pag/mac/x64/libpag.a)
     list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/swiftshader/mac/x64/libEGL.dylib)
     list(APPEND libs ${CMAKE_CURRENT_SOURCE_DIR}/vendor/swiftshader/mac/x64/libGLESv2.dylib)
 
