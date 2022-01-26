@@ -19,9 +19,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-          lfs: true
+      
       - name: Run sync_deps script
         run: ./sync_deps.sh 
         shell: bash 
