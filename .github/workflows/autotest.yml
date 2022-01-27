@@ -51,7 +51,6 @@ jobs:
           
       - name: Run autotest script
         run: |
-         ls vendor_tools/
          chmod +x autotest.sh
          ./sync_deps.sh 
          ./autotest.sh
