@@ -37,7 +37,7 @@ jobs:
            /usr/local/Cellar/emscripten
           key: ${{ hashFiles('DEPS') }}
       - name: pull third-party dependencies   
-        if: steps.cache-third_party.outputs.cache-hit != 'true'
+        # if: steps.cache-third_party.outputs.cache-hit != 'true'
         run: |
           ./sync_deps.sh 
       - name: Run autotest script
