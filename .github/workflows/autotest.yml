@@ -42,9 +42,6 @@ jobs:
           ./sync_deps.sh 
       - name: Run autotest script
         run: |
-         which ninja
-         which yasm
-         ls vendor_tools/
          chmod +x autotest.sh
          ./autotest.sh
         shell: bash
