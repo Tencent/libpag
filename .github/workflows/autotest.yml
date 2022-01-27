@@ -26,16 +26,16 @@ jobs:
         id: cache-third_party
         uses: actions/cache@v2
         with:
-          path:
+          path: |
            third_party
            vendor_tools
            /usr/local/etc/bash_completion.d
            /usr/local/share/emacs/site-lisp/ninja
-           /usr/local/Cellar/ninja
-           /usr/local/Cellar/yasm
-           /usr/local/Cellar/node
-           /usr/local/Cellar/emscripten
-          key: ${{ hashFiles('DEPS') }}
+           /usr/local/bin/ninja
+           /usr/local/bin/yasm
+           /usr/local/bin/node
+           /usr/local/bin/emscripten
+          key: ${{ hashFiles('DEPS') }}-01
       - name: pull third-party dependencies   
         # if: steps.cache-third_party.outputs.cache-hit != 'true'
         run: |
