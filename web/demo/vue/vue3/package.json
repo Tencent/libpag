@@ -1,5 +1,5 @@
 {
-  "name": "pag-vue",
+  "name": "libpag-vue3-vite-demo",
   "version": "0.0.0",
   "scripts": {
     "dev": "vite",
@@ -7,11 +7,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "libpag": "^0.0.1",
+    "@vitejs/plugin-vue": "^2.1.0",
+    "rollup-plugin-copy": "^3.4.0",
     "vue": "^3.2.25"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^2.0.0",
+    "libpag": "^0.0.2",
     "vite": "^2.7.2"
   }
 }

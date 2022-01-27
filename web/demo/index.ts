@@ -2,6 +2,12 @@ import { PAGInit } from '../src/pag';
 import { PAGFile } from '../src/pag-file';
 import { PAG as PAGNamespace, ParagraphJustification } from '../src/types';
 
+declare global {
+  interface Window {
+    VConsole: any;
+  }
+}
+
 let pagView = null;
 let pagFile: PAGFile = null;
 let cacheEnabled: boolean;
@@ -9,14 +15,35 @@ let videoEnabled: boolean;
 let globalCacheScale: boolean;
 let videoEl = null;
 let PAG: PAGNamespace;
+let canvasElementSize = 640;
+let isMobile = false;
 
-PAGInit({
-  locateFile: (file) => '../lib/' + file,
-}).then((_PAG) => {
-  PAG = _PAG;
+window.onload = async () => {
+  PAG = await PAGInit({ locateFile: (file) => '../lib/' + file });
+  // 移动端
+  isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
+  if (isMobile) {
+    document
+      .querySelector('meta[name="viewport"]')
+      ?.setAttribute(
+        'content',
+        'viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no',
+      );
+    await loadScript('https://unpkg.com/vconsole@latest/dist/vconsole.min.js');
+    new window.VConsole();
+    canvasElementSize = 320;
+    const canvas = document.getElementById('pag') as HTMLCanvasElement;
+    canvas.width = canvasElementSize;
+    canvas.height = canvasElementSize;
+    const tablecloth = document.getElementById('tablecloth');
+    tablecloth.style.width = `${canvasElementSize}px`;
+    tablecloth.style.height = `${canvasElementSize}px`;
+  }
+
   console.log('wasm loaded!', PAG);
+
   document.getElementById('waiting').style.display = 'none';
-  document.getElementById('container').style.display = '';
+  document.getElementById('container').style.display = isMobile ? 'block' : '';
 
   // 加载Font
   document.getElementById('btn-upload-font').addEventListener('click', () => {
@@ -34,8 +61,8 @@ PAGInit({
       .then((response) => response.blob())
       .then(async (blob) => {
         const file = new window.File([blob], url.replace(/(.*\/)*([^.]+)/i, '$2'));
-        document.getElementById('upload-font-text').innerText = `已加载${file.name}`;
         await PAG.PAGFont.registerFont('SourceHanSansSC', file);
+        document.getElementById('upload-font-text').innerText = `已加载${file.name}`;
       });
   });
 
@@ -73,21 +100,21 @@ PAGInit({
     const textDoc = await pagFile.getTextData(0);
     console.log(textDoc);
     textDoc.text = '替换后的文字';
-    textDoc.fillColor = { red: 255, green: 255, blue: 255 };
-    textDoc.applyFill = true;
-    textDoc.backgroundAlpha = 100;
-    textDoc.backgroundColor = { red: 255, green: 0, blue: 0 };
-    textDoc.baselineShift = 200;
-    textDoc.fauxBold = true;
-    textDoc.fauxItalic = false;
-    textDoc.fontFamily = 'PingFang SC';
-    textDoc.fontSize = 100;
-    textDoc.justification = ParagraphJustification.CenterJustify;
-    textDoc.strokeWidth = 20;
-    textDoc.strokeColor = { red: 0, green: 0, blue: 0 };
-    textDoc.applyStroke = true;
-    textDoc.strokeOverFill = true;
-    textDoc.tracking = 600;
+    // textDoc.fillColor = { red: 255, green: 255, blue: 255 };
+    // textDoc.applyFill = true;
+    // textDoc.backgroundAlpha = 100;
+    // textDoc.backgroundColor = { red: 255, green: 0, blue: 0 };
+    // textDoc.baselineShift = 200;
+    // textDoc.fauxBold = true;
+    // textDoc.fauxItalic = false;
+    textDoc.fontFamily = 'SourceHanSansSC';
+    // textDoc.fontSize = 100;
+    // textDoc.justification = ParagraphJustification.CenterJustify;
+    // textDoc.strokeWidth = 20;
+    // textDoc.strokeColor = { red: 0, green: 0, blue: 0 };
+    // textDoc.applyStroke = true;
+    // textDoc.strokeOverFill = true;
+    // textDoc.tracking = 600;
     pagFile.replaceText(0, textDoc);
     pagView.play();
   });
@@ -213,15 +240,15 @@ PAGInit({
     }
     pagView.setCacheScale(cacheScale);
   });
-});
+};
 
 const createPAGView = async (file) => {
   if (pagFile) pagFile.destroy();
   if (pagView) pagView.destroy();
   pagFile = await PAG.PAGFile.load(file);
   const pagCanvas = document.getElementById('pag') as HTMLCanvasElement;
-  pagCanvas.width = 640;
-  pagCanvas.height = 640;
+  pagCanvas.width = canvasElementSize;
+  pagCanvas.height = canvasElementSize;
   pagView = await PAG.PAGView.init(pagFile, pagCanvas);
   pagView.setRepeatCount(0);
   // 绑定事件监听
@@ -356,4 +383,19 @@ const replaceVideo = (element, index) => {
   });
   inputEl.click();
   element.removeChild(inputEl);
+};
+
+const loadScript = (url) => {
+  return new Promise((resolve, reject) => {
+    const scriptEl = document.createElement('script');
+    scriptEl.type = 'text/javascript';
+    scriptEl.onload = () => {
+      resolve(true);
+    };
+    scriptEl.onerror = () => {
+      reject(false);
+    };
+    scriptEl.src = url;
+    document.body.appendChild(scriptEl);
+  });
 };

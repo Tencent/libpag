@@ -1,9 +1,7 @@
 <script setup>
 import { PAGInit } from 'libpag';
 
-PAGInit({
-  locateFile: (file) => '../node_modules/libpag/lib/' + file,
-}).then((PAG) => {
+PAGInit().then((PAG) => {
   const url = 'https://pag.io/file/like.pag';
   fetch(url)
     .then((response) => response.blob())
