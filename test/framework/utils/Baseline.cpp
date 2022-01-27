@@ -19,6 +19,7 @@
 #include "Baseline.h"
 #include <chrono>
 #include <fstream>
+#include <unordered_set>
 #include "LzmaUtil.h"
 #include "core/Data.h"
 #include "image/Image.h"
@@ -26,11 +27,26 @@
 
 namespace pag {
 #define BASELINE_ROOT "../test/baseline/"
-#define OUT_ROOT "../test/out/baseline/"
-#define OUT_WEBP_ROOT "../test/out/compare/"
+#define OUT_BASELINE_ROOT "../test/out/baseline/"
+#define OUT_COMPARE_ROOT "../test/out/compare/"
 #define COMPRESS_FILE_EXT ".lzma2"
 
-ImageInfo MakeInfo(int with, int height) {
+static std::unordered_set<std::string> clearedFolders = {};
+
+static void ClearPreviousOutput(const std::string& key) {
+  std::filesystem::path folder = key;
+  while (!folder.parent_path().empty()) {
+    folder = folder.parent_path();
+  }
+  if (clearedFolders.count(folder) > 0) {
+    return;
+  }
+  clearedFolders.insert(folder);
+  std::filesystem::remove_all(OUT_BASELINE_ROOT + folder.string());
+  std::filesystem::remove_all(OUT_COMPARE_ROOT + folder.string());
+}
+
+static ImageInfo MakeInfo(int with, int height) {
   return ImageInfo::Make(with, height, ColorType::RGBA_8888, AlphaType::Premultiplied);
 }
 
@@ -57,25 +73,24 @@ static void SaveImage(const ImageInfo& info, const std::shared_ptr<Data>& imageD
   if (data == nullptr) {
     return;
   }
-  auto path = OUT_ROOT + key + COMPRESS_FILE_EXT;
+  auto path = OUT_BASELINE_ROOT + key + COMPRESS_FILE_EXT;
   SaveData(data, path);
   auto baselineData = LoadImageData(key);
   if (baselineData == nullptr) {
     return;
   }
-  auto fileName = key;
-  std::replace(fileName.begin(), fileName.end(), '/', '-');
   auto baselineImage = Image::Encode(info, baselineData->data(), EncodedFormat::WEBP, 100);
-  SaveData(baselineImage, OUT_WEBP_ROOT + fileName + "-baseline.webp");
+  SaveData(baselineImage, OUT_COMPARE_ROOT + key + "_baseline.webp");
   auto compareImage = Image::Encode(info, imageData->data(), EncodedFormat::WEBP, 100);
-  SaveData(compareImage, OUT_WEBP_ROOT + fileName + "-compare.webp");
+  SaveData(compareImage, OUT_COMPARE_ROOT + key + "_new.webp");
 }
 
-bool ComparePixelData(const std::shared_ptr<Data>& pixelData, const std::string& pngPath) {
+bool ComparePixelData(const std::shared_ptr<Data>& pixelData, const std::string& key) {
+  ClearPreviousOutput(key);
   if (pixelData == nullptr) {
     return false;
   }
-  auto baselineData = LoadImageData(pngPath);
+  auto baselineData = LoadImageData(key);
   if (baselineData == nullptr || pixelData->size() != baselineData->size()) {
     return false;
   }
