@@ -18,6 +18,15 @@ make_dir build
 
 cd build
 
+cmake -DcppFlags="-fprofile-arcs -ftest-coverage -g -O0" ../
+if test $? -eq 0
+then
+echo "~~~~~~~~~~~~~~~~~~~CMakeLists OK~~~~~~~~~~~~~~~~~~"
+else
+echo "~~~~~~~~~~~~~~~~~~~CMakeLists error~~~~~~~~~~~~~~~~~~"
+exit -1
+fi
+
 cmake --build . --target PAGFullTest -- -j 12
 if test $? -eq 0
 then
