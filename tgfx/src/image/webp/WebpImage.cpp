@@ -138,9 +138,7 @@ std::shared_ptr<Data> WebpImage::Encode(const ImageInfo& imageInfo, const void* 
   const uint8_t* convertPixels = nullptr;
   if (imageInfo.alphaType() == AlphaType::Premultiplied ||
       imageInfo.colorType() == ColorType::ALPHA_8) {
-    auto srcInfo = ImageInfo::Make(imageInfo.width(), imageInfo.height(), imageInfo.colorType(),
-                                   AlphaType::Unpremultiplied);
-    PixelMap pixelMap(srcInfo, srcPixels);
+    PixelMap pixelMap(imageInfo, srcPixels);
     auto dstPixels = new uint8_t[imageInfo.width() * imageInfo.height() * 4];
     auto colorType =
         imageInfo.colorType() == ColorType::ALPHA_8 ? ColorType::RGBA_8888 : imageInfo.colorType();
