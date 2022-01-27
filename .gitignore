@@ -40,7 +40,7 @@ local.properties
 !.idea
 **/.idea/*
 !**/.idea/fileTemplates/
-!.idea/misc.xml
+!**/.idea/misc.xml
 
 /third_party
 /out
