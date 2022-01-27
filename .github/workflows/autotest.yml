@@ -36,7 +36,7 @@ jobs:
            /usr/local/bin/node
            /usr/local/bin/emscripten
            /usr/local/bin/depsync
-          key: ${{ hashFiles('DEPS') }}
+          key: ${{ hashFiles('DEPS') }}-03
       - name: pull third-party dependencies   
         # if: steps.cache-third_party.outputs.cache-hit != 'true'
         run: |
@@ -44,6 +44,7 @@ jobs:
       - name: Run autotest script
         run: |
          chmod +x autotest.sh
+         ./sync_deps.sh 
         # ./autotest.sh
         shell: bash
       - uses: actions/upload-artifact@v2
