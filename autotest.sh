@@ -27,14 +27,14 @@ echo "~~~~~~~~~~~~~~~~~~~CMakeLists error~~~~~~~~~~~~~~~~~~"
 exit -1
 fi
 
-# cmake --build . --target PAGFullTest -- -j 12
-# if test $? -eq 0
-# then
-# echo "~~~~~~~~~~~~~~~~~~~PAGFullTest make successed~~~~~~~~~~~~~~~~~~"
-# else
-# echo "~~~~~~~~~~~~~~~~~~~PAGFullTest make error~~~~~~~~~~~~~~~~~~"
-# exit -1
-# fi
+cmake --build . --target PAGFullTest -- -j 12
+if test $? -eq 0
+then
+echo "~~~~~~~~~~~~~~~~~~~PAGFullTest make successed~~~~~~~~~~~~~~~~~~"
+else
+echo "~~~~~~~~~~~~~~~~~~~PAGFullTest make error~~~~~~~~~~~~~~~~~~"
+exit -1
+fi
 
 # ./PAGFullTest --gtest_output=json 
 
