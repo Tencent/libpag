@@ -23,35 +23,26 @@ make_dir build
 
 cd build
 
-cmake -DcppFlags="-fprofile-arcs -ftest-coverage -g -O0" ../
+cmake --build . --target PAGFullTest -- -j 12
 if test $? -eq 0
 then
-echo "~~~~~~~~~~~~~~~~~~~CMakeLists OK~~~~~~~~~~~~~~~~~~"
+echo "~~~~~~~~~~~~~~~~~~~PAGFullTest make successed~~~~~~~~~~~~~~~~~~"
 else
-echo "~~~~~~~~~~~~~~~~~~~CMakeLists error~~~~~~~~~~~~~~~~~~"
+echo "~~~~~~~~~~~~~~~~~~~PAGFullTest make error~~~~~~~~~~~~~~~~~~"
 exit -1
 fi
 
-# cmake --build . --target PAGFullTest -- -j 12
-# if test $? -eq 0
-# then
-# echo "~~~~~~~~~~~~~~~~~~~PAGFullTest make successed~~~~~~~~~~~~~~~~~~"
-# else
-# echo "~~~~~~~~~~~~~~~~~~~PAGFullTest make error~~~~~~~~~~~~~~~~~~"
-# exit -1
-# fi
+./PAGFullTest --gtest_output=json 
 
-# ./PAGFullTest --gtest_output=json 
+if test $? -eq 0
 
-# if test $? -eq 0
+then
+echo "~~~~~~~~~~~~~~~~~~~PAGFullTest successed~~~~~~~~~~~~~~~~~~"
+else
+echo "~~~~~~~~~~~~~~~~~~~PAGFullTest Failed~~~~~~~~~~~~~~~~~~"
+cp -a $WORKSPACE/test/out/baseline/**/*.lzma2 $WORKSPACE/result/
+cp -a $WORKSPACE/test/out/compare/*.webp $WORKSPACE/result/
+exit -1
+fi
 
-# then
-# echo "~~~~~~~~~~~~~~~~~~~PAGFullTest successed~~~~~~~~~~~~~~~~~~"
-# else
-# echo "~~~~~~~~~~~~~~~~~~~PAGFullTest Failed~~~~~~~~~~~~~~~~~~"
-# cp -a $WORKSPACE/test/out/*.json $WORKSPACE/result/
-# cp -a $WORKSPACE/test/out/*.png $WORKSPACE/result/
-# exit -1
-# fi
-
-# cp -a $WORKSPACE/build/test_detail.json $WORKSPACE/result/
+cp -a $WORKSPACE/build/test_detail.json $WORKSPACE/result/
