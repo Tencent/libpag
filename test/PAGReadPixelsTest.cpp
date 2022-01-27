@@ -29,10 +29,10 @@
 namespace pag {
 using nlohmann::json;
 
-#define CHECK_PIXELS(info, pixels, key)                                      \
-  {                                                                          \
-    PixelMap pm(info, pixels);                                               \
-    Baseline::Compare(pm, "PAGReadPixelsTest/" + std::string(key) + ".webp"); \
+#define CHECK_PIXELS(info, pixels, key)                                                    \
+  {                                                                                        \
+    PixelMap pm(info, pixels);                                                             \
+    EXPECT_TRUE(Baseline::Compare(pm, "PAGReadPixelsTest/" + std::string(key) + ".webp")); \
   }
 
 /**
@@ -261,8 +261,10 @@ PAG_TEST(PAGReadPixelsTest, PngCodec) {
   auto rowBytes = image->width() * 4;
   auto pixels = new (std::nothrow) uint8_t[rowBytes * image->height()];
   ASSERT_TRUE(pixels);
-  auto info = ImageInfo::Make(1280, 720, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  auto info = ImageInfo::Make(image->width(), image->height(), ColorType::RGBA_8888,
+                              AlphaType::Premultiplied);
   ASSERT_TRUE(image->readPixels(info, pixels));
+  CHECK_PIXELS(info, pixels, "PngCodec_Decode");
   PixelMap pixelMap(info, pixels);
   auto bytes = Image::Encode(pixelMap.info(), pixelMap.pixels(), EncodedFormat::PNG, 100);
   image = Image::MakeFrom(bytes);
@@ -282,20 +284,29 @@ PAG_TEST(PAGReadPixelsTest, WebpCodec) {
   ASSERT_EQ(image->width(), 110);
   ASSERT_EQ(image->height(), 110);
   ASSERT_EQ(static_cast<int>(image->orientation()), static_cast<int>(Orientation::TopLeft));
-  auto rowBytes = image->width() * 4;
-  auto pixels = new (std::nothrow) uint8_t[rowBytes * image->height()];
+  auto info = ImageInfo::Make(image->width(), image->height(), ColorType::RGBA_8888,
+                              AlphaType::Premultiplied);
+  auto pixels = new (std::nothrow) uint8_t[info.byteSize()];
   ASSERT_TRUE(pixels);
-  auto info = ImageInfo::Make(110, 110, ColorType::RGBA_8888, AlphaType::Premultiplied);
-  bool res = image->readPixels(info, pixels);
-  ASSERT_TRUE(res);
-  PixelMap pixelMap(info, pixels);
-  auto bytes = Image::Encode(pixelMap.info(), pixelMap.pixels(), EncodedFormat::WEBP, 100);
+  ASSERT_TRUE(image->readPixels(info, pixels));
+  CHECK_PIXELS(info, pixels, "WebpCodec_Decode");
+  auto bytes = Image::Encode(info, pixels, EncodedFormat::WEBP, 100);
   image = Image::MakeFrom(bytes);
   ASSERT_TRUE(image != nullptr);
   ASSERT_EQ(image->width(), 110);
   ASSERT_EQ(image->height(), 110);
   ASSERT_EQ(static_cast<int>(image->orientation()), static_cast<int>(Orientation::TopLeft));
+
+  auto a8Info = ImageInfo::Make(image->width(), image->height(), ColorType::ALPHA_8,
+                                AlphaType::Premultiplied);
+  auto a8Pixels = new (std::nothrow) uint8_t[a8Info.byteSize()];
+  ASSERT_TRUE(image->readPixels(a8Info, a8Pixels));
+  auto rgbaFromA8Data = image->Encode(a8Info, a8Pixels, EncodedFormat::WEBP, 100);
+  auto rgbaFromA8Image = Image::MakeFrom(rgbaFromA8Data);
+  rgbaFromA8Image->readPixels(info, pixels);
+  CHECK_PIXELS(info, pixels, "WebpCodec_EncodeA8");
   delete[] pixels;
+  delete[] a8Pixels;
 }
 
 /**
@@ -311,8 +322,10 @@ PAG_TEST(PAGReadPixelsTest, JpegCodec) {
   auto pixels = new (std::nothrow)
       uint8_t[image->height() * image->width() * ImageInfo::GetBytesPerPixel(outputColorType)];
   ASSERT_TRUE(pixels);
-  auto info = ImageInfo::Make(4032, 3024, outputColorType, AlphaType::Premultiplied);
+  auto info =
+      ImageInfo::Make(image->width(), image->height(), outputColorType, AlphaType::Premultiplied);
   bool res = image->readPixels(info, pixels);
+  CHECK_PIXELS(info, pixels, "JpegCodec_Decode");
   PixelMap pixelMap(info, pixels);
 
   auto bytes = Image::Encode(pixelMap.info(), pixelMap.pixels(), EncodedFormat::JPEG, 20);
