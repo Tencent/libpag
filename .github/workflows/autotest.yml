@@ -35,6 +35,7 @@ jobs:
            /usr/local/bin/yasm
            /usr/local/bin/node
            /usr/local/bin/emscripten
+           /usr/local/bin/depsync
           key: ${{ hashFiles('DEPS') }}
       - name: pull third-party dependencies   
         # if: steps.cache-third_party.outputs.cache-hit != 'true'
