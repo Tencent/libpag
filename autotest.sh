@@ -13,6 +13,11 @@ WORKSPACE=$(pwd)
 
 cd $WORKSPACE
 
+which ninja
+which yasm
+
+ls vendor_tools/
+
 make_dir result
 make_dir build
 
