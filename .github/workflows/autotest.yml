@@ -39,7 +39,7 @@ jobs:
            /usr/local/bin/yasm
            /usr/local/Cellar/depsync
            /usr/local/bin/depsync
-          key: ${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-2
+          key: ${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-3
       - name: pull third-party dependencies   
         if: steps.cache-third_party.outputs.cache-hit != 'true'
         run: |
