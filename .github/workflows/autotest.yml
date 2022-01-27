@@ -19,21 +19,22 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+        with:
+          lfs: true
       
-      - name: Cache thirdparty codes and libraries
+      - name: cache-third_party
+        id: cache-third_party
         uses: actions/cache@v2
         with:
-         path: |
+          path:
            third_party
-           vendor
            vendor_tools
-         key: thirdparty-${{ hashFiles('**/package-lock.json') }}
-         restore-keys: |
-            thirdparty-codes-libraried
-      
-      - name: Run sync_deps script
-        run: ./sync_deps.sh 
-        shell: bash 
+          key: ${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+      - name: pull third-party dependencies   
+        if: steps.cache-third_party.outputs.cache-hit != 'true'
+        run: |
+          ./sync_deps.sh 
+           
       - name: Run autotest script
         run: |
          chmod +x autotest.sh
