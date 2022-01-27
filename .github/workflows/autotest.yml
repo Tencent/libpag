@@ -29,12 +29,17 @@ jobs:
           path:
            third_party
            vendor_tools
-          key: ${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+           /usr/local/etc/bash_completion.d
+           /usr/local/share/emacs/site-lisp/ninja
+           /usr/local/Cellar/ninja
+           /usr/local/Cellar/yasm
+           /usr/local/Cellar/node
+           /usr/local/Cellar/emscripten
+          key: ${{ hashFiles('DEPS') }}
       - name: pull third-party dependencies   
         if: steps.cache-third_party.outputs.cache-hit != 'true'
         run: |
           ./sync_deps.sh 
-           
       - name: Run autotest script
         run: |
          chmod +x autotest.sh
