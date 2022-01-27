@@ -40,9 +40,11 @@ jobs:
       - name: pull third-party dependencies   
         # if: steps.cache-third_party.outputs.cache-hit != 'true'
         run: |
+         ls vendor_tools/
           ./sync_deps.sh 
       - name: Run autotest script
         run: |
+         ls vendor_tools/
          chmod +x autotest.sh
          ./sync_deps.sh 
         # ./autotest.sh
