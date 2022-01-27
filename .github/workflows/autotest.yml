@@ -29,23 +29,32 @@ jobs:
           path: |
            third_party
            vendor_tools
-           ~/.ninja
-           ~/.yasm
-           ~/.node
-           ~/.emscripten
-           ~/.depsync
-          key: ${{ hashFiles('DEPS') }}-04
+           /usr/local/Cellar/ninja
+           /usr/local/bin/ninja
+           /usr/local/Cellar/node
+           /usr/local/bin/node
+           /usr/local/Cellar/emscripten
+           /usr/local/bin/emscripten
+           /usr/local/Cellar/yasm
+           /usr/local/bin/yasm
+           /usr/local/Cellar/depsync
+           /usr/local/bin/depsync
+          key: ${{ hashFiles('DEPS') }}-05
       - name: pull third-party dependencies   
         # if: steps.cache-third_party.outputs.cache-hit != 'true'
         run: |
-          ls vendor_tools/
           ./sync_deps.sh 
+      - name: pull third-party dependencies2   
+        # if: steps.cache-third_party.outputs.cache-hit == 'true'
+        run: |
+          brew link emscripten 
+          
       - name: Run autotest script
         run: |
          ls vendor_tools/
          chmod +x autotest.sh
          ./sync_deps.sh 
-        # ./autotest.sh
+         ./autotest.sh
         shell: bash
       - uses: actions/upload-artifact@v2
         with:
