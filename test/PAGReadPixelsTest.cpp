@@ -29,10 +29,10 @@
 namespace pag {
 using nlohmann::json;
 
-#define CHECK_PIXELS(info, pixels, key)                                                    \
-  {                                                                                        \
-    PixelMap pm(info, pixels);                                                             \
-    EXPECT_TRUE(Baseline::Compare(pm, "PAGReadPixelsTest/" + std::string(key) + ".webp")); \
+#define CHECK_PIXELS(info, pixels, key)                                          \
+  {                                                                              \
+    PixelMap pm(info, pixels);                                                   \
+    EXPECT_TRUE(Baseline::Compare(pm, "PAGReadPixelsTest/" + std::string(key))); \
   }
 
 /**
