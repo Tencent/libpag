@@ -39,12 +39,12 @@ jobs:
            /usr/local/bin/yasm
            /usr/local/Cellar/depsync
            /usr/local/bin/depsync
-          key: ${{ hashFiles('DEPS') }}-05
+          key: ${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-2
       - name: pull third-party dependencies   
         # if: steps.cache-third_party.outputs.cache-hit != 'true'
         run: |
           ./sync_deps.sh 
-      - name: pull third-party dependencies1   
+      - name: brew link emscripten 
         # if: steps.cache-third_party.outputs.cache-hit == 'true'
         run: |
           brew link emscripten 
