@@ -29,14 +29,12 @@ jobs:
           path: |
            third_party
            vendor_tools
-           /usr/local/etc/bash_completion.d
-           /usr/local/share/emacs/site-lisp/ninja
-           /usr/local/bin/ninja
-           /usr/local/bin/yasm
-           /usr/local/bin/node
-           /usr/local/bin/emscripten
-           /usr/local/bin/depsync
-          key: ${{ hashFiles('DEPS') }}-03
+           ~/.ninja
+           ~/.yasm
+           ~/.node
+           ~/.emscripten
+           ~/.depsync
+          key: ${{ hashFiles('DEPS') }}-04
       - name: pull third-party dependencies   
         # if: steps.cache-third_party.outputs.cache-hit != 'true'
         run: |
