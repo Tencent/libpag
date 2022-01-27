@@ -44,7 +44,7 @@ jobs:
         # if: steps.cache-third_party.outputs.cache-hit != 'true'
         run: |
           ./sync_deps.sh 
-      - name: pull third-party dependencies2   
+      - name: pull third-party dependencies1   
         # if: steps.cache-third_party.outputs.cache-hit == 'true'
         run: |
           brew link emscripten 
