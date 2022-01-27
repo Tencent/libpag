@@ -35,7 +35,7 @@ jobs:
            /usr/local/bin/yasm
            /usr/local/bin/node
            /usr/local/bin/emscripten
-          key: ${{ hashFiles('DEPS') }}-01
+          key: ${{ hashFiles('DEPS') }}
       - name: pull third-party dependencies   
         # if: steps.cache-third_party.outputs.cache-hit != 'true'
         run: |
@@ -43,7 +43,7 @@ jobs:
       - name: Run autotest script
         run: |
          chmod +x autotest.sh
-         ./autotest.sh
+        # ./autotest.sh
         shell: bash
       - uses: actions/upload-artifact@v2
         with:
