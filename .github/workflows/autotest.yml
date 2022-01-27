@@ -41,11 +41,11 @@ jobs:
            /usr/local/bin/depsync
           key: ${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-2
       - name: pull third-party dependencies   
-        # if: steps.cache-third_party.outputs.cache-hit != 'true'
+        if: steps.cache-third_party.outputs.cache-hit != 'true'
         run: |
           ./sync_deps.sh 
       - name: brew link emscripten 
-        # if: steps.cache-third_party.outputs.cache-hit == 'true'
+        if: steps.cache-third_party.outputs.cache-hit == 'true'
         run: |
           brew link emscripten 
           
