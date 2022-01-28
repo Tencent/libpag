@@ -18,7 +18,7 @@ make_dir build
 
 cd build
 
-cmake -DcppFlags="-fprofile-arcs -ftest-coverage -g -O0" ../
+cmake -DcppFlags="-fprofile-arcs -ftest-coverage -g -O0" -DSMOKE_TEST=ON ../
 if test $? -eq 0
 then
 echo "~~~~~~~~~~~~~~~~~~~CMakeLists OK~~~~~~~~~~~~~~~~~~"
