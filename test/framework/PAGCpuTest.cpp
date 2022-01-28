@@ -21,6 +21,7 @@
 #include "gtest/gtest.h"
 #include "utils/PAGTestUtils.h"
 
+
 namespace pag {
 
 std::shared_ptr<PAGFile> PAGCpuTest::TestPAGFile = nullptr;
@@ -62,13 +63,6 @@ void PAGCpuTest::PagTearDown() {
 
 std::string PAGCpuTest::GetPagPath() {
   return DEFAULT_PAG_PATH;
-}
-
-std::string PAGCpuTest::getMd5FromSnap() {
-  if (TestPAGSurface == nullptr) {
-    return "";
-  }
-  return DumpMD5(TestPAGSurface);
 }
 
 }  // namespace pag

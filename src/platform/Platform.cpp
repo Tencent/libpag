@@ -73,9 +73,6 @@ bool Platform::registerFallbackFonts() const {
   return false;
 }
 
-void Platform::reportStatisticalData(std::unordered_map<std::string, std::string>&) const {
-}
-
 NALUType Platform::naluType() const {
   return NALUType::AnnexB;
 }

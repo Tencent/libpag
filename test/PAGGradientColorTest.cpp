@@ -35,16 +35,9 @@ PAG_TEST_F(PAGGradientColorTest, GradientColor_ID84028439) {
     TestPAGPlayer->setComposition(pagFile);
     TestPAGPlayer->setProgress(0.5);
     TestPAGPlayer->flush();
-    auto md5 = DumpMD5(TestPAGSurface);
-    auto found = file.find_last_of("/\\");
-    auto fileName = file.substr(found + 1);
-    PAGTestEnvironment::DumpJson["PAGGradientColorTest"][fileName] = md5;
-#ifdef COMPARE_JSON_PATH
-    auto compareMD5 = PAGTestEnvironment::CompareJson["PAGGradientColorTest"][fileName];
-    auto path = "../test/out/gradient_" + fileName + ".png";
-    TraceIf(TestPAGSurface, path, compareMD5.get<std::string>() != md5);
-    EXPECT_EQ(compareMD5.get<std::string>(), md5);
-#endif
+    std::filesystem::path path(file);
+    auto key = path.filename().replace_extension();
+    EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGGradientColorTest/" + key.string()));
   }
 }
 }  // namespace pag

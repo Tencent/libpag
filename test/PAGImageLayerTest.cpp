@@ -35,12 +35,20 @@ PAG_TEST_F(PAGImageLayerTest, imageBasetTest) {
   std::shared_ptr<PAGImageLayer> imageLayer =
       std::static_pointer_cast<PAGImageLayer>(GetLayer(TestPAGFile, LayerType::Image, target));
   ASSERT_NE(imageLayer, nullptr);
-  auto file = PAGImage::FromPath("../test/res/compare_dump.json");
-  auto pag = PAGImage::FromPath("../resources/apitest/test.pag");
+  auto file = PAGImage::FromPath("../resources/font/NotoColorEmoji.ttf");
   // 非法文件都无法被decode成PAGImage，file是nullptr
+  EXPECT_TRUE(file == nullptr);
+  auto pag = PAGImage::FromPath("../resources/apitest/test.pag");
+  EXPECT_TRUE(pag == nullptr);
   imageLayer->replaceImage(file);
+  TestPAGPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGImageLayerTest/ImageReplacement_Empty"));
   imageLayer->replaceImage(pag);
+  TestPAGPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGImageLayerTest/ImageReplacement_Empty"));
   imageLayer->replaceImage(nullptr);
+  TestPAGPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGImageLayerTest/ImageReplacement_Empty"));
 }
 
 /**
@@ -76,13 +84,7 @@ PAG_TEST_F(PAGImageLayerTest, imageMultiThreadReplace) {
 
   imageLayer->replaceImage(image);
   TestPAGPlayer->flush();
-  auto md5 = getMd5FromSnap();
-  json imageLayerJson = {{"image", md5}};
-  PAGTestEnvironment::DumpJson["PAGImageLayerTest"] = imageLayerJson;
-#ifdef COMPARE_JSON_PATH
-  auto cJson = PAGTestEnvironment::CompareJson["PAGImageLayerTest"]["image"];
-  ASSERT_EQ(cJson.get<std::string>(), md5);
-#endif
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGImageLayerTest/ImageReplacement"));
 }
 
 /**

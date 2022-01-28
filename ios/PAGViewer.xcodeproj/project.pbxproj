@@ -27,8 +27,6 @@
 		4D72AC9D22C1C2AC00C60D04 /* PAGPlayerView.m in Sources */ = {isa = PBXBuildFile; fileRef = 5445132622687A0600503DE9 /* PAGPlayerView.m */; };
 		4D8D69452797EB5800BF1625 /* ffavc.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4D8D69432797EB0000BF1625 /* ffavc.framework */; };
 		4D8D69462797EB5800BF1625 /* ffavc.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 4D8D69432797EB0000BF1625 /* ffavc.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		4DC5D34523A08E0C007DFA8C /* md5 in Resources */ = {isa = PBXBuildFile; fileRef = 4DC5D34423A08E0C007DFA8C /* md5 */; };
-		4DC5D34623A08E0C007DFA8C /* md5 in Resources */ = {isa = PBXBuildFile; fileRef = 4DC5D34423A08E0C007DFA8C /* md5 */; };
 		4DC5D34823A09099007DFA8C /* md5.json in Resources */ = {isa = PBXBuildFile; fileRef = 4DC5D34723A09099007DFA8C /* md5.json */; };
 		4DC5D34923A09099007DFA8C /* md5.json in Resources */ = {isa = PBXBuildFile; fileRef = 4DC5D34723A09099007DFA8C /* md5.json */; };
 		5445132D22687A0600503DE9 /* PAGPlayerView.m in Sources */ = {isa = PBXBuildFile; fileRef = 5445132622687A0600503DE9 /* PAGPlayerView.m */; };
@@ -187,7 +185,6 @@
 		5478FF5C278EFAB100999C9C /* fail.jpeg in Resources */ = {isa = PBXBuildFile; fileRef = 4D72ABFA22C0FBC600C60D04 /* fail.jpeg */; };
 		5478FF5E278EFAB100999C9C /* loading.jpeg in Resources */ = {isa = PBXBuildFile; fileRef = 4D72ABF822C0FBC600C60D04 /* loading.jpeg */; };
 		5478FF5F278EFAB100999C9C /* md5.json in Resources */ = {isa = PBXBuildFile; fileRef = 4DC5D34723A09099007DFA8C /* md5.json */; };
-		5478FF69278EFAB100999C9C /* md5 in Resources */ = {isa = PBXBuildFile; fileRef = 4DC5D34423A08E0C007DFA8C /* md5 */; };
 		5478FF6C278EFAB100999C9C /* success.jpeg in Resources */ = {isa = PBXBuildFile; fileRef = 4D72ABF922C0FBC600C60D04 /* success.jpeg */; };
 		56A801A433B669FB17B83D83 /* Pods_PAGViewerSlim.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 693211C18FC56075B43D590B /* Pods_PAGViewerSlim.framework */; };
 		DE2FAB4622A21A7EC38498B8 /* Pods_PAGViewerTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8985467E174F172CB98BAB33 /* Pods_PAGViewerTest.framework */; };
@@ -240,7 +237,6 @@
 		4DA817522411FA7200C4FBB3 /* CoreMedia.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMedia.framework; path = System/Library/Frameworks/CoreMedia.framework; sourceTree = SDKROOT; };
 		4DA817542411FB9300C4FBB3 /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
 		4DA817562411FBA000C4FBB3 /* VideoToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = VideoToolbox.framework; path = System/Library/Frameworks/VideoToolbox.framework; sourceTree = SDKROOT; };
-		4DC5D34423A08E0C007DFA8C /* md5 */ = {isa = PBXFileReference; lastKnownFileType = folder; name = md5; path = ../../resources/md5; sourceTree = "<group>"; };
 		4DC5D34723A09099007DFA8C /* md5.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = md5.json; sourceTree = "<group>"; };
 		5445132622687A0600503DE9 /* PAGPlayerView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = PAGPlayerView.m; sourceTree = "<group>"; };
 		5445132A22687A0600503DE9 /* PAGPlayerView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PAGPlayerView.h; sourceTree = "<group>"; };
@@ -650,7 +646,6 @@
 			children = (
 				5478FF74278EFD2100999C9C /* Full */,
 				E62CBEBA2421BFF6007F8165 /* Slim */,
-				4DC5D34423A08E0C007DFA8C /* md5 */,
 				4DC5D301239FD95D007DFA8C /* assets */,
 				4D72AB7722C0FB1300C60D04 /* Resources */,
 				F2ED88A11FCBEDF100555707 /* AppDelegate.h */,
@@ -779,7 +774,6 @@
 				4D72AC8722C1071600C60D04 /* fail.jpeg in Resources */,
 				4D72AC8A22C1071600C60D04 /* loading.jpeg in Resources */,
 				4DC5D34923A09099007DFA8C /* md5.json in Resources */,
-				4DC5D34623A08E0C007DFA8C /* md5 in Resources */,
 				4D72AC9222C1071600C60D04 /* success.jpeg in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -860,7 +854,6 @@
 				545B9812278F115400A0112E /* bulgetext.pag in Resources */,
 				545B982C278F115400A0112E /* RootLayerBitmapFreeze.pag in Resources */,
 				545B9804278F115400A0112E /* srgb.pag in Resources */,
-				5478FF69278EFAB100999C9C /* md5 in Resources */,
 				545B9800278F115400A0112E /* fans.pag in Resources */,
 				545B9810278F115400A0112E /* travel.pag in Resources */,
 				5478FF6C278EFAB100999C9C /* success.jpeg in Resources */,
@@ -932,7 +925,6 @@
 				545B97F9278F115300A0112E /* moonlight.pag in Resources */,
 				4DC5D34823A09099007DFA8C /* md5.json in Resources */,
 				545B9803278F115400A0112E /* jisha.pag in Resources */,
-				4DC5D34523A08E0C007DFA8C /* md5 in Resources */,
 				545B9843278F115400A0112E /* test.pag in Resources */,
 				545B97ED278F115300A0112E /* scene.png in Resources */,
 				545B9841278F115400A0112E /* transitions.pag in Resources */,

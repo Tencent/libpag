@@ -51,7 +51,8 @@ inline double FrameToProgress(Frame currentFrame, Frame totalFrames) {
   if (currentFrame >= totalFrames - 1) {
     return 1;
   }
-  return currentFrame * 1.0 / totalFrames;
+  // todo(partyhuang): figure out which one is best for offsetting, 0.1 or 0.5?
+  return (currentFrame * 1.0 + 0.1) / totalFrames;
 }
 
 inline int64_t ProgressToTime(double progress, int64_t totalTime) {

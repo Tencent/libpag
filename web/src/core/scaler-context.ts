@@ -1,5 +1,6 @@
 import { NativeImage } from './native-image';
 import { measureText } from '../utils/measure-text';
+import { defaultFontNames } from '../utils/font-family';
 
 export interface Bounds {
   top: number;
@@ -56,6 +57,8 @@ export class ScalerContext {
   }
 
   public fontString() {
+    const fallbackFontNames = defaultFontNames.concat();
+    fallbackFontNames.unshift(this.fontName);
     const attributes = [];
     if (this.fauxBold) {
       attributes.push('bold');
@@ -64,7 +67,7 @@ export class ScalerContext {
       attributes.push('italic');
     }
     attributes.push(`${this.size}px`);
-    attributes.push(`${this.fontName}`);
+    attributes.push(`${fallbackFontNames.join(',')}`);
     return attributes.join(' ');
   }
 

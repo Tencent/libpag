@@ -35,9 +35,6 @@ export const binding = (module: PAG) => {
   module.ScalerContext = ScalerContext;
   module.WebMask = WebMask;
   WebMask.module = module;
-  module.registerFontPath = function (path) {
-    this._RegisterFontPath(path);
-  };
   module.setFallbackFontNames = function (fontNames) {
     this._SetFallbackFontNames(fontNames);
   };

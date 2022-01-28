@@ -28,7 +28,7 @@ PAG_TEST_SUIT(PAGSimplePathTest)
 /**
  * 用例描述: 测试 shader 绘制椭圆
  */
-PAG_TEST_F(PAGSimplePathTest, TestRRect_ID86088211) {
+PAG_TEST_F(PAGSimplePathTest, TestRect) {
   auto pagFile = PAGFile::Load("../resources/apitest/ellipse.pag");
   auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_shared<PAGPlayer>();
@@ -37,12 +37,6 @@ PAG_TEST_F(PAGSimplePathTest, TestRRect_ID86088211) {
   pagPlayer->setMatrix(Matrix::I());
   pagPlayer->setProgress(0);
   pagPlayer->flush();
-  auto md5 = DumpMD5(pagSurface);
-  PAGTestEnvironment::DumpJson["PAGSimplePathTest"]["TestRRect_ID86088211"] = md5;
-#ifdef COMPARE_JSON_PATH
-  auto compareMD5 = PAGTestEnvironment::CompareJson["PAGSimplePathTest"]["TestRRect_ID86088211"];
-  TraceIf(pagSurface, "../test/out/TestRRect_ID86088211.png", compareMD5.get<std::string>() != md5);
-  EXPECT_EQ(compareMD5.get<std::string>(), md5);
-#endif
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGSimplePathTest/TestRect"));
 }
 }  // namespace pag
