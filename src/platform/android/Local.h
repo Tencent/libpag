@@ -19,9 +19,49 @@
 #pragma once
 
 #include <jni.h>
-#include "Local.h"
 
-class JNIEnvironment {
+template<typename T>
+class Local {
  public:
-  static JNIEnv* Current();
+  Local() = default;
+
+  Local(const Local<T>& that) = delete;
+
+  Local<T>& operator=(const Local<T>& that) = delete;
+
+  Local(JNIEnv* env, T ref) : _env(env), ref(ref) {
+  }
+
+  ~Local() {
+    if (_env != nullptr) {
+      _env->DeleteLocalRef(ref);
+    }
+  }
+
+  void reset(JNIEnv* env, T reference) {
+    if (reference == ref) {
+      return;
+    }
+    if (_env != nullptr) {
+      _env->DeleteLocalRef(ref);
+    }
+    _env = env;
+    ref = reference;
+  }
+
+  bool empty() const {
+    return ref == nullptr;
+  }
+
+  T get() const {
+    return ref;
+  }
+
+  JNIEnv* env() const {
+    return _env;
+  }
+
+ private:
+  JNIEnv* _env = nullptr;
+  T ref = nullptr;
 };

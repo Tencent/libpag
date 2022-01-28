@@ -36,20 +36,19 @@ void JTraceImage::Trace(const PixelMap& pixelMap, const std::string& tag) {
   }
 
   auto rowBytes = static_cast<size_t>(pixelMap.width() * 4);
-  auto pixels = new (std::nothrow) uint8_t[pixelMap.height() * rowBytes];
+  auto pixels = new(std::nothrow) uint8_t[pixelMap.height() * rowBytes];
   if (pixels == nullptr) {
     return;
   }
   auto info = ImageInfo::Make(pixelMap.width(), pixelMap.height(), ColorType::RGBA_8888,
                               AlphaType::Premultiplied, rowBytes);
   pixelMap.readPixels(info, pixels);
-  auto byteBuffer =
-      MakeByteBufferObject(env, pixels, static_cast<size_t>(pixelMap.height() * rowBytes));
-  auto tagString = SafeConvertToJString(env, tag.c_str());
-  env->CallStaticVoidMethod(TraceImageClass.get(), TraceImage_Trace, tagString, byteBuffer,
+  Local<jobject> byteBuffer =
+      {env, MakeByteBufferObject(env, pixels, static_cast<size_t>(pixelMap.height() * rowBytes))};
+  Local<jstring> tagString = {env, SafeConvertToJString(env, tag.c_str())};
+  env->CallStaticVoidMethod(TraceImageClass.get(), TraceImage_Trace, tagString.get(),
+                            byteBuffer.get(),
                             pixelMap.width(), pixelMap.height());
-  env->DeleteLocalRef(byteBuffer);
-  env->DeleteLocalRef(tagString);
   delete[] pixels;
 }
 }  // namespace pag

@@ -70,17 +70,16 @@ GPUDecoder::GPUDecoder(const VideoConfig& config) {
   if (videoSurface == nullptr) {
     return;
   }
-  jobject outputSurface = videoSurface->getOutputSurface(env);
-  jobject decoder =
-      env->CallStaticObjectMethod(GPUDecoderClass.get(), GPUDecoder_Create, outputSurface);
-  env->DeleteLocalRef(outputSurface);
-  if (decoder == nullptr) {
+  Local<jobject> outputSurface = {env, videoSurface->getOutputSurface(env)};
+  Local<jobject> decoder =
+      {env,
+       env->CallStaticObjectMethod(GPUDecoderClass.get(), GPUDecoder_Create, outputSurface.get())};
+  if (decoder.empty()) {
     _isValid = false;
     return;
   }
-  videoDecoder.reset(env, decoder);
-  _isValid = onConfigure(decoder, config);
-  env->DeleteLocalRef(decoder);
+  videoDecoder.reset(env,decoder.get());
+  _isValid = onConfigure(decoder.get(), config);
 }
 
 GPUDecoder::~GPUDecoder() {
@@ -100,14 +99,14 @@ bool GPUDecoder::onConfigure(jobject decoder, const VideoConfig& config) {
   if (env == nullptr) {
     return false;
   }
-  jstring mimeType = SafeConvertToJString(env, config.mimeType.c_str());
-  auto mediaFormat = env->CallStaticObjectMethod(
-      MediaFormatClass.get(), MediaFormat_createVideoFormat, mimeType, config.width, config.height);
-  env->DeleteLocalRef(mimeType);
+  Local<jstring> mimeType = {env, SafeConvertToJString(env, config.mimeType.c_str())};
+  Local<jobject> mediaFormat = {env, env->CallStaticObjectMethod(
+      MediaFormatClass.get(), MediaFormat_createVideoFormat, mimeType.get(), config.width,
+      config.height)};
   if (config.mimeType == "video/hevc") {
     if (!config.headers.empty()) {
       char keyString[] = "csd-0";
-      auto key = SafeConvertToJString(env, keyString);
+      Local<jstring> key = {env, SafeConvertToJString(env, keyString)};
       int dataLength = 0;
       for (auto& header : config.headers) {
         dataLength += header->length();
@@ -118,10 +117,8 @@ bool GPUDecoder::onConfigure(jobject decoder, const VideoConfig& config) {
         memcpy(data + index, header->data(), header->length());
         index += header->length();
       }
-      auto bytes = env->NewDirectByteBuffer(data, dataLength);
-      env->CallVoidMethod(mediaFormat, MediaFormat_setByteBuffer, key, bytes);
-      env->DeleteLocalRef(key);
-      env->DeleteLocalRef(bytes);
+      Local<jobject> bytes = {env, env->NewDirectByteBuffer(data, dataLength)};
+      env->CallVoidMethod(mediaFormat.get(), MediaFormat_setByteBuffer, key.get(), bytes.get());
       delete[] data;
     }
   } else {
@@ -129,22 +126,17 @@ bool GPUDecoder::onConfigure(jobject decoder, const VideoConfig& config) {
     for (auto& header : config.headers) {
       char keyString[6];
       snprintf(keyString, 6, "csd-%d", index);
-      auto key = SafeConvertToJString(env, keyString);
-      auto bytes = env->NewDirectByteBuffer(header->data(), header->length());
-      env->CallVoidMethod(mediaFormat, MediaFormat_setByteBuffer, key, bytes);
-      env->DeleteLocalRef(key);
-      env->DeleteLocalRef(bytes);
+      Local<jstring> key = {env, SafeConvertToJString(env, keyString)};
+      Local<jobject> bytes = {env, env->NewDirectByteBuffer(header->data(), header->length())};
+      env->CallVoidMethod(mediaFormat.get(), MediaFormat_setByteBuffer, key.get(), bytes.get());
       index++;
     }
   }
   char frameRateKeyString[] = "frame-rate";
-  auto frameRateKey = SafeConvertToJString(env, frameRateKeyString);
-  env->CallVoidMethod(mediaFormat, MediaFormat_setFloat, frameRateKey, config.frameRate);
-  env->DeleteLocalRef(frameRateKey);
-  auto result = env->CallBooleanMethod(decoder, GPUDecoder_onConfigure, mediaFormat);
-  env->DeleteLocalRef(mediaFormat);
-
-  return result;
+  Local<jstring> frameRateKey = {env, SafeConvertToJString(env, frameRateKeyString)};
+  env->CallVoidMethod(mediaFormat.get(), MediaFormat_setFloat, frameRateKey.get(),
+                      config.frameRate);
+  return env->CallBooleanMethod(decoder, GPUDecoder_onConfigure, mediaFormat.get());
 }
 
 DecodingResult GPUDecoder::onSendBytes(void* bytes, size_t length, int64_t time) {
@@ -153,9 +145,9 @@ DecodingResult GPUDecoder::onSendBytes(void* bytes, size_t length, int64_t time)
     LOGE("GPUDecoder: Error on sending bytes for decoding.\n");
     return pag::DecodingResult::Error;
   }
-  auto byteBuffer = env->NewDirectByteBuffer(bytes, length);
-  auto result = env->CallIntMethod(videoDecoder.get(), GPUDecoder_onSendBytes, byteBuffer, time);
-  env->DeleteLocalRef(byteBuffer);
+  Local<jobject> byteBuffer = {env, env->NewDirectByteBuffer(bytes, length)};
+  auto result = env->CallIntMethod(videoDecoder.get(), GPUDecoder_onSendBytes, byteBuffer.get(),
+                                   time);
   return static_cast<pag::DecodingResult>(result);
 }
 
