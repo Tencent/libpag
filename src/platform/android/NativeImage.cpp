@@ -24,34 +24,64 @@
 #include "image/PixelMap.h"
 
 namespace pag {
-#define COLOR_TYPE_ALPHA_8 1
-#define COLOR_TYPE_ARGB_8888_PREMULTIPLIED 2
-#define COLOR_TYPE_ARGB_8888_UNPREMULTIPLIED 3
-
-static Global<jclass> ImageCodecClass;
-static jmethodID ImageCodec_GetOrientationFromPath;
-static jmethodID ImageCodec_GetOrientationFromBytes;
-static jmethodID ImageCodec_GetSizeFromPath;
-static jmethodID ImageCodec_GetSizeFromBytes;
-static jmethodID ImageCodec_CreateBitmapFromPath;
-static jmethodID ImageCodec_CreateBitmapFromBytes;
+static Global<jclass> BitmapFactoryOptionsClass;
+static jmethodID BitmapFactoryOptions_Constructor;
+static jfieldID BitmapFactoryOptions_inJustDecodeBounds;
+static jfieldID BitmapFactoryOptions_inPreferredConfig;
+static jfieldID BitmapFactoryOptions_inPremultiplied;
+static jfieldID BitmapFactoryOptions_outWidth;
+static jfieldID BitmapFactoryOptions_outHeight;
+static Global<jclass> BitmapFactoryClass;
+static jmethodID BitmapFactory_decodeFile;
+static jmethodID BitmapFactory_decodeByteArray;
+static Global<jclass> ByteArrayInputStreamClass;
+static jmethodID ByteArrayInputStream_Constructor;
+static Global<jclass> ExifInterfaceClass;
+static jmethodID ExifInterface_Constructor_Path;
+static jmethodID ExifInterface_Constructor_Stream;
+static jmethodID ExifInterfaceClass_getAttributeInt;
+static Global<jclass> BitmapConfigClass;
+static jfieldID BitmapConfig_ALPHA_8;
+static jfieldID BitmapConfig_ARGB_8888;
 
 void NativeImage::InitJNI(JNIEnv* env) {
-  ImageCodecClass.reset(env, env->FindClass("org/libpag/ImageCodec"));
-  ImageCodec_GetSizeFromPath =
-      env->GetStaticMethodID(ImageCodecClass.get(), "GetSizeFromPath", "(Ljava/lang/String;)[I");
-  ImageCodec_GetSizeFromBytes = env->GetStaticMethodID(ImageCodecClass.get(), "GetSizeFromBytes",
-                                                       "(Ljava/nio/ByteBuffer;)[I");
-  ImageCodec_GetOrientationFromPath = env->GetStaticMethodID(
-      ImageCodecClass.get(), "GetOrientationFromPath", "(Ljava/lang/String;)I");
-  ImageCodec_GetOrientationFromBytes = env->GetStaticMethodID(
-      ImageCodecClass.get(), "GetOrientationFromBytes", "(Ljava/nio/ByteBuffer;)I");
-  ImageCodec_CreateBitmapFromPath =
-      env->GetStaticMethodID(ImageCodecClass.get(), "CreateBitmapFromPath",
-                             "(Ljava/lang/String;I)Landroid/graphics/Bitmap;");
-  ImageCodec_CreateBitmapFromBytes =
-      env->GetStaticMethodID(ImageCodecClass.get(), "CreateBitmapFromBytes",
-                             "(Ljava/nio/ByteBuffer;I)Landroid/graphics/Bitmap;");
+  BitmapFactoryOptionsClass.reset(env, env->FindClass("android/graphics/BitmapFactory$Options"));
+  BitmapFactoryOptions_Constructor =
+      env->GetMethodID(BitmapFactoryOptionsClass.get(), "<init>", "()V");
+  BitmapFactoryOptions_inJustDecodeBounds = env->GetFieldID(BitmapFactoryOptionsClass.get(),
+                                                            "inJustDecodeBounds", "Z");
+  BitmapFactoryOptions_inPreferredConfig = env->GetFieldID(BitmapFactoryOptionsClass.get(),
+                                                           "inPreferredConfig",
+                                                           "Landroid/graphics/Bitmap$Config;");
+  BitmapFactoryOptions_inPremultiplied = env->GetFieldID(BitmapFactoryOptionsClass.get(),
+                                                         "inPremultiplied", "Z");
+  BitmapFactoryOptions_outWidth = env->GetFieldID(BitmapFactoryOptionsClass.get(),
+                                                  "outWidth", "I");
+  BitmapFactoryOptions_outHeight = env->GetFieldID(BitmapFactoryOptionsClass.get(),
+                                                   "outHeight", "I");
+  ByteArrayInputStreamClass.reset(env, env->FindClass("java/io/ByteArrayInputStream"));
+  ByteArrayInputStream_Constructor =
+      env->GetMethodID(ByteArrayInputStreamClass.get(), "<init>", "([B)V");
+  ExifInterfaceClass.reset(env, env->FindClass("android/media/ExifInterface"));
+  ExifInterface_Constructor_Path =
+      env->GetMethodID(ExifInterfaceClass.get(), "<init>", "(Ljava/lang/String;)V");
+  ExifInterface_Constructor_Stream =
+      env->GetMethodID(ExifInterfaceClass.get(), "<init>", "(Ljava/io/InputStream;)V");
+  ExifInterfaceClass_getAttributeInt = env->GetMethodID(ExifInterfaceClass.get(), "getAttributeInt",
+                                                        "(Ljava/lang/String;I)I");
+  BitmapFactoryClass.reset(env, env->FindClass("android/graphics/BitmapFactory"));
+  BitmapFactory_decodeFile =
+      env->GetStaticMethodID(BitmapFactoryClass.get(), "decodeFile",
+                             "(Ljava/lang/String;Landroid/graphics/BitmapFactory$Options;)Landroid/graphics/Bitmap;");
+  BitmapFactory_decodeByteArray =
+      env->GetStaticMethodID(BitmapFactoryClass.get(), "decodeByteArray",
+                             "([BIILandroid/graphics/BitmapFactory$Options;)Landroid/graphics/Bitmap;");
+  BitmapConfigClass.reset(env, env->FindClass("android/graphics/Bitmap$Config"));
+  BitmapConfig_ALPHA_8 = env->GetStaticFieldID(BitmapConfigClass.get(),
+                                               "ALPHA_8", "Landroid/graphics/Bitmap$Config;");
+  BitmapConfig_ARGB_8888 = env->GetStaticFieldID(BitmapConfigClass.get(),
+                                                 "ARGB_8888", "Landroid/graphics/Bitmap$Config;");
+
 }
 
 std::shared_ptr<NativeImage> NativeImage::Make(JNIEnv* env, jobject sizeObject, int orientation) {
@@ -66,23 +96,65 @@ std::shared_ptr<NativeImage> NativeImage::Make(JNIEnv* env, jobject sizeObject, 
       new NativeImage(width, height, static_cast<Orientation>(orientation)));
 }
 
+static Orientation GetOrientation(JNIEnv* env, jobject exifInterface) {
+  if (exifInterface == nullptr) {
+    env->ExceptionClear();
+    return Orientation::TopLeft;
+  }
+  auto key = env->NewStringUTF("Orientation");
+  auto orientation = env->CallIntMethod(exifInterface, ExifInterfaceClass_getAttributeInt, key,
+                                        static_cast<int>(Orientation::TopLeft));
+  env->DeleteLocalRef(key);
+  return static_cast<Orientation>(orientation);
+}
+
+static jobject DecodeBitmap(JNIEnv* env, jobject options, const std::string& filePath) {
+  jstring imagePath = SafeConvertToJString(env, filePath.c_str());
+  auto bitmap = env->CallStaticObjectMethod(BitmapFactoryClass.get(), BitmapFactory_decodeFile,
+                                            imagePath, options);
+  env->DeleteLocalRef(imagePath);
+  return bitmap;
+}
+
 std::shared_ptr<Image> NativeImage::MakeFrom(const std::string& filePath) {
   auto env = JNIEnvironment::Current();
-  if (env == nullptr) {
+  if (env == nullptr || filePath.empty()) {
+    return nullptr;
+  }
+  jobject options = env->NewObject(BitmapFactoryOptionsClass.get(),
+                                   BitmapFactoryOptions_Constructor);
+  if (options == nullptr) {
+    return nullptr;
+  }
+  env->SetBooleanField(options, BitmapFactoryOptions_inJustDecodeBounds, true);
+  DecodeBitmap(env, options, filePath);
+  auto width = env->GetIntField(options, BitmapFactoryOptions_outWidth);
+  auto height = env->GetIntField(options, BitmapFactoryOptions_outHeight);
+  env->DeleteLocalRef(options);
+  if (width <= 0 || height <= 0) {
+    env->ExceptionClear();
     return nullptr;
   }
   jstring imagePath = SafeConvertToJString(env, filePath.c_str());
-  auto sizeObject =
-      env->CallStaticObjectMethod(ImageCodecClass.get(), ImageCodec_GetSizeFromPath, imagePath);
-  auto orientation =
-      env->CallStaticIntMethod(ImageCodecClass.get(), ImageCodec_GetOrientationFromPath, imagePath);
-  auto image = Make(env, sizeObject, orientation);
-  if (image != nullptr) {
-    image->imagePath = filePath;
-  }
-  env->DeleteLocalRef(sizeObject);
+  jobject exifInterface = env->NewObject(ExifInterfaceClass.get(),
+                                         ExifInterface_Constructor_Path, imagePath);
   env->DeleteLocalRef(imagePath);
-  return image;
+  auto orientation = GetOrientation(env, exifInterface);
+  env->DeleteLocalRef(exifInterface);
+  auto codec = std::unique_ptr<NativeImage>(
+      new NativeImage(width, height, orientation));
+  codec->imagePath = filePath;
+  return codec;
+}
+
+static jobject DecodeBitmap(JNIEnv* env, jobject options, std::shared_ptr<Data> imageBytes) {
+  jbyteArray byteArray = env->NewByteArray(imageBytes->size());
+  env->SetByteArrayRegion(byteArray, 0, imageBytes->size(),
+                          reinterpret_cast<const jbyte*>(imageBytes->data()));
+  auto bitmap = env->CallStaticObjectMethod(BitmapFactoryClass.get(), BitmapFactory_decodeByteArray,
+                                            byteArray, 0, imageBytes->size(), options);
+  env->DeleteLocalRef(byteArray);
+  return bitmap;
 }
 
 std::shared_ptr<Image> NativeImage::MakeFrom(std::shared_ptr<Data> imageBytes) {
@@ -90,19 +162,35 @@ std::shared_ptr<Image> NativeImage::MakeFrom(std::shared_ptr<Data> imageBytes) {
   if (env == nullptr || imageBytes == nullptr) {
     return nullptr;
   }
-  auto byteBuffer =
-      env->NewDirectByteBuffer(const_cast<void*>(imageBytes->data()), imageBytes->size());
-  auto sizeObject =
-      env->CallStaticObjectMethod(ImageCodecClass.get(), ImageCodec_GetSizeFromBytes, byteBuffer);
-  auto orientation = env->CallStaticIntMethod(ImageCodecClass.get(),
-                                              ImageCodec_GetOrientationFromBytes, byteBuffer);
-  auto image = Make(env, sizeObject, orientation);
-  if (image != nullptr) {
-    image->imageBytes = imageBytes;
+  jobject options = env->NewObject(BitmapFactoryOptionsClass.get(),
+                                   BitmapFactoryOptions_Constructor);
+  if (options == nullptr) {
+    return nullptr;
   }
-  env->DeleteLocalRef(sizeObject);
-  env->DeleteLocalRef(byteBuffer);
-  return image;
+  env->SetBooleanField(options, BitmapFactoryOptions_inJustDecodeBounds, true);
+  DecodeBitmap(env, options, imageBytes);
+  auto width = env->GetIntField(options, BitmapFactoryOptions_outWidth);
+  auto height = env->GetIntField(options, BitmapFactoryOptions_outHeight);
+  env->DeleteLocalRef(options);
+  if (width <= 0 || height <= 0) {
+    env->ExceptionClear();
+    return nullptr;
+  }
+  jbyteArray byteArray = env->NewByteArray(imageBytes->size());
+  env->SetByteArrayRegion(byteArray, 0, imageBytes->size(),
+                          reinterpret_cast<const jbyte*>(imageBytes->data()));
+  jobject inputStream = env->NewObject(ByteArrayInputStreamClass.get(),
+                                       ByteArrayInputStream_Constructor, byteArray);
+  jobject exifInterface = env->NewObject(ExifInterfaceClass.get(),
+                                         ExifInterface_Constructor_Stream, inputStream);
+  auto orientation = GetOrientation(env, exifInterface);
+  env->DeleteLocalRef(exifInterface);
+  env->DeleteLocalRef(inputStream);
+  env->DeleteLocalRef(byteArray);
+  auto codec = std::unique_ptr<NativeImage>(
+      new NativeImage(width, height, orientation));
+  codec->imageBytes = imageBytes;
+  return codec;
 }
 
 bool NativeImage::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
@@ -113,42 +201,39 @@ bool NativeImage::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (env == nullptr) {
     return false;
   }
-  int androidColorType = 0;
-  switch (dstInfo.colorType()) {
-    case ColorType::RGBA_8888:
-      androidColorType = dstInfo.alphaType() == AlphaType::Premultiplied
-                             ? COLOR_TYPE_ARGB_8888_PREMULTIPLIED
-                             : COLOR_TYPE_ARGB_8888_UNPREMULTIPLIED;
-      break;
-    case ColorType::ALPHA_8:
-      androidColorType = COLOR_TYPE_ALPHA_8;
-      break;
-    default:
-      break;
-  }
-  if (androidColorType == 0) {
+  jobject options = env->NewObject(BitmapFactoryOptionsClass.get(),
+                                   BitmapFactoryOptions_Constructor);
+  if (options == nullptr) {
+    env->ExceptionClear();
     return false;
   }
-  jobject bitmap = NULL;
-  if (!imagePath.empty()) {
-    jstring path = SafeConvertToJString(env, imagePath.c_str());
-    bitmap = env->CallStaticObjectMethod(ImageCodecClass.get(), ImageCodec_CreateBitmapFromPath,
-                                         path, androidColorType);
-    env->DeleteLocalRef(path);
+  jobject config;
+  if (dstInfo.colorType() == ColorType::ALPHA_8) {
+    config = env->GetStaticObjectField(BitmapConfigClass.get(), BitmapConfig_ALPHA_8);
   } else {
-    auto byteBuffer =
-        env->NewDirectByteBuffer(const_cast<void*>(imageBytes->data()), imageBytes->size());
-    bitmap = env->CallStaticObjectMethod(ImageCodecClass.get(), ImageCodec_CreateBitmapFromBytes,
-                                         byteBuffer, androidColorType);
-    env->DeleteLocalRef(byteBuffer);
+    config = env->GetStaticObjectField(BitmapConfigClass.get(), BitmapConfig_ARGB_8888);
   }
+  env->SetObjectField(options, BitmapFactoryOptions_inPreferredConfig, config);
+  env->DeleteLocalRef(config);
+  if (dstInfo.alphaType() == AlphaType::Unpremultiplied) {
+    env->SetBooleanField(options, BitmapFactoryOptions_inPremultiplied, false);
+  }
+  jobject bitmap = nullptr;
+  if (!imagePath.empty()) {
+    bitmap = DecodeBitmap(env, options, imagePath);
+  } else {
+    bitmap = DecodeBitmap(env, options, imageBytes);
+  }
+  env->DeleteLocalRef(options);
   auto info = GetImageInfo(env, bitmap);
   if (info.isEmpty()) {
+    env->ExceptionClear();
     env->DeleteLocalRef(bitmap);
     return false;
   }
   void* pixels = nullptr;
   if (AndroidBitmap_lockPixels(env, bitmap, &pixels) != 0) {
+    env->ExceptionClear();
     env->DeleteLocalRef(bitmap);
     return false;
   }
