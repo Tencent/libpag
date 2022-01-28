@@ -30,21 +30,8 @@ namespace pag {
 #define OUT_BASELINE_ROOT "../test/out/baseline/"
 #define OUT_COMPARE_ROOT "../test/out/compare/"
 #define COMPRESS_FILE_EXT ".lzma2"
-
-static std::unordered_set<std::string> clearedFolders = {};
-
-static void ClearPreviousOutput(const std::string& key) {
-  std::filesystem::path folder = key;
-  while (!folder.parent_path().empty()) {
-    folder = folder.parent_path();
-  }
-  if (clearedFolders.count(folder) > 0) {
-    return;
-  }
-  clearedFolders.insert(folder);
-  std::filesystem::remove_all(OUT_BASELINE_ROOT + folder.string());
-  std::filesystem::remove_all(OUT_COMPARE_ROOT + folder.string());
-}
+#define MAX_DIFF_COUNT 10
+#define MAX_DIFF_VALUE 5
 
 static ImageInfo MakeInfo(int with, int height) {
   return ImageInfo::Make(with, height, ColorType::RGBA_8888, AlphaType::Premultiplied);
@@ -85,8 +72,14 @@ static void SaveImage(const ImageInfo& info, const std::shared_ptr<Data>& imageD
   SaveData(compareImage, OUT_COMPARE_ROOT + key + "_new.webp");
 }
 
-bool ComparePixelData(const std::shared_ptr<Data>& pixelData, const std::string& key) {
-  ClearPreviousOutput(key);
+static void ClearPreviousOutput(const std::string& key) {
+  std::filesystem::remove(OUT_BASELINE_ROOT + key + COMPRESS_FILE_EXT);
+  std::filesystem::remove(OUT_COMPARE_ROOT + key + "_baseline.webp");
+  std::filesystem::remove(OUT_COMPARE_ROOT + key + "_new.webp");
+}
+
+static bool ComparePixelData(const std::shared_ptr<Data>& pixelData, const std::string& key,
+                             const ImageInfo& info) {
   if (pixelData == nullptr) {
     return false;
   }
@@ -94,16 +87,23 @@ bool ComparePixelData(const std::shared_ptr<Data>& pixelData, const std::string&
   if (baselineData == nullptr || pixelData->size() != baselineData->size()) {
     return false;
   }
+  size_t diffCount = 0;
   auto baseline = baselineData->bytes();
   auto pixels = pixelData->bytes();
   auto byteSize = pixelData->size();
   for (size_t index = 0; index < byteSize; index++) {
     auto pixelA = pixels[index];
     auto pixelB = baseline[index];
-    if (abs(pixelA - pixelB) > 3) {
-      return false;
+    if (abs(pixelA - pixelB) > MAX_DIFF_VALUE) {
+      diffCount++;
     }
   }
+  // We assume that the two images are the same if the number of different pixels is less than 10.
+  if (diffCount > MAX_DIFF_COUNT) {
+    SaveImage(info, pixelData, key);
+    return false;
+  }
+  ClearPreviousOutput(key);
   return true;
 }
 
@@ -121,11 +121,7 @@ bool Baseline::Compare(const std::shared_ptr<PixelBuffer>& pixelBuffer, const st
   if (!result) {
     return false;
   }
-  result = ComparePixelData(data, key);
-  if (!result) {
-    SaveImage(info, data, key);
-  }
-  return result;
+  return ComparePixelData(data, key, info);
 }
 
 bool Baseline::Compare(const Bitmap& bitmap, const std::string& key) {
@@ -139,11 +135,7 @@ bool Baseline::Compare(const Bitmap& bitmap, const std::string& key) {
   if (!result) {
     return false;
   }
-  result = ComparePixelData(data, key);
-  if (!result) {
-    SaveImage(info, data, key);
-  }
-  return result;
+  return ComparePixelData(data, key, info);
 }
 
 bool Baseline::Compare(const PixelMap& pixelMap, const std::string& key) {
@@ -157,11 +149,7 @@ bool Baseline::Compare(const PixelMap& pixelMap, const std::string& key) {
   if (!result) {
     return false;
   }
-  result = ComparePixelData(data, key);
-  if (!result) {
-    SaveImage(info, data, key);
-  }
-  return result;
+  return ComparePixelData(data, key, info);
 }
 
 bool Baseline::Compare(const std::shared_ptr<PAGSurface>& surface, const std::string& key) {
@@ -176,10 +164,6 @@ bool Baseline::Compare(const std::shared_ptr<PAGSurface>& surface, const std::st
   if (!result) {
     return false;
   }
-  result = ComparePixelData(data, key);
-  if (!result) {
-    SaveImage(info, data, key);
-  }
-  return result;
+  return ComparePixelData(data, key, info);
 }
 }  // namespace pag

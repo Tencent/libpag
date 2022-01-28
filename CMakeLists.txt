@@ -1,10 +1,11 @@
 cmake_minimum_required(VERSION 3.1)
 project(PAG)
 
-if (APPLE AND NOT IOS)
-    SET(CMAKE_SYSTEM_PROCESSOR x86_64)
-    SET(CMAKE_OSX_ARCHITECTURES x86_64)
-endif ()
+# Uncomment the next 4 lines to build libpag for Intel cpus.
+#if (APPLE AND NOT IOS)
+#    SET(CMAKE_SYSTEM_PROCESSOR x86_64)
+#    SET(CMAKE_OSX_ARCHITECTURES x86_64)
+#endif ()
 
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 include(./vendor_tools/vendor.cmake)

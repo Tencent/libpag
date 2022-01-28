@@ -65,8 +65,8 @@ class CompareFrameTask : public Executor {
   bool success = false;
 
   void execute() override {
-    success = Baseline::Compare(pixelBuffer, "PAGCompareFrameTest/" + fileName + "/" +
-                                                 std::to_string(_currentFrame));
+    success = Baseline::Compare(
+        pixelBuffer, "PAGCompareFrameTest/" + fileName + "/" + std::to_string(_currentFrame));
   }
 };
 
@@ -102,6 +102,9 @@ void CompareFileFrames(Semaphore* semaphore, std::string pagPath) {
   std::shared_ptr<Task> lastTask = nullptr;
 
   auto CompareFrame = [&](Frame currentFrame) {
+    if (lastTask == nullptr) {
+      return;
+    }
     auto startTime = GetTimer();
     auto task = static_cast<CompareFrameTask*>(lastTask->wait());
     auto compareCost = GetTimer() - startTime;
@@ -113,6 +116,7 @@ void CompareFileFrames(Semaphore* semaphore, std::string pagPath) {
     if (!task->isSuccess()) {
       errorMsg += (std::to_string(currentFrame) + ";");
     }
+    lastTask = nullptr;
   };
 
   while (currentFrame < totalFrames) {
@@ -127,9 +131,7 @@ void CompareFileFrames(Semaphore* semaphore, std::string pagPath) {
       cost.performance = cache->getPerformanceString();
       performanceMap[currentFrame] = cost;
     }
-    if (currentFrame > 0) {
-      CompareFrame(currentFrame - 1);
-    }
+    CompareFrame(currentFrame - 1);
     if (changed) {
       auto executor = new CompareFrameTask(fileName, currentFrame, currentSnapshot);
       lastTask = Task::Make(std::unique_ptr<CompareFrameTask>(executor));
