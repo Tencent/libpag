@@ -110,14 +110,6 @@ org.libpag.GPUDecoder extends org.libpag.VideoDecoder{
     private void onRelease();
 }
 
-org.libpag.ImageCodec {
-    // keep method
-   private static int[] GetSizeFromPath(String imagePath);
-   private static int[] GetSizeFromBytes(byte[] bytes);
-   private static boolean ReadPixelsFromPath(String imagePath, ByteBuffer pixels);
-   private static boolean ReadPixelsFromBytes(byte[] bytes, ByteBuffer pixels);
-}
-
 org.libpag.PAGView {
     // API Override
     public void setSurfaceTextureListener(SurfaceTextureListener listener);

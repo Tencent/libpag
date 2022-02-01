@@ -17,13 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "NativeImage.h"
-
 #include <android/bitmap.h>
-
-#include "JNIHelper.h"
 #include "image/PixelMap.h"
 
 namespace pag {
+static constexpr int BITMAP_FLAGS_ALPHA_UNPREMUL = 2;
+
 static Global<jclass> BitmapFactoryOptionsClass;
 static jmethodID BitmapFactoryOptions_Constructor;
 static jfieldID BitmapFactoryOptions_inJustDecodeBounds;
@@ -109,7 +108,7 @@ static Orientation GetOrientation(JNIEnv* env, jobject exifInterface) {
 }
 
 static jobject DecodeBitmap(JNIEnv* env, jobject options, const std::string& filePath) {
-  Local<jstring> imagePath = {env, SafeConvertToJString(env, filePath.c_str())};
+  Local<jstring> imagePath = {env, SafeToJString(env, filePath)};
   return env->CallStaticObjectMethod(BitmapFactoryClass.get(), BitmapFactory_decodeFile,
                                      imagePath.get(), options);
 }
@@ -132,7 +131,7 @@ std::shared_ptr<Image> NativeImage::MakeFrom(const std::string& filePath) {
     env->ExceptionClear();
     return nullptr;
   }
-  Local<jstring> imagePath = {env, SafeConvertToJString(env, filePath.c_str())};
+  Local<jstring> imagePath = {env, SafeToJString(env, filePath)};
   Local<jobject> exifInterface = {env, env->NewObject(ExifInterfaceClass.get(),
                                                       ExifInterface_Constructor_Path,
                                                       imagePath.get())};
@@ -183,6 +182,30 @@ std::shared_ptr<Image> NativeImage::MakeFrom(std::shared_ptr<Data> imageBytes) {
       new NativeImage(width, height, orientation));
   codec->imageBytes = imageBytes;
   return codec;
+}
+
+static ImageInfo GetImageInfo(JNIEnv* env, jobject bitmap) {
+  AndroidBitmapInfo bitmapInfo = {};
+  if (bitmap == nullptr || AndroidBitmap_getInfo(env, bitmap, &bitmapInfo) != 0) {
+    return {};
+  }
+  AlphaType alphaType = (bitmapInfo.flags & BITMAP_FLAGS_ALPHA_UNPREMUL)
+                             ? AlphaType::Unpremultiplied
+                             : AlphaType::Premultiplied;
+  ColorType colorType;
+  switch (bitmapInfo.format) {
+    case ANDROID_BITMAP_FORMAT_RGBA_8888:
+      colorType = ColorType::RGBA_8888;
+      break;
+    case ANDROID_BITMAP_FORMAT_A_8:
+      colorType = ColorType::ALPHA_8;
+      break;
+    default:
+      colorType = ColorType::Unknown;
+      break;
+  }
+  return ImageInfo::Make(bitmapInfo.width, bitmapInfo.height, colorType, alphaType,
+                              bitmapInfo.stride);
 }
 
 bool NativeImage::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
