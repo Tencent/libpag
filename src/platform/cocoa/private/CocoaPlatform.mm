@@ -43,14 +43,6 @@ std::shared_ptr<PixelBuffer> CocoaPlatform::makeHardwareBuffer(int width, int he
 #endif
 }
 
-PAGFont CocoaPlatform::parseFont(const std::string& fontPath, int ttcIndex) const {
-  return FontConfig::Parse(fontPath, ttcIndex);
-}
-
-PAGFont CocoaPlatform::parseFont(const void* data, size_t length, int ttcIndex) const {
-  return FontConfig::Parse(data, length, ttcIndex);
-}
-
 bool CocoaPlatform::registerFallbackFonts() const {
   return FontConfig::RegisterFallbackFonts();
 }

@@ -35,10 +35,6 @@ class NativePlatform : public Platform {
 
   std::unique_ptr<VideoDecoder> makeHardwareDecoder(const VideoConfig& config) const override;
 
-  PAGFont parseFont(const std::string& fontPath, int ttcIndex) const override;
-
-  PAGFont parseFont(const void* data, size_t length, int ttcIndex) const override;
-
   void printLog(const char format[], ...) const override;
 
   void printError(const char format[], ...) const override;

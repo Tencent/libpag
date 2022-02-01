@@ -61,14 +61,6 @@ std::unique_ptr<VideoDecoder> NativePlatform::makeHardwareDecoder(
   return std::unique_ptr<VideoDecoder>(decoder);
 }
 
-PAGFont NativePlatform::parseFont(const std::string& fontPath, int ttcIndex) const {
-  return FontConfigAndroid::Parse(fontPath, ttcIndex);
-}
-
-PAGFont NativePlatform::parseFont(const void* data, size_t length, int ttcIndex) const {
-  return FontConfigAndroid::Parse(data, length, ttcIndex);
-}
-
 void NativePlatform::printLog(const char* format, ...) const {
   va_list args;
   va_start(args, format);

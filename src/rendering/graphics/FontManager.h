@@ -20,7 +20,6 @@
 
 #include <unordered_map>
 #include "pag/pag.h"
-#include "platform/Platform.h"
 #include "raster/Typeface.h"
 
 namespace pag {
@@ -71,8 +70,8 @@ class FontManager {
   PAGFont registerFont(const void* data, size_t length, int ttcIndex = 0,
                        const std::string& fontFamily = "", const std::string& fontStyle = "");
 
-  PAGFont registerFont(const PAGFont& font, std::shared_ptr<Typeface> typeface,
-                       const std::string& fontFamily = "", const std::string& fontStyle = "");
+  PAGFont registerFont(std::shared_ptr<Typeface> typeface, const std::string& fontFamily = "",
+                       const std::string& fontStyle = "");
 
   void unregisterFont(const PAGFont& font);
 

@@ -67,18 +67,6 @@ class Platform {
                                                           bool alphaOnly) const;
 
   /**
-   * Parses the font family and style from specified file path. Returns a font data with empty
-   * family and style names if the file path is not a valid font.
-   */
-  virtual PAGFont parseFont(const std::string& fontPath, int ttcIndex) const;
-
-  /**
-   * Parses the font family and style from specified file bytes. Returns a font data with empty
-   * family and style names if the file bytes is not a valid font.
-   */
-  virtual PAGFont parseFont(const void* data, size_t length, int ttcIndex) const;
-
-  /**
    * Writes the string pointed by format to the standard output (stdout).
    */
   virtual void printLog(const char format[], ...) const;
