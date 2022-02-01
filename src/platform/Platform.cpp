@@ -37,14 +37,6 @@ std::shared_ptr<PixelBuffer> Platform::makeHardwareBuffer(int, int, bool) const 
   return nullptr;
 }
 
-std::shared_ptr<Image> Platform::makeImage(const std::string&) const {
-  return nullptr;
-}
-
-std::shared_ptr<Image> Platform::makeImage(std::shared_ptr<Data>) const {
-  return nullptr;
-}
-
 PAGFont Platform::parseFont(const std::string&, int) const {
   return {"", ""};
 }

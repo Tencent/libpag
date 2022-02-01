@@ -16,26 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "JNIUtil.h"
-#include "image/Image.h"
+#include "platform/NativeCodec.h"
 
 namespace pag {
-class NativeImage : public Image {
- public:
-  static void JNIInit(JNIEnv* env);
+std::shared_ptr<Image> NativeCodec::MakeImage(const std::string&) {
+  return nullptr;
+}
 
-  bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
-
- private:
-  std::string imagePath;
-  std::shared_ptr<Data> imageBytes;
-
-  NativeImage(int width, int height, Orientation orientation) : Image(width, height, orientation){};
-
-  static std::shared_ptr<NativeImage> Make(JNIEnv* env, jobject sizeObject, int orientation);
-
-  friend class NativeCodec;
-};
+std::shared_ptr<Image> NativeCodec::MakeImage(std::shared_ptr<Data>) {
+  return nullptr;
+}
 }  // namespace pag

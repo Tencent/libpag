@@ -17,10 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "JNIUtil.h"
-#include "tgfx/jni.h"
 #include <pthread.h>
 #include <mutex>
+#include "JNIInit.h"
 #include "base/utils/Log.h"
+#include "tgfx/jni.h"
 
 namespace pag {
 static std::mutex globalLocker = {};
@@ -34,12 +35,16 @@ static void JNI_Thread_Destroy(void*) {
 }
 
 bool SetJavaVM(void* javaVM) {
-  std::lock_guard<std::mutex> autoLock(globalLocker);
-  if (globalJavaVM != nullptr && globalJavaVM != javaVM) {
-    return false;
+  {
+    std::lock_guard<std::mutex> autoLock(globalLocker);
+    if (globalJavaVM != nullptr && globalJavaVM != javaVM) {
+      return false;
+    }
+    globalJavaVM = reinterpret_cast<JavaVM*>(javaVM);
+    pthread_key_create(&envKey, JNI_Thread_Destroy);
   }
-  globalJavaVM = reinterpret_cast<JavaVM*>(javaVM);
-  pthread_key_create(&envKey, JNI_Thread_Destroy);
+  auto env = CurrentJNIEnv();
+  JNIInit(env);
   return true;
 }
 
