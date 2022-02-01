@@ -63,6 +63,8 @@ class FontManager {
 
   ~FontManager();
 
+  bool hasFallbackFonts();
+
  private:
   PAGFont registerFont(const std::string& fontPath, int ttcIndex = 0,
                        const std::string& fontFamily = "", const std::string& fontStyle = "");

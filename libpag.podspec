@@ -3,7 +3,7 @@ PAG_ROOT = __dir__
 vendorNames = "pathkit skcms libwebp"
 commonCFlags = ["-DGLES_SILENCE_DEPRECATION -DTGFX_USE_WEBP_DECODE -DPAG_DLL -fvisibility=hidden -Wall -Wextra -Weffc++ -pedantic -Werror=return-type"]
 # PAG_USE_FREETYPE=ON pod install
-if ENV["PAG_USE_FREETYPE"] == 'ON'
+if ENV["PAG_USE_FREETYPE"] == 'ON' and ENV["PLATFORM"] == "mac"
   vendorNames += " freetype"
   commonCFlags += ["-DTGFX_USE_FREETYPE"]
   $rasterSourceFiles = ['tgfx/src/raster/freetype/**/*.{h,cpp,mm}']

@@ -17,11 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CocoaPlatform.h"
-#include "FontConfig.h"
 #include "NativeHardwareBuffer.h"
 #include "PixelBufferUtils.h"
 #include "TraceImage.h"
-#include "base/utils/USE.h"
+#include "pag/pag.h"
 
 namespace pag {
 
@@ -44,7 +43,33 @@ std::shared_ptr<PixelBuffer> CocoaPlatform::makeHardwareBuffer(int width, int he
 }
 
 bool CocoaPlatform::registerFallbackFonts() const {
-  return FontConfig::RegisterFallbackFonts();
+#ifdef TGFX_USE_FREETYPE
+  // only works for macOS:
+  std::vector<std::string> fontPaths = {"/System/Library/Fonts/PingFang.ttc",
+                                        "/System/Library/Fonts/AppleSDGothicNeo.ttc",
+                                        "/System/Library/Fonts/Helvetica.ttc",
+                                        "/System/Library/Fonts/Myanmar Sangam MN.ttc",
+                                        "/System/Library/Fonts/Thonburi.ttc",
+                                        "/System/Library/Fonts/Mishafi.ttf",
+                                        "/System/Library/Fonts/Menlo.ttc",
+                                        "/System/Library/Fonts/Kailasa.ttc",
+                                        "/System/Library/Fonts/Kefa.ttc",
+                                        "/System/Library/Fonts/KohinoorTelugu.ttc",
+                                        "/System/Library/Fonts/ヒラギノ丸ゴ ProN W4.ttc",
+                                        "/System/Library/Fonts/Apple Color Emoji.ttc"};
+  std::vector<int> ttcIndices = {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  PAGFont::SetFallbackFontPaths(fontPaths, ttcIndices);
+#else
+  // for macOS 10.11+ iOS 9.0+
+  std::vector<std::string> fallbackList = {"PingFang SC",       "Apple SD Gothic Neo",
+                                           "Apple Color Emoji", "Helvetica",
+                                           "Myanmar Sangam MN", "Thonburi",
+                                           "Mishafi",           "Menlo",
+                                           "Kailasa",           "Kefa",
+                                           "Kohinoor Telugu",   "Hiragino Maru Gothic ProN"};
+  PAGFont::SetFallbackFontNames(fallbackList);
+#endif
+  return true;
 }
 
 void CocoaPlatform::traceImage(const PixelMap& pixelMap, const std::string& tag) const {

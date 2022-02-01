@@ -53,6 +53,11 @@ FontManager::~FontManager() {
   registeredFontMap.clear();
 }
 
+bool FontManager::hasFallbackFonts() {
+  std::lock_guard<std::mutex> autoLock(locker);
+  return !fallbackFontList.empty();
+}
+
 PAGFont FontManager::registerFont(const std::string& fontPath, int ttcIndex,
                                   const std::string& fontFamily, const std::string& fontStyle) {
   std::lock_guard<std::mutex> autoLock(locker);
@@ -177,13 +182,20 @@ static FontManager fontManager = {};
 
 std::shared_ptr<Typeface> FontManager::GetTypefaceWithoutFallback(const std::string& fontFamily,
                                                                   const std::string& fontStyle) {
-  static bool initialized = Platform::Current()->registerFallbackFonts();
-  USE(initialized);
   return fontManager.getTypefaceWithoutFallback(fontFamily, fontStyle);
+}
+
+static bool RegisterFallbackFonts() {
+  if (fontManager.hasFallbackFonts()) {
+    return false;
+  }
+  return Platform::Current()->registerFallbackFonts();
 }
 
 std::shared_ptr<Typeface> FontManager::GetFallbackTypeface(const std::string& name,
                                                            GlyphID* glyphID) {
+  static auto registered = RegisterFallbackFonts();
+  USE(registered);
   return fontManager.getFallbackTypeface(name, glyphID);
 }
 
