@@ -18,28 +18,12 @@
 
 #pragma once
 
-#include <jni.h>
-#include "image/Image.h"
-#include "platform/android/Global.h"
-
 namespace pag {
-class NativeImage : public Image {
- public:
-  static void InitJNI(JNIEnv* env);
-
-  static std::shared_ptr<Image> MakeFrom(const std::string& filePath);
-
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Data> imageBytes);
-
-  bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
-
- private:
-  std::string imagePath;
-  std::shared_ptr<Data> imageBytes;
-
-  NativeImage(int width, int height, Orientation orientation) : Image(width, height,
-                                                                      orientation) {};
-
-  static std::shared_ptr<NativeImage> Make(JNIEnv* env, jobject sizeObject, int orientation);
-};
+/*
+ * Manually set a Java virtual machine which will be used by tgfx to retrieve the JNI environment.
+ * Once a Java VM is set it cannot be changed afterwards, meaning you can call multiple times
+ * SetJavaVM() with the same Java VM pointer however it will error out if you try to set a different
+ * Java VM. Returns true on success, false otherwise.
+ */
+bool SetJavaVM(void* javaVM);
 }  // namespace pag

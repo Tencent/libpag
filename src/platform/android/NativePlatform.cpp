@@ -28,7 +28,7 @@
 #include "JTraceImage.h"
 #include "NativeGraphicBuffer.h"
 #include "NativeHardwareBuffer.h"
-#include "NativeImage.h"
+#include "platform/android/NativeImage.h"
 #include "VideoSurface.h"
 
 #define LOG_TAG "libpag"
