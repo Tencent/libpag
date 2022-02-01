@@ -17,13 +17,17 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "NativeImage.h"
-
 #include "NativeTextureBuffer.h"
+#include "platform/NativeCodec.h"
 
 using namespace emscripten;
 
 namespace pag {
-std::unique_ptr<Image> NativeImage::MakeFrom(const std::shared_ptr<Data>& imageBytes) {
+std::shared_ptr<Image> NativeCodec::MakeImage(const std::string&) {
+  return nullptr;
+}
+
+std::shared_ptr<Image> NativeCodec::MakeImage(std::shared_ptr<Data> imageBytes) {
   auto nativeImageClass = val::module_property("NativeImage");
   if (!nativeImageClass.as<bool>()) {
     return nullptr;
@@ -34,7 +38,7 @@ std::unique_ptr<Image> NativeImage::MakeFrom(const std::shared_ptr<Data>& imageB
   return MakeFrom(nativeImage);
 }
 
-std::unique_ptr<NativeImage> NativeImage::MakeFrom(emscripten::val nativeImage) {
+std::shared_ptr<NativeImage> NativeImage::MakeFrom(emscripten::val nativeImage) {
   if (!nativeImage.as<bool>()) {
     return nullptr;
   }
@@ -43,7 +47,7 @@ std::unique_ptr<NativeImage> NativeImage::MakeFrom(emscripten::val nativeImage) 
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
-  auto image = std::unique_ptr<NativeImage>(new NativeImage(width, height));
+  auto image = std::shared_ptr<NativeImage>(new NativeImage(width, height));
   image->nativeImage = std::move(nativeImage);
   return image;
 }

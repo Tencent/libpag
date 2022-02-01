@@ -67,18 +67,6 @@ class Platform {
                                                           bool alphaOnly) const;
 
   /**
-   * If the file path represents an encoded image that current platform knows how to decode, returns
-   * an Image that can decode it. Otherwise returns nullptr.
-   */
-  virtual std::shared_ptr<Image> makeImage(const std::string& filePath) const;
-
-  /**
-   * If the file bytes represents an encoded image that current platform knows how to decode,
-   * returns an Image that can decode it. Otherwise returns nullptr.
-   */
-  virtual std::shared_ptr<Image> makeImage(std::shared_ptr<Data> imageBytes) const;
-
-  /**
    * Parses the font family and style from specified file path. Returns a font data with empty
    * family and style names if the file path is not a valid font.
    */

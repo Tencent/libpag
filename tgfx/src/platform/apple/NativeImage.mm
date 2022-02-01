@@ -18,6 +18,7 @@
 
 #include "NativeImage.h"
 #include "BitmapContextUtil.h"
+#include "platform/NativeCodec.h"
 
 namespace pag {
 static CGImagePropertyOrientation GetOrientationFromProperties(CFDictionaryRef imageProperties) {
@@ -54,7 +55,7 @@ static CGSize GetImageSize(CGImageSourceRef imageSource, CGImagePropertyOrientat
   return CGSizeMake(width, height);
 }
 
-std::unique_ptr<Image> NativeImage::MakeFrom(const std::string& filePath) {
+std::shared_ptr<Image> NativeCodec::MakeImage(const std::string& filePath) {
   CFStringRef imagePath = CFStringCreateWithCString(NULL, filePath.c_str(), kCFStringEncodingUTF8);
   CFURLRef imageURL = CFURLCreateWithFileSystemPath(NULL, imagePath, kCFURLPOSIXPathStyle, 0);
   CFRelease(imagePath);
@@ -74,7 +75,7 @@ std::unique_ptr<Image> NativeImage::MakeFrom(const std::string& filePath) {
   return std::unique_ptr<Image>(image);
 }
 
-std::unique_ptr<Image> NativeImage::MakeFrom(std::shared_ptr<Data> imageBytes) {
+std::shared_ptr<Image> NativeCodec::MakeImage(std::shared_ptr<Data> imageBytes) {
   if (imageBytes == nullptr) {
     return nullptr;
   }

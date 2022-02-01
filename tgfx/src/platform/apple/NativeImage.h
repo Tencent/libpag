@@ -24,10 +24,6 @@
 namespace pag {
 class NativeImage : public Image {
  public:
-  static std::unique_ptr<Image> MakeFrom(const std::string& filePath);
-
-  static std::unique_ptr<Image> MakeFrom(std::shared_ptr<Data> imageBytes);
-
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
 
  private:
@@ -36,5 +32,7 @@ class NativeImage : public Image {
 
   NativeImage(int width, int height, Orientation orientation) : Image(width, height, orientation) {
   }
+
+  friend class NativeCodec;
 };
 }  // namespace pag

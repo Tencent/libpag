@@ -28,7 +28,6 @@
 #include "JTraceImage.h"
 #include "NativeGraphicBuffer.h"
 #include "NativeHardwareBuffer.h"
-#include "platform/android/NativeImage.h"
 #include "VideoSurface.h"
 
 #define LOG_TAG "libpag"
@@ -47,7 +46,6 @@ void NativePlatform::InitJNI(JNIEnv* env) {
   }
   initialized = true;
   JTraceImage::InitJNI(env);
-  NativeImage::InitJNI(env);
   FontConfigAndroid::InitJNI(env);
   GPUDecoder::InitJNI(env, "org/libpag/GPUDecoder");
   VideoSurface::InitJNI(env, "org/libpag/VideoSurface");
@@ -61,14 +59,6 @@ std::unique_ptr<VideoDecoder> NativePlatform::makeHardwareDecoder(
     return nullptr;
   }
   return std::unique_ptr<VideoDecoder>(decoder);
-}
-
-std::shared_ptr<Image> NativePlatform::makeImage(const std::string& filePath) const {
-  return NativeImage::MakeFrom(filePath);
-}
-
-std::shared_ptr<Image> NativePlatform::makeImage(std::shared_ptr<Data> imageBytes) const {
-  return NativeImage::MakeFrom(imageBytes);
 }
 
 PAGFont NativePlatform::parseFont(const std::string& fontPath, int ttcIndex) const {

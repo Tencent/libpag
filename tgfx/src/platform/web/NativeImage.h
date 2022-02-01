@@ -25,10 +25,7 @@
 namespace pag {
 class NativeImage : public Image {
  public:
- public:
-  static std::unique_ptr<Image> MakeFrom(const std::shared_ptr<Data>& imageBytes);
-
-  static std::unique_ptr<NativeImage> MakeFrom(emscripten::val nativeImage);
+  static std::shared_ptr<NativeImage> MakeFrom(emscripten::val nativeImage);
 
   std::shared_ptr<TextureBuffer> makeBuffer() const override;
 
@@ -41,5 +38,7 @@ class NativeImage : public Image {
 
   NativeImage(int width, int height) : Image(width, height, Orientation::TopLeft) {
   }
+
+  friend class NativeCodec;
 };
 }  // namespace pag

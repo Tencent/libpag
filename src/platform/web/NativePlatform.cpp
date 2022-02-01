@@ -18,7 +18,6 @@
 
 #include "NativePlatform.h"
 
-#include "NativeImage.h"
 #include "image/PixelMap.h"
 #include "pag/pag.h"
 
@@ -28,10 +27,6 @@ namespace pag {
 const Platform* Platform::Current() {
   static const NativePlatform platform = {};
   return &platform;
-}
-
-std::shared_ptr<Image> NativePlatform::makeImage(std::shared_ptr<Data> imageBytes) const {
-  return NativeImage::MakeFrom(imageBytes);
 }
 
 void NativePlatform::traceImage(const PixelMap& pixelMap, const std::string& tag) const {

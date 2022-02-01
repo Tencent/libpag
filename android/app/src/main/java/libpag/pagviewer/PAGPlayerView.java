@@ -63,8 +63,8 @@ public class PAGPlayerView {
                 pagFile.replaceText(0, pagText);
             }
             if (pagFile.numImages() > 0) {
-//                PAGImage pagImage = PAGImage.FromAssets(context.getAssets(), "mountain.jpg");
-                PAGImage pagImage = makePAGImage(context, "mountain.jpg");
+                PAGImage pagImage = PAGImage.FromAssets(context.getAssets(), "rotation.jpg");
+//                PAGImage pagImage = makePAGImage(context, "mountain.jpg");
                 pagFile.replaceImage(0, pagImage);
             }
             mPagView.setComposition(pagFile);

@@ -19,7 +19,6 @@
 #include "CocoaPlatform.h"
 #include "FontConfig.h"
 #include "NativeHardwareBuffer.h"
-#include "NativeImage.h"
 #include "PixelBufferUtils.h"
 #include "TraceImage.h"
 #include "base/utils/USE.h"
@@ -42,14 +41,6 @@ std::shared_ptr<PixelBuffer> CocoaPlatform::makeHardwareBuffer(int width, int he
     return std::shared_ptr<PixelBuffer>(new NativeHardwareBuffer(pixelBuffer, false));
   }
 #endif
-}
-
-std::shared_ptr<Image> CocoaPlatform::makeImage(const std::string& filePath) const {
-  return NativeImage::MakeFrom(filePath);
-}
-
-std::shared_ptr<Image> CocoaPlatform::makeImage(std::shared_ptr<Data> imageBytes) const {
-  return NativeImage::MakeFrom(imageBytes);
 }
 
 PAGFont CocoaPlatform::parseFont(const std::string& fontPath, int ttcIndex) const {
