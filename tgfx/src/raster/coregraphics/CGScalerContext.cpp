@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "raster/coregraphics/CGScalerContext.h"
-#include "BitmapContextUtil.h"
 #include "base/utils/Interpolate.h"
 #include "base/utils/MathExtra.h"
+#include "platform/apple/BitmapContextUtil.h"
 #include "raster/PathEffect.h"
 
 namespace pag {

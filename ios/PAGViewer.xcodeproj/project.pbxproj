@@ -190,6 +190,8 @@
 		DE2FAB4622A21A7EC38498B8 /* Pods_PAGViewerTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8985467E174F172CB98BAB33 /* Pods_PAGViewerTest.framework */; };
 		EE57501531B1261D7F139D95 /* (null) in Frameworks */ = {isa = PBXBuildFile; };
 		F26AEC7621575DB20056C475 /* BackgroundView.m in Sources */ = {isa = PBXBuildFile; fileRef = F26AEC7521575DB20056C475 /* BackgroundView.m */; };
+		F2C7AD5427A91FF600DEBEC6 /* rotation.jpg in Resources */ = {isa = PBXBuildFile; fileRef = F2C7AD5327A91FF600DEBEC6 /* rotation.jpg */; };
+		F2C7AD5527A9202C00DEBEC6 /* rotation.jpg in Resources */ = {isa = PBXBuildFile; fileRef = F2C7AD5327A91FF600DEBEC6 /* rotation.jpg */; };
 		F2ED88A31FCBEDF100555707 /* AppDelegate.mm in Sources */ = {isa = PBXBuildFile; fileRef = F2ED88A21FCBEDF100555707 /* AppDelegate.mm */; };
 		F2ED88A61FCBEDF100555707 /* SlimViewController.mm in Sources */ = {isa = PBXBuildFile; fileRef = F2ED88A51FCBEDF100555707 /* SlimViewController.mm */; };
 		F2ED88A91FCBEDF100555707 /* SlimMain.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = F2ED88A71FCBEDF100555707 /* SlimMain.storyboard */; };
@@ -347,6 +349,7 @@
 		E5499323070711CBCA4851BE /* Pods-PAGViewer.dailybuild.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-PAGViewer.dailybuild.xcconfig"; path = "Pods/Target Support Files/Pods-PAGViewer/Pods-PAGViewer.dailybuild.xcconfig"; sourceTree = "<group>"; };
 		F26AEC7421575DB20056C475 /* BackgroundView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = BackgroundView.h; sourceTree = "<group>"; };
 		F26AEC7521575DB20056C475 /* BackgroundView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = BackgroundView.m; sourceTree = "<group>"; };
+		F2C7AD5327A91FF600DEBEC6 /* rotation.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; name = rotation.jpg; path = ../../assets/rotation.jpg; sourceTree = "<group>"; };
 		F2ED889E1FCBEDF100555707 /* PAGViewerSlim.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PAGViewerSlim.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F2ED88A11FCBEDF100555707 /* AppDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AppDelegate.h; sourceTree = "<group>"; };
 		F2ED88A21FCBEDF100555707 /* AppDelegate.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = AppDelegate.mm; sourceTree = "<group>"; };
@@ -458,6 +461,7 @@
 		4DC5D301239FD95D007DFA8C /* assets */ = {
 			isa = PBXGroup;
 			children = (
+				F2C7AD5327A91FF600DEBEC6 /* rotation.jpg */,
 				545B97C4278F115200A0112E /* 2J.pag */,
 				545B97CF278F115200A0112E /* alpha_matte.pag */,
 				545B97AE278F115100A0112E /* alpha.pag */,
@@ -801,6 +805,7 @@
 				545B9852278F115400A0112E /* alpha2.pag in Resources */,
 				5478FF53278EFAB100999C9C /* SlimMain.storyboard in Resources */,
 				545B97FE278F115400A0112E /* repeater.pag in Resources */,
+				F2C7AD5427A91FF600DEBEC6 /* rotation.jpg in Resources */,
 				545B9808278F115400A0112E /* TextAnimatorMode.pag in Resources */,
 				545B9822278F115400A0112E /* 2J.pag in Resources */,
 				545B9834278F115400A0112E /* vlog.pag in Resources */,
@@ -883,6 +888,7 @@
 				545B9837278F115400A0112E /* TextAnimators.pag in Resources */,
 				545B984F278F115400A0112E /* AudioMarker.pag in Resources */,
 				F2ED88AE1FCBEDF100555707 /* SlimLaunchScreen.storyboard in Resources */,
+				F2C7AD5527A9202C00DEBEC6 /* rotation.jpg in Resources */,
 				545B9815278F115400A0112E /* replacement.pag in Resources */,
 				545B9851278F115400A0112E /* test2.pag in Resources */,
 				545B981D278F115400A0112E /* MultiVideoSequence.pag in Resources */,

@@ -17,9 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CGMask.h"
-#include "BitmapContextUtil.h"
+#include "platform/apple/BitmapContextUtil.h"
 #include "raster/Mask.h"
-#include "raster/coregraphics/CGScalerContext.h"
 
 namespace pag {
 static void Iterator(PathVerb verb, const Point points[4], void* info) {
