@@ -39,19 +39,18 @@ static EGLContext CreateContext(EGLContext sharedContext, EGLConfig eglConfig) {
   return eglContext;
 }
 
-std::shared_ptr<EGLDevice> EGLDevice::Current() {
+void* GLDevice::CurrentNativeHandle() {
+  return eglGetCurrentContext();
+}
+
+std::shared_ptr<GLDevice> GLDevice::Current() {
   auto eglContext = eglGetCurrentContext();
   auto eglDisplay = eglGetCurrentDisplay();
   auto eglSurface = eglGetCurrentSurface(EGL_DRAW);
   return EGLDevice::Wrap(eglDisplay, eglSurface, eglContext, nullptr, true);
 }
 
-std::shared_ptr<EGLDevice> EGLDevice::MakeAdopted(EGLDisplay eglDisplay, EGLSurface eglSurface,
-                                                  EGLContext eglContext) {
-  return EGLDevice::Wrap(eglDisplay, eglSurface, eglContext, nullptr, true);
-}
-
-std::shared_ptr<EGLDevice> EGLDevice::Make(EGLContext sharedContext) {
+std::shared_ptr<GLDevice> GLDevice::Make(void* sharedContext) {
   static auto eglGlobals = EGLGlobals::Get();
   auto eglContext = EGL_NO_CONTEXT;
   EGLint surfaceAttributes[] = {EGL_WIDTH,           1,        EGL_HEIGHT, 1,
@@ -59,20 +58,27 @@ std::shared_ptr<EGLDevice> EGLDevice::Make(EGLContext sharedContext) {
   auto eglSurface =
       eglCreatePbufferSurface(eglGlobals->display, eglGlobals->pbufferConfig, surfaceAttributes);
   if (eglSurface == nullptr) {
-    LOGE("EGLDevice::Make() eglCreatePbufferSurface error=%d", eglGetError());
+    LOGE("GLDevice::Make() eglCreatePbufferSurface error=%d", eglGetError());
     return nullptr;
   }
-  eglContext = CreateContext(sharedContext, eglGlobals->pbufferConfig);
+  auto eglShareContext = reinterpret_cast<EGLContext>(sharedContext);
+  eglContext = CreateContext(eglShareContext, eglGlobals->pbufferConfig);
   if (eglContext == nullptr) {
     eglDestroySurface(eglGlobals->display, eglSurface);
     return nullptr;
   }
-  auto device = EGLDevice::Wrap(eglGlobals->display, eglSurface, eglContext, sharedContext, false);
+  auto device =
+      EGLDevice::Wrap(eglGlobals->display, eglSurface, eglContext, eglShareContext, false);
   if (device == nullptr) {
     eglDestroyContext(eglGlobals->display, eglContext);
     eglDestroySurface(eglGlobals->display, eglSurface);
   }
   return device;
+}
+
+std::shared_ptr<EGLDevice> EGLDevice::MakeAdopted(EGLDisplay eglDisplay, EGLSurface eglSurface,
+                                                  EGLContext eglContext) {
+  return EGLDevice::Wrap(eglDisplay, eglSurface, eglContext, nullptr, true);
 }
 
 std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLNativeWindowType nativeWindow,

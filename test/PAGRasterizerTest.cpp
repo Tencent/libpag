@@ -21,8 +21,8 @@
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
 #include "gpu/Surface.h"
+#include "gpu/opengl/GLDevice.h"
 #include "nlohmann/json.hpp"
-#include "platform/NativeGLDevice.h"
 #include "raster/Mask.h"
 #include "raster/freetype/FTMask.h"
 
@@ -46,7 +46,7 @@ PAG_TEST(PAGRasterizerTest, TestRasterizer) {
   auto pixelBuffer = std::static_pointer_cast<FTMask>(mask)->getBuffer();
   EXPECT_TRUE(Baseline::Compare(pixelBuffer, "PAGRasterizerTest/rasterizer_path"));
 
-  auto device = NativeGLDevice::Make();
+  auto device = GLDevice::Make();
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);

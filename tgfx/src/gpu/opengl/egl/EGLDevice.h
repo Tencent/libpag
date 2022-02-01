@@ -36,21 +36,10 @@ namespace pag {
 class EGLDevice : public GLDevice {
  public:
   /**
-   * Returns an EGL device associated with current OpenGL context. Returns nullptr if there is no
-   * current OpenGL context on the calling thread.
-   */
-  static std::shared_ptr<EGLDevice> Current();
-
-  /**
    * Creates an EGL device with adopted EGLDisplay, EGLSurface and EGLContext.
    */
   static std::shared_ptr<EGLDevice> MakeAdopted(EGLDisplay eglDisplay, EGLSurface eglSurface,
                                                 EGLContext eglContext);
-
-  /**
-   * Creates a offscreen EGL device with specified shared context.
-   */
-  static std::shared_ptr<EGLDevice> Make(EGLContext sharedContext = nullptr);
 
   ~EGLDevice() override;
 
@@ -81,6 +70,7 @@ class EGLDevice : public GLDevice {
   EGLDevice(std::unique_ptr<Context> context, void* nativeHandle);
   void swapBuffers(int64_t timestamp = INT64_MIN);
 
+  friend class GLDevice;
   friend class EGLWindow;
 };
 }  // namespace pag

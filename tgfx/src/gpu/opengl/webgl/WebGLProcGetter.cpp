@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "WEBGLProcGetter.h"
+#include "WebGLProcGetter.h"
 
 #include <webgl/webgl1.h>
 #include <webgl/webgl2.h>
@@ -29,7 +29,7 @@ static void emscripten_glWaitSync(GLsync sync, GLbitfield flags, GLuint64 timeou
   emscripten_glWaitSync(sync, flags, timeoutLo, timeoutHi);
 }
 
-void* WEBGLProcGetter::getProcAddress(const char* name) const {
+void* WebGLProcGetter::getProcAddress(const char* name) const {
 #define N(X)                                        \
   if (0 == strcmp(#X, name)) {                      \
     return reinterpret_cast<void*>(emscripten_##X); \

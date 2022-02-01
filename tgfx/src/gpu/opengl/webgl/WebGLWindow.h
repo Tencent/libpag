@@ -18,24 +18,26 @@
 
 #pragma once
 
-#include "gpu/opengl/GLDevice.h"
+#include "WebGLDevice.h"
+#include "gpu/Window.h"
 
 namespace pag {
-class NativeGLDevice {
+class WebGLWindow : public Window {
  public:
   /**
-   * Returns the native handle of current OpenGL context.
+   * Creates a new window from a canvas.
    */
-  static void* GetCurrentNativeHandle();
+  static std::shared_ptr<WebGLWindow> MakeFrom(const std::string& canvasID);
 
-  /**
-   * Returns a offscreen device with adopted current OpenGL context.
-   */
-  static std::shared_ptr<GLDevice> Current();
+ protected:
+  std::shared_ptr<Surface> onCreateSurface(Context* context) override;
 
-  /**
-   * Creates an offscreen device with specified shared OpenGL context.
-   */
-  static std::shared_ptr<GLDevice> Make(void* sharedContext = nullptr);
+  void onPresent(Context*, int64_t) override {
+  }
+
+ private:
+  std::string canvasID;
+
+  explicit WebGLWindow(std::shared_ptr<Device> device);
 };
 }  // namespace pag

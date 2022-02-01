@@ -45,7 +45,7 @@ std::shared_ptr<Device> GPUDrawable::getDevice() {
     return nullptr;
   }
   if (window == nullptr) {
-    window = WEBGLWindow::MakeFrom(canvasID);
+    window = WebGLWindow::MakeFrom(canvasID);
   }
   return window->getDevice();
 }

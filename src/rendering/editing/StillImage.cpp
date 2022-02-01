@@ -18,8 +18,8 @@
 
 #include "StillImage.h"
 #include "base/utils/UniqueID.h"
+#include "gpu/opengl/GLDevice.h"
 #include "pag/pag.h"
-#include "platform/NativeGLDevice.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/graphics/Graphic.h"
 #include "rendering/graphics/Picture.h"
@@ -93,7 +93,7 @@ std::shared_ptr<StillImage> StillImage::FromImage(std::shared_ptr<Image> image) 
 }
 
 std::shared_ptr<PAGImage> PAGImage::FromTexture(const BackendTexture& texture, ImageOrigin origin) {
-  auto context = NativeGLDevice::GetCurrentNativeHandle();
+  auto context = GLDevice::CurrentNativeHandle();
   if (context == nullptr) {
     LOGE("PAGImage.MakeFrom() There is no current GPU context on the calling thread.");
     return nullptr;

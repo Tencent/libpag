@@ -24,9 +24,9 @@
 
 namespace pag {
 static std::mutex threadCacheLocker = {};
-static std::unordered_map<std::thread::id, std::weak_ptr<EAGLDevice>> threadCacheMap = {};
+static std::unordered_map<std::thread::id, std::weak_ptr<GLDevice>> threadCacheMap = {};
 
-static std::shared_ptr<EAGLDevice> MakeDeviceFromThreadPool() {
+static std::shared_ptr<GLDevice> MakeDeviceFromThreadPool() {
   std::lock_guard<std::mutex> autoLock(threadCacheLocker);
   auto threadID = std::this_thread::get_id();
   auto result = threadCacheMap.find(threadID);
@@ -38,7 +38,7 @@ static std::shared_ptr<EAGLDevice> MakeDeviceFromThreadPool() {
     }
     threadCacheMap.erase(result);
   }
-  auto device = EAGLDevice::Make();
+  auto device = GLDevice::Make();
   if (device == nullptr) {
     return nullptr;
   }
@@ -47,7 +47,7 @@ static std::shared_ptr<EAGLDevice> MakeDeviceFromThreadPool() {
 }
 
 std::shared_ptr<EAGLWindow> EAGLWindow::MakeFrom(CAEAGLLayer* layer,
-                                                 std::shared_ptr<EAGLDevice> device) {
+                                                 std::shared_ptr<GLDevice> device) {
   if (layer == nil) {
     return nullptr;
   }
@@ -64,7 +64,7 @@ std::shared_ptr<EAGLWindow> EAGLWindow::MakeFrom(CAEAGLLayer* layer,
 }
 
 std::shared_ptr<EAGLWindow> EAGLWindow::MakeFrom(CVPixelBufferRef pixelBuffer,
-                                                 std::shared_ptr<EAGLDevice> device) {
+                                                 std::shared_ptr<GLDevice> device) {
   if (pixelBuffer == nil) {
     return nullptr;
   }
@@ -126,7 +126,8 @@ std::shared_ptr<Surface> EAGLWindow::onCreateSurface(Context* context) {
   gl->bindFramebuffer(GL::FRAMEBUFFER, frameBufferID);
   gl->genRenderbuffers(1, &colorBuffer);
   gl->bindRenderbuffer(GL::RENDERBUFFER, colorBuffer);
-  gl->framebufferRenderbuffer(GL::FRAMEBUFFER, GL::COLOR_ATTACHMENT0, GL::RENDERBUFFER, colorBuffer);
+  gl->framebufferRenderbuffer(GL::FRAMEBUFFER, GL::COLOR_ATTACHMENT0, GL::RENDERBUFFER,
+                              colorBuffer);
   auto eaglContext = static_cast<EAGLDevice*>(context->getDevice())->eaglContext();
   [eaglContext renderbufferStorage:GL::RENDERBUFFER fromDrawable:layer];
   auto frameBufferStatus = gl->checkFramebufferStatus(GL::FRAMEBUFFER);

@@ -74,7 +74,7 @@ std::shared_ptr<Device> GPUDrawable::getDevice() {
   }
   if (window == nullptr) {
     if (pixelBuffer) {
-      auto device = CGLDevice::Make();
+      auto device = std::static_pointer_cast<CGLDevice>(GLDevice::Make());
       window = CGLWindow::MakeFrom(pixelBuffer, device);
     } else {
       window = CGLWindow::MakeFrom(view);

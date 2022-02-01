@@ -16,20 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "platform/NativeGLDevice.h"
+#pragma once
 
-#include "gpu/opengl/webgl/WEBGLDevice.h"
+#include "gpu/opengl/GLProcGetter.h"
 
 namespace pag {
-void* NativeGLDevice::GetCurrentNativeHandle() {
-  return reinterpret_cast<void*>(emscripten_webgl_get_current_context());
-}
-
-std::shared_ptr<GLDevice> NativeGLDevice::Current() {
-  return WEBGLDevice::Current();
-}
-
-std::shared_ptr<GLDevice> NativeGLDevice::Make(void*) {
-  return nullptr;
-}
+class WebGLProcGetter : public GLProcGetter {
+ public:
+  void* getProcAddress(const char name[]) const override;
+};
 }  // namespace pag
