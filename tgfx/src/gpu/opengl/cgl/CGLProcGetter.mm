@@ -35,4 +35,8 @@ void* CGLProcGetter::getProcAddress(const char* name) const {
   auto handle = fLibrary ? fLibrary : RTLD_DEFAULT;
   return dlsym(handle, name);
 }
+
+std::unique_ptr<GLProcGetter> GLProcGetter::Make() {
+  return std::make_unique<CGLProcGetter>();
+}
 }  // namespace pag

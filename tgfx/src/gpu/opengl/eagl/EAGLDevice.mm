@@ -102,9 +102,7 @@ std::shared_ptr<EAGLDevice> EAGLDevice::Wrap(EAGLContext* eaglContext, bool isAd
       return nullptr;
     }
   }
-  static EAGLProcGetter glProcGetter = {};
-  static GLInterfaceCache glInterfaceCache = {};
-  auto glInterface = GLInterface::GetNative(&glProcGetter, &glInterfaceCache);
+  auto glInterface = GLInterface::GetNative();
   std::shared_ptr<EAGLDevice> device = nullptr;
   if (glInterface != nullptr) {
     auto context = std::make_unique<GLContext>(glInterface);

@@ -145,4 +145,8 @@ static void* egl_get_gl_proc(void*, const char name[]) {
 void* EGLProcGetter::getProcAddress(const char* name) const {
   return egl_get_gl_proc(nullptr, name);
 }
+
+std::unique_ptr<GLProcGetter> GLProcGetter::Make() {
+  return std::make_unique<EGLProcGetter>();
+}
 }  // namespace pag

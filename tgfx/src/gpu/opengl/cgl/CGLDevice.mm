@@ -78,9 +78,7 @@ std::shared_ptr<CGLDevice> CGLDevice::Wrap(CGLContextObj cglContext, bool isAdop
     }
   }
 
-  static CGLProcGetter glProcGetter = {};
-  static GLInterfaceCache glInterfaceCache = {};
-  auto glInterface = GLInterface::GetNative(&glProcGetter, &glInterfaceCache);
+  auto glInterface = GLInterface::GetNative();
   std::shared_ptr<CGLDevice> device = nullptr;
   if (glInterface != nullptr) {
     auto context = std::make_unique<GLContext>(glInterface);

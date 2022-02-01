@@ -128,9 +128,7 @@ std::shared_ptr<EGLDevice> EGLDevice::Wrap(EGLDisplay eglDisplay, EGLSurface egl
     }
   }
 
-  static EGLProcGetter glProcGetter = {};
-  static GLInterfaceCache glInterfaceCache = {};
-  auto glInterface = GLInterface::GetNative(&glProcGetter, &glInterfaceCache);
+  auto glInterface = GLInterface::GetNative();
   std::shared_ptr<EGLDevice> device = nullptr;
   if (glInterface != nullptr) {
     auto context = std::make_unique<GLContext>(glInterface);

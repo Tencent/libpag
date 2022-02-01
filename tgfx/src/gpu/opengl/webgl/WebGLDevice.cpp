@@ -84,9 +84,7 @@ std::shared_ptr<WebGLDevice> WebGLDevice::Wrap(EMSCRIPTEN_WEBGL_CONTEXT_HANDLE w
       return nullptr;
     }
   }
-  static WebGLProcGetter glProcGetter = {};
-  static GLInterfaceCache glInterfaceCache = {};
-  auto glInterface = GLInterface::GetNative(&glProcGetter, &glInterfaceCache);
+  auto glInterface = GLInterface::GetNative();
   std::shared_ptr<WebGLDevice> device = nullptr;
   if (glInterface != nullptr) {
     auto context = std::make_unique<GLContext>(glInterface);

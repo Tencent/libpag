@@ -16,20 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <QOpenGLContext>
-#include "gpu/opengl/GLProcGetter.h"
+#include "QGLProcGetter.h"
 
 namespace pag {
-class QGLProcGetter : public GLProcGetter {
- public:
-  explicit QGLProcGetter(QOpenGLContext* glContext) : glContext(glContext) {
+void* QGLProcGetter::getProcAddress(const char* name) const {
+  return reinterpret_cast<void*>(glContext->getProcAddress(name));
+}
+
+std::unique_ptr<GLProcGetter> GLProcGetter::Make() {
+  auto context = QOpenGLContext::currentContext();
+  if (context == nullptr) {
+    return nullptr;
   }
-
-  void* getProcAddress(const char name[]) const override;
-
- private:
-  QOpenGLContext* glContext = nullptr;
-};
+  return std::make_unique<QGLProcGetter>(context);
+}
 }  // namespace pag

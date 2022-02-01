@@ -150,4 +150,8 @@ void* WebGLProcGetter::getProcAddress(const char* name) const {
   // https://github.com/emscripten-core/emscripten/blob/7ba7700902c46734987585409502f3c63beb650f/system/include/emscripten/html5_webgl.h#L93
   return nullptr;
 }
+
+std::unique_ptr<GLProcGetter> GLProcGetter::Make() {
+  return std::make_unique<WebGLProcGetter>();
+}
 }  // namespace pag
