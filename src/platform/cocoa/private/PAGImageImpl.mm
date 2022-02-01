@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGImageImpl.h"
-#include "ImageUtilsCocoa.h"
 #include "NativeHardwareBuffer.h"
 #import "pag/pag.h"
+#include "platform/apple/BitmapContextUtil.h"
 #include "rendering/editing/StillImage.h"
 
 @interface PAGImageImpl ()
@@ -77,18 +77,23 @@
   if (cgImage == nil) {
     return nil;
   }
-  NSUInteger width = CGImageGetWidth(cgImage);
-  NSUInteger height = CGImageGetHeight(cgImage);
+  auto width = static_cast<int>(CGImageGetWidth(cgImage));
+  auto height = static_cast<int>(CGImageGetHeight(cgImage));
   pag::Bitmap bitmap = {};
-  if (!bitmap.allocPixels(static_cast<int>(width), static_cast<int>(height))) {
+  if (!bitmap.allocPixels(width, height)) {
     return nil;
   }
   auto pixels = bitmap.lockPixels();
-  auto result = pag::ReadPixelsFromCGImage(cgImage, bitmap.info(), pixels);
-  bitmap.unlockPixels();
-  if (!result) {
+  auto context = CreateBitmapContext(bitmap.info(), pixels);
+  if (context == nullptr) {
+    bitmap.unlockPixels();
     return nil;
   }
+  CGRect rect = CGRectMake(0, 0, width, height);
+  CGContextSetBlendMode(context, kCGBlendModeCopy);
+  CGContextDrawImage(context, rect, cgImage);
+  CGContextRelease(context);
+  bitmap.unlockPixels();
   auto data = pag::StillImage::FromBitmap(bitmap);
   if (data == nullptr) {
     return nil;

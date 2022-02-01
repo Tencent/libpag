@@ -6,9 +6,7 @@ commonCFlags = ["-DGLES_SILENCE_DEPRECATION -DTGFX_USE_WEBP_DECODE -DPAG_DLL -fv
 if ENV["PAG_USE_FREETYPE"] == 'ON'
   vendorNames += " freetype"
   commonCFlags += ["-DTGFX_USE_FREETYPE"]
-  $rasterSourceFiles = ['tgfx/src/raster/coregraphics/BitmapContextUtil.h',
-                       'tgfx/src/raster/coregraphics/BitmapContextUtil.mm',
-                       'tgfx/src/raster/freetype/**/*.{h,cpp,mm}']
+  $rasterSourceFiles = ['tgfx/src/raster/freetype/**/*.{h,cpp,mm}']
 
 else
   commonCFlags += ["-DTGFX_USE_CORE_GRAPHICS"]
@@ -68,7 +66,6 @@ Pod::Spec.new do |s|
   s.osx.source_files =  'src/platform/mac/**/*.{h,cpp,mm,m}',
                         'src/platform/cocoa/**/*.{h,cpp,mm,m}',
                         'tgfx/src/gpu/opengl/cgl/*.{h,cpp,mm}',
-                        'tgfx/src/platform/mac/**/*.{h,cpp,mm,m}',
                         'tgfx/src/platform/apple/**/*.{h,cpp,mm,m}'
 
   s.osx.frameworks   = ['ApplicationServices', 'AGL', 'OpenGL', 'QuartzCore', 'Cocoa', 'Foundation', 'VideoToolbox', 'CoreMedia']
@@ -81,7 +78,6 @@ Pod::Spec.new do |s|
                           'src/platform/ios/private/*.{h,cpp,mm,m}',
                           'src/platform/cocoa/**/*.{h,cpp,mm,m}',
                           'tgfx/src/gpu/opengl/eagl/*.{h,cpp,mm}',
-                          'tgfx/src/platform/ios/**/*.{h,cpp,mm,m}',
                           'tgfx/src/platform/apple/**/*.{h,cpp,mm,m}'
 
   s.ios.frameworks   = ['UIKit', 'CoreFoundation', 'QuartzCore', 'CoreGraphics', 'CoreText', 'OpenGLES', 'VideoToolbox', 'CoreMedia']

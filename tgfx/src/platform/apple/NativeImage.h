@@ -34,7 +34,7 @@ class NativeImage : public Image {
   std::string imagePath;
   std::shared_ptr<Data> imageBytes;
 
-  NativeImage(int width, int height) : Image(width, height, Orientation::TopLeft) {
+  NativeImage(int width, int height, Orientation orientation) : Image(width, height, orientation) {
   }
 };
 }  // namespace pag

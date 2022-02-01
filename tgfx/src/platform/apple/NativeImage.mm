@@ -17,8 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "NativeImage.h"
-#include "ImageUtilsCocoa.h"
-#include "raster/coregraphics/BitmapContextUtil.h"
+#include "BitmapContextUtil.h"
 
 namespace pag {
 static CGImagePropertyOrientation GetOrientationFromProperties(CFDictionaryRef imageProperties) {
@@ -34,7 +33,7 @@ static CGImagePropertyOrientation GetOrientationFromProperties(CFDictionaryRef i
   return orientation;
 }
 
-static CGSize GetImageSize(CGImageSourceRef imageSource) {
+static CGSize GetImageSize(CGImageSourceRef imageSource, CGImagePropertyOrientation* orientation) {
   int width = 0;
   int height = 0;
   CFDictionaryRef imageProperties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, NULL);
@@ -49,18 +48,7 @@ static CGSize GetImageSize(CGImageSourceRef imageSource) {
     if (heightNum != NULL) {
       CFNumberGetValue(heightNum, kCFNumberIntType, &height);
     }
-    CGImagePropertyOrientation orientation = GetOrientationFromProperties(imageProperties);
-    switch (orientation) {
-      case kCGImagePropertyOrientationLeftMirrored:
-      case kCGImagePropertyOrientationRight:
-      case kCGImagePropertyOrientationRightMirrored:
-      case kCGImagePropertyOrientationLeft:
-        std::swap(width, height);
-        break;
-
-      default:
-        break;
-    }
+    *orientation = GetOrientationFromProperties(imageProperties);
     CFRelease(imageProperties);
   }
   return CGSizeMake(width, height);
@@ -75,12 +63,13 @@ std::unique_ptr<Image> NativeImage::MakeFrom(const std::string& filePath) {
   if (imageSource == nil) {
     return nullptr;
   }
-  auto size = GetImageSize(imageSource);
+  CGImagePropertyOrientation orientation = kCGImagePropertyOrientationUp;
+  auto size = GetImageSize(imageSource, &orientation);
   CFRelease(imageSource);
   if (size.width <= 0 || size.height <= 0) {
     return nullptr;
   }
-  auto image = new NativeImage(size.width, size.height);
+  auto image = new NativeImage(size.width, size.height, static_cast<Orientation>(orientation));
   image->imagePath = filePath;
   return std::unique_ptr<Image>(image);
 }
@@ -99,12 +88,13 @@ std::unique_ptr<Image> NativeImage::MakeFrom(std::shared_ptr<Data> imageBytes) {
   if (imageSource == nil) {
     return nullptr;
   }
-  auto size = GetImageSize(imageSource);
+  CGImagePropertyOrientation orientation = kCGImagePropertyOrientationUp;
+  auto size = GetImageSize(imageSource, &orientation);
   CFRelease(imageSource);
   if (size.width <= 0 || size.height <= 0) {
     return nullptr;
   }
-  auto image = new NativeImage(size.width, size.height);
+  auto image = new NativeImage(size.width, size.height, static_cast<Orientation>(orientation));
   image->imageBytes = imageBytes;
   return std::unique_ptr<Image>(image);
 }
@@ -130,21 +120,24 @@ bool NativeImage::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     [data release];
     return false;
   }
-
   CGImageRef cgImage = CGImageSourceCreateImageAtIndex(sourceRef, 0, NULL);
   if (cgImage == NULL) {
     [data release];
     CFRelease(sourceRef);
     return false;
   }
-
-  CFDictionaryRef imageProperties = CGImageSourceCopyPropertiesAtIndex(sourceRef, 0, NULL);
-  CGImagePropertyOrientation orientation = GetOrientationFromProperties(imageProperties);
-
-  auto result = pag::ReadPixelsFromCGImage(cgImage, dstInfo, dstPixels, orientation);
+  auto context = CreateBitmapContext(dstInfo, dstPixels);
+  auto result = context != nullptr;
+  if (result) {
+    int width = static_cast<int>(CGImageGetWidth(cgImage));
+    int height = static_cast<int>(CGImageGetHeight(cgImage));
+    CGRect rect = CGRectMake(0, 0, width, height);
+    CGContextSetBlendMode(context, kCGBlendModeCopy);
+    CGContextDrawImage(context, rect, cgImage);
+    CGContextRelease(context);
+  }
   [data release];
   CFRelease(sourceRef);
-  CFRelease(imageProperties);
   CGImageRelease(cgImage);
   return result;
 }
