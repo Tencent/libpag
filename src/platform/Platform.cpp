@@ -37,14 +37,6 @@ std::shared_ptr<PixelBuffer> Platform::makeHardwareBuffer(int, int, bool) const 
   return nullptr;
 }
 
-PAGFont Platform::parseFont(const std::string&, int) const {
-  return {"", ""};
-}
-
-PAGFont Platform::parseFont(const void*, size_t, int) const {
-  return {"", ""};
-}
-
 void Platform::printLog(const char format[], ...) const {
   va_list args;
   va_start(args, format);

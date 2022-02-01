@@ -30,10 +30,6 @@ class CocoaPlatform : public Platform {
   std::shared_ptr<PixelBuffer> makeHardwareBuffer(int width, int height,
                                                   bool alphaOnly) const override;
 
-  PAGFont parseFont(const std::string& fontPath, int ttcIndex) const override;
-
-  PAGFont parseFont(const void* data, size_t length, int ttcIndex) const override;
-
   bool registerFallbackFonts() const override;
 
   NALUType naluType() const override {

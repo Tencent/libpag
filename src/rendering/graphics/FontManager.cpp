@@ -56,47 +56,35 @@ FontManager::~FontManager() {
 PAGFont FontManager::registerFont(const std::string& fontPath, int ttcIndex,
                                   const std::string& fontFamily, const std::string& fontStyle) {
   std::lock_guard<std::mutex> autoLock(locker);
-  auto font = Platform::Current()->parseFont(fontPath, ttcIndex);
-  if (font.fontFamily.empty()) {
-    return font;
-  }
-  return registerFont(font, Typeface::MakeFromPath(fontPath, ttcIndex), fontFamily, fontStyle);
+  auto typeface = Typeface::MakeFromPath(fontPath, ttcIndex);
+  return registerFont(typeface, fontFamily, fontStyle);
 }
 
 PAGFont FontManager::registerFont(const void* data, size_t length, int ttcIndex,
                                   const std::string& fontFamily, const std::string& fontStyle) {
   std::lock_guard<std::mutex> autoLock(locker);
-  auto font = Platform::Current()->parseFont(data, length, ttcIndex);
-  if (font.fontFamily.empty()) {
-    return font;
-  }
-  return registerFont(font, Typeface::MakeFromBytes(data, length), fontFamily, fontStyle);
+  auto typeface = Typeface::MakeFromBytes(data, length, ttcIndex);
+  return registerFont(typeface, fontFamily, fontStyle);
 }
 
 static std::string PAGFontRegisterKey(const std::string& fontFamily, const std::string& fontStyle) {
   return fontFamily + "|" + fontStyle;
 }
 
-PAGFont FontManager::registerFont(const PAGFont& font, std::shared_ptr<Typeface> typeface,
-                                  const std::string& fontFamily, const std::string& fontStyle) {
-  if (font.fontFamily.empty() || typeface == nullptr) {
-    return font;
+PAGFont FontManager::registerFont(std::shared_ptr<Typeface> typeface, const std::string& fontFamily,
+                                  const std::string& fontStyle) {
+  if (typeface == nullptr) {
+    return {"", ""};
   }
-  std::string pagFontFamily = font.fontFamily;
-  std::string pagFontStyle = font.fontStyle;
-  // 由于各个平台解析出来的 family 和 style 不一样，此处为了统一，
-  // 如果用户注册时候传入了就使用用户的值
-  if (!fontFamily.empty()) {
-    pagFontFamily = fontFamily;
-    pagFontStyle = fontStyle;
-  }
-  auto key = PAGFontRegisterKey(pagFontFamily, pagFontStyle);
+  auto family = fontFamily.empty() ? typeface->fontFamily() : fontFamily;
+  auto style = fontStyle.empty() ? typeface->fontStyle() : fontStyle;
+  auto key = PAGFontRegisterKey(family, style);
   auto iter = registeredFontMap.find(key);
   if (iter != registeredFontMap.end()) {
     registeredFontMap.erase(iter);
   }
   registeredFontMap[key] = std::move(typeface);
-  return {pagFontFamily, pagFontStyle};
+  return {family, style};
 }
 
 void FontManager::unregisterFont(const PAGFont& font) {

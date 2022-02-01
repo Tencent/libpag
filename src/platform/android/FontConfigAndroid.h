@@ -32,9 +32,5 @@ class FontConfigAndroid {
   static void InitJNI(JNIEnv* env);
 
   static bool RegisterFallbackFonts();
-
-  static PAGFont Parse(const void* data, size_t length, int ttcIndex);
-
-  static PAGFont Parse(const std::string& fontPath, int ttcIndex);
 };
 }  // namespace pag
