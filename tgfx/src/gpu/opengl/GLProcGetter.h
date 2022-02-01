@@ -23,6 +23,8 @@
 namespace pag {
 class GLProcGetter {
  public:
+  static std::unique_ptr<GLProcGetter> Make();
+
   virtual ~GLProcGetter() = default;
 
   virtual void* getProcAddress(const char name[]) const = 0;

@@ -36,4 +36,7 @@ void* EAGLProcGetter::getProcAddress(const char* name) const {
   return dlsym(handle, name);
 }
 
+std::unique_ptr<GLProcGetter> GLProcGetter::Make() {
+  return std::make_unique<EAGLProcGetter>();
+}
 }  // namespace pag

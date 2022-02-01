@@ -81,9 +81,7 @@ std::shared_ptr<QGLDevice> QGLDevice::Wrap(QOpenGLContext* qtContext, QSurface* 
       return nullptr;
     }
   }
-  QGLProcGetter glProcGetter(qtContext);
-  static GLInterfaceCache glInterfaceCache = {};
-  auto glInterface = GLInterface::GetNative(&glProcGetter, &glInterfaceCache);
+  auto glInterface = GLInterface::GetNative();
   std::shared_ptr<QGLDevice> device = nullptr;
   if (glInterface != nullptr) {
     auto context = std::make_unique<GLContext>(glInterface);
