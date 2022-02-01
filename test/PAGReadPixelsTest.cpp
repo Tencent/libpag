@@ -21,10 +21,10 @@
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
 #include "gpu/Surface.h"
+#include "gpu/opengl/GLDevice.h"
 #include "gpu/opengl/GLUtil.h"
 #include "image/Image.h"
 #include "image/PixelMap.h"
-#include "platform/NativeGLDevice.h"
 
 namespace pag {
 using nlohmann::json;
@@ -154,7 +154,7 @@ PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
   bitmap.unlockPixels();
   ASSERT_TRUE(result);
 
-  auto device = NativeGLDevice::Make();
+  auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto texture = bitmap.makeTexture(context);

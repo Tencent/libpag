@@ -30,17 +30,6 @@ namespace pag {
 class QGLDevice : public GLDevice {
  public:
   /**
-   * Returns an QT device associated with current OpenGL context. Returns nullptr if there is no
-   * current OpenGL context on the calling thread.
-   */
-  static std::shared_ptr<QGLDevice> Current();
-
-  /**
-   * Creates an QT device with adopted EGLDisplay, EGLSurface and EGLContext.
-   */
-  static std::shared_ptr<QGLDevice> MakeAdopted(QOpenGLContext* context, QSurface* surface);
-
-  /**
    * Creates a offscreen QT device with specified format and shared context. If format is not
    * specified, QSurfaceFormat::defaultFormat() will be used.
    * Note: Due to the fact that QOffscreenSurface is backed by a QWindow on some platforms,
@@ -51,6 +40,11 @@ class QGLDevice : public GLDevice {
    */
   static std::shared_ptr<QGLDevice> Make(QOpenGLContext* sharedContext = nullptr,
                                          QSurfaceFormat* format = nullptr);
+
+  /**
+   * Creates an QT device with adopted EGLDisplay, EGLSurface and EGLContext.
+   */
+  static std::shared_ptr<QGLDevice> MakeAdopted(QOpenGLContext* context, QSurface* surface);
 
   ~QGLDevice() override;
 
@@ -84,6 +78,7 @@ class QGLDevice : public GLDevice {
 
   QGLDevice(std::unique_ptr<Context> context, void* nativeHandle);
 
+  friend class GLDevice;
   friend class QGLWindow;
 };
 }  // namespace pag

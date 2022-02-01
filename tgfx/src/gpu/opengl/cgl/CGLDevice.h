@@ -25,20 +25,9 @@ namespace pag {
 class CGLDevice : public GLDevice {
  public:
   /**
-   * Returns an CGL device associated with current OpenGL context. Returns nullptr if there is no
-   * current OpenGL context on the calling thread.
-   */
-  static std::shared_ptr<CGLDevice> Current();
-
-  /**
    * Creates an CGL device with adopted CGL context.
    */
   static std::shared_ptr<CGLDevice> MakeAdopted(CGLContextObj cglContext);
-
-  /**
-   * Creates an offscreen CGL device with specified shared context.
-   */
-  static std::shared_ptr<CGLDevice> Make(CGLContextObj sharedContext = nullptr);
 
   ~CGLDevice() override;
 
@@ -63,6 +52,7 @@ class CGLDevice : public GLDevice {
 
   CGLDevice(std::unique_ptr<Context> context, CGLContextObj cglContext);
 
+  friend class GLDevice;
   friend class CGLWindow;
 };
 }  // namespace pag

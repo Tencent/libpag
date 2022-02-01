@@ -20,7 +20,7 @@
 #include "base/utils/GetTimer.h"
 #include "base/utils/MatrixUtil.h"
 #include "gpu/Surface.h"
-#include "platform/NativeGLDevice.h"
+#include "gpu/opengl/GLDevice.h"
 #include "rendering/caches/RenderCache.h"
 
 namespace pag {
@@ -489,7 +489,7 @@ std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, const BackendTexture& tex
   if (!texture.isValid()) {
     return nullptr;
   }
-  auto context = NativeGLDevice::GetCurrentNativeHandle();
+  auto context = GLDevice::CurrentNativeHandle();
   if (context == nullptr) {
     return nullptr;
   }

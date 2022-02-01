@@ -19,8 +19,8 @@
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
 #include "gpu/opengl/GLCaps.h"
+#include "gpu/opengl/GLDevice.h"
 #include "gpu/opengl/GLUtil.h"
-#include "platform/NativeGLDevice.h"
 #include "rendering/Drawable.h"
 
 namespace pag {
@@ -33,7 +33,7 @@ PAG_TEST(PAGSurfaceTest, FromTexture) {
   auto pagFile = PAGFile::Load("../resources/apitest/test.pag");
   int width = pagFile->width();
   int height = pagFile->height();
-  auto device = NativeGLDevice::Make();
+  auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto gl = GLContext::Unwrap(context);
@@ -42,7 +42,7 @@ PAG_TEST(PAGSurfaceTest, FromTexture) {
   CreateTexture(gl, width, height, &textureInfo);
   auto backendTexture = BackendTexture(textureInfo, width, height);
   auto pagSurface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::TopLeft);
-  auto nativeHandle = NativeGLDevice::GetCurrentNativeHandle();
+  auto nativeHandle = GLDevice::CurrentNativeHandle();
   device->unlock();
   auto glDevice = std::static_pointer_cast<GLDevice>(pagSurface->drawable->getDevice());
   EXPECT_TRUE(glDevice->sharableWith(nativeHandle));
@@ -85,7 +85,7 @@ PAG_TEST(PAGSurfaceTest, Mask) {
   auto pagFile = PAGFile::Load("../assets/test2.pag");
   auto width = pagFile->width();
   auto height = pagFile->height();
-  auto device = NativeGLDevice::Make();
+  auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto gl = GLContext::Unwrap(context);

@@ -24,6 +24,22 @@ namespace pag {
 class GLDevice : public Device {
  public:
   /**
+   * Returns the native handle of current OpenGL context on the calling thread.
+   */
+  static void* CurrentNativeHandle();
+
+  /**
+   * Returns an GLDevice associated with current OpenGL context. Returns nullptr if there is no
+   * current OpenGL context on the calling thread.
+   */
+  static std::shared_ptr<GLDevice> Current();
+
+  /**
+   * Creates an offscreen GLDevice with specified shared OpenGL context.
+   */
+  static std::shared_ptr<GLDevice> Make(void* sharedContext = nullptr);
+
+  /**
    * Returns the GLDevice associated with the specified OpenGL context.
    */
   static std::shared_ptr<GLDevice> Get(void* nativeHandle);

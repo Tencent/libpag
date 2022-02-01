@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLNV12Texture.h"
-#include "platform/NativeGLDevice.h"
 #include "gpu/opengl/eagl/EAGLDevice.h"
 
 namespace pag {
@@ -33,7 +32,7 @@ std::shared_ptr<GLNV12Texture> GLNV12Texture::MakeFrom(Context* context,
                                                        CVPixelBufferRef pixelBuffer,
                                                        YUVColorSpace colorSpace,
                                                        YUVColorRange colorRange) {
-  auto glDevice = std::static_pointer_cast<EAGLDevice>(NativeGLDevice::Current());
+  auto glDevice = std::static_pointer_cast<EAGLDevice>(GLDevice::Current());
   if (glDevice == nullptr) {
     return nullptr;
   }
@@ -100,7 +99,7 @@ void GLNV12Texture::onRelease(Context*) {
   if (lumaTexture == nil || chromaTexture == nil) {
     return;
   }
-  auto glDevice = std::static_pointer_cast<EAGLDevice>(NativeGLDevice::Current());
+  auto glDevice = std::static_pointer_cast<EAGLDevice>(GLDevice::Current());
   if (glDevice == nullptr) {
     return;
   }

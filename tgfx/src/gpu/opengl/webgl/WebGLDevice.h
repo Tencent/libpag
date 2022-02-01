@@ -16,20 +16,38 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "platform/NativeGLDevice.h"
-#include "gpu/opengl/qt/QGLDevice.h"
+#pragma once
+
+#include <emscripten/html5_webgl.h>
+
+#include "gpu/opengl/GLDevice.h"
 
 namespace pag {
-void* NativeGLDevice::GetCurrentNativeHandle() {
-  return QOpenGLContext::currentContext();
-}
+class WebGLDevice : public GLDevice {
+ public:
+  /**
+   * Creates a new WebGLDevice from a canvas.
+   */
+  static std::shared_ptr<WebGLDevice> MakeFrom(const std::string& canvasID);
 
-std::shared_ptr<GLDevice> NativeGLDevice::Current() {
-  return QGLDevice::Current();
-}
+  ~WebGLDevice() override;
 
-std::shared_ptr<GLDevice> NativeGLDevice::Make(void* sharedContext) {
-  return QGLDevice::Make(reinterpret_cast<QOpenGLContext*>(sharedContext));
-}
+  bool sharableWith(void* nativeHandle) const override;
 
+ protected:
+  bool onMakeCurrent() override;
+  void onClearCurrent() override;
+
+ private:
+  EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context = 0;
+  EMSCRIPTEN_WEBGL_CONTEXT_HANDLE oldContext = 0;
+
+  static std::shared_ptr<WebGLDevice> Wrap(EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context,
+                                           bool isAdopted = false);
+
+  WebGLDevice(std::unique_ptr<Context> context, EMSCRIPTEN_WEBGL_CONTEXT_HANDLE nativeHandle);
+
+  friend class GLDevice;
+  friend class WebGLWindow;
+};
 }  // namespace pag

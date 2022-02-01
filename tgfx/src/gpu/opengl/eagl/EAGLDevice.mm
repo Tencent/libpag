@@ -46,28 +46,26 @@ void ApplicationDidBecomeActive() {
   }
 }
 
-std::shared_ptr<EAGLDevice> EAGLDevice::Current() {
+void* GLDevice::CurrentNativeHandle() {
+  return [EAGLContext currentContext];
+}
+
+std::shared_ptr<GLDevice> GLDevice::Current() {
   if (appInBackground) {
     return nullptr;
   }
   return EAGLDevice::Wrap([EAGLContext currentContext], true);
 }
 
-std::shared_ptr<EAGLDevice> EAGLDevice::MakeAdopted(EAGLContext* eaglContext) {
-  if (appInBackground) {
-    return nullptr;
-  }
-  return EAGLDevice::Wrap(eaglContext, true);
-}
-
-std::shared_ptr<EAGLDevice> EAGLDevice::Make(EAGLContext* sharedContext) {
+std::shared_ptr<GLDevice> GLDevice::Make(void* sharedContext) {
   if (appInBackground) {
     return nullptr;
   }
   EAGLContext* eaglContext = nil;
-  if (sharedContext != nil) {
-    eaglContext = [[EAGLContext alloc] initWithAPI:[sharedContext API]
-                                        sharegroup:[sharedContext sharegroup]];
+  EAGLContext* eaglShareContext = reinterpret_cast<EAGLContext*>(sharedContext);
+  if (eaglShareContext != nil) {
+    eaglContext = [[EAGLContext alloc] initWithAPI:[eaglShareContext API]
+                                        sharegroup:[eaglShareContext sharegroup]];
   } else {
     eaglContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES3];
     if (eaglContext == nil) {
@@ -80,6 +78,13 @@ std::shared_ptr<EAGLDevice> EAGLDevice::Make(EAGLContext* sharedContext) {
   auto device = EAGLDevice::Wrap(eaglContext, false);
   [eaglContext release];
   return device;
+}
+
+std::shared_ptr<EAGLDevice> EAGLDevice::MakeAdopted(EAGLContext* eaglContext) {
+  if (appInBackground) {
+    return nullptr;
+  }
+  return EAGLDevice::Wrap(eaglContext, true);
 }
 
 std::shared_ptr<EAGLDevice> EAGLDevice::Wrap(EAGLContext* eaglContext, bool isAdopted) {

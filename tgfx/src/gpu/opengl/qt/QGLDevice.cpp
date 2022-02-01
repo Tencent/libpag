@@ -23,14 +23,18 @@
 #include "gpu/opengl/GLContext.h"
 
 namespace pag {
-std::shared_ptr<QGLDevice> QGLDevice::Current() {
+void* GLDevice::CurrentNativeHandle() {
+  return QOpenGLContext::currentContext();
+}
+
+std::shared_ptr<GLDevice> GLDevice::Current() {
   auto context = QOpenGLContext::currentContext();
   auto surface = context != nullptr ? context->surface() : nullptr;
   return QGLDevice::Wrap(context, surface, true);
 }
 
-std::shared_ptr<QGLDevice> QGLDevice::MakeAdopted(QOpenGLContext* context, QSurface* surface) {
-  return QGLDevice::Wrap(context, surface, true);
+std::shared_ptr<GLDevice> GLDevice::Make(void*) {
+  return nullptr;
 }
 
 std::shared_ptr<QGLDevice> QGLDevice::Make(QOpenGLContext* sharedContext, QSurfaceFormat* format) {
@@ -55,6 +59,10 @@ std::shared_ptr<QGLDevice> QGLDevice::Make(QOpenGLContext* sharedContext, QSurfa
     delete context;
   }
   return device;
+}
+
+std::shared_ptr<QGLDevice> QGLDevice::MakeAdopted(QOpenGLContext* context, QSurface* surface) {
+  return QGLDevice::Wrap(context, surface, true);
 }
 
 std::shared_ptr<QGLDevice> QGLDevice::Wrap(QOpenGLContext* qtContext, QSurface* qtSurface,
