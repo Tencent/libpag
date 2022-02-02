@@ -19,7 +19,6 @@
 #include "EGLDevice.h"
 #include "EGLGlobals.h"
 #include "EGLProcGetter.h"
-#include "gpu/opengl/GLContext.h"
 
 namespace pag {
 static EGLContext CreateContext(EGLContext sharedContext, EGLConfig eglConfig) {
@@ -127,20 +126,13 @@ std::shared_ptr<EGLDevice> EGLDevice::Wrap(EGLDisplay eglDisplay, EGLSurface egl
       return nullptr;
     }
   }
-
-  auto glInterface = GLInterface::GetNative();
-  std::shared_ptr<EGLDevice> device = nullptr;
-  if (glInterface != nullptr) {
-    auto context = std::make_unique<GLContext>(glInterface);
-    device = std::shared_ptr<EGLDevice>(new EGLDevice(std::move(context), eglContext));
-    device->isAdopted = isAdopted;
-    device->eglDisplay = eglDisplay;
-    device->eglSurface = eglSurface;
-    device->eglContext = eglContext;
-    device->shareContext = shareContext;
-    device->weakThis = device;
-  }
-
+  auto device = std::shared_ptr<EGLDevice>(new EGLDevice(eglContext));
+  device->isAdopted = isAdopted;
+  device->eglDisplay = eglDisplay;
+  device->eglSurface = eglSurface;
+  device->eglContext = eglContext;
+  device->shareContext = shareContext;
+  device->weakThis = device;
   if (oldEglContext != eglContext) {
     eglMakeCurrent(eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
     if (oldEglDisplay) {
@@ -150,8 +142,7 @@ std::shared_ptr<EGLDevice> EGLDevice::Wrap(EGLDisplay eglDisplay, EGLSurface egl
   return device;
 }
 
-EGLDevice::EGLDevice(std::unique_ptr<Context> context, void* nativeHandle)
-    : GLDevice(std::move(context), nativeHandle) {
+EGLDevice::EGLDevice(void* nativeHandle) : GLDevice(nativeHandle) {
 }
 
 EGLDevice::~EGLDevice() {

@@ -77,24 +77,16 @@ std::shared_ptr<CGLDevice> CGLDevice::Wrap(CGLContextObj cglContext, bool isAdop
       return nullptr;
     }
   }
-
-  auto glInterface = GLInterface::GetNative();
-  std::shared_ptr<CGLDevice> device = nullptr;
-  if (glInterface != nullptr) {
-    auto context = std::make_unique<GLContext>(glInterface);
-    device = std::shared_ptr<CGLDevice>(new CGLDevice(std::move(context), cglContext));
-    device->isAdopted = isAdopted;
-    device->weakThis = device;
-  }
-
+  auto device = std::shared_ptr<CGLDevice>(new CGLDevice(cglContext));
+  device->isAdopted = isAdopted;
+  device->weakThis = device;
   if (oldCGLContext != cglContext) {
     CGLSetCurrentContext(oldCGLContext);
   }
   return device;
 }
 
-CGLDevice::CGLDevice(std::unique_ptr<Context> context, CGLContextObj cglContext)
-    : GLDevice(std::move(context), cglContext) {
+CGLDevice::CGLDevice(CGLContextObj cglContext) : GLDevice(cglContext) {
   glContext = [[NSOpenGLContext alloc] initWithCGLContextObj:cglContext];
 }
 

@@ -55,7 +55,7 @@ class GLDevice : public Device {
   void* nativeHandle = nullptr;
   bool isAdopted = false;
 
-  GLDevice(std::unique_ptr<Context> context, void* nativeHandle);
+  explicit GLDevice(void* nativeHandle);
   bool onLockContext() override;
   void onUnlockContext() override;
   virtual bool onMakeCurrent() = 0;
