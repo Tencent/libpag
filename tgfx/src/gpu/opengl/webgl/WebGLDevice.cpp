@@ -17,9 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WebGLDevice.h"
-
 #include "WebGLProcGetter.h"
-#include "gpu/opengl/GLContext.h"
 
 namespace pag {
 
@@ -84,15 +82,10 @@ std::shared_ptr<WebGLDevice> WebGLDevice::Wrap(EMSCRIPTEN_WEBGL_CONTEXT_HANDLE w
       return nullptr;
     }
   }
-  auto glInterface = GLInterface::GetNative();
-  std::shared_ptr<WebGLDevice> device = nullptr;
-  if (glInterface != nullptr) {
-    auto context = std::make_unique<GLContext>(glInterface);
-    device = std::shared_ptr<WebGLDevice>(new WebGLDevice(std::move(context), webglContext));
-    device->isAdopted = isAdopted;
-    device->context = webglContext;
-    device->weakThis = device;
-  }
+  auto device = std::shared_ptr<WebGLDevice>(new WebGLDevice(webglContext));
+  device->isAdopted = isAdopted;
+  device->context = webglContext;
+  device->weakThis = device;
   if (oldContext != webglContext) {
     emscripten_webgl_make_context_current(0);
     if (oldContext) {
@@ -102,9 +95,8 @@ std::shared_ptr<WebGLDevice> WebGLDevice::Wrap(EMSCRIPTEN_WEBGL_CONTEXT_HANDLE w
   return device;
 }
 
-WebGLDevice::WebGLDevice(std::unique_ptr<Context> context,
-                         EMSCRIPTEN_WEBGL_CONTEXT_HANDLE nativeHandle)
-    : GLDevice(std::move(context), reinterpret_cast<void*>(nativeHandle)) {
+WebGLDevice::WebGLDevice(EMSCRIPTEN_WEBGL_CONTEXT_HANDLE nativeHandle)
+    : GLDevice(reinterpret_cast<void*>(nativeHandle)) {
 }
 
 WebGLDevice::~WebGLDevice() {

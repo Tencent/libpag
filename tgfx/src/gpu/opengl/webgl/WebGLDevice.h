@@ -45,7 +45,7 @@ class WebGLDevice : public GLDevice {
   static std::shared_ptr<WebGLDevice> Wrap(EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context,
                                            bool isAdopted = false);
 
-  WebGLDevice(std::unique_ptr<Context> context, EMSCRIPTEN_WEBGL_CONTEXT_HANDLE nativeHandle);
+  explicit WebGLDevice(EMSCRIPTEN_WEBGL_CONTEXT_HANDLE nativeHandle);
 
   friend class GLDevice;
   friend class WebGLWindow;

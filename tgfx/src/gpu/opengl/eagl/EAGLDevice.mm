@@ -17,8 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "EAGLDevice.h"
+#import <OpenGLES/ES2/gl.h>
+#import <OpenGLES/ES3/glext.h>
 #include "EAGLProcGetter.h"
-#include "gpu/opengl/GLContext.h"
 
 namespace pag {
 static std::mutex deviceLocker = {};
@@ -102,15 +103,10 @@ std::shared_ptr<EAGLDevice> EAGLDevice::Wrap(EAGLContext* eaglContext, bool isAd
       return nullptr;
     }
   }
-  auto glInterface = GLInterface::GetNative();
-  std::shared_ptr<EAGLDevice> device = nullptr;
-  if (glInterface != nullptr) {
-    auto context = std::make_unique<GLContext>(glInterface);
-    device = std::shared_ptr<EAGLDevice>(new EAGLDevice(std::move(context), eaglContext),
-                                         EAGLDevice::NotifyReferenceReachedZero);
-    device->isAdopted = isAdopted;
-    device->weakThis = device;
-  }
+  auto device = std::shared_ptr<EAGLDevice>(new EAGLDevice(eaglContext),
+                                            EAGLDevice::NotifyReferenceReachedZero);
+  device->isAdopted = isAdopted;
+  device->weakThis = device;
   if (oldEAGLContext != eaglContext) {
     [EAGLContext setCurrentContext:oldEAGLContext];
   }
@@ -126,8 +122,8 @@ void EAGLDevice::NotifyReferenceReachedZero(EAGLDevice* device) {
   delayPurgeList.push_back(device);
 }
 
-EAGLDevice::EAGLDevice(std::unique_ptr<Context> context, EAGLContext* eaglContext)
-    : GLDevice(std::move(context), eaglContext), _eaglContext(eaglContext) {
+EAGLDevice::EAGLDevice(EAGLContext* eaglContext)
+    : GLDevice(eaglContext), _eaglContext(eaglContext) {
   [_eaglContext retain];
   std::lock_guard<std::mutex> autoLock(deviceLocker);
   auto index = deviceList.size();
@@ -224,8 +220,7 @@ void EAGLDevice::clearCurrent() {
 void EAGLDevice::finish() {
   std::lock_guard<std::mutex> autoLock(locker);
   if (makeCurrent(true)) {
-    auto gl = GLContext::Unwrap(context);
-    gl->finish();
+    glFinish();
     clearCurrent();
   }
 }

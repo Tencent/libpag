@@ -20,16 +20,6 @@
 
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
-#ifdef None
-#undef None
-#endif
-#ifdef Above
-#undef Above
-#endif
-#ifdef Below
-#undef Below
-#endif
-
 #include "gpu/opengl/GLDevice.h"
 
 namespace pag {
@@ -67,7 +57,7 @@ class EGLDevice : public GLDevice {
                                          EGLContext eglContext, EGLContext shareContext,
                                          bool isAdopted = false);
 
-  EGLDevice(std::unique_ptr<Context> context, void* nativeHandle);
+  explicit EGLDevice(void* nativeHandle);
   void swapBuffers(int64_t timestamp = INT64_MIN);
 
   friend class GLDevice;

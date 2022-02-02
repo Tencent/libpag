@@ -29,10 +29,6 @@
 #include "gpu/Swizzle.h"
 #include "pag/types.h"
 
-#ifdef None
-#undef None
-#endif
-
 #define GL_VER(major, minor) ((static_cast<uint32_t>(major) << 16) | static_cast<uint32_t>(minor))
 
 namespace pag {

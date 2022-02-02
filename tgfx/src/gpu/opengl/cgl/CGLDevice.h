@@ -50,7 +50,7 @@ class CGLDevice : public GLDevice {
 
   static std::shared_ptr<CGLDevice> Wrap(CGLContextObj cglContext, bool isAdopted = false);
 
-  CGLDevice(std::unique_ptr<Context> context, CGLContextObj cglContext);
+  explicit CGLDevice(CGLContextObj cglContext);
 
   friend class GLDevice;
   friend class CGLWindow;

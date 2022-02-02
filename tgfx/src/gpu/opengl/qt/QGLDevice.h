@@ -76,7 +76,7 @@ class QGLDevice : public GLDevice {
   static std::shared_ptr<QGLDevice> Wrap(QOpenGLContext* context, QSurface* surface,
                                          bool isAdopted);
 
-  QGLDevice(std::unique_ptr<Context> context, void* nativeHandle);
+  explicit QGLDevice(void* nativeHandle);
 
   friend class GLDevice;
   friend class QGLWindow;

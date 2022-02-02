@@ -29,11 +29,7 @@ class GLTextureSampler : public TextureSampler {
       : TextureSampler(config), glInfo(textureInfo) {
   }
 
-  void computeKey(Context* context, BytesKey* bytesKey) const override {
-    const auto* gl = GLContext::Unwrap(context);
-    bytesKey->write(static_cast<uint32_t>(gl->caps->configTextureSwizzle(config).asKey()));
-    bytesKey->write(glInfo.target);
-  }
+  void computeKey(Context* context, BytesKey* bytesKey) const override;
 
   GLTextureInfo glInfo = {};
 };

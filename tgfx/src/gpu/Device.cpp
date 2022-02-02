@@ -21,12 +21,13 @@
 #include "base/utils/UniqueID.h"
 
 namespace pag {
-Device::Device(std::unique_ptr<Context> ctx) : context(ctx.release()), _uniqueID(UniqueID::Next()) {
-  context->device = this;
+Device::Device() : _uniqueID(UniqueID::Next()) {
 }
 
 Device::~Device() {
-  delete context;
+  // Subclasses must call releaseAll() before the Device is destructed to clean up all GPU
+  // resources in context.
+  DEBUG_ASSERT(context == nullptr);
 }
 
 Context* Device::lockContext() {
@@ -51,16 +52,21 @@ void Device::unlock() {
 
 void Device::releaseAll() {
   std::lock_guard<std::mutex> autoLock(locker);
+  if (context == nullptr) {
+    return;
+  }
   contextLocked = onLockContext();
   context->releaseAll(contextLocked);
   if (contextLocked) {
     contextLocked = false;
     onUnlockContext();
   }
+  delete context;
+  context = nullptr;
 }
 
 bool Device::onLockContext() {
-  return true;
+  return context != nullptr;
 }
 
 void Device::onUnlockContext() {

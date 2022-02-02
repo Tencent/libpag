@@ -78,11 +78,10 @@ class Context {
   virtual const Caps* caps() const = 0;
 
  protected:
-  Device* device = nullptr;
-
-  Context();
+  explicit Context(Device* device);
 
  private:
+  Device* device = nullptr;
   bool purgingResource = false;
   std::list<Program*> programLRU = {};
   std::unordered_map<BytesKey, Program*, BytesHasher> programMap = {};

@@ -40,8 +40,7 @@ std::shared_ptr<GLDevice> GLDevice::Get(void* nativeHandle) {
   return nullptr;
 }
 
-GLDevice::GLDevice(std::unique_ptr<Context> context, void* nativeHandle)
-    : Device(std::move(context)), nativeHandle(nativeHandle) {
+GLDevice::GLDevice(void* nativeHandle) : nativeHandle(nativeHandle) {
   std::lock_guard<std::mutex> autoLock(deviceMapLocker);
   deviceMap[nativeHandle] = this;
 }
@@ -53,6 +52,18 @@ GLDevice::~GLDevice() {
 
 bool GLDevice::onLockContext() {
   if (!onMakeCurrent()) {
+    return false;
+  }
+  if (context == nullptr) {
+    auto glInterface = GLInterface::GetNative();
+    if (glInterface != nullptr) {
+      context = new GLContext(this, glInterface);
+    } else {
+      LOGE("GLDevice::onLockContext(): Error on creating GLInterface! ");
+    }
+  }
+  if (context == nullptr) {
+    onClearCurrent();
     return false;
   }
   auto glContext = static_cast<GLContext*>(context);

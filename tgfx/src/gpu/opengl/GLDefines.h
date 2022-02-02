@@ -24,10 +24,6 @@
 namespace GL {
 #undef FALSE
 #undef TRUE
-#undef DIFFERENCE
-#undef OUT_OF_MEMORY
-#undef NO_ERROR
-
 // The following constants consist of the intersection of GL constants
 // exported by GLES 1.0, GLES 2.0, and desktop GL required by the system.
 

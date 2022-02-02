@@ -52,7 +52,7 @@ class EAGLDevice : public GLDevice {
   static std::shared_ptr<EAGLDevice> Wrap(EAGLContext* eaglContext, bool isAdopted);
   static void NotifyReferenceReachedZero(EAGLDevice* device);
 
-  EAGLDevice(std::unique_ptr<Context> context, EAGLContext* eaglContext);
+  explicit EAGLDevice(EAGLContext* eaglContext);
   bool makeCurrent(bool force = false);
   void clearCurrent();
   void finish();

@@ -56,7 +56,7 @@ class Device {
   Context* context = nullptr;
   std::weak_ptr<Device> weakThis;
 
-  explicit Device(std::unique_ptr<Context> context);
+  Device();
   void releaseAll();
   virtual bool onLockContext();
   virtual void onUnlockContext();

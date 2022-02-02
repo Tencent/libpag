@@ -31,7 +31,7 @@ class GLContext : public Context {
     return context ? static_cast<GLContext*>(context)->interface.get() : nullptr;
   }
 
-  explicit GLContext(const GLInterface* glInterface);
+  GLContext(Device* device, const GLInterface* glInterface);
 
   Backend backend() const override {
     return Backend::OPENGL;
