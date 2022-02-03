@@ -57,6 +57,7 @@ jobs:
         run: |
           echo "file exit"
           tar xvf libpag.tar.zst
+          rm -rf libpag.tar.zst
           cd libpag
           git pull
       - name: File not exists
@@ -74,6 +75,8 @@ jobs:
 
       - name: Run autotest script
         run: |
+          ls
+          cd libpag
           chmod +x sync_deps.sh
           ./sync_deps.sh
           chmod +x autotest.sh
@@ -87,6 +90,5 @@ jobs:
         run: |
           rm -rf result
           cd ..
-          rm -rf libpag.tar.zst
           tar cvfa libpag.tar.zst libpag
 
