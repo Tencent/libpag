@@ -1,11 +1,11 @@
-#!/usr/bin/env bash
+#!/bin/bash -e
 
-# we run clang-format and astyle twice to get stable format output
+git-clang-format --diff
+result=`git-clang-format --diff | grep "diff"`
+echo $result
+if [[ $result =~ "diff" ]]
+then
+    exit 1
+fi
 
-find src/ test/ -type f -name '*.c' -o -name '*.cpp' -o -name '*.cc' -o -name '*.h' xargs -i clang-format -i {}
-astyle -n -r "src/*.h,*.cpp,*.cc"
-astyle -n -r "test/*.h,*.cpp,*.cc"
 
-find src/ test/ -type f -name '*.c' -o -name '*.cpp' -o -name '*.cc' -o -name '*.h' xargs -i clang-format -i {}
-astyle -n -r "src/*.h,*.cpp,*.cc"
-astyle -n -r "test/*.h,*.cpp,*.cc"
