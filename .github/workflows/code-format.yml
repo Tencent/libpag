@@ -1,23 +1,26 @@
 name: code-format
 
-on: [push, pull_request, pull_request_target]
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
 
-concurrency:
-  group: code-format-${{ github.ref }}
-  cancel-in-progress: true
+env:
+  # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
+  BUILD_TYPE: Debug
 
 jobs:
-  code-format:
-    runs-on: ubuntu-20.04
-    strategy:
-      matrix:
-        path:
-          - 'include'
-          - 'src'
-          - 'test'
+  build:
+    # The CMake configure and build commands are platform agnostic and should work equally well on Windows or Mac.
+    # You can convert this to a matrix build if you need cross-platform coverage.
+    # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
+    runs-on: macos-latest
     steps:
-    - uses: actions/checkout@v2
-    - name: Run clang-format style check for C/C++/Protobuf programs.
-      uses: jidicula/clang-format-action@v4.5.0
-      with:
-        check-path: ${{ matrix.path }}
+      - uses: actions/checkout@v2
+
+      - name: Run codeformat script
+          run: |
+            chmod +x codeformat.sh
+            ./codeformat.sh
+          shell: bash
