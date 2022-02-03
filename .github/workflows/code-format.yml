@@ -12,6 +12,7 @@ jobs:
     strategy:
       matrix:
         path:
+          - 'include'
           - 'src'
           - 'test'
     steps:
