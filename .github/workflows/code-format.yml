@@ -17,5 +17,3 @@ jobs:
         source: './src ./test'
         exclude: '.'
         extensions: 'h,cpp'
-        clangFormatVersion: 12
-        style: google
