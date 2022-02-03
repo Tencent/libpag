@@ -21,6 +21,7 @@ jobs:
 
       - name: Run codeformat script
         run: |
+          brew install npm
           npm install -g clang-format
           chmod +x codeformat.sh
           ./codeformat.sh
