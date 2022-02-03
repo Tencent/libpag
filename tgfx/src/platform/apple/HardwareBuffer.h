@@ -18,26 +18,30 @@
 
 #pragma once
 
-#include "JNIHelper.h"
-#include "platform/Platform.h"
+#import <CoreVideo/CoreVideo.h>
+#include "image/PixelBuffer.h"
 
 namespace pag {
-class NativePlatform : public Platform {
+class HardwareBuffer : public PixelBuffer {
  public:
-  static void InitJNI(JNIEnv* env);
+  static std::shared_ptr<HardwareBuffer> Make(int width, int height, bool alphaOnly = false);
 
-  bool hasHardwareDecoder() const override {
-    return true;
-  }
+  static std::shared_ptr<HardwareBuffer> MakeFrom(CVPixelBufferRef pixelBuffer);
 
-  std::unique_ptr<VideoDecoder> makeHardwareDecoder(const VideoConfig& config) const override;
+  ~HardwareBuffer() override;
 
-  void printLog(const char format[], ...) const override;
+  void* lockPixels() override;
 
-  void printError(const char format[], ...) const override;
+  void unlockPixels() override;
 
-  bool registerFallbackFonts() const override;
+  std::shared_ptr<Texture> makeTexture(Context* context) const override;
 
-  void traceImage(const PixelMap& pixelMap, const std::string& tag) const override;
+ private:
+  CVPixelBufferRef pixelBuffer = nullptr;
+
+  explicit HardwareBuffer(CVPixelBufferRef pixelBuffer);
+
+  friend class CocoaPlatform;
 };
+
 }  // namespace pag

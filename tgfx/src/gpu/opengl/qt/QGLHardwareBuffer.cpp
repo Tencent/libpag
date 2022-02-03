@@ -16,26 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#ifdef __APPLE__
-#include <TargetConditionals.h>
-#endif
-
-#if TARGET_OS_IPHONE
-
-#include "gpu/opengl/eagl/EAGLHardwareTexture.h"
+#include "gpu/YUVTexture.h"
+#include "image/PixelBuffer.h"
 
 namespace pag {
-using GLHardwareTexture = EAGLHardwareTexture;
+std::shared_ptr<PixelBuffer> PixelBuffer::MakeHardwareBuffer(int, int, bool) {
+  return nullptr;
+}
+
+std::shared_ptr<PixelBuffer> PixelBuffer::MakeFrom(void*) {
+  return nullptr;
+}
+
+std::shared_ptr<Texture> Texture::MakeFrom(Context*, void*) {
+  return nullptr;
+}
+
+std::shared_ptr<YUVTexture> YUVTexture::MakeFrom(Context*, YUVColorSpace, YUVColorRange, void*) {
+  return nullptr;
+}
 }  // namespace pag
-
-#elif TARGET_OS_MAC
-
-#include "gpu/opengl/cgl/CGLHardwareTexture.h"
-
-namespace pag {
-using GLHardwareTexture = CGLHardwareTexture;
-}  // namespace pag
-
-#endif

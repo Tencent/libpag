@@ -105,7 +105,7 @@ EAGLWindow::~EAGLWindow() {
 
 std::shared_ptr<Surface> EAGLWindow::onCreateSurface(Context* context) {
   if (pixelBuffer != nil) {
-    auto texture = EAGLHardwareTexture::MakeFrom(context, pixelBuffer, true);
+    auto texture = EAGLHardwareTexture::MakeFrom(context, pixelBuffer);
     return GLSurface::MakeFrom(context, texture);
   }
   auto gl = GLContext::Unwrap(context);

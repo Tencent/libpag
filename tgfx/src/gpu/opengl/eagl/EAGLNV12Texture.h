@@ -18,27 +18,32 @@
 
 #pragma once
 
-#include "NativeGraphicBufferInterface.h"
-#include "image/PixelBuffer.h"
+#import <CoreVideo/CoreVideo.h>
+#include "gpu/opengl/GLYUVTexture.h"
 
 namespace pag {
-class NativeGraphicBuffer : public PixelBuffer {
+class EAGLNV12Texture : public GLYUVTexture {
  public:
-  static std::shared_ptr<PixelBuffer> Make(int width, int height, bool alphaOnly);
+  static std::shared_ptr<EAGLNV12Texture> MakeFrom(Context* context, CVPixelBufferRef pixelBuffer,
+                                                   YUVColorSpace colorSpace,
+                                                   YUVColorRange colorRange);
 
-  static std::shared_ptr<NativeGraphicBuffer> MakeAdopted(android::GraphicBuffer* graphicBuffer);
+  EAGLNV12Texture(CVPixelBufferRef pixelBuffer, YUVColorSpace colorSpace, YUVColorRange colorRange);
 
-  ~NativeGraphicBuffer() override;
+  ~EAGLNV12Texture() override;
 
-  void* lockPixels() override;
+  YUVPixelFormat pixelFormat() const override {
+    return YUVPixelFormat::NV12;
+  }
 
-  void unlockPixels() override;
+  size_t memoryUsage() const override;
 
-  std::shared_ptr<Texture> makeTexture(Context*) const override;
-
-  NativeGraphicBuffer(android::GraphicBuffer* graphicBuffer);
+ protected:
+  void onRelease(Context* context) override;
 
  private:
-  android::GraphicBuffer* graphicBuffer = nullptr;
+  CVPixelBufferRef pixelBuffer = nullptr;
+  CVOpenGLESTextureRef lumaTexture = nullptr;
+  CVOpenGLESTextureRef chromaTexture = nullptr;
 };
 }  // namespace pag

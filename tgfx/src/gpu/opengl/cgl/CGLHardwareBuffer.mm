@@ -16,34 +16,33 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#import <CoreVideo/CoreVideo.h>
-#include "gpu/opengl/GLYUVTexture.h"
+#include "CGLHardwareTexture.h"
+#include "gpu/YUVTexture.h"
+#include "platform/apple/HardwareBuffer.h"
 
 namespace pag {
-class GLNV12Texture : public GLYUVTexture {
- public:
-  static std::shared_ptr<GLNV12Texture> MakeFrom(Context* context, CVPixelBufferRef pixelBuffer,
-                                                 YUVColorSpace colorSpace, YUVColorRange colorRange);
-
-  GLNV12Texture(CVPixelBufferRef pixelBuffer,
-                YUVColorSpace colorSpace, YUVColorRange colorRange);
-
-  ~GLNV12Texture() override;
-
-  YUVPixelFormat pixelFormat() const override {
-    return YUVPixelFormat::NV12;
+std::shared_ptr<PixelBuffer> PixelBuffer::MakeFrom(void* hardwareBuffer) {
+  auto pixelBuffer = reinterpret_cast<CVPixelBufferRef>(hardwareBuffer);
+  if (pixelBuffer == nullptr) {
+    return nullptr;
   }
+  return HardwareBuffer::MakeFrom(pixelBuffer);
+}
 
-  size_t memoryUsage() const override;
+std::shared_ptr<PixelBuffer> PixelBuffer::MakeHardwareBuffer(int width, int height,
+                                                             bool alphaOnly) {
+  return HardwareBuffer::Make(width, height, alphaOnly);
+}
 
- protected:
-  void onRelease(Context* context) override;
+std::shared_ptr<Texture> Texture::MakeFrom(Context* context, void* hardwareBuffer) {
+  auto pixelBuffer = reinterpret_cast<CVPixelBufferRef>(hardwareBuffer);
+  if (pixelBuffer == nullptr) {
+    return nullptr;
+  }
+  return CGLHardwareTexture::MakeFrom(context, pixelBuffer);
+}
 
- private:
-  CVPixelBufferRef pixelBuffer = nullptr;
-  CVOpenGLESTextureRef lumaTexture = nullptr;
-  CVOpenGLESTextureRef chromaTexture = nullptr;
-};
+std::shared_ptr<YUVTexture> YUVTexture::MakeFrom(Context*, YUVColorSpace, YUVColorRange, void*) {
+  return nullptr;
+}
 }  // namespace pag

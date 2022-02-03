@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLNV12Texture.h"
-#include "gpu/opengl/eagl/EAGLDevice.h"
+#include "EAGLNV12Texture.h"
+#include "EAGLDevice.h"
 
 namespace pag {
 static GLTextureInfo ToGLTexture(CVOpenGLESTextureRef texture, unsigned format) {
@@ -28,10 +28,10 @@ static GLTextureInfo ToGLTexture(CVOpenGLESTextureRef texture, unsigned format) 
   return glInfo;
 }
 
-std::shared_ptr<GLNV12Texture> GLNV12Texture::MakeFrom(Context* context,
-                                                       CVPixelBufferRef pixelBuffer,
-                                                       YUVColorSpace colorSpace,
-                                                       YUVColorRange colorRange) {
+std::shared_ptr<EAGLNV12Texture> EAGLNV12Texture::MakeFrom(Context* context,
+                                                           CVPixelBufferRef pixelBuffer,
+                                                           YUVColorSpace colorSpace,
+                                                           YUVColorRange colorRange) {
   auto glDevice = std::static_pointer_cast<EAGLDevice>(GLDevice::Current());
   if (glDevice == nullptr) {
     return nullptr;
@@ -62,7 +62,7 @@ std::shared_ptr<GLNV12Texture> GLNV12Texture::MakeFrom(Context* context,
   if (outputTextureLuma == nil || outputTextureChroma == nil) {
     return nullptr;
   }
-  auto texture = Resource::Wrap(context, new GLNV12Texture(pixelBuffer, colorSpace, colorRange));
+  auto texture = Resource::Wrap(context, new EAGLNV12Texture(pixelBuffer, colorSpace, colorRange));
   texture->lumaTexture = outputTextureLuma;
   texture->samplers.emplace_back(oneComponentConfig,
                                  ToGLTexture(outputTextureLuma, oneComponentFormat.sizedFormat));
@@ -72,15 +72,15 @@ std::shared_ptr<GLNV12Texture> GLNV12Texture::MakeFrom(Context* context,
   return texture;
 }
 
-GLNV12Texture::GLNV12Texture(CVPixelBufferRef pixelBuffer,
-                             YUVColorSpace colorSpace, YUVColorRange colorRange)
+EAGLNV12Texture::EAGLNV12Texture(CVPixelBufferRef pixelBuffer, YUVColorSpace colorSpace,
+                                 YUVColorRange colorRange)
     : GLYUVTexture(colorSpace, colorRange, static_cast<int>(CVPixelBufferGetWidth(pixelBuffer)),
                    static_cast<int>(CVPixelBufferGetHeight(pixelBuffer))),
       pixelBuffer(pixelBuffer) {
   CFRetain(pixelBuffer);
 }
 
-GLNV12Texture::~GLNV12Texture() {
+EAGLNV12Texture::~EAGLNV12Texture() {
   CFRelease(pixelBuffer);
   if (lumaTexture) {
     CFRelease(lumaTexture);
@@ -90,12 +90,12 @@ GLNV12Texture::~GLNV12Texture() {
   }
 }
 
-size_t GLNV12Texture::memoryUsage() const {
+size_t EAGLNV12Texture::memoryUsage() const {
   // 显存来自 CVPixelBuffer，这里不做重复统计。
   return 0;
 }
 
-void GLNV12Texture::onRelease(Context*) {
+void EAGLNV12Texture::onRelease(Context*) {
   if (lumaTexture == nil || chromaTexture == nil) {
     return;
   }

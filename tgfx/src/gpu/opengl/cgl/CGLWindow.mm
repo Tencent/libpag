@@ -112,7 +112,7 @@ std::shared_ptr<Surface> CGLWindow::onCreateSurface(Context* context) {
     BackendRenderTarget renderTarget(glInfo, size.width, size.height);
     return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
   }
-  auto texture = CGLHardwareTexture::MakeFrom(context, pixelBuffer, true);
+  auto texture = CGLHardwareTexture::MakeFrom(context, pixelBuffer);
   return GLSurface::MakeFrom(context, texture);
 }
 

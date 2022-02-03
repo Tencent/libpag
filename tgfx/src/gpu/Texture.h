@@ -35,6 +35,13 @@ class Texture : public Resource {
                                            ImageOrigin origin);
 
   /**
+   * Creates a single-plane texture from a hardware buffer. The type of hardwareBuffer should be
+   * either AHardwareBuffer* on android platform or CVPixelBufferRef on apple platform. The returned
+   * Texture takes a reference on the buffer.
+   */
+  static std::shared_ptr<Texture> MakeFrom(Context* context, void* hardwareBuffer);
+
+  /**
    * Creates a new texture from specified pixels data with each pixel stored as 32-bit RGBA data.
    */
   static std::shared_ptr<Texture> MakeRGBA(Context* context, int width, int height, void* pixels,
