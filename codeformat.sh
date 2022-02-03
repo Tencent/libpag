@@ -9,5 +9,6 @@ then
     echo "----Failed to pass coding specification----"
     exit 1
 fi
+echo "----end coding format----"
 
 
