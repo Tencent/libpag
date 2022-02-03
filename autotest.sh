@@ -76,3 +76,5 @@ then
 fi
 
 cp -a $WORKSPACE/build/*.json $WORKSPACE/result/
+
+rm -rf build
