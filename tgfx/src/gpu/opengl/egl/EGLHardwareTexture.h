@@ -16,41 +16,37 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#if defined(__ANDROID__) || defined(ANDROID)
+
 #pragma once
-#include "NativeGraphicBufferInterface.h"
-#include <android/hardware_buffer.h>
+
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
 #include "gpu/opengl/GLTexture.h"
-#include "EGL/egl.h"
-#include "EGL/eglext.h"
-#include "GLES/gl.h"
-#include "GLES/glext.h"
-#include "NativeHardwareBufferInterface.h"
+#include "platform/android/HardwareBufferInterface.h"
 
 namespace pag {
-class GLHardwareTexture : public GLTexture {
+class EGLHardwareTexture : public GLTexture {
  public:
-  static std::shared_ptr<GLHardwareTexture> MakeFrom(
-      Context* context, AHardwareBuffer* hardwareBuffer);
-  static std::shared_ptr<GLHardwareTexture> MakeFrom(
-      Context* context, android::GraphicBuffer* graphicBuffer);
-
-  static std::shared_ptr<GLHardwareTexture> MakeFrom(
-      Context* context, AHardwareBuffer* hardwareBuffer,
-      android::GraphicBuffer* graphicBuffer, EGLClientBuffer client_buffer, int width,
-      int height);
+  static std::shared_ptr<EGLHardwareTexture> MakeFrom(Context* context,
+                                                      AHardwareBuffer* hardwareBuffer);
 
   size_t memoryUsage() const override {
     return 0;
   }
 
  private:
-  explicit GLHardwareTexture(AHardwareBuffer* hardwareBuffer,
-                             android::GraphicBuffer* graphicBuffer, EGLImageKHR eglImage,
-                             int width, int height);
-  EGLImageKHR _eglImage = EGL_NO_IMAGE_KHR;
   AHardwareBuffer* hardwareBuffer = nullptr;
-  android::GraphicBuffer* graphicBuffer = nullptr;
+  EGLImageKHR eglImage = EGL_NO_IMAGE_KHR;
+
+  static void ComputeRecycleKey(BytesKey* recycleKey, void* hardwareBuffer);
+
+  EGLHardwareTexture(AHardwareBuffer* hardwareBuffer, EGLImageKHR eglImage, int width, int height);
+
+  ~EGLHardwareTexture() override;
+
   void onRelease(Context* context) override;
-  static void ComputeRecycleKey(BytesKey* recycleKey, void* hardware_buffer);
 };
 }  // namespace pag
+
+#endif

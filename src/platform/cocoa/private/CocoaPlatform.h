@@ -27,9 +27,6 @@ class CocoaPlatform : public Platform {
     return true;
   }
 
-  std::shared_ptr<PixelBuffer> makeHardwareBuffer(int width, int height,
-                                                  bool alphaOnly) const override;
-
   bool registerFallbackFonts() const override;
 
   NALUType naluType() const override {

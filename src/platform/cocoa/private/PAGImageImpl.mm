@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGImageImpl.h"
-#include "NativeHardwareBuffer.h"
-#import "pag/pag.h"
+#include "image/PixelBuffer.h"
+#include "pag/pag.h"
 #include "platform/apple/BitmapContextUtil.h"
 #include "rendering/editing/StillImage.h"
 
@@ -62,7 +62,7 @@
 #else
 
 + (PAGImageImpl*)FromPixelBuffer:(CVPixelBufferRef)pixelBuffer {
-  auto hardwareBuffer = pag::NativeHardwareBuffer::MakeAdopted(pixelBuffer);
+  auto hardwareBuffer = pag::PixelBuffer::MakeFrom(pixelBuffer);
   pag::Bitmap bitmap(hardwareBuffer);
   auto image = pag::StillImage::FromBitmap(bitmap);
   if (image == nullptr) {

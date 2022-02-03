@@ -19,21 +19,20 @@
 #include "PixelBufferUtils.h"
 
 namespace pag {
-CVPixelBufferRef PixelBufferUtils::Make(int width, int height, bool alphaOnly) {
+CVPixelBufferRef PixelBufferUtils::Make(int width, int height) {
   if (width == 0 || height == 0) {
     return nil;
   }
-  OSType pixelFormat = alphaOnly ? kCVPixelFormatType_OneComponent8 : kCVPixelFormatType_32BGRA;
   CFDictionaryRef empty =
-      CFDictionaryCreate(kCFAllocatorDefault, NULL, NULL, 0, &kCFTypeDictionaryKeyCallBacks,
+      CFDictionaryCreate(kCFAllocatorDefault, nullptr, nullptr, 0, &kCFTypeDictionaryKeyCallBacks,
                          &kCFTypeDictionaryValueCallBacks);
   CFMutableDictionaryRef attrs = CFDictionaryCreateMutable(
       kCFAllocatorDefault, 1, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
   CFDictionarySetValue(attrs, kCVPixelBufferIOSurfacePropertiesKey, empty);
   CVPixelBufferRef pixelBuffer = nil;
-  CVReturn status =
-      CVPixelBufferCreate(kCFAllocatorDefault, static_cast<size_t>(width),
-                          static_cast<size_t>(height), pixelFormat, attrs, &pixelBuffer);
+  CVReturn status = CVPixelBufferCreate(kCFAllocatorDefault, static_cast<size_t>(width),
+                                        static_cast<size_t>(height), kCVPixelFormatType_32BGRA,
+                                        attrs, &pixelBuffer);
   CFRelease(attrs);
   CFRelease(empty);
   if (status != kCVReturnSuccess) {

@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "GLHardwareTexture.h"
 #include "video/VideoBuffer.h"
 
 namespace pag {
@@ -32,7 +31,7 @@ class VideoImage : public VideoBuffer {
 
  protected:
   std::shared_ptr<Texture> makeTexture(Context* context) const override {
-    return GLHardwareTexture::MakeFrom(context, pixelBuffer, false);
+    return Texture::MakeFrom(context, pixelBuffer);
   }
 
  private:

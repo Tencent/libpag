@@ -17,31 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CocoaPlatform.h"
-#include "NativeHardwareBuffer.h"
 #include "PixelBufferUtils.h"
 #include "TraceImage.h"
 #include "pag/pag.h"
 
 namespace pag {
-
-std::shared_ptr<PixelBuffer> CocoaPlatform::makeHardwareBuffer(int width, int height,
-                                                               bool alphaOnly) const {
-#if TARGET_IPHONE_SIMULATOR
-  USE(width);
-  USE(height);
-  USE(alphaOnly);
-  return nullptr;
-#else
-  @autoreleasepool {
-    auto pixelBuffer = PixelBufferUtils::Make(width, height, alphaOnly);
-    if (pixelBuffer == nil) {
-      return nullptr;
-    }
-    return std::shared_ptr<PixelBuffer>(new NativeHardwareBuffer(pixelBuffer, false));
-  }
-#endif
-}
-
 bool CocoaPlatform::registerFallbackFonts() const {
 #ifdef TGFX_USE_FREETYPE
   // only works for macOS:

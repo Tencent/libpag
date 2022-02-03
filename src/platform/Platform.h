@@ -28,7 +28,6 @@ namespace pag {
 class PAGFont;
 class GLProcGetter;
 class Image;
-class PixelBuffer;
 class PixelMap;
 struct VideoConfig;
 class VideoDecoder;
@@ -56,15 +55,6 @@ class Platform {
    * current platform has no hardware decoder support.
    */
   virtual std::unique_ptr<VideoDecoder> makeHardwareDecoder(const VideoConfig& config) const;
-
-  /**
-   * Creates a hardware backed PixelBuffer with specified width and height. Returns nullptr if
-   * current platform has no hardware buffer support. Hardware buffer is a low-level object
-   * representing a memory buffer accessible by various hardware units. Hardware buffer allows
-   * sharing buffers across CPU and GPU, which can be used to speed up the texture uploading.
-   */
-  virtual std::shared_ptr<PixelBuffer> makeHardwareBuffer(int width, int height,
-                                                          bool alphaOnly) const;
 
   /**
    * Writes the string pointed by format to the standard output (stdout).

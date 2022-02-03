@@ -26,8 +26,6 @@
 #include "Global.h"
 #include "JNIEnvironment.h"
 #include "JTraceImage.h"
-#include "NativeGraphicBuffer.h"
-#include "NativeHardwareBuffer.h"
 #include "VideoSurface.h"
 
 #define LOG_TAG "libpag"
@@ -82,22 +80,4 @@ bool NativePlatform::registerFallbackFonts() const {
 void NativePlatform::traceImage(const pag::PixelMap& pixelMap, const std::string& tag) const {
   JTraceImage::Trace(pixelMap, tag);
 }
-
-static int GetSDKVersion() {
-  char sdk[PROP_VALUE_MAX] = "0";
-  __system_property_get("ro.build.version.sdk", sdk);
-  return atoi(sdk);
-}
-
-std::shared_ptr<PixelBuffer> NativePlatform::makeHardwareBuffer(int width, int height,
-                                                                bool alphaOnly) const {
-  static auto version = GetSDKVersion();
-  if (version >= 26) {
-    return NativeHardwareBuffer::Make(width, height, alphaOnly);
-  } else if (version <= 23) {
-    return NativeGraphicBuffer::Make(width, height, alphaOnly);
-  }
-  return nullptr;
-}
-
 }  // namespace pag

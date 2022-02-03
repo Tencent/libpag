@@ -18,6 +18,7 @@
 
 #include "PixelBuffer.h"
 #include "PixelMap.h"
+#include "gpu/Device.h"
 
 namespace pag {
 class RasterPixelBuffer : public PixelBuffer {
@@ -59,7 +60,7 @@ std::shared_ptr<PixelBuffer> PixelBuffer::Make(int width, int height, bool alpha
   }
   std::shared_ptr<PixelBuffer> pixelBuffer = nullptr;
   if (tryHardware) {
-    pixelBuffer = Platform::Current()->makeHardwareBuffer(width, height, alphaOnly);
+    pixelBuffer = MakeHardwareBuffer(width, height, alphaOnly);
     if (pixelBuffer != nullptr) {
       pixelBuffer->hardwareBacked = true;
       return pixelBuffer;

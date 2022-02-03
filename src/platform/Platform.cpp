@@ -33,10 +33,6 @@ std::unique_ptr<VideoDecoder> Platform::makeHardwareDecoder(const VideoConfig&) 
   return nullptr;
 }
 
-std::shared_ptr<PixelBuffer> Platform::makeHardwareBuffer(int, int, bool) const {
-  return nullptr;
-}
-
 void Platform::printLog(const char format[], ...) const {
   va_list args;
   va_start(args, format);

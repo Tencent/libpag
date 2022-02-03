@@ -33,6 +33,10 @@ class EGLDevice : public GLDevice {
 
   ~EGLDevice() override;
 
+  EGLDisplay getDisplay() const {
+    return eglDisplay;
+  }
+
   bool sharableWith(void* nativeHandle) const override;
 
  protected:
@@ -61,6 +65,7 @@ class EGLDevice : public GLDevice {
   void swapBuffers(int64_t timestamp = INT64_MIN);
 
   friend class GLDevice;
+
   friend class EGLWindow;
 };
 }  // namespace pag

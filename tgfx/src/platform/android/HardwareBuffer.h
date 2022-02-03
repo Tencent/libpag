@@ -18,31 +18,28 @@
 
 #pragma once
 
-#include "GLHardwareTexture.h"
+#include <android/hardware_buffer.h>
+#include "HardwareBufferInterface.h"
 #include "image/PixelBuffer.h"
 
 namespace pag {
-class NativeHardwareBuffer : public PixelBuffer {
+class HardwareBuffer : public PixelBuffer {
  public:
-  static std::shared_ptr<NativeHardwareBuffer> MakeAdopted(CVPixelBufferRef pixelBuffer);
+  static std::shared_ptr<PixelBuffer> Make(int width, int height, bool alphaOnly);
 
-  ~NativeHardwareBuffer() override;
+  static std::shared_ptr<PixelBuffer> MakeFrom(AHardwareBuffer* hardwareBuffer);
+
+  ~HardwareBuffer() override;
 
   void* lockPixels() override;
 
   void unlockPixels() override;
 
-  std::shared_ptr<Texture> makeTexture(Context* context) const override {
-    return GLHardwareTexture::MakeFrom(context, pixelBuffer, adopted);
-  }
+  std::shared_ptr<Texture> makeTexture(Context*) const override;
+
+  explicit HardwareBuffer(AHardwareBuffer* hardwareBuffer);
 
  private:
-  CVPixelBufferRef pixelBuffer = nullptr;
-  bool adopted = false;
-
-  NativeHardwareBuffer(CVPixelBufferRef pixelBuffer, bool adopted);
-
-  friend class CocoaPlatform;
+  AHardwareBuffer* hardwareBuffer = nullptr;
 };
-
 }  // namespace pag

@@ -18,15 +18,13 @@
 
 #pragma once
 
-#include "GLNV12Texture.h"
 #include "video/VideoBuffer.h"
 
 namespace pag {
 class VideoImage : public VideoBuffer {
  public:
   static std::shared_ptr<VideoImage> MakeFrom(CVPixelBufferRef pixelBuffer,
-                                              YUVColorSpace colorSpace,
-                                              YUVColorRange colorRange);
+                                              YUVColorSpace colorSpace, YUVColorRange colorRange);
 
   ~VideoImage() override;
 
@@ -34,7 +32,7 @@ class VideoImage : public VideoBuffer {
 
  protected:
   std::shared_ptr<Texture> makeTexture(Context* context) const override {
-    return GLNV12Texture::MakeFrom(context, pixelBuffer, _colorSpace, _colorRange);
+    return YUVTexture::MakeFrom(context, _colorSpace, _colorRange, pixelBuffer);
   }
 
  private:

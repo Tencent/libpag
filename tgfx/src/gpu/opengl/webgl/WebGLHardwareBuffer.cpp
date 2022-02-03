@@ -16,30 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <android/hardware_buffer.h>
-#include "NativeHardwareBufferInterface.h"
+#include "gpu/YUVTexture.h"
 #include "image/PixelBuffer.h"
 
 namespace pag {
-class NativeHardwareBuffer : public PixelBuffer {
- public:
-  static std::shared_ptr<PixelBuffer> Make(int width, int height, bool alphaOnly);
+std::shared_ptr<PixelBuffer> PixelBuffer::MakeHardwareBuffer(int, int, bool) {
+  return nullptr;
+}
 
-  static std::shared_ptr<NativeHardwareBuffer> MakeAdopted(AHardwareBuffer* hardwareBuffer);
+std::shared_ptr<PixelBuffer> PixelBuffer::MakeFrom(void*) {
+  return nullptr;
+}
 
-  ~NativeHardwareBuffer() override;
+std::shared_ptr<Texture> Texture::MakeFrom(Context*, void*) {
+  return nullptr;
+}
 
-  void* lockPixels() override;
-
-  void unlockPixels() override;
-
-  std::shared_ptr<Texture> makeTexture(Context*) const override;
-
-  NativeHardwareBuffer(AHardwareBuffer* hardwareBuffer);
-
- private:
-  AHardwareBuffer* hardwareBuffer = nullptr;
-};
+std::shared_ptr<YUVTexture> YUVTexture::MakeFrom(Context*, YUVColorSpace, YUVColorRange, void*) {
+  return nullptr;
+}
 }  // namespace pag
