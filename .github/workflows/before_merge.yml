@@ -2,7 +2,7 @@ name: before_merge
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
 
@@ -57,7 +57,7 @@ jobs:
         if: steps.check_files.outputs.files_exists == 'true'
         # Only runs if all of the files exists
         run: |
-          echo "file exit"
+          echo "file exist"
           tar xvf libpag.tar.zst
           rm -rf libpag.tar.zst
           cd libpag
