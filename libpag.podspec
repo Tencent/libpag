@@ -20,10 +20,10 @@ end
 
 if  ENV["PLATFORM"] == "mac"
   system("depsync mac")
-  system("node build_vendor #{vendorNames} -o #{PAG_ROOT}/mac/Pods/pag-vendor -p mac --fatLib")
+  system("node build_vendor #{vendorNames} -o #{PAG_ROOT}/mac/Pods/pag-vendor -p mac --xcframework")
 else
   system("depsync ios")
-  system("node build_vendor #{vendorNames} -o #{PAG_ROOT}/ios/Pods/pag-vendor -p ios --fatLib")
+  system("node build_vendor #{vendorNames} -o #{PAG_ROOT}/ios/Pods/pag-vendor -p ios --xcframework")
 end
 
 Pod::Spec.new do |s|
@@ -86,7 +86,7 @@ Pod::Spec.new do |s|
   s.xcconfig = {'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17','CLANG_CXX_LIBRARY' => 'libc++',"HEADER_SEARCH_PATHS" => "#{PAG_ROOT}/src #{PAG_ROOT}/include #{PAG_ROOT}/tgfx/src #{PAG_ROOT}/tgfx/include #{PAG_ROOT}/third_party/pathkit #{PAG_ROOT}/third_party/skcms #{PAG_ROOT}/third_party/freetype/include #{PAG_ROOT}/third_party/libwebp/src #{PAG_ROOT}/third_party/libavc/common #{PAG_ROOT}/third_party/libavc/decoder"}
   s.ios.xcconfig = {"OTHER_CFLAGS" => commonCFlags.join(" "),"EXPORTED_SYMBOLS_FILE" => "${PODS_ROOT}/../libpag.lds","OTHER_LDFLAGS" => "-w","VALIDATE_WORKSPACE_SKIPPED_SDK_FRAMEWORKS" => "OpenGLES"}
   s.osx.xcconfig = {"OTHER_CFLAGS" => commonCFlags.join(" ")}
-  s.ios.vendored_libraries = 'ios/Pods/pag-vendor/libpag-vendor.a'
-  s.osx.vendored_libraries = 'mac/Pods/pag-vendor/libpag-vendor.a'
+  s.ios.vendored_frameworks = 'ios/Pods/pag-vendor/libpag-vendor.xcframework'
+  s.osx.vendored_frameworks = 'mac/Pods/pag-vendor/libpag-vendor.xcframework'
 
 end
