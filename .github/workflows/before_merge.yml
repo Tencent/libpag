@@ -2,7 +2,7 @@ name: before_merge
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
 
