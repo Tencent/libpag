@@ -9,11 +9,15 @@ concurrency:
 jobs:
   code-format:
     runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        path:
+          - 'src'
+          - 'test'
     steps:
     - uses: actions/checkout@v2
-
-    - uses: DoozyX/clang-format-lint-action@v0.13
+    - name: Run clang-format style check for C/C++/Protobuf programs.
+      uses: jidicula/clang-format-action@v4.5.0
       with:
-        source: './src ./test'
-        exclude: '.'
-        extensions: 'h,cpp'
+        clang-format-version: '13'
+        check-path: ${{ matrix.path }}
