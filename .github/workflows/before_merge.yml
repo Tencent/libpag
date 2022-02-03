@@ -59,6 +59,7 @@ jobs:
         run: |
           echo "file exit"
           tar xvf libpag.tar.zst
+          rm -rf libpag.tar.zst
           cd libpag
           git fetch
           git checkout ${{ github.head_ref }}
@@ -67,7 +68,6 @@ jobs:
         run: |
           echo "file not exit"
           git clone -b ${{ github.head_ref }} https://github.com/kevingpqi123/libpag.git
-          cd libpag
       - name: brew link emscripten
         if: steps.cache-third_party.outputs.cache-hit == 'true'
         run: |
@@ -75,6 +75,7 @@ jobs:
 
       - name: Run autotest script
         run: |
+          cd libpag
           chmod +x sync_deps.sh
           ./sync_deps.sh
           chmod +x autotest.sh
@@ -84,11 +85,6 @@ jobs:
         with:
           name: result
           path: result
-      - name: Run autotest script
-        run: |
-          rm -rf result
-          cd ..
-          tar cvfa libpag.tar.zst libpag
 
         
         

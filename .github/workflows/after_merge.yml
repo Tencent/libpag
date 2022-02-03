@@ -86,8 +86,9 @@ jobs:
         with:
           name: result
           path: result
-      - name: Run autotest script
+      - name: compress libpag
         run: |
+          cd libpag
           rm -rf result
           cd ..
           tar cvfa libpag.tar.zst libpag
