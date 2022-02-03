@@ -18,6 +18,10 @@ jobs:
     runs-on: macos-latest
 
     steps:
+      - name: Dump GitHub context
+        id: github_context_step
+        run: |
+          echo '${{ toJSON(github) }}'
       - name: cache-environment
         id: cache-environment
         uses: actions/cache@v2
@@ -71,6 +75,8 @@ jobs:
 
       - name: Run autotest script
         run: |
+          chmod +x sync_deps.sh
+          ./sync_deps.sh
           chmod +x autotest.sh
           ./autotest.sh
         shell: bash
