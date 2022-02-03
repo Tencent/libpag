@@ -1,5 +1,6 @@
 #!/bin/bash -e
 
+echo "----begin coding format----"
 git-clang-format --diff
 result=`git-clang-format --diff | grep "diff"`
 echo $result
