@@ -132,7 +132,7 @@ std::string PAGFile::path() const {
 }
 
 std::shared_ptr<TextDocument> PAGFile::getTextData(int editableTextIndex) {
-  return file->getTextData(editableTextIndex);
+   return file->getTextData(editableTextIndex);
 }
 
 void PAGFile::replaceText(int editableTextIndex, std::shared_ptr<TextDocument> textData) {
@@ -255,7 +255,7 @@ static void HandleTimeStretch_Repeat(int64_t* fileContent, int64_t layerDuration
   }
 }
 
-static void HandleTimeStretch_RepeatInverted(int64_t* fileContent, int64_t layerDuration) {
+static void HandleTimeStretch_RepeatInverted(int64_t *fileContent, int64_t layerDuration) {
   if (*fileContent >= layerDuration) {
     auto count = static_cast<int>(ceil(static_cast<double>(*fileContent + 1) / layerDuration));
     *fileContent = *fileContent % layerDuration;

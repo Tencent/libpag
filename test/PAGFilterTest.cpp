@@ -49,7 +49,7 @@ PAG_TEST(PAGFilterTest, CornerPin) {
 PAG_TEST(PAGFilterTest, Bulge) {
   auto pagFile = PAGFile::Load("../resources/filter/bulge.pag");
   ASSERT_NE(pagFile, nullptr);
-  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+   auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
