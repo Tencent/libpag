@@ -19,4 +19,4 @@ jobs:
           source: './src ./test ./include ./tgfx'
           exclude: './src/platform/ios ./src/platform/mac ./test/framework/lzma'
           extensions: 'h,cpp'
-          clangFormatVersion: 12
+          clangFormatVersion: 11

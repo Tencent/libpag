@@ -63,6 +63,7 @@ SpacesInCStyleCastParentheses: false
 SpacesInContainerLiterals: false
 SpacesInParentheses: false
 SpacesInSquareBrackets: false
+ConstructorInitializerAllOnOneLineOrOnePerLine: false
 IncludeBlocks:   Merge
 TabWidth: 2
 UseTab: Never

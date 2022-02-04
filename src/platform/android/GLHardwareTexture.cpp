@@ -124,10 +124,8 @@ std::shared_ptr<GLHardwareTexture> GLHardwareTexture::MakeFrom(
 GLHardwareTexture::GLHardwareTexture(AHardwareBuffer* hardwareBuffer,
                                      android::GraphicBuffer* graphicBuffer, EGLImageKHR eglImage,
                                      int width, int height)
-    : GLTexture(width, height, ImageOrigin::TopLeft),
-      _eglImage(eglImage),
-      hardwareBuffer(hardwareBuffer),
-      graphicBuffer(graphicBuffer) {
+    : GLTexture(width, height, ImageOrigin::TopLeft), _eglImage(eglImage),
+      hardwareBuffer(hardwareBuffer), graphicBuffer(graphicBuffer) {
   if (graphicBuffer) {
     NativeGraphicBufferInterface::Acquire(graphicBuffer);
   }

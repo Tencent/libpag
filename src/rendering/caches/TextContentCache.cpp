@@ -22,21 +22,14 @@
 
 namespace pag {
 TextContentCache::TextContentCache(TextLayer* layer)
-    : ContentCache(layer),
-      sourceText(layer->sourceText),
-      pathOption(layer->pathOption),
-      moreOption(layer->moreOption),
-      animators(&layer->animators) {
+    : ContentCache(layer), sourceText(layer->sourceText), pathOption(layer->pathOption),
+      moreOption(layer->moreOption), animators(&layer->animators) {
 }
 
 TextContentCache::TextContentCache(TextLayer* layer, ID cacheID,
                                    Property<TextDocumentHandle>* sourceText)
-    : ContentCache(layer),
-      cacheID(cacheID),
-      sourceText(sourceText),
-      pathOption(layer->pathOption),
-      moreOption(layer->moreOption),
-      animators(&layer->animators) {
+    : ContentCache(layer), cacheID(cacheID), sourceText(sourceText), pathOption(layer->pathOption),
+      moreOption(layer->moreOption), animators(&layer->animators) {
 }
 
 void TextContentCache::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {
