@@ -20,6 +20,7 @@
 
 #include "EncodedFormat.h"
 #include "ImageInfo.h"
+#include "core/Data.h"
 #include "pag/types.h"
 
 namespace pag {

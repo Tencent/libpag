@@ -18,7 +18,7 @@
 
 #include "JNIEnvironment.h"
 #include <pthread.h>
-#include "tgfx/jni.h"
+#include "tgfx/platform.h"
 
 static JavaVM* globalJavaVM = nullptr;
 static pthread_key_t threadKey = 0;

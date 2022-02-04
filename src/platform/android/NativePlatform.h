@@ -32,10 +32,6 @@ class NativePlatform : public Platform {
 
   std::unique_ptr<VideoDecoder> makeHardwareDecoder(const VideoConfig& config) const override;
 
-  void printLog(const char format[], ...) const override;
-
-  void printError(const char format[], ...) const override;
-
   bool registerFallbackFonts() const override;
 
   void traceImage(const PixelMap& pixelMap, const std::string& tag) const override;

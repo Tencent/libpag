@@ -57,16 +57,6 @@ class Platform {
   virtual std::unique_ptr<VideoDecoder> makeHardwareDecoder(const VideoConfig& config) const;
 
   /**
-   * Writes the string pointed by format to the standard output (stdout).
-   */
-  virtual void printLog(const char format[], ...) const;
-
-  /**
-   * Writes the string pointed by format to the standard error (stderr).
-   */
-  virtual void printError(const char format[], ...) const;
-
-  /**
    * Implement this method to register the default fallback font list. User should call
    * PAGFont::SetFallbackFontPaths() or PAGFont::SetFallbackFontNames() manually in host app if this
    * method is not implemented on current platform.

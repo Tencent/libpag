@@ -18,39 +18,22 @@
 
 #pragma once
 
-#include "tgfx/platform.h"
-
 namespace pag {
-#define ABORT(msg)                                                             \
-  do {                                                                         \
-    pag::PrintError("%s:%d: fatal error: \"%s\"\n", __FILE__, __LINE__, #msg); \
-    ::abort();                                                                 \
-  } while (false)
+/**
+ * Writes an output message pointed by format to the log facility of native platform.
+ */
+void PrintLog(const char format[], ...);
 
-#ifdef NO_LOG
+/**
+   * Writes an error message pointed by format to the log facility of native platform.
+ */
+void PrintError(const char format[], ...);
 
-#define LOGI(...)
-#define LOGE(...)
-#define ASSERT(assertion)
-
-#else
-
-#define LOGI(...) pag::PrintLog(__VA_ARGS__)
-#define LOGE(...) pag::PrintError(__VA_ARGS__)
-#define ASSERT(assertion) \
-  if (!(assertion)) {     \
-    ABORT(#assertion);    \
-  }
-
-#endif
-
-#if DEBUG
-
-#define DEBUG_ASSERT(assertion) ASSERT(assertion)
-
-#else
-
-#define DEBUG_ASSERT(assertion)
-
-#endif
+/*
+ * Manually set a Java virtual machine which will be used by tgfx to retrieve the JNI environment.
+ * Once a Java VM is set it cannot be changed afterwards, meaning you can call multiple times
+ * SetJavaVM() with the same Java VM pointer however it will error out if you try to set a different
+ * Java VM. Returns true on success, false otherwise.
+ */
+bool SetJavaVM(void* javaVM);
 }  // namespace pag

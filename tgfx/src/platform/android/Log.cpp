@@ -16,41 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
+#include <android/log.h>
 #include "tgfx/platform.h"
 
 namespace pag {
-#define ABORT(msg)                                                             \
-  do {                                                                         \
-    pag::PrintError("%s:%d: fatal error: \"%s\"\n", __FILE__, __LINE__, #msg); \
-    ::abort();                                                                 \
-  } while (false)
+#define LOG_TAG "Log"
 
-#ifdef NO_LOG
+void PrintLog(const char format[], ...) {
+  va_list args;
+  va_start(args, format);
+  __android_log_vprint(ANDROID_LOG_INFO, LOG_TAG, format, args);
+  va_end(args);
+}
 
-#define LOGI(...)
-#define LOGE(...)
-#define ASSERT(assertion)
-
-#else
-
-#define LOGI(...) pag::PrintLog(__VA_ARGS__)
-#define LOGE(...) pag::PrintError(__VA_ARGS__)
-#define ASSERT(assertion) \
-  if (!(assertion)) {     \
-    ABORT(#assertion);    \
-  }
-
-#endif
-
-#if DEBUG
-
-#define DEBUG_ASSERT(assertion) ASSERT(assertion)
-
-#else
-
-#define DEBUG_ASSERT(assertion)
-
-#endif
+void PrintError(const char format[], ...) {
+  va_list args;
+  va_start(args, format);
+  __android_log_vprint(ANDROID_LOG_ERROR, LOG_TAG, format, args);
+  va_end(args);
+}
 }  // namespace pag

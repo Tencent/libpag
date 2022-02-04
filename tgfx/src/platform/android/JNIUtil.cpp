@@ -21,7 +21,7 @@
 #include <mutex>
 #include "JNIInit.h"
 #include "base/utils/Log.h"
-#include "tgfx/jni.h"
+#include "tgfx/platform.h"
 
 namespace pag {
 static std::mutex globalLocker = {};
