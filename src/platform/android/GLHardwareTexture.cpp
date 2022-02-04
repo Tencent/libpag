@@ -68,8 +68,8 @@ std::shared_ptr<GLHardwareTexture> GLHardwareTexture::MakeFrom(
                                      buffer->height);
 }
 
-std::shared_ptr<GLHardwareTexture> GLHardwareTexture::MakeFrom(
-    Context* context, AHardwareBuffer* hardwareBuffer) {
+std::shared_ptr<GLHardwareTexture> GLHardwareTexture::MakeFrom(Context* context,
+                                                               AHardwareBuffer* hardwareBuffer) {
   if (!hardwareBuffer) {
     return nullptr;
   }
@@ -95,9 +95,8 @@ std::shared_ptr<GLHardwareTexture> GLHardwareTexture::MakeFrom(
 }
 
 std::shared_ptr<GLHardwareTexture> GLHardwareTexture::MakeFrom(
-    Context* context, AHardwareBuffer* hardwareBuffer,
-    android::GraphicBuffer* graphicBuffer, EGLClientBuffer clientBuffer, int width,
-    int height) {
+    Context* context, AHardwareBuffer* hardwareBuffer, android::GraphicBuffer* graphicBuffer,
+    EGLClientBuffer clientBuffer, int width, int height) {
   static bool init = initGlextProc();
   if (!init || !clientBuffer) {
     return nullptr;
@@ -123,8 +122,8 @@ std::shared_ptr<GLHardwareTexture> GLHardwareTexture::MakeFrom(
 }
 
 GLHardwareTexture::GLHardwareTexture(AHardwareBuffer* hardwareBuffer,
-                                     android::GraphicBuffer* graphicBuffer,
-                                     EGLImageKHR eglImage, int width, int height)
+                                     android::GraphicBuffer* graphicBuffer, EGLImageKHR eglImage,
+                                     int width, int height)
     : GLTexture(width, height, ImageOrigin::TopLeft),
       _eglImage(eglImage),
       hardwareBuffer(hardwareBuffer),

@@ -18,9 +18,8 @@
 
 #pragma once
 
-#include "image/Image.h"
-
 #include <emscripten/val.h>
+#include "image/Image.h"
 
 namespace pag {
 class NativeImage : public Image {

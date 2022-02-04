@@ -17,36 +17,36 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include "NativeGraphicBufferInterface.h"
 #include <android/hardware_buffer.h>
-#include "gpu/opengl/GLTexture.h"
 #include "EGL/egl.h"
 #include "EGL/eglext.h"
 #include "GLES/gl.h"
 #include "GLES/glext.h"
+#include "NativeGraphicBufferInterface.h"
 #include "NativeHardwareBufferInterface.h"
+#include "gpu/opengl/GLTexture.h"
 
 namespace pag {
 class GLHardwareTexture : public GLTexture {
  public:
-  static std::shared_ptr<GLHardwareTexture> MakeFrom(
-      Context* context, AHardwareBuffer* hardwareBuffer);
-  static std::shared_ptr<GLHardwareTexture> MakeFrom(
-      Context* context, android::GraphicBuffer* graphicBuffer);
+  static std::shared_ptr<GLHardwareTexture> MakeFrom(Context* context,
+                                                     AHardwareBuffer* hardwareBuffer);
+  static std::shared_ptr<GLHardwareTexture> MakeFrom(Context* context,
+                                                     android::GraphicBuffer* graphicBuffer);
 
-  static std::shared_ptr<GLHardwareTexture> MakeFrom(
-      Context* context, AHardwareBuffer* hardwareBuffer,
-      android::GraphicBuffer* graphicBuffer, EGLClientBuffer client_buffer, int width,
-      int height);
+  static std::shared_ptr<GLHardwareTexture> MakeFrom(Context* context,
+                                                     AHardwareBuffer* hardwareBuffer,
+                                                     android::GraphicBuffer* graphicBuffer,
+                                                     EGLClientBuffer client_buffer, int width,
+                                                     int height);
 
   size_t memoryUsage() const override {
     return 0;
   }
 
  private:
-  explicit GLHardwareTexture(AHardwareBuffer* hardwareBuffer,
-                             android::GraphicBuffer* graphicBuffer, EGLImageKHR eglImage,
-                             int width, int height);
+  explicit GLHardwareTexture(AHardwareBuffer* hardwareBuffer, android::GraphicBuffer* graphicBuffer,
+                             EGLImageKHR eglImage, int width, int height);
   EGLImageKHR _eglImage = EGL_NO_IMAGE_KHR;
   AHardwareBuffer* hardwareBuffer = nullptr;
   android::GraphicBuffer* graphicBuffer = nullptr;

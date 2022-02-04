@@ -18,9 +18,8 @@
 
 #pragma once
 
-#include "gpu/TextureBuffer.h"
-
 #include <emscripten/val.h>
+#include "gpu/TextureBuffer.h"
 
 namespace pag {
 class NativeTextureBuffer : public TextureBuffer {

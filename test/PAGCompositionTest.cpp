@@ -58,8 +58,7 @@ PAG_TEST_F(PAGCompositionTest, composition) {
 
   pagComposition->setLayerIndex(imageLayer1, 3);
   TestPAGPlayer->flush();
-  EXPECT_TRUE(
-      Baseline::Compare(TestPAGSurface, "PAGCompositionTest/composition_setLayerIndex"));
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGCompositionTest/composition_setLayerIndex"));
 
   pagComposition->removeLayer(imageLayer1);
   TestPAGPlayer->flush();
@@ -67,8 +66,7 @@ PAG_TEST_F(PAGCompositionTest, composition) {
 
   pagComposition->removeLayerAt(2);
   TestPAGPlayer->flush();
-  EXPECT_TRUE(
-      Baseline::Compare(TestPAGSurface, "PAGCompositionTest/composition_removeLayerAt"));
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGCompositionTest/composition_removeLayerAt"));
 
   pagComposition->removeAllLayers();
   TestPAGPlayer->flush();

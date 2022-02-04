@@ -65,8 +65,8 @@ class CompareFrameTask : public Executor {
   bool success = false;
 
   void execute() override {
-    success = Baseline::Compare(pixelBuffer, "PAGCompareFrameTest/" + fileName + "/" +
-                                                 std::to_string(_currentFrame));
+    success = Baseline::Compare(
+        pixelBuffer, "PAGCompareFrameTest/" + fileName + "/" + std::to_string(_currentFrame));
   }
 };
 

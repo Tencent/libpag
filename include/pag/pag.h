@@ -142,7 +142,7 @@ class PAG_API PAGImage : public Content {
   }
 
  private:
-   std::mutex locker = {};
+  std::mutex locker = {};
   ID _uniqueID = 0;
   Matrix _matrix = Matrix::I();
   bool hasSetScaleMode = false;

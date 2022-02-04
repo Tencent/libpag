@@ -31,6 +31,6 @@ class NativePlatform : public Platform {
 
   PAGFont parseFont(const void* data, size_t length, int ttcIndex) const override;
 
-  void traceImage(const PixelMap &pixelMap, const std::string &tag) const override;
+  void traceImage(const PixelMap& pixelMap, const std::string& tag) const override;
 };
 }  // namespace pag

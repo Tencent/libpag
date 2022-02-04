@@ -57,8 +57,8 @@ void GPUDecoder::InitJNI(JNIEnv* env, const std::string& className) {
                              "(Ljava/lang/String;II)Landroid/media/MediaFormat;");
   MediaFormat_setByteBuffer = env->GetMethodID(MediaFormatClass.get(), "setByteBuffer",
                                                "(Ljava/lang/String;Ljava/nio/ByteBuffer;)V");
-  MediaFormat_setFloat = env->GetMethodID(MediaFormatClass.get(), "setFloat",
-                                          "(Ljava/lang/String;F)V");
+  MediaFormat_setFloat =
+      env->GetMethodID(MediaFormatClass.get(), "setFloat", "(Ljava/lang/String;F)V");
 }
 
 GPUDecoder::GPUDecoder(const VideoConfig& config) {

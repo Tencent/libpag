@@ -38,13 +38,13 @@ PAG_TEST_F(PAGTimeUtilsTest, ConvertProgressAndFrame) {
     auto progress = i * 0.5 / totalFrames;
     pagFile->setProgress(progress);
     TestPAGPlayer->flush();
-    EXPECT_TRUE(Baseline::Compare(
-        TestPAGSurface, "PAGTimeUtilsTest/ConvertProgressAndFrame_" + std::to_string(i)));
+    EXPECT_TRUE(Baseline::Compare(TestPAGSurface,
+                                  "PAGTimeUtilsTest/ConvertProgressAndFrame_" + std::to_string(i)));
     progress = pagFile->getProgress();
     pagFile->setProgress(progress);
     TestPAGPlayer->flush();
-    EXPECT_TRUE(Baseline::Compare(
-        TestPAGSurface, "PAGTimeUtilsTest/ConvertProgressAndFrame_" + std::to_string(i)));
+    EXPECT_TRUE(Baseline::Compare(TestPAGSurface,
+                                  "PAGTimeUtilsTest/ConvertProgressAndFrame_" + std::to_string(i)));
   }
 }
 

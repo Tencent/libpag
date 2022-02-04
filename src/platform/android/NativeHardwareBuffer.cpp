@@ -17,14 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "NativeHardwareBuffer.h"
-
-#include <jni.h>
-#include <string>
-
 #include <android/hardware_buffer.h>
 #include <dlfcn.h>
+#include <jni.h>
+#include <string>
 #include <unordered_set>
-
 #include "GLHardwareTexture.h"
 #include "NativeHardwareBufferInterface.h"
 

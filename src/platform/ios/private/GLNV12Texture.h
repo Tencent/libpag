@@ -25,10 +25,10 @@ namespace pag {
 class GLNV12Texture : public GLYUVTexture {
  public:
   static std::shared_ptr<GLNV12Texture> MakeFrom(Context* context, CVPixelBufferRef pixelBuffer,
-                                                 YUVColorSpace colorSpace, YUVColorRange colorRange);
+                                                 YUVColorSpace colorSpace,
+                                                 YUVColorRange colorRange);
 
-  GLNV12Texture(CVPixelBufferRef pixelBuffer,
-                YUVColorSpace colorSpace, YUVColorRange colorRange);
+  GLNV12Texture(CVPixelBufferRef pixelBuffer, YUVColorSpace colorSpace, YUVColorRange colorRange);
 
   ~GLNV12Texture() override;
 
