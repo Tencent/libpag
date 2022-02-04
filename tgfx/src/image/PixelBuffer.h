@@ -23,7 +23,7 @@
 
 namespace pag {
 /**
- * PixelBuffer describes a two dimensional array of pixels located in CPU memory.
+ * PixelBuffer describes a two dimensional array of pixels.
  */
 class PixelBuffer : public TextureBuffer {
  public:

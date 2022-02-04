@@ -27,8 +27,8 @@
 namespace pag {
 /**
  * Mask is a utility that can take an image described in a vector graphics format (paths, glyphs)
- * and convert it into a raster image that can be used as a drawing mask. Mas is no thread safe, do
- * not use it across multiple threads.
+ * and convert it into a raster image that can be used as a drawing mask. Mask is not thread safe,
+ * do not use it across multiple threads.
  */
 class Mask : public TextureBuffer {
  public:

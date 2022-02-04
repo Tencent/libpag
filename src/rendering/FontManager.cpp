@@ -19,6 +19,7 @@
 #include "FontManager.h"
 #include "base/utils/USE.h"
 #include "pag/file.h"
+#include "platform/Platform.h"
 
 namespace pag {
 std::shared_ptr<TypefaceHolder> TypefaceHolder::MakeFromName(const std::string& fontFamily,

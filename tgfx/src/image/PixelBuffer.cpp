@@ -19,6 +19,7 @@
 #include "PixelBuffer.h"
 #include "PixelMap.h"
 #include "gpu/Device.h"
+#include "platform/Platform.h"
 
 namespace pag {
 class RasterPixelBuffer : public PixelBuffer {

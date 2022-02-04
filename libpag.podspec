@@ -49,6 +49,7 @@ Pod::Spec.new do |s|
                     'src/video/**/*.{h,cpp}',
                     'src/rendering/**/*.{h,cpp}',
                     'src/platform/*.{h,cpp}',
+                    'tgfx/src/platform/*.{h,cpp}',
                     'tgfx/src/base/**/*.{h,cpp}',
                     'tgfx/src/core/**/*.{h,cpp}',
                     'tgfx/src/gpu/*.{h,cpp}',

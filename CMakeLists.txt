@@ -94,6 +94,7 @@ file(GLOB PAG_COMMON_FILES
         src/platform/*.*
         tgfx/src/gpu/*.*
         tgfx/src/image/*.*
+        tgfx/src/platform/*.*
         tgfx/src/raster/*.*)
 list(APPEND PAG_FILES ${PAG_COMMON_FILES})
 

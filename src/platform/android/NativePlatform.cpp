@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "NativePlatform.h"
-#include <android/log.h>
 #include <jni.h>
 #include <sys/system_properties.h>
 #include <cstdarg>
@@ -57,20 +56,6 @@ std::unique_ptr<VideoDecoder> NativePlatform::makeHardwareDecoder(
     return nullptr;
   }
   return std::unique_ptr<VideoDecoder>(decoder);
-}
-
-void NativePlatform::printLog(const char* format, ...) const {
-  va_list args;
-  va_start(args, format);
-  __android_log_vprint(ANDROID_LOG_INFO, LOG_TAG, format, args);
-  va_end(args);
-}
-
-void NativePlatform::printError(const char* format, ...) const {
-  va_list args;
-  va_start(args, format);
-  __android_log_vprint(ANDROID_LOG_ERROR, LOG_TAG, format, args);
-  va_end(args);
 }
 
 bool NativePlatform::registerFallbackFonts() const {

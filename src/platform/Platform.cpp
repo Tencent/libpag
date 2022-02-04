@@ -33,22 +33,6 @@ std::unique_ptr<VideoDecoder> Platform::makeHardwareDecoder(const VideoConfig&) 
   return nullptr;
 }
 
-void Platform::printLog(const char format[], ...) const {
-  va_list args;
-  va_start(args, format);
-  vfprintf(stdout, format, args);
-  va_end(args);
-  fprintf(stdout, "\n");
-}
-
-void Platform::printError(const char format[], ...) const {
-  va_list args;
-  va_start(args, format);
-  vfprintf(stderr, format, args);
-  va_end(args);
-  fprintf(stderr, "\n");
-}
-
 bool Platform::registerFallbackFonts() const {
   return false;
 }

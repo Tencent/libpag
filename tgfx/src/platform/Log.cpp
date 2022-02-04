@@ -16,14 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#if !defined(__ANDROID__) && !defined(ANDROID)
+
+#include <cstdarg>
+#include <cstdio>
+#include "tgfx/platform.h"
 
 namespace pag {
-/*
- * Manually set a Java virtual machine which will be used by tgfx to retrieve the JNI environment.
- * Once a Java VM is set it cannot be changed afterwards, meaning you can call multiple times
- * SetJavaVM() with the same Java VM pointer however it will error out if you try to set a different
- * Java VM. Returns true on success, false otherwise.
- */
-bool SetJavaVM(void* javaVM);
+void PrintLog(const char format[], ...) {
+  va_list args;
+  va_start(args, format);
+  vfprintf(stdout, format, args);
+  va_end(args);
+  fprintf(stdout, "\n");
+}
+
+void PrintError(const char format[], ...) {
+  va_list args;
+  va_start(args, format);
+  vfprintf(stderr, format, args);
+  va_end(args);
+  fprintf(stderr, "\n");
+}
 }  // namespace pag
+
+#endif
