@@ -78,6 +78,12 @@ jobs:
           chmod +x autotest.sh
           ./autotest.sh
         shell: bash
+      - name: The job has failed
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v2
+        with:
+            name: result
+            path: result
       - uses: actions/upload-artifact@v2
         with:
           name: result

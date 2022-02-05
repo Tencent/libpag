@@ -69,6 +69,14 @@ fi
 cp -a $WORKSPACE/build/*.json $WORKSPACE/result/
 rm -rf build
 
+brew install gcovr
+pip3 install diff-cover
+
+gcovr -r . -e='test/*.*' -e='vendor/*.*' --html -o ./result/coverage.html
+gcovr -r . -e='test/*.*' -e='vendor/*.*' --xml-pretty -o coverage.xml
+diff-cover coverage.xml --compare-branch=origin/main --exclude 'test/*.*' 'vendor/*.*' --html-report coveragediff.html>coveragediff.txt
+cp -a coveragediff.html ./result/
+
 if [ "$COMPLIE_RESULT" == false ]
 then
  cp -a $WORKSPACE/test/out/baseline/**/*.lzma2 $WORKSPACE/result/

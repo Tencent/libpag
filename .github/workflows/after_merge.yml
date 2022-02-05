@@ -65,9 +65,6 @@ jobs:
         run: |
           echo "file not exit"
           git clone -b main https://github.com/kevingpqi123/libpag.git
-          ls
-          cd libpag
-          ls
       - name: brew link emscripten
         if: steps.cache-third_party.outputs.cache-hit == 'true'
         run: |
