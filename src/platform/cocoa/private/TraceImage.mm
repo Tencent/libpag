@@ -19,22 +19,27 @@
 #include "TraceImage.h"
 #include <fstream>
 #include "PixelBufferUtils.h"
+#include "image/Bitmap.h"
 
 namespace pag {
-void TraceImage(const PixelMap& pixelMap, const std::string& tag) {
+void TraceImage(const ImageInfo& info, const void* pixels, const std::string& tag) {
+  if (info.isEmpty() || pixels == nullptr) {
+    return;
+  }
   @autoreleasepool {
-    auto pixelBuffer = PixelBufferUtils::Make(pixelMap.width(), pixelMap.height());
+    auto pixelBuffer = PixelBufferUtils::Make(info.width(), info.height());
     if (pixelBuffer == nil) {
       return;
     }
     CVPixelBufferLockBaseAddress(pixelBuffer, 0);
-    auto pixels = CVPixelBufferGetBaseAddress(pixelBuffer);
+    auto dstPixels = CVPixelBufferGetBaseAddress(pixelBuffer);
     auto rowBytes = CVPixelBufferGetBytesPerRow(pixelBuffer);
-    auto info = ImageInfo::Make(pixelMap.width(), pixelMap.height(), ColorType::BGRA_8888,
-                                AlphaType::Premultiplied, rowBytes);
-    pixelMap.readPixels(info, pixels);
+    auto dstInfo = ImageInfo::Make(info.width(), info.height(), ColorType::BGRA_8888,
+                                   AlphaType::Premultiplied, rowBytes);
+    Bitmap bitmap(dstInfo, dstPixels);
+    bitmap.writePixels(info, pixels);
     CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
-    LOGI("%s : Image(width = %d, height = %d)", tag.c_str(), pixelMap.width(), pixelMap.height());
+    LOGI("%s : Image(width = %d, height = %d)", tag.c_str(), info.width(), info.height());
   }
 }
 }

@@ -63,8 +63,7 @@
 
 + (PAGImageImpl*)FromPixelBuffer:(CVPixelBufferRef)pixelBuffer {
   auto hardwareBuffer = pag::PixelBuffer::MakeFrom(pixelBuffer);
-  pag::Bitmap bitmap(hardwareBuffer);
-  auto image = pag::StillImage::FromBitmap(bitmap);
+  auto image = pag::StillImage::FromPixelBuffer(hardwareBuffer);
   if (image == nullptr) {
     return nil;
   }
@@ -79,22 +78,21 @@
   }
   auto width = static_cast<int>(CGImageGetWidth(cgImage));
   auto height = static_cast<int>(CGImageGetHeight(cgImage));
-  pag::Bitmap bitmap = {};
-  if (!bitmap.allocPixels(width, height)) {
+  auto pixelBuffer = pag::PixelBuffer::Make(width, height);
+  pag::Bitmap bitmap(pixelBuffer);
+  if (bitmap.isEmpty()) {
     return nil;
   }
-  auto pixels = bitmap.lockPixels();
-  auto context = CreateBitmapContext(bitmap.info(), pixels);
+  auto context = CreateBitmapContext(bitmap.info(), bitmap.writablePixels());
   if (context == nullptr) {
-    bitmap.unlockPixels();
     return nil;
   }
   CGRect rect = CGRectMake(0, 0, width, height);
   CGContextSetBlendMode(context, kCGBlendModeCopy);
   CGContextDrawImage(context, rect, cgImage);
   CGContextRelease(context);
-  bitmap.unlockPixels();
-  auto data = pag::StillImage::FromBitmap(bitmap);
+  bitmap.reset();
+  auto data = pag::StillImage::FromPixelBuffer(pixelBuffer);
   if (data == nullptr) {
     return nil;
   }

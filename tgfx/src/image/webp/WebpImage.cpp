@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "image/webp/WebpImage.h"
-#include "image/PixelMap.h"
+#include "image/Bitmap.h"
 #include "image/webp/WebpUtility.h"
 
 namespace pag {
@@ -94,8 +94,8 @@ bool WebpImage::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
       if (decodeSuccess) {
         auto info =
             ImageInfo::Make(width(), height(), ColorType::RGBA_8888, AlphaType::Unpremultiplied);
-        PixelMap pixelMap(info, pixels);
-        decodeSuccess = pixelMap.readPixels(dstInfo, dstPixels);
+        Bitmap bitmap(info, pixels);
+        decodeSuccess = bitmap.readPixels(dstInfo, dstPixels);
       }
       delete[] pixels;
     }
@@ -138,13 +138,13 @@ std::shared_ptr<Data> WebpImage::Encode(const ImageInfo& imageInfo, const void* 
   const uint8_t* convertPixels = nullptr;
   if (imageInfo.alphaType() == AlphaType::Premultiplied ||
       imageInfo.colorType() == ColorType::ALPHA_8) {
-    PixelMap pixelMap(imageInfo, srcPixels);
+    Bitmap bitmap(imageInfo, srcPixels);
     auto dstPixels = new uint8_t[imageInfo.width() * imageInfo.height() * 4];
     auto colorType =
         imageInfo.colorType() == ColorType::ALPHA_8 ? ColorType::RGBA_8888 : imageInfo.colorType();
     auto dstInfo = ImageInfo::Make(imageInfo.width(), imageInfo.height(), colorType,
                                    AlphaType::Unpremultiplied);
-    if (!pixelMap.readPixels(dstInfo, dstPixels)) {
+    if (!bitmap.readPixels(dstInfo, dstPixels)) {
       delete[] dstPixels;
       return nullptr;
     }

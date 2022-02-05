@@ -62,7 +62,8 @@ bool NativePlatform::registerFallbackFonts() const {
   return FontConfigAndroid::RegisterFallbackFonts();
 }
 
-void NativePlatform::traceImage(const pag::PixelMap& pixelMap, const std::string& tag) const {
-  JTraceImage::Trace(pixelMap, tag);
+void NativePlatform::traceImage(const ImageInfo& info, const void* pixels,
+                                const std::string& tag) const {
+  JTraceImage::Trace(info, pixels, tag);
 }
 }  // namespace pag

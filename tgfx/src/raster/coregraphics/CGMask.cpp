@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CGMask.h"
+#include "image/Bitmap.h"
 #include "platform/apple/BitmapContextUtil.h"
 #include "raster/Mask.h"
 
@@ -49,7 +50,7 @@ std::shared_ptr<Mask> Mask::Make(int width, int height) {
   if (buffer == nullptr) {
     return nullptr;
   }
-  buffer->eraseAll();
+  Bitmap(buffer).eraseAll();
   return std::make_shared<CGMask>(std::move(buffer));
 }
 

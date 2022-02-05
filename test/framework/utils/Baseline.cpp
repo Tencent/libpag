@@ -23,7 +23,6 @@
 #include "LzmaUtil.h"
 #include "core/Data.h"
 #include "image/Image.h"
-#include "image/PixelMap.h"
 
 namespace pag {
 #define BASELINE_ROOT "../test/baseline/"
@@ -66,9 +65,9 @@ static void SaveImage(const ImageInfo& info, const std::shared_ptr<Data>& imageD
   if (baselineData == nullptr) {
     return;
   }
-  auto baselineImage = Image::Encode(info, baselineData->data(), EncodedFormat::WEBP, 100);
+  auto baselineImage = Bitmap(info, baselineData->data()).encode(EncodedFormat::WEBP, 100);
   SaveData(baselineImage, OUT_COMPARE_ROOT + key + "_baseline.webp");
-  auto compareImage = Image::Encode(info, imageData->data(), EncodedFormat::WEBP, 100);
+  auto compareImage = Bitmap(info, imageData->data()).encode(EncodedFormat::WEBP, 100);
   SaveData(compareImage, OUT_COMPARE_ROOT + key + "_new.webp");
 }
 
@@ -111,13 +110,11 @@ bool Baseline::Compare(const std::shared_ptr<PixelBuffer>& pixelBuffer, const st
   if (pixelBuffer == nullptr) {
     return false;
   }
-  auto srcPixels = pixelBuffer->lockPixels();
-  PixelMap pixelMap(pixelBuffer->info(), srcPixels);
-  auto info = MakeInfo(pixelBuffer->width(), pixelBuffer->height());
+  Bitmap bitmap(pixelBuffer);
+  auto info = MakeInfo(bitmap.width(), bitmap.height());
   auto pixels = new uint8_t[info.byteSize()];
   auto data = Data::MakeAdopted(pixels, info.byteSize(), Data::DeleteProc);
-  auto result = pixelMap.readPixels(info, pixels);
-  pixelBuffer->unlockPixels();
+  auto result = bitmap.readPixels(info, pixels);
   if (!result) {
     return false;
   }
@@ -132,20 +129,6 @@ bool Baseline::Compare(const Bitmap& bitmap, const std::string& key) {
   auto pixels = new uint8_t[info.byteSize()];
   auto data = Data::MakeAdopted(pixels, info.byteSize(), Data::DeleteProc);
   auto result = bitmap.readPixels(info, pixels);
-  if (!result) {
-    return false;
-  }
-  return ComparePixelData(data, key, info);
-}
-
-bool Baseline::Compare(const PixelMap& pixelMap, const std::string& key) {
-  if (pixelMap.isEmpty()) {
-    return false;
-  }
-  auto info = MakeInfo(pixelMap.width(), pixelMap.height());
-  auto pixels = new uint8_t[info.byteSize()];
-  auto data = Data::MakeAdopted(pixels, info.byteSize(), Data::DeleteProc);
-  auto result = pixelMap.readPixels(info, pixels);
   if (!result) {
     return false;
   }

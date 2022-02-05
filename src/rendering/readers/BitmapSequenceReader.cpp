@@ -26,21 +26,19 @@ BitmapSequenceReader::BitmapSequenceReader(std::shared_ptr<File> file, BitmapSeq
     : SequenceReader(std::move(file), sequence) {
   // 若内容非静态，强制使用非 hardware 的 Bitmap，否则纹理内容跟 bitmap
   // 内存是共享的，无法进行解码预测。
-  if (bitmap.allocPixels(sequence->width, sequence->height, false, staticContent)) {
-    // 必须清零，否则首帧是空帧的情况会绘制错误。
-    bitmap.eraseAll();
-  }
+  pixelBuffer = PixelBuffer::Make(sequence->width, sequence->height, false, staticContent);
+  // 必须清零，否则首帧是空帧的情况会绘制错误。
+  Bitmap(pixelBuffer).eraseAll();
 }
 void BitmapSequenceReader::decodeFrame(Frame targetFrame) {
   // decodeBitmap 这里需要立即加锁，防止异步解码时线程冲突。
   std::lock_guard<std::mutex> autoLock(locker);
-  if (lastDecodeFrame == targetFrame || bitmap.isEmpty()) {
+  if (lastDecodeFrame == targetFrame || pixelBuffer == nullptr) {
     return;
   }
   auto startFrame = findStartFrame(targetFrame);
   auto& bitmapFrames = static_cast<BitmapSequence*>(sequence)->frames;
-  BitmapLock bitmapLock(bitmap);
-  auto pixels = bitmapLock.pixels();
+  Bitmap bitmap(pixelBuffer);
   for (Frame frame = startFrame; frame <= targetFrame; frame++) {
     auto bitmapFrame = bitmapFrames[frame];
     auto firstRead = true;
@@ -52,10 +50,11 @@ void BitmapSequenceReader::decodeFrame(Frame targetFrame) {
         // 关键帧不是全屏的时候要清屏
         if (firstRead && bitmapFrame->isKeyframe &&
             !(image->width() == bitmap.width() && image->height() == bitmap.height())) {
-          memset(pixels, 0, bitmap.byteSize());
+          bitmap.eraseAll();
         }
         auto offset = bitmap.rowBytes() * bitmapRect->y + bitmapRect->x * 4;
-        image->readPixels(bitmap.info(), reinterpret_cast<uint8_t*>(pixels) + offset);
+        image->readPixels(bitmap.info(),
+                          reinterpret_cast<uint8_t*>(bitmap.writablePixels()) + offset);
         firstRead = false;
       }
     }
@@ -86,7 +85,7 @@ void BitmapSequenceReader::prepareAsync(Frame targetFrame) {
 }
 
 std::shared_ptr<Texture> BitmapSequenceReader::readTexture(Frame targetFrame, RenderCache* cache) {
-  if (lastTextureFrame == targetFrame || bitmap.isEmpty()) {
+  if (lastTextureFrame == targetFrame || pixelBuffer == nullptr) {
     return lastTexture;
   }
   auto startTime = GetTimer();
@@ -97,7 +96,7 @@ std::shared_ptr<Texture> BitmapSequenceReader::readTexture(Frame targetFrame, Re
   cache->imageDecodingTime += GetTimer() - startTime;
   lastTexture = nullptr;  // 先释放上一次的 Texture，允许在 Context 里复用。
   startTime = GetTimer();
-  lastTexture = bitmap.makeTexture(cache->getContext());
+  lastTexture = pixelBuffer->makeTexture(cache->getContext());
   lastTextureFrame = targetFrame;
   cache->textureUploadingTime += GetTimer() - startTime;
   if (!staticContent) {

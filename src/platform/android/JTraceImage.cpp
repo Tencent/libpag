@@ -18,6 +18,7 @@
 
 #include "JTraceImage.h"
 #include "JNIHelper.h"
+#include "image/Bitmap.h"
 
 namespace pag {
 static Global<jclass> TraceImageClass;
@@ -29,26 +30,25 @@ void JTraceImage::InitJNI(JNIEnv* env) {
                                             "(Ljava/lang/String;Ljava/nio/ByteBuffer;II)V");
 }
 
-void JTraceImage::Trace(const PixelMap& pixelMap, const std::string& tag) {
+void JTraceImage::Trace(const ImageInfo& info, const void* pixels, const std::string& tag) {
   auto env = JNIEnvironment::Current();
-  if (env == nullptr || pixelMap.isEmpty()) {
+  if (env == nullptr || info.isEmpty() || pixels == nullptr) {
     return;
   }
 
-  auto rowBytes = static_cast<size_t>(pixelMap.width() * 4);
-  auto pixels = new(std::nothrow) uint8_t[pixelMap.height() * rowBytes];
-  if (pixels == nullptr) {
+  auto rowBytes = static_cast<size_t>(info.width() * 4);
+  auto dstPixels = new (std::nothrow) uint8_t[info.height() * rowBytes];
+  if (dstPixels == nullptr) {
     return;
   }
-  auto info = ImageInfo::Make(pixelMap.width(), pixelMap.height(), ColorType::RGBA_8888,
-                              AlphaType::Premultiplied, rowBytes);
-  pixelMap.readPixels(info, pixels);
-  Local<jobject> byteBuffer =
-      {env, MakeByteBufferObject(env, pixels, static_cast<size_t>(pixelMap.height() * rowBytes))};
+  auto dstInfo = ImageInfo::Make(info.width(), info.height(), ColorType::RGBA_8888,
+                                 AlphaType::Premultiplied, rowBytes);
+  Bitmap bitmap(dstInfo, dstPixels);
+  bitmap.writePixels(info, pixels);
+  Local<jobject> byteBuffer = {env, MakeByteBufferObject(env, dstPixels, dstInfo.byteSize())};
   Local<jstring> tagString = {env, SafeConvertToJString(env, tag.c_str())};
   env->CallStaticVoidMethod(TraceImageClass.get(), TraceImage_Trace, tagString.get(),
-                            byteBuffer.get(),
-                            pixelMap.width(), pixelMap.height());
-  delete[] pixels;
+                            byteBuffer.get(), info.width(), info.height());
+  delete[] dstPixels;
 }
 }  // namespace pag

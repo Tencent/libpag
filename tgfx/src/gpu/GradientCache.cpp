@@ -45,14 +45,15 @@ void GradientCache::add(const BytesKey& bytesKey, std::shared_ptr<Texture> textu
   }
 }
 
-std::unique_ptr<Bitmap> CreateGradient(const Color4f* colors, const float* positions, int count,
-                                       int resolution) {
-  auto bitmap = std::make_unique<Bitmap>();
-  if (!bitmap->allocPixels(resolution, 1)) {
+std::shared_ptr<PixelBuffer> CreateGradient(const Color4f* colors, const float* positions,
+                                            int count, int resolution) {
+  auto pixelBuffer = PixelBuffer::Make(resolution, 1);
+  Bitmap bitmap(pixelBuffer);
+  if (bitmap.isEmpty()) {
     return nullptr;
   }
-  bitmap->eraseAll();
-  auto* pixels = reinterpret_cast<uint8_t*>(bitmap->lockPixels());
+  bitmap.eraseAll();
+  auto* pixels = reinterpret_cast<uint8_t*>(bitmap.writablePixels());
   int prevIndex = 0;
   for (int i = 1; i < count; ++i) {
     int nextIndex =
@@ -87,8 +88,7 @@ std::unique_ptr<Bitmap> CreateGradient(const Color4f* colors, const float* posit
     }
     prevIndex = nextIndex;
   }
-  bitmap->unlockPixels();
-  return bitmap;
+  return pixelBuffer;
 }
 
 const Texture* GradientCache::getGradient(const Color4f* colors, const float* positions,
@@ -106,11 +106,11 @@ const Texture* GradientCache::getGradient(const Color4f* colors, const float* po
   if (texture) {
     return texture;
   }
-  auto bitmap = CreateGradient(colors, positions, count, kGradientTextureSize);
-  if (bitmap == nullptr) {
+  auto pixelBuffer = CreateGradient(colors, positions, count, kGradientTextureSize);
+  if (pixelBuffer == nullptr) {
     return nullptr;
   }
-  auto tex = bitmap->makeTexture(context);
+  auto tex = pixelBuffer->makeTexture(context);
   add(bytesKey, tex);
   return tex.get();
 }
