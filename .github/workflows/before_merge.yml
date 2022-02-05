@@ -43,9 +43,8 @@ jobs:
         uses: actions/cache@v2
         with:
           path: libpag.tar.zst
-          key: libpag-${{ github.event.pull_request.base.sha }}
-          restore-keys: |
-            libpag-
+          key: libpag-code-${{ github.event.pull_request.base.sha }}
+          restore-keys: libpag-code-
       - name: Check file existence
         id: check_files
         uses: andstor/file-existence-action@v1
