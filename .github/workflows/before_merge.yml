@@ -42,7 +42,7 @@ jobs:
         uses: actions/cache@v2
         with:
           path: libpag.tar.zst
-          key: libpag-${{ github.sha }}
+          key: libpag-${{ github.event.pull_request.base.sha }}
           restore-keys: |
             libpag-${{ github.event.before }}
             libpag-
