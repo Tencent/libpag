@@ -45,7 +45,6 @@ jobs:
           path: libpag.tar.zst
           key: libpag-${{ github.event.pull_request.base.sha }}
           restore-keys: |
-            libpag-${{ github.event.before }}
             libpag-
       - name: Check file existence
         id: check_files
