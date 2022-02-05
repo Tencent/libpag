@@ -35,18 +35,7 @@ then
 echo "~~~~~~~~~~~~~~~~~~~PAGFullTest make successed~~~~~~~~~~~~~~~~~~"
 else
 echo "~~~~~~~~~~~~~~~~~~~PAGFullTest make error~~~~~~~~~~~~~~~~~~"
-exit
-fi
-
-./PAGFullTest --gtest_output=json:PAGFullTest.json
-
-if test $? -eq 0
-
-then
-echo "~~~~~~~~~~~~~~~~~~~PAGFullTest successed~~~~~~~~~~~~~~~~~~"
-else
-echo "~~~~~~~~~~~~~~~~~~~PAGFullTest Failed~~~~~~~~~~~~~~~~~~"
-COMPLIE_RESULT=false
+exit 1
 fi
 
 cmake --build . --target PAGSmokeTest -- -j 12
@@ -55,13 +44,21 @@ then
 echo "~~~~~~~~~~~~~~~~~~~PAGSmokeTest make successed~~~~~~~~~~~~~~~~~~"
 else
 echo "~~~~~~~~~~~~~~~~~~~PAGSmokeTest make error~~~~~~~~~~~~~~~~~~"
-exit
+exit 1
+fi
+
+./PAGFullTest --gtest_output=json:PAGFullTest.json
+
+if test $? -eq 0
+then
+echo "~~~~~~~~~~~~~~~~~~~PAGFullTest successed~~~~~~~~~~~~~~~~~~"
+else
+echo "~~~~~~~~~~~~~~~~~~~PAGFullTest Failed~~~~~~~~~~~~~~~~~~"
+COMPLIE_RESULT=false
 fi
 
 ./PAGSmokeTest --gtest_output=json:PAGSmokeTest.json
-
 if test $? -eq 0
-
 then
 echo "~~~~~~~~~~~~~~~~~~~PAGSmokeTest successed~~~~~~~~~~~~~~~~~~"
 else
@@ -69,12 +66,14 @@ echo "~~~~~~~~~~~~~~~~~~~PAGSmokeTest Failed~~~~~~~~~~~~~~~~~~"
 COMPLIE_RESULT=false
 fi
 
+cp -a $WORKSPACE/build/*.json $WORKSPACE/result/
+rm -rf build
+
 if [ "$COMPLIE_RESULT" == false ]
 then
  cp -a $WORKSPACE/test/out/baseline/**/*.lzma2 $WORKSPACE/result/
  cp -a $WORKSPACE/test/out/compare/*.webp $WORKSPACE/result/
+ exit 1
 fi
 
-cp -a $WORKSPACE/build/*.json $WORKSPACE/result/
 
-rm -rf build

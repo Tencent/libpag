@@ -17,15 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "VideoSequenceReader.h"
-
 #include "gpu/opengl/GLTexture.h"
 #include "rendering/caches/RenderCache.h"
 
 using namespace emscripten;
 
 namespace pag {
-std::shared_ptr<SequenceReader>
-SequenceReader::Make(std::shared_ptr<File> file, VideoSequence* sequence, DecodingPolicy policy) {
+std::shared_ptr<SequenceReader> SequenceReader::Make(std::shared_ptr<File> file,
+                                                     VideoSequence* sequence,
+                                                     DecodingPolicy policy) {
   return std::make_shared<VideoSequenceReader>(std::move(file), sequence, policy);
 }
 
@@ -43,12 +43,12 @@ VideoSequenceReader::VideoSequenceReader(std::shared_ptr<File> file, VideoSequen
   auto videoReaderClass = val::module_property("VideoReader");
   if (videoReaderClass.as<bool>()) {
     auto headers = val::array();
-    for (auto* header: sequence->headers) {
+    for (auto* header : sequence->headers) {
       headers.call<void>("push", val(typed_memory_view(header->length(), header->data())));
     }
     auto frames = val::array();
     auto ptsList = val::array();
-    for (auto* frame: sequence->frames) {
+    for (auto* frame : sequence->frames) {
       frames.call<void>(
           "push", val(typed_memory_view(frame->fileBytes->length(), frame->fileBytes->data())));
       ptsList.call<void>("push", static_cast<int>(frame->frame));

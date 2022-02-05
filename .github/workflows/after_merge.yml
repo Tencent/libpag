@@ -20,7 +20,7 @@ jobs:
         id: github_context_step
         run: |
           echo '${{ toJSON(github) }}'
-      - name: cache-environment
+      - name: Get environment cache
         id: cache-environment
         uses: actions/cache@v2
         with:
@@ -37,15 +37,15 @@ jobs:
             /usr/local/bin/depsync
           key: libpag-environment
 
-      - name: Get cache
+      - name: Get libpag cache
         id: libpag
         uses: actions/cache@v2
         with:
           path: libpag.tar.zst
-          key: libpag-${{ github.sha }}
+          key: libpag-code-${{ github.sha }}
           restore-keys: |
-            libpag-${{ github.event.before }}
-            libpag-
+            libpag-code-${{ github.event.before }}
+            libpag-code-
       - name: Check file existence
         id: check_files
         uses: andstor/file-existence-action@v1
@@ -86,7 +86,7 @@ jobs:
         with:
           name: result
           path: result
-      - name: compress libpag
+      - name: Compress libpag
         run: |
           cd libpag
           rm -rf result

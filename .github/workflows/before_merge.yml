@@ -1,8 +1,6 @@
 name: before_merge
 
 on:
-  push:
-    branches: [ main ]
   pull_request:
     branches: [ main ]
 
@@ -22,7 +20,8 @@ jobs:
         id: github_context_step
         run: |
           echo '${{ toJSON(github) }}'
-      - name: cache-environment
+          echo '${{ github.event.pull_request.base.sha }}'
+      - name: Get environment cache
         id: cache-environment
         uses: actions/cache@v2
         with:
@@ -39,15 +38,13 @@ jobs:
             /usr/local/bin/depsync
           key: libpag-environment
 
-      - name: Get cache
+      - name: Get libpag cache
         id: libpag
         uses: actions/cache@v2
         with:
           path: libpag.tar.zst
-          key: libpag-${{ github.sha }}
-          restore-keys: |
-            libpag-${{ github.event.before }}
-            libpag-
+          key: libpag-code-${{ github.event.pull_request.base.sha }}
+          restore-keys: libpag-code-
       - name: Check file existence
         id: check_files
         uses: andstor/file-existence-action@v1

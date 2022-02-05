@@ -85,22 +85,21 @@ class YUVTexture : public Texture {
   /**
    * Creates a new texture from I420 buffers.
    */
-  static std::shared_ptr<YUVTexture> MakeI420(Context* context,
-                                              YUVColorSpace colorSpace, YUVColorRange colorRange,
-                                              int width, int height, uint8_t* pixelsPlane[3],
-                                              const int lineSize[3]);
+  static std::shared_ptr<YUVTexture> MakeI420(Context* context, YUVColorSpace colorSpace,
+                                              YUVColorRange colorRange, int width, int height,
+                                              uint8_t* pixelsPlane[3], const int lineSize[3]);
 
   /**
    * Creates a new texture from NV12 buffers.
    */
-  static std::shared_ptr<YUVTexture> MakeNV12(Context* context,
-                                              YUVColorSpace colorSpace, YUVColorRange colorRange,
-                                              int width, int height, uint8_t* pixelsPlane[2],
-                                              const int lineSize[2]);
+  static std::shared_ptr<YUVTexture> MakeNV12(Context* context, YUVColorSpace colorSpace,
+                                              YUVColorRange colorRange, int width, int height,
+                                              uint8_t* pixelsPlane[2], const int lineSize[2]);
 
   YUVTexture(YUVColorSpace colorSpace, YUVColorRange colorRange, int width, int height)
       : Texture(width, height, ImageOrigin::TopLeft),
-        _colorSpace(colorSpace), _colorRange(colorRange) {
+        _colorSpace(colorSpace),
+        _colorRange(colorRange) {
   }
 
   /**

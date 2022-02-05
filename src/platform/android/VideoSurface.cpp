@@ -105,8 +105,8 @@ std::shared_ptr<VideoSurface> VideoSurface::Make(int width, int height, bool has
   if (surface == nullptr) {
     return nullptr;
   }
-  auto videoSurface = std::shared_ptr<VideoSurface>(
-      new VideoSurface(env, surface, width, height, hasAlpha));
+  auto videoSurface =
+      std::shared_ptr<VideoSurface>(new VideoSurface(env, surface, width, height, hasAlpha));
   env->DeleteLocalRef(surface);
   return videoSurface;
 }

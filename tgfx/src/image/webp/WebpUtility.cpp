@@ -19,8 +19,8 @@
 #include "image/webp/WebpUtility.h"
 #include <cstdint>
 #include <cstdio>
-#include "image/utils/OrientationHelper.h"
 #include "base/utils/Log.h"
+#include "image/utils/OrientationHelper.h"
 #include "webp/decode.h"
 #include "webp/demux.h"
 #include "webp/encode.h"

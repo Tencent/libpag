@@ -23,10 +23,12 @@
 
 namespace pag {
 struct FTFontData {
-  FTFontData(std::string path, int ttcIndex) : path(std::move(path)), ttcIndex(ttcIndex) {}
+  FTFontData(std::string path, int ttcIndex) : path(std::move(path)), ttcIndex(ttcIndex) {
+  }
 
   FTFontData(const void* data, size_t length, int ttcIndex)
-      : data(ByteData::MakeCopy(data, length)), ttcIndex(ttcIndex) {}
+      : data(ByteData::MakeCopy(data, length)), ttcIndex(ttcIndex) {
+  }
 
   std::string path;
   std::unique_ptr<ByteData> data;

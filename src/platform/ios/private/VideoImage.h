@@ -25,8 +25,7 @@ namespace pag {
 class VideoImage : public VideoBuffer {
  public:
   static std::shared_ptr<VideoImage> MakeFrom(CVPixelBufferRef pixelBuffer,
-                                              YUVColorSpace colorSpace,
-                                              YUVColorRange colorRange);
+                                              YUVColorSpace colorSpace, YUVColorRange colorRange);
 
   ~VideoImage() override;
 

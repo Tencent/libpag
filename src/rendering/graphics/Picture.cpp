@@ -417,9 +417,7 @@ class ImageTextureProxy : public TextureProxy {
 class BackendTextureProxy : public TextureProxy {
  public:
   BackendTextureProxy(const BackendTexture& texture, ImageOrigin origin, void* sharedContext)
-      : TextureProxy(texture.width(), texture.height()),
-        backendTexture(texture),
-        origin(origin),
+      : TextureProxy(texture.width(), texture.height()), backendTexture(texture), origin(origin),
         sharedContext(sharedContext) {
   }
 

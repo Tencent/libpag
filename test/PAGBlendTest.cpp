@@ -45,7 +45,7 @@ PAG_TEST_F(PAGBlendTest, Blend) {
     auto found = file.find_last_of("/\\");
     auto suffixIndex = file.rfind('.');
     auto fileName = file.substr(found + 1, suffixIndex - found - 1);
-    EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGBlendTest/Blend_"+ fileName));
+    EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGBlendTest/Blend_" + fileName));
   }
 }
 

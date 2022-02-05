@@ -19,7 +19,6 @@
 #pragma once
 
 #include <emscripten/val.h>
-
 #include "rendering/readers/SequenceReader.h"
 
 namespace pag {

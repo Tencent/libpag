@@ -21,7 +21,6 @@
 #include "gtest/gtest.h"
 #include "utils/PAGTestUtils.h"
 
-
 namespace pag {
 
 std::shared_ptr<PAGFile> PAGCpuTest::TestPAGFile = nullptr;
