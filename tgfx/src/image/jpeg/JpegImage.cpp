@@ -19,7 +19,7 @@
 #include "image/jpeg/JpegImage.h"
 #include <csetjmp>
 
-#include "image/PixelMap.h"
+#include "image/Bitmap.h"
 #include "image/utils/OrientationHelper.h"
 
 extern "C" {
@@ -161,11 +161,11 @@ std::shared_ptr<Data> JpegImage::Encode(const ImageInfo& imageInfo, const void* 
   auto srcPixels = static_cast<uint8_t*>(const_cast<void*>(pixels));
   JSAMPLE* convertPixels = nullptr;
   if (imageInfo.colorType() == ColorType::ALPHA_8) {
-    PixelMap pixelMap(imageInfo, srcPixels);
+    Bitmap bitmap(imageInfo, srcPixels);
     auto dstPixels = new uint8_t[imageInfo.byteSize()];
     auto dstInfo = ImageInfo::Make(imageInfo.width(), imageInfo.height(), ColorType::RGBA_8888,
                                    AlphaType::Opaque);
-    if (!pixelMap.readPixels(dstInfo, dstPixels)) {
+    if (!bitmap.readPixels(dstInfo, dstPixels)) {
       delete[] dstPixels;
       return nullptr;
     }

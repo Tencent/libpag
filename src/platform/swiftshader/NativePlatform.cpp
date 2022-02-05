@@ -19,8 +19,7 @@
 #include "NativePlatform.h"
 #include <atomic>
 #include <fstream>
-#include "image/Image.h"
-#include "image/PixelMap.h"
+#include "image/Bitmap.h"
 
 namespace pag {
 static std::atomic<NALUType> defaultType = {NALUType::AnnexB};
@@ -38,14 +37,15 @@ void NativePlatform::setNALUType(NALUType type) const {
   defaultType = type;
 }
 
-void NativePlatform::traceImage(const PixelMap& pixelMap, const std::string& tag) const {
+void NativePlatform::traceImage(const ImageInfo& info, const void* pixels,
+                                const std::string& tag) const {
   std::string path = tag;
   if (path.empty()) {
     path = "TraceImage.png";
   } else if (path.rfind(".png") != path.size() - 4 && path.rfind(".PNG") != path.size() - 4) {
     path += ".png";
   }
-  auto bytes = Image::Encode(pixelMap.info(), pixelMap.pixels(), EncodedFormat::PNG, 100);
+  auto bytes = Bitmap(info, pixels).encode(EncodedFormat::PNG, 100);
   if (bytes) {
     std::ofstream out(path);
     out.write(reinterpret_cast<const char*>(bytes->data()), bytes->size());

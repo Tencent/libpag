@@ -20,7 +20,6 @@
 
 #include "image/Bitmap.h"
 #include "image/PixelBuffer.h"
-#include "image/PixelMap.h"
 #include "pag/pag.h"
 
 namespace pag {
@@ -29,8 +28,6 @@ class Baseline {
   static bool Compare(const std::shared_ptr<PixelBuffer>& pixelBuffer, const std::string& key);
 
   static bool Compare(const Bitmap& bitmap, const std::string& key);
-
-  static bool Compare(const PixelMap& pixelMap, const std::string& key);
 
   static bool Compare(const std::shared_ptr<PAGSurface>& surface, const std::string& key);
 };

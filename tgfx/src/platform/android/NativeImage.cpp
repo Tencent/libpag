@@ -18,7 +18,7 @@
 
 #include "NativeImage.h"
 #include <android/bitmap.h>
-#include "image/PixelMap.h"
+#include "image/Bitmap.h"
 #include "platform/NativeCodec.h"
 
 namespace pag {
@@ -243,8 +243,7 @@ bool NativeImage::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     env->ExceptionClear();
     return false;
   }
-  PixelMap pixelMap(info, pixels);
-  auto result = pixelMap.readPixels(dstInfo, dstPixels);
+  auto result = Bitmap(info, pixels).readPixels(dstInfo, dstPixels);
   AndroidBitmap_unlockPixels(env, bitmap.get());
   return result;
 }

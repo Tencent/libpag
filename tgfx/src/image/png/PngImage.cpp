@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "image/png/PngImage.h"
-#include "image/PixelMap.h"
+#include "image/Bitmap.h"
 #include "png.h"
 
 namespace pag {
@@ -233,8 +233,8 @@ bool PngImage::readPixelsInternal(const ImageInfo& dstInfo, void* dstPixels,
       return false;
     }
     ImageInfo info = ImageInfo::Make(w, h, ColorType::RGBA_8888, AlphaType::Unpremultiplied);
-    PixelMap pixelMap(info, readInfo.data);
-    return pixelMap.readPixels(dstInfo, dstPixels);
+    Bitmap bitmap(info, readInfo.data);
+    return bitmap.readPixels(dstInfo, dstPixels);
   } else {
     if (readInfo.rowPtrs == nullptr) return false;
     for (int i = 0; i < height(); i++) {
@@ -272,11 +272,11 @@ std::shared_ptr<Data> PngImage::Encode(const ImageInfo& imageInfo, const void* p
     convertPixels = new uint8_t[imageInfo.width() * 2];
   } else if (imageInfo.colorType() != ColorType::RGBA_8888 ||
              imageInfo.alphaType() != AlphaType::Unpremultiplied) {
-    PixelMap pixelMap(imageInfo, srcPixels);
+    Bitmap bitmap(imageInfo, srcPixels);
     auto dstPixels = new uint8_t[imageInfo.byteSize()];
     auto dstInfo = ImageInfo::Make(imageInfo.width(), imageInfo.height(), ColorType::RGBA_8888,
                                    AlphaType::Unpremultiplied);
-    if (!pixelMap.readPixels(dstInfo, dstPixels)) {
+    if (!bitmap.readPixels(dstInfo, dstPixels)) {
       delete[] dstPixels;
       return nullptr;
     }

@@ -18,6 +18,7 @@
 
 #include "FTMask.h"
 #include "FTPath.h"
+#include "image/Bitmap.h"
 #include FT_STROKER_H
 
 namespace pag {
@@ -52,7 +53,7 @@ std::shared_ptr<Mask> Mask::Make(int width, int height) {
   if (buffer == nullptr) {
     return nullptr;
   }
-  buffer->eraseAll();
+  Bitmap(buffer).eraseAll();
   return std::make_shared<FTMask>(std::move(buffer));
 }
 
@@ -74,18 +75,17 @@ void FTMask::fillPath(const Path& path) {
   finalPath.decompose(Iterator, &ftPath);
   ftPath.setFillType(path.getFillType());
   auto outlines = ftPath.getOutlines();
-  auto pixels = buffer->lockPixels();
+  Bitmap bm(buffer);
   FT_Bitmap bitmap;
   bitmap.width = info.width();
   bitmap.rows = info.height();
   bitmap.pitch = static_cast<int>(info.rowBytes());
-  bitmap.buffer = static_cast<unsigned char*>(pixels);
+  bitmap.buffer = static_cast<unsigned char*>(bm.writablePixels());
   bitmap.pixel_mode = FT_PIXEL_MODE_GRAY;
   bitmap.num_grays = 256;
   auto ftLibrary = GetLibrary().library();
   for (auto& outline : outlines) {
     FT_Outline_Get_Bitmap(ftLibrary, &(outline->outline), &bitmap);
   }
-  buffer->unlockPixels();
 }
 }  // namespace pag

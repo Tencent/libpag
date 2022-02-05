@@ -23,7 +23,7 @@
 
 namespace pag {
 /**
- * PixelBuffer describes a two dimensional array of pixels.
+ * PixelBuffer describes a two dimensional array of pixels which is optimized for creating textures.
  */
 class PixelBuffer : public TextureBuffer {
  public:
@@ -85,16 +85,12 @@ class PixelBuffer : public TextureBuffer {
   }
 
   /**
-   * Returns true if this pixel buffer is hardware backed.
+   * Returns true if this pixel buffer is hardware backed. A hardware backed PixelBuffer allows
+   * sharing buffers across CPU and GPU, which can be used to speed up the texture uploading.
    */
   bool isHardwareBacked() const {
     return hardwareBacked;
   }
-
-  /**
-   * Replaces all pixel values with transparent colors.
-   */
-  void eraseAll();
 
   /**
    * Locks and returns the address of the pixels to ensure that the memory is accessible.
@@ -117,10 +113,10 @@ class PixelBuffer : public TextureBuffer {
   bool hardwareBacked = false;
 
   /**
-   * Creates a hardware buffer with specified width and height. Returns nullptr if current platform
-   * has no hardware buffer support. Hardware buffer is a low-level object representing a memory
-   * buffer accessible by various hardware units. Hardware buffer allows sharing buffers across CPU
-   * and GPU, which can be used to speed up the texture uploading.
+   * Creates a hardware backed PixelBuffer with specified width and height. Returns nullptr if
+   * current platform has no hardware buffer support. Hardware buffer is a low-level object
+   * representing a memory buffer accessible by various hardware units. Hardware buffer allows
+   * sharing buffers across CPU and GPU, which can be used to speed up the texture uploading.
    */
   static std::shared_ptr<PixelBuffer> MakeHardwareBuffer(int width, int height, bool alphaOnly);
 };

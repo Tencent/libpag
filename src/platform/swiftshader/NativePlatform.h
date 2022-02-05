@@ -27,6 +27,6 @@ class NativePlatform : public Platform {
 
   void setNALUType(NALUType type) const;
 
-  void traceImage(const PixelMap &pixelMap, const std::string &tag) const override;
+  void traceImage(const ImageInfo& info, const void* pixels, const std::string& tag) const override;
 };
 }  // namespace pag

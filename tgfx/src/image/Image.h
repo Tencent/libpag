@@ -47,12 +47,6 @@ class Image {
    */
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Data> imageBytes);
 
-  /**
-   * Encodes the specified pixels into a binary image format. Returns nullptr if encoding fails.
-   */
-  static std::shared_ptr<Data> Encode(const ImageInfo& info, const void* pixels,
-                                      EncodedFormat format, int quality);
-
   virtual ~Image() = default;
 
   /**
@@ -99,5 +93,13 @@ class Image {
   int _width = 0;
   int _height = 0;
   Orientation _orientation = Orientation::TopLeft;
+
+  /**
+   * Encodes the specified pixels into a binary image format. Returns nullptr if encoding fails.
+   */
+  static std::shared_ptr<Data> Encode(const ImageInfo& info, const void* pixels,
+                                      EncodedFormat format, int quality);
+
+  friend class Bitmap;
 };
 }  // namespace pag

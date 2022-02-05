@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CocoaPlatform.h"
-#include "PixelBufferUtils.h"
 #include "TraceImage.h"
 #include "pag/pag.h"
 
@@ -52,7 +51,8 @@ bool CocoaPlatform::registerFallbackFonts() const {
   return true;
 }
 
-void CocoaPlatform::traceImage(const PixelMap& pixelMap, const std::string& tag) const {
-  TraceImage(pixelMap, tag);
+void CocoaPlatform::traceImage(const ImageInfo& info, const void* pixels,
+                               const std::string& tag) const {
+  TraceImage(info, pixels, tag);
 }
 }

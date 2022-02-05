@@ -25,7 +25,7 @@ namespace pag {
 
 class StillImage : public PAGImage {
  public:
-  static std::shared_ptr<StillImage> FromBitmap(const Bitmap& bitmap);
+  static std::shared_ptr<StillImage> FromPixelBuffer(std::shared_ptr<PixelBuffer> pixelBuffer);
   static std::shared_ptr<StillImage> FromImage(std::shared_ptr<Image> image);
 
   void measureBounds(Rect* bounds) override;

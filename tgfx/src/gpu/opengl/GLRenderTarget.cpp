@@ -20,7 +20,7 @@
 #include "GLContext.h"
 #include "GLState.h"
 #include "GLUtil.h"
-#include "image/PixelMap.h"
+#include "image/Bitmap.h"
 
 namespace pag {
 std::shared_ptr<GLRenderTarget> GLRenderTarget::MakeFrom(Context* context,
@@ -206,8 +206,8 @@ static void CopyPixels(const ImageInfo& srcInfo, const void* srcPixels, const Im
     }
     pixels = tempPixels;
   }
-  PixelMap pixelMap(srcInfo, pixels);
-  pixelMap.readPixels(dstInfo, dstPixels);
+  Bitmap bitmap(srcInfo, pixels);
+  bitmap.readPixels(dstInfo, dstPixels);
   delete[] tempPixels;
 }
 

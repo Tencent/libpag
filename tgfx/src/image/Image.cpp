@@ -137,9 +137,8 @@ std::shared_ptr<TextureBuffer> Image::makeBuffer() const {
   if (pixelBuffer == nullptr) {
     return nullptr;
   }
-  auto pixels = pixelBuffer->lockPixels();
-  auto result = readPixels(pixelBuffer->info(), pixels);
-  pixelBuffer->unlockPixels();
+  Bitmap bitmap(pixelBuffer);
+  auto result = readPixels(pixelBuffer->info(), bitmap.writablePixels());
   return result ? pixelBuffer : nullptr;
 }
 }  // namespace pag

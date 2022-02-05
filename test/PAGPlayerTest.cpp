@@ -108,28 +108,25 @@ PAG_TEST_F(PAGPlayerTest, autoClear) {
   pagPlayer->setAutoClear(false);
   pagPlayer->flush();
 
-  Bitmap bitmap = {};
-  auto result = bitmap.allocPixels(pagSurface->width(), pagSurface->height());
-  ASSERT_TRUE(result);
-  BitmapLock lock(bitmap);
-  PixelMap pixelMap(bitmap.info(), lock.pixels());
-  result = pagSurface->readPixels(pixelMap.colorType(), pixelMap.alphaType(), lock.pixels(),
-                                  pixelMap.rowBytes());
+  auto pixelBuffer = PixelBuffer::Make(pagSurface->width(), pagSurface->height());
+  Bitmap bitmap(pixelBuffer);
+  ASSERT_FALSE(bitmap.isEmpty());
+  auto result = pagSurface->readPixels(bitmap.colorType(), bitmap.alphaType(),
+                                       bitmap.writablePixels(), bitmap.rowBytes());
   ASSERT_TRUE(result);
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGPlayerTest/autoClear_autoClear_false_flush0"));
 
   pagPlayer->flush();
-  result = pagSurface->readPixels(pixelMap.colorType(), pixelMap.alphaType(), lock.pixels(),
-                                  pixelMap.rowBytes());
+  result = pagSurface->readPixels(bitmap.colorType(), bitmap.alphaType(), bitmap.writablePixels(),
+                                  bitmap.rowBytes());
   ASSERT_TRUE(result);
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGPlayerTest/autoClear_autoClear_false_flush1"));
 
   pagPlayer->setAutoClear(true);
   pagPlayer->flush();
-  result = pagSurface->readPixels(pixelMap.colorType(), pixelMap.alphaType(), lock.pixels(),
-                                  pixelMap.rowBytes());
+  result = pagSurface->readPixels(bitmap.colorType(), bitmap.alphaType(), bitmap.writablePixels(),
+                                  bitmap.rowBytes());
   ASSERT_TRUE(result);
-
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGPlayerTest/autoClear_autoClear_true"));
 }
 

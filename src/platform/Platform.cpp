@@ -41,6 +41,6 @@ NALUType Platform::naluType() const {
   return NALUType::AnnexB;
 }
 
-void Platform::traceImage(const PixelMap&, const std::string&) const {
+void Platform::traceImage(const ImageInfo&, const void*, const std::string&) const {
 }
 }  // namespace pag
