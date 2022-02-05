@@ -20,6 +20,7 @@ jobs:
         id: github_context_step
         run: |
           echo '${{ toJSON(github) }}'
+          echo '${{ github.event.pull_request.base.sha }}'
       - name: Get environment cache
         id: cache-environment
         uses: actions/cache@v2
