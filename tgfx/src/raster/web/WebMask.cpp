@@ -18,9 +18,9 @@
 
 #include "WebMask.h"
 
+#include "WebTextBlob.h"
 #include "WebTypeface.h"
 #include "gpu/opengl/GLTexture.h"
-#include "WebTextBlob.h"
 
 using namespace emscripten;
 
