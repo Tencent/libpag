@@ -20,7 +20,7 @@ make_dir build
 
 cd build
 
-cmake -DcppFlags="-fprofile-arcs -ftest-coverage -g -O0" -DSMOKE_TEST=ON -DCMAKE_BUILD_TYPE=Debug ../
+cmake -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DSMOKE_TEST=ON -DCMAKE_BUILD_TYPE=Debug ../
 if test $? -eq 0
 then
 echo "~~~~~~~~~~~~~~~~~~~CMakeLists OK~~~~~~~~~~~~~~~~~~"
@@ -70,21 +70,14 @@ cp -a $WORKSPACE/build/*.json $WORKSPACE/result/
 
 cd ..
 
-brew install gcovr
-pip install diff-cover
-
-gcovr -r . -e='test/*.*' -e='vendor/*.*' --html -o ./result/coverage.html
-gcovr -r . -e='test/*.*' -e='vendor/*.*' --xml-pretty -o coverage.xml
-diff-cover coverage.xml --compare-branch=origin/main --exclude 'test/*.*' 'vendor/*.*' --html-report coveragediff.html>coveragediff.txt
-cp -a coveragediff.html result/
+gcovr -r . -e='test/*.*' -e='vendor/*.*'--html -o ./result/coverage.html
+gcovr -r . -e='test/*.*' -e='vendor/*.*' --xml-pretty -o ./result/coverage.xml
 
 rm -rf build
+
 if [ "$COMPLIE_RESULT" == false ]
 then
  cp -a $WORKSPACE/test/out/baseline/**/*.lzma2 $WORKSPACE/result/
  cp -a $WORKSPACE/test/out/compare/*.webp $WORKSPACE/result/
  exit 1
-fi
-
-
-
+ fi

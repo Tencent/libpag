@@ -92,7 +92,7 @@ jobs:
         uses: codecov/codecov-action@v2.1.0
         with:
           token: 8e38459f-ae9b-48f0-894e-87b9f369e7e9
-          file: libpag/result/coveragediff.html
+          file: libpag/result/coverage.xml
         
         
 
