@@ -16,11 +16,6 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - name: Dump GitHub context
-        id: github_context_step
-        run: |
-          echo '${{ toJSON(github) }}'
-          echo '${{ github.event.pull_request.base.sha }}'
       - name: Get environment cache
         id: cache-environment
         uses: actions/cache@v2
@@ -36,7 +31,8 @@ jobs:
             /usr/local/bin/yasm
             /usr/local/Cellar/depsync
             /usr/local/bin/depsync
-          key: libpag-environment
+            /opt/homebrew/bin/gcovr
+          key: libpag-environment-1
 
       - name: Get libpag cache
         id: libpag
@@ -78,11 +74,21 @@ jobs:
           chmod +x autotest.sh
           ./autotest.sh
         shell: bash
+      - name: The job has failed
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v2
+        with:
+            name: result
+            path: libpag/result
       - uses: actions/upload-artifact@v2
         with:
           name: result
-          path: result
-
+          path: libpag/result
+      - name: codecov
+        uses: codecov/codecov-action@v2.1.0
+        with:
+          token: 8e38459f-ae9b-48f0-894e-87b9f369e7e9
+          file: libpag/result/coverage.xml
         
         
 

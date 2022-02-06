@@ -35,7 +35,8 @@ jobs:
             /usr/local/bin/yasm
             /usr/local/Cellar/depsync
             /usr/local/bin/depsync
-          key: libpag-environment
+            /opt/homebrew/bin/gcovr
+          key: libpag-environment-1
 
       - name: Get libpag cache
         id: libpag
@@ -65,9 +66,6 @@ jobs:
         run: |
           echo "file not exit"
           git clone -b main https://github.com/kevingpqi123/libpag.git
-          ls
-          cd libpag
-          ls
       - name: brew link emscripten
         if: steps.cache-third_party.outputs.cache-hit == 'true'
         run: |
@@ -82,6 +80,12 @@ jobs:
           chmod +x autotest.sh
           ./autotest.sh
         shell: bash
+      - name: The job has failed
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: result
+          path: libpag/result
       - uses: actions/upload-artifact@v2
         with:
           name: result

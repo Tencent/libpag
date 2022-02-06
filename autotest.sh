@@ -6,6 +6,20 @@ function make_dir() {
 }
 
 echo "shell log - autotest start begin "
+if [[ `uname` == 'Darwin' ]]; then
+  MAC_REQUIRED_TOOLS="gcovr"
+  for TOOL in ${MAC_REQUIRED_TOOLS[@]}; do
+  if [ ! $(which $TOOL) ]; then
+    if [ ! $(which brew) ]; then
+      echo "Homebrew not found. Trying to install..."
+      /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" ||
+        exit 1
+    fi
+    echo "$TOOL not found. Trying to install..."
+    brew install $TOOL || exit 1
+  fi
+  done
+fi
 
 echo `pwd`
 
@@ -20,7 +34,7 @@ make_dir build
 
 cd build
 
-cmake -DcppFlags="-fprofile-arcs -ftest-coverage -g -O0" -DSMOKE_TEST=ON -DCMAKE_BUILD_TYPE=Debug ../
+cmake -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DSMOKE_TEST=ON -DCMAKE_BUILD_TYPE=Debug ../
 if test $? -eq 0
 then
 echo "~~~~~~~~~~~~~~~~~~~CMakeLists OK~~~~~~~~~~~~~~~~~~"
@@ -67,6 +81,12 @@ COMPLIE_RESULT=false
 fi
 
 cp -a $WORKSPACE/build/*.json $WORKSPACE/result/
+
+cd ..
+
+gcovr -r . -e='test/*.*' -e='vendor/*.*'--html -o ./result/coverage.html
+gcovr -r . -e='test/*.*' -e='vendor/*.*' --xml-pretty -o ./result/coverage.xml
+
 rm -rf build
 
 if [ "$COMPLIE_RESULT" == false ]
@@ -74,6 +94,4 @@ then
  cp -a $WORKSPACE/test/out/baseline/**/*.lzma2 $WORKSPACE/result/
  cp -a $WORKSPACE/test/out/compare/*.webp $WORKSPACE/result/
  exit 1
-fi
-
-
+ fi
