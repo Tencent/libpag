@@ -16,11 +16,6 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      - name: Dump GitHub context
-        id: github_context_step
-        run: |
-          echo '${{ toJSON(github) }}'
-          echo '${{ github.event.pull_request.base.sha }}'
       - name: Get environment cache
         id: cache-environment
         uses: actions/cache@v2
@@ -36,7 +31,8 @@ jobs:
             /usr/local/bin/yasm
             /usr/local/Cellar/depsync
             /usr/local/bin/depsync
-          key: libpag-environment
+            /opt/homebrew/bin/gcovr
+          key: libpag-environment-1
 
       - name: Get libpag cache
         id: libpag

@@ -35,7 +35,8 @@ jobs:
             /usr/local/bin/yasm
             /usr/local/Cellar/depsync
             /usr/local/bin/depsync
-          key: libpag-environment
+            /opt/homebrew/bin/gcovr
+          key: libpag-environment-1
 
       - name: Get libpag cache
         id: libpag
@@ -79,6 +80,12 @@ jobs:
           chmod +x autotest.sh
           ./autotest.sh
         shell: bash
+      - name: The job has failed
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: result
+          path: libpag/result
       - uses: actions/upload-artifact@v2
         with:
           name: result
