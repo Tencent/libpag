@@ -76,7 +76,7 @@ pip install diff-cover
 gcovr -r . -e='test/*.*' -e='vendor/*.*' --html -o ./result/coverage.html
 gcovr -r . -e='test/*.*' -e='vendor/*.*' --xml-pretty -o coverage.xml
 diff-cover coverage.xml --compare-branch=origin/main --exclude 'test/*.*' 'vendor/*.*' --html-report coveragediff.html>coveragediff.txt
-cp -a coveragediff.html ./result/
+cp -a coveragediff.html result/
 
 rm -rf build
 if [ "$COMPLIE_RESULT" == false ]

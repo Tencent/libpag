@@ -83,16 +83,16 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
             name: result
-            path: result
+            path: libpag/result
       - uses: actions/upload-artifact@v2
         with:
           name: result
-          path: result
+          path: libpag/result
       - name: codecov
         uses: codecov/codecov-action@v2.1.0
         with:
           token: 8e38459f-ae9b-48f0-894e-87b9f369e7e9
-          file: result/coveragediff.html
+          file: libpag/result/coveragediff.html
         
         
 
