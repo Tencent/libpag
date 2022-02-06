@@ -68,9 +68,10 @@ fi
 
 cp -a $WORKSPACE/build/*.json $WORKSPACE/result/
 
+cd ..
 
 brew install gcovr
-pip3 install diff-cover
+pip install diff-cover
 
 gcovr -r . -e='test/*.*' -e='vendor/*.*' --html -o ./result/coverage.html
 gcovr -r . -e='test/*.*' -e='vendor/*.*' --xml-pretty -o coverage.xml
