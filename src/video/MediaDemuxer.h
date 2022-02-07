@@ -46,8 +46,7 @@ class SampleData {
 class PTSDetail {
  public:
   PTSDetail(int64_t duration, std::vector<int64_t> ptsVector, std::vector<int> keyframeIndexVector)
-      : duration(duration),
-        ptsVector(std::move(ptsVector)),
+      : duration(duration), ptsVector(std::move(ptsVector)),
         keyframeIndexVector(std::move(keyframeIndexVector)) {
   }
   int64_t duration = 0;
