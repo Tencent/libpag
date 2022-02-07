@@ -21,8 +21,8 @@
 #include <android/asset_manager_jni.h>
 #include <android/bitmap.h>
 #include <cassert>
-#include "NativePlatform.h"
 #include "JNIHelper.h"
+#include "NativePlatform.h"
 
 namespace pag {
 static jfieldID PAGImage_nativeContext;

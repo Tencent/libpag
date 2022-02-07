@@ -33,4 +33,3 @@ class EAGLProcGetter : public GLProcGetter {
   void* fLibrary;
 };
 }  // namespace pag
-

@@ -57,8 +57,8 @@ void GPUDecoder::InitJNI(JNIEnv* env, const std::string& className) {
                              "(Ljava/lang/String;II)Landroid/media/MediaFormat;");
   MediaFormat_setByteBuffer = env->GetMethodID(MediaFormatClass.get(), "setByteBuffer",
                                                "(Ljava/lang/String;Ljava/nio/ByteBuffer;)V");
-  MediaFormat_setFloat = env->GetMethodID(MediaFormatClass.get(), "setFloat",
-                                          "(Ljava/lang/String;F)V");
+  MediaFormat_setFloat =
+      env->GetMethodID(MediaFormatClass.get(), "setFloat", "(Ljava/lang/String;F)V");
 }
 
 GPUDecoder::GPUDecoder(const VideoConfig& config) {
@@ -71,14 +71,14 @@ GPUDecoder::GPUDecoder(const VideoConfig& config) {
     return;
   }
   Local<jobject> outputSurface = {env, videoSurface->getOutputSurface(env)};
-  Local<jobject> decoder =
-      {env,
-       env->CallStaticObjectMethod(GPUDecoderClass.get(), GPUDecoder_Create, outputSurface.get())};
+  Local<jobject> decoder = {
+      env,
+      env->CallStaticObjectMethod(GPUDecoderClass.get(), GPUDecoder_Create, outputSurface.get())};
   if (decoder.empty()) {
     _isValid = false;
     return;
   }
-  videoDecoder.reset(env,decoder.get());
+  videoDecoder.reset(env, decoder.get());
   _isValid = onConfigure(decoder.get(), config);
 }
 
@@ -100,9 +100,9 @@ bool GPUDecoder::onConfigure(jobject decoder, const VideoConfig& config) {
     return false;
   }
   Local<jstring> mimeType = {env, SafeConvertToJString(env, config.mimeType.c_str())};
-  Local<jobject> mediaFormat = {env, env->CallStaticObjectMethod(
-      MediaFormatClass.get(), MediaFormat_createVideoFormat, mimeType.get(), config.width,
-      config.height)};
+  Local<jobject> mediaFormat = {
+      env, env->CallStaticObjectMethod(MediaFormatClass.get(), MediaFormat_createVideoFormat,
+                                       mimeType.get(), config.width, config.height)};
   if (config.mimeType == "video/hevc") {
     if (!config.headers.empty()) {
       char keyString[] = "csd-0";
@@ -146,8 +146,8 @@ DecodingResult GPUDecoder::onSendBytes(void* bytes, size_t length, int64_t time)
     return pag::DecodingResult::Error;
   }
   Local<jobject> byteBuffer = {env, env->NewDirectByteBuffer(bytes, length)};
-  auto result = env->CallIntMethod(videoDecoder.get(), GPUDecoder_onSendBytes, byteBuffer.get(),
-                                   time);
+  auto result =
+      env->CallIntMethod(videoDecoder.get(), GPUDecoder_onSendBytes, byteBuffer.get(), time);
   return static_cast<pag::DecodingResult>(result);
 }
 

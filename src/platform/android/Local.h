@@ -20,7 +20,7 @@
 
 #include <jni.h>
 
-template<typename T>
+template <typename T>
 class Local {
  public:
   Local() = default;
