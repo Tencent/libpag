@@ -1,0 +1,95 @@
+name: pull_request
+
+on:
+  pull_request:
+    branches: [ main ]
+
+env:
+  # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
+  BUILD_TYPE: Debug
+
+jobs:
+  build:
+    # The CMake configure and build commands are platform agnostic and should work equally well on Windows or Mac.
+    # You can convert this to a matrix build if you need cross-platform coverage.
+    # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
+    runs-on: macos-latest
+
+    steps:
+      - name: Get environment cache
+        id: cache-environment
+        uses: actions/cache@v2
+        with:
+          path: |
+            /usr/local/Cellar/ninja
+            /usr/local/bin/ninja
+            /usr/local/Cellar/node
+            /usr/local/bin/node
+            /usr/local/Cellar/emscripten
+            /usr/local/bin/emscripten
+            /usr/local/Cellar/yasm
+            /usr/local/bin/yasm
+            /usr/local/Cellar/depsync
+            /usr/local/bin/depsync
+          key: libpag-environment-20220208
+
+      - name: Get libpag cache
+        id: libpag
+        uses: actions/cache@v2
+        with:
+          path: libpag.tar.zst
+          key: libpag-code-${{ github.event.pull_request.base.sha }}
+          restore-keys: libpag-code-
+      - name: Check file existence
+        id: check_files
+        uses: andstor/file-existence-action@v1
+        with:
+          files: "libpag.tar.zst"
+      - name: File exist
+        if: steps.check_files.outputs.files_exists == 'true'
+        # Only runs if all of the files exists
+        run: |
+          echo "file exist"
+          tar xvf libpag.tar.zst
+          rm -rf libpag.tar.zst
+          cd libpag
+          git fetch
+          git checkout ${{ github.head_ref }}
+      - name: File not exist
+        if: steps.check_files.outputs.files_exists != 'true'
+        run: |
+          echo "file not exist"
+          git clone -b ${{ github.head_ref }} https://github.com/kevingpqi123/libpag.git
+      - name: brew link emscripten
+        if: steps.cache-third_party.outputs.cache-hit == 'true'
+        run: |
+          brew link emscripten
+
+      - name: Run autotest script
+        run: |
+          cd libpag
+          chmod +x sync_deps.sh
+          ./sync_deps.sh
+          chmod +x autotest.sh
+          ./autotest.sh
+        shell: bash
+      - name: The job has failed
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v2
+        with:
+            name: result
+            path: libpag/result
+      - uses: actions/upload-artifact@v2
+        with:
+          name: result
+          path: libpag/result
+      - name: codecov
+        uses: codecov/codecov-action@v2.1.0
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: libpag/result/coverage.xml
+        
+        
+
+
+      
