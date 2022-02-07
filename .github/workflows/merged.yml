@@ -60,7 +60,7 @@ jobs:
         if: steps.check_files.outputs.files_exists != 'true'
         run: |
           echo "file not exist"
-          git clone -b main https://github.com/kevingpqi123/libpag.git
+          git clone -b main https://github.com/Tencent/libpag.git
       - name: brew link emscripten
         if: steps.cache-third_party.outputs.cache-hit == 'true'
         run: |
