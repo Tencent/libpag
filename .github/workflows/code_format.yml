@@ -1,4 +1,4 @@
-name: code-format
+name: code_format
 
 on:
   pull_request:
