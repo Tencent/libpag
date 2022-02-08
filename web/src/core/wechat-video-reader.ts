@@ -66,10 +66,7 @@ export class VideoReader {
       return Promise.resolve(true);
     } else {
       if (!this.videoDecoderReady) {
-        this.videoDecoderStart(this.fileTarget).then((res) => {
-          this.currentFrame = targetFrame;
-          return Promise.resolve(this.getFrameData());
-        });
+        this.videoDecoderStart(this.fileTarget);
       }
       this.currentFrame = targetFrame;
       return Promise.resolve(this.getFrameData());
