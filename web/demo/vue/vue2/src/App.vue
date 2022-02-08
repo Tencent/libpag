@@ -5,10 +5,12 @@
 </template>
 
 <script>
+import { PAGInit } from 'libpag'
+
 export default {
   name: 'App',
   mounted() {
-    window.libpag.PAGInit().then((PAG) => {
+    PAGInit().then((PAG) => {
       const url = 'https://pag.io/file/like.pag';
       fetch(url)
         .then((response) => response.blob())

@@ -177,9 +177,8 @@ JNIEXPORT jobjectArray Java_org_libpag_PAGLayer_markers(JNIEnv* env, jobject thi
   int markerSize = pagLayer->markers().size();
   jobjectArray markerArray = env->NewObjectArray(markerSize, PAGMarker_Class.get(), nullptr);
   for (int i = 0; i < markerSize; ++i) {
-    jobject jMarker = ToPAGMarkerObject(env, pagLayer->markers()[i]);
-    env->SetObjectArrayElement(markerArray, i, jMarker);
-    env->DeleteLocalRef(jMarker);
+    Local<jobject> jMarker = {env, ToPAGMarkerObject(env, pagLayer->markers()[i])};
+    env->SetObjectArrayElement(markerArray, i, jMarker.get());
   }
   return markerArray;
 }

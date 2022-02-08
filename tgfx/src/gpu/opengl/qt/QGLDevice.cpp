@@ -20,17 +20,20 @@
 #include <QApplication>
 #include <QThread>
 #include "QGLProcGetter.h"
-#include "gpu/opengl/GLContext.h"
 
 namespace pag {
-std::shared_ptr<QGLDevice> QGLDevice::Current() {
+void* GLDevice::CurrentNativeHandle() {
+  return QOpenGLContext::currentContext();
+}
+
+std::shared_ptr<GLDevice> GLDevice::Current() {
   auto context = QOpenGLContext::currentContext();
   auto surface = context != nullptr ? context->surface() : nullptr;
   return QGLDevice::Wrap(context, surface, true);
 }
 
-std::shared_ptr<QGLDevice> QGLDevice::MakeAdopted(QOpenGLContext* context, QSurface* surface) {
-  return QGLDevice::Wrap(context, surface, true);
+std::shared_ptr<GLDevice> GLDevice::Make(void*) {
+  return nullptr;
 }
 
 std::shared_ptr<QGLDevice> QGLDevice::Make(QOpenGLContext* sharedContext, QSurfaceFormat* format) {
@@ -57,6 +60,10 @@ std::shared_ptr<QGLDevice> QGLDevice::Make(QOpenGLContext* sharedContext, QSurfa
   return device;
 }
 
+std::shared_ptr<QGLDevice> QGLDevice::MakeAdopted(QOpenGLContext* context, QSurface* surface) {
+  return QGLDevice::Wrap(context, surface, true);
+}
+
 std::shared_ptr<QGLDevice> QGLDevice::Wrap(QOpenGLContext* qtContext, QSurface* qtSurface,
                                            bool isAdopted) {
   auto glContext = GLDevice::Get(qtContext);
@@ -73,18 +80,11 @@ std::shared_ptr<QGLDevice> QGLDevice::Wrap(QOpenGLContext* qtContext, QSurface* 
       return nullptr;
     }
   }
-  QGLProcGetter glProcGetter(qtContext);
-  static GLInterfaceCache glInterfaceCache = {};
-  auto glInterface = GLInterface::GetNative(&glProcGetter, &glInterfaceCache);
-  std::shared_ptr<QGLDevice> device = nullptr;
-  if (glInterface != nullptr) {
-    auto context = std::make_unique<GLContext>(glInterface);
-    device = std::shared_ptr<QGLDevice>(new QGLDevice(std::move(context), qtContext));
-    device->isAdopted = isAdopted;
-    device->qtContext = qtContext;
-    device->qtSurface = qtSurface;
-    device->weakThis = device;
-  }
+  auto device = std::shared_ptr<QGLDevice>(new QGLDevice(qtContext));
+  device->isAdopted = isAdopted;
+  device->qtContext = qtContext;
+  device->qtSurface = qtSurface;
+  device->weakThis = device;
   if (oldContext != qtContext) {
     qtContext->doneCurrent();
     if (oldContext != nullptr) {
@@ -94,8 +94,7 @@ std::shared_ptr<QGLDevice> QGLDevice::Wrap(QOpenGLContext* qtContext, QSurface* 
   return device;
 }
 
-QGLDevice::QGLDevice(std::unique_ptr<Context> context, void* nativeHandle)
-    : GLDevice(std::move(context), nativeHandle) {
+QGLDevice::QGLDevice(void* nativeHandle) : GLDevice(nativeHandle) {
 }
 
 QGLDevice::~QGLDevice() {

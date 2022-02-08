@@ -30,8 +30,6 @@ struct RectData {
   float x, y, width, height;
 };
 
-int JniThrowException(JNIEnv* env, const char* className, const char* msg);
-
 jobject MakeRectFObject(JNIEnv* env, float x, float y, float width, float height);
 
 jint MakeColorInt(JNIEnv* env, uint32_t red, uint32_t green, uint32_t blue);
@@ -60,7 +58,5 @@ std::shared_ptr<pag::PAGComposition> ToPAGCompositionNativeObject(JNIEnv* env,
 jobject ToPAGMarkerObject(JNIEnv* env, const pag::Marker* marker);
 
 jobject ToPAGVideoRangeObject(JNIEnv* env, const pag::PAGVideoRange& range);
-
-jobject ToHashMapObject(JNIEnv* env, std::unordered_map<std::string, std::string>);
 
 pag::ImageInfo GetImageInfo(JNIEnv* env, jobject bitmap);

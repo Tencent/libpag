@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PixelBuffer.h"
-#include "PixelMap.h"
+#include "Bitmap.h"
+#include "gpu/Device.h"
+#include "platform/Platform.h"
 
 namespace pag {
 class RasterPixelBuffer : public PixelBuffer {
@@ -59,7 +61,7 @@ std::shared_ptr<PixelBuffer> PixelBuffer::Make(int width, int height, bool alpha
   }
   std::shared_ptr<PixelBuffer> pixelBuffer = nullptr;
   if (tryHardware) {
-    pixelBuffer = Platform::Current()->makeHardwareBuffer(width, height, alphaOnly);
+    pixelBuffer = MakeHardwareBuffer(width, height, alphaOnly);
     if (pixelBuffer != nullptr) {
       pixelBuffer->hardwareBacked = true;
       return pixelBuffer;
@@ -78,26 +80,8 @@ std::shared_ptr<PixelBuffer> PixelBuffer::Make(int width, int height, bool alpha
   return std::shared_ptr<RasterPixelBuffer>(new RasterPixelBuffer(info, pixels));
 }
 
-void PixelBuffer::eraseAll() {
-  auto pixels = lockPixels();
-  if (pixels) {
-    if (_info.rowBytes() == _info.minRowBytes()) {
-      memset(pixels, 0, byteSize());
-    } else {
-      auto rowCount = _info.height();
-      auto trimRowBytes = _info.width() * _info.bytesPerPixel();
-      for (int i = 0; i < rowCount; i++) {
-        memset(pixels, 0, trimRowBytes);
-      }
-    }
-  }
-  unlockPixels();
-}
-
 void Trace(std::shared_ptr<PixelBuffer> pixelBuffer, const std::string& tag) {
-  auto pixels = pixelBuffer->lockPixels();
-  PixelMap pixelMap(pixelBuffer->info(), pixels);
-  Platform::Current()->traceImage(pixelMap, tag);
-  pixelBuffer->unlockPixels();
+  Bitmap bitmap(pixelBuffer);
+  Trace(bitmap, tag);
 }
 }  // namespace pag

@@ -23,13 +23,9 @@
 #include <string>
 #include <unordered_map>
 #include "codec/NALUType.h"
+#include "image/ImageInfo.h"
 
 namespace pag {
-class PAGFont;
-class GLProcGetter;
-class Image;
-class PixelBuffer;
-class PixelMap;
 struct VideoConfig;
 class VideoDecoder;
 class Data;
@@ -58,49 +54,6 @@ class Platform {
   virtual std::unique_ptr<VideoDecoder> makeHardwareDecoder(const VideoConfig& config) const;
 
   /**
-   * Creates a hardware backed PixelBuffer with specified width and height. Returns nullptr if
-   * current platform has no hardware buffer support. Hardware buffer is a low-level object
-   * representing a memory buffer accessible by various hardware units. Hardware buffer allows
-   * sharing buffers across CPU and GPU, which can be used to speed up the texture uploading.
-   */
-  virtual std::shared_ptr<PixelBuffer> makeHardwareBuffer(int width, int height,
-                                                          bool alphaOnly) const;
-
-  /**
-   * If the file path represents an encoded image that current platform knows how to decode, returns
-   * an Image that can decode it. Otherwise returns nullptr.
-   */
-  virtual std::shared_ptr<Image> makeImage(const std::string& filePath) const;
-
-  /**
-   * If the file bytes represents an encoded image that current platform knows how to decode,
-   * returns an Image that can decode it. Otherwise returns nullptr.
-   */
-  virtual std::shared_ptr<Image> makeImage(std::shared_ptr<Data> imageBytes) const;
-
-  /**
-   * Parses the font family and style from specified file path. Returns a font data with empty
-   * family and style names if the file path is not a valid font.
-   */
-  virtual PAGFont parseFont(const std::string& fontPath, int ttcIndex) const;
-
-  /**
-   * Parses the font family and style from specified file bytes. Returns a font data with empty
-   * family and style names if the file bytes is not a valid font.
-   */
-  virtual PAGFont parseFont(const void* data, size_t length, int ttcIndex) const;
-
-  /**
-   * Writes the string pointed by format to the standard output (stdout).
-   */
-  virtual void printLog(const char format[], ...) const;
-
-  /**
-   * Writes the string pointed by format to the standard error (stderr).
-   */
-  virtual void printError(const char format[], ...) const;
-
-  /**
    * Implement this method to register the default fallback font list. User should call
    * PAGFont::SetFallbackFontPaths() or PAGFont::SetFallbackFontNames() manually in host app if this
    * method is not implemented on current platform.
@@ -115,6 +68,6 @@ class Platform {
   /**
    * Provides a utility to view the PixelMap data.
    */
-  virtual void traceImage(const PixelMap& pixelMap, const std::string& tag) const;
+  virtual void traceImage(const ImageInfo& info, const void* pixels, const std::string& tag) const;
 };
 }  // namespace pag

@@ -19,8 +19,8 @@
 #include "TestUtils.h"
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
+#include "gpu/opengl/GLDevice.h"
 #include "gpu/opengl/GLUtil.h"
-#include "platform/NativeGLDevice.h"
 #include "rendering/Drawable.h"
 
 namespace pag {
@@ -45,7 +45,7 @@ PAG_TEST_F(PAGBlendTest, Blend) {
     auto found = file.find_last_of("/\\");
     auto suffixIndex = file.rfind('.');
     auto fileName = file.substr(found + 1, suffixIndex - found - 1);
-    EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGBlendTest/Blend_"+ fileName));
+    EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGBlendTest/Blend_" + fileName));
   }
 }
 
@@ -74,7 +74,7 @@ GLTextureInfo GetBottomLeftImage(std::shared_ptr<Device> device, int width, int 
 PAG_TEST_F(PAGBlendTest, CopyDstTexture) {
   auto width = 400;
   auto height = 400;
-  auto device = NativeGLDevice::Make();
+  auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto gl = GLContext::Unwrap(context);
@@ -104,7 +104,7 @@ PAG_TEST_F(PAGBlendTest, CopyDstTexture) {
 PAG_TEST_F(PAGBlendTest, TextureBottomLeft) {
   auto width = 720;
   auto height = 1280;
-  auto device = NativeGLDevice::Make();
+  auto device = GLDevice::Make();
   auto replaceTextureInfo = GetBottomLeftImage(device, width, height);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
@@ -140,7 +140,7 @@ PAG_TEST_F(PAGBlendTest, TextureBottomLeft) {
 PAG_TEST_F(PAGBlendTest, BothBottomLeft) {
   auto width = 720;
   auto height = 1280;
-  auto device = NativeGLDevice::Make();
+  auto device = GLDevice::Make();
   auto replaceTextureInfo = GetBottomLeftImage(device, width, height);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);

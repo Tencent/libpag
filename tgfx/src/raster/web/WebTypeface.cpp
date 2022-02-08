@@ -22,7 +22,7 @@
 
 #include "base/utils/UniqueID.h"
 #include "platform/web/NativeTextureBuffer.h"
-#include "rendering/graphics/FontManager.h"
+#include "rendering/FontManager.h"
 
 using namespace emscripten;
 

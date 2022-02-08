@@ -26,10 +26,9 @@ std::shared_ptr<PixelBuffer> MakeSnapshot(std::shared_ptr<PAGSurface> pagSurface
   if (pixelBuffer == nullptr) {
     return nullptr;
   }
-  auto pixels = pixelBuffer->lockPixels();
-  auto info = pixelBuffer->info();
-  auto result = pagSurface->readPixels(info.colorType(), info.alphaType(), pixels, info.rowBytes());
-  pixelBuffer->unlockPixels();
+  Bitmap bitmap(pixelBuffer);
+  auto result = pagSurface->readPixels(bitmap.colorType(), bitmap.alphaType(),
+                                       bitmap.writablePixels(), bitmap.rowBytes());
   return result ? pixelBuffer : nullptr;
 }
 

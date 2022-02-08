@@ -21,17 +21,18 @@
 #include "gpu/opengl/GLContext.h"
 
 namespace pag {
-std::shared_ptr<CGLDevice> CGLDevice::Current() {
+void* GLDevice::CurrentNativeHandle() {
+  return CGLGetCurrentContext();
+}
+
+std::shared_ptr<GLDevice> GLDevice::Current() {
   return CGLDevice::Wrap(CGLGetCurrentContext(), true);
 }
 
-std::shared_ptr<CGLDevice> CGLDevice::MakeAdopted(CGLContextObj cglContext) {
-  return CGLDevice::Wrap(cglContext, true);
-}
-
-std::shared_ptr<CGLDevice> CGLDevice::Make(CGLContextObj sharedContext) {
+std::shared_ptr<GLDevice> GLDevice::Make(void* sharedContext) {
   CGLPixelFormatObj format = nullptr;
-  if (sharedContext == nullptr) {
+  CGLContextObj cglShareContext = reinterpret_cast<CGLContextObj>(sharedContext);
+  if (cglShareContext == nullptr) {
     const CGLPixelFormatAttribute attributes[] = {
         kCGLPFAStencilSize,        (CGLPixelFormatAttribute)8,
         kCGLPFAAccelerated,        kCGLPFADoubleBuffer,
@@ -40,11 +41,11 @@ std::shared_ptr<CGLDevice> CGLDevice::Make(CGLContextObj sharedContext) {
     GLint npix = 0;
     CGLChoosePixelFormat(attributes, &format, &npix);
   } else {
-    format = CGLGetPixelFormat(sharedContext);
+    format = CGLGetPixelFormat(cglShareContext);
   }
   CGLContextObj cglContext = nullptr;
-  CGLCreateContext(format, sharedContext, &cglContext);
-  if (sharedContext == nullptr) {
+  CGLCreateContext(format, cglShareContext, &cglContext);
+  if (cglShareContext == nullptr) {
     CGLDestroyPixelFormat(format);
   }
   if (cglContext == nullptr) {
@@ -55,6 +56,10 @@ std::shared_ptr<CGLDevice> CGLDevice::Make(CGLContextObj sharedContext) {
   auto device = CGLDevice::Wrap(cglContext, false);
   CGLReleaseContext(cglContext);
   return device;
+}
+
+std::shared_ptr<CGLDevice> CGLDevice::MakeAdopted(CGLContextObj cglContext) {
+  return CGLDevice::Wrap(cglContext, true);
 }
 
 std::shared_ptr<CGLDevice> CGLDevice::Wrap(CGLContextObj cglContext, bool isAdopted) {
@@ -72,26 +77,16 @@ std::shared_ptr<CGLDevice> CGLDevice::Wrap(CGLContextObj cglContext, bool isAdop
       return nullptr;
     }
   }
-
-  static CGLProcGetter glProcGetter = {};
-  static GLInterfaceCache glInterfaceCache = {};
-  auto glInterface = GLInterface::GetNative(&glProcGetter, &glInterfaceCache);
-  std::shared_ptr<CGLDevice> device = nullptr;
-  if (glInterface != nullptr) {
-    auto context = std::make_unique<GLContext>(glInterface);
-    device = std::shared_ptr<CGLDevice>(new CGLDevice(std::move(context), cglContext));
-    device->isAdopted = isAdopted;
-    device->weakThis = device;
-  }
-
+  auto device = std::shared_ptr<CGLDevice>(new CGLDevice(cglContext));
+  device->isAdopted = isAdopted;
+  device->weakThis = device;
   if (oldCGLContext != cglContext) {
     CGLSetCurrentContext(oldCGLContext);
   }
   return device;
 }
 
-CGLDevice::CGLDevice(std::unique_ptr<Context> context, CGLContextObj cglContext)
-    : GLDevice(std::move(context), cglContext) {
+CGLDevice::CGLDevice(CGLContextObj cglContext) : GLDevice(cglContext) {
   glContext = [[NSOpenGLContext alloc] initWithCGLContextObj:cglContext];
 }
 

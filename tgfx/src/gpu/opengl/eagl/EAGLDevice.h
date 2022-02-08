@@ -25,20 +25,9 @@ namespace pag {
 class EAGLDevice : public GLDevice {
  public:
   /**
-   * Returns an EAGL device associated with current OpenGL context. Returns nullptr if there is no
-   * current OpenGL context on the calling thread.
-   */
-  static std::shared_ptr<EAGLDevice> Current();
-
-  /**
    * Creates an EAGL device with adopted EAGL context.
    */
   static std::shared_ptr<EAGLDevice> MakeAdopted(EAGLContext* eaglContext);
-
-  /**
-   * Creates an offscreen EAGL device with specified shared context.
-   */
-  static std::shared_ptr<EAGLDevice> Make(EAGLContext* sharedContext = nullptr);
 
   ~EAGLDevice() override;
 
@@ -63,11 +52,12 @@ class EAGLDevice : public GLDevice {
   static std::shared_ptr<EAGLDevice> Wrap(EAGLContext* eaglContext, bool isAdopted);
   static void NotifyReferenceReachedZero(EAGLDevice* device);
 
-  EAGLDevice(std::unique_ptr<Context> context, EAGLContext* eaglContext);
+  explicit EAGLDevice(EAGLContext* eaglContext);
   bool makeCurrent(bool force = false);
   void clearCurrent();
   void finish();
 
+  friend class GLDevice;
   friend class EAGLWindow;
 
   friend void ApplicationWillResignActive();

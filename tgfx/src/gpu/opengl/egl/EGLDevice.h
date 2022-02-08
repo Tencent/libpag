@@ -20,39 +20,22 @@
 
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
-#ifdef None
-#undef None
-#endif
-#ifdef Above
-#undef Above
-#endif
-#ifdef Below
-#undef Below
-#endif
-
 #include "gpu/opengl/GLDevice.h"
 
 namespace pag {
 class EGLDevice : public GLDevice {
  public:
   /**
-   * Returns an EGL device associated with current OpenGL context. Returns nullptr if there is no
-   * current OpenGL context on the calling thread.
-   */
-  static std::shared_ptr<EGLDevice> Current();
-
-  /**
    * Creates an EGL device with adopted EGLDisplay, EGLSurface and EGLContext.
    */
   static std::shared_ptr<EGLDevice> MakeAdopted(EGLDisplay eglDisplay, EGLSurface eglSurface,
                                                 EGLContext eglContext);
 
-  /**
-   * Creates a offscreen EGL device with specified shared context.
-   */
-  static std::shared_ptr<EGLDevice> Make(EGLContext sharedContext = nullptr);
-
   ~EGLDevice() override;
+
+  EGLDisplay getDisplay() const {
+    return eglDisplay;
+  }
 
   bool sharableWith(void* nativeHandle) const override;
 
@@ -78,8 +61,10 @@ class EGLDevice : public GLDevice {
                                          EGLContext eglContext, EGLContext shareContext,
                                          bool isAdopted = false);
 
-  EGLDevice(std::unique_ptr<Context> context, void* nativeHandle);
+  explicit EGLDevice(void* nativeHandle);
   void swapBuffers(int64_t timestamp = INT64_MIN);
+
+  friend class GLDevice;
 
   friend class EGLWindow;
 };

@@ -18,6 +18,7 @@
 
 #include "JNIEnvironment.h"
 #include <pthread.h>
+#include "tgfx/platform.h"
 
 static JavaVM* globalJavaVM = nullptr;
 static pthread_key_t threadKey = 0;
@@ -32,9 +33,8 @@ static void JNI_Thread_Destroy(void* value) {
 
 extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
   globalJavaVM = vm;
-
+  pag::SetJavaVM(vm);
   pthread_key_create(&threadKey, JNI_Thread_Destroy);
-
   return JNI_VERSION_1_4;
 }
 

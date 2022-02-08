@@ -22,14 +22,16 @@
 #include "PixelBuffer.h"
 #include "base/utils/USE.h"
 #include "core/Stream.h"
-#include "platform/Platform.h"
+#include "platform/NativeCodec.h"
 
 #if defined(TGFX_USE_WEBP_DECODE) || defined(TGFX_USE_WEBP_ENCODE)
 #include "image/webp/WebpImage.h"
 #endif
 
 #if defined(TGFX_USE_PNG_DECODE) || defined(TGFX_USE_PNG_ENCODE)
+
 #include "image/png/PngImage.h"
+
 #endif
 
 #if defined(TGFX_USE_JPEG_DECODE) || defined(TGFX_USE_JPEG_ENCODE)
@@ -67,7 +69,7 @@ std::shared_ptr<Image> Image::MakeFrom(const std::string& filePath) {
   }
 #endif
   if (image == nullptr) {
-    image = Platform::Current()->makeImage(filePath);
+    image = NativeCodec::MakeImage(filePath);
   }
   if (image && !ImageInfo::IsValidSize(image->width(), image->height())) {
     image = nullptr;
@@ -96,7 +98,7 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Data> imageBytes) {
   }
 #endif
   if (image == nullptr) {
-    image = Platform::Current()->makeImage(imageBytes);
+    image = NativeCodec::MakeImage(imageBytes);
   }
   if (image && !ImageInfo::IsValidSize(image->width(), image->height())) {
     image = nullptr;
@@ -135,9 +137,8 @@ std::shared_ptr<TextureBuffer> Image::makeBuffer() const {
   if (pixelBuffer == nullptr) {
     return nullptr;
   }
-  auto pixels = pixelBuffer->lockPixels();
-  auto result = readPixels(pixelBuffer->info(), pixels);
-  pixelBuffer->unlockPixels();
+  Bitmap bitmap(pixelBuffer);
+  auto result = readPixels(pixelBuffer->info(), bitmap.writablePixels());
   return result ? pixelBuffer : nullptr;
 }
 }  // namespace pag

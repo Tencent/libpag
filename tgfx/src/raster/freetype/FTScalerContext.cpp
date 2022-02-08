@@ -25,6 +25,7 @@
 #include FT_TRUETYPE_TABLES_H
 #include "FTUtil.h"
 #include "base/utils/MathExtra.h"
+#include "image/Bitmap.h"
 #include "skcms.h"
 
 namespace pag {
@@ -623,7 +624,7 @@ static gfx::skcms_PixelFormat ToPixelFormat(ColorType colorType) {
   }
 }
 
-void CopyFTBitmap(const FT_Bitmap& bitmap, PixelBuffer* pixelBuffer) {
+void CopyFTBitmap(const FT_Bitmap& bitmap, std::shared_ptr<PixelBuffer> pixelBuffer) {
   auto width = static_cast<int>(bitmap.width);
   auto height = static_cast<int>(bitmap.rows);
   auto src = reinterpret_cast<const uint8_t*>(bitmap.buffer);
@@ -631,18 +632,16 @@ void CopyFTBitmap(const FT_Bitmap& bitmap, PixelBuffer* pixelBuffer) {
   auto srcRB = bitmap.pitch;
   auto srcFormat = bitmap.pixel_mode == FT_PIXEL_MODE_GRAY ? gfx::skcms_PixelFormat_A_8
                                                            : gfx::skcms_PixelFormat_BGRA_8888;
-  void* dstPixels = pixelBuffer->lockPixels();
-  auto dst = static_cast<uint8_t*>(dstPixels);
-  auto dstRB = pixelBuffer->rowBytes();
-  auto dstFormat = ToPixelFormat(pixelBuffer->colorType());
+  Bitmap bm(pixelBuffer);
+  auto dst = static_cast<uint8_t*>(bm.writablePixels());
+  auto dstRB = bm.rowBytes();
+  auto dstFormat = ToPixelFormat(bm.colorType());
   for (int i = 0; i < height; i++) {
     gfx::skcms_Transform(src, srcFormat, gfx::skcms_AlphaFormat_PremulAsEncoded, nullptr, dst,
                          dstFormat, gfx::skcms_AlphaFormat_PremulAsEncoded, nullptr, width);
     src += srcRB;
     dst += dstRB;
   }
-
-  pixelBuffer->unlockPixels();
 }
 
 std::shared_ptr<TextureBuffer> FTScalerContext::generateImage(GlyphID glyphId, Matrix* matrix) {
@@ -668,7 +667,7 @@ std::shared_ptr<TextureBuffer> FTScalerContext::generateImage(GlyphID glyphId, M
   if (pixelBuffer == nullptr) {
     return nullptr;
   }
-  CopyFTBitmap(face->glyph->bitmap, pixelBuffer.get());
+  CopyFTBitmap(face->glyph->bitmap, pixelBuffer);
   if (matrix) {
     matrix->setTranslate(static_cast<float>(face->glyph->bitmap_left),
                          -static_cast<float>(face->glyph->bitmap_top));

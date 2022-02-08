@@ -120,7 +120,8 @@
           "${BUILD_DIR}/pnglibconf.h"
         ],
         "platforms": [
-          "ios"
+          "ios",
+          "mac"
         ]
       }
     },

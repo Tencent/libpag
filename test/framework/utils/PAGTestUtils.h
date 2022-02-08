@@ -22,7 +22,6 @@
 #include "base/utils/GetTimer.h"
 #include "image/Bitmap.h"
 #include "image/PixelBuffer.h"
-#include "image/PixelMap.h"
 #include "pag/pag.h"
 
 namespace pag {

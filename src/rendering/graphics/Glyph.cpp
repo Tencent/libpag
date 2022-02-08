@@ -18,7 +18,7 @@
 
 #include "Glyph.h"
 #include "base/utils/UTF8Text.h"
-#include "rendering/graphics/FontManager.h"
+#include "rendering/FontManager.h"
 
 namespace pag {
 std::vector<GlyphHandle> Glyph::BuildFromText(const std::string& text, const TextPaint& textPaint) {

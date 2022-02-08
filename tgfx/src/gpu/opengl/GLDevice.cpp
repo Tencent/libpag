@@ -21,38 +21,49 @@
 #include "gpu/opengl/GLUtil.h"
 
 namespace pag {
-static std::mutex contextMapLocker = {};
-static std::unordered_map<void*, GLDevice*> contextMap = {};
+static std::mutex deviceMapLocker = {};
+static std::unordered_map<void*, GLDevice*> deviceMap = {};
 
 std::shared_ptr<GLDevice> GLDevice::Get(void* nativeHandle) {
   if (nativeHandle == nullptr) {
     return nullptr;
   }
-  std::lock_guard<std::mutex> autoLock(contextMapLocker);
-  auto result = contextMap.find(nativeHandle);
-  if (result != contextMap.end()) {
+  std::lock_guard<std::mutex> autoLock(deviceMapLocker);
+  auto result = deviceMap.find(nativeHandle);
+  if (result != deviceMap.end()) {
     auto device = result->second->weakThis.lock();
     if (device) {
       return std::static_pointer_cast<GLDevice>(device);
     }
-    contextMap.erase(result);
+    deviceMap.erase(result);
   }
   return nullptr;
 }
 
-GLDevice::GLDevice(std::unique_ptr<Context> context, void* nativeHandle)
-    : Device(std::move(context)), nativeHandle(nativeHandle) {
-  std::lock_guard<std::mutex> autoLock(contextMapLocker);
-  contextMap[nativeHandle] = this;
+GLDevice::GLDevice(void* nativeHandle) : nativeHandle(nativeHandle) {
+  std::lock_guard<std::mutex> autoLock(deviceMapLocker);
+  deviceMap[nativeHandle] = this;
 }
 
 GLDevice::~GLDevice() {
-  std::lock_guard<std::mutex> autoLock(contextMapLocker);
-  contextMap.erase(nativeHandle);
+  std::lock_guard<std::mutex> autoLock(deviceMapLocker);
+  deviceMap.erase(nativeHandle);
 }
 
 bool GLDevice::onLockContext() {
   if (!onMakeCurrent()) {
+    return false;
+  }
+  if (context == nullptr) {
+    auto glInterface = GLInterface::GetNative();
+    if (glInterface != nullptr) {
+      context = new GLContext(this, glInterface);
+    } else {
+      LOGE("GLDevice::onLockContext(): Error on creating GLInterface! ");
+    }
+  }
+  if (context == nullptr) {
+    onClearCurrent();
     return false;
   }
   auto glContext = static_cast<GLContext*>(context);

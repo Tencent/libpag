@@ -19,18 +19,20 @@
 #include "Baseline.h"
 #include <chrono>
 #include <fstream>
+#include <unordered_set>
 #include "LzmaUtil.h"
 #include "core/Data.h"
 #include "image/Image.h"
-#include "image/PixelMap.h"
 
 namespace pag {
 #define BASELINE_ROOT "../test/baseline/"
-#define OUT_ROOT "../test/out/baseline/"
-#define OUT_WEBP_ROOT "../test/out/compare/"
+#define OUT_BASELINE_ROOT "../test/out/baseline/"
+#define OUT_COMPARE_ROOT "../test/out/compare/"
 #define COMPRESS_FILE_EXT ".lzma2"
+#define MAX_DIFF_COUNT 10
+#define MAX_DIFF_VALUE 5
 
-ImageInfo MakeInfo(int with, int height) {
+static ImageInfo MakeInfo(int with, int height) {
   return ImageInfo::Make(with, height, ColorType::RGBA_8888, AlphaType::Premultiplied);
 }
 
@@ -57,38 +59,50 @@ static void SaveImage(const ImageInfo& info, const std::shared_ptr<Data>& imageD
   if (data == nullptr) {
     return;
   }
-  auto path = OUT_ROOT + key + COMPRESS_FILE_EXT;
+  auto path = OUT_BASELINE_ROOT + key + COMPRESS_FILE_EXT;
   SaveData(data, path);
   auto baselineData = LoadImageData(key);
   if (baselineData == nullptr) {
     return;
   }
-  auto fileName = key;
-  std::replace(fileName.begin(), fileName.end(), '/', '-');
-  auto baselineImage = Image::Encode(info, baselineData->data(), EncodedFormat::WEBP, 100);
-  SaveData(baselineImage, OUT_WEBP_ROOT + fileName + "-baseline.webp");
-  auto compareImage = Image::Encode(info, imageData->data(), EncodedFormat::WEBP, 100);
-  SaveData(compareImage, OUT_WEBP_ROOT + fileName + "-compare.webp");
+  auto baselineImage = Bitmap(info, baselineData->data()).encode(EncodedFormat::WEBP, 100);
+  SaveData(baselineImage, OUT_COMPARE_ROOT + key + "_baseline.webp");
+  auto compareImage = Bitmap(info, imageData->data()).encode(EncodedFormat::WEBP, 100);
+  SaveData(compareImage, OUT_COMPARE_ROOT + key + "_new.webp");
 }
 
-bool ComparePixelData(const std::shared_ptr<Data>& pixelData, const std::string& pngPath) {
+static void ClearPreviousOutput(const std::string& key) {
+  std::filesystem::remove(OUT_BASELINE_ROOT + key + COMPRESS_FILE_EXT);
+  std::filesystem::remove(OUT_COMPARE_ROOT + key + "_baseline.webp");
+  std::filesystem::remove(OUT_COMPARE_ROOT + key + "_new.webp");
+}
+
+static bool ComparePixelData(const std::shared_ptr<Data>& pixelData, const std::string& key,
+                             const ImageInfo& info) {
   if (pixelData == nullptr) {
     return false;
   }
-  auto baselineData = LoadImageData(pngPath);
+  auto baselineData = LoadImageData(key);
   if (baselineData == nullptr || pixelData->size() != baselineData->size()) {
     return false;
   }
+  size_t diffCount = 0;
   auto baseline = baselineData->bytes();
   auto pixels = pixelData->bytes();
   auto byteSize = pixelData->size();
   for (size_t index = 0; index < byteSize; index++) {
     auto pixelA = pixels[index];
     auto pixelB = baseline[index];
-    if (abs(pixelA - pixelB) > 3) {
-      return false;
+    if (abs(pixelA - pixelB) > MAX_DIFF_VALUE) {
+      diffCount++;
     }
   }
+  // We assume that the two images are the same if the number of different pixels is less than 10.
+  if (diffCount > MAX_DIFF_COUNT) {
+    SaveImage(info, pixelData, key);
+    return false;
+  }
+  ClearPreviousOutput(key);
   return true;
 }
 
@@ -96,21 +110,15 @@ bool Baseline::Compare(const std::shared_ptr<PixelBuffer>& pixelBuffer, const st
   if (pixelBuffer == nullptr) {
     return false;
   }
-  auto srcPixels = pixelBuffer->lockPixels();
-  PixelMap pixelMap(pixelBuffer->info(), srcPixels);
-  auto info = MakeInfo(pixelBuffer->width(), pixelBuffer->height());
+  Bitmap bitmap(pixelBuffer);
+  auto info = MakeInfo(bitmap.width(), bitmap.height());
   auto pixels = new uint8_t[info.byteSize()];
   auto data = Data::MakeAdopted(pixels, info.byteSize(), Data::DeleteProc);
-  auto result = pixelMap.readPixels(info, pixels);
-  pixelBuffer->unlockPixels();
+  auto result = bitmap.readPixels(info, pixels);
   if (!result) {
     return false;
   }
-  result = ComparePixelData(data, key);
-  if (!result) {
-    SaveImage(info, data, key);
-  }
-  return result;
+  return ComparePixelData(data, key, info);
 }
 
 bool Baseline::Compare(const Bitmap& bitmap, const std::string& key) {
@@ -124,29 +132,7 @@ bool Baseline::Compare(const Bitmap& bitmap, const std::string& key) {
   if (!result) {
     return false;
   }
-  result = ComparePixelData(data, key);
-  if (!result) {
-    SaveImage(info, data, key);
-  }
-  return result;
-}
-
-bool Baseline::Compare(const PixelMap& pixelMap, const std::string& key) {
-  if (pixelMap.isEmpty()) {
-    return false;
-  }
-  auto info = MakeInfo(pixelMap.width(), pixelMap.height());
-  auto pixels = new uint8_t[info.byteSize()];
-  auto data = Data::MakeAdopted(pixels, info.byteSize(), Data::DeleteProc);
-  auto result = pixelMap.readPixels(info, pixels);
-  if (!result) {
-    return false;
-  }
-  result = ComparePixelData(data, key);
-  if (!result) {
-    SaveImage(info, data, key);
-  }
-  return result;
+  return ComparePixelData(data, key, info);
 }
 
 bool Baseline::Compare(const std::shared_ptr<PAGSurface>& surface, const std::string& key) {
@@ -161,10 +147,6 @@ bool Baseline::Compare(const std::shared_ptr<PAGSurface>& surface, const std::st
   if (!result) {
     return false;
   }
-  result = ComparePixelData(data, key);
-  if (!result) {
-    SaveImage(info, data, key);
-  }
-  return result;
+  return ComparePixelData(data, key, info);
 }
 }  // namespace pag

@@ -7,7 +7,7 @@
     "common": [
       {
         "url": "${PAG_GROUP}/vendor_tools.git",
-        "commit": "27837194cf1834bcdf2bc2643655bdebcf2a67e9",
+        "commit": "ed9431fc0fac1fa74c3004d2b13be13f76547828",
         "dir": "vendor_tools"
       },
       {
@@ -22,12 +22,12 @@
       },
       {
         "url": "${PAG_GROUP}/libavc.git",
-        "commit": "dfc550bc75eef789eae8f0b0bfb954e11f7740e4",
+        "commit": "c2bf4c84a6d39788929e59514417e819185af98e",
         "dir": "third_party/libavc"
       },
       {
         "url": "${PAG_GROUP}/swiftshader.git",
-        "commit": "8d781475d99e8c1582f4c0da44b54ba105f8b79a",
+        "commit": "040ee43bfeba9b6b532dbd8222df737aac2d55b1",
         "dir": "third_party/swiftshader"
       },
       {

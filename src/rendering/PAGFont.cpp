@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pag/pag.h"
-#include "rendering/graphics/FontManager.h"
+#include "rendering/FontManager.h"
 
 namespace pag {
 PAGFont PAGFont::RegisterFont(const std::string& fontPath, int ttcIndex,

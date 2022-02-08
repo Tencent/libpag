@@ -20,7 +20,7 @@
 #include "GLDevice.h"
 
 namespace pag {
-GLContext::GLContext(const GLInterface* glInterface) {
+GLContext::GLContext(Device* device, const GLInterface* glInterface) : Context(device) {
   glState = std::make_unique<GLState>(glInterface);
   interface = GLInterface::HookWithState(glInterface, glState.get());
 }

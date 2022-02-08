@@ -28,12 +28,12 @@ class EAGLWindow : public Window {
    * Creates a new window from a CAEAGLLayer with specified device.
    */
   static std::shared_ptr<EAGLWindow> MakeFrom(CAEAGLLayer* layer,
-                                              std::shared_ptr<EAGLDevice> device = nullptr);
+                                              std::shared_ptr<GLDevice> device = nullptr);
   /**
    * Creates a new window from a CVPixelBuffer with specified device.
    */
   static std::shared_ptr<EAGLWindow> MakeFrom(CVPixelBufferRef pixelBuffer,
-                                              std::shared_ptr<EAGLDevice> device = nullptr);
+                                              std::shared_ptr<GLDevice> device = nullptr);
 
   ~EAGLWindow() override;
 

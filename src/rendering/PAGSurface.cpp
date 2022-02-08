@@ -18,9 +18,9 @@
 
 #include "base/utils/GetTimer.h"
 #include "core/Canvas.h"
+#include "gpu/opengl/GLDevice.h"
 #include "pag/file.h"
 #include "pag/pag.h"
-#include "platform/NativeGLDevice.h"
 #include "rendering/Drawable.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/graphics/Recorder.h"
@@ -37,18 +37,18 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(std::shared_ptr<Drawable> drawa
 
 static std::shared_ptr<Device> GetCurrentDevice(bool forAsyncThread) {
   if (forAsyncThread) {
-    auto sharedContext = NativeGLDevice::GetCurrentNativeHandle();
-    auto device = NativeGLDevice::Make(sharedContext);
+    auto sharedContext = GLDevice::CurrentNativeHandle();
+    auto device = GLDevice::Make(sharedContext);
     if (device) {
       return device;
     }
   }
-  return NativeGLDevice::Current();
+  return GLDevice::Current();
 }
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendRenderTarget& renderTarget,
                                                  ImageOrigin origin) {
-  auto device = NativeGLDevice::Current();
+  auto device = GLDevice::Current();
   if (device == nullptr || !renderTarget.isValid()) {
     return nullptr;
   }
@@ -67,7 +67,7 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendTexture& texture, 
 }
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeOffscreen(int width, int height) {
-  auto device = NativeGLDevice::Make();
+  auto device = GLDevice::Make();
   if (device == nullptr || width <= 0 || height <= 0) {
     return nullptr;
   }

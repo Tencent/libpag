@@ -58,17 +58,14 @@ static CVOpenGLESTextureRef GetTextureRef(Context* context, CVPixelBufferRef pix
 }
 
 std::shared_ptr<EAGLHardwareTexture> EAGLHardwareTexture::MakeFrom(Context* context,
-                                                                   CVPixelBufferRef pixelBuffer,
-                                                                   bool adopted) {
+                                                                   CVPixelBufferRef pixelBuffer) {
   std::shared_ptr<EAGLHardwareTexture> glTexture = nullptr;
-  if (!adopted) {
-    BytesKey recycleKey = {};
-    ComputeRecycleKey(&recycleKey, pixelBuffer);
-    glTexture =
-        std::static_pointer_cast<EAGLHardwareTexture>(context->getRecycledResource(recycleKey));
-    if (glTexture) {
-      return glTexture;
-    }
+  BytesKey recycleKey = {};
+  ComputeRecycleKey(&recycleKey, pixelBuffer);
+  glTexture =
+      std::static_pointer_cast<EAGLHardwareTexture>(context->getRecycledResource(recycleKey));
+  if (glTexture) {
+    return glTexture;
   }
   auto eaglDevice = static_cast<EAGLDevice*>(context->getDevice());
   if (eaglDevice == nullptr) {
@@ -85,7 +82,7 @@ std::shared_ptr<EAGLHardwareTexture> EAGLHardwareTexture::MakeFrom(Context* cont
   glInfo.format = sizedFormat;
   auto oneComponent8 =
       CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_OneComponent8;
-  glTexture = Resource::Wrap(context, new EAGLHardwareTexture(pixelBuffer, adopted));
+  glTexture = Resource::Wrap(context, new EAGLHardwareTexture(pixelBuffer));
   glTexture->sampler.glInfo = glInfo;
   glTexture->sampler.config = oneComponent8 ? PixelConfig::ALPHA_8 : PixelConfig::RGBA_8888;
   glTexture->texture = texture;
@@ -101,11 +98,10 @@ void EAGLHardwareTexture::ComputeRecycleKey(BytesKey* recycleKey, CVPixelBufferR
   recycleKey->write(pixelBuffer);
 }
 
-EAGLHardwareTexture::EAGLHardwareTexture(CVPixelBufferRef pixelBuffer, bool adopted)
+EAGLHardwareTexture::EAGLHardwareTexture(CVPixelBufferRef pixelBuffer)
     : GLTexture(static_cast<int>(CVPixelBufferGetWidth(pixelBuffer)),
                 static_cast<int>(CVPixelBufferGetHeight(pixelBuffer)), ImageOrigin::TopLeft),
-      pixelBuffer(pixelBuffer),
-      adopted(adopted) {
+      pixelBuffer(pixelBuffer) {
   CFRetain(pixelBuffer);
 }
 
@@ -122,9 +118,7 @@ size_t EAGLHardwareTexture::memoryUsage() const {
 }
 
 void EAGLHardwareTexture::computeRecycleKey(BytesKey* recycleKey) const {
-  if (!adopted) {
-    ComputeRecycleKey(recycleKey, pixelBuffer);
-  }
+  ComputeRecycleKey(recycleKey, pixelBuffer);
 }
 
 void EAGLHardwareTexture::onRelease(Context* context) {

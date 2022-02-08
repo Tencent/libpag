@@ -32,7 +32,7 @@ class CGLWindow : public Window {
    * Creates a new window from a CVPixelBuffer with specified device.
    */
   static std::shared_ptr<CGLWindow> MakeFrom(CVPixelBufferRef pixelBuffer,
-                                             std::shared_ptr<CGLDevice> device = nullptr);
+                                             std::shared_ptr<GLDevice> device = nullptr);
 
   ~CGLWindow() override;
 

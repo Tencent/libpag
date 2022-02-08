@@ -29,8 +29,6 @@ class Baseline {
 
   static bool Compare(const Bitmap& bitmap, const std::string& key);
 
-  static bool Compare(const PixelMap& pixelMap, const std::string& key);
-
   static bool Compare(const std::shared_ptr<PAGSurface>& surface, const std::string& key);
 };
 }  // namespace pag

@@ -20,7 +20,7 @@
 #include "base/utils/GetTimer.h"
 #include "base/utils/MatrixUtil.h"
 #include "gpu/Surface.h"
-#include "platform/NativeGLDevice.h"
+#include "gpu/opengl/GLDevice.h"
 #include "rendering/caches/RenderCache.h"
 
 namespace pag {
@@ -355,10 +355,10 @@ class SnapshotPicture : public Picture {
 //===================================== SnapshotPicture ============================================
 
 //==================================== Texture Proxies =============================================
-class BitmapTextureProxy : public TextureProxy {
+class TextureBufferProxy : public TextureProxy {
  public:
-  explicit BitmapTextureProxy(const Bitmap& bitmap)
-      : TextureProxy(bitmap.width(), bitmap.height()), bitmap(bitmap) {
+  explicit TextureBufferProxy(const std::shared_ptr<TextureBuffer> buffer)
+      : TextureProxy(buffer->width(), buffer->height()), buffer(buffer) {
   }
 
   bool cacheEnabled() const override {
@@ -370,13 +370,13 @@ class BitmapTextureProxy : public TextureProxy {
 
   std::shared_ptr<Texture> getTexture(RenderCache* cache) const override {
     auto startTime = GetTimer();
-    auto texture = bitmap.makeTexture(cache->getContext());
+    auto texture = buffer->makeTexture(cache->getContext());
     cache->recordTextureUploadingTime(GetTimer() - startTime);
     return texture;
   }
 
  private:
-  Bitmap bitmap = {};
+  std::shared_ptr<TextureBuffer> buffer = nullptr;
 };
 
 class ImageTextureProxy : public TextureProxy {
@@ -475,13 +475,12 @@ std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, std::shared_ptr<Image> im
   return picture;
 }
 
-std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, const Bitmap& bitmap) {
-  if (bitmap.isEmpty()) {
+std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, std::shared_ptr<TextureBuffer> buffer) {
+  if (buffer == nullptr) {
     return nullptr;
   }
-  auto proxy = new BitmapTextureProxy(bitmap);
-  return std::shared_ptr<Graphic>(
-      new TextureProxyPicture(assetID, proxy, bitmap.isHardwareBacked()));
+  auto proxy = new TextureBufferProxy(buffer);
+  return std::shared_ptr<Graphic>(new TextureProxyPicture(assetID, proxy, false));
 }
 
 std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, const BackendTexture& texture,
@@ -489,7 +488,7 @@ std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, const BackendTexture& tex
   if (!texture.isValid()) {
     return nullptr;
   }
-  auto context = NativeGLDevice::GetCurrentNativeHandle();
+  auto context = GLDevice::CurrentNativeHandle();
   if (context == nullptr) {
     return nullptr;
   }

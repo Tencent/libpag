@@ -25,7 +25,7 @@ namespace pag {
 class CGLHardwareTexture : public GLTexture {
  public:
   static std::shared_ptr<CGLHardwareTexture> MakeFrom(Context* context,
-                                                      CVPixelBufferRef pixelBuffer, bool adopted);
+                                                      CVPixelBufferRef pixelBuffer);
 
   explicit CGLHardwareTexture(CVPixelBufferRef pixelBuffer);
 
@@ -39,7 +39,6 @@ class CGLHardwareTexture : public GLTexture {
 
  private:
   CVPixelBufferRef pixelBuffer = nullptr;
-  CVOpenGLTextureCacheRef textureCache = nil;
   CVOpenGLTextureRef texture = nil;
 
   static void ComputeRecycleKey(BytesKey* recycleKey, CVPixelBufferRef pixelBuffer);

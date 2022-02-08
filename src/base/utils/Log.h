@@ -18,14 +18,13 @@
 
 #pragma once
 
-#include "platform/Platform.h"
+#include "tgfx/platform.h"
 
 namespace pag {
-#define ABORT(msg)                                                                           \
-  do {                                                                                       \
-    pag::Platform::Current()->printError("%s:%d: fatal error: \"%s\"\n", __FILE__, __LINE__, \
-                                         #msg);                                              \
-    ::abort();                                                                               \
+#define ABORT(msg)                                                             \
+  do {                                                                         \
+    pag::PrintError("%s:%d: fatal error: \"%s\"\n", __FILE__, __LINE__, #msg); \
+    ::abort();                                                                 \
   } while (false)
 
 #ifdef NO_LOG
@@ -36,8 +35,8 @@ namespace pag {
 
 #else
 
-#define LOGI(...) pag::Platform::Current()->printLog(__VA_ARGS__)
-#define LOGE(...) pag::Platform::Current()->printError(__VA_ARGS__)
+#define LOGI(...) pag::PrintLog(__VA_ARGS__)
+#define LOGE(...) pag::PrintError(__VA_ARGS__)
 #define ASSERT(assertion) \
   if (!(assertion)) {     \
     ABORT(#assertion);    \

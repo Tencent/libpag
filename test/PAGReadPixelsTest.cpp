@@ -21,18 +21,18 @@
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
 #include "gpu/Surface.h"
+#include "gpu/opengl/GLDevice.h"
 #include "gpu/opengl/GLUtil.h"
+#include "image/Bitmap.h"
 #include "image/Image.h"
-#include "image/PixelMap.h"
-#include "platform/NativeGLDevice.h"
 
 namespace pag {
 using nlohmann::json;
 
-#define CHECK_PIXELS(info, pixels, key)                                      \
-  {                                                                          \
-    PixelMap pm(info, pixels);                                               \
-    Baseline::Compare(pm, "PAGReadPixelsTest/" + std::string(key) + ".webp"); \
+#define CHECK_PIXELS(info, pixels, key)                                          \
+  {                                                                              \
+    Bitmap bm(info, pixels);                                                     \
+    EXPECT_TRUE(Baseline::Compare(bm, "PAGReadPixelsTest/" + std::string(key))); \
   }
 
 /**
@@ -50,7 +50,7 @@ PAG_TEST(PAGReadPixelsTest, TestPixelMap) {
   auto result = image->readPixels(RGBAInfo, pixelsA);
   EXPECT_TRUE(result);
 
-  PixelMap RGBAMap(RGBAInfo, pixelsA);
+  Bitmap RGBAMap(RGBAInfo, pixelsA);
   CHECK_PIXELS(RGBAInfo, pixelsA, "PixelMap_RGBA_Original");
 
   result = RGBAMap.readPixels(RGBAInfo, pixelsB);
@@ -88,7 +88,7 @@ PAG_TEST(PAGReadPixelsTest, TestPixelMap) {
   EXPECT_TRUE(result);
   CHECK_PIXELS(BGRAInfo, pixelsB, "PixelMap_RGBA_to_BGRA");
 
-  PixelMap BGRAMap(BGRAInfo, pixelsB);
+  Bitmap BGRAMap(BGRAInfo, pixelsB);
 
   result = BGRAMap.readPixels(BGRAInfo, pixelsA);
   EXPECT_TRUE(result);
@@ -102,7 +102,7 @@ PAG_TEST(PAGReadPixelsTest, TestPixelMap) {
   EXPECT_TRUE(result);
   CHECK_PIXELS(rgbAInfo, pixelsA, "PixelMap_BGRA_to_rgbA");
 
-  PixelMap rgbAMap(rgbAInfo, pixelsA);
+  Bitmap rgbAMap(rgbAInfo, pixelsA);
 
   result = rgbAMap.readPixels(RGBAInfo, pixelsB);
   EXPECT_TRUE(result);
@@ -125,7 +125,7 @@ PAG_TEST(PAGReadPixelsTest, TestPixelMap) {
   EXPECT_TRUE(result);
   CHECK_PIXELS(A8Info, pixelsC, "PixelMap_rgbA_to_alpha");
 
-  PixelMap A8Map(A8Info, pixelsC);
+  Bitmap A8Map(A8Info, pixelsC);
 
   result = A8Map.readPixels(rgbAInfo, pixelsB);
   EXPECT_TRUE(result);
@@ -146,28 +146,27 @@ PAG_TEST(PAGReadPixelsTest, TestPixelMap) {
 PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
   auto image = Image::MakeFrom("../resources/apitest/test_timestretch.png");
   ASSERT_TRUE(image != nullptr);
-  Bitmap bitmap = {};
-  auto result = bitmap.allocPixels(image->width(), image->height());
-  ASSERT_TRUE(result);
-  auto pixels = bitmap.lockPixels();
-  result = image->readPixels(bitmap.info(), pixels);
-  bitmap.unlockPixels();
+  auto pixelBuffer = PixelBuffer::Make(image->width(), image->height());
+  ASSERT_TRUE(pixelBuffer != nullptr);
+  auto pixels = pixelBuffer->lockPixels();
+  auto result = image->readPixels(pixelBuffer->info(), pixels);
+  pixelBuffer->unlockPixels();
   ASSERT_TRUE(result);
 
-  auto device = NativeGLDevice::Make();
+  auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto texture = bitmap.makeTexture(context);
+  auto texture = pixelBuffer->makeTexture(context);
   ASSERT_TRUE(texture != nullptr);
-  auto surface = Surface::Make(context, bitmap.width(), bitmap.height());
+  auto surface = Surface::Make(context, pixelBuffer->width(), pixelBuffer->height());
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
   canvas->drawTexture(texture.get());
 
-  BitmapLock lock(bitmap);
+  Bitmap bitmap(pixelBuffer);
   auto width = bitmap.width();
   auto height = bitmap.height();
-  pixels = lock.pixels();
+  pixels = bitmap.writablePixels();
 
   auto RGBAInfo = ImageInfo::Make(width, height, ColorType::RGBA_8888, AlphaType::Premultiplied);
   result = surface->readPixels(RGBAInfo, pixels);
@@ -261,10 +260,12 @@ PAG_TEST(PAGReadPixelsTest, PngCodec) {
   auto rowBytes = image->width() * 4;
   auto pixels = new (std::nothrow) uint8_t[rowBytes * image->height()];
   ASSERT_TRUE(pixels);
-  auto info = ImageInfo::Make(1280, 720, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  auto info = ImageInfo::Make(image->width(), image->height(), ColorType::RGBA_8888,
+                              AlphaType::Premultiplied);
   ASSERT_TRUE(image->readPixels(info, pixels));
-  PixelMap pixelMap(info, pixels);
-  auto bytes = Image::Encode(pixelMap.info(), pixelMap.pixels(), EncodedFormat::PNG, 100);
+  CHECK_PIXELS(info, pixels, "PngCodec_Decode");
+  Bitmap bitmap(info, pixels);
+  auto bytes = bitmap.encode(EncodedFormat::PNG, 100);
   image = Image::MakeFrom(bytes);
   ASSERT_TRUE(image != nullptr);
   ASSERT_EQ(image->width(), 1280);
@@ -282,20 +283,30 @@ PAG_TEST(PAGReadPixelsTest, WebpCodec) {
   ASSERT_EQ(image->width(), 110);
   ASSERT_EQ(image->height(), 110);
   ASSERT_EQ(static_cast<int>(image->orientation()), static_cast<int>(Orientation::TopLeft));
-  auto rowBytes = image->width() * 4;
-  auto pixels = new (std::nothrow) uint8_t[rowBytes * image->height()];
+  auto info = ImageInfo::Make(image->width(), image->height(), ColorType::RGBA_8888,
+                              AlphaType::Premultiplied);
+  auto pixels = new (std::nothrow) uint8_t[info.byteSize()];
   ASSERT_TRUE(pixels);
-  auto info = ImageInfo::Make(110, 110, ColorType::RGBA_8888, AlphaType::Premultiplied);
-  bool res = image->readPixels(info, pixels);
-  ASSERT_TRUE(res);
-  PixelMap pixelMap(info, pixels);
-  auto bytes = Image::Encode(pixelMap.info(), pixelMap.pixels(), EncodedFormat::WEBP, 100);
+  ASSERT_TRUE(image->readPixels(info, pixels));
+  CHECK_PIXELS(info, pixels, "WebpCodec_Decode");
+  Bitmap bitmap(info, pixels);
+  auto bytes = bitmap.encode(EncodedFormat::WEBP, 100);
   image = Image::MakeFrom(bytes);
   ASSERT_TRUE(image != nullptr);
   ASSERT_EQ(image->width(), 110);
   ASSERT_EQ(image->height(), 110);
   ASSERT_EQ(static_cast<int>(image->orientation()), static_cast<int>(Orientation::TopLeft));
+
+  auto a8Info = ImageInfo::Make(image->width(), image->height(), ColorType::ALPHA_8,
+                                AlphaType::Premultiplied);
+  auto a8Pixels = new (std::nothrow) uint8_t[a8Info.byteSize()];
+  ASSERT_TRUE(image->readPixels(a8Info, a8Pixels));
+  auto rgbaFromA8Data = Bitmap(a8Info, a8Pixels).encode(EncodedFormat::WEBP, 100);
+  auto rgbaFromA8Image = Image::MakeFrom(rgbaFromA8Data);
+  rgbaFromA8Image->readPixels(info, pixels);
+  CHECK_PIXELS(info, pixels, "WebpCodec_EncodeA8");
   delete[] pixels;
+  delete[] a8Pixels;
 }
 
 /**
@@ -311,11 +322,13 @@ PAG_TEST(PAGReadPixelsTest, JpegCodec) {
   auto pixels = new (std::nothrow)
       uint8_t[image->height() * image->width() * ImageInfo::GetBytesPerPixel(outputColorType)];
   ASSERT_TRUE(pixels);
-  auto info = ImageInfo::Make(4032, 3024, outputColorType, AlphaType::Premultiplied);
+  auto info =
+      ImageInfo::Make(image->width(), image->height(), outputColorType, AlphaType::Premultiplied);
   bool res = image->readPixels(info, pixels);
-  PixelMap pixelMap(info, pixels);
+  CHECK_PIXELS(info, pixels, "JpegCodec_Decode");
+  Bitmap bitmap(info, pixels);
 
-  auto bytes = Image::Encode(pixelMap.info(), pixelMap.pixels(), EncodedFormat::JPEG, 20);
+  auto bytes = bitmap.encode(EncodedFormat::JPEG, 20);
   image = Image::MakeFrom(bytes);
   ASSERT_TRUE(image != nullptr);
   ASSERT_EQ(image->width(), 4032);

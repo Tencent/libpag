@@ -246,9 +246,8 @@ JNIEXPORT jobjectArray Java_org_libpag_PAGComposition_audioMarkers(JNIEnv* env, 
   int markerSize = composition->audioMarkers().size();
   jobjectArray markerArray = env->NewObjectArray(markerSize, PAGMarker_Class.get(), nullptr);
   for (int i = 0; i < markerSize; ++i) {
-    jobject jMarker = ToPAGMarkerObject(env, composition->audioMarkers()[i]);
-    env->SetObjectArrayElement(markerArray, i, jMarker);
-    env->DeleteLocalRef(jMarker);
+    Local<jobject> jMarker = {env, ToPAGMarkerObject(env, composition->audioMarkers()[i])};
+    env->SetObjectArrayElement(markerArray, i, jMarker.get());
   }
   return markerArray;
 }

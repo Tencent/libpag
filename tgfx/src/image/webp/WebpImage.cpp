@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "image/webp/WebpImage.h"
-#include "image/PixelMap.h"
+#include "image/Bitmap.h"
 #include "image/webp/WebpUtility.h"
 
 namespace pag {
@@ -94,8 +94,8 @@ bool WebpImage::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
       if (decodeSuccess) {
         auto info =
             ImageInfo::Make(width(), height(), ColorType::RGBA_8888, AlphaType::Unpremultiplied);
-        PixelMap pixelMap(info, pixels);
-        decodeSuccess = pixelMap.readPixels(dstInfo, dstPixels);
+        Bitmap bitmap(info, pixels);
+        decodeSuccess = bitmap.readPixels(dstInfo, dstPixels);
       }
       delete[] pixels;
     }
@@ -134,15 +134,17 @@ static int webp_reader_write_data(const uint8_t* data, size_t data_size,
 
 std::shared_ptr<Data> WebpImage::Encode(const ImageInfo& imageInfo, const void* pixels,
                                         EncodedFormat, int quality) {
-  if (imageInfo.colorType() == ColorType::ALPHA_8) return nullptr;
   const uint8_t* srcPixels = static_cast<uint8_t*>(const_cast<void*>(pixels));
   const uint8_t* convertPixels = nullptr;
-  if (imageInfo.colorType() == ColorType::ALPHA_8) {
-    PixelMap pixelMap(imageInfo, srcPixels);
-    auto dstPixels = new uint8_t[imageInfo.byteSize()];
-    auto dstInfo = ImageInfo::Make(imageInfo.width(), imageInfo.height(), ColorType::RGBA_8888,
-                                   AlphaType::Opaque);
-    if (!pixelMap.readPixels(dstInfo, dstPixels)) {
+  if (imageInfo.alphaType() == AlphaType::Premultiplied ||
+      imageInfo.colorType() == ColorType::ALPHA_8) {
+    Bitmap bitmap(imageInfo, srcPixels);
+    auto dstPixels = new uint8_t[imageInfo.width() * imageInfo.height() * 4];
+    auto colorType =
+        imageInfo.colorType() == ColorType::ALPHA_8 ? ColorType::RGBA_8888 : imageInfo.colorType();
+    auto dstInfo = ImageInfo::Make(imageInfo.width(), imageInfo.height(), colorType,
+                                   AlphaType::Unpremultiplied);
+    if (!bitmap.readPixels(dstInfo, dstPixels)) {
       delete[] dstPixels;
       return nullptr;
     }
@@ -177,7 +179,8 @@ std::shared_ptr<Data> WebpImage::Encode(const ImageInfo& imageInfo, const void* 
   pic.custom_ptr = &webpWriter;
   const int rgbStride = pic.width * 4;
   auto importProc = WebPPictureImportRGBX;
-  if (ColorType::RGBA_8888 == imageInfo.colorType()) {
+  if (ColorType::RGBA_8888 == imageInfo.colorType() ||
+      ColorType::ALPHA_8 == imageInfo.colorType()) {
     if (AlphaType::Opaque == imageInfo.alphaType()) {
       importProc = WebPPictureImportRGBX;
     } else {

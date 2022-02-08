@@ -17,16 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FontConfigAndroid.h"
-#include <ft2build.h>
 #include "JNIEnvironment.h"
 #include "JNIHelper.h"
-#include FT_ADVANCES_H
-#include FT_MODULE_H
 
 namespace pag {
-typedef struct FT_LibraryRec_* FT_Library;
-typedef struct FT_FaceRec_* FT_Face;
-
 static Global<jclass> PAGFontClass;
 static jmethodID PAGFont_RegisterFallbackFonts;
 
@@ -54,64 +48,5 @@ bool FontConfigAndroid::RegisterFallbackFonts() {
   env->CallStaticVoidMethod(PAGFontClass.get(), PAGFont_RegisterFallbackFonts);
   return true;
 }
-
-static void* ft_alloc(FT_Memory, long size) {
-  return malloc(static_cast<size_t>(size));
-}
-static void ft_free(FT_Memory, void* block) {
-  free(block);
-}
-static void* ft_realloc(FT_Memory, long, long new_size, void* block) {
-  return realloc(block, static_cast<size_t>(new_size));
-}
-}
-
-static FT_MemoryRec_ gFTMemory = {nullptr, ft_alloc, ft_free, ft_realloc};
-
-static PAGFont ParseFont(const FT_Open_Args* args, int ttcIndex) {
-  if (args == nullptr) {
-    return {"", ""};
-  }
-  FT_Library fLibrary = nullptr;
-  if (FT_New_Library(&gFTMemory, &fLibrary)) {
-    return {"", ""};
-  }
-  FT_Add_Default_Modules(fLibrary);
-  FT_Face face;
-  if (FT_Open_Face(fLibrary, args, ttcIndex, &face)) {
-    FT_Done_Library(fLibrary);
-    return {"", ""};
-  }
-  if (face->family_name == nullptr) {
-    return {"", ""};
-  }
-  std::string fontFamily = face->family_name;
-  std::string fontStyle = face->style_name;
-  FT_Done_Face(face);
-  FT_Done_Library(fLibrary);
-  return {fontFamily, fontStyle};
-}
-
-PAGFont FontConfigAndroid::Parse(const void* data, size_t length, int ttcIndex) {
-  if (length == 0) {
-    return {"", ""};
-  }
-  FT_Open_Args args = {};
-  memset(&args, 0, sizeof(args));
-  args.flags = FT_OPEN_MEMORY;
-  args.memory_base = (const FT_Byte*)data;
-  args.memory_size = static_cast<FT_Long>(length);
-  return ParseFont(&args, ttcIndex);
-}
-
-PAGFont FontConfigAndroid::Parse(const std::string& fontPath, int ttcIndex) {
-  if (fontPath.empty()) {
-    return {"", ""};
-  }
-  FT_Open_Args args = {};
-  memset(&args, 0, sizeof(args));
-  args.flags = FT_OPEN_PATHNAME;
-  args.pathname = const_cast<FT_String*>(fontPath.c_str());
-  return ParseFont(&args, ttcIndex);
 }
 }  // namespace pag

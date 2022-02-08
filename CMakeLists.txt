@@ -1,10 +1,11 @@
 cmake_minimum_required(VERSION 3.1)
 project(PAG)
 
-if (APPLE AND NOT IOS)
-    SET(CMAKE_SYSTEM_PROCESSOR x86_64)
-    SET(CMAKE_OSX_ARCHITECTURES x86_64)
-endif ()
+# Uncomment the next 4 lines to build libpag for Intel cpus on Apple Silicon devices.
+#if (APPLE AND NOT IOS)
+#    SET(CMAKE_SYSTEM_PROCESSOR x86_64)
+#    SET(CMAKE_OSX_ARCHITECTURES x86_64)
+#endif ()
 
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 include(./vendor_tools/vendor.cmake)
@@ -93,6 +94,7 @@ file(GLOB PAG_COMMON_FILES
         src/platform/*.*
         tgfx/src/gpu/*.*
         tgfx/src/image/*.*
+        tgfx/src/platform/*.*
         tgfx/src/raster/*.*)
 list(APPEND PAG_FILES ${PAG_COMMON_FILES})
 
@@ -289,10 +291,6 @@ elseif (IOS)
 
     if (USE_NATIVE_PLATFORM)
         file(GLOB_RECURSE PAG_PLATFORM_FILES src/platform/ios/*.* src/platform/cocoa/*.*)
-        if (PAG_USE_FREETYPE)
-            file(GLOB PLATFORM_FILES tgfx/src/raster/coregraphics/BitmapContextUtil.mm)
-            list(APPEND PAG_PLATFORM_FILES ${PLATFORM_FILES})
-        endif ()
         file(GLOB GL_PLATFORM_FILES tgfx/src/gpu/opengl/eagl/*.*)
         list(APPEND PAG_PLATFORM_FILES ${GL_PLATFORM_FILES})
         find_include_dirs(IOS_PLATFORM_INCLUDES
@@ -331,10 +329,6 @@ elseif (MACOS)
 
     if (USE_NATIVE_PLATFORM)
         file(GLOB_RECURSE PAG_PLATFORM_FILES src/platform/mac/*.* src/platform/cocoa/*.*)
-        if (PAG_USE_FREETYPE)
-            file(GLOB PLATFORM_FILES tgfx/src/raster/coregraphics/BitmapContextUtil.mm)
-            list(APPEND PAG_PLATFORM_FILES ${PLATFORM_FILES})
-        endif ()
         file(GLOB GL_PLATFORM_FILES tgfx/src/gpu/opengl/cgl/*.*)
         list(APPEND PAG_PLATFORM_FILES ${GL_PLATFORM_FILES})
         find_include_dirs(MAC_PLATFORM_INCLUDES
@@ -404,13 +398,23 @@ add_vendor_target(PAG STATIC_VENDORS ${PAG_STATIC_VENDORS} SHARED_VENDORS ${PAG_
 list(APPEND PAG_PLATFORM_STATIC_LIBS ${PAG_VENDOR_STATIC_LIBRARIES})
 list(APPEND PAG_PLATFORM_SHARED_LIBS ${PAG_VENDOR_SHARED_LIBRARIES})
 
+if (WEB)
+    file(GLOB_RECURSE TGFX_PLATFORM_FILES tgfx/src/platform/web/*.*)
+elseif (IOS OR MACOS)
+    file(GLOB_RECURSE TGFX_PLATFORM_FILES tgfx/src/platform/apple/*.*)
+elseif (ANDROID)
+    file(GLOB_RECURSE TGFX_PLATFORM_FILES tgfx/src/platform/android/*.*)
+else ()
+    file(GLOB_RECURSE TGFX_PLATFORM_FILES tgfx/src/platform/mock/*.*)
+endif ()
+
 if (PAG_BUILD_SHARED)
-    add_library(pag SHARED ${PAG_VENDOR_TARGET} ${PAG_FILES} ${PAG_PLATFORM_FILES})
+    add_library(pag SHARED ${PAG_VENDOR_TARGET} ${PAG_FILES} ${PAG_PLATFORM_FILES} ${TGFX_PLATFORM_FILES})
     target_compile_definitions(pag PUBLIC PAG_DLL)
     target_include_directories(pag PUBLIC ${PAG_INCLUDES} ${PAG_PLATFORM_INCLUDES})
     target_link_libraries(pag ${PAG_PLATFORM_STATIC_LIBS} ${PAG_PLATFORM_SHARED_LIBS})
 else ()
-    add_library(pag STATIC ${PAG_VENDOR_TARGET} ${PAG_FILES} ${PAG_PLATFORM_FILES})
+    add_library(pag STATIC ${PAG_VENDOR_TARGET} ${PAG_FILES} ${PAG_PLATFORM_FILES} ${TGFX_PLATFORM_FILES})
     merge_libraries_into(pag ${PAG_PLATFORM_STATIC_LIBS})
     target_include_directories(pag PUBLIC ${PAG_INCLUDES} ${PAG_PLATFORM_INCLUDES})
     target_link_libraries(pag)
@@ -418,6 +422,7 @@ endif ()
 
 if (PAG_BUILD_TESTS)
     file(GLOB_RECURSE SWIFTSHADER_PLATFORM_FILES src/platform/swiftshader/*.*)
+    list(APPEND SWIFTSHADER_PLATFORM_FILES ${TGFX_PLATFORM_FILES})
     file(GLOB GL_PLATFORM_FILES tgfx/src/gpu/opengl/egl/*.*)
     list(APPEND SWIFTSHADER_PLATFORM_FILES ${GL_PLATFORM_FILES})
     add_library(pag-ss STATIC ${PAG_VENDOR_TARGET} ${PAG_FILES} ${SWIFTSHADER_PLATFORM_FILES})

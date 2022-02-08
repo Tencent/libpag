@@ -20,114 +20,97 @@
 
 #include "EncodedFormat.h"
 #include "ImageInfo.h"
-#include "pag/types.h"
+#include "core/Data.h"
+#include "image/PixelBuffer.h"
 
 namespace pag {
-class Texture;
-
-class Context;
-
-class PixelBuffer;
-
 /**
- * Bitmap describes a two-dimensional raster pixel array. Bitmap is not thread safe. Each thread
- * must have its own copy of Bitmap fields, although threads may share the underlying pixel array.
+ * Bitmap is a low level class which provides convenience functions to access raster destinations,
+ * which provides a utility to convert the format of pixels from one to another or compress the
+ * pixels into a image file.
  */
 class Bitmap {
  public:
   /**
-   * Creates an empty Bitmap without pixels, with ColorType::Unknown, AlphaType::Unknown, and with
-   * a width and height of zero.
+   * Creates a new Bitmap with specified ImageInfo and read-only pixels. The returned bitmap does
+   * not try to manage the lifetime of the pixel memory.
+   * Note: All non-const methods are invalid if the bitmap constructed from read-only pixels, such
+   * as writePixels() and eraseAll().
    */
-  Bitmap();
+  Bitmap(const ImageInfo& info, const void* pixels);
 
   /**
-   * Creates an new Bitmap with specified PixelBuffer object.
+   * Creates a new Bitmap with specified ImageInfo and writable pixels. The returned bitmap does not
+   * try to manage the lifetime of the pixel memory.
+   */
+  Bitmap(const ImageInfo& info, void* pixels);
+
+  /**
+   * Creates an new Bitmap with specified PixelBuffer object. Bitmap will hold a reference to The
+   * PixelBuffer and lock pixels from it. The PixelBuffer will remain locked until the returned
+   * bitmap is destructed or reset.
    */
   explicit Bitmap(std::shared_ptr<PixelBuffer> pixelBuffer);
 
-  /**
-   * Allocates pixel memory for this bitmap with specified width and height.
-   * @param width pixel column count, must be greater than zero.
-   * @param height pixel row count, must be greater than zero.
-   * @param alphaOnly If true, sets colorType to ColorType::ALPHA_8, otherwise sets to the native
-   * 32-bit color type of current platform.
-   * @param tryHardware If true, Bitmap will try to allocate a hardware PixelBuffer as the backing
-   * buffer if it is available on current platform, otherwise a raster PixelBuffer is allocated.
-   * @return Returns true if pixel memory is allocated successfully.
-   */
-  bool allocPixels(int width, int height, bool alphaOnly = false, bool tryHardware = true);
+  ~Bitmap();
 
   /**
-   * Resets to its initial state, as if Bitmap had been initialized by Bitmap(). Sets width, height,
-   * row bytes to zero; pixel address to nullptr; color type to ColorType::Unknown; and alpha type
-   * to AlphaType::Unknown. If PixelBuffer is allocated, its reference count is decreased by one,
-   * releasing its memory if Bitmap is the sole owner.
+   * Resets the bitmap to empty. If the pixels in this bitmap are locked from a PixelBuffer, the
+   * unlockPixels() of the PixelBuffer will be called immediately.
    */
   void reset();
 
   /**
-   * Returns true if this bitmap has not allocated pixel memory.
+   * Return true if this Bitmap describes an empty area of pixels.
    */
   bool isEmpty() const;
 
   /**
    * Returns a ImageInfo describing the width, height, color type, alpha type, and row bytes of the
-   * PixelMap.
+   * pixels.
    */
   const ImageInfo& info() const;
 
   /**
-   * Returns the width of this bitmap.
+   * Returns the width of the pixels.
    */
   int width() const;
 
   /**
-   * Returns the height of this bitmap.
+   * Returns the height of the pixels.
    */
   int height() const;
 
   /**
-   * Returns the AlphaType of the Bitmap, which is always AlphaType::Premultiplied.
-   */
-  AlphaType alphaType() const;
-
-  /**
-   * Returns the ColorType of the Bitmap.
+   * Returns the ColorType of the pixels.
    */
   ColorType colorType() const;
 
   /**
-   * Returns the rowBytes of the Bitmap.
+   * Returns the AlphaType of the pixels.
+   */
+  AlphaType alphaType() const;
+
+  /**
+   * Returns the rowBytes of the pixels.
    */
   size_t rowBytes() const;
 
   /**
-   * Returns the byte size of the Bitmap.
+   * Returns the byte size of the pixels.
    */
   size_t byteSize() const;
 
   /**
-   * Returns true if this bitmap has a HardwareBuffer as pixel storage.
+   * Returns the read-only pixel address, the base address corresponding to the pixel origin.
    */
-  bool isHardwareBacked() const {
-    return hardwareBacked;
-  }
+  const void* pixels() const;
 
   /**
-   * Locks and returns the address of the pixels to ensure that the memory is accessible.
+   * Returns the writable pixel address, the base address corresponding to the pixel origin. Returns
+   * nullptr if the bitmap is constructed from read-only pixels.
    */
-  void* lockPixels() const;
-
-  /**
-   * Call this to balance a successful call to lockPixels().
-   */
-  void unlockPixels() const;
-
-  /**
-   * Replaces all pixel values with transparent colors.
-   */
-  void eraseAll();
+  void* writablePixels() const;
 
   /**
    * Encodes the pixels in Bitmap into a binary image format.
@@ -139,12 +122,6 @@ class Bitmap {
   std::shared_ptr<Data> encode(EncodedFormat format = EncodedFormat::PNG, int quality = 100) const;
 
   /**
-   * Creates a new Texture capturing bitmap contents for the context that is current on the calling
-   * thread.
-   */
-  std::shared_ptr<Texture> makeTexture(Context* context) const;
-
-  /**
    * Copies a rect of pixels to dstPixels with specified ImageInfo. Copy starts at (srcX, srcY), and
    * does not exceed Bitmap (width(), height()). Pixels are copied only if pixel conversion is
    * possible. Returns true if pixels are copied to dstPixels.
@@ -153,40 +130,22 @@ class Bitmap {
 
   /**
    * Copies a rect of pixels from src. Copy starts at (dstX, dstY), and does not exceed
-   * Bitmap (width(), height()). Pixels are copied only if pixel conversion is possible.
-   * Returns true if src pixels are copied to Bitmap.
+   * Bitmap (width(), height()). Pixels are copied only if pixel conversion is possible and the
+   * bitmap is constructed from writable pixels. Returns true if src pixels are copied to Bitmap.
    */
   bool writePixels(const ImageInfo& srcInfo, const void* srcPixels, int dstX = 0, int dstY = 0);
 
- private:
-  bool hardwareBacked = false;
-  std::shared_ptr<PixelBuffer> pixelBuffer = nullptr;
-};
-
-/**
- * BitmapLock provides a convenient RAII-style mechanism for locking pixels of bitmap for the
- * duration of a scoped block.
- */
-class BitmapLock {
- public:
-  explicit BitmapLock(const Bitmap& bitmap) : bitmap(bitmap) {
-    _pixels = bitmap.lockPixels();
-  }
-
-  ~BitmapLock() {
-    bitmap.unlockPixels();
-  }
-
   /**
-   * Returns the locked address of bitmap pixels.
+   * Replaces all pixel values with transparent colors. Returns false if the bitmap is constructed
+   * from read-only pixels.
    */
-  void* pixels() const {
-    return _pixels;
-  }
+  bool eraseAll();
 
  private:
-  void* _pixels = nullptr;
-  Bitmap bitmap = {};
+  ImageInfo _info = {};
+  const void* _pixels = nullptr;
+  void* _writablePixels = nullptr;
+  std::shared_ptr<PixelBuffer> pixelBuffer = nullptr;
 };
 
 /**
