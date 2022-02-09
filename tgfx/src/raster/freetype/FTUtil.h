@@ -40,8 +40,8 @@ inline FT_F26Dot6 FDot6Ceil(FT_F26Dot6 x) {
   return ((x) + 63) >> 6;
 }
 
-inline FT_F26Dot6 FDot6Round(FT_F26Dot6 x)   {
-    return  (((x) + 32) >> 6);
+inline FT_F26Dot6 FDot6Round(FT_F26Dot6 x) {
+  return (((x) + 32) >> 6);
 }
 
 class FTLibrary {

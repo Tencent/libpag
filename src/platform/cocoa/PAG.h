@@ -18,8 +18,7 @@
 
 #import <Foundation/Foundation.h>
 
-__attribute__((visibility("default")))
-@interface PAG : NSObject
+__attribute__((visibility("default"))) @interface PAG : NSObject
 /**
  * Get SDK version information.
  */

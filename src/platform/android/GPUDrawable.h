@@ -20,8 +20,8 @@
 
 #include <android/native_window.h>
 #include <android/native_window_jni.h>
-#include "pag/pag.h"
 #include "gpu/opengl/egl/EGLWindow.h"
+#include "pag/pag.h"
 
 namespace pag {
 class GPUDrawable : public Drawable {

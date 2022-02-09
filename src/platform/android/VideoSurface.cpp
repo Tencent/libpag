@@ -100,8 +100,8 @@ std::shared_ptr<VideoSurface> VideoSurface::Make(int width, int height, bool has
   if (env == nullptr) {
     return nullptr;
   }
-  Local<jobject> surface =
-      {env, env->CallStaticObjectMethod(VideoSurfaceClass.get(), VideoSurface_Make, width, height)};
+  Local<jobject> surface = {
+      env, env->CallStaticObjectMethod(VideoSurfaceClass.get(), VideoSurface_Make, width, height)};
   if (surface.empty()) {
     return nullptr;
   }

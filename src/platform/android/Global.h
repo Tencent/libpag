@@ -20,7 +20,7 @@
 
 #include "JNIEnvironment.h"
 
-template<typename T>
+template <typename T>
 class Global {
  public:
   Global() = default;

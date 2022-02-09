@@ -114,7 +114,8 @@ PAG_TEST_F(MultiThreadCase, AsyncFlushAndFreeCache) {
 }
 
 /**
- * 用例描述: 多线程HitTest相关，因为flush线程会不停刷新位置，所以另外一个线程来测试hit的准确性没有意义，此处更多是看
+ * 用例描述:
+ * 多线程HitTest相关，因为flush线程会不停刷新位置，所以另外一个线程来测试hit的准确性没有意义，此处更多是看
  * 多线程会不会引起死锁之类的问题，正确性是HitTest接口本身来保证
  */
 PAG_TEST_F(MultiThreadCase, HitTestPoint) {

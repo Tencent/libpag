@@ -132,8 +132,7 @@ void GLYUVTextureFragmentProcessor::onSetData(const ProgramDataManager& programD
       }
       case YUVColorSpace::Rec2020: {
         if (yuvFP.texture->colorRange() == YUVColorRange::JPEG) {
-          programDataManager.setMatrix3f(mat3ColorConversionUniform,
-                                         kColorConversion2020FullRange);
+          programDataManager.setMatrix3f(mat3ColorConversionUniform, kColorConversion2020FullRange);
         } else {
           programDataManager.setMatrix3f(mat3ColorConversionUniform,
                                          kColorConversion2020LimitRange);
