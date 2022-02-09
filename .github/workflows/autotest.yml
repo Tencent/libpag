@@ -36,7 +36,7 @@ jobs:
           key: libpag-environment-20220208
       - if: github.event_name == 'push'
         name: Get libpag cache
-        id: libpag
+        id: libpag-push
         uses: actions/cache@v2
         with:
           path: libpag.tar.zst
@@ -46,7 +46,7 @@ jobs:
             libpag-code-
       - if: github.event_name == 'pull_request'
         name: Get libpag cache
-        id: libpag
+        id: libpag-pull
         uses: actions/cache@v2
         with:
           path: libpag.tar.zst
@@ -76,8 +76,8 @@ jobs:
             git pull
             git checkout ${{ github.head_ref }}
       - if: github.event_name == 'push'
-          name: swith branch
-          run: |
+        name: swith branch
+        run: |
             cd libpag
             git pull  
       - name: brew link emscripten
@@ -87,7 +87,6 @@ jobs:
 
       - name: Run autotest script
         run: |
-          ls
           cd libpag
           chmod +x sync_deps.sh
           ./sync_deps.sh
