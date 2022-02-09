@@ -17,8 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "NativePlatform.h"
-#include "image/PixelMap.h"
-#include "pag/pag.h"
+#include <emscripten/val.h>
 
 using namespace emscripten;
 
