@@ -36,7 +36,7 @@ jobs:
           key: libpag-environment-20220208
       - if: github.event_name == 'push'
         name: Get libpag cache (push)
-        id: libpag
+        id: libpag-push
         uses: actions/cache@v2
         with:
           path: libpag.tar.zst
@@ -46,7 +46,7 @@ jobs:
             libpag-code-
       - if: github.event_name == 'pull_request'
         name: Get libpag cache (pull_request)
-        id: libpag
+        id: libpag-pull_request
         uses: actions/cache@v2
         with:
           path: libpag.tar.zst
