@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-echo "----begin coding format----"
+echo "----Start code formatting----"
 find include/ -iname '*.h' -print0 | xargs clang-format -i
 find tgfx/include -iname '*.h' -print0 | xargs clang-format -i
 # shellcheck disable=SC2038
@@ -18,5 +18,5 @@ then
 else
     echo "----Pass coding specification----"
 fi
-echo "----end coding format----"
+echo "----Finish code formatting----"
 
