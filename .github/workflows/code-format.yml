@@ -3,6 +3,8 @@ name: code-format
 on:
   pull_request:
     branches: [ main ]
+  push:
+    branches: [ main ]  
 
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
@@ -19,6 +21,7 @@ jobs:
       - name: Run codeformat script
         run: |
           npm install -g clang-format
+          clang-format --version
           chmod +x codeformat.sh
           ./codeformat.sh
         shell: bash
