@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-echo "----Start code formatting----"
+echo "----begin to scan code format----"
 find include/ -iname '*.h' -print0 | xargs clang-format -i
 find tgfx/include -iname '*.h' -print0 | xargs clang-format -i
 # shellcheck disable=SC2038
@@ -13,10 +13,10 @@ git diff
 result=`git diff`
 if [[ $result =~ "diff" ]]
 then
-    echo "----Failed to pass coding specification----"
+    echo "----Failed----"
     exit 1
 else
-    echo "----Pass coding specification----"
+    echo "----Success----"
 fi
-echo "----Finish code formatting----"
+echo "----Complete the scan code format-----"
 
