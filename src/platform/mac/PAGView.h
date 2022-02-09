@@ -66,7 +66,8 @@
 
 @end
 
-__attribute__((visibility("default"))) @interface PAGView : NSView
+__attribute__((visibility("default")))
+@interface PAGView : NSView
 
 /**
  * Adds a listener to the set of listeners that are sent events through the life of an animation,

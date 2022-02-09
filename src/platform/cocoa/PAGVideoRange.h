@@ -21,7 +21,8 @@
 /**
  * Represents a time range from the content of PAGImageLayer.
  */
-__attribute__((visibility("default"))) @interface PAGVideoRange : NSObject
+__attribute__((visibility("default")))
+@interface PAGVideoRange : NSObject
 
 /**
  * The start time of the source video, in microseconds.

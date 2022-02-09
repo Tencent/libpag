@@ -21,7 +21,8 @@
 #import <Foundation/Foundation.h>
 #import "PAGScaleMode.h"
 
-__attribute__((visibility("default"))) @interface PAGImage : NSObject
+__attribute__((visibility("default")))
+@interface PAGImage : NSObject
 /**
  * Creates a PAGImage object from a CGImage object, return null if it's not valid CGImage object.
  */
