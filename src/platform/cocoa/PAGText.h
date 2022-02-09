@@ -32,7 +32,8 @@ enum {
 /**
  * The PAGText object stores a value for a TextLayer's Source Text property.
  */
-__attribute__((visibility("default"))) @interface PAGText : NSObject
+__attribute__((visibility("default")))
+@interface PAGText : NSObject
 
 /**
  * When true, the text layer shows a fill.

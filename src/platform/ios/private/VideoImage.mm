@@ -44,13 +44,14 @@ std::shared_ptr<VideoImage> VideoImage::MakeFrom(CVPixelBufferRef pixelBuffer,
     }
     videoImageMap.erase(result);
   }
-  auto videoImage = std::shared_ptr<VideoImage>(new VideoImage(pixelBuffer, colorSpace, colorRange));
+  auto videoImage =
+      std::shared_ptr<VideoImage>(new VideoImage(pixelBuffer, colorSpace, colorRange));
   videoImageMap[pixelBuffer] = videoImage;
   return videoImage;
 }
 
-VideoImage::VideoImage(CVPixelBufferRef pixelBuffer,
-                       YUVColorSpace colorSpace, YUVColorRange colorRange)
+VideoImage::VideoImage(CVPixelBufferRef pixelBuffer, YUVColorSpace colorSpace,
+                       YUVColorRange colorRange)
     : VideoBuffer(static_cast<int>(CVPixelBufferGetWidth(pixelBuffer)),
                   static_cast<int>(CVPixelBufferGetHeight(pixelBuffer))),
       pixelBuffer(pixelBuffer),

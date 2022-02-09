@@ -20,7 +20,8 @@
 #import "CocoaUtils.h"
 #import "PAGLayer.h"
 
-__attribute__((visibility("default"))) @interface PAGSolidLayer : PAGLayer
+__attribute__((visibility("default")))
+@interface PAGSolidLayer : PAGLayer
 
 /**
  * Returns the layer's solid color.

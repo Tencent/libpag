@@ -24,9 +24,10 @@
 
 namespace pag {
 
-GPUDecoder::GPUDecoder(const VideoConfig& config) : sourceColorSpace(config.colorSpace),
-                                                    destinationColorSpace(config.colorSpace),
-                                                    colorRange(config.colorRange) {
+GPUDecoder::GPUDecoder(const VideoConfig& config)
+    : sourceColorSpace(config.colorSpace),
+      destinationColorSpace(config.colorSpace),
+      colorRange(config.colorRange) {
   isInitialized = initVideoToolBox(config.headers, config.mimeType);
 }
 
@@ -147,11 +148,11 @@ bool GPUDecoder::resetVideoToolBox() {
   CFDictionaryRef attrs = NULL;
   const void* keys[] = {kCVPixelBufferPixelFormatTypeKey, kCVPixelBufferOpenGLESCompatibilityKey,
                         kCVPixelBufferIOSurfacePropertiesKey};
-  
+
   uint32_t openGLESCompatibility = true;
-  uint32_t pixelFormatType =
-            colorRange == YUVColorRange::JPEG ? kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
-                                              : kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange;
+  uint32_t pixelFormatType = colorRange == YUVColorRange::JPEG
+                                 ? kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
+                                 : kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange;
 
   CFNumberRef pixelFormatTypeValue = CFNumberCreate(NULL, kCFNumberSInt32Type, &pixelFormatType);
   CFNumberRef openGLESCompatibilityValue =
@@ -178,18 +179,25 @@ bool GPUDecoder::resetVideoToolBox() {
 
   if (@available(iOS 10.0, *)) {
     if (sourceColorSpace == YUVColorSpace::Rec2020) {
-      CFStringRef destinationColorPrimaries = CFStringCreateWithCString(kCFAllocatorDefault, "DestinationColorPrimaries", kCFStringEncodingUTF8);
-      CFStringRef destinationTransferFunction = CFStringCreateWithCString(kCFAllocatorDefault, "DestinationTransferFunction", kCFStringEncodingUTF8);
-      CFStringRef destinationYCbCrMatrix = CFStringCreateWithCString(kCFAllocatorDefault, "DestinationYCbCrMatrix", kCFStringEncodingUTF8);
-      CFStringRef pixelTransferProperties = CFStringCreateWithCString(kCFAllocatorDefault, "PixelTransferProperties", kCFStringEncodingUTF8);
+      CFStringRef destinationColorPrimaries = CFStringCreateWithCString(
+          kCFAllocatorDefault, "DestinationColorPrimaries", kCFStringEncodingUTF8);
+      CFStringRef destinationTransferFunction = CFStringCreateWithCString(
+          kCFAllocatorDefault, "DestinationTransferFunction", kCFStringEncodingUTF8);
+      CFStringRef destinationYCbCrMatrix = CFStringCreateWithCString(
+          kCFAllocatorDefault, "DestinationYCbCrMatrix", kCFStringEncodingUTF8);
+      CFStringRef pixelTransferProperties = CFStringCreateWithCString(
+          kCFAllocatorDefault, "PixelTransferProperties", kCFStringEncodingUTF8);
 
-      CFMutableDictionaryRef pixelTransferPropertiesParam = CFDictionaryCreateMutable(kCFAllocatorDefault, 0,
-                                                                                      &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-      CFDictionarySetValue(pixelTransferPropertiesParam, destinationColorPrimaries, kCVImageBufferColorPrimaries_ITU_R_709_2);
-      CFDictionarySetValue(pixelTransferPropertiesParam, destinationTransferFunction, kCVImageBufferTransferFunction_ITU_R_709_2);
-      CFDictionarySetValue(pixelTransferPropertiesParam, destinationYCbCrMatrix, kCVImageBufferYCbCrMatrix_ITU_R_709_2);
+      CFMutableDictionaryRef pixelTransferPropertiesParam = CFDictionaryCreateMutable(
+          kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+      CFDictionarySetValue(pixelTransferPropertiesParam, destinationColorPrimaries,
+                           kCVImageBufferColorPrimaries_ITU_R_709_2);
+      CFDictionarySetValue(pixelTransferPropertiesParam, destinationTransferFunction,
+                           kCVImageBufferTransferFunction_ITU_R_709_2);
+      CFDictionarySetValue(pixelTransferPropertiesParam, destinationYCbCrMatrix,
+                           kCVImageBufferYCbCrMatrix_ITU_R_709_2);
       VTSessionSetProperty(session, pixelTransferProperties, pixelTransferPropertiesParam);
-      
+
       CFRelease(destinationColorPrimaries);
       CFRelease(destinationTransferFunction);
       CFRelease(destinationYCbCrMatrix);
@@ -264,7 +272,9 @@ pag::DecodingResult GPUDecoder::onDecodeFrame() {
       if (status == kVTInvalidSessionErr) {
         cleanResources();
         isInitialized = resetVideoToolBox();
-        LOGI("GPUDecoder: Resetting VideoToolBox session, which may be caused by app entered background, initialized = %d", isInitialized);
+        LOGI("GPUDecoder: Resetting VideoToolBox session, which may be caused by app entered "
+             "background, initialized = %d",
+             isInitialized);
       } else {
         LOGE("GPUDecoder:Decode failed status = %d", (int)status);
       }

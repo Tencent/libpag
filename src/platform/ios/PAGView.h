@@ -66,7 +66,8 @@
 
 @end
 
-__attribute__((visibility("default"))) @interface PAGView : UIView
+__attribute__((visibility("default")))
+@interface PAGView : UIView
 
 /**
  * Default is NO.
