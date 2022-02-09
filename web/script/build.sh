@@ -27,6 +27,7 @@ cmake --build $BUILD_DIR --target pag -- -j 12
 emcc $RELEASE_CONF -std=c++17 \
   -I$SOURCE_DIR/include/ \
   -I$SOURCE_DIR/src/ \
+  -I$SOURCE_DIR/tgfx/include/ \
   -I$SOURCE_DIR/tgfx/src/ \
   -DPAG_BUILD_FOR_WEB \
   ../src/pag_wasm_bindings.cpp \
