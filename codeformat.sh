@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 echo "----begin coding format----"
+clang-format --version
 find include/ -iname '*.h' -print0 | xargs clang-format -i
 find tgfx/include -iname '*.h' -print0 | xargs clang-format -i
 # shellcheck disable=SC2038
