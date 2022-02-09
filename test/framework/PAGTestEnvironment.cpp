@@ -40,7 +40,6 @@ void PAGTestEnvironment::SetUp() {
 }
 
 void PAGTestEnvironment::TearDown() {
-
 }
 
 }  // namespace pag

@@ -19,8 +19,8 @@
 #pragma once
 
 #include <CoreGraphics/CGBitmapContext.h>
-#include "pag/types.h"
 #include "image/ImageInfo.h"
+#include "pag/types.h"
 
 namespace pag {
 CGContextRef CreateBitmapContext(const ImageInfo& info, void* pixels);

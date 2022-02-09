@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include <string>
 #include <jni.h>
+#include <string>
 
 namespace pag {
 /**
@@ -34,7 +34,7 @@ JNIEnv* CurrentJNIEnv();
  */
 jstring SafeToJString(JNIEnv* env, const std::string& text);
 
-template<typename T>
+template <typename T>
 class Global {
  public:
   Global() = default;
@@ -84,7 +84,7 @@ class Global {
   T _ref = nullptr;
 };
 
-template<typename T>
+template <typename T>
 class Local {
  public:
   Local() = default;

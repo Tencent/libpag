@@ -18,8 +18,7 @@
 
 #import <Foundation/Foundation.h>
 
-__attribute__((visibility("default")))
-@interface PAGMarker : NSObject
+__attribute__((visibility("default"))) @interface PAGMarker : NSObject
 
 @property(nonatomic) long long startTime;
 @property(nonatomic) long long duration;

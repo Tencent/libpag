@@ -31,7 +31,7 @@ std::shared_ptr<VideoImage> VideoImage::MakeFrom(std::shared_ptr<VideoSurface> v
 
 VideoImage::VideoImage(std::shared_ptr<VideoSurface> videoSurface, int width, int height)
     : VideoBuffer(width, height), videoSurface(std::move(videoSurface)) {
-    this->videoSurface->markHasNewTextureImage();
+  this->videoSurface->markHasNewTextureImage();
 }
 
 std::shared_ptr<Texture> VideoImage::makeTexture(Context* context) const {

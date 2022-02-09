@@ -16,9 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <unordered_map>
-
 #include "Text.h"
+#include <unordered_map>
 #include "core/Canvas.h"
 #include "pag/file.h"
 #include "raster/PathEffect.h"

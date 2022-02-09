@@ -19,8 +19,7 @@
 #import <Foundation/Foundation.h>
 #import "PAGLayer.h"
 
-__attribute__((visibility("default")))
-@interface PAGComposition : PAGLayer
+__attribute__((visibility("default"))) @interface PAGComposition : PAGLayer
 
 /**
  * Make a empty PAGComposition with specified size.

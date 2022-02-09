@@ -28,8 +28,8 @@ class RenderCache;
 
 class SequenceReader {
  public:
-  static std::shared_ptr<SequenceReader>
-  Make(std::shared_ptr<File> file, VideoSequence* sequence, DecodingPolicy policy);
+  static std::shared_ptr<SequenceReader> Make(std::shared_ptr<File> file, VideoSequence* sequence,
+                                              DecodingPolicy policy);
 
   SequenceReader(std::shared_ptr<File> file, Sequence* sequence);
 

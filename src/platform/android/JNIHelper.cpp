@@ -261,8 +261,8 @@ pag::ImageInfo GetImageInfo(JNIEnv* env, jobject bitmap) {
     return {};
   }
   pag::AlphaType alphaType = (bitmapInfo.flags & BITMAP_FLAGS_ALPHA_UNPREMUL)
-                             ? pag::AlphaType::Unpremultiplied
-                             : pag::AlphaType::Premultiplied;
+                                 ? pag::AlphaType::Unpremultiplied
+                                 : pag::AlphaType::Premultiplied;
   pag::ColorType colorType;
   switch (bitmapInfo.format) {
     case ANDROID_BITMAP_FORMAT_RGBA_8888:

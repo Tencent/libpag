@@ -48,8 +48,8 @@ PAG_TEST(PAGFontTest, TestFont) {
     pagPlayer->setProgress((currentFrame + 0.1) * 1.0 / totalFrames);
     pagPlayer->flush();
 
-    bool same = Baseline::Compare(pagSurface,
-                                  "PAGFontTest/TestFont_" + std::to_string(currentFrame));
+    bool same =
+        Baseline::Compare(pagSurface, "PAGFontTest/TestFont_" + std::to_string(currentFrame));
     if (!same) {
       errorMsg += (std::to_string(currentFrame) + ";");
     }
