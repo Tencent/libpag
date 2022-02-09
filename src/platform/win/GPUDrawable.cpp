@@ -18,7 +18,6 @@
 
 #include "GPUDrawable.h"
 #include <windows.h>
-#include "gpu/opengl/GLInterface.h"
 #include "gpu/opengl/egl/EGLWindow.h"
 
 namespace pag {
