@@ -23,8 +23,7 @@
 #import "PAGScaleMode.h"
 #import "PAGSurface.h"
 
-__attribute__((visibility("default")))
-@interface PAGPlayer : NSObject
+__attribute__((visibility("default"))) @interface PAGPlayer : NSObject
 /**
  * Returns the current PAGComposition for PAGPlayer to render as content.
  */

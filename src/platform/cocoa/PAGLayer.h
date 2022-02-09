@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import <Foundation/Foundation.h>
 #import <CoreGraphics/CoreGraphics.h>
+#import <Foundation/Foundation.h>
 #import "PAGMarker.h"
 
 typedef NS_ENUM(NSInteger, PAGLayerType) {
@@ -33,8 +33,7 @@ typedef NS_ENUM(NSInteger, PAGLayerType) {
 @class PAGComposition;
 @class PAGFile;
 
-__attribute__((visibility("default")))
-@interface PAGLayer : NSObject
+__attribute__((visibility("default"))) @interface PAGLayer : NSObject
 
 /**
  * Returns the type of layer.

@@ -2,17 +2,18 @@
 Language: Cpp
 BasedOnStyle: Google
 ColumnLimit: 100
+SortIncludes: true
 AccessModifierOffset: -1
 AlignAfterOpenBracket: Align
 AlignConsecutiveAssignments: false
-AlignOperands: true
+AlignOperands: Align
 AllowAllArgumentsOnNextLine: false
 AllowAllConstructorInitializersOnNextLine: true
 AllowAllParametersOfDeclarationOnNextLine: false
-AllowShortBlocksOnASingleLine: false
+AllowShortBlocksOnASingleLine: Never
 AllowShortCaseLabelsOnASingleLine: false
 AllowShortFunctionsOnASingleLine: None
-AllowShortIfStatementsOnASingleLine: true
+AllowShortIfStatementsOnASingleLine: Always
 AllowShortLambdasOnASingleLine: All
 AllowShortLoopsOnASingleLine: true
 AlwaysBreakAfterReturnType: None
@@ -21,7 +22,6 @@ BreakBeforeBraces: Custom
 BraceWrapping:
   AfterCaseLabel: false
   AfterClass: false
-  AfterControlStatement: false
   AfterEnum: false
   AfterFunction: false
   AfterNamespace: false
@@ -58,7 +58,7 @@ SpaceBeforeParens: ControlStatements
 SpaceBeforeRangeBasedForLoopColon: true
 SpaceInEmptyParentheses: false
 SpacesBeforeTrailingComments: 2
-SpacesInAngles: Never
+SpacesInAngles: false
 SpacesInCStyleCastParentheses: false
 SpacesInContainerLiterals: false
 SpacesInParentheses: false
@@ -67,3 +67,17 @@ ConstructorInitializerAllOnOneLineOrOnePerLine: false
 IncludeBlocks:   Merge
 TabWidth: 2
 UseTab: Never
+
+---
+Language: ObjC
+BasedOnStyle: Google
+ColumnLimit: 100
+
+# Only sort headers in each include block
+SortIncludes: true
+IncludeBlocks: Preserve
+DerivePointerAlignment: false
+PointerAlignment: Left
+AllowShortFunctionsOnASingleLine: None
+BraceWrapping:
+  SplitEmptyFunction: true
