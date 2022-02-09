@@ -14,6 +14,12 @@ import { PAGComposition } from './pag-composition';
 import { NativeImage } from './core/native-image';
 import { WebMask } from './core/web-mask';
 
+declare global {
+  interface Window {
+    WeixinJSBridge?: any;
+  }
+}
+
 export interface PAG extends EmscriptenModule {
   _PAGFile: {
     Load: (bytes: number, length: number) => Promise<PAGFile>;

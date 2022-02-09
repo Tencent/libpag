@@ -1,6 +1,24 @@
 import { VIDEO_DECODE_WAIT_FRAME } from '../constant';
 import { convertMp4 } from '../h264/h264';
 import { addListener, removeListener, removeAllListeners } from '../utils/video-listener';
+import { IS_WECHAT } from '../utils/ua';
+
+const playVideoElement = (videoElement: HTMLVideoElement) => {
+  if (IS_WECHAT && window.WeixinJSBridge) {
+    window.WeixinJSBridge.invoke(
+      'getNetworkType',
+      {},
+      () => {
+        videoElement.play();
+      },
+      () => {
+        videoElement.play();
+      },
+    );
+  } else {
+    videoElement.play();
+  }
+};
 
 export class VideoReader {
   private videoEl: HTMLVideoElement = null;
@@ -41,7 +59,7 @@ export class VideoReader {
             removeListener(this.videoEl, 'playing', canplayCallback);
           };
           addListener(this.videoEl, 'playing', canplayCallback);
-          this.videoEl.play();
+          playVideoElement(this.videoEl);
         }
       } else {
         if (targetTime === currentTime) {
@@ -50,7 +68,7 @@ export class VideoReader {
         } else if (Math.abs(currentTime - targetTime) < (1 / this.frameRate) * VIDEO_DECODE_WAIT_FRAME) {
           // 在可容忍的帧数偏差内
           if (this.videoEl.paused) {
-            this.videoEl.play();
+            playVideoElement(this.videoEl);
           }
           resolve(true);
         } else {
@@ -58,7 +76,7 @@ export class VideoReader {
           let isCallback = false;
           const timeupdateCallback = () => {
             removeListener(this.videoEl, 'timeupdate', timeupdateCallback);
-            this.videoEl.play();
+            playVideoElement(this.videoEl);
             isCallback = true;
             resolve(true);
           };
