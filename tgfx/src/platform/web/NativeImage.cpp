@@ -35,7 +35,7 @@ std::shared_ptr<Image> NativeCodec::MakeImage(std::shared_ptr<Data> imageBytes) 
   auto bytes =
       val(typed_memory_view(imageBytes->size(), static_cast<const uint8_t*>(imageBytes->data())));
   auto nativeImage = nativeImageClass.call<val>("createFromBytes", bytes).await();
-  return MakeFrom(nativeImage);
+  return NativeImage::MakeFrom(nativeImage);
 }
 
 std::shared_ptr<NativeImage> NativeImage::MakeFrom(emscripten::val nativeImage) {

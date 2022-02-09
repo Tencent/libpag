@@ -13,6 +13,13 @@ export interface Bounds {
   right: number;
 }
 
+export interface Bounds {
+  top: number;
+  left: number;
+  bottom: number;
+  right: number;
+}
+
 /* #if _WECHAT
 const wxFreeNode = wxOffscreenManager.getFreeCanvas();
 const canvas = wxFreeNode.canvas;
