@@ -15,42 +15,42 @@ export class PAGView {
   /**
    * Create pag view.
    */
-  public static async init(file: PAGFile, _canvas: string | HTMLCanvasElement | OffscreenCanvas): Promise<PAGView> {
+  public static async init(file: PAGFile, canvas: string | HTMLCanvasElement | OffscreenCanvas): Promise<PAGView> {
     /* #if _WECHAT
-    let canvas: any;
-    if (typeof _canvas === 'string') {
-      canvas = await getWechatElementById(_canvas);
+    let canvasElement: any;
+    if (typeof canvas === 'string') {
+      canvasElement = await getWechatElementById(canvas);
     } else {
-      canvas = _canvas;
+      canvasElement = canvas;
     }
     const dpr = wx.getSystemInfoSync().pixelRatio
-    canvas.width = canvas.width * dpr;
-    canvas.height = canvas.height * dpr;
-    const width = canvas.width;
-    const height = canvas.height;
-    const gl = canvas.getContext('webgl', { alpha: true });
+    canvasElement.width = canvasElement.width * dpr;
+    canvasElement.height = canvasElement.height * dpr;
+    const width = canvasElement.width;
+    const height = canvasElement.height;
+    const gl = canvasElement.getContext('webgl', { alpha: true });
     const contextID = this.module.GL.registerContext(gl, { majorVersion: 1, minorVersion: 0 });
     const pagPlayer = await this.module._PAGPlayer.create();
     const pagView = new PAGView(pagPlayer);
     this.module.GL.makeContextCurrent(contextID);
     pagView.pagSurface = await this.module._PAGSurface.FromFrameBuffer(0, width, height, true);
     //#else */
-    let canvas: HTMLCanvasElement;
-    if (typeof _canvas === 'string') {
-      canvas = document.getElementById(_canvas.substr(1)) as HTMLCanvasElement;
-    } else if (_canvas instanceof HTMLCanvasElement) {
-      canvas = _canvas;
+    let canvasElement: HTMLCanvasElement;
+    if (typeof canvas === 'string') {
+      canvasElement = document.getElementById(canvas.substr(1)) as HTMLCanvasElement;
+    } else if (canvas instanceof HTMLCanvasElement) {
+      canvasElement = canvas;
     }
-    canvas.style.width = `${canvas.width}px`;
-    canvas.style.height = `${canvas.height}px`;
-    canvas.width = canvas.width * window.devicePixelRatio;
-    canvas.height = canvas.height * window.devicePixelRatio;
+    canvasElement.style.width = `${canvasElement.width}px`;
+    canvasElement.style.height = `${canvasElement.height}px`;
+    canvasElement.width = canvasElement.width * window.devicePixelRatio;
+    canvasElement.height = canvasElement.height * window.devicePixelRatio;
     const pagPlayer = await this.module._PAGPlayer.create();
     const pagView = new PAGView(pagPlayer);
-    const gl = canvas.getContext('webgl');
+    const gl = canvasElement.getContext('webgl');
     const contextID = this.module.GL.registerContext(gl, { majorVersion: 1, minorVersion: 0 });
     this.module.GL.makeContextCurrent(contextID);
-    pagView.pagSurface = await this.module._PAGSurface.FromFrameBuffer(0, canvas.width, canvas.height, true);
+    pagView.pagSurface = await this.module._PAGSurface.FromFrameBuffer(0, canvasElement.width, canvasElement.height, true);
     // #endif
     pagView.player.setSurface(pagView.pagSurface);
     pagView.player.setComposition(file);

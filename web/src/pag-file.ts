@@ -14,7 +14,11 @@ export class PAGFile extends PAGComposition {
   /**
    * Load pag file from file.
    */
-  public static async load(data: File & ArrayBuffer) {
+  /* #if _WECHAT
+  public static async load(data: ArrayBuffer) {
+//#else */
+  public static async load(data: File) {
+// #endif
     /* #if _WECHAT
     const buffer = data;
     //#else */

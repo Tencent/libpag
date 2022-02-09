@@ -102,7 +102,7 @@ export class WebMask {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, imgData.width, imgData.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(imgData.data, 0, imgData.data.length));
     wxOffscreenManager.freeCanvas(this.wxFreeNode.id);
     //#else */
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.ALPHA, gl.ALPHA, gl.UNSIGNED_BYTE, this.canvas as any);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.ALPHA, gl.ALPHA, gl.UNSIGNED_BYTE, this.canvas as HTMLCanvasElement);
     // #endif
   }
 }
