@@ -93,4 +93,4 @@ then
  cp -a $WORKSPACE/test/out/baseline/**/*.lzma2 $WORKSPACE/result/
  cp -a $WORKSPACE/test/out/compare/*.webp $WORKSPACE/result/
  exit 1
- fi
+fi
