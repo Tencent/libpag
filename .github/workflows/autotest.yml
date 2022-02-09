@@ -76,8 +76,8 @@ jobs:
             git pull
             git checkout ${{ github.head_ref }}
       - if: github.event_name == 'push'
-          name: swith branch (push)
-          run: |
+        name: swith branch (push)
+        run: |
             cd libpag
             git pull
       - name: brew link emscripten
