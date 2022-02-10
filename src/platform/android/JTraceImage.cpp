@@ -18,7 +18,7 @@
 
 #include "JTraceImage.h"
 #include "JNIHelper.h"
-#include "image/Bitmap.h"
+#include "core/Bitmap.h"
 
 namespace pag {
 static Global<jclass> TraceImageClass;

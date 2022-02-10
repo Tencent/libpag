@@ -19,7 +19,7 @@
 #pragma once
 
 #include <CoreGraphics/CGBitmapContext.h>
-#include "image/ImageInfo.h"
+#include "core/ImageInfo.h"
 #include "pag/types.h"
 
 namespace pag {

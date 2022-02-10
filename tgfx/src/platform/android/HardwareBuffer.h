@@ -20,7 +20,7 @@
 
 #include <android/hardware_buffer.h>
 #include "HardwareBufferInterface.h"
-#include "image/PixelBuffer.h"
+#include "core/PixelBuffer.h"
 
 namespace pag {
 class HardwareBuffer : public PixelBuffer {

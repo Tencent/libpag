@@ -22,7 +22,7 @@
 #include <unordered_set>
 #include "LzmaUtil.h"
 #include "core/Data.h"
-#include "image/Image.h"
+#include "core/Image.h"
 
 namespace pag {
 #define BASELINE_ROOT "../test/baseline/"

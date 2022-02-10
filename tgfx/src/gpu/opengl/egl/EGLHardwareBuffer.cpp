@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "core/PixelBuffer.h"
 #include "gpu/YUVTexture.h"
-#include "image/PixelBuffer.h"
 
 #if defined(__ANDROID__) || defined(ANDROID)
 #include "EGLHardwareTexture.h"

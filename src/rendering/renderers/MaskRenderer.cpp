@@ -18,7 +18,7 @@
 
 #include "MaskRenderer.h"
 #include "pag/file.h"
-#include "raster/PathEffect.h"
+#include "core/PathEffect.h"
 #include "rendering/utils/PathUtil.h"
 
 namespace pag {

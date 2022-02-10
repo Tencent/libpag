@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "EAGLDevice.h"
+#include "gpu/opengl/eagl/EAGLDevice.h"
 #import <OpenGLES/ES2/gl.h>
 #import <OpenGLES/ES3/glext.h>
 #include "EAGLProcGetter.h"

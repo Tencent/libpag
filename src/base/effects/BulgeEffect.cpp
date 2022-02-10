@@ -18,8 +18,8 @@
 
 #include "base/utils/MathExtra.h"
 #include "base/utils/Verify.h"
+#include "core/Path.h"
 #include "pag/file.h"
-#include "raster/Path.h"
 
 namespace pag {
 static void ConvertEllipseToPath(Path* path, float centerX, float centerY, float radiusX,

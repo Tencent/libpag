@@ -19,8 +19,8 @@
 #pragma once
 
 #include "Graphic.h"
-#include "image/Bitmap.h"
-#include "image/Image.h"
+#include "core/Bitmap.h"
+#include "core/Image.h"
 #include "rendering/graphics/Snapshot.h"
 
 namespace pag {

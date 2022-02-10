@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/Blend.h"
+#include "core/Blend.h"
 #include "gpu/FragmentShaderBuilder.h"
 #include "pag/types.h"
 

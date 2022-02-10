@@ -18,13 +18,13 @@
 
 #include <fstream>
 #include <vector>
+#include "core/Bitmap.h"
+#include "core/Image.h"
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
 #include "gpu/Surface.h"
 #include "gpu/opengl/GLDevice.h"
 #include "gpu/opengl/GLUtil.h"
-#include "image/Bitmap.h"
-#include "image/Image.h"
 
 namespace pag {
 using nlohmann::json;

@@ -19,7 +19,7 @@
 #pragma once
 
 #include "JNIUtil.h"
-#include "image/Image.h"
+#include "core/Image.h"
 
 namespace pag {
 class NativeImage : public Image {
@@ -32,7 +32,8 @@ class NativeImage : public Image {
   std::string imagePath;
   std::shared_ptr<Data> imageBytes;
 
-  NativeImage(int width, int height, Orientation orientation) : Image(width, height, orientation){};
+  NativeImage(int width, int height, Orientation orientation) : Image(width, height,
+                                                                      orientation) {};
 
   static std::shared_ptr<NativeImage> Make(JNIEnv* env, jobject sizeObject, int orientation);
 

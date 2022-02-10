@@ -19,7 +19,7 @@
 #pragma once
 
 #include <CoreImage/CoreImage.h>
-#include "image/Image.h"
+#include "core/Image.h"
 
 namespace pag {
 class NativeImage : public Image {

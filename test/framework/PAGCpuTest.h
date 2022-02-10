@@ -18,8 +18,8 @@
 
 #pragma once
 
+#include "core/PixelBuffer.h"
 #include "gtest/gtest.h"
-#include "image/PixelBuffer.h"
 #include "nlohmann/json.hpp"
 #include "pag/file.h"
 #include "pag/pag.h"

@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "CGLWindow.h"
+#include "gpu/opengl/cgl/CGLWindow.h"
 #include <thread>
 #include "CGLHardwareTexture.h"
 #include "gpu/opengl/GLSurface.h"

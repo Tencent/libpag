@@ -21,13 +21,13 @@
 #include "GLRRectOp.h"
 #include "GLSurface.h"
 #include "base/utils/MathExtra.h"
+#include "core/Mask.h"
+#include "core/TextBlob.h"
 #include "gpu/AlphaFragmentProcessor.h"
 #include "gpu/TextureFragmentProcessor.h"
 #include "gpu/TextureMaskFragmentProcessor.h"
 #include "gpu/YUVTextureFragmentProcessor.h"
 #include "pag/file.h"
-#include "raster/Mask.h"
-#include "raster/TextBlob.h"
 
 namespace pag {
 GLCanvas::GLCanvas(Surface* surface) : Canvas(surface) {
@@ -154,7 +154,7 @@ static std::unique_ptr<Shader> MakeGradientShader(const GradientPaint& gradient)
     auto g = static_cast<float>(color.green) / 255.0f;
     auto b = static_cast<float>(color.blue) / 255.0f;
     auto a = static_cast<float>(alphas[index++]) / 255.0f;
-    colors.emplace_back(r, g, b, a);
+    colors.push_back({r, g, b, a});
   }
   if (gradient.gradientType == GradientFillType::Linear) {
     shader = GradientShader::MakeLinear(gradient.startPoint, gradient.endPoint, colors,

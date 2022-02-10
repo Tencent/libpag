@@ -20,7 +20,7 @@
 
 #include "GLState.h"
 #include "GLTexture.h"
-#include "image/ImageInfo.h"
+#include "core/ImageInfo.h"
 
 namespace pag {
 /**

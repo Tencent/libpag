@@ -20,7 +20,7 @@
 
 #include "AAType.h"
 #include "GeometryProcessor.h"
-#include "core/Paint.h"
+#include "gpu/Paint.h"
 
 namespace pag {
 class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {

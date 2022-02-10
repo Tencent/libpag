@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLDualIntervalGradientColorizer.h"
-#include "gpu/DualIntervalGradientColorizer.h"
+#include "gpu/gradients/DualIntervalGradientColorizer.h"
 
 namespace pag {
 void GLDualIntervalGradientColorizer::emitCode(EmitArgs& args) {
@@ -54,19 +54,19 @@ void GLDualIntervalGradientColorizer::onSetData(const ProgramDataManager& progra
   const auto& fp = static_cast<const DualIntervalGradientColorizer&>(fragmentProcessor);
   if (scale01Prev != fp.scale01) {
     scale01Prev = fp.scale01;
-    programDataManager.set4fv(scale01Uniform, 1, fp.scale01.vec());
+    programDataManager.set4fv(scale01Uniform, 1, fp.scale01.vector());
   }
   if (bias01Prev != fp.bias01) {
     bias01Prev = fp.bias01;
-    programDataManager.set4fv(bias01Uniform, 1, fp.bias01.vec());
+    programDataManager.set4fv(bias01Uniform, 1, fp.bias01.vector());
   }
   if (scale23Prev != fp.scale23) {
     scale23Prev = fp.scale23;
-    programDataManager.set4fv(scale23Uniform, 1, fp.scale23.vec());
+    programDataManager.set4fv(scale23Uniform, 1, fp.scale23.vector());
   }
   if (bias23Prev != fp.bias23) {
     bias23Prev = fp.bias23;
-    programDataManager.set4fv(bias23Uniform, 1, fp.bias23.vec());
+    programDataManager.set4fv(bias23Uniform, 1, fp.bias23.vector());
   }
   if (thresholdPrev != fp.threshold) {
     thresholdPrev = fp.threshold;

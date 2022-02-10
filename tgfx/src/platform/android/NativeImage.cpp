@@ -18,7 +18,7 @@
 
 #include "NativeImage.h"
 #include <android/bitmap.h>
-#include "image/Bitmap.h"
+#include "core/Bitmap.h"
 #include "platform/NativeCodec.h"
 
 namespace pag {
@@ -185,8 +185,8 @@ static ImageInfo GetImageInfo(JNIEnv* env, jobject bitmap) {
     return {};
   }
   AlphaType alphaType = (bitmapInfo.flags & BITMAP_FLAGS_ALPHA_UNPREMUL)
-                            ? AlphaType::Unpremultiplied
-                            : AlphaType::Premultiplied;
+                        ? AlphaType::Unpremultiplied
+                        : AlphaType::Premultiplied;
   ColorType colorType;
   switch (bitmapInfo.format) {
     case ANDROID_BITMAP_FORMAT_RGBA_8888:

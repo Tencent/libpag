@@ -19,8 +19,8 @@
 #pragma once
 
 #include "FragmentProcessor.h"
-#include "YUVTexture.h"
-#include "core/Paint.h"
+#include "gpu/Paint.h"
+#include "gpu/YUVTexture.h"
 
 namespace pag {
 class YUVTextureFragmentProcessor : public FragmentProcessor {

@@ -18,9 +18,9 @@
 
 #include "Text.h"
 #include <unordered_map>
-#include "core/Canvas.h"
+#include "core/PathEffect.h"
+#include "gpu/Canvas.h"
 #include "pag/file.h"
-#include "raster/PathEffect.h"
 
 namespace pag {
 static std::unique_ptr<Paint> CreateFillPaint(const Glyph* glyph) {

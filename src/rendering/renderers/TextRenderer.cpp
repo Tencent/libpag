@@ -18,7 +18,7 @@
 
 #include "TextRenderer.h"
 #include "TextAnimatorRenderer.h"
-#include "raster/PathEffect.h"
+#include "core/PathEffect.h"
 #include "rendering/graphics/Shape.h"
 #include "rendering/graphics/Text.h"
 

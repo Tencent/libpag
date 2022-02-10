@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "CGLDevice.h"
+#include "gpu/opengl/cgl/CGLDevice.h"
 #include "CGLProcGetter.h"
 #include "gpu/opengl/GLContext.h"
 

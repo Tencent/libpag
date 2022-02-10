@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "tgfx/platform.h"
+#include "platform/Print.h"
 
 namespace pag {
 #define ABORT(msg)                                                             \

@@ -18,7 +18,8 @@
 
 #include "JNIEnvironment.h"
 #include <pthread.h>
-#include "tgfx/platform.h"
+#include "platform/Print.h"
+#include "platform/android/SetJavaVM.h"
 
 static JavaVM* globalJavaVM = nullptr;
 static pthread_key_t threadKey = 0;

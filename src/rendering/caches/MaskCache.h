@@ -19,7 +19,7 @@
 #pragma once
 
 #include "FrameCache.h"
-#include "raster/Path.h"
+#include "core/Path.h"
 
 namespace pag {
 class MaskCache : public FrameCache<Path> {

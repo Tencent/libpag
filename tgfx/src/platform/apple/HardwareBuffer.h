@@ -19,7 +19,7 @@
 #pragma once
 
 #import <CoreVideo/CoreVideo.h>
-#include "image/PixelBuffer.h"
+#include "core/PixelBuffer.h"
 
 namespace pag {
 class HardwareBuffer : public PixelBuffer {

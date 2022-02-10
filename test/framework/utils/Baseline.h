@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "image/Bitmap.h"
-#include "image/PixelBuffer.h"
+#include "core/Bitmap.h"
+#include "core/PixelBuffer.h"
 #include "pag/pag.h"
 
 namespace pag {

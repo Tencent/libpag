@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSingleIntervalGradientColorizer.h"
-#include "gpu/SingleIntervalGradientColorizer.h"
+#include "gpu/gradients/SingleIntervalGradientColorizer.h"
 
 namespace pag {
 void GLSingleIntervalGradientColorizer::emitCode(EmitArgs& args) {
@@ -38,11 +38,11 @@ void GLSingleIntervalGradientColorizer::onSetData(const ProgramDataManager& prog
   const auto& fp = static_cast<const SingleIntervalGradientColorizer&>(fragmentProcessor);
   if (startPrev != fp.start) {
     startPrev = fp.start;
-    programDataManager.set4fv(startUniform, 1, fp.start.vec());
+    programDataManager.set4fv(startUniform, 1, fp.start.vector());
   }
   if (endPrev != fp.end) {
     endPrev = fp.end;
-    programDataManager.set4fv(endUniform, 1, fp.end.vec());
+    programDataManager.set4fv(endUniform, 1, fp.end.vector());
   }
 }
 }  // namespace pag

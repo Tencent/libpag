@@ -17,9 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TraceImage.h"
-#include <fstream>
 #include "PixelBufferUtils.h"
-#include "image/Bitmap.h"
+#include "core/Bitmap.h"
 
 namespace pag {
 void TraceImage(const ImageInfo& info, const void* pixels, const std::string& tag) {
