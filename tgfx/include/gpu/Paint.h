@@ -19,21 +19,10 @@
 #pragma once
 
 #include "core/Stroke.h"
+#include "gpu/Shader.h"
 #include "pag/types.h"
 
 namespace pag {
-/**
- * Defines attributes for drawing gradient colors.
- */
-struct GradientPaint {
-  Enum gradientType;
-  Point startPoint;
-  Point endPoint;
-  std::vector<Color> colors;
-  std::vector<Opacity> alphas;
-  std::vector<float> positions;
-};
-
 /**
  * Defines the layout of a RGBAAA format image, which is half RGB, half AAA.
  */
@@ -189,12 +178,33 @@ class Paint {
     stroke.miterLimit = limit;
   }
 
+  /**
+   * Returns the stroke options.
+   */
   const Stroke* getStroke() const {
     return &stroke;
   }
 
+  /**
+   * Sets the stroke options.
+   */
   void setStroke(const Stroke& newStroke) {
     stroke = newStroke;
+  }
+
+  /**
+   * Returns optional colors used when filling a path if previously set, such as a gradient.
+   */
+  std::shared_ptr<Shader> getShader() const {
+    return shader;
+  }
+
+  /**
+   * Sets optional colors used when filling a path, such as a gradient. If nullptr, color is used
+   * instead.
+   */
+  void setShader(std::shared_ptr<Shader> newShader) {
+    shader = newShader;
   }
 
  private:
@@ -202,5 +212,6 @@ class Paint {
   Color color = Black;
   Opacity alpha = Opaque;
   Stroke stroke = Stroke(0);
+  std::shared_ptr<Shader> shader = nullptr;
 };
 }  // namespace pag

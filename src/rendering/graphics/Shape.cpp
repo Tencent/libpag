@@ -18,6 +18,7 @@
 
 #include "Shape.h"
 #include "gpu/Canvas.h"
+#include "gpu/GradientShader.h"
 #include "pag/file.h"
 
 namespace pag {
@@ -25,25 +26,47 @@ std::shared_ptr<Graphic> Shape::MakeFrom(const Path& path, Color color) {
   if (path.isEmpty()) {
     return nullptr;
   }
-  auto fill = new SolidFill();
-  fill->color = color;
-  return std::shared_ptr<Graphic>(new Shape(path, fill));
+  Paint paint = {};
+  paint.setColor(color);
+  return std::shared_ptr<Graphic>(new Shape(path, paint));
+}
+
+static std::shared_ptr<Shader> MakeGradientShader(const GradientPaint& gradient) {
+  std::shared_ptr<Shader> shader;
+  std::vector<Color4f> colors = {};
+  int index = 0;
+  auto& alphas = gradient.alphas;
+  for (auto& color : gradient.colors) {
+    auto r = static_cast<float>(color.red) / 255.0f;
+    auto g = static_cast<float>(color.green) / 255.0f;
+    auto b = static_cast<float>(color.blue) / 255.0f;
+    auto a = static_cast<float>(alphas[index++]) / 255.0f;
+    colors.push_back({r, g, b, a});
+  }
+  if (gradient.gradientType == GradientFillType::Linear) {
+    shader = GradientShader::MakeLinear(gradient.startPoint, gradient.endPoint, colors,
+                                        gradient.positions);
+  } else {
+    auto radius = Point::Distance(gradient.startPoint, gradient.endPoint);
+    shader = GradientShader::MakeRadial(gradient.startPoint, radius, colors, gradient.positions);
+  }
+  if (!shader) {
+    shader = Shader::MakeColorShader(gradient.colors.back(), gradient.alphas.back());
+  }
+  return shader;
 }
 
 std::shared_ptr<Graphic> Shape::MakeFrom(const Path& path, const GradientPaint& gradient) {
   if (path.isEmpty()) {
     return nullptr;
   }
-  auto fill = new GradientFill();
-  fill->gradient = gradient;
-  return std::shared_ptr<Graphic>(new Shape(path, fill));
+  Paint paint = {};
+  auto shader = MakeGradientShader(gradient);
+  paint.setShader(shader);
+  return std::shared_ptr<Graphic>(new Shape(path, paint));
 }
 
-Shape::Shape(Path path, ShapeFill* fill) : path(std::move(path)), fill(fill) {
-}
-
-Shape::~Shape() {
-  delete fill;
+Shape::Shape(Path path, Paint paint) : path(std::move(path)), paint(paint) {
 }
 
 void Shape::measureBounds(Rect* bounds) const {
@@ -55,7 +78,11 @@ bool Shape::hitTest(RenderCache*, float x, float y) {
 }
 
 bool Shape::getPath(Path* result) const {
-  if (fill->type() == ShapeFillType::Gradient) {
+  if (paint.getAlpha() != Opaque) {
+    return false;
+  }
+  auto shader = paint.getShader();
+  if (shader && !shader->isOpaque()) {
     return false;
   }
   result->addPath(path);
@@ -66,14 +93,7 @@ void Shape::prepare(RenderCache*) const {
 }
 
 void Shape::draw(Canvas* canvas, RenderCache*) const {
-  switch (fill->type()) {
-    case ShapeFillType::Solid:
-      canvas->drawPath(path, static_cast<SolidFill*>(fill)->color);
-      break;
-    case ShapeFillType::Gradient:
-      canvas->drawPath(path, static_cast<GradientFill*>(fill)->gradient);
-      break;
-  }
+  canvas->drawPath(path, paint);
 }
 
 }  // namespace pag

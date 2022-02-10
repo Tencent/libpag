@@ -235,7 +235,6 @@ class RGBAAAPicture : public Picture {
       }
     }
     // 因为视频绘制会涉及自定义的 OpenGL 操作。
-    // 要先 flush 父级 SkCanvas 里当前的 OpenGL 操作，防止渲染异常。
     canvas->flush();
     auto snapshot = cache->getSnapshot(this);
     if (snapshot) {

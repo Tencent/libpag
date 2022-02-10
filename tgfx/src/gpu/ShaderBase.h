@@ -18,35 +18,12 @@
 
 #pragma once
 
-#include "rendering/graphics/Graphic.h"
+#include "gpu/FragmentProcessor.h"
+#include "gpu/Shader.h"
 
 namespace pag {
-class Shape : public Graphic {
+class ShaderBase : public Shader {
  public:
-  /**
-   * Creates a shape Graphic with solid color fill. Returns nullptr if path is empty.
-   */
-  static std::shared_ptr<Graphic> MakeFrom(const Path& path, Color color);
-
-  /**
-   * Creates a shape Graphic with gradient color fill. Returns nullptr if path is empty.
-   */
-  static std::shared_ptr<Graphic> MakeFrom(const Path& path, const GradientPaint& gradient);
-
-  GraphicType type() const override {
-    return GraphicType::Shape;
-  }
-
-  void measureBounds(Rect* bounds) const override;
-  bool hitTest(RenderCache* cache, float x, float y) override;
-  bool getPath(Path* result) const override;
-  void prepare(RenderCache* cache) const override;
-  void draw(Canvas* canvas, RenderCache* cache) const override;
-
- private:
-  Path path = {};
-  Paint paint = {};
-
-  Shape(Path path, Paint paint);
+  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const = 0;
 };
 }  // namespace pag

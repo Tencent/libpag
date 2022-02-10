@@ -159,11 +159,7 @@ static void ApplyPaintToPath(const Paint& paint, Path* path) {
   if (strokeEffect) {
     strokeEffect->applyTo(&strokePath);
   }
-  if (paint.getStyle() == PaintStyle::Stroke) {
-    *path = strokePath;
-  } else {
-    path->addPath(strokePath);
-  }
+  *path = strokePath;
 }
 
 bool Text::hitTest(RenderCache*, float x, float y) {

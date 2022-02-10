@@ -19,72 +19,40 @@
 #pragma once
 
 #include "core/Color4f.h"
-#include "gpu/FragmentProcessor.h"
+#include "gpu/Shader.h"
 
 namespace pag {
-struct FPArgs {
-  FPArgs(Context* context, const Matrix& localMatrix) : context(context), localMatrix(localMatrix) {
-  }
-
-  Context* context = nullptr;
-  Matrix localMatrix = Matrix::I();
-};
-
-class Shader {
- public:
-  static std::unique_ptr<Shader> MakeColorShader(Color color, Opacity opacity = Opaque);
-
-  virtual ~Shader() = default;
-
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const = 0;
-};
-
-class Color4Shader : public Shader {
- public:
-  explicit Color4Shader(Color4f color) : color(color) {
-  }
-
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const override;
-
- private:
-  Color4f color;
-};
-
-class GradientShaderBase : public Shader {
- public:
-  GradientShaderBase(const std::vector<Color4f>& colors, const std::vector<float>& positions,
-                     const Matrix& pointsToUnit);
-
-  std::vector<Color4f> originalColors = {};
-  std::vector<float> originalPositions = {};
-
- protected:
-  const Matrix pointsToUnit;
-};
-
-class LinearGradient : public GradientShaderBase {
- public:
-  LinearGradient(const Point& startPoint, const Point& endPoint, const std::vector<Color4f>& colors,
-                 const std::vector<float>& positions);
-
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const override;
-};
-
-class RadialGradient : public GradientShaderBase {
- public:
-  RadialGradient(const Point& center, float radius, const std::vector<Color4f>& colors,
-                 const std::vector<float>& positions);
-
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const override;
-};
-
+/**
+ * GradientShader hosts factories for creating subclasses of Shader that render linear and radial
+ * gradients.
+ */
 class GradientShader {
  public:
-  static std::unique_ptr<Shader> MakeLinear(const Point& startPoint, const Point& endPoint,
+  /**
+   * Returns a shader that generates a linear gradient between the two specified points.
+   * @param startPoint The start point for the gradient.
+   * @param endPoint The end point for the gradient.
+   * @param colors The array of colors, to be distributed between the two points.
+   * @param positions May be empty. The relative position of each corresponding color in the colors
+   * array. If this is empty, the the colors are distributed evenly between the start and end point.
+   * If this is not empty, the values must begin with 0, end with 1.0, and intermediate values must
+   * be strictly increasing.
+   */
+  static std::shared_ptr<Shader> MakeLinear(const Point& startPoint, const Point& endPoint,
                                             const std::vector<Color4f>& colors,
                                             const std::vector<float>& positions);
 
-  static std::unique_ptr<Shader> MakeRadial(const Point& center, float radius,
+  /**
+   * Returns a shader that generates a radial gradient given the center and radius.
+   * @param center The center of the circle for this gradient
+   * @param radius Must be positive. The radius of the circle for this gradient.
+   * @param colors The array of colors, to be distributed between the center and edge of the circle.
+   * @param positions May be empty. The relative position of each corresponding color in the colors
+   * array. If this is empty, the the colors are distributed evenly between the start and end point.
+   * If this is not empty, the values must begin with 0, end with 1.0, and intermediate values must
+   * be strictly increasing.
+   */
+  static std::shared_ptr<Shader> MakeRadial(const Point& center, float radius,
                                             const std::vector<Color4f>& colors,
                                             const std::vector<float>& positions);
 };

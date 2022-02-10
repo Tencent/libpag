@@ -21,6 +21,9 @@
 #include "Path.h"
 
 namespace pag {
+/**
+ * PathMeasure calculates the length of a Path and cuts child segments from it.
+ */
 class PathMeasure {
  public:
   /**

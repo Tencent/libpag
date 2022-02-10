@@ -144,14 +144,9 @@ class Canvas {
   void drawTexture(const Texture* texture, const Matrix& matrix);
 
   /**
-   * Draws a path with solid color fill, using current alpha, blend mode, clip and Matrix.
+   * Draws a path with using current clip, matrix and specified paint.
    */
-  virtual void drawPath(const Path& path, Color color) = 0;
-
-  /**
-   * Draws a path with gradient color fill, using current alpha, blend mode, clip and Matrix.
-   */
-  virtual void drawPath(const Path& path, const GradientPaint& gradient) = 0;
+  virtual void drawPath(const Path& path, const Paint& paint) = 0;
 
   /**
    * Draw array of glyphs with specified font, using current alpha, blend mode, clip and Matrix.

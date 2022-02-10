@@ -48,23 +48,19 @@ static void ComputeGivensRotation(const Point& h, Matrix* G) {
   if (0 == b) {
     c = copysignf(1.f, a);
     s = 0;
-    // r = SkScalarAbs(a);
   } else if (0 == a) {
     c = 0;
     s = -copysignf(1.f, b);
-    // r = SkScalarAbs(b);
   } else if (fabsf(b) > fabsf(a)) {
     auto t = a / b;
     auto u = copysignf(sqrtf(1.f + t * t), b);
     s = -1.f / u;
     c = -s * t;
-    // r = b * u;
   } else {
     auto t = b / a;
     auto u = copysignf(sqrtf(1.f + t * t), a);
     c = 1.f / u;
     s = -c * t;
-    // r = a * u;
   }
 
   G->setSinCos(s, c);
