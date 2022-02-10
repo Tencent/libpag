@@ -17,11 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Platform.h"
-#include <cstdarg>
-#include <cstdio>
 #include "core/Image.h"
 #include "gpu/opengl/GLProcGetter.h"
-#include "pag/pag.h"
 #include "video/VideoDecoder.h"
 
 namespace pag {
