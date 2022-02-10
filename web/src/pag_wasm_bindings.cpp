@@ -17,15 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <emscripten/bind.h>
-
+#include "core/FontMetrics.h"
+#include "core/ImageInfo.h"
+#include "core/PathTypes.h"
 #include "gpu/opengl/GLDefines.h"
-#include "image/ImageInfo.h"
 #include "pag/pag.h"
 #include "pag/types.h"
 #include "platform/web/GPUDrawable.h"
 #include "platform/web/NativeImage.h"
-#include "raster/FontMetrics.h"
-#include "raster/PathTypes.h"
 #include "rendering/editing/StillImage.h"
 
 using namespace emscripten;
