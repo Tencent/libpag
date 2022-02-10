@@ -19,7 +19,6 @@
 #import <Foundation/Foundation.h>
 #import "PAGLayer.h"
 
-__attribute__((visibility("default")))
-@interface PAGShapeLayer : PAGLayer
+__attribute__((visibility("default"))) @interface PAGShapeLayer : PAGLayer
 
 @end

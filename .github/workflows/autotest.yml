@@ -69,31 +69,36 @@ jobs:
         run: |
           echo "file not exist"
           git clone -b main https://github.com/Tencent/libpag.git
+      - if: github.event_name == 'push'
+        name: Swith branch (push)
+        run: |
+          cd libpag
+          git pull
       - if: github.event_name == 'pull_request'
-        name: swith branch (pull_request)
+        name: Swith branch (pull_request)
         run: |
             cd libpag
             git pull
             git checkout ${{ github.head_ref }}
-      - if: github.event_name == 'push'
-        name: swith branch (push)
-        run: |
-            cd libpag
-            git pull
+
       - name: brew link emscripten
-        if: steps.cache-third_party.outputs.cache-hit == 'true'
+        if: steps.cache-environment.outputs.cache-hit == 'true'
         run: |
            brew link emscripten
 
       - name: Run autotest script
         run: |
-          ls
           cd libpag
           chmod +x sync_deps.sh
           ./sync_deps.sh
           chmod +x autotest.sh
           ./autotest.sh
         shell: bash
+      - name: codecov
+        uses: codecov/codecov-action@v2.1.0
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: libpag/result/coverage.xml
       - name: The job has failed
         if: ${{ failure() }}
         uses: actions/upload-artifact@v2
@@ -103,7 +108,7 @@ jobs:
       - uses: actions/upload-artifact@v2
         with:
           name: result
-          path: result
+          path: libpag/result
       - name: Compress libpag
         run: |
           cd libpag

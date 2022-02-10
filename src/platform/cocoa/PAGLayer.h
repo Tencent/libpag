@@ -33,8 +33,7 @@ typedef NS_ENUM(NSInteger, PAGLayerType) {
 @class PAGComposition;
 @class PAGFile;
 
-__attribute__((visibility("default")))
-@interface PAGLayer : NSObject
+__attribute__((visibility("default"))) @interface PAGLayer : NSObject
 
 /**
  * Returns the type of layer.

@@ -1,6 +1,8 @@
 name: code_format
 
 on:
+  push:
+    branches: [ main ]
   pull_request:
     branches: [ main ]
 
@@ -18,7 +20,7 @@ jobs:
       - uses: actions/checkout@v2
       - name: Run codeformat script
         run: |
-          npm install -g clang-format
+          brew install clang-format
           chmod +x codeformat.sh
           ./codeformat.sh
         shell: bash
