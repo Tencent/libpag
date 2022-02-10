@@ -16,9 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "Device.h"
-#include "Context.h"
+#include "gpu/Device.h"
 #include "base/utils/UniqueID.h"
+#include "gpu/Context.h"
 
 namespace pag {
 Device::Device() : _uniqueID(UniqueID::Next()) {

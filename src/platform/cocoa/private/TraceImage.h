@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "image/ImageInfo.h"
+#include "core/ImageInfo.h"
 
 namespace pag {
 void TraceImage(const ImageInfo& info, const void* pixels, const std::string& tag);

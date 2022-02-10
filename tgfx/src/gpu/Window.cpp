@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "Window.h"
-#include "Device.h"
+#include "gpu/Window.h"
+#include "gpu/Device.h"
 
 namespace pag {
 Window::Window(std::shared_ptr<Device> device) : device(std::move(device)) {

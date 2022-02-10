@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "image/Image.h"
+#include "core/Image.h"
 
 namespace pag {
 class NativeCodec {

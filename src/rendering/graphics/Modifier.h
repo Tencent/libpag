@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "raster/Path.h"
+#include "core/Path.h"
 
 namespace pag {
 class Graphic;

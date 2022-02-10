@@ -19,8 +19,8 @@
 #pragma once
 
 #include "base/utils/BytesKey.h"
+#include "core/Font.h"
 #include "pag/types.h"
-#include "raster/Font.h"
 
 namespace pag {
 

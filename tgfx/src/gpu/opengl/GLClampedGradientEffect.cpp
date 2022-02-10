@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLClampedGradientEffect.h"
-#include "gpu/ClampedGradientEffect.h"
+#include "gpu/gradients/ClampedGradientEffect.h"
 
 namespace pag {
 void GLClampedGradientEffect::emitCode(EmitArgs& args) {
@@ -56,11 +56,11 @@ void GLClampedGradientEffect::onSetData(const ProgramDataManager& programDataMan
   const auto& fp = static_cast<const ClampedGradientEffect&>(fragmentProcessor);
   if (leftBorderColorPrev != fp.leftBorderColor) {
     leftBorderColorPrev = fp.leftBorderColor;
-    programDataManager.set4fv(leftBorderColorUniform, 1, fp.leftBorderColor.vec());
+    programDataManager.set4fv(leftBorderColorUniform, 1, fp.leftBorderColor.vector());
   }
   if (rightBorderColorPrev != fp.rightBorderColor) {
     rightBorderColorPrev = fp.rightBorderColor;
-    programDataManager.set4fv(rightBorderColorUniform, 1, fp.rightBorderColor.vec());
+    programDataManager.set4fv(rightBorderColorUniform, 1, fp.rightBorderColor.vector());
   }
 }
 }  // namespace pag

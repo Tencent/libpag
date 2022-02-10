@@ -19,9 +19,38 @@
 #include "Modifier.h"
 #include "Graphic.h"
 #include "base/utils/MatrixUtil.h"
+#include "core/Blend.h"
 #include "gpu/Surface.h"
 
 namespace pag {
+static constexpr std::pair<Enum, Blend> kBlendModeMap[] = {
+    {BlendMode::Normal, Blend::SrcOver},
+    {BlendMode::Multiply, Blend::Multiply},
+    {BlendMode::Screen, Blend::Screen},
+    {BlendMode::Overlay, Blend::Overlay},
+    {BlendMode::Darken, Blend::Darken},
+    {BlendMode::Lighten, Blend::Lighten},
+    {BlendMode::ColorDodge, Blend::ColorDodge},
+    {BlendMode::ColorBurn, Blend::ColorBurn},
+    {BlendMode::HardLight, Blend::HardLight},
+    {BlendMode::SoftLight, Blend::SoftLight},
+    {BlendMode::Difference, Blend::Difference},
+    {BlendMode::Exclusion, Blend::Exclusion},
+    {BlendMode::Hue, Blend::Hue},
+    {BlendMode::Saturation, Blend::Saturation},
+    {BlendMode::Color, Blend::Color},
+    {BlendMode::Luminosity, Blend::Luminosity},
+    {BlendMode::Add, Blend::Plus}};
+
+Blend ToBlend(Enum blendMode) {
+  for (const auto& pair : kBlendModeMap) {
+    if (pair.first == blendMode) {
+      return pair.second;
+    }
+  }
+  return Blend::SrcOver;
+}
+
 class BlendModifier : public Modifier {
  public:
   BlendModifier(Opacity alpha, Enum blendMode) : alpha(alpha), blendMode(blendMode) {

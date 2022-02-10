@@ -19,7 +19,7 @@
 #include "NativePlatform.h"
 #include <atomic>
 #include <fstream>
-#include "image/Bitmap.h"
+#include "core/Bitmap.h"
 
 namespace pag {
 static std::atomic<NALUType> defaultType = {NALUType::AnnexB};

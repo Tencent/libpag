@@ -20,17 +20,17 @@
 //  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-#include "GradientShader.h"
-#include "ClampedGradientEffect.h"
-#include "ConstColorProcessor.h"
-#include "DualIntervalGradientColorizer.h"
-#include "GradientCache.h"
-#include "LinearGradientLayout.h"
-#include "RadialGradientLayout.h"
-#include "SingleIntervalGradientColorizer.h"
-#include "TextureGradientColorizer.h"
-#include "UnrolledBinaryGradientColorizer.h"
+#include "gpu/GradientShader.h"
 #include "base/utils/MathExtra.h"
+#include "gpu/ConstColorProcessor.h"
+#include "gpu/GradientCache.h"
+#include "gpu/gradients/ClampedGradientEffect.h"
+#include "gpu/gradients/DualIntervalGradientColorizer.h"
+#include "gpu/gradients/LinearGradientLayout.h"
+#include "gpu/gradients/RadialGradientLayout.h"
+#include "gpu/gradients/SingleIntervalGradientColorizer.h"
+#include "gpu/gradients/TextureGradientColorizer.h"
+#include "gpu/gradients/UnrolledBinaryGradientColorizer.h"
 
 namespace pag {
 // Intervals smaller than this (that aren't hard stops) on low-precision-only devices force us to

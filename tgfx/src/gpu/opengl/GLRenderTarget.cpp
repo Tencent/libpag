@@ -20,7 +20,7 @@
 #include "GLContext.h"
 #include "GLState.h"
 #include "GLUtil.h"
-#include "image/Bitmap.h"
+#include "core/Bitmap.h"
 
 namespace pag {
 std::shared_ptr<GLRenderTarget> GLRenderTarget::MakeFrom(Context* context,

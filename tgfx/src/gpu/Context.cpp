@@ -16,11 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "Context.h"
+#include "gpu/Context.h"
 #include "GradientCache.h"
 #include "Program.h"
-#include "Resource.h"
 #include "base/utils/GetTimer.h"
+#include "gpu/Resource.h"
 
 namespace pag {
 #define MAX_PROGRAM_COUNT 128

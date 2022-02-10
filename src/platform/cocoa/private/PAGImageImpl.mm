@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGImageImpl.h"
-#include "image/PixelBuffer.h"
+#include "core/PixelBuffer.h"
 #include "pag/pag.h"
 #include "platform/apple/BitmapContextUtil.h"
 #include "rendering/editing/StillImage.h"

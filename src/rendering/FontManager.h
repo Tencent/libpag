@@ -19,8 +19,8 @@
 #pragma once
 
 #include <unordered_map>
+#include "core/Typeface.h"
 #include "pag/pag.h"
-#include "raster/Typeface.h"
 
 namespace pag {
 

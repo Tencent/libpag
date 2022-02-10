@@ -1,4 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="CMakeWorkspace" PROJECT_DIR="$PROJECT_DIR$" />
+  <component name="CidrRootsConfiguration">
+    <excludeRoots>
+      <file path="$PROJECT_DIR$/.github" />
+      <file path="$PROJECT_DIR$/android" />
+      <file path="$PROJECT_DIR$/assets" />
+      <file path="$PROJECT_DIR$/ios" />
+      <file path="$PROJECT_DIR$/mac" />
+      <file path="$PROJECT_DIR$/resources" />
+      <file path="$PROJECT_DIR$/web" />
+      <file path="$PROJECT_DIR$/win" />
+    </excludeRoots>
+  </component>
 </project>

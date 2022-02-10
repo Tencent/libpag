@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/Color4f.h"
+#include "core/Color4f.h"
 #include "gpu/GLFragmentProcessor.h"
 
 namespace pag {

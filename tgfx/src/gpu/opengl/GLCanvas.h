@@ -19,10 +19,10 @@
 #pragma once
 
 #include "GLDrawer.h"
-#include "core/Canvas.h"
-#include "gpu/Blend.h"
+#include "core/Blend.h"
+#include "core/Mask.h"
+#include "gpu/Canvas.h"
 #include "gpu/GradientShader.h"
-#include "raster/Mask.h"
 
 namespace pag {
 class GLCanvas : public Canvas {

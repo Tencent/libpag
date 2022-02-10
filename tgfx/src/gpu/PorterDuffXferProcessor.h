@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "Blend.h"
 #include "XferProcessor.h"
+#include "core/Blend.h"
 
 namespace pag {
 class PorterDuffXferProcessor : public XferProcessor {

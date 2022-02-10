@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "EAGLNV12Texture.h"
-#include "EAGLDevice.h"
+#include "gpu/opengl/eagl/EAGLDevice.h"
 
 namespace pag {
 static GLTextureInfo ToGLTexture(CVOpenGLESTextureRef texture, unsigned format) {

@@ -16,9 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "EGLDevice.h"
-#include "EGLGlobals.h"
-#include "EGLProcGetter.h"
+#include "gpu/opengl/egl/EGLDevice.h"
+#include "gpu/opengl/egl/EGLGlobals.h"
+#include "gpu/opengl/egl/EGLProcGetter.h"
 
 namespace pag {
 static EGLContext CreateContext(EGLContext sharedContext, EGLConfig eglConfig) {

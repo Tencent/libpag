@@ -18,8 +18,8 @@
 
 #include "GLTexture.h"
 #include "GLUtil.h"
+#include "core/Bitmap.h"
 #include "gpu/Surface.h"
-#include "image/Bitmap.h"
 
 namespace pag {
 class GLBackendTexture : public GLTexture {

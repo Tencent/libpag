@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "Surface.h"
+#include "gpu/Surface.h"
 
 namespace pag {
 Surface::Surface(Context* context) : context(context) {

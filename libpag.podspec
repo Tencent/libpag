@@ -6,11 +6,11 @@ commonCFlags = ["-DGLES_SILENCE_DEPRECATION -DTGFX_USE_WEBP_DECODE -DPAG_DLL -fv
 if ENV["PAG_USE_FREETYPE"] == 'ON' and ENV["PLATFORM"] == "mac"
   vendorNames += " freetype"
   commonCFlags += ["-DTGFX_USE_FREETYPE"]
-  $rasterSourceFiles = ['tgfx/src/raster/freetype/**/*.{h,cpp,mm}']
+  $rasterSourceFiles = ['tgfx/src/core/vectors/freetype/**/*.{h,cpp,mm}']
 
 else
   commonCFlags += ["-DTGFX_USE_CORE_GRAPHICS"]
-  $rasterSourceFiles = ['tgfx/src/raster/coregraphics/**/*.{h,cpp,mm}']
+  $rasterSourceFiles = ['tgfx/src/core/vectors/coregraphics/**/*.{h,cpp,mm}']
 end
 # PAG_USE_LIBAVC=OFF pod install
 if ENV["PAG_USE_LIBAVC"] != 'OFF'
@@ -49,14 +49,15 @@ Pod::Spec.new do |s|
                     'src/video/**/*.{h,cpp}',
                     'src/rendering/**/*.{h,cpp}',
                     'src/platform/*.{h,cpp}',
-                    'tgfx/src/platform/*.{h,cpp}',
-                    'tgfx/src/base/**/*.{h,cpp}',
-                    'tgfx/src/core/**/*.{h,cpp}',
+                    'tgfx/src/core/*.{h,cpp}',
+                    'tgfx/src/core/images/*.{h,cpp}',
+                    'tgfx/src/core/vectors/*.{h,cpp}',
                     'tgfx/src/gpu/*.{h,cpp}',
-                    'tgfx/src/image/*.{h,cpp}',
-                    'tgfx/src/raster/*.{h,cpp}',
+                    'tgfx/src/platform/*.{h,cpp}',
+                    'tgfx/src/core/utils/**/*.{h,cpp}',
+                    'tgfx/src/gpu/gradients/**/*.{h,cpp}',
                     'tgfx/src/gpu/opengl/*.{h,cpp,mm}',
-                    'tgfx/src/image/webp/**/*.{h,cpp,mm}'
+                    'tgfx/src/core/images/webp/**/*.{h,cpp,mm}'
 
   s.source_files = $source_files + $rasterSourceFiles;
 

@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "QuadPerEdgeAAGeometryProcessor.h"
-#include "YUVTexture.h"
+#include "gpu/YUVTexture.h"
 #include "gpu/opengl/GLQuadPerEdgeAAGeometryProcessor.h"
 
 namespace pag {

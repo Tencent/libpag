@@ -20,7 +20,7 @@
 
 #include <chrono>
 #include "base/utils/Log.h"
-#include "image/ImageInfo.h"
+#include "core/ImageInfo.h"
 #include "pag/pag.h"
 #include "platform/android/Global.h"
 #include "platform/android/JNIEnvironment.h"

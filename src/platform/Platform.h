@@ -23,7 +23,7 @@
 #include <string>
 #include <unordered_map>
 #include "codec/NALUType.h"
-#include "image/ImageInfo.h"
+#include "core/ImageInfo.h"
 
 namespace pag {
 struct VideoConfig;

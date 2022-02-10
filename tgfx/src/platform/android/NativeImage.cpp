@@ -18,7 +18,7 @@
 
 #include "NativeImage.h"
 #include <android/bitmap.h>
-#include "image/Bitmap.h"
+#include "core/Bitmap.h"
 #include "platform/NativeCodec.h"
 
 namespace pag {

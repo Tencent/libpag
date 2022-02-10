@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <thread>
+#include "core/Image.h"
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
 #include "gpu/Surface.h"
-#include "image/Image.h"
 #include "nlohmann/json.hpp"
 #include "pag/pag.h"
 

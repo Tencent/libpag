@@ -20,7 +20,7 @@
 
 #include "CoordTransform.h"
 #include "Processor.h"
-#include "Texture.h"
+#include "gpu/Texture.h"
 
 namespace pag {
 class Pipeline;

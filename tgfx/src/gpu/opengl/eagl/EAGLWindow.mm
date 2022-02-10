@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "EAGLWindow.h"
+#include "gpu/opengl/eagl/EAGLWindow.h"
 #include <thread>
 #include "EAGLHardwareTexture.h"
 #include "gpu/opengl/GLContext.h"

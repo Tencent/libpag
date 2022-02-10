@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "FragmentProcessor.h"
-#include "core/Paint.h"
+#include "gpu/FragmentProcessor.h"
+#include "gpu/Paint.h"
 
 namespace pag {
 class TextureFragmentProcessor : public FragmentProcessor {

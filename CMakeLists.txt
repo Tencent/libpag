@@ -84,18 +84,19 @@ file(GLOB_RECURSE PAG_FILES
         src/base/*.*
         src/codec/*.*
         src/rendering/*.*
-        tgfx/src/base/*.*
-        tgfx/src/core/*.*)
+        tgfx/src/core/utils/*.*
+        tgfx/src/gpu/gradients/*.*)
 if (NOT WEB)
     file(GLOB PAG_VIDEO_FILES src/video/*.*)
     list(APPEND PAG_FILES ${PAG_VIDEO_FILES})
 endif ()
 file(GLOB PAG_COMMON_FILES
         src/platform/*.*
+        tgfx/src/core/*.*
+        tgfx/src/core/images/*.*
+        tgfx/src/core/vectors/*.*
         tgfx/src/gpu/*.*
-        tgfx/src/image/*.*
-        tgfx/src/platform/*.*
-        tgfx/src/raster/*.*)
+        tgfx/src/platform/*.*)
 list(APPEND PAG_FILES ${PAG_COMMON_FILES})
 
 if (PAG_USE_QT)
@@ -155,37 +156,37 @@ endif ()
 if (PAG_USE_FREETYPE)
     add_definitions(-DTGFX_USE_FREETYPE)
     list(APPEND PAG_STATIC_VENDORS freetype)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES tgfx/src/raster/freetype/*.*)
+    file(GLOB_RECURSE GFX_PLATFORM_FILES tgfx/src/core/vectors/freetype/*.*)
     list(APPEND PAG_FILES ${GFX_PLATFORM_FILES})
     list(APPEND PAG_INCLUDES third_party/freetype/include)
 elseif (WEB)
     add_definitions(-DTGFX_BUILD_FOR_WEB)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES tgfx/src/raster/web/*.*)
+    file(GLOB_RECURSE GFX_PLATFORM_FILES tgfx/src/core/vectors/web/*.*)
     list(APPEND PAG_FILES ${GFX_PLATFORM_FILES})
 elseif (APPLE)
     # Uses CoreGraphics instead.
     add_definitions(-DTGFX_USE_CORE_GRAPHICS)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES tgfx/src/raster/coregraphics/*.*)
+    file(GLOB_RECURSE GFX_PLATFORM_FILES tgfx/src/core/vectors/coregraphics/*.*)
     list(APPEND PAG_FILES ${GFX_PLATFORM_FILES})
 endif ()
 
 if (PAG_USE_JPEG)
     list(APPEND PAG_STATIC_VENDORS libjpeg-turbo)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES tgfx/src/image/jpeg/*.*)
+    file(GLOB_RECURSE GFX_PLATFORM_FILES tgfx/src/core/images/jpeg/*.*)
     list(APPEND PAG_FILES ${GFX_PLATFORM_FILES})
     list(APPEND PAG_INCLUDES third_party/out/libjpeg-turbo/${INCLUDE_ENTRY})
 endif ()
 
 if (PAG_USE_WEBP)
     list(APPEND PAG_STATIC_VENDORS libwebp)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES tgfx/src/image/webp/*.*)
+    file(GLOB_RECURSE GFX_PLATFORM_FILES tgfx/src/core/images/webp/*.*)
     list(APPEND PAG_FILES ${GFX_PLATFORM_FILES})
     list(APPEND PAG_INCLUDES third_party/libwebp/src)
 endif ()
 
 if (PAG_USE_PNG)
     list(APPEND PAG_STATIC_VENDORS libpng)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES tgfx/src/image/png/*.*)
+    file(GLOB_RECURSE GFX_PLATFORM_FILES tgfx/src/core/images/png/*.*)
     list(APPEND PAG_FILES ${GFX_PLATFORM_FILES})
     list(APPEND PAG_INCLUDES third_party/out/libpng/${INCLUDE_ENTRY})
 endif ()

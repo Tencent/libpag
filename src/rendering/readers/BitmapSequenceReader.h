@@ -20,7 +20,7 @@
 
 #include "SequenceReader.h"
 #include "base/utils/Task.h"
-#include "image/Bitmap.h"
+#include "core/Bitmap.h"
 #include "pag/file.h"
 
 namespace pag {

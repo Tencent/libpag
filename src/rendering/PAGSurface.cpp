@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "base/utils/GetTimer.h"
-#include "core/Canvas.h"
+#include "gpu/Canvas.h"
 #include "gpu/opengl/GLDevice.h"
 #include "pag/file.h"
 #include "pag/pag.h"
