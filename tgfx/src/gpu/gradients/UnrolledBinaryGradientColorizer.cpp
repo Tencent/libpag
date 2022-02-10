@@ -61,12 +61,12 @@ std::unique_ptr<UnrolledBinaryGradientColorizer> UnrolledBinaryGradientColorizer
     }
 
     for (int j = 0; j < 4; ++j) {
-      auto c0 = colors[i].vector()[j];
-      auto c1 = colors[i + 1].vector()[j];
+      auto c0 = colors[i][j];
+      auto c1 = colors[i + 1][j];
       auto scale = (c1 - c0) / dt;
       auto bias = c0 - t0 * scale;
-      scales[intervalCount].vector()[j] = scale;
-      biases[intervalCount].vector()[j] = bias;
+      scales[intervalCount][j] = scale;
+      biases[intervalCount][j] = bias;
     }
     thresholds[intervalCount] = t1;
     intervalCount++;

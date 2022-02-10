@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstdlib>
 #include "platform/Print.h"
 
 namespace pag {

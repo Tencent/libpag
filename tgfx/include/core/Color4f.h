@@ -98,31 +98,40 @@ struct Color4f {
   /**
    * Returns a pointer to components of Color, for array access.
    */
-  const float* vector() const {
+  const float* array() const {
     return &r;
   }
 
   /**
    * Returns a pointer to components of Color, for array access.
    */
-  float* vector() {
+  float* array() {
     return &r;
   }
 
   /**
+   * Returns one component.
+   * @param index  one of: 0 (r), 1 (g), 2 (b), 3 (a)
+   * @return value corresponding to index.
+   */
+  float operator[](int index) const;
+
+  /**
+   * Returns one component.
+   * @param index  one of: 0 (r), 1 (g), 2 (b), 3 (a)
+   * @return value corresponding to index.
+   */
+  float& operator[](int index);
+
+  /**
    * Returns true if all channels are in [0, 1].
    **/
-  bool isValid() const {
-    return r >= 0.0f && r <= 1.0f && g >= 0.0f && g <= 1.0f && b >= 0.0f && b <= 1.0f &&
-           a >= 0.0f && a <= 1.0f;
-  }
+  bool isValid() const;
 
   /**
    * Returns true if Color is an opaque color.
    */
-  bool isOpaque() const {
-    return a == 1.0f;
-  }
+  bool isOpaque() const;
 
   /**
    * Returns a Color with alpha set to 1.0.

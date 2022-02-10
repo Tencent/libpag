@@ -54,19 +54,19 @@ void GLDualIntervalGradientColorizer::onSetData(const ProgramDataManager& progra
   const auto& fp = static_cast<const DualIntervalGradientColorizer&>(fragmentProcessor);
   if (scale01Prev != fp.scale01) {
     scale01Prev = fp.scale01;
-    programDataManager.set4fv(scale01Uniform, 1, fp.scale01.vector());
+    programDataManager.set4fv(scale01Uniform, 1, fp.scale01.array());
   }
   if (bias01Prev != fp.bias01) {
     bias01Prev = fp.bias01;
-    programDataManager.set4fv(bias01Uniform, 1, fp.bias01.vector());
+    programDataManager.set4fv(bias01Uniform, 1, fp.bias01.array());
   }
   if (scale23Prev != fp.scale23) {
     scale23Prev = fp.scale23;
-    programDataManager.set4fv(scale23Uniform, 1, fp.scale23.vector());
+    programDataManager.set4fv(scale23Uniform, 1, fp.scale23.array());
   }
   if (bias23Prev != fp.bias23) {
     bias23Prev = fp.bias23;
-    programDataManager.set4fv(bias23Uniform, 1, fp.bias23.vector());
+    programDataManager.set4fv(bias23Uniform, 1, fp.bias23.array());
   }
   if (thresholdPrev != fp.threshold) {
     thresholdPrev = fp.threshold;

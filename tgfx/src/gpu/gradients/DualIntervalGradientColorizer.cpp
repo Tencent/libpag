@@ -25,19 +25,19 @@ std::unique_ptr<DualIntervalGradientColorizer> DualIntervalGradientColorizer::Ma
   Color4f scale01;
   // Derive scale and biases from the 4 colors and threshold
   for (int i = 0; i < 4; ++i) {
-    auto vc0 = c0.vector()[i];
-    auto vc1 = c1.vector()[i];
-    scale01.vector()[i] = (vc1 - vc0) / threshold;
+    auto vc0 = c0[i];
+    auto vc1 = c1[i];
+    scale01[i] = (vc1 - vc0) / threshold;
   }
   // bias01 = c0
 
   Color4f scale23;
   Color4f bias23;
   for (int i = 0; i < 4; ++i) {
-    auto vc2 = c2.vector()[i];
-    auto vc3 = c3.vector()[i];
-    scale23.vector()[i] = (vc3 - vc2) / (1 - threshold);
-    bias23.vector()[i] = vc2 - threshold * scale23.vector()[i];
+    auto vc2 = c2[i];
+    auto vc3 = c3[i];
+    scale23[i] = (vc3 - vc2) / (1 - threshold);
+    bias23[i] = vc2 - threshold * scale23[i];
   }
 
   return std::unique_ptr<DualIntervalGradientColorizer>(
