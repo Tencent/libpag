@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MaskRenderer.h"
-#include "pag/file.h"
 #include "core/PathEffect.h"
+#include "pag/file.h"
 #include "rendering/utils/PathUtil.h"
 
 namespace pag {

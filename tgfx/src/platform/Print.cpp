@@ -18,9 +18,9 @@
 
 #if !defined(__ANDROID__) && !defined(ANDROID)
 
+#include "platform/Print.h"
 #include <cstdarg>
 #include <cstdio>
-#include "platform/Print.h"
 
 namespace pag {
 void PrintLog(const char format[], ...) {

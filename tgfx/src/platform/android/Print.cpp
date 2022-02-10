@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <android/log.h>
 #include "platform/Print.h"
+#include <android/log.h>
 
 namespace pag {
 #define LOG_TAG "Log"
