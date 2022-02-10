@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "gpu/Shader.h"
 #include "gpu/FragmentProcessor.h"
+#include "gpu/Shader.h"
 
 namespace pag {
 class ShaderBase : public Shader {
