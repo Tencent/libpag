@@ -24,5 +24,6 @@ void Paint::reset() {
   color = Black;
   alpha = Opaque;
   stroke = Stroke(0);
+  shader = nullptr;
 }
 }  // namespace pag

@@ -18,35 +18,31 @@
 
 #pragma once
 
-#include "rendering/graphics/Graphic.h"
+#include <memory>
+#include "pag/types.h"
 
 namespace pag {
-class Shape : public Graphic {
+/**
+ * Shaders specify the source color(s) for what is being drawn. If a paint has no shader, then the
+ * paint's color is used. If the paint has a shader, then the shader's color(s) are use instead, but
+ * they are modulated by the paint's alpha.
+ */
+class Shader {
  public:
   /**
-   * Creates a shape Graphic with solid color fill. Returns nullptr if path is empty.
+   * Create a shader that draws the specified color.
    */
-  static std::shared_ptr<Graphic> MakeFrom(const Path& path, Color color);
+  static std::shared_ptr<Shader> MakeColorShader(Color color, Opacity opacity = Opaque);
+
+  virtual ~Shader() = default;
 
   /**
-   * Creates a shape Graphic with gradient color fill. Returns nullptr if path is empty.
+   * Returns true if the shader is guaranteed to produce only opaque colors, subject to the Paint
+   * using the shader to apply an opaque alpha value. Subclasses should override this to allow some
+   * optimizations.
    */
-  static std::shared_ptr<Graphic> MakeFrom(const Path& path, const GradientPaint& gradient);
-
-  GraphicType type() const override {
-    return GraphicType::Shape;
+  virtual bool isOpaque() const {
+    return false;
   }
-
-  void measureBounds(Rect* bounds) const override;
-  bool hitTest(RenderCache* cache, float x, float y) override;
-  bool getPath(Path* result) const override;
-  void prepare(RenderCache* cache) const override;
-  void draw(Canvas* canvas, RenderCache* cache) const override;
-
- private:
-  Path path = {};
-  Paint paint = {};
-
-  Shape(Path path, Paint paint);
 };
 }  // namespace pag

@@ -25,6 +25,17 @@
 #include "gpu/Paint.h"
 
 namespace pag {
+/**
+ * Defines attributes for drawing gradient colors.
+ */
+struct GradientPaint {
+  Enum gradientType;
+  Point startPoint;
+  Point endPoint;
+  std::vector<Color> colors;
+  std::vector<Opacity> alphas;
+  std::vector<float> positions;
+};
 
 enum class GraphicType {
   Unknown,

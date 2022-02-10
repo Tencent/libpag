@@ -22,8 +22,11 @@
 #include "GLSurface.h"
 #include "base/utils/MathExtra.h"
 #include "core/Mask.h"
+#include "core/PathEffect.h"
 #include "core/TextBlob.h"
 #include "gpu/AlphaFragmentProcessor.h"
+#include "gpu/ColorShader.h"
+#include "gpu/ShaderBase.h"
 #include "gpu/TextureFragmentProcessor.h"
 #include "gpu/TextureMaskFragmentProcessor.h"
 #include "gpu/YUVTextureFragmentProcessor.h"
@@ -81,7 +84,9 @@ std::unique_ptr<FragmentProcessor> GLCanvas::getClipMask(const Rect& deviceQuad,
       auto clipSurface = getClipSurface();
       auto clipCanvas = clipSurface->getCanvas();
       clipCanvas->clear();
-      clipCanvas->drawPath(globalPaint.clip, Black);
+      Paint paint = {};
+      paint.setColor(Black);
+      clipCanvas->drawPath(globalPaint.clip, paint);
       return TextureMaskFragmentProcessor::MakeUseDeviceCoord(clipSurface->getTexture().get(),
                                                               surface->origin());
     }
@@ -139,39 +144,21 @@ void GLCanvas::drawTexture(const Texture* texture, const RGBAAALayout* layout, c
        TextureMaskFragmentProcessor::MakeUseLocalCoord(mask, Matrix::I(), inverted), true);
 }
 
-void GLCanvas::drawPath(const Path& path, Color color) {
-  auto shader = Shader::MakeColorShader(color);
-  drawPath(path, shader.get());
-}
-
-static std::unique_ptr<Shader> MakeGradientShader(const GradientPaint& gradient) {
-  std::unique_ptr<Shader> shader;
-  std::vector<Color4f> colors = {};
-  int index = 0;
-  auto& alphas = gradient.alphas;
-  for (auto& color : gradient.colors) {
-    auto r = static_cast<float>(color.red) / 255.0f;
-    auto g = static_cast<float>(color.green) / 255.0f;
-    auto b = static_cast<float>(color.blue) / 255.0f;
-    auto a = static_cast<float>(alphas[index++]) / 255.0f;
-    colors.push_back({r, g, b, a});
+void GLCanvas::drawPath(const Path& path, const Paint& paint) {
+  auto shader = paint.getShader();
+  if (shader == nullptr) {
+    shader = Shader::MakeColorShader(paint.getColor(), paint.getAlpha());
   }
-  if (gradient.gradientType == GradientFillType::Linear) {
-    shader = GradientShader::MakeLinear(gradient.startPoint, gradient.endPoint, colors,
-                                        gradient.positions);
-  } else {
-    auto radius = Point::Distance(gradient.startPoint, gradient.endPoint);
-    shader = GradientShader::MakeRadial(gradient.startPoint, radius, colors, gradient.positions);
+  if (paint.getStyle() == PaintStyle::Fill) {
+    drawPath(path, shader.get());
+    return;
   }
-  if (!shader) {
-    shader = std::make_unique<Color4Shader>(colors.back());
+  auto strokePath = path;
+  auto strokeEffect = PathEffect::MakeStroke(*paint.getStroke());
+  if (strokeEffect) {
+    strokeEffect->applyTo(&strokePath);
   }
-  return shader;
-}
-
-void GLCanvas::drawPath(const Path& path, const GradientPaint& gradient) {
-  auto shader = MakeGradientShader(gradient);
-  drawPath(path, shader.get());
+  drawPath(strokePath, shader.get());
 }
 
 static std::unique_ptr<GLDrawOp> MakeSimplePathOp(const Path& path) {
@@ -199,7 +186,8 @@ void GLCanvas::drawPath(const Path& path, const Shader* shader) {
     auto localMatrix = Matrix::MakeScale(bounds.width(), bounds.height());
     localMatrix.postTranslate(bounds.x(), bounds.y());
     auto args = FPArgs(getContext(), localMatrix);
-    draw(bounds, bounds, std::move(op), shader->asFragmentProcessor(args));
+    draw(bounds, bounds, std::move(op),
+         static_cast<const ShaderBase*>(shader)->asFragmentProcessor(args));
     return;
   }
   auto quad = globalPaint.matrix.mapRect(clippedLocalQuad);
@@ -234,7 +222,8 @@ void GLCanvas::drawMask(Rect quad, const Texture* mask, const Shader* shader) {
   auto args = FPArgs(getContext(), localMatrix);
   save();
   resetMatrix();
-  draw(quad, quad, GLFillRectOp::Make(), shader->asFragmentProcessor(args),
+  draw(quad, quad, GLFillRectOp::Make(),
+       static_cast<const ShaderBase*>(shader)->asFragmentProcessor(args),
        TextureMaskFragmentProcessor::MakeUseLocalCoord(mask, Matrix::MakeScale(scale.x, scale.y)));
   restore();
 }

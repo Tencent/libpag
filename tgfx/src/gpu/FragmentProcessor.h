@@ -23,6 +23,14 @@
 #include "gpu/Texture.h"
 
 namespace pag {
+struct FPArgs {
+  FPArgs(Context* context, const Matrix& localMatrix) : context(context), localMatrix(localMatrix) {
+  }
+
+  Context* context = nullptr;
+  Matrix localMatrix = Matrix::I();
+};
+
 class Pipeline;
 class GLFragmentProcessor;
 
