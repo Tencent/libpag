@@ -17,9 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WebTypeface.h"
-
 #include <vector>
-
 #include "base/utils/UniqueID.h"
 #include "platform/web/NativeTextureBuffer.h"
 #include "rendering/FontManager.h"

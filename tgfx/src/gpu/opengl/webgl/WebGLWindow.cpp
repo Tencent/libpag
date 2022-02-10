@@ -16,8 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "WebGLWindow.h"
-
+#include "gpu/opengl/webgl/WebGLWindow.h"
 #include "gpu/opengl/GLDefines.h"
 
 namespace pag {

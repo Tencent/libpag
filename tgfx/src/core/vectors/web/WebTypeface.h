@@ -19,12 +19,10 @@
 #pragma once
 
 #include <emscripten/val.h>
-
 #include <unordered_map>
 #include <vector>
-
-#include "raster/Font.h"
-#include "raster/Typeface.h"
+#include "core/Font.h"
+#include "core/Typeface.h"
 
 namespace pag {
 class WebTypeface : public Typeface {

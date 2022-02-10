@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "core/PixelBuffer.h"
 #include "gpu/YUVTexture.h"
-#include "image/PixelBuffer.h"
 
 namespace pag {
 std::shared_ptr<PixelBuffer> PixelBuffer::MakeHardwareBuffer(int, int, bool) {
