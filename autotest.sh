@@ -4,7 +4,7 @@ function make_dir() {
   rm -rf $1
   mkdir -p $1
 }
-echo "shell log - autotest start begin "
+echo "shell log - autotest start"
 if [[ `uname` == 'Darwin' ]]; then
   MAC_REQUIRED_TOOLS="gcovr"
   for TOOL in ${MAC_REQUIRED_TOOLS[@]}; do
