@@ -110,7 +110,7 @@ $ npm install
 
 ### 开发流程
 
-删除项目根目录的 `cmake-build-debug`，执行 `build.sh debug` 打包 C++ 代码，每次改动 C++ 代码都需要重新打包新的 `libpag.wasm` 文件，执行完成之后可以通过 `Tools->CMake->Reload CMake Project` 刷新项目
+执行 `build.sh debug` 来获得 `libpag.wasm` 文件
 
 ```bash
 # web/script目录下
@@ -146,4 +146,12 @@ $ cd script
 $ chmod +x ./build.sh
 # 打包
 $ ./build.sh
+```
+
+### CLion 编译
+
+创建一个新的 profile，然后使用下面的 **CMake options**（位置在 **CLion** > **Preferences** > **Build, Execution, Deployment** > **CMake**）
+
+```
+CMAKE_TOOLCHAIN_FILE=path/to/emscripten/emscripten/version/cmake/Modules/Platform/Emscripten.cmake
 ```
