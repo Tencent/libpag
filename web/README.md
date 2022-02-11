@@ -107,9 +107,7 @@ $ npm install
 
 ### Debug
 
-Remove `cmake-build-debug` folder that in libpag root folder, run `build.sh debug` to build `libpag.wasm` file.
-
-If you use CLion IDE, you cloud reload the project by `Tools->CMake->Reload CMake Project`.
+Execute `build.sh debug` to get `libpag.wasm` file.
 
 ```bash
 # ./web/script/
@@ -139,4 +137,12 @@ $ emrun --browser chrome --serve_root . --port 8081 ./web/demo/index.html
 $ cd script
 $ chmod +x ./build.sh
 $ ./build.sh
+```
+
+### Build with CLion
+
+Create a new profile, and use the following **CMake options**（find them under **CLion** > **Preferences** > **Build, Execution, Deployment** > **CMake**）
+
+```
+CMAKE_TOOLCHAIN_FILE=path/to/emscripten/emscripten/version/cmake/Modules/Platform/Emscripten.cmake
 ```

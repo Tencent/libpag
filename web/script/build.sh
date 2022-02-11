@@ -13,16 +13,14 @@ fi
 RELEASE_CONF="-Oz -s"
 CMAKE_BUILD_TYPE=Relese
 if [[ $@ == *debug* ]]; then
-  BUILD_DIR=../../cmake-build-debug
   CMAKE_BUILD_TYPE=Debug
   RELEASE_CONF="-O0 -g3 -s SAFE_HEAP=1"
   BUILD_TS=""
 fi
 
-emcmake cmake -S $SOURCE_DIR -B $BUILD_DIR \
-  -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE"
+emcmake cmake -S $SOURCE_DIR -B $BUILD_DIR -G Ninja -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE"
 
-cmake --build $BUILD_DIR --target pag -- -j 12
+cmake --build $BUILD_DIR --target pag
 
 emcc $RELEASE_CONF -std=c++17 \
   -I$SOURCE_DIR/include/ \
