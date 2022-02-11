@@ -441,7 +441,7 @@ class BackendTextureProxy : public TextureProxy {
   void* sharedContext = nullptr;
 
   bool checkContext(Context* context) const {
-    auto glDevice = static_cast<GLDevice*>(context->getDevice());
+    auto glDevice = static_cast<GLDevice*>(context->device());
     if (!glDevice->sharableWith(sharedContext)) {
       LOGE(
           "A Graphic which made from a texture can not be drawn on to a PAGSurface"

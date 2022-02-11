@@ -17,12 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLDrawer.h"
-
 #include "GLBlend.h"
 #include "GLProgramBuilder.h"
 #include "GLProgramCreator.h"
 #include "GLUtil.h"
+#include "base/utils/UniqueID.h"
 #include "gpu/PorterDuffXferProcessor.h"
+#include "gpu/ProgramCache.h"
 
 namespace pag {
 struct AttribLayout {
@@ -62,7 +63,8 @@ void GLDrawer::computeRecycleKey(BytesKey* recycleKey) const {
 std::shared_ptr<GLDrawer> GLDrawer::Make(Context* context) {
   BytesKey recycleKey = {};
   ComputeRecycleKey(&recycleKey);
-  auto drawer = std::static_pointer_cast<GLDrawer>(context->getRecycledResource(recycleKey));
+  auto drawer =
+      std::static_pointer_cast<GLDrawer>(context->resourceCache()->getRecycled(recycleKey));
   if (drawer != nullptr) {
     return drawer;
   }
@@ -193,7 +195,7 @@ void GLDrawer::draw(DrawArgs args, std::unique_ptr<GLDrawOp> op) const {
   GLStateGuard stateGuard(args.context);
   auto geometryProcessor = op->getGeometryProcessor(args);
   GLProgramCreator creator(geometryProcessor.get(), &pipeline);
-  auto program = static_cast<GLProgram*>(args.context->getProgram(&creator));
+  auto program = static_cast<GLProgram*>(args.context->programCache()->getProgram(&creator));
   if (program == nullptr) {
     return;
   }

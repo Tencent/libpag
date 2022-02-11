@@ -19,6 +19,7 @@
 #include "Modifier.h"
 #include "Graphic.h"
 #include "base/utils/MatrixUtil.h"
+#include "base/utils/UniqueID.h"
 #include "core/Blend.h"
 #include "gpu/Surface.h"
 

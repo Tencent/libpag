@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <vector>
 #include "core/Data.h"
 
 namespace pag {

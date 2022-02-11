@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "EncodedFormat.h"
-#include "ImageInfo.h"
 #include "core/Data.h"
+#include "core/EncodedFormat.h"
+#include "core/ImageInfo.h"
 #include "core/PixelBuffer.h"
 
 namespace pag {

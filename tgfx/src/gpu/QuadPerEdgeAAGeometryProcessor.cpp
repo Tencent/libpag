@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "QuadPerEdgeAAGeometryProcessor.h"
+#include "base/utils/UniqueID.h"
 #include "gpu/YUVTexture.h"
 #include "gpu/opengl/GLQuadPerEdgeAAGeometryProcessor.h"
 

@@ -18,8 +18,7 @@
 
 #pragma once
 
-#include "PathTypes.h"
-#include "base/utils/Log.h"
+#include "core/PathTypes.h"
 #include "pag/types.h"
 
 namespace pag {

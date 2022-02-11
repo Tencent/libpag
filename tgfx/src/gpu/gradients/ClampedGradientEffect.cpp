@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ClampedGradientEffect.h"
+#include "base/utils/UniqueID.h"
 #include "gpu/opengl/GLClampedGradientEffect.h"
 
 namespace pag {

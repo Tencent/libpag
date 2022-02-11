@@ -18,6 +18,7 @@
 
 #include "GLTexture.h"
 #include "GLUtil.h"
+#include "base/utils/UniqueID.h"
 #include "core/Bitmap.h"
 #include "gpu/Surface.h"
 
@@ -134,7 +135,8 @@ std::shared_ptr<Texture> Texture::Make(Context* context, int width, int height, 
     GLRGBATexture::ComputeRecycleKey(&recycleKey, width, height);
   }
 
-  auto texture = std::static_pointer_cast<GLTexture>(context->getRecycledResource(recycleKey));
+  auto texture =
+      std::static_pointer_cast<GLTexture>(context->resourceCache()->getRecycled(recycleKey));
   GLTextureInfo glInfo = {};
   if (texture) {
     texture->_origin = origin;

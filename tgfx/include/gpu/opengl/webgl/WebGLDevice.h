@@ -19,7 +19,6 @@
 #pragma once
 
 #include <emscripten/html5_webgl.h>
-
 #include "gpu/opengl/GLDevice.h"
 
 namespace pag {

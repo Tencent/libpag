@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "base/utils/Log.h"
 #include "pag/types.h"
 
 namespace pag {

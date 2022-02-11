@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RadialGradientLayout.h"
+#include "base/utils/UniqueID.h"
 #include "gpu/opengl/GLRadialGradientLayout.h"
 
 namespace pag {

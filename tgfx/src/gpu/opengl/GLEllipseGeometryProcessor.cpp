@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLEllipseGeometryProcessor.h"
-
+#include "gpu/Caps.h"
 #include "gpu/EllipseGeometryProcessor.h"
 
 namespace pag {

@@ -18,11 +18,10 @@
 
 #pragma once
 
-#include "EncodedFormat.h"
-#include "ImageInfo.h"
-#include "Orientation.h"
 #include "core/Data.h"
-#include "pag/types.h"
+#include "core/EncodedFormat.h"
+#include "core/ImageInfo.h"
+#include "core/Orientation.h"
 
 namespace pag {
 

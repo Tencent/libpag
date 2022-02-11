@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureMaskFragmentProcessor.h"
+#include "base/utils/UniqueID.h"
 #include "opengl/GLTextureMaskFragmentProcessor.h"
 
 namespace pag {

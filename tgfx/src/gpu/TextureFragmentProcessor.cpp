@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureFragmentProcessor.h"
+#include "base/utils/UniqueID.h"
 #include "opengl/GLTextureFragmentProcessor.h"
 
 namespace pag {

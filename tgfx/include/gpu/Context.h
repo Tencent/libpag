@@ -18,49 +18,51 @@
 
 #pragma once
 
-#include <list>
-#include <unordered_map>
-#include "base/utils/BytesKey.h"
-#include "base/utils/UniqueID.h"
 #include "core/Color4f.h"
-#include "gpu/Caps.h"
+#include "core/utils/BytesKey.h"
 #include "gpu/Device.h"
 #include "pag/gpu.h"
 
 namespace pag {
-
-class Resource;
-
-class Texture;
-
-class Program;
-
-class ProgramCreator;
+class ProgramCache;
 
 class GradientCache;
+
+class ResourceCache;
+
+class Caps;
 
 class Context {
  public:
   virtual ~Context();
 
   /**
-   * Returns the unique ID of the associated device.
+   * Returns the associated device.
    */
-  Device* getDevice() const;
+  Device* device() const {
+    return _device;
+  }
 
   /**
-   * Returns a program cache of specified ProgramMaker. If there is no associated cache available,
-   * a new program will be created by programMaker. Returns null if the programMaker fails to make a
-   * new program.
+   * Returns the associated cache that manages the lifetime of all gradients.
    */
-  Program* getProgram(const ProgramCreator* programMaker);
-
-  const Texture* getGradient(const Color4f* colors, const float* positions, int count);
+  GradientCache* gradientCache() const {
+    return _gradientCache;
+  }
 
   /**
-   * Returns a reusable resource in the cache.
+   * Returns the associated cache that manages the lifetime of all Program instances.
    */
-  std::shared_ptr<Resource> getRecycledResource(const BytesKey& recycleKey);
+  ProgramCache* programCache() const {
+    return _programCache;
+  }
+
+  /**
+   * Returns the associated cache that manages the lifetime of all Resource instances.
+   */
+  ResourceCache* resourceCache() const {
+    return _resourceCache;
+  }
 
   /**
    * Purges GPU resources that haven't been used in the past 'usNotUsed' microseconds.
@@ -81,24 +83,11 @@ class Context {
   explicit Context(Device* device);
 
  private:
-  Device* device = nullptr;
-  bool purgingResource = false;
-  std::list<Program*> programLRU = {};
-  std::unordered_map<BytesKey, Program*, BytesHasher> programMap = {};
-  GradientCache* gradientCache = nullptr;
-  std::vector<Resource*> nonpurgeableResources = {};
-  std::vector<std::shared_ptr<Resource>> strongReferences = {};
-  std::unordered_map<BytesKey, std::vector<Resource*>, BytesHasher> recycledResources = {};
-  std::mutex removeLocker = {};
-  std::vector<Resource*> pendingRemovedResources = {};
+  Device* _device = nullptr;
+  GradientCache* _gradientCache = nullptr;
+  ProgramCache* _programCache = nullptr;
+  ResourceCache* _resourceCache = nullptr;
 
-  static void AddToList(std::vector<Resource*>& list, Resource* resource);
-  static void RemoveFromList(std::vector<Resource*>& list, Resource* resource);
-  static void NotifyReferenceReachedZero(Resource* resource);
-
-  std::shared_ptr<Resource> wrapResource(Resource* resource);
-  void removeResource(Resource* resource);
-  void removeOldestProgram(bool releaseGPU = true);
   void releaseAll(bool releaseGPU);
   void onLocked();
   void onUnlocked();
@@ -106,8 +95,6 @@ class Context {
   friend class Device;
 
   friend class Resource;
-
-  friend class PurgeGuard;
 };
 
 }  // namespace pag

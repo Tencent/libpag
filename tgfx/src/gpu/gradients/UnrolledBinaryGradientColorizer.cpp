@@ -18,6 +18,7 @@
 
 #include "UnrolledBinaryGradientColorizer.h"
 #include "base/utils/MathExtra.h"
+#include "base/utils/UniqueID.h"
 #include "gpu/opengl/GLUnrolledBinaryGradientColorizer.h"
 
 namespace pag {

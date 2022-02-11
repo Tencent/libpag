@@ -177,13 +177,13 @@ void RenderCache::prepareFrame() {
 }
 
 void RenderCache::attachToContext(Context* current, bool forHitTest) {
-  if (deviceID > 0 && deviceID != current->getDevice()->uniqueID()) {
+  if (deviceID > 0 && deviceID != current->device()->uniqueID()) {
     // Context 改变需要清理内部所有缓存，这里用 uniqueID
     // 而不用指针比较，是因为指针析构后再创建可能会地址重合。
     releaseAll();
   }
   context = current;
-  deviceID = context->getDevice()->uniqueID();
+  deviceID = context->device()->uniqueID();
   hitTestOnly = forHitTest;
   if (hitTestOnly) {
     return;

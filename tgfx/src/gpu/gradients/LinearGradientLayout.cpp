@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LinearGradientLayout.h"
+#include "base/utils/UniqueID.h"
 #include "gpu/opengl/GLLinearGradientLayout.h"
 
 namespace pag {

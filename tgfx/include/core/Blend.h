@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include "pag/types.h"
-
 namespace pag {
 /**
  * Defines constant values for visual blend mode effects.

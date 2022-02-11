@@ -21,6 +21,9 @@
 #include "gpu/Device.h"
 
 namespace pag {
+/**
+ * The OpenGL interface for drawing graphics.
+ */
 class GLDevice : public Device {
  public:
   /**

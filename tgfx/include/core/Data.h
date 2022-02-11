@@ -18,7 +18,8 @@
 
 #pragma once
 
-#include "pag/types.h"
+#include <memory>
+#include <string>
 
 namespace pag {
 /**

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SingleIntervalGradientColorizer.h"
+#include "base/utils/UniqueID.h"
 #include "gpu/opengl/GLSingleIntervalGradientColorizer.h"
 
 namespace pag {

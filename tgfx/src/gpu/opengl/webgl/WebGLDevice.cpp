@@ -18,6 +18,7 @@
 
 #include "gpu/opengl/webgl/WebGLDevice.h"
 #include "WebGLProcGetter.h"
+#include "base/utils/Log.h"
 
 namespace pag {
 
