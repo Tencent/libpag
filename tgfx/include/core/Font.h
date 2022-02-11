@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "Typeface.h"
+#include "core/Typeface.h"
 
 namespace pag {
 /**

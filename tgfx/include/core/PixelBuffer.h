@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "ImageInfo.h"
+#include "core/ImageInfo.h"
 #include "gpu/TextureBuffer.h"
 
 namespace pag {

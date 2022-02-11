@@ -18,20 +18,38 @@
 
 #pragma once
 
-#include <memory>
-
-#include "Processor.h"
-#include "core/utils/BytesKey.h"
+#include <list>
+#include <unordered_map>
+#include "Program.h"
 
 namespace pag {
-class GLXferProcessor;
-
-class XferProcessor : public Processor {
+/**
+ * Manages the lifetime of all Program instances.
+ */
+class ProgramCache {
  public:
+  explicit ProgramCache(Context* context);
+
   /**
-   * Returns a new instance of the appropriate *GL* implementation class for the given
-   * XferProcessor.
+   * Returns true if there is no cache at all.
    */
-  virtual std::unique_ptr<GLXferProcessor> createGLInstance() const = 0;
+  bool empty() const;
+
+  /**
+   * Returns a program cache of specified ProgramMaker. If there is no associated cache available,
+   * a new program will be created by programMaker. Returns null if the programMaker fails to make a
+   * new program.
+   */
+  Program* getProgram(const ProgramCreator* programMaker);
+
+ private:
+  Context* context = nullptr;
+  std::list<Program*> programLRU = {};
+  std::unordered_map<BytesKey, Program*, BytesHasher> programMap = {};
+
+  void removeOldestProgram(bool releaseGPU = true);
+  void releaseAll(bool releaseGPU);
+
+  friend class Context;
 };
 }  // namespace pag

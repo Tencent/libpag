@@ -18,6 +18,7 @@
 
 #include "EllipseGeometryProcessor.h"
 
+#include "base/utils/UniqueID.h"
 #include "gpu/opengl/GLEllipseGeometryProcessor.h"
 
 namespace pag {

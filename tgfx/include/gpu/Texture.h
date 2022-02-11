@@ -20,9 +20,10 @@
 
 #include <string>
 #include "gpu/Resource.h"
-#include "gpu/TextureSampler.h"
 
 namespace pag {
+class TextureSampler;
+
 /**
  * Texture describes a two dimensional array of pixels in the GPU backend for drawing.
  */

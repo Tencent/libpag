@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "FontMetrics.h"
-#include "Path.h"
+#include "core/FontMetrics.h"
+#include "core/Path.h"
 #include "gpu/TextureBuffer.h"
 
 namespace pag {

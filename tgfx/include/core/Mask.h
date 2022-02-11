@@ -18,10 +18,10 @@
 
 #pragma once
 
-#include "Font.h"
-#include "Path.h"
-#include "TextBlob.h"
+#include "core/Font.h"
+#include "core/Path.h"
 #include "core/Stroke.h"
+#include "core/TextBlob.h"
 #include "gpu/TextureBuffer.h"
 
 namespace pag {

@@ -18,6 +18,7 @@
 
 #include "TraceImage.h"
 #include "PixelBufferUtils.h"
+#include "base/utils/Log.h"
 #include "core/Bitmap.h"
 
 namespace pag {

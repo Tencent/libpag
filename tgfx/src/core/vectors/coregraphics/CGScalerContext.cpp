@@ -18,6 +18,7 @@
 
 #include "core/vectors/coregraphics/CGScalerContext.h"
 #include "base/utils/Interpolate.h"
+#include "base/utils/Log.h"
 #include "base/utils/MathExtra.h"
 #include "core/PathEffect.h"
 #include "platform/apple/BitmapContextUtil.h"

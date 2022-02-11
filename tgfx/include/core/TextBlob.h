@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "Font.h"
-#include "Path.h"
+#include "core/Font.h"
+#include "core/Path.h"
 #include "core/Stroke.h"
 
 namespace pag {

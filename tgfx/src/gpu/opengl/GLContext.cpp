@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLContext.h"
-#include "GLDevice.h"
+#include "gpu/opengl/GLContext.h"
+#include "gpu/opengl/GLDevice.h"
 
 namespace pag {
 GLContext::GLContext(Device* device, const GLInterface* glInterface) : Context(device) {

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MemoryCalculator.h"
+#include "base/utils/Log.h"
 #include "rendering/caches/LayerCache.h"
 
 namespace pag {

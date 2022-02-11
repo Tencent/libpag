@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "YUVTextureFragmentProcessor.h"
+#include "base/utils/UniqueID.h"
 #include "opengl/GLYUVTextureFragmentProcessor.h"
 
 namespace pag {

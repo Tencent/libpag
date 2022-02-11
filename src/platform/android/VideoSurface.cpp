@@ -128,7 +128,7 @@ jobject VideoSurface::getOutputSurface(JNIEnv* env) const {
 
 bool VideoSurface::attachToContext(Context* context) {
   if (oesTexture) {
-    if (deviceID != context->getDevice()->uniqueID()) {
+    if (deviceID != context->device()->uniqueID()) {
       LOGE("VideoSurface::attachToGLContext(): VideoSurface has already attached to a Context!");
       return false;
     }
@@ -146,7 +146,7 @@ bool VideoSurface::attachToContext(Context* context) {
   }
   auto result = env->CallBooleanMethod(videoSurface.get(), VideoSurface_attachToGLContext,
                                        oesTexture->getGLInfo().id);
-  deviceID = context->getDevice()->uniqueID();
+  deviceID = context->device()->uniqueID();
   if (!result) {
     LOGE("VideoSurface::attachToGLContext(): failed to attached to a Surface!");
     oesTexture = nullptr;

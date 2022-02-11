@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ConstColorProcessor.h"
+#include "base/utils/UniqueID.h"
 #include "opengl/GLConstColorProcessor.h"
 
 namespace pag {

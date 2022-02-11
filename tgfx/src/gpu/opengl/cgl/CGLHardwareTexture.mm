@@ -18,6 +18,7 @@
 
 #include "CGLHardwareTexture.h"
 #include "gpu/opengl/cgl/CGLDevice.h"
+#include "base/utils/UniqueID.h"
 
 namespace pag {
 std::shared_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(Context* context,
@@ -25,11 +26,11 @@ std::shared_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(Context* contex
   BytesKey recycleKey = {};
   ComputeRecycleKey(&recycleKey, pixelBuffer);
   auto glTexture =
-      std::static_pointer_cast<CGLHardwareTexture>(context->getRecycledResource(recycleKey));
+      std::static_pointer_cast<CGLHardwareTexture>(context->resourceCache()->getRecycled(recycleKey));
   if (glTexture) {
     return glTexture;
   }
-  auto cglDevice = static_cast<CGLDevice*>(context->getDevice());
+  auto cglDevice = static_cast<CGLDevice*>(context->device());
   if (cglDevice == nullptr) {
     return nullptr;
   }
@@ -102,7 +103,7 @@ void CGLHardwareTexture::onRelease(Context* context) {
   }
   CFRelease(texture);
   texture = nil;
-  auto cglDevice = static_cast<CGLDevice*>(context->getDevice());
+  auto cglDevice = static_cast<CGLDevice*>(context->device());
   auto textureCache = cglDevice->getTextureCache();
   CVOpenGLTextureCacheFlush(textureCache, 0);
 }

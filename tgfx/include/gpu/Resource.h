@@ -18,8 +18,7 @@
 
 #pragma once
 
-#include "Context.h"
-#include "base/utils/BytesKey.h"
+#include "gpu/ResourceCache.h"
 
 namespace pag {
 /**
@@ -35,7 +34,7 @@ class Resource {
   static std::shared_ptr<T> Wrap(Context* context, T* resource) {
     resource->context = context;
     static_cast<Resource*>(resource)->computeRecycleKey(&resource->recycleKey);
-    return std::static_pointer_cast<T>(context->wrapResource(resource));
+    return std::static_pointer_cast<T>(context->resourceCache()->wrapResource(resource));
   }
 
   virtual ~Resource() = default;
@@ -60,6 +59,6 @@ class Resource {
   size_t cacheArrayIndex = 0;
   int64_t lastUsedTime = 0;
 
-  friend class Context;
+  friend class ResourceCache;
 };
 }  // namespace pag

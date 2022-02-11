@@ -22,6 +22,7 @@
 #include <GLES/gl.h>
 #include <GLES/glext.h>
 #include <android/hardware_buffer.h>
+#include "base/utils/UniqueID.h"
 #include "gpu/opengl/egl/EGLDevice.h"
 #include "platform/android/HardwareBuffer.h"
 #include "platform/android/HardwareBufferInterface.h"
@@ -53,8 +54,8 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(Context* contex
   }
   BytesKey recycleKey = {};
   ComputeRecycleKey(&recycleKey, hardwareBuffer);
-  auto glTexture =
-      std::static_pointer_cast<EGLHardwareTexture>(context->getRecycledResource(recycleKey));
+  auto glTexture = std::static_pointer_cast<EGLHardwareTexture>(
+      context->resourceCache()->getRecycled(recycleKey));
   if (glTexture != nullptr) {
     return glTexture;
   }
@@ -62,7 +63,7 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(Context* contex
   if (!clientBuffer) {
     return nullptr;
   }
-  auto display = static_cast<EGLDevice*>(context->getDevice())->getDisplay();
+  auto display = static_cast<EGLDevice*>(context->device())->getDisplay();
   EGLint attributes[] = {EGL_IMAGE_PRESERVED_KHR, EGL_TRUE, EGL_NONE};
   EGLImageKHR eglImage = eglext::eglCreateImageKHR(
       display, EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_ANDROID, clientBuffer, attributes);
@@ -111,7 +112,7 @@ void EGLHardwareTexture::ComputeRecycleKey(BytesKey* recycleKey, void* hardwareB
 void EGLHardwareTexture::onRelease(Context* context) {
   auto gl = GLContext::Unwrap(context);
   gl->deleteTextures(1, &sampler.glInfo.id);
-  auto display = static_cast<EGLDevice*>(context->getDevice())->getDisplay();
+  auto display = static_cast<EGLDevice*>(context->device())->getDisplay();
   eglext::eglDestroyImageKHR(display, eglImage);
 }
 }  // namespace pag

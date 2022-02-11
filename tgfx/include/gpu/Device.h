@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "base/utils/Log.h"
 #include "pag/types.h"
 
 namespace pag {
@@ -65,6 +64,6 @@ class Device {
   uint32_t _uniqueID = 0;
   bool contextLocked = false;
 
-  friend class Context;
+  friend class ResourceCache;
 };
 }  // namespace pag

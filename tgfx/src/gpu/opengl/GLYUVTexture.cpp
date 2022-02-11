@@ -18,6 +18,7 @@
 
 #include "GLYUVTexture.h"
 #include "GLUtil.h"
+#include "base/utils/UniqueID.h"
 
 namespace pag {
 #define I420_PLANE_COUNT 3
@@ -148,7 +149,8 @@ std::shared_ptr<YUVTexture> YUVTexture::MakeI420(Context* context, YUVColorSpace
 
   BytesKey recycleKey = {};
   GLI420Texture::ComputeRecycleKey(&recycleKey, width, height);
-  auto texture = std::static_pointer_cast<GLYUVTexture>(context->getRecycledResource(recycleKey));
+  auto texture =
+      std::static_pointer_cast<GLYUVTexture>(context->resourceCache()->getRecycled(recycleKey));
   if (texture == nullptr) {
     auto texturePlanes = MakeTexturePlanes(gl, yuvConfig);
     if (texturePlanes.empty()) {
@@ -183,7 +185,8 @@ std::shared_ptr<YUVTexture> YUVTexture::MakeNV12(Context* context, YUVColorSpace
 
   BytesKey recycleKey = {};
   GLNV12Texture::ComputeRecycleKey(&recycleKey, width, height);
-  auto texture = std::static_pointer_cast<GLYUVTexture>(context->getRecycledResource(recycleKey));
+  auto texture =
+      std::static_pointer_cast<GLYUVTexture>(context->resourceCache()->getRecycled(recycleKey));
   if (texture == nullptr) {
     auto texturePlanes = MakeTexturePlanes(gl, yuvConfig);
     if (texturePlanes.empty()) {

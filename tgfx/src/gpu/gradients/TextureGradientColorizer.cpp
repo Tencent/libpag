@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureGradientColorizer.h"
+#include "base/utils/UniqueID.h"
 #include "gpu/opengl/GLTextureGradientColorizer.h"
 
 namespace pag {

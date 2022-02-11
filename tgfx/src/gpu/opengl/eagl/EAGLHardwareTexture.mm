@@ -18,6 +18,7 @@
 
 #include "EAGLHardwareTexture.h"
 #include "gpu/opengl/eagl/EAGLDevice.h"
+#include "base/utils/UniqueID.h"
 
 namespace pag {
 static CVOpenGLESTextureRef GetTextureRef(Context* context, CVPixelBufferRef pixelBuffer,
@@ -63,11 +64,11 @@ std::shared_ptr<EAGLHardwareTexture> EAGLHardwareTexture::MakeFrom(Context* cont
   BytesKey recycleKey = {};
   ComputeRecycleKey(&recycleKey, pixelBuffer);
   glTexture =
-      std::static_pointer_cast<EAGLHardwareTexture>(context->getRecycledResource(recycleKey));
+      std::static_pointer_cast<EAGLHardwareTexture>(context->resourceCache()->getRecycled(recycleKey));
   if (glTexture) {
     return glTexture;
   }
-  auto eaglDevice = static_cast<EAGLDevice*>(context->getDevice());
+  auto eaglDevice = static_cast<EAGLDevice*>(context->device());
   if (eaglDevice == nullptr) {
     return nullptr;
   }
@@ -125,7 +126,7 @@ void EAGLHardwareTexture::onRelease(Context* context) {
   if (texture == nil) {
     return;
   }
-  static_cast<EAGLDevice*>(context->getDevice())->releaseTexture(texture);
+  static_cast<EAGLDevice*>(context->device())->releaseTexture(texture);
   texture = nil;
 }
 }

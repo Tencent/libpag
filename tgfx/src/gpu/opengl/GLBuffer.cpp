@@ -19,6 +19,7 @@
 #include "GLBuffer.h"
 
 #include "GLContext.h"
+#include "base/utils/UniqueID.h"
 
 namespace pag {
 static void ComputeRecycleKey(BytesKey* recycleKey, const void* uniqueKey, size_t length) {
@@ -33,7 +34,8 @@ static void ComputeRecycleKey(BytesKey* recycleKey, const void* uniqueKey, size_
 std::shared_ptr<GLBuffer> GLBuffer::Make(Context* context, const uint16_t* buffer, size_t length) {
   BytesKey recycleKey = {};
   ComputeRecycleKey(&recycleKey, buffer, length);
-  auto glBuffer = std::static_pointer_cast<GLBuffer>(context->getRecycledResource(recycleKey));
+  auto glBuffer =
+      std::static_pointer_cast<GLBuffer>(context->resourceCache()->getRecycled(recycleKey));
   if (glBuffer != nullptr) {
     return glBuffer;
   }

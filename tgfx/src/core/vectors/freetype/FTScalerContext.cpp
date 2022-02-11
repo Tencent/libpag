@@ -24,6 +24,7 @@
 #include FT_SIZES_H
 #include FT_TRUETYPE_TABLES_H
 #include "FTUtil.h"
+#include "base/utils/Log.h"
 #include "base/utils/MathExtra.h"
 #include "core/Bitmap.h"
 #include "skcms.h"

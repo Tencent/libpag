@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DualIntervalGradientColorizer.h"
+#include "base/utils/UniqueID.h"
 #include "gpu/opengl/GLDualIntervalGradientColorizer.h"
 
 namespace pag {

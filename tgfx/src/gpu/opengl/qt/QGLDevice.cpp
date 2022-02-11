@@ -20,6 +20,7 @@
 #include <QApplication>
 #include <QThread>
 #include "QGLProcGetter.h"
+#include "base/utils/Log.h"
 
 namespace pag {
 void* GLDevice::CurrentNativeHandle() {

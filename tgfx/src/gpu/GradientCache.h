@@ -21,9 +21,9 @@
 #include <list>
 #include <unordered_map>
 
-#include "base/utils/BytesKey.h"
 #include "core/Bitmap.h"
 #include "core/Color4f.h"
+#include "core/utils/BytesKey.h"
 
 namespace pag {
 class Context;

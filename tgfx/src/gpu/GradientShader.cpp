@@ -18,6 +18,7 @@
 
 #include "gpu/GradientShader.h"
 #include "base/utils/MathExtra.h"
+#include "gpu/Caps.h"
 #include "gpu/ColorShader.h"
 #include "gpu/ConstColorProcessor.h"
 #include "gpu/GradientCache.h"
@@ -106,7 +107,7 @@ static std::unique_ptr<FragmentProcessor> MakeColorizer(Context* context, const 
   // Otherwise, fall back to a raster gradient sample by a texture, which can handle
   // arbitrary gradients (the only downside being sampling resolution).
   return TextureGradientColorizer::Make(
-      context->getGradient(colors + offset, positions + offset, count));
+      context->gradientCache()->getGradient(colors + offset, positions + offset, count));
 }
 
 class GradientShaderBase : public ShaderBase {

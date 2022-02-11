@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "Path.h"
+#include "core/Path.h"
 #include "core/Stroke.h"
 
 namespace pag {
