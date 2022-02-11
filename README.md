@@ -1,6 +1,10 @@
 <img src="resources/readme/logo.png" alt="PAG Logo" width="474"/>
 
-[![license](https://img.shields.io/badge/license-Apache%202-blue)](https://github.com/Tencent/libpag/blob/master/LICENSE.txt) [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/Tencent/libpag/pulls) [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/Tencent/libpag)](https://github.com/Tencent/libpag/releases)
+[![license](https://img.shields.io/badge/license-Apache%202-blue)](https://github.com/Tencent/libpag/blob/master/LICENSE.txt) 
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/Tencent/libpag/pulls) 
+[![codecov](https://codecov.io/gh/Tencent/libpag/branch/main/graph/badge.svg)](https://codecov.io/gh/Tencent/libpag)
+[![Actions Status](https://github.com/Tencent/libpag/workflows/autotest/badge.svg?branch=main)](https://github.com/Tencent/libpag/actions)
+[![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/Tencent/libpag)](https://github.com/Tencent/libpag/releases)
 
 English | [简体中文](./README.zh_CN.md) | [Homepage](https://pag.io)
 
@@ -96,12 +100,12 @@ After installing the cocoapod into your project import libpag with
 
 You can use the aar downloaded from the release page, or add libpag to your project by Maven:
 
-Edit the `build.gradle` file in the root of your project, add `jcenter()` to `repositories`:
+Edit the `build.gradle` file in the root of your project, add `mavenCentral()` to `repositories`:
 
 ```
 buildscript {
     repositories {
-        jcenter()
+        mavenCentral()
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:3.2.1'
