@@ -40,6 +40,6 @@ void PAGFont::SetFallbackFontNames(const std::vector<std::string>& fontNames) {
 
 void PAGFont::SetFallbackFontPaths(const std::vector<std::string>& fontPaths,
                                    const std::vector<int>& ttcIndices) {
-  FontManager::SetFallbackFontPaths(fontPaths, ttcIndices);
+    FontManager::SetFallbackFontPaths(fontPaths, ttcIndices);
 }
 }  // namespace pag
