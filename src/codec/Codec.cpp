@@ -41,7 +41,7 @@ static bool HasTrackMatte(Enum type) {
 }
 
 uint16_t Codec::MaxSupportedTagLevel() {
-    return static_cast<uint16_t>(TagCode::Count) - 1;
+  return static_cast<uint16_t>(TagCode::Count) - 1;
 }
 
 void Codec::InstallReferences(Layer* layer) {
