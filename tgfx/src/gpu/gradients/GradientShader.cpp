@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/GradientShader.h"
+#include "GradientShader.h"
 #include "base/utils/MathExtra.h"
 #include "gpu/Caps.h"
 #include "gpu/ColorShader.h"
@@ -110,65 +110,52 @@ static std::unique_ptr<FragmentProcessor> MakeColorizer(Context* context, const 
       context->gradientCache()->getGradient(colors + offset, positions + offset, count));
 }
 
-class GradientShaderBase : public ShaderBase {
- public:
-  GradientShaderBase(const std::vector<Color4f>& colors, const std::vector<float>& positions,
-                     const Matrix& pointsToUnit)
-      : pointsToUnit(pointsToUnit) {
-    colorsAreOpaque = true;
-    for (auto& color : colors) {
-      if (!color.isOpaque()) {
-        colorsAreOpaque = false;
-        break;
-      }
-    }
-    auto dummyFirst = false;
-    auto dummyLast = false;
-    if (!positions.empty()) {
-      dummyFirst = positions[0] != 0;
-      dummyLast = positions[positions.size() - 1] != 1.0f;
-    }
-    // Now copy over the colors, adding the dummies as needed
-    if (dummyFirst) {
-      originalColors.push_back(colors[0]);
-    }
-    originalColors.insert(originalColors.end(), colors.begin(), colors.end());
-    if (dummyLast) {
-      originalColors.push_back(colors[colors.size() - 1]);
-    }
-    if (positions.empty()) {
-      auto posScale = 1.0f / static_cast<float>(positions.size() - 1);
-      for (size_t i = 0; i < positions.size(); i++) {
-        originalPositions.push_back(static_cast<float>(i) * posScale);
-      }
-    } else {
-      float prev = 0;
-      originalPositions.push_back(prev);  // force the first pos to 0
-      for (size_t i = dummyFirst ? 0 : 1; i < colors.size() + dummyLast; ++i) {
-        // Pin the last value to 1.0, and make sure position is monotonic.
-        float curr;
-        if (i != colors.size()) {
-          curr = std::max(std::min(positions[i], 1.0f), prev);
-        } else {
-          curr = 1.0f;
-        }
-        originalPositions.push_back(curr);
-        prev = curr;
-      }
+GradientShaderBase::GradientShaderBase(const std::vector<Color4f>& colors,
+                                       const std::vector<float>& positions,
+                                       const Matrix& pointsToUnit)
+    : pointsToUnit(pointsToUnit) {
+  colorsAreOpaque = true;
+  for (auto& color : colors) {
+    if (!color.isOpaque()) {
+      colorsAreOpaque = false;
+      break;
     }
   }
-
-  bool isOpaque() const override {
-    return colorsAreOpaque;
+  auto dummyFirst = false;
+  auto dummyLast = false;
+  if (!positions.empty()) {
+    dummyFirst = positions[0] != 0;
+    dummyLast = positions[positions.size() - 1] != 1.0f;
   }
-
-  std::vector<Color4f> originalColors = {};
-  std::vector<float> originalPositions = {};
-
- protected:
-  const Matrix pointsToUnit;
-  bool colorsAreOpaque = false;
-};
+  // Now copy over the colors, adding the dummies as needed
+  if (dummyFirst) {
+    originalColors.push_back(colors[0]);
+  }
+  originalColors.insert(originalColors.end(), colors.begin(), colors.end());
+  if (dummyLast) {
+    originalColors.push_back(colors[colors.size() - 1]);
+  }
+  if (positions.empty()) {
+    auto posScale = 1.0f / static_cast<float>(positions.size() - 1);
+    for (size_t i = 0; i < positions.size(); i++) {
+      originalPositions.push_back(static_cast<float>(i) * posScale);
+    }
+  } else {
+    float prev = 0;
+    originalPositions.push_back(prev);  // force the first pos to 0
+    for (size_t i = dummyFirst ? 0 : 1; i < colors.size() + dummyLast; ++i) {
+      // Pin the last value to 1.0, and make sure position is monotonic.
+      float curr;
+      if (i != colors.size()) {
+        curr = std::max(std::min(positions[i], 1.0f), prev);
+      } else {
+        curr = 1.0f;
+      }
+      originalPositions.push_back(curr);
+      prev = curr;
+    }
+  }
+}
 
 // Combines the colorizer and layout with an appropriately configured master effect based on the
 // gradient's tile mode
@@ -213,19 +200,17 @@ static Matrix PointsToUnitMatrix(const Point& startPoint, const Point& endPoint)
   return matrix;
 }
 
-class LinearGradient : public GradientShaderBase {
- public:
-  LinearGradient(const Point& startPoint, const Point& endPoint, const std::vector<Color4f>& colors,
-                 const std::vector<float>& positions)
-      : GradientShaderBase(colors, positions, PointsToUnitMatrix(startPoint, endPoint)) {
-  }
+LinearGradient::LinearGradient(const Point& startPoint, const Point& endPoint,
+                               const std::vector<Color4f>& colors,
+                               const std::vector<float>& positions)
+    : GradientShaderBase(colors, positions, PointsToUnitMatrix(startPoint, endPoint)) {
+}
 
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const override {
-    auto matrix = args.localMatrix;
-    matrix.postConcat(pointsToUnit);
-    return MakeGradient(args.context, *this, LinearGradientLayout::Make(matrix));
-  }
-};
+std::unique_ptr<FragmentProcessor> LinearGradient::asFragmentProcessor(const FPArgs& args) const {
+  auto matrix = args.localMatrix;
+  matrix.postConcat(pointsToUnit);
+  return MakeGradient(args.context, *this, LinearGradientLayout::Make(matrix));
+}
 
 static Matrix RadialToUnitMatrix(const Point& center, float radius) {
   float inv = 1 / radius;
@@ -234,21 +219,19 @@ static Matrix RadialToUnitMatrix(const Point& center, float radius) {
   return matrix;
 }
 
-class RadialGradient : public GradientShaderBase {
- public:
-  RadialGradient(const Point& center, float radius, const std::vector<Color4f>& colors,
-                 const std::vector<float>& positions)
-      : GradientShaderBase(colors, positions, RadialToUnitMatrix(center, radius)) {
-  }
+RadialGradient::RadialGradient(const Point& center, float radius,
+                               const std::vector<Color4f>& colors,
+                               const std::vector<float>& positions)
+    : GradientShaderBase(colors, positions, RadialToUnitMatrix(center, radius)) {
+}
 
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const override {
-    auto matrix = args.localMatrix;
-    matrix.postConcat(pointsToUnit);
-    return MakeGradient(args.context, *this, RadialGradientLayout::Make(matrix));
-  }
-};
+std::unique_ptr<FragmentProcessor> RadialGradient::asFragmentProcessor(const FPArgs& args) const {
+  auto matrix = args.localMatrix;
+  matrix.postConcat(pointsToUnit);
+  return MakeGradient(args.context, *this, RadialGradientLayout::Make(matrix));
+}
 
-std::shared_ptr<Shader> GradientShader::MakeLinear(const Point& startPoint, const Point& endPoint,
+std::shared_ptr<Shader> Shader::MakeLinearGradient(const Point& startPoint, const Point& endPoint,
                                                    const std::vector<Color4f>& colors,
                                                    const std::vector<float>& positions) {
   if (!std::isfinite(Point::Distance(endPoint, startPoint))) {
@@ -270,7 +253,7 @@ std::shared_ptr<Shader> GradientShader::MakeLinear(const Point& startPoint, cons
   return std::make_shared<LinearGradient>(startPoint, endPoint, colors, positions);
 }
 
-std::shared_ptr<Shader> GradientShader::MakeRadial(const Point& center, float radius,
+std::shared_ptr<Shader> Shader::MakeRadialGradient(const Point& center, float radius,
                                                    const std::vector<Color4f>& colors,
                                                    const std::vector<float>& positions) {
   if (radius < 0) {
