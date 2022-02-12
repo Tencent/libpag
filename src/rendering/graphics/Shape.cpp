@@ -18,7 +18,7 @@
 
 #include "Shape.h"
 #include "gpu/Canvas.h"
-#include "gpu/GradientShader.h"
+#include "gpu/Shader.h"
 #include "pag/file.h"
 
 namespace pag {
@@ -44,11 +44,11 @@ static std::shared_ptr<Shader> MakeGradientShader(const GradientPaint& gradient)
     colors.push_back({r, g, b, a});
   }
   if (gradient.gradientType == GradientFillType::Linear) {
-    shader = GradientShader::MakeLinear(gradient.startPoint, gradient.endPoint, colors,
+    shader = Shader::MakeLinearGradient(gradient.startPoint, gradient.endPoint, colors,
                                         gradient.positions);
   } else {
     auto radius = Point::Distance(gradient.startPoint, gradient.endPoint);
-    shader = GradientShader::MakeRadial(gradient.startPoint, radius, colors, gradient.positions);
+    shader = Shader::MakeRadialGradient(gradient.startPoint, radius, colors, gradient.positions);
   }
   if (!shader) {
     shader = Shader::MakeColorShader(gradient.colors.back(), gradient.alphas.back());

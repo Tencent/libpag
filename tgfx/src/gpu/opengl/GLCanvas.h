@@ -22,7 +22,6 @@
 #include "core/Blend.h"
 #include "core/Mask.h"
 #include "gpu/Canvas.h"
-#include "gpu/GradientShader.h"
 
 namespace pag {
 class GLCanvas : public Canvas {
