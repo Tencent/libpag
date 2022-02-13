@@ -267,8 +267,8 @@ PAG_TEST_F(PAGLayerTest, TextScale) {
 PAG_TEST_F(PAGLayerTest, Opacity) {
   auto pagFile = PAGFile::Load("../resources/apitest/AlphaTrackMatte.pag");
   ASSERT_NE(pagFile, nullptr);
-  pagFile->setOpacity(128);
-  ASSERT_EQ(pagFile->opacity(), 128);
+  pagFile->setAlpha(0.5f);
+  ASSERT_TRUE(fabsf(pagFile->alpha() - 0.5f) < 0.01);
   auto pagSurface = PAGSurface::MakeOffscreen(500, 500);
   ASSERT_NE(pagSurface, nullptr);
   auto pagPlayer = std::make_shared<PAGPlayer>();

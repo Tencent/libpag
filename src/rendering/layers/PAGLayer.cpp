@@ -83,14 +83,14 @@ Matrix PAGLayer::getTotalMatrixInternal() {
   return matrix;
 }
 
-void PAGLayer::setOpacity(const Opacity& value) {
+float PAGLayer::alpha() const {
   LockGuard autoLock(rootLocker);
-  setOpacityInternal(value);
+  return static_cast<float>(layerOpacity) / 255.0f;
 }
 
-Opacity PAGLayer::opacity() const {
+void PAGLayer::setAlpha(float value) {
   LockGuard autoLock(rootLocker);
-  return layerOpacity;
+  setAlphaInternal(value);
 }
 
 bool PAGLayer::visible() const {
@@ -504,7 +504,8 @@ void PAGLayer::setMatrixInternal(const Matrix& matrix) {
   invalidateCacheScale();
 }
 
-void PAGLayer::setOpacityInternal(const Opacity& opacity) {
+void PAGLayer::setAlphaInternal(float alpha) {
+  auto opacity = static_cast<Opacity>(roundf(alpha * 255));
   if (opacity == layerOpacity) {
     return;
   }

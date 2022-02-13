@@ -71,10 +71,13 @@ Stroke::Join ToTGFXJoin(Enum join) {
 
 Color4f ToTGFXColor(Color color, Opacity opacity) {
   return {static_cast<float>(color.red) / 255.0f, static_cast<float>(color.green) / 255.0f,
-          static_cast<float>(color.blue) / 255.0f, static_cast<float>(opacity) / 255.0f};
+          static_cast<float>(color.blue) / 255.0f, ToTGFXAlpha(opacity)};
 }
 
 float ToTGFXAlpha(Opacity opacity) {
+  if (opacity == 255) {
+    return 1.0f;
+  }
   return static_cast<float>(opacity) / 255.0f;
 }
 
