@@ -260,7 +260,7 @@ void GLCanvas::drawColorGlyphs(const GlyphID glyphIDs[], const Point positions[]
     glyphMatrix.postTranslate(position.x, position.y);
     save();
     concat(glyphMatrix);
-    concatAlpha(paint.getAlpha());
+    globalPaint.alpha = OpacityConcat(globalPaint.alpha, paint.getAlpha());
     auto texture = glyphBuffer->makeTexture(getContext());
     drawTexture(texture.get(), nullptr, false);
     restore();

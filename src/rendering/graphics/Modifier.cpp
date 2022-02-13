@@ -200,8 +200,11 @@ bool BlendModifier::hitTest(RenderCache*, float, float) const {
 void BlendModifier::applyToGraphic(Canvas* canvas, RenderCache* cache,
                                    std::shared_ptr<Graphic> graphic) const {
   canvas->save();
-  canvas->concatAlpha(alpha);
-  canvas->concatBlendMode(ToBlend(blendMode));
+  auto newAlpha = OpacityConcat(canvas->getAlpha(), alpha);
+  canvas->setAlpha(newAlpha);
+  if (blendMode != BlendMode::Normal) {
+    canvas->setBlendMode(ToBlend(blendMode));
+  }
   graphic->draw(canvas, cache);
   canvas->restore();
 }

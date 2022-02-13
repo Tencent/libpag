@@ -61,14 +61,19 @@ void Canvas::concat(const Matrix& matrix) {
   onSetMatrix(globalPaint.matrix);
 }
 
-void Canvas::concatAlpha(Opacity alpha) {
-  globalPaint.alpha = OpacityConcat(globalPaint.alpha, alpha);
+Opacity Canvas::getAlpha() const {
+  return globalPaint.alpha;
 }
 
-void Canvas::concatBlendMode(Blend blendMode) {
-  if (blendMode == Blend::SrcOver) {
-    return;
-  }
+void Canvas::setAlpha(Opacity newAlpha) {
+  globalPaint.alpha = newAlpha;
+}
+
+Blend Canvas::getBlendMode() const {
+  return globalPaint.blendMode;
+}
+
+void Canvas::setBlendMode(Blend blendMode) {
   globalPaint.blendMode = blendMode;
 }
 
