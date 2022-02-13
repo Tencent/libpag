@@ -18,20 +18,57 @@
 
 #pragma once
 
-#include "pag/file.h"
-
 namespace pag {
 /**
  * Stroke controls options applied when stroking geometries (paths, glyphs).
  */
 class Stroke {
  public:
+  /**
+   * Cap draws at the beginning and end of an open path contour.
+   */
+  enum class Cap {
+    /**
+     * No stroke extension.
+     */
+    Butt,
+    /**
+     * Adds circle
+     */
+    Round,
+    /**
+     * Adds square
+     */
+    Square
+  };
+
+  /**
+   * Join specifies how corners are drawn when a shape is stroked. Join affects the four corners
+   * of a stroked rectangle, and the connected segments in a stroked path. Choose miter join to draw
+   * sharp corners. Choose round join to draw a circle with a radius equal to the stroke width on
+   * top of the corner. Choose bevel join to minimally connect the thick strokes.
+   */
+  enum class Join {
+    /**
+     * Extends to miter limit.
+     */
+    Miter,
+    /**
+     * Adds circle.
+     */
+    Round,
+    /**
+     * Connects outside edges.
+     */
+    Bevel
+  };
+
   Stroke() = default;
 
   /**
    * Creates a new Stroke width specified options.
    */
-  explicit Stroke(float width, Enum cap = LineCap::Butt, Enum join = LineJoin::Miter,
+  explicit Stroke(float width, Cap cap = Cap::Butt, Join join = Join::Miter,
                   float miterLimit = 4.0f)
       : width(width), cap(cap), join(join), miterLimit(miterLimit) {
   }
@@ -44,12 +81,12 @@ class Stroke {
   /**
    *  The geometry drawn at the beginning and end of strokes.
    */
-  Enum cap = LineCap::Butt;
+  Cap cap = Cap::Butt;
 
   /**
    * The geometry drawn at the corners of strokes.
    */
-  Enum join = LineJoin::Miter;
+  Join join = Join::Miter;
 
   /**
    * The limit at which a sharp corner is drawn beveled.

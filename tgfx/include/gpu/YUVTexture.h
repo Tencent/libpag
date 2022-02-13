@@ -23,6 +23,9 @@
 
 namespace pag {
 
+/**
+ * YUVTexture wraps separate textures in the GPU backend for Y, U, and V planes.
+ */
 class YUVTexture : public Texture {
  public:
   /**

@@ -18,7 +18,7 @@
 
 #include "core/PathEffect.h"
 #include "core/PathRef.h"
-#include "pag/file.h"
+#include "core/Stroke.h"
 
 namespace pag {
 using namespace pk;
@@ -58,22 +58,22 @@ class StrokePathEffect : public PathEffect {
   SkPaint paint = {};
 };
 
-static SkPaint::Cap ToSkLineCap(Enum cap) {
+static SkPaint::Cap ToSkLineCap(Stroke::Cap cap) {
   switch (cap) {
-    case LineCap::Round:
+    case Stroke::Cap::Round:
       return SkPaint::kRound_Cap;
-    case LineCap::Square:
+    case Stroke::Cap::Square:
       return SkPaint::kSquare_Cap;
     default:
       return SkPaint::kButt_Cap;
   }
 }
 
-static SkPaint::Join ToSkLineJoin(Enum join) {
+static SkPaint::Join ToSkLineJoin(Stroke::Join join) {
   switch (join) {
-    case LineJoin::Round:
+    case Stroke::Join::Round:
       return SkPaint::kRound_Join;
-    case LineJoin::Bevel:
+    case Stroke::Join::Bevel:
       return SkPaint::kBevel_Join;
     default:
       return SkPaint::kMiter_Join;

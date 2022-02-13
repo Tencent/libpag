@@ -27,6 +27,7 @@
 #include "rendering/graphics/Graphic.h"
 #include "rendering/graphics/Shape.h"
 #include "rendering/utils/PathUtil.h"
+#include "rendering/utils/TGFXTypes.h"
 
 namespace pag {
 
@@ -47,7 +48,7 @@ enum class PaintType { Fill, Stroke, GradientFill, GradientStroke };
  */
 struct StrokePaint {
   Stroke getStroke() const {
-    return Stroke(strokeWidth, lineCap, lineJoin, miterLimit);
+    return Stroke(strokeWidth, ToTGFXCap(lineCap), ToTGFXJoin(lineJoin), miterLimit);
   }
 
   float strokeWidth;

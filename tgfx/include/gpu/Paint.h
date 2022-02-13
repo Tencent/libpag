@@ -110,28 +110,28 @@ class Paint {
   /**
    * Returns the geometry drawn at the beginning and end of strokes.
    */
-  Enum getLineCap() const {
+  Stroke::Cap getLineCap() const {
     return stroke.cap;
   }
 
   /**
    * Sets the geometry drawn at the beginning and end of strokes.
    */
-  void setLineCap(Enum cap) {
+  void setLineCap(Stroke::Cap cap) {
     stroke.cap = cap;
   }
 
   /**
    * Returns the geometry drawn at the corners of strokes.
    */
-  Enum getLineJoin() const {
+  Stroke::Join getLineJoin() const {
     return stroke.join;
   }
 
   /**
    * Sets the geometry drawn at the corners of strokes.
    */
-  void setLineJoin(Enum join) {
+  void setLineJoin(Stroke::Join join) {
     stroke.join = join;
   }
 

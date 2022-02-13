@@ -28,7 +28,6 @@
 #include "gpu/ColorShader.h"
 #include "gpu/TextureFragmentProcessor.h"
 #include "gpu/TextureMaskFragmentProcessor.h"
-#include "pag/file.h"
 
 namespace pag {
 GLCanvas::GLCanvas(Surface* surface) : Canvas(surface) {
