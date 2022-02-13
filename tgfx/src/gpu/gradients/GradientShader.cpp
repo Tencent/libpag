@@ -22,7 +22,6 @@
 #include "gpu/ColorShader.h"
 #include "gpu/ConstColorProcessor.h"
 #include "gpu/GradientCache.h"
-#include "gpu/ShaderBase.h"
 #include "gpu/gradients/ClampedGradientEffect.h"
 #include "gpu/gradients/DualIntervalGradientColorizer.h"
 #include "gpu/gradients/LinearGradientLayout.h"

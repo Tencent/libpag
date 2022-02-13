@@ -23,6 +23,10 @@
 #include "pag/types.h"
 
 namespace pag {
+struct FPArgs;
+
+class FragmentProcessor;
+
 /**
  * Shaders specify the source color(s) for what is being drawn. If a paint has no shader, then the
  * paint's color is used. If the paint has a shader, then the shader's color(s) are use instead, but
@@ -73,5 +77,7 @@ class Shader {
   virtual bool isOpaque() const {
     return false;
   }
+
+  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const = 0;
 };
 }  // namespace pag

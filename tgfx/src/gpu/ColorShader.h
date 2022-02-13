@@ -18,10 +18,10 @@
 
 #pragma once
 
-#include "ShaderBase.h"
+#include "gpu/Shader.h"
 
 namespace pag {
-class ColorShader : public ShaderBase {
+class ColorShader : public Shader {
  public:
   explicit ColorShader(Color4f color) : color(color) {
   }
