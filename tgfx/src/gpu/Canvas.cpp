@@ -17,12 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/Canvas.h"
-#include "base/utils/MatrixUtil.h"
 #include "gpu/Surface.h"
 
 namespace pag {
-#define CONTENT_SCALE_STEP 20.0f
-
 Canvas::Canvas(Surface* surface) : surface(surface) {
   globalPaint.clip.addRect(0, 0, static_cast<float>(surface->width()),
                            static_cast<float>(surface->height()));
@@ -77,7 +74,7 @@ void Canvas::setBlendMode(Blend blendMode) {
   globalPaint.blendMode = blendMode;
 }
 
-Path Canvas::getGlobalClip() const {
+Path Canvas::getTotalClip() const {
   return globalPaint.clip;
 }
 
@@ -109,35 +106,11 @@ Context* Canvas::getContext() const {
   return surface->getContext();
 }
 
-const SurfaceOptions* Canvas::surfaceOptions() const {
-  return surface->options();
+Surface* Canvas::getSurface() const {
+  return surface;
 }
 
-std::shared_ptr<Surface> Canvas::makeContentSurface(const Rect& bounds, float scaleFactorLimit,
-                                                    bool usesMSAA) const {
-  auto totalMatrix = getMatrix();
-  auto maxScale = GetMaxScaleFactor(totalMatrix);
-  if (maxScale > scaleFactorLimit) {
-    maxScale = scaleFactorLimit;
-  } else {
-    // Corrected the zoom value to snap to 1/20th the accuracy of pixels to prevent edge jitter
-    // during gradual zoom-in.
-    // 1/20 is the minimum pixel accuracy for most platforms, and there is no jitter when drawing
-    // on the screen.
-    maxScale = ceilf(maxScale * CONTENT_SCALE_STEP) / CONTENT_SCALE_STEP;
-  }
-  auto width = static_cast<int>(ceilf(bounds.width() * maxScale));
-  auto height = static_cast<int>(ceil(bounds.height() * maxScale));
-  // LOGE("makeContentSurface: (width = %d, height = %d)", width, height);
-  auto sampleCount = usesMSAA ? 4 : 1;
-  auto newSurface = Surface::Make(getContext(), width, height, false, sampleCount);
-  if (newSurface == nullptr) {
-    return nullptr;
-  }
-  auto newCanvas = newSurface->getCanvas();
-  auto matrix = Matrix::MakeScale(maxScale);
-  matrix.preTranslate(-bounds.x(), -bounds.y());
-  newCanvas->setMatrix(matrix);
-  return newSurface;
+const SurfaceOptions* Canvas::surfaceOptions() const {
+  return surface->options();
 }
 }  // namespace pag

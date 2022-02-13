@@ -34,7 +34,6 @@ class GLCanvas : public Canvas {
   void drawPath(const Path& path, const Paint& paint) override;
   void drawGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
                   const Font& font, const Paint& paint) override;
-  Enum hasComplexPaint(const Rect& drawingBounds) const override;
 
  protected:
   void onSave() override {

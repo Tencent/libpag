@@ -22,6 +22,7 @@
 #include "base/utils/UniqueID.h"
 #include "core/Blend.h"
 #include "gpu/Surface.h"
+#include "rendering/utils/SurfaceUtil.h"
 
 namespace pag {
 static constexpr std::pair<Enum, Blend> kBlendModeMap[] = {
@@ -286,7 +287,7 @@ void MaskModifier::applyToGraphic(Canvas* canvas, RenderCache* cache,
     // 与遮罩不相交，直接跳过绘制。
     return;
   }
-  auto contentSurface = canvas->makeContentSurface(bounds, FLT_MAX);
+  auto contentSurface = SurfaceUtil::MakeContentSurface(canvas, bounds, FLT_MAX);
   if (contentSurface == nullptr) {
     return;
   }

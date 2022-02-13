@@ -302,25 +302,6 @@ void GLCanvas::drawMaskGlyphs(TextBlob* textBlob, const Paint& paint) {
   drawMask(clippedDeviceQuad, texture.get(), shader.get());
 }
 
-Enum GLCanvas::hasComplexPaint(const Rect& drawingBounds) const {
-  auto bounds = drawingBounds;
-  globalPaint.matrix.mapRect(&bounds);
-  auto result = PaintKind::None;
-  if (globalPaint.alpha != Opaque) {
-    result |= PaintKind::Alpha;
-  }
-  if (globalPaint.blendMode != Blend::SrcOver) {
-    result |= PaintKind::Blend;
-  }
-  auto surfaceBounds =
-      Rect::MakeWH(static_cast<float>(surface->width()), static_cast<float>(surface->height()));
-  bounds.intersect(surfaceBounds);
-  if (!globalPaint.clip.contains(bounds)) {
-    result |= PaintKind::Clip;
-  }
-  return result;
-}
-
 GLDrawer* GLCanvas::getDrawer() {
   if (_drawer == nullptr) {
     _drawer = GLDrawer::Make(getContext());

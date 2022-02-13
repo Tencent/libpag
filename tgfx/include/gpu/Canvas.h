@@ -30,14 +30,6 @@ class Surface;
 
 class SurfaceOptions;
 
-struct PaintKind {
- public:
-  static const Enum None = 0;
-  static const Enum Alpha = 1 << 0;
-  static const Enum Blend = 1 << 1;
-  static const Enum Clip = 1 << 2;
-};
-
 struct CanvasPaint {
   Opacity alpha = Opaque;
   Blend blendMode = Blend::SrcOver;
@@ -56,6 +48,21 @@ class Canvas {
   explicit Canvas(Surface* surface);
 
   virtual ~Canvas() = default;
+
+  /**
+   * Retrieves the context associated with this Surface.
+   */
+  Context* getContext() const;
+
+  /**
+   * Returns the Surface this canvas draws into.
+   */
+  Surface* getSurface() const;
+
+  /**
+   * Returns SurfaceOptions associated with this canvas.
+   */
+  const SurfaceOptions* surfaceOptions() const;
 
   /**
    * Saves alpha, blend mode, matrix and clip. Calling restore() discards changes to them, restoring
@@ -117,7 +124,7 @@ class Canvas {
   /**
    * Returns the current total clip.
    */
-  Path getGlobalClip() const;
+  Path getTotalClip() const;
 
   /**
    * Replaces clip with the intersection of clip and path. The path is transformed by Matrix before
@@ -131,7 +138,8 @@ class Canvas {
   virtual void clear() = 0;
 
   /**
-   * Draws a rectangle using current clip, matrix, and specified paint.
+   * Draws a rectangle with specified paint, using current current alpha, blend mode, clip and
+   * matrix.
    */
   void drawRect(const Rect& rect, const Paint& paint);
 
@@ -143,7 +151,7 @@ class Canvas {
 
   /**
    *  Draws a RGBAAA layout Texture, with its top-left corner at (0, 0), using current alpha, blend
-   *  mode, clip and Matrix.
+   *  mode, clip and matrix.
    */
   virtual void drawTexture(const Texture* texture, const RGBAAALayout* layout) = 0;
 
@@ -175,31 +183,6 @@ class Canvas {
    */
   virtual void flush() {
   }
-
-  /**
-   * Returns the paint kinds of this canvas for specified area.
-   */
-  virtual Enum hasComplexPaint(const Rect& drawingBounds) const = 0;
-
-  /**
-   * Retrieves the context associated with this Surface.
-   */
-  Context* getContext() const;
-
-  /**
-   * Returns the Surface this canvas draws into.
-   */
-  Surface* getSurface() const {
-    return surface;
-  }
-
-  /**
-   * Returns SurfaceOptions associated with this canvas.
-   */
-  const SurfaceOptions* surfaceOptions() const;
-
-  std::shared_ptr<Surface> makeContentSurface(const Rect& bounds, float scaleFactorLimit = FLT_MAX,
-                                              bool usesMSAA = false) const;
 
  protected:
   Surface* surface = nullptr;
