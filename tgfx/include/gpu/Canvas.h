@@ -95,14 +95,24 @@ class Canvas {
   void concat(const Matrix& matrix);
 
   /**
-   * Replaces the global alpha with specified alpha premultiplied with existing alpha.
+   * Returns the current global alpha.
    */
-  void concatAlpha(Opacity alpha);
+  Opacity getAlpha() const;
 
   /**
-   * Replaces the global blend mode with specified blend mode if it is not BlendMode::Normal.
+   * Replaces the global alpha with specified newAlpha.
    */
-  void concatBlendMode(Blend blendMode);
+  void setAlpha(Opacity newAlpha);
+
+  /**
+   * Returns the current global blend mode.
+   */
+  Blend getBlendMode() const;
+
+  /**
+   * Replaces the global blend mode with specified new blend mode.
+   */
+  void setBlendMode(Blend blendMode);
 
   /**
    * Returns the current total clip.
