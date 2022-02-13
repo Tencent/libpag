@@ -26,7 +26,6 @@
 #include "core/TextBlob.h"
 #include "gpu/AlphaFragmentProcessor.h"
 #include "gpu/ColorShader.h"
-#include "gpu/ShaderBase.h"
 #include "gpu/TextureFragmentProcessor.h"
 #include "gpu/TextureMaskFragmentProcessor.h"
 #include "gpu/YUVTextureFragmentProcessor.h"
@@ -186,8 +185,7 @@ void GLCanvas::drawPath(const Path& path, const Shader* shader) {
     auto localMatrix = Matrix::MakeScale(bounds.width(), bounds.height());
     localMatrix.postTranslate(bounds.x(), bounds.y());
     auto args = FPArgs(getContext(), localMatrix);
-    draw(bounds, bounds, std::move(op),
-         static_cast<const ShaderBase*>(shader)->asFragmentProcessor(args));
+    draw(bounds, bounds, std::move(op), shader->asFragmentProcessor(args));
     return;
   }
   auto quad = globalPaint.matrix.mapRect(clippedLocalQuad);
@@ -222,8 +220,7 @@ void GLCanvas::drawMask(Rect quad, const Texture* mask, const Shader* shader) {
   auto args = FPArgs(getContext(), localMatrix);
   save();
   resetMatrix();
-  draw(quad, quad, GLFillRectOp::Make(),
-       static_cast<const ShaderBase*>(shader)->asFragmentProcessor(args),
+  draw(quad, quad, GLFillRectOp::Make(), shader->asFragmentProcessor(args),
        TextureMaskFragmentProcessor::MakeUseLocalCoord(mask, Matrix::MakeScale(scale.x, scale.y)));
   restore();
 }

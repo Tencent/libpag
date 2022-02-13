@@ -18,11 +18,11 @@
 
 #pragma once
 
-#include "gpu/ShaderBase.h"
+#include "gpu/Shader.h"
 
 namespace pag {
 
-class GradientShaderBase : public ShaderBase {
+class GradientShaderBase : public Shader {
  public:
   GradientShaderBase(const std::vector<Color4f>& colors, const std::vector<float>& positions,
                      const Matrix& pointsToUnit);
