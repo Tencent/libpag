@@ -58,11 +58,11 @@ void Canvas::concat(const Matrix& matrix) {
   onSetMatrix(globalPaint.matrix);
 }
 
-Opacity Canvas::getAlpha() const {
+float Canvas::getAlpha() const {
   return globalPaint.alpha;
 }
 
-void Canvas::setAlpha(Opacity newAlpha) {
+void Canvas::setAlpha(float newAlpha) {
   globalPaint.alpha = newAlpha;
 }
 

@@ -21,6 +21,7 @@
 #include "core/PathEffect.h"
 #include "gpu/Canvas.h"
 #include "pag/file.h"
+#include "rendering/utils/TGFXTypes.h"
 
 namespace pag {
 static std::unique_ptr<Paint> CreateFillPaint(const Glyph* glyph) {
@@ -29,8 +30,7 @@ static std::unique_ptr<Paint> CreateFillPaint(const Glyph* glyph) {
   }
   auto fillPaint = new Paint();
   fillPaint->setStyle(PaintStyle::Fill);
-  fillPaint->setColor(glyph->getFillColor());
-  fillPaint->setAlpha(glyph->getAlpha());
+  fillPaint->setColor(ToTGFXColor(glyph->getFillColor(), glyph->getAlpha()));
   return std::unique_ptr<Paint>(fillPaint);
 }
 
@@ -40,8 +40,7 @@ static std::unique_ptr<Paint> CreateStrokePaint(const Glyph* glyph) {
   }
   auto strokePaint = new Paint();
   strokePaint->setStyle(PaintStyle::Stroke);
-  strokePaint->setColor(glyph->getStrokeColor());
-  strokePaint->setAlpha(glyph->getAlpha());
+  strokePaint->setColor(ToTGFXColor(glyph->getStrokeColor(), glyph->getAlpha()));
   strokePaint->setStrokeWidth(glyph->getStrokeWidth());
   return std::unique_ptr<Paint>(strokePaint);
 }

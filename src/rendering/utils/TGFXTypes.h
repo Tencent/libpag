@@ -18,11 +18,19 @@
 
 #pragma once
 
+#include "core/Blend.h"
+#include "core/Color4f.h"
 #include "core/Stroke.h"
 #include "pag/file.h"
 
 namespace pag {
+Blend ToTGFXBlend(Enum blendMode);
+
 Stroke::Cap ToTGFXCap(Enum cap);
 
 Stroke::Join ToTGFXJoin(Enum join);
+
+Color4f ToTGFXColor(Color color, Opacity opacity = Opaque);
+
+float ToTGFXAlpha(Opacity opacity);
 }  // namespace pag

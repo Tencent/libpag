@@ -20,6 +20,7 @@
 #include "gpu/Canvas.h"
 #include "gpu/Shader.h"
 #include "pag/file.h"
+#include "rendering/utils/TGFXTypes.h"
 
 namespace pag {
 std::shared_ptr<Graphic> Shape::MakeFrom(const Path& path, Color color) {
@@ -27,7 +28,7 @@ std::shared_ptr<Graphic> Shape::MakeFrom(const Path& path, Color color) {
     return nullptr;
   }
   Paint paint = {};
-  paint.setColor(color);
+  paint.setColor(ToTGFXColor(color));
   return std::shared_ptr<Graphic>(new Shape(path, paint));
 }
 
@@ -51,7 +52,7 @@ static std::shared_ptr<Shader> MakeGradientShader(const GradientPaint& gradient)
     shader = Shader::MakeRadialGradient(gradient.startPoint, radius, colors, gradient.positions);
   }
   if (!shader) {
-    shader = Shader::MakeColorShader(gradient.colors.back(), gradient.alphas.back());
+    shader = Shader::MakeColorShader(colors.back());
   }
   return shader;
 }
@@ -78,7 +79,7 @@ bool Shape::hitTest(RenderCache*, float x, float y) {
 }
 
 bool Shape::getPath(Path* result) const {
-  if (paint.getAlpha() != Opaque) {
+  if (paint.getAlpha() != 1.0f) {
     return false;
   }
   auto shader = paint.getShader();

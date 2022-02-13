@@ -27,7 +27,7 @@ void GLConstColorProcessor::emitCode(EmitArgs& args) {
                                                  "Color", &colorName);
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
   const auto* fp = static_cast<const ConstColorProcessor*>(args.fragmentProcessor);
-  if (fp->color.a != 1.0f) {
+  if (fp->color.alpha != 1.0f) {
     fragBuilder->codeAppendf("%s.rgb *= %s.a;", args.outputColor.c_str(), args.outputColor.c_str());
   }
 }

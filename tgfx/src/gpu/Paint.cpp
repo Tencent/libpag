@@ -21,8 +21,7 @@
 namespace pag {
 void Paint::reset() {
   style = PaintStyle::Fill;
-  color = Black;
-  alpha = Opaque;
+  color = Color4f::Black();
   stroke = Stroke(0);
   shader = nullptr;
 }
