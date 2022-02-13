@@ -35,7 +35,6 @@ class GLCanvas : public Canvas {
   void drawGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
                   const Font& font, const Paint& paint) override;
   Enum hasComplexPaint(const Rect& drawingBounds) const override;
-  void drawPath(const Path& path, const Shader* shader);
 
  protected:
   void onSave() override {
@@ -70,6 +69,8 @@ class GLCanvas : public Canvas {
                        const Font& font, const Paint& paint);
 
   void drawMaskGlyphs(TextBlob* textBlob, const Paint& paint);
+
+  void fillPath(const Path& path, const Shader* shader);
 
   void draw(const Rect& localQuad, const Rect& deviceQuad, std::unique_ptr<GLDrawOp> op,
             std::unique_ptr<FragmentProcessor> color,

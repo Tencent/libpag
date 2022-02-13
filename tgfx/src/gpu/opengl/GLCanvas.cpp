@@ -28,7 +28,6 @@
 #include "gpu/ColorShader.h"
 #include "gpu/TextureFragmentProcessor.h"
 #include "gpu/TextureMaskFragmentProcessor.h"
-#include "gpu/YUVTextureFragmentProcessor.h"
 #include "pag/file.h"
 
 namespace pag {
@@ -132,14 +131,11 @@ void GLCanvas::drawTexture(const Texture* texture, const RGBAAALayout* layout, c
   localMatrix.postScale(scale.x, scale.y);
   auto translate = texture->getTextureCoord(clippedLocalQuad.x(), clippedLocalQuad.y());
   localMatrix.postTranslate(translate.x, translate.y);
-  std::unique_ptr<FragmentProcessor> color;
-  if (texture->isYUV()) {
-    color = YUVTextureFragmentProcessor::Make(static_cast<const YUVTexture*>(texture), layout,
-                                              localMatrix);
-  } else {
-    color = TextureFragmentProcessor::Make(texture, layout, localMatrix);
+  auto processor = TextureFragmentProcessor::Make(texture, layout, localMatrix);
+  if (processor == nullptr) {
+    return;
   }
-  draw(clippedLocalQuad, clippedDeviceQuad, GLFillRectOp::Make(), std::move(color),
+  draw(clippedLocalQuad, clippedDeviceQuad, GLFillRectOp::Make(), std::move(processor),
        TextureMaskFragmentProcessor::MakeUseLocalCoord(mask, Matrix::I(), inverted), true);
 }
 
@@ -149,7 +145,7 @@ void GLCanvas::drawPath(const Path& path, const Paint& paint) {
     shader = Shader::MakeColorShader(paint.getColor(), paint.getAlpha());
   }
   if (paint.getStyle() == PaintStyle::Fill) {
-    drawPath(path, shader.get());
+    fillPath(path, shader.get());
     return;
   }
   auto strokePath = path;
@@ -157,7 +153,7 @@ void GLCanvas::drawPath(const Path& path, const Paint& paint) {
   if (strokeEffect) {
     strokeEffect->applyTo(&strokePath);
   }
-  drawPath(strokePath, shader.get());
+  fillPath(strokePath, shader.get());
 }
 
 static std::unique_ptr<GLDrawOp> MakeSimplePathOp(const Path& path) {
@@ -171,7 +167,7 @@ static std::unique_ptr<GLDrawOp> MakeSimplePathOp(const Path& path) {
   return nullptr;
 }
 
-void GLCanvas::drawPath(const Path& path, const Shader* shader) {
+void GLCanvas::fillPath(const Path& path, const Shader* shader) {
   if (path.isEmpty()) {
     return;
   }
@@ -239,7 +235,7 @@ void GLCanvas::drawGlyphs(const GlyphID glyphIDs[], const Point positions[], siz
   auto stroke = paint.getStyle() == PaintStyle::Stroke ? paint.getStroke() : nullptr;
   if (textBlob->getPath(&path, stroke)) {
     auto shader = Shader::MakeColorShader(paint.getColor(), paint.getAlpha());
-    drawPath(path, shader.get());
+    fillPath(path, shader.get());
     return;
   }
   drawMaskGlyphs(textBlob.get(), paint);
@@ -266,7 +262,7 @@ void GLCanvas::drawColorGlyphs(const GlyphID glyphIDs[], const Point positions[]
     concat(glyphMatrix);
     concatAlpha(paint.getAlpha());
     auto texture = glyphBuffer->makeTexture(getContext());
-    drawTexture(texture.get(), nullptr);
+    drawTexture(texture.get(), nullptr, false);
     restore();
   }
 }

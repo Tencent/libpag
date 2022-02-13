@@ -21,6 +21,7 @@
 #include "core/Blend.h"
 #include "core/Font.h"
 #include "core/Path.h"
+#include "core/RGBAAALayout.h"
 #include "gpu/Paint.h"
 #include "gpu/Texture.h"
 
@@ -118,6 +119,11 @@ class Canvas {
    * Replacing all pixels with transparent color.
    */
   virtual void clear() = 0;
+
+  /**
+   * Draws a rectangle using current clip, matrix, and specified paint.
+   */
+  void drawRect(const Rect& rect, const Paint& paint);
 
   /**
    * Draws a Texture, with its top-left corner at (0, 0), using a mask texture and current alpha,

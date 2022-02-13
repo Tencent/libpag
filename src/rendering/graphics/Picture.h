@@ -21,6 +21,7 @@
 #include "Graphic.h"
 #include "core/Bitmap.h"
 #include "core/Image.h"
+#include "core/RGBAAALayout.h"
 #include "rendering/graphics/Snapshot.h"
 
 namespace pag {

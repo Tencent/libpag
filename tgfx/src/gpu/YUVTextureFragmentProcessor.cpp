@@ -21,12 +21,6 @@
 #include "opengl/GLYUVTextureFragmentProcessor.h"
 
 namespace pag {
-std::unique_ptr<YUVTextureFragmentProcessor> YUVTextureFragmentProcessor::Make(
-    const YUVTexture* texture, const RGBAAALayout* layout, const Matrix& localMatrix) {
-  return std::unique_ptr<YUVTextureFragmentProcessor>(
-      new YUVTextureFragmentProcessor(texture, layout, localMatrix));
-}
-
 YUVTextureFragmentProcessor::YUVTextureFragmentProcessor(const YUVTexture* texture,
                                                          const RGBAAALayout* layout,
                                                          const Matrix& localMatrix)
