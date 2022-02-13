@@ -32,24 +32,14 @@ static bool TryDrawDirectly(Canvas* canvas, const Texture* texture, const RGBAAA
   if (!texture->isYUV() && layout == nullptr) {
     // RGBA 纹理始终可以直接上屏。
     canvas->drawTexture(texture);
-    // 防止临时纹理析构
-    canvas->flush();
     return true;
   }
   auto totalMatrix = canvas->getMatrix();
   auto scaleFactor = GetMaxScaleFactor(totalMatrix);
   if (scaleFactor <= 1.0f) {
-    auto width = layout ? layout->width : texture->width();
-    auto height = layout ? layout->height : texture->height();
     // 纹理格式为 YUV 或含有 RGBAAALayout 时在缩放值小于等于 1.0f 时才直接上屏会有更好的性能。
-    auto bounds = Rect::MakeWH(static_cast<float>(width), static_cast<float>(height));
-    auto result = canvas->hasComplexPaint(bounds);
-    if (!(result & PaintKind::Blend || result & PaintKind::Clip)) {
-      canvas->drawTexture(texture, layout);
-      // 防止临时纹理析构
-      canvas->flush();
-      return true;
-    }
+    canvas->drawTexture(texture, layout);
+    return true;
   }
   return false;
 }

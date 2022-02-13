@@ -18,35 +18,26 @@
 
 #pragma once
 
-#include "core/RGBAAALayout.h"
-#include "gpu/FragmentProcessor.h"
-
 namespace pag {
-class TextureFragmentProcessor : public FragmentProcessor {
- public:
-  static std::unique_ptr<FragmentProcessor> Make(const Texture* texture, const RGBAAALayout* layout,
-                                                 const Matrix& localMatrix);
-
-  std::string name() const override {
-    return "TextureFragmentProcessor";
-  }
-
- private:
-  explicit TextureFragmentProcessor(const Texture* texture, const RGBAAALayout* layout,
-                                    const Matrix& localMatrix);
-
-  void onComputeProcessorKey(BytesKey* bytesKey) const override;
-
-  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
-
-  const TextureSampler* onTextureSampler(size_t) const override {
-    return texture->getSampler();
-  }
-
-  const Texture* texture;
-  const RGBAAALayout* layout;
-  CoordTransform coordTransform;
-
-  friend class GLTextureFragmentProcessor;
+/**
+ * Defines the layout of a RGBAAA format image, which is half RGB, half AAA.
+ */
+struct RGBAAALayout {
+  /**
+   * The display width of the image.
+   */
+  int width;
+  /**
+   * The display height of the image.
+   */
+  int height;
+  /**
+   * The x position of where alpha area begins.
+   */
+  int alphaStartX;
+  /**
+   * The y position of where alpha area begins.
+   */
+  int alphaStartY;
 };
 }  // namespace pag

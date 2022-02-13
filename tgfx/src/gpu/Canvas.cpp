@@ -83,6 +83,12 @@ void Canvas::clipPath(const Path& path) {
   globalPaint.clip.addPath(clipPath, PathOp::Intersect);
 }
 
+void Canvas::drawRect(const Rect& rect, const Paint& paint) {
+  Path path = {};
+  path.addRect(rect);
+  drawPath(path, paint);
+}
+
 void Canvas::drawTexture(const Texture* texture) {
   drawTexture(texture, nullptr);
 }

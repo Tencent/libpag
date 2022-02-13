@@ -24,35 +24,6 @@
 
 namespace pag {
 /**
- * Defines the layout of a RGBAAA format image, which is half RGB, half AAA.
- */
-class RGBAAALayout {
- public:
-  RGBAAALayout() = default;
-
-  RGBAAALayout(int width, int height, int alphaStartX, int alphaStartY)
-      : width(width), height(height), alphaStartX(alphaStartX), alphaStartY(alphaStartY) {
-  }
-
-  /**
-   * The display width of the image.
-   */
-  int width = 0;
-  /**
-   * The display height of the image.
-   */
-  int height = 0;
-  /**
-   * The x position of where alpha area begins.
-   */
-  int alphaStartX = 0;
-  /**
-   * The y position of where alpha area begins.
-   */
-  int alphaStartY = 0;
-};
-
-/**
  * Defines enumerations for Paint.setStyle().
  */
 enum class PaintStyle {

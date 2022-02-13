@@ -17,12 +17,31 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureFragmentProcessor.h"
+#include "base/utils/Log.h"
 #include "base/utils/UniqueID.h"
+#include "gpu/YUVTextureFragmentProcessor.h"
 #include "opengl/GLTextureFragmentProcessor.h"
 
 namespace pag {
-std::unique_ptr<TextureFragmentProcessor> TextureFragmentProcessor::Make(
-    const Texture* texture, const RGBAAALayout* layout, const Matrix& localMatrix) {
+std::unique_ptr<FragmentProcessor> TextureFragmentProcessor::Make(const Texture* texture,
+                                                                  const RGBAAALayout* layout,
+                                                                  const Matrix& localMatrix) {
+  if (texture == nullptr) {
+    return nullptr;
+  }
+  if (layout != nullptr) {
+    if (layout->width <= 0 || layout->height <= 0 ||
+        (layout->alphaStartX <= 0 && layout->alphaStartY <= 0) ||
+        layout->width + layout->alphaStartX > texture->width() ||
+        layout->height + layout->alphaStartY > texture->height()) {
+      LOGE("TextureFragmentProcessor::Make(): Invalid RGBAAALayout specified!");
+      return nullptr;
+    }
+  }
+  if (texture->isYUV()) {
+    return std::unique_ptr<YUVTextureFragmentProcessor>(new YUVTextureFragmentProcessor(
+        static_cast<const YUVTexture*>(texture), layout, localMatrix));
+  }
   return std::unique_ptr<TextureFragmentProcessor>(
       new TextureFragmentProcessor(texture, layout, localMatrix));
 }
