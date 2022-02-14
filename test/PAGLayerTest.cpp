@@ -264,7 +264,7 @@ PAG_TEST_F(PAGLayerTest, TextScale) {
 /**
  * 用例描述: 透明度设置
  */
-PAG_TEST_F(PAGLayerTest, Opacity) {
+PAG_TEST_F(PAGLayerTest, LayerAlpha) {
   auto pagFile = PAGFile::Load("../resources/apitest/AlphaTrackMatte.pag");
   ASSERT_NE(pagFile, nullptr);
   pagFile->setAlpha(0.5f);
@@ -276,6 +276,6 @@ PAG_TEST_F(PAGLayerTest, Opacity) {
   pagPlayer->setComposition(pagFile);
   pagPlayer->setProgress(0.5f);
   pagPlayer->flush();
-  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGLayerTest/Opacity"));
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGLayerTest/LayerAlpha"));
 }
 }  // namespace pag

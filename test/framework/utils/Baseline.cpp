@@ -61,14 +61,13 @@ static void SaveImage(const ImageInfo& info, const std::shared_ptr<Data>& imageD
   }
   auto path = OUT_BASELINE_ROOT + key + COMPRESS_FILE_EXT;
   SaveData(data, path);
-  auto baselineData = LoadImageData(key);
-  if (baselineData == nullptr) {
-    return;
-  }
-  auto baselineImage = Bitmap(info, baselineData->data()).encode(EncodedFormat::WEBP, 100);
-  SaveData(baselineImage, OUT_COMPARE_ROOT + key + "_baseline.webp");
   auto compareImage = Bitmap(info, imageData->data()).encode(EncodedFormat::WEBP, 100);
   SaveData(compareImage, OUT_COMPARE_ROOT + key + "_new.webp");
+  auto baselineData = LoadImageData(key);
+  if (baselineData) {
+    auto baselineImage = Bitmap(info, baselineData->data()).encode(EncodedFormat::WEBP, 100);
+    SaveData(baselineImage, OUT_COMPARE_ROOT + key + "_baseline.webp");
+  }
 }
 
 static void ClearPreviousOutput(const std::string& key) {
@@ -84,6 +83,7 @@ static bool ComparePixelData(const std::shared_ptr<Data>& pixelData, const std::
   }
   auto baselineData = LoadImageData(key);
   if (baselineData == nullptr || pixelData->size() != baselineData->size()) {
+    SaveImage(info, pixelData, key);
     return false;
   }
   size_t diffCount = 0;
