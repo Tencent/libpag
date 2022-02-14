@@ -1,7 +1,7 @@
 import { PAGFile } from './pag-file';
 import { PAGSurface } from './pag-surface';
 import { PAG, PAGScaleMode } from './types';
-import { wasmAwaitRewind, wasmAwaitIgnore } from './utils/decorators';
+import { wasmAwaitRewind, wasmAsyncMethod } from './utils/decorators';
 
 @wasmAwaitRewind
 export class PAGPlayer {
@@ -27,14 +27,14 @@ export class PAGPlayer {
    * Apply all pending changes to the target surface immediately. Returns true if the content has
    * changed.
    */
-  @wasmAwaitIgnore
+  @wasmAsyncMethod
   public async flush(): Promise<boolean> {
     return (await PAGPlayer.module.webAssemblyQueue.exec(this.wasmIns._flush, this.wasmIns)) as boolean;
   }
   /**
    * Set the progress of play position, And Apply all pending changes to the target surface immediately.
    */
-  @wasmAwaitIgnore
+  @wasmAsyncMethod
   public async setProgressAndFlush(progress: number) {
     this.setProgress(progress);
     return await this.flush();

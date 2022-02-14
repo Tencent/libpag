@@ -1,6 +1,6 @@
 import { PAG } from './types';
 import { NativeImage } from './core/native-image';
-import { wasmAwaitRewind, wasmAwaitIgnore } from './utils/decorators';
+import { wasmAwaitRewind, wasmAsyncMethod } from './utils/decorators';
 
 @wasmAwaitRewind
 export class PAGImage {
@@ -8,7 +8,7 @@ export class PAGImage {
   /**
    * Create pag image from image file.
    */
-  @wasmAwaitIgnore
+  @wasmAsyncMethod
   public static async fromFile(data: File): Promise<PAGImage> {
     return new Promise((resolve, reject) => {
       const image = new Image();

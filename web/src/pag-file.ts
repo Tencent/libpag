@@ -2,7 +2,7 @@ import { PAGComposition } from './pag-composition';
 import { PAGImage } from './pag-image';
 import { LayerType, PAG, PAGTimeStretchMode, TextDocument } from './types';
 import { readFile } from './utils/common';
-import { wasmAwaitRewind, wasmAwaitIgnore } from './utils/decorators';
+import { wasmAwaitRewind, wasmAsyncMethod } from './utils/decorators';
 import { ErrorCode } from './utils/error-map';
 import { Log } from './utils/log';
 
@@ -12,7 +12,7 @@ export class PAGFile extends PAGComposition {
   /**
    * Load pag file from file.
    */
-  @wasmAwaitIgnore
+  @wasmAsyncMethod
   public static async load(data: File) {
     const buffer = (await readFile(data)) as ArrayBuffer;
     return PAGFile.loadFromBuffer(buffer);

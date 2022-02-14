@@ -2,9 +2,9 @@ export function wasmAwaitRewind(constructor: any) {
   let functions = Object.getOwnPropertyNames(constructor.prototype).filter(
     (name) => name !== 'constructor' && typeof constructor.prototype[name] === 'function',
   );
-  const wasmAwaitIgnore = constructor.prototype.wasmAwaitIgnore;
-  if (wasmAwaitIgnore && wasmAwaitIgnore.length > 0) {
-    functions = functions.filter((name) => wasmAwaitIgnore.indexOf(name) === -1);
+  const wasmAsyncMethods = constructor.prototype.wasmAsyncMethods;
+  if (wasmAsyncMethods && wasmAsyncMethods.length > 0) {
+    functions = functions.filter((name) => wasmAsyncMethods.indexOf(name) === -1);
   }
   functions.forEach((name) => {
     const fn = constructor.prototype[name];
@@ -22,9 +22,9 @@ export function wasmAwaitRewind(constructor: any) {
   });
 }
 
-export function wasmAwaitIgnore(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
-  if (!target.wasmAwaitIgnore) {
-    target.wasmAwaitIgnore = [];
+export function wasmAsyncMethod(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+  if (!target.wasmAsyncMethods) {
+    target.wasmAsyncMethods = [];
   }
-  target.wasmAwaitIgnore.push(propertyKey);
+  target.wasmAsyncMethods.push(propertyKey);
 }

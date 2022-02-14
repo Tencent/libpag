@@ -3,7 +3,7 @@ import { readFile } from './utils/common';
 import { ErrorCode } from './utils/error-map';
 import { Log } from './utils/log';
 import { defaultFontNames } from './utils/font-family';
-import { wasmAwaitRewind, wasmAwaitIgnore } from './utils/decorators';
+import { wasmAwaitRewind, wasmAsyncMethod } from './utils/decorators';
 
 @wasmAwaitRewind
 export class PAGFont {
@@ -11,7 +11,7 @@ export class PAGFont {
   /**
    * Register custom font family in the browser.
    */
-  @wasmAwaitIgnore
+  @wasmAsyncMethod
   public static async registerFont(family: string, data: File) {
     const buffer = (await readFile(data)) as ArrayBuffer;
     if (!buffer || !(buffer.byteLength > 0)) Log.errorByCode(ErrorCode.PagFontDataEmpty);
