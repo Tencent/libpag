@@ -1,5 +1,5 @@
 export class NativeImage {
-  public static async createFromBytes(bytes) {
+  public static async createFromBytes(bytes: ArrayBuffer) {
     const blob = new Blob([bytes], { type: 'image/*' });
     return new Promise((resolve) => {
       const image = new Image();
