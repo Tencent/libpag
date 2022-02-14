@@ -29,4 +29,8 @@
   [PAGVideoDecoderImpl SetMaxHardwareDecoderCount:maxCount];
 }
 
++ (void)SetSoftwareToHardwareEnabled:(Boolean)value {
+  [PAGVideoDecoderImpl SetSoftwareToHardwareEnabled:value];
+}
+
 @end

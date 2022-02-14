@@ -22,6 +22,7 @@
 #include "base/utils/TimeUtil.h"
 #include "base/utils/USE.h"
 #include "base/utils/UniqueID.h"
+#include "video/VideoDecoder.h"
 #include "rendering/caches/ImageContentCache.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/renderers/FilterRenderer.h"
@@ -166,8 +167,9 @@ void RenderCache::prepareFrame() {
   for (auto& item : layerDistances) {
     for (auto pagLayer : item.second) {
       if (pagLayer->layerType() == LayerType::PreCompose) {
-        auto policy = item.first < MIN_HARDWARE_PREPARE_TIME ? DecodingPolicy::SoftwareToHardware
-                                                             : DecodingPolicy::Hardware;
+        auto policy = VideoDecoder::SoftwareToHardwareEnabled()
+                              && item.first < MIN_HARDWARE_PREPARE_TIME
+                          ? DecodingPolicy::SoftwareToHardware : DecodingPolicy::Hardware;
         preparePreComposeLayer(static_cast<PreComposeLayer*>(pagLayer->layer), policy);
       } else if (pagLayer->layerType() == LayerType::Image) {
         prepareImageLayer(static_cast<PAGImageLayer*>(pagLayer));
@@ -419,7 +421,9 @@ std::shared_ptr<SequenceReader> RenderCache::getSequenceReader(Sequence* sequenc
   }
   if (reader == nullptr) {
     auto file = stage->getSequenceFile(sequence);
-    reader = MakeSequenceReader(file, sequence, DecodingPolicy::SoftwareToHardware);
+    reader = MakeSequenceReader(file, sequence,
+                                VideoDecoder::SoftwareToHardwareEnabled() ?
+                                DecodingPolicy::SoftwareToHardware : DecodingPolicy::Hardware);
     if (reader && !staticComposition) {
       // 完全静态的序列帧不用缓存。
       sequenceCaches[compositionID] = reader;

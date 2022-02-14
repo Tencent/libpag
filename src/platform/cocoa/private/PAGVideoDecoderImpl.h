@@ -24,4 +24,6 @@
 
 + (void)SetMaxHardwareDecoderCount:(int)maxCount;
 
++ (void)SetSoftwareToHardwareEnabled:(Boolean)value;
+
 @end

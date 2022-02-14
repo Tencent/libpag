@@ -18,6 +18,7 @@
 
 #include "CompositionRenderer.h"
 #include "LayerRenderer.h"
+#include "video/VideoDecoder.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/graphics/Picture.h"
@@ -36,8 +37,10 @@ class SequenceProxy : public TextureProxy {
   }
 
   void prepare(RenderCache* cache) const override {
-    static_cast<RenderCache*>(cache)->prepareSequenceReader(sequence, frame,
-                                                            DecodingPolicy::SoftwareToHardware);
+    static_cast<RenderCache*>(cache)->
+        prepareSequenceReader(sequence, frame,
+                              VideoDecoder::SoftwareToHardwareEnabled() ?
+                              DecodingPolicy::SoftwareToHardware : DecodingPolicy::Hardware);
   }
 
   std::shared_ptr<Texture> getTexture(RenderCache* cache) const override {
