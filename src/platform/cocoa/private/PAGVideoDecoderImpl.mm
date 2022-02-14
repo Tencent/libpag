@@ -36,4 +36,8 @@
 
 #pragma clang diagnostic pop
 
++ (void)SetSoftwareToHardwareEnabled:(Boolean)value {
+  pag::PAGVideoDecoder::SetSoftwareToHardwareEnabled(value);
+}
+
 @end
