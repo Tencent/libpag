@@ -417,7 +417,7 @@ class PAG_API PAGLayer : public Content {
   PAGFile* rootFile = nullptr;
   std::weak_ptr<PAGLayer> weakThis;
   Matrix layerMatrix = {};
-  Opacity layerOpacity = Opaque;
+  float layerAlpha = 1.0f;
   PAGLayer* trackMatteOwner = nullptr;
 
   const Layer* getLayer() const;
@@ -429,7 +429,6 @@ class PAG_API PAGLayer : public Content {
   void measureBounds(Rect* bounds) override;
   Matrix getTotalMatrixInternal();
   virtual void setMatrixInternal(const Matrix& matrix);
-  void setAlphaInternal(float alpha);
   virtual float frameRateInternal() const;
   double getProgressInternal();
   void setProgressInternal(double percent);

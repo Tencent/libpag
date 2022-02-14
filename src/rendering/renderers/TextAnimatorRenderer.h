@@ -56,7 +56,7 @@ class TextAnimatorRenderer {
   Point position = Point::Zero();   // 位置
   Point scale = Point::Make(1, 1);  // 缩放
   float rotation = 0.0f;            // 旋转
-  Opacity opacity = Opaque;         // 不透明度，默认不透明
+  float alpha = 1.0f;         // 不透明度，默认不透明
 
   float trackingBefore = 0.0f;  // 字间距-之前
   float trackingAfter = 0.0f;   // 字间距-之后

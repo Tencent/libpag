@@ -32,5 +32,5 @@ Stroke::Join ToTGFXJoin(Enum join);
 
 Color4f ToTGFXColor(Color color, Opacity opacity = Opaque);
 
-float ToTGFXAlpha(Opacity opacity);
+float ToAlpha(Opacity opacity);
 }  // namespace pag

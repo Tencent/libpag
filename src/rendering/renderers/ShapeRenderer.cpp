@@ -71,7 +71,7 @@ class PaintElement : public ElementData {
   std::unique_ptr<ElementData> clone() override {
     auto newPaint = new PaintElement(paintType);
     newPaint->blendMode = blendMode;
-    newPaint->opacity = opacity;
+    newPaint->alpha = alpha;
     newPaint->color = color;
     newPaint->gradient = gradient;
     newPaint->stroke = stroke;
@@ -88,11 +88,11 @@ class PaintElement : public ElementData {
   }
 
   PaintType paintType = PaintType::Fill;
-  Enum blendMode = BlendMode::Normal;
-  Opacity opacity = Opaque;
+  Blend blendMode = Blend::SrcOver;
+  float alpha = 1.0f;
   Enum compositeOrder = CompositeOrder::BelowPreviousInSameGroup;
   PathFillType pathFillType = PathFillType::Winding;
-  Color color = White;
+  Color4f color = Color4f::White();
   GradientPaint gradient;
   StrokePaint stroke;
 };
@@ -131,7 +131,7 @@ class GroupElement : public ElementData {
   std::unique_ptr<ElementData> clone() override {
     auto newGroup = new GroupElement();
     newGroup->blendMode = blendMode;
-    newGroup->opacity = opacity;
+    newGroup->alpha = alpha;
     for (auto& data : elements) {
       auto element = data->clone().release();
       newGroup->elements.push_back(element);
@@ -172,8 +172,8 @@ class GroupElement : public ElementData {
     elements.clear();
   }
 
-  Enum blendMode = BlendMode::Normal;
-  Opacity opacity = Opaque;
+  Blend blendMode = Blend::SrcOver;
+  float alpha = 1.0f;
   std::vector<ElementData*> elements;
 };
 
@@ -327,9 +327,9 @@ PaintElement* FillToPaint(FillElement* fill, Frame frame) {
     return nullptr;
   }
   auto paint = new PaintElement(PaintType::Fill);
-  paint->blendMode = fill->blendMode;
-  paint->opacity = fill->opacity->getValueAt(frame);
-  paint->color = fill->color->getValueAt(frame);
+  paint->blendMode = ToTGFXBlend(fill->blendMode);
+  paint->alpha = ToAlpha(fill->opacity->getValueAt(frame));
+  paint->color = ToTGFXColor(fill->color->getValueAt(frame));
   paint->pathFillType = ToPathFillType(fill->fillRule);
   paint->compositeOrder = fill->composite;
   return paint;
@@ -340,10 +340,10 @@ PaintElement* StrokeToPaint(StrokeElement* stroke, Frame frame) {
     return nullptr;
   }
   auto paint = new PaintElement(PaintType::Stroke);
-  paint->blendMode = stroke->blendMode;
-  paint->opacity = stroke->opacity->getValueAt(frame);
+  paint->blendMode = ToTGFXBlend(stroke->blendMode);
+  paint->alpha = ToAlpha(stroke->opacity->getValueAt(frame));
   paint->compositeOrder = stroke->composite;
-  paint->color = stroke->color->getValueAt(frame);
+  paint->color = ToTGFXColor(stroke->color->getValueAt(frame));
   paint->stroke.strokeWidth = stroke->strokeWidth->getValueAt(frame);
   paint->stroke.lineCap = stroke->lineCap;
   paint->stroke.lineJoin = stroke->lineJoin;
@@ -415,8 +415,8 @@ GradientPaint MakeGradientPaint(Enum fillType, Point startPoint, Point endPoint,
     auto alphaPosition = alphaPositions[alphaIndex];
     if (colorPosition == alphaPosition) {
       gradient.positions.push_back(colorPosition);
-      gradient.colors.push_back(colorValues[colorIndex++]);
-      gradient.alphas.push_back(alphaValues[alphaIndex++]);
+      auto color4f = ToTGFXColor(colorValues[colorIndex++], alphaValues[alphaIndex++]);
+      gradient.colors.push_back(color4f);
     } else if (colorPosition < alphaPosition) {
       gradient.positions.push_back(colorPosition);
       Opacity alpha;
@@ -427,8 +427,8 @@ GradientPaint MakeGradientPaint(Enum fillType, Point startPoint, Point endPoint,
       } else {
         alpha = alphaValues[alphaIndex];
       }
-      gradient.colors.push_back(colorValues[colorIndex++]);
-      gradient.alphas.push_back(alpha);
+      auto color4f = ToTGFXColor(colorValues[colorIndex++], alpha);
+      gradient.colors.push_back(color4f);
     } else {
       gradient.positions.push_back(alphaPosition);
       Color color = {};
@@ -441,23 +441,23 @@ GradientPaint MakeGradientPaint(Enum fillType, Point startPoint, Point endPoint,
       } else {
         color = colorValues[colorIndex];
       }
-      gradient.colors.push_back(color);
-      gradient.alphas.push_back(alphaValues[alphaIndex++]);
+      auto color4f = ToTGFXColor(color, alphaValues[alphaIndex++]);
+      gradient.colors.push_back(color4f);
     }
   }
 
   auto lastAlpha = alphaValues.back();
   while (colorIndex < colorValues.size()) {
     gradient.positions.push_back(colorPositions[colorIndex]);
-    gradient.colors.push_back(colorValues[colorIndex++]);
-    gradient.alphas.push_back(lastAlpha);
+    auto color4f = ToTGFXColor(colorValues[colorIndex++], lastAlpha);
+    gradient.colors.push_back(color4f);
   }
 
   auto lastColor = colorValues.back();
   while (alphaIndex < alphaValues.size()) {
     gradient.positions.push_back(alphaPositions[alphaIndex]);
-    gradient.colors.push_back(lastColor);
-    gradient.alphas.push_back(alphaValues[alphaIndex++]);
+    auto color4f = ToTGFXColor(lastColor, alphaValues[alphaIndex++]);
+    gradient.colors.push_back(color4f);
   }
   return gradient;
 }
@@ -467,8 +467,8 @@ PaintElement* GradientFillToPaint(GradientFillElement* fill, const Matrix& matri
     return nullptr;
   }
   auto paint = new PaintElement(PaintType::GradientFill);
-  paint->blendMode = fill->blendMode;
-  paint->opacity = fill->opacity->getValueAt(frame);
+  paint->blendMode = ToTGFXBlend(fill->blendMode);
+  paint->alpha = ToAlpha(fill->opacity->getValueAt(frame));
   paint->compositeOrder = fill->composite;
   paint->gradient =
       MakeGradientPaint(fill->fillType, fill->startPoint->getValueAt(frame),
@@ -484,8 +484,8 @@ PaintElement* GradientStrokeToPaint(GradientStrokeElement* stroke, const Matrix&
     return nullptr;
   }
   auto paint = new PaintElement(PaintType::GradientStroke);
-  paint->blendMode = stroke->blendMode;
-  paint->opacity = stroke->opacity->getValueAt(frame);
+  paint->blendMode = ToTGFXBlend(stroke->blendMode);
+  paint->alpha = ToAlpha(stroke->opacity->getValueAt(frame));
   paint->compositeOrder = stroke->composite;
   paint->stroke.strokeWidth = stroke->strokeWidth->getValueAt(frame);
   paint->stroke.lineCap = stroke->lineCap;
@@ -685,7 +685,7 @@ void ApplyRepeater(RepeaterElement* repeater, GroupElement* group, Frame frame) 
     }
     if (i == maxCount - 1) {
       if (progress != copies + offset) {
-        newGroup->opacity = static_cast<Opacity>(newGroup->opacity * (copies - i));
+        newGroup->alpha *= copies - i;
       }
     }
     auto matrix = Matrix::I();
@@ -696,7 +696,7 @@ void ApplyRepeater(RepeaterElement* repeater, GroupElement* group, Frame frame) 
     matrix.postTranslate(anchorPoint.x, anchorPoint.y);
     newGroup->applyMatrix(matrix);
     auto newOpacity = Interpolate(startOpacity, endOpacity, progress / maxCount);
-    newGroup->opacity = OpacityConcat(newGroup->opacity, newOpacity);
+    newGroup->alpha *= ToAlpha(newOpacity);
     i += 1.0f;
   }
   group->clear();
@@ -739,7 +739,7 @@ Transform ShapeTransformToTransform(const ShapeTransform* transform, Frame frame
   auto skew = transform->skew->getValueAt(frame);
   auto skewAxis = transform->skewAxis->getValueAt(frame);
   auto rotation = transform->rotation->getValueAt(frame);
-  auto opacity = transform->opacity->getValueAt(frame);
+  auto alpha = ToAlpha(transform->opacity->getValueAt(frame));
   matrix.postTranslate(-anchorPoint.x, -anchorPoint.y);
   matrix.postScale(scale.x, scale.y);
   if (skew != 0) {
@@ -747,7 +747,7 @@ Transform ShapeTransformToTransform(const ShapeTransform* transform, Frame frame
   }
   matrix.postRotate(rotation);
   matrix.postTranslate(position.x, position.y);
-  return {matrix, opacity};
+  return {matrix, alpha};
 }
 
 void RenderElements(const std::vector<ShapeElement*>& list, const Matrix& parentMatrix,
@@ -759,8 +759,8 @@ void RenderElements_ShapeGroup(ShapeElement* element, const Matrix& parentMatrix
   auto transform = ShapeTransformToTransform(shape->transform, frame);
   transform.matrix.postConcat(parentMatrix);
   auto group = new GroupElement();
-  group->opacity = transform.opacity;
-  group->blendMode = shape->blendMode;
+  group->alpha = transform.alpha;
+  group->blendMode = ToTGFXBlend(shape->blendMode);
   RenderElements(shape->elements, transform.matrix, group, frame);
   parentGroup->elements.push_back(group);
 }
@@ -929,7 +929,7 @@ std::shared_ptr<Graphic> RenderShape(PaintElement* paint, Path* path) {
   } else {
     shape = Shape::MakeFrom(shapePath, paint->color);
   }
-  auto modifier = Modifier::MakeBlend(paint->opacity, paint->blendMode);
+  auto modifier = Modifier::MakeBlend(paint->alpha, paint->blendMode);
   return Graphic::MakeCompose(shape, modifier);
 }
 
@@ -963,7 +963,7 @@ std::shared_ptr<Graphic> RenderShape(GroupElement* group, Path* path) {
     }
   }
   auto shape = Graphic::MakeCompose(contents);
-  auto modifier = Modifier::MakeBlend(group->opacity, group->blendMode);
+  auto modifier = Modifier::MakeBlend(group->alpha, group->blendMode);
   return Graphic::MakeCompose(shape, modifier);
 }
 

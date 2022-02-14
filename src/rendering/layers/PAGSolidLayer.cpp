@@ -22,6 +22,7 @@
 #include "rendering/graphics/Shape.h"
 #include "rendering/layers/PAGStage.h"
 #include "rendering/utils/LockGuard.h"
+#include "rendering/utils/TGFXTypes.h"
 
 namespace pag {
 std::shared_ptr<PAGSolidLayer> PAGSolidLayer::Make(int64_t duration, int32_t width, int32_t height,
@@ -84,7 +85,7 @@ void PAGSolidLayer::setSolidColor(const pag::Color& value) {
   if (solidLayer->solidColor != _solidColor) {
     Path path = {};
     path.addRect(0, 0, solidLayer->width, solidLayer->height);
-    auto solid = Shape::MakeFrom(path, _solidColor);
+    auto solid = Shape::MakeFrom(path, ToTGFXColor(_solidColor));
     replacement = new GraphicContent(solid);
   }
   notifyModified(true);

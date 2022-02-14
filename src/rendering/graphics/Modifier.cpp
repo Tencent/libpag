@@ -37,7 +37,7 @@ class BlendModifier : public Modifier {
   }
 
   bool isEmpty() const override {
-    return alpha == Transparent;
+    return alpha == 0.0f;
   }
 
   bool hitTest(RenderCache* cache, float x, float y) const override;
@@ -135,11 +135,11 @@ class MaskModifier : public Modifier {
 
 //================================================================================
 
-std::shared_ptr<Modifier> Modifier::MakeBlend(Opacity alpha, Enum blendMode) {
-  if (alpha == Opaque && blendMode == BlendMode::Normal) {
+std::shared_ptr<Modifier> Modifier::MakeBlend(float alpha, Blend blendMode) {
+  if (alpha == 1.0f && blendMode == Blend::SrcOver) {
     return nullptr;
   }
-  return std::make_shared<BlendModifier>(ToTGFXAlpha(alpha), ToTGFXBlend(blendMode));
+  return std::make_shared<BlendModifier>(alpha, blendMode);
 }
 
 std::shared_ptr<Modifier> Modifier::MakeClip(const Path& clip) {
@@ -168,7 +168,7 @@ std::shared_ptr<Modifier> Modifier::MakeMask(std::shared_ptr<Graphic> graphic, b
 //================================================================================
 
 bool BlendModifier::hitTest(RenderCache*, float, float) const {
-  return alpha != Transparent;
+  return alpha != 0.0f;
 }
 
 void BlendModifier::applyToGraphic(Canvas* canvas, RenderCache* cache,

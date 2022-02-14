@@ -112,10 +112,6 @@ class Texture : public Resource {
   // Two texture types: Alpha, RGBA
   static std::shared_ptr<Texture> Make(Context* context, int width, int height, void* pixels,
                                        size_t rowBytes, ImageOrigin origin, bool alphaOnly);
-  // for Trace() only.
-  Context* getContext() const {
-    return context;
-  }
 
   friend void Trace(const Texture* texture, const std::string& path);
 };

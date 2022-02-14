@@ -71,7 +71,7 @@ class Recorder {
    * on a stack, multiple calls to saveLayer(), saveClip() and save() should be balance by an equal
    * number of calls to restore().
    */
-  void saveLayer(Opacity alpha, Enum blendMode);
+  void saveLayer(float alpha, Blend blendMode);
 
   /**
    * Saves matrix, and allocates a layer for subsequent drawing. Calling restore() discards changes

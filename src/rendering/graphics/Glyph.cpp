@@ -105,7 +105,8 @@ void Glyph::computeStyleKey(BytesKey* styleKey) const {
   styleKey->write(m.getSkewX());
   styleKey->write(m.getSkewY());
   styleKey->write(m.getScaleY());
-  uint8_t fillValues[] = {fillColor.red, fillColor.green, fillColor.blue, alpha};
+  uint8_t fillValues[] = {fillColor.red, fillColor.green, fillColor.blue,
+                          static_cast<uint8_t>(alpha * 255)};
   styleKey->write(fillValues);
   uint8_t strokeValues[] = {strokeColor.red, strokeColor.green, strokeColor.blue,
                             static_cast<uint8_t>(textStyle)};
@@ -115,7 +116,7 @@ void Glyph::computeStyleKey(BytesKey* styleKey) const {
 }
 
 bool Glyph::isVisible() const {
-  return matrix.invertible() && alpha != Transparent && !bounds.isEmpty();
+  return matrix.invertible() && alpha != 0.0f && !bounds.isEmpty();
 }
 
 Matrix Glyph::getTotalMatrix() const {

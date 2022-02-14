@@ -32,8 +32,7 @@ struct GradientPaint {
   Enum gradientType;
   Point startPoint;
   Point endPoint;
-  std::vector<Color> colors;
-  std::vector<Opacity> alphas;
+  std::vector<Color4f> colors;
   std::vector<float> positions;
 };
 

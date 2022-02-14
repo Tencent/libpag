@@ -20,6 +20,7 @@
 #include "base/utils/MathExtra.h"
 #include "gpu/opengl/GLUtil.h"
 #include "rendering/filters/utils/FilterHelper.h"
+#include "rendering/utils/TGFXTypes.h"
 
 namespace pag {
 DropShadowFilter::DropShadowFilter(DropShadowStyle* layerStyle) : layerStyle(layerStyle) {
@@ -56,8 +57,8 @@ void DropShadowFilter::update(Frame frame, const Rect& contentBounds, const Rect
                               const Point& filterScale) {
   LayerFilter::update(frame, contentBounds, transformedBounds, filterScale);
 
-  color = layerStyle->color->getValueAt(layerFrame);
-  opacity = layerStyle->opacity->getValueAt(layerFrame);
+  color = ToTGFXColor(layerStyle->color->getValueAt(layerFrame));
+  alpha = ToAlpha(layerStyle->opacity->getValueAt(layerFrame));
   spread = layerStyle->spread->getValueAt(layerFrame);
   auto size = layerStyle->size->getValueAt(layerFrame);
   spread *= (spread == 1.0) ? 1.0 : 0.8;
@@ -188,7 +189,7 @@ void DropShadowFilter::onDrawModeNotSpread(Context* context, const FilterSource*
 
   auto sourceH = blurFilterBuffer->toFilterSource(source->scale);
 
-  blurFilterH->updateParams(blurSize, opacity / 255.f, false, BlurMode::Shadow);
+  blurFilterH->updateParams(blurSize, alpha, false, BlurMode::Shadow);
   Matrix revertMatrix =
       Matrix::MakeTrans((filterBounds.left - contentBounds.left) * source->scale.x,
                         (filterBounds.top - contentBounds.top) * source->scale.y);
@@ -248,7 +249,7 @@ void DropShadowFilter::onDrawModeNotFullSpread(Context* context, const FilterSou
                         (filterBounds.top - contentBounds.top) * source->scale.y);
   auto targetH = *target;
   PreConcatMatrix(&targetH, revertMatrix);
-  blurFilterH->updateParams(blurSize, opacity / 255.f, false, BlurMode::Shadow);
+  blurFilterH->updateParams(blurSize, alpha, false, BlurMode::Shadow);
   blurFilterH->draw(context, sourceH.get(), &targetH);
 }
 
