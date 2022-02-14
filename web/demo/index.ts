@@ -1,6 +1,7 @@
 import { PAGInit } from '../src/pag';
 import { PAGFile } from '../src/pag-file';
-import { PAG as PAGNamespace, ParagraphJustification } from '../src/types';
+import { PAGView } from '../src/pag-view';
+import { PAG as PAGNamespace, PAGViewListenerEvent } from '../src/types';
 
 declare global {
   interface Window {
@@ -8,11 +9,11 @@ declare global {
   }
 }
 
-let pagView = null;
+let pagView: PAGView = null;
 let pagFile: PAGFile = null;
 let cacheEnabled: boolean;
 let videoEnabled: boolean;
-let globalCacheScale: boolean;
+let globalCacheScale: number;
 let videoEl = null;
 let PAG: PAGNamespace;
 let canvasElementSize = 640;
@@ -97,7 +98,7 @@ window.onload = async () => {
     const blob = await response.blob();
     const file = new window.File([blob], url.replace(/(.*\/)*([^.]+)/i, '$2'));
     await createPAGView(file);
-    const textDoc = await pagFile.getTextData(0);
+    const textDoc = pagFile.getTextData(0);
     console.log(textDoc);
     textDoc.text = '替换后的文字';
     // textDoc.fillColor = { red: 255, green: 255, blue: 255 };
@@ -120,21 +121,21 @@ window.onload = async () => {
   });
 
   // Get PAGFile duration
-  document.getElementById('btn-pagfile-get-duration').addEventListener('click', async () => {
-    const duration = await pagFile.duration();
+  document.getElementById('btn-pagfile-get-duration').addEventListener('click', () => {
+    const duration = pagFile.duration();
     console.log(`PAGFile duration ${duration}`);
   });
 
   // PAGFile setDuration
-  document.getElementById('btn-pagfile-set-duration').addEventListener('click', async () => {
+  document.getElementById('btn-pagfile-set-duration').addEventListener('click', () => {
     const duration = Number((document.getElementById('input-pagfile-duration') as HTMLInputElement).value);
-    await pagFile.setDuration(duration);
+    pagFile.setDuration(duration);
     console.log(`Set PAGFile duration ${duration} `);
   });
 
   // Get timeStretchMode
-  document.getElementById('btn-pagfile-time-stretch-mode').addEventListener('click', async () => {
-    const timeStretchMode = await pagFile.timeStretchMode();
+  document.getElementById('btn-pagfile-time-stretch-mode').addEventListener('click', () => {
+    const timeStretchMode = pagFile.timeStretchMode();
     console.log(`PAGFile timeStretchMode ${timeStretchMode} `);
   });
 
@@ -163,17 +164,17 @@ window.onload = async () => {
   });
 
   // 获取进度
-  document.getElementById('btn-getProgress').addEventListener('click', async () => {
-    console.log(`当前进度：${await pagView.getProgress()}`);
+  document.getElementById('btn-getProgress').addEventListener('click', () => {
+    console.log(`当前进度：${pagView.getProgress()}`);
   });
 
   // 设置进度
-  document.getElementById('setProgress').addEventListener('click', async () => {
+  document.getElementById('setProgress').addEventListener('click', () => {
     let progress = Number((document.getElementById('progress') as HTMLInputElement).value);
     if (!(progress >= 0 && progress <= 1)) {
       alert('请输入0～1之间');
     }
-    await pagView.setProgress(progress);
+    pagView.setProgress(progress);
     console.log(`已设置进度：${progress}`);
   });
 
@@ -185,8 +186,8 @@ window.onload = async () => {
   });
 
   // maxFrameRate
-  document.getElementById('btn-maxFrameRate').addEventListener('click', async () => {
-    console.log(`maxFrameRate: ${await pagView.maxFrameRate()}`);
+  document.getElementById('btn-maxFrameRate').addEventListener('click', () => {
+    console.log(`maxFrameRate: ${pagView.maxFrameRate()}`);
   });
   document.getElementById('setMaxFrameRate').addEventListener('click', () => {
     let maxFrameRate = Number((document.getElementById('maxFrameRate') as HTMLInputElement).value);
@@ -194,8 +195,8 @@ window.onload = async () => {
   });
 
   // scaleMode
-  document.getElementById('btn-scaleMode').addEventListener('click', async () => {
-    console.log(`scaleMode: ${await pagView.scaleMode()}`);
+  document.getElementById('btn-scaleMode').addEventListener('click', () => {
+    console.log(`scaleMode: ${pagView.scaleMode()}`);
   });
   document.getElementById('setScaleMode').addEventListener('click', () => {
     let scaleMode = Number((document.getElementById('scaleMode') as HTMLSelectElement).value);
@@ -204,8 +205,8 @@ window.onload = async () => {
 
   // videoEnabled
   videoEnabled = true;
-  document.getElementById('btn-videoEnabled').addEventListener('click', async () => {
-    videoEnabled = await pagView.videoEnabled();
+  document.getElementById('btn-videoEnabled').addEventListener('click', () => {
+    videoEnabled = pagView.videoEnabled();
     console.log(`videoEnabled status: ${videoEnabled}`);
   });
   document.getElementById('btn-setVideoEnabled').addEventListener('click', () => {
@@ -214,8 +215,8 @@ window.onload = async () => {
 
   // cacheEnabled
   cacheEnabled = true;
-  document.getElementById('btn-cacheEnabled').addEventListener('click', async () => {
-    cacheEnabled = await pagView.cacheEnabled();
+  document.getElementById('btn-cacheEnabled').addEventListener('click', () => {
+    cacheEnabled = pagView.cacheEnabled();
     console.log(`cacheEnabled status: ${cacheEnabled}`);
   });
   document.getElementById('btn-setCacheEnabled').addEventListener('click', () => {
@@ -223,14 +224,14 @@ window.onload = async () => {
   });
 
   // freeCache
-  document.getElementById('btn-freeCache').addEventListener('click', () => {
-    pagView.freeCache();
-  });
+  // document.getElementById('btn-freeCache').addEventListener('click', () => {
+  //   pagView.freeCache();
+  // });
 
   // cacheScale
-  globalCacheScale = true;
-  document.getElementById('btn-cacheScale').addEventListener('click', async () => {
-    globalCacheScale = await pagView.cacheScale();
+  globalCacheScale = 1;
+  document.getElementById('btn-cacheScale').addEventListener('click', () => {
+    globalCacheScale = pagView.cacheScale();
     console.log(`cacheScale status: ${globalCacheScale}`);
   });
   document.getElementById('btn-setCacheScale').addEventListener('click', () => {
@@ -252,21 +253,21 @@ const createPAGView = async (file) => {
   pagView = await PAG.PAGView.init(pagFile, pagCanvas);
   pagView.setRepeatCount(0);
   // 绑定事件监听
-  pagView.addListener('onAnimationStart', (event) => {
+  pagView.addListener(PAGViewListenerEvent.onAnimationStart, (event) => {
     console.log('onAnimationStart', event);
   });
-  pagView.addListener('onAnimationEnd', (event) => {
+  pagView.addListener(PAGViewListenerEvent.onAnimationEnd, (event) => {
     console.log('onAnimationEnd', event);
   });
-  pagView.addListener('onAnimationCancel', (event) => {
+  pagView.addListener(PAGViewListenerEvent.onAnimationCancel, (event) => {
     console.log('onAnimationCancel', event);
   });
-  pagView.addListener('onAnimationRepeat', (event) => {
+  pagView.addListener(PAGViewListenerEvent.onAnimationRepeat, (event) => {
     console.log('onAnimationRepeat', event);
   });
   document.getElementById('control').style.display = '';
   // 图层编辑
-  const editableLayers = await getEditableLayer(PAG, pagFile);
+  const editableLayers = getEditableLayer(PAG, pagFile);
   console.log(editableLayers);
   renderEditableLayer(editableLayers);
   console.log(`已加载 ${file.name}`);
@@ -297,25 +298,25 @@ const setVideoTime = (el, time) => {
   });
 };
 
-const getEditableLayer = async (PAG: PAGNamespace, pagFile) => {
-  const editableImageCount = await pagFile.numImages();
+const getEditableLayer = (PAG: PAGNamespace, pagFile: PAGFile) => {
+  const editableImageCount = pagFile.numImages();
   let res = [];
   for (let i = 0; i < editableImageCount; i++) {
-    const vectorPagLayer = await pagFile.getLayersByEditableIndex(i, PAG.LayerType.Image);
+    const vectorPagLayer = pagFile.getLayersByEditableIndex(i, PAG.LayerType.Image);
     for (let j = 0; j < vectorPagLayer.size(); j++) {
       const pagLayerWasm = vectorPagLayer.get(j);
       const pagLayer = new PAG.PAGLayer(pagLayerWasm);
-      const uniqueID = await pagLayer.uniqueID();
-      const layerType = await pagLayer.layerType();
-      const layerName = await pagLayer.layerName();
-      const opacity = await pagLayer.opacity();
-      const visible = await pagLayer.visible();
-      const editableIndex = await pagLayer.editableIndex();
-      const duration = await pagLayer.duration();
-      const frameRate = await pagLayer.frameRate();
-      const localStartTime = await pagLayer.startTime();
-      const startTime = await pagLayer.localTimeToGlobal(localStartTime);
-      res.push({ uniqueID, layerType, layerName, opacity, visible, editableIndex, frameRate, startTime, duration });
+      const uniqueID = pagLayer.uniqueID();
+      const layerType = pagLayer.layerType();
+      const layerName = pagLayer.layerName();
+      const alpha = pagLayer.alpha();
+      const visible = pagLayer.visible();
+      const editableIndex = pagLayer.editableIndex();
+      const duration = pagLayer.duration();
+      const frameRate = pagLayer.frameRate();
+      const localStartTime = pagLayer.startTime();
+      const startTime = pagLayer.localTimeToGlobal(localStartTime);
+      res.push({ uniqueID, layerType, layerName, alpha, visible, editableIndex, frameRate, startTime, duration });
     }
   }
   return res;
@@ -356,10 +357,10 @@ const replaceImage = (element, index) => {
   element.appendChild(inputEl);
   inputEl.addEventListener('change', async (event) => {
     const pagImage = await PAG.PAGImage.fromFile((event.target as HTMLInputElement).files[0]);
-    const pagFile = await pagView.getComposition();
-    await pagFile.replaceImage(index, pagImage);
+    const pagFile = pagView.getComposition();
+    pagFile.replaceImage(index, pagImage);
     await pagView.flush();
-    await pagImage.destroy();
+    pagImage.destroy();
   });
   inputEl.click();
   element.removeChild(inputEl);
@@ -375,11 +376,11 @@ const replaceVideo = (element, index) => {
     if (!videoEl) videoEl = document.createElement('video');
     await loadVideoReady(videoEl, URL.createObjectURL((event.target as HTMLInputElement).files[0]));
     await setVideoTime(videoEl, 0.05);
-    const pagImage = await PAG.PAGImage.fromSource(videoEl);
-    const pagFile = await pagView.getComposition();
-    await pagFile.replaceImage(index, pagImage);
+    const pagImage = PAG.PAGImage.fromSource(videoEl);
+    const pagFile = pagView.getComposition();
+    pagFile.replaceImage(index, pagImage);
     await pagView.flush();
-    await pagImage.destroy();
+    pagImage.destroy();
   });
   inputEl.click();
   element.removeChild(inputEl);

@@ -1,6 +1,8 @@
 import { PAG } from './types';
 import { PAGLayer } from './pag-layer';
+import { wasmAwaitRewind } from './utils/decorators';
 
+@wasmAwaitRewind
 export class PAGComposition extends PAGLayer {
   public static module: PAG;
 
@@ -10,13 +12,13 @@ export class PAGComposition extends PAGLayer {
   /**
    * Returns the width of the Composition.
    */
-  public async width(): Promise<number> {
-    return (await PAGComposition.module.webAssemblyQueue.exec(this.wasmIns._width, this.wasmIns)) as number;
+  public width(): number {
+    return this.wasmIns._width() as number;
   }
   /**
    * Returns the height of the Composition.
    */
-  public async height(): Promise<number> {
-    return (await PAGComposition.module.webAssemblyQueue.exec(this.wasmIns._height, this.wasmIns)) as number;
+  public height(): number {
+    return this.wasmIns._height() as number;
   }
 }

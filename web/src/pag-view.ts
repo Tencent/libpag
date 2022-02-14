@@ -20,12 +20,12 @@ export class PAGView {
     canvasElement.style.height = `${canvasElement.height}px`;
     canvasElement.width = canvasElement.width * window.devicePixelRatio;
     canvasElement.height = canvasElement.height * window.devicePixelRatio;
-    const pagPlayer = await this.module._PAGPlayer.create();
+    const pagPlayer = this.module.PAGPlayer.create();
     const pagView = new PAGView(pagPlayer);
     const gl = canvasElement.getContext('webgl');
     const contextID = this.module.GL.registerContext(gl, { majorVersion: 1, minorVersion: 0 });
     this.module.GL.makeContextCurrent(contextID);
-    pagView.pagSurface = await this.module._PAGSurface.FromFrameBuffer(0, canvasElement.width, canvasElement.height, true);
+    pagView.pagSurface = this.module.PAGSurface.FromFrameBuffer(0, canvasElement.width, canvasElement.height, true);
     pagView.player.setSurface(pagView.pagSurface);
     pagView.player.setComposition(file);
     await pagView.setProgress(0);
@@ -61,8 +61,8 @@ export class PAGView {
   /**
    * The duration of current composition in microseconds.
    */
-  public async duration() {
-    return await this.player.duration();
+  public duration() {
+    return this.player.duration();
   }
   /**
    * Adds a listener to the set of listeners that are sent events through the life of an animation,
@@ -104,7 +104,7 @@ export class PAGView {
     if (this.isDestroyed) return;
     this.clearTimer();
     this.playTime = 0;
-    await this.player.setProgress(0);
+    this.player.setProgress(0);
     await this.flush();
     this.isPlaying = false;
     if (notification) {
@@ -122,8 +122,8 @@ export class PAGView {
    * Returns the current progress of play position, the value is from 0.0 to 1.0. It is applied only
    * when the composition is not null.
    */
-  public async getProgress() {
-    return await this.player.getProgress();
+  public getProgress(): number {
+    return this.player.getProgress();
   }
   /**
    * Set the progress of play position, the value is from 0.0 to 1.0.
@@ -139,14 +139,14 @@ export class PAGView {
   /**
    * Return the value of videoEnabled property.
    */
-  public async videoEnabled(): Promise<boolean> {
-    return await this.player.videoEnabled();
+  public videoEnabled(): boolean {
+    return this.player.videoEnabled();
   }
   /**
    * If set false, will skip video layer drawing.
    */
-  public async setVideoEnabled(enable: boolean) {
-    await this.player.setVideoEnabled(enable);
+  public setVideoEnabled(enable: boolean) {
+    this.player.setVideoEnabled(enable);
   }
   /**
    * If set to true, PAG renderer caches an internal bitmap representation of the static content for
@@ -154,55 +154,55 @@ export class PAGView {
    * The execution speed can be significantly faster depending on the complexity of the content, but
    * it requires extra graphics memory. The default value is true.
    */
-  public async cacheEnabled(): Promise<boolean> {
-    return await this.player.cacheEnabled();
+  public cacheEnabled(): boolean {
+    return this.player.cacheEnabled();
   }
   /**
    * Set the value of cacheEnabled property.
    */
-  public async setCacheEnabled(enable: boolean) {
-    await this.player.setCacheEnabled(enable);
+  public setCacheEnabled(enable: boolean) {
+    this.player.setCacheEnabled(enable);
   }
   /**
    * This value defines the scale factor for internal graphics caches, ranges from 0.0 to 1.0. The
    * scale factors less than 1.0 may result in blurred output, but it can reduce the usage of graphics
    * memory which leads to better performance. The default value is 1.0.
    */
-  public async cacheScale(): Promise<number> {
-    return await this.player.cacheScale();
+  public cacheScale(): number {
+    return this.player.cacheScale();
   }
   /**
    * Set the value of cacheScale property.
    */
-  public async setCacheScale(value: number) {
-    await this.player.setCacheScale(value);
+  public setCacheScale(value: number) {
+    this.player.setCacheScale(value);
   }
   /**
    * The maximum frame rate for rendering. If set to a value less than the actual frame rate from
    * PAGFile, it drops frames but increases performance. Otherwise, it has no effect. The default
    * value is 60.
    */
-  public async maxFrameRate(): Promise<number> {
-    return await this.player.maxFrameRate();
+  public maxFrameRate(): number {
+    return this.player.maxFrameRate();
   }
   /**
    * Set the maximum frame rate for rendering.
    */
-  public async setMaxFrameRate(value: number) {
-    await this.player.setMaxFrameRate(value);
+  public setMaxFrameRate(value: number) {
+    this.player.setMaxFrameRate(value);
   }
   /**
    * Returns the current scale mode.
    */
-  public async scaleMode(): Promise<PAGScaleMode> {
-    return await this.player.scaleMode();
+  public scaleMode(): PAGScaleMode {
+    return this.player.scaleMode();
   }
   /**
    * Specifies the rule of how to scale the pag content to fit the surface size. The matrix
    * changes when this method is called.
    */
-  public async setScaleMode(value: PAGScaleMode) {
-    await this.player.setScaleMode(value);
+  public setScaleMode(value: PAGScaleMode) {
+    this.player.setScaleMode(value);
   }
   /**
    * Call this method to render current position immediately. If the play() method is already
@@ -214,27 +214,27 @@ export class PAGView {
   /**
    * Free the cache created by the pag view immediately. Can be called to reduce memory pressure.
    */
-  public async freeCache() {
-    await this.player.freeCache();
+  public freeCache() {
+    // TODO(akazenoslin): PAGSurface freeCache
   }
   /**
    * Returns the current PAGComposition for PAGView to render as content.
    */
-  public async getComposition() {
-    return await this.player.getComposition();
+  public getComposition(): PAGFile {
+    return this.player.getComposition();
   }
   /**
    * Update size when changed canvas size.
    */
-  public async updateSize() {
-    return this.pagSurface.updateSize();
+  public updateSize() {
+    this.pagSurface.updateSize();
   }
 
-  public async destroy() {
+  public destroy() {
     if (this.isDestroyed) return;
     this.clearTimer();
-    await this.player.destroy();
-    await this.pagSurface.destroy();
+    this.player.destroy();
+    this.pagSurface.destroy();
     this.isDestroyed = true;
   }
 
@@ -249,7 +249,7 @@ export class PAGView {
   }
 
   private async flushNextFrame() {
-    const duration = await this.duration();
+    const duration = this.duration();
     const count = Math.floor(this.playTime / duration);
     if (this.repeatCount >= 0 && count > this.repeatCount) {
       await this.stop(false);

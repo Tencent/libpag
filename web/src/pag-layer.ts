@@ -1,9 +1,11 @@
 import { LayerType, PAG } from './types';
+import { wasmAwaitRewind } from './utils/decorators';
 
+@wasmAwaitRewind
 export class PAGLayer {
   public static module: PAG;
 
-  public wasmIns;
+  public wasmIns: any;
 
   public constructor(wasmIns) {
     this.wasmIns = wasmIns;
@@ -11,95 +13,88 @@ export class PAGLayer {
   /**
    * Returns a globally unique id for this object.
    */
-  public async uniqueID(): Promise<number> {
-    return (await PAGLayer.module.webAssemblyQueue.exec(this.wasmIns._uniqueID, this.wasmIns)) as number;
+  public uniqueID(): number {
+    return this.wasmIns._uniqueID() as number;
   }
   /**
    * Returns the type of layer.
    */
-  public async layerType(): Promise<LayerType> {
-    return (await PAGLayer.module.webAssemblyQueue.exec(this.wasmIns._layerType, this.wasmIns)) as LayerType;
+  public layerType(): LayerType {
+    return this.wasmIns._layerType() as LayerType;
   }
   /**
    * Returns the name of the layer.
    */
-  public async layerName(): Promise<string> {
-    return (await PAGLayer.module.webAssemblyQueue.exec(this.wasmIns._layerName, this.wasmIns)) as string;
+  public layerName(): string {
+    return this.wasmIns._layerName() as string;
   }
   /**
-   * Returns the opacity of the layer.
+   * Returns the current alpha of the layer if previously set.
    */
-  public async opacity(): Promise<number> {
-    return (await PAGLayer.module.webAssemblyQueue.exec(this.wasmIns._opacity, this.wasmIns)) as number;
+  public alpha(): number {
+    return this.wasmIns._alpha() as number;
   }
   /**
-   * Set the opacity of the layer. it will be concatenated to current animation opacity for
+   * Set the alpha of the layer, which will be concatenated to the current animation opacity for
    * displaying.
    */
-  public async setOpacity(opacity: Number): Promise<void> {
-    await PAGLayer.module.webAssemblyQueue.exec(this.wasmIns._opacity, this.wasmIns, opacity);
+  public setAlpha(opacity: Number): void {
+    this.wasmIns._setAlpha(opacity);
   }
   /**
    * Whether or not the layer is visible.
    */
-  public async visible(): Promise<boolean> {
-    return (await PAGLayer.module.webAssemblyQueue.exec(this.wasmIns._visible, this.wasmIns)) as boolean;
+
+  public visible(): boolean {
+    return this.wasmIns._visible() as boolean;
   }
   /**
    * Set the visible of the layer.
    */
-  public async setVisible(visible: boolean): Promise<void> {
-    await PAGLayer.module.webAssemblyQueue.exec(this.wasmIns._setVisible, this.wasmIns, visible);
+  public setVisible(visible: boolean): void {
+    this.wasmIns._setVisible(visible);
   }
   /**
    * Ranges from 0 to PAGFile.numTexts - 1 if the layer type is text, or from 0 to PAGFile.numImages
    * -1 if the layer type is image, otherwise returns -1.
    */
-  public async editableIndex(): Promise<number> {
-    return (await PAGLayer.module.webAssemblyQueue.exec(this.wasmIns._editableIndex, this.wasmIns)) as number;
+  public editableIndex(): number {
+    return this.wasmIns._editableIndex() as number;
   }
   /**
    * The duration of the layer in microseconds, indicates the length of the visible range.
    */
-  public async duration(): Promise<number> {
-    return (await PAGLayer.module.webAssemblyQueue.exec(this.wasmIns._duration, this.wasmIns)) as number;
+  public duration(): number {
+    return this.wasmIns._duration() as number;
   }
   /**
    * Returns the frame rate of this layer.
    */
-  public async frameRate(): Promise<number> {
-    return (await PAGLayer.module.webAssemblyQueue.exec(this.wasmIns._frameRate, this.wasmIns)) as number;
+  public frameRate(): number {
+    return this.wasmIns._frameRate() as number;
   }
   /**
    * The start time of the layer in microseconds, indicates the start position of the visible range
    * in parent composition. It could be negative value.
    */
-  public async startTime(): Promise<number> {
-    return (await PAGLayer.module.webAssemblyQueue.exec(this.wasmIns._startTime, this.wasmIns)) as number;
+  public startTime(): number {
+    return this.wasmIns._startTime() as number;
   }
   /**
    * Converts the time from the PAGLayer's (local) timeline to the PAGSurface (global) timeline. The
    * time is in microseconds.
    */
-  public async localTimeToGlobal(localTime: number): Promise<number> {
-    return (await PAGLayer.module.webAssemblyQueue.exec(
-      this.wasmIns._localTimeToGlobal,
-      this.wasmIns,
-      localTime,
-    )) as number;
+  public localTimeToGlobal(localTime: number): number {
+    return this.wasmIns._localTimeToGlobal(localTime) as number;
   }
   /**
    * Converts the time from the PAGSurface (global) to the PAGLayer's (local) timeline timeline. The
    * time is in microseconds.
    */
-  public async globalToLocalTime(globalTime: number): Promise<number> {
-    return (await PAGLayer.module.webAssemblyQueue.exec(
-      this.wasmIns._globalToLocalTime,
-      this.wasmIns,
-      globalTime,
-    )) as number;
+  public globalToLocalTime(globalTime: number): number {
+    return this.wasmIns._globalToLocalTime(globalTime) as number;
   }
-  public async destroy() {
-    await PAGLayer.module.webAssemblyQueue.exec(this.wasmIns.delete, this.wasmIns);
+  public destroy(): void {
+    this.wasmIns.delete();
   }
 }

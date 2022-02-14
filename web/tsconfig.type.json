@@ -6,7 +6,8 @@
     "declarationDir": "./types",
     "emitDeclarationOnly": true,
     "removeComments": false,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "experimentalDecorators": true
   },
   "include": ["src/pag.ts"]
 }
