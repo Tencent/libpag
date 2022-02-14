@@ -270,12 +270,15 @@ class PAG_API PAGLayer : public Content {
   Matrix getTotalMatrix();
 
   /**
-   * Set the opacity of the layer. it will be concatenated to current animation opacity for
+   * Returns the current alpha of the layer if previously set.
+   */
+  float alpha() const;
+
+  /**
+   * Set the alpha of the layer, which will be concatenated to the current animation opacity for
    * displaying.
    */
-  Opacity opacity() const;
-
-  void setOpacity(const Opacity& value);
+  void setAlpha(float value);
 
   /**
    * Whether or not the layer is visible.
@@ -414,7 +417,7 @@ class PAG_API PAGLayer : public Content {
   PAGFile* rootFile = nullptr;
   std::weak_ptr<PAGLayer> weakThis;
   Matrix layerMatrix = {};
-  Opacity layerOpacity = Opaque;
+  float layerAlpha = 1.0f;
   PAGLayer* trackMatteOwner = nullptr;
 
   const Layer* getLayer() const;
@@ -426,7 +429,6 @@ class PAG_API PAGLayer : public Content {
   void measureBounds(Rect* bounds) override;
   Matrix getTotalMatrixInternal();
   virtual void setMatrixInternal(const Matrix& matrix);
-  void setOpacityInternal(const Opacity& opacity);
   virtual float frameRateInternal() const;
   double getProgressInternal();
   void setProgressInternal(double percent);

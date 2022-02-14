@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cinttypes>
 #include <limits>
 
 namespace pag {
@@ -30,62 +31,53 @@ struct Color4f {
   /**
    * Red component.
    */
-  float r;
+  float red;
 
   /**
    * Green component.
    */
-  float g;
+  float green;
 
   /**
    * Blue component.
    */
-  float b;
+  float blue;
 
   /**
    * Alpha component.
    */
-  float a;
+  float alpha;
 
   /**
    * Returns an invalid Color.
    */
-  static const Color4f& Invalid() {
-    static const Color4f color = {
-        std::numeric_limits<float>::max(), std::numeric_limits<float>::max(),
-        std::numeric_limits<float>::max(), std::numeric_limits<float>::max()};
-    return color;
-  }
+  static const Color4f& Invalid();
 
   /**
    * Returns a fully transparent Color.
    */
-  static const Color4f& Transparent() {
-    static const Color4f color = {0.0f, 0.0f, 0.0f, 0.0f};
-    return color;
-  }
+  static const Color4f& Transparent();
 
   /**
    * Returns a fully opaque black Color.
    */
-  static const Color4f& Black() {
-    static const Color4f color = {0.0f, 0.0f, 0.0f, 1.0f};
-    return color;
-  }
+  static const Color4f& Black();
 
   /**
    * Returns a fully opaque white Color.
    */
-  static const Color4f& White() {
-    static const Color4f color = {1.0f, 1.0f, 1.0f, 1.0f};
-    return color;
-  }
+  static const Color4f& White();
+
+  /**
+   * Returns color value from 8-bit component values.
+   */
+  static Color4f FromRGBA(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255);
 
   /**
    * Compares Color with other, and returns true if all components are equal.
    */
   bool operator==(const Color4f& other) const {
-    return a == other.a && r == other.r && g == other.g && b == other.b;
+    return alpha == other.alpha && red == other.red && green == other.green && blue == other.blue;
   }
 
   /**
@@ -99,14 +91,14 @@ struct Color4f {
    * Returns a pointer to components of Color, for array access.
    */
   const float* array() const {
-    return &r;
+    return &red;
   }
 
   /**
    * Returns a pointer to components of Color, for array access.
    */
   float* array() {
-    return &r;
+    return &red;
   }
 
   /**
@@ -137,14 +129,14 @@ struct Color4f {
    * Returns a Color with alpha set to 1.0.
    */
   Color4f makeOpaque() const {
-    return {r, g, b, 1.0f};
+    return {red, green, blue, 1.0f};
   }
 
   /**
    * Returns a Color premultiplied by alpha.
    */
   Color4f premultiply() const {
-    return {r * a, g * a, b * a, a};
+    return {red * alpha, green * alpha, blue * alpha, alpha};
   }
 
   /**

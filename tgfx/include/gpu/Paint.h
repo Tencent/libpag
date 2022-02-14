@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "core/Color4f.h"
 #include "core/Stroke.h"
 #include "gpu/Shader.h"
 #include "pag/types.h"
@@ -63,31 +64,32 @@ class Paint {
   }
 
   /**
-   * Retrieves RGB from the color used when stroking and filling.
+   * Retrieves alpha and RGB, unpremultiplied, as four floating point values.
    */
-  Color getColor() const {
+  Color4f getColor() const {
     return color;
   }
 
   /**
-   * Sets RGB from the color used when stroking and filling.
+   * Sets alpha and RGB used when stroking and filling. The color is four floating point values,
+   * unpremultiplied.
    */
-  void setColor(Color newColor) {
+  void setColor(Color4f newColor) {
     color = newColor;
   }
 
   /**
    * Retrieves alpha from the color used when stroking and filling.
    */
-  Opacity getAlpha() const {
-    return alpha;
+  float getAlpha() const {
+    return color.alpha;
   }
 
   /**
    * Replaces alpha, leaving RGB unchanged.
    */
-  void setAlpha(Opacity newAlpha) {
-    alpha = newAlpha;
+  void setAlpha(float newAlpha) {
+    color.alpha = newAlpha;
   }
 
   /**
@@ -180,8 +182,7 @@ class Paint {
 
  private:
   PaintStyle style = PaintStyle::Fill;
-  Color color = Black;
-  Opacity alpha = Opaque;
+  Color4f color = Color4f::Black();
   Stroke stroke = Stroke(0);
   std::shared_ptr<Shader> shader = nullptr;
 };

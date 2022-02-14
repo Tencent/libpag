@@ -27,14 +27,14 @@ class Transform {
     matrix.setIdentity();
   }
 
-  Transform(const Matrix& matrix, Opacity opacity) : matrix(matrix), opacity(opacity) {
+  Transform(const Matrix& matrix, float alpha) : matrix(matrix), alpha(alpha) {
   }
 
   bool visible() const {
-    return matrix.invertible() && opacity > 0;
+    return matrix.invertible() && alpha > 0;
   }
 
   Matrix matrix = {};
-  Opacity opacity = Opaque;
+  float alpha = 1.0f;
 };
 }  // namespace pag

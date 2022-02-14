@@ -20,9 +20,10 @@
 #include "gpu/Canvas.h"
 #include "gpu/Shader.h"
 #include "pag/file.h"
+#include "rendering/utils/TGFXTypes.h"
 
 namespace pag {
-std::shared_ptr<Graphic> Shape::MakeFrom(const Path& path, Color color) {
+std::shared_ptr<Graphic> Shape::MakeFrom(const Path& path, Color4f color) {
   if (path.isEmpty()) {
     return nullptr;
   }
@@ -31,37 +32,23 @@ std::shared_ptr<Graphic> Shape::MakeFrom(const Path& path, Color color) {
   return std::shared_ptr<Graphic>(new Shape(path, paint));
 }
 
-static std::shared_ptr<Shader> MakeGradientShader(const GradientPaint& gradient) {
-  std::shared_ptr<Shader> shader;
-  std::vector<Color4f> colors = {};
-  int index = 0;
-  auto& alphas = gradient.alphas;
-  for (auto& color : gradient.colors) {
-    auto r = static_cast<float>(color.red) / 255.0f;
-    auto g = static_cast<float>(color.green) / 255.0f;
-    auto b = static_cast<float>(color.blue) / 255.0f;
-    auto a = static_cast<float>(alphas[index++]) / 255.0f;
-    colors.push_back({r, g, b, a});
-  }
-  if (gradient.gradientType == GradientFillType::Linear) {
-    shader = Shader::MakeLinearGradient(gradient.startPoint, gradient.endPoint, colors,
-                                        gradient.positions);
-  } else {
-    auto radius = Point::Distance(gradient.startPoint, gradient.endPoint);
-    shader = Shader::MakeRadialGradient(gradient.startPoint, radius, colors, gradient.positions);
-  }
-  if (!shader) {
-    shader = Shader::MakeColorShader(gradient.colors.back(), gradient.alphas.back());
-  }
-  return shader;
-}
-
 std::shared_ptr<Graphic> Shape::MakeFrom(const Path& path, const GradientPaint& gradient) {
   if (path.isEmpty()) {
     return nullptr;
   }
+  std::shared_ptr<Shader> shader;
+  if (gradient.gradientType == GradientFillType::Linear) {
+    shader = Shader::MakeLinearGradient(gradient.startPoint, gradient.endPoint, gradient.colors,
+                                        gradient.positions);
+  } else {
+    auto radius = Point::Distance(gradient.startPoint, gradient.endPoint);
+    shader = Shader::MakeRadialGradient(gradient.startPoint, radius, gradient.colors,
+                                        gradient.positions);
+  }
+  if (!shader) {
+    shader = Shader::MakeColorShader(gradient.colors.back());
+  }
   Paint paint = {};
-  auto shader = MakeGradientShader(gradient);
   paint.setShader(shader);
   return std::shared_ptr<Graphic>(new Shape(path, paint));
 }
@@ -78,7 +65,7 @@ bool Shape::hitTest(RenderCache*, float x, float y) {
 }
 
 bool Shape::getPath(Path* result) const {
-  if (paint.getAlpha() != Opaque) {
+  if (paint.getAlpha() != 1.0f) {
     return false;
   }
   auto shader = paint.getShader();

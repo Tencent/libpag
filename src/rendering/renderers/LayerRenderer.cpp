@@ -20,6 +20,7 @@
 #include "base/utils/MatrixUtil.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/editing/StillImage.h"
+#include "rendering/utils/TGFXTypes.h"
 
 namespace pag {
 
@@ -48,11 +49,11 @@ void LayerRenderer::DrawLayer(Recorder* recorder, Layer* layer, Frame layerFrame
   }
   auto content = layerContent ? layerContent : layerCache->getContent(contentFrame);
   auto layerTransform = layerCache->getTransform(contentFrame);
-  auto opacity = layerTransform->opacity;
+  auto alpha = layerTransform->alpha;
   if (extraTransform) {
-    opacity = OpacityConcat(opacity, extraTransform->opacity);
+    alpha *= extraTransform->alpha;
   }
-  recorder->saveLayer(opacity, layer->blendMode);
+  recorder->saveLayer(alpha, ToTGFXBlend(layer->blendMode));
   if (trackMatte) {
     recorder->saveLayer(trackMatte->modifier);
   }

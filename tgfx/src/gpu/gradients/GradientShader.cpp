@@ -166,7 +166,7 @@ static std::unique_ptr<FragmentProcessor> MakeGradient(Context* context,
   }
   bool allOpaque = true;
   for (const auto& color : shader.originalColors) {
-    if (!FloatNearlyEqual(color.a, 1.0)) {
+    if (!FloatNearlyEqual(color.alpha, 1.0)) {
       allOpaque = false;
       break;
     }

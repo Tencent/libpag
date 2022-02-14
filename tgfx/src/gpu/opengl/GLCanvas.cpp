@@ -82,7 +82,7 @@ std::unique_ptr<FragmentProcessor> GLCanvas::getClipMask(const Rect& deviceQuad,
       auto clipCanvas = clipSurface->getCanvas();
       clipCanvas->clear();
       Paint paint = {};
-      paint.setColor(Black);
+      paint.setColor(Color4f::Black());
       clipCanvas->drawPath(globalPaint.clip, paint);
       return TextureMaskFragmentProcessor::MakeUseDeviceCoord(clipSurface->getTexture().get(),
                                                               surface->origin());
@@ -141,7 +141,7 @@ void GLCanvas::drawTexture(const Texture* texture, const RGBAAALayout* layout, c
 void GLCanvas::drawPath(const Path& path, const Paint& paint) {
   auto shader = paint.getShader();
   if (shader == nullptr) {
-    shader = Shader::MakeColorShader(paint.getColor(), paint.getAlpha());
+    shader = Shader::MakeColorShader(paint.getColor());
   }
   if (paint.getStyle() == PaintStyle::Fill) {
     fillPath(path, shader.get());
@@ -233,7 +233,7 @@ void GLCanvas::drawGlyphs(const GlyphID glyphIDs[], const Point positions[], siz
   Path path = {};
   auto stroke = paint.getStyle() == PaintStyle::Stroke ? paint.getStroke() : nullptr;
   if (textBlob->getPath(&path, stroke)) {
-    auto shader = Shader::MakeColorShader(paint.getColor(), paint.getAlpha());
+    auto shader = Shader::MakeColorShader(paint.getColor());
     fillPath(path, shader.get());
     return;
   }
@@ -259,7 +259,7 @@ void GLCanvas::drawColorGlyphs(const GlyphID glyphIDs[], const Point positions[]
     glyphMatrix.postTranslate(position.x, position.y);
     save();
     concat(glyphMatrix);
-    globalPaint.alpha = OpacityConcat(globalPaint.alpha, paint.getAlpha());
+    globalPaint.alpha *= paint.getAlpha();
     auto texture = glyphBuffer->makeTexture(getContext());
     drawTexture(texture.get(), nullptr, false);
     restore();
@@ -297,7 +297,7 @@ void GLCanvas::drawMaskGlyphs(TextBlob* textBlob, const Paint& paint) {
     mask->fillText(textBlob);
   }
   auto texture = mask->makeTexture(getContext());
-  auto shader = Shader::MakeColorShader(paint.getColor(), paint.getAlpha());
+  auto shader = Shader::MakeColorShader(paint.getColor());
   drawMask(clippedDeviceQuad, texture.get(), shader.get());
 }
 
@@ -342,9 +342,8 @@ void GLCanvas::draw(const Rect& localQuad, const Rect& deviceQuad, std::unique_p
   if (color) {
     args.colors.push_back(std::move(color));
   }
-  auto alpha = static_cast<float>(globalPaint.alpha) / Opaque;
-  if (alpha != 1.0) {
-    args.colors.push_back(AlphaFragmentProcessor::Make(alpha));
+  if (globalPaint.alpha != 1.0) {
+    args.colors.push_back(AlphaFragmentProcessor::Make(globalPaint.alpha));
   }
   if (mask) {
     args.masks.push_back(std::move(mask));

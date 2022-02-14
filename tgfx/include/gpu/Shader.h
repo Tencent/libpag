@@ -37,7 +37,7 @@ class Shader {
   /**
    * Create a shader that draws the specified color.
    */
-  static std::shared_ptr<Shader> MakeColorShader(Color color, Opacity opacity = Opaque);
+  static std::shared_ptr<Shader> MakeColorShader(Color4f color);
 
   /**
    * Returns a shader that generates a linear gradient between the two specified points.

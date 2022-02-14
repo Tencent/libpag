@@ -21,6 +21,7 @@
 #include "core/PathEffect.h"
 #include "gpu/Canvas.h"
 #include "pag/file.h"
+#include "rendering/utils/TGFXTypes.h"
 
 namespace pag {
 static std::unique_ptr<Paint> CreateFillPaint(const Glyph* glyph) {
@@ -29,7 +30,7 @@ static std::unique_ptr<Paint> CreateFillPaint(const Glyph* glyph) {
   }
   auto fillPaint = new Paint();
   fillPaint->setStyle(PaintStyle::Fill);
-  fillPaint->setColor(glyph->getFillColor());
+  fillPaint->setColor(ToTGFXColor(glyph->getFillColor()));
   fillPaint->setAlpha(glyph->getAlpha());
   return std::unique_ptr<Paint>(fillPaint);
 }
@@ -40,7 +41,7 @@ static std::unique_ptr<Paint> CreateStrokePaint(const Glyph* glyph) {
   }
   auto strokePaint = new Paint();
   strokePaint->setStyle(PaintStyle::Stroke);
-  strokePaint->setColor(glyph->getStrokeColor());
+  strokePaint->setColor(ToTGFXColor(glyph->getStrokeColor()));
   strokePaint->setAlpha(glyph->getAlpha());
   strokePaint->setStrokeWidth(glyph->getStrokeWidth());
   return std::unique_ptr<Paint>(strokePaint);
@@ -123,7 +124,7 @@ std::shared_ptr<Graphic> Text::MakeFrom(const std::vector<GlyphHandle>& glyphs,
     if (strokeWidth > maxStrokeWidth) {
       maxStrokeWidth = strokeWidth;
     }
-    if (glyphList[0]->getAlpha() != Opaque) {
+    if (glyphList[0]->getAlpha() != 1.0f) {
       hasAlpha = true;
     }
     auto textRun = MakeTextRun(glyphList).release();

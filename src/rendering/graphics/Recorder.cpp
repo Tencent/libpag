@@ -93,7 +93,7 @@ void Recorder::saveClip(const Path& path) {
   saveLayer(modifier);
 }
 
-void Recorder::saveLayer(Opacity alpha, Enum blendMode) {
+void Recorder::saveLayer(float alpha, Blend blendMode) {
   auto modifier = Modifier::MakeBlend(alpha, blendMode);
   saveLayer(modifier);
 }

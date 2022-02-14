@@ -347,7 +347,7 @@ void ApplyFilters(Context* context, std::vector<FilterNode> filterNodes, const R
 }
 
 static bool HasComplexPaint(Canvas* parentCanvas, const Rect& drawingBounds) {
-  if (parentCanvas->getAlpha() != Opaque) {
+  if (parentCanvas->getAlpha() != 1.0f) {
     return true;
   }
   if (parentCanvas->getBlendMode() != Blend::SrcOver) {

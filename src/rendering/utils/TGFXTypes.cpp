@@ -19,6 +19,34 @@
 #include "TGFXTypes.h"
 
 namespace pag {
+static constexpr std::pair<Enum, Blend> kBlendModeMap[] = {
+    {BlendMode::Normal, Blend::SrcOver},
+    {BlendMode::Multiply, Blend::Multiply},
+    {BlendMode::Screen, Blend::Screen},
+    {BlendMode::Overlay, Blend::Overlay},
+    {BlendMode::Darken, Blend::Darken},
+    {BlendMode::Lighten, Blend::Lighten},
+    {BlendMode::ColorDodge, Blend::ColorDodge},
+    {BlendMode::ColorBurn, Blend::ColorBurn},
+    {BlendMode::HardLight, Blend::HardLight},
+    {BlendMode::SoftLight, Blend::SoftLight},
+    {BlendMode::Difference, Blend::Difference},
+    {BlendMode::Exclusion, Blend::Exclusion},
+    {BlendMode::Hue, Blend::Hue},
+    {BlendMode::Saturation, Blend::Saturation},
+    {BlendMode::Color, Blend::Color},
+    {BlendMode::Luminosity, Blend::Luminosity},
+    {BlendMode::Add, Blend::Plus}};
+
+Blend ToTGFXBlend(Enum blendMode) {
+  for (const auto& pair : kBlendModeMap) {
+    if (pair.first == blendMode) {
+      return pair.second;
+    }
+  }
+  return Blend::SrcOver;
+}
+
 Stroke::Cap ToTGFXCap(Enum cap) {
   switch (cap) {
     case LineCap::Round:
@@ -39,6 +67,18 @@ Stroke::Join ToTGFXJoin(Enum join) {
     default:
       return Stroke::Join::Miter;
   }
+}
+
+Color4f ToTGFXColor(Color color, Opacity opacity) {
+  return {static_cast<float>(color.red) / 255.0f, static_cast<float>(color.green) / 255.0f,
+          static_cast<float>(color.blue) / 255.0f, ToAlpha(opacity)};
+}
+
+float ToAlpha(Opacity opacity) {
+  if (opacity == 255) {
+    return 1.0f;
+  }
+  return static_cast<float>(opacity) / 255.0f;
 }
 
 }  // namespace pag

@@ -31,7 +31,7 @@ static const char BLUR_FRAGMENT_SHADER[] = R"(
 
     uniform vec3 uColor;
     uniform float uColorValid;
-    uniform float uOpacity;
+    uniform float uAlpha;
 
     varying vec2 vertexColor;
 
@@ -73,7 +73,7 @@ static const char BLUR_FRAGMENT_SHADER[] = R"(
         }
 
         color = sum / divisor;
-        gl_FragColor = vec4(mix(color.rgb, uColor * color.a, uColorValid), color.a) * uOpacity;
+        gl_FragColor = vec4(mix(color.rgb, uColor * color.a, uColorValid), color.a) * uAlpha;
     }
     )";
 
@@ -90,13 +90,13 @@ void SinglePassBlurFilter::onPrepareProgram(const GLInterface* gl, unsigned int 
   repeatEdgeHandle = gl->getUniformLocation(program, "uRepeatEdge");
   colorHandle = gl->getUniformLocation(program, "uColor");
   colorValidHandle = gl->getUniformLocation(program, "uColorValid");
-  opacityHandle = gl->getUniformLocation(program, "uOpacity");
+  alphaHandle = gl->getUniformLocation(program, "uAlpha");
 }
 
-void SinglePassBlurFilter::updateParams(float blurrinessValue, float blurOpacityValue,
+void SinglePassBlurFilter::updateParams(float blurrinessValue, float blurAlphaValue,
                                         bool repeatEdgeValue, BlurMode mode) {
   blurriness = blurrinessValue;
-  opacity = blurOpacityValue;
+  alpha = blurAlphaValue;
   repeatEdge = repeatEdgeValue;
   switch (mode) {
     case BlurMode::Picture:
@@ -112,14 +112,14 @@ void SinglePassBlurFilter::updateParams(float blurrinessValue, float blurOpacity
   }
 }
 
-void SinglePassBlurFilter::enableBlurColor(Color blurColor) {
+void SinglePassBlurFilter::enableBlurColor(Color4f blurColor) {
   isColorValid = true;
   color = blurColor;
 }
 
 void SinglePassBlurFilter::disableBlurColor() {
   isColorValid = false;
-  color = Black;
+  color = Color4f::Black();
 }
 
 void SinglePassBlurFilter::onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
@@ -137,9 +137,9 @@ void SinglePassBlurFilter::onUpdateParams(const GLInterface* gl, const Rect& con
                 blurLevel / static_cast<float>(contentBounds.height()) *
                     (direction == BlurDirection::Vertical));
   gl->uniform1f(repeatEdgeHandle, repeatEdge);
-  gl->uniform3f(colorHandle, color.red / 255.f, color.green / 255.f, color.blue / 255.f);
+  gl->uniform3f(colorHandle, color.red, color.green, color.blue);
   gl->uniform1f(colorValidHandle, isColorValid);
-  gl->uniform1f(opacityHandle, opacity);
+  gl->uniform1f(alphaHandle, alpha);
 }
 
 std::vector<Point> SinglePassBlurFilter::computeVertices(const Rect& inputBounds,

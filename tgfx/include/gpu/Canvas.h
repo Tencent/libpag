@@ -31,7 +31,7 @@ class Surface;
 class SurfaceOptions;
 
 struct CanvasPaint {
-  Opacity alpha = Opaque;
+  float alpha = 1.0f;
   Blend blendMode = Blend::SrcOver;
   Matrix matrix = Matrix::I();
   Path clip = {};
@@ -104,12 +104,12 @@ class Canvas {
   /**
    * Returns the current global alpha.
    */
-  Opacity getAlpha() const;
+  float getAlpha() const;
 
   /**
    * Replaces the global alpha with specified newAlpha.
    */
-  void setAlpha(Opacity newAlpha);
+  void setAlpha(float newAlpha);
 
   /**
    * Returns the current global blend mode.

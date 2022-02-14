@@ -26,7 +26,7 @@ class Shape : public Graphic {
   /**
    * Creates a shape Graphic with solid color fill. Returns nullptr if path is empty.
    */
-  static std::shared_ptr<Graphic> MakeFrom(const Path& path, Color color);
+  static std::shared_ptr<Graphic> MakeFrom(const Path& path, Color4f color);
 
   /**
    * Creates a shape Graphic with gradient color fill. Returns nullptr if path is empty.

@@ -19,6 +19,7 @@
 #include "DropShadowSpreadFilter.h"
 #include "gpu/opengl/GLUtil.h"
 #include "rendering/filters/utils/BlurTypes.h"
+#include "rendering/utils/TGFXTypes.h"
 
 namespace pag {
 static const char DROPSHADOW_SPREAD_FRAGMENT_SHADER[] = R"(
@@ -26,7 +27,7 @@ static const char DROPSHADOW_SPREAD_FRAGMENT_SHADER[] = R"(
         precision highp float;
         uniform sampler2D uTextureInput;
         uniform vec3 uColor;
-        uniform float uOpacity;
+        uniform float uAlpha;
         uniform vec2 uSize;
 
         varying vec2 vertexColor;
@@ -44,7 +45,7 @@ static const char DROPSHADOW_SPREAD_FRAGMENT_SHADER[] = R"(
                 alphaSum += texture2D(uTextureInput, vertexColor + vec2(measureX, -measureY)).a;
             }
 
-            gl_FragColor = (alphaSum > 0.0) ? vec4(uColor, uOpacity) : vec4(0.0);
+            gl_FragColor = (alphaSum > 0.0) ? vec4(uColor, uAlpha) : vec4(0.0);
         }
     )";
 
@@ -53,7 +54,7 @@ static const char DROPSHADOW_SPREAD_THICK_FRAGMENT_SHADER[] = R"(
         precision highp float;
         uniform sampler2D uTextureInput;
         uniform vec3 uColor;
-        uniform float uOpacity;
+        uniform float uAlpha;
         uniform vec2 uSize;
 
         varying vec2 vertexColor;
@@ -73,7 +74,7 @@ static const char DROPSHADOW_SPREAD_THICK_FRAGMENT_SHADER[] = R"(
                 alphaSum += texture2D(uTextureInput, vertexColor + vec2(measureX / 2.0, -measureY / 2.0)).a;
             }
 
-            gl_FragColor = (alphaSum > 0.0) ? vec4(uColor, uOpacity) : vec4(0.0);
+            gl_FragColor = (alphaSum > 0.0) ? vec4(uColor, uAlpha) : vec4(0.0);
         }
     )";
 
@@ -90,14 +91,14 @@ std::string DropShadowSpreadFilter::onBuildFragmentShader() {
 
 void DropShadowSpreadFilter::onPrepareProgram(const GLInterface* gl, unsigned program) {
   spreadColorHandle = gl->getUniformLocation(program, "uColor");
-  spreadOpacityHandle = gl->getUniformLocation(program, "uOpacity");
+  spreadAlphaHandle = gl->getUniformLocation(program, "uAlpha");
   spreadSizeHandle = gl->getUniformLocation(program, "uSize");
 }
 
 void DropShadowSpreadFilter::onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
                                             const Point& filterScale) {
-  auto color = layerStyle->color->getValueAt(layerFrame);
-  auto opacity = layerStyle->opacity->getValueAt(layerFrame);
+  auto color = ToTGFXColor(layerStyle->color->getValueAt(layerFrame));
+  auto alpha = ToAlpha(layerStyle->opacity->getValueAt(layerFrame));
   auto spread = layerStyle->spread->getValueAt(layerFrame);
   auto size = layerStyle->size->getValueAt(layerFrame);
   spread *= (spread == 1.0) ? 1.0 : 0.8;
@@ -107,8 +108,8 @@ void DropShadowSpreadFilter::onUpdateParams(const GLInterface* gl, const Rect& c
   spreadSizeX = std::min(spreadSizeX, DROPSHADOW_MAX_SPREAD_SIZE);
   spreadSizeY = std::min(spreadSizeY, DROPSHADOW_MAX_SPREAD_SIZE);
 
-  gl->uniform3f(spreadColorHandle, color.red / 255.f, color.green / 255.f, color.blue / 255.f);
-  gl->uniform1f(spreadOpacityHandle, opacity / 255.f);
+  gl->uniform3f(spreadColorHandle, color.red, color.green, color.blue);
+  gl->uniform1f(spreadAlphaHandle, alpha);
   gl->uniform2f(spreadSizeHandle, spreadSizeX / contentBounds.width(),
                 spreadSizeY / contentBounds.height());
 }

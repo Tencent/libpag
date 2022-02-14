@@ -47,8 +47,8 @@ class DropShadowFilter : public LayerFilter {
   DropShadowSpreadFilter* spreadFilter = nullptr;
   DropShadowSpreadFilter* spreadThickFilter = nullptr;
 
-  Color color = Black;
-  float opacity = 0.0f;
+  Color4f color = Color4f::Black();
+  float alpha = 0.0f;
   float spread = 0.0f;
   float spreadSize = 0.0f;
   float blurSize = 0.0f;

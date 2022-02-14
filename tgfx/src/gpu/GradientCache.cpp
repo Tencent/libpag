@@ -60,14 +60,14 @@ std::shared_ptr<PixelBuffer> CreateGradient(const Color4f* colors, const float* 
         std::min(static_cast<int>(positions[i] * static_cast<float>(resolution)), resolution - 1);
 
     if (nextIndex > prevIndex) {
-      auto r0 = colors[i - 1].r;
-      auto g0 = colors[i - 1].g;
-      auto b0 = colors[i - 1].b;
-      auto a0 = colors[i - 1].a;
-      auto r1 = colors[i].r;
-      auto g1 = colors[i].g;
-      auto b1 = colors[i].b;
-      auto a1 = colors[i].a;
+      auto r0 = colors[i - 1].red;
+      auto g0 = colors[i - 1].green;
+      auto b0 = colors[i - 1].blue;
+      auto a0 = colors[i - 1].alpha;
+      auto r1 = colors[i].red;
+      auto g1 = colors[i].green;
+      auto b1 = colors[i].blue;
+      auto a1 = colors[i].alpha;
 
       auto step = 1.0f / static_cast<float>(nextIndex - prevIndex);
       auto deltaR = (r1 - r0) * step;
@@ -95,10 +95,10 @@ const Texture* GradientCache::getGradient(const Color4f* colors, const float* po
                                           int count) {
   BytesKey bytesKey = {};
   for (int i = 0; i < count; ++i) {
-    bytesKey.write(colors[i].r);
-    bytesKey.write(colors[i].g);
-    bytesKey.write(colors[i].b);
-    bytesKey.write(colors[i].a);
+    bytesKey.write(colors[i].red);
+    bytesKey.write(colors[i].green);
+    bytesKey.write(colors[i].blue);
+    bytesKey.write(colors[i].alpha);
     bytesKey.write(positions[i]);
   }
 

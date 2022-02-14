@@ -20,10 +20,8 @@
 #include "gpu/ConstColorProcessor.h"
 
 namespace pag {
-std::shared_ptr<Shader> Shader::MakeColorShader(Color color, Opacity opacity) {
-  return std::make_shared<ColorShader>(
-      Color4f{static_cast<float>(color.red) / 255.0f, static_cast<float>(color.green) / 255.0f,
-              static_cast<float>(color.blue) / 255.0f, static_cast<float>(opacity) / 255.0f});
+std::shared_ptr<Shader> Shader::MakeColorShader(Color4f color) {
+  return std::make_shared<ColorShader>(color);
 }
 
 bool ColorShader::isOpaque() const {

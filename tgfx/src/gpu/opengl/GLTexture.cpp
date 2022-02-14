@@ -221,7 +221,7 @@ void Trace(const Texture* texture, const std::string& path) {
   if (texture == nullptr) {
     return;
   }
-  auto surface = Surface::Make(texture->getContext(), texture->width(), texture->height());
+  auto surface = Surface::Make(texture->context, texture->width(), texture->height());
   if (surface == nullptr) {
     return;
   }

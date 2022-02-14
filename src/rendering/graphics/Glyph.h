@@ -166,15 +166,15 @@ class Glyph {
   /**
    * Retrieves alpha from the color used when stroking and filling.
    */
-  Opacity getAlpha() const {
+  float getAlpha() const {
     return alpha;
   }
 
   /**
    * Replaces alpha of the color used when stroking and filling, leaving RGB unchanged.
    */
-  void setAlpha(Opacity opacity) {
-    alpha = opacity;
+  void setAlpha(float newAlpha) {
+    alpha = newAlpha;
   }
 
   /**
@@ -239,7 +239,7 @@ class Glyph {
   // writable attributes:
   Matrix matrix = Matrix::I();
   TextStyle textStyle = TextStyle::Fill;
-  Opacity alpha = Opaque;
+  float alpha = 1.0f;
   Color fillColor = Black;
   Color strokeColor = Black;
   float strokeWidth = 0;
