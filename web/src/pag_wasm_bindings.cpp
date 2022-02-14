@@ -40,8 +40,8 @@ EMSCRIPTEN_BINDINGS(pag) {
                   return static_cast<LayerType>(pagLayer.layerType());
                 }))
       .function("_layerName", &PAGLayer::layerName)
-      .function("_opacity", &PAGLayer::opacity)
-      .function("_setOpacity", &PAGLayer::setOpacity)
+      .function("_alpha", &PAGLayer::alpha)
+      .function("_setAlpha", &PAGLayer::setAlpha)
       .function("_visible", &PAGLayer::visible)
       .function("_setVisible", &PAGLayer::setVisible)
       .function("_editableIndex", &PAGLayer::editableIndex)
