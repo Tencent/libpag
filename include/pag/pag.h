@@ -1485,7 +1485,7 @@ class PAG_API PAGVideoDecoder {
   /**
    * If set to true, PAGVideoDecoder uses a software decoder first, but initializes a hardware on async
    * thread, and then switches to the hardware decoder when it is initialized.
-   * The default is true, which will improve the performance of first frame rendering.
+   * The default value is true, which will improve the performance of first frame rendering.
    */
   static void SetSoftwareToHardwareEnabled(bool value);
 
