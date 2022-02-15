@@ -38,22 +38,22 @@ export class PAGComposition extends PAGLayer {
    * @param index The index position of the child layer.
    * @returns The child layer at the specified index position.
    */
-  public getLayerAt(index: number): number {
-    return this.wasmIns._getLayerAt(index) as number;
+  public getLayerAt(index: number): PAGLayer {
+    return this.wasmIns._getLayerAt(index) as PAGLayer;
   }
   /**
    * Returns an array of layers that match the specified layer name.
    */
-  public getLayersByName(layerName: string): PAGLayer {
-    return this.wasmIns._getLayersByName(layerName) as PAGLayer;
+  public getLayersByName(layerName: string): Array<PAGLayer> {
+    return this.wasmIns._getLayersByName(layerName) as Array<PAGLayer>;
   }
   /**
    * Returns the index position of a child layer.
    * @param pagLayer The layer instance to identify.
    * @returns The index position of the child layer to identify.
    */
-  public getLayerIndex(index: number): number {
-    return this.wasmIns._getLayerIndex(index) as number;
+  public getLayerIndex(index: number): PAGLayer {
+    return this.wasmIns._getLayerIndex(index) as PAGLayer;
   }
   /**
    * Swap the layers at the specified index.
@@ -104,14 +104,14 @@ export class PAGComposition extends PAGLayer {
   /**
     * The audio data of this composition.
     */
-  public audioBytes(): Int8Array {
-    return this.wasmIns._audioBytes() as Int8Array;
+  public audioBytes(): Uint8Array {
+    return this.wasmIns._audioBytes() as Uint8Array;
   }
   /**
    * Remove the specified PAGLayer from current PAGComposition.
    */
-  public removeLayerAt(index: number): number {
-    return this.wasmIns._removeLayerAt(index) as number;
+  public removeLayerAt(index: number): PAGLayer {
+    return this.wasmIns._removeLayerAt(index) as PAGLayer;
   }
   /**
    * Remove all PAGLayers from current PAGComposition.
