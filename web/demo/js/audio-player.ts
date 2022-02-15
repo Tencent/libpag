@@ -34,7 +34,7 @@ export class AudioPlayer {
     this.audioEl.pause();
     Log.log('音频停止');
   }
-  public onDestroy() {
+  public destroy() {
     if (!this.isEffective || this.isDestroyed) return;
     Log.log('音频销毁');
     this.audioEl.pause();
