@@ -3,7 +3,6 @@ import { PAGFile } from '../src/pag-file';
 import { PAGView } from '../src/pag-view';
 import { AudioPlayer } from './js/audio-player';
 import { PAG as PAGNamespace, PAGViewListenerEvent } from '../src/types';
-import { Log } from '../src/utils/log';
 
 declare global {
   interface Window {
@@ -258,27 +257,27 @@ window.onload = async () => {
 
 const existsLayer = (pagLayerWasm: object) => {
   if (pagLayerWasm) return true;
-  Log.log('no Layer');
+  console.log('no Layer');
   return false;
 }
 
 // PAGComposition api test
 const testPAGComposition = {
   rect: () => {
-    Log.log(`test result: width: ${pagComposition.width()}, height: ${pagComposition.height()}`)
+    console.log(`test result: width: ${pagComposition.width()}, height: ${pagComposition.height()}`)
   },
   setContentSize: () => {
     pagComposition.setContentSize(360, 640);
-    Log.log(`test setContentSize result: width: ${pagComposition.width()}, height: ${pagComposition.height()}`)
+    console.log(`test setContentSize result: width: ${pagComposition.width()}, height: ${pagComposition.height()}`)
   },
   numChildren: () => {
-    Log.log(`test numChildren: ${pagComposition.numChildren()}`)
+    console.log(`test numChildren: ${pagComposition.numChildren()}`)
   },
   getLayerAt: () => {
     const pagLayerWasm = pagComposition.getLayerAt(0);
     if (!existsLayer(pagLayerWasm)) return;
     const pagLayer = new PAG.PAGLayer(pagLayerWasm);
-    Log.log(`test getLayerAt index 0, layerName: ${pagLayer.layerName()}`)
+    console.log(`test getLayerAt index 0, layerName: ${pagLayer.layerName()}`)
   },
   getLayersByName: () => {
     const pagLayerWasm = pagComposition.getLayerAt(0);
@@ -289,16 +288,16 @@ const testPAGComposition = {
     for (let j = 0; j < vectorPagLayer.size(); j++) {
       const pagLayerWasm = vectorPagLayer.get(j);
       const pagLayer_1 = new PAG.PAGLayer(pagLayerWasm);
-      Log.log(`test getLayersByName: layerName: ${pagLayer_1.layerName()}`);
+      console.log(`test getLayersByName: layerName: ${pagLayer_1.layerName()}`);
     }
   },
   audioStartTime: () => {
     const audioStartTime = pagComposition.audioStartTime();
-    Log.log('test audioStartTime:', audioStartTime);
+    console.log('test audioStartTime:', audioStartTime);
   },
   audioMarkers: () => {
     const audioMarkers = pagComposition.audioMarkers();
-    Log.log(`test audioMarkers: size`, audioMarkers.size());
+    console.log(`test audioMarkers: size`, audioMarkers.size());
   },
   audioBytes: () => {
     const audioBytes = pagComposition.audioBytes();
@@ -307,7 +306,7 @@ const testPAGComposition = {
   getLayerIndex: () => {
     const pagLayerWasm = pagComposition.getLayerAt(0);
     const index = pagComposition.getLayerIndex(pagLayerWasm);
-    Log.log(`test GetLayerIndex: ${index}`);
+    console.log(`test GetLayerIndex: ${index}`);
   },
   swapLayerAt: () => {
     swapLayer('swapLayerAt');
@@ -318,41 +317,41 @@ const testPAGComposition = {
   contains: () => {
     const pagLayerWasm = pagComposition.getLayerAt(0);
     const isContains = pagComposition.contains(pagLayerWasm);
-    if (isContains) { Log.log('test contains'); }
+    if (isContains) { console.log('test contains'); }
   },
   addLayer: () => {
     const pagLayerWasm = pagComposition.getLayerAt(0);
     pagComposition.removeLayerAt(0);
     const oldNum =  pagComposition.numChildren();
     const isSuccess: boolean =  pagComposition.addLayer(pagLayerWasm);
-    if (isSuccess) { Log.log(`test addLayer success: old num ${oldNum} current num ${pagComposition.numChildren()}`)};
+    if (isSuccess) { console.log(`test addLayer success: old num ${oldNum} current num ${pagComposition.numChildren()}`)};
   },
   removeLayerAt: () => {
     const oldNum = pagComposition.numChildren();
     pagComposition.removeLayerAt(0);
-    Log.log(`test delete Layer[0] success: old LayersNum: ${oldNum} current LayersNum ${pagComposition.numChildren()}`);
+    console.log(`test delete Layer[0] success: old LayersNum: ${oldNum} current LayersNum ${pagComposition.numChildren()}`);
   },
   removeAllLayers: () => {
     const oldNum = pagComposition.numChildren();
     pagComposition.removeAllLayers();
-    Log.log(`test removeAllLayers success: old LayersNum${oldNum} current LayersNum ${pagComposition.numChildren()}`);
+    console.log(`test removeAllLayers success: old LayersNum${oldNum} current LayersNum ${pagComposition.numChildren()}`);
   }
 }
 const testPAGCompositionAPi = () => {
-  Log.log(`-------------------TEST PAGCompositionAPI START--------------------- `);
+  console.log(`-------------------TEST PAGCompositionAPI START--------------------- `);
   for (let i in testPAGComposition) {
     if (testPAGComposition.hasOwnProperty(i)) {
        testPAGComposition[i]();
     }
   }
-  Log.log(`-------------------TEST PAGCompositionAPI END--------------------- `);
+  console.log(`-------------------TEST PAGCompositionAPI END--------------------- `);
 }
 
 const swapLayer = (type: string) => {
   const pagLayerWasm_0 =  pagComposition.getLayerAt(0);
   const pagLayerWasm_1 =  pagComposition.getLayerAt(1);
   if (!pagLayerWasm_0 || !pagLayerWasm_1) {
-    Log.log('No layer switching');
+    console.log('No layer switching');
     return;
   };
   const pagLayer_name_0 =  new PAG.PAGLayer(pagLayerWasm_0).layerName();
@@ -366,7 +365,7 @@ const swapLayer = (type: string) => {
   const pagLayerWasm_exch_1 =  pagComposition.getLayerAt(1);
   const pagLayer__exch_0 =  (new PAG.PAGLayer(pagLayerWasm_exch_0).layerName());
   const pagLayer__exch_1 =  (new PAG.PAGLayer(pagLayerWasm_exch_1).layerName());
-  Log.log(`test ${type}:  oldLayerName_0=${pagLayer_name_0}, oldLayerName_1=${pagLayer_name_1} exchange LayerName_0=${pagLayer__exch_0}, LayerName_1=${pagLayer__exch_1} `);
+  console.log(`test ${type}:  oldLayerName_0=${pagLayer_name_0}, oldLayerName_1=${pagLayer_name_1} exchange LayerName_0=${pagLayer__exch_0}, LayerName_1=${pagLayer__exch_1} `);
 }
 
 const createPAGView = async (file) => {
