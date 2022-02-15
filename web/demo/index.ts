@@ -232,7 +232,7 @@ window.onload = async () => {
   });
 
    // PAGComposition
-   document.getElementById('btn-composition').addEventListener('click', async () => {
+   document.getElementById('btn-composition').addEventListener('click', () => {
     testPAGCompositionAPi();
   });
 
