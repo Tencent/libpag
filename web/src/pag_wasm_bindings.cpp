@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <emscripten/bind.h>
+#include <emscripten/val.h>
 #include "core/FontMetrics.h"
 #include "core/ImageInfo.h"
 #include "core/PathTypes.h"
@@ -61,7 +62,42 @@ EMSCRIPTEN_BINDINGS(pag) {
   class_<PAGComposition, base<PAGLayer>>("_PAGComposition")
       .smart_ptr<std::shared_ptr<PAGComposition>>("_PAGComposition")
       .function("_width", &PAGComposition::width)
-      .function("_height", &PAGComposition::height);
+      .function("_height", &PAGComposition::height)
+      .function("_setContentSize", &PAGComposition::setContentSize)
+      .function("_numChildren", &PAGComposition::numChildren)
+      .function("_getLayerAt", &PAGComposition::getLayerAt)
+      .function("_getLayerIndex", &PAGComposition::getLayerIndex)
+      .function("_swapLayerAt", &PAGComposition::swapLayerAt)
+      .function("_swapLayer", &PAGComposition::swapLayer)
+      .function("_contains", optional_override([](PAGComposition& pagComposition,
+                                                  std::shared_ptr<PAGLayer> pagLayer) {
+                  return static_cast<bool>(pagComposition.contains(pagLayer));
+                }))
+      .function("_removeLayerAt", &PAGComposition::removeLayerAt)
+      .function("_removeAllLayers", &PAGComposition::removeAllLayers)
+      .function("_addLayer", optional_override([](PAGComposition& pagComposition,
+                                                  std::shared_ptr<PAGLayer> pagLayer) {
+                  return static_cast<bool>(pagComposition.addLayer(pagLayer));
+                }))
+      .function("_addLayerAt", optional_override([](PAGComposition& pagComposition,
+                                                    std::shared_ptr<PAGLayer> pagLayer, int index) {
+                  return static_cast<bool>(pagComposition.addLayerAt(pagLayer, index));
+                }))
+      .function("_audioBytes", optional_override([](PAGComposition& pagComposition) {
+                  ByteData* result = pagComposition.audioBytes();
+                  if (result->length() == 0) {
+                    uint8_t empty_arr[] = {};
+                    return val(typed_memory_view(0, empty_arr));
+                  }
+                  return val(typed_memory_view(result->length(), result->data()));
+                }))
+      .function("_audioMarkers", &PAGComposition::audioMarkers)
+      .function("_audioStartTime", optional_override([](PAGComposition& pagComposition) {
+                  return static_cast<int>(pagComposition.audioStartTime());
+                }))
+      .function("_getLayersByName", &PAGComposition::getLayersByName)
+      .function("_getLayersUnderPoint", &PAGComposition::getLayersUnderPoint);
+      
   class_<PAGFile, base<PAGComposition>>("_PAGFile")
       .smart_ptr<std::shared_ptr<PAGFile>>("_PAGFile")
       .class_function("_Load", optional_override([](uintptr_t bytes, size_t length) {
@@ -215,6 +251,11 @@ EMSCRIPTEN_BINDINGS(pag) {
       .field("green", &Color::green)
       .field("blue", &Color::blue);
 
+  value_object<Marker>("Marker")
+      .field("startTime", &Marker::startTime)
+      .field("duration", &Marker::duration)
+      .field("comment", &Marker::comment);
+
   enum_<PathFillType>("PathFillType")
       .value("WINDING", PathFillType::Winding)
       .value("EVEN_ODD", PathFillType::EvenOdd)
@@ -249,6 +290,7 @@ EMSCRIPTEN_BINDINGS(pag) {
   register_vector<std::shared_ptr<PAGLayer>>("VectorPAGLayer");
   register_vector<std::string>("VectorString");
   register_vector<Point>("VectorPoint");
+  register_vector<const Marker*>("VectorMarker");
 
   function("_SetFallbackFontNames", optional_override([](std::vector<std::string> fontNames) {
              PAGFont::SetFallbackFontNames(fontNames);

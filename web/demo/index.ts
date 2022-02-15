@@ -1,7 +1,9 @@
 import { PAGInit } from '../src/pag';
 import { PAGFile } from '../src/pag-file';
 import { PAGView } from '../src/pag-view';
+import { AudioPlayer } from './js/audio-player';
 import { PAG as PAGNamespace, PAGViewListenerEvent } from '../src/types';
+import { Log } from '../src/utils/log';
 
 declare global {
   interface Window {
@@ -15,6 +17,8 @@ let cacheEnabled: boolean;
 let videoEnabled: boolean;
 let globalCacheScale: number;
 let videoEl = null;
+let pagComposition = null;
+let audioEl = null;
 let PAG: PAGNamespace;
 let canvasElementSize = 640;
 let isMobile = false;
@@ -148,18 +152,22 @@ window.onload = async () => {
   // 控制
   document.getElementById('btn-play').addEventListener('click', () => {
     pagView.play();
+    audioEl.play();
     console.log('开始');
   });
   document.getElementById('btn-pause').addEventListener('click', () => {
     pagView.pause();
+    audioEl.pause();
     console.log('暂停');
   });
   document.getElementById('btn-stop').addEventListener('click', () => {
     pagView.stop();
+    audioEl.stop();
     console.log('停止');
   });
-  document.getElementById('btn-destroy').addEventListener('click', function () {
+  document.getElementById('btn-destroy').addEventListener('click', () => {
     pagView.destroy();
+    audioEl.destroy();
     console.log('销毁');
   });
 
@@ -223,6 +231,11 @@ window.onload = async () => {
     pagView.setCacheEnabled(!cacheEnabled);
   });
 
+   // PAGComposition
+   document.getElementById('btn-composition').addEventListener('click', async () => {
+    testPAGCompositionAPi();
+  });
+
   // freeCache
   // document.getElementById('btn-freeCache').addEventListener('click', () => {
   //   pagView.freeCache();
@@ -242,6 +255,119 @@ window.onload = async () => {
     pagView.setCacheScale(cacheScale);
   });
 };
+
+const existsLayer = (pagLayerWasm: object) => {
+  if (pagLayerWasm) return true;
+  Log.log('no Layer');
+  return false;
+}
+
+// PAGComposition api test
+const testPAGComposition = {
+  rect: async () => {
+    Log.log(`test result: width: ${pagComposition.width()}, height: ${pagComposition.height()}`)
+  },
+  setContentSize: async () => {
+    pagComposition.setContentSize(360, 640);
+    Log.log(`test setContentSize result: width: ${pagComposition.width()}, height: ${pagComposition.height()}`)
+  },
+  numChildren: async () => {
+    Log.log(`test numChildren: ${pagComposition.numChildren()}`)
+  },
+  getLayerAt: async () => {
+    const pagLayerWasm = pagComposition.getLayerAt(0);
+    if (!existsLayer(pagLayerWasm)) return;
+    const pagLayer = new PAG.PAGLayer(pagLayerWasm);
+    Log.log(`test getLayerAt index 0, layerName: ${pagLayer.layerName()}`)
+  },
+  getLayersByName: async () => {
+    const pagLayerWasm = pagComposition.getLayerAt(0);
+    if(!existsLayer(pagLayerWasm)) return;
+    const pagLayer = new PAG.PAGLayer(pagLayerWasm);
+    const layerName = pagLayer.layerName();
+    const vectorPagLayer = pagComposition.getLayersByName(layerName);
+    for (let j = 0; j < vectorPagLayer.size(); j++) {
+      const pagLayerWasm = vectorPagLayer.get(j);
+      const pagLayer_1 = new PAG.PAGLayer(pagLayerWasm);
+      Log.log(`test getLayersByName: layerName: ${pagLayer_1.layerName()}`);
+    }
+  },
+  audioStartTime: async () => {
+    const audioStartTime = pagComposition.audioStartTime();
+    Log.log('test audioStartTime:', audioStartTime);
+  },
+  audioMarkers: async () => {
+    const audioMarkers = pagComposition.audioMarkers();
+    Log.log(`test audioMarkers: size`, audioMarkers.size());
+  },
+  audioBytes: async () => {
+    const audioBytes = pagComposition.audioBytes();
+    console.log('test audioBytes：', audioBytes);
+  },
+  getLayerIndex: async () => {
+    const pagLayerWasm = pagComposition.getLayerAt(0);
+    const index = pagComposition.getLayerIndex(pagLayerWasm);
+    Log.log(`test GetLayerIndex: ${index}`);
+  },
+  swapLayerAt: async () => {
+    swapLayer('swapLayerAt');
+  },
+  swapLayer: async () => {
+     swapLayer('swapLayer');
+  },
+  contains: async () => {
+    const pagLayerWasm = pagComposition.getLayerAt(0);
+    const isContains = pagComposition.contains(pagLayerWasm);
+    if (isContains) { Log.log('test contains'); }
+  },
+  addLayer: async () => {
+    const pagLayerWasm = pagComposition.getLayerAt(0);
+    pagComposition.removeLayerAt(0);
+    const oldNum =  pagComposition.numChildren();
+    const isSuccess: boolean =  pagComposition.addLayer(pagLayerWasm);
+    if (isSuccess) { Log.log(`test addLayer success: old num ${oldNum} current num ${pagComposition.numChildren()}`)};
+  },
+  removeLayerAt: async () => {
+    const oldNum = pagComposition.numChildren();
+    pagComposition.removeLayerAt(0);
+    Log.log(`test delete Layer[0] success: old LayersNum: ${oldNum} current LayersNum ${pagComposition.numChildren()}`);
+  },
+  removeAllLayers: async () => {
+    const oldNum = pagComposition.numChildren();
+    pagComposition.removeAllLayers();
+    Log.log(`test removeAllLayers success: old LayersNum${oldNum} current LayersNum ${pagComposition.numChildren()}`);
+  }
+}
+const testPAGCompositionAPi = () => {
+  Log.log(`-------------------TEST PAGCompositionAPI START--------------------- `);
+  for (let i in testPAGComposition) {
+    if (testPAGComposition.hasOwnProperty(i)) {
+       testPAGComposition[i]();
+    }
+  }
+  Log.log(`-------------------TEST PAGCompositionAPI END--------------------- `);
+}
+
+const swapLayer = async (type: string) => {
+  const pagLayerWasm_0 =  pagComposition.getLayerAt(0);
+  const pagLayerWasm_1 =  pagComposition.getLayerAt(1);
+  if (!pagLayerWasm_0 || !pagLayerWasm_1) {
+    Log.log('No layer switching');
+    return;
+  };
+  const pagLayer_name_0 =  new PAG.PAGLayer(pagLayerWasm_0).layerName();
+  const pagLayer_name_1 =  new PAG.PAGLayer(pagLayerWasm_1).layerName();
+  if (type === 'swapLayer') {
+     pagComposition.swapLayer(pagLayerWasm_0, pagLayerWasm_1);
+  } else {
+     pagComposition.swapLayerAt(0, 1);
+  }
+  const pagLayerWasm_exch_0 =  pagComposition.getLayerAt(0);
+  const pagLayerWasm_exch_1 =  pagComposition.getLayerAt(1);
+  const pagLayer__exch_0 =  (new PAG.PAGLayer(pagLayerWasm_exch_0).layerName());
+  const pagLayer__exch_1 =  (new PAG.PAGLayer(pagLayerWasm_exch_1).layerName());
+  Log.log(`test ${type}:  oldLayerName_0=${pagLayer_name_0}, oldLayerName_1=${pagLayer_name_1} exchange LayerName_0=${pagLayer__exch_0}, LayerName_1=${pagLayer__exch_1} `);
+}
 
 const createPAGView = async (file) => {
   if (pagFile) pagFile.destroy();
@@ -264,13 +390,17 @@ const createPAGView = async (file) => {
   });
   pagView.addListener(PAGViewListenerEvent.onAnimationRepeat, (event) => {
     console.log('onAnimationRepeat', event);
+    audioEl.stop();
+    audioEl.play();
   });
   document.getElementById('control').style.display = '';
   // 图层编辑
   const editableLayers = getEditableLayer(PAG, pagFile);
   console.log(editableLayers);
   renderEditableLayer(editableLayers);
-  console.log(`已加载 ${file.name}`);
+  console.log(`已加载 ${file.name}`); 
+  pagComposition =  pagView.getComposition();
+  audioEl = new AudioPlayer(pagComposition.audioBytes()); 
   return pagView;
 };
 
@@ -346,7 +476,7 @@ const renderEditableLayer = (editableLayers) => {
     item.appendChild(replaceVideoBtn);
     box.appendChild(item);
   });
-  document.body.appendChild(box);
+  document.querySelector('#editLayer-content').appendChild(box)
 };
 
 // 替换图片
