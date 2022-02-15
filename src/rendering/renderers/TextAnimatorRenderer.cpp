@@ -208,8 +208,8 @@ void TextAnimatorRenderer::apply(std::vector<std::vector<GlyphHandle>>& glyphLis
         factor = 0.0f;  // 透明度的范围不能超过[0，1]，所以限制factor不能为负。
       }
       auto oldAlpha = glyph->getAlpha();
-      auto opacityFactor = (alpha - 1.0f) * factor + 1.0f;
-      glyph->setAlpha(oldAlpha * opacityFactor);
+      auto alphaFactor = (alpha - 1.0f) * factor + 1.0f;
+      glyph->setAlpha(oldAlpha * alphaFactor);
 
       glyph->setMatrix(matrix);
       index++;

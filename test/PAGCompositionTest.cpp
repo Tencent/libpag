@@ -90,16 +90,20 @@ PAG_TEST_F(PAGCompositionTest, composition) {
   EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGCompositionTest/composition_empty"));
 }
 
-PAG_TEST_SUIT_WITH_PATH(VideoSequenceSize, "../resources/apitest/video_sequence_size.pag")
-
 /**
  * 用例描述: VideoSequence的大小和Composition不一致
  */
-PAG_TEST_F(VideoSequenceSize, VideoSequence) {
-  TestPAGFile->setMatrix(Matrix::MakeScale(0.8625));
-  TestPAGPlayer->setProgress(0.5);
-  TestPAGPlayer->flush();
-  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "VideoSequenceSize/VideoSequence"));
+PAG_TEST_F(PAGCompositionTest, VideoSequence) {
+  auto pagFile = PAGFile::Load("../resources/apitest/video_sequence_size.pag");
+  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagPlayer = new PAGPlayer();
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setSurface(pagSurface);
+  pagFile->setMatrix(Matrix::MakeScale(0.8625));
+  pagPlayer->setProgress(0.5);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGCompositionTest/VideoSequence"));
+  delete pagPlayer;
 }
 
 // ContainerTest 中会操作容器，所以此处需要声明为case，不能声明为suit

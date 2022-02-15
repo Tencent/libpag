@@ -404,30 +404,30 @@ GradientPaint MakeGradientPaint(Enum fillType, Point startPoint, Point endPoint,
   std::vector<float> colorPositions;
   ConvertColorStop(gradientColor, colorValues, colorPositions);
 
-  std::vector<Opacity> alphaValues;
+  std::vector<Opacity> opacityValues;
   std::vector<float> alphaPositions;
-  ConvertAlphaStop(gradientColor, alphaValues, alphaPositions);
+  ConvertAlphaStop(gradientColor, opacityValues, alphaPositions);
 
   size_t colorIndex = 0;
-  size_t alphaIndex = 0;
-  while (colorIndex < colorValues.size() && alphaIndex < alphaValues.size()) {
+  size_t opacityIndex = 0;
+  while (colorIndex < colorValues.size() && opacityIndex < opacityValues.size()) {
     auto colorPosition = colorPositions[colorIndex];
-    auto alphaPosition = alphaPositions[alphaIndex];
+    auto alphaPosition = alphaPositions[opacityIndex];
     if (colorPosition == alphaPosition) {
       gradient.positions.push_back(colorPosition);
-      auto color4f = ToTGFXColor(colorValues[colorIndex++], alphaValues[alphaIndex++]);
+      auto color4f = ToTGFXColor(colorValues[colorIndex++], opacityValues[opacityIndex++]);
       gradient.colors.push_back(color4f);
     } else if (colorPosition < alphaPosition) {
       gradient.positions.push_back(colorPosition);
-      Opacity alpha;
-      if (alphaIndex > 0) {
-        auto lastPosition = alphaPositions[alphaIndex - 1];
+      Opacity opacity;
+      if (opacityIndex > 0) {
+        auto lastPosition = alphaPositions[opacityIndex - 1];
         auto factor = (colorPosition - lastPosition) * 1.0f / (alphaPosition - lastPosition);
-        alpha = Interpolate(alphaValues[alphaIndex - 1], alphaValues[alphaIndex], factor);
+        opacity = Interpolate(opacityValues[opacityIndex - 1], opacityValues[opacityIndex], factor);
       } else {
-        alpha = alphaValues[alphaIndex];
+        opacity = opacityValues[opacityIndex];
       }
-      auto color4f = ToTGFXColor(colorValues[colorIndex++], alpha);
+      auto color4f = ToTGFXColor(colorValues[colorIndex++], opacity);
       gradient.colors.push_back(color4f);
     } else {
       gradient.positions.push_back(alphaPosition);
@@ -441,22 +441,22 @@ GradientPaint MakeGradientPaint(Enum fillType, Point startPoint, Point endPoint,
       } else {
         color = colorValues[colorIndex];
       }
-      auto color4f = ToTGFXColor(color, alphaValues[alphaIndex++]);
+      auto color4f = ToTGFXColor(color, opacityValues[opacityIndex++]);
       gradient.colors.push_back(color4f);
     }
   }
 
-  auto lastAlpha = alphaValues.back();
+  auto lastOpacity = opacityValues.back();
   while (colorIndex < colorValues.size()) {
     gradient.positions.push_back(colorPositions[colorIndex]);
-    auto color4f = ToTGFXColor(colorValues[colorIndex++], lastAlpha);
+    auto color4f = ToTGFXColor(colorValues[colorIndex++], lastOpacity);
     gradient.colors.push_back(color4f);
   }
 
   auto lastColor = colorValues.back();
-  while (alphaIndex < alphaValues.size()) {
-    gradient.positions.push_back(alphaPositions[alphaIndex]);
-    auto color4f = ToTGFXColor(lastColor, alphaValues[alphaIndex++]);
+  while (opacityIndex < opacityValues.size()) {
+    gradient.positions.push_back(alphaPositions[opacityIndex]);
+    auto color4f = ToTGFXColor(lastColor, opacityValues[opacityIndex++]);
     gradient.colors.push_back(color4f);
   }
   return gradient;

@@ -39,7 +39,24 @@ void PAGTestEnvironment::SetUp() {
   RegisterSoftwareDecoder();
 }
 
+static void RemoveEmptyFolder(const std::filesystem::path& path) {
+  if (!std::filesystem::is_directory(path)) {
+    if (path.filename() == ".DS_Store") {
+      std::filesystem::remove(path);
+    }
+    return;
+  }
+  for (const auto& entry : std::filesystem::directory_iterator(path)) {
+    RemoveEmptyFolder(entry.path());
+  }
+  if (std::filesystem::is_empty(path)) {
+    std::filesystem::remove(path);
+  }
+}
+
 void PAGTestEnvironment::TearDown() {
+  RemoveEmptyFolder("../test/out/baseline");
+  RemoveEmptyFolder("../test/out/compare");
 }
 
 }  // namespace pag

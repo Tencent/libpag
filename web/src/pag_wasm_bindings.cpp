@@ -190,6 +190,12 @@ EMSCRIPTEN_BINDINGS(pag) {
       .property("backgroundAlpha", &TextDocument::backgroundAlpha)
       .property("direction", &TextDocument::direction);
 
+  class_<Stroke>("Stroke")
+      .property("width", &Stroke::width)
+      .property("cap", &Stroke::cap)
+      .property("join", &Stroke::join)
+      .property("miterLimit", &Stroke::miterLimit);
+
   value_object<FontMetrics>("FontMetrics")
       .field("ascent", &FontMetrics::ascent)
       .field("descent", &FontMetrics::descent)
@@ -203,12 +209,6 @@ EMSCRIPTEN_BINDINGS(pag) {
       .field("bottom", &Rect::bottom);
 
   value_object<Point>("Point").field("x", &Point::x).field("y", &Point::y);
-
-  value_object<Stroke>("Stroke")
-      .field("width", &Stroke::width)
-      .field("cap", &Stroke::cap)
-      .field("join", &Stroke::join)
-      .field("miterLimit", &Stroke::miterLimit);
 
   value_object<Color>("Color")
       .field("red", &Color::red)
@@ -235,6 +235,16 @@ EMSCRIPTEN_BINDINGS(pag) {
       .value("Shape", LayerType::Shape)
       .value("Image", LayerType::Image)
       .value("PreCompose", LayerType::PreCompose);
+
+  enum_<Stroke::Cap>("Cap")
+      .value("Miter", Stroke::Cap::Butt)
+      .value("Round", Stroke::Cap::Round)
+      .value("Bevel", Stroke::Cap::Square);
+
+  enum_<Stroke::Join>("Join")
+      .value("Miter", Stroke::Join::Miter)
+      .value("Round", Stroke::Join::Round)
+      .value("Bevel", Stroke::Join::Bevel);
 
   register_vector<std::shared_ptr<PAGLayer>>("VectorPAGLayer");
   register_vector<std::string>("VectorString");
