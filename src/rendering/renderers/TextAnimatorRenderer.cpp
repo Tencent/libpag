@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextAnimatorRenderer.h"
+#include "rendering/utils/TGFXTypes.h"
 
 namespace pag {
 
@@ -126,7 +127,7 @@ TextAnimatorRenderer::TextAnimatorRenderer(const TextAnimator* animator,
       rotation = typographyProperties->rotation->getValueAt(frame);  // 旋转
     }
     if (typographyProperties->opacity != nullptr) {
-      opacity = typographyProperties->opacity->getValueAt(frame);  // 不透明度
+      alpha = ToAlpha(typographyProperties->opacity->getValueAt(frame));  // 不透明度
     }
   }
 
@@ -206,9 +207,9 @@ void TextAnimatorRenderer::apply(std::vector<std::vector<GlyphHandle>>& glyphLis
       if (factor < 0.0f) {
         factor = 0.0f;  // 透明度的范围不能超过[0，1]，所以限制factor不能为负。
       }
-      auto oldOpacity = glyph->getAlpha();
-      auto opacityFactor = (opacity / 255.0f - 1.0f) * factor + 1.0f;
-      glyph->setAlpha(oldOpacity * opacityFactor);
+      auto oldAlpha = glyph->getAlpha();
+      auto alphaFactor = (alpha - 1.0f) * factor + 1.0f;
+      glyph->setAlpha(oldAlpha * alphaFactor);
 
       glyph->setMatrix(matrix);
       index++;

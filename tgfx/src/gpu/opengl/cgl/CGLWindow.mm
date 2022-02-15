@@ -16,16 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "CGLWindow.h"
+#include "gpu/opengl/cgl/CGLWindow.h"
 #include <thread>
 #include "CGLHardwareTexture.h"
 #include "gpu/opengl/GLSurface.h"
 
 namespace pag {
 static std::mutex threadCacheLocker = {};
-static std::unordered_map<std::thread::id, std::weak_ptr<CGLDevice>> threadCacheMap = {};
+static std::unordered_map<std::thread::id, std::weak_ptr<GLDevice>> threadCacheMap = {};
 
-static std::shared_ptr<CGLDevice> MakeDeviceFromThreadPool() {
+static std::shared_ptr<GLDevice> MakeDeviceFromThreadPool() {
   std::lock_guard<std::mutex> autoLock(threadCacheLocker);
   auto threadID = std::this_thread::get_id();
   auto result = threadCacheMap.find(threadID);
@@ -37,7 +37,7 @@ static std::shared_ptr<CGLDevice> MakeDeviceFromThreadPool() {
     }
     threadCacheMap.erase(result);
   }
-  auto device = CGLDevice::Make();
+  auto device = GLDevice::Make();
   if (device == nullptr) {
     return nullptr;
   }
@@ -49,7 +49,7 @@ std::shared_ptr<CGLWindow> CGLWindow::MakeFrom(NSView* view, CGLContextObj share
   if (view == nil) {
     return nullptr;
   }
-  auto device = CGLDevice::Make(sharedContext);
+  auto device = GLDevice::Make(sharedContext);
   if (device == nullptr) {
     return nullptr;
   }
@@ -60,7 +60,7 @@ std::shared_ptr<CGLWindow> CGLWindow::MakeFrom(NSView* view, CGLContextObj share
 }
 
 std::shared_ptr<CGLWindow> CGLWindow::MakeFrom(CVPixelBufferRef pixelBuffer,
-                                               std::shared_ptr<CGLDevice> device) {
+                                               std::shared_ptr<GLDevice> device) {
   if (pixelBuffer == nil) {
     return nullptr;
   }
@@ -112,7 +112,7 @@ std::shared_ptr<Surface> CGLWindow::onCreateSurface(Context* context) {
     BackendRenderTarget renderTarget(glInfo, size.width, size.height);
     return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
   }
-  auto texture = CGLHardwareTexture::MakeFrom(context, pixelBuffer, true);
+  auto texture = CGLHardwareTexture::MakeFrom(context, pixelBuffer);
   return GLSurface::MakeFrom(context, texture);
 }
 

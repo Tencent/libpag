@@ -18,8 +18,9 @@
 
 #include "GLTexture.h"
 #include "GLUtil.h"
+#include "base/utils/UniqueID.h"
+#include "core/Bitmap.h"
 #include "gpu/Surface.h"
-#include "image/Bitmap.h"
 
 namespace pag {
 class GLBackendTexture : public GLTexture {
@@ -134,7 +135,8 @@ std::shared_ptr<Texture> Texture::Make(Context* context, int width, int height, 
     GLRGBATexture::ComputeRecycleKey(&recycleKey, width, height);
   }
 
-  auto texture = std::static_pointer_cast<GLTexture>(context->getRecycledResource(recycleKey));
+  auto texture =
+      std::static_pointer_cast<GLTexture>(context->resourceCache()->getRecycled(recycleKey));
   GLTextureInfo glInfo = {};
   if (texture) {
     texture->_origin = origin;
@@ -219,19 +221,18 @@ void Trace(const Texture* texture, const std::string& path) {
   if (texture == nullptr) {
     return;
   }
-  auto surface = Surface::Make(texture->getContext(), texture->width(), texture->height());
+  auto surface = Surface::Make(texture->context, texture->width(), texture->height());
   if (surface == nullptr) {
     return;
   }
   auto canvas = surface->getCanvas();
   canvas->drawTexture(texture);
-  Bitmap bitmap = {};
-  if (!bitmap.allocPixels(texture->width(), texture->height())) {
+  auto pixelBuffer = PixelBuffer::Make(texture->width(), texture->height());
+  Bitmap bitmap(pixelBuffer);
+  if (bitmap.isEmpty()) {
     return;
   }
-  auto pixels = bitmap.lockPixels();
-  surface->readPixels(bitmap.info(), pixels);
-  bitmap.unlockPixels();
+  surface->readPixels(bitmap.info(), bitmap.writablePixels());
   Trace(bitmap, path);
 }
 }  // namespace pag

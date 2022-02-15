@@ -1,10 +1,11 @@
 cmake_minimum_required(VERSION 3.1)
 project(PAG)
 
-if (APPLE AND NOT IOS)
-    SET(CMAKE_SYSTEM_PROCESSOR x86_64)
-    SET(CMAKE_OSX_ARCHITECTURES x86_64)
-endif ()
+# Uncomment the next 4 lines to build libpag for Intel cpus on Apple Silicon devices.
+#if (APPLE AND NOT IOS)
+#    SET(CMAKE_SYSTEM_PROCESSOR x86_64)
+#    SET(CMAKE_OSX_ARCHITECTURES x86_64)
+#endif ()
 
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 include(./vendor_tools/vendor.cmake)
@@ -83,17 +84,19 @@ file(GLOB_RECURSE PAG_FILES
         src/base/*.*
         src/codec/*.*
         src/rendering/*.*
-        tgfx/src/base/*.*
-        tgfx/src/core/*.*)
+        tgfx/src/core/utils/*.*
+        tgfx/src/gpu/gradients/*.*)
 if (NOT WEB)
     file(GLOB PAG_VIDEO_FILES src/video/*.*)
     list(APPEND PAG_FILES ${PAG_VIDEO_FILES})
 endif ()
 file(GLOB PAG_COMMON_FILES
         src/platform/*.*
+        tgfx/src/core/*.*
+        tgfx/src/core/images/*.*
+        tgfx/src/core/vectors/*.*
         tgfx/src/gpu/*.*
-        tgfx/src/image/*.*
-        tgfx/src/raster/*.*)
+        tgfx/src/platform/*.*)
 list(APPEND PAG_FILES ${PAG_COMMON_FILES})
 
 if (PAG_USE_QT)
@@ -153,37 +156,37 @@ endif ()
 if (PAG_USE_FREETYPE)
     add_definitions(-DTGFX_USE_FREETYPE)
     list(APPEND PAG_STATIC_VENDORS freetype)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES tgfx/src/raster/freetype/*.*)
+    file(GLOB_RECURSE GFX_PLATFORM_FILES tgfx/src/core/vectors/freetype/*.*)
     list(APPEND PAG_FILES ${GFX_PLATFORM_FILES})
     list(APPEND PAG_INCLUDES third_party/freetype/include)
 elseif (WEB)
     add_definitions(-DTGFX_BUILD_FOR_WEB)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES tgfx/src/raster/web/*.*)
+    file(GLOB_RECURSE GFX_PLATFORM_FILES tgfx/src/core/vectors/web/*.*)
     list(APPEND PAG_FILES ${GFX_PLATFORM_FILES})
 elseif (APPLE)
     # Uses CoreGraphics instead.
     add_definitions(-DTGFX_USE_CORE_GRAPHICS)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES tgfx/src/raster/coregraphics/*.*)
+    file(GLOB_RECURSE GFX_PLATFORM_FILES tgfx/src/core/vectors/coregraphics/*.*)
     list(APPEND PAG_FILES ${GFX_PLATFORM_FILES})
 endif ()
 
 if (PAG_USE_JPEG)
     list(APPEND PAG_STATIC_VENDORS libjpeg-turbo)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES tgfx/src/image/jpeg/*.*)
+    file(GLOB_RECURSE GFX_PLATFORM_FILES tgfx/src/core/images/jpeg/*.*)
     list(APPEND PAG_FILES ${GFX_PLATFORM_FILES})
     list(APPEND PAG_INCLUDES third_party/out/libjpeg-turbo/${INCLUDE_ENTRY})
 endif ()
 
 if (PAG_USE_WEBP)
     list(APPEND PAG_STATIC_VENDORS libwebp)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES tgfx/src/image/webp/*.*)
+    file(GLOB_RECURSE GFX_PLATFORM_FILES tgfx/src/core/images/webp/*.*)
     list(APPEND PAG_FILES ${GFX_PLATFORM_FILES})
     list(APPEND PAG_INCLUDES third_party/libwebp/src)
 endif ()
 
 if (PAG_USE_PNG)
     list(APPEND PAG_STATIC_VENDORS libpng)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES tgfx/src/image/png/*.*)
+    file(GLOB_RECURSE GFX_PLATFORM_FILES tgfx/src/core/images/png/*.*)
     list(APPEND PAG_FILES ${GFX_PLATFORM_FILES})
     list(APPEND PAG_INCLUDES third_party/out/libpng/${INCLUDE_ENTRY})
 endif ()
@@ -289,10 +292,6 @@ elseif (IOS)
 
     if (USE_NATIVE_PLATFORM)
         file(GLOB_RECURSE PAG_PLATFORM_FILES src/platform/ios/*.* src/platform/cocoa/*.*)
-        if (PAG_USE_FREETYPE)
-            file(GLOB PLATFORM_FILES tgfx/src/raster/coregraphics/BitmapContextUtil.mm)
-            list(APPEND PAG_PLATFORM_FILES ${PLATFORM_FILES})
-        endif ()
         file(GLOB GL_PLATFORM_FILES tgfx/src/gpu/opengl/eagl/*.*)
         list(APPEND PAG_PLATFORM_FILES ${GL_PLATFORM_FILES})
         find_include_dirs(IOS_PLATFORM_INCLUDES
@@ -331,10 +330,6 @@ elseif (MACOS)
 
     if (USE_NATIVE_PLATFORM)
         file(GLOB_RECURSE PAG_PLATFORM_FILES src/platform/mac/*.* src/platform/cocoa/*.*)
-        if (PAG_USE_FREETYPE)
-            file(GLOB PLATFORM_FILES tgfx/src/raster/coregraphics/BitmapContextUtil.mm)
-            list(APPEND PAG_PLATFORM_FILES ${PLATFORM_FILES})
-        endif ()
         file(GLOB GL_PLATFORM_FILES tgfx/src/gpu/opengl/cgl/*.*)
         list(APPEND PAG_PLATFORM_FILES ${GL_PLATFORM_FILES})
         find_include_dirs(MAC_PLATFORM_INCLUDES
@@ -404,13 +399,23 @@ add_vendor_target(PAG STATIC_VENDORS ${PAG_STATIC_VENDORS} SHARED_VENDORS ${PAG_
 list(APPEND PAG_PLATFORM_STATIC_LIBS ${PAG_VENDOR_STATIC_LIBRARIES})
 list(APPEND PAG_PLATFORM_SHARED_LIBS ${PAG_VENDOR_SHARED_LIBRARIES})
 
+if (WEB)
+    file(GLOB_RECURSE TGFX_PLATFORM_FILES tgfx/src/platform/web/*.*)
+elseif (IOS OR MACOS)
+    file(GLOB_RECURSE TGFX_PLATFORM_FILES tgfx/src/platform/apple/*.*)
+elseif (ANDROID)
+    file(GLOB_RECURSE TGFX_PLATFORM_FILES tgfx/src/platform/android/*.*)
+else ()
+    file(GLOB_RECURSE TGFX_PLATFORM_FILES tgfx/src/platform/mock/*.*)
+endif ()
+
 if (PAG_BUILD_SHARED)
-    add_library(pag SHARED ${PAG_VENDOR_TARGET} ${PAG_FILES} ${PAG_PLATFORM_FILES})
+    add_library(pag SHARED ${PAG_VENDOR_TARGET} ${PAG_FILES} ${PAG_PLATFORM_FILES} ${TGFX_PLATFORM_FILES})
     target_compile_definitions(pag PUBLIC PAG_DLL)
     target_include_directories(pag PUBLIC ${PAG_INCLUDES} ${PAG_PLATFORM_INCLUDES})
     target_link_libraries(pag ${PAG_PLATFORM_STATIC_LIBS} ${PAG_PLATFORM_SHARED_LIBS})
 else ()
-    add_library(pag STATIC ${PAG_VENDOR_TARGET} ${PAG_FILES} ${PAG_PLATFORM_FILES})
+    add_library(pag STATIC ${PAG_VENDOR_TARGET} ${PAG_FILES} ${PAG_PLATFORM_FILES} ${TGFX_PLATFORM_FILES})
     merge_libraries_into(pag ${PAG_PLATFORM_STATIC_LIBS})
     target_include_directories(pag PUBLIC ${PAG_INCLUDES} ${PAG_PLATFORM_INCLUDES})
     target_link_libraries(pag)
@@ -418,6 +423,7 @@ endif ()
 
 if (PAG_BUILD_TESTS)
     file(GLOB_RECURSE SWIFTSHADER_PLATFORM_FILES src/platform/swiftshader/*.*)
+    list(APPEND SWIFTSHADER_PLATFORM_FILES ${TGFX_PLATFORM_FILES})
     file(GLOB GL_PLATFORM_FILES tgfx/src/gpu/opengl/egl/*.*)
     list(APPEND SWIFTSHADER_PLATFORM_FILES ${GL_PLATFORM_FILES})
     add_library(pag-ss STATIC ${PAG_VENDOR_TARGET} ${PAG_FILES} ${SWIFTSHADER_PLATFORM_FILES})
@@ -441,18 +447,21 @@ if (PAG_BUILD_TESTS)
     file(GLOB PAG_TEST_FILES
             test/*.*
             test/framework/*.*
+            test/framework/lzma/*.*
             test/framework/utils/*.*)
 
     file(GLOB PAG_SMOKE_TEST_FILES
             test/PAGSmokeTest.cpp
             test/TestUtils.cpp
             test/framework/*.cpp
+            test/framework/lzma/*.*
             test/framework/utils/*.cpp)
 
     file(GLOB PAG_PERFORMANCE_TEST_FILES
             test/PAGPerformanceTest.cpp
             test/TestUtils.cpp
             test/framework/*.cpp
+            test/framework/lzma/*.*
             test/framework/utils/*.cpp)
 
     file(GLOB FFAVC_LIB vendor/ffavc/${LIBRARY_ENTRY}/*${CMAKE_SHARED_LIBRARY_SUFFIX})
@@ -461,8 +470,8 @@ if (PAG_BUILD_TESTS)
 
     add_executable(PAGUnitTest ${Test_VENDOR_TARGET} ${PAG_TEST_FILES})
     target_include_directories(PAGUnitTest PUBLIC ${TEST_INCLUDES})
-    # skip all File MD5 check in PAGUnitTest
-    target_compile_definitions(PAGUnitTest PUBLIC SKIP_FILE_MD5)
+    # skip the PAGCompareFrameTest test case in PAGUnitTest
+    target_compile_definitions(PAGUnitTest PUBLIC SKIP_FRAME_COMPARE)
     target_link_libraries(PAGUnitTest ${TEST_PLATFORM_LIBS})
     set_target_properties(PAGUnitTest PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
 
@@ -474,7 +483,7 @@ if (PAG_BUILD_TESTS)
     add_executable(PAGSmokeTest ${Test_VENDOR_TARGET} ${PAG_SMOKE_TEST_FILES})
     target_include_directories(PAGSmokeTest PUBLIC ${TEST_INCLUDES})
     target_link_libraries(PAGSmokeTest ${TEST_PLATFORM_LIBS})
-    target_compile_definitions(PAGSmokeTest PUBLIC SMOKE_TEST SKIP_FILE_MD5)
+    target_compile_definitions(PAGSmokeTest PUBLIC SMOKE_TEST SKIP_FRAME_COMPARE)
 
     add_executable(PAGPerformanceTest ${Test_VENDOR_TARGET} ${PAG_PERFORMANCE_TEST_FILES})
     target_include_directories(PAGPerformanceTest PUBLIC ${TEST_INCLUDES})

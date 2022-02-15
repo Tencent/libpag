@@ -36,7 +36,7 @@
     
     UIViewController *vc1 = [[UIViewController alloc] init];
     UITabBarItem *item1 = [[UITabBarItem alloc] init];
-    item1.title = @"test2.pag";
+    item1.title = @"alpha.pag";
     [item1 setTitleTextAttributes:@{NSFontAttributeName:[UIFont systemFontOfSize:30]} forState:UIControlStateNormal];
     vc1.tabBarItem = item1;
     

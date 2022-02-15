@@ -1,16 +1,19 @@
 import { PAG } from './types';
 import { NativeImage } from './core/native-image';
+import { wasmAwaitRewind, wasmAsyncMethod } from './utils/decorators';
 
+@wasmAwaitRewind
 export class PAGImage {
   public static module: PAG;
   /**
    * Create pag image from image file.
    */
+  @wasmAsyncMethod
   public static async fromFile(data: File): Promise<PAGImage> {
     return new Promise((resolve, reject) => {
       const image = new Image();
       image.onload = async () => {
-        resolve(await PAGImage.fromSource(image));
+        resolve(PAGImage.fromSource(image));
       };
       image.onerror = (error) => {
         reject(error);
@@ -28,32 +31,33 @@ export class PAGImage {
    * }
    * ```
    */
-  public static async fromSource(source: HTMLVideoElement | HTMLImageElement): Promise<PAGImage> {
+  public static fromSource(source: HTMLVideoElement | HTMLImageElement): PAGImage {
     const nativeImage = new NativeImage(source);
-    return this.module._PAGImage.FromNativeImage(nativeImage);
+    const wasmIns = this.module._PAGImage._FromNativeImage(nativeImage);
+    return new PAGImage(wasmIns);
   }
 
-  public pagImageWasm;
+  public wasmIns;
 
-  public constructor(pagImageWasm) {
-    this.pagImageWasm = pagImageWasm;
+  public constructor(wasmIns) {
+    this.wasmIns = wasmIns;
   }
   /**
    * Returns the width in pixels.
    */
-  public async width(): Promise<number> {
-    return (await PAGImage.module.webAssemblyQueue.exec(this.pagImageWasm._width, this.pagImageWasm)) as number;
+  public width(): number {
+    return this.wasmIns._width() as number;
   }
   /**
    * Returns the height in pixels.
    */
-  public async height(): Promise<number> {
-    return (await PAGImage.module.webAssemblyQueue.exec(this.pagImageWasm._height, this.pagImageWasm)) as number;
+  public height(): number {
+    return this.wasmIns._height() as number;
   }
   /**
    * Destroy the pag image.
    */
-  public async destroy() {
-    await PAGImage.module.webAssemblyQueue.exec(this.pagImageWasm.delete, this.pagImageWasm);
+  public destroy(): void {
+    this.wasmIns.delete();
   }
 }

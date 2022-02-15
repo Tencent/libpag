@@ -20,13 +20,16 @@
 
 #include "JNIEnvironment.h"
 
-template<typename T>
+template <typename T>
 class Global {
  public:
-  Global() : mEnv(nullptr), mRef(nullptr) {
-  }
+  Global() = default;
 
-  Global(JNIEnv* env, T ref) : mEnv(nullptr), mRef(nullptr) {
+  Global(const Global<T>& that) = delete;
+
+  Global<T>& operator=(const Global<T>& that) = delete;
+
+  Global(JNIEnv* env, T ref) {
     reset(env, ref);
   }
 
@@ -62,6 +65,6 @@ class Global {
   }
 
  private:
-  JNIEnv* mEnv;
-  T mRef;
+  JNIEnv* mEnv = nullptr;
+  T mRef = nullptr;
 };

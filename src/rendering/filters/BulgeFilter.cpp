@@ -59,14 +59,16 @@ static const char BULGE_FRAGMENT_SHADER[] = R"(
         vec2 point = target - bulgeCenter;
 
         float distance = pow(point.x, 2.0) / pow(uHorizontalRadius, 2.0) + pow(point.y, 2.0) / pow(uVerticalRadius, 2.0);
-        float isInside = step(1.0, distance);
 
         float len = length(point);
         float radius = atan(point.y, point.x);
         float weight = (1.0 - distance) * atan(len, sqrt(1.0 - sqrt(len))) / PI;
         vec2 newPoint = point - uBulgeHeight * weight * vec2(cos(radius), sin(radius));
 
-        target = mix(newPoint + bulgeCenter, vertexColor, isInside);
+        // TODO: 在swiftshader上，此处使用mix来减少分支语句会引起画面异常，待排查
+        if (distance <= 1.0) {
+            target = newPoint + bulgeCenter;
+        }
 
         if(uPinning) {
             target.x = clamp(target.x, edge, 1.0 - edge);

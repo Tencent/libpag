@@ -26,8 +26,6 @@
 namespace pag {
 class GLState;
 
-class GLInterfaceCache;
-
 /**
  * NOTE:
  * If added API can change OpenGL state, you should add code to recovery it.
@@ -36,9 +34,7 @@ class GLInterfaceCache;
  */
 class GLInterface {
  public:
-  static const GLInterface* GetNative(const GLProcGetter* getter, GLInterfaceCache* cache);
-
-  static std::unique_ptr<const GLInterface> HookWithState(const GLInterface* gl, GLState* state);
+  static const GLInterface* GetNative();
 
   GLFunction<GLActiveTexture> activeTexture;
   GLFunction<GLAttachShader> attachShader;
@@ -130,11 +126,8 @@ class GLInterface {
 
  private:
   static std::unique_ptr<const GLInterface> MakeNativeInterface(const GLProcGetter* getter);
-};
+  static std::unique_ptr<const GLInterface> HookWithState(const GLInterface* gl, GLState* state);
 
-class GLInterfaceCache {
- public:
-  std::mutex locker = {};
-  std::unordered_map<int, std::unique_ptr<const GLInterface>> glInterfaceMap = {};
+  friend class GLContext;
 };
 }  // namespace pag

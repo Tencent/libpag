@@ -50,75 +50,60 @@ PAG_TEST_F(PAGCompositionTest, composition) {
 
   pagComposition->swapLayer(imageLayer1, imageLayer2);
   TestPAGPlayer->flush();
-  auto swapLayerMd5 = getMd5FromSnap();
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGCompositionTest/composition_swapLayer"));
 
   pagComposition->swapLayerAt(2, 3);
   TestPAGPlayer->flush();
-  auto swapLayerAtMd5 = getMd5FromSnap();
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGCompositionTest/composition_swapLayerAt"));
 
   pagComposition->setLayerIndex(imageLayer1, 3);
   TestPAGPlayer->flush();
-  auto setLayerIndexMd5 = getMd5FromSnap();
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGCompositionTest/composition_setLayerIndex"));
 
   pagComposition->removeLayer(imageLayer1);
   TestPAGPlayer->flush();
-  auto removeLayerMd5 = getMd5FromSnap();
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGCompositionTest/composition_removeLayer"));
 
   pagComposition->removeLayerAt(2);
   TestPAGPlayer->flush();
-  auto removeLayerAtMd5 = getMd5FromSnap();
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGCompositionTest/composition_removeLayerAt"));
 
   pagComposition->removeAllLayers();
   TestPAGPlayer->flush();
-  auto removeAllLayersMd5 = getMd5FromSnap();
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGCompositionTest/composition_empty"));
 
   auto pagFile2 = PAGFile::Load(DEFAULT_PAG_PATH);
   auto pagComposition2 = std::static_pointer_cast<PAGComposition>(pagFile2->getLayerAt(0));
   auto imageLayer = pagComposition2->getLayerAt(2);
   pagComposition->addLayer(imageLayer);
   TestPAGPlayer->flush();
-  auto addLayerMd5 = getMd5FromSnap();
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGCompositionTest/composition_empty"));
 
   pagComposition->addLayerAt(pagComposition2->getLayerAt(3), 0);
   TestPAGPlayer->flush();
-  auto addLayerAtMd5 = DumpMD5(TestPAGSurface);
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGCompositionTest/composition_empty"));
 
   pagComposition->setContentSize(300, 300);
   ASSERT_EQ(pagComposition->width(), 300);
   ASSERT_EQ(pagComposition->height(), 300);
   TestPAGPlayer->flush();
-  auto changeContentSizeMd5 = DumpMD5(TestPAGSurface);
-
-  json out = {{"composition",
-               {{"swapLayer", swapLayerMd5},
-                {"setLayerIndexMd5", setLayerIndexMd5},
-                {"removeLayerMd5", removeLayerMd5},
-                {"removeLayerAtMd5", removeLayerAtMd5},
-                {"removeAllLayersMd5", removeAllLayersMd5},
-                {"addLayerMd5", addLayerMd5},
-                {"addLayerAtMd5", addLayerAtMd5},
-                {"changeContentSizeMd5", changeContentSizeMd5}}}};
-  PAGTestEnvironment::DumpJson["PAGCompositionTest"] = out;
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGCompositionTest/composition_empty"));
 }
-
-PAG_TEST_SUIT_WITH_PATH(VideoSequenceSize, "../resources/apitest/video_sequence_size.pag")
 
 /**
  * 用例描述: VideoSequence的大小和Composition不一致
  */
-PAG_TEST_F(VideoSequenceSize, VideoSequence_ID82854769) {
-  TestPAGFile->setMatrix(Matrix::MakeScale(0.8625));
-  TestPAGPlayer->setProgress(0.5);
-  TestPAGPlayer->flush();
-  auto image = MakeSnapshot(TestPAGSurface);
-  auto md5 = DumpMD5(image);
-  PAGTestEnvironment::DumpJson["PAGCompositionTest"]["VideoSequence_ID82854769"] = md5;
-#ifdef COMPARE_JSON_PATH
-  auto compareMD5 =
-      PAGTestEnvironment::CompareJson["PAGCompositionTest"]["VideoSequence_ID82854769"];
-  TraceIf(image, "../test/out/VideoSequence_ID82854769.png", compareMD5.get<std::string>() != md5);
-  EXPECT_EQ(compareMD5.get<std::string>(), md5);
-#endif
+PAG_TEST_F(PAGCompositionTest, VideoSequence) {
+  auto pagFile = PAGFile::Load("../resources/apitest/video_sequence_size.pag");
+  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagPlayer = new PAGPlayer();
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setSurface(pagSurface);
+  pagFile->setMatrix(Matrix::MakeScale(0.8625));
+  pagPlayer->setProgress(0.5);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGCompositionTest/VideoSequence"));
+  delete pagPlayer;
 }
 
 // ContainerTest 中会操作容器，所以此处需要声明为case，不能声明为suit

@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "Color4f.h"
 #include "FragmentProcessor.h"
+#include "core/Color4f.h"
 
 namespace pag {
 class ConstColorProcessor : public FragmentProcessor {

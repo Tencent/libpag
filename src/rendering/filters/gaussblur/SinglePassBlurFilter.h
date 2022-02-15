@@ -27,9 +27,9 @@ class SinglePassBlurFilter : public LayerFilter {
   explicit SinglePassBlurFilter(BlurDirection blurDirection);
   ~SinglePassBlurFilter() override = default;
 
-  void updateParams(float blurriness, float opacity, bool repeatEdge, BlurMode mode);
+  void updateParams(float blurriness, float alpha, bool repeatEdge, BlurMode mode);
 
-  void enableBlurColor(Color blurColor);
+  void enableBlurColor(Color4f blurColor);
   void disableBlurColor();
 
  protected:
@@ -49,13 +49,13 @@ class SinglePassBlurFilter : public LayerFilter {
   int repeatEdgeHandle = -1;
   int colorHandle = -1;
   int colorValidHandle = -1;
-  int opacityHandle = -1;
+  int alphaHandle = -1;
 
   BlurDirection direction;
-  Color color = Black;
+  Color4f color = Color4f::Black();
   bool isColorValid = false;
   float blurriness = 0.0;
-  float opacity = 1.0f;
+  float alpha = 1.0f;
   bool repeatEdge = true;
   float maxRadius = 3.0f;
   float maxLevel = 13.0f;

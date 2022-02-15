@@ -16,9 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "EGLWindow.h"
+#include "gpu/opengl/egl/EGLWindow.h"
 #include <EGL/eglext.h>
-#include "gpu/opengl/GLDefines.h"
+#include <GLES3/gl3.h>
 
 namespace pag {
 std::shared_ptr<EGLWindow> EGLWindow::Current() {
@@ -55,7 +55,7 @@ std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
   }
   GLFrameBufferInfo glInfo = {};
   glInfo.id = 0;
-  glInfo.format = GL::RGBA8;
+  glInfo.format = GL_RGBA8;
   BackendRenderTarget renderTarget(glInfo, width, height);
   return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
 }

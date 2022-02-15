@@ -19,8 +19,9 @@
 #pragma once
 
 #include "Graphic.h"
-#include "image/Bitmap.h"
-#include "image/Image.h"
+#include "core/Bitmap.h"
+#include "core/Image.h"
+#include "core/RGBAAALayout.h"
 #include "rendering/graphics/Snapshot.h"
 
 namespace pag {
@@ -39,9 +40,9 @@ class Picture : public Graphic {
   static std::shared_ptr<Graphic> MakeFrom(ID assetID, std::shared_ptr<Image> image);
 
   /**
-   * Creates a new Picture with specified bitmap. Returns null if the bitmap is empty.
+   * Creates a new Picture with specified TextureBuffer. Returns null if the bitmap is empty.
    */
-  static std::shared_ptr<Graphic> MakeFrom(ID assetID, const Bitmap& bitmap);
+  static std::shared_ptr<Graphic> MakeFrom(ID assetID, std::shared_ptr<TextureBuffer> buffer);
 
   /**
    * Creates a new Picture with specified backend texture. Returns null if the texture is invalid.

@@ -21,10 +21,20 @@
 #include "Glyph.h"
 #include "Modifier.h"
 #include "TextureProxy.h"
-#include "core/Paint.h"
-#include "image/Bitmap.h"
+#include "core/Bitmap.h"
+#include "gpu/Paint.h"
 
 namespace pag {
+/**
+ * Defines attributes for drawing gradient colors.
+ */
+struct GradientPaint {
+  Enum gradientType;
+  Point startPoint;
+  Point endPoint;
+  std::vector<Color4f> colors;
+  std::vector<float> positions;
+};
 
 enum class GraphicType {
   Unknown,

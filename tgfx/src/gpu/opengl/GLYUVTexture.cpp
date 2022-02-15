@@ -18,6 +18,7 @@
 
 #include "GLYUVTexture.h"
 #include "GLUtil.h"
+#include "base/utils/UniqueID.h"
 
 namespace pag {
 #define I420_PLANE_COUNT 3
@@ -26,10 +27,13 @@ namespace pag {
 #define NV12_PIXEL_BYTES 1.5
 
 struct YUVConfig {
-  YUVConfig(YUVColorSpace colorSpace, YUVColorRange colorRange,
-            int width, int height, int planeCount)
-      : colorSpace(colorSpace), colorRange(colorRange),
-        width(width), height(height), planeCount(planeCount) {
+  YUVConfig(YUVColorSpace colorSpace, YUVColorRange colorRange, int width, int height,
+            int planeCount)
+      : colorSpace(colorSpace),
+        colorRange(colorRange),
+        width(width),
+        height(height),
+        planeCount(planeCount) {
   }
   YUVColorSpace colorSpace;
   YUVColorRange colorRange;
@@ -127,10 +131,9 @@ static void SubmitYUVTexture(const GLInterface* gl, const YUVConfig& yuvConfig,
   }
 }
 
-std::shared_ptr<YUVTexture> YUVTexture::MakeI420(Context* context,
-                                                 YUVColorSpace colorSpace, YUVColorRange colorRange,
-                                                 int width, int height, uint8_t* pixelsPlane[3],
-                                                 const int lineSize[3]) {
+std::shared_ptr<YUVTexture> YUVTexture::MakeI420(Context* context, YUVColorSpace colorSpace,
+                                                 YUVColorRange colorRange, int width, int height,
+                                                 uint8_t* pixelsPlane[3], const int lineSize[3]) {
   auto gl = GLContext::Unwrap(context);
   GLStateGuard stateGuard(context);
 
@@ -146,15 +149,16 @@ std::shared_ptr<YUVTexture> YUVTexture::MakeI420(Context* context,
 
   BytesKey recycleKey = {};
   GLI420Texture::ComputeRecycleKey(&recycleKey, width, height);
-  auto texture = std::static_pointer_cast<GLYUVTexture>(context->getRecycledResource(recycleKey));
+  auto texture =
+      std::static_pointer_cast<GLYUVTexture>(context->resourceCache()->getRecycled(recycleKey));
   if (texture == nullptr) {
     auto texturePlanes = MakeTexturePlanes(gl, yuvConfig);
     if (texturePlanes.empty()) {
       return nullptr;
     }
-    texture = std::static_pointer_cast<GLYUVTexture>(Resource::Wrap(
-        context, new GLI420Texture(yuvConfig.colorSpace, yuvConfig.colorRange,
-                                   yuvConfig.width, yuvConfig.height)));
+    texture = std::static_pointer_cast<GLYUVTexture>(
+        Resource::Wrap(context, new GLI420Texture(yuvConfig.colorSpace, yuvConfig.colorRange,
+                                                  yuvConfig.width, yuvConfig.height)));
     texture->samplers.emplace_back(pixelConfig, texturePlanes[0]);
     texture->samplers.emplace_back(pixelConfig, texturePlanes[1]);
     texture->samplers.emplace_back(pixelConfig, texturePlanes[2]);
@@ -163,10 +167,9 @@ std::shared_ptr<YUVTexture> YUVTexture::MakeI420(Context* context,
   return texture;
 }
 
-std::shared_ptr<YUVTexture> YUVTexture::MakeNV12(Context* context,
-                                                 YUVColorSpace colorSpace, YUVColorRange colorRange,
-                                                 int width, int height, uint8_t* pixelsPlane[2],
-                                                 const int lineSize[2]) {
+std::shared_ptr<YUVTexture> YUVTexture::MakeNV12(Context* context, YUVColorSpace colorSpace,
+                                                 YUVColorRange colorRange, int width, int height,
+                                                 uint8_t* pixelsPlane[2], const int lineSize[2]) {
   auto gl = GLContext::Unwrap(context);
   GLStateGuard stateGuard(context);
 
@@ -182,15 +185,16 @@ std::shared_ptr<YUVTexture> YUVTexture::MakeNV12(Context* context,
 
   BytesKey recycleKey = {};
   GLNV12Texture::ComputeRecycleKey(&recycleKey, width, height);
-  auto texture = std::static_pointer_cast<GLYUVTexture>(context->getRecycledResource(recycleKey));
+  auto texture =
+      std::static_pointer_cast<GLYUVTexture>(context->resourceCache()->getRecycled(recycleKey));
   if (texture == nullptr) {
     auto texturePlanes = MakeTexturePlanes(gl, yuvConfig);
     if (texturePlanes.empty()) {
       return nullptr;
     }
-    texture = std::static_pointer_cast<GLYUVTexture>(Resource::Wrap(
-        context, new GLNV12Texture(yuvConfig.colorSpace, yuvConfig.colorRange,
-                                   yuvConfig.width, yuvConfig.height)));
+    texture = std::static_pointer_cast<GLYUVTexture>(
+        Resource::Wrap(context, new GLNV12Texture(yuvConfig.colorSpace, yuvConfig.colorRange,
+                                                  yuvConfig.width, yuvConfig.height)));
     texture->samplers.emplace_back(pixelConfig[0], texturePlanes[0]);
     texture->samplers.emplace_back(pixelConfig[1], texturePlanes[1]);
   }
@@ -198,8 +202,8 @@ std::shared_ptr<YUVTexture> YUVTexture::MakeNV12(Context* context,
   return texture;
 }
 
-GLYUVTexture::GLYUVTexture(YUVColorSpace colorSpace, YUVColorRange colorRange,
-                           int width, int height)
+GLYUVTexture::GLYUVTexture(YUVColorSpace colorSpace, YUVColorRange colorRange, int width,
+                           int height)
     : YUVTexture(colorSpace, colorRange, width, height) {
 }
 

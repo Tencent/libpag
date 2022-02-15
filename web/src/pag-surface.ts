@@ -1,34 +1,50 @@
 import { PAG } from './types';
+import { wasmAwaitRewind } from './utils/decorators';
 
+@wasmAwaitRewind
 export class PAGSurface {
-  public pagSurfaceWasm;
+  public static module: PAG;
 
-  private module: PAG;
+  public static FromCanvas(canvasID: string): PAGSurface {
+    const wasmIns = PAGSurface.module._PAGSurface._FromCanvas(canvasID);
+    return new PAGSurface(wasmIns);
+  }
 
-  public constructor(module, pagSurfaceWasm) {
-    this.module = module;
-    this.pagSurfaceWasm = pagSurfaceWasm;
+  public static FromTexture(textureID: number, width: number, height: number, flipY: boolean): PAGSurface {
+    const wasmIns = PAGSurface.module._PAGSurface._FromTexture(textureID, width, height, flipY);
+    return new PAGSurface(wasmIns);
+  }
+
+  public static FromFrameBuffer(frameBufferID: number, width: number, height: number, flipY: boolean): PAGSurface {
+    const wasmIns = PAGSurface.module._PAGSurface._FromFrameBuffer(frameBufferID, width, height, flipY);
+    return new PAGSurface(wasmIns);
+  }
+
+  public wasmIns;
+
+  public constructor(wasmIns) {
+    this.wasmIns = wasmIns;
   }
   /**
    * The width of surface in pixels.
    */
-  public async width(): Promise<number> {
-    return (await this.module.webAssemblyQueue.exec(this.pagSurfaceWasm._width, this.pagSurfaceWasm)) as number;
+  public width(): number {
+    return this.wasmIns._width() as number;
   }
   /**
    * The height of surface in pixels.
    */
-  public async height(): Promise<number> {
-    return (await this.module.webAssemblyQueue.exec(this.pagSurfaceWasm._height, this.pagSurfaceWasm)) as number;
+  public height(): number {
+    return this.wasmIns._height() as number;
   }
   /**
    * Update the size of surface, and reset the internal surface.
    */
-  public async updateSize() {
-    return await this.module.webAssemblyQueue.exec(this.pagSurfaceWasm._updateSize, this.pagSurfaceWasm);
+  public updateSize(): void {
+    this.wasmIns._updateSize();
   }
 
-  public async destroy() {
-    await this.module.webAssemblyQueue.exec(this.pagSurfaceWasm.delete, this.pagSurfaceWasm);
+  public destroy(): void {
+    this.wasmIns.delete();
   }
 }

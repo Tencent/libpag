@@ -85,11 +85,11 @@ demo 文件夹中提供了简单的接入示例， 可以点击 [这里](./demo/
 
 ## 浏览器兼容性
 
-| [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/chrome/chrome_48x48.png" alt="Chrome" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Chrome | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/safari/safari_48x48.png" alt="Safari" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Safari |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Chrome >= 69                                                                                                                                                                                                  | Safari >= 11.1                                                                                                                                                                                                |
+| [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/chrome/chrome_48x48.png" alt="Chrome" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Chrome | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/safari/safari_48x48.png" alt="Safari" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Safari | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/chrome/chrome_48x48.png" alt="Chrome" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Chrome for Android | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/safari/safari_48x48.png" alt="Safari" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Safari on iOS |
+| ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| Chrome >= 69                                                 | Safari >= 11.3                                               | Android >= 7.0                                               | iOS >= 11.3                                                  |
 
-Chrome 69+ 与 移动端 等更多版本的兼容工作正在进行中
+更多版本的兼容工作正在进行中
 
 **因受到微信浏览器“用户与页面交互之后才可以使用 Video 标签进行视频播放”规则的限制，PAG Web SDK无法在微信浏览器下自动播放带有视频序列帧的PAG动画，建议设计师使用矢量导出。计划后续版本中提供一个解码器注入的接口，以及对应的h264解码器插件去解决这个问题。**
 
@@ -110,7 +110,7 @@ $ npm install
 
 ### 开发流程
 
-删除项目根目录的 `cmake-build-debug`，执行 `build.sh debug` 打包 C++ 代码，每次改动 C++ 代码都需要重新打包新的 `libpag.wasm` 文件，执行完成之后可以通过 `Tools->CMake->Reload CMake Project` 刷新项目
+执行 `build.sh debug` 来获得 `libpag.wasm` 文件
 
 ```bash
 # web/script目录下
@@ -146,4 +146,12 @@ $ cd script
 $ chmod +x ./build.sh
 # 打包
 $ ./build.sh
+```
+
+### CLion 编译
+
+创建一个新的 profile，然后使用下面的 **CMake options**（位置在 **CLion** > **Preferences** > **Build, Execution, Deployment** > **CMake**）
+
+```
+CMAKE_TOOLCHAIN_FILE=path/to/emscripten/emscripten/version/cmake/Modules/Platform/Emscripten.cmake
 ```

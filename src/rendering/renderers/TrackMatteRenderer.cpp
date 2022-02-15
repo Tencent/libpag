@@ -21,6 +21,7 @@
 #include "rendering/caches/RenderCache.h"
 #include "rendering/caches/TextContent.h"
 #include "rendering/renderers/LayerRenderer.h"
+#include "rendering/utils/TGFXTypes.h"
 
 namespace pag {
 static std::shared_ptr<Graphic> RenderColorGlyphs(TextLayer* layer, Frame layerFrame,
@@ -38,7 +39,7 @@ static std::shared_ptr<Graphic> RenderColorGlyphs(TextLayer* layer, Frame layerF
   }
   auto layerTransform = layerCache->getTransform(contentFrame);
   Recorder recorder = {};
-  recorder.saveLayer(layerTransform->opacity, layer->blendMode);
+  recorder.saveLayer(layerTransform->alpha, ToTGFXBlend(layer->blendMode));
   if (extraTransform) {
     recorder.concat(extraTransform->matrix);
   }
@@ -68,7 +69,7 @@ std::unique_ptr<TrackMatte> TrackMatteRenderer::Make(PAGLayer* trackMatteOwner) 
     filterModifier = FilterModifier::Make(trackMatteLayer);
   }
   Recorder recorder = {};
-  Transform extraTransform = {trackMatteLayer->layerMatrix, trackMatteLayer->layerOpacity};
+  Transform extraTransform = {trackMatteLayer->layerMatrix, trackMatteLayer->layerAlpha};
   LayerRenderer::DrawLayer(&recorder, trackMatteLayer->layer, layerFrame, filterModifier, nullptr,
                            trackMatteLayer, &extraTransform);
   content = recorder.makeGraphic();

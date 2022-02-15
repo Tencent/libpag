@@ -18,15 +18,14 @@
 
 #pragma once
 
-#include "FragmentProcessor.h"
-#include "core/Paint.h"
+#include "core/RGBAAALayout.h"
+#include "gpu/FragmentProcessor.h"
 
 namespace pag {
 class TextureFragmentProcessor : public FragmentProcessor {
  public:
-  static std::unique_ptr<TextureFragmentProcessor> Make(const Texture* texture,
-                                                        const RGBAAALayout* layout,
-                                                        const Matrix& localMatrix);
+  static std::unique_ptr<FragmentProcessor> Make(const Texture* texture, const RGBAAALayout* layout,
+                                                 const Matrix& localMatrix);
 
   std::string name() const override {
     return "TextureFragmentProcessor";

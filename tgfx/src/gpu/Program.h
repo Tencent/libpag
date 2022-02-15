@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "Context.h"
-#include "base/utils/BytesKey.h"
+#include "core/utils/BytesKey.h"
+#include "gpu/Context.h"
 
 namespace pag {
 /**
@@ -40,7 +40,7 @@ class Program {
  private:
   BytesKey uniqueKey = {};
 
-  friend class Context;
+  friend class ProgramCache;
 };
 
 class ProgramCreator {

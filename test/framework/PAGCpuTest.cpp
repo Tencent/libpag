@@ -64,11 +64,4 @@ std::string PAGCpuTest::GetPagPath() {
   return DEFAULT_PAG_PATH;
 }
 
-std::string PAGCpuTest::getMd5FromSnap() {
-  if (TestPAGSurface == nullptr) {
-    return "";
-  }
-  return DumpMD5(TestPAGSurface);
-}
-
 }  // namespace pag

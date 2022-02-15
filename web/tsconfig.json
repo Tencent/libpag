@@ -5,7 +5,8 @@
     "allowJs": true,
     "sourceMap": true,
     "esModuleInterop": true,
-    "moduleResolution": "Node"
+    "moduleResolution": "Node",
+    "experimentalDecorators": true
   },
   "files": ["src/pag.ts", "demo/index.ts"],
   "typedocOptions": {

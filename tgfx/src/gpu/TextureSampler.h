@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "Context.h"
-#include "PixelConfig.h"
-#include "base/utils/BytesKey.h"
+#include "core/utils/BytesKey.h"
+#include "gpu/Context.h"
+#include "gpu/PixelConfig.h"
 
 namespace pag {
 class TextureSampler {

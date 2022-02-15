@@ -27,9 +27,7 @@ class QGLProcGetter : public GLProcGetter {
   explicit QGLProcGetter(QOpenGLContext* glContext) : glContext(glContext) {
   }
 
-  void* getProcAddress(const char name[]) const override {
-    return reinterpret_cast<void*>(glContext->getProcAddress(name));
-  }
+  void* getProcAddress(const char name[]) const override;
 
  private:
   QOpenGLContext* glContext = nullptr;

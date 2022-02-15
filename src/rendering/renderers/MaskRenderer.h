@@ -18,9 +18,9 @@
 
 #pragma once
 
+#include "core/Path.h"
 #include "pag/file.h"
 #include "pag/pag.h"
-#include "raster/Path.h"
 
 namespace pag {
 void RenderMasks(Path* maskContent, const std::vector<MaskData*>& masks, Frame layerFrame);

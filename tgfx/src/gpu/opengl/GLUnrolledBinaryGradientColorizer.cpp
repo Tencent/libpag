@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLUnrolledBinaryGradientColorizer.h"
-#include "gpu/UnrolledBinaryGradientColorizer.h"
+#include "gpu/gradients/UnrolledBinaryGradientColorizer.h"
 
 namespace pag {
 UniformHandle AddUniform(UniformHandler* uniformHandler, const std::string& name, int intervalCount,
@@ -197,7 +197,7 @@ void SetUniformData(const ProgramDataManager& programDataManager, const UniformH
                     const Color4f& current, Color4f* previous) {
   if (handle.isValid() && current != *previous) {
     *previous = current;
-    programDataManager.set4fv(handle, 1, current.vec());
+    programDataManager.set4fv(handle, 1, current.array());
   }
 }
 
@@ -205,7 +205,7 @@ void GLUnrolledBinaryGradientColorizer::onSetData(const ProgramDataManager& prog
                                                   const FragmentProcessor& fragmentProcessor) {
   const auto& fp = static_cast<const UnrolledBinaryGradientColorizer&>(fragmentProcessor);
   if (scale0_1Prev != fp.scale0_1) {
-    programDataManager.set4fv(scale0_1Uniform, 1, fp.scale0_1.vec());
+    programDataManager.set4fv(scale0_1Uniform, 1, fp.scale0_1.array());
   }
   SetUniformData(programDataManager, scale2_3Uniform, fp.scale2_3, &scale2_3Prev);
   SetUniformData(programDataManager, scale4_5Uniform, fp.scale4_5, &scale4_5Prev);
@@ -215,7 +215,7 @@ void GLUnrolledBinaryGradientColorizer::onSetData(const ProgramDataManager& prog
   SetUniformData(programDataManager, scale12_13Uniform, fp.scale12_13, &scale12_13Prev);
   SetUniformData(programDataManager, scale14_15Uniform, fp.scale14_15, &scale14_15Prev);
   if (bias0_1Prev != fp.bias0_1) {
-    programDataManager.set4fv(bias0_1Uniform, 1, fp.bias0_1.vec());
+    programDataManager.set4fv(bias0_1Uniform, 1, fp.bias0_1.array());
   }
   SetUniformData(programDataManager, bias2_3Uniform, fp.bias2_3, &bias2_3Prev);
   SetUniformData(programDataManager, bias4_5Uniform, fp.bias4_5, &bias4_5Prev);

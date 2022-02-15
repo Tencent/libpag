@@ -21,13 +21,13 @@
 #include "GLRRectOp.h"
 #include "GLSurface.h"
 #include "base/utils/MathExtra.h"
+#include "core/Mask.h"
+#include "core/PathEffect.h"
+#include "core/TextBlob.h"
 #include "gpu/AlphaFragmentProcessor.h"
+#include "gpu/ColorShader.h"
 #include "gpu/TextureFragmentProcessor.h"
 #include "gpu/TextureMaskFragmentProcessor.h"
-#include "gpu/YUVTextureFragmentProcessor.h"
-#include "pag/file.h"
-#include "raster/Mask.h"
-#include "raster/TextBlob.h"
 
 namespace pag {
 GLCanvas::GLCanvas(Surface* surface) : Canvas(surface) {
@@ -81,7 +81,9 @@ std::unique_ptr<FragmentProcessor> GLCanvas::getClipMask(const Rect& deviceQuad,
       auto clipSurface = getClipSurface();
       auto clipCanvas = clipSurface->getCanvas();
       clipCanvas->clear();
-      clipCanvas->drawPath(globalPaint.clip, Black);
+      Paint paint = {};
+      paint.setColor(Color4f::Black());
+      clipCanvas->drawPath(globalPaint.clip, paint);
       return TextureMaskFragmentProcessor::MakeUseDeviceCoord(clipSurface->getTexture().get(),
                                                               surface->origin());
     }
@@ -128,50 +130,29 @@ void GLCanvas::drawTexture(const Texture* texture, const RGBAAALayout* layout, c
   localMatrix.postScale(scale.x, scale.y);
   auto translate = texture->getTextureCoord(clippedLocalQuad.x(), clippedLocalQuad.y());
   localMatrix.postTranslate(translate.x, translate.y);
-  std::unique_ptr<FragmentProcessor> color;
-  if (texture->isYUV()) {
-    color = YUVTextureFragmentProcessor::Make(static_cast<const YUVTexture*>(texture), layout,
-                                              localMatrix);
-  } else {
-    color = TextureFragmentProcessor::Make(texture, layout, localMatrix);
+  auto processor = TextureFragmentProcessor::Make(texture, layout, localMatrix);
+  if (processor == nullptr) {
+    return;
   }
-  draw(clippedLocalQuad, clippedDeviceQuad, GLFillRectOp::Make(), std::move(color),
+  draw(clippedLocalQuad, clippedDeviceQuad, GLFillRectOp::Make(), std::move(processor),
        TextureMaskFragmentProcessor::MakeUseLocalCoord(mask, Matrix::I(), inverted), true);
 }
 
-void GLCanvas::drawPath(const Path& path, Color color) {
-  auto shader = Shader::MakeColorShader(color);
-  drawPath(path, shader.get());
-}
-
-static std::unique_ptr<Shader> MakeGradientShader(const GradientPaint& gradient) {
-  std::unique_ptr<Shader> shader;
-  std::vector<Color4f> colors = {};
-  int index = 0;
-  auto& alphas = gradient.alphas;
-  for (auto& color : gradient.colors) {
-    auto r = static_cast<float>(color.red) / 255.0f;
-    auto g = static_cast<float>(color.green) / 255.0f;
-    auto b = static_cast<float>(color.blue) / 255.0f;
-    auto a = static_cast<float>(alphas[index++]) / 255.0f;
-    colors.emplace_back(r, g, b, a);
+void GLCanvas::drawPath(const Path& path, const Paint& paint) {
+  auto shader = paint.getShader();
+  if (shader == nullptr) {
+    shader = Shader::MakeColorShader(paint.getColor());
   }
-  if (gradient.gradientType == GradientFillType::Linear) {
-    shader = GradientShader::MakeLinear(gradient.startPoint, gradient.endPoint, colors,
-                                        gradient.positions);
-  } else {
-    auto radius = Point::Distance(gradient.startPoint, gradient.endPoint);
-    shader = GradientShader::MakeRadial(gradient.startPoint, radius, colors, gradient.positions);
+  if (paint.getStyle() == PaintStyle::Fill) {
+    fillPath(path, shader.get());
+    return;
   }
-  if (!shader) {
-    shader = std::make_unique<Color4Shader>(colors.back());
+  auto strokePath = path;
+  auto strokeEffect = PathEffect::MakeStroke(*paint.getStroke());
+  if (strokeEffect) {
+    strokeEffect->applyTo(&strokePath);
   }
-  return shader;
-}
-
-void GLCanvas::drawPath(const Path& path, const GradientPaint& gradient) {
-  auto shader = MakeGradientShader(gradient);
-  drawPath(path, shader.get());
+  fillPath(strokePath, shader.get());
 }
 
 static std::unique_ptr<GLDrawOp> MakeSimplePathOp(const Path& path) {
@@ -185,7 +166,7 @@ static std::unique_ptr<GLDrawOp> MakeSimplePathOp(const Path& path) {
   return nullptr;
 }
 
-void GLCanvas::drawPath(const Path& path, const Shader* shader) {
+void GLCanvas::fillPath(const Path& path, const Shader* shader) {
   if (path.isEmpty()) {
     return;
   }
@@ -252,8 +233,8 @@ void GLCanvas::drawGlyphs(const GlyphID glyphIDs[], const Point positions[], siz
   Path path = {};
   auto stroke = paint.getStyle() == PaintStyle::Stroke ? paint.getStroke() : nullptr;
   if (textBlob->getPath(&path, stroke)) {
-    auto shader = Shader::MakeColorShader(paint.getColor(), paint.getAlpha());
-    drawPath(path, shader.get());
+    auto shader = Shader::MakeColorShader(paint.getColor());
+    fillPath(path, shader.get());
     return;
   }
   drawMaskGlyphs(textBlob.get(), paint);
@@ -278,9 +259,9 @@ void GLCanvas::drawColorGlyphs(const GlyphID glyphIDs[], const Point positions[]
     glyphMatrix.postTranslate(position.x, position.y);
     save();
     concat(glyphMatrix);
-    concatAlpha(paint.getAlpha());
+    globalPaint.alpha *= paint.getAlpha();
     auto texture = glyphBuffer->makeTexture(getContext());
-    drawTexture(texture.get(), nullptr);
+    drawTexture(texture.get(), nullptr, false);
     restore();
   }
 }
@@ -316,27 +297,8 @@ void GLCanvas::drawMaskGlyphs(TextBlob* textBlob, const Paint& paint) {
     mask->fillText(textBlob);
   }
   auto texture = mask->makeTexture(getContext());
-  auto shader = Shader::MakeColorShader(paint.getColor(), paint.getAlpha());
+  auto shader = Shader::MakeColorShader(paint.getColor());
   drawMask(clippedDeviceQuad, texture.get(), shader.get());
-}
-
-Enum GLCanvas::hasComplexPaint(const Rect& drawingBounds) const {
-  auto bounds = drawingBounds;
-  globalPaint.matrix.mapRect(&bounds);
-  auto result = PaintKind::None;
-  if (globalPaint.alpha != Opaque) {
-    result |= PaintKind::Alpha;
-  }
-  if (globalPaint.blendMode != Blend::SrcOver) {
-    result |= PaintKind::Blend;
-  }
-  auto surfaceBounds =
-      Rect::MakeWH(static_cast<float>(surface->width()), static_cast<float>(surface->height()));
-  bounds.intersect(surfaceBounds);
-  if (!globalPaint.clip.contains(bounds)) {
-    result |= PaintKind::Clip;
-  }
-  return result;
 }
 
 GLDrawer* GLCanvas::getDrawer() {
@@ -380,9 +342,8 @@ void GLCanvas::draw(const Rect& localQuad, const Rect& deviceQuad, std::unique_p
   if (color) {
     args.colors.push_back(std::move(color));
   }
-  auto alpha = static_cast<float>(globalPaint.alpha) / Opaque;
-  if (alpha != 1.0) {
-    args.colors.push_back(AlphaFragmentProcessor::Make(alpha));
+  if (globalPaint.alpha != 1.0) {
+    args.colors.push_back(AlphaFragmentProcessor::Make(globalPaint.alpha));
   }
   if (mask) {
     args.masks.push_back(std::move(mask));

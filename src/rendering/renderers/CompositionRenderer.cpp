@@ -69,7 +69,7 @@ static std::shared_ptr<Graphic> MakeVideoSequenceGraphic(VideoSequence* sequence
   RGBAAALayout layout = {sequence->width, sequence->height, sequence->alphaStartX,
                          sequence->alphaStartY};
   return Picture::MakeFrom(sequence->composition->uniqueID, std::unique_ptr<SequenceProxy>(proxy),
-                         layout);
+                           layout);
 }
 
 std::shared_ptr<Graphic> RenderVectorComposition(VectorComposition* composition,

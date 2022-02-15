@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "QGLWindow.h"
+#include "gpu/opengl/qt/QGLWindow.h"
 #include <QApplication>
 #include <QQuickWindow>
 #include <QThread>

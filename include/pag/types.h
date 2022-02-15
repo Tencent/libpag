@@ -867,7 +867,7 @@ class PAG_API Matrix {
 
   /**
    * Copies nine scalar values contained by Matrix into buffer, in member value ascending order:
-   * kMScaleX, kMSkewX, kMTransX, kMSkewY, kMScaleY, kMTransY, kMPersp0, kMPersp1, kMPersp2.
+   * ScaleX, SkewX, TransX, SkewY, ScaleY, TransY, Persp0, Persp1, Persp2.
    * @param buffer  storage for nine scalar values
    */
   void get9(float buffer[9]) const {
@@ -875,8 +875,8 @@ class PAG_API Matrix {
   }
 
   /**
-   * Sets Matrix to nine scalar values in buffer, in member value ascending order: kMScaleX,
-   * kMSkewX, kMTransX, kMSkewY, kMScaleY, kMTransY, kMPersp0, kMPersp1, kMPersp2.
+   * Sets Matrix to nine scalar values in buffer, in member value ascending order: ScaleX,
+   * SkewX, TransX, SkewY, ScaleY, TransY, Persp0, Persp1, Persp2.
    *
    * Sets matrix to:
    *

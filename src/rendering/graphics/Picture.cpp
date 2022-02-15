@@ -20,7 +20,7 @@
 #include "base/utils/GetTimer.h"
 #include "base/utils/MatrixUtil.h"
 #include "gpu/Surface.h"
-#include "platform/NativeGLDevice.h"
+#include "gpu/opengl/GLDevice.h"
 #include "rendering/caches/RenderCache.h"
 
 namespace pag {
@@ -32,24 +32,14 @@ static bool TryDrawDirectly(Canvas* canvas, const Texture* texture, const RGBAAA
   if (!texture->isYUV() && layout == nullptr) {
     // RGBA 纹理始终可以直接上屏。
     canvas->drawTexture(texture);
-    // 防止临时纹理析构
-    canvas->flush();
     return true;
   }
   auto totalMatrix = canvas->getMatrix();
   auto scaleFactor = GetMaxScaleFactor(totalMatrix);
   if (scaleFactor <= 1.0f) {
-    auto width = layout ? layout->width : texture->width();
-    auto height = layout ? layout->height : texture->height();
     // 纹理格式为 YUV 或含有 RGBAAALayout 时在缩放值小于等于 1.0f 时才直接上屏会有更好的性能。
-    auto bounds = Rect::MakeWH(static_cast<float>(width), static_cast<float>(height));
-    auto result = canvas->hasComplexPaint(bounds);
-    if (!(result & PaintKind::Blend || result & PaintKind::Clip)) {
-      canvas->drawTexture(texture, layout);
-      // 防止临时纹理析构
-      canvas->flush();
-      return true;
-    }
+    canvas->drawTexture(texture, layout);
+    return true;
   }
   return false;
 }
@@ -235,7 +225,6 @@ class RGBAAAPicture : public Picture {
       }
     }
     // 因为视频绘制会涉及自定义的 OpenGL 操作。
-    // 要先 flush 父级 SkCanvas 里当前的 OpenGL 操作，防止渲染异常。
     canvas->flush();
     auto snapshot = cache->getSnapshot(this);
     if (snapshot) {
@@ -355,10 +344,10 @@ class SnapshotPicture : public Picture {
 //===================================== SnapshotPicture ============================================
 
 //==================================== Texture Proxies =============================================
-class BitmapTextureProxy : public TextureProxy {
+class TextureBufferProxy : public TextureProxy {
  public:
-  explicit BitmapTextureProxy(const Bitmap& bitmap)
-      : TextureProxy(bitmap.width(), bitmap.height()), bitmap(bitmap) {
+  explicit TextureBufferProxy(const std::shared_ptr<TextureBuffer> buffer)
+      : TextureProxy(buffer->width(), buffer->height()), buffer(buffer) {
   }
 
   bool cacheEnabled() const override {
@@ -370,13 +359,13 @@ class BitmapTextureProxy : public TextureProxy {
 
   std::shared_ptr<Texture> getTexture(RenderCache* cache) const override {
     auto startTime = GetTimer();
-    auto texture = bitmap.makeTexture(cache->getContext());
+    auto texture = buffer->makeTexture(cache->getContext());
     cache->recordTextureUploadingTime(GetTimer() - startTime);
     return texture;
   }
 
  private:
-  Bitmap bitmap = {};
+  std::shared_ptr<TextureBuffer> buffer = nullptr;
 };
 
 class ImageTextureProxy : public TextureProxy {
@@ -417,9 +406,7 @@ class ImageTextureProxy : public TextureProxy {
 class BackendTextureProxy : public TextureProxy {
  public:
   BackendTextureProxy(const BackendTexture& texture, ImageOrigin origin, void* sharedContext)
-      : TextureProxy(texture.width(), texture.height()),
-        backendTexture(texture),
-        origin(origin),
+      : TextureProxy(texture.width(), texture.height()), backendTexture(texture), origin(origin),
         sharedContext(sharedContext) {
   }
 
@@ -444,7 +431,7 @@ class BackendTextureProxy : public TextureProxy {
   void* sharedContext = nullptr;
 
   bool checkContext(Context* context) const {
-    auto glDevice = static_cast<GLDevice*>(context->getDevice());
+    auto glDevice = static_cast<GLDevice*>(context->device());
     if (!glDevice->sharableWith(sharedContext)) {
       LOGE(
           "A Graphic which made from a texture can not be drawn on to a PAGSurface"
@@ -475,13 +462,12 @@ std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, std::shared_ptr<Image> im
   return picture;
 }
 
-std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, const Bitmap& bitmap) {
-  if (bitmap.isEmpty()) {
+std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, std::shared_ptr<TextureBuffer> buffer) {
+  if (buffer == nullptr) {
     return nullptr;
   }
-  auto proxy = new BitmapTextureProxy(bitmap);
-  return std::shared_ptr<Graphic>(
-      new TextureProxyPicture(assetID, proxy, bitmap.isHardwareBacked()));
+  auto proxy = new TextureBufferProxy(buffer);
+  return std::shared_ptr<Graphic>(new TextureProxyPicture(assetID, proxy, false));
 }
 
 std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, const BackendTexture& texture,
@@ -489,7 +475,7 @@ std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, const BackendTexture& tex
   if (!texture.isValid()) {
     return nullptr;
   }
-  auto context = NativeGLDevice::GetCurrentNativeHandle();
+  auto context = GLDevice::CurrentNativeHandle();
   if (context == nullptr) {
     return nullptr;
   }

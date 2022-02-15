@@ -19,12 +19,16 @@
 #include "Modifier.h"
 #include "Graphic.h"
 #include "base/utils/MatrixUtil.h"
+#include "base/utils/UniqueID.h"
+#include "core/Blend.h"
 #include "gpu/Surface.h"
+#include "rendering/utils/SurfaceUtil.h"
+#include "rendering/utils/TGFXTypes.h"
 
 namespace pag {
 class BlendModifier : public Modifier {
  public:
-  BlendModifier(Opacity alpha, Enum blendMode) : alpha(alpha), blendMode(blendMode) {
+  BlendModifier(float alpha, Blend blendMode) : alpha(alpha), blendMode(blendMode) {
   }
 
   ID type() const override {
@@ -33,7 +37,7 @@ class BlendModifier : public Modifier {
   }
 
   bool isEmpty() const override {
-    return alpha == Transparent;
+    return alpha == 0.0f;
   }
 
   bool hitTest(RenderCache* cache, float x, float y) const override;
@@ -44,7 +48,7 @@ class BlendModifier : public Modifier {
   void applyToBounds(Rect*) const override{};
 
   bool applyToPath(Path*) const override {
-    return alpha == Opaque;  // blendMode 只影响颜色，不改变形状或透明度，不影响 getPath 结果。
+    return alpha == 1.0f;  // blendMode 只影响颜色，不改变形状或透明度，不影响 getPath 结果。
   }
 
   void applyToGraphic(Canvas* canvas, RenderCache* cache,
@@ -53,8 +57,8 @@ class BlendModifier : public Modifier {
   std::shared_ptr<Modifier> mergeWith(const Modifier* modifier) const override;
 
  private:
-  Opacity alpha = Opaque;
-  Enum blendMode = BlendMode::Normal;
+  float alpha = 1.0f;
+  Blend blendMode = Blend::SrcOver;
 };
 
 class ClipModifier : public Modifier {
@@ -131,8 +135,8 @@ class MaskModifier : public Modifier {
 
 //================================================================================
 
-std::shared_ptr<Modifier> Modifier::MakeBlend(Opacity alpha, Enum blendMode) {
-  if (alpha == Opaque && blendMode == BlendMode::Normal) {
+std::shared_ptr<Modifier> Modifier::MakeBlend(float alpha, Blend blendMode) {
+  if (alpha == 1.0f && blendMode == Blend::SrcOver) {
     return nullptr;
   }
   return std::make_shared<BlendModifier>(alpha, blendMode);
@@ -164,25 +168,28 @@ std::shared_ptr<Modifier> Modifier::MakeMask(std::shared_ptr<Graphic> graphic, b
 //================================================================================
 
 bool BlendModifier::hitTest(RenderCache*, float, float) const {
-  return alpha != Transparent;
+  return alpha != 0.0f;
 }
 
 void BlendModifier::applyToGraphic(Canvas* canvas, RenderCache* cache,
                                    std::shared_ptr<Graphic> graphic) const {
   canvas->save();
-  canvas->concatAlpha(alpha);
-  canvas->concatBlendMode(ToBlend(blendMode));
+  auto newAlpha = canvas->getAlpha() * alpha;
+  canvas->setAlpha(newAlpha);
+  if (blendMode != Blend::SrcOver) {
+    canvas->setBlendMode(blendMode);
+  }
   graphic->draw(canvas, cache);
   canvas->restore();
 }
 
 std::shared_ptr<Modifier> BlendModifier::mergeWith(const Modifier* modifier) const {
   auto target = static_cast<const BlendModifier*>(modifier);
-  if (target->blendMode != BlendMode::Normal && blendMode != BlendMode::Normal) {
+  if (target->blendMode != Blend::SrcOver && blendMode != Blend::SrcOver) {
     return nullptr;
   }
-  auto newBlendMode = blendMode != BlendMode::Normal ? blendMode : target->blendMode;
-  auto newAlpha = OpacityConcat(alpha, target->alpha);
+  auto newBlendMode = blendMode != Blend::SrcOver ? blendMode : target->blendMode;
+  auto newAlpha = alpha * target->alpha;
   return std::make_shared<BlendModifier>(newAlpha, newBlendMode);
 }
 
@@ -253,7 +260,7 @@ void MaskModifier::applyToGraphic(Canvas* canvas, RenderCache* cache,
     // 与遮罩不相交，直接跳过绘制。
     return;
   }
-  auto contentSurface = canvas->makeContentSurface(bounds, FLT_MAX);
+  auto contentSurface = SurfaceUtil::MakeContentSurface(canvas, bounds, FLT_MAX);
   if (contentSurface == nullptr) {
     return;
   }

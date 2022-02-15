@@ -44,7 +44,7 @@ class DropShadowSpreadFilter : public LayerFilter {
   DropShadowStyleMode styleMode;
 
   int spreadColorHandle = -1;
-  int spreadOpacityHandle = -1;
+  int spreadAlphaHandle = -1;
   int spreadSizeHandle = -1;
 };
 }  // namespace pag

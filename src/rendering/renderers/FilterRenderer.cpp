@@ -28,6 +28,7 @@
 #include "rendering/filters/MotionBlurFilter.h"
 #include "rendering/filters/utils/FilterBuffer.h"
 #include "rendering/filters/utils/FilterHelper.h"
+#include "rendering/utils/SurfaceUtil.h"
 
 namespace pag {
 #define FAST_BLUR_MAX_SCALE_FACTOR 0.1f
@@ -160,7 +161,7 @@ void FilterRenderer::MeasureFilterBounds(Rect* bounds, const FilterModifier* mod
 }
 
 Rect GetClipBounds(Canvas* canvas, const FilterList* filterList) {
-  auto clip = canvas->getGlobalClip();
+  auto clip = canvas->getTotalClip();
   auto matrix = canvas->getMatrix();
   if (filterList->useParentSizeInput) {
     Matrix inverted = Matrix::I();
@@ -345,6 +346,27 @@ void ApplyFilters(Context* context, std::vector<FilterNode> filterNodes, const R
   }
 }
 
+static bool HasComplexPaint(Canvas* parentCanvas, const Rect& drawingBounds) {
+  if (parentCanvas->getAlpha() != 1.0f) {
+    return true;
+  }
+  if (parentCanvas->getBlendMode() != Blend::SrcOver) {
+    return true;
+  }
+  auto bounds = drawingBounds;
+  auto matrix = parentCanvas->getMatrix();
+  matrix.mapRect(&bounds);
+  auto surface = parentCanvas->getSurface();
+  auto surfaceBounds =
+      Rect::MakeWH(static_cast<float>(surface->width()), static_cast<float>(surface->height()));
+  bounds.intersect(surfaceBounds);
+  auto clip = parentCanvas->getTotalClip();
+  if (!clip.contains(bounds)) {
+    return true;
+  }
+  return false;
+}
+
 std::unique_ptr<FilterTarget> GetDirectFilterTarget(Canvas* parentCanvas,
                                                     const FilterList* filterList,
                                                     const std::vector<FilterNode>& filterNodes,
@@ -361,7 +383,7 @@ std::unique_ptr<FilterTarget> GetDirectFilterTarget(Canvas* parentCanvas,
   // 因为计算filter的顶点位置的bounds都是没有经过裁切的
   auto transformBounds = contentBounds;
   TransformFilterBounds(&transformBounds, filterList);
-  if (parentCanvas->hasComplexPaint(transformBounds) != PaintKind::None) {
+  if (HasComplexPaint(parentCanvas, transformBounds)) {
     return nullptr;
   }
   auto surface = parentCanvas->getSurface();
@@ -431,7 +453,7 @@ void FilterRenderer::DrawWithFilter(Canvas* parentCanvas, RenderCache* cache,
   }
   ProcessFastBlur(filterList.get());
   auto contentSurface =
-      parentCanvas->makeContentSurface(contentBounds, filterList->scaleFactorLimit);
+      SurfaceUtil::MakeContentSurface(parentCanvas, contentBounds, filterList->scaleFactorLimit);
   if (contentSurface == nullptr) {
     return;
   }
@@ -446,9 +468,9 @@ void FilterRenderer::DrawWithFilter(Canvas* parentCanvas, RenderCache* cache,
       parentCanvas, filterList.get(), filterNodes, contentBounds, filterSource->scale);
   if (filterTarget == nullptr) {
     // 需要离屏绘制
-    targetSurface =
-        parentCanvas->makeContentSurface(filterNodes.back().bounds, filterList->scaleFactorLimit,
-                                         filterNodes.back().filter->needsMSAA());
+    targetSurface = SurfaceUtil::MakeContentSurface(parentCanvas, filterNodes.back().bounds,
+                                                    filterList->scaleFactorLimit,
+                                                    filterNodes.back().filter->needsMSAA());
     if (targetSurface == nullptr) {
       return;
     }

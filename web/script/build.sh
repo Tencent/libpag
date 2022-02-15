@@ -13,20 +13,19 @@ fi
 RELEASE_CONF="-Oz -s"
 CMAKE_BUILD_TYPE=Relese
 if [[ $@ == *debug* ]]; then
-  BUILD_DIR=../../cmake-build-debug
   CMAKE_BUILD_TYPE=Debug
   RELEASE_CONF="-O0 -g3 -s SAFE_HEAP=1"
   BUILD_TS=""
 fi
 
-emcmake cmake -S $SOURCE_DIR -B $BUILD_DIR \
-  -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE"
+emcmake cmake -S $SOURCE_DIR -B $BUILD_DIR -G Ninja -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE"
 
-cmake --build $BUILD_DIR --target pag -- -j 12
+cmake --build $BUILD_DIR --target pag
 
 emcc $RELEASE_CONF -std=c++17 \
   -I$SOURCE_DIR/include/ \
   -I$SOURCE_DIR/src/ \
+  -I$SOURCE_DIR/tgfx/include/ \
   -I$SOURCE_DIR/tgfx/src/ \
   -DPAG_BUILD_FOR_WEB \
   ../src/pag_wasm_bindings.cpp \
@@ -36,7 +35,7 @@ emcc $RELEASE_CONF -std=c++17 \
   -s WASM=1 \
   -s ASYNCIFY \
   -s USE_WEBGL2=1 \
-  -s "EXPORTED_RUNTIME_METHODS=['GL']" \
+  -s "EXPORTED_RUNTIME_METHODS=['GL','Asyncify']" \
   -s ALLOW_MEMORY_GROWTH=1 \
   -s EXPORT_NAME="PAGInit" \
   -s ERROR_ON_UNDEFINED_SYMBOLS=0 \

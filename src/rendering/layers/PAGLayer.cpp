@@ -83,14 +83,18 @@ Matrix PAGLayer::getTotalMatrixInternal() {
   return matrix;
 }
 
-void PAGLayer::setOpacity(const Opacity& value) {
+float PAGLayer::alpha() const {
   LockGuard autoLock(rootLocker);
-  setOpacityInternal(value);
+  return layerAlpha;
 }
 
-Opacity PAGLayer::opacity() const {
+void PAGLayer::setAlpha(float alpha) {
   LockGuard autoLock(rootLocker);
-  return layerOpacity;
+  if (alpha == layerAlpha) {
+    return;
+  }
+  layerAlpha = alpha;
+  notifyModified();
 }
 
 bool PAGLayer::visible() const {
@@ -504,14 +508,6 @@ void PAGLayer::setMatrixInternal(const Matrix& matrix) {
   invalidateCacheScale();
 }
 
-void PAGLayer::setOpacityInternal(const Opacity& opacity) {
-  if (opacity == layerOpacity) {
-    return;
-  }
-  layerOpacity = opacity;
-  notifyModified();
-}
-
 void PAGLayer::removeFromParentOrOwner() {
   if (_parent) {
     auto oldIndex = _parent->getLayerIndexInternal(weakThis.lock());
@@ -543,7 +539,7 @@ void PAGLayer::detachFromTree() {
 
 bool PAGLayer::getTransform(Transform* transform) {
   if (contentFrame < 0 || contentFrame >= frameDuration() || !layerMatrix.invertible() ||
-      layerOpacity == Transparent) {
+      layerAlpha == 0.0f) {
     return false;
   }
   auto layerTransform = layerCache->getTransform(contentFrame);
@@ -552,7 +548,7 @@ bool PAGLayer::getTransform(Transform* transform) {
   }
   *transform = *layerTransform;
   transform->matrix.postConcat(layerMatrix);
-  transform->opacity = OpacityConcat(transform->opacity, layerOpacity);
+  transform->alpha *= layerAlpha;
   return true;
 }
 

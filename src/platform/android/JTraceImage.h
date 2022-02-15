@@ -19,13 +19,12 @@
 #pragma once
 
 #include "JNIHelper.h"
-#include "image/PixelMap.h"
 
 namespace pag {
 class JTraceImage {
  public:
   static void InitJNI(JNIEnv* env);
 
-  static void Trace(const PixelMap& pixelMap, const std::string& tag);
+  static void Trace(const ImageInfo& info, const void* pixels, const std::string& tag);
 };
 }  // namespace pag

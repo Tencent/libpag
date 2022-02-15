@@ -18,6 +18,7 @@
 
 #ifdef PERFORMANCE_TEST
 
+#include <filesystem>
 #include <fstream>
 #include <vector>
 #include "TestUtils.h"
@@ -46,7 +47,7 @@ PAG_TEST(PerformanceTest, TestRender) {
   json graphicsJson;
 
   json compareRenderJson;
-  std::ifstream inputRenderFile("../test/res/compare_performance_render.json");
+  std::ifstream inputRenderFile("../test/baseline/PerformanceTest/compare_performance_render.json");
   bool needCompareRender = false;
   if (inputRenderFile) {
     needCompareRender = true;
@@ -54,7 +55,8 @@ PAG_TEST(PerformanceTest, TestRender) {
   }
 
   json compareGraphicsJson;
-  std::ifstream inputGraphicsFile("../test/res/compare_performance_graphics.json");
+  std::ifstream inputGraphicsFile(
+      "../test/baseline/PerformanceTest/compare_performance_graphics.json");
   bool needCompareGraphics = false;
   if (inputGraphicsFile) {
     needCompareGraphics = true;
@@ -143,11 +145,14 @@ PAG_TEST(PerformanceTest, TestRender) {
     renderJson[fileName] = renderVector;
     graphicsJson[fileName] = graphicsVector;
   }
-  std::ofstream outRenderFile("../test/out/performance_render.json");
+  std::filesystem::path renderConfig("../test/out/PerformanceTest/performance_render.json");
+  std::filesystem::create_directories(renderConfig.parent_path());
+  std::ofstream outRenderFile(renderConfig);
   outRenderFile << std::setw(4) << renderJson << std::endl;
   outRenderFile.close();
-
-  std::ofstream outGraphicsFile("../test/out/performance_graphics.json");
+  std::filesystem::path graphicsConfig("../test/out/PerformanceTest/performance_graphics.json");
+  std::filesystem::create_directories(graphicsConfig.parent_path());
+  std::ofstream outGraphicsFile(graphicsConfig);
   outGraphicsFile << std::setw(4) << graphicsJson << std::endl;
   outGraphicsFile.close();
 }

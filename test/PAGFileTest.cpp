@@ -357,7 +357,7 @@ PAG_TEST_CASE(PAGFileContainerTest)
 /**
  * 用例描述: PAGFile children编辑测试
  */
-PAG_TEST_F(PAGFileContainerTest, getLayersByEditableIndex) {
+PAG_TEST_F(PAGFileContainerTest, ContainerEditing) {
   TestPAGFile->removeAllLayers();
   ASSERT_EQ(TestPAGFile->numChildren(), 0);
   auto rootLayer = PAGFile::Load(DEFAULT_PAG_PATH);
@@ -403,40 +403,43 @@ PAG_TEST_F(PAGFileContainerTest, getLayersByEditableIndex) {
 
   TestPAGFile->swapLayer(imageLayer1, imageLayer2);
   TestPAGPlayer->flush();
-  auto swapLayerMd5 = getMd5FromSnap();
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGFileContainerTest/swapLayer"));
 
   TestPAGFile->swapLayerAt(2, 3);
   TestPAGPlayer->flush();
-  auto swapLayerAtMd5 = getMd5FromSnap();
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGFileContainerTest/swapLayerAt"));
 
   TestPAGFile->setLayerIndex(imageLayer1, 3);
   TestPAGPlayer->flush();
-  auto setLayerIndexMd5 = getMd5FromSnap();
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGFileContainerTest/setLayerIndex"));
 
   TestPAGFile->removeLayer(imageLayer1);
   TestPAGPlayer->flush();
-  auto removeLayerMd5 = getMd5FromSnap();
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGFileContainerTest/removeLayer"));
 
   TestPAGFile->removeLayerAt(2);
   TestPAGPlayer->flush();
-  auto removeLayerAtMd5 = getMd5FromSnap();
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGFileContainerTest/removeLayerAt"));
 
   TestPAGFile->removeAllLayers();
   TestPAGPlayer->flush();
   ASSERT_EQ(TestPAGFile->numChildren(), 0);
-  auto removeAllLayersMd5 = getMd5FromSnap();
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGFileContainerTest/removeAllLayers"));
 
   auto pagFile2 = PAGFile::Load(DEFAULT_PAG_PATH);
   auto root2 = pagFile2;
   auto pagComposition2 = std::static_pointer_cast<PAGComposition>(root2->getLayerAt(0));
   auto imageLayer = pagComposition2->getLayerAt(2);
+  imageLayer->setCurrentTime(2000000);
   TestPAGFile->addLayer(imageLayer);
   TestPAGPlayer->flush();
-  auto addLayerMd5 = getMd5FromSnap();
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGFileContainerTest/addLayer"));
 
-  TestPAGFile->addLayerAt(pagComposition2->getLayerAt(3), 0);
+  auto pagLayer = pagComposition2->getLayerAt(3);
+  pagLayer->setCurrentTime(4000000);
+  TestPAGFile->addLayerAt(pagLayer, 0);
   TestPAGPlayer->flush();
-  auto addLayerAtMd5 = getMd5FromSnap();
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGFileContainerTest/addLayerAt"));
 
   TestPAGFile->contains(nullptr);
   TestPAGFile->removeLayer(nullptr);
@@ -447,151 +450,80 @@ PAG_TEST_F(PAGFileContainerTest, getLayersByEditableIndex) {
 
   TestPAGFile->addLayerAt(nullptr, 0);
   TestPAGFile->swapLayer(nullptr, imageLayer2);
-
-  auto image = PAGImage::FromPath("../resources/apitest/imageReplacement.png");
-  TestPAGFile->replaceImage(0, image);
-  TestPAGPlayer->flush();
-  auto replaceImageMd5 = getMd5FromSnap();
-
-  auto textData = std::shared_ptr<TextDocument>(new TextDocument());
-  textData->text = "测试ceshi";
-  textData->fillColor = Red;
-  TestPAGFile->replaceText(0, textData);
-  TestPAGPlayer->flush();
-  auto replaceTextMd5 = getMd5FromSnap();
-
-  json out = {
-      {"swapLayerMd5", swapLayerMd5},
-      {"setLayerIndexMd5", setLayerIndexMd5},
-      {"removeLayerMd5", removeLayerMd5},
-      {"removeLayerAtMd5", removeLayerAtMd5},
-      {"removeAllLayersMd5", removeAllLayersMd5},
-      {"addLayerMd5", addLayerMd5},
-      {"addLayerAt", addLayerAtMd5},
-      {"replaceImageMd5", replaceImageMd5},
-      {"replaceTextMd5", replaceTextMd5},
-  };
-  PAGTestEnvironment::DumpJson["PAGFileTest"]["PAGFileContainerTest"] = out;
-
-#ifdef COMPARE_JSON_PATH
-  auto cAddLayerAt =
-      PAGTestEnvironment::CompareJson["PAGFileTest"]["PAGFileContainerTest"]["addLayerAt"];
-  EXPECT_EQ(cAddLayerAt.get<std::string>(), addLayerAtMd5);
-  auto cAddLayerMd5 =
-      PAGTestEnvironment::CompareJson["PAGFileTest"]["PAGFileContainerTest"]["addLayerMd5"];
-  EXPECT_EQ(cAddLayerMd5.get<std::string>(), addLayerMd5);
-  auto cRemoveAllLayersMd5 =
-      PAGTestEnvironment::CompareJson["PAGFileTest"]["PAGFileContainerTest"]["removeAllLayersMd5"];
-  EXPECT_EQ(cRemoveAllLayersMd5.get<std::string>(), removeAllLayersMd5);
-  auto cRemoveLayerAtMd5 =
-      PAGTestEnvironment::CompareJson["PAGFileTest"]["PAGFileContainerTest"]["removeLayerAtMd5"];
-  EXPECT_EQ(cRemoveLayerAtMd5.get<std::string>(), removeLayerAtMd5);
-  auto cRemoveLayerMd5 =
-      PAGTestEnvironment::CompareJson["PAGFileTest"]["PAGFileContainerTest"]["removeLayerMd5"];
-  EXPECT_EQ(cRemoveLayerMd5.get<std::string>(), removeLayerMd5);
-  auto cSetLayerIndexMd5 =
-      PAGTestEnvironment::CompareJson["PAGFileTest"]["PAGFileContainerTest"]["setLayerIndexMd5"];
-  EXPECT_EQ(cSetLayerIndexMd5.get<std::string>(), setLayerIndexMd5);
-  auto cSwapLayerMd5 =
-      PAGTestEnvironment::CompareJson["PAGFileTest"]["PAGFileContainerTest"]["swapLayerMd5"];
-  EXPECT_EQ(cSwapLayerMd5.get<std::string>(), swapLayerMd5);
-  auto cReplaceImageMd5 =
-      PAGTestEnvironment::CompareJson["PAGFileTest"]["PAGFileContainerTest"]["replaceImageMd5"];
-  EXPECT_EQ(cReplaceImageMd5.get<std::string>(), replaceImageMd5);
-  auto cReplaceTextMd5 =
-      PAGTestEnvironment::CompareJson["PAGFileTest"]["PAGFileContainerTest"]["replaceTextMd5"];
-  EXPECT_EQ(cReplaceTextMd5.get<std::string>(), replaceTextMd5);
-#endif
 }
 
-PAG_TEST_CASE_WITH_PATH(PAGFileTimeStretchRepeat, "../resources/apitest/test_repeat.pag")
+PAG_TEST_CASE(PAGFileTimeStretchTest)
 
 /**
  * 用例描述: PAGFile时间伸缩属性-Repeat测试
  */
-PAG_TEST_F(PAGFileTimeStretchRepeat, timeStretch) {
-  TestPAGFile->setDuration(TestPAGFile->duration() * 2);
+PAG_TEST_F(PAGFileTimeStretchTest, Repeat) {
+  auto pagFile = PAGFile::Load("../resources/apitest/test_repeat.pag");
+  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagPlayer = new PAGPlayer();
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setSurface(pagSurface);
+  pagFile->setDuration(pagFile->duration() * 2);
   //第1帧
-  TestPAGFile->setCurrentTime(1000000ll / 30 + 1);
-  TestPAGPlayer->flush();
-  auto skImage_1 = MakeSnapshot(TestPAGSurface);
-  std::string md5 = DumpMD5(skImage_1);
+  pagFile->setCurrentTime(1000000ll / 30 + 1);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFileTimeStretchTest/Repeat_1"));
   //第61帧
-  TestPAGFile->setCurrentTime(2000000ll + 1000000ll / 30 + 1);
-  TestPAGPlayer->flush();
-  auto skImage_61 = MakeSnapshot(TestPAGSurface);
-  std::string compMd5 = DumpMD5(skImage_61);
-  ASSERT_EQ(md5, compMd5);
-  TraceIf(skImage_1, "../test/out/test_repeat.pag_PAGFileTimeStretchRepeate_1.png", md5 != compMd5);
-  TraceIf(skImage_61, "../test/out/test_repeat.pag_PAGFileTimeStretchRepeate_61.png",
-          md5 != compMd5);
+  pagFile->setCurrentTime(2000000ll + 1000000ll / 30 + 1);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFileTimeStretchTest/Repeat_1"));
 }
-
-PAG_TEST_CASE_WITH_PATH(PAGFileTimeStretchRepeatInverted,
-                        "../resources/apitest/test_repeatInverted.pag")
 
 /**
  * 用例描述: PAGFile时间伸缩属性-RepeatInverted测试
  */
-PAG_TEST_F(PAGFileTimeStretchRepeatInverted, timeStretch) {
-  TestPAGFile->setDuration(TestPAGFile->duration() * 2);
+PAG_TEST_F(PAGFileTimeStretchTest, RepeatInverted) {
+  auto pagFile = PAGFile::Load("../resources/apitest/test_repeatInverted.pag");
+  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagPlayer = new PAGPlayer();
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setSurface(pagSurface);
+  pagFile->setDuration(pagFile->duration() * 2);
   //第1帧
-  TestPAGFile->setCurrentTime(1000000ll / 30 + 1);
-  TestPAGPlayer->flush();
-  auto skImage_1 = MakeSnapshot(TestPAGSurface);
-  std::string md5 = DumpMD5(skImage_1);
-  //第198帧
-  TestPAGFile->setCurrentTime(2000000ll - 2 * 1000000ll / 30 + 2000000ll);
-  TestPAGPlayer->flush();
-  auto skImage_198 = MakeSnapshot(TestPAGSurface);
-  std::string compMd5 = DumpMD5(skImage_198);
-  ASSERT_EQ(md5, compMd5);
-  TraceIf(skImage_1, "../test/out/test_repeat.pag_PAGFileTimeStretchRepeateInverted_1.png",
-          md5 != compMd5);
-  TraceIf(skImage_198, "../test/out/test_repeat.pag_PAGFileTimeStretchRepeateInverted_198.png",
-          md5 != compMd5);
-}
+  pagFile->setCurrentTime(1000000ll / 30 + 1);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFileTimeStretchTest/RepeateInverted_1"));
 
-PAG_TEST_CASE_WITH_PATH(PAGFileTimeStretchScale, "../resources/apitest/test_scale.pag")
+  //第198帧
+  pagFile->setCurrentTime(2000000ll - 2 * 1000000ll / 30 + 2000000ll);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFileTimeStretchTest/RepeateInverted_198"));
+}
 
 /**
  * 用例描述: PAGFile时间伸缩属性-Scale测试
  */
-PAG_TEST_F(PAGFileTimeStretchScale, timeStretch) {
+PAG_TEST_F(PAGFileTimeStretchTest, Scale) {
+  auto pagFile = PAGFile::Load("../resources/apitest/test_scale.pag");
+  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagPlayer = new PAGPlayer();
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setSurface(pagSurface);
   //第30帧
-  TestPAGFile->setCurrentTime(30 * 1000000ll / 30 + 1);
-  TestPAGPlayer->flush();
-  auto skImage_30 = MakeSnapshot(TestPAGSurface);
-  std::string md5 = DumpMD5(skImage_30);
+  pagFile->setCurrentTime(30 * 1000000ll / 30 + 1);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFileTimeStretchTest/Scale_30"));
 
   //第12帧
-  TestPAGFile->setCurrentTime(12 * 1000000ll / 30 + 1);
-  TestPAGPlayer->flush();
-  auto skImage_12 = MakeSnapshot(TestPAGSurface);
-  std::string secMd5 = DumpMD5(skImage_12);
-
-  TestPAGFile->setDuration(TestPAGFile->duration() * 2);
+  pagFile->setCurrentTime(12 * 1000000ll / 30 + 1);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFileTimeStretchTest/Scale_12"));
+  pagFile->setDuration(pagFile->duration() * 2);
 
   //第90帧
-  TestPAGFile->setCurrentTime(4000000ll - 30 * 1000000ll / 30);
-  TestPAGPlayer->flush();
-  auto skImage_90 = MakeSnapshot(TestPAGSurface);
-  std::string compMd5 = DumpMD5(skImage_90);
-  ASSERT_EQ(md5, compMd5);
-  TraceIf(skImage_30, "../test/out/test_repeat.pag_PAGFileTimeStretchScale_30.png", md5 != compMd5);
-  TraceIf(skImage_90, "../test/out/test_repeat.pag_PAGFileTimeStretchScale_90.png", md5 != compMd5);
-
+  pagFile->setCurrentTime(4000000ll - 30 * 1000000ll / 30);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFileTimeStretchTest/Scale_30"));
   //第17帧
   //计算会有一定误差：现在的结果是10->10 13->11 17->12
-  TestPAGFile->setCurrentTime(17 * 1000000ll / 30 + 1);
-  TestPAGPlayer->flush();
-  auto skImage_17 = MakeSnapshot(TestPAGSurface);
-  std::string compSecMd5 = DumpMD5(skImage_17);
-  ASSERT_EQ(secMd5, compSecMd5);
-  TraceIf(skImage_12, "../test/out/test_repeat.pag_PAGFileTimeStretchScale_12.png",
-          secMd5 != compSecMd5);
-  TraceIf(skImage_17, "../test/out/test_repeat.pag_PAGFileTimeStretchScale_17.png",
-          secMd5 != compSecMd5);
+  pagFile->setCurrentTime(17 * 1000000ll / 30 + 1);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFileTimeStretchTest/Scale_12"));
 }
 
 /**
@@ -639,12 +571,7 @@ PAG_TEST_F(PAGFileBaseTest, ShapeType) {
   TestPAGPlayer->setComposition(testFile);
   TestPAGPlayer->setProgress(0.5);
   TestPAGPlayer->flush();
-  auto md5 = getMd5FromSnap();
-  PAGTestEnvironment::DumpJson["PAGFileTest"]["ShapeType"] = md5;
-#ifdef COMPARE_JSON_PATH
-  auto cMd5 = PAGTestEnvironment::CompareJson["PAGFileTest"]["ShapeType"];
-  EXPECT_EQ(cMd5.get<std::string>(), md5);
-#endif
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGFileBaseTest/ShapeType"));
 }
 
 /**
@@ -708,44 +635,29 @@ PAG_TEST_F(PAGFileBaseTest, EllipseToPath_ID80701969) {
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0.5);
   TestPAGPlayer->flush();
-  auto md5 = getMd5FromSnap();
-  PAGTestEnvironment::DumpJson["PAGFileTest"]["EllipseToPath_ID80701969"] = md5;
-#ifdef COMPARE_JSON_PATH
-  auto audioMD5 = PAGTestEnvironment::CompareJson["PAGFileTest"]["EllipseToPath_ID80701969"];
-  EXPECT_EQ(audioMD5.get<std::string>(), md5);
-#endif
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGFileBaseTest/EllipseToPath"));
 }
 
 /**
  * 用例描述: 测试矩形转path，iOS14badcase
  */
-PAG_TEST_F(PAGFileBaseTest, RectToPath_ID80703199) {
+PAG_TEST_F(PAGFileBaseTest, RectToPath) {
   auto pagFile = PAGFile::Load("../resources/apitest/rect_to_path.pag");
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0.5);
   TestPAGPlayer->flush();
-  auto md5 = getMd5FromSnap();
-  PAGTestEnvironment::DumpJson["PAGFileTest"]["RectToPath_ID80703199"] = md5;
-#ifdef COMPARE_JSON_PATH
-  auto audioMD5 = PAGTestEnvironment::CompareJson["PAGFileTest"]["RectToPath_ID80703199"];
-  EXPECT_EQ(audioMD5.get<std::string>(), md5);
-#endif
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGFileBaseTest/RectToPath"));
 }
 
 /**
  * 用例描述: 测试圆角矩形转path,iOS14badCase
  */
-PAG_TEST_F(PAGFileBaseTest, RoundRectToPath_ID80703201) {
+PAG_TEST_F(PAGFileBaseTest, RoundRectToPath) {
   auto pagFile = PAGFile::Load("../resources/apitest/round_rect_to_path.pag");
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0.5);
   TestPAGPlayer->flush();
-  auto md5 = getMd5FromSnap();
-  PAGTestEnvironment::DumpJson["PAGFileTest"]["RoundRectToPath_ID80703201"] = md5;
-#ifdef COMPARE_JSON_PATH
-  auto audioMD5 = PAGTestEnvironment::CompareJson["PAGFileTest"]["RoundRectToPath_ID80703201"];
-  EXPECT_EQ(audioMD5.get<std::string>(), md5);
-#endif
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGFileBaseTest/RoundRectToPath"));
 }
 
 /**
@@ -757,12 +669,6 @@ PAG_TEST_F(PAGFileBaseTest, SetStartTime) {
   pagFile->setStartTime(2000000);
   TestPAGPlayer->setProgress(0);
   TestPAGPlayer->flush();
-  auto skImage = MakeSnapshot(TestPAGSurface);
-  auto md5 = getMd5FromSnap();
-  PAGTestEnvironment::DumpJson["PAGFileTest"]["SetStartTime"] = md5;
-#ifdef COMPARE_JSON_PATH
-  auto setStartTimeMD5 = PAGTestEnvironment::CompareJson["PAGFileTest"]["SetStartTime"];
-  EXPECT_EQ(setStartTimeMD5.get<std::string>(), md5);
-#endif
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGFileBaseTest/SetStartTime"));
 }
 }  // namespace pag

@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "NativePlatform.h"
-#include <android/log.h>
 #include <jni.h>
 #include <sys/system_properties.h>
 #include <cstdarg>
@@ -26,9 +25,6 @@
 #include "Global.h"
 #include "JNIEnvironment.h"
 #include "JTraceImage.h"
-#include "NativeGraphicBuffer.h"
-#include "NativeHardwareBuffer.h"
-#include "NativeImage.h"
 #include "VideoSurface.h"
 
 #define LOG_TAG "libpag"
@@ -47,7 +43,6 @@ void NativePlatform::InitJNI(JNIEnv* env) {
   }
   initialized = true;
   JTraceImage::InitJNI(env);
-  NativeImage::InitJNI(env);
   FontConfigAndroid::InitJNI(env);
   GPUDecoder::InitJNI(env, "org/libpag/GPUDecoder");
   VideoSurface::InitJNI(env, "org/libpag/VideoSurface");
@@ -63,59 +58,12 @@ std::unique_ptr<VideoDecoder> NativePlatform::makeHardwareDecoder(
   return std::unique_ptr<VideoDecoder>(decoder);
 }
 
-std::shared_ptr<Image> NativePlatform::makeImage(const std::string& filePath) const {
-  return NativeImage::MakeFrom(filePath);
-}
-
-std::shared_ptr<Image> NativePlatform::makeImage(std::shared_ptr<Data> imageBytes) const {
-  return NativeImage::MakeFrom(imageBytes);
-}
-
-PAGFont NativePlatform::parseFont(const std::string& fontPath, int ttcIndex) const {
-  return FontConfigAndroid::Parse(fontPath, ttcIndex);
-}
-
-PAGFont NativePlatform::parseFont(const void* data, size_t length, int ttcIndex) const {
-  return FontConfigAndroid::Parse(data, length, ttcIndex);
-}
-
-void NativePlatform::printLog(const char* format, ...) const {
-  va_list args;
-  va_start(args, format);
-  __android_log_vprint(ANDROID_LOG_INFO, LOG_TAG, format, args);
-  va_end(args);
-}
-
-void NativePlatform::printError(const char* format, ...) const {
-  va_list args;
-  va_start(args, format);
-  __android_log_vprint(ANDROID_LOG_ERROR, LOG_TAG, format, args);
-  va_end(args);
-}
-
 bool NativePlatform::registerFallbackFonts() const {
   return FontConfigAndroid::RegisterFallbackFonts();
 }
 
-void NativePlatform::traceImage(const pag::PixelMap& pixelMap, const std::string& tag) const {
-  JTraceImage::Trace(pixelMap, tag);
+void NativePlatform::traceImage(const ImageInfo& info, const void* pixels,
+                                const std::string& tag) const {
+  JTraceImage::Trace(info, pixels, tag);
 }
-
-static int GetSDKVersion() {
-  char sdk[PROP_VALUE_MAX] = "0";
-  __system_property_get("ro.build.version.sdk", sdk);
-  return atoi(sdk);
-}
-
-std::shared_ptr<PixelBuffer> NativePlatform::makeHardwareBuffer(int width, int height,
-                                                                bool alphaOnly) const {
-  static auto version = GetSDKVersion();
-  if (version >= 26) {
-    return NativeHardwareBuffer::Make(width, height, alphaOnly);
-  } else if (version <= 23) {
-    return NativeGraphicBuffer::Make(width, height, alphaOnly);
-  }
-  return nullptr;
-}
-
 }  // namespace pag

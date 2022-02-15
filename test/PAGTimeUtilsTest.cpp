@@ -27,21 +27,24 @@ namespace pag {
 PAG_TEST_SUIT(PAGTimeUtilsTest)
 
 /**
- * 用例描述: 测试图层对时间的测试是否正确
+ * 用例描述: 测试图层对时间的输入输出是否一致
  */
 PAG_TEST_F(PAGTimeUtilsTest, ConvertProgressAndFrame) {
-  auto duration = TestPAGFile->duration();
-  auto frame = TimeToFrame(duration, TestPAGFile->frameRate());
-  for (int i = 0; i <= frame * 2; i++) {
-    auto progress = i * 0.5 / frame;
-    TestPAGFile->setProgress(progress);
+  auto pagFile = PAGFile::Load("../resources/apitest/ZC_mg_seky2_landscape.pag");
+  TestPAGPlayer->setComposition(pagFile);
+  auto duration = pagFile->duration();
+  auto totalFrames = TimeToFrame(duration, pagFile->frameRate());
+  for (int i = 99; i < 120; i++) {
+    auto progress = i * 0.5 / totalFrames;
+    pagFile->setProgress(progress);
     TestPAGPlayer->flush();
-    auto md5 = getMd5FromSnap();
-    progress = TestPAGFile->getProgress();
-    TestPAGFile->setProgress(progress);
+    EXPECT_TRUE(Baseline::Compare(TestPAGSurface,
+                                  "PAGTimeUtilsTest/ConvertProgressAndFrame_" + std::to_string(i)));
+    progress = pagFile->getProgress();
+    pagFile->setProgress(progress);
     TestPAGPlayer->flush();
-    auto md52 = getMd5FromSnap();
-    ASSERT_EQ(md52, md5);
+    EXPECT_TRUE(Baseline::Compare(TestPAGSurface,
+                                  "PAGTimeUtilsTest/ConvertProgressAndFrame_" + std::to_string(i)));
   }
 }
 

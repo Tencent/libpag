@@ -1,6 +1,6 @@
 # TGFX
 
-TGFX is a lightweight 2D graphics library that provides high-performance APIs that work across a
+TGFX is a lightweight 2D graphics library which provides high-performance APIs that work across a
 variety of hardware platforms. The main goal of TGFX is to achieve the best balance between binary 
 size and performance by taking advantage of available platform APIs as many as possible. It serves
 as the graphics engine for the PAG library and other libraries.
@@ -9,11 +9,11 @@ TGFX is under active development and the APIs are subject to change.
 
 ### Platform support via backing renderers
 
-|   Raster Backend   |  GPU Backend   |      Target Platforms        |    Status     |
-|:------------------:|:--------------:|:----------------------------:|:-------------:|
-|      FreeType      |  OpenGL        |  All                         |   complete    |
-|    CoreGraphics    |  OpenGL        |  iOS, macOS                  |   complete    |
-|      Canvas2D      |  WebGL         |  Web                         |  in progress  |
-|    CoreGraphics    |  Metal         |  iOS, macOS                  |  in progress  |
-|      FreeType      |  Vulkan        |  Android, Linux              |    planned    |
+| Vector Backend |  GPU Backend   |      Target Platforms        |    Status     |
+|:--------------:|:--------------:|:----------------------------:|:-------------:|
+|    FreeType    |  OpenGL        |  All                         |   complete    |
+|  CoreGraphics  |  OpenGL        |  iOS, macOS                  |   complete    |
+|    Canvas2D    |  WebGL         |  Web                         |  in progress  |
+|  CoreGraphics  |  Metal         |  iOS, macOS                  |  in progress  |
+|    FreeType    |  Vulkan        |  Android, Linux              |    planned    |
 

@@ -64,9 +64,9 @@ void DestoryFlushQueue() {
   return pag::flushQueue;
 }
 
-/// 函数用于在执行 exit() 函数时把渲染任务全部完成，防止 PAG 的全局函数被析构，导致 PAG 野指针 crash。
-/// 注意这里注册需要等待 PAG 执行一次后再进行注册。因此需要等到 bufferPerpared 并再执行一次 flush 后,
-/// 否则 PAG 的 static 对象仍然会先析构
+/// 函数用于在执行 exit() 函数时把渲染任务全部完成，防止 PAG 的全局函数被析构，导致 PAG 野指针
+/// crash。 注意这里注册需要等待 PAG 执行一次后再进行注册。因此需要等到 bufferPerpared 并再执行一次
+/// flush 后, 否则 PAG 的 static 对象仍然会先析构
 + (void)RegisterFlushQueueDestoryMethod {
   static dispatch_once_t onceToken;
   dispatch_once(&onceToken, ^{

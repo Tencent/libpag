@@ -16,10 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "EGLDevice.h"
-#include "EGLGlobals.h"
-#include "EGLProcGetter.h"
-#include "gpu/opengl/GLContext.h"
+#include "gpu/opengl/egl/EGLDevice.h"
+#include "base/utils/Log.h"
+#include "gpu/opengl/egl/EGLGlobals.h"
+#include "gpu/opengl/egl/EGLProcGetter.h"
 
 namespace pag {
 static EGLContext CreateContext(EGLContext sharedContext, EGLConfig eglConfig) {
@@ -39,19 +39,18 @@ static EGLContext CreateContext(EGLContext sharedContext, EGLConfig eglConfig) {
   return eglContext;
 }
 
-std::shared_ptr<EGLDevice> EGLDevice::Current() {
+void* GLDevice::CurrentNativeHandle() {
+  return eglGetCurrentContext();
+}
+
+std::shared_ptr<GLDevice> GLDevice::Current() {
   auto eglContext = eglGetCurrentContext();
   auto eglDisplay = eglGetCurrentDisplay();
   auto eglSurface = eglGetCurrentSurface(EGL_DRAW);
   return EGLDevice::Wrap(eglDisplay, eglSurface, eglContext, nullptr, true);
 }
 
-std::shared_ptr<EGLDevice> EGLDevice::MakeAdopted(EGLDisplay eglDisplay, EGLSurface eglSurface,
-                                                  EGLContext eglContext) {
-  return EGLDevice::Wrap(eglDisplay, eglSurface, eglContext, nullptr, true);
-}
-
-std::shared_ptr<EGLDevice> EGLDevice::Make(EGLContext sharedContext) {
+std::shared_ptr<GLDevice> GLDevice::Make(void* sharedContext) {
   static auto eglGlobals = EGLGlobals::Get();
   auto eglContext = EGL_NO_CONTEXT;
   EGLint surfaceAttributes[] = {EGL_WIDTH,           1,        EGL_HEIGHT, 1,
@@ -59,20 +58,27 @@ std::shared_ptr<EGLDevice> EGLDevice::Make(EGLContext sharedContext) {
   auto eglSurface =
       eglCreatePbufferSurface(eglGlobals->display, eglGlobals->pbufferConfig, surfaceAttributes);
   if (eglSurface == nullptr) {
-    LOGE("EGLDevice::Make() eglCreatePbufferSurface error=%d", eglGetError());
+    LOGE("GLDevice::Make() eglCreatePbufferSurface error=%d", eglGetError());
     return nullptr;
   }
-  eglContext = CreateContext(sharedContext, eglGlobals->pbufferConfig);
+  auto eglShareContext = reinterpret_cast<EGLContext>(sharedContext);
+  eglContext = CreateContext(eglShareContext, eglGlobals->pbufferConfig);
   if (eglContext == nullptr) {
     eglDestroySurface(eglGlobals->display, eglSurface);
     return nullptr;
   }
-  auto device = EGLDevice::Wrap(eglGlobals->display, eglSurface, eglContext, sharedContext, false);
+  auto device =
+      EGLDevice::Wrap(eglGlobals->display, eglSurface, eglContext, eglShareContext, false);
   if (device == nullptr) {
     eglDestroyContext(eglGlobals->display, eglContext);
     eglDestroySurface(eglGlobals->display, eglSurface);
   }
   return device;
+}
+
+std::shared_ptr<EGLDevice> EGLDevice::MakeAdopted(EGLDisplay eglDisplay, EGLSurface eglSurface,
+                                                  EGLContext eglContext) {
+  return EGLDevice::Wrap(eglDisplay, eglSurface, eglContext, nullptr, true);
 }
 
 std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLNativeWindowType nativeWindow,
@@ -121,22 +127,13 @@ std::shared_ptr<EGLDevice> EGLDevice::Wrap(EGLDisplay eglDisplay, EGLSurface egl
       return nullptr;
     }
   }
-
-  static EGLProcGetter glProcGetter = {};
-  static GLInterfaceCache glInterfaceCache = {};
-  auto glInterface = GLInterface::GetNative(&glProcGetter, &glInterfaceCache);
-  std::shared_ptr<EGLDevice> device = nullptr;
-  if (glInterface != nullptr) {
-    auto context = std::make_unique<GLContext>(glInterface);
-    device = std::shared_ptr<EGLDevice>(new EGLDevice(std::move(context), eglContext));
-    device->isAdopted = isAdopted;
-    device->eglDisplay = eglDisplay;
-    device->eglSurface = eglSurface;
-    device->eglContext = eglContext;
-    device->shareContext = shareContext;
-    device->weakThis = device;
-  }
-
+  auto device = std::shared_ptr<EGLDevice>(new EGLDevice(eglContext));
+  device->isAdopted = isAdopted;
+  device->eglDisplay = eglDisplay;
+  device->eglSurface = eglSurface;
+  device->eglContext = eglContext;
+  device->shareContext = shareContext;
+  device->weakThis = device;
   if (oldEglContext != eglContext) {
     eglMakeCurrent(eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
     if (oldEglDisplay) {
@@ -146,8 +143,7 @@ std::shared_ptr<EGLDevice> EGLDevice::Wrap(EGLDisplay eglDisplay, EGLSurface egl
   return device;
 }
 
-EGLDevice::EGLDevice(std::unique_ptr<Context> context, void* nativeHandle)
-    : GLDevice(std::move(context), nativeHandle) {
+EGLDevice::EGLDevice(void* nativeHandle) : GLDevice(nativeHandle) {
 }
 
 EGLDevice::~EGLDevice() {

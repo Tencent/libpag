@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "image/PixelMap.h"
+#include "core/ImageInfo.h"
 
 namespace pag {
-void TraceImage(const PixelMap& pixelMap, const std::string& tag);
+void TraceImage(const ImageInfo& info, const void* pixels, const std::string& tag);
 }

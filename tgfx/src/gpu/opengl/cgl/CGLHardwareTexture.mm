@@ -18,35 +18,23 @@
 
 #include "CGLHardwareTexture.h"
 #include "gpu/opengl/cgl/CGLDevice.h"
+#include "base/utils/UniqueID.h"
 
 namespace pag {
 std::shared_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(Context* context,
-                                                                 CVPixelBufferRef pixelBuffer,
-                                                                 bool adopted) {
-  std::shared_ptr<CGLHardwareTexture> glTexture = nullptr;
-  if (!adopted) {
-    BytesKey recycleKey = {};
-    ComputeRecycleKey(&recycleKey, pixelBuffer);
-    auto glTexture =
-        std::static_pointer_cast<CGLHardwareTexture>(context->getRecycledResource(recycleKey));
-    if (glTexture) {
-      return glTexture;
-    }
+                                                                 CVPixelBufferRef pixelBuffer) {
+  BytesKey recycleKey = {};
+  ComputeRecycleKey(&recycleKey, pixelBuffer);
+  auto glTexture =
+      std::static_pointer_cast<CGLHardwareTexture>(context->resourceCache()->getRecycled(recycleKey));
+  if (glTexture) {
+    return glTexture;
   }
-  auto cglDevice = static_cast<CGLDevice*>(context->getDevice());
+  auto cglDevice = static_cast<CGLDevice*>(context->device());
   if (cglDevice == nullptr) {
     return nullptr;
   }
-  CVOpenGLTextureCacheRef textureCache = nil;
-  if (adopted) {
-    // use independent texture cache here, to prevent memory leaking when binding the same
-    // CVPixelBuffer to two different texture caches.
-    CGLPixelFormatObj cglPixelFormat = CGLGetPixelFormat(cglDevice->cglContext());
-    CVOpenGLTextureCacheCreate(kCFAllocatorDefault, NULL, cglDevice->cglContext(), cglPixelFormat,
-                               NULL, &textureCache);
-  } else {
-    textureCache = cglDevice->getTextureCache();
-  }
+  CVOpenGLTextureCacheRef textureCache = cglDevice->getTextureCache();
   if (textureCache == nil) {
     return nullptr;
   }
@@ -54,9 +42,6 @@ std::shared_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(Context* contex
   CVOpenGLTextureCacheCreateTextureFromImage(kCFAllocatorDefault, textureCache, pixelBuffer,
                                              nullptr, &texture);
   if (texture == nil) {
-    if (adopted) {
-      CFRelease(textureCache);
-    }
     return nullptr;
   }
   GLTextureInfo glInfo = {};
@@ -70,7 +55,6 @@ std::shared_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(Context* contex
   glTexture->sampler.glInfo = glInfo;
   glTexture->sampler.config = oneComponent8 ? PixelConfig::ALPHA_8 : PixelConfig::RGBA_8888;
   glTexture->texture = texture;
-  glTexture->textureCache = adopted ? textureCache : nil;
   return glTexture;
 }
 
@@ -95,9 +79,6 @@ CGLHardwareTexture::~CGLHardwareTexture() {
   if (texture) {
     CFRelease(texture);
   }
-  if (textureCache) {
-    CFRelease(textureCache);
-  }
 }
 
 Point CGLHardwareTexture::getTextureCoord(float x, float y) const {
@@ -113,27 +94,17 @@ size_t CGLHardwareTexture::memoryUsage() const {
 }
 
 void CGLHardwareTexture::computeRecycleKey(BytesKey* recycleKey) const {
-  if (textureCache == nil) {
-    // not adopted
-    ComputeRecycleKey(recycleKey, pixelBuffer);
-  }
+  ComputeRecycleKey(recycleKey, pixelBuffer);
 }
 
 void CGLHardwareTexture::onRelease(Context* context) {
   if (texture == nil) {
     return;
   }
-  auto cache = textureCache;
-  if (!cache) {
-    auto cglDevice = static_cast<CGLDevice*>(context->getDevice());
-    cache = cglDevice->getTextureCache();
-  }
   CFRelease(texture);
   texture = nil;
-  CVOpenGLTextureCacheFlush(cache, 0);
-  if (textureCache != nil) {
-    CFRelease(textureCache);
-    textureCache = nil;
-  }
+  auto cglDevice = static_cast<CGLDevice*>(context->device());
+  auto textureCache = cglDevice->getTextureCache();
+  CVOpenGLTextureCacheFlush(textureCache, 0);
 }
 }

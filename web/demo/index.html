@@ -12,7 +12,7 @@
     <div id="container" class="container" style="display: none">
       <div>
         <canvas class="canvas" id="pag" width="640" height="640"></canvas>
-        <div class="tablecloth"></div>
+        <div class="tablecloth" id="tablecloth"></div>
       </div>
       <div class="ml-24">
         <div class="mt-24">
@@ -21,33 +21,21 @@
           <p style="display: inline" id="upload-font-text">注册字体文件(含有字体的PAG暂时需要先加载字体)</p>
           <input id="upload-font" type="file" style="display: none" accept=".otf,.ttf,.ttc,.cid,.cff,.fon,.fnt,.pcf" />
         </div>
-        <div class="mt-24">
-          <button id="btn-upload-pag">加载PAG文件</button>
-          <button id="btn-test-vector-pag">测试矢量文件</button>
-          <button id="btn-test-video-pag">测试视频文件</button>
-          <button id="btn-test-text-pag">测试文字文件</button>
+        <div>
+          <button id="btn-upload-pag" class="mt-24">加载PAG文件</button>
+          <button id="btn-test-vector-pag" class="mt-24">测试矢量文件</button>
+          <button id="btn-test-video-pag" class="mt-24">测试视频文件</button>
+          <button id="btn-test-text-pag" class="mt-24">测试文字文件</button>
           <input id="upload-pag" type="file" style="display: none" accept=".pag" />
         </div>
         <section id="control" style="display: none">
-          <h2>PAGFile:</h2>
-          <div class="mt-24">
-            <button id="btn-pagfile-get-duration">Get duration</button>
-            PAGFile duration
-            <input id="input-pagfile-duration" type="number" value="0" />
-            <button id="btn-pagfile-set-duration">setDuration</button>
-          </div>
-          <div class="mt-24">
-            <button id="btn-pagfile-time-stretch-mode">Get timeStretchMode</button>
-            timeStretchMode
-            <select id="select-time-stretch-mode">
-              <option value="0">None</option>
-              <option value="1">Scale</option>
-              <option value="2" selected>Repeat</option>
-              <option value="3">RepeatInverted</option>
-            </select>
-            <button id="btn-pagfile-set-time-stretch-mode">setTimeStretchMode</button>
-          </div>
           <h2>PAGView:</h2>
+          <div class="mt-24">
+            <button id="btn-play">播放</button>
+            <button id="btn-pause">暂停</button>
+            <button id="btn-stop">停止</button>
+            <button id="btn-destroy">销毁</button>
+          </div>
           <div class="mt-24">
             设置次数
             <input id="repeatCount" type="number" value="0" />
@@ -70,10 +58,6 @@
             </select>
             <button id="setScaleMode" class="mt-24">设置</button>
           </div>
-          <button class="mt-24" id="btn-play">播放</button>
-          <button class="mt-24" id="btn-pause">暂停</button>
-          <button class="mt-24" id="btn-stop">停止</button>
-          <button class="mt-24" id="btn-destroy">销毁</button>
           <div class="mt-24">
             <button id="btn-getProgress">获取进度</button>
             设置进度
@@ -84,12 +68,30 @@
           <button class="mt-24" id="btn-setVideoEnabled">Set videoEnabled</button>
           <button class="mt-24" id="btn-cacheEnabled">CacheEnabled status</button>
           <button class="mt-24" id="btn-setCacheEnabled">Set cacheEnabled</button>
-          <button class="mt-24" id="btn-freeCache">FreeCache</button>
+          <!-- <button class="mt-24" id="btn-freeCache">FreeCache</button> -->
           <div class="mt-24">
             <button id="btn-cacheScale">CacheScale status</button>
             CacheScale
             <input id="cacheScale" type="number" value="1" />
             <button id="btn-setCacheScale">Set cacheScale</button>
+          </div>
+          <h2>PAGFile:</h2>
+          <div class="mt-24">
+            <button id="btn-pagfile-get-duration">Get duration</button>
+            PAGFile duration
+            <input id="input-pagfile-duration" type="number" value="0" />
+            <button id="btn-pagfile-set-duration">setDuration</button>
+          </div>
+          <div class="mt-24">
+            <button id="btn-pagfile-time-stretch-mode">Get timeStretchMode</button>
+            timeStretchMode
+            <select id="select-time-stretch-mode">
+              <option value="0">None</option>
+              <option value="1">Scale</option>
+              <option value="2" selected>Repeat</option>
+              <option value="3">RepeatInverted</option>
+            </select>
+            <button id="btn-pagfile-set-time-stretch-mode">setTimeStretchMode</button>
           </div>
         </section>
       </div>

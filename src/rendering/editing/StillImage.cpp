@@ -18,8 +18,8 @@
 
 #include "StillImage.h"
 #include "base/utils/UniqueID.h"
+#include "gpu/opengl/GLDevice.h"
 #include "pag/pag.h"
-#include "platform/NativeGLDevice.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/graphics/Graphic.h"
 #include "rendering/graphics/Picture.h"
@@ -53,8 +53,9 @@ std::shared_ptr<PAGImage> PAGImage::FromBytes(const void* bytes, size_t length) 
 std::shared_ptr<PAGImage> PAGImage::FromPixels(const void* pixels, int width, int height,
                                                size_t rowBytes, ColorType colorType,
                                                AlphaType alphaType) {
-  Bitmap bitmap = {};
-  if (!bitmap.allocPixels(width, height)) {
+  auto pixelBuffer = PixelBuffer::Make(width, height);
+  Bitmap bitmap(pixelBuffer);
+  if (bitmap.isEmpty()) {
     return nullptr;
   }
   auto info = ImageInfo::Make(width, height, colorType, alphaType, rowBytes);
@@ -62,15 +63,15 @@ std::shared_ptr<PAGImage> PAGImage::FromPixels(const void* pixels, int width, in
   if (!result) {
     return nullptr;
   }
-  return StillImage::FromBitmap(bitmap);
+  return StillImage::FromPixelBuffer(pixelBuffer);
 }
 
-std::shared_ptr<StillImage> StillImage::FromBitmap(const Bitmap& bitmap) {
-  if (bitmap.isEmpty()) {
+std::shared_ptr<StillImage> StillImage::FromPixelBuffer(std::shared_ptr<PixelBuffer> pixelBuffer) {
+  if (pixelBuffer == nullptr) {
     return nullptr;
   }
   auto pagImage = std::make_shared<StillImage>();
-  auto picture = Picture::MakeFrom(pagImage->uniqueID(), bitmap);
+  auto picture = Picture::MakeFrom(pagImage->uniqueID(), pixelBuffer);
   if (!picture) {
     return nullptr;
   }
@@ -93,7 +94,7 @@ std::shared_ptr<StillImage> StillImage::FromImage(std::shared_ptr<Image> image) 
 }
 
 std::shared_ptr<PAGImage> PAGImage::FromTexture(const BackendTexture& texture, ImageOrigin origin) {
-  auto context = NativeGLDevice::GetCurrentNativeHandle();
+  auto context = GLDevice::CurrentNativeHandle();
   if (context == nullptr) {
     LOGE("PAGImage.MakeFrom() There is no current GPU context on the calling thread.");
     return nullptr;

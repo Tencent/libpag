@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "core/PixelBuffer.h"
 #include "gtest/gtest.h"
 #include "nlohmann/json.hpp"
 #include "pag/file.h"
@@ -62,8 +63,6 @@ class PAGCpuTest : public testing::Test {
   static std::shared_ptr<PAGSurface> TestPAGSurface;
 
   static std::shared_ptr<PAGPlayer> TestPAGPlayer;
-
-  static std::string getMd5FromSnap();
 
  private:
   GTEST_DISALLOW_COPY_AND_ASSIGN_(PAGCpuTest);

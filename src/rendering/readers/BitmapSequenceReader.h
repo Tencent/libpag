@@ -20,7 +20,7 @@
 
 #include "SequenceReader.h"
 #include "base/utils/Task.h"
-#include "image/Bitmap.h"
+#include "core/Bitmap.h"
 #include "pag/file.h"
 
 namespace pag {
@@ -39,7 +39,7 @@ class BitmapSequenceReader : public SequenceReader {
   Frame lastDecodeFrame = -1;
   Frame lastTextureFrame = -1;
   Frame pendingFrame = -1;
-  Bitmap bitmap = {};
+  std::shared_ptr<PixelBuffer> pixelBuffer = nullptr;
   std::shared_ptr<Texture> lastTexture = nullptr;
   std::shared_ptr<Task> lastTask = nullptr;
 

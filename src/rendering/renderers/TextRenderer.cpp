@@ -18,9 +18,10 @@
 
 #include "TextRenderer.h"
 #include "TextAnimatorRenderer.h"
-#include "raster/PathEffect.h"
+#include "core/PathEffect.h"
 #include "rendering/graphics/Shape.h"
 #include "rendering/graphics/Text.h"
+#include "rendering/utils/TGFXTypes.h"
 
 namespace pag {
 
@@ -466,8 +467,8 @@ std::shared_ptr<Graphic> RenderTextBackground(const std::vector<std::vector<Glyp
   if (effect) {
     effect->applyTo(&backgroundPath);
   }
-  auto graphic = Shape::MakeFrom(backgroundPath, textDocument->backgroundColor);
-  auto modifier = Modifier::MakeBlend(textDocument->backgroundAlpha, BlendMode::Normal);
+  auto graphic = Shape::MakeFrom(backgroundPath, ToTGFXColor(textDocument->backgroundColor));
+  auto modifier = Modifier::MakeBlend(ToAlpha(textDocument->backgroundAlpha), Blend::SrcOver);
   return Graphic::MakeCompose(graphic, modifier);
 }
 

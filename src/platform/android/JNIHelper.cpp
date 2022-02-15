@@ -27,19 +27,6 @@
 static constexpr int BITMAP_FLAGS_ALPHA_UNPREMUL = 2;
 static constexpr int BITMAP_FLAGS_IS_HARDWARE = 1 << 31;
 
-int JniThrowException(JNIEnv* env, const char* className, const char* msg) {
-  if (env->ExceptionCheck()) {
-    env->ExceptionClear();
-  }
-  auto exceptionClass = env->FindClass(className);
-  if (exceptionClass == nullptr) {
-    return -1;
-  }
-  auto result = env->ThrowNew(exceptionClass, msg);
-  env->DeleteLocalRef(exceptionClass);
-  return result;
-}
-
 jobject MakeRectFObject(JNIEnv* env, float x, float y, float width, float height) {
   static Global<jclass> RectFClass(env, env->FindClass("android/graphics/RectF"));
   static auto RectFConstructID = env->GetMethodID(RectFClass.get(), "<init>", "(FFFF)V");
@@ -60,12 +47,10 @@ jobject MakePAGFontObject(JNIEnv* env, const char* familyName, const char* famil
       env->GetFieldID(PAGFontClass.get(), "fontStyle", "Ljava/lang/String;");
 
   jobject fontObject = env->NewObject(PAGFontClass.get(), PAGFontConstructID);
-  jstring fontFamily = SafeConvertToJString(env, familyName);
-  env->SetObjectField(fontObject, PAGFont_fontFamily, fontFamily);
-  env->DeleteLocalRef(fontFamily);
-  jstring fontStyle = SafeConvertToJString(env, familyStyle);
-  env->SetObjectField(fontObject, PAGFont_fontStyle, fontStyle);
-  env->DeleteLocalRef(fontStyle);
+  Local<jstring> fontFamily = {env, SafeConvertToJString(env, familyName)};
+  env->SetObjectField(fontObject, PAGFont_fontFamily, fontFamily.get());
+  Local<jstring> fontStyle = {env, SafeConvertToJString(env, familyStyle)};
+  env->SetObjectField(fontObject, PAGFont_fontStyle, fontStyle.get());
   return fontObject;
 }
 
@@ -73,11 +58,9 @@ jobject MakeByteBufferObject(JNIEnv* env, const void* bytes, size_t length) {
   static Global<jclass> ByteBufferClass(env, env->FindClass("java/nio/ByteBuffer"));
   static jmethodID ByteBuffer_wrap =
       env->GetStaticMethodID(ByteBufferClass.get(), "wrap", "([B)Ljava/nio/ByteBuffer;");
-  jbyteArray byteArray = env->NewByteArray(length);
-  env->SetByteArrayRegion(byteArray, 0, length, (jbyte*)bytes);
-  auto result = env->CallStaticObjectMethod(ByteBufferClass.get(), ByteBuffer_wrap, byteArray);
-  env->DeleteLocalRef(byteArray);
-  return result;
+  Local<jbyteArray> byteArray = {env, env->NewByteArray(length)};
+  env->SetByteArrayRegion(byteArray.get(), 0, length, (jbyte*)bytes);
+  return env->CallStaticObjectMethod(ByteBufferClass.get(), ByteBuffer_wrap, byteArray.get());
 }
 
 pag::Color ToColor(JNIEnv*, jint value) {
@@ -137,8 +120,8 @@ jobjectArray ToPAGLayerJavaObjectList(JNIEnv* env,
   jobjectArray layerArray = env->NewObjectArray(layers.size(), PAGLayer_Class.get(), nullptr);
   for (size_t i = 0; i < layers.size(); ++i) {
     auto layer = layers[i];
-    auto jLayer = ToPAGLayerJavaObject(env, layer);
-    env->SetObjectArrayElement(layerArray, i, jLayer);
+    Local<jobject> jLayer = {env, ToPAGLayerJavaObject(env, layer)};
+    env->SetObjectArrayElement(layerArray, i, jLayer.get());
   }
   return layerArray;
 }
@@ -207,8 +190,7 @@ jobject ToPAGLayerJavaObject(JNIEnv* env, std::shared_ptr<pag::PAGLayer> pagLaye
   }
   auto gObject = env->NewWeakGlobalRef(layerObject);
   pagLayer->externalHandle = gObject;
-  env->DeleteLocalRef(layerObject);
-  return gObject;
+  return layerObject;
 }
 
 std::shared_ptr<pag::PAGLayer> ToPAGLayerNativeObject(JNIEnv* env, jobject jLayer) {
@@ -255,11 +237,9 @@ jobject ToPAGMarkerObject(JNIEnv* env, const pag::Marker* marker) {
   static Global<jclass> PAGMarker_Class(env, env->FindClass("org/libpag/PAGMarker"));
   static auto PAGMarker_Construct =
       env->GetMethodID(PAGMarker_Class.get(), "<init>", "(JJLjava/lang/String;)V");
-  jstring comment = SafeConvertToJString(env, marker->comment.c_str());
-  auto result = env->NewObject(PAGMarker_Class.get(), PAGMarker_Construct, marker->startTime,
-                               marker->duration, comment);
-  env->DeleteLocalRef(comment);
-  return result;
+  Local<jstring> comment = {env, SafeConvertToJString(env, marker->comment.c_str())};
+  return env->NewObject(PAGMarker_Class.get(), PAGMarker_Construct, marker->startTime,
+                        marker->duration, comment.get());
 }
 
 jobject ToPAGVideoRangeObject(JNIEnv* env, const pag::PAGVideoRange& range) {
@@ -274,27 +254,6 @@ jobject ToPAGVideoRangeObject(JNIEnv* env, const pag::PAGVideoRange& range) {
                         range.endTime(), range.playDuration(), range.reversed());
 }
 
-jobject ToHashMapObject(JNIEnv* env, std::unordered_map<std::string, std::string> map) {
-  if (env == nullptr) {
-    return nullptr;
-  }
-  static Global<jclass> HashMap_Class(env, env->FindClass("java/util/HashMap"));
-  static auto HashMap_Construct = env->GetMethodID(HashMap_Class.get(), "<init>", "()V");
-  static jmethodID HashMap_put = env->GetMethodID(
-      HashMap_Class.get(), "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
-  auto jMap = env->NewObject(HashMap_Class.get(), HashMap_Construct, "");
-  if (!map.empty()) {
-    for (auto& item : map) {
-      auto key = SafeConvertToJString(env, item.first.c_str());
-      auto value = SafeConvertToJString(env, item.second.c_str());
-      env->CallObjectMethod(jMap, HashMap_put, key, value);
-      env->DeleteLocalRef(key);
-      env->DeleteLocalRef(value);
-    }
-  }
-  return jMap;
-}
-
 pag::ImageInfo GetImageInfo(JNIEnv* env, jobject bitmap) {
   AndroidBitmapInfo bitmapInfo = {};
   if (bitmap == nullptr || AndroidBitmap_getInfo(env, bitmap, &bitmapInfo) != 0 ||
@@ -302,8 +261,8 @@ pag::ImageInfo GetImageInfo(JNIEnv* env, jobject bitmap) {
     return {};
   }
   pag::AlphaType alphaType = (bitmapInfo.flags & BITMAP_FLAGS_ALPHA_UNPREMUL)
-                             ? pag::AlphaType::Unpremultiplied
-                             : pag::AlphaType::Premultiplied;
+                                 ? pag::AlphaType::Unpremultiplied
+                                 : pag::AlphaType::Premultiplied;
   pag::ColorType colorType;
   switch (bitmapInfo.format) {
     case ANDROID_BITMAP_FORMAT_RGBA_8888:

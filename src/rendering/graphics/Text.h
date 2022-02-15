@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "core/Paint.h"
+#include "gpu/Paint.h"
 #include "rendering/graphics/Graphic.h"
 
 namespace pag {

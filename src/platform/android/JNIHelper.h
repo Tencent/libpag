@@ -20,7 +20,7 @@
 
 #include <chrono>
 #include "base/utils/Log.h"
-#include "image/ImageInfo.h"
+#include "core/ImageInfo.h"
 #include "pag/pag.h"
 #include "platform/android/Global.h"
 #include "platform/android/JNIEnvironment.h"
@@ -29,8 +29,6 @@
 struct RectData {
   float x, y, width, height;
 };
-
-int JniThrowException(JNIEnv* env, const char* className, const char* msg);
 
 jobject MakeRectFObject(JNIEnv* env, float x, float y, float width, float height);
 
@@ -60,7 +58,5 @@ std::shared_ptr<pag::PAGComposition> ToPAGCompositionNativeObject(JNIEnv* env,
 jobject ToPAGMarkerObject(JNIEnv* env, const pag::Marker* marker);
 
 jobject ToPAGVideoRangeObject(JNIEnv* env, const pag::PAGVideoRange& range);
-
-jobject ToHashMapObject(JNIEnv* env, std::unordered_map<std::string, std::string>);
 
 pag::ImageInfo GetImageInfo(JNIEnv* env, jobject bitmap);

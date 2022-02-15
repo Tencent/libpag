@@ -37,12 +37,14 @@ build/
 local.properties
 
 # IDEA Projects
-.idea
+!.idea
+**/.idea/*
+!**/.idea/fileTemplates/
+!**/.idea/misc.xml
 
 /third_party
 /out
-cmake-build-debug
-cmake-build-release
+cmake-build-*
 node_modules
 Build/
 test/out/

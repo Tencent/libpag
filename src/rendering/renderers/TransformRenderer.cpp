@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TransformRenderer.h"
+#include "rendering/utils/TGFXTypes.h"
 
 namespace pag {
 void RenderTransform(Transform* transform, Transform2D* transform2D, Frame layerFrame) {
@@ -31,7 +32,7 @@ void RenderTransform(Transform* transform, Transform2D* transform2D, Frame layer
     position.y = transform2D->yPosition->getValueAt(layerFrame);
   }
   auto rotation = transform2D->rotation->getValueAt(layerFrame);
-  transform->opacity = transform2D->opacity->getValueAt(layerFrame);
+  transform->alpha = ToAlpha(transform2D->opacity->getValueAt(layerFrame));
   matrix.postTranslate(-anchorPoint.x, -anchorPoint.y);
   matrix.postScale(scale.x, scale.y);
   matrix.postRotate(rotation);

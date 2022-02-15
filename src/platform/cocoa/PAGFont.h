@@ -18,8 +18,7 @@
 
 #import <Foundation/Foundation.h>
 
-__attribute__((visibility("default")))
-@interface PAGFont : NSObject
+__attribute__((visibility("default"))) @interface PAGFont : NSObject
 
 /**
  * A string with the name of the font family.

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PorterDuffXferProcessor.h"
+#include "base/utils/UniqueID.h"
 #include "opengl/GLPorterDuffXferProcessor.h"
 
 namespace pag {

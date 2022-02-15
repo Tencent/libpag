@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "EmptyXferProcessor.h"
+#include "base/utils/UniqueID.h"
 #include "opengl/GLEmptyXferProcessor.h"
 
 namespace pag {

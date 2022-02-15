@@ -16,8 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "Window.h"
-#include "Device.h"
+#include "gpu/Window.h"
+#include "base/utils/Log.h"
+#include "gpu/Device.h"
 
 namespace pag {
 Window::Window(std::shared_ptr<Device> device) : device(std::move(device)) {
@@ -41,7 +42,7 @@ bool Window::checkContext(Context* context) {
   if (context == nullptr) {
     return false;
   }
-  if (context->getDevice() != device.get()) {
+  if (context->device() != device.get()) {
     LOGE("Window::checkContext() : context is not locked from the same device of this window");
     return false;
   }

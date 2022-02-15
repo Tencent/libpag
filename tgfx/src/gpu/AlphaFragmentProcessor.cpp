@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AlphaFragmentProcessor.h"
+#include "base/utils/UniqueID.h"
 #include "opengl/GLAlphaFragmentProcessor.h"
 
 namespace pag {

@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "Data.h"
-#include "Stream.h"
+#include "core/Data.h"
+#include "core/Stream.h"
 
 namespace pag {
 std::shared_ptr<Data> Data::MakeFromFile(const std::string& filePath) {

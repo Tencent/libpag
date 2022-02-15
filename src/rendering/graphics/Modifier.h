@@ -18,7 +18,8 @@
 
 #pragma once
 
-#include "raster/Path.h"
+#include "core/Blend.h"
+#include "core/Path.h"
 
 namespace pag {
 class Graphic;
@@ -29,7 +30,7 @@ class RenderCache;
 
 class Modifier {
  public:
-  static std::shared_ptr<Modifier> MakeBlend(Opacity alpha, Enum blendMode);
+  static std::shared_ptr<Modifier> MakeBlend(float alpha, Blend blendMode);
   static std::shared_ptr<Modifier> MakeClip(const Path& clip);
   static std::shared_ptr<Modifier> MakeMask(std::shared_ptr<Graphic> graphic, bool inverted);
 

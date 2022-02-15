@@ -18,10 +18,9 @@
 
 #pragma once
 
-#include <raster/Path.h>
-#include "GLDrawer.h"
-
 #include "GLBuffer.h"
+#include "GLDrawer.h"
+#include "core/Path.h"
 
 namespace pag {
 class GLRRectOp : public GLDrawOp {

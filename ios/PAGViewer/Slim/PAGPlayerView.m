@@ -47,10 +47,10 @@
     }
 
     if ([pagFile numImages] > 0) {
-        NSString* filePath = [[NSBundle mainBundle] pathForResource:@"mountain" ofType:@"jpg"];
-        CVPixelBufferRef pixelBuffer = [self pixelBufferFromPath:filePath];
-        PAGImage* pagImage = [PAGImage FromPixelBuffer:pixelBuffer];
-//        PAGImage* pagImage = [PAGImage FromPath:filePath];
+        NSString* filePath = [[NSBundle mainBundle] pathForResource:@"rotation" ofType:@"jpg"];
+//        CVPixelBufferRef pixelBuffer = [self pixelBufferFromPath:filePath];
+//        PAGImage* pagImage = [PAGImage FromPixelBuffer:pixelBuffer];
+        PAGImage* pagImage = [PAGImage FromPath:filePath];
         if (pagImage) {
             [pagFile replaceImage:0 data:pagImage];
         }

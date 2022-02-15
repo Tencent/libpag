@@ -64,9 +64,8 @@ JNIEXPORT jobjectArray Java_org_libpag_PAGImageLayer_getVideoRanges(JNIEnv* env,
   int size = videoRanges.size();
   jobjectArray rangeArray = env->NewObjectArray(size, PAGVideoRange_Class.get(), nullptr);
   for (int i = 0; i < size; ++i) {
-    jobject jRange = ToPAGVideoRangeObject(env, videoRanges[i]);
-    env->SetObjectArrayElement(rangeArray, i, jRange);
-    env->DeleteLocalRef(jRange);
+    Local<jobject> jRange = {env, ToPAGVideoRangeObject(env, videoRanges[i])};
+    env->SetObjectArrayElement(rangeArray, i, jRange.get());
   }
   return rangeArray;
 }

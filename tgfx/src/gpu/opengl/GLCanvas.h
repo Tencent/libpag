@@ -19,10 +19,9 @@
 #pragma once
 
 #include "GLDrawer.h"
-#include "core/Canvas.h"
-#include "gpu/Blend.h"
-#include "gpu/GradientShader.h"
-#include "raster/Mask.h"
+#include "core/Blend.h"
+#include "core/Mask.h"
+#include "gpu/Canvas.h"
 
 namespace pag {
 class GLCanvas : public Canvas {
@@ -32,12 +31,9 @@ class GLCanvas : public Canvas {
   void clear() override;
   void drawTexture(const Texture* texture, const Texture* mask, bool inverted) override;
   void drawTexture(const Texture* texture, const RGBAAALayout* layout) override;
-  void drawPath(const Path& path, Color color) override;
-  void drawPath(const Path& path, const GradientPaint& gradient) override;
+  void drawPath(const Path& path, const Paint& paint) override;
   void drawGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
                   const Font& font, const Paint& paint) override;
-  Enum hasComplexPaint(const Rect& drawingBounds) const override;
-  void drawPath(const Path& path, const Shader* shader);
 
  protected:
   void onSave() override {
@@ -72,6 +68,8 @@ class GLCanvas : public Canvas {
                        const Font& font, const Paint& paint);
 
   void drawMaskGlyphs(TextBlob* textBlob, const Paint& paint);
+
+  void fillPath(const Path& path, const Shader* shader);
 
   void draw(const Rect& localQuad, const Rect& deviceQuad, std::unique_ptr<GLDrawOp> op,
             std::unique_ptr<FragmentProcessor> color,

@@ -17,15 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <emscripten/bind.h>
-
+#include "core/FontMetrics.h"
+#include "core/ImageInfo.h"
+#include "core/PathTypes.h"
 #include "gpu/opengl/GLDefines.h"
-#include "image/ImageInfo.h"
 #include "pag/pag.h"
 #include "pag/types.h"
 #include "platform/web/GPUDrawable.h"
 #include "platform/web/NativeImage.h"
-#include "raster/FontMetrics.h"
-#include "raster/PathTypes.h"
 #include "rendering/editing/StillImage.h"
 
 using namespace emscripten;
@@ -41,8 +40,8 @@ EMSCRIPTEN_BINDINGS(pag) {
                   return static_cast<LayerType>(pagLayer.layerType());
                 }))
       .function("_layerName", &PAGLayer::layerName)
-      .function("_opacity", &PAGLayer::opacity)
-      .function("_setOpacity", &PAGLayer::setOpacity)
+      .function("_alpha", &PAGLayer::alpha)
+      .function("_setAlpha", &PAGLayer::setAlpha)
       .function("_visible", &PAGLayer::visible)
       .function("_setVisible", &PAGLayer::setVisible)
       .function("_editableIndex", &PAGLayer::editableIndex)
@@ -59,7 +58,6 @@ EMSCRIPTEN_BINDINGS(pag) {
       .function("_globalToLocalTime", optional_override([](PAGLayer& pagLayer, int globalTime) {
                   return static_cast<int>(pagLayer.globalToLocalTime(globalTime));
                 }));
-
   class_<PAGComposition, base<PAGLayer>>("_PAGComposition")
       .smart_ptr<std::shared_ptr<PAGComposition>>("_PAGComposition")
       .function("_width", &PAGComposition::width)
@@ -98,7 +96,6 @@ EMSCRIPTEN_BINDINGS(pag) {
                         glInfo.format = GL::RGBA8;
                         BackendTexture glTexture(glInfo, width, height);
                         auto origin = flipY ? ImageOrigin::BottomLeft : ImageOrigin::TopLeft;
-
                         return PAGSurface::MakeFrom(glTexture, origin);
                       }))
       .class_function("_FromFrameBuffer",
@@ -108,7 +105,6 @@ EMSCRIPTEN_BINDINGS(pag) {
                         glFrameBufferInfo.format = GL::RGBA8;
                         BackendRenderTarget glRenderTarget(glFrameBufferInfo, width, height);
                         auto origin = flipY ? ImageOrigin::BottomLeft : ImageOrigin::TopLeft;
-
                         return PAGSurface::MakeFrom(glRenderTarget, origin);
                       }))
       .function("_width", &PAGSurface::width)
@@ -154,20 +150,6 @@ EMSCRIPTEN_BINDINGS(pag) {
                   pagPlayer.setComposition(std::move(pagFile));
                 }));
 
-  value_object<FontMetrics>("FontMetrics")
-      .field("ascent", &FontMetrics::ascent)
-      .field("descent", &FontMetrics::descent)
-      .field("xHeight", &FontMetrics::xHeight)
-      .field("capHeight", &FontMetrics::capHeight);
-
-  value_object<Rect>("Rect")
-      .field("left", &Rect::left)
-      .field("top", &Rect::top)
-      .field("right", &Rect::right)
-      .field("bottom", &Rect::bottom);
-
-  value_object<Point>("Point").field("x", &Point::x).field("y", &Point::y);
-
   class_<ImageInfo>("ImageInfo")
       .property("width", &ImageInfo::width)
       .property("height", &ImageInfo::height)
@@ -181,45 +163,6 @@ EMSCRIPTEN_BINDINGS(pag) {
       .property("d", &Matrix::getScaleY)
       .property("tx", &Matrix::getTranslateX)
       .property("ty", &Matrix::getTranslateY);
-
-  enum_<PathFillType>("PathFillType")
-      .value("WINDING", PathFillType::Winding)
-      .value("EVEN_ODD", PathFillType::EvenOdd)
-      .value("INVERSE_WINDING", PathFillType::InverseWinding)
-      .value("INVERSE_EVEN_ODD", PathFillType::InverseEvenOdd);
-
-  enum_<ColorType>("ColorType")
-      .value("Unknown", ColorType::Unknown)
-      .value("ALPHA_8", ColorType::ALPHA_8)
-      .value("RGBA_8888", ColorType::RGBA_8888)
-      .value("BGRA_8888", ColorType::BGRA_8888);
-
-  value_object<Stroke>("Stroke")
-      .field("width", &Stroke::width)
-      .field("cap", &Stroke::cap)
-      .field("join", &Stroke::join)
-      .field("miterLimit", &Stroke::miterLimit);
-
-  enum_<LayerType>("LayerType")
-      .value("Unknown", LayerType::Unknown)
-      .value("Null", LayerType::Null)
-      .value("Solid", LayerType::Solid)
-      .value("Text", LayerType::Text)
-      .value("Shape", LayerType::Shape)
-      .value("Image", LayerType::Image)
-      .value("PreCompose", LayerType::PreCompose);
-
-  register_vector<std::shared_ptr<PAGLayer>>("VectorPAGLayer");
-  register_vector<std::string>("VectorString");
-  register_vector<Point>("VectorPoint");
-  function("_SetFallbackFontNames", optional_override([](std::vector<std::string> fontNames) {
-             PAGFont::SetFallbackFontNames(fontNames);
-           }));
-
-  value_object<Color>("Color")
-      .field("red", &Color::red)
-      .field("green", &Color::green)
-      .field("blue", &Color::blue);
 
   class_<TextDocument>("TextDocument")
       .smart_ptr<std::shared_ptr<TextDocument>>("TextDocument")
@@ -246,4 +189,68 @@ EMSCRIPTEN_BINDINGS(pag) {
       .property("backgroundColor", &TextDocument::backgroundColor)
       .property("backgroundAlpha", &TextDocument::backgroundAlpha)
       .property("direction", &TextDocument::direction);
+
+  class_<Stroke>("Stroke")
+      .property("width", &Stroke::width)
+      .property("cap", &Stroke::cap)
+      .property("join", &Stroke::join)
+      .property("miterLimit", &Stroke::miterLimit);
+
+  value_object<FontMetrics>("FontMetrics")
+      .field("ascent", &FontMetrics::ascent)
+      .field("descent", &FontMetrics::descent)
+      .field("xHeight", &FontMetrics::xHeight)
+      .field("capHeight", &FontMetrics::capHeight);
+
+  value_object<Rect>("Rect")
+      .field("left", &Rect::left)
+      .field("top", &Rect::top)
+      .field("right", &Rect::right)
+      .field("bottom", &Rect::bottom);
+
+  value_object<Point>("Point").field("x", &Point::x).field("y", &Point::y);
+
+  value_object<Color>("Color")
+      .field("red", &Color::red)
+      .field("green", &Color::green)
+      .field("blue", &Color::blue);
+
+  enum_<PathFillType>("PathFillType")
+      .value("WINDING", PathFillType::Winding)
+      .value("EVEN_ODD", PathFillType::EvenOdd)
+      .value("INVERSE_WINDING", PathFillType::InverseWinding)
+      .value("INVERSE_EVEN_ODD", PathFillType::InverseEvenOdd);
+
+  enum_<ColorType>("ColorType")
+      .value("Unknown", ColorType::Unknown)
+      .value("ALPHA_8", ColorType::ALPHA_8)
+      .value("RGBA_8888", ColorType::RGBA_8888)
+      .value("BGRA_8888", ColorType::BGRA_8888);
+
+  enum_<LayerType>("LayerType")
+      .value("Unknown", LayerType::Unknown)
+      .value("Null", LayerType::Null)
+      .value("Solid", LayerType::Solid)
+      .value("Text", LayerType::Text)
+      .value("Shape", LayerType::Shape)
+      .value("Image", LayerType::Image)
+      .value("PreCompose", LayerType::PreCompose);
+
+  enum_<Stroke::Cap>("Cap")
+      .value("Miter", Stroke::Cap::Butt)
+      .value("Round", Stroke::Cap::Round)
+      .value("Bevel", Stroke::Cap::Square);
+
+  enum_<Stroke::Join>("Join")
+      .value("Miter", Stroke::Join::Miter)
+      .value("Round", Stroke::Join::Round)
+      .value("Bevel", Stroke::Join::Bevel);
+
+  register_vector<std::shared_ptr<PAGLayer>>("VectorPAGLayer");
+  register_vector<std::string>("VectorString");
+  register_vector<Point>("VectorPoint");
+
+  function("_SetFallbackFontNames", optional_override([](std::vector<std::string> fontNames) {
+             PAGFont::SetFallbackFontNames(fontNames);
+           }));
 }

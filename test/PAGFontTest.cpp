@@ -30,21 +30,6 @@ using nlohmann::json;
  * 用例描述: 字体相关功能测试
  */
 PAG_TEST(PAGFontTest, TestFont) {
-  json dumpJson;
-  json compareJson;
-  std::ifstream inputFile("../test/res/compare_font_md5.json");
-  bool needCompare = false;
-  if (inputFile) {
-    needCompare = true;
-    inputFile >> compareJson;
-  }
-
-  std::vector<std::string> compareVector;
-  std::string fileName = "test_font";
-  if (needCompare && compareJson.contains(fileName) && compareJson[fileName].is_array()) {
-    compareVector = compareJson[fileName].get<std::vector<std::string>>();
-  }
-
   PAGFont::RegisterFont("../resources/font/NotoSerifSC-Regular.otf", 0, "TTTGBMedium", "Regular");
   auto TestPAGFile = PAGFile::Load("../resources/apitest/test_font.pag");
   ASSERT_NE(TestPAGFile, nullptr);
@@ -57,35 +42,20 @@ PAG_TEST(PAGFontTest, TestFont) {
   Frame totalFrames = TimeToFrame(TestPAGFile->duration(), TestPAGFile->frameRate());
   Frame currentFrame = 0;
 
-  std::vector<std::string> md5Vector;
   std::string errorMsg;
-
-  bool status = true;
   while (currentFrame < totalFrames) {
     //添加0.1帧目的是保证progress不会由于精度问题帧数计算错误，frame应该使用totalFrames作为总体帧数。因为对于file来说总时长为[0,totalFrames],对应于[0,1]，因此归一化时，分母应该为totalFrames
     pagPlayer->setProgress((currentFrame + 0.1) * 1.0 / totalFrames);
     pagPlayer->flush();
 
-    auto skImage = MakeSnapshot(pagSurface);
-
-    std::string md5 = DumpMD5(skImage);
-    md5Vector.push_back(md5);
-    if (needCompare && compareVector[currentFrame] != md5) {
+    bool same =
+        Baseline::Compare(pagSurface, "PAGFontTest/TestFont_" + std::to_string(currentFrame));
+    if (!same) {
       errorMsg += (std::to_string(currentFrame) + ";");
-      if (status) {
-        std::string imagePath =
-            "../test/out/" + fileName + "_" + std::to_string(currentFrame) + ".png";
-        Trace(skImage, imagePath);
-        status = false;
-      }
     }
     currentFrame++;
   }
-  EXPECT_EQ(errorMsg, "") << fileName << " frame fail";
-  dumpJson[fileName] = md5Vector;
-  std::ofstream outFile("../test/out/compare_font_md5.json");
-  outFile << std::setw(4) << dumpJson << std::endl;
-  outFile.close();
+  EXPECT_EQ(errorMsg, "") << "test_font frame fail";
 }
 
 }  // namespace pag

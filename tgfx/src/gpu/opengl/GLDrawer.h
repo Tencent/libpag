@@ -20,8 +20,8 @@
 
 #include "GLBuffer.h"
 #include "GLRenderTarget.h"
+#include "core/Blend.h"
 #include "gpu/AAType.h"
-#include "gpu/Blend.h"
 #include "gpu/FragmentProcessor.h"
 #include "gpu/GeometryProcessor.h"
 

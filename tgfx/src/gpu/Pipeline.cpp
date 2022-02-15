@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Pipeline.h"
+#include "gpu/TextureSampler.h"
 
 namespace pag {
 Pipeline::Pipeline(std::vector<std::unique_ptr<FragmentProcessor>> fragmentProcessors,

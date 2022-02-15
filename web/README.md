@@ -85,9 +85,9 @@ More doc such as [demo]((./demo/)), [API](https://pag.io/api.html#/apis/web/).
 
 ## Browser
 
-| [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/chrome/chrome_48x48.png" alt="Chrome" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Chrome | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/safari/safari_48x48.png" alt="Safari" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Safari |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Chrome >= 69                                                                                                                                                                                                  | Safari >= 11.1                                                                                                                                                                                                |
+| [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/chrome/chrome_48x48.png" alt="Chrome" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Chrome | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/safari/safari_48x48.png" alt="Safari" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Safari | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/chrome/chrome_48x48.png" alt="Chrome" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Chrome for Android | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/safari/safari_48x48.png" alt="Safari" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Safari on iOS |
+| ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| Chrome >= 69                                                 | Safari >= 11.3                                               | Android >= 7.0                                               | iOS >= 11.3                                                  |
 
 More versions will be coming soon.
 
@@ -107,9 +107,7 @@ $ npm install
 
 ### Debug
 
-Remove `cmake-build-debug` folder that in libpag root folder, run `build.sh debug` to build `libpag.wasm` file.
-
-If you use CLion IDE, you cloud reload the project by `Tools->CMake->Reload CMake Project`.
+Execute `build.sh debug` to get `libpag.wasm` file.
 
 ```bash
 # ./web/script/
@@ -139,4 +137,12 @@ $ emrun --browser chrome --serve_root . --port 8081 ./web/demo/index.html
 $ cd script
 $ chmod +x ./build.sh
 $ ./build.sh
+```
+
+### Build with CLion
+
+Create a new profile, and use the following **CMake options**（find them under **CLion** > **Preferences** > **Build, Execution, Deployment** > **CMake**）
+
+```
+CMAKE_TOOLCHAIN_FILE=path/to/emscripten/emscripten/version/cmake/Modules/Platform/Emscripten.cmake
 ```

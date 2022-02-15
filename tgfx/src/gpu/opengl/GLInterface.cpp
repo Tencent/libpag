@@ -28,6 +28,9 @@
 #include "GLUtil.h"
 
 namespace pag {
+static std::mutex interfaceLocker = {};
+static std::unordered_map<int, std::unique_ptr<const GLInterface>> glInterfaceMap = {};
+
 static int GetGLVersion(const GLProcGetter* getter) {
   if (getter == nullptr) {
     return -1;
@@ -40,18 +43,22 @@ static int GetGLVersion(const GLProcGetter* getter) {
   return GetGLVersion(versionString).majorVersion;
 }
 
-const GLInterface* GLInterface::GetNative(const GLProcGetter* getter, GLInterfaceCache* cache) {
-  auto version = GetGLVersion(getter);
+const GLInterface* GLInterface::GetNative() {
+  auto getter = GLProcGetter::Make();
+  if (getter == nullptr) {
+    return nullptr;
+  }
+  auto version = GetGLVersion(getter.get());
   if (version <= 0) {
     return nullptr;
   }
-  std::lock_guard<std::mutex> autoLock(cache->locker);
-  auto result = cache->glInterfaceMap.find(version);
-  if (result != cache->glInterfaceMap.end()) {
+  std::lock_guard<std::mutex> autoLock(interfaceLocker);
+  auto result = glInterfaceMap.find(version);
+  if (result != glInterfaceMap.end()) {
     return result->second.get();
   }
-  cache->glInterfaceMap[version] = MakeNativeInterface(getter);
-  return cache->glInterfaceMap[version].get();
+  glInterfaceMap[version] = MakeNativeInterface(getter.get());
+  return glInterfaceMap[version].get();
 }
 
 namespace {

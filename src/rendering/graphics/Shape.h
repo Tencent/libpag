@@ -21,46 +21,17 @@
 #include "rendering/graphics/Graphic.h"
 
 namespace pag {
-enum class ShapeFillType { Solid, Gradient };
-
-class ShapeFill {
- public:
-  virtual ~ShapeFill() = default;
-
-  virtual ShapeFillType type() const = 0;
-};
-
-class SolidFill : public ShapeFill {
- public:
-  ShapeFillType type() const override {
-    return ShapeFillType::Solid;
-  }
-
-  Color color;
-};
-
-class GradientFill : public ShapeFill {
- public:
-  ShapeFillType type() const override {
-    return ShapeFillType::Gradient;
-  }
-
-  GradientPaint gradient = {};
-};
-
 class Shape : public Graphic {
  public:
   /**
    * Creates a shape Graphic with solid color fill. Returns nullptr if path is empty.
    */
-  static std::shared_ptr<Graphic> MakeFrom(const Path& path, Color color);
+  static std::shared_ptr<Graphic> MakeFrom(const Path& path, Color4f color);
 
   /**
    * Creates a shape Graphic with gradient color fill. Returns nullptr if path is empty.
    */
   static std::shared_ptr<Graphic> MakeFrom(const Path& path, const GradientPaint& gradient);
-
-  ~Shape() override;
 
   GraphicType type() const override {
     return GraphicType::Shape;
@@ -74,8 +45,8 @@ class Shape : public Graphic {
 
  private:
   Path path = {};
-  ShapeFill* fill = nullptr;
+  Paint paint = {};
 
-  Shape(Path path, ShapeFill* fill);
+  Shape(Path path, Paint paint);
 };
 }  // namespace pag

@@ -26,6 +26,10 @@ void GLConstColorProcessor::emitCode(EmitArgs& args) {
   colorUniform = args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4,
                                                  "Color", &colorName);
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+  const auto* fp = static_cast<const ConstColorProcessor*>(args.fragmentProcessor);
+  if (fp->color.alpha != 1.0f) {
+    fragBuilder->codeAppendf("%s.rgb *= %s.a;", args.outputColor.c_str(), args.outputColor.c_str());
+  }
 }
 
 void GLConstColorProcessor::onSetData(const ProgramDataManager& programDataManager,
@@ -33,7 +37,7 @@ void GLConstColorProcessor::onSetData(const ProgramDataManager& programDataManag
   const auto& fp = static_cast<const ConstColorProcessor&>(fragmentProcessor);
   if (colorPrev != fp.color) {
     colorPrev = fp.color;
-    programDataManager.set4fv(colorUniform, 1, fp.color.vec());
+    programDataManager.set4fv(colorUniform, 1, fp.color.array());
   }
 }
 }  // namespace pag

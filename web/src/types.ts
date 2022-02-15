@@ -14,20 +14,26 @@ import { PAGComposition } from './pag-composition';
 import { NativeImage } from './core/native-image';
 import { WebMask } from './core/web-mask';
 
+declare global {
+  interface Window {
+    WeixinJSBridge?: any;
+  }
+}
+
 export interface PAG extends EmscriptenModule {
   _PAGFile: {
-    Load: (bytes: number, length: number) => Promise<PAGFile>;
+    _Load: (bytes: number, length: number) => any;
   };
   _PAGImage: {
-    FromBytes: (bytes: number, length: number) => Promise<PAGImage>;
-    FromNativeImage: (nativeImage: NativeImage) => Promise<PAGImage>;
+    _FromNativeImage: (nativeImage: NativeImage) => any;
   };
   _PAGPlayer: any;
   _PAGSurface: {
-    FromCanvas: (canvasID: string) => Promise<PAGSurface>;
-    FromTexture: (textureID: number, width: number, height: number, flipY: boolean) => Promise<PAGSurface>;
-    FromFrameBuffer: (framebufferID: number, width: number, height: number, flipY: boolean) => Promise<PAGSurface>;
+    _FromCanvas: (canvasID: string) => any;
+    _FromTexture: (textureID: number, width: number, height: number, flipY: boolean) => any;
+    _FromFrameBuffer: (framebufferID: number, width: number, height: number, flipY: boolean) => any;
   };
+  _SetFallbackFontNames: (fontName: any) => void;
   VectorString: any;
   webAssemblyQueue: WebAssemblyQueue;
   PAGPlayer: typeof PAGPlayer;
@@ -37,12 +43,11 @@ export interface PAG extends EmscriptenModule {
   PAGImage: typeof PAGImage;
   PAGLayer: typeof PAGLayer;
   PAGComposition: typeof PAGComposition;
+  PAGSurface: typeof PAGSurface;
   NativeImage: typeof NativeImage;
   WebMask: typeof WebMask;
   ScalerContext: typeof ScalerContext;
   VideoReader: typeof VideoReader;
-  registerFontPath: (path: string) => void;
-  setFallbackFontNames: (fontName: any) => void;
   traceImage: (info, pixels, tag: string) => void;
   GL: any;
   LayerType: typeof LayerType;

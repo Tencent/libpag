@@ -21,7 +21,7 @@
 #include <memory>
 
 #include "Processor.h"
-#include "base/utils/BytesKey.h"
+#include "core/utils/BytesKey.h"
 
 namespace pag {
 class GLXferProcessor;

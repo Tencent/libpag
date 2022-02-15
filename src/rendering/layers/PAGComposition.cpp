@@ -435,7 +435,7 @@ void PAGComposition::draw(Recorder* recorder) {
 void PAGComposition::DrawChildLayer(Recorder* recorder, PAGLayer* childLayer) {
   auto filterModifier = childLayer->cacheFilters() ? nullptr : FilterModifier::Make(childLayer);
   auto trackMatte = TrackMatteRenderer::Make(childLayer);
-  Transform extraTransform = {childLayer->layerMatrix, childLayer->layerOpacity};
+  Transform extraTransform = {childLayer->layerMatrix, childLayer->layerAlpha};
   LayerRenderer::DrawLayer(recorder, childLayer->layer,
                            childLayer->contentFrame + childLayer->layer->startTime, filterModifier,
                            trackMatte.get(), childLayer, &extraTransform);
@@ -476,14 +476,14 @@ void PAGComposition::MeasureChildLayer(Rect* bounds, PAGLayer* childLayer) {
     auto trackMatteLayer = childLayer->_trackMatteLayer;
     auto layerFrame = trackMatteLayer->contentFrame + trackMatteLayer->layer->startTime;
     auto filterModifier = FilterModifier::Make(trackMatteLayer.get());
-    Transform extraTransform = {trackMatteLayer->layerMatrix, trackMatteLayer->layerOpacity};
+    Transform extraTransform = {trackMatteLayer->layerMatrix, trackMatteLayer->layerAlpha};
     LayerRenderer::MeasureLayerBounds(trackMatteBounds.get(), trackMatteLayer->layer, layerFrame,
                                       filterModifier, nullptr, trackMatteLayer.get(),
                                       &extraTransform);
   }
   auto layerFrame = childLayer->contentFrame + childLayer->layer->startTime;
   auto filterModifier = FilterModifier::Make(childLayer->layer, layerFrame);
-  Transform extraTransform = {childLayer->layerMatrix, childLayer->layerOpacity};
+  Transform extraTransform = {childLayer->layerMatrix, childLayer->layerAlpha};
   LayerRenderer::MeasureLayerBounds(bounds, childLayer->layer, layerFrame, filterModifier,
                                     trackMatteBounds.get(), childLayer, &extraTransform);
 }

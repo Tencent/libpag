@@ -19,16 +19,12 @@
 #pragma once
 
 #include "FragmentProcessor.h"
-#include "YUVTexture.h"
-#include "core/Paint.h"
+#include "core/RGBAAALayout.h"
+#include "gpu/YUVTexture.h"
 
 namespace pag {
 class YUVTextureFragmentProcessor : public FragmentProcessor {
  public:
-  static std::unique_ptr<YUVTextureFragmentProcessor> Make(const YUVTexture* texture,
-                                                           const RGBAAALayout* layout,
-                                                           const Matrix& localMatrix);
-
   std::string name() const override {
     return "YUVTextureFragmentProcessor";
   }
@@ -48,6 +44,8 @@ class YUVTextureFragmentProcessor : public FragmentProcessor {
   const YUVTexture* texture;
   const RGBAAALayout* layout;
   CoordTransform coordTransform;
+
+  friend class TextureFragmentProcessor;
 
   friend class GLYUVTextureFragmentProcessor;
 };

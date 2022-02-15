@@ -18,11 +18,11 @@
 
 #pragma once
 
-#include "FragmentShaderBuilder.h"
-#include "ProgramDataManager.h"
-#include "Texture.h"
-#include "UniformHandler.h"
-#include "XferProcessor.h"
+#include "gpu/FragmentShaderBuilder.h"
+#include "gpu/ProgramDataManager.h"
+#include "gpu/Texture.h"
+#include "gpu/UniformHandler.h"
+#include "gpu/XferProcessor.h"
 
 namespace pag {
 class GLXferProcessor {

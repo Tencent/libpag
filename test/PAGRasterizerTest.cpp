@@ -18,13 +18,13 @@
 
 #include <vector>
 #include "base/utils/TimeUtil.h"
+#include "core/Mask.h"
+#include "core/vectors/freetype/FTMask.h"
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
 #include "gpu/Surface.h"
+#include "gpu/opengl/GLDevice.h"
 #include "nlohmann/json.hpp"
-#include "platform/NativeGLDevice.h"
-#include "raster/Mask.h"
-#include "raster/freetype/FTMask.h"
 
 namespace pag {
 using nlohmann::json;
@@ -43,15 +43,10 @@ PAG_TEST(PAGRasterizerTest, TestRasterizer) {
   auto matrix = Matrix::MakeTrans(50, 50);
   mask->setMatrix(matrix);
   mask->fillPath(path);
-  auto pixelBuffer = std::static_pointer_cast<FTMask>(mask)->getBuffer();
-  std::string pathMD5 = DumpMD5(pixelBuffer);
-  json rasterizerJson = {{"rasterizer_path", pathMD5}};
-  auto pathCompareMD5 = PAGTestEnvironment::CompareJson["PAGRasterizerTest"]["rasterizer_path"];
-  std::string imagePath = "../test/out/rasterizer_path.png";
-  TraceIf(pixelBuffer, imagePath, pathMD5 != pathCompareMD5);
-  EXPECT_EQ(pathCompareMD5.get<std::string>(), pathMD5);
+  auto maskBuffer = std::static_pointer_cast<FTMask>(mask)->getBuffer();
+  EXPECT_TRUE(Baseline::Compare(maskBuffer, "PAGRasterizerTest/rasterizer_path"));
 
-  auto device = NativeGLDevice::Make();
+  auto device = GLDevice::Make();
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
@@ -61,22 +56,14 @@ PAG_TEST(PAGRasterizerTest, TestRasterizer) {
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
   canvas->drawTexture(texture.get());
-  Bitmap bitmap = {};
-  auto result = bitmap.allocPixels(mask->width(), mask->height(), true);
-  ASSERT_TRUE(result);
+  auto pixelBuffer = PixelBuffer::Make(mask->width(), mask->height(), true);
+  ASSERT_TRUE(pixelBuffer != nullptr);
+  Bitmap bitmap(pixelBuffer);
   bitmap.eraseAll();
-  auto pixels = bitmap.lockPixels();
-  result = surface->readPixels(bitmap.info(), pixels);
-  bitmap.unlockPixels();
+  auto result = surface->readPixels(bitmap.info(), bitmap.writablePixels());
   ASSERT_TRUE(result);
   device->unlock();
-  std::string textureMD5 = DumpMD5(bitmap);
-  rasterizerJson["rasterizer_path_texture"] = textureMD5;
-  auto textureCompareMD5 =
-      PAGTestEnvironment::CompareJson["PAGRasterizerTest"]["rasterizer_path_texture"];
-  std::string texturePath = "../test/out/rasterizer_path_texture.png";
-  TraceIf(bitmap, texturePath, textureMD5 != textureCompareMD5);
-  EXPECT_EQ(textureCompareMD5.get<std::string>(), textureMD5);
+  EXPECT_TRUE(Baseline::Compare(bitmap, "PAGRasterizerTest/rasterizer_path_texture"));
 
   auto typeface = Typeface::MakeFromPath("../resources/font/NotoColorEmoji.ttf");
   ASSERT_TRUE(typeface != nullptr);
@@ -92,13 +79,7 @@ PAG_TEST(PAGRasterizerTest, TestRasterizer) {
   ASSERT_TRUE(buffer != nullptr);
   EXPECT_TRUE(fabsf(matrix.getScaleX() - 2.75229359f) < FLT_EPSILON);
   EXPECT_TRUE(fabsf(matrix.getSkewX() + 0.550458729f) < FLT_EPSILON);
-  bitmap = Bitmap(std::static_pointer_cast<PixelBuffer>(buffer));
-  auto glyphMD5 = DumpMD5(bitmap);
-  rasterizerJson["rasterizer_glyph"] = glyphMD5;
-  auto glyphCompareMD5 = PAGTestEnvironment::CompareJson["PAGRasterizerTest"]["rasterizer_glyph"];
-  imagePath = "../test/out/rasterizer_emoji.png";
-  TraceIf(bitmap, imagePath, glyphMD5 != glyphCompareMD5);
-  EXPECT_EQ(glyphCompareMD5.get<std::string>(), glyphMD5);
-  PAGTestEnvironment::DumpJson["PAGRasterizerTest"] = rasterizerJson;
+  EXPECT_TRUE(Baseline::Compare(std::static_pointer_cast<PixelBuffer>(buffer),
+                                "PAGRasterizerTest/rasterizer_emoji"));
 }
 }  // namespace pag

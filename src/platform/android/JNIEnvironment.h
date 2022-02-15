@@ -19,6 +19,7 @@
 #pragma once
 
 #include <jni.h>
+#include "Local.h"
 
 class JNIEnvironment {
  public:
