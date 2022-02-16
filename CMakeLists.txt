@@ -65,6 +65,7 @@ endif ()
 
 if (MSVC)
     add_compile_options("/utf-8")
+    add_compile_options(/w44251 /w44275)
 endif (MSVC)
 
 # Sets flags
