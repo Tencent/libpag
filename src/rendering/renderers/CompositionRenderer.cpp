@@ -23,7 +23,6 @@
 #include "rendering/graphics/Picture.h"
 #include "rendering/graphics/Recorder.h"
 #include "rendering/readers/BitmapSequenceReader.h"
-#include "video/VideoDecoder.h"
 
 namespace pag {
 class SequenceProxy : public TextureProxy {
@@ -37,10 +36,10 @@ class SequenceProxy : public TextureProxy {
   }
 
   void prepare(RenderCache* cache) const override {
-    static_cast<RenderCache*>(cache)->prepareSequenceReader(
-        sequence, frame,
-        VideoDecoder::SoftwareToHardwareEnabled() ? DecodingPolicy::SoftwareToHardware
-                                                  : DecodingPolicy::Hardware);
+    static_cast<RenderCache*>(cache)->prepareSequenceReader(sequence, frame,
+                                                            SoftwareToHardwareEnabled()
+                                                                ? DecodingPolicy::SoftwareToHardware
+                                                                : DecodingPolicy::Hardware);
   }
 
   std::shared_ptr<Texture> getTexture(RenderCache* cache) const override {

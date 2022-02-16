@@ -34,20 +34,12 @@ void PAGVideoDecoder::SetMaxHardwareDecoderCount(int count) {
   maxHardwareDecoderCount = count;
 }
 
-void PAGVideoDecoder::SetSoftwareToHardwareEnabled(bool value) {
-  softwareToHardwareEnabled = value;
-}
-
 void PAGVideoDecoder::RegisterSoftwareDecoderFactory(SoftwareDecoderFactory* decoderFactory) {
   softwareDecoderFactory = decoderFactory;
 }
 
 bool VideoDecoder::HasHardwareDecoder() {
   return Platform::Current()->hasHardwareDecoder();
-}
-
-bool VideoDecoder::SoftwareToHardwareEnabled() {
-  return softwareToHardwareEnabled;
 }
 
 int VideoDecoder::GetMaxHardwareDecoderCount() {
