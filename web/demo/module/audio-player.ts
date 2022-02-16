@@ -4,18 +4,18 @@ export class AudioPlayer {
   private isDestroyed = false;
 
   public constructor(audioBytes: Uint8Array) {
-    if (audioBytes.byteLength > 0){
+    if (audioBytes.byteLength > 0) {
       this.audioEl = document.createElement('audio');
       this.audioEl.style.display = 'none';
       this.audioEl.controls = true;
-      this.audioEl.preload = 'preload';
+      this.audioEl.preload = 'auto';
       const blob = new Blob([audioBytes], { type: 'audio/mp3' });
       this.audioEl.src = URL.createObjectURL(blob);
-      this.isDestroyed = false
+      this.isDestroyed = false;
     } else {
       this.isEffective = false;
     }
-    console.log(`${audioBytes.byteLength === 0 ? '无音频文件' : '有音频文件'}`)
+    console.log(`${audioBytes.byteLength === 0 ? '无音频文件' : '有音频文件'}`);
   }
   public play() {
     if (!this.isEffective || this.isDestroyed) return;
@@ -38,6 +38,6 @@ export class AudioPlayer {
     console.log('音频销毁');
     this.audioEl.pause();
     this.audioEl = null;
-    this.isDestroyed = true
+    this.isDestroyed = true;
   }
 }

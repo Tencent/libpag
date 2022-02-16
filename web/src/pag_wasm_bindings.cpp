@@ -69,20 +69,11 @@ EMSCRIPTEN_BINDINGS(pag) {
       .function("_getLayerIndex", &PAGComposition::getLayerIndex)
       .function("_swapLayerAt", &PAGComposition::swapLayerAt)
       .function("_swapLayer", &PAGComposition::swapLayer)
-      .function("_contains", optional_override([](PAGComposition& pagComposition,
-                                                  std::shared_ptr<PAGLayer> pagLayer) {
-                  return static_cast<bool>(pagComposition.contains(pagLayer));
-                }))
+      .function("_contains", &PAGComposition::contains)
       .function("_removeLayerAt", &PAGComposition::removeLayerAt)
       .function("_removeAllLayers", &PAGComposition::removeAllLayers)
-      .function("_addLayer", optional_override([](PAGComposition& pagComposition,
-                                                  std::shared_ptr<PAGLayer> pagLayer) {
-                  return static_cast<bool>(pagComposition.addLayer(pagLayer));
-                }))
-      .function("_addLayerAt", optional_override([](PAGComposition& pagComposition,
-                                                    std::shared_ptr<PAGLayer> pagLayer, int index) {
-                  return static_cast<bool>(pagComposition.addLayerAt(pagLayer, index));
-                }))
+      .function("_addLayer", &PAGComposition::addLayer)
+      .function("_addLayerAt", &PAGComposition::addLayerAt)
       .function("_audioBytes", optional_override([](PAGComposition& pagComposition) {
                   ByteData* result = pagComposition.audioBytes();
                   if (result->length() == 0) {
@@ -97,7 +88,6 @@ EMSCRIPTEN_BINDINGS(pag) {
                 }))
       .function("_getLayersByName", &PAGComposition::getLayersByName)
       .function("_getLayersUnderPoint", &PAGComposition::getLayersUnderPoint);
-      
   class_<PAGFile, base<PAGComposition>>("_PAGFile")
       .smart_ptr<std::shared_ptr<PAGFile>>("_PAGFile")
       .class_function("_Load", optional_override([](uintptr_t bytes, size_t length) {
