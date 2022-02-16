@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "pag/types.h"
+#include "core/Matrix.h"
 
-namespace pag {
+namespace tgfx {
 /**
  * These values match the orientation www.exif.org/Exif2-2.PDF.
  */
@@ -66,4 +66,4 @@ enum class Orientation {
  */
 Matrix OrientationToMatrix(Orientation orientation, int width, int height);
 
-}  // namespace pag
+}  // namespace tgfx

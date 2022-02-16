@@ -21,7 +21,7 @@
 #include <emscripten/html5_webgl.h>
 #include "gpu/opengl/GLDevice.h"
 
-namespace pag {
+namespace tgfx {
 class WebGLDevice : public GLDevice {
  public:
   /**
@@ -49,4 +49,4 @@ class WebGLDevice : public GLDevice {
   friend class GLDevice;
   friend class WebGLWindow;
 };
-}  // namespace pag
+}  // namespace tgfx

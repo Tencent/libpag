@@ -19,7 +19,7 @@
 #include "GLClampedGradientEffect.h"
 #include "gpu/gradients/ClampedGradientEffect.h"
 
-namespace pag {
+namespace tgfx {
 void GLClampedGradientEffect::emitCode(EmitArgs& args) {
   auto* fragBuilder = args.fragBuilder;
   const auto* fp = static_cast<const ClampedGradientEffect*>(args.fragmentProcessor);
@@ -63,4 +63,4 @@ void GLClampedGradientEffect::onSetData(const ProgramDataManager& programDataMan
     programDataManager.set4fv(rightBorderColorUniform, 1, fp.rightBorderColor.array());
   }
 }
-}  // namespace pag
+}  // namespace tgfx

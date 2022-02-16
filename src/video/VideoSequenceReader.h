@@ -30,13 +30,13 @@ class VideoSequenceReader : public SequenceReader {
 
   void prepareAsync(Frame targetFrame) override;
 
-  std::shared_ptr<Texture> readTexture(Frame targetFrame, RenderCache* cache) override;
+  std::shared_ptr<tgfx::Texture> readTexture(Frame targetFrame, RenderCache* cache) override;
 
  private:
   Frame lastFrame = -1;
   int64_t pendingTime = -1;
   std::shared_ptr<VideoReader> reader = nullptr;
-  std::shared_ptr<Texture> lastTexture = nullptr;
+  std::shared_ptr<tgfx::Texture> lastTexture = nullptr;
   std::shared_ptr<Task> lastTask = nullptr;
 };
 }  // namespace pag

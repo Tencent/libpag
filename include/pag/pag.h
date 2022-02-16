@@ -24,10 +24,16 @@
 #include "pag/gpu.h"
 #include "pag/types.h"
 
+namespace tgfx {
+struct Rect;
+class Context;
+class Surface;
+class Device;
+class Image;
+}  // namespace tgfx
+
 namespace pag {
 class Recorder;
-
-class Path;
 
 class RenderCache;
 
@@ -36,7 +42,7 @@ class Content {
   virtual ~Content() = default;
 
  protected:
-  virtual void measureBounds(Rect* bounds) = 0;
+  virtual void measureBounds(tgfx::Rect* bounds) = 0;
 
   virtual void draw(Recorder* recorder) = 0;
 
@@ -56,8 +62,6 @@ class Content {
 
   friend class PAGTextLayer;
 };
-
-class Image;
 
 /**
  * A still image used to replace the image contents in a PAGFile.
@@ -135,9 +139,9 @@ class PAG_API PAGImage : public Content {
  protected:
   PAGImage();
 
-  virtual Rect getContentSize() const = 0;
+  virtual tgfx::Rect getContentSize() const = 0;
 
-  virtual std::shared_ptr<Image> getImage() const {
+  virtual std::shared_ptr<tgfx::Image> getImage() const {
     return nullptr;
   }
 
@@ -426,7 +430,7 @@ class PAG_API PAGLayer : public Content {
   Frame globalToLocalFrame(Frame globalFrame) const;
   Point globalToLocalPoint(float stageX, float stageY);
   void draw(Recorder* recorder) override;
-  void measureBounds(Rect* bounds) override;
+  void measureBounds(tgfx::Rect* bounds) override;
   Matrix getTotalMatrixInternal();
   virtual void setMatrixInternal(const Matrix& matrix);
   virtual float frameRateInternal() const;
@@ -758,7 +762,7 @@ class PAG_API PAGImageLayer : public PAGLayer {
   static Frame ScaleTimeRemap(AnimatableProperty<float>* property, const TimeRange& visibleRange,
                               double frameScale, Frame fileEndFrame);
   Frame getFrameFromTimeRemap(Frame value);
-  void measureBounds(Rect* bounds) override;
+  void measureBounds(tgfx::Rect* bounds) override;
 
   friend class RenderCache;
 
@@ -912,7 +916,7 @@ class PAG_API PAGComposition : public PAGLayer {
   int heightInternal() const;
   void setContentSizeInternal(int width, int height);
   void draw(Recorder* recorder) override;
-  void measureBounds(Rect* bounds) override;
+  void measureBounds(tgfx::Rect* bounds) override;
   bool hasClip() const;
   Frame frameDuration() const override;
   bool cacheFilters() const override;
@@ -932,7 +936,7 @@ class PAG_API PAGComposition : public PAGLayer {
   static void FindLayers(std::function<bool(PAGLayer* pagLayer)> filterFunc,
                          std::vector<std::shared_ptr<PAGLayer>>* result,
                          std::shared_ptr<PAGLayer> pagLayer);
-  static void MeasureChildLayer(Rect* bounds, PAGLayer* childLayer);
+  static void MeasureChildLayer(tgfx::Rect* bounds, PAGLayer* childLayer);
   static void DrawChildLayer(Recorder* recorder, PAGLayer* childLayer);
   static bool GetTrackMatteLayerAtPoint(PAGLayer* childLayer, float x, float y,
                                         std::vector<std::shared_ptr<PAGLayer>>* results);
@@ -1093,12 +1097,6 @@ class Composition;
 
 class PAGPlayer;
 
-class Context;
-
-class Surface;
-
-class Device;
-
 class Drawable {
  public:
   virtual ~Drawable() = default;
@@ -1121,18 +1119,18 @@ class Drawable {
   /**
    * Returns the GPU device associated with this drawable.
    */
-  virtual std::shared_ptr<Device> getDevice() = 0;
+  virtual std::shared_ptr<tgfx::Device> getDevice() = 0;
 
   /**
    * Creates a new Surface from this drawable.
    */
-  virtual std::shared_ptr<Surface> createSurface(Context* context) = 0;
+  virtual std::shared_ptr<tgfx::Surface> createSurface(tgfx::Context* context) = 0;
 
   /**
    * Apply all pending changes to the drawable.
    * Note: The associated GPUDevice must be the current rendering device on the calling thread.
    */
-  virtual void present(Context* context) = 0;
+  virtual void present(tgfx::Context* context) = 0;
 
   /**
    * Set the presenting timeStamp, used for android
@@ -1212,15 +1210,15 @@ class PAG_API PAGSurface {
   PAGPlayer* pagPlayer = nullptr;
   std::shared_ptr<std::mutex> rootLocker = nullptr;
   std::shared_ptr<Drawable> drawable = nullptr;
-  std::shared_ptr<Device> device = nullptr;
-  std::shared_ptr<Surface> surface = nullptr;
+  std::shared_ptr<tgfx::Device> device = nullptr;
+  std::shared_ptr<tgfx::Surface> surface = nullptr;
 
   explicit PAGSurface(std::shared_ptr<Drawable> drawable);
 
   bool draw(RenderCache* cache, std::shared_ptr<Graphic> graphic, BackendSemaphore* signalSemaphore,
             bool autoClear = true);
   bool hitTest(RenderCache* cache, std::shared_ptr<Graphic> graphic, float x, float y);
-  Context* lockContext();
+  tgfx::Context* lockContext();
   void unlockContext();
   bool wait(const BackendSemaphore& waitSemaphore);
 

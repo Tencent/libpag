@@ -18,8 +18,8 @@
 
 #pragma once
 
+#include "core/BytesKey.h"
 #include "core/Font.h"
-#include "core/utils/BytesKey.h"
 #include "pag/types.h"
 
 namespace pag {
@@ -64,19 +64,19 @@ class Glyph {
    * Called by the Text::MakeFrom() method to merge the draw calls of glyphs with the same style.
    * Return false if this glyph is not visible.
    */
-  void computeStyleKey(BytesKey* styleKey) const;
+  void computeStyleKey(tgfx::BytesKey* styleKey) const;
 
   /**
    * Returns the Font object associated with this Glyph.
    */
-  Font getFont() const {
+  tgfx::Font getFont() const {
     return textFont;
   }
 
   /**
    * Returns the id of this glyph in associated typeface.
    */
-  GlyphID getGlyphID() const {
+  tgfx::GlyphID getGlyphID() const {
     return glyphId;
   }
 
@@ -124,21 +124,21 @@ class Glyph {
    * Returns the bounding box relative to (0, 0) of this glyph. Returned bounds may be larger than
    * the exact bounds of this glyph.
    */
-  const Rect& getBounds() const {
+  const tgfx::Rect& getBounds() const {
     return bounds;
   }
 
   /**
    * Returns the matrix for this glyph.
    */
-  Matrix getMatrix() const {
+  tgfx::Matrix getMatrix() const {
     return matrix;
   }
 
   /**
    * Replaces transformation with specified matrix.
    */
-  void setMatrix(const Matrix& m) {
+  void setMatrix(const tgfx::Matrix& m) {
     matrix = m;
   }
 
@@ -222,29 +222,30 @@ class Glyph {
   /**
    * Returns the total matrix of this glyph which contains the style matrix.
    */
-  Matrix getTotalMatrix() const;
+  tgfx::Matrix getTotalMatrix() const;
 
  private:
-  GlyphID glyphId = 0;
-  Font textFont = {};
+  tgfx::GlyphID glyphId = 0;
+  tgfx::Font textFont = {};
   // read only attributes:
   float advance = 0;
   float ascent = 0;
   float descent = 0;
-  Rect bounds = Rect::MakeEmpty();
+  tgfx::Rect bounds = tgfx::Rect::MakeEmpty();
   std::string name;
   bool _isVertical = false;
   bool strokeOverFill = true;
-  Matrix extraMatrix = Matrix::I();  // for vertical text or fauxItalic.
+  tgfx::Matrix extraMatrix = tgfx::Matrix::I();  // for vertical text or fauxItalic.
   // writable attributes:
-  Matrix matrix = Matrix::I();
+  tgfx::Matrix matrix = tgfx::Matrix::I();
   TextStyle textStyle = TextStyle::Fill;
   float alpha = 1.0f;
   Color fillColor = Black;
   Color strokeColor = Black;
   float strokeWidth = 0;
 
-  Glyph(GlyphID glyphId, const std::string& name, const Font& textFont, const TextPaint& textPaint);
+  Glyph(tgfx::GlyphID glyphId, const std::string& name, const tgfx::Font& textFont,
+        const TextPaint& textPaint);
 };
 
 }  // namespace pag

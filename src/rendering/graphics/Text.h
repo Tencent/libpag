@@ -29,11 +29,11 @@ class TextRun {
     delete paints[1];
   }
 
-  Matrix matrix = Matrix::I();
-  Paint* paints[2] = {nullptr, nullptr};
-  Font textFont = {};
-  std::vector<GlyphID> glyphIDs;
-  std::vector<Point> positions;
+  tgfx::Matrix matrix = tgfx::Matrix::I();
+  tgfx::Paint* paints[2] = {nullptr, nullptr};
+  tgfx::Font textFont = {};
+  std::vector<tgfx::GlyphID> glyphIDs;
+  std::vector<tgfx::Point> positions;
 };
 
 class Text : public Graphic {
@@ -43,7 +43,7 @@ class Text : public Graphic {
    * are invisible.
    */
   static std::shared_ptr<Graphic> MakeFrom(const std::vector<GlyphHandle>& glyphs,
-                                           const Rect* calculatedBounds = nullptr);
+                                           const tgfx::Rect* calculatedBounds = nullptr);
 
   ~Text() override;
 
@@ -51,18 +51,18 @@ class Text : public Graphic {
     return GraphicType::Text;
   }
 
-  void measureBounds(Rect* rect) const override;
+  void measureBounds(tgfx::Rect* rect) const override;
   bool hitTest(RenderCache* cache, float x, float y) override;
-  bool getPath(Path* path) const override;
+  bool getPath(tgfx::Path* path) const override;
   void prepare(RenderCache* cache) const override;
-  void draw(Canvas* canvas, RenderCache* cache) const override;
+  void draw(tgfx::Canvas* canvas, RenderCache* cache) const override;
 
  private:
   std::vector<TextRun*> textRuns;
-  Rect bounds = Rect::MakeEmpty();
+  tgfx::Rect bounds = tgfx::Rect::MakeEmpty();
   bool hasAlpha = false;
 
-  explicit Text(const std::vector<TextRun*>& textRuns, const Rect& bounds, bool hasAlpha);
-  void drawTextRuns(Canvas* canvas, int paintIndex) const;
+  explicit Text(const std::vector<TextRun*>& textRuns, const tgfx::Rect& bounds, bool hasAlpha);
+  void drawTextRuns(tgfx::Canvas* canvas, int paintIndex) const;
 };
 }  // namespace pag

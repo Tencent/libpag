@@ -23,7 +23,7 @@
 
 using namespace emscripten;
 
-namespace pag {
+namespace tgfx {
 std::shared_ptr<Mask> Mask::Make(int width, int height) {
   auto webMaskClass = val::module_property("WebMask");
   if (!webMaskClass.as<bool>()) {
@@ -111,4 +111,4 @@ bool WebMask::drawText(const TextBlob* textBlob, const Stroke* stroke) {
   }
   return true;
 }
-}  // namespace pag
+}  // namespace tgfx

@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextAnimatorRenderer.h"
-#include "rendering/utils/TGFXTypes.h"
+#include "base/utils/TGFXCast.h"
 
 namespace pag {
 
@@ -86,11 +86,10 @@ bool TextAnimatorRenderer::ApplyToGlyphs(std::vector<std::vector<GlyphHandle>>& 
 }
 
 // 根据序号获取文本动画位置（供AE导出插件在计算firstBaseLine时调用）
-Point TextAnimatorRenderer::GetPositionFromAnimators(const std::vector<TextAnimator*>* animators,
-                                                     const TextDocument* textDocument,
-                                                     Frame layerFrame, size_t index,
-                                                     bool* pBiasFlag) {
-  Point ret = {0.0f, 0.0f};
+tgfx::Point TextAnimatorRenderer::GetPositionFromAnimators(
+    const std::vector<TextAnimator*>* animators, const TextDocument* textDocument, Frame layerFrame,
+    size_t index, bool* pBiasFlag) {
+  tgfx::Point ret = {0.0f, 0.0f};
   *pBiasFlag = false;
   if (animators != nullptr) {
     for (auto animator : *animators) {
@@ -118,10 +117,10 @@ TextAnimatorRenderer::TextAnimatorRenderer(const TextAnimator* animator,
     readTackingInfo(animator, frame);  // 字间距
 
     if (typographyProperties->position != nullptr) {
-      position = typographyProperties->position->getValueAt(frame);  // 位置
+      position = ToTGFX(typographyProperties->position->getValueAt(frame));  // 位置
     }
     if (typographyProperties->scale != nullptr) {
-      scale = typographyProperties->scale->getValueAt(frame);  // 缩放
+      scale = ToTGFX(typographyProperties->scale->getValueAt(frame));  // 缩放
     }
     if (typographyProperties->rotation != nullptr) {
       rotation = typographyProperties->rotation->getValueAt(frame);  // 旋转
@@ -238,7 +237,7 @@ float TextAnimatorRenderer::calculateFactorByIndex(size_t index, bool* pBiasFlag
 }
 
 // 根据序号获取位置（供AE导出插件在计算firstBaseLine时调用）
-Point TextAnimatorRenderer::getPositionByIndex(size_t index, bool* pBiasFlag) {
+tgfx::Point TextAnimatorRenderer::getPositionByIndex(size_t index, bool* pBiasFlag) {
   auto biasFlag = false;
   auto factor = calculateFactorByIndex(index, &biasFlag);
   if (biasFlag && (position.x != 0.0f || position.y != 0.0f)) {

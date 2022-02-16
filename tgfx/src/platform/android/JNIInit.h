@@ -20,8 +20,8 @@
 
 #include <jni.h>
 
-namespace pag {
+namespace tgfx {
 
 void JNIInit(JNIEnv* env);
 
-}  // namespace pag
+}  // namespace tgfx

@@ -21,13 +21,13 @@
 #include <functional>
 #include "base/utils/EnumClassHash.h"
 #include "base/utils/Interpolate.h"
-#include "base/utils/MathExtra.h"
+#include "base/utils/MathUtil.h"
+#include "base/utils/TGFXCast.h"
 #include "core/PathEffect.h"
 #include "core/PathMeasure.h"
 #include "rendering/graphics/Graphic.h"
 #include "rendering/graphics/Shape.h"
 #include "rendering/utils/PathUtil.h"
-#include "rendering/utils/TGFXTypes.h"
 
 namespace pag {
 
@@ -38,7 +38,7 @@ class ElementData {
   virtual ~ElementData() = default;
   virtual ElementDataType type() const = 0;
   virtual std::unique_ptr<ElementData> clone() = 0;
-  virtual void applyMatrix(const Matrix& matrix) = 0;
+  virtual void applyMatrix(const tgfx::Matrix& matrix) = 0;
 };
 
 enum class PaintType { Fill, Stroke, GradientFill, GradientStroke };
@@ -47,8 +47,8 @@ enum class PaintType { Fill, Stroke, GradientFill, GradientStroke };
  * Defines attributes for drawing strokes.
  */
 struct StrokePaint {
-  Stroke getStroke() const {
-    return Stroke(strokeWidth, ToTGFXCap(lineCap), ToTGFXJoin(lineJoin), miterLimit);
+  tgfx::Stroke getStroke() const {
+    return tgfx::Stroke(strokeWidth, ToTGFXCap(lineCap), ToTGFXJoin(lineJoin), miterLimit);
   }
 
   float strokeWidth;
@@ -80,7 +80,7 @@ class PaintElement : public ElementData {
     return std::unique_ptr<ElementData>(newPaint);
   }
 
-  void applyMatrix(const Matrix& matrix) override {
+  void applyMatrix(const tgfx::Matrix& matrix) override {
     if (paintType == PaintType::Fill || paintType == PaintType::GradientFill) {
       return;
     }
@@ -88,11 +88,11 @@ class PaintElement : public ElementData {
   }
 
   PaintType paintType = PaintType::Fill;
-  Blend blendMode = Blend::SrcOver;
+  tgfx::BlendMode blendMode = tgfx::BlendMode::SrcOver;
   float alpha = 1.0f;
   Enum compositeOrder = CompositeOrder::BelowPreviousInSameGroup;
-  PathFillType pathFillType = PathFillType::Winding;
-  Color4f color = Color4f::White();
+  tgfx::PathFillType pathFillType = tgfx::PathFillType::Winding;
+  tgfx::Color color = tgfx::Color::White();
   GradientPaint gradient;
   StrokePaint stroke;
 };
@@ -109,11 +109,11 @@ class PathElement : public ElementData {
     return std::unique_ptr<ElementData>(newPath);
   }
 
-  void applyMatrix(const Matrix& matrix) override {
+  void applyMatrix(const tgfx::Matrix& matrix) override {
     path.transform(matrix);
   }
 
-  Path path;
+  tgfx::Path path;
 };
 
 class GroupElement : public ElementData {
@@ -139,14 +139,14 @@ class GroupElement : public ElementData {
     return std::unique_ptr<ElementData>(newGroup);
   }
 
-  void applyMatrix(const Matrix& matrix) override {
+  void applyMatrix(const tgfx::Matrix& matrix) override {
     for (auto& element : elements) {
       element->applyMatrix(matrix);
     }
   }
 
-  std::vector<Path*> pathList() const {
-    std::vector<Path*> list;
+  std::vector<tgfx::Path*> pathList() const {
+    std::vector<tgfx::Path*> list;
     for (auto& element : elements) {
       switch (element->type()) {
         case ElementDataType::Path: {
@@ -172,12 +172,12 @@ class GroupElement : public ElementData {
     elements.clear();
   }
 
-  Blend blendMode = Blend::SrcOver;
+  tgfx::BlendMode blendMode = tgfx::BlendMode::SrcOver;
   float alpha = 1.0f;
   std::vector<ElementData*> elements;
 };
 
-void RectangleToPath(RectangleElement* rectangle, Path* path, Frame frame) {
+void RectangleToPath(RectangleElement* rectangle, tgfx::Path* path, Frame frame) {
   auto size = rectangle->size->getValueAt(frame);
   auto position = rectangle->position->getValueAt(frame);
   auto radius = rectangle->roundness->getValueAt(frame);
@@ -190,20 +190,21 @@ void RectangleToPath(RectangleElement* rectangle, Path* path, Frame frame) {
     radius = hh;
   }
   auto rect =
-      Rect::MakeXYWH(position.x - size.x * 0.5f, position.y - size.y * 0.5f, size.x, size.y);
+      tgfx::Rect::MakeXYWH(position.x - size.x * 0.5f, position.y - size.y * 0.5f, size.x, size.y);
   path->addRoundRect(rect, radius, radius, rectangle->reversed, 2);
 }
 
-void EllipseToPath(EllipseElement* ellipse, Path* path, Frame frame) {
+void EllipseToPath(EllipseElement* ellipse, tgfx::Path* path, Frame frame) {
   auto size = ellipse->size->getValueAt(frame);
   auto position = ellipse->position->getValueAt(frame);
   auto rect =
-      Rect::MakeXYWH(position.x - size.x * 0.5f, position.y - size.y * 0.5f, size.x, size.y);
+      tgfx::Rect::MakeXYWH(position.x - size.x * 0.5f, position.y - size.y * 0.5f, size.x, size.y);
   path->addOval(rect, ellipse->reversed);
 }
 
-static void AddCurveToPath(Path* path, float centerX, float centerY, float angleDelta, float dx1,
-                           float dy1, float roundness1, float dx2, float dy2, float roundness2) {
+static void AddCurveToPath(tgfx::Path* path, float centerX, float centerY, float angleDelta,
+                           float dx1, float dy1, float roundness1, float dx2, float dy2,
+                           float roundness2) {
   auto control1X = dx1 - dy1 * roundness1 * angleDelta + centerX;
   auto control1Y = dy1 + dx1 * roundness1 * angleDelta + centerY;
   auto control2X = dx2 + dy2 * roundness2 * angleDelta + centerX;
@@ -211,7 +212,7 @@ static void AddCurveToPath(Path* path, float centerX, float centerY, float angle
   path->cubicTo(control1X, control1Y, control2X, control2Y, dx2 + centerX, dy2 + centerY);
 }
 
-static void ConvertPolyStartToPath(Path* path, float centerX, float centerY, float points,
+static void ConvertPolyStartToPath(tgfx::Path* path, float centerX, float centerY, float points,
                                    float rotation, float innerRadius, float outerRadius,
                                    float innerRoundness, float outerRoundness, bool reversed) {
   float direction = reversed ? -1 : 1;
@@ -262,7 +263,7 @@ static void ConvertPolyStartToPath(Path* path, float centerX, float centerY, flo
   path->close();
 }
 
-static void ConvertPolygonToPath(Path* path, float centerX, float centerY, float points,
+static void ConvertPolygonToPath(tgfx::Path* path, float centerX, float centerY, float points,
                                  float rotation, float radius, float roundness, bool reversed) {
   auto numPoints = static_cast<int>(floorf(points));
   float direction = reversed ? -1 : 1;
@@ -293,7 +294,7 @@ static void ConvertPolygonToPath(Path* path, float centerX, float centerY, float
   path->close();
 }
 
-void PolyStarToPath(PolyStarElement* polyStar, Path* path, Frame frame) {
+void PolyStarToPath(PolyStarElement* polyStar, tgfx::Path* path, Frame frame) {
   auto points = polyStar->points->getValueAt(frame);
   auto position = polyStar->position->getValueAt(frame);
   auto rotation = polyStar->rotation->getValueAt(frame);
@@ -310,7 +311,7 @@ void PolyStarToPath(PolyStarElement* polyStar, Path* path, Frame frame) {
   }
 }
 
-void ShapePathToPath(ShapePathElement* shapePath, Path* path, Frame frame) {
+void ShapePathToPath(ShapePathElement* shapePath, tgfx::Path* path, Frame frame) {
   auto pathData = shapePath->shapePath->getValueAt(frame);
   if (pathData == nullptr) {
     return;
@@ -318,8 +319,8 @@ void ShapePathToPath(ShapePathElement* shapePath, Path* path, Frame frame) {
   path->addPath(ToPath(*pathData));
 }
 
-PathFillType ToPathFillType(Enum rule) {
-  return rule == FillRule::EvenOdd ? PathFillType::EvenOdd : PathFillType::Winding;
+tgfx::PathFillType ToPathFillType(Enum rule) {
+  return rule == FillRule::EvenOdd ? tgfx::PathFillType::EvenOdd : tgfx::PathFillType::Winding;
 }
 
 PaintElement* FillToPaint(FillElement* fill, Frame frame) {
@@ -329,7 +330,7 @@ PaintElement* FillToPaint(FillElement* fill, Frame frame) {
   auto paint = new PaintElement(PaintType::Fill);
   paint->blendMode = ToTGFXBlend(fill->blendMode);
   paint->alpha = ToAlpha(fill->opacity->getValueAt(frame));
-  paint->color = ToTGFXColor(fill->color->getValueAt(frame));
+  paint->color = ToTGFX(fill->color->getValueAt(frame));
   paint->pathFillType = ToPathFillType(fill->fillRule);
   paint->compositeOrder = fill->composite;
   return paint;
@@ -343,7 +344,7 @@ PaintElement* StrokeToPaint(StrokeElement* stroke, Frame frame) {
   paint->blendMode = ToTGFXBlend(stroke->blendMode);
   paint->alpha = ToAlpha(stroke->opacity->getValueAt(frame));
   paint->compositeOrder = stroke->composite;
-  paint->color = ToTGFXColor(stroke->color->getValueAt(frame));
+  paint->color = ToTGFX(stroke->color->getValueAt(frame));
   paint->stroke.strokeWidth = stroke->strokeWidth->getValueAt(frame);
   paint->stroke.lineCap = stroke->lineCap;
   paint->stroke.lineJoin = stroke->lineJoin;
@@ -392,8 +393,10 @@ void ConvertAlphaStop(const GradientColorHandle& gradientColor, std::vector<Opac
 }
 
 GradientPaint MakeGradientPaint(Enum fillType, Point startPoint, Point endPoint,
-                                const GradientColorHandle& gradientColor, const Matrix& matrix) {
-  Point points[2] = {Point::Make(startPoint.x, startPoint.y), Point::Make(endPoint.x, endPoint.y)};
+                                const GradientColorHandle& gradientColor,
+                                const tgfx::Matrix& matrix) {
+  tgfx::Point points[2] = {tgfx::Point::Make(startPoint.x, startPoint.y),
+                           tgfx::Point::Make(endPoint.x, endPoint.y)};
   matrix.mapPoints(points, 2);
   GradientPaint gradient = {};
   gradient.gradientType = fillType;
@@ -415,7 +418,7 @@ GradientPaint MakeGradientPaint(Enum fillType, Point startPoint, Point endPoint,
     auto alphaPosition = alphaPositions[opacityIndex];
     if (colorPosition == alphaPosition) {
       gradient.positions.push_back(colorPosition);
-      auto color4f = ToTGFXColor(colorValues[colorIndex++], opacityValues[opacityIndex++]);
+      auto color4f = ToTGFX(colorValues[colorIndex++], opacityValues[opacityIndex++]);
       gradient.colors.push_back(color4f);
     } else if (colorPosition < alphaPosition) {
       gradient.positions.push_back(colorPosition);
@@ -427,7 +430,7 @@ GradientPaint MakeGradientPaint(Enum fillType, Point startPoint, Point endPoint,
       } else {
         opacity = opacityValues[opacityIndex];
       }
-      auto color4f = ToTGFXColor(colorValues[colorIndex++], opacity);
+      auto color4f = ToTGFX(colorValues[colorIndex++], opacity);
       gradient.colors.push_back(color4f);
     } else {
       gradient.positions.push_back(alphaPosition);
@@ -441,7 +444,7 @@ GradientPaint MakeGradientPaint(Enum fillType, Point startPoint, Point endPoint,
       } else {
         color = colorValues[colorIndex];
       }
-      auto color4f = ToTGFXColor(color, opacityValues[opacityIndex++]);
+      auto color4f = ToTGFX(color, opacityValues[opacityIndex++]);
       gradient.colors.push_back(color4f);
     }
   }
@@ -449,20 +452,21 @@ GradientPaint MakeGradientPaint(Enum fillType, Point startPoint, Point endPoint,
   auto lastOpacity = opacityValues.back();
   while (colorIndex < colorValues.size()) {
     gradient.positions.push_back(colorPositions[colorIndex]);
-    auto color4f = ToTGFXColor(colorValues[colorIndex++], lastOpacity);
+    auto color4f = ToTGFX(colorValues[colorIndex++], lastOpacity);
     gradient.colors.push_back(color4f);
   }
 
   auto lastColor = colorValues.back();
   while (opacityIndex < opacityValues.size()) {
     gradient.positions.push_back(alphaPositions[opacityIndex]);
-    auto color4f = ToTGFXColor(lastColor, opacityValues[opacityIndex++]);
+    auto color4f = ToTGFX(lastColor, opacityValues[opacityIndex++]);
     gradient.colors.push_back(color4f);
   }
   return gradient;
 }
 
-PaintElement* GradientFillToPaint(GradientFillElement* fill, const Matrix& matrix, Frame frame) {
+PaintElement* GradientFillToPaint(GradientFillElement* fill, const tgfx::Matrix& matrix,
+                                  Frame frame) {
   if (fill->opacity->getValueAt(frame) <= 0) {
     return nullptr;
   }
@@ -478,7 +482,7 @@ PaintElement* GradientFillToPaint(GradientFillElement* fill, const Matrix& matri
   return paint;
 }
 
-PaintElement* GradientStrokeToPaint(GradientStrokeElement* stroke, const Matrix& matrix,
+PaintElement* GradientStrokeToPaint(GradientStrokeElement* stroke, const tgfx::Matrix& matrix,
                                     Frame frame) {
   if (stroke->opacity->getValueAt(frame) <= 0 || stroke->strokeWidth->getValueAt(frame) <= 0) {
     return nullptr;
@@ -508,12 +512,12 @@ struct TrimSegment {
   float end;
 };
 
-void ApplyTrimPathIndividually(const std::vector<Path*>& pathList,
+void ApplyTrimPathIndividually(const std::vector<tgfx::Path*>& pathList,
                                std::vector<TrimSegment> segments) {
   float totalLength = 0;
-  std::vector<std::unique_ptr<PathMeasure>> measureList;
+  std::vector<std::unique_ptr<tgfx::PathMeasure>> measureList;
   for (auto& path : pathList) {
-    auto pathMeasure = PathMeasure::MakeFrom(*path);
+    auto pathMeasure = tgfx::PathMeasure::MakeFrom(*path);
     totalLength += pathMeasure->getLength();
     measureList.push_back(std::move(pathMeasure));
   }
@@ -523,7 +527,7 @@ void ApplyTrimPathIndividually(const std::vector<Path*>& pathList,
   }
   float addedLength = 0;
   int index = 0;
-  Path tempPath = {};
+  tgfx::Path tempPath = {};
   for (auto& pathMeasure : measureList) {
     auto& path = pathList[index++];
     auto pathLength = pathMeasure->getLength();
@@ -548,7 +552,7 @@ void ApplyTrimPathIndividually(const std::vector<Path*>& pathList,
   }
 }
 
-void ApplyTrimPaths(TrimPathsElement* trimPaths, std::vector<Path*>& pathList, float start,
+void ApplyTrimPaths(TrimPathsElement* trimPaths, std::vector<tgfx::Path*>& pathList, float start,
                     float end, bool reversed) {
   if (start == 0 && end == 1) {
     return;
@@ -567,9 +571,9 @@ void ApplyTrimPaths(TrimPathsElement* trimPaths, std::vector<Path*>& pathList, f
     segments.push_back({start, end});
   }
   if (trimPaths->trimType == TrimPathsType::Simultaneously) {
-    Path tempPath = {};
+    tgfx::Path tempPath = {};
     for (auto& path : pathList) {
-      auto pathMeasure = PathMeasure::MakeFrom(*path);
+      auto pathMeasure = tgfx::PathMeasure::MakeFrom(*path);
       auto length = pathMeasure->getLength();
       if (length == 0) {
         continue;
@@ -591,7 +595,7 @@ void ApplyTrimPaths(TrimPathsElement* trimPaths, std::vector<Path*>& pathList, f
   }
 }
 
-void ApplyTrimPaths(TrimPathsElement* trimPaths, std::vector<Path*> pathList, Frame frame) {
+void ApplyTrimPaths(TrimPathsElement* trimPaths, std::vector<tgfx::Path*> pathList, Frame frame) {
   auto start = trimPaths->start->getValueAt(frame);
   auto end = trimPaths->end->getValueAt(frame);
   auto offset = fmodf(trimPaths->offset->getValueAt(frame), 360.0f) / 360.0f;
@@ -626,22 +630,22 @@ void ApplyMergePaths(MergePathsElement* mergePaths, GroupElement* group) {
   if (pathList.empty()) {
     return;
   }
-  PathOp pathOp;
+  tgfx::PathOp pathOp;
   switch (mergePaths->mode) {
     case MergePathsMode::Merge:
-      pathOp = PathOp::Append;
+      pathOp = tgfx::PathOp::Append;
       break;
     case MergePathsMode::Intersect:
-      pathOp = PathOp::Intersect;
+      pathOp = tgfx::PathOp::Intersect;
       break;
     case MergePathsMode::Subtract:
-      pathOp = PathOp::Difference;
+      pathOp = tgfx::PathOp::Difference;
       break;
     case MergePathsMode::ExcludeIntersections:
-      pathOp = PathOp::XOR;
+      pathOp = tgfx::PathOp::XOR;
       break;
     default:
-      pathOp = PathOp::Union;
+      pathOp = tgfx::PathOp::Union;
       break;
   }
   auto tempPath = *(pathList[0]);
@@ -688,7 +692,7 @@ void ApplyRepeater(RepeaterElement* repeater, GroupElement* group, Frame frame) 
         newGroup->alpha *= copies - i;
       }
     }
-    auto matrix = Matrix::I();
+    auto matrix = tgfx::Matrix::I();
     matrix.postTranslate(-anchorPoint.x, -anchorPoint.y);
     matrix.postScale(powf(scale.x, progress), powf(scale.y, progress));
     matrix.postRotate(rotation * progress);
@@ -703,10 +707,10 @@ void ApplyRepeater(RepeaterElement* repeater, GroupElement* group, Frame frame) 
   group->elements = elements;
 }
 
-void ApplyRoundCorners(RoundCornersElement* roundCorners, std::vector<Path*> pathList,
+void ApplyRoundCorners(RoundCornersElement* roundCorners, std::vector<tgfx::Path*> pathList,
                        Frame frame) {
   auto radius = roundCorners->radius->getValueAt(frame);
-  auto effect = PathEffect::MakeCorner(radius);
+  auto effect = tgfx::PathEffect::MakeCorner(radius);
   if (effect == nullptr) {
     return;
   }
@@ -715,13 +719,13 @@ void ApplyRoundCorners(RoundCornersElement* roundCorners, std::vector<Path*> pat
   }
 }
 
-void SkewFromAxis(Matrix* matrix, float skew, float skewAxis) {
+void SkewFromAxis(tgfx::Matrix* matrix, float skew, float skewAxis) {
   if (skew == 0 && skewAxis == 0) {
     return;
   }
   auto u = cosf(skewAxis);
   auto v = sinf(skewAxis);
-  Matrix temp = {};
+  tgfx::Matrix temp = {};
   temp.setAll(u, -v, 0, v, u, 0, 0, 0, 1);
   matrix->postConcat(temp);
   auto w = tanf(skew);
@@ -732,7 +736,7 @@ void SkewFromAxis(Matrix* matrix, float skew, float skewAxis) {
 }
 
 Transform ShapeTransformToTransform(const ShapeTransform* transform, Frame frame) {
-  auto matrix = Matrix::I();
+  auto matrix = tgfx::Matrix::I();
   auto anchorPoint = transform->anchorPoint->getValueAt(frame);
   auto scale = transform->scale->getValueAt(frame);
   auto position = transform->position->getValueAt(frame);
@@ -750,10 +754,10 @@ Transform ShapeTransformToTransform(const ShapeTransform* transform, Frame frame
   return {matrix, alpha};
 }
 
-void RenderElements(const std::vector<ShapeElement*>& list, const Matrix& parentMatrix,
+void RenderElements(const std::vector<ShapeElement*>& list, const tgfx::Matrix& parentMatrix,
                     GroupElement* parentGroup, Frame frame);
 
-void RenderElements_ShapeGroup(ShapeElement* element, const Matrix& parentMatrix,
+void RenderElements_ShapeGroup(ShapeElement* element, const tgfx::Matrix& parentMatrix,
                                GroupElement* parentGroup, Frame frame) {
   auto shape = reinterpret_cast<ShapeGroupElement*>(element);
   auto transform = ShapeTransformToTransform(shape->transform, frame);
@@ -765,7 +769,7 @@ void RenderElements_ShapeGroup(ShapeElement* element, const Matrix& parentMatrix
   parentGroup->elements.push_back(group);
 }
 
-void RenderElements_Rectangle(ShapeElement* element, const Matrix& parentMatrix,
+void RenderElements_Rectangle(ShapeElement* element, const tgfx::Matrix& parentMatrix,
                               GroupElement* parentGroup, Frame frame) {
   auto pathElement = new PathElement();
   RectangleToPath(static_cast<RectangleElement*>(element), &pathElement->path, frame);
@@ -773,7 +777,7 @@ void RenderElements_Rectangle(ShapeElement* element, const Matrix& parentMatrix,
   parentGroup->elements.push_back(pathElement);
 }
 
-void RenderElements_Ellipse(ShapeElement* element, const Matrix& parentMatrix,
+void RenderElements_Ellipse(ShapeElement* element, const tgfx::Matrix& parentMatrix,
                             GroupElement* parentGroup, Frame frame) {
   auto pathElement = new PathElement();
   EllipseToPath(static_cast<EllipseElement*>(element), &pathElement->path, frame);
@@ -781,7 +785,7 @@ void RenderElements_Ellipse(ShapeElement* element, const Matrix& parentMatrix,
   parentGroup->elements.push_back(pathElement);
 }
 
-void RenderElements_PolyStar(ShapeElement* element, const Matrix& parentMatrix,
+void RenderElements_PolyStar(ShapeElement* element, const tgfx::Matrix& parentMatrix,
                              GroupElement* parentGroup, Frame frame) {
   auto pathElement = new PathElement();
   PolyStarToPath(static_cast<PolyStarElement*>(element), &pathElement->path, frame);
@@ -789,7 +793,7 @@ void RenderElements_PolyStar(ShapeElement* element, const Matrix& parentMatrix,
   parentGroup->elements.push_back(pathElement);
 }
 
-void RenderElements_ShapePath(ShapeElement* element, const Matrix& parentMatrix,
+void RenderElements_ShapePath(ShapeElement* element, const tgfx::Matrix& parentMatrix,
                               GroupElement* parentGroup, Frame frame) {
   auto pathElement = new PathElement();
   ShapePathToPath(static_cast<ShapePathElement*>(element), &pathElement->path, frame);
@@ -797,7 +801,7 @@ void RenderElements_ShapePath(ShapeElement* element, const Matrix& parentMatrix,
   parentGroup->elements.push_back(pathElement);
 }
 
-void RenderElements_Fill(ShapeElement* element, const Matrix&, GroupElement* parentGroup,
+void RenderElements_Fill(ShapeElement* element, const tgfx::Matrix&, GroupElement* parentGroup,
                          Frame frame) {
   auto fill = static_cast<FillElement*>(element);
   auto paint = FillToPaint(fill, frame);
@@ -806,7 +810,7 @@ void RenderElements_Fill(ShapeElement* element, const Matrix&, GroupElement* par
   }
 }
 
-void RenderElements_Stroke(ShapeElement* element, const Matrix&, GroupElement* parentGroup,
+void RenderElements_Stroke(ShapeElement* element, const tgfx::Matrix&, GroupElement* parentGroup,
                            Frame frame) {
   auto stroke = static_cast<StrokeElement*>(element);
   auto paint = StrokeToPaint(stroke, frame);
@@ -815,7 +819,7 @@ void RenderElements_Stroke(ShapeElement* element, const Matrix&, GroupElement* p
   }
 }
 
-void RenderElements_GradientFill(ShapeElement* element, const Matrix& parentMatrix,
+void RenderElements_GradientFill(ShapeElement* element, const tgfx::Matrix& parentMatrix,
                                  GroupElement* parentGroup, Frame frame) {
   auto fill = static_cast<GradientFillElement*>(element);
   auto paint = GradientFillToPaint(fill, parentMatrix, frame);
@@ -824,7 +828,7 @@ void RenderElements_GradientFill(ShapeElement* element, const Matrix& parentMatr
   }
 }
 
-void RenderElements_GradientStroke(ShapeElement* element, const Matrix& parentMatrix,
+void RenderElements_GradientStroke(ShapeElement* element, const tgfx::Matrix& parentMatrix,
                                    GroupElement* parentGroup, Frame frame) {
   auto stroke = static_cast<GradientStrokeElement*>(element);
   auto paint = GradientStrokeToPaint(stroke, parentMatrix, frame);
@@ -833,27 +837,27 @@ void RenderElements_GradientStroke(ShapeElement* element, const Matrix& parentMa
   }
 }
 
-void RenderElements_MergePaths(ShapeElement* element, const Matrix&, GroupElement* parentGroup,
-                               Frame) {
+void RenderElements_MergePaths(ShapeElement* element, const tgfx::Matrix&,
+                               GroupElement* parentGroup, Frame) {
   ApplyMergePaths(static_cast<MergePathsElement*>(element), parentGroup);
 }
 
-void RenderElements_Repeater(ShapeElement* element, const Matrix&, GroupElement* parentGroup,
+void RenderElements_Repeater(ShapeElement* element, const tgfx::Matrix&, GroupElement* parentGroup,
                              Frame frame) {
   ApplyRepeater(static_cast<RepeaterElement*>(element), parentGroup, frame);
 }
 
-void RenderElements_TrimPaths(ShapeElement* element, const Matrix&, GroupElement* parentGroup,
+void RenderElements_TrimPaths(ShapeElement* element, const tgfx::Matrix&, GroupElement* parentGroup,
                               Frame frame) {
   ApplyTrimPaths(static_cast<TrimPathsElement*>(element), parentGroup->pathList(), frame);
 }
 
-void RenderElements_RoundCorners(ShapeElement* element, const Matrix&, GroupElement* parentGroup,
-                                 Frame frame) {
+void RenderElements_RoundCorners(ShapeElement* element, const tgfx::Matrix&,
+                                 GroupElement* parentGroup, Frame frame) {
   ApplyRoundCorners(static_cast<RoundCornersElement*>(element), parentGroup->pathList(), frame);
 }
 
-using RenderElementsHandler = void(ShapeElement* element, const Matrix& parentMatrix,
+using RenderElementsHandler = void(ShapeElement* element, const tgfx::Matrix& parentMatrix,
                                    GroupElement* parentGroup, Frame frame);
 
 static const std::unordered_map<ShapeType, std::function<RenderElementsHandler>, EnumClassHash>
@@ -871,7 +875,7 @@ static const std::unordered_map<ShapeType, std::function<RenderElementsHandler>,
                        {ShapeType::TrimPaths, RenderElements_TrimPaths},
                        {ShapeType::RoundCorners, RenderElements_RoundCorners}};
 
-void RenderElements(const std::vector<ShapeElement*>& list, const Matrix& parentMatrix,
+void RenderElements(const std::vector<ShapeElement*>& list, const tgfx::Matrix& parentMatrix,
                     GroupElement* parentGroup, Frame frame) {
   for (auto& element : list) {
     auto iter = elementHandlers.find(element->type());
@@ -881,7 +885,8 @@ void RenderElements(const std::vector<ShapeElement*>& list, const Matrix& parent
   }
 }
 
-std::unique_ptr<PathEffect> CreateDashEffect(const std::vector<float>& dashes, float dashOffset) {
+std::unique_ptr<tgfx::PathEffect> CreateDashEffect(const std::vector<float>& dashes,
+                                                   float dashOffset) {
   auto dashCount = dashes.size();
   auto size = static_cast<int>(dashCount);
   int times = 1;
@@ -896,31 +901,31 @@ std::unique_ptr<PathEffect> CreateDashEffect(const std::vector<float>& dashes, f
       dashList[index++] = static_cast<float>(dashes[j]);
     }
   }
-  auto dashEffect = PathEffect::MakeDash(dashList, size, dashOffset);
+  auto dashEffect = tgfx::PathEffect::MakeDash(dashList, size, dashOffset);
   delete[] dashList;
   return dashEffect;
 }
 
-void ApplyStrokeToPath(Path* path, const StrokePaint& stroke) {
+void ApplyStrokeToPath(tgfx::Path* path, const StrokePaint& stroke) {
   if (!stroke.dashes.empty()) {
     auto dashEffect = CreateDashEffect(stroke.dashes, stroke.dashOffset);
     if (dashEffect) {
       dashEffect->applyTo(path);
     }
   }
-  auto strokeEffect = PathEffect::MakeStroke(stroke.getStroke());
+  auto strokeEffect = tgfx::PathEffect::MakeStroke(stroke.getStroke());
   if (strokeEffect) {
     strokeEffect->applyTo(path);
   }
 }
 
-std::shared_ptr<Graphic> RenderShape(PaintElement* paint, Path* path) {
-  Path shapePath = *path;
+std::shared_ptr<Graphic> RenderShape(PaintElement* paint, tgfx::Path* path) {
+  tgfx::Path shapePath = *path;
   auto paintType = paint->paintType;
   if (paintType == PaintType::Stroke || paintType == PaintType::GradientStroke) {
     ApplyStrokeToPath(&shapePath, paint->stroke);
   }
-  if (shapePath.getFillType() == PathFillType::Winding) {
+  if (shapePath.getFillType() == tgfx::PathFillType::Winding) {
     shapePath.setFillType(paint->pathFillType);
   }
   std::shared_ptr<Graphic> shape = nullptr;
@@ -933,7 +938,7 @@ std::shared_ptr<Graphic> RenderShape(PaintElement* paint, Path* path) {
   return Graphic::MakeCompose(shape, modifier);
 }
 
-std::shared_ptr<Graphic> RenderShape(GroupElement* group, Path* path) {
+std::shared_ptr<Graphic> RenderShape(GroupElement* group, tgfx::Path* path) {
   std::vector<std::shared_ptr<Graphic>> contents = {};
   for (auto& element : group->elements) {
     switch (element->type()) {
@@ -953,7 +958,7 @@ std::shared_ptr<Graphic> RenderShape(GroupElement* group, Path* path) {
         }
       } break;
       case ElementDataType::Group: {
-        Path tempPath = {};
+        tgfx::Path tempPath = {};
         auto shape = RenderShape(static_cast<GroupElement*>(element), &tempPath);
         path->addPath(tempPath);
         if (shape) {
@@ -970,9 +975,9 @@ std::shared_ptr<Graphic> RenderShape(GroupElement* group, Path* path) {
 std::shared_ptr<Graphic> RenderShapes(const std::vector<ShapeElement*>& contents,
                                       Frame layerFrame) {
   GroupElement rootGroup;
-  auto matrix = Matrix::I();
+  auto matrix = tgfx::Matrix::I();
   RenderElements(contents, matrix, &rootGroup, layerFrame);
-  Path tempPath = {};
+  tgfx::Path tempPath = {};
   return RenderShape(&rootGroup, &tempPath);
 }
 }  // namespace pag

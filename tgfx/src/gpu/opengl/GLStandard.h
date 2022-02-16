@@ -18,6 +18,6 @@
 
 #pragma once
 
-namespace pag {
+namespace tgfx {
 enum class GLStandard { None, GL, GLES, WebGL };
 }

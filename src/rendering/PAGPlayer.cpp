@@ -301,7 +301,7 @@ Rect PAGPlayer::getBounds(std::shared_ptr<PAGLayer> pagLayer) {
   }
   LockGuard autoLock(rootLocker);
   updateStageSize();
-  Rect bounds = {};
+  tgfx::Rect bounds = {};
   pagLayer->measureBounds(&bounds);
   auto layer = pagLayer.get();
   bool contains = false;
@@ -310,14 +310,15 @@ Rect PAGPlayer::getBounds(std::shared_ptr<PAGLayer> pagLayer) {
       contains = true;
       break;
     }
-    layer->getTotalMatrixInternal().mapRect(&bounds);
+    auto layerMatrix = ToTGFX(layer->getTotalMatrixInternal());
+    layerMatrix.mapRect(&bounds);
     if (layer->_parent == nullptr && layer->trackMatteOwner) {
       layer = layer->trackMatteOwner->_parent;
     } else {
       layer = layer->_parent;
     }
   }
-  return contains ? bounds : Rect::MakeEmpty();
+  return contains ? ToPAG(bounds) : Rect::MakeEmpty();
 }
 
 std::vector<std::shared_ptr<PAGLayer>> PAGPlayer::getLayersUnderPoint(float surfaceX,
@@ -335,7 +336,7 @@ bool PAGPlayer::hitTestPoint(std::shared_ptr<PAGLayer> pagLayer, float surfaceX,
   updateStageSize();
   auto local = pagLayer->globalToLocalPoint(surfaceX, surfaceY);
   if (!pixelHitTest) {
-    Rect bounds = {};
+    tgfx::Rect bounds = {};
     pagLayer->measureBounds(&bounds);
     return bounds.contains(local.x, local.y);
   }

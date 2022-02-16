@@ -30,7 +30,7 @@ void JTraceImage::InitJNI(JNIEnv* env) {
                                             "(Ljava/lang/String;Ljava/nio/ByteBuffer;II)V");
 }
 
-void JTraceImage::Trace(const ImageInfo& info, const void* pixels, const std::string& tag) {
+void JTraceImage::Trace(const tgfx::ImageInfo& info, const void* pixels, const std::string& tag) {
   auto env = JNIEnvironment::Current();
   if (env == nullptr || info.isEmpty() || pixels == nullptr) {
     return;
@@ -41,9 +41,9 @@ void JTraceImage::Trace(const ImageInfo& info, const void* pixels, const std::st
   if (dstPixels == nullptr) {
     return;
   }
-  auto dstInfo = ImageInfo::Make(info.width(), info.height(), ColorType::RGBA_8888,
-                                 AlphaType::Premultiplied, rowBytes);
-  Bitmap bitmap(dstInfo, dstPixels);
+  auto dstInfo = tgfx::ImageInfo::Make(info.width(), info.height(), tgfx::ColorType::RGBA_8888,
+                                       tgfx::AlphaType::Premultiplied, rowBytes);
+  tgfx::Bitmap bitmap(dstInfo, dstPixels);
   bitmap.writePixels(info, pixels);
   Local<jobject> byteBuffer = {env, MakeByteBufferObject(env, dstPixels, dstInfo.byteSize())};
   Local<jstring> tagString = {env, SafeConvertToJString(env, tag.c_str())};

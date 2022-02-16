@@ -24,8 +24,9 @@ namespace pag {
 class SoftwareI420Buffer : public I420Buffer {
  public:
   static std::shared_ptr<SoftwareI420Buffer> Make(
-      int width, int height, uint8_t* data[3], const int lineSize[3], YUVColorSpace colorSpace,
-      YUVColorRange colorRange, std::shared_ptr<SoftwareDecoder> softwareDecoder) {
+      int width, int height, uint8_t* data[3], const int lineSize[3],
+      tgfx::YUVColorSpace colorSpace, tgfx::YUVColorRange colorRange,
+      std::shared_ptr<SoftwareDecoder> softwareDecoder) {
     auto buffer = new SoftwareI420Buffer(width, height, data, lineSize, colorSpace, colorRange,
                                          std::move(softwareDecoder));
     return std::shared_ptr<SoftwareI420Buffer>(buffer);
@@ -36,7 +37,7 @@ class SoftwareI420Buffer : public I420Buffer {
   std::shared_ptr<SoftwareDecoder> softwareDecoder = nullptr;
 
   SoftwareI420Buffer(int width, int height, uint8_t* data[3], const int lineSize[3],
-                     YUVColorSpace colorSpace, YUVColorRange colorRange,
+                     tgfx::YUVColorSpace colorSpace, tgfx::YUVColorRange colorRange,
                      std::shared_ptr<SoftwareDecoder> softwareDecoder)
       : I420Buffer(width, height, data, lineSize, colorSpace, colorRange),
         softwareDecoder(std::move(softwareDecoder)) {

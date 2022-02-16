@@ -19,7 +19,7 @@
 #include "GLQuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/QuadPerEdgeAAGeometryProcessor.h"
 
-namespace pag {
+namespace tgfx {
 void GLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) {
   const auto* geometryProcessor = static_cast<const QuadPerEdgeAAGeometryProcessor*>(args.gp);
   auto* vertBuilder = args.vertBuilder;
@@ -77,4 +77,4 @@ void GLQuadPerEdgeAAGeometryProcessor::setData(const ProgramDataManager& program
   }
   updated = true;
 }
-}  // namespace pag
+}  // namespace tgfx

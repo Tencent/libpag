@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GradientShader.h"
-#include "base/utils/MathExtra.h"
+#include "core/utils/MathExtra.h"
 #include "gpu/Caps.h"
 #include "gpu/ColorShader.h"
 #include "gpu/ConstColorProcessor.h"
@@ -30,7 +30,7 @@
 #include "gpu/gradients/TextureGradientColorizer.h"
 #include "gpu/gradients/UnrolledBinaryGradientColorizer.h"
 
-namespace pag {
+namespace tgfx {
 // Intervals smaller than this (that aren't hard stops) on low-precision-only devices force us to
 // use the textured gradient
 static constexpr float LowPrecisionIntervalLimit = 0.01f;
@@ -38,7 +38,7 @@ static constexpr float DegenerateThreshold = 1.0f / (1 << 15);
 
 // Analyze the shader's color stops and positions and chooses an appropriate colorizer to represent
 // the gradient.
-static std::unique_ptr<FragmentProcessor> MakeColorizer(Context* context, const Color4f* colors,
+static std::unique_ptr<FragmentProcessor> MakeColorizer(Context* context, const Color* colors,
                                                         const float* positions, int count) {
   // If there are hard stops at the beginning or end, the first and/or last color should be
   // ignored by the colorizer since it should only be used in a clamped border color. By detecting
@@ -109,7 +109,7 @@ static std::unique_ptr<FragmentProcessor> MakeColorizer(Context* context, const 
       context->gradientCache()->getGradient(colors + offset, positions + offset, count));
 }
 
-GradientShaderBase::GradientShaderBase(const std::vector<Color4f>& colors,
+GradientShaderBase::GradientShaderBase(const std::vector<Color>& colors,
                                        const std::vector<float>& positions,
                                        const Matrix& pointsToUnit)
     : pointsToUnit(pointsToUnit) {
@@ -200,7 +200,7 @@ static Matrix PointsToUnitMatrix(const Point& startPoint, const Point& endPoint)
 }
 
 LinearGradient::LinearGradient(const Point& startPoint, const Point& endPoint,
-                               const std::vector<Color4f>& colors,
+                               const std::vector<Color>& colors,
                                const std::vector<float>& positions)
     : GradientShaderBase(colors, positions, PointsToUnitMatrix(startPoint, endPoint)) {
 }
@@ -218,8 +218,7 @@ static Matrix RadialToUnitMatrix(const Point& center, float radius) {
   return matrix;
 }
 
-RadialGradient::RadialGradient(const Point& center, float radius,
-                               const std::vector<Color4f>& colors,
+RadialGradient::RadialGradient(const Point& center, float radius, const std::vector<Color>& colors,
                                const std::vector<float>& positions)
     : GradientShaderBase(colors, positions, RadialToUnitMatrix(center, radius)) {
 }
@@ -231,7 +230,7 @@ std::unique_ptr<FragmentProcessor> RadialGradient::asFragmentProcessor(const FPA
 }
 
 std::shared_ptr<Shader> Shader::MakeLinearGradient(const Point& startPoint, const Point& endPoint,
-                                                   const std::vector<Color4f>& colors,
+                                                   const std::vector<Color>& colors,
                                                    const std::vector<float>& positions) {
   if (!std::isfinite(Point::Distance(endPoint, startPoint))) {
     return nullptr;
@@ -253,7 +252,7 @@ std::shared_ptr<Shader> Shader::MakeLinearGradient(const Point& startPoint, cons
 }
 
 std::shared_ptr<Shader> Shader::MakeRadialGradient(const Point& center, float radius,
-                                                   const std::vector<Color4f>& colors,
+                                                   const std::vector<Color>& colors,
                                                    const std::vector<float>& positions) {
   if (radius < 0) {
     return nullptr;
@@ -271,4 +270,4 @@ std::shared_ptr<Shader> Shader::MakeRadialGradient(const Point& center, float ra
   }
   return std::make_shared<RadialGradient>(center, radius, colors, positions);
 }
-}  // namespace pag
+}  // namespace tgfx

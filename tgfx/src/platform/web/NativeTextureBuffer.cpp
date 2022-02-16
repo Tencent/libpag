@@ -21,7 +21,7 @@
 
 using namespace emscripten;
 
-namespace pag {
+namespace tgfx {
 std::shared_ptr<NativeTextureBuffer> NativeTextureBuffer::Make(int width, int height, val source) {
   if (!source.as<bool>()) {
     return nullptr;
@@ -41,4 +41,4 @@ std::shared_ptr<Texture> NativeTextureBuffer::makeTexture(Context* context) cons
   source.call<void>("upload", val::module_property("GL"));
   return texture;
 }
-}  // namespace pag
+}  // namespace tgfx

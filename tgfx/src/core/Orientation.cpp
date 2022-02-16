@@ -18,7 +18,7 @@
 
 #include "core/Orientation.h"
 
-namespace pag {
+namespace tgfx {
 Matrix OrientationToMatrix(Orientation orientation, int width, int height) {
   auto w = static_cast<float>(width);
   auto h = static_cast<float>(height);
@@ -42,4 +42,4 @@ Matrix OrientationToMatrix(Orientation orientation, int width, int height) {
   }
   return Matrix::I();
 }
-}  // namespace pag
+}  // namespace tgfx

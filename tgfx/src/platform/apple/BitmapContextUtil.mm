@@ -18,7 +18,7 @@
 
 #include "BitmapContextUtil.h"
 
-namespace pag {
+namespace tgfx {
 static uint32_t GetBitmapInfo(AlphaType alphaType, ColorType colorType) {
   CGBitmapInfo bitmapInfo = 0;
   auto premultiplied = alphaType == AlphaType::Premultiplied;
@@ -58,4 +58,4 @@ CGContextRef CreateBitmapContext(const ImageInfo& info, void* pixels) {
   }
   return cgContext;
 }
-}  // namespace pag
+}  // namespace tgfx

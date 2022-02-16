@@ -46,7 +46,7 @@ VideoSequenceReader::VideoSequenceReader(std::shared_ptr<File> file, VideoSequen
     config.headers.push_back(std::move(bytes));
   }
   config.mimeType = "video/avc";
-  config.colorSpace = YUVColorSpace::Rec601;
+  config.colorSpace = tgfx::YUVColorSpace::Rec601;
   config.frameRate = sequence->frameRate;
   reader = std::make_unique<VideoReader>(config, std::move(demuxer), policy);
 }
@@ -65,7 +65,8 @@ void VideoSequenceReader::prepareAsync(Frame targetFrame) {
   }
 }
 
-std::shared_ptr<Texture> VideoSequenceReader::readTexture(Frame targetFrame, RenderCache* cache) {
+std::shared_ptr<tgfx::Texture> VideoSequenceReader::readTexture(Frame targetFrame,
+                                                                RenderCache* cache) {
   if (!reader) {
     return nullptr;
   }

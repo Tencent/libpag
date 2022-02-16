@@ -24,7 +24,7 @@
 #include "platform/android/HardwareBuffer.h"
 #endif
 
-namespace pag {
+namespace tgfx {
 #if defined(__ANDROID__) || defined(ANDROID)
 
 std::shared_ptr<PixelBuffer> PixelBuffer::MakeFrom(void* hardwareBuffer) {
@@ -67,4 +67,4 @@ std::shared_ptr<Texture> Texture::MakeFrom(Context*, void*) {
 std::shared_ptr<YUVTexture> YUVTexture::MakeFrom(Context*, YUVColorSpace, YUVColorRange, void*) {
   return nullptr;
 }
-}  // namespace pag
+}  // namespace tgfx

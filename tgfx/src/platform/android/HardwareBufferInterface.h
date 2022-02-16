@@ -20,7 +20,7 @@
 
 #include <android/hardware_buffer.h>
 
-namespace pag {
+namespace tgfx {
 /**
  * This utility class allows us to use AHardwareBuffer interfaces without compiling for API 26
  * (Oreo) and above.
@@ -95,4 +95,4 @@ class HardwareBufferInterface {
    */
   static int Unlock(AHardwareBuffer* buffer, int32_t* fence);
 };
-}  // namespace pag
+}  // namespace tgfx

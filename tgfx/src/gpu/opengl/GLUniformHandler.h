@@ -21,7 +21,7 @@
 #include "gpu/Swizzle.h"
 #include "gpu/UniformHandler.h"
 
-namespace pag {
+namespace tgfx {
 static constexpr int kUnusedUniform = -1;
 
 struct Uniform {
@@ -59,4 +59,4 @@ class GLUniformHandler : public UniformHandler {
 
   friend class GLProgramBuilder;
 };
-}  // namespace pag
+}  // namespace tgfx

@@ -18,11 +18,11 @@
 
 #include "GLTexture.h"
 #include "GLUtil.h"
-#include "base/utils/UniqueID.h"
 #include "core/Bitmap.h"
+#include "core/utils/UniqueID.h"
 #include "gpu/Surface.h"
 
-namespace pag {
+namespace tgfx {
 class GLBackendTexture : public GLTexture {
  public:
   GLBackendTexture(GLTextureSampler textureSampler, int width, int height, ImageOrigin origin)
@@ -170,7 +170,7 @@ std::shared_ptr<Texture> Texture::Make(Context* context, int width, int height, 
   }
   if (pixels != nullptr) {
     int bytesPerPixel = alphaOnly ? 1 : 4;
-    SubmitTexture(gl, glInfo, format, width, height, rowBytes, bytesPerPixel, pixels);
+    SubmitGLTexture(gl, glInfo, format, width, height, rowBytes, bytesPerPixel, pixels);
   }
   return texture;
 }
@@ -216,23 +216,4 @@ GLTexture::GLTexture(int width, int height, ImageOrigin origin) : Texture(width,
 Point GLTexture::getTextureCoord(float x, float y) const {
   return {x / static_cast<float>(width()), y / static_cast<float>(height())};
 }
-
-void Trace(const Texture* texture, const std::string& path) {
-  if (texture == nullptr) {
-    return;
-  }
-  auto surface = Surface::Make(texture->context, texture->width(), texture->height());
-  if (surface == nullptr) {
-    return;
-  }
-  auto canvas = surface->getCanvas();
-  canvas->drawTexture(texture);
-  auto pixelBuffer = PixelBuffer::Make(texture->width(), texture->height());
-  Bitmap bitmap(pixelBuffer);
-  if (bitmap.isEmpty()) {
-    return;
-  }
-  surface->readPixels(bitmap.info(), bitmap.writablePixels());
-  Trace(bitmap, path);
-}
-}  // namespace pag
+}  // namespace tgfx

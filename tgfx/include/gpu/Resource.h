@@ -20,7 +20,7 @@
 
 #include "gpu/ResourceCache.h"
 
-namespace pag {
+namespace tgfx {
 /**
  * The base class for GPU resource. Overrides the onRelease() method to to free all GPU resources.
  * No backend API calls should be made during destructuring since there may be no GPU context which
@@ -39,9 +39,14 @@ class Resource {
 
   virtual ~Resource() = default;
 
- protected:
-  Context* context = nullptr;
+  /**
+   * Retrieves the context associated with this Resource.
+   */
+  Context* getContext() const {
+    return context;
+  }
 
+ protected:
   /**
    * Overridden to compute a recycleKey to make this Resource reusable.
    */
@@ -54,6 +59,7 @@ class Resource {
   virtual void onRelease(Context* context) = 0;
 
  private:
+  Context* context = nullptr;
   std::weak_ptr<Resource> weakThis;
   BytesKey recycleKey = {};
   size_t cacheArrayIndex = 0;
@@ -61,4 +67,4 @@ class Resource {
 
   friend class ResourceCache;
 };
-}  // namespace pag
+}  // namespace tgfx

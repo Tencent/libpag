@@ -40,18 +40,18 @@ class GPUDrawable : public Drawable {
 
   void updateSize() override;
 
-  std::shared_ptr<Device> getDevice() override;
+  std::shared_ptr<tgfx::Device> getDevice() override;
 
-  std::shared_ptr<Surface> createSurface(Context* context) override;
+  std::shared_ptr<tgfx::Surface> createSurface(tgfx::Context* context) override;
 
-  void present(Context* context) override;
+  void present(tgfx::Context* context) override;
 
  private:
   int _width = 0;
   int _height = 0;
   NSView* view = nil;
   CVPixelBufferRef pixelBuffer = nil;
-  std::shared_ptr<CGLWindow> window = nullptr;
+  std::shared_ptr<tgfx::CGLWindow> window = nullptr;
 
   explicit GPUDrawable(NSView* view);
   explicit GPUDrawable(CVPixelBufferRef pixelBuffer);

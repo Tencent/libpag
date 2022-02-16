@@ -114,14 +114,14 @@ class PAGStage : public PAGComposition {
   std::unordered_set<ID> invalidAssets = {};
   std::unordered_map<ID, PAGImage*> pagImageMap = {};
 
-  static Point GetLayerContentScaleFactor(PAGLayer* pagLayer, bool isPAGImage);
+  static tgfx::Point GetLayerContentScaleFactor(PAGLayer* pagLayer, bool isPAGImage);
   PAGStage(int width, int height);
   std::shared_ptr<File> getSequenceFile(Sequence* sequence);
   void addToReferenceMap(ID uniqueID, PAGLayer* pagLayer);
   bool removeFromReferenceMap(ID uniqueID, PAGLayer* pagLayer);
   float getMaxScaleFactor(ID referenceID);
   float calcMaxScaleFactor(ID referenceID);
-  float getLayerScaleFactor(PAGLayer* pagLayer, Point scale);
+  float getLayerScaleFactor(PAGLayer* pagLayer, tgfx::Point scale);
   void updateLayerStartTime(PAGLayer* pagLayer);
   void updateChildLayerStartTime(PAGComposition* pagComposition);
 

@@ -29,12 +29,13 @@ class GlowFilter : public LayerFilter {
   explicit GlowFilter(Effect* effect);
   ~GlowFilter() override;
 
-  bool initialize(Context* context) override;
+  bool initialize(tgfx::Context* context) override;
 
-  void draw(Context* context, const FilterSource* source, const FilterTarget* target) override;
+  void draw(tgfx::Context* context, const FilterSource* source,
+            const FilterTarget* target) override;
 
-  void update(Frame frame, const Rect& contentBounds, const Rect& transformedBounds,
-              const Point& filterScale) override;
+  void update(Frame frame, const tgfx::Rect& contentBounds, const tgfx::Rect& transformedBounds,
+              const tgfx::Point& filterScale) override;
 
  private:
   Effect* effect = nullptr;
@@ -48,6 +49,6 @@ class GlowFilter : public LayerFilter {
   std::shared_ptr<FilterBuffer> blurFilterBufferH = nullptr;
   std::shared_ptr<FilterBuffer> blurFilterBufferV = nullptr;
 
-  bool checkBuffer(Context* context, int blurWidth, int blurHeight);
+  bool checkBuffer(tgfx::Context* context, int blurWidth, int blurHeight);
 };
 }  // namespace pag

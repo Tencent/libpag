@@ -26,7 +26,7 @@ namespace pag {
 class GraphicContent : public Content {
  public:
   explicit GraphicContent(std::shared_ptr<Graphic> graphic);
-  void measureBounds(Rect* bounds) override;
+  void measureBounds(tgfx::Rect* bounds) override;
   void draw(Recorder* recorder) override;
 
   std::shared_ptr<Graphic> graphic = nullptr;

@@ -24,7 +24,7 @@
 #include "core/TextBlob.h"
 #include "gpu/TextureBuffer.h"
 
-namespace pag {
+namespace tgfx {
 /**
  * Mask is a utility that can take an image described in a vector graphics format (paths, glyphs)
  * and convert it into a raster image that can be used as a drawing mask. Mask is not thread safe,
@@ -86,4 +86,4 @@ class Mask : public TextureBuffer {
   Mask(int width, int height) : TextureBuffer(width, height) {
   }
 };
-}  // namespace pag
+}  // namespace tgfx

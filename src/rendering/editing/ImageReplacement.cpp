@@ -32,12 +32,12 @@ ImageReplacement::ImageReplacement(ImageLayer* imageLayer, PAGImageHolder* image
   contentHeight = imageLayer->imageBytes->height;
 }
 
-void ImageReplacement::measureBounds(Rect* bounds) {
-  Rect contentBounds = {};
+void ImageReplacement::measureBounds(tgfx::Rect* bounds) {
+  tgfx::Rect contentBounds = {};
   auto pagImage = imageHolder->getImage(editableIndex);
   pagImage->measureBounds(&contentBounds);
   auto contentMatrix = pagImage->getContentMatrix(defaultScaleMode, contentWidth, contentHeight);
-  contentMatrix.mapRect(&contentBounds);
+  ToTGFX(contentMatrix).mapRect(&contentBounds);
   bounds->setXYWH(0, 0, contentWidth, contentHeight);
   if (!bounds->intersect(contentBounds)) {
     bounds->setEmpty();
@@ -48,16 +48,16 @@ void ImageReplacement::draw(Recorder* recorder) {
   recorder->saveClip(0, 0, static_cast<float>(contentWidth), static_cast<float>(contentHeight));
   auto pagImage = imageHolder->getImage(editableIndex);
   auto contentMatrix = pagImage->getContentMatrix(defaultScaleMode, contentWidth, contentHeight);
-  recorder->concat(contentMatrix);
+  recorder->concat(ToTGFX(contentMatrix));
   pagImage->draw(recorder);
   recorder->restore();
 }
 
-Point ImageReplacement::getScaleFactor() const {
+tgfx::Point ImageReplacement::getScaleFactor() const {
   // TODO((domrjchen):
   // 当PAGImage的适配模式或者matrix发生改变时，需要补充一个通知机制让上层重置scaleFactor。
   auto pagImage = imageHolder->getImage(editableIndex);
   auto contentMatrix = pagImage->getContentMatrix(defaultScaleMode, contentWidth, contentHeight);
-  return GetScaleFactor(contentMatrix);
+  return GetScaleFactor(ToTGFX(contentMatrix));
 }
 }  // namespace pag

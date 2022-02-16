@@ -435,13 +435,13 @@ void PAGComposition::draw(Recorder* recorder) {
 void PAGComposition::DrawChildLayer(Recorder* recorder, PAGLayer* childLayer) {
   auto filterModifier = childLayer->cacheFilters() ? nullptr : FilterModifier::Make(childLayer);
   auto trackMatte = TrackMatteRenderer::Make(childLayer);
-  Transform extraTransform = {childLayer->layerMatrix, childLayer->layerAlpha};
+  Transform extraTransform = {ToTGFX(childLayer->layerMatrix), childLayer->layerAlpha};
   LayerRenderer::DrawLayer(recorder, childLayer->layer,
                            childLayer->contentFrame + childLayer->layer->startTime, filterModifier,
                            trackMatte.get(), childLayer, &extraTransform);
 }
 
-void PAGComposition::measureBounds(Rect* bounds) {
+void PAGComposition::measureBounds(tgfx::Rect* bounds) {
   if (!contentModified() && layerCache->contentStatic()) {
     getContent()->measureBounds(bounds);
     return;
@@ -456,34 +456,34 @@ void PAGComposition::measureBounds(Rect* bounds) {
     if (!childLayer->layerVisible) {
       continue;
     }
-    Rect layerBounds = {};
+    tgfx::Rect layerBounds = {};
     MeasureChildLayer(&layerBounds, childLayer.get());
     bounds->join(layerBounds);
   }
   if (hasClip() && !bounds->isEmpty()) {
-    auto clipBounds = Rect::MakeXYWH(0, 0, _width, _height);
+    auto clipBounds = tgfx::Rect::MakeXYWH(0, 0, _width, _height);
     if (!bounds->intersect(clipBounds)) {
       bounds->setEmpty();
     }
   }
 }
 
-void PAGComposition::MeasureChildLayer(Rect* bounds, PAGLayer* childLayer) {
-  std::unique_ptr<Rect> trackMatteBounds = nullptr;
+void PAGComposition::MeasureChildLayer(tgfx::Rect* bounds, PAGLayer* childLayer) {
+  std::unique_ptr<tgfx::Rect> trackMatteBounds = nullptr;
   if (childLayer->_trackMatteLayer != nullptr) {
-    trackMatteBounds = std::unique_ptr<Rect>(new Rect());
+    trackMatteBounds = std::make_unique<tgfx::Rect>();
     trackMatteBounds->setEmpty();
     auto trackMatteLayer = childLayer->_trackMatteLayer;
     auto layerFrame = trackMatteLayer->contentFrame + trackMatteLayer->layer->startTime;
     auto filterModifier = FilterModifier::Make(trackMatteLayer.get());
-    Transform extraTransform = {trackMatteLayer->layerMatrix, trackMatteLayer->layerAlpha};
+    Transform extraTransform = {ToTGFX(trackMatteLayer->layerMatrix), trackMatteLayer->layerAlpha};
     LayerRenderer::MeasureLayerBounds(trackMatteBounds.get(), trackMatteLayer->layer, layerFrame,
                                       filterModifier, nullptr, trackMatteLayer.get(),
                                       &extraTransform);
   }
   auto layerFrame = childLayer->contentFrame + childLayer->layer->startTime;
   auto filterModifier = FilterModifier::Make(childLayer->layer, layerFrame);
-  Transform extraTransform = {childLayer->layerMatrix, childLayer->layerAlpha};
+  Transform extraTransform = {ToTGFX(childLayer->layerMatrix), childLayer->layerAlpha};
   LayerRenderer::MeasureLayerBounds(bounds, childLayer->layer, layerFrame, filterModifier,
                                     trackMatteBounds.get(), childLayer, &extraTransform);
 }
@@ -515,9 +515,9 @@ bool PAGComposition::GetTrackMatteLayerAtPoint(PAGLayer* childLayer, float x, fl
   Transform trackMatteTransform = {};
   auto trackMatteLayer = childLayer->_trackMatteLayer.get();
   if (trackMatteLayer->getTransform(&trackMatteTransform)) {
-    Point local = {x, y};
+    tgfx::Point local = {x, y};
     MapPointInverted(trackMatteTransform.matrix, &local);
-    Rect trackMatteBounds = {};
+    tgfx::Rect trackMatteBounds = {};
     trackMatteLayer->measureBounds(&trackMatteBounds);
     contains = trackMatteBounds.contains(local.x, local.y);
     if (contains) {
@@ -536,7 +536,7 @@ bool PAGComposition::GetChildLayerAtPoint(PAGLayer* childLayer, float x, float y
   if (!childLayer->getTransform(&layerTransform)) {
     return false;
   }
-  Point localPoint = {x, y};
+  tgfx::Point localPoint = {x, y};
   MapPointInverted(layerTransform.matrix, &localPoint);
   auto mask = childLayer->layerCache->getMasks(childLayer->contentFrame);
   if (mask) {
@@ -553,7 +553,7 @@ bool PAGComposition::GetChildLayerAtPoint(PAGLayer* childLayer, float x, float y
                   ->getLayersUnderPointInternal(localPoint.x, localPoint.y, results);
   }
   if (!success) {
-    Rect childBounds = {};
+    tgfx::Rect childBounds = {};
     childLayer->measureBounds(&childBounds);
     success = childBounds.contains(localPoint.x, localPoint.y);
   }
@@ -562,7 +562,7 @@ bool PAGComposition::GetChildLayerAtPoint(PAGLayer* childLayer, float x, float y
 
 bool PAGComposition::getLayersUnderPointInternal(float x, float y,
                                                  std::vector<std::shared_ptr<PAGLayer>>* results) {
-  auto bounds = Rect::MakeWH(static_cast<float>(_width), static_cast<float>(_height));
+  auto bounds = tgfx::Rect::MakeWH(static_cast<float>(_width), static_cast<float>(_height));
   if (hasClip() && !bounds.contains(x, y)) {
     return false;
   }

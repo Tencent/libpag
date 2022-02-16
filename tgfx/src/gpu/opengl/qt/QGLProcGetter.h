@@ -21,7 +21,7 @@
 #include <QOpenGLContext>
 #include "gpu/opengl/GLProcGetter.h"
 
-namespace pag {
+namespace tgfx {
 class QGLProcGetter : public GLProcGetter {
  public:
   explicit QGLProcGetter(QOpenGLContext* glContext) : glContext(glContext) {
@@ -32,4 +32,4 @@ class QGLProcGetter : public GLProcGetter {
  private:
   QOpenGLContext* glContext = nullptr;
 };
-}  // namespace pag
+}  // namespace tgfx

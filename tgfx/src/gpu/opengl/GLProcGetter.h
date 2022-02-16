@@ -20,7 +20,7 @@
 
 #include <memory>
 
-namespace pag {
+namespace tgfx {
 class GLProcGetter {
  public:
   static std::unique_ptr<GLProcGetter> Make();
@@ -29,4 +29,4 @@ class GLProcGetter {
 
   virtual void* getProcAddress(const char name[]) const = 0;
 };
-}  // namespace pag
+}  // namespace tgfx

@@ -20,7 +20,7 @@
 #include "BitmapContextUtil.h"
 #include "platform/NativeCodec.h"
 
-namespace pag {
+namespace tgfx {
 static CGImagePropertyOrientation GetOrientationFromProperties(CFDictionaryRef imageProperties) {
   CGImagePropertyOrientation orientation = kCGImagePropertyOrientationUp;
   if (imageProperties != NULL) {

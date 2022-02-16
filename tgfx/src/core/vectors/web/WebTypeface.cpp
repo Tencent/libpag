@@ -18,13 +18,13 @@
 
 #include "WebTypeface.h"
 #include <vector>
-#include "base/utils/UniqueID.h"
+#include "core/utils/UniqueID.h"
 #include "platform/web/NativeTextureBuffer.h"
 #include "rendering/FontManager.h"
 
 using namespace emscripten;
 
-namespace pag {
+namespace tgfx {
 std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& name, const std::string&) {
   return WebTypeface::Make(name);
 }
@@ -154,4 +154,4 @@ std::shared_ptr<TextureBuffer> WebTypeface::getGlyphImage(GlyphID glyphID, float
   }
   return NativeTextureBuffer::Make(buffer.call<int>("width"), buffer.call<int>("height"), buffer);
 }
-}  // namespace pag
+}  // namespace tgfx

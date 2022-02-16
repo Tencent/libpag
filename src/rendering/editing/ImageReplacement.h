@@ -24,9 +24,9 @@ class ImageReplacement : public Content {
  public:
   ImageReplacement(ImageLayer* imageLayer, PAGImageHolder* imageHolder, int editableIndex);
 
-  void measureBounds(Rect* bounds) override;
+  void measureBounds(tgfx::Rect* bounds) override;
   void draw(Recorder* recorder) override;
-  Point getScaleFactor() const;
+  tgfx::Point getScaleFactor() const;
 
  private:
   PAGImageHolder* imageHolder = nullptr;

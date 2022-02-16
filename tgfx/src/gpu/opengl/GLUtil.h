@@ -20,13 +20,12 @@
 
 #include <array>
 #include <string>
-
 #include "GLInterface.h"
+#include "core/ImageOrigin.h"
+#include "core/Matrix.h"
 #include "gpu/opengl/GLContext.h"
-#include "pag/gpu.h"
-#include "pag/types.h"
 
-namespace pag {
+namespace tgfx {
 struct GLVersion {
   int majorVersion = -1;
   int minorVersion = -1;
@@ -39,24 +38,25 @@ struct GLVersion {
 
 GLVersion GetGLVersion(const char* versionString);
 
-unsigned CreateProgram(const GLInterface* gl, const std::string& vertex,
-                       const std::string& fragment);
+unsigned CreateGLProgram(const GLInterface* gl, const std::string& vertex,
+                         const std::string& fragment);
 
-unsigned LoadShader(const GLInterface* gl, unsigned shaderType, const std::string& source);
+unsigned LoadGLShader(const GLInterface* gl, unsigned shaderType, const std::string& source);
 
 bool CheckGLError(const GLInterface* gl);
 
-bool CreateTexture(const GLInterface* gl, int width, int height, GLTextureInfo* texture);
+bool CreateGLTexture(const GLInterface* gl, int width, int height, GLTextureInfo* texture);
 
-void ActiveTexture(const GLInterface* gl, unsigned textureUnit, unsigned target, unsigned textureID,
-                   PixelConfig pixelConfig = PixelConfig::RGBA_8888);
+void ActiveGLTexture(const GLInterface* gl, unsigned textureUnit, unsigned target,
+                     unsigned textureID, PixelConfig pixelConfig = PixelConfig::RGBA_8888);
 
-void SubmitTexture(const GLInterface* gl, const GLTextureInfo& glInfo, const TextureFormat& format,
-                   int width, int height, size_t rowBytes, int bytesPerPixel, void* pixels);
+void SubmitGLTexture(const GLInterface* gl, const GLTextureInfo& glInfo,
+                     const TextureFormat& format, int width, int height, size_t rowBytes,
+                     int bytesPerPixel, void* pixels);
 
 std::array<float, 9> ToGLMatrix(const Matrix& matrix);
 std::array<float, 9> ToGLVertexMatrix(const Matrix& matrix, int width, int height,
                                       ImageOrigin origin);
 std::array<float, 9> ToGLTextureMatrix(const Matrix& matrix, int width, int height,
                                        ImageOrigin origin);
-}  // namespace pag
+}  // namespace tgfx

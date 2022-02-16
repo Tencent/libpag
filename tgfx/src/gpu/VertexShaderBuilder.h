@@ -20,7 +20,7 @@
 
 #include "ShaderBuilder.h"
 
-namespace pag {
+namespace tgfx {
 class VertexShaderBuilder : public ShaderBuilder {
  public:
   explicit VertexShaderBuilder(ProgramBuilder* program) : ShaderBuilder(program) {
@@ -31,4 +31,4 @@ class VertexShaderBuilder : public ShaderBuilder {
  private:
   void onFinalize() override;
 };
-}  // namespace pag
+}  // namespace tgfx

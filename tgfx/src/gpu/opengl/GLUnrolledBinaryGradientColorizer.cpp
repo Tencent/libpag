@@ -19,7 +19,7 @@
 #include "GLUnrolledBinaryGradientColorizer.h"
 #include "gpu/gradients/UnrolledBinaryGradientColorizer.h"
 
-namespace pag {
+namespace tgfx {
 UniformHandle AddUniform(UniformHandler* uniformHandler, const std::string& name, int intervalCount,
                          int limit, std::string* out) {
   if (intervalCount > limit) {
@@ -194,7 +194,7 @@ void GLUnrolledBinaryGradientColorizer::emitCode(EmitArgs& args) {
 }
 
 void SetUniformData(const ProgramDataManager& programDataManager, const UniformHandle& handle,
-                    const Color4f& current, Color4f* previous) {
+                    const Color& current, Color* previous) {
   if (handle.isValid() && current != *previous) {
     *previous = current;
     programDataManager.set4fv(handle, 1, current.array());
@@ -235,4 +235,4 @@ void GLUnrolledBinaryGradientColorizer::onSetData(const ProgramDataManager& prog
                               reinterpret_cast<const float*>(&(fp.thresholds9_13)));
   }
 }
-}  // namespace pag
+}  // namespace tgfx

@@ -17,13 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ClampedGradientEffect.h"
-#include "base/utils/UniqueID.h"
+#include "core/utils/UniqueID.h"
 #include "gpu/opengl/GLClampedGradientEffect.h"
 
-namespace pag {
+namespace tgfx {
 std::unique_ptr<ClampedGradientEffect> ClampedGradientEffect::Make(
     std::unique_ptr<FragmentProcessor> colorizer, std::unique_ptr<FragmentProcessor> gradLayout,
-    Color4f leftBorderColor, Color4f rightBorderColor, bool makePremultiply) {
+    Color leftBorderColor, Color rightBorderColor, bool makePremultiply) {
   return std::unique_ptr<ClampedGradientEffect>(
       new ClampedGradientEffect(std::move(colorizer), std::move(gradLayout), leftBorderColor,
                                 rightBorderColor, makePremultiply));
@@ -42,7 +42,7 @@ std::unique_ptr<GLFragmentProcessor> ClampedGradientEffect::onCreateGLInstance()
 
 ClampedGradientEffect::ClampedGradientEffect(std::unique_ptr<FragmentProcessor> colorizer,
                                              std::unique_ptr<FragmentProcessor> gradLayout,
-                                             Color4f leftBorderColor, Color4f rightBorderColor,
+                                             Color leftBorderColor, Color rightBorderColor,
                                              bool makePremultiplied)
     : leftBorderColor(leftBorderColor),
       rightBorderColor(rightBorderColor),
@@ -50,4 +50,4 @@ ClampedGradientEffect::ClampedGradientEffect(std::unique_ptr<FragmentProcessor> 
   colorizerIndex = registerChildProcessor(std::move(colorizer));
   gradLayoutIndex = registerChildProcessor(std::move(gradLayout));
 }
-}  // namespace pag
+}  // namespace tgfx

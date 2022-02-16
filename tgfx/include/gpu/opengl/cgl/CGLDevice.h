@@ -21,7 +21,7 @@
 #include <AppKit/AppKit.h>
 #include "gpu/opengl/GLDevice.h"
 
-namespace pag {
+namespace tgfx {
 class CGLDevice : public GLDevice {
  public:
   /**
@@ -55,4 +55,4 @@ class CGLDevice : public GLDevice {
   friend class GLDevice;
   friend class CGLWindow;
 };
-}  // namespace pag
+}  // namespace tgfx

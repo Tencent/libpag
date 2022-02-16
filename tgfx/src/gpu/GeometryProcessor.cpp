@@ -18,7 +18,7 @@
 
 #include "GeometryProcessor.h"
 
-namespace pag {
+namespace tgfx {
 /**
  * Returns the size of the attrib type in bytes.
  */
@@ -58,4 +58,4 @@ void GeometryProcessor::setVertexAttributes(const Attribute* attrs, int attrCoun
     attributes.push_back(attrs + i);
   }
 }
-}  // namespace pag
+}  // namespace tgfx

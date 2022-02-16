@@ -20,10 +20,10 @@
 
 #include "gpu/Shader.h"
 
-namespace pag {
+namespace tgfx {
 class ColorShader : public Shader {
  public:
-  explicit ColorShader(Color4f color) : color(color) {
+  explicit ColorShader(Color color) : color(color) {
   }
 
   bool isOpaque() const override;
@@ -31,6 +31,6 @@ class ColorShader : public Shader {
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const override;
 
  private:
-  Color4f color;
+  Color color;
 };
-}  // namespace pag
+}  // namespace tgfx

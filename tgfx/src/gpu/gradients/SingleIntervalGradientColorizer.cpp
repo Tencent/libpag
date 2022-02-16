@@ -17,12 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SingleIntervalGradientColorizer.h"
-#include "base/utils/UniqueID.h"
+#include "core/utils/UniqueID.h"
 #include "gpu/opengl/GLSingleIntervalGradientColorizer.h"
 
-namespace pag {
-std::unique_ptr<SingleIntervalGradientColorizer> SingleIntervalGradientColorizer::Make(
-    Color4f start, Color4f end) {
+namespace tgfx {
+std::unique_ptr<SingleIntervalGradientColorizer> SingleIntervalGradientColorizer::Make(Color start,
+                                                                                       Color end) {
   return std::unique_ptr<SingleIntervalGradientColorizer>(
       new SingleIntervalGradientColorizer(start, end));
 }
@@ -35,4 +35,4 @@ void SingleIntervalGradientColorizer::onComputeProcessorKey(BytesKey* bytesKey) 
 std::unique_ptr<GLFragmentProcessor> SingleIntervalGradientColorizer::onCreateGLInstance() const {
   return std::make_unique<GLSingleIntervalGradientColorizer>();
 }
-}  // namespace pag
+}  // namespace tgfx

@@ -19,19 +19,19 @@
 #pragma once
 
 #include <memory>
-#include "pag/types.h"
+#include "core/Data.h"
 
-namespace pag {
+namespace tgfx {
 struct FTFontData {
   FTFontData(std::string path, int ttcIndex) : path(std::move(path)), ttcIndex(ttcIndex) {
   }
 
   FTFontData(const void* data, size_t length, int ttcIndex)
-      : data(ByteData::MakeCopy(data, length)), ttcIndex(ttcIndex) {
+      : data(Data::MakeWithCopy(data, length)), ttcIndex(ttcIndex) {
   }
 
   std::string path;
-  std::unique_ptr<ByteData> data;
+  std::shared_ptr<Data> data;
   int ttcIndex = -1;
 };
-}  // namespace pag
+}  // namespace tgfx

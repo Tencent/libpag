@@ -18,10 +18,10 @@
 
 #pragma once
 
-#include "core/utils/BytesKey.h"
+#include "core/BytesKey.h"
 #include "gpu/Context.h"
 
-namespace pag {
+namespace tgfx {
 /**
  * The base class for GPU program. Overrides the onRelease() method to to free all GPU resources.
  * No backend API calls should be made during destructuring since there may be no GPU context which
@@ -56,4 +56,4 @@ class ProgramCreator {
    */
   virtual std::unique_ptr<Program> createProgram(Context* context) const = 0;
 };
-}  // namespace pag
+}  // namespace tgfx

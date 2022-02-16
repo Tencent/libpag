@@ -20,7 +20,7 @@
 
 #include "GLContext.h"
 
-namespace pag {
+namespace tgfx {
 #define PRIORITY_HIGH 3
 #define PRIORITY_MEDIUM 2
 #define PRIORITY_DEFAULT 1
@@ -1106,4 +1106,4 @@ GLStateGuard::~GLStateGuard() {
   state->restore();
 }
 
-}  // namespace pag
+}  // namespace tgfx

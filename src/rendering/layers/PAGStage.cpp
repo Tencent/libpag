@@ -328,8 +328,8 @@ float PAGStage::calcMaxScaleFactor(ID referenceID) {
   return maxScaleFactor;
 }
 
-Point PAGStage::GetLayerContentScaleFactor(PAGLayer* pagLayer, bool isPAGImage) {
-  Point scale = {1, 1};
+tgfx::Point PAGStage::GetLayerContentScaleFactor(PAGLayer* pagLayer, bool isPAGImage) {
+  tgfx::Point scale = {1, 1};
   if (pagLayer->layerType() == LayerType::Image) {
     if (isPAGImage) {
       scale = static_cast<PAGImageLayer*>(pagLayer)->replacement->getScaleFactor();
@@ -350,13 +350,13 @@ Point PAGStage::GetLayerContentScaleFactor(PAGLayer* pagLayer, bool isPAGImage) 
   return scale;
 }
 
-float PAGStage::getLayerScaleFactor(PAGLayer* pagLayer, Point scale) {
+float PAGStage::getLayerScaleFactor(PAGLayer* pagLayer, tgfx::Point scale) {
   auto parent = pagLayer;
   while (parent) {
     auto layerScaleFactor = parent->layerCache->getMaxScaleFactor();
     scale.x *= fabs(layerScaleFactor.x);
     scale.y *= fabs(layerScaleFactor.y);
-    auto matrixScaleFactor = GetScaleFactor(parent->layerMatrix);
+    auto matrixScaleFactor = GetScaleFactor(ToTGFX(parent->layerMatrix));
     scale.x *= fabs(matrixScaleFactor.x);
     scale.y *= fabs(matrixScaleFactor.y);
     if (parent->_parent) {

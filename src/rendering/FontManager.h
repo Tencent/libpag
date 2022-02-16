@@ -23,7 +23,6 @@
 #include "pag/pag.h"
 
 namespace pag {
-
 class TypefaceHolder {
  public:
   static std::shared_ptr<TypefaceHolder> MakeFromName(const std::string& fontFamily,
@@ -32,21 +31,22 @@ class TypefaceHolder {
   static std::shared_ptr<TypefaceHolder> MakeFromFile(const std::string& fontPath,
                                                       int ttcIndex = 0);
 
-  std::shared_ptr<Typeface> getTypeface();
+  std::shared_ptr<tgfx::Typeface> getTypeface();
 
  private:
   std::string fontFamily;
   std::string fontStyle;
   std::string fontPath;
   int ttcIndex = 0;
-  std::shared_ptr<Typeface> typeface = nullptr;
+  std::shared_ptr<tgfx::Typeface> typeface = nullptr;
 };
 
 class FontManager {
  public:
-  static std::shared_ptr<Typeface> GetTypefaceWithoutFallback(const std::string& fontFamily,
-                                                              const std::string& fontStyle);
-  static std::shared_ptr<Typeface> GetFallbackTypeface(const std::string& name, GlyphID* glyphID);
+  static std::shared_ptr<tgfx::Typeface> GetTypefaceWithoutFallback(const std::string& fontFamily,
+                                                                    const std::string& fontStyle);
+  static std::shared_ptr<tgfx::Typeface> GetFallbackTypeface(const std::string& name,
+                                                             tgfx::GlyphID* glyphID);
 
   static PAGFont RegisterFont(const std::string& fontPath, int ttcIndex,
                               const std::string& fontFamily, const std::string& fontStyle);
@@ -72,27 +72,28 @@ class FontManager {
   PAGFont registerFont(const void* data, size_t length, int ttcIndex = 0,
                        const std::string& fontFamily = "", const std::string& fontStyle = "");
 
-  PAGFont registerFont(std::shared_ptr<Typeface> typeface, const std::string& fontFamily = "",
+  PAGFont registerFont(std::shared_ptr<tgfx::Typeface> typeface, const std::string& fontFamily = "",
                        const std::string& fontStyle = "");
 
   void unregisterFont(const PAGFont& font);
 
-  std::shared_ptr<Typeface> getTypefaceWithoutFallback(const std::string& fontFamily,
-                                                       const std::string& fontStyle);
+  std::shared_ptr<tgfx::Typeface> getTypefaceWithoutFallback(const std::string& fontFamily,
+                                                             const std::string& fontStyle);
 
-  std::shared_ptr<Typeface> getFallbackTypeface(const std::string& name, GlyphID* glyphID);
+  std::shared_ptr<tgfx::Typeface> getFallbackTypeface(const std::string& name,
+                                                      tgfx::GlyphID* glyphID);
 
   void setFallbackFontNames(const std::vector<std::string>& fontNames);
 
   void setFallbackFontPaths(const std::vector<std::string>& fontPaths,
                             const std::vector<int>& ttcIndices);
 
-  std::unordered_map<std::string, std::shared_ptr<Typeface>> registeredFontMap;
+  std::unordered_map<std::string, std::shared_ptr<tgfx::Typeface>> registeredFontMap;
   std::vector<std::shared_ptr<TypefaceHolder>> fallbackFontList;
   std::mutex locker = {};
 
-  std::shared_ptr<Typeface> getTypefaceFromCache(const std::string& fontFamily,
-                                                 const std::string& fontStyle);
+  std::shared_ptr<tgfx::Typeface> getTypefaceFromCache(const std::string& fontFamily,
+                                                       const std::string& fontStyle);
 
   friend class PAGFont;
 };

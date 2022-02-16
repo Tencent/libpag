@@ -19,8 +19,8 @@
 #include "JNIInit.h"
 #include "NativeImage.h"
 
-namespace pag {
+namespace tgfx {
 void JNIInit(JNIEnv* env) {
   NativeImage::JNIInit(env);
 }
-}  // namespace pag
+}  // namespace tgfx

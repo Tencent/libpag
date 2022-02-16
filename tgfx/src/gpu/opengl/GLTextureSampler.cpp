@@ -19,10 +19,10 @@
 #include "GLTextureSampler.h"
 #include "GLContext.h"
 
-namespace pag {
+namespace tgfx {
 void GLTextureSampler::computeKey(Context* context, BytesKey* bytesKey) const {
   const auto* gl = GLContext::Unwrap(context);
   bytesKey->write(static_cast<uint32_t>(gl->caps->configTextureSwizzle(config).asKey()));
   bytesKey->write(glInfo.target);
 }
-}  // namespace pag
+}  // namespace tgfx

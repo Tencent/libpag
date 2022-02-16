@@ -20,7 +20,7 @@
 
 #include "gpu/QuadPerEdgeAAGeometryProcessor.h"
 
-namespace pag {
+namespace tgfx {
 std::unique_ptr<GeometryProcessor> GLFillRectOp::getGeometryProcessor(const DrawArgs& args) {
   return QuadPerEdgeAAGeometryProcessor::Make(
       args.renderTarget->width(), args.renderTarget->height(), args.viewMatrix, args.aa);
@@ -83,4 +83,4 @@ std::shared_ptr<GLBuffer> GLFillRectOp::getIndexBuffer(const DrawArgs& args) {
   }
   return nullptr;
 }
-}  // namespace pag
+}  // namespace tgfx

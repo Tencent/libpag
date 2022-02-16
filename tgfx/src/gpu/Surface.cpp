@@ -18,7 +18,7 @@
 
 #include "gpu/Surface.h"
 
-namespace pag {
+namespace tgfx {
 Surface::Surface(Context* context) : context(context) {
 }
 
@@ -32,4 +32,4 @@ bool Surface::hitTest(float x, float y) const {
   auto result = onReadPixels(info, pixel, static_cast<int>(x), static_cast<int>(y));
   return result && pixel[3] > 0;
 }
-}  // namespace pag
+}  // namespace tgfx

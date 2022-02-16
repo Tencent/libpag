@@ -18,7 +18,7 @@
 
 #pragma once
 
-namespace pag {
+namespace tgfx {
 /**
  * Writes an output message pointed by format to the log facility of native platform.
  */
@@ -28,4 +28,4 @@ void PrintLog(const char format[], ...);
    * Writes an error message pointed by format to the log facility of native platform.
  */
 void PrintError(const char format[], ...);
-}  // namespace pag
+}  // namespace tgfx

@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GaussBlurFilter.h"
-#include "gpu/opengl/GLUtil.h"
 #include "rendering/filters/utils/FilterHelper.h"
 
 namespace pag {
@@ -31,7 +30,7 @@ GaussBlurFilter::~GaussBlurFilter() {
   delete blurFilterH;
 }
 
-bool GaussBlurFilter::initialize(Context* context) {
+bool GaussBlurFilter::initialize(tgfx::Context* context) {
   if (!blurFilterV->initialize(context)) {
     return false;
   }
@@ -41,8 +40,8 @@ bool GaussBlurFilter::initialize(Context* context) {
   return true;
 }
 
-void GaussBlurFilter::update(Frame frame, const Rect& contentBounds, const Rect& transformedBounds,
-                             const Point& filterScale) {
+void GaussBlurFilter::update(Frame frame, const tgfx::Rect& contentBounds,
+                             const tgfx::Rect& transformedBounds, const tgfx::Point& filterScale) {
   LayerFilter::update(frame, contentBounds, transformedBounds, filterScale);
 
   auto* gaussBlurEffect = static_cast<FastBlurEffect*>(effect);
@@ -74,7 +73,7 @@ void GaussBlurFilter::update(Frame frame, const Rect& contentBounds, const Rect&
   filtersBounds.emplace_back(transformedBounds);
 }
 
-void GaussBlurFilter::draw(Context* context, const FilterSource* source,
+void GaussBlurFilter::draw(tgfx::Context* context, const FilterSource* source,
                            const FilterTarget* target) {
   if (source == nullptr || target == nullptr) {
     LOGE("GaussFilter::draw() can not draw filter");
@@ -102,20 +101,20 @@ void GaussBlurFilter::draw(Context* context, const FilterSource* source,
       if (blurFilterBuffer == nullptr) {
         return;
       }
-      auto gl = GLContext::Unwrap(context);
+      auto gl = tgfx::GLContext::Unwrap(context);
       blurFilterBuffer->clearColor(gl);
 
       auto offsetMatrix =
-          Matrix::MakeTrans((contentBounds.left - blurVBounds.left) * source->scale.x,
-                            (contentBounds.top - blurVBounds.top) * source->scale.y);
+          tgfx::Matrix::MakeTrans((contentBounds.left - blurVBounds.left) * source->scale.x,
+                                  (contentBounds.top - blurVBounds.top) * source->scale.y);
       auto targetV = blurFilterBuffer->toFilterTarget(offsetMatrix);
       blurFilterV->draw(context, source, targetV.get());
 
       auto sourceH = blurFilterBuffer->toFilterSource(source->scale);
       blurFilterH->updateParams(blurriness, 1.0f, repeatEdge, BlurMode::Picture);
-      Matrix revertMatrix =
-          Matrix::MakeTrans((blurVBounds.left - contentBounds.left) * source->scale.x,
-                            (blurVBounds.top - contentBounds.top) * source->scale.y);
+      tgfx::Matrix revertMatrix =
+          tgfx::Matrix::MakeTrans((blurVBounds.left - contentBounds.left) * source->scale.x,
+                                  (blurVBounds.top - contentBounds.top) * source->scale.y);
       auto targetH = *target;
       PreConcatMatrix(&targetH, revertMatrix);
       blurFilterH->draw(context, sourceH.get(), &targetH);

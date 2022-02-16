@@ -18,7 +18,7 @@
 
 #pragma once
 
-namespace pag {
+namespace tgfx {
 class FontMetrics {
  public:
   /**
@@ -79,4 +79,4 @@ struct GlyphMetrics {
   float advanceX = 0;
   float advanceY = 0;
 };
-}  // namespace pag
+}  // namespace tgfx

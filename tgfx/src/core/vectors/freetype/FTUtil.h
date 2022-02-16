@@ -23,7 +23,7 @@
 #include "ft2build.h"
 #include FT_FREETYPE_H
 
-namespace pag {
+namespace tgfx {
 inline FT_F26Dot6 FloatToFDot6(float x) {
   return static_cast<FT_F26Dot6>(x * 64.f);
 }
@@ -62,4 +62,4 @@ class FTLibrary {
   FT_Library _library = nullptr;
 };
 
-}  // namespace pag
+}  // namespace tgfx

@@ -19,16 +19,15 @@
 #pragma once
 
 #include <climits>
-#include "core/Color4f.h"
+#include "core/Color.h"
 #include "gpu/FragmentProcessor.h"
 
-namespace pag {
+namespace tgfx {
 class ClampedGradientEffect : public FragmentProcessor {
  public:
   static std::unique_ptr<ClampedGradientEffect> Make(std::unique_ptr<FragmentProcessor> colorizer,
                                                      std::unique_ptr<FragmentProcessor> gradLayout,
-                                                     Color4f leftBorderColor,
-                                                     Color4f rightBorderColor,
+                                                     Color leftBorderColor, Color rightBorderColor,
                                                      bool makePremultiply);
 
   std::string name() const override {
@@ -41,15 +40,15 @@ class ClampedGradientEffect : public FragmentProcessor {
 
  private:
   ClampedGradientEffect(std::unique_ptr<FragmentProcessor> colorizer,
-                        std::unique_ptr<FragmentProcessor> gradLayout, Color4f leftBorderColor,
-                        Color4f rightBorderColor, bool makePremultiplied);
+                        std::unique_ptr<FragmentProcessor> gradLayout, Color leftBorderColor,
+                        Color rightBorderColor, bool makePremultiplied);
 
   size_t colorizerIndex = ULONG_MAX;
   size_t gradLayoutIndex = ULONG_MAX;
-  Color4f leftBorderColor;
-  Color4f rightBorderColor;
+  Color leftBorderColor;
+  Color rightBorderColor;
   bool makePremultiply;
 
   friend class GLClampedGradientEffect;
 };
-}  // namespace pag
+}  // namespace tgfx

@@ -501,24 +501,18 @@ struct PAG_API Rect {
    * Returns true if Rect intersects construction.
    * Returns false if either construction or Rect is empty, or do not intersect.
    */
-  bool intersects(float l, float t, float r, float b) const {
-    return Intersects(left, top, right, bottom, l, t, r, b);
-  }
+  bool intersects(float l, float t, float r, float b) const;
 
   /**
    * Returns true if Rect intersects r. Returns false if either r or Rect is empty, or do not
    * intersect.
    */
-  bool intersects(const Rect& r) const {
-    return Intersects(left, top, right, bottom, r.left, r.top, r.right, r.bottom);
-  }
+  bool intersects(const Rect& r) const;
 
   /**
    * Returns true if a intersects b. Returns false if either a or b is empty, or do not intersect.
    */
-  static bool Intersects(const Rect& a, const Rect& b) {
-    return Intersects(a.left, a.top, a.right, a.bottom, b.left, b.top, b.right, b.bottom);
-  }
+  static bool Intersects(const Rect& a, const Rect& b);
 
   /**
    * Constructs Rect to intersect from (left, top, right, bottom). Does not sort construction.
@@ -554,64 +548,25 @@ struct PAG_API Rect {
    * Sets Rect by discarding the fractional portion of left and top; and rounding up right and
    * bottom.
    */
-  void roundOut() {
-    left = floorf(left);
-    top = floorf(top);
-    right = ceilf(right);
-    bottom = ceilf(bottom);
-  }
+  void roundOut();
 
   /**
    * Sets Rect by rounding of left, top,  right and bottom.
    */
-  void round() {
-    left = roundf(left);
-    top = roundf(top);
-    right = roundf(right);
-    bottom = roundf(bottom);
-  }
+  void round();
 
   /**
    * Swaps left and right if left is greater than right; and swaps top and bottom if top is
    * greater than bottom. Result may be empty; and width() and height() will be zero or positive.
    */
-  void sort() {
-    if (left > right) {
-      std::swap(left, right);
-    }
-
-    if (top > bottom) {
-      std::swap(top, bottom);
-    }
-  }
+  void sort();
 
   /**
    * Returns Rect with left and right swapped if left is greater than right, and with top and
    * bottom swapped if top is greater than bottom. Result may be empty, and width() and height()
    * will be zero or positive.
    */
-  Rect makeSorted() const {
-    return MakeLTRB(std::min(left, right), std::min(top, bottom), std::max(left, right),
-                    std::max(top, bottom));
-  }
-
- private:
-  static bool Intersects(float al, float at, float ar, float ab, float bl, float bt, float br,
-                         float bb) {
-    float L = al > bl ? al : bl;
-    float R = ar < br ? ar : br;
-    float T = at > bt ? at : bt;
-    float B = ab < bb ? ab : bb;
-    return L < R && T < B;
-  }
-};
-
-/**
- * Round Rect.
- */
-struct RRect {
-  Rect rect = Rect::MakeEmpty();
-  Point radii = Point::Zero();
+  Rect makeSorted() const;
 };
 
 /***
@@ -1090,15 +1045,7 @@ class PAG_API Matrix {
    * If this matrix can be inverted, return true and if inverse is not null, set inverse to be the
    * inverse of this matrix. If this matrix cannot be inverted, ignore inverse and return false.
    */
-  bool invert(Matrix* inverse) const {
-    if (this->isIdentity()) {
-      if (inverse) {
-        inverse->reset();
-      }
-      return true;
-    }
-    return this->invertNonIdentity(inverse);
-  }
+  bool invert(Matrix* inverse) const;
 
   bool invertible() const;
 
@@ -1292,10 +1239,6 @@ class PAG_API Matrix {
   static constexpr int PERSP_0 = 6;  //!< input x perspective factor
   static constexpr int PERSP_1 = 7;  //!< input y perspective factor
   static constexpr int PERSP_2 = 8;  //!< perspective bias
-
-  void setScaleTranslate(float sx, float sy, float tx, float ty);
-  bool invertNonIdentity(Matrix* inverse) const;
-  bool getMinMaxScaleFactors(float results[2]) const;
 };
 
 /**

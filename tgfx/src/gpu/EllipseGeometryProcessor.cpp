@@ -18,10 +18,10 @@
 
 #include "EllipseGeometryProcessor.h"
 
-#include "base/utils/UniqueID.h"
+#include "core/utils/UniqueID.h"
 #include "gpu/opengl/GLEllipseGeometryProcessor.h"
 
-namespace pag {
+namespace tgfx {
 std::unique_ptr<EllipseGeometryProcessor> EllipseGeometryProcessor::Make(int width, int height,
                                                                          bool stroke, bool useScale,
                                                                          const Matrix& localMatrix,
@@ -59,4 +59,4 @@ void EllipseGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
 std::unique_ptr<GLGeometryProcessor> EllipseGeometryProcessor::createGLInstance() const {
   return std::make_unique<GLEllipseGeometryProcessor>();
 }
-}  // namespace pag
+}  // namespace tgfx

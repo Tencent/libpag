@@ -19,13 +19,13 @@
 #include "core/images/webp/WebpUtility.h"
 #include <cstdint>
 #include <cstdio>
-#include "base/utils/Log.h"
+#include "core/utils/Log.h"
 #include "core/utils/OrientationHelper.h"
 #include "webp/decode.h"
 #include "webp/demux.h"
 #include "webp/encode.h"
 
-namespace pag {
+namespace tgfx {
 
 #define VP8L_MAGIC_BYTE 0x2f      // VP8L signature byte.
 #define VP8L_FRAME_HEADER_SIZE 5  // Size of the VP8L frame header.
@@ -339,4 +339,4 @@ DecodeInfo WebpUtility::getDecodeInfo(const void* fileBytes, size_t byteLength) 
   return {width, height, origin};
 }
 
-}  // namespace pag
+}  // namespace tgfx

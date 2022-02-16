@@ -24,8 +24,8 @@
 namespace pag {
 class LzmaUtil {
  public:
-  static std::shared_ptr<Data> Compress(const std::shared_ptr<Data>& pixelData);
+  static std::shared_ptr<tgfx::Data> Compress(const std::shared_ptr<tgfx::Data>& pixelData);
 
-  static std::shared_ptr<Data> Decompress(const std::shared_ptr<Data>& data);
+  static std::shared_ptr<tgfx::Data> Decompress(const std::shared_ptr<tgfx::Data>& data);
 };
 }  // namespace pag

@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/opengl/webgl/WebGLWindow.h"
-#include "base/utils/Log.h"
+#include "core/utils/Log.h"
 #include "gpu/opengl/GLDefines.h"
 
-namespace pag {
+namespace tgfx {
 std::shared_ptr<WebGLWindow> WebGLWindow::MakeFrom(const std::string& canvasID) {
   if (canvasID.empty()) {
     return nullptr;
@@ -51,4 +51,4 @@ std::shared_ptr<Surface> WebGLWindow::onCreateSurface(Context* context) {
   BackendRenderTarget renderTarget(glInfo, width, height);
   return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
 }
-}  // namespace pag
+}  // namespace tgfx

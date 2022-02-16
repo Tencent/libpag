@@ -150,7 +150,7 @@ bool GPUDecoder::resetVideoToolBox() {
                         kCVPixelBufferIOSurfacePropertiesKey};
 
   uint32_t openGLESCompatibility = true;
-  uint32_t pixelFormatType = colorRange == YUVColorRange::JPEG
+  uint32_t pixelFormatType = colorRange == tgfx::YUVColorRange::JPEG
                                  ? kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
                                  : kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange;
 
@@ -178,7 +178,7 @@ bool GPUDecoder::resetVideoToolBox() {
   CFRelease(ioSurfaceParam);
 
   if (@available(iOS 10.0, *)) {
-    if (sourceColorSpace == YUVColorSpace::Rec2020) {
+    if (sourceColorSpace == tgfx::YUVColorSpace::Rec2020) {
       CFStringRef destinationColorPrimaries = CFStringCreateWithCString(
           kCFAllocatorDefault, "DestinationColorPrimaries", kCFStringEncodingUTF8);
       CFStringRef destinationTransferFunction = CFStringCreateWithCString(
@@ -203,7 +203,7 @@ bool GPUDecoder::resetVideoToolBox() {
       CFRelease(destinationYCbCrMatrix);
       CFRelease(pixelTransferProperties);
 
-      destinationColorSpace = YUVColorSpace::Rec709;
+      destinationColorSpace = tgfx::YUVColorSpace::Rec709;
     }
   }
 

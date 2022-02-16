@@ -22,7 +22,7 @@
 #include "core/Path.h"
 #include "core/Stroke.h"
 
-namespace pag {
+namespace tgfx {
 /**
  * TextBlob combines multiple glyphs, Font, and positions into an immutable container.
  */
@@ -66,4 +66,4 @@ class TextBlob {
 
   friend class Mask;
 };
-}  // namespace pag
+}  // namespace tgfx

@@ -22,6 +22,8 @@
 #include "gpu/opengl/GLUtil.h"
 
 namespace pag {
+using namespace tgfx;
+
 PAG_TEST_SUIT(GLUtilTest)
 
 int i = 0;

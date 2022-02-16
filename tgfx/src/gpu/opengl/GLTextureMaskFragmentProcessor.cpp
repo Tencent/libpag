@@ -19,7 +19,7 @@
 #include "GLTextureMaskFragmentProcessor.h"
 #include "gpu/TextureMaskFragmentProcessor.h"
 
-namespace pag {
+namespace tgfx {
 void GLTextureMaskFragmentProcessor::emitCode(EmitArgs& args) {
   const auto* textureFP = static_cast<const TextureMaskFragmentProcessor*>(args.fragmentProcessor);
   auto* fragBuilder = args.fragBuilder;
@@ -67,4 +67,4 @@ void GLTextureMaskFragmentProcessor::onSetData(const ProgramDataManager& program
     }
   }
 }
-}  // namespace pag
+}  // namespace tgfx

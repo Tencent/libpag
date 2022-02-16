@@ -19,12 +19,12 @@
 #include "ResourceCache.h"
 #include <unordered_map>
 #include <unordered_set>
-#include "base/utils/GetTimer.h"
-#include "base/utils/Log.h"
-#include "core/utils/BytesKey.h"
+#include "core/BytesKey.h"
+#include "core/Performance.h"
+#include "core/utils/Log.h"
 #include "gpu/Resource.h"
 
-namespace pag {
+namespace tgfx {
 static thread_local std::unordered_set<ResourceCache*> currentThreadCaches = {};
 
 class PurgeGuard {
@@ -98,7 +98,7 @@ void ResourceCache::releaseAll(bool releaseGPU) {
 
 void ResourceCache::purgeNotUsedIn(int64_t usNotUsed) {
   PurgeGuard guard(this);
-  auto currentTime = GetTimer();
+  auto currentTime = Performance::Now();
   std::unordered_map<BytesKey, std::vector<Resource*>, BytesHasher> recycledMap = {};
   for (auto& item : recycledResources) {
     std::vector<Resource*> needToRecycle = {};
@@ -178,7 +178,7 @@ void ResourceCache::removeResource(Resource* resource) {
   DEBUG_ASSERT(context->device()->contextLocked);
   RemoveFromList(nonpurgeableResources, resource);
   if (resource->recycleKey.isValid()) {
-    resource->lastUsedTime = GetTimer();
+    resource->lastUsedTime = Performance::Now();
     recycledResources[resource->recycleKey].push_back(resource);
   } else {
     purgingResource = true;
@@ -187,4 +187,4 @@ void ResourceCache::removeResource(Resource* resource) {
     delete resource;
   }
 }
-}  // namespace pag
+}  // namespace tgfx

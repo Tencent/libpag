@@ -19,7 +19,7 @@
 #pragma once
 #include <cstring>
 
-namespace pag {
+namespace tgfx {
 #if !defined(GL_FUNCTION_TYPE)
 #if defined(_WIN32) && !defined(_WIN32_WCE) && !defined(__SCITECH_SNAP__)
 #define GL_FUNCTION_TYPE __stdcall
@@ -203,4 +203,4 @@ class GLFunction<R GL_FUNCTION_TYPE(Args...)> {
   size_t buffer[4] = {};
 };
 
-}  // namespace pag
+}  // namespace tgfx

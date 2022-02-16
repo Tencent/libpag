@@ -18,12 +18,12 @@
 
 #pragma once
 
-#include "core/Color4f.h"
-#include "core/utils/BytesKey.h"
+#include "core/BytesKey.h"
+#include "core/Color.h"
+#include "gpu/Backend.h"
 #include "gpu/Device.h"
-#include "pag/gpu.h"
 
-namespace pag {
+namespace tgfx {
 class ProgramCache;
 
 class GradientCache;
@@ -97,4 +97,4 @@ class Context {
   friend class Resource;
 };
 
-}  // namespace pag
+}  // namespace tgfx

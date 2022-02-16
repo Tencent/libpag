@@ -20,7 +20,7 @@
 
 #include "XferProcessor.h"
 
-namespace pag {
+namespace tgfx {
 class EmptyXferProcessor : public XferProcessor {
  public:
   EmptyXferProcessor() = default;
@@ -33,4 +33,4 @@ class EmptyXferProcessor : public XferProcessor {
 
   std::unique_ptr<GLXferProcessor> createGLInstance() const override;
 };
-}  // namespace pag
+}  // namespace tgfx

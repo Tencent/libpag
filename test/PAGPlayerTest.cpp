@@ -22,6 +22,7 @@
 
 namespace pag {
 using nlohmann::json;
+using namespace tgfx;
 
 PAG_TEST_CASE(PAGPlayerTest)
 
@@ -111,21 +112,21 @@ PAG_TEST_F(PAGPlayerTest, autoClear) {
   auto pixelBuffer = PixelBuffer::Make(pagSurface->width(), pagSurface->height());
   Bitmap bitmap(pixelBuffer);
   ASSERT_FALSE(bitmap.isEmpty());
-  auto result = pagSurface->readPixels(bitmap.colorType(), bitmap.alphaType(),
+  auto result = pagSurface->readPixels(ToPAG(bitmap.colorType()), ToPAG(bitmap.alphaType()),
                                        bitmap.writablePixels(), bitmap.rowBytes());
   ASSERT_TRUE(result);
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGPlayerTest/autoClear_autoClear_false_flush0"));
 
   pagPlayer->flush();
-  result = pagSurface->readPixels(bitmap.colorType(), bitmap.alphaType(), bitmap.writablePixels(),
-                                  bitmap.rowBytes());
+  result = pagSurface->readPixels(ToPAG(bitmap.colorType()), ToPAG(bitmap.alphaType()),
+                                  bitmap.writablePixels(), bitmap.rowBytes());
   ASSERT_TRUE(result);
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGPlayerTest/autoClear_autoClear_false_flush1"));
 
   pagPlayer->setAutoClear(true);
   pagPlayer->flush();
-  result = pagSurface->readPixels(bitmap.colorType(), bitmap.alphaType(), bitmap.writablePixels(),
-                                  bitmap.rowBytes());
+  result = pagSurface->readPixels(ToPAG(bitmap.colorType()), ToPAG(bitmap.alphaType()),
+                                  bitmap.writablePixels(), bitmap.rowBytes());
   ASSERT_TRUE(result);
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGPlayerTest/autoClear_autoClear_true"));
 }

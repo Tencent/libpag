@@ -21,7 +21,7 @@
 #include "Swizzle.h"
 #include "stdarg.h"
 
-namespace pag {
+namespace tgfx {
 // number of bytes (on the stack) to receive the printf result
 static constexpr size_t kBufferSize = 1024;
 
@@ -124,7 +124,7 @@ void ShaderBuilder::finalize(ShaderFlags visibility) {
   finalized = true;
 }
 
-void ShaderBuilder::appendEnterIfNotEmpty(Enum type) {
+void ShaderBuilder::appendEnterIfNotEmpty(uint8_t type) {
   if (shaderStrings[type].empty()) {
     return;
   }
@@ -158,4 +158,4 @@ std::string ShaderBuilder::shaderString() {
   }
   return fragment;
 }
-}  // namespace pag
+}  // namespace tgfx

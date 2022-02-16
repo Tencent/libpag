@@ -19,7 +19,7 @@
 #include "FragmentShaderBuilder.h"
 #include "ProgramBuilder.h"
 
-namespace pag {
+namespace tgfx {
 FragmentShaderBuilder::FragmentShaderBuilder(ProgramBuilder* program) : ShaderBuilder(program) {
   subStageIndices.push_back(0);
 }
@@ -47,4 +47,4 @@ void FragmentShaderBuilder::onAfterChildProcEmitCode() {
   auto removeAt = _mangleString.rfind('_');
   _mangleString.erase(removeAt, _mangleString.size() - removeAt);
 }
-}  // namespace pag
+}  // namespace tgfx

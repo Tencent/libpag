@@ -21,7 +21,7 @@
 #include "gpu/GLFragmentProcessor.h"
 #include "gpu/YUVTexture.h"
 
-namespace pag {
+namespace tgfx {
 class GLYUVTextureFragmentProcessor : public GLFragmentProcessor {
  public:
   void emitCode(EmitArgs& args) override;
@@ -37,4 +37,4 @@ class GLYUVTextureFragmentProcessor : public GLFragmentProcessor {
   YUVColorSpace colorSpacePrev = YUVColorSpace::Unknown;
   YUVColorRange colorRangePrev = YUVColorRange::Unknown;
 };
-}  // namespace pag
+}  // namespace tgfx

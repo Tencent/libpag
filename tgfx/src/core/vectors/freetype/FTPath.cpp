@@ -18,7 +18,7 @@
 
 #include "FTPath.h"
 
-namespace pag {
+namespace tgfx {
 bool FTPath::isEmpty() const {
   return points.empty();
 }
@@ -127,4 +127,4 @@ bool FTPath::finalizeOutline(FreetypeOutline* outline, int startPointIndex) cons
   return true;
 }
 
-}  // namespace pag
+}  // namespace tgfx

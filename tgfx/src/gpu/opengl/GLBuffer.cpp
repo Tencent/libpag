@@ -19,9 +19,9 @@
 #include "GLBuffer.h"
 
 #include "GLContext.h"
-#include "base/utils/UniqueID.h"
+#include "core/utils/UniqueID.h"
 
-namespace pag {
+namespace tgfx {
 static void ComputeRecycleKey(BytesKey* recycleKey, const void* uniqueKey, size_t length) {
   static const uint32_t Type = UniqueID::Next();
   recycleKey->write(Type);
@@ -61,4 +61,4 @@ void GLBuffer::onRelease(Context* context) {
     _bufferID = 0;
   }
 }
-}  // namespace pag
+}  // namespace tgfx

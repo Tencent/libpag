@@ -18,7 +18,7 @@
 
 #pragma once
 
-namespace pag {
+namespace tgfx {
 /**
  * Defines the layout of a RGBAAA format image, which is half RGB, half AAA.
  */
@@ -40,4 +40,4 @@ struct RGBAAALayout {
    */
   int alphaStartY;
 };
-}  // namespace pag
+}  // namespace tgfx

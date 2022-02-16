@@ -59,4 +59,4 @@ jobject ToPAGMarkerObject(JNIEnv* env, const pag::Marker* marker);
 
 jobject ToPAGVideoRangeObject(JNIEnv* env, const pag::PAGVideoRange& range);
 
-pag::ImageInfo GetImageInfo(JNIEnv* env, jobject bitmap);
+tgfx::ImageInfo GetImageInfo(JNIEnv* env, jobject bitmap);

@@ -19,11 +19,11 @@
 #pragma once
 
 #include "GLDrawer.h"
-#include "core/Blend.h"
+#include "core/BlendMode.h"
 #include "core/Mask.h"
 #include "gpu/Canvas.h"
 
-namespace pag {
+namespace tgfx {
 class GLCanvas : public Canvas {
  public:
   explicit GLCanvas(Surface* surface);
@@ -75,4 +75,4 @@ class GLCanvas : public Canvas {
             std::unique_ptr<FragmentProcessor> color,
             std::unique_ptr<FragmentProcessor> mask = nullptr, bool aa = false);
 };
-}  // namespace pag
+}  // namespace tgfx

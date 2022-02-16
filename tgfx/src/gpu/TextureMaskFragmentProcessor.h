@@ -20,7 +20,7 @@
 
 #include "FragmentProcessor.h"
 
-namespace pag {
+namespace tgfx {
 class TextureMaskFragmentProcessor : public FragmentProcessor {
  public:
   static std::unique_ptr<TextureMaskFragmentProcessor> MakeUseLocalCoord(
@@ -54,4 +54,4 @@ class TextureMaskFragmentProcessor : public FragmentProcessor {
 
   friend class GLTextureMaskFragmentProcessor;
 };
-}  // namespace pag
+}  // namespace tgfx

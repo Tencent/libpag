@@ -17,12 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Glyph.h"
-#include "base/utils/UTF8Text.h"
+#include "core/UTF.h"
 #include "rendering/FontManager.h"
 
 namespace pag {
 std::vector<GlyphHandle> Glyph::BuildFromText(const std::string& text, const TextPaint& textPaint) {
-  Font textFont = {};
+  tgfx::Font textFont = {};
   textFont.setFauxBold(textPaint.fauxBold);
   textFont.setFauxItalic(textPaint.fauxItalic);
   textFont.setSize(textPaint.fontSize);
@@ -34,10 +34,10 @@ std::vector<GlyphHandle> Glyph::BuildFromText(const std::string& text, const Tex
   const char* textStop = textStart + text.size();
   while (textStart < textStop) {
     auto oldPosition = textStart;
-    UTF8Text::NextChar(&textStart);
+    tgfx::UTF::NextUTF8(&textStart, textStop);
     auto length = textStart - oldPosition;
     auto name = std::string(oldPosition, length);
-    GlyphID glyphId = 0;
+    tgfx::GlyphID glyphId = 0;
     if (hasTypeface) {
       glyphId = typeface->getGlyphID(name);
       if (glyphId != 0) {
@@ -54,7 +54,7 @@ std::vector<GlyphHandle> Glyph::BuildFromText(const std::string& text, const Tex
   return glyphList;
 }
 
-Glyph::Glyph(GlyphID glyphId, const std::string& charName, const Font& textFont,
+Glyph::Glyph(tgfx::GlyphID glyphId, const std::string& charName, const tgfx::Font& textFont,
              const TextPaint& textPaint)
     : glyphId(glyphId), textFont(textFont) {
   name = charName;
@@ -99,7 +99,7 @@ Glyph::Glyph(GlyphID glyphId, const std::string& charName, const Font& textFont,
   }
 }
 
-void Glyph::computeStyleKey(BytesKey* styleKey) const {
+void Glyph::computeStyleKey(tgfx::BytesKey* styleKey) const {
   auto m = getTotalMatrix();
   styleKey->write(m.getScaleX());
   styleKey->write(m.getSkewX());
@@ -119,7 +119,7 @@ bool Glyph::isVisible() const {
   return matrix.invertible() && alpha != 0.0f && !bounds.isEmpty();
 }
 
-Matrix Glyph::getTotalMatrix() const {
+tgfx::Matrix Glyph::getTotalMatrix() const {
   auto m = extraMatrix;
   m.postConcat(matrix);
   return m;

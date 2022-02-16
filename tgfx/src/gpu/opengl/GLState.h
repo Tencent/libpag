@@ -22,7 +22,7 @@
 #include <unordered_map>
 #include "GLInterface.h"
 
-namespace pag {
+namespace tgfx {
 enum class GLAttributeType {
   ActiveTexture,
   BlendEquationSeparate,
@@ -77,8 +77,7 @@ class StateRecord {
   std::list<std::shared_ptr<GLAttribute>> defaultAttributes = {};
   std::unordered_map<unsigned, std::shared_ptr<GLAttribute>> vertexMap = {};
   std::unordered_map<uint32_t, std::shared_ptr<GLAttribute>> textureMap = {};
-  std::unordered_map<GLAttributeType, std::shared_ptr<GLAttribute>, EnumClassHash> attributeMap =
-      {};
+  std::unordered_map<GLAttributeType, std::shared_ptr<GLAttribute>, EnumHasher> attributeMap = {};
 };
 
 // TODO(domrjchen): All GL methods that may modify the state should be hooked uniformly onto
@@ -154,4 +153,4 @@ class GLStateGuard {
  private:
   GLState* state = nullptr;
 };
-}  // namespace pag
+}  // namespace tgfx

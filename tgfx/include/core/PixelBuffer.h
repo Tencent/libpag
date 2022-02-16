@@ -21,7 +21,7 @@
 #include "core/ImageInfo.h"
 #include "gpu/TextureBuffer.h"
 
-namespace pag {
+namespace tgfx {
 /**
  * PixelBuffer describes a two dimensional array of pixels which is optimized for creating textures.
  */
@@ -120,9 +120,4 @@ class PixelBuffer : public TextureBuffer {
    */
   static std::shared_ptr<PixelBuffer> MakeHardwareBuffer(int width, int height, bool alphaOnly);
 };
-
-/**
- * Trace() provides a utility to view the PixelBuffer.
- */
-void Trace(std::shared_ptr<PixelBuffer> pixelBuffer, const std::string& tag = "");
-}  // namespace pag
+}  // namespace tgfx

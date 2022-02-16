@@ -19,12 +19,11 @@
 #pragma once
 
 #include <vector>
-
 #include "Processor.h"
 #include "ShaderVar.h"
 #include "TextureSampler.h"
 
-namespace pag {
+namespace tgfx {
 class GLGeometryProcessor;
 
 class GeometryProcessor : public Processor {
@@ -81,4 +80,4 @@ class GeometryProcessor : public Processor {
 
   std::vector<const Attribute*> attributes = {};
 };
-}  // namespace pag
+}  // namespace tgfx

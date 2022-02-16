@@ -19,8 +19,8 @@
 #include "PathUtil.h"
 
 namespace pag {
-Path ToPath(const PathData& pathData) {
-  Path path = {};
+tgfx::Path ToPath(const PathData& pathData) {
+  tgfx::Path path = {};
   auto& points = pathData.points;
   uint32_t index = 0;
   Point control1 = {}, control2 = {}, point = {};

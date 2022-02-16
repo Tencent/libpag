@@ -29,10 +29,10 @@ class RadialBlurFilter : public LayerFilter {
  protected:
   std::string onBuildFragmentShader() override;
 
-  void onPrepareProgram(const GLInterface* gl, unsigned program) override;
+  void onPrepareProgram(const tgfx::GLInterface* gl, unsigned program) override;
 
-  void onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
-                      const Point& filterScale) override;
+  void onUpdateParams(const tgfx::GLInterface* gl, const tgfx::Rect& contentBounds,
+                      const tgfx::Point& filterScale) override;
 
  private:
   Effect* effect = nullptr;

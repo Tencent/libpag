@@ -32,15 +32,15 @@ class BitmapSequenceReader : public SequenceReader {
 
   void prepareAsync(Frame targetFrame) override;
 
-  std::shared_ptr<Texture> readTexture(Frame frame, RenderCache* cache) override;
+  std::shared_ptr<tgfx::Texture> readTexture(Frame frame, RenderCache* cache) override;
 
  private:
   std::mutex locker = {};
   Frame lastDecodeFrame = -1;
   Frame lastTextureFrame = -1;
   Frame pendingFrame = -1;
-  std::shared_ptr<PixelBuffer> pixelBuffer = nullptr;
-  std::shared_ptr<Texture> lastTexture = nullptr;
+  std::shared_ptr<tgfx::PixelBuffer> pixelBuffer = nullptr;
+  std::shared_ptr<tgfx::Texture> lastTexture = nullptr;
   std::shared_ptr<Task> lastTask = nullptr;
 
   Frame findStartFrame(Frame targetFrame);

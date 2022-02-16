@@ -19,8 +19,8 @@
 #include "MatrixUtil.h"
 
 namespace pag {
-bool MapPointInverted(const Matrix& matrix, Point* point) {
-  Matrix inverted = {};
+bool MapPointInverted(const tgfx::Matrix& matrix, tgfx::Point* point) {
+  tgfx::Matrix inverted = {};
   bool canInvert = matrix.invert(&inverted);
   if (canInvert) {
     inverted.mapPoints(point, 1);
@@ -29,13 +29,13 @@ bool MapPointInverted(const Matrix& matrix, Point* point) {
   return false;
 }
 
-float GetMaxScaleFactor(const Matrix& matrix) {
+float GetMaxScaleFactor(const tgfx::Matrix& matrix) {
   auto scale = GetScaleFactor(matrix);
   return std::max(fabsf(scale.x), fabsf(scale.y));
 }
 
-Point GetScaleFactor(const Matrix& matrix, float contentScale, bool inverted) {
-  Point scale = {};
+tgfx::Point GetScaleFactor(const tgfx::Matrix& matrix, float contentScale, bool inverted) {
+  tgfx::Point scale = {};
   auto a = matrix.get(0);
   auto c = matrix.get(1);
   auto b = matrix.get(3);

@@ -21,10 +21,11 @@
 #include "rendering/renderers/FilterRenderer.h"
 
 namespace pag {
-void LayerStylesFilter::TransformBounds(Rect* bounds, const FilterList* filterList) {
+void LayerStylesFilter::TransformBounds(tgfx::Rect* bounds, const FilterList* filterList) {
   for (auto& layerStyle : filterList->layerStyles) {
     auto rect = *bounds;
-    layerStyle->transformBounds(&rect, filterList->layerStyleScale, filterList->layerFrame);
+    layerStyle->transformBounds(ToPAG(&rect), ToPAG(filterList->layerStyleScale),
+                                filterList->layerFrame);
     rect.roundOut();
     bounds->join(rect);
   }
@@ -38,19 +39,19 @@ LayerStylesFilter::~LayerStylesFilter() {
   delete drawFilter;
 }
 
-bool LayerStylesFilter::initialize(Context* context) {
+bool LayerStylesFilter::initialize(tgfx::Context* context) {
   return drawFilter->initialize(context);
 }
 
-void LayerStylesFilter::update(const FilterList* list, const Rect& inputBounds,
-                               const Rect& outputBounds, const Point& extraScale) {
+void LayerStylesFilter::update(const FilterList* list, const tgfx::Rect& inputBounds,
+                               const tgfx::Rect& outputBounds, const tgfx::Point& extraScale) {
   filterList = list;
   contentBounds = inputBounds;
   transformedBounds = outputBounds;
   filterScale = extraScale;
 }
 
-void LayerStylesFilter::draw(Context* context, const FilterSource* source,
+void LayerStylesFilter::draw(tgfx::Context* context, const FilterSource* source,
                              const FilterTarget* target) {
   for (auto& layerStyle : filterList->layerStyles) {
     if (layerStyle->drawPosition() == LayerStylePosition::Blow) {

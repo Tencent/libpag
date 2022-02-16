@@ -19,14 +19,14 @@
 #pragma once
 
 #include "XferProcessor.h"
-#include "core/Blend.h"
+#include "core/BlendMode.h"
 
-namespace pag {
+namespace tgfx {
 class PorterDuffXferProcessor : public XferProcessor {
  public:
-  static std::unique_ptr<PorterDuffXferProcessor> Make(Blend blend);
+  static std::unique_ptr<PorterDuffXferProcessor> Make(BlendMode blend);
 
-  Blend getBlend() const {
+  BlendMode getBlend() const {
     return blend;
   }
 
@@ -39,9 +39,9 @@ class PorterDuffXferProcessor : public XferProcessor {
   std::unique_ptr<GLXferProcessor> createGLInstance() const override;
 
  private:
-  explicit PorterDuffXferProcessor(Blend blend) : blend(blend) {
+  explicit PorterDuffXferProcessor(BlendMode blend) : blend(blend) {
   }
 
-  Blend blend;
+  BlendMode blend;
 };
-}  // namespace pag
+}  // namespace tgfx

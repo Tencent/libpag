@@ -37,18 +37,18 @@ class Picture : public Graphic {
   /**
    * Creates a new Picture with specified Image. Return null if the proxy is null.
    */
-  static std::shared_ptr<Graphic> MakeFrom(ID assetID, std::shared_ptr<Image> image);
+  static std::shared_ptr<Graphic> MakeFrom(ID assetID, std::shared_ptr<tgfx::Image> image);
 
   /**
    * Creates a new Picture with specified TextureBuffer. Returns null if the bitmap is empty.
    */
-  static std::shared_ptr<Graphic> MakeFrom(ID assetID, std::shared_ptr<TextureBuffer> buffer);
+  static std::shared_ptr<Graphic> MakeFrom(ID assetID, std::shared_ptr<tgfx::TextureBuffer> buffer);
 
   /**
    * Creates a new Picture with specified backend texture. Returns null if the texture is invalid.
    */
-  static std::shared_ptr<Graphic> MakeFrom(ID assetID, const BackendTexture& texture,
-                                           ImageOrigin origin);
+  static std::shared_ptr<Graphic> MakeFrom(ID assetID, const tgfx::BackendTexture& texture,
+                                           tgfx::ImageOrigin origin);
 
   /*
    * Creates a new image with specified TextureProxy. Returns nullptr if the proxy is null.
@@ -60,7 +60,7 @@ class Picture : public Graphic {
    * proxy is null or the layout is invalid.
    */
   static std::shared_ptr<Graphic> MakeFrom(ID assetID, std::unique_ptr<TextureProxy> proxy,
-                                           const RGBAAALayout& layout);
+                                           const tgfx::RGBAAALayout& layout);
 
   /**
    * Creates a new Picture with specified graphic. If the assetID is valid (not 0), the returned

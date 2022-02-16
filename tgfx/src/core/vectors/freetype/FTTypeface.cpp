@@ -21,13 +21,13 @@
 #include FT_TRUETYPE_TABLES_H
 
 #include "FTScalerContext.h"
-#include "base/utils/UTF8Text.h"
-#include "base/utils/UniqueID.h"
+#include "core/UTF.h"
+#include "core/utils/UniqueID.h"
 
-namespace pag {
+namespace tgfx {
 class EmptyTypeface : public Typeface {
  public:
-  ID uniqueID() const override {
+  uint32_t uniqueID() const override {
     return _uniqueID;
   }
 
@@ -81,7 +81,7 @@ class EmptyTypeface : public Typeface {
   }
 
  private:
-  ID _uniqueID = UniqueID::Next();
+  uint32_t _uniqueID = UniqueID::Next();
 };
 
 std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& /*fontFamily*/,
@@ -148,12 +148,13 @@ GlyphID FTTypeface::getGlyphID(const std::string& name) const {
   if (name.empty()) {
     return 0;
   }
-  auto count = UTF8Text::Count(name);
+  auto count = tgfx::UTF::CountUTF8(name.c_str(), name.size());
   if (count > 1 || count <= 0) {
     return 0;
   }
   const char* start = &(name[0]);
-  return FT_Get_Char_Index(_face->face, static_cast<FT_ULong>(UTF8Text::NextChar(&start)));
+  auto unichar = tgfx::UTF::NextUTF8(&start, start + name.size());
+  return FT_Get_Char_Index(_face->face, static_cast<FT_ULong>(unichar));
 }
 
 FontMetrics FTTypeface::getMetrics(float size) const {
@@ -220,4 +221,4 @@ Point FTTypeface::getGlyphVerticalOffset(GlyphID glyphID, float size, bool fauxB
   auto glyphMetrics = scalerContext->generateGlyphMetrics(glyphID);
   return {-glyphMetrics.advanceX * 0.5f, offsetY};
 }
-}  // namespace pag
+}  // namespace tgfx

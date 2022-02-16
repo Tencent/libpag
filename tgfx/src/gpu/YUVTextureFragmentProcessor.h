@@ -22,7 +22,7 @@
 #include "core/RGBAAALayout.h"
 #include "gpu/YUVTexture.h"
 
-namespace pag {
+namespace tgfx {
 class YUVTextureFragmentProcessor : public FragmentProcessor {
  public:
   std::string name() const override {
@@ -49,4 +49,4 @@ class YUVTextureFragmentProcessor : public FragmentProcessor {
 
   friend class GLYUVTextureFragmentProcessor;
 };
-}  // namespace pag
+}  // namespace tgfx

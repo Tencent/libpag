@@ -20,7 +20,7 @@
 
 #include "gpu/GLFragmentProcessor.h"
 
-namespace pag {
+namespace tgfx {
 class GLTextureMaskFragmentProcessor : public GLFragmentProcessor {
  public:
   void emitCode(EmitArgs& args) override;
@@ -36,4 +36,4 @@ class GLTextureMaskFragmentProcessor : public GLFragmentProcessor {
   int heightPrev = -1;
   Matrix deviceCoordMatrixPrev = Matrix::MakeScale(FLT_MAX);
 };
-}  // namespace pag
+}  // namespace tgfx

@@ -20,7 +20,7 @@
 #include "CGLProcGetter.h"
 #include "gpu/opengl/GLContext.h"
 
-namespace pag {
+namespace tgfx {
 void* GLDevice::CurrentNativeHandle() {
   return CGLGetCurrentContext();
 }
@@ -139,4 +139,4 @@ void CGLDevice::onClearCurrent() {
   CGLSetCurrentContext(oldContext);
   CGLReleaseContext(oldContext);
 }
-}  // namespace pag
+}  // namespace tgfx

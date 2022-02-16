@@ -16,10 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <unordered_map>
-#include "pag/gpu.h"
+#include "gpu/Backend.h"
 
-namespace pag {
+namespace tgfx {
 BackendTexture::BackendTexture(const GLTextureInfo& glInfo, int width, int height)
     : _backend(Backend::OPENGL), _width(width), _height(height), glInfo(glInfo) {
 }
@@ -134,4 +133,4 @@ void* BackendSemaphore::glSync() const {
   }
   return _glSync;
 }
-}  // namespace pag
+}  // namespace tgfx

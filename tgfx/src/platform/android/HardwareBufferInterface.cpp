@@ -21,7 +21,7 @@
 #include <sys/system_properties.h>
 #include <cstdlib>
 
-namespace pag {
+namespace tgfx {
 template <typename T>
 static void LoadSymbol(T*& function, const char* symbol) {
   function = (T*)dlsym(RTLD_DEFAULT, symbol);
@@ -88,4 +88,4 @@ int HardwareBufferInterface::Lock(AHardwareBuffer* buffer, uint64_t usage, int32
 int HardwareBufferInterface::Unlock(AHardwareBuffer* buffer, int32_t* fence) {
   return GetFunctions()->unlock(buffer, fence);
 }
-}  // namespace pag
+}  // namespace tgfx

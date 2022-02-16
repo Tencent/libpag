@@ -21,7 +21,7 @@
 #include "GLGeometryProcessor.h"
 #include "GLXferProcessor.h"
 
-namespace pag {
+namespace tgfx {
 ProgramBuilder::ProgramBuilder(const GeometryProcessor* geometryProcessor, const Pipeline* pipeline)
     : geometryProcessor(geometryProcessor), pipeline(pipeline) {
 }
@@ -199,4 +199,4 @@ void ProgramBuilder::finalizeShaders() {
   vertexShaderBuilder()->finalize(ShaderFlags::Vertex);
   fragmentShaderBuilder()->finalize(ShaderFlags::Fragment);
 }
-}  // namespace pag
+}  // namespace tgfx

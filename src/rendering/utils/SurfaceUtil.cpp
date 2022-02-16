@@ -23,8 +23,10 @@ namespace pag {
 // 1/20 is the minimum precision for rendering pixels on most platforms.
 #define CONTENT_SCALE_STEP 20.0f
 
-std::shared_ptr<Surface> SurfaceUtil::MakeContentSurface(Canvas* parentCanvas, const Rect& bounds,
-                                                         float scaleFactorLimit, bool usesMSAA) {
+std::shared_ptr<tgfx::Surface> SurfaceUtil::MakeContentSurface(tgfx::Canvas* parentCanvas,
+                                                               const tgfx::Rect& bounds,
+                                                               float scaleFactorLimit,
+                                                               bool usesMSAA) {
   auto maxScale = GetMaxScaleFactor(parentCanvas->getMatrix());
   if (maxScale > scaleFactorLimit) {
     maxScale = scaleFactorLimit;
@@ -36,12 +38,13 @@ std::shared_ptr<Surface> SurfaceUtil::MakeContentSurface(Canvas* parentCanvas, c
   auto height = static_cast<int>(ceil(bounds.height() * maxScale));
   // LOGE("makeContentSurface: (width = %d, height = %d)", width, height);
   auto sampleCount = usesMSAA ? 4 : 1;
-  auto newSurface = Surface::Make(parentCanvas->getContext(), width, height, false, sampleCount);
+  auto newSurface =
+      tgfx::Surface::Make(parentCanvas->getContext(), width, height, false, sampleCount);
   if (newSurface == nullptr) {
     return nullptr;
   }
   auto newCanvas = newSurface->getCanvas();
-  auto matrix = Matrix::MakeScale(maxScale);
+  auto matrix = tgfx::Matrix::MakeScale(maxScale);
   matrix.preTranslate(-bounds.x(), -bounds.y());
   newCanvas->setMatrix(matrix);
   return newSurface;

@@ -19,10 +19,10 @@
 #pragma once
 
 #include <string>
-
+#include <vector>
 #include "BitmaskOperators.h"
 
-namespace pag {
+namespace tgfx {
 enum class ShaderFlags : unsigned {
   None = 0,
   Vertex = 1 << 0,
@@ -90,4 +90,4 @@ class ShaderVar {
   TypeModifier _typeModifier = TypeModifier::None;
   std::string _name;
 };
-}  // namespace pag
+}  // namespace tgfx

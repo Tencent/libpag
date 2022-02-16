@@ -17,11 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/opengl/egl/EGLDevice.h"
-#include "base/utils/Log.h"
+#include "core/utils/Log.h"
 #include "gpu/opengl/egl/EGLGlobals.h"
 #include "gpu/opengl/egl/EGLProcGetter.h"
 
-namespace pag {
+namespace tgfx {
 static EGLContext CreateContext(EGLContext sharedContext, EGLConfig eglConfig) {
   static auto eglGlobals = EGLGlobals::Get();
   static const EGLint context3Attributes[] = {EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE};
@@ -199,4 +199,4 @@ void EGLDevice::swapBuffers(int64_t timestamp) {
   }
   eglSwapBuffers(eglDisplay, eglSurface);
 }
-}  // namespace pag
+}  // namespace tgfx

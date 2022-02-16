@@ -41,7 +41,7 @@ class SequenceReader {
 
   virtual void prepareAsync(Frame targetFrame) = 0;
 
-  virtual std::shared_ptr<Texture> readTexture(Frame targetFrame, RenderCache* cache) = 0;
+  virtual std::shared_ptr<tgfx::Texture> readTexture(Frame targetFrame, RenderCache* cache) = 0;
 
  protected:
   // 持有 File 引用，防止在异步解码时 Sequence 被析构。

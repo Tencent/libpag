@@ -23,5 +23,5 @@
 #include "pag/pag.h"
 
 namespace pag {
-void RenderMasks(Path* maskContent, const std::vector<MaskData*>& masks, Frame layerFrame);
+void RenderMasks(tgfx::Path* maskContent, const std::vector<MaskData*>& masks, Frame layerFrame);
 }

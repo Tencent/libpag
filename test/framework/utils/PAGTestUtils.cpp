@@ -17,9 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGTestUtils.h"
+#include "base/utils/TGFXCast.h"
 #include "core/Image.h"
 
 namespace pag {
+using namespace tgfx;
 
 std::shared_ptr<PixelBuffer> MakeSnapshot(std::shared_ptr<PAGSurface> pagSurface) {
   auto pixelBuffer = PixelBuffer::Make(pagSurface->width(), pagSurface->height(), false, false);
@@ -27,7 +29,7 @@ std::shared_ptr<PixelBuffer> MakeSnapshot(std::shared_ptr<PAGSurface> pagSurface
     return nullptr;
   }
   Bitmap bitmap(pixelBuffer);
-  auto result = pagSurface->readPixels(bitmap.colorType(), bitmap.alphaType(),
+  auto result = pagSurface->readPixels(ToPAG(bitmap.colorType()), ToPAG(bitmap.alphaType()),
                                        bitmap.writablePixels(), bitmap.rowBytes());
   return result ? pixelBuffer : nullptr;
 }

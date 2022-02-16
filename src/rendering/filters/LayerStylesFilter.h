@@ -29,25 +29,26 @@ struct FilterList;
 
 class LayerStylesFilter : public Filter {
  public:
-  static void TransformBounds(Rect* bounds, const FilterList* filterList);
+  static void TransformBounds(tgfx::Rect* bounds, const FilterList* filterList);
 
   explicit LayerStylesFilter(RenderCache* renderCache);
 
   ~LayerStylesFilter() override;
 
-  bool initialize(Context* context) override;
+  bool initialize(tgfx::Context* context) override;
 
-  void update(const FilterList* filterList, const Rect& contentBounds,
-              const Rect& transformedBounds, const Point& filterScale);
+  void update(const FilterList* filterList, const tgfx::Rect& contentBounds,
+              const tgfx::Rect& transformedBounds, const tgfx::Point& filterScale);
 
-  void draw(Context* context, const FilterSource* source, const FilterTarget* target) override;
+  void draw(tgfx::Context* context, const FilterSource* source,
+            const FilterTarget* target) override;
 
  private:
   const FilterList* filterList = nullptr;
   RenderCache* renderCache = nullptr;
   LayerFilter* drawFilter = nullptr;
-  Rect contentBounds = {};
-  Rect transformedBounds = {};
-  Point filterScale = {};
+  tgfx::Rect contentBounds = {};
+  tgfx::Rect transformedBounds = {};
+  tgfx::Point filterScale = {};
 };
 }  // namespace pag

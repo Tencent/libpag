@@ -18,10 +18,10 @@
 
 #include "GLRRectOp.h"
 
-#include "base/utils/MathExtra.h"
+#include "core/utils/MathExtra.h"
 #include "gpu/EllipseGeometryProcessor.h"
 
-namespace pag {
+namespace tgfx {
 // We have three possible cases for geometry for a round rect.
 //
 // In the case of a normal fill or a stroke, we draw the round rect as a 9-patch:
@@ -214,4 +214,4 @@ std::vector<float> GLRRectOp::vertices(const DrawArgs& args) {
 std::shared_ptr<GLBuffer> GLRRectOp::getIndexBuffer(const DrawArgs& args) {
   return GLBuffer::Make(args.context, gStandardRRectIndices, kIndicesPerFillRRect);
 }
-}  // namespace pag
+}  // namespace tgfx

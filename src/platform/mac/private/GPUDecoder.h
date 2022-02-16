@@ -48,7 +48,7 @@ class GPUDecoder : public VideoDecoder {
  private:
   VTDecompressionSessionRef session = nullptr;
   CMFormatDescriptionRef videoFormatDescription = nullptr;
-  YUVColorSpace colorSpace = YUVColorSpace::Rec601;
+  tgfx::YUVColorSpace colorSpace = tgfx::YUVColorSpace::Rec601;
 
   bool initVideoToolBox(const std::vector<std::shared_ptr<ByteData>>& headers,
                         const std::string& mimeType);

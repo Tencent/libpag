@@ -18,9 +18,9 @@
 
 #include "LayerRenderer.h"
 #include "base/utils/MatrixUtil.h"
+#include "base/utils/TGFXCast.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/editing/StillImage.h"
-#include "rendering/utils/TGFXTypes.h"
 
 namespace pag {
 
@@ -80,7 +80,7 @@ void LayerRenderer::DrawLayer(Recorder* recorder, Layer* layer, Frame layerFrame
   recorder->restore();
 }
 
-static void ApplyClipToBounds(const Path& clipPath, Rect* bounds) {
+static void ApplyClipToBounds(const tgfx::Path& clipPath, tgfx::Rect* bounds) {
   if (!clipPath.isInverseFillType()) {
     auto clipBounds = clipPath.getBounds();
     if (!bounds->intersect(clipBounds)) {
@@ -88,19 +88,19 @@ static void ApplyClipToBounds(const Path& clipPath, Rect* bounds) {
     }
     return;
   }
-  Path boundsPath = {};
+  tgfx::Path boundsPath = {};
   boundsPath.addRect(*bounds);
-  boundsPath.addPath(clipPath, PathOp::Intersect);
+  boundsPath.addPath(clipPath, tgfx::PathOp::Intersect);
   *bounds = boundsPath.getBounds();
 }
 
-static bool boundsIsEmpty(Rect* bounds) {
+static bool boundsIsEmpty(tgfx::Rect* bounds) {
   return bounds && bounds->isEmpty();
 }
 
-void LayerRenderer::MeasureLayerBounds(Rect* bounds, Layer* layer, Frame layerFrame,
+void LayerRenderer::MeasureLayerBounds(tgfx::Rect* bounds, Layer* layer, Frame layerFrame,
                                        std::shared_ptr<FilterModifier> filterModifier,
-                                       Rect* trackMatteBounds, Content* layerContent,
+                                       tgfx::Rect* trackMatteBounds, Content* layerContent,
                                        Transform* extraTransform) {
   bounds->setEmpty();
   if (TransformIllegal(extraTransform) || boundsIsEmpty(trackMatteBounds)) {

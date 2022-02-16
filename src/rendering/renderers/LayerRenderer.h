@@ -29,9 +29,9 @@ class LayerRenderer {
                         TrackMatte* trackMatte = nullptr, Content* layerContent = nullptr,
                         Transform* extraTransform = nullptr);
 
-  static void MeasureLayerBounds(Rect* bounds, Layer* layer, Frame layerFrame,
+  static void MeasureLayerBounds(tgfx::Rect* bounds, Layer* layer, Frame layerFrame,
                                  std::shared_ptr<FilterModifier> filterModifier = nullptr,
-                                 Rect* trackMatteBounds = nullptr, Content* content = nullptr,
+                                 tgfx::Rect* trackMatteBounds = nullptr, Content* content = nullptr,
                                  Transform* extraTransform = nullptr);
 };
 

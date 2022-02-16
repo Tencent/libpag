@@ -19,9 +19,9 @@
 #include "VertexShaderBuilder.h"
 #include "ProgramBuilder.h"
 
-namespace pag {
+namespace tgfx {
 void VertexShaderBuilder::onFinalize() {
   programBuilder->varyingHandler()->getVertexDecls(&shaderStrings[Type::Inputs],
                                                    &shaderStrings[Type::Outputs]);
 }
-}  // namespace pag
+}  // namespace tgfx

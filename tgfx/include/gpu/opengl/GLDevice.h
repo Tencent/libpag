@@ -20,7 +20,7 @@
 
 #include "gpu/Device.h"
 
-namespace pag {
+namespace tgfx {
 /**
  * The OpenGL interface for drawing graphics.
  */
@@ -66,4 +66,4 @@ class GLDevice : public Device {
 
   friend class GLContext;
 };
-}  // namespace pag
+}  // namespace tgfx

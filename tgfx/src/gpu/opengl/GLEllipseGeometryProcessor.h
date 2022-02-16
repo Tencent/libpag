@@ -20,7 +20,7 @@
 
 #include "gpu/GLGeometryProcessor.h"
 
-namespace pag {
+namespace tgfx {
 class GLEllipseGeometryProcessor : public GLGeometryProcessor {
  public:
   void emitCode(EmitArgs& args) override;
@@ -36,4 +36,4 @@ class GLEllipseGeometryProcessor : public GLGeometryProcessor {
   int widthPrev = -1;
   int heightPrev = -1;
 };
-}  // namespace pag
+}  // namespace tgfx

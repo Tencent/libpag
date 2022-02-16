@@ -20,7 +20,7 @@
 
 #include "gpu/opengl/GLProcGetter.h"
 
-namespace pag {
+namespace tgfx {
 class CGLProcGetter : public GLProcGetter {
  public:
   CGLProcGetter();
@@ -32,4 +32,4 @@ class CGLProcGetter : public GLProcGetter {
  private:
   void* fLibrary;
 };
-}  // namespace pag
+}  // namespace tgfx

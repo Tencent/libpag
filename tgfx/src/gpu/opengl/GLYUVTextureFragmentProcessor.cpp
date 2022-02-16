@@ -19,7 +19,7 @@
 #include "GLYUVTextureFragmentProcessor.h"
 #include "gpu/YUVTextureFragmentProcessor.h"
 
-namespace pag {
+namespace tgfx {
 void GLYUVTextureFragmentProcessor::emitCode(EmitArgs& args) {
   const auto* yuvFP = static_cast<const YUVTextureFragmentProcessor*>(args.fragmentProcessor);
   auto* fragBuilder = args.fragBuilder;
@@ -144,4 +144,4 @@ void GLYUVTextureFragmentProcessor::onSetData(const ProgramDataManager& programD
     }
   }
 }
-}  // namespace pag
+}  // namespace tgfx

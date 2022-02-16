@@ -32,14 +32,14 @@ class Recorder {
   /**
    * Returns the current total matrix.
    */
-  Matrix getMatrix() const;
+  tgfx::Matrix getMatrix() const;
 
   /**
    * Replaces transformation with specified matrix. Unlike concat(), any prior matrix state is
    * overwritten.
    * @param matrix  matrix to copy, replacing existing Matrix
    */
-  void setMatrix(const Matrix& matrix);
+  void setMatrix(const tgfx::Matrix& matrix);
 
   /**
    * Replaces transformation with specified matrix premultiplied with existing Matrix. This has the
@@ -47,7 +47,7 @@ class Recorder {
    * existing Matrix.
    * @param matrix  matrix to premultiply with existing Matrix
    */
-  void concat(const Matrix& matrix);
+  void concat(const tgfx::Matrix& matrix);
 
   /**
    * Saves matrix, and allocates a layer for subsequent drawing. Calling restore() discards changes
@@ -63,7 +63,7 @@ class Recorder {
    * a stack, multiple calls to saveLayer(), saveClip() and save() should be balance by an equal
    * number of calls to restore().
    */
-  void saveClip(const Path& path);
+  void saveClip(const tgfx::Path& path);
 
   /**
    * Saves matrix, and allocates a layer for subsequent drawing. Calling restore() discards changes
@@ -71,7 +71,7 @@ class Recorder {
    * on a stack, multiple calls to saveLayer(), saveClip() and save() should be balance by an equal
    * number of calls to restore().
    */
-  void saveLayer(float alpha, Blend blendMode);
+  void saveLayer(float alpha, tgfx::BlendMode blendMode);
 
   /**
    * Saves matrix, and allocates a layer for subsequent drawing. Calling restore() discards changes
@@ -113,7 +113,7 @@ class Recorder {
   /**
    * Draws a graphic using current clip and extra matrix.
    */
-  void drawGraphic(std::shared_ptr<Graphic> graphic, const Matrix& matrix);
+  void drawGraphic(std::shared_ptr<Graphic> graphic, const tgfx::Matrix& matrix);
 
   /**
    * Returns a Graphic capturing recorder contents. Subsequent drawing to recorder contents are not
@@ -124,7 +124,7 @@ class Recorder {
  private:
   std::vector<std::shared_ptr<Graphic>> rootContents = {};
   int layerIndex = 0;
-  Matrix matrix = Matrix::I();
+  tgfx::Matrix matrix = tgfx::Matrix::I();
   std::vector<std::shared_ptr<Graphic>> layerContents = {};
   std::vector<std::shared_ptr<Record>> records = {};
 };

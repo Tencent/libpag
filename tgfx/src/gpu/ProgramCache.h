@@ -22,7 +22,7 @@
 #include <unordered_map>
 #include "Program.h"
 
-namespace pag {
+namespace tgfx {
 /**
  * Manages the lifetime of all Program instances.
  */
@@ -52,4 +52,4 @@ class ProgramCache {
 
   friend class Context;
 };
-}  // namespace pag
+}  // namespace tgfx

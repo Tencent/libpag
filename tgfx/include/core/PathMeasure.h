@@ -20,7 +20,7 @@
 
 #include "core/Path.h"
 
-namespace pag {
+namespace tgfx {
 /**
  * PathMeasure calculates the length of a Path and cuts child segments from it.
  */
@@ -45,4 +45,4 @@ class PathMeasure {
    */
   virtual bool getSegment(float startD, float stopD, Path* result) = 0;
 };
-}  // namespace pag
+}  // namespace tgfx

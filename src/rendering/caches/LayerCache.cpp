@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LayerCache.h"
+#include "base/utils/TGFXCast.h"
 #include "rendering/caches/ImageContentCache.h"
 #include "rendering/caches/PreComposeContentCache.h"
 #include "rendering/caches/ShapeContentCache.h"
@@ -60,7 +61,7 @@ LayerCache::LayerCache(Layer* layer) : layer(layer) {
     maskCache = new MaskCache(layer);
   }
   updateStaticTimeRanges();
-  maxScaleFactor = layer->getMaxScaleFactor();
+  maxScaleFactor = ToTGFX(layer->getMaxScaleFactor());
 }
 
 LayerCache::~LayerCache() {
@@ -73,7 +74,7 @@ Transform* LayerCache::getTransform(Frame contentFrame) {
   return transformCache->getCache(contentFrame);
 }
 
-Path* LayerCache::getMasks(Frame contentFrame) {
+tgfx::Path* LayerCache::getMasks(Frame contentFrame) {
   auto mask = maskCache ? maskCache->getCache(contentFrame) : nullptr;
   if (mask && mask->isEmpty()) {
     return nullptr;
@@ -89,7 +90,7 @@ Layer* LayerCache::getLayer() const {
   return layer;
 }
 
-Point LayerCache::getMaxScaleFactor() const {
+tgfx::Point LayerCache::getMaxScaleFactor() const {
   return maxScaleFactor;
 }
 

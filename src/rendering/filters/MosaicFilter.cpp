@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MosaicFilter.h"
-#include "gpu/opengl/GLUtil.h"
 
 namespace pag {
 static const char FRAGMENT_SHADER[] = R"(
@@ -44,13 +43,14 @@ std::string MosaicFilter::onBuildFragmentShader() {
   return FRAGMENT_SHADER;
 }
 
-void MosaicFilter::onPrepareProgram(const GLInterface* gl, unsigned int program) {
+void MosaicFilter::onPrepareProgram(const tgfx::GLInterface* gl, unsigned int program) {
   horizontalBlocksHandle = gl->getUniformLocation(program, "mHorizontalBlocks");
   verticalBlocksHandle = gl->getUniformLocation(program, "mVerticalBlocks");
   sharpColorsHandle = gl->getUniformLocation(program, "mSharpColors");
 }
 
-void MosaicFilter::onUpdateParams(const GLInterface* gl, const Rect& contentBounds, const Point&) {
+void MosaicFilter::onUpdateParams(const tgfx::GLInterface* gl, const tgfx::Rect& contentBounds,
+                                  const tgfx::Point&) {
   auto* mosaicEffect = reinterpret_cast<const MosaicEffect*>(effect);
   horizontalBlocks = 1.0f / mosaicEffect->horizontalBlocks->getValueAt(layerFrame);
   verticalBlocks = 1.0f / mosaicEffect->verticalBlocks->getValueAt(layerFrame);

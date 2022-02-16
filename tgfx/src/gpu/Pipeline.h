@@ -22,7 +22,7 @@
 #include "FragmentProcessor.h"
 #include "Swizzle.h"
 
-namespace pag {
+namespace tgfx {
 class Pipeline {
  public:
   Pipeline(std::vector<std::unique_ptr<FragmentProcessor>> fragmentProcessors,
@@ -65,4 +65,4 @@ class Pipeline {
   Point dstTextureOffset = Point::Zero();
   const Swizzle* _outputSwizzle = nullptr;
 };
-}  // namespace pag
+}  // namespace tgfx

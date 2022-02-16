@@ -18,10 +18,10 @@
 
 #pragma once
 
-#include "core/Color4f.h"
+#include "core/Color.h"
 #include "gpu/GLFragmentProcessor.h"
 
-namespace pag {
+namespace tgfx {
 class GLClampedGradientEffect : public GLFragmentProcessor {
  public:
   void emitCode(EmitArgs& args) override;
@@ -30,9 +30,9 @@ class GLClampedGradientEffect : public GLFragmentProcessor {
   void onSetData(const ProgramDataManager& programDataManager,
                  const FragmentProcessor& fragmentProcessor) override;
 
-  Color4f leftBorderColorPrev = Color4f::Invalid();
-  Color4f rightBorderColorPrev = Color4f::Invalid();
+  Color leftBorderColorPrev = Color::Invalid();
+  Color rightBorderColorPrev = Color::Invalid();
   UniformHandle leftBorderColorUniform;
   UniformHandle rightBorderColorUniform;
 };
-}  // namespace pag
+}  // namespace tgfx

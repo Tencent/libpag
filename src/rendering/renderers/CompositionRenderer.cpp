@@ -42,7 +42,7 @@ class SequenceProxy : public TextureProxy {
                                                                 : DecodingPolicy::Hardware);
   }
 
-  std::shared_ptr<Texture> getTexture(RenderCache* cache) const override {
+  std::shared_ptr<tgfx::Texture> getTexture(RenderCache* cache) const override {
     auto reader = static_cast<RenderCache*>(cache)->getSequenceReader(sequence);
     if (reader) {
       return reader->readTexture(frame, static_cast<RenderCache*>(cache));
@@ -68,8 +68,8 @@ static std::shared_ptr<Graphic> MakeVideoSequenceGraphic(VideoSequence* sequence
     videoHeight++;
   }
   auto proxy = new SequenceProxy(sequence, contentFrame, videoWidth, videoHeight);
-  RGBAAALayout layout = {sequence->width, sequence->height, sequence->alphaStartX,
-                         sequence->alphaStartY};
+  tgfx::RGBAAALayout layout = {sequence->width, sequence->height, sequence->alphaStartX,
+                               sequence->alphaStartY};
   return Picture::MakeFrom(sequence->composition->uniqueID, std::unique_ptr<SequenceProxy>(proxy),
                            layout);
 }
@@ -119,6 +119,6 @@ std::shared_ptr<Graphic> RenderSequenceComposition(Composition* composition,
   }
   auto scaleX = static_cast<float>(composition->width) / static_cast<float>(sequence->width);
   auto scaleY = static_cast<float>(composition->height) / static_cast<float>(sequence->height);
-  return Graphic::MakeCompose(graphic, Matrix::MakeScale(scaleX, scaleY));
+  return Graphic::MakeCompose(graphic, tgfx::Matrix::MakeScale(scaleX, scaleY));
 }
 }  // namespace pag

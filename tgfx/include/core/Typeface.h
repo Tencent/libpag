@@ -22,7 +22,7 @@
 #include "core/Path.h"
 #include "gpu/TextureBuffer.h"
 
-namespace pag {
+namespace tgfx {
 /**
  * 16 bit unsigned integer to hold a glyph index
  */
@@ -63,7 +63,7 @@ class Typeface {
   /**
    * Returns the uniqueID for the specified typeface.
    */
-  virtual ID uniqueID() const = 0;
+  virtual uint32_t uniqueID() const = 0;
 
   /**
    * Returns the family name of this typeface.
@@ -141,4 +141,4 @@ class Typeface {
 
   friend class Font;
 };
-}  // namespace pag
+}  // namespace tgfx

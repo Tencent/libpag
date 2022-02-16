@@ -25,7 +25,7 @@
 #include "gpu/GLXferProcessor.h"
 #include "gpu/Program.h"
 
-namespace pag {
+namespace tgfx {
 class GLProgram : public Program {
  public:
   struct Attribute {
@@ -85,4 +85,4 @@ class GLProgram : public Program {
   int _vertexStride = 0;
   std::vector<int> uniformLocations;
 };
-}  // namespace pag
+}  // namespace tgfx

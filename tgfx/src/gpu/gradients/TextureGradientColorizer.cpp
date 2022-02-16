@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureGradientColorizer.h"
-#include "base/utils/UniqueID.h"
+#include "core/utils/UniqueID.h"
 #include "gpu/opengl/GLTextureGradientColorizer.h"
 
-namespace pag {
+namespace tgfx {
 std::unique_ptr<TextureGradientColorizer> TextureGradientColorizer::Make(const Texture* gradient) {
   return std::unique_ptr<TextureGradientColorizer>(new TextureGradientColorizer(gradient));
 }
@@ -33,4 +33,4 @@ void TextureGradientColorizer::onComputeProcessorKey(BytesKey* bytesKey) const {
 std::unique_ptr<GLFragmentProcessor> TextureGradientColorizer::onCreateGLInstance() const {
   return std::make_unique<GLTextureGradientColorizer>();
 }
-}  // namespace pag
+}  // namespace tgfx

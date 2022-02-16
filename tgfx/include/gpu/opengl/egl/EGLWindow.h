@@ -21,7 +21,7 @@
 #include "EGLDevice.h"
 #include "gpu/Window.h"
 
-namespace pag {
+namespace tgfx {
 class EGLWindow : public Window {
  public:
   /**
@@ -43,4 +43,4 @@ class EGLWindow : public Window {
  private:
   explicit EGLWindow(std::shared_ptr<Device> device);
 };
-}  // namespace pag
+}  // namespace tgfx

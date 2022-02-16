@@ -37,7 +37,7 @@ namespace pag {
 
 class ImageTask : public Executor {
  public:
-  static std::shared_ptr<Task> MakeAndRun(std::shared_ptr<Image> image) {
+  static std::shared_ptr<Task> MakeAndRun(std::shared_ptr<tgfx::Image> image) {
     if (image == nullptr) {
       return nullptr;
     }
@@ -47,15 +47,15 @@ class ImageTask : public Executor {
     return task;
   }
 
-  std::shared_ptr<TextureBuffer> getBuffer() const {
+  std::shared_ptr<tgfx::TextureBuffer> getBuffer() const {
     return buffer;
   }
 
  private:
-  std::shared_ptr<TextureBuffer> buffer = {};
-  std::shared_ptr<Image> image = nullptr;
+  std::shared_ptr<tgfx::TextureBuffer> buffer = {};
+  std::shared_ptr<tgfx::Image> image = nullptr;
 
-  explicit ImageTask(std::shared_ptr<Image> image) : image(std::move(image)) {
+  explicit ImageTask(std::shared_ptr<tgfx::Image> image) : image(std::move(image)) {
   }
 
   void execute() override {
@@ -177,7 +177,7 @@ void RenderCache::prepareFrame() {
   }
 }
 
-void RenderCache::attachToContext(Context* current, bool forHitTest) {
+void RenderCache::attachToContext(tgfx::Context* current, bool forHitTest) {
   if (deviceID > 0 && deviceID != current->device()->uniqueID()) {
     // Context 改变需要清理内部所有缓存，这里用 uniqueID
     // 而不用指针比较，是因为指针析构后再创建可能会地址重合。
@@ -315,7 +315,7 @@ void RenderCache::clearExpiredSnapshots() {
   }
 }
 
-void RenderCache::prepareImage(ID assetID, std::shared_ptr<Image> image) {
+void RenderCache::prepareImage(ID assetID, std::shared_ptr<tgfx::Image> image) {
   usedAssets.insert(assetID);
   if (imageTasks.count(assetID) != 0 || snapshotCaches.count(assetID) != 0) {
     return;
@@ -326,7 +326,7 @@ void RenderCache::prepareImage(ID assetID, std::shared_ptr<Image> image) {
   }
 }
 
-std::shared_ptr<TextureBuffer> RenderCache::getImageBuffer(ID assetID) {
+std::shared_ptr<tgfx::TextureBuffer> RenderCache::getImageBuffer(ID assetID) {
   usedAssets.insert(assetID);
   auto result = imageTasks.find(assetID);
   if (result != imageTasks.end()) {

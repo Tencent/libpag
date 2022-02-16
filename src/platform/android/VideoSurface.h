@@ -22,18 +22,18 @@
 #include "platform/android/Global.h"
 
 namespace pag {
-class OESTexture : public GLTexture {
+class OESTexture : public tgfx::GLTexture {
  public:
-  OESTexture(GLTextureInfo info, int width, int height, bool hasAlpha);
+  OESTexture(tgfx::GLTextureInfo info, int width, int height, bool hasAlpha);
 
-  Point getTextureCoord(float x, float y) const override;
+  tgfx::Point getTextureCoord(float x, float y) const override;
 
   size_t memoryUsage() const override {
     return 0;
   }
 
  protected:
-  void onRelease(Context* context) override;
+  void onRelease(tgfx::Context* context) override;
 
  private:
   void setTextureSize(int width, int height);
@@ -63,7 +63,7 @@ class VideoSurface {
 
   jobject getOutputSurface(JNIEnv* env) const;
 
-  bool attachToContext(Context* context);
+  bool attachToContext(tgfx::Context* context);
 
   bool updateTexImage();
 
@@ -76,7 +76,7 @@ class VideoSurface {
   int width = 0;
   int height = 0;
   bool hasAlpha = false;
-  ID deviceID = 0;
+  uint32_t deviceID = 0;
   std::shared_ptr<OESTexture> oesTexture = nullptr;
   mutable std::atomic_bool hasPendingTextureImage = {false};
 

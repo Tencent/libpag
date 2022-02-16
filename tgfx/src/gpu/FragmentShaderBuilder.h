@@ -20,7 +20,7 @@
 
 #include "ShaderBuilder.h"
 
-namespace pag {
+namespace tgfx {
 class FragmentShaderBuilder : public ShaderBuilder {
  public:
   explicit FragmentShaderBuilder(ProgramBuilder* program);
@@ -41,7 +41,7 @@ class FragmentShaderBuilder : public ShaderBuilder {
   virtual std::string colorOutputName() = 0;
 
   static std::string CustomColorOutputName() {
-    return "pag_FragColor";
+    return "tgfx_FragColor";
   }
 
   void onFinalize() override;
@@ -68,4 +68,4 @@ class FragmentShaderBuilder : public ShaderBuilder {
 
   friend class ProgramBuilder;
 };
-}  // namespace pag
+}  // namespace tgfx

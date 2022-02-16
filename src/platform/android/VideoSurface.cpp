@@ -44,10 +44,10 @@ void VideoSurface::InitJNI(JNIEnv* env, const std::string& className) {
   VideoSurface_onRelease = env->GetMethodID(VideoSurfaceClass.get(), "onRelease", "()V");
 }
 
-OESTexture::OESTexture(GLTextureInfo info, int width, int height, bool hasAlpha)
-    : GLTexture(width, height, ImageOrigin::TopLeft), hasAlpha(hasAlpha) {
+OESTexture::OESTexture(tgfx::GLTextureInfo info, int width, int height, bool hasAlpha)
+    : GLTexture(width, height, tgfx::ImageOrigin::TopLeft), hasAlpha(hasAlpha) {
   sampler.glInfo = info;
-  sampler.config = PixelConfig::RGBA_8888;
+  sampler.config = tgfx::PixelConfig::RGBA_8888;
 }
 
 void OESTexture::setTextureSize(int width, int height) {
@@ -80,7 +80,7 @@ void OESTexture::computeTransform() {
   }
 }
 
-Point OESTexture::getTextureCoord(float x, float y) const {
+tgfx::Point OESTexture::getTextureCoord(float x, float y) const {
   if (hasAlpha) {
     // 如果有 alpha 通道，不需要缩小纹素
     return {x / static_cast<float>(textureWidth), y / static_cast<float>(textureHeight)};
@@ -88,9 +88,9 @@ Point OESTexture::getTextureCoord(float x, float y) const {
   return {x / static_cast<float>(width()) * sx + tx, y / static_cast<float>(height()) * sy + ty};
 }
 
-void OESTexture::onRelease(pag::Context* context) {
+void OESTexture::onRelease(tgfx::Context* context) {
   if (sampler.glInfo.id > 0) {
-    auto gl = GLContext::Unwrap(context);
+    auto gl = tgfx::GLContext::Unwrap(context);
     gl->deleteTextures(1, &sampler.glInfo.id);
   }
 }
@@ -126,7 +126,7 @@ jobject VideoSurface::getOutputSurface(JNIEnv* env) const {
   return env->CallObjectMethod(videoSurface.get(), VideoSurface_getOutputSurface);
 }
 
-bool VideoSurface::attachToContext(Context* context) {
+bool VideoSurface::attachToContext(tgfx::Context* context) {
   if (oesTexture) {
     if (deviceID != context->device()->uniqueID()) {
       LOGE("VideoSurface::attachToGLContext(): VideoSurface has already attached to a Context!");
@@ -134,12 +134,12 @@ bool VideoSurface::attachToContext(Context* context) {
     }
     return true;
   }
-  auto gl = GLContext::Unwrap(context);
-  GLTextureInfo glInfo = {};
+  auto gl = tgfx::GLContext::Unwrap(context);
+  tgfx::GLTextureInfo glInfo = {};
   glInfo.target = GL::TEXTURE_EXTERNAL_OES;
   glInfo.format = GL::RGBA8;
   gl->genTextures(1, &glInfo.id);
-  oesTexture = Resource::Wrap(context, new OESTexture(glInfo, width, height, hasAlpha));
+  oesTexture = tgfx::Resource::Wrap(context, new OESTexture(glInfo, width, height, hasAlpha));
   auto env = JNIEnvironment::Current();
   if (env == nullptr) {
     return false;

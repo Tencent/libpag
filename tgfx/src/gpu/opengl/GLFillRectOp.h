@@ -22,7 +22,7 @@
 
 #include "GLBuffer.h"
 
-namespace pag {
+namespace tgfx {
 class GLFillRectOp : public GLDrawOp {
  public:
   static std::unique_ptr<GLFillRectOp> Make();
@@ -33,4 +33,4 @@ class GLFillRectOp : public GLDrawOp {
 
   std::shared_ptr<GLBuffer> getIndexBuffer(const DrawArgs& args) override;
 };
-}  // namespace pag
+}  // namespace tgfx

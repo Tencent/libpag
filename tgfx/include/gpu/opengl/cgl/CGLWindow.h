@@ -21,7 +21,7 @@
 #include "CGLDevice.h"
 #include "gpu/Window.h"
 
-namespace pag {
+namespace tgfx {
 class CGLWindow : public Window {
  public:
   /**
@@ -46,4 +46,4 @@ class CGLWindow : public Window {
 
   explicit CGLWindow(std::shared_ptr<Device> device);
 };
-}  // namespace pag
+}  // namespace tgfx

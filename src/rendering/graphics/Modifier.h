@@ -18,20 +18,19 @@
 
 #pragma once
 
-#include "core/Blend.h"
+#include "core/BlendMode.h"
 #include "core/Path.h"
+#include "gpu/Canvas.h"
 
 namespace pag {
 class Graphic;
-
-class Canvas;
 
 class RenderCache;
 
 class Modifier {
  public:
-  static std::shared_ptr<Modifier> MakeBlend(float alpha, Blend blendMode);
-  static std::shared_ptr<Modifier> MakeClip(const Path& clip);
+  static std::shared_ptr<Modifier> MakeBlend(float alpha, tgfx::BlendMode blendMode);
+  static std::shared_ptr<Modifier> MakeClip(const tgfx::Path& clip);
   static std::shared_ptr<Modifier> MakeMask(std::shared_ptr<Graphic> graphic, bool inverted);
 
   virtual ~Modifier() = default;
@@ -44,7 +43,7 @@ class Modifier {
   /**
    * Returns the type ID of this modifier.
    */
-  virtual ID type() const = 0;
+  virtual uint32_t type() const = 0;
 
   /**
    * Return false if target content with modification applied does not overlap or intersect with
@@ -61,17 +60,17 @@ class Modifier {
   /**
    * Applies the modification to content bounds.
    */
-  virtual void applyToBounds(Rect* bounds) const = 0;
+  virtual void applyToBounds(tgfx::Rect* bounds) const = 0;
 
   /**
    * Returns false if this modifier can not process path.
    */
-  virtual bool applyToPath(Path* path) const = 0;
+  virtual bool applyToPath(tgfx::Path* path) const = 0;
 
   /**
    * Draws the graphic to specified canvas with custom modification.
    */
-  virtual void applyToGraphic(Canvas* canvas, RenderCache* cache,
+  virtual void applyToGraphic(tgfx::Canvas* canvas, RenderCache* cache,
                               std::shared_ptr<Graphic> graphic) const = 0;
 
   /**

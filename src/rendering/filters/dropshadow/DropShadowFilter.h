@@ -29,12 +29,13 @@ class DropShadowFilter : public LayerFilter {
   explicit DropShadowFilter(DropShadowStyle* layerStyle);
   ~DropShadowFilter() override;
 
-  bool initialize(Context* context) override;
+  bool initialize(tgfx::Context* context) override;
 
-  void update(Frame frame, const Rect& contentBounds, const Rect& transformedBounds,
-              const Point& filterScale) override;
+  void update(Frame frame, const tgfx::Rect& contentBounds, const tgfx::Rect& transformedBounds,
+              const tgfx::Point& filterScale) override;
 
-  void draw(Context* context, const FilterSource* source, const FilterTarget* target) override;
+  void draw(tgfx::Context* context, const FilterSource* source,
+            const FilterTarget* target) override;
 
  private:
   DropShadowStyle* layerStyle = nullptr;
@@ -47,25 +48,28 @@ class DropShadowFilter : public LayerFilter {
   DropShadowSpreadFilter* spreadFilter = nullptr;
   DropShadowSpreadFilter* spreadThickFilter = nullptr;
 
-  Color4f color = Color4f::Black();
+  tgfx::Color color = tgfx::Color::Black();
   float alpha = 0.0f;
   float spread = 0.0f;
   float spreadSize = 0.0f;
   float blurSize = 0.0f;
-  std::vector<Rect> filtersBounds = {};
+  std::vector<tgfx::Rect> filtersBounds = {};
 
-  void updateParamModeNotSpread(Frame frame, const Rect& contentBounds,
-                                const Rect& transformedBounds, const Point& filterScale);
-  void updateParamModeNotFullSpread(Frame frame, const Rect& contentBounds,
-                                    const Rect& transformedBounds, const Point& filterScale);
-  void updateParamModeFullSpread(Frame frame, const Rect& contentBounds,
-                                 const Rect& transformedBounds, const Point& filterScale);
+  void updateParamModeNotSpread(Frame frame, const tgfx::Rect& contentBounds,
+                                const tgfx::Rect& transformedBounds,
+                                const tgfx::Point& filterScale);
+  void updateParamModeNotFullSpread(Frame frame, const tgfx::Rect& contentBounds,
+                                    const tgfx::Rect& transformedBounds,
+                                    const tgfx::Point& filterScale);
+  void updateParamModeFullSpread(Frame frame, const tgfx::Rect& contentBounds,
+                                 const tgfx::Rect& transformedBounds,
+                                 const tgfx::Point& filterScale);
 
-  void onDrawModeNotSpread(Context* context, const FilterSource* source,
+  void onDrawModeNotSpread(tgfx::Context* context, const FilterSource* source,
                            const FilterTarget* target);
-  void onDrawModeNotFullSpread(Context* context, const FilterSource* source,
+  void onDrawModeNotFullSpread(tgfx::Context* context, const FilterSource* source,
                                const FilterTarget* target);
-  void onDrawModeFullSpread(Context* context, const FilterSource* source,
+  void onDrawModeFullSpread(tgfx::Context* context, const FilterSource* source,
                             const FilterTarget* target);
 };
 }  // namespace pag

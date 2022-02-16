@@ -26,9 +26,9 @@ BitmapSequenceReader::BitmapSequenceReader(std::shared_ptr<File> file, BitmapSeq
     : SequenceReader(std::move(file), sequence) {
   // 若内容非静态，强制使用非 hardware 的 Bitmap，否则纹理内容跟 bitmap
   // 内存是共享的，无法进行解码预测。
-  pixelBuffer = PixelBuffer::Make(sequence->width, sequence->height, false, staticContent);
+  pixelBuffer = tgfx::PixelBuffer::Make(sequence->width, sequence->height, false, staticContent);
   // 必须清零，否则首帧是空帧的情况会绘制错误。
-  Bitmap(pixelBuffer).eraseAll();
+  tgfx::Bitmap(pixelBuffer).eraseAll();
 }
 void BitmapSequenceReader::decodeFrame(Frame targetFrame) {
   // decodeBitmap 这里需要立即加锁，防止异步解码时线程冲突。
@@ -38,14 +38,14 @@ void BitmapSequenceReader::decodeFrame(Frame targetFrame) {
   }
   auto startFrame = findStartFrame(targetFrame);
   auto& bitmapFrames = static_cast<BitmapSequence*>(sequence)->frames;
-  Bitmap bitmap(pixelBuffer);
+  tgfx::Bitmap bitmap(pixelBuffer);
   for (Frame frame = startFrame; frame <= targetFrame; frame++) {
     auto bitmapFrame = bitmapFrames[frame];
     auto firstRead = true;
     for (auto bitmapRect : bitmapFrame->bitmaps) {
-      auto imageBytes =
-          Data::MakeWithoutCopy(bitmapRect->fileBytes->data(), bitmapRect->fileBytes->length());
-      auto image = Image::MakeFrom(imageBytes);
+      auto imageBytes = tgfx::Data::MakeWithoutCopy(bitmapRect->fileBytes->data(),
+                                                    bitmapRect->fileBytes->length());
+      auto image = tgfx::Image::MakeFrom(imageBytes);
       if (image != nullptr) {
         // 关键帧不是全屏的时候要清屏
         if (firstRead && bitmapFrame->isKeyframe &&
@@ -84,7 +84,8 @@ void BitmapSequenceReader::prepareAsync(Frame targetFrame) {
   }
 }
 
-std::shared_ptr<Texture> BitmapSequenceReader::readTexture(Frame targetFrame, RenderCache* cache) {
+std::shared_ptr<tgfx::Texture> BitmapSequenceReader::readTexture(Frame targetFrame,
+                                                                 RenderCache* cache) {
   if (lastTextureFrame == targetFrame || pixelBuffer == nullptr) {
     return lastTexture;
   }

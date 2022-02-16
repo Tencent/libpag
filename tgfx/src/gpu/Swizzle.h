@@ -20,7 +20,7 @@
 
 #include <cstdint>
 
-namespace pag {
+namespace tgfx {
 class Swizzle {
  public:
   constexpr Swizzle() : Swizzle("rgba") {
@@ -96,4 +96,4 @@ class Swizzle {
         key((CToI(c[0]) << 0) | (CToI(c[1]) << 4) | (CToI(c[2]) << 8) | (CToI(c[3]) << 12)) {
   }
 };
-}  // namespace pag
+}  // namespace tgfx

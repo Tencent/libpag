@@ -21,14 +21,14 @@
 #include <CoreText/CoreText.h>
 #include "core/Typeface.h"
 
-namespace pag {
+namespace tgfx {
 class CGTypeface : public Typeface {
  public:
   static std::shared_ptr<CGTypeface> Make(CTFontRef ctFont);
 
   ~CGTypeface() override;
 
-  ID uniqueID() const override {
+  uint32_t uniqueID() const override {
     return _uniqueID;
   }
 
@@ -66,10 +66,10 @@ class CGTypeface : public Typeface {
  private:
   explicit CGTypeface(CTFontRef ctFont);
 
-  ID _uniqueID;
+  uint32_t _uniqueID = 0;
   CTFontRef ctFont = nullptr;
   std::weak_ptr<CGTypeface> weakThis;
 
   friend class CGScalerContext;
 };
-}  // namespace pag
+}  // namespace tgfx

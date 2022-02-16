@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MotionTileFilter.h"
-#include "gpu/opengl/GLUtil.h"
 #include "rendering/filters/utils/FilterHelper.h"
 
 namespace pag {
@@ -99,7 +98,7 @@ std::string MotionTileFilter::onBuildFragmentShader() {
   return MOTIONTILE_FRAGMENT_SHADER;
 }
 
-void MotionTileFilter::onPrepareProgram(const GLInterface* gl, unsigned int program) {
+void MotionTileFilter::onPrepareProgram(const tgfx::GLInterface* gl, unsigned int program) {
   tileCenterHandle = gl->getUniformLocation(program, "uTileCenter");
   tileWidthHandle = gl->getUniformLocation(program, "uTileWidth");
   tileHeightHandle = gl->getUniformLocation(program, "uTileHeight");
@@ -110,8 +109,8 @@ void MotionTileFilter::onPrepareProgram(const GLInterface* gl, unsigned int prog
   isHorizontalPhaseShiftHandle = gl->getUniformLocation(program, "uIsHorizontalPhaseShift");
 }
 
-void MotionTileFilter::onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
-                                      const Point&) {
+void MotionTileFilter::onUpdateParams(const tgfx::GLInterface* gl, const tgfx::Rect& contentBounds,
+                                      const tgfx::Point&) {
   auto* pagEffect = reinterpret_cast<const MotionTileEffect*>(effect);
   auto tileCenter = pagEffect->tileCenter->getValueAt(layerFrame);
   auto tileWidth = pagEffect->tileWidth->getValueAt(layerFrame);

@@ -24,6 +24,8 @@
 #include "rendering/Drawable.h"
 
 namespace pag {
+using namespace tgfx;
+
 PAG_TEST_CASE(PAGBlendTest)
 
 /**
@@ -49,13 +51,13 @@ PAG_TEST_F(PAGBlendTest, Blend) {
   }
 }
 
-GLTextureInfo GetBottomLeftImage(std::shared_ptr<Device> device, int width, int height) {
+tgfx::GLTextureInfo GetBottomLeftImage(std::shared_ptr<Device> device, int width, int height) {
   auto context = device->lockContext();
   auto gl = GLContext::Unwrap(context);
-  GLTextureInfo textureInfo;
-  CreateTexture(gl, width, height, &textureInfo);
-  auto surface =
-      PAGSurface::MakeFrom(BackendTexture(textureInfo, width, height), ImageOrigin::BottomLeft);
+  tgfx::GLTextureInfo textureInfo;
+  CreateGLTexture(gl, width, height, &textureInfo);
+  tgfx::BackendTexture backendTexture(textureInfo, width, height);
+  auto surface = PAGSurface::MakeFrom(ToPAG(backendTexture), ImageOrigin::BottomLeft);
   device->unlock();
   auto composition = PAGComposition::Make(1080, 1920);
   auto imageLayer = PAGImageLayer::Make(1080, 1920, 1000000);
@@ -78,10 +80,10 @@ PAG_TEST_F(PAGBlendTest, CopyDstTexture) {
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto gl = GLContext::Unwrap(context);
-  GLTextureInfo textureInfo;
-  CreateTexture(gl, width, height, &textureInfo);
-  auto backendTexture = BackendTexture(textureInfo, width, height);
-  auto pagSurface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::BottomLeft);
+  tgfx::GLTextureInfo textureInfo;
+  CreateGLTexture(gl, width, height, &textureInfo);
+  auto backendTexture = tgfx::BackendTexture(textureInfo, width, height);
+  auto pagSurface = PAGSurface::MakeFrom(ToPAG(backendTexture), ImageOrigin::BottomLeft);
   device->unlock();
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -109,12 +111,12 @@ PAG_TEST_F(PAGBlendTest, TextureBottomLeft) {
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto gl = GLContext::Unwrap(context);
-  auto replaceImage = PAGImage::FromTexture(BackendTexture(replaceTextureInfo, width, height),
-                                            ImageOrigin::BottomLeft);
-  GLTextureInfo textureInfo;
-  CreateTexture(gl, width, height, &textureInfo);
-  auto backendTexture = BackendTexture(textureInfo, width, height);
-  auto pagSurface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::TopLeft);
+  auto backendTexture = tgfx::BackendTexture(replaceTextureInfo, width, height);
+  auto replaceImage = PAGImage::FromTexture(ToPAG(backendTexture), ImageOrigin::BottomLeft);
+  tgfx::GLTextureInfo textureInfo;
+  CreateGLTexture(gl, width, height, &textureInfo);
+  backendTexture = tgfx::BackendTexture(textureInfo, width, height);
+  auto pagSurface = PAGSurface::MakeFrom(ToPAG(backendTexture), ImageOrigin::TopLeft);
   device->unlock();
 
   auto pagPlayer = std::make_shared<PAGPlayer>();
@@ -144,15 +146,15 @@ PAG_TEST_F(PAGBlendTest, BothBottomLeft) {
   auto replaceTextureInfo = GetBottomLeftImage(device, width, height);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto replaceImage = PAGImage::FromTexture(
-      BackendTexture(replaceTextureInfo, width / 2, height / 2), ImageOrigin::BottomLeft);
+  auto backendTexture = tgfx::BackendTexture(replaceTextureInfo, width / 2, height / 2);
+  auto replaceImage = PAGImage::FromTexture(ToPAG(backendTexture), ImageOrigin::BottomLeft);
   replaceImage->setMatrix(
       Matrix::MakeTrans(static_cast<float>(width) * 0.1, static_cast<float>(height) * 0.2));
   auto gl = GLContext::Unwrap(context);
-  GLTextureInfo textureInfo;
-  CreateTexture(gl, width, height, &textureInfo);
-  auto backendTexture = BackendTexture(textureInfo, width, height);
-  auto pagSurface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::BottomLeft);
+  tgfx::GLTextureInfo textureInfo;
+  CreateGLTexture(gl, width, height, &textureInfo);
+  backendTexture = tgfx::BackendTexture(textureInfo, width, height);
+  auto pagSurface = PAGSurface::MakeFrom(ToPAG(backendTexture), ImageOrigin::BottomLeft);
   device->unlock();
 
   auto composition = PAGComposition::Make(width, height);

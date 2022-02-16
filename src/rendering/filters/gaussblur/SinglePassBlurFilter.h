@@ -29,19 +29,20 @@ class SinglePassBlurFilter : public LayerFilter {
 
   void updateParams(float blurriness, float alpha, bool repeatEdge, BlurMode mode);
 
-  void enableBlurColor(Color4f blurColor);
+  void enableBlurColor(tgfx::Color blurColor);
   void disableBlurColor();
 
  protected:
   std::string onBuildFragmentShader() override;
 
-  void onPrepareProgram(const GLInterface* gl, unsigned program) override;
+  void onPrepareProgram(const tgfx::GLInterface* gl, unsigned program) override;
 
-  void onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
-                      const Point& filterScale) override;
+  void onUpdateParams(const tgfx::GLInterface* gl, const tgfx::Rect& contentBounds,
+                      const tgfx::Point& filterScale) override;
 
-  std::vector<Point> computeVertices(const Rect& contentBounds, const Rect& transformedBounds,
-                                     const Point& filterScale) override;
+  std::vector<tgfx::Point> computeVertices(const tgfx::Rect& contentBounds,
+                                           const tgfx::Rect& transformedBounds,
+                                           const tgfx::Point& filterScale) override;
 
  private:
   int radiusHandle = -1;
@@ -52,7 +53,7 @@ class SinglePassBlurFilter : public LayerFilter {
   int alphaHandle = -1;
 
   BlurDirection direction;
-  Color4f color = Color4f::Black();
+  tgfx::Color color = tgfx::Color::Black();
   bool isColorValid = false;
   float blurriness = 0.0;
   float alpha = 1.0f;

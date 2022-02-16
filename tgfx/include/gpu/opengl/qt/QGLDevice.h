@@ -26,7 +26,7 @@
 #pragma clang diagnostic pop
 #include "gpu/opengl/GLDevice.h"
 
-namespace pag {
+namespace tgfx {
 class QGLDevice : public GLDevice {
  public:
   /**
@@ -81,4 +81,4 @@ class QGLDevice : public GLDevice {
   friend class GLDevice;
   friend class QGLWindow;
 };
-}  // namespace pag
+}  // namespace tgfx

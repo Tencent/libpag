@@ -19,7 +19,7 @@
 #include "GLConstColorProcessor.h"
 #include "gpu/ConstColorProcessor.h"
 
-namespace pag {
+namespace tgfx {
 void GLConstColorProcessor::emitCode(EmitArgs& args) {
   auto* fragBuilder = args.fragBuilder;
   std::string colorName;
@@ -40,4 +40,4 @@ void GLConstColorProcessor::onSetData(const ProgramDataManager& programDataManag
     programDataManager.set4fv(colorUniform, 1, fp.color.array());
   }
 }
-}  // namespace pag
+}  // namespace tgfx

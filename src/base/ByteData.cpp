@@ -21,7 +21,7 @@
 
 namespace pag {
 std::unique_ptr<ByteData> ByteData::FromPath(const std::string& filePath) {
-  auto stream = Stream::MakeFromFile(filePath);
+  auto stream = tgfx::Stream::MakeFromFile(filePath);
   if (stream == nullptr) {
     return nullptr;
   }

@@ -18,9 +18,9 @@
 
 #include "EAGLHardwareTexture.h"
 #include "gpu/opengl/eagl/EAGLDevice.h"
-#include "base/utils/UniqueID.h"
+#include "core/utils/UniqueID.h"
 
-namespace pag {
+namespace tgfx {
 static CVOpenGLESTextureRef GetTextureRef(Context* context, CVPixelBufferRef pixelBuffer,
                                           CVOpenGLESTextureCacheRef textureCache,
                                           unsigned* sizedFormat) {

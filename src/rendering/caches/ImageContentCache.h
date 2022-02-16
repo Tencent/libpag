@@ -23,7 +23,7 @@
 namespace pag {
 class ImageContentCache : public ContentCache {
  public:
-  static std::shared_ptr<Image> GetImage(ImageBytes* imageBytes);
+  static std::shared_ptr<tgfx::Image> GetImage(ImageBytes* imageBytes);
 
   explicit ImageContentCache(ImageLayer* layer);
 

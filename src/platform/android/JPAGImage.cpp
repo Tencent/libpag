@@ -23,6 +23,7 @@
 #include <cassert>
 #include "JNIHelper.h"
 #include "NativePlatform.h"
+#include "base/utils/TGFXCast.h"
 
 namespace pag {
 static jfieldID PAGImage_nativeContext;
@@ -78,7 +79,7 @@ JNIEXPORT jlong Java_org_libpag_PAGImage_LoadFromBitmap(JNIEnv* env, jclass, job
     return 0;
   }
   auto pagImage = PAGImage::FromPixels(pixels, info.width(), info.height(), info.rowBytes(),
-                                       info.colorType(), info.alphaType());
+                                       ToPAG(info.colorType()), ToPAG(info.alphaType()));
   AndroidBitmap_unlockPixels(env, bitmap);
   if (pagImage == nullptr) {
     LOGE("PAGImage.LoadFromPixels() Invalid pixels specified.");
@@ -193,7 +194,7 @@ JNIEXPORT void Java_org_libpag_PAGImage_nativeGetMatrix(JNIEnv* env, jobject thi
     auto matrix = image->matrix();
     matrix.get9(list);
   } else {
-    Matrix matrix = {};
+    tgfx::Matrix matrix = {};
     matrix.setIdentity();
     matrix.get9(list);
   }

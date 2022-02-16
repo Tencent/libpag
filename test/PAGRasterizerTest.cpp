@@ -28,6 +28,7 @@
 
 namespace pag {
 using nlohmann::json;
+using namespace tgfx;
 
 /**
  * 用例描述: 矢量栅格化相关功能测试
@@ -35,12 +36,12 @@ using nlohmann::json;
 PAG_TEST(PAGRasterizerTest, TestRasterizer) {
   Path path = {};
   path.addRect(100, 100, 400, 400);
-  path.addRoundRect(Rect::MakeLTRB(150, 150, 350, 350), 30, 20, true);
-  path.addOval(Rect::MakeLTRB(200, 200, 300, 300));
+  path.addRoundRect(tgfx::Rect::MakeLTRB(150, 150, 350, 350), 30, 20, true);
+  path.addOval(tgfx::Rect::MakeLTRB(200, 200, 300, 300));
   // 501*501 是为了测试 GL_UNPACK_ALIGNMENT
   auto mask = Mask::Make(501, 501);
   ASSERT_TRUE(mask != nullptr);
-  auto matrix = Matrix::MakeTrans(50, 50);
+  auto matrix = tgfx::Matrix::MakeTrans(50, 50);
   mask->setMatrix(matrix);
   mask->fillPath(path);
   auto maskBuffer = std::static_pointer_cast<FTMask>(mask)->getBuffer();

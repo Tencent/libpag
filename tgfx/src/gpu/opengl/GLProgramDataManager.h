@@ -21,7 +21,7 @@
 #include "GLInterface.h"
 #include "gpu/ProgramDataManager.h"
 
-namespace pag {
+namespace tgfx {
 class GLProgramDataManager : public ProgramDataManager {
  public:
   GLProgramDataManager(const GLInterface* gl, const std::vector<int>* uniforms);
@@ -40,4 +40,4 @@ class GLProgramDataManager : public ProgramDataManager {
   const GLInterface* gl;
   const std::vector<int>* uniforms;
 };
-}  // namespace pag
+}  // namespace tgfx

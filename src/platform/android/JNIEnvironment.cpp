@@ -34,7 +34,7 @@ static void JNI_Thread_Destroy(void* value) {
 
 extern "C" jint JNI_OnLoad(JavaVM* vm, void*) {
   globalJavaVM = vm;
-  pag::SetJavaVM(vm);
+  tgfx::SetJavaVM(vm);
   pthread_key_create(&threadKey, JNI_Thread_Destroy);
   return JNI_VERSION_1_4;
 }
