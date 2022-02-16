@@ -18,13 +18,13 @@
 
 #pragma once
 
-#include "core/Color4f.h"
+#include "core/Color.h"
 #include "gpu/FragmentProcessor.h"
 
-namespace pag {
+namespace tgfx {
 class SingleIntervalGradientColorizer : public FragmentProcessor {
  public:
-  static std::unique_ptr<SingleIntervalGradientColorizer> Make(Color4f start, Color4f end);
+  static std::unique_ptr<SingleIntervalGradientColorizer> Make(Color start, Color end);
 
   std::string name() const override {
     return "SingleIntervalGradientColorizer";
@@ -35,12 +35,12 @@ class SingleIntervalGradientColorizer : public FragmentProcessor {
   std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
 
  private:
-  SingleIntervalGradientColorizer(Color4f start, Color4f end) : start(start), end(end) {
+  SingleIntervalGradientColorizer(Color start, Color end) : start(start), end(end) {
   }
 
-  Color4f start;
-  Color4f end;
+  Color start;
+  Color end;
 
   friend class GLSingleIntervalGradientColorizer;
 };
-}  // namespace pag
+}  // namespace tgfx

@@ -18,7 +18,7 @@
 
 #include "GLTextureGradientColorizer.h"
 
-namespace pag {
+namespace tgfx {
 void GLTextureGradientColorizer::emitCode(EmitArgs& args) {
   auto* fragBuilder = args.fragBuilder;
   fragBuilder->codeAppendf("vec2 coord = vec2(%s.x, 0.5);", args.inputColor.c_str());
@@ -26,4 +26,4 @@ void GLTextureGradientColorizer::emitCode(EmitArgs& args) {
   fragBuilder->appendTextureLookup((*args.textureSamplers)[0], "coord");
   fragBuilder->codeAppend(";");
 }
-}  // namespace pag
+}  // namespace tgfx

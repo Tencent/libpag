@@ -22,7 +22,7 @@ namespace pag {
 #define I420_PLANE_COUNT 3
 
 I420Buffer::I420Buffer(int width, int height, uint8_t** data, const int* lineSize,
-                       YUVColorSpace colorSpace, YUVColorRange colorRange)
+                       tgfx::YUVColorSpace colorSpace, tgfx::YUVColorRange colorRange)
     : VideoBuffer(width, height), colorSpace(colorSpace), colorRange(colorRange) {
   for (int i = 0; i < I420_PLANE_COUNT; i++) {
     pixelsPlane[i] = data[i];
@@ -34,11 +34,11 @@ size_t I420Buffer::planeCount() const {
   return I420_PLANE_COUNT;
 }
 
-std::shared_ptr<Texture> I420Buffer::makeTexture(Context* context) const {
+std::shared_ptr<tgfx::Texture> I420Buffer::makeTexture(tgfx::Context* context) const {
   if (context == nullptr) {
     return nullptr;
   }
-  return YUVTexture::MakeI420(context, colorSpace, colorRange, width(), height(),
-                              const_cast<uint8_t**>(pixelsPlane), rowBytesPlane);
+  return tgfx::YUVTexture::MakeI420(context, colorSpace, colorRange, width(), height(),
+                                    const_cast<uint8_t**>(pixelsPlane), rowBytesPlane);
 }
 }  // namespace pag

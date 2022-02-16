@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SolidContentCache.h"
+#include "base/utils/TGFXCast.h"
 #include "rendering/graphics/Shape.h"
-#include "rendering/utils/TGFXTypes.h"
 
 namespace pag {
 SolidContentCache::SolidContentCache(SolidLayer* layer) : ContentCache(layer) {
@@ -26,9 +26,9 @@ SolidContentCache::SolidContentCache(SolidLayer* layer) : ContentCache(layer) {
 
 GraphicContent* SolidContentCache::createContent(Frame) const {
   auto solidLayer = static_cast<SolidLayer*>(layer);
-  Path path = {};
+  tgfx::Path path = {};
   path.addRect(0, 0, solidLayer->width, solidLayer->height);
-  auto graphic = Shape::MakeFrom(path, ToTGFXColor(solidLayer->solidColor));
+  auto graphic = Shape::MakeFrom(path, ToTGFX(solidLayer->solidColor));
   return new GraphicContent(graphic);
 }
 }  // namespace pag

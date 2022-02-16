@@ -18,9 +18,10 @@
 
 #pragma once
 
-#include "pag/types.h"
+#include <functional>
+#include "core/Point.h"
 
-namespace pag {
+namespace tgfx {
 /**
  * PathFillType selects the rule used to fill Path.
  */
@@ -100,4 +101,4 @@ enum class PathVerb {
  */
 using PathIterator = std::function<void(PathVerb verb, const Point points[4], void* info)>;
 
-}  // namespace pag
+}  // namespace tgfx

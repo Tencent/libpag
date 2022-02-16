@@ -21,7 +21,7 @@
 #include "GLContext.h"
 #include "GLUtil.h"
 
-namespace pag {
+namespace tgfx {
 std::shared_ptr<Surface> Surface::MakeFrom(Context* context,
                                            const BackendRenderTarget& renderTarget,
                                            ImageOrigin origin) {
@@ -153,4 +153,4 @@ bool GLSurface::onReadPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX
   renderTarget->resolve(context);
   return renderTarget->readPixels(context, dstInfo, dstPixels, srcX, srcY);
 }
-}  // namespace pag
+}  // namespace tgfx

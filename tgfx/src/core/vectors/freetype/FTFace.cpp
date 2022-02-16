@@ -19,7 +19,7 @@
 #include "FTFace.h"
 #include "FTUtil.h"
 
-namespace pag {
+namespace tgfx {
 std::mutex& FTMutex() {
   static std::mutex& mutex = *new std::mutex;
   return mutex;
@@ -64,7 +64,7 @@ std::unique_ptr<FTFace> FTFace::Make(const FTFontData& data) {
   if (data.path.empty()) {
     args.flags = FT_OPEN_MEMORY;
     args.memory_base = static_cast<const FT_Byte*>(data.data->data());
-    args.memory_size = static_cast<FT_Long>(data.data->length());
+    args.memory_size = static_cast<FT_Long>(data.data->size());
   } else {
     args.flags = FT_OPEN_PATHNAME;
     args.pathname = const_cast<FT_String*>(data.path.c_str());
@@ -78,4 +78,4 @@ std::unique_ptr<FTFace> FTFace::Make(const FTFontData& data) {
   }
   return face;
 }
-}  // namespace pag
+}  // namespace tgfx

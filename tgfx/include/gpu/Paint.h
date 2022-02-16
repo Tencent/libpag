@@ -18,12 +18,11 @@
 
 #pragma once
 
-#include "core/Color4f.h"
+#include "core/Color.h"
 #include "core/Stroke.h"
 #include "gpu/Shader.h"
-#include "pag/types.h"
 
-namespace pag {
+namespace tgfx {
 /**
  * Defines enumerations for Paint.setStyle().
  */
@@ -66,7 +65,7 @@ class Paint {
   /**
    * Retrieves alpha and RGB, unpremultiplied, as four floating point values.
    */
-  Color4f getColor() const {
+  Color getColor() const {
     return color;
   }
 
@@ -74,7 +73,7 @@ class Paint {
    * Sets alpha and RGB used when stroking and filling. The color is four floating point values,
    * unpremultiplied.
    */
-  void setColor(Color4f newColor) {
+  void setColor(Color newColor) {
     color = newColor;
   }
 
@@ -112,28 +111,28 @@ class Paint {
   /**
    * Returns the geometry drawn at the beginning and end of strokes.
    */
-  Stroke::Cap getLineCap() const {
+  LineCap getLineCap() const {
     return stroke.cap;
   }
 
   /**
    * Sets the geometry drawn at the beginning and end of strokes.
    */
-  void setLineCap(Stroke::Cap cap) {
+  void setLineCap(LineCap cap) {
     stroke.cap = cap;
   }
 
   /**
    * Returns the geometry drawn at the corners of strokes.
    */
-  Stroke::Join getLineJoin() const {
+  LineJoin getLineJoin() const {
     return stroke.join;
   }
 
   /**
    * Sets the geometry drawn at the corners of strokes.
    */
-  void setLineJoin(Stroke::Join join) {
+  void setLineJoin(LineJoin join) {
     stroke.join = join;
   }
 
@@ -182,8 +181,8 @@ class Paint {
 
  private:
   PaintStyle style = PaintStyle::Fill;
-  Color4f color = Color4f::Black();
+  Color color = Color::Black();
   Stroke stroke = Stroke(0);
   std::shared_ptr<Shader> shader = nullptr;
 };
-}  // namespace pag
+}  // namespace tgfx

@@ -19,7 +19,7 @@
 #include "gpu/Canvas.h"
 #include "gpu/Surface.h"
 
-namespace pag {
+namespace tgfx {
 Canvas::Canvas(Surface* surface) : surface(surface) {
   globalPaint.clip.addRect(0, 0, static_cast<float>(surface->width()),
                            static_cast<float>(surface->height()));
@@ -66,11 +66,11 @@ void Canvas::setAlpha(float newAlpha) {
   globalPaint.alpha = newAlpha;
 }
 
-Blend Canvas::getBlendMode() const {
+BlendMode Canvas::getBlendMode() const {
   return globalPaint.blendMode;
 }
 
-void Canvas::setBlendMode(Blend blendMode) {
+void Canvas::setBlendMode(BlendMode blendMode) {
   globalPaint.blendMode = blendMode;
 }
 
@@ -113,4 +113,4 @@ Surface* Canvas::getSurface() const {
 const SurfaceOptions* Canvas::surfaceOptions() const {
   return surface->options();
 }
-}  // namespace pag
+}  // namespace tgfx

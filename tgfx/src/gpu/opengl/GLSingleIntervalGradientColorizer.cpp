@@ -19,7 +19,7 @@
 #include "GLSingleIntervalGradientColorizer.h"
 #include "gpu/gradients/SingleIntervalGradientColorizer.h"
 
-namespace pag {
+namespace tgfx {
 void GLSingleIntervalGradientColorizer::emitCode(EmitArgs& args) {
   auto* fragBuilder = args.fragBuilder;
   std::string startName;
@@ -45,4 +45,4 @@ void GLSingleIntervalGradientColorizer::onSetData(const ProgramDataManager& prog
     programDataManager.set4fv(endUniform, 1, fp.end.array());
   }
 }
-}  // namespace pag
+}  // namespace tgfx

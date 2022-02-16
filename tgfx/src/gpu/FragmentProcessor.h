@@ -22,7 +22,7 @@
 #include "Processor.h"
 #include "gpu/Texture.h"
 
-namespace pag {
+namespace tgfx {
 struct FPArgs {
   FPArgs(Context* context, const Matrix& localMatrix) : context(context), localMatrix(localMatrix) {
   }
@@ -151,4 +151,4 @@ class FragmentProcessor : public Processor {
 
   std::vector<std::unique_ptr<FragmentProcessor>> childProcessors;
 };
-}  // namespace pag
+}  // namespace tgfx

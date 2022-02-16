@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "pag/file.h"
+#include "core/Matrix.h"
 
 namespace pag {
 class Transform {
@@ -27,14 +27,14 @@ class Transform {
     matrix.setIdentity();
   }
 
-  Transform(const Matrix& matrix, float alpha) : matrix(matrix), alpha(alpha) {
+  Transform(const tgfx::Matrix& matrix, float alpha) : matrix(matrix), alpha(alpha) {
   }
 
   bool visible() const {
     return matrix.invertible() && alpha > 0;
   }
 
-  Matrix matrix = {};
+  tgfx::Matrix matrix = {};
   float alpha = 1.0f;
 };
 }  // namespace pag

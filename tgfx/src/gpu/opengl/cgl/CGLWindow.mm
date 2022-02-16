@@ -21,7 +21,7 @@
 #include "CGLHardwareTexture.h"
 #include "gpu/opengl/GLSurface.h"
 
-namespace pag {
+namespace tgfx {
 static std::mutex threadCacheLocker = {};
 static std::unordered_map<std::thread::id, std::weak_ptr<GLDevice>> threadCacheMap = {};
 
@@ -125,4 +125,4 @@ void CGLWindow::onPresent(Context* context, int64_t) {
     gl->flush();
   }
 }
-}  // namespace pag
+}  // namespace tgfx

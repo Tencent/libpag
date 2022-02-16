@@ -18,14 +18,14 @@
 
 #pragma once
 
-#include "core/Color4f.h"
+#include "core/Color.h"
 #include "gpu/FragmentProcessor.h"
 
-namespace pag {
+namespace tgfx {
 class DualIntervalGradientColorizer : public FragmentProcessor {
  public:
-  static std::unique_ptr<DualIntervalGradientColorizer> Make(Color4f c0, Color4f c1, Color4f c2,
-                                                             Color4f c3, float threshold);
+  static std::unique_ptr<DualIntervalGradientColorizer> Make(Color c0, Color c1, Color c2, Color c3,
+                                                             float threshold);
 
   std::string name() const override {
     return "DualIntervalGradientColorizer";
@@ -36,17 +36,17 @@ class DualIntervalGradientColorizer : public FragmentProcessor {
   std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
 
  private:
-  DualIntervalGradientColorizer(Color4f scale01, Color4f bias01, Color4f scale23, Color4f bias23,
+  DualIntervalGradientColorizer(Color scale01, Color bias01, Color scale23, Color bias23,
                                 float threshold)
       : scale01(scale01), bias01(bias01), scale23(scale23), bias23(bias23), threshold(threshold) {
   }
 
-  Color4f scale01;
-  Color4f bias01;
-  Color4f scale23;
-  Color4f bias23;
+  Color scale01;
+  Color bias01;
+  Color scale23;
+  Color bias23;
   float threshold;
 
   friend class GLDualIntervalGradientColorizer;
 };
-}  // namespace pag
+}  // namespace tgfx

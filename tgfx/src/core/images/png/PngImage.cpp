@@ -20,7 +20,7 @@
 #include "core/Bitmap.h"
 #include "png.h"
 
-namespace pag {
+namespace tgfx {
 std::shared_ptr<Image> PngImage::MakeFrom(const std::string& filePath) {
   return MakeFromData(filePath, nullptr);
 }
@@ -350,4 +350,4 @@ std::shared_ptr<Data> PngImage::Encode(const ImageInfo& imageInfo, const void* p
 }
 #endif
 
-}  // namespace pag
+}  // namespace tgfx

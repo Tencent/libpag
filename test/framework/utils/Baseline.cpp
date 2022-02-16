@@ -21,10 +21,13 @@
 #include <fstream>
 #include <unordered_set>
 #include "LzmaUtil.h"
+#include "base/utils/TGFXCast.h"
 #include "core/Data.h"
 #include "core/Image.h"
 
 namespace pag {
+using namespace tgfx;
+
 #define BASELINE_ROOT "../test/baseline/"
 #define OUT_BASELINE_ROOT "../test/out/baseline/"
 #define OUT_COMPARE_ROOT "../test/out/compare/"
@@ -33,7 +36,7 @@ namespace pag {
 #define MAX_DIFF_VALUE 5
 
 static ImageInfo MakeInfo(int with, int height) {
-  return ImageInfo::Make(with, height, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  return ImageInfo::Make(with, height, tgfx::ColorType::RGBA_8888, tgfx::AlphaType::Premultiplied);
 }
 
 static std::shared_ptr<Data> LoadImageData(const std::string& key) {
@@ -142,8 +145,8 @@ bool Baseline::Compare(const std::shared_ptr<PAGSurface>& surface, const std::st
   auto info = MakeInfo(surface->width(), surface->height());
   auto pixels = new uint8_t[info.byteSize()];
   auto data = Data::MakeAdopted(pixels, info.byteSize(), Data::DeleteProc);
-  auto result =
-      surface->readPixels(info.colorType(), AlphaType::Premultiplied, pixels, info.rowBytes());
+  auto result = surface->readPixels(ToPAG(info.colorType()), AlphaType::Premultiplied, pixels,
+                                    info.rowBytes());
   if (!result) {
     return false;
   }

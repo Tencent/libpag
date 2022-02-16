@@ -62,7 +62,7 @@ bool NativePlatform::registerFallbackFonts() const {
   return FontConfigAndroid::RegisterFallbackFonts();
 }
 
-void NativePlatform::traceImage(const ImageInfo& info, const void* pixels,
+void NativePlatform::traceImage(const tgfx::ImageInfo& info, const void* pixels,
                                 const std::string& tag) const {
   JTraceImage::Trace(info, pixels, tag);
 }

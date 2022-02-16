@@ -52,13 +52,13 @@ class FilterModifier : public Modifier {
   void prepare(RenderCache*) const override {
   }
 
-  void applyToBounds(Rect* bounds) const override;
+  void applyToBounds(tgfx::Rect* bounds) const override;
 
-  bool applyToPath(Path*) const override {
+  bool applyToPath(tgfx::Path*) const override {
     return false;
   }
 
-  void applyToGraphic(Canvas* canvas, RenderCache* cache,
+  void applyToGraphic(tgfx::Canvas* canvas, RenderCache* cache,
                       std::shared_ptr<Graphic> graphic) const override;
 
   std::shared_ptr<Modifier> mergeWith(const Modifier*) const override {

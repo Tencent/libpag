@@ -20,14 +20,19 @@
 
 #include <cmath>
 
-namespace pag {
+namespace tgfx {
 static constexpr float M_PI_F = static_cast<float>(M_PI);
 static constexpr float M_PI_2_F = static_cast<float>(M_PI_2);
 static constexpr float FLOAT_NEARLY_ZERO = 1.0f / (1 << 12);
 static constexpr float FLOAT_SQRT2 = 1.41421356f;
 
-#define DegreesToRadians(degrees) ((degrees) * (M_PI_F / 180.0f))
-#define RadiansToDegrees(radians) ((radians) * (180.0f / M_PI_F))
+static inline float DegreesToRadians(float degrees) {
+  return degrees * (static_cast<float>(M_PI) / 180.0f);
+}
+
+static inline float RadiansToDegrees(float radians) {
+  return radians * (180.0f / static_cast<float>(M_PI));
+}
 
 static inline bool FloatNearlyZero(float x, float tolerance = FLOAT_NEARLY_ZERO) {
   return fabsf(x) <= tolerance;
@@ -54,4 +59,4 @@ static inline bool FloatsAreFinite(const float array[], int count) {
   }
   return prod == 0;
 }
-}  // namespace pag
+}  // namespace tgfx

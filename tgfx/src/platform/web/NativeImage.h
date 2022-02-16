@@ -21,7 +21,7 @@
 #include <emscripten/val.h>
 #include "core/Image.h"
 
-namespace pag {
+namespace tgfx {
 class NativeImage : public Image {
  public:
   static std::shared_ptr<NativeImage> MakeFrom(emscripten::val nativeImage);
@@ -40,4 +40,4 @@ class NativeImage : public Image {
 
   friend class NativeCodec;
 };
-}  // namespace pag
+}  // namespace tgfx

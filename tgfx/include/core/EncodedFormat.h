@@ -18,11 +18,11 @@
 
 #pragma once
 
-namespace pag {
+namespace tgfx {
 
 /**
  *  Describes the known formats a Bitmap can be encoded into.
  */
 enum class EncodedFormat { JPEG, PNG, WEBP };
 
-}  // namespace pag
+}  // namespace tgfx

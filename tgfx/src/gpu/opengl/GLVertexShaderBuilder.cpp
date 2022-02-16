@@ -18,7 +18,7 @@
 
 #include "GLVertexShaderBuilder.h"
 
-namespace pag {
+namespace tgfx {
 GLVertexShaderBuilder::GLVertexShaderBuilder(ProgramBuilder* program)
     : VertexShaderBuilder(program) {
   setPrecisionQualifier("precision mediump float;");
@@ -27,4 +27,4 @@ GLVertexShaderBuilder::GLVertexShaderBuilder(ProgramBuilder* program)
 void GLVertexShaderBuilder::emitNormalizedPosition(const std::string& devPos) {
   codeAppendf("gl_Position = vec4(%s, 0, 1);", devPos.c_str());
 }
-}  // namespace pag
+}  // namespace tgfx

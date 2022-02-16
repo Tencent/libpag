@@ -20,7 +20,7 @@
 #include "core/Bitmap.h"
 #include "core/images/webp/WebpUtility.h"
 
-namespace pag {
+namespace tgfx {
 
 bool WebpImage::IsWebp(const std::shared_ptr<Data>& data) {
   const char* bytes = static_cast<const char*>(data->data());
@@ -30,8 +30,8 @@ bool WebpImage::IsWebp(const std::shared_ptr<Data>& data) {
 std::shared_ptr<Image> WebpImage::MakeFrom(const std::string& filePath) {
   auto info = WebpUtility::getDecodeInfo(filePath);
   if (info.width == 0 || info.height == 0) {
-    auto data = ByteData::FromPath(filePath);
-    info = WebpUtility::getDecodeInfo(data->data(), data->length());
+    auto data = Data::MakeFromFile(filePath);
+    info = WebpUtility::getDecodeInfo(data->data(), data->size());
     if (info.width == 0 || info.height == 0) {
       return nullptr;
     }
@@ -207,4 +207,4 @@ std::shared_ptr<Data> WebpImage::Encode(const ImageInfo& imageInfo, const void* 
 }
 #endif
 
-}  // namespace pag
+}  // namespace tgfx

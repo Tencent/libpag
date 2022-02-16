@@ -22,7 +22,7 @@
 
 #include "gpu/FragmentProcessor.h"
 
-namespace pag {
+namespace tgfx {
 class TextureGradientColorizer : public FragmentProcessor {
  public:
   static std::unique_ptr<TextureGradientColorizer> Make(const Texture* gradient);
@@ -48,4 +48,4 @@ class TextureGradientColorizer : public FragmentProcessor {
 
   friend class GLTextureGradientColorizer;
 };
-}  // namespace pag
+}  // namespace tgfx

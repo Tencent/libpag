@@ -20,7 +20,7 @@
 #include "gpu/opengl/GLContext.h"
 #include "gpu/opengl/GLUtil.h"
 
-namespace pag {
+namespace tgfx {
 static std::mutex deviceMapLocker = {};
 static std::unordered_map<void*, GLDevice*> deviceMap = {};
 
@@ -83,4 +83,4 @@ void GLDevice::onUnlockContext() {
   }
   onClearCurrent();
 }
-}  // namespace pag
+}  // namespace tgfx

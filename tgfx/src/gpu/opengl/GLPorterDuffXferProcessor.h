@@ -20,7 +20,7 @@
 
 #include "gpu/GLXferProcessor.h"
 
-namespace pag {
+namespace tgfx {
 class GLPorterDuffXferProcessor : public GLXferProcessor {
  public:
   void emitCode(const EmitArgs&) override;
@@ -36,4 +36,4 @@ class GLPorterDuffXferProcessor : public GLXferProcessor {
   int widthPrev = -1;
   int heightPrev = -1;
 };
-}  // namespace pag
+}  // namespace tgfx

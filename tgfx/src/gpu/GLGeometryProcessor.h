@@ -26,7 +26,7 @@
 #include "VaryingHandler.h"
 #include "VertexShaderBuilder.h"
 
-namespace pag {
+namespace tgfx {
 class GLGeometryProcessor {
  public:
   // Use only for easy-to-use aliases.
@@ -126,4 +126,4 @@ class GLGeometryProcessor {
 
   std::vector<TransformUniform> installedTransforms;
 };
-}  // namespace pag
+}  // namespace tgfx

@@ -21,7 +21,7 @@
 #include "core/Bitmap.h"
 #include "platform/NativeCodec.h"
 
-namespace pag {
+namespace tgfx {
 static constexpr int BITMAP_FLAGS_ALPHA_UNPREMUL = 2;
 
 static Global<jclass> BitmapFactoryOptionsClass;
@@ -247,4 +247,4 @@ bool NativeImage::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   AndroidBitmap_unlockPixels(env, bitmap.get());
   return result;
 }
-}  // namespace pag
+}  // namespace tgfx

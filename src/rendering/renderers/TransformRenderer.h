@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "pag/file.h"
 #include "rendering/utils/Transform.h"
 
 namespace pag {

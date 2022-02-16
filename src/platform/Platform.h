@@ -23,12 +23,12 @@
 #include <string>
 #include <unordered_map>
 #include "codec/NALUType.h"
+#include "core/Data.h"
 #include "core/ImageInfo.h"
 
 namespace pag {
 struct VideoConfig;
 class VideoDecoder;
-class Data;
 
 /**
  * Defines methods for native platforms to implement.
@@ -68,6 +68,7 @@ class Platform {
   /**
    * Provides a utility to view the PixelMap data.
    */
-  virtual void traceImage(const ImageInfo& info, const void* pixels, const std::string& tag) const;
+  virtual void traceImage(const tgfx::ImageInfo& info, const void* pixels,
+                          const std::string& tag) const;
 };
 }  // namespace pag

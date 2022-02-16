@@ -16,16 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "core/Performance.h"
 
-#include <cstdint>
-#include <string>
-
-namespace pag {
-class UTF8Text {
- public:
-  static int Count(const std::string& string);
-
-  static int32_t NextChar(const char** ptr);
-};
-}  // namespace pag
+namespace tgfx {
+int64_t Performance::Now() {
+  static const auto START_TIME = std::chrono::high_resolution_clock::now();
+  auto now = std::chrono::high_resolution_clock::now();
+  auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now - START_TIME);
+  return static_cast<int64_t>(ns.count() * 1e-3);
+}
+}  // namespace tgfx

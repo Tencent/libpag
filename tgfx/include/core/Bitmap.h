@@ -23,7 +23,7 @@
 #include "core/ImageInfo.h"
 #include "core/PixelBuffer.h"
 
-namespace pag {
+namespace tgfx {
 /**
  * Bitmap is a low level class which provides convenience functions to access raster destinations,
  * which provides a utility to convert the format of pixels from one to another or compress the
@@ -147,9 +147,4 @@ class Bitmap {
   void* _writablePixels = nullptr;
   std::shared_ptr<PixelBuffer> pixelBuffer = nullptr;
 };
-
-/**
- * Trace() provides a utility to view the Bitmap.
- */
-void Trace(const Bitmap& bitmap, const std::string& tag = "");
-}  // namespace pag
+}  // namespace tgfx

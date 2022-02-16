@@ -27,7 +27,7 @@ class ComposeGraphic : public Graphic {
     return GraphicType::Compose;
   }
 
-  virtual std::shared_ptr<Graphic> mergeWith(const Matrix&) const {
+  virtual std::shared_ptr<Graphic> mergeWith(const tgfx::Matrix&) const {
     return nullptr;
   }
 
@@ -39,24 +39,24 @@ class ComposeGraphic : public Graphic {
 //===================================== MatrixGraphic ==============================================
 class MatrixGraphic : public ComposeGraphic {
  public:
-  MatrixGraphic(std::shared_ptr<Graphic> graphic, const Matrix& matrix)
+  MatrixGraphic(std::shared_ptr<Graphic> graphic, const tgfx::Matrix& matrix)
       : graphic(std::move(graphic)), matrix(matrix) {
   }
 
-  void measureBounds(Rect* bounds) const override;
+  void measureBounds(tgfx::Rect* bounds) const override;
   bool hitTest(RenderCache* cache, float x, float y) override;
-  bool getPath(Path* path) const override;
+  bool getPath(tgfx::Path* path) const override;
   void prepare(RenderCache* cache) const override;
-  void draw(Canvas* canvas, RenderCache* cache) const override;
-  std::shared_ptr<Graphic> mergeWith(const Matrix& matrix) const override;
+  void draw(tgfx::Canvas* canvas, RenderCache* cache) const override;
+  std::shared_ptr<Graphic> mergeWith(const tgfx::Matrix& matrix) const override;
 
  protected:
   std::shared_ptr<Graphic> graphic = nullptr;
-  Matrix matrix = {};
+  tgfx::Matrix matrix = {};
 };
 
 std::shared_ptr<Graphic> Graphic::MakeCompose(std::shared_ptr<Graphic> graphic,
-                                              const Matrix& matrix) {
+                                              const tgfx::Matrix& matrix) {
   if (graphic == nullptr || !matrix.invertible()) {
     return nullptr;
   }
@@ -72,21 +72,21 @@ std::shared_ptr<Graphic> Graphic::MakeCompose(std::shared_ptr<Graphic> graphic,
   return std::make_shared<MatrixGraphic>(graphic, matrix);
 }
 
-void MatrixGraphic::measureBounds(Rect* bounds) const {
+void MatrixGraphic::measureBounds(tgfx::Rect* bounds) const {
   graphic->measureBounds(bounds);
   matrix.mapRect(bounds);
 }
 
 bool MatrixGraphic::hitTest(RenderCache* cache, float x, float y) {
-  Point local = {x, y};
+  tgfx::Point local = {x, y};
   if (!MapPointInverted(matrix, &local)) {
     return false;
   }
   return graphic->hitTest(cache, local.x, local.y);
 }
 
-bool MatrixGraphic::getPath(Path* path) const {
-  Path fillPath = {};
+bool MatrixGraphic::getPath(tgfx::Path* path) const {
+  tgfx::Path fillPath = {};
   if (!graphic->getPath(&fillPath)) {
     return false;
   }
@@ -99,14 +99,14 @@ void MatrixGraphic::prepare(RenderCache* cache) const {
   graphic->prepare(cache);
 }
 
-void MatrixGraphic::draw(Canvas* canvas, RenderCache* cache) const {
+void MatrixGraphic::draw(tgfx::Canvas* canvas, RenderCache* cache) const {
   canvas->save();
   canvas->concat(matrix);
   graphic->draw(canvas, cache);
   canvas->restore();
 }
 
-std::shared_ptr<Graphic> MatrixGraphic::mergeWith(const Matrix& m) const {
+std::shared_ptr<Graphic> MatrixGraphic::mergeWith(const tgfx::Matrix& m) const {
   auto totalMatrix = matrix;
   totalMatrix.postConcat(m);
   if (totalMatrix.isIdentity()) {
@@ -123,12 +123,12 @@ class LayerGraphic : public ComposeGraphic {
       : contents(std::move(contents)) {
   }
 
-  void measureBounds(Rect* bounds) const override;
+  void measureBounds(tgfx::Rect* bounds) const override;
   bool hitTest(RenderCache* cache, float x, float y) override;
-  bool getPath(Path* path) const override;
+  bool getPath(tgfx::Path* path) const override;
   void prepare(RenderCache* cache) const override;
-  void draw(Canvas* canvas, RenderCache* cache) const override;
-  std::shared_ptr<Graphic> mergeWith(const Matrix& matrix) const override;
+  void draw(tgfx::Canvas* canvas, RenderCache* cache) const override;
+  std::shared_ptr<Graphic> mergeWith(const tgfx::Matrix& matrix) const override;
 
  private:
   std::vector<std::shared_ptr<Graphic>> contents = {};
@@ -151,10 +151,10 @@ std::shared_ptr<Graphic> Graphic::MakeCompose(std::vector<std::shared_ptr<Graphi
   return std::make_shared<LayerGraphic>(graphics);
 }
 
-void LayerGraphic::measureBounds(Rect* bounds) const {
+void LayerGraphic::measureBounds(tgfx::Rect* bounds) const {
   bounds->setEmpty();
   for (auto& content : contents) {
-    Rect rect = Rect::MakeEmpty();
+    tgfx::Rect rect = tgfx::Rect::MakeEmpty();
     content->measureBounds(&rect);
     bounds->join(rect);
   }
@@ -166,10 +166,10 @@ bool LayerGraphic::hitTest(RenderCache* cache, float x, float y) {
   });
 }
 
-bool LayerGraphic::getPath(Path* path) const {
-  Path fillPath = {};
+bool LayerGraphic::getPath(tgfx::Path* path) const {
+  tgfx::Path fillPath = {};
   for (auto& content : contents) {
-    Path temp = {};
+    tgfx::Path temp = {};
     if (!content->getPath(&temp)) {
       return false;
     }
@@ -185,7 +185,7 @@ void LayerGraphic::prepare(RenderCache* cache) const {
   }
 }
 
-void LayerGraphic::draw(Canvas* canvas, RenderCache* cache) const {
+void LayerGraphic::draw(tgfx::Canvas* canvas, RenderCache* cache) const {
   for (auto& content : contents) {
     canvas->save();
     content->draw(canvas, cache);
@@ -193,7 +193,7 @@ void LayerGraphic::draw(Canvas* canvas, RenderCache* cache) const {
   }
 }
 
-std::shared_ptr<Graphic> LayerGraphic::mergeWith(const Matrix& m) const {
+std::shared_ptr<Graphic> LayerGraphic::mergeWith(const tgfx::Matrix& m) const {
   std::vector<std::shared_ptr<Graphic>> newContents = {};
   for (auto& graphic : contents) {
     if (graphic->type() != GraphicType::Compose) {
@@ -216,11 +216,11 @@ class ModifierGraphic : public ComposeGraphic {
       : graphic(std::move(graphic)), modifier(std::move(modifier)) {
   }
 
-  void measureBounds(Rect* bounds) const override;
+  void measureBounds(tgfx::Rect* bounds) const override;
   bool hitTest(RenderCache* cache, float x, float y) override;
-  bool getPath(Path* path) const override;
+  bool getPath(tgfx::Path* path) const override;
   void prepare(RenderCache* cache) const override;
-  void draw(Canvas* canvas, RenderCache* cache) const override;
+  void draw(tgfx::Canvas* canvas, RenderCache* cache) const override;
   std::shared_ptr<Graphic> mergeWith(const Modifier* target) const override;
 
  private:
@@ -245,7 +245,7 @@ std::shared_ptr<Graphic> Graphic::MakeCompose(std::shared_ptr<Graphic> graphic,
   return std::make_shared<ModifierGraphic>(graphic, modifier);
 }
 
-void ModifierGraphic::measureBounds(Rect* bounds) const {
+void ModifierGraphic::measureBounds(tgfx::Rect* bounds) const {
   graphic->measureBounds(bounds);
   modifier->applyToBounds(bounds);
 }
@@ -257,8 +257,8 @@ bool ModifierGraphic::hitTest(RenderCache* cache, float x, float y) {
   return graphic->hitTest(cache, x, y);
 }
 
-bool ModifierGraphic::getPath(Path* path) const {
-  Path fillPath = {};
+bool ModifierGraphic::getPath(tgfx::Path* path) const {
+  tgfx::Path fillPath = {};
   if (!graphic->getPath(&fillPath)) {
     return false;
   }
@@ -274,7 +274,7 @@ void ModifierGraphic::prepare(RenderCache* cache) const {
   graphic->prepare(cache);
 }
 
-void ModifierGraphic::draw(Canvas* canvas, RenderCache* cache) const {
+void ModifierGraphic::draw(tgfx::Canvas* canvas, RenderCache* cache) const {
   canvas->save();
   modifier->applyToGraphic(canvas, cache, graphic);
   canvas->restore();

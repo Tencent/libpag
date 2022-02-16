@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/Path.h"
-#include "base/utils/MathExtra.h"
 #include "core/PathRef.h"
+#include "core/utils/MathExtra.h"
 
-namespace pag {
+namespace tgfx {
 using namespace pk;
 
 static SkPathDirection ToSkDirection(bool reversed) {
@@ -393,4 +393,4 @@ PathRef* Path::writableRef() {
   }
   return pathRef.get();
 }
-}  // namespace pag
+}  // namespace tgfx

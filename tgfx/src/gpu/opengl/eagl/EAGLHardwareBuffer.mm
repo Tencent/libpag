@@ -20,7 +20,7 @@
 #include "EAGLNV12Texture.h"
 #include "platform/apple/HardwareBuffer.h"
 
-namespace pag {
+namespace tgfx {
 std::shared_ptr<PixelBuffer> PixelBuffer::MakeFrom(void* hardwareBuffer) {
   auto pixelBuffer = reinterpret_cast<CVPixelBufferRef>(hardwareBuffer);
   if (pixelBuffer == nullptr) {
@@ -50,4 +50,4 @@ std::shared_ptr<YUVTexture> YUVTexture::MakeFrom(Context* context, YUVColorSpace
   }
   return EAGLNV12Texture::MakeFrom(context, pixelBuffer, colorSpace, colorRange);
 }
-}  // namespace pag
+}  // namespace tgfx

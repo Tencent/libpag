@@ -20,10 +20,8 @@
 
 #include "core/ImageInfo.h"
 #include "gpu/Canvas.h"
-#include "pag/gpu.h"
-#include "pag/types.h"
 
-namespace pag {
+namespace tgfx {
 /**
  * Describes options of a given Surface. The caller can add some custom options to its subclass and
  * parse them during drawing, which can sometimes optimize the rendering performance (e.g. disabling
@@ -173,4 +171,4 @@ class Surface {
   Context* context = nullptr;
   std::unique_ptr<SurfaceOptions> surfaceOptions = nullptr;
 };
-}  // namespace pag
+}  // namespace tgfx

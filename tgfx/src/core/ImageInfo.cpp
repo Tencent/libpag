@@ -18,7 +18,7 @@
 
 #include "core/ImageInfo.h"
 
-namespace pag {
+namespace tgfx {
 static constexpr int MaxDimension = INT32_MAX >> 2;
 
 bool ImageInfo::IsValidSize(int width, int height) {
@@ -99,4 +99,4 @@ void* ImageInfo::computeOffset(void* pixels, int x, int y) const {
   auto offset = y * _rowBytes + x * bytesPerPixel();
   return reinterpret_cast<uint8_t*>(pixels) + offset;
 }
-}  // namespace pag
+}  // namespace tgfx

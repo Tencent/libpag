@@ -20,11 +20,11 @@
 
 #include "gpu/VertexShaderBuilder.h"
 
-namespace pag {
+namespace tgfx {
 class GLVertexShaderBuilder : public VertexShaderBuilder {
  public:
   explicit GLVertexShaderBuilder(ProgramBuilder* program);
 
   void emitNormalizedPosition(const std::string& devPos) override;
 };
-}  // namespace pag
+}  // namespace tgfx

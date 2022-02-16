@@ -25,7 +25,7 @@ namespace pag {
 /**
  * VideoBuffer describes a two dimensional array of pixels from a decoded video frame.
  */
-class VideoBuffer : public TextureBuffer {
+class VideoBuffer : public tgfx::TextureBuffer {
  public:
   /**
    * Returns number of planes in this video buffer.
@@ -33,7 +33,7 @@ class VideoBuffer : public TextureBuffer {
   virtual size_t planeCount() const = 0;
 
  protected:
-  VideoBuffer(int width, int height) : TextureBuffer(width, height) {
+  VideoBuffer(int width, int height) : tgfx::TextureBuffer(width, height) {
   }
 };
 }  // namespace pag

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "base/utils/TGFXCast.h"
 #include "rendering/caches/ContentCache.h"
 #include "rendering/caches/MaskCache.h"
 #include "rendering/caches/TransformCache.h"
@@ -31,13 +32,13 @@ class LayerCache : public Cache {
 
   Transform* getTransform(Frame contentFrame);
 
-  Path* getMasks(Frame contentFrame);
+  tgfx::Path* getMasks(Frame contentFrame);
 
   Content* getContent(Frame contentFrame);
 
   Layer* getLayer() const;
 
-  Point getMaxScaleFactor() const;
+  tgfx::Point getMaxScaleFactor() const;
 
   bool checkFrameChanged(Frame contentFrame, Frame lastContentFrame);
 
@@ -64,7 +65,7 @@ class LayerCache : public Cache {
   TransformCache* transformCache = nullptr;
   MaskCache* maskCache = nullptr;
   ContentCache* contentCache = nullptr;
-  Point maxScaleFactor = {};
+  tgfx::Point maxScaleFactor = {};
   std::vector<TimeRange> staticTimeRanges;
 
   explicit LayerCache(Layer* layer);

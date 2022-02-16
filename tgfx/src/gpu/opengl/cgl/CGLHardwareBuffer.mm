@@ -20,7 +20,7 @@
 #include "gpu/YUVTexture.h"
 #include "platform/apple/HardwareBuffer.h"
 
-namespace pag {
+namespace tgfx {
 std::shared_ptr<PixelBuffer> PixelBuffer::MakeFrom(void* hardwareBuffer) {
   auto pixelBuffer = reinterpret_cast<CVPixelBufferRef>(hardwareBuffer);
   if (pixelBuffer == nullptr) {
@@ -45,4 +45,4 @@ std::shared_ptr<Texture> Texture::MakeFrom(Context* context, void* hardwareBuffe
 std::shared_ptr<YUVTexture> YUVTexture::MakeFrom(Context*, YUVColorSpace, YUVColorRange, void*) {
   return nullptr;
 }
-}  // namespace pag
+}  // namespace tgfx

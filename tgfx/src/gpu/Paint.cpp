@@ -18,11 +18,11 @@
 
 #include "gpu/Paint.h"
 
-namespace pag {
+namespace tgfx {
 void Paint::reset() {
   style = PaintStyle::Fill;
-  color = Color4f::Black();
+  color = Color::Black();
   stroke = Stroke(0);
   shader = nullptr;
 }
-}  // namespace pag
+}  // namespace tgfx

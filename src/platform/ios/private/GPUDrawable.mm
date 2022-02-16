@@ -88,22 +88,22 @@ void GPUDrawable::updateSize() {
   surface = nullptr;
 }
 
-std::shared_ptr<Device> GPUDrawable::getDevice() {
+std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
   if (_width <= 0 || _height <= 0) {
     return nullptr;
   }
   if (window == nullptr) {
-    auto device = EAGLDevice::MakeAdopted(eaglContext);
+    auto device = tgfx::EAGLDevice::MakeAdopted(eaglContext);
     if (pixelBuffer) {
-      window = EAGLWindow::MakeFrom(pixelBuffer, device);
+      window = tgfx::EAGLWindow::MakeFrom(pixelBuffer, device);
     } else {
-      window = EAGLWindow::MakeFrom(layer, device);
+      window = tgfx::EAGLWindow::MakeFrom(layer, device);
     }
   }
   return window ? window->getDevice() : nullptr;
 }
 
-std::shared_ptr<Surface> GPUDrawable::createSurface(Context* context) {
+std::shared_ptr<tgfx::Surface> GPUDrawable::createSurface(tgfx::Context* context) {
   if (window == nullptr || bufferPreparing) {
     return nullptr;
   }
@@ -151,7 +151,7 @@ std::shared_ptr<Surface> GPUDrawable::createSurface(Context* context) {
   }
 }
 
-void GPUDrawable::present(Context* context) {
+void GPUDrawable::present(tgfx::Context* context) {
   if (window == nullptr) {
     return;
   }

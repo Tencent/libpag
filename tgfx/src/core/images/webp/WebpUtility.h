@@ -18,9 +18,10 @@
 
 #pragma once
 
+#include <string>
 #include "core/Orientation.h"
 
-namespace pag {
+namespace tgfx {
 
 struct DecodeInfo {
   int width = 0;
@@ -35,4 +36,4 @@ class WebpUtility {
   static DecodeInfo getDecodeInfo(const void* fileBytes, size_t byteLength);
 };
 
-}  // namespace pag
+}  // namespace tgfx

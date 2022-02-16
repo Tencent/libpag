@@ -23,7 +23,7 @@
 #include "GeometryProcessor.h"
 #include "ShaderVar.h"
 
-namespace pag {
+namespace tgfx {
 class ProgramBuilder;
 
 class Varying {
@@ -82,4 +82,4 @@ class VaryingHandler {
   // This is not owned by the class
   ProgramBuilder* programBuilder;
 };
-}  // namespace pag
+}  // namespace tgfx

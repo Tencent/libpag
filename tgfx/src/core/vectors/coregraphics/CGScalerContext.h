@@ -22,7 +22,7 @@
 #include "core/ImageInfo.h"
 #include "core/PixelBuffer.h"
 
-namespace pag {
+namespace tgfx {
 class CGScalerContextRec {
  public:
   float textSize = 12.f;
@@ -55,4 +55,4 @@ class CGScalerContext {
   CTFontRef ctFont = nullptr;
   CGAffineTransform transform = CGAffineTransformIdentity;
 };
-}  // namespace pag
+}  // namespace tgfx

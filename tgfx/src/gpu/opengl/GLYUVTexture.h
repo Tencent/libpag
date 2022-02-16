@@ -22,7 +22,7 @@
 #include "GLTextureSampler.h"
 #include "gpu/YUVTexture.h"
 
-namespace pag {
+namespace tgfx {
 struct YUVConfig;
 class GLYUVTexture : public YUVTexture {
  public:
@@ -47,4 +47,4 @@ class GLYUVTexture : public YUVTexture {
 
   friend class YUVTexture;
 };
-}  // namespace pag
+}  // namespace tgfx

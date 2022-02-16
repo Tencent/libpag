@@ -254,27 +254,27 @@ jobject ToPAGVideoRangeObject(JNIEnv* env, const pag::PAGVideoRange& range) {
                         range.endTime(), range.playDuration(), range.reversed());
 }
 
-pag::ImageInfo GetImageInfo(JNIEnv* env, jobject bitmap) {
+tgfx::ImageInfo GetImageInfo(JNIEnv* env, jobject bitmap) {
   AndroidBitmapInfo bitmapInfo = {};
   if (bitmap == nullptr || AndroidBitmap_getInfo(env, bitmap, &bitmapInfo) != 0 ||
       (bitmapInfo.flags & BITMAP_FLAGS_IS_HARDWARE)) {
     return {};
   }
-  pag::AlphaType alphaType = (bitmapInfo.flags & BITMAP_FLAGS_ALPHA_UNPREMUL)
-                                 ? pag::AlphaType::Unpremultiplied
-                                 : pag::AlphaType::Premultiplied;
-  pag::ColorType colorType;
+  tgfx::AlphaType alphaType = (bitmapInfo.flags & BITMAP_FLAGS_ALPHA_UNPREMUL)
+                                  ? tgfx::AlphaType::Unpremultiplied
+                                  : tgfx::AlphaType::Premultiplied;
+  tgfx::ColorType colorType;
   switch (bitmapInfo.format) {
     case ANDROID_BITMAP_FORMAT_RGBA_8888:
-      colorType = pag::ColorType::RGBA_8888;
+      colorType = tgfx::ColorType::RGBA_8888;
       break;
     case ANDROID_BITMAP_FORMAT_A_8:
-      colorType = pag::ColorType::ALPHA_8;
+      colorType = tgfx::ColorType::ALPHA_8;
       break;
     default:
-      colorType = pag::ColorType::Unknown;
+      colorType = tgfx::ColorType::Unknown;
       break;
   }
-  return pag::ImageInfo::Make(bitmapInfo.width, bitmapInfo.height, colorType, alphaType,
-                              bitmapInfo.stride);
+  return tgfx::ImageInfo::Make(bitmapInfo.width, bitmapInfo.height, colorType, alphaType,
+                               bitmapInfo.stride);
 }

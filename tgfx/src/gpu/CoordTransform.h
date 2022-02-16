@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "pag/types.h"
+#include "core/Matrix.h"
 
-namespace pag {
+namespace tgfx {
 struct CoordTransform {
   CoordTransform() = default;
 
@@ -29,4 +29,4 @@ struct CoordTransform {
 
   Matrix matrix = Matrix::I();
 };
-}  // namespace pag
+}  // namespace tgfx

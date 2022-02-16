@@ -20,7 +20,7 @@
 #include "GLContext.h"
 #include "GLProgramBuilder.h"
 
-namespace pag {
+namespace tgfx {
 static constexpr char kDstColorName[] = "_dstColor";
 
 GLFragmentShaderBuilder::GLFragmentShaderBuilder(ProgramBuilder* program)
@@ -41,4 +41,4 @@ std::string GLFragmentShaderBuilder::colorOutputName() {
   return static_cast<GLProgramBuilder*>(programBuilder)->isDesktopGL() ? CustomColorOutputName()
                                                                        : "gl_FragColor";
 }
-}  // namespace pag
+}  // namespace tgfx

@@ -20,7 +20,7 @@
 
 #include "gpu/GLGeometryProcessor.h"
 
-namespace pag {
+namespace tgfx {
 class GLQuadPerEdgeAAGeometryProcessor : public GLGeometryProcessor {
  public:
   void emitCode(EmitArgs& args) override;
@@ -38,4 +38,4 @@ class GLQuadPerEdgeAAGeometryProcessor : public GLGeometryProcessor {
   int heightPrev = -1;
   bool updated = false;
 };
-}  // namespace pag
+}  // namespace tgfx

@@ -26,27 +26,27 @@ class Shape : public Graphic {
   /**
    * Creates a shape Graphic with solid color fill. Returns nullptr if path is empty.
    */
-  static std::shared_ptr<Graphic> MakeFrom(const Path& path, Color4f color);
+  static std::shared_ptr<Graphic> MakeFrom(const tgfx::Path& path, tgfx::Color color);
 
   /**
    * Creates a shape Graphic with gradient color fill. Returns nullptr if path is empty.
    */
-  static std::shared_ptr<Graphic> MakeFrom(const Path& path, const GradientPaint& gradient);
+  static std::shared_ptr<Graphic> MakeFrom(const tgfx::Path& path, const GradientPaint& gradient);
 
   GraphicType type() const override {
     return GraphicType::Shape;
   }
 
-  void measureBounds(Rect* bounds) const override;
+  void measureBounds(tgfx::Rect* bounds) const override;
   bool hitTest(RenderCache* cache, float x, float y) override;
-  bool getPath(Path* result) const override;
+  bool getPath(tgfx::Path* result) const override;
   void prepare(RenderCache* cache) const override;
-  void draw(Canvas* canvas, RenderCache* cache) const override;
+  void draw(tgfx::Canvas* canvas, RenderCache* cache) const override;
 
  private:
-  Path path = {};
-  Paint paint = {};
+  tgfx::Path path = {};
+  tgfx::Paint paint = {};
 
-  Shape(Path path, Paint paint);
+  Shape(tgfx::Path path, tgfx::Paint paint);
 };
 }  // namespace pag

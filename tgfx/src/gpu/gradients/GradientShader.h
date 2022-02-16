@@ -18,20 +18,21 @@
 
 #pragma once
 
+#include "core/Matrix.h"
 #include "gpu/Shader.h"
 
-namespace pag {
+namespace tgfx {
 
 class GradientShaderBase : public Shader {
  public:
-  GradientShaderBase(const std::vector<Color4f>& colors, const std::vector<float>& positions,
+  GradientShaderBase(const std::vector<Color>& colors, const std::vector<float>& positions,
                      const Matrix& pointsToUnit);
 
   bool isOpaque() const override {
     return colorsAreOpaque;
   }
 
-  std::vector<Color4f> originalColors = {};
+  std::vector<Color> originalColors = {};
   std::vector<float> originalPositions = {};
 
  protected:
@@ -41,7 +42,7 @@ class GradientShaderBase : public Shader {
 
 class LinearGradient : public GradientShaderBase {
  public:
-  LinearGradient(const Point& startPoint, const Point& endPoint, const std::vector<Color4f>& colors,
+  LinearGradient(const Point& startPoint, const Point& endPoint, const std::vector<Color>& colors,
                  const std::vector<float>& positions);
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const override;
@@ -49,9 +50,9 @@ class LinearGradient : public GradientShaderBase {
 
 class RadialGradient : public GradientShaderBase {
  public:
-  RadialGradient(const Point& center, float radius, const std::vector<Color4f>& colors,
+  RadialGradient(const Point& center, float radius, const std::vector<Color>& colors,
                  const std::vector<float>& positions);
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const override;
 };
-}  // namespace pag
+}  // namespace tgfx

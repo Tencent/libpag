@@ -20,7 +20,7 @@
 #include <EGL/eglext.h>
 #include <GLES3/gl3.h>
 
-namespace pag {
+namespace tgfx {
 std::shared_ptr<EGLWindow> EGLWindow::Current() {
   auto device = EGLDevice::Current();
   if (device == nullptr) {
@@ -63,4 +63,4 @@ std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
 void EGLWindow::onPresent(Context*, int64_t presentationTime) {
   std::static_pointer_cast<EGLDevice>(device)->swapBuffers(presentationTime);
 }
-}  // namespace pag
+}  // namespace tgfx

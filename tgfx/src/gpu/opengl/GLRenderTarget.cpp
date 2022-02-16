@@ -22,7 +22,7 @@
 #include "GLUtil.h"
 #include "core/Bitmap.h"
 
-namespace pag {
+namespace tgfx {
 std::shared_ptr<GLRenderTarget> GLRenderTarget::MakeFrom(Context* context,
                                                          const BackendRenderTarget& renderTarget,
                                                          ImageOrigin origin) {
@@ -295,4 +295,4 @@ void GLRenderTarget::onRelease(Context* context) {
   }
   ReleaseResource(context, &textureFBInfo, &renderTargetFBInfo, &msRenderBufferID);
 }
-}  // namespace pag
+}  // namespace tgfx

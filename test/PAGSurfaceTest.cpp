@@ -24,6 +24,8 @@
 #include "rendering/Drawable.h"
 
 namespace pag {
+using namespace tgfx;
+
 PAG_TEST_SUIT(PAGSurfaceTest)
 
 /**
@@ -38,16 +40,17 @@ PAG_TEST(PAGSurfaceTest, FromTexture) {
   ASSERT_TRUE(context != nullptr);
   auto gl = GLContext::Unwrap(context);
   auto glVersion = gl->caps->version;
-  GLTextureInfo textureInfo;
-  CreateTexture(gl, width, height, &textureInfo);
-  auto backendTexture = BackendTexture(textureInfo, width, height);
-  auto pagSurface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::TopLeft);
+  tgfx::GLTextureInfo textureInfo;
+  CreateGLTexture(gl, width, height, &textureInfo);
+  auto backendTexture = tgfx::BackendTexture(textureInfo, width, height);
+  auto pagSurface = PAGSurface::MakeFrom(ToPAG(backendTexture), ImageOrigin::TopLeft);
   auto nativeHandle = GLDevice::CurrentNativeHandle();
   device->unlock();
   auto glDevice = std::static_pointer_cast<GLDevice>(pagSurface->drawable->getDevice());
   EXPECT_TRUE(glDevice->sharableWith(nativeHandle));
 
-  auto drawable = std::make_shared<TextureDrawable>(device, backendTexture, ImageOrigin::TopLeft);
+  auto drawable =
+      std::make_shared<TextureDrawable>(device, backendTexture, tgfx::ImageOrigin::TopLeft);
   auto pagSurface2 = PAGSurface::MakeFrom(drawable);
   auto pagPlayer2 = std::make_shared<PAGPlayer>();
   pagPlayer2->setSurface(pagSurface2);
@@ -89,10 +92,10 @@ PAG_TEST(PAGSurfaceTest, Mask) {
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto gl = GLContext::Unwrap(context);
-  GLTextureInfo textureInfo;
-  CreateTexture(gl, width, height, &textureInfo);
-  auto backendTexture = BackendTexture(textureInfo, width, height);
-  auto pagSurface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::BottomLeft);
+  tgfx::GLTextureInfo textureInfo;
+  CreateGLTexture(gl, width, height, &textureInfo);
+  auto backendTexture = tgfx::BackendTexture(textureInfo, width, height);
+  auto pagSurface = PAGSurface::MakeFrom(ToPAG(backendTexture), ImageOrigin::BottomLeft);
   device->unlock();
 
   auto pagPlayer = std::make_shared<PAGPlayer>();

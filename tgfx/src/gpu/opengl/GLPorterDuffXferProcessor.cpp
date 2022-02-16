@@ -20,7 +20,7 @@
 #include "GLBlend.h"
 #include "gpu/PorterDuffXferProcessor.h"
 
-namespace pag {
+namespace tgfx {
 void GLPorterDuffXferProcessor::emitCode(const EmitArgs& args) {
   auto* fragBuilder = args.fragBuilder;
   auto* uniformHandler = args.uniformHandler;
@@ -84,4 +84,4 @@ void GLPorterDuffXferProcessor::setData(const ProgramDataManager& programDataMan
     }
   }
 }
-}  // namespace pag
+}  // namespace tgfx

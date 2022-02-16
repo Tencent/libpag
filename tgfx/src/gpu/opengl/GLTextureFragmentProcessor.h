@@ -20,7 +20,7 @@
 
 #include "gpu/GLFragmentProcessor.h"
 
-namespace pag {
+namespace tgfx {
 class GLTextureFragmentProcessor : public GLFragmentProcessor {
  public:
   void emitCode(EmitArgs& args) override;
@@ -33,4 +33,4 @@ class GLTextureFragmentProcessor : public GLFragmentProcessor {
 
   Point alphaStartPrev = Point::Make(-1, -1);
 };
-}  // namespace pag
+}  // namespace tgfx

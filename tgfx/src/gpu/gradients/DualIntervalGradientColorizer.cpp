@@ -17,13 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DualIntervalGradientColorizer.h"
-#include "base/utils/UniqueID.h"
+#include "core/utils/UniqueID.h"
 #include "gpu/opengl/GLDualIntervalGradientColorizer.h"
 
-namespace pag {
+namespace tgfx {
 std::unique_ptr<DualIntervalGradientColorizer> DualIntervalGradientColorizer::Make(
-    Color4f c0, Color4f c1, Color4f c2, Color4f c3, float threshold) {
-  Color4f scale01;
+    Color c0, Color c1, Color c2, Color c3, float threshold) {
+  Color scale01;
   // Derive scale and biases from the 4 colors and threshold
   for (int i = 0; i < 4; ++i) {
     auto vc0 = c0[i];
@@ -32,8 +32,8 @@ std::unique_ptr<DualIntervalGradientColorizer> DualIntervalGradientColorizer::Ma
   }
   // bias01 = c0
 
-  Color4f scale23;
-  Color4f bias23;
+  Color scale23;
+  Color bias23;
   for (int i = 0; i < 4; ++i) {
     auto vc2 = c2[i];
     auto vc3 = c3[i];
@@ -53,4 +53,4 @@ void DualIntervalGradientColorizer::onComputeProcessorKey(BytesKey* bytesKey) co
 std::unique_ptr<GLFragmentProcessor> DualIntervalGradientColorizer::onCreateGLInstance() const {
   return std::make_unique<GLDualIntervalGradientColorizer>();
 }
-}  // namespace pag
+}  // namespace tgfx

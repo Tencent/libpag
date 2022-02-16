@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LevelsIndividualFilter.h"
-#include "gpu/opengl/GLUtil.h"
 
 namespace pag {
 static const char FRAGMENT_SHADER[] = R"(
@@ -87,7 +86,7 @@ std::string LevelsIndividualFilter::onBuildFragmentShader() {
   return FRAGMENT_SHADER;
 }
 
-void LevelsIndividualFilter::onPrepareProgram(const GLInterface* gl, unsigned int program) {
+void LevelsIndividualFilter::onPrepareProgram(const tgfx::GLInterface* gl, unsigned int program) {
   inputBlackHandle = gl->getUniformLocation(program, "inputBlack");
   inputWhiteHandle = gl->getUniformLocation(program, "inputWhite");
   gammaHandle = gl->getUniformLocation(program, "gamma");
@@ -113,7 +112,8 @@ void LevelsIndividualFilter::onPrepareProgram(const GLInterface* gl, unsigned in
   blueOutputWhiteHandle = gl->getUniformLocation(program, "blueOutputWhite");
 }
 
-void LevelsIndividualFilter::onUpdateParams(const GLInterface* gl, const Rect&, const Point&) {
+void LevelsIndividualFilter::onUpdateParams(const tgfx::GLInterface* gl, const tgfx::Rect&,
+                                            const tgfx::Point&) {
   auto* levelsIndividualFilter = reinterpret_cast<const LevelsIndividualEffect*>(effect);
   gl->uniform1f(inputBlackHandle, levelsIndividualFilter->inputBlack->getValueAt(layerFrame));
   gl->uniform1f(inputWhiteHandle, levelsIndividualFilter->inputWhite->getValueAt(layerFrame));

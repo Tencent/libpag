@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LinearGradientLayout.h"
-#include "base/utils/UniqueID.h"
+#include "core/utils/UniqueID.h"
 #include "gpu/opengl/GLLinearGradientLayout.h"
 
-namespace pag {
+namespace tgfx {
 std::unique_ptr<LinearGradientLayout> LinearGradientLayout::Make(Matrix matrix) {
   return std::unique_ptr<LinearGradientLayout>(new LinearGradientLayout(matrix));
 }
@@ -37,4 +37,4 @@ LinearGradientLayout::LinearGradientLayout(Matrix matrix) : coordTransform(matri
 std::unique_ptr<GLFragmentProcessor> LinearGradientLayout::onCreateGLInstance() const {
   return std::make_unique<GLLinearGradientLayout>();
 }
-}  // namespace pag
+}  // namespace tgfx

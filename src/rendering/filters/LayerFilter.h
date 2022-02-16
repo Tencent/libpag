@@ -22,14 +22,16 @@
 #include "gpu/Resource.h"
 #include "pag/file.h"
 #include "pag/pag.h"
+#include "rendering/filters/utils/FilterHelper.h"
 
 namespace pag {
-std::vector<Point> ComputeVerticesForMotionBlurAndBulge(const Rect& inputBounds,
-                                                        const Rect& outputBounds);
+std::vector<tgfx::Point> ComputeVerticesForMotionBlurAndBulge(const tgfx::Rect& inputBounds,
+                                                              const tgfx::Rect& outputBounds);
 
-class FilterProgram : public Resource {
+class FilterProgram : public tgfx::Resource {
  public:
-  static std::shared_ptr<const FilterProgram> Make(Context* context, const std::string& vertex,
+  static std::shared_ptr<const FilterProgram> Make(tgfx::Context* context,
+                                                   const std::string& vertex,
                                                    const std::string& fragment);
 
   unsigned program = 0;
@@ -37,7 +39,7 @@ class FilterProgram : public Resource {
   unsigned int vertexBuffer = 0;
 
  protected:
-  void onRelease(Context* context) override;
+  void onRelease(tgfx::Context* context) override;
 
  private:
   FilterProgram() = default;
@@ -49,7 +51,7 @@ class LayerFilter : public Filter {
 
   static std::unique_ptr<LayerFilter> Make(Effect* effect);
 
-  bool initialize(Context* context) override;
+  bool initialize(tgfx::Context* context) override;
 
   virtual bool needsMSAA() const override;
 
@@ -61,7 +63,8 @@ class LayerFilter : public Filter {
    * 该参数里含有纹理的ID、像素级的宽高、纹理点的matrix、以及纹理相对于layer bounds的scale信息
    * @param target : 滤镜的输出target，该参数里含有frame buffer的ID、像素级的宽高、顶点的matrix信息
    */
-  void draw(Context* context, const FilterSource* source, const FilterTarget* target) override;
+  void draw(tgfx::Context* context, const FilterSource* source,
+            const FilterTarget* target) override;
 
   /**
    * filter的刷新接口。
@@ -76,8 +79,8 @@ class LayerFilter : public Filter {
    * 该filterScale等于反向matrix的scale，不包含source.scale，
    *                      source.scale会整体应用到FilterTarget上屏的matrix里。
    */
-  virtual void update(Frame layerFrame, const Rect& contentBounds, const Rect& transformedBounds,
-                      const Point& filterScale);
+  virtual void update(Frame layerFrame, const tgfx::Rect& contentBounds,
+                      const tgfx::Rect& transformedBounds, const tgfx::Point& filterScale);
 
  protected:
   Frame layerFrame = 0;
@@ -87,7 +90,7 @@ class LayerFilter : public Filter {
 
   virtual std::string onBuildFragmentShader();
 
-  virtual void onPrepareProgram(const GLInterface* gl, unsigned program);
+  virtual void onPrepareProgram(const tgfx::GLInterface* gl, unsigned program);
 
   /**
    * filter的给shader上传数据接口
@@ -96,8 +99,8 @@ class LayerFilter : public Filter {
    * bounds来计算shader中的参数，比如：bulge、MotionTile
    * @param filterScale : 滤镜效果的scale
    */
-  virtual void onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
-                              const Point& filterScale);
+  virtual void onUpdateParams(const tgfx::GLInterface* gl, const tgfx::Rect& contentBounds,
+                              const tgfx::Point& filterScale);
 
   /**
    * filter的收集顶点数据的接口
@@ -108,17 +111,17 @@ class LayerFilter : public Filter {
    * @return : 返回顶点与纹理的point数组，顶点 + 纹理 + 顶点 +
    * 纹理的组合方式，所有的Point都是基于layer bounds尺寸的点
    */
-  virtual std::vector<Point> computeVertices(const Rect& contentBounds,
-                                             const Rect& transformedBounds,
-                                             const Point& filterScale);
+  virtual std::vector<tgfx::Point> computeVertices(const tgfx::Rect& contentBounds,
+                                                   const tgfx::Rect& transformedBounds,
+                                                   const tgfx::Point& filterScale);
 
-  virtual void bindVertices(const GLInterface* gl, const FilterSource* source,
-                            const FilterTarget* target, const std::vector<Point>& points);
+  virtual void bindVertices(const tgfx::GLInterface* gl, const FilterSource* source,
+                            const FilterTarget* target, const std::vector<tgfx::Point>& points);
 
  private:
-  Rect contentBounds = {};
-  Rect transformedBounds = {};
-  Point filterScale = {};
+  tgfx::Rect contentBounds = {};
+  tgfx::Rect transformedBounds = {};
+  tgfx::Point filterScale = {};
 
   int vertexMatrixHandle = -1;
   int textureMatrixHandle = -1;

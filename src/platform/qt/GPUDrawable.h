@@ -26,9 +26,11 @@
 #pragma clang diagnostic pop
 #include "pag/pag.h"
 
-namespace pag {
+namespace tgfx {
 class QGLWindow;
+}
 
+namespace pag {
 class GPUDrawable : public Drawable {
  public:
   static std::shared_ptr<GPUDrawable> MakeFrom(QQuickItem* quickItem,
@@ -44,11 +46,11 @@ class GPUDrawable : public Drawable {
 
   void updateSize() override;
 
-  std::shared_ptr<Device> getDevice() override;
+  std::shared_ptr<tgfx::Device> getDevice() override;
 
-  std::shared_ptr<Surface> createSurface(Context* context) override;
+  std::shared_ptr<tgfx::Surface> createSurface(tgfx::Context* context) override;
 
-  void present(Context* context) override;
+  void present(tgfx::Context* context) override;
 
   void moveToThread(QThread* targetThread);
 
@@ -58,8 +60,8 @@ class GPUDrawable : public Drawable {
   int _width = 0;
   int _height = 0;
   QQuickItem* quickItem = nullptr;
-  std::shared_ptr<QGLWindow> window = nullptr;
+  std::shared_ptr<tgfx::QGLWindow> window = nullptr;
 
-  GPUDrawable(QQuickItem* quickItem, std::shared_ptr<QGLWindow> window);
+  GPUDrawable(QQuickItem* quickItem, std::shared_ptr<tgfx::QGLWindow> window);
 };
 }  // namespace pag

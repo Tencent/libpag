@@ -22,7 +22,7 @@
 #include "GLState.h"
 #include "gpu/Context.h"
 
-namespace pag {
+namespace tgfx {
 class GLCaps;
 
 class GLContext : public Context {
@@ -48,4 +48,4 @@ class GLContext : public Context {
   friend class GLStateGuard;
   friend class GLDevice;
 };
-}  // namespace pag
+}  // namespace tgfx

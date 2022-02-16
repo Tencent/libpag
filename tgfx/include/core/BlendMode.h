@@ -18,11 +18,11 @@
 
 #pragma once
 
-namespace pag {
+namespace tgfx {
 /**
  * Defines constant values for visual blend mode effects.
  */
-enum class Blend {
+enum class BlendMode {
   /**
    * Replaces destination with zero: fully transparent.
    */
@@ -140,4 +140,4 @@ enum class Blend {
    */
   Luminosity
 };
-}  // namespace pag
+}  // namespace tgfx

@@ -656,7 +656,7 @@ Frame PAGImageLayer::getFrameFromTimeRemap(pag::Frame value) {
 }
 
 // ImageBytesV3场景下，图片的透明区域会发生裁剪，不能从图片解码中获取宽高
-void PAGImageLayer::measureBounds(Rect* bounds) {
+void PAGImageLayer::measureBounds(tgfx::Rect* bounds) {
   auto imageLayer = static_cast<ImageLayer*>(layer);
   bounds->setWH(imageLayer->imageBytes->width, imageLayer->imageBytes->height);
 }

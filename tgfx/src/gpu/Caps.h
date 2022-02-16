@@ -18,9 +18,9 @@
 
 #pragma once
 
-namespace pag {
+namespace tgfx {
 class Caps {
  public:
   bool floatIs32Bits = true;
 };
-}  // namespace pag
+}  // namespace tgfx

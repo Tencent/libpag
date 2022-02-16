@@ -20,7 +20,7 @@
 
 #include "core/Image.h"
 
-namespace pag {
+namespace tgfx {
 
 struct ReadInfo;
 
@@ -52,4 +52,4 @@ class PngImage : public Image {
   }
   bool readPixelsInternal(const ImageInfo& dstInfo, void* dstPixels, ReadInfo& readInfo) const;
 };
-}  // namespace pag
+}  // namespace tgfx

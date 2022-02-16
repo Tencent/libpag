@@ -19,8 +19,9 @@
 #pragma once
 
 #include <string>
+#include <memory>
 
-namespace pag {
+namespace tgfx {
 /**
  * Stream represents a source of bytes. Subclasses can be backed by memory, or a file, or something
  * else. Stream is not thread safe.
@@ -64,4 +65,4 @@ class Stream {
    */
   virtual bool rewind() = 0;
 };
-}  // namespace pag
+}  // namespace tgfx

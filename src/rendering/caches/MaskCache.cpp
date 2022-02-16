@@ -21,7 +21,7 @@
 
 namespace pag {
 MaskCache::MaskCache(Layer* layer)
-    : FrameCache<Path>(layer->startTime, layer->duration), layer(layer) {
+    : FrameCache<tgfx::Path>(layer->startTime, layer->duration), layer(layer) {
   std::vector<TimeRange> timeRanges = {layer->visibleRange()};
   for (auto& mask : layer->masks) {
     mask->excludeVaryingRanges(&timeRanges);
@@ -29,8 +29,8 @@ MaskCache::MaskCache(Layer* layer)
   staticTimeRanges = OffsetTimeRanges(timeRanges, -layer->startTime);
 }
 
-Path* MaskCache::createCache(Frame layerFrame) {
-  auto maskContent = new Path();
+tgfx::Path* MaskCache::createCache(Frame layerFrame) {
+  auto maskContent = new tgfx::Path();
   RenderMasks(maskContent, layer->masks, layerFrame);
   return maskContent;
 }

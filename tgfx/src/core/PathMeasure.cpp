@@ -19,7 +19,7 @@
 #include "core/PathMeasure.h"
 #include "core/PathRef.h"
 
-namespace pag {
+namespace tgfx {
 using namespace pk;
 
 class PkPathMeasure : public PathMeasure {
@@ -51,4 +51,4 @@ class PkPathMeasure : public PathMeasure {
 std::unique_ptr<PathMeasure> PathMeasure::MakeFrom(const Path& path) {
   return std::make_unique<PkPathMeasure>(PathRef::ReadAccess(path));
 }
-}  // namespace pag
+}  // namespace tgfx

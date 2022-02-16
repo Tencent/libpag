@@ -20,7 +20,7 @@
 #include "GLFragmentProcessor.h"
 #include "Pipeline.h"
 
-namespace pag {
+namespace tgfx {
 void FragmentProcessor::computeProcessorKey(Context* context, BytesKey* bytesKey) const {
   onComputeProcessorKey(bytesKey);
   for (size_t i = 0; i < textureSamplerCount; ++i) {
@@ -81,4 +81,4 @@ const CoordTransform* FragmentProcessor::CoordTransformIter::next() {
   }
   return currFP->coordTransform(currentIndex++);
 }
-}  // namespace pag
+}  // namespace tgfx

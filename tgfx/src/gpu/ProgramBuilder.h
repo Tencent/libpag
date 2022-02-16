@@ -25,7 +25,7 @@
 #include "VaryingHandler.h"
 #include "VertexShaderBuilder.h"
 
-namespace pag {
+namespace tgfx {
 class ProgramBuilder {
  public:
   virtual ~ProgramBuilder() = default;
@@ -111,4 +111,4 @@ class ProgramBuilder {
   const Pipeline* pipeline = nullptr;
   std::vector<ShaderVar> transformedCoordVars = {};
 };
-}  // namespace pag
+}  // namespace tgfx

@@ -97,7 +97,7 @@ EMSCRIPTEN_BINDINGS(pag) {
                 }))
       .function("_getLayersByName", &PAGComposition::getLayersByName)
       .function("_getLayersUnderPoint", &PAGComposition::getLayersUnderPoint);
-      
+
   class_<PAGFile, base<PAGComposition>>("_PAGFile")
       .smart_ptr<std::shared_ptr<PAGFile>>("_PAGFile")
       .class_function("_Load", optional_override([](uintptr_t bytes, size_t length) {
@@ -154,7 +154,7 @@ EMSCRIPTEN_BINDINGS(pag) {
                       }))
       .class_function("_FromNativeImage", optional_override([](val nativeImage) {
                         return std::static_pointer_cast<PAGImage>(
-                            StillImage::FromImage(NativeImage::MakeFrom(nativeImage)));
+                            StillImage::FromImage(tgfx::NativeImage::MakeFrom(nativeImage)));
                       }))
       .function("_width", &PAGImage::width)
       .function("_height", &PAGImage::height);
@@ -186,11 +186,11 @@ EMSCRIPTEN_BINDINGS(pag) {
                   pagPlayer.setComposition(std::move(pagFile));
                 }));
 
-  class_<ImageInfo>("ImageInfo")
-      .property("width", &ImageInfo::width)
-      .property("height", &ImageInfo::height)
-      .property("rowBytes", &ImageInfo::rowBytes)
-      .property("colorType", &ImageInfo::colorType);
+  class_<tgfx::ImageInfo>("ImageInfo")
+      .property("width", &tgfx::ImageInfo::width)
+      .property("height", &tgfx::ImageInfo::height)
+      .property("rowBytes", &tgfx::ImageInfo::rowBytes)
+      .property("colorType", &tgfx::ImageInfo::colorType);
 
   class_<Matrix>("Matrix")
       .property("a", &Matrix::getScaleX)
@@ -226,17 +226,17 @@ EMSCRIPTEN_BINDINGS(pag) {
       .property("backgroundAlpha", &TextDocument::backgroundAlpha)
       .property("direction", &TextDocument::direction);
 
-  class_<Stroke>("Stroke")
-      .property("width", &Stroke::width)
-      .property("cap", &Stroke::cap)
-      .property("join", &Stroke::join)
-      .property("miterLimit", &Stroke::miterLimit);
+  class_<tgfx::Stroke>("Stroke")
+      .property("width", &tgfx::Stroke::width)
+      .property("cap", &tgfx::Stroke::cap)
+      .property("join", &tgfx::Stroke::join)
+      .property("miterLimit", &tgfx::Stroke::miterLimit);
 
-  value_object<FontMetrics>("FontMetrics")
-      .field("ascent", &FontMetrics::ascent)
-      .field("descent", &FontMetrics::descent)
-      .field("xHeight", &FontMetrics::xHeight)
-      .field("capHeight", &FontMetrics::capHeight);
+  value_object<tgfx::FontMetrics>("FontMetrics")
+      .field("ascent", &tgfx::FontMetrics::ascent)
+      .field("descent", &tgfx::FontMetrics::descent)
+      .field("xHeight", &tgfx::FontMetrics::xHeight)
+      .field("capHeight", &tgfx::FontMetrics::capHeight);
 
   value_object<Rect>("Rect")
       .field("left", &Rect::left)
@@ -256,11 +256,11 @@ EMSCRIPTEN_BINDINGS(pag) {
       .field("duration", &Marker::duration)
       .field("comment", &Marker::comment);
 
-  enum_<PathFillType>("PathFillType")
-      .value("WINDING", PathFillType::Winding)
-      .value("EVEN_ODD", PathFillType::EvenOdd)
-      .value("INVERSE_WINDING", PathFillType::InverseWinding)
-      .value("INVERSE_EVEN_ODD", PathFillType::InverseEvenOdd);
+  enum_<tgfx::PathFillType>("PathFillType")
+      .value("WINDING", tgfx::PathFillType::Winding)
+      .value("EVEN_ODD", tgfx::PathFillType::EvenOdd)
+      .value("INVERSE_WINDING", tgfx::PathFillType::InverseWinding)
+      .value("INVERSE_EVEN_ODD", tgfx::PathFillType::InverseEvenOdd);
 
   enum_<ColorType>("ColorType")
       .value("Unknown", ColorType::Unknown)
@@ -277,15 +277,15 @@ EMSCRIPTEN_BINDINGS(pag) {
       .value("Image", LayerType::Image)
       .value("PreCompose", LayerType::PreCompose);
 
-  enum_<Stroke::Cap>("Cap")
-      .value("Miter", Stroke::Cap::Butt)
-      .value("Round", Stroke::Cap::Round)
-      .value("Bevel", Stroke::Cap::Square);
+  enum_<tgfx::LineCap>("Cap")
+      .value("Miter", tgfx::LineCap::Butt)
+      .value("Round", tgfx::LineCap::Round)
+      .value("Bevel", tgfx::LineCap::Square);
 
-  enum_<Stroke::Join>("Join")
-      .value("Miter", Stroke::Join::Miter)
-      .value("Round", Stroke::Join::Round)
-      .value("Bevel", Stroke::Join::Bevel);
+  enum_<tgfx::LineJoin>("Join")
+      .value("Miter", tgfx::LineJoin::Miter)
+      .value("Round", tgfx::LineJoin::Round)
+      .value("Bevel", tgfx::LineJoin::Bevel);
 
   register_vector<std::shared_ptr<PAGLayer>>("VectorPAGLayer");
   register_vector<std::string>("VectorString");

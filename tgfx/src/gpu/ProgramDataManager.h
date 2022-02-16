@@ -19,9 +19,9 @@
 #pragma once
 
 #include "ResourceHandle.h"
-#include "pag/types.h"
+#include "core/Matrix.h"
 
-namespace pag {
+namespace tgfx {
 class ProgramDataManager {
  public:
   virtual ~ProgramDataManager() = default;
@@ -37,4 +37,4 @@ class ProgramDataManager {
   // convenience method for uploading a Matrix to a 3x3 matrix uniform
   virtual void setMatrix(UniformHandle u, const Matrix& matrix) const = 0;
 };
-}  // namespace pag
+}  // namespace tgfx

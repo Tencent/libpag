@@ -26,14 +26,14 @@
 #include "core/Font.h"
 #include "core/Typeface.h"
 
-namespace pag {
+namespace tgfx {
 class FTTypeface : public Typeface {
  public:
   static std::shared_ptr<FTTypeface> Make(FTFontData data);
 
   ~FTTypeface() override;
 
-  ID uniqueID() const override {
+  uint32_t uniqueID() const override {
     return _uniqueID;
   }
 
@@ -75,11 +75,11 @@ class FTTypeface : public Typeface {
  private:
   FTTypeface(FTFontData data, std::unique_ptr<FTFace> face);
 
-  ID _uniqueID;
+  uint32_t _uniqueID = 0;
   FTFontData data;
   std::unique_ptr<FTFace> _face;
   std::weak_ptr<FTTypeface> weakThis;
 
   friend class FTScalerContext;
 };
-}  // namespace pag
+}  // namespace tgfx

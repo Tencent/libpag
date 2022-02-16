@@ -19,7 +19,7 @@
 #include "EAGLNV12Texture.h"
 #include "gpu/opengl/eagl/EAGLDevice.h"
 
-namespace pag {
+namespace tgfx {
 static GLTextureInfo ToGLTexture(CVOpenGLESTextureRef texture, unsigned format) {
   GLTextureInfo glInfo = {};
   glInfo.target = CVOpenGLESTextureGetTarget(texture);

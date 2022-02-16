@@ -17,32 +17,33 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Drawable.h"
+#include "base/utils/TGFXCast.h"
 
 namespace pag {
-RenderTargetDrawable::RenderTargetDrawable(std::shared_ptr<Device> device,
-                                           const BackendRenderTarget& renderTarget,
-                                           ImageOrigin origin)
+RenderTargetDrawable::RenderTargetDrawable(std::shared_ptr<tgfx::Device> device,
+                                           const tgfx::BackendRenderTarget& renderTarget,
+                                           tgfx::ImageOrigin origin)
     : device(std::move(device)), renderTarget(renderTarget), origin(origin) {
 }
 
-std::shared_ptr<Surface> RenderTargetDrawable::createSurface(Context* context) {
-  return Surface::MakeFrom(context, renderTarget, origin);
+std::shared_ptr<tgfx::Surface> RenderTargetDrawable::createSurface(tgfx::Context* context) {
+  return tgfx::Surface::MakeFrom(context, renderTarget, origin);
 }
 
-TextureDrawable::TextureDrawable(std::shared_ptr<Device> device, const BackendTexture& texture,
-                                 ImageOrigin origin)
+TextureDrawable::TextureDrawable(std::shared_ptr<tgfx::Device> device,
+                                 const tgfx::BackendTexture& texture, tgfx::ImageOrigin origin)
     : device(std::move(device)), texture(texture), origin(origin) {
 }
 
-std::shared_ptr<Surface> TextureDrawable::createSurface(Context* context) {
-  return Surface::MakeFrom(context, texture, origin);
+std::shared_ptr<tgfx::Surface> TextureDrawable::createSurface(tgfx::Context* context) {
+  return tgfx::Surface::MakeFrom(context, texture, origin);
 }
 
-OffscreenDrawable::OffscreenDrawable(int width, int height, std::shared_ptr<Device> device)
+OffscreenDrawable::OffscreenDrawable(int width, int height, std::shared_ptr<tgfx::Device> device)
     : _width(width), _height(height), device(std::move(device)) {
 }
 
-std::shared_ptr<Surface> OffscreenDrawable::createSurface(Context* context) {
-  return Surface::Make(context, _width, _height);
+std::shared_ptr<tgfx::Surface> OffscreenDrawable::createSurface(tgfx::Context* context) {
+  return tgfx::Surface::Make(context, _width, _height);
 }
 }  // namespace pag

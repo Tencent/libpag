@@ -31,9 +31,9 @@ class TextAnimatorRenderer {
                             const std::vector<TextAnimator*>* animators,
                             const TextDocument* textDocument, Frame layerFrame);
   // 根据序号获取文本动画位置（供AE导出插件在计算firstBaseLine时调用）
-  static Point GetPositionFromAnimators(const std::vector<TextAnimator*>* animators,
-                                        const TextDocument* textDocument, Frame layerFrame,
-                                        size_t index, bool* pBiasFlag);
+  static tgfx::Point GetPositionFromAnimators(const std::vector<TextAnimator*>* animators,
+                                              const TextDocument* textDocument, Frame layerFrame,
+                                              size_t index, bool* pBiasFlag);
   TextAnimatorRenderer(const TextAnimator* animator, const TextDocument* textDocument,
                        size_t textCount, Frame frame);
   ~TextAnimatorRenderer();
@@ -48,15 +48,15 @@ class TextAnimatorRenderer {
   // 读取字间距信息
   void readTackingInfo(const TextAnimator* animator, Frame frame);
   // 根据序号获取位置（供AE导出插件在计算firstBaseLine时调用）
-  Point getPositionByIndex(size_t index, bool* pBiasFlag);
+  tgfx::Point getPositionByIndex(size_t index, bool* pBiasFlag);
 
   //
   // 动画属性：位置、缩放、旋转、不透明度、字间距
   //
-  Point position = Point::Zero();   // 位置
-  Point scale = Point::Make(1, 1);  // 缩放
-  float rotation = 0.0f;            // 旋转
-  float alpha = 1.0f;               // 不透明度，默认不透明
+  tgfx::Point position = tgfx::Point::Zero();   // 位置
+  tgfx::Point scale = tgfx::Point::Make(1, 1);  // 缩放
+  float rotation = 0.0f;                        // 旋转
+  float alpha = 1.0f;                           // 不透明度，默认不透明
 
   float trackingBefore = 0.0f;  // 字间距-之前
   float trackingAfter = 0.0f;   // 字间距-之后

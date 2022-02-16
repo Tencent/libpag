@@ -18,7 +18,7 @@
 
 #pragma once
 
-namespace pag {
+namespace tgfx {
 /**
  * Defines pixel formats for YUV pixels.
  */
@@ -78,4 +78,4 @@ enum class YUVColorRange {
   JPEG
 };
 
-}  // namespace pag
+}  // namespace tgfx

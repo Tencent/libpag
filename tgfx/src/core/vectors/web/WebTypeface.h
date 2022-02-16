@@ -24,14 +24,14 @@
 #include "core/Font.h"
 #include "core/Typeface.h"
 
-namespace pag {
+namespace tgfx {
 class WebTypeface : public Typeface {
  public:
   static std::shared_ptr<WebTypeface> Make(const std::string& name);
 
   ~WebTypeface() override;
 
-  ID uniqueID() const override {
+  uint32_t uniqueID() const override {
     return _uniqueID;
   }
 
@@ -76,10 +76,10 @@ class WebTypeface : public Typeface {
  private:
   explicit WebTypeface(std::string name);
 
-  ID _uniqueID;
+  uint32_t _uniqueID;
   std::unordered_map<float, FontMetrics>* fontMetricsMap =
       new std::unordered_map<float, FontMetrics>;
   emscripten::val scalerContextClass = emscripten::val::null();
   std::string name;
 };
-}  // namespace pag
+}  // namespace tgfx

@@ -21,7 +21,7 @@
 #include "core/Path.h"
 #include "core/Stroke.h"
 
-namespace pag {
+namespace tgfx {
 /**
  * PathEffect applies transformation to a Path.
  */
@@ -57,4 +57,4 @@ class PathEffect {
    */
   virtual bool applyTo(Path* path) const = 0;
 };
-}  // namespace pag
+}  // namespace tgfx

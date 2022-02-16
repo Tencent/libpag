@@ -27,6 +27,7 @@
 #include "gpu/opengl/GLUtil.h"
 
 namespace pag {
+using namespace tgfx;
 using nlohmann::json;
 
 #define CHECK_PIXELS(info, pixels, key)                                          \
@@ -43,7 +44,8 @@ PAG_TEST(PAGReadPixelsTest, TestPixelMap) {
   EXPECT_TRUE(image != nullptr);
   auto width = image->width();
   auto height = image->height();
-  auto RGBAInfo = ImageInfo::Make(width, height, ColorType::RGBA_8888, AlphaType::Unpremultiplied);
+  auto RGBAInfo =
+      ImageInfo::Make(width, height, tgfx::ColorType::RGBA_8888, tgfx::AlphaType::Unpremultiplied);
   auto byteSize = RGBAInfo.byteSize();
   auto pixelsA = new uint8_t[byteSize];
   auto pixelsB = new uint8_t[byteSize];
@@ -62,7 +64,8 @@ PAG_TEST(PAGReadPixelsTest, TestPixelMap) {
   ASSERT_TRUE(result);
   CHECK_PIXELS(RGBAInfo, pixelsB, "PixelMap_RGBA_to_RGBA_100_100");
 
-  auto RGBARectInfo = ImageInfo::Make(500, 500, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  auto RGBARectInfo =
+      ImageInfo::Make(500, 500, tgfx::ColorType::RGBA_8888, tgfx::AlphaType::Premultiplied);
   memset(pixelsB, 0, RGBARectInfo.byteSize());
   result = RGBAMap.readPixels(RGBARectInfo, pixelsB, -100, -100);
   ASSERT_TRUE(result);
@@ -73,17 +76,17 @@ PAG_TEST(PAGReadPixelsTest, TestPixelMap) {
   ASSERT_TRUE(result);
   CHECK_PIXELS(RGBARectInfo, pixelsB, "PixelMap_RGBA_to_RGBA_100_-100");
 
-  auto rgbAInfo = RGBAInfo.makeAlphaType(AlphaType::Premultiplied);
+  auto rgbAInfo = RGBAInfo.makeAlphaType(tgfx::AlphaType::Premultiplied);
   result = RGBAMap.readPixels(rgbAInfo, pixelsB);
   EXPECT_TRUE(result);
   CHECK_PIXELS(rgbAInfo, pixelsB, "PixelMap_RGBA_to_rgbA");
 
-  auto bgrAInfo = rgbAInfo.makeColorType(ColorType::BGRA_8888);
+  auto bgrAInfo = rgbAInfo.makeColorType(tgfx::ColorType::BGRA_8888);
   result = RGBAMap.readPixels(bgrAInfo, pixelsB);
   EXPECT_TRUE(result);
   CHECK_PIXELS(bgrAInfo, pixelsB, "PixelMap_RGBA_to_bgrA");
 
-  auto BGRAInfo = bgrAInfo.makeAlphaType(AlphaType::Unpremultiplied);
+  auto BGRAInfo = bgrAInfo.makeAlphaType(tgfx::AlphaType::Unpremultiplied);
   result = RGBAMap.readPixels(BGRAInfo, pixelsB);
   EXPECT_TRUE(result);
   CHECK_PIXELS(BGRAInfo, pixelsB, "PixelMap_RGBA_to_BGRA");
@@ -116,8 +119,9 @@ PAG_TEST(PAGReadPixelsTest, TestPixelMap) {
   EXPECT_TRUE(result);
   CHECK_PIXELS(bgrAInfo, pixelsB, "PixelMap_rgbA_to_bgrA");
 
-  auto A8Info = ImageInfo::Make(width, height, ColorType::ALPHA_8, AlphaType::Unpremultiplied);
-  EXPECT_EQ(A8Info.alphaType(), AlphaType::Premultiplied);
+  auto A8Info =
+      ImageInfo::Make(width, height, tgfx::ColorType::ALPHA_8, tgfx::AlphaType::Unpremultiplied);
+  EXPECT_EQ(A8Info.alphaType(), tgfx::AlphaType::Premultiplied);
   auto alphaByteSize = A8Info.byteSize();
   auto pixelsC = new uint8_t[alphaByteSize];
 
@@ -168,12 +172,14 @@ PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
   auto height = bitmap.height();
   pixels = bitmap.writablePixels();
 
-  auto RGBAInfo = ImageInfo::Make(width, height, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  auto RGBAInfo =
+      ImageInfo::Make(width, height, tgfx::ColorType::RGBA_8888, tgfx::AlphaType::Premultiplied);
   result = surface->readPixels(RGBAInfo, pixels);
   ASSERT_TRUE(result);
   CHECK_PIXELS(RGBAInfo, pixels, "Surface_rgbA_to_rgbA");
 
-  auto BGRAInfo = ImageInfo::Make(width, height, ColorType::BGRA_8888, AlphaType::Premultiplied);
+  auto BGRAInfo =
+      ImageInfo::Make(width, height, tgfx::ColorType::BGRA_8888, tgfx::AlphaType::Premultiplied);
   result = surface->readPixels(BGRAInfo, pixels);
   ASSERT_TRUE(result);
   CHECK_PIXELS(BGRAInfo, pixels, "Surface_rgbA_to_bgrA");
@@ -183,7 +189,8 @@ PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
   ASSERT_TRUE(result);
   CHECK_PIXELS(RGBAInfo, pixels, "Surface_rgbA_to_rgbA_100_100");
 
-  auto RGBARectInfo = ImageInfo::Make(500, 500, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  auto RGBARectInfo =
+      ImageInfo::Make(500, 500, tgfx::ColorType::RGBA_8888, tgfx::AlphaType::Premultiplied);
   memset(pixels, 0, RGBARectInfo.byteSize());
   result = surface->readPixels(RGBARectInfo, pixels, -100, -100);
   ASSERT_TRUE(result);
@@ -199,7 +206,8 @@ PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
   canvas = surface->getCanvas();
   canvas->drawTexture(texture.get());
 
-  auto A8Info = ImageInfo::Make(width, height, ColorType::ALPHA_8, AlphaType::Premultiplied);
+  auto A8Info =
+      ImageInfo::Make(width, height, tgfx::ColorType::ALPHA_8, tgfx::AlphaType::Premultiplied);
   result = surface->readPixels(A8Info, pixels);
   ASSERT_TRUE(result);
   CHECK_PIXELS(A8Info, pixels, "Surface_alpha_to_alpha");
@@ -208,18 +216,19 @@ PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
   ASSERT_TRUE(result);
   CHECK_PIXELS(RGBAInfo, pixels, "Surface_alpha_to_rgba");
 
-  auto AlphaRectInfo = ImageInfo::Make(500, 500, ColorType::ALPHA_8, AlphaType::Premultiplied);
+  auto AlphaRectInfo =
+      ImageInfo::Make(500, 500, tgfx::ColorType::ALPHA_8, tgfx::AlphaType::Premultiplied);
   memset(pixels, 0, AlphaRectInfo.byteSize());
   result = surface->readPixels(AlphaRectInfo, pixels, 100, -100);
   ASSERT_TRUE(result);
   CHECK_PIXELS(AlphaRectInfo, pixels, "Surface_alpha_to_alpha_100_-100");
 
   auto gl = GLContext::Unwrap(context);
-  GLTextureInfo textureInfo = {};
-  result = CreateTexture(gl, width, height, &textureInfo);
+  tgfx::GLTextureInfo textureInfo = {};
+  result = CreateGLTexture(gl, width, height, &textureInfo);
   ASSERT_TRUE(result);
-  auto backendTexture = BackendTexture(textureInfo, width, height);
-  surface = Surface::MakeFrom(context, backendTexture, ImageOrigin::BottomLeft);
+  auto backendTexture = tgfx::BackendTexture(textureInfo, width, height);
+  surface = Surface::MakeFrom(context, backendTexture, tgfx::ImageOrigin::BottomLeft);
   ASSERT_TRUE(surface != nullptr);
   canvas = surface->getCanvas();
   canvas->clear();
@@ -260,8 +269,8 @@ PAG_TEST(PAGReadPixelsTest, PngCodec) {
   auto rowBytes = image->width() * 4;
   auto pixels = new (std::nothrow) uint8_t[rowBytes * image->height()];
   ASSERT_TRUE(pixels);
-  auto info = ImageInfo::Make(image->width(), image->height(), ColorType::RGBA_8888,
-                              AlphaType::Premultiplied);
+  auto info = ImageInfo::Make(image->width(), image->height(), tgfx::ColorType::RGBA_8888,
+                              tgfx::AlphaType::Premultiplied);
   ASSERT_TRUE(image->readPixels(info, pixels));
   CHECK_PIXELS(info, pixels, "PngCodec_Decode");
   Bitmap bitmap(info, pixels);
@@ -283,8 +292,8 @@ PAG_TEST(PAGReadPixelsTest, WebpCodec) {
   ASSERT_EQ(image->width(), 110);
   ASSERT_EQ(image->height(), 110);
   ASSERT_EQ(static_cast<int>(image->orientation()), static_cast<int>(Orientation::TopLeft));
-  auto info = ImageInfo::Make(image->width(), image->height(), ColorType::RGBA_8888,
-                              AlphaType::Premultiplied);
+  auto info = ImageInfo::Make(image->width(), image->height(), tgfx::ColorType::RGBA_8888,
+                              tgfx::AlphaType::Premultiplied);
   auto pixels = new (std::nothrow) uint8_t[info.byteSize()];
   ASSERT_TRUE(pixels);
   ASSERT_TRUE(image->readPixels(info, pixels));
@@ -297,8 +306,8 @@ PAG_TEST(PAGReadPixelsTest, WebpCodec) {
   ASSERT_EQ(image->height(), 110);
   ASSERT_EQ(static_cast<int>(image->orientation()), static_cast<int>(Orientation::TopLeft));
 
-  auto a8Info = ImageInfo::Make(image->width(), image->height(), ColorType::ALPHA_8,
-                                AlphaType::Premultiplied);
+  auto a8Info = ImageInfo::Make(image->width(), image->height(), tgfx::ColorType::ALPHA_8,
+                                tgfx::AlphaType::Premultiplied);
   auto a8Pixels = new (std::nothrow) uint8_t[a8Info.byteSize()];
   ASSERT_TRUE(image->readPixels(a8Info, a8Pixels));
   auto rgbaFromA8Data = Bitmap(a8Info, a8Pixels).encode(EncodedFormat::WEBP, 100);
@@ -318,12 +327,12 @@ PAG_TEST(PAGReadPixelsTest, JpegCodec) {
   ASSERT_EQ(image->width(), 4032);
   ASSERT_EQ(image->height(), 3024);
   ASSERT_EQ(static_cast<int>(image->orientation()), static_cast<int>(Orientation::RightTop));
-  ColorType outputColorType = ColorType::RGBA_8888;
+  auto outputColorType = tgfx::ColorType::RGBA_8888;
   auto pixels = new (std::nothrow)
       uint8_t[image->height() * image->width() * ImageInfo::GetBytesPerPixel(outputColorType)];
   ASSERT_TRUE(pixels);
-  auto info =
-      ImageInfo::Make(image->width(), image->height(), outputColorType, AlphaType::Premultiplied);
+  auto info = ImageInfo::Make(image->width(), image->height(), outputColorType,
+                              tgfx::AlphaType::Premultiplied);
   bool res = image->readPixels(info, pixels);
   CHECK_PIXELS(info, pixels, "JpegCodec_Decode");
   Bitmap bitmap(info, pixels);

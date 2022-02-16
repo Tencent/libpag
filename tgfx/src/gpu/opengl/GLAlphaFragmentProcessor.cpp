@@ -19,7 +19,7 @@
 #include "GLAlphaFragmentProcessor.h"
 #include "gpu/AlphaFragmentProcessor.h"
 
-namespace pag {
+namespace tgfx {
 void GLAlphaFragmentProcessor::emitCode(EmitArgs& args) {
   auto* fragBuilder = args.fragBuilder;
   auto* uniformHandler = args.uniformHandler;
@@ -39,4 +39,4 @@ void GLAlphaFragmentProcessor::onSetData(const ProgramDataManager& programDataMa
     programDataManager.set1f(alphaUniform, afp.alpha);
   }
 }
-}  // namespace pag
+}  // namespace tgfx

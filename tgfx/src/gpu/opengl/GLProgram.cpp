@@ -22,7 +22,7 @@
 #include "GLUtil.h"
 #include "gpu/Pipeline.h"
 
-namespace pag {
+namespace tgfx {
 GLProgram::GLProgram(unsigned programID, const std::vector<Uniform>& uniforms,
                      std::unique_ptr<GLGeometryProcessor> geometryProcessor,
                      std::unique_ptr<GLXferProcessor> xferProcessor,
@@ -59,9 +59,9 @@ void GLProgram::onRelease(Context* context) {
   }
 }
 
-void BindTexture(const GLInterface* gl, int position, const TextureSampler* sampler) {
+static void BindGLTexture(const GLInterface* gl, int position, const TextureSampler* sampler) {
   const auto& glInfo = static_cast<const GLTextureSampler*>(sampler)->glInfo;
-  ActiveTexture(gl, GL::TEXTURE0 + position, glInfo.target, glInfo.id, sampler->config);
+  ActiveGLTexture(gl, GL::TEXTURE0 + position, glInfo.target, glInfo.id, sampler->config);
 }
 
 void GLProgram::updateUniformsAndTextureBindings(const GLInterface* gl,
@@ -82,7 +82,7 @@ void GLProgram::updateUniformsAndTextureBindings(const GLInterface* gl,
   const auto* dstTexture = pipeline.getDstTexture(&offset);
   if (dstTexture) {
     glXferProcessor->setData(programDataManager, *pipeline.getXferProcessor(), dstTexture, offset);
-    BindTexture(gl, nextTexSamplerIdx++, dstTexture->getSampler());
+    BindGLTexture(gl, nextTexSamplerIdx++, dstTexture->getSampler());
   }
 }
 
@@ -96,10 +96,10 @@ void GLProgram::setFragmentData(const GLInterface* gl,
   while (fp && glslFP) {
     glslFP->setData(programDataManager, *fp);
     for (size_t i = 0; i < fp->numTextureSamplers(); ++i) {
-      BindTexture(gl, (*nextTexSamplerIdx)++, fp->textureSampler(i));
+      BindGLTexture(gl, (*nextTexSamplerIdx)++, fp->textureSampler(i));
     }
     fp = iter.next();
     glslFP = glslIter.next();
   }
 }
-}  // namespace pag
+}  // namespace tgfx

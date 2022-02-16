@@ -20,7 +20,7 @@
 
 #include "core/Image.h"
 
-namespace pag {
+namespace tgfx {
 class NativeCodec {
  public:
   /**
@@ -35,4 +35,4 @@ class NativeCodec {
    */
   static std::shared_ptr<Image> MakeImage(std::shared_ptr<Data> imageBytes);
 };
-}  // namespace pag
+}  // namespace tgfx

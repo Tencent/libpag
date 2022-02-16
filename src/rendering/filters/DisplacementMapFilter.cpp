@@ -18,7 +18,6 @@
 
 #include "DisplacementMapFilter.h"
 #include "gpu/Surface.h"
-#include "gpu/opengl/GLUtil.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/filters/utils/FilterHelper.h"
@@ -97,7 +96,7 @@ std::string DisplacementMapFilter::onBuildFragmentShader() {
   return FRAGMENT_SHADER;
 }
 
-void DisplacementMapFilter::onPrepareProgram(const GLInterface* gl, unsigned int program) {
+void DisplacementMapFilter::onPrepareProgram(const tgfx::GLInterface* gl, unsigned int program) {
   useForDisplacementHandle = gl->getUniformLocation(program, "uUseForDisplacement");
   maxDisplacementHandle = gl->getUniformLocation(program, "uMaxDisplacement");
   displacementMapBehaviorHandle = gl->getUniformLocation(program, "uDisplacementMapBehavior");
@@ -108,21 +107,21 @@ void DisplacementMapFilter::onPrepareProgram(const GLInterface* gl, unsigned int
 }
 
 void DisplacementMapFilter::updateMapTexture(RenderCache* cache, const Graphic* mapGraphic,
-                                             const Rect& bounds) {
+                                             const tgfx::Rect& bounds) {
   if (mapSurface == nullptr || mapBounds.width() != bounds.width() ||
       mapBounds.height() != bounds.height()) {
-    mapSurface = Surface::Make(cache->getContext(), static_cast<int>(bounds.width()),
-                               static_cast<int>(bounds.height()));
+    mapSurface = tgfx::Surface::Make(cache->getContext(), static_cast<int>(bounds.width()),
+                                     static_cast<int>(bounds.height()));
     mapBounds = bounds;
   }
   mapGraphic->draw(mapSurface->getCanvas(), cache);
 }
 
-void DisplacementMapFilter::onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
-                                           const Point&) {
+void DisplacementMapFilter::onUpdateParams(const tgfx::GLInterface* gl,
+                                           const tgfx::Rect& contentBounds, const tgfx::Point&) {
   auto* pagEffect = reinterpret_cast<const DisplacementMapEffect*>(effect);
-  auto mapTexture = GLTexture::Unwrap(mapSurface->getTexture().get());
-  ActiveTexture(gl, GL::TEXTURE1, GL::TEXTURE_2D, mapTexture.id);
+  auto mapTexture = tgfx::GLTexture::Unwrap(mapSurface->getTexture().get());
+  ActiveGLTexture(gl, GL::TEXTURE1, GL::TEXTURE_2D, mapTexture.id);
   gl->uniform2f(useForDisplacementHandle,
                 pagEffect->useForHorizontalDisplacement->getValueAt(layerFrame),
                 pagEffect->useForVerticalDisplacement->getValueAt(layerFrame));

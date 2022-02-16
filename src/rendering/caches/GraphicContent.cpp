@@ -24,7 +24,7 @@ namespace pag {
 GraphicContent::GraphicContent(std::shared_ptr<Graphic> graphic) : graphic(std::move(graphic)) {
 }
 
-void GraphicContent::measureBounds(Rect* bounds) {
+void GraphicContent::measureBounds(tgfx::Rect* bounds) {
   if (graphic) {
     graphic->measureBounds(bounds);
   } else {

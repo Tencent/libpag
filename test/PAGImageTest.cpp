@@ -25,6 +25,7 @@
 #include "pag/pag.h"
 
 namespace pag {
+using namespace tgfx;
 using nlohmann::json;
 
 PAG_TEST_SUIT(PAGImageTest)
@@ -56,12 +57,12 @@ PAG_TEST_F(PAGImageTest, image) {
   ASSERT_TRUE(pixelBuffer == nullptr);
   pixelBuffer = PixelBuffer::Make(width, height, true);
   ASSERT_TRUE(pixelBuffer != nullptr);
-  EXPECT_EQ(pixelBuffer->colorType(), ColorType::ALPHA_8);
+  EXPECT_EQ(pixelBuffer->colorType(), tgfx::ColorType::ALPHA_8);
   pixelBuffer = PixelBuffer::Make(width, height);
   ASSERT_TRUE(pixelBuffer != nullptr);
   Bitmap bitmap(pixelBuffer);
-  auto info =
-      ImageInfo::Make(width, height, ColorType::RGBA_8888, AlphaType::Premultiplied, rowBytes);
+  auto info = ImageInfo::Make(width, height, tgfx::ColorType::RGBA_8888,
+                              tgfx::AlphaType::Premultiplied, rowBytes);
   auto result = bitmap.writePixels(info, fileData->data());
   ASSERT_TRUE(result);
   auto newFileData = ByteData::Make(fileData->length());

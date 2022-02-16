@@ -20,9 +20,8 @@
 
 #include "ResourceHandle.h"
 #include "ShaderVar.h"
-#include "pag/types.h"
 
-namespace pag {
+namespace tgfx {
 class ProgramBuilder;
 
 /**
@@ -68,16 +67,16 @@ class ShaderBuilder {
  protected:
   class Type {
    public:
-    static const Enum VersionDecl = 0;
-    static const Enum Extensions = 1;
-    static const Enum Definitions = 2;
-    static const Enum PrecisionQualifier = 3;
-    static const Enum Uniforms = 4;
-    static const Enum Inputs = 5;
-    static const Enum Outputs = 6;
-    static const Enum Functions = 7;
-    static const Enum Main = 8;
-    static const Enum Code = 9;
+    static const uint8_t VersionDecl = 0;
+    static const uint8_t Extensions = 1;
+    static const uint8_t Definitions = 2;
+    static const uint8_t PrecisionQualifier = 3;
+    static const uint8_t Uniforms = 4;
+    static const uint8_t Inputs = 5;
+    static const uint8_t Outputs = 6;
+    static const uint8_t Functions = 7;
+    static const uint8_t Main = 8;
+    static const uint8_t Code = 9;
   };
 
   /**
@@ -91,7 +90,7 @@ class ShaderBuilder {
 
   virtual void onFinalize() = 0;
 
-  void appendEnterIfNotEmpty(Enum type);
+  void appendEnterIfNotEmpty(uint8_t type);
 
   void appendIndentationIfNeeded(const std::string& code);
 
@@ -111,4 +110,4 @@ class ShaderBuilder {
 
   friend class GLUniformHandler;
 };
-}  // namespace pag
+}  // namespace tgfx

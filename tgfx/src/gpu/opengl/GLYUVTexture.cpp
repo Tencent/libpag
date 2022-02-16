@@ -18,9 +18,9 @@
 
 #include "GLYUVTexture.h"
 #include "GLUtil.h"
-#include "base/utils/UniqueID.h"
+#include "core/utils/UniqueID.h"
 
-namespace pag {
+namespace tgfx {
 #define I420_PLANE_COUNT 3
 #define NV12_PLANE_COUNT 2
 #define I420_PIXEL_BYTES 1.5
@@ -127,7 +127,7 @@ static void SubmitYUVTexture(const GLInterface* gl, const YUVConfig& yuvConfig,
     auto rowBytes = yuvConfig.rowBytes[index];
     auto bytesPerPixel = yuvConfig.bytesPerPixel[index];
     auto pixels = yuvConfig.pixelsPlane[index];
-    SubmitTexture(gl, glInfo, format, w, h, rowBytes, bytesPerPixel, pixels);
+    SubmitGLTexture(gl, glInfo, format, w, h, rowBytes, bytesPerPixel, pixels);
   }
 }
 
@@ -224,4 +224,4 @@ void GLYUVTexture::onRelease(Context* context) {
     gl->deleteTextures(1, &sampler.glInfo.id);
   }
 }
-}  // namespace pag
+}  // namespace tgfx

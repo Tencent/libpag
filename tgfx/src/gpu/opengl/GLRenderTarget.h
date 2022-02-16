@@ -22,7 +22,7 @@
 #include "GLTexture.h"
 #include "core/ImageInfo.h"
 
-namespace pag {
+namespace tgfx {
 /**
  * GLRenderTarget represents a 2D buffer of pixels that can be rendered to.
  */
@@ -110,4 +110,4 @@ class GLRenderTarget : public Resource {
 
   friend class GLSurface;
 };
-}  // namespace pag
+}  // namespace tgfx

@@ -18,20 +18,20 @@
 
 #pragma once
 
+#include <string>
 #include <unordered_map>
-
+#include <vector>
 #include "GLDefines.h"
 #include "GLFunctions.h"
-#include "base/utils/EnumClassHash.h"
-#include "base/utils/Log.h"
+#include "core/utils/EnumHasher.h"
+#include "core/utils/Log.h"
 #include "gpu/Caps.h"
 #include "gpu/PixelConfig.h"
 #include "gpu/Swizzle.h"
-#include "pag/types.h"
 
 #define GL_VER(major, minor) ((static_cast<uint32_t>(major) << 16) | static_cast<uint32_t>(minor))
 
-namespace pag {
+namespace tgfx {
 enum class GLStandard { None, GL, GLES, WebGL };
 
 struct TextureFormat {
@@ -153,7 +153,7 @@ class GLCaps : public Caps {
   bool usesImplicitMSAAResolve() const;
 
  private:
-  std::unordered_map<PixelConfig, ConfigInfo, EnumClassHash> configMap = {};
+  std::unordered_map<PixelConfig, ConfigInfo, EnumHasher> configMap = {};
 
   void initConfigMap(const GLInfo& info);
   void initColorSampleCount(const GLInfo& info);
@@ -162,4 +162,4 @@ class GLCaps : public Caps {
   void initWebGLSupport(const GLInfo& info);
   void initFSAASupport(const GLInfo& info);
 };
-}  // namespace pag
+}  // namespace tgfx

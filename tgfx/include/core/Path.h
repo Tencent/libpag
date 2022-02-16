@@ -18,10 +18,10 @@
 
 #pragma once
 
+#include "core/Matrix.h"
 #include "core/PathTypes.h"
-#include "pag/types.h"
 
-namespace pag {
+namespace tgfx {
 class PathRef;
 
 /**
@@ -244,4 +244,4 @@ class Path {
 
   friend class PathRef;
 };
-}  // namespace pag
+}  // namespace tgfx

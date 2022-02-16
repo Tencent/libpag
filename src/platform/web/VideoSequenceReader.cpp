@@ -73,18 +73,19 @@ void VideoSequenceReader::prepareAsync(Frame targetFrame) {
   }
 }
 
-std::shared_ptr<Texture> VideoSequenceReader::readTexture(Frame targetFrame, RenderCache* cache) {
+std::shared_ptr<tgfx::Texture> VideoSequenceReader::readTexture(Frame targetFrame,
+                                                                RenderCache* cache) {
   if (!videoReader.as<bool>()) {
     return nullptr;
   }
   if (targetFrame == lastFrame) {
     return texture;
   }
-  GLStateGuard stateGuard(cache->getContext());
+  tgfx::GLStateGuard stateGuard(cache->getContext());
   if (texture == nullptr) {
-    texture = GLTexture::MakeRGBA(cache->getContext(), width, height);
+    texture = tgfx::GLTexture::MakeRGBA(cache->getContext(), width, height);
   }
-  auto& glInfo = std::static_pointer_cast<GLTexture>(texture)->getGLInfo();
+  auto& glInfo = std::static_pointer_cast<tgfx::GLTexture>(texture)->getGLInfo();
   videoReader.call<void>("renderToTexture", val::module_property("GL"), glInfo.id);
   lastFrame = targetFrame;
   return texture;

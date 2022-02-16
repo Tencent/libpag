@@ -23,6 +23,6 @@
 
 namespace pag {
 
-Path ToPath(const PathData& pathData);
+tgfx::Path ToPath(const PathData& pathData);
 
 }  // namespace pag

@@ -20,7 +20,7 @@
 
 #include "Texture.h"
 
-namespace pag {
+namespace tgfx {
 /**
  * A TextureBuffer contains an array of fully processed pixels, suitable for immediate texture
  * uploading on the GPU.
@@ -55,4 +55,4 @@ class TextureBuffer {
   int _width = 0;
   int _height = 0;
 };
-}  // namespace pag
+}  // namespace tgfx

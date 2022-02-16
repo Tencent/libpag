@@ -21,7 +21,7 @@
 #include <emscripten/val.h>
 #include "core/Mask.h"
 
-namespace pag {
+namespace tgfx {
 class WebMask : public Mask {
  public:
   explicit WebMask(int width, int height, emscripten::val webMask)
@@ -41,4 +41,4 @@ class WebMask : public Mask {
 
   emscripten::val webMask = emscripten::val::null();
 };
-}  // namespace pag
+}  // namespace tgfx

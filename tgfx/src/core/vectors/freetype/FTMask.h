@@ -21,7 +21,7 @@
 #include "core/Mask.h"
 #include "core/PixelBuffer.h"
 
-namespace pag {
+namespace tgfx {
 class FTMask : public Mask {
  public:
   explicit FTMask(std::shared_ptr<PixelBuffer> buffer);
@@ -39,4 +39,4 @@ class FTMask : public Mask {
  private:
   std::shared_ptr<PixelBuffer> buffer = nullptr;
 };
-}  // namespace pag
+}  // namespace tgfx

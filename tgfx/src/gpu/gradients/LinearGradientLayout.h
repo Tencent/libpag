@@ -20,7 +20,7 @@
 
 #include "gpu/FragmentProcessor.h"
 
-namespace pag {
+namespace tgfx {
 class LinearGradientLayout : public FragmentProcessor {
  public:
   static std::unique_ptr<LinearGradientLayout> Make(Matrix matrix);
@@ -38,4 +38,4 @@ class LinearGradientLayout : public FragmentProcessor {
 
   CoordTransform coordTransform;
 };
-}  // namespace pag
+}  // namespace tgfx

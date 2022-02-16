@@ -19,7 +19,7 @@
 #include "core/PixelBuffer.h"
 #include "gpu/YUVTexture.h"
 
-namespace pag {
+namespace tgfx {
 std::shared_ptr<PixelBuffer> PixelBuffer::MakeHardwareBuffer(int, int, bool) {
   return nullptr;
 }
@@ -35,4 +35,4 @@ std::shared_ptr<Texture> Texture::MakeFrom(Context*, void*) {
 std::shared_ptr<YUVTexture> YUVTexture::MakeFrom(Context*, YUVColorSpace, YUVColorRange, void*) {
   return nullptr;
 }
-}  // namespace pag
+}  // namespace tgfx

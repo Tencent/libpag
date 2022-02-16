@@ -23,7 +23,7 @@
 #include "ProgramDataManager.h"
 #include "UniformHandler.h"
 
-namespace pag {
+namespace tgfx {
 class GLFragmentProcessor {
  public:
   virtual ~GLFragmentProcessor() = default;
@@ -170,4 +170,4 @@ class GLFragmentProcessor {
 
   friend class FragmentProcessor;
 };
-}  // namespace pag
+}  // namespace tgfx

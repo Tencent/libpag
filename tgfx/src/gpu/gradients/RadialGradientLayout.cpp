@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RadialGradientLayout.h"
-#include "base/utils/UniqueID.h"
+#include "core/utils/UniqueID.h"
 #include "gpu/opengl/GLRadialGradientLayout.h"
 
-namespace pag {
+namespace tgfx {
 std::unique_ptr<RadialGradientLayout> RadialGradientLayout::Make(Matrix matrix) {
   return std::unique_ptr<RadialGradientLayout>(new RadialGradientLayout(matrix));
 }
@@ -37,4 +37,4 @@ RadialGradientLayout::RadialGradientLayout(Matrix matrix) : coordTransform(matri
 std::unique_ptr<GLFragmentProcessor> RadialGradientLayout::onCreateGLInstance() const {
   return std::make_unique<GLRadialGradientLayout>();
 }
-}  // namespace pag
+}  // namespace tgfx

@@ -19,7 +19,7 @@
 #include "core/Data.h"
 #include "core/Stream.h"
 
-namespace pag {
+namespace tgfx {
 std::shared_ptr<Data> Data::MakeFromFile(const std::string& filePath) {
   auto stream = Stream::MakeFromFile(filePath);
   if (stream == nullptr) {
@@ -91,4 +91,4 @@ Data::~Data() {
   }
 }
 
-}  // namespace pag
+}  // namespace tgfx

@@ -31,11 +31,12 @@ class CornerPinFilter : public LayerFilter {
 
   std::string onBuildFragmentShader() override;
 
-  std::vector<Point> computeVertices(const Rect& contentBounds, const Rect& transformedBounds,
-                                     const Point& filterScale) override;
+  std::vector<tgfx::Point> computeVertices(const tgfx::Rect& contentBounds,
+                                           const tgfx::Rect& transformedBounds,
+                                           const tgfx::Point& filterScale) override;
 
-  void bindVertices(const GLInterface* gl, const FilterSource* source, const FilterTarget* target,
-                    const std::vector<Point>& points) override;
+  void bindVertices(const tgfx::GLInterface* gl, const FilterSource* source,
+                    const FilterTarget* target, const std::vector<tgfx::Point>& points) override;
 
   bool needsMSAA() const override {
     return true;

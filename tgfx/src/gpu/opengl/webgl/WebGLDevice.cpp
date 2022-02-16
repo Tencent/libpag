@@ -18,9 +18,9 @@
 
 #include "gpu/opengl/webgl/WebGLDevice.h"
 #include "WebGLProcGetter.h"
-#include "base/utils/Log.h"
+#include "core/utils/Log.h"
 
-namespace pag {
+namespace tgfx {
 
 void* GLDevice::CurrentNativeHandle() {
   return reinterpret_cast<void*>(emscripten_webgl_get_current_context());
@@ -132,4 +132,4 @@ void WebGLDevice::onClearCurrent() {
 bool WebGLDevice::sharableWith(void*) const {
   return false;
 }
-}  // namespace pag
+}  // namespace tgfx

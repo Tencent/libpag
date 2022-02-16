@@ -19,7 +19,7 @@
 #include "HardwareBuffer.h"
 #include "base/utils/USE.h"
 
-namespace pag {
+namespace tgfx {
 static std::mutex cacheLocker = {};
 static std::unordered_map<CVPixelBufferRef, std::weak_ptr<HardwareBuffer>> hardwareBufferMap = {};
 

@@ -20,9 +20,9 @@
 
 #include "gpu/opengl/GLProcGetter.h"
 
-namespace pag {
+namespace tgfx {
 class EGLProcGetter : public GLProcGetter {
  public:
   void* getProcAddress(const char name[]) const override;
 };
-}  // namespace pag
+}  // namespace tgfx

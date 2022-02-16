@@ -22,12 +22,12 @@
 #include <GLES/gl.h>
 #include <GLES/glext.h>
 #include <android/hardware_buffer.h>
-#include "base/utils/UniqueID.h"
+#include "core/utils/UniqueID.h"
 #include "gpu/opengl/egl/EGLDevice.h"
 #include "platform/android/HardwareBuffer.h"
 #include "platform/android/HardwareBufferInterface.h"
 
-namespace pag {
+namespace tgfx {
 namespace eglext {
 static PFNEGLGETNATIVECLIENTBUFFERANDROIDPROC eglGetNativeClientBufferANDROID = nullptr;
 static PFNGLEGLIMAGETARGETTEXTURE2DOESPROC glEGLImageTargetTexture2DOES = nullptr;
@@ -115,6 +115,6 @@ void EGLHardwareTexture::onRelease(Context* context) {
   auto display = static_cast<EGLDevice*>(context->device())->getDisplay();
   eglext::eglDestroyImageKHR(display, eglImage);
 }
-}  // namespace pag
+}  // namespace tgfx
 
 #endif

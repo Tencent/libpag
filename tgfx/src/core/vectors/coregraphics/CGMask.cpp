@@ -21,7 +21,7 @@
 #include "core/Mask.h"
 #include "platform/apple/BitmapContextUtil.h"
 
-namespace pag {
+namespace tgfx {
 static void Iterator(PathVerb verb, const Point points[4], void* info) {
   auto cgPath = reinterpret_cast<CGMutablePathRef>(info);
   switch (verb) {
@@ -106,4 +106,4 @@ void CGMask::fillPath(const Path& path) {
   CGPathRelease(cgPath);
   buffer->unlockPixels();
 }
-}  // namespace pag
+}  // namespace tgfx

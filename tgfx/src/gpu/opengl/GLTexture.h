@@ -22,7 +22,7 @@
 #include "GLTextureSampler.h"
 #include "gpu/Texture.h"
 
-namespace pag {
+namespace tgfx {
 class GLTexture : public Texture {
  public:
   static GLTextureInfo Unwrap(const Texture* texture);
@@ -56,4 +56,4 @@ class GLTexture : public Texture {
 
   friend class Texture;
 };
-}  // namespace pag
+}  // namespace tgfx

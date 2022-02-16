@@ -41,11 +41,11 @@ class GPUDrawable : public Drawable {
 
   void updateSize() override;
 
-  std::shared_ptr<Device> getDevice() override;
+  std::shared_ptr<tgfx::Device> getDevice() override;
 
-  std::shared_ptr<Surface> createSurface(Context* context) override;
+  std::shared_ptr<tgfx::Surface> createSurface(tgfx::Context* context) override;
 
-  void present(Context* context) override;
+  void present(tgfx::Context* context) override;
 
   void setTimeStamp(int64_t timeStamp) override;
 
@@ -55,7 +55,7 @@ class GPUDrawable : public Drawable {
   ANativeWindow* nativeWindow = nullptr;
   EGLContext sharedContext = nullptr;
   int64_t currentTimeStamp = 0;
-  std::shared_ptr<EGLWindow> window = nullptr;
+  std::shared_ptr<tgfx::EGLWindow> window = nullptr;
 
   explicit GPUDrawable(ANativeWindow* nativeWindow, EGLContext eglContext = EGL_NO_CONTEXT);
 };

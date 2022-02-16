@@ -20,7 +20,7 @@
 
 #include <type_traits>
 
-namespace pag {
+namespace tgfx {
 #define TGFX_MARK_AS_BITMASK_ENUM(LargestValue) TGFX_BITMASK_LARGEST_ENUMERATOR = LargestValue
 
 /// Traits class to determine whether an enum has a
@@ -87,4 +87,4 @@ E& operator^=(E& LHS, E RHS) {
   LHS = LHS ^ RHS;
   return LHS;
 }
-}  // namespace pag
+}  // namespace tgfx

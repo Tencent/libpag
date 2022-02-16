@@ -18,9 +18,10 @@
 
 #pragma once
 
-#include "pag/types.h"
+#include <mutex>
+#include "core/Matrix.h"
 
-namespace pag {
+namespace tgfx {
 class Context;
 /**
  * The GPU interface for drawing graphics.
@@ -66,4 +67,4 @@ class Device {
 
   friend class ResourceCache;
 };
-}  // namespace pag
+}  // namespace tgfx

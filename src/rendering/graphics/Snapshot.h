@@ -18,7 +18,9 @@
 
 #pragma once
 
+#include "core/Matrix.h"
 #include "gpu/Texture.h"
+#include "pag/types.h"
 
 namespace pag {
 class RenderCache;
@@ -32,7 +34,7 @@ class Snapshot {
   /**
    * Creates a new Snapshot with specified texture and matrix.
    */
-  explicit Snapshot(std::shared_ptr<Texture> texture, const Matrix& matrix)
+  explicit Snapshot(std::shared_ptr<tgfx::Texture> texture, const tgfx::Matrix& matrix)
       : texture(std::move(texture)), matrix(matrix) {
   }
 
@@ -43,11 +45,11 @@ class Snapshot {
     return 1 / matrix.getScaleX();
   }
 
-  Matrix getMatrix() const {
+  tgfx::Matrix getMatrix() const {
     return matrix;
   }
 
-  Texture* getTexture() const {
+  tgfx::Texture* getTexture() const {
     return texture.get();
   }
 
@@ -66,8 +68,8 @@ class Snapshot {
   bool hitTest(RenderCache* cache, float x, float y) const;
 
  private:
-  std::shared_ptr<Texture> texture = nullptr;
-  Matrix matrix = Matrix::I();
+  std::shared_ptr<tgfx::Texture> texture = nullptr;
+  tgfx::Matrix matrix = tgfx::Matrix::I();
   ID assetID = 0;
   uint64_t makerKey = 0;
   Frame idleFrames = 0;

@@ -23,7 +23,7 @@
 #include "webp/demux.h"
 #include "webp/encode.h"
 
-namespace pag {
+namespace tgfx {
 class WebpImage : public Image {
  public:
   static std::shared_ptr<Image> MakeFrom(const std::string& filePath);
@@ -50,4 +50,4 @@ class WebpImage : public Image {
   }
 };
 
-}  // namespace pag
+}  // namespace tgfx

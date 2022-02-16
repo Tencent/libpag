@@ -51,7 +51,7 @@ bool CocoaPlatform::registerFallbackFonts() const {
   return true;
 }
 
-void CocoaPlatform::traceImage(const ImageInfo& info, const void* pixels,
+void CocoaPlatform::traceImage(const tgfx::ImageInfo& info, const void* pixels,
                                const std::string& tag) const {
   TraceImage(info, pixels, tag);
 }

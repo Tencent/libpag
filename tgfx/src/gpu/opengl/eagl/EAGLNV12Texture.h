@@ -21,7 +21,7 @@
 #import <CoreVideo/CoreVideo.h>
 #include "gpu/opengl/GLYUVTexture.h"
 
-namespace pag {
+namespace tgfx {
 class EAGLNV12Texture : public GLYUVTexture {
  public:
   static std::shared_ptr<EAGLNV12Texture> MakeFrom(Context* context, CVPixelBufferRef pixelBuffer,
@@ -46,4 +46,4 @@ class EAGLNV12Texture : public GLYUVTexture {
   CVOpenGLESTextureRef lumaTexture = nullptr;
   CVOpenGLESTextureRef chromaTexture = nullptr;
 };
-}  // namespace pag
+}  // namespace tgfx

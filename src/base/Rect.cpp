@@ -16,89 +16,56 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "base/utils/TGFXCast.h"
 #include "pag/types.h"
 
 namespace pag {
 
 void Rect::scale(float scaleX, float scaleY) {
-  left *= scaleX;
-  right *= scaleY;
-  top *= scaleX;
-  bottom *= scaleY;
+  ToTGFX(this)->scale(scaleX, scaleY);
 }
 
 bool Rect::setBounds(const Point pts[], int count) {
-  if (count <= 0) {
-    this->setEmpty();
-    return true;
-  }
-  float minX, maxX;
-  float minY, maxY;
-  minX = maxX = pts[0].x;
-  minY = maxY = pts[0].y;
-
-  for (int i = 1; i < count; i++) {
-    auto x = pts[i].x;
-    auto y = pts[i].y;
-    auto isFinite = ((x + y) * 0 == 0);
-    if (!isFinite) {
-      setEmpty();
-      return false;
-    }
-    if (x < minX) {
-      minX = x;
-    }
-    if (x > maxX) {
-      maxX = x;
-    }
-    if (y < minY) {
-      minY = y;
-    }
-    if (y > maxY) {
-      maxY = y;
-    }
-  }
-  setLTRB(minX, minY, maxX, maxY);
-  return true;
+  return ToTGFX(this)->setBounds(ToTGFX(pts), count);
 }
 
-#define CHECK_INTERSECT(al, at, ar, ab, bl, bt, br, bb) \
-  float L = al > bl ? al : bl;                          \
-  float R = ar < br ? ar : br;                          \
-  float T = at > bt ? at : bt;                          \
-  float B = ab < bb ? ab : bb;                          \
-  do {                                                  \
-    if (!(L < R && T < B)) {                            \
-      return false;                                     \
-    }                                                   \
-  } while (0)
-// do the !(opposite) check so we return false if either arg is NaN
-
 bool Rect::intersect(float l, float t, float r, float b) {
-  CHECK_INTERSECT(l, t, r, b, left, top, right, bottom);
-  this->setLTRB(L, T, R, B);
-  return true;
+  return ToTGFX(this)->intersect(l, t, r, b);
 }
 
 bool Rect::intersect(const Rect& a, const Rect& b) {
-  CHECK_INTERSECT(a.left, a.top, a.right, a.bottom, b.left, b.top, b.right, b.bottom);
-  this->setLTRB(L, T, R, B);
-  return true;
+  return ToTGFX(this)->intersect(ToTGFX(a), ToTGFX(b));
 }
 
 void Rect::join(float l, float t, float r, float b) {
-  // do nothing if the params are empty
-  if (l >= r || t >= b) {
-    return;
-  }
-  // if we are empty, just assign
-  if (left >= right || top >= bottom) {
-    this->setLTRB(l, t, r, b);
-  } else {
-    left = left < l ? left : l;
-    top = top < t ? top : t;
-    right = right > r ? right : r;
-    bottom = bottom > b ? bottom : b;
-  }
+  ToTGFX(this)->join(l, t, r, b);
+}
+
+bool Rect::intersects(float l, float t, float r, float b) const {
+  return ToTGFX(this)->intersects(l, t, r, b);
+}
+
+bool Rect::intersects(const Rect& r) const {
+  return ToTGFX(this)->intersects(ToTGFX(r));
+}
+
+bool Rect::Intersects(const Rect& a, const Rect& b) {
+  return tgfx::Rect::Intersects(ToTGFX(a), ToTGFX(b));
+}
+
+void Rect::roundOut() {
+  ToTGFX(this)->roundOut();
+}
+
+void Rect::round() {
+  ToTGFX(this)->round();
+}
+
+void Rect::sort() {
+  ToTGFX(this)->sort();
+}
+
+Rect Rect::makeSorted() const {
+  return ToPAG(ToTGFX(this)->makeSorted());
 }
 }  // namespace pag

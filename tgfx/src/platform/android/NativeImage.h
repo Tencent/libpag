@@ -21,7 +21,7 @@
 #include "JNIUtil.h"
 #include "core/Image.h"
 
-namespace pag {
+namespace tgfx {
 class NativeImage : public Image {
  public:
   static void JNIInit(JNIEnv* env);
@@ -38,4 +38,4 @@ class NativeImage : public Image {
 
   friend class NativeCodec;
 };
-}  // namespace pag
+}  // namespace tgfx

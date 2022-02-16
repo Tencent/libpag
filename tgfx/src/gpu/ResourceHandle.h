@@ -21,7 +21,7 @@
 #include <climits>
 #include <cstddef>
 
-namespace pag {
+namespace tgfx {
 class ResourceHandle {
  public:
   ResourceHandle() = default;
@@ -57,4 +57,4 @@ class SamplerHandle : public ResourceHandle {
   explicit SamplerHandle(size_t value) : ResourceHandle(value) {
   }
 };
-}  // namespace pag
+}  // namespace tgfx

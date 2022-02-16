@@ -18,7 +18,7 @@
 
 #include "GLFragmentProcessor.h"
 
-namespace pag {
+namespace tgfx {
 void GLFragmentProcessor::setData(const ProgramDataManager& programDataManager,
                                   const FragmentProcessor& processor) {
   onSetData(programDataManager, processor);
@@ -91,4 +91,4 @@ GLFragmentProcessor::BuilderInputProvider<T, COUNT>::childInputs(size_t childInd
     numToSkip += (processor->*COUNT)();
   }
 }
-}  // namespace pag
+}  // namespace tgfx

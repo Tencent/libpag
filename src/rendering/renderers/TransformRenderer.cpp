@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TransformRenderer.h"
-#include "rendering/utils/TGFXTypes.h"
+#include "base/utils/TGFXCast.h"
 
 namespace pag {
 void RenderTransform(Transform* transform, Transform2D* transform2D, Frame layerFrame) {

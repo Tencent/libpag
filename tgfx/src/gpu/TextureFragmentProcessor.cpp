@@ -17,12 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureFragmentProcessor.h"
-#include "base/utils/Log.h"
-#include "base/utils/UniqueID.h"
+#include "core/utils/Log.h"
+#include "core/utils/UniqueID.h"
 #include "gpu/YUVTextureFragmentProcessor.h"
 #include "opengl/GLTextureFragmentProcessor.h"
 
-namespace pag {
+namespace tgfx {
 std::unique_ptr<FragmentProcessor> TextureFragmentProcessor::Make(const Texture* texture,
                                                                   const RGBAAALayout* layout,
                                                                   const Matrix& localMatrix) {
@@ -68,4 +68,4 @@ void TextureFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
 std::unique_ptr<GLFragmentProcessor> TextureFragmentProcessor::onCreateGLInstance() const {
   return std::make_unique<GLTextureFragmentProcessor>();
 }
-}  // namespace pag
+}  // namespace tgfx

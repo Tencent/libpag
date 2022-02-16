@@ -22,7 +22,7 @@
 #include "gpu/Pipeline.h"
 #include "gpu/Program.h"
 
-namespace pag {
+namespace tgfx {
 class GLProgramCreator : public ProgramCreator {
  public:
   GLProgramCreator(const GeometryProcessor* geometryProcessor, const Pipeline* pipeline);
@@ -35,4 +35,4 @@ class GLProgramCreator : public ProgramCreator {
   const GeometryProcessor* geometryProcessor;
   const Pipeline* pipeline;
 };
-}  // namespace pag
+}  // namespace tgfx

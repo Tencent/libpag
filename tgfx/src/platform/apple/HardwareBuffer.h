@@ -21,7 +21,7 @@
 #import <CoreVideo/CoreVideo.h>
 #include "core/PixelBuffer.h"
 
-namespace pag {
+namespace tgfx {
 class HardwareBuffer : public PixelBuffer {
  public:
   static std::shared_ptr<HardwareBuffer> Make(int width, int height, bool alphaOnly = false);
@@ -44,4 +44,4 @@ class HardwareBuffer : public PixelBuffer {
   friend class CocoaPlatform;
 };
 
-}  // namespace pag
+}  // namespace tgfx

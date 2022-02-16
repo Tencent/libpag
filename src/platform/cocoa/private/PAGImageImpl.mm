@@ -62,7 +62,7 @@
 #else
 
 + (PAGImageImpl*)FromPixelBuffer:(CVPixelBufferRef)pixelBuffer {
-  auto hardwareBuffer = pag::PixelBuffer::MakeFrom(pixelBuffer);
+  auto hardwareBuffer = tgfx::PixelBuffer::MakeFrom(pixelBuffer);
   auto image = pag::StillImage::FromPixelBuffer(hardwareBuffer);
   if (image == nullptr) {
     return nil;
@@ -78,8 +78,8 @@
   }
   auto width = static_cast<int>(CGImageGetWidth(cgImage));
   auto height = static_cast<int>(CGImageGetHeight(cgImage));
-  auto pixelBuffer = pag::PixelBuffer::Make(width, height);
-  pag::Bitmap bitmap(pixelBuffer);
+  auto pixelBuffer = tgfx::PixelBuffer::Make(width, height);
+  tgfx::Bitmap bitmap(pixelBuffer);
   if (bitmap.isEmpty()) {
     return nil;
   }

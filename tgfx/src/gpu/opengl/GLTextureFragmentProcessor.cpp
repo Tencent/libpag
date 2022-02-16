@@ -19,7 +19,7 @@
 #include "GLTextureFragmentProcessor.h"
 #include "gpu/TextureFragmentProcessor.h"
 
-namespace pag {
+namespace tgfx {
 void GLTextureFragmentProcessor::emitCode(EmitArgs& args) {
   const auto* textureFP = static_cast<const TextureFragmentProcessor*>(args.fragmentProcessor);
   auto* fragBuilder = args.fragBuilder;
@@ -60,4 +60,4 @@ void GLTextureFragmentProcessor::onSetData(const ProgramDataManager& programData
     }
   }
 }
-}  // namespace pag
+}  // namespace tgfx

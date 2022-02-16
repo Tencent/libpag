@@ -18,7 +18,7 @@
 
 #pragma once
 
-namespace pag {
+namespace tgfx {
 /*
  * Manually set a Java virtual machine which will be used by tgfx to retrieve the JNI environment.
  * Once a Java VM is set it cannot be changed afterwards, meaning you can call multiple times
@@ -26,4 +26,4 @@ namespace pag {
  * Java VM. Returns true on success, false otherwise.
  */
 bool SetJavaVM(void* javaVM);
-}  // namespace pag
+}  // namespace tgfx

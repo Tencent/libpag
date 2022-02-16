@@ -20,7 +20,7 @@
 
 #include "gpu/GLFragmentProcessor.h"
 
-namespace pag {
+namespace tgfx {
 class GLAlphaFragmentProcessor : public GLFragmentProcessor {
  public:
   void emitCode(EmitArgs& args) override;
@@ -33,4 +33,4 @@ class GLAlphaFragmentProcessor : public GLFragmentProcessor {
 
   float alphaPrev = -1;
 };
-}  // namespace pag
+}  // namespace tgfx
