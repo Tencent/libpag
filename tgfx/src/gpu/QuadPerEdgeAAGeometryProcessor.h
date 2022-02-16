@@ -22,7 +22,7 @@
 #include "GeometryProcessor.h"
 #include "gpu/Paint.h"
 
-namespace pag {
+namespace tgfx {
 class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
  public:
   static std::unique_ptr<QuadPerEdgeAAGeometryProcessor> Make(int width, int height, Matrix matrix,
@@ -49,4 +49,4 @@ class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
 
   friend class GLQuadPerEdgeAAGeometryProcessor;
 };
-}  // namespace pag
+}  // namespace tgfx

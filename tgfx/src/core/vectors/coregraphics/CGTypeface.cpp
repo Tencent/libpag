@@ -18,10 +18,10 @@
 
 #include "CGTypeface.h"
 #include "CGScalerContext.h"
-#include "base/utils/UTF8Text.h"
-#include "base/utils/UniqueID.h"
+#include "core/UTF.h"
+#include "core/utils/UniqueID.h"
 
-namespace pag {
+namespace tgfx {
 std::string StringFromCFString(CFStringRef src) {
   static const CFIndex kCStringSize = 128;
   char temporaryCString[kCStringSize];
@@ -177,7 +177,7 @@ static size_t ToUTF16(int32_t uni, uint16_t utf16[2]) {
 
 GlyphID CGTypeface::getGlyphID(const std::string& name) const {
   const char* start = &(name[0]);
-  auto uni = UTF8Text::NextChar(&start);
+  auto uni = UTF::NextUTF8(&start, start + name.size());
   UniChar utf16[2] = {0, 0};
   auto srcCount = ToUTF16(uni, utf16);
   GlyphID macGlyphs[2] = {0, 0};
@@ -245,4 +245,4 @@ Point CGTypeface::getGlyphVerticalOffset(GlyphID glyphID, float size, bool fauxB
   }
   return scalerContext->getGlyphVerticalOffset(glyphID);
 }
-}  // namespace pag
+}  // namespace tgfx

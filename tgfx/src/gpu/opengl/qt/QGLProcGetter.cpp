@@ -18,7 +18,7 @@
 
 #include "QGLProcGetter.h"
 
-namespace pag {
+namespace tgfx {
 void* QGLProcGetter::getProcAddress(const char* name) const {
   return reinterpret_cast<void*>(glContext->getProcAddress(name));
 }
@@ -30,4 +30,4 @@ std::unique_ptr<GLProcGetter> GLProcGetter::Make() {
   }
   return std::make_unique<QGLProcGetter>(context);
 }
-}  // namespace pag
+}  // namespace tgfx

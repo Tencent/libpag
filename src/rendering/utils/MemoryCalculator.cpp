@@ -33,7 +33,7 @@ static void* GetCacheResourcesForLayer(Layer* layer) {
 }
 
 void MemoryCalculator::FillLayerGraphicsMemoriesPreFrame(
-    Layer* layer, std::unordered_map<void*, Point>& resourcesScaleMap,
+    Layer* layer, std::unordered_map<void*, tgfx::Point>& resourcesScaleMap,
     std::unordered_map<void*, std::vector<TimeRange>*>& resourcesTimeRangesMap,
     std::vector<int64_t>& memoriesPreFrame, std::unordered_set<void*>& cachedResources) {
   auto resources = GetCacheResourcesForLayer(layer);
@@ -63,7 +63,7 @@ void MemoryCalculator::FillLayerGraphicsMemoriesPreFrame(
         break;
       }
       auto layerContent = layerCache->getContent(0);
-      Rect bounds = {};
+      tgfx::Rect bounds = {};
       layerContent->measureBounds(&bounds);
       auto scale = std::max(scaleIter->second.x, scaleIter->second.y);
       if (layerType == LayerType::Image) {
@@ -105,7 +105,7 @@ void FillGraphicsMemories(
 }
 
 void MemoryCalculator::FillBitmapGraphicsMemories(
-    Composition* composition, std::unordered_map<void*, Point>&,
+    Composition* composition, std::unordered_map<void*, tgfx::Point>&,
     std::unordered_map<void*, std::vector<TimeRange>*>& resourcesTimeRangesMap,
     std::vector<int64_t>& memoriesPreFrame, int64_t& graphicsMemory) {
   // Just use the last one for best rendering quality, ignore all others.
@@ -126,7 +126,7 @@ void MemoryCalculator::FillVideoGraphicsMemories(
 }
 
 void MemoryCalculator::FillVectorGraphicsMemories(
-    Composition* composition, std::unordered_map<void*, Point>& resourcesScaleMap,
+    Composition* composition, std::unordered_map<void*, tgfx::Point>& resourcesScaleMap,
     std::unordered_map<void*, std::vector<TimeRange>*>& resourcesTimeRangesMap,
     std::vector<int64_t>& memoriesPreFrame, std::unordered_set<void*>& cachedResources) {
   VectorComposition* vectorComposition = static_cast<VectorComposition*>(composition);
@@ -139,7 +139,7 @@ void MemoryCalculator::FillVectorGraphicsMemories(
 }
 
 int64_t MemoryCalculator::FillCompositionGraphicsMemories(
-    Composition* composition, std::unordered_map<void*, Point>& resourcesScaleMap,
+    Composition* composition, std::unordered_map<void*, tgfx::Point>& resourcesScaleMap,
     std::unordered_map<void*, std::vector<TimeRange>*>& resourcesTimeRangesMap,
     std::vector<int64_t>& memoriesPreFrame, std::unordered_set<void*>& cachedResources) {
   int64_t graphicsMemory = 0;
@@ -166,7 +166,7 @@ int64_t MemoryCalculator::FillCompositionGraphicsMemories(
 }
 
 std::vector<int64_t> MemoryCalculator::GetRootLayerGraphicsMemoriesPreFrame(
-    PreComposeLayer* rootLayer, std::unordered_map<void*, Point>& resourcesScaleMap,
+    PreComposeLayer* rootLayer, std::unordered_map<void*, tgfx::Point>& resourcesScaleMap,
     std::unordered_map<void*, std::vector<TimeRange>*>& resourcesTimeRangesMap) {
   std::unordered_set<void*> cachedResources;
   if (static_cast<size_t>(rootLayer->composition->duration) > std::vector<int64_t>().max_size()) {
@@ -180,7 +180,8 @@ std::vector<int64_t> MemoryCalculator::GetRootLayerGraphicsMemoriesPreFrame(
 }
 
 bool MemoryCalculator::UpdateMaxScaleMapIfNeed(
-    void* resource, Point currentScale, std::unordered_map<void*, Point>& resourcesMaxScaleMap) {
+    void* resource, tgfx::Point currentScale,
+    std::unordered_map<void*, tgfx::Point>& resourcesMaxScaleMap) {
   auto maxScale = currentScale;
   auto iter = resourcesMaxScaleMap.find(resource);
   bool hasChange = true;
@@ -260,8 +261,8 @@ void MemoryCalculator::UpdateTimeRange(
 }
 
 void MemoryCalculator::UpdateMaxScaleAndTimeRange(
-    Layer* layer, Point referenceScale, Frame referenceStartTime,
-    std::unordered_map<void*, Point>& resourcesMaxScaleMap,
+    Layer* layer, tgfx::Point referenceScale, Frame referenceStartTime,
+    std::unordered_map<void*, tgfx::Point>& resourcesMaxScaleMap,
     std::unordered_map<void*, std::vector<TimeRange>*>& resourcesTimeRangesMap) {
   if (!layer->isActive) {
     return;
@@ -303,7 +304,7 @@ void MemoryCalculator::UpdateMaxScaleAndTimeRange(
 }
 
 void MemoryCalculator::CaculateResourcesMaxScaleAndTimeRanges(
-    Layer* rootLayer, std::unordered_map<void*, Point>& resourcesMaxScaleMap,
+    Layer* rootLayer, std::unordered_map<void*, tgfx::Point>& resourcesMaxScaleMap,
     std::unordered_map<void*, std::vector<TimeRange>*>& resourcesTimeRangesMap) {
   UpdateMaxScaleAndTimeRange(rootLayer, {1, 1}, rootLayer->startTime, resourcesMaxScaleMap,
                              resourcesTimeRangesMap);
@@ -314,7 +315,7 @@ int64_t CalculateGraphicsMemory(std::shared_ptr<File> file) {
     return 0;
   }
   auto rootLayer = file->getRootLayer();
-  std::unordered_map<void*, Point> resourcesMaxScaleMap;
+  std::unordered_map<void*, tgfx::Point> resourcesMaxScaleMap;
   std::unordered_map<void*, std::vector<TimeRange>*> resourcesTimeRangesMap;
   MemoryCalculator::CaculateResourcesMaxScaleAndTimeRanges(rootLayer, resourcesMaxScaleMap,
                                                            resourcesTimeRangesMap);

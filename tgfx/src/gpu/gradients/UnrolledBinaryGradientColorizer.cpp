@@ -17,14 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "UnrolledBinaryGradientColorizer.h"
-#include "base/utils/MathExtra.h"
-#include "base/utils/UniqueID.h"
+#include "core/utils/MathExtra.h"
+#include "core/utils/UniqueID.h"
 #include "gpu/opengl/GLUnrolledBinaryGradientColorizer.h"
 
-namespace pag {
+namespace tgfx {
 static constexpr int kMaxIntervals = 8;
 std::unique_ptr<UnrolledBinaryGradientColorizer> UnrolledBinaryGradientColorizer::Make(
-    const Color4f* colors, const float* positions, int count) {
+    const Color* colors, const float* positions, int count) {
   // Depending on how the positions resolve into hard stops or regular stops, the number of
   // intervals specified by the number of colors/positions can change. For instance, a plain
   // 3 color gradient is two intervals, but a 4 color gradient with a hard stop is also
@@ -38,8 +38,8 @@ std::unique_ptr<UnrolledBinaryGradientColorizer> UnrolledBinaryGradientColorizer
 
   // The raster implementation also uses scales and biases, but since they must be calculated
   // after the dst color space is applied, it limits our ability to cache their values.
-  Color4f scales[kMaxIntervals];
-  Color4f biases[kMaxIntervals];
+  Color scales[kMaxIntervals];
+  Color biases[kMaxIntervals];
   float thresholds[kMaxIntervals];
 
   int intervalCount = 0;
@@ -75,8 +75,8 @@ std::unique_ptr<UnrolledBinaryGradientColorizer> UnrolledBinaryGradientColorizer
 
   // set the unused values to something consistent
   for (int i = intervalCount; i < kMaxIntervals; i++) {
-    scales[i] = Color4f::Transparent();
-    biases[i] = Color4f::Transparent();
+    scales[i] = Color::Transparent();
+    biases[i] = Color::Transparent();
     thresholds[i] = 0.0;
   }
 
@@ -95,4 +95,4 @@ void UnrolledBinaryGradientColorizer::onComputeProcessorKey(BytesKey* bytesKey) 
 std::unique_ptr<GLFragmentProcessor> UnrolledBinaryGradientColorizer::onCreateGLInstance() const {
   return std::make_unique<GLUnrolledBinaryGradientColorizer>();
 }
-}  // namespace pag
+}  // namespace tgfx

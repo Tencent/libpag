@@ -20,7 +20,7 @@
 #include "GLContext.h"
 #include "GLUtil.h"
 
-namespace pag {
+namespace tgfx {
 static std::string TypeModifierString(bool isDesktopGL, ShaderVar::TypeModifier t,
                                       ShaderFlags flag) {
   switch (t) {
@@ -112,7 +112,7 @@ std::unique_ptr<GLProgram> GLProgramBuilder::finalize() {
 
   auto vertex = vertexShaderBuilder()->shaderString();
   auto fragment = fragmentShaderBuilder()->shaderString();
-  auto programID = pag::CreateProgram(_gl, vertex, fragment);
+  auto programID = CreateGLProgram(_gl, vertex, fragment);
   if (programID == 0) {
     return nullptr;
   }
@@ -159,4 +159,4 @@ std::unique_ptr<GLProgram> GLProgramBuilder::createProgram(unsigned programID) {
 bool GLProgramBuilder::isDesktopGL() const {
   return gl()->caps->standard == GLStandard::GL;
 }
-}  // namespace pag
+}  // namespace tgfx

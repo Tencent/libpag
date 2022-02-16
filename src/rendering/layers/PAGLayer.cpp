@@ -78,7 +78,7 @@ Matrix PAGLayer::getTotalMatrix() {
 }
 
 Matrix PAGLayer::getTotalMatrixInternal() {
-  auto matrix = layerCache->getTransform(contentFrame)->matrix;
+  auto matrix = ToPAG(layerCache->getTransform(contentFrame)->matrix);
   matrix.postConcat(layerMatrix);
   return matrix;
 }
@@ -118,7 +118,7 @@ void PAGLayer::setVisibleInternal(bool value) {
 Rect PAGLayer::getBounds() {
   LockGuard autoLock(rootLocker);
   Rect bounds = {};
-  measureBounds(&bounds);
+  measureBounds(ToTGFX(&bounds));
   return bounds;
 }
 
@@ -372,7 +372,7 @@ Point PAGLayer::globalToLocalPoint(float stageX, float stageY) {
     pagLayer = pagLayer->_parent;
   }
   Point localPoint = {stageX, stageY};
-  MapPointInverted(totalMatrix, &localPoint);
+  MapPointInverted(ToTGFX(totalMatrix), ToTGFX(&localPoint));
   return localPoint;
 }
 
@@ -441,7 +441,7 @@ void PAGLayer::draw(Recorder* recorder) {
   getContent()->draw(recorder);
 }
 
-void PAGLayer::measureBounds(Rect* bounds) {
+void PAGLayer::measureBounds(tgfx::Rect* bounds) {
   getContent()->measureBounds(bounds);
 }
 
@@ -547,7 +547,7 @@ bool PAGLayer::getTransform(Transform* transform) {
     return false;
   }
   *transform = *layerTransform;
-  transform->matrix.postConcat(layerMatrix);
+  transform->matrix.postConcat(ToTGFX(layerMatrix));
   transform->alpha *= layerAlpha;
   return true;
 }

@@ -20,7 +20,7 @@
 
 #include "core/Typeface.h"
 
-namespace pag {
+namespace tgfx {
 /**
  * Font controls options applied when drawing and measuring text.
  */
@@ -155,4 +155,4 @@ class Font {
   bool fauxBold = false;
   bool fauxItalic = false;
 };
-}  // namespace pag
+}  // namespace tgfx

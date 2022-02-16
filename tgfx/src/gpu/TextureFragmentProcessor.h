@@ -21,7 +21,7 @@
 #include "core/RGBAAALayout.h"
 #include "gpu/FragmentProcessor.h"
 
-namespace pag {
+namespace tgfx {
 class TextureFragmentProcessor : public FragmentProcessor {
  public:
   static std::unique_ptr<FragmentProcessor> Make(const Texture* texture, const RGBAAALayout* layout,
@@ -49,4 +49,4 @@ class TextureFragmentProcessor : public FragmentProcessor {
 
   friend class GLTextureFragmentProcessor;
 };
-}  // namespace pag
+}  // namespace tgfx

@@ -18,21 +18,21 @@
 
 #pragma once
 
-#include "core/Blend.h"
+#include "core/BlendMode.h"
 #include "core/Font.h"
 #include "core/Path.h"
 #include "core/RGBAAALayout.h"
 #include "gpu/Paint.h"
 #include "gpu/Texture.h"
 
-namespace pag {
+namespace tgfx {
 class Surface;
 
 class SurfaceOptions;
 
 struct CanvasPaint {
   float alpha = 1.0f;
-  Blend blendMode = Blend::SrcOver;
+  BlendMode blendMode = BlendMode::SrcOver;
   Matrix matrix = Matrix::I();
   Path clip = {};
 };
@@ -114,12 +114,12 @@ class Canvas {
   /**
    * Returns the current global blend mode.
    */
-  Blend getBlendMode() const;
+  BlendMode getBlendMode() const;
 
   /**
    * Replaces the global blend mode with specified new blend mode.
    */
-  void setBlendMode(Blend blendMode);
+  void setBlendMode(BlendMode blendMode);
 
   /**
    * Returns the current total clip.
@@ -196,4 +196,4 @@ class Canvas {
  private:
   std::vector<CanvasPaint> savedPaintList = {};
 };
-}  // namespace pag
+}  // namespace tgfx

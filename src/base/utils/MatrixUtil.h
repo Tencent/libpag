@@ -18,10 +18,11 @@
 
 #pragma once
 
-#include "pag/types.h"
+#include "core/Matrix.h"
 
 namespace pag {
-bool MapPointInverted(const Matrix& matrix, Point* point);
-float GetMaxScaleFactor(const Matrix& matrix);
-Point GetScaleFactor(const Matrix& matrix, float contentScale = 1.0f, bool inverted = false);
+bool MapPointInverted(const tgfx::Matrix& matrix, tgfx::Point* point);
+float GetMaxScaleFactor(const tgfx::Matrix& matrix);
+tgfx::Point GetScaleFactor(const tgfx::Matrix& matrix, float contentScale = 1.0f,
+                           bool inverted = false);
 }  // namespace pag

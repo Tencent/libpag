@@ -25,6 +25,6 @@ class JTraceImage {
  public:
   static void InitJNI(JNIEnv* env);
 
-  static void Trace(const ImageInfo& info, const void* pixels, const std::string& tag);
+  static void Trace(const tgfx::ImageInfo& info, const void* pixels, const std::string& tag);
 };
 }  // namespace pag

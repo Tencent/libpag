@@ -23,7 +23,7 @@ enum class RecordType { Matrix, Layer };
 
 class Record {
  public:
-  explicit Record(const Matrix& matrix) : matrix(matrix) {
+  explicit Record(const tgfx::Matrix& matrix) : matrix(matrix) {
   }
 
   virtual ~Record() = default;
@@ -32,12 +32,12 @@ class Record {
     return RecordType::Matrix;
   }
 
-  Matrix matrix = {};
+  tgfx::Matrix matrix = {};
 };
 
 class LayerRecord : public Record {
  public:
-  LayerRecord(const Matrix& matrix, std::shared_ptr<Modifier> modifier,
+  LayerRecord(const tgfx::Matrix& matrix, std::shared_ptr<Modifier> modifier,
               std::vector<std::shared_ptr<Graphic>> contents)
       : Record(matrix), modifier(std::move(modifier)), oldNodes(std::move(contents)) {
   }
@@ -50,8 +50,8 @@ class LayerRecord : public Record {
   std::vector<std::shared_ptr<Graphic>> oldNodes = {};
 };
 
-Matrix Recorder::getMatrix() const {
-  Matrix totalMatrix = matrix;
+tgfx::Matrix Recorder::getMatrix() const {
+  tgfx::Matrix totalMatrix = matrix;
   for (int i = static_cast<int>(records.size() - 1); i >= 0; i--) {
     auto& record = records[i];
     if (record->type() == RecordType::Layer) {
@@ -61,11 +61,11 @@ Matrix Recorder::getMatrix() const {
   return totalMatrix;
 }
 
-void Recorder::setMatrix(const Matrix& m) {
+void Recorder::setMatrix(const tgfx::Matrix& m) {
   matrix = m;
   auto count = static_cast<int>(records.size());
   if (count > 0) {
-    auto totalMatrix = Matrix::I();
+    auto totalMatrix = tgfx::Matrix::I();
     for (auto i = count - 1; i >= 0; i--) {
       auto& record = records[i];
       if (record->type() == RecordType::Layer) {
@@ -78,22 +78,22 @@ void Recorder::setMatrix(const Matrix& m) {
   }
 }
 
-void Recorder::concat(const Matrix& m) {
+void Recorder::concat(const tgfx::Matrix& m) {
   matrix.preConcat(m);
 }
 
 void Recorder::saveClip(float x, float y, float width, float height) {
-  Path path = {};
-  path.addRect(Rect::MakeXYWH(x, y, width, height));
+  tgfx::Path path = {};
+  path.addRect(tgfx::Rect::MakeXYWH(x, y, width, height));
   saveClip(path);
 }
 
-void Recorder::saveClip(const Path& path) {
+void Recorder::saveClip(const tgfx::Path& path) {
   auto modifier = Modifier::MakeClip(path);
   saveLayer(modifier);
 }
 
-void Recorder::saveLayer(float alpha, Blend blendMode) {
+void Recorder::saveLayer(float alpha, tgfx::BlendMode blendMode) {
   auto modifier = Modifier::MakeBlend(alpha, blendMode);
   saveLayer(modifier);
 }
@@ -105,7 +105,7 @@ void Recorder::saveLayer(std::shared_ptr<Modifier> modifier) {
   }
   auto record = std::make_shared<LayerRecord>(matrix, modifier, layerContents);
   records.push_back(record);
-  matrix = Matrix::I();
+  matrix = tgfx::Matrix::I();
   layerContents = {};
   layerIndex++;
 }
@@ -142,7 +142,7 @@ void Recorder::restoreToCount(size_t saveCount) {
   }
 }
 
-void Recorder::drawGraphic(std::shared_ptr<Graphic> graphic, const Matrix& m) {
+void Recorder::drawGraphic(std::shared_ptr<Graphic> graphic, const tgfx::Matrix& m) {
   auto oldMatrix = matrix;
   matrix.preConcat(m);
   drawGraphic(std::move(graphic));

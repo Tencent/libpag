@@ -23,8 +23,9 @@
 namespace pag {
 class SurfaceUtil {
  public:
-  static std::shared_ptr<Surface> MakeContentSurface(Canvas* parentCanvas, const Rect& bounds,
-                                                     float scaleFactorLimit = FLT_MAX,
-                                                     bool usesMSAA = false);
+  static std::shared_ptr<tgfx::Surface> MakeContentSurface(tgfx::Canvas* parentCanvas,
+                                                           const tgfx::Rect& bounds,
+                                                           float scaleFactorLimit = FLT_MAX,
+                                                           bool usesMSAA = false);
 };
 }  // namespace pag

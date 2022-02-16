@@ -25,23 +25,24 @@ namespace pag {
 
 class StillImage : public PAGImage {
  public:
-  static std::shared_ptr<StillImage> FromPixelBuffer(std::shared_ptr<PixelBuffer> pixelBuffer);
-  static std::shared_ptr<StillImage> FromImage(std::shared_ptr<Image> image);
+  static std::shared_ptr<StillImage> FromPixelBuffer(
+      std::shared_ptr<tgfx::PixelBuffer> pixelBuffer);
+  static std::shared_ptr<StillImage> FromImage(std::shared_ptr<tgfx::Image> image);
 
-  void measureBounds(Rect* bounds) override;
+  void measureBounds(tgfx::Rect* bounds) override;
   void draw(Recorder* recorder) override;
 
  protected:
-  Rect getContentSize() const override;
+  tgfx::Rect getContentSize() const override;
 
-  std::shared_ptr<Image> getImage() const override {
+  std::shared_ptr<tgfx::Image> getImage() const override {
     return image;
   }
 
  private:
   int width = 0;
   int height = 0;
-  std::shared_ptr<Image> image = nullptr;
+  std::shared_ptr<tgfx::Image> image = nullptr;
   std::shared_ptr<Graphic> graphic = nullptr;
 
   void reset(std::shared_ptr<Graphic> graphic);

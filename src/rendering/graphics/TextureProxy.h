@@ -61,7 +61,7 @@ class TextureProxy {
   /**
    * Instantiates and returns the backing texture associated with this proxy.
    */
-  virtual std::shared_ptr<Texture> getTexture(RenderCache* cache) const = 0;
+  virtual std::shared_ptr<tgfx::Texture> getTexture(RenderCache* cache) const = 0;
 
  private:
   int _width = 0;

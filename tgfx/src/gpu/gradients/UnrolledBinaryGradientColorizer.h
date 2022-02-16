@@ -18,14 +18,14 @@
 
 #pragma once
 
-#include "core/Color4f.h"
+#include "core/Color.h"
 #include "gpu/FragmentProcessor.h"
 
-namespace pag {
+namespace tgfx {
 class UnrolledBinaryGradientColorizer : public FragmentProcessor {
  public:
   static constexpr int kMaxColorCount = 16;
-  static std::unique_ptr<UnrolledBinaryGradientColorizer> Make(const Color4f* colors,
+  static std::unique_ptr<UnrolledBinaryGradientColorizer> Make(const Color* colors,
                                                                const float* positions, int count);
 
   std::string name() const override {
@@ -37,7 +37,7 @@ class UnrolledBinaryGradientColorizer : public FragmentProcessor {
   std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
 
  private:
-  UnrolledBinaryGradientColorizer(int intervalCount, Color4f* scales, Color4f* biases,
+  UnrolledBinaryGradientColorizer(int intervalCount, Color* scales, Color* biases,
                                   Rect thresholds1_7, Rect thresholds9_13)
       : intervalCount(intervalCount),
         scale0_1(scales[0]),
@@ -61,25 +61,25 @@ class UnrolledBinaryGradientColorizer : public FragmentProcessor {
   }
 
   int intervalCount;
-  Color4f scale0_1;
-  Color4f scale2_3;
-  Color4f scale4_5;
-  Color4f scale6_7;
-  Color4f scale8_9;
-  Color4f scale10_11;
-  Color4f scale12_13;
-  Color4f scale14_15;
-  Color4f bias0_1;
-  Color4f bias2_3;
-  Color4f bias4_5;
-  Color4f bias6_7;
-  Color4f bias8_9;
-  Color4f bias10_11;
-  Color4f bias12_13;
-  Color4f bias14_15;
+  Color scale0_1;
+  Color scale2_3;
+  Color scale4_5;
+  Color scale6_7;
+  Color scale8_9;
+  Color scale10_11;
+  Color scale12_13;
+  Color scale14_15;
+  Color bias0_1;
+  Color bias2_3;
+  Color bias4_5;
+  Color bias6_7;
+  Color bias8_9;
+  Color bias10_11;
+  Color bias12_13;
+  Color bias14_15;
   Rect thresholds1_7;
   Rect thresholds9_13;
 
   friend class GLUnrolledBinaryGradientColorizer;
 };
-}  // namespace pag
+}  // namespace tgfx

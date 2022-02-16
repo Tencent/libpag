@@ -20,7 +20,7 @@
 
 #include "pathkit.h"
 
-namespace pag {
+namespace tgfx {
 class Path;
 
 class PathRef {
@@ -41,4 +41,4 @@ class PathRef {
   friend bool operator==(const Path& a, const Path& b);
   friend bool operator!=(const Path& a, const Path& b);
 };
-}  // namespace pag
+}  // namespace tgfx

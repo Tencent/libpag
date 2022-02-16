@@ -17,11 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "QuadPerEdgeAAGeometryProcessor.h"
-#include "base/utils/UniqueID.h"
+#include "core/utils/UniqueID.h"
 #include "gpu/YUVTexture.h"
 #include "gpu/opengl/GLQuadPerEdgeAAGeometryProcessor.h"
 
-namespace pag {
+namespace tgfx {
 std::unique_ptr<QuadPerEdgeAAGeometryProcessor> QuadPerEdgeAAGeometryProcessor::Make(int width,
                                                                                      int height,
                                                                                      Matrix matrix,
@@ -52,4 +52,4 @@ void QuadPerEdgeAAGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) c
 std::unique_ptr<GLGeometryProcessor> QuadPerEdgeAAGeometryProcessor::createGLInstance() const {
   return std::make_unique<GLQuadPerEdgeAAGeometryProcessor>();
 }
-}  // namespace pag
+}  // namespace tgfx

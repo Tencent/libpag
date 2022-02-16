@@ -19,7 +19,7 @@
 #include "EGLGlobals.h"
 #include <EGL/eglext.h>
 
-namespace pag {
+namespace tgfx {
 EGLGlobals InitializeEGL() {
   EGLGlobals globals = {};
   globals.display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
@@ -68,4 +68,4 @@ const EGLGlobals* EGLGlobals::Get() {
   static const EGLGlobals globals = InitializeEGL();
   return &globals;
 }
-}  // namespace pag
+}  // namespace tgfx

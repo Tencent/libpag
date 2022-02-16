@@ -20,9 +20,9 @@
 
 #include "core/TextBlob.h"
 
-namespace pag {
+namespace tgfx {
 class FTTextBlob : public TextBlob {
  public:
   std::shared_ptr<TextureBuffer> getImage(float resolutionScale, Matrix* matrix) const;
 };
-}  // namespace pag
+}  // namespace tgfx

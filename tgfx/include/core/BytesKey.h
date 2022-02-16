@@ -21,7 +21,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace pag {
+namespace tgfx {
 /**
  * A key used for hashing a byte stream.
  */
@@ -74,4 +74,4 @@ class BytesKey {
 struct BytesHasher {
   size_t operator()(const BytesKey& key) const;
 };
-}  // namespace pag
+}  // namespace tgfx

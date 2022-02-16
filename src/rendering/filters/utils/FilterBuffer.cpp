@@ -17,15 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FilterBuffer.h"
-#include "gpu/opengl/GLUtil.h"
 
 namespace pag {
-std::shared_ptr<FilterBuffer> FilterBuffer::Make(Context* context, int width, int height,
+std::shared_ptr<FilterBuffer> FilterBuffer::Make(tgfx::Context* context, int width, int height,
                                                  bool usesMSAA) {
-  auto texture = GLTexture::MakeRGBA(context, width, height);
-  auto gl = GLContext::Unwrap(context);
-  auto sampleCount = usesMSAA ? gl->caps->getSampleCount(4, PixelConfig::RGBA_8888) : 1;
-  auto renderTarget = GLRenderTarget::MakeFrom(context, texture.get(), sampleCount);
+  auto texture = tgfx::GLTexture::MakeRGBA(context, width, height);
+  auto gl = tgfx::GLContext::Unwrap(context);
+  auto sampleCount = usesMSAA ? gl->caps->getSampleCount(4, tgfx::PixelConfig::RGBA_8888) : 1;
+  auto renderTarget = tgfx::GLRenderTarget::MakeFrom(context, texture.get(), sampleCount);
   if (renderTarget == nullptr) {
     return nullptr;
   }
@@ -35,33 +34,34 @@ std::shared_ptr<FilterBuffer> FilterBuffer::Make(Context* context, int width, in
   return std::shared_ptr<FilterBuffer>(buffer);
 }
 
-void FilterBuffer::resolve(Context* context) {
+void FilterBuffer::resolve(tgfx::Context* context) {
   renderTarget->resolve(context);
 }
 
-void FilterBuffer::clearColor(const GLInterface* gl) const {
+void FilterBuffer::clearColor(const tgfx::GLInterface* gl) const {
   renderTarget->clear(gl);
 }
 
-std::unique_ptr<FilterSource> FilterBuffer::toFilterSource(const Point& scale) const {
+std::unique_ptr<FilterSource> FilterBuffer::toFilterSource(const tgfx::Point& scale) const {
   auto filterSource = new FilterSource();
   filterSource->textureID = getTexture().id;
   filterSource->width = texture->width();
   filterSource->height = texture->height();
   filterSource->scale = scale;
   // TODO(domrjchen): 这里的 ImageOrigin 是错的
-  filterSource->textureMatrix =
-      ToGLTextureMatrix(Matrix::I(), texture->width(), texture->height(), ImageOrigin::BottomLeft);
+  filterSource->textureMatrix = tgfx::ToGLTextureMatrix(
+      tgfx::Matrix::I(), texture->width(), texture->height(), tgfx::ImageOrigin::BottomLeft);
   return std::unique_ptr<FilterSource>(filterSource);
 }
 
-std::unique_ptr<FilterTarget> FilterBuffer::toFilterTarget(const Matrix& drawingMatrix) const {
+std::unique_ptr<FilterTarget> FilterBuffer::toFilterTarget(
+    const tgfx::Matrix& drawingMatrix) const {
   auto filterTarget = new FilterTarget();
   filterTarget->frameBufferID = getFramebuffer().id;
   filterTarget->width = renderTarget->width();
   filterTarget->height = renderTarget->height();
-  filterTarget->vertexMatrix = ToGLVertexMatrix(drawingMatrix, renderTarget->width(),
-                                                renderTarget->height(), ImageOrigin::BottomLeft);
+  filterTarget->vertexMatrix = tgfx::ToGLVertexMatrix(
+      drawingMatrix, renderTarget->width(), renderTarget->height(), tgfx::ImageOrigin::BottomLeft);
   return std::unique_ptr<FilterTarget>(filterTarget);
 }
 }  // namespace pag

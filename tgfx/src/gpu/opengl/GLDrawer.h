@@ -20,15 +20,15 @@
 
 #include "GLBuffer.h"
 #include "GLRenderTarget.h"
-#include "core/Blend.h"
+#include "core/BlendMode.h"
 #include "gpu/AAType.h"
 #include "gpu/FragmentProcessor.h"
 #include "gpu/GeometryProcessor.h"
 
-namespace pag {
+namespace tgfx {
 struct DrawArgs {
   Context* context = nullptr;
-  Blend blendMode = Blend::SrcOver;
+  BlendMode blendMode = BlendMode::SrcOver;
   Matrix viewMatrix = Matrix::I();
   const GLRenderTarget* renderTarget = nullptr;
   std::shared_ptr<Texture> renderTargetTexture = nullptr;
@@ -67,4 +67,4 @@ class GLDrawer : public Resource {
   unsigned vertexArray = 0;
   unsigned vertexBuffer = 0;
 };
-}  // namespace pag
+}  // namespace tgfx

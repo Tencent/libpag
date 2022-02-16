@@ -19,7 +19,7 @@
 #include "GLCaps.h"
 #include "GLUtil.h"
 
-namespace pag {
+namespace tgfx {
 static GLStandard GetGLStandard(const char* versionString) {
   if (versionString == nullptr) {
     return GLStandard::None;
@@ -418,4 +418,4 @@ bool GLCaps::usesMSAARenderBuffers() const {
 bool GLCaps::usesImplicitMSAAResolve() const {
   return MSFBOType::ES_IMG_MsToTexture == msFBOType || MSFBOType::ES_EXT_MsToTexture == msFBOType;
 }
-}  // namespace pag
+}  // namespace tgfx

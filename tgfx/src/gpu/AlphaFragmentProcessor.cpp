@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AlphaFragmentProcessor.h"
-#include "base/utils/UniqueID.h"
+#include "core/utils/UniqueID.h"
 #include "opengl/GLAlphaFragmentProcessor.h"
 
-namespace pag {
+namespace tgfx {
 std::unique_ptr<AlphaFragmentProcessor> AlphaFragmentProcessor::Make(float alpha) {
   return std::unique_ptr<AlphaFragmentProcessor>(new AlphaFragmentProcessor(alpha));
 }
@@ -33,4 +33,4 @@ void AlphaFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
 std::unique_ptr<GLFragmentProcessor> AlphaFragmentProcessor::onCreateGLInstance() const {
   return std::make_unique<GLAlphaFragmentProcessor>();
 }
-}  // namespace pag
+}  // namespace tgfx

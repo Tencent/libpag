@@ -19,7 +19,7 @@
 #include "VaryingHandler.h"
 #include "ProgramBuilder.h"
 
-namespace pag {
+namespace tgfx {
 Varying VaryingHandler::addVarying(const std::string& name, ShaderVar::Type type) {
   Varying varying;
   varying._type = type;
@@ -67,4 +67,4 @@ void VaryingHandler::getVertexDecls(std::string* inputDecls, std::string* output
 void VaryingHandler::getFragDecls(std::string* inputDecls) const {
   appendDecls(fragInputs, inputDecls, ShaderFlags::Fragment);
 }
-}  // namespace pag
+}  // namespace tgfx

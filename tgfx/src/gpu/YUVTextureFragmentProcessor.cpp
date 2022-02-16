@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "YUVTextureFragmentProcessor.h"
-#include "base/utils/UniqueID.h"
+#include "core/utils/UniqueID.h"
 #include "opengl/GLYUVTextureFragmentProcessor.h"
 
-namespace pag {
+namespace tgfx {
 YUVTextureFragmentProcessor::YUVTextureFragmentProcessor(const YUVTexture* texture,
                                                          const RGBAAALayout* layout,
                                                          const Matrix& localMatrix)
@@ -41,4 +41,4 @@ void YUVTextureFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) cons
 std::unique_ptr<GLFragmentProcessor> YUVTextureFragmentProcessor::onCreateGLInstance() const {
   return std::make_unique<GLYUVTextureFragmentProcessor>();
 }
-}  // namespace pag
+}  // namespace tgfx

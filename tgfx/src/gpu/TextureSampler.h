@@ -18,11 +18,11 @@
 
 #pragma once
 
-#include "core/utils/BytesKey.h"
+#include "core/BytesKey.h"
 #include "gpu/Context.h"
 #include "gpu/PixelConfig.h"
 
-namespace pag {
+namespace tgfx {
 class TextureSampler {
  public:
   TextureSampler() = default;
@@ -36,4 +36,4 @@ class TextureSampler {
 
   PixelConfig config = PixelConfig::RGBA_8888;
 };
-}  // namespace pag
+}  // namespace tgfx

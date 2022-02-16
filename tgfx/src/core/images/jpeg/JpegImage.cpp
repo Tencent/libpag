@@ -26,7 +26,7 @@ extern "C" {
 #include "jpeglib.h"
 }
 
-namespace pag {
+namespace tgfx {
 
 bool JpegImage::IsJpeg(const std::shared_ptr<Data>& data) {
   constexpr uint8_t jpegSig[] = {0xFF, 0xD8, 0xFF};
@@ -212,4 +212,4 @@ std::shared_ptr<Data> JpegImage::Encode(const ImageInfo& imageInfo, const void* 
 }
 #endif
 
-}  // namespace pag
+}  // namespace tgfx

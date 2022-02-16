@@ -19,7 +19,7 @@
 #include "GLDualIntervalGradientColorizer.h"
 #include "gpu/gradients/DualIntervalGradientColorizer.h"
 
-namespace pag {
+namespace tgfx {
 void GLDualIntervalGradientColorizer::emitCode(EmitArgs& args) {
   auto* fragBuilder = args.fragBuilder;
   std::string scale01Name;
@@ -73,4 +73,4 @@ void GLDualIntervalGradientColorizer::onSetData(const ProgramDataManager& progra
     programDataManager.set1f(thresholdUniform, fp.threshold);
   }
 }
-}  // namespace pag
+}  // namespace tgfx

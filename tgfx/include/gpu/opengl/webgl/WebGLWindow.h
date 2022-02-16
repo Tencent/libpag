@@ -21,7 +21,7 @@
 #include "WebGLDevice.h"
 #include "gpu/Window.h"
 
-namespace pag {
+namespace tgfx {
 class WebGLWindow : public Window {
  public:
   /**
@@ -40,4 +40,4 @@ class WebGLWindow : public Window {
 
   explicit WebGLWindow(std::shared_ptr<Device> device);
 };
-}  // namespace pag
+}  // namespace tgfx

@@ -27,7 +27,7 @@ const Platform* Platform::Current() {
   return &platform;
 }
 
-void NativePlatform::traceImage(const ImageInfo& info, const void* pixels,
+void NativePlatform::traceImage(const tgfx::ImageInfo& info, const void* pixels,
                                 const std::string& tag) const {
   auto traceImage = val::module_property("traceImage");
   auto bytes = val(typed_memory_view(info.byteSize(), static_cast<const uint8_t*>(pixels)));

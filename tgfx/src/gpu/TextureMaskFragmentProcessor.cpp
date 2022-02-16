@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureMaskFragmentProcessor.h"
-#include "base/utils/UniqueID.h"
+#include "core/utils/UniqueID.h"
 #include "opengl/GLTextureMaskFragmentProcessor.h"
 
-namespace pag {
+namespace tgfx {
 std::unique_ptr<TextureMaskFragmentProcessor> TextureMaskFragmentProcessor::MakeUseLocalCoord(
     const Texture* texture, const Matrix& localMatrix, bool inverted) {
   if (texture == nullptr) {
@@ -72,4 +72,4 @@ void TextureMaskFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) con
 std::unique_ptr<GLFragmentProcessor> TextureMaskFragmentProcessor::onCreateGLInstance() const {
   return std::make_unique<GLTextureMaskFragmentProcessor>();
 }
-}  // namespace pag
+}  // namespace tgfx

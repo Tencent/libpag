@@ -21,9 +21,9 @@
 #include <memory>
 
 #include "Processor.h"
-#include "core/utils/BytesKey.h"
+#include "core/BytesKey.h"
 
-namespace pag {
+namespace tgfx {
 class GLXferProcessor;
 
 class XferProcessor : public Processor {
@@ -34,4 +34,4 @@ class XferProcessor : public Processor {
    */
   virtual std::unique_ptr<GLXferProcessor> createGLInstance() const = 0;
 };
-}  // namespace pag
+}  // namespace tgfx

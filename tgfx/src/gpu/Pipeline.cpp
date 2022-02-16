@@ -19,7 +19,7 @@
 #include "Pipeline.h"
 #include "gpu/TextureSampler.h"
 
-namespace pag {
+namespace tgfx {
 Pipeline::Pipeline(std::vector<std::unique_ptr<FragmentProcessor>> fragmentProcessors,
                    size_t numColorProcessors, std::unique_ptr<XferProcessor> xferProcessor,
                    std::shared_ptr<Texture> dstTexture, Point dstTextureOffset,
@@ -60,4 +60,4 @@ const Texture* Pipeline::getDstTexture(Point* offset) const {
   }
   return dstTexture.get();
 }
-}  // namespace pag
+}  // namespace tgfx

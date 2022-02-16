@@ -18,7 +18,7 @@
 
 #include "CGTextBlob.h"
 
-namespace pag {
+namespace tgfx {
 std::shared_ptr<TextBlob> TextBlob::MakeFrom(const GlyphID glyphIDs[], const Point positions[],
                                              size_t glyphCount, const Font& font) {
   if (glyphCount == 0) {
@@ -37,4 +37,4 @@ std::shared_ptr<TextureBuffer> CGTextBlob::getImage(float /*resolutionScale*/,
   //  completed GLCanvas.drawColorGlyphs().
   return nullptr;
 }
-}  // namespace pag
+}  // namespace tgfx

@@ -20,7 +20,7 @@
 
 #include <utility>
 
-namespace pag {
+namespace tgfx {
 // Each bitmap will be 256x1.
 static constexpr size_t kMaxNumCachedGradientBitmaps = 32;
 static constexpr int kGradientTextureSize = 256;
@@ -45,8 +45,8 @@ void GradientCache::add(const BytesKey& bytesKey, std::shared_ptr<Texture> textu
   }
 }
 
-std::shared_ptr<PixelBuffer> CreateGradient(const Color4f* colors, const float* positions,
-                                            int count, int resolution) {
+std::shared_ptr<PixelBuffer> CreateGradient(const Color* colors, const float* positions, int count,
+                                            int resolution) {
   auto pixelBuffer = PixelBuffer::Make(resolution, 1);
   Bitmap bitmap(pixelBuffer);
   if (bitmap.isEmpty()) {
@@ -91,8 +91,7 @@ std::shared_ptr<PixelBuffer> CreateGradient(const Color4f* colors, const float* 
   return pixelBuffer;
 }
 
-const Texture* GradientCache::getGradient(const Color4f* colors, const float* positions,
-                                          int count) {
+const Texture* GradientCache::getGradient(const Color* colors, const float* positions, int count) {
   BytesKey bytesKey = {};
   for (int i = 0; i < count; ++i) {
     bytesKey.write(colors[i].red);
@@ -123,4 +122,4 @@ void GradientCache::releaseAll() {
 bool GradientCache::empty() const {
   return textures.empty() && keys.empty();
 }
-}  // namespace pag
+}  // namespace tgfx

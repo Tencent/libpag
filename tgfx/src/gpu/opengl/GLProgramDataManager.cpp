@@ -22,7 +22,7 @@
 #include "GLUniformHandler.h"
 #include "GLUtil.h"
 
-namespace pag {
+namespace tgfx {
 GLProgramDataManager::GLProgramDataManager(const GLInterface* gl, const std::vector<int>* uniforms)
     : gl(gl), uniforms(uniforms) {
 }
@@ -59,4 +59,4 @@ void GLProgramDataManager::setMatrix(UniformHandle u, const Matrix& matrix) cons
   auto values = ToGLMatrix(matrix);
   setMatrix3f(u, &(values[0]));
 }
-}  // namespace pag
+}  // namespace tgfx

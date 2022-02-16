@@ -21,7 +21,7 @@
 #include "Texture.h"
 #include "core/YUVInfo.h"
 
-namespace pag {
+namespace tgfx {
 
 /**
  * YUVTexture wraps separate textures in the GPU backend for Y, U, and V planes.
@@ -100,4 +100,4 @@ class YUVTexture : public Texture {
   YUVColorSpace _colorSpace = YUVColorSpace::Rec601;
   YUVColorRange _colorRange = YUVColorRange::MPEG;
 };
-}  // namespace pag
+}  // namespace tgfx

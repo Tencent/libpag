@@ -21,7 +21,7 @@
 #include <GLES2/gl2.h>
 #include <cstring>
 
-namespace pag {
+namespace tgfx {
 
 static void* egl_get_gl_proc(void*, const char name[]) {
   // https://www.khronos.org/registry/EGL/extensions/KHR/EGL_KHR_get_all_proc_addresses.txt
@@ -149,4 +149,4 @@ void* EGLProcGetter::getProcAddress(const char* name) const {
 std::unique_ptr<GLProcGetter> GLProcGetter::Make() {
   return std::make_unique<EGLProcGetter>();
 }
-}  // namespace pag
+}  // namespace tgfx

@@ -19,6 +19,7 @@
 #pragma once
 
 #include "gpu/opengl/GLRenderTarget.h"
+#include "gpu/opengl/GLUtil.h"
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "rendering/filters/Filter.h"
@@ -26,14 +27,14 @@
 namespace pag {
 class FilterBuffer {
  public:
-  static std::shared_ptr<FilterBuffer> Make(Context* context, int width, int height,
+  static std::shared_ptr<FilterBuffer> Make(tgfx::Context* context, int width, int height,
                                             bool usesMSAA = false);
 
-  void clearColor(const GLInterface* gl) const;
+  void clearColor(const tgfx::GLInterface* gl) const;
 
-  std::unique_ptr<FilterSource> toFilterSource(const Point& scale) const;
+  std::unique_ptr<FilterSource> toFilterSource(const tgfx::Point& scale) const;
 
-  std::unique_ptr<FilterTarget> toFilterTarget(const Matrix& drawingMatrix) const;
+  std::unique_ptr<FilterTarget> toFilterTarget(const tgfx::Matrix& drawingMatrix) const;
 
   int width() const {
     return renderTarget->width();
@@ -47,19 +48,19 @@ class FilterBuffer {
     return renderTarget->usesMSAA();
   }
 
-  GLFrameBufferInfo getFramebuffer() const {
+  tgfx::GLFrameBufferInfo getFramebuffer() const {
     return renderTarget->getGLInfo();
   }
 
-  GLTextureInfo getTexture() const {
+  tgfx::GLTextureInfo getTexture() const {
     return texture->getGLInfo();
   }
 
-  void resolve(Context* context);
+  void resolve(tgfx::Context* context);
 
  private:
-  std::shared_ptr<GLRenderTarget> renderTarget = nullptr;
-  std::shared_ptr<GLTexture> texture = nullptr;
+  std::shared_ptr<tgfx::GLRenderTarget> renderTarget = nullptr;
+  std::shared_ptr<tgfx::GLTexture> texture = nullptr;
   FilterBuffer() = default;
 };
 }  // namespace pag

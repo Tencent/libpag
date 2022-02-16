@@ -18,7 +18,7 @@
 
 #include "GLGeometryProcessor.h"
 
-namespace pag {
+namespace tgfx {
 void GLGeometryProcessor::setTransformDataHelper(const Matrix& localMatrix,
                                                  const ProgramDataManager& programDataManager,
                                                  FPCoordTransformIter* transformIter) {
@@ -66,4 +66,4 @@ void GLGeometryProcessor::emitTransforms(VertexShaderBuilder* vertexBuilder,
   }
 }
 
-}  // namespace pag
+}  // namespace tgfx

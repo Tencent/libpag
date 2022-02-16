@@ -17,46 +17,46 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Shape.h"
+#include "base/utils/TGFXCast.h"
 #include "gpu/Canvas.h"
 #include "gpu/Shader.h"
 #include "pag/file.h"
-#include "rendering/utils/TGFXTypes.h"
 
 namespace pag {
-std::shared_ptr<Graphic> Shape::MakeFrom(const Path& path, Color4f color) {
+std::shared_ptr<Graphic> Shape::MakeFrom(const tgfx::Path& path, tgfx::Color color) {
   if (path.isEmpty()) {
     return nullptr;
   }
-  Paint paint = {};
+  tgfx::Paint paint = {};
   paint.setColor(color);
   return std::shared_ptr<Graphic>(new Shape(path, paint));
 }
 
-std::shared_ptr<Graphic> Shape::MakeFrom(const Path& path, const GradientPaint& gradient) {
+std::shared_ptr<Graphic> Shape::MakeFrom(const tgfx::Path& path, const GradientPaint& gradient) {
   if (path.isEmpty()) {
     return nullptr;
   }
-  std::shared_ptr<Shader> shader;
+  std::shared_ptr<tgfx::Shader> shader;
   if (gradient.gradientType == GradientFillType::Linear) {
-    shader = Shader::MakeLinearGradient(gradient.startPoint, gradient.endPoint, gradient.colors,
-                                        gradient.positions);
+    shader = tgfx::Shader::MakeLinearGradient(gradient.startPoint, gradient.endPoint,
+                                              gradient.colors, gradient.positions);
   } else {
-    auto radius = Point::Distance(gradient.startPoint, gradient.endPoint);
-    shader = Shader::MakeRadialGradient(gradient.startPoint, radius, gradient.colors,
-                                        gradient.positions);
+    auto radius = tgfx::Point::Distance(gradient.startPoint, gradient.endPoint);
+    shader = tgfx::Shader::MakeRadialGradient(gradient.startPoint, radius, gradient.colors,
+                                              gradient.positions);
   }
   if (!shader) {
-    shader = Shader::MakeColorShader(gradient.colors.back());
+    shader = tgfx::Shader::MakeColorShader(gradient.colors.back());
   }
-  Paint paint = {};
+  tgfx::Paint paint = {};
   paint.setShader(shader);
   return std::shared_ptr<Graphic>(new Shape(path, paint));
 }
 
-Shape::Shape(Path path, Paint paint) : path(std::move(path)), paint(paint) {
+Shape::Shape(tgfx::Path path, tgfx::Paint paint) : path(std::move(path)), paint(paint) {
 }
 
-void Shape::measureBounds(Rect* bounds) const {
+void Shape::measureBounds(tgfx::Rect* bounds) const {
   *bounds = path.getBounds();
 }
 
@@ -64,7 +64,7 @@ bool Shape::hitTest(RenderCache*, float x, float y) {
   return path.contains(x, y);
 }
 
-bool Shape::getPath(Path* result) const {
+bool Shape::getPath(tgfx::Path* result) const {
   if (paint.getAlpha() != 1.0f) {
     return false;
   }
@@ -79,7 +79,7 @@ bool Shape::getPath(Path* result) const {
 void Shape::prepare(RenderCache*) const {
 }
 
-void Shape::draw(Canvas* canvas, RenderCache*) const {
+void Shape::draw(tgfx::Canvas* canvas, RenderCache*) const {
   canvas->drawPath(path, paint);
 }
 

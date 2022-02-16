@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "EmptyXferProcessor.h"
-#include "base/utils/UniqueID.h"
+#include "core/utils/UniqueID.h"
 #include "opengl/GLEmptyXferProcessor.h"
 
-namespace pag {
+namespace tgfx {
 void EmptyXferProcessor::computeProcessorKey(Context*, BytesKey* bytesKey) const {
   static auto Type = UniqueID::Next();
   bytesKey->write(Type);
@@ -29,4 +29,4 @@ void EmptyXferProcessor::computeProcessorKey(Context*, BytesKey* bytesKey) const
 std::unique_ptr<GLXferProcessor> EmptyXferProcessor::createGLInstance() const {
   return std::make_unique<GLEmptyXferProcessor>();
 }
-}  // namespace pag
+}  // namespace tgfx

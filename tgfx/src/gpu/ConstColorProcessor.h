@@ -19,12 +19,12 @@
 #pragma once
 
 #include "FragmentProcessor.h"
-#include "core/Color4f.h"
+#include "core/Color.h"
 
-namespace pag {
+namespace tgfx {
 class ConstColorProcessor : public FragmentProcessor {
  public:
-  static std::unique_ptr<ConstColorProcessor> Make(Color4f color);
+  static std::unique_ptr<ConstColorProcessor> Make(Color color);
 
   std::string name() const override {
     return "ConstColorProcessor";
@@ -35,11 +35,11 @@ class ConstColorProcessor : public FragmentProcessor {
   std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
 
  private:
-  explicit ConstColorProcessor(Color4f color) : color(color) {
+  explicit ConstColorProcessor(Color color) : color(color) {
   }
 
-  Color4f color;
+  Color color;
 
   friend class GLConstColorProcessor;
 };
-}  // namespace pag
+}  // namespace tgfx

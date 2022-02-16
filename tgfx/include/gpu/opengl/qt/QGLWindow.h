@@ -26,7 +26,7 @@
 #include "QGLDevice.h"
 #include "gpu/Window.h"
 
-namespace pag {
+namespace tgfx {
 class GLTexture;
 
 class GLRenderTarget;
@@ -72,4 +72,4 @@ class QGLWindow : public Window {
   QGLWindow(std::shared_ptr<Device> device, QQuickItem* quickItem);
   void invalidateTexture();
 };
-}  // namespace pag
+}  // namespace tgfx

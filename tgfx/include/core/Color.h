@@ -18,16 +18,17 @@
 
 #pragma once
 
+#include <cfloat>
 #include <cinttypes>
 #include <limits>
 
-namespace pag {
+namespace tgfx {
 
 /**
  * RGBA color value, holding four floating point components. Color components are always in a known
  * order.
  */
-struct Color4f {
+struct Color {
   /**
    * Red component.
    */
@@ -51,39 +52,39 @@ struct Color4f {
   /**
    * Returns an invalid Color.
    */
-  static const Color4f& Invalid();
+  static const Color& Invalid();
 
   /**
    * Returns a fully transparent Color.
    */
-  static const Color4f& Transparent();
+  static const Color& Transparent();
 
   /**
    * Returns a fully opaque black Color.
    */
-  static const Color4f& Black();
+  static const Color& Black();
 
   /**
    * Returns a fully opaque white Color.
    */
-  static const Color4f& White();
+  static const Color& White();
 
   /**
    * Returns color value from 8-bit component values.
    */
-  static Color4f FromRGBA(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255);
+  static Color FromRGBA(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255);
 
   /**
    * Compares Color with other, and returns true if all components are equal.
    */
-  bool operator==(const Color4f& other) const {
+  bool operator==(const Color& other) const {
     return alpha == other.alpha && red == other.red && green == other.green && blue == other.blue;
   }
 
   /**
    * Compares Color with other, and returns true if not all components are equal.
    */
-  bool operator!=(const Color4f& other) const {
+  bool operator!=(const Color& other) const {
     return !(*this == other);
   }
 
@@ -128,20 +129,20 @@ struct Color4f {
   /**
    * Returns a Color with alpha set to 1.0.
    */
-  Color4f makeOpaque() const {
+  Color makeOpaque() const {
     return {red, green, blue, 1.0f};
   }
 
   /**
    * Returns a Color premultiplied by alpha.
    */
-  Color4f premultiply() const {
+  Color premultiply() const {
     return {red * alpha, green * alpha, blue * alpha, alpha};
   }
 
   /**
    * Returns a Color unpremultiplied by alpha.
    */
-  Color4f unpremultiply() const;
+  Color unpremultiply() const;
 };
-}  // namespace pag
+}  // namespace tgfx

@@ -20,7 +20,7 @@
 #include "GLProgramBuilder.h"
 #include "GLTexture.h"
 
-namespace pag {
+namespace tgfx {
 UniformHandle GLUniformHandler::internalAddUniform(ShaderFlags visibility, ShaderVar::Type type,
                                                    const std::string& name, bool mangleName,
                                                    std::string* outName) {
@@ -98,4 +98,4 @@ void GLUniformHandler::resolveUniformLocations(unsigned programID) {
     sampler.location = gl->getUniformLocation(programID, sampler.variable.name().c_str());
   }
 }
-}  // namespace pag
+}  // namespace tgfx

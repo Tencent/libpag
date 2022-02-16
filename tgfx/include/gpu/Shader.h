@@ -19,10 +19,10 @@
 #pragma once
 
 #include <memory>
-#include "core/Color4f.h"
-#include "pag/types.h"
+#include "core/Color.h"
+#include "core/Point.h"
 
-namespace pag {
+namespace tgfx {
 struct FPArgs;
 
 class FragmentProcessor;
@@ -37,7 +37,7 @@ class Shader {
   /**
    * Create a shader that draws the specified color.
    */
-  static std::shared_ptr<Shader> MakeColorShader(Color4f color);
+  static std::shared_ptr<Shader> MakeColorShader(Color color);
 
   /**
    * Returns a shader that generates a linear gradient between the two specified points.
@@ -50,7 +50,7 @@ class Shader {
    * be strictly increasing.
    */
   static std::shared_ptr<Shader> MakeLinearGradient(const Point& startPoint, const Point& endPoint,
-                                                    const std::vector<Color4f>& colors,
+                                                    const std::vector<Color>& colors,
                                                     const std::vector<float>& positions);
 
   /**
@@ -64,7 +64,7 @@ class Shader {
    * be strictly increasing.
    */
   static std::shared_ptr<Shader> MakeRadialGradient(const Point& center, float radius,
-                                                    const std::vector<Color4f>& colors,
+                                                    const std::vector<Color>& colors,
                                                     const std::vector<float>& positions);
 
   virtual ~Shader() = default;
@@ -80,4 +80,4 @@ class Shader {
 
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const = 0;
 };
-}  // namespace pag
+}  // namespace tgfx

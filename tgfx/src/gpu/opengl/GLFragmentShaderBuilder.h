@@ -20,7 +20,7 @@
 
 #include "gpu/FragmentShaderBuilder.h"
 
-namespace pag {
+namespace tgfx {
 class GLFragmentShaderBuilder : public FragmentShaderBuilder {
  public:
   explicit GLFragmentShaderBuilder(ProgramBuilder* program);
@@ -30,4 +30,4 @@ class GLFragmentShaderBuilder : public FragmentShaderBuilder {
  private:
   std::string colorOutputName() override;
 };
-}  // namespace pag
+}  // namespace tgfx

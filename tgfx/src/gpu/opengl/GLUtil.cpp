@@ -18,7 +18,7 @@
 
 #include "GLUtil.h"
 
-namespace pag {
+namespace tgfx {
 GLVersion GetGLVersion(const char* versionString) {
   if (versionString == nullptr) {
     return {};
@@ -50,7 +50,7 @@ GLVersion GetGLVersion(const char* versionString) {
   return {};
 }
 
-bool CreateTexture(const GLInterface* gl, int width, int height, GLTextureInfo* texture) {
+bool CreateGLTexture(const GLInterface* gl, int width, int height, GLTextureInfo* texture) {
   texture->target = GL::TEXTURE_2D;
   texture->format = GL::RGBA8;
   gl->genTextures(1, &texture->id);
@@ -94,8 +94,8 @@ static std::array<unsigned, 4> GetGLSwizzleValues(const Swizzle& swizzle) {
   return {glValues[0], glValues[1], glValues[2], glValues[3]};
 }
 
-void ActiveTexture(const GLInterface* gl, unsigned textureUnit, unsigned target, unsigned textureID,
-                   PixelConfig pixelConfig) {
+void ActiveGLTexture(const GLInterface* gl, unsigned textureUnit, unsigned target,
+                     unsigned textureID, PixelConfig pixelConfig) {
   gl->activeTexture(textureUnit);
   gl->bindTexture(target, textureID);
   gl->texParameteri(target, GL::TEXTURE_WRAP_S, GL::CLAMP_TO_EDGE);
@@ -118,8 +118,9 @@ void ActiveTexture(const GLInterface* gl, unsigned textureUnit, unsigned target,
   }
 }
 
-void SubmitTexture(const GLInterface* gl, const GLTextureInfo& glInfo, const TextureFormat& format,
-                   int width, int height, size_t rowBytes, int bytesPerPixel, void* pixels) {
+void SubmitGLTexture(const GLInterface* gl, const GLTextureInfo& glInfo,
+                     const TextureFormat& format, int width, int height, size_t rowBytes,
+                     int bytesPerPixel, void* pixels) {
   if (pixels == nullptr || rowBytes == 0) {
     return;
   }
@@ -147,13 +148,13 @@ void SubmitTexture(const GLInterface* gl, const GLTextureInfo& glInfo, const Tex
   gl->bindTexture(glInfo.target, 0);
 }
 
-unsigned CreateProgram(const GLInterface* gl, const std::string& vertex,
-                       const std::string& fragment) {
-  auto vertexShader = LoadShader(gl, GL::VERTEX_SHADER, vertex);
+unsigned CreateGLProgram(const GLInterface* gl, const std::string& vertex,
+                         const std::string& fragment) {
+  auto vertexShader = LoadGLShader(gl, GL::VERTEX_SHADER, vertex);
   if (vertexShader == 0) {
     return 0;
   }
-  auto fragmentShader = LoadShader(gl, GL::FRAGMENT_SHADER, fragment);
+  auto fragmentShader = LoadGLShader(gl, GL::FRAGMENT_SHADER, fragment);
   if (fragmentShader == 0) {
     return 0;
   }
@@ -173,7 +174,7 @@ unsigned CreateProgram(const GLInterface* gl, const std::string& vertex,
   return programHandle;
 }
 
-unsigned LoadShader(const GLInterface* gl, unsigned shaderType, const std::string& source) {
+unsigned LoadGLShader(const GLInterface* gl, unsigned shaderType, const std::string& source) {
   auto shader = gl->createShader(shaderType);
   const char* files[] = {source.c_str()};
   gl->shaderSource(shader, 1, files, nullptr);
@@ -249,4 +250,4 @@ std::array<float, 9> ToGLTextureMatrix(const Matrix& matrix, int width, int heig
   }
   return ToGLMatrix(result);
 }
-}  // namespace pag
+}  // namespace tgfx

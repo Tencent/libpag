@@ -20,7 +20,7 @@
 
 #include "GLInterface.h"
 
-namespace pag {
+namespace tgfx {
 static void InitFramebufferTexture2DMultisample(const GLProcGetter* getter, GLInterface* interface,
                                                 const GLInfo& info) {
   if (info.hasExtension("GL_EXT_multisampled_render_to_texture")) {
@@ -110,4 +110,4 @@ void GLAssembleGLESInterface(const GLProcGetter* getter, GLInterface* interface,
   InitFramebufferTexture2DMultisample(getter, interface, info);
   InitVertexArray(getter, interface, info);
 }
-}  // namespace pag
+}  // namespace tgfx

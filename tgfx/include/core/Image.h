@@ -23,7 +23,7 @@
 #include "core/ImageInfo.h"
 #include "core/Orientation.h"
 
-namespace pag {
+namespace tgfx {
 
 class TextureBuffer;
 
@@ -101,4 +101,4 @@ class Image {
 
   friend class Bitmap;
 };
-}  // namespace pag
+}  // namespace tgfx

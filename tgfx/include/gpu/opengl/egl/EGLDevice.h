@@ -22,7 +22,7 @@
 #include <EGL/eglext.h>
 #include "gpu/opengl/GLDevice.h"
 
-namespace pag {
+namespace tgfx {
 class EGLDevice : public GLDevice {
  public:
   /**
@@ -68,4 +68,4 @@ class EGLDevice : public GLDevice {
 
   friend class EGLWindow;
 };
-}  // namespace pag
+}  // namespace tgfx

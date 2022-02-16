@@ -20,10 +20,10 @@
 #include <pthread.h>
 #include <mutex>
 #include "JNIInit.h"
-#include "base/utils/Log.h"
+#include "core/utils/Log.h"
 #include "platform/android/SetJavaVM.h"
 
-namespace pag {
+namespace tgfx {
 static std::mutex globalLocker = {};
 static JavaVM* globalJavaVM = nullptr;
 static pthread_key_t envKey = 0;
@@ -91,4 +91,4 @@ jstring SafeToJString(JNIEnv* env, const std::string& text) {
   return (jstring)env->NewObject(StringClass.get(), StringConstructID, array.get(),
                                  stringUTF.get());
 }
-}  // namespace pag
+}  // namespace tgfx

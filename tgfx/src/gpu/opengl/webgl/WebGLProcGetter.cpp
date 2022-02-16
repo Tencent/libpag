@@ -21,7 +21,7 @@
 #include <webgl/webgl2.h>
 #include <cstring>
 
-namespace pag {
+namespace tgfx {
 static void emscripten_glWaitSync(GLsync sync, GLbitfield flags, GLuint64 timeout) {
   uint32_t timeoutLo = timeout;
   uint32_t timeoutHi = timeout >> 32;
@@ -153,4 +153,4 @@ void* WebGLProcGetter::getProcAddress(const char* name) const {
 std::unique_ptr<GLProcGetter> GLProcGetter::Make() {
   return std::make_unique<WebGLProcGetter>();
 }
-}  // namespace pag
+}  // namespace tgfx

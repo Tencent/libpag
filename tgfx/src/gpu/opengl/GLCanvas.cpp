@@ -20,16 +20,16 @@
 #include "GLFillRectOp.h"
 #include "GLRRectOp.h"
 #include "GLSurface.h"
-#include "base/utils/MathExtra.h"
 #include "core/Mask.h"
 #include "core/PathEffect.h"
 #include "core/TextBlob.h"
+#include "core/utils/MathExtra.h"
 #include "gpu/AlphaFragmentProcessor.h"
 #include "gpu/ColorShader.h"
 #include "gpu/TextureFragmentProcessor.h"
 #include "gpu/TextureMaskFragmentProcessor.h"
 
-namespace pag {
+namespace tgfx {
 GLCanvas::GLCanvas(Surface* surface) : Canvas(surface) {
 }
 
@@ -82,7 +82,7 @@ std::unique_ptr<FragmentProcessor> GLCanvas::getClipMask(const Rect& deviceQuad,
       auto clipCanvas = clipSurface->getCanvas();
       clipCanvas->clear();
       Paint paint = {};
-      paint.setColor(Color4f::Black());
+      paint.setColor(Color::Black());
       clipCanvas->drawPath(globalPaint.clip, paint);
       return TextureMaskFragmentProcessor::MakeUseDeviceCoord(clipSurface->getTexture().get(),
                                                               surface->origin());
@@ -361,4 +361,4 @@ void GLCanvas::draw(const Rect& localQuad, const Rect& deviceQuad, std::unique_p
   args.rectToDraw = localQuad;
   drawer->draw(std::move(args), std::move(op));
 }
-}  // namespace pag
+}  // namespace tgfx

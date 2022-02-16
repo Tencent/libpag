@@ -23,7 +23,7 @@
 #include "GLFunctions.h"
 #include "GLProcGetter.h"
 
-namespace pag {
+namespace tgfx {
 class GLState;
 
 /**
@@ -130,4 +130,4 @@ class GLInterface {
 
   friend class GLContext;
 };
-}  // namespace pag
+}  // namespace tgfx

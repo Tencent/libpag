@@ -26,7 +26,7 @@
 #include "gpu/opengl/GLSurface.h"
 #include "gpu/opengl/GLTexture.h"
 
-namespace pag {
+namespace tgfx {
 
 std::shared_ptr<QGLWindow> QGLWindow::MakeFrom(QQuickItem* quickItem,
                                                QOpenGLContext* sharedContext) {
@@ -116,4 +116,4 @@ void QGLWindow::onPresent(Context* context, int64_t) {
   gl->bindFramebuffer(GL_FRAMEBUFFER, 0);
   invalidateTexture();
 }
-}  // namespace pag
+}  // namespace tgfx

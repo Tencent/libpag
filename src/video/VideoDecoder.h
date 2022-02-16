@@ -38,8 +38,8 @@ struct VideoConfig {
   float frameRate = 0.0;
   bool hasAlpha = false;
   std::vector<std::shared_ptr<ByteData>> headers = {};
-  YUVColorSpace colorSpace = YUVColorSpace::Rec601;
-  YUVColorRange colorRange = YUVColorRange::MPEG;
+  tgfx::YUVColorSpace colorSpace = tgfx::YUVColorSpace::Rec601;
+  tgfx::YUVColorRange colorRange = tgfx::YUVColorRange::MPEG;
   std::string mimeType = "video/avc";
 };
 

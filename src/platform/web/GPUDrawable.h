@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/opengl/webgl//WebGLWindow.h"
+#include "gpu/opengl/webgl/WebGLWindow.h"
 #include "pag/pag.h"
 
 namespace pag {
@@ -36,11 +36,11 @@ class GPUDrawable : public Drawable {
 
   void updateSize() override;
 
-  std::shared_ptr<Device> getDevice() override;
+  std::shared_ptr<tgfx::Device> getDevice() override;
 
-  std::shared_ptr<Surface> createSurface(Context* context) override;
+  std::shared_ptr<tgfx::Surface> createSurface(tgfx::Context* context) override;
 
-  void present(Context*) override {
+  void present(tgfx::Context*) override {
   }
 
  private:
@@ -49,6 +49,6 @@ class GPUDrawable : public Drawable {
   std::string canvasID;
   int _width = 0;
   int _height = 0;
-  std::shared_ptr<WebGLWindow> window = nullptr;
+  std::shared_ptr<tgfx::WebGLWindow> window = nullptr;
 };
 }  // namespace pag

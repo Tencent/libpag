@@ -17,11 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ConstColorProcessor.h"
-#include "base/utils/UniqueID.h"
+#include "core/utils/UniqueID.h"
 #include "opengl/GLConstColorProcessor.h"
 
-namespace pag {
-std::unique_ptr<ConstColorProcessor> ConstColorProcessor::Make(Color4f color) {
+namespace tgfx {
+std::unique_ptr<ConstColorProcessor> ConstColorProcessor::Make(Color color) {
   return std::unique_ptr<ConstColorProcessor>(new ConstColorProcessor(color));
 }
 
@@ -35,4 +35,4 @@ void ConstColorProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
 std::unique_ptr<GLFragmentProcessor> ConstColorProcessor::onCreateGLInstance() const {
   return std::make_unique<GLConstColorProcessor>();
 }
-}  // namespace pag
+}  // namespace tgfx

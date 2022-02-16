@@ -20,9 +20,9 @@
 
 #include "gpu/GLXferProcessor.h"
 
-namespace pag {
+namespace tgfx {
 class GLEmptyXferProcessor : public GLXferProcessor {
  public:
   void emitCode(const EmitArgs& args) override;
 };
-}  // namespace pag
+}  // namespace tgfx

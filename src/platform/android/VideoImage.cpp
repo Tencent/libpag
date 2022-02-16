@@ -34,7 +34,7 @@ VideoImage::VideoImage(std::shared_ptr<VideoSurface> videoSurface, int width, in
   this->videoSurface->markHasNewTextureImage();
 }
 
-std::shared_ptr<Texture> VideoImage::makeTexture(Context* context) const {
+std::shared_ptr<tgfx::Texture> VideoImage::makeTexture(tgfx::Context* context) const {
   std::lock_guard<std::mutex> autoLock(locker);
   if (!videoSurface->attachToContext(context)) {
     return nullptr;

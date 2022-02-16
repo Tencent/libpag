@@ -18,7 +18,7 @@
 
 #pragma once
 
-namespace pag {
+namespace tgfx {
 enum class AAType {
   // No antialiasing.
   None,

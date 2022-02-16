@@ -33,7 +33,7 @@ GlowFilter::~GlowFilter() {
   delete targetFilter;
 }
 
-bool GlowFilter::initialize(Context* context) {
+bool GlowFilter::initialize(tgfx::Context* context) {
   if (!blurFilterH->initialize(context)) {
     return false;
   }
@@ -46,8 +46,8 @@ bool GlowFilter::initialize(Context* context) {
   return true;
 }
 
-void GlowFilter::update(Frame frame, const Rect& contentBounds, const Rect& transformedBounds,
-                        const Point& filterScale) {
+void GlowFilter::update(Frame frame, const tgfx::Rect& contentBounds,
+                        const tgfx::Rect& transformedBounds, const tgfx::Point& filterScale) {
   LayerFilter::update(frame, contentBounds, transformedBounds, filterScale);
 
   auto glowEffect = static_cast<GlowEffect*>(effect);
@@ -62,7 +62,7 @@ void GlowFilter::update(Frame frame, const Rect& contentBounds, const Rect& tran
   targetFilter->update(frame, contentBounds, transformedBounds, filterScale);
 }
 
-bool GlowFilter::checkBuffer(Context* context, int blurWidth, int blurHeight) {
+bool GlowFilter::checkBuffer(tgfx::Context* context, int blurWidth, int blurHeight) {
   if (blurFilterBufferH == nullptr || blurFilterBufferH->width() != blurWidth ||
       blurFilterBufferH->height() != blurHeight) {
     blurFilterBufferH = FilterBuffer::Make(context, blurWidth, blurHeight);
@@ -81,7 +81,8 @@ bool GlowFilter::checkBuffer(Context* context, int blurWidth, int blurHeight) {
   return true;
 }
 
-void GlowFilter::draw(Context* context, const FilterSource* source, const FilterTarget* target) {
+void GlowFilter::draw(tgfx::Context* context, const FilterSource* source,
+                      const FilterTarget* target) {
   if (source == nullptr || target == nullptr) {
     LOGE("GlowFilter::draw() can not draw filter");
     return;
@@ -92,16 +93,16 @@ void GlowFilter::draw(Context* context, const FilterSource* source, const Filter
   if (!checkBuffer(context, blurWidth, blurHeight)) {
     return;
   }
-  auto gl = GLContext::Unwrap(context);
+  auto gl = tgfx::GLContext::Unwrap(context);
   blurFilterBufferH->clearColor(gl);
   blurFilterBufferV->clearColor(gl);
 
-  auto targetH = blurFilterBufferH->toFilterTarget(Matrix::I());
+  auto targetH = blurFilterBufferH->toFilterTarget(tgfx::Matrix::I());
   blurFilterH->updateOffset(1.0f / blurWidth);
   blurFilterH->draw(context, source, targetH.get());
 
   auto sourceV = blurFilterBufferH->toFilterSource(source->scale);
-  auto targetV = blurFilterBufferV->toFilterTarget(Matrix::I());
+  auto targetV = blurFilterBufferV->toFilterTarget(tgfx::Matrix::I());
   blurFilterV->updateOffset(1.0f / blurHeight);
   blurFilterV->draw(context, sourceV.get(), targetV.get());
 

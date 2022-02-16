@@ -16,10 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/utils/BytesKey.h"
+#include "core/BytesKey.h"
 #include <cstring>
 
-namespace pag {
+namespace tgfx {
 union DataConverter {
   float floatValue;
   uint8_t bytes[4];
@@ -64,4 +64,4 @@ size_t BytesHasher::operator()(const BytesKey& key) const {
   }
   return hash;
 }
-}  // namespace pag
+}  // namespace tgfx

@@ -8,8 +8,13 @@
       <file path="$PROJECT_DIR$/assets" />
       <file path="$PROJECT_DIR$/ios" />
       <file path="$PROJECT_DIR$/mac" />
+      <file path="$PROJECT_DIR$/qt" />
       <file path="$PROJECT_DIR$/resources" />
-      <file path="$PROJECT_DIR$/web" />
+      <file path="$PROJECT_DIR$/tgfx/.idea" />
+      <file path="$PROJECT_DIR$/tgfx/cmake-build-debug" />
+      <file path="$PROJECT_DIR$/third_party" />
+      <file path="$PROJECT_DIR$/vendor" />
+      <file path="$PROJECT_DIR$/vendor_tools" />
       <file path="$PROJECT_DIR$/win" />
     </excludeRoots>
   </component>

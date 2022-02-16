@@ -25,8 +25,8 @@ static std::mutex cacheLocker = {};
 static std::unordered_map<CVPixelBufferRef, std::weak_ptr<VideoImage>> videoImageMap = {};
 
 std::shared_ptr<VideoImage> VideoImage::MakeFrom(CVPixelBufferRef pixelBuffer,
-                                                 YUVColorSpace colorSpace,
-                                                 YUVColorRange colorRange) {
+                                                 tgfx::YUVColorSpace colorSpace,
+                                                 tgfx::YUVColorRange colorRange) {
   if (pixelBuffer == nil) {
     return nullptr;
   }
@@ -50,8 +50,8 @@ std::shared_ptr<VideoImage> VideoImage::MakeFrom(CVPixelBufferRef pixelBuffer,
   return videoImage;
 }
 
-VideoImage::VideoImage(CVPixelBufferRef pixelBuffer, YUVColorSpace colorSpace,
-                       YUVColorRange colorRange)
+VideoImage::VideoImage(CVPixelBufferRef pixelBuffer, tgfx::YUVColorSpace colorSpace,
+                       tgfx::YUVColorRange colorRange)
     : VideoBuffer(static_cast<int>(CVPixelBufferGetWidth(pixelBuffer)),
                   static_cast<int>(CVPixelBufferGetHeight(pixelBuffer))),
       pixelBuffer(pixelBuffer),

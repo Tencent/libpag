@@ -19,7 +19,7 @@
 #include "core/TextBlob.h"
 #include "core/PathEffect.h"
 
-namespace pag {
+namespace tgfx {
 Rect TextBlob::getBounds(const Stroke* stroke) const {
   auto totalBounds = Rect::MakeEmpty();
   int index = 0;
@@ -62,4 +62,4 @@ bool TextBlob::getPath(Path* path, const Stroke* stroke) const {
   *path = totalPath;
   return true;
 }
-}  // namespace pag
+}  // namespace tgfx

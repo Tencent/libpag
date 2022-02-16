@@ -20,7 +20,7 @@
 
 #include "gpu/Resource.h"
 
-namespace pag {
+namespace tgfx {
 class GLBuffer : public Resource {
  public:
   static std::shared_ptr<GLBuffer> Make(Context* context, const uint16_t* buffer, size_t length);
@@ -46,4 +46,4 @@ class GLBuffer : public Resource {
   size_t _length = 0;
   unsigned _bufferID = 0;
 };
-}  // namespace pag
+}  // namespace tgfx

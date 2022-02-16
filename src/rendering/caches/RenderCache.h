@@ -46,7 +46,7 @@ class RenderCache : public Performance {
 
   void prepareFrame();
 
-  void attachToContext(Context* current, bool forHitTest = false);
+  void attachToContext(tgfx::Context* current, bool forHitTest = false);
 
   void detachFromContext();
 
@@ -60,7 +60,7 @@ class RenderCache : public Performance {
   /**
    * Returns the GPU context associated with this cache.
    */
-  Context* getContext() const {
+  tgfx::Context* getContext() const {
     return context;
   }
 
@@ -102,13 +102,13 @@ class RenderCache : public Performance {
   /**
    * Prepares a bitmap task for next getImageBuffer() call.
    */
-  void prepareImage(ID assetID, std::shared_ptr<Image> image);
+  void prepareImage(ID assetID, std::shared_ptr<tgfx::Image> image);
 
   /**
    * Returns a texture buffer cache of specified asset id. Returns null if there is no associated
    * cache available.
    */
-  std::shared_ptr<TextureBuffer> getImageBuffer(ID assetID);
+  std::shared_ptr<tgfx::TextureBuffer> getImageBuffer(ID assetID);
 
   uint32_t getContentVersion() const;
 
@@ -140,7 +140,7 @@ class RenderCache : public Performance {
   ID _uniqueID = 0;
   PAGStage* stage = nullptr;
   uint32_t deviceID = 0;
-  Context* context = nullptr;
+  tgfx::Context* context = nullptr;
   int64_t lastTimestamp = 0;
   bool hitTestOnly = false;
   size_t graphicsMemory = 0;

@@ -23,7 +23,7 @@
 #include "GLTexture.h"
 #include "gpu/Surface.h"
 
-namespace pag {
+namespace tgfx {
 class GLSurface : public Surface {
  public:
   static std::shared_ptr<GLSurface> MakeFrom(Context* context,
@@ -68,4 +68,4 @@ class GLSurface : public Surface {
 
   friend class Surface;
 };
-}  // namespace pag
+}  // namespace tgfx

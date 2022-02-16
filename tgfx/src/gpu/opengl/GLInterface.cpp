@@ -27,7 +27,7 @@
 #include "GLState.h"
 #include "GLUtil.h"
 
-namespace pag {
+namespace tgfx {
 static std::mutex interfaceLocker = {};
 static std::unordered_map<int, std::unique_ptr<const GLInterface>> glInterfaceMap = {};
 
@@ -257,4 +257,4 @@ std::unique_ptr<const GLInterface> GLInterface::MakeNativeInterface(const GLProc
   interface->caps = std::shared_ptr<const GLCaps>(new GLCaps(info));
   return std::unique_ptr<const GLInterface>(interface);
 }
-}  // namespace pag
+}  // namespace tgfx

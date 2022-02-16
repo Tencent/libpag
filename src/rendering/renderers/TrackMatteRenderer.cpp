@@ -17,11 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TrackMatteRenderer.h"
+#include "base/utils/TGFXCast.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/caches/TextContent.h"
 #include "rendering/renderers/LayerRenderer.h"
-#include "rendering/utils/TGFXTypes.h"
 
 namespace pag {
 static std::shared_ptr<Graphic> RenderColorGlyphs(TextLayer* layer, Frame layerFrame,
@@ -69,7 +69,7 @@ std::unique_ptr<TrackMatte> TrackMatteRenderer::Make(PAGLayer* trackMatteOwner) 
     filterModifier = FilterModifier::Make(trackMatteLayer);
   }
   Recorder recorder = {};
-  Transform extraTransform = {trackMatteLayer->layerMatrix, trackMatteLayer->layerAlpha};
+  Transform extraTransform = {ToTGFX(trackMatteLayer->layerMatrix), trackMatteLayer->layerAlpha};
   LayerRenderer::DrawLayer(&recorder, trackMatteLayer->layer, layerFrame, filterModifier, nullptr,
                            trackMatteLayer, &extraTransform);
   content = recorder.makeGraphic();

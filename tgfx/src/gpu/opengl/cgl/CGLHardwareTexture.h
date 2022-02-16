@@ -21,7 +21,7 @@
 #import <AppKit/AppKit.h>
 #include "gpu/opengl/GLTexture.h"
 
-namespace pag {
+namespace tgfx {
 class CGLHardwareTexture : public GLTexture {
  public:
   static std::shared_ptr<CGLHardwareTexture> MakeFrom(Context* context,
@@ -43,4 +43,4 @@ class CGLHardwareTexture : public GLTexture {
 
   static void ComputeRecycleKey(BytesKey* recycleKey, CVPixelBufferRef pixelBuffer);
 };
-}  // namespace pag
+}  // namespace tgfx

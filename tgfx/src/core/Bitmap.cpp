@@ -21,7 +21,7 @@
 #include "platform/Platform.h"
 #include "skcms.h"
 
-namespace pag {
+namespace tgfx {
 
 static inline void* AddOffset(void* pixels, size_t offset) {
   return reinterpret_cast<uint8_t*>(pixels) + offset;
@@ -202,11 +202,4 @@ bool Bitmap::eraseAll() {
   }
   return true;
 }
-
-void Trace(const Bitmap& bitmap, const std::string& tag) {
-  if (bitmap.isEmpty()) {
-    return;
-  }
-  Platform::Current()->traceImage(bitmap.info(), bitmap.pixels(), tag);
-}
-}  // namespace pag
+}  // namespace tgfx

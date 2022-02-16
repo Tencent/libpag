@@ -25,15 +25,15 @@ class I420Buffer : public VideoBuffer {
  public:
   size_t planeCount() const override;
 
-  std::shared_ptr<Texture> makeTexture(Context* context) const override;
+  std::shared_ptr<tgfx::Texture> makeTexture(tgfx::Context* context) const override;
 
  protected:
   I420Buffer(int width, int height, uint8_t* data[3], const int lineSize[3],
-             YUVColorSpace colorSpace, YUVColorRange colorRange);
+             tgfx::YUVColorSpace colorSpace, tgfx::YUVColorRange colorRange);
 
  private:
-  YUVColorSpace colorSpace = YUVColorSpace::Rec601;
-  YUVColorRange colorRange = YUVColorRange::MPEG;
+  tgfx::YUVColorSpace colorSpace = tgfx::YUVColorSpace::Rec601;
+  tgfx::YUVColorRange colorRange = tgfx::YUVColorRange::MPEG;
   uint8_t* pixelsPlane[3] = {};
   int rowBytesPlane[3] = {};
 };

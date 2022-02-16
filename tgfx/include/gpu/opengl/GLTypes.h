@@ -18,19 +18,37 @@
 
 #pragma once
 
-#include "core/Blend.h"
-#include "core/Color4f.h"
-#include "core/Stroke.h"
-#include "pag/file.h"
+namespace tgfx {
+/**
+ * Types for interacting with GL textures created externally to TGFX.
+ */
+struct GLTextureInfo {
+  /**
+   * the id of this texture.
+   */
+  unsigned id = 0;
+  /**
+   * The target of this texture.
+   */
+  unsigned target = 0x0DE1;  // GL_TEXTURE_2D;
+  /**
+   * The pixel format of this texture.
+   */
+  unsigned format = 0x8058;  // GL_RGBA8;
+};
 
-namespace pag {
-Blend ToTGFXBlend(Enum blendMode);
+/**
+ * Types for interacting with GL frame buffers created externally to TGFX.
+ */
+struct GLFrameBufferInfo {
+  /**
+   * The id of this frame buffer.
+   */
+  unsigned id = 0;
 
-Stroke::Cap ToTGFXCap(Enum cap);
-
-Stroke::Join ToTGFXJoin(Enum join);
-
-Color4f ToTGFXColor(Color color, Opacity opacity = Opaque);
-
-float ToAlpha(Opacity opacity);
-}  // namespace pag
+  /**
+   * The pixel format of this frame buffer.
+   */
+  unsigned format = 0x8058;  // GL_RGBA8;
+};
+}  // namespace tgfx

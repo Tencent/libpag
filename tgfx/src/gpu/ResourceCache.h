@@ -21,7 +21,7 @@
 #include <unordered_map>
 #include "gpu/Context.h"
 
-namespace pag {
+namespace tgfx {
 class Resource;
 
 /**
@@ -69,4 +69,4 @@ class ResourceCache {
   friend class Context;
   friend class PurgeGuard;
 };
-}  // namespace pag
+}  // namespace tgfx

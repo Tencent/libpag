@@ -18,9 +18,9 @@
 
 #include "CGLHardwareTexture.h"
 #include "gpu/opengl/cgl/CGLDevice.h"
-#include "base/utils/UniqueID.h"
+#include "core/utils/UniqueID.h"
 
-namespace pag {
+namespace tgfx {
 std::shared_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(Context* context,
                                                                  CVPixelBufferRef pixelBuffer) {
   BytesKey recycleKey = {};

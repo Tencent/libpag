@@ -20,7 +20,7 @@
 
 #include FT_MODULE_H
 
-namespace pag {
+namespace tgfx {
 FTLibrary::FTLibrary() {
   FT_Init_FreeType(&_library);
 }
@@ -30,4 +30,4 @@ FTLibrary::~FTLibrary() {
     FT_Done_Library(_library);
   }
 }
-}  // namespace pag
+}  // namespace tgfx

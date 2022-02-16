@@ -32,6 +32,7 @@
 #include "rendering/caches/RenderCache.h"
 
 namespace pag {
+using namespace tgfx;
 using nlohmann::json;
 
 static constexpr bool PrintPerformance = false;

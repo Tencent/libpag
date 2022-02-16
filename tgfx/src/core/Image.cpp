@@ -38,7 +38,7 @@
 #include "core/images/jpeg/JpegImage.h"
 #endif
 
-namespace pag {
+namespace tgfx {
 std::shared_ptr<Image> Image::MakeFrom(const std::string& filePath) {
   std::shared_ptr<Image> image = nullptr;
   auto stream = Stream::MakeFromFile(filePath);
@@ -141,4 +141,4 @@ std::shared_ptr<TextureBuffer> Image::makeBuffer() const {
   auto result = readPixels(pixelBuffer->info(), bitmap.writablePixels());
   return result ? pixelBuffer : nullptr;
 }
-}  // namespace pag
+}  // namespace tgfx

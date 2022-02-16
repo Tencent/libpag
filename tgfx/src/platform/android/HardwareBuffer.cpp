@@ -19,7 +19,7 @@
 #include "HardwareBuffer.h"
 #include "HardwareBufferInterface.h"
 
-namespace pag {
+namespace tgfx {
 
 std::shared_ptr<PixelBuffer> HardwareBuffer::MakeFrom(AHardwareBuffer* hardwareBuffer) {
   if (!hardwareBuffer || !HardwareBufferInterface::Available()) {
@@ -83,4 +83,4 @@ void HardwareBuffer::unlockPixels() {
 HardwareBuffer::~HardwareBuffer() {
   HardwareBufferInterface::Release(hardwareBuffer);
 }
-}  // namespace pag
+}  // namespace tgfx

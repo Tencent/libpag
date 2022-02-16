@@ -20,8 +20,7 @@
 
 #include <CoreGraphics/CGBitmapContext.h>
 #include "core/ImageInfo.h"
-#include "pag/types.h"
 
-namespace pag {
+namespace tgfx {
 CGContextRef CreateBitmapContext(const ImageInfo& info, void* pixels);
-}  // namespace pag
+}  // namespace tgfx

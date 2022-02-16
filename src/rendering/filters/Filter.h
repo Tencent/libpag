@@ -19,8 +19,8 @@
 #pragma once
 
 #include <array>
+#include "core/Matrix.h"
 #include "gpu/opengl/GLContext.h"
-#include "pag/types.h"
 
 namespace pag {
 struct FilterSource {
@@ -45,7 +45,7 @@ struct FilterSource {
    * example, a blur of 4 pixels should be interpreted as a blur of 2 pixels if the scale factor is
    * 1/2 in each direction.
    */
-  Point scale = {};
+  tgfx::Point scale = {};
 
   /**
    * The 3x3 texture coordinate transform matrix. This transform matrix maps 2D texture coordinates
@@ -84,12 +84,13 @@ class Filter {
  public:
   virtual ~Filter() = default;
 
-  virtual bool initialize(Context* context) = 0;
+  virtual bool initialize(tgfx::Context* context) = 0;
 
   /**
    * Apply this filter to a filter source and draw it to a filter target.
    */
-  virtual void draw(Context* context, const FilterSource* source, const FilterTarget* target) = 0;
+  virtual void draw(tgfx::Context* context, const FilterSource* source,
+                    const FilterTarget* target) = 0;
 
   virtual bool needsMSAA() const {
     return false;

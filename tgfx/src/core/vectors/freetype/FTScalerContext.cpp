@@ -24,12 +24,12 @@
 #include FT_SIZES_H
 #include FT_TRUETYPE_TABLES_H
 #include "FTUtil.h"
-#include "base/utils/Log.h"
-#include "base/utils/MathExtra.h"
 #include "core/Bitmap.h"
+#include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
 #include "skcms.h"
 
-namespace pag {
+namespace tgfx {
 static float FTFixedToFloat(FT_Fixed x) {
   return static_cast<float>(x) * 1.52587890625e-5f;
 }
@@ -672,4 +672,4 @@ std::shared_ptr<TextureBuffer> FTScalerContext::generateImage(GlyphID glyphId, M
   }
   return pixelBuffer;
 }
-}  // namespace pag
+}  // namespace tgfx

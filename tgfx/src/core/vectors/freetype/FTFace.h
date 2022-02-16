@@ -19,13 +19,12 @@
 #pragma once
 
 #include <memory>
-
+#include <mutex>
 #include "FTFontData.h"
-
 #include "ft2build.h"
 #include FT_FREETYPE_H
 
-namespace pag {
+namespace tgfx {
 std::mutex& FTMutex();
 
 class FTFace {
@@ -38,4 +37,4 @@ class FTFace {
 
   FT_Face face = nullptr;
 };
-}  // namespace pag
+}  // namespace tgfx

@@ -19,7 +19,7 @@
 #include "GLBlend.h"
 #include "GLDefines.h"
 
-namespace pag {
+namespace tgfx {
 static void HardLight(FragmentShaderBuilder* fsBuilder, const char* final, const char* src,
                       const char* dst) {
   static constexpr char kComponents[] = {'r', 'g', 'b'};
@@ -314,25 +314,25 @@ static void BlendHandler_Luminosity(FragmentShaderBuilder* fsBuilder, const char
 using BlendHandler = void (*)(FragmentShaderBuilder* fsBuilder, const char* srcColor,
                               const char* dstColor, const char* outputColor);
 
-static constexpr std::pair<Blend, BlendHandler> kBlendHandlers[] = {
-    {Blend::Overlay, BlendHandler_Overlay},
-    {Blend::Darken, BlendHandler_Darken},
-    {Blend::Lighten, BlendHandler_Lighten},
-    {Blend::ColorDodge, BlendHandler_ColorDodge},
-    {Blend::ColorBurn, BlendHandler_ColorBurn},
-    {Blend::HardLight, BlendHandler_HardLight},
-    {Blend::SoftLight, BlendHandler_SoftLight},
-    {Blend::Difference, BlendHandler_Difference},
-    {Blend::Exclusion, BlendHandler_Exclusion},
-    {Blend::Multiply, BlendHandler_Multiply},
-    {Blend::Hue, BlendHandler_Hue},
-    {Blend::Saturation, BlendHandler_Saturation},
-    {Blend::Color, BlendHandler_Color},
-    {Blend::Luminosity, BlendHandler_Luminosity}};
+static constexpr std::pair<BlendMode, BlendHandler> kBlendHandlers[] = {
+    {BlendMode::Overlay, BlendHandler_Overlay},
+    {BlendMode::Darken, BlendHandler_Darken},
+    {BlendMode::Lighten, BlendHandler_Lighten},
+    {BlendMode::ColorDodge, BlendHandler_ColorDodge},
+    {BlendMode::ColorBurn, BlendHandler_ColorBurn},
+    {BlendMode::HardLight, BlendHandler_HardLight},
+    {BlendMode::SoftLight, BlendHandler_SoftLight},
+    {BlendMode::Difference, BlendHandler_Difference},
+    {BlendMode::Exclusion, BlendHandler_Exclusion},
+    {BlendMode::Multiply, BlendHandler_Multiply},
+    {BlendMode::Hue, BlendHandler_Hue},
+    {BlendMode::Saturation, BlendHandler_Saturation},
+    {BlendMode::Color, BlendHandler_Color},
+    {BlendMode::Luminosity, BlendHandler_Luminosity}};
 
 static void HandleBlendModes(FragmentShaderBuilder* fsBuilder, const std::string& srcColor,
                              const std::string& dstColor, const std::string& outputColor,
-                             Blend blendMode) {
+                             BlendMode blendMode) {
   // These all perform src-over on the alpha channel.
   fsBuilder->codeAppendf("%s.a = %s.a + (1.0 - %s.a) * %s.a;", outputColor.c_str(),
                          srcColor.c_str(), srcColor.c_str(), dstColor.c_str());
@@ -344,24 +344,24 @@ static void HandleBlendModes(FragmentShaderBuilder* fsBuilder, const std::string
   }
 }
 
-static constexpr std::pair<Blend, std::pair<unsigned, unsigned>> kBlendCoeffMap[] = {
-    {Blend::Clear, {GL::ZERO, GL::ZERO}},
-    {Blend::Src, {GL::ONE, GL::ZERO}},
-    {Blend::Dst, {GL::ZERO, GL::ONE}},
-    {Blend::SrcOver, {GL::ONE, GL::ONE_MINUS_SRC_ALPHA}},
-    {Blend::DstOver, {GL::ONE_MINUS_DST_ALPHA, GL::ONE}},
-    {Blend::SrcIn, {GL::DST_ALPHA, GL::ZERO}},
-    {Blend::DstIn, {GL::ZERO, GL::SRC_ALPHA}},
-    {Blend::SrcOut, {GL::ONE_MINUS_DST_ALPHA, GL::ZERO}},
-    {Blend::DstOut, {GL::ZERO, GL::ONE_MINUS_SRC_ALPHA}},
-    {Blend::SrcATop, {GL::DST_ALPHA, GL::ONE_MINUS_SRC_ALPHA}},
-    {Blend::DstATop, {GL::ONE_MINUS_DST_ALPHA, GL::SRC_ALPHA}},
-    {Blend::Xor, {GL::ONE_MINUS_DST_ALPHA, GL::ONE_MINUS_SRC_ALPHA}},
-    {Blend::Plus, {GL::ONE, GL::ONE}},
-    {Blend::Modulate, {GL::ZERO, GL::SRC_COLOR}},
-    {Blend::Screen, {GL::ONE, GL::ONE_MINUS_SRC_COLOR}}};
+static constexpr std::pair<BlendMode, std::pair<unsigned, unsigned>> kBlendCoeffMap[] = {
+    {BlendMode::Clear, {GL::ZERO, GL::ZERO}},
+    {BlendMode::Src, {GL::ONE, GL::ZERO}},
+    {BlendMode::Dst, {GL::ZERO, GL::ONE}},
+    {BlendMode::SrcOver, {GL::ONE, GL::ONE_MINUS_SRC_ALPHA}},
+    {BlendMode::DstOver, {GL::ONE_MINUS_DST_ALPHA, GL::ONE}},
+    {BlendMode::SrcIn, {GL::DST_ALPHA, GL::ZERO}},
+    {BlendMode::DstIn, {GL::ZERO, GL::SRC_ALPHA}},
+    {BlendMode::SrcOut, {GL::ONE_MINUS_DST_ALPHA, GL::ZERO}},
+    {BlendMode::DstOut, {GL::ZERO, GL::ONE_MINUS_SRC_ALPHA}},
+    {BlendMode::SrcATop, {GL::DST_ALPHA, GL::ONE_MINUS_SRC_ALPHA}},
+    {BlendMode::DstATop, {GL::ONE_MINUS_DST_ALPHA, GL::SRC_ALPHA}},
+    {BlendMode::Xor, {GL::ONE_MINUS_DST_ALPHA, GL::ONE_MINUS_SRC_ALPHA}},
+    {BlendMode::Plus, {GL::ONE, GL::ONE}},
+    {BlendMode::Modulate, {GL::ZERO, GL::SRC_COLOR}},
+    {BlendMode::Screen, {GL::ONE, GL::ONE_MINUS_SRC_COLOR}}};
 
-bool BlendAsCoeff(Blend blendMode, unsigned* first, unsigned* second) {
+bool BlendAsCoeff(BlendMode blendMode, unsigned* first, unsigned* second) {
   for (const auto& pair : kBlendCoeffMap) {
     if (pair.first == blendMode) {
       if (first) {
@@ -454,11 +454,11 @@ static bool AppendPorterDuffTerm(FragmentShaderBuilder* fsBuilder, unsigned coef
 }
 
 void AppendMode(FragmentShaderBuilder* fsBuilder, const std::string& srcColor,
-                const std::string& dstColor, const std::string& outColor, Blend blendMode) {
+                const std::string& dstColor, const std::string& outColor, BlendMode blendMode) {
   unsigned srcCoeff, dstCoeff;
   if (BlendAsCoeff(blendMode, &srcCoeff, &dstCoeff)) {
     // The only coeff mode that can go out of range is plus.
-    bool clamp = blendMode == Blend::Plus;
+    bool clamp = blendMode == BlendMode::Plus;
 
     fsBuilder->codeAppendf("%s = ", outColor.c_str());
     if (clamp) {
@@ -478,4 +478,4 @@ void AppendMode(FragmentShaderBuilder* fsBuilder, const std::string& srcColor,
     HandleBlendModes(fsBuilder, srcColor, dstColor, outColor, blendMode);
   }
 }
-}  // namespace pag
+}  // namespace tgfx

@@ -25,7 +25,7 @@
 #include "GLVertexShaderBuilder.h"
 #include "gpu/ProgramBuilder.h"
 
-namespace pag {
+namespace tgfx {
 class GLProgramBuilder : public ProgramBuilder {
  public:
   /**
@@ -96,4 +96,4 @@ class GLProgramBuilder : public ProgramBuilder {
   std::vector<GLProgram::Attribute> attributes;
   int vertexStride = 0;
 };
-}  // namespace pag
+}  // namespace tgfx

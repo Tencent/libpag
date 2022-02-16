@@ -22,7 +22,7 @@
 #include "GLDrawer.h"
 #include "core/Path.h"
 
-namespace pag {
+namespace tgfx {
 class GLRRectOp : public GLDrawOp {
  public:
   static std::unique_ptr<GLRRectOp> Make(RRect rRect);
@@ -41,4 +41,4 @@ class GLRRectOp : public GLDrawOp {
   //  bool stroked = false;
   //  Point strokeWidths = Point::Zero();
 };
-}  // namespace pag
+}  // namespace tgfx

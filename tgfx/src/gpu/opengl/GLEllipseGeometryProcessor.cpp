@@ -20,7 +20,7 @@
 #include "gpu/Caps.h"
 #include "gpu/EllipseGeometryProcessor.h"
 
-namespace pag {
+namespace tgfx {
 void GLEllipseGeometryProcessor::emitCode(EmitArgs& args) {
   const auto& egp = *static_cast<const EllipseGeometryProcessor*>(args.gp);
   auto* vertBuilder = args.vertBuilder;
@@ -142,4 +142,4 @@ void GLEllipseGeometryProcessor::setData(const ProgramDataManager& programDataMa
                              static_cast<float>(egp.height));
   }
 }
-}  // namespace pag
+}  // namespace tgfx

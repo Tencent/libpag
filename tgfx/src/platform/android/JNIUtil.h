@@ -21,7 +21,7 @@
 #include <jni.h>
 #include <string>
 
-namespace pag {
+namespace tgfx {
 /**
  * Attach permanently a JNI environment to the current thread and retrieve it. If successfully
  * attached, the JNI environment will automatically be detached at thread destruction.
@@ -126,4 +126,4 @@ class Local {
   T _ref = nullptr;
 };
 
-}  // namespace pag
+}  // namespace tgfx

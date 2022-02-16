@@ -17,12 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <base/utils/TimeUtil.h>
+#include "base/utils/TGFXCast.h"
 #include "pag/pag.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/graphics/Shape.h"
 #include "rendering/layers/PAGStage.h"
 #include "rendering/utils/LockGuard.h"
-#include "rendering/utils/TGFXTypes.h"
 
 namespace pag {
 std::shared_ptr<PAGSolidLayer> PAGSolidLayer::Make(int64_t duration, int32_t width, int32_t height,
@@ -83,9 +83,9 @@ void PAGSolidLayer::setSolidColor(const pag::Color& value) {
   }
   auto solidLayer = static_cast<SolidLayer*>(layer);
   if (solidLayer->solidColor != _solidColor) {
-    Path path = {};
+    tgfx::Path path = {};
     path.addRect(0, 0, solidLayer->width, solidLayer->height);
-    auto solid = Shape::MakeFrom(path, ToTGFXColor(_solidColor));
+    auto solid = Shape::MakeFrom(path, ToTGFX(_solidColor));
     replacement = new GraphicContent(solid);
   }
   notifyModified(true);

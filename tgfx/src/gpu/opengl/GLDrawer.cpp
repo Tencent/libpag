@@ -21,11 +21,11 @@
 #include "GLProgramBuilder.h"
 #include "GLProgramCreator.h"
 #include "GLUtil.h"
-#include "base/utils/UniqueID.h"
+#include "core/utils/UniqueID.h"
 #include "gpu/PorterDuffXferProcessor.h"
 #include "gpu/ProgramCache.h"
 
-namespace pag {
+namespace tgfx {
 struct AttribLayout {
   bool normalized = false;  // Only used by floating point types.
   int count = 0;
@@ -237,4 +237,4 @@ void GLDrawer::draw(DrawArgs args, std::unique_ptr<GLDrawOp> op) const {
   }
   CheckGLError(gl);
 }
-}  // namespace pag
+}  // namespace tgfx

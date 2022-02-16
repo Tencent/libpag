@@ -20,7 +20,7 @@
 
 #include "GeometryProcessor.h"
 
-namespace pag {
+namespace tgfx {
 /**
  * Skia's sharing：
  * https://www.essentialmath.com/GDC2015/VanVerth_Jim_DrawingAntialiasedEllipse.pdf
@@ -61,4 +61,4 @@ class EllipseGeometryProcessor : public GeometryProcessor {
 
   friend class GLEllipseGeometryProcessor;
 };
-}  // namespace pag
+}  // namespace tgfx

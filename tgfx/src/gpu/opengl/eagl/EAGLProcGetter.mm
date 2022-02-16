@@ -19,7 +19,7 @@
 #include "EAGLProcGetter.h"
 #include <dlfcn.h>
 
-namespace pag {
+namespace tgfx {
 EAGLProcGetter::EAGLProcGetter() {
   fLibrary = dlopen("/System/Library/Frameworks/OpenGL.framework/Versions/A/Libraries/libGL.dylib",
                     RTLD_LAZY);
@@ -39,4 +39,4 @@ void* EAGLProcGetter::getProcAddress(const char* name) const {
 std::unique_ptr<GLProcGetter> GLProcGetter::Make() {
   return std::make_unique<EAGLProcGetter>();
 }
-}  // namespace pag
+}  // namespace tgfx

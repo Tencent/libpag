@@ -30,9 +30,9 @@ namespace pag {
  */
 struct GradientPaint {
   Enum gradientType;
-  Point startPoint;
-  Point endPoint;
-  std::vector<Color4f> colors;
+  tgfx::Point startPoint;
+  tgfx::Point endPoint;
+  std::vector<tgfx::Color> colors;
   std::vector<float> positions;
 };
 
@@ -57,7 +57,7 @@ class Graphic {
    * nullptr or matrix is invisible.
    */
   static std::shared_ptr<Graphic> MakeCompose(std::shared_ptr<Graphic> graphic,
-                                              const Matrix& matrix);
+                                              const tgfx::Matrix& matrix);
 
   /**
    * Creates a compose Graphic with graphic contents. Returns nullptr if contents are emtpy.
@@ -76,7 +76,7 @@ class Graphic {
   /**
    * Measures the bounds of this Graphic.
    */
-  virtual void measureBounds(Rect* bounds) const = 0;
+  virtual void measureBounds(tgfx::Rect* bounds) const = 0;
 
   /**
    * Evaluates the Graphic to see if it overlaps or intersects with the specified point. The point
@@ -95,7 +95,7 @@ class Graphic {
    * leaves the path unchanged if the Graphic contents are not opaque or can not be converted to
    * a path.
    */
-  virtual bool getPath(Path* path) const = 0;
+  virtual bool getPath(tgfx::Path* path) const = 0;
 
   /**
    * Prepares this graphic for next draw() call. It collects all CPU tasks in this Graphic and run
@@ -106,6 +106,6 @@ class Graphic {
   /**
    * Draw this Graphic into specified Canvas.
    */
-  virtual void draw(Canvas* canvas, RenderCache* cache) const = 0;
+  virtual void draw(tgfx::Canvas* canvas, RenderCache* cache) const = 0;
 };
 }  // namespace pag

@@ -43,12 +43,12 @@ std::shared_ptr<FilterModifier> FilterModifier::Make(Layer* layer, Frame layerFr
   return modifier;
 }
 
-void FilterModifier::applyToBounds(Rect* bounds) const {
+void FilterModifier::applyToBounds(tgfx::Rect* bounds) const {
   FilterRenderer::MeasureFilterBounds(bounds, this);
 }
 
-void FilterModifier::applyToGraphic(Canvas* canvas, RenderCache* cache,
+void FilterModifier::applyToGraphic(tgfx::Canvas* canvas, RenderCache* cache,
                                     std::shared_ptr<Graphic> graphic) const {
-  FilterRenderer::DrawWithFilter(static_cast<GLCanvas*>(canvas), cache, this, graphic);
+  FilterRenderer::DrawWithFilter(canvas, cache, this, graphic);
 }
 }  // namespace pag

@@ -21,7 +21,7 @@
 #import <OpenGLES/ES3/glext.h>
 #include "EAGLProcGetter.h"
 
-namespace pag {
+namespace tgfx {
 static std::mutex deviceLocker = {};
 static std::vector<EAGLDevice*> deviceList = {};
 static std::vector<EAGLDevice*> delayPurgeList = {};
@@ -224,18 +224,18 @@ void EAGLDevice::finish() {
     clearCurrent();
   }
 }
-}  // namespace pag
+}  // namespace tgfx
 
 @interface AppMonitor : NSObject
 @end
 
 @implementation AppMonitor
 + (void)applicationWillResignActive:(NSNotification*)notification {
-  pag::ApplicationWillResignActive();
+  tgfx::ApplicationWillResignActive();
 }
 
 + (void)applicationDidBecomeActive:(NSNotification*)notification {
-  pag::ApplicationDidBecomeActive();
+  tgfx::ApplicationDidBecomeActive();
 }
 @end
 

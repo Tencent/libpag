@@ -21,7 +21,7 @@
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 
-namespace pag {
+namespace tgfx {
 class EGLGlobals {
  public:
   static const EGLGlobals* Get();
@@ -30,4 +30,4 @@ class EGLGlobals {
   EGLConfig windowConfig = nullptr;
   EGLConfig pbufferConfig = nullptr;
 };
-}  // namespace pag
+}  // namespace tgfx

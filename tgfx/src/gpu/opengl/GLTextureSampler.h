@@ -20,7 +20,7 @@
 
 #include "gpu/TextureSampler.h"
 
-namespace pag {
+namespace tgfx {
 class GLTextureSampler : public TextureSampler {
  public:
   GLTextureSampler() = default;
@@ -33,4 +33,4 @@ class GLTextureSampler : public TextureSampler {
 
   GLTextureInfo glInfo = {};
 };
-}  // namespace pag
+}  // namespace tgfx

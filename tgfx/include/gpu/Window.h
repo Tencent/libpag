@@ -21,7 +21,7 @@
 #include "gpu/Context.h"
 #include "gpu/Surface.h"
 
-namespace pag {
+namespace tgfx {
 /**
  * Window represents a native displayable resource that can be rendered or written to by a Device.
  */
@@ -58,4 +58,4 @@ class Window {
  private:
   bool checkContext(Context* context);
 };
-}  // namespace pag
+}  // namespace tgfx

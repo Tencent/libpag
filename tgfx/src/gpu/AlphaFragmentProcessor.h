@@ -20,7 +20,7 @@
 
 #include "FragmentProcessor.h"
 
-namespace pag {
+namespace tgfx {
 class AlphaFragmentProcessor : public FragmentProcessor {
  public:
   static std::unique_ptr<AlphaFragmentProcessor> Make(float alpha);
@@ -41,4 +41,4 @@ class AlphaFragmentProcessor : public FragmentProcessor {
 
   friend class GLAlphaFragmentProcessor;
 };
-}  // namespace pag
+}  // namespace tgfx

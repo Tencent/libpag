@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BulgeFilter.h"
-#include "gpu/opengl/GLUtil.h"
 
 namespace pag {
 static const char BULGE_VERTEX_SHADER[] = R"(
@@ -92,7 +91,7 @@ std::string BulgeFilter::onBuildFragmentShader() {
   return BULGE_FRAGMENT_SHADER;
 }
 
-void BulgeFilter::onPrepareProgram(const GLInterface* gl, unsigned int program) {
+void BulgeFilter::onPrepareProgram(const tgfx::GLInterface* gl, unsigned int program) {
   horizontalRadiusHandle = gl->getUniformLocation(program, "uHorizontalRadius");
   verticalRadiusHandle = gl->getUniformLocation(program, "uVerticalRadius");
   bulgeCenterHandle = gl->getUniformLocation(program, "uBulgeCenter");
@@ -100,7 +99,8 @@ void BulgeFilter::onPrepareProgram(const GLInterface* gl, unsigned int program) 
   pinningHandle = gl->getUniformLocation(program, "uPinning");
 }
 
-void BulgeFilter::onUpdateParams(const GLInterface* gl, const Rect& contentBounds, const Point&) {
+void BulgeFilter::onUpdateParams(const tgfx::GLInterface* gl, const tgfx::Rect& contentBounds,
+                                 const tgfx::Point&) {
   auto* bulgeEffect = reinterpret_cast<const BulgeEffect*>(effect);
   auto horizontalRadius = bulgeEffect->horizontalRadius->getValueAt(layerFrame);
   auto verticalRadius = bulgeEffect->verticalRadius->getValueAt(layerFrame);
@@ -116,8 +116,9 @@ void BulgeFilter::onUpdateParams(const GLInterface* gl, const Rect& contentBound
   gl->uniform1i(pinningHandle, pinning);
 }
 
-std::vector<Point> BulgeFilter::computeVertices(const Rect& inputBounds, const Rect& outputBounds,
-                                                const Point&) {
+std::vector<tgfx::Point> BulgeFilter::computeVertices(const tgfx::Rect& inputBounds,
+                                                      const tgfx::Rect& outputBounds,
+                                                      const tgfx::Point&) {
   return ComputeVerticesForMotionBlurAndBulge(inputBounds, outputBounds);
 }
 }  // namespace pag

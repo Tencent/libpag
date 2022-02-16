@@ -20,7 +20,7 @@
 
 #include "GLInterface.h"
 
-namespace pag {
+namespace tgfx {
 static unsigned GetErrorFake() {
   return GL::NO_ERROR;
 }
@@ -62,4 +62,4 @@ void GLAssembleWebGLInterface(const GLProcGetter* getter, GLInterface* interface
   }
   InitVertexArray(getter, interface, info);
 }
-}  // namespace pag
+}  // namespace tgfx

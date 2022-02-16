@@ -20,9 +20,9 @@
 
 #include "gpu/GLFragmentProcessor.h"
 
-namespace pag {
+namespace tgfx {
 class GLRadialGradientLayout : public GLFragmentProcessor {
  public:
   void emitCode(EmitArgs& args) override;
 };
-}  // namespace pag
+}  // namespace tgfx

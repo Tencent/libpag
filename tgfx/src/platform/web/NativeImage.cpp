@@ -22,7 +22,7 @@
 
 using namespace emscripten;
 
-namespace pag {
+namespace tgfx {
 std::shared_ptr<Image> NativeCodec::MakeImage(const std::string&) {
   return nullptr;
 }
@@ -55,4 +55,4 @@ std::shared_ptr<NativeImage> NativeImage::MakeFrom(emscripten::val nativeImage) 
 std::shared_ptr<TextureBuffer> NativeImage::makeBuffer() const {
   return NativeTextureBuffer::Make(width(), height(), nativeImage);
 }
-}  // namespace pag
+}  // namespace tgfx

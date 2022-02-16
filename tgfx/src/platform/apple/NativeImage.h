@@ -21,7 +21,7 @@
 #include <CoreImage/CoreImage.h>
 #include "core/Image.h"
 
-namespace pag {
+namespace tgfx {
 class NativeImage : public Image {
  public:
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
@@ -35,4 +35,4 @@ class NativeImage : public Image {
 
   friend class NativeCodec;
 };
-}  // namespace pag
+}  // namespace tgfx

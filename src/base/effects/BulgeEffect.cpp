@@ -16,16 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "base/utils/MathExtra.h"
 #include "base/utils/Verify.h"
 #include "core/Path.h"
 #include "pag/file.h"
 
 namespace pag {
-static void ConvertEllipseToPath(Path* path, float centerX, float centerY, float radiusX,
+static void ConvertEllipseToPath(tgfx::Path* path, float centerX, float centerY, float radiusX,
                                  float radiusY) {
-  auto start = -M_PI_2_F;
-  auto endAngle = M_PI_F + M_PI_2_F;
+  auto start = -static_cast<float>(M_PI_2);
+  auto endAngle = static_cast<float>(M_PI + M_PI_2);
   auto end = 0;
   auto currentX = centerX + cosf(start) * radiusX;
   auto currentY = centerY + sinf(start) * radiusY;
@@ -48,7 +47,7 @@ static void ConvertEllipseToPath(Path* path, float centerX, float centerY, float
       break;
     }
     start = end;
-    end = start + M_PI_2_F;
+    end = start + static_cast<float>(M_PI_2);
     if (end > endAngle) {
       end = endAngle;
     }
@@ -120,14 +119,14 @@ void BulgeEffect::transformBounds(Rect* contentBounds, const Point&, Frame layer
   auto right = contentBounds->right;
   auto bottom = contentBounds->bottom;
 
-  Path ellipsePath = {};
+  tgfx::Path ellipsePath = {};
   // radius 需要加 1，如果 2 者相交只有一个点时，intersectPath.isEmpty 为 true
   ConvertEllipseToPath(&ellipsePath, bulgeCenterValue.x, bulgeCenterValue.y,
                        horizontalRadiusValue + 1, verticalRadiusValue + 1);
-  Path boundsPath = {};
+  tgfx::Path boundsPath = {};
   boundsPath.addRect(left, top, right, bottom);
   auto intersectPath = ellipsePath;
-  intersectPath.addPath(boundsPath, PathOp::Intersect);
+  intersectPath.addPath(boundsPath, tgfx::PathOp::Intersect);
   // 凸出效果的椭圆与内容 bounds 没有交集，不改变尺寸
   if (intersectPath.isEmpty() && !intersectPath.isInverseFillType()) {
     return;

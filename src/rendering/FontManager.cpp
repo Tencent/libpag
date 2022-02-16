@@ -38,12 +38,12 @@ std::shared_ptr<TypefaceHolder> TypefaceHolder::MakeFromFile(const std::string& 
   return std::shared_ptr<TypefaceHolder>(holder);
 }
 
-std::shared_ptr<Typeface> TypefaceHolder::getTypeface() {
+std::shared_ptr<tgfx::Typeface> TypefaceHolder::getTypeface() {
   if (typeface == nullptr) {
     if (!fontPath.empty()) {
-      typeface = Typeface::MakeFromPath(fontPath, ttcIndex);
+      typeface = tgfx::Typeface::MakeFromPath(fontPath, ttcIndex);
     } else {
-      typeface = Typeface::MakeFromName(fontFamily, fontStyle);
+      typeface = tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
     }
   }
   return typeface;
@@ -62,14 +62,14 @@ bool FontManager::hasFallbackFonts() {
 PAGFont FontManager::registerFont(const std::string& fontPath, int ttcIndex,
                                   const std::string& fontFamily, const std::string& fontStyle) {
   std::lock_guard<std::mutex> autoLock(locker);
-  auto typeface = Typeface::MakeFromPath(fontPath, ttcIndex);
+  auto typeface = tgfx::Typeface::MakeFromPath(fontPath, ttcIndex);
   return registerFont(typeface, fontFamily, fontStyle);
 }
 
 PAGFont FontManager::registerFont(const void* data, size_t length, int ttcIndex,
                                   const std::string& fontFamily, const std::string& fontStyle) {
   std::lock_guard<std::mutex> autoLock(locker);
-  auto typeface = Typeface::MakeFromBytes(data, length, ttcIndex);
+  auto typeface = tgfx::Typeface::MakeFromBytes(data, length, ttcIndex);
   return registerFont(typeface, fontFamily, fontStyle);
 }
 
@@ -77,8 +77,8 @@ static std::string PAGFontRegisterKey(const std::string& fontFamily, const std::
   return fontFamily + "|" + fontStyle;
 }
 
-PAGFont FontManager::registerFont(std::shared_ptr<Typeface> typeface, const std::string& fontFamily,
-                                  const std::string& fontStyle) {
+PAGFont FontManager::registerFont(std::shared_ptr<tgfx::Typeface> typeface,
+                                  const std::string& fontFamily, const std::string& fontStyle) {
   if (typeface == nullptr) {
     return {"", ""};
   }
@@ -105,9 +105,9 @@ void FontManager::unregisterFont(const PAGFont& font) {
   registeredFontMap.erase(iter);
 }
 
-static std::shared_ptr<Typeface> MakeTypefaceWithName(const std::string& fontFamily,
-                                                      const std::string& fontStyle) {
-  auto typeface = Typeface::MakeFromName(fontFamily, fontStyle);
+static std::shared_ptr<tgfx::Typeface> MakeTypefaceWithName(const std::string& fontFamily,
+                                                            const std::string& fontStyle) {
+  auto typeface = tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
   if (typeface != nullptr) {
     if (fontFamily != typeface->fontFamily()) {
       typeface = nullptr;
@@ -116,9 +116,9 @@ static std::shared_ptr<Typeface> MakeTypefaceWithName(const std::string& fontFam
   return typeface;
 }
 
-std::shared_ptr<Typeface> FontManager::getTypefaceWithoutFallback(const std::string& fontFamily,
-                                                                  const std::string& fontStyle) {
-  std::shared_ptr<Typeface> typeface = getTypefaceFromCache(fontFamily, fontStyle);
+std::shared_ptr<tgfx::Typeface> FontManager::getTypefaceWithoutFallback(
+    const std::string& fontFamily, const std::string& fontStyle) {
+  std::shared_ptr<tgfx::Typeface> typeface = getTypefaceFromCache(fontFamily, fontStyle);
   if (typeface == nullptr) {
     typeface = MakeTypefaceWithName(fontFamily, fontStyle);
   }
@@ -133,8 +133,8 @@ std::shared_ptr<Typeface> FontManager::getTypefaceWithoutFallback(const std::str
   return typeface;
 }
 
-std::shared_ptr<Typeface> FontManager::getFallbackTypeface(const std::string& name,
-                                                           GlyphID* glyphID) {
+std::shared_ptr<tgfx::Typeface> FontManager::getFallbackTypeface(const std::string& name,
+                                                                 tgfx::GlyphID* glyphID) {
   std::lock_guard<std::mutex> autoLock(locker);
   for (auto& holder : fallbackFontList) {
     auto typeface = holder->getTypeface();
@@ -145,7 +145,7 @@ std::shared_ptr<Typeface> FontManager::getFallbackTypeface(const std::string& na
       }
     }
   }
-  return Typeface::MakeDefault();
+  return tgfx::Typeface::MakeDefault();
 }
 
 void FontManager::setFallbackFontNames(const std::vector<std::string>& fontNames) {
@@ -169,8 +169,8 @@ void FontManager::setFallbackFontPaths(const std::vector<std::string>& fontPaths
   }
 }
 
-std::shared_ptr<Typeface> FontManager::getTypefaceFromCache(const std::string& fontFamily,
-                                                            const std::string& fontStyle) {
+std::shared_ptr<tgfx::Typeface> FontManager::getTypefaceFromCache(const std::string& fontFamily,
+                                                                  const std::string& fontStyle) {
   std::lock_guard<std::mutex> autoLock(locker);
   auto result = registeredFontMap.find(PAGFontRegisterKey(fontFamily, fontStyle));
   if (result != registeredFontMap.end()) {
@@ -181,8 +181,8 @@ std::shared_ptr<Typeface> FontManager::getTypefaceFromCache(const std::string& f
 
 static FontManager fontManager = {};
 
-std::shared_ptr<Typeface> FontManager::GetTypefaceWithoutFallback(const std::string& fontFamily,
-                                                                  const std::string& fontStyle) {
+std::shared_ptr<tgfx::Typeface> FontManager::GetTypefaceWithoutFallback(
+    const std::string& fontFamily, const std::string& fontStyle) {
   return fontManager.getTypefaceWithoutFallback(fontFamily, fontStyle);
 }
 
@@ -193,8 +193,8 @@ static bool RegisterFallbackFonts() {
   return Platform::Current()->registerFallbackFonts();
 }
 
-std::shared_ptr<Typeface> FontManager::GetFallbackTypeface(const std::string& name,
-                                                           GlyphID* glyphID) {
+std::shared_ptr<tgfx::Typeface> FontManager::GetFallbackTypeface(const std::string& name,
+                                                                 tgfx::GlyphID* glyphID) {
   static auto registered = RegisterFallbackFonts();
   USE(registered);
   return fontManager.getFallbackTypeface(name, glyphID);

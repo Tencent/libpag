@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CornerPinFilter.h"
-#include "gpu/opengl/GLUtil.h"
 #include "rendering/filters/utils/FilterHelper.h"
 
 namespace pag {
@@ -56,12 +55,13 @@ std::string CornerPinFilter::onBuildFragmentShader() {
   return CORNER_PIN_FRAGMENT_SHADER;
 }
 
-static float calculateDistance(const Point& intersection, const Point& vertexPoint) {
+static float calculateDistance(const tgfx::Point& intersection, const tgfx::Point& vertexPoint) {
   return std::sqrt(std::pow(fabs(intersection.x - vertexPoint.x), 2) +
                    std::pow(fabs(intersection.y - vertexPoint.y), 2));
 }
 
-static bool PointIsBetween(const Point& point, const Point& start, const Point& end) {
+static bool PointIsBetween(const tgfx::Point& point, const tgfx::Point& start,
+                           const tgfx::Point& end) {
   auto minX = std::min(start.x, end.x);
   auto maxX = std::max(start.x, end.x);
   auto minY = std::min(start.y, end.y);
@@ -73,15 +73,15 @@ void CornerPinFilter::calculateVertexQs() {
   // https://www.reedbeta.com/blog/quadrilateral-interpolation-part-1/
   // 计算2条对角线的交点：y1 = k1 * x1 + b1; y2 = k2 * x2 + b2
   auto* cornerPinEffect = reinterpret_cast<const CornerPinEffect*>(effect);
-  auto lowerLeft = cornerPinEffect->lowerLeft->getValueAt(layerFrame);
-  auto upperRight = cornerPinEffect->upperRight->getValueAt(layerFrame);
-  auto lowerRight = cornerPinEffect->lowerRight->getValueAt(layerFrame);
-  auto upperLeft = cornerPinEffect->upperLeft->getValueAt(layerFrame);
+  auto lowerLeft = ToTGFX(cornerPinEffect->lowerLeft->getValueAt(layerFrame));
+  auto upperRight = ToTGFX(cornerPinEffect->upperRight->getValueAt(layerFrame));
+  auto lowerRight = ToTGFX(cornerPinEffect->lowerRight->getValueAt(layerFrame));
+  auto upperLeft = ToTGFX(cornerPinEffect->upperLeft->getValueAt(layerFrame));
   auto ll2ur_k = (upperRight.y - lowerLeft.y) / (upperRight.x - lowerLeft.x);
   auto ul2lr_k = (lowerRight.y - upperLeft.y) / (lowerRight.x - upperLeft.x);
   auto ll2ur_b = lowerLeft.y - ll2ur_k * lowerLeft.x;
   auto ul2lr_b = upperLeft.y - ul2lr_k * upperLeft.x;
-  Point intersection = {0, 0};
+  tgfx::Point intersection = {0, 0};
   intersection.x = (ul2lr_b - ll2ur_b) / (ll2ur_k - ul2lr_k);
   intersection.y = ll2ur_k * intersection.x + ll2ur_b;
   // 计算对角线交点与4个顶点的距离
@@ -105,18 +105,18 @@ void CornerPinFilter::calculateVertexQs() {
   }
 }
 
-std::vector<Point> CornerPinFilter::computeVertices(const Rect& contentBounds, const Rect&,
-                                                    const Point&) {
-  std::vector<Point> vertices = {};
+std::vector<tgfx::Point> CornerPinFilter::computeVertices(const tgfx::Rect& contentBounds,
+                                                          const tgfx::Rect&, const tgfx::Point&) {
+  std::vector<tgfx::Point> vertices = {};
   auto* cornerPinEffect = reinterpret_cast<const CornerPinEffect*>(effect);
-  Point contentPoint[4] = {cornerPinEffect->lowerLeft->getValueAt(layerFrame),
-                           cornerPinEffect->lowerRight->getValueAt(layerFrame),
-                           cornerPinEffect->upperLeft->getValueAt(layerFrame),
-                           cornerPinEffect->upperRight->getValueAt(layerFrame)};
-  Point texturePoints[4] = {{0.0f, contentBounds.height()},
-                            {contentBounds.width(), contentBounds.height()},
-                            {0.0f, 0.0f},
-                            {contentBounds.width(), 0.0f}};
+  tgfx::Point contentPoint[4] = {ToTGFX(cornerPinEffect->lowerLeft->getValueAt(layerFrame)),
+                                 ToTGFX(cornerPinEffect->lowerRight->getValueAt(layerFrame)),
+                                 ToTGFX(cornerPinEffect->upperLeft->getValueAt(layerFrame)),
+                                 ToTGFX(cornerPinEffect->upperRight->getValueAt(layerFrame))};
+  tgfx::Point texturePoints[4] = {{0.0f, contentBounds.height()},
+                                  {contentBounds.width(), contentBounds.height()},
+                                  {0.0f, 0.0f},
+                                  {contentBounds.width(), 0.0f}};
 
   for (int ii = 0; ii < 4; ii++) {
     vertices.push_back(contentPoint[ii]);
@@ -125,8 +125,9 @@ std::vector<Point> CornerPinFilter::computeVertices(const Rect& contentBounds, c
   return vertices;
 }
 
-void CornerPinFilter::bindVertices(const GLInterface* gl, const FilterSource* source,
-                                   const FilterTarget* target, const std::vector<Point>& points) {
+void CornerPinFilter::bindVertices(const tgfx::GLInterface* gl, const FilterSource* source,
+                                   const FilterTarget* target,
+                                   const std::vector<tgfx::Point>& points) {
   std::vector<float> vertices = {};
   calculateVertexQs();
   for (size_t i = 0, j = 0; i < points.size() && j < 4; j++) {

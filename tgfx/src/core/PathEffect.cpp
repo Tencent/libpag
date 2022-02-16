@@ -20,7 +20,7 @@
 #include "core/PathRef.h"
 #include "core/Stroke.h"
 
-namespace pag {
+namespace tgfx {
 using namespace pk;
 
 class PkPathEffect : public PathEffect {
@@ -58,22 +58,22 @@ class StrokePathEffect : public PathEffect {
   SkPaint paint = {};
 };
 
-static SkPaint::Cap ToSkLineCap(Stroke::Cap cap) {
+static SkPaint::Cap ToSkLineCap(LineCap cap) {
   switch (cap) {
-    case Stroke::Cap::Round:
+    case LineCap::Round:
       return SkPaint::kRound_Cap;
-    case Stroke::Cap::Square:
+    case LineCap::Square:
       return SkPaint::kSquare_Cap;
     default:
       return SkPaint::kButt_Cap;
   }
 }
 
-static SkPaint::Join ToSkLineJoin(Stroke::Join join) {
+static SkPaint::Join ToSkLineJoin(LineJoin join) {
   switch (join) {
-    case Stroke::Join::Round:
+    case LineJoin::Round:
       return SkPaint::kRound_Join;
-    case Stroke::Join::Bevel:
+    case LineJoin::Bevel:
       return SkPaint::kBevel_Join;
     default:
       return SkPaint::kMiter_Join;
@@ -108,4 +108,4 @@ std::unique_ptr<PathEffect> PathEffect::MakeCorner(float radius) {
   }
   return std::unique_ptr<PathEffect>(new PkPathEffect(std::move(effect)));
 }
-}  // namespace pag
+}  // namespace tgfx

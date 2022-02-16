@@ -18,22 +18,26 @@
 
 #pragma once
 
+#include "base/utils/TGFXCast.h"
 #include "gpu/Texture.h"
+#include "gpu/opengl/GLUtil.h"
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "rendering/filters/Filter.h"
 
 namespace pag {
-Matrix ToMatrix(const FilterTarget* target, bool flipY = false);
+tgfx::Matrix ToMatrix(const FilterTarget* target, bool flipY = false);
 
-std::unique_ptr<FilterSource> ToFilterSource(const Texture* texture, const Point& scale);
+std::unique_ptr<FilterSource> ToFilterSource(const tgfx::Texture* texture,
+                                             const tgfx::Point& scale);
 
-std::unique_ptr<FilterTarget> ToFilterTarget(const Surface* surface, const Matrix& drawingMatrix);
+std::unique_ptr<FilterTarget> ToFilterTarget(const tgfx::Surface* surface,
+                                             const tgfx::Matrix& drawingMatrix);
 
-Point ToGLTexturePoint(const FilterSource* source, const Point& texturePoint);
+tgfx::Point ToGLTexturePoint(const FilterSource* source, const tgfx::Point& texturePoint);
 
-Point ToGLVertexPoint(const FilterTarget* target, const FilterSource* source,
-                      const Rect& contentBounds, const Point& contentPoint);
+tgfx::Point ToGLVertexPoint(const FilterTarget* target, const FilterSource* source,
+                            const tgfx::Rect& contentBounds, const tgfx::Point& contentPoint);
 
-void PreConcatMatrix(FilterTarget* target, const Matrix& matrix);
+void PreConcatMatrix(FilterTarget* target, const tgfx::Matrix& matrix);
 }  // namespace pag

@@ -25,7 +25,7 @@
 #include "gpu/opengl/GLTexture.h"
 #include "platform/android/HardwareBufferInterface.h"
 
-namespace pag {
+namespace tgfx {
 class EGLHardwareTexture : public GLTexture {
  public:
   static std::shared_ptr<EGLHardwareTexture> MakeFrom(Context* context,
@@ -47,6 +47,6 @@ class EGLHardwareTexture : public GLTexture {
 
   void onRelease(Context* context) override;
 };
-}  // namespace pag
+}  // namespace tgfx
 
 #endif

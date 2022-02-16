@@ -22,7 +22,7 @@
 #include "core/Bitmap.h"
 
 namespace pag {
-void TraceImage(const ImageInfo& info, const void* pixels, const std::string& tag) {
+void TraceImage(const tgfx::ImageInfo& info, const void* pixels, const std::string& tag) {
   if (info.isEmpty() || pixels == nullptr) {
     return;
   }
@@ -34,9 +34,9 @@ void TraceImage(const ImageInfo& info, const void* pixels, const std::string& ta
     CVPixelBufferLockBaseAddress(pixelBuffer, 0);
     auto dstPixels = CVPixelBufferGetBaseAddress(pixelBuffer);
     auto rowBytes = CVPixelBufferGetBytesPerRow(pixelBuffer);
-    auto dstInfo = ImageInfo::Make(info.width(), info.height(), ColorType::BGRA_8888,
-                                   AlphaType::Premultiplied, rowBytes);
-    Bitmap bitmap(dstInfo, dstPixels);
+    auto dstInfo = tgfx::ImageInfo::Make(info.width(), info.height(), tgfx::ColorType::BGRA_8888,
+                                         tgfx::AlphaType::Premultiplied, rowBytes);
+    tgfx::Bitmap bitmap(dstInfo, dstPixels);
     bitmap.writePixels(info, pixels);
     CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
     LOGI("%s : Image(width = %d, height = %d)", tag.c_str(), info.width(), info.height());

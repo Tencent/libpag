@@ -18,9 +18,9 @@
 
 #include "GLEmptyXferProcessor.h"
 
-namespace pag {
+namespace tgfx {
 void GLEmptyXferProcessor::emitCode(const EmitArgs& args) {
   args.fragBuilder->codeAppendf("%s = %s * %s;", args.outputColor.c_str(), args.inputColor.c_str(),
                                 args.inputCoverage.c_str());
 }
-}  // namespace pag
+}  // namespace tgfx

@@ -18,10 +18,10 @@
 
 #pragma once
 
-#include "core/utils/BytesKey.h"
+#include "core/BytesKey.h"
 #include "gpu/Context.h"
 
-namespace pag {
+namespace tgfx {
 class Processor {
  public:
   virtual ~Processor() = default;
@@ -33,4 +33,4 @@ class Processor {
 
   virtual void computeProcessorKey(Context* context, BytesKey* bytesKey) const = 0;
 };
-}  // namespace pag
+}  // namespace tgfx

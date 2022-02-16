@@ -18,6 +18,6 @@
 
 #pragma once
 
-namespace pag {
+namespace tgfx {
 enum class PixelConfig { ALPHA_8, Gray_8, RG_88, RGBA_8888 };
-}  // namespace pag
+}  // namespace tgfx

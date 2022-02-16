@@ -158,7 +158,7 @@ class Lzma2Encoder {
     Lzma2Enc_Destroy(encoder);
   }
 
-  std::shared_ptr<Data> code(const std::shared_ptr<Data>& inputData) {
+  std::shared_ptr<tgfx::Data> code(const std::shared_ptr<tgfx::Data>& inputData) {
     if (encoder == nullptr || inputData == nullptr || inputData->size() == 0) {
       return nullptr;
     }
@@ -187,14 +187,14 @@ class Lzma2Encoder {
     if (status != SZ_OK) {
       return nullptr;
     }
-    return Data::MakeWithCopy(&outBuf[0], outBuf.size());
+    return tgfx::Data::MakeWithCopy(&outBuf[0], outBuf.size());
   }
 
  private:
   CLzma2EncHandle encoder = nullptr;
 };
 
-std::shared_ptr<Data> LzmaUtil::Compress(const std::shared_ptr<Data>& pixelData) {
+std::shared_ptr<tgfx::Data> LzmaUtil::Compress(const std::shared_ptr<tgfx::Data>& pixelData) {
   Lzma2Encoder encoder;
   return encoder.code(pixelData);
 }
@@ -211,7 +211,7 @@ class Lzma2Decoder {
     }
   }
 
-  std::shared_ptr<Data> code(const std::shared_ptr<Data>& inputData) {
+  std::shared_ptr<tgfx::Data> code(const std::shared_ptr<tgfx::Data>& inputData) {
     if (decoder == nullptr || inputData == nullptr || inputData->size() == 0) {
       return nullptr;
     }
@@ -241,7 +241,7 @@ class Lzma2Decoder {
     auto res = Lzma2DecMt_Decode(decoder, prop, &props, &outWrap.vt, &outBufferSize, 1, &inWrap.vt,
                                  &inProcessed, &isMT, nullptr);
     if (res == SZ_OK && inputSize == inProcessed) {
-      return Data::MakeAdopted(outBuffer, outBufferSize, Data::DeleteProc);
+      return tgfx::Data::MakeAdopted(outBuffer, outBufferSize, tgfx::Data::DeleteProc);
     }
     delete[] outBuffer;
     return nullptr;
@@ -251,7 +251,7 @@ class Lzma2Decoder {
   CLzma2DecMtHandle decoder = nullptr;
 };
 
-std::shared_ptr<Data> LzmaUtil::Decompress(const std::shared_ptr<Data>& data) {
+std::shared_ptr<tgfx::Data> LzmaUtil::Decompress(const std::shared_ptr<tgfx::Data>& data) {
   Lzma2Decoder decoder;
   return decoder.code(data);
 }

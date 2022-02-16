@@ -18,15 +18,14 @@
 
 #pragma once
 
-#include "core/Blend.h"
+#include "core/BlendMode.h"
 #include "gpu/FragmentShaderBuilder.h"
-#include "pag/types.h"
 
-namespace pag {
-bool BlendAsCoeff(Blend blendMode, unsigned* first = nullptr, unsigned* second = nullptr);
+namespace tgfx {
+bool BlendAsCoeff(BlendMode blendMode, unsigned* first = nullptr, unsigned* second = nullptr);
 
 // Appends GLSL code to fragment that assigns a specified blend of the srcColor and dstColor
 // variables to the outColor variable.
 void AppendMode(FragmentShaderBuilder* fsBuilder, const std::string& srcColor,
-                const std::string& dstColor, const std::string& outColor, Blend blendMode);
-}  // namespace pag
+                const std::string& dstColor, const std::string& outColor, BlendMode blendMode);
+}  // namespace tgfx

@@ -16,59 +16,58 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "base/utils/Log.h"
-#include "core/Color4f.h"
+#include "core/Color.h"
+#include "core/utils/Log.h"
 
-namespace pag {
-const Color4f& Color4f::Invalid() {
-  static const Color4f color = {
-      std::numeric_limits<float>::max(), std::numeric_limits<float>::max(),
-      std::numeric_limits<float>::max(), std::numeric_limits<float>::max()};
+namespace tgfx {
+const Color& Color::Invalid() {
+  static const Color color = {std::numeric_limits<float>::max(), std::numeric_limits<float>::max(),
+                              std::numeric_limits<float>::max(), std::numeric_limits<float>::max()};
   return color;
 }
 
-const Color4f& Color4f::Transparent() {
-  static const Color4f color = {0.0f, 0.0f, 0.0f, 0.0f};
+const Color& Color::Transparent() {
+  static const Color color = {0.0f, 0.0f, 0.0f, 0.0f};
   return color;
 }
 
-const Color4f& Color4f::Black() {
-  static const Color4f color = {0.0f, 0.0f, 0.0f, 1.0f};
+const Color& Color::Black() {
+  static const Color color = {0.0f, 0.0f, 0.0f, 1.0f};
   return color;
 }
 
-const Color4f& Color4f::White() {
-  static const Color4f color = {1.0f, 1.0f, 1.0f, 1.0f};
+const Color& Color::White() {
+  static const Color color = {1.0f, 1.0f, 1.0f, 1.0f};
   return color;
 }
 
-Color4f Color4f::FromRGBA(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
+Color Color::FromRGBA(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
   auto alpha = a == 255 ? 1.0f : static_cast<float>(a) / 255.0f;
   return {static_cast<float>(r) / 255.0f, static_cast<float>(g) / 255.0f,
           static_cast<float>(b) / 255.0f, alpha};
 }
 
-float Color4f::operator[](int index) const {
+float Color::operator[](int index) const {
   DEBUG_ASSERT(index >= 0 && index < 4);
   return (&red)[index];
 }
 
-float& Color4f::operator[](int index) {
+float& Color::operator[](int index) {
   DEBUG_ASSERT(index >= 0 && index < 4);
   return (&red)[index];
 }
 
-bool Color4f::isValid() const {
+bool Color::isValid() const {
   return red >= 0.0f && red <= 1.0f && green >= 0.0f && green <= 1.0f && blue >= 0.0f &&
          blue <= 1.0f && alpha >= 0.0f && alpha <= 1.0f;
 }
 
-bool Color4f::isOpaque() const {
+bool Color::isOpaque() const {
   DEBUG_ASSERT(alpha <= 1.0f && alpha >= 0.0f);
   return alpha == 1.0f;
 }
 
-Color4f Color4f::unpremultiply() const {
+Color Color::unpremultiply() const {
   if (alpha == 0.0f) {
     return {0, 0, 0, 0};
   } else {
@@ -77,4 +76,4 @@ Color4f Color4f::unpremultiply() const {
   }
 }
 
-}  // namespace pag
+}  // namespace tgfx

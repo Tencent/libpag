@@ -22,38 +22,38 @@
 #include "rendering/utils/PathUtil.h"
 
 namespace pag {
-PathOp ToPathOp(Enum maskMode) {
+tgfx::PathOp ToPathOp(Enum maskMode) {
   switch (maskMode) {
     case MaskMode::Subtract:
-      return PathOp::Difference;
+      return tgfx::PathOp::Difference;
     case MaskMode::Intersect:
-      return PathOp::Intersect;
+      return tgfx::PathOp::Intersect;
     case MaskMode::Difference:
-      return PathOp::XOR;
+      return tgfx::PathOp::XOR;
     case MaskMode::Darken:  // without the opacity blending, haven't supported it
-      return PathOp::Intersect;
+      return tgfx::PathOp::Intersect;
     default:
-      return PathOp::Union;
+      return tgfx::PathOp::Union;
   }
 }
 
-static void ExpandPath(Path* path, float expansion) {
+static void ExpandPath(tgfx::Path* path, float expansion) {
   if (expansion == 0) {
     return;
   }
   auto strokePath = *path;
-  auto effect = PathEffect::MakeStroke(Stroke(fabsf(expansion) * 2));
+  auto effect = tgfx::PathEffect::MakeStroke(tgfx::Stroke(fabsf(expansion) * 2));
   if (effect) {
     effect->applyTo(&strokePath);
   }
   if (expansion < 0) {
-    path->addPath(strokePath, PathOp::Difference);
+    path->addPath(strokePath, tgfx::PathOp::Difference);
   } else {
-    path->addPath(strokePath, PathOp::Union);
+    path->addPath(strokePath, tgfx::PathOp::Union);
   }
 }
 
-void RenderMasks(Path* maskContent, const std::vector<MaskData*>& masks, Frame layerFrame) {
+void RenderMasks(tgfx::Path* maskContent, const std::vector<MaskData*>& masks, Frame layerFrame) {
   bool isFirst = true;
   for (auto& mask : masks) {
     auto path = mask->maskPath->getValueAt(layerFrame);

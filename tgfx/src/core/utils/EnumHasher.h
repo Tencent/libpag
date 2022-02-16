@@ -16,41 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "UTF8Text.h"
+#pragma once
 
-namespace pag {
-int UTF8Text::Count(const std::string& string) {
-  if (string.empty()) {
-    return -1;
-  }
-  int count = 0;
-  const char* start = &(string[0]);
-  const char* stop = start + string.size();
-  while (start < stop) {
-    NextChar(&start);
-    ++count;
-  }
-  return count;
-}
+#include <cstddef>
 
-static inline int32_t LeftShift(int32_t value) {
-  return static_cast<int32_t>((static_cast<uint32_t>(value) << 1));
-}
+namespace tgfx {
 
-int32_t UTF8Text::NextChar(const char** ptr) {
-  auto p = (const uint8_t*)*ptr;
-  int c = *p;
-  int hic = c << 24;
-  if (hic < 0) {
-    auto mask = static_cast<uint32_t>(~0x3F);
-    hic = LeftShift(hic);
-    do {
-      c = (c << 6) | (*++p & 0x3F);
-      mask <<= 5;
-    } while ((hic = LeftShift(hic)) < 0);
-    c &= ~mask;
+struct EnumHasher {
+  template <typename T>
+  size_t operator()(T t) const {
+    return static_cast<size_t>(t);
   }
-  *ptr = static_cast<const char*>(static_cast<const void*>(p + 1));
-  return c;
-}
-}  // namespace pag
+};
+
+}  // namespace tgfx

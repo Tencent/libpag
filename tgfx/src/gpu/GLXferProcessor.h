@@ -24,7 +24,7 @@
 #include "gpu/UniformHandler.h"
 #include "gpu/XferProcessor.h"
 
-namespace pag {
+namespace tgfx {
 class GLXferProcessor {
  public:
   virtual ~GLXferProcessor() = default;
@@ -63,4 +63,4 @@ class GLXferProcessor {
                        const Point&) {
   }
 };
-}  // namespace pag
+}  // namespace tgfx

@@ -19,9 +19,11 @@
 #pragma once
 
 #include <string>
+#include "core/ImageOrigin.h"
+#include "core/Point.h"
 #include "gpu/Resource.h"
 
-namespace pag {
+namespace tgfx {
 class TextureSampler;
 
 /**
@@ -112,13 +114,5 @@ class Texture : public Resource {
   // Two texture types: Alpha, RGBA
   static std::shared_ptr<Texture> Make(Context* context, int width, int height, void* pixels,
                                        size_t rowBytes, ImageOrigin origin, bool alphaOnly);
-
-  friend void Trace(const Texture* texture, const std::string& path);
 };
-
-/**
- * Trace() provides a utility to view the texture.
- */
-void Trace(const Texture* texture, const std::string& path = "");
-
-}  // namespace pag
+}  // namespace tgfx

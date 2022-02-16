@@ -21,7 +21,7 @@
 #import <UIKit/UIKit.h>
 #include "gpu/opengl/GLDevice.h"
 
-namespace pag {
+namespace tgfx {
 class EAGLDevice : public GLDevice {
  public:
   /**
@@ -63,4 +63,4 @@ class EAGLDevice : public GLDevice {
   friend void ApplicationWillResignActive();
   friend void ApplicationDidBecomeActive();
 };
-}  // namespace pag
+}  // namespace tgfx

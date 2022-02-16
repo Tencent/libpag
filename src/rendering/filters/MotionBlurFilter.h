@@ -23,7 +23,7 @@
 namespace pag {
 class MotionBlurFilter : public LayerFilter {
  public:
-  static void TransformBounds(Rect* bounds, const Point& filterScale, Layer* layer,
+  static void TransformBounds(tgfx::Rect* bounds, const tgfx::Point& filterScale, Layer* layer,
                               Frame layerFrame);
 
   MotionBlurFilter();
@@ -36,17 +36,18 @@ class MotionBlurFilter : public LayerFilter {
 
   std::string onBuildFragmentShader() override;
 
-  void onPrepareProgram(const GLInterface* gl, unsigned program) override;
+  void onPrepareProgram(const tgfx::GLInterface* gl, unsigned program) override;
 
-  void onUpdateParams(const GLInterface* gl, const Rect& contentBounds,
-                      const Point& filterScale) override;
+  void onUpdateParams(const tgfx::GLInterface* gl, const tgfx::Rect& contentBounds,
+                      const tgfx::Point& filterScale) override;
 
-  std::vector<Point> computeVertices(const Rect& contentBounds, const Rect& transformedBounds,
-                                     const Point& filterScale) override;
+  std::vector<tgfx::Point> computeVertices(const tgfx::Rect& contentBounds,
+                                           const tgfx::Rect& transformedBounds,
+                                           const tgfx::Point& filterScale) override;
 
  private:
-  Matrix previousMatrix = Matrix::I();
-  Matrix currentMatrix = Matrix::I();
+  tgfx::Matrix previousMatrix = tgfx::Matrix::I();
+  tgfx::Matrix currentMatrix = tgfx::Matrix::I();
 
   int prevTransformHandle = 0;
   int transformHandle = 0;
