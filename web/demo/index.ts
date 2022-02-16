@@ -1,8 +1,9 @@
 import { PAGInit } from '../src/pag';
 import { PAGFile } from '../src/pag-file';
 import { PAGView } from '../src/pag-view';
-import { AudioPlayer } from './js/audio-player';
+import { AudioPlayer } from './module/audio-player';
 import { PAG as PAGNamespace, PAGViewListenerEvent } from '../src/types';
+import { PAGComposition } from '../src/pag-composition';
 
 declare global {
   interface Window {
@@ -15,9 +16,9 @@ let pagFile: PAGFile = null;
 let cacheEnabled: boolean;
 let videoEnabled: boolean;
 let globalCacheScale: number;
-let videoEl = null;
-let pagComposition = null;
-let audioEl = null;
+let videoEl: HTMLVideoElement = null;
+let pagComposition: PAGComposition = null;
+let audioEl: AudioPlayer = null;
 let PAG: PAGNamespace;
 let canvasElementSize = 640;
 let isMobile = false;
@@ -304,8 +305,8 @@ const testPAGComposition = {
     console.log('test audioBytes：', audioBytes);
   },
   getLayerIndex: () => {
-    const pagLayerWasm = pagComposition.getLayerAt(0);
-    const index = pagComposition.getLayerIndex(pagLayerWasm);
+    const pagLayer = pagComposition.getLayerAt(0);
+    const index = pagComposition.getLayerIndex(pagLayer);
     console.log(`test GetLayerIndex: ${index}`);
   },
   swapLayerAt: () => {

@@ -1,4 +1,4 @@
-import { PAG, Marker } from './types';
+import { PAG, Vector, Marker } from './types';
 import { PAGLayer } from './pag-layer';
 import { wasmAwaitRewind } from './utils/decorators';
 
@@ -39,21 +39,22 @@ export class PAGComposition extends PAGLayer {
    * @returns The child layer at the specified index position.
    */
   public getLayerAt(index: number): PAGLayer {
-    return this.wasmIns._getLayerAt(index) as PAGLayer;
+    const wasmIns = this.wasmIns._getLayerAt(index);
+    return new PAGLayer(wasmIns);
   }
   /**
    * Returns an array of layers that match the specified layer name.
    */
-  public getLayersByName(layerName: string): Array<PAGLayer> {
-    return this.wasmIns._getLayersByName(layerName) as Array<PAGLayer>;
+  public getLayersByName(layerName: string): Vector<any> {
+    return this.wasmIns._getLayersByName(layerName) as Vector<any>;
   }
   /**
    * Returns the index position of a child layer.
    * @param pagLayer The layer instance to identify.
    * @returns The index position of the child layer to identify.
    */
-  public getLayerIndex(index: number): PAGLayer {
-    return this.wasmIns._getLayerIndex(index) as PAGLayer;
+  public getLayerIndex(pagLayer: PAGLayer): number {
+    return this.wasmIns._getLayerIndex(pagLayer.wasmIns) as number;
   }
   /**
    * Swap the layers at the specified index.
@@ -71,7 +72,7 @@ export class PAGComposition extends PAGLayer {
    * Check whether current PAGComposition contains the specified pagLayer.
    */
   public contains(pagLayer: PAGLayer): boolean {
-    return this.wasmIns._contains(pagLayer);
+    return this.wasmIns._contains(pagLayer) as boolean;
   }
   /**
    * Add a PAGLayer to current PAGComposition at the top. If you add a layer that already has a
@@ -90,20 +91,20 @@ export class PAGComposition extends PAGLayer {
     return this.wasmIns._addLayerAt(layer, index) as boolean;
   }
   /**
-  * Indicates when the first frame of the audio plays in the composition's timeline.
-  */
+   * Indicates when the first frame of the audio plays in the composition's timeline.
+   */
   public audioStartTime(): number {
     return this.wasmIns._audioStartTime() as number;
   }
   /**
    * Returns the audio markers of this composition.
    */
-  public audioMarkers(): Array<Marker> {
-    return this.wasmIns._audioMarkers() as Array<Marker>;
+  public audioMarkers(): Vector<Marker> {
+    return this.wasmIns._audioMarkers() as Vector<Marker>;
   }
   /**
-    * The audio data of this composition.
-    */
+   * The audio data of this composition.
+   */
   public audioBytes(): Uint8Array {
     return this.wasmIns._audioBytes() as Uint8Array;
   }
