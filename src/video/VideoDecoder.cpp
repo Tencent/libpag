@@ -26,7 +26,6 @@
 
 namespace pag {
 static std::atomic<SoftwareDecoderFactory*> softwareDecoderFactory = {nullptr};
-static std::atomic_bool softwareToHardwareEnabled = true;
 static std::atomic_int maxHardwareDecoderCount = {65535};
 static std::atomic_int globalGPUDecoderCount = {0};
 
