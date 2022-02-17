@@ -1,4 +1,4 @@
-<img src="../resources/readme/logo.png" alt="PAG Logo" width="474"/>
+<img src="https://pag.io/img/readme/logo.png" alt="PAG Logo" width="474"/>
 
 [English](./README.md) | 简体中文 | [Homepage](https://pag.io)
 
@@ -70,8 +70,8 @@ ESModule 引入的方式需要打包构建的时候，需要把 node_modules 下
 ```javascript
 // <canvas class="canvas" id="pag"></canvas>
 const pagFile = await PAG.PAGFile.load(file);
-document.getElementById('pag').width = await pagFile.width();
-document.getElementById('pag').height = await pagFile.height();
+document.getElementById('pag').width = pagFile.width();
+document.getElementById('pag').height = pagFile.height();
 const pagView = await PAG.PAGView.init(pagFile, '#pag');
 pagView.setRepeatCount(0);
 await pagView.play();
@@ -79,7 +79,7 @@ await pagView.play();
 
 npm package 中提供了多种构建产物，可以阅读 [这里](./doc/develop-install.md) 了解不同目录下产物的差别。
 
-demo 文件夹中提供了简单的接入示例， 可以点击 [这里](./demo/) 查看。
+demo 文件夹中提供了简单的接入示例， 可以点击 [这里](https://github.com/libpag/pag-web) 查看。
 
 更多的 API 接口可以阅读 [API 文档](https://pag.io/api.html#/apis/web/)。
 

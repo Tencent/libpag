@@ -23,3 +23,20 @@
 ### Bug Fixes
 
 - 修复 `PAGView` 的 `duration` 计算错误
+
+## 0.0.3
+
+### Breaking Changes
+
+- 消除 emscripten 中 `Asyncify` 模块带来的副作用，将大部分与 wasm 交互的接口改为同步接口，仅保留 `PAGPlayer.flush()` 为 `async` 方法
+- 替换 `module._PAGSurface`  为 `module.PAGSurface`
+
+### Features
+
+- `PAGComposition` 上增加  `numChildren`，`setContentSize`，`getLayerAt`，`getLayersByName`，`getLayerIndex`，`swapLayer`，`swapLayerAt`，`contains`，`addLayer`，`addLayerAt`，`audioStartTime`，`audioMarkers`，`audioBytes`，`removeLayerAt`，`removeAllLayers` 方法
+- `PAGViewListenerEvent` 上增加 `onAnimationPla`，`onAnimationPause` ，`onAnimationFlushed`
+
+### Bug Fixes
+
+- 修复 `FontFamily` 渲染错误
+- 修复微信平台下视频序列帧无法播放

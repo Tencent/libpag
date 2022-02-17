@@ -1,4 +1,4 @@
-<img src="../resources/readme/logo.png" alt="PAG Logo" width="474"/>
+<img src="https://pag.io/img/readme/logo.png" alt="PAG Logo" width="474"/>
 
 English | [简体中文](./README.zh_CN.md) | [Homepage](https://pag.io)
 
@@ -72,8 +72,8 @@ Then use the `locateFile` function to return the path of the `libpag.wasm` .
 ```javascript
 // <canvas class="canvas" id="pag"></canvas>
 const pagFile = await PAG.PAGFile.load(file);
-document.getElementById('pag').width = await pagFile.width();
-document.getElementById('pag').height = await pagFile.height();
+document.getElementById('pag').width = pagFile.width();
+document.getElementById('pag').height = pagFile.height();
 const pagView = await PAG.PAGView.init(pagFile, '#pag');
 pagView.setRepeatCount(0);
 await pagView.play();
@@ -81,7 +81,7 @@ await pagView.play();
 
 Offer much product in the npm package after building. You could read the [doc](./doc/develop-install.md) about them.
 
-More doc such as [demo]((./demo/)), [API](https://pag.io/api.html#/apis/web/).
+More doc such as [demo](https://github.com/libpag/pag-web), [API](https://pag.io/api.html#/apis/web/).
 
 ## Browser
 

@@ -23,3 +23,20 @@
 ### Bug Fixes
 
 - Fix `duration` on `PAGView` calculate error.
+
+## 0.0.3
+
+### Breaking Changes
+
+- Eliminate the side effects caused by the `Asyncify` module in emscripten, change most of the methods that interact with wasm to `await` methods, and only keep `PAGPlayer.flush()` as an `async` method.
+- Replace  *`module*._PAGSurface`  to  *`module*.PAGSurface`.
+
+### Features
+
+- Add  `numChildren`，`setContentSize`，`getLayerAt`，`getLayersByName`，`getLayerIndex`，`swapLayer`，`swapLayerAt`，`contains`，`addLayer`，`addLayerAt`，`audioStartTime`，`audioMarkers`，`audioBytes`，`removeLayerAt`，`removeAllLayers`  on `PAGComposition`.
+- Add  `onAnimationPla`，`onAnimationPause` ，`onAnimationFlushed` on `PAGViewListenerEvent`.
+
+### Bug Fixes
+
+- Fix font family rending error.
+- Fix video sequence can not play on Wechat.
