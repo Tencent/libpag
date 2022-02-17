@@ -192,13 +192,13 @@ EMSCRIPTEN_BINDINGS(pag) {
       .property("rowBytes", &tgfx::ImageInfo::rowBytes)
       .property("colorType", &tgfx::ImageInfo::colorType);
 
-  class_<Matrix>("Matrix")
-      .property("a", &Matrix::getScaleX)
-      .property("b", &Matrix::getSkewY)
-      .property("c", &Matrix::getSkewX)
-      .property("d", &Matrix::getScaleY)
-      .property("tx", &Matrix::getTranslateX)
-      .property("ty", &Matrix::getTranslateY);
+  class_<tgfx::Matrix>("Matrix")
+      .property("a", &tgfx::Matrix::getScaleX)
+      .property("b", &tgfx::Matrix::getSkewY)
+      .property("c", &tgfx::Matrix::getSkewX)
+      .property("d", &tgfx::Matrix::getScaleY)
+      .property("tx", &tgfx::Matrix::getTranslateX)
+      .property("ty", &tgfx::Matrix::getTranslateY);
 
   class_<TextDocument>("TextDocument")
       .smart_ptr<std::shared_ptr<TextDocument>>("TextDocument")
@@ -238,18 +238,18 @@ EMSCRIPTEN_BINDINGS(pag) {
       .field("xHeight", &tgfx::FontMetrics::xHeight)
       .field("capHeight", &tgfx::FontMetrics::capHeight);
 
-  value_object<Rect>("Rect")
-      .field("left", &Rect::left)
-      .field("top", &Rect::top)
-      .field("right", &Rect::right)
-      .field("bottom", &Rect::bottom);
+  value_object<tgfx::Rect>("Rect")
+      .field("left", &tgfx::Rect::left)
+      .field("top", &tgfx::Rect::top)
+      .field("right", &tgfx::Rect::right)
+      .field("bottom", &tgfx::Rect::bottom);
 
-  value_object<Point>("Point").field("x", &Point::x).field("y", &Point::y);
+  value_object<tgfx::Point>("Point").field("x", &tgfx::Point::x).field("y", &tgfx::Point::y);
 
-  value_object<Color>("Color")
-      .field("red", &Color::red)
-      .field("green", &Color::green)
-      .field("blue", &Color::blue);
+  value_object<tgfx::Color>("Color")
+      .field("red", &tgfx::Color::red)
+      .field("green", &tgfx::Color::green)
+      .field("blue", &tgfx::Color::blue);
 
   value_object<Marker>("Marker")
       .field("startTime", &Marker::startTime)
@@ -262,11 +262,11 @@ EMSCRIPTEN_BINDINGS(pag) {
       .value("INVERSE_WINDING", tgfx::PathFillType::InverseWinding)
       .value("INVERSE_EVEN_ODD", tgfx::PathFillType::InverseEvenOdd);
 
-  enum_<ColorType>("ColorType")
-      .value("Unknown", ColorType::Unknown)
-      .value("ALPHA_8", ColorType::ALPHA_8)
-      .value("RGBA_8888", ColorType::RGBA_8888)
-      .value("BGRA_8888", ColorType::BGRA_8888);
+  enum_<tgfx::ColorType>("ColorType")
+      .value("Unknown", tgfx::ColorType::Unknown)
+      .value("ALPHA_8", tgfx::ColorType::ALPHA_8)
+      .value("RGBA_8888", tgfx::ColorType::RGBA_8888)
+      .value("BGRA_8888", tgfx::ColorType::BGRA_8888);
 
   enum_<LayerType>("LayerType")
       .value("Unknown", LayerType::Unknown)
@@ -289,7 +289,7 @@ EMSCRIPTEN_BINDINGS(pag) {
 
   register_vector<std::shared_ptr<PAGLayer>>("VectorPAGLayer");
   register_vector<std::string>("VectorString");
-  register_vector<Point>("VectorPoint");
+  register_vector<tgfx::Point>("VectorPoint");
   register_vector<const Marker*>("VectorMarker");
 
   function("_SetFallbackFontNames", optional_override([](std::vector<std::string> fontNames) {

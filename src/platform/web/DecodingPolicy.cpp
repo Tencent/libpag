@@ -16,29 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "pag/pag.h"
 
 namespace pag {
-enum class DecodingPolicy {
-  /**
-   * Uses hardware decoders.
-   */
-  Hardware,
-  /**
-   * Uses software decoders.
-   */
-  Software,
-  /**
-   * Uses a software decoder first, but initializes a hardware on async thread, and then switches to
-   * the hardware decoder when it is initialized.
-   */
-  SoftwareToHardware
-};
+void PAGVideoDecoder::SetSoftwareToHardwareEnabled(bool) {
+}
 
-/**
-   * If true, VideoDecoder uses a software decoder first, but initializes a hardware on
-   * async thread, and then switches to the hardware decoder when it is initialized.
-   * The default value is true, which will improve the performance of first frame rendering.
-   */
-bool SoftwareToHardwareEnabled();
+bool SoftwareToHardwareEnabled() {
+  return false;
+}
 }  // namespace pag
