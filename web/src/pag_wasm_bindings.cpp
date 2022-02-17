@@ -236,10 +236,10 @@ EMSCRIPTEN_BINDINGS(pag) {
 
   value_object<tgfx::Point>("Point").field("x", &tgfx::Point::x).field("y", &tgfx::Point::y);
 
-  value_object<tgfx::Color>("Color")
-      .field("red", &tgfx::Color::red)
-      .field("green", &tgfx::Color::green)
-      .field("blue", &tgfx::Color::blue);
+  value_object<Color>("Color")
+      .field("red", &Color::red)
+      .field("green", &Color::green)
+      .field("blue", &Color::blue);
 
   value_object<Marker>("Marker")
       .field("startTime", &Marker::startTime)
@@ -252,11 +252,11 @@ EMSCRIPTEN_BINDINGS(pag) {
       .value("INVERSE_WINDING", tgfx::PathFillType::InverseWinding)
       .value("INVERSE_EVEN_ODD", tgfx::PathFillType::InverseEvenOdd);
 
-  enum_<tgfx::ColorType>("ColorType")
-      .value("Unknown", tgfx::ColorType::Unknown)
-      .value("ALPHA_8", tgfx::ColorType::ALPHA_8)
-      .value("RGBA_8888", tgfx::ColorType::RGBA_8888)
-      .value("BGRA_8888", tgfx::ColorType::BGRA_8888);
+  enum_<ColorType>("ColorType")
+      .value("Unknown", ColorType::Unknown)
+      .value("ALPHA_8", ColorType::ALPHA_8)
+      .value("RGBA_8888", ColorType::RGBA_8888)
+      .value("BGRA_8888", ColorType::BGRA_8888);
 
   enum_<LayerType>("LayerType")
       .value("Unknown", LayerType::Unknown)

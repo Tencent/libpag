@@ -22,6 +22,7 @@ export class PAGView {
     canvasElement.height = canvasElement.height * window.devicePixelRatio;
     const pagPlayer = this.module.PAGPlayer.create();
     const pagView = new PAGView(pagPlayer);
+    pagView.eventManager = new EventManager();
     const gl = canvasElement.getContext('webgl');
     const contextID = this.module.GL.registerContext(gl, { majorVersion: 1, minorVersion: 0 });
     this.module.GL.makeContextCurrent(contextID);
@@ -29,7 +30,6 @@ export class PAGView {
     pagView.player.setSurface(pagView.pagSurface);
     pagView.player.setComposition(file);
     await pagView.setProgress(0);
-    pagView.eventManager = new EventManager();
     return pagView;
   }
 
@@ -85,6 +85,7 @@ export class PAGView {
     if (this.playTime === 0) {
       this.eventManager.emit(PAGViewListenerEvent.onAnimationStart, this);
     }
+    this.eventManager.emit(PAGViewListenerEvent.onAnimationPlay, this);
     this.isPlaying = true;
     this.startTime = Date.now() * 1000 - this.playTime;
     await this.flushLoop();
@@ -96,6 +97,7 @@ export class PAGView {
     if (!this.isPlaying || this.isDestroyed) return;
     this.clearTimer();
     this.isPlaying = false;
+    this.eventManager.emit(PAGViewListenerEvent.onAnimationPause, this);
   }
   /**
    * Stop the animation.
@@ -132,7 +134,8 @@ export class PAGView {
     this.playTime = progress * (await this.duration());
     this.startTime = Date.now() * 1000 - this.playTime;
     if (!this.isPlaying) {
-      await this.player.setProgressAndFlush(progress);
+      this.player.setProgress(progress);
+      await this.flush();
     }
     return progress;
   }
@@ -210,6 +213,7 @@ export class PAGView {
    */
   public async flush() {
     await this.player.flush();
+    this.eventManager.emit(PAGViewListenerEvent.onAnimationFlushed, this);
   }
   /**
    * Free the cache created by the pag view immediately. Can be called to reduce memory pressure.
@@ -259,7 +263,8 @@ export class PAGView {
         this.eventManager.emit(PAGViewListenerEvent.onAnimationRepeat, this);
       }
       this.playTime = Date.now() * 1000 - this.startTime;
-      await this.player.setProgressAndFlush((this.playTime % duration) / duration);
+      this.player.setProgress((this.playTime % duration) / duration);
+      await this.flush();
     }
     this.repeatedTimes = count;
   }

@@ -32,14 +32,6 @@ export class PAGPlayer {
     return (await PAGPlayer.module.webAssemblyQueue.exec(this.wasmIns._flush, this.wasmIns)) as boolean;
   }
   /**
-   * Set the progress of play position, And Apply all pending changes to the target surface immediately.
-   */
-  @wasmAsyncMethod
-  public async setProgressAndFlush(progress: number) {
-    this.setProgress(progress);
-    return await this.flush();
-  }
-  /**
    * The duration of current composition in microseconds.
    */
   public duration(): number {

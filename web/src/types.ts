@@ -94,6 +94,18 @@ export const enum PAGViewListenerEvent {
    * Notifies the repetition of the animation.
    */
   onAnimationRepeat = 'onAnimationRepeat',
+  /**
+   * Notifies the play of the animation.
+   */
+  onAnimationPlay = 'onAnimationPlay',
+  /**
+   * Notifies the pause of the animation.
+   */
+  onAnimationPause = 'onAnimationPause',
+  /**
+   * Notifies the flushed of the animation.
+   */
+  onAnimationFlushed = 'onAnimationFlushed',
 }
 
 export const enum ParagraphJustification {

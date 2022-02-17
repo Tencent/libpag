@@ -2,7 +2,7 @@ import { PAGInit } from '../src/pag';
 import { PAGFile } from '../src/pag-file';
 import { PAGView } from '../src/pag-view';
 import { AudioPlayer } from './module/audio-player';
-import { PAG as PAGNamespace, PAGViewListenerEvent } from '../src/types';
+import { PAG as PAGNamespace, PAGViewListenerEvent, ParagraphJustification } from '../src/types';
 import { PAGComposition } from '../src/pag-composition';
 
 declare global {
@@ -105,21 +105,21 @@ window.onload = async () => {
     const textDoc = pagFile.getTextData(0);
     console.log(textDoc);
     textDoc.text = '替换后的文字🤔';
-    // textDoc.fillColor = { red: 255, green: 255, blue: 255 };
-    // textDoc.applyFill = true;
-    // textDoc.backgroundAlpha = 100;
-    // textDoc.backgroundColor = { red: 255, green: 0, blue: 0 };
-    // textDoc.baselineShift = 200;
-    // textDoc.fauxBold = true;
+    textDoc.fillColor = { red: 255, green: 255, blue: 255 };
+    textDoc.applyFill = true;
+    textDoc.backgroundAlpha = 100;
+    textDoc.backgroundColor = { red: 255, green: 0, blue: 0 };
+    textDoc.baselineShift = 200;
+    textDoc.fauxBold = true;
     textDoc.fauxItalic = false;
     textDoc.fontFamily = 'SourceHanSerifCN';
-    // textDoc.fontSize = 100;
-    // textDoc.justification = ParagraphJustification.CenterJustify;
-    // textDoc.strokeWidth = 20;
-    // textDoc.strokeColor = { red: 0, green: 0, blue: 0 };
-    // textDoc.applyStroke = true;
-    // textDoc.strokeOverFill = true;
-    // textDoc.tracking = 600;
+    textDoc.fontSize = 100;
+    textDoc.justification = ParagraphJustification.CenterJustify;
+    textDoc.strokeWidth = 20;
+    textDoc.strokeColor = { red: 0, green: 0, blue: 0 };
+    textDoc.applyStroke = true;
+    textDoc.strokeOverFill = true;
+    textDoc.tracking = 600;
     pagFile.replaceText(0, textDoc);
     pagView.play();
   });
@@ -400,6 +400,15 @@ const createPAGView = async (file) => {
     console.log('onAnimationRepeat', event);
     audioEl.stop();
     audioEl.play();
+  });
+  pagView.addListener(PAGViewListenerEvent.onAnimationPlay, (event) => {
+    console.log('onAnimationPlay', event);
+  });
+  pagView.addListener(PAGViewListenerEvent.onAnimationPause, (event) => {
+    console.log('onAnimationPause', event);
+  });
+  pagView.addListener(PAGViewListenerEvent.onAnimationFlushed, (event) => {
+    // console.log('onAnimationFlushed', event);
   });
   document.getElementById('control').style.display = '';
   // 图层编辑
