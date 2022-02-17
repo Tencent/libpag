@@ -60,7 +60,7 @@ export class PAGComposition extends PAGLayer {
    * Swap the layers at the specified index.
    */
   public swapLayer(pagLayer1: PAGLayer, pagLayer2: PAGLayer): void {
-    this.wasmIns._swapLayer(pagLayer1, pagLayer2);
+    this.wasmIns._swapLayer(pagLayer1.wasmIns, pagLayer2.wasmIns);
   }
   /**
    * Swap the layers at the specified index.
@@ -72,23 +72,23 @@ export class PAGComposition extends PAGLayer {
    * Check whether current PAGComposition contains the specified pagLayer.
    */
   public contains(pagLayer: PAGLayer): boolean {
-    return this.wasmIns._contains(pagLayer) as boolean;
+    return this.wasmIns._contains(pagLayer.wasmIns) as boolean;
   }
   /**
    * Add a PAGLayer to current PAGComposition at the top. If you add a layer that already has a
    * different PAGComposition object as a parent, the layer is removed from the other PAGComposition
    * object.
    */
-  public addLayer(layer: PAGLayer): boolean {
-    return this.wasmIns._addLayer(layer) as boolean;
+  public addLayer(pagLayer: PAGLayer): boolean {
+    return this.wasmIns._addLayer(pagLayer.wasmIns) as boolean;
   }
   /**
    * Add a PAGLayer to current PAGComposition at the top. If you add a layer that already has a
    * different PAGComposition object as a parent, the layer is removed from the other PAGComposition
    * object.
    */
-  public addLayerAt(layer: PAGLayer, index: number): boolean {
-    return this.wasmIns._addLayerAt(layer, index) as boolean;
+  public addLayerAt(pagLayer: PAGLayer, index: number): boolean {
+    return this.wasmIns._addLayerAt(pagLayer.wasmIns, index) as boolean;
   }
   /**
    * Indicates when the first frame of the audio plays in the composition's timeline.
