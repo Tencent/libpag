@@ -35,12 +35,6 @@
         "includes": [
           "${SOURCE_DIR}/zlib.h",
           "${BUILD_DIR}/zconf.h"
-        ],
-        "platforms": [
-          "mac",
-          "win",
-          "linux",
-          "ios"
         ]
       }
     },

@@ -7,7 +7,7 @@
     "common": [
       {
         "url": "${PAG_GROUP}/vendor_tools.git",
-        "commit": "9b28c43638b358c05a0a9c26042390e86d1a213d",
+        "commit": "00907e189429712aafe57da2d937e369f1e9ea84",
         "dir": "vendor_tools"
       },
       {
