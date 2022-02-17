@@ -20,14 +20,14 @@ import android.view.TextureView;
 import android.view.View;
 import android.view.animation.LinearInterpolator;
 
-import org.extra.tools.BroadcastUtil;
-import org.extra.tools.ScreenBroadcastReceiver;
+import org.extra.tools.Lifecycle;
+import org.extra.tools.LifecycleListener;
 
 import java.util.ArrayList;
 import java.util.List;
 
 
-public class PAGView extends TextureView implements TextureView.SurfaceTextureListener, ScreenBroadcastReceiver.ScreenStateListener {
+public class PAGView extends TextureView implements TextureView.SurfaceTextureListener, LifecycleListener {
 
     private final static String TAG = "PAGView";
     private SurfaceTextureListener mListener;
@@ -306,6 +306,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     };
 
     private void setupSurfaceTexture() {
+        Lifecycle.getInstance().addListener(this);
         setOpaque(false);
         pagPlayer = new PAGPlayer();
         setSurfaceTextureListener(this);
@@ -406,7 +407,6 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         isAttachedToWindow = true;
         super.onAttachedToWindow();
         animator.addListener(mAnimatorListenerAdapter);
-        BroadcastUtil.getInstance().registerScreenBroadcast(this);
         synchronized (g_HandlerLock) {
             StartHandlerThread();
         }
@@ -417,7 +417,6 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     protected void onDetachedFromWindow() {
         isAttachedToWindow = false;
         super.onDetachedFromWindow();
-        BroadcastUtil.getInstance().unregisterScreenBroadcast(this);
         if (pagSurface != null) {
             // 延迟释放 pagSurface，否则Android 4.4 及之前版本会在 onDetachedFromWindow() 时 Crash。https://www.jianshu.com/p/675455c225bd
             pagSurface.release();
@@ -759,24 +758,6 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     }
 
     @Override
-    public void onScreenOff() {
-        if (this.getVisibility() == View.VISIBLE) {
-            this.mSaveVisibleState = true;
-            // workaround 在有些手机上，如果不置成不可见，解锁以后画面会不可见
-            // 在VIVO IQOO Pro表现为必现的不可见，在一加6t上表现为偶现不可见
-            setVisibility(View.INVISIBLE);
-        }
-    }
-
-    @Override
-    public void onScreenOn() {
-        if (this.mSaveVisibleState) {
-            this.setVisibility(View.VISIBLE);
-        }
-        this.mSaveVisibleState = false;
-    }
-
-    @Override
     public void setBackgroundDrawable(Drawable background) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N && background != null) {
             super.setBackgroundDrawable(background);
@@ -799,6 +780,16 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         }
     }
 
+    @Override
+    public void onResume() {
+        // When the device is locked and then unlocked, the PAGView's content may disappear,
+        // use the following way to make the content appear.
+        if (isAttachedToWindow && getVisibility() == View.VISIBLE) {
+            setVisibility(View.INVISIBLE);
+            setVisibility(View.VISIBLE);
+        }
+    }
+
     private void pauseAnimator() {
         if (_isAnimatorPreRunning == null) {
             _isAnimatorPreRunning = animator.isRunning();
@@ -816,9 +807,5 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         }
         _isAnimatorPreRunning = null;
         doPlay();
-    }
-
-    static {
-        BroadcastUtil.getInstance().registerScreenBroadcast();
     }
 }
