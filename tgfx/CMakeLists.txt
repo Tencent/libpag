@@ -288,7 +288,7 @@ elseif (WIN32)
 
     if (TGFX_USE_NATIVE_GL)
         file(GLOB ANGLE_LIBS ../vendor/angle/${PLATFORM}/${ARCH}/*${CMAKE_STATIC_LIBRARY_SUFFIX})
-        list(APPEND GPU_PLATFORM_SHARED_LIBS ${ANGLE_LIBS})
+        list(APPEND GPU_PLATFORM_STATIC_LIBS ${ANGLE_LIBS})
         list(APPEND GPU_PLATFORM_INCLUDES ../vendor/angle/include)
         file(GLOB_RECURSE GPU_PLATFORM_FILES src/gpu/opengl/egl/*.*)
     endif ()
