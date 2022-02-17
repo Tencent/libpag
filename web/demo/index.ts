@@ -35,7 +35,7 @@ window.onload = async () => {
         'viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no',
       );
     await loadScript('https://unpkg.com/vconsole@latest/dist/vconsole.min.js');
-    new window.VConsole();
+    const vconsole = new window.VConsole();
     canvasElementSize = 320;
     const canvas = document.getElementById('pag') as HTMLCanvasElement;
     canvas.width = canvasElementSize;
@@ -56,7 +56,7 @@ window.onload = async () => {
   });
   document.getElementById('upload-font').addEventListener('change', async (event) => {
     const file = (event.target as HTMLInputElement).files[0];
-    document.getElementById('upload-font-text').innerText = `已加载${file.name}`;    
+    document.getElementById('upload-font-text').innerText = `已加载${file.name}`;
     await PAG.PAGFont.registerFont('test', file);
   });
   // 加载测试字体
@@ -256,8 +256,8 @@ window.onload = async () => {
   });
 };
 
-const existsLayer = (pagLayerWasm: object) => {
-  if (pagLayerWasm) return true;
+const existsLayer = (pagLayer: object) => {
+  if (pagLayer) return true;
   console.log('no Layer');
   return false;
 };
@@ -275,15 +275,13 @@ const testPAGComposition = {
     console.log(`test numChildren: ${pagComposition.numChildren()}`);
   },
   getLayerAt: () => {
-    const pagLayerWasm = pagComposition.getLayerAt(0);
-    if (!existsLayer(pagLayerWasm)) return;
-    const pagLayer = new PAG.PAGLayer(pagLayerWasm);
+    const pagLayer = pagComposition.getLayerAt(0);
+    if (!existsLayer(pagLayer)) return;
     console.log(`test getLayerAt index 0, layerName: ${pagLayer.layerName()}`);
   },
   getLayersByName: () => {
-    const pagLayerWasm = pagComposition.getLayerAt(0);
-    if (!existsLayer(pagLayerWasm)) return;
-    const pagLayer = new PAG.PAGLayer(pagLayerWasm);
+    const pagLayer = pagComposition.getLayerAt(0);
+    if (!existsLayer(pagLayer)) return;
     const layerName = pagLayer.layerName();
     const vectorPagLayer = pagComposition.getLayersByName(layerName);
     for (let j = 0; j < vectorPagLayer.size(); j++) {
@@ -316,17 +314,17 @@ const testPAGComposition = {
     swapLayer('swapLayer');
   },
   contains: () => {
-    const pagLayerWasm = pagComposition.getLayerAt(0);
-    const isContains = pagComposition.contains(pagLayerWasm);
+    const pagLayer = pagComposition.getLayerAt(0);
+    const isContains = pagComposition.contains(pagLayer);
     if (isContains) {
       console.log('test contains');
     }
   },
   addLayer: () => {
-    const pagLayerWasm = pagComposition.getLayerAt(0);
+    const pagLayer = pagComposition.getLayerAt(0);
     pagComposition.removeLayerAt(0);
     const oldNum = pagComposition.numChildren();
-    const isSuccess: boolean = pagComposition.addLayer(pagLayerWasm);
+    const isSuccess: boolean = pagComposition.addLayer(pagLayer);
     if (isSuccess) {
       console.log(`test addLayer success: old num ${oldNum} current num ${pagComposition.numChildren()}`);
     }
@@ -357,23 +355,23 @@ const testPAGCompositionAPi = () => {
 };
 
 const swapLayer = (type: string) => {
-  const pagLayerWasm_0 = pagComposition.getLayerAt(0);
-  const pagLayerWasm_1 = pagComposition.getLayerAt(1);
-  if (!pagLayerWasm_0 || !pagLayerWasm_1) {
+  const pagLayer_0 = pagComposition.getLayerAt(0);
+  const pagLayer_1 = pagComposition.getLayerAt(1);
+  if (!pagLayer_0 || !pagLayer_1) {
     console.log('No layer switching');
     return;
   }
-  const pagLayer_name_0 = new PAG.PAGLayer(pagLayerWasm_0).layerName();
-  const pagLayer_name_1 = new PAG.PAGLayer(pagLayerWasm_1).layerName();
+  const pagLayer_name_0 = pagLayer_0.layerName();
+  const pagLayer_name_1 = pagLayer_1.layerName();
   if (type === 'swapLayer') {
-    pagComposition.swapLayer(pagLayerWasm_0, pagLayerWasm_1);
+    pagComposition.swapLayer(pagLayer_0, pagLayer_1);
   } else {
     pagComposition.swapLayerAt(0, 1);
   }
-  const pagLayerWasm_exch_0 = pagComposition.getLayerAt(0);
-  const pagLayerWasm_exch_1 = pagComposition.getLayerAt(1);
-  const pagLayer__exch_0 = new PAG.PAGLayer(pagLayerWasm_exch_0).layerName();
-  const pagLayer__exch_1 = new PAG.PAGLayer(pagLayerWasm_exch_1).layerName();
+  const pagLayer_exch_0 = pagComposition.getLayerAt(0);
+  const pagLayer_exch_1 = pagComposition.getLayerAt(1);
+  const pagLayer__exch_0 = pagLayer_exch_0.layerName();
+  const pagLayer__exch_1 = pagLayer_exch_1.layerName();
   console.log(
     `test ${type}:  oldLayerName_0=${pagLayer_name_0}, oldLayerName_1=${pagLayer_name_1} exchange LayerName_0=${pagLayer__exch_0}, LayerName_1=${pagLayer__exch_1} `,
   );
@@ -533,8 +531,8 @@ const loadScript = (url) => {
     scriptEl.onload = () => {
       resolve(true);
     };
-    scriptEl.onerror = () => {
-      reject(false);
+    scriptEl.onerror = (e) => {
+      reject(e);
     };
     scriptEl.src = url;
     document.body.appendChild(scriptEl);
