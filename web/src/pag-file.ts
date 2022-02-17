@@ -1,6 +1,6 @@
 import { PAGComposition } from './pag-composition';
 import { PAGImage } from './pag-image';
-import { LayerType, PAG, PAGTimeStretchMode, TextDocument } from './types';
+import { LayerType, PAG, PAGTimeStretchMode, TextDocument, Vector } from './types';
 import { readFile } from './utils/common';
 import { wasmAwaitRewind, wasmAsyncMethod } from './utils/decorators';
 import { ErrorCode } from './utils/error-map';
@@ -79,8 +79,8 @@ export class PAGFile extends PAGComposition {
   /**
    * Return an array of layers by specified editable index and layer type.
    */
-  public getLayersByEditableIndex(editableIndex: Number, layerType: LayerType) {
-    return this.wasmIns._getLayersByEditableIndex(editableIndex, layerType);
+  public getLayersByEditableIndex(editableIndex: Number, layerType: LayerType): Vector<any> {
+    return this.wasmIns._getLayersByEditableIndex(editableIndex, layerType) as Vector<any>;
   }
   /**
    * Indicate how to stretch the original duration to fit target duration when file's duration is

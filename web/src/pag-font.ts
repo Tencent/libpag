@@ -23,18 +23,19 @@ export class PAGFont {
   /**
    * Register fallback font names from pag.
    */
-  public static registerFallbackFontNames() {
+  public static registerFallbackFontNames(fontNames: String[] = []) {
     /**
      * Cannot determine whether a certain word exists in the font on the web environment.
      * Because the canvas has font fallback when drawing.
      * The fonts registered here are mainly used to put words in a list in order, and the list can put up to UINT16_MAX words.
      * The emoji font family also has emoji words.
      */
-    const names = new this.module.VectorString();
-    for (const name of defaultFontNames) {
-      names.push_back(name);
+    const vectorNames = new this.module.VectorString();
+    const names = fontNames.concat(defaultFontNames);
+    for (const name of names) {
+      vectorNames.push_back(name);
     }
-    this.module._SetFallbackFontNames(names);
-    names.delete();
+    this.module._SetFallbackFontNames(vectorNames);
+    vectorNames.delete();
   }
 }

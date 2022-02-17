@@ -56,7 +56,7 @@ export interface PAG extends EmscriptenModule {
 /**
  * Defines the rules on how to scale the content to fit the specified area.
  */
-export enum PAGScaleMode {
+export const enum PAGScaleMode {
   /**
    * The content is not scaled.
    */
@@ -77,7 +77,7 @@ export enum PAGScaleMode {
   Zoom = 3,
 }
 
-export enum PAGViewListenerEvent {
+export const enum PAGViewListenerEvent {
   /**
    * Notifies the start of the animation.
    */
@@ -112,6 +112,44 @@ export const enum TextDirection {
   Vertical = 2,
 }
 
+/**
+ * Layers are always one of the following types.
+ */
+export const enum LayerType {
+  Unknown,
+  Null,
+  Solid,
+  Text,
+  Shape,
+  Image,
+  PreCompose,
+}
+
+/**
+ * Defines the rules on how to stretch the timeline of content to fit the specified duration.
+ */
+export const enum PAGTimeStretchMode {
+  /**
+   * Keep the original playing speed, and display the last frame if the content's duration is less
+   * than target duration.
+   */
+  None = 0,
+  /*
+   * Change the playing speed of the content to fit target duration.
+   */
+  Scale = 1,
+  /**
+   * Keep the original playing speed, but repeat the content if the content's duration is less than
+   * target duration. This is the default mode.
+   */
+  Repeat = 2,
+  /**
+   * Keep the original playing speed, but repeat the content in reversed if the content's duration
+   * is less than target duration.
+   */
+  RepeatInverted = 3,
+}
+
 export interface Point {
   x: number;
   y: number;
@@ -120,11 +158,17 @@ export interface Point {
 /**
  * Marker stores comments and other metadata and mark important times in a composition or layer.
  */
- export interface Marker {
+export interface Marker {
   startTime: number;
-  duration : number;
+  duration: number;
   comment: string;
-};
+}
+
+export interface Color {
+  red: number;
+  green: number;
+  blue: number;
+}
 
 export declare class TextDocument {
   /**
@@ -210,45 +254,10 @@ export declare class TextDocument {
   private constructor();
 }
 
-export interface Color {
-  red: number;
-  green: number;
-  blue: number;
-}
-/**
- * Layers are always one of the following types.
- */
-export enum LayerType {
-  Unknown,
-  Null,
-  Solid,
-  Text,
-  Shape,
-  Image,
-  PreCompose,
-}
+export declare class Vector<T> {
+  public get: (index: number) => T;
 
-/**
- * Defines the rules on how to stretch the timeline of content to fit the specified duration.
- */
-export enum PAGTimeStretchMode {
-  /**
-   * Keep the original playing speed, and display the last frame if the content's duration is less
-   * than target duration.
-   */
-  None = 0,
-  /*
-   * Change the playing speed of the content to fit target duration.
-   */
-  Scale = 1,
-  /**
-   * Keep the original playing speed, but repeat the content if the content's duration is less than
-   * target duration. This is the default mode.
-   */
-  Repeat = 2,
-  /**
-   * Keep the original playing speed, but repeat the content in reversed if the content's duration
-   * is less than target duration.
-   */
-  RepeatInverted = 3,
+  public size: () => number;
+
+  private constructor();
 }
