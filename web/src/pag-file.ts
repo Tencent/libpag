@@ -12,7 +12,7 @@ export class PAGFile extends PAGComposition {
   /**
    * Load pag file from file.
    */
-  @wasmAsyncMethod
+  @wasmAsyncMethod(true)
   public static async load(data: File) {
     const buffer = (await readFile(data)) as ArrayBuffer;
     return PAGFile.loadFromBuffer(buffer);
