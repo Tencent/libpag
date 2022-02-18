@@ -17,9 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/PixelBuffer.h"
-#include "core/Bitmap.h"
 #include "gpu/Device.h"
-#include "platform/Platform.h"
 
 namespace tgfx {
 class RasterPixelBuffer : public PixelBuffer {

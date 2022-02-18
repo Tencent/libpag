@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ResourceCache.h"
+#include "gpu/ResourceCache.h"
 #include <unordered_map>
 #include <unordered_set>
 #include "core/BytesKey.h"

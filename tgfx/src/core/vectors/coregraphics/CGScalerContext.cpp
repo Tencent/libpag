@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/vectors/coregraphics/CGScalerContext.h"
-#include "base/utils/Interpolate.h"
 #include "core/PathEffect.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"

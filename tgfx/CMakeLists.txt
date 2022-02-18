@@ -55,7 +55,6 @@ endif ()
 
 # collects tgfx common files.
 set(TGFX_INCLUDES ./ include src)
-list(APPEND TGFX_INCLUDES ../ ../include ../src)
 file(GLOB TGFX_FILES
         src/core/*.*
         src/core/utils/*.*

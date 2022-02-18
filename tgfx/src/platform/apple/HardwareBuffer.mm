@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "HardwareBuffer.h"
-#include "base/utils/USE.h"
+#include "core/utils/USE.h"
 
 namespace tgfx {
 static std::mutex cacheLocker = {};

@@ -18,7 +18,6 @@
 
 #include "core/Bitmap.h"
 #include "core/Image.h"
-#include "platform/Platform.h"
 #include "skcms.h"
 
 namespace tgfx {

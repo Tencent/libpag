@@ -17,11 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/Image.h"
-#include "base/utils/USE.h"
 #include "core/Bitmap.h"
 #include "core/ImageInfo.h"
 #include "core/PixelBuffer.h"
 #include "core/Stream.h"
+#include "core/utils/USE.h"
 #include "platform/NativeCodec.h"
 
 #if defined(TGFX_USE_WEBP_DECODE) || defined(TGFX_USE_WEBP_ENCODE)

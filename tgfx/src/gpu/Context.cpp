@@ -17,10 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/Context.h"
-#include "base/utils/GetTimer.h"
+#include "core/Performance.h"
 #include "core/utils/Log.h"
 #include "gpu/GradientCache.h"
-#include "gpu/Program.h"
 #include "gpu/ProgramCache.h"
 #include "gpu/ResourceCache.h"
 
