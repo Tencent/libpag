@@ -113,7 +113,6 @@ class GLCaps : public Caps {
   GLStandard standard = GLStandard::None;
   uint32_t version = 0;
   GLVendor vendor;
-  int maxTextureSize = 0;
   bool vertexArrayObjectSupport = false;
   bool packRowLengthSupport = false;
   bool unpackRowLengthSupport = false;

@@ -22,5 +22,6 @@ namespace tgfx {
 class Caps {
  public:
   bool floatIs32Bits = true;
+  int maxTextureSize = 0;
 };
 }  // namespace tgfx
