@@ -15,8 +15,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "F2ED889D1FCBEDF100555707"
-               BuildableName = "PAGViewerSlim.app"
-               BlueprintName = "PAGViewerSlim"
+               BuildableName = "PAGViewer.app"
+               BlueprintName = "PAGViewer"
                ReferencedContainer = "container:PAGViewer.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -31,8 +31,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "F2ED889D1FCBEDF100555707"
-            BuildableName = "PAGViewerSlim.app"
-            BlueprintName = "PAGViewerSlim"
+            BuildableName = "PAGViewer.app"
+            BlueprintName = "PAGViewer"
             ReferencedContainer = "container:PAGViewer.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
@@ -64,21 +64,12 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "5478FF39278EFAB100999C9C"
+            BlueprintIdentifier = "F2ED889D1FCBEDF100555707"
             BuildableName = "PAGViewer.app"
             BlueprintName = "PAGViewer"
             ReferencedContainer = "container:PAGViewer.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
-      <MacroExpansion>
-         <BuildableReference
-            BuildableIdentifier = "primary"
-            BlueprintIdentifier = "F2ED889D1FCBEDF100555707"
-            BuildableName = "PAGViewerSlim.app"
-            BlueprintName = "PAGViewerSlim"
-            ReferencedContainer = "container:PAGViewer.xcodeproj">
-         </BuildableReference>
-      </MacroExpansion>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Debug"
@@ -91,8 +82,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "F2ED889D1FCBEDF100555707"
-            BuildableName = "PAGViewerSlim.app"
-            BlueprintName = "PAGViewerSlim"
+            BuildableName = "PAGViewer.app"
+            BlueprintName = "PAGViewer"
             ReferencedContainer = "container:PAGViewer.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>

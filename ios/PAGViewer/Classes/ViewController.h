@@ -8,7 +8,7 @@
 
 #import <UIKit/UIKit.h>
 
-@interface SlimViewController : UIViewController
+@interface ViewController : UIViewController
 
 @property (nonatomic) NSInteger type;
 

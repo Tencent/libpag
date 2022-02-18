@@ -69,7 +69,7 @@ features like video templates.
 
 ## Getting Started
 
-We currently only publish precompiled libraries for iOS and Android. You can build libraries of
+We currently only publish precompiled libraries for iOS, Android, and Web. You can build libraries of
 other platforms from the source code. The latest releases can be downloaded
 from [here](https://github.com/Tencent/libpag/releases).
 
@@ -77,7 +77,6 @@ from [here](https://github.com/Tencent/libpag/releases).
 
 You can use the framework downloaded from the release page, or add libpag to your project by
 CocoaPods:
-
 Add the pod to your Podfile:
 
 ```
@@ -113,11 +112,11 @@ buildscript {
 }
 ```
 
-Add libpag to `app/build.gradle` (*`3.2.7.34` should be replaced with the latest release version*):
+Add libpag to `app/build.gradle` (*`3.2.7.40` should be replaced with the latest release version*):
 
 ```
 dependencies {
-    implementation 'com.tencent.tav:libpag:3.2.7.34'
+    implementation 'com.tencent.tav:libpag:3.2.7.40'
 }
 ```
 
@@ -129,6 +128,34 @@ Add the following rule to your proguard rules to avoid the wrong obfuscation.
 
 Finally, run gradle sync and then build the project.
 
+### Web Installation
+You could use the `locateFile` function to return the path of `libpag.wasm` file, the default path 
+is the same as `libpag.js` 's path.
+
+```html
+<canvas class="canvas" id="pag"></canvas>
+<script src="https://unpkg.com/libpag@latest/lib/libpag.min.js"></script>
+<script>
+  window.libpag.PAGInit().then((PAG) => {
+    const url = 'https://pag.io/file/like.pag';
+    fetch(url)
+      .then((response) => response.blob())
+      .then(async (blob) => {
+        const file = new window.File([blob], url.replace(/(.*\/)*([^.]+)/i, '$2'));
+        // Do Something.
+      });
+  });
+</script>
+```
+More information：[Web Access Guide](https://pag.io/docs/sdk-web.html)
+
+
+### Example project
+If you want to know how to use the SDK, you can run the sample project we provide.
+- [https://github.com/libpag/pag-ios](https://github.com/libpag/pag-ios)
+- [https://github.com/libpag/pag-android](https://github.com/libpag/pag-android)
+- [https://github.com/libpag/pag-web](https://github.com/libpag/pag-web)
+
 ### Documentation
 
 - [iOS API Reference](https://pag.io/api.html#/apis/ios/)
@@ -139,7 +166,7 @@ You can find other docs on [pag.io](https://pag.io/docs/sdk.html)
 
 ## Development
 
-We recommend using CLion IDE on macOS platform for development.
+We recommend using CLion IDE on the macOS platform for development.
 
 ### Branch Management
 
