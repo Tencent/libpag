@@ -1,17 +1,17 @@
 //
-//  SlimViewController.m
+//  ViewController.m
 //  PAGViewer
 //
 //  Created by dom on 25/09/2017.
 //  Copyright © 2017 idom.me. All rights reserved.
 //
 
-#import "SlimViewController.h"
+#import "ViewController.h"
 #import "PAGPlayerView.h"
 #import "BackgroundView.h"
 #import <libpag/PAGVideoDecoder.h>
 
-@interface SlimViewController () <UITabBarControllerDelegate>
+@interface ViewController () <UITabBarControllerDelegate>
 @property (nonatomic, strong) UIImageView *imageView;
 @property (nonatomic, strong) UILabel *label;
 @property (weak, nonatomic) IBOutlet BackgroundView *bgView;
@@ -19,7 +19,7 @@
 
 @end
 
-@implementation SlimViewController
+@implementation ViewController
 
 - (void)viewDidLoad {
     [super viewDidLoad];

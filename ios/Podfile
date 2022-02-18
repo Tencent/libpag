@@ -3,7 +3,7 @@ platform :ios, '9.0'
 ENV["PLATFORM"] = "ios"
 install! 'cocoapods', :deterministic_uuids => false
 
-targetsArray = ['PAGViewer', 'PAGViewerSlim', 'PAGViewerTest']
+targetsArray = ['PAGViewer', 'PAGViewerTest']
 
 targetsArray.each do |t|
   target t do
@@ -12,7 +12,5 @@ targetsArray.each do |t|
     
     # Pods for PAGViewer
     pod 'libpag', :path => '../'
-    pod 'Masonry'
-    pod 'Toast', '~> 4.0.0'
   end
 end

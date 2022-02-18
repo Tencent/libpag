@@ -62,12 +62,90 @@ PAG 方案目前已经接入了腾讯系 40 余款应用，包括微信，手机
 
 ## 快速开始
 
-由于大部分平台没有统一的上层业务框架，目前我们暂时只为 iOS 和 Android 定期发布预编译的二进制库，其他平台的库需要通过源 码根据自己的实际需求调整参数进行编译。移动端最新的 release
-库可以在 [这里](https://github.com/tencent/libpag/releases) 下载。 详细的 SDK
-接入文档可以参考 [SDK 接入](https://pag.io/docs/sdk.html) 。Web 平台的接入文档可以参考 [Web SDK
+由于大部分平台没有统一的上层业务框架，目前我们暂时只为 iOS、Android 和Web定期发布预编译的二进制库，其他平台的库需要通过
+源码根据自己的实际需求调整参数进行编译。移动端最新的release库可以在 [这里](https://github.com/tencent/libpag/releases) 
+下载。 详细的 SDK接入文档可以参考 [SDK 接入](https://pag.io/docs/sdk.html) 。Web 平台的接入文档可以参考 [Web SDK
 接入](./web/README.md)
 
-API 手册：
+### iOS 接入
+可以从发布页面下载预制库，或者通过CocoaPods接入
+
+在Podfile中添加libpag依赖:
+
+```
+pod 'libpag'
+```
+
+然后运行:
+
+```
+pod install
+```
+
+然后在项目中引入libpag的头文件
+
+```
+#import <libpag/xxx.h>
+```
+
+### Android 接入
+可以从发布页面下载aar库文件，或者通过 Maven 将 libpag 添加到你的项目中：
+
+编辑工程根目录下的 `build.gradle` 文件, 在`repositories`下面添加 `mavenCentral()`  :
+
+```
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:3.2.1'
+    }
+}
+```
+
+在 `app/build.gradle`中添加libpag依赖 (*`3.2.7.40` 应替换为最新发布版本*):
+
+```
+dependencies {
+    implementation 'com.tencent.tav:libpag:3.2.7.40'
+}
+```
+
+在混淆列表里面，添加libpag的keep规则
+
+```
+  -keep class org.libpag.* {*;}
+```
+
+配置完以后，sync一下，再编译。
+
+### Web 接入
+可以通过 `locateFile` 函数返回 `.wasm` 文件的路径，默认为 libpag.js 文件同目录下。
+```html
+<canvas class="canvas" id="pag"></canvas>
+<script src="https://unpkg.com/libpag@latest/lib/libpag.min.js"></script>
+<script>
+  window.libpag.PAGInit().then((PAG) => {
+    const url = 'https://pag.io/file/like.pag';
+    fetch(url)
+      .then((response) => response.blob())
+      .then(async (blob) => {
+        const file = new window.File([blob], url.replace(/(.*\/)*([^.]+)/i, '$2'));
+        // Do Something.
+      });
+  });
+</script>
+```
+更多接入方式参考[Web端接入指南](https://pag.io/docs/sdk-web.html)
+
+### 范例工程
+如果仅仅想了解SDK如何使用，可以下载运行提供的范例工程。
+- [https://github.com/libpag/pag-ios](https://github.com/libpag/pag-ios)
+- [https://github.com/libpag/pag-android](https://github.com/libpag/pag-android)
+- [https://github.com/libpag/pag-web](https://github.com/libpag/pag-web)
+
+### API 手册：
 
 - [iOS API 参考](https://pag.io/api.html#/apis/ios/)
 - [Android API 参考](https://pag.io/api.html#/apis/android/org/libpag/package-summary.html)
