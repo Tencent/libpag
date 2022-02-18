@@ -36,6 +36,7 @@ class CGScalerContext {
   static std::unique_ptr<CGScalerContext> Make(std::shared_ptr<Typeface> typeface, float size,
                                                bool fauxBold = false, bool fauxItalic = false,
                                                bool verticalText = false);
+  ~CGScalerContext();
 
   FontMetrics generateFontMetrics();
 
