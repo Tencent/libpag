@@ -11,7 +11,7 @@ export class PAGFont {
   /**
    * Register custom font family in the browser.
    */
-  @wasmAsyncMethod(true)
+  @wasmAsyncMethod
   public static async registerFont(family: string, data: File) {
     const buffer = (await readFile(data)) as ArrayBuffer;
     if (!buffer || !(buffer.byteLength > 0)) Log.errorByCode(ErrorCode.PagFontDataEmpty);
