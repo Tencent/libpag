@@ -40,3 +40,9 @@
 
 - 修复 `FontFamily` 渲染错误
 - 修复微信平台下视频序列帧无法播放
+
+## 0.0.4
+
+### Bug Fixes
+
+- 修复消除 emscripten 中 `Asyncify` 模块带来副作用的Typescript 装饰器遗漏了静态方法

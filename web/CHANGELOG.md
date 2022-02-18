@@ -40,3 +40,9 @@
 
 - Fix font family rending error.
 - Fix video sequence can not play on Wechat.
+
+## 0.0.4
+
+### Bug Fixes
+
+- Fix some static functions that eliminate the side effects caused by the `Asyncify` module in emscripten miss in the Typescript decorator.
