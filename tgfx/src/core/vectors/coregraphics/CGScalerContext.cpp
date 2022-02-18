@@ -101,6 +101,12 @@ CGScalerContext::CGScalerContext(std::shared_ptr<Typeface> typeface, CGScalerCon
       CTFontCreateCopyWithAttributes(font, static_cast<CGFloat>(rec.textSize), nullptr, nullptr);
 }
 
+CGScalerContext::~CGScalerContext() {
+  if (ctFont) {
+    CFRelease(ctFont);
+  }
+}
+
 FontMetrics CGScalerContext::generateFontMetrics() {
   FontMetrics metrics;
   auto theBounds = CTFontGetBoundingBox(ctFont);
