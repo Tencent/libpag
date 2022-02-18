@@ -20,7 +20,6 @@
 #include <vector>
 #include "core/utils/UniqueID.h"
 #include "platform/web/NativeTextureBuffer.h"
-#include "rendering/FontManager.h"
 
 using namespace emscripten;
 
