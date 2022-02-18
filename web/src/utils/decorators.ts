@@ -30,7 +30,7 @@ export function wasmAwaitRewind(constructor: any) {
   };
 
   staticFunctions.forEach((name) => proxyFn(constructor, name));
-  functions.forEach((name) => proxyFn(constructor.prototype, name))
+  functions.forEach((name) => proxyFn(constructor.prototype, name));
 }
 
 export function wasmAsyncMethod(target: any, propertyKey: string, descriptor: PropertyDescriptor) {

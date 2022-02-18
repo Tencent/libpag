@@ -46,3 +46,9 @@
 ### Bug Fixes
 
 - Fix some static functions that eliminate the side effects caused by the `Asyncify` module in emscripten miss in the Typescript decorator.
+
+## 0.0.5
+
+### Bug Fixes
+
+- Fix `PAGImage.fromSource` miss rewind `Asyncify` currData.

@@ -46,3 +46,9 @@
 ### Bug Fixes
 
 - 修复消除 emscripten 中 `Asyncify` 模块带来副作用的Typescript 装饰器遗漏了静态方法
+
+## 0.0.5
+
+### Bug Fixes
+
+- 修复 `PAGImage` 的 `fromSource` 方法没有回溯 `Asyncify` 的状态
