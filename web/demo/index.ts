@@ -25,7 +25,7 @@ let isMobile = false;
 
 window.onload = async () => {
   PAG = await PAGInit({ locateFile: (file) => '../lib/' + file });
-  // 移动端
+  // Mobile
   isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
   if (isMobile) {
     document
@@ -50,15 +50,6 @@ window.onload = async () => {
   document.getElementById('waiting').style.display = 'none';
   document.getElementById('container').style.display = isMobile ? 'block' : '';
 
-  // 加载Font
-  document.getElementById('btn-upload-font').addEventListener('click', () => {
-    document.getElementById('upload-font').click();
-  });
-  document.getElementById('upload-font').addEventListener('change', async (event) => {
-    const file = (event.target as HTMLInputElement).files[0];
-    document.getElementById('upload-font-text').innerText = `已加载${file.name}`;
-    await PAG.PAGFont.registerFont('test', file);
-  });
   // 加载测试字体
   document.getElementById('btn-test-font').addEventListener('click', () => {
     const url = './assets/SourceHanSerifCN-Regular.ttf';
@@ -67,7 +58,7 @@ window.onload = async () => {
       .then(async (blob) => {
         const file = new window.File([blob], url.replace(/(.*\/)*([^.]+)/i, '$2'));
         await PAG.PAGFont.registerFont('SourceHanSerifCN', file);
-        document.getElementById('upload-font-text').innerText = `已加载${file.name}`;
+        console.log(`已加载${file.name}`);
       });
   });
 
@@ -121,7 +112,7 @@ window.onload = async () => {
     textDoc.strokeOverFill = true;
     textDoc.tracking = 600;
     pagFile.replaceText(0, textDoc);
-    pagView.play();
+    await pagView.flush();
   });
 
   // Get PAGFile duration
@@ -380,11 +371,19 @@ const swapLayer = (type: string) => {
 const createPAGView = async (file) => {
   if (pagFile) pagFile.destroy();
   if (pagView) pagView.destroy();
+  const decodeTime = performance.now();
   pagFile = await PAG.PAGFile.load(file);
+  document.getElementById('decode-time').innerText = `PAG File decode time: ${Math.floor(
+    performance.now() - decodeTime,
+  )}ms`;
   const pagCanvas = document.getElementById('pag') as HTMLCanvasElement;
   pagCanvas.width = canvasElementSize;
   pagCanvas.height = canvasElementSize;
+  const initializedTime = performance.now();
   pagView = await PAG.PAGView.init(pagFile, pagCanvas);
+  document.getElementById('initialized-time').innerText = `PAG View initialized time: ${Math.floor(
+    performance.now() - initializedTime,
+  )}ms`;
   pagView.setRepeatCount(0);
   // 绑定事件监听
   pagView.addListener(PAGViewListenerEvent.onAnimationStart, (event) => {
@@ -401,19 +400,33 @@ const createPAGView = async (file) => {
     audioEl.stop();
     audioEl.play();
   });
+  let lastProgress = 0;
+  let lastFlushedTime = null;
+  let flushCount = 0; // Every 3 times update FPSinfo.
   pagView.addListener(PAGViewListenerEvent.onAnimationPlay, (event) => {
     console.log('onAnimationPlay', event);
+    lastFlushedTime = performance.now();
   });
   pagView.addListener(PAGViewListenerEvent.onAnimationPause, (event) => {
     console.log('onAnimationPause', event);
   });
-  pagView.addListener(PAGViewListenerEvent.onAnimationFlushed, (event) => {
-    // console.log('onAnimationFlushed', event);
+  pagView.addListener(PAGViewListenerEvent.onAnimationFlushed, (pagView: PAGView) => {
+    // console.log('onAnimationFlushed', pagView);
+    const progress = pagView.getProgress();
+    const time = performance.now();
+    if (progress !== lastProgress) {
+      flushCount += 1;
+      lastProgress = progress;
+    }
+    if (flushCount === 3) {
+      document.getElementById('fps').innerText = `PAG View FPS: ${Math.floor(1000 / ((time - lastFlushedTime) / 3))}`;
+      lastFlushedTime = time;
+      flushCount = 0;
+    }
   });
   document.getElementById('control').style.display = '';
   // 图层编辑
   const editableLayers = getEditableLayer(PAG, pagFile);
-  console.log(editableLayers);
   renderEditableLayer(editableLayers);
   console.log(`已加载 ${file.name}`);
   pagComposition = pagView.getComposition();
@@ -470,9 +483,14 @@ const getEditableLayer = (PAG: PAGNamespace, pagFile: PAGFile) => {
 };
 
 const renderEditableLayer = (editableLayers) => {
+  const editLayerContent = document.getElementById('editLayer-content');
+  const childNodes = editLayerContent.childNodes;
+  if (childNodes.length > 0) {
+    childNodes.forEach((node) => editLayerContent.removeChild(node));
+  }
   const box = document.createElement('div');
   box.className = 'mt-24';
-  box.innerText = '图层编辑：';
+  box.innerText = 'Editable layer:';
   editableLayers.forEach((layer) => {
     const item = document.createElement('div');
     item.className = 'mt-24';
@@ -493,7 +511,7 @@ const renderEditableLayer = (editableLayers) => {
     item.appendChild(replaceVideoBtn);
     box.appendChild(item);
   });
-  document.querySelector('#editLayer-content').appendChild(box);
+  editLayerContent.appendChild(box);
 };
 
 // 替换图片

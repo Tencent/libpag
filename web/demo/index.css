@@ -38,33 +38,48 @@ input {
   font-size: 16px;
 }
 
+.performance {
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.performance-title {
+  margin: 0;
+  height: 40px;
+  line-height: 40px;
+  font-size: 16px;
+  font-weight: bold;
+  color: #fff;
+  padding: 0 20px;
+  background: #0252d9;
+}
+
+.performance-label {
+  margin: 0;
+  height: 40px;
+  line-height: 40px;
+  font-size: 14px;
+  color: #000;
+  padding: 0 20px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+}
+
 .ac-container {
   margin: 10px auto 30px auto;
 }
 
 .ac-container label {
-  font-family: 'BebasNeueRegular', 'Arial Narrow', Arial, sans-serif;
   padding: 5px 20px;
   position: relative;
   display: block;
   height: 30px;
   cursor: pointer;
   color: #777;
-  text-shadow: 1px 1px 1px rgba(255,255,255,0.8);
   line-height: 33px;
-  font-size: 19px;
+  font-size: 16px;
   background: #ffffff;
-  background: -moz-linear-gradient(top, #ffffff 1%, #eaeaea 100%);
-  background: -webkit-gradient(linear, left top, left bottom, color-stop(1%,#ffffff), color-stop(100%,#eaeaea));
-  background: -webkit-linear-gradient(top, #ffffff 1%,#eaeaea 100%);
-  background: -o-linear-gradient(top, #ffffff 1%,#eaeaea 100%);
-  background: -ms-linear-gradient(top, #ffffff 1%,#eaeaea 100%);
-  background: linear-gradient(top, #ffffff 1%,#eaeaea 100%);
-  filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#ffffff', endColorstr='#eaeaea',GradientType=0 );
-  box-shadow: 
-    0px 0px 0px 1px rgba(155,155,155,0.3), 
-    1px 0px 0px 0px rgba(255,255,255,0.9) inset, 
-    0px 2px 2px rgba(0,0,0,0.1);
+  background: -webkit-linear-gradient(top, #ffffff 1%, #eaeaea 100%);
+  box-shadow: 0px 0px 0px 1px rgba(155, 155, 155, 0.3), 1px 0px 0px 0px rgba(255, 255, 255, 0.9) inset,
+    0px 2px 2px rgba(0, 0, 0, 0.1);
 }
 
 .ac-container label:hover {
@@ -75,10 +90,7 @@ input {
 .ac-container input:checked + label:hover {
   background: #0252d9;
   color: white;
-  text-shadow: 0px 1px 1px rgba(255,255,255, 0.6);
-  box-shadow: 
-    0px 0px 0px 1px rgba(155,155,155,0.3), 
-    0px 2px 2px rgba(0,0,0,0.1);
+  box-shadow: 0px 0px 0px 1px rgba(155, 155, 155, 0.3), 0px 2px 2px rgba(0, 0, 0, 0.1);
 }
 
 .ac-container label:hover:after,
@@ -89,7 +101,9 @@ input {
   height: 24px;
   right: 13px;
   top: 7px;
-  background: transparent url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAJCAYAAAACTR1pAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyBpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMC1jMDYwIDYxLjEzNDc3NywgMjAxMC8wMi8xMi0xNzozMjowMCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RSZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENTNSBXaW5kb3dzIiB4bXBNTTpJbnN0YW5jZUlEPSJ4bXAuaWlkOjJDQjg3QjIzNUEwQTExRTFCMzhGODE4MEUyMzVCOUExIiB4bXBNTTpEb2N1bWVudElEPSJ4bXAuZGlkOjJDQjg3QjI0NUEwQTExRTFCMzhGODE4MEUyMzVCOUExIj4gPHhtcE1NOkRlcml2ZWRGcm9tIHN0UmVmOmluc3RhbmNlSUQ9InhtcC5paWQ6MkNCODdCMjE1QTBBMTFFMUIzOEY4MTgwRTIzNUI5QTEiIHN0UmVmOmRvY3VtZW50SUQ9InhtcC5kaWQ6MkNCODdCMjI1QTBBMTFFMUIzOEY4MTgwRTIzNUI5QTEiLz4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz5cTChyAAAAsUlEQVR42mJcduA0AxBkAvEOIL7PgBuwAXE1EHcA8XcmIFEBxNOA+DAQq+DRtBqI64B4CxBzgjS6QiWlgfgAEKtj0bQOiP2gfF0gVgRp9AHifUia9yJpBmnaCMTeUP5rIHYG4msgjd+xaAbZbADV5IGkyQGIL4M4TFBBmObdUL4EEJ9H0vQCqukazP1MSH4BafZH0syApMkZWRO6RmTNO/BpwqYRpjkIiBegOw8ZAAQYAErPJ/hwLstPAAAAAElFTkSuQmCC) no-repeat center center;
+  background: transparent
+    url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA4AAAAJCAYAAAACTR1pAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyBpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMC1jMDYwIDYxLjEzNDc3NywgMjAxMC8wMi8xMi0xNzozMjowMCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RSZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENTNSBXaW5kb3dzIiB4bXBNTTpJbnN0YW5jZUlEPSJ4bXAuaWlkOjJDQjg3QjIzNUEwQTExRTFCMzhGODE4MEUyMzVCOUExIiB4bXBNTTpEb2N1bWVudElEPSJ4bXAuZGlkOjJDQjg3QjI0NUEwQTExRTFCMzhGODE4MEUyMzVCOUExIj4gPHhtcE1NOkRlcml2ZWRGcm9tIHN0UmVmOmluc3RhbmNlSUQ9InhtcC5paWQ6MkNCODdCMjE1QTBBMTFFMUIzOEY4MTgwRTIzNUI5QTEiIHN0UmVmOmRvY3VtZW50SUQ9InhtcC5kaWQ6MkNCODdCMjI1QTBBMTFFMUIzOEY4MTgwRTIzNUI5QTEiLz4gPC9yZGY6RGVzY3JpcHRpb24+IDwvcmRmOlJERj4gPC94OnhtcG1ldGE+IDw/eHBhY2tldCBlbmQ9InIiPz5cTChyAAAAsUlEQVR42mJcduA0AxBkAvEOIL7PgBuwAXE1EHcA8XcmIFEBxNOA+DAQq+DRtBqI64B4CxBzgjS6QiWlgfgAEKtj0bQOiP2gfF0gVgRp9AHifUia9yJpBmnaCMTeUP5rIHYG4msgjd+xaAbZbADV5IGkyQGIL4M4TFBBmObdUL4EEJ9H0vQCqukazP1MSH4BafZH0syApMkZWRO6RmTNO/BpwqYRpjkIiBegOw8ZAAQYAErPJ/hwLstPAAAAAElFTkSuQmCC)
+    no-repeat center center;
 }
 
 .ac-container input:checked + label:hover:after {
@@ -120,9 +134,9 @@ input {
   -o-transition: height 0.5s ease-in-out, box-shadow 0.1s linear;
   -ms-transition: height 0.5s ease-in-out, box-shadow 0.1s linear;
   transition: height 0.5s ease-in-out, box-shadow 0.1s linear;
-  box-shadow: 0px 0px 0px 1px rgba(155,155,155,0.3);
+  box-shadow: 0px 0px 0px 1px rgba(155, 155, 155, 0.3);
 }
-.support-method .title{
+.support-method .title {
   font-size: 18px;
   color: black;
   font-weight: 600;
