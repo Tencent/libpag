@@ -73,7 +73,7 @@ We currently only publish precompiled libraries for iOS, Android, and Web. You c
 other platforms from the source code. The latest releases can be downloaded
 from [here](https://github.com/Tencent/libpag/releases).
 
-### iOS Installation
+### iOS Integration
 
 You can use the framework downloaded from the release page, or add libpag to your project by
 CocoaPods:
@@ -95,7 +95,7 @@ After installing the cocoapod into your project import libpag with
 #import <libpag/xxx.h>
 ```
 
-### Android Installation
+### Android Integration
 
 You can use the aar downloaded from the release page, or add libpag to your project by Maven:
 
@@ -128,9 +128,9 @@ Add the following rule to your proguard rules to avoid the wrong obfuscation.
 
 Finally, run gradle sync and then build the project.
 
-### Web Installation
-You could use the `locateFile` function to return the path of `libpag.wasm` file, the default path 
-is the same as `libpag.js` 's path.
+### Web Integration
+
+Simply copy the following code into an HTML file and open it in your browser:
 
 ```html
 <canvas class="canvas" id="pag"></canvas>
@@ -147,11 +147,13 @@ is the same as `libpag.js` 's path.
   });
 </script>
 ```
-More information：[Web Access Guide](https://pag.io/docs/sdk-web.html)
+More information：[Web SDK Guide](./web/README.md)
 
 
-### Example project
-If you want to know how to use the SDK, you can run the sample project we provide.
+### Example
+
+Check out the following projects to learn how to use the APIs of libpag:
+
 - [https://github.com/libpag/pag-ios](https://github.com/libpag/pag-ios)
 - [https://github.com/libpag/pag-android](https://github.com/libpag/pag-android)
 - [https://github.com/libpag/pag-web](https://github.com/libpag/pag-web)

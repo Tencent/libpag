@@ -62,13 +62,14 @@ PAG 方案目前已经接入了腾讯系 40 余款应用，包括微信，手机
 
 ## 快速开始
 
-由于大部分平台没有统一的上层业务框架，目前我们暂时只为 iOS、Android 和Web定期发布预编译的二进制库，其他平台的库需要通过
-源码根据自己的实际需求调整参数进行编译。移动端最新的release库可以在 [这里](https://github.com/tencent/libpag/releases) 
+由于大部分平台没有统一的上层业务框架，目前我们暂时只为 iOS, Android 和 Web 平台定期发布预编译的二进制库，其他平台的库需要通过
+源码根据自己的实际需求调整参数进行编译。移动端最新的release库可以在 [这里](https://github.com/Tencent/libpag/releases) 
 下载。 详细的 SDK接入文档可以参考 [SDK 接入](https://pag.io/docs/sdk.html) 。Web 平台的接入文档可以参考 [Web SDK
 接入](./web/README.md)
 
-### iOS 接入
-可以从发布页面下载预制库，或者通过CocoaPods接入
+### iOS 端接入
+
+可以从 [release](https://github.com/Tencent/libpag/releases) 页面下载预编译的二进制库，或者通过CocoaPods接入
 
 在Podfile中添加libpag依赖:
 
@@ -88,8 +89,9 @@ pod install
 #import <libpag/xxx.h>
 ```
 
-### Android 接入
-可以从发布页面下载aar库文件，或者通过 Maven 将 libpag 添加到你的项目中：
+### Android 端接入
+
+可以从 [release](https://github.com/Tencent/libpag/releases) 页面下载预编译的 aar 库文件，或者通过 Maven 将 libpag 添加到你的项目中：
 
 编辑工程根目录下的 `build.gradle` 文件, 在`repositories`下面添加 `mavenCentral()`  :
 
@@ -118,10 +120,12 @@ dependencies {
   -keep class org.libpag.* {*;}
 ```
 
-配置完以后，sync一下，再编译。
+配置完以后，sync一下，再编译即可。
 
-### Web 接入
-可以通过 `locateFile` 函数返回 `.wasm` 文件的路径，默认为 libpag.js 文件同目录下。
+### Web 端接入
+
+直接拷贝如下代码，然后在浏览器中运行即可：
+
 ```html
 <canvas class="canvas" id="pag"></canvas>
 <script src="https://unpkg.com/libpag@latest/lib/libpag.min.js"></script>
@@ -137,10 +141,12 @@ dependencies {
   });
 </script>
 ```
-更多接入方式参考[Web端接入指南](https://pag.io/docs/sdk-web.html)
+Web 端更多接入方式请参考：[Web端接入指南](https://pag.io/docs/sdk-web.html)
 
 ### 范例工程
-如果仅仅想了解SDK如何使用，可以下载运行提供的范例工程。
+
+我们准备了如下各端的 Demo 工程，检出对应平台的 Demo 工程可以快速开始学习如何使用 libpag 的 API：
+
 - [https://github.com/libpag/pag-ios](https://github.com/libpag/pag-ios)
 - [https://github.com/libpag/pag-android](https://github.com/libpag/pag-android)
 - [https://github.com/libpag/pag-web](https://github.com/libpag/pag-web)
@@ -154,6 +160,8 @@ dependencies {
 更多的其他文档可以访问官网  [pag.io](https://pag.io) 获得。
 
 ## 开发指南
+
+**如果您希望参与到 libpag 项目的源码开发中，请务必严格按照以下步骤先配置完开发环境再进行开发和调试。**
 
 我们推荐使用 CLion 并在 macOS 平台上进行开发。
 
