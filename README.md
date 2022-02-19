@@ -64,8 +64,8 @@ features like video templates.
 - Android 4.4 or later
 - macOS 10.13 or later
 - Windows 7.0 or later
-- Chrome 87.0 or later (Web)
-- Safari 11.1 or later (Web)
+- Chrome 69.0 or later (Web)
+- Safari 11.3 or later (Web)
 
 ## Getting Started
 
