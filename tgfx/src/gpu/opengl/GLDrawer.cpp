@@ -121,24 +121,25 @@ static std::shared_ptr<Texture> CreateDstTexture(const DrawArgs& args, Point* ds
     return nullptr;
   }
   GLStateGuard stateGuard(args.context);
-  gl->bindFramebuffer(GL::FRAMEBUFFER, args.renderTarget->getGLInfo().id);
-  auto textureInfo = std::static_pointer_cast<GLTexture>(dstTexture)->getGLInfo();
-  gl->bindTexture(textureInfo.target, textureInfo.id);
+  auto renderTarget = static_cast<const GLRenderTarget*>(args.renderTarget);
+  gl->bindFramebuffer(GL::FRAMEBUFFER, renderTarget->glFrameBuffer().id);
+  auto glSampler = std::static_pointer_cast<GLTexture>(dstTexture)->glSampler();
+  gl->bindTexture(glSampler.target, glSampler.id);
   // format != BGRA && !srcHasMSAARenderBuffer && !dstHasMSAARenderBuffer && dstIsTextureable &&
   // dstOrigin == srcOrigin && canConfigBeFBOColorAttachment(srcConfig) && (!srcIsTextureable ||
   // srcIsGLTexture2D)
-  gl->copyTexSubImage2D(textureInfo.target, 0, 0, 0, static_cast<int>(dstRect.x()),
+  gl->copyTexSubImage2D(glSampler.target, 0, 0, 0, static_cast<int>(dstRect.x()),
                         static_cast<int>(dstRect.y()), static_cast<int>(dstRect.width()),
                         static_cast<int>(dstRect.height()));
-  gl->bindTexture(textureInfo.target, 0);
+  gl->bindTexture(glSampler.target, 0);
   return dstTexture;
 }
 
-static PixelConfig GetOutputPixelConfig(const DrawArgs& args) {
+static PixelFormat GetOutputPixelFormat(const DrawArgs& args) {
   if (args.renderTargetTexture) {
-    return args.renderTargetTexture->getSampler()->config;
+    return args.renderTargetTexture->getSampler()->format;
   }
-  return PixelConfig::RGBA_8888;
+  return PixelFormat::RGBA_8888;
 }
 
 static void UpdateScissor(const GLInterface* gl, const DrawArgs& args) {
@@ -188,8 +189,8 @@ void GLDrawer::draw(DrawArgs args, std::unique_ptr<GLDrawOp> op) const {
       dstTexture = CreateDstTexture(args, &dstTextureOffset);
     }
   }
-  auto config = GetOutputPixelConfig(args);
-  const auto& swizzle = gl->caps->configOutputSwizzle(config);
+  auto config = GetOutputPixelFormat(args);
+  const auto& swizzle = gl->caps->getOutputSwizzle(config);
   Pipeline pipeline(std::move(fragmentProcessors), numColorProcessors, std::move(xferProcessor),
                     dstTexture, dstTextureOffset, &swizzle);
   GLStateGuard stateGuard(args.context);
@@ -200,9 +201,10 @@ void GLDrawer::draw(DrawArgs args, std::unique_ptr<GLDrawOp> op) const {
     return;
   }
   CheckGLError(gl);
+  auto renderTarget = static_cast<const GLRenderTarget*>(args.renderTarget);
   gl->useProgram(program->programID());
-  gl->bindFramebuffer(GL::FRAMEBUFFER, args.renderTarget->getGLInfo().id);
-  gl->viewport(0, 0, args.renderTarget->width(), args.renderTarget->height());
+  gl->bindFramebuffer(GL::FRAMEBUFFER, renderTarget->glFrameBuffer().id);
+  gl->viewport(0, 0, renderTarget->width(), renderTarget->height());
   UpdateScissor(gl, args);
   UpdateBlend(gl, blendAsCoeff, first, second);
   if (pipeline.needsBarrierTexture(args.renderTargetTexture.get())) {

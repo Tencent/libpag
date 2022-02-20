@@ -24,6 +24,7 @@
 #include "core/ImageOrigin.h"
 #include "core/Matrix.h"
 #include "gpu/opengl/GLContext.h"
+#include "gpu/opengl/GLSampler.h"
 
 namespace tgfx {
 struct GLVersion {
@@ -48,11 +49,10 @@ bool CheckGLError(const GLInterface* gl);
 bool CreateGLTexture(const GLInterface* gl, int width, int height, GLTextureInfo* texture);
 
 void ActiveGLTexture(const GLInterface* gl, unsigned textureUnit, unsigned target,
-                     unsigned textureID, PixelConfig pixelConfig = PixelConfig::RGBA_8888);
+                     unsigned textureID, PixelFormat pixelFormat = PixelFormat::RGBA_8888);
 
-void SubmitGLTexture(const GLInterface* gl, const GLTextureInfo& glInfo,
-                     const TextureFormat& format, int width, int height, size_t rowBytes,
-                     int bytesPerPixel, void* pixels);
+void SubmitGLTexture(const GLInterface* gl, const GLSampler& sampler, int width, int height,
+                     size_t rowBytes, int bytesPerPixel, void* pixels);
 
 std::array<float, 9> ToGLMatrix(const Matrix& matrix);
 std::array<float, 9> ToGLVertexMatrix(const Matrix& matrix, int width, int height,

@@ -18,15 +18,18 @@
 
 #pragma once
 
-#include "GLState.h"
-#include "GLTexture.h"
 #include "core/ImageInfo.h"
+#include "gpu/RenderTarget.h"
+#include "gpu/opengl/GLFrameBuffer.h"
+#include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
+class GLInterface;
+
 /**
- * GLRenderTarget represents a 2D buffer of pixels that can be rendered to.
+ * Represents a OpenGL 2D buffer of pixels that can be rendered to.
  */
-class GLRenderTarget : public Resource {
+class GLRenderTarget : public RenderTarget {
  public:
   /**
    * Wraps a BackendRenderTarget into GLRenderTarget. Caller must ensure the BackendRenderTarget is
@@ -37,50 +40,34 @@ class GLRenderTarget : public Resource {
                                                   ImageOrigin origin);
 
   /**
-   * Creates a new render target which uses specified texture as pixel storage. Caller must ensure
-   * texture is valid for the lifetime of returned render target.
+   * Returns the GLFrameBuffer associated with this render target.
    */
-  static std::shared_ptr<GLRenderTarget> MakeFrom(Context* context, GLTexture* texture,
-                                                  int sampleCount = 1);
-
-  /**
-   * Returns the display width of this render target.
-   */
-  int width() const {
-    return _width;
-  }
-
-  /**
-   * Returns the display height of this render target.
-   */
-  int height() const {
-    return _height;
-  }
-
-  /**
-   * Returns the origin of this render target, either ImageOrigin::TopLeft or
-   * ImageOrigin::BottomLeft.
-   */
-  ImageOrigin origin() const {
-    return _origin;
-  }
-
-  GLFrameBufferInfo getGLInfo() const {
+  GLFrameBuffer glFrameBuffer() const {
     return renderTargetFBInfo;
   }
 
-  int sampleCount() const {
-    return _sampleCount;
-  }
+ protected:
+  void onRelease(Context* context) override;
 
-  bool usesMSAA() const {
-    return _sampleCount > 1;
-  }
+ private:
+  GLFrameBuffer textureFBInfo = {};
+  GLFrameBuffer renderTargetFBInfo = {};
+  unsigned msRenderBufferID = 0;
+  unsigned textureTarget = 0;
 
   /**
-   * Replacing all pixels with transparent color.
+   * Creates a new render target which uses specified texture as pixel storage. Caller must ensure
+   * texture is valid for the lifetime of returned render target.
    */
+  static std::shared_ptr<GLRenderTarget> MakeFrom(Context* context, const GLTexture* texture,
+                                                  int sampleCount = 1);
+
+  GLRenderTarget(int width, int height, ImageOrigin origin, int sampleCount,
+                 GLFrameBuffer frameBuffer, unsigned textureTarget = 0);
+
   void clear(const GLInterface* gl) const;
+
+  void resolve(Context* context) const;
 
   /**
    * Copies a rect of pixels to dstPixels with specified color type, alpha type and row bytes. Copy
@@ -90,24 +77,10 @@ class GLRenderTarget : public Resource {
   bool readPixels(Context* context, const ImageInfo& dstInfo, void* dstPixels, int srcX = 0,
                   int srcY = 0) const;
 
-  void resolve(Context* context) const;
-
- protected:
-  void onRelease(Context* context) override;
-
- private:
-  int _width = 0;
-  int _height = 0;
-  ImageOrigin _origin = ImageOrigin::TopLeft;
-  int _sampleCount = 1;
-  GLFrameBufferInfo textureFBInfo = {};
-  GLFrameBufferInfo renderTargetFBInfo = {};
-  unsigned msRenderBufferID = 0;
-  unsigned textureTarget = 0;
-
-  GLRenderTarget(int width, int height, ImageOrigin origin, GLFrameBufferInfo info,
-                 unsigned textureTarget = 0);
-
   friend class GLSurface;
+
+  friend class GLCanvas;
+
+  friend class Surface;
 };
 }  // namespace tgfx

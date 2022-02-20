@@ -119,10 +119,10 @@ PAG_TEST_F(GLUtilTest, Caps_ID82991749) {
     EXPECT_EQ(caps.standard, GLStandard::GL);
     EXPECT_TRUE(caps.textureRedSupport);
     EXPECT_TRUE(caps.multisampleDisableSupport);
-    EXPECT_EQ(caps.getSampleCount(5, PixelConfig::RGBA_8888), 8);
-    EXPECT_EQ(caps.getSampleCount(10, PixelConfig::RGBA_8888), 1);
-    EXPECT_EQ(caps.getSampleCount(0, PixelConfig::RGBA_8888), 1);
-    EXPECT_EQ(caps.getSampleCount(5, PixelConfig::ALPHA_8), 1);
+    EXPECT_EQ(caps.getSampleCount(5, PixelFormat::RGBA_8888), 8);
+    EXPECT_EQ(caps.getSampleCount(10, PixelFormat::RGBA_8888), 1);
+    EXPECT_EQ(caps.getSampleCount(0, PixelFormat::RGBA_8888), 1);
+    EXPECT_EQ(caps.getSampleCount(5, PixelFormat::ALPHA_8), 1);
   }
   {
     ++i;

@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/opengl/cgl/CGLDevice.h"
-#include "CGLProcGetter.h"
-#include "gpu/opengl/GLContext.h"
 
 namespace tgfx {
 void* GLDevice::CurrentNativeHandle() {

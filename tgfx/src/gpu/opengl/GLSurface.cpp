@@ -33,25 +33,25 @@ std::shared_ptr<Surface> Surface::MakeFrom(Context* context, const BackendTextur
                                            ImageOrigin origin) {
   auto texture =
       std::static_pointer_cast<GLTexture>(Texture::MakeFrom(context, backendTexture, origin));
-  return GLSurface::MakeFrom(context, std::move(texture));
+  return Surface::MakeFrom(context, std::move(texture));
 }
 
 std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, bool alphaOnly,
                                        int sampleCount) {
-  auto config = alphaOnly ? PixelConfig::ALPHA_8 : PixelConfig::RGBA_8888;
+  auto pixelFormat = alphaOnly ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
   std::shared_ptr<GLTexture> texture;
   if (alphaOnly) {
     if (GLContext::Unwrap(context)->caps->textureRedSupport) {
-      texture = GLTexture::MakeAlpha(context, width, height);
+      texture = std::static_pointer_cast<GLTexture>(Texture::MakeAlpha(context, width, height));
     }
   } else {
-    texture = GLTexture::MakeRGBA(context, width, height);
+    texture = std::static_pointer_cast<GLTexture>(Texture::MakeRGBA(context, width, height));
   }
   if (texture == nullptr) {
     return nullptr;
   }
   auto gl = GLContext::Unwrap(context);
-  sampleCount = gl->caps->getSampleCount(sampleCount, config);
+  sampleCount = gl->caps->getSampleCount(sampleCount, pixelFormat);
   auto renderTarget = GLRenderTarget::MakeFrom(context, texture.get(), sampleCount);
   if (renderTarget == nullptr) {
     return nullptr;
@@ -70,16 +70,16 @@ std::shared_ptr<GLSurface> GLSurface::MakeFrom(Context* context,
   return std::shared_ptr<GLSurface>(new GLSurface(context, std::move(renderTarget)));
 }
 
-std::shared_ptr<GLSurface> GLSurface::MakeFrom(Context* context,
-                                               std::shared_ptr<GLTexture> texture) {
-  if (texture == nullptr) {
+std::shared_ptr<Surface> Surface::MakeFrom(Context* context, std::shared_ptr<Texture> texture) {
+  if (texture == nullptr || texture->isYUV()) {
     return nullptr;
   }
-  auto renderTarget = GLRenderTarget::MakeFrom(context, texture.get());
+  auto glTexture = std::static_pointer_cast<GLTexture>(texture);
+  auto renderTarget = GLRenderTarget::MakeFrom(context, glTexture.get());
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto surface = new GLSurface(context, renderTarget, texture);
+  auto surface = new GLSurface(context, renderTarget, glTexture);
   return std::shared_ptr<GLSurface>(surface);
 }
 
@@ -131,10 +131,6 @@ bool GLSurface::flush(BackendSemaphore* semaphore) {
     return true;
   }
   return false;
-}
-
-std::shared_ptr<GLRenderTarget> GLSurface::getRenderTarget() const {
-  return renderTarget;
 }
 
 std::shared_ptr<Texture> GLSurface::getTexture() const {

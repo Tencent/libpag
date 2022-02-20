@@ -26,7 +26,7 @@
 #include "core/utils/EnumHasher.h"
 #include "core/utils/Log.h"
 #include "gpu/Caps.h"
-#include "gpu/PixelConfig.h"
+#include "gpu/PixelFormat.h"
 #include "gpu/Swizzle.h"
 
 #define GL_VER(major, minor) ((static_cast<uint32_t>(major) << 16) | static_cast<uint32_t>(minor))
@@ -130,15 +130,15 @@ class GLCaps : public Caps {
 
   explicit GLCaps(const GLInfo& info);
 
-  const TextureFormat& getTextureFormat(PixelConfig config) const;
+  const TextureFormat& getTextureFormat(PixelFormat pixelFormat) const;
 
-  const Swizzle& configSwizzle(PixelConfig config) const;
+  const Swizzle& getSwizzle(PixelFormat pixelFormat) const;
 
-  const Swizzle& configTextureSwizzle(PixelConfig config) const;
+  const Swizzle& getTextureSwizzle(PixelFormat pixelFormat) const;
 
-  const Swizzle& configOutputSwizzle(PixelConfig config) const;
+  const Swizzle& getOutputSwizzle(PixelFormat pixelFormat) const;
 
-  int getSampleCount(int requestedCount, PixelConfig config) const;
+  int getSampleCount(int requestedCount, PixelFormat pixelFormat) const;
 
   /**
    * Does the preferred MSAA FBO extension have MSAA renderBuffers?
@@ -152,9 +152,9 @@ class GLCaps : public Caps {
   bool usesImplicitMSAAResolve() const;
 
  private:
-  std::unordered_map<PixelConfig, ConfigInfo, EnumHasher> configMap = {};
+  std::unordered_map<PixelFormat, ConfigInfo, EnumHasher> pixelFormatMap = {};
 
-  void initConfigMap(const GLInfo& info);
+  void initFormatMap(const GLInfo& info);
   void initColorSampleCount(const GLInfo& info);
   void initGLSupport(const GLInfo& info);
   void initGLESSupport(const GLInfo& info);

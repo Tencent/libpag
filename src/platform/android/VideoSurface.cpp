@@ -47,7 +47,7 @@ void VideoSurface::InitJNI(JNIEnv* env, const std::string& className) {
 OESTexture::OESTexture(tgfx::GLTextureInfo info, int width, int height)
     : GLTexture(width, height, tgfx::ImageOrigin::TopLeft) {
   sampler.glInfo = info;
-  sampler.config = tgfx::PixelConfig::RGBA_8888;
+  sampler.config = tgfx::PixelFormat::RGBA_8888;
 }
 
 void OESTexture::setTextureSize(int width, int height) {
@@ -101,8 +101,7 @@ std::shared_ptr<VideoSurface> VideoSurface::Make(int width, int height) {
   if (surface.empty()) {
     return nullptr;
   }
-  return std::shared_ptr<VideoSurface>(
-      new VideoSurface(env, surface.get(), width, height));
+  return std::shared_ptr<VideoSurface>(new VideoSurface(env, surface.get(), width, height));
 }
 
 VideoSurface::VideoSurface(JNIEnv* env, jobject surface, int width, int height)
@@ -171,8 +170,7 @@ bool VideoSurface::attachToContext(JNIEnv* env, tgfx::Context* context) {
   if (info.id == 0) {
     return false;
   }
-  auto result = env->CallBooleanMethod(videoSurface.get(), VideoSurface_attachToGLContext,
-                                       info.id);
+  auto result = env->CallBooleanMethod(videoSurface.get(), VideoSurface_attachToGLContext, info.id);
   if (!result) {
     gl->deleteTextures(1, &info.id);
     LOGE("VideoSurface::attachToGLContext(): failed to attached to a Surface!");

@@ -18,39 +18,30 @@
 
 #pragma once
 
-#include "GLContext.h"
-#include "GLTextureSampler.h"
 #include "gpu/Texture.h"
+#include "gpu/opengl/GLSampler.h"
 
 namespace tgfx {
+/**
+ * Describes a two dimensional array of pixels in the OpenGL backend for drawing.
+ */
 class GLTexture : public Texture {
  public:
-  static GLTextureInfo Unwrap(const Texture* texture);
-
-  /**
-   * Creates a new texture with each pixel stored as a single translucency (alpha) channel.
-   */
-  static std::shared_ptr<GLTexture> MakeAlpha(Context* context, int width, int height,
-                                              ImageOrigin origin = ImageOrigin::TopLeft);
-
-  /**
-   * Creates a new texture with each pixel stored as 32-bit RGBA data.
-   */
-  static std::shared_ptr<GLTexture> MakeRGBA(Context* context, int width, int height,
-                                             ImageOrigin origin = ImageOrigin::TopLeft);
-
   Point getTextureCoord(float x, float y) const override;
 
   const TextureSampler* getSampler() const override {
     return &sampler;
   }
 
-  const GLTextureInfo& getGLInfo() const {
-    return sampler.glInfo;
+  /**
+   * Returns the GLSampler associated with the texture.
+   */
+  const GLSampler& glSampler() const {
+    return sampler;
   }
 
  protected:
-  GLTextureSampler sampler = {};
+  GLSampler sampler = {};
 
   GLTexture(int width, int height, ImageOrigin origin);
 

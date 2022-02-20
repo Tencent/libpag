@@ -18,33 +18,21 @@
 
 #pragma once
 
-#include "GLContext.h"
-#include "GLTextureSampler.h"
-#include "gpu/YUVTexture.h"
+#include "gpu/PixelFormat.h"
 
 namespace tgfx {
-struct YUVConfig;
-class GLYUVTexture : public YUVTexture {
- public:
-  Point getTextureCoord(float x, float y) const override;
+/**
+ * Types for interacting with GL frame buffers.
+ */
+struct GLFrameBuffer {
+  /**
+   * The id of this frame buffer.
+   */
+  unsigned id = 0;
 
-  size_t samplerCount() const override {
-    return samplers.size();
-  }
-
-  const TextureSampler* getSamplerAt(size_t index) const override;
-
-  size_t planeCount() const {
-    return samplerCount();
-  }
-
- protected:
-  std::vector<GLTextureSampler> samplers = {};
-
-  GLYUVTexture(YUVColorSpace colorSpace, YUVColorRange colorRange, int width, int height);
-
-  void onRelease(Context*) override;
-
-  friend class YUVTexture;
+  /**
+   * The pixel format of this frame buffer.
+   */
+  PixelFormat format = PixelFormat::RGBA_8888;
 };
 }  // namespace tgfx

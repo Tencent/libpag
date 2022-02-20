@@ -22,8 +22,6 @@
 #include <memory>
 
 namespace GL {
-#undef FALSE
-#undef TRUE
 // The following constants consist of the intersection of GL constants
 // exported by GLES 1.0, GLES 2.0, and desktop GL required by the system.
 

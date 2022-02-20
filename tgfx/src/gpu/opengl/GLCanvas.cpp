@@ -34,7 +34,8 @@ GLCanvas::GLCanvas(Surface* surface) : Canvas(surface) {
 }
 
 void GLCanvas::clear() {
-  static_cast<GLSurface*>(surface)->getRenderTarget()->clear(GLContext::Unwrap(getContext()));
+  auto renderTarget = std::static_pointer_cast<GLRenderTarget>(surface->getRenderTarget());
+  renderTarget->clear(GLContext::Unwrap(getContext()));
 }
 
 void GLCanvas::drawTexture(const Texture* texture, const Texture* mask, bool inverted) {
@@ -363,9 +364,9 @@ void GLCanvas::draw(const Rect& localQuad, const Rect& deviceQuad, std::unique_p
   if (drawer == nullptr) {
     return;
   }
-  auto renderTarget = static_cast<GLSurface*>(surface)->getRenderTarget();
+  auto renderTarget = surface->getRenderTarget();
   auto aaType = AAType::None;
-  if (renderTarget->usesMSAA()) {
+  if (renderTarget->sampleCount() > 1) {
     aaType = AAType::MSAA;
   } else if (aa && !IsPixelAligned(deviceQuad)) {
     aaType = AAType::Coverage;

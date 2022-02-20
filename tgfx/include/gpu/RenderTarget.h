@@ -18,22 +18,52 @@
 
 #pragma once
 
-#include "core/BytesKey.h"
-#include "gpu/Context.h"
-#include "gpu/PixelConfig.h"
+#include "gpu/Texture.h"
 
 namespace tgfx {
-class TextureSampler {
+/**
+ * RenderTarget represents a 2D buffer of pixels that can be rendered to.
+ */
+class RenderTarget : public Resource {
  public:
-  TextureSampler() = default;
-
-  virtual ~TextureSampler() = default;
-
-  explicit TextureSampler(PixelConfig config) : config(config) {
+  /**
+   * Returns the display width of the render target.
+   */
+  int width() const {
+    return _width;
   }
 
-  virtual void computeKey(Context* context, BytesKey* bytesKey) const = 0;
+  /**
+   * Returns the display height of the render target.
+   */
+  int height() const {
+    return _height;
+  }
 
-  PixelConfig config = PixelConfig::RGBA_8888;
+  /**
+   * Returns the origin of the render target, either ImageOrigin::TopLeft or
+   * ImageOrigin::BottomLeft.
+   */
+  ImageOrigin origin() const {
+    return _origin;
+  }
+
+  /**
+   * Returns the sample count of the render target.
+   */
+  int sampleCount() const {
+    return _sampleCount;
+  }
+
+ protected:
+  RenderTarget(int width, int height, ImageOrigin origin, int sampleCount = 1)
+      : _width(width), _height(height), _origin(origin), _sampleCount(sampleCount) {
+  }
+
+ private:
+  int _width = 0;
+  int _height = 0;
+  ImageOrigin _origin = ImageOrigin::TopLeft;
+  int _sampleCount = 1;
 };
 }  // namespace tgfx

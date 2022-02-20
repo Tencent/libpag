@@ -87,7 +87,7 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(Context* contex
   glTexture = Resource::Wrap(
       context, new EGLHardwareTexture(hardwareBuffer, eglImage, desc.width, desc.height));
   glTexture->sampler.glInfo = glInfo;
-  glTexture->sampler.config = PixelConfig::RGBA_8888;
+  glTexture->sampler.format = PixelFormat::RGBA_8888;
   return glTexture;
 }
 

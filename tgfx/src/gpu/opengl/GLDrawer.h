@@ -19,18 +19,19 @@
 #pragma once
 
 #include "GLBuffer.h"
-#include "GLRenderTarget.h"
+#include "GLContext.h"
 #include "core/BlendMode.h"
 #include "gpu/AAType.h"
 #include "gpu/FragmentProcessor.h"
 #include "gpu/GeometryProcessor.h"
+#include "gpu/opengl/GLRenderTarget.h"
 
 namespace tgfx {
 struct DrawArgs {
   Context* context = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
   Matrix viewMatrix = Matrix::I();
-  const GLRenderTarget* renderTarget = nullptr;
+  const RenderTarget* renderTarget = nullptr;
   std::shared_ptr<Texture> renderTargetTexture = nullptr;
   Rect rectToDraw = Rect::MakeEmpty();
   Rect scissorRect = Rect::MakeEmpty();

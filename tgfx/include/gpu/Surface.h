@@ -20,6 +20,7 @@
 
 #include "core/ImageInfo.h"
 #include "gpu/Canvas.h"
+#include "gpu/RenderTarget.h"
 
 namespace tgfx {
 /**
@@ -35,8 +36,6 @@ class SurfaceOptions {
 class Canvas;
 
 class Context;
-
-class Texture;
 
 /**
  * Surface is responsible for managing the pixels that a canvas draws into. Surface takes care of
@@ -69,6 +68,11 @@ class Surface {
    */
   static std::shared_ptr<Surface> MakeFrom(Context* context, const BackendTexture& backendTexture,
                                            ImageOrigin origin);
+
+  /**
+   * Wraps a texture into Surface. Returns nullptr if the specified texture is not renderable.
+   */
+  static std::shared_ptr<Surface> MakeFrom(Context* context, std::shared_ptr<Texture>);
 
   explicit Surface(Context* context);
 
@@ -111,8 +115,13 @@ class Surface {
   virtual ImageOrigin origin() const = 0;
 
   /**
-   * Retrieves the texture which Surface renders onto. Return nullptr if Surface was made from a
-   * BackendRenderTarget.
+   * Retrieves the render target that the surface renders to.
+   */
+  virtual std::shared_ptr<RenderTarget> getRenderTarget() const = 0;
+
+  /**
+   * Retrieves the texture that the surface renders to. Return nullptr if the surface was made from
+   * a RenderTarget.
    */
   virtual std::shared_ptr<Texture> getTexture() const = 0;
 

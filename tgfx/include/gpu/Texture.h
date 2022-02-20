@@ -40,24 +40,43 @@ class Texture : public Resource {
   /**
    * Creates a single-plane texture from a hardware buffer. The type of hardwareBuffer should be
    * either AHardwareBuffer* on android platform or CVPixelBufferRef on apple platform. The returned
-   * Texture takes a reference on the buffer.
+   * Texture takes a reference on the buffer. Returns nullptr if any of the parameters is not valid.
    */
   static std::shared_ptr<Texture> MakeFrom(Context* context, void* hardwareBuffer);
 
   /**
-   * Creates a new texture from specified pixels data with each pixel stored as 32-bit RGBA data.
+   * Creates a new texture from the specified pixel data with each pixel stored as 32-bit RGBA
+   * data. Returns nullptr if any of the parameters is not valid.
    */
   static std::shared_ptr<Texture> MakeRGBA(Context* context, int width, int height, void* pixels,
                                            size_t rowBytes,
                                            ImageOrigin origin = ImageOrigin::TopLeft);
+  /**
+   * Creates a empty texture with each pixel stored as 32-bit RGBA data. Returns nullptr if any of
+   * the parameters is not valid.
+   */
+  static std::shared_ptr<Texture> MakeRGBA(Context* context, int width, int height,
+                                           ImageOrigin origin = ImageOrigin::TopLeft) {
+    return MakeRGBA(context, width, height, nullptr, 0, origin);
+  }
 
   /**
-   * Creates a new texture from specified pixels data with each pixel stored as a single
-   * translucency (alpha) channel.
+   * Creates a new texture from the specified pixel data with each pixel stored as a single
+   * translucency (alpha) channel. Returns nullptr if any of the parameters is not valid or the
+   * backend does not support creating alpha only textures.
    */
   static std::shared_ptr<Texture> MakeAlpha(Context* context, int width, int height, void* pixels,
                                             size_t rowBytes,
                                             ImageOrigin origin = ImageOrigin::TopLeft);
+  /**
+   * Creates a empty texture with each pixel stored as a single translucency (alpha) channel.
+   * Returns nullptr if any of the parameters is not valid or the backend does not support creating
+   * alpha only textures.
+   */
+  static std::shared_ptr<Texture> MakeAlpha(Context* context, int width, int height,
+                                            ImageOrigin origin = ImageOrigin::TopLeft) {
+    return MakeAlpha(context, width, height, nullptr, 0, origin);
+  }
 
   Texture(int width, int height, ImageOrigin origin)
       : _width(width), _height(height), _origin(origin) {
@@ -95,7 +114,7 @@ class Texture : public Resource {
   virtual size_t memoryUsage() const = 0;
 
   /**
-   * Returns texture sampler.
+   * Returns the default texture sampler.
    */
   virtual const TextureSampler* getSampler() const = 0;
 

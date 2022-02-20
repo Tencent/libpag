@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "gpu/Surface.h"
 #include "gpu/opengl/GLRenderTarget.h"
 #include "gpu/opengl/GLUtil.h"
 #include "pag/file.h"
@@ -37,30 +38,24 @@ class FilterBuffer {
   std::unique_ptr<FilterTarget> toFilterTarget(const tgfx::Matrix& drawingMatrix) const;
 
   int width() const {
-    return renderTarget->width();
+    return surface->width();
   }
 
   int height() const {
-    return renderTarget->height();
+    return surface->height();
   }
 
   bool usesMSAA() const {
-    return renderTarget->usesMSAA();
+    return surface->getRenderTarget()->sampleCount() > 1;
   }
 
-  tgfx::GLFrameBufferInfo getFramebuffer() const {
-    return renderTarget->getGLInfo();
-  }
+  tgfx::GLFrameBuffer getFramebuffer() const;
 
-  tgfx::GLTextureInfo getTexture() const {
-    return texture->getGLInfo();
-  }
-
-  void resolve(tgfx::Context* context);
+  tgfx::GLSampler getTexture() const;
 
  private:
-  std::shared_ptr<tgfx::GLRenderTarget> renderTarget = nullptr;
-  std::shared_ptr<tgfx::GLTexture> texture = nullptr;
+  std::shared_ptr<tgfx::Surface> surface = nullptr;
+
   FilterBuffer() = default;
 };
 }  // namespace pag

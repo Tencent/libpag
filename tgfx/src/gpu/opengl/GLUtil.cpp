@@ -95,7 +95,7 @@ static std::array<unsigned, 4> GetGLSwizzleValues(const Swizzle& swizzle) {
 }
 
 void ActiveGLTexture(const GLInterface* gl, unsigned textureUnit, unsigned target,
-                     unsigned textureID, PixelConfig pixelConfig) {
+                     unsigned textureID, PixelFormat pixelFormat) {
   gl->activeTexture(textureUnit);
   gl->bindTexture(target, textureID);
   gl->texParameteri(target, GL::TEXTURE_WRAP_S, GL::CLAMP_TO_EDGE);
@@ -103,7 +103,7 @@ void ActiveGLTexture(const GLInterface* gl, unsigned textureUnit, unsigned targe
   gl->texParameteri(target, GL::TEXTURE_MIN_FILTER, GL::LINEAR);
   gl->texParameteri(target, GL::TEXTURE_MAG_FILTER, GL::LINEAR);
   if (gl->caps->textureSwizzleSupport) {
-    const auto& swizzle = gl->caps->configSwizzle(pixelConfig);
+    const auto& swizzle = gl->caps->getSwizzle(pixelFormat);
     auto glValues = GetGLSwizzleValues(swizzle);
     if (gl->caps->standard == GLStandard::GL) {
       gl->texParameteriv(target, GL::TEXTURE_SWIZZLE_RGBA,
@@ -118,34 +118,34 @@ void ActiveGLTexture(const GLInterface* gl, unsigned textureUnit, unsigned targe
   }
 }
 
-void SubmitGLTexture(const GLInterface* gl, const GLTextureInfo& glInfo,
-                     const TextureFormat& format, int width, int height, size_t rowBytes,
-                     int bytesPerPixel, void* pixels) {
+void SubmitGLTexture(const GLInterface* gl, const GLSampler& sampler, int width, int height,
+                     size_t rowBytes, int bytesPerPixel, void* pixels) {
   if (pixels == nullptr || rowBytes == 0) {
     return;
   }
-  gl->bindTexture(glInfo.target, glInfo.id);
+  const auto& format = gl->caps->getTextureFormat(sampler.format);
+  gl->bindTexture(sampler.target, sampler.id);
   gl->pixelStorei(GL::UNPACK_ALIGNMENT, bytesPerPixel);
   if (gl->caps->unpackRowLengthSupport) {
     // the number of pixels, not bytes
     gl->pixelStorei(GL::UNPACK_ROW_LENGTH, static_cast<int>(rowBytes / bytesPerPixel));
-    gl->texImage2D(glInfo.target, 0, static_cast<int>(format.internalFormatTexImage), width, height,
-                   0, format.externalFormat, GL::UNSIGNED_BYTE, pixels);
+    gl->texImage2D(sampler.target, 0, static_cast<int>(format.internalFormatTexImage), width,
+                   height, 0, format.externalFormat, GL::UNSIGNED_BYTE, pixels);
   } else {
     if (static_cast<size_t>(width) * bytesPerPixel == rowBytes) {
-      gl->texImage2D(glInfo.target, 0, static_cast<int>(format.internalFormatTexImage), width,
+      gl->texImage2D(sampler.target, 0, static_cast<int>(format.internalFormatTexImage), width,
                      height, 0, format.externalFormat, GL::UNSIGNED_BYTE, pixels);
     } else {
-      gl->texImage2D(glInfo.target, 0, static_cast<int>(format.internalFormatTexImage), width,
+      gl->texImage2D(sampler.target, 0, static_cast<int>(format.internalFormatTexImage), width,
                      height, 0, format.externalFormat, GL::UNSIGNED_BYTE, nullptr);
       auto data = reinterpret_cast<uint8_t*>(pixels);
       for (int row = 0; row < height; ++row) {
-        gl->texSubImage2D(glInfo.target, 0, 0, row, width, 1, format.externalFormat,
+        gl->texSubImage2D(sampler.target, 0, 0, row, width, 1, format.externalFormat,
                           GL::UNSIGNED_BYTE, data + (row * rowBytes));
       }
     }
   }
-  gl->bindTexture(glInfo.target, 0);
+  gl->bindTexture(sampler.target, 0);
 }
 
 unsigned CreateGLProgram(const GLInterface* gl, const std::string& vertex,

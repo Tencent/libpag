@@ -24,7 +24,7 @@
 namespace tgfx {
 
 /**
- * YUVTexture wraps separate textures in the GPU backend for Y, U, and V planes.
+ * YUVTexture wraps separate texture units in the GPU backend for Y, U, and V planes.
  */
 class YUVTexture : public Texture {
  public:

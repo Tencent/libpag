@@ -341,7 +341,6 @@ void ApplyFilters(tgfx::Context* context, std::vector<FilterNode> filterNodes,
                                                 (lastBounds.top - node.bounds.top) * scale.y);
     auto currentTarget = currentBuffer->toFilterTarget(offsetMatrix);
     node.filter->draw(context, source, currentTarget.get());
-    currentBuffer->resolve(context);
     lastSource = currentBuffer->toFilterSource(scale);
     freeBuffer = lastBuffer;
     lastBuffer = currentBuffer;

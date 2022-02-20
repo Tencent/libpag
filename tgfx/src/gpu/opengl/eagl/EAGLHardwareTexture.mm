@@ -34,7 +34,7 @@ static CVOpenGLESTextureRef GetTextureRef(Context* context, CVPixelBufferRef pix
   CVReturn result;
   if (pixelFormat == kCVPixelFormatType_OneComponent8) {
     auto gl = GLContext::Unwrap(context);
-    const auto& format = gl->caps->getTextureFormat(PixelConfig::ALPHA_8);
+    const auto& format = gl->caps->getTextureFormat(PixelFormat::ALPHA_8);
     *sizedFormat = format.sizedFormat;
     // 返回的 texture 对象是一个强引用计数为 1 的对象。
     result = CVOpenGLESTextureCacheCreateTextureFromImage(
@@ -85,7 +85,7 @@ std::shared_ptr<EAGLHardwareTexture> EAGLHardwareTexture::MakeFrom(Context* cont
       CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_OneComponent8;
   glTexture = Resource::Wrap(context, new EAGLHardwareTexture(pixelBuffer));
   glTexture->sampler.glInfo = glInfo;
-  glTexture->sampler.config = oneComponent8 ? PixelConfig::ALPHA_8 : PixelConfig::RGBA_8888;
+  glTexture->sampler.format = oneComponent8 ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
   glTexture->texture = texture;
   return glTexture;
 }

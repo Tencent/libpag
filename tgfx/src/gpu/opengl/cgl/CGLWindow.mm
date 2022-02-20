@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/opengl/cgl/CGLWindow.h"
+#include <OpenGL/gl3.h>
 #include <thread>
 #include "CGLHardwareTexture.h"
-#include "gpu/opengl/GLSurface.h"
 
 namespace tgfx {
 static std::mutex threadCacheLocker = {};
@@ -108,21 +108,20 @@ std::shared_ptr<Surface> CGLWindow::onCreateSurface(Context* context) {
 #pragma clang diagnostic pop
     GLFrameBufferInfo glInfo = {};
     glInfo.id = 0;
-    glInfo.format = GL::RGBA8;
+    glInfo.format = GL_RGBA8;
     BackendRenderTarget renderTarget(glInfo, size.width, size.height);
     return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
   }
   auto texture = CGLHardwareTexture::MakeFrom(context, pixelBuffer);
-  return GLSurface::MakeFrom(context, texture);
+  return Surface::MakeFrom(context, texture);
 }
 
-void CGLWindow::onPresent(Context* context, int64_t) {
+void CGLWindow::onPresent(Context*, int64_t) {
   auto glContext = static_cast<CGLDevice*>(device.get())->glContext;
   if (view) {
     [glContext flushBuffer];
   } else {
-    auto gl = GLContext::Unwrap(context);
-    gl->flush();
+    glFlush();
   }
 }
 }  // namespace tgfx

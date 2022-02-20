@@ -18,19 +18,30 @@
 
 #pragma once
 
-#include "gpu/TextureSampler.h"
+#include "gpu/YUVTexture.h"
+#include "gpu/opengl/GLSampler.h"
 
 namespace tgfx {
-class GLTextureSampler : public TextureSampler {
+/**
+ * GLYUVTexture wraps separate texture units in the OpenGL backend for Y, U, and V planes.
+ */
+class GLYUVTexture : public YUVTexture {
  public:
-  GLTextureSampler() = default;
+  Point getTextureCoord(float x, float y) const override;
 
-  GLTextureSampler(PixelConfig config, GLTextureInfo textureInfo)
-      : TextureSampler(config), glInfo(textureInfo) {
+  size_t samplerCount() const override {
+    return samplers.size();
   }
 
-  void computeKey(Context* context, BytesKey* bytesKey) const override;
+  const TextureSampler* getSamplerAt(size_t index) const override;
 
-  GLTextureInfo glInfo = {};
+ protected:
+  std::vector<GLSampler> samplers = {};
+
+  GLYUVTexture(YUVColorSpace colorSpace, YUVColorRange colorRange, int width, int height);
+
+  void onRelease(Context*) override;
+
+  friend class YUVTexture;
 };
 }  // namespace tgfx
