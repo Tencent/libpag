@@ -228,9 +228,9 @@ window.onload = async () => {
   });
 
   // freeCache
-  // document.getElementById('btn-freeCache').addEventListener('click', () => {
-  //   pagView.freeCache();
-  // });
+  document.getElementById('btn-freeCache').addEventListener('click', () => {
+    pagView.freeCache();
+  });
 
   // cacheScale
   globalCacheScale = 1;

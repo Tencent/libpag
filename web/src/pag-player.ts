@@ -1,6 +1,8 @@
+import { PAGComposition } from './pag-composition';
 import { PAGFile } from './pag-file';
+import { PAGLayer } from './pag-layer';
 import { PAGSurface } from './pag-surface';
-import { PAG, PAGScaleMode } from './types';
+import { Matrix, PAG, PAGScaleMode, Rect, Vector } from './types';
 import { wasmAwaitRewind, wasmAsyncMethod } from './utils/decorators';
 
 @wasmAwaitRewind
@@ -121,14 +123,108 @@ export class PAGPlayer {
    * Returns the current PAGComposition for PAGPlayer to render as content.
    */
   public getComposition(): PAGFile {
-    const wasmIns = this.wasmIns._getComposition();
-    return new PAGFile(wasmIns);
+    return new PAGFile(this.wasmIns._getComposition());
   }
   /**
    * Sets a new PAGComposition for PAGPlayer to render as content.
    */
-  public setComposition(pagFile: PAGFile) {
-    this.wasmIns._setComposition(pagFile.wasmIns);
+  public setComposition(pagComposition: PAGComposition) {
+    this.wasmIns._setComposition(pagComposition.wasmIns);
+  }
+  /**
+   * Returns the PAGSurface object for PAGPlayer to render onto.
+   */
+  public getSurface(): PAGSurface {
+    return new PAGSurface(this.wasmIns._getSurface());
+  }
+  /**
+   * Returns a copy of current matrix.
+   */
+  public matrix(): Matrix {
+    return this.wasmIns._matrix() as Matrix;
+  }
+  /**
+   * Set the transformation which will be applied to the composition. The scaleMode property
+   * will be set to PAGScaleMode::None when this method is called.
+   */
+  public setMatrix(matrix: Matrix) {
+    this.wasmIns._setMatrix(matrix);
+  }
+  /**
+   * Set the progress of play position to next frame. It is applied only when the composition is not
+   * null.
+   */
+  public nextFrame() {
+    this.wasmIns._nextFrame();
+  }
+  /**
+   * Set the progress of play position to previous frame. It is applied only when the composition is
+   * not null.
+   */
+  public preFrame() {
+    this.wasmIns._preFrame();
+  }
+  /**
+   * If true, PAGPlayer clears the whole content of PAGSurface before drawing anything new to it.
+   * The default value is true.
+   */
+  public autoClear(): boolean {
+    return this.wasmIns._autoClear() as boolean;
+  }
+  /**
+   * Sets the autoClear property.
+   */
+  public setAutoClear(value: boolean) {
+    this.wasmIns._setAutoClear(value);
+  }
+  /**
+   * Returns a rectangle that defines the original area of the layer, which is not transformed by
+   * the matrix.
+   */
+  public getBounds(pagLayer: PAGLayer): Rect {
+    return this.wasmIns._getBounds(pagLayer.wasmIns) as Rect;
+  }
+  /**
+   * Returns an array of layers that lie under the specified point. The point is in pixels and from
+   * this PAGComposition's local coordinates.
+   */
+  public getLayersUnderPoint(): Vector<any> {
+    return this.wasmIns._getLayersUnderPoint();
+  }
+  /**
+   * Evaluates the PAGLayer to see if it overlaps or intersects with the specified point. The point
+   * is in the coordinate space of the PAGSurface, not the PAGComposition that contains the
+   * PAGLayer. It always returns false if the PAGLayer or its parent (or parent's parent...) has not
+   * been added to this PAGPlayer. The pixelHitTest parameter indicates whether or not to check
+   * against the actual pixels of the object (true) or the bounding box (false). Returns true if the
+   * PAGLayer overlaps or intersects with the specified point.
+   */
+  public hitTestPoint(pagLayer: PAGLayer, surfaceX: number, surfaceY: number, pixelHitTest = false): boolean {
+    return this.wasmIns._hitTestPoint(pagLayer.wasmIns, surfaceX, surfaceY, pixelHitTest) as boolean;
+  }
+  /**
+   * The time cost by rendering in microseconds.
+   */
+  public renderingTime(): number {
+    return this.wasmIns._renderingTime() as number;
+  }
+  /**
+   * The time cost by image decoding in microseconds.
+   */
+  public imageDecodingTime(): number {
+    return this.wasmIns._imageDecodingTime() as number;
+  }
+  /**
+   * The time cost by presenting in microseconds.
+   */
+  public presentingTime(): number {
+    return this.wasmIns._presentingTime() as number;
+  }
+  /**
+   * The memory cost by graphics in bytes.
+   */
+  public graphicsMemory(): number {
+    return this.wasmIns._graphicsMemory() as number;
   }
 
   public destroy() {

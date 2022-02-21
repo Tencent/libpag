@@ -219,7 +219,7 @@ export class PAGView {
    * Free the cache created by the pag view immediately. Can be called to reduce memory pressure.
    */
   public freeCache() {
-    // TODO(akazenoslin): PAGSurface freeCache
+    this.pagSurface.freeCache();
   }
   /**
    * Returns the current PAGComposition for PAGView to render as content.

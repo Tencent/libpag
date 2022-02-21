@@ -1,13 +1,7 @@
 import { NativeImage } from './native-image';
 import { measureText } from '../utils/measure-text';
 import { defaultFontNames } from '../utils/font-family';
-
-export interface Bounds {
-  top: number;
-  left: number;
-  bottom: number;
-  right: number;
-}
+import { Rect } from '../types';
 
 const canvas = ((): HTMLCanvasElement | OffscreenCanvas => {
   try {
@@ -47,7 +41,7 @@ export class ScalerContext {
   private readonly fauxBold: boolean;
   private readonly fauxItalic: boolean;
 
-  private fontBoundingBoxMap: { key: string; value: Bounds }[] = [];
+  private fontBoundingBoxMap: { key: string; value: Rect }[] = [];
 
   public constructor(fontName: string, size: number, fauxBold = false, fauxItalic = false) {
     this.fontName = fontName;
@@ -82,7 +76,7 @@ export class ScalerContext {
     context.font = this.fontString();
     const metrics = this.measureText(context, text);
 
-    const bounds: Bounds = {
+    const bounds: Rect = {
       left: Math.floor(-metrics.actualBoundingBoxLeft),
       top: Math.floor(-metrics.actualBoundingBoxAscent),
       right: Math.ceil(metrics.actualBoundingBoxRight),
@@ -106,7 +100,7 @@ export class ScalerContext {
     };
   }
 
-  public generateImage(text: string, bounds): NativeImage {
+  public generateImage(text: string, bounds: Rect): NativeImage {
     const canvas = document.createElement('canvas');
     canvas.width = bounds.right - bounds.left;
     canvas.height = bounds.bottom - bounds.top;
@@ -129,7 +123,7 @@ export class ScalerContext {
     const { left, top, right, bottom } = measureText(imageData);
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
 
-    let fontMeasure: Bounds;
+    let fontMeasure: Rect;
     const fontBoundingBox = this.fontBoundingBoxMap.find((item) => item.key === this.fontName);
     if (fontBoundingBox) {
       fontMeasure = fontBoundingBox.value;

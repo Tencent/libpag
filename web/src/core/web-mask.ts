@@ -1,3 +1,4 @@
+import { Matrix } from '../types';
 import { ScalerContext } from './scaler-context';
 
 export class WebMask {
@@ -46,7 +47,15 @@ export class WebMask {
     }
   }
 
-  public fillText(size: number, fauxBold: boolean, fauxItalic: boolean, fontName: string, texts, positions, matrix) {
+  public fillText(
+    size: number,
+    fauxBold: boolean,
+    fauxItalic: boolean,
+    fontName: string,
+    texts,
+    positions,
+    matrix: Matrix,
+  ) {
     const scalerContext = new ScalerContext(fontName, size, fauxBold, fauxItalic);
     const context = this.canvas.getContext('2d');
     context.transform(matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx, matrix.ty);
@@ -65,7 +74,7 @@ export class WebMask {
     stroke,
     texts,
     positions,
-    matrix,
+    matrix: Matrix,
   ) {
     if (stroke.width < 0.5) {
       return;

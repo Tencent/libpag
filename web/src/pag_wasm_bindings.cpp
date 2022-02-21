@@ -18,6 +18,7 @@
 
 #include <emscripten/bind.h>
 #include <emscripten/val.h>
+#include "base/utils/TGFXCast.h"
 #include "core/FontMetrics.h"
 #include "core/ImageInfo.h"
 #include "core/PathTypes.h"
@@ -135,7 +136,9 @@ EMSCRIPTEN_BINDINGS(pag) {
                       }))
       .function("_width", &PAGSurface::width)
       .function("_height", &PAGSurface::height)
-      .function("_updateSize", &PAGSurface::updateSize);
+      .function("_updateSize", &PAGSurface::updateSize)
+      .function("_clearAll", &PAGSurface::clearAll)
+      .function("_freeCache", &PAGSurface::freeCache);
 
   class_<PAGImage>("_PAGImage")
       .smart_ptr<std::shared_ptr<PAGImage>>("_PAGImage")
@@ -168,12 +171,35 @@ EMSCRIPTEN_BINDINGS(pag) {
       .function("_scaleMode", &PAGPlayer::scaleMode)
       .function("_setScaleMode", &PAGPlayer::setScaleMode)
       .function("_setSurface", &PAGPlayer::setSurface)
-      .function("_getComposition", optional_override([](PAGPlayer& pagPlayer) {
-                  return std::static_pointer_cast<PAGFile>(pagPlayer.getComposition());
+      .function("_getComposition", &PAGPlayer::getComposition)
+      .function("_setComposition", &PAGPlayer::setComposition)
+      .function("_getSurface", &PAGPlayer::getSurface)
+      .function("_matrix",
+                optional_override([](PAGPlayer& pagPlayer) { return ToTGFX(pagPlayer.matrix()); }))
+      .function("_setMatrix", optional_override([](PAGPlayer& pagPlayer, tgfx::Matrix matrix) {
+                  pagPlayer.setMatrix(ToPAG(matrix));
                 }))
-      .function("_setComposition",
-                optional_override([](PAGPlayer& pagPlayer, std::shared_ptr<PAGFile>& pagFile) {
-                  pagPlayer.setComposition(std::move(pagFile));
+      .function("_nextFrame", &PAGPlayer::nextFrame)
+      .function("_preFrame", &PAGPlayer::preFrame)
+      .function("_autoClear", &PAGPlayer::autoClear)
+      .function("_setAutoClear", &PAGPlayer::setAutoClear)
+      .function("_getBounds",
+                optional_override([](PAGPlayer& pagPlayer, std::shared_ptr<PAGLayer> pagLayer) {
+                  return ToTGFX(pagPlayer.getBounds(pagLayer));
+                }))
+      .function("_getLayersUnderPoint", &PAGPlayer::getLayersUnderPoint)
+      .function("_hitTestPoint", &PAGPlayer::hitTestPoint)
+      .function("_renderingTime", optional_override([](PAGPlayer& pagPlayer) {
+                  return static_cast<int>(pagPlayer.renderingTime());
+                }))
+      .function("_imageDecodingTime", optional_override([](PAGPlayer& pagPlayer) {
+                  return static_cast<int>(pagPlayer.imageDecodingTime());
+                }))
+      .function("_presentingTime", optional_override([](PAGPlayer& pagPlayer) {
+                  return static_cast<int>(pagPlayer.presentingTime());
+                }))
+      .function("_graphicsMemory", optional_override([](PAGPlayer& pagPlayer) {
+                  return static_cast<int>(pagPlayer.graphicsMemory());
                 }));
 
   class_<tgfx::ImageInfo>("ImageInfo")

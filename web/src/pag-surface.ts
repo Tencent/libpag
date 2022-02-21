@@ -43,6 +43,34 @@ export class PAGSurface {
   public updateSize(): void {
     this.wasmIns._updateSize();
   }
+  /**
+   * Erases all pixels of this surface with transparent color. Returns true if the content has
+   * changed.
+   */
+  public clearAll(): boolean {
+    return this.wasmIns._clearAll() as boolean;
+  }
+  /**
+   * Free the cache created by the surface immediately. Can be called to reduce memory pressure.
+   */
+  public freeCache(): void {
+    this.wasmIns._freeCache();
+  }
+  /**
+   * Copies pixels from current PAGSurface to dstPixels with specified color type, alpha type and
+   * row bytes. Returns true if pixels are copied to dstPixels.
+   */
+  // TODO(zenoslin) binding PAGSurface::readPixels
+  // public readPixels(colorType, alphaType, buffer): boolean {
+  //   const dataUint8Array = new Uint8Array(buffer);
+  //   const numBytes = dataUint8Array.byteLength * dataUint8Array.BYTES_PER_ELEMENT;
+  //   const dataPtr = PAGSurface.module._malloc(numBytes);
+  //   const dataOnHeap = new Uint8Array(PAGSurface.module.HEAPU8.buffer, dataPtr, numBytes);
+  //   dataOnHeap.set(dataUint8Array);
+  //   const res = this.wasmIns._readPixels(colorType, alphaType, dataOnHeap.byteOffset, dataOnHeap.length);
+  //   PAGSurface.module._free(dataPtr);
+  //   return res;
+  // }
 
   public destroy(): void {
     this.wasmIns.delete();

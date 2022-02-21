@@ -182,6 +182,54 @@ export interface Color {
   blue: number;
 }
 
+export declare class Matrix {
+  /**
+   * The entry at position [1,1] in the matrix.
+   */
+  public a: number;
+  /**
+   * The entry at position [1,2] in the matrix.
+   */
+  public b: number;
+  /**
+   * The entry at position [2,1] in the matrix.
+   */
+  public c: number;
+  /**
+   * The entry at position [2,2] in the matrix.
+   */
+  public d: number;
+  /**
+   * The entry at position [3,1] in the matrix.
+   */
+  public tx: number;
+  /**
+   * The entry at position [3,2] in the matrix.
+   */
+  public ty: number;
+  private constructor();
+}
+
+export declare class Rect {
+  /**
+   * smaller x-axis bounds.
+   */
+  public left: number;
+  /**
+   * smaller y-axis bounds.
+   */
+  public top: number;
+  /**
+   * larger x-axis bounds.
+   */
+  public right: number;
+  /**
+   * larger y-axis bounds.
+   */
+  public bottom: number;
+  private constructor();
+}
+
 export declare class TextDocument {
   /**
    * When true, the text layer shows a fill.
