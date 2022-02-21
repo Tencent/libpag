@@ -20,6 +20,8 @@
 
 #include <memory>
 #include <unordered_set>
+#include "TextAtlas.h"
+#include "TextGlyphs.h"
 #include "gpu/Device.h"
 #include "pag/file.h"
 #include "pag/pag.h"
@@ -99,6 +101,12 @@ class RenderCache : public Performance {
    */
   void removeSnapshot(ID assetID);
 
+  TextAtlas* getTextAtlas(ID assetID);
+
+  TextAtlas* getTextAtlas(const TextGlyphs* textGlyphs);
+
+  void removeTextAtlas(ID assetID);
+
   /**
    * Prepares a bitmap task for next getImageBuffer() call.
    */
@@ -149,6 +157,7 @@ class RenderCache : public Performance {
   std::unordered_set<ID> usedAssets = {};
   std::unordered_map<ID, Snapshot*> snapshotCaches = {};
   std::list<Snapshot*> snapshotLRU = {};
+  std::unordered_map<ID, TextAtlas*> textAtlases = {};
   std::unordered_map<ID, std::shared_ptr<Task>> imageTasks;
   std::unordered_map<ID, std::shared_ptr<SequenceReader>> sequenceCaches;
   std::unordered_map<ID, Filter*> filterCaches;

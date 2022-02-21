@@ -21,13 +21,14 @@
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "rendering/caches/TextContent.h"
+#include "rendering/caches/TextGlyphs.h"
 #include "rendering/graphics/Recorder.h"
 
 namespace pag {
-std::unique_ptr<TextContent> RenderTexts(Property<TextDocumentHandle>* sourceText,
+std::unique_ptr<TextContent> RenderTexts(const std::shared_ptr<TextGlyphs>& textGlyphs,
                                          TextPathOptions* pathOption, TextMoreOptions* moreOption,
                                          std::vector<TextAnimator*>* animators, Frame layerFrame);
 
-void CalculateTextAscentAndDescent(TextDocumentHandle textDocument, float* pMinAscent,
+void CalculateTextAscentAndDescent(const TextDocument* textDocument, float* pMinAscent,
                                    float* pMaxDescent);
 }  // namespace pag

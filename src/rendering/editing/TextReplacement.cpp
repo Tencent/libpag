@@ -25,8 +25,6 @@ TextReplacement::TextReplacement(PAGTextLayer* pagLayer) : pagLayer(pagLayer) {
   auto textData = TextDocumentHandle(new TextDocument());
   *textData = *(textLayer->sourceText->value);
   sourceText->value = textData;
-  textContentCache = new TextContentCache(textLayer, pagLayer->uniqueID(), sourceText);
-  textContentCache->update();
 }
 
 TextReplacement::~TextReplacement() {

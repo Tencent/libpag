@@ -286,7 +286,7 @@ PAG_TEST_F(PAGTextLayerTest, TextAnimatorsMode_ID863204817) {
   EXPECT_EQ(position.y, -180.0f);
   float minAscent = 0.0f;
   float maxDescent = 0.0f;
-  pag::CalculateTextAscentAndDescent(text->getTextDocument(), &minAscent, &maxDescent);
+  pag::CalculateTextAscentAndDescent(text->getTextDocument().get(), &minAscent, &maxDescent);
   EXPECT_LE(fabs(minAscent - (-55.68f)), 0.01f);
   EXPECT_LE(fabs(maxDescent - 13.824f), 0.01f);
 }

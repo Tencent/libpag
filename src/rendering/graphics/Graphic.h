@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "Glyph.h"
 #include "Modifier.h"
+#include "MutableGlyph.h"
 #include "TextureProxy.h"
 #include "core/Bitmap.h"
 #include "gpu/Paint.h"

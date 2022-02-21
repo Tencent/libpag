@@ -195,6 +195,7 @@ void RenderCache::attachToContext(tgfx::Context* current, bool forHitTest) {
     imageTasks.erase(assetID);
     clearSequenceCache(assetID);
     clearFilterCache(assetID);
+    removeTextAtlas(assetID);
   }
 }
 
@@ -286,6 +287,46 @@ void RenderCache::removeSnapshot(ID assetID) {
   graphicsMemory -= snapshot->second->memoryUsage();
   delete snapshot->second;
   snapshotCaches.erase(assetID);
+}
+
+TextAtlas* RenderCache::getTextAtlas(ID assetID) {
+  auto textAtlas = textAtlases.find(assetID);
+  if (textAtlas == textAtlases.end()) {
+    return nullptr;
+  }
+  return textAtlas->second;
+}
+
+TextAtlas* RenderCache::getTextAtlas(const TextGlyphs* textGlyphs) {
+  auto maxScaleFactor = stage->getAssetMaxScale(textGlyphs->assetID());
+  auto textAtlas = getTextAtlas(textGlyphs->assetID());
+  if (textAtlas && (textAtlas->textGlyphsID() != textGlyphs->id() ||
+                    fabsf(textAtlas->scaleFactor() - maxScaleFactor) > SCALE_FACTOR_PRECISION)) {
+    removeTextAtlas(textGlyphs->assetID());
+    textAtlas = nullptr;
+  }
+  if (textAtlas) {
+    return textAtlas;
+  }
+  if (maxScaleFactor < SCALE_FACTOR_PRECISION) {
+    return nullptr;
+  }
+  textAtlas = TextAtlas::Make(textGlyphs, this, maxScaleFactor).release();
+  if (textAtlas) {
+    graphicsMemory += textAtlas->memoryUsage();
+    textAtlases[textGlyphs->assetID()] = textAtlas;
+  }
+  return textAtlas;
+}
+
+void RenderCache::removeTextAtlas(ID assetID) {
+  auto textAtlas = textAtlases.find(assetID);
+  if (textAtlas == textAtlases.end()) {
+    return;
+  }
+  graphicsMemory -= textAtlas->second->memoryUsage();
+  delete textAtlas->second;
+  textAtlases.erase(textAtlas);
 }
 
 void RenderCache::clearAllSnapshots() {
