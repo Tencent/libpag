@@ -18,7 +18,9 @@
 
 #pragma once
 
+#include <unordered_map>
 #include "ContentCache.h"
+#include "TextGlyphs.h"
 
 namespace pag {
 class TextContentCache : public ContentCache {
@@ -32,10 +34,13 @@ class TextContentCache : public ContentCache {
   GraphicContent* createContent(Frame layerFrame) const override;
 
  private:
+  void initTextGlyphs();
+
   ID cacheID = 0;
   Property<TextDocumentHandle>* sourceText;
   TextPathOptions* pathOption;
   TextMoreOptions* moreOption;
   std::vector<TextAnimator*>* animators;
+  std::unordered_map<TextDocument*, std::shared_ptr<TextGlyphs>> textGlyphs;
 };
 }  // namespace pag

@@ -19,6 +19,8 @@
 #pragma once
 
 #include "gpu/Paint.h"
+#include "rendering/caches/TextAtlas.h"
+#include "rendering/caches/TextGlyphs.h"
 #include "rendering/graphics/Graphic.h"
 
 namespace pag {
@@ -43,6 +45,7 @@ class Text : public Graphic {
    * are invisible.
    */
   static std::shared_ptr<Graphic> MakeFrom(const std::vector<GlyphHandle>& glyphs,
+                                           std::shared_ptr<TextGlyphs> textGlyphs,
                                            const tgfx::Rect* calculatedBounds = nullptr);
 
   ~Text() override;
@@ -58,11 +61,17 @@ class Text : public Graphic {
   void draw(tgfx::Canvas* canvas, RenderCache* cache) const override;
 
  private:
+  Text(std::vector<GlyphHandle> glyphs, std::vector<TextRun*> textRuns, const tgfx::Rect& bounds,
+       bool hasAlpha, std::shared_ptr<TextGlyphs> textGlyphs);
+
+  void draw(tgfx::Canvas* canvas, const TextAtlas* textAtlas) const;
+
+  void drawTextRuns(tgfx::Canvas* canvas, int paintIndex) const;
+
+  std::vector<GlyphHandle> glyphs;
   std::vector<TextRun*> textRuns;
   tgfx::Rect bounds = tgfx::Rect::MakeEmpty();
   bool hasAlpha = false;
-
-  explicit Text(const std::vector<TextRun*>& textRuns, const tgfx::Rect& bounds, bool hasAlpha);
-  void drawTextRuns(tgfx::Canvas* canvas, int paintIndex) const;
+  std::shared_ptr<TextGlyphs> textGlyphs = nullptr;
 };
 }  // namespace pag

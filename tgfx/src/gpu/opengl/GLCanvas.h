@@ -34,6 +34,8 @@ class GLCanvas : public Canvas {
   void drawPath(const Path& path, const Paint& paint) override;
   void drawGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
                   const Font& font, const Paint& paint) override;
+  void drawAtlas(const Texture* atlas, const Matrix matrix[], const Rect tex[],
+                 const Color colors[], size_t count) override;
 
  protected:
   void onSave() override {
