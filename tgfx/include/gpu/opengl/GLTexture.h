@@ -27,6 +27,20 @@ namespace tgfx {
  */
 class GLTexture : public Texture {
  public:
+  /**
+   * Creates a new GLTexture which wraps the specified backend texture. Caller must ensure the
+   * backend texture is valid for the lifetime of returned GLTexture.
+   */
+  static std::shared_ptr<GLTexture> MakeFrom(Context* context, const GLSampler& sampler, int width,
+                                             int height, ImageOrigin origin);
+
+  /**
+   * Creates a new GLTexture which wraps the specified backend texture. The returned GLTexture takes
+   * ownership of the specified backend texture.
+   */
+  static std::shared_ptr<GLTexture> MakeAdopted(Context* context, const GLSampler& sampler,
+                                                int width, int height, ImageOrigin origin);
+
   Point getTextureCoord(float x, float y) const override;
 
   const TextureSampler* getSampler() const override {

@@ -26,9 +26,6 @@
 namespace tgfx {
 class GLSurface : public Surface {
  public:
-  static std::shared_ptr<GLSurface> MakeFrom(Context* context,
-                                             std::shared_ptr<GLRenderTarget> renderTarget);
-
   ~GLSurface() override;
 
   int width() const override {
@@ -45,9 +42,9 @@ class GLSurface : public Surface {
 
   Canvas* getCanvas() override;
 
-  bool wait(const BackendSemaphore& semaphore) override;
+  bool wait(const Semaphore* semaphore) override;
 
-  bool flush(BackendSemaphore* semaphore) override;
+  bool flush(Semaphore* semaphore) override;
 
   std::shared_ptr<RenderTarget> getRenderTarget() const override {
     return renderTarget;
@@ -63,8 +60,8 @@ class GLSurface : public Surface {
   std::shared_ptr<GLTexture> texture = nullptr;
   GLCanvas* canvas = nullptr;
 
-  GLSurface(Context* context, std::shared_ptr<GLRenderTarget> renderTarget,
-            std::shared_ptr<GLTexture> texture = nullptr);
+  explicit GLSurface(Context* context, std::shared_ptr<GLRenderTarget> renderTarget,
+                     std::shared_ptr<GLTexture> texture = nullptr);
 
   friend class Surface;
 };

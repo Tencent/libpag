@@ -24,18 +24,27 @@
 
 namespace tgfx {
 std::shared_ptr<GLRenderTarget> GLRenderTarget::MakeFrom(Context* context,
-                                                         const BackendRenderTarget& renderTarget,
-                                                         ImageOrigin origin) {
-  GLFrameBufferInfo glInfo = {};
-  if (context == nullptr || !renderTarget.getGLFramebufferInfo(&glInfo)) {
+                                                         const GLFrameBuffer& frameBuffer,
+                                                         int width, int height, ImageOrigin origin,
+                                                         int sampleCount) {
+  if (context == nullptr || width <= 0 || height <= 0) {
     return nullptr;
   }
-  GLFrameBuffer glFrameBuffer = {};
-  glFrameBuffer.id = glInfo.id;
-  glFrameBuffer.format = PixelFormat::RGBA_8888;
-  auto target =
-      new GLRenderTarget(renderTarget.width(), renderTarget.height(), origin, 1, glFrameBuffer);
-  target->renderTargetFBInfo = glFrameBuffer;
+  auto target = new GLRenderTarget(width, height, origin, sampleCount, frameBuffer);
+  target->renderTargetFBInfo = frameBuffer;
+  target->externalTexture = true;
+  return Resource::Wrap(context, target);
+}
+
+std::shared_ptr<GLRenderTarget> GLRenderTarget::MakeAdopted(Context* context,
+                                                            const GLFrameBuffer& frameBuffer,
+                                                            int width, int height,
+                                                            ImageOrigin origin, int sampleCount) {
+  if (context == nullptr || width <= 0 || height <= 0) {
+    return nullptr;
+  }
+  auto target = new GLRenderTarget(width, height, origin, sampleCount, frameBuffer);
+  target->renderTargetFBInfo = frameBuffer;
   return Resource::Wrap(context, target);
 }
 
@@ -283,10 +292,10 @@ void GLRenderTarget::resolve(Context* context) const {
 }
 
 void GLRenderTarget::onRelease(Context* context) {
-  if (textureTarget == 0) {
+  if (externalTexture) {
     return;
   }
-  {
+  if (textureTarget != 0) {
     // The currently bound fboID may be the same as textureFBInfo.id, we must restore and then
     // delete, otherwise GL::INVALID_OPERATION(1282) will be reported。
     GLStateGuard stateGuard(context);

@@ -50,9 +50,9 @@ GLVersion GetGLVersion(const char* versionString) {
   return {};
 }
 
-bool CreateGLTexture(const GLInterface* gl, int width, int height, GLTextureInfo* texture) {
+bool CreateGLTexture(const GLInterface* gl, int width, int height, GLSampler* texture) {
   texture->target = GL::TEXTURE_2D;
-  texture->format = GL::RGBA8;
+  texture->format = PixelFormat::RGBA_8888;
   gl->genTextures(1, &texture->id);
   if (texture->id <= 0) {
     return false;

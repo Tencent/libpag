@@ -53,8 +53,7 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendRenderTarget& rend
   if (device == nullptr || !renderTarget.isValid()) {
     return nullptr;
   }
-  auto drawable =
-      std::make_shared<RenderTargetDrawable>(device, ToTGFX(renderTarget), ToTGFX(origin));
+  auto drawable = std::make_shared<RenderTargetDrawable>(device, renderTarget, ToTGFX(origin));
   return MakeFrom(std::move(drawable));
 }
 
@@ -64,7 +63,7 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendTexture& texture, 
   if (device == nullptr || !texture.isValid()) {
     return nullptr;
   }
-  auto drawable = std::make_shared<TextureDrawable>(device, ToTGFX(texture), ToTGFX(origin));
+  auto drawable = std::make_shared<TextureDrawable>(device, texture, ToTGFX(origin));
   return MakeFrom(std::move(drawable));
 }
 
@@ -183,7 +182,13 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
   if (graphic) {
     graphic->draw(canvas, cache);
   }
-  surface->flush(ToTGFX(signalSemaphore));
+  if (signalSemaphore == nullptr) {
+    surface->flush();
+  } else {
+    tgfx::GLSemaphore semaphore = {};
+    surface->flush(&semaphore);
+    signalSemaphore->initGL(semaphore.glSync);
+  }
   cache->detachFromContext();
   drawable->setTimeStamp(pagPlayer->getTimeStampInternal());
   drawable->present(context);
@@ -209,7 +214,8 @@ bool PAGSurface::wait(const BackendSemaphore& waitSemaphore) {
     unlockContext();
     return false;
   }
-  auto ret = surface->wait(ToTGFX(waitSemaphore));
+  auto semaphore = ToTGFX(waitSemaphore);
+  auto ret = surface->wait(&semaphore);
   unlockContext();
   return ret;
 }

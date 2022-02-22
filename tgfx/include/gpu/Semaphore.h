@@ -20,13 +20,10 @@
 
 namespace tgfx {
 /**
- * Types for interacting with Metal resources created externally to TGFX. Holds the MTLTexture as a
- * const void*.
+ * Wrapper class for a backend semaphore object.
  */
-struct MtlTextureInfo {
-  /**
-   * Pointer to MTLTexture.
-   */
-  const void* texture = nullptr;
+class Semaphore {
+ public:
+  virtual ~Semaphore() = default;
 };
 }  // namespace tgfx

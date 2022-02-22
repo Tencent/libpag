@@ -32,12 +32,6 @@ class TextureSampler;
 class Texture : public Resource {
  public:
   /**
-   * Creates a new texture which wraps the BackendTexture.
-   */
-  static std::shared_ptr<Texture> MakeFrom(Context* context, const BackendTexture& backendTexture,
-                                           ImageOrigin origin);
-
-  /**
    * Creates a single-plane texture from a hardware buffer. The type of hardwareBuffer should be
    * either AHardwareBuffer* on android platform or CVPixelBufferRef on apple platform. The returned
    * Texture takes a reference on the buffer. Returns nullptr if any of the parameters is not valid.

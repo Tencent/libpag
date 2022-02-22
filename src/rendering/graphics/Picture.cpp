@@ -21,6 +21,7 @@
 #include "base/utils/MatrixUtil.h"
 #include "gpu/Surface.h"
 #include "gpu/opengl/GLDevice.h"
+#include "gpu/opengl/GLTexture.h"
 #include "rendering/caches/RenderCache.h"
 
 namespace pag {
@@ -407,8 +408,7 @@ class ImageTextureProxy : public TextureProxy {
 
 class BackendTextureProxy : public TextureProxy {
  public:
-  BackendTextureProxy(const tgfx::BackendTexture& texture, tgfx::ImageOrigin origin,
-                      void* sharedContext)
+  BackendTextureProxy(const BackendTexture& texture, tgfx::ImageOrigin origin, void* sharedContext)
       : TextureProxy(texture.width(), texture.height()), backendTexture(texture), origin(origin),
         sharedContext(sharedContext) {
   }
@@ -425,11 +425,16 @@ class BackendTextureProxy : public TextureProxy {
     if (!checkContext(context)) {
       return nullptr;
     }
-    return tgfx::Texture::MakeFrom(context, backendTexture, origin);
+    tgfx::GLSampler sampler = {};
+    if (!GetGLSampler(backendTexture, &sampler)) {
+      return nullptr;
+    }
+    return tgfx::GLTexture::MakeFrom(context, sampler, backendTexture.width(),
+                                     backendTexture.height(), origin);
   }
 
  private:
-  tgfx::BackendTexture backendTexture = {};
+  BackendTexture backendTexture = {};
   tgfx::ImageOrigin origin = tgfx::ImageOrigin::TopLeft;
   void* sharedContext = nullptr;
 
@@ -474,7 +479,7 @@ std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID,
   return std::shared_ptr<Graphic>(new TextureProxyPicture(assetID, proxy, false));
 }
 
-std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, const tgfx::BackendTexture& texture,
+std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, const BackendTexture& texture,
                                            tgfx::ImageOrigin origin) {
   if (!texture.isValid()) {
     return nullptr;

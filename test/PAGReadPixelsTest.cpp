@@ -24,6 +24,7 @@
 #include "framework/utils/PAGTestUtils.h"
 #include "gpu/Surface.h"
 #include "gpu/opengl/GLDevice.h"
+#include "gpu/opengl/GLTexture.h"
 #include "gpu/opengl/GLUtil.h"
 
 namespace pag {
@@ -224,11 +225,12 @@ PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
   CHECK_PIXELS(AlphaRectInfo, pixels, "Surface_alpha_to_alpha_100_-100");
 
   auto gl = GLContext::Unwrap(context);
-  tgfx::GLTextureInfo textureInfo = {};
+  tgfx::GLSampler textureInfo = {};
   result = CreateGLTexture(gl, width, height, &textureInfo);
   ASSERT_TRUE(result);
-  auto backendTexture = tgfx::BackendTexture(textureInfo, width, height);
-  surface = Surface::MakeFrom(context, backendTexture, tgfx::ImageOrigin::BottomLeft);
+  auto glTexture =
+      GLTexture::MakeFrom(context, textureInfo, width, height, tgfx::ImageOrigin::BottomLeft);
+  surface = Surface::MakeFrom(context, glTexture);
   ASSERT_TRUE(surface != nullptr);
   canvas = surface->getCanvas();
   canvas->clear();

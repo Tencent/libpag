@@ -32,12 +32,24 @@ class GLInterface;
 class GLRenderTarget : public RenderTarget {
  public:
   /**
-   * Wraps a BackendRenderTarget into GLRenderTarget. Caller must ensure the BackendRenderTarget is
-   * valid for the lifetime of returned render target.
+   * Wraps an OpenGL frame buffer into GLRenderTarget. Please pass the number of samples-per-pixel
+   * in the sampleCount parameter if the frame buffer was constructed with MSAA enabled. Caller must
+   * ensure the backend frame buffer is valid for the lifetime of returned GLRenderTarget.
    */
   static std::shared_ptr<GLRenderTarget> MakeFrom(Context* context,
-                                                  const BackendRenderTarget& renderTarget,
-                                                  ImageOrigin origin);
+                                                  const GLFrameBuffer& frameBuffer, int width,
+                                                  int height, ImageOrigin origin,
+                                                  int sampleCount = 1);
+
+  /**
+   * Wraps an OpenGL frame buffer into GLRenderTarget. Please pass the number of samples-per-pixel
+   * in the sampleCount parameter if the frame buffer was constructed with MSAA enabled. The
+   * returned GLRenderTarget takes ownership of the backend frame buffer.
+   */
+  static std::shared_ptr<GLRenderTarget> MakeAdopted(Context* context,
+                                                     const GLFrameBuffer& frameBuffer, int width,
+                                                     int height, ImageOrigin origin,
+                                                     int sampleCount = 1);
 
   /**
    * Returns the GLFrameBuffer associated with this render target.
@@ -54,6 +66,7 @@ class GLRenderTarget : public RenderTarget {
   GLFrameBuffer renderTargetFBInfo = {};
   unsigned msRenderBufferID = 0;
   unsigned textureTarget = 0;
+  bool externalTexture = false;
 
   /**
    * Creates a new render target which uses specified texture as pixel storage. Caller must ensure

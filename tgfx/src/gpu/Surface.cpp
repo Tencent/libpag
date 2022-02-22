@@ -17,9 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/Surface.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
 Surface::Surface(Context* context) : context(context) {
+  DEBUG_ASSERT(context != nullptr);
 }
 
 bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) const {

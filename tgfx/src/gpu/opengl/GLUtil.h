@@ -46,7 +46,7 @@ unsigned LoadGLShader(const GLInterface* gl, unsigned shaderType, const std::str
 
 bool CheckGLError(const GLInterface* gl);
 
-bool CreateGLTexture(const GLInterface* gl, int width, int height, GLTextureInfo* texture);
+bool CreateGLTexture(const GLInterface* gl, int width, int height, GLSampler* texture);
 
 void ActiveGLTexture(const GLInterface* gl, unsigned textureUnit, unsigned target,
                      unsigned textureID, PixelFormat pixelFormat = PixelFormat::RGBA_8888);

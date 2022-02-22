@@ -19,21 +19,30 @@
 #include "GLSurface.h"
 #include "GLCaps.h"
 #include "GLContext.h"
-#include "GLUtil.h"
+#include "gpu/opengl/GLSemaphore.h"
 
 namespace tgfx {
 std::shared_ptr<Surface> Surface::MakeFrom(Context* context,
-                                           const BackendRenderTarget& renderTarget,
-                                           ImageOrigin origin) {
-  auto rt = GLRenderTarget::MakeFrom(context, renderTarget, origin);
-  return GLSurface::MakeFrom(context, std::move(rt));
+                                           std::shared_ptr<RenderTarget> renderTarget) {
+  if (renderTarget == nullptr || context == nullptr) {
+    return nullptr;
+  }
+  auto glRT = std::static_pointer_cast<GLRenderTarget>(renderTarget);
+  return std::shared_ptr<GLSurface>(new GLSurface(context, std::move(glRT)));
 }
 
-std::shared_ptr<Surface> Surface::MakeFrom(Context* context, const BackendTexture& backendTexture,
-                                           ImageOrigin origin) {
-  auto texture =
-      std::static_pointer_cast<GLTexture>(Texture::MakeFrom(context, backendTexture, origin));
-  return Surface::MakeFrom(context, std::move(texture));
+std::shared_ptr<Surface> Surface::MakeFrom(Context* context, std::shared_ptr<Texture> texture,
+                                           int sampleCount) {
+  if (texture == nullptr || texture->isYUV()) {
+    return nullptr;
+  }
+  auto glTexture = std::static_pointer_cast<GLTexture>(texture);
+  auto renderTarget = GLRenderTarget::MakeFrom(context, glTexture.get(), sampleCount);
+  if (renderTarget == nullptr) {
+    return nullptr;
+  }
+  auto surface = new GLSurface(context, renderTarget, glTexture);
+  return std::shared_ptr<GLSurface>(surface);
 }
 
 std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, bool alphaOnly,
@@ -56,31 +65,10 @@ std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, 
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  // 对于内部创建的 RenderTarget 默认清屏。
   auto surface = new GLSurface(context, renderTarget, texture);
+  // 对于内部创建的 RenderTarget 默认清屏。
   surface->getCanvas()->clear();
   return std::shared_ptr<Surface>(surface);
-}
-
-std::shared_ptr<GLSurface> GLSurface::MakeFrom(Context* context,
-                                               std::shared_ptr<GLRenderTarget> renderTarget) {
-  if (renderTarget == nullptr || context == nullptr) {
-    return nullptr;
-  }
-  return std::shared_ptr<GLSurface>(new GLSurface(context, std::move(renderTarget)));
-}
-
-std::shared_ptr<Surface> Surface::MakeFrom(Context* context, std::shared_ptr<Texture> texture) {
-  if (texture == nullptr || texture->isYUV()) {
-    return nullptr;
-  }
-  auto glTexture = std::static_pointer_cast<GLTexture>(texture);
-  auto renderTarget = GLRenderTarget::MakeFrom(context, glTexture.get());
-  if (renderTarget == nullptr) {
-    return nullptr;
-  }
-  auto surface = new GLSurface(context, renderTarget, glTexture);
-  return std::shared_ptr<GLSurface>(surface);
 }
 
 GLSurface::GLSurface(Context* context, std::shared_ptr<GLRenderTarget> renderTarget,
@@ -99,20 +87,21 @@ Canvas* GLSurface::getCanvas() {
   return canvas;
 }
 
-bool GLSurface::wait(const BackendSemaphore& semaphore) {
-  if (semaphore.glSync() == nullptr) {
+bool GLSurface::wait(const Semaphore* semaphore) {
+  auto glSync = static_cast<const GLSemaphore*>(semaphore)->glSync;
+  if (glSync == nullptr) {
     return false;
   }
   const auto* gl = GLContext::Unwrap(getContext());
   if (!gl->caps->semaphoreSupport) {
     return false;
   }
-  gl->waitSync(semaphore.glSync(), 0, GL::TIMEOUT_IGNORED);
-  gl->deleteSync(semaphore.glSync());
+  gl->waitSync(glSync, 0, GL::TIMEOUT_IGNORED);
+  gl->deleteSync(glSync);
   return true;
 }
 
-bool GLSurface::flush(BackendSemaphore* semaphore) {
+bool GLSurface::flush(Semaphore* semaphore) {
   if (semaphore == nullptr) {
     if (canvas) {
       canvas->flush();
@@ -125,7 +114,7 @@ bool GLSurface::flush(BackendSemaphore* semaphore) {
   }
   auto* sync = gl->fenceSync(GL::SYNC_GPU_COMMANDS_COMPLETE, 0);
   if (sync) {
-    semaphore->initGL(sync);
+    static_cast<GLSemaphore*>(semaphore)->glSync = sync;
     // If we inserted semaphores during the flush, we need to call glFlush.
     gl->flush();
     return true;

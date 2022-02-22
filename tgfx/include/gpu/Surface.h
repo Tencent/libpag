@@ -21,6 +21,7 @@
 #include "core/ImageInfo.h"
 #include "gpu/Canvas.h"
 #include "gpu/RenderTarget.h"
+#include "gpu/Semaphore.h"
 
 namespace tgfx {
 /**
@@ -48,31 +49,25 @@ class Surface {
  public:
   /**
    * Creates a new Surface on GPU indicated by context. Allocates memory for pixels, based on the
-   * width, height and color type (alphaOnly). Return nullptr if alphaOnly is not supported or the
-   * size is zero.
+   * width, height and color type (alphaOnly). A Surface with MSAA enabled is returned if the
+   * sampleCount is greater than 1. Return nullptr if alphaOnly is not supported or the size is
+   * zero.
    */
   static std::shared_ptr<Surface> Make(Context* context, int width, int height,
                                        bool alphaOnly = false, int sampleCount = 1);
 
   /**
-   * Wraps a backed render target into Surface. Caller must ensure renderTarget is valid for the
-   * lifetime of returned Surface.
+   * Wraps a render target into Surface. Returns nullptr if renderTarget is nullptr.
    */
   static std::shared_ptr<Surface> MakeFrom(Context* context,
-                                           const BackendRenderTarget& renderTarget,
-                                           ImageOrigin origin);
+                                           std::shared_ptr<RenderTarget> renderTarget);
 
   /**
-   * Wraps a backed texture into Surface. Caller must ensure backendTexture is valid for the
-   * lifetime of returned Surface.
+   * Wraps a texture into Surface. A Surface with MSAA enabled is returned if the sampleCount is
+   * greater than 1. Returns nullptr if the specified texture is not renderable.
    */
-  static std::shared_ptr<Surface> MakeFrom(Context* context, const BackendTexture& backendTexture,
-                                           ImageOrigin origin);
-
-  /**
-   * Wraps a texture into Surface. Returns nullptr if the specified texture is not renderable.
-   */
-  static std::shared_ptr<Surface> MakeFrom(Context* context, std::shared_ptr<Texture>);
+  static std::shared_ptr<Surface> MakeFrom(Context* context, std::shared_ptr<Texture> texture,
+                                           int sampleCount = 1);
 
   explicit Surface(Context* context);
 
@@ -138,7 +133,7 @@ class Surface {
    * GPU back-end will not wait on the passed semaphore, and the client will still own the
    * semaphore. Returns true if GPU is waiting on the semaphore.
    */
-  virtual bool wait(const BackendSemaphore& waitSemaphore) = 0;
+  virtual bool wait(const Semaphore* waitSemaphore) = 0;
 
   /**
    * Apply all pending changes to the render target immediately. After issuing all commands, the
@@ -149,7 +144,7 @@ class Surface {
    * If false is returned, the GPU back-end did not create or add a semaphore to signal on the GPU;
    * the caller should not instruct the GPU to wait on the semaphore.
    */
-  virtual bool flush(BackendSemaphore* signalSemaphore) = 0;
+  virtual bool flush(Semaphore* signalSemaphore) = 0;
 
   /**
    * Apply all pending changes to the render target immediately.

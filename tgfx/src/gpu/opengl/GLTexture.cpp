@@ -23,8 +23,9 @@
 namespace tgfx {
 class GLBackendTexture : public GLTexture {
  public:
-  GLBackendTexture(GLSampler textureSampler, int width, int height, ImageOrigin origin)
-      : GLTexture(width, height, origin) {
+  GLBackendTexture(GLSampler textureSampler, int width, int height, ImageOrigin origin,
+                   bool adopted)
+      : GLTexture(width, height, origin), adopted(adopted) {
     sampler = std::move(textureSampler);
   }
 
@@ -33,22 +34,32 @@ class GLBackendTexture : public GLTexture {
   }
 
  protected:
-  void onRelease(Context*) override {
+  void onRelease(Context* context) override {
+    if (adopted) {
+      auto gl = GLContext::Unwrap(context);
+      gl->deleteTextures(1, &sampler.id);
+    }
   }
+
+ private:
+  bool adopted = false;
 };
 
-std::shared_ptr<Texture> Texture::MakeFrom(Context* context, const BackendTexture& backendTexture,
-                                           ImageOrigin origin) {
-  GLTextureInfo glTextureInfo = {};
-  if (context == nullptr || !backendTexture.getGLTextureInfo(&glTextureInfo)) {
+std::shared_ptr<GLTexture> GLTexture::MakeFrom(Context* context, const GLSampler& sampler,
+                                               int width, int height, ImageOrigin origin) {
+  if (context == nullptr || width <= 0 || height <= 0 || sampler.id == 0) {
     return nullptr;
   }
-  GLSampler sampler = {};
-  sampler.id = glTextureInfo.id;
-  sampler.target = glTextureInfo.target;
-  sampler.format = PixelFormat::RGBA_8888;
-  auto texture =
-      new GLBackendTexture(sampler, backendTexture.width(), backendTexture.height(), origin);
+  auto texture = new GLBackendTexture(sampler, width, height, origin, false);
+  return Resource::Wrap(context, texture);
+}
+
+std::shared_ptr<GLTexture> GLTexture::MakeAdopted(Context* context, const GLSampler& sampler,
+                                                  int width, int height, ImageOrigin origin) {
+  if (context == nullptr || width <= 0 || height <= 0 || sampler.id == 0) {
+    return nullptr;
+  }
+  auto texture = new GLBackendTexture(sampler, width, height, origin, true);
   return Resource::Wrap(context, texture);
 }
 

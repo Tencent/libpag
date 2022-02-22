@@ -18,37 +18,18 @@
 
 #pragma once
 
+#include "gpu/Semaphore.h"
+
 namespace tgfx {
-/**
- * Types for interacting with GL textures created externally to TGFX.
- */
-struct GLTextureInfo {
-  /**
-   * the id of this texture.
-   */
-  unsigned id = 0;
-  /**
-   * The target of this texture.
-   */
-  unsigned target = 0x0DE1;  // GL_TEXTURE_2D;
-  /**
-   * The pixel format of this texture.
-   */
-  unsigned format = 0x8058;  // GL_RGBA8;
-};
 
 /**
- * Types for interacting with GL frame buffers created externally to TGFX.
+ * Types for interacting with OpenGL semaphore object.
  */
-struct GLFrameBufferInfo {
+class GLSemaphore : public Semaphore {
+ public:
   /**
-   * The id of this frame buffer.
+   * Holds the GLsync as a void*.
    */
-  unsigned id = 0;
-
-  /**
-   * The pixel format of this frame buffer.
-   */
-  unsigned format = 0x8058;  // GL_RGBA8;
+  void* glSync = nullptr;
 };
 }  // namespace tgfx
