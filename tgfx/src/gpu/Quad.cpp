@@ -16,37 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "AAType.h"
-#include "GeometryProcessor.h"
-#include "gpu/Paint.h"
+#include "Quad.h"
 
 namespace tgfx {
-class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
- public:
-  static std::unique_ptr<QuadPerEdgeAAGeometryProcessor> Make(int width, int height, AAType aa,
-                                                              bool hasColor);
+Quad Quad::MakeFromRect(const Rect& rect, const Matrix& matrix) {
+  std::vector<Point> points;
+  points.push_back(Point::Make(rect.left, rect.top));
+  points.push_back(Point::Make(rect.left, rect.bottom));
+  points.push_back(Point::Make(rect.right, rect.top));
+  points.push_back(Point::Make(rect.right, rect.bottom));
+  matrix.mapPoints(&points[0], 4);
+  return Quad(points);
+}
 
-  std::string name() const override {
-    return "QuadPerEdgeAAGeometryProcessor";
-  }
-
-  std::unique_ptr<GLGeometryProcessor> createGLInstance() const override;
-
- private:
-  QuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa, bool hasColor);
-
-  void onComputeProcessorKey(BytesKey* bytesKey) const override;
-
-  Attribute position;  // May contain coverage as last channel
-  Attribute localCoord;
-  Attribute color;
-
-  int width = 1;
-  int height = 1;
-  AAType aa = AAType::None;
-
-  friend class GLQuadPerEdgeAAGeometryProcessor;
-};
+Rect Quad::bounds() const {
+  auto min = [](const float c[4]) { return std::min(std::min(c[0], c[1]), std::min(c[2], c[3])); };
+  auto max = [](const float c[4]) { return std::max(std::max(c[0], c[1]), std::max(c[2], c[3])); };
+  float x[4] = {points[0].x, points[1].x, points[2].x, points[3].x};
+  float y[4] = {points[0].y, points[1].y, points[2].y, points[3].y};
+  return {min(x), min(y), max(x), max(y)};
+}
 }  // namespace tgfx

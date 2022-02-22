@@ -23,7 +23,8 @@
 namespace tgfx {
 class GLBuffer : public Resource {
  public:
-  static std::shared_ptr<GLBuffer> Make(Context* context, const uint16_t* buffer, size_t length);
+  static std::shared_ptr<GLBuffer> Make(Context* context, const uint16_t* buffer, size_t length,
+                                        uint32_t type);
 
   unsigned bufferID() const {
     return _bufferID;
@@ -37,12 +38,12 @@ class GLBuffer : public Resource {
   void computeRecycleKey(BytesKey*) const override;
 
  private:
-  GLBuffer(const void* uniqueKey, size_t length) : uniqueKey(uniqueKey), _length(length) {
+  GLBuffer(uint32_t type, size_t length) : type(type), _length(length) {
   }
 
   void onReleaseGPU() override;
 
-  const void* uniqueKey = nullptr;
+  uint32_t type = 0;
   size_t _length = 0;
   unsigned _bufferID = 0;
 };

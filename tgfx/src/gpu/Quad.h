@@ -18,35 +18,24 @@
 
 #pragma once
 
-#include "AAType.h"
-#include "GeometryProcessor.h"
-#include "gpu/Paint.h"
+#include "core/Matrix.h"
+#include "core/Rect.h"
 
 namespace tgfx {
-class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
+class Quad {
  public:
-  static std::unique_ptr<QuadPerEdgeAAGeometryProcessor> Make(int width, int height, AAType aa,
-                                                              bool hasColor);
+  static Quad MakeFromRect(const Rect& rect, const Matrix& matrix);
 
-  std::string name() const override {
-    return "QuadPerEdgeAAGeometryProcessor";
+  const Point& point(size_t i) const {
+    return points[i];
   }
 
-  std::unique_ptr<GLGeometryProcessor> createGLInstance() const override;
+  Rect bounds() const;
 
  private:
-  QuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa, bool hasColor);
+  explicit Quad(std::vector<Point> points) : points(std::move(points)) {
+  }
 
-  void onComputeProcessorKey(BytesKey* bytesKey) const override;
-
-  Attribute position;  // May contain coverage as last channel
-  Attribute localCoord;
-  Attribute color;
-
-  int width = 1;
-  int height = 1;
-  AAType aa = AAType::None;
-
-  friend class GLQuadPerEdgeAAGeometryProcessor;
+  std::vector<Point> points;
 };
 }  // namespace tgfx

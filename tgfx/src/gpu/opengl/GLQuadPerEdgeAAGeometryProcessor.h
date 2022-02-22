@@ -30,12 +30,9 @@ class GLQuadPerEdgeAAGeometryProcessor : public GLGeometryProcessor {
                FPCoordTransformIter* transformIter) override;
 
  private:
-  UniformHandle matrixUniform;
   UniformHandle screenSizeUniform;
 
-  Matrix viewMatrixPrev = Matrix::I();
   int widthPrev = -1;
   int heightPrev = -1;
-  bool updated = false;
 };
 }  // namespace tgfx

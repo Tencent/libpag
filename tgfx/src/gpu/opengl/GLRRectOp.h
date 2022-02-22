@@ -25,7 +25,7 @@
 namespace tgfx {
 class GLRRectOp : public GLDrawOp {
  public:
-  static std::unique_ptr<GLRRectOp> Make(RRect rRect);
+  static std::unique_ptr<GLRRectOp> Make(const RRect& rRect, const Matrix& viewMatrix);
 
   std::unique_ptr<GeometryProcessor> getGeometryProcessor(const DrawArgs& args) override;
 
@@ -34,6 +34,10 @@ class GLRRectOp : public GLDrawOp {
   std::shared_ptr<GLBuffer> getIndexBuffer(const DrawArgs& args) override;
 
  private:
+  GLRRectOp(const RRect& rRect, const Matrix& viewMatrix);
+
+  RRect rRect;
+  Matrix viewMatrix = Matrix::I();
   float xRadius = 0;
   float yRadius = 0;
   float innerXRadius = 0;

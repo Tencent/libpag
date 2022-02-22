@@ -22,30 +22,32 @@
 #include "gpu/opengl/GLQuadPerEdgeAAGeometryProcessor.h"
 
 namespace tgfx {
-std::unique_ptr<QuadPerEdgeAAGeometryProcessor> QuadPerEdgeAAGeometryProcessor::Make(int width,
-                                                                                     int height,
-                                                                                     Matrix matrix,
-                                                                                     AAType aa) {
+std::unique_ptr<QuadPerEdgeAAGeometryProcessor> QuadPerEdgeAAGeometryProcessor::Make(
+    int width, int height, AAType aa, bool hasColor) {
   return std::unique_ptr<QuadPerEdgeAAGeometryProcessor>(
-      new QuadPerEdgeAAGeometryProcessor(width, height, matrix, aa));
+      new QuadPerEdgeAAGeometryProcessor(width, height, aa, hasColor));
 }
 
-QuadPerEdgeAAGeometryProcessor::QuadPerEdgeAAGeometryProcessor(int width, int height, Matrix matrix,
-                                                               AAType aa)
-    : width(width), height(height), viewMatrix(matrix), aa(aa) {
+QuadPerEdgeAAGeometryProcessor::QuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa,
+                                                               bool hasColor)
+    : width(width), height(height), aa(aa) {
   if (aa == AAType::Coverage) {
     position = {"aPositionWithCoverage", ShaderVar::Type::Float3};
   } else {
     position = {"aPosition", ShaderVar::Type::Float2};
   }
   localCoord = {"localCoord", ShaderVar::Type::Float2};
-  setVertexAttributes(&position, 2);
+  if (hasColor) {
+    color = {"inColor", ShaderVar::Type::Float4};
+  }
+  setVertexAttributes(&position, 3);
 }
 
 void QuadPerEdgeAAGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   static auto Type = UniqueID::Next();
   bytesKey->write(Type);
   uint32_t flags = aa == AAType::Coverage ? 1 : 0;
+  flags |= color.isInitialized() ? 2 : 0;
   bytesKey->write(flags);
 }
 

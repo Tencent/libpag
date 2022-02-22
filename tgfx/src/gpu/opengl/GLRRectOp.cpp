@@ -19,6 +19,7 @@
 #include "GLRRectOp.h"
 
 #include "core/utils/MathExtra.h"
+#include "core/utils/UniqueID.h"
 #include "gpu/EllipseGeometryProcessor.h"
 
 namespace tgfx {
@@ -97,14 +98,16 @@ static constexpr size_t kIndicesPerFillRRect =
 // stroke count is fill count minus center indices
 // static constexpr int kIndicesPerStrokeRRect = kCornerIndicesCount + kEdgeIndicesCount;
 
-std::unique_ptr<GLRRectOp> GLRRectOp::Make(RRect rRect) {
+std::unique_ptr<GLRRectOp> GLRRectOp::Make(const RRect& rRect, const Matrix& viewMatrix) {
   if (/*!isStrokeOnly && */ 0.5f <= rRect.radii.x && 0.5f <= rRect.radii.y) {
-    auto op = new GLRRectOp();
-    op->xRadius = rRect.radii.x;
-    op->yRadius = rRect.radii.y;
-    return std::unique_ptr<GLRRectOp>(op);
+    return std::unique_ptr<GLRRectOp>(new GLRRectOp(rRect, viewMatrix));
   }
   return nullptr;
+}
+
+GLRRectOp::GLRRectOp(const RRect& rRect, const Matrix& viewMatrix)
+    : rRect(rRect), viewMatrix(viewMatrix), xRadius(rRect.radii.x), yRadius(rRect.radii.y) {
+  setTransformedBounds(rRect.rect, viewMatrix);
 }
 
 static bool UseScale(const DrawArgs& args) {
@@ -112,12 +115,11 @@ static bool UseScale(const DrawArgs& args) {
 }
 
 std::unique_ptr<GeometryProcessor> GLRRectOp::getGeometryProcessor(const DrawArgs& args) {
-  auto localMatrix =
-      Matrix::MakeScale(1.f / args.rectToDraw.width(), 1.f / args.rectToDraw.height());
-  localMatrix.postTranslate(-args.rectToDraw.left / args.rectToDraw.width(),
-                            -args.rectToDraw.top / args.rectToDraw.height());
+  auto localMatrix = Matrix::MakeScale(1.f / rRect.rect.width(), 1.f / rRect.rect.height());
+  localMatrix.postTranslate(-rRect.rect.left / rRect.rect.width(),
+                            -rRect.rect.top / rRect.rect.height());
   return EllipseGeometryProcessor::Make(args.renderTarget->width(), args.renderTarget->height(),
-                                        false, UseScale(args), localMatrix, args.viewMatrix);
+                                        false, UseScale(args), localMatrix, viewMatrix);
 }
 
 std::vector<float> GLRRectOp::vertices(const DrawArgs& args) {
@@ -150,7 +152,7 @@ std::vector<float> GLRRectOp::vertices(const DrawArgs& args) {
   xMaxOffset /= xRadius;
   yMaxOffset /= yRadius;
   //  }
-  auto bounds = args.rectToDraw.makeOutset(aaBloat, aaBloat);
+  auto bounds = rRect.rect.makeOutset(aaBloat, aaBloat);
   float yCoords[4] = {bounds.top, bounds.top + yOuterRadius, bounds.bottom - yOuterRadius,
                       bounds.bottom};
   float yOuterOffsets[4] = {
@@ -212,6 +214,7 @@ std::vector<float> GLRRectOp::vertices(const DrawArgs& args) {
 }
 
 std::shared_ptr<GLBuffer> GLRRectOp::getIndexBuffer(const DrawArgs& args) {
-  return GLBuffer::Make(args.context, gStandardRRectIndices, kIndicesPerFillRRect);
+  static auto Type = UniqueID::Next();
+  return GLBuffer::Make(args.context, gStandardRRectIndices, kIndicesPerFillRRect, Type);
 }
 }  // namespace tgfx

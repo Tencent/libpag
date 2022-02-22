@@ -22,25 +22,24 @@
 #include "core/utils/UniqueID.h"
 
 namespace tgfx {
-static void ComputeRecycleKey(BytesKey* recycleKey, const void* uniqueKey, size_t length) {
+static void ComputeRecycleKey(BytesKey* recycleKey, uint32_t type, size_t length) {
   static const uint32_t Type = UniqueID::Next();
   recycleKey->write(Type);
-  if (uniqueKey) {
-    recycleKey->write(uniqueKey);
-    recycleKey->write(static_cast<uint32_t>(length));
-  }
+  recycleKey->write(type);
+  recycleKey->write(static_cast<uint32_t>(length));
 }
 
-std::shared_ptr<GLBuffer> GLBuffer::Make(Context* context, const uint16_t* buffer, size_t length) {
+std::shared_ptr<GLBuffer> GLBuffer::Make(Context* context, const uint16_t* buffer, size_t length,
+                                         uint32_t type) {
   BytesKey recycleKey = {};
-  ComputeRecycleKey(&recycleKey, buffer, length);
+  ComputeRecycleKey(&recycleKey, type, length);
   auto glBuffer =
       std::static_pointer_cast<GLBuffer>(context->resourceCache()->getRecycled(recycleKey));
   if (glBuffer != nullptr) {
     return glBuffer;
   }
   auto gl = GLFunctions::Get(context);
-  glBuffer = Resource::Wrap(context, new GLBuffer(buffer, length));
+  glBuffer = Resource::Wrap(context, new GLBuffer(type, length));
   gl->genBuffers(1, &glBuffer->_bufferID);
   if (buffer) {
     gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, glBuffer->_bufferID);
@@ -52,7 +51,7 @@ std::shared_ptr<GLBuffer> GLBuffer::Make(Context* context, const uint16_t* buffe
 }
 
 void GLBuffer::computeRecycleKey(BytesKey* bytesKey) const {
-  ComputeRecycleKey(bytesKey, uniqueKey, _length);
+  ComputeRecycleKey(bytesKey, type, _length);
 }
 
 void GLBuffer::onReleaseGPU() {
