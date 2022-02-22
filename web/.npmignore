@@ -1,0 +1,2 @@
+src/wasm
+src/pag_wasm_bindings.cpp
