@@ -29,7 +29,7 @@ export class PAGView {
       const rawHeight = canvasElement.height * window.devicePixelRatio;
       if (rawWidth > SCREEN_2560_RESOLUTION || rawHeight > SCREEN_2560_RESOLUTION) {
         Log.warn(
-          "Don't rendering target larger then 2560 px resolution. It maybe reading fail in low graphic memory device.",
+          "Don't render the target larger than 2560 px resolution. It may be a render failure in the low graphic memory device.",
         );
       }
       canvasElement.style.width = `${canvasElement.width}px`;
