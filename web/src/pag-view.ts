@@ -3,34 +3,46 @@ import { PAGPlayer } from './pag-player';
 import { EventManager, Listener } from './utils/event-manager';
 import { PAGSurface } from './pag-surface';
 import { PAGFile } from './pag-file';
+import { Log } from './utils/log';
+import { ErrorCode } from './utils/error-map';
 
 export class PAGView {
   public static module: PAG;
   /**
    * Create pag view.
    */
-  public static async init(file: PAGFile, canvas: string | HTMLCanvasElement | OffscreenCanvas): Promise<PAGView> {
-    let canvasElement: HTMLCanvasElement;
+  public static async init(
+    file: PAGFile,
+    canvas: string | HTMLCanvasElement | OffscreenCanvas,
+  ): Promise<PAGView | undefined> {
+    let canvasElement: HTMLCanvasElement | null = null;
     if (typeof canvas === 'string') {
       canvasElement = document.getElementById(canvas.substr(1)) as HTMLCanvasElement;
     } else if (canvas instanceof HTMLCanvasElement) {
       canvasElement = canvas;
     }
-    canvasElement.style.width = `${canvasElement.width}px`;
-    canvasElement.style.height = `${canvasElement.height}px`;
-    canvasElement.width = canvasElement.width * window.devicePixelRatio;
-    canvasElement.height = canvasElement.height * window.devicePixelRatio;
-    const pagPlayer = this.module.PAGPlayer.create();
-    const pagView = new PAGView(pagPlayer);
-    pagView.eventManager = new EventManager();
-    const gl = canvasElement.getContext('webgl');
-    const contextID = this.module.GL.registerContext(gl, { majorVersion: 1, minorVersion: 0 });
-    this.module.GL.makeContextCurrent(contextID);
-    pagView.pagSurface = this.module.PAGSurface.FromFrameBuffer(0, canvasElement.width, canvasElement.height, true);
-    pagView.player.setSurface(pagView.pagSurface);
-    pagView.player.setComposition(file);
-    await pagView.setProgress(0);
-    return pagView;
+    if (!canvasElement) {
+      Log.errorByCode(ErrorCode.CanvasIsNotFound);
+    } else {
+      canvasElement.style.width = `${canvasElement.width}px`;
+      canvasElement.style.height = `${canvasElement.height}px`;
+      canvasElement.width = canvasElement.width * window.devicePixelRatio;
+      canvasElement.height = canvasElement.height * window.devicePixelRatio;
+      const pagPlayer = this.module.PAGPlayer.create();
+      const pagView = new PAGView(pagPlayer);
+      const gl = canvasElement.getContext('webgl');
+      if (!(gl instanceof WebGLRenderingContext)) {
+        Log.errorByCode(ErrorCode.CanvasContextIsNotWebGL);
+      } else {
+        const contextID = this.module.GL.registerContext(gl, { majorVersion: 1, minorVersion: 0 });
+        this.module.GL.makeContextCurrent(contextID);
+        pagView.pagSurface = this.module.PAGSurface.FromFrameBuffer(0, canvasElement.width, canvasElement.height, true);
+        pagView.player.setSurface(pagView.pagSurface);
+        pagView.player.setComposition(file);
+        await pagView.setProgress(0);
+        return pagView;
+      }
+    }
   }
 
   /**
@@ -48,11 +60,11 @@ export class PAGView {
 
   private startTime = 0;
   private playTime = 0;
-  private timer: number = null;
+  private timer: number | null = null;
   private player: PAGPlayer;
-  private pagSurface: PAGSurface;
+  private pagSurface: PAGSurface | undefined;
   private repeatedTimes = 0;
-  private eventManager: EventManager = null;
+  private eventManager: EventManager = new EventManager();
 
   public constructor(pagPlayer: PAGPlayer) {
     this.player = pagPlayer;
@@ -117,7 +129,7 @@ export class PAGView {
    * Set the number of times the animation will repeat. The default is 1, which means the animation
    * will play only once. 0 means the animation will play infinity times.
    */
-  public setRepeatCount(repeatCount) {
+  public setRepeatCount(repeatCount: number) {
     this.repeatCount = repeatCount < 0 ? 0 : repeatCount - 1;
   }
   /**
@@ -130,7 +142,7 @@ export class PAGView {
   /**
    * Set the progress of play position, the value is from 0.0 to 1.0.
    */
-  public async setProgress(progress): Promise<number> {
+  public async setProgress(progress: number): Promise<number> {
     this.playTime = progress * (await this.duration());
     this.startTime = Date.now() * 1000 - this.playTime;
     if (!this.isPlaying) {
@@ -219,7 +231,7 @@ export class PAGView {
    * Free the cache created by the pag view immediately. Can be called to reduce memory pressure.
    */
   public freeCache() {
-    this.pagSurface.freeCache();
+    this.pagSurface?.freeCache();
   }
   /**
    * Returns the current PAGComposition for PAGView to render as content.
@@ -231,14 +243,14 @@ export class PAGView {
    * Update size when changed canvas size.
    */
   public updateSize() {
-    this.pagSurface.updateSize();
+    this.pagSurface?.updateSize();
   }
 
   public destroy() {
     if (this.isDestroyed) return;
     this.clearTimer();
     this.player.destroy();
-    this.pagSurface.destroy();
+    this.pagSurface?.destroy();
     this.isDestroyed = true;
   }
 

@@ -33,7 +33,7 @@ export class PAGFile extends PAGComposition {
     return pagFile;
   }
 
-  public constructor(wasmIns) {
+  public constructor(wasmIns: any) {
     super(wasmIns);
   }
   /**

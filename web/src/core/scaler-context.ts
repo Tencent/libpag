@@ -19,7 +19,7 @@ canvas.height = 10;
 const testCanvas = document.createElement('canvas');
 testCanvas.width = 1;
 testCanvas.height = 1;
-const testContext = testCanvas.getContext('2d');
+const testContext = testCanvas.getContext('2d') as CanvasRenderingContext2D;
 testContext.textBaseline = 'top';
 testContext.font = '100px -no-font-family-here-';
 testContext.scale(0.01, 0.01);
@@ -28,7 +28,9 @@ testContext.globalCompositeOperation = 'copy';
 
 export class ScalerContext {
   public static canvas: HTMLCanvasElement | OffscreenCanvas = canvas;
-  public static context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D = canvas.getContext('2d');
+  public static context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D = canvas.getContext('2d') as
+    | CanvasRenderingContext2D
+    | OffscreenCanvasRenderingContext2D;
 
   public static isEmoji(text: string): boolean {
     testContext.fillText(text, 0, 0);
@@ -104,7 +106,7 @@ export class ScalerContext {
     const canvas = document.createElement('canvas');
     canvas.width = bounds.right - bounds.left;
     canvas.height = bounds.bottom - bounds.top;
-    const context = canvas.getContext('2d');
+    const context = canvas.getContext('2d') as CanvasRenderingContext2D;
     context.font = this.fontString();
     context.fillText(text, -bounds.left, -bounds.top);
     return new NativeImage(canvas);

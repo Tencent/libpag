@@ -7,7 +7,7 @@ export class PAGLayer {
 
   public wasmIns: any;
 
-  public constructor(wasmIns) {
+  public constructor(wasmIns: any) {
     this.wasmIns = wasmIns;
   }
   /**

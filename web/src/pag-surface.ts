@@ -22,7 +22,7 @@ export class PAGSurface {
 
   public wasmIns;
 
-  public constructor(wasmIns) {
+  public constructor(wasmIns: any) {
     this.wasmIns = wasmIns;
   }
   /**

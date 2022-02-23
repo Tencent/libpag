@@ -1,3 +1,5 @@
+/* global EmscriptenModule */
+
 import { PAGFont } from './pag-font';
 import { binding } from './binding';
 import * as types from './types';
@@ -7,7 +9,7 @@ import { WebAssemblyQueue } from './utils/queue';
 /**
  * Initialize pag webassembly module.
  */
-const PAGInit = (moduleOption): Promise<types.PAG> =>
+const PAGInit = (moduleOption: EmscriptenModule): Promise<types.PAG> =>
   createPAG(moduleOption).then((module: types.PAG) => {
     module.webAssemblyQueue = new WebAssemblyQueue();
     module.webAssemblyQueue.start();

@@ -6,7 +6,7 @@ import { wasmAwaitRewind } from './utils/decorators';
 export class PAGComposition extends PAGLayer {
   public static module: PAG;
 
-  public constructor(wasmIns) {
+  public constructor(wasmIns: any) {
     super(wasmIns);
   }
   /**

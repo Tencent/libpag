@@ -1,13 +1,13 @@
 import { Log } from './log';
 
-export const readFile = (file: File): Promise<String | ArrayBuffer> =>
+export const readFile = (file: File): Promise<String | ArrayBuffer | null> =>
   new Promise((resolve) => {
     const reader = new FileReader();
     reader.onload = () => {
       resolve(reader.result);
     };
     reader.onerror = () => {
-      Log.error(reader.error.message);
+      Log.error((reader.error as DOMException).message);
     };
     reader.readAsArrayBuffer(file);
   });

@@ -1,3 +1,5 @@
+import { EmscriptenGL } from '../types';
+
 export class NativeImage {
   public static async createFromBytes(bytes: ArrayBuffer) {
     const blob = new Blob([bytes], { type: 'image/*' });
@@ -12,7 +14,7 @@ export class NativeImage {
 
   private readonly source: TexImageSource;
 
-  public constructor(source) {
+  public constructor(source: TexImageSource) {
     this.source = source;
   }
 
@@ -24,7 +26,7 @@ export class NativeImage {
     return this.source instanceof HTMLVideoElement ? this.source.videoHeight : this.source.height;
   }
 
-  public upload(GL) {
+  public upload(GL: EmscriptenGL) {
     const gl = GL.currentContext.GLctx as WebGLRenderingContext;
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.source);

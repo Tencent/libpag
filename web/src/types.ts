@@ -48,9 +48,16 @@ export interface PAG extends EmscriptenModule {
   WebMask: typeof WebMask;
   ScalerContext: typeof ScalerContext;
   VideoReader: typeof VideoReader;
-  traceImage: (info, pixels, tag: string) => void;
-  GL: any;
+  traceImage: (info: { width: number; height: number }, pixels: Uint8Array, tag: string) => void;
+  GL: EmscriptenGL;
   LayerType: typeof LayerType;
+}
+
+export interface EmscriptenGL {
+  currentContext: { GLctx: WebGLRenderingContext };
+  textures: WebGLTexture[];
+  registerContext: (gl: WebGLRenderingContext, options: { majorVersion: number; minorVersion: number }) => number;
+  makeContextCurrent: (contextId: number) => void;
 }
 
 /**
@@ -160,6 +167,25 @@ export const enum PAGTimeStretchMode {
    * is less than target duration.
    */
   RepeatInverted = 3,
+}
+
+export const enum PathFillType {
+  /**
+   * Enclosed by a non-zero sum of contour directions.
+   */
+  Winding,
+  /**
+   * Enclosed by an odd number of contours.
+   */
+  EvenOdd,
+  /**
+   * Enclosed by a zero sum of contour directions.
+   */
+  InverseWinding,
+  /**
+   * Enclosed by an even number of contours.
+   */
+  InverseEvenOdd,
 }
 
 export interface Point {

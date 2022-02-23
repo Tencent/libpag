@@ -41,7 +41,7 @@ export const binding = (module: PAG) => {
     const canvas = document.createElement('canvas');
     canvas.width = info.width;
     canvas.height = info.height;
-    const context = canvas.getContext('2d');
+    const context = canvas.getContext('2d') as CanvasRenderingContext2D;
     const imageData = new ImageData(new Uint8ClampedArray(pixels), canvas.width, canvas.height);
     context.putImageData(imageData, 0, 0);
     document.body.appendChild(canvas);

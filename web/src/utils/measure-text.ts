@@ -7,7 +7,7 @@ export const measureText = (imageData: ImageData) => {
   return { left, top, right, bottom };
 };
 
-export const getLeftPixel = (imageDataArray, width, height) => {
+export const getLeftPixel = (imageDataArray: Int32Array, width: number, height: number) => {
   const verticalCount = imageDataArray.length / width;
   const acrossCount = imageDataArray.length / height;
   for (let i = 0; i < acrossCount; i++) {
@@ -15,9 +15,10 @@ export const getLeftPixel = (imageDataArray, width, height) => {
       if (imageDataArray[i + j * width] !== 0) return i;
     }
   }
+  return acrossCount;
 };
 
-export const getTopPixel = (imageDataArray, width, height) => {
+export const getTopPixel = (imageDataArray: Int32Array, width: number, height: number) => {
   const verticalCount = imageDataArray.length / width;
   const acrossCount = imageDataArray.length / height;
   for (let i = 0; i < verticalCount; i++) {
@@ -25,9 +26,10 @@ export const getTopPixel = (imageDataArray, width, height) => {
       if (imageDataArray[i * width + j] !== 0) return i;
     }
   }
+  return verticalCount;
 };
 
-export const getRightPixel = (imageDataArray, width, height) => {
+export const getRightPixel = (imageDataArray: Int32Array, width: number, height: number) => {
   const verticalCount = imageDataArray.length / width;
   const acrossCount = imageDataArray.length / height;
   for (let i = acrossCount - 1; i > 0; i--) {
@@ -35,9 +37,10 @@ export const getRightPixel = (imageDataArray, width, height) => {
       if (imageDataArray[i + width * j] !== 0) return i;
     }
   }
+  return 0;
 };
 
-export const getBottomPixel = (imageDataArray, width, height) => {
+export const getBottomPixel = (imageDataArray: Int32Array, width: number, height: number) => {
   const verticalCount = imageDataArray.length / width;
   const acrossCount = imageDataArray.length / height;
   for (let i = verticalCount - 1; i > 0; i--) {
@@ -45,4 +48,5 @@ export const getBottomPixel = (imageDataArray, width, height) => {
       if (imageDataArray[i * width + j] !== 0) return i;
     }
   }
+  return 0;
 };

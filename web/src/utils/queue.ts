@@ -6,7 +6,7 @@ export class WebAssemblyQueue {
   private executing = false;
   private queue: Task[] = [];
 
-  public exec(fn, scope, ...args) {
+  public exec(fn: (...args: any[]) => any, scope: any, ...args: any[]) {
     return new Promise((resolve) => {
       const copyFn = async () => {
         if (!fn) {
@@ -35,7 +35,7 @@ export class WebAssemblyQueue {
       return;
     }
     this.executing = true;
-    const task = this.queue.shift();
+    const task = this.queue.shift() as Task;
     task
       .fn()
       .then(() => {

@@ -38,7 +38,7 @@ export class ExpGolomb {
     return this.readBits(numberOfBytes * 8);
   }
 
-  private getBits(size: number, offsetBits: number, moveIndex = true) {
+  private getBits(size: number, offsetBits: number, moveIndex = true): number {
     if (this.bitsAvailable < size) {
       return 0;
     }

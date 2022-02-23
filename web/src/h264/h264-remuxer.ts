@@ -25,6 +25,7 @@ export interface Mp4Sample {
     isKeyFrame: boolean;
     isNonSyncSample: number;
     dependsOn: number;
+    paddingValue: number;
   };
 }
 
@@ -65,7 +66,14 @@ export class H264Remuxer {
     return id;
   }
 
-  public static remux(frames: H264Frame[], headers: Uint8Array[], width, height, frameRate, ptsList) {
+  public static remux(
+    frames: H264Frame[],
+    headers: Uint8Array[],
+    width: number,
+    height: number,
+    frameRate: number,
+    ptsList: number[],
+  ) {
     if (frames.length < 1) Log.errorByCode(ErrorCode.FrameEmpty);
     if (headers.length < 2) Log.errorByCode(ErrorCode.VideoReaderH264HeaderError);
     const remuxer = new H264Remuxer();
@@ -98,8 +106,8 @@ export class H264Remuxer {
     type: 'video',
     len: 0,
     fragmented: true,
-    sps: null,
-    pps: null,
+    sps: [],
+    pps: [],
     width: 0,
     height: 0,
     timescale: 0,
@@ -113,7 +121,7 @@ export class H264Remuxer {
 
   public convertMp4() {
     const payload = this.getPayload();
-    if (!payload) return;
+    if (!payload) return new Uint8Array();
     const mp4Generator = new Mp4Generator();
     const ftyp = mp4Generator.ftyp();
     const moov = mp4Generator.moov([this.mp4track], this.mp4track.duration, this.mp4track.timescale);
@@ -144,6 +152,7 @@ export class H264Remuxer {
           isKeyFrame: sample.keyFrame,
           isNonSyncSample: sample.keyFrame ? 0 : 1,
           dependsOn: sample.keyFrame ? 2 : 1,
+          paddingValue: 0,
         },
       };
 

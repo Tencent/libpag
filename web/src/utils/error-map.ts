@@ -10,6 +10,9 @@ export enum ErrorCode {
   ImageCodecUndefined,
   FontNamesUnloaded,
   UnsupportCanvas2D,
+  VideoElementNull,
+  CanvasIsNotFound,
+  CanvasContextIsNotWebGL,
 }
 
 export const ErrorMap = {
@@ -24,4 +27,7 @@ export const ErrorMap = {
   [ErrorCode.ImageCodecUndefined]: 'Image codec instance undefined!',
   [ErrorCode.FontNamesUnloaded]: 'Target fontNames unloaded!',
   [ErrorCode.UnsupportCanvas2D]: 'Unsupport Canvas2D!',
+  [ErrorCode.VideoElementNull]: 'Video Element is null!',
+  [ErrorCode.CanvasIsNotFound]: 'Canvas is not found!',
+  [ErrorCode.CanvasContextIsNotWebGL]: 'Canvas context is not WebGL!',
 };

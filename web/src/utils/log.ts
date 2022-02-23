@@ -1,7 +1,7 @@
 import { ErrorCode, ErrorMap } from './error-map';
 
 export class Log {
-  public static log(...args) {
+  public static log(...args: any[]) {
     console.log(...args);
   }
 

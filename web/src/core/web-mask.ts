@@ -1,8 +1,8 @@
-import { Matrix } from '../types';
+import { EmscriptenGL, Matrix, PAG, PathFillType, Vector } from '../types';
 import { ScalerContext } from './scaler-context';
 
 export class WebMask {
-  public static module;
+  public static module: PAG;
 
   private static getLineCap(cap: number): CanvasLineCap {
     switch (cap) {
@@ -34,16 +34,13 @@ export class WebMask {
     this.canvas.height = height;
   }
 
-  public fillPath(path: Path2D, fillType) {
-    const context = this.canvas.getContext('2d');
-    if (
-      fillType === WebMask.module.PathFillType.INVERSE_WINDING ||
-      fillType === WebMask.module.PathFillType.INVERSE_EVEN_ODD
-    ) {
-      context.clip(path, fillType === WebMask.module.PathFillType.INVERSE_EVEN_ODD ? 'evenodd' : 'nonzero');
+  public fillPath(path: Path2D, fillType: PathFillType) {
+    const context = this.canvas.getContext('2d') as CanvasRenderingContext2D;
+    if (fillType === PathFillType.InverseWinding || fillType === PathFillType.InverseEvenOdd) {
+      context.clip(path, fillType === PathFillType.InverseEvenOdd ? 'evenodd' : 'nonzero');
       context.fillRect(0, 0, this.canvas.width, this.canvas.height);
     } else {
-      context.fill(path, fillType === WebMask.module.PathFillType.EVEN_ODD ? 'evenodd' : 'nonzero');
+      context.fill(path, fillType === PathFillType.EvenOdd ? 'evenodd' : 'nonzero');
     }
   }
 
@@ -52,12 +49,12 @@ export class WebMask {
     fauxBold: boolean,
     fauxItalic: boolean,
     fontName: string,
-    texts,
-    positions,
+    texts: Vector<any>,
+    positions: Vector<any>,
     matrix: Matrix,
   ) {
     const scalerContext = new ScalerContext(fontName, size, fauxBold, fauxItalic);
-    const context = this.canvas.getContext('2d');
+    const context = this.canvas.getContext('2d') as CanvasRenderingContext2D;
     context.transform(matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx, matrix.ty);
     context.font = scalerContext.fontString();
     for (let i = 0; i < texts.size(); i++) {
@@ -71,16 +68,16 @@ export class WebMask {
     fauxBold: boolean,
     fauxItalic: boolean,
     fontName: string,
-    stroke,
-    texts,
-    positions,
+    stroke: any,
+    texts: Vector<any>,
+    positions: Vector<any>,
     matrix: Matrix,
   ) {
     if (stroke.width < 0.5) {
       return;
     }
     const scalerContext = new ScalerContext(fontName, size, fauxBold, fauxItalic);
-    const context = this.canvas.getContext('2d');
+    const context = this.canvas.getContext('2d') as CanvasRenderingContext2D;
     context.transform(matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx, matrix.ty);
     context.font = scalerContext.fontString();
     context.lineJoin = WebMask.getLineJoin(stroke.join);
@@ -93,7 +90,7 @@ export class WebMask {
     }
   }
 
-  public update(GL) {
+  public update(GL: EmscriptenGL) {
     const gl = GL.currentContext.GLctx as WebGLRenderingContext;
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.ALPHA, gl.ALPHA, gl.UNSIGNED_BYTE, this.canvas);
   }

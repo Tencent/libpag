@@ -9,10 +9,52 @@ const decimal2HexadecimalArray = (payload: number) => [
   payload & 0xff,
 ];
 
-const getCharCode = (name: string) => [name.charCodeAt(0), name.charCodeAt(1), name.charCodeAt(2), name.charCodeAt(3)];
+const getCharCode = (name: string) =>
+  new Uint8Array([name.charCodeAt(0), name.charCodeAt(1), name.charCodeAt(2), name.charCodeAt(3)]);
+
+const boxTypes = [
+  'avc1',
+  'avcC',
+  'btrt',
+  'ctts',
+  'dinf',
+  'dref',
+  'edts',
+  'elst',
+  'esds',
+  'ftyp',
+  'hdlr',
+  'mdat',
+  'mdhd',
+  'mdia',
+  'mfhd',
+  'minf',
+  'moof',
+  'moov',
+  'mp4a',
+  'mvex',
+  'mvhd',
+  'sdtp',
+  'stbl',
+  'stco',
+  'stsc',
+  'stsd',
+  'stsz',
+  'stts',
+  'stss',
+  'tfdt',
+  'tfhd',
+  'traf',
+  'trak',
+  'trun',
+  'trex',
+  'tkhd',
+  'vmhd',
+  'smhd',
+];
 
 export class Mp4Generator {
-  private static hdlrTypes = {
+  private static hdlrTypes: { [key: string]: Uint8Array } = {
     video: new Uint8Array([
       0x00, // version 0
       0x00,
@@ -160,7 +202,7 @@ export class Mp4Generator {
     0x01, // entry_count
   ]);
 
-  private static box(type: any[], ...payload: Uint8Array[]): Uint8Array {
+  private static box(type: Uint8Array, ...payload: Uint8Array[]): Uint8Array {
     let size = 8;
     let i = payload.length;
     const len = i;
@@ -183,54 +225,13 @@ export class Mp4Generator {
     return result;
   }
 
-  private types = {
-    avc1: [],
-    avcC: [],
-    btrt: [],
-    ctts: [],
-    dinf: [],
-    dref: [],
-    edts: [],
-    elst: [],
-    esds: [],
-    ftyp: [],
-    hdlr: [],
-    mdat: [],
-    mdhd: [],
-    mdia: [],
-    mfhd: [],
-    minf: [],
-    moof: [],
-    moov: [],
-    mp4a: [],
-    mvex: [],
-    mvhd: [],
-    sdtp: [],
-    stbl: [],
-    stco: [],
-    stsc: [],
-    stsd: [],
-    stsz: [],
-    stts: [],
-    stss: [],
-    tfdt: [],
-    tfhd: [],
-    traf: [],
-    trak: [],
-    trun: [],
-    trex: [],
-    tkhd: [],
-    vmhd: [],
-    smhd: [],
-  };
+  private types: { [key: string]: Uint8Array } = {};
 
   private dinf: Uint8Array;
 
   public constructor() {
-    Object.keys(this.types).forEach((type) => {
-      if (Object.prototype.hasOwnProperty.call(this.types, type)) {
-        this.types[type] = getCharCode(type);
-      }
+    boxTypes.forEach((type) => {
+      this.types[type] = getCharCode(type);
     });
 
     const dref = new Uint8Array([
@@ -272,17 +273,13 @@ export class Mp4Generator {
 
   public moov(tracks: Mp4Track[], duration: number, timescale: number) {
     let i = tracks.length;
-    const boxes = [];
+    const boxes: Uint8Array[] = [];
 
     while (i) {
       i -= 1;
       boxes[i] = this.trak(tracks[i]);
     }
-
-    return Mp4Generator.box.apply(
-      null,
-      [this.types.moov, this.mvhd(timescale, duration)].concat(boxes).concat(this.mvex(tracks)),
-    );
+    return Mp4Generator.box(this.types.moov, this.mvhd(timescale, duration), ...boxes, this.mvex(tracks));
   }
 
   public moof(sequence_number: number, baseMediaDecodeTime: number, track: Mp4Track) {
@@ -367,7 +364,7 @@ export class Mp4Generator {
       i -= 1;
       boxes[i] = this.trex(tracks[i]);
     }
-    return Mp4Generator.box.apply(null, [this.types.mvex].concat(boxes));
+    return Mp4Generator.box(this.types.mvex, ...boxes);
   }
 
   private mvhd(timescale: number, duration: number) {
@@ -493,8 +490,8 @@ export class Mp4Generator {
   }
 
   private avc1(track: Mp4Track) {
-    let sps = [];
-    let pps = [];
+    let sps: number[] = [];
+    let pps: number[] = [];
     let i;
     let data;
     let len;
@@ -623,88 +620,14 @@ export class Mp4Generator {
     );
   }
 
-  private esds(track) {
-    const configlen = track.config.byteLength;
-    const data = new Uint8Array(26 + configlen + 3);
-    data.set([
-      0x00, // version 0
-      0x00,
-      0x00,
-      0x00, // flags
-      0x03, // descriptor_type
-      0x17 + configlen, // length
-      0x00,
-      0x01, // es_id
-      0x00, // stream_priority
-      0x04, // descriptor_type
-      0x0f + configlen, // length
-      0x40, // codec : mpeg4_audio
-      0x15, // stream_type
-      0x00,
-      0x00,
-      0x00, // buffer_size
-      0x00,
-      0x00,
-      0x00,
-      0x00, // maxBitrate
-      0x00,
-      0x00,
-      0x00,
-      0x00, // avgBitrate
-      0x05, // descriptor_type
-      configlen,
-    ]);
-    data.set(track.config, 26);
-    data.set([0x06, 0x01, 0x02], 26 + configlen);
-    return data;
-  }
-
-  private mp4a(track) {
-    const { audiosamplerate } = track;
-    return Mp4Generator.box(
-      this.types.mp4a,
-      new Uint8Array([
-        0x00,
-        0x00,
-        0x00, // reserved
-        0x00,
-        0x00,
-        0x00, // reserved
-        0x00,
-        0x01, // data_reference_index
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00,
-        0x00, // reserved
-        0x00,
-        track.channelCount, // channelcount
-        0x00,
-        0x10, // sampleSize:16bits
-        0x00,
-        0x00, // pre_defined
-        0x00,
-        0x00, // reserved2
-        (audiosamplerate >> 8) & 0xff,
-        audiosamplerate & 0xff, //
-        0x00,
-        0x00,
-      ]),
-      Mp4Generator.box(this.types.esds, this.esds(track)),
-    );
-  }
-
   private stsd(track: Mp4Track) {
     if (track.type === 'audio') {
-      return Mp4Generator.box(this.types.stsd, Mp4Generator.stsd, this.mp4a(track));
+      return new Uint8Array();
     }
     return Mp4Generator.box(this.types.stsd, Mp4Generator.stsd, this.avc1(track));
   }
 
-  private tkhd(track) {
+  private tkhd(track: Mp4Track) {
     return Mp4Generator.box(
       this.types.tkhd,
       new Uint8Array([
@@ -732,8 +655,8 @@ export class Mp4Generator {
         0x00, // layer
         0x00,
         0x00, // alternate_group
-        (track.volume >> 0) & 0xff,
-        (((track.volume % 1) * 10) >> 0) & 0xff, // track volume // FIXME
+        0x00,
+        0x00, // track volume // FIXME
         0x00,
         0x00, // reserved
         0x00,

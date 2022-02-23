@@ -14,7 +14,7 @@ export function wasmAwaitRewind(constructor: any) {
     functions = functions.filter((name) => constructor.prototype.wasmAsyncMethods.indexOf(name) === -1);
   }
 
-  const proxyFn = (target, methodName) => {
+  const proxyFn = (target: { [prop: string]: (...args: any[]) => any }, methodName: string) => {
     const fn = target[methodName];
     target[methodName] = function (...args) {
       if (constructor.module.Asyncify.currData !== null) {

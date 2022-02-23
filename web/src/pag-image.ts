@@ -39,7 +39,7 @@ export class PAGImage {
 
   public wasmIns;
 
-  public constructor(wasmIns) {
+  public constructor(wasmIns: any) {
     this.wasmIns = wasmIns;
   }
   /**

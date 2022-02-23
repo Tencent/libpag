@@ -273,10 +273,10 @@ EMSCRIPTEN_BINDINGS(pag) {
       .field("comment", &Marker::comment);
 
   enum_<tgfx::PathFillType>("PathFillType")
-      .value("WINDING", tgfx::PathFillType::Winding)
-      .value("EVEN_ODD", tgfx::PathFillType::EvenOdd)
-      .value("INVERSE_WINDING", tgfx::PathFillType::InverseWinding)
-      .value("INVERSE_EVEN_ODD", tgfx::PathFillType::InverseEvenOdd);
+      .value("Winding", tgfx::PathFillType::Winding)
+      .value("EvenOdd", tgfx::PathFillType::EvenOdd)
+      .value("InverseWinding", tgfx::PathFillType::InverseWinding)
+      .value("InverseEvenOdd", tgfx::PathFillType::InverseEvenOdd);
 
   enum_<ColorType>("ColorType")
       .value("Unknown", ColorType::Unknown)
