@@ -5,6 +5,10 @@ export class Log {
     console.log(...args);
   }
 
+  public static warn(...args: any[]) {
+    console.warn(...args);
+  }
+
   public static error(error: string) {
     throw new Error(error);
   }

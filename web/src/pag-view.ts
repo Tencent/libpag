@@ -5,6 +5,7 @@ import { PAGSurface } from './pag-surface';
 import { PAGFile } from './pag-file';
 import { Log } from './utils/log';
 import { ErrorCode } from './utils/error-map';
+import { SCREEN_2560_RESOLUTION } from './constant';
 
 export class PAGView {
   public static module: PAG;
@@ -24,6 +25,13 @@ export class PAGView {
     if (!canvasElement) {
       Log.errorByCode(ErrorCode.CanvasIsNotFound);
     } else {
+      const rawWidth = canvasElement.width * window.devicePixelRatio;
+      const rawHeight = canvasElement.height * window.devicePixelRatio;
+      if (rawWidth > SCREEN_2560_RESOLUTION || rawHeight > SCREEN_2560_RESOLUTION) {
+        Log.warn(
+          "Don't rendering target larger then 2560 px resolution. It maybe reading fail in low graphic memory device.",
+        );
+      }
       canvasElement.style.width = `${canvasElement.width}px`;
       canvasElement.style.height = `${canvasElement.height}px`;
       canvasElement.width = canvasElement.width * window.devicePixelRatio;
