@@ -300,20 +300,20 @@ std::unique_ptr<TextAtlas> TextAtlas::Make(const TextGlyphs* textGlyphs, RenderC
                                            float scale) {
   auto context = renderCache->getContext();
   auto maxTextureSize = context->caps()->maxTextureSize;
-  scale = scale * textGlyphs->maxScale();
+  auto maxScale = scale * textGlyphs->maxScale();
   const auto& maskGlyphs = textGlyphs->maskAtlasGlyphs();
-  if (maskGlyphs.empty() || maskGlyphs[0]->getFont().getSize() * scale > kMaxAtlasFontSize) {
+  if (maskGlyphs.empty() || maskGlyphs[0]->getFont().getSize() * maxScale > kMaxAtlasFontSize) {
     return nullptr;
   }
   const auto& colorGlyphs = textGlyphs->colorAtlasGlyphs();
-  if (!colorGlyphs.empty() && colorGlyphs[0]->getFont().getSize() * scale > kMaxAtlasFontSize) {
+  if (!colorGlyphs.empty() && colorGlyphs[0]->getFont().getSize() * maxScale > kMaxAtlasFontSize) {
     return nullptr;
   }
-  auto maskAtlas = Atlas::Make(context, scale, maskGlyphs, maxTextureSize).release();
+  auto maskAtlas = Atlas::Make(context, maxScale, maskGlyphs, maxTextureSize).release();
   if (maskAtlas == nullptr) {
     return nullptr;
   }
-  auto colorAtlas = Atlas::Make(context, scale, colorGlyphs, maxTextureSize, false).release();
+  auto colorAtlas = Atlas::Make(context, maxScale, colorGlyphs, maxTextureSize, false).release();
   return std::unique_ptr<TextAtlas>(new TextAtlas(textGlyphs->id(), maskAtlas, colorAtlas, scale));
 }
 
