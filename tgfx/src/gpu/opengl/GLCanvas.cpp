@@ -135,7 +135,7 @@ void GLCanvas::drawTexture(const Texture* texture, const RGBAAALayout* layout, c
     return;
   }
   draw(clippedLocalQuad, clippedDeviceQuad, GLFillRectOp::Make(), std::move(processor),
-       TextureMaskFragmentProcessor::MakeUseLocalCoord(mask, Matrix::I(), inverted), true);
+       TextureMaskFragmentProcessor::MakeUseLocalCoord(mask, localMatrix, inverted), true);
 }
 
 void GLCanvas::drawPath(const Path& path, const Paint& paint) {
