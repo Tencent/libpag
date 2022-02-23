@@ -36,8 +36,13 @@ export class WebAssemblyQueue {
     }
     this.executing = true;
     const task = this.queue.shift();
-    task.fn().finally(() => {
-      this.execNextTask();
-    });
+    task
+      .fn()
+      .then(() => {
+        this.execNextTask();
+      })
+      .catch(() => {
+        this.execNextTask();
+      });
   }
 }
