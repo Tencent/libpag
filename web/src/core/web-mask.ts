@@ -36,6 +36,7 @@ export class WebMask {
 
   public fillPath(path: Path2D, fillType: PathFillType) {
     const context = this.canvas.getContext('2d') as CanvasRenderingContext2D;
+    context.setTransform(1, 0, 0, 1, 0, 0);
     if (fillType === PathFillType.InverseWinding || fillType === PathFillType.InverseEvenOdd) {
       context.clip(path, fillType === PathFillType.InverseEvenOdd ? 'evenodd' : 'nonzero');
       context.fillRect(0, 0, this.canvas.width, this.canvas.height);
@@ -55,7 +56,7 @@ export class WebMask {
   ) {
     const scalerContext = new ScalerContext(fontName, size, fauxBold, fauxItalic);
     const context = this.canvas.getContext('2d') as CanvasRenderingContext2D;
-    context.transform(matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx, matrix.ty);
+    context.setTransform(matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx, matrix.ty);
     context.font = scalerContext.fontString();
     for (let i = 0; i < texts.size(); i++) {
       const position = positions.get(i);
@@ -78,7 +79,7 @@ export class WebMask {
     }
     const scalerContext = new ScalerContext(fontName, size, fauxBold, fauxItalic);
     const context = this.canvas.getContext('2d') as CanvasRenderingContext2D;
-    context.transform(matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx, matrix.ty);
+    context.setTransform(matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx, matrix.ty);
     context.font = scalerContext.fontString();
     context.lineJoin = WebMask.getLineJoin(stroke.join);
     context.miterLimit = stroke.miterLimit;
