@@ -18,6 +18,7 @@
 
 #include "VideoSurface.h"
 #include "android/native_window_jni.h"
+#include "gpu/opengl/GLContext.h"
 #include "gpu/opengl/GLTexture.h"
 
 namespace pag {
@@ -44,10 +45,9 @@ void VideoSurface::InitJNI(JNIEnv* env, const std::string& className) {
   VideoSurface_onRelease = env->GetMethodID(VideoSurfaceClass.get(), "onRelease", "()V");
 }
 
-OESTexture::OESTexture(tgfx::GLTextureInfo info, int width, int height)
+OESTexture::OESTexture(const tgfx::GLSampler& glSampler, int width, int height)
     : GLTexture(width, height, tgfx::ImageOrigin::TopLeft) {
-  sampler.glInfo = info;
-  sampler.config = tgfx::PixelFormat::RGBA_8888;
+  sampler = glSampler;
 }
 
 void OESTexture::setTextureSize(int width, int height) {
@@ -85,9 +85,9 @@ tgfx::Point OESTexture::getTextureCoord(float x, float y) const {
 }
 
 void OESTexture::onRelease(tgfx::Context* context) {
-  if (sampler.glInfo.id > 0) {
+  if (sampler.id > 0) {
     auto gl = tgfx::GLContext::Unwrap(context);
-    gl->deleteTextures(1, &sampler.glInfo.id);
+    gl->deleteTextures(1, &sampler.id);
   }
 }
 
@@ -163,20 +163,21 @@ bool VideoSurface::attachToContext(JNIEnv* env, tgfx::Context* context) {
     return true;
   }
   auto gl = tgfx::GLContext::Unwrap(context);
-  tgfx::GLTextureInfo info = {};
-  info.target = GL::TEXTURE_EXTERNAL_OES;
-  info.format = GL::RGBA8;
-  gl->genTextures(1, &info.id);
-  if (info.id == 0) {
+  tgfx::GLSampler sampler = {};
+  sampler.target = GL::TEXTURE_EXTERNAL_OES;
+  sampler.format = tgfx::PixelFormat::RGBA_8888;
+  gl->genTextures(1, &sampler.id);
+  if (sampler.id == 0) {
     return false;
   }
-  auto result = env->CallBooleanMethod(videoSurface.get(), VideoSurface_attachToGLContext, info.id);
+  auto result =
+      env->CallBooleanMethod(videoSurface.get(), VideoSurface_attachToGLContext, sampler.id);
   if (!result) {
-    gl->deleteTextures(1, &info.id);
+    gl->deleteTextures(1, &sampler.id);
     LOGE("VideoSurface::attachToGLContext(): failed to attached to a Surface!");
     return false;
   }
-  glInfo = info;
+  glInfo = sampler;
   deviceID = context->device()->uniqueID();
   return true;
 }

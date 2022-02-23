@@ -20,6 +20,7 @@
 #include <OpenGL/gl3.h>
 #include <thread>
 #include "CGLHardwareTexture.h"
+#include "gpu/opengl/GLRenderTarget.h"
 
 namespace tgfx {
 static std::mutex threadCacheLocker = {};
@@ -106,11 +107,11 @@ std::shared_ptr<Surface> CGLWindow::onCreateSurface(Context* context) {
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
     [glContext setView:view];
 #pragma clang diagnostic pop
-    GLFrameBufferInfo glInfo = {};
-    glInfo.id = 0;
-    glInfo.format = GL_RGBA8;
-    BackendRenderTarget renderTarget(glInfo, size.width, size.height);
-    return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
+    GLFrameBuffer frameBuffer = {};
+    frameBuffer.id = 0;
+    frameBuffer.format = PixelFormat::RGBA_8888;
+    auto renderTarget = GLRenderTarget::MakeFrom(context, frameBuffer, size.width, size.height, ImageOrigin::BottomLeft);
+    return Surface::MakeFrom(context, renderTarget);
   }
   auto texture = CGLHardwareTexture::MakeFrom(context, pixelBuffer);
   return Surface::MakeFrom(context, texture);

@@ -24,7 +24,7 @@
 namespace pag {
 class OESTexture : public tgfx::GLTexture {
  public:
-  OESTexture(tgfx::GLTextureInfo info, int width, int height);
+  OESTexture(const tgfx::GLSampler& sampler, int width, int height);
 
   tgfx::Point getTextureCoord(float x, float y) const override;
 
@@ -73,7 +73,7 @@ class VideoSurface {
   int width = 0;
   int height = 0;
   uint32_t deviceID = 0;
-  tgfx::GLTextureInfo glInfo = {};
+  tgfx::GLSampler glInfo = {};
   std::shared_ptr<OESTexture> oesTexture = nullptr;
   mutable std::atomic_bool hasPendingTextureImage = {false};
 
