@@ -21,16 +21,22 @@
 #include "gpu/TextureSampler.h"
 
 namespace tgfx {
-class GLTextureSampler : public TextureSampler {
+/**
+ * Defines the sampling parameters for an OpenGL texture uint.
+ */
+class GLSampler : public TextureSampler {
  public:
-  GLTextureSampler() = default;
+  /**
+   * The OpenGL texture id of the sampler.
+   */
+  unsigned id = 0;
 
-  GLTextureSampler(PixelConfig config, GLTextureInfo textureInfo)
-      : TextureSampler(config), glInfo(textureInfo) {
-  }
+  /**
+   * The OpenGL texture target of the sampler.
+   */
+  unsigned target = 0x0DE1;  // GL_TEXTURE_2D;
 
+ protected:
   void computeKey(Context* context, BytesKey* bytesKey) const override;
-
-  GLTextureInfo glInfo = {};
 };
 }  // namespace tgfx

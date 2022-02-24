@@ -180,31 +180,31 @@ GLCaps::GLCaps(const GLInfo& info) {
   info.getIntegerv(GL::MAX_TEXTURE_SIZE, &maxTextureSize);
   info.getIntegerv(GL::MAX_TEXTURE_IMAGE_UNITS, &maxFragmentSamplers);
   initFSAASupport(info);
-  initConfigMap(info);
+  initFormatMap(info);
 }
 
-const TextureFormat& GLCaps::getTextureFormat(PixelConfig config) const {
-  return configMap.at(config).format;
+const TextureFormat& GLCaps::getTextureFormat(PixelFormat pixelFormat) const {
+  return pixelFormatMap.at(pixelFormat).format;
 }
 
-const Swizzle& GLCaps::configSwizzle(PixelConfig config) const {
-  return configMap.at(config).swizzle;
+const Swizzle& GLCaps::getSwizzle(PixelFormat pixelFormat) const {
+  return pixelFormatMap.at(pixelFormat).swizzle;
 }
 
-const Swizzle& GLCaps::configTextureSwizzle(PixelConfig config) const {
-  return configMap.at(config).textureSwizzle;
+const Swizzle& GLCaps::getTextureSwizzle(PixelFormat pixelFormat) const {
+  return pixelFormatMap.at(pixelFormat).textureSwizzle;
 }
 
-const Swizzle& GLCaps::configOutputSwizzle(PixelConfig config) const {
-  return configMap.at(config).outputSwizzle;
+const Swizzle& GLCaps::getOutputSwizzle(PixelFormat pixelFormat) const {
+  return pixelFormatMap.at(pixelFormat).outputSwizzle;
 }
 
-int GLCaps::getSampleCount(int requestedCount, PixelConfig config) const {
+int GLCaps::getSampleCount(int requestedCount, PixelFormat pixelFormat) const {
   if (requestedCount <= 1) {
     return 1;
   }
-  auto result = configMap.find(config);
-  if (result == configMap.end() || result->second.colorSampleCounts.empty()) {
+  auto result = pixelFormatMap.find(pixelFormat);
+  if (result == pixelFormatMap.end() || result->second.colorSampleCounts.empty()) {
     return 1;
   }
   for (auto colorSampleCount : result->second.colorSampleCounts) {
@@ -272,40 +272,40 @@ void GLCaps::initWebGLSupport(const GLInfo& info) {
   semaphoreSupport = version >= GL_VER(2, 0);
 }
 
-void GLCaps::initConfigMap(const GLInfo& info) {
-  configMap[PixelConfig::RGBA_8888].format.sizedFormat = GL::RGBA8;
-  configMap[PixelConfig::RGBA_8888].format.externalFormat = GL::RGBA;
-  configMap[PixelConfig::RGBA_8888].swizzle = Swizzle::RGBA();
+void GLCaps::initFormatMap(const GLInfo& info) {
+  pixelFormatMap[PixelFormat::RGBA_8888].format.sizedFormat = GL::RGBA8;
+  pixelFormatMap[PixelFormat::RGBA_8888].format.externalFormat = GL::RGBA;
+  pixelFormatMap[PixelFormat::RGBA_8888].swizzle = Swizzle::RGBA();
   if (textureRedSupport) {
-    configMap[PixelConfig::ALPHA_8].format.sizedFormat = GL::R8;
-    configMap[PixelConfig::ALPHA_8].format.externalFormat = GL::RED;
-    configMap[PixelConfig::ALPHA_8].swizzle = Swizzle::RRRR();
+    pixelFormatMap[PixelFormat::ALPHA_8].format.sizedFormat = GL::R8;
+    pixelFormatMap[PixelFormat::ALPHA_8].format.externalFormat = GL::RED;
+    pixelFormatMap[PixelFormat::ALPHA_8].swizzle = Swizzle::RRRR();
     // Shader output swizzles will default to RGBA. When we've use GL::RED instead of GL::ALPHA to
-    // implement PixelConfig::ALPHA_8 we need to swizzle the shader outputs so the alpha channel
+    // implement PixelFormat::ALPHA_8 we need to swizzle the shader outputs so the alpha channel
     // gets written to the single component.
-    configMap[PixelConfig::ALPHA_8].outputSwizzle = Swizzle::AAAA();
-    configMap[PixelConfig::Gray_8].format.sizedFormat = GL::R8;
-    configMap[PixelConfig::Gray_8].format.externalFormat = GL::RED;
-    configMap[PixelConfig::Gray_8].swizzle = Swizzle::RRRA();
-    configMap[PixelConfig::RG_88].format.sizedFormat = GL::RG8;
-    configMap[PixelConfig::RG_88].format.externalFormat = GL::RG;
-    configMap[PixelConfig::RG_88].swizzle = Swizzle::RGRG();
+    pixelFormatMap[PixelFormat::ALPHA_8].outputSwizzle = Swizzle::AAAA();
+    pixelFormatMap[PixelFormat::GRAY_8].format.sizedFormat = GL::R8;
+    pixelFormatMap[PixelFormat::GRAY_8].format.externalFormat = GL::RED;
+    pixelFormatMap[PixelFormat::GRAY_8].swizzle = Swizzle::RRRA();
+    pixelFormatMap[PixelFormat::RG_88].format.sizedFormat = GL::RG8;
+    pixelFormatMap[PixelFormat::RG_88].format.externalFormat = GL::RG;
+    pixelFormatMap[PixelFormat::RG_88].swizzle = Swizzle::RGRG();
   } else {
-    configMap[PixelConfig::ALPHA_8].format.sizedFormat = GL::ALPHA8;
-    configMap[PixelConfig::ALPHA_8].format.externalFormat = GL::ALPHA;
-    configMap[PixelConfig::ALPHA_8].swizzle = Swizzle::AAAA();
-    configMap[PixelConfig::Gray_8].format.sizedFormat = GL::LUMINANCE8;
-    configMap[PixelConfig::Gray_8].format.externalFormat = GL::LUMINANCE;
-    configMap[PixelConfig::Gray_8].swizzle = Swizzle::RGBA();
-    configMap[PixelConfig::RG_88].format.sizedFormat = GL::LUMINANCE8_ALPHA8;
-    configMap[PixelConfig::RG_88].format.externalFormat = GL::LUMINANCE_ALPHA;
-    configMap[PixelConfig::RG_88].swizzle = Swizzle::RARA();
+    pixelFormatMap[PixelFormat::ALPHA_8].format.sizedFormat = GL::ALPHA8;
+    pixelFormatMap[PixelFormat::ALPHA_8].format.externalFormat = GL::ALPHA;
+    pixelFormatMap[PixelFormat::ALPHA_8].swizzle = Swizzle::AAAA();
+    pixelFormatMap[PixelFormat::GRAY_8].format.sizedFormat = GL::LUMINANCE8;
+    pixelFormatMap[PixelFormat::GRAY_8].format.externalFormat = GL::LUMINANCE;
+    pixelFormatMap[PixelFormat::GRAY_8].swizzle = Swizzle::RGBA();
+    pixelFormatMap[PixelFormat::RG_88].format.sizedFormat = GL::LUMINANCE8_ALPHA8;
+    pixelFormatMap[PixelFormat::RG_88].format.externalFormat = GL::LUMINANCE_ALPHA;
+    pixelFormatMap[PixelFormat::RG_88].swizzle = Swizzle::RARA();
   }
   // If we don't have texture swizzle support then the shader generator must insert the
   // swizzle into shader code.
   if (!textureSwizzleSupport) {
-    for (auto& config : configMap) {
-      config.second.textureSwizzle = config.second.swizzle;
+    for (auto& item : pixelFormatMap) {
+      item.second.textureSwizzle = item.second.swizzle;
     }
   }
   // ES 2.0 requires that the internal/external formats match.
@@ -313,7 +313,7 @@ void GLCaps::initConfigMap(const GLInfo& info) {
       (standard == GLStandard::GL || (standard == GLStandard::GLES && version >= GL_VER(3, 0)));
   bool useSizedRbFormats = standard == GLStandard::GLES || standard == GLStandard::WebGL;
 
-  for (auto& item : configMap) {
+  for (auto& item : pixelFormatMap) {
     auto& format = item.second.format;
     format.internalFormatTexImage = useSizedTexFormats ? format.sizedFormat : format.externalFormat;
     format.internalFormatRenderBuffer =
@@ -330,11 +330,11 @@ static bool UsesInternalformatQuery(GLStandard standard, const GLInfo& glInterfa
 }
 
 void GLCaps::initColorSampleCount(const GLInfo& info) {
-  std::vector<PixelConfig> pixelConfigs = {PixelConfig::RGBA_8888};
-  for (auto config : pixelConfigs) {
+  std::vector<PixelFormat> pixelFormats = {PixelFormat::RGBA_8888};
+  for (auto pixelFormat : pixelFormats) {
     if (UsesInternalformatQuery(standard, info, version)) {
       int count = 0;
-      unsigned format = configMap[config].format.internalFormatRenderBuffer;
+      unsigned format = pixelFormatMap[pixelFormat].format.internalFormatRenderBuffer;
       info.getInternalformativ(GL::RENDERBUFFER, format, GL::NUM_SAMPLE_COUNTS, 1, &count);
       if (count) {
         int* temp = new int[count];
@@ -345,9 +345,9 @@ void GLCaps::initColorSampleCount(const GLInfo& info) {
         }
         // We initialize our supported values with 1 (no msaa) and reverse the order
         // returned by GL so that the array is ascending.
-        configMap[config].colorSampleCounts.push_back(1);
+        pixelFormatMap[pixelFormat].colorSampleCounts.push_back(1);
         for (int j = 0; j < count; ++j) {
-          configMap[config].colorSampleCounts.push_back(temp[count - j - 1]);
+          pixelFormatMap[pixelFormat].colorSampleCounts.push_back(temp[count - j - 1]);
         }
         delete[] temp;
       }
@@ -368,7 +368,7 @@ void GLCaps::initColorSampleCount(const GLInfo& info) {
         if (samples > maxSampleCnt) {
           break;
         }
-        configMap[config].colorSampleCounts.push_back(samples);
+        pixelFormatMap[pixelFormat].colorSampleCounts.push_back(samples);
       }
     }
   }

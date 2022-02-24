@@ -18,29 +18,13 @@
 
 #pragma once
 
+#include "gpu/PixelFormat.h"
+
 namespace tgfx {
 /**
- * Types for interacting with GL textures created externally to TGFX.
+ * Types for interacting with GL frame buffers.
  */
-struct GLTextureInfo {
-  /**
-   * the id of this texture.
-   */
-  unsigned id = 0;
-  /**
-   * The target of this texture.
-   */
-  unsigned target = 0x0DE1;  // GL_TEXTURE_2D;
-  /**
-   * The pixel format of this texture.
-   */
-  unsigned format = 0x8058;  // GL_RGBA8;
-};
-
-/**
- * Types for interacting with GL frame buffers created externally to TGFX.
- */
-struct GLFrameBufferInfo {
+struct GLFrameBuffer {
   /**
    * The id of this frame buffer.
    */
@@ -49,6 +33,6 @@ struct GLFrameBufferInfo {
   /**
    * The pixel format of this frame buffer.
    */
-  unsigned format = 0x8058;  // GL_RGBA8;
+  PixelFormat format = PixelFormat::RGBA_8888;
 };
 }  // namespace tgfx

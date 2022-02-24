@@ -48,9 +48,8 @@ std::unique_ptr<FilterSource> ToFilterSource(const tgfx::Texture* texture,
   if (texture == nullptr) {
     return nullptr;
   }
-  auto textureInfo = tgfx::GLTexture::Unwrap(texture);
   auto filterSource = new FilterSource();
-  filterSource->textureID = textureInfo.id;
+  filterSource->textureID = GetTextureID(texture);
   filterSource->width = texture->width();
   filterSource->height = texture->height();
   filterSource->scale = scale;
@@ -64,9 +63,9 @@ std::unique_ptr<FilterTarget> ToFilterTarget(const tgfx::Surface* surface,
   if (surface == nullptr) {
     return nullptr;
   }
-  auto renderTarget = static_cast<const tgfx::GLSurface*>(surface)->getRenderTarget();
+  auto renderTarget = std::static_pointer_cast<tgfx::GLRenderTarget>(surface->getRenderTarget());
   auto filterTarget = new FilterTarget();
-  filterTarget->frameBufferID = renderTarget->getGLInfo().id;
+  filterTarget->frameBufferID = renderTarget->glFrameBuffer().id;
   filterTarget->width = surface->width();
   filterTarget->height = surface->height();
   filterTarget->vertexMatrix =
@@ -93,5 +92,12 @@ void PreConcatMatrix(FilterTarget* target, const tgfx::Matrix& matrix) {
   vertexMatrix.preConcat(matrix);
   target->vertexMatrix = tgfx::ToGLVertexMatrix(vertexMatrix, target->width, target->height,
                                                 tgfx::ImageOrigin::BottomLeft);
+}
+
+unsigned GetTextureID(const tgfx::Texture* texture) {
+  if (texture == nullptr || texture->isYUV()) {
+    return 0;
+  }
+  return static_cast<const tgfx::GLTexture*>(texture)->glSampler().id;
 }
 }  // namespace pag

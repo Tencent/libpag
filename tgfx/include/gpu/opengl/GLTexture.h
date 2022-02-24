@@ -18,26 +18,28 @@
 
 #pragma once
 
-#include "GLContext.h"
-#include "GLTextureSampler.h"
 #include "gpu/Texture.h"
+#include "gpu/opengl/GLSampler.h"
 
 namespace tgfx {
+/**
+ * Describes a two dimensional array of pixels in the OpenGL backend for drawing.
+ */
 class GLTexture : public Texture {
  public:
-  static GLTextureInfo Unwrap(const Texture* texture);
+  /**
+   * Creates a new GLTexture which wraps the specified backend texture. Caller must ensure the
+   * backend texture is valid for the lifetime of returned GLTexture.
+   */
+  static std::shared_ptr<GLTexture> MakeFrom(Context* context, const GLSampler& sampler, int width,
+                                             int height, ImageOrigin origin);
 
   /**
-   * Creates a new texture with each pixel stored as a single translucency (alpha) channel.
+   * Creates a new GLTexture which wraps the specified backend texture. The returned GLTexture takes
+   * ownership of the specified backend texture.
    */
-  static std::shared_ptr<GLTexture> MakeAlpha(Context* context, int width, int height,
-                                              ImageOrigin origin = ImageOrigin::TopLeft);
-
-  /**
-   * Creates a new texture with each pixel stored as 32-bit RGBA data.
-   */
-  static std::shared_ptr<GLTexture> MakeRGBA(Context* context, int width, int height,
-                                             ImageOrigin origin = ImageOrigin::TopLeft);
+  static std::shared_ptr<GLTexture> MakeAdopted(Context* context, const GLSampler& sampler,
+                                                int width, int height, ImageOrigin origin);
 
   Point getTextureCoord(float x, float y) const override;
 
@@ -45,12 +47,15 @@ class GLTexture : public Texture {
     return &sampler;
   }
 
-  const GLTextureInfo& getGLInfo() const {
-    return sampler.glInfo;
+  /**
+   * Returns the GLSampler associated with the texture.
+   */
+  const GLSampler& glSampler() const {
+    return sampler;
   }
 
  protected:
-  GLTextureSampler sampler = {};
+  GLSampler sampler = {};
 
   GLTexture(int width, int height, ImageOrigin origin);
 

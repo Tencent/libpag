@@ -17,15 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "EAGLNV12Texture.h"
+#include "gpu/opengl/GLContext.h"
 #include "gpu/opengl/eagl/EAGLDevice.h"
 
 namespace tgfx {
-static GLTextureInfo ToGLTexture(CVOpenGLESTextureRef texture, unsigned format) {
-  GLTextureInfo glInfo = {};
-  glInfo.target = CVOpenGLESTextureGetTarget(texture);
-  glInfo.id = CVOpenGLESTextureGetName(texture);
-  glInfo.format = format;
-  return glInfo;
+static GLSampler ToGLSampler(CVOpenGLESTextureRef texture, PixelFormat format) {
+  GLSampler sampler = {};
+  sampler.target = CVOpenGLESTextureGetTarget(texture);
+  sampler.id = CVOpenGLESTextureGetName(texture);
+  sampler.format = format;
+  return sampler;
 }
 
 std::shared_ptr<EAGLNV12Texture> EAGLNV12Texture::MakeFrom(Context* context,
@@ -44,16 +45,16 @@ std::shared_ptr<EAGLNV12Texture> EAGLNV12Texture::MakeFrom(Context* context,
   auto height = static_cast<int>(CVPixelBufferGetHeight(pixelBuffer));
   CVOpenGLESTextureRef outputTextureLuma = nil;
   CVOpenGLESTextureRef outputTextureChroma = nil;
-  auto oneComponentConfig = PixelConfig::Gray_8;
   auto gl = GLContext::Unwrap(context);
-  const auto& oneComponentFormat = gl->caps->getTextureFormat(oneComponentConfig);
+  auto lumaComponentFormat = PixelFormat::GRAY_8;
+  const auto& oneComponentFormat = gl->caps->getTextureFormat(lumaComponentFormat);
   // 返回的 texture 对象是一个强引用计数为 1 的对象。
   CVOpenGLESTextureCacheCreateTextureFromImage(
       kCFAllocatorDefault, textureCache, pixelBuffer, NULL, GL::TEXTURE_2D,
       oneComponentFormat.internalFormatTexImage, width, height, oneComponentFormat.externalFormat,
       GL::UNSIGNED_BYTE, 0, &outputTextureLuma);
-  auto twoComponentConfig = PixelConfig::RG_88;
-  const auto& twoComponentFormat = gl->caps->getTextureFormat(twoComponentConfig);
+  auto chromaComponentFormat = PixelFormat::RG_88;
+  const auto& twoComponentFormat = gl->caps->getTextureFormat(chromaComponentFormat);
   // 返回的 texture 对象是一个强引用计数为 1 的对象。
   CVOpenGLESTextureCacheCreateTextureFromImage(
       kCFAllocatorDefault, textureCache, pixelBuffer, NULL, GL::TEXTURE_2D,
@@ -64,11 +65,9 @@ std::shared_ptr<EAGLNV12Texture> EAGLNV12Texture::MakeFrom(Context* context,
   }
   auto texture = Resource::Wrap(context, new EAGLNV12Texture(pixelBuffer, colorSpace, colorRange));
   texture->lumaTexture = outputTextureLuma;
-  texture->samplers.emplace_back(oneComponentConfig,
-                                 ToGLTexture(outputTextureLuma, oneComponentFormat.sizedFormat));
+  texture->samplers.push_back(ToGLSampler(outputTextureLuma, lumaComponentFormat));
   texture->chromaTexture = outputTextureChroma;
-  texture->samplers.emplace_back(twoComponentConfig,
-                                 ToGLTexture(outputTextureChroma, twoComponentFormat.sizedFormat));
+  texture->samplers.push_back(ToGLSampler(outputTextureChroma, chromaComponentFormat));
   return texture;
 }
 

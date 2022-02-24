@@ -17,6 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "JPAGSurface.h"
+#include <GLES/gl.h>
+#include <GLES/glext.h>
+#include <GLES3/gl3.h>
 #include <android/native_window_jni.h>
 #include "GPUDecoder.h"
 #include "GPUDrawable.h"
@@ -130,9 +133,9 @@ JNIEXPORT jlong Java_org_libpag_PAGSurface_SetupFromTexture(JNIEnv*, jclass, jin
                                                             jint width, jint height, jboolean flipY,
                                                             jboolean forAsyncThread) {
   GLTextureInfo glInfo = {};
-  glInfo.target = GL::TEXTURE_2D;
+  glInfo.target = GL_TEXTURE_2D;
   glInfo.id = static_cast<unsigned>(textureID);
-  glInfo.format = GL::RGBA8;
+  glInfo.format = GL_RGBA8;
   BackendTexture glTexture(glInfo, width, height);
   auto origin = flipY ? ImageOrigin::BottomLeft : ImageOrigin::TopLeft;
 

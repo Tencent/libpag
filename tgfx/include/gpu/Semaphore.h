@@ -19,5 +19,11 @@
 #pragma once
 
 namespace tgfx {
-enum class PixelConfig { ALPHA_8, Gray_8, RG_88, RGBA_8888 };
+/**
+ * Wrapper class for a backend semaphore object.
+ */
+class Semaphore {
+ public:
+  virtual ~Semaphore() = default;
+};
 }  // namespace tgfx

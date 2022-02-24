@@ -17,9 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/opengl/cgl/CGLWindow.h"
+#include <OpenGL/gl3.h>
 #include <thread>
 #include "CGLHardwareTexture.h"
-#include "gpu/opengl/GLSurface.h"
+#include "gpu/opengl/GLRenderTarget.h"
 
 namespace tgfx {
 static std::mutex threadCacheLocker = {};
@@ -106,23 +107,22 @@ std::shared_ptr<Surface> CGLWindow::onCreateSurface(Context* context) {
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
     [glContext setView:view];
 #pragma clang diagnostic pop
-    GLFrameBufferInfo glInfo = {};
-    glInfo.id = 0;
-    glInfo.format = GL::RGBA8;
-    BackendRenderTarget renderTarget(glInfo, size.width, size.height);
-    return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
+    GLFrameBuffer frameBuffer = {};
+    frameBuffer.id = 0;
+    frameBuffer.format = PixelFormat::RGBA_8888;
+    auto renderTarget = GLRenderTarget::MakeFrom(context, frameBuffer, size.width, size.height, ImageOrigin::BottomLeft);
+    return Surface::MakeFrom(context, renderTarget);
   }
   auto texture = CGLHardwareTexture::MakeFrom(context, pixelBuffer);
-  return GLSurface::MakeFrom(context, texture);
+  return Surface::MakeFrom(context, texture);
 }
 
-void CGLWindow::onPresent(Context* context, int64_t) {
+void CGLWindow::onPresent(Context*, int64_t) {
   auto glContext = static_cast<CGLDevice*>(device.get())->glContext;
   if (view) {
     [glContext flushBuffer];
   } else {
-    auto gl = GLContext::Unwrap(context);
-    gl->flush();
+    glFlush();
   }
 }
 }  // namespace tgfx

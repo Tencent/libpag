@@ -66,7 +66,7 @@ GPUDecoder::GPUDecoder(const VideoConfig& config) {
   if (env == nullptr) {
     return;
   }
-  videoSurface = VideoSurface::Make(config.width, config.height, config.hasAlpha);
+  videoSurface = VideoSurface::Make(config.width, config.height);
   if (videoSurface == nullptr) {
     return;
   }
@@ -192,11 +192,12 @@ std::shared_ptr<VideoBuffer> GPUDecoder::onRenderFrame() {
   if (env == nullptr) {
     return nullptr;
   }
-  videoSurface->updateTexImage();
+  videoSurface->clearPendingTexImage();
   auto result = env->CallBooleanMethod(videoDecoder.get(), GPUDecoder_onRenderFrame);
   if (!result) {
     return nullptr;
   }
+  videoSurface->markPendingTexImage();
   return VideoImage::MakeFrom(videoSurface, videoWidth, videoHeight);
 }
 }  // namespace pag

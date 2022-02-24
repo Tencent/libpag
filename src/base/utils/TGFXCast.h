@@ -25,6 +25,9 @@
 #include "core/Matrix.h"
 #include "core/Stroke.h"
 #include "gpu/Backend.h"
+#include "gpu/opengl/GLFrameBuffer.h"
+#include "gpu/opengl/GLSampler.h"
+#include "gpu/opengl/GLSemaphore.h"
 #include "pag/file.h"
 #include "pag/gpu.h"
 
@@ -52,29 +55,13 @@ tgfx::ColorType ToTGFX(ColorType colorType);
 
 ColorType ToPAG(tgfx::ColorType colorType);
 
-static inline tgfx::BackendTexture ToTGFX(const BackendTexture& texture) {
-  return *reinterpret_cast<const tgfx::BackendTexture*>(&texture);
-}
+bool GetGLSampler(const BackendTexture& texture, tgfx::GLSampler* sampler);
 
-static inline BackendTexture ToPAG(const tgfx::BackendTexture& texture) {
-  return *reinterpret_cast<const BackendTexture*>(&texture);
-}
+bool GetGLFrameBuffer(const BackendRenderTarget& renderTarget, tgfx::GLFrameBuffer* frameBuffer);
 
-static inline tgfx::BackendRenderTarget ToTGFX(const BackendRenderTarget& renderTarget) {
-  return *reinterpret_cast<const tgfx::BackendRenderTarget*>(&renderTarget);
-}
+BackendTexture ToBackendTexture(const tgfx::GLSampler& sampler, int width, int height);
 
-static inline BackendRenderTarget ToPAG(const tgfx::BackendRenderTarget& renderTarget) {
-  return *reinterpret_cast<const BackendRenderTarget*>(&renderTarget);
-}
-
-static inline tgfx::BackendSemaphore* ToTGFX(BackendSemaphore* semaphore) {
-  return reinterpret_cast<tgfx::BackendSemaphore*>(semaphore);
-}
-
-static inline tgfx::BackendSemaphore ToTGFX(const BackendSemaphore& semaphore) {
-  return *reinterpret_cast<const tgfx::BackendSemaphore*>(&semaphore);
-}
+tgfx::GLSemaphore ToTGFX(const BackendSemaphore& semaphore);
 
 static inline const tgfx::Matrix* ToTGFX(const Matrix* matrix) {
   return reinterpret_cast<const tgfx::Matrix*>(matrix);

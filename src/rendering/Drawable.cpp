@@ -18,25 +18,38 @@
 
 #include "Drawable.h"
 #include "base/utils/TGFXCast.h"
+#include "gpu/opengl/GLRenderTarget.h"
 
 namespace pag {
 RenderTargetDrawable::RenderTargetDrawable(std::shared_ptr<tgfx::Device> device,
-                                           const tgfx::BackendRenderTarget& renderTarget,
+                                           const BackendRenderTarget& renderTarget,
                                            tgfx::ImageOrigin origin)
     : device(std::move(device)), renderTarget(renderTarget), origin(origin) {
 }
 
 std::shared_ptr<tgfx::Surface> RenderTargetDrawable::createSurface(tgfx::Context* context) {
-  return tgfx::Surface::MakeFrom(context, renderTarget, origin);
+  tgfx::GLFrameBuffer frameBuffer = {};
+  if (!GetGLFrameBuffer(renderTarget, &frameBuffer)) {
+    return nullptr;
+  }
+  auto glRT = tgfx::GLRenderTarget::MakeFrom(context, frameBuffer, renderTarget.width(),
+                                             renderTarget.height(), origin);
+  return tgfx::Surface::MakeFrom(context, std::move(glRT));
 }
 
 TextureDrawable::TextureDrawable(std::shared_ptr<tgfx::Device> device,
-                                 const tgfx::BackendTexture& texture, tgfx::ImageOrigin origin)
+                                 const BackendTexture& texture, tgfx::ImageOrigin origin)
     : device(std::move(device)), texture(texture), origin(origin) {
 }
 
 std::shared_ptr<tgfx::Surface> TextureDrawable::createSurface(tgfx::Context* context) {
-  return tgfx::Surface::MakeFrom(context, texture, origin);
+  tgfx::GLSampler sampler = {};
+  if (!GetGLSampler(texture, &sampler)) {
+    return nullptr;
+  }
+  auto glTexture =
+      tgfx::GLTexture::MakeFrom(context, sampler, texture.width(), texture.height(), origin);
+  return tgfx::Surface::MakeFrom(context, std::move(glTexture));
 }
 
 OffscreenDrawable::OffscreenDrawable(int width, int height, std::shared_ptr<tgfx::Device> device)

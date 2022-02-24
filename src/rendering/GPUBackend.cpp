@@ -122,6 +122,9 @@ BackendSemaphore::BackendSemaphore()
 }
 
 void BackendSemaphore::initGL(void* sync) {
+  if (sync == nullptr) {
+    return;
+  }
   _backend = Backend::OPENGL;
   _glSync = sync;
   _isInitialized = true;

@@ -22,6 +22,7 @@
 #include "core/Bitmap.h"
 #include "core/Image.h"
 #include "core/RGBAAALayout.h"
+#include "pag/gpu.h"
 #include "rendering/graphics/Snapshot.h"
 
 namespace pag {
@@ -47,7 +48,7 @@ class Picture : public Graphic {
   /**
    * Creates a new Picture with specified backend texture. Returns null if the texture is invalid.
    */
-  static std::shared_ptr<Graphic> MakeFrom(ID assetID, const tgfx::BackendTexture& texture,
+  static std::shared_ptr<Graphic> MakeFrom(ID assetID, const BackendTexture& texture,
                                            tgfx::ImageOrigin origin);
 
   /*

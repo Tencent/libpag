@@ -16,17 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLTexture.h"
+#include "gpu/opengl/GLTexture.h"
 #include "GLUtil.h"
-#include "core/Bitmap.h"
 #include "core/utils/UniqueID.h"
-#include "gpu/Surface.h"
 
 namespace tgfx {
 class GLBackendTexture : public GLTexture {
  public:
-  GLBackendTexture(GLTextureSampler textureSampler, int width, int height, ImageOrigin origin)
-      : GLTexture(width, height, origin) {
+  GLBackendTexture(GLSampler textureSampler, int width, int height, ImageOrigin origin,
+                   bool adopted)
+      : GLTexture(width, height, origin), adopted(adopted) {
     sampler = std::move(textureSampler);
   }
 
@@ -35,19 +34,32 @@ class GLBackendTexture : public GLTexture {
   }
 
  protected:
-  void onRelease(Context*) override {
+  void onRelease(Context* context) override {
+    if (adopted) {
+      auto gl = GLContext::Unwrap(context);
+      gl->deleteTextures(1, &sampler.id);
+    }
   }
+
+ private:
+  bool adopted = false;
 };
 
-std::shared_ptr<Texture> Texture::MakeFrom(Context* context, const BackendTexture& backendTexture,
-                                           ImageOrigin origin) {
-  GLTextureInfo glTextureInfo = {};
-  if (context == nullptr || !backendTexture.getGLTextureInfo(&glTextureInfo)) {
+std::shared_ptr<GLTexture> GLTexture::MakeFrom(Context* context, const GLSampler& sampler,
+                                               int width, int height, ImageOrigin origin) {
+  if (context == nullptr || width <= 0 || height <= 0 || sampler.id == 0) {
     return nullptr;
   }
-  auto sampler = GLTextureSampler(PixelConfig::RGBA_8888, glTextureInfo);
-  auto texture =
-      new GLBackendTexture(sampler, backendTexture.width(), backendTexture.height(), origin);
+  auto texture = new GLBackendTexture(sampler, width, height, origin, false);
+  return Resource::Wrap(context, texture);
+}
+
+std::shared_ptr<GLTexture> GLTexture::MakeAdopted(Context* context, const GLSampler& sampler,
+                                                  int width, int height, ImageOrigin origin) {
+  if (context == nullptr || width <= 0 || height <= 0 || sampler.id == 0) {
+    return nullptr;
+  }
+  auto texture = new GLBackendTexture(sampler, width, height, origin, true);
   return Resource::Wrap(context, texture);
 }
 
@@ -60,7 +72,7 @@ class GLAlphaTexture : public GLTexture {
     recycleKey->write(static_cast<uint32_t>(height));
   }
 
-  GLAlphaTexture(GLTextureSampler textureSampler, int width, int height, ImageOrigin origin)
+  GLAlphaTexture(GLSampler textureSampler, int width, int height, ImageOrigin origin)
       : GLTexture(width, height, origin) {
     sampler = std::move(textureSampler);
   }
@@ -76,7 +88,7 @@ class GLAlphaTexture : public GLTexture {
 
   void onRelease(Context* context) override {
     auto gl = GLContext::Unwrap(context);
-    gl->deleteTextures(1, &sampler.glInfo.id);
+    gl->deleteTextures(1, &sampler.id);
   }
 };
 
@@ -89,7 +101,7 @@ class GLRGBATexture : public GLTexture {
     recycleKey->write(static_cast<uint32_t>(height));
   }
 
-  GLRGBATexture(GLTextureSampler textureSampler, int width, int height,
+  GLRGBATexture(GLSampler textureSampler, int width, int height,
                 ImageOrigin origin = ImageOrigin::TopLeft)
       : GLTexture(width, height, origin) {
     sampler = std::move(textureSampler);
@@ -106,7 +118,7 @@ class GLRGBATexture : public GLTexture {
 
   void onRelease(Context* context) override {
     auto gl = GLContext::Unwrap(context);
-    gl->deleteTextures(1, &sampler.glInfo.id);
+    gl->deleteTextures(1, &sampler.id);
   }
 };
 
@@ -125,8 +137,8 @@ std::shared_ptr<Texture> Texture::Make(Context* context, int width, int height, 
   if (!CheckMaxTextureSize(gl, width, height)) {
     return nullptr;
   }
-  PixelConfig pixelConfig = alphaOnly ? PixelConfig::ALPHA_8 : PixelConfig::RGBA_8888;
-  const auto& format = gl->caps->getTextureFormat(pixelConfig);
+  PixelFormat pixelFormat = alphaOnly ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
+  const auto& format = gl->caps->getTextureFormat(pixelFormat);
   GLStateGuard stateGuard(context);
   BytesKey recycleKey = {};
   if (alphaOnly) {
@@ -137,31 +149,30 @@ std::shared_ptr<Texture> Texture::Make(Context* context, int width, int height, 
 
   auto texture =
       std::static_pointer_cast<GLTexture>(context->resourceCache()->getRecycled(recycleKey));
-  GLTextureInfo glInfo = {};
+  GLSampler sampler = {};
   if (texture) {
     texture->_origin = origin;
-    glInfo = texture->getGLInfo();
+    sampler = texture->glSampler();
   } else {
-    glInfo.target = GL::TEXTURE_2D;
-    glInfo.format = format.sizedFormat;
-    gl->genTextures(1, &(glInfo.id));
-    if (glInfo.id == 0) {
+    sampler.target = GL::TEXTURE_2D;
+    sampler.format = pixelFormat;
+    gl->genTextures(1, &(sampler.id));
+    if (sampler.id == 0) {
       return nullptr;
     }
-    gl->bindTexture(glInfo.target, glInfo.id);
-    gl->texParameteri(glInfo.target, GL::TEXTURE_WRAP_S, GL::CLAMP_TO_EDGE);
-    gl->texParameteri(glInfo.target, GL::TEXTURE_WRAP_T, GL::CLAMP_TO_EDGE);
-    gl->texParameteri(glInfo.target, GL::TEXTURE_MIN_FILTER, GL::LINEAR);
-    gl->texParameteri(glInfo.target, GL::TEXTURE_MAG_FILTER, GL::LINEAR);
+    gl->bindTexture(sampler.target, sampler.id);
+    gl->texParameteri(sampler.target, GL::TEXTURE_WRAP_S, GL::CLAMP_TO_EDGE);
+    gl->texParameteri(sampler.target, GL::TEXTURE_WRAP_T, GL::CLAMP_TO_EDGE);
+    gl->texParameteri(sampler.target, GL::TEXTURE_MIN_FILTER, GL::LINEAR);
+    gl->texParameteri(sampler.target, GL::TEXTURE_MAG_FILTER, GL::LINEAR);
     if (pixels == nullptr) {
-      gl->texImage2D(glInfo.target, 0, static_cast<int>(format.internalFormatTexImage), width,
+      gl->texImage2D(sampler.target, 0, static_cast<int>(format.internalFormatTexImage), width,
                      height, 0, format.externalFormat, GL::UNSIGNED_BYTE, nullptr);
     }
     if (!CheckGLError(gl)) {
-      gl->deleteTextures(1, &glInfo.id);
+      gl->deleteTextures(1, &sampler.id);
       return nullptr;
     }
-    auto sampler = GLTextureSampler(pixelConfig, glInfo);
     if (alphaOnly) {
       texture = Resource::Wrap(context, new GLAlphaTexture(sampler, width, height, origin));
     } else {
@@ -170,7 +181,7 @@ std::shared_ptr<Texture> Texture::Make(Context* context, int width, int height, 
   }
   if (pixels != nullptr) {
     int bytesPerPixel = alphaOnly ? 1 : 4;
-    SubmitGLTexture(gl, glInfo, format, width, height, rowBytes, bytesPerPixel, pixels);
+    SubmitGLTexture(gl, sampler, width, height, rowBytes, bytesPerPixel, pixels);
   }
   return texture;
 }
@@ -183,31 +194,12 @@ std::shared_ptr<Texture> Texture::MakeAlpha(Context* context, int width, int hei
   return Make(context, width, height, pixels, rowBytes, origin, true);
 }
 
-std::shared_ptr<GLTexture> GLTexture::MakeAlpha(Context* context, int width, int height,
-                                                ImageOrigin origin) {
-  auto texture = Texture::MakeAlpha(context, width, height, nullptr, 0, origin);
-  return std::static_pointer_cast<GLTexture>(texture);
-}
-
 std::shared_ptr<Texture> Texture::MakeRGBA(Context* context, int width, int height, void* pixels,
                                            size_t rowBytes, ImageOrigin origin) {
   if (context == nullptr) {
     return nullptr;
   }
   return Make(context, width, height, pixels, rowBytes, origin, false);
-}
-
-std::shared_ptr<GLTexture> GLTexture::MakeRGBA(Context* context, int width, int height,
-                                               ImageOrigin origin) {
-  auto texture = Texture::MakeRGBA(context, width, height, nullptr, 0, origin);
-  return std::static_pointer_cast<GLTexture>(texture);
-}
-
-GLTextureInfo GLTexture::Unwrap(const Texture* texture) {
-  if (texture == nullptr || texture->isYUV()) {
-    return {};
-  }
-  return static_cast<const GLTexture*>(texture)->sampler.glInfo;
 }
 
 GLTexture::GLTexture(int width, int height, ImageOrigin origin) : Texture(width, height, origin) {

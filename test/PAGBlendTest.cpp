@@ -51,13 +51,13 @@ PAG_TEST_F(PAGBlendTest, Blend) {
   }
 }
 
-tgfx::GLTextureInfo GetBottomLeftImage(std::shared_ptr<Device> device, int width, int height) {
+tgfx::GLSampler GetBottomLeftImage(std::shared_ptr<Device> device, int width, int height) {
   auto context = device->lockContext();
   auto gl = GLContext::Unwrap(context);
-  tgfx::GLTextureInfo textureInfo;
+  tgfx::GLSampler textureInfo;
   CreateGLTexture(gl, width, height, &textureInfo);
-  tgfx::BackendTexture backendTexture(textureInfo, width, height);
-  auto surface = PAGSurface::MakeFrom(ToPAG(backendTexture), ImageOrigin::BottomLeft);
+  auto backendTexture = ToBackendTexture(textureInfo, width, height);
+  auto surface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::BottomLeft);
   device->unlock();
   auto composition = PAGComposition::Make(1080, 1920);
   auto imageLayer = PAGImageLayer::Make(1080, 1920, 1000000);
@@ -80,10 +80,10 @@ PAG_TEST_F(PAGBlendTest, CopyDstTexture) {
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto gl = GLContext::Unwrap(context);
-  tgfx::GLTextureInfo textureInfo;
+  tgfx::GLSampler textureInfo;
   CreateGLTexture(gl, width, height, &textureInfo);
-  auto backendTexture = tgfx::BackendTexture(textureInfo, width, height);
-  auto pagSurface = PAGSurface::MakeFrom(ToPAG(backendTexture), ImageOrigin::BottomLeft);
+  auto backendTexture = ToBackendTexture(textureInfo, width, height);
+  auto pagSurface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::BottomLeft);
   device->unlock();
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -111,12 +111,12 @@ PAG_TEST_F(PAGBlendTest, TextureBottomLeft) {
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto gl = GLContext::Unwrap(context);
-  auto backendTexture = tgfx::BackendTexture(replaceTextureInfo, width, height);
-  auto replaceImage = PAGImage::FromTexture(ToPAG(backendTexture), ImageOrigin::BottomLeft);
-  tgfx::GLTextureInfo textureInfo;
+  auto backendTexture = ToBackendTexture(replaceTextureInfo, width, height);
+  auto replaceImage = PAGImage::FromTexture(backendTexture, ImageOrigin::BottomLeft);
+  tgfx::GLSampler textureInfo;
   CreateGLTexture(gl, width, height, &textureInfo);
-  backendTexture = tgfx::BackendTexture(textureInfo, width, height);
-  auto pagSurface = PAGSurface::MakeFrom(ToPAG(backendTexture), ImageOrigin::TopLeft);
+  backendTexture = ToBackendTexture(textureInfo, width, height);
+  auto pagSurface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::TopLeft);
   device->unlock();
 
   auto pagPlayer = std::make_shared<PAGPlayer>();
@@ -146,15 +146,15 @@ PAG_TEST_F(PAGBlendTest, BothBottomLeft) {
   auto replaceTextureInfo = GetBottomLeftImage(device, width, height);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto backendTexture = tgfx::BackendTexture(replaceTextureInfo, width / 2, height / 2);
-  auto replaceImage = PAGImage::FromTexture(ToPAG(backendTexture), ImageOrigin::BottomLeft);
+  auto backendTexture = ToBackendTexture(replaceTextureInfo, width / 2, height / 2);
+  auto replaceImage = PAGImage::FromTexture(backendTexture, ImageOrigin::BottomLeft);
   replaceImage->setMatrix(
       Matrix::MakeTrans(static_cast<float>(width) * 0.1, static_cast<float>(height) * 0.2));
   auto gl = GLContext::Unwrap(context);
-  tgfx::GLTextureInfo textureInfo;
+  tgfx::GLSampler textureInfo = {};
   CreateGLTexture(gl, width, height, &textureInfo);
-  backendTexture = tgfx::BackendTexture(textureInfo, width, height);
-  auto pagSurface = PAGSurface::MakeFrom(ToPAG(backendTexture), ImageOrigin::BottomLeft);
+  backendTexture = ToBackendTexture(textureInfo, width, height);
+  auto pagSurface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::BottomLeft);
   device->unlock();
 
   auto composition = PAGComposition::Make(width, height);

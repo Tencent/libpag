@@ -16,13 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLTextureSampler.h"
-#include "GLContext.h"
+#pragma once
+
+#include "core/BytesKey.h"
+#include "gpu/Context.h"
+#include "gpu/PixelFormat.h"
 
 namespace tgfx {
-void GLTextureSampler::computeKey(Context* context, BytesKey* bytesKey) const {
-  const auto* gl = GLContext::Unwrap(context);
-  bytesKey->write(static_cast<uint32_t>(gl->caps->configTextureSwizzle(config).asKey()));
-  bytesKey->write(glInfo.target);
-}
+/**
+ * TextureSampler stores the sampling parameters for a backend texture uint.
+ */
+class TextureSampler {
+ public:
+  virtual ~TextureSampler() = default;
+
+  /**
+   * The pixel format of the sampler.
+   */
+  PixelFormat format = PixelFormat::RGBA_8888;
+  
+ protected:
+  virtual void computeKey(Context* context, BytesKey* bytesKey) const = 0;
+
+  friend class FragmentProcessor;
+
+  friend class Pipeline;
+};
 }  // namespace tgfx

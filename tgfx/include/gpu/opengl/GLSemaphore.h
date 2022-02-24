@@ -18,33 +18,18 @@
 
 #pragma once
 
-#include "GLContext.h"
-#include "GLTextureSampler.h"
-#include "gpu/YUVTexture.h"
+#include "gpu/Semaphore.h"
 
 namespace tgfx {
-struct YUVConfig;
-class GLYUVTexture : public YUVTexture {
+
+/**
+ * Types for interacting with OpenGL semaphore object.
+ */
+class GLSemaphore : public Semaphore {
  public:
-  Point getTextureCoord(float x, float y) const override;
-
-  size_t samplerCount() const override {
-    return samplers.size();
-  }
-
-  const TextureSampler* getSamplerAt(size_t index) const override;
-
-  size_t planeCount() const {
-    return samplerCount();
-  }
-
- protected:
-  std::vector<GLTextureSampler> samplers = {};
-
-  GLYUVTexture(YUVColorSpace colorSpace, YUVColorRange colorRange, int width, int height);
-
-  void onRelease(Context*) override;
-
-  friend class YUVTexture;
+  /**
+   * Holds the GLsync as a void*.
+   */
+  void* glSync = nullptr;
 };
 }  // namespace tgfx

@@ -18,15 +18,30 @@
 
 #pragma once
 
+#include "gpu/YUVTexture.h"
+#include "gpu/opengl/GLSampler.h"
+
 namespace tgfx {
 /**
- * Types for interacting with Metal resources created externally to TGFX. Holds the MTLTexture as a
- * const void*.
+ * GLYUVTexture wraps separate texture units in the OpenGL backend for Y, U, and V planes.
  */
-struct MtlTextureInfo {
-  /**
-   * Pointer to MTLTexture.
-   */
-  const void* texture = nullptr;
+class GLYUVTexture : public YUVTexture {
+ public:
+  Point getTextureCoord(float x, float y) const override;
+
+  size_t samplerCount() const override {
+    return samplers.size();
+  }
+
+  const TextureSampler* getSamplerAt(size_t index) const override;
+
+ protected:
+  std::vector<GLSampler> samplers = {};
+
+  GLYUVTexture(YUVColorSpace colorSpace, YUVColorRange colorRange, int width, int height);
+
+  void onRelease(Context*) override;
+
+  friend class YUVTexture;
 };
 }  // namespace tgfx

@@ -18,9 +18,9 @@
 
 #include "GLProgram.h"
 #include "GLContext.h"
-#include "GLTexture.h"
 #include "GLUtil.h"
 #include "gpu/Pipeline.h"
+#include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
 GLProgram::GLProgram(unsigned programID, const std::vector<Uniform>& uniforms,
@@ -60,8 +60,8 @@ void GLProgram::onRelease(Context* context) {
 }
 
 static void BindGLTexture(const GLInterface* gl, int position, const TextureSampler* sampler) {
-  const auto& glInfo = static_cast<const GLTextureSampler*>(sampler)->glInfo;
-  ActiveGLTexture(gl, GL::TEXTURE0 + position, glInfo.target, glInfo.id, sampler->config);
+  auto glSampler = static_cast<const GLSampler*>(sampler);
+  ActiveGLTexture(gl, GL::TEXTURE0 + position, glSampler->target, glSampler->id, glSampler->format);
 }
 
 void GLProgram::updateUniformsAndTextureBindings(const GLInterface* gl,

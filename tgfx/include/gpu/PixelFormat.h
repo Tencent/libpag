@@ -16,22 +16,31 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/Surface.h"
-#include "core/utils/Log.h"
+#pragma once
 
 namespace tgfx {
-Surface::Surface(Context* context) : context(context) {
-  DEBUG_ASSERT(context != nullptr);
-}
+/**
+ * Describes the possible pixel formats of a TextureSampler.
+ */
+enum class PixelFormat {
+  /**
+   * Pixel with 8 bits for alpha. Each pixel is stored on 1 bytes.
+   */
+  ALPHA_8,
 
-bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) const {
-  return onReadPixels(dstInfo, dstPixels, srcX, srcY);
-}
+  /**
+   * Pixel with 8 bits for grayscale. Each pixel is stored on 1 bytes.
+   */
+  GRAY_8,
 
-bool Surface::hitTest(float x, float y) const {
-  uint8_t pixel[4];
-  auto info = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
-  auto result = onReadPixels(info, pixel, static_cast<int>(x), static_cast<int>(y));
-  return result && pixel[3] > 0;
-}
+  /**
+   * Pixel with 8 bits for red, green. Each pixel is stored on 2 bytes.
+   */
+  RG_88,
+
+  /**
+   * Pixel with 8 bits for red, green, blue, alpha. Each pixel is stored on 4 bytes.
+   */
+  RGBA_8888
+};
 }  // namespace tgfx

@@ -137,11 +137,11 @@ std::shared_ptr<Surface> EAGLWindow::onCreateSurface(Context* context) {
     LOGE("EAGLWindow::onCreateSurface() Framebuffer is not complete!");
     return nullptr;
   }
-  GLFrameBufferInfo glInfo = {};
+  GLFrameBuffer glInfo = {};
   glInfo.id = frameBufferID;
-  glInfo.format = GL::RGBA8;
-  BackendRenderTarget renderTarget(glInfo, static_cast<int>(width), static_cast<int>(height));
-  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
+  glInfo.format = PixelFormat::RGBA_8888;
+  auto renderTarget = GLRenderTarget::MakeFrom(context, glInfo, static_cast<int>(width), static_cast<int>(height), ImageOrigin::BottomLeft);
+  return Surface::MakeFrom(context, renderTarget);
 }
 
 void EAGLWindow::onPresent(Context* context, int64_t) {

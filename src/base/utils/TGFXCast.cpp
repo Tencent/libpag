@@ -141,4 +141,38 @@ ColorType ToPAG(tgfx::ColorType colorType) {
       return ColorType::Unknown;
   }
 }
+
+tgfx::GLSemaphore ToTGFX(const BackendSemaphore& semaphore) {
+  tgfx::GLSemaphore glSemaphore = {};
+  glSemaphore.glSync = semaphore.glSync();
+  return glSemaphore;
+}
+
+bool GetGLSampler(const BackendTexture& texture, tgfx::GLSampler* sampler) {
+  GLTextureInfo glInfo = {};
+  if (!texture.getGLTextureInfo(&glInfo)) {
+    return false;
+  }
+  sampler->id = glInfo.id;
+  sampler->target = glInfo.target;
+  sampler->format = tgfx::PixelFormat::RGBA_8888;
+  return true;
+}
+
+bool GetGLFrameBuffer(const BackendRenderTarget& renderTarget, tgfx::GLFrameBuffer* frameBuffer) {
+  GLFrameBufferInfo glInfo = {};
+  if (!renderTarget.getGLFramebufferInfo(&glInfo)) {
+    return false;
+  }
+  frameBuffer->id = glInfo.id;
+  frameBuffer->format = tgfx::PixelFormat::RGBA_8888;
+  return true;
+}
+
+BackendTexture ToBackendTexture(const tgfx::GLSampler& sampler, int width, int height) {
+  GLTextureInfo glInfo = {};
+  glInfo.id = sampler.id;
+  glInfo.target = sampler.target;
+  return BackendTexture(glInfo, width, height);
+}
 }  // namespace pag

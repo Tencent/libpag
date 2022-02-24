@@ -72,7 +72,7 @@ QSGTexture* QGLWindow::getTexture() {
       delete outTexture;
       outTexture = nullptr;
     }
-    auto textureID = frontTexture->getGLInfo().id;
+    auto textureID = frontTexture->glSampler().id;
     auto width = static_cast<int>(ceil(quickItem->width()));
     auto height = static_cast<int>(ceil(quickItem->height()));
     outTexture = nativeWindow->createTextureFromId(textureID, QSize(width, height),
@@ -97,10 +97,11 @@ std::shared_ptr<Surface> QGLWindow::onCreateSurface(Context* context) {
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
-  frontTexture = GLTexture::MakeRGBA(context, width, height);
-  backTexture = GLTexture::MakeRGBA(context, width, height);
-  renderTarget = GLRenderTarget::MakeFrom(context, backTexture.get());
-  return GLSurface::MakeFrom(context, renderTarget);
+  frontTexture = std::static_pointer_cast<GLTexture>(Texture::MakeRGBA(context, width, height));
+  backTexture = std::static_pointer_cast<GLTexture>(Texture::MakeRGBA(context, width, height));
+  auto surface = Surface::MakeFrom(context, backTexture);
+  renderTarget = std::static_pointer_cast<GLRenderTarget>(surface->getRenderTarget());
+  return surface;
 }
 
 void QGLWindow::onPresent(Context* context, int64_t) {
@@ -110,9 +111,9 @@ void QGLWindow::onPresent(Context* context, int64_t) {
   auto gl = GLContext::Unwrap(context);
   std::swap(frontTexture, backTexture);
   gl->flush();
-  gl->bindFramebuffer(GL_FRAMEBUFFER, renderTarget->getGLInfo().id);
+  gl->bindFramebuffer(GL_FRAMEBUFFER, renderTarget->glFrameBuffer().id);
   gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-                           backTexture->getGLInfo().id, 0);
+                           backTexture->glSampler().id, 0);
   gl->bindFramebuffer(GL_FRAMEBUFFER, 0);
   invalidateTexture();
 }

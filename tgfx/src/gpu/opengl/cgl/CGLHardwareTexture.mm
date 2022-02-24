@@ -17,16 +17,17 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CGLHardwareTexture.h"
-#include "gpu/opengl/cgl/CGLDevice.h"
+#include <OpenGL/gl3.h>
 #include "core/utils/UniqueID.h"
+#include "gpu/opengl/cgl/CGLDevice.h"
 
 namespace tgfx {
 std::shared_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(Context* context,
                                                                  CVPixelBufferRef pixelBuffer) {
   BytesKey recycleKey = {};
   ComputeRecycleKey(&recycleKey, pixelBuffer);
-  auto glTexture =
-      std::static_pointer_cast<CGLHardwareTexture>(context->resourceCache()->getRecycled(recycleKey));
+  auto glTexture = std::static_pointer_cast<CGLHardwareTexture>(
+      context->resourceCache()->getRecycled(recycleKey));
   if (glTexture) {
     return glTexture;
   }
@@ -44,16 +45,15 @@ std::shared_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(Context* contex
   if (texture == nil) {
     return nullptr;
   }
-  GLTextureInfo glInfo = {};
-  glInfo.target = CVOpenGLTextureGetTarget(texture);
-  glInfo.id = CVOpenGLTextureGetName(texture);
-  auto oneComponent8 =
-      CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_OneComponent8;
-  // mac 端创建的单通道纹理都是 GL::RED。
-  glInfo.format = oneComponent8 ? GL::R8 : GL::RGBA8;
+  GLSampler glSampler = {};
+  glSampler.target = CVOpenGLTextureGetTarget(texture);
+  glSampler.id = CVOpenGLTextureGetName(texture);
+  glSampler.format =
+      CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_OneComponent8
+          ? PixelFormat::ALPHA_8
+          : PixelFormat::RGBA_8888;
   glTexture = Resource::Wrap(context, new CGLHardwareTexture(pixelBuffer));
-  glTexture->sampler.glInfo = glInfo;
-  glTexture->sampler.config = oneComponent8 ? PixelConfig::ALPHA_8 : PixelConfig::RGBA_8888;
+  glTexture->sampler = glSampler;
   glTexture->texture = texture;
   return glTexture;
 }
@@ -82,7 +82,7 @@ CGLHardwareTexture::~CGLHardwareTexture() {
 }
 
 Point CGLHardwareTexture::getTextureCoord(float x, float y) const {
-  if (sampler.glInfo.target == GL::TEXTURE_RECTANGLE) {
+  if (sampler.target == GL_TEXTURE_RECTANGLE) {
     return {x, y};
   }
   return GLTexture::getTextureCoord(x, y);

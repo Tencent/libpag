@@ -31,17 +31,10 @@ std::shared_ptr<VideoImage> VideoImage::MakeFrom(std::shared_ptr<VideoSurface> v
 
 VideoImage::VideoImage(std::shared_ptr<VideoSurface> videoSurface, int width, int height)
     : VideoBuffer(width, height), videoSurface(std::move(videoSurface)) {
-  this->videoSurface->markHasNewTextureImage();
 }
 
 std::shared_ptr<tgfx::Texture> VideoImage::makeTexture(tgfx::Context* context) const {
   std::lock_guard<std::mutex> autoLock(locker);
-  if (!videoSurface->attachToContext(context)) {
-    return nullptr;
-  }
-  if (!videoSurface->updateTexImage()) {
-    return nullptr;
-  }
-  return videoSurface->getTexture();
+  return videoSurface->makeTexture(context);
 }
 }  // namespace pag

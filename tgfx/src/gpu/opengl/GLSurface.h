@@ -19,18 +19,13 @@
 #pragma once
 
 #include "GLCanvas.h"
-#include "GLRenderTarget.h"
-#include "GLTexture.h"
 #include "gpu/Surface.h"
+#include "gpu/opengl/GLRenderTarget.h"
+#include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
 class GLSurface : public Surface {
  public:
-  static std::shared_ptr<GLSurface> MakeFrom(Context* context,
-                                             std::shared_ptr<GLRenderTarget> renderTarget);
-
-  static std::shared_ptr<GLSurface> MakeFrom(Context* context, std::shared_ptr<GLTexture> texture);
-
   ~GLSurface() override;
 
   int width() const override {
@@ -47,11 +42,13 @@ class GLSurface : public Surface {
 
   Canvas* getCanvas() override;
 
-  bool wait(const BackendSemaphore& semaphore) override;
+  bool wait(const Semaphore* semaphore) override;
 
-  bool flush(BackendSemaphore* semaphore) override;
+  bool flush(Semaphore* semaphore) override;
 
-  std::shared_ptr<GLRenderTarget> getRenderTarget() const;
+  std::shared_ptr<RenderTarget> getRenderTarget() const override {
+    return renderTarget;
+  }
 
   std::shared_ptr<Texture> getTexture() const override;
 
@@ -63,8 +60,8 @@ class GLSurface : public Surface {
   std::shared_ptr<GLTexture> texture = nullptr;
   GLCanvas* canvas = nullptr;
 
-  GLSurface(Context* context, std::shared_ptr<GLRenderTarget> renderTarget,
-            std::shared_ptr<GLTexture> texture = nullptr);
+  explicit GLSurface(Context* context, std::shared_ptr<GLRenderTarget> renderTarget,
+                     std::shared_ptr<GLTexture> texture = nullptr);
 
   friend class Surface;
 };
