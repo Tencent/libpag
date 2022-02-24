@@ -205,13 +205,13 @@ void LayerFilter::update(Frame frame, const tgfx::Rect& inputBounds, const tgfx:
 
 static void EnableMultisample(const tgfx::GLInterface* gl, bool usesMSAA) {
   if (usesMSAA && gl->caps->multisampleDisableSupport) {
-    gl->enable(GL::MULTISAMPLE);
+    gl->enable(GL_MULTISAMPLE);
   }
 }
 
 static void DisableMultisample(const tgfx::GLInterface* gl, bool usesMSAA) {
   if (usesMSAA && gl->caps->multisampleDisableSupport) {
-    gl->disable(GL::MULTISAMPLE);
+    gl->disable(GL_MULTISAMPLE);
   }
 }
 
@@ -226,19 +226,19 @@ void LayerFilter::draw(tgfx::Context* context, const FilterSource* source,
   auto gl = tgfx::GLContext::Unwrap(context);
   EnableMultisample(gl, needsMSAA());
   gl->useProgram(filterProgram->program);
-  gl->enable(GL::BLEND);
-  gl->blendEquation(GL::FUNC_ADD);
-  gl->blendFunc(GL::ONE, GL::ONE_MINUS_SRC_ALPHA);
-  gl->bindFramebuffer(GL::FRAMEBUFFER, target->frameBufferID);
+  gl->enable(GL_BLEND);
+  gl->blendEquation(GL_FUNC_ADD);
+  gl->blendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+  gl->bindFramebuffer(GL_FRAMEBUFFER, target->frameBufferID);
   gl->viewport(0, 0, target->width, target->height);
 
-  ActiveGLTexture(gl, GL::TEXTURE0, GL::TEXTURE_2D, source->textureID);
-  gl->uniformMatrix3fv(vertexMatrixHandle, 1, GL::FALSE, target->vertexMatrix.data());
-  gl->uniformMatrix3fv(textureMatrixHandle, 1, GL::FALSE, source->textureMatrix.data());
+  ActiveGLTexture(gl, GL_TEXTURE0, GL_TEXTURE_2D, source->textureID);
+  gl->uniformMatrix3fv(vertexMatrixHandle, 1, GL_FALSE, target->vertexMatrix.data());
+  gl->uniformMatrix3fv(textureMatrixHandle, 1, GL_FALSE, source->textureMatrix.data());
   onUpdateParams(gl, contentBounds, filterScale);
   auto vertices = computeVertices(contentBounds, transformedBounds, filterScale);
   bindVertices(gl, source, target, vertices);
-  gl->drawArrays(GL::TRIANGLE_STRIP, 0, 4);
+  gl->drawArrays(GL_TRIANGLE_STRIP, 0, 4);
   if (filterProgram->vertexArray > 0) {
     gl->bindVertexArray(0);
   }
@@ -280,16 +280,16 @@ void LayerFilter::bindVertices(const tgfx::GLInterface* gl, const FilterSource* 
   if (filterProgram->vertexArray > 0) {
     gl->bindVertexArray(filterProgram->vertexArray);
   }
-  gl->bindBuffer(GL::ARRAY_BUFFER, filterProgram->vertexBuffer);
-  gl->bufferData(GL::ARRAY_BUFFER, vertices.size() * sizeof(float), &vertices[0], GL::STREAM_DRAW);
-  gl->vertexAttribPointer(static_cast<unsigned>(positionHandle), 2, GL::FLOAT, GL::FALSE,
+  gl->bindBuffer(GL_ARRAY_BUFFER, filterProgram->vertexBuffer);
+  gl->bufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), &vertices[0], GL_STREAM_DRAW);
+  gl->vertexAttribPointer(static_cast<unsigned>(positionHandle), 2, GL_FLOAT, GL_FALSE,
                           4 * sizeof(float), static_cast<void*>(0));
   gl->enableVertexAttribArray(static_cast<unsigned>(positionHandle));
 
-  gl->vertexAttribPointer(textureCoordHandle, 2, GL::FLOAT, GL::FALSE, 4 * sizeof(float),
+  gl->vertexAttribPointer(textureCoordHandle, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float),
                           reinterpret_cast<void*>(2 * sizeof(float)));
   gl->enableVertexAttribArray(textureCoordHandle);
-  gl->bindBuffer(GL::ARRAY_BUFFER, 0);
+  gl->bindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 bool LayerFilter::needsMSAA() const {

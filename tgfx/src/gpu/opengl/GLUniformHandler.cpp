@@ -50,12 +50,12 @@ SamplerHandle GLUniformHandler::addSampler(const TextureSampler* sampler, const 
 
   ShaderVar::Type type;
   switch (static_cast<const GLSampler*>(sampler)->target) {
-    case GL::TEXTURE_EXTERNAL_OES:
+    case GL_TEXTURE_EXTERNAL_OES:
       programBuilder->fragmentShaderBuilder()->addFeature(PrivateFeature::OESTexture,
                                                           "GL_OES_EGL_image_external");
       type = ShaderVar::Type::TextureExternalSampler;
       break;
-    case GL::TEXTURE_RECTANGLE:
+    case GL_TEXTURE_RECTANGLE:
       type = ShaderVar::Type::Texture2DRectSampler;
       break;
     default:

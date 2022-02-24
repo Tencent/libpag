@@ -61,7 +61,7 @@ void GLProgram::onRelease(Context* context) {
 
 static void BindGLTexture(const GLInterface* gl, int position, const TextureSampler* sampler) {
   auto glSampler = static_cast<const GLSampler*>(sampler);
-  ActiveGLTexture(gl, GL::TEXTURE0 + position, glSampler->target, glSampler->id, glSampler->format);
+  ActiveGLTexture(gl, GL_TEXTURE0 + position, glSampler->target, glSampler->id, glSampler->format);
 }
 
 void GLProgram::updateUniformsAndTextureBindings(const GLInterface* gl,

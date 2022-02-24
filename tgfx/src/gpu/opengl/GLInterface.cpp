@@ -39,7 +39,7 @@ static int GetGLVersion(const GLProcGetter* getter) {
   if (glGetString == nullptr) {
     return -1;
   }
-  auto versionString = (const char*)glGetString(GL::VERSION);
+  auto versionString = (const char*)glGetString(GL_VERSION);
   return GetGLVersion(versionString).majorVersion;
 }
 

@@ -123,17 +123,17 @@ std::shared_ptr<Surface> EAGLWindow::onCreateSurface(Context* context) {
     return nullptr;
   }
   gl->genFramebuffers(1, &frameBufferID);
-  gl->bindFramebuffer(GL::FRAMEBUFFER, frameBufferID);
+  gl->bindFramebuffer(GL_FRAMEBUFFER, frameBufferID);
   gl->genRenderbuffers(1, &colorBuffer);
-  gl->bindRenderbuffer(GL::RENDERBUFFER, colorBuffer);
-  gl->framebufferRenderbuffer(GL::FRAMEBUFFER, GL::COLOR_ATTACHMENT0, GL::RENDERBUFFER,
+  gl->bindRenderbuffer(GL_RENDERBUFFER, colorBuffer);
+  gl->framebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER,
                               colorBuffer);
   auto eaglContext = static_cast<EAGLDevice*>(context->device())->eaglContext();
-  [eaglContext renderbufferStorage:GL::RENDERBUFFER fromDrawable:layer];
-  auto frameBufferStatus = gl->checkFramebufferStatus(GL::FRAMEBUFFER);
-  gl->bindFramebuffer(GL::FRAMEBUFFER, 0);
-  gl->bindRenderbuffer(GL::RENDERBUFFER, 0);
-  if (frameBufferStatus != GL::FRAMEBUFFER_COMPLETE) {
+  [eaglContext renderbufferStorage:GL_RENDERBUFFER fromDrawable:layer];
+  auto frameBufferStatus = gl->checkFramebufferStatus(GL_FRAMEBUFFER);
+  gl->bindFramebuffer(GL_FRAMEBUFFER, 0);
+  gl->bindRenderbuffer(GL_RENDERBUFFER, 0);
+  if (frameBufferStatus != GL_FRAMEBUFFER_COMPLETE) {
     LOGE("EAGLWindow::onCreateSurface() Framebuffer is not complete!");
     return nullptr;
   }
@@ -147,10 +147,10 @@ std::shared_ptr<Surface> EAGLWindow::onCreateSurface(Context* context) {
 void EAGLWindow::onPresent(Context* context, int64_t) {
   auto gl = GLContext::Unwrap(context);
   if (layer) {
-    gl->bindRenderbuffer(GL::RENDERBUFFER, colorBuffer);
+    gl->bindRenderbuffer(GL_RENDERBUFFER, colorBuffer);
     auto eaglContext = static_cast<EAGLDevice*>(context->device())->eaglContext();
-    [eaglContext presentRenderbuffer:GL::RENDERBUFFER];
-    gl->bindRenderbuffer(GL::RENDERBUFFER, 0);
+    [eaglContext presentRenderbuffer:GL_RENDERBUFFER];
+    gl->bindRenderbuffer(GL_RENDERBUFFER, 0);
   } else {
     gl->flush();
   }

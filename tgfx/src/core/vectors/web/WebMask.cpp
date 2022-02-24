@@ -19,6 +19,7 @@
 #include "WebMask.h"
 #include "WebTextBlob.h"
 #include "WebTypeface.h"
+#include "gpu/opengl/GLContext.h"
 #include "gpu/opengl/GLTexture.h"
 
 using namespace emscripten;
@@ -41,7 +42,7 @@ std::shared_ptr<Texture> WebMask::makeTexture(Context* context) const {
   if (texture == nullptr) {
     return nullptr;
   }
-  auto& glInfo = std::static_pointer_cast<GLTexture>(texture)->getGLInfo();
+  auto& glInfo = std::static_pointer_cast<GLTexture>(texture)->glSampler();
   const auto* gl = GLContext::Unwrap(context);
   gl->bindTexture(glInfo.target, glInfo.id);
   webMask.call<void>("update", val::module_property("GL"));

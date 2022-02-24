@@ -37,16 +37,16 @@ static CVOpenGLESTextureRef GetTextureRef(Context* context, CVPixelBufferRef pix
     // 返回的 texture 对象是一个强引用计数为 1 的对象。
     result = CVOpenGLESTextureCacheCreateTextureFromImage(
         kCFAllocatorDefault, textureCache, pixelBuffer, NULL, /* texture attributes */
-        GL::TEXTURE_2D, format.internalFormatTexImage,        /* opengl format */
-        width, height, GL::RED,                 /* native iOS format */
-        GL::UNSIGNED_BYTE, 0, &texture);
+        GL_TEXTURE_2D, format.internalFormatTexImage,        /* opengl format */
+        width, height, GL_RED,                 /* native iOS format */
+        GL_UNSIGNED_BYTE, 0, &texture);
   } else {
     // 返回的 texture 对象是一个强引用计数为 1 的对象。
     result = CVOpenGLESTextureCacheCreateTextureFromImage(
         kCFAllocatorDefault, textureCache, pixelBuffer, NULL, /* texture attributes */
-        GL::TEXTURE_2D, GL::RGBA,                             /* opengl format */
-        width, height, GL::BGRA,                              /* native iOS format */
-        GL::UNSIGNED_BYTE, 0, &texture);
+        GL_TEXTURE_2D, GL_RGBA,                             /* opengl format */
+        width, height, GL_BGRA,                              /* native iOS format */
+        GL_UNSIGNED_BYTE, 0, &texture);
   }
   if (result != kCVReturnSuccess && texture != nil) {
     CFRelease(texture);

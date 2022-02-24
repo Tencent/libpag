@@ -164,7 +164,7 @@ bool VideoSurface::attachToContext(JNIEnv* env, tgfx::Context* context) {
   }
   auto gl = tgfx::GLContext::Unwrap(context);
   tgfx::GLSampler sampler = {};
-  sampler.target = GL::TEXTURE_EXTERNAL_OES;
+  sampler.target = GL_TEXTURE_EXTERNAL_OES;
   sampler.format = tgfx::PixelFormat::RGBA_8888;
   gl->genTextures(1, &sampler.id);
   if (sampler.id == 0) {
