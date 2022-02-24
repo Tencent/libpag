@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "NativeTextureBuffer.h"
+#include "gpu/opengl/GLContext.h"
 #include "gpu/opengl/GLTexture.h"
 
 using namespace emscripten;
@@ -35,7 +36,7 @@ std::shared_ptr<Texture> NativeTextureBuffer::makeTexture(Context* context) cons
   if (texture == nullptr) {
     return nullptr;
   }
-  auto& glInfo = std::static_pointer_cast<GLTexture>(texture)->getGLInfo();
+  auto& glInfo = std::static_pointer_cast<GLTexture>(texture)->glSampler();
   const auto* gl = GLContext::Unwrap(context);
   gl->bindTexture(glInfo.target, glInfo.id);
   source.call<void>("upload", val::module_property("GL"));

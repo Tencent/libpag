@@ -138,8 +138,8 @@ void MotionBlurFilter::onUpdateParams(const tgfx::GLInterface* gl, const tgfx::R
   auto scaling = (previousMatrix.getScaleX() != currentMatrix.getScaleX() ||
                   previousMatrix.getScaleY() != currentMatrix.getScaleY());
 
-  gl->uniformMatrix3fv(prevTransformHandle, 1, GL::FALSE, previousGLMatrix.data());
-  gl->uniformMatrix3fv(transformHandle, 1, GL::FALSE, currentGLMatrix.data());
+  gl->uniformMatrix3fv(prevTransformHandle, 1, GL_FALSE, previousGLMatrix.data());
+  gl->uniformMatrix3fv(transformHandle, 1, GL_FALSE, currentGLMatrix.data());
   gl->uniform1f(velCenterHandle, scaling ? 0.0f : 0.5f);
   gl->uniform1f(maxDistanceHandle, (MOTION_BLUR_SCALE_FACTOR - 1.0) * 0.5f);
 }

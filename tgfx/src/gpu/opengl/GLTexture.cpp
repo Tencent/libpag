@@ -154,20 +154,20 @@ std::shared_ptr<Texture> Texture::Make(Context* context, int width, int height, 
     texture->_origin = origin;
     sampler = texture->glSampler();
   } else {
-    sampler.target = GL::TEXTURE_2D;
+    sampler.target = GL_TEXTURE_2D;
     sampler.format = pixelFormat;
     gl->genTextures(1, &(sampler.id));
     if (sampler.id == 0) {
       return nullptr;
     }
     gl->bindTexture(sampler.target, sampler.id);
-    gl->texParameteri(sampler.target, GL::TEXTURE_WRAP_S, GL::CLAMP_TO_EDGE);
-    gl->texParameteri(sampler.target, GL::TEXTURE_WRAP_T, GL::CLAMP_TO_EDGE);
-    gl->texParameteri(sampler.target, GL::TEXTURE_MIN_FILTER, GL::LINEAR);
-    gl->texParameteri(sampler.target, GL::TEXTURE_MAG_FILTER, GL::LINEAR);
+    gl->texParameteri(sampler.target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    gl->texParameteri(sampler.target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    gl->texParameteri(sampler.target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    gl->texParameteri(sampler.target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     if (pixels == nullptr) {
       gl->texImage2D(sampler.target, 0, static_cast<int>(format.internalFormatTexImage), width,
-                     height, 0, format.externalFormat, GL::UNSIGNED_BYTE, nullptr);
+                     height, 0, format.externalFormat, GL_UNSIGNED_BYTE, nullptr);
     }
     if (!CheckGLError(gl)) {
       gl->deleteTextures(1, &sampler.id);

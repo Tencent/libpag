@@ -22,11 +22,11 @@
 
 namespace tgfx {
 static unsigned GetErrorFake() {
-  return GL::NO_ERROR;
+  return GL_NO_ERROR;
 }
 
 static unsigned CheckFramebufferStatusFake(unsigned) {
-  return GL::FRAMEBUFFER_COMPLETE;
+  return GL_FRAMEBUFFER_COMPLETE;
 }
 
 static void InitVertexArray(const GLProcGetter* getter, GLInterface* interface,

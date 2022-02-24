@@ -108,7 +108,7 @@ static std::vector<GLSampler> MakeTexturePlanes(const GLInterface* gl, const YUV
   for (int index = 0; index < yuvConfig.planeCount; index++) {
     GLSampler sampler = {};
     sampler.id = yuvTextureIDs[index];
-    sampler.target = GL::TEXTURE_2D;
+    sampler.target = GL_TEXTURE_2D;
     sampler.format = yuvConfig.formats[index];
     texturePlanes.emplace_back(sampler);
   }

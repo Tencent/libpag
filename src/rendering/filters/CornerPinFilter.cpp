@@ -143,15 +143,15 @@ void CornerPinFilter::bindVertices(const tgfx::GLInterface* gl, const FilterSour
   if (filterProgram->vertexArray > 0) {
     gl->bindVertexArray(filterProgram->vertexArray);
   }
-  gl->bindBuffer(GL::ARRAY_BUFFER, filterProgram->vertexBuffer);
-  gl->bufferData(GL::ARRAY_BUFFER, vertices.size() * sizeof(float), &vertices[0], GL::STREAM_DRAW);
-  gl->vertexAttribPointer(static_cast<unsigned>(positionHandle), 2, GL::FLOAT, GL::FALSE,
+  gl->bindBuffer(GL_ARRAY_BUFFER, filterProgram->vertexBuffer);
+  gl->bufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), &vertices[0], GL_STREAM_DRAW);
+  gl->vertexAttribPointer(static_cast<unsigned>(positionHandle), 2, GL_FLOAT, GL_FALSE,
                           5 * sizeof(float), static_cast<void*>(0));
   gl->enableVertexAttribArray(static_cast<unsigned>(positionHandle));
 
-  gl->vertexAttribPointer(textureCoordHandle, 3, GL::FLOAT, GL::FALSE, 5 * sizeof(float),
+  gl->vertexAttribPointer(textureCoordHandle, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
                           reinterpret_cast<void*>(2 * sizeof(float)));
   gl->enableVertexAttribArray(textureCoordHandle);
-  gl->bindBuffer(GL::ARRAY_BUFFER, 0);
+  gl->bindBuffer(GL_ARRAY_BUFFER, 0);
 }
 }  // namespace pag

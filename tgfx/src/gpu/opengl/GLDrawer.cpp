@@ -33,10 +33,10 @@ struct AttribLayout {
 };
 
 static constexpr std::pair<ShaderVar::Type, AttribLayout> attribLayoutPair[] = {
-    {ShaderVar::Type::Float, {false, 1, GL::FLOAT}},
-    {ShaderVar::Type::Float2, {false, 2, GL::FLOAT}},
-    {ShaderVar::Type::Float3, {false, 3, GL::FLOAT}},
-    {ShaderVar::Type::Float4, {false, 4, GL::FLOAT}}};
+    {ShaderVar::Type::Float, {false, 1, GL_FLOAT}},
+    {ShaderVar::Type::Float2, {false, 2, GL_FLOAT}},
+    {ShaderVar::Type::Float3, {false, 3, GL_FLOAT}},
+    {ShaderVar::Type::Float4, {false, 4, GL_FLOAT}}};
 
 static AttribLayout GetAttribLayout(ShaderVar::Type type) {
   for (const auto& pair : attribLayoutPair) {
@@ -122,7 +122,7 @@ static std::shared_ptr<Texture> CreateDstTexture(const DrawArgs& args, Point* ds
   }
   GLStateGuard stateGuard(args.context);
   auto renderTarget = static_cast<const GLRenderTarget*>(args.renderTarget);
-  gl->bindFramebuffer(GL::FRAMEBUFFER, renderTarget->glFrameBuffer().id);
+  gl->bindFramebuffer(GL_FRAMEBUFFER, renderTarget->glFrameBuffer().id);
   auto glSampler = std::static_pointer_cast<GLTexture>(dstTexture)->glSampler();
   gl->bindTexture(glSampler.target, glSampler.id);
   // format != BGRA && !srcHasMSAARenderBuffer && !dstHasMSAARenderBuffer && dstIsTextureable &&
@@ -144,9 +144,9 @@ static PixelFormat GetOutputPixelFormat(const DrawArgs& args) {
 
 static void UpdateScissor(const GLInterface* gl, const DrawArgs& args) {
   if (args.scissorRect.isEmpty()) {
-    gl->disable(GL::SCISSOR_TEST);
+    gl->disable(GL_SCISSOR_TEST);
   } else {
-    gl->enable(GL::SCISSOR_TEST);
+    gl->enable(GL_SCISSOR_TEST);
     gl->scissor(static_cast<int>(args.scissorRect.x()), static_cast<int>(args.scissorRect.y()),
                 static_cast<int>(args.scissorRect.width()),
                 static_cast<int>(args.scissorRect.height()));
@@ -155,13 +155,13 @@ static void UpdateScissor(const GLInterface* gl, const DrawArgs& args) {
 
 static void UpdateBlend(const GLInterface* gl, bool blendAsCoeff, unsigned first, unsigned second) {
   if (blendAsCoeff) {
-    gl->enable(GL::BLEND);
+    gl->enable(GL_BLEND);
     gl->blendFunc(first, second);
-    gl->blendEquation(GL::FUNC_ADD);
+    gl->blendEquation(GL_FUNC_ADD);
   } else {
-    gl->disable(GL::BLEND);
+    gl->disable(GL_BLEND);
     if (gl->caps->frameBufferFetchSupport && gl->caps->frameBufferFetchRequiresEnablePerSample) {
-      gl->enable(GL::FETCH_PER_SAMPLE_ARM);
+      gl->enable(GL_FETCH_PER_SAMPLE_ARM);
     }
   }
 }
@@ -203,7 +203,7 @@ void GLDrawer::draw(DrawArgs args, std::unique_ptr<GLDrawOp> op) const {
   CheckGLError(gl);
   auto renderTarget = static_cast<const GLRenderTarget*>(args.renderTarget);
   gl->useProgram(program->programID());
-  gl->bindFramebuffer(GL::FRAMEBUFFER, renderTarget->glFrameBuffer().id);
+  gl->bindFramebuffer(GL_FRAMEBUFFER, renderTarget->glFrameBuffer().id);
   gl->viewport(0, 0, renderTarget->width(), renderTarget->height());
   UpdateScissor(gl, args);
   UpdateBlend(gl, blendAsCoeff, first, second);
@@ -214,10 +214,10 @@ void GLDrawer::draw(DrawArgs args, std::unique_ptr<GLDrawOp> op) const {
   if (vertexArray > 0) {
     gl->bindVertexArray(vertexArray);
   }
-  gl->bindBuffer(GL::ARRAY_BUFFER, vertexBuffer);
+  gl->bindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
   auto vertices = op->vertices(args);
-  gl->bufferData(GL::ARRAY_BUFFER, static_cast<GLsizeiptr>(vertices.size()) * sizeof(float),
-                 &vertices[0], GL::STATIC_DRAW);
+  gl->bufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(vertices.size()) * sizeof(float),
+                 &vertices[0], GL_STATIC_DRAW);
   for (const auto& attribute : program->vertexAttributes()) {
     const AttribLayout& layout = GetAttribLayout(attribute.gpuType);
     gl->vertexAttribPointer(static_cast<unsigned>(attribute.location), layout.count, layout.type,
@@ -225,14 +225,14 @@ void GLDrawer::draw(DrawArgs args, std::unique_ptr<GLDrawOp> op) const {
                             reinterpret_cast<void*>(attribute.offset));
     gl->enableVertexAttribArray(static_cast<unsigned>(attribute.location));
   }
-  gl->bindBuffer(GL::ARRAY_BUFFER, 0);
+  gl->bindBuffer(GL_ARRAY_BUFFER, 0);
   auto indexBuffer = op->getIndexBuffer(args);
   if (indexBuffer) {
-    gl->bindBuffer(GL::ELEMENT_ARRAY_BUFFER, indexBuffer->bufferID());
-    gl->drawElements(GL::TRIANGLES, static_cast<int>(indexBuffer->length()), GL::UNSIGNED_SHORT, 0);
-    gl->bindBuffer(GL::ELEMENT_ARRAY_BUFFER, 0);
+    gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer->bufferID());
+    gl->drawElements(GL_TRIANGLES, static_cast<int>(indexBuffer->length()), GL_UNSIGNED_SHORT, 0);
+    gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
   } else {
-    gl->drawArrays(GL::TRIANGLE_STRIP, 0, 4);
+    gl->drawArrays(GL_TRIANGLE_STRIP, 0, 4);
   }
   if (vertexArray > 0) {
     gl->bindVertexArray(0);

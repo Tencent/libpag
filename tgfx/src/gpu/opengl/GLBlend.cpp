@@ -345,21 +345,21 @@ static void HandleBlendModes(FragmentShaderBuilder* fsBuilder, const std::string
 }
 
 static constexpr std::pair<BlendMode, std::pair<unsigned, unsigned>> kBlendCoeffMap[] = {
-    {BlendMode::Clear, {GL::ZERO, GL::ZERO}},
-    {BlendMode::Src, {GL::ONE, GL::ZERO}},
-    {BlendMode::Dst, {GL::ZERO, GL::ONE}},
-    {BlendMode::SrcOver, {GL::ONE, GL::ONE_MINUS_SRC_ALPHA}},
-    {BlendMode::DstOver, {GL::ONE_MINUS_DST_ALPHA, GL::ONE}},
-    {BlendMode::SrcIn, {GL::DST_ALPHA, GL::ZERO}},
-    {BlendMode::DstIn, {GL::ZERO, GL::SRC_ALPHA}},
-    {BlendMode::SrcOut, {GL::ONE_MINUS_DST_ALPHA, GL::ZERO}},
-    {BlendMode::DstOut, {GL::ZERO, GL::ONE_MINUS_SRC_ALPHA}},
-    {BlendMode::SrcATop, {GL::DST_ALPHA, GL::ONE_MINUS_SRC_ALPHA}},
-    {BlendMode::DstATop, {GL::ONE_MINUS_DST_ALPHA, GL::SRC_ALPHA}},
-    {BlendMode::Xor, {GL::ONE_MINUS_DST_ALPHA, GL::ONE_MINUS_SRC_ALPHA}},
-    {BlendMode::Plus, {GL::ONE, GL::ONE}},
-    {BlendMode::Modulate, {GL::ZERO, GL::SRC_COLOR}},
-    {BlendMode::Screen, {GL::ONE, GL::ONE_MINUS_SRC_COLOR}}};
+    {BlendMode::Clear, {GL_ZERO, GL_ZERO}},
+    {BlendMode::Src, {GL_ONE, GL_ZERO}},
+    {BlendMode::Dst, {GL_ZERO, GL_ONE}},
+    {BlendMode::SrcOver, {GL_ONE, GL_ONE_MINUS_SRC_ALPHA}},
+    {BlendMode::DstOver, {GL_ONE_MINUS_DST_ALPHA, GL_ONE}},
+    {BlendMode::SrcIn, {GL_DST_ALPHA, GL_ZERO}},
+    {BlendMode::DstIn, {GL_ZERO, GL_SRC_ALPHA}},
+    {BlendMode::SrcOut, {GL_ONE_MINUS_DST_ALPHA, GL_ZERO}},
+    {BlendMode::DstOut, {GL_ZERO, GL_ONE_MINUS_SRC_ALPHA}},
+    {BlendMode::SrcATop, {GL_DST_ALPHA, GL_ONE_MINUS_SRC_ALPHA}},
+    {BlendMode::DstATop, {GL_ONE_MINUS_DST_ALPHA, GL_SRC_ALPHA}},
+    {BlendMode::Xor, {GL_ONE_MINUS_DST_ALPHA, GL_ONE_MINUS_SRC_ALPHA}},
+    {BlendMode::Plus, {GL_ONE, GL_ONE}},
+    {BlendMode::Modulate, {GL_ZERO, GL_SRC_COLOR}},
+    {BlendMode::Screen, {GL_ONE, GL_ONE_MINUS_SRC_COLOR}}};
 
 bool BlendAsCoeff(BlendMode blendMode, unsigned* first, unsigned* second) {
   for (const auto& pair : kBlendCoeffMap) {
@@ -423,20 +423,20 @@ using CoeffHandler = void (*)(FragmentShaderBuilder* fsBuilder, const char* srcC
                               const char* dstColorName);
 
 static constexpr std::pair<unsigned, CoeffHandler> kCoeffHandleMap[] = {
-    {GL::ONE, CoeffHandler_ONE},
-    {GL::SRC_COLOR, CoeffHandler_SRC_COLOR},
-    {GL::ONE_MINUS_SRC_COLOR, CoeffHandler_ONE_MINUS_SRC_COLOR},
-    {GL::DST_COLOR, CoeffHandler_DST_COLOR},
-    {GL::ONE_MINUS_DST_COLOR, CoeffHandler_ONE_MINUS_DST_COLOR},
-    {GL::SRC_ALPHA, CoeffHandler_SRC_ALPHA},
-    {GL::ONE_MINUS_SRC_ALPHA, CoeffHandler_ONE_MINUS_SRC_ALPHA},
-    {GL::DST_ALPHA, CoeffHandler_DST_ALPHA},
-    {GL::ONE_MINUS_DST_ALPHA, CoeffHandler_ONE_MINUS_DST_ALPHA}};
+    {GL_ONE, CoeffHandler_ONE},
+    {GL_SRC_COLOR, CoeffHandler_SRC_COLOR},
+    {GL_ONE_MINUS_SRC_COLOR, CoeffHandler_ONE_MINUS_SRC_COLOR},
+    {GL_DST_COLOR, CoeffHandler_DST_COLOR},
+    {GL_ONE_MINUS_DST_COLOR, CoeffHandler_ONE_MINUS_DST_COLOR},
+    {GL_SRC_ALPHA, CoeffHandler_SRC_ALPHA},
+    {GL_ONE_MINUS_SRC_ALPHA, CoeffHandler_ONE_MINUS_SRC_ALPHA},
+    {GL_DST_ALPHA, CoeffHandler_DST_ALPHA},
+    {GL_ONE_MINUS_DST_ALPHA, CoeffHandler_ONE_MINUS_DST_ALPHA}};
 
 static bool AppendPorterDuffTerm(FragmentShaderBuilder* fsBuilder, unsigned coeff,
                                  const std::string& colorName, const std::string& srcColorName,
                                  const std::string& dstColorName, bool hasPrevious) {
-  if (GL::ZERO == coeff) {
+  if (GL_ZERO == coeff) {
     return hasPrevious;
   } else {
     if (hasPrevious) {

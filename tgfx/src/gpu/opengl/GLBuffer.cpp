@@ -43,10 +43,10 @@ std::shared_ptr<GLBuffer> GLBuffer::Make(Context* context, const uint16_t* buffe
   glBuffer = Resource::Wrap(context, new GLBuffer(buffer, length));
   gl->genBuffers(1, &glBuffer->_bufferID);
   if (buffer) {
-    gl->bindBuffer(GL::ELEMENT_ARRAY_BUFFER, glBuffer->_bufferID);
-    gl->bufferData(GL::ELEMENT_ARRAY_BUFFER, static_cast<GLsizeiptr>(sizeof(uint16_t) * length),
-                   buffer, GL::STATIC_DRAW);
-    gl->bindBuffer(GL::ELEMENT_ARRAY_BUFFER, 0);
+    gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, glBuffer->_bufferID);
+    gl->bufferData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLsizeiptr>(sizeof(uint16_t) * length),
+                   buffer, GL_STATIC_DRAW);
+    gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
   }
   return glBuffer;
 }

@@ -85,7 +85,7 @@ std::shared_ptr<tgfx::Texture> VideoSequenceReader::readTexture(Frame targetFram
   if (texture == nullptr) {
     texture = tgfx::GLTexture::MakeRGBA(cache->getContext(), width, height);
   }
-  auto& glInfo = std::static_pointer_cast<tgfx::GLTexture>(texture)->getGLInfo();
+  auto& glInfo = std::static_pointer_cast<tgfx::GLTexture>(texture)->glSampler();
   videoReader.call<void>("renderToTexture", val::module_property("GL"), glInfo.id);
   lastFrame = targetFrame;
   return texture;

@@ -51,7 +51,7 @@ void GLProgramDataManager::set4fv(UniformHandle handle, int arrayCount, const fl
 void GLProgramDataManager::setMatrix3f(UniformHandle handle, const float matrix[]) const {
   auto location = uniforms->at(handle.toIndex());
   if (kUnusedUniform != location) {
-    gl->uniformMatrix3fv(location, 1, GL::FALSE, matrix);
+    gl->uniformMatrix3fv(location, 1, GL_FALSE, matrix);
   }
 }
 

@@ -118,9 +118,9 @@ EMSCRIPTEN_BINDINGS(pag) {
       .class_function("_FromTexture",
                       optional_override([](int textureID, int width, int height, bool flipY) {
                         GLTextureInfo glInfo = {};
-                        glInfo.target = GL::TEXTURE_2D;
+                        glInfo.target = GL_TEXTURE_2D;
                         glInfo.id = static_cast<unsigned>(textureID);
-                        glInfo.format = GL::RGBA8;
+                        glInfo.format = GL_RGBA8;
                         BackendTexture glTexture(glInfo, width, height);
                         auto origin = flipY ? ImageOrigin::BottomLeft : ImageOrigin::TopLeft;
                         return PAGSurface::MakeFrom(glTexture, origin);
@@ -129,7 +129,7 @@ EMSCRIPTEN_BINDINGS(pag) {
                       optional_override([](int frameBufferID, int width, int height, bool flipY) {
                         GLFrameBufferInfo glFrameBufferInfo = {};
                         glFrameBufferInfo.id = static_cast<unsigned>(frameBufferID);
-                        glFrameBufferInfo.format = GL::RGBA8;
+                        glFrameBufferInfo.format = GL_RGBA8;
                         BackendRenderTarget glRenderTarget(glFrameBufferInfo, width, height);
                         auto origin = flipY ? ImageOrigin::BottomLeft : ImageOrigin::TopLeft;
                         return PAGSurface::MakeFrom(glRenderTarget, origin);

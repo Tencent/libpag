@@ -96,7 +96,7 @@ bool GLSurface::wait(const Semaphore* semaphore) {
   if (!gl->caps->semaphoreSupport) {
     return false;
   }
-  gl->waitSync(glSync, 0, GL::TIMEOUT_IGNORED);
+  gl->waitSync(glSync, 0, GL_TIMEOUT_IGNORED);
   gl->deleteSync(glSync);
   return true;
 }
@@ -112,7 +112,7 @@ bool GLSurface::flush(Semaphore* semaphore) {
   if (!gl->caps->semaphoreSupport) {
     return false;
   }
-  auto* sync = gl->fenceSync(GL::SYNC_GPU_COMMANDS_COMPLETE, 0);
+  auto* sync = gl->fenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
   if (sync) {
     static_cast<GLSemaphore*>(semaphore)->glSync = sync;
     // If we inserted semaphores during the flush, we need to call glFlush.
