@@ -88,11 +88,6 @@ Point CGLHardwareTexture::getTextureCoord(float x, float y) const {
   return GLTexture::getTextureCoord(x, y);
 }
 
-size_t CGLHardwareTexture::memoryUsage() const {
-  // 显存来自 CVPixelBuffer，这里不做重复统计。
-  return 0;
-}
-
 void CGLHardwareTexture::computeRecycleKey(BytesKey* recycleKey) const {
   ComputeRecycleKey(recycleKey, pixelBuffer);
 }

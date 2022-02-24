@@ -56,9 +56,7 @@ class Snapshot {
   /**
    * Returns memory usage information for this Snapshot.
    */
-  size_t memoryUsage() const {
-    return texture->memoryUsage();
-  }
+  size_t memoryUsage() const;
 
   /**
    * Evaluates the Snapshot to see if it overlaps or intersects with the specified point. The point

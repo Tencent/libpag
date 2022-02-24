@@ -29,10 +29,6 @@ class GLBackendTexture : public GLTexture {
     sampler = std::move(textureSampler);
   }
 
-  size_t memoryUsage() const override {
-    return 0;
-  }
-
  protected:
   void onRelease(Context* context) override {
     if (adopted) {
@@ -77,10 +73,6 @@ class GLAlphaTexture : public GLTexture {
     sampler = std::move(textureSampler);
   }
 
-  size_t memoryUsage() const override {
-    return static_cast<size_t>(width() * height());
-  }
-
  protected:
   void computeRecycleKey(BytesKey* recycleKey) const override {
     ComputeRecycleKey(recycleKey, width(), height());
@@ -105,10 +97,6 @@ class GLRGBATexture : public GLTexture {
                 ImageOrigin origin = ImageOrigin::TopLeft)
       : GLTexture(width, height, origin) {
     sampler = std::move(textureSampler);
-  }
-
-  size_t memoryUsage() const override {
-    return width() * height() * 4;
   }
 
  protected:

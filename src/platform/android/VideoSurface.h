@@ -28,10 +28,6 @@ class OESTexture : public tgfx::GLTexture {
 
   tgfx::Point getTextureCoord(float x, float y) const override;
 
-  size_t memoryUsage() const override {
-    return 0;
-  }
-
  protected:
   void onRelease(tgfx::Context* context) override;
 

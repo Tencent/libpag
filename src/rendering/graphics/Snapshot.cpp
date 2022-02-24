@@ -22,6 +22,17 @@
 #include "rendering/caches/RenderCache.h"
 
 namespace pag {
+
+size_t Snapshot::memoryUsage() const {
+  float bytesPerPixels;
+  if (texture->isYUV()) {
+    bytesPerPixels = 1.5f;
+  } else {
+    bytesPerPixels = texture->getSampler()->format == tgfx::PixelFormat::ALPHA_8 ? 1 : 4;
+  }
+  return static_cast<size_t>(texture->width() * texture->height() * bytesPerPixels);
+}
+
 bool Snapshot::hitTest(RenderCache* cache, float x, float y) const {
   tgfx::Point local = {x, y};
   if (!MapPointInverted(matrix, &local)) {

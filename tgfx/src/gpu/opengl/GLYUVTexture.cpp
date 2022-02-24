@@ -23,8 +23,6 @@
 namespace tgfx {
 #define I420_PLANE_COUNT 3
 #define NV12_PLANE_COUNT 2
-#define I420_PIXEL_BYTES 1.5
-#define NV12_PIXEL_BYTES 1.5
 
 struct YUVConfig {
   YUVConfig(YUVColorSpace colorSpace, YUVColorRange colorRange, int width, int height,
@@ -63,10 +61,6 @@ class GLI420Texture : public GLYUVTexture {
     return YUVPixelFormat::I420;
   }
 
-  size_t memoryUsage() const override {
-    return static_cast<size_t>(width() * height() * I420_PIXEL_BYTES);
-  }
-
  protected:
   void computeRecycleKey(BytesKey* recycleKey) const override {
     ComputeRecycleKey(recycleKey, width(), height());
@@ -87,9 +81,6 @@ class GLNV12Texture : public GLYUVTexture {
 
   YUVPixelFormat pixelFormat() const override {
     return YUVPixelFormat::NV12;
-  }
-  size_t memoryUsage() const override {
-    return static_cast<size_t>(width() * height() * NV12_PIXEL_BYTES);
   }
 
  protected:
