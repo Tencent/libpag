@@ -31,10 +31,6 @@ class EGLHardwareTexture : public GLTexture {
   static std::shared_ptr<EGLHardwareTexture> MakeFrom(Context* context,
                                                       AHardwareBuffer* hardwareBuffer);
 
-  size_t memoryUsage() const override {
-    return 0;
-  }
-
  private:
   AHardwareBuffer* hardwareBuffer = nullptr;
   EGLImageKHR eglImage = EGL_NO_IMAGE_KHR;

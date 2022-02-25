@@ -103,11 +103,6 @@ class Texture : public Resource {
   virtual Point getTextureCoord(float x, float y) const = 0;
 
   /**
-   * Returns memory usage information for this Texture.
-   */
-  virtual size_t memoryUsage() const = 0;
-
-  /**
    * Returns the default texture sampler.
    */
   virtual const TextureSampler* getSampler() const = 0;

@@ -21,6 +21,7 @@
 #include "core/Mask.h"
 #include "gpu/Canvas.h"
 #include "gpu/Surface.h"
+#include "gpu/opengl/GLTexture.h"
 
 namespace pag {
 class Atlas {
@@ -103,11 +104,15 @@ class RectanglePack {
 };
 
 size_t Atlas::memoryUsage() const {
+  if (textures.empty()) {
+    return 0;
+  }
   size_t usage = 0;
   for (auto& texture : textures) {
-    usage += texture->memoryUsage();
+    usage += texture->width() * texture->height();
   }
-  return usage;
+  auto bytesPerPixels = textures[0]->getSampler()->format == tgfx::PixelFormat::ALPHA_8 ? 1 : 4;
+  return usage * bytesPerPixels;
 }
 
 static tgfx::PaintStyle ToTGFX(TextStyle style) {

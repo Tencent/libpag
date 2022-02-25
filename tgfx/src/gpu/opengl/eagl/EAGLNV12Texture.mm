@@ -89,11 +89,6 @@ EAGLNV12Texture::~EAGLNV12Texture() {
   }
 }
 
-size_t EAGLNV12Texture::memoryUsage() const {
-  // 显存来自 CVPixelBuffer，这里不做重复统计。
-  return 0;
-}
-
 void EAGLNV12Texture::onRelease(Context*) {
   if (lumaTexture == nil || chromaTexture == nil) {
     return;

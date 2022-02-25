@@ -36,8 +36,6 @@ class EAGLNV12Texture : public GLYUVTexture {
     return YUVPixelFormat::NV12;
   }
 
-  size_t memoryUsage() const override;
-
  protected:
   void onRelease(Context* context) override;
 

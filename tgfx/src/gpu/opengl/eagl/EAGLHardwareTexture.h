@@ -30,7 +30,6 @@ class EAGLHardwareTexture : public GLTexture {
   explicit EAGLHardwareTexture(CVPixelBufferRef pixelBuffer);
 
   ~EAGLHardwareTexture() override;
-  size_t memoryUsage() const override;
 
  protected:
   void computeRecycleKey(BytesKey* recycleKey) const override;

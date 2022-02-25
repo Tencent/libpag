@@ -109,11 +109,6 @@ EAGLHardwareTexture::~EAGLHardwareTexture() {
   }
 }
 
-size_t EAGLHardwareTexture::memoryUsage() const {
-  // 显存来自 CVPixelBuffer，这里不做重复统计。
-  return 0;
-}
-
 void EAGLHardwareTexture::computeRecycleKey(BytesKey* recycleKey) const {
   ComputeRecycleKey(recycleKey, pixelBuffer);
 }
