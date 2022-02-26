@@ -16,29 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLFragmentShaderBuilder.h"
-#include "GLContext.h"
-#include "GLProgramBuilder.h"
+#include "gpu/opengl/GLFunctions.h"
+#include "gpu/opengl/GLContext.h"
 
 namespace tgfx {
-static constexpr char kDstColorName[] = "_dstColor";
-
-GLFragmentShaderBuilder::GLFragmentShaderBuilder(ProgramBuilder* program)
-    : FragmentShaderBuilder(program) {
-  setPrecisionQualifier("precision mediump float;");
-}
-
-std::string GLFragmentShaderBuilder::dstColor() {
-  auto gl = static_cast<GLProgramBuilder*>(programBuilder)->gl();
-  if (gl->caps->frameBufferFetchSupport) {
-    addFeature(PrivateFeature::FramebufferFetch, gl->caps->frameBufferFetchExtensionString);
-    return gl->caps->frameBufferFetchColorName;
-  }
-  return kDstColorName;
-}
-
-std::string GLFragmentShaderBuilder::colorOutputName() {
-  return static_cast<GLProgramBuilder*>(programBuilder)->isDesktopGL() ? CustomColorOutputName()
-                                                                       : "gl_FragColor";
+const GLFunctions* GLFunctions::Get(const Context* context) {
+  return context ? static_cast<const GLContext*>(context)->functions() : nullptr;
 }
 }  // namespace tgfx

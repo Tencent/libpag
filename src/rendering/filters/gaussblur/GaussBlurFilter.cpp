@@ -101,7 +101,7 @@ void GaussBlurFilter::draw(tgfx::Context* context, const FilterSource* source,
       if (blurFilterBuffer == nullptr) {
         return;
       }
-      auto gl = tgfx::GLContext::Unwrap(context);
+      auto gl = tgfx::GLInterface::Get(context);
       blurFilterBuffer->clearColor(gl);
 
       auto offsetMatrix =

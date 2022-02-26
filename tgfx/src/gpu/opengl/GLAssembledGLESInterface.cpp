@@ -21,93 +21,90 @@
 #include "GLInterface.h"
 
 namespace tgfx {
-static void InitFramebufferTexture2DMultisample(const GLProcGetter* getter, GLInterface* interface,
+static void InitFramebufferTexture2DMultisample(const GLProcGetter* getter, GLFunctions* functions,
                                                 const GLInfo& info) {
   if (info.hasExtension("GL_EXT_multisampled_render_to_texture")) {
-    interface->framebufferTexture2DMultisample =
+    functions->framebufferTexture2DMultisample =
         reinterpret_cast<GLFramebufferTexture2DMultisample*>(
             getter->getProcAddress("glFramebufferTexture2DMultisampleEXT"));
   } else if (info.hasExtension("GL_IMG_multisampled_render_to_texture")) {
-    interface->framebufferTexture2DMultisample =
+    functions->framebufferTexture2DMultisample =
         reinterpret_cast<GLFramebufferTexture2DMultisample*>(
             getter->getProcAddress("glFramebufferTexture2DMultisampleIMG"));
   }
 }
 
-static void InitRenderbufferStorageMultisample(const GLProcGetter* getter, GLInterface* interface,
+static void InitRenderbufferStorageMultisample(const GLProcGetter* getter, GLFunctions* functions,
                                                const GLInfo& info) {
   if (info.version >= GL_VER(3, 0)) {
-    interface->renderbufferStorageMultisample = reinterpret_cast<GLRenderbufferStorageMultisample*>(
+    functions->renderbufferStorageMultisample = reinterpret_cast<GLRenderbufferStorageMultisample*>(
         getter->getProcAddress("glRenderbufferStorageMultisample"));
   } else if (info.hasExtension("GL_CHROMIUM_framebuffer_multisample")) {
-    interface->renderbufferStorageMultisample = reinterpret_cast<GLRenderbufferStorageMultisample*>(
+    functions->renderbufferStorageMultisample = reinterpret_cast<GLRenderbufferStorageMultisample*>(
         getter->getProcAddress("glRenderbufferStorageMultisampleCHROMIUM"));
   } else if (info.hasExtension("GL_ANGLE_framebuffer_multisample")) {
-    interface->renderbufferStorageMultisample = reinterpret_cast<GLRenderbufferStorageMultisample*>(
+    functions->renderbufferStorageMultisample = reinterpret_cast<GLRenderbufferStorageMultisample*>(
         getter->getProcAddress("glRenderbufferStorageMultisampleANGLE"));
   }
   if (info.hasExtension("GL_EXT_multisampled_render_to_texture")) {
-    interface->renderbufferStorageMultisampleEXT =
+    functions->renderbufferStorageMultisampleEXT =
         reinterpret_cast<GLRenderbufferStorageMultisampleEXT*>(
             getter->getProcAddress("glRenderbufferStorageMultisampleEXT"));
   }
   if (info.hasExtension("GL_IMG_multisampled_render_to_texture")) {
-    interface->renderbufferStorageMultisampleEXT =
+    functions->renderbufferStorageMultisampleEXT =
         reinterpret_cast<GLRenderbufferStorageMultisampleEXT*>(
             getter->getProcAddress("glRenderbufferStorageMultisampleIMG"));
   }
   if (info.hasExtension("GL_APPLE_framebuffer_multisample")) {
-    interface->renderbufferStorageMultisampleAPPLE =
+    functions->renderbufferStorageMultisampleAPPLE =
         reinterpret_cast<GLRenderbufferStorageMultisampleAPPLE*>(
             getter->getProcAddress("glRenderbufferStorageMultisampleAPPLE"));
   }
 }
 
-static void InitBlitFramebuffer(const GLProcGetter* getter, GLInterface* interface,
+static void InitBlitFramebuffer(const GLProcGetter* getter, GLFunctions* functions,
                                 const GLInfo& info) {
   if (info.version >= GL_VER(3, 0)) {
-    interface->blitFramebuffer =
+    functions->blitFramebuffer =
         reinterpret_cast<GLBlitFramebuffer*>(getter->getProcAddress("glBlitFramebuffer"));
   } else if (info.hasExtension("GL_CHROMIUM_framebuffer_multisample")) {
-    interface->blitFramebuffer =
+    functions->blitFramebuffer =
         reinterpret_cast<GLBlitFramebuffer*>(getter->getProcAddress("glBlitFramebufferCHROMIUM"));
   } else if (info.hasExtension("GL_ANGLE_framebuffer_blit")) {
-    interface->blitFramebuffer =
+    functions->blitFramebuffer =
         reinterpret_cast<GLBlitFramebuffer*>(getter->getProcAddress("glBlitFramebufferANGLE"));
   }
 }
 
-static void InitVertexArray(const GLProcGetter* getter, GLInterface* interface,
+static void InitVertexArray(const GLProcGetter* getter, GLFunctions* functions,
                             const GLInfo& info) {
   if (info.version >= GL_VER(3, 0)) {
-    interface->bindVertexArray =
+    functions->bindVertexArray =
         reinterpret_cast<GLBindVertexArray*>(getter->getProcAddress("glBindVertexArray"));
-    interface->deleteVertexArrays =
+    functions->deleteVertexArrays =
         reinterpret_cast<GLDeleteVertexArrays*>(getter->getProcAddress("glDeleteVertexArrays"));
-    interface->genVertexArrays =
+    functions->genVertexArrays =
         reinterpret_cast<GLGenVertexArrays*>(getter->getProcAddress("glGenVertexArrays"));
   } else if (info.hasExtension("GL_OES_vertex_array_object")) {
-    interface->bindVertexArray =
+    functions->bindVertexArray =
         reinterpret_cast<GLBindVertexArray*>(getter->getProcAddress("glBindVertexArrayOES"));
-    interface->deleteVertexArrays =
+    functions->deleteVertexArrays =
         reinterpret_cast<GLDeleteVertexArrays*>(getter->getProcAddress("glDeleteVertexArraysOES"));
-    interface->genVertexArrays =
+    functions->genVertexArrays =
         reinterpret_cast<GLGenVertexArrays*>(getter->getProcAddress("glGenVertexArraysOES"));
   }
 }
 
-void GLAssembleGLESInterface(const GLProcGetter* getter, GLInterface* interface,
+void GLAssembleGLESInterface(const GLProcGetter* getter, GLFunctions* functions,
                              const GLInfo& info) {
-  interface->checkFramebufferStatus = reinterpret_cast<GLCheckFramebufferStatus*>(
-      getter->getProcAddress("glCheckFramebufferStatus"));
-  interface->getError = reinterpret_cast<GLGetError*>(getter->getProcAddress("glGetError"));
   if (info.hasExtension("GL_NV_texture_barrier")) {
-    interface->textureBarrier =
+    functions->textureBarrier =
         reinterpret_cast<GLTextureBarrier*>(getter->getProcAddress("glTextureBarrierNV"));
   }
-  InitBlitFramebuffer(getter, interface, info);
-  InitRenderbufferStorageMultisample(getter, interface, info);
-  InitFramebufferTexture2DMultisample(getter, interface, info);
-  InitVertexArray(getter, interface, info);
+  InitBlitFramebuffer(getter, functions, info);
+  InitRenderbufferStorageMultisample(getter, functions, info);
+  InitFramebufferTexture2DMultisample(getter, functions, info);
+  InitVertexArray(getter, functions, info);
 }
 }  // namespace tgfx

@@ -21,13 +21,13 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "GLDefines.h"
-#include "GLFunctions.h"
 #include "core/utils/EnumHasher.h"
 #include "core/utils/Log.h"
 #include "gpu/Caps.h"
 #include "gpu/PixelFormat.h"
 #include "gpu/Swizzle.h"
+#include "gpu/opengl/GLDefines.h"
+#include "gpu/opengl/GLFunctions.h"
 
 #define GL_VER(major, minor) ((static_cast<uint32_t>(major) << 16) | static_cast<uint32_t>(minor))
 
@@ -112,7 +112,7 @@ class GLCaps : public Caps {
  public:
   GLStandard standard = GLStandard::None;
   uint32_t version = 0;
-  GLVendor vendor;
+  GLVendor vendor = GLVendor::Other;
   bool vertexArrayObjectSupport = false;
   bool packRowLengthSupport = false;
   bool unpackRowLengthSupport = false;

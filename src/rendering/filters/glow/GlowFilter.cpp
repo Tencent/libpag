@@ -93,7 +93,7 @@ void GlowFilter::draw(tgfx::Context* context, const FilterSource* source,
   if (!checkBuffer(context, blurWidth, blurHeight)) {
     return;
   }
-  auto gl = tgfx::GLContext::Unwrap(context);
+  auto gl = tgfx::GLInterface::Get(context);
   blurFilterBufferH->clearColor(gl);
   blurFilterBufferV->clearColor(gl);
 

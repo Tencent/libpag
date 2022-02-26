@@ -32,7 +32,7 @@ static CVOpenGLESTextureRef GetTextureRef(Context* context, CVPixelBufferRef pix
   CVOpenGLESTextureRef texture = nil;
   CVReturn result;
   if (CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_OneComponent8) {
-      auto gl = GLContext::Unwrap(context);
+      auto gl = GLInterface::Get(context);
     const auto& format = gl->caps->getTextureFormat(PixelFormat::ALPHA_8);
     // 返回的 texture 对象是一个强引用计数为 1 的对象。
     result = CVOpenGLESTextureCacheCreateTextureFromImage(

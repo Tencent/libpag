@@ -92,11 +92,11 @@ std::string BulgeFilter::onBuildFragmentShader() {
 }
 
 void BulgeFilter::onPrepareProgram(const tgfx::GLInterface* gl, unsigned int program) {
-  horizontalRadiusHandle = gl->getUniformLocation(program, "uHorizontalRadius");
-  verticalRadiusHandle = gl->getUniformLocation(program, "uVerticalRadius");
-  bulgeCenterHandle = gl->getUniformLocation(program, "uBulgeCenter");
-  bulgeHeightHandle = gl->getUniformLocation(program, "uBulgeHeight");
-  pinningHandle = gl->getUniformLocation(program, "uPinning");
+  horizontalRadiusHandle = gl->functions->getUniformLocation(program, "uHorizontalRadius");
+  verticalRadiusHandle = gl->functions->getUniformLocation(program, "uVerticalRadius");
+  bulgeCenterHandle = gl->functions->getUniformLocation(program, "uBulgeCenter");
+  bulgeHeightHandle = gl->functions->getUniformLocation(program, "uBulgeHeight");
+  pinningHandle = gl->functions->getUniformLocation(program, "uPinning");
 }
 
 void BulgeFilter::onUpdateParams(const tgfx::GLInterface* gl, const tgfx::Rect& contentBounds,
@@ -108,12 +108,13 @@ void BulgeFilter::onUpdateParams(const tgfx::GLInterface* gl, const tgfx::Rect& 
   auto bulgeHeight = bulgeEffect->bulgeHeight->getValueAt(layerFrame);
   auto pinning = bulgeEffect->pinning->getValueAt(layerFrame);
 
-  gl->uniform1f(horizontalRadiusHandle, horizontalRadius / contentBounds.width());
-  gl->uniform1f(verticalRadiusHandle, verticalRadius / contentBounds.height());
-  gl->uniform2f(bulgeCenterHandle, (bulgeCenter.x - contentBounds.x()) / contentBounds.width(),
-                1.0f - (bulgeCenter.y - contentBounds.y()) / contentBounds.height());
-  gl->uniform1f(bulgeHeightHandle, bulgeHeight);
-  gl->uniform1i(pinningHandle, pinning);
+  gl->functions->uniform1f(horizontalRadiusHandle, horizontalRadius / contentBounds.width());
+  gl->functions->uniform1f(verticalRadiusHandle, verticalRadius / contentBounds.height());
+  gl->functions->uniform2f(bulgeCenterHandle,
+                           (bulgeCenter.x - contentBounds.x()) / contentBounds.width(),
+                           1.0f - (bulgeCenter.y - contentBounds.y()) / contentBounds.height());
+  gl->functions->uniform1f(bulgeHeightHandle, bulgeHeight);
+  gl->functions->uniform1i(pinningHandle, pinning);
 }
 
 std::vector<tgfx::Point> BulgeFilter::computeVertices(const tgfx::Rect& inputBounds,

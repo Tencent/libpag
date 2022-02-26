@@ -51,7 +51,7 @@ namespace tgfx {
 class ActiveTexture : public GLAttribute {
  public:
   explicit ActiveTexture(const GLInterface* gl) {
-    gl->getIntegerv(GL_ACTIVE_TEXTURE, &activeTexture);
+    gl->functions->getIntegerv(GL_ACTIVE_TEXTURE, &activeTexture);
   }
 
   GLAttributeType type() const override {
@@ -63,7 +63,7 @@ class ActiveTexture : public GLAttribute {
   }
 
   void apply(GLState* state) const override {
-    state->gl->activeTexture(activeTexture);
+    state->gl->functions->activeTexture(activeTexture);
     state->currentTextureUnit = activeTexture;
   }
 
@@ -73,8 +73,8 @@ class ActiveTexture : public GLAttribute {
 class BlendEquationSeparate : public GLAttribute {
  public:
   explicit BlendEquationSeparate(const GLInterface* gl) {
-    gl->getIntegerv(GL_BLEND_EQUATION_RGB, &equationRGB);
-    gl->getIntegerv(GL_BLEND_EQUATION_ALPHA, &equationAlpha);
+    gl->functions->getIntegerv(GL_BLEND_EQUATION_RGB, &equationRGB);
+    gl->functions->getIntegerv(GL_BLEND_EQUATION_ALPHA, &equationAlpha);
   }
 
   GLAttributeType type() const override {
@@ -86,7 +86,7 @@ class BlendEquationSeparate : public GLAttribute {
   }
 
   void apply(GLState* state) const override {
-    state->gl->blendEquationSeparate(equationRGB, equationAlpha);
+    state->gl->functions->blendEquationSeparate(equationRGB, equationAlpha);
   }
 
   int equationRGB = 0;
@@ -96,10 +96,10 @@ class BlendEquationSeparate : public GLAttribute {
 class BlendFuncSeparate : public GLAttribute {
  public:
   explicit BlendFuncSeparate(const GLInterface* gl) {
-    gl->getIntegerv(GL_BLEND_SRC_RGB, &srcRGB);
-    gl->getIntegerv(GL_BLEND_DST_RGB, &dstRGB);
-    gl->getIntegerv(GL_BLEND_SRC_ALPHA, &srcAlpha);
-    gl->getIntegerv(GL_BLEND_DST_ALPHA, &dstAlpha);
+    gl->functions->getIntegerv(GL_BLEND_SRC_RGB, &srcRGB);
+    gl->functions->getIntegerv(GL_BLEND_DST_RGB, &dstRGB);
+    gl->functions->getIntegerv(GL_BLEND_SRC_ALPHA, &srcAlpha);
+    gl->functions->getIntegerv(GL_BLEND_DST_ALPHA, &dstAlpha);
   }
 
   GLAttributeType type() const override {
@@ -111,7 +111,7 @@ class BlendFuncSeparate : public GLAttribute {
   }
 
   void apply(GLState* state) const override {
-    state->gl->blendFuncSeparate(srcRGB, dstRGB, srcAlpha, dstAlpha);
+    state->gl->functions->blendFuncSeparate(srcRGB, dstRGB, srcAlpha, dstAlpha);
   }
 
   int srcRGB = 0;
@@ -123,7 +123,7 @@ class BlendFuncSeparate : public GLAttribute {
 class CurrentProgram : public GLAttribute {
  public:
   explicit CurrentProgram(const GLInterface* gl) {
-    gl->getIntegerv(GL_CURRENT_PROGRAM, &program);
+    gl->functions->getIntegerv(GL_CURRENT_PROGRAM, &program);
   }
 
   GLAttributeType type() const override {
@@ -135,7 +135,7 @@ class CurrentProgram : public GLAttribute {
   }
 
   void apply(GLState* state) const override {
-    state->gl->useProgram(program);
+    state->gl->functions->useProgram(program);
   }
 
   int program = 0;
@@ -144,7 +144,7 @@ class CurrentProgram : public GLAttribute {
 class EnableBlend : public GLAttribute {
  public:
   explicit EnableBlend(const GLInterface* gl) {
-    enabled = gl->isEnabled(GL_BLEND);
+    enabled = gl->functions->isEnabled(GL_BLEND);
   }
 
   GLAttributeType type() const override {
@@ -157,9 +157,9 @@ class EnableBlend : public GLAttribute {
 
   void apply(GLState* state) const override {
     if (enabled) {
-      state->gl->enable(GL_BLEND);
+      state->gl->functions->enable(GL_BLEND);
     } else {
-      state->gl->disable(GL_BLEND);
+      state->gl->functions->disable(GL_BLEND);
     }
   }
 
@@ -169,7 +169,7 @@ class EnableBlend : public GLAttribute {
 class EnableCullFace : public GLAttribute {
  public:
   explicit EnableCullFace(const GLInterface* gl) {
-    enabled = gl->isEnabled(GL_CULL_FACE);
+    enabled = gl->functions->isEnabled(GL_CULL_FACE);
   }
 
   GLAttributeType type() const override {
@@ -182,9 +182,9 @@ class EnableCullFace : public GLAttribute {
 
   void apply(GLState* state) const override {
     if (enabled) {
-      state->gl->enable(GL_CULL_FACE);
+      state->gl->functions->enable(GL_CULL_FACE);
     } else {
-      state->gl->disable(GL_CULL_FACE);
+      state->gl->functions->disable(GL_CULL_FACE);
     }
   }
 
@@ -194,7 +194,7 @@ class EnableCullFace : public GLAttribute {
 class EnableDepth : public GLAttribute {
  public:
   explicit EnableDepth(const GLInterface* gl) {
-    enabled = gl->isEnabled(GL_DEPTH_TEST);
+    enabled = gl->functions->isEnabled(GL_DEPTH_TEST);
   }
 
   GLAttributeType type() const override {
@@ -207,9 +207,9 @@ class EnableDepth : public GLAttribute {
 
   void apply(GLState* state) const override {
     if (enabled) {
-      state->gl->enable(GL_DEPTH_TEST);
+      state->gl->functions->enable(GL_DEPTH_TEST);
     } else {
-      state->gl->disable(GL_DEPTH_TEST);
+      state->gl->functions->disable(GL_DEPTH_TEST);
     }
   }
 
@@ -219,7 +219,7 @@ class EnableDepth : public GLAttribute {
 class EnableDither : public GLAttribute {
  public:
   explicit EnableDither(const GLInterface* gl) {
-    enabled = gl->isEnabled(GL_DITHER);
+    enabled = gl->functions->isEnabled(GL_DITHER);
   }
 
   GLAttributeType type() const override {
@@ -232,9 +232,9 @@ class EnableDither : public GLAttribute {
 
   void apply(GLState* state) const override {
     if (enabled) {
-      state->gl->enable(GL_DITHER);
+      state->gl->functions->enable(GL_DITHER);
     } else {
-      state->gl->disable(GL_DITHER);
+      state->gl->functions->disable(GL_DITHER);
     }
   }
 
@@ -244,7 +244,7 @@ class EnableDither : public GLAttribute {
 class EnableFramebufferSRGB : public GLAttribute {
  public:
   explicit EnableFramebufferSRGB(const GLInterface* gl) {
-    enabled = gl->isEnabled(GL_FRAMEBUFFER_SRGB);
+    enabled = gl->functions->isEnabled(GL_FRAMEBUFFER_SRGB);
   }
 
   GLAttributeType type() const override {
@@ -257,9 +257,9 @@ class EnableFramebufferSRGB : public GLAttribute {
 
   void apply(GLState* state) const override {
     if (enabled) {
-      state->gl->enable(GL_FRAMEBUFFER_SRGB);
+      state->gl->functions->enable(GL_FRAMEBUFFER_SRGB);
     } else {
-      state->gl->disable(GL_FRAMEBUFFER_SRGB);
+      state->gl->functions->disable(GL_FRAMEBUFFER_SRGB);
     }
   }
 
@@ -269,7 +269,7 @@ class EnableFramebufferSRGB : public GLAttribute {
 class EnableScissor : public GLAttribute {
  public:
   explicit EnableScissor(const GLInterface* gl) {
-    enabled = gl->isEnabled(GL_SCISSOR_TEST);
+    enabled = gl->functions->isEnabled(GL_SCISSOR_TEST);
   }
 
   GLAttributeType type() const override {
@@ -282,9 +282,9 @@ class EnableScissor : public GLAttribute {
 
   void apply(GLState* state) const override {
     if (enabled) {
-      state->gl->enable(GL_SCISSOR_TEST);
+      state->gl->functions->enable(GL_SCISSOR_TEST);
     } else {
-      state->gl->disable(GL_SCISSOR_TEST);
+      state->gl->functions->disable(GL_SCISSOR_TEST);
     }
   }
 
@@ -294,7 +294,7 @@ class EnableScissor : public GLAttribute {
 class EnableStencil : public GLAttribute {
  public:
   explicit EnableStencil(const GLInterface* gl) {
-    enabled = gl->isEnabled(GL_STENCIL_TEST);
+    enabled = gl->functions->isEnabled(GL_STENCIL_TEST);
   }
 
   GLAttributeType type() const override {
@@ -307,9 +307,9 @@ class EnableStencil : public GLAttribute {
 
   void apply(GLState* state) const override {
     if (enabled) {
-      state->gl->enable(GL_STENCIL_TEST);
+      state->gl->functions->enable(GL_STENCIL_TEST);
     } else {
-      state->gl->disable(GL_STENCIL_TEST);
+      state->gl->functions->disable(GL_STENCIL_TEST);
     }
   }
 
@@ -319,7 +319,7 @@ class EnableStencil : public GLAttribute {
 class EnableVertexProgramPointSize : public GLAttribute {
  public:
   explicit EnableVertexProgramPointSize(const GLInterface* gl) {
-    enabled = gl->isEnabled(GL_VERTEX_PROGRAM_POINT_SIZE);
+    enabled = gl->functions->isEnabled(GL_VERTEX_PROGRAM_POINT_SIZE);
   }
 
   GLAttributeType type() const override {
@@ -332,9 +332,9 @@ class EnableVertexProgramPointSize : public GLAttribute {
 
   void apply(GLState* state) const override {
     if (enabled) {
-      state->gl->enable(GL_VERTEX_PROGRAM_POINT_SIZE);
+      state->gl->functions->enable(GL_VERTEX_PROGRAM_POINT_SIZE);
     } else {
-      state->gl->disable(GL_VERTEX_PROGRAM_POINT_SIZE);
+      state->gl->functions->disable(GL_VERTEX_PROGRAM_POINT_SIZE);
     }
   }
 
@@ -344,7 +344,7 @@ class EnableVertexProgramPointSize : public GLAttribute {
 class EnableMultisample : public GLAttribute {
  public:
   explicit EnableMultisample(const GLInterface* gl) {
-    enabled = gl->isEnabled(GL_MULTISAMPLE);
+    enabled = gl->functions->isEnabled(GL_MULTISAMPLE);
   }
 
   GLAttributeType type() const override {
@@ -357,9 +357,9 @@ class EnableMultisample : public GLAttribute {
 
   void apply(GLState* state) const override {
     if (enabled) {
-      state->gl->enable(GL_MULTISAMPLE);
+      state->gl->functions->enable(GL_MULTISAMPLE);
     } else {
-      state->gl->disable(GL_MULTISAMPLE);
+      state->gl->functions->disable(GL_MULTISAMPLE);
     }
   }
 
@@ -369,7 +369,7 @@ class EnableMultisample : public GLAttribute {
 class EnableFetchPerSampleARM : public GLAttribute {
  public:
   explicit EnableFetchPerSampleARM(const GLInterface* gl) {
-    enabled = gl->isEnabled(GL_FETCH_PER_SAMPLE_ARM);
+    enabled = gl->functions->isEnabled(GL_FETCH_PER_SAMPLE_ARM);
   }
 
   GLAttributeType type() const override {
@@ -382,9 +382,9 @@ class EnableFetchPerSampleARM : public GLAttribute {
 
   void apply(GLState* state) const override {
     if (enabled) {
-      state->gl->enable(GL_FETCH_PER_SAMPLE_ARM);
+      state->gl->functions->enable(GL_FETCH_PER_SAMPLE_ARM);
     } else {
-      state->gl->disable(GL_FETCH_PER_SAMPLE_ARM);
+      state->gl->functions->disable(GL_FETCH_PER_SAMPLE_ARM);
     }
   }
 
@@ -394,7 +394,7 @@ class EnableFetchPerSampleARM : public GLAttribute {
 class EnablePolygonOffsetFill : public GLAttribute {
  public:
   explicit EnablePolygonOffsetFill(const GLInterface* gl) {
-    enabled = gl->isEnabled(GL_POLYGON_OFFSET_FILL);
+    enabled = gl->functions->isEnabled(GL_POLYGON_OFFSET_FILL);
   }
 
   GLAttributeType type() const override {
@@ -407,9 +407,9 @@ class EnablePolygonOffsetFill : public GLAttribute {
 
   void apply(GLState* state) const override {
     if (enabled) {
-      state->gl->enable(GL_POLYGON_OFFSET_FILL);
+      state->gl->functions->enable(GL_POLYGON_OFFSET_FILL);
     } else {
-      state->gl->disable(GL_POLYGON_OFFSET_FILL);
+      state->gl->functions->disable(GL_POLYGON_OFFSET_FILL);
     }
   }
 
@@ -419,7 +419,7 @@ class EnablePolygonOffsetFill : public GLAttribute {
 class ElementBufferBinding : public GLAttribute {
  public:
   explicit ElementBufferBinding(const GLInterface* gl) {
-    gl->getIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &buffer);
+    gl->functions->getIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &buffer);
   }
 
   GLAttributeType type() const override {
@@ -431,7 +431,7 @@ class ElementBufferBinding : public GLAttribute {
   }
 
   void apply(GLState* state) const override {
-    state->gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffer);
+    state->gl->functions->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffer);
   }
 
   int buffer = 0;
@@ -440,7 +440,7 @@ class ElementBufferBinding : public GLAttribute {
 class FrameBufferBinding : public GLAttribute {
  public:
   explicit FrameBufferBinding(const GLInterface* gl) {
-    gl->getIntegerv(GL_FRAMEBUFFER_BINDING, &buffer);
+    gl->functions->getIntegerv(GL_FRAMEBUFFER_BINDING, &buffer);
   }
 
   GLAttributeType type() const override {
@@ -452,7 +452,7 @@ class FrameBufferBinding : public GLAttribute {
   }
 
   void apply(GLState* state) const override {
-    state->gl->bindFramebuffer(GL_FRAMEBUFFER, buffer);
+    state->gl->functions->bindFramebuffer(GL_FRAMEBUFFER, buffer);
   }
 
   int buffer = 0;
@@ -461,7 +461,7 @@ class FrameBufferBinding : public GLAttribute {
 class ReadFrameBufferBinding : public GLAttribute {
  public:
   explicit ReadFrameBufferBinding(const GLInterface* gl) {
-    gl->getIntegerv(GL_READ_FRAMEBUFFER_BINDING, &buffer);
+    gl->functions->getIntegerv(GL_READ_FRAMEBUFFER_BINDING, &buffer);
   }
 
   GLAttributeType type() const override {
@@ -473,7 +473,7 @@ class ReadFrameBufferBinding : public GLAttribute {
   }
 
   void apply(GLState* state) const override {
-    state->gl->bindFramebuffer(GL_READ_FRAMEBUFFER, buffer);
+    state->gl->functions->bindFramebuffer(GL_READ_FRAMEBUFFER, buffer);
   }
 
   int buffer = 0;
@@ -482,7 +482,7 @@ class ReadFrameBufferBinding : public GLAttribute {
 class DrawFrameBufferBinding : public GLAttribute {
  public:
   explicit DrawFrameBufferBinding(const GLInterface* gl) {
-    gl->getIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &buffer);
+    gl->functions->getIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &buffer);
   }
 
   GLAttributeType type() const override {
@@ -494,7 +494,7 @@ class DrawFrameBufferBinding : public GLAttribute {
   }
 
   void apply(GLState* state) const override {
-    state->gl->bindFramebuffer(GL_DRAW_FRAMEBUFFER, buffer);
+    state->gl->functions->bindFramebuffer(GL_DRAW_FRAMEBUFFER, buffer);
   }
 
   int buffer = 0;
@@ -503,7 +503,7 @@ class DrawFrameBufferBinding : public GLAttribute {
 class RenderBufferBinding : public GLAttribute {
  public:
   explicit RenderBufferBinding(const GLInterface* gl) {
-    gl->getIntegerv(GL_RENDERBUFFER_BINDING, &buffer);
+    gl->functions->getIntegerv(GL_RENDERBUFFER_BINDING, &buffer);
   }
 
   GLAttributeType type() const override {
@@ -515,7 +515,7 @@ class RenderBufferBinding : public GLAttribute {
   }
 
   void apply(GLState* state) const override {
-    state->gl->bindRenderbuffer(GL_RENDERBUFFER, buffer);
+    state->gl->functions->bindRenderbuffer(GL_RENDERBUFFER, buffer);
   }
 
   int buffer = 0;
@@ -524,7 +524,7 @@ class RenderBufferBinding : public GLAttribute {
 class PackAlignment : public GLAttribute {
  public:
   explicit PackAlignment(const GLInterface* gl) {
-    gl->getIntegerv(GL_PACK_ALIGNMENT, &alignment);
+    gl->functions->getIntegerv(GL_PACK_ALIGNMENT, &alignment);
   }
 
   GLAttributeType type() const override {
@@ -536,7 +536,7 @@ class PackAlignment : public GLAttribute {
   }
 
   void apply(GLState* state) const override {
-    state->gl->pixelStorei(GL_PACK_ALIGNMENT, alignment);
+    state->gl->functions->pixelStorei(GL_PACK_ALIGNMENT, alignment);
   }
 
   int alignment = 0;
@@ -545,7 +545,7 @@ class PackAlignment : public GLAttribute {
 class PackRowLength : public GLAttribute {
  public:
   explicit PackRowLength(const GLInterface* gl) {
-    gl->getIntegerv(GL_PACK_ROW_LENGTH, &rowLength);
+    gl->functions->getIntegerv(GL_PACK_ROW_LENGTH, &rowLength);
   }
 
   GLAttributeType type() const override {
@@ -557,7 +557,7 @@ class PackRowLength : public GLAttribute {
   }
 
   void apply(GLState* state) const override {
-    state->gl->pixelStorei(GL_PACK_ROW_LENGTH, rowLength);
+    state->gl->functions->pixelStorei(GL_PACK_ROW_LENGTH, rowLength);
   }
 
   int rowLength = 0;
@@ -566,7 +566,7 @@ class PackRowLength : public GLAttribute {
 class ScissorBox : public GLAttribute {
  public:
   explicit ScissorBox(const GLInterface* gl) {
-    gl->getIntegerv(GL_SCISSOR_BOX, box);
+    gl->functions->getIntegerv(GL_SCISSOR_BOX, box);
   }
 
   GLAttributeType type() const override {
@@ -578,7 +578,7 @@ class ScissorBox : public GLAttribute {
   }
 
   void apply(GLState* state) const override {
-    state->gl->scissor(box[0], box[1], box[2], box[3]);
+    state->gl->functions->scissor(box[0], box[1], box[2], box[3]);
   }
 
   int box[4] = {};
@@ -590,13 +590,13 @@ class TextureBinding : public GLAttribute {
       : textureUnit(textureUnit), textureTarget(textureTarget) {
     switch (textureTarget) {
       case GL_TEXTURE_2D:
-        gl->getIntegerv(GL_TEXTURE_BINDING_2D, &textureID);
+        gl->functions->getIntegerv(GL_TEXTURE_BINDING_2D, &textureID);
         break;
       case GL_TEXTURE_EXTERNAL_OES:
-        gl->getIntegerv(GL_TEXTURE_BINDING_EXTERNAL_OES, &textureID);
+        gl->functions->getIntegerv(GL_TEXTURE_BINDING_EXTERNAL_OES, &textureID);
         break;
       case GL_TEXTURE_RECTANGLE:
-        gl->getIntegerv(GL_TEXTURE_BINDING_RECTANGLE, &textureID);
+        gl->functions->getIntegerv(GL_TEXTURE_BINDING_RECTANGLE, &textureID);
         break;
       default:
         UNSUPPORTED_STATE_WARNING()
@@ -613,8 +613,8 @@ class TextureBinding : public GLAttribute {
   }
 
   void apply(GLState* state) const override {
-    state->gl->activeTexture(textureUnit);
-    state->gl->bindTexture(textureTarget, textureID);
+    state->gl->functions->activeTexture(textureUnit);
+    state->gl->functions->bindTexture(textureTarget, textureID);
   }
 
  private:
@@ -626,7 +626,7 @@ class TextureBinding : public GLAttribute {
 class UnpackAlignment : public GLAttribute {
  public:
   explicit UnpackAlignment(const GLInterface* gl) {
-    gl->getIntegerv(GL_UNPACK_ALIGNMENT, &alignment);
+    gl->functions->getIntegerv(GL_UNPACK_ALIGNMENT, &alignment);
   }
 
   GLAttributeType type() const override {
@@ -638,7 +638,7 @@ class UnpackAlignment : public GLAttribute {
   }
 
   void apply(GLState* state) const override {
-    state->gl->pixelStorei(GL_UNPACK_ALIGNMENT, alignment);
+    state->gl->functions->pixelStorei(GL_UNPACK_ALIGNMENT, alignment);
   }
 
   int alignment = 0;
@@ -647,7 +647,7 @@ class UnpackAlignment : public GLAttribute {
 class UnpackRowLength : public GLAttribute {
  public:
   explicit UnpackRowLength(const GLInterface* gl) {
-    gl->getIntegerv(GL_UNPACK_ROW_LENGTH, &rowLength);
+    gl->functions->getIntegerv(GL_UNPACK_ROW_LENGTH, &rowLength);
   }
 
   GLAttributeType type() const override {
@@ -659,7 +659,7 @@ class UnpackRowLength : public GLAttribute {
   }
 
   void apply(GLState* state) const override {
-    state->gl->pixelStorei(GL_UNPACK_ROW_LENGTH, rowLength);
+    state->gl->functions->pixelStorei(GL_UNPACK_ROW_LENGTH, rowLength);
   }
 
   int rowLength = 0;
@@ -668,7 +668,7 @@ class UnpackRowLength : public GLAttribute {
 class VertexArrayBinding : public GLAttribute {
  public:
   explicit VertexArrayBinding(const GLInterface* gl) {
-    gl->getIntegerv(GL_VERTEX_ARRAY_BINDING, &vertexArray);
+    gl->functions->getIntegerv(GL_VERTEX_ARRAY_BINDING, &vertexArray);
   }
 
   GLAttributeType type() const override {
@@ -680,7 +680,7 @@ class VertexArrayBinding : public GLAttribute {
   }
 
   void apply(GLState* state) const override {
-    state->gl->bindVertexArray(vertexArray);
+    state->gl->functions->bindVertexArray(vertexArray);
     state->currentVAO = vertexArray;
   }
 
@@ -690,13 +690,13 @@ class VertexArrayBinding : public GLAttribute {
 class VertexAttribute : public GLAttribute {
  public:
   explicit VertexAttribute(const GLInterface* gl, unsigned index) : index(index) {
-    gl->getVertexAttribiv(index, GL_VERTEX_ATTRIB_ARRAY_BUFFER_BINDING, &vbo);
-    gl->getVertexAttribiv(index, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &enabled);
-    gl->getVertexAttribiv(index, GL_VERTEX_ATTRIB_ARRAY_SIZE, &size);
-    gl->getVertexAttribiv(index, GL_VERTEX_ATTRIB_ARRAY_TYPE, &dataType);
-    gl->getVertexAttribiv(index, GL_VERTEX_ATTRIB_ARRAY_NORMALIZED, &normalized);
-    gl->getVertexAttribiv(index, GL_VERTEX_ATTRIB_ARRAY_STRIDE, &stride);
-    gl->getVertexAttribPointerv(index, GL_VERTEX_ATTRIB_ARRAY_POINTER, &pointer);
+    gl->functions->getVertexAttribiv(index, GL_VERTEX_ATTRIB_ARRAY_BUFFER_BINDING, &vbo);
+    gl->functions->getVertexAttribiv(index, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &enabled);
+    gl->functions->getVertexAttribiv(index, GL_VERTEX_ATTRIB_ARRAY_SIZE, &size);
+    gl->functions->getVertexAttribiv(index, GL_VERTEX_ATTRIB_ARRAY_TYPE, &dataType);
+    gl->functions->getVertexAttribiv(index, GL_VERTEX_ATTRIB_ARRAY_NORMALIZED, &normalized);
+    gl->functions->getVertexAttribiv(index, GL_VERTEX_ATTRIB_ARRAY_STRIDE, &stride);
+    gl->functions->getVertexAttribPointerv(index, GL_VERTEX_ATTRIB_ARRAY_POINTER, &pointer);
   }
 
   GLAttributeType type() const override {
@@ -708,12 +708,12 @@ class VertexAttribute : public GLAttribute {
   }
 
   void apply(GLState* state) const override {
-    state->gl->bindBuffer(GL_ARRAY_BUFFER, vbo);
-    state->gl->vertexAttribPointer(index, size, dataType, normalized, stride, pointer);
+    state->gl->functions->bindBuffer(GL_ARRAY_BUFFER, vbo);
+    state->gl->functions->vertexAttribPointer(index, size, dataType, normalized, stride, pointer);
     if (enabled == GL_TRUE) {
-      state->gl->enableVertexAttribArray(index);
+      state->gl->functions->enableVertexAttribArray(index);
     } else {
-      state->gl->disableVertexAttribArray(index);
+      state->gl->functions->disableVertexAttribArray(index);
     }
   }
 
@@ -731,7 +731,7 @@ class VertexAttribute : public GLAttribute {
 class VertexBufferBinding : public GLAttribute {
  public:
   explicit VertexBufferBinding(const GLInterface* gl) {
-    gl->getIntegerv(GL_ARRAY_BUFFER_BINDING, &buffer);
+    gl->functions->getIntegerv(GL_ARRAY_BUFFER_BINDING, &buffer);
   }
 
   GLAttributeType type() const override {
@@ -743,7 +743,7 @@ class VertexBufferBinding : public GLAttribute {
   }
 
   void apply(GLState* state) const override {
-    state->gl->bindBuffer(GL_ARRAY_BUFFER, buffer);
+    state->gl->functions->bindBuffer(GL_ARRAY_BUFFER, buffer);
   }
 
   int buffer = 0;
@@ -752,7 +752,7 @@ class VertexBufferBinding : public GLAttribute {
 class DepthMask : public GLAttribute {
  public:
   explicit DepthMask(const GLInterface* gl) {
-    gl->getBooleanv(GL_DEPTH_WRITEMASK, &flag);
+    gl->functions->getBooleanv(GL_DEPTH_WRITEMASK, &flag);
   }
 
   GLAttributeType type() const override {
@@ -764,7 +764,7 @@ class DepthMask : public GLAttribute {
   }
 
   void apply(GLState* state) const override {
-    state->gl->depthMask(flag);
+    state->gl->functions->depthMask(flag);
   }
 
   unsigned char flag = false;
@@ -773,7 +773,7 @@ class DepthMask : public GLAttribute {
 class Viewport : public GLAttribute {
  public:
   explicit Viewport(const GLInterface* gl) {
-    gl->getIntegerv(GL_VIEWPORT, viewport);
+    gl->functions->getIntegerv(GL_VIEWPORT, viewport);
   }
 
   GLAttributeType type() const override {
@@ -785,7 +785,7 @@ class Viewport : public GLAttribute {
   }
 
   void apply(GLState* state) const override {
-    state->gl->viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+    state->gl->functions->viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
   }
 
   int viewport[4] = {};
@@ -798,11 +798,11 @@ GLState::GLState(const GLInterface* gl) : gl(gl) {
 void GLState::reset() {
   if (gl->caps->vertexArrayObjectSupport) {
     int vao = 0;
-    gl->getIntegerv(GL_VERTEX_ARRAY_BINDING, &vao);
+    gl->functions->getIntegerv(GL_VERTEX_ARRAY_BINDING, &vao);
     currentVAO = vao;
   }
   int texture = 0;
-  gl->getIntegerv(GL_ACTIVE_TEXTURE, &texture);
+  gl->functions->getIntegerv(GL_ACTIVE_TEXTURE, &texture);
   currentTextureUnit = texture;
   currentRecord = nullptr;
   recordList = {};
@@ -836,28 +836,28 @@ void GLState::activeTexture(unsigned textureUnit) {
   }
   SAVE_DEFAULT(ActiveTexture)
   currentTextureUnit = textureUnit;
-  gl->activeTexture(textureUnit);
+  gl->functions->activeTexture(textureUnit);
 }
 
 void GLState::blendEquation(unsigned mode) {
   SAVE_DEFAULT(BlendEquationSeparate)
-  gl->blendEquation(mode);
+  gl->functions->blendEquation(mode);
 }
 
 void GLState::blendEquationSeparate(unsigned modeRGB, unsigned modeAlpha) {
   SAVE_DEFAULT(BlendEquationSeparate)
-  gl->blendEquationSeparate(modeRGB, modeAlpha);
+  gl->functions->blendEquationSeparate(modeRGB, modeAlpha);
 }
 
 void GLState::blendFunc(unsigned int srcFactor, unsigned int dstFactor) {
   SAVE_DEFAULT(BlendFuncSeparate)
-  gl->blendFunc(srcFactor, dstFactor);
+  gl->functions->blendFunc(srcFactor, dstFactor);
 }
 
 void GLState::blendFuncSeparate(unsigned srcRGB, unsigned dstRGB, unsigned srcAlpha,
                                 unsigned dstAlpha) {
   SAVE_DEFAULT(BlendFuncSeparate)
-  gl->blendFuncSeparate(srcRGB, dstRGB, srcAlpha, dstAlpha);
+  gl->functions->blendFuncSeparate(srcRGB, dstRGB, srcAlpha, dstAlpha);
 }
 
 void GLState::bindFramebuffer(unsigned target, unsigned framebuffer) {
@@ -875,7 +875,7 @@ void GLState::bindFramebuffer(unsigned target, unsigned framebuffer) {
       UNSUPPORTED_STATE_WARNING()
       break;
   }
-  gl->bindFramebuffer(target, framebuffer);
+  gl->functions->bindFramebuffer(target, framebuffer);
 }
 
 void GLState::bindRenderbuffer(unsigned int target, unsigned int renderbuffer) {
@@ -884,7 +884,7 @@ void GLState::bindRenderbuffer(unsigned int target, unsigned int renderbuffer) {
   } else {
     UNSUPPORTED_STATE_WARNING()
   }
-  gl->bindRenderbuffer(target, renderbuffer);
+  gl->functions->bindRenderbuffer(target, renderbuffer);
 }
 
 void GLState::bindBuffer(unsigned target, unsigned buffer) {
@@ -903,7 +903,7 @@ void GLState::bindBuffer(unsigned target, unsigned buffer) {
       UNSUPPORTED_STATE_WARNING()
       break;
   }
-  gl->bindBuffer(target, buffer);
+  gl->functions->bindBuffer(target, buffer);
 }
 
 void GLState::bindTexture(unsigned target, unsigned texture) {
@@ -916,7 +916,7 @@ void GLState::bindTexture(unsigned target, unsigned texture) {
           insertAttribute(std::make_shared<TextureBinding>(gl, currentTextureUnit, target));
     }
   }
-  gl->bindTexture(target, texture);
+  gl->functions->bindTexture(target, texture);
 }
 
 void GLState::bindVertexArray(unsigned vertexArray) {
@@ -925,7 +925,7 @@ void GLState::bindVertexArray(unsigned vertexArray) {
   }
   SAVE_DEFAULT(VertexArrayBinding)
   currentVAO = vertexArray;
-  gl->bindVertexArray(vertexArray);
+  gl->functions->bindVertexArray(vertexArray);
 }
 
 static void SaveDefaultBlend(GLState* state) {
@@ -989,12 +989,12 @@ void GLState::disable(unsigned cap) {
   if (!found) {
     // UNSUPPORTED_STATE_WARNING()
   }
-  gl->disable(cap);
+  gl->functions->disable(cap);
 }
 
 void GLState::disableVertexAttribArray(unsigned index) {
   saveVertexAttribute(index);
-  gl->disableVertexAttribArray(index);
+  gl->functions->disableVertexAttribArray(index);
 }
 
 void GLState::enable(unsigned cap) {
@@ -1009,12 +1009,12 @@ void GLState::enable(unsigned cap) {
   if (!found) {
     UNSUPPORTED_STATE_WARNING()
   }
-  gl->enable(cap);
+  gl->functions->enable(cap);
 }
 
 void GLState::enableVertexAttribArray(unsigned index) {
   saveVertexAttribute(index);
-  gl->enableVertexAttribArray(index);
+  gl->functions->enableVertexAttribArray(index);
 }
 
 void GLState::pixelStorei(unsigned int name, int param) {
@@ -1035,33 +1035,33 @@ void GLState::pixelStorei(unsigned int name, int param) {
       UNSUPPORTED_STATE_WARNING()
       break;
   }
-  gl->pixelStorei(name, param);
+  gl->functions->pixelStorei(name, param);
 }
 
 void GLState::scissor(int x, int y, int width, int height) {
   SAVE_DEFAULT(ScissorBox)
-  gl->scissor(x, y, width, height);
+  gl->functions->scissor(x, y, width, height);
 }
 
 void GLState::viewport(int x, int y, int width, int height) {
   SAVE_DEFAULT(Viewport)
-  gl->viewport(x, y, width, height);
+  gl->functions->viewport(x, y, width, height);
 }
 
 void GLState::useProgram(unsigned program) {
   SAVE_DEFAULT(CurrentProgram)
-  gl->useProgram(program);
+  gl->functions->useProgram(program);
 }
 
 void GLState::vertexAttribPointer(unsigned index, int size, unsigned type, unsigned char normalized,
                                   int stride, const void* ptr) {
   saveVertexAttribute(index);
-  gl->vertexAttribPointer(index, size, type, normalized, stride, ptr);
+  gl->functions->vertexAttribPointer(index, size, type, normalized, stride, ptr);
 }
 
 void GLState::depthMask(unsigned char flag) {
   SAVE_DEFAULT(DepthMask);
-  gl->depthMask(flag);
+  gl->functions->depthMask(flag);
 }
 
 void GLState::saveVertexAttribute(unsigned int index) {

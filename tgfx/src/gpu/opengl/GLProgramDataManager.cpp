@@ -30,28 +30,28 @@ GLProgramDataManager::GLProgramDataManager(const GLInterface* gl, const std::vec
 void GLProgramDataManager::set1f(UniformHandle handle, float v0) const {
   auto location = uniforms->at(handle.toIndex());
   if (kUnusedUniform != location) {
-    gl->uniform1f(location, v0);
+    gl->functions->uniform1f(location, v0);
   }
 }
 
 void GLProgramDataManager::set2f(UniformHandle handle, float v0, float v1) const {
   auto location = uniforms->at(handle.toIndex());
   if (kUnusedUniform != location) {
-    gl->uniform2f(location, v0, v1);
+    gl->functions->uniform2f(location, v0, v1);
   }
 }
 
 void GLProgramDataManager::set4fv(UniformHandle handle, int arrayCount, const float* v) const {
   auto location = uniforms->at(handle.toIndex());
   if (kUnusedUniform != location) {
-    gl->uniform4fv(location, arrayCount, v);
+    gl->functions->uniform4fv(location, arrayCount, v);
   }
 }
 
 void GLProgramDataManager::setMatrix3f(UniformHandle handle, const float matrix[]) const {
   auto location = uniforms->at(handle.toIndex());
   if (kUnusedUniform != location) {
-    gl->uniformMatrix3fv(location, 1, GL_FALSE, matrix);
+    gl->functions->uniformMatrix3fv(location, 1, GL_FALSE, matrix);
   }
 }
 

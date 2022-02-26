@@ -99,14 +99,15 @@ std::string MotionTileFilter::onBuildFragmentShader() {
 }
 
 void MotionTileFilter::onPrepareProgram(const tgfx::GLInterface* gl, unsigned int program) {
-  tileCenterHandle = gl->getUniformLocation(program, "uTileCenter");
-  tileWidthHandle = gl->getUniformLocation(program, "uTileWidth");
-  tileHeightHandle = gl->getUniformLocation(program, "uTileHeight");
-  outputWidthHandle = gl->getUniformLocation(program, "uOutputWidth");
-  outputHeightHandle = gl->getUniformLocation(program, "uOutputHeight");
-  mirrorEdgesHandle = gl->getUniformLocation(program, "uMirrorEdges");
-  phaseHandle = gl->getUniformLocation(program, "uPhase");
-  isHorizontalPhaseShiftHandle = gl->getUniformLocation(program, "uIsHorizontalPhaseShift");
+  tileCenterHandle = gl->functions->getUniformLocation(program, "uTileCenter");
+  tileWidthHandle = gl->functions->getUniformLocation(program, "uTileWidth");
+  tileHeightHandle = gl->functions->getUniformLocation(program, "uTileHeight");
+  outputWidthHandle = gl->functions->getUniformLocation(program, "uOutputWidth");
+  outputHeightHandle = gl->functions->getUniformLocation(program, "uOutputHeight");
+  mirrorEdgesHandle = gl->functions->getUniformLocation(program, "uMirrorEdges");
+  phaseHandle = gl->functions->getUniformLocation(program, "uPhase");
+  isHorizontalPhaseShiftHandle =
+      gl->functions->getUniformLocation(program, "uIsHorizontalPhaseShift");
 }
 
 void MotionTileFilter::onUpdateParams(const tgfx::GLInterface* gl, const tgfx::Rect& contentBounds,
@@ -121,14 +122,15 @@ void MotionTileFilter::onUpdateParams(const tgfx::GLInterface* gl, const tgfx::R
   auto phase = pagEffect->phase->getValueAt(layerFrame);
   auto isHorizontalPhaseShift = pagEffect->horizontalPhaseShift->getValueAt(layerFrame);
 
-  gl->uniform2f(tileCenterHandle, (tileCenter.x - contentBounds.x()) / contentBounds.width(),
-                1.0f - (tileCenter.y - contentBounds.y()) / contentBounds.height());
-  gl->uniform1f(tileWidthHandle, tileWidth / 100.f);
-  gl->uniform1f(tileHeightHandle, tileHeight / 100.f);
-  gl->uniform1f(outputWidthHandle, outputWidth / 100.f);
-  gl->uniform1f(outputHeightHandle, outputHeight / 100.f);
-  gl->uniform1i(mirrorEdgesHandle, mirrorEdges);
-  gl->uniform1f(phaseHandle, phase);
-  gl->uniform1i(isHorizontalPhaseShiftHandle, isHorizontalPhaseShift);
+  gl->functions->uniform2f(tileCenterHandle,
+                           (tileCenter.x - contentBounds.x()) / contentBounds.width(),
+                           1.0f - (tileCenter.y - contentBounds.y()) / contentBounds.height());
+  gl->functions->uniform1f(tileWidthHandle, tileWidth / 100.f);
+  gl->functions->uniform1f(tileHeightHandle, tileHeight / 100.f);
+  gl->functions->uniform1f(outputWidthHandle, outputWidth / 100.f);
+  gl->functions->uniform1f(outputHeightHandle, outputHeight / 100.f);
+  gl->functions->uniform1i(mirrorEdgesHandle, mirrorEdges);
+  gl->functions->uniform1f(phaseHandle, phase);
+  gl->functions->uniform1i(isHorizontalPhaseShiftHandle, isHorizontalPhaseShift);
 }
 }  // namespace pag

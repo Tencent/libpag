@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLBlend.h"
-#include "GLDefines.h"
+#include "gpu/opengl/GLDefines.h"
 
 namespace tgfx {
 static void HardLight(FragmentShaderBuilder* fsBuilder, const char* final, const char* src,

@@ -45,7 +45,7 @@ UniformHandle GLUniformHandler::internalAddUniform(ShaderFlags visibility, Shade
 SamplerHandle GLUniformHandler::addSampler(const TextureSampler* sampler, const std::string& name) {
   auto mangleName = programBuilder->nameVariable('u', name);
 
-  const auto* gl = static_cast<GLProgramBuilder*>(programBuilder)->gl();
+  auto gl = static_cast<GLProgramBuilder*>(programBuilder)->gl();
   const auto& swizzle = gl->caps->getTextureSwizzle(sampler->format);
 
   ShaderVar::Type type;
@@ -90,12 +90,14 @@ std::string GLUniformHandler::getUniformDeclarations(ShaderFlags visibility) con
 }
 
 void GLUniformHandler::resolveUniformLocations(unsigned programID) {
-  const auto* gl = static_cast<GLProgramBuilder*>(programBuilder)->gl();
+  auto gl = static_cast<GLProgramBuilder*>(programBuilder)->gl();
   for (auto& uniform : uniforms) {
-    uniform.location = gl->getUniformLocation(programID, uniform.variable.name().c_str());
+    uniform.location =
+        gl->functions->getUniformLocation(programID, uniform.variable.name().c_str());
   }
   for (auto& sampler : samplers) {
-    sampler.location = gl->getUniformLocation(programID, sampler.variable.name().c_str());
+    sampler.location =
+        gl->functions->getUniformLocation(programID, sampler.variable.name().c_str());
   }
 }
 }  // namespace tgfx

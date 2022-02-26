@@ -20,9 +20,9 @@
 
 namespace tgfx {
 class GLProcGetter;
-class GLInterface;
+class GLFunctions;
 class GLInfo;
 
-void GLAssembleGLESInterface(const GLProcGetter* getter, GLInterface* interface,
+void GLAssembleGLESInterface(const GLProcGetter* getter, GLFunctions* functions,
                              const GLInfo& info);
 }  // namespace tgfx

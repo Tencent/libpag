@@ -32,8 +32,8 @@ class GLBackendTexture : public GLTexture {
  protected:
   void onRelease(Context* context) override {
     if (adopted) {
-      auto gl = GLContext::Unwrap(context);
-      gl->deleteTextures(1, &sampler.id);
+      auto gl = GLInterface::Get(context);
+      gl->functions->deleteTextures(1, &sampler.id);
     }
   }
 
@@ -79,8 +79,8 @@ class GLAlphaTexture : public GLTexture {
   }
 
   void onRelease(Context* context) override {
-    auto gl = GLContext::Unwrap(context);
-    gl->deleteTextures(1, &sampler.id);
+    auto gl = GLInterface::Get(context);
+    gl->functions->deleteTextures(1, &sampler.id);
   }
 };
 
@@ -105,8 +105,8 @@ class GLRGBATexture : public GLTexture {
   }
 
   void onRelease(Context* context) override {
-    auto gl = GLContext::Unwrap(context);
-    gl->deleteTextures(1, &sampler.id);
+    auto gl = GLInterface::Get(context);
+    gl->functions->deleteTextures(1, &sampler.id);
   }
 };
 
@@ -117,7 +117,7 @@ static bool CheckMaxTextureSize(const GLInterface* gl, int width, int height) {
 
 std::shared_ptr<Texture> Texture::Make(Context* context, int width, int height, void* pixels,
                                        size_t rowBytes, ImageOrigin origin, bool alphaOnly) {
-  auto gl = GLContext::Unwrap(context);
+  auto gl = GLInterface::Get(context);
   // Clear the previously generated GLError, causing the subsequent CheckGLError to return an
   // incorrect result.
   CheckGLError(gl);
@@ -144,21 +144,21 @@ std::shared_ptr<Texture> Texture::Make(Context* context, int width, int height, 
   } else {
     sampler.target = GL_TEXTURE_2D;
     sampler.format = pixelFormat;
-    gl->genTextures(1, &(sampler.id));
+    gl->functions->genTextures(1, &(sampler.id));
     if (sampler.id == 0) {
       return nullptr;
     }
-    gl->bindTexture(sampler.target, sampler.id);
-    gl->texParameteri(sampler.target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    gl->texParameteri(sampler.target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    gl->texParameteri(sampler.target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    gl->texParameteri(sampler.target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    gl->functions->bindTexture(sampler.target, sampler.id);
+    gl->functions->texParameteri(sampler.target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    gl->functions->texParameteri(sampler.target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    gl->functions->texParameteri(sampler.target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    gl->functions->texParameteri(sampler.target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     if (pixels == nullptr) {
-      gl->texImage2D(sampler.target, 0, static_cast<int>(format.internalFormatTexImage), width,
-                     height, 0, format.externalFormat, GL_UNSIGNED_BYTE, nullptr);
+      gl->functions->texImage2D(sampler.target, 0, static_cast<int>(format.internalFormatTexImage),
+                                width, height, 0, format.externalFormat, GL_UNSIGNED_BYTE, nullptr);
     }
     if (!CheckGLError(gl)) {
-      gl->deleteTextures(1, &sampler.id);
+      gl->functions->deleteTextures(1, &sampler.id);
       return nullptr;
     }
     if (alphaOnly) {

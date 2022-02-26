@@ -97,13 +97,14 @@ std::string DisplacementMapFilter::onBuildFragmentShader() {
 }
 
 void DisplacementMapFilter::onPrepareProgram(const tgfx::GLInterface* gl, unsigned int program) {
-  useForDisplacementHandle = gl->getUniformLocation(program, "uUseForDisplacement");
-  maxDisplacementHandle = gl->getUniformLocation(program, "uMaxDisplacement");
-  displacementMapBehaviorHandle = gl->getUniformLocation(program, "uDisplacementMapBehavior");
-  edgeBehaviorHandle = gl->getUniformLocation(program, "uEdgeBehavior");
-  expandOutputHandle = gl->getUniformLocation(program, "uExpandOutput");
-  mapTextureHandle = gl->getUniformLocation(program, "mapTexture");
-  mapTextureSizeHandle = gl->getUniformLocation(program, "mapTextureSize");
+  useForDisplacementHandle = gl->functions->getUniformLocation(program, "uUseForDisplacement");
+  maxDisplacementHandle = gl->functions->getUniformLocation(program, "uMaxDisplacement");
+  displacementMapBehaviorHandle =
+      gl->functions->getUniformLocation(program, "uDisplacementMapBehavior");
+  edgeBehaviorHandle = gl->functions->getUniformLocation(program, "uEdgeBehavior");
+  expandOutputHandle = gl->functions->getUniformLocation(program, "uExpandOutput");
+  mapTextureHandle = gl->functions->getUniformLocation(program, "mapTexture");
+  mapTextureSizeHandle = gl->functions->getUniformLocation(program, "mapTextureSize");
 }
 
 void DisplacementMapFilter::updateMapTexture(RenderCache* cache, const Graphic* mapGraphic,
@@ -122,17 +123,18 @@ void DisplacementMapFilter::onUpdateParams(const tgfx::GLInterface* gl,
   auto* pagEffect = reinterpret_cast<const DisplacementMapEffect*>(effect);
   auto mapTextureID = GetTextureID(mapSurface->getTexture().get());
   ActiveGLTexture(gl, GL_TEXTURE1, GL_TEXTURE_2D, mapTextureID);
-  gl->uniform2f(useForDisplacementHandle,
-                pagEffect->useForHorizontalDisplacement->getValueAt(layerFrame),
-                pagEffect->useForVerticalDisplacement->getValueAt(layerFrame));
-  gl->uniform2f(maxDisplacementHandle, pagEffect->maxHorizontalDisplacement->getValueAt(layerFrame),
-                pagEffect->maxVerticalDisplacement->getValueAt(layerFrame));
-  gl->uniform1i(displacementMapBehaviorHandle,
-                pagEffect->displacementMapBehavior->getValueAt(layerFrame));
-  gl->uniform1i(edgeBehaviorHandle, pagEffect->edgeBehavior->getValueAt(layerFrame));
-  gl->uniform1i(expandOutputHandle, pagEffect->expandOutput->getValueAt(layerFrame));
-  gl->uniform1i(mapTextureHandle, 1);
-  gl->uniform2f(mapTextureSizeHandle, mapBounds.width() / contentBounds.width(),
-                mapBounds.height() / contentBounds.height());
+  gl->functions->uniform2f(useForDisplacementHandle,
+                           pagEffect->useForHorizontalDisplacement->getValueAt(layerFrame),
+                           pagEffect->useForVerticalDisplacement->getValueAt(layerFrame));
+  gl->functions->uniform2f(maxDisplacementHandle,
+                           pagEffect->maxHorizontalDisplacement->getValueAt(layerFrame),
+                           pagEffect->maxVerticalDisplacement->getValueAt(layerFrame));
+  gl->functions->uniform1i(displacementMapBehaviorHandle,
+                           pagEffect->displacementMapBehavior->getValueAt(layerFrame));
+  gl->functions->uniform1i(edgeBehaviorHandle, pagEffect->edgeBehavior->getValueAt(layerFrame));
+  gl->functions->uniform1i(expandOutputHandle, pagEffect->expandOutput->getValueAt(layerFrame));
+  gl->functions->uniform1i(mapTextureHandle, 1);
+  gl->functions->uniform2f(mapTextureSizeHandle, mapBounds.width() / contentBounds.width(),
+                           mapBounds.height() / contentBounds.height());
 }
 }  // namespace pag
