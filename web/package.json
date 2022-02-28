@@ -14,7 +14,7 @@
     "prettier": "prettier --check \"src/**/*.ts\"",
     "prettier:fix": "prettier --write \"src/**/*.ts\"",
     "test": "cypress open",
-    "test:server": "http-server -p 8080 cypress -c-1",
+    "server": "http-server -p 8080 . -c-1",
     "doc": "rimraf api-docs && typedoc --entryPointStrategy expand ./src"
   },
   "repository": {
@@ -37,6 +37,7 @@
     "eslint": "^7.31.0",
     "eslint-config-alloy": "^4.4.0",
     "http-server": "^14.1.0",
+    "pako": "^2.0.4",
     "pixelmatch": "^5.2.1",
     "prettier": "^2.5.1",
     "rimraf": "^3.0.2",
@@ -45,7 +46,8 @@
     "rollup-plugin-terser": "^7.0.2",
     "tslib": "^2.1.0",
     "typedoc": "^0.22.10",
-    "typescript": "^4.5.2"
+    "typescript": "^4.5.2",
+    "wait-on": "^6.0.1"
   },
   "files": [
     "lib",

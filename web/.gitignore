@@ -11,8 +11,4 @@ dist
 api-docs
 *.js.map
 demo/index.js
-cypress/libpag.umd.js
-cypress/libpag.wasm
-cypress/plugins
-cypress/support
-cypress/fixtures
+cypress/downloads/*.png
