@@ -7,6 +7,7 @@ import android.os.Build;
 import android.view.Surface;
 
 import org.extra.tools.LibraryLoadUtils;
+import org.ffavc.DecoderFactory;
 
 public class PAGSurface {
     public static PAGSurface FromSurfaceTexture(SurfaceTexture surfaceTexture) {
@@ -177,6 +178,7 @@ public class PAGSurface {
     static {
         LibraryLoadUtils.loadLibrary("pag");
         nativeInit();
+        VideoDecoder.RegisterSoftwareDecoderFactory(DecoderFactory.GetHandle());
     }
 
     long nativeSurface = 0;

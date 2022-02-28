@@ -1,6 +1,8 @@
 apply plugin: 'com.android.library'
 apply plugin: 'maven-publish'
 apply plugin: 'com.github.panpf.bintray-publish'
+apply plugin: 'signing'
+apply plugin: 'com.kezong.fat-aar'
 
 version = '4.0.0.0'
 project.ext.artifactId = 'libpag'
@@ -22,7 +24,7 @@ android {
         externalNativeBuild {
             cmake {
                 arguments "-DANDROID_STL=c++_static",
-                        "-DPAG_USE_LIBAVC=ON"
+                        "-DPAG_USE_LIBAVC=OFF"
             }
         }
 
@@ -47,20 +49,82 @@ android {
 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
+    embed(name: 'ffavc', ext: 'aar')
     androidTestImplementation('com.android.support.test.espresso:espresso-core:2.2.2', {
         exclude group: 'com.android.support', module: 'support-annotations'
     })
     testImplementation 'junit:junit:4.12'
 }
 
-// 发布到Jcenter配置
+task androidSourcesJar(type: Jar) {
+    archiveClassifier.set("sources")
+    from android.sourceSets.main.java.source
+    exclude "**/R.class"
+    exclude "**/BuildConfig.class"
+}
+
 publish {
     userOrg = 'libpag'
     groupId = 'com.tencent.tav'
     artifactId = 'libpag'
     publishVersion = project.version
-    desc = ' '
-    website = 'https://github.com/libpag/libpag.github.io'
+    desc = 'A real-time rendering library for PAG (Portable Animated Graphics) files that renders After Effects animations natively across multiple platforms.'
+    website = 'https://github.com/Tencent/libpag'
+}
+
+publishing {
+    publications {
+        mavenAar(MavenPublication) {
+            // group id，发布后引用的依赖的 group id
+            groupId 'com.tencent.tav'
+            // 发布后引用的依赖的 artifact id
+            artifactId 'libpag'
+            println version
+            // 发布的 arr 的文件和源码文件
+            artifact("$buildDir/outputs/aar/libpag-release.aar")
+            artifact androidSourcesJar
+            pom {
+                // 构件名称，可以自定义
+                name = 'libpag'
+                // 构件描述
+                description = 'A real-time rendering library for PAG (Portable Animated Graphics) files that renders After Effects animations natively across multiple platforms.'
+                // 构件主页
+                url = 'https://github.com/Tencent/libpag'
+                // 许可证名称和地址
+                licenses {
+                    license {
+                        name = 'The Apache License, Version 2.0'
+                        url = 'https://github.com/Tencent/libpag/blob/main/LICENSE.txt'
+                    }
+                }
+                // 开发者信息
+                developers {
+                    developer {
+                        name = 'libpag'
+                        email = 'libpag@tencent.com'
+                    }
+                }
+                // 版本控制仓库地址
+                scm {
+                    url = 'https://github.com/Tencent/libpag'
+                    connection = 'scm:git:github.com/Tencent/libpag.git'
+                    developerConnection = 'scm:git:ssh://git@github.com/Tencent/libpag.git'
+                }
+            }
+        }
+    }
+    repositories {
+        maven {
+            // 发布的位置，这里根据发布的版本区分了 SNAPSHOT 和最终版本两种情况
+            def releasesRepoUrl = "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
+            def snapshotsRepoUrl = "https://oss.sonatype.org/content/repositories/snapshots/"
+            url = version.endsWith('SNAPSHOT') ? snapshotsRepoUrl : releasesRepoUrl
+        }
+    }
+}
+
+signing {
+    sign publishing.publications
 }
 
 project.afterEvaluate {
