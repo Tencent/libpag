@@ -16,28 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "GLCaps.h"
-#include "GLProcGetter.h"
-#include "gpu/opengl/GLDefines.h"
 #include "gpu/opengl/GLFunctions.h"
+#include "gpu/opengl/GLContext.h"
 
 namespace tgfx {
-class GLState;
-
-class GLInterface {
- public:
-  static const GLInterface* Get(const Context* context);
-
-  std::shared_ptr<const GLCaps> caps = nullptr;
-  std::shared_ptr<const GLFunctions> functions = nullptr;
-
- private:
-  static const GLInterface* GetNative();
-  static std::unique_ptr<const GLInterface> MakeNativeInterface(const GLProcGetter* getter);
-
-  friend class GLDevice;
-  friend class GLContext;
-};
+const GLFunctions* GLFunctions::Get(const Context* context) {
+  return context ? static_cast<const GLContext*>(context)->functions() : nullptr;
+}
 }  // namespace tgfx

@@ -18,13 +18,13 @@
 
 #include "base/utils/GetTimer.h"
 #include "base/utils/TGFXCast.h"
-#include "gpu/Canvas.h"
 #include "gpu/opengl/GLDevice.h"
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "rendering/Drawable.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/graphics/Recorder.h"
+#include "rendering/utils/GLRestorer.h"
 #include "rendering/utils/LockGuard.h"
 
 namespace pag {
@@ -36,17 +36,6 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(std::shared_ptr<Drawable> drawa
   return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(drawable)));
 }
 
-static std::shared_ptr<tgfx::Device> GetCurrentDevice(bool forAsyncThread) {
-  if (forAsyncThread) {
-    auto sharedContext = tgfx::GLDevice::CurrentNativeHandle();
-    auto device = tgfx::GLDevice::Make(sharedContext);
-    if (device) {
-      return device;
-    }
-  }
-  return tgfx::GLDevice::Current();
-}
-
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendRenderTarget& renderTarget,
                                                  ImageOrigin origin) {
   auto device = tgfx::GLDevice::Current();
@@ -54,17 +43,32 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendRenderTarget& rend
     return nullptr;
   }
   auto drawable = std::make_shared<RenderTargetDrawable>(device, renderTarget, ToTGFX(origin));
-  return MakeFrom(std::move(drawable));
+  if (drawable == nullptr) {
+    return nullptr;
+  }
+  return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(drawable), true));
 }
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendTexture& texture, ImageOrigin origin,
                                                  bool forAsyncThread) {
-  auto device = GetCurrentDevice(forAsyncThread);
+  std::shared_ptr<tgfx::Device> device = nullptr;
+  bool isAdopted = false;
+  if (forAsyncThread) {
+    auto sharedContext = tgfx::GLDevice::CurrentNativeHandle();
+    device = tgfx::GLDevice::Make(sharedContext);
+  }
+  if (device == nullptr) {
+    device = tgfx::GLDevice::Current();
+    isAdopted = true;
+  }
   if (device == nullptr || !texture.isValid()) {
     return nullptr;
   }
   auto drawable = std::make_shared<TextureDrawable>(device, texture, ToTGFX(origin));
-  return MakeFrom(std::move(drawable));
+  if (drawable == nullptr) {
+    return nullptr;
+  }
+  return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(drawable), isAdopted));
 }
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeOffscreen(int width, int height) {
@@ -76,7 +80,8 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeOffscreen(int width, int height) {
   return std::shared_ptr<PAGSurface>(new PAGSurface(drawable));
 }
 
-PAGSurface::PAGSurface(std::shared_ptr<Drawable> drawable) : drawable(std::move(drawable)) {
+PAGSurface::PAGSurface(std::shared_ptr<Drawable> drawable, bool contextAdopted)
+    : drawable(std::move(drawable)), contextAdopted(contextAdopted) {
   rootLocker = std::make_shared<std::mutex>();
 }
 
@@ -103,12 +108,10 @@ void PAGSurface::freeCache() {
     pagPlayer->renderCache->releaseAll();
   }
   surface = nullptr;
-  if (device) {
-    auto context = device->lockContext();
-    if (context) {
-      context->purgeResourcesNotUsedIn(0);
-      device->unlock();
-    }
+  auto context = lockContext();
+  if (context) {
+    context->purgeResourcesNotUsedIn(0);
+    unlockContext();
   }
   device = nullptr;
 }
@@ -239,12 +242,20 @@ tgfx::Context* PAGSurface::lockContext() {
   if (device == nullptr) {
     return nullptr;
   }
-  return device->lockContext();
+  auto context = device->lockContext();
+  if (context != nullptr && contextAdopted) {
+    glRestorer = new GLRestorer(tgfx::GLFunctions::Get(context));
+  }
+  return context;
 }
 
 void PAGSurface::unlockContext() {
   if (device == nullptr) {
     return;
+  }
+  if (contextAdopted) {
+    delete glRestorer;
+    glRestorer = nullptr;
   }
   device->unlock();
 }

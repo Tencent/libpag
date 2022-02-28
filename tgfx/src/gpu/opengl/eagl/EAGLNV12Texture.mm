@@ -45,7 +45,7 @@ std::shared_ptr<EAGLNV12Texture> EAGLNV12Texture::MakeFrom(Context* context,
   auto height = static_cast<int>(CVPixelBufferGetHeight(pixelBuffer));
   CVOpenGLESTextureRef outputTextureLuma = nil;
   CVOpenGLESTextureRef outputTextureChroma = nil;
-  auto gl = GLContext::Unwrap(context);
+  auto gl = GLInterface::Get(context);
   auto lumaComponentFormat = PixelFormat::GRAY_8;
   const auto& oneComponentFormat = gl->caps->getTextureFormat(lumaComponentFormat);
   // 返回的 texture 对象是一个强引用计数为 1 的对象。

@@ -224,7 +224,7 @@ PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
   ASSERT_TRUE(result);
   CHECK_PIXELS(AlphaRectInfo, pixels, "Surface_alpha_to_alpha_100_-100");
 
-  auto gl = GLContext::Unwrap(context);
+  auto gl = GLInterface::Get(context);
   tgfx::GLSampler textureInfo = {};
   result = CreateGLTexture(gl, width, height, &textureInfo);
   ASSERT_TRUE(result);
@@ -255,7 +255,7 @@ PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
   ASSERT_TRUE(result);
   CHECK_PIXELS(RGBARectInfo, pixels, "Surface_BL_rgbA_to_rgbA_100_-100");
 
-  gl->deleteTextures(1, &textureInfo.id);
+  gl->functions->deleteTextures(1, &textureInfo.id);
   device->unlock();
 }
 

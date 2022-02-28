@@ -176,7 +176,7 @@ void DropShadowFilter::onDrawModeNotSpread(tgfx::Context* context, const FilterS
   if (blurFilterBuffer == nullptr) {
     return;
   }
-  auto gl = tgfx::GLContext::Unwrap(context);
+  auto gl = tgfx::GLInterface::Get(context);
   blurFilterBuffer->clearColor(gl);
 
   auto offsetMatrix =
@@ -215,7 +215,7 @@ void DropShadowFilter::onDrawModeNotFullSpread(tgfx::Context* context, const Fil
   if (spreadFilterBuffer == nullptr) {
     return;
   }
-  auto gl = tgfx::GLContext::Unwrap(context);
+  auto gl = tgfx::GLInterface::Get(context);
   spreadFilterBuffer->clearColor(gl);
   auto offsetMatrix =
       tgfx::Matrix::MakeTrans((lastBounds.left - filterBounds.left) * source->scale.x,

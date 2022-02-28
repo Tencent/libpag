@@ -44,9 +44,9 @@ std::string MosaicFilter::onBuildFragmentShader() {
 }
 
 void MosaicFilter::onPrepareProgram(const tgfx::GLInterface* gl, unsigned int program) {
-  horizontalBlocksHandle = gl->getUniformLocation(program, "mHorizontalBlocks");
-  verticalBlocksHandle = gl->getUniformLocation(program, "mVerticalBlocks");
-  sharpColorsHandle = gl->getUniformLocation(program, "mSharpColors");
+  horizontalBlocksHandle = gl->functions->getUniformLocation(program, "mHorizontalBlocks");
+  verticalBlocksHandle = gl->functions->getUniformLocation(program, "mVerticalBlocks");
+  sharpColorsHandle = gl->functions->getUniformLocation(program, "mSharpColors");
 }
 
 void MosaicFilter::onUpdateParams(const tgfx::GLInterface* gl, const tgfx::Rect& contentBounds,
@@ -70,8 +70,8 @@ void MosaicFilter::onUpdateParams(const tgfx::GLInterface* gl, const tgfx::Rect&
     verticalBlocks *= 1.0f * placeHolderHeight / contentHeight;
   }
 
-  gl->uniform1f(horizontalBlocksHandle, horizontalBlocks);
-  gl->uniform1f(verticalBlocksHandle, verticalBlocks);
-  gl->uniform1f(sharpColorsHandle, sharpColors);
+  gl->functions->uniform1f(horizontalBlocksHandle, horizontalBlocks);
+  gl->functions->uniform1f(verticalBlocksHandle, verticalBlocks);
+  gl->functions->uniform1f(sharpColorsHandle, sharpColors);
 }
 }  // namespace pag

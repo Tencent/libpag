@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Platform.h"
-#include "core/Image.h"
-#include "gpu/opengl/GLProcGetter.h"
 #include "video/VideoDecoder.h"
 
 namespace pag {

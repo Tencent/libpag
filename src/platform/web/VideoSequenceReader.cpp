@@ -81,7 +81,6 @@ std::shared_ptr<tgfx::Texture> VideoSequenceReader::readTexture(Frame targetFram
   if (targetFrame == lastFrame) {
     return texture;
   }
-  tgfx::GLStateGuard stateGuard(cache->getContext());
   if (texture == nullptr) {
     texture = tgfx::GLTexture::MakeRGBA(cache->getContext(), width, height);
   }

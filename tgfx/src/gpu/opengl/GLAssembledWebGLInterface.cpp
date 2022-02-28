@@ -21,45 +21,34 @@
 #include "GLInterface.h"
 
 namespace tgfx {
-static unsigned GetErrorFake() {
-  return GL_NO_ERROR;
-}
-
-static unsigned CheckFramebufferStatusFake(unsigned) {
-  return GL_FRAMEBUFFER_COMPLETE;
-}
-
-static void InitVertexArray(const GLProcGetter* getter, GLInterface* interface,
+static void InitVertexArray(const GLProcGetter* getter, GLFunctions* functions,
                             const GLInfo& info) {
   if (info.version >= GL_VER(2, 0)) {
-    interface->bindVertexArray =
+    functions->bindVertexArray =
         reinterpret_cast<GLBindVertexArray*>(getter->getProcAddress("glBindVertexArray"));
-    interface->deleteVertexArrays =
+    functions->deleteVertexArrays =
         reinterpret_cast<GLDeleteVertexArrays*>(getter->getProcAddress("glDeleteVertexArrays"));
-    interface->genVertexArrays =
+    functions->genVertexArrays =
         reinterpret_cast<GLGenVertexArrays*>(getter->getProcAddress("glGenVertexArrays"));
   } else if (info.hasExtension("GL_OES_vertex_array_object") ||
              info.hasExtension("OES_vertex_array_object")) {
-    interface->bindVertexArray =
+    functions->bindVertexArray =
         reinterpret_cast<GLBindVertexArray*>(getter->getProcAddress("glBindVertexArrayOES"));
-    interface->deleteVertexArrays =
+    functions->deleteVertexArrays =
         reinterpret_cast<GLDeleteVertexArrays*>(getter->getProcAddress("glDeleteVertexArraysOES"));
-    interface->genVertexArrays =
+    functions->genVertexArrays =
         reinterpret_cast<GLGenVertexArrays*>(getter->getProcAddress("glGenVertexArraysOES"));
   }
 }
 
-void GLAssembleWebGLInterface(const GLProcGetter* getter, GLInterface* interface,
+void GLAssembleWebGLInterface(const GLProcGetter* getter, GLFunctions* functions,
                               const GLInfo& info) {
-  interface->getError = reinterpret_cast<GLGetError*>(GetErrorFake);
-  interface->checkFramebufferStatus =
-      reinterpret_cast<GLCheckFramebufferStatus*>(CheckFramebufferStatusFake);
   if (info.version >= GL_VER(2, 0)) {
-    interface->blitFramebuffer =
+    functions->blitFramebuffer =
         reinterpret_cast<GLBlitFramebuffer*>(getter->getProcAddress("glBlitFramebuffer"));
-    interface->renderbufferStorageMultisample = reinterpret_cast<GLRenderbufferStorageMultisample*>(
+    functions->renderbufferStorageMultisample = reinterpret_cast<GLRenderbufferStorageMultisample*>(
         getter->getProcAddress("glRenderbufferStorageMultisample"));
   }
-  InitVertexArray(getter, interface, info);
+  InitVertexArray(getter, functions, info);
 }
 }  // namespace tgfx

@@ -1141,6 +1141,8 @@ class Drawable {
 
 class Graphic;
 
+class GLRestorer;
+
 class PAG_API PAGSurface {
  public:
   /**
@@ -1212,8 +1214,10 @@ class PAG_API PAGSurface {
   std::shared_ptr<Drawable> drawable = nullptr;
   std::shared_ptr<tgfx::Device> device = nullptr;
   std::shared_ptr<tgfx::Surface> surface = nullptr;
+  bool contextAdopted = false;
+  GLRestorer* glRestorer = nullptr;
 
-  explicit PAGSurface(std::shared_ptr<Drawable> drawable);
+  explicit PAGSurface(std::shared_ptr<Drawable> drawable, bool contextAdopted = false);
 
   bool draw(RenderCache* cache, std::shared_ptr<Graphic> graphic, BackendSemaphore* signalSemaphore,
             bool autoClear = true);

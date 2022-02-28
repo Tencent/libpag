@@ -50,7 +50,7 @@ std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, 
   auto pixelFormat = alphaOnly ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
   std::shared_ptr<GLTexture> texture;
   if (alphaOnly) {
-    if (GLContext::Unwrap(context)->caps->textureRedSupport) {
+    if (GLInterface::Get(context)->caps->textureRedSupport) {
       texture = std::static_pointer_cast<GLTexture>(Texture::MakeAlpha(context, width, height));
     }
   } else {
@@ -59,7 +59,7 @@ std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, 
   if (texture == nullptr) {
     return nullptr;
   }
-  auto gl = GLContext::Unwrap(context);
+  auto gl = GLInterface::Get(context);
   sampleCount = gl->caps->getSampleCount(sampleCount, pixelFormat);
   auto renderTarget = GLRenderTarget::MakeFrom(context, texture.get(), sampleCount);
   if (renderTarget == nullptr) {
@@ -92,12 +92,12 @@ bool GLSurface::wait(const Semaphore* semaphore) {
   if (glSync == nullptr) {
     return false;
   }
-  const auto* gl = GLContext::Unwrap(getContext());
+  auto gl = GLInterface::Get(getContext());
   if (!gl->caps->semaphoreSupport) {
     return false;
   }
-  gl->waitSync(glSync, 0, GL_TIMEOUT_IGNORED);
-  gl->deleteSync(glSync);
+  gl->functions->waitSync(glSync, 0, GL_TIMEOUT_IGNORED);
+  gl->functions->deleteSync(glSync);
   return true;
 }
 
@@ -108,15 +108,15 @@ bool GLSurface::flush(Semaphore* semaphore) {
     }
     return false;
   }
-  const auto* gl = GLContext::Unwrap(getContext());
+  auto gl = GLInterface::Get(getContext());
   if (!gl->caps->semaphoreSupport) {
     return false;
   }
-  auto* sync = gl->fenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+  auto* sync = gl->functions->fenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
   if (sync) {
     static_cast<GLSemaphore*>(semaphore)->glSync = sync;
     // If we inserted semaphores during the flush, we need to call glFlush.
-    gl->flush();
+    gl->functions->flush();
     return true;
   }
   return false;

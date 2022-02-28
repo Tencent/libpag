@@ -41,21 +41,21 @@ GLProgram::GLProgram(unsigned programID, const std::vector<Uniform>& uniforms,
 
 void GLProgram::setupSamplerUniforms(const GLInterface* gl,
                                      const std::vector<Uniform>& textureSamplers) const {
-  gl->useProgram(programId);
+  gl->functions->useProgram(programId);
   // Assign texture units to sampler uniforms one time up front.
   auto count = static_cast<int>(textureSamplers.size());
   for (int i = 0; i < count; ++i) {
     const auto& sampler = textureSamplers[i];
     if (kUnusedUniform != sampler.location) {
-      gl->uniform1i(sampler.location, i);
+      gl->functions->uniform1i(sampler.location, i);
     }
   }
 }
 
 void GLProgram::onRelease(Context* context) {
   if (programId) {
-    auto gl = GLContext::Unwrap(context);
-    gl->deleteProgram(programId);
+    auto gl = GLInterface::Get(context);
+    gl->functions->deleteProgram(programId);
   }
 }
 

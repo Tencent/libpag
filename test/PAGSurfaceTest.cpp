@@ -38,7 +38,7 @@ PAG_TEST(PAGSurfaceTest, FromTexture) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto gl = GLContext::Unwrap(context);
+  auto gl = GLInterface::Get(context);
   auto glVersion = gl->caps->version;
   tgfx::GLSampler textureInfo;
   CreateGLTexture(gl, width, height, &textureInfo);
@@ -91,7 +91,7 @@ PAG_TEST(PAGSurfaceTest, Mask) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto gl = GLContext::Unwrap(context);
+  auto gl = GLInterface::Get(context);
   tgfx::GLSampler textureInfo;
   CreateGLTexture(gl, width, height, &textureInfo);
   auto backendTexture = ToBackendTexture(textureInfo, width, height);
@@ -108,8 +108,8 @@ PAG_TEST(PAGSurfaceTest, Mask) {
 
   context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  gl = GLContext::Unwrap(context);
-  gl->deleteTextures(1, &textureInfo.id);
+  gl = GLInterface::Get(context);
+  gl->functions->deleteTextures(1, &textureInfo.id);
   device->unlock();
 }
 }  // namespace pag

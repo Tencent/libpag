@@ -19,7 +19,6 @@
 #include "gpu/opengl/GLRenderTarget.h"
 #include "core/Bitmap.h"
 #include "gpu/opengl/GLContext.h"
-#include "gpu/opengl/GLState.h"
 #include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
@@ -54,14 +53,17 @@ static bool RenderbufferStorageMSAA(const GLInterface* gl, int sampleCount, Pixe
   auto format = gl->caps->getTextureFormat(pixelFormat).sizedFormat;
   switch (gl->caps->msFBOType) {
     case MSFBOType::Standard:
-      gl->renderbufferStorageMultisample(GL_RENDERBUFFER, sampleCount, format, width, height);
+      gl->functions->renderbufferStorageMultisample(GL_RENDERBUFFER, sampleCount, format, width,
+                                                    height);
       break;
     case MSFBOType::ES_Apple:
-      gl->renderbufferStorageMultisampleAPPLE(GL_RENDERBUFFER, sampleCount, format, width, height);
+      gl->functions->renderbufferStorageMultisampleAPPLE(GL_RENDERBUFFER, sampleCount, format,
+                                                         width, height);
       break;
     case MSFBOType::ES_EXT_MsToTexture:
     case MSFBOType::ES_IMG_MsToTexture:
-      gl->renderbufferStorageMultisampleEXT(GL_RENDERBUFFER, sampleCount, format, width, height);
+      gl->functions->renderbufferStorageMultisampleEXT(GL_RENDERBUFFER, sampleCount, format, width,
+                                                       height);
       break;
     case MSFBOType::None:
       LOGE("Shouldn't be here if we don't support multisampled renderbuffers.");
@@ -74,35 +76,35 @@ static void FrameBufferTexture2D(const GLInterface* gl, unsigned textureTarget, 
                                  int sampleCount) {
   // 解绑的时候framebufferTexture2DMultisample在华为手机上会出现crash，统一走framebufferTexture2D解绑
   if (textureID != 0 && sampleCount > 1 && gl->caps->usesImplicitMSAAResolve()) {
-    gl->framebufferTexture2DMultisample(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, textureTarget,
-                                        textureID, 0, sampleCount);
+    gl->functions->framebufferTexture2DMultisample(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                                                   textureTarget, textureID, 0, sampleCount);
   } else {
-    gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, textureTarget, textureID, 0);
+    gl->functions->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, textureTarget,
+                                        textureID, 0);
   }
 }
 
 static void ReleaseResource(Context* context, GLFrameBuffer* textureFBInfo,
                             GLFrameBuffer* renderTargetFBInfo = nullptr,
                             unsigned* msRenderBufferID = nullptr) {
-  auto gl = GLContext::Unwrap(context);
+  auto gl = GLInterface::Get(context);
   if (textureFBInfo && textureFBInfo->id) {
-    gl->deleteFramebuffers(1, &(textureFBInfo->id));
+    gl->functions->deleteFramebuffers(1, &(textureFBInfo->id));
     if (renderTargetFBInfo && renderTargetFBInfo->id == textureFBInfo->id) {
       renderTargetFBInfo->id = 0;
     }
     textureFBInfo->id = 0;
   }
   if (renderTargetFBInfo && renderTargetFBInfo->id > 0) {
-    {
-      GLStateGuard stateGuard(context);
-      gl->bindFramebuffer(GL_FRAMEBUFFER, renderTargetFBInfo->id);
-      gl->framebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, 0);
-    }
-    gl->deleteFramebuffers(1, &(renderTargetFBInfo->id));
+    gl->functions->bindFramebuffer(GL_FRAMEBUFFER, renderTargetFBInfo->id);
+    gl->functions->framebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER,
+                                           0);
+    gl->functions->bindFramebuffer(GL_FRAMEBUFFER, 0);
+    gl->functions->deleteFramebuffers(1, &(renderTargetFBInfo->id));
     renderTargetFBInfo->id = 0;
   }
   if (msRenderBufferID && *msRenderBufferID > 0) {
-    gl->deleteRenderbuffers(1, msRenderBufferID);
+    gl->functions->deleteRenderbuffers(1, msRenderBufferID);
     *msRenderBufferID = 0;
   }
 }
@@ -110,23 +112,27 @@ static void ReleaseResource(Context* context, GLFrameBuffer* textureFBInfo,
 static bool CreateRenderBuffer(const GLInterface* gl, const GLTexture* texture,
                                GLFrameBuffer* renderTargetFBInfo, unsigned* msRenderBufferID,
                                int sampleCount) {
-  gl->genFramebuffers(1, &(renderTargetFBInfo->id));
+  gl->functions->genFramebuffers(1, &(renderTargetFBInfo->id));
   if (renderTargetFBInfo->id == 0) {
     return false;
   }
-  gl->genRenderbuffers(1, msRenderBufferID);
+  gl->functions->genRenderbuffers(1, msRenderBufferID);
   if (*msRenderBufferID == 0) {
     return false;
   }
-  gl->bindRenderbuffer(GL_RENDERBUFFER, *msRenderBufferID);
+  gl->functions->bindRenderbuffer(GL_RENDERBUFFER, *msRenderBufferID);
   if (!RenderbufferStorageMSAA(gl, sampleCount, renderTargetFBInfo->format, texture->width(),
                                texture->height())) {
     return false;
   }
-  gl->bindFramebuffer(GL_FRAMEBUFFER, renderTargetFBInfo->id);
-  gl->framebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER,
-                              *msRenderBufferID);
-  return gl->checkFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+  gl->functions->bindFramebuffer(GL_FRAMEBUFFER, renderTargetFBInfo->id);
+  gl->functions->framebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER,
+                                         *msRenderBufferID);
+#ifdef TGFX_BUILD_FOR_WEB
+  return true;
+#else
+  return gl->functions->checkFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+#endif
 }
 
 std::shared_ptr<GLRenderTarget> GLRenderTarget::MakeFrom(Context* context, const GLTexture* texture,
@@ -134,14 +140,13 @@ std::shared_ptr<GLRenderTarget> GLRenderTarget::MakeFrom(Context* context, const
   if (texture == nullptr || context == nullptr) {
     return nullptr;
   }
-  auto gl = GLContext::Unwrap(context);
+  auto gl = GLInterface::Get(context);
   GLFrameBuffer textureFBInfo = {};
   textureFBInfo.format = texture->glSampler().format;
-  gl->genFramebuffers(1, &textureFBInfo.id);
+  gl->functions->genFramebuffers(1, &textureFBInfo.id);
   if (textureFBInfo.id == 0) {
     return nullptr;
   }
-  GLStateGuard stateGuard(context);
   GLFrameBuffer renderTargetFBInfo = {};
   renderTargetFBInfo.format = texture->glSampler().format;
   unsigned msRenderBufferID = 0;
@@ -153,22 +158,21 @@ std::shared_ptr<GLRenderTarget> GLRenderTarget::MakeFrom(Context* context, const
   } else {
     renderTargetFBInfo = textureFBInfo;
   }
-  gl->bindFramebuffer(GL_FRAMEBUFFER, textureFBInfo.id);
+  gl->functions->bindFramebuffer(GL_FRAMEBUFFER, textureFBInfo.id);
   auto textureInfo = texture->glSampler();
   FrameBufferTexture2D(gl, textureInfo.target, textureInfo.id, sampleCount);
-  std::shared_ptr<GLRenderTarget> renderTarget = nullptr;
-
-  if (gl->checkFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+#ifndef TGFX_BUILD_FOR_WEB
+  if (gl->functions->checkFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
     ReleaseResource(context, &textureFBInfo, &renderTargetFBInfo, &msRenderBufferID);
-  } else {
-    auto textureTarget = texture->glSampler().target;
-    auto rt = new GLRenderTarget(texture->width(), texture->height(), texture->origin(),
-                                 sampleCount, textureFBInfo, textureTarget);
-    rt->renderTargetFBInfo = renderTargetFBInfo;
-    rt->msRenderBufferID = msRenderBufferID;
-    renderTarget = Resource::Wrap(context, rt);
+    return nullptr;
   }
-  return renderTarget;
+#endif
+  auto textureTarget = texture->glSampler().target;
+  auto rt = new GLRenderTarget(texture->width(), texture->height(), texture->origin(), sampleCount,
+                               textureFBInfo, textureTarget);
+  rt->renderTargetFBInfo = renderTargetFBInfo;
+  rt->msRenderBufferID = msRenderBufferID;
+  return Resource::Wrap(context, rt);
 }
 
 GLRenderTarget::GLRenderTarget(int width, int height, ImageOrigin origin, int sampleCount,
@@ -180,13 +184,13 @@ GLRenderTarget::GLRenderTarget(int width, int height, ImageOrigin origin, int sa
 
 void GLRenderTarget::clear(const GLInterface* gl) const {
   int oldFb = 0;
-  gl->getIntegerv(GL_FRAMEBUFFER_BINDING, &oldFb);
-  gl->bindFramebuffer(GL_FRAMEBUFFER, renderTargetFBInfo.id);
-  gl->viewport(0, 0, width(), height());
-  gl->scissor(0, 0, width(), height());
-  gl->clearColor(0.0f, 0.0f, 0.0f, 0.0f);
-  gl->clear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-  gl->bindFramebuffer(GL_FRAMEBUFFER, oldFb);
+  gl->functions->getIntegerv(GL_FRAMEBUFFER_BINDING, &oldFb);
+  gl->functions->bindFramebuffer(GL_FRAMEBUFFER, renderTargetFBInfo.id);
+  gl->functions->viewport(0, 0, width(), height());
+  gl->functions->scissor(0, 0, width(), height());
+  gl->functions->clearColor(0.0f, 0.0f, 0.0f, 0.0f);
+  gl->functions->clear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  gl->functions->bindFramebuffer(GL_FRAMEBUFFER, oldFb);
 }
 
 static bool CanReadDirectly(const GLInterface* gl, ImageOrigin origin, const ImageInfo& srcInfo,
@@ -230,35 +234,39 @@ bool GLRenderTarget::readPixels(Context* context, const ImageInfo& dstInfo, void
     return false;
   }
   auto pixelFormat = renderTargetFBInfo.format;
-  GLStateGuard stateGuard(context);
-  auto gl = GLContext::Unwrap(context);
+  auto gl = GLInterface::Get(context);
   const auto& format = gl->caps->getTextureFormat(pixelFormat);
-  gl->bindFramebuffer(GL_FRAMEBUFFER, renderTargetFBInfo.id);
+  gl->functions->bindFramebuffer(GL_FRAMEBUFFER, renderTargetFBInfo.id);
   auto colorType = pixelFormat == PixelFormat::ALPHA_8 ? ColorType::ALPHA_8 : ColorType::RGBA_8888;
   auto srcInfo =
       ImageInfo::Make(outInfo.width(), outInfo.height(), colorType, AlphaType::Premultiplied);
   void* pixels = nullptr;
   uint8_t* tempPixels = nullptr;
+  auto restoreGLRowLength = false;
   if (CanReadDirectly(gl, origin(), srcInfo, outInfo)) {
     pixels = dstPixels;
     if (outInfo.rowBytes() != outInfo.minRowBytes()) {
-      gl->pixelStorei(GL_PACK_ROW_LENGTH,
-                      static_cast<int>(outInfo.rowBytes() / outInfo.bytesPerPixel()));
+      gl->functions->pixelStorei(GL_PACK_ROW_LENGTH,
+                                 static_cast<int>(outInfo.rowBytes() / outInfo.bytesPerPixel()));
+      restoreGLRowLength = true;
     }
   } else {
     tempPixels = new uint8_t[srcInfo.byteSize()];
     pixels = tempPixels;
   }
   auto alignment = pixelFormat == PixelFormat::ALPHA_8 ? 1 : 4;
-  gl->pixelStorei(GL_PACK_ALIGNMENT, alignment);
+  gl->functions->pixelStorei(GL_PACK_ALIGNMENT, alignment);
   auto flipY = origin() == ImageOrigin::BottomLeft;
   auto readX = std::max(0, srcX);
   auto readY = std::max(0, srcY);
   if (flipY) {
     readY = height() - readY - outInfo.height();
   }
-  gl->readPixels(readX, readY, outInfo.width(), outInfo.height(), format.externalFormat,
-                 GL_UNSIGNED_BYTE, pixels);
+  gl->functions->readPixels(readX, readY, outInfo.width(), outInfo.height(), format.externalFormat,
+                            GL_UNSIGNED_BYTE, pixels);
+  if (restoreGLRowLength) {
+    gl->functions->pixelStorei(GL_PACK_ROW_LENGTH, 0);
+  }
   if (tempPixels != nullptr) {
     CopyPixels(srcInfo, tempPixels, outInfo, dstPixels, flipY);
     delete[] tempPixels;
@@ -270,24 +278,23 @@ void GLRenderTarget::resolve(Context* context) const {
   if (sampleCount() <= 1) {
     return;
   }
-  auto gl = GLContext::Unwrap(context);
+  auto gl = GLInterface::Get(context);
   if (!gl->caps->usesMSAARenderBuffers()) {
     return;
   }
-  GLStateGuard stateGuard(context);
-  gl->bindFramebuffer(GL_READ_FRAMEBUFFER, renderTargetFBInfo.id);
-  gl->bindFramebuffer(GL_DRAW_FRAMEBUFFER, textureFBInfo.id);
+  gl->functions->bindFramebuffer(GL_READ_FRAMEBUFFER, renderTargetFBInfo.id);
+  gl->functions->bindFramebuffer(GL_DRAW_FRAMEBUFFER, textureFBInfo.id);
   if (gl->caps->msFBOType == MSFBOType::ES_Apple) {
     // Apple's extension uses the scissor as the blit bounds.
-    gl->enable(GL_SCISSOR_TEST);
-    gl->scissor(0, 0, width(), height());
-    gl->resolveMultisampleFramebuffer();
-    gl->disable(GL_SCISSOR_TEST);
+    gl->functions->enable(GL_SCISSOR_TEST);
+    gl->functions->scissor(0, 0, width(), height());
+    gl->functions->resolveMultisampleFramebuffer();
+    gl->functions->disable(GL_SCISSOR_TEST);
   } else {
     // BlitFrameBuffer respects the scissor, so disable it.
-    gl->disable(GL_SCISSOR_TEST);
-    gl->blitFramebuffer(0, 0, width(), height(), 0, 0, width(), height(), GL_COLOR_BUFFER_BIT,
-                        GL_NEAREST);
+    gl->functions->disable(GL_SCISSOR_TEST);
+    gl->functions->blitFramebuffer(0, 0, width(), height(), 0, 0, width(), height(),
+                                   GL_COLOR_BUFFER_BIT, GL_NEAREST);
   }
 }
 
@@ -296,12 +303,10 @@ void GLRenderTarget::onRelease(Context* context) {
     return;
   }
   if (textureTarget != 0) {
-    // The currently bound fboID may be the same as textureFBInfo.id, we must restore and then
-    // delete, otherwise GL_INVALID_OPERATION(1282) will be reported。
-    GLStateGuard stateGuard(context);
-    auto gl = GLContext::Unwrap(context);
-    gl->bindFramebuffer(GL_FRAMEBUFFER, textureFBInfo.id);
+    auto gl = GLInterface::Get(context);
+    gl->functions->bindFramebuffer(GL_FRAMEBUFFER, textureFBInfo.id);
     FrameBufferTexture2D(gl, textureTarget, 0, sampleCount());
+    gl->functions->bindFramebuffer(GL_FRAMEBUFFER, 0);
   }
   ReleaseResource(context, &textureFBInfo, &renderTargetFBInfo, &msRenderBufferID);
 }

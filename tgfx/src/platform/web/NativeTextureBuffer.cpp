@@ -37,8 +37,8 @@ std::shared_ptr<Texture> NativeTextureBuffer::makeTexture(Context* context) cons
     return nullptr;
   }
   auto& glInfo = std::static_pointer_cast<GLTexture>(texture)->glSampler();
-  const auto* gl = GLContext::Unwrap(context);
-  gl->bindTexture(glInfo.target, glInfo.id);
+  auto gl = GLInterface::Get(context);
+  gl->functions->bindTexture(glInfo.target, glInfo.id);
   source.call<void>("upload", val::module_property("GL"));
   return texture;
 }

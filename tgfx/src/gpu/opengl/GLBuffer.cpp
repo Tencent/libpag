@@ -39,14 +39,15 @@ std::shared_ptr<GLBuffer> GLBuffer::Make(Context* context, const uint16_t* buffe
   if (glBuffer != nullptr) {
     return glBuffer;
   }
-  const auto* gl = GLContext::Unwrap(context);
+  auto gl = GLInterface::Get(context);
   glBuffer = Resource::Wrap(context, new GLBuffer(buffer, length));
-  gl->genBuffers(1, &glBuffer->_bufferID);
+  gl->functions->genBuffers(1, &glBuffer->_bufferID);
   if (buffer) {
-    gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, glBuffer->_bufferID);
-    gl->bufferData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLsizeiptr>(sizeof(uint16_t) * length),
-                   buffer, GL_STATIC_DRAW);
-    gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    gl->functions->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, glBuffer->_bufferID);
+    gl->functions->bufferData(GL_ELEMENT_ARRAY_BUFFER,
+                              static_cast<GLsizeiptr>(sizeof(uint16_t) * length), buffer,
+                              GL_STATIC_DRAW);
+    gl->functions->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
   }
   return glBuffer;
 }
@@ -57,7 +58,8 @@ void GLBuffer::computeRecycleKey(BytesKey* bytesKey) const {
 
 void GLBuffer::onRelease(Context* context) {
   if (_bufferID > 0) {
-    GLContext::Unwrap(context)->deleteBuffers(1, &_bufferID);
+    auto gl = GLInterface::Get(context);
+    gl->functions->deleteBuffers(1, &_bufferID);
     _bufferID = 0;
   }
 }

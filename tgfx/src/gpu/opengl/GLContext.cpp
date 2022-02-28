@@ -20,8 +20,7 @@
 #include "gpu/opengl/GLDevice.h"
 
 namespace tgfx {
-GLContext::GLContext(Device* device, const GLInterface* glInterface) : Context(device) {
-  glState = std::make_unique<GLState>(glInterface);
-  interface = GLInterface::HookWithState(glInterface, glState.get());
+GLContext::GLContext(Device* device, const GLInterface* glInterface)
+    : Context(device), interface(glInterface) {
 }
 }  // namespace tgfx

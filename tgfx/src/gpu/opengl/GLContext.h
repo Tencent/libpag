@@ -19,7 +19,6 @@
 #pragma once
 
 #include "GLInterface.h"
-#include "GLState.h"
 #include "gpu/Context.h"
 
 namespace tgfx {
@@ -27,14 +26,14 @@ class GLCaps;
 
 class GLContext : public Context {
  public:
-  static const GLInterface* Unwrap(Context* context) {
-    return context ? static_cast<GLContext*>(context)->interface.get() : nullptr;
-  }
-
   GLContext(Device* device, const GLInterface* glInterface);
 
   Backend backend() const override {
     return Backend::OPENGL;
+  }
+
+  const GLFunctions* functions() const {
+    return interface->functions.get();
   }
 
   const Caps* caps() const override {
@@ -42,10 +41,9 @@ class GLContext : public Context {
   }
 
  private:
-  std::unique_ptr<const GLInterface> interface = nullptr;
-  std::unique_ptr<GLState> glState = nullptr;
+  const GLInterface* interface = nullptr;
 
-  friend class GLStateGuard;
   friend class GLDevice;
+  friend class GLInterface;
 };
 }  // namespace tgfx

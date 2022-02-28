@@ -108,10 +108,10 @@ std::string MotionBlurFilter::onBuildFragmentShader() {
 }
 
 void MotionBlurFilter::onPrepareProgram(const tgfx::GLInterface* gl, unsigned int program) {
-  prevTransformHandle = gl->getUniformLocation(program, "uPrevTransform");
-  transformHandle = gl->getUniformLocation(program, "uTransform");
-  velCenterHandle = gl->getUniformLocation(program, "uVelCenter");
-  maxDistanceHandle = gl->getUniformLocation(program, "maxDistance");
+  prevTransformHandle = gl->functions->getUniformLocation(program, "uPrevTransform");
+  transformHandle = gl->functions->getUniformLocation(program, "uTransform");
+  velCenterHandle = gl->functions->getUniformLocation(program, "uVelCenter");
+  maxDistanceHandle = gl->functions->getUniformLocation(program, "maxDistance");
 }
 
 bool MotionBlurFilter::updateLayer(Layer* targetLayer, Frame layerFrame) {
@@ -138,10 +138,10 @@ void MotionBlurFilter::onUpdateParams(const tgfx::GLInterface* gl, const tgfx::R
   auto scaling = (previousMatrix.getScaleX() != currentMatrix.getScaleX() ||
                   previousMatrix.getScaleY() != currentMatrix.getScaleY());
 
-  gl->uniformMatrix3fv(prevTransformHandle, 1, GL_FALSE, previousGLMatrix.data());
-  gl->uniformMatrix3fv(transformHandle, 1, GL_FALSE, currentGLMatrix.data());
-  gl->uniform1f(velCenterHandle, scaling ? 0.0f : 0.5f);
-  gl->uniform1f(maxDistanceHandle, (MOTION_BLUR_SCALE_FACTOR - 1.0) * 0.5f);
+  gl->functions->uniformMatrix3fv(prevTransformHandle, 1, GL_FALSE, previousGLMatrix.data());
+  gl->functions->uniformMatrix3fv(transformHandle, 1, GL_FALSE, currentGLMatrix.data());
+  gl->functions->uniform1f(velCenterHandle, scaling ? 0.0f : 0.5f);
+  gl->functions->uniform1f(maxDistanceHandle, (MOTION_BLUR_SCALE_FACTOR - 1.0) * 0.5f);
 }
 
 std::vector<tgfx::Point> MotionBlurFilter::computeVertices(const tgfx::Rect& inputBounds,

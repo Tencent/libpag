@@ -89,9 +89,9 @@ std::string DropShadowSpreadFilter::onBuildFragmentShader() {
 }
 
 void DropShadowSpreadFilter::onPrepareProgram(const tgfx::GLInterface* gl, unsigned program) {
-  spreadColorHandle = gl->getUniformLocation(program, "uColor");
-  spreadAlphaHandle = gl->getUniformLocation(program, "uAlpha");
-  spreadSizeHandle = gl->getUniformLocation(program, "uSize");
+  spreadColorHandle = gl->functions->getUniformLocation(program, "uColor");
+  spreadAlphaHandle = gl->functions->getUniformLocation(program, "uAlpha");
+  spreadSizeHandle = gl->functions->getUniformLocation(program, "uSize");
 }
 
 void DropShadowSpreadFilter::onUpdateParams(const tgfx::GLInterface* gl,
@@ -108,10 +108,10 @@ void DropShadowSpreadFilter::onUpdateParams(const tgfx::GLInterface* gl,
   spreadSizeX = std::min(spreadSizeX, DROPSHADOW_MAX_SPREAD_SIZE);
   spreadSizeY = std::min(spreadSizeY, DROPSHADOW_MAX_SPREAD_SIZE);
 
-  gl->uniform3f(spreadColorHandle, color.red, color.green, color.blue);
-  gl->uniform1f(spreadAlphaHandle, alpha);
-  gl->uniform2f(spreadSizeHandle, spreadSizeX / contentBounds.width(),
-                spreadSizeY / contentBounds.height());
+  gl->functions->uniform3f(spreadColorHandle, color.red, color.green, color.blue);
+  gl->functions->uniform1f(spreadAlphaHandle, alpha);
+  gl->functions->uniform2f(spreadSizeHandle, spreadSizeX / contentBounds.width(),
+                           spreadSizeY / contentBounds.height());
 }
 
 std::vector<tgfx::Point> DropShadowSpreadFilter::computeVertices(const tgfx::Rect&,

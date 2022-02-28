@@ -21,7 +21,7 @@
 
 namespace tgfx {
 void GLSampler::computeKey(Context* context, BytesKey* bytesKey) const {
-  const auto* gl = GLContext::Unwrap(context);
+  auto gl = GLInterface::Get(context);
   bytesKey->write(static_cast<uint32_t>(gl->caps->getTextureSwizzle(format).asKey()));
   bytesKey->write(target);
 }

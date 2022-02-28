@@ -62,8 +62,8 @@ std::string RadialBlurFilter::onBuildFragmentShader() {
 }
 
 void RadialBlurFilter::onPrepareProgram(const tgfx::GLInterface* gl, unsigned int program) {
-  amountHandle = gl->getUniformLocation(program, "uAmount");
-  centerHandle = gl->getUniformLocation(program, "uCenter");
+  amountHandle = gl->functions->getUniformLocation(program, "uAmount");
+  centerHandle = gl->functions->getUniformLocation(program, "uCenter");
 }
 
 void RadialBlurFilter::onUpdateParams(const tgfx::GLInterface* gl, const tgfx::Rect& contentBounds,
@@ -74,8 +74,8 @@ void RadialBlurFilter::onUpdateParams(const tgfx::GLInterface* gl, const tgfx::R
 
   amount = amount < 0.25 ? amount : 0.25;
 
-  gl->uniform1f(amountHandle, amount);
-  gl->uniform2f(centerHandle, (center.x - contentBounds.x()) / contentBounds.width(),
-                (center.y - contentBounds.y()) / contentBounds.height());
+  gl->functions->uniform1f(amountHandle, amount);
+  gl->functions->uniform2f(centerHandle, (center.x - contentBounds.x()) / contentBounds.width(),
+                           (center.y - contentBounds.y()) / contentBounds.height());
 }
 }  // namespace pag

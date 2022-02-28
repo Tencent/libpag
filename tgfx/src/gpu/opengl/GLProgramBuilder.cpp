@@ -129,7 +129,7 @@ void GLProgramBuilder::computeCountsAndStrides(unsigned int programID) {
     attribute.gpuType = attr->gpuType();
     attribute.offset = vertexStride;
     vertexStride += static_cast<int>(attr->sizeAlign4());
-    attribute.location = _gl->getAttribLocation(programID, attr->name().c_str());
+    attribute.location = _gl->functions->getAttribLocation(programID, attr->name().c_str());
     if (attribute.location >= 0) {
       attributes.push_back(attribute);
     }
