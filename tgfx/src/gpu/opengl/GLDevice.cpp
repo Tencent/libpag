@@ -69,7 +69,6 @@ bool GLDevice::onLockContext() {
   auto glContext = static_cast<GLContext*>(context);
   if (isAdopted) {
     glContext->glState->reset();
-    glContext->glState->save();
     // Clear externally generated GLError.
     CheckGLError(glContext->interface.get());
   }
@@ -77,10 +76,6 @@ bool GLDevice::onLockContext() {
 }
 
 void GLDevice::onUnlockContext() {
-  auto glContext = static_cast<GLContext*>(context);
-  if (isAdopted) {
-    glContext->glState->restore();
-  }
   onClearCurrent();
 }
 }  // namespace tgfx

@@ -22,6 +22,7 @@
 #include <cstddef>
 #include <cstring>
 #include <utility>
+#include "gpu/opengl/GLDefines.h"
 
 namespace tgfx {
 #if !defined(GL_FUNCTION_TYPE)

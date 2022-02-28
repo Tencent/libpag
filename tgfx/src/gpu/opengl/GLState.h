@@ -80,8 +80,6 @@ class StateRecord {
   std::unordered_map<GLAttributeType, std::shared_ptr<GLAttribute>, EnumHasher> attributeMap = {};
 };
 
-// TODO(domrjchen): All GL methods that may modify the state should be hooked uniformly onto
-//  GLState, and the warning output should be added.
 class GLState {
  public:
   explicit GLState(const GLInterface* gl);
