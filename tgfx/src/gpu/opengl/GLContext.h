@@ -45,7 +45,6 @@ class GLContext : public Context {
   std::unique_ptr<const GLInterface> interface = nullptr;
   std::unique_ptr<GLState> glState = nullptr;
 
-  friend class GLStateGuard;
   friend class GLDevice;
   friend class GLInterface;
 };

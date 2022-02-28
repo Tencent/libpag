@@ -124,8 +124,6 @@ std::shared_ptr<YUVTexture> YUVTexture::MakeI420(Context* context, YUVColorSpace
                                                  YUVColorRange colorRange, int width, int height,
                                                  uint8_t* pixelsPlane[3], const int lineSize[3]) {
   auto gl = GLInterface::Get(context);
-  GLStateGuard stateGuard(context);
-
   YUVConfig yuvConfig = YUVConfig(colorSpace, colorRange, width, height, I420_PLANE_COUNT);
   for (int i = 0; i < 3; i++) {
     yuvConfig.pixelsPlane[i] = pixelsPlane[i];
@@ -156,8 +154,6 @@ std::shared_ptr<YUVTexture> YUVTexture::MakeNV12(Context* context, YUVColorSpace
                                                  YUVColorRange colorRange, int width, int height,
                                                  uint8_t* pixelsPlane[2], const int lineSize[2]) {
   auto gl = GLInterface::Get(context);
-  GLStateGuard stateGuard(context);
-
   YUVConfig yuvConfig = YUVConfig(colorSpace, colorRange, width, height, NV12_PLANE_COUNT);
   for (int i = 0; i < 2; i++) {
     yuvConfig.pixelsPlane[i] = pixelsPlane[i];

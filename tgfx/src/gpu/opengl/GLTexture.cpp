@@ -127,7 +127,6 @@ std::shared_ptr<Texture> Texture::Make(Context* context, int width, int height, 
   }
   PixelFormat pixelFormat = alphaOnly ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
   const auto& format = gl->caps->getTextureFormat(pixelFormat);
-  GLStateGuard stateGuard(context);
   BytesKey recycleKey = {};
   if (alphaOnly) {
     GLAlphaTexture::ComputeRecycleKey(&recycleKey, width, height);

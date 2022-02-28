@@ -132,6 +132,7 @@ void SubmitGLTexture(const GLInterface* gl, const GLSampler& sampler, int width,
     gl->functions->pixelStorei(GL_UNPACK_ROW_LENGTH, static_cast<int>(rowBytes / bytesPerPixel));
     gl->functions->texImage2D(sampler.target, 0, static_cast<int>(format.internalFormatTexImage),
                               width, height, 0, format.externalFormat, GL_UNSIGNED_BYTE, pixels);
+    gl->functions->pixelStorei(GL_UNPACK_ROW_LENGTH, 0);
   } else {
     if (static_cast<size_t>(width) * bytesPerPixel == rowBytes) {
       gl->functions->texImage2D(sampler.target, 0, static_cast<int>(format.internalFormatTexImage),
@@ -146,7 +147,6 @@ void SubmitGLTexture(const GLInterface* gl, const GLSampler& sampler, int width,
       }
     }
   }
-  gl->functions->bindTexture(sampler.target, 0);
 }
 
 unsigned CreateGLProgram(const GLInterface* gl, const std::string& vertex,

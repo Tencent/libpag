@@ -1096,14 +1096,4 @@ std::shared_ptr<GLAttribute> GLState::insertAttribute(
   }
   return attribute;
 }
-
-GLStateGuard::GLStateGuard(Context* context) {
-  state = static_cast<GLContext*>(context)->glState.get();
-  state->save();
-}
-
-GLStateGuard::~GLStateGuard() {
-  state->restore();
-}
-
 }  // namespace tgfx

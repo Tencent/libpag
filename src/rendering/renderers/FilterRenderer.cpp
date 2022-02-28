@@ -308,7 +308,6 @@ std::vector<FilterNode> FilterRenderer::MakeFilterNodes(const FilterList* filter
 void ApplyFilters(tgfx::Context* context, std::vector<FilterNode> filterNodes,
                   const tgfx::Rect& contentBounds, FilterSource* filterSource,
                   FilterTarget* filterTarget) {
-  tgfx::GLStateGuard stateGuard(context);
   auto gl = tgfx::GLInterface::Get(context);
   auto scale = filterSource->scale;
   std::shared_ptr<FilterBuffer> freeBuffer = nullptr;

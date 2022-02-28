@@ -97,12 +97,10 @@ static void ReleaseResource(Context* context, GLFrameBuffer* textureFBInfo,
     textureFBInfo->id = 0;
   }
   if (renderTargetFBInfo && renderTargetFBInfo->id > 0) {
-    {
-      GLStateGuard stateGuard(context);
-      gl->functions->bindFramebuffer(GL_FRAMEBUFFER, renderTargetFBInfo->id);
-      gl->functions->framebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER,
-                                             0);
-    }
+    gl->functions->bindFramebuffer(GL_FRAMEBUFFER, renderTargetFBInfo->id);
+    gl->functions->framebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER,
+                                           0);
+    gl->functions->bindFramebuffer(GL_FRAMEBUFFER, 0);
     gl->functions->deleteFramebuffers(1, &(renderTargetFBInfo->id));
     renderTargetFBInfo->id = 0;
   }
@@ -131,7 +129,11 @@ static bool CreateRenderBuffer(const GLInterface* gl, const GLTexture* texture,
   gl->functions->bindFramebuffer(GL_FRAMEBUFFER, renderTargetFBInfo->id);
   gl->functions->framebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER,
                                          *msRenderBufferID);
+#ifdef TGFX_BUILD_FOR_WEB
+  return true;
+#else
   return gl->functions->checkFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+#endif
 }
 
 std::shared_ptr<GLRenderTarget> GLRenderTarget::MakeFrom(Context* context, const GLTexture* texture,
@@ -146,7 +148,6 @@ std::shared_ptr<GLRenderTarget> GLRenderTarget::MakeFrom(Context* context, const
   if (textureFBInfo.id == 0) {
     return nullptr;
   }
-  GLStateGuard stateGuard(context);
   GLFrameBuffer renderTargetFBInfo = {};
   renderTargetFBInfo.format = texture->glSampler().format;
   unsigned msRenderBufferID = 0;
@@ -161,19 +162,18 @@ std::shared_ptr<GLRenderTarget> GLRenderTarget::MakeFrom(Context* context, const
   gl->functions->bindFramebuffer(GL_FRAMEBUFFER, textureFBInfo.id);
   auto textureInfo = texture->glSampler();
   FrameBufferTexture2D(gl, textureInfo.target, textureInfo.id, sampleCount);
-  std::shared_ptr<GLRenderTarget> renderTarget = nullptr;
-
+#ifndef TGFX_BUILD_FOR_WEB
   if (gl->functions->checkFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
     ReleaseResource(context, &textureFBInfo, &renderTargetFBInfo, &msRenderBufferID);
-  } else {
-    auto textureTarget = texture->glSampler().target;
-    auto rt = new GLRenderTarget(texture->width(), texture->height(), texture->origin(),
-                                 sampleCount, textureFBInfo, textureTarget);
-    rt->renderTargetFBInfo = renderTargetFBInfo;
-    rt->msRenderBufferID = msRenderBufferID;
-    renderTarget = Resource::Wrap(context, rt);
+    return nullptr;
   }
-  return renderTarget;
+#endif
+  auto textureTarget = texture->glSampler().target;
+  auto rt = new GLRenderTarget(texture->width(), texture->height(), texture->origin(), sampleCount,
+                               textureFBInfo, textureTarget);
+  rt->renderTargetFBInfo = renderTargetFBInfo;
+  rt->msRenderBufferID = msRenderBufferID;
+  return Resource::Wrap(context, rt);
 }
 
 GLRenderTarget::GLRenderTarget(int width, int height, ImageOrigin origin, int sampleCount,
@@ -235,7 +235,6 @@ bool GLRenderTarget::readPixels(Context* context, const ImageInfo& dstInfo, void
     return false;
   }
   auto pixelFormat = renderTargetFBInfo.format;
-  GLStateGuard stateGuard(context);
   auto gl = GLInterface::Get(context);
   const auto& format = gl->caps->getTextureFormat(pixelFormat);
   gl->functions->bindFramebuffer(GL_FRAMEBUFFER, renderTargetFBInfo.id);
@@ -244,11 +243,13 @@ bool GLRenderTarget::readPixels(Context* context, const ImageInfo& dstInfo, void
       ImageInfo::Make(outInfo.width(), outInfo.height(), colorType, AlphaType::Premultiplied);
   void* pixels = nullptr;
   uint8_t* tempPixels = nullptr;
+  auto restoreGLRowLength = false;
   if (CanReadDirectly(gl, origin(), srcInfo, outInfo)) {
     pixels = dstPixels;
     if (outInfo.rowBytes() != outInfo.minRowBytes()) {
       gl->functions->pixelStorei(GL_PACK_ROW_LENGTH,
                                  static_cast<int>(outInfo.rowBytes() / outInfo.bytesPerPixel()));
+      restoreGLRowLength = true;
     }
   } else {
     tempPixels = new uint8_t[srcInfo.byteSize()];
@@ -264,6 +265,9 @@ bool GLRenderTarget::readPixels(Context* context, const ImageInfo& dstInfo, void
   }
   gl->functions->readPixels(readX, readY, outInfo.width(), outInfo.height(), format.externalFormat,
                             GL_UNSIGNED_BYTE, pixels);
+  if (restoreGLRowLength) {
+    gl->functions->pixelStorei(GL_PACK_ROW_LENGTH, 0);
+  }
   if (tempPixels != nullptr) {
     CopyPixels(srcInfo, tempPixels, outInfo, dstPixels, flipY);
     delete[] tempPixels;
@@ -279,7 +283,6 @@ void GLRenderTarget::resolve(Context* context) const {
   if (!gl->caps->usesMSAARenderBuffers()) {
     return;
   }
-  GLStateGuard stateGuard(context);
   gl->functions->bindFramebuffer(GL_READ_FRAMEBUFFER, renderTargetFBInfo.id);
   gl->functions->bindFramebuffer(GL_DRAW_FRAMEBUFFER, textureFBInfo.id);
   if (gl->caps->msFBOType == MSFBOType::ES_Apple) {
@@ -301,12 +304,10 @@ void GLRenderTarget::onRelease(Context* context) {
     return;
   }
   if (textureTarget != 0) {
-    // The currently bound fboID may be the same as textureFBInfo.id, we must restore and then
-    // delete, otherwise GL_INVALID_OPERATION(1282) will be reported。
-    GLStateGuard stateGuard(context);
     auto gl = GLInterface::Get(context);
     gl->functions->bindFramebuffer(GL_FRAMEBUFFER, textureFBInfo.id);
     FrameBufferTexture2D(gl, textureTarget, 0, sampleCount());
+    gl->functions->bindFramebuffer(GL_FRAMEBUFFER, 0);
   }
   ReleaseResource(context, &textureFBInfo, &renderTargetFBInfo, &msRenderBufferID);
 }

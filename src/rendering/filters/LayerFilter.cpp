@@ -226,6 +226,7 @@ void LayerFilter::draw(tgfx::Context* context, const FilterSource* source,
   auto gl = tgfx::GLInterface::Get(context);
   EnableMultisample(gl, needsMSAA());
   gl->functions->useProgram(filterProgram->program);
+  gl->functions->disable(GL_SCISSOR_TEST);
   gl->functions->enable(GL_BLEND);
   gl->functions->blendEquation(GL_FUNC_ADD);
   gl->functions->blendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);

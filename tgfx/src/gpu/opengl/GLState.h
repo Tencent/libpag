@@ -141,14 +141,4 @@ class GLState {
 };
 
 class Context;
-
-class GLStateGuard {
- public:
-  explicit GLStateGuard(Context* context);
-
-  ~GLStateGuard();
-
- private:
-  GLState* state = nullptr;
-};
 }  // namespace tgfx

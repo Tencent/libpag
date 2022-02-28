@@ -120,7 +120,6 @@ static std::shared_ptr<Texture> CreateDstTexture(const DrawArgs& args, Point* ds
     LOGE("Failed to create dst texture(%f*%f).", dstRect.width(), dstRect.height());
     return nullptr;
   }
-  GLStateGuard stateGuard(args.context);
   auto renderTarget = static_cast<const GLRenderTarget*>(args.renderTarget);
   gl->functions->bindFramebuffer(GL_FRAMEBUFFER, renderTarget->glFrameBuffer().id);
   auto glSampler = std::static_pointer_cast<GLTexture>(dstTexture)->glSampler();
@@ -131,7 +130,6 @@ static std::shared_ptr<Texture> CreateDstTexture(const DrawArgs& args, Point* ds
   gl->functions->copyTexSubImage2D(glSampler.target, 0, 0, 0, static_cast<int>(dstRect.x()),
                                    static_cast<int>(dstRect.y()), static_cast<int>(dstRect.width()),
                                    static_cast<int>(dstRect.height()));
-  gl->functions->bindTexture(glSampler.target, 0);
   return dstTexture;
 }
 
@@ -193,7 +191,6 @@ void GLDrawer::draw(DrawArgs args, std::unique_ptr<GLDrawOp> op) const {
   const auto& swizzle = gl->caps->getOutputSwizzle(config);
   Pipeline pipeline(std::move(fragmentProcessors), numColorProcessors, std::move(xferProcessor),
                     dstTexture, dstTextureOffset, &swizzle);
-  GLStateGuard stateGuard(args.context);
   auto geometryProcessor = op->getGeometryProcessor(args);
   GLProgramCreator creator(geometryProcessor.get(), &pipeline);
   auto program = static_cast<GLProgram*>(args.context->programCache()->getProgram(&creator));
