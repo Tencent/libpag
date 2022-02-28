@@ -32,6 +32,6 @@ class GLRestorer {
   int blendSrcAlpha = 0;
   int blendDstAlpha = 0;
 };
-}
+}  // namespace pag
 
-#endif //PAG_GLRESTORER_H
+#endif  //PAG_GLRESTORER_H

@@ -1217,7 +1217,6 @@ class PAG_API PAGSurface {
   bool contextAdopted = false;
   GLRestorer* glRestorer = nullptr;
 
-
   explicit PAGSurface(std::shared_ptr<Drawable> drawable, bool contextAdopted = false);
 
   bool draw(RenderCache* cache, std::shared_ptr<Graphic> graphic, BackendSemaphore* signalSemaphore,
