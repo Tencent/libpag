@@ -16,7 +16,7 @@ GLRestorer::GLRestorer(const tgfx::GLFunctions* gl) : gl(gl) {
   gl->getIntegerv(GL_TEXTURE_BINDING_2D, &textureID);
   gl->getIntegerv(GL_ARRAY_BUFFER_BINDING, &arrayBuffer);
   gl->getIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &elementArrayBuffer);
-  if (gl->bindVertexArray) {
+  if (gl->bindVertexArray != nullptr) {
     gl->getIntegerv(GL_VERTEX_ARRAY_BINDING, &vertexArray);
   }
   gl->bindBuffer(GL_ARRAY_BUFFER, 0);
