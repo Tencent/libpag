@@ -66,12 +66,6 @@ bool GLDevice::onLockContext() {
     onClearCurrent();
     return false;
   }
-  auto glContext = static_cast<GLContext*>(context);
-  if (isAdopted) {
-    glContext->glState->reset();
-    // Clear externally generated GLError.
-    CheckGLError(glContext->interface.get());
-  }
   return true;
 }
 

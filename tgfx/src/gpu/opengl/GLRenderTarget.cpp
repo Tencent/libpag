@@ -19,7 +19,6 @@
 #include "gpu/opengl/GLRenderTarget.h"
 #include "core/Bitmap.h"
 #include "gpu/opengl/GLContext.h"
-#include "gpu/opengl/GLState.h"
 #include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {

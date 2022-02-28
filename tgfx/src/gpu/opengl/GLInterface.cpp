@@ -17,13 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLInterface.h"
-
 #include <mutex>
 #include <unordered_map>
 #include "GLAssembledGLESInterface.h"
 #include "GLAssembledGLInterface.h"
 #include "GLAssembledWebGLInterface.h"
-#include "GLState.h"
 #include "GLUtil.h"
 
 namespace tgfx {
@@ -43,7 +41,7 @@ static int GetGLVersion(const GLProcGetter* getter) {
 }
 
 const GLInterface* GLInterface::Get(const Context* context) {
-  return context ? static_cast<const GLContext*>(context)->interface.get() : nullptr;
+  return context ? static_cast<const GLContext*>(context)->interface : nullptr;
 }
 
 const GLInterface* GLInterface::GetNative() {
@@ -62,49 +60,6 @@ const GLInterface* GLInterface::GetNative() {
   }
   glInterfaceMap[version] = MakeNativeInterface(getter.get());
   return glInterfaceMap[version].get();
-}
-
-namespace {
-template <typename R, typename... Args>
-GLFunction<R GL_FUNCTION_TYPE(Args...)> Bind(GLState* interface, R (GLState::*member)(Args...)) {
-  return [interface, member](Args... a) -> R { return (interface->*member)(a...); };
-}
-}  // anonymous namespace
-
-#ifdef TGFX_BUILD_FOR_WEB
-#define Hook(X) state
-#else
-#define Hook(X) functions->X = Bind(state, &GLState::X)
-#endif
-
-std::unique_ptr<const GLInterface> GLInterface::HookWithState(const GLInterface* gl,
-                                                              GLState* state) {
-  auto functions = std::make_shared<GLFunctions>();
-  *functions = *gl->functions;
-  Hook(activeTexture);
-  Hook(blendEquation);
-  Hook(blendFunc);
-  Hook(bindFramebuffer);
-  Hook(bindRenderbuffer);
-  Hook(bindBuffer);
-  Hook(bindTexture);
-  Hook(disable);
-  Hook(disableVertexAttribArray);
-  Hook(enable);
-  Hook(enableVertexAttribArray);
-  Hook(pixelStorei);
-  Hook(scissor);
-  Hook(viewport);
-  Hook(useProgram);
-  Hook(vertexAttribPointer);
-  Hook(depthMask);
-  if (gl->caps->vertexArrayObjectSupport) {
-    Hook(bindVertexArray);
-  }
-  auto interface = new GLInterface();
-  interface->functions = functions;
-  interface->caps = gl->caps;
-  return std::unique_ptr<const GLInterface>(interface);
 }
 
 std::unique_ptr<const GLInterface> GLInterface::MakeNativeInterface(const GLProcGetter* getter) {

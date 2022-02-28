@@ -36,7 +36,6 @@ class GLInterface {
  private:
   static const GLInterface* GetNative();
   static std::unique_ptr<const GLInterface> MakeNativeInterface(const GLProcGetter* getter);
-  static std::unique_ptr<const GLInterface> HookWithState(const GLInterface* gl, GLState* state);
 
   friend class GLDevice;
   friend class GLContext;

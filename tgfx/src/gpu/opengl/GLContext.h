@@ -19,7 +19,6 @@
 #pragma once
 
 #include "GLInterface.h"
-#include "GLState.h"
 #include "gpu/Context.h"
 
 namespace tgfx {
@@ -42,8 +41,7 @@ class GLContext : public Context {
   }
 
  private:
-  std::unique_ptr<const GLInterface> interface = nullptr;
-  std::unique_ptr<GLState> glState = nullptr;
+  const GLInterface* interface = nullptr;
 
   friend class GLDevice;
   friend class GLInterface;
