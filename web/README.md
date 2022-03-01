@@ -146,3 +146,17 @@ Create a new profile, and use the following **CMake options**（find them under 
 ```
 CMAKE_TOOLCHAIN_FILE=path/to/emscripten/emscripten/version/cmake/Modules/Platform/Emscripten.cmake
 ```
+
+### Test
+
+Start test HTTP server.
+
+```bash
+$ npm run server
+```
+
+Start cypress test.
+
+```bash
+$ npm run test
+```

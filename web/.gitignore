@@ -11,4 +11,5 @@ dist
 api-docs
 *.js.map
 demo/index.js
-cypress/downloads/*.png
+cypress/videos
+cypress/screenshots

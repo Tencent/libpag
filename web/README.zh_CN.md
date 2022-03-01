@@ -155,3 +155,17 @@ $ ./build.sh
 ```
 CMAKE_TOOLCHAIN_FILE=path/to/emscripten/emscripten/version/cmake/Modules/Platform/Emscripten.cmake
 ```
+
+### 测试流程
+
+启动测试 HTTP 服务
+
+```bash
+$ npm run server
+```
+
+启动 cypress 测试
+
+```bash
+$ npm run test
+```

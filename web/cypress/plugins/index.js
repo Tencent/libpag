@@ -14,10 +14,9 @@
 
 const fs = require('fs');
 const path = require('path');
-const pako = require('pako');
+const brotli = require('brotli');
 
-const downloadsDir = path.join(__dirname, '../downloads/');
-const imageHeader = 'data:image/png;base64,';
+const baselinesDir = path.join(__dirname, '../baselines/');
 
 /**
  * @type {Cypress.PluginConfig}
@@ -25,25 +24,18 @@ const imageHeader = 'data:image/png;base64,';
 // eslint-disable-next-line no-unused-vars
 module.exports = (on, config) => {
   on('task', {
-    readImage(filename) {
-      const filePath = path.join(downloadsDir, filename);
+    readData(filename) {
+      const filePath = path.join(baselinesDir, filename);
       if (fs.existsSync(filePath)) {
-        const compressed = fs.readFileSync(filePath);
-        console.log('readFileSync succ');
-        try {
-          const result = pako.inflate(compressed, { to: 'string' });
-          console.log('succ');
-          return result;
-        } catch (e) {
-          console.log(e);
-          return null;
-        }
+        const buffer = brotli.decompress(fs.readFileSync(filePath));
+        return buffer;
       }
       return null;
     },
-    saveImage({ filename, data }) {
-      const output = pako.deflate(data);
-      fs.writeFileSync(path.join(downloadsDir, filename), output);
+    saveData({ filename, data }) {
+      const buffer = Buffer.from(data);
+      const output = brotli.compress(buffer);
+      fs.writeFileSync(path.join(baselinesDir, filename), Buffer.from(output.buffer));
       return null;
     },
   });
