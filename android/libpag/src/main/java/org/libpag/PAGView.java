@@ -43,6 +43,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     private boolean mSaveVisibleState;
     private SparseArray<PAGText> textReplacementMap = new SparseArray<>();
     private SparseArray<PAGImage> imageReplacementMap = new SparseArray<>();
+    private boolean isSync = false;
 
     private static final Object g_HandlerLock = new Object();
     private static PAGViewHandler g_PAGViewHandler = null;
@@ -92,6 +93,10 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     }
 
     private static void NeedsUpdateView(PAGView pagView) {
+        if (pagView.isSync) {
+            pagView.updateView();
+            return;
+        }
         if (g_PAGViewHandler == null) {
             return;
         }
@@ -321,6 +326,15 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         }
         pagPlayer.setProgress(animatorProgress);
         flush();
+        PAGView.this.post(new Runnable() {
+            @Override
+            public void run() {
+                boolean opaque = PAGView.this.isOpaque();
+                // In order to call updateLayerAndInvalidate to update the TextureView.
+                PAGView.this.setOpaque(!opaque);
+                PAGView.this.setOpaque(opaque);
+            }
+        });
         if (!mPAGFlushListeners.isEmpty()) {
             PAGView.this.post(new Runnable() {
                 @Override
@@ -730,6 +744,17 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         value = Math.max(0, Math.min(value, 1));
         currentPlayTime = (long) (value * animator.getDuration());
         animator.setCurrentPlayTime(currentPlayTime);
+    }
+
+    /**
+     * Default is false.
+     */
+    public void setSync(boolean isSync) {
+        this.isSync = isSync;
+    }
+
+    public boolean isSync() {
+        return isSync;
     }
 
     /**
