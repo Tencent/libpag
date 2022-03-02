@@ -41,7 +41,7 @@ class EGLHardwareTexture : public GLTexture {
 
   ~EGLHardwareTexture() override;
 
-  void onRelease(Context* context) override;
+  void onReleaseGPU() override;
 };
 }  // namespace tgfx
 

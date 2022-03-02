@@ -128,6 +128,8 @@ class GLCaps : public Caps {
   bool textureSwizzleSupport = false;
   bool semaphoreSupport = false;
 
+  static const GLCaps* Get(Context* context);
+
   explicit GLCaps(const GLInfo& info);
 
   const TextureFormat& getTextureFormat(PixelFormat pixelFormat) const;

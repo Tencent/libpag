@@ -92,7 +92,7 @@ void CGLHardwareTexture::computeRecycleKey(BytesKey* recycleKey) const {
   ComputeRecycleKey(recycleKey, pixelBuffer);
 }
 
-void CGLHardwareTexture::onRelease(Context* context) {
+void CGLHardwareTexture::onReleaseGPU() {
   if (texture == nil) {
     return;
   }

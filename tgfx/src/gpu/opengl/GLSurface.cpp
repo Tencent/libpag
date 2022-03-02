@@ -22,26 +22,24 @@
 #include "gpu/opengl/GLSemaphore.h"
 
 namespace tgfx {
-std::shared_ptr<Surface> Surface::MakeFrom(Context* context,
-                                           std::shared_ptr<RenderTarget> renderTarget) {
-  if (renderTarget == nullptr || context == nullptr) {
+std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<RenderTarget> renderTarget) {
+  if (renderTarget == nullptr) {
     return nullptr;
   }
   auto glRT = std::static_pointer_cast<GLRenderTarget>(renderTarget);
-  return std::shared_ptr<GLSurface>(new GLSurface(context, std::move(glRT)));
+  return std::shared_ptr<GLSurface>(new GLSurface(std::move(glRT)));
 }
 
-std::shared_ptr<Surface> Surface::MakeFrom(Context* context, std::shared_ptr<Texture> texture,
-                                           int sampleCount) {
+std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<Texture> texture, int sampleCount) {
   if (texture == nullptr || texture->isYUV()) {
     return nullptr;
   }
   auto glTexture = std::static_pointer_cast<GLTexture>(texture);
-  auto renderTarget = GLRenderTarget::MakeFrom(context, glTexture.get(), sampleCount);
+  auto renderTarget = GLRenderTarget::MakeFrom(glTexture.get(), sampleCount);
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto surface = new GLSurface(context, renderTarget, glTexture);
+  auto surface = new GLSurface(renderTarget, glTexture);
   return std::shared_ptr<GLSurface>(surface);
 }
 
@@ -50,7 +48,7 @@ std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, 
   auto pixelFormat = alphaOnly ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
   std::shared_ptr<GLTexture> texture;
   if (alphaOnly) {
-    if (GLInterface::Get(context)->caps->textureRedSupport) {
+    if (GLCaps::Get(context)->textureRedSupport) {
       texture = std::static_pointer_cast<GLTexture>(Texture::MakeAlpha(context, width, height));
     }
   } else {
@@ -59,21 +57,23 @@ std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, 
   if (texture == nullptr) {
     return nullptr;
   }
-  auto gl = GLInterface::Get(context);
-  sampleCount = gl->caps->getSampleCount(sampleCount, pixelFormat);
-  auto renderTarget = GLRenderTarget::MakeFrom(context, texture.get(), sampleCount);
+  auto caps = GLCaps::Get(context);
+  sampleCount = caps->getSampleCount(sampleCount, pixelFormat);
+  auto renderTarget = GLRenderTarget::MakeFrom(texture.get(), sampleCount);
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto surface = new GLSurface(context, renderTarget, texture);
+  auto surface = new GLSurface(renderTarget, texture);
   // 对于内部创建的 RenderTarget 默认清屏。
   surface->getCanvas()->clear();
   return std::shared_ptr<Surface>(surface);
 }
 
-GLSurface::GLSurface(Context* context, std::shared_ptr<GLRenderTarget> renderTarget,
+GLSurface::GLSurface(std::shared_ptr<GLRenderTarget> renderTarget,
                      std::shared_ptr<GLTexture> texture)
-    : Surface(context), renderTarget(std::move(renderTarget)), texture(std::move(texture)) {
+    : Surface(renderTarget->getContext()),
+      renderTarget(std::move(renderTarget)),
+      texture(std::move(texture)) {
 }
 
 GLSurface::~GLSurface() {
@@ -92,12 +92,13 @@ bool GLSurface::wait(const Semaphore* semaphore) {
   if (glSync == nullptr) {
     return false;
   }
-  auto gl = GLInterface::Get(getContext());
-  if (!gl->caps->semaphoreSupport) {
+  auto caps = GLCaps::Get(context);
+  if (!caps->semaphoreSupport) {
     return false;
   }
-  gl->functions->waitSync(glSync, 0, GL_TIMEOUT_IGNORED);
-  gl->functions->deleteSync(glSync);
+  auto gl = GLFunctions::Get(context);
+  gl->waitSync(glSync, 0, GL_TIMEOUT_IGNORED);
+  gl->deleteSync(glSync);
   return true;
 }
 
@@ -108,15 +109,16 @@ bool GLSurface::flush(Semaphore* semaphore) {
     }
     return false;
   }
-  auto gl = GLInterface::Get(getContext());
-  if (!gl->caps->semaphoreSupport) {
+  auto caps = GLCaps::Get(context);
+  if (!caps->semaphoreSupport) {
     return false;
   }
-  auto* sync = gl->functions->fenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+  auto gl = GLFunctions::Get(context);
+  auto* sync = gl->fenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
   if (sync) {
     static_cast<GLSemaphore*>(semaphore)->glSync = sync;
     // If we inserted semaphores during the flush, we need to call glFlush.
-    gl->functions->flush();
+    gl->flush();
     return true;
   }
   return false;
@@ -126,7 +128,7 @@ std::shared_ptr<Texture> GLSurface::getTexture() const {
   if (canvas) {
     canvas->flush();
   }
-  renderTarget->resolve(getContext());
+  renderTarget->resolve();
   return texture;
 }
 
@@ -134,8 +136,7 @@ bool GLSurface::onReadPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX
   if (canvas) {
     canvas->flush();
   }
-  auto context = getContext();
-  renderTarget->resolve(context);
-  return renderTarget->readPixels(context, dstInfo, dstPixels, srcX, srcY);
+  renderTarget->resolve();
+  return renderTarget->readPixels(dstInfo, dstPixels, srcX, srcY);
 }
 }  // namespace tgfx

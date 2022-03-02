@@ -83,13 +83,14 @@ std::string SinglePassBlurFilter::onBuildFragmentShader() {
   return BLUR_FRAGMENT_SHADER;
 }
 
-void SinglePassBlurFilter::onPrepareProgram(const tgfx::GLInterface* gl, unsigned int program) {
-  radiusHandle = gl->functions->getUniformLocation(program, "uRadius");
-  levelHandle = gl->functions->getUniformLocation(program, "uLevel");
-  repeatEdgeHandle = gl->functions->getUniformLocation(program, "uRepeatEdge");
-  colorHandle = gl->functions->getUniformLocation(program, "uColor");
-  colorValidHandle = gl->functions->getUniformLocation(program, "uColorValid");
-  alphaHandle = gl->functions->getUniformLocation(program, "uAlpha");
+void SinglePassBlurFilter::onPrepareProgram(tgfx::Context* context, unsigned int program) {
+  auto gl = tgfx::GLFunctions::Get(context);
+  radiusHandle = gl->getUniformLocation(program, "uRadius");
+  levelHandle = gl->getUniformLocation(program, "uLevel");
+  repeatEdgeHandle = gl->getUniformLocation(program, "uRepeatEdge");
+  colorHandle = gl->getUniformLocation(program, "uColor");
+  colorValidHandle = gl->getUniformLocation(program, "uColorValid");
+  alphaHandle = gl->getUniformLocation(program, "uAlpha");
 }
 
 void SinglePassBlurFilter::updateParams(float blurrinessValue, float blurAlphaValue,
@@ -121,25 +122,24 @@ void SinglePassBlurFilter::disableBlurColor() {
   color = tgfx::Color::Black();
 }
 
-void SinglePassBlurFilter::onUpdateParams(const tgfx::GLInterface* gl,
-                                          const tgfx::Rect& contentBounds,
+void SinglePassBlurFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
                                           const tgfx::Point& filterScale) {
   auto scale = direction == BlurDirection::Horizontal ? filterScale.x : filterScale.y;
 
   auto blurValue = std::min(blurriness * scale, BLUR_LIMIT_BLURRINESS);
   auto blurRadius = blurValue / BLUR_LIMIT_BLURRINESS * (maxRadius - 1.0) + 1.0;
   auto blurLevel = blurValue / BLUR_LIMIT_BLURRINESS * (maxLevel - 1.0) + 1.0;
-
-  gl->functions->uniform1f(radiusHandle, blurRadius);
-  gl->functions->uniform2f(levelHandle,
-                           blurLevel / static_cast<float>(contentBounds.width()) *
-                               (direction == BlurDirection::Horizontal),
-                           blurLevel / static_cast<float>(contentBounds.height()) *
-                               (direction == BlurDirection::Vertical));
-  gl->functions->uniform1f(repeatEdgeHandle, repeatEdge);
-  gl->functions->uniform3f(colorHandle, color.red, color.green, color.blue);
-  gl->functions->uniform1f(colorValidHandle, isColorValid);
-  gl->functions->uniform1f(alphaHandle, alpha);
+  auto gl = tgfx::GLFunctions::Get(context);
+  gl->uniform1f(radiusHandle, blurRadius);
+  gl->uniform2f(levelHandle,
+                blurLevel / static_cast<float>(contentBounds.width()) *
+                    (direction == BlurDirection::Horizontal),
+                blurLevel / static_cast<float>(contentBounds.height()) *
+                    (direction == BlurDirection::Vertical));
+  gl->uniform1f(repeatEdgeHandle, repeatEdge);
+  gl->uniform3f(colorHandle, color.red, color.green, color.blue);
+  gl->uniform1f(colorValidHandle, isColorValid);
+  gl->uniform1f(alphaHandle, alpha);
 }
 
 std::vector<tgfx::Point> SinglePassBlurFilter::computeVertices(const tgfx::Rect& inputBounds,

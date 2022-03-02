@@ -40,6 +40,4 @@ tgfx::Point ToGLVertexPoint(const FilterTarget* target, const FilterSource* sour
                             const tgfx::Rect& contentBounds, const tgfx::Point& contentPoint);
 
 void PreConcatMatrix(FilterTarget* target, const tgfx::Matrix& matrix);
-
-unsigned GetTextureID(const tgfx::Texture* texture);
 }  // namespace pag

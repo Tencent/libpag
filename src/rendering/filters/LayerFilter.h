@@ -38,11 +38,10 @@ class FilterProgram : public tgfx::Resource {
   unsigned int vertexArray = 0;
   unsigned int vertexBuffer = 0;
 
- protected:
-  void onRelease(tgfx::Context* context) override;
-
  private:
   FilterProgram() = default;
+
+  void onReleaseGPU() override;
 };
 
 class LayerFilter : public Filter {
@@ -90,7 +89,7 @@ class LayerFilter : public Filter {
 
   virtual std::string onBuildFragmentShader();
 
-  virtual void onPrepareProgram(const tgfx::GLInterface* gl, unsigned program);
+  virtual void onPrepareProgram(tgfx::Context* context, unsigned program);
 
   /**
    * filter的给shader上传数据接口
@@ -99,7 +98,7 @@ class LayerFilter : public Filter {
    * bounds来计算shader中的参数，比如：bulge、MotionTile
    * @param filterScale : 滤镜效果的scale
    */
-  virtual void onUpdateParams(const tgfx::GLInterface* gl, const tgfx::Rect& contentBounds,
+  virtual void onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
                               const tgfx::Point& filterScale);
 
   /**
@@ -115,7 +114,7 @@ class LayerFilter : public Filter {
                                                    const tgfx::Rect& transformedBounds,
                                                    const tgfx::Point& filterScale);
 
-  virtual void bindVertices(const tgfx::GLInterface* gl, const FilterSource* source,
+  virtual void bindVertices(tgfx::Context* context, const FilterSource* source,
                             const FilterTarget* target, const std::vector<tgfx::Point>& points);
 
  private:

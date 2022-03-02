@@ -40,7 +40,7 @@ class GLBuffer : public Resource {
   GLBuffer(const void* uniqueKey, size_t length) : uniqueKey(uniqueKey), _length(length) {
   }
 
-  void onRelease(Context* context) override;
+  void onReleaseGPU() override;
 
   const void* uniqueKey = nullptr;
   size_t _length = 0;

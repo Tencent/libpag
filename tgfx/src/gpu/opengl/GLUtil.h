@@ -20,7 +20,6 @@
 
 #include <array>
 #include <string>
-#include "GLInterface.h"
 #include "core/ImageOrigin.h"
 #include "core/Matrix.h"
 #include "gpu/opengl/GLContext.h"
@@ -39,19 +38,15 @@ struct GLVersion {
 
 GLVersion GetGLVersion(const char* versionString);
 
-unsigned CreateGLProgram(const GLInterface* gl, const std::string& vertex,
-                         const std::string& fragment);
+unsigned CreateGLProgram(Context* context, const std::string& vertex, const std::string& fragment);
 
-unsigned LoadGLShader(const GLInterface* gl, unsigned shaderType, const std::string& source);
+unsigned LoadGLShader(Context* context, unsigned shaderType, const std::string& source);
 
-bool CheckGLError(const GLInterface* gl);
+bool CheckGLError(Context* context);
 
-bool CreateGLTexture(const GLInterface* gl, int width, int height, GLSampler* texture);
+bool CreateGLTexture(Context* context, int width, int height, GLSampler* texture);
 
-void ActiveGLTexture(const GLInterface* gl, unsigned textureUnit, unsigned target,
-                     unsigned textureID, PixelFormat pixelFormat = PixelFormat::RGBA_8888);
-
-void SubmitGLTexture(const GLInterface* gl, const GLSampler& sampler, int width, int height,
+void SubmitGLTexture(Context* context, const GLSampler& sampler, int width, int height,
                      size_t rowBytes, int bytesPerPixel, void* pixels);
 
 std::array<float, 9> ToGLMatrix(const Matrix& matrix);

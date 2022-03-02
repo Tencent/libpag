@@ -51,155 +51,109 @@ GLVersion GetGLVersion(const char* versionString) {
   return {};
 }
 
-bool CreateGLTexture(const GLInterface* gl, int width, int height, GLSampler* texture) {
+bool CreateGLTexture(Context* context, int width, int height, GLSampler* texture) {
   texture->target = GL_TEXTURE_2D;
   texture->format = PixelFormat::RGBA_8888;
-  gl->functions->genTextures(1, &texture->id);
+  auto gl = GLFunctions::Get(context);
+  gl->genTextures(1, &texture->id);
   if (texture->id <= 0) {
     return false;
   }
-  gl->functions->bindTexture(texture->target, texture->id);
-  gl->functions->texParameteri(texture->target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  gl->functions->texParameteri(texture->target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  gl->functions->texParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  gl->functions->texParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  gl->functions->texImage2D(texture->target, 0, GL_RGBA, width, height, 0, GL_RGBA,
-                            GL_UNSIGNED_BYTE, nullptr);
-  gl->functions->bindTexture(texture->target, 0);
+  gl->bindTexture(texture->target, texture->id);
+  gl->texParameteri(texture->target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  gl->texParameteri(texture->target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  gl->texParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  gl->texParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  gl->texImage2D(texture->target, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+  gl->bindTexture(texture->target, 0);
   return true;
 }
 
-static std::array<unsigned, 4> GetGLSwizzleValues(const Swizzle& swizzle) {
-  unsigned glValues[4];
-  for (int i = 0; i < 4; ++i) {
-    switch (swizzle[i]) {
-      case 'r':
-        glValues[i] = GL_RED;
-        break;
-      case 'g':
-        glValues[i] = GL_GREEN;
-        break;
-      case 'b':
-        glValues[i] = GL_BLUE;
-        break;
-      case 'a':
-        glValues[i] = GL_ALPHA;
-        break;
-      case '1':
-        glValues[i] = GL_ONE;
-        break;
-      default:
-        LOGE("Unsupported component");
-    }
-  }
-  return {glValues[0], glValues[1], glValues[2], glValues[3]};
-}
-
-void ActiveGLTexture(const GLInterface* gl, unsigned textureUnit, unsigned target,
-                     unsigned textureID, PixelFormat pixelFormat) {
-  gl->functions->activeTexture(textureUnit);
-  gl->functions->bindTexture(target, textureID);
-  gl->functions->texParameteri(target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  gl->functions->texParameteri(target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  gl->functions->texParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  gl->functions->texParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  if (gl->caps->textureSwizzleSupport) {
-    const auto& swizzle = gl->caps->getSwizzle(pixelFormat);
-    auto glValues = GetGLSwizzleValues(swizzle);
-    if (gl->caps->standard == GLStandard::GL) {
-      gl->functions->texParameteriv(target, GL_TEXTURE_SWIZZLE_RGBA,
-                                    reinterpret_cast<const int*>(&glValues[0]));
-    } else if (gl->caps->standard == GLStandard::GLES) {
-      // ES3 added swizzle support but not GL_TEXTURE_SWIZZLE_RGBA.
-      gl->functions->texParameteri(target, GL_TEXTURE_SWIZZLE_R, static_cast<int>(glValues[0]));
-      gl->functions->texParameteri(target, GL_TEXTURE_SWIZZLE_G, static_cast<int>(glValues[1]));
-      gl->functions->texParameteri(target, GL_TEXTURE_SWIZZLE_B, static_cast<int>(glValues[2]));
-      gl->functions->texParameteri(target, GL_TEXTURE_SWIZZLE_A, static_cast<int>(glValues[3]));
-    }
-  }
-}
-
-void SubmitGLTexture(const GLInterface* gl, const GLSampler& sampler, int width, int height,
+void SubmitGLTexture(Context* context, const GLSampler& sampler, int width, int height,
                      size_t rowBytes, int bytesPerPixel, void* pixels) {
   if (pixels == nullptr || rowBytes == 0) {
     return;
   }
-  const auto& format = gl->caps->getTextureFormat(sampler.format);
-  gl->functions->bindTexture(sampler.target, sampler.id);
-  gl->functions->pixelStorei(GL_UNPACK_ALIGNMENT, bytesPerPixel);
-  if (gl->caps->unpackRowLengthSupport) {
+  auto gl = GLFunctions::Get(context);
+  auto caps = GLCaps::Get(context);
+  const auto& format = caps->getTextureFormat(sampler.format);
+  gl->bindTexture(sampler.target, sampler.id);
+  gl->pixelStorei(GL_UNPACK_ALIGNMENT, bytesPerPixel);
+  if (caps->unpackRowLengthSupport) {
     // the number of pixels, not bytes
-    gl->functions->pixelStorei(GL_UNPACK_ROW_LENGTH, static_cast<int>(rowBytes / bytesPerPixel));
-    gl->functions->texImage2D(sampler.target, 0, static_cast<int>(format.internalFormatTexImage),
-                              width, height, 0, format.externalFormat, GL_UNSIGNED_BYTE, pixels);
-    gl->functions->pixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+    gl->pixelStorei(GL_UNPACK_ROW_LENGTH, static_cast<int>(rowBytes / bytesPerPixel));
+    gl->texImage2D(sampler.target, 0, static_cast<int>(format.internalFormatTexImage), width,
+                   height, 0, format.externalFormat, GL_UNSIGNED_BYTE, pixels);
+    gl->pixelStorei(GL_UNPACK_ROW_LENGTH, 0);
   } else {
     if (static_cast<size_t>(width) * bytesPerPixel == rowBytes) {
-      gl->functions->texImage2D(sampler.target, 0, static_cast<int>(format.internalFormatTexImage),
-                                width, height, 0, format.externalFormat, GL_UNSIGNED_BYTE, pixels);
+      gl->texImage2D(sampler.target, 0, static_cast<int>(format.internalFormatTexImage), width,
+                     height, 0, format.externalFormat, GL_UNSIGNED_BYTE, pixels);
     } else {
-      gl->functions->texImage2D(sampler.target, 0, static_cast<int>(format.internalFormatTexImage),
-                                width, height, 0, format.externalFormat, GL_UNSIGNED_BYTE, nullptr);
+      gl->texImage2D(sampler.target, 0, static_cast<int>(format.internalFormatTexImage), width,
+                     height, 0, format.externalFormat, GL_UNSIGNED_BYTE, nullptr);
       auto data = reinterpret_cast<uint8_t*>(pixels);
       for (int row = 0; row < height; ++row) {
-        gl->functions->texSubImage2D(sampler.target, 0, 0, row, width, 1, format.externalFormat,
-                                     GL_UNSIGNED_BYTE, data + (row * rowBytes));
+        gl->texSubImage2D(sampler.target, 0, 0, row, width, 1, format.externalFormat,
+                          GL_UNSIGNED_BYTE, data + (row * rowBytes));
       }
     }
   }
 }
 
-unsigned CreateGLProgram(const GLInterface* gl, const std::string& vertex,
-                         const std::string& fragment) {
-  auto vertexShader = LoadGLShader(gl, GL_VERTEX_SHADER, vertex);
+unsigned CreateGLProgram(Context* context, const std::string& vertex, const std::string& fragment) {
+  auto vertexShader = LoadGLShader(context, GL_VERTEX_SHADER, vertex);
   if (vertexShader == 0) {
     return 0;
   }
-  auto fragmentShader = LoadGLShader(gl, GL_FRAGMENT_SHADER, fragment);
+  auto fragmentShader = LoadGLShader(context, GL_FRAGMENT_SHADER, fragment);
   if (fragmentShader == 0) {
     return 0;
   }
-  auto programHandle = gl->functions->createProgram();
-  gl->functions->attachShader(programHandle, vertexShader);
-  gl->functions->attachShader(programHandle, fragmentShader);
-  gl->functions->linkProgram(programHandle);
+  auto gl = GLFunctions::Get(context);
+  auto programHandle = gl->createProgram();
+  gl->attachShader(programHandle, vertexShader);
+  gl->attachShader(programHandle, fragmentShader);
+  gl->linkProgram(programHandle);
   int success;
-  gl->functions->getProgramiv(programHandle, GL_LINK_STATUS, &success);
+  gl->getProgramiv(programHandle, GL_LINK_STATUS, &success);
   if (!success) {
     char infoLog[512];
-    gl->functions->getProgramInfoLog(programHandle, 512, nullptr, infoLog);
-    gl->functions->deleteProgram(programHandle);
+    gl->getProgramInfoLog(programHandle, 512, nullptr, infoLog);
+    gl->deleteProgram(programHandle);
   }
-  gl->functions->deleteShader(vertexShader);
-  gl->functions->deleteShader(fragmentShader);
+  gl->deleteShader(vertexShader);
+  gl->deleteShader(fragmentShader);
   return programHandle;
 }
 
-unsigned LoadGLShader(const GLInterface* gl, unsigned shaderType, const std::string& source) {
-  auto shader = gl->functions->createShader(shaderType);
+unsigned LoadGLShader(Context* context, unsigned shaderType, const std::string& source) {
+  auto gl = GLFunctions::Get(context);
+  auto shader = gl->createShader(shaderType);
   const char* files[] = {source.c_str()};
-  gl->functions->shaderSource(shader, 1, files, nullptr);
-  gl->functions->compileShader(shader);
+  gl->shaderSource(shader, 1, files, nullptr);
+  gl->compileShader(shader);
   int success;
-  gl->functions->getShaderiv(shader, GL_COMPILE_STATUS, &success);
+  gl->getShaderiv(shader, GL_COMPILE_STATUS, &success);
   if (!success) {
     char infoLog[512];
-    gl->functions->getShaderInfoLog(shader, 512, nullptr, infoLog);
+    gl->getShaderInfoLog(shader, 512, nullptr, infoLog);
     LOGE("Could not compile shader: %d %s", shaderType, infoLog);
-    gl->functions->deleteShader(shader);
+    gl->deleteShader(shader);
     shader = 0;
   }
   return shader;
 }
 
-bool CheckGLError(const GLInterface* gl) {
+bool CheckGLError(Context* context) {
 #ifdef TGFX_BUILD_FOR_WEB
-  USE(gl);
+  USE(context);
   return true;
 #else
+  auto gl = GLFunctions::Get(context);
   bool success = true;
   unsigned errorCode;
-  while ((errorCode = gl->functions->getError()) != GL_NO_ERROR) {
+  while ((errorCode = gl->getError()) != GL_NO_ERROR) {
     success = false;
     LOGE("glCheckError: %d", errorCode);
   }

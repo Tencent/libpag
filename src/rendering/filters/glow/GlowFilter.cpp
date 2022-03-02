@@ -93,9 +93,8 @@ void GlowFilter::draw(tgfx::Context* context, const FilterSource* source,
   if (!checkBuffer(context, blurWidth, blurHeight)) {
     return;
   }
-  auto gl = tgfx::GLInterface::Get(context);
-  blurFilterBufferH->clearColor(gl);
-  blurFilterBufferV->clearColor(gl);
+  blurFilterBufferH->clearColor();
+  blurFilterBufferV->clearColor();
 
   auto targetH = blurFilterBufferH->toFilterTarget(tgfx::Matrix::I());
   blurFilterH->updateOffset(1.0f / blurWidth);
@@ -106,7 +105,7 @@ void GlowFilter::draw(tgfx::Context* context, const FilterSource* source,
   blurFilterV->updateOffset(1.0f / blurHeight);
   blurFilterV->draw(context, sourceV.get(), targetV.get());
 
-  targetFilter->updateTexture(blurFilterBufferV->getTexture().id);
+  targetFilter->updateTexture(blurFilterBufferV->getTexture());
   targetFilter->draw(context, source, target);
 }
 }  // namespace pag

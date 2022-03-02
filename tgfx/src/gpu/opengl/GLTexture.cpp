@@ -29,16 +29,15 @@ class GLBackendTexture : public GLTexture {
     sampler = std::move(textureSampler);
   }
 
- protected:
-  void onRelease(Context* context) override {
-    if (adopted) {
-      auto gl = GLInterface::Get(context);
-      gl->functions->deleteTextures(1, &sampler.id);
-    }
-  }
-
  private:
   bool adopted = false;
+
+  void onReleaseGPU() override {
+    if (adopted) {
+      auto gl = GLFunctions::Get(context);
+      gl->deleteTextures(1, &sampler.id);
+    }
+  }
 };
 
 std::shared_ptr<GLTexture> GLTexture::MakeFrom(Context* context, const GLSampler& sampler,
@@ -78,9 +77,10 @@ class GLAlphaTexture : public GLTexture {
     ComputeRecycleKey(recycleKey, width(), height());
   }
 
-  void onRelease(Context* context) override {
-    auto gl = GLInterface::Get(context);
-    gl->functions->deleteTextures(1, &sampler.id);
+ private:
+  void onReleaseGPU() override {
+    auto gl = GLFunctions::Get(context);
+    gl->deleteTextures(1, &sampler.id);
   }
 };
 
@@ -104,29 +104,29 @@ class GLRGBATexture : public GLTexture {
     ComputeRecycleKey(recycleKey, width(), height());
   }
 
-  void onRelease(Context* context) override {
-    auto gl = GLInterface::Get(context);
-    gl->functions->deleteTextures(1, &sampler.id);
+ private:
+  void onReleaseGPU() override {
+    auto gl = GLFunctions::Get(context);
+    gl->deleteTextures(1, &sampler.id);
   }
 };
 
-static bool CheckMaxTextureSize(const GLInterface* gl, int width, int height) {
-  auto maxTextureSize = gl->caps->maxTextureSize;
+static bool CheckMaxTextureSize(const GLCaps* caps, int width, int height) {
+  auto maxTextureSize = caps->maxTextureSize;
   return width <= maxTextureSize && height <= maxTextureSize;
 }
 
 std::shared_ptr<Texture> Texture::Make(Context* context, int width, int height, void* pixels,
                                        size_t rowBytes, ImageOrigin origin, bool alphaOnly) {
-  auto gl = GLInterface::Get(context);
   // Clear the previously generated GLError, causing the subsequent CheckGLError to return an
   // incorrect result.
-  CheckGLError(gl);
-
-  if (!CheckMaxTextureSize(gl, width, height)) {
+  CheckGLError(context);
+  auto caps = GLCaps::Get(context);
+  if (!CheckMaxTextureSize(caps, width, height)) {
     return nullptr;
   }
   PixelFormat pixelFormat = alphaOnly ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
-  const auto& format = gl->caps->getTextureFormat(pixelFormat);
+  const auto& format = caps->getTextureFormat(pixelFormat);
   BytesKey recycleKey = {};
   if (alphaOnly) {
     GLAlphaTexture::ComputeRecycleKey(&recycleKey, width, height);
@@ -143,21 +143,22 @@ std::shared_ptr<Texture> Texture::Make(Context* context, int width, int height, 
   } else {
     sampler.target = GL_TEXTURE_2D;
     sampler.format = pixelFormat;
-    gl->functions->genTextures(1, &(sampler.id));
+    auto gl = GLFunctions::Get(context);
+    gl->genTextures(1, &(sampler.id));
     if (sampler.id == 0) {
       return nullptr;
     }
-    gl->functions->bindTexture(sampler.target, sampler.id);
-    gl->functions->texParameteri(sampler.target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    gl->functions->texParameteri(sampler.target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    gl->functions->texParameteri(sampler.target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    gl->functions->texParameteri(sampler.target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    gl->bindTexture(sampler.target, sampler.id);
+    gl->texParameteri(sampler.target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    gl->texParameteri(sampler.target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    gl->texParameteri(sampler.target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    gl->texParameteri(sampler.target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     if (pixels == nullptr) {
-      gl->functions->texImage2D(sampler.target, 0, static_cast<int>(format.internalFormatTexImage),
-                                width, height, 0, format.externalFormat, GL_UNSIGNED_BYTE, nullptr);
+      gl->texImage2D(sampler.target, 0, static_cast<int>(format.internalFormatTexImage), width,
+                     height, 0, format.externalFormat, GL_UNSIGNED_BYTE, nullptr);
     }
-    if (!CheckGLError(gl)) {
-      gl->functions->deleteTextures(1, &sampler.id);
+    if (!CheckGLError(context)) {
+      gl->deleteTextures(1, &sampler.id);
       return nullptr;
     }
     if (alphaOnly) {
@@ -168,7 +169,7 @@ std::shared_ptr<Texture> Texture::Make(Context* context, int width, int height, 
   }
   if (pixels != nullptr) {
     int bytesPerPixel = alphaOnly ? 1 : 4;
-    SubmitGLTexture(gl, sampler, width, height, rowBytes, bytesPerPixel, pixels);
+    SubmitGLTexture(context, sampler, width, height, rowBytes, bytesPerPixel, pixels);
   }
   return texture;
 }

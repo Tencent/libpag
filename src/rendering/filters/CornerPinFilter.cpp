@@ -125,7 +125,7 @@ std::vector<tgfx::Point> CornerPinFilter::computeVertices(const tgfx::Rect& cont
   return vertices;
 }
 
-void CornerPinFilter::bindVertices(const tgfx::GLInterface* gl, const FilterSource* source,
+void CornerPinFilter::bindVertices(tgfx::Context* context, const FilterSource* source,
                                    const FilterTarget* target,
                                    const std::vector<tgfx::Point>& points) {
   std::vector<float> vertices = {};
@@ -139,20 +139,19 @@ void CornerPinFilter::bindVertices(const tgfx::GLInterface* gl, const FilterSour
     vertices.push_back(texturePoint.y * vertexQs[j]);
     vertices.push_back(vertexQs[j]);
   }
-
+  auto gl = tgfx::GLFunctions::Get(context);
   if (filterProgram->vertexArray > 0) {
-    gl->functions->bindVertexArray(filterProgram->vertexArray);
+    gl->bindVertexArray(filterProgram->vertexArray);
   }
-  gl->functions->bindBuffer(GL_ARRAY_BUFFER, filterProgram->vertexBuffer);
-  gl->functions->bufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), &vertices[0],
-                            GL_STREAM_DRAW);
-  gl->functions->vertexAttribPointer(static_cast<unsigned>(positionHandle), 2, GL_FLOAT, GL_FALSE,
-                                     5 * sizeof(float), static_cast<void*>(0));
-  gl->functions->enableVertexAttribArray(static_cast<unsigned>(positionHandle));
+  gl->bindBuffer(GL_ARRAY_BUFFER, filterProgram->vertexBuffer);
+  gl->bufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), &vertices[0], GL_STREAM_DRAW);
+  gl->vertexAttribPointer(static_cast<unsigned>(positionHandle), 2, GL_FLOAT, GL_FALSE,
+                          5 * sizeof(float), static_cast<void*>(0));
+  gl->enableVertexAttribArray(static_cast<unsigned>(positionHandle));
 
-  gl->functions->vertexAttribPointer(textureCoordHandle, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
-                                     reinterpret_cast<void*>(2 * sizeof(float)));
-  gl->functions->enableVertexAttribArray(textureCoordHandle);
-  gl->functions->bindBuffer(GL_ARRAY_BUFFER, 0);
+  gl->vertexAttribPointer(textureCoordHandle, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float),
+                          reinterpret_cast<void*>(2 * sizeof(float)));
+  gl->enableVertexAttribArray(textureCoordHandle);
+  gl->bindBuffer(GL_ARRAY_BUFFER, 0);
 }
 }  // namespace pag

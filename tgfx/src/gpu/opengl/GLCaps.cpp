@@ -159,6 +159,10 @@ static bool IsMediumFloatFp32(const GLInfo& ctxInfo) {
   return true;
 }
 
+const GLCaps* GLCaps::Get(Context* context) {
+  return context ? static_cast<const GLCaps*>(context->caps()) : nullptr;
+}
+
 GLCaps::GLCaps(const GLInfo& info) {
   standard = info.standard;
   version = info.version;

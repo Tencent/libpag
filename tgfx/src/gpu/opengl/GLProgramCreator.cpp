@@ -32,7 +32,6 @@ void GLProgramCreator::computeUniqueKey(Context* context, BytesKey* bytesKey) co
 }
 
 std::unique_ptr<Program> GLProgramCreator::createProgram(Context* context) const {
-  auto gl = GLInterface::Get(context);
-  return GLProgramBuilder::CreateProgram(gl, geometryProcessor, pipeline);
+  return GLProgramBuilder::CreateProgram(context, geometryProcessor, pipeline);
 }
 }  // namespace tgfx

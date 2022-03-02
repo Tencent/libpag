@@ -224,13 +224,12 @@ PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
   ASSERT_TRUE(result);
   CHECK_PIXELS(AlphaRectInfo, pixels, "Surface_alpha_to_alpha_100_-100");
 
-  auto gl = GLInterface::Get(context);
   tgfx::GLSampler textureInfo = {};
-  result = CreateGLTexture(gl, width, height, &textureInfo);
+  result = CreateGLTexture(context, width, height, &textureInfo);
   ASSERT_TRUE(result);
   auto glTexture =
       GLTexture::MakeFrom(context, textureInfo, width, height, tgfx::ImageOrigin::BottomLeft);
-  surface = Surface::MakeFrom(context, glTexture);
+  surface = Surface::MakeFrom(glTexture);
   ASSERT_TRUE(surface != nullptr);
   canvas = surface->getCanvas();
   canvas->clear();
@@ -254,8 +253,8 @@ PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
   result = surface->readPixels(RGBARectInfo, pixels, 100, -100);
   ASSERT_TRUE(result);
   CHECK_PIXELS(RGBARectInfo, pixels, "Surface_BL_rgbA_to_rgbA_100_-100");
-
-  gl->functions->deleteTextures(1, &textureInfo.id);
+  auto gl = GLFunctions::Get(context);
+  gl->deleteTextures(1, &textureInfo.id);
   device->unlock();
 }
 

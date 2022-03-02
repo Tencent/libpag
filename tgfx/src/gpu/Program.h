@@ -23,22 +23,34 @@
 
 namespace tgfx {
 /**
- * The base class for GPU program. Overrides the onRelease() method to to free all GPU resources.
+ * The base class for GPU program. Overrides the onReleaseGPU() method to to free all GPU resources.
  * No backend API calls should be made during destructuring since there may be no GPU context which
  * is current on the calling thread.
  */
 class Program {
  public:
+  explicit Program(Context* context) : context(context) {
+  }
+
   virtual ~Program() = default;
 
- protected:
   /**
-   * Overridden to free GPU resources in the backend API.
+   * Retrieves the context associated with this Program.
    */
-  virtual void onRelease(Context* context) = 0;
+  Context* getContext() const {
+    return context;
+  }
+
+ protected:
+  Context* context = nullptr;
 
  private:
   BytesKey uniqueKey = {};
+
+  /**
+   * Overridden to free GPU resources in the backend API.
+   */
+  virtual void onReleaseGPU() = 0;
 
   friend class ProgramCache;
 };

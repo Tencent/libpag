@@ -59,19 +59,17 @@ static std::string SLTypeString(ShaderVar::Type t) {
 }
 
 std::unique_ptr<GLProgram> GLProgramBuilder::CreateProgram(
-    const GLInterface* gl, const GeometryProcessor* geometryProcessor, const Pipeline* pipeline) {
-  GLProgramBuilder builder(gl, geometryProcessor, pipeline);
+    Context* context, const GeometryProcessor* geometryProcessor, const Pipeline* pipeline) {
+  GLProgramBuilder builder(context, geometryProcessor, pipeline);
   if (!builder.emitAndInstallProcessors()) {
     return nullptr;
   }
   return builder.finalize();
 }
 
-GLProgramBuilder::GLProgramBuilder(const GLInterface* gl,
-                                   const GeometryProcessor* geometryProcessor,
+GLProgramBuilder::GLProgramBuilder(Context* context, const GeometryProcessor* geometryProcessor,
                                    const Pipeline* pipeline)
-    : ProgramBuilder(geometryProcessor, pipeline),
-      _gl(gl),
+    : ProgramBuilder(context, geometryProcessor, pipeline),
       _varyingHandler(this),
       _uniformHandler(this),
       _vertexBuilder(this),
@@ -112,7 +110,7 @@ std::unique_ptr<GLProgram> GLProgramBuilder::finalize() {
 
   auto vertex = vertexShaderBuilder()->shaderString();
   auto fragment = fragmentShaderBuilder()->shaderString();
-  auto programID = CreateGLProgram(_gl, vertex, fragment);
+  auto programID = CreateGLProgram(context, vertex, fragment);
   if (programID == 0) {
     return nullptr;
   }
@@ -123,13 +121,14 @@ std::unique_ptr<GLProgram> GLProgramBuilder::finalize() {
 }
 
 void GLProgramBuilder::computeCountsAndStrides(unsigned int programID) {
+  auto gl = GLFunctions::Get(context);
   vertexStride = 0;
   for (const auto* attr : geometryProcessor->vertexAttributes()) {
     GLProgram::Attribute attribute;
     attribute.gpuType = attr->gpuType();
     attribute.offset = vertexStride;
     vertexStride += static_cast<int>(attr->sizeAlign4());
-    attribute.location = _gl->functions->getAttribLocation(programID, attr->name().c_str());
+    attribute.location = gl->getAttribLocation(programID, attr->name().c_str());
     if (attribute.location >= 0) {
       attributes.push_back(attribute);
     }
@@ -141,7 +140,8 @@ void GLProgramBuilder::resolveProgramResourceLocations(unsigned programID) {
 }
 
 bool GLProgramBuilder::checkSamplerCounts() {
-  if (numFragmentSamplers > _gl->caps->maxFragmentSamplers) {
+  auto caps = GLCaps::Get(context);
+  if (numFragmentSamplers > caps->maxFragmentSamplers) {
     LOGE("Program would use too many fragment samplers.");
     return false;
   }
@@ -149,14 +149,15 @@ bool GLProgramBuilder::checkSamplerCounts() {
 }
 
 std::unique_ptr<GLProgram> GLProgramBuilder::createProgram(unsigned programID) {
-  auto program = new GLProgram(programID, _uniformHandler.uniforms, std::move(glGeometryProcessor),
-                               std::move(xferProcessor), std::move(fragmentProcessors), attributes,
-                               vertexStride);
-  program->setupSamplerUniforms(_gl, _uniformHandler.samplers);
+  auto program = new GLProgram(context, programID, _uniformHandler.uniforms,
+                               std::move(glGeometryProcessor), std::move(xferProcessor),
+                               std::move(fragmentProcessors), attributes, vertexStride);
+  program->setupSamplerUniforms(_uniformHandler.samplers);
   return std::unique_ptr<GLProgram>(program);
 }
 
 bool GLProgramBuilder::isDesktopGL() const {
-  return gl()->caps->standard == GLStandard::GL;
+  auto caps = GLCaps::Get(context);
+  return caps->standard == GLStandard::GL;
 }
 }  // namespace tgfx

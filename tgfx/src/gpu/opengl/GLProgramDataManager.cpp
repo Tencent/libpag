@@ -17,41 +17,39 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLProgramDataManager.h"
-#include "GLContext.h"
-#include "GLInterface.h"
 #include "GLUniformHandler.h"
 #include "GLUtil.h"
 
 namespace tgfx {
-GLProgramDataManager::GLProgramDataManager(const GLInterface* gl, const std::vector<int>* uniforms)
-    : gl(gl), uniforms(uniforms) {
+GLProgramDataManager::GLProgramDataManager(Context* context, const std::vector<int>* uniforms)
+    : gl(GLFunctions::Get(context)), uniforms(uniforms) {
 }
 
 void GLProgramDataManager::set1f(UniformHandle handle, float v0) const {
   auto location = uniforms->at(handle.toIndex());
   if (kUnusedUniform != location) {
-    gl->functions->uniform1f(location, v0);
+    gl->uniform1f(location, v0);
   }
 }
 
 void GLProgramDataManager::set2f(UniformHandle handle, float v0, float v1) const {
   auto location = uniforms->at(handle.toIndex());
   if (kUnusedUniform != location) {
-    gl->functions->uniform2f(location, v0, v1);
+    gl->uniform2f(location, v0, v1);
   }
 }
 
 void GLProgramDataManager::set4fv(UniformHandle handle, int arrayCount, const float* v) const {
   auto location = uniforms->at(handle.toIndex());
   if (kUnusedUniform != location) {
-    gl->functions->uniform4fv(location, arrayCount, v);
+    gl->uniform4fv(location, arrayCount, v);
   }
 }
 
 void GLProgramDataManager::setMatrix3f(UniformHandle handle, const float matrix[]) const {
   auto location = uniforms->at(handle.toIndex());
   if (kUnusedUniform != location) {
-    gl->functions->uniformMatrix3fv(location, 1, GL_FALSE, matrix);
+    gl->uniformMatrix3fv(location, 1, GL_FALSE, matrix);
   }
 }
 

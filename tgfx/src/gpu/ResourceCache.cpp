@@ -79,7 +79,7 @@ void ResourceCache::releaseAll(bool releaseGPU) {
   PurgeGuard guard(this);
   for (auto& resource : nonpurgeableResources) {
     if (releaseGPU) {
-      resource->onRelease(context);
+      resource->onReleaseGPU();
     }
     // 标记 Resource 已经被释放，等外部指针计数为 0 时可以直接 delete。
     resource->context = nullptr;
@@ -88,7 +88,7 @@ void ResourceCache::releaseAll(bool releaseGPU) {
   for (auto& item : recycledResources) {
     for (auto& resource : item.second) {
       if (releaseGPU) {
-        resource->onRelease(context);
+        resource->onReleaseGPU();
       }
       delete resource;
     }
@@ -106,7 +106,7 @@ void ResourceCache::purgeNotUsedIn(int64_t usNotUsed) {
       if (currentTime - resource->lastUsedTime < usNotUsed) {
         needToRecycle.push_back(resource);
       } else {
-        resource->onRelease(context);
+        resource->onReleaseGPU();
         delete resource;
       }
     }
@@ -182,7 +182,7 @@ void ResourceCache::removeResource(Resource* resource) {
     recycledResources[resource->recycleKey].push_back(resource);
   } else {
     purgingResource = true;
-    resource->onRelease(context);
+    resource->onReleaseGPU();
     purgingResource = false;
     delete resource;
   }

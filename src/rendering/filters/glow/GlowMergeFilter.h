@@ -26,14 +26,14 @@ class GlowMergeFilter : public LayerFilter {
   explicit GlowMergeFilter(Effect* effect);
   ~GlowMergeFilter() override = default;
 
-  void updateTexture(unsigned blurTexture);
+  void updateTexture(const tgfx::GLSampler& sampler);
 
  protected:
   std::string onBuildFragmentShader() override;
 
-  void onPrepareProgram(const tgfx::GLInterface* gl, unsigned program) override;
+  void onPrepareProgram(tgfx::Context* context, unsigned program) override;
 
-  void onUpdateParams(const tgfx::GLInterface* gl, const tgfx::Rect& contentBounds,
+  void onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
                       const tgfx::Point& filterScale) override;
 
  private:
@@ -42,6 +42,6 @@ class GlowMergeFilter : public LayerFilter {
   int inputTextureHandle = -1;
   int blurTextureHandle = -1;
   int progressHandle = -1;
-  unsigned blurTextureID = 0;
+  tgfx::GLSampler blurTexture = {};
 };
 }  // namespace pag

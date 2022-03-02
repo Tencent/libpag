@@ -60,7 +60,7 @@ class GLSurface : public Surface {
   std::shared_ptr<GLTexture> texture = nullptr;
   GLCanvas* canvas = nullptr;
 
-  explicit GLSurface(Context* context, std::shared_ptr<GLRenderTarget> renderTarget,
+  explicit GLSurface(std::shared_ptr<GLRenderTarget> renderTarget,
                      std::shared_ptr<GLTexture> texture = nullptr);
 
   friend class Surface;

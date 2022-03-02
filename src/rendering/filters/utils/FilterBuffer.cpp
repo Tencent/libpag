@@ -41,13 +41,13 @@ tgfx::GLSampler FilterBuffer::getTexture() const {
   return texture->glSampler();
 }
 
-void FilterBuffer::clearColor(const tgfx::GLInterface*) const {
+void FilterBuffer::clearColor() const {
   surface->getCanvas()->clear();
 }
 
 std::unique_ptr<FilterSource> FilterBuffer::toFilterSource(const tgfx::Point& scale) const {
   auto filterSource = new FilterSource();
-  filterSource->textureID = getTexture().id;
+  filterSource->sampler = getTexture();
   filterSource->width = surface->width();
   filterSource->height = surface->height();
   filterSource->scale = scale;
@@ -60,7 +60,7 @@ std::unique_ptr<FilterSource> FilterBuffer::toFilterSource(const tgfx::Point& sc
 std::unique_ptr<FilterTarget> FilterBuffer::toFilterTarget(
     const tgfx::Matrix& drawingMatrix) const {
   auto filterTarget = new FilterTarget();
-  filterTarget->frameBufferID = getFramebuffer().id;
+  filterTarget->frameBuffer = getFramebuffer();
   filterTarget->width = surface->width();
   filterTarget->height = surface->height();
   filterTarget->vertexMatrix = tgfx::ToGLVertexMatrix(

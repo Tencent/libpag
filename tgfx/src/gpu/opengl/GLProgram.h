@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "GLContext.h"
 #include "GLProgramDataManager.h"
 #include "GLUniformHandler.h"
 #include "gpu/GLFragmentProcessor.h"
@@ -34,16 +35,13 @@ class GLProgram : public Program {
     int location = 0;
   };
 
-  GLProgram(unsigned programID, const std::vector<Uniform>& uniforms,
+  GLProgram(Context* context, unsigned programID, const std::vector<Uniform>& uniforms,
             std::unique_ptr<GLGeometryProcessor> geometryProcessor,
             std::unique_ptr<GLXferProcessor> xferProcessor,
             std::vector<std::unique_ptr<GLFragmentProcessor>> fragmentProcessors,
             std::vector<Attribute> attributes, int vertexStride);
 
-  void setupSamplerUniforms(const GLInterface* gl,
-                            const std::vector<Uniform>& textureSamplers) const;
-
-  void onRelease(Context* context) override;
+  void setupSamplerUniforms(const std::vector<Uniform>& textureSamplers) const;
 
   /**
    * Gets the GL program ID for this program.
@@ -58,8 +56,7 @@ class GLProgram : public Program {
    *
    * It is the caller's responsibility to ensure the program is bound before calling.
    */
-  void updateUniformsAndTextureBindings(const GLInterface* gl,
-                                        const GeometryProcessor& geometryProcessor,
+  void updateUniformsAndTextureBindings(const GeometryProcessor& geometryProcessor,
                                         const Pipeline& pipeline);
 
   int vertexStride() const {
@@ -72,8 +69,10 @@ class GLProgram : public Program {
 
  private:
   // A helper to loop over effects, set the transforms (via subclass) and bind textures
-  void setFragmentData(const GLInterface* gl, const GLProgramDataManager& programDataManager,
-                       const Pipeline& pipeline, int* nextTexSamplerIdx);
+  void setFragmentData(const GLProgramDataManager& programDataManager, const Pipeline& pipeline,
+                       int* nextTexSamplerIdx);
+
+  void onReleaseGPU() override;
 
   unsigned programId = 0;
 

@@ -99,7 +99,7 @@ std::shared_ptr<Surface> QGLWindow::onCreateSurface(Context* context) {
   }
   frontTexture = std::static_pointer_cast<GLTexture>(Texture::MakeRGBA(context, width, height));
   backTexture = std::static_pointer_cast<GLTexture>(Texture::MakeRGBA(context, width, height));
-  auto surface = Surface::MakeFrom(context, backTexture);
+  auto surface = Surface::MakeFrom(backTexture);
   renderTarget = std::static_pointer_cast<GLRenderTarget>(surface->getRenderTarget());
   return surface;
 }
@@ -108,13 +108,13 @@ void QGLWindow::onPresent(Context* context, int64_t) {
   if (renderTarget == nullptr) {
     return;
   }
-  auto gl = GLInterface::Get(context);
+  auto gl = GLFunctions::Get(context);
   std::swap(frontTexture, backTexture);
-  gl->functions->flush();
-  gl->functions->bindFramebuffer(GL_FRAMEBUFFER, renderTarget->glFrameBuffer().id);
-  gl->functions->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-                                      backTexture->glSampler().id, 0);
-  gl->functions->bindFramebuffer(GL_FRAMEBUFFER, 0);
+  gl->flush();
+  gl->bindFramebuffer(GL_FRAMEBUFFER, renderTarget->glFrameBuffer().id);
+  gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                           backTexture->glSampler().id, 0);
+  gl->bindFramebuffer(GL_FRAMEBUFFER, 0);
   invalidateTexture();
 }
 }  // namespace tgfx

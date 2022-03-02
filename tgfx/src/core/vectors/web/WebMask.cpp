@@ -43,8 +43,8 @@ std::shared_ptr<Texture> WebMask::makeTexture(Context* context) const {
     return nullptr;
   }
   auto& glInfo = std::static_pointer_cast<GLTexture>(texture)->glSampler();
-  auto gl = GLInterface::Get(context);
-  gl->functions->bindTexture(glInfo.target, glInfo.id);
+  auto gl = GLFunctions::Get(context);
+  gl->bindTexture(glInfo.target, glInfo.id);
   webMask.call<void>("update", val::module_property("GL"));
   return texture;
 }

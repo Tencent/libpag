@@ -30,7 +30,9 @@ class ProgramBuilder {
  public:
   virtual ~ProgramBuilder() = default;
 
-  virtual const Caps* caps() const = 0;
+  Context* getContext() const {
+    return context;
+  }
 
   virtual std::string versionDeclString() = 0;
 
@@ -66,7 +68,10 @@ class ProgramBuilder {
   virtual FragmentShaderBuilder* fragmentShaderBuilder() = 0;
 
  protected:
-  ProgramBuilder(const GeometryProcessor* geometryProcessor, const Pipeline* pipeline);
+  Context* context = nullptr;
+
+  ProgramBuilder(Context* context, const GeometryProcessor* geometryProcessor,
+                 const Pipeline* pipeline);
 
   bool emitAndInstallProcessors();
 

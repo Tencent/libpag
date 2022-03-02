@@ -23,12 +23,13 @@
 #include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
-GLProgram::GLProgram(unsigned programID, const std::vector<Uniform>& uniforms,
+GLProgram::GLProgram(Context* context, unsigned programID, const std::vector<Uniform>& uniforms,
                      std::unique_ptr<GLGeometryProcessor> geometryProcessor,
                      std::unique_ptr<GLXferProcessor> xferProcessor,
                      std::vector<std::unique_ptr<GLFragmentProcessor>> fragmentProcessors,
                      std::vector<Attribute> attributes, int vertexStride)
-    : programId(programID),
+    : Program(context),
+      programId(programID),
       glGeometryProcessor(std::move(geometryProcessor)),
       glXferProcessor(std::move(xferProcessor)),
       glFragmentProcessors(std::move(fragmentProcessors)),
@@ -39,64 +40,59 @@ GLProgram::GLProgram(unsigned programID, const std::vector<Uniform>& uniforms,
   }
 }
 
-void GLProgram::setupSamplerUniforms(const GLInterface* gl,
-                                     const std::vector<Uniform>& textureSamplers) const {
-  gl->functions->useProgram(programId);
+void GLProgram::setupSamplerUniforms(const std::vector<Uniform>& textureSamplers) const {
+  auto gl = GLFunctions::Get(context);
+  gl->useProgram(programId);
   // Assign texture units to sampler uniforms one time up front.
   auto count = static_cast<int>(textureSamplers.size());
   for (int i = 0; i < count; ++i) {
     const auto& sampler = textureSamplers[i];
     if (kUnusedUniform != sampler.location) {
-      gl->functions->uniform1i(sampler.location, i);
+      gl->uniform1i(sampler.location, i);
     }
   }
 }
 
-void GLProgram::onRelease(Context* context) {
+void GLProgram::onReleaseGPU() {
   if (programId) {
-    auto gl = GLInterface::Get(context);
-    gl->functions->deleteProgram(programId);
+    auto gl = GLFunctions::Get(context);
+    gl->deleteProgram(programId);
   }
 }
 
-static void BindGLTexture(const GLInterface* gl, int position, const TextureSampler* sampler) {
-  auto glSampler = static_cast<const GLSampler*>(sampler);
-  ActiveGLTexture(gl, GL_TEXTURE0 + position, glSampler->target, glSampler->id, glSampler->format);
-}
-
-void GLProgram::updateUniformsAndTextureBindings(const GLInterface* gl,
-                                                 const GeometryProcessor& geometryProcessor,
+void GLProgram::updateUniformsAndTextureBindings(const GeometryProcessor& geometryProcessor,
                                                  const Pipeline& pipeline) {
   // we set the textures, and uniforms for installed processors in a generic way.
 
   // We must bind to texture units in the same order in which we set the uniforms in
   // GLProgramDataManager. That is, we bind textures for processors in this order:
   // geometryProcessor, fragmentProcessors, XferProcessor.
-  GLProgramDataManager programDataManager(gl, &uniformLocations);
+  GLProgramDataManager programDataManager(context, &uniformLocations);
   FragmentProcessor::CoordTransformIter coordTransformIter(pipeline);
   glGeometryProcessor->setData(programDataManager, geometryProcessor, &coordTransformIter);
   int nextTexSamplerIdx = 0;
-  setFragmentData(gl, programDataManager, pipeline, &nextTexSamplerIdx);
+  setFragmentData(programDataManager, pipeline, &nextTexSamplerIdx);
 
   auto offset = Point::Zero();
   const auto* dstTexture = pipeline.getDstTexture(&offset);
+  auto glContext = GLContext::Unwrap(context);
   if (dstTexture) {
     glXferProcessor->setData(programDataManager, *pipeline.getXferProcessor(), dstTexture, offset);
-    BindGLTexture(gl, nextTexSamplerIdx++, dstTexture->getSampler());
+    glContext->bindTexture(nextTexSamplerIdx++, dstTexture->getSampler());
   }
 }
 
-void GLProgram::setFragmentData(const GLInterface* gl,
-                                const GLProgramDataManager& programDataManager,
+void GLProgram::setFragmentData(const GLProgramDataManager& programDataManager,
                                 const Pipeline& pipeline, int* nextTexSamplerIdx) {
   FragmentProcessor::Iter iter(pipeline);
   GLFragmentProcessor::Iter glslIter(glFragmentProcessors);
   const FragmentProcessor* fp = iter.next();
   GLFragmentProcessor* glslFP = glslIter.next();
+  auto glContext = GLContext::Unwrap(context);
   while (fp && glslFP) {
     glslFP->setData(programDataManager, *fp);
     for (size_t i = 0; i < fp->numTextureSamplers(); ++i) {
-      BindGLTexture(gl, (*nextTexSamplerIdx)++, fp->textureSampler(i));
+      glContext->bindTexture((*nextTexSamplerIdx)++, fp->textureSampler(i));
     }
     fp = iter.next();
     glslFP = glslIter.next();
