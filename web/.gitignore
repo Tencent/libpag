@@ -10,6 +10,6 @@ src/wasm
 dist
 api-docs
 *.js.map
-demo/index.js
+demo/*.js
 cypress/videos
 cypress/screenshots

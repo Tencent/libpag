@@ -1,4 +1,4 @@
-import { PAG } from './types';
+import { Matrix, PAG, ScaleMode } from './types';
 import { NativeImage } from './core/native-image';
 import { wasmAwaitRewind, wasmAsyncMethod } from './utils/decorators';
 
@@ -53,6 +53,32 @@ export class PAGImage {
    */
   public height(): number {
     return this.wasmIns._height() as number;
+  }
+  /**
+   * Returns the current scale mode. The default value is PAGScaleMode::LetterBox.
+   */
+  public scaleMode(): ScaleMode {
+    return this.wasmIns._scaleMode() as ScaleMode;
+  }
+  /**
+   * Specifies the rule of how to scale the content to fit the image layer's original size.
+   * The matrix changes when this method is called.
+   */
+  public setScaleMode(scaleMode: ScaleMode) {
+    this.wasmIns._setScaleMode(scaleMode);
+  }
+  /**
+   * Returns a copy of current matrix.
+   */
+  public matrix(): Matrix {
+    return this.wasmIns._matrix() as Matrix;
+  }
+  /**
+   * Set the transformation which will be applied to the content.
+   * The scaleMode property will be set to PAGScaleMode::None when this method is called.
+   */
+  public setMatrix(matrix: Matrix) {
+    this.wasmIns._setMatrix(matrix);
   }
   /**
    * Destroy the pag image.

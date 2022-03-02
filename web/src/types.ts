@@ -63,7 +63,7 @@ export interface EmscriptenGL {
 /**
  * Defines the rules on how to scale the content to fit the specified area.
  */
-export const enum PAGScaleMode {
+export const enum ScaleMode {
   /**
    * The content is not scaled.
    */
@@ -188,6 +188,15 @@ export const enum PathFillType {
   InverseEvenOdd,
 }
 
+export const enum MatrixIndex {
+  a,
+  b,
+  c,
+  d,
+  tx,
+  ty,
+}
+
 export interface Point {
   x: number;
   y: number;
@@ -233,6 +242,11 @@ export declare class Matrix {
    * The entry at position [3,2] in the matrix.
    */
   public ty: number;
+  /**
+   * Sets Matrix value.
+   */
+  public set: (index: number, value: number) => {};
+  public setAffine: (a: number, b: number, c: number, d: number, tx: number, ty: number) => {};
   private constructor();
 }
 

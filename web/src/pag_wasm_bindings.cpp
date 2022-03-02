@@ -150,7 +150,14 @@ EMSCRIPTEN_BINDINGS(pag) {
                             StillImage::FromImage(tgfx::NativeImage::MakeFrom(nativeImage)));
                       }))
       .function("_width", &PAGImage::width)
-      .function("_height", &PAGImage::height);
+      .function("_height", &PAGImage::height)
+      .function("_scaleMode", &PAGImage::scaleMode)
+      .function("_setScaleMode", &PAGImage::setScaleMode)
+      .function("_matrix",
+                optional_override([](PAGImage& pagImage) { return ToTGFX(pagImage.matrix()); }))
+      .function("_setMatrix", optional_override([](PAGImage& pagImage, tgfx::Matrix matrix) {
+                  pagImage.setMatrix(ToPAG(matrix));
+                }));
 
   class_<PAGPlayer>("_PAGPlayer")
       .smart_ptr_constructor("_PAGPlayer", &std::make_shared<PAGPlayer>)
@@ -214,7 +221,9 @@ EMSCRIPTEN_BINDINGS(pag) {
       .property("c", &tgfx::Matrix::getSkewX)
       .property("d", &tgfx::Matrix::getScaleY)
       .property("tx", &tgfx::Matrix::getTranslateX)
-      .property("ty", &tgfx::Matrix::getTranslateY);
+      .property("ty", &tgfx::Matrix::getTranslateY)
+      .function("set", &tgfx::Matrix::set)
+      .function("setAffine", &tgfx::Matrix::setAffine);
 
   class_<TextDocument>("TextDocument")
       .smart_ptr<std::shared_ptr<TextDocument>>("TextDocument")

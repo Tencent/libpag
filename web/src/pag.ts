@@ -9,7 +9,7 @@ import { WebAssemblyQueue } from './utils/queue';
 /**
  * Initialize pag webassembly module.
  */
-const PAGInit = (moduleOption: EmscriptenModule): Promise<types.PAG> =>
+const PAGInit = (moduleOption: { [fn: string]: Function } = {}): Promise<types.PAG> =>
   createPAG(moduleOption).then((module: types.PAG) => {
     module.webAssemblyQueue = new WebAssemblyQueue();
     module.webAssemblyQueue.start();
