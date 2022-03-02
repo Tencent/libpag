@@ -57,9 +57,9 @@ void ProgramBuilder::emitAndInstallGeoProc(std::string* outputColor, std::string
   glGeometryProcessor = geometryProcessor->createGLInstance();
 
   GLGeometryProcessor::FPCoordTransformHandler transformHandler(*pipeline, &transformedCoordVars);
-  GLGeometryProcessor::EmitArgs args(vertexShaderBuilder(), fragmentShaderBuilder(),
-                                     varyingHandler(), uniformHandler(), caps(), geometryProcessor,
-                                     *outputColor, *outputCoverage, &transformHandler);
+  GLGeometryProcessor::EmitArgs args(
+      vertexShaderBuilder(), fragmentShaderBuilder(), varyingHandler(), uniformHandler(),
+      getContext()->caps(), geometryProcessor, *outputColor, *outputCoverage, &transformHandler);
   glGeometryProcessor->emitCode(args);
 
   fragmentShaderBuilder()->codeAppend("}");

@@ -18,13 +18,13 @@
 
 #pragma once
 
-#include "GLInterface.h"
+#include "GLContext.h"
 #include "gpu/ProgramDataManager.h"
 
 namespace tgfx {
 class GLProgramDataManager : public ProgramDataManager {
  public:
-  GLProgramDataManager(const GLInterface* gl, const std::vector<int>* uniforms);
+  GLProgramDataManager(const GLFunctions* gl, const std::vector<int>* uniforms);
 
   void set1f(UniformHandle handle, float v0) const override;
 
@@ -37,7 +37,7 @@ class GLProgramDataManager : public ProgramDataManager {
   void setMatrix(UniformHandle u, const Matrix& matrix) const override;
 
  private:
-  const GLInterface* gl;
+  const GLFunctions* gl;
   const std::vector<int>* uniforms;
 };
 }  // namespace tgfx

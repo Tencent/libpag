@@ -35,8 +35,8 @@ class CornerPinFilter : public LayerFilter {
                                            const tgfx::Rect& transformedBounds,
                                            const tgfx::Point& filterScale) override;
 
-  void bindVertices(const tgfx::GLInterface* gl, const FilterSource* source,
-                    const FilterTarget* target, const std::vector<tgfx::Point>& points) override;
+  void bindVertices(tgfx::Context* context, const FilterSource* source, const FilterTarget* target,
+                    const std::vector<tgfx::Point>& points) override;
 
   bool needsMSAA() const override {
     return true;

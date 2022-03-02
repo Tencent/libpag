@@ -20,12 +20,17 @@
 
 #include "GLInterface.h"
 #include "gpu/Context.h"
+#include "gpu/opengl/GLSampler.h"
 
 namespace tgfx {
 class GLCaps;
 
 class GLContext : public Context {
  public:
+  static GLContext* Unwrap(Context* context) {
+    return static_cast<GLContext*>(context);
+  }
+
   GLContext(Device* device, const GLInterface* glInterface);
 
   Backend backend() const override {
@@ -39,6 +44,10 @@ class GLContext : public Context {
   const Caps* caps() const override {
     return interface->caps.get();
   }
+
+  void resetState() override;
+
+  void bindTexture(int unitIndex, const TextureSampler* sampler);
 
  private:
   const GLInterface* interface = nullptr;

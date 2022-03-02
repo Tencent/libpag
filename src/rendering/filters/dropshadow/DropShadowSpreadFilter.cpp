@@ -88,14 +88,14 @@ std::string DropShadowSpreadFilter::onBuildFragmentShader() {
   return DROPSHADOW_SPREAD_FRAGMENT_SHADER;
 }
 
-void DropShadowSpreadFilter::onPrepareProgram(const tgfx::GLInterface* gl, unsigned program) {
-  spreadColorHandle = gl->functions->getUniformLocation(program, "uColor");
-  spreadAlphaHandle = gl->functions->getUniformLocation(program, "uAlpha");
-  spreadSizeHandle = gl->functions->getUniformLocation(program, "uSize");
+void DropShadowSpreadFilter::onPrepareProgram(tgfx::Context* context, unsigned program) {
+  auto gl = tgfx::GLFunctions::Get(context);
+  spreadColorHandle = gl->getUniformLocation(program, "uColor");
+  spreadAlphaHandle = gl->getUniformLocation(program, "uAlpha");
+  spreadSizeHandle = gl->getUniformLocation(program, "uSize");
 }
 
-void DropShadowSpreadFilter::onUpdateParams(const tgfx::GLInterface* gl,
-                                            const tgfx::Rect& contentBounds,
+void DropShadowSpreadFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
                                             const tgfx::Point& filterScale) {
   auto color = ToTGFX(layerStyle->color->getValueAt(layerFrame));
   auto alpha = ToAlpha(layerStyle->opacity->getValueAt(layerFrame));
@@ -107,11 +107,11 @@ void DropShadowSpreadFilter::onUpdateParams(const tgfx::GLInterface* gl,
   auto spreadSizeY = size * spread * filterScale.y;
   spreadSizeX = std::min(spreadSizeX, DROPSHADOW_MAX_SPREAD_SIZE);
   spreadSizeY = std::min(spreadSizeY, DROPSHADOW_MAX_SPREAD_SIZE);
-
-  gl->functions->uniform3f(spreadColorHandle, color.red, color.green, color.blue);
-  gl->functions->uniform1f(spreadAlphaHandle, alpha);
-  gl->functions->uniform2f(spreadSizeHandle, spreadSizeX / contentBounds.width(),
-                           spreadSizeY / contentBounds.height());
+  auto gl = tgfx::GLFunctions::Get(context);
+  gl->uniform3f(spreadColorHandle, color.red, color.green, color.blue);
+  gl->uniform1f(spreadAlphaHandle, alpha);
+  gl->uniform2f(spreadSizeHandle, spreadSizeX / contentBounds.width(),
+                spreadSizeY / contentBounds.height());
 }
 
 std::vector<tgfx::Point> DropShadowSpreadFilter::computeVertices(const tgfx::Rect&,

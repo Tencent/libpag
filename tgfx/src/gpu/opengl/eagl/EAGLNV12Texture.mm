@@ -45,16 +45,16 @@ std::shared_ptr<EAGLNV12Texture> EAGLNV12Texture::MakeFrom(Context* context,
   auto height = static_cast<int>(CVPixelBufferGetHeight(pixelBuffer));
   CVOpenGLESTextureRef outputTextureLuma = nil;
   CVOpenGLESTextureRef outputTextureChroma = nil;
-  auto gl = GLInterface::Get(context);
+  auto caps = GLCaps::Get(context);
   auto lumaComponentFormat = PixelFormat::GRAY_8;
-  const auto& oneComponentFormat = gl->caps->getTextureFormat(lumaComponentFormat);
+  const auto& oneComponentFormat = caps->getTextureFormat(lumaComponentFormat);
   // 返回的 texture 对象是一个强引用计数为 1 的对象。
   CVOpenGLESTextureCacheCreateTextureFromImage(
       kCFAllocatorDefault, textureCache, pixelBuffer, NULL, GL_TEXTURE_2D,
       oneComponentFormat.internalFormatTexImage, width, height, oneComponentFormat.externalFormat,
       GL_UNSIGNED_BYTE, 0, &outputTextureLuma);
   auto chromaComponentFormat = PixelFormat::RG_88;
-  const auto& twoComponentFormat = gl->caps->getTextureFormat(chromaComponentFormat);
+  const auto& twoComponentFormat = caps->getTextureFormat(chromaComponentFormat);
   // 返回的 texture 对象是一个强引用计数为 1 的对象。
   CVOpenGLESTextureCacheCreateTextureFromImage(
       kCFAllocatorDefault, textureCache, pixelBuffer, NULL, GL_TEXTURE_2D,

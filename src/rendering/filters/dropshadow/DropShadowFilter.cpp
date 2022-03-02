@@ -176,8 +176,7 @@ void DropShadowFilter::onDrawModeNotSpread(tgfx::Context* context, const FilterS
   if (blurFilterBuffer == nullptr) {
     return;
   }
-  auto gl = tgfx::GLInterface::Get(context);
-  blurFilterBuffer->clearColor(gl);
+  blurFilterBuffer->clearColor();
 
   auto offsetMatrix =
       tgfx::Matrix::MakeTrans((contentBounds.left - filterBounds.left) * source->scale.x,
@@ -215,8 +214,7 @@ void DropShadowFilter::onDrawModeNotFullSpread(tgfx::Context* context, const Fil
   if (spreadFilterBuffer == nullptr) {
     return;
   }
-  auto gl = tgfx::GLInterface::Get(context);
-  spreadFilterBuffer->clearColor(gl);
+  spreadFilterBuffer->clearColor();
   auto offsetMatrix =
       tgfx::Matrix::MakeTrans((lastBounds.left - filterBounds.left) * source->scale.x,
                               (lastBounds.top - filterBounds.top) * source->scale.y);
@@ -239,7 +237,7 @@ void DropShadowFilter::onDrawModeNotFullSpread(tgfx::Context* context, const Fil
   if (blurFilterBuffer == nullptr) {
     return;
   }
-  blurFilterBuffer->clearColor(gl);
+  blurFilterBuffer->clearColor();
   offsetMatrix = tgfx::Matrix::MakeTrans((lastBounds.left - filterBounds.left) * source->scale.x,
                                          (lastBounds.top - filterBounds.top) * source->scale.y);
   auto targetV = blurFilterBuffer->toFilterTarget(offsetMatrix);

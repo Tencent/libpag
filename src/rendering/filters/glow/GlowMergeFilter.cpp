@@ -49,25 +49,27 @@ std::string GlowMergeFilter::onBuildFragmentShader() {
   return GLOW_TARGET_FRAGMENT_SHADER;
 }
 
-void GlowMergeFilter::onPrepareProgram(const tgfx::GLInterface* gl, unsigned int program) {
-  inputTextureHandle = gl->functions->getUniformLocation(program, "inputImageTexture");
-  blurTextureHandle = gl->functions->getUniformLocation(program, "blurImageTexture");
-  progressHandle = gl->functions->getUniformLocation(program, "progress");
+void GlowMergeFilter::onPrepareProgram(tgfx::Context* context, unsigned int program) {
+  auto gl = tgfx::GLFunctions::Get(context);
+  inputTextureHandle = gl->getUniformLocation(program, "inputImageTexture");
+  blurTextureHandle = gl->getUniformLocation(program, "blurImageTexture");
+  progressHandle = gl->getUniformLocation(program, "progress");
 }
 
-void GlowMergeFilter::updateTexture(unsigned blurTexture) {
-  blurTextureID = blurTexture;
+void GlowMergeFilter::updateTexture(const tgfx::GLSampler& sampler) {
+  blurTexture = sampler;
 }
 
-void GlowMergeFilter::onUpdateParams(const tgfx::GLInterface* gl, const tgfx::Rect&,
+void GlowMergeFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect&,
                                      const tgfx::Point&) {
   auto glowEffect = static_cast<GlowEffect*>(effect);
   auto glowThreshold = glowEffect->glowThreshold->getValueAt(layerFrame);
-  gl->functions->uniform1f(progressHandle, glowThreshold);
-  gl->functions->uniform1i(inputTextureHandle, 0);
-  // TODO(domrjchen): 下面这行之前写成了 gl->functions->uniform1i(progressHandle, 1), 会导致 glError,
+  auto gl = tgfx::GLFunctions::Get(context);
+  gl->uniform1f(progressHandle, glowThreshold);
+  gl->uniform1i(inputTextureHandle, 0);
+  // TODO(domrjchen): 下面这行之前写成了 gl->uniform1i(progressHandle, 1), 会导致 glError,
   // 暂时注释掉。目前的发光效果跟 AE 也没有对齐，后面重写发光效果时时再修复。
-  //  gl->functions->uniform1i(blurTextureHandle, 1);
-  ActiveGLTexture(gl, GL_TEXTURE1, GL_TEXTURE_2D, blurTextureID);
+  //  gl->uniform1i(blurTextureHandle, 1);
+  tgfx::GLContext::Unwrap(context)->bindTexture(1, &blurTexture);
 }
 }  // namespace pag

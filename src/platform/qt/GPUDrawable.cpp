@@ -18,7 +18,6 @@
 
 #include "GPUDrawable.h"
 #include <QQuickWindow>
-#include "gpu/opengl/GLInterface.h"
 #include "gpu/opengl/qt/QGLWindow.h"
 
 namespace pag {

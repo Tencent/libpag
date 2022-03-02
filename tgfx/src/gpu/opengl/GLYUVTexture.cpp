@@ -89,10 +89,11 @@ class GLNV12Texture : public GLYUVTexture {
   }
 };
 
-static std::vector<GLSampler> MakeTexturePlanes(const GLInterface* gl, const YUVConfig& yuvConfig) {
+static std::vector<GLSampler> MakeTexturePlanes(Context* context, const YUVConfig& yuvConfig) {
   std::vector<GLSampler> texturePlanes{};
   unsigned yuvTextureIDs[] = {0, 0, 0};
-  gl->functions->genTextures(yuvConfig.planeCount, yuvTextureIDs);
+  auto gl = GLFunctions::Get(context);
+  gl->genTextures(yuvConfig.planeCount, yuvTextureIDs);
   if (yuvTextureIDs[0] == 0) {
     return texturePlanes;
   }
@@ -106,7 +107,7 @@ static std::vector<GLSampler> MakeTexturePlanes(const GLInterface* gl, const YUV
   return texturePlanes;
 }
 
-static void SubmitYUVTexture(const GLInterface* gl, const YUVConfig& yuvConfig,
+static void SubmitYUVTexture(Context* context, const YUVConfig& yuvConfig,
                              const GLSampler yuvTextures[]) {
   static constexpr int factor[] = {0, 1, 1};
   for (int index = 0; index < yuvConfig.planeCount; index++) {
@@ -116,14 +117,13 @@ static void SubmitYUVTexture(const GLInterface* gl, const YUVConfig& yuvConfig,
     auto rowBytes = yuvConfig.rowBytes[index];
     auto bytesPerPixel = yuvConfig.bytesPerPixel[index];
     auto pixels = yuvConfig.pixelsPlane[index];
-    SubmitGLTexture(gl, sampler, w, h, rowBytes, bytesPerPixel, pixels);
+    SubmitGLTexture(context, sampler, w, h, rowBytes, bytesPerPixel, pixels);
   }
 }
 
 std::shared_ptr<YUVTexture> YUVTexture::MakeI420(Context* context, YUVColorSpace colorSpace,
                                                  YUVColorRange colorRange, int width, int height,
                                                  uint8_t* pixelsPlane[3], const int lineSize[3]) {
-  auto gl = GLInterface::Get(context);
   YUVConfig yuvConfig = YUVConfig(colorSpace, colorRange, width, height, I420_PLANE_COUNT);
   for (int i = 0; i < 3; i++) {
     yuvConfig.pixelsPlane[i] = pixelsPlane[i];
@@ -137,7 +137,7 @@ std::shared_ptr<YUVTexture> YUVTexture::MakeI420(Context* context, YUVColorSpace
   auto texture =
       std::static_pointer_cast<GLYUVTexture>(context->resourceCache()->getRecycled(recycleKey));
   if (texture == nullptr) {
-    auto texturePlanes = MakeTexturePlanes(gl, yuvConfig);
+    auto texturePlanes = MakeTexturePlanes(context, yuvConfig);
     if (texturePlanes.empty()) {
       return nullptr;
     }
@@ -146,14 +146,13 @@ std::shared_ptr<YUVTexture> YUVTexture::MakeI420(Context* context, YUVColorSpace
                                                   yuvConfig.width, yuvConfig.height)));
     texture->samplers = texturePlanes;
   }
-  SubmitYUVTexture(gl, yuvConfig, &texture->samplers[0]);
+  SubmitYUVTexture(context, yuvConfig, &texture->samplers[0]);
   return texture;
 }
 
 std::shared_ptr<YUVTexture> YUVTexture::MakeNV12(Context* context, YUVColorSpace colorSpace,
                                                  YUVColorRange colorRange, int width, int height,
                                                  uint8_t* pixelsPlane[2], const int lineSize[2]) {
-  auto gl = GLInterface::Get(context);
   YUVConfig yuvConfig = YUVConfig(colorSpace, colorRange, width, height, NV12_PLANE_COUNT);
   for (int i = 0; i < 2; i++) {
     yuvConfig.pixelsPlane[i] = pixelsPlane[i];
@@ -169,7 +168,7 @@ std::shared_ptr<YUVTexture> YUVTexture::MakeNV12(Context* context, YUVColorSpace
   auto texture =
       std::static_pointer_cast<GLYUVTexture>(context->resourceCache()->getRecycled(recycleKey));
   if (texture == nullptr) {
-    auto texturePlanes = MakeTexturePlanes(gl, yuvConfig);
+    auto texturePlanes = MakeTexturePlanes(context, yuvConfig);
     if (texturePlanes.empty()) {
       return nullptr;
     }
@@ -178,7 +177,7 @@ std::shared_ptr<YUVTexture> YUVTexture::MakeNV12(Context* context, YUVColorSpace
                                                   yuvConfig.width, yuvConfig.height)));
     texture->samplers = texturePlanes;
   }
-  SubmitYUVTexture(gl, yuvConfig, &texture->samplers[0]);
+  SubmitYUVTexture(context, yuvConfig, &texture->samplers[0]);
   return texture;
 }
 
@@ -199,9 +198,9 @@ const TextureSampler* GLYUVTexture::getSamplerAt(size_t index) const {
 }
 
 void GLYUVTexture::onRelease(Context* context) {
-  auto gl = GLInterface::Get(context);
+  auto gl = GLFunctions::Get(context);
   for (const auto& sampler : samplers) {
-    gl->functions->deleteTextures(1, &sampler.id);
+    gl->deleteTextures(1, &sampler.id);
   }
 }
 }  // namespace tgfx

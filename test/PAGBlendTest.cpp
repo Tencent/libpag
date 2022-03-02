@@ -53,9 +53,8 @@ PAG_TEST_F(PAGBlendTest, Blend) {
 
 tgfx::GLSampler GetBottomLeftImage(std::shared_ptr<Device> device, int width, int height) {
   auto context = device->lockContext();
-  auto gl = GLInterface::Get(context);
   tgfx::GLSampler textureInfo;
-  CreateGLTexture(gl, width, height, &textureInfo);
+  CreateGLTexture(context, width, height, &textureInfo);
   auto backendTexture = ToBackendTexture(textureInfo, width, height);
   auto surface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::BottomLeft);
   device->unlock();
@@ -79,9 +78,8 @@ PAG_TEST_F(PAGBlendTest, CopyDstTexture) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto gl = GLInterface::Get(context);
   tgfx::GLSampler textureInfo;
-  CreateGLTexture(gl, width, height, &textureInfo);
+  CreateGLTexture(context, width, height, &textureInfo);
   auto backendTexture = ToBackendTexture(textureInfo, width, height);
   auto pagSurface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::BottomLeft);
   device->unlock();
@@ -95,8 +93,8 @@ PAG_TEST_F(PAGBlendTest, CopyDstTexture) {
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGBlendTest/CopyDstTexture"));
 
   context = device->lockContext();
-  gl = GLInterface::Get(context);
-  gl->functions->deleteTextures(1, &textureInfo.id);
+  auto gl = GLFunctions::Get(context);
+  gl->deleteTextures(1, &textureInfo.id);
   device->unlock();
 }
 
@@ -110,11 +108,10 @@ PAG_TEST_F(PAGBlendTest, TextureBottomLeft) {
   auto replaceTextureInfo = GetBottomLeftImage(device, width, height);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto gl = GLInterface::Get(context);
   auto backendTexture = ToBackendTexture(replaceTextureInfo, width, height);
   auto replaceImage = PAGImage::FromTexture(backendTexture, ImageOrigin::BottomLeft);
   tgfx::GLSampler textureInfo;
-  CreateGLTexture(gl, width, height, &textureInfo);
+  CreateGLTexture(context, width, height, &textureInfo);
   backendTexture = ToBackendTexture(textureInfo, width, height);
   auto pagSurface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::TopLeft);
   device->unlock();
@@ -130,9 +127,9 @@ PAG_TEST_F(PAGBlendTest, TextureBottomLeft) {
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGBlendTest/TextureBottomLeft"));
 
   context = device->lockContext();
-  gl = GLInterface::Get(context);
-  gl->functions->deleteTextures(1, &replaceTextureInfo.id);
-  gl->functions->deleteTextures(1, &textureInfo.id);
+  auto gl = GLFunctions::Get(context);
+  gl->deleteTextures(1, &replaceTextureInfo.id);
+  gl->deleteTextures(1, &textureInfo.id);
   device->unlock();
 }
 
@@ -150,9 +147,8 @@ PAG_TEST_F(PAGBlendTest, BothBottomLeft) {
   auto replaceImage = PAGImage::FromTexture(backendTexture, ImageOrigin::BottomLeft);
   replaceImage->setMatrix(
       Matrix::MakeTrans(static_cast<float>(width) * 0.1, static_cast<float>(height) * 0.2));
-  auto gl = GLInterface::Get(context);
   tgfx::GLSampler textureInfo = {};
-  CreateGLTexture(gl, width, height, &textureInfo);
+  CreateGLTexture(context, width, height, &textureInfo);
   backendTexture = ToBackendTexture(textureInfo, width, height);
   auto pagSurface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::BottomLeft);
   device->unlock();
@@ -172,9 +168,9 @@ PAG_TEST_F(PAGBlendTest, BothBottomLeft) {
 
   context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  gl = GLInterface::Get(context);
-  gl->functions->deleteTextures(1, &replaceTextureInfo.id);
-  gl->functions->deleteTextures(1, &textureInfo.id);
+  auto gl = GLFunctions::Get(context);
+  gl->deleteTextures(1, &replaceTextureInfo.id);
+  gl->deleteTextures(1, &textureInfo.id);
   device->unlock();
 }
 }  // namespace pag

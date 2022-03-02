@@ -31,7 +31,7 @@ class FilterBuffer {
   static std::shared_ptr<FilterBuffer> Make(tgfx::Context* context, int width, int height,
                                             bool usesMSAA = false);
 
-  void clearColor(const tgfx::GLInterface* gl) const;
+  void clearColor() const;
 
   std::unique_ptr<FilterSource> toFilterSource(const tgfx::Point& scale) const;
 

@@ -308,7 +308,6 @@ std::vector<FilterNode> FilterRenderer::MakeFilterNodes(const FilterList* filter
 void ApplyFilters(tgfx::Context* context, std::vector<FilterNode> filterNodes,
                   const tgfx::Rect& contentBounds, FilterSource* filterSource,
                   FilterTarget* filterTarget) {
-  auto gl = tgfx::GLInterface::Get(context);
   auto scale = filterSource->scale;
   std::shared_ptr<FilterBuffer> freeBuffer = nullptr;
   std::shared_ptr<FilterBuffer> lastBuffer = nullptr;
@@ -335,7 +334,7 @@ void ApplyFilters(tgfx::Context* context, std::vector<FilterNode> filterNodes,
     if (currentBuffer == nullptr) {
       return;
     }
-    currentBuffer->clearColor(gl);
+    currentBuffer->clearColor();
     auto offsetMatrix = tgfx::Matrix::MakeTrans((lastBounds.left - node.bounds.left) * scale.x,
                                                 (lastBounds.top - node.bounds.top) * scale.y);
     auto currentTarget = currentBuffer->toFilterTarget(offsetMatrix);
@@ -485,6 +484,8 @@ void FilterRenderer::DrawWithFilter(tgfx::Canvas* parentCanvas, RenderCache* cac
   parentCanvas->flush();
   auto context = parentCanvas->getContext();
   ApplyFilters(context, filterNodes, contentBounds, filterSource.get(), filterTarget.get());
+  // Reset the GL states stored in the context, they may be modified during the filter being applied.
+  context->resetState();
 
   if (targetSurface) {
     tgfx::Matrix drawingMatrix = {};

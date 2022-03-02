@@ -78,7 +78,7 @@ class GLRenderTarget : public RenderTarget {
   GLRenderTarget(int width, int height, ImageOrigin origin, int sampleCount,
                  GLFrameBuffer frameBuffer, unsigned textureTarget = 0);
 
-  void clear(const GLInterface* gl) const;
+  void clear(Context* context) const;
 
   void resolve(Context* context) const;
 

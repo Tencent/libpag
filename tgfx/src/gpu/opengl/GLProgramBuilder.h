@@ -18,8 +18,8 @@
 
 #pragma once
 
+#include "GLContext.h"
 #include "GLFragmentShaderBuilder.h"
-#include "GLInterface.h"
 #include "GLProgram.h"
 #include "GLUniformHandler.h"
 #include "GLVertexShaderBuilder.h"
@@ -35,15 +35,11 @@ class GLProgramBuilder : public ProgramBuilder {
    * After successful generation, the builder result objects are available
    * to be used.
    */
-  static std::unique_ptr<GLProgram> CreateProgram(const GLInterface* gl,
+  static std::unique_ptr<GLProgram> CreateProgram(Context* context,
                                                   const GeometryProcessor* geometryProcessor,
                                                   const Pipeline* pipeline);
-  const GLInterface* gl() const {
-    return _gl;
-  }
-
-  const Caps* caps() const override {
-    return _gl->caps.get();
+  Context* getContext() const override {
+    return context;
   }
 
   std::string versionDeclString() override;
@@ -55,7 +51,7 @@ class GLProgramBuilder : public ProgramBuilder {
   bool isDesktopGL() const;
 
  private:
-  GLProgramBuilder(const GLInterface* gl, const GeometryProcessor* geometryProcessor,
+  GLProgramBuilder(Context* context, const GeometryProcessor* geometryProcessor,
                    const Pipeline* pipeline);
 
   void computeCountsAndStrides(unsigned programID);
@@ -88,7 +84,7 @@ class GLProgramBuilder : public ProgramBuilder {
 
   bool checkSamplerCounts() override;
 
-  const GLInterface* _gl;
+  Context* context = nullptr;
   VaryingHandler _varyingHandler;
   GLUniformHandler _uniformHandler;
   GLVertexShaderBuilder _vertexBuilder;

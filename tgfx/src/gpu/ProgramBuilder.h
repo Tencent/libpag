@@ -30,7 +30,7 @@ class ProgramBuilder {
  public:
   virtual ~ProgramBuilder() = default;
 
-  virtual const Caps* caps() const = 0;
+  virtual Context* getContext() const = 0;
 
   virtual std::string versionDeclString() = 0;
 

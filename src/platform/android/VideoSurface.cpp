@@ -86,8 +86,8 @@ tgfx::Point OESTexture::getTextureCoord(float x, float y) const {
 
 void OESTexture::onRelease(tgfx::Context* context) {
   if (sampler.id > 0) {
-    auto gl = tgfx::GLInterface::Get(context);
-    gl->functions->deleteTextures(1, &sampler.id);
+    auto gl = tgfx::GLFunctions::Get(context);
+    gl->deleteTextures(1, &sampler.id);
   }
 }
 
@@ -162,18 +162,18 @@ bool VideoSurface::attachToContext(JNIEnv* env, tgfx::Context* context) {
     }
     return true;
   }
-  auto gl = tgfx::GLInterface::Get(context);
+  auto gl = tgfx::GLFunctions::Get(context);
   tgfx::GLSampler sampler = {};
   sampler.target = GL_TEXTURE_EXTERNAL_OES;
   sampler.format = tgfx::PixelFormat::RGBA_8888;
-  gl->functions->genTextures(1, &sampler.id);
+  gl->genTextures(1, &sampler.id);
   if (sampler.id == 0) {
     return false;
   }
   auto result =
       env->CallBooleanMethod(videoSurface.get(), VideoSurface_attachToGLContext, sampler.id);
   if (!result) {
-    gl->functions->deleteTextures(1, &sampler.id);
+    gl->deleteTextures(1, &sampler.id);
     LOGE("VideoSurface::attachToGLContext(): failed to attached to a Surface!");
     return false;
   }
