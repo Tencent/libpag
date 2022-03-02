@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <list>
 #include <memory>
 #include <unordered_set>
 #include "TextAtlas.h"
