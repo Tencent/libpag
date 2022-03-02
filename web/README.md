@@ -149,6 +149,12 @@ CMAKE_TOOLCHAIN_FILE=path/to/emscripten/emscripten/version/cmake/Modules/Platfor
 
 ### Test
 
+Build release version
+
+```bash
+$ cd script & ./build.sh
+```
+
 Start test HTTP server.
 
 ```bash
