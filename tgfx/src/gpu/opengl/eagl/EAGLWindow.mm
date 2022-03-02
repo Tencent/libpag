@@ -106,7 +106,7 @@ EAGLWindow::~EAGLWindow() {
 std::shared_ptr<Surface> EAGLWindow::onCreateSurface(Context* context) {
   if (pixelBuffer != nil) {
     auto texture = EAGLHardwareTexture::MakeFrom(context, pixelBuffer);
-    return GLSurface::MakeFrom(context, texture);
+    return GLSurface::MakeFrom(texture);
   }
   auto gl = GLFunctions::Get(context);
   if (frameBufferID > 0) {
@@ -141,7 +141,7 @@ std::shared_ptr<Surface> EAGLWindow::onCreateSurface(Context* context) {
   glInfo.format = PixelFormat::RGBA_8888;
   auto renderTarget = GLRenderTarget::MakeFrom(context, glInfo, static_cast<int>(width),
                                                static_cast<int>(height), ImageOrigin::BottomLeft);
-  return Surface::MakeFrom(context, renderTarget);
+  return Surface::MakeFrom(renderTarget);
 }
 
 void EAGLWindow::onPresent(Context* context, int64_t) {

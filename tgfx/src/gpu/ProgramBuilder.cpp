@@ -22,8 +22,9 @@
 #include "GLXferProcessor.h"
 
 namespace tgfx {
-ProgramBuilder::ProgramBuilder(const GeometryProcessor* geometryProcessor, const Pipeline* pipeline)
-    : geometryProcessor(geometryProcessor), pipeline(pipeline) {
+ProgramBuilder::ProgramBuilder(Context* context, const GeometryProcessor* geometryProcessor,
+                               const Pipeline* pipeline)
+    : context(context), geometryProcessor(geometryProcessor), pipeline(pipeline) {
 }
 
 bool ProgramBuilder::emitAndInstallProcessors() {

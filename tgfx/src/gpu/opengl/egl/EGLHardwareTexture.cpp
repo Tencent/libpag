@@ -110,7 +110,7 @@ void EGLHardwareTexture::ComputeRecycleKey(BytesKey* recycleKey, void* hardwareB
   recycleKey->write(hardwareBuffer);
 }
 
-void EGLHardwareTexture::onRelease(Context* context) {
+void EGLHardwareTexture::onReleaseGPU() {
   glDeleteTextures(1, &sampler.id);
   auto display = static_cast<EGLDevice*>(context->device())->getDisplay();
   eglext::eglDestroyImageKHR(display, eglImage);

@@ -87,7 +87,7 @@ bool GLDrawer::init(Context* context) {
   return CheckGLError(context);
 }
 
-void GLDrawer::onRelease(Context* context) {
+void GLDrawer::onReleaseGPU() {
   auto gl = GLFunctions::Get(context);
   if (vertexArray > 0) {
     gl->deleteVertexArrays(1, &vertexArray);
@@ -213,8 +213,7 @@ void GLDrawer::draw(DrawArgs args, std::unique_ptr<GLDrawOp> op) const {
   if (pipeline.needsBarrierTexture(args.renderTargetTexture.get())) {
     gl->textureBarrier();
   }
-  program->updateUniformsAndTextureBindings(GLContext::Unwrap(args.context), *geometryProcessor,
-                                            pipeline);
+  program->updateUniformsAndTextureBindings(*geometryProcessor, pipeline);
   if (vertexArray > 0) {
     gl->bindVertexArray(vertexArray);
   }

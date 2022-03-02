@@ -38,10 +38,6 @@ class GLProgramBuilder : public ProgramBuilder {
   static std::unique_ptr<GLProgram> CreateProgram(Context* context,
                                                   const GeometryProcessor* geometryProcessor,
                                                   const Pipeline* pipeline);
-  Context* getContext() const override {
-    return context;
-  }
-
   std::string versionDeclString() override;
 
   std::string textureFuncName() const override;
@@ -84,7 +80,6 @@ class GLProgramBuilder : public ProgramBuilder {
 
   bool checkSamplerCounts() override;
 
-  Context* context = nullptr;
   VaryingHandler _varyingHandler;
   GLUniformHandler _uniformHandler;
   GLVertexShaderBuilder _vertexBuilder;

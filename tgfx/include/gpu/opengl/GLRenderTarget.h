@@ -58,9 +58,6 @@ class GLRenderTarget : public RenderTarget {
     return renderTargetFBInfo;
   }
 
- protected:
-  void onRelease(Context* context) override;
-
  private:
   GLFrameBuffer textureFBInfo = {};
   GLFrameBuffer renderTargetFBInfo = {};
@@ -72,23 +69,23 @@ class GLRenderTarget : public RenderTarget {
    * Creates a new render target which uses specified texture as pixel storage. Caller must ensure
    * texture is valid for the lifetime of returned render target.
    */
-  static std::shared_ptr<GLRenderTarget> MakeFrom(Context* context, const GLTexture* texture,
-                                                  int sampleCount = 1);
+  static std::shared_ptr<GLRenderTarget> MakeFrom(const GLTexture* texture, int sampleCount = 1);
 
   GLRenderTarget(int width, int height, ImageOrigin origin, int sampleCount,
                  GLFrameBuffer frameBuffer, unsigned textureTarget = 0);
 
-  void clear(Context* context) const;
+  void onReleaseGPU() override;
 
-  void resolve(Context* context) const;
+  void clear() const;
+
+  void resolve() const;
 
   /**
    * Copies a rect of pixels to dstPixels with specified color type, alpha type and row bytes. Copy
    * starts at (srcX, srcY), and does not exceed Surface (width(), height()). Pixels are copied
    * only if pixel conversion is possible. Returns true if pixels are copied to dstPixels.
    */
-  bool readPixels(Context* context, const ImageInfo& dstInfo, void* dstPixels, int srcX = 0,
-                  int srcY = 0) const;
+  bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0, int srcY = 0) const;
 
   friend class GLSurface;
 

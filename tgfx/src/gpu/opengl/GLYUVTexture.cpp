@@ -197,7 +197,7 @@ const TextureSampler* GLYUVTexture::getSamplerAt(size_t index) const {
   return &samplers[index];
 }
 
-void GLYUVTexture::onRelease(Context* context) {
+void GLYUVTexture::onReleaseGPU() {
   auto gl = GLFunctions::Get(context);
   for (const auto& sampler : samplers) {
     gl->deleteTextures(1, &sampler.id);

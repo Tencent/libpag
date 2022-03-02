@@ -34,12 +34,13 @@ class CGLHardwareTexture : public GLTexture {
 
  protected:
   void computeRecycleKey(BytesKey* recycleKey) const override;
-  void onRelease(Context*) override;
 
  private:
   CVPixelBufferRef pixelBuffer = nullptr;
   CVOpenGLTextureRef texture = nil;
 
   static void ComputeRecycleKey(BytesKey* recycleKey, CVPixelBufferRef pixelBuffer);
+
+  void onReleaseGPU() override;
 };
 }  // namespace tgfx

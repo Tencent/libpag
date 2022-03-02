@@ -56,7 +56,7 @@ void ProgramCache::removeOldestProgram(bool releaseGPU) {
   programLRU.pop_back();
   programMap.erase(program->uniqueKey);
   if (releaseGPU) {
-    program->onRelease(context);
+    program->onReleaseGPU();
   }
   delete program;
 }

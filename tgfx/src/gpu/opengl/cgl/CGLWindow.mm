@@ -110,11 +110,12 @@ std::shared_ptr<Surface> CGLWindow::onCreateSurface(Context* context) {
     GLFrameBuffer frameBuffer = {};
     frameBuffer.id = 0;
     frameBuffer.format = PixelFormat::RGBA_8888;
-    auto renderTarget = GLRenderTarget::MakeFrom(context, frameBuffer, size.width, size.height, ImageOrigin::BottomLeft);
-    return Surface::MakeFrom(context, renderTarget);
+    auto renderTarget = GLRenderTarget::MakeFrom(context, frameBuffer, size.width, size.height,
+                                                 ImageOrigin::BottomLeft);
+    return Surface::MakeFrom(renderTarget);
   }
   auto texture = CGLHardwareTexture::MakeFrom(context, pixelBuffer);
-  return Surface::MakeFrom(context, texture);
+  return Surface::MakeFrom(texture);
 }
 
 void CGLWindow::onPresent(Context*, int64_t) {

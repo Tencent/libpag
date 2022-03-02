@@ -24,7 +24,7 @@
 namespace tgfx {
 class GLProgramDataManager : public ProgramDataManager {
  public:
-  GLProgramDataManager(const GLFunctions* gl, const std::vector<int>* uniforms);
+  GLProgramDataManager(Context* context, const std::vector<int>* uniforms);
 
   void set1f(UniformHandle handle, float v0) const override;
 

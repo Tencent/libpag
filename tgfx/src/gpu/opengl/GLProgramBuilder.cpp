@@ -69,8 +69,7 @@ std::unique_ptr<GLProgram> GLProgramBuilder::CreateProgram(
 
 GLProgramBuilder::GLProgramBuilder(Context* context, const GeometryProcessor* geometryProcessor,
                                    const Pipeline* pipeline)
-    : ProgramBuilder(geometryProcessor, pipeline),
-      context(context),
+    : ProgramBuilder(context, geometryProcessor, pipeline),
       _varyingHandler(this),
       _uniformHandler(this),
       _vertexBuilder(this),
@@ -150,10 +149,10 @@ bool GLProgramBuilder::checkSamplerCounts() {
 }
 
 std::unique_ptr<GLProgram> GLProgramBuilder::createProgram(unsigned programID) {
-  auto program = new GLProgram(programID, _uniformHandler.uniforms, std::move(glGeometryProcessor),
-                               std::move(xferProcessor), std::move(fragmentProcessors), attributes,
-                               vertexStride);
-  program->setupSamplerUniforms(context, _uniformHandler.samplers);
+  auto program = new GLProgram(context, programID, _uniformHandler.uniforms,
+                               std::move(glGeometryProcessor), std::move(xferProcessor),
+                               std::move(fragmentProcessors), attributes, vertexStride);
+  program->setupSamplerUniforms(_uniformHandler.samplers);
   return std::unique_ptr<GLProgram>(program);
 }
 

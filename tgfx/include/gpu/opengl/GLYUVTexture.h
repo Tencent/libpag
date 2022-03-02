@@ -40,7 +40,8 @@ class GLYUVTexture : public YUVTexture {
 
   GLYUVTexture(YUVColorSpace colorSpace, YUVColorRange colorRange, int width, int height);
 
-  void onRelease(Context*) override;
+ private:
+  void onReleaseGPU() override;
 
   friend class YUVTexture;
 };

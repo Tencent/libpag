@@ -89,7 +89,7 @@ EAGLNV12Texture::~EAGLNV12Texture() {
   }
 }
 
-void EAGLNV12Texture::onRelease(Context*) {
+void EAGLNV12Texture::onReleaseGPU() {
   if (lumaTexture == nil || chromaTexture == nil) {
     return;
   }

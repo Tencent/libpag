@@ -34,7 +34,7 @@ std::shared_ptr<tgfx::Surface> RenderTargetDrawable::createSurface(tgfx::Context
   }
   auto glRT = tgfx::GLRenderTarget::MakeFrom(context, frameBuffer, renderTarget.width(),
                                              renderTarget.height(), origin);
-  return tgfx::Surface::MakeFrom(context, std::move(glRT));
+  return tgfx::Surface::MakeFrom(std::move(glRT));
 }
 
 TextureDrawable::TextureDrawable(std::shared_ptr<tgfx::Device> device,
@@ -49,7 +49,7 @@ std::shared_ptr<tgfx::Surface> TextureDrawable::createSurface(tgfx::Context* con
   }
   auto glTexture =
       tgfx::GLTexture::MakeFrom(context, sampler, texture.width(), texture.height(), origin);
-  return tgfx::Surface::MakeFrom(context, std::move(glTexture));
+  return tgfx::Surface::MakeFrom(std::move(glTexture));
 }
 
 OffscreenDrawable::OffscreenDrawable(int width, int height, std::shared_ptr<tgfx::Device> device)

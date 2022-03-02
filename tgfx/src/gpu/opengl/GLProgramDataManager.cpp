@@ -21,8 +21,8 @@
 #include "GLUtil.h"
 
 namespace tgfx {
-GLProgramDataManager::GLProgramDataManager(const GLFunctions* gl, const std::vector<int>* uniforms)
-    : gl(gl), uniforms(uniforms) {
+GLProgramDataManager::GLProgramDataManager(Context* context, const std::vector<int>* uniforms)
+    : gl(GLFunctions::Get(context)), uniforms(uniforms) {
 }
 
 void GLProgramDataManager::set1f(UniformHandle handle, float v0) const {

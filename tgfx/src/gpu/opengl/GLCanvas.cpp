@@ -35,7 +35,7 @@ GLCanvas::GLCanvas(Surface* surface) : Canvas(surface) {
 
 void GLCanvas::clear() {
   auto renderTarget = std::static_pointer_cast<GLRenderTarget>(surface->getRenderTarget());
-  renderTarget->clear(getContext());
+  renderTarget->clear();
 }
 
 void GLCanvas::drawTexture(const Texture* texture, const Texture* mask, bool inverted) {

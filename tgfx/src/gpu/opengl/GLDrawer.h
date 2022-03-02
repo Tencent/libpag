@@ -63,7 +63,7 @@ class GLDrawer : public Resource {
  private:
   bool init(Context* context);
 
-  void onRelease(Context* context) override;
+  void onReleaseGPU() override;
 
   unsigned vertexArray = 0;
   unsigned vertexBuffer = 0;

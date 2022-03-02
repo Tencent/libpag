@@ -38,11 +38,10 @@ class FilterProgram : public tgfx::Resource {
   unsigned int vertexArray = 0;
   unsigned int vertexBuffer = 0;
 
- protected:
-  void onRelease(tgfx::Context* context) override;
-
  private:
   FilterProgram() = default;
+
+  void onReleaseGPU() override;
 };
 
 class LayerFilter : public Filter {

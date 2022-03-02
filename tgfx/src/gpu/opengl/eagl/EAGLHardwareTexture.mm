@@ -113,7 +113,7 @@ void EAGLHardwareTexture::computeRecycleKey(BytesKey* recycleKey) const {
   ComputeRecycleKey(recycleKey, pixelBuffer);
 }
 
-void EAGLHardwareTexture::onRelease(Context* context) {
+void EAGLHardwareTexture::onReleaseGPU() {
   if (texture == nil) {
     return;
   }

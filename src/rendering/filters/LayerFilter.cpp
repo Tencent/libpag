@@ -95,7 +95,7 @@ std::shared_ptr<const FilterProgram> FilterProgram::Make(tgfx::Context* context,
   return Resource::Wrap(context, filterProgram);
 }
 
-void FilterProgram::onRelease(tgfx::Context* context) {
+void FilterProgram::onReleaseGPU() {
   auto gl = tgfx::GLFunctions::Get(context);
   if (program > 0) {
     gl->deleteProgram(program);

@@ -22,7 +22,7 @@
 
 namespace tgfx {
 /**
- * The base class for GPU resource. Overrides the onRelease() method to to free all GPU resources.
+ * The base class for GPU resource. Overrides the onReleaseGPU() method to to free all GPU resources.
  * No backend API calls should be made during destructuring since there may be no GPU context which
  * is current on the calling thread.
  * Note: Resource is not thread safe, do not access any properties of a Resource unless its
@@ -47,23 +47,24 @@ class Resource {
   }
 
  protected:
+  Context* context = nullptr;
+
   /**
    * Overridden to compute a recycleKey to make this Resource reusable.
    */
   virtual void computeRecycleKey(BytesKey*) const {
   }
 
-  /**
-   * Overridden to free GPU resources in the backend API.
-   */
-  virtual void onRelease(Context* context) = 0;
-
  private:
-  Context* context = nullptr;
   std::weak_ptr<Resource> weakThis;
   BytesKey recycleKey = {};
   size_t cacheArrayIndex = 0;
   int64_t lastUsedTime = 0;
+
+  /**
+   * Overridden to free GPU resources in the backend API.
+   */
+  virtual void onReleaseGPU() = 0;
 
   friend class ResourceCache;
 };

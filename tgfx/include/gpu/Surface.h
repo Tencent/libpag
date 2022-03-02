@@ -59,15 +59,13 @@ class Surface {
   /**
    * Wraps a render target into Surface. Returns nullptr if renderTarget is nullptr.
    */
-  static std::shared_ptr<Surface> MakeFrom(Context* context,
-                                           std::shared_ptr<RenderTarget> renderTarget);
+  static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<RenderTarget> renderTarget);
 
   /**
    * Wraps a texture into Surface. A Surface with MSAA enabled is returned if the sampleCount is
    * greater than 1. Returns nullptr if the specified texture is not renderable.
    */
-  static std::shared_ptr<Surface> MakeFrom(Context* context, std::shared_ptr<Texture> texture,
-                                           int sampleCount = 1);
+  static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<Texture> texture, int sampleCount = 1);
 
   explicit Surface(Context* context);
 
@@ -168,11 +166,12 @@ class Surface {
   bool hitTest(float x, float y) const;
 
  protected:
+  Context* context = nullptr;
+  
   virtual bool onReadPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX,
                             int srcY) const = 0;
 
  private:
-  Context* context = nullptr;
   std::unique_ptr<SurfaceOptions> surfaceOptions = nullptr;
 };
 }  // namespace tgfx

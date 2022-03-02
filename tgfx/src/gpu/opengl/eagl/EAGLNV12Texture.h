@@ -36,12 +36,11 @@ class EAGLNV12Texture : public GLYUVTexture {
     return YUVPixelFormat::NV12;
   }
 
- protected:
-  void onRelease(Context* context) override;
-
  private:
   CVPixelBufferRef pixelBuffer = nullptr;
   CVOpenGLESTextureRef lumaTexture = nullptr;
   CVOpenGLESTextureRef chromaTexture = nullptr;
+
+  void onReleaseGPU() override;
 };
 }  // namespace tgfx

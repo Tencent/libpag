@@ -108,10 +108,12 @@ static void ReleaseResource(Context* context, GLFrameBuffer* textureFBInfo,
   }
 }
 
-static bool CreateRenderBuffer(Context* context, const GLTexture* texture,
-                               GLFrameBuffer* renderTargetFBInfo, unsigned* msRenderBufferID,
-                               int sampleCount) {
-  auto gl = GLFunctions::Get(context);
+static bool CreateRenderBuffer(const GLTexture* texture, GLFrameBuffer* renderTargetFBInfo,
+                               unsigned* msRenderBufferID, int sampleCount) {
+  if (texture == nullptr) {
+    return false;
+  }
+  auto gl = GLFunctions::Get(texture->getContext());
   gl->genFramebuffers(1, &(renderTargetFBInfo->id));
   if (renderTargetFBInfo->id == 0) {
     return false;
@@ -121,8 +123,8 @@ static bool CreateRenderBuffer(Context* context, const GLTexture* texture,
     return false;
   }
   gl->bindRenderbuffer(GL_RENDERBUFFER, *msRenderBufferID);
-  if (!RenderbufferStorageMSAA(context, sampleCount, renderTargetFBInfo->format, texture->width(),
-                               texture->height())) {
+  if (!RenderbufferStorageMSAA(texture->getContext(), sampleCount, renderTargetFBInfo->format,
+                               texture->width(), texture->height())) {
     return false;
   }
   gl->bindFramebuffer(GL_FRAMEBUFFER, renderTargetFBInfo->id);
@@ -135,11 +137,12 @@ static bool CreateRenderBuffer(Context* context, const GLTexture* texture,
 #endif
 }
 
-std::shared_ptr<GLRenderTarget> GLRenderTarget::MakeFrom(Context* context, const GLTexture* texture,
+std::shared_ptr<GLRenderTarget> GLRenderTarget::MakeFrom(const GLTexture* texture,
                                                          int sampleCount) {
-  if (texture == nullptr || context == nullptr) {
+  if (texture == nullptr) {
     return nullptr;
   }
+  auto context = texture->getContext();
   auto gl = GLFunctions::Get(context);
   auto caps = GLCaps::Get(context);
   GLFrameBuffer textureFBInfo = {};
@@ -152,8 +155,7 @@ std::shared_ptr<GLRenderTarget> GLRenderTarget::MakeFrom(Context* context, const
   renderTargetFBInfo.format = texture->glSampler().format;
   unsigned msRenderBufferID = 0;
   if (sampleCount > 1 && caps->usesMSAARenderBuffers()) {
-    if (!CreateRenderBuffer(context, texture, &renderTargetFBInfo, &msRenderBufferID,
-                            sampleCount)) {
+    if (!CreateRenderBuffer(texture, &renderTargetFBInfo, &msRenderBufferID, sampleCount)) {
       ReleaseResource(context, &textureFBInfo, &renderTargetFBInfo, &msRenderBufferID);
       return nullptr;
     }
@@ -184,7 +186,7 @@ GLRenderTarget::GLRenderTarget(int width, int height, ImageOrigin origin, int sa
       textureTarget(textureTarget) {
 }
 
-void GLRenderTarget::clear(Context* context) const {
+void GLRenderTarget::clear() const {
   int oldFb = 0;
   auto gl = GLFunctions::Get(context);
   gl->getIntegerv(GL_FRAMEBUFFER_BINDING, &oldFb);
@@ -230,8 +232,8 @@ static void CopyPixels(const ImageInfo& srcInfo, const void* srcPixels, const Im
   delete[] tempPixels;
 }
 
-bool GLRenderTarget::readPixels(Context* context, const ImageInfo& dstInfo, void* dstPixels,
-                                int srcX, int srcY) const {
+bool GLRenderTarget::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX,
+                                int srcY) const {
   dstPixels = dstInfo.computeOffset(dstPixels, -srcX, -srcY);
   auto outInfo = dstInfo.makeIntersect(-srcX, -srcY, width(), height());
   if (outInfo.isEmpty()) {
@@ -279,7 +281,7 @@ bool GLRenderTarget::readPixels(Context* context, const ImageInfo& dstInfo, void
   return true;
 }
 
-void GLRenderTarget::resolve(Context* context) const {
+void GLRenderTarget::resolve() const {
   if (sampleCount() <= 1) {
     return;
   }
@@ -304,7 +306,7 @@ void GLRenderTarget::resolve(Context* context) const {
   }
 }
 
-void GLRenderTarget::onRelease(Context* context) {
+void GLRenderTarget::onReleaseGPU() {
   if (externalTexture) {
     return;
   }

@@ -55,7 +55,7 @@ void GLBuffer::computeRecycleKey(BytesKey* bytesKey) const {
   ComputeRecycleKey(bytesKey, uniqueKey, _length);
 }
 
-void GLBuffer::onRelease(Context* context) {
+void GLBuffer::onReleaseGPU() {
   if (_bufferID > 0) {
     auto gl = GLFunctions::Get(context);
     gl->deleteBuffers(1, &_bufferID);

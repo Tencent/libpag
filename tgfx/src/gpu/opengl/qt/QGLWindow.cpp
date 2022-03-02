@@ -99,7 +99,7 @@ std::shared_ptr<Surface> QGLWindow::onCreateSurface(Context* context) {
   }
   frontTexture = std::static_pointer_cast<GLTexture>(Texture::MakeRGBA(context, width, height));
   backTexture = std::static_pointer_cast<GLTexture>(Texture::MakeRGBA(context, width, height));
-  auto surface = Surface::MakeFrom(context, backTexture);
+  auto surface = Surface::MakeFrom(backTexture);
   renderTarget = std::static_pointer_cast<GLRenderTarget>(surface->getRenderTarget());
   return surface;
 }

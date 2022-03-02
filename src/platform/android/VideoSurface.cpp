@@ -84,7 +84,7 @@ tgfx::Point OESTexture::getTextureCoord(float x, float y) const {
   return {x / static_cast<float>(width()) * sx + tx, y / static_cast<float>(height()) * sy + ty};
 }
 
-void OESTexture::onRelease(tgfx::Context* context) {
+void OESTexture::onReleaseGPU() {
   if (sampler.id > 0) {
     auto gl = tgfx::GLFunctions::Get(context);
     gl->deleteTextures(1, &sampler.id);

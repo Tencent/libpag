@@ -29,16 +29,15 @@ class GLBackendTexture : public GLTexture {
     sampler = std::move(textureSampler);
   }
 
- protected:
-  void onRelease(Context* context) override {
+ private:
+  bool adopted = false;
+
+  void onReleaseGPU() override {
     if (adopted) {
       auto gl = GLFunctions::Get(context);
       gl->deleteTextures(1, &sampler.id);
     }
   }
-
- private:
-  bool adopted = false;
 };
 
 std::shared_ptr<GLTexture> GLTexture::MakeFrom(Context* context, const GLSampler& sampler,
@@ -78,7 +77,8 @@ class GLAlphaTexture : public GLTexture {
     ComputeRecycleKey(recycleKey, width(), height());
   }
 
-  void onRelease(Context* context) override {
+ private:
+  void onReleaseGPU() override {
     auto gl = GLFunctions::Get(context);
     gl->deleteTextures(1, &sampler.id);
   }
@@ -104,7 +104,8 @@ class GLRGBATexture : public GLTexture {
     ComputeRecycleKey(recycleKey, width(), height());
   }
 
-  void onRelease(Context* context) override {
+ private:
+  void onReleaseGPU() override {
     auto gl = GLFunctions::Get(context);
     gl->deleteTextures(1, &sampler.id);
   }
