@@ -37,11 +37,12 @@ namespace pag {
 
 class ImageTask : public Executor {
  public:
-  static std::shared_ptr<Task> MakeAndRun(std::shared_ptr<tgfx::Image> image) {
+  static std::shared_ptr<Task> MakeAndRun(std::shared_ptr<tgfx::Image> image,
+                                          std::shared_ptr<File> file) {
     if (image == nullptr) {
       return nullptr;
     }
-    auto bitmap = new ImageTask(std::move(image));
+    auto bitmap = new ImageTask(std::move(image), file);
     auto task = Task::Make(std::unique_ptr<ImageTask>(bitmap));
     task->run();
     return task;
@@ -54,8 +55,11 @@ class ImageTask : public Executor {
  private:
   std::shared_ptr<tgfx::TextureBuffer> buffer = {};
   std::shared_ptr<tgfx::Image> image = nullptr;
+  // Make a reference to file when image made from imageByte of file.
+  std::shared_ptr<File> file = nullptr;
 
-  explicit ImageTask(std::shared_ptr<tgfx::Image> image) : image(std::move(image)) {
+  explicit ImageTask(std::shared_ptr<tgfx::Image> image, std::shared_ptr<File> file)
+      : image(std::move(image)), file(std::move(file)) {
   }
 
   void execute() override {
@@ -125,13 +129,13 @@ void RenderCache::prepareImageLayer(PAGImageLayer* pagLayer) {
     auto imageBytes = static_cast<ImageLayer*>(pagLayer->layer)->imageBytes;
     auto image = ImageContentCache::GetImage(imageBytes);
     if (image) {
-      prepareImage(imageBytes->uniqueID, image);
+      prepareImage(imageBytes->uniqueID, image, pagLayer->file);
     }
     return;
   }
   auto image = pagImage->getImage();
   if (image) {
-    prepareImage(pagImage->uniqueID(), image);
+    prepareImage(pagImage->uniqueID(), image, pagLayer->file);
   }
 }
 
@@ -356,12 +360,13 @@ void RenderCache::clearExpiredSnapshots() {
   }
 }
 
-void RenderCache::prepareImage(ID assetID, std::shared_ptr<tgfx::Image> image) {
+void RenderCache::prepareImage(ID assetID, std::shared_ptr<tgfx::Image> image,
+                               std::shared_ptr<File> file) {
   usedAssets.insert(assetID);
   if (imageTasks.count(assetID) != 0 || snapshotCaches.count(assetID) != 0) {
     return;
   }
-  auto task = ImageTask::MakeAndRun(std::move(image));
+  auto task = ImageTask::MakeAndRun(std::move(image), std::move(file));
   if (task) {
     imageTasks[assetID] = task;
   }
