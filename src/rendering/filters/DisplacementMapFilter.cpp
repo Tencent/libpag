@@ -121,7 +121,7 @@ void DisplacementMapFilter::updateMapTexture(RenderCache* cache, const Graphic* 
 void DisplacementMapFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
                                            const tgfx::Point&) {
   auto* pagEffect = reinterpret_cast<const DisplacementMapEffect*>(effect);
-  tgfx::GLContext::Unwrap(context)->bindTexture(1, mapSurface->getTexture()->getSampler());
+  ActiveGLTexture(context, 1, mapSurface->getTexture()->getSampler());
   auto gl = tgfx::GLFunctions::Get(context);
   gl->uniform2f(useForDisplacementHandle,
                 pagEffect->useForHorizontalDisplacement->getValueAt(layerFrame),

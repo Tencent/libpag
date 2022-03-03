@@ -20,7 +20,6 @@
 
 #include "gpu/Surface.h"
 #include "gpu/opengl/GLRenderTarget.h"
-#include "gpu/opengl/GLUtil.h"
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "rendering/filters/Filter.h"

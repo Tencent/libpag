@@ -81,14 +81,13 @@ std::shared_ptr<const FilterProgram> FilterProgram::Make(tgfx::Context* context,
                                                          const std::string& vertex,
                                                          const std::string& fragment) {
   auto gl = tgfx::GLFunctions::Get(context);
-  auto caps = tgfx::GLCaps::Get(context);
-  auto program = tgfx::CreateGLProgram(context, vertex, fragment);
+  auto program = CreateGLProgram(context, vertex, fragment);
   if (program == 0) {
     return nullptr;
   }
   auto filterProgram = new FilterProgram();
   filterProgram->program = program;
-  if (caps->vertexArrayObjectSupport) {
+  if (gl->bindVertexArray != nullptr) {
     gl->genVertexArrays(1, &filterProgram->vertexArray);
   }
   gl->genBuffers(1, &filterProgram->vertexBuffer);
@@ -205,16 +204,14 @@ void LayerFilter::update(Frame frame, const tgfx::Rect& inputBounds, const tgfx:
 }
 
 static void EnableMultisample(tgfx::Context* context, bool usesMSAA) {
-  auto caps = tgfx::GLCaps::Get(context);
-  if (usesMSAA && caps->multisampleDisableSupport) {
+  if (usesMSAA && context->caps()->multisampleDisableSupport) {
     auto gl = tgfx::GLFunctions::Get(context);
     gl->enable(GL_MULTISAMPLE);
   }
 }
 
 static void DisableMultisample(tgfx::Context* context, bool usesMSAA) {
-  auto caps = tgfx::GLCaps::Get(context);
-  if (usesMSAA && caps->multisampleDisableSupport) {
+  if (usesMSAA && context->caps()->multisampleDisableSupport) {
     auto gl = tgfx::GLFunctions::Get(context);
     gl->disable(GL_MULTISAMPLE);
   }
@@ -237,7 +234,7 @@ void LayerFilter::draw(tgfx::Context* context, const FilterSource* source,
   gl->blendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
   gl->bindFramebuffer(GL_FRAMEBUFFER, target->frameBuffer.id);
   gl->viewport(0, 0, target->width, target->height);
-  tgfx::GLContext::Unwrap(context)->bindTexture(0, &source->sampler);
+  ActiveGLTexture(context, 0, &source->sampler);
   gl->uniformMatrix3fv(vertexMatrixHandle, 1, GL_FALSE, target->vertexMatrix.data());
   gl->uniformMatrix3fv(textureMatrixHandle, 1, GL_FALSE, source->textureMatrix.data());
   onUpdateParams(context, contentBounds, filterScale);

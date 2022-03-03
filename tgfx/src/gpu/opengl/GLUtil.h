@@ -44,14 +44,8 @@ unsigned LoadGLShader(Context* context, unsigned shaderType, const std::string& 
 
 bool CheckGLError(Context* context);
 
-bool CreateGLTexture(Context* context, int width, int height, GLSampler* texture);
-
 void SubmitGLTexture(Context* context, const GLSampler& sampler, int width, int height,
                      size_t rowBytes, int bytesPerPixel, void* pixels);
 
 std::array<float, 9> ToGLMatrix(const Matrix& matrix);
-std::array<float, 9> ToGLVertexMatrix(const Matrix& matrix, int width, int height,
-                                      ImageOrigin origin);
-std::array<float, 9> ToGLTextureMatrix(const Matrix& matrix, int width, int height,
-                                       ImageOrigin origin);
 }  // namespace tgfx

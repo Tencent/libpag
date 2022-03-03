@@ -21,6 +21,7 @@
 #include "core/BytesKey.h"
 #include "core/Color.h"
 #include "gpu/Backend.h"
+#include "gpu/Caps.h"
 #include "gpu/Device.h"
 
 namespace tgfx {
@@ -29,8 +30,6 @@ class ProgramCache;
 class GradientCache;
 
 class ResourceCache;
-
-class Caps;
 
 class Context {
  public:

@@ -70,6 +70,6 @@ void GlowMergeFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect&,
   // TODO(domrjchen): 下面这行之前写成了 gl->uniform1i(progressHandle, 1), 会导致 glError,
   // 暂时注释掉。目前的发光效果跟 AE 也没有对齐，后面重写发光效果时时再修复。
   //  gl->uniform1i(blurTextureHandle, 1);
-  tgfx::GLContext::Unwrap(context)->bindTexture(1, &blurTexture);
+  ActiveGLTexture(context, 1, &blurTexture);
 }
 }  // namespace pag

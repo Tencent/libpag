@@ -51,24 +51,6 @@ GLVersion GetGLVersion(const char* versionString) {
   return {};
 }
 
-bool CreateGLTexture(Context* context, int width, int height, GLSampler* texture) {
-  texture->target = GL_TEXTURE_2D;
-  texture->format = PixelFormat::RGBA_8888;
-  auto gl = GLFunctions::Get(context);
-  gl->genTextures(1, &texture->id);
-  if (texture->id <= 0) {
-    return false;
-  }
-  gl->bindTexture(texture->target, texture->id);
-  gl->texParameteri(texture->target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  gl->texParameteri(texture->target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  gl->texParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  gl->texParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  gl->texImage2D(texture->target, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-  gl->bindTexture(texture->target, 0);
-  return true;
-}
-
 void SubmitGLTexture(Context* context, const GLSampler& sampler, int width, int height,
                      size_t rowBytes, int bytesPerPixel, void* pixels) {
   if (pixels == nullptr || rowBytes == 0) {
@@ -166,48 +148,5 @@ std::array<float, 9> ToGLMatrix(const Matrix& matrix) {
   matrix.get9(values);
   return {values[0], values[3], values[6], values[1], values[4],
           values[7], values[2], values[5], values[8]};
-}
-
-std::array<float, 9> ToGLVertexMatrix(const Matrix& matrix, int width, int height,
-                                      ImageOrigin origin) {
-  auto w = static_cast<float>(width);
-  auto h = static_cast<float>(height);
-  auto result = matrix;
-  Matrix convertMatrix = {};
-  // The following is equivalent：
-  // convertMatrix.setScale(1.0f, -1.0f);
-  // convertMatrix.postTranslate(1.0f, 1.0f);
-  // convertMatrix.postScale(width/2.0f, height/2f);
-  convertMatrix.setAll(w * 0.5f, 0.0f, w * 0.5f, 0.0f, h * -0.5f, h * 0.5f, 0.0f, 0.0f, 1.0f);
-  result.preConcat(convertMatrix);
-  if (convertMatrix.invert(&convertMatrix)) {
-    result.postConcat(convertMatrix);
-  }
-  if (origin == ImageOrigin::TopLeft) {
-    result.postScale(1.0f, -1.0f);
-  }
-  return ToGLMatrix(result);
-}
-
-std::array<float, 9> ToGLTextureMatrix(const Matrix& matrix, int width, int height,
-                                       ImageOrigin origin) {
-  auto w = static_cast<float>(width);
-  auto h = static_cast<float>(height);
-  auto result = matrix;
-  Matrix convertMatrix = {};
-  // The following is equivalent：
-  // convertMatrix.setScale(1.0f, -1.0f);
-  // convertMatrix.postTranslate(0.0f, 1.0f);
-  // convertMatrix.postScale(width, height);
-  convertMatrix.setAll(w, 0.0f, 0.0f, 0.0f, -h, h, 0.0f, 0.0f, 1.0f);
-  result.preConcat(convertMatrix);
-  if (convertMatrix.invert(&convertMatrix)) {
-    result.postConcat(convertMatrix);
-  }
-  if (origin == ImageOrigin::TopLeft) {
-    result.postScale(1.0f, -1.0f);
-    result.postTranslate(0.0f, 1.0f);
-  }
-  return ToGLMatrix(result);
 }
 }  // namespace tgfx
