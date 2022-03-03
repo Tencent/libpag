@@ -69,11 +69,8 @@ uint32_t PAGStage::getContentVersion() const {
   return contentVersion;
 }
 
-std::shared_ptr<File> PAGStage::getSequenceFile(Sequence* sequence) {
-  if (sequence == nullptr) {
-    return nullptr;
-  }
-  auto result = layerReferenceMap.find(sequence->composition->uniqueID);
+std::shared_ptr<File> PAGStage::getFileFromReferenceMap(ID uniqueID) {
+  auto result = layerReferenceMap.find(uniqueID);
   if (result == layerReferenceMap.end()) {
     return nullptr;
   }

@@ -129,13 +129,13 @@ void RenderCache::prepareImageLayer(PAGImageLayer* pagLayer) {
     auto imageBytes = static_cast<ImageLayer*>(pagLayer->layer)->imageBytes;
     auto image = ImageContentCache::GetImage(imageBytes);
     if (image) {
-      prepareImage(imageBytes->uniqueID, image, pagLayer->file);
+      prepareImage(imageBytes->uniqueID, image);
     }
     return;
   }
   auto image = pagImage->getImage();
   if (image) {
-    prepareImage(pagImage->uniqueID(), image, pagLayer->file);
+    prepareImage(pagImage->uniqueID(), image);
   }
 }
 
@@ -360,13 +360,12 @@ void RenderCache::clearExpiredSnapshots() {
   }
 }
 
-void RenderCache::prepareImage(ID assetID, std::shared_ptr<tgfx::Image> image,
-                               std::shared_ptr<File> file) {
+void RenderCache::prepareImage(ID assetID, std::shared_ptr<tgfx::Image> image) {
   usedAssets.insert(assetID);
   if (imageTasks.count(assetID) != 0 || snapshotCaches.count(assetID) != 0) {
     return;
   }
-  auto task = ImageTask::MakeAndRun(std::move(image), std::move(file));
+  auto task = ImageTask::MakeAndRun(std::move(image), stage->getFileFromReferenceMap(assetID));
   if (task) {
     imageTasks[assetID] = task;
   }
@@ -434,7 +433,7 @@ bool RenderCache::prepareSequenceReader(Sequence* sequence, Frame targetFrame,
     // 静态的序列帧采用位图的缓存逻辑，如果上层缓存过 Snapshot 就不需要预测。
     return false;
   }
-  auto file = stage->getSequenceFile(sequence);
+  auto file = stage->getFileFromReferenceMap(composition->uniqueID);
   auto reader = MakeSequenceReader(file, sequence, policy);
   sequenceCaches[composition->uniqueID] = reader;
   reader->prepareAsync(targetFrame);
@@ -465,7 +464,7 @@ std::shared_ptr<SequenceReader> RenderCache::getSequenceReader(Sequence* sequenc
     }
   }
   if (reader == nullptr) {
-    auto file = stage->getSequenceFile(sequence);
+    auto file = stage->getFileFromReferenceMap(composition->uniqueID);
     reader = MakeSequenceReader(file, sequence,
                                 SoftwareToHardwareEnabled() ? DecodingPolicy::SoftwareToHardware
                                                             : DecodingPolicy::Hardware);
