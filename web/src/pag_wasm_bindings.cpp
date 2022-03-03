@@ -42,24 +42,56 @@ EMSCRIPTEN_BINDINGS(pag) {
                   return static_cast<LayerType>(pagLayer.layerType());
                 }))
       .function("_layerName", &PAGLayer::layerName)
+      .function("_matrix",
+                optional_override([](PAGLayer& pagLayer) { return ToTGFX(pagLayer.matrix()); }))
+      .function("_setMatrix", optional_override([](PAGLayer& pagLayer, tgfx::Matrix matrix) {
+                  pagLayer.setMatrix(ToPAG(matrix));
+                }))
+      .function("_resetMatrix", &PAGLayer::resetMatrix)
+      .function("_getTotalMatrix", &PAGLayer::getTotalMatrix)
       .function("_alpha", &PAGLayer::alpha)
       .function("_setAlpha", &PAGLayer::setAlpha)
       .function("_visible", &PAGLayer::visible)
       .function("_setVisible", &PAGLayer::setVisible)
       .function("_editableIndex", &PAGLayer::editableIndex)
-      .function("_frameRate", &PAGLayer::frameRate)
-      .function("_duration", optional_override([](PAGLayer& pagLayer) {
-                  return static_cast<int>(pagLayer.duration());
-                }))
-      .function("_startTime", optional_override([](PAGLayer& pagLayer) {
-                  return static_cast<int>(pagLayer.startTime());
+      .function("_parent", &PAGLayer::parent)
+      .function("_markers", &PAGLayer::markers)
+      .function("_globalToLocalTime", optional_override([](PAGLayer& pagLayer, int globalTime) {
+                  return static_cast<int>(pagLayer.globalToLocalTime(globalTime));
                 }))
       .function("_localTimeToGlobal", optional_override([](PAGLayer& pagLayer, int localTime) {
                   return static_cast<int>(pagLayer.localTimeToGlobal(localTime));
                 }))
-      .function("_globalToLocalTime", optional_override([](PAGLayer& pagLayer, int globalTime) {
-                  return static_cast<int>(pagLayer.globalToLocalTime(globalTime));
-                }));
+      .function("_duration", optional_override([](PAGLayer& pagLayer) {
+                  return static_cast<int>(pagLayer.duration());
+                }))
+      .function("_frameRate", &PAGLayer::frameRate)
+      .function("_startTime", optional_override([](PAGLayer& pagLayer) {
+                  return static_cast<int>(pagLayer.startTime());
+                }))
+      .function("_startTime", optional_override([](PAGLayer& pagLayer) {
+                  return static_cast<int>(pagLayer.startTime());
+                }))
+      .function("_setStartTime", optional_override([](PAGLayer& pagLayer, int time) {
+                  return pagLayer.setStartTime(static_cast<int64_t>(time));
+                }))
+      .function("_currentTime", optional_override([](PAGLayer& pagLayer) {
+                  return static_cast<int>(pagLayer.currentTime());
+                }))
+      .function("_setCurrentTime", optional_override([](PAGLayer& pagLayer, int time) {
+                  return pagLayer.setCurrentTime(static_cast<int64_t>(time));
+                }))
+      .function("_getProgress", &PAGLayer::getProgress)
+      .function("_setProgress", &PAGLayer::setProgress)
+      .function("_preFrame", &PAGLayer::preFrame)
+      .function("_nextFrame", &PAGLayer::nextFrame)
+      .function("_getBounds",
+                optional_override([](PAGLayer& pagLayer) { return ToTGFX(pagLayer.getBounds()); }))
+      .function("_trackMatteLayer", &PAGLayer::trackMatteLayer)
+      .function("_excludedFromTimeline", &PAGLayer::excludedFromTimeline)
+      .function("_setExcludedFromTimeline", &PAGLayer::setExcludedFromTimeline)
+      .function("_isPAGFile", &PAGLayer::isPAGFile);
+
   class_<PAGComposition, base<PAGLayer>>("_PAGComposition")
       .smart_ptr<std::shared_ptr<PAGComposition>>("_PAGComposition")
       .function("_width", &PAGComposition::width)
