@@ -119,7 +119,7 @@ set(TGFX_USE_WEBP_ENCODE ${PAG_USE_WEBP_ENCODE})
 
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 add_subdirectory(tgfx/ EXCLUDE_FROM_ALL)
-list(APPEND PAG_INCLUDES tgfx/include tgfx/src)
+list(APPEND PAG_INCLUDES tgfx/include)
 
 if (PAG_USE_LIBAVC)
     add_definitions(-DPAG_USE_LIBAVC)
@@ -352,7 +352,7 @@ if (PAG_BUILD_TESTS)
 
     file(GLOB FFAVC_LIB vendor/ffavc/${LIBRARY_ENTRY}/*${CMAKE_SHARED_LIBRARY_SUFFIX})
     list(APPEND TEST_PLATFORM_LIBS ${FFAVC_LIB})
-    list(APPEND TEST_INCLUDES vendor/ffavc/include)
+    list(APPEND TEST_INCLUDES tgfx/src vendor/ffavc/include)
 
     add_executable(PAGUnitTest ${Test_VENDOR_TARGET} ${PAG_TEST_FILES})
     target_include_directories(PAGUnitTest PUBLIC ${TEST_INCLUDES})

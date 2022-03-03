@@ -30,4 +30,6 @@ std::shared_ptr<tgfx::PixelBuffer> MakeSnapshot(std::shared_ptr<PAGSurface> pagS
 
 std::shared_ptr<PAGLayer> GetLayer(std::shared_ptr<PAGComposition> root, LayerType type,
                                    int& targetIndex);
+
+bool CreateGLTexture(tgfx::Context* context, int width, int height, tgfx::GLSampler* texture);
 }  // namespace pag

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FilterBuffer.h"
+#include "FilterHelper.h"
 
 namespace pag {
 std::shared_ptr<FilterBuffer> FilterBuffer::Make(tgfx::Context* context, int width, int height,
@@ -52,8 +53,8 @@ std::unique_ptr<FilterSource> FilterBuffer::toFilterSource(const tgfx::Point& sc
   filterSource->height = surface->height();
   filterSource->scale = scale;
   // TODO(domrjchen): 这里的 ImageOrigin 是错的
-  filterSource->textureMatrix = tgfx::ToGLTextureMatrix(
-      tgfx::Matrix::I(), surface->width(), surface->height(), tgfx::ImageOrigin::BottomLeft);
+  filterSource->textureMatrix = ToGLTextureMatrix(tgfx::Matrix::I(), surface->width(),
+                                                  surface->height(), tgfx::ImageOrigin::BottomLeft);
   return std::unique_ptr<FilterSource>(filterSource);
 }
 
@@ -63,8 +64,8 @@ std::unique_ptr<FilterTarget> FilterBuffer::toFilterTarget(
   filterTarget->frameBuffer = getFramebuffer();
   filterTarget->width = surface->width();
   filterTarget->height = surface->height();
-  filterTarget->vertexMatrix = tgfx::ToGLVertexMatrix(
-      drawingMatrix, surface->width(), surface->height(), tgfx::ImageOrigin::BottomLeft);
+  filterTarget->vertexMatrix = ToGLVertexMatrix(drawingMatrix, surface->width(), surface->height(),
+                                                tgfx::ImageOrigin::BottomLeft);
   return std::unique_ptr<FilterTarget>(filterTarget);
 }
 }  // namespace pag
