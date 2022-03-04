@@ -33,6 +33,9 @@ export interface PAG extends EmscriptenModule {
     _FromTexture: (textureID: number, width: number, height: number, flipY: boolean) => any;
     _FromFrameBuffer: (framebufferID: number, width: number, height: number, flipY: boolean) => any;
   };
+  _PAGComposition: {
+    _Make: (width: number, height: number) => any;
+  };
   _SetFallbackFontNames: (fontName: any) => void;
   VectorString: any;
   webAssemblyQueue: WebAssemblyQueue;

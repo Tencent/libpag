@@ -94,19 +94,22 @@ EMSCRIPTEN_BINDINGS(pag) {
 
   class_<PAGComposition, base<PAGLayer>>("_PAGComposition")
       .smart_ptr<std::shared_ptr<PAGComposition>>("_PAGComposition")
+      .class_function("_Make", PAGComposition::Make)
       .function("_width", &PAGComposition::width)
       .function("_height", &PAGComposition::height)
       .function("_setContentSize", &PAGComposition::setContentSize)
       .function("_numChildren", &PAGComposition::numChildren)
       .function("_getLayerAt", &PAGComposition::getLayerAt)
       .function("_getLayerIndex", &PAGComposition::getLayerIndex)
-      .function("_swapLayerAt", &PAGComposition::swapLayerAt)
-      .function("_swapLayer", &PAGComposition::swapLayer)
-      .function("_contains", &PAGComposition::contains)
-      .function("_removeLayerAt", &PAGComposition::removeLayerAt)
-      .function("_removeAllLayers", &PAGComposition::removeAllLayers)
+      .function("_setLayerIndex", &PAGComposition::setLayerIndex)
       .function("_addLayer", &PAGComposition::addLayer)
       .function("_addLayerAt", &PAGComposition::addLayerAt)
+      .function("_contains", &PAGComposition::contains)
+      .function("_removeLayer", &PAGComposition::removeLayer)
+      .function("_removeLayerAt", &PAGComposition::removeLayerAt)
+      .function("_removeAllLayers", &PAGComposition::removeAllLayers)
+      .function("_swapLayer", &PAGComposition::swapLayer)
+      .function("_swapLayerAt", &PAGComposition::swapLayerAt)
       .function("_audioBytes", optional_override([](PAGComposition& pagComposition) {
                   ByteData* result = pagComposition.audioBytes();
                   if (result->length() == 0) {
@@ -121,6 +124,7 @@ EMSCRIPTEN_BINDINGS(pag) {
                 }))
       .function("_getLayersByName", &PAGComposition::getLayersByName)
       .function("_getLayersUnderPoint", &PAGComposition::getLayersUnderPoint);
+
   class_<PAGFile, base<PAGComposition>>("_PAGFile")
       .smart_ptr<std::shared_ptr<PAGFile>>("_PAGFile")
       .class_function("_Load", optional_override([](uintptr_t bytes, size_t length) {
