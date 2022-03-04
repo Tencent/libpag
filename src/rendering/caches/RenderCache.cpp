@@ -37,11 +37,12 @@ namespace pag {
 
 class ImageTask : public Executor {
  public:
-  static std::shared_ptr<Task> MakeAndRun(std::shared_ptr<tgfx::Image> image) {
+  static std::shared_ptr<Task> MakeAndRun(std::shared_ptr<tgfx::Image> image,
+                                          std::shared_ptr<File> file) {
     if (image == nullptr) {
       return nullptr;
     }
-    auto bitmap = new ImageTask(std::move(image));
+    auto bitmap = new ImageTask(std::move(image), file);
     auto task = Task::Make(std::unique_ptr<ImageTask>(bitmap));
     task->run();
     return task;
@@ -54,8 +55,11 @@ class ImageTask : public Executor {
  private:
   std::shared_ptr<tgfx::TextureBuffer> buffer = {};
   std::shared_ptr<tgfx::Image> image = nullptr;
+  // Make a reference to file when image made from imageByte of file.
+  std::shared_ptr<File> file = nullptr;
 
-  explicit ImageTask(std::shared_ptr<tgfx::Image> image) : image(std::move(image)) {
+  explicit ImageTask(std::shared_ptr<tgfx::Image> image, std::shared_ptr<File> file)
+      : image(std::move(image)), file(std::move(file)) {
   }
 
   void execute() override {
@@ -361,7 +365,7 @@ void RenderCache::prepareImage(ID assetID, std::shared_ptr<tgfx::Image> image) {
   if (imageTasks.count(assetID) != 0 || snapshotCaches.count(assetID) != 0) {
     return;
   }
-  auto task = ImageTask::MakeAndRun(std::move(image));
+  auto task = ImageTask::MakeAndRun(std::move(image), stage->getFileFromReferenceMap(assetID));
   if (task) {
     imageTasks[assetID] = task;
   }
@@ -429,7 +433,7 @@ bool RenderCache::prepareSequenceReader(Sequence* sequence, Frame targetFrame,
     // 静态的序列帧采用位图的缓存逻辑，如果上层缓存过 Snapshot 就不需要预测。
     return false;
   }
-  auto file = stage->getSequenceFile(sequence);
+  auto file = stage->getFileFromReferenceMap(composition->uniqueID);
   auto reader = MakeSequenceReader(file, sequence, policy);
   sequenceCaches[composition->uniqueID] = reader;
   reader->prepareAsync(targetFrame);
@@ -460,7 +464,7 @@ std::shared_ptr<SequenceReader> RenderCache::getSequenceReader(Sequence* sequenc
     }
   }
   if (reader == nullptr) {
-    auto file = stage->getSequenceFile(sequence);
+    auto file = stage->getFileFromReferenceMap(composition->uniqueID);
     reader = MakeSequenceReader(file, sequence,
                                 SoftwareToHardwareEnabled() ? DecodingPolicy::SoftwareToHardware
                                                             : DecodingPolicy::Hardware);
