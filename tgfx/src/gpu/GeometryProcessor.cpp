@@ -55,7 +55,9 @@ void GeometryProcessor::computeProcessorKey(Context*, BytesKey* bytesKey) const 
 
 void GeometryProcessor::setVertexAttributes(const Attribute* attrs, int attrCount) {
   for (int i = 0; i < attrCount; ++i) {
-    attributes.push_back(attrs + i);
+    if (attrs[i].isInitialized()) {
+      attributes.push_back(attrs + i);
+    }
   }
 }
 }  // namespace tgfx

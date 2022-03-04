@@ -18,57 +18,123 @@
 
 #include "GLFillRectOp.h"
 
+#include "core/utils/UniqueID.h"
+#include "gpu/Quad.h"
 #include "gpu/QuadPerEdgeAAGeometryProcessor.h"
 
 namespace tgfx {
 std::unique_ptr<GeometryProcessor> GLFillRectOp::getGeometryProcessor(const DrawArgs& args) {
   return QuadPerEdgeAAGeometryProcessor::Make(
-      args.renderTarget->width(), args.renderTarget->height(), args.viewMatrix, args.aa);
+      args.renderTarget->width(), args.renderTarget->height(), args.aa, !colors.empty());
+}
+
+std::vector<float> GLFillRectOp::coverageVertices() const {
+  auto normalBounds = Rect::MakeLTRB(0, 0, 1, 1);
+  std::vector<float> vertices;
+  for (size_t i = 0; i < rects.size(); ++i) {
+    auto scale = sqrtf(viewMatrices[i].getScaleX() * viewMatrices[i].getScaleX() +
+                       viewMatrices[i].getSkewY() * viewMatrices[i].getSkewY());
+    // we want the new edge to be .5px away from the old line.
+    auto padding = 0.5f / scale;
+    auto insetBounds = rects[i].makeInset(padding, padding);
+    auto insetQuad = Quad::MakeFromRect(insetBounds, viewMatrices[i]);
+    auto outsetBounds = rects[i].makeOutset(padding, padding);
+    auto outsetQuad = Quad::MakeFromRect(outsetBounds, viewMatrices[i]);
+
+    auto normalPadding = Point::Make(padding / rects[i].width(), padding / rects[i].height());
+    auto normalInset = normalBounds.makeInset(normalPadding.x, normalPadding.y);
+    auto normalInsetQuad = Quad::MakeFromRect(normalInset, localMatrices[i]);
+    auto normalOutset = normalBounds.makeOutset(normalPadding.x, normalPadding.y);
+    auto normalOutsetQuad = Quad::MakeFromRect(normalOutset, localMatrices[i]);
+
+    for (int j = 0; j < 2; ++j) {
+      const auto& quad = j == 0 ? insetQuad : outsetQuad;
+      const auto& normalQuad = j == 0 ? normalInsetQuad : normalOutsetQuad;
+      auto coverage = j == 0 ? 1.0f : 0.0f;
+      for (int k = 0; k < 4; ++k) {
+        vertices.push_back(quad.point(k).x);
+        vertices.push_back(quad.point(k).y);
+        vertices.push_back(coverage);
+        vertices.push_back(normalQuad.point(k).x);
+        vertices.push_back(normalQuad.point(k).y);
+        if (!colors.empty()) {
+          vertices.push_back(colors[i].red);
+          vertices.push_back(colors[i].green);
+          vertices.push_back(colors[i].blue);
+          vertices.push_back(colors[i].alpha);
+        }
+      }
+    }
+  }
+  return vertices;
+}
+
+std::vector<float> GLFillRectOp::noCoverageVertices() const {
+  auto normalBounds = Rect::MakeLTRB(0, 0, 1, 1);
+  std::vector<float> vertices;
+  for (size_t i = 0; i < rects.size(); ++i) {
+    auto quad = Quad::MakeFromRect(rects[i], viewMatrices[i]);
+    auto localQuad = Quad::MakeFromRect(normalBounds, localMatrices[i]);
+    for (int j = 3; j >= 0; --j) {
+      vertices.push_back(quad.point(j).x);
+      vertices.push_back(quad.point(j).y);
+      vertices.push_back(localQuad.point(j).x);
+      vertices.push_back(localQuad.point(j).y);
+      if (!colors.empty()) {
+        vertices.push_back(colors[i].red);
+        vertices.push_back(colors[i].green);
+        vertices.push_back(colors[i].blue);
+        vertices.push_back(colors[i].alpha);
+      }
+    }
+  }
+  return vertices;
 }
 
 std::vector<float> GLFillRectOp::vertices(const DrawArgs& args) {
-  auto bounds = args.rectToDraw;
-  auto normalBounds = Rect::MakeLTRB(0, 0, 1, 1);
-  // Vertex coordinates are arranged in a 2D pixel coordinate system, and textures are arranged
-  // according to a texture coordinate system (0 - 1).
   if (args.aa != AAType::Coverage) {
-    return {
-        bounds.right, bounds.bottom, normalBounds.right, normalBounds.bottom,
-        bounds.right, bounds.top,    normalBounds.right, normalBounds.top,
-        bounds.left,  bounds.bottom, normalBounds.left,  normalBounds.bottom,
-        bounds.left,  bounds.top,    normalBounds.left,  normalBounds.top,
-    };
+    return noCoverageVertices();
+  } else {
+    return coverageVertices();
   }
-  auto scale = sqrtf(args.viewMatrix.getScaleX() * args.viewMatrix.getScaleX() +
-                     args.viewMatrix.getSkewY() * args.viewMatrix.getSkewY());
-  // we want the new edge to be .5px away from the old line.
-  auto padding = 0.5f / scale;
-  auto insetBounds = bounds.makeInset(padding, padding);
-  auto outsetBounds = bounds.makeOutset(padding, padding);
-
-  auto normalPadding = Point::Make(padding / bounds.width(), padding / bounds.height());
-  auto normalInset = normalBounds.makeInset(normalPadding.x, normalPadding.y);
-  auto normalOutset = normalBounds.makeOutset(normalPadding.x, normalPadding.y);
-  return {
-      insetBounds.left,   insetBounds.top,     1.0f, normalInset.left,   normalInset.top,
-      insetBounds.left,   insetBounds.bottom,  1.0f, normalInset.left,   normalInset.bottom,
-      insetBounds.right,  insetBounds.top,     1.0f, normalInset.right,  normalInset.top,
-      insetBounds.right,  insetBounds.bottom,  1.0f, normalInset.right,  normalInset.bottom,
-      outsetBounds.left,  outsetBounds.top,    0.0f, normalOutset.left,  normalOutset.top,
-      outsetBounds.left,  outsetBounds.bottom, 0.0f, normalOutset.left,  normalOutset.bottom,
-      outsetBounds.right, outsetBounds.top,    0.0f, normalOutset.right, normalOutset.top,
-      outsetBounds.right, outsetBounds.bottom, 0.0f, normalOutset.right, normalOutset.bottom,
-  };
 }
 
-std::unique_ptr<GLFillRectOp> GLFillRectOp::Make() {
-  return std::make_unique<GLFillRectOp>();
+std::unique_ptr<GLFillRectOp> GLFillRectOp::Make(const Rect& rect, const Matrix& viewMatrix) {
+  return std::unique_ptr<GLFillRectOp>(new GLFillRectOp({rect}, {viewMatrix}, {Matrix::I()}, {}));
 }
 
-static constexpr size_t kIndicesPerAAFillRect = 30;
+std::unique_ptr<GLFillRectOp> GLFillRectOp::Make(const std::vector<Rect>& rects,
+                                                 const std::vector<Matrix>& viewMatrices,
+                                                 const std::vector<Matrix>& localMatrices,
+                                                 const std::vector<Color>& colors) {
+  return std::unique_ptr<GLFillRectOp>(
+      new GLFillRectOp(rects, viewMatrices, localMatrices, colors));
+}
+
+GLFillRectOp::GLFillRectOp(std::vector<Rect> rects, std::vector<Matrix> viewMatrices,
+                           std::vector<Matrix> localMatrices, std::vector<Color> colors)
+    : rects(std::move(rects)),
+      viewMatrices(std::move(viewMatrices)),
+      localMatrices(std::move(localMatrices)),
+      colors(std::move(colors)) {
+  auto bounds = Rect::MakeEmpty();
+  for (size_t i = 0; i < this->rects.size(); ++i) {
+    bounds.join(this->viewMatrices[i].mapRect(this->rects[i]));
+  }
+  setBounds(bounds);
+}
+
+static constexpr int kVerticesPerNonAAQuad = 4;
+static constexpr int kIndicesPerNonAAQuad = 6;
+static constexpr int kVerticesPerAAQuad = 8;
+static constexpr int kIndicesPerAAQuad = 30;
 
 // clang-format off
-static constexpr uint16_t gFillAARectIdx[] = {
+static constexpr uint16_t kNonAAQuadIndexPattern[] = {
+  0, 1, 2, 2, 1, 3
+};
+
+static constexpr uint16_t kAAQuadIndexPattern[] = {
   0, 1, 2, 1, 3, 2,
   0, 4, 1, 4, 5, 1,
   0, 6, 4, 0, 2, 6,
@@ -78,8 +144,31 @@ static constexpr uint16_t gFillAARectIdx[] = {
 // clang-format on
 
 std::shared_ptr<GLBuffer> GLFillRectOp::getIndexBuffer(const DrawArgs& args) {
-  if (args.aa == AAType::Coverage) {
-    return GLBuffer::Make(args.context, gFillAARectIdx, kIndicesPerAAFillRect);
+  if (rects.size() > 1 || args.aa == AAType::Coverage) {
+    std::vector<uint16_t> indexes;
+    static auto kNonAAType = UniqueID::Next();
+    static auto kAAType = UniqueID::Next();
+    uint32_t type;
+    const uint16_t* indexPattern;
+    int verticesPerQuad;
+    int indexesPerQuad;
+    if (args.aa == AAType::Coverage) {
+      type = kAAType;
+      indexPattern = kAAQuadIndexPattern;
+      verticesPerQuad = kVerticesPerAAQuad;
+      indexesPerQuad = kIndicesPerAAQuad;
+    } else {
+      type = kNonAAType;
+      indexPattern = kNonAAQuadIndexPattern;
+      verticesPerQuad = kVerticesPerNonAAQuad;
+      indexesPerQuad = kIndicesPerNonAAQuad;
+    }
+    for (size_t i = 0; i < rects.size(); ++i) {
+      for (int j = 0; j < indexesPerQuad; ++j) {
+        indexes.push_back(i * verticesPerQuad + indexPattern[j]);
+      }
+    }
+    return GLBuffer::Make(args.context, &indexes[0], indexes.size(), type);
   }
   return nullptr;
 }

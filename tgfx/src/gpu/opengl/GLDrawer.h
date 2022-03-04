@@ -30,10 +30,8 @@ namespace tgfx {
 struct DrawArgs {
   Context* context = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
-  Matrix viewMatrix = Matrix::I();
   const RenderTarget* renderTarget = nullptr;
   std::shared_ptr<Texture> renderTargetTexture = nullptr;
-  Rect rectToDraw = Rect::MakeEmpty();
   Rect scissorRect = Rect::MakeEmpty();
   AAType aa = AAType::None;
   std::vector<std::unique_ptr<FragmentProcessor>> colors;
@@ -49,6 +47,22 @@ class GLDrawOp {
   virtual std::vector<float> vertices(const DrawArgs& args) = 0;
 
   virtual std::shared_ptr<GLBuffer> getIndexBuffer(const DrawArgs& args) = 0;
+
+  const Rect& bounds() const {
+    return _bounds;
+  }
+
+ protected:
+  void setBounds(Rect bounds) {
+    _bounds = bounds;
+  }
+
+  void setTransformedBounds(const Rect& srcBounds, const Matrix& matrix) {
+    _bounds = matrix.mapRect(srcBounds);
+  }
+
+ private:
+  Rect _bounds = Rect::MakeEmpty();
 };
 
 class GLDrawer : public Resource {
