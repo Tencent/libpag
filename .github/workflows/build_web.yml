@@ -1,0 +1,104 @@
+# This is a basic workflow to help you get started with Actions
+
+name: build_web
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the master branch
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  build_web:
+    # The CMake configure and build commands are platform agnostic and should work equally well on Windows or Mac.
+    # You can convert this to a matrix build if you need cross-platform coverage.
+    # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
+    runs-on: macos-latest
+
+    steps:
+      - name: Get environment cache
+        id: cache-environment
+        uses: actions/cache@v2
+        with:
+          path: |
+            /usr/local/Cellar/ninja
+            /usr/local/bin/ninja
+            /usr/local/Cellar/node
+            /usr/local/bin/node
+            /usr/local/Cellar/emscripten
+            /usr/local/bin/emscripten
+            /usr/local/Cellar/yasm
+            /usr/local/bin/yasm
+            /usr/local/Cellar/depsync
+            /usr/local/bin/depsync
+          key: libpag-environment-20220208
+      - if: github.event_name == 'push'
+        name: Get libpag cache (push)
+        id: libpag-push
+        uses: actions/cache@v2
+        with:
+          path: libpag.tar.zst
+          key: libpag-code-${{ github.sha }}
+          restore-keys: |
+            libpag-code-${{ github.event.before }}
+            libpag-code-
+      - if: github.event_name == 'pull_request'
+        name: Get libpag cache (pull_request)
+        id: libpag-pull_request
+        uses: actions/cache@v2
+        with:
+          path: libpag.tar.zst
+          key: libpag-code-${{ github.event.pull_request.base.sha }}
+          restore-keys: libpag-code-
+      - name: Check file existence
+        id: check_files
+        uses: andstor/file-existence-action@v1
+        with:
+          files: "libpag.tar.zst"
+      - name: File exist
+        if: steps.check_files.outputs.files_exists == 'true'
+        # Only runs if all of the files exists
+        run: |
+          echo "file exist"
+          tar xvf libpag.tar.zst
+          rm -rf libpag.tar.zst
+      - name: File not exist
+        if: steps.check_files.outputs.files_exists != 'true'
+        run: |
+          echo "file not exist"
+          git clone -b main https://github.com/Tencent/libpag.git
+      - if: github.event_name == 'push'
+        name: Swith branch (push)
+        run: |
+          cd libpag
+          git pull
+      - if: github.event_name == 'pull_request'
+        name: Swith branch (pull_request)
+        run: |
+            cd libpag
+            git pull
+            git checkout ${{ github.head_ref }}
+
+      - name: brew link emscripten
+        if: steps.cache-environment.outputs.cache-hit == 'true'
+        run: |
+           brew link emscripten
+
+      - name: Web build
+        run: |
+          cd libpag
+          chmod +x sync_deps.sh
+          ./sync_deps.sh
+          cd web/script
+          chmod +x build.sh
+          ./build.sh debug
+        shell: bash
+      - name: Compress libpag
+        run: |
+          cd libpag
+          rm -rf result
+          git checkout main
+          cd ..
+          tar cvfa libpag.tar.zst libpag
