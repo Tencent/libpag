@@ -24,18 +24,18 @@ jobs:
         uses: actions/cache@v2
         with:
           path: libpag.tar.zst
-          key: libpag-code-${{ github.sha }}
+          key: libpag-win-${{ github.sha }}
           restore-keys: |
-            libpag-code-${{ github.event.before }}
-            libpag-code-
+            libpag-win-${{ github.event.before }}
+            libpag-win-
       - if: github.event_name == 'pull_request'
         name: Get libpag cache (pull_request)
         id: libpag-pull_request
         uses: actions/cache@v2
         with:
           path: libpag.tar.zst
-          key: libpag-code-${{ github.event.pull_request.base.sha }}
-          restore-keys: libpag-code-
+          key: libpag-win-${{ github.event.pull_request.base.sha }}
+          restore-keys: libpag-win-
       - name: Check file existence
         id: check_files
         uses: andstor/file-existence-action@v1
@@ -61,15 +61,15 @@ jobs:
       - if: github.event_name == 'pull_request'
         name: Swith branch (pull_request)
         run: |
-            cd libpag
-            git fetch
-            git pull
-            git checkout ${{ github.head_ref }}
+          cd libpag
+          git fetch
+          git pull
+          git checkout ${{ github.head_ref }}
 
       - name: brew link emscripten
         if: steps.cache-environment.outputs.cache-hit == 'true'
         run: |
-           brew link emscripten
+          brew link emscripten
 
       - name: Windows build
         run: |
