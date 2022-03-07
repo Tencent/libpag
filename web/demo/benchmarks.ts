@@ -12,6 +12,8 @@ window.onload = async () => {
   console.log('====== wasm loaded! ======', PAG);
   console.log('====== PAGImage test ======');
   await PAGImageTest();
+  console.log('====== PAGFile test ======');
+  await PAGFileTest();
   console.log('====== PAGComposition test ======');
   await PAGCompositionTest();
   console.log('====== PAGLayer test ======');
@@ -30,8 +32,8 @@ const PAGImageTest = async () => {
   console.log('PAGImage width:', pagImage.width());
   console.log('PAGImage height:', pagImage.height());
   console.log('PAGImage scaleMode:', pagImage.scaleMode());
-  pagImage.setScaleMode(types.ScaleMode.Zoom);
-  if (pagImage.scaleMode() === types.ScaleMode.Zoom) {
+  pagImage.setScaleMode(types.PAGScaleMode.Zoom);
+  if (pagImage.scaleMode() === types.PAGScaleMode.Zoom) {
     console.log(`PAGImage setScaleMode succeed!`);
   } else {
     console.error('PAGImage setScaleMode failed!');
@@ -48,11 +50,50 @@ const PAGImageTest = async () => {
 };
 
 let pagFile: PAGFile;
+const PAGFileTest = async () => {
+  console.log('PAGFile MaxSupportedTagLevel: ', PAGFile.maxSupportedTagLevel());
+  const arrayBuffer = await fetch('./assets/test2.pag').then((res) => res.arrayBuffer());
+  pagFile = (await PAGFile.load(arrayBuffer)) as PAGFile;
+  console.log('PAGFile: ', pagFile);
+  console.log('PAGFile tagLevel: ', pagFile.tagLevel());
+  console.log('PAGFile numTexts: ', pagFile.numTexts());
+  console.log('PAGFile numImages: ', pagFile.numImages());
+  console.log('PAGFile numVideos: ', pagFile.numVideos());
+  let textData = pagFile.getTextData(0);
+  console.log('PAGFile getTextData: ', textData);
+  textData.text = 'test';
+  pagFile.replaceText(0, textData);
+  // Todo(zenoslin) C++ get replaced text data
+  // textData = pagFile.getTextData(0);
+  // console.log(textData);
+  // if (textData.text === 'test') {
+  //   console.log(`PAGFile replaceText succeed!`);
+  // } else {
+  //   console.error(`PAGFile replaceText failed!`);
+  // }
+  // Todo(zenoslin) test
+  // pagFile.replaceImage(0, pagImage);
+  console.log('PAGFile getLayersByEditableIndex: ', pagFile.getLayersByEditableIndex(0, types.LayerType.Text));
+  console.log('PAGFile timeStretchMode: ', pagFile.timeStretchMode());
+  pagFile.setTimeStretchMode(types.PAGTimeStretchMode.Repeat);
+  if (pagFile.timeStretchMode() === types.PAGTimeStretchMode.Repeat) {
+    console.log(`PAGFile setTimeStretchMode succeed!`);
+  } else {
+    console.error(`PAGFile setTimeStretchMode failed!`);
+  }
+  pagFile.setDuration(1000000);
+  if (pagFile.duration() === 1000000) {
+    console.log(`PAGFile setDuration succeed!`);
+  } else {
+    console.error(`PAGFile setDuration failed!`);
+  }
+  console.log('PAGFile copyOriginal: ', pagFile.copyOriginal());
+};
 let pagComposition: PAGComposition;
 const PAGCompositionTest = async () => {
   console.log('PAGComposition Make:', PAGComposition.Make(100, 100));
   const arrayBuffer = await fetch('./assets/AudioMarker.pag').then((res) => res.arrayBuffer());
-  pagComposition = PAGFile.loadFromBuffer(arrayBuffer) as PAGComposition;
+  pagComposition = (await PAGFile.load(arrayBuffer)) as PAGComposition;
   console.log('PAGComposition: ', pagComposition);
   console.log('PAGComposition width: ', pagComposition.width());
   console.log('PAGComposition height: ', pagComposition.height());

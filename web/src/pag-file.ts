@@ -13,9 +13,20 @@ export class PAGFile extends PAGComposition {
    * Load pag file from file.
    */
   @wasmAsyncMethod
-  public static async load(data: File) {
-    const buffer = (await readFile(data)) as ArrayBuffer;
-    return PAGFile.loadFromBuffer(buffer);
+  public static async load(data: File | Blob | ArrayBuffer) {
+    let buffer: ArrayBuffer | null = null;
+    if (data instanceof File) {
+      buffer = (await readFile(data)) as ArrayBuffer;
+    } else if (data instanceof File) {
+      buffer = (await readFile(new File([data], ''))) as ArrayBuffer;
+    } else if (data instanceof ArrayBuffer) {
+      buffer = data;
+    }
+    if (buffer === null) {
+      Log.errorByCode(ErrorCode.PagFileDataError);
+    } else {
+      return PAGFile.loadFromBuffer(buffer);
+    }
   }
   /**
    * Load pag file from arrayBuffer
@@ -32,9 +43,40 @@ export class PAGFile extends PAGComposition {
     this.module._free(dataPtr);
     return pagFile;
   }
+  /**
+   * The maximum tag level current SDK supports.
+   */
+  public static maxSupportedTagLevel(): number {
+    return this.module._PAGFile._MaxSupportedTagLevel() as number;
+  }
 
   public constructor(wasmIns: any) {
     super(wasmIns);
+  }
+
+  /**
+   * The tag level this pag file requires.
+   */
+  public tagLevel(): number {
+    return this.wasmIns._tagLevel() as number;
+  }
+  /**
+   * The number of replaceable texts.
+   */
+  public numTexts(): number {
+    return this.wasmIns._numTexts() as number;
+  }
+  /**
+   * The number of replaceable images.
+   */
+  public numImages(): number {
+    return this.wasmIns._numImages() as number;
+  }
+  /**
+   * The number of video compositions.
+   */
+  public numVideos(): number {
+    return this.wasmIns._numVideos() as number;
   }
   /**
    * Get a text data of the specified index. The index ranges from 0 to numTexts - 1.
@@ -57,24 +99,6 @@ export class PAGFile extends PAGComposition {
    */
   public replaceImage(editableImageIndex: number, pagImage: PAGImage) {
     this.wasmIns._replaceImage(editableImageIndex, pagImage.wasmIns);
-  }
-  /**
-   * The number of replaceable texts.
-   */
-  public numTexts(): number {
-    return this.wasmIns._numTexts() as number;
-  }
-  /**
-   * The number of replaceable images.
-   */
-  public numImages(): number {
-    return this.wasmIns._numImages() as number;
-  }
-  /**
-   * The number of video compositions.
-   */
-  public numVideos(): number {
-    return this.wasmIns._numVideos() as number;
   }
   /**
    * Return an array of layers by specified editable index and layer type.
@@ -101,6 +125,13 @@ export class PAGFile extends PAGComposition {
    */
   public setDuration(duration: number): void {
     this.wasmIns._setDuration(duration);
+  }
+  /**
+   * Set the duration of this PAGFile. Passing a value less than or equal to 0 resets the duration
+   * to its default value.
+   */
+  public copyOriginal(): PAGFile {
+    return new PAGFile(this.wasmIns._copyOriginal());
   }
 
   public destroy(): void {

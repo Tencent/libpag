@@ -112,6 +112,7 @@ window.onload = async () => {
     textDoc.strokeOverFill = true;
     textDoc.tracking = 600;
     pagFile.replaceText(0, textDoc);
+    console.log(pagFile.getTextData(0));
     await pagView.flush();
   });
 

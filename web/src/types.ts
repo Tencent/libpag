@@ -23,6 +23,7 @@ declare global {
 export interface PAG extends EmscriptenModule {
   _PAGFile: {
     _Load: (bytes: number, length: number) => any;
+    _MaxSupportedTagLevel: () => number;
   };
   _PAGImage: {
     _FromNativeImage: (nativeImage: NativeImage) => any;
@@ -66,7 +67,7 @@ export interface EmscriptenGL {
 /**
  * Defines the rules on how to scale the content to fit the specified area.
  */
-export const enum ScaleMode {
+export const enum PAGScaleMode {
   /**
    * The content is not scaled.
    */

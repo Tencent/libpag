@@ -127,12 +127,14 @@ EMSCRIPTEN_BINDINGS(pag) {
 
   class_<PAGFile, base<PAGComposition>>("_PAGFile")
       .smart_ptr<std::shared_ptr<PAGFile>>("_PAGFile")
+      .class_function("_MaxSupportedTagLevel", PAGFile::MaxSupportedTagLevel)
       .class_function("_Load", optional_override([](uintptr_t bytes, size_t length) {
                         return PAGFile::Load(reinterpret_cast<void*>(bytes), length);
                       }))
+      .function("_tagLevel", &PAGFile::tagLevel)
+      .function("_numTexts", &PAGFile::numTexts)
       .function("_numImages", &PAGFile::numImages)
       .function("_numVideos", &PAGFile::numVideos)
-      .function("_numTexts", &PAGFile::numTexts)
       .function("_getTextData", &PAGFile::getTextData)
       .function("_replaceText", &PAGFile::replaceText)
       .function("_replaceImage", &PAGFile::replaceImage)
@@ -144,7 +146,8 @@ EMSCRIPTEN_BINDINGS(pag) {
       .function("_setTimeStretchMode", &PAGFile::setTimeStretchMode)
       .function("_setDuration", optional_override([](PAGFile& pagFile, int duration) {
                   return pagFile.setDuration(static_cast<int64_t>(duration));
-                }));
+                }))
+      .function("_copyOriginal", &PAGFile::copyOriginal);
 
   class_<PAGSurface>("_PAGSurface")
       .smart_ptr<std::shared_ptr<PAGSurface>>("_PAGSurface")
