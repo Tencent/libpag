@@ -18,62 +18,14 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - if: github.event_name == 'push'
-        name: Get libpag cache (push)
-        id: libpag-push
-        uses: actions/cache@v2
+      - uses: actions/checkout@v2
         with:
-          path: libpag.tar.zst
-          key: libpag-win-${{ github.sha }}
-          restore-keys: |
-            libpag-win-${{ github.event.before }}
-            libpag-win-
-      - if: github.event_name == 'pull_request'
-        name: Get libpag cache (pull_request)
-        id: libpag-pull_request
-        uses: actions/cache@v2
-        with:
-          path: libpag.tar.zst
-          key: libpag-win-${{ github.event.pull_request.base.sha }}
-          restore-keys: libpag-win-
-      - name: Check file existence
-        id: check_files
-        uses: andstor/file-existence-action@v1
-        with:
-          files: "libpag.tar.zst"
-      - name: File exist
-        if: steps.check_files.outputs.files_exists == 'true'
-        # Only runs if all of the files exists
-        run: |
-          echo "file exist"
-          tar xvf libpag.tar.zst
-      - name: File not exist
-        if: steps.check_files.outputs.files_exists != 'true'
-        run: |
-          echo "file not exist"
-          git clone -b main https://github.com/kevingpqi123/libpag.git
-      - if: github.event_name == 'push'
-        name: Swith branch (push)
-        run: |
-          cd libpag
-          git fetch
-          git pull
-      - if: github.event_name == 'pull_request'
-        name: Swith branch (pull_request)
-        run: |
-          cd libpag
-          git fetch
-          git pull
-          git checkout ${{ github.head_ref }}
-
-      - name: brew link emscripten
-        if: steps.cache-environment.outputs.cache-hit == 'true'
-        run: |
-          brew link emscripten
+          lfs: true
+      - name: Checkout LFS objects
+        run: git lfs checkout
 
       - name: Windows build
         run: |
-          cd libpag
           npm install depsync -g
           depsync
           node ./vendor_tools/cmake-build pag -p win -o ./win/paglib -v -i -DPAG_BUILD_SHARED=OFF
