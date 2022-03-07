@@ -62,6 +62,7 @@ jobs:
         name: Swith branch (pull_request)
         run: |
             cd libpag
+            git fetch
             git pull
             git checkout ${{ github.head_ref }}
 
