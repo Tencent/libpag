@@ -63,10 +63,9 @@ void CGMask::fillPath(const Path& path) {
     return;
   }
   const auto& info = buffer->info();
-  auto pixels = buffer->lockPixels();
-  auto cgContext = CreateBitmapContext(info, pixels);
+  Bitmap bm(buffer);
+  auto cgContext = CreateBitmapContext(info, bm.writablePixels());
   if (cgContext == nullptr) {
-    buffer->unlockPixels();
     return;
   }
 
@@ -104,6 +103,5 @@ void CGMask::fillPath(const Path& path) {
 
   CGContextRelease(cgContext);
   CGPathRelease(cgPath);
-  buffer->unlockPixels();
 }
 }  // namespace tgfx
