@@ -83,7 +83,7 @@ void WebMask::fillPath(const Path& path) {
   finalPath.transform(matrix);
   auto path2D = path2DClass.new_();
   finalPath.decompose(Iterator, &path2D);
-  webMask.call<val>("fillPath", path2D, path.getFillType());
+  webMask.call<void>("fillPath", path2D, path.getFillType());
 }
 
 bool WebMask::fillText(const TextBlob* textBlob) {
@@ -104,11 +104,11 @@ bool WebMask::drawText(const TextBlob* textBlob, const Stroke* stroke) {
   webTextBlob->getTextsAndPositions(&texts, &points);
   const auto& font = webTextBlob->getFont();
   if (stroke) {
-    webMask.call<val>("strokeText", font.getSize(), font.isFauxBold(), font.isFauxItalic(),
-                      font.getTypeface()->fontFamily(), *stroke, texts, points, matrix);
+    webMask.call<void>("strokeText", font.getSize(), font.isFauxBold(), font.isFauxItalic(),
+                       font.getTypeface()->fontFamily(), *stroke, texts, points, matrix);
   } else {
-    webMask.call<val>("fillText", font.getSize(), font.isFauxBold(), font.isFauxItalic(),
-                      font.getTypeface()->fontFamily(), texts, points, matrix);
+    webMask.call<void>("fillText", font.getSize(), font.isFauxBold(), font.isFauxItalic(),
+                       font.getTypeface()->fontFamily(), texts, points, matrix);
   }
   return true;
 }
