@@ -16,54 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import <QuartzCore/QuartzCore.h>
+#import "PAGColorUtility.h"
 
-@protocol ValueAnimatorListener <NSObject>
-
-- (void)onAnimationUpdate:(double)value;
-
-- (void)onAnimationStart;
-
-- (void)onAnimationEnd;
-
-- (void)onAnimationCancel;
-
-- (void)onAnimationRepeat;
-
-@end
-
-@interface ValueAnimator : NSObject {
-  int64_t duration;
-  int64_t startTime;
-  int64_t playTime;
-  int repeatCount;
-  int repeatedTimes;
-  NSUInteger animatorId;
-  id<ValueAnimatorListener> animatorListener;
+CocoaColor* PAGColorUtility::ToCocoaColor(pag::Color color) {
+  return [CocoaColor colorWithRed:color.red / 255.0f
+                            green:color.green / 255.0f
+                             blue:color.blue / 255.0f
+                            alpha:1];
 }
-
-- (void)setListener:(id)listener;
-
-- (int64_t)duration;
-
-- (void)setDuration:(int64_t)duration;
-
-- (void)setCurrentPlayTime:(int64_t)playTime;
-
-- (BOOL)isPlaying;
-
-- (int)repeatedTimes;
-
-- (void)setRepeatedTimes:(int)value;
-
-- (void)setRepeatCount:(int)value;
-
-- (void)start;
-
-- (void)stop;
-
-- (void)stop:(bool)notification;
-
-- (int64_t)animatorId;
-
-@end

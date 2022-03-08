@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGTextLayerImpl.h"
-#import "ColorUtility.h"
+#import "PAGColorUtility.h"
 #import "PAGFont.h"
 #import "PAGLayerImpl+Internal.h"
 
@@ -26,12 +26,12 @@
 - (CocoaColor*)fillColor {
   auto pagTextLayer = std::static_pointer_cast<pag::PAGTextLayer>([super pagLayer]);
   auto color = pagTextLayer->fillColor();
-  return ColorUtility::ToCocoaColor(color);
+  return PAGColorUtility::ToCocoaColor(color);
 }
 
 - (void)setFillColor:(CocoaColor*)color {
   auto pagTextLayer = std::static_pointer_cast<pag::PAGTextLayer>([super pagLayer]);
-  pagTextLayer->setFillColor(ColorUtility::ToColor(color));
+  pagTextLayer->setFillColor(PAGColorUtility::ToColor(color));
 }
 
 - (PAGFont*)font {
@@ -70,12 +70,12 @@
 - (CocoaColor*)strokeColor {
   auto pagTextLayer = std::static_pointer_cast<pag::PAGTextLayer>([super pagLayer]);
   auto color = pagTextLayer->strokeColor();
-  return ColorUtility::ToCocoaColor(color);
+  return PAGColorUtility::ToCocoaColor(color);
 }
 
 - (void)setStrokeColor:(CocoaColor*)color {
   auto pagTextLayer = std::static_pointer_cast<pag::PAGTextLayer>([super pagLayer]);
-  pagTextLayer->setStrokeColor(ColorUtility::ToColor(color));
+  pagTextLayer->setStrokeColor(PAGColorUtility::ToColor(color));
 }
 
 - (NSString*)text {

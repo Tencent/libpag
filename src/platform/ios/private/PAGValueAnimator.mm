@@ -16,11 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import "ValueAnimator.h"
+#import "PAGValueAnimator.h"
 #include <chrono>
 #include <mutex>
 
-@implementation ValueAnimator
+@implementation PAGValueAnimator
 
 static CADisplayLink* caDisplayLink = NULL;
 static NSMutableArray* animators = [[NSMutableArray array] retain];
@@ -35,7 +35,7 @@ static int64_t GetCurrentTimeUS() {
 }
 
 + (void)StartDisplayLink {
-  caDisplayLink = [CADisplayLink displayLinkWithTarget:[ValueAnimator class]
+  caDisplayLink = [CADisplayLink displayLinkWithTarget:[PAGValueAnimator class]
                                               selector:@selector(HandleDisplayLink:)];
   //这里本来是默认的mode，当ui处于drag模式下时,无法进行渲染， 所以改成commonmodes...
   [caDisplayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
@@ -51,17 +51,17 @@ static int64_t GetCurrentTimeUS() {
   NSArray* copyanimators = animators.copy;
   //遍历copy数组
   for (id animator in copyanimators) {
-    ValueAnimator* valueAnimator = (ValueAnimator*)animator;
+    PAGValueAnimator* valueAnimator = (PAGValueAnimator*)animator;
     [valueAnimator onAnimationFrame:timestamp];
   }
   [copyanimators release];
 }
 
-+ (int64_t)AddAnimator:(ValueAnimator*)animator {
++ (int64_t)AddAnimator:(PAGValueAnimator*)animator {
   std::lock_guard<std::mutex> autoLock(valueAnimatorLocker);
   [animators addObject:animator];
   if (animators.count == 1) {
-    [ValueAnimator StartDisplayLink];
+    [PAGValueAnimator StartDisplayLink];
   }
   return ++AnimatorIdCount;
 }
@@ -69,7 +69,7 @@ static int64_t GetCurrentTimeUS() {
 + (void)RemoveAnimator:(int64_t)animatorId {
   std::lock_guard<std::mutex> autoLock(valueAnimatorLocker);
   NSUInteger realAnimatorIndex = 0;
-  for (ValueAnimator* animator in animators) {
+  for (PAGValueAnimator* animator in animators) {
     if (animator.animatorId == animatorId) {
       realAnimatorIndex = [animators indexOfObject:animator];
       break;
@@ -78,7 +78,7 @@ static int64_t GetCurrentTimeUS() {
   [animators removeObjectAtIndex:realAnimatorIndex];
 
   if (animators.count == 0) {
-    [ValueAnimator StopDisplayLink];
+    [PAGValueAnimator StopDisplayLink];
   }
 }
 
@@ -157,7 +157,7 @@ static int64_t GetCurrentTimeUS() {
   if (duration <= 0 || animatorId != NSIntegerMax || animatorListener == nil) {
     return;
   }
-  animatorId = [ValueAnimator AddAnimator:self];
+  animatorId = [PAGValueAnimator AddAnimator:self];
   startTime = GetCurrentTimeUS() - playTime % duration - repeatedTimes * duration;
   double value = static_cast<double>(playTime) / duration;
   [animatorListener onAnimationUpdate:value];
@@ -174,7 +174,7 @@ static int64_t GetCurrentTimeUS() {
   if (animatorId == NSIntegerMax) {
     return;
   }
-  [ValueAnimator RemoveAnimator:animatorId];
+  [PAGValueAnimator RemoveAnimator:animatorId];
   animatorId = NSIntegerMax;
   if (notification) {
     [animatorListener onAnimationCancel];
