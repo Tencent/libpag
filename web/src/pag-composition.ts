@@ -118,7 +118,7 @@ export class PAGComposition extends PAGLayer {
     this.wasmIns._swapLayerAt(index1, index2);
   }
   /**
-   * The audio data of this composition.
+   * The audio data of this composition, which is an AAC audio in an MPEG-4 container format.
    */
   public audioBytes(): Uint8Array {
     return this.wasmIns._audioBytes() as Uint8Array;

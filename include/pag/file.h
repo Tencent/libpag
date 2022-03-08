@@ -1774,7 +1774,7 @@ class PAG_API Composition {
   Color backgroundColor = White;
 
   /**
-   * The audio data of this composition.
+   * The audio data of this composition, which is an AAC audio in an MPEG-4 container format.
    */
   ByteData* audioBytes = nullptr;
   std::vector<Marker*> audioMarkers;
