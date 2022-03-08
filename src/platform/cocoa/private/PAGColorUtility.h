@@ -19,7 +19,7 @@
 #include "pag/file.h"
 #include "platform/cocoa/CocoaUtils.h"
 
-class ColorUtility {
+class PAGColorUtility {
  public:
   static CocoaColor* ToCocoaColor(pag::Color color);
 

@@ -21,7 +21,7 @@
 
 #import "platform/ios/private/GPUDrawable.h"
 #import "platform/ios/private/PAGSurface+Internal.h"
-#import "platform/ios/private/ValueAnimator.h"
+#import "platform/ios/private/PAGValueAnimator.h"
 
 namespace pag {
 static NSOperationQueue* flushQueue;
@@ -46,7 +46,7 @@ void DestoryFlushQueue() {
   PAGSurface* pagSurface;
   PAGFile* pagFile;
   NSString* filePath;
-  ValueAnimator* valueAnimator;
+  PAGValueAnimator* valueAnimator;
   BOOL _isPlaying;
   BOOL _isVisible;
   NSMutableDictionary* textReplacementMap;
@@ -95,7 +95,7 @@ void DestoryFlushQueue() {
   self.contentScaleFactor = [UIScreen mainScreen].scale;
   self.backgroundColor = [UIColor clearColor];
   pagPlayer = [[PAGPlayer alloc] init];
-  valueAnimator = [[ValueAnimator alloc] init];
+  valueAnimator = [[PAGValueAnimator alloc] init];
   [valueAnimator setListener:self];
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(applicationDidBecomeActive:)

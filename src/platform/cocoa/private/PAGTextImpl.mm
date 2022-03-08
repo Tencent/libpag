@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGTextImpl.h"
-#import "ColorUtility.h"
+#import "PAGColorUtility.h"
 
 using namespace pag;
 
@@ -39,18 +39,18 @@ PAGText* ToPAGText(pag::TextDocumentHandle textDocument) {
   textData.firstBaseLine = textDocument->firstBaseLine;
   textData.fauxBold = textDocument->fauxBold;
   textData.fauxItalic = textDocument->fauxItalic;
-  textData.fillColor = ColorUtility::ToCocoaColor(textDocument->fillColor);
+  textData.fillColor = PAGColorUtility::ToCocoaColor(textDocument->fillColor);
   textData.fontFamily = [NSString stringWithUTF8String:textDocument->fontFamily.c_str()];
   textData.fontStyle = [NSString stringWithUTF8String:textDocument->fontStyle.c_str()];
   textData.fontSize = textDocument->fontSize;
-  textData.strokeColor = ColorUtility::ToCocoaColor(textDocument->strokeColor);
+  textData.strokeColor = PAGColorUtility::ToCocoaColor(textDocument->strokeColor);
   textData.strokeOverFill = textDocument->strokeOverFill;
   textData.strokeWidth = textDocument->strokeWidth;
   textData.text = [NSString stringWithUTF8String:textDocument->text.c_str()];
   textData.justification = textDocument->justification;
   textData.leading = textDocument->leading;
   textData.tracking = textDocument->tracking;
-  textData.backgroundColor = ColorUtility::ToCocoaColor(textDocument->backgroundColor);
+  textData.backgroundColor = PAGColorUtility::ToCocoaColor(textDocument->backgroundColor);
   textData.backgroundAlpha = textDocument->backgroundAlpha;
   return textData;
 }
@@ -71,18 +71,18 @@ pag::TextDocumentHandle ToTextDocument(PAGText* value) {
   textDocument->firstBaseLine = value.firstBaseLine;
   textDocument->fauxBold = value.fauxBold;
   textDocument->fauxItalic = value.fauxItalic;
-  textDocument->fillColor = ColorUtility::ToColor(value.fillColor);
+  textDocument->fillColor = PAGColorUtility::ToColor(value.fillColor);
   textDocument->fontFamily = IsUTF8StringEmpty(value.fontFamily) ? "" : value.fontFamily.UTF8String;
   textDocument->fontStyle = IsUTF8StringEmpty(value.fontStyle) ? "" : value.fontStyle.UTF8String;
   textDocument->fontSize = value.fontSize;
-  textDocument->strokeColor = ColorUtility::ToColor(value.strokeColor);
+  textDocument->strokeColor = PAGColorUtility::ToColor(value.strokeColor);
   textDocument->strokeOverFill = value.strokeOverFill;
   textDocument->strokeWidth = value.strokeWidth;
   textDocument->text = IsUTF8StringEmpty(value.text) ? "" : value.text.UTF8String;
   textDocument->justification = value.justification;
   textDocument->leading = value.leading;
   textDocument->tracking = value.tracking;
-  textDocument->backgroundColor = ColorUtility::ToColor(value.backgroundColor);
+  textDocument->backgroundColor = PAGColorUtility::ToColor(value.backgroundColor);
   textDocument->backgroundAlpha = value.backgroundAlpha;
   return textDocument;
 }
