@@ -26,7 +26,6 @@ jobs:
       - uses: seanmiddleditch/gha-setup-ninja@master
       - name: Linux build
         run: |
-          cd libpag
           chmod +x sync_deps.sh
           ./sync_deps.sh
           chmod +x build_linux.sh
