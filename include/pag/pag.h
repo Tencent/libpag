@@ -873,7 +873,7 @@ class PAG_API PAGComposition : public PAGLayer {
   void swapLayerAt(int index1, int index2);
 
   /**
-   * The audio data of this composition, which is an AAC audio in an MPEG-4 container format.
+   * The audio data of this composition, which is an AAC audio in an MPEG-4 container.
    */
   ByteData* audioBytes() const;
 

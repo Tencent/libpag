@@ -125,7 +125,7 @@ __attribute__((visibility("default"))) @interface PAGComposition : PAGLayer
 - (void)swapLayerAt:(int)index1 withIndex:(int)index2;
 
 /**
- * Returns the audio data of this composition, which is an AAC audio in an MPEG-4 container format.
+ * Returns the audio data of this composition, which is an AAC audio in an MPEG-4 container.
  */
 - (NSData*)audioBytes;
 
