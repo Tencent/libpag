@@ -1,0 +1,87 @@
+# This is a basic workflow to help you get started with Actions
+
+name: build_win
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the master branch
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  build_win:
+    # The CMake configure and build commands are platform agnostic and should work equally well on Windows or Mac.
+    # You can convert this to a matrix build if you need cross-platform coverage.
+    # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
+    runs-on: windows-latest
+
+    steps:
+      - if: github.event_name == 'push'
+        name: Get libpag cache (push)
+        id: libpag-push
+        uses: actions/cache@v2
+        with:
+          path: libpag.tar.gz
+          key: libpag-win-${{ github.sha }}
+          restore-keys: |
+            libpag-win-${{ github.event.before }}
+            libpag-win-
+      - if: github.event_name == 'pull_request'
+        name: Get libpag cache (pull_request)
+        id: libpag-pull_request
+        uses: actions/cache@v2
+        with:
+          path: libpag.tar.gz
+          key: libpag-win-${{ github.event.pull_request.base.sha }}
+          restore-keys: libpag-win-
+      - name: Check file existence
+        id: check_files
+        uses: andstor/file-existence-action@v1
+        with:
+          files: "libpag.tar.gz"
+      - name: File exist
+        if: steps.check_files.outputs.files_exists == 'true'
+        # Only runs if all of the files exists
+        run: |
+          echo "file exist"
+          tar zxvf libpag.tar.gz
+          rm libpag.tar.gz
+      - name: File not exist
+        if: steps.check_files.outputs.files_exists != 'true'
+        run: |
+          echo "file not exist"
+          git clone -b main https://github.com/Tencent/libpag.git
+      - if: github.event_name == 'push'
+        name: Swith branch (push)
+        run: |
+          cd libpag
+          git fetch
+          git pull
+      - if: github.event_name == 'pull_request'
+        name: Swith branch (pull_request)
+        run: |
+          cd libpag
+          git fetch
+          git pull
+          git checkout ${{ github.head_ref }}
+
+      - name: brew link emscripten
+        if: steps.cache-environment.outputs.cache-hit == 'true'
+        run: |
+          brew link emscripten
+
+      - name: Windows build
+        run: |
+          cd libpag
+          npm install depsync -g
+          depsync
+          node ./vendor_tools/cmake-build pag -p win -o ./win/paglib -v -i -DPAG_BUILD_SHARED=OFF
+        shell: bash
+      - name: Compress libpag
+        run: |
+          cd libpag
+          git checkout main
+          cd ..
+          tar czvf libpag.tar.gz libpag
