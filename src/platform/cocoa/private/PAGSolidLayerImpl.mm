@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGSolidLayerImpl.h"
-#import "ColorUtility.h"
+#import "PAGColorUtility.h"
 #import "PAGLayerImpl+Internal.h"
 
 @implementation PAGSolidLayerImpl
@@ -25,12 +25,12 @@
 - (CocoaColor*)solidColor {
   auto pagSolidLayer = std::static_pointer_cast<pag::PAGSolidLayer>([super pagLayer]);
   auto color = pagSolidLayer->solidColor();
-  return ColorUtility::ToCocoaColor(color);
+  return PAGColorUtility::ToCocoaColor(color);
 }
 
 - (void)setSolidColor:(CocoaColor*)color {
   auto pagSolidLayer = std::static_pointer_cast<pag::PAGSolidLayer>([super pagLayer]);
-  pagSolidLayer->setSolidColor(ColorUtility::ToColor(color));
+  pagSolidLayer->setSolidColor(PAGColorUtility::ToColor(color));
 }
 
 @end
