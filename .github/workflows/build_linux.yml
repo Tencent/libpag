@@ -70,7 +70,6 @@ jobs:
           cd libpag
           chmod +x sync_deps.sh
           ./sync_deps.sh
-          ninja --version
           chmod +x build_linux.sh
           ./build_linux.sh
         shell: bash
