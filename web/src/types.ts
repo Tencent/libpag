@@ -42,6 +42,12 @@ export interface PAG extends EmscriptenModule {
     _Make(duration: number, text: string, fontSize: number, fontFamily: string, fontStyle: string): any;
     _Make(duration: number, textDocumentHandle: TextDocument): any;
   };
+  _PAGImageLayer: {
+    _Make(width: number, height: number, duration: number): any;
+  };
+  _PAGSolidLayer: {
+    _Make(duration: number, width: number, height: number, solidColor: Color, opacity: number): any;
+  };
   _PAGFont: {
     _create(fontFamily: string, fontStyle: string): any;
     _SetFallbackFontNames(fontName: any): void;
@@ -364,6 +370,27 @@ export declare class TextDocument {
   public backgroundAlpha: number;
 
   public direction: TextDirection;
+  private constructor();
+}
+
+export declare class PAGVideoRange {
+  /**
+   * The start time of the source video, in microseconds.
+   */
+  public startTime(): number;
+  /**
+   * The end time of the source video (not included), in microseconds.
+   */
+  public endTime(): number;
+  /**
+   * The duration for playing after applying speed.
+   */
+  public playDuration(): number;
+  /**
+   * Indicates whether the video should play backward.
+   */
+  public reversed(): boolean;
+
   private constructor();
 }
 

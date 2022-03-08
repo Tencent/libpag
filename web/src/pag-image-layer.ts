@@ -1,0 +1,50 @@
+import { PAGImage } from './pag-image';
+import { PAGLayer } from './pag-layer';
+import { Vector, PAGVideoRange } from './types';
+import { wasmAwaitRewind } from './utils/decorators';
+
+@wasmAwaitRewind
+export class PAGImageLayer extends PAGLayer {
+  public static Make(width: number, height: number, duration: number): PAGImageLayer {
+    return new PAGImageLayer(this.module._PAGImageLayer._Make(width, height, duration));
+  }
+
+  public constructor(wasmIns: any) {
+    super(wasmIns);
+  }
+  /**
+   * Returns the content duration in microseconds, which indicates the minimal length required for
+   * replacement.
+   */
+  public contentDuration(): number {
+    return this.wasmIns._contentDuration() as number;
+  }
+  /**
+   * Returns the time ranges of the source video for replacement.
+   */
+  public getVideoRanges(): Vector<PAGVideoRange> {
+    return this.wasmIns._getVideoRanges() as Vector<PAGVideoRange>;
+  }
+  /**
+   * Replace the original image content with the specified PAGImage object. Passing in null for the
+   * image parameter resets the layer to its default image content.
+   * @param image The PAGImage object to replace with.
+   */
+  public replaceImage(pagImage: PAGImage) {
+    this.wasmIns._replaceImage(pagImage.wasmIns);
+  }
+  /**
+   * Converts the time from the PAGImageLayer's timeline to the replacement content's timeline. The
+   * time is in microseconds.
+   */
+  public layerTimeToContent(layerTime: number): number {
+    return this.wasmIns._layerTimeToContent(layerTime) as number;
+  }
+  /**
+   * Converts the time from the replacement content's timeline to the PAGLayer's timeline. The time
+   * is in microseconds.
+   */
+  public contentTimeToLayer(contentTime: number): number {
+    return this.wasmIns._contentTimeToLayer(contentTime) as number;
+  }
+}

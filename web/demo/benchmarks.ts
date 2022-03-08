@@ -3,15 +3,21 @@ import { PAGComposition } from '../src/pag-composition';
 import { PAGFile } from '../src/pag-file';
 import { PAGFont } from '../src/pag-font';
 import { PAGImage } from '../src/pag-image';
+import { PAGImageLayer } from '../src/pag-image-layer';
 import { PAGLayer } from '../src/pag-layer';
+import { PAGSolidLayer } from '../src/pag-solid-layer';
 import { PAGSurface } from '../src/pag-surface';
 import { PAGTextLayer } from '../src/pag-text-layer';
 import * as types from '../src/types';
 
 let PAG: types.PAG;
+let textPagArrayBuffer: ArrayBuffer;
+let imagePagArrayBuffer: ArrayBuffer;
 
 window.onload = async () => {
   PAG = await PAGInit({ locateFile: (file: string) => '../lib/' + file });
+  textPagArrayBuffer = await fetch('./assets/test2.pag').then((res) => res.arrayBuffer());
+  imagePagArrayBuffer = await fetch('./assets/AudioMarker.pag').then((res) => res.arrayBuffer());
   console.log('====== wasm loaded! ======', PAG);
   console.log('====== PAGImage test ======');
   await PAGImageTest();
@@ -23,6 +29,10 @@ window.onload = async () => {
   PAGLayerTest();
   console.log('====== PAGTextLayer test ======');
   PAGTextLayerTest();
+  console.log('====== PAGImageLayerTest test ======');
+  await PAGImageLayerTest();
+  console.log('====== PAGSolidLayerTest test ======');
+  await PAGSolidLayerTest();
   console.log('====== PAGSurface test ======');
   await PAGSurfaceTest();
 };
@@ -59,8 +69,7 @@ const PAGImageTest = async () => {
 let pagFile: PAGFile;
 const PAGFileTest = async () => {
   console.log('PAGFile MaxSupportedTagLevel: ', PAGFile.maxSupportedTagLevel());
-  const arrayBuffer = await fetch('./assets/test2.pag').then((res) => res.arrayBuffer());
-  pagFile = (await PAGFile.load(arrayBuffer)) as PAGFile;
+  pagFile = (await PAGFile.load(textPagArrayBuffer)) as PAGFile;
   console.log('PAGFile: ', pagFile);
   console.log('PAGFile tagLevel: ', pagFile.tagLevel());
   console.log('PAGFile numTexts: ', pagFile.numTexts());
@@ -99,10 +108,11 @@ const PAGFileTest = async () => {
 };
 
 let pagComposition: PAGComposition;
+let imagePagFile: PAGFile;
 const PAGCompositionTest = async () => {
   console.log('PAGComposition Make:', PAGComposition.Make(100, 100));
-  const arrayBuffer = await fetch('./assets/AudioMarker.pag').then((res) => res.arrayBuffer());
-  pagComposition = (await PAGFile.load(arrayBuffer)) as PAGComposition;
+  imagePagFile = (await PAGFile.load(imagePagArrayBuffer)) as PAGFile;
+  pagComposition = imagePagFile as PAGComposition;
   console.log('PAGComposition: ', pagComposition);
   console.log('PAGComposition width: ', pagComposition.width());
   console.log('PAGComposition height: ', pagComposition.height());
@@ -317,8 +327,43 @@ const PAGTextLayerTest = () => {
   }
 };
 
+let pagImageLayer: PAGImageLayer;
+const PAGImageLayerTest = async () => {
+  console.log('PAGImageLayer Make: ', PAGImageLayer.Make(100, 100, 1000));
+  imagePagFile.destroy();
+  imagePagFile = (await PAGFile.load(imagePagArrayBuffer)) as PAGFile;
+  pagImageLayer = new PAGImageLayer(imagePagFile.getLayersByEditableIndex(0, PAG.LayerType.Image).get(0));
+  console.log('PAGImageLayer: ', pagImageLayer);
+  console.log('PAGImageLayer contentDuration : ', pagImageLayer.contentDuration());
+  console.log('PAGImageLayer getVideoRanges : ', pagImageLayer.getVideoRanges());
+  console.log('PAGImageLayer replaceImage : ', pagImageLayer.replaceImage(pagImage));
+  console.log('PAGImageLayer layerTimeToContent : ', pagImageLayer.layerTimeToContent(0));
+  console.log('PAGImageLayer contentTimeToLayer : ', pagImageLayer.contentTimeToLayer(0));
+};
+
+let pagSolidLayer: PAGSolidLayer;
+const PAGSolidLayerTest = async () => {
+  console.log('PAGSolidLayer Make: ', PAGSolidLayer.Make(1000, 100, 100, { red: 255, green: 255, blue: 255 }, 1));
+  const layerCount = pagFile.numChildren();
+  for (let i = 0; i < layerCount; i++) {
+    const pagLayer = pagFile.getLayerAt(i);
+    if (pagLayer.layerType() === PAG.LayerType.Solid) {
+      pagSolidLayer = new PAGSolidLayer(pagLayer.wasmIns);
+      break;
+    }
+  }
+  console.log('PAGSolidLayer: ', pagSolidLayer);
+  console.log('PAGSolidLayer solidColor: ', pagSolidLayer.solidColor());
+  pagSolidLayer.setSolidColor({ red: 255, green: 255, blue: 255 });
+  if (pagSolidLayer.solidColor().red === 255) {
+    console.log(`PAGFile setSolidColor succeed!`);
+  } else {
+    console.error(`PAGFile setSolidColor failed!`);
+  }
+};
+
 let pagSurface: PAGSurface;
-const PAGSurfaceTest = async () => {
+const PAGSurfaceTest = () => {
   pagSurface = PAGSurface.FromCanvas('#pag');
   console.log('PAGSurface FromCanvas:', pagSurface);
   const canvasElement = document.getElementById('pag') as HTMLCanvasElement;

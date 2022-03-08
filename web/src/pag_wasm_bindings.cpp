@@ -92,8 +92,37 @@ EMSCRIPTEN_BINDINGS(pag) {
       .function("_setExcludedFromTimeline", &PAGLayer::setExcludedFromTimeline)
       .function("_isPAGFile", &PAGLayer::isPAGFile);
 
+  class_<PAGSolidLayer, base<PAGLayer>>("_PAGSolidLayer")
+      .smart_ptr<std::shared_ptr<PAGSolidLayer>>("_PAGSolidLayer")
+      .class_function("_Make", optional_override([](int duration, int width, int height,
+                                                    Color solidColor, int opacity) {
+                        return PAGSolidLayer::Make(static_cast<int64_t>(duration), width, height,
+                                                   solidColor, opacity);
+                      }))
+      .function("_solidColor", &PAGSolidLayer::solidColor)
+      .function("_setSolidColor", &PAGSolidLayer::setSolidColor);
+
+  class_<PAGImageLayer, base<PAGLayer>>("_PAGImageLayer")
+      .smart_ptr<std::shared_ptr<PAGImageLayer>>("_PAGImageLayer")
+      .class_function("_Make", optional_override([](int width, int height, int duration) {
+                        return PAGImageLayer::Make(width, height, static_cast<int64_t>(duration));
+                      }))
+      .function("_contentDuration", optional_override([](PAGImageLayer& pagImageLayer) {
+                  return static_cast<int>(pagImageLayer.contentDuration());
+                }))
+      .function("_getVideoRanges", &PAGImageLayer::getVideoRanges)
+      .function("_replaceImage", &PAGImageLayer::replaceImage)
+      .function("_layerTimeToContent",
+                optional_override([](PAGImageLayer& pagImageLayer, int layerTime) {
+                  return static_cast<int>(pagImageLayer.layerTimeToContent(layerTime));
+                }))
+      .function("_contentTimeToLayer",
+                optional_override([](PAGImageLayer& pagImageLayer, int contentTime) {
+                  return static_cast<int>(pagImageLayer.contentTimeToLayer(contentTime));
+                }));
+
   class_<PAGTextLayer, base<PAGLayer>>("_PAGTextLayer")
-      .smart_ptr<std::shared_ptr<PAGTextLayer>>("_PAGComposition")
+      .smart_ptr<std::shared_ptr<PAGTextLayer>>("_PAGTextLayer")
       .class_function("_Make", optional_override([](int duration, std::string text, float fontSize,
                                                     std::string fontFamily, std::string fontStyle) {
                         return PAGTextLayer::Make(static_cast<int64_t>(duration), text, fontSize,
@@ -271,6 +300,7 @@ EMSCRIPTEN_BINDINGS(pag) {
       .function("_graphicsMemory", optional_override([](PAGPlayer& pagPlayer) {
                   return static_cast<int>(pagPlayer.graphicsMemory());
                 }));
+
   class_<PAGFont>("_PAGFont")
       .smart_ptr<std::shared_ptr<PAGFont>>("_PAGFont")
       .class_function("_create",
@@ -328,6 +358,18 @@ EMSCRIPTEN_BINDINGS(pag) {
       .property("cap", &tgfx::Stroke::cap)
       .property("join", &tgfx::Stroke::join)
       .property("miterLimit", &tgfx::Stroke::miterLimit);
+
+  class_<PAGVideoRange>("PAGVideoRange")
+      .function("startTime", optional_override([](PAGVideoRange& pagVideoRange) {
+                  return static_cast<int>(pagVideoRange.startTime());
+                }))
+      .function("endTime", optional_override([](PAGVideoRange& pagVideoRange) {
+                  return static_cast<int>(pagVideoRange.endTime());
+                }))
+      .function("playDuration", optional_override([](PAGVideoRange& pagVideoRange) {
+                  return static_cast<int>(pagVideoRange.playDuration());
+                }))
+      .function("reversed", &PAGVideoRange::reversed);
 
   value_object<tgfx::FontMetrics>("FontMetrics")
       .field("ascent", &tgfx::FontMetrics::ascent)
@@ -388,8 +430,5 @@ EMSCRIPTEN_BINDINGS(pag) {
   register_vector<std::string>("VectorString");
   register_vector<tgfx::Point>("VectorPoint");
   register_vector<const Marker*>("VectorMarker");
-
-  function("_SetFallbackFontNames", optional_override([](std::vector<std::string> fontNames) {
-             PAGFont::SetFallbackFontNames(fontNames);
-           }));
+  register_vector<PAGVideoRange>("VectorPAGVideoRange");
 }
