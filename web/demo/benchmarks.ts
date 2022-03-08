@@ -1,8 +1,11 @@
 import { PAGInit } from '../src/pag';
 import { PAGComposition } from '../src/pag-composition';
 import { PAGFile } from '../src/pag-file';
+import { PAGFont } from '../src/pag-font';
 import { PAGImage } from '../src/pag-image';
 import { PAGLayer } from '../src/pag-layer';
+import { PAGSurface } from '../src/pag-surface';
+import { PAGTextLayer } from '../src/pag-text-layer';
 import * as types from '../src/types';
 
 let PAG: types.PAG;
@@ -17,7 +20,11 @@ window.onload = async () => {
   console.log('====== PAGComposition test ======');
   await PAGCompositionTest();
   console.log('====== PAGLayer test ======');
-  await PAGLayerTest();
+  PAGLayerTest();
+  console.log('====== PAGTextLayer test ======');
+  PAGTextLayerTest();
+  console.log('====== PAGSurface test ======');
+  await PAGSurfaceTest();
 };
 
 let pagImage: PAGImage;
@@ -73,7 +80,8 @@ const PAGFileTest = async () => {
   // }
   // Todo(zenoslin) test
   // pagFile.replaceImage(0, pagImage);
-  console.log('PAGFile getLayersByEditableIndex: ', pagFile.getLayersByEditableIndex(0, types.LayerType.Text));
+  console.log('PAGFile getLayersByEditableIndex: ', pagFile.getLayersByEditableIndex(0, PAG.LayerType.Text));
+
   console.log('PAGFile timeStretchMode: ', pagFile.timeStretchMode());
   pagFile.setTimeStretchMode(types.PAGTimeStretchMode.Repeat);
   if (pagFile.timeStretchMode() === types.PAGTimeStretchMode.Repeat) {
@@ -89,6 +97,7 @@ const PAGFileTest = async () => {
   }
   console.log('PAGFile copyOriginal: ', pagFile.copyOriginal());
 };
+
 let pagComposition: PAGComposition;
 const PAGCompositionTest = async () => {
   console.log('PAGComposition Make:', PAGComposition.Make(100, 100));
@@ -175,9 +184,7 @@ const PAGCompositionTest = async () => {
 };
 
 let pagLayer: PAGLayer;
-const PAGLayerTest = async () => {
-  const arrayBuffer = await fetch('./assets/test2.pag').then((res) => res.arrayBuffer());
-  const pagFile = PAGFile.loadFromBuffer(arrayBuffer);
+const PAGLayerTest = () => {
   pagLayer = pagFile.getLayerAt(0);
   console.log('PAGLayer: ', pagLayer);
   console.log('PAGLayer uniqueID: ', pagLayer.uniqueID());
@@ -263,4 +270,69 @@ const PAGLayerTest = async () => {
     console.error(`PAGLayer excludedFromTimeline failed!`);
   }
   console.log('PAGLayer isPAGFile: ', pagLayer.isPAGFile());
+};
+
+let pagTextLayer: PAGTextLayer;
+const PAGTextLayerTest = () => {
+  pagTextLayer = new PAGTextLayer(pagFile.getLayersByEditableIndex(0, PAG.LayerType.Text).get(0));
+  console.log('PAGTextLayer: ', pagTextLayer);
+  const fillColor = pagTextLayer.fillColor();
+  console.log('PAGTextLayer fillColor : ', fillColor);
+  fillColor.red = 255;
+  pagTextLayer.setFillColor(fillColor);
+  if (pagTextLayer.fillColor().red === 255) {
+    console.log(`PAGFile setFillColor succeed!`);
+  } else {
+    console.error(`PAGFile setFillColor failed!`);
+  }
+  console.log('PAGTextLayer font : ', pagTextLayer.font());
+  const font = PAGFont.create('Arial', 'Regular');
+  pagTextLayer.setFont(font);
+  if (pagTextLayer.font().fontFamily === 'Arial') {
+    console.log(`PAGFile setFont succeed!`);
+  } else {
+    console.error(`PAGFile setFont failed!`);
+  }
+  let strokeColor = pagTextLayer.strokeColor();
+  console.log('PAGTextLayer strokeColor : ', strokeColor);
+  strokeColor.red = 255;
+  pagTextLayer.setStrokeColor(strokeColor);
+  if (pagTextLayer.strokeColor().red === 255) {
+    console.log(`PAGFile setStrokeColor succeed!`);
+  } else {
+    console.error(`PAGFile setStrokeColor failed!`);
+  }
+  console.log('PAGTextLayer text : ', pagTextLayer.text());
+  pagTextLayer.setText('Hello PAG');
+  if (pagTextLayer.text() === 'Hello PAG') {
+    console.log(`PAGFile setText succeed!`);
+  } else {
+    console.error(`PAGFile setText failed!`);
+  }
+  pagTextLayer.reset();
+  if (pagTextLayer.text() === '过去的一年里最开心的瞬间') {
+    console.log(`PAGFile reset succeed!`);
+  } else {
+    console.error(`PAGFile reset failed!`);
+  }
+};
+
+let pagSurface: PAGSurface;
+const PAGSurfaceTest = async () => {
+  pagSurface = PAGSurface.FromCanvas('#pag');
+  console.log('PAGSurface FromCanvas:', pagSurface);
+  const canvasElement = document.getElementById('pag') as HTMLCanvasElement;
+  const gl = canvasElement.getContext('webgl');
+  if (gl instanceof WebGLRenderingContext) {
+    const contextID = PAGSurface.module.GL.registerContext(gl, { majorVersion: 1, minorVersion: 0 });
+    PAGSurface.module.GL.makeContextCurrent(contextID);
+    console.log(
+      'PAGSurface FromFrameBuffer:',
+      PAGSurface.module.PAGSurface.FromFrameBuffer(0, canvasElement.width, canvasElement.height, true),
+    );
+  } else {
+    console.error(`PAGSurface FromFrameBuffer failed!`);
+  }
+  console.log('PAGSurface width:', pagSurface.width());
+  console.log('PAGSurface height:', pagSurface.height());
 };

@@ -1,5 +1,6 @@
 import { PAGComposition } from './pag-composition';
 import { PAGImage } from './pag-image';
+import { PAGLayer } from './pag-layer';
 import { LayerType, PAG, PAGTimeStretchMode, TextDocument, Vector } from './types';
 import { readFile } from './utils/common';
 import { wasmAwaitRewind, wasmAsyncMethod } from './utils/decorators';

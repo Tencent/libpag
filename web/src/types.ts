@@ -13,6 +13,7 @@ import { PAGLayer } from './pag-layer';
 import { PAGComposition } from './pag-composition';
 import { NativeImage } from './core/native-image';
 import { WebMask } from './core/web-mask';
+import { PAGTextLayer } from './pag-text-layer';
 
 declare global {
   interface Window {
@@ -37,7 +38,14 @@ export interface PAG extends EmscriptenModule {
   _PAGComposition: {
     _Make: (width: number, height: number) => any;
   };
-  _SetFallbackFontNames: (fontName: any) => void;
+  _PAGTextLayer: {
+    _Make(duration: number, text: string, fontSize: number, fontFamily: string, fontStyle: string): any;
+    _Make(duration: number, textDocumentHandle: TextDocument): any;
+  };
+  _PAGFont: {
+    _create(fontFamily: string, fontStyle: string): any;
+    _SetFallbackFontNames(fontName: any): void;
+  };
   VectorString: any;
   webAssemblyQueue: WebAssemblyQueue;
   PAGPlayer: typeof PAGPlayer;
@@ -48,6 +56,7 @@ export interface PAG extends EmscriptenModule {
   PAGLayer: typeof PAGLayer;
   PAGComposition: typeof PAGComposition;
   PAGSurface: typeof PAGSurface;
+  PAGTextLayer: typeof PAGTextLayer;
   NativeImage: typeof NativeImage;
   WebMask: typeof WebMask;
   ScalerContext: typeof ScalerContext;

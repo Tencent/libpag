@@ -1,4 +1,5 @@
 import { PAGComposition } from './pag-composition';
+import { PAGFile } from './pag-file';
 import { LayerType, Marker, Matrix, PAG, Rect, Vector } from './types';
 import { wasmAwaitRewind } from './utils/decorators';
 

@@ -11,6 +11,7 @@ import { VideoReader } from './core/video-reader';
 import { ScalerContext } from './core/scaler-context';
 import { WebMask } from './core/web-mask';
 import { NativeImage } from './core/native-image';
+import { PAGTextLayer } from './pag-text-layer';
 
 /**
  * Binding pag js module on pag webassembly module.
@@ -32,6 +33,8 @@ export const binding = (module: PAG) => {
   PAGComposition.module = module;
   module.PAGSurface = PAGSurface;
   PAGSurface.module = module;
+  module.PAGTextLayer = PAGTextLayer;
+  PAGTextLayer.module = module;
   module.VideoReader = VideoReader;
   module.NativeImage = NativeImage;
   module.ScalerContext = ScalerContext;

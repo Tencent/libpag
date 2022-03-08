@@ -92,6 +92,30 @@ EMSCRIPTEN_BINDINGS(pag) {
       .function("_setExcludedFromTimeline", &PAGLayer::setExcludedFromTimeline)
       .function("_isPAGFile", &PAGLayer::isPAGFile);
 
+  class_<PAGTextLayer, base<PAGLayer>>("_PAGTextLayer")
+      .smart_ptr<std::shared_ptr<PAGTextLayer>>("_PAGComposition")
+      .class_function("_Make", optional_override([](int duration, std::string text, float fontSize,
+                                                    std::string fontFamily, std::string fontStyle) {
+                        return PAGTextLayer::Make(static_cast<int64_t>(duration), text, fontSize,
+                                                  fontFamily, fontStyle);
+                      }))
+      .class_function(
+          "_Make",
+          optional_override([](int duration, std::shared_ptr<TextDocument> textDocumentHandle) {
+            return PAGTextLayer::Make(static_cast<int64_t>(duration), textDocumentHandle);
+          }))
+      .function("_fillColor", &PAGTextLayer::fillColor)
+      .function("_setFillColor", &PAGTextLayer::setFillColor)
+      .function("_font", &PAGTextLayer::font)
+      .function("_setFont", &PAGTextLayer::setFont)
+      .function("_fontSize", &PAGTextLayer::fontSize)
+      .function("_setFontSize", &PAGTextLayer::setFontSize)
+      .function("_strokeColor", &PAGTextLayer::strokeColor)
+      .function("_setStrokeColor", &PAGTextLayer::setStrokeColor)
+      .function("_text", &PAGTextLayer::text)
+      .function("_setText", &PAGTextLayer::setText)
+      .function("_reset", &PAGTextLayer::reset);
+
   class_<PAGComposition, base<PAGLayer>>("_PAGComposition")
       .smart_ptr<std::shared_ptr<PAGComposition>>("_PAGComposition")
       .class_function("_Make", PAGComposition::Make)
@@ -247,6 +271,15 @@ EMSCRIPTEN_BINDINGS(pag) {
       .function("_graphicsMemory", optional_override([](PAGPlayer& pagPlayer) {
                   return static_cast<int>(pagPlayer.graphicsMemory());
                 }));
+  class_<PAGFont>("_PAGFont")
+      .smart_ptr<std::shared_ptr<PAGFont>>("_PAGFont")
+      .class_function("_create",
+                      optional_override([](std::string fontFamily, std::string fontStyle) {
+                        return pag::PAGFont(fontFamily, fontStyle);
+                      }))
+      .class_function("_SetFallbackFontNames", PAGFont::SetFallbackFontNames)
+      .property("fontFamily", &PAGFont::fontFamily)
+      .property("fontStyle", &PAGFont::fontStyle);
 
   class_<tgfx::ImageInfo>("ImageInfo")
       .property("width", &tgfx::ImageInfo::width)
