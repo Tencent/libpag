@@ -314,6 +314,7 @@ void GLCanvas::drawAtlas(const Texture* atlas, const Matrix matrix[], const Rect
     auto height = static_cast<float>(tex[i].height());
     auto localBounds = clipLocalBounds(Rect::MakeWH(width, height));
     if (localBounds.isEmpty()) {
+      setMatrix(totalMatrix);
       continue;
     }
     rects.push_back(localBounds);
