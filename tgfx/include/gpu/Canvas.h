@@ -35,6 +35,12 @@ struct CanvasPaint {
   BlendMode blendMode = BlendMode::SrcOver;
   Matrix matrix = Matrix::I();
   Path clip = {};
+
+ private:
+  std::shared_ptr<Texture> clipTexture;
+  Matrix clipTextureMatrix = Matrix::I();
+
+  friend class Canvas;
 };
 
 /**
@@ -190,6 +196,8 @@ class Canvas {
   }
 
  protected:
+  std::unique_ptr<FragmentProcessor> getClipFragmentProcessor();
+
   Surface* surface = nullptr;
   CanvasPaint globalPaint = {};
 

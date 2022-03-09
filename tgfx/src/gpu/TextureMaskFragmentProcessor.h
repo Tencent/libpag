@@ -27,14 +27,14 @@ class TextureMaskFragmentProcessor : public FragmentProcessor {
       const Texture* texture, const Matrix& localMatrix = Matrix::I(), bool inverted = false);
 
   static std::unique_ptr<TextureMaskFragmentProcessor> MakeUseDeviceCoord(const Texture* texture,
-                                                                          ImageOrigin deviceOrigin);
+                                                                          const Matrix& matrix);
 
   std::string name() const override {
     return "TextureMaskFragmentProcessor";
   }
 
  private:
-  TextureMaskFragmentProcessor(const Texture* texture, ImageOrigin deviceOrigin);
+  TextureMaskFragmentProcessor(const Texture* texture, const Matrix& matrix);
 
   TextureMaskFragmentProcessor(const Texture* texture, const Matrix& localMatrix, bool inverted);
 

@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/Canvas.h"
+#include "TextureMaskFragmentProcessor.h"
+#include "core/Mask.h"
 #include "gpu/Surface.h"
 
 namespace tgfx {
@@ -83,6 +85,7 @@ void Canvas::clipPath(const Path& path) {
   auto clipPath = path;
   clipPath.transform(globalPaint.matrix);
   globalPaint.clip.addPath(clipPath, PathOp::Intersect);
+  globalPaint.clipTexture = nullptr;
 }
 
 void Canvas::drawRect(const Rect& rect, const Paint& paint) {
@@ -112,5 +115,32 @@ Surface* Canvas::getSurface() const {
 
 const SurfaceOptions* Canvas::surfaceOptions() const {
   return surface->options();
+}
+
+std::unique_ptr<FragmentProcessor> Canvas::getClipFragmentProcessor() {
+  if (!globalPaint.clip.isEmpty() && globalPaint.clipTexture == nullptr) {
+    auto bounds = globalPaint.clip.getBounds();
+    auto width = ceilf(bounds.width());
+    auto height = ceilf(bounds.height());
+    if (width == 0 || height == 0) {
+      return nullptr;
+    }
+    auto mask = Mask::Make(static_cast<int>(width), static_cast<int>(height));
+    auto matrix = Matrix::MakeTrans(-bounds.x(), -bounds.y());
+    matrix.postScale(width / bounds.width(), height / bounds.height());
+    mask->setMatrix(matrix);
+    mask->fillPath(globalPaint.clip);
+    globalPaint.clipTexture = mask->makeTexture(getContext());
+    auto textureMatrix = Matrix::I();
+    if (surface->origin() == ImageOrigin::BottomLeft) {
+      textureMatrix.postScale(1, -1);
+      textureMatrix.postTranslate(0, static_cast<float>(surface->height()));
+    }
+    textureMatrix.postTranslate(-bounds.x(), -bounds.y());
+    textureMatrix.postScale(1.f / bounds.width(), 1.f / bounds.height());
+    globalPaint.clipTextureMatrix = textureMatrix;
+  }
+  return TextureMaskFragmentProcessor::MakeUseDeviceCoord(globalPaint.clipTexture.get(),
+                                                          globalPaint.clipTextureMatrix);
 }
 }  // namespace tgfx

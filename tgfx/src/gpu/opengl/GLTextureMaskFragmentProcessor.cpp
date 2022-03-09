@@ -32,17 +32,23 @@ void GLTextureMaskFragmentProcessor::emitCode(EmitArgs& args) {
     deviceCoordMatrixUniform =
         uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float3x3,
                                    "DeviceCoordMatrix", &deviceCoordMatrixName);
-    std::string scaleName;
-    scaleUniform = uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float2,
-                                              "CoordScale", &scaleName);
-    fragBuilder->codeAppendf("vec3 deviceCoord = %s * vec3(gl_FragCoord.xy * %s, 1.0);",
-                             deviceCoordMatrixName.c_str(), scaleName.c_str());
-    coordName = "deviceCoord.xy";
+    coordName = "deviceCoord";
+    fragBuilder->codeAppendf("vec2 %s = (%s * vec3(gl_FragCoord.xy, 1.0)).xy;", coordName.c_str(),
+                             deviceCoordMatrixName.c_str());
+    // Clamp to border and the border's color is vec4(0.0).
+    fragBuilder->codeAppendf("if (0.0 <= %s.x && %s.x <= 1.0 && 0.0 <= %s.y && %s.y <= 1.0) {",
+                             coordName.c_str(), coordName.c_str(), coordName.c_str(),
+                             coordName.c_str());
   }
   fragBuilder->codeAppendf("%s = ", args.outputColor.c_str());
   fragBuilder->appendTextureLookup((*args.textureSamplers)[0], coordName);
   fragBuilder->codeAppendf(".aaaa * %s", args.inputColor.c_str());
   fragBuilder->codeAppend(";");
+  if (!textureFP->useLocalCoord) {
+    fragBuilder->codeAppendf("} else {");
+    fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
+    fragBuilder->codeAppendf("}");
+  }
   if (textureFP->inverted) {
     fragBuilder->codeAppendf("%s = vec4(1.0) - %s;", args.outputColor.c_str(),
                              args.outputColor.c_str());
@@ -52,14 +58,6 @@ void GLTextureMaskFragmentProcessor::emitCode(EmitArgs& args) {
 void GLTextureMaskFragmentProcessor::onSetData(const ProgramDataManager& programDataManager,
                                                const FragmentProcessor& fragmentProcessor) {
   const auto& textureFP = static_cast<const TextureMaskFragmentProcessor&>(fragmentProcessor);
-  if (scaleUniform.isValid()) {
-    if (textureFP.texture->width() != widthPrev || textureFP.texture->height() != heightPrev) {
-      widthPrev = textureFP.texture->width();
-      heightPrev = textureFP.texture->height();
-      programDataManager.set2f(scaleUniform, 1.f / static_cast<float>(widthPrev),
-                               1.f / static_cast<float>(heightPrev));
-    }
-  }
   if (deviceCoordMatrixUniform.isValid()) {
     if (textureFP.deviceCoordMatrix != deviceCoordMatrixPrev) {
       deviceCoordMatrixPrev = textureFP.deviceCoordMatrix;

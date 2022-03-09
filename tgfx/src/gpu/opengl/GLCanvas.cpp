@@ -42,16 +42,6 @@ void GLCanvas::drawTexture(const Texture* texture, const Texture* mask, bool inv
   drawTexture(texture, nullptr, mask, inverted);
 }
 
-Surface* GLCanvas::getClipSurface() {
-  if (_clipSurface == nullptr) {
-    _clipSurface = Surface::Make(getContext(), surface->width(), surface->height(), true);
-    if (_clipSurface == nullptr) {
-      _clipSurface = Surface::Make(getContext(), surface->width(), surface->height());
-    }
-  }
-  return _clipSurface.get();
-}
-
 static constexpr float BOUNDS_TO_LERANCE = 1e-3f;
 
 /**
@@ -79,14 +69,7 @@ std::unique_ptr<FragmentProcessor> GLCanvas::getClipMask(const Rect& deviceBound
         scissorRect->round();
       }
     } else {
-      auto clipSurface = getClipSurface();
-      auto clipCanvas = clipSurface->getCanvas();
-      clipCanvas->clear();
-      Paint paint = {};
-      paint.setColor(Color::Black());
-      clipCanvas->drawPath(globalPaint.clip, paint);
-      return TextureMaskFragmentProcessor::MakeUseDeviceCoord(clipSurface->getTexture().get(),
-                                                              surface->origin());
+      return getClipFragmentProcessor();
     }
   }
   return nullptr;
@@ -94,10 +77,10 @@ std::unique_ptr<FragmentProcessor> GLCanvas::getClipMask(const Rect& deviceBound
 
 Rect GLCanvas::clipLocalBounds(Rect localBounds) {
   auto deviceBounds = globalPaint.matrix.mapRect(localBounds);
-  auto surfaceBounds =
-      Rect::MakeWH(static_cast<float>(surface->width()), static_cast<float>(surface->height()));
   auto clippedDeviceBounds = deviceBounds;
-  if (!clippedDeviceBounds.intersect(surfaceBounds)) {
+  auto clipBounds = globalPaint.clip.getBounds();
+  clipBounds.roundOut();
+  if (!clippedDeviceBounds.intersect(clipBounds)) {
     return Rect::MakeEmpty();
   }
   auto clippedLocalBounds = localBounds;
@@ -314,6 +297,7 @@ void GLCanvas::drawAtlas(const Texture* atlas, const Matrix matrix[], const Rect
     auto height = static_cast<float>(tex[i].height());
     auto localBounds = clipLocalBounds(Rect::MakeWH(width, height));
     if (localBounds.isEmpty()) {
+      setMatrix(totalMatrix);
       continue;
     }
     rects.push_back(localBounds);

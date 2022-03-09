@@ -29,11 +29,8 @@ class GLTextureMaskFragmentProcessor : public GLFragmentProcessor {
   void onSetData(const ProgramDataManager& programDataManager,
                  const FragmentProcessor& fragmentProcessor) override;
 
-  UniformHandle scaleUniform;
   UniformHandle deviceCoordMatrixUniform;
 
-  int widthPrev = -1;
-  int heightPrev = -1;
   Matrix deviceCoordMatrixPrev = Matrix::MakeScale(FLT_MAX);
 };
 }  // namespace tgfx

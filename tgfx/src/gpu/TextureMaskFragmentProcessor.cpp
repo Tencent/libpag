@@ -31,22 +31,18 @@ std::unique_ptr<TextureMaskFragmentProcessor> TextureMaskFragmentProcessor::Make
 }
 
 std::unique_ptr<TextureMaskFragmentProcessor> TextureMaskFragmentProcessor::MakeUseDeviceCoord(
-    const Texture* texture, ImageOrigin deviceOrigin) {
+    const Texture* texture, const Matrix& matrix) {
   if (texture == nullptr) {
     return nullptr;
   }
   return std::unique_ptr<TextureMaskFragmentProcessor>(
-      new TextureMaskFragmentProcessor(texture, deviceOrigin));
+      new TextureMaskFragmentProcessor(texture, matrix));
 }
 
 TextureMaskFragmentProcessor::TextureMaskFragmentProcessor(const Texture* texture,
-                                                           ImageOrigin deviceOrigin)
-    : useLocalCoord(false), texture(texture) {
+                                                           const Matrix& matrix)
+    : useLocalCoord(false), texture(texture), deviceCoordMatrix(matrix) {
   setTextureSamplerCnt(1);
-  if (deviceOrigin == ImageOrigin::BottomLeft) {
-    deviceCoordMatrix.postScale(1, -1);
-    deviceCoordMatrix.postTranslate(0, 1);
-  }
 }
 
 TextureMaskFragmentProcessor::TextureMaskFragmentProcessor(const Texture* texture,
