@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 
 SOURCE_DIR=../..
 BUILD_DIR=../../build
@@ -45,6 +45,14 @@ emcc $RELEASE_CONF -std=c++17 \
   -s EXPORT_ES6=1 \
   -s USE_ES6_IMPORT_META=0 \
   -o ../src/wasm/libpag.js
+
+if test $? -eq 0
+then
+echo "~~~~~~~~~~~~~~~~~~~wasm build success~~~~~~~~~~~~~~~~~~"
+else
+echo "~~~~~~~~~~~~~~~~~~~wasm build failed~~~~~~~~~~~~~~~~~~~"
+exit 1
+fi
 
 if [ ! -d "../lib" ]; then
   mkdir ../lib

@@ -39,6 +39,10 @@ jobs:
           lfs: true
       - name: Checkout LFS objects
         run: git lfs checkout
+      - name: brew link emscripten
+        if: steps.cache-environment.outputs.cache-hit == 'true'
+        run: |
+            brew link emscripten
       - name: Web build
         run: |
           chmod +x sync_deps.sh
