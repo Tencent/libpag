@@ -94,10 +94,10 @@ std::unique_ptr<FragmentProcessor> GLCanvas::getClipMask(const Rect& deviceBound
 
 Rect GLCanvas::clipLocalBounds(Rect localBounds) {
   auto deviceBounds = globalPaint.matrix.mapRect(localBounds);
-  auto surfaceBounds =
-      Rect::MakeWH(static_cast<float>(surface->width()), static_cast<float>(surface->height()));
+  auto clipBounds = globalPaint.clip.getBounds();
+  clipBounds.roundOut();
   auto clippedDeviceBounds = deviceBounds;
-  if (!clippedDeviceBounds.intersect(surfaceBounds)) {
+  if (!clippedDeviceBounds.intersect(clipBounds)) {
     return Rect::MakeEmpty();
   }
   auto clippedLocalBounds = localBounds;
