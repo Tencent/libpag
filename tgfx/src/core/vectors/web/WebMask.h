@@ -34,6 +34,8 @@ class WebMask : public Mask {
 
   bool strokeText(const TextBlob* textBlob, const Stroke& stroke) override;
 
+  void clear() override;
+
   std::shared_ptr<Texture> makeTexture(Context* context) const override;
 
  private:

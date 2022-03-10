@@ -112,4 +112,8 @@ bool WebMask::drawText(const TextBlob* textBlob, const Stroke* stroke) {
   }
   return true;
 }
+
+void WebMask::clear() {
+  webMask.call<void>("clear");
+}
 }  // namespace tgfx

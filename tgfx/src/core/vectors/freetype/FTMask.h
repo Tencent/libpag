@@ -28,6 +28,8 @@ class FTMask : public Mask {
 
   void fillPath(const Path& path) override;
 
+  void clear() override;
+
   std::shared_ptr<Texture> makeTexture(Context* context) const override {
     return buffer->makeTexture(context);
   }
