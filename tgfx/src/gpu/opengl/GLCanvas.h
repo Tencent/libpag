@@ -22,6 +22,7 @@
 #include "core/BlendMode.h"
 #include "core/Mask.h"
 #include "gpu/Canvas.h"
+#include "gpu/CanvasState.h"
 
 namespace tgfx {
 class GLCanvas : public Canvas {
@@ -49,6 +50,7 @@ class GLCanvas : public Canvas {
 
  private:
   std::shared_ptr<Surface> _clipSurface = nullptr;
+  uint32_t clipID = kDefaultClipID;
   std::shared_ptr<GLDrawer> _drawer = nullptr;
 
   GLDrawer* getDrawer();

@@ -70,7 +70,7 @@ void GLCanvas::drawTexture(const Texture* texture, const RGBAAALayout* layout) {
 
 std::unique_ptr<FragmentProcessor> GLCanvas::getClipMask(const Rect& deviceBounds,
                                                          Rect* scissorRect) {
-  auto& clipPath = globalPaint.clip;
+  const auto& clipPath = state->clip;
   if (!clipPath.contains(deviceBounds)) {
     auto rect = Rect::MakeEmpty();
     if (clipPath.asRect(&rect) && IsPixelAligned(rect)) {
@@ -81,10 +81,12 @@ std::unique_ptr<FragmentProcessor> GLCanvas::getClipMask(const Rect& deviceBound
     } else {
       auto clipSurface = getClipSurface();
       auto clipCanvas = clipSurface->getCanvas();
-      clipCanvas->clear();
-      Paint paint = {};
-      paint.setColor(Color::Black());
-      clipCanvas->drawPath(globalPaint.clip, paint);
+      if (clipID != state->clipID) {
+        clipCanvas->clear();
+        Paint paint = {};
+        paint.setColor(Color::Black());
+        clipCanvas->drawPath(state->clip, paint);
+      }
       return TextureMaskFragmentProcessor::MakeUseDeviceCoord(clipSurface->getTexture().get(),
                                                               surface->origin());
     }
@@ -93,18 +95,18 @@ std::unique_ptr<FragmentProcessor> GLCanvas::getClipMask(const Rect& deviceBound
 }
 
 Rect GLCanvas::clipLocalBounds(Rect localBounds) {
-  auto deviceBounds = globalPaint.matrix.mapRect(localBounds);
-  auto clipBounds = globalPaint.clip.getBounds();
+  auto deviceBounds = state->matrix.mapRect(localBounds);
+  auto clipBounds = state->clip.getBounds();
   clipBounds.roundOut();
   auto clippedDeviceBounds = deviceBounds;
   if (!clippedDeviceBounds.intersect(clipBounds)) {
     return Rect::MakeEmpty();
   }
   auto clippedLocalBounds = localBounds;
-  if (globalPaint.matrix.getSkewX() == 0 && globalPaint.matrix.getSkewY() == 0 &&
+  if (state->matrix.getSkewX() == 0 && state->matrix.getSkewY() == 0 &&
       clippedDeviceBounds != deviceBounds) {
     Matrix inverse = Matrix::I();
-    globalPaint.matrix.invert(&inverse);
+    state->matrix.invert(&inverse);
     clippedLocalBounds = inverse.mapRect(clippedDeviceBounds);
   }
   return clippedLocalBounds;
@@ -181,14 +183,14 @@ void GLCanvas::fillPath(const Path& path, const Shader* shader) {
     draw(std::move(op), shader->asFragmentProcessor(args));
     return;
   }
-  auto deviceBounds = globalPaint.matrix.mapRect(localBounds);
+  auto deviceBounds = state->matrix.mapRect(localBounds);
   auto width = ceilf(deviceBounds.width());
   auto height = ceilf(deviceBounds.height());
   auto mask = Mask::Make(static_cast<int>(width), static_cast<int>(height));
   if (!mask) {
     return;
   }
-  auto totalMatrix = globalPaint.matrix;
+  auto totalMatrix = state->matrix;
   auto matrix = Matrix::MakeTrans(-deviceBounds.x(), -deviceBounds.y());
   matrix.postScale(width / deviceBounds.width(), height / deviceBounds.height());
   totalMatrix.postConcat(matrix);
@@ -208,7 +210,7 @@ void GLCanvas::drawMask(const Rect& bounds, const Texture* mask, const Shader* s
   localMatrix.postScale(bounds.width(), bounds.height());
   localMatrix.postTranslate(bounds.x(), bounds.y());
   auto invert = Matrix::I();
-  globalPaint.matrix.invert(&invert);
+  state->matrix.invert(&invert);
   localMatrix.postConcat(invert);
   auto args = FPArgs(getContext(), localMatrix);
   save();
@@ -240,8 +242,8 @@ void GLCanvas::drawGlyphs(const GlyphID glyphIDs[], const Point positions[], siz
 
 void GLCanvas::drawColorGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
                                const Font& font, const Paint& paint) {
-  auto scaleX = globalPaint.matrix.getScaleX();
-  auto skewY = globalPaint.matrix.getSkewY();
+  auto scaleX = state->matrix.getScaleX();
+  auto skewY = state->matrix.getSkewY();
   auto scale = std::sqrt(scaleX * scaleX + skewY * skewY);
   auto scaleFont = font.makeWithSize(font.getSize() * scale);
   for (size_t i = 0; i < glyphCount; ++i) {
@@ -257,7 +259,7 @@ void GLCanvas::drawColorGlyphs(const GlyphID glyphIDs[], const Point positions[]
     glyphMatrix.postTranslate(position.x, position.y);
     save();
     concat(glyphMatrix);
-    globalPaint.alpha *= paint.getAlpha();
+    state->alpha *= paint.getAlpha();
     auto texture = glyphBuffer->makeTexture(getContext());
     drawTexture(texture.get(), nullptr, false);
     restore();
@@ -273,14 +275,14 @@ void GLCanvas::drawMaskGlyphs(TextBlob* textBlob, const Paint& paint) {
   if (localBounds.isEmpty()) {
     return;
   }
-  auto deviceBounds = globalPaint.matrix.mapRect(localBounds);
+  auto deviceBounds = state->matrix.mapRect(localBounds);
   auto width = ceilf(deviceBounds.width());
   auto height = ceilf(deviceBounds.height());
   auto mask = Mask::Make(static_cast<int>(width), static_cast<int>(height));
   if (mask == nullptr) {
     return;
   }
-  auto totalMatrix = globalPaint.matrix;
+  auto totalMatrix = state->matrix;
   auto matrix = Matrix::I();
   matrix.postTranslate(-deviceBounds.x(), -deviceBounds.y());
   matrix.postScale(width / deviceBounds.width(), height / deviceBounds.height());
@@ -350,7 +352,7 @@ GLDrawer* GLCanvas::getDrawer() {
 }
 
 Matrix GLCanvas::getViewMatrix() {
-  auto matrix = globalPaint.matrix;
+  auto matrix = state->matrix;
   if (surface->origin() == ImageOrigin::BottomLeft) {
     // Flip Y
     matrix.postScale(1, -1);
@@ -372,7 +374,7 @@ void GLCanvas::draw(std::unique_ptr<GLDrawOp> op, std::unique_ptr<FragmentProces
   } else if (aa && !IsPixelAligned(op->bounds())) {
     aaType = AAType::Coverage;
   } else {
-    auto& matrix = globalPaint.matrix;
+    const auto& matrix = state->matrix;
     auto rotation = std::round(RadiansToDegrees(atan2f(matrix.getSkewX(), matrix.getScaleX())));
     if (static_cast<int>(rotation) % 90 != 0) {
       aaType = AAType::Coverage;
@@ -382,8 +384,8 @@ void GLCanvas::draw(std::unique_ptr<GLDrawOp> op, std::unique_ptr<FragmentProces
   if (color) {
     args.colors.push_back(std::move(color));
   }
-  if (globalPaint.alpha != 1.0) {
-    args.colors.push_back(AlphaFragmentProcessor::Make(globalPaint.alpha));
+  if (state->alpha != 1.0) {
+    args.colors.push_back(AlphaFragmentProcessor::Make(state->alpha));
   }
   if (mask) {
     args.masks.push_back(std::move(mask));
@@ -393,7 +395,7 @@ void GLCanvas::draw(std::unique_ptr<GLDrawOp> op, std::unique_ptr<FragmentProces
     args.masks.push_back(std::move(clipMask));
   }
   args.context = surface->getContext();
-  args.blendMode = globalPaint.blendMode;
+  args.blendMode = state->blendMode;
   args.renderTarget = renderTarget.get();
   args.renderTargetTexture = surface->getTexture();
   args.aa = aaType;
