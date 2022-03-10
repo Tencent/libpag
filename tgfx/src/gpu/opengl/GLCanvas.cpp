@@ -86,6 +86,7 @@ std::unique_ptr<FragmentProcessor> GLCanvas::getClipMask(const Rect& deviceBound
         Paint paint = {};
         paint.setColor(Color::Black());
         clipCanvas->drawPath(state->clip, paint);
+        clipID = state->clipID;
       }
       return TextureMaskFragmentProcessor::MakeUseDeviceCoord(clipSurface->getTexture().get(),
                                                               surface->origin());
