@@ -18,7 +18,7 @@ export class PAGFile extends PAGComposition {
     let buffer: ArrayBuffer | null = null;
     if (data instanceof File) {
       buffer = (await readFile(data)) as ArrayBuffer;
-    } else if (data instanceof File) {
+    } else if (data instanceof Blob) {
       buffer = (await readFile(new File([data], ''))) as ArrayBuffer;
     } else if (data instanceof ArrayBuffer) {
       buffer = data;
