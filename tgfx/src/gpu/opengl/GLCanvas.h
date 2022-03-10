@@ -55,7 +55,7 @@ class GLCanvas : public Canvas {
 
   GLDrawer* getDrawer();
 
-  Surface* getClipSurface();
+  Texture* getClipTexture();
 
   Matrix getViewMatrix();
 
