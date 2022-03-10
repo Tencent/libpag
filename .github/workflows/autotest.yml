@@ -81,11 +81,6 @@ jobs:
             git pull
             git checkout ${{ github.head_ref }}
 
-      - name: brew link emscripten
-        if: steps.cache-environment.outputs.cache-hit == 'true'
-        run: |
-           brew link emscripten
-
       - name: Run autotest script
         run: |
           cd libpag
