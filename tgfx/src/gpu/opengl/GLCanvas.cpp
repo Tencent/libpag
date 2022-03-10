@@ -42,14 +42,25 @@ void GLCanvas::drawTexture(const Texture* texture, const Texture* mask, bool inv
   drawTexture(texture, nullptr, mask, inverted);
 }
 
-Surface* GLCanvas::getClipSurface() {
+Texture* GLCanvas::getClipTexture() {
   if (_clipSurface == nullptr) {
     _clipSurface = Surface::Make(getContext(), surface->width(), surface->height(), true);
     if (_clipSurface == nullptr) {
       _clipSurface = Surface::Make(getContext(), surface->width(), surface->height());
     }
   }
-  return _clipSurface.get();
+  if (_clipSurface == nullptr) {
+    return nullptr;
+  }
+  if (clipID != state->clipID) {
+    auto clipCanvas = _clipSurface->getCanvas();
+    clipCanvas->clear();
+    Paint paint = {};
+    paint.setColor(Color::Black());
+    clipCanvas->drawPath(state->clip, paint);
+    clipID = state->clipID;
+  }
+  return _clipSurface->getTexture().get();
 }
 
 static constexpr float BOUNDS_TO_LERANCE = 1e-3f;
@@ -71,28 +82,17 @@ void GLCanvas::drawTexture(const Texture* texture, const RGBAAALayout* layout) {
 std::unique_ptr<FragmentProcessor> GLCanvas::getClipMask(const Rect& deviceBounds,
                                                          Rect* scissorRect) {
   const auto& clipPath = state->clip;
-  if (!clipPath.contains(deviceBounds)) {
-    auto rect = Rect::MakeEmpty();
-    if (clipPath.asRect(&rect) && IsPixelAligned(rect)) {
-      if (scissorRect) {
-        *scissorRect = rect;
-        scissorRect->round();
-      }
-    } else {
-      auto clipSurface = getClipSurface();
-      auto clipCanvas = clipSurface->getCanvas();
-      if (clipID != state->clipID) {
-        clipCanvas->clear();
-        Paint paint = {};
-        paint.setColor(Color::Black());
-        clipCanvas->drawPath(state->clip, paint);
-        clipID = state->clipID;
-      }
-      return TextureMaskFragmentProcessor::MakeUseDeviceCoord(clipSurface->getTexture().get(),
-                                                              surface->origin());
-    }
+  if (clipPath.contains(deviceBounds)) {
+    return nullptr;
   }
-  return nullptr;
+  auto rect = Rect::MakeEmpty();
+  if (clipPath.asRect(&rect) && IsPixelAligned(rect) && scissorRect) {
+    *scissorRect = rect;
+    scissorRect->round();
+    return nullptr;
+  } else {
+    return TextureMaskFragmentProcessor::MakeUseDeviceCoord(getClipTexture(), surface->origin());
+  }
 }
 
 Rect GLCanvas::clipLocalBounds(Rect localBounds) {
