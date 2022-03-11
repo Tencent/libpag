@@ -466,10 +466,4 @@ const Matrix& Matrix::I() {
   static const Matrix identity = Matrix::MakeAll(1, 0, 0, 0, 1, 0, 0, 0, 1);
   return identity;
 }
-
-const Matrix& Matrix::Invalid() {
-  static const Matrix invalid = Matrix::MakeAll(FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX,
-                                                FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX);
-  return invalid;
-}
 }  // namespace tgfx
