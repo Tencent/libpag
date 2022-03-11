@@ -88,4 +88,8 @@ void FTMask::fillPath(const Path& path) {
     FT_Outline_Get_Bitmap(ftLibrary, &(outline->outline), &bitmap);
   }
 }
+
+void FTMask::clear() {
+  Bitmap(buffer).eraseAll();
+}
 }  // namespace tgfx

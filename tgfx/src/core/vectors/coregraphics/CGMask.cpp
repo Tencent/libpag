@@ -104,4 +104,8 @@ void CGMask::fillPath(const Path& path) {
   CGContextRelease(cgContext);
   CGPathRelease(cgPath);
 }
+
+void CGMask::clear() {
+  Bitmap(buffer).eraseAll();
+}
 }  // namespace tgfx

@@ -44,24 +44,24 @@ void GLCanvas::drawTexture(const Texture* texture, const Texture* mask, bool inv
 }
 
 Texture* GLCanvas::getClipTexture() {
-  if (_clipSurface == nullptr) {
-    _clipSurface = Surface::Make(getContext(), surface->width(), surface->height(), true);
-    if (_clipSurface == nullptr) {
-      _clipSurface = Surface::Make(getContext(), surface->width(), surface->height());
-    }
+  if (_clipMask == nullptr) {
+    _clipMask = Mask::Make(surface->width(), surface->height());
   }
-  if (_clipSurface == nullptr) {
+  if (_clipMask == nullptr) {
     return nullptr;
   }
   if (clipID != state->clipID) {
-    auto clipCanvas = _clipSurface->getCanvas();
-    clipCanvas->clear();
-    Paint paint = {};
-    paint.setColor(Color::Black());
-    clipCanvas->drawPath(state->clip, paint);
+    _clipMask->clear();
+    _clipMask->fillPath(state->clip);
     clipID = state->clipID;
+    // recycle the clip texture.
+    _clipTexture = nullptr;
+    _clipTexture = _clipMask->makeTexture(getContext());
   }
-  return _clipSurface->getTexture().get();
+  if (_clipTexture == nullptr) {
+    _clipTexture = _clipMask->makeTexture(getContext());
+  }
+  return _clipTexture.get();
 }
 
 static constexpr float BOUNDS_TO_LERANCE = 1e-3f;

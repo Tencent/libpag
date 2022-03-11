@@ -78,6 +78,8 @@ class Mask : public TextureBuffer {
    */
   virtual bool strokeText(const TextBlob* textBlob, const Stroke& stroke);
 
+  virtual void clear() = 0;
+
  protected:
   Matrix matrix = Matrix::I();
 
