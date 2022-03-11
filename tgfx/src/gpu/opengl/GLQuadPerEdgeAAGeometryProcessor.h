@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "gpu/GLGeometryProcessor.h"
 
 namespace tgfx {
@@ -32,7 +33,7 @@ class GLQuadPerEdgeAAGeometryProcessor : public GLGeometryProcessor {
  private:
   UniformHandle screenSizeUniform;
 
-  int widthPrev = -1;
-  int heightPrev = -1;
+  std::optional<int> widthPrev;
+  std::optional<int> heightPrev;
 };
 }  // namespace tgfx

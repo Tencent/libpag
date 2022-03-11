@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "core/Color.h"
 #include "gpu/GLFragmentProcessor.h"
 
@@ -32,7 +33,7 @@ class GLSingleIntervalGradientColorizer : public GLFragmentProcessor {
   UniformHandle startUniform;
   UniformHandle endUniform;
 
-  Color startPrev = Color::Invalid();
-  Color endPrev = Color::Invalid();
+  std::optional<Color> startPrev;
+  std::optional<Color> endPrev;
 };
 }  // namespace tgfx

@@ -42,7 +42,7 @@ void GLAARectEffect::onSetData(const ProgramDataManager& programDataManager,
   // The AA math in the shader evaluates to 0 at the uploaded coordinates, so outset by 0.5
   // to interpolate from 0 at a half pixel inset and 1 at a half pixel outset of rect.
   auto rect = rectEffect.rect.makeOutset(0.5f, 0.5f);
-  if (rectPrev == std::nullopt || rectPrev != rect) {
+  if (rectPrev != rect) {
     rectPrev = rect;
     programDataManager.set4f(rectUniform, rect.left, rect.top, rect.right, rect.bottom);
   }

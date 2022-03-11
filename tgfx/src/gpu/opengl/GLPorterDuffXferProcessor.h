@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "gpu/GLXferProcessor.h"
 
 namespace tgfx {
@@ -32,8 +33,8 @@ class GLPorterDuffXferProcessor : public GLXferProcessor {
   UniformHandle dstTopLeftUniform;
   UniformHandle dstScaleUniform;
 
-  Point dstTopLeftPrev = Point::Make(-1, -1);
-  int widthPrev = -1;
-  int heightPrev = -1;
+  std::optional<Point> dstTopLeftPrev;
+  std::optional<int> widthPrev;
+  std::optional<int> heightPrev;
 };
 }  // namespace tgfx
