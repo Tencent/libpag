@@ -24,6 +24,7 @@
 #include "core/PathEffect.h"
 #include "core/TextBlob.h"
 #include "core/utils/MathExtra.h"
+#include "gpu/AARectEffect.h"
 #include "gpu/AlphaFragmentProcessor.h"
 #include "gpu/ColorShader.h"
 #include "gpu/TextureFragmentProcessor.h"
@@ -86,10 +87,19 @@ std::unique_ptr<FragmentProcessor> GLCanvas::getClipMask(const Rect& deviceBound
     return nullptr;
   }
   auto rect = Rect::MakeEmpty();
-  if (clipPath.asRect(&rect) && IsPixelAligned(rect) && scissorRect) {
-    *scissorRect = rect;
-    scissorRect->round();
-    return nullptr;
+  if (clipPath.asRect(&rect)) {
+    if (IsPixelAligned(rect) && scissorRect) {
+      *scissorRect = rect;
+      scissorRect->round();
+      return nullptr;
+    } else {
+      if (surface->origin() == ImageOrigin::BottomLeft) {
+        auto height = rect.height();
+        rect.top = static_cast<float>(surface->height()) - rect.bottom;
+        rect.bottom = rect.top + height;
+      }
+      return AARectEffect::Make(rect);
+    }
   } else {
     return TextureMaskFragmentProcessor::MakeUseDeviceCoord(getClipTexture(), surface->origin());
   }

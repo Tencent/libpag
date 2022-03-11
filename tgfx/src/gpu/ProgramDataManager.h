@@ -30,6 +30,8 @@ class ProgramDataManager {
 
   virtual void set2f(UniformHandle handle, float v0, float v1) const = 0;
 
+  virtual void set4f(UniformHandle handle, float v0, float v1, float v2, float v3) const = 0;
+
   virtual void set4fv(UniformHandle handle, int arrayCount, const float v[]) const = 0;
 
   virtual void setMatrix3f(UniformHandle handle, const float matrix[]) const = 0;
