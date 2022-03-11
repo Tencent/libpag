@@ -56,14 +56,14 @@ void GLTextureMaskFragmentProcessor::onSetData(const ProgramDataManager& program
     if (textureFP.texture->width() != widthPrev || textureFP.texture->height() != heightPrev) {
       widthPrev = textureFP.texture->width();
       heightPrev = textureFP.texture->height();
-      programDataManager.set2f(scaleUniform, 1.f / static_cast<float>(widthPrev),
-                               1.f / static_cast<float>(heightPrev));
+      programDataManager.set2f(scaleUniform, 1.f / static_cast<float>(*widthPrev),
+                               1.f / static_cast<float>(*heightPrev));
     }
   }
   if (deviceCoordMatrixUniform.isValid()) {
     if (textureFP.deviceCoordMatrix != deviceCoordMatrixPrev) {
       deviceCoordMatrixPrev = textureFP.deviceCoordMatrix;
-      programDataManager.setMatrix(deviceCoordMatrixUniform, deviceCoordMatrixPrev);
+      programDataManager.setMatrix(deviceCoordMatrixUniform, *deviceCoordMatrixPrev);
     }
   }
 }

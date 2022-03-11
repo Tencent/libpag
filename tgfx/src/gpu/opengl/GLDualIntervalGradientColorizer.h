@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "core/Color.h"
 #include "gpu/GLFragmentProcessor.h"
 
@@ -35,10 +36,10 @@ class GLDualIntervalGradientColorizer : public GLFragmentProcessor {
   UniformHandle bias23Uniform;
   UniformHandle thresholdUniform;
 
-  Color scale01Prev = Color::Invalid();
-  Color bias01Prev = Color::Invalid();
-  Color scale23Prev = Color::Invalid();
-  Color bias23Prev = Color::Invalid();
-  float thresholdPrev = -1;
+  std::optional<Color> scale01Prev;
+  std::optional<Color> bias01Prev;
+  std::optional<Color> scale23Prev;
+  std::optional<Color> bias23Prev;
+  std::optional<float> thresholdPrev;
 };
 }  // namespace tgfx

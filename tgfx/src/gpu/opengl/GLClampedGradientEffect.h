@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "core/Color.h"
 #include "gpu/GLFragmentProcessor.h"
 
@@ -30,8 +31,8 @@ class GLClampedGradientEffect : public GLFragmentProcessor {
   void onSetData(const ProgramDataManager& programDataManager,
                  const FragmentProcessor& fragmentProcessor) override;
 
-  Color leftBorderColorPrev = Color::Invalid();
-  Color rightBorderColorPrev = Color::Invalid();
+  std::optional<Color> leftBorderColorPrev;
+  std::optional<Color> rightBorderColorPrev;
   UniformHandle leftBorderColorUniform;
   UniformHandle rightBorderColorUniform;
 };
