@@ -39,6 +39,14 @@ void GLProgramDataManager::set2f(UniformHandle handle, float v0, float v1) const
   }
 }
 
+void GLProgramDataManager::set4f(UniformHandle handle, float v0, float v1, float v2,
+                                 float v3) const {
+  auto location = uniforms->at(handle.toIndex());
+  if (kUnusedUniform != location) {
+    gl->uniform4f(location, v0, v1, v2, v3);
+  }
+}
+
 void GLProgramDataManager::set4fv(UniformHandle handle, int arrayCount, const float* v) const {
   auto location = uniforms->at(handle.toIndex());
   if (kUnusedUniform != location) {
