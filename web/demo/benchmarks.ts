@@ -9,6 +9,7 @@ import { PAGSolidLayer } from '../src/pag-solid-layer';
 import { PAGSurface } from '../src/pag-surface';
 import { PAGTextLayer } from '../src/pag-text-layer';
 import * as types from '../src/types';
+import { vector2array } from '../src/utils/type-utils';
 
 let PAG: types.PAG;
 let textPagArrayBuffer: ArrayBuffer;
@@ -35,6 +36,8 @@ window.onload = async () => {
   await PAGSolidLayerTest();
   console.log('====== PAGSurface test ======');
   await PAGSurfaceTest();
+  console.log('====== Vector test ======');
+  VectorTest();
 };
 
 let pagImage: PAGImage;
@@ -380,4 +383,19 @@ const PAGSurfaceTest = () => {
   }
   console.log('PAGSurface width:', pagSurface.width());
   console.log('PAGSurface height:', pagSurface.height());
+};
+
+const VectorTest = () => {
+  const vector = imagePagFile.getLayersByEditableIndex(0, PAG.LayerType.Image);
+  const array = vector2array(vector, PAGImageLayer);
+  console.log('array', array);
+  console.log('array.length', array.length);
+  console.log('array[0]', array[0]);
+  console.log('array[1]', array[1]);
+  const pagImageLayer = PAGImageLayer.Make(100, 100, 1000);
+  array[1] = pagImageLayer;
+  console.log('array[1]', array[1]);
+  array.push(pagImageLayer);
+  array.delete();
+  console.log(array);
 };
