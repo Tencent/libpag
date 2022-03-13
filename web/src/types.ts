@@ -69,7 +69,6 @@ export interface PAG extends EmscriptenModule {
   VideoReader: typeof VideoReader;
   traceImage: (info: { width: number; height: number }, pixels: Uint8Array, tag: string) => void;
   GL: EmscriptenGL;
-  LayerType: typeof LayerType;
 }
 
 export interface EmscriptenGL {
@@ -399,6 +398,6 @@ export declare class Vector<T> {
   public set: (index: number, value: T) => boolean;
   public push_back: (value: T) => void;
   public size: () => number;
-
+  public delete: () => void;
   private constructor();
 }

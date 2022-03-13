@@ -4,6 +4,7 @@ import { PAGLayer } from './pag-layer';
 import { PAGSurface } from './pag-surface';
 import { Matrix, PAG, PAGScaleMode, Rect, Vector } from './types';
 import { wasmAwaitRewind, wasmAsyncMethod } from './utils/decorators';
+import { vectorClass2array } from './utils/type-utils';
 
 @wasmAwaitRewind
 export class PAGPlayer {
@@ -188,8 +189,8 @@ export class PAGPlayer {
    * Returns an array of layers that lie under the specified point. The point is in pixels and from
    * this PAGComposition's local coordinates.
    */
-  public getLayersUnderPoint(): Vector<any> {
-    return this.wasmIns._getLayersUnderPoint();
+  public getLayersUnderPoint(): PAGLayer[] {
+    return vectorClass2array(this.wasmIns._getLayersUnderPoint() as Vector<any>, PAGLayer);
   }
   /**
    * Evaluates the PAGLayer to see if it overlaps or intersects with the specified point. The point

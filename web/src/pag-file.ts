@@ -1,11 +1,15 @@
 import { PAGComposition } from './pag-composition';
 import { PAGImage } from './pag-image';
+import { PAGImageLayer } from './pag-image-layer';
 import { PAGLayer } from './pag-layer';
+import { PAGSolidLayer } from './pag-solid-layer';
+import { PAGTextLayer } from './pag-text-layer';
 import { LayerType, PAG, PAGTimeStretchMode, TextDocument, Vector } from './types';
 import { readFile } from './utils/common';
 import { wasmAwaitRewind, wasmAsyncMethod } from './utils/decorators';
 import { ErrorCode } from './utils/error-map';
 import { Log } from './utils/log';
+import { vectorClass2array, VectorArray } from './utils/type-utils';
 
 @wasmAwaitRewind
 export class PAGFile extends PAGComposition {
@@ -104,8 +108,18 @@ export class PAGFile extends PAGComposition {
   /**
    * Return an array of layers by specified editable index and layer type.
    */
-  public getLayersByEditableIndex(editableIndex: Number, layerType: LayerType): Vector<any> {
-    return this.wasmIns._getLayersByEditableIndex(editableIndex, layerType) as Vector<any>;
+  public getLayersByEditableIndex(editableIndex: Number, layerType: LayerType) {
+    const vector = this.wasmIns._getLayersByEditableIndex(editableIndex, layerType) as Vector<any>;
+    switch (layerType) {
+      case LayerType.Solid:
+        return vectorClass2array(vector, PAGSolidLayer);
+      case LayerType.Text:
+        return vectorClass2array(vector, PAGTextLayer);
+      case LayerType.Image:
+        return vectorClass2array(vector, PAGImageLayer);
+      default:
+        return vectorClass2array(vector, PAGLayer);
+    }
   }
   /**
    * Indicate how to stretch the original duration to fit target duration when file's duration is

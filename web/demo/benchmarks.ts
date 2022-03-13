@@ -9,7 +9,6 @@ import { PAGSolidLayer } from '../src/pag-solid-layer';
 import { PAGSurface } from '../src/pag-surface';
 import { PAGTextLayer } from '../src/pag-text-layer';
 import * as types from '../src/types';
-import { vector2array } from '../src/utils/type-utils';
 
 let PAG: types.PAG;
 let textPagArrayBuffer: ArrayBuffer;
@@ -92,7 +91,7 @@ const PAGFileTest = async () => {
   // }
   // Todo(zenoslin) test
   // pagFile.replaceImage(0, pagImage);
-  console.log('PAGFile getLayersByEditableIndex: ', pagFile.getLayersByEditableIndex(0, PAG.LayerType.Text));
+  console.log('PAGFile getLayersByEditableIndex: ', pagFile.getLayersByEditableIndex(0, types.LayerType.Text));
 
   console.log('PAGFile timeStretchMode: ', pagFile.timeStretchMode());
   pagFile.setTimeStretchMode(types.PAGTimeStretchMode.Repeat);
@@ -287,7 +286,7 @@ const PAGLayerTest = () => {
 
 let pagTextLayer: PAGTextLayer;
 const PAGTextLayerTest = () => {
-  pagTextLayer = new PAGTextLayer(pagFile.getLayersByEditableIndex(0, PAG.LayerType.Text).get(0));
+  pagTextLayer = pagFile.getLayersByEditableIndex(0, types.LayerType.Text)[0] as PAGTextLayer;
   console.log('PAGTextLayer: ', pagTextLayer);
   const fillColor = pagTextLayer.fillColor();
   console.log('PAGTextLayer fillColor : ', fillColor);
@@ -335,7 +334,7 @@ const PAGImageLayerTest = async () => {
   console.log('PAGImageLayer Make: ', PAGImageLayer.Make(100, 100, 1000));
   imagePagFile.destroy();
   imagePagFile = (await PAGFile.load(imagePagArrayBuffer)) as PAGFile;
-  pagImageLayer = new PAGImageLayer(imagePagFile.getLayersByEditableIndex(0, PAG.LayerType.Image).get(0));
+  pagImageLayer = imagePagFile.getLayersByEditableIndex(0, types.LayerType.Image)[0] as PAGImageLayer;
   console.log('PAGImageLayer: ', pagImageLayer);
   console.log('PAGImageLayer contentDuration : ', pagImageLayer.contentDuration());
   console.log('PAGImageLayer getVideoRanges : ', pagImageLayer.getVideoRanges());
@@ -350,7 +349,7 @@ const PAGSolidLayerTest = async () => {
   const layerCount = pagFile.numChildren();
   for (let i = 0; i < layerCount; i++) {
     const pagLayer = pagFile.getLayerAt(i);
-    if (pagLayer.layerType() === PAG.LayerType.Solid) {
+    if (pagLayer.layerType() === types.LayerType.Solid) {
       pagSolidLayer = new PAGSolidLayer(pagLayer.wasmIns);
       break;
     }
@@ -386,16 +385,16 @@ const PAGSurfaceTest = () => {
 };
 
 const VectorTest = () => {
-  const vector = imagePagFile.getLayersByEditableIndex(0, PAG.LayerType.Image);
-  const array = vector2array(vector, PAGImageLayer);
-  console.log('array', array);
-  console.log('array.length', array.length);
-  console.log('array[0]', array[0]);
-  console.log('array[1]', array[1]);
+  const layers = imagePagFile.getLayersByEditableIndex(0, types.LayerType.Image);
+  console.log('array', layers); // length 3
+  console.log('array.length', layers.length);
+  console.log('array[0]', layers[0]);
+  console.log('array[1]', layers[1]);
   const pagImageLayer = PAGImageLayer.Make(100, 100, 1000);
-  array[1] = pagImageLayer;
-  console.log('array[1]', array[1]);
-  array.push(pagImageLayer);
-  array.delete();
-  console.log(array);
+  layers[1] = pagImageLayer;
+  console.log('array[1]', layers[1]);
+  layers.push(pagImageLayer);
+  layers.pop();
+  layers.delete();
+  console.log('array', layers);
 };

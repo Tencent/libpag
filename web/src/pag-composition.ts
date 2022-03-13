@@ -1,6 +1,7 @@
 import { PAG, Vector, Marker } from './types';
 import { PAGLayer } from './pag-layer';
 import { wasmAwaitRewind } from './utils/decorators';
+import { VectorArray, vectorBasics2array, vectorClass2array } from './utils/type-utils';
 
 @wasmAwaitRewind
 export class PAGComposition extends PAGLayer {
@@ -126,8 +127,8 @@ export class PAGComposition extends PAGLayer {
   /**
    * Returns the audio markers of this composition.
    */
-  public audioMarkers(): Vector<Marker> {
-    return this.wasmIns._audioMarkers() as Vector<Marker>;
+  public audioMarkers(): VectorArray<Marker> {
+    return vectorBasics2array(this.wasmIns._audioMarkers() as Vector<Marker>);
   }
   /**
    * Indicates when the first frame of the audio plays in the composition's timeline.
@@ -138,15 +139,15 @@ export class PAGComposition extends PAGLayer {
   /**
    * Returns an array of layers that match the specified layer name.
    */
-  public getLayersByName(layerName: string): Vector<any> {
-    return this.wasmIns._getLayersByName(layerName) as Vector<any>;
+  public getLayersByName(layerName: string): PAGLayer[] {
+    return vectorClass2array(this.wasmIns._getLayersByName(layerName) as Vector<any>, PAGLayer);
   }
   /**
    * Returns an array of layers that lie under the specified point. The point is in pixels and from
    * this PAGComposition's local coordinates.
    */
-  public getLayersUnderPoint(localX: number, localY: number): Vector<any> {
-    return this.wasmIns._getLayersUnderPoint(localX, localY);
+  public getLayersUnderPoint(localX: number, localY: number): PAGLayer[] {
+    return vectorClass2array(this.wasmIns._getLayersUnderPoint(localX, localY), PAGLayer);
   }
 
   public destroy(): void {

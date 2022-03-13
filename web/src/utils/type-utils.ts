@@ -1,19 +1,25 @@
 import { Vector } from '../types';
+import { Log } from './log';
 
 export class VectorArray<T> extends Array<T> {
   public delete() {}
 }
 
-export const vector2array = <T extends { destroy: () => void }>(
+export const vectorClass2array = <T extends { isDelete: () => boolean }>(
   vector: Vector<any>,
   constructor: { new (wasmIns: any): T },
 ): VectorArray<T> => {
   const array: VectorArray<T> = new VectorArray<T>(vector.size());
-  array.delete = () => {
-    const set = new Set(array);
-    set.forEach((value: T) => {
-      value.destroy();
-    });
+  array.delete = (check: boolean = false) => {
+    if (check) {
+      for (let i = 0; i < array.length; i++) {
+        if (array[i] && array[i].isDelete() === false) {
+          Log.warn('There have been some wasm objects not be deleted!');
+          break;
+        }
+      }
+    }
+    vector.delete();
   };
   const proxy = new Proxy(array, {
     get(target, property, receiver) {
@@ -36,4 +42,15 @@ export const vector2array = <T extends { destroy: () => void }>(
     },
   });
   return proxy;
+};
+
+export const vectorBasics2array = <T>(vector: Vector<T>) => {
+  const array = new VectorArray<T>(vector.size());
+  for (let i = 0; i < vector.size(); i++) {
+    array[i] = vector.get(i);
+  }
+  array.delete = () => {
+    vector.delete();
+  };
+  return array;
 };

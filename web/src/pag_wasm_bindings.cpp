@@ -39,7 +39,7 @@ EMSCRIPTEN_BINDINGS(pag) {
                   return static_cast<int>(pagLayer.uniqueID());
                 }))
       .function("_layerType", optional_override([](PAGLayer& pagLayer) {
-                  return static_cast<LayerType>(pagLayer.layerType());
+                  return static_cast<int>(pagLayer.layerType());
                 }))
       .function("_layerName", &PAGLayer::layerName)
       .function("_matrix",
@@ -55,7 +55,17 @@ EMSCRIPTEN_BINDINGS(pag) {
       .function("_setVisible", &PAGLayer::setVisible)
       .function("_editableIndex", &PAGLayer::editableIndex)
       .function("_parent", &PAGLayer::parent)
-      .function("_markers", &PAGLayer::markers)
+      .function("_markers", optional_override([](PAGLayer& pagLayer) {
+                  std::vector<Marker> result = {};
+                  for (auto marker_ptr : pagLayer.markers()) {
+                    Marker marker;
+                    marker.startTime = marker_ptr->startTime;
+                    marker.duration = marker_ptr->duration;
+                    marker.comment = marker_ptr->comment;
+                    result.push_back(marker);
+                  }
+                  return result;
+                }))
       .function("_globalToLocalTime", optional_override([](PAGLayer& pagLayer, int globalTime) {
                   return static_cast<int>(pagLayer.globalToLocalTime(globalTime));
                 }))
@@ -171,7 +181,17 @@ EMSCRIPTEN_BINDINGS(pag) {
                   }
                   return val(typed_memory_view(result->length(), result->data()));
                 }))
-      .function("_audioMarkers", &PAGComposition::audioMarkers)
+      .function("_audioMarkers", optional_override([](PAGComposition& pagComposition) {
+                  std::vector<Marker> result = {};
+                  for (auto marker_ptr : pagComposition.audioMarkers()) {
+                    Marker marker;
+                    marker.startTime = marker_ptr->startTime;
+                    marker.duration = marker_ptr->duration;
+                    marker.comment = marker_ptr->comment;
+                    result.push_back(marker);
+                  }
+                  return result;
+                }))
       .function("_audioStartTime", optional_override([](PAGComposition& pagComposition) {
                   return static_cast<int>(pagComposition.audioStartTime());
                 }))
@@ -192,8 +212,9 @@ EMSCRIPTEN_BINDINGS(pag) {
       .function("_replaceText", &PAGFile::replaceText)
       .function("_replaceImage", &PAGFile::replaceImage)
       .function("_getLayersByEditableIndex",
-                optional_override([](PAGFile& pagFile, int editableIndex, LayerType layerType) {
-                  return pagFile.getLayersByEditableIndex(editableIndex, layerType);
+                optional_override([](PAGFile& pagFile, int editableIndex, int layerType) {
+                  return pagFile.getLayersByEditableIndex(editableIndex,
+                                                          static_cast<LayerType>(layerType));
                 }))
       .function("_timeStretchMode", &PAGFile::timeStretchMode)
       .function("_setTimeStretchMode", &PAGFile::setTimeStretchMode)
@@ -391,8 +412,16 @@ EMSCRIPTEN_BINDINGS(pag) {
       .field("blue", &Color::blue);
 
   value_object<Marker>("Marker")
-      .field("startTime", &Marker::startTime)
-      .field("duration", &Marker::duration)
+      .field("startTime", optional_override([](const Marker& marker) {
+               return static_cast<int>(marker.startTime);
+             }),
+             optional_override(
+                 [](Marker& marker, int value) { marker.startTime = static_cast<int64_t>(value); }))
+      .field("duration", optional_override([](const Marker& marker) {
+               return static_cast<int>(marker.duration);
+             }),
+             optional_override(
+                 [](Marker& marker, int value) { marker.duration = static_cast<int64_t>(value); }))
       .field("comment", &Marker::comment);
 
   enum_<tgfx::PathFillType>("PathFillType")
@@ -407,15 +436,6 @@ EMSCRIPTEN_BINDINGS(pag) {
       .value("RGBA_8888", ColorType::RGBA_8888)
       .value("BGRA_8888", ColorType::BGRA_8888);
 
-  enum_<LayerType>("LayerType")
-      .value("Unknown", LayerType::Unknown)
-      .value("Null", LayerType::Null)
-      .value("Solid", LayerType::Solid)
-      .value("Text", LayerType::Text)
-      .value("Shape", LayerType::Shape)
-      .value("Image", LayerType::Image)
-      .value("PreCompose", LayerType::PreCompose);
-
   enum_<tgfx::LineCap>("Cap")
       .value("Miter", tgfx::LineCap::Butt)
       .value("Round", tgfx::LineCap::Round)
@@ -429,6 +449,6 @@ EMSCRIPTEN_BINDINGS(pag) {
   register_vector<std::shared_ptr<PAGLayer>>("VectorPAGLayer");
   register_vector<std::string>("VectorString");
   register_vector<tgfx::Point>("VectorPoint");
-  register_vector<const Marker*>("VectorMarker");
+  register_vector<Marker>("VectorMarker");
   register_vector<PAGVideoRange>("VectorPAGVideoRange");
 }
