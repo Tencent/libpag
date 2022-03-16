@@ -5,22 +5,22 @@ function make_dir() {
   mkdir -p $1
 }
 echo "shell log - autotest start"
-if [[ `uname` == 'Darwin' ]]; then
+if [[ $(uname) == 'Darwin' ]]; then
   MAC_REQUIRED_TOOLS="gcovr"
   for TOOL in ${MAC_REQUIRED_TOOLS[@]}; do
-  if [ ! $(which $TOOL) ]; then
-    if [ ! $(which brew) ]; then
-      echo "Homebrew not found. Trying to install..."
-      /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" ||
-        exit 1
+    if [ ! $(which $TOOL) ]; then
+      if [ ! $(which brew) ]; then
+        echo "Homebrew not found. Trying to install..."
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" ||
+          exit 1
+      fi
+      echo "$TOOL not found. Trying to install..."
+      brew install $TOOL || exit 1
     fi
-    echo "$TOOL not found. Trying to install..."
-    brew install $TOOL || exit 1
-  fi
   done
 fi
 
-echo `pwd`
+echo $(pwd)
 
 COMPLIE_RESULT=true
 
@@ -31,52 +31,33 @@ cd $WORKSPACE
 make_dir result
 make_dir build
 
+./update_baseline.sh 1
+
 cd build
 
-cmake -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DSMOKE_TEST=ON -DCMAKE_BUILD_TYPE=Debug ../
-if test $? -eq 0
-then
-echo "~~~~~~~~~~~~~~~~~~~CMakeLists OK~~~~~~~~~~~~~~~~~~"
+cmake -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DCMAKE_BUILD_TYPE=Debug ../
+if test $? -eq 0; then
+  echo "~~~~~~~~~~~~~~~~~~~CMakeLists OK~~~~~~~~~~~~~~~~~~"
 else
-echo "~~~~~~~~~~~~~~~~~~~CMakeLists error~~~~~~~~~~~~~~~~~~"
-exit
+  echo "~~~~~~~~~~~~~~~~~~~CMakeLists error~~~~~~~~~~~~~~~~~~"
+  exit
 fi
 
 cmake --build . --target PAGFullTest -- -j 12
-if test $? -eq 0
-then
-echo "~~~~~~~~~~~~~~~~~~~PAGFullTest make successed~~~~~~~~~~~~~~~~~~"
+if test $? -eq 0; then
+  echo "~~~~~~~~~~~~~~~~~~~PAGFullTest make successed~~~~~~~~~~~~~~~~~~"
 else
-echo "~~~~~~~~~~~~~~~~~~~PAGFullTest make error~~~~~~~~~~~~~~~~~~"
-exit 1
-fi
-
-cmake --build . --target PAGSmokeTest -- -j 12
-if test $? -eq 0
-then
-echo "~~~~~~~~~~~~~~~~~~~PAGSmokeTest make successed~~~~~~~~~~~~~~~~~~"
-else
-echo "~~~~~~~~~~~~~~~~~~~PAGSmokeTest make error~~~~~~~~~~~~~~~~~~"
-exit 1
+  echo "~~~~~~~~~~~~~~~~~~~PAGFullTest make error~~~~~~~~~~~~~~~~~~"
+  exit 1
 fi
 
 ./PAGFullTest --gtest_output=json:PAGFullTest.json
 
-if test $? -eq 0
-then
-echo "~~~~~~~~~~~~~~~~~~~PAGFullTest successed~~~~~~~~~~~~~~~~~~"
+if test $? -eq 0; then
+  echo "~~~~~~~~~~~~~~~~~~~PAGFullTest successed~~~~~~~~~~~~~~~~~~"
 else
-echo "~~~~~~~~~~~~~~~~~~~PAGFullTest Failed~~~~~~~~~~~~~~~~~~"
-COMPLIE_RESULT=false
-fi
-
-./PAGSmokeTest --gtest_output=json:PAGSmokeTest.json
-if test $? -eq 0
-then
-echo "~~~~~~~~~~~~~~~~~~~PAGSmokeTest successed~~~~~~~~~~~~~~~~~~"
-else
-echo "~~~~~~~~~~~~~~~~~~~PAGSmokeTest Failed~~~~~~~~~~~~~~~~~~"
-COMPLIE_RESULT=false
+  echo "~~~~~~~~~~~~~~~~~~~PAGFullTest Failed~~~~~~~~~~~~~~~~~~"
+  COMPLIE_RESULT=false
 fi
 
 cp -a $WORKSPACE/build/*.json $WORKSPACE/result/
@@ -88,9 +69,7 @@ gcovr -r . -e='test/*.*' -e='vendor/*.*' --xml-pretty -o ./result/coverage.xml
 
 rm -rf build
 
-if [ "$COMPLIE_RESULT" == false ]
-then
- cp -a $WORKSPACE/test/out/baseline/**/*.lzma2 $WORKSPACE/result/
- cp -a $WORKSPACE/test/out/compare/*.webp $WORKSPACE/result/
- exit 1
+if [ "$COMPLIE_RESULT" == false ]; then
+  cp -r $WORKSPACE/test/out/. $WORKSPACE/result
+  exit 1
 fi

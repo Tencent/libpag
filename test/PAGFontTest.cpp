@@ -49,7 +49,7 @@ PAG_TEST(PAGFontTest, TestFont) {
     pagPlayer->flush();
 
     bool same =
-        Baseline::Compare(pagSurface, "PAGFontTest/TestFont_" + std::to_string(currentFrame));
+        Baseline::Compare(pagSurface, "PAGFontTest/TestFont/" + ToString(currentFrame));
     if (!same) {
       errorMsg += (std::to_string(currentFrame) + ";");
     }

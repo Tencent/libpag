@@ -25,10 +25,8 @@
 namespace pag {
 class PAGTestEnvironment : public testing::Environment {
  public:
-  virtual ~PAGTestEnvironment() override;
+  void SetUp() override;
 
-  virtual void SetUp() override;
-
-  virtual void TearDown() override;
+  void TearDown() override;
 };
 }  // namespace pag

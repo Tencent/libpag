@@ -17,12 +17,38 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGTestUtils.h"
+#include <dirent.h>
 #include "base/utils/TGFXCast.h"
 #include "core/Image.h"
 #include "gpu/opengl/GLFunctions.h"
 
 namespace pag {
 using namespace tgfx;
+
+std::string ToString(Frame frame) {
+  auto result = std::to_string(frame);
+  while (result.size() < 4) {
+    result = "0" + result;
+  }
+  return result;
+}
+
+void GetAllPAGFiles(std::string path, std::vector<std::string>& files) {
+  struct dirent* dirp;
+  DIR* dir = opendir(path.c_str());
+  std::string p;
+
+  while ((dirp = readdir(dir)) != nullptr) {
+    if (dirp->d_type == DT_REG) {
+      std::string str(dirp->d_name);
+      std::string::size_type idx = str.find(".pag");
+      if (idx != std::string::npos) {
+        files.push_back(p.assign(path).append("/").append(dirp->d_name));
+      }
+    }
+  }
+  closedir(dir);
+}
 
 std::shared_ptr<PixelBuffer> MakeSnapshot(std::shared_ptr<PAGSurface> pagSurface) {
   auto pixelBuffer = PixelBuffer::Make(pagSurface->width(), pagSurface->height(), false, false);
