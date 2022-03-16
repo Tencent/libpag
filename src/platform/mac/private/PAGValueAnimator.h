@@ -20,7 +20,7 @@
 
 #import <QuartzCore/QuartzCore.h>
 
-@protocol ValueAnimatorListener <NSObject>
+@protocol PAGValueAnimatorListener<NSObject>
 
 - (void)onAnimationUpdate:(double)value;
 
@@ -34,14 +34,14 @@
 
 @end
 
-@interface ValueAnimator : NSObject {
+@interface PAGValueAnimator : NSObject {
   int64_t duration;
   int64_t startTime;
   int64_t playTime;
   int repeatCount;
   int lastRepeatCount;
   int64_t animatorId;
-  id<ValueAnimatorListener> animatorListener;
+  id<PAGValueAnimatorListener> animatorListener;
 }
 
 - (void)setListener:(id)listener;

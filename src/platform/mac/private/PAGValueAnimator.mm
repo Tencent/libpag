@@ -16,11 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import "ValueAnimator.h"
+#import "PAGValueAnimator.h"
 #include <chrono>
 #include <mutex>
 
-@implementation ValueAnimator
+@implementation PAGValueAnimator
 
 static CVDisplayLinkRef cvDisplayLink = NULL;
 static NSMutableArray* animators = [[NSMutableArray array] retain];
@@ -40,7 +40,7 @@ static CVReturn handleDisplayLink(CVDisplayLinkRef, const CVTimeStamp*, const CV
   auto timestamp = GetCurrentTimeUS();
   //遍历copy数组
   for (id animator in copyanimators) {
-    ValueAnimator* valueAnimator = (ValueAnimator*)animator;
+    PAGValueAnimator* valueAnimator = (PAGValueAnimator*)animator;
     [valueAnimator onAnimationFrame:timestamp];
   }
   [copyanimators release];
@@ -58,11 +58,11 @@ static CVReturn handleDisplayLink(CVDisplayLinkRef, const CVTimeStamp*, const CV
   CVDisplayLinkRelease(cvDisplayLink);
 }
 
-+ (int64_t)AddAnimator:(ValueAnimator*)animator {
++ (int64_t)AddAnimator:(PAGValueAnimator*)animator {
   std::lock_guard<std::mutex> autoLock(valueAnimatorLocker);
   [animators addObject:animator];
   if (animators.count == 1) {
-    [ValueAnimator StartDisplayLink];
+    [PAGValueAnimator StartDisplayLink];
   }
   return ++AnimatorIdCount;
 }
@@ -70,7 +70,7 @@ static CVReturn handleDisplayLink(CVDisplayLinkRef, const CVTimeStamp*, const CV
 + (void)RemoveAnimator:(int64_t)animatorId {
   std::lock_guard<std::mutex> autoLock(valueAnimatorLocker);
   NSUInteger realAnimatorIndex = 0;
-  for (ValueAnimator* animator in animators) {
+  for (PAGValueAnimator* animator in animators) {
     if (animator.animatorId == animatorId) {
       realAnimatorIndex = [animators indexOfObject:animator];
       break;
@@ -79,7 +79,7 @@ static CVReturn handleDisplayLink(CVDisplayLinkRef, const CVTimeStamp*, const CV
   [animators removeObjectAtIndex:realAnimatorIndex];
 
   if (animators.count == 0) {
-    [ValueAnimator StopDisplayLink];
+    [PAGValueAnimator StopDisplayLink];
   }
 }
 
@@ -150,7 +150,7 @@ static CVReturn handleDisplayLink(CVDisplayLinkRef, const CVTimeStamp*, const CV
   if (duration <= 0 || animatorId != NSIntegerMax || animatorListener == nil) {
     return;
   }
-  animatorId = [ValueAnimator AddAnimator:self];
+  animatorId = [PAGValueAnimator AddAnimator:self];
   startTime = GetCurrentTimeUS() - playTime % duration;
   double value = static_cast<double>(playTime) / duration;
   [animatorListener onAnimationUpdate:value];
@@ -167,7 +167,7 @@ static CVReturn handleDisplayLink(CVDisplayLinkRef, const CVTimeStamp*, const CV
   if (animatorId == NSIntegerMax) {
     return;
   }
-  [ValueAnimator RemoveAnimator:animatorId];
+  [PAGValueAnimator RemoveAnimator:animatorId];
   animatorId = NSIntegerMax;
   if (notification) {
     [animatorListener onAnimationCancel];
