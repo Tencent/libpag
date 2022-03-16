@@ -20,7 +20,7 @@
 
 #import <QuartzCore/QuartzCore.h>
 
-@protocol PAGValueAnimatorListener<NSObject>
+@protocol PAGValueAnimatorListener <NSObject>
 
 - (void)onAnimationUpdate:(double)value;
 
