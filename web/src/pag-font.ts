@@ -9,7 +9,13 @@ import { wasmAwaitRewind, wasmAsyncMethod } from './utils/decorators';
 export class PAGFont {
   public static module: PAG;
 
-  public wasmIns: any;
+  /**
+   * Create PAGFont instance.
+   */
+  public static create(fontFamily: string, fontStyle: string) {
+    return new PAGFont(this.module._PAGFont._create(fontFamily, fontStyle));
+  }
+
   /**
    * Register custom font family in the browser.
    */
@@ -22,6 +28,7 @@ export class PAGFont {
     document.fonts.add(fontFace);
     await fontFace.load();
   }
+
   /**
    * Register fallback font names from pag.
    */
@@ -41,14 +48,12 @@ export class PAGFont {
     vectorNames.delete();
   }
 
-  public static create(fontFamily: string, fontStyle: string) {
-    return new PAGFont(this.module._PAGFont._create(fontFamily, fontStyle));
-  }
+  public wasmIns: any;
 
   public readonly fontFamily: string;
   public readonly fontStyle: string;
 
-  constructor(wasmIns: any) {
+  public constructor(wasmIns: any) {
     this.wasmIns = wasmIns;
     this.fontFamily = this.wasmIns.fontFamily;
     this.fontStyle = this.wasmIns.fontStyle;
