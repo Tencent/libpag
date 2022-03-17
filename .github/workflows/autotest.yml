@@ -5,8 +5,6 @@ name: autotest
 # Controls when the workflow will run
 on:
   # Triggers the workflow on push or pull request events but only for the master branch
-  push:
-    branches: [ main ]
   pull_request:
     branches: [ main ]
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
@@ -34,16 +32,6 @@ jobs:
             /usr/local/Cellar/depsync
             /usr/local/bin/depsync
           key: libpag-environment-20220208
-      - if: github.event_name == 'push'
-        name: Get libpag cache (push)
-        id: libpag-push
-        uses: actions/cache@v2
-        with:
-          path: libpag.tar.zst
-          key: libpag-autotest-${{ github.sha }}
-          restore-keys: |
-            libpag-autotest-${{ github.event.before }}
-            libpag-autotest-
       - if: github.event_name == 'pull_request'
         name: Get libpag cache (pull_request)
         id: libpag-pull_request
