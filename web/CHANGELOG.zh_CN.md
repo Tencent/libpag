@@ -52,3 +52,23 @@
 ### Bug Fixes
 
 - 修复 `PAGImage` 的 `fromSource` 方法没有回溯 `Asyncify` 的状态
+
+## 0.0.6
+
+### Breaking Changes
+
+- `PAGFile.getLayersByEditableIndex` 返回值改为 `Vector<PAGLayer>`
+- 消除 C++ enum `LayerType` 替换为 Js enum `LayerType`,  `PAG.LayerType` 替换为 `PAG.types.LayerType`
+
+### Features
+
+- Add warn message when canvas size is more than 2560 on Web env. 当 canvas 渲染尺寸大于 2560px 的时候，提示警告
+- `PAGFile` 的 `load` 方法支持 `Blob` 和 `ArrayBuffer` 类型的数据，并且 `PAGFile` 上增加 `maxSupportedTagLevel`，`tagLevel`，`copyOriginal` 方法。
+- `PAGView` 上增加 `freeCache` 方法
+- `PAGSurface` 上增加 `clearAll`
+- `PAGPlayer` 上增加 `getSurface` ，`matrix` ，`setMatrix` ，`nextFrame` ， `preFrame` ， `autoClear` ， `setAutoClear` ， `getBounds` ， `getLayersUnderPoint` ， `hitTestPoint` ， `renderingTime` ，`imageDecodingTime` ， `presentingTime` ， `graphicsMemory` 方法
+- `PAGImage` 上增加 `scaleMode` ， `setScaleMode` ， `matrix` ， `setMatrix` 方法
+- `PAGLayer` 上增加 `matrix` ， `setMatrix` ， `resetMatrix` ， `getTotalMatrix` ， `parent` ， `markers` ， `setStartTime` ， `currentTime` ， `setCurrentTime` ， `getProgress` ， `setProgress` ， `preFrame` ， `nextFrame` ， `getBounds` ， `trackMatteLayer` ， `excludedFromTimeline` ， `setExcludedFromTimeline` ， `isPAGFile` ， `isDelete` 方法
+- `PAGComposition` 上增加 `Make` ， `removeLayer` ， `getLayersUnderPoint` 方法
+- `PAGFont` 上增加 `create` 方法和 `fontFamily` ， `fontStyle` 属性
+- 增加 `PAGTextLayer` ， `PAGImageLayer` 类
