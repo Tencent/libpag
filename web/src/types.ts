@@ -39,18 +39,18 @@ export interface PAG extends EmscriptenModule {
     _Make: (width: number, height: number) => any;
   };
   _PAGTextLayer: {
-    _Make(duration: number, text: string, fontSize: number, fontFamily: string, fontStyle: string): any;
-    _Make(duration: number, textDocumentHandle: TextDocument): any;
+    _Make: ((duration: number, text: string, fontSize: number, fontFamily: string, fontStyle: string) => any) &
+      ((duration: number, textDocumentHandle: TextDocument) => any);
   };
   _PAGImageLayer: {
-    _Make(width: number, height: number, duration: number): any;
+    _Make: (width: number, height: number, duration: number) => any;
   };
   _PAGSolidLayer: {
-    _Make(duration: number, width: number, height: number, solidColor: Color, opacity: number): any;
+    _Make: (duration: number, width: number, height: number, solidColor: Color, opacity: number) => any;
   };
   _PAGFont: {
-    _create(fontFamily: string, fontStyle: string): any;
-    _SetFallbackFontNames(fontName: any): void;
+    _create: (fontFamily: string, fontStyle: string) => any;
+    _SetFallbackFontNames: (fontName: any) => void;
   };
   VectorString: any;
   webAssemblyQueue: WebAssemblyQueue;
@@ -373,6 +373,7 @@ export declare class TextDocument {
 }
 
 export declare class PAGVideoRange {
+  private constructor();
   /**
    * The start time of the source video, in microseconds.
    */
@@ -389,14 +390,24 @@ export declare class PAGVideoRange {
    * Indicates whether the video should play backward.
    */
   public reversed(): boolean;
-
-  private constructor();
 }
 
 export declare class Vector<T> {
-  public get: (index: number) => T;
-  public push_back: (value: T) => void;
-  public size: () => number;
-  public delete: () => void;
   private constructor();
+  /**
+   * Get item from Vector by index.
+   */
+  public get(index: number): T;
+  /**
+   * Push item into Vector.
+   */
+  public push_back(value: T): void;
+  /**
+   * Get item number in Vector.
+   */
+  public size(): number;
+  /**
+   * Delete Vector instance.
+   */
+  public delete(): void;
 }

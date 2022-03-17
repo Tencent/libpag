@@ -14,4 +14,3 @@ export const WEB_SAFE_FONT = 'Arial';
  * Screen 2K resolution.
  */
 export const SCREEN_2560_RESOLUTION = 2560;
-

@@ -31,5 +31,6 @@ export const ErrorMap = {
   [ErrorCode.VideoElementNull]: 'Video Element is null!',
   [ErrorCode.CanvasIsNotFound]: 'Canvas is not found!',
   [ErrorCode.CanvasContextIsNotWebGL]: 'Canvas context is not WebGL!',
-  [ErrorCode.PagFileDataError]: 'Initialize PAGFile data type error, please put check data type must to be File ｜ Blob | ArrayBuffer!',
+  [ErrorCode.PagFileDataError]:
+    'Initialize PAGFile data type error, please put check data type must to be File ｜ Blob | ArrayBuffer!',
 };

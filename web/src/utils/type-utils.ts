@@ -2,7 +2,7 @@ import { Vector } from '../types';
 
 export const proxyVector = <T extends { wasmIns: any }>(
   vector: Vector<any>,
-  constructor: { new (wasmIns: any): T },
+  constructor: new (wasmIns: any) => T,
 ): Vector<T> => {
   const proxy = new Proxy(vector, {
     get(target, property, receiver) {

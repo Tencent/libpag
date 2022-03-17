@@ -16,9 +16,9 @@ export class PAGTextLayer extends PAGLayer {
   public static Make(
     duration: number,
     text: string | TextDocument,
-    fontSize: number = 0,
-    fontFamily: string = '',
-    fontStyle: string = '',
+    fontSize = 0,
+    fontFamily = '',
+    fontStyle = '',
   ): PAGTextLayer {
     if (typeof text === 'string') {
       return new PAGTextLayer(this.module._PAGTextLayer._Make(duration, text, fontSize, fontFamily, fontStyle));
