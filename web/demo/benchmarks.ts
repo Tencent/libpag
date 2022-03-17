@@ -286,7 +286,7 @@ const PAGLayerTest = () => {
 
 let pagTextLayer: PAGTextLayer;
 const PAGTextLayerTest = () => {
-  pagTextLayer = pagFile.getLayersByEditableIndex(0, types.LayerType.Text)[0] as PAGTextLayer;
+  pagTextLayer = pagFile.getLayersByEditableIndex(0, types.LayerType.Text).get(0) as PAGTextLayer;
   console.log('PAGTextLayer: ', pagTextLayer);
   const fillColor = pagTextLayer.fillColor();
   console.log('PAGTextLayer fillColor : ', fillColor);
@@ -334,7 +334,7 @@ const PAGImageLayerTest = async () => {
   console.log('PAGImageLayer Make: ', PAGImageLayer.Make(100, 100, 1000));
   imagePagFile.destroy();
   imagePagFile = (await PAGFile.load(imagePagArrayBuffer)) as PAGFile;
-  pagImageLayer = imagePagFile.getLayersByEditableIndex(0, types.LayerType.Image)[0] as PAGImageLayer;
+  pagImageLayer = imagePagFile.getLayersByEditableIndex(0, types.LayerType.Image).get(0) as PAGImageLayer;
   console.log('PAGImageLayer: ', pagImageLayer);
   console.log('PAGImageLayer contentDuration : ', pagImageLayer.contentDuration());
   console.log('PAGImageLayer getVideoRanges : ', pagImageLayer.getVideoRanges());
@@ -384,17 +384,27 @@ const PAGSurfaceTest = () => {
   console.log('PAGSurface height:', pagSurface.height());
 };
 
-const VectorTest = () => {
-  const layers = imagePagFile.getLayersByEditableIndex(0, types.LayerType.Image);
-  console.log('array', layers); // length 3
-  console.log('array.length', layers.length);
-  console.log('array[0]', layers[0]);
-  console.log('array[1]', layers[1]);
+const VectorTest = async () => {
+  const testPagFile = (await PAGFile.load(imagePagArrayBuffer)) as PAGFile;
+  const layers = testPagFile.getLayersByEditableIndex(0, types.LayerType.Image) as types.Vector<PAGImageLayer>;
+  console.log('Vector.size', layers.size());
+  const layer = layers.get(0);
+  console.log('Vector.get', layer);
   const pagImageLayer = PAGImageLayer.Make(100, 100, 1000);
-  layers[1] = pagImageLayer;
-  console.log('array[1]', layers[1]);
-  layers.push(pagImageLayer);
-  layers.pop();
+  layers.push_back(pagImageLayer);
+  if (layers.size() === 2) {
+    console.log(`Vector push_back succeed!`);
+  } else {
+    console.error(`Vector push_back succeed!`);
+  }
   layers.delete();
-  console.log('array', layers);
+
+  // console.log('array[0]', layers[0]);
+  // console.log('array[1]', layers[1]);
+  // layers[1] = pagImageLayer;
+  // console.log('array[1]', layers[1]);
+  // layers.push(pagImageLayer);
+  // layers.pop();
+  // layers.delete();
+  // console.log('array', layers);
 };

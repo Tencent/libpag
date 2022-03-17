@@ -9,7 +9,7 @@ import { readFile } from './utils/common';
 import { wasmAwaitRewind, wasmAsyncMethod } from './utils/decorators';
 import { ErrorCode } from './utils/error-map';
 import { Log } from './utils/log';
-import { vectorClass2array, VectorArray } from './utils/type-utils';
+import { proxyVector } from './utils/type-utils';
 
 @wasmAwaitRewind
 export class PAGFile extends PAGComposition {
@@ -112,13 +112,13 @@ export class PAGFile extends PAGComposition {
     const vector = this.wasmIns._getLayersByEditableIndex(editableIndex, layerType) as Vector<any>;
     switch (layerType) {
       case LayerType.Solid:
-        return vectorClass2array(vector, PAGSolidLayer);
+        return proxyVector(vector, PAGSolidLayer);
       case LayerType.Text:
-        return vectorClass2array(vector, PAGTextLayer);
+        return proxyVector(vector, PAGTextLayer);
       case LayerType.Image:
-        return vectorClass2array(vector, PAGImageLayer);
+        return proxyVector(vector, PAGImageLayer);
       default:
-        return vectorClass2array(vector, PAGLayer);
+        return proxyVector(vector, PAGLayer);
     }
   }
   /**
