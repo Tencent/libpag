@@ -1,8 +1,6 @@
 name: code_format
 
 on:
-  push:
-    branches: [ main ]
   pull_request:
     branches: [ main ]
 
