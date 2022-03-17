@@ -67,7 +67,8 @@ class CompareFrameTask : public Executor {
   bool success = false;
 
   void execute() override {
-
+    auto key = "PAGCompareFrameTest/" + fileName + "/" + ToString(_currentFrame);
+    LOGI("Task->execute():%s", key.c_str());
     success = Baseline::Compare(pixelBuffer,
                                 "PAGCompareFrameTest/" + fileName + "/" + ToString(_currentFrame));
   }
@@ -137,6 +138,8 @@ void CompareFileFrames(Semaphore* semaphore, std::string pagPath) {
     }
     CompareFrame(currentFrame - 1);
     if (changed) {
+      auto key = "PAGCompareFrameTest/" + fileName + "/" + ToString(currentFrame);
+      LOGI("lastTask->run():%s", key.c_str());
       auto executor = new CompareFrameTask(fileName, currentFrame, currentSnapshot);
       lastTask = Task::Make(std::unique_ptr<CompareFrameTask>(executor));
       lastTask->run();
