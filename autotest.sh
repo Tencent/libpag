@@ -70,6 +70,7 @@ gcovr -r . -e='test/*.*' -e='vendor/*.*' --xml-pretty -o ./result/coverage.xml
 rm -rf build
 
 if [ "$COMPLIE_RESULT" == false ]; then
-  cp -r $WORKSPACE/test/out/. $WORKSPACE/result
+  cp -r $WORKSPACE/test/out $WORKSPACE/result
+  cp -r $WORKSPACE/test/baseline $WORKSPACE/result
   exit 1
 fi
