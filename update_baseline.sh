@@ -9,7 +9,11 @@
   fi
   echo "~~~~~~~~~~~~~~~~~~~Update Baseline Start~~~~~~~~~~~~~~~~~~~~~"
   CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+  STASH_LIST_BEFORE=$(git stash list)
+  echo $STASH_LIST_BEFORE
   git stash push
+  STASH_LIST_AFTER=$(git stash list)
+  echo $STASH_LIST_AFTER
   git switch main
 
   if [[ $1 == "1" ]]; then
@@ -47,7 +51,10 @@
   cd ..
 
   git switch $CURRENT_BRANCH
-  git stash pop --index
+  if [[ $STASH_LIST_BEFORE != "$STASH_LIST_AFTER" ]]; then
+    git stash pop --index
+  fi
+
   echo "~~~~~~~~~~~~~~~~~~~Update Baseline END~~~~~~~~~~~~~~~~~~~~~"
   exit
 }
