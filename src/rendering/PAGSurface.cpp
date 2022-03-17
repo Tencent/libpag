@@ -168,7 +168,8 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
   }
   if (surface != nullptr && autoClear && contentVersion == cache->getContentVersion()) {
     unlockContext();
-    LOGI("PAGSurface::draw(): contentVersion == cache->getContentVersion(): %s", contentVersion == cache->getContentVersion()?"true":"false");
+    LOGI("PAGSurface::draw(): contentVersion == cache->getContentVersion(): %s",
+         contentVersion == cache->getContentVersion() ? "true" : "false");
     return false;
   }
   if (surface == nullptr) {
