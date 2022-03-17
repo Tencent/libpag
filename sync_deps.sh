@@ -29,4 +29,4 @@ for TOOL in ${NODE_REQUIRED_TOOLS[@]}; do
 done
 
 depsync
-git lfs prune > /dev/null
+git lfs prune -f > /dev/null
