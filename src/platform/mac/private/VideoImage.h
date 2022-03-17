@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <CoreVideo/CVPixelBuffer.h>
 #include "video/VideoBuffer.h"
 
 namespace pag {

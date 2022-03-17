@@ -53,12 +53,12 @@ PAG_TEST_F(PAGImageTest, image) {
   int height = 110;
   size_t rowBytes = 110 * 4;
   auto fileData = ByteData::FromPath("../resources/apitest/data.rgba");
-  auto pixelBuffer = PixelBuffer::Make(0, height);
+  auto pixelBuffer = PixelBuffer::Make(0, height, false, false);
   ASSERT_TRUE(pixelBuffer == nullptr);
-  pixelBuffer = PixelBuffer::Make(width, height, true);
+  pixelBuffer = PixelBuffer::Make(width, height, true, false);
   ASSERT_TRUE(pixelBuffer != nullptr);
   EXPECT_EQ(pixelBuffer->colorType(), tgfx::ColorType::ALPHA_8);
-  pixelBuffer = PixelBuffer::Make(width, height);
+  pixelBuffer = PixelBuffer::Make(width, height, false, false);
   ASSERT_TRUE(pixelBuffer != nullptr);
   Bitmap bitmap(pixelBuffer);
   auto info = ImageInfo::Make(width, height, tgfx::ColorType::RGBA_8888,
@@ -105,7 +105,7 @@ PAG_TEST_F(PAGImageTest, image2) {
   ASSERT_EQ(image->width(), 110);
   ASSERT_EQ(image->height(), 110);
   ASSERT_EQ(image->orientation(), Orientation::TopLeft);
-  auto pixelBuffer = PixelBuffer::Make(image->width(), image->height());
+  auto pixelBuffer = PixelBuffer::Make(image->width(), image->height(), false, false);
   ASSERT_TRUE(pixelBuffer != nullptr);
   Bitmap bitmap(pixelBuffer);
   auto result = image->readPixels(bitmap.info(), bitmap.writablePixels());

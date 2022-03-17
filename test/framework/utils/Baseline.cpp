@@ -32,6 +32,7 @@ using namespace tgfx;
 
 #define BASELINE_VERSION_PATH "../test/baseline/version.json"
 #define CACHE_MD5_PATH "../test/baseline/.cache/md5.json"
+#define OUT_MD5_PATH "../test/out/md5.json"
 #define CACHE_VERSION_PATH "../test/baseline/.cache/version.json"
 #define OUT_VERSION_PATH "../test/out/version.json"
 #define OUT_ROOT "../test/out/"
@@ -143,6 +144,7 @@ bool Baseline::Compare(const Bitmap& bitmap, const std::string& key) {
   if (cacheVersion.empty() || baselineVersion.empty() ||
       (baselineVersion == cacheVersion && GetJSONValue(CacheMD5, key) != md5)) {
     SetJSONValue(OutputVersion, key, currentVersion);
+    SetJSONValue(OutputMD5, key, md5);
     SaveImage(bitmap, key);
     return false;
   }
@@ -155,7 +157,7 @@ bool Baseline::Compare(const std::shared_ptr<PAGSurface>& surface, const std::st
   if (surface == nullptr) {
     return false;
   }
-  auto pixelBuffer = PixelBuffer::Make(surface->width(), surface->height(), false);
+  auto pixelBuffer = PixelBuffer::Make(surface->width(), surface->height(), false, false);
   Bitmap bitmap(pixelBuffer);
   auto result = surface->readPixels(ToPAG(bitmap.colorType()), ToPAG(bitmap.alphaType()),
                                     bitmap.writablePixels(), bitmap.rowBytes());
@@ -219,6 +221,13 @@ void Baseline::TearDown() {
   outVersionFile << std::setw(4) << BaselineVersion << std::endl;
   outVersionFile.close();
 #else
+  std::filesystem::remove(OUT_MD5_PATH);
+  if (!OutputMD5.empty()) {
+    CreateFolder(OUT_MD5_PATH);
+    std::ofstream outMD5File(OUT_MD5_PATH);
+    outMD5File << std::setw(4) << OutputMD5 << std::endl;
+    outMD5File.close();
+  }
   CreateFolder(OUT_VERSION_PATH);
   std::ofstream versionFile(OUT_VERSION_PATH);
   versionFile << std::setw(4) << OutputVersion << std::endl;

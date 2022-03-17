@@ -109,7 +109,7 @@ PAG_TEST_F(PAGPlayerTest, autoClear) {
   pagPlayer->setAutoClear(false);
   pagPlayer->flush();
 
-  auto pixelBuffer = PixelBuffer::Make(pagSurface->width(), pagSurface->height());
+  auto pixelBuffer = PixelBuffer::Make(pagSurface->width(), pagSurface->height(), false, false);
   Bitmap bitmap(pixelBuffer);
   ASSERT_FALSE(bitmap.isEmpty());
   auto result = pagSurface->readPixels(ToPAG(bitmap.colorType()), ToPAG(bitmap.alphaType()),

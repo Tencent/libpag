@@ -70,3 +70,4 @@ win/Win32Demo/Debug/
 win/Win32Demo/Release/
 QTCMAKE.cfg
 test/baseline/.cache
+/result

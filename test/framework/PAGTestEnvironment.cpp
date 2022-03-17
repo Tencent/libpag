@@ -32,7 +32,9 @@ void PAGTestEnvironment::SetUp() {
   std::vector<std::string> fontPaths = {"../resources/font/NotoSansSC-Regular.otf",
                                         "../resources/font/NotoColorEmoji.ttf"};
   std::vector<int> ttcIndices = {0, 0};
-  pag::PAGFont::SetFallbackFontPaths(fontPaths, ttcIndices);
+  PAGFont::SetFallbackFontPaths(fontPaths, ttcIndices);
+  // Disable SoftwareToHardware policy for tests， otherwise there will be random rendering outputs.
+  PAGVideoDecoder::SetSoftwareToHardwareEnabled(false);
   RegisterSoftwareDecoder();
   Baseline::SetUp();
 }
