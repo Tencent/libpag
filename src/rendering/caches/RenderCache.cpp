@@ -204,6 +204,7 @@ void RenderCache::attachToContext(tgfx::Context* current, bool forHitTest) {
 
 void RenderCache::releaseAll() {
   clearAllSnapshots();
+  clearAllTextAtlas();
   graphicsMemory = 0;
   clearAllSequenceCaches();
   for (auto& item : filterCaches) {
@@ -292,7 +293,7 @@ void RenderCache::removeSnapshot(ID assetID) {
   snapshotCaches.erase(assetID);
 }
 
-TextAtlas* RenderCache::getTextAtlas(ID assetID) {
+TextAtlas* RenderCache::getTextAtlas(ID assetID) const {
   auto textAtlas = textAtlases.find(assetID);
   if (textAtlas == textAtlases.end()) {
     return nullptr;
@@ -330,6 +331,14 @@ void RenderCache::removeTextAtlas(ID assetID) {
   graphicsMemory -= textAtlas->second->memoryUsage();
   delete textAtlas->second;
   textAtlases.erase(textAtlas);
+}
+
+void RenderCache::clearAllTextAtlas() {
+  for (auto atlas : textAtlases) {
+    graphicsMemory -= atlas.second->memoryUsage();
+    delete atlas.second;
+  }
+  textAtlases.clear();
 }
 
 void RenderCache::clearAllSnapshots() {
