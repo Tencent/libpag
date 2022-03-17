@@ -52,3 +52,23 @@
 ### Bug Fixes
 
 - Fix `PAGImage.fromSource` miss rewind `Asyncify` currData.
+
+## 0.0.6
+
+### Breaking Changes
+
+- Edit returns from `PAGFile.getLayersByEditableIndex` be `Vector<PAGLayer>`.
+- Replace C++ enum `LayerType` to Js enum `LayerType`,  replace `PAG.LayerType` to `PAG.types.LayerType`.
+
+### Features
+
+- Add warn message when canvas size is more than 2560 on Web env.
+- Make `PAGFile.load` support data what's type is  `Blob` or `ArrayBuffer` ，and add `maxSupportedTagLevel`, `tagLevel`, `copyOriginal` on `PAGFile`.
+- Add `freeCache` on  `PAGView`.
+- ADD `clearAll` on `PAGSurface.`
+- Add  `getSurface` , `matrix`, `setMatrix` , `nextFrame` ,  `preFrame` ,  `autoClear` , `setAutoClear`, `getBounds,` `getLayersUnderPoint`,  `hitTestPoint`,  `renderingTime` , `imageDecodingTime`,  `presentingTime` ,  `graphicsMemory` on `PAGPlayer`.
+- Add  `scaleMode`  ,  `setScaleMode` , `matrix` , `setMatrix` on `PAGImage`.
+- Add `matrix`, `setMatrix`, `resetMatrix`, `getTotalMatrix`, `parent`, `markers`, `setStartTime`, `currentTime`, `setCurrentTime`, `getProgress`, `setProgress`, `preFrame` , `nextFrame`, `getBounds`, `trackMatteLayer`, `excludedFromTimeline`,  `setExcludedFromTimeline`, `isPAGFile`, `isDelete` on `PAGLayer`.
+- Add `Make`, `removeLayer`, `getLayersUnderPoint` on `PAGComposition`.
+- Add `create`, `fontFamily`, `fontStyle` on `PAGFont`.
+- Add `PAGTextLayer`, `PAGImageLayer` Class.
