@@ -53,7 +53,7 @@
 
 - Fix `PAGImage.fromSource` miss rewind `Asyncify` currData.
 
-## 0.0.6
+## 0.1.0
 
 ### Breaking Changes
 

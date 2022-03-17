@@ -53,7 +53,7 @@
 
 - 修复 `PAGImage` 的 `fromSource` 方法没有回溯 `Asyncify` 的状态
 
-## 0.0.6
+## 0.1.0
 
 ### Breaking Changes
 
