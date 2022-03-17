@@ -25,8 +25,8 @@
 namespace tgfx {
 class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
  public:
-  static std::unique_ptr<QuadPerEdgeAAGeometryProcessor> Make(int width, int height, Matrix matrix,
-                                                              AAType aa);
+  static std::unique_ptr<QuadPerEdgeAAGeometryProcessor> Make(int width, int height, AAType aa,
+                                                              bool hasColor);
 
   std::string name() const override {
     return "QuadPerEdgeAAGeometryProcessor";
@@ -35,16 +35,16 @@ class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
   std::unique_ptr<GLGeometryProcessor> createGLInstance() const override;
 
  private:
-  QuadPerEdgeAAGeometryProcessor(int width, int height, Matrix matrix, AAType aa);
+  QuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa, bool hasColor);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   Attribute position;  // May contain coverage as last channel
   Attribute localCoord;
+  Attribute color;
 
   int width = 1;
   int height = 1;
-  Matrix viewMatrix = Matrix::I();
   AAType aa = AAType::None;
 
   friend class GLQuadPerEdgeAAGeometryProcessor;

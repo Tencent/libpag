@@ -17,14 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PAGTestEnvironment.h"
-#include <fstream>
 #include "ffavc.h"
 #include "pag_test.h"
+#include "utils/Baseline.h"
 
 namespace pag {
-PAGTestEnvironment::~PAGTestEnvironment() {
-}
-
 static void RegisterSoftwareDecoder() {
   auto factory = ffavc::DecoderFactory::GetHandle();
   pag::PAGVideoDecoder::RegisterSoftwareDecoderFactory(
@@ -35,28 +32,15 @@ void PAGTestEnvironment::SetUp() {
   std::vector<std::string> fontPaths = {"../resources/font/NotoSansSC-Regular.otf",
                                         "../resources/font/NotoColorEmoji.ttf"};
   std::vector<int> ttcIndices = {0, 0};
-  pag::PAGFont::SetFallbackFontPaths(fontPaths, ttcIndices);
+  PAGFont::SetFallbackFontPaths(fontPaths, ttcIndices);
+  // Disable SoftwareToHardware policy for tests， otherwise there will be random rendering outputs.
+  PAGVideoDecoder::SetSoftwareToHardwareEnabled(false);
   RegisterSoftwareDecoder();
-}
-
-static void RemoveEmptyFolder(const std::filesystem::path& path) {
-  if (!std::filesystem::is_directory(path)) {
-    if (path.filename() == ".DS_Store") {
-      std::filesystem::remove(path);
-    }
-    return;
-  }
-  for (const auto& entry : std::filesystem::directory_iterator(path)) {
-    RemoveEmptyFolder(entry.path());
-  }
-  if (std::filesystem::is_empty(path)) {
-    std::filesystem::remove(path);
-  }
+  Baseline::SetUp();
 }
 
 void PAGTestEnvironment::TearDown() {
-  RemoveEmptyFolder("../test/out/baseline");
-  RemoveEmptyFolder("../test/out/compare");
+  Baseline::TearDown();
 }
 
 }  // namespace pag

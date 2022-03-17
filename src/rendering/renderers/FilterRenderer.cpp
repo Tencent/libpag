@@ -19,7 +19,6 @@
 #include "FilterRenderer.h"
 #include "base/utils/MatrixUtil.h"
 #include "gpu/Surface.h"
-#include "gpu/opengl/GLContext.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/filters/DisplacementMapFilter.h"

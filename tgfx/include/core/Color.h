@@ -50,11 +50,6 @@ struct Color {
   float alpha;
 
   /**
-   * Returns an invalid Color.
-   */
-  static const Color& Invalid();
-
-  /**
    * Returns a fully transparent Color.
    */
   static const Color& Transparent();

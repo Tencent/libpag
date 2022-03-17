@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "core/Color.h"
 #include "gpu/GLFragmentProcessor.h"
 
@@ -30,7 +31,7 @@ class GLConstColorProcessor : public GLFragmentProcessor {
   void onSetData(const ProgramDataManager& programDataManager,
                  const FragmentProcessor& fragmentProcessor) override;
 
-  Color colorPrev = Color::Invalid();
+  std::optional<Color> colorPrev;
   UniformHandle colorUniform;
 };
 }  // namespace tgfx

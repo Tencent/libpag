@@ -131,10 +131,8 @@ void MotionBlurFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect& 
 
   previousMatrix.preTranslate(contentBounds.left, contentBounds.top);
   currentMatrix.preTranslate(contentBounds.left, contentBounds.top);
-  std::array<float, 9> previousGLMatrix =
-      tgfx::ToGLTextureMatrix(previousMatrix, width, height, origin);
-  std::array<float, 9> currentGLMatrix =
-      tgfx::ToGLTextureMatrix(currentMatrix, width, height, origin);
+  std::array<float, 9> previousGLMatrix = ToGLTextureMatrix(previousMatrix, width, height, origin);
+  std::array<float, 9> currentGLMatrix = ToGLTextureMatrix(currentMatrix, width, height, origin);
 
   auto scaling = (previousMatrix.getScaleX() != currentMatrix.getScaleX() ||
                   previousMatrix.getScaleY() != currentMatrix.getScaleY());

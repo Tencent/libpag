@@ -675,17 +675,6 @@ class Matrix {
    */
   static const Matrix& I();
 
-  /**
-   * Returns reference to a const Matrix with invalid values. Returned Matrix is set to:
-   *
-   *    | FLT_MAX FLT_MAX FLT_MAX |
-   *    | FLT_MAX FLT_MAX FLT_MAX |
-   *    | FLT_MAX FLT_MAX FLT_MAX |
-   *
-   * @return  const invalid Matrix
-   */
-  static const Matrix& Invalid();
-
  private:
   float values[9];
   /**

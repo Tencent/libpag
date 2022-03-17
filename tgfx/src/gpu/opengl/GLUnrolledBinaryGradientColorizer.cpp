@@ -194,7 +194,7 @@ void GLUnrolledBinaryGradientColorizer::emitCode(EmitArgs& args) {
 }
 
 void SetUniformData(const ProgramDataManager& programDataManager, const UniformHandle& handle,
-                    const Color& current, Color* previous) {
+                    const Color& current, std::optional<Color>* previous) {
   if (handle.isValid() && current != *previous) {
     *previous = current;
     programDataManager.set4fv(handle, 1, current.array());

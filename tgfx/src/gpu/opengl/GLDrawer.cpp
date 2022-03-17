@@ -48,7 +48,7 @@ static AttribLayout GetAttribLayout(ShaderVar::Type type) {
 }
 
 static bool isDrawArgsValid(const DrawArgs& args) {
-  return args.context != nullptr && args.renderTarget != nullptr && !args.rectToDraw.isEmpty();
+  return args.context != nullptr && args.renderTarget != nullptr;
 }
 
 static void ComputeRecycleKey(BytesKey* recycleKey) {
@@ -99,7 +99,8 @@ void GLDrawer::onReleaseGPU() {
   }
 }
 
-static std::shared_ptr<Texture> CreateDstTexture(const DrawArgs& args, Point* dstOffset) {
+static std::shared_ptr<Texture> CreateDstTexture(const DrawArgs& args, Rect dstRect,
+                                                 Point* dstOffset) {
   auto gl = GLFunctions::Get(args.context);
   auto caps = GLCaps::Get(args.context);
   if (caps->textureBarrierSupport && args.renderTargetTexture) {
@@ -108,8 +109,6 @@ static std::shared_ptr<Texture> CreateDstTexture(const DrawArgs& args, Point* ds
   }
   auto bounds = Rect::MakeWH(static_cast<float>(args.renderTarget->width()),
                              static_cast<float>(args.renderTarget->height()));
-  auto dstRect = args.rectToDraw;
-  args.viewMatrix.mapRect(&dstRect);
   if (!dstRect.intersect(bounds)) {
     return nullptr;
   }
@@ -190,7 +189,7 @@ void GLDrawer::draw(DrawArgs args, std::unique_ptr<GLDrawOp> op) const {
   if (!blendAsCoeff) {
     xferProcessor = PorterDuffXferProcessor::Make(args.blendMode);
     if (!caps->frameBufferFetchSupport) {
-      dstTexture = CreateDstTexture(args, &dstTextureOffset);
+      dstTexture = CreateDstTexture(args, op->bounds(), &dstTextureOffset);
     }
   }
   auto config = GetOutputPixelFormat(args);

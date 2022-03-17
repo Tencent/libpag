@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "gpu/GLFragmentProcessor.h"
 
 namespace tgfx {
@@ -31,6 +32,6 @@ class GLTextureFragmentProcessor : public GLFragmentProcessor {
 
   UniformHandle alphaStartUniform;
 
-  Point alphaStartPrev = Point::Make(-1, -1);
+  std::optional<Point> alphaStartPrev;
 };
 }  // namespace tgfx

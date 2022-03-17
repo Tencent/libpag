@@ -1,0 +1,29 @@
+# This is a basic workflow to help you get started with Actions
+
+name: build_linux
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the master branch
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  build_linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          lfs: true
+      - name: Checkout LFS objects
+        run: git lfs checkout
+      - uses: seanmiddleditch/gha-setup-ninja@master
+      - name: Linux build
+        run: |
+          chmod +x sync_deps.sh
+          ./sync_deps.sh
+          chmod +x build_linux.sh
+          ./build_linux.sh

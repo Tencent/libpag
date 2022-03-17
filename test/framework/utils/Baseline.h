@@ -31,5 +31,12 @@ class Baseline {
   static bool Compare(const tgfx::Bitmap& bitmap, const std::string& key);
 
   static bool Compare(const std::shared_ptr<PAGSurface>& surface, const std::string& key);
+
+ private:
+  static void SetUp();
+
+  static void TearDown();
+
+  friend class PAGTestEnvironment;
 };
 }  // namespace pag

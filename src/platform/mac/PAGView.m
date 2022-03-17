@@ -18,14 +18,14 @@
 
 #import "PAGView.h"
 #import "PAGPlayer.h"
-#import "platform/mac/private/ValueAnimator.h"
+#import "platform/mac/private/PAGValueAnimator.h"
 
 @implementation PAGView {
   PAGPlayer* pagPlayer;
   PAGSurface* pagSurface;
   PAGFile* pagFile;
   NSString* filePath;
-  ValueAnimator* valueAnimator;
+  PAGValueAnimator* valueAnimator;
   BOOL _isPlaying;
   BOOL _isVisible;
   NSMutableDictionary* textReplacementMap;
@@ -50,7 +50,7 @@
   filePath = nil;
   self.layer.backgroundColor = [NSColor clearColor].CGColor;
   pagPlayer = [[PAGPlayer alloc] init];
-  valueAnimator = [[ValueAnimator alloc] init];
+  valueAnimator = [[PAGValueAnimator alloc] init];
   [valueAnimator setListener:self];
 }
 

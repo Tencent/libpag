@@ -2,7 +2,7 @@ import { PAGInit } from '../src/pag';
 import { PAGFile } from '../src/pag-file';
 import { PAGView } from '../src/pag-view';
 import { AudioPlayer } from './module/audio-player';
-import { PAG as PAGNamespace, PAGViewListenerEvent, ParagraphJustification } from '../src/types';
+import { LayerType, PAG as PAGNamespace, PAGViewListenerEvent, ParagraphJustification } from '../src/types';
 import { PAGComposition } from '../src/pag-composition';
 
 declare global {
@@ -112,6 +112,7 @@ window.onload = async () => {
     textDoc.strokeOverFill = true;
     textDoc.tracking = 600;
     pagFile.replaceText(0, textDoc);
+    console.log(pagFile.getTextData(0));
     await pagView.flush();
   });
 
@@ -460,24 +461,22 @@ const setVideoTime = (el, time) => {
 
 const getEditableLayer = (PAG: PAGNamespace, pagFile: PAGFile) => {
   const editableImageCount = pagFile.numImages();
-  let res = [];
+  let res: any[] = [];
   for (let i = 0; i < editableImageCount; i++) {
-    const vectorPagLayer = pagFile.getLayersByEditableIndex(i, PAG.LayerType.Image);
-    for (let j = 0; j < vectorPagLayer.size(); j++) {
-      const pagLayerWasm = vectorPagLayer.get(j);
-      const pagLayer = new PAG.PAGLayer(pagLayerWasm);
-      const uniqueID = pagLayer.uniqueID();
-      const layerType = pagLayer.layerType();
-      const layerName = pagLayer.layerName();
-      const alpha = pagLayer.alpha();
-      const visible = pagLayer.visible();
-      const editableIndex = pagLayer.editableIndex();
-      const duration = pagLayer.duration();
-      const frameRate = pagLayer.frameRate();
-      const localStartTime = pagLayer.startTime();
-      const startTime = pagLayer.localTimeToGlobal(localStartTime);
+    const imageLayers = pagFile.getLayersByEditableIndex(i, LayerType.Image);
+    imageLayers.forEach((layer) => {
+      const uniqueID = layer.uniqueID();
+      const layerType = layer.layerType();
+      const layerName = layer.layerName();
+      const alpha = layer.alpha();
+      const visible = layer.visible();
+      const editableIndex = layer.editableIndex();
+      const duration = layer.duration();
+      const frameRate = layer.frameRate();
+      const localStartTime = layer.startTime();
+      const startTime = layer.localTimeToGlobal(localStartTime);
       res.push({ uniqueID, layerType, layerName, alpha, visible, editableIndex, frameRate, startTime, duration });
-    }
+    });
   }
   return res;
 };

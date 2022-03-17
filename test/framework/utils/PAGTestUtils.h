@@ -26,8 +26,14 @@
 #include "pag/pag.h"
 
 namespace pag {
+std::string ToString(Frame frame);
+
+void GetAllPAGFiles(std::string path, std::vector<std::string>& files);
+
 std::shared_ptr<tgfx::PixelBuffer> MakeSnapshot(std::shared_ptr<PAGSurface> pagSurface);
 
 std::shared_ptr<PAGLayer> GetLayer(std::shared_ptr<PAGComposition> root, LayerType type,
                                    int& targetIndex);
+
+bool CreateGLTexture(tgfx::Context* context, int width, int height, tgfx::GLSampler* texture);
 }  // namespace pag

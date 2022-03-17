@@ -117,7 +117,6 @@ class GLCaps : public Caps {
   bool packRowLengthSupport = false;
   bool unpackRowLengthSupport = false;
   bool textureRedSupport = false;
-  bool multisampleDisableSupport = false;
   MSFBOType msFBOType = MSFBOType::None;
   bool frameBufferFetchSupport = false;
   bool frameBufferFetchRequiresEnablePerSample = false;

@@ -1,4 +1,4 @@
-import { PAG, ScaleMode, PAGViewListenerEvent } from './types';
+import { PAG, PAGScaleMode, PAGViewListenerEvent } from './types';
 import { PAGPlayer } from './pag-player';
 import { EventManager, Listener } from './utils/event-manager';
 import { PAGSurface } from './pag-surface';
@@ -217,14 +217,14 @@ export class PAGView {
   /**
    * Returns the current scale mode.
    */
-  public scaleMode(): ScaleMode {
+  public scaleMode(): PAGScaleMode {
     return this.player.scaleMode();
   }
   /**
    * Specifies the rule of how to scale the pag content to fit the surface size. The matrix
    * changes when this method is called.
    */
-  public setScaleMode(value: ScaleMode) {
+  public setScaleMode(value: PAGScaleMode) {
     this.player.setScaleMode(value);
   }
   /**

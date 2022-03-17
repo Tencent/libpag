@@ -17,72 +17,89 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/Canvas.h"
+#include <atomic>
+#include "CanvasState.h"
 #include "gpu/Surface.h"
 
 namespace tgfx {
+static uint32_t NextClipID() {
+  static const uint32_t kFirstUnreservedClipID = 1;
+  static std::atomic_uint32_t nextID{kFirstUnreservedClipID};
+  uint32_t id;
+  do {
+    id = nextID++;
+  } while (id < kFirstUnreservedClipID);
+  return id;
+}
+
 Canvas::Canvas(Surface* surface) : surface(surface) {
-  globalPaint.clip.addRect(0, 0, static_cast<float>(surface->width()),
-                           static_cast<float>(surface->height()));
+  state = std::make_shared<CanvasState>();
+  state->clip.addRect(0, 0, static_cast<float>(surface->width()),
+                      static_cast<float>(surface->height()));
+  state->clipID = NextClipID();
 }
 
 void Canvas::save() {
   onSave();
-  savedPaintList.push_back(globalPaint);
+  auto canvasState = std::make_shared<CanvasState>();
+  *canvasState = *state;
+  savedStateList.push_back(canvasState);
 }
 
 void Canvas::restore() {
-  if (savedPaintList.empty()) {
+  if (savedStateList.empty()) {
     return;
   }
-  globalPaint = savedPaintList.back();
-  savedPaintList.pop_back();
+  state = savedStateList.back();
+  savedStateList.pop_back();
   onRestore();
 }
 
 Matrix Canvas::getMatrix() const {
-  return globalPaint.matrix;
+  return state->matrix;
 }
 
 void Canvas::setMatrix(const Matrix& matrix) {
-  globalPaint.matrix = matrix;
-  onSetMatrix(globalPaint.matrix);
+  state->matrix = matrix;
+  onSetMatrix(state->matrix);
 }
 
 void Canvas::resetMatrix() {
-  globalPaint.matrix.reset();
-  onSetMatrix(globalPaint.matrix);
+  state->matrix.reset();
+  onSetMatrix(state->matrix);
 }
 
 void Canvas::concat(const Matrix& matrix) {
-  globalPaint.matrix.preConcat(matrix);
-  onSetMatrix(globalPaint.matrix);
+  state->matrix.preConcat(matrix);
+  onSetMatrix(state->matrix);
 }
 
 float Canvas::getAlpha() const {
-  return globalPaint.alpha;
+  return state->alpha;
 }
 
 void Canvas::setAlpha(float newAlpha) {
-  globalPaint.alpha = newAlpha;
+  state->alpha = newAlpha;
 }
 
 BlendMode Canvas::getBlendMode() const {
-  return globalPaint.blendMode;
+  return state->blendMode;
 }
 
 void Canvas::setBlendMode(BlendMode blendMode) {
-  globalPaint.blendMode = blendMode;
+  state->blendMode = blendMode;
 }
 
 Path Canvas::getTotalClip() const {
-  return globalPaint.clip;
+  return state->clip;
 }
 
 void Canvas::clipPath(const Path& path) {
   onClipPath(path);
   auto clipPath = path;
-  clipPath.transform(globalPaint.matrix);
-  globalPaint.clip.addPath(clipPath, PathOp::Intersect);
+  clipPath.transform(state->matrix);
+  state->clip.addPath(clipPath, PathOp::Intersect);
+  state->clipID = NextClipID();
 }
 
 void Canvas::drawRect(const Rect& rect, const Paint& paint) {

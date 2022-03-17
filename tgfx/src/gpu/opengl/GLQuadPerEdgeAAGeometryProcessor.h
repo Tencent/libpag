@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "gpu/GLGeometryProcessor.h"
 
 namespace tgfx {
@@ -30,12 +31,9 @@ class GLQuadPerEdgeAAGeometryProcessor : public GLGeometryProcessor {
                FPCoordTransformIter* transformIter) override;
 
  private:
-  UniformHandle matrixUniform;
   UniformHandle screenSizeUniform;
 
-  Matrix viewMatrixPrev = Matrix::I();
-  int widthPrev = -1;
-  int heightPrev = -1;
-  bool updated = false;
+  std::optional<int> widthPrev;
+  std::optional<int> heightPrev;
 };
 }  // namespace tgfx

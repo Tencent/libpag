@@ -17,96 +17,97 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Baseline.h"
+#include <CommonCrypto/CommonCrypto.h>
 #include <chrono>
 #include <fstream>
+#include <iostream>
 #include <unordered_set>
-#include "LzmaUtil.h"
 #include "base/utils/TGFXCast.h"
 #include "core/Data.h"
 #include "core/Image.h"
+#include "nlohmann/json.hpp"
 
 namespace pag {
 using namespace tgfx;
 
-#define BASELINE_ROOT "../test/baseline/"
-#define OUT_BASELINE_ROOT "../test/out/baseline/"
-#define OUT_COMPARE_ROOT "../test/out/compare/"
-#define COMPRESS_FILE_EXT ".lzma2"
-#define MAX_DIFF_COUNT 10
-#define MAX_DIFF_VALUE 5
+#define BASELINE_VERSION_PATH "../test/baseline/version.json"
+#define CACHE_MD5_PATH "../test/baseline/.cache/md5.json"
+#define OUT_MD5_PATH "../test/out/md5.json"
+#define CACHE_VERSION_PATH "../test/baseline/.cache/version.json"
+#define OUT_VERSION_PATH "../test/out/version.json"
+#define OUT_ROOT "../test/out/"
+#define WEBP_FILE_EXT ".webp"
 
-static ImageInfo MakeInfo(int with, int height) {
-  return ImageInfo::Make(with, height, tgfx::ColorType::RGBA_8888, tgfx::AlphaType::Premultiplied);
-}
+static nlohmann::json BaselineVersion = {};
+static nlohmann::json CacheVersion = {};
+static nlohmann::json OutputVersion = {};
+static nlohmann::json CacheMD5 = {};
+static nlohmann::json OutputMD5 = {};
+static std::mutex jsonLocker = {};
+static std::string currentVersion;
 
-static std::shared_ptr<Data> LoadImageData(const std::string& key) {
-  auto data = Data::MakeFromFile(BASELINE_ROOT + key + COMPRESS_FILE_EXT);
-  if (data == nullptr) {
-    return nullptr;
+std::string DumpMD5(const void* bytes, size_t size) {
+  unsigned char digest[CC_MD5_DIGEST_LENGTH] = {0};
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+  CC_MD5(bytes, size, digest);
+#pragma clang diagnostic pop
+  char buffer[32];
+  char* position = buffer;
+  for (unsigned char i : digest) {
+    sprintf(position, "%02x", i);
+    position += 2;
   }
-  return LzmaUtil::Decompress(data);
+  return {buffer, 32};
 }
 
-static void SaveData(const std::shared_ptr<Data>& data, const std::string& path) {
-  std::filesystem::path filePath = path;
-  std::filesystem::create_directories(filePath.parent_path());
+static nlohmann::json* FindJSON(nlohmann::json& md5JSON, const std::string& key,
+                                std::string* lastKey) {
+  std::vector<std::string> keys = {};
+  size_t start;
+  size_t end = 0;
+  while ((start = key.find_first_not_of('/', end)) != std::string::npos) {
+    end = key.find('/', start);
+    keys.push_back(key.substr(start, end - start));
+  }
+  *lastKey = keys.back();
+  keys.pop_back();
+  auto json = &md5JSON;
+  for (auto& jsonKey : keys) {
+    if ((*json)[jsonKey] == nullptr) {
+      (*json)[jsonKey] = {};
+    }
+    json = &(*json)[jsonKey];
+  }
+  return json;
+}
+
+static std::string GetJSONValue(nlohmann::json& target, const std::string& key) {
+  std::lock_guard<std::mutex> autoLock(jsonLocker);
+  std::string jsonKey;
+  auto json = FindJSON(target, key, &jsonKey);
+  auto value = (*json)[jsonKey];
+  return value != nullptr ? value.get<std::string>() : "";
+}
+
+static void SetJSONValue(nlohmann::json& target, const std::string& key, const std::string& value) {
+  std::lock_guard<std::mutex> autoLock(jsonLocker);
+  std::string jsonKey;
+  auto json = FindJSON(target, key, &jsonKey);
+  (*json)[jsonKey] = value;
+}
+
+static void SaveImage(const Bitmap& bitmap, const std::string& key) {
+  auto data = bitmap.encode(EncodedFormat::WEBP, 100);
+  if (data == nullptr) {
+    return;
+  }
+  std::filesystem::path path = OUT_ROOT + key + WEBP_FILE_EXT;
+  std::filesystem::create_directories(path.parent_path());
   std::ofstream out(path);
   out.write(reinterpret_cast<const char*>(data->data()),
             static_cast<std::streamsize>(data->size()));
   out.close();
-}
-
-static void SaveImage(const ImageInfo& info, const std::shared_ptr<Data>& imageData,
-                      const std::string& key) {
-  auto data = LzmaUtil::Compress(imageData);
-  if (data == nullptr) {
-    return;
-  }
-  auto path = OUT_BASELINE_ROOT + key + COMPRESS_FILE_EXT;
-  SaveData(data, path);
-  auto compareImage = Bitmap(info, imageData->data()).encode(EncodedFormat::WEBP, 100);
-  SaveData(compareImage, OUT_COMPARE_ROOT + key + "_new.webp");
-  auto baselineData = LoadImageData(key);
-  if (baselineData) {
-    auto baselineImage = Bitmap(info, baselineData->data()).encode(EncodedFormat::WEBP, 100);
-    SaveData(baselineImage, OUT_COMPARE_ROOT + key + "_baseline.webp");
-  }
-}
-
-static void ClearPreviousOutput(const std::string& key) {
-  std::filesystem::remove(OUT_BASELINE_ROOT + key + COMPRESS_FILE_EXT);
-  std::filesystem::remove(OUT_COMPARE_ROOT + key + "_baseline.webp");
-  std::filesystem::remove(OUT_COMPARE_ROOT + key + "_new.webp");
-}
-
-static bool ComparePixelData(const std::shared_ptr<Data>& pixelData, const std::string& key,
-                             const ImageInfo& info) {
-  if (pixelData == nullptr) {
-    return false;
-  }
-  auto baselineData = LoadImageData(key);
-  if (baselineData == nullptr || pixelData->size() != baselineData->size()) {
-    SaveImage(info, pixelData, key);
-    return false;
-  }
-  size_t diffCount = 0;
-  auto baseline = baselineData->bytes();
-  auto pixels = pixelData->bytes();
-  auto byteSize = pixelData->size();
-  for (size_t index = 0; index < byteSize; index++) {
-    auto pixelA = pixels[index];
-    auto pixelB = baseline[index];
-    if (abs(pixelA - pixelB) > MAX_DIFF_VALUE) {
-      diffCount++;
-    }
-  }
-  // We assume that the two images are the same if the number of different pixels is less than 10.
-  if (diffCount > MAX_DIFF_COUNT) {
-    SaveImage(info, pixelData, key);
-    return false;
-  }
-  ClearPreviousOutput(key);
-  return true;
 }
 
 bool Baseline::Compare(const std::shared_ptr<PixelBuffer>& pixelBuffer, const std::string& key) {
@@ -114,42 +115,124 @@ bool Baseline::Compare(const std::shared_ptr<PixelBuffer>& pixelBuffer, const st
     return false;
   }
   Bitmap bitmap(pixelBuffer);
-  auto info = MakeInfo(bitmap.width(), bitmap.height());
-  auto pixels = new uint8_t[info.byteSize()];
-  auto data = Data::MakeAdopted(pixels, info.byteSize(), Data::DeleteProc);
-  auto result = bitmap.readPixels(info, pixels);
-  if (!result) {
-    return false;
-  }
-  return ComparePixelData(data, key, info);
+  return Baseline::Compare(bitmap, key);
 }
 
 bool Baseline::Compare(const Bitmap& bitmap, const std::string& key) {
   if (bitmap.isEmpty()) {
     return false;
   }
-  auto info = MakeInfo(bitmap.width(), bitmap.height());
-  auto pixels = new uint8_t[info.byteSize()];
-  auto data = Data::MakeAdopted(pixels, info.byteSize(), Data::DeleteProc);
-  auto result = bitmap.readPixels(info, pixels);
-  if (!result) {
+  std::string md5;
+  if (bitmap.rowBytes() == bitmap.info().minRowBytes()) {
+    md5 = DumpMD5(bitmap.pixels(), bitmap.byteSize());
+  } else {
+    auto pixelBuffer = PixelBuffer::Make(bitmap.width(), bitmap.height(),
+                                         bitmap.colorType() == tgfx::ColorType::ALPHA_8, false);
+    Bitmap newBitmap(pixelBuffer);
+    auto result = bitmap.readPixels(newBitmap.info(), newBitmap.writablePixels());
+    if (!result) {
+      return false;
+    }
+    md5 = DumpMD5(newBitmap.pixels(), newBitmap.byteSize());
+  }
+#ifdef UPDATE_BASELINE
+  SetJSONValue(OutputMD5, key, md5);
+  return true;
+#endif
+  auto baselineVersion = GetJSONValue(BaselineVersion, key);
+  auto cacheVersion = GetJSONValue(CacheVersion, key);
+  if (cacheVersion.empty() || baselineVersion.empty() ||
+      (baselineVersion == cacheVersion && GetJSONValue(CacheMD5, key) != md5)) {
+    SetJSONValue(OutputVersion, key, currentVersion);
+    SetJSONValue(OutputMD5, key, md5);
+    SaveImage(bitmap, key);
     return false;
   }
-  return ComparePixelData(data, key, info);
+  SetJSONValue(OutputVersion, key, baselineVersion);
+  std::filesystem::remove(OUT_ROOT + key + WEBP_FILE_EXT);
+  return true;
 }
 
 bool Baseline::Compare(const std::shared_ptr<PAGSurface>& surface, const std::string& key) {
   if (surface == nullptr) {
     return false;
   }
-  auto info = MakeInfo(surface->width(), surface->height());
-  auto pixels = new uint8_t[info.byteSize()];
-  auto data = Data::MakeAdopted(pixels, info.byteSize(), Data::DeleteProc);
-  auto result = surface->readPixels(ToPAG(info.colorType()), AlphaType::Premultiplied, pixels,
-                                    info.rowBytes());
+  auto pixelBuffer = PixelBuffer::Make(surface->width(), surface->height(), false, false);
+  Bitmap bitmap(pixelBuffer);
+  auto result = surface->readPixels(ToPAG(bitmap.colorType()), ToPAG(bitmap.alphaType()),
+                                    bitmap.writablePixels(), bitmap.rowBytes());
   if (!result) {
     return false;
   }
-  return ComparePixelData(data, key, info);
+  return Baseline::Compare(bitmap, key);
+}
+
+void Baseline::SetUp() {
+  std::ifstream cacheMD5File(CACHE_MD5_PATH);
+  if (cacheMD5File.is_open()) {
+    cacheMD5File >> CacheMD5;
+    cacheMD5File.close();
+  }
+  std::ifstream baselineVersionFile(BASELINE_VERSION_PATH);
+  if (baselineVersionFile.is_open()) {
+    baselineVersionFile >> BaselineVersion;
+    baselineVersionFile.close();
+  }
+  std::ifstream cacheVersionFile(CACHE_VERSION_PATH);
+  if (cacheVersionFile.is_open()) {
+    cacheVersionFile >> CacheVersion;
+    cacheVersionFile.close();
+  }
+  std::ifstream headFile("./HEAD");
+  if (headFile.is_open()) {
+    headFile >> currentVersion;
+    headFile.close();
+  }
+}
+
+static void RemoveEmptyFolder(const std::filesystem::path& path) {
+  if (!std::filesystem::is_directory(path)) {
+    if (path.filename() == ".DS_Store") {
+      std::filesystem::remove(path);
+    }
+    return;
+  }
+  for (const auto& entry : std::filesystem::directory_iterator(path)) {
+    RemoveEmptyFolder(entry.path());
+  }
+  if (std::filesystem::is_empty(path)) {
+    std::filesystem::remove(path);
+  }
+}
+
+static void CreateFolder(const std::string& path) {
+  std::filesystem::path filePath = path;
+  std::filesystem::create_directories(filePath.parent_path());
+}
+
+void Baseline::TearDown() {
+#ifdef UPDATE_BASELINE
+  CreateFolder(CACHE_MD5_PATH);
+  std::ofstream outMD5File(CACHE_MD5_PATH);
+  outMD5File << std::setw(4) << OutputMD5 << std::endl;
+  outMD5File.close();
+  CreateFolder(CACHE_VERSION_PATH);
+  std::ofstream outVersionFile(CACHE_VERSION_PATH);
+  outVersionFile << std::setw(4) << BaselineVersion << std::endl;
+  outVersionFile.close();
+#else
+  std::filesystem::remove(OUT_MD5_PATH);
+  if (!OutputMD5.empty()) {
+    CreateFolder(OUT_MD5_PATH);
+    std::ofstream outMD5File(OUT_MD5_PATH);
+    outMD5File << std::setw(4) << OutputMD5 << std::endl;
+    outMD5File.close();
+  }
+  CreateFolder(OUT_VERSION_PATH);
+  std::ofstream versionFile(OUT_VERSION_PATH);
+  versionFile << std::setw(4) << OutputVersion << std::endl;
+  versionFile.close();
+#endif
+  RemoveEmptyFolder("../test/out");
 }
 }  // namespace pag

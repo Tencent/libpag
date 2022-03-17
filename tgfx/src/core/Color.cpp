@@ -20,12 +20,6 @@
 #include "core/utils/Log.h"
 
 namespace tgfx {
-const Color& Color::Invalid() {
-  static const Color color = {std::numeric_limits<float>::max(), std::numeric_limits<float>::max(),
-                              std::numeric_limits<float>::max(), std::numeric_limits<float>::max()};
-  return color;
-}
-
 const Color& Color::Transparent() {
   static const Color color = {0.0f, 0.0f, 0.0f, 0.0f};
   return color;

@@ -158,18 +158,8 @@ bool JpegImage::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
 std::shared_ptr<Data> JpegImage::Encode(const ImageInfo& imageInfo, const void* pixels,
                                         EncodedFormat, int quality) {
   auto srcPixels = static_cast<uint8_t*>(const_cast<void*>(pixels));
-  JSAMPLE* convertPixels = nullptr;
   if (imageInfo.colorType() == ColorType::ALPHA_8) {
-    Bitmap bitmap(imageInfo, srcPixels);
-    auto dstPixels = new uint8_t[imageInfo.byteSize()];
-    auto dstInfo = ImageInfo::Make(imageInfo.width(), imageInfo.height(), ColorType::RGBA_8888,
-                                   AlphaType::Opaque);
-    if (!bitmap.readPixels(dstInfo, dstPixels)) {
-      delete[] dstPixels;
-      return nullptr;
-    }
-    srcPixels = dstPixels;
-    convertPixels = dstPixels;
+    return nullptr;
   }
   jpeg_compress_struct cinfo = {};
   jpeg_error_mgr jerr = {};
@@ -207,7 +197,6 @@ std::shared_ptr<Data> JpegImage::Encode(const ImageInfo& imageInfo, const void* 
   /* similar to read file, clean up after we're done compressing */
   jpeg_finish_compress(&cinfo);
   jpeg_destroy_compress(&cinfo);
-  delete[] convertPixels;
   return Data::MakeAdopted(dstBuffer, dstBufferSize, Data::FreeProc);
 }
 #endif

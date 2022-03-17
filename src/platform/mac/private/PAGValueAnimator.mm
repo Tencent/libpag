@@ -1,0 +1,181 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making libpag available.
+//
+//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#import "PAGValueAnimator.h"
+#include <chrono>
+#include <mutex>
+
+@implementation PAGValueAnimator
+
+static CVDisplayLinkRef cvDisplayLink = NULL;
+static NSMutableArray* animators = [[NSMutableArray array] retain];
+static std::mutex valueAnimatorLocker = {};
+static int64_t AnimatorIdCount = 0;
+
+static int64_t GetCurrentTimeUS() {
+  static auto START_TIME = std::chrono::high_resolution_clock::now();
+  auto now = std::chrono::high_resolution_clock::now();
+  auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now - START_TIME);
+  return static_cast<int64_t>(ns.count() * 1e-3);
+}
+
+static CVReturn handleDisplayLink(CVDisplayLinkRef, const CVTimeStamp*, const CVTimeStamp*,
+                                  CVOptionFlags, CVOptionFlags*, void*) {
+  NSArray* copyanimators = copyanimators = animators.copy;
+  auto timestamp = GetCurrentTimeUS();
+  //遍历copy数组
+  for (id animator in copyanimators) {
+    PAGValueAnimator* valueAnimator = (PAGValueAnimator*)animator;
+    [valueAnimator onAnimationFrame:timestamp];
+  }
+  [copyanimators release];
+  return kCVReturnSuccess;
+}
+
++ (void)StartDisplayLink {
+  CVDisplayLinkCreateWithActiveCGDisplays(&cvDisplayLink);
+  CVDisplayLinkSetOutputCallback(cvDisplayLink, &handleDisplayLink, NULL);
+  CVDisplayLinkStart(cvDisplayLink);
+}
+
++ (void)StopDisplayLink {
+  CVDisplayLinkStop(cvDisplayLink);
+  CVDisplayLinkRelease(cvDisplayLink);
+}
+
++ (int64_t)AddAnimator:(PAGValueAnimator*)animator {
+  std::lock_guard<std::mutex> autoLock(valueAnimatorLocker);
+  [animators addObject:animator];
+  if (animators.count == 1) {
+    [PAGValueAnimator StartDisplayLink];
+  }
+  return ++AnimatorIdCount;
+}
+
++ (void)RemoveAnimator:(int64_t)animatorId {
+  std::lock_guard<std::mutex> autoLock(valueAnimatorLocker);
+  NSUInteger realAnimatorIndex = 0;
+  for (PAGValueAnimator* animator in animators) {
+    if (animator.animatorId == animatorId) {
+      realAnimatorIndex = [animators indexOfObject:animator];
+      break;
+    }
+  }
+  [animators removeObjectAtIndex:realAnimatorIndex];
+
+  if (animators.count == 0) {
+    [PAGValueAnimator StopDisplayLink];
+  }
+}
+
+- (id)init {
+  self = [super init];
+  duration = 0;
+  startTime = 0;
+  playTime = 0;
+  animatorId = NSIntegerMax;
+  animatorListener = nil;
+  repeatCount = 0;
+  lastRepeatCount = 0;
+  return self;
+}
+
+- (void)onAnimationFrame:(int64_t)timestamp {
+  auto count = (timestamp - startTime) / duration;
+  if (repeatCount >= 0 && count > repeatCount) {
+    playTime = duration;
+    [self stop:false];
+    [animatorListener onAnimationUpdate:1.0];
+    [animatorListener onAnimationEnd];
+  } else {
+    if (lastRepeatCount < count) {
+      [animatorListener onAnimationRepeat];
+    }
+    playTime = (timestamp - startTime) % duration;
+    double value = static_cast<double>(playTime) / duration;
+    [animatorListener onAnimationUpdate:value];
+  }
+  lastRepeatCount = (int)count;
+}
+
+- (void)setListener:(id)listener {
+  animatorListener = listener;
+}
+
+- (int64_t)duration {
+  return duration;
+}
+
+- (void)setDuration:(int64_t)value {
+  duration = value;
+}
+
+- (void)setCurrentPlayTime:(int64_t)time {
+  if (duration <= 0) {
+    return;
+  }
+  int64_t gapTime = playTime - time;
+  playTime = time;
+  startTime += gapTime % duration;
+}
+
+- (BOOL)isPlaying {
+  return animatorId != NSIntegerMax;
+}
+
+/**
+ * Set the number of times the animation will repeat. The default is 0, which means the animation
+ * will play only once. -1 means the animation will play infinity times.
+ */
+- (void)setRepeatCount:(int)value {
+  repeatCount = value;
+}
+
+- (void)start {
+  if (duration <= 0 || animatorId != NSIntegerMax || animatorListener == nil) {
+    return;
+  }
+  animatorId = [PAGValueAnimator AddAnimator:self];
+  startTime = GetCurrentTimeUS() - playTime % duration;
+  double value = static_cast<double>(playTime) / duration;
+  [animatorListener onAnimationUpdate:value];
+  if (value == 0) {
+    [animatorListener onAnimationStart];
+  }
+}
+
+- (void)stop {
+  [self stop:true];
+}
+
+- (void)stop:(bool)notification {
+  if (animatorId == NSIntegerMax) {
+    return;
+  }
+  [PAGValueAnimator RemoveAnimator:animatorId];
+  animatorId = NSIntegerMax;
+  if (notification) {
+    [animatorListener onAnimationCancel];
+  }
+}
+
+- (int64_t)animatorId {
+  return animatorId;
+}
+
+@end

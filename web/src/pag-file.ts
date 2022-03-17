@@ -1,10 +1,15 @@
 import { PAGComposition } from './pag-composition';
 import { PAGImage } from './pag-image';
+import { PAGImageLayer } from './pag-image-layer';
+import { PAGLayer } from './pag-layer';
+import { PAGSolidLayer } from './pag-solid-layer';
+import { PAGTextLayer } from './pag-text-layer';
 import { LayerType, PAG, PAGTimeStretchMode, TextDocument, Vector } from './types';
 import { readFile } from './utils/common';
 import { wasmAwaitRewind, wasmAsyncMethod } from './utils/decorators';
 import { ErrorCode } from './utils/error-map';
 import { Log } from './utils/log';
+import { vectorClass2array, VectorArray } from './utils/type-utils';
 
 @wasmAwaitRewind
 export class PAGFile extends PAGComposition {
@@ -13,9 +18,20 @@ export class PAGFile extends PAGComposition {
    * Load pag file from file.
    */
   @wasmAsyncMethod
-  public static async load(data: File) {
-    const buffer = (await readFile(data)) as ArrayBuffer;
-    return PAGFile.loadFromBuffer(buffer);
+  public static async load(data: File | Blob | ArrayBuffer) {
+    let buffer: ArrayBuffer | null = null;
+    if (data instanceof File) {
+      buffer = (await readFile(data)) as ArrayBuffer;
+    } else if (data instanceof Blob) {
+      buffer = (await readFile(new File([data], ''))) as ArrayBuffer;
+    } else if (data instanceof ArrayBuffer) {
+      buffer = data;
+    }
+    if (buffer === null) {
+      Log.errorByCode(ErrorCode.PagFileDataError);
+    } else {
+      return PAGFile.loadFromBuffer(buffer);
+    }
   }
   /**
    * Load pag file from arrayBuffer
@@ -32,9 +48,40 @@ export class PAGFile extends PAGComposition {
     this.module._free(dataPtr);
     return pagFile;
   }
+  /**
+   * The maximum tag level current SDK supports.
+   */
+  public static maxSupportedTagLevel(): number {
+    return this.module._PAGFile._MaxSupportedTagLevel() as number;
+  }
 
   public constructor(wasmIns: any) {
     super(wasmIns);
+  }
+
+  /**
+   * The tag level this pag file requires.
+   */
+  public tagLevel(): number {
+    return this.wasmIns._tagLevel() as number;
+  }
+  /**
+   * The number of replaceable texts.
+   */
+  public numTexts(): number {
+    return this.wasmIns._numTexts() as number;
+  }
+  /**
+   * The number of replaceable images.
+   */
+  public numImages(): number {
+    return this.wasmIns._numImages() as number;
+  }
+  /**
+   * The number of video compositions.
+   */
+  public numVideos(): number {
+    return this.wasmIns._numVideos() as number;
   }
   /**
    * Get a text data of the specified index. The index ranges from 0 to numTexts - 1.
@@ -59,28 +106,20 @@ export class PAGFile extends PAGComposition {
     this.wasmIns._replaceImage(editableImageIndex, pagImage.wasmIns);
   }
   /**
-   * The number of replaceable texts.
-   */
-  public numTexts(): number {
-    return this.wasmIns._numTexts() as number;
-  }
-  /**
-   * The number of replaceable images.
-   */
-  public numImages(): number {
-    return this.wasmIns._numImages() as number;
-  }
-  /**
-   * The number of video compositions.
-   */
-  public numVideos(): number {
-    return this.wasmIns._numVideos() as number;
-  }
-  /**
    * Return an array of layers by specified editable index and layer type.
    */
-  public getLayersByEditableIndex(editableIndex: Number, layerType: LayerType): Vector<any> {
-    return this.wasmIns._getLayersByEditableIndex(editableIndex, layerType) as Vector<any>;
+  public getLayersByEditableIndex(editableIndex: Number, layerType: LayerType) {
+    const vector = this.wasmIns._getLayersByEditableIndex(editableIndex, layerType) as Vector<any>;
+    switch (layerType) {
+      case LayerType.Solid:
+        return vectorClass2array(vector, PAGSolidLayer);
+      case LayerType.Text:
+        return vectorClass2array(vector, PAGTextLayer);
+      case LayerType.Image:
+        return vectorClass2array(vector, PAGImageLayer);
+      default:
+        return vectorClass2array(vector, PAGLayer);
+    }
   }
   /**
    * Indicate how to stretch the original duration to fit target duration when file's duration is
@@ -101,6 +140,13 @@ export class PAGFile extends PAGComposition {
    */
   public setDuration(duration: number): void {
     this.wasmIns._setDuration(duration);
+  }
+  /**
+   * Set the duration of this PAGFile. Passing a value less than or equal to 0 resets the duration
+   * to its default value.
+   */
+  public copyOriginal(): PAGFile {
+    return new PAGFile(this.wasmIns._copyOriginal());
   }
 
   public destroy(): void {

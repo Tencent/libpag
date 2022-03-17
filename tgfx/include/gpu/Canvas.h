@@ -30,12 +30,7 @@ class Surface;
 
 class SurfaceOptions;
 
-struct CanvasPaint {
-  float alpha = 1.0f;
-  BlendMode blendMode = BlendMode::SrcOver;
-  Matrix matrix = Matrix::I();
-  Path clip = {};
-};
+struct CanvasState;
 
 /**
  * Canvas provides an interface for drawing, and how the drawing is clipped and transformed. Canvas
@@ -191,7 +186,7 @@ class Canvas {
 
  protected:
   Surface* surface = nullptr;
-  CanvasPaint globalPaint = {};
+  std::shared_ptr<CanvasState> state = nullptr;
 
   virtual void onSave() = 0;
   virtual void onRestore() = 0;
@@ -199,6 +194,6 @@ class Canvas {
   virtual void onClipPath(const Path& path) = 0;
 
  private:
-  std::vector<CanvasPaint> savedPaintList = {};
+  std::vector<std::shared_ptr<CanvasState>> savedStateList = {};
 };
 }  // namespace tgfx

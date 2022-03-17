@@ -1,10 +1,17 @@
 import { PAG, Vector, Marker } from './types';
 import { PAGLayer } from './pag-layer';
 import { wasmAwaitRewind } from './utils/decorators';
+import { VectorArray, vectorBasics2array, vectorClass2array } from './utils/type-utils';
 
 @wasmAwaitRewind
 export class PAGComposition extends PAGLayer {
   public static module: PAG;
+  /**
+   * Make a empty PAGComposition with specified size.
+   */
+  public static Make(width: number, height: number): PAGComposition {
+    return new PAGComposition(this.module._PAGComposition._Make(width, height));
+  }
 
   public constructor(wasmIns: any) {
     super(wasmIns);
@@ -22,16 +29,16 @@ export class PAGComposition extends PAGLayer {
     return this.wasmIns._height() as number;
   }
   /**
-   * Returns the number of child layers of this composition.
-   */
-  public numChildren(): number {
-    return this.wasmIns._numChildren() as number;
-  }
-  /**
    * Set the width and height of the Composition.
    */
   public setContentSize(width: number, height: number): void {
     this.wasmIns._setContentSize(width, height);
+  }
+  /**
+   * Returns the number of child layers of this composition.
+   */
+  public numChildren(): number {
+    return this.wasmIns._numChildren() as number;
   }
   /**
    * Returns the child layer that exists at the specified index.
@@ -43,12 +50,6 @@ export class PAGComposition extends PAGLayer {
     return new PAGLayer(wasmIns);
   }
   /**
-   * Returns an array of layers that match the specified layer name.
-   */
-  public getLayersByName(layerName: string): Vector<any> {
-    return this.wasmIns._getLayersByName(layerName) as Vector<any>;
-  }
-  /**
    * Returns the index position of a child layer.
    * @param pagLayer The layer instance to identify.
    * @returns The index position of the child layer to identify.
@@ -57,22 +58,13 @@ export class PAGComposition extends PAGLayer {
     return this.wasmIns._getLayerIndex(pagLayer.wasmIns) as number;
   }
   /**
-   * Swap the layers at the specified index.
+   * Changes the position of an existing child layer in the composition. This affects the layering
+   * of child layers.
+   * @param pagLayer The child layer for which you want to change the index number.
+   * @param index The resulting index number for the child layer.
    */
-  public swapLayer(pagLayer1: PAGLayer, pagLayer2: PAGLayer): void {
-    this.wasmIns._swapLayer(pagLayer1.wasmIns, pagLayer2.wasmIns);
-  }
-  /**
-   * Swap the layers at the specified index.
-   */
-  public swapLayerAt(index1: number, index2: number): void {
-    this.wasmIns._swapLayerAt(index1, index2);
-  }
-  /**
-   * Check whether current PAGComposition contains the specified pagLayer.
-   */
-  public contains(pagLayer: PAGLayer): boolean {
-    return this.wasmIns._contains(pagLayer.wasmIns) as boolean;
+  public setLayerIndex(pagLayer: PAGLayer, index: number): number {
+    return this.wasmIns._setLayerIndex(pagLayer.wasmIns, index) as number;
   }
   /**
    * Add a PAGLayer to current PAGComposition at the top. If you add a layer that already has a
@@ -91,33 +83,74 @@ export class PAGComposition extends PAGLayer {
     return this.wasmIns._addLayerAt(pagLayer.wasmIns, index) as boolean;
   }
   /**
-   * Indicates when the first frame of the audio plays in the composition's timeline.
+   * Check whether current PAGComposition contains the specified pagLayer.
    */
-  public audioStartTime(): number {
-    return this.wasmIns._audioStartTime() as number;
+  public contains(pagLayer: PAGLayer): boolean {
+    return this.wasmIns._contains(pagLayer.wasmIns) as boolean;
   }
   /**
-   * Returns the audio markers of this composition.
+   * Remove the specified PAGLayer from current PAGComposition.
    */
-  public audioMarkers(): Vector<Marker> {
-    return this.wasmIns._audioMarkers() as Vector<Marker>;
-  }
-  /**
-   * The audio data of this composition.
-   */
-  public audioBytes(): Uint8Array {
-    return this.wasmIns._audioBytes() as Uint8Array;
+  public removeLayer(pagLayer: PAGLayer): PAGLayer {
+    return new PAGLayer(this.wasmIns._removeLayer(pagLayer.wasmIns));
   }
   /**
    * Remove the specified PAGLayer from current PAGComposition.
    */
   public removeLayerAt(index: number): PAGLayer {
-    return this.wasmIns._removeLayerAt(index) as PAGLayer;
+    return new PAGLayer(this.wasmIns._removeLayerAt(index));
   }
   /**
    * Remove all PAGLayers from current PAGComposition.
    */
   public removeAllLayers(): void {
     this.wasmIns._removeAllLayers();
+  }
+  /**
+   * Swap the layers at the specified index.
+   */
+  public swapLayer(pagLayer1: PAGLayer, pagLayer2: PAGLayer): void {
+    this.wasmIns._swapLayer(pagLayer1.wasmIns, pagLayer2.wasmIns);
+  }
+  /**
+   * Swap the layers at the specified index.
+   */
+  public swapLayerAt(index1: number, index2: number): void {
+    this.wasmIns._swapLayerAt(index1, index2);
+  }
+  /**
+   * The audio data of this composition, which is an AAC audio in an MPEG-4 container.
+   */
+  public audioBytes(): Uint8Array {
+    return this.wasmIns._audioBytes() as Uint8Array;
+  }
+  /**
+   * Returns the audio markers of this composition.
+   */
+  public audioMarkers(): VectorArray<Marker> {
+    return vectorBasics2array(this.wasmIns._audioMarkers() as Vector<Marker>);
+  }
+  /**
+   * Indicates when the first frame of the audio plays in the composition's timeline.
+   */
+  public audioStartTime(): number {
+    return this.wasmIns._audioStartTime() as number;
+  }
+  /**
+   * Returns an array of layers that match the specified layer name.
+   */
+  public getLayersByName(layerName: string): PAGLayer[] {
+    return vectorClass2array(this.wasmIns._getLayersByName(layerName) as Vector<any>, PAGLayer);
+  }
+  /**
+   * Returns an array of layers that lie under the specified point. The point is in pixels and from
+   * this PAGComposition's local coordinates.
+   */
+  public getLayersUnderPoint(localX: number, localY: number): PAGLayer[] {
+    return vectorClass2array(this.wasmIns._getLayersUnderPoint(localX, localY), PAGLayer);
+  }
+
+  public destroy(): void {
+    this.wasmIns.delete();
   }
 }

@@ -13,6 +13,7 @@ import { PAGLayer } from './pag-layer';
 import { PAGComposition } from './pag-composition';
 import { NativeImage } from './core/native-image';
 import { WebMask } from './core/web-mask';
+import { PAGTextLayer } from './pag-text-layer';
 
 declare global {
   interface Window {
@@ -23,6 +24,7 @@ declare global {
 export interface PAG extends EmscriptenModule {
   _PAGFile: {
     _Load: (bytes: number, length: number) => any;
+    _MaxSupportedTagLevel: () => number;
   };
   _PAGImage: {
     _FromNativeImage: (nativeImage: NativeImage) => any;
@@ -33,7 +35,23 @@ export interface PAG extends EmscriptenModule {
     _FromTexture: (textureID: number, width: number, height: number, flipY: boolean) => any;
     _FromFrameBuffer: (framebufferID: number, width: number, height: number, flipY: boolean) => any;
   };
-  _SetFallbackFontNames: (fontName: any) => void;
+  _PAGComposition: {
+    _Make: (width: number, height: number) => any;
+  };
+  _PAGTextLayer: {
+    _Make(duration: number, text: string, fontSize: number, fontFamily: string, fontStyle: string): any;
+    _Make(duration: number, textDocumentHandle: TextDocument): any;
+  };
+  _PAGImageLayer: {
+    _Make(width: number, height: number, duration: number): any;
+  };
+  _PAGSolidLayer: {
+    _Make(duration: number, width: number, height: number, solidColor: Color, opacity: number): any;
+  };
+  _PAGFont: {
+    _create(fontFamily: string, fontStyle: string): any;
+    _SetFallbackFontNames(fontName: any): void;
+  };
   VectorString: any;
   webAssemblyQueue: WebAssemblyQueue;
   PAGPlayer: typeof PAGPlayer;
@@ -44,13 +62,13 @@ export interface PAG extends EmscriptenModule {
   PAGLayer: typeof PAGLayer;
   PAGComposition: typeof PAGComposition;
   PAGSurface: typeof PAGSurface;
+  PAGTextLayer: typeof PAGTextLayer;
   NativeImage: typeof NativeImage;
   WebMask: typeof WebMask;
   ScalerContext: typeof ScalerContext;
   VideoReader: typeof VideoReader;
   traceImage: (info: { width: number; height: number }, pixels: Uint8Array, tag: string) => void;
   GL: EmscriptenGL;
-  LayerType: typeof LayerType;
 }
 
 export interface EmscriptenGL {
@@ -63,7 +81,7 @@ export interface EmscriptenGL {
 /**
  * Defines the rules on how to scale the content to fit the specified area.
  */
-export const enum ScaleMode {
+export const enum PAGScaleMode {
   /**
    * The content is not scaled.
    */
@@ -354,10 +372,32 @@ export declare class TextDocument {
   private constructor();
 }
 
+export declare class PAGVideoRange {
+  /**
+   * The start time of the source video, in microseconds.
+   */
+  public startTime(): number;
+  /**
+   * The end time of the source video (not included), in microseconds.
+   */
+  public endTime(): number;
+  /**
+   * The duration for playing after applying speed.
+   */
+  public playDuration(): number;
+  /**
+   * Indicates whether the video should play backward.
+   */
+  public reversed(): boolean;
+
+  private constructor();
+}
+
 export declare class Vector<T> {
   public get: (index: number) => T;
-
+  public set: (index: number, value: T) => boolean;
+  public push_back: (value: T) => void;
   public size: () => number;
-
+  public delete: () => void;
   private constructor();
 }

@@ -18,14 +18,21 @@
 
 #pragma once
 
+#include "base/utils/Log.h"
 #include "base/utils/TGFXCast.h"
 #include "gpu/Texture.h"
-#include "gpu/opengl/GLUtil.h"
+#include "gpu/opengl/GLFunctions.h"
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "rendering/filters/Filter.h"
 
 namespace pag {
+std::array<float, 9> ToGLVertexMatrix(const tgfx::Matrix& matrix, int width, int height,
+                                      tgfx::ImageOrigin origin);
+
+std::array<float, 9> ToGLTextureMatrix(const tgfx::Matrix& matrix, int width, int height,
+                                       tgfx::ImageOrigin origin);
+
 tgfx::Matrix ToMatrix(const FilterTarget* target, bool flipY = false);
 
 std::unique_ptr<FilterSource> ToFilterSource(const tgfx::Texture* texture,
@@ -40,4 +47,12 @@ tgfx::Point ToGLVertexPoint(const FilterTarget* target, const FilterSource* sour
                             const tgfx::Rect& contentBounds, const tgfx::Point& contentPoint);
 
 void PreConcatMatrix(FilterTarget* target, const tgfx::Matrix& matrix);
+
+unsigned CreateGLProgram(tgfx::Context* context, const std::string& vertex,
+                         const std::string& fragment);
+
+void ActiveGLTexture(tgfx::Context* context, int unitIndex, const tgfx::TextureSampler* sampler);
+
+bool CheckGLError(tgfx::Context* context);
+
 }  // namespace pag

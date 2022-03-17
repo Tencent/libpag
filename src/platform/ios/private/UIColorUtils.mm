@@ -16,9 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import "platform/cocoa/private/ColorUtility.h"
+#import "platform/cocoa/private/PAGColorUtility.h"
 
-pag::Color ColorUtility::ToColor(CocoaColor* color) {
+pag::Color PAGColorUtility::ToColor(CocoaColor* color) {
   if (color == nil) {
     return pag::Black;
   }

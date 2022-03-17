@@ -28,9 +28,14 @@ namespace pag {
 static std::atomic<SoftwareDecoderFactory*> softwareDecoderFactory = {nullptr};
 static std::atomic_int maxHardwareDecoderCount = {65535};
 static std::atomic_int globalGPUDecoderCount = {0};
+static std::atomic_bool softwareToHardwareEnabled = true;
 
 void PAGVideoDecoder::SetMaxHardwareDecoderCount(int count) {
   maxHardwareDecoderCount = count;
+}
+
+void PAGVideoDecoder::SetSoftwareToHardwareEnabled(bool value) {
+  softwareToHardwareEnabled = value;
 }
 
 void PAGVideoDecoder::RegisterSoftwareDecoderFactory(SoftwareDecoderFactory* decoderFactory) {
@@ -55,6 +60,12 @@ bool VideoDecoder::HasSoftwareDecoder() {
 
 bool VideoDecoder::HasExternalSoftwareDecoder() {
   return softwareDecoderFactory != nullptr;
+}
+
+bool VideoDecoder::SoftwareToHardwareEnabled() {
+  // Enable the SoftwareToHardware policy only when external decoders are available, because the
+  // built-in libavc has poor performance.
+  return softwareToHardwareEnabled && softwareDecoderFactory != nullptr;
 }
 
 SoftwareDecoderFactory* VideoDecoder::GetExternalSoftwareDecoderFactory() {

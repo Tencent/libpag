@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "gpu/GLFragmentProcessor.h"
 
 namespace tgfx {
@@ -31,6 +32,6 @@ class GLAlphaFragmentProcessor : public GLFragmentProcessor {
 
   UniformHandle alphaUniform;
 
-  float alphaPrev = -1;
+  std::optional<float> alphaPrev;
 };
 }  // namespace tgfx

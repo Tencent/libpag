@@ -2,8 +2,9 @@ import { PAGComposition } from './pag-composition';
 import { PAGFile } from './pag-file';
 import { PAGLayer } from './pag-layer';
 import { PAGSurface } from './pag-surface';
-import { Matrix, PAG, ScaleMode, Rect, Vector } from './types';
+import { Matrix, PAG, PAGScaleMode, Rect, Vector } from './types';
 import { wasmAwaitRewind, wasmAsyncMethod } from './utils/decorators';
+import { vectorClass2array } from './utils/type-utils';
 
 @wasmAwaitRewind
 export class PAGPlayer {
@@ -103,14 +104,14 @@ export class PAGPlayer {
   /**
    * Returns the current scale mode.
    */
-  public scaleMode(): ScaleMode {
-    return this.wasmIns._scaleMode() as ScaleMode;
+  public scaleMode(): PAGScaleMode {
+    return this.wasmIns._scaleMode() as PAGScaleMode;
   }
   /**
    * Specifies the rule of how to scale the pag content to fit the surface size. The matrix
    * changes when this method is called.
    */
-  public setScaleMode(value: ScaleMode): void {
+  public setScaleMode(value: PAGScaleMode): void {
     this.wasmIns._setScaleMode(value);
   }
   /**
@@ -145,7 +146,7 @@ export class PAGPlayer {
   }
   /**
    * Set the transformation which will be applied to the composition. The scaleMode property
-   * will be set to ScaleMode::None when this method is called.
+   * will be set to PAGScaleMode::None when this method is called.
    */
   public setMatrix(matrix: Matrix) {
     this.wasmIns._setMatrix(matrix);
@@ -188,8 +189,8 @@ export class PAGPlayer {
    * Returns an array of layers that lie under the specified point. The point is in pixels and from
    * this PAGComposition's local coordinates.
    */
-  public getLayersUnderPoint(): Vector<any> {
-    return this.wasmIns._getLayersUnderPoint();
+  public getLayersUnderPoint(): PAGLayer[] {
+    return vectorClass2array(this.wasmIns._getLayersUnderPoint() as Vector<any>, PAGLayer);
   }
   /**
    * Evaluates the PAGLayer to see if it overlaps or intersects with the specified point. The point

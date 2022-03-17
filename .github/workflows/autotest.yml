@@ -40,18 +40,18 @@ jobs:
         uses: actions/cache@v2
         with:
           path: libpag.tar.zst
-          key: libpag-code-${{ github.sha }}
+          key: libpag-autotest-${{ github.sha }}
           restore-keys: |
-            libpag-code-${{ github.event.before }}
-            libpag-code-
+            libpag-autotest-${{ github.event.before }}
+            libpag-autotest-
       - if: github.event_name == 'pull_request'
         name: Get libpag cache (pull_request)
         id: libpag-pull_request
         uses: actions/cache@v2
         with:
           path: libpag.tar.zst
-          key: libpag-code-${{ github.event.pull_request.base.sha }}
-          restore-keys: libpag-code-
+          key: libpag-autotest-${{ github.event.pull_request.base.sha }}
+          restore-keys: libpag-autotest-
       - name: Check file existence
         id: check_files
         uses: andstor/file-existence-action@v1
@@ -80,11 +80,6 @@ jobs:
             cd libpag
             git pull
             git checkout ${{ github.head_ref }}
-
-      - name: brew link emscripten
-        if: steps.cache-environment.outputs.cache-hit == 'true'
-        run: |
-           brew link emscripten
 
       - name: Run autotest script
         run: |
