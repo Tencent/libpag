@@ -13,13 +13,15 @@
   git switch main
 
   if [[ $1 == "1" ]]; then
-    cd build
-  elif [ -d "./cmake-build-debug" ]; then
-    cd cmake-build-debug
+    BUILD_DIR=build
   else
-    mkdir build
-    cd build
+    BUILD_DIR=cmake-build-debug
   fi
+
+  if [ ! -d "./${BUILD_DIR}" ]; then
+    mkdir ${BUILD_DIR}
+  fi
+  cd ${BUILD_DIR}
 
   if [ -f "./CMakeCache.txt" ]; then
     TEXT=$(cat ./CMakeCache.txt)
@@ -34,7 +36,12 @@
   fi
   echo $CMAKE_COMMAND
 
-  $CMAKE_COMMAND -DCMAKE_BUILD_TYPE=Debug ../
+  if [[ $1 == "1" ]]; then
+    $CMAKE_COMMAND -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DPAG_USE_SWIFTSHADER=ON -DCMAKE_BUILD_TYPE=Debug ../
+  else
+    $CMAKE_COMMAND -DCMAKE_BUILD_TYPE=Debug ../
+  fi
+
   $CMAKE_COMMAND --build . --target PAGBaseline -- -j 12
   ./PAGBaseline
   cd ..

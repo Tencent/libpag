@@ -37,9 +37,7 @@ class SequenceProxy : public TextureProxy {
 
   void prepare(RenderCache* cache) const override {
     static_cast<RenderCache*>(cache)->prepareSequenceReader(sequence, frame,
-                                                            SoftwareToHardwareEnabled()
-                                                                ? DecodingPolicy::SoftwareToHardware
-                                                                : DecodingPolicy::Hardware);
+                                                            DecodingPolicy::SoftwareToHardware);
   }
 
   std::shared_ptr<tgfx::Texture> getTexture(RenderCache* cache) const override {

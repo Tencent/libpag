@@ -151,7 +151,7 @@ PAG_TEST(PAGReadPixelsTest, TestPixelMap) {
 PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
   auto image = Image::MakeFrom("../resources/apitest/test_timestretch.png");
   ASSERT_TRUE(image != nullptr);
-  auto pixelBuffer = PixelBuffer::Make(image->width(), image->height());
+  auto pixelBuffer = PixelBuffer::Make(image->width(), image->height(), false, false);
   ASSERT_TRUE(pixelBuffer != nullptr);
   auto pixels = pixelBuffer->lockPixels();
   auto result = image->readPixels(pixelBuffer->info(), pixels);

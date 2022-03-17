@@ -170,9 +170,8 @@ void RenderCache::prepareFrame() {
   for (auto& item : layerDistances) {
     for (auto pagLayer : item.second) {
       if (pagLayer->layerType() == LayerType::PreCompose) {
-        auto policy = SoftwareToHardwareEnabled() && item.first < MIN_HARDWARE_PREPARE_TIME
-                          ? DecodingPolicy::SoftwareToHardware
-                          : DecodingPolicy::Hardware;
+        auto policy = item.first < MIN_HARDWARE_PREPARE_TIME ? DecodingPolicy::SoftwareToHardware
+                                                             : DecodingPolicy::Hardware;
         preparePreComposeLayer(static_cast<PreComposeLayer*>(pagLayer->layer), policy);
       } else if (pagLayer->layerType() == LayerType::Image) {
         prepareImageLayer(static_cast<PAGImageLayer*>(pagLayer));
@@ -465,9 +464,7 @@ std::shared_ptr<SequenceReader> RenderCache::getSequenceReader(Sequence* sequenc
   }
   if (reader == nullptr) {
     auto file = stage->getFileFromReferenceMap(composition->uniqueID);
-    reader = MakeSequenceReader(file, sequence,
-                                SoftwareToHardwareEnabled() ? DecodingPolicy::SoftwareToHardware
-                                                            : DecodingPolicy::Hardware);
+    reader = MakeSequenceReader(file, sequence, DecodingPolicy::SoftwareToHardware);
     if (reader && !staticComposition) {
       // 完全静态的序列帧不用缓存。
       sequenceCaches[compositionID] = reader;

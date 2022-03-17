@@ -68,7 +68,7 @@ VideoReader::VideoReader(VideoConfig config, std::unique_ptr<MediaDemuxer> demux
       }
       break;
     case DecodingPolicy::SoftwareToHardware:
-      if (VideoDecoder::HasExternalSoftwareDecoder() && VideoDecoder::HasHardwareDecoder()) {
+      if (VideoDecoder::SoftwareToHardwareEnabled() && VideoDecoder::HasHardwareDecoder()) {
         decoderTypeIndex = DECODER_TYPE_SOFTWARE;
         gpuDecoderTask = GPUDecoderTask::MakeAndRun(videoConfig);
       }
