@@ -83,6 +83,7 @@ enum class TagCode {
   TimeStretchMode = 32,
 
   // 33 ~ 44 are preserved
+  Mp4Header = 33,
 
   BitmapCompositionBlock = 45,
   BitmapSequence = 46,
@@ -1969,6 +1970,8 @@ class PAG_API BitmapSequence : public Sequence {
 
   bool verify() const override;
 
+  std::unique_ptr<ByteData> getMp4Data();
+
   RTTR_ENABLE(Sequence)
 };
 
@@ -2031,6 +2034,8 @@ class PAG_API VideoSequence : public Sequence {
   std::vector<ByteData*> headers;
 
   std::vector<TimeRange> staticTimeRanges;
+
+  ByteData* mp4Header;
 
   Frame duration() const override {
     return static_cast<Frame>(frames.size());

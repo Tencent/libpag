@@ -107,4 +107,22 @@ TagCode WriteVideoSequence(EncodeStream* stream, std::pair<VideoSequence*, bool>
 
   return TagCode::VideoSequence;
 }
+
+ByteData* ReadMp4Header(ByteBuffer* byteArray) {
+  auto length = byteArray->readEncodedUint32();
+  auto bytes = byteArray->readBytes(length);
+  // must check whether the bytes is valid. otherwise memcpy will crash.
+  if (length == 0 || byteArray->context->hasException()) {
+    return nullptr;
+  }
+  auto data = new uint8_t[length];
+  memcpy(data, bytes.data(), length);
+  return ByteData::MakeAdopted(data, length).release();
+}
+
+TagCode WriteMp4Header(ByteArray* byteArray, ByteData* byteData) {
+  byteArray->writeEncodedUint32(byteData->length());
+  byteArray->writeBytes(byteData->data(), byteData->length());
+  return TagCode::Mp4Header;
+}
 }  // namespace pag
