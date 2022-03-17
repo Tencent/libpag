@@ -5,8 +5,6 @@ name: build_web
 # Controls when the workflow will run
 on:
   # Triggers the workflow on push or pull request events but only for the master branch
-  push:
-    branches: [ main ]
   pull_request:
     branches: [ main ]
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
@@ -34,19 +32,53 @@ jobs:
             /usr/local/Cellar/depsync
             /usr/local/bin/depsync
           key: libpag-environment-20220208
-      - uses: actions/checkout@v2
+      - if: github.event_name == 'pull_request'
+        name: Get libpag cache (pull_request)
+        id: libpag-pull_request
+        uses: actions/cache@v2
         with:
-          lfs: true
-      - name: Checkout LFS objects
-        run: git lfs checkout
+          path: libpag.tar.zst
+          key: libpag-web01-${{ github.event.pull_request.base.sha }}
+          restore-keys: libpag-web01-
+      - name: Check file existence
+        id: check_files
+        uses: andstor/file-existence-action@v1
+        with:
+          files: "libpag.tar.zst"
+      - name: File exist
+        if: steps.check_files.outputs.files_exists == 'true'
+        # Only runs if all of the files exists
+        run: |
+          echo "file exist"
+          tar xvf libpag.tar.zst
+          rm -rf libpag.tar.zst
+      - name: File not exist
+        if: steps.check_files.outputs.files_exists != 'true'
+        run: |
+          echo "file not exist"
+          git clone -b main https://github.com/Tencent/libpag.git
+      - if: github.event_name == 'pull_request'
+        name: Swith branch (pull_request)
+        run: |
+          cd libpag
+          git pull
+          git checkout ${{ github.head_ref }}
       - name: brew link emscripten
         if: steps.cache-environment.outputs.cache-hit == 'true'
         run: |
-            brew link emscripten
+          brew link emscripten
       - name: Web build
         run: |
+          cd libpag
           chmod +x sync_deps.sh
           ./sync_deps.sh
           cd web/script
           chmod +x build.sh
           ./build.sh debug
+      - name: Compress libpag
+        run: |
+          cd libpag
+          git checkout main
+          cd ..
+          tar cvfa libpag.tar.zst libpag
+
