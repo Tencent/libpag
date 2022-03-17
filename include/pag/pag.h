@@ -1207,6 +1207,8 @@ class PAG_API PAGSurface {
    */
   bool readPixels(ColorType colorType, AlphaType alphaType, void* dstPixels, size_t dstRowBytes);
 
+  bool log = false;
+
  private:
   uint32_t contentVersion = 0;
   PAGPlayer* pagPlayer = nullptr;
