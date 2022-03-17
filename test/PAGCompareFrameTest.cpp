@@ -127,6 +127,7 @@ void CompareFileFrames(Semaphore* semaphore, std::string pagPath) {
   };
 
   while (currentFrame < totalFrames) {
+    pagSurface->log = fileName == "error_0.pag";
     auto changed = pagPlayer->flush();
     if (fileName == "error_0.pag") {
       auto key = "PAGCompareFrameTest/" + fileName + "/" + ToString(currentFrame);
