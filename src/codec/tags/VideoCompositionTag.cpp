@@ -34,6 +34,14 @@ void ReadTagsOfVideoComposition(DecodeStream* stream, TagCode code,
       sequence->composition = composition;
       composition->sequences.push_back(sequence);
     } break;
+    case TagCode::Mp4Header: {
+      for (auto sequence : composition->sequences) {
+        if (sequence->mp4Header == nullptr) {
+          sequence->mp4Header = ReadMp4Header(stream);
+          break;
+        }
+      }
+    } break;
     default:
       ReadTagsOfComposition(stream, code, composition);
       break;
@@ -64,6 +72,12 @@ TagCode WriteVideoComposition(EncodeStream* stream, VideoComposition* compositio
   for (auto sequence : sequences) {
     auto parameter = std::make_pair(sequence, hasAlpha);
     WriteTag(stream, &parameter, WriteVideoSequence);
+  }
+  for (auto sequence : sequences) {
+    if (sequence->mp4Header == nullptr) {
+      break;
+    }
+    WriteTag(stream, sequence->mp4Header, WriteMp4Header);
   }
   WriteEndTag(stream);
   return TagCode::VideoCompositionBlock;
