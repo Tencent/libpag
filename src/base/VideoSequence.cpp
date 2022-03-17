@@ -18,6 +18,7 @@
 
 #include "base/utils/Verify.h"
 #include "pag/file.h"
+#include "utils/mp4util/Mp4BoxHelper.h"
 
 namespace pag {
 VideoFrame::~VideoFrame() {
@@ -52,5 +53,9 @@ bool VideoSequence::verify() const {
     return false;
   }
   return true;
+}
+
+std::unique_ptr<ByteData> VideoSequence::getMp4Data() {
+  return Mp4BoxHelper::CovertToMp4(this);
 }
 }  // namespace pag
