@@ -4,6 +4,7 @@ import { PAGView } from '../src/pag-view';
 import { AudioPlayer } from './module/audio-player';
 import { LayerType, PAG as PAGNamespace, PAGViewListenerEvent, ParagraphJustification } from '../src/types';
 import { PAGComposition } from '../src/pag-composition';
+import { PAGImageLayer } from '../src/pag-image-layer';
 
 declare global {
   interface Window {
@@ -464,7 +465,8 @@ const getEditableLayer = (PAG: PAGNamespace, pagFile: PAGFile) => {
   let res: any[] = [];
   for (let i = 0; i < editableImageCount; i++) {
     const imageLayers = pagFile.getLayersByEditableIndex(i, LayerType.Image);
-    imageLayers.forEach((layer) => {
+    for (let j = 0; j < imageLayers.size(); j++) {
+      const layer = imageLayers.get(j) as PAGImageLayer;
       const uniqueID = layer.uniqueID();
       const layerType = layer.layerType();
       const layerName = layer.layerName();
@@ -476,7 +478,7 @@ const getEditableLayer = (PAG: PAGNamespace, pagFile: PAGFile) => {
       const localStartTime = layer.startTime();
       const startTime = layer.localTimeToGlobal(localStartTime);
       res.push({ uniqueID, layerType, layerName, alpha, visible, editableIndex, frameRate, startTime, duration });
-    });
+    }
   }
   return res;
 };

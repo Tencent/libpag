@@ -1,7 +1,6 @@
 import { PAGComposition } from './pag-composition';
 import { LayerType, Marker, Matrix, PAG, Rect, Vector } from './types';
 import { wasmAwaitRewind } from './utils/decorators';
-import { VectorArray, vectorBasics2array } from './utils/type-utils';
 
 @wasmAwaitRewind
 export class PAGLayer {
@@ -97,8 +96,8 @@ export class PAGLayer {
   /**
    * Returns the markers of this layer.
    */
-  public markers(): VectorArray<Marker> {
-    return vectorBasics2array(this.wasmIns._markers() as Vector<Marker>);
+  public markers(): Vector<Marker> {
+    return this.wasmIns._markers() as Vector<Marker>;
   }
   /**
    * Converts the time from the PAGLayer's (local) timeline to the PAGSurface (global) timeline. The
@@ -210,7 +209,7 @@ export class PAGLayer {
     return this.wasmIns._isPAGFile() as boolean;
   }
 
-  public isDelete():boolean {
+  public isDelete(): boolean {
     return this.wasmIns.isDelete();
   }
 

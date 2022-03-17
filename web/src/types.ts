@@ -395,7 +395,6 @@ export declare class PAGVideoRange {
 
 export declare class Vector<T> {
   public get: (index: number) => T;
-  public set: (index: number, value: T) => boolean;
   public push_back: (value: T) => void;
   public size: () => number;
   public delete: () => void;
