@@ -37,7 +37,7 @@
   echo $CMAKE_COMMAND
 
   if [[ $1 == "1" ]]; then
-    $CMAKE_COMMAND -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DCMAKE_BUILD_TYPE=Debug ../
+    $CMAKE_COMMAND -DCMAKE_CXX_FLAGS="-fprofile-arcs -ftest-coverage -g -O0" -DPAG_USE_SWIFTSHADER=ON -DCMAKE_BUILD_TYPE=Debug ../
   else
     $CMAKE_COMMAND -DCMAKE_BUILD_TYPE=Debug ../
   fi
