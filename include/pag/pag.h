@@ -63,9 +63,8 @@ class Content {
   friend class PAGTextLayer;
 };
 
-/**
- * A still image used to replace the image contents in a PAGFile.
- */
+class Image;
+
 class PAG_API PAGImage : public Content {
  public:
   /**
@@ -107,12 +106,12 @@ class PAG_API PAGImage : public Content {
   /**
    * Returns the width in pixels.
    */
-  int width();
+  virtual int width();
 
   /**
    * Returns the height in pixels.
    */
-  int height();
+  virtual int height();
 
   /**
    * Returns the current scale mode. The default value is PAGScaleMode::LetterBox.
@@ -137,7 +136,13 @@ class PAG_API PAGImage : public Content {
   void setMatrix(const Matrix& matrix);
 
  protected:
+  std::shared_ptr<std::mutex> rootLocker = nullptr;
+
   PAGImage();
+
+  virtual bool isMovie() const {
+    return false;
+  }
 
   virtual tgfx::Rect getContentSize() const = 0;
 
@@ -146,7 +151,6 @@ class PAG_API PAGImage : public Content {
   }
 
  private:
-  std::mutex locker = {};
   ID _uniqueID = 0;
   Matrix _matrix = Matrix::I();
   bool hasSetScaleMode = false;
@@ -165,11 +169,74 @@ class PAG_API PAGImage : public Content {
   friend class PAGImageHolder;
 };
 
+class AudioClip;
+
 class PAGComposition;
 
 class PAGImageLayer;
 
 class PAGStage;
+
+class PAG_API PAGMovie : public PAGImage {
+ public:
+  /**
+   * Creates a PAGMovie object from a PAGComposition object, returns null if the composition is
+   * null.
+   */
+  static std::shared_ptr<PAGMovie> FromComposition(std::shared_ptr<PAGComposition> composition);
+
+  /**
+   * Creates a PAGMovie object from a path of a video file, return null if the file does not exist
+   * or it's not a valid video file.
+   */
+  static std::shared_ptr<PAGMovie> FromVideoPath(const std::string& filePath);
+
+  /**
+   * Creates a PAGMovie object from a specified range of a video file, return null if the file does
+   * not exist or it's not a valid video file.
+   */
+  static std::shared_ptr<PAGMovie> FromVideoPath(const std::string& filePath, int64_t startTime,
+                                                 int64_t duration, float speed = 1.0f,
+                                                 int16_t trackID = 0);
+
+  /**
+   * Returns the duration of this movie in microseconds.
+   */
+  virtual int64_t duration() = 0;
+
+  /**
+   * Sets a volume ramp to apply during a specified time range.
+   */
+  virtual void setVolumeRamp(float fromStartVolume, float toEndVolume,
+                             const TimeRange& forTimeRange);
+
+ protected:
+  PAGImageLayer* layerOwner = nullptr;
+  bool isMovie() const override;
+
+  virtual bool isFile() const {
+    return false;
+  }
+
+  virtual bool setCurrentTime(int64_t time) = 0;
+  virtual bool excludedFromTimeline() const;
+  virtual void invalidateCacheScale();
+  virtual void updateRootLocker(std::shared_ptr<std::mutex> newLocker);
+  virtual void onAddToStage(PAGStage* pagStage);
+  virtual void onRemoveFromStage();
+  virtual int64_t durationInternal() = 0;
+  virtual std::vector<AudioClip> generateAudioClips() = 0;
+
+  friend class PAGImageLayer;
+
+  friend class FileMovie;
+
+  friend class PAGStage;
+
+  friend class RenderCache;
+
+  friend class AudioClip;
+};
 
 class PAG_API PAGFont {
  public:
@@ -225,6 +292,8 @@ class File;
 class Layer;
 
 class LayerCache;
+
+class CompositionMovie;
 
 class Content;
 
@@ -422,6 +491,7 @@ class PAG_API PAGLayer : public Content {
   std::weak_ptr<PAGLayer> weakThis;
   Matrix layerMatrix = {};
   float layerAlpha = 1.0f;
+  CompositionMovie* movieOwner = nullptr;
   PAGLayer* trackMatteOwner = nullptr;
 
   const Layer* getLayer() const;
@@ -502,6 +572,10 @@ class PAG_API PAGLayer : public Content {
   friend class FileReporter;
 
   friend class PAGImageLayer;
+
+  friend class PAGMovie;
+
+  friend class CompositionMovie;
 };
 
 class SolidLayer;
@@ -635,7 +709,7 @@ class PAG_API PAGShapeLayer : public PAGLayer {
 };
 
 /**
- * Represents a time range from the content of PAGImageLayer.
+ * [Deprecated](Please use PAGMovie class instead)
  */
 class PAG_API PAGVideoRange {
  public:
@@ -701,12 +775,13 @@ class PAG_API PAGImageLayer : public PAGLayer {
   ~PAGImageLayer() override;
 
   /**
-   * Returns the content duration in microseconds, which indicates the minimal length required for
-   * replacement.
+   * Returns the preferred duration of a PAGMovie object which is used as a image replacement for
+   * this layer.
    */
   int64_t contentDuration();
 
   /**
+   * [Deprecated](Please use PAGMovie class instead)
    * Returns the time ranges of the source video for replacement.
    */
   std::vector<PAGVideoRange> getVideoRanges() const;
@@ -719,28 +794,33 @@ class PAG_API PAGImageLayer : public PAGLayer {
   void replaceImage(std::shared_ptr<PAGImage> image);
 
   /**
-   * Converts the time from the PAGImageLayer's timeline to the replacement content's timeline. The
-   * time is in microseconds.
+   * Converts the time from the PAGImageLayer's timeline to the PAGMovie's timeline. The time is in
+   * microseconds.
    */
-  int64_t layerTimeToContent(int64_t layerTime);
+  int64_t layerTimeToMovie(int64_t localTime);
 
   /**
-   * Converts the time from the replacement content's timeline to the PAGLayer's timeline. The time
-   * is in microseconds.
+   * Converts the time from the PAGMovie's timeline to the PAGLayer's timeline. The time is in
+   * microseconds.
    */
-  int64_t contentTimeToLayer(int64_t contentTime);
+  int64_t movieTimeToLayer(int64_t movieTime);
 
  protected:
+  bool gotoTime(int64_t layerTime) override;
   void replaceImageInternal(std::shared_ptr<PAGImage> image);
-  int64_t getCurrentContentTime(int64_t layerTime);
-  Property<float>* getContentTimeRemap();
+  int64_t getCurrentMovieTime(int64_t layerTime);
+  Property<float>* getMovieTimeRemap();
   bool contentVisible();
   Content* getContent() override;
   bool contentModified() const override;
   bool cacheFilters() const override;
+  void invalidateCacheScale() override;
   void onAddToRootFile(PAGFile* pagFile) override;
   void onRemoveFromRootFile() override;
   void onTimelineChanged() override;
+  void onAddToStage(PAGStage* pagStage) override;
+  void onRemoveFromStage() override;
+  void updateRootLocker(std::shared_ptr<std::mutex> locker) override;
   int64_t localFrameToFileFrame(int64_t localFrame) const;
   int64_t fileFrameToLocalFrame(int64_t fileFrame) const;
 
@@ -748,19 +828,22 @@ class PAG_API PAGImageLayer : public PAGLayer {
   ImageLayer* emptyImageLayer = nullptr;
   ImageReplacement* replacement = nullptr;
   std::shared_ptr<PAGImageHolder> imageHolder = nullptr;
-  std::unique_ptr<Property<float>> contentTimeRemap;
+  std::unique_ptr<Property<float>> movieTimeRemap;
 
   PAGImageLayer(int width, int height, int64_t duration);
   bool hasPAGImage() const;
   std::shared_ptr<PAGImage> getPAGImage() const;
+  std::shared_ptr<PAGMovie> getPAGMovie(bool own = true) const;
   std::unique_ptr<AnimatableProperty<float>> copyContentTimeRemap();
   TimeRange getVisibleRangeInFile();
-  static void BuildContentTimeRemap(AnimatableProperty<float>* property, PAGFile* fileOwner,
-                                    const TimeRange& visibleRange, double frameScale);
+  static void BuildMovieTimeRemap(AnimatableProperty<float>* property, PAGFile* fileOwner,
+                                  const TimeRange& visibleRange, double frameScale);
   static void ExpandPropertyByRepeat(AnimatableProperty<float>* property, PAGFile* fileOwner,
                                      Frame contentDuration);
   static Frame ScaleTimeRemap(AnimatableProperty<float>* property, const TimeRange& visibleRange,
                               double frameScale, Frame fileEndFrame);
+  void removeMovie(std::shared_ptr<PAGMovie> movie);
+  void replaceMovie(std::shared_ptr<PAGMovie> movie);
   Frame getFrameFromTimeRemap(Frame value);
   void measureBounds(tgfx::Rect* bounds) override;
 
@@ -769,6 +852,8 @@ class PAG_API PAGImageLayer : public PAGLayer {
   friend class PAGStage;
 
   friend class PAGFile;
+
+  friend class AudioClip;
 };
 
 class PreComposeLayer;
@@ -964,6 +1049,10 @@ class PAG_API PAGComposition : public PAGLayer {
   friend class PAGImageLayer;
 
   friend class FileReporter;
+
+  friend class CompositionMovie;
+
+  friend class AudioClip;
 };
 
 class PAG_API PAGFile : public PAGComposition {
@@ -1024,9 +1113,8 @@ class PAG_API PAGFile : public PAGComposition {
   void replaceText(int editableTextIndex, std::shared_ptr<TextDocument> textData);
 
   /**
-   * Replace the image content of the specified index with a PAGImage object. The index ranges from
-   * 0 to PAGFile.numImages - 1. Passing in null for the image parameter will reset it to default
-   * image content.
+   * Replace the image data of the specified index. The index ranges from 0 to PAGFile.numImages
+   * - 1. Passing in null for the image parameter will reset it to default image data.
    */
   void replaceImage(int editableImageIndex, std::shared_ptr<PAGImage> image);
 
@@ -1091,6 +1179,8 @@ class PAG_API PAGFile : public PAGComposition {
   friend class PAGImageLayer;
 
   friend class LayerRenderer;
+
+  friend class AudioClip;
 };
 
 class Composition;

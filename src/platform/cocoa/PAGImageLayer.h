@@ -23,14 +23,16 @@
 @class PAGImage;
 @class PAGVideoRange;
 
-__attribute__((visibility("default"))) @interface PAGImageLayer : PAGLayer
+__attribute__((visibility("default")))
+@interface PAGImageLayer : PAGLayer
 /**
  * Make a PAGImageLayer with size and duration(in microseconds).
  */
 + (instancetype)Make:(CGSize)size duration:(int64_t)duration;
 
 /**
- * Returns the time ranges of the source video for replacement.
+ * [Deprecated](Please use PAGMovie class instead) Returns the time ranges of the source video for
+ * replacement.
  */
 - (NSArray<PAGVideoRange*>*)getVideoRanges;
 
@@ -43,8 +45,8 @@ __attribute__((visibility("default"))) @interface PAGImageLayer : PAGLayer
 - (void)replaceImage:(PAGImage*)image;
 
 /**
- * Returns the content duration in microseconds, which indicates the minimal length required for
- * replacement.
+ * Returns the preferred duration of a PAGMovie object which is used as a image replacement for this
+ * layer.
  */
 - (int64_t)contentDuration;
 

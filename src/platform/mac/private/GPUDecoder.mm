@@ -18,11 +18,13 @@
 
 #include "GPUDecoder.h"
 #include "VideoImage.h"
+#include "h264_sps_parser.h"
+#include "hevc_vps_parser.h"
 
 #define DEFAULT_MAX_NUM_REORDER 4
 
 namespace pag {
-GPUDecoder::GPUDecoder(const VideoConfig& config) : colorSpace(config.colorSpace) {
+GPUDecoder::GPUDecoder(const VideoConfig& config) : colorSpace(config.colorSpace)  {
   isInitialized = initVideoToolBox(config.headers, config.mimeType);
 }
 
@@ -75,6 +77,22 @@ void DidDecompress(void*, void* sourceFrameRefCon, OSStatus status, VTDecodeInfo
   }
 }
 
+size_t ResetMaxNumReorder(const std::vector<std::shared_ptr<ByteData>>& headers,
+                          const std::string& mimeType) {
+  int maxNumReorder = 0;
+  if (mimeType == "video/hevc") {
+    uint8_t* vps = headers[0]->data() + 4;
+    size_t vpsSize = headers[0]->length() - 4;
+    maxNumReorder = hevc_get_max_num_reorder(vps, vpsSize);
+  } else {
+    uint8_t* sps = headers[0]->data() + 4;
+    size_t spsSize = headers[0]->length() - 4;
+    maxNumReorder = h264_get_max_num_reorder(sps, spsSize);
+  }
+  maxNumReorder = maxNumReorder < 0 ? DEFAULT_MAX_NUM_REORDER : maxNumReorder;
+  return static_cast<size_t>(maxNumReorder);
+}
+
 void initParameterSets(const std::vector<std::shared_ptr<ByteData>>& headers,
                        uint8_t** parameterSetPointers, size_t* parameterSetSizes) {
   int index = 0;
@@ -119,7 +137,7 @@ bool GPUDecoder::initVideoToolBox(const std::vector<std::shared_ptr<ByteData>>& 
         return false;
       }
     }
-    maxNumReorder = DEFAULT_MAX_NUM_REORDER;
+    maxNumReorder = ResetMaxNumReorder(headers, mimeType);
 
     return resetVideoToolBox();
   }
@@ -167,20 +185,12 @@ bool GPUDecoder::resetVideoToolBox() {
   CFRelease(openGLCompatibilityValue);
   CFRelease(ioSurfaceParam);
 
-  if (colorSpace == tgfx::YUVColorSpace::Rec2020) {
-    CFMutableDictionaryRef pixelTransferProperties = CFDictionaryCreateMutable(
-        kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-    CFDictionarySetValue(pixelTransferProperties,
-                         kVTPixelTransferPropertyKey_DestinationColorPrimaries,
-                         kCVImageBufferColorPrimaries_ITU_R_709_2);
-    CFDictionarySetValue(pixelTransferProperties,
-                         kVTPixelTransferPropertyKey_DestinationTransferFunction,
-                         kCVImageBufferTransferFunction_ITU_R_709_2);
-    CFDictionarySetValue(pixelTransferProperties,
-                         kVTPixelTransferPropertyKey_DestinationYCbCrMatrix,
-                         kCVImageBufferYCbCrMatrix_ITU_R_709_2);
-    VTSessionSetProperty(session, kVTDecompressionPropertyKey_PixelTransferProperties,
-                         pixelTransferProperties);
+  if (colorSpace == YUVColorSpace::Rec2020) {
+    CFMutableDictionaryRef pixelTransferProperties = CFDictionaryCreateMutable(kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    CFDictionarySetValue(pixelTransferProperties, kVTPixelTransferPropertyKey_DestinationColorPrimaries, kCVImageBufferColorPrimaries_ITU_R_709_2);
+    CFDictionarySetValue(pixelTransferProperties, kVTPixelTransferPropertyKey_DestinationTransferFunction, kCVImageBufferTransferFunction_ITU_R_709_2);
+    CFDictionarySetValue(pixelTransferProperties, kVTPixelTransferPropertyKey_DestinationYCbCrMatrix, kCVImageBufferYCbCrMatrix_ITU_R_709_2);
+    VTSessionSetProperty(session, kVTDecompressionPropertyKey_PixelTransferProperties, pixelTransferProperties);
     CFRelease(pixelTransferProperties);
   }
 

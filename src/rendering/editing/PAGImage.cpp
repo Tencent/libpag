@@ -21,9 +21,11 @@
 #include "pag/pag.h"
 #include "rendering/graphics/Recorder.h"
 #include "rendering/utils/ApplyScaleMode.h"
+#include "rendering/utils/LockGuard.h"
 
 namespace pag {
 PAGImage::PAGImage() : _uniqueID(UniqueID::Next()) {
+  rootLocker = std::make_shared<std::mutex>();
 }
 
 ID PAGImage::uniqueID() const {
@@ -39,24 +41,24 @@ int PAGImage::height() {
 }
 
 int PAGImage::scaleMode() {
-  std::lock_guard<std::mutex> autoLock(locker);
+  LockGuard autoLock(rootLocker);
   return _scaleMode;
 }
 
 void PAGImage::setScaleMode(int mode) {
-  std::lock_guard<std::mutex> autoLock(locker);
+  LockGuard autoLock(rootLocker);
   _scaleMode = mode;
   _matrix.setIdentity();
   hasSetScaleMode = true;
 }
 
 Matrix PAGImage::matrix() {
-  std::lock_guard<std::mutex> autoLock(locker);
+  LockGuard autoLock(rootLocker);
   return _matrix;
 }
 
 void PAGImage::setMatrix(const Matrix& matrix) {
-  std::lock_guard<std::mutex> autoLock(locker);
+  LockGuard autoLock(rootLocker);
   _scaleMode = PAGScaleMode::None;
   _matrix = matrix;
   hasSetScaleMode = true;

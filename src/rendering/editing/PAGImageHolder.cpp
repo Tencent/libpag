@@ -19,6 +19,32 @@
 #include "PAGImageHolder.h"
 
 namespace pag {
+bool PAGImageHolder::hasMovie(int editableIndex) const {
+  auto result = imageMap.find(editableIndex);
+  if (result != imageMap.end()) {
+    return result->second->isMovie();
+  }
+  return false;
+}
+
+std::shared_ptr<PAGMovie> PAGImageHolder::getMovie(int editableIndex) const {
+  auto result = imageMap.find(editableIndex);
+  if (result != imageMap.end() && result->second->isMovie()) {
+    return std::static_pointer_cast<PAGMovie>(result->second);
+  }
+  return nullptr;
+}
+
+std::vector<PAGMovie*> PAGImageHolder::getMovies() const {
+  std::vector<PAGMovie*> movies = {};
+  for (auto& item : imageMap) {
+    if (item.second->isMovie()) {
+      movies.push_back(static_cast<PAGMovie*>(item.second.get()));
+    }
+  }
+  return movies;
+}
+
 bool PAGImageHolder::hasImage(int editableIndex) const {
   return imageMap.count(editableIndex) > 0;
 }

@@ -145,7 +145,8 @@ void PAGFile::replaceText(int editableTextIndex, std::shared_ptr<TextDocument> t
 }
 
 void PAGFile::replaceImage(int editableImageIndex, std::shared_ptr<PAGImage> image) {
-  LockGuard autoLock(rootLocker);
+  auto locker = image ? image->rootLocker : nullptr;
+  ScopedLock autoLock(rootLocker, locker);
   auto imageLayers = getLayersByEditableIndexInternal(editableImageIndex, LayerType::Image);
   if (!imageLayers.empty()) {
     std::static_pointer_cast<PAGImageLayer>(imageLayers[0])->replaceImageInternal(image);

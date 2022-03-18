@@ -26,6 +26,12 @@
 #include "rendering/caches/LayerCache.h"
 #include "rendering/renderers/FilterRenderer.h"
 
+#ifdef FILE_MOVIE
+
+#include "rendering/readers/MovieReader.h"
+
+#endif
+
 namespace pag {
 // 300M设置的大一些用于兜底，通常在大于20M时就开始随时清理。
 #define MAX_GRAPHICS_MEMORY 314572800
@@ -123,7 +129,7 @@ void RenderCache::preparePreComposeLayer(PreComposeLayer* layer, DecodingPolicy 
   }
 }
 
-void RenderCache::prepareImageLayer(PAGImageLayer* pagLayer) {
+void RenderCache::prepareImageLayer(PAGImageLayer* pagLayer, DecodingPolicy policy) {
   auto pagImage = static_cast<PAGImageLayer*>(pagLayer)->getPAGImage();
   if (pagImage == nullptr) {
     auto imageBytes = static_cast<ImageLayer*>(pagLayer->layer)->imageBytes;
@@ -133,9 +139,28 @@ void RenderCache::prepareImageLayer(PAGImageLayer* pagLayer) {
     }
     return;
   }
-  auto image = pagImage->getImage();
-  if (image) {
-    prepareImage(pagImage->uniqueID(), image);
+  if (pagImage->isMovie()) {
+#ifdef FILE_MOVIE
+    auto movie = static_cast<PAGMovie*>(pagImage.get());
+    if (movie->isFile()) {
+      auto fileMovie = static_cast<FileMovie*>(movie);
+      auto prepared = prepareMovieReader(fileMovie->uniqueID(), fileMovie->getInfo(),
+                                         fileMovie->startTime, policy);
+      if (!prepared) {
+        auto result = movieCaches.find(fileMovie->uniqueID());
+        if (result != movieCaches.end()) {
+          result->second->prepareAsync(fileMovie->startTime);
+        }
+      }
+    }
+#else
+    USE(policy);
+#endif
+  } else {
+    auto image = pagImage->getImage();
+    if (image) {
+      prepareImage(pagImage->uniqueID(), image);
+    }
   }
 }
 
@@ -168,13 +193,14 @@ void RenderCache::prepareFrame() {
   resetPerformance();
   auto layerDistances = stage->findNearlyVisibleLayersIn(DECODING_VISIBLE_DISTANCE);
   for (auto& item : layerDistances) {
+    auto policy = SoftwareToHardwareEnabled() && item.first < MIN_HARDWARE_PREPARE_TIME
+                      ? DecodingPolicy::SoftwareToHardware
+                      : DecodingPolicy::Hardware;
     for (auto pagLayer : item.second) {
       if (pagLayer->layerType() == LayerType::PreCompose) {
-        auto policy = item.first < MIN_HARDWARE_PREPARE_TIME ? DecodingPolicy::SoftwareToHardware
-                                                             : DecodingPolicy::Hardware;
         preparePreComposeLayer(static_cast<PreComposeLayer*>(pagLayer->layer), policy);
       } else if (pagLayer->layerType() == LayerType::Image) {
-        prepareImageLayer(static_cast<PAGImageLayer*>(pagLayer));
+        prepareImageLayer(static_cast<PAGImageLayer*>(pagLayer), policy);
       }
     }
   }
@@ -199,6 +225,9 @@ void RenderCache::attachToContext(tgfx::Context* current, bool forHitTest) {
     clearSequenceCache(assetID);
     clearFilterCache(assetID);
     removeTextAtlas(assetID);
+#ifdef FILE_MOVIE
+    clearMovieCache(assetID);
+#endif
   }
 }
 
@@ -207,6 +236,9 @@ void RenderCache::releaseAll() {
   clearAllTextAtlas();
   graphicsMemory = 0;
   clearAllSequenceCaches();
+#ifdef FILE_MOVIE
+  clearAllMovieCaches();
+#endif
   for (auto& item : filterCaches) {
     delete item.second;
   }
@@ -222,6 +254,9 @@ void RenderCache::detachFromContext() {
     return;
   }
   clearExpiredSequences();
+#ifdef FILE_MOVIE
+  clearExpiredMovieCaches();
+#endif
   clearExpiredBitmaps();
   clearExpiredSnapshots();
   auto currentTimestamp = GetTimer();
@@ -564,6 +599,65 @@ void RenderCache::clearFilterCache(ID uniqueID) {
     filterCaches.erase(result);
   }
 }
+
+#ifdef FILE_MOVIE
+
+bool RenderCache::prepareMovieReader(ID movieID, MovieInfo* movieInfo, int64_t targetTime,
+                                     DecodingPolicy policy) {
+  usedAssets.insert(movieID);
+  if (movieCaches.count(movieID) != 0) {
+    return false;
+  }
+  auto reader = std::make_shared<MovieReader>(movieInfo, policy);
+  movieCaches[movieID] = reader;
+  reader->prepareAsync(targetTime);
+  return true;
+}
+
+std::shared_ptr<MovieReader> RenderCache::getMovieReader(ID movieID, MovieInfo* movieInfo) {
+  if (movieInfo == nullptr) {
+    return nullptr;
+  }
+  usedAssets.insert(movieID);
+  std::shared_ptr<MovieReader> reader = nullptr;
+  auto result = movieCaches.find(movieID);
+  if (result != movieCaches.end()) {
+    reader = result->second;
+  } else {
+    reader = std::make_shared<MovieReader>(movieInfo, DecodingPolicy::Hardware);
+    movieCaches[movieID] = reader;
+  }
+  return reader;
+}
+
+void RenderCache::clearAllMovieCaches() {
+  for (auto& item : movieCaches) {
+    removeSnapshot(item.first);
+  }
+  movieCaches.clear();
+}
+
+void RenderCache::clearMovieCache(ID movieID) {
+  auto result = movieCaches.find(movieID);
+  if (result != movieCaches.end()) {
+    removeSnapshot(result->first);
+    movieCaches.erase(result);
+  }
+}
+
+void RenderCache::clearExpiredMovieCaches() {
+  std::vector<ID> expiredMovies = {};
+  for (auto& item : movieCaches) {
+    if (usedAssets.count(item.first) == 0) {
+      expiredMovies.push_back(item.first);
+    }
+  }
+  for (auto& id : expiredMovies) {
+    clearMovieCache(id);
+  }
+}
+
+#endif
 
 void RenderCache::recordImageDecodingTime(int64_t decodingTime) {
   imageDecodingTime += decodingTime;

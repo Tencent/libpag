@@ -1,0 +1,79 @@
+#-----------------------------
+#填写说明
+ #  1.列出所有未符合可信源制品的列表
+ #  2.针对未符合可信源的解释说明：是指那些自己产品级可信源中没有保存的制品信息
+ #  3.若项目不存在未符合可信源制品，则该文件可为空
+ #  4.每个未符合可信源的制品需罗列其文件名以及基本信息
+ #      对应制品基本信息包括：
+ #         功能介绍（Functional_description）：简单介绍该制品在项目产品中的作用
+ #         使用人（User）：该制品引入项目的引入者rtx英文名
+ #         负责人（Principal）：该制品维护或更新负责人，可以跟使用者是同一个人
+ #         维护团队（Maintenance_teams）：该制品由哪个团队或组织进行维护和更新，一般指该制品的制作方
+ #         更新方式（Update_mode）：说明该制品在项目中是如何更新的。比如：手动更新sdk或通过pod或maven或一定的自动化流程进行更新
+ #         未能转化为可信源原因（Reason）：说明未能进行可信源转化的原因
+
+#-----------------------------
+# swiftshader
+- filename: libEGL.dylib
+  Functional_description: cpu渲染框架
+  User: kevingpqi
+  Maintenance_teams: 光流内核
+  Update_mode: 手动更新提交至代码库
+  Reason: 项目暂无计划
+- filename: libGLESv2.dylib
+  Functional_description: cpu渲染框架
+  User: kevingpqi
+  Maintenance_teams: 光流内核
+  Update_mode: 手动更新提交至代码库
+  Reason: 项目暂无计划
+- filename: libEGL.so
+  Functional_description: cpu渲染框架
+  User: kevingpqi
+  Maintenance_teams: 光流内核
+  Update_mode: 手动更新提交至代码库
+  Reason: 项目暂无计划
+- filename: libGLESv2.so
+  Functional_description: cpu渲染框架
+  User: kevingpqi
+  Maintenance_teams: 光流内核
+  Update_mode: 手动更新提交至代码库
+  Reason: 项目暂无计划
+# ffmpeg
+- filename: libavcodec.a
+  Functional_description: 视频软解码
+  User: kevingpqi
+  Maintenance_teams: 光流内核
+  Update_mode: 手动更新提交至代码库
+  Reason: 项目暂无计划
+- filename: libavutil.a
+  Functional_description: 视频软解码
+  User: kevingpqi
+  Maintenance_teams: 光流内核
+  Update_mode: 手动更新提交至代码库
+  Reason: 项目暂无计划
+- filename: libavcodec.a
+  Functional_description: 视频软解码
+  User: kevingpqi
+  Maintenance_teams: 光流内核
+  Update_mode: 手动更新提交至代码库
+  Reason: 项目暂无计划
+- filename: libswscale.a
+  Functional_description: 视频软解码
+  User: kevingpqi
+  Maintenance_teams: 光流内核
+  Update_mode: 手动更新提交至代码库
+  Reason: 项目暂无计划
+# freetype
+- filename: libfreetype.a
+  Functional_description: 字体渲染到纹理
+  User: kevingpqi
+  Maintenance_teams: 光流内核
+  Update_mode: 手动更新提交至代码库
+  Reason: 项目暂无计划
+# rttr
+- filename: librttr_core_s.a
+  Functional_description: C++数据结构属性反射
+  User: ichenzhang
+  Maintenance_teams: 光流内核
+  Update_mode: 手动更新提交至代码库
+  Reason: 项目暂无计划

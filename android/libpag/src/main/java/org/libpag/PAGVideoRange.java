@@ -1,8 +1,9 @@
 package org.libpag;
 
 /**
- * Represents a time range from the content of PAGImageLayer.
+ * [Deprecated](Please use PAGMovie class instead)
  */
+@Deprecated
 public class PAGVideoRange {
     /**
      * The start time of the source video, in microseconds.

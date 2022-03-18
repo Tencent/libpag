@@ -22,6 +22,7 @@
 #include "pag/pag.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/caches/RenderCache.h"
+#include "rendering/editing/CompositionMovie.h"
 #include "rendering/layers/PAGStage.h"
 #include "rendering/renderers/TrackMatteRenderer.h"
 #include "rendering/utils/LockGuard.h"
@@ -214,6 +215,9 @@ PAGLayer* PAGLayer::getTimelineOwner() const {
   if (trackMatteOwner) {
     return trackMatteOwner->_parent;
   }
+  if (movieOwner) {
+    return movieOwner->layerOwner;
+  }
   return nullptr;
 }
 
@@ -404,6 +408,9 @@ PAGLayer* PAGLayer::getParentOrOwner() const {
   if (trackMatteOwner) {
     return trackMatteOwner;
   }
+  if (movieOwner) {
+    return movieOwner->layerOwner;
+  }
   return nullptr;
 }
 
@@ -519,6 +526,11 @@ void PAGLayer::removeFromParentOrOwner() {
     detachFromTree();
     trackMatteOwner->_trackMatteLayer = nullptr;
     trackMatteOwner = nullptr;
+  }
+  if (movieOwner) {
+    detachFromTree();
+    movieOwner->composition = nullptr;
+    movieOwner = nullptr;
   }
 }
 

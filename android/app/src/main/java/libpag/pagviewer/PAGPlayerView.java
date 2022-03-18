@@ -19,6 +19,7 @@ import android.widget.RelativeLayout;
 import org.libpag.PAGComposition;
 import org.libpag.PAGFile;
 import org.libpag.PAGImage;
+import org.libpag.PAGMovie;
 import org.libpag.PAGText;
 import org.libpag.PAGView;
 import org.libpag.VideoDecoder;
@@ -63,9 +64,10 @@ public class PAGPlayerView {
                 pagFile.replaceText(0, pagText);
             }
             if (pagFile.numImages() > 0) {
-                PAGImage pagImage = PAGImage.FromAssets(context.getAssets(), "rotation.jpg");
+//                PAGImage pagImage = PAGImage.FromAssets(context.getAssets(), "rotation.jpg");
 //                PAGImage pagImage = makePAGImage(context, "mountain.jpg");
-                pagFile.replaceImage(0, pagImage);
+                PAGMovie pagMovie = PAGMovie.FromVideoPath("/sdcard/mvtest.mp4");
+                pagFile.replaceImage(0, pagMovie);
             }
             mPagView.setComposition(pagFile);
         }

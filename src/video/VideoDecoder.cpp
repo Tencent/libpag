@@ -19,6 +19,7 @@
 #include "VideoDecoder.h"
 #include <atomic>
 #include <mutex>
+#include "FFmpegDecoder.h"
 #include "SoftAVCDecoder.h"
 #include "SoftwareDecoderWrapper.h"
 #include "pag/pag.h"
@@ -51,7 +52,7 @@ int VideoDecoder::GetMaxHardwareDecoderCount() {
 }
 
 bool VideoDecoder::HasSoftwareDecoder() {
-#ifdef PAG_USE_LIBAVC
+#if defined(PAG_USE_LIBAVC) || defined(FFMPEG)
   return true;
 #else
   return softwareDecoderFactory != nullptr;
@@ -59,7 +60,11 @@ bool VideoDecoder::HasSoftwareDecoder() {
 }
 
 bool VideoDecoder::HasExternalSoftwareDecoder() {
+#ifdef FFMPEG
+  return true;
+#else
   return softwareDecoderFactory != nullptr;
+#endif
 }
 
 bool VideoDecoder::SoftwareToHardwareEnabled() {
@@ -90,6 +95,17 @@ std::unique_ptr<VideoDecoder> VideoDecoder::CreateSoftwareDecoder(const VideoCon
   if (factory != nullptr) {
     videoDecoder = SoftwareDecoderWrapper::Wrap(factory->createSoftwareDecoder(), config);
   }
+
+#ifdef FFMPEG
+  if (videoDecoder == nullptr) {
+    auto decoder = new FFmpegDecoder();
+    if (decoder->onConfigure(config)) {
+      videoDecoder = std::unique_ptr<VideoDecoder>(decoder);
+    } else {
+      delete decoder;
+    }
+  }
+#endif
 
 #ifdef PAG_USE_LIBAVC
   if (videoDecoder == nullptr) {

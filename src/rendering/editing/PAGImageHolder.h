@@ -24,6 +24,12 @@
 namespace pag {
 class PAGImageHolder {
  public:
+  bool hasMovie(int editableIndex) const;
+
+  std::shared_ptr<PAGMovie> getMovie(int editableIndex) const;
+
+  std::vector<PAGMovie*> getMovies() const;
+
   bool hasImage(int editableIndex) const;
 
   std::shared_ptr<PAGImage> getImage(int editableIndex) const;

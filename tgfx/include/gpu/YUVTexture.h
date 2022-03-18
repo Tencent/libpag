@@ -31,8 +31,8 @@ class YUVTexture : public Texture {
   /**
    * Creates a new YUV texture from I420 buffers.
    */
-  static std::shared_ptr<YUVTexture> MakeI420(Context* context, YUVColorSpace colorSpace,
-                                              YUVColorRange colorRange, int width, int height,
+  static std::shared_ptr<YUVTexture> MakeI420(Context* context, tgfx::YUVColorSpace colorSpace,
+                                              tgfx::YUVColorRange colorRange, int width, int height,
                                               uint8_t* pixelsPlane[3], const int lineSize[3]);
 
   /**

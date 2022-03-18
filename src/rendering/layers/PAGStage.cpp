@@ -22,6 +22,7 @@
 #include "base/utils/TimeUtil.h"
 #include "rendering/caches/ImageContentCache.h"
 #include "rendering/caches/LayerCache.h"
+#include "rendering/editing/CompositionMovie.h"
 #include "rendering/editing/ImageReplacement.h"
 #include "rendering/editing/PAGImageHolder.h"
 #include "rendering/readers/SequenceReader.h"
@@ -237,15 +238,25 @@ std::map<int64_t, std::vector<PAGLayer*>> PAGStage::findNearlyVisibleLayersIn(
 }
 
 void PAGStage::updateLayerStartTime(PAGLayer* pagLayer) {
-  if (pagLayer->layerType() == LayerType::PreCompose) {
-    updateChildLayerStartTime(static_cast<PAGComposition*>(pagLayer));
-    auto composition = static_cast<PreComposeLayer*>(pagLayer->layer)->composition;
-    if (composition->type() != CompositionType::Video &&
-        composition->type() != CompositionType::Bitmap) {
+  switch (pagLayer->layerType()) {
+    case LayerType::PreCompose: {
+      updateChildLayerStartTime(static_cast<PAGComposition*>(pagLayer));
+      auto composition = static_cast<PreComposeLayer*>(pagLayer->layer)->composition;
+      if (composition->type() != CompositionType::Video &&
+          composition->type() != CompositionType::Bitmap) {
+        return;
+      }
+    } break;
+    case LayerType::Image: {
+      auto movie = static_cast<PAGImageLayer*>(pagLayer)->getPAGMovie();
+      if (movie && !movie->isFile()) {
+        auto pagComposition = static_cast<CompositionMovie*>(movie.get())->composition;
+        updateChildLayerStartTime(pagComposition.get());
+        return;
+      }
+    } break;
+    default:
       return;
-    }
-  } else if (pagLayer->layerType() != LayerType::Image) {
-    return;
   }
   auto frame = pagLayer->localFrameToGlobal(pagLayer->startFrame);
   layerStartTimeMap[pagLayer] = FrameToTime(frame, frameRateInternal());
@@ -360,6 +371,12 @@ float PAGStage::getLayerScaleFactor(PAGLayer* pagLayer, tgfx::Point scale) {
       parent = parent->_parent;
     } else if (parent->trackMatteOwner) {
       parent = parent->trackMatteOwner->_parent;
+    } else if (parent->movieOwner) {
+      // 遇到了 Movie，无法再单链条向上遍历。
+      auto movieScale = getMaxScaleFactor(parent->movieOwner->uniqueID());
+      scale.x *= movieScale;
+      scale.y *= movieScale;
+      break;
     } else {
       break;
     }

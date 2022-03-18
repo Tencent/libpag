@@ -19,9 +19,10 @@
 #import <Foundation/Foundation.h>
 
 /**
- * Represents a time range from the content of PAGImageLayer.
+ * [Deprecated](Please use PAGMovie class instead)
  */
-__attribute__((visibility("default"))) @interface PAGVideoRange : NSObject
+__attribute__((visibility("default")))
+@interface PAGVideoRange : NSObject
 
 /**
  * The start time of the source video, in microseconds.

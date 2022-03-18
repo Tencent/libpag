@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FileReporter.h"
+#include "platform/ReportData.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/layers/PAGStage.h"
 
@@ -103,6 +104,7 @@ void FileReporter::reportData() {
   reportInfos.insert(std::make_pair("event", "pag_monitor"));
   reportInfos.insert(std::make_pair("version", PAG::SDKVersion()));
   reportInfos.insert(std::make_pair("usability", "1"));
+  OnReportData(reportInfos);
 }
 
 static int64_t GetOldRenderTime(RenderCache* cache) {

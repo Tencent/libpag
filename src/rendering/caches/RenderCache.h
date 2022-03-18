@@ -37,6 +37,16 @@
 #include "video/DecodingPolicy.h"
 
 namespace pag {
+#ifdef FILE_MOVIE
+
+class MovieReader;
+
+class MovieInfo;
+
+class FileMovie;
+
+#endif
+
 class RenderCache : public Performance {
  public:
   explicit RenderCache(PAGStage* stage);
@@ -125,6 +135,13 @@ class RenderCache : public Performance {
 
   std::shared_ptr<SequenceReader> getSequenceReader(Sequence* sequence);
 
+#ifdef FILE_MOVIE
+  bool prepareMovieReader(ID movieID, MovieInfo* movieInfo, int64_t targetTime,
+                          DecodingPolicy policy);
+
+  std::shared_ptr<MovieReader> getMovieReader(ID movieID, MovieInfo* movieInfo);
+#endif
+
   LayerFilter* getFilterCache(LayerStyle* layerStyle);
 
   LayerFilter* getFilterCache(Effect* effect);
@@ -183,6 +200,14 @@ class RenderCache : public Performance {
   TextAtlas* getTextAtlas(ID assetID) const;
 
   void preparePreComposeLayer(PreComposeLayer* layer, DecodingPolicy policy);
-  void prepareImageLayer(PAGImageLayer* layer);
+  void prepareImageLayer(PAGImageLayer* layer, DecodingPolicy policy);
+
+#ifdef FILE_MOVIE
+  std::unordered_map<ID, std::shared_ptr<MovieReader>> movieCaches;
+
+  void clearAllMovieCaches();
+  void clearMovieCache(ID movieID);
+  void clearExpiredMovieCaches();
+#endif
 };
 }  // namespace pag

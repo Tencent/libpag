@@ -16,11 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "ffmpeg/FFmpegDecoder.h"
+#include "ffmpeg/FFmpegDecoderSendHeader.h"
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
 #include "pag/pag.h"
 #include "platform/swiftshader/NativePlatform.h"
 #include "rendering/caches/RenderCache.h"
+#include "video/VideoDecoder.h"
 
 namespace pag {
 
@@ -44,6 +47,58 @@ void pagSequenceTest() {
  */
 PAG_TEST_F(PAGSequenceTest, RenderOnScreen) {
   pagSequenceTest();
+}
+
+/**
+ * 用例描述: 测试直接上屏-外部注入软解
+ */
+PAG_TEST_F(PAGSequenceTest, RenderOnScreen_SendHeader_ID862231499) {
+  auto oldFactory = VideoDecoder::GetExternalSoftwareDecoderFactory();
+  pagTestSendHeader::FFmpegDecoderFactory decoderFactory = {};
+  PAGVideoDecoder::RegisterSoftwareDecoderFactory(&decoderFactory);
+  pagSequenceTest();
+  PAGVideoDecoder::RegisterSoftwareDecoderFactory(oldFactory);
+}
+
+/**
+ * 用例描述: 测试直接上屏-外部注入软解
+ */
+PAG_TEST_F(PAGSequenceTest, RenderOnScreen_SendHeader_AVCC_ID862231499) {
+  auto platform = static_cast<const NativePlatform*>(Platform::Current());
+  auto oldNALUType = platform->naluType();
+  platform->setNALUType(NALUType::AVCC);
+  auto oldFactory = VideoDecoder::GetExternalSoftwareDecoderFactory();
+  pagTestSendHeader::FFmpegDecoderFactory decoderFactory = {};
+  PAGVideoDecoder::RegisterSoftwareDecoderFactory(&decoderFactory);
+  pagSequenceTest();
+  PAGVideoDecoder::RegisterSoftwareDecoderFactory(oldFactory);
+  platform->setNALUType(oldNALUType);
+}
+
+/**
+ * 用例描述: 测试直接上屏-外部注入软解
+ */
+PAG_TEST_F(PAGSequenceTest, RenderOnScreen_CodecContext_ID862231499) {
+  auto oldFactory = VideoDecoder::GetExternalSoftwareDecoderFactory();
+  pagTest::FFmpegDecoderFactory decoderFactory = {};
+  PAGVideoDecoder::RegisterSoftwareDecoderFactory(&decoderFactory);
+  pagSequenceTest();
+  PAGVideoDecoder::RegisterSoftwareDecoderFactory(oldFactory);
+}
+
+/**
+ * 用例描述: 测试直接上屏-外部注入软解
+ */
+PAG_TEST_F(PAGSequenceTest, RenderOnScreen_CodecContext_AVCC_ID862231499) {
+  auto platform = static_cast<const NativePlatform*>(Platform::Current());
+  auto oldFactory = VideoDecoder::GetExternalSoftwareDecoderFactory();
+  auto oldNALUType = platform->naluType();
+  platform->setNALUType(NALUType::AVCC);
+  pagTest::FFmpegDecoderFactory decoderFactory = {};
+  PAGVideoDecoder::RegisterSoftwareDecoderFactory(&decoderFactory);
+  pagSequenceTest();
+  PAGVideoDecoder::RegisterSoftwareDecoderFactory(oldFactory);
+  platform->setNALUType(oldNALUType);
 }
 
 /**

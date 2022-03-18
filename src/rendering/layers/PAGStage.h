@@ -26,6 +26,12 @@
 #include "rendering/graphics/Recorder.h"
 
 namespace pag {
+#ifdef FILE_MOVIE
+
+class FileMovie;
+
+#endif
+
 struct SequenceCache {
   std::shared_ptr<Graphic> graphic = nullptr;
   Frame compositionFrame = 0;

@@ -44,7 +44,7 @@
             android:focusable="true"
             android:gravity="center"
             android:text="particle_video.pag"
-            android:drawableStart="@mipmap/softavc"
+            android:drawableStart="@mipmap/ffmpeg"
             android:textAllCaps="false"
             android:textColor="#ffffff"
             android:textSize="18sp" />

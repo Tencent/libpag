@@ -84,12 +84,11 @@ Frame CalculateMaxFrame(const std::vector<Keyframe<T>*>& keyframes) {
 }
 
 int64_t PAGImageLayer::contentDuration() {
-  LockGuard autoLock(rootLocker);
   Frame maxFrame = 0;
   float frameRate = 60;
   if (rootFile) {
     frameRate = rootFile->frameRateInternal();
-    auto property = getContentTimeRemap();
+    auto property = getMovieTimeRemap();
     if (!property->animatable()) {
       return 0;
     }
@@ -161,7 +160,6 @@ class FrameRange {
 };
 
 std::vector<PAGVideoRange> PAGImageLayer::getVideoRanges() const {
-  LockGuard autoLock(rootLocker);
   auto frameRate = frameRateInternal();
   auto imageFillRule = static_cast<ImageLayer*>(layer)->imageFillRule;
   auto timeRemap = (imageFillRule == nullptr) ? nullptr : imageFillRule->timeRemap;
@@ -184,15 +182,52 @@ std::vector<PAGVideoRange> PAGImageLayer::getVideoRanges() const {
   return ranges;
 }
 
+bool PAGImageLayer::gotoTime(int64_t layerTime) {
+  auto changed = PAGLayer::gotoTime(layerTime);
+  auto movie = getPAGMovie();
+  if (movie && !movie->excludedFromTimeline()) {
+    auto movieTime = getCurrentMovieTime(layerTime);
+    if (movie->setCurrentTime(movieTime)) {
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 void PAGImageLayer::replaceImage(std::shared_ptr<pag::PAGImage> image) {
-  LockGuard autoLock(rootLocker);
+  auto locker = image ? image->rootLocker : nullptr;
+  ScopedLock autoLock(rootLocker, locker);
   replaceImageInternal(image);
+}
+
+void PAGImageLayer::removeMovie(std::shared_ptr<PAGMovie> movie) {
+  if (movie != nullptr) {
+    movie->updateRootLocker(std::make_shared<std::mutex>());
+    movie->layerOwner = nullptr;
+    if (stage) {
+      movie->onRemoveFromStage();
+    }
+  }
+}
+
+void PAGImageLayer::replaceMovie(std::shared_ptr<PAGMovie> movie) {
+  if (movie->layerOwner) {
+    movie->layerOwner->replaceImageInternal(nullptr);
+  }
+  movie->layerOwner = this;
+  movie->updateRootLocker(rootLocker);
+  if (stage) {
+    movie->onAddToStage(stage);
+  }
 }
 
 void PAGImageLayer::replaceImageInternal(std::shared_ptr<PAGImage> image) {
   if (imageHolder == nullptr) {
     return;
   }
+  auto oldMovie = imageHolder->getMovie(_editableIndex);
+  removeMovie(oldMovie);
+
   if (stage) {
     auto oldPAGImage = imageHolder->getImage(_editableIndex);
     auto pagLayers = imageHolder->getLayers(_editableIndex);
@@ -206,6 +241,11 @@ void PAGImageLayer::replaceImageInternal(std::shared_ptr<PAGImage> image) {
     }
   }
   imageHolder->setImage(_editableIndex, image);
+  if (image && image->isMovie()) {
+    auto movie = std::static_pointer_cast<PAGMovie>(image);
+    replaceMovie(movie);
+  }
+
   std::vector<PAGImageLayer*> imageLayers = {};
   if (rootFile) {
     auto layers = rootFile->getLayersByEditableIndexInternal(_editableIndex, LayerType::Image);
@@ -233,6 +273,17 @@ bool PAGImageLayer::cacheFilters() const {
   return layerCache->cacheFilters() && !hasPAGImage();
 }
 
+void PAGImageLayer::invalidateCacheScale() {
+  if (stage == nullptr) {
+    return;
+  }
+  PAGLayer::invalidateCacheScale();
+  auto movie = getPAGMovie(false);
+  if (movie) {
+    movie->invalidateCacheScale();
+  }
+}
+
 void PAGImageLayer::onAddToRootFile(PAGFile* pagFile) {
   PAGLayer::onAddToRootFile(pagFile);
   imageHolder = pagFile->imageHolder;
@@ -243,15 +294,43 @@ void PAGImageLayer::onAddToRootFile(PAGFile* pagFile) {
 
 void PAGImageLayer::onRemoveFromRootFile() {
   PAGLayer::onRemoveFromRootFile();
+  auto movie = imageHolder->getMovie(_editableIndex);
+  if (movie && movie->layerOwner == this) {
+    replaceImageInternal(nullptr);
+  }
   imageHolder->removeLayer(this);
   delete replacement;
   replacement = nullptr;
   imageHolder = nullptr;
-  contentTimeRemap = nullptr;
+  movieTimeRemap = nullptr;
 }
 
 void PAGImageLayer::onTimelineChanged() {
-  contentTimeRemap = nullptr;
+  movieTimeRemap = nullptr;
+}
+
+void PAGImageLayer::onAddToStage(PAGStage* pagStage) {
+  PAGLayer::onAddToStage(pagStage);
+  auto movie = getPAGMovie();
+  if (movie) {
+    movie->onAddToStage(stage);
+  }
+}
+
+void PAGImageLayer::onRemoveFromStage() {
+  auto movie = getPAGMovie();
+  if (movie) {
+    movie->onRemoveFromStage();
+  }
+  PAGLayer::onRemoveFromStage();
+}
+
+void PAGImageLayer::updateRootLocker(std::shared_ptr<std::mutex> locker) {
+  PAGLayer::updateRootLocker(locker);
+  auto movie = getPAGMovie();
+  if (movie) {
+    movie->updateRootLocker(locker);
+  }
 }
 
 bool PAGImageLayer::contentVisible() {
@@ -265,22 +344,20 @@ bool PAGImageLayer::contentVisible() {
   }
 }
 
-int64_t PAGImageLayer::getCurrentContentTime(int64_t layerTime) {
-  int64_t replacementTime = 0;
+int64_t PAGImageLayer::getCurrentMovieTime(int64_t layerTime) {
+  int64_t movieTime = 0;
   if (rootFile) {
     if (contentVisible()) {
-      auto timeRemap = getContentTimeRemap();
-      auto replacementFrame = timeRemap->getValueAt(rootFile->stretchedContentFrame());
-      replacementTime =
-          static_cast<Frame>(ceil(replacementFrame * 1000000.0 / rootFile->frameRateInternal()));
+      auto timeRemap = getMovieTimeRemap();
+      auto movieFrame = timeRemap->getValueAt(rootFile->stretchedContentFrame());
+      movieTime = static_cast<Frame>(ceil(movieFrame * 1000000.0 / rootFile->frameRateInternal()));
     } else {
-      replacementTime =
-          FrameToTime(rootFile->stretchedContentFrame(), rootFile->frameRateInternal());
+      movieTime = FrameToTime(rootFile->stretchedContentFrame(), rootFile->frameRateInternal());
     }
   } else {
-    replacementTime = layerTime - startTimeInternal();
+    movieTime = layerTime - startTimeInternal();
   }
-  return replacementTime;
+  return movieTime;
 }
 
 static Keyframe<float>* CreateKeyframe(float startTime, float endTime, float startValue,
@@ -331,6 +408,17 @@ std::shared_ptr<PAGImage> PAGImageLayer::getPAGImage() const {
   return imageHolder->getImage(_editableIndex);
 }
 
+std::shared_ptr<PAGMovie> PAGImageLayer::getPAGMovie(bool own) const {
+  if (!imageHolder) {
+    return nullptr;
+  }
+  auto movie = imageHolder->getMovie(_editableIndex);
+  if (own && movie && movie->layerOwner != this) {
+    return nullptr;
+  }
+  return movie;
+}
+
 // 输出的时间轴不包含startTime
 std::unique_ptr<AnimatableProperty<float>> PAGImageLayer::copyContentTimeRemap() {
   std::vector<Keyframe<float>*> keyframes = {};
@@ -367,15 +455,15 @@ std::unique_ptr<AnimatableProperty<float>> PAGImageLayer::copyContentTimeRemap()
   return std::unique_ptr<AnimatableProperty<float>>(new AnimatableProperty<float>(keyframes));
 }
 
-Property<float>* PAGImageLayer::getContentTimeRemap() {
-  if (contentTimeRemap == nullptr && rootFile) {
+Property<float>* PAGImageLayer::getMovieTimeRemap() {
+  if (movieTimeRemap == nullptr && rootFile) {
     auto visibleRange = getVisibleRangeInFile();
     if (visibleRange.start == visibleRange.end || visibleRange.end < 0 ||
         visibleRange.start > rootFile->stretchedFrameDuration() - 1) {
       // 在File层级不可见
       auto property = new Property<float>();
       property->value = 0;
-      contentTimeRemap = std::unique_ptr<Property<float>>(property);
+      movieTimeRemap = std::unique_ptr<Property<float>>(property);
     } else {
       auto property = copyContentTimeRemap();
       if (property != nullptr) {
@@ -386,11 +474,11 @@ Property<float>* PAGImageLayer::getContentTimeRemap() {
       }
       double frameScale =
           static_cast<double>(visibleRange.end - visibleRange.start + 1) / frameDuration();
-      BuildContentTimeRemap(property.get(), rootFile, visibleRange, frameScale);
-      contentTimeRemap = std::move(property);
+      BuildMovieTimeRemap(property.get(), rootFile, visibleRange, frameScale);
+      movieTimeRemap = std::move(property);
     }
   }
-  return contentTimeRemap.get();
+  return movieTimeRemap.get();
 }
 
 Frame PAGImageLayer::ScaleTimeRemap(AnimatableProperty<float>* property,
@@ -452,8 +540,8 @@ Frame PAGImageLayer::ScaleTimeRemap(AnimatableProperty<float>* property,
 }
 
 // 输出的时间轴不包含startTime
-void PAGImageLayer::BuildContentTimeRemap(AnimatableProperty<float>* property, PAGFile* fileOwner,
-                                          const TimeRange& visibleRange, double frameScale) {
+void PAGImageLayer::BuildMovieTimeRemap(AnimatableProperty<float>* property, PAGFile* fileOwner,
+                                        const TimeRange& visibleRange, double frameScale) {
   auto fileDuration = fileOwner->frameDuration();
   auto fileStretchedDuration = fileOwner->stretchedFrameDuration();
   auto hasRepeat = (fileOwner->_timeStretchMode == PAGTimeStretchMode::Repeat ||
@@ -538,13 +626,12 @@ void PAGImageLayer::ExpandPropertyByRepeat(AnimatableProperty<float>* property, 
   }
 }
 
-int64_t PAGImageLayer::contentTimeToLayer(int64_t replacementTime) {
-  LockGuard autoLock(rootLocker);
+int64_t PAGImageLayer::movieTimeToLayer(int64_t movieTime) {
   if (rootFile == nullptr) {
-    return replacementTime;
+    return movieTime;
   }
-  auto replacementFrame = TimeToFrame(replacementTime, rootFile->frameRateInternal());
-  auto fileFrame = getFrameFromTimeRemap(replacementFrame);
+  auto movieFrame = TimeToFrame(movieTime, rootFile->frameRateInternal());
+  auto fileFrame = getFrameFromTimeRemap(movieFrame);
   auto localFrame = fileFrameToLocalFrame(fileFrame);
   if (localFrame > startFrame + stretchedFrameDuration()) {
     localFrame = startFrame + stretchedFrameDuration();
@@ -555,16 +642,15 @@ int64_t PAGImageLayer::contentTimeToLayer(int64_t replacementTime) {
   return FrameToTime(localFrame, frameRateInternal());
 }
 
-int64_t PAGImageLayer::layerTimeToContent(int64_t layerTime) {
-  LockGuard autoLock(rootLocker);
+int64_t PAGImageLayer::layerTimeToMovie(int64_t localTime) {
   if (rootFile == nullptr) {
-    return layerTime;
+    return localTime;
   }
-  auto localFrame = TimeToFrame(layerTime, frameRateInternal());
+  auto localFrame = TimeToFrame(localTime, frameRateInternal());
   auto fileFrame = localFrameToFileFrame(localFrame);
-  auto timeRemap = getContentTimeRemap();
-  auto replacementFrame = timeRemap->getValueAt(fileFrame);
-  return FrameToTime(replacementFrame, rootFile->frameRateInternal());
+  auto timeRemap = getMovieTimeRemap();
+  auto movieFrame = timeRemap->getValueAt(fileFrame);
+  return FrameToTime(movieFrame, rootFile->frameRateInternal());
 }
 
 int64_t PAGImageLayer::localFrameToFileFrame(int64_t localFrame) const {
@@ -622,7 +708,7 @@ Frame GetFrameFromBezierTimeRemap(Frame value, Keyframe<float>* frame,
 }
 
 Frame PAGImageLayer::getFrameFromTimeRemap(pag::Frame value) {
-  auto timeRemap = getContentTimeRemap();
+  auto timeRemap = getMovieTimeRemap();
   if (!timeRemap->animatable()) {
     return 0;
   }

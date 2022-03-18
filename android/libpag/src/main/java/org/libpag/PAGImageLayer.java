@@ -19,13 +19,12 @@ public class PAGImageLayer extends PAGLayer {
     }
 
     /**
-     * Returns the content duration in microseconds, which indicates the minimal length required for
-     * replacement.
+     * Returns the preferred duration of a PAGMovie object which is used as a image replacement for this layer.
      */
     public native long contentDuration();
 
     /**
-     * Returns the time ranges of the source video for replacement.
+     * [Deprecated](Please use PAGMovie class instead) Returns the time ranges of the source video for replacement.
      */
     public native PAGVideoRange[] getVideoRanges();
 
@@ -33,7 +32,7 @@ public class PAGImageLayer extends PAGLayer {
      * Replace the original image content with the specified PAGImage object. Passing in null for the image parameter
      * resets the layer to its default image content.
      *
-     * @param image The PAGImage object to replace with.
+     * @param image     The PAGImage object to replace with.
      */
     public void replaceImage(PAGImage image) {
         replaceImage(image == null ? 0 : image.nativeContext);
