@@ -64,6 +64,7 @@ jobs:
           git pull
           git checkout ${{ github.head_ref }}
           git pull
+          
       - name: brew link emscripten
         if: steps.cache-environment.outputs.cache-hit == 'true'
         run: |
