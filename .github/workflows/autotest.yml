@@ -80,6 +80,7 @@ jobs:
             cd libpag
             git pull
             git checkout ${{ github.head_ref }}
+            git pull
 
       - name: Run autotest script
         run: |
