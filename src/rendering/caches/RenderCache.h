@@ -102,11 +102,7 @@ class RenderCache : public Performance {
    */
   void removeSnapshot(ID assetID);
 
-  TextAtlas* getTextAtlas(ID assetID);
-
   TextAtlas* getTextAtlas(const TextGlyphs* textGlyphs);
-
-  void removeTextAtlas(ID assetID);
 
   /**
    * Prepares a bitmap task for next getImageBuffer() call.
@@ -180,6 +176,11 @@ class RenderCache : public Performance {
   LayerFilter* getLayerFilterCache(ID uniqueID, const std::function<LayerFilter*()>& makeFilter);
   void clearFilterCache(ID uniqueID);
   bool initFilter(Filter* filter);
+
+  // text atlas caches:
+  void clearAllTextAtlas();
+  void removeTextAtlas(ID assetID);
+  TextAtlas* getTextAtlas(ID assetID) const;
 
   void preparePreComposeLayer(PreComposeLayer* layer, DecodingPolicy policy);
   void prepareImageLayer(PAGImageLayer* layer);
