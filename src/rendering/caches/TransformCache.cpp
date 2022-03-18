@@ -17,21 +17,45 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TransformCache.h"
+#include "base/utils/Log.h"
 #include "rendering/renderers/TransformRenderer.h"
 
 namespace pag {
+static void PrintStaticTimeRanges(int count, const std::string& key,
+                                  const std::vector<TimeRange>& timeRanges) {
+  if (count != 18) {
+    return;
+  }
+  std::string text = "";
+  for (auto& timeRange : timeRanges) {
+    if (!text.empty()) {
+      text += ",";
+    }
+    text += "[" + std::to_string(timeRange.start) + "," + std::to_string(timeRange.end) + "]";
+  }
+  LOGI("count:%d, key: %s, staticTimeRange: %s", count, key.c_str(), text.c_str());
+}
+
 TransformCache::TransformCache(Layer* layer)
     : FrameCache<Transform>(layer->startTime, layer->duration), layer(layer) {
+  static int count = 0;
+  count++;
   std::vector<TimeRange> timeRanges = {layer->visibleRange()};
+  PrintStaticTimeRanges(count, "visibleRange", timeRanges);
   layer->transform->excludeVaryingRanges(&timeRanges);
+  PrintStaticTimeRanges(count, "tansform", timeRanges);
   auto parent = layer->parent;
   while (parent != nullptr) {
     parent->transform->excludeVaryingRanges(&timeRanges);
+    PrintStaticTimeRanges(count, "parent->transform", timeRanges);
     SplitTimeRangesAt(&timeRanges, parent->startTime);
+    PrintStaticTimeRanges(count, "parent->startTime", timeRanges);
     SplitTimeRangesAt(&timeRanges, parent->startTime + parent->duration);
+    PrintStaticTimeRanges(count, "parent->endTime", timeRanges);
     parent = parent->parent;
   }
   staticTimeRanges = OffsetTimeRanges(timeRanges, -layer->startTime);
+  PrintStaticTimeRanges(count, "OffsetTimeRanges", staticTimeRanges);
 }
 
 Transform* TransformCache::createCache(Frame layerFrame) {

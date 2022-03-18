@@ -118,9 +118,7 @@ bool LayerCache::contentVisible(Frame contentFrame) {
 
 static void PrintStaticTimeRanges(int count, const std::string& key,
                                   const std::vector<TimeRange>& timeRanges) {
-  if (count != 18) {
-    return;
-  }
+  return;
   std::string text = "";
   for (auto& timeRange : timeRanges) {
     if (!text.empty()) {
