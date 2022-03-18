@@ -163,13 +163,17 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
   }
   auto context = lockContext();
   if (!context) {
-    LOGI("PAGSurface::draw(): !context");
+    if (log) {
+      LOGI("PAGSurface::draw(): !context");
+    }
     return false;
   }
   if (surface != nullptr && autoClear && contentVersion == cache->getContentVersion()) {
     unlockContext();
-    LOGI("PAGSurface::draw(): contentVersion == cache->getContentVersion(): %s",
-         contentVersion == cache->getContentVersion() ? "true" : "false");
+    if (log) {
+      LOGI("PAGSurface::draw(): contentVersion == cache->getContentVersion(): %s",
+           contentVersion == cache->getContentVersion() ? "true" : "false");
+    }
     return false;
   }
   if (surface == nullptr) {
@@ -177,7 +181,9 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
   }
   if (surface == nullptr) {
     unlockContext();
-    LOGI("PAGSurface::draw(): surface==nullptr");
+    if (log) {
+      LOGI("PAGSurface::draw(): surface==nullptr");
+    }
     return false;
   }
   contentVersion = cache->getContentVersion();

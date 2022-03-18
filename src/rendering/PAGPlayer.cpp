@@ -183,9 +183,19 @@ int64_t PAGPlayer::duration() {
 
 void PAGPlayer::nextFrame() {
   LockGuard autoLock(rootLocker);
+  if (stage->log) {
+    LOGI("stage->contentVersion-before: %lld", stage->getContentVersion());
+  }
   auto pagComposition = stage->getRootComposition();
   if (pagComposition) {
+    if (stage->log) {
+      LOGI("stage->contentFrame-before: %lld", pagComposition->currentFrameInternal());
+    }
     pagComposition->nextFrameInternal();
+    if (stage->log) {
+      LOGI("stage->contentFrame-before: %lld", pagComposition->currentFrameInternal());
+      LOGI("stage->contentVersion-after: %lld", stage->getContentVersion());
+    }
   }
 }
 

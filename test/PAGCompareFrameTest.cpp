@@ -125,9 +125,9 @@ void CompareFileFrames(Semaphore* semaphore, std::string pagPath) {
     }
     lastTask = nullptr;
   };
-
+  auto stage = std::static_pointer_cast<PAGStage>(pagPlayer->getComposition()->parent());
   while (currentFrame < totalFrames) {
-    pagSurface->log = fileName == "error_0.pag";
+    pagSurface->log = fileName == "error_0.pag" && currentFrame == 209;
     auto changed = pagPlayer->flush();
     if (fileName == "error_0.pag") {
       auto key = "PAGCompareFrameTest/" + fileName + "/" + ToString(currentFrame);
@@ -153,6 +153,7 @@ void CompareFileFrames(Semaphore* semaphore, std::string pagPath) {
       lastTask = Task::Make(std::unique_ptr<CompareFrameTask>(executor));
       lastTask->run();
     }
+    stage->log = fileName == "error_0.pag" && currentFrame == 208;
     pagPlayer->nextFrame();
     currentFrame++;
   }

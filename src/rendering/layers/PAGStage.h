@@ -34,7 +34,7 @@ struct SequenceCache {
 class PAGStage : public PAGComposition {
  public:
   static std::shared_ptr<PAGStage> Make(int width, int height);
-
+  bool log = false;
   ~PAGStage() override;
 
   /**
