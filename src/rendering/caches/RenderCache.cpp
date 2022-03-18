@@ -193,7 +193,7 @@ void RenderCache::prepareFrame() {
   resetPerformance();
   auto layerDistances = stage->findNearlyVisibleLayersIn(DECODING_VISIBLE_DISTANCE);
   for (auto& item : layerDistances) {
-    auto policy = SoftwareToHardwareEnabled() && item.first < MIN_HARDWARE_PREPARE_TIME
+    auto policy = VideoDecoder::SoftwareToHardwareEnabled() && item.first < MIN_HARDWARE_PREPARE_TIME
                       ? DecodingPolicy::SoftwareToHardware
                       : DecodingPolicy::Hardware;
     for (auto pagLayer : item.second) {
