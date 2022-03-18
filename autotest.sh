@@ -51,7 +51,7 @@ else
   exit 1
 fi
 
-./PAGFullTest --gtest_output=json:PAGFullTest.json
+./PAGFullTest --gtest_filter=PAGFrameCompareTest.RenderFiles:PAGFrameCompareTest/*.RenderFiles:PAGFrameCompareTest.RenderFiles/*:*/PAGFrameCompareTest.RenderFiles/*:*/PAGFrameCompareTest/*.RenderFiles --gtest_output=json:PAGFullTest.json
 
 if test $? -eq 0; then
   echo "~~~~~~~~~~~~~~~~~~~PAGFullTest successed~~~~~~~~~~~~~~~~~~"
