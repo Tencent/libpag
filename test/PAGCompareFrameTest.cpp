@@ -154,6 +154,10 @@ void CompareFileFrames(Semaphore* semaphore, std::string pagPath) {
       lastTask->run();
     }
     stage->log = fileName == "error_0.pag" && currentFrame == 208;
+    if (fileName == "error_0.pag") {
+      auto key = "PAGCompareFrameTest/" + fileName + "/" + ToString(currentFrame);
+      LOGI("pagPlayer->nextFrame()", key.c_str());
+    }
     pagPlayer->nextFrame();
     currentFrame++;
   }
