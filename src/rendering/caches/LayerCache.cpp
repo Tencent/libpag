@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LayerCache.h"
+#include "base/utils/Log.h"
 #include "base/utils/TGFXCast.h"
 #include "rendering/caches/ImageContentCache.h"
 #include "rendering/caches/PreComposeContentCache.h"
@@ -115,7 +116,24 @@ bool LayerCache::contentVisible(Frame contentFrame) {
   return layerTransform->visible();
 }
 
+static void PrintStaticTimeRanges(int count, const std::string& key,
+                                  const std::vector<TimeRange>& timeRanges) {
+  if (count != 18) {
+    return;
+  }
+  std::string text = "";
+  for (auto& timeRange : timeRanges) {
+    if (!text.empty()) {
+      text += ",";
+    }
+    text += "[" + std::to_string(timeRange.start) + "," + std::to_string(timeRange.end) + "]";
+  }
+  LOGI("count:%d, key: %s, staticTimeRange: %s", count, key.c_str(), text.c_str());
+}
+
 void LayerCache::updateStaticTimeRanges() {
+  static int count = 0;
+  count++;
   // layer->startTime is excluded from all time ranges.
   if (layer->type() == LayerType::PreCompose &&
       static_cast<PreComposeLayer*>(layer)->composition->type() == CompositionType::Vector) {
@@ -127,17 +145,22 @@ void LayerCache::updateStaticTimeRanges() {
   } else {
     staticTimeRanges = *contentCache->getStaticTimeRanges();
   }
+  PrintStaticTimeRanges(count, "content", staticTimeRanges);
   MergeTimeRanges(&staticTimeRanges, transformCache->getStaticTimeRanges());
+  PrintStaticTimeRanges(count, "transform", staticTimeRanges);
   if (maskCache) {
     MergeTimeRanges(&staticTimeRanges, maskCache->getStaticTimeRanges());
+    PrintStaticTimeRanges(count, "mask", staticTimeRanges);
   }
   if (layer->trackMatteLayer) {
     auto timeRanges = getTrackMatteStaticTimeRanges();
     MergeTimeRanges(&staticTimeRanges, &timeRanges);
+    PrintStaticTimeRanges(count, "trackMatteLayer", staticTimeRanges);
   }
   if (!layer->layerStyles.empty() || !layer->effects.empty()) {
     auto timeRanges = getFilterStaticTimeRanges();
     MergeTimeRanges(&staticTimeRanges, &timeRanges);
+    PrintStaticTimeRanges(count, "layerStyles-effects", staticTimeRanges);
   }
   if (layer->motionBlur) {
     // MotionBlur是根据Transform来处理图像，
@@ -148,7 +171,9 @@ void LayerCache::updateStaticTimeRanges() {
     for (auto& timeRange : *transformCache->getStaticTimeRanges()) {
       SplitTimeRangesAt(&staticTimeRanges, timeRange.start + 1);
     }
+    PrintStaticTimeRanges(count, "motionBlur", staticTimeRanges);
   }
+  PrintStaticTimeRanges(count, "final", staticTimeRanges);
 }
 
 std::vector<TimeRange> LayerCache::getTrackMatteStaticTimeRanges() {

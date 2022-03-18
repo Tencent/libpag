@@ -440,11 +440,13 @@ bool PAGLayer::gotoTime(int64_t layerTime) {
       if (!layerCache->staticTimeRanges.empty()) {
         timeRange = layerCache->staticTimeRanges[0];
       }
-      LOGI(
-          "count:%d, changed:%s, contentFrame:%lld, oldContentFrame:%lld, staticTimeRange:[%lld, "
-          "%lld]",
-          count, changed ? "true" : "false", contentFrame, oldContentFrame, timeRange.start,
-          timeRange.end);
+      if (count == 18) {
+        LOGI(
+            "count:%d, changed:%s, contentFrame:%lld, oldContentFrame:%lld, staticTimeRange:[%lld, "
+            "%lld]",
+            count, changed ? "true" : "false", contentFrame, oldContentFrame, timeRange.start,
+            timeRange.end);
+      }
     }
   }
   return changed;

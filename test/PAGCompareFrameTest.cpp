@@ -194,6 +194,8 @@ PAG_TEST(PAGFrameCompareTest, RenderFiles) {
   std::vector<std::string> files;
   GetAllPAGFiles("../resources/compare", files);
 
+  files.clear();
+  files.push_back("../resources/compare/error_0.pag");
   Semaphore semaphore(MAX_THREADS);
   std::vector<std::thread> threads = {};
   for (auto& file : files) {
