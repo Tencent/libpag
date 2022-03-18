@@ -22,7 +22,7 @@
 namespace pag {
 static void TargetInsideTimeRange(std::vector<TimeRange>* timeRanges, int i, Frame startTime,
                                   Frame endTime) {
-  auto& timeRange = (*timeRanges)[i];
+  auto timeRange = (*timeRanges)[i];
   TimeRange range = {endTime + 1, timeRange.end};
   timeRange.end = startTime - 1;
   if (range.end > range.start) {
@@ -30,11 +30,13 @@ static void TargetInsideTimeRange(std::vector<TimeRange>* timeRanges, int i, Fra
   }
   if (timeRange.end <= timeRange.start) {
     timeRanges->erase(timeRanges->begin() + i);
+  } else {
+    (*timeRanges)[i] = timeRange;
   }
 }
 static void TargetIntersectTimeRange(std::vector<TimeRange>* timeRanges, int i, Frame startTime,
                                      Frame endTime) {
-  auto& timeRange = (*timeRanges)[i];
+  auto timeRange = (*timeRanges)[i];
   if (timeRange.start < startTime) {
     timeRange.end = startTime - 1;
   } else {
@@ -42,6 +44,8 @@ static void TargetIntersectTimeRange(std::vector<TimeRange>* timeRanges, int i, 
   }
   if (timeRange.end <= timeRange.start) {
     timeRanges->erase(timeRanges->begin() + i);
+  } else {
+    (*timeRanges)[i] = timeRange;
   }
 }
 
@@ -52,7 +56,7 @@ void SubtractFromTimeRanges(std::vector<TimeRange>* timeRanges, Frame startTime,
   }
   auto size = static_cast<int>(timeRanges->size());
   for (int i = size - 1; i >= 0; i--) {
-    auto& timeRange = (*timeRanges)[i];
+    auto timeRange = (*timeRanges)[i];
     if (timeRange.end < startTime || timeRange.start > endTime) {
       // target outside timeRange
       continue;
@@ -97,7 +101,7 @@ void MergeTimeRanges(std::vector<TimeRange>* timeRanges,
                      const std::vector<TimeRange>* otherRanges) {
   std::vector<TimeRange> intersections;
   auto mergeFunc = [otherRanges, &intersections](TimeRange& timeRange) {
-    for (auto& range : *otherRanges) {
+    for (auto range : *otherRanges) {
       if (range.end < timeRange.start) {
         continue;
       }
@@ -141,7 +145,7 @@ std::vector<TimeRange> OffsetTimeRanges(const std::vector<TimeRange>& timeRanges
 bool HasVaryingTimeRange(const std::vector<TimeRange>* staticTimeRanges, Frame startTime,
                          Frame duration) {
   if (staticTimeRanges->size() == 1) {
-    auto& range = (*staticTimeRanges)[0];
+    const auto& range = (*staticTimeRanges)[0];
     if (range.start == startTime && range.end == startTime + duration - 1) {
       return false;
     }
@@ -154,7 +158,7 @@ int FindTimeRangeAt(const std::vector<TimeRange>& timeRanges, Frame position, in
     return -1;
   }
   auto index = static_cast<int>((start + end) * 0.5);
-  auto& timeRange = timeRanges[index];
+  const auto& timeRange = timeRanges[index];
   if (timeRange.start > position) {
     return FindTimeRangeAt(timeRanges, position, start, index - 1);
   } else if (timeRange.end < position) {
