@@ -68,6 +68,9 @@ jobs:
             cd libpag
             git pull
             git checkout ${{ github.head_ref }}
+            git pull
+            git rev-parse HEAD
+
 
       - name: Run autotest script
         run: |
