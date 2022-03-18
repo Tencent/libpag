@@ -59,14 +59,14 @@ class LayerCache : public Cache {
   bool cacheFilters() const {
     return contentCache->cacheFilters();
   }
-
+  std::vector<TimeRange> staticTimeRanges;
  private:
   Layer* layer = nullptr;
   TransformCache* transformCache = nullptr;
   MaskCache* maskCache = nullptr;
   ContentCache* contentCache = nullptr;
   tgfx::Point maxScaleFactor = {};
-  std::vector<TimeRange> staticTimeRanges;
+
 
   explicit LayerCache(Layer* layer);
   void updateStaticTimeRanges();

@@ -433,6 +433,19 @@ bool PAGLayer::gotoTime(int64_t layerTime) {
   contentFrame = layerFrame - startFrame;
   if (!changed) {
     changed = layerCache->checkFrameChanged(contentFrame, oldContentFrame);
+    if (stage && stage->log) {
+      static int count = 0;
+      count++;
+      TimeRange timeRange = {0, 0};
+      if (!layerCache->staticTimeRanges.empty()) {
+        timeRange = layerCache->staticTimeRanges[0];
+      }
+      LOGI(
+          "count:%d, changed:%s, contentFrame:%lld, oldContentFrame:%lld, staticTimeRange:[%lld, "
+          "%lld]",
+          count, changed ? "true" : "false", contentFrame, oldContentFrame, timeRange.start,
+          timeRange.end);
+    }
   }
   return changed;
 }
