@@ -29,7 +29,6 @@ struct Rect;
 class Context;
 class Surface;
 class Device;
-class Image;
 }  // namespace tgfx
 
 namespace pag {
@@ -63,10 +62,12 @@ class Content {
   friend class PAGTextLayer;
 };
 
+class Graphic;
+
 /**
- * A still image used to replace the image contents in a PAGFile.
+ * An image used to replace the contents of PAGImageLayers in a PAGFile.
  */
-class PAG_API PAGImage : public Content {
+class PAG_API PAGImage {
  public:
   /**
    * Creates a PAGImage object from a path of a image file, return null if the file does not exist
@@ -99,25 +100,33 @@ class PAG_API PAGImage : public Content {
    */
   static std::shared_ptr<PAGImage> FromTexture(const BackendTexture& texture, ImageOrigin origin);
 
+  virtual ~PAGImage() = default;
+
   /**
    * Returns a globally unique id for this object.
    */
-  ID uniqueID() const;
+  ID uniqueID() const {
+    return _uniqueID;
+  }
 
   /**
    * Returns the width in pixels.
    */
-  int width();
+  int width() const {
+    return _width;
+  }
 
   /**
    * Returns the height in pixels.
    */
-  int height();
+  int height() const {
+    return _height;
+  }
 
   /**
    * Returns the current scale mode. The default value is PAGScaleMode::LetterBox.
    */
-  int scaleMode();
+  int scaleMode() const;
 
   /**
    * Specifies the rule of how to scale the content to fit the image layer's original size.
@@ -128,7 +137,7 @@ class PAG_API PAGImage : public Content {
   /**
    * Returns a copy of current matrix.
    */
-  Matrix matrix();
+  Matrix matrix() const;
 
   /**
    * Set the transformation which will be applied to the content.
@@ -137,20 +146,18 @@ class PAG_API PAGImage : public Content {
   void setMatrix(const Matrix& matrix);
 
  protected:
-  PAGImage();
+  PAGImage(int width, int height);
 
-  virtual tgfx::Rect getContentSize() const = 0;
-
-  virtual std::shared_ptr<tgfx::Image> getImage() const {
-    return nullptr;
-  }
+  virtual std::shared_ptr<Graphic> getGraphic() const = 0;
 
  private:
-  std::mutex locker = {};
+  mutable std::mutex locker = {};
   ID _uniqueID = 0;
+  int _width = 0;
+  int _height = 0;
+  int _scaleMode = PAGScaleMode::LetterBox;
   Matrix _matrix = Matrix::I();
   bool hasSetScaleMode = false;
-  int _scaleMode = PAGScaleMode::LetterBox;
 
   Matrix getContentMatrix(int defaultScaleMode, int contentWidth, int contentHeight);
 
@@ -161,8 +168,6 @@ class PAG_API PAGImage : public Content {
   friend class PAGFile;
 
   friend class RenderCache;
-
-  friend class PAGImageHolder;
 };
 
 class PAGComposition;
@@ -1138,8 +1143,6 @@ class Drawable {
   virtual void setTimeStamp(int64_t) {
   }
 };
-
-class Graphic;
 
 class GLRestorer;
 

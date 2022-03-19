@@ -30,8 +30,8 @@ class ImageBytesCache : public Cache {
     auto cache = new ImageBytesCache();
     auto fileBytes =
         tgfx::Data::MakeWithoutCopy(imageBytes->fileBytes->data(), imageBytes->fileBytes->length());
-    cache->image = tgfx::Image::MakeFrom(std::move(fileBytes));
-    auto picture = Picture::MakeFrom(imageBytes->uniqueID, cache->image);
+    auto image = tgfx::Image::MakeFrom(std::move(fileBytes));
+    auto picture = Picture::MakeFrom(imageBytes->uniqueID, image);
     auto matrix = tgfx::Matrix::MakeScale(1 / imageBytes->scaleFactor);
     matrix.postTranslate(static_cast<float>(-imageBytes->anchorX),
                          static_cast<float>(-imageBytes->anchorY));
@@ -40,12 +40,11 @@ class ImageBytesCache : public Cache {
     return cache;
   }
 
-  std::shared_ptr<tgfx::Image> image = nullptr;
   std::shared_ptr<Graphic> graphic = nullptr;
 };
 
-std::shared_ptr<tgfx::Image> ImageContentCache::GetImage(ImageBytes* imageBytes) {
-  return ImageBytesCache::Get(imageBytes)->image;
+std::shared_ptr<Graphic> ImageContentCache::GetGraphic(ImageBytes* imageBytes) {
+  return ImageBytesCache::Get(imageBytes)->graphic;
 }
 
 ImageContentCache::ImageContentCache(ImageLayer* layer) : ContentCache(layer) {

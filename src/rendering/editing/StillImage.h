@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "core/Image.h"
 #include "pag/pag.h"
 #include "rendering/graphics/Graphic.h"
 
@@ -25,27 +26,20 @@ namespace pag {
 
 class StillImage : public PAGImage {
  public:
-  static std::shared_ptr<StillImage> FromPixelBuffer(
-      std::shared_ptr<tgfx::PixelBuffer> pixelBuffer);
-  static std::shared_ptr<StillImage> FromImage(std::shared_ptr<tgfx::Image> image);
+  static std::shared_ptr<StillImage> MakeFrom(std::shared_ptr<tgfx::PixelBuffer> pixelBuffer);
 
-  void measureBounds(tgfx::Rect* bounds) override;
-  void draw(Recorder* recorder) override;
+  static std::shared_ptr<StillImage> MakeFrom(std::shared_ptr<tgfx::Image> image);
 
  protected:
-  tgfx::Rect getContentSize() const override;
-
-  std::shared_ptr<tgfx::Image> getImage() const override {
-    return image;
+  std::shared_ptr<Graphic> getGraphic() const override {
+    return graphic;
   }
 
  private:
-  int width = 0;
-  int height = 0;
-  std::shared_ptr<tgfx::Image> image = nullptr;
-  std::shared_ptr<Graphic> graphic = nullptr;
+  StillImage(int width, int height) : PAGImage(width, height) {
+  }
 
-  void reset(std::shared_ptr<Graphic> graphic);
+  std::shared_ptr<Graphic> graphic = nullptr;
 
   friend class PAGImage;
 };

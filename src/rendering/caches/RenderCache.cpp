@@ -124,18 +124,16 @@ void RenderCache::preparePreComposeLayer(PreComposeLayer* layer, DecodingPolicy 
 }
 
 void RenderCache::prepareImageLayer(PAGImageLayer* pagLayer) {
+  std::shared_ptr<Graphic> graphic = nullptr;
   auto pagImage = static_cast<PAGImageLayer*>(pagLayer)->getPAGImage();
-  if (pagImage == nullptr) {
+  if (pagImage != nullptr) {
+    graphic = pagImage->getGraphic();
+  } else {
     auto imageBytes = static_cast<ImageLayer*>(pagLayer->layer)->imageBytes;
-    auto image = ImageContentCache::GetImage(imageBytes);
-    if (image) {
-      prepareImage(imageBytes->uniqueID, image);
-    }
-    return;
+    graphic = ImageContentCache::GetGraphic(imageBytes);
   }
-  auto image = pagImage->getImage();
-  if (image) {
-    prepareImage(pagImage->uniqueID(), image);
+  if (graphic) {
+    graphic->prepare(this);
   }
 }
 

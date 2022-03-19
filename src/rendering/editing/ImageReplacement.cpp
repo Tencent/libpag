@@ -35,10 +35,11 @@ ImageReplacement::ImageReplacement(ImageLayer* imageLayer, PAGImageHolder* image
 void ImageReplacement::measureBounds(tgfx::Rect* bounds) {
   tgfx::Rect contentBounds = {};
   auto pagImage = imageHolder->getImage(editableIndex);
-  pagImage->measureBounds(&contentBounds);
+  auto graphic = pagImage->getGraphic();
+  graphic->measureBounds(&contentBounds);
   auto contentMatrix = pagImage->getContentMatrix(defaultScaleMode, contentWidth, contentHeight);
   ToTGFX(contentMatrix).mapRect(&contentBounds);
-  bounds->setXYWH(0, 0, contentWidth, contentHeight);
+  bounds->setXYWH(0, 0, static_cast<float>(contentWidth), static_cast<float>(contentHeight));
   if (!bounds->intersect(contentBounds)) {
     bounds->setEmpty();
   }
@@ -49,7 +50,7 @@ void ImageReplacement::draw(Recorder* recorder) {
   auto pagImage = imageHolder->getImage(editableIndex);
   auto contentMatrix = pagImage->getContentMatrix(defaultScaleMode, contentWidth, contentHeight);
   recorder->concat(ToTGFX(contentMatrix));
-  pagImage->draw(recorder);
+  recorder->drawGraphic(pagImage->getGraphic());
   recorder->restore();
 }
 

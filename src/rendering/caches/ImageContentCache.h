@@ -19,11 +19,12 @@
 #pragma once
 
 #include "ContentCache.h"
+#include "core/Image.h"
 
 namespace pag {
 class ImageContentCache : public ContentCache {
  public:
-  static std::shared_ptr<tgfx::Image> GetImage(ImageBytes* imageBytes);
+  static std::shared_ptr<Graphic> GetGraphic(ImageBytes* imageBytes);
 
   explicit ImageContentCache(ImageLayer* layer);
 

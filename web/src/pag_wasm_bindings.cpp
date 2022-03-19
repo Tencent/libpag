@@ -260,7 +260,7 @@ EMSCRIPTEN_BINDINGS(pag) {
                       }))
       .class_function("_FromNativeImage", optional_override([](val nativeImage) {
                         return std::static_pointer_cast<PAGImage>(
-                            StillImage::FromImage(tgfx::NativeImage::MakeFrom(nativeImage)));
+                            StillImage::MakeFrom(tgfx::NativeImage::MakeFrom(nativeImage)));
                       }))
       .function("_width", &PAGImage::width)
       .function("_height", &PAGImage::height)
