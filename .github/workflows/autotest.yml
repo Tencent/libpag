@@ -31,7 +31,10 @@ jobs:
             /usr/local/bin/yasm
             /usr/local/Cellar/depsync
             /usr/local/bin/depsync
-          key: libpag-environment-20220208
+            /usr/local/Cellar/gcovr
+            /usr/local/bin/gcovr
+          key: libpag-environment-20220319
+          restore-keys: libpag-environment-
       - if: github.event_name == 'pull_request'
         name: Get libpag cache (pull_request)
         id: libpag-pull_request
