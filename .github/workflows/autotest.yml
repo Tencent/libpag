@@ -33,51 +33,24 @@ jobs:
             /usr/local/bin/depsync
             /usr/local/Cellar/gcovr
             /usr/local/bin/gcovr
-          key: libpag-environment-20220319
+          key: libpag-environment-20220319_1
           restore-keys: libpag-environment-
-      - if: github.event_name == 'pull_request'
-        name: Get libpag cache (pull_request)
-        id: libpag-pull_request
+      - uses: actions/checkout@v2
+        with:
+          lfs: true
+      - name: Checkout LFS objects
+        run: git lfs checkout
+      - name: Get thirdParty cache
+        id: cache-thirdParty
         uses: actions/cache@v2
         with:
-          path: libpag.tar.zst
-          key: libpag-autotest-${{ github.event.pull_request.base.sha }}
-          restore-keys: libpag-autotest-
-      - name: Check file existence
-        id: check_files
-        uses: andstor/file-existence-action@v1
-        with:
-          files: "libpag.tar.zst"
-      - name: File exist
-        if: steps.check_files.outputs.files_exists == 'true'
-        # Only runs if all of the files exists
-        run: |
-          echo "file exist"
-          tar xvf libpag.tar.zst
-          rm -rf libpag.tar.zst
-      - name: File not exist
-        if: steps.check_files.outputs.files_exists != 'true'
-        run: |
-          echo "file not exist"
-          git clone -b main https://github.com/Tencent/libpag.git
-      - if: github.event_name == 'push'
-        name: Swith branch (push)
-        run: |
-          cd libpag
-          git pull
-      - if: github.event_name == 'pull_request'
-        name: Swith branch (pull_request)
-        run: |
-            cd libpag
-            git pull
-            git checkout ${{ github.head_ref }}
-            git pull
-            git rev-parse HEAD
-
-
+          path: |
+            third_party
+            vendor_tools
+          key: third_party-autotest-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: third_party-autotest-
       - name: Run autotest script
         run: |
-          cd libpag
           chmod +x sync_deps.sh
           ./sync_deps.sh
           chmod +x autotest.sh
@@ -93,16 +66,9 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: result
-          path: libpag/result
+          path: result
       - uses: actions/upload-artifact@v2
         with:
           name: result
-          path: libpag/result
-      - name: Compress libpag
-        run: |
-          cd libpag
-          rm -rf result
-          git checkout main
-          cd ..
-          tar cvfa libpag.tar.zst libpag
+          path: result
 

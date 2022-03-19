@@ -18,6 +18,21 @@ jobs:
           lfs: true
       - name: Checkout LFS objects
         run: git lfs checkout
+      - uses: actions/checkout@v2
+        with:
+          lfs: true
+      - name: Checkout LFS objects
+        run: git lfs checkout
+      - name: Get thirdParty cache
+        id: cache-thirdParty
+        uses: actions/cache@v2
+        with:
+          path: |
+            third_party
+            vendor_tools
+          key: third_party-linux-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: third_party-linux-
+
       - uses: seanmiddleditch/gha-setup-ninja@master
       - name: Linux build
         run: |
