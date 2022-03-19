@@ -19,9 +19,7 @@
 #pragma once
 
 #include <emscripten/val.h>
-#include "pag/file.h"
-#include "rendering/sequences/SequenceReader.h"
-#include "rendering/video/DecodingPolicy.h"
+#include "rendering/sequences/SequenceReaderFactory.h"
 
 namespace pag {
 class VideoSequenceReader : public SequenceReader {
@@ -29,8 +27,6 @@ class VideoSequenceReader : public SequenceReader {
   VideoSequenceReader(std::shared_ptr<File> file, VideoSequence* sequence, DecodingPolicy);
 
   ~VideoSequenceReader() override;
-
-  void prepareAsync(Frame targetFrame) override;
 
   bool staticContent() const override {
     return sequence->composition->staticContent();

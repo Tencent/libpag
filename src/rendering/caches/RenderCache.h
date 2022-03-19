@@ -33,8 +33,7 @@
 #include "rendering/graphics/Picture.h"
 #include "rendering/graphics/Snapshot.h"
 #include "rendering/layers/PAGStage.h"
-#include "rendering/sequences/SequenceReader.h"
-#include "rendering/video/DecodingPolicy.h"
+#include "rendering/sequences/SequenceReaderFactory.h"
 
 namespace pag {
 class RenderCache : public Performance {
@@ -121,9 +120,9 @@ class RenderCache : public Performance {
 
   void setVideoEnabled(bool value);
 
-  bool prepareSequenceReader(Sequence* sequence, Frame targetFrame, DecodingPolicy policy);
+  void prepareSequenceReader(const SequenceReaderFactory* factory, Frame targetFrame);
 
-  std::shared_ptr<SequenceReader> getSequenceReader(Sequence* sequence);
+  std::shared_ptr<SequenceReader> getSequenceReader(const SequenceReaderFactory* factory);
 
   LayerFilter* getFilterCache(LayerStyle* layerStyle);
 
@@ -133,11 +132,11 @@ class RenderCache : public Performance {
 
   LayerStylesFilter* getLayerStylesFilter(Layer* layer);
 
-  void recordImageDecodingTime(int64_t decodingTime);
+  void reportImageDecodingTime(int64_t decodingTime);
 
-  void recordTextureUploadingTime(int64_t time);
+  void reportTextureUploadingTime(int64_t time);
 
-  void recordProgramCompilingTime(int64_t time);
+  void reportProgramCompilingTime(int64_t time);
 
   void releaseAll();
 
@@ -184,5 +183,7 @@ class RenderCache : public Performance {
 
   void preparePreComposeLayer(PreComposeLayer* layer, DecodingPolicy policy);
   void prepareImageLayer(PAGImageLayer* layer);
+  std::shared_ptr<SequenceReader> getSequenceReaderInternal(const SequenceReaderFactory* factory,
+                                                            DecodingPolicy policy);
 };
 }  // namespace pag

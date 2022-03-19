@@ -363,7 +363,7 @@ class TextureBufferProxy : public TextureProxy {
   std::shared_ptr<tgfx::Texture> getTexture(RenderCache* cache) const override {
     auto startTime = GetTimer();
     auto texture = buffer->makeTexture(cache->getContext());
-    cache->recordTextureUploadingTime(GetTimer() - startTime);
+    cache->reportTextureUploadingTime(GetTimer() - startTime);
     return texture;
   }
 
@@ -391,13 +391,13 @@ class ImageTextureProxy : public TextureProxy {
     if (buffer == nullptr) {
       buffer = image->makeBuffer();
     }
-    cache->recordImageDecodingTime(GetTimer() - startTime);
+    cache->reportImageDecodingTime(GetTimer() - startTime);
     if (buffer == nullptr) {
       return nullptr;
     }
     startTime = GetTimer();
     auto texture = buffer->makeTexture(cache->getContext());
-    cache->recordTextureUploadingTime(GetTimer() - startTime);
+    cache->reportTextureUploadingTime(GetTimer() - startTime);
     return texture;
   }
 

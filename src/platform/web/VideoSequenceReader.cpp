@@ -18,7 +18,6 @@
 
 #include "VideoSequenceReader.h"
 #include "gpu/opengl/GLTexture.h"
-#include "rendering/caches/RenderCache.h"
 
 using namespace emscripten;
 
@@ -59,22 +58,19 @@ VideoSequenceReader::~VideoSequenceReader() {
   }
 }
 
-void VideoSequenceReader::prepareAsync(Frame targetFrame) {
-  // Web 端没有异步初始化解码器，也没有预测。
-  // 这个方法是 Graphic->prepare() 每次调用的。
-  // Web 端渲染过程不能 await，否则会把渲染一半的 Canvas 上屏。
-  if (videoReader.as<bool>()) {
-    videoReader.call<val>("prepareAsync", static_cast<int>(targetFrame)).await();
-  }
-}
-
 int64_t VideoSequenceReader::getNextFrameAt(int64_t targetFrame) {
   auto nextFrame = targetFrame + 1;
   return nextFrame >= sequence->duration() ? -1 : nextFrame;
 }
 
-bool VideoSequenceReader::decodeFrame(int64_t) {
-  return videoReader.as<bool>();
+bool VideoSequenceReader::decodeFrame(int64_t targetFrame) {
+  // Web 端没有异步初始化解码器，也没有预测。
+  // Web 端渲染过程不能 await，否则会把渲染一半的 Canvas 上屏。
+  if (videoReader.as<bool>()) {
+    videoReader.call<val>("decodeFrame", static_cast<int>(targetFrame)).await();
+    return true;
+  }
+  return false;
 }
 
 std::shared_ptr<tgfx::Texture> VideoSequenceReader::makeTexture(tgfx::Context* context) {

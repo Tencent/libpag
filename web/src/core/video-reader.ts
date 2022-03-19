@@ -49,7 +49,7 @@ export class VideoReader {
     this.videoEl.src = URL.createObjectURL(blob);
   }
 
-  public prepareAsync(targetFrame: number) {
+  public decodeFrame(targetFrame: number) {
     return new Promise((resolve) => {
       if (this.videoEl === null) {
         Log.errorByCode(ErrorCode.VideoElementNull);

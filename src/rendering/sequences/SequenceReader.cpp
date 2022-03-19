@@ -47,10 +47,8 @@ SequenceReader::~SequenceReader() {
   DEBUG_ASSERT(lastTask == nullptr || !lastTask->isRunning());
 }
 
-void SequenceReader::prepareAsync(int64_t targetFrame) {
-  if (lastTask != nullptr) {
-    pendingFrame = targetFrame;
-  } else {
+void SequenceReader::prepare(int64_t targetFrame) {
+  if (lastTask == nullptr && targetFrame > 0) {
     lastTask = SequenceTask::MakeAndRun(this, targetFrame);
   }
 }
@@ -76,14 +74,12 @@ std::shared_ptr<tgfx::Texture> SequenceReader::readTexture(int64_t targetFrame,
     cache->textureUploadingTime += GetTimer() - startTime;
     if (!staticContent()) {
       auto nextFrame = getNextFrameAt(targetFrame);
-      if (nextFrame == -1 && pendingFrame >= 0) {
+      if (nextFrame == -1 && pendingFirstFrame >= 0) {
         // Add preparation for the first frame when reach to the end.
-        nextFrame = pendingFrame;
-        pendingFrame = -1;
+        nextFrame = pendingFirstFrame;
+        pendingFirstFrame = -1;
       }
-      if (nextFrame != -1) {
-        lastTask = SequenceTask::MakeAndRun(this, nextFrame);
-      }
+      prepare(nextFrame);
     }
   }
   return lastTexture;

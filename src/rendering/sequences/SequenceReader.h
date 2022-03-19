@@ -32,7 +32,7 @@ class SequenceReader {
   /**
    * Decodes the specified target frame asynchronously.
    */
-  virtual void prepareAsync(int64_t targetFrame);
+  void prepare(int64_t targetFrame);
 
   /**
    * Returns the texture of specified target frame.
@@ -69,15 +69,12 @@ class SequenceReader {
   std::shared_ptr<Task> lastTask = nullptr;
 
  private:
-  int64_t pendingFrame = -1;
+  int64_t pendingFirstFrame = -1;
   int64_t lastFrame = -1;
   std::shared_ptr<tgfx::Texture> lastTexture = nullptr;
 
   friend class SequenceTask;
-};
 
-class SequenceReaderFactory {
- public:
-  virtual ~SequenceReaderFactory() = default;
+  friend class RenderCache;
 };
 }  // namespace pag
