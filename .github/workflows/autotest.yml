@@ -33,7 +33,7 @@ jobs:
             /usr/local/bin/depsync
             /usr/local/Cellar/gcovr
             /usr/local/bin/gcovr
-          key: libpag-environment-20220319
+          key: libpag-environment-20220319_1
           restore-keys: libpag-environment-
       - if: github.event_name == 'pull_request'
         name: Get libpag cache (pull_request)
