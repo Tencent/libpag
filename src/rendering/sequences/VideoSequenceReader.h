@@ -18,19 +18,35 @@
 
 #pragma once
 
-#include "BitmapSequenceReader.h"
-#include "base/utils/Task.h"
+#include "SequenceReader.h"
+#include "pag/file.h"
+#include "rendering/video/VideoReader.h"
 
 namespace pag {
-class BitmapDecodingTask : public Executor {
+class VideoSequenceReader : public SequenceReader {
  public:
-  static std::shared_ptr<Task> MakeAndRun(BitmapSequenceReader* reader, Frame targetFrame);
+  VideoSequenceReader(std::shared_ptr<File> file, VideoSequence* sequence, DecodingPolicy policy);
+
+  ~VideoSequenceReader() override;
+
+  bool staticContent() const override {
+    return sequence->composition->staticContent();
+  }
+
+ protected:
+  int64_t getNextFrameAt(int64_t targetFrame) override;
+
+  bool decodeFrame(int64_t targetFrame) override;
+
+  std::shared_ptr<tgfx::Texture> makeTexture(tgfx::Context* context) override;
+
+  void reportPerformance(Performance* performance, int64_t decodingTime) const override;
 
  private:
-  BitmapSequenceReader* reader = nullptr;
-  Frame targetFrame = 0;
-
-  BitmapDecodingTask(BitmapSequenceReader* reader, Frame targetFrame);
-  void execute() override;
+  // Keep a reference to the File in case the Sequence object is released while we are using it.
+  std::shared_ptr<File> file = nullptr;
+  VideoSequence* sequence = nullptr;
+  std::shared_ptr<VideoReader> reader = nullptr;
+  std::shared_ptr<VideoBuffer> lastBuffer = nullptr;
 };
 }  // namespace pag

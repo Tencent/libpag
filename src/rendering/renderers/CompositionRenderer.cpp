@@ -22,7 +22,7 @@
 #include "rendering/caches/RenderCache.h"
 #include "rendering/graphics/Picture.h"
 #include "rendering/graphics/Recorder.h"
-#include "rendering/readers/BitmapSequenceReader.h"
+#include "rendering/sequences/SequenceReader.h"
 
 namespace pag {
 class SequenceProxy : public TextureProxy {

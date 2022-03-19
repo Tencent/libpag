@@ -19,7 +19,9 @@
 #pragma once
 
 #include <emscripten/val.h>
-#include "rendering/readers/SequenceReader.h"
+#include "pag/file.h"
+#include "rendering/sequences/SequenceReader.h"
+#include "rendering/video/DecodingPolicy.h"
 
 namespace pag {
 class VideoSequenceReader : public SequenceReader {
@@ -30,10 +32,23 @@ class VideoSequenceReader : public SequenceReader {
 
   void prepareAsync(Frame targetFrame) override;
 
-  std::shared_ptr<tgfx::Texture> readTexture(Frame targetFrame, RenderCache* cache) override;
+  bool staticContent() const override {
+    return sequence->composition->staticContent();
+  }
+
+ protected:
+  int64_t getNextFrameAt(int64_t targetFrame) override;
+
+  bool decodeFrame(int64_t targetFrame) override;
+
+  std::shared_ptr<tgfx::Texture> makeTexture(tgfx::Context* context) override;
+
+  void reportPerformance(Performance* performance, int64_t decodingTime) const override;
 
  private:
-  Frame lastFrame = -1;
+  // Keep a reference to the File in case the Sequence object is released while we are using it.
+  std::shared_ptr<File> file = nullptr;
+  VideoSequence* sequence = nullptr;
   emscripten::val videoReader = emscripten::val::null();
   std::shared_ptr<tgfx::Texture> texture = nullptr;
   int32_t width = 0;

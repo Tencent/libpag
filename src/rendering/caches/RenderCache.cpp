@@ -25,6 +25,8 @@
 #include "rendering/caches/ImageContentCache.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/renderers/FilterRenderer.h"
+#include "rendering/sequences/BitmapSequenceReader.h"
+#include "rendering/sequences/VideoSequenceReader.h"
 
 namespace pag {
 // 300M设置的大一些用于兜底，通常在大于20M时就开始随时清理。
@@ -408,10 +410,10 @@ static std::shared_ptr<SequenceReader> MakeSequenceReader(std::shared_ptr<File> 
   std::shared_ptr<SequenceReader> reader = nullptr;
   if (sequence->composition->type() == CompositionType::Video) {
     if (sequence->composition->staticContent()) {
-      // 全静态的序列帧强制软件解码。
       policy = DecodingPolicy::Software;
     }
-    reader = SequenceReader::Make(std::move(file), static_cast<VideoSequence*>(sequence), policy);
+    reader = std::make_shared<VideoSequenceReader>(std::move(file),
+                                                   static_cast<VideoSequence*>(sequence), policy);
   } else {
     reader = std::make_shared<BitmapSequenceReader>(std::move(file),
                                                     static_cast<BitmapSequence*>(sequence));
@@ -461,10 +463,7 @@ std::shared_ptr<SequenceReader> RenderCache::getSequenceReader(Sequence* sequenc
   auto result = sequenceCaches.find(compositionID);
   if (result != sequenceCaches.end()) {
     reader = result->second;
-    if (reader->getSequence() != sequence) {
-      clearSequenceCache(compositionID);
-      reader = nullptr;
-    } else if (staticComposition) {
+    if (staticComposition) {
       // 完全静态的序列帧是预测生成的，第一次访问时就可以移除，上层会进行缓存。
       sequenceCaches.erase(result);
     }

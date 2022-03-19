@@ -33,7 +33,7 @@
 #include "rendering/graphics/Picture.h"
 #include "rendering/graphics/Snapshot.h"
 #include "rendering/layers/PAGStage.h"
-#include "rendering/readers/BitmapSequenceReader.h"
+#include "rendering/sequences/SequenceReader.h"
 #include "rendering/video/DecodingPolicy.h"
 
 namespace pag {

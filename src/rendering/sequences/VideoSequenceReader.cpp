@@ -18,18 +18,12 @@
 
 #include "VideoSequenceReader.h"
 #include "VideoSequenceDemuxer.h"
-#include "rendering/caches/RenderCache.h"
+#include "base/utils/TimeUtil.h"
 
 namespace pag {
-std::shared_ptr<SequenceReader> SequenceReader::Make(std::shared_ptr<File> file,
-                                                     VideoSequence* sequence,
-                                                     DecodingPolicy policy) {
-  return std::make_shared<VideoSequenceReader>(std::move(file), sequence, policy);
-}
-
 VideoSequenceReader::VideoSequenceReader(std::shared_ptr<File> file, VideoSequence* sequence,
                                          DecodingPolicy policy)
-    : SequenceReader(std::move(file), sequence) {
+    : file(std::move(file)), sequence(sequence) {
   VideoConfig config = {};
   auto demuxer = std::make_unique<VideoSequenceDemuxer>(sequence);
   config.hasAlpha = sequence->alphaStartX + sequence->alphaStartY > 0;
@@ -51,55 +45,34 @@ VideoSequenceReader::VideoSequenceReader(std::shared_ptr<File> file, VideoSequen
   reader = std::make_unique<VideoReader>(config, std::move(demuxer), policy);
 }
 
-void VideoSequenceReader::prepareAsync(Frame targetFrame) {
-  if (!reader) {
-    return;
-  }
-  auto targetTime = FrameToTime(targetFrame, sequence->frameRate);
-  if (lastTask != nullptr) {
-    if (lastFrame != -1) {
-      pendingTime = targetTime;
-    }
-  } else {
-    lastTask = VideoDecodingTask::MakeAndRun(reader.get(), targetTime);
-  }
+VideoSequenceReader::~VideoSequenceReader() {
+  lastTask = nullptr;
 }
 
-std::shared_ptr<tgfx::Texture> VideoSequenceReader::readTexture(Frame targetFrame,
-                                                                RenderCache* cache) {
+int64_t VideoSequenceReader::getNextFrameAt(int64_t targetFrame) {
+  auto nextFrame = targetFrame + 1;
+  return nextFrame >= sequence->duration() ? -1 : nextFrame;
+}
+
+bool VideoSequenceReader::decodeFrame(int64_t targetFrame) {
   if (!reader) {
+    return false;
+  }
+  auto targetTime = FrameToTime(targetFrame, sequence->frameRate);
+  lastBuffer = reader->readSample(targetTime);
+  return lastBuffer != nullptr;
+}
+
+std::shared_ptr<tgfx::Texture> VideoSequenceReader::makeTexture(tgfx::Context* context) {
+  if (lastBuffer == nullptr) {
     return nullptr;
   }
-  if (lastFrame == targetFrame) {
-    return lastTexture;
+  return lastBuffer->makeTexture(context);
+}
+
+void VideoSequenceReader::reportPerformance(Performance* performance, int64_t decodingTime) const {
+  if (reader != nullptr) {
+    reader->reportPerformance(performance, decodingTime);
   }
-  auto startTime = GetTimer();
-  // setting task to nullptr triggers cancel(), in case the bitmap content changes before we
-  // makeTexture().
-  lastTask = nullptr;
-  auto targetTime = FrameToTime(targetFrame, sequence->frameRate);
-  auto buffer = reader->readSample(targetTime);
-  auto decodingTime = GetTimer() - startTime;
-  reader->recordPerformance(cache, decodingTime);
-  lastTexture = nullptr;  // Release the last texture for reusing in context.
-  lastFrame = -1;
-  if (buffer) {
-    startTime = GetTimer();
-    lastTexture = buffer->makeTexture(cache->getContext());
-    lastFrame = targetFrame;
-    cache->textureUploadingTime += GetTimer() - startTime;
-    if (!staticContent) {
-      auto nextSampleTime = reader->getNextSampleTimeAt(targetTime);
-      if (nextSampleTime == INT64_MAX && pendingTime >= 0) {
-        // Add preparation for the first frame when reach to the end.
-        nextSampleTime = pendingTime;
-        pendingTime = -1;
-      }
-      if (nextSampleTime != INT64_MAX) {
-        lastTask = VideoDecodingTask::MakeAndRun(reader.get(), nextSampleTime);
-      }
-    }
-  }
-  return lastTexture;
 }
 }  // namespace pag
