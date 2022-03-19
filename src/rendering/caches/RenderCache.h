@@ -34,7 +34,7 @@
 #include "rendering/graphics/Snapshot.h"
 #include "rendering/layers/PAGStage.h"
 #include "rendering/readers/BitmapSequenceReader.h"
-#include "video/DecodingPolicy.h"
+#include "rendering/video/DecodingPolicy.h"
 
 namespace pag {
 class RenderCache : public Performance {

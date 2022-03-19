@@ -21,7 +21,8 @@
 
 namespace pag {
 Sequence* Sequence::Get(Composition* composition) {
-  // Currently, we use the last one for best rendering quality, ignore all others.
+  // Multiple sequences in one composition is no longer supported. Right now we just use the last
+  // one for best rendering quality, ignore all others.
   if (composition != nullptr) {
     switch (composition->type()) {
       case CompositionType::Video:

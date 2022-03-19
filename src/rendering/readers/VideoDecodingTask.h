@@ -18,28 +18,19 @@
 
 #pragma once
 
-#include <climits>
-#include "pag/file.h"
-#include "video/MediaDemuxer.h"
+#include "base/utils/Task.h"
+#include "rendering/video/VideoReader.h"
 
 namespace pag {
-class VideoSequenceDemuxer : public MediaDemuxer {
+class VideoDecodingTask : public Executor {
  public:
-  explicit VideoSequenceDemuxer(VideoSequence* sequence);
-
-  void seekTo(int64_t timeUs) override;
-
-  int64_t getSampleTime() override;
-
-  bool advance() override;
-
-  SampleData readSampleData() override;
+  static std::shared_ptr<Task> MakeAndRun(VideoReader* reader, int64_t targetTime);
 
  private:
-  VideoSequence* sequence;
-  int seekFrameIndex = INT_MIN;
-  int currentFrameIndex = 0;
+  VideoReader* reader = nullptr;
+  int64_t targetTime = 0;
 
-  std::shared_ptr<PTSDetail> createPTSDetail() override;
+  VideoDecodingTask(VideoReader* reader, int64_t targetTime);
+  void execute() override;
 };
 }  // namespace pag

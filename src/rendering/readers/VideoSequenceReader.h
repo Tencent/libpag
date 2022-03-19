@@ -21,7 +21,7 @@
 #include "VideoDecodingTask.h"
 #include "base/utils/TimeUtil.h"
 #include "rendering/readers/SequenceReader.h"
-#include "video/VideoReader.h"
+#include "rendering/video/VideoReader.h"
 
 namespace pag {
 class VideoSequenceReader : public SequenceReader {

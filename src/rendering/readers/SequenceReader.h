@@ -21,7 +21,7 @@
 #include "pag/file.h"
 #include "rendering/Performance.h"
 #include "rendering/graphics/TextureProxy.h"
-#include "video/DecodingPolicy.h"
+#include "rendering/video/DecodingPolicy.h"
 
 namespace pag {
 class RenderCache;

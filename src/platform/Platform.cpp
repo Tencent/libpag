@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Platform.h"
-#include "video/VideoDecoder.h"
+#include "rendering/video/VideoDecoder.h"
 
 namespace pag {
 bool Platform::hasHardwareDecoder() const {
