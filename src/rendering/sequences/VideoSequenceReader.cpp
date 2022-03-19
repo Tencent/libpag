@@ -16,6 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#ifndef PAG_BUILD_FOR_WEB
+
 #include "VideoSequenceReader.h"
 #include "VideoSequenceDemuxer.h"
 #include "base/utils/TimeUtil.h"
@@ -76,3 +78,5 @@ void VideoSequenceReader::reportPerformance(Performance* performance, int64_t de
   }
 }
 }  // namespace pag
+
+#endif

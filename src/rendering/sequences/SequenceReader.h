@@ -28,7 +28,7 @@ class RenderCache;
 class SequenceReader {
  public:
   virtual ~SequenceReader();
-  
+
   /**
    * Decodes the specified target frame asynchronously.
    */

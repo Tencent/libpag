@@ -88,11 +88,6 @@ file(GLOB_RECURSE PAG_FILES
         src/codec/*.*
         src/rendering/*.*)
 
-if (NOT WEB)
-    file(GLOB PAG_VIDEO_FILES src/video/*.*)
-    list(APPEND PAG_FILES ${PAG_VIDEO_FILES})
-endif ()
-
 file(GLOB PAG_COMMON_FILES src/platform/*.*)
 list(APPEND PAG_FILES ${PAG_COMMON_FILES})
 

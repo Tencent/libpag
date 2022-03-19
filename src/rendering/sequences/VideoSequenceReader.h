@@ -16,6 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#ifndef PAG_BUILD_FOR_WEB
+
 #pragma once
 
 #include "SequenceReader.h"
@@ -50,3 +52,9 @@ class VideoSequenceReader : public SequenceReader {
   std::shared_ptr<VideoBuffer> lastBuffer = nullptr;
 };
 }  // namespace pag
+
+#else
+
+#include "platform/web/VideoSequenceReader.h"
+
+#endif
