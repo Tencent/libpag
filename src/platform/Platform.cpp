@@ -24,7 +24,7 @@ bool Platform::hasHardwareDecoder() const {
   return false;
 }
 
-std::unique_ptr<VideoDecoder> Platform::makeHardwareDecoder(const VideoConfig&) const {
+std::unique_ptr<VideoDecoder> Platform::makeHardwareDecoder(const VideoFormat&) const {
   return nullptr;
 }
 

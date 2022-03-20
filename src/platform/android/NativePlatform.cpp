@@ -49,8 +49,8 @@ void NativePlatform::InitJNI(JNIEnv* env) {
 }
 
 std::unique_ptr<VideoDecoder> NativePlatform::makeHardwareDecoder(
-    const pag::VideoConfig& config) const {
-  auto decoder = new GPUDecoder(config);
+    const pag::VideoFormat& format) const {
+  auto decoder = new GPUDecoder(format);
   if (!decoder->isValid()) {
     delete decoder;
     return nullptr;

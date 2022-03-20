@@ -26,11 +26,11 @@ namespace pag {
 class SoftwareDecoderWrapper : public VideoDecoder {
  public:
   static std::unique_ptr<VideoDecoder> Wrap(std::shared_ptr<SoftwareDecoder> softwareDecoder,
-                                            const VideoConfig& config);
+                                            const VideoFormat& format);
 
   ~SoftwareDecoderWrapper() override;
 
-  bool onConfigure(const VideoConfig& config);
+  bool onConfigure(const VideoFormat& format);
 
   DecodingResult onSendBytes(void* bytes, size_t length, int64_t time) override;
 
@@ -46,7 +46,7 @@ class SoftwareDecoderWrapper : public VideoDecoder {
 
  private:
   std::shared_ptr<SoftwareDecoder> softwareDecoder = nullptr;
-  VideoConfig videoConfig = {};
+  VideoFormat videoFormat = {};
   uint8_t* frameBytes = nullptr;
   size_t frameLength = 0;
   int64_t currentDecodedTime = -1;

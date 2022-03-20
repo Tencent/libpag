@@ -35,8 +35,8 @@ void NativePlatform::setNALUType(NALUType type) const {
   defaultType = type;
 }
 
-std::unique_ptr<VideoDecoder> NativePlatform::makeHardwareDecoder(const VideoConfig& config) const {
-  auto decoder = new GPUDecoder(config);
+std::unique_ptr<VideoDecoder> NativePlatform::makeHardwareDecoder(const VideoFormat& format) const {
+  auto decoder = new GPUDecoder(format);
   if (!decoder->isInitialized) {
     delete decoder;
     return nullptr;

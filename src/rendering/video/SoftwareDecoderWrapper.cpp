@@ -45,12 +45,12 @@ class SoftwareI420Buffer : public I420Buffer {
 };
 
 std::unique_ptr<VideoDecoder> SoftwareDecoderWrapper::Wrap(
-    std::shared_ptr<SoftwareDecoder> softwareDecoder, const VideoConfig& config) {
+    std::shared_ptr<SoftwareDecoder> softwareDecoder, const VideoFormat& format) {
   if (softwareDecoder == nullptr) {
     return nullptr;
   }
   auto decoder = new SoftwareDecoderWrapper(std::move(softwareDecoder));
-  if (!decoder->onConfigure(config)) {
+  if (!decoder->onConfigure(format)) {
     delete decoder;
     return nullptr;
   }
@@ -66,12 +66,12 @@ SoftwareDecoderWrapper::~SoftwareDecoderWrapper() {
   pendingFrames.clear();
 }
 
-bool SoftwareDecoderWrapper::onConfigure(const VideoConfig& config) {
-  videoConfig = config;
+bool SoftwareDecoderWrapper::onConfigure(const VideoFormat& format) {
+  videoFormat = format;
   if (Platform::Current()->naluType() != NALUType::AnnexB) {
     // External decoders only support AnnexB format.
-    videoConfig.headers.clear();
-    for (auto& header : config.headers) {
+    videoFormat.headers.clear();
+    for (auto& header : format.headers) {
       if (header->length() <= 4) {
         return false;
       }
@@ -82,18 +82,18 @@ bool SoftwareDecoderWrapper::onConfigure(const VideoConfig& config) {
       bytes[2] = 0;
       bytes[3] = 1;
       memcpy(bytes + 4, header->data() + 4, header->length() - 4);
-      videoConfig.headers.push_back(std::move(newHeader));
+      videoFormat.headers.push_back(std::move(newHeader));
     }
   }
   std::vector<HeaderData> codecHeaders = {};
-  for (auto& header : videoConfig.headers) {
+  for (auto& header : videoFormat.headers) {
     HeaderData newHeader = {};
     newHeader.data = header->data();
     newHeader.length = header->length();
     codecHeaders.push_back(newHeader);
   }
-  return softwareDecoder->onConfigure(codecHeaders, videoConfig.mimeType, videoConfig.width,
-                                      videoConfig.height);
+  return softwareDecoder->onConfigure(codecHeaders, videoFormat.mimeType, videoFormat.width,
+                                      videoFormat.height);
 }
 
 DecodingResult SoftwareDecoderWrapper::onSendBytes(void* bytes, size_t length, int64_t time) {
@@ -171,8 +171,8 @@ std::shared_ptr<VideoBuffer> SoftwareDecoderWrapper::onRenderFrame() {
   if (frame == nullptr) {
     return nullptr;
   }
-  return SoftwareI420Buffer::Make(videoConfig.width, videoConfig.height, frame->data,
-                                  frame->lineSize, videoConfig.colorSpace, videoConfig.colorRange,
+  return SoftwareI420Buffer::Make(videoFormat.width, videoFormat.height, frame->data,
+                                  frame->lineSize, videoFormat.colorSpace, videoFormat.colorRange,
                                   softwareDecoder);
 }
 

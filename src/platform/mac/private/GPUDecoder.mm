@@ -22,8 +22,8 @@
 #define DEFAULT_MAX_NUM_REORDER 4
 
 namespace pag {
-GPUDecoder::GPUDecoder(const VideoConfig& config) : colorSpace(config.colorSpace) {
-  isInitialized = initVideoToolBox(config.headers, config.mimeType);
+GPUDecoder::GPUDecoder(const VideoFormat& format) : colorSpace(format.colorSpace) {
+  isInitialized = initVideoToolBox(format.headers, format.mimeType);
 }
 
 GPUDecoder::~GPUDecoder() {

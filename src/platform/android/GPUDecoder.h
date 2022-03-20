@@ -28,7 +28,7 @@ class GPUDecoder : public VideoDecoder {
  public:
   static void InitJNI(JNIEnv* env, const std::string& className);
 
-  explicit GPUDecoder(const VideoConfig& config);
+  explicit GPUDecoder(const VideoFormat& format);
 
   ~GPUDecoder() override;
 
@@ -55,6 +55,6 @@ class GPUDecoder : public VideoDecoder {
   std::shared_ptr<VideoSurface> videoSurface = nullptr;
   Global<jobject> videoDecoder;
 
-  bool onConfigure(jobject decoder, const VideoConfig& config);
+  bool onConfigure(jobject decoder, const VideoFormat& format);
 };
 }  // namespace pag

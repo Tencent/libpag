@@ -2002,7 +2002,10 @@ class PAG_API VideoFrame {
    */
   bool isKeyframe = false;
 
-  pag::Frame frame = 0;
+  /**
+   * The presentation frame index.
+   */
+  Frame frame = 0;
 
   /**
    * The file bytes of the video frame.

@@ -181,9 +181,9 @@ class RenderCache : public Performance {
   void removeTextAtlas(ID assetID);
   TextAtlas* getTextAtlas(ID assetID) const;
 
-  void preparePreComposeLayer(PreComposeLayer* layer, DecodingPolicy policy);
+  void preparePreComposeLayer(PreComposeLayer* layer, DecoderPolicy policy);
   void prepareImageLayer(PAGImageLayer* layer);
   std::shared_ptr<SequenceReader> getSequenceReaderInternal(const SequenceReaderFactory* factory,
-                                                            DecodingPolicy policy);
+                                                            DecoderPolicy policy);
 };
 }  // namespace pag

@@ -18,16 +18,12 @@
 
 #include "RenderCache.h"
 #include <functional>
-#include <map>
 #include "base/utils/TimeUtil.h"
-#include "base/utils/USE.h"
 #include "base/utils/UniqueID.h"
 #include "core/Clock.h"
 #include "rendering/caches/ImageContentCache.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/renderers/FilterRenderer.h"
-#include "rendering/sequences/BitmapSequenceReader.h"
-#include "rendering/sequences/VideoSequenceReader.h"
 
 namespace pag {
 // 300M设置的大一些用于兜底，通常在大于20M时就开始随时清理。
@@ -100,7 +96,7 @@ bool RenderCache::initFilter(Filter* filter) {
   return result;
 }
 
-void RenderCache::preparePreComposeLayer(PreComposeLayer* layer, DecodingPolicy policy) {
+void RenderCache::preparePreComposeLayer(PreComposeLayer* layer, DecoderPolicy policy) {
   auto composition = layer->composition;
   if (composition->type() != CompositionType::Video &&
       composition->type() != CompositionType::Bitmap) {
@@ -180,8 +176,8 @@ void RenderCache::prepareFrame() {
   for (auto& item : layerDistances) {
     for (auto pagLayer : item.second) {
       if (pagLayer->layerType() == LayerType::PreCompose) {
-        auto policy = item.first < MIN_HARDWARE_PREPARE_TIME ? DecodingPolicy::SoftwareToHardware
-                                                             : DecodingPolicy::Hardware;
+        auto policy = item.first < MIN_HARDWARE_PREPARE_TIME ? DecoderPolicy::SoftwareToHardware
+                                                             : DecoderPolicy::Hardware;
         preparePreComposeLayer(static_cast<PreComposeLayer*>(pagLayer->layer), policy);
       } else if (pagLayer->layerType() == LayerType::Image) {
         prepareImageLayer(static_cast<PAGImageLayer*>(pagLayer));
@@ -424,7 +420,7 @@ void RenderCache::prepareSequenceReader(const SequenceReaderFactory* factory, Fr
     // 静态的序列帧采用位图的缓存逻辑，如果上层缓存过 Snapshot 就不需要预测。
     return;
   }
-  auto reader = getSequenceReaderInternal(factory, DecodingPolicy::SoftwareToHardware);
+  auto reader = getSequenceReaderInternal(factory, DecoderPolicy::SoftwareToHardware);
   if (reader) {
     reader->prepare(targetFrame);
   }
@@ -435,7 +431,7 @@ std::shared_ptr<SequenceReader> RenderCache::getSequenceReader(
   if (factory == nullptr) {
     return nullptr;
   }
-  auto reader = getSequenceReaderInternal(factory, DecodingPolicy::SoftwareToHardware);
+  auto reader = getSequenceReaderInternal(factory, DecoderPolicy::SoftwareToHardware);
   if (reader && factory->staticContent()) {
     // There is no need to cache a reader for the static sequence, it has already been cached as
     // a snapshot. We get here because the reader was created by prepare() methods.
@@ -445,7 +441,7 @@ std::shared_ptr<SequenceReader> RenderCache::getSequenceReader(
 }
 
 std::shared_ptr<SequenceReader> RenderCache::getSequenceReaderInternal(
-    const SequenceReaderFactory* factory, DecodingPolicy policy) {
+    const SequenceReaderFactory* factory, DecoderPolicy policy) {
   if (factory == nullptr) {
     return nullptr;
   }
@@ -462,7 +458,7 @@ std::shared_ptr<SequenceReader> RenderCache::getSequenceReaderInternal(
   if (reader == nullptr) {
     auto file = stage->getFileFromReferenceMap(assetID);
     if (factory->staticContent()) {
-      policy = DecodingPolicy::Software;
+      policy = DecoderPolicy::Software;
     }
     reader = factory->makeReader(file, policy);
     if (reader) {

@@ -72,10 +72,10 @@ SoftwareDecoderFactory* VideoDecoder::GetExternalSoftwareDecoderFactory() {
   return softwareDecoderFactory;
 }
 
-std::unique_ptr<VideoDecoder> VideoDecoder::CreateHardwareDecoder(const VideoConfig& config) {
+std::unique_ptr<VideoDecoder> VideoDecoder::CreateHardwareDecoder(const VideoFormat& format) {
   std::unique_ptr<VideoDecoder> videoDecoder = nullptr;
   if (globalGPUDecoderCount < VideoDecoder::GetMaxHardwareDecoderCount()) {
-    videoDecoder = Platform::Current()->makeHardwareDecoder(config);
+    videoDecoder = Platform::Current()->makeHardwareDecoder(format);
   }
   if (videoDecoder != nullptr) {
     globalGPUDecoderCount++;
@@ -84,16 +84,16 @@ std::unique_ptr<VideoDecoder> VideoDecoder::CreateHardwareDecoder(const VideoCon
   return videoDecoder;
 }
 
-std::unique_ptr<VideoDecoder> VideoDecoder::CreateSoftwareDecoder(const VideoConfig& config) {
+std::unique_ptr<VideoDecoder> VideoDecoder::CreateSoftwareDecoder(const VideoFormat& format) {
   std::unique_ptr<VideoDecoder> videoDecoder = nullptr;
   SoftwareDecoderFactory* factory = softwareDecoderFactory;
   if (factory != nullptr) {
-    videoDecoder = SoftwareDecoderWrapper::Wrap(factory->createSoftwareDecoder(), config);
+    videoDecoder = SoftwareDecoderWrapper::Wrap(factory->createSoftwareDecoder(), format);
   }
 
 #ifdef PAG_USE_LIBAVC
   if (videoDecoder == nullptr) {
-    videoDecoder = SoftwareDecoderWrapper::Wrap(std::make_unique<SoftAVCDecoder>(), config);
+    videoDecoder = SoftwareDecoderWrapper::Wrap(std::make_unique<SoftAVCDecoder>(), format);
     if (videoDecoder != nullptr) {
       LOGI("All other video decoders are not available, fallback to SoftAVCDecoder!");
     }
@@ -108,8 +108,8 @@ std::unique_ptr<VideoDecoder> VideoDecoder::CreateSoftwareDecoder(const VideoCon
   return videoDecoder;
 }
 
-std::unique_ptr<VideoDecoder> VideoDecoder::Make(const VideoConfig& config, bool useHardware) {
-  return useHardware ? CreateHardwareDecoder(config) : CreateSoftwareDecoder(config);
+std::unique_ptr<VideoDecoder> VideoDecoder::Make(const VideoFormat& format, bool useHardware) {
+  return useHardware ? CreateHardwareDecoder(format) : CreateSoftwareDecoder(format);
 }
 
 VideoDecoder::~VideoDecoder() {

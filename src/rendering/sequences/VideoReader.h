@@ -18,65 +18,53 @@
 
 #pragma once
 
-#include "DecodingPolicy.h"
-#include "MediaDemuxer.h"
-#include "VideoDecoder.h"
-#include "base/utils/Task.h"
-#include "rendering/Performance.h"
+#include "DecoderPolicy.h"
+#include "SequenceReader.h"
+#include "rendering/video/VideoDecoder.h"
+#include "rendering/video/VideoDemuxer.h"
 
 namespace pag {
-class VideoReader {
+class VideoReader : public SequenceReader {
  public:
-  VideoReader(VideoConfig videoConfig, std::unique_ptr<MediaDemuxer> demuxer,
-              DecodingPolicy policy = DecodingPolicy::Hardware);
+  explicit VideoReader(std::unique_ptr<VideoDemuxer> demuxer,
+                       DecoderPolicy policy = DecoderPolicy::Hardware);
 
-  ~VideoReader();
+  ~VideoReader() override;
 
-  int64_t getSampleTimeAt(int64_t targetTime);
+ protected:
+  bool decodeFrame(Frame targetFrame) override;
 
-  /**
-   * 如果不存在有效的下一帧，返回 INT64_MAX。
-   */
-  int64_t getNextSampleTimeAt(int64_t targetTime);
+  std::shared_ptr<tgfx::Texture> makeTexture(tgfx::Context* context) override;
 
-  std::shared_ptr<VideoBuffer> readSample(int64_t targetTime);
-
-  void recordPerformance(Performance* performance, int64_t decodingTime);
+  void recordPerformance(Performance* performance, int64_t decodingTime) override;
 
  private:
   std::mutex locker = {};
-  VideoConfig videoConfig = {};
-  MediaDemuxer* demuxer = nullptr;
+  VideoDemuxer* demuxer = nullptr;
+  float frameRate = 0.0;
+  int decoderTypeIndex = 0;
   std::shared_ptr<Task> gpuDecoderTask = nullptr;
   VideoDecoder* videoDecoder = nullptr;
-  int decoderTypeIndex = 0;
-
-  std::shared_ptr<VideoBuffer> outputBuffer = nullptr;
+  std::shared_ptr<VideoBuffer> lastBuffer = nullptr;
   bool outputEndOfStream = false;
-  bool needsAdvance = false;
   bool inputEndOfStream = false;
   int64_t currentDecodedTime = INT64_MIN;
   int64_t currentRenderedTime = INT64_MIN;
-
   int64_t hardDecodingInitialTime = 0;
   int64_t softDecodingInitialTime = 0;
 
   void destroyVideoDecoder();
 
-  void tryMakeVideoDecoder();
+  bool checkVideoDecoder();
 
   void resetParams();
 
-  bool sendData();
-
-  bool decodeFrame(int64_t sampleTime);
+  bool sendSampleData();
 
   bool onDecodeFrame(int64_t sampleTime);
 
   bool switchToGPUDecoderOfTask();
 
-  bool renderFrame(int64_t sampleTime);
-
-  VideoDecoder* makeDecoder();
+  VideoDecoder* makeVideoDecoder();
 };
 }  // namespace pag

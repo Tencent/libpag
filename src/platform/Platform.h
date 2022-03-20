@@ -27,7 +27,7 @@
 #include "core/ImageInfo.h"
 
 namespace pag {
-struct VideoConfig;
+struct VideoFormat;
 class VideoDecoder;
 
 /**
@@ -48,10 +48,10 @@ class Platform {
   virtual bool hasHardwareDecoder() const;
 
   /**
-   * Creates a hardware backed VideoDecoder with the specified video config. Returns nullptr if
+   * Creates a hardware backed VideoDecoder with the specified video format. Returns nullptr if
    * current platform has no hardware decoder support.
    */
-  virtual std::unique_ptr<VideoDecoder> makeHardwareDecoder(const VideoConfig& config) const;
+  virtual std::unique_ptr<VideoDecoder> makeHardwareDecoder(const VideoFormat& format) const;
 
   /**
    * Implement this method to register the default fallback font list. User should call

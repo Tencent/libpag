@@ -20,26 +20,34 @@
 
 #include <climits>
 #include "pag/file.h"
-#include "rendering/video/MediaDemuxer.h"
+#include "rendering/video/VideoDemuxer.h"
 
 namespace pag {
-class VideoSequenceDemuxer : public MediaDemuxer {
+class VideoSequenceDemuxer : public VideoDemuxer {
  public:
-  explicit VideoSequenceDemuxer(VideoSequence* sequence);
+  VideoSequenceDemuxer(std::shared_ptr<File> file, VideoSequence* sequence);
 
-  void seekTo(int64_t timeUs) override;
+  VideoFormat getFormat() const override {
+    return format;
+  }
 
-  int64_t getSampleTime() override;
+  SampleData nextSample() override;
 
-  bool advance() override;
+  int64_t getSampleTimeAt(int64_t targetTime) const override;
 
-  SampleData readSampleData() override;
+  bool needSeeking(int64_t currentSampleTime, int64_t targetSampleTime) const override;
+
+  void seekTo(int64_t targetTime) override;
+
+  void reset() override;
 
  private:
-  VideoSequence* sequence;
-  int seekFrameIndex = INT_MIN;
-  int currentFrameIndex = 0;
-
-  std::shared_ptr<PTSDetail> createPTSDetail() override;
+  // Keep a reference to the File in case the Sequence object is released while we are using it.
+  std::shared_ptr<File> file = nullptr;
+  VideoSequence* sequence = nullptr;
+  VideoFormat format = {};
+  std::vector<Frame> keyframes = {};
+  Frame maxPTSFrame = -1;
+  Frame sampleIndex = 0;
 };
 }  // namespace pag

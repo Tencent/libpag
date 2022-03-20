@@ -18,9 +18,10 @@
 
 #pragma once
 
-#include "SequenceReaderFactory.h"
+#include "SequenceReader.h"
 #include "base/utils/Task.h"
 #include "core/Bitmap.h"
+#include "pag/file.h"
 #include "rendering/Performance.h"
 #include "rendering/graphics/TextureProxy.h"
 
@@ -31,18 +32,12 @@ class BitmapSequenceReader : public SequenceReader {
 
   ~BitmapSequenceReader() override;
 
-  bool staticContent() const override {
-    return sequence->composition->staticContent();
-  }
-
  protected:
-  int64_t getNextFrameAt(int64_t targetFrame) override;
-
-  bool decodeFrame(int64_t targetFrame) override;
+  bool decodeFrame(Frame targetFrame) override;
 
   std::shared_ptr<tgfx::Texture> makeTexture(tgfx::Context* context) override;
 
-  void recordPerformance(Performance* performance, int64_t decodingTime) const override;
+  void recordPerformance(Performance* performance, int64_t decodingTime) override;
 
  private:
   std::mutex locker = {};

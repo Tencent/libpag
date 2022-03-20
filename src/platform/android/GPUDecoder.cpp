@@ -61,12 +61,12 @@ void GPUDecoder::InitJNI(JNIEnv* env, const std::string& className) {
       env->GetMethodID(MediaFormatClass.get(), "setFloat", "(Ljava/lang/String;F)V");
 }
 
-GPUDecoder::GPUDecoder(const VideoConfig& config) {
+GPUDecoder::GPUDecoder(const VideoFormat& format) {
   auto env = JNIEnvironment::Current();
   if (env == nullptr) {
     return;
   }
-  videoSurface = VideoSurface::Make(config.width, config.height);
+  videoSurface = VideoSurface::Make(format.width, format.height);
   if (videoSurface == nullptr) {
     return;
   }
@@ -79,7 +79,7 @@ GPUDecoder::GPUDecoder(const VideoConfig& config) {
     return;
   }
   videoDecoder.reset(env, decoder.get());
-  _isValid = onConfigure(decoder.get(), config);
+  _isValid = onConfigure(decoder.get(), format);
 }
 
 GPUDecoder::~GPUDecoder() {
@@ -92,28 +92,28 @@ GPUDecoder::~GPUDecoder() {
   }
 }
 
-bool GPUDecoder::onConfigure(jobject decoder, const VideoConfig& config) {
-  videoWidth = config.width;
-  videoHeight = config.height;
+bool GPUDecoder::onConfigure(jobject decoder, const VideoFormat& format) {
+  videoWidth = format.width;
+  videoHeight = format.height;
   auto env = JNIEnvironment::Current();
   if (env == nullptr) {
     return false;
   }
-  Local<jstring> mimeType = {env, SafeConvertToJString(env, config.mimeType.c_str())};
+  Local<jstring> mimeType = {env, SafeConvertToJString(env, format.mimeType.c_str())};
   Local<jobject> mediaFormat = {
       env, env->CallStaticObjectMethod(MediaFormatClass.get(), MediaFormat_createVideoFormat,
-                                       mimeType.get(), config.width, config.height)};
-  if (config.mimeType == "video/hevc") {
-    if (!config.headers.empty()) {
+                                       mimeType.get(), format.width, format.height)};
+  if (format.mimeType == "video/hevc") {
+    if (!format.headers.empty()) {
       char keyString[] = "csd-0";
       Local<jstring> key = {env, SafeConvertToJString(env, keyString)};
       int dataLength = 0;
-      for (auto& header : config.headers) {
+      for (auto& header : format.headers) {
         dataLength += header->length();
       }
       auto data = new uint8_t[dataLength];
       int index = 0;
-      for (auto& header : config.headers) {
+      for (auto& header : format.headers) {
         memcpy(data + index, header->data(), header->length());
         index += header->length();
       }
@@ -123,7 +123,7 @@ bool GPUDecoder::onConfigure(jobject decoder, const VideoConfig& config) {
     }
   } else {
     int index = 0;
-    for (auto& header : config.headers) {
+    for (auto& header : format.headers) {
       char keyString[6];
       snprintf(keyString, 6, "csd-%d", index);
       Local<jstring> key = {env, SafeConvertToJString(env, keyString)};
@@ -135,7 +135,7 @@ bool GPUDecoder::onConfigure(jobject decoder, const VideoConfig& config) {
   char frameRateKeyString[] = "frame-rate";
   Local<jstring> frameRateKey = {env, SafeConvertToJString(env, frameRateKeyString)};
   env->CallVoidMethod(mediaFormat.get(), MediaFormat_setFloat, frameRateKey.get(),
-                      config.frameRate);
+                      format.frameRate);
   return env->CallBooleanMethod(decoder, GPUDecoder_onConfigure, mediaFormat.get());
 }
 

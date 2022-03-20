@@ -26,16 +26,16 @@ const Platform* Platform::Current() {
   return &platform;
 }
 
-std::unique_ptr<VideoDecoder> NativePlatform::makeHardwareDecoder(const VideoConfig& config) const {
+std::unique_ptr<VideoDecoder> NativePlatform::makeHardwareDecoder(const VideoFormat& format) const {
 #if !TARGET_IPHONE_SIMULATOR
-  auto decoder = new GPUDecoder(config);
+  auto decoder = new GPUDecoder(format);
   if (!decoder->isInitialized) {
     delete decoder;
     return nullptr;
   }
   return std::unique_ptr<VideoDecoder>(decoder);
 #else
-  USE(config);
+  USE(format);
   return nullptr;
 #endif
 }
