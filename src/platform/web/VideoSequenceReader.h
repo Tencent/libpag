@@ -39,7 +39,7 @@ class VideoSequenceReader : public SequenceReader {
 
   std::shared_ptr<tgfx::Texture> makeTexture(tgfx::Context* context) override;
 
-  void reportPerformance(Performance* performance, int64_t decodingTime) const override;
+  void recordPerformance(Performance* performance, int64_t decodingTime) const override;
 
  private:
   // Keep a reference to the File in case the Sequence object is released while we are using it.

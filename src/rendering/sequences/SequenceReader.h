@@ -63,7 +63,7 @@ class SequenceReader {
   /**
    * Reports the decoding performance data.
    */
-  virtual void reportPerformance(Performance* performance, int64_t decodingTime) const = 0;
+  virtual void recordPerformance(Performance* performance, int64_t decodingTime) const = 0;
 
  protected:
   std::shared_ptr<Task> lastTask = nullptr;

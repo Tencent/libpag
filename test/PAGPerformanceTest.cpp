@@ -22,8 +22,8 @@
 #include <fstream>
 #include <vector>
 #include "TestUtils.h"
-#include "base/utils/GetTimer.h"
 #include "base/utils/TimeUtil.h"
+#include "core/Clock.h"
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
 #include "nlohmann/json.hpp"

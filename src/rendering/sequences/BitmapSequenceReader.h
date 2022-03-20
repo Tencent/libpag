@@ -42,7 +42,7 @@ class BitmapSequenceReader : public SequenceReader {
 
   std::shared_ptr<tgfx::Texture> makeTexture(tgfx::Context* context) override;
 
-  void reportPerformance(Performance* performance, int64_t decodingTime) const override;
+  void recordPerformance(Performance* performance, int64_t decodingTime) const override;
 
  private:
   std::mutex locker = {};

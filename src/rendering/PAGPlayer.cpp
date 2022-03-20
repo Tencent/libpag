@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "base/utils/GetTimer.h"
 #include "base/utils/TimeUtil.h"
+#include "core/Clock.h"
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "rendering/FileReporter.h"
@@ -263,28 +263,28 @@ bool PAGPlayer::flushInternal(BackendSemaphore* signalSemaphore) {
   // must be called before content comparing, otherwise decoders can not be prepared.
   renderCache->prepareFrame();
 #endif
-  auto renderingStart = GetTimer();
+  tgfx::Clock clock = {};
   if (contentVersion != stage->getContentVersion()) {
     contentVersion = stage->getContentVersion();
     Recorder recorder = {};
     stage->draw(&recorder);
     lastGraphic = recorder.makeGraphic();
   }
-  auto presentingStart = GetTimer();
+  clock.mark("rendering");
   if (lastGraphic) {
     lastGraphic->prepare(renderCache);
   }
   if (!pagSurface->draw(renderCache, lastGraphic, signalSemaphore, _autoClear)) {
     return false;
   }
-  auto finishTime = GetTimer();
-  renderCache->renderingTime = presentingStart - renderingStart;
-  renderCache->presentingTime = finishTime - presentingStart;
+  clock.mark("presenting");
+  renderCache->renderingTime = clock.measure("", "rendering");
+  renderCache->presentingTime = clock.measure("rendering", "presenting");
   renderCache->presentingTime -=
       renderCache->imageDecodingTime + renderCache->textureUploadingTime +
       renderCache->programCompilingTime + renderCache->hardwareDecodingTime +
       renderCache->softwareDecodingTime;
-  renderCache->totalTime = finishTime - renderingStart;
+  renderCache->totalTime = clock.measure("", "presenting");
   //  auto composition = stage->getRootComposition();
   //  if (composition) {
   //    renderCache->printPerformance(composition->currentFrameInternal());

@@ -132,11 +132,11 @@ class RenderCache : public Performance {
 
   LayerStylesFilter* getLayerStylesFilter(Layer* layer);
 
-  void reportImageDecodingTime(int64_t decodingTime);
+  void recordImageDecodingTime(int64_t decodingTime);
 
-  void reportTextureUploadingTime(int64_t time);
+  void recordTextureUploadingTime(int64_t time);
 
-  void reportProgramCompilingTime(int64_t time);
+  void recordProgramCompilingTime(int64_t time);
 
   void releaseAll();
 

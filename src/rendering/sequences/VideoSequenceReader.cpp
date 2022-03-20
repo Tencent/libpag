@@ -72,9 +72,9 @@ std::shared_ptr<tgfx::Texture> VideoSequenceReader::makeTexture(tgfx::Context* c
   return lastBuffer->makeTexture(context);
 }
 
-void VideoSequenceReader::reportPerformance(Performance* performance, int64_t decodingTime) const {
+void VideoSequenceReader::recordPerformance(Performance* performance, int64_t decodingTime) const {
   if (reader != nullptr) {
-    reader->reportPerformance(performance, decodingTime);
+    reader->recordPerformance(performance, decodingTime);
   }
 }
 }  // namespace pag

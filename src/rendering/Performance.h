@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "base/utils/GetTimer.h"
 #include "base/utils/Log.h"
+#include "core/Clock.h"
 #include "pag/types.h"
 
 namespace pag {
