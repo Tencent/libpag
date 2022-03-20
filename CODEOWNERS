@@ -2,9 +2,10 @@
 *       @domchen @lvpengwei
 
 *.js    @zenoslin
-*.sh    @kevingpqi123
+*.ts    @zenoslin
 /web/    @zenoslin
+*.sh    @kevingpqi123
 /.github/   @kevingpqi123
 /test/   @kevingpqi123
-/win/   @kevingpqi123 @FusionXu
 /linux/   @kevingpqi123
+/win/   @FusionXu @kevingpqi123
