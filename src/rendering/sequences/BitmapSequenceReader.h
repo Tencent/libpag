@@ -18,36 +18,40 @@
 
 #pragma once
 
-#include "pag/file.h"
+#include "SequenceReaderFactory.h"
+#include "base/utils/Task.h"
+#include "core/Bitmap.h"
 #include "rendering/Performance.h"
 #include "rendering/graphics/TextureProxy.h"
-#include "video/DecodingPolicy.h"
 
 namespace pag {
-class RenderCache;
-
-class SequenceReader {
+class BitmapSequenceReader : public SequenceReader {
  public:
-  static std::shared_ptr<SequenceReader> Make(std::shared_ptr<File> file, VideoSequence* sequence,
-                                              DecodingPolicy policy);
+  BitmapSequenceReader(std::shared_ptr<File> file, BitmapSequence* sequence);
 
-  SequenceReader(std::shared_ptr<File> file, Sequence* sequence);
+  ~BitmapSequenceReader() override;
 
-  virtual ~SequenceReader() = default;
-
-  Sequence* getSequence() const {
-    return sequence;
+  bool staticContent() const override {
+    return sequence->composition->staticContent();
   }
 
-  virtual void prepareAsync(Frame targetFrame) = 0;
-
-  virtual std::shared_ptr<tgfx::Texture> readTexture(Frame targetFrame, RenderCache* cache) = 0;
-
  protected:
-  // 持有 File 引用，防止在异步解码时 Sequence 被析构。
-  std::shared_ptr<File> file = nullptr;
-  Sequence* sequence = nullptr;
-  bool staticContent = false;
-};
+  int64_t getNextFrameAt(int64_t targetFrame) override;
 
+  bool decodeFrame(int64_t targetFrame) override;
+
+  std::shared_ptr<tgfx::Texture> makeTexture(tgfx::Context* context) override;
+
+  void reportPerformance(Performance* performance, int64_t decodingTime) const override;
+
+ private:
+  std::mutex locker = {};
+  // Keep a reference to the File in case the Sequence object is released while we are using it.
+  std::shared_ptr<File> file = nullptr;
+  BitmapSequence* sequence = nullptr;
+  Frame lastDecodeFrame = -1;
+  std::shared_ptr<tgfx::PixelBuffer> pixelBuffer = nullptr;
+
+  Frame findStartFrame(Frame targetFrame);
+};
 }  // namespace pag

@@ -16,30 +16,44 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#ifndef PAG_BUILD_FOR_WEB
+
 #pragma once
 
-#include <climits>
-#include "pag/file.h"
-#include "video/MediaDemuxer.h"
+#include "SequenceReaderFactory.h"
+#include "rendering/video/VideoReader.h"
 
 namespace pag {
-class VideoSequenceDemuxer : public MediaDemuxer {
+class VideoSequenceReader : public SequenceReader {
  public:
-  explicit VideoSequenceDemuxer(VideoSequence* sequence);
+  VideoSequenceReader(std::shared_ptr<File> file, VideoSequence* sequence, DecodingPolicy policy);
 
-  void seekTo(int64_t timeUs) override;
+  ~VideoSequenceReader() override;
 
-  int64_t getSampleTime() override;
+  bool staticContent() const override {
+    return sequence->composition->staticContent();
+  }
 
-  bool advance() override;
+ protected:
+  int64_t getNextFrameAt(int64_t targetFrame) override;
 
-  SampleData readSampleData() override;
+  bool decodeFrame(int64_t targetFrame) override;
+
+  std::shared_ptr<tgfx::Texture> makeTexture(tgfx::Context* context) override;
+
+  void reportPerformance(Performance* performance, int64_t decodingTime) const override;
 
  private:
-  VideoSequence* sequence;
-  int seekFrameIndex = INT_MIN;
-  int currentFrameIndex = 0;
-
-  std::shared_ptr<PTSDetail> createPTSDetail() override;
+  // Keep a reference to the File in case the Sequence object is released while we are using it.
+  std::shared_ptr<File> file = nullptr;
+  VideoSequence* sequence = nullptr;
+  std::shared_ptr<VideoReader> reader = nullptr;
+  std::shared_ptr<VideoBuffer> lastBuffer = nullptr;
 };
 }  // namespace pag
+
+#else
+
+#include "platform/web/VideoSequenceReader.h"
+
+#endif

@@ -22,35 +22,35 @@
 #include "rendering/caches/RenderCache.h"
 #include "rendering/graphics/Picture.h"
 #include "rendering/graphics/Recorder.h"
-#include "rendering/readers/BitmapSequenceReader.h"
+#include "rendering/sequences/SequenceReaderFactory.h"
 
 namespace pag {
 class SequenceProxy : public TextureProxy {
  public:
-  SequenceProxy(Sequence* sequence, Frame frame, int width, int height)
-      : TextureProxy(width, height), sequence(sequence), frame(frame) {
+  SequenceProxy(Sequence* sequence, Frame targetFrame, int width, int height)
+      : TextureProxy(width, height), factory(SequenceReaderFactory(sequence)),
+        targetFrame(targetFrame) {
   }
 
   bool cacheEnabled() const override {
-    return !sequence->composition->staticContent();
+    return !factory.staticContent();
   }
 
   void prepare(RenderCache* cache) const override {
-    static_cast<RenderCache*>(cache)->prepareSequenceReader(sequence, frame,
-                                                            DecodingPolicy::SoftwareToHardware);
+    static_cast<RenderCache*>(cache)->prepareSequenceReader(&factory, targetFrame);
   }
 
   std::shared_ptr<tgfx::Texture> getTexture(RenderCache* cache) const override {
-    auto reader = static_cast<RenderCache*>(cache)->getSequenceReader(sequence);
+    auto reader = static_cast<RenderCache*>(cache)->getSequenceReader(&factory);
     if (reader) {
-      return reader->readTexture(frame, static_cast<RenderCache*>(cache));
+      return reader->readTexture(targetFrame, static_cast<RenderCache*>(cache));
     }
     return nullptr;
   }
 
  private:
-  Sequence* sequence = nullptr;
-  Frame frame = 0;
+  SequenceReaderFactory factory;
+  Frame targetFrame = 0;
 };
 
 static std::shared_ptr<Graphic> MakeVideoSequenceGraphic(VideoSequence* sequence,

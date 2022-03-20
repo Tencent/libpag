@@ -19,26 +19,16 @@
 #include "base/utils/UniqueID.h"
 #include "pag/file.h"
 #include "pag/pag.h"
+#include "rendering/caches/RenderCache.h"
 #include "rendering/graphics/Recorder.h"
 #include "rendering/utils/ApplyScaleMode.h"
 
 namespace pag {
-PAGImage::PAGImage() : _uniqueID(UniqueID::Next()) {
+PAGImage::PAGImage(int width, int height)
+    : _uniqueID(UniqueID::Next()), _width(width), _height(height) {
 }
 
-ID PAGImage::uniqueID() const {
-  return _uniqueID;
-}
-
-int PAGImage::width() {
-  return static_cast<int>(getContentSize().width());
-}
-
-int PAGImage::height() {
-  return static_cast<int>(getContentSize().height());
-}
-
-int PAGImage::scaleMode() {
+int PAGImage::scaleMode() const {
   std::lock_guard<std::mutex> autoLock(locker);
   return _scaleMode;
 }
@@ -50,7 +40,7 @@ void PAGImage::setScaleMode(int mode) {
   hasSetScaleMode = true;
 }
 
-Matrix PAGImage::matrix() {
+Matrix PAGImage::matrix() const {
   std::lock_guard<std::mutex> autoLock(locker);
   return _matrix;
 }
@@ -66,8 +56,7 @@ Matrix PAGImage::getContentMatrix(int defaultScaleMode, int contentWidth, int co
   auto scaleMode = hasSetScaleMode ? _scaleMode : defaultScaleMode;
   Matrix matrix = {};
   if (scaleMode != PAGScaleMode::None) {
-    auto size = getContentSize();
-    matrix = ApplyScaleMode(scaleMode, size.width(), size.height(), contentWidth, contentHeight);
+    matrix = ApplyScaleMode(scaleMode, _width, _height, contentWidth, contentHeight);
   } else {
     matrix = _matrix;
   }

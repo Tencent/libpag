@@ -18,20 +18,13 @@
 
 #include "VideoSequenceReader.h"
 #include "gpu/opengl/GLTexture.h"
-#include "rendering/caches/RenderCache.h"
 
 using namespace emscripten;
 
 namespace pag {
-std::shared_ptr<SequenceReader> SequenceReader::Make(std::shared_ptr<File> file,
-                                                     VideoSequence* sequence,
-                                                     DecodingPolicy policy) {
-  return std::make_shared<VideoSequenceReader>(std::move(file), sequence, policy);
-}
-
 VideoSequenceReader::VideoSequenceReader(std::shared_ptr<File> file, VideoSequence* sequence,
                                          DecodingPolicy)
-    : SequenceReader(std::move(file), sequence) {
+    : file(std::move(file)), sequence(sequence) {
   width = sequence->alphaStartX + sequence->width;
   if (width % 2 == 1) {
     width++;
@@ -59,34 +52,39 @@ VideoSequenceReader::VideoSequenceReader(std::shared_ptr<File> file, VideoSequen
 }
 
 VideoSequenceReader::~VideoSequenceReader() {
+  lastTask = nullptr;
   if (videoReader.as<bool>()) {
     videoReader.call<void>("onDestroy");
   }
 }
 
-void VideoSequenceReader::prepareAsync(Frame targetFrame) {
-  // Web 端没有异步初始化解码器，也没有预测。
-  // 这个方法是 Graphic->prepare() 每次调用的。
-  // Web 端渲染过程不能 await，否则会把渲染一半的 Canvas 上屏。
-  if (videoReader.as<bool>()) {
-    videoReader.call<val>("prepareAsync", static_cast<int>(targetFrame)).await();
-  }
+int64_t VideoSequenceReader::getNextFrameAt(int64_t targetFrame) {
+  auto nextFrame = targetFrame + 1;
+  return nextFrame >= sequence->duration() ? -1 : nextFrame;
 }
 
-std::shared_ptr<tgfx::Texture> VideoSequenceReader::readTexture(Frame targetFrame,
-                                                                RenderCache* cache) {
+bool VideoSequenceReader::decodeFrame(int64_t targetFrame) {
+  // Web 端没有异步初始化解码器，也没有预测。
+  // Web 端渲染过程不能 await，否则会把渲染一半的 Canvas 上屏。
+  if (videoReader.as<bool>()) {
+    videoReader.call<val>("decodeFrame", static_cast<int>(targetFrame)).await();
+    return true;
+  }
+  return false;
+}
+
+std::shared_ptr<tgfx::Texture> VideoSequenceReader::makeTexture(tgfx::Context* context) {
   if (!videoReader.as<bool>()) {
     return nullptr;
   }
-  if (targetFrame == lastFrame) {
-    return texture;
-  }
   if (texture == nullptr) {
-    texture = tgfx::GLTexture::MakeRGBA(cache->getContext(), width, height);
+    texture = tgfx::GLTexture::MakeRGBA(context, width, height);
   }
   auto& glInfo = std::static_pointer_cast<tgfx::GLTexture>(texture)->glSampler();
   videoReader.call<void>("renderToTexture", val::module_property("GL"), glInfo.id);
-  lastFrame = targetFrame;
   return texture;
+}
+
+void VideoSequenceReader::reportPerformance(Performance*, int64_t) const {
 }
 }  // namespace pag

@@ -42,4 +42,11 @@ Matrix OrientationToMatrix(Orientation orientation, int width, int height) {
   }
   return Matrix::I();
 }
+
+void ApplyOrientation(Orientation orientation, int* width, int* height) {
+  if (orientation == Orientation::LeftTop || orientation == Orientation::RightTop ||
+      orientation == Orientation::RightBottom || orientation == Orientation::LeftBottom) {
+    std::swap(*width, *height);
+  }
+}
 }  // namespace tgfx

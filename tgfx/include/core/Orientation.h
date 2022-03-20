@@ -66,4 +66,10 @@ enum class Orientation {
  */
 Matrix OrientationToMatrix(Orientation orientation, int width, int height);
 
+/**
+ * Transforms the source size (width, height) to a correctly oriented destination size by the given
+ * an orientation.
+ */
+void ApplyOrientation(Orientation orientation, int* width, int* height);
+
 }  // namespace tgfx

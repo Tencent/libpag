@@ -64,7 +64,7 @@
 
 + (PAGImageImpl*)FromPixelBuffer:(CVPixelBufferRef)pixelBuffer {
   auto hardwareBuffer = tgfx::PixelBuffer::MakeFrom(pixelBuffer);
-  auto image = pag::StillImage::FromPixelBuffer(hardwareBuffer);
+  auto image = pag::StillImage::MakeFrom(hardwareBuffer);
   if (image == nullptr) {
     return nil;
   }
@@ -93,7 +93,7 @@
   CGContextDrawImage(context, rect, cgImage);
   CGContextRelease(context);
   bitmap.reset();
-  auto data = pag::StillImage::FromPixelBuffer(pixelBuffer);
+  auto data = pag::StillImage::MakeFrom(pixelBuffer);
   if (data == nullptr) {
     return nil;
   }

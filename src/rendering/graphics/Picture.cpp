@@ -363,7 +363,7 @@ class TextureBufferProxy : public TextureProxy {
   std::shared_ptr<tgfx::Texture> getTexture(RenderCache* cache) const override {
     auto startTime = GetTimer();
     auto texture = buffer->makeTexture(cache->getContext());
-    cache->recordTextureUploadingTime(GetTimer() - startTime);
+    cache->reportTextureUploadingTime(GetTimer() - startTime);
     return texture;
   }
 
@@ -391,13 +391,13 @@ class ImageTextureProxy : public TextureProxy {
     if (buffer == nullptr) {
       buffer = image->makeBuffer();
     }
-    cache->recordImageDecodingTime(GetTimer() - startTime);
+    cache->reportImageDecodingTime(GetTimer() - startTime);
     if (buffer == nullptr) {
       return nullptr;
     }
     startTime = GetTimer();
     auto texture = buffer->makeTexture(cache->getContext());
-    cache->recordTextureUploadingTime(GetTimer() - startTime);
+    cache->reportTextureUploadingTime(GetTimer() - startTime);
     return texture;
   }
 
@@ -461,10 +461,11 @@ std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, std::shared_ptr<tgfx::Ima
     return nullptr;
   }
   auto extraMatrix = OrientationToMatrix(image->orientation(), image->width(), image->height());
-  auto bounds = tgfx::Rect::MakeWH(image->width(), image->height());
-  extraMatrix.mapRect(&bounds);
-  auto textureProxy = new ImageTextureProxy(assetID, static_cast<int>(bounds.width()),
-                                            static_cast<int>(bounds.height()), image);
+  auto width = image->width();
+  auto height = image->height();
+  ApplyOrientation(image->orientation(), &width, &height);
+  auto textureProxy =
+      new ImageTextureProxy(assetID, static_cast<int>(width), static_cast<int>(height), image);
   auto picture = std::make_shared<TextureProxyPicture>(assetID, textureProxy, false);
   picture->extraMatrix = extraMatrix;
   return picture;

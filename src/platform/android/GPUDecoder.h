@@ -21,7 +21,7 @@
 #include "VideoImage.h"
 #include "VideoSurface.h"
 #include "platform/android/Global.h"
-#include "video/VideoDecoder.h"
+#include "rendering/video/VideoDecoder.h"
 
 namespace pag {
 class GPUDecoder : public VideoDecoder {

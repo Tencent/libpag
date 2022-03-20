@@ -20,11 +20,9 @@
 #include <algorithm>
 #include "base/utils/MatrixUtil.h"
 #include "base/utils/TimeUtil.h"
-#include "rendering/caches/ImageContentCache.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/editing/ImageReplacement.h"
 #include "rendering/editing/PAGImageHolder.h"
-#include "rendering/readers/SequenceReader.h"
 #include "rendering/renderers/CompositionRenderer.h"
 #include "rendering/utils/LockGuard.h"
 

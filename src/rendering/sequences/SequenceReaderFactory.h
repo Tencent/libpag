@@ -18,19 +18,27 @@
 
 #pragma once
 
-#include "BitmapSequenceReader.h"
-#include "base/utils/Task.h"
+#include "SequenceReader.h"
+#include "pag/file.h"
+#include "rendering/video/DecodingPolicy.h"
 
 namespace pag {
-class BitmapDecodingTask : public Executor {
+class SequenceReaderFactory {
  public:
-  static std::shared_ptr<Task> MakeAndRun(BitmapSequenceReader* reader, Frame targetFrame);
+  explicit SequenceReaderFactory(Sequence* sequence);
+
+  virtual ~SequenceReaderFactory() = default;
+
+  virtual uint32_t assetID() const;
+
+  virtual bool staticContent() const;
+
+  virtual bool isVideo() const;
+
+  virtual std::shared_ptr<SequenceReader> makeReader(std::shared_ptr<File> file,
+                                                     DecodingPolicy policy) const;
 
  private:
-  BitmapSequenceReader* reader = nullptr;
-  Frame targetFrame = 0;
-
-  BitmapDecodingTask(BitmapSequenceReader* reader, Frame targetFrame);
-  void execute() override;
+  Sequence* sequence = nullptr;
 };
 }  // namespace pag

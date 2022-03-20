@@ -119,7 +119,7 @@ int64_t VideoReader::getNextSampleTimeAt(int64_t targetTime) {
   return demuxer->getNextSampleTimeAt(targetTime);
 }
 
-void VideoReader::recordPerformance(Performance* performance, int64_t decodingTime) {
+void VideoReader::reportPerformance(Performance* performance, int64_t decodingTime) {
   if (performance) {
     if (decoderTypeIndex == DECODER_TYPE_HARDWARE) {
       performance->hardwareDecodingTime += decodingTime;
