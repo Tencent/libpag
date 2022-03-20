@@ -1,0 +1,10 @@
+# Default owners:
+*       @domchen @lvpengwei
+
+*.js    @zenoslin
+*.sh    @kevingpqi123
+/web/    @zenoslin
+/.github/   @kevingpqi123
+/test/   @kevingpqi123
+/win/   @kevingpqi123 @FusionXu
+/linux/   @kevingpqi123
