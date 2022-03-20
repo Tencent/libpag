@@ -41,7 +41,7 @@ class VideoReader {
 
   std::shared_ptr<VideoBuffer> readSample(int64_t targetTime);
 
-  void reportPerformance(Performance* performance, int64_t decodingTime);
+  void recordPerformance(Performance* performance, int64_t decodingTime);
 
  private:
   std::mutex locker = {};

@@ -97,7 +97,7 @@ Frame BitmapSequenceReader::findStartFrame(Frame targetFrame) {
   return startFrame;
 }
 
-void BitmapSequenceReader::reportPerformance(Performance* performance, int64_t decodingTime) const {
+void BitmapSequenceReader::recordPerformance(Performance* performance, int64_t decodingTime) const {
   performance->imageDecodingTime += decodingTime;
 }
 }  // namespace pag

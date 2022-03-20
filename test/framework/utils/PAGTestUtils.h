@@ -19,9 +19,9 @@
 #pragma once
 
 #include "Baseline.h"
-#include "base/utils/GetTimer.h"
 #include "base/utils/TGFXCast.h"
 #include "core/Bitmap.h"
+#include "core/Clock.h"
 #include "core/PixelBuffer.h"
 #include "pag/pag.h"
 

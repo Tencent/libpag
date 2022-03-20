@@ -85,6 +85,6 @@ std::shared_ptr<tgfx::Texture> VideoSequenceReader::makeTexture(tgfx::Context* c
   return texture;
 }
 
-void VideoSequenceReader::reportPerformance(Performance*, int64_t) const {
+void VideoSequenceReader::recordPerformance(Performance*, int64_t) const {
 }
 }  // namespace pag

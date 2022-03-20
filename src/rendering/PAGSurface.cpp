@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "base/utils/GetTimer.h"
 #include "base/utils/TGFXCast.h"
+#include "core/Clock.h"
 #include "gpu/opengl/GLDevice.h"
 #include "pag/file.h"
 #include "pag/pag.h"

@@ -58,20 +58,20 @@ std::shared_ptr<tgfx::Texture> SequenceReader::readTexture(int64_t targetFrame,
   if (lastFrame == targetFrame) {
     return lastTexture;
   }
-  auto startTime = GetTimer();
+  tgfx::Clock clock = {};
   // Setting the lastTask to nullptr triggers cancel().
   lastTask = nullptr;
   auto success = decodeFrame(targetFrame);
-  auto decodingTime = GetTimer() - startTime;
-  reportPerformance(cache, decodingTime);
+  auto decodingTime = clock.measure();
+  recordPerformance(cache, decodingTime);
   // Release the last texture for immediately reusing.
   lastTexture = nullptr;
   lastFrame = -1;
   if (success) {
-    startTime = GetTimer();
+    clock.reset();
     lastTexture = makeTexture(cache->getContext());
     lastFrame = targetFrame;
-    cache->textureUploadingTime += GetTimer() - startTime;
+    cache->textureUploadingTime += clock.measure();
     if (!staticContent()) {
       auto nextFrame = getNextFrameAt(targetFrame);
       if (nextFrame == -1 && pendingFirstFrame >= 0) {

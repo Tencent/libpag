@@ -20,7 +20,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include "core/BytesKey.h"
-#include "core/Performance.h"
+#include "core/Clock.h"
 #include "core/utils/Log.h"
 #include "gpu/Resource.h"
 
@@ -98,7 +98,7 @@ void ResourceCache::releaseAll(bool releaseGPU) {
 
 void ResourceCache::purgeNotUsedIn(int64_t usNotUsed) {
   PurgeGuard guard(this);
-  auto currentTime = Performance::Now();
+  auto currentTime = Clock::Now();
   std::unordered_map<BytesKey, std::vector<Resource*>, BytesHasher> recycledMap = {};
   for (auto& item : recycledResources) {
     std::vector<Resource*> needToRecycle = {};
@@ -178,7 +178,7 @@ void ResourceCache::removeResource(Resource* resource) {
   DEBUG_ASSERT(context->device()->contextLocked);
   RemoveFromList(nonpurgeableResources, resource);
   if (resource->recycleKey.isValid()) {
-    resource->lastUsedTime = Performance::Now();
+    resource->lastUsedTime = Clock::Now();
     recycledResources[resource->recycleKey].push_back(resource);
   } else {
     purgingResource = true;

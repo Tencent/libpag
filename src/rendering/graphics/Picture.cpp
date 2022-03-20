@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Picture.h"
-#include "base/utils/GetTimer.h"
 #include "base/utils/MatrixUtil.h"
+#include "core/Clock.h"
 #include "gpu/Surface.h"
 #include "gpu/opengl/GLDevice.h"
 #include "gpu/opengl/GLTexture.h"
@@ -361,9 +361,9 @@ class TextureBufferProxy : public TextureProxy {
   }
 
   std::shared_ptr<tgfx::Texture> getTexture(RenderCache* cache) const override {
-    auto startTime = GetTimer();
+    tgfx::Clock clock = {};
     auto texture = buffer->makeTexture(cache->getContext());
-    cache->reportTextureUploadingTime(GetTimer() - startTime);
+    cache->recordTextureUploadingTime(clock.measure());
     return texture;
   }
 
@@ -386,18 +386,18 @@ class ImageTextureProxy : public TextureProxy {
   }
 
   std::shared_ptr<tgfx::Texture> getTexture(RenderCache* cache) const override {
-    auto startTime = GetTimer();
+    tgfx::Clock clock = {};
     auto buffer = cache->getImageBuffer(assetID);
     if (buffer == nullptr) {
       buffer = image->makeBuffer();
     }
-    cache->reportImageDecodingTime(GetTimer() - startTime);
+    cache->recordImageDecodingTime(clock.measure());
     if (buffer == nullptr) {
       return nullptr;
     }
-    startTime = GetTimer();
+    clock.reset();
     auto texture = buffer->makeTexture(cache->getContext());
-    cache->reportTextureUploadingTime(GetTimer() - startTime);
+    cache->recordTextureUploadingTime(clock.measure());
     return texture;
   }
 

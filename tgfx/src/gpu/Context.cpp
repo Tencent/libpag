@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/Context.h"
-#include "core/Performance.h"
+#include "core/Clock.h"
 #include "core/utils/Log.h"
 #include "gpu/GradientCache.h"
 #include "gpu/ProgramCache.h"

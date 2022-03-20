@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "VideoReader.h"
-#include "base/utils/GetTimer.h"
+#include "core/Clock.h"
 
 namespace pag {
 #define DECODER_TYPE_HARDWARE 1
@@ -119,7 +119,7 @@ int64_t VideoReader::getNextSampleTimeAt(int64_t targetTime) {
   return demuxer->getNextSampleTimeAt(targetTime);
 }
 
-void VideoReader::reportPerformance(Performance* performance, int64_t decodingTime) {
+void VideoReader::recordPerformance(Performance* performance, int64_t decodingTime) {
   if (performance) {
     if (decoderTypeIndex == DECODER_TYPE_HARDWARE) {
       performance->hardwareDecodingTime += decodingTime;
@@ -287,20 +287,20 @@ bool VideoReader::renderFrame(int64_t sampleTime) {
 VideoDecoder* VideoReader::makeDecoder() {
   VideoDecoder* decoder = nullptr;
   if (decoderTypeIndex <= DECODER_TYPE_HARDWARE) {
-    int64_t initialStartTime = GetTimer();
+    tgfx::Clock clock = {};
     // try hardware decoder.
     decoder = VideoDecoder::Make(videoConfig, true).release();
-    hardDecodingInitialTime = GetTimer() - initialStartTime;
+    hardDecodingInitialTime = clock.measure();
     if (decoder) {
       decoderTypeIndex = DECODER_TYPE_HARDWARE;
       return decoder;
     }
   }
   if (decoderTypeIndex <= DECODER_TYPE_SOFTWARE) {
-    int64_t initialStartTime = GetTimer();
+    tgfx::Clock clock = {};
     // try software decoder.
     decoder = VideoDecoder::Make(videoConfig, false).release();
-    softDecodingInitialTime = GetTimer() - initialStartTime;
+    softDecodingInitialTime = clock.measure();
     if (decoder) {
       decoderTypeIndex = DECODER_TYPE_SOFTWARE;
       return decoder;

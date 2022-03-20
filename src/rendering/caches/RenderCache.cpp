@@ -22,6 +22,7 @@
 #include "base/utils/TimeUtil.h"
 #include "base/utils/USE.h"
 #include "base/utils/UniqueID.h"
+#include "core/Clock.h"
 #include "rendering/caches/ImageContentCache.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/renderers/FilterRenderer.h"
@@ -93,9 +94,9 @@ void RenderCache::setVideoEnabled(bool value) {
 }
 
 bool RenderCache::initFilter(Filter* filter) {
-  auto startTime = GetTimer();
+  tgfx::Clock clock = {};
   auto result = filter->initialize(getContext());
-  programCompilingTime += GetTimer() - startTime;
+  programCompilingTime += clock.measure();
   return result;
 }
 
@@ -233,7 +234,7 @@ void RenderCache::detachFromContext() {
   clearExpiredSequences();
   clearExpiredBitmaps();
   clearExpiredSnapshots();
-  auto currentTimestamp = GetTimer();
+  auto currentTimestamp = tgfx::Clock::Now();
   context->purgeResourcesNotUsedIn(currentTimestamp - lastTimestamp);
   lastTimestamp = currentTimestamp;
   context = nullptr;
@@ -554,15 +555,15 @@ void RenderCache::clearFilterCache(ID uniqueID) {
   }
 }
 
-void RenderCache::reportImageDecodingTime(int64_t decodingTime) {
+void RenderCache::recordImageDecodingTime(int64_t decodingTime) {
   imageDecodingTime += decodingTime;
 }
 
-void RenderCache::reportTextureUploadingTime(int64_t time) {
+void RenderCache::recordTextureUploadingTime(int64_t time) {
   textureUploadingTime += time;
 }
 
-void RenderCache::reportProgramCompilingTime(int64_t time) {
+void RenderCache::recordProgramCompilingTime(int64_t time) {
   programCompilingTime += time;
 }
 }  // namespace pag
