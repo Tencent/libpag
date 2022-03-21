@@ -212,7 +212,7 @@ static void AddCurveToPath(tgfx::Path* path, float centerX, float centerY, float
   path->cubicTo(control1X, control1Y, control2X, control2Y, dx2 + centerX, dy2 + centerY);
 }
 
-static void ConvertPolyStartToPath(tgfx::Path* path, float centerX, float centerY, float points,
+static void ConvertPolyStarToPath(tgfx::Path* path, float centerX, float centerY, float points,
                                    float rotation, float innerRadius, float outerRadius,
                                    float innerRoundness, float outerRoundness, bool reversed) {
   float direction = reversed ? -1 : 1;
@@ -232,7 +232,7 @@ static void ConvertPolyStartToPath(tgfx::Path* path, float centerX, float center
   path->moveTo(lastDx + centerX, lastDy + centerY);
 
   auto outerFlag = false;
-  for (int i = 0; i < numPoints; i++) {
+  for (int i = 0; i < numPoints - 1; i++) {
     auto radius = outerFlag ? outerRadius : innerRadius;
     auto angleDelta = angleStep * direction;
     if (i == decimalIndex || i == decimalIndex + 1) {
@@ -276,7 +276,7 @@ static void ConvertPolygonToPath(tgfx::Path* path, float centerX, float centerY,
   path->moveTo(lastDx + centerX, lastDy + centerY);
 
   auto outerFlag = false;
-  for (int i = 0; i < numPoints; i++) {
+  for (int i = 0; i < numPoints - 1; i++) {
     auto angleDelta = angleStep * direction;
     currentAngle += angleDelta;
     auto dx = radius * cosf(currentAngle);
@@ -303,7 +303,7 @@ void PolyStarToPath(PolyStarElement* polyStar, tgfx::Path* path, Frame frame) {
   auto innerRoundness = polyStar->innerRoundness->getValueAt(frame);
   auto outerRoundness = polyStar->outerRoundness->getValueAt(frame);
   if (polyStar->polyType == PolyStarType::Star) {
-    ConvertPolyStartToPath(path, position.x, position.y, points, rotation, innerRadius, outerRadius,
+    ConvertPolyStarToPath(path, position.x, position.y, points, rotation, innerRadius, outerRadius,
                            innerRoundness, outerRoundness, polyStar->reversed);
   } else {
     ConvertPolygonToPath(path, position.x, position.y, points, rotation, outerRadius,
