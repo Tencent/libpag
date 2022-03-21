@@ -48,4 +48,9 @@ __attribute__((visibility("default"))) @interface PAGImageLayer : PAGLayer
  */
 - (int64_t)contentDuration;
 
+/**
+ * The default image data of this layer, which is webp format.
+ */
+- (NSData*)imageBytes;
+
 @end

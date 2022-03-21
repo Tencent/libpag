@@ -2,6 +2,8 @@ package org.libpag;
 
 import org.extra.tools.LibraryLoadUtils;
 
+import java.nio.ByteBuffer;
+
 public class PAGImageLayer extends PAGLayer {
     /**
      * Make a PAGImageLayer with with, height and duration(in microseconds).
@@ -40,6 +42,11 @@ public class PAGImageLayer extends PAGLayer {
     }
 
     private native void replaceImage(long image);
+
+    /**
+     * The default image data of this layer, which is webp format.
+     */
+    public native ByteBuffer imageBytes();
 
     private static native long nativeMake(int width, int height, long duration);
 
