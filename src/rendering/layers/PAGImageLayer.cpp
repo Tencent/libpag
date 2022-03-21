@@ -660,4 +660,13 @@ void PAGImageLayer::measureBounds(tgfx::Rect* bounds) {
   auto imageLayer = static_cast<ImageLayer*>(layer);
   bounds->setWH(imageLayer->imageBytes->width, imageLayer->imageBytes->height);
 }
+
+ByteData* PAGImageLayer::imageBytes() const {
+  auto imageLayer = static_cast<ImageLayer*>(layer);
+  if (imageLayer->imageBytes) {
+    return imageLayer->imageBytes->fileBytes;
+  }
+  return nullptr;
+}
+
 }  // namespace pag

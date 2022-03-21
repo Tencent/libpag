@@ -30,4 +30,6 @@
 - (void)replaceImage:(PAGImage*)image;
 
 - (int64_t)contentDuration;
+
+- (NSData*)imageBytes;
 @end

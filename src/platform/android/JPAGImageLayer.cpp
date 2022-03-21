@@ -87,4 +87,12 @@ JNIEXPORT jlong Java_org_libpag_PAGImageLayer_contentDuration(JNIEnv* env, jobje
   }
   return pagLayer->contentDuration();
 }
+
+JNIEXPORT jobject Java_org_libpag_PAGImageLayer_imageBytes(JNIEnv* env, jobject thiz) {
+  auto pagLayer = GetPAGImageLayer(env, thiz);
+  if (pagLayer == nullptr || pagLayer->imageBytes() == nullptr) {
+    return nullptr;
+  }
+  return env->NewDirectByteBuffer(pagLayer->imageBytes()->data(), pagLayer->imageBytes()->length());
+}
 }

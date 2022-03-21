@@ -72,4 +72,13 @@
   auto pagImageLayer = std::static_pointer_cast<pag::PAGImageLayer>([super pagLayer]);
   return pagImageLayer->contentDuration();
 }
+
+- (NSData*)imageBytes {
+  auto temp = std::static_pointer_cast<pag::PAGImageLayer>([super pagLayer])->imageBytes();
+  if (temp == nullptr) {
+    return nil;
+  }
+  return [NSData dataWithBytes:temp->data() length:temp->length()];
+}
+
 @end
