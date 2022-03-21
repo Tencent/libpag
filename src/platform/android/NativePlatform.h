@@ -30,7 +30,7 @@ class NativePlatform : public Platform {
     return true;
   }
 
-  std::unique_ptr<VideoDecoder> makeHardwareDecoder(const VideoConfig& config) const override;
+  std::unique_ptr<VideoDecoder> makeHardwareDecoder(const VideoFormat& format) const override;
 
   bool registerFallbackFonts() const override;
 

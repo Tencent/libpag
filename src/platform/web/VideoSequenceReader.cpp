@@ -23,8 +23,8 @@ using namespace emscripten;
 
 namespace pag {
 VideoSequenceReader::VideoSequenceReader(std::shared_ptr<File> file, VideoSequence* sequence,
-                                         DecodingPolicy)
-    : file(std::move(file)), sequence(sequence) {
+                                         DecoderPolicy)
+    : SequenceReader(sequence->duration()), file(std::move(file)) {
   width = sequence->alphaStartX + sequence->width;
   if (width % 2 == 1) {
     width++;
@@ -58,11 +58,6 @@ VideoSequenceReader::~VideoSequenceReader() {
   }
 }
 
-int64_t VideoSequenceReader::getNextFrameAt(int64_t targetFrame) {
-  auto nextFrame = targetFrame + 1;
-  return nextFrame >= sequence->duration() ? -1 : nextFrame;
-}
-
 bool VideoSequenceReader::decodeFrame(int64_t targetFrame) {
   // Web 端没有异步初始化解码器，也没有预测。
   // Web 端渲染过程不能 await，否则会把渲染一半的 Canvas 上屏。
@@ -85,6 +80,6 @@ std::shared_ptr<tgfx::Texture> VideoSequenceReader::makeTexture(tgfx::Context* c
   return texture;
 }
 
-void VideoSequenceReader::recordPerformance(Performance*, int64_t) const {
+void VideoSequenceReader::recordPerformance(Performance*, int64_t) {
 }
 }  // namespace pag

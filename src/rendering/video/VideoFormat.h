@@ -18,20 +18,18 @@
 
 #pragma once
 
+#include "core/YUVInfo.h"
+#include "pag/types.h"
+
 namespace pag {
-enum class DecodingPolicy {
-  /**
-   * Uses hardware decoders.
-   */
-  Hardware,
-  /**
-   * Uses software decoders.
-   */
-  Software,
-  /**
-   * Uses a software decoder first, but initializes a hardware on async thread, and then switches to
-   * the hardware decoder when it is initialized.
-   */
-  SoftwareToHardware
+struct VideoFormat {
+  int width = 0;
+  int height = 0;
+  int64_t duration = 0;
+  float frameRate = 0.0;
+  std::vector<std::shared_ptr<ByteData>> headers = {};
+  tgfx::YUVColorSpace colorSpace = tgfx::YUVColorSpace::Rec601;
+  tgfx::YUVColorRange colorRange = tgfx::YUVColorRange::MPEG;
+  std::string mimeType = "video/avc";
 };
 }  // namespace pag

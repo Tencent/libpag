@@ -1,11 +1,12 @@
 # Default owners:
-*       @domchen @lvpengwei
+*       @domchen @lvpengwei @luckyzhliu
 
-*.js    @zenoslin @domchen @lvpengwei
-*.ts    @zenoslin @domchen @lvpengwei
-*.sh    @kevingpqi123 @domchen @lvpengwei
-/web/    @zenoslin @domchen @lvpengwei
-/.github/   @kevingpqi123 @domchen @lvpengwei
-/test/   @kevingpqi123 @domchen @lvpengwei
-/linux/   @kevingpqi123 @domchen @lvpengwei
-/win/   @FusionXu @kevingpqi123 @domchen @lvpengwei
+*.js    @zenoslin @domchen @lvpengwei @luckyzhliu
+*.ts    @zenoslin @domchen @lvpengwei @luckyzhliu
+*.sh    @kevingpqi123 @domchen @lvpengwei @luckyzhliu
+/*      @kevingpqi123 @domchen @lvpengwei @luckyzhliu
+/web/    @zenoslin @domchen @lvpengwei @luckyzhliu
+/.github/   @kevingpqi123 @domchen @lvpengwei @luckyzhliu
+/test/   @kevingpqi123 @domchen @lvpengwei @luckyzhliu
+/linux/   @kevingpqi123 @domchen @lvpengwei @luckyzhliu
+/win/   @FusionXu @kevingpqi123 @domchen @lvpengwei @luckyzhliu

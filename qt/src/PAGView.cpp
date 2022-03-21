@@ -22,7 +22,7 @@
 #include <QSGImageNode>
 #include <QScreen>
 #include <QThread>
-#include "base/utils/GetTimer.h"
+#include "core/Clock.h"
 #include "pag/file.h"
 #include "platform/qt/GPUDrawable.h"
 
@@ -108,9 +108,8 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData* data) {
   }
 
   if (isPlaying) {
-    auto timestamp = GetTimer();
     auto duration = pagPlayer->duration();
-    auto playTime = (timestamp - startTime) % duration;
+    auto playTime = (tgfx::Clock::Now() - startTime) % duration;
     auto progress = static_cast<double>(playTime) / static_cast<double>(duration);
     pagPlayer->setProgress(progress);
     QMetaObject::invokeMethod(renderThread, "flush", Qt::QueuedConnection);

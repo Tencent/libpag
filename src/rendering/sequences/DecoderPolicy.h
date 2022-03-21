@@ -18,11 +18,20 @@
 
 #pragma once
 
-#include "platform/cocoa/private/CocoaPlatform.h"
-
 namespace pag {
-class NativePlatform : public CocoaPlatform {
- public:
-  std::unique_ptr<VideoDecoder> makeHardwareDecoder(const VideoFormat& format) const override;
+enum class DecoderPolicy {
+  /**
+   * Uses hardware decoders.
+   */
+  Hardware,
+  /**
+   * Uses software decoders.
+   */
+  Software,
+  /**
+   * Uses a software decoder first, but initializes a hardware on async thread, and then switches to
+   * the hardware decoder when it is initialized.
+   */
+  SoftwareToHardware
 };
 }  // namespace pag

@@ -22,22 +22,22 @@
 namespace pag {
 class SequenceTask : public Executor {
  public:
-  static std::shared_ptr<Task> MakeAndRun(SequenceReader* reader, int64_t targetTime) {
-    auto task = Task::Make(std::unique_ptr<SequenceTask>(new SequenceTask(reader, targetTime)));
+  static std::shared_ptr<Task> MakeAndRun(SequenceReader* reader, Frame targetFrame) {
+    auto task = Task::Make(std::unique_ptr<SequenceTask>(new SequenceTask(reader, targetFrame)));
     task->run();
     return task;
   }
 
  private:
   SequenceReader* reader = nullptr;
-  int64_t targetTime = 0;
+  Frame targetFrame = 0;
 
-  SequenceTask(SequenceReader* reader, int64_t targetTime)
-      : reader(reader), targetTime(targetTime) {
+  SequenceTask(SequenceReader* reader, Frame targetFrame)
+      : reader(reader), targetFrame(targetFrame) {
   }
 
   void execute() override {
-    reader->decodeFrame(targetTime);
+    reader->decodeFrame(targetFrame);
   }
 };
 
@@ -47,14 +47,13 @@ SequenceReader::~SequenceReader() {
   DEBUG_ASSERT(lastTask == nullptr || !lastTask->isRunning());
 }
 
-void SequenceReader::prepare(int64_t targetFrame) {
-  if (lastTask == nullptr && targetFrame > 0) {
+void SequenceReader::prepare(Frame targetFrame) {
+  if (lastTask == nullptr && targetFrame >= 0 && targetFrame < totalFrames) {
     lastTask = SequenceTask::MakeAndRun(this, targetFrame);
   }
 }
 
-std::shared_ptr<tgfx::Texture> SequenceReader::readTexture(int64_t targetFrame,
-                                                           RenderCache* cache) {
+std::shared_ptr<tgfx::Texture> SequenceReader::readTexture(Frame targetFrame, RenderCache* cache) {
   if (lastFrame == targetFrame) {
     return lastTexture;
   }
@@ -73,8 +72,8 @@ std::shared_ptr<tgfx::Texture> SequenceReader::readTexture(int64_t targetFrame,
     lastFrame = targetFrame;
     cache->textureUploadingTime += clock.measure();
     if (!staticContent()) {
-      auto nextFrame = getNextFrameAt(targetFrame);
-      if (nextFrame == -1 && pendingFirstFrame >= 0) {
+      auto nextFrame = targetFrame + 1;
+      if (nextFrame >= totalFrames && pendingFirstFrame >= 0) {
         // Add preparation for the first frame when reach to the end.
         nextFrame = pendingFirstFrame;
         pendingFirstFrame = -1;

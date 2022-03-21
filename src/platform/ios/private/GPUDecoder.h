@@ -27,7 +27,7 @@
 namespace pag {
 class GPUDecoder : public VideoDecoder {
  public:
-  explicit GPUDecoder(const VideoConfig& config);
+  explicit GPUDecoder(const VideoFormat& format);
 
   ~GPUDecoder() override;
 

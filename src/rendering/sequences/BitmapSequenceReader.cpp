@@ -21,7 +21,7 @@
 
 namespace pag {
 BitmapSequenceReader::BitmapSequenceReader(std::shared_ptr<File> file, BitmapSequence* sequence)
-    : file(std::move(file)), sequence(sequence) {
+    : SequenceReader(sequence->duration()), file(std::move(file)), sequence(sequence) {
   // Force allocating raster PixelBuffer when staticContent is false, otherwise the asynchronous
   // decoding will fail due to the GPU memory sharing.
   pixelBuffer = tgfx::PixelBuffer::Make(sequence->width, sequence->height, false, staticContent());
@@ -32,12 +32,7 @@ BitmapSequenceReader::~BitmapSequenceReader() {
   lastTask = nullptr;
 }
 
-int64_t BitmapSequenceReader::getNextFrameAt(int64_t targetFrame) {
-  auto nextFrame = targetFrame + 1;
-  return nextFrame >= sequence->duration() ? -1 : nextFrame;
-}
-
-bool BitmapSequenceReader::decodeFrame(int64_t targetFrame) {
+bool BitmapSequenceReader::decodeFrame(Frame targetFrame) {
   // a locker is required here because decodeFrame() could be called from multiple threads.
   std::lock_guard<std::mutex> autoLock(locker);
   if (lastDecodeFrame == targetFrame) {
@@ -97,7 +92,7 @@ Frame BitmapSequenceReader::findStartFrame(Frame targetFrame) {
   return startFrame;
 }
 
-void BitmapSequenceReader::recordPerformance(Performance* performance, int64_t decodingTime) const {
+void BitmapSequenceReader::recordPerformance(Performance* performance, int64_t decodingTime) {
   performance->imageDecodingTime += decodingTime;
 }
 }  // namespace pag

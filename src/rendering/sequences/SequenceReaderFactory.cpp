@@ -18,7 +18,13 @@
 
 #include "SequenceReaderFactory.h"
 #include "BitmapSequenceReader.h"
-#include "VideoSequenceReader.h"
+
+#ifdef PAG_BUILD_FOR_WEB
+#include "platform/web/VideoSequenceReader.h"
+#else
+#include "VideoReader.h"
+#include "VideoSequenceDemuxer.h"
+#endif
 
 namespace pag {
 SequenceReaderFactory::SequenceReaderFactory(Sequence* sequence) : sequence(sequence) {
@@ -37,11 +43,16 @@ bool SequenceReaderFactory::isVideo() const {
 }
 
 std::shared_ptr<SequenceReader> SequenceReaderFactory::makeReader(std::shared_ptr<File> file,
-                                                                  DecodingPolicy policy) const {
-  if (sequence->composition->type() == CompositionType::Video) {
-    return std::make_shared<VideoSequenceReader>(file, static_cast<VideoSequence*>(sequence),
-                                                 policy);
+                                                                  DecoderPolicy policy) const {
+  if (sequence->composition->type() == CompositionType::Bitmap) {
+    return std::make_shared<BitmapSequenceReader>(file, static_cast<BitmapSequence*>(sequence));
   }
-  return std::make_shared<BitmapSequenceReader>(file, static_cast<BitmapSequence*>(sequence));
+  auto videoSequence = static_cast<VideoSequence*>(sequence);
+#ifdef PAG_BUILD_FOR_WEB
+  return std::make_shared<VideoSequenceReader>(file, videoSequence, policy);
+#else
+  auto demuxer = std::make_unique<VideoSequenceDemuxer>(file, videoSequence);
+  return std::make_unique<VideoReader>(std::move(demuxer), policy);
+#endif
 }
 }  // namespace pag

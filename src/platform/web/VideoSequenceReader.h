@@ -24,27 +24,20 @@
 namespace pag {
 class VideoSequenceReader : public SequenceReader {
  public:
-  VideoSequenceReader(std::shared_ptr<File> file, VideoSequence* sequence, DecodingPolicy);
+  VideoSequenceReader(std::shared_ptr<File> file, VideoSequence* sequence, DecoderPolicy);
 
   ~VideoSequenceReader() override;
 
-  bool staticContent() const override {
-    return sequence->composition->staticContent();
-  }
-
  protected:
-  int64_t getNextFrameAt(int64_t targetFrame) override;
-
-  bool decodeFrame(int64_t targetFrame) override;
+  bool decodeFrame(Frame targetFrame) override;
 
   std::shared_ptr<tgfx::Texture> makeTexture(tgfx::Context* context) override;
 
-  void recordPerformance(Performance* performance, int64_t decodingTime) const override;
+  void recordPerformance(Performance* performance, int64_t decodingTime) override;
 
  private:
   // Keep a reference to the File in case the Sequence object is released while we are using it.
   std::shared_ptr<File> file = nullptr;
-  VideoSequence* sequence = nullptr;
   emscripten::val videoReader = emscripten::val::null();
   std::shared_ptr<tgfx::Texture> texture = nullptr;
   int32_t width = 0;

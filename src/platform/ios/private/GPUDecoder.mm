@@ -24,11 +24,11 @@
 
 namespace pag {
 
-GPUDecoder::GPUDecoder(const VideoConfig& config)
-    : sourceColorSpace(config.colorSpace),
-      destinationColorSpace(config.colorSpace),
-      colorRange(config.colorRange) {
-  isInitialized = initVideoToolBox(config.headers, config.mimeType);
+GPUDecoder::GPUDecoder(const VideoFormat& format)
+    : sourceColorSpace(format.colorSpace),
+      destinationColorSpace(format.colorSpace),
+      colorRange(format.colorRange) {
+  isInitialized = initVideoToolBox(format.headers, format.mimeType);
 }
 
 GPUDecoder::~GPUDecoder() {

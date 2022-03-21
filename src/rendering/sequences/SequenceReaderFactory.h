@@ -18,9 +18,9 @@
 
 #pragma once
 
+#include "DecoderPolicy.h"
 #include "SequenceReader.h"
 #include "pag/file.h"
-#include "rendering/video/DecodingPolicy.h"
 
 namespace pag {
 class SequenceReaderFactory {
@@ -36,7 +36,7 @@ class SequenceReaderFactory {
   virtual bool isVideo() const;
 
   virtual std::shared_ptr<SequenceReader> makeReader(std::shared_ptr<File> file,
-                                                     DecodingPolicy policy) const;
+                                                     DecoderPolicy policy) const;
 
  private:
   Sequence* sequence = nullptr;

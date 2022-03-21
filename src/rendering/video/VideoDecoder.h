@@ -19,6 +19,7 @@
 #pragma once
 
 #include "VideoBuffer.h"
+#include "VideoFormat.h"
 #include "base/utils/Log.h"
 #include "codec/NALUType.h"
 #include "pag/decoder.h"
@@ -30,17 +31,6 @@ enum class DecodingResult {
   TryAgainLater = -1,
   Error = -2,
   EndOfStream = -3,
-};
-
-struct VideoConfig {
-  int width = 0;
-  int height = 0;
-  float frameRate = 0.0;
-  bool hasAlpha = false;
-  std::vector<std::shared_ptr<ByteData>> headers = {};
-  tgfx::YUVColorSpace colorSpace = tgfx::YUVColorSpace::Rec601;
-  tgfx::YUVColorRange colorRange = tgfx::YUVColorRange::MPEG;
-  std::string mimeType = "video/avc";
 };
 
 class VideoDecoder {
@@ -82,7 +72,7 @@ class VideoDecoder {
    * Creates a new video decoder by specified type. Returns a hardware video decoder if useHardware
    * is true, otherwise, returns a software video decoder.
    */
-  static std::unique_ptr<VideoDecoder> Make(const VideoConfig& config, bool useHardware);
+  static std::unique_ptr<VideoDecoder> Make(const VideoFormat& format, bool useHardware);
 
   virtual ~VideoDecoder();
 
@@ -128,7 +118,7 @@ class VideoDecoder {
  private:
   bool hardwareBacked = false;
 
-  static std::unique_ptr<VideoDecoder> CreateHardwareDecoder(const VideoConfig& config);
-  static std::unique_ptr<VideoDecoder> CreateSoftwareDecoder(const VideoConfig& config);
+  static std::unique_ptr<VideoDecoder> CreateHardwareDecoder(const VideoFormat& format);
+  static std::unique_ptr<VideoDecoder> CreateSoftwareDecoder(const VideoFormat& format);
 };
 }  // namespace pag
