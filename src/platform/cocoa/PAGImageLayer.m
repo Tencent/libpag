@@ -40,4 +40,8 @@
 - (int64_t)contentDuration {
   return [(PAGImageLayerImpl*)self.impl contentDuration];
 }
+
+- (NSData*)imageBytes {
+  return [(PAGImageLayerImpl*)self.impl imageBytes];
+}
 @end

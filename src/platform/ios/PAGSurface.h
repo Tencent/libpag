@@ -80,4 +80,13 @@ __attribute__((visibility("default"))) @interface PAGSurface : NSObject
  */
 - (CVPixelBufferRef)getCVPixelBuffer;
 
+/**
+ * Copies pixels from current PAGSurface to dstPixels with specified color type, alpha type and
+ * row bytes. Returns true if pixels are copied to dstPixels.
+ */
+- (BOOL)readPixels:(int)colorType
+         alphaType:(int)alphaType
+         dstPixels:(void*)dstPixels
+       dstRowBytes:(size_t)dstRowBytes;
+
 @end

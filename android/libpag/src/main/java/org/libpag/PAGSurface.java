@@ -155,6 +155,12 @@ public class PAGSurface {
     public native void freeCache();
 
     /**
+     * Copies pixels from current PAGSurface to dstPixels with specified color type, alpha type and
+     * row bytes. Returns true if pixels are copied to dstPixels.
+     */
+    public native boolean readPixels(int colorType, int alphaType, byte[] dstPixels, int dstRowBytes);
+
+    /**
      * Free up resources used by the PAGSurface instance immediately instead of relying on the
      * garbage collector to do this for you at some point in the future.
      */

@@ -147,3 +147,19 @@ JNIEXPORT jlong Java_org_libpag_PAGSurface_SetupFromTexture(JNIEnv*, jclass, jin
   return reinterpret_cast<jlong>(new JPAGSurface(surface));
 }
 }
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_org_libpag_PAGSurface_readPixels(JNIEnv* env, jobject thiz, jint color_type, jint alpha_type,
+                                      jbyteArray dst_pixels, jint dst_row_bytes) {
+  auto surface = getPAGSurface(env, thiz);
+  if (surface == nullptr) {
+    return false;
+  }
+  auto dstData = env->GetByteArrayElements(dst_pixels, nullptr);
+  bool status = surface->readPixels(static_cast<ColorType>(color_type),
+                                    static_cast<AlphaType>(alpha_type), dstData, dst_row_bytes);
+  if (status) {
+    env->SetByteArrayRegion(dst_pixels, 0, env->GetArrayLength(dst_pixels), dstData);
+  }
+  return status;
+}

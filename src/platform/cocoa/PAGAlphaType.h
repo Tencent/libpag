@@ -16,37 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#import <AppKit/AppKit.h>
-#import <CoreVideo/CoreVideo.h>
-#import <Foundation/Foundation.h>
-#import <QuartzCore/QuartzCore.h>
-
-#import "PAGImageLayerImpl.h"
-#import "PAGLayerImpl.h"
-
-@interface PAGSurfaceImpl : NSObject
-
-+ (PAGSurfaceImpl*)FromView:(NSView*)view;
-
-+ (PAGSurfaceImpl*)MakeFromGPU:(CGSize)size;
-
-- (void)updateSize;
-
-- (int)width;
-
-- (int)height;
-
-- (BOOL)clearAll;
-
-- (void)freeCache;
-
-- (CVPixelBufferRef)getCVPixelBuffer;
-
-- (BOOL)readPixels:(int)colorType
-         alphaType:(int)alphaType
-         dstPixels:(void*)dstPixels
-       dstRowBytes:(size_t)dstRowBytes;
-
-@end
+/**
+ * Describes how to interpret the alpha component of a pixel.
+ */
+typedef enum {
+  /**
+     * uninitialized.
+     */
+  PAGAlphaTypeUnknown = 0,
+  /**
+     * pixel is opaque.
+     */
+  PAGAlphaTypeOpaque = 1,
+  /**
+     * pixel components are premultiplied by alpha.
+     */
+  PAGAlphaTypePremultiplied = 2,
+  /**
+     * pixel components are independent of alpha.
+     */
+  PAGAlphaTypeUnpremultiplied = 3,
+} PAGAlphaType;

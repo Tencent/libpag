@@ -31,10 +31,8 @@ jobs:
             /usr/local/bin/yasm
             /usr/local/Cellar/depsync
             /usr/local/bin/depsync
-            /usr/local/Cellar/gcovr
-            /usr/local/bin/gcovr
-          key: libpag-environment-20220319_1
-          restore-keys: libpag-environment-
+          key: libpag-environment-20220321
+          restore-keys: libpag-environment
       - uses: actions/checkout@v2
         with:
           lfs: true

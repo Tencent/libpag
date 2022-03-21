@@ -47,4 +47,9 @@
 
 - (CVPixelBufferRef)getCVPixelBuffer;
 
+- (BOOL)readPixels:(int)colorType
+         alphaType:(int)alphaType
+         dstPixels:(void*)dstPixels
+       dstRowBytes:(size_t)dstRowBytes;
+
 @end

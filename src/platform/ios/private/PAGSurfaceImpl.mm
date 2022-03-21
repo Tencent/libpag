@@ -23,6 +23,7 @@
 #import "PAGSurface+Internal.h"
 #include "PixelBufferUtils.h"
 #include "base/utils/Log.h"
+#include "types.h"
 
 @interface PAGSurfaceImpl ()
 
@@ -125,5 +126,13 @@
 
 - (CVPixelBufferRef)getCVPixelBuffer {
   return _gpuDrawable->getCVPixelBuffer();
+}
+
+- (BOOL)readPixels:(int)colorType
+         alphaType:(int)alphaType
+         dstPixels:(void*)dstPixels
+       dstRowBytes:(size_t)dstRowBytes {
+  return _pagSurface->readPixels(static_cast<pag::ColorType>(colorType),
+                                 static_cast<pag::AlphaType>(alphaType), dstPixels, dstRowBytes);
 }
 @end

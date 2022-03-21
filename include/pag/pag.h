@@ -735,6 +735,11 @@ class PAG_API PAGImageLayer : public PAGLayer {
    */
   int64_t contentTimeToLayer(int64_t contentTime);
 
+  /**
+   * The default image data of this layer, which is webp format.
+   */
+  ByteData* imageBytes() const;
+
  protected:
   void replaceImageInternal(std::shared_ptr<PAGImage> image);
   int64_t getCurrentContentTime(int64_t layerTime);

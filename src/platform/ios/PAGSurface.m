@@ -101,4 +101,14 @@
   return [_surface getCVPixelBuffer];
 }
 
+- (BOOL)readPixels:(int)colorType
+         alphaType:(int)alphaType
+         dstPixels:(void*)dstPixels
+       dstRowBytes:(size_t)dstRowBytes {
+  return [_surface readPixels:colorType
+                    alphaType:alphaType
+                    dstPixels:dstPixels
+                  dstRowBytes:dstRowBytes];
+}
+
 @end
