@@ -47,4 +47,6 @@
 
 - (CVPixelBufferRef)getCVPixelBuffer;
 
+- (CVPixelBufferRef)makeSnapshot;
+
 @end

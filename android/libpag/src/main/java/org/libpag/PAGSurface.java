@@ -1,5 +1,6 @@
 package org.libpag;
 
+import android.graphics.Bitmap;
 import android.graphics.SurfaceTexture;
 import android.opengl.EGL14;
 import android.opengl.EGLContext;
@@ -153,6 +154,13 @@ public class PAGSurface {
      * Free the cache created by the surface immediately. Call this method can reduce memory pressure.
      */
     public native void freeCache();
+
+    /**
+     * Returns a bitmap capturing the contents of the PAGSurface.
+     * Subsequent rendering of the PAGSurface will not be captured.
+     * @return
+     */
+    public native Bitmap makeSnapshot();
 
     /**
      * Free up resources used by the PAGSurface instance immediately instead of relying on the
