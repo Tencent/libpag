@@ -20,6 +20,7 @@
 #include <GLES/gl.h>
 #include <GLES/glext.h>
 #include <GLES3/gl3.h>
+#include <android/bitmap.h>
 #include <android/native_window_jni.h>
 #include "GPUDecoder.h"
 #include "GPUDrawable.h"
@@ -146,4 +147,38 @@ JNIEXPORT jlong Java_org_libpag_PAGSurface_SetupFromTexture(JNIEnv*, jclass, jin
   }
   return reinterpret_cast<jlong>(new JPAGSurface(surface));
 }
+}
+
+extern "C" JNIEXPORT jobject JNICALL Java_org_libpag_PAGSurface_makeSnapshot(JNIEnv* env,
+                                                                             jobject thiz) {
+  auto surface = getPAGSurface(env, thiz);
+  if (surface == nullptr) {
+    return nullptr;
+  }
+  int widht = surface->width();
+  int height = surface->height();
+  unsigned char* newBitmapPixels;
+  jclass bitmapCls = env->FindClass("android/graphics/Bitmap");
+  jmethodID createBitmapFunction = env->GetStaticMethodID(
+      bitmapCls, "createBitmap", "(IILandroid/graphics/Bitmap$Config;)Landroid/graphics/Bitmap;");
+  jstring configName = env->NewStringUTF("ARGB_8888");
+  jclass bitmapConfigClass = env->FindClass("android/graphics/Bitmap$Config");
+  jmethodID valueOfBitmapConfigFunction = env->GetStaticMethodID(
+      bitmapConfigClass, "valueOf", "(Ljava/lang/String;)Landroid/graphics/Bitmap$Config;");
+  jobject bitmapConfig =
+      env->CallStaticObjectMethod(bitmapConfigClass, valueOfBitmapConfigFunction, configName);
+  jobject newBitmap =
+      env->CallStaticObjectMethod(bitmapCls, createBitmapFunction, widht, height, bitmapConfig);
+  int ret;
+  if ((ret = AndroidBitmap_lockPixels(env, newBitmap, (void**)&newBitmapPixels)) < 0) {
+    LOGE("AndroidBitmap_lockPixels() failed ! error=%d", ret);
+    return nullptr;
+  }
+  bool status = surface->readPixels(pag::ColorType::RGBA_8888, pag::AlphaType::Premultiplied,
+                                    newBitmapPixels, widht * 4);
+  if (!status) {
+    LOGE("ReadPixels failed!");
+  }
+  AndroidBitmap_unlockPixels(env, newBitmap);
+  return newBitmap;
 }

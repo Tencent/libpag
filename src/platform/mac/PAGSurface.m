@@ -77,4 +77,8 @@
   return [_surface getCVPixelBuffer];
 }
 
+- (CVPixelBufferRef)makeSnapshot {
+  return [_surface makeSnapshot];
+}
+
 @end

@@ -23,6 +23,7 @@
 #import "PAGSurface+Internal.h"
 #include "PixelBufferUtils.h"
 #include "base/utils/Log.h"
+#include "types.h"
 
 @interface PAGSurfaceImpl ()
 
@@ -126,4 +127,34 @@
 - (CVPixelBufferRef)getCVPixelBuffer {
   return _gpuDrawable->getCVPixelBuffer();
 }
+
+- (CVPixelBufferRef)makeSnapshot {
+  size_t width = _pagSurface->width();
+  size_t height = _pagSurface->height();
+  size_t bytesPerRow = _pagSurface->width() * 4;
+  CVPixelBufferRef pixelBuffer = nil;
+  CFDictionaryRef empty =
+      CFDictionaryCreate(kCFAllocatorDefault, NULL, NULL, 0, &kCFTypeDictionaryKeyCallBacks,
+                         &kCFTypeDictionaryValueCallBacks);
+  CFMutableDictionaryRef attrs = CFDictionaryCreateMutable(
+      kCFAllocatorDefault, 1, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+
+  CFDictionarySetValue(attrs, kCVPixelBufferIOSurfacePropertiesKey, empty);
+  CVPixelBufferCreate(kCFAllocatorDefault, width, height, kCVPixelFormatType_32BGRA, attrs,
+                      &pixelBuffer);
+  CFRelease(attrs);
+  CFRelease(empty);
+
+  CVPixelBufferLockBaseAddress(pixelBuffer, 0);
+  void* pixelBufferData = CVPixelBufferGetBaseAddress(pixelBuffer);
+  BOOL status = _pagSurface->readPixels(pag::ColorType::BGRA_8888, pag::AlphaType::Premultiplied,
+                                        pixelBufferData, bytesPerRow);
+  if (!status) {
+    LOGE("ReadPixels failed!");
+  }
+  CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
+  CFAutorelease(pixelBuffer);
+  return pixelBuffer;
+}
+
 @end
