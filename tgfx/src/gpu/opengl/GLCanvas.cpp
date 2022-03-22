@@ -88,16 +88,16 @@ std::unique_ptr<FragmentProcessor> GLCanvas::getClipMask(const Rect& deviceBound
   }
   auto rect = Rect::MakeEmpty();
   if (clipPath.asRect(&rect)) {
+    if (surface->origin() == ImageOrigin::BottomLeft) {
+      auto height = rect.height();
+      rect.top = static_cast<float>(surface->height()) - rect.bottom;
+      rect.bottom = rect.top + height;
+    }
     if (IsPixelAligned(rect) && scissorRect) {
       *scissorRect = rect;
       scissorRect->round();
       return nullptr;
     } else {
-      if (surface->origin() == ImageOrigin::BottomLeft) {
-        auto height = rect.height();
-        rect.top = static_cast<float>(surface->height()) - rect.bottom;
-        rect.bottom = rect.top + height;
-      }
       return AARectEffect::Make(rect);
     }
   } else {

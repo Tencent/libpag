@@ -7788,6 +7788,7 @@
         "SolidColor": "48a897dd"
     },
     "PAGSurfaceTest": {
+        "BottomLeftScissor": "52521d0b",
         "FromTexture": "48a897dd",
         "Mask": "48a897dd"
     },
