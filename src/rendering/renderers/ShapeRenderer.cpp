@@ -213,8 +213,8 @@ static void AddCurveToPath(tgfx::Path* path, float centerX, float centerY, float
 }
 
 static void ConvertPolyStarToPath(tgfx::Path* path, float centerX, float centerY, float points,
-                                   float rotation, float innerRadius, float outerRadius,
-                                   float innerRoundness, float outerRoundness, bool reversed) {
+                                  float rotation, float innerRadius, float outerRadius,
+                                  float innerRoundness, float outerRoundness, bool reversed) {
   float direction = reversed ? -1 : 1;
   auto angleStep = static_cast<float>(M_PI) / points;
   auto currentAngle = (rotation - 90) * static_cast<float>(M_PI) / 180;
@@ -304,7 +304,7 @@ void PolyStarToPath(PolyStarElement* polyStar, tgfx::Path* path, Frame frame) {
   auto outerRoundness = polyStar->outerRoundness->getValueAt(frame);
   if (polyStar->polyType == PolyStarType::Star) {
     ConvertPolyStarToPath(path, position.x, position.y, points, rotation, innerRadius, outerRadius,
-                           innerRoundness, outerRoundness, polyStar->reversed);
+                          innerRoundness, outerRoundness, polyStar->reversed);
   } else {
     ConvertPolygonToPath(path, position.x, position.y, points, rotation, outerRadius,
                          outerRoundness, polyStar->reversed);
