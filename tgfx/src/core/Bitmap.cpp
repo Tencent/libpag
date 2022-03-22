@@ -195,8 +195,10 @@ bool Bitmap::eraseAll() {
   } else {
     auto rowCount = _info.height();
     auto trimRowBytes = _info.width() * _info.bytesPerPixel();
+    auto* pixels = static_cast<char*>(_writablePixels);
     for (int i = 0; i < rowCount; i++) {
-      memset(_writablePixels, 0, trimRowBytes);
+      memset(pixels, 0, trimRowBytes);
+      pixels += info().rowBytes();
     }
   }
   return true;
