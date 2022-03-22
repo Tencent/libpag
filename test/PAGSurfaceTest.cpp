@@ -111,4 +111,35 @@ PAG_TEST(PAGSurfaceTest, Mask) {
   gl->deleteTextures(1, &textureInfo.id);
   device->unlock();
 }
+
+/**
+ * 用例描述: PAGSurface 的 origin 是 BottomLeft 时 scissor rect 需要 flip Y。
+ */
+PAG_TEST(PAGSurfaceTest, BottomLeftScissor) {
+  auto pagFile = PAGFile::Load("../assets/test.pag");
+  auto width = pagFile->width();
+  auto height = pagFile->height() * 2;
+  auto device = GLDevice::Make();
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  tgfx::GLSampler textureInfo;
+  CreateGLTexture(context, width, height, &textureInfo);
+  auto backendTexture = ToBackendTexture(textureInfo, width, height);
+  auto pagSurface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::BottomLeft);
+  device->unlock();
+
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setMatrix(pag::Matrix::MakeTrans(0, static_cast<float>(pagFile->height())));
+  pagPlayer->setProgress(0.5);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGSurfaceTest/BottomLeftScissor"));
+
+  context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto gl = GLFunctions::Get(context);
+  gl->deleteTextures(1, &textureInfo.id);
+  device->unlock();
+}
 }  // namespace pag
