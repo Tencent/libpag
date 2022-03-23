@@ -62,8 +62,7 @@ SoftwareDecoderWrapper::SoftwareDecoderWrapper(std::shared_ptr<SoftwareDecoder> 
 }
 
 SoftwareDecoderWrapper::~SoftwareDecoderWrapper() {
-  delete frameBytes;
-  pendingFrames.clear();
+  delete frameBuffer;
 }
 
 bool SoftwareDecoderWrapper::onConfigure(const VideoFormat& format) {
@@ -72,24 +71,22 @@ bool SoftwareDecoderWrapper::onConfigure(const VideoFormat& format) {
     // External decoders only support AnnexB format.
     videoFormat.headers.clear();
     for (auto& header : format.headers) {
-      if (header->length() <= 4) {
+      if (header->size() <= 4) {
         return false;
       }
-      auto newHeader = ByteData::Make(header->length());
-      auto bytes = newHeader->data();
-      bytes[0] = 0;
-      bytes[1] = 0;
-      bytes[2] = 0;
-      bytes[3] = 1;
-      memcpy(bytes + 4, header->data() + 4, header->length() - 4);
-      videoFormat.headers.push_back(std::move(newHeader));
+      tgfx::Buffer buffer(header->data(), header->size());
+      buffer[0] = 0;
+      buffer[1] = 0;
+      buffer[2] = 0;
+      buffer[3] = 1;
+      videoFormat.headers.push_back(buffer.release());
     }
   }
   std::vector<HeaderData> codecHeaders = {};
   for (auto& header : videoFormat.headers) {
     HeaderData newHeader = {};
-    newHeader.data = header->data();
-    newHeader.length = header->length();
+    newHeader.data = const_cast<uint8_t*>(header->bytes());
+    newHeader.length = header->size();
     codecHeaders.push_back(newHeader);
   }
   return softwareDecoder->onConfigure(codecHeaders, videoFormat.mimeType, videoFormat.width,
@@ -101,30 +98,30 @@ DecodingResult SoftwareDecoderWrapper::onSendBytes(void* bytes, size_t length, i
   if (softwareDecoder != nullptr) {
     // External decoders only support AnnexB format.
     if (bytes != nullptr && length > 0 && Platform::Current()->naluType() != NALUType::AnnexB) {
-      if (frameBytes != nullptr && frameLength < length) {
-        delete frameBytes;
-        frameBytes = nullptr;
+      if (frameBuffer != nullptr && frameBuffer->size() < length) {
+        delete frameBuffer;
+        frameBuffer = nullptr;
       }
       uint32_t pos = 0;
-      if (frameBytes == nullptr) {
-        frameBytes = new uint8_t[length];
-        frameLength = length;
+      if (frameBuffer == nullptr) {
+        frameBuffer = new tgfx::Buffer(bytes, length);
+      } else {
+        frameBuffer->writeRange(0, length, bytes);
       }
       while (pos < length) {
-        frameBytes[pos] = 0;
-        frameBytes[pos + 1] = 0;
-        frameBytes[pos + 2] = 0;
-        frameBytes[pos + 3] = 1;
-        uint32_t NALULength = (static_cast<uint8_t*>(bytes)[pos] << 24) +
+        (*frameBuffer)[pos] = 0;
+        (*frameBuffer)[pos + 1] = 0;
+        (*frameBuffer)[pos + 2] = 0;
+        (*frameBuffer)[pos + 3] = 1;
+        uint32_t naluLength = (static_cast<uint8_t*>(bytes)[pos] << 24) +
                               (static_cast<uint8_t*>(bytes)[pos + 1] << 16) +
                               (static_cast<uint8_t*>(bytes)[pos + 2] << 8) +
                               static_cast<uint8_t*>(bytes)[pos + 3];
-        pos += 4;
-        memcpy(frameBytes + pos, static_cast<uint8_t*>(bytes) + pos, NALULength);
-        pos += NALULength;
+        pos += 4 + naluLength;
       }
 
-      result = static_cast<DecodingResult>(softwareDecoder->onSendBytes(frameBytes, length, time));
+      result = static_cast<DecodingResult>(
+          softwareDecoder->onSendBytes(frameBuffer->data(), length, time));
     } else {
       result = static_cast<DecodingResult>(softwareDecoder->onSendBytes(bytes, length, time));
     }

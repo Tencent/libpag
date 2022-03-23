@@ -18,36 +18,25 @@
 
 #pragma once
 
-#include <climits>
-#include "pag/file.h"
-#include "rendering/video/VideoDemuxer.h"
+#include <cinttypes>
 
 namespace pag {
-class VideoSequenceDemuxer : public VideoDemuxer {
- public:
-  VideoSequenceDemuxer(std::shared_ptr<File> file, VideoSequence* sequence);
+/**
+ * This structure stores encoded video sample data.
+ */
+struct VideoSample {
+  /**
+   * The byte data of the sample.
+   */
+  void* data = nullptr;
+  /**
+   * The size in bytes of the data.
+   */
+  size_t length = 0;
 
-  VideoFormat getFormat() override {
-    return format;
-  }
-
-  VideoSample nextSample() override;
-
-  int64_t getSampleTimeAt(int64_t targetTime) override;
-
-  bool needSeeking(int64_t currentTime, int64_t targetTime) override;
-
-  void seekTo(int64_t targetTime) override;
-
-  void reset() override;
-
- private:
-  // Keep a reference to the File in case the Sequence object is released while we are using it.
-  std::shared_ptr<File> file = nullptr;
-  VideoSequence* sequence = nullptr;
-  VideoFormat format = {};
-  std::vector<Frame> keyframes = {};
-  Frame maxPTSFrame = -1;
-  Frame sampleIndex = 0;
+  /**
+   * Sample's presentation time in microseconds.
+   */
+  int64_t time = 0;
 };
 }  // namespace pag

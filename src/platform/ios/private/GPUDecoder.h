@@ -52,7 +52,7 @@ class GPUDecoder : public VideoDecoder {
   tgfx::YUVColorSpace destinationColorSpace = tgfx::YUVColorSpace::Rec601;
   tgfx::YUVColorRange colorRange = tgfx::YUVColorRange::MPEG;
 
-  bool initVideoToolBox(const std::vector<std::shared_ptr<ByteData>>& headers,
+  bool initVideoToolBox(const std::vector<std::shared_ptr<tgfx::Data>>& headers,
                         const std::string& mimeType);
   bool resetVideoToolBox();
   void cleanResources();

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GPUDecoder.h"
+#include "core/Buffer.h"
 #include "platform/android/JStringUtil.h"
 
 namespace pag {
@@ -109,17 +110,16 @@ bool GPUDecoder::onConfigure(jobject decoder, const VideoFormat& format) {
       Local<jstring> key = {env, SafeConvertToJString(env, keyString)};
       int dataLength = 0;
       for (auto& header : format.headers) {
-        dataLength += header->length();
+        dataLength += header->size();
       }
-      auto data = new uint8_t[dataLength];
-      int index = 0;
+      tgfx::Buffer buffer(dataLength);
+      int pos = 0;
       for (auto& header : format.headers) {
-        memcpy(data + index, header->data(), header->length());
-        index += header->length();
+        buffer.writeRange(pos, header->size(), header->data());
+        pos += header->size();
       }
-      Local<jobject> bytes = {env, env->NewDirectByteBuffer(data, dataLength)};
+      Local<jobject> bytes = {env, env->NewDirectByteBuffer(buffer.data(), buffer.size())};
       env->CallVoidMethod(mediaFormat.get(), MediaFormat_setByteBuffer, key.get(), bytes.get());
-      delete[] data;
     }
   } else {
     int index = 0;
@@ -127,7 +127,8 @@ bool GPUDecoder::onConfigure(jobject decoder, const VideoFormat& format) {
       char keyString[6];
       snprintf(keyString, 6, "csd-%d", index);
       Local<jstring> key = {env, SafeConvertToJString(env, keyString)};
-      Local<jobject> bytes = {env, env->NewDirectByteBuffer(header->data(), header->length())};
+      Local<jobject> bytes = {
+          env, env->NewDirectByteBuffer(const_cast<uint8_t*>(header->bytes()), header->size())};
       env->CallVoidMethod(mediaFormat.get(), MediaFormat_setByteBuffer, key.get(), bytes.get());
       index++;
     }

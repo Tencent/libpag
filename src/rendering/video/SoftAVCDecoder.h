@@ -21,6 +21,8 @@
 #ifdef PAG_USE_LIBAVC
 
 #include "base/utils/Log.h"
+#include "core/Buffer.h"
+#include "core/Data.h"
 #include "pag/decoder.h"
 #include "pag/types.h"
 
@@ -57,8 +59,8 @@ class SoftAVCDecoder : public SoftwareDecoder {
   std::unique_ptr<YUVBuffer> onRenderFrame() override;
 
  private:
-  std::unique_ptr<ByteData> headerData = nullptr;
-  std::unique_ptr<ByteData> outputFrame = nullptr;
+  std::shared_ptr<tgfx::Data> headerData = nullptr;
+  tgfx::Buffer* outputFrame = nullptr;
   iv_obj_t* codecContext = nullptr;  // Codec context
   ivd_video_decode_ip_t decodeInput = {};
   ivd_video_decode_op_t decodeOutput = {};

@@ -20,6 +20,7 @@
 
 #include <list>
 #include "VideoDecoder.h"
+#include "core/Buffer.h"
 #include "pag/decoder.h"
 
 namespace pag {
@@ -47,8 +48,7 @@ class SoftwareDecoderWrapper : public VideoDecoder {
  private:
   std::shared_ptr<SoftwareDecoder> softwareDecoder = nullptr;
   VideoFormat videoFormat = {};
-  uint8_t* frameBytes = nullptr;
-  size_t frameLength = 0;
+  tgfx::Buffer* frameBuffer = nullptr;
   int64_t currentDecodedTime = -1;
   std::list<int64_t> pendingFrames{};
 

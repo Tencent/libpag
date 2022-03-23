@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "core/Data.h"
 #include "core/YUVInfo.h"
 #include "pag/types.h"
 
@@ -27,7 +28,7 @@ struct VideoFormat {
   int height = 0;
   int64_t duration = 0;
   float frameRate = 0.0;
-  std::vector<std::shared_ptr<ByteData>> headers = {};
+  std::vector<std::shared_ptr<tgfx::Data>> headers = {};
   tgfx::YUVColorSpace colorSpace = tgfx::YUVColorSpace::Rec601;
   tgfx::YUVColorRange colorRange = tgfx::YUVColorRange::MPEG;
   std::string mimeType = "video/avc";

@@ -31,7 +31,7 @@ VideoSequenceDemuxer::VideoSequenceDemuxer(std::shared_ptr<File> file, VideoSequ
     format.height++;
   }
   for (auto& header : sequence->headers) {
-    auto bytes = ByteData::MakeWithoutCopy(header->data(), header->length());
+    auto bytes = tgfx::Data::MakeWithoutCopy(header->data(), header->length());
     format.headers.push_back(std::move(bytes));
   }
   format.mimeType = "video/avc";
@@ -45,16 +45,16 @@ VideoSequenceDemuxer::VideoSequenceDemuxer(std::shared_ptr<File> file, VideoSequ
   }
 }
 
-int64_t VideoSequenceDemuxer::getSampleTimeAt(int64_t targetTime) const {
+int64_t VideoSequenceDemuxer::getSampleTimeAt(int64_t targetTime) {
   auto frame = TimeToFrame(targetTime, sequence->frameRate);
   return FrameToTime(frame, sequence->frameRate);
 }
 
-SampleData VideoSequenceDemuxer::nextSample() {
+VideoSample VideoSequenceDemuxer::nextSample() {
   if (sampleIndex >= static_cast<int>(sequence->frames.size())) {
     return {};
   }
-  SampleData sample = {};
+  VideoSample sample = {};
   auto videoFrame = sequence->frames[sampleIndex];
   sample.data = videoFrame->fileBytes->data();
   sample.length = videoFrame->fileBytes->length();
@@ -64,9 +64,9 @@ SampleData VideoSequenceDemuxer::nextSample() {
   return sample;
 }
 
-bool VideoSequenceDemuxer::needSeeking(int64_t currentSampleTime, int64_t targetSampleTime) const {
-  auto current = TimeToFrame(currentSampleTime, sequence->frameRate);
-  auto target = TimeToFrame(targetSampleTime, sequence->frameRate);
+bool VideoSequenceDemuxer::needSeeking(int64_t currentTime, int64_t targetTime) {
+  auto current = TimeToFrame(currentTime, sequence->frameRate);
+  auto target = TimeToFrame(targetTime, sequence->frameRate);
   if (target < current) {
     return true;
   }

@@ -16,9 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <fstream>
 #include <vector>
 #include "core/Bitmap.h"
+#include "core/Buffer.h"
 #include "core/Image.h"
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
@@ -48,101 +48,97 @@ PAG_TEST(PAGReadPixelsTest, TestPixelMap) {
   auto RGBAInfo =
       ImageInfo::Make(width, height, tgfx::ColorType::RGBA_8888, tgfx::AlphaType::Unpremultiplied);
   auto byteSize = RGBAInfo.byteSize();
-  auto pixelsA = new uint8_t[byteSize];
-  auto pixelsB = new uint8_t[byteSize];
-  auto result = image->readPixels(RGBAInfo, pixelsA);
+  Buffer pixelsA(byteSize);
+  Buffer pixelsB(byteSize);
+  auto result = image->readPixels(RGBAInfo, pixelsA.data());
   EXPECT_TRUE(result);
 
-  Bitmap RGBAMap(RGBAInfo, pixelsA);
-  CHECK_PIXELS(RGBAInfo, pixelsA, "PixelMap_RGBA_Original");
+  Bitmap RGBAMap(RGBAInfo, pixelsA.data());
+  CHECK_PIXELS(RGBAInfo, pixelsA.data(), "PixelMap_RGBA_Original");
 
-  result = RGBAMap.readPixels(RGBAInfo, pixelsB);
+  result = RGBAMap.readPixels(RGBAInfo, pixelsB.data());
   EXPECT_TRUE(result);
-  CHECK_PIXELS(RGBAInfo, pixelsB, "PixelMap_RGBA_to_RGBA");
+  CHECK_PIXELS(RGBAInfo, pixelsB.data(), "PixelMap_RGBA_to_RGBA");
 
-  memset(pixelsB, 0, RGBAInfo.byteSize());
-  result = RGBAMap.readPixels(RGBAInfo, pixelsB, 100, 100);
+  pixelsB.clear();
+  result = RGBAMap.readPixels(RGBAInfo, pixelsB.data(), 100, 100);
   ASSERT_TRUE(result);
-  CHECK_PIXELS(RGBAInfo, pixelsB, "PixelMap_RGBA_to_RGBA_100_100");
+  CHECK_PIXELS(RGBAInfo, pixelsB.data(), "PixelMap_RGBA_to_RGBA_100_100");
 
   auto RGBARectInfo =
       ImageInfo::Make(500, 500, tgfx::ColorType::RGBA_8888, tgfx::AlphaType::Premultiplied);
-  memset(pixelsB, 0, RGBARectInfo.byteSize());
-  result = RGBAMap.readPixels(RGBARectInfo, pixelsB, -100, -100);
+  pixelsB.clear();
+  result = RGBAMap.readPixels(RGBARectInfo, pixelsB.data(), -100, -100);
   ASSERT_TRUE(result);
-  CHECK_PIXELS(RGBARectInfo, pixelsB, "PixelMap_RGBA_to_RGBA_-100_-100");
+  CHECK_PIXELS(RGBARectInfo, pixelsB.data(), "PixelMap_RGBA_to_RGBA_-100_-100");
 
-  memset(pixelsB, 0, RGBARectInfo.byteSize());
-  result = RGBAMap.readPixels(RGBARectInfo, pixelsB, 100, -100);
+  pixelsB.clear();
+  result = RGBAMap.readPixels(RGBARectInfo, pixelsB.data(), 100, -100);
   ASSERT_TRUE(result);
-  CHECK_PIXELS(RGBARectInfo, pixelsB, "PixelMap_RGBA_to_RGBA_100_-100");
+  CHECK_PIXELS(RGBARectInfo, pixelsB.data(), "PixelMap_RGBA_to_RGBA_100_-100");
 
   auto rgb_AInfo = RGBAInfo.makeAlphaType(tgfx::AlphaType::Premultiplied);
-  result = RGBAMap.readPixels(rgb_AInfo, pixelsB);
+  result = RGBAMap.readPixels(rgb_AInfo, pixelsB.data());
   EXPECT_TRUE(result);
-  CHECK_PIXELS(rgb_AInfo, pixelsB, "PixelMap_RGBA_to_rgb_A");
+  CHECK_PIXELS(rgb_AInfo, pixelsB.data(), "PixelMap_RGBA_to_rgb_A");
 
   auto bgr_AInfo = rgb_AInfo.makeColorType(tgfx::ColorType::BGRA_8888);
-  result = RGBAMap.readPixels(bgr_AInfo, pixelsB);
+  result = RGBAMap.readPixels(bgr_AInfo, pixelsB.data());
   EXPECT_TRUE(result);
-  CHECK_PIXELS(bgr_AInfo, pixelsB, "PixelMap_RGBA_to_bgr_A");
+  CHECK_PIXELS(bgr_AInfo, pixelsB.data(), "PixelMap_RGBA_to_bgr_A");
 
   auto BGRAInfo = bgr_AInfo.makeAlphaType(tgfx::AlphaType::Unpremultiplied);
-  result = RGBAMap.readPixels(BGRAInfo, pixelsB);
+  result = RGBAMap.readPixels(BGRAInfo, pixelsB.data());
   EXPECT_TRUE(result);
-  CHECK_PIXELS(BGRAInfo, pixelsB, "PixelMap_RGBA_to_BGRA");
+  CHECK_PIXELS(BGRAInfo, pixelsB.data(), "PixelMap_RGBA_to_BGRA");
 
-  Bitmap BGRAMap(BGRAInfo, pixelsB);
+  Bitmap BGRAMap(BGRAInfo, pixelsB.data());
 
-  result = BGRAMap.readPixels(BGRAInfo, pixelsA);
+  result = BGRAMap.readPixels(BGRAInfo, pixelsA.data());
   EXPECT_TRUE(result);
-  CHECK_PIXELS(BGRAInfo, pixelsA, "PixelMap_BGRA_to_BGRA");
+  CHECK_PIXELS(BGRAInfo, pixelsA.data(), "PixelMap_BGRA_to_BGRA");
 
-  result = BGRAMap.readPixels(RGBAInfo, pixelsA);
+  result = BGRAMap.readPixels(RGBAInfo, pixelsA.data());
   EXPECT_TRUE(result);
-  CHECK_PIXELS(RGBAInfo, pixelsA, "PixelMap_BGRA_to_RGBA");
+  CHECK_PIXELS(RGBAInfo, pixelsA.data(), "PixelMap_BGRA_to_RGBA");
 
-  result = BGRAMap.readPixels(rgb_AInfo, pixelsA);
+  result = BGRAMap.readPixels(rgb_AInfo, pixelsA.data());
   EXPECT_TRUE(result);
-  CHECK_PIXELS(rgb_AInfo, pixelsA, "PixelMap_BGRA_to_rgb_A");
+  CHECK_PIXELS(rgb_AInfo, pixelsA.data(), "PixelMap_BGRA_to_rgb_A");
 
-  Bitmap rgb_AMap(rgb_AInfo, pixelsA);
+  Bitmap rgb_AMap(rgb_AInfo, pixelsA.data());
 
-  result = rgb_AMap.readPixels(RGBAInfo, pixelsB);
+  result = rgb_AMap.readPixels(RGBAInfo, pixelsB.data());
   EXPECT_TRUE(result);
-  CHECK_PIXELS(RGBAInfo, pixelsB, "PixelMap_rgb_A_to_RGBA");
+  CHECK_PIXELS(RGBAInfo, pixelsB.data(), "PixelMap_rgb_A_to_RGBA");
 
-  result = rgb_AMap.readPixels(BGRAInfo, pixelsB);
+  result = rgb_AMap.readPixels(BGRAInfo, pixelsB.data());
   EXPECT_TRUE(result);
-  CHECK_PIXELS(BGRAInfo, pixelsB, "PixelMap_rgb_A_to_BGRA");
+  CHECK_PIXELS(BGRAInfo, pixelsB.data(), "PixelMap_rgb_A_to_BGRA");
 
-  result = rgb_AMap.readPixels(bgr_AInfo, pixelsB);
+  result = rgb_AMap.readPixels(bgr_AInfo, pixelsB.data());
   EXPECT_TRUE(result);
-  CHECK_PIXELS(bgr_AInfo, pixelsB, "PixelMap_rgb_A_to_bgr_A");
+  CHECK_PIXELS(bgr_AInfo, pixelsB.data(), "PixelMap_rgb_A_to_bgr_A");
 
   auto A8Info =
       ImageInfo::Make(width, height, tgfx::ColorType::ALPHA_8, tgfx::AlphaType::Unpremultiplied);
   EXPECT_EQ(A8Info.alphaType(), tgfx::AlphaType::Premultiplied);
   auto alphaByteSize = A8Info.byteSize();
-  auto pixelsC = new uint8_t[alphaByteSize];
+  Buffer pixelsC(alphaByteSize);
 
-  result = rgb_AMap.readPixels(A8Info, pixelsC);
+  result = rgb_AMap.readPixels(A8Info, pixelsC.data());
   EXPECT_TRUE(result);
-  CHECK_PIXELS(A8Info, pixelsC, "PixelMap_rgb_A_to_alpha");
+  CHECK_PIXELS(A8Info, pixelsC.data(), "PixelMap_rgb_A_to_alpha");
 
-  Bitmap A8Map(A8Info, pixelsC);
+  Bitmap A8Map(A8Info, pixelsC.data());
 
-  result = A8Map.readPixels(rgb_AInfo, pixelsB);
+  result = A8Map.readPixels(rgb_AInfo, pixelsB.data());
   EXPECT_TRUE(result);
-  CHECK_PIXELS(rgb_AInfo, pixelsB, "PixelMap_alpha_to_rgb_A");
+  CHECK_PIXELS(rgb_AInfo, pixelsB.data(), "PixelMap_alpha_to_rgb_A");
 
-  result = A8Map.readPixels(BGRAInfo, pixelsB);
+  result = A8Map.readPixels(BGRAInfo, pixelsB.data());
   EXPECT_TRUE(result);
-  CHECK_PIXELS(BGRAInfo, pixelsB, "PixelMap_alpha_to_BGRA");
-
-  delete[] pixelsA;
-  delete[] pixelsB;
-  delete[] pixelsC;
+  CHECK_PIXELS(BGRAInfo, pixelsB.data(), "PixelMap_alpha_to_BGRA");
 }
 
 /**

@@ -65,7 +65,8 @@ class Data {
    * Creates a Data object, taking ownership of the specified data, and using the releaseProc to
    * free it. The releaseProc may be nullptr.
    */
-  static std::shared_ptr<Data> MakeAdopted(const void* data, size_t length, ReleaseProc releaseProc,
+  static std::shared_ptr<Data> MakeAdopted(const void* data, size_t length,
+                                           ReleaseProc releaseProc = DeleteProc,
                                            void* context = nullptr);
 
   /**
@@ -95,6 +96,13 @@ class Data {
    */
   size_t size() const {
     return _size;
+  }
+
+  /**
+   * Returns true if the Data is empty.
+   */
+  bool empty() const {
+    return _size == 0;
   }
 
  private:
