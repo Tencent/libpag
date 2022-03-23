@@ -87,6 +87,8 @@ PAG_TEST_F(PAGImageTest, image) {
   auto bytes = reinterpret_cast<uint8_t*>(emptyData->data());
   EXPECT_TRUE(bytes[399] == 0);
   EXPECT_TRUE(bytes[400] == 1);
+  EXPECT_TRUE(bytes[399 + info.rowBytes()] == 0);
+  EXPECT_TRUE(bytes[400 + info.rowBytes()] == 1);
   auto image = PAGImage::FromPixels(fileData->data(), width, height, rowBytes, ColorType::RGBA_8888,
                                     AlphaType::Premultiplied);
   TestPAGFile->setCurrentTime(3000000);
