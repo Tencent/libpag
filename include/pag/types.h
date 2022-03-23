@@ -1462,7 +1462,7 @@ class PAG_API ByteData {
   static std::unique_ptr<ByteData> MakeAdopted(
       uint8_t* data, size_t length, std::function<void(uint8_t*)> releaseCallback = DeleteCallback);
   /**
-   * Creates a ByteData object with specified legnth.
+   * Creates a ByteData object with specified length.
    */
   static std::unique_ptr<ByteData> Make(size_t length);
 

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "DecodingResult.h"
 #include "VideoBuffer.h"
 #include "VideoFormat.h"
 #include "base/utils/Log.h"
@@ -26,13 +27,6 @@
 #include "pag/file.h"
 
 namespace pag {
-enum class DecodingResult {
-  Success = 0,
-  TryAgainLater = -1,
-  Error = -2,
-  EndOfStream = -3,
-};
-
 class VideoDecoder {
  public:
   /**

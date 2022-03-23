@@ -21,27 +21,9 @@
 #include <memory>
 #include <vector>
 #include "VideoFormat.h"
+#include "VideoSample.h"
 
 namespace pag {
-/**
- * This structure stores encoded sample data.
- */
-struct SampleData {
-  /**
-   * The byte data of the sample.
-   */
-  void* data = nullptr;
-  /**
-   * The size in bytes of the data.
-   */
-  size_t length = 0;
-
-  /**
-   * Sample's presentation time in microseconds.
-   */
-  int64_t time = 0;
-};
-
 /**
  * VideoDemuxer extracts encoded video sample data from a data source.
  */
@@ -52,23 +34,24 @@ class VideoDemuxer {
   /**
    * Returns the descriptions of the video format.
    */
-  virtual VideoFormat getFormat() const = 0;
+  virtual VideoFormat getFormat() = 0;
 
   /**
-   * Returns the next sample data in the demuxer. Returns an empty SampleData if no more sample data
-   * is available. Note: The returned SampleData is valid until the next call to the nextSample().
+   * Returns the next sample data in the demuxer. Returns an empty VideoSample if no more sample
+   * data is available. Note: The returned VideoSample is valid until the next call to the
+   * nextSample() method.
    */
-  virtual SampleData nextSample() = 0;
+  virtual VideoSample nextSample() = 0;
 
   /**
    * Returns the sample time closest to the specified target time.
    */
-  virtual int64_t getSampleTimeAt(int64_t targetTime) const = 0;
+  virtual int64_t getSampleTimeAt(int64_t targetTime) = 0;
 
   /**
    * Returns true if calling seekTo() is required from currentSampleTime to targetSampleTime.
    */
-  virtual bool needSeeking(int64_t currentSampleTime, int64_t targetSampleTime) const = 0;
+  virtual bool needSeeking(int64_t currentTime, int64_t targetTime) = 0;
 
   /**
    * Seek to a sync sample at or before the specified target time.

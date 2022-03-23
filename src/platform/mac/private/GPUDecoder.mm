@@ -18,6 +18,7 @@
 
 #include "GPUDecoder.h"
 #include "VideoImage.h"
+#include "core/Buffer.h"
 
 #define DEFAULT_MAX_NUM_REORDER 4
 
@@ -75,26 +76,18 @@ void DidDecompress(void*, void* sourceFrameRefCon, OSStatus status, VTDecodeInfo
   }
 }
 
-void initParameterSets(const std::vector<std::shared_ptr<ByteData>>& headers,
-                       uint8_t** parameterSetPointers, size_t* parameterSetSizes) {
-  int index = 0;
-  for (const auto& header : headers) {
-    parameterSetPointers[index] = header->data() + 4;
-    parameterSetSizes[index] = header->length() - 4;
-    index++;
-  }
-}
-
-bool GPUDecoder::initVideoToolBox(const std::vector<std::shared_ptr<ByteData>>& headers,
+bool GPUDecoder::initVideoToolBox(const std::vector<std::shared_ptr<tgfx::Data>>& headers,
                                   const std::string& mimeType) {
   if (videoFormatDescription == nullptr) {
     OSStatus status;
     auto size = headers.size();
-    std::vector<uint8_t*> parameterSetPointers = {};
-    parameterSetPointers.reserve(size);
+
+    std::vector<const uint8_t*> parameterSetPointers = {};
     std::vector<size_t> parameterSetSizes = {};
-    parameterSetSizes.reserve(size);
-    initParameterSets(headers, &parameterSetPointers[0], &parameterSetSizes[0]);
+    for (const auto& header : headers) {
+      parameterSetPointers.push_back(header->bytes() + 4);
+      parameterSetSizes.push_back(header->size() - 4);
+    }
 
     if (mimeType == "video/hevc") {
       status = CMVideoFormatDescriptionCreateFromHEVCParameterSets(
@@ -270,11 +263,11 @@ pag::DecodingResult GPUDecoder::onDecodeFrame() {
   }
 
   if (outputPixelBuffer) {
-    auto outputFrame = new OutputFrame();
-    outputFrame->frameTime = sendFrameTime;
-    outputFrame->outputPixelBuffer = outputPixelBuffer;
+    auto newFrame = new OutputFrame();
+    newFrame->frameTime = sendFrameTime;
+    newFrame->outputPixelBuffer = outputPixelBuffer;
     outputPixelBuffer = nullptr;
-    outputFrameCaches.insert(std::pair<pag::Frame, OutputFrame*>(sendFrameTime, outputFrame));
+    outputFrameCaches.insert(std::pair<pag::Frame, OutputFrame*>(sendFrameTime, newFrame));
   }
 
   if (!inputEndOfStream && pendingFrames.size() <= static_cast<size_t>(maxNumReorder)) {

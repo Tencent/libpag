@@ -18,6 +18,7 @@
 
 #include "core/images/png/PngImage.h"
 #include "core/Bitmap.h"
+#include "core/Buffer.h"
 #include "png.h"
 
 namespace tgfx {
@@ -266,22 +267,21 @@ static void png_reader_write_data(png_structp png_ptr, png_bytep data, png_size_
 std::shared_ptr<Data> PngImage::Encode(const ImageInfo& imageInfo, const void* pixels,
                                        EncodedFormat, int) {
   auto srcPixels = static_cast<png_bytep>(const_cast<void*>((pixels)));
-  png_bytep convertPixels = nullptr;
-
+  uint8_t* alphaPixels = nullptr;
+  std::unique_ptr<Buffer> tempPixels = nullptr;
   if (imageInfo.colorType() == ColorType::ALPHA_8) {
-    convertPixels = new uint8_t[imageInfo.width() * 2];
+    tempPixels = std::make_unique<Buffer>(imageInfo.width() * 2);
+    alphaPixels = tempPixels->bytes();
   } else if (imageInfo.colorType() != ColorType::RGBA_8888 ||
              imageInfo.alphaType() != AlphaType::Unpremultiplied) {
     Bitmap bitmap(imageInfo, srcPixels);
-    auto dstPixels = new uint8_t[imageInfo.byteSize()];
+    tempPixels = std::make_unique<Buffer>(imageInfo.byteSize());
     auto dstInfo = ImageInfo::Make(imageInfo.width(), imageInfo.height(), ColorType::RGBA_8888,
                                    AlphaType::Unpremultiplied);
-    if (!bitmap.readPixels(dstInfo, dstPixels)) {
-      delete[] dstPixels;
+    if (!bitmap.readPixels(dstInfo, tempPixels->data())) {
       return nullptr;
     }
-    srcPixels = dstPixels;
-    convertPixels = dstPixels;
+    srcPixels = tempPixels->bytes();
   }
   PngWriter pngWriter;
   png_structp png_ptr = nullptr;
@@ -323,11 +323,11 @@ std::shared_ptr<Data> PngImage::Encode(const ImageInfo& imageInfo, const void* p
       if (imageInfo.colorType() == ColorType::ALPHA_8) {
         // convert alpha8 to gray
         for (int j = 0; j < imageInfo.width(); j++) {
-          *(convertPixels++) = 0;
-          *(convertPixels++) = *(srcPixels++);
+          *(alphaPixels++) = 0;
+          *(alphaPixels++) = *(srcPixels++);
         }
-        convertPixels -= imageInfo.width() * 2;
-        png_write_row(png_ptr, reinterpret_cast<png_const_bytep>(convertPixels));
+        alphaPixels -= imageInfo.width() * 2;
+        png_write_row(png_ptr, reinterpret_cast<png_const_bytep>(alphaPixels));
       } else {
         png_write_row(png_ptr, reinterpret_cast<png_const_bytep>(srcPixels));
         srcPixels += imageInfo.width() * 4;
@@ -339,7 +339,6 @@ std::shared_ptr<Data> PngImage::Encode(const ImageInfo& imageInfo, const void* p
   if (png_ptr) {
     png_destroy_read_struct(&png_ptr, &info_ptr, nullptr);
   }
-  delete[] convertPixels;
   if (!encodeSuccess) {
     if (pngWriter.data) {
       free(pngWriter.data);

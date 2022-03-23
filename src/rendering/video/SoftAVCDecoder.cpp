@@ -18,6 +18,7 @@
 
 #include "SoftAVCDecoder.h"
 #include <cstdlib>
+#include "core/Buffer.h"
 
 #ifdef PAG_USE_LIBAVC
 
@@ -77,17 +78,19 @@ bool SoftAVCDecoder::onConfigure(const std::vector<HeaderData>& headers, std::st
   for (auto& header : headers) {
     totalLength += header.length;
   }
-  headerData = ByteData::Make(totalLength);
+  tgfx::Buffer buffer(totalLength);
   size_t pos = 0;
   for (auto& header : headers) {
-    memcpy(headerData->data() + pos, header.data, header.length);
+    buffer.writeRange(pos, header.length, header.data);
     pos += header.length;
   }
+  headerData = buffer.release();
   return openDecoder();
 }
 
 SoftAVCDecoder::~SoftAVCDecoder() {
   destroyDecoder();
+  delete outputFrame;
 }
 
 DecoderResult SoftAVCDecoder::onSendBytes(void* bytes, size_t length, int64_t time) {
@@ -181,7 +184,7 @@ bool SoftAVCDecoder::openDecoder() {
   if (!setParams(true)) {
     return false;
   }
-  onSendBytes(headerData->data(), headerData->length(), 0);
+  onSendBytes(const_cast<void*>(headerData->data()), headerData->size(), 0);
   auto result = onDecodeFrame();
   if (result == DecoderResult::Error) {
     return false;
@@ -210,12 +213,12 @@ bool SoftAVCDecoder::initOutputFrame() {
   for (uint32_t i = 0; i < s_ctl_op.u4_min_num_out_bufs; i++) {
     outLength += s_ctl_op.u4_min_out_buf_size[i];
   }
-  outputFrame = ByteData::Make(outLength);
+  outputFrame = new tgfx::Buffer(outLength);
   auto& ps_out_buf = decodeInput.s_out_buffer;
   size_t offset = 0;
   for (uint32_t i = 0; i < s_ctl_op.u4_min_num_out_bufs; i++) {
     ps_out_buf.u4_min_out_buf_size[i] = s_ctl_op.u4_min_out_buf_size[i];
-    ps_out_buf.pu1_bufs[i] = outputFrame->data() + offset;
+    ps_out_buf.pu1_bufs[i] = outputFrame->bytes() + offset;
     offset += s_ctl_op.u4_min_out_buf_size[i];
   }
   ps_out_buf.u4_num_bufs = s_ctl_op.u4_min_num_out_bufs;

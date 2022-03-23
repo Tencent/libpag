@@ -18,6 +18,7 @@
 
 #include "core/Image.h"
 #include "core/Bitmap.h"
+#include "core/Buffer.h"
 #include "core/ImageInfo.h"
 #include "core/PixelBuffer.h"
 #include "core/Stream.h"
@@ -45,12 +46,11 @@ std::shared_ptr<Image> Image::MakeFrom(const std::string& filePath) {
   if (stream == nullptr || stream->size() <= 14) {
     return nullptr;
   }
-  auto buffer = new uint8_t[14];
-  if (stream->read(buffer, 14) < 14) {
-    delete[] buffer;
+  Buffer buffer(14);
+  if (stream->read(buffer.data(), 14) < 14) {
     return nullptr;
   }
-  auto data = Data::MakeAdopted(buffer, 14, Data::DeleteProc);
+  auto data = buffer.release();
 #ifdef TGFX_USE_WEBP_DECODE
   if (WebpImage::IsWebp(data)) {
     image = WebpImage::MakeFrom(filePath);

@@ -18,6 +18,7 @@
 
 #include "core/images/webp/WebpImage.h"
 #include "core/Bitmap.h"
+#include "core/Buffer.h"
 #include "core/images/webp/WebpUtility.h"
 
 namespace tgfx {
@@ -135,21 +136,19 @@ static int webp_reader_write_data(const uint8_t* data, size_t data_size,
 std::shared_ptr<Data> WebpImage::Encode(const ImageInfo& imageInfo, const void* pixels,
                                         EncodedFormat, int quality) {
   const uint8_t* srcPixels = static_cast<uint8_t*>(const_cast<void*>(pixels));
-  const uint8_t* convertPixels = nullptr;
+  std::unique_ptr<Buffer> tempPixels = nullptr;
   if (imageInfo.alphaType() == AlphaType::Premultiplied ||
       imageInfo.colorType() == ColorType::ALPHA_8) {
     Bitmap bitmap(imageInfo, srcPixels);
-    auto dstPixels = new uint8_t[imageInfo.width() * imageInfo.height() * 4];
+    tempPixels = std::make_unique<Buffer>(imageInfo.width() * imageInfo.height() * 4);
     auto colorType =
         imageInfo.colorType() == ColorType::ALPHA_8 ? ColorType::RGBA_8888 : imageInfo.colorType();
     auto dstInfo = ImageInfo::Make(imageInfo.width(), imageInfo.height(), colorType,
                                    AlphaType::Unpremultiplied);
-    if (!bitmap.readPixels(dstInfo, dstPixels)) {
-      delete[] dstPixels;
+    if (!bitmap.readPixels(dstInfo, tempPixels->data())) {
       return nullptr;
     }
-    srcPixels = dstPixels;
-    convertPixels = dstPixels;
+    srcPixels = tempPixels->bytes();
   }
   WebPConfig webp_config;
   bool isLossless = false;
@@ -198,11 +197,9 @@ std::shared_ptr<Data> WebpImage::Encode(const ImageInfo& imageInfo, const void* 
     if (webpWriter.data) {
       free(webpWriter.data);
     }
-    delete[] convertPixels;
     return nullptr;
   }
   WebPPictureFree(&pic);
-  delete[] convertPixels;
   return Data::MakeAdopted(webpWriter.data, webpWriter.length, Data::FreeProc);
 }
 #endif
