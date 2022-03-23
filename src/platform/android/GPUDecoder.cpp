@@ -127,8 +127,8 @@ bool GPUDecoder::onConfigure(jobject decoder, const VideoFormat& format) {
       char keyString[6];
       snprintf(keyString, 6, "csd-%d", index);
       Local<jstring> key = {env, SafeConvertToJString(env, keyString)};
-      Local<jobject> bytes =
-          {env, env->NewDirectByteBuffer(const_cast<uint8_t*>(header->bytes()), header->size())};
+      Local<jobject> bytes = {
+          env, env->NewDirectByteBuffer(const_cast<uint8_t*>(header->bytes()), header->size())};
       env->CallVoidMethod(mediaFormat.get(), MediaFormat_setByteBuffer, key.get(), bytes.get());
       index++;
     }
