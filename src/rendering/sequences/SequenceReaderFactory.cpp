@@ -52,7 +52,7 @@ std::shared_ptr<SequenceReader> SequenceReaderFactory::makeReader(std::shared_pt
   return std::make_shared<VideoSequenceReader>(file, videoSequence, policy);
 #else
   auto demuxer = std::make_unique<VideoSequenceDemuxer>(file, videoSequence);
-  return std::make_unique<VideoReader>(std::move(demuxer), policy);
+  return std::make_shared<VideoReader>(std::move(demuxer), policy);
 #endif
 }
 }  // namespace pag

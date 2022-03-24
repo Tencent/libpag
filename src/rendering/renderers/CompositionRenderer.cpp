@@ -22,37 +22,9 @@
 #include "rendering/caches/RenderCache.h"
 #include "rendering/graphics/Picture.h"
 #include "rendering/graphics/Recorder.h"
-#include "rendering/sequences/SequenceReaderFactory.h"
+#include "rendering/sequences/SequenceProxy.h"
 
 namespace pag {
-class SequenceProxy : public TextureProxy {
- public:
-  SequenceProxy(Sequence* sequence, Frame targetFrame, int width, int height)
-      : TextureProxy(width, height), factory(SequenceReaderFactory(sequence)),
-        targetFrame(targetFrame) {
-  }
-
-  bool cacheEnabled() const override {
-    return !factory.staticContent();
-  }
-
-  void prepare(RenderCache* cache) const override {
-    static_cast<RenderCache*>(cache)->prepareSequenceReader(&factory, targetFrame);
-  }
-
-  std::shared_ptr<tgfx::Texture> getTexture(RenderCache* cache) const override {
-    auto reader = static_cast<RenderCache*>(cache)->getSequenceReader(&factory);
-    if (reader) {
-      return reader->readTexture(targetFrame, static_cast<RenderCache*>(cache));
-    }
-    return nullptr;
-  }
-
- private:
-  SequenceReaderFactory factory;
-  Frame targetFrame = 0;
-};
-
 static std::shared_ptr<Graphic> MakeVideoSequenceGraphic(VideoSequence* sequence,
                                                          Frame contentFrame) {
   // 视频序列帧导出时没有记录准确的画面总宽高，需要自己通过 width 和 alphaStartX 计算，
@@ -65,7 +37,8 @@ static std::shared_ptr<Graphic> MakeVideoSequenceGraphic(VideoSequence* sequence
   if (videoHeight % 2 == 1) {
     videoHeight++;
   }
-  auto proxy = new SequenceProxy(sequence, contentFrame, videoWidth, videoHeight);
+  auto factory = std::make_unique<SequenceReaderFactory>(sequence);
+  auto proxy = new SequenceProxy(videoWidth, videoHeight, std::move(factory), contentFrame);
   tgfx::RGBAAALayout layout = {sequence->width, sequence->height, sequence->alphaStartX,
                                sequence->alphaStartY};
   return Picture::MakeFrom(sequence->composition->uniqueID, std::unique_ptr<SequenceProxy>(proxy),
@@ -111,7 +84,9 @@ std::shared_ptr<Graphic> RenderSequenceComposition(Composition* composition,
   if (composition->type() == CompositionType::Video) {
     graphic = MakeVideoSequenceGraphic(static_cast<VideoSequence*>(sequence), sequenceFrame);
   } else {
-    auto proxy = new SequenceProxy(sequence, sequenceFrame, sequence->width, sequence->height);
+    auto factory = std::make_unique<SequenceReaderFactory>(sequence);
+    auto proxy =
+        new SequenceProxy(sequence->width, sequence->height, std::move(factory), sequenceFrame);
     graphic =
         Picture::MakeFrom(sequence->composition->uniqueID, std::unique_ptr<SequenceProxy>(proxy));
   }

@@ -16,31 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "DecoderPolicy.h"
-#include "SequenceReader.h"
-#include "pag/file.h"
+#include "SequenceProxy.h"
 
 namespace pag {
-class SequenceReaderFactory {
- public:
-  SequenceReaderFactory() = default;
+SequenceProxy::SequenceProxy(int width, int height, std::unique_ptr<SequenceReaderFactory> factory,
+                             Frame targetFrame)
+    : TextureProxy(width, height), factory(std::move(factory)), targetFrame(targetFrame) {
+}
 
-  explicit SequenceReaderFactory(Sequence* sequence);
+void SequenceProxy::prepare(RenderCache* cache) const {
+  static_cast<RenderCache*>(cache)->prepareSequenceReader(factory.get(), targetFrame);
+}
 
-  virtual ~SequenceReaderFactory() = default;
-
-  virtual uint32_t assetID() const;
-
-  virtual bool staticContent() const;
-
-  virtual bool isVideo() const;
-
-  virtual std::shared_ptr<SequenceReader> makeReader(std::shared_ptr<File> file,
-                                                     DecoderPolicy policy) const;
-
- private:
-  Sequence* sequence = nullptr;
-};
+std::shared_ptr<tgfx::Texture> SequenceProxy::getTexture(RenderCache* cache) const {
+  auto reader = static_cast<RenderCache*>(cache)->getSequenceReader(factory.get());
+  if (reader) {
+    return reader->readTexture(targetFrame, static_cast<RenderCache*>(cache));
+  }
+  return nullptr;
+}
 }  // namespace pag

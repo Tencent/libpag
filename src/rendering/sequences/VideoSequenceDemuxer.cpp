@@ -38,6 +38,8 @@ VideoSequenceDemuxer::VideoSequenceDemuxer(std::shared_ptr<File> file, VideoSequ
   format.colorSpace = tgfx::YUVColorSpace::Rec601;
   format.duration = FrameToTime(sequence->duration(), sequence->frameRate);
   format.frameRate = sequence->frameRate;
+  // The reorder size of a VideoSequence can only be one of these: 0, 1,  2.
+  format.maxReorderSize = 2;
   for (auto& frame : sequence->frames) {
     if (frame->isKeyframe) {
       keyframes.push_back(frame->frame);

@@ -31,12 +31,23 @@ std::shared_ptr<PAGImage> PAGImageHolder::getImage(int editableIndex) const {
   return nullptr;
 }
 
-void PAGImageHolder::setImage(int editableIndex, std::shared_ptr<PAGImage> image) {
+void PAGImageHolder::setImage(int editableIndex, std::shared_ptr<PAGImage> image,
+                              PAGLayer* layerOwner) {
   if (image) {
     imageMap[editableIndex] = image;
+    ownerMap[editableIndex] = layerOwner;
   } else {
     imageMap.erase(editableIndex);
+    ownerMap.erase(editableIndex);
   }
+}
+
+PAGLayer* PAGImageHolder::getOwner(int editableIndex) const {
+  auto result = ownerMap.find(editableIndex);
+  if (result != ownerMap.end()) {
+    return result->second;
+  }
+  return nullptr;
 }
 
 void PAGImageHolder::addLayer(PAGLayer* layer) {

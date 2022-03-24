@@ -20,14 +20,13 @@
 #include "VideoImage.h"
 #include "base/utils/USE.h"
 
-#define DEFAULT_MAX_NUM_REORDER 4
-
 namespace pag {
 
 GPUDecoder::GPUDecoder(const VideoFormat& format)
     : sourceColorSpace(format.colorSpace),
       destinationColorSpace(format.colorSpace),
-      colorRange(format.colorRange) {
+      colorRange(format.colorRange),
+      maxNumReorder(format.maxReorderSize) {
   isInitialized = initVideoToolBox(format.headers, format.mimeType);
 }
 
@@ -118,8 +117,6 @@ bool GPUDecoder::initVideoToolBox(const std::vector<std::shared_ptr<tgfx::Data>>
         return false;
       }
     }
-    maxNumReorder = DEFAULT_MAX_NUM_REORDER;
-
     return resetVideoToolBox();
   }
   return true;

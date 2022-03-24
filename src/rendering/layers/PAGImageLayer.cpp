@@ -184,6 +184,20 @@ std::vector<PAGVideoRange> PAGImageLayer::getVideoRanges() const {
   return ranges;
 }
 
+bool PAGImageLayer::gotoTime(int64_t layerTime) {
+  auto changed = PAGLayer::gotoTime(layerTime);
+  if (imageHolder) {
+    auto pagImage = imageHolder->getImage(_editableIndex);
+    if (pagImage && !pagImage->isStill() && imageHolder->getOwner(_editableIndex) == this) {
+      auto contentTime = getCurrentContentTime(layerTime);
+      if (pagImage->setContentTime(contentTime)) {
+        changed = true;
+      }
+    }
+  }
+  return changed;
+}
+
 void PAGImageLayer::replaceImage(std::shared_ptr<pag::PAGImage> image) {
   LockGuard autoLock(rootLocker);
   replaceImageInternal(image);
@@ -205,7 +219,7 @@ void PAGImageLayer::replaceImageInternal(std::shared_ptr<PAGImage> image) {
       }
     }
   }
-  imageHolder->setImage(_editableIndex, image);
+  imageHolder->setImage(_editableIndex, image, this);
   std::vector<PAGImageLayer*> imageLayers = {};
   if (rootFile) {
     auto layers = rootFile->getLayersByEditableIndexInternal(_editableIndex, LayerType::Image);

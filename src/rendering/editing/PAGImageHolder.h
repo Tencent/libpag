@@ -28,7 +28,9 @@ class PAGImageHolder {
 
   std::shared_ptr<PAGImage> getImage(int editableIndex) const;
 
-  void setImage(int editableIndex, std::shared_ptr<PAGImage> image);
+  void setImage(int editableIndex, std::shared_ptr<PAGImage> image, PAGLayer* layerOwner);
+
+  PAGLayer* getOwner(int editableIndex) const;
 
   void addLayer(PAGLayer* layer);
 
@@ -38,6 +40,7 @@ class PAGImageHolder {
 
  private:
   std::unordered_map<int, std::shared_ptr<PAGImage>> imageMap;
+  std::unordered_map<int, PAGLayer*> ownerMap;
   std::vector<PAGLayer*> imageLayers;
 };
 }  // namespace pag

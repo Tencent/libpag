@@ -198,17 +198,6 @@ void PAGFile::setDurationInternal(int64_t duration) {
   notifyModified();
 }
 
-std::shared_ptr<PAGImage> PAGFile::replaceImageTemporarily(int editableIndex,
-                                                           std::shared_ptr<PAGImage> image) {
-  if (!imageHolder) {
-    return nullptr;
-  }
-  auto oldImage = imageHolder->getImage(editableIndex);
-  imageHolder->setImage(editableIndex, image);
-  notifyModified(true);
-  return oldImage;
-}
-
 std::shared_ptr<PAGFile> PAGFile::copyOriginal() {
   return MakeFrom(file);
 }
