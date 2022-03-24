@@ -43,4 +43,6 @@
 
 - (void)setText:(NSString*)text;
 
+- (void)reset;
+
 @end

@@ -90,4 +90,9 @@
   pagTextLayer->setText(newText);
 }
 
+- (void)reset {
+  auto pagTextLayer = std::static_pointer_cast<pag::PAGTextLayer>([super pagLayer]);
+  pagTextLayer->reset();
+}
+
 @end

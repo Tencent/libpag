@@ -612,16 +612,13 @@ class PAG_API PAGTextLayer : public PAGLayer {
    */
   void setText(const std::string& text);
 
-  // internal methods start here :
-
-  void replaceTextInternal(std::shared_ptr<TextDocument> textData);
-
   /**
    * Reset the text layer to its default text data.
    */
   void reset();
 
  protected:
+  void replaceTextInternal(std::shared_ptr<TextDocument> textData);
   void setMatrixInternal(const Matrix& matrix) override;
   Content* getContent() override;
   bool contentModified() const override;
@@ -634,6 +631,8 @@ class PAG_API PAGTextLayer : public PAGLayer {
   const TextDocument* textDocumentForRead() const;
 
   TextDocument* textDocumentForWrite();
+
+  friend class PAGFile;
 
   friend class TextReplacement;
 };

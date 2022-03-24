@@ -59,8 +59,12 @@ public class PAGTextLayer extends PAGLayer {
      */
     public native void setText(String text);
 
-    private native void setFont(String fontFamily, String fontStyle);
+    /**
+     * Reset the text layer to its default text data.
+     */
+    public native void reset();
 
+    private native void setFont(String fontFamily, String fontStyle);
 
     private static native void nativeInit();
 
