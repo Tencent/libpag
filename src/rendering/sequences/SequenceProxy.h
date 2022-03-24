@@ -18,29 +18,26 @@
 
 #pragma once
 
-#include "DecoderPolicy.h"
-#include "SequenceReader.h"
-#include "pag/file.h"
+#include "SequenceReaderFactory.h"
+#include "rendering/caches/RenderCache.h"
+#include "rendering/graphics/TextureProxy.h"
 
 namespace pag {
-class SequenceReaderFactory {
+class SequenceProxy : public TextureProxy {
  public:
-  SequenceReaderFactory() = default;
+  SequenceProxy(int width, int height, std::unique_ptr<SequenceReaderFactory> factory,
+                Frame targetFrame);
 
-  explicit SequenceReaderFactory(Sequence* sequence);
+  bool cacheEnabled() const override {
+    return !factory->staticContent();
+  }
 
-  virtual ~SequenceReaderFactory() = default;
+  void prepare(RenderCache* cache) const override;
 
-  virtual uint32_t assetID() const;
-
-  virtual bool staticContent() const;
-
-  virtual bool isVideo() const;
-
-  virtual std::shared_ptr<SequenceReader> makeReader(std::shared_ptr<File> file,
-                                                     DecoderPolicy policy) const;
+  std::shared_ptr<tgfx::Texture> getTexture(RenderCache* cache) const override;
 
  private:
-  Sequence* sequence = nullptr;
+  std::unique_ptr<SequenceReaderFactory> factory;
+  Frame targetFrame = 0;
 };
 }  // namespace pag

@@ -148,7 +148,11 @@ class PAG_API PAGImage {
  protected:
   PAGImage(int width, int height);
 
-  virtual std::shared_ptr<Graphic> getGraphic() const = 0;
+  virtual std::shared_ptr<Graphic> getGraphic() = 0;
+
+  virtual bool isStill() const = 0;
+
+  virtual bool setContentTime(int64_t time) = 0;
 
  private:
   mutable std::mutex locker = {};
@@ -168,6 +172,8 @@ class PAG_API PAGImage {
   friend class PAGFile;
 
   friend class RenderCache;
+
+  friend class AudioClip;
 };
 
 class PAGComposition;
@@ -741,6 +747,7 @@ class PAG_API PAGImageLayer : public PAGLayer {
   ByteData* imageBytes() const;
 
  protected:
+  bool gotoTime(int64_t layerTime) override;
   void replaceImageInternal(std::shared_ptr<PAGImage> image);
   int64_t getCurrentContentTime(int64_t layerTime);
   Property<float>* getContentTimeRemap();
@@ -779,6 +786,8 @@ class PAG_API PAGImageLayer : public PAGLayer {
   friend class PAGStage;
 
   friend class PAGFile;
+
+  friend class AudioClip;
 };
 
 class PreComposeLayer;
@@ -974,6 +983,8 @@ class PAG_API PAGComposition : public PAGLayer {
   friend class PAGImageLayer;
 
   friend class FileReporter;
+
+  friend class AudioClip;
 };
 
 class PAG_API PAGFile : public PAGComposition {
@@ -1085,8 +1096,6 @@ class PAG_API PAGFile : public PAGComposition {
   static std::shared_ptr<PAGLayer> BuildPAGLayer(std::shared_ptr<File> file, pag::Layer* layer);
 
   void setDurationInternal(int64_t duration);
-  std::shared_ptr<PAGImage> replaceImageTemporarily(int editableIndex,
-                                                    std::shared_ptr<PAGImage> image);
   Frame stretchedFrameToFileFrame(Frame stretchedFrame) const;
   int64_t stretchedTimeToFileTime(int64_t stretchedTime) const;
   Frame scaledFrameToFileFrame(Frame scaledFrame, const TimeRange& scaledTimeRange) const;
@@ -1101,6 +1110,8 @@ class PAG_API PAGFile : public PAGComposition {
   friend class PAGImageLayer;
 
   friend class LayerRenderer;
+
+  friend class AudioClip;
 };
 
 class Composition;

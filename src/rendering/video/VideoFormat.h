@@ -24,13 +24,14 @@
 
 namespace pag {
 struct VideoFormat {
+  std::string mimeType = "video/avc";
+  std::vector<std::shared_ptr<tgfx::Data>> headers = {};
+  tgfx::YUVColorSpace colorSpace = tgfx::YUVColorSpace::Rec601;
+  tgfx::YUVColorRange colorRange = tgfx::YUVColorRange::MPEG;
   int width = 0;
   int height = 0;
   int64_t duration = 0;
   float frameRate = 0.0;
-  std::vector<std::shared_ptr<tgfx::Data>> headers = {};
-  tgfx::YUVColorSpace colorSpace = tgfx::YUVColorSpace::Rec601;
-  tgfx::YUVColorRange colorRange = tgfx::YUVColorRange::MPEG;
-  std::string mimeType = "video/avc";
+  int maxReorderSize = 4;
 };
 }  // namespace pag
