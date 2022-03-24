@@ -62,4 +62,8 @@
   [(PAGTextLayerImpl*)self.impl setText:text];
 }
 
+- (void)reset {
+  [(PAGTextLayerImpl*)self.impl reset];
+}
+
 @end

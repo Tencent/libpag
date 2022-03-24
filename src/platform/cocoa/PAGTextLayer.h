@@ -74,4 +74,9 @@ __attribute__((visibility("default"))) @interface PAGTextLayer : PAGLayer
  */
 - (void)setText:(NSString*)text;
 
+/**
+ * Reset the text layer to its default text data.
+ */
+- (void)reset;
+
 @end

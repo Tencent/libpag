@@ -99,6 +99,14 @@ JNIEXPORT void Java_org_libpag_PAGTextLayer_setText(JNIEnv* env, jclass thiz, js
   pagLayer->setText(SafeConvertToStdString(env, text));
 }
 
+JNIEXPORT void Java_org_libpag_PAGTextLayer_reset(JNIEnv* env, jclass thiz) {
+  auto pagLayer = GetPAGTextLayer(env, thiz);
+  if (pagLayer == nullptr) {
+    return;
+  }
+  pagLayer->reset();
+}
+
 JNIEXPORT jstring Java_org_libpag_PAGTextLayer_text(JNIEnv* env, jclass thiz) {
   auto pagLayer = GetPAGTextLayer(env, thiz);
   if (pagLayer != nullptr) {
