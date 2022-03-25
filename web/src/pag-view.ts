@@ -41,7 +41,7 @@ export class PAGView {
       canvasElement.style.height = `${displayHeight}px`;
       canvasElement.width = rawWidth;
       canvasElement.height = rawHeight;
-      
+
       const pagPlayer = this.module.PAGPlayer.create();
       const pagView = new PAGView(pagPlayer);
       const gl = canvasElement.getContext('webgl');
@@ -113,7 +113,7 @@ export class PAGView {
     }
     this.eventManager.emit(PAGViewListenerEvent.onAnimationPlay, this);
     this.isPlaying = true;
-    this.startTime = Date.now() * 1000 - this.playTime;
+    this.startTime = performance.now() * 1000 - this.playTime;
     await this.flushLoop();
   }
   /**
@@ -158,7 +158,7 @@ export class PAGView {
    */
   public async setProgress(progress: number): Promise<number> {
     this.playTime = progress * (await this.duration());
-    this.startTime = Date.now() * 1000 - this.playTime;
+    this.startTime = performance.now() * 1000 - this.playTime;
     if (!this.isPlaying) {
       this.player.setProgress(progress);
       await this.flush();
@@ -280,15 +280,17 @@ export class PAGView {
 
   private async flushNextFrame() {
     const duration = this.duration();
+    this.playTime = performance.now() * 1000 - this.startTime;
     const count = Math.floor(this.playTime / duration);
     if (this.repeatCount >= 0 && count > this.repeatCount) {
-      await this.stop(false);
+      this.clearTimer();
+      this.playTime = 0;
+      this.isPlaying = false;
       this.eventManager.emit(PAGViewListenerEvent.onAnimationEnd, this);
     } else {
       if (this.repeatedTimes < count) {
         this.eventManager.emit(PAGViewListenerEvent.onAnimationRepeat, this);
       }
-      this.playTime = Date.now() * 1000 - this.startTime;
       this.player.setProgress((this.playTime % duration) / duration);
       await this.flush();
     }

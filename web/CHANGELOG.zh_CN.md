@@ -72,3 +72,10 @@
 - `PAGComposition` 上增加 `Make` ， `removeLayer` ， `getLayersUnderPoint` 方法
 - `PAGFont` 上增加 `create` 方法和 `fontFamily` ， `fontStyle` 属性
 - 增加 `PAGTextLayer` ， `PAGImageLayer` 类
+
+## 0.1.1
+
+### Bug Fixes
+
+- 修复 `PAGView` 重复调用 `init` 会多次缩放 `Canvas` 的问题
+- 修复 `PAGView` 的 `repeatCount` 为1时结束帧不是最后一帧的问题
