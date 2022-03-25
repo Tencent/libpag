@@ -379,8 +379,8 @@ const createPAGView = async (file) => {
     performance.now() - decodeTime,
   )}ms`;
   const pagCanvas = document.getElementById('pag') as HTMLCanvasElement;
-  pagCanvas.width = canvasElementSize;
-  pagCanvas.height = canvasElementSize;
+  // pagCanvas.width = canvasElementSize;
+  // pagCanvas.height = canvasElementSize;
   const initializedTime = performance.now();
   pagView = await PAG.PAGView.init(pagFile, pagCanvas);
   document.getElementById('initialized-time').innerText = `PAG View initialized time: ${Math.floor(
