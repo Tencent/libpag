@@ -25,17 +25,23 @@ export class PAGView {
     if (!canvasElement) {
       Log.errorByCode(ErrorCode.CanvasIsNotFound);
     } else {
-      const rawWidth = canvasElement.width * window.devicePixelRatio;
-      const rawHeight = canvasElement.height * window.devicePixelRatio;
+      const styleWidth = Number(canvasElement.style.width.replace('px', ''));
+      const styleHeight = Number(canvasElement.style.height.replace('px', ''));
+      const displayWidth = styleWidth > 0 ? styleWidth : canvasElement.width;
+      const displayHeight = styleHeight > 0 ? styleHeight : canvasElement.width;
+      const rawWidth = displayWidth * window.devicePixelRatio;
+      const rawHeight = displayHeight * window.devicePixelRatio;
+
       if (rawWidth > SCREEN_2560_RESOLUTION || rawHeight > SCREEN_2560_RESOLUTION) {
         Log.warn(
           "Don't render the target larger than 2560 px resolution. It may be a render failure in the low graphic memory device.",
         );
       }
-      canvasElement.style.width = `${canvasElement.width}px`;
-      canvasElement.style.height = `${canvasElement.height}px`;
-      canvasElement.width = canvasElement.width * window.devicePixelRatio;
-      canvasElement.height = canvasElement.height * window.devicePixelRatio;
+      canvasElement.style.width = `${displayWidth}px`;
+      canvasElement.style.height = `${displayHeight}px`;
+      canvasElement.width = rawWidth;
+      canvasElement.height = rawHeight;
+      
       const pagPlayer = this.module.PAGPlayer.create();
       const pagView = new PAGView(pagPlayer);
       const gl = canvasElement.getContext('webgl');
