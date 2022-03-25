@@ -72,3 +72,10 @@
 - Add `Make`, `removeLayer`, `getLayersUnderPoint` on `PAGComposition`.
 - Add `create`, `fontFamily`, `fontStyle` on `PAGFont`.
 - Add `PAGTextLayer`, `PAGImageLayer` Class.
+
+## 0.1.1
+
+### Bug Fixes
+
+- Fix canvas rescaling error when repeated call init function.
+- Fix render end frame error when repeat count is 1.
