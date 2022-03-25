@@ -58,7 +58,7 @@
 ### Breaking Changes
 
 - Edit returns from `PAGFile.getLayersByEditableIndex` be `Vector<PAGLayer>`.
-- Replace C++ enum `LayerType` to Js enum `LayerType`,  replace `PAG.LayerType` to `PAG.types.LayerType`.
+- Replace C++ enum `LayerType` to Js enum `LayerType`,  replace `PAG.LayerType` to `libpag.types.LayerType`.
 
 ### Features
 
