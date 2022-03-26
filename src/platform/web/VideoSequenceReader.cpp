@@ -58,14 +58,11 @@ VideoSequenceReader::~VideoSequenceReader() {
   }
 }
 
-bool VideoSequenceReader::decodeFrame(int64_t targetFrame) {
-  // Web 端没有异步初始化解码器，也没有预测。
+void VideoSequenceReader::prepare(Frame targetFrame) {
   // Web 端渲染过程不能 await，否则会把渲染一半的 Canvas 上屏。
   if (videoReader.as<bool>()) {
-    videoReader.call<val>("decodeFrame", static_cast<int>(targetFrame)).await();
-    return true;
+    videoReader.call<val>("prepare", static_cast<int>(targetFrame)).await();
   }
-  return false;
 }
 
 std::shared_ptr<tgfx::Texture> VideoSequenceReader::makeTexture(tgfx::Context* context) {

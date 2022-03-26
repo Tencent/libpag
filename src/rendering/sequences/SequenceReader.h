@@ -42,7 +42,7 @@ class SequenceReader {
   /**
    * Decodes the specified target frame asynchronously.
    */
-  void prepare(Frame targetFrame);
+  virtual void prepare(Frame targetFrame);
 
   /**
    * Returns the texture of specified target frame.

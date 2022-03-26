@@ -28,8 +28,13 @@ class VideoSequenceReader : public SequenceReader {
 
   ~VideoSequenceReader() override;
 
+  void prepare(Frame targetFrame) override;
+
  protected:
-  bool decodeFrame(Frame targetFrame) override;
+  bool decodeFrame(Frame) override {
+    // NOP
+    return true;
+  }
 
   std::shared_ptr<tgfx::Texture> makeTexture(tgfx::Context* context) override;
 
