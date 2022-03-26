@@ -31,7 +31,7 @@ class VideoSequenceReader : public SequenceReader {
   void prepare(Frame targetFrame) override;
 
  protected:
-  bool decodeFrame(Frame targetFrame) override {
+  bool decodeFrame(Frame) override {
     // NOP
     return true;
   }
