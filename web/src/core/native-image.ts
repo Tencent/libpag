@@ -18,6 +18,10 @@ export class NativeImage {
       image.onload = function () {
         resolve(new NativeImage(image));
       };
+      image.onerror = function(){
+        console.error(`file load error:${path}`);
+        resolve(new NativeImage(image));
+      }
       image.src = path;
     });
   }
