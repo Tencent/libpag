@@ -6,7 +6,7 @@ const rewindData = (module: any, fn: (...args: any[]) => any, scope: any, ...arg
     module.Asyncify.currData = null;
     const ret = fn.call(scope, ...args);
     module.Asyncify.currData = currData;
-    ret();
+    return ret;
   } else {
     return fn.call(scope, ...args);
   }

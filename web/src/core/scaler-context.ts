@@ -54,7 +54,7 @@ export class ScalerContext {
 
   public fontString() {
     const fallbackFontNames = defaultFontNames.concat();
-    fallbackFontNames.unshift(this.fontName);
+    fallbackFontNames.unshift(`"${this.fontName}"`);
     const attributes = [];
     if (this.fauxBold) {
       attributes.push('bold');
