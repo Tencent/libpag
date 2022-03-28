@@ -156,7 +156,7 @@ void GPUDrawable::present(tgfx::Context* context) {
     return;
   }
 
-  if (IsInMainThread()) {
+  if (pixelBuffer || IsInMainThread()) {
     window->present(context);
   } else {
     auto strongThis = weakThis.lock();
@@ -171,7 +171,6 @@ void GPUDrawable::present(tgfx::Context* context) {
       strongThis->window->getDevice()->unlock();
       [strongThis->layer release];
     });
-    return;
   }
 }
 
