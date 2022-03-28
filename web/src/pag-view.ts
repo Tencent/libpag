@@ -28,7 +28,7 @@ export class PAGView {
       const styleWidth = Number(canvasElement.style.width.replace('px', ''));
       const styleHeight = Number(canvasElement.style.height.replace('px', ''));
       const displayWidth = styleWidth > 0 ? styleWidth : canvasElement.width;
-      const displayHeight = styleHeight > 0 ? styleHeight : canvasElement.width;
+      const displayHeight = styleHeight > 0 ? styleHeight : canvasElement.height;
       const rawWidth = displayWidth * window.devicePixelRatio;
       const rawHeight = displayHeight * window.devicePixelRatio;
 
