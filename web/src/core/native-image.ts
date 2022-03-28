@@ -12,6 +12,16 @@ export class NativeImage {
     });
   }
 
+  public static async createFromPath(path: string) { 
+    return new Promise((resolve) => {
+      const image = new Image();
+      image.onload = function () {
+        resolve(new NativeImage(image));
+      };
+      image.src = path;
+    });
+  }
+
   private readonly source: TexImageSource;
 
   public constructor(source: TexImageSource) {

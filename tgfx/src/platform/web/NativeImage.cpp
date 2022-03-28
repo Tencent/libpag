@@ -23,8 +23,13 @@
 using namespace emscripten;
 
 namespace tgfx {
-std::shared_ptr<Image> NativeCodec::MakeImage(const std::string&) {
-  return nullptr;
+std::unique_ptr<Image> NativeCodec::MakeImage(const std::string& filePath) {
+  auto nativeImageClass = val::module_property("NativeImage");
+  if (!nativeImageClass.as<bool>()) {
+    return nullptr;
+  }
+  auto nativeImage = nativeImageClass.call<val>("createFromPath", filePath).await();
+  return NativeImage::MakeFrom(nativeImage);
 }
 
 std::shared_ptr<Image> NativeCodec::MakeImage(std::shared_ptr<Data> imageBytes) {
