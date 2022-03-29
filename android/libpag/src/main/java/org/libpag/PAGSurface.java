@@ -156,9 +156,8 @@ public class PAGSurface {
     public native void freeCache();
 
     /**
-     * Returns a bitmap capturing the contents of the PAGSurface.
-     * Subsequent rendering of the PAGSurface will not be captured.
-     * @return
+     * Returns a bitmap capturing the contents of the PAGSurface. Subsequent rendering of the
+     * PAGSurface will not be captured.
      */
     public native Bitmap makeSnapshot();
 

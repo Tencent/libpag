@@ -236,6 +236,24 @@ void PAGPlayer::setAutoClear(bool value) {
   stage->notifyModified(true);
 }
 
+void PAGPlayer::prepare() {
+  LockGuard autoLock(rootLocker);
+  prepareInternal();
+}
+
+void PAGPlayer::prepareInternal() {
+  renderCache->prepareLayers();
+  if (contentVersion != stage->getContentVersion()) {
+    contentVersion = stage->getContentVersion();
+    Recorder recorder = {};
+    stage->draw(&recorder);
+    lastGraphic = recorder.makeGraphic();
+  }
+  if (lastGraphic) {
+    lastGraphic->prepare(renderCache);
+  }
+}
+
 bool PAGPlayer::wait(const BackendSemaphore& waitSemaphore) {
   LockGuard autoLock(rootLocker);
   if (pagSurface == nullptr) {
@@ -258,32 +276,21 @@ bool PAGPlayer::flushInternal(BackendSemaphore* signalSemaphore) {
   if (pagSurface == nullptr) {
     return false;
   }
+  renderCache->beginFrame();
   updateStageSize();
-#ifndef PAG_BUILD_FOR_WEB
-  // must be called before content comparing, otherwise decoders can not be prepared.
-  renderCache->prepareFrame();
-#endif
   tgfx::Clock clock = {};
-  if (contentVersion != stage->getContentVersion()) {
-    contentVersion = stage->getContentVersion();
-    Recorder recorder = {};
-    stage->draw(&recorder);
-    lastGraphic = recorder.makeGraphic();
-  }
+  prepareInternal();
   clock.mark("rendering");
-  if (lastGraphic) {
-    lastGraphic->prepare(renderCache);
-  }
   if (!pagSurface->draw(renderCache, lastGraphic, signalSemaphore, _autoClear)) {
     return false;
   }
   clock.mark("presenting");
   renderCache->renderingTime = clock.measure("", "rendering");
   renderCache->presentingTime = clock.measure("rendering", "presenting");
-  renderCache->presentingTime -=
-      renderCache->imageDecodingTime + renderCache->textureUploadingTime +
-      renderCache->programCompilingTime + renderCache->hardwareDecodingTime +
-      renderCache->softwareDecodingTime;
+  auto knownTime = renderCache->imageDecodingTime + renderCache->textureUploadingTime +
+                   renderCache->programCompilingTime + renderCache->hardwareDecodingTime +
+                   renderCache->softwareDecodingTime;
+  renderCache->presentingTime -= knownTime;
   renderCache->totalTime = clock.measure("", "presenting");
   //  auto composition = stage->getRootComposition();
   //  if (composition) {

@@ -60,9 +60,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private PAGPlayerView createPlayerView() {
         PAGPlayerView pagView = new PAGPlayerView();
         pagView.setRepeatCount(-1);
-        // 软解开关
-//        pagView.registerSoftwareDecoderFactory(org.libffmpeg.FFmpegDecoderFactory.GetDecoderFactory(), 0);
-
         return pagView;
     }
 

@@ -61,9 +61,8 @@ __attribute__((visibility("default"))) @interface PAGSurface : NSObject
 - (CVPixelBufferRef)getCVPixelBuffer;
 
 /**
- * Returns a CVPixelBuffer object capturing the contents of the PAGSurface.
- * Subsequent rendering of the PAGSurface will not be captured.
- * @return
+ * Returns a CVPixelBuffer object capturing the contents of the PAGSurface. Subsequent rendering of
+ * the PAGSurface will not be captured.
  */
 - (CVPixelBufferRef)makeSnapshot;
 @end

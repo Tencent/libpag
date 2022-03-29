@@ -57,6 +57,8 @@
 
 - (void)setProgress:(double)value;
 
+- (void)prepare;
+
 - (BOOL)flush;
 
 - (CGRect)getBounds:(PAGLayer*)pagLayer;

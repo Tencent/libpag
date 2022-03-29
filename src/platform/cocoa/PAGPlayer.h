@@ -131,6 +131,13 @@ __attribute__((visibility("default"))) @interface PAGPlayer : NSObject
 - (void)setProgress:(double)value;
 
 /**
+ * Prepares the player for the next flush() call. It collects all CPU tasks from the current
+ * progress of the composition and runs them asynchronously in parallel. It is usually used for
+ * speeding up the first frame rendering.
+ */
+- (void)prepare;
+
+/**
  * Apply all pending changes to the target surface immediately. Returns true if the content has
  * changed.
  */

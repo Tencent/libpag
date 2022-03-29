@@ -240,6 +240,14 @@ JNIEXPORT void Java_org_libpag_PAGPlayer_setProgress(JNIEnv* env, jobject thiz, 
   player->setProgress(value);
 }
 
+JNIEXPORT void Java_org_libpag_PAGPlayer_prepare(JNIEnv* env, jobject thiz) {
+  auto player = getPAGPlayer(env, thiz);
+  if (player == nullptr) {
+    return;
+  }
+  player->prepare();
+}
+
 JNIEXPORT jboolean Java_org_libpag_PAGPlayer_flushAndFenceSync(JNIEnv* env, jobject thiz,
                                                                jlongArray syncArray) {
   auto player = getPAGPlayer(env, thiz);
@@ -274,7 +282,6 @@ JNIEXPORT jobject Java_org_libpag_PAGPlayer_getBounds(JNIEnv* env, jobject thiz,
   auto player = getPAGPlayer(env, thiz);
   if (player == nullptr) {
     return MakeRectFObject(env, 0.0f, 0.0f, 0.0f, 0.0f);
-    ;
   }
   auto pagLayer = ToPAGLayerNativeObject(env, layer);
   auto rect = player->getBounds(pagLayer);
