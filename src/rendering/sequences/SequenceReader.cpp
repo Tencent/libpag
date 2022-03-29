@@ -48,12 +48,18 @@ SequenceReader::~SequenceReader() {
 }
 
 void SequenceReader::prepare(Frame targetFrame) {
+  if (staticContent) {
+    targetFrame = 0;
+  }
   if (lastTask == nullptr && targetFrame >= 0 && targetFrame < totalFrames) {
     lastTask = SequenceTask::MakeAndRun(this, targetFrame);
   }
 }
 
 std::shared_ptr<tgfx::Texture> SequenceReader::readTexture(Frame targetFrame, RenderCache* cache) {
+  if (staticContent) {
+    targetFrame = 0;
+  }
   if (lastFrame == targetFrame) {
     return lastTexture;
   }
@@ -71,7 +77,7 @@ std::shared_ptr<tgfx::Texture> SequenceReader::readTexture(Frame targetFrame, Re
     lastTexture = makeTexture(cache->getContext());
     lastFrame = targetFrame;
     cache->textureUploadingTime += clock.measure();
-    if (!staticContent()) {
+    if (!staticContent) {
       auto nextFrame = targetFrame + 1;
       if (nextFrame >= totalFrames && pendingFirstFrame >= 0) {
         // Add preparation for the first frame when reach to the end.

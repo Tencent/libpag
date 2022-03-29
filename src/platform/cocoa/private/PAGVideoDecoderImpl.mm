@@ -27,17 +27,8 @@
       (pag::SoftwareDecoderFactory*)decoderFactory);
 }
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wunused-parameter"
-
 + (void)SetMaxHardwareDecoderCount:(int)maxCount {
   pag::PAGVideoDecoder::SetMaxHardwareDecoderCount(maxCount);
-}
-
-#pragma clang diagnostic pop
-
-+ (void)SetSoftwareToHardwareEnabled:(Boolean)value {
-  pag::PAGVideoDecoder::SetSoftwareToHardwareEnabled(value);
 }
 
 @end

@@ -49,5 +49,9 @@ class VideoSequenceDemuxer : public VideoDemuxer {
   std::vector<Frame> keyframes = {};
   Frame maxPTSFrame = -1;
   Frame sampleIndex = 0;
+
+  bool staticContent() const override {
+    return sequence->composition->staticContent();
+  }
 };
 }  // namespace pag

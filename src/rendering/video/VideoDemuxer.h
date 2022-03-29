@@ -30,6 +30,13 @@ namespace pag {
 class VideoDemuxer {
  public:
   virtual ~VideoDemuxer() = default;
+  
+  /**
+   * Returns true if all of the frames in the video are the same .
+   */
+  virtual bool staticContent() const {
+    return false;
+  }
 
   /**
    * Returns the descriptions of the video format.
