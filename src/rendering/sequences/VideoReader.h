@@ -45,6 +45,7 @@ class VideoReader : public SequenceReader {
   int decoderTypeIndex = 0;
   std::shared_ptr<Task> gpuDecoderTask = nullptr;
   VideoDecoder* videoDecoder = nullptr;
+  VideoSample videoSample = {};
   std::shared_ptr<VideoBuffer> lastBuffer = nullptr;
   bool outputEndOfStream = false;
   bool inputEndOfStream = false;

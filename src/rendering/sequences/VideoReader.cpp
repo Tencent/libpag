@@ -156,8 +156,10 @@ bool VideoReader::sendSampleData() {
   if (inputEndOfStream) {
     return true;
   }
-  auto sample = demuxer->nextSample();
-  if (sample.length <= 0) {
+  if (videoSample.length <= 0) {
+    videoSample = demuxer->nextSample();
+  }
+  if (videoSample.length <= 0) {
     auto result = videoDecoder->onEndOfStream();
     if (result == DecodingResult::Error) {
       return false;
@@ -165,11 +167,12 @@ bool VideoReader::sendSampleData() {
       inputEndOfStream = true;
     }
   } else {
-    auto result = videoDecoder->onSendBytes(sample.data, sample.length, sample.time);
+    auto result = videoDecoder->onSendBytes(videoSample.data, videoSample.length, videoSample.time);
     if (result == DecodingResult::Error) {
       LOGE("VideoReader: Error on sending bytes for decoding.\n");
       return false;
     } else if (result == DecodingResult::Success) {
+      videoSample = {};
       return true;
     }
   }
@@ -242,6 +245,7 @@ void VideoReader::resetParams() {
   currentDecodedTime = INT64_MIN;
   outputEndOfStream = false;
   inputEndOfStream = false;
+  videoSample = {};
   demuxer->reset();
 }
 
