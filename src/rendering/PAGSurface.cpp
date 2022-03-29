@@ -244,7 +244,9 @@ tgfx::Context* PAGSurface::lockContext() {
   }
   auto context = device->lockContext();
   if (context != nullptr && contextAdopted) {
+#ifndef PAG_BUILD_FOR_WEB
     glRestorer = new GLRestorer(tgfx::GLFunctions::Get(context));
+#endif
     context->resetState();
   }
   return context;
