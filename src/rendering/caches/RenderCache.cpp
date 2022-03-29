@@ -96,6 +96,24 @@ bool RenderCache::initFilter(Filter* filter) {
   return result;
 }
 
+void RenderCache::prepareLayers() {
+#ifndef PAG_BUILD_FOR_WEB
+  // There is no multiple-thread support on the web platform.
+  auto layerDistances = stage->findNearlyVisibleLayersIn(DECODING_VISIBLE_DISTANCE);
+  for (auto& item : layerDistances) {
+    for (auto pagLayer : item.second) {
+      if (pagLayer->layerType() == LayerType::PreCompose) {
+        auto policy = item.first < MIN_HARDWARE_PREPARE_TIME ? DecoderPolicy::SoftwareToHardware
+                                                             : DecoderPolicy::Hardware;
+        preparePreComposeLayer(static_cast<PreComposeLayer*>(pagLayer->layer), policy);
+      } else if (pagLayer->layerType() == LayerType::Image) {
+        prepareImageLayer(static_cast<PAGImageLayer*>(pagLayer));
+      }
+    }
+  }
+#endif
+}
+
 void RenderCache::preparePreComposeLayer(PreComposeLayer* layer, DecoderPolicy policy) {
   auto composition = layer->composition;
   if (composition->type() != CompositionType::Video &&
@@ -169,21 +187,9 @@ void RenderCache::setSnapshotEnabled(bool value) {
   clearAllSnapshots();
 }
 
-void RenderCache::prepareFrame() {
+void RenderCache::beginFrame() {
   usedAssets = {};
   resetPerformance();
-  auto layerDistances = stage->findNearlyVisibleLayersIn(DECODING_VISIBLE_DISTANCE);
-  for (auto& item : layerDistances) {
-    for (auto pagLayer : item.second) {
-      if (pagLayer->layerType() == LayerType::PreCompose) {
-        auto policy = item.first < MIN_HARDWARE_PREPARE_TIME ? DecoderPolicy::SoftwareToHardware
-                                                             : DecoderPolicy::Hardware;
-        preparePreComposeLayer(static_cast<PreComposeLayer*>(pagLayer->layer), policy);
-      } else if (pagLayer->layerType() == LayerType::Image) {
-        prepareImageLayer(static_cast<PAGImageLayer*>(pagLayer));
-      }
-    }
-  }
 }
 
 void RenderCache::attachToContext(tgfx::Context* current, bool forHitTest) {

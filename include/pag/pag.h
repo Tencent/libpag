@@ -1264,6 +1264,8 @@ class PAG_API PAGPlayer {
 
   /**
    * Sets a new PAGComposition for PAGPlayer to render as content.
+   * Note: If the composition is already added to another PAGPlayer, it will be removed from the
+   * previous PAGPlayer.
    */
   void setComposition(std::shared_ptr<PAGComposition> newComposition);
 
@@ -1320,7 +1322,7 @@ class PAG_API PAGPlayer {
   float maxFrameRate();
 
   /**
-   * Set the maximum frame rate for rendering.
+   * Sets the maximum frame rate for rendering.
    */
   void setMaxFrameRate(float value);
 
@@ -1341,7 +1343,7 @@ class PAG_API PAGPlayer {
   Matrix matrix();
 
   /**
-   * Set the transformation which will be applied to the composition. The scaleMode property
+   * Sets the transformation which will be applied to the composition. The scaleMode property
    * will be set to PAGScaleMode::None when this method is called.
    */
   void setMatrix(const Matrix& matrix);
@@ -1369,7 +1371,7 @@ class PAG_API PAGPlayer {
   double getProgress();
 
   /**
-   * Set the progress of play position, the value ranges from 0.0 to 1.0. It is applied only when
+   * Sets the progress of play position, the value ranges from 0.0 to 1.0. It is applied only when
    * the composition is not null.
    */
   void setProgress(double percent);
@@ -1384,6 +1386,13 @@ class PAG_API PAGPlayer {
    * Sets the autoClear property.
    */
   void setAutoClear(bool value);
+
+  /**
+   * Prepares the player for the next flush() call. It collects all CPU tasks from the current
+   * progress of the composition and runs them asynchronously in parallel. It is usually used for
+   * speeding up the first frame rendering.
+   */
+  void prepare();
 
   /**
    * Inserts a GPU semaphore that the current GPU-backed API must wait on before executing any more
@@ -1488,6 +1497,7 @@ class PAG_API PAGPlayer {
   void updateStageSize();
   void setSurfaceInternal(std::shared_ptr<PAGSurface> newSurface);
   int64_t getTimeStampInternal();
+  void prepareInternal();
 
   friend class PAGSurface;
 };

@@ -132,6 +132,10 @@
   [pagPlayer setProgress:value];
 }
 
+- (void)prepare {
+  [pagPlayer prepare];
+}
+
 - (BOOL)flush {
   return [pagPlayer flush];
 }

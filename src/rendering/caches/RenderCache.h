@@ -46,7 +46,7 @@ class RenderCache : public Performance {
     return _uniqueID;
   }
 
-  void prepareFrame();
+  void beginFrame();
 
   void attachToContext(tgfx::Context* current, bool forHitTest = false);
 
@@ -181,9 +181,12 @@ class RenderCache : public Performance {
   void removeTextAtlas(ID assetID);
   TextAtlas* getTextAtlas(ID assetID) const;
 
+  void prepareLayers();
   void preparePreComposeLayer(PreComposeLayer* layer, DecoderPolicy policy);
   void prepareImageLayer(PAGImageLayer* layer);
   std::shared_ptr<SequenceReader> getSequenceReaderInternal(const SequenceReaderFactory* factory,
                                                             DecoderPolicy policy);
+
+  friend class PAGPlayer;
 };
 }  // namespace pag
