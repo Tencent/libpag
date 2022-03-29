@@ -60,7 +60,7 @@ void NativeImage::JNIInit(JNIEnv* env) {
   ByteArrayInputStreamClass.reset(env, env->FindClass("java/io/ByteArrayInputStream"));
   ByteArrayInputStream_Constructor =
       env->GetMethodID(ByteArrayInputStreamClass.get(), "<init>", "([B)V");
-  ExifInterfaceClass.reset(env, env->FindClass("android/media/ExifInterface"));
+  ExifInterfaceClass.reset(env, env->FindClass("androidx/exifinterface/media/ExifInterface"));
   ExifInterface_Constructor_Path =
       env->GetMethodID(ExifInterfaceClass.get(), "<init>", "(Ljava/lang/String;)V");
   ExifInterface_Constructor_Stream =
