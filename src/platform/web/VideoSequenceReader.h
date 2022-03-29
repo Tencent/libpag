@@ -24,7 +24,7 @@
 namespace pag {
 class VideoSequenceReader : public SequenceReader {
  public:
-  VideoSequenceReader(std::shared_ptr<File> file, VideoSequence* sequence, DecoderPolicy);
+  VideoSequenceReader(std::shared_ptr<File> file, VideoSequence* sequence);
 
   ~VideoSequenceReader() override;
 

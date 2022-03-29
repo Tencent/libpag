@@ -49,7 +49,7 @@ std::shared_ptr<SequenceReader> SequenceReaderFactory::makeReader(
   }
   auto videoSequence = static_cast<VideoSequence*>(sequence);
 #ifdef PAG_BUILD_FOR_WEB
-  return std::make_shared<VideoSequenceReader>(file, videoSequence, policy);
+  return std::make_shared<VideoSequenceReader>(file, videoSequence);
 #else
   auto demuxer = std::make_unique<VideoSequenceDemuxer>(file, videoSequence);
   return std::make_shared<VideoReader>(std::move(demuxer));

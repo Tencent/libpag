@@ -22,9 +22,9 @@
 using namespace emscripten;
 
 namespace pag {
-VideoSequenceReader::VideoSequenceReader(std::shared_ptr<File> file, VideoSequence* sequence,
-                                         DecoderPolicy)
-    : SequenceReader(sequence->duration()), file(std::move(file)) {
+VideoSequenceReader::VideoSequenceReader(std::shared_ptr<File> file, VideoSequence* sequence)
+    : SequenceReader(sequence->duration(), sequence->composition->staticContent()),
+      file(std::move(file)) {
   width = sequence->alphaStartX + sequence->width;
   if (width % 2 == 1) {
     width++;
