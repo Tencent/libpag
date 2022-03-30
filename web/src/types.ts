@@ -76,6 +76,7 @@ export interface EmscriptenGL {
   textures: WebGLTexture[];
   registerContext: (gl: WebGLRenderingContext, options: { majorVersion: number; minorVersion: number }) => number;
   makeContextCurrent: (contextId: number) => void;
+  deleteContext: (contextId: number) => void;
 }
 
 /**

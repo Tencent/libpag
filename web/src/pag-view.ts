@@ -48,8 +48,8 @@ export class PAGView {
       if (!(gl instanceof WebGLRenderingContext)) {
         Log.errorByCode(ErrorCode.CanvasContextIsNotWebGL);
       } else {
-        const contextID = this.module.GL.registerContext(gl, { majorVersion: 1, minorVersion: 0 });
-        this.module.GL.makeContextCurrent(contextID);
+        pagView.contextID = this.module.GL.registerContext(gl, { majorVersion: 1, minorVersion: 0 });
+        this.module.GL.makeContextCurrent(pagView.contextID);
         pagView.pagSurface = this.module.PAGSurface.FromFrameBuffer(0, canvasElement.width, canvasElement.height, true);
         pagView.player.setSurface(pagView.pagSurface);
         pagView.player.setComposition(file);
@@ -79,6 +79,7 @@ export class PAGView {
   private pagSurface: PAGSurface | undefined;
   private repeatedTimes = 0;
   private eventManager: EventManager = new EventManager();
+  private contextID = -1;
 
   public constructor(pagPlayer: PAGPlayer) {
     this.player = pagPlayer;
@@ -265,6 +266,7 @@ export class PAGView {
     this.clearTimer();
     this.player.destroy();
     this.pagSurface?.destroy();
+    PAGView.module.GL.deleteContext(this.contextID);
     this.isDestroyed = true;
   }
 

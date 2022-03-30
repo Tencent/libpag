@@ -79,3 +79,13 @@
 
 - Fix canvas rescaling error when repeated call init function.
 - Fix render end frame error when repeat count is 1.
+
+## 0.1.2
+
+### Bug Fixes
+
+- Fix video sequence reader decode frame error.
+- Fix vector function async error.
+- Fix font family format error.
+- Fix the performance issue of a PAGSurface made from texture.
+- Fix WebGL context release error by destroy.
