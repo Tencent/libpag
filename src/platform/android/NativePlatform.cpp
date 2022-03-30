@@ -25,6 +25,7 @@
 #include "Global.h"
 #include "JNIEnvironment.h"
 #include "JTraceImage.h"
+#include "PAGText.h"
 #include "VideoSurface.h"
 
 #define LOG_TAG "libpag"
@@ -46,6 +47,7 @@ void NativePlatform::InitJNI(JNIEnv* env) {
   FontConfigAndroid::InitJNI(env);
   GPUDecoder::InitJNI(env, "org/libpag/GPUDecoder");
   VideoSurface::InitJNI(env, "org/libpag/VideoSurface");
+  InitPAGTextJNI(env);
 }
 
 std::unique_ptr<VideoDecoder> NativePlatform::makeHardwareDecoder(

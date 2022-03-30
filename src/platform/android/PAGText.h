@@ -21,6 +21,8 @@
 #include "JNIHelper.h"
 #include "pag/pag.h"
 
+void InitPAGTextJNI(JNIEnv* env);
+
 jobject ToPAGTextObject(JNIEnv* env, pag::TextDocumentHandle textDocument);
 
 pag::TextDocumentHandle ToTextDocument(JNIEnv* env, jobject textData);
