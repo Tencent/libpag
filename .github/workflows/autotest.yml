@@ -7,6 +7,8 @@ on:
   # Triggers the workflow on push or pull request events but only for the master branch
   pull_request:
     branches: [ main ]
+  push:
+    branches: [ main ]
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   autotest:
@@ -48,16 +50,30 @@ jobs:
           path: |
             third_party
             vendor_tools
-          key: third_party-autotest-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+            test/baseline/.cache
+          key: third_party-autotest-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
           restore-keys: third_party-autotest-
-      - name: Run autotest script
+      - name: Run sync_deps script
         run: |
           chmod +x sync_deps.sh
           ./sync_deps.sh
+        shell: bash
+
+      - if: github.event_name == 'push'
+        name: Build cache（push）
+        run: |
+          node build_vendor
+          chmod +x update_baseline.sh
+          ./update_baseline.sh
+
+      - if: github.event_name == 'pull_request'
+        name: Run autotest script
+        run: |
           chmod +x autotest.sh
           ./autotest.sh
-        shell: bash
+
       - name: codecov
+        if: github.event_name == 'pull_request'
         uses: codecov/codecov-action@v2.1.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -72,4 +88,3 @@ jobs:
         with:
           name: result
           path: result
-

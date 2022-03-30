@@ -7,6 +7,8 @@ on:
   # Triggers the workflow on push or pull request events but only for the master branch
   pull_request:
     branches: [ main ]
+  push:
+    branches: [ main ]
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   build_win:
@@ -31,14 +33,19 @@ jobs:
           key: third_party-win-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third_party-win-
 
-      - name: brew link emscripten
-        if: steps.cache-environment.outputs.cache-hit == 'true'
-        run: |
-          brew link emscripten
-
-      - name: Windows build
+      - name: Run depsync
         run: |
           npm install depsync -g
           depsync
+        shell: bash
+
+      - if: github.event_name == 'push'
+        name: Build cache（push）
+        run: |
+          node build_vendor
+
+      - if: github.event_name == 'pull_request'
+        name: Windows build
+        run: |
           node ./vendor_tools/cmake-build pag -p win -o ./win/paglib -v -i -DPAG_BUILD_SHARED=OFF
         shell: bash
