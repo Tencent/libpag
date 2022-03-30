@@ -46,7 +46,7 @@ jobs:
       - if: github.event_name == 'push'
         name: Build cache（push）
         run: |
-          node build_vendor
+          node build_vendor -p linux
 
       - if: github.event_name == 'pull_request'
         name: Run build_linux script

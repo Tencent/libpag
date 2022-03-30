@@ -61,7 +61,7 @@ jobs:
       - if: github.event_name == 'push'
         name: Build cache（push）
         run: |
-          node build_vendor
+          node build_vendor -p web
           if [ ! $(which gcovr) ]; then
             brew install gcovr
           fi

@@ -62,7 +62,10 @@ jobs:
       - if: github.event_name == 'push'
         name: Build cache（push）
         run: |
-          node build_vendor
+          node build_vendor -p mac
+          if [ ! $(which gcovr) ]; then
+            brew install gcovr
+          fi
           chmod +x update_baseline.sh
           ./update_baseline.sh
 

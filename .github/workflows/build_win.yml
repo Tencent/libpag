@@ -42,10 +42,10 @@ jobs:
       - if: github.event_name == 'push'
         name: Build cache（push）
         run: |
-          node build_vendor
+          node build_vendor -p win
 
       - if: github.event_name == 'pull_request'
         name: Windows build
         run: |
-          node ./vendor_tools/cmake-build pag -p win -o ./win/paglib -v -i -DPAG_BUILD_SHARED=OFF
+          node ./vendor_tools/cmake-build pag -p win -o ./win/paglib -v -i -DPAG_BUILD_SHARED=ON
         shell: bash
