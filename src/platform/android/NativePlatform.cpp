@@ -25,8 +25,8 @@
 #include "Global.h"
 #include "JNIEnvironment.h"
 #include "JTraceImage.h"
-#include "VideoSurface.h"
 #include "PAGText.h"
+#include "VideoSurface.h"
 
 #define LOG_TAG "libpag"
 
