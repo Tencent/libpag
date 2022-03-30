@@ -7,7 +7,6 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.SystemClock;
-import android.view.Surface;
 
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -20,25 +19,13 @@ public class GPUDecoder {
     private static final int ERROR = -2;
     private static final int END_OF_STREAM = -3;
 
-    private Surface outputSurface = null;
-
-    private static GPUDecoder Create(Surface outputSurface) {
-        if (forceSoftwareDecoder()) {
-            return null;
-        }
-        GPUDecoder decoder = new GPUDecoder();
-        decoder.outputSurface = outputSurface;
-        return decoder;
-    }
+    private VideoSurface videoSurface = null;
 
     /**
-     * Some devices will crash in some scene when using MediaCodec, so exclude them.
+     * Some devices will crash in some scenes when using MediaCodec, so exclude them.
      */
-    private static boolean forceSoftwareDecoder() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
-            return true;
-        }
-        return false;
+    private static boolean ForceSoftwareDecoder() {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP;
     }
 
     private MediaCodec decoder;
@@ -48,20 +35,16 @@ public class GPUDecoder {
     // HUAWEI Mate 40 Pro，在连续或者相近的时间执行上面代码会解码失败，
     // 报 `VIDEO-[pps_sps_check_tmp_id]:[5994]pps is null ppsid = 0 havn't decode`
     private boolean disableFlush = true;
-    private boolean onConfigure(MediaFormat mediaFormat) {
-        if (outputSurface == null) {
-            return false;
-        }
-        return initDecoder(mediaFormat);
-    }
 
     private static final int INIT_DECODER_TIMEOUT_MS = 2000;
     private static final int DECODER_THREAD_MAX_COUNT = 10;
     private static final AtomicInteger decoderThreadCount = new AtomicInteger();
-    private boolean initDecoder(final MediaFormat mediaFormat) {
-        if (decoderThreadCount.get() >= DECODER_THREAD_MAX_COUNT) {
-            return false;
+
+    private static GPUDecoder Create(final VideoSurface videoSurface, final MediaFormat mediaFormat) {
+        if (videoSurface == null || decoderThreadCount.get() >= DECODER_THREAD_MAX_COUNT) {
+            return null;
         }
+        videoSurface.retain();
         decoderThreadCount.getAndIncrement();
         HandlerThread initHandlerThread = new HandlerThread("libpag_GPUDecoder_init_decoder");
         initHandlerThread.start();
@@ -76,12 +59,13 @@ public class GPUDecoder {
                 startTime = SystemClock.uptimeMillis();
                 try {
                     decoder = MediaCodec.createDecoderByType(mediaFormat.getString(MediaFormat.KEY_MIME));
-                    decoder.configure(mediaFormat, outputSurface, null, 0);
+                    decoder.configure(mediaFormat, videoSurface.getOutputSurface(), null, 0);
                     decoder.start();
                 } catch (Exception e) {
                     if (decoder != null) {
                         decoder.release();
                         decoder = null;
+                        videoSurface.release();
                     }
                 }
             }
@@ -99,6 +83,7 @@ public class GPUDecoder {
                     } catch (Exception ignored) {
                     }
                     decoder = null;
+                    videoSurface.release();
                     String errorMessage = "init decoder timeout. cost: " + costTime + "ms";
                     new RuntimeException(errorMessage).printStackTrace();
                 }
@@ -110,10 +95,12 @@ public class GPUDecoder {
         }, INIT_DECODER_TIMEOUT_MS);
         initHandlerThread.quitSafely();
         if (res) {
-            decoder = initDecoder[0];
-            return decoder != null;
+            GPUDecoder decoder = new GPUDecoder();
+            decoder.videoSurface = videoSurface;
+            decoder.decoder = initDecoder[0];
+            return decoder;
         }
-        return false;
+        return null;
     }
 
     private MediaCodec.BufferInfo bufferInfo = new MediaCodec.BufferInfo();
@@ -279,6 +266,7 @@ public class GPUDecoder {
                     e.printStackTrace();
                 }
                 decoder = null;
+                videoSurface.release();
             }
         });
     }

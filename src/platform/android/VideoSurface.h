@@ -55,7 +55,7 @@ class VideoSurface {
 
   ~VideoSurface();
 
-  jobject getOutputSurface(JNIEnv* env) const;
+  jobject getVideoSurface() const;
 
   void markPendingTexImage();
 
