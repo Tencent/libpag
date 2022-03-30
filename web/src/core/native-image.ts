@@ -8,6 +8,10 @@ export class NativeImage {
       image.onload = function () {
         resolve(new NativeImage(image));
       };
+      image.onerror = function(){
+        console.error('image create from bytes error.');
+        resolve(null);
+      }
       image.src = URL.createObjectURL(blob);
     });
   }
@@ -19,8 +23,8 @@ export class NativeImage {
         resolve(new NativeImage(image));
       };
       image.onerror = function(){
-        console.error(`file load error:${path}`);
-        resolve(new NativeImage(image));
+        console.error(`image create from path error: ${path}`);
+        resolve(null);
       }
       image.src = path;
     });
