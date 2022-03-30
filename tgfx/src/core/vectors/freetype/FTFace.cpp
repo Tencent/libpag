@@ -58,17 +58,19 @@ FTFace::~FTFace() {
 
 std::unique_ptr<FTFace> FTFace::Make(const FTFontData& data) {
   std::lock_guard<std::mutex> lockGuard(FTMutex());
-  auto face = std::make_unique<FTFace>();
   FT_Open_Args args;
   memset(&args, 0, sizeof(args));
-  if (data.path.empty()) {
+  if (data.data) {
     args.flags = FT_OPEN_MEMORY;
     args.memory_base = static_cast<const FT_Byte*>(data.data->data());
     args.memory_size = static_cast<FT_Long>(data.data->size());
-  } else {
+  } else if (!data.path.empty()) {
     args.flags = FT_OPEN_PATHNAME;
     args.pathname = const_cast<FT_String*>(data.path.c_str());
+  } else {
+    return nullptr;
   }
+  auto face = std::make_unique<FTFace>();
   auto err = FT_Open_Face(gFTLibrary->library(), &args, data.ttcIndex, &face->face);
   if (err) {
     return nullptr;
