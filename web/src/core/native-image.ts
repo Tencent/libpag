@@ -8,24 +8,24 @@ export class NativeImage {
       image.onload = function () {
         resolve(new NativeImage(image));
       };
-      image.onerror = function(){
+      image.onerror = function () {
         console.error('image create from bytes error.');
         resolve(null);
-      }
+      };
       image.src = URL.createObjectURL(blob);
     });
   }
 
-  public static async createFromPath(path: string) { 
+  public static async createFromPath(path: string) {
     return new Promise((resolve) => {
       const image = new Image();
       image.onload = function () {
         resolve(new NativeImage(image));
       };
-      image.onerror = function(){
+      image.onerror = function () {
         console.error(`image create from path error: ${path}`);
         resolve(null);
-      }
+      };
       image.src = path;
     });
   }
