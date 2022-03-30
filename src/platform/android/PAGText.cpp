@@ -46,7 +46,7 @@ static jfieldID PAGText_backgroundColor;
 static jfieldID PAGText_backgroundAlpha;
 }  // namespace pag
 
-void InitPAGText(JNIEnv* env) {
+void InitPAGTextJNI(JNIEnv* env) {
   PAGTextClass.reset(env, env->FindClass("org/libpag/PAGText"));
   PAGTextConstructID = env->GetMethodID(PAGTextClass.get(), "<init>", "()V");
   PAGText_applyFill = env->GetFieldID(PAGTextClass.get(), "applyFill", "Z");
@@ -76,9 +76,6 @@ void InitPAGText(JNIEnv* env) {
 jobject ToPAGTextObject(JNIEnv* env, pag::TextDocumentHandle textDocument) {
   if (textDocument == nullptr) {
     return nullptr;
-  }
-  if (PAGTextClass.get() == nullptr) {
-    InitPAGText(env);
   }
   auto textData = env->NewObject(PAGTextClass.get(), PAGTextConstructID);
   env->SetBooleanField(textData, PAGText_applyFill, static_cast<jboolean>(textDocument->applyFill));
@@ -124,9 +121,6 @@ jobject ToPAGTextObject(JNIEnv* env, pag::TextDocumentHandle textDocument) {
 TextDocumentHandle ToTextDocument(JNIEnv* env, jobject textData) {
   if (textData == nullptr) {
     return nullptr;
-  }
-  if (PAGTextClass.get() == nullptr) {
-    InitPAGText(env);
   }
   auto textDocument = pag::TextDocumentHandle(new TextDocument());
   textDocument->applyFill = env->GetBooleanField(textData, PAGText_applyFill);
