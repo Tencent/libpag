@@ -28,7 +28,8 @@ jobs:
             /usr/local/Cellar/node
             /usr/local/bin/node
             /usr/local/Cellar/emscripten
-            /usr/local/bin/emscripten
+            /usr/local/bin/emcc
+            /usr/local/bin/emcmake
             /usr/local/Cellar/yasm
             /usr/local/bin/yasm
             /usr/local/Cellar/depsync

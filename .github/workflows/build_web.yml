@@ -28,7 +28,8 @@ jobs:
             /usr/local/Cellar/node
             /usr/local/bin/node
             /usr/local/Cellar/emscripten
-            /usr/local/bin/emscripten
+            /usr/local/bin/emcc
+            /usr/local/bin/emcmake
             /usr/local/Cellar/yasm
             /usr/local/bin/yasm
             /usr/local/Cellar/depsync
@@ -52,16 +53,11 @@ jobs:
             vendor_tools
           key: third_party-web-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third_party-web-
-          
+
       - name: Run sync_deps script
         run: |
           chmod +x sync_deps.sh
           ./sync_deps.sh
-
-      - name: brew link emscripten
-        if: steps.cache-environment.outputs.cache-hit == 'true'
-        run: |
-          brew link emscripten
 
       - if: github.event_name == 'push'
         name: Build cache（push）
