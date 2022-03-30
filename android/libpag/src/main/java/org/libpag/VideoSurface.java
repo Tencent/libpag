@@ -30,6 +30,7 @@ public class VideoSurface implements SurfaceTexture.OnFrameAvailableListener {
     private final Object frameSyncObject = new Object();
     private boolean frameAvailable = false;
     private boolean released = false;
+    private int retainCount = 1;
 
     private static VideoSurface Make(int width, int height) {
         VideoSurface videoSurface = new VideoSurface();
@@ -94,7 +95,7 @@ public class VideoSurface implements SurfaceTexture.OnFrameAvailableListener {
         }
     }
 
-    private Surface getOutputSurface() {
+    public Surface getOutputSurface() {
         return outputSurface;
     }
 
@@ -160,8 +161,13 @@ public class VideoSurface implements SurfaceTexture.OnFrameAvailableListener {
         return true;
     }
 
-    private void onRelease() {
-        if (released) {
+    public void retain() {
+        retainCount++;
+    }
+
+    public void release() {
+        retainCount--;
+        if (released || retainCount > 0) {
             return;
         }
         released = true;

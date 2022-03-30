@@ -55,6 +55,6 @@ class GPUDecoder : public VideoDecoder {
   std::shared_ptr<VideoSurface> videoSurface = nullptr;
   Global<jobject> videoDecoder;
 
-  bool onConfigure(jobject decoder, const VideoFormat& format);
+  bool initDecoder(JNIEnv* env, const VideoFormat& format);
 };
 }  // namespace pag

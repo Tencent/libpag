@@ -24,25 +24,22 @@
 namespace pag {
 static Global<jclass> VideoSurfaceClass;
 static jmethodID VideoSurface_Make;
-static jmethodID VideoSurface_getOutputSurface;
 static jmethodID VideoSurface_updateTexImage;
 static jmethodID VideoSurface_attachToGLContext;
 static jmethodID VideoSurface_videoWidth;
 static jmethodID VideoSurface_videoHeight;
-static jmethodID VideoSurface_onRelease;
+static jmethodID VideoSurface_release;
 
 void VideoSurface::InitJNI(JNIEnv* env, const std::string& className) {
   VideoSurfaceClass.reset(env, env->FindClass(className.c_str()));
   std::string createSig = std::string("(II)L") + className + ";";
   VideoSurface_Make = env->GetStaticMethodID(VideoSurfaceClass.get(), "Make", createSig.c_str());
-  VideoSurface_getOutputSurface =
-      env->GetMethodID(VideoSurfaceClass.get(), "getOutputSurface", "()Landroid/view/Surface;");
   VideoSurface_updateTexImage = env->GetMethodID(VideoSurfaceClass.get(), "updateTexImage", "()Z");
   VideoSurface_attachToGLContext =
       env->GetMethodID(VideoSurfaceClass.get(), "attachToGLContext", "(I)Z");
   VideoSurface_videoWidth = env->GetMethodID(VideoSurfaceClass.get(), "videoWidth", "()I");
   VideoSurface_videoHeight = env->GetMethodID(VideoSurfaceClass.get(), "videoHeight", "()I");
-  VideoSurface_onRelease = env->GetMethodID(VideoSurfaceClass.get(), "onRelease", "()V");
+  VideoSurface_release = env->GetMethodID(VideoSurfaceClass.get(), "release", "()V");
 }
 
 OESTexture::OESTexture(const tgfx::GLSampler& glSampler, int width, int height)
@@ -114,11 +111,11 @@ VideoSurface::~VideoSurface() {
   if (env == nullptr) {
     return;
   }
-  env->CallVoidMethod(videoSurface.get(), VideoSurface_onRelease);
+  env->CallVoidMethod(videoSurface.get(), VideoSurface_release);
 }
 
-jobject VideoSurface::getOutputSurface(JNIEnv* env) const {
-  return env->CallObjectMethod(videoSurface.get(), VideoSurface_getOutputSurface);
+jobject VideoSurface::getVideoSurface() const {
+  return videoSurface.get();
 }
 
 void VideoSurface::markPendingTexImage() {
