@@ -56,32 +56,18 @@ static Frame TotalFrames(VideoDemuxer* demuxer) {
   return TimeToFrame(format.duration, format.frameRate);
 }
 
-VideoReader::VideoReader(std::unique_ptr<VideoDemuxer> videoDemuxer, DecoderPolicy policy)
-    : SequenceReader(TotalFrames(videoDemuxer.get())), demuxer(videoDemuxer.release()) {
+VideoReader::VideoReader(std::unique_ptr<VideoDemuxer> videoDemuxer)
+    : SequenceReader(TotalFrames(videoDemuxer.get()), videoDemuxer->staticContent()),
+      demuxer(videoDemuxer.release()) {
   auto videoFormat = demuxer->getFormat();
   frameRate = videoFormat.frameRate;
-  if (videoFormat.width * videoFormat.height <= FORCE_SOFTWARE_SIZE) {
-    // force using software decoder if the size of video is less than 400x400 for better
-    // performance。
-    policy = DecoderPolicy::Software;
-  }
   decoderTypeIndex = DECODER_TYPE_HARDWARE;
-  switch (policy) {
-    case DecoderPolicy::Software:
-      // Force using software decoders only when external decoders are available, because the
-      // built-in libavc has poor performance.
-      if (VideoDecoder::HasExternalSoftwareDecoder()) {
-        decoderTypeIndex = DECODER_TYPE_SOFTWARE;
-      }
-      break;
-    case DecoderPolicy::SoftwareToHardware:
-      if (VideoDecoder::SoftwareToHardwareEnabled() && VideoDecoder::HasHardwareDecoder()) {
-        decoderTypeIndex = DECODER_TYPE_SOFTWARE;
-        gpuDecoderTask = GPUDecoderTask::MakeAndRun(videoFormat);
-      }
-      break;
-    default:
-      break;
+  auto forceSoftware =
+      (demuxer->staticContent() || videoFormat.width * videoFormat.height <= FORCE_SOFTWARE_SIZE);
+  // Force using software decoders only when external decoders are available, because the built-in
+  // libavc has poor performance.
+  if (forceSoftware && VideoDecoder::HasExternalSoftwareDecoder()) {
+    decoderTypeIndex = DECODER_TYPE_SOFTWARE;
   }
 }
 

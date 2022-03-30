@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "DecoderPolicy.h"
 #include "SequenceReader.h"
 #include "rendering/video/VideoDecoder.h"
 #include "rendering/video/VideoDemuxer.h"
@@ -26,8 +25,7 @@
 namespace pag {
 class VideoReader : public SequenceReader {
  public:
-  explicit VideoReader(std::unique_ptr<VideoDemuxer> demuxer,
-                       DecoderPolicy policy = DecoderPolicy::Hardware);
+  explicit VideoReader(std::unique_ptr<VideoDemuxer> demuxer);
 
   ~VideoReader() override;
 

@@ -27,17 +27,11 @@ class RenderCache;
 
 class SequenceReader {
  public:
-  explicit SequenceReader(Frame totalFrames) : totalFrames(totalFrames) {
+  SequenceReader(Frame totalFrames, bool staticContent)
+      : totalFrames(totalFrames), staticContent(staticContent) {
   }
 
   virtual ~SequenceReader();
-
-  /**
-   * Returns true if the TextureReader contains only one frame.
-   */
-  bool staticContent() const {
-    return totalFrames == 1;
-  }
 
   /**
    * Decodes the specified target frame asynchronously.
@@ -70,6 +64,7 @@ class SequenceReader {
 
  private:
   Frame totalFrames = 0;
+  bool staticContent = false;
   Frame pendingFirstFrame = -1;
   Frame lastFrame = -1;
   std::shared_ptr<tgfx::Texture> lastTexture = nullptr;

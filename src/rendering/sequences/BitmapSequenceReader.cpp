@@ -21,10 +21,12 @@
 
 namespace pag {
 BitmapSequenceReader::BitmapSequenceReader(std::shared_ptr<File> file, BitmapSequence* sequence)
-    : SequenceReader(sequence->duration()), file(std::move(file)), sequence(sequence) {
-  // Force allocating raster PixelBuffer when staticContent is false, otherwise the asynchronous
-  // decoding will fail due to the GPU memory sharing.
-  pixelBuffer = tgfx::PixelBuffer::Make(sequence->width, sequence->height, false, staticContent());
+    : SequenceReader(sequence->duration(), sequence->composition->staticContent()),
+      file(std::move(file)), sequence(sequence) {
+  // Force allocating a raster PixelBuffer if staticContent is false, otherwise the asynchronous
+  // decoding will fail due to the memory sharing mechanism.
+  auto staticContent = sequence->composition->staticContent();
+  pixelBuffer = tgfx::PixelBuffer::Make(sequence->width, sequence->height, false, staticContent);
   tgfx::Bitmap(pixelBuffer).eraseAll();
 }
 
@@ -52,21 +54,21 @@ bool BitmapSequenceReader::decodeFrame(Frame targetFrame) {
       auto imageBytes = tgfx::Data::MakeWithoutCopy(bitmapRect->fileBytes->data(),
                                                     bitmapRect->fileBytes->length());
       auto image = tgfx::Image::MakeFrom(imageBytes);
-      if (image == nullptr) {
-        return false;
+      // The returned image could be nullptr if the frame is an empty frame.
+      if (image != nullptr) {
+        if (firstRead && bitmapFrame->isKeyframe &&
+            !(image->width() == bitmap.width() && image->height() == bitmap.height())) {
+          // clear the whole screen if the size of the key frame is smaller than the screen.
+          bitmap.eraseAll();
+        }
+        auto offset = bitmap.rowBytes() * bitmapRect->y + bitmapRect->x * 4;
+        auto result = image->readPixels(
+            bitmap.info(), reinterpret_cast<uint8_t*>(bitmap.writablePixels()) + offset);
+        if (!result) {
+          return false;
+        }
+        firstRead = false;
       }
-      if (firstRead && bitmapFrame->isKeyframe &&
-          !(image->width() == bitmap.width() && image->height() == bitmap.height())) {
-        // clear the whole screen if the size of the key frame is smaller than the screen.
-        bitmap.eraseAll();
-      }
-      auto offset = bitmap.rowBytes() * bitmapRect->y + bitmapRect->x * 4;
-      auto result = image->readPixels(bitmap.info(),
-                                      reinterpret_cast<uint8_t*>(bitmap.writablePixels()) + offset);
-      if (!result) {
-        return false;
-      }
-      firstRead = false;
     }
   }
   lastDecodeFrame = targetFrame;

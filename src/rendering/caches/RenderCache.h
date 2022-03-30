@@ -182,10 +182,9 @@ class RenderCache : public Performance {
   TextAtlas* getTextAtlas(ID assetID) const;
 
   void prepareLayers();
-  void preparePreComposeLayer(PreComposeLayer* layer, DecoderPolicy policy);
+  void preparePreComposeLayer(PreComposeLayer* layer);
   void prepareImageLayer(PAGImageLayer* layer);
-  std::shared_ptr<SequenceReader> getSequenceReaderInternal(const SequenceReaderFactory* factory,
-                                                            DecoderPolicy policy);
+  std::shared_ptr<SequenceReader> getSequenceReaderInternal(const SequenceReaderFactory* factory);
 
   friend class PAGPlayer;
 };

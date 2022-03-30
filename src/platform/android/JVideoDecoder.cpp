@@ -30,9 +30,4 @@ JNIEXPORT void Java_org_libpag_VideoDecoder_SetMaxHardwareDecoderCount(JNIEnv *,
                                                                        jint maxCount) {
   pag::PAGVideoDecoder::SetMaxHardwareDecoderCount(maxCount);
 }
-
-JNIEXPORT void Java_org_libpag_VideoDecoder_SetSoftwareToHardwareEnabled(JNIEnv *, jclass,
-                                                                         jboolean value) {
-  pag::PAGVideoDecoder::SetSoftwareToHardwareEnabled(value);
-}
 }
