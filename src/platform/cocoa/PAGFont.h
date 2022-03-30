@@ -17,8 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import <Foundation/Foundation.h>
+#import "PAG.h"
 
-__attribute__((visibility("default"))) @interface PAGFont : NSObject
+PAG_API @interface PAGFont : NSObject
 
 /**
  * A string with the name of the font family.

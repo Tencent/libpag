@@ -49,25 +49,25 @@ void setPAGImage(JNIEnv* env, jobject thiz, JPAGImage* pagImage) {
 
 extern "C" {
 
-JNIEXPORT void Java_org_libpag_PAGImage_nativeRelease(JNIEnv* env, jobject thiz) {
+PAG_API void Java_org_libpag_PAGImage_nativeRelease(JNIEnv* env, jobject thiz) {
   auto jPagImage = reinterpret_cast<JPAGImage*>(env->GetLongField(thiz, PAGImage_nativeContext));
   if (jPagImage != nullptr) {
     jPagImage->clear();
   }
 }
 
-JNIEXPORT void Java_org_libpag_PAGImage_nativeFinalize(JNIEnv* env, jobject thiz) {
+PAG_API void Java_org_libpag_PAGImage_nativeFinalize(JNIEnv* env, jobject thiz) {
   setPAGImage(env, thiz, nullptr);
 }
 
-JNIEXPORT void Java_org_libpag_PAGImage_nativeInit(JNIEnv* env, jclass clazz) {
+PAG_API void Java_org_libpag_PAGImage_nativeInit(JNIEnv* env, jclass clazz) {
   PAGImage_nativeContext = env->GetFieldID(clazz, "nativeContext", "J");
   // 调用堆栈源头从C++触发而不是Java触发的情况下，FindClass
   // 可能会失败，因此要提前初始化这部分反射方法。
   NativePlatform::InitJNI(env);
 }
 
-JNIEXPORT jlong Java_org_libpag_PAGImage_LoadFromBitmap(JNIEnv* env, jclass, jobject bitmap) {
+PAG_API jlong Java_org_libpag_PAGImage_LoadFromBitmap(JNIEnv* env, jclass, jobject bitmap) {
   auto info = GetImageInfo(env, bitmap);
   if (info.isEmpty()) {
     LOGE("PAGImage.LoadFromBitmap() Invalid bitmap specified.");
@@ -88,7 +88,7 @@ JNIEXPORT jlong Java_org_libpag_PAGImage_LoadFromBitmap(JNIEnv* env, jclass, job
   return reinterpret_cast<jlong>(new JPAGImage(pagImage));
 }
 
-JNIEXPORT jlong Java_org_libpag_PAGImage_LoadFromPath(JNIEnv* env, jclass, jstring pathObj) {
+PAG_API jlong Java_org_libpag_PAGImage_LoadFromPath(JNIEnv* env, jclass, jstring pathObj) {
   if (pathObj == nullptr) {
     LOGE("PAGImage.LoadFromPath() Invalid path specified.");
     return 0;
@@ -105,8 +105,8 @@ JNIEXPORT jlong Java_org_libpag_PAGImage_LoadFromPath(JNIEnv* env, jclass, jstri
   return reinterpret_cast<jlong>(new JPAGImage(pagImage));
 }
 
-JNIEXPORT jlong Java_org_libpag_PAGImage_LoadFromBytes(JNIEnv* env, jclass, jbyteArray bytes,
-                                                       jint length) {
+PAG_API jlong Java_org_libpag_PAGImage_LoadFromBytes(JNIEnv* env, jclass, jbyteArray bytes,
+                                                     jint length) {
   if (bytes == nullptr) {
     LOGE("PAGImage.LoadFromBytes() Invalid image bytes specified.");
     return 0;
@@ -121,8 +121,8 @@ JNIEXPORT jlong Java_org_libpag_PAGImage_LoadFromBytes(JNIEnv* env, jclass, jbyt
   return reinterpret_cast<jlong>(new JPAGImage(pagImage));
 }
 
-JNIEXPORT jlong Java_org_libpag_PAGImage_LoadFromAssets(JNIEnv* env, jclass, jobject managerObj,
-                                                        jstring pathObj) {
+PAG_API jlong Java_org_libpag_PAGImage_LoadFromAssets(JNIEnv* env, jclass, jobject managerObj,
+                                                      jstring pathObj) {
   auto path = SafeConvertToStdString(env, pathObj);
   auto byteData = ReadBytesFromAssets(env, managerObj, pathObj);
   if (byteData == nullptr) {
@@ -138,9 +138,9 @@ JNIEXPORT jlong Java_org_libpag_PAGImage_LoadFromAssets(JNIEnv* env, jclass, job
   return reinterpret_cast<jlong>(new JPAGImage(pagImage));
 }
 
-JNIEXPORT jlong Java_org_libpag_PAGImage_LoadFromTexture(JNIEnv*, jclass, jint textureID,
-                                                         jint textureTarget, jint width,
-                                                         jint height, jboolean flipY) {
+PAG_API jlong Java_org_libpag_PAGImage_LoadFromTexture(JNIEnv*, jclass, jint textureID,
+                                                       jint textureTarget, jint width,
+                                                       jint height, jboolean flipY) {
   GLTextureInfo textureInfo = {};
   textureInfo.target = static_cast<unsigned>(textureTarget);
   textureInfo.id = static_cast<unsigned>(textureID);
@@ -154,7 +154,7 @@ JNIEXPORT jlong Java_org_libpag_PAGImage_LoadFromTexture(JNIEnv*, jclass, jint t
   return reinterpret_cast<jlong>(pagImage);
 }
 
-JNIEXPORT jint Java_org_libpag_PAGImage_width(JNIEnv* env, jobject thiz) {
+PAG_API jint Java_org_libpag_PAGImage_width(JNIEnv* env, jobject thiz) {
   auto image = getPAGImage(env, thiz);
   if (image == nullptr) {
     return 0;
@@ -162,7 +162,7 @@ JNIEXPORT jint Java_org_libpag_PAGImage_width(JNIEnv* env, jobject thiz) {
   return image->width();
 }
 
-JNIEXPORT jint Java_org_libpag_PAGImage_height(JNIEnv* env, jobject thiz) {
+PAG_API jint Java_org_libpag_PAGImage_height(JNIEnv* env, jobject thiz) {
   auto image = getPAGImage(env, thiz);
   if (image == nullptr) {
     return 0;
@@ -170,7 +170,7 @@ JNIEXPORT jint Java_org_libpag_PAGImage_height(JNIEnv* env, jobject thiz) {
   return image->height();
 }
 
-JNIEXPORT jint Java_org_libpag_PAGImage_scaleMode(JNIEnv* env, jobject thiz) {
+PAG_API jint Java_org_libpag_PAGImage_scaleMode(JNIEnv* env, jobject thiz) {
   auto image = getPAGImage(env, thiz);
   if (image == nullptr) {
     return 0;
@@ -178,7 +178,7 @@ JNIEXPORT jint Java_org_libpag_PAGImage_scaleMode(JNIEnv* env, jobject thiz) {
   return image->scaleMode();
 }
 
-JNIEXPORT void Java_org_libpag_PAGImage_setScaleMode(JNIEnv* env, jobject thiz, jint value) {
+PAG_API void Java_org_libpag_PAGImage_setScaleMode(JNIEnv* env, jobject thiz, jint value) {
   auto image = getPAGImage(env, thiz);
   if (image == nullptr) {
     return;
@@ -186,8 +186,8 @@ JNIEXPORT void Java_org_libpag_PAGImage_setScaleMode(JNIEnv* env, jobject thiz, 
   image->setScaleMode(value);
 }
 
-JNIEXPORT void Java_org_libpag_PAGImage_nativeGetMatrix(JNIEnv* env, jobject thiz,
-                                                        jfloatArray values) {
+PAG_API void Java_org_libpag_PAGImage_nativeGetMatrix(JNIEnv* env, jobject thiz,
+                                                      jfloatArray values) {
   auto list = env->GetFloatArrayElements(values, nullptr);
   auto image = getPAGImage(env, thiz);
   if (image != nullptr) {
@@ -202,9 +202,9 @@ JNIEXPORT void Java_org_libpag_PAGImage_nativeGetMatrix(JNIEnv* env, jobject thi
   env->ReleaseFloatArrayElements(values, list, 0);
 }
 
-JNIEXPORT void Java_org_libpag_PAGImage_nativeSetMatrix(JNIEnv* env, jobject thiz, jfloat a,
-                                                        jfloat b, jfloat c, jfloat d, jfloat tx,
-                                                        jfloat ty) {
+PAG_API void Java_org_libpag_PAGImage_nativeSetMatrix(JNIEnv* env, jobject thiz, jfloat a,
+                                                      jfloat b, jfloat c, jfloat d, jfloat tx,
+                                                      jfloat ty) {
   auto image = getPAGImage(env, thiz);
   if (image == nullptr) {
     return;

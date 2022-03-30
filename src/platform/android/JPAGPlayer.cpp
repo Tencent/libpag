@@ -46,30 +46,30 @@ void setPAGPlayer(JNIEnv* env, jobject thiz, JPAGPlayer* player) {
 
 extern "C" {
 
-JNIEXPORT void Java_org_libpag_PAGPlayer_nativeInit(JNIEnv* env, jclass clazz) {
+PAG_API void Java_org_libpag_PAGPlayer_nativeInit(JNIEnv* env, jclass clazz) {
   PAGPlayer_nativeContext = env->GetFieldID(clazz, "nativeContext", "J");
   // 调用堆栈源头从C++触发而不是Java触发的情况下，FindClass
   // 可能会失败，因此要提前初始化这部分反射方法。
   NativePlatform::InitJNI(env);
 }
 
-JNIEXPORT void Java_org_libpag_PAGPlayer_nativeSetup(JNIEnv* env, jobject thiz) {
+PAG_API void Java_org_libpag_PAGPlayer_nativeSetup(JNIEnv* env, jobject thiz) {
   auto player = std::make_shared<PAGPlayer>();
   setPAGPlayer(env, thiz, new JPAGPlayer(player));
 }
 
-JNIEXPORT void Java_org_libpag_PAGPlayer_nativeRelease(JNIEnv* env, jobject thiz) {
+PAG_API void Java_org_libpag_PAGPlayer_nativeRelease(JNIEnv* env, jobject thiz) {
   auto jPlayer = reinterpret_cast<JPAGPlayer*>(env->GetLongField(thiz, PAGPlayer_nativeContext));
   if (jPlayer != nullptr) {
     jPlayer->clear();
   }
 }
 
-JNIEXPORT void Java_org_libpag_PAGPlayer_nativeFinalize(JNIEnv* env, jobject thiz) {
+PAG_API void Java_org_libpag_PAGPlayer_nativeFinalize(JNIEnv* env, jobject thiz) {
   setPAGPlayer(env, thiz, nullptr);
 }
 
-JNIEXPORT jobject Java_org_libpag_PAGPlayer_getComposition(JNIEnv* env, jobject thiz) {
+PAG_API jobject Java_org_libpag_PAGPlayer_getComposition(JNIEnv* env, jobject thiz) {
   auto player = getPAGPlayer(env, thiz);
   if (player == nullptr) {
     return nullptr;
@@ -82,8 +82,8 @@ JNIEXPORT jobject Java_org_libpag_PAGPlayer_getComposition(JNIEnv* env, jobject 
   return ToPAGLayerJavaObject(env, composition);
 }
 
-JNIEXPORT void Java_org_libpag_PAGPlayer_setComposition(JNIEnv* env, jobject thiz,
-                                                        jobject newComposition) {
+PAG_API void Java_org_libpag_PAGPlayer_setComposition(JNIEnv* env, jobject thiz,
+                                                      jobject newComposition) {
   auto player = getPAGPlayer(env, thiz);
   if (player == nullptr) {
     return;
@@ -92,8 +92,8 @@ JNIEXPORT void Java_org_libpag_PAGPlayer_setComposition(JNIEnv* env, jobject thi
   player->setComposition(composition);
 }
 
-JNIEXPORT void Java_org_libpag_PAGPlayer_nativeSetSurface(JNIEnv* env, jobject thiz,
-                                                          jlong surfaceObject) {
+PAG_API void Java_org_libpag_PAGPlayer_nativeSetSurface(JNIEnv* env, jobject thiz,
+                                                        jlong surfaceObject) {
   auto player = getPAGPlayer(env, thiz);
   if (player == nullptr) {
     return;
@@ -106,7 +106,7 @@ JNIEXPORT void Java_org_libpag_PAGPlayer_nativeSetSurface(JNIEnv* env, jobject t
   }
 }
 
-JNIEXPORT jboolean Java_org_libpag_PAGPlayer_videoEnabled(JNIEnv* env, jobject thiz) {
+PAG_API jboolean Java_org_libpag_PAGPlayer_videoEnabled(JNIEnv* env, jobject thiz) {
   auto player = getPAGPlayer(env, thiz);
   if (player == nullptr) {
     return 0;
@@ -114,8 +114,8 @@ JNIEXPORT jboolean Java_org_libpag_PAGPlayer_videoEnabled(JNIEnv* env, jobject t
   return static_cast<jboolean>(player->videoEnabled());
 }
 
-JNIEXPORT void Java_org_libpag_PAGPlayer_setVideoEnabled(JNIEnv* env, jobject thiz,
-                                                         jboolean value) {
+PAG_API void Java_org_libpag_PAGPlayer_setVideoEnabled(JNIEnv* env, jobject thiz,
+                                                       jboolean value) {
   auto player = getPAGPlayer(env, thiz);
   if (player == nullptr) {
     return;
@@ -123,7 +123,7 @@ JNIEXPORT void Java_org_libpag_PAGPlayer_setVideoEnabled(JNIEnv* env, jobject th
   player->setVideoEnabled(value);
 }
 
-JNIEXPORT jboolean Java_org_libpag_PAGPlayer_cacheEnabled(JNIEnv* env, jobject thiz) {
+PAG_API jboolean Java_org_libpag_PAGPlayer_cacheEnabled(JNIEnv* env, jobject thiz) {
   auto player = getPAGPlayer(env, thiz);
   if (player == nullptr) {
     return 0;
@@ -131,8 +131,8 @@ JNIEXPORT jboolean Java_org_libpag_PAGPlayer_cacheEnabled(JNIEnv* env, jobject t
   return static_cast<jboolean>(player->cacheEnabled());
 }
 
-JNIEXPORT void Java_org_libpag_PAGPlayer_setCacheEnabled(JNIEnv* env, jobject thiz,
-                                                         jboolean value) {
+PAG_API void Java_org_libpag_PAGPlayer_setCacheEnabled(JNIEnv* env, jobject thiz,
+                                                       jboolean value) {
   auto player = getPAGPlayer(env, thiz);
   if (player == nullptr) {
     return;
@@ -140,7 +140,7 @@ JNIEXPORT void Java_org_libpag_PAGPlayer_setCacheEnabled(JNIEnv* env, jobject th
   player->setCacheEnabled(value);
 }
 
-JNIEXPORT jfloat Java_org_libpag_PAGPlayer_cacheScale(JNIEnv* env, jobject thiz) {
+PAG_API jfloat Java_org_libpag_PAGPlayer_cacheScale(JNIEnv* env, jobject thiz) {
   auto player = getPAGPlayer(env, thiz);
   if (player == nullptr) {
     return 0;
@@ -148,7 +148,7 @@ JNIEXPORT jfloat Java_org_libpag_PAGPlayer_cacheScale(JNIEnv* env, jobject thiz)
   return player->cacheScale();
 }
 
-JNIEXPORT void Java_org_libpag_PAGPlayer_setCacheScale(JNIEnv* env, jobject thiz, jfloat value) {
+PAG_API void Java_org_libpag_PAGPlayer_setCacheScale(JNIEnv* env, jobject thiz, jfloat value) {
   auto player = getPAGPlayer(env, thiz);
   if (player == nullptr) {
     return;
@@ -156,7 +156,7 @@ JNIEXPORT void Java_org_libpag_PAGPlayer_setCacheScale(JNIEnv* env, jobject thiz
   player->setCacheScale(value);
 }
 
-JNIEXPORT jfloat Java_org_libpag_PAGPlayer_maxFrameRate(JNIEnv* env, jobject thiz) {
+PAG_API jfloat Java_org_libpag_PAGPlayer_maxFrameRate(JNIEnv* env, jobject thiz) {
   auto player = getPAGPlayer(env, thiz);
   if (player == nullptr) {
     return 0;
@@ -164,7 +164,7 @@ JNIEXPORT jfloat Java_org_libpag_PAGPlayer_maxFrameRate(JNIEnv* env, jobject thi
   return player->maxFrameRate();
 }
 
-JNIEXPORT void Java_org_libpag_PAGPlayer_setMaxFrameRate(JNIEnv* env, jobject thiz, jfloat value) {
+PAG_API void Java_org_libpag_PAGPlayer_setMaxFrameRate(JNIEnv* env, jobject thiz, jfloat value) {
   auto player = getPAGPlayer(env, thiz);
   if (player == nullptr) {
     return;
@@ -172,7 +172,7 @@ JNIEXPORT void Java_org_libpag_PAGPlayer_setMaxFrameRate(JNIEnv* env, jobject th
   player->setMaxFrameRate(value);
 }
 
-JNIEXPORT jint Java_org_libpag_PAGPlayer_scaleMode(JNIEnv* env, jobject thiz) {
+PAG_API jint Java_org_libpag_PAGPlayer_scaleMode(JNIEnv* env, jobject thiz) {
   auto player = getPAGPlayer(env, thiz);
   if (player == nullptr) {
     return 0;
@@ -180,7 +180,7 @@ JNIEXPORT jint Java_org_libpag_PAGPlayer_scaleMode(JNIEnv* env, jobject thiz) {
   return player->scaleMode();
 }
 
-JNIEXPORT void Java_org_libpag_PAGPlayer_setScaleMode(JNIEnv* env, jobject thiz, jint value) {
+PAG_API void Java_org_libpag_PAGPlayer_setScaleMode(JNIEnv* env, jobject thiz, jint value) {
   auto player = getPAGPlayer(env, thiz);
   if (player == nullptr) {
     return;
@@ -188,8 +188,8 @@ JNIEXPORT void Java_org_libpag_PAGPlayer_setScaleMode(JNIEnv* env, jobject thiz,
   player->setScaleMode(value);
 }
 
-JNIEXPORT void Java_org_libpag_PAGPlayer_nativeGetMatrix(JNIEnv* env, jobject thiz,
-                                                         jfloatArray values) {
+PAG_API void Java_org_libpag_PAGPlayer_nativeGetMatrix(JNIEnv* env, jobject thiz,
+                                                       jfloatArray values) {
   auto list = env->GetFloatArrayElements(values, nullptr);
   auto player = getPAGPlayer(env, thiz);
   if (player != nullptr) {
@@ -204,9 +204,9 @@ JNIEXPORT void Java_org_libpag_PAGPlayer_nativeGetMatrix(JNIEnv* env, jobject th
   env->ReleaseFloatArrayElements(values, list, 0);
 }
 
-JNIEXPORT void Java_org_libpag_PAGPlayer_nativeSetMatrix(JNIEnv* env, jobject thiz, jfloat a,
-                                                         jfloat b, jfloat c, jfloat d, jfloat tx,
-                                                         jfloat ty) {
+PAG_API void Java_org_libpag_PAGPlayer_nativeSetMatrix(JNIEnv* env, jobject thiz, jfloat a,
+                                                       jfloat b, jfloat c, jfloat d, jfloat tx,
+                                                       jfloat ty) {
   auto player = getPAGPlayer(env, thiz);
   if (player == nullptr) {
     return;
@@ -216,7 +216,7 @@ JNIEXPORT void Java_org_libpag_PAGPlayer_nativeSetMatrix(JNIEnv* env, jobject th
   player->setMatrix(matrix);
 }
 
-JNIEXPORT jlong Java_org_libpag_PAGPlayer_duration(JNIEnv* env, jobject thiz) {
+PAG_API jlong Java_org_libpag_PAGPlayer_duration(JNIEnv* env, jobject thiz) {
   auto player = getPAGPlayer(env, thiz);
   if (player == nullptr) {
     return 0;
@@ -224,7 +224,7 @@ JNIEXPORT jlong Java_org_libpag_PAGPlayer_duration(JNIEnv* env, jobject thiz) {
   return player->duration();
 }
 
-JNIEXPORT jdouble Java_org_libpag_PAGPlayer_getProgress(JNIEnv* env, jobject thiz) {
+PAG_API jdouble Java_org_libpag_PAGPlayer_getProgress(JNIEnv* env, jobject thiz) {
   auto player = getPAGPlayer(env, thiz);
   if (player == nullptr) {
     return 0;
@@ -232,7 +232,7 @@ JNIEXPORT jdouble Java_org_libpag_PAGPlayer_getProgress(JNIEnv* env, jobject thi
   return player->getProgress();
 }
 
-JNIEXPORT void Java_org_libpag_PAGPlayer_setProgress(JNIEnv* env, jobject thiz, jdouble value) {
+PAG_API void Java_org_libpag_PAGPlayer_setProgress(JNIEnv* env, jobject thiz, jdouble value) {
   auto player = getPAGPlayer(env, thiz);
   if (player == nullptr) {
     return;
@@ -240,7 +240,7 @@ JNIEXPORT void Java_org_libpag_PAGPlayer_setProgress(JNIEnv* env, jobject thiz, 
   player->setProgress(value);
 }
 
-JNIEXPORT void Java_org_libpag_PAGPlayer_prepare(JNIEnv* env, jobject thiz) {
+PAG_API void Java_org_libpag_PAGPlayer_prepare(JNIEnv* env, jobject thiz) {
   auto player = getPAGPlayer(env, thiz);
   if (player == nullptr) {
     return;
@@ -248,8 +248,8 @@ JNIEXPORT void Java_org_libpag_PAGPlayer_prepare(JNIEnv* env, jobject thiz) {
   player->prepare();
 }
 
-JNIEXPORT jboolean Java_org_libpag_PAGPlayer_flushAndFenceSync(JNIEnv* env, jobject thiz,
-                                                               jlongArray syncArray) {
+PAG_API jboolean Java_org_libpag_PAGPlayer_flushAndFenceSync(JNIEnv* env, jobject thiz,
+                                                             jlongArray syncArray) {
   auto player = getPAGPlayer(env, thiz);
   if (player == nullptr) {
     return 0;
@@ -268,7 +268,7 @@ JNIEXPORT jboolean Java_org_libpag_PAGPlayer_flushAndFenceSync(JNIEnv* env, jobj
   return result;
 }
 
-JNIEXPORT jboolean Java_org_libpag_PAGPlayer_waitSync(JNIEnv* env, jobject thiz, jlong sync) {
+PAG_API jboolean Java_org_libpag_PAGPlayer_waitSync(JNIEnv* env, jobject thiz, jlong sync) {
   auto player = getPAGPlayer(env, thiz);
   if (player == nullptr || sync == 0) {
     return false;
@@ -278,7 +278,7 @@ JNIEXPORT jboolean Java_org_libpag_PAGPlayer_waitSync(JNIEnv* env, jobject thiz,
   return player->wait(semaphore);
 }
 
-JNIEXPORT jobject Java_org_libpag_PAGPlayer_getBounds(JNIEnv* env, jobject thiz, jobject layer) {
+PAG_API jobject Java_org_libpag_PAGPlayer_getBounds(JNIEnv* env, jobject thiz, jobject layer) {
   auto player = getPAGPlayer(env, thiz);
   if (player == nullptr) {
     return MakeRectFObject(env, 0.0f, 0.0f, 0.0f, 0.0f);
@@ -288,8 +288,8 @@ JNIEXPORT jobject Java_org_libpag_PAGPlayer_getBounds(JNIEnv* env, jobject thiz,
   return MakeRectFObject(env, rect.x(), rect.y(), rect.width(), rect.height());
 }
 
-JNIEXPORT jobjectArray Java_org_libpag_PAGPlayer_getLayersUnderPoint(JNIEnv* env, jobject thiz,
-                                                                     jfloat x, jfloat y) {
+PAG_API jobjectArray Java_org_libpag_PAGPlayer_getLayersUnderPoint(JNIEnv* env, jobject thiz,
+                                                                   jfloat x, jfloat y) {
   auto player = getPAGPlayer(env, thiz);
   if (player == nullptr) {
     return ToPAGLayerJavaObjectList(env, {});
@@ -299,9 +299,9 @@ JNIEXPORT jobjectArray Java_org_libpag_PAGPlayer_getLayersUnderPoint(JNIEnv* env
   return ToPAGLayerJavaObjectList(env, layers);
 }
 
-JNIEXPORT jboolean Java_org_libpag_PAGPlayer_hitTestPoint(JNIEnv* env, jobject thiz, jobject layer,
-                                                          jfloat x, jfloat y,
-                                                          jboolean pixelHitTest) {
+PAG_API jboolean Java_org_libpag_PAGPlayer_hitTestPoint(JNIEnv* env, jobject thiz, jobject layer,
+                                                        jfloat x, jfloat y,
+                                                        jboolean pixelHitTest) {
   auto player = getPAGPlayer(env, thiz);
   if (player == nullptr) {
     return JNI_FALSE;

@@ -42,11 +42,11 @@ std::shared_ptr<PAGLayer> GetPAGLayer(JNIEnv* env, jobject thiz) {
 
 extern "C" {
 
-JNIEXPORT void Java_org_libpag_PAGLayer_nativeInit(JNIEnv* env, jclass clazz) {
+PAG_API void Java_org_libpag_PAGLayer_nativeInit(JNIEnv* env, jclass clazz) {
   PAGLayer_nativeContext = env->GetFieldID(clazz, "nativeContext", "J");
 }
 
-JNIEXPORT void Java_org_libpag_PAGLayer_nativeRelease(JNIEnv* env, jobject thiz) {
+PAG_API void Java_org_libpag_PAGLayer_nativeRelease(JNIEnv* env, jobject thiz) {
   auto pagLayer = GetPAGLayer(env, thiz);
   if (pagLayer != nullptr) {
     env->DeleteWeakGlobalRef(static_cast<jobject>(pagLayer->externalHandle));
@@ -55,7 +55,7 @@ JNIEXPORT void Java_org_libpag_PAGLayer_nativeRelease(JNIEnv* env, jobject thiz)
   SetPAGLayer(env, thiz, nullptr);
 }
 
-JNIEXPORT jint Java_org_libpag_PAGLayer_layerType(JNIEnv* env, jobject thiz) {
+PAG_API jint Java_org_libpag_PAGLayer_layerType(JNIEnv* env, jobject thiz) {
   auto pagLayer = GetPAGLayer(env, thiz);
   if (pagLayer == nullptr) {
     return static_cast<jint>(LayerType::Unknown);
@@ -64,7 +64,7 @@ JNIEXPORT jint Java_org_libpag_PAGLayer_layerType(JNIEnv* env, jobject thiz) {
   return static_cast<jint>(pagLayer->layerType());
 }
 
-JNIEXPORT jstring Java_org_libpag_PAGLayer_layerName(JNIEnv* env, jobject thiz) {
+PAG_API jstring Java_org_libpag_PAGLayer_layerName(JNIEnv* env, jobject thiz) {
   auto pagLayer = GetPAGLayer(env, thiz);
   std::string name = "";
   if (pagLayer != nullptr) {
@@ -73,8 +73,8 @@ JNIEXPORT jstring Java_org_libpag_PAGLayer_layerName(JNIEnv* env, jobject thiz) 
   return SafeConvertToJString(env, name.c_str());
 }
 
-JNIEXPORT void Java_org_libpag_PAGLayer_matrix(JNIEnv* env, jobject thiz,
-                                               jfloatArray matrixObject) {
+PAG_API void Java_org_libpag_PAGLayer_matrix(JNIEnv* env, jobject thiz,
+                                             jfloatArray matrixObject) {
   auto pagLayer = GetPAGLayer(env, thiz);
   if (pagLayer == nullptr) {
     return;
@@ -86,8 +86,8 @@ JNIEXPORT void Java_org_libpag_PAGLayer_matrix(JNIEnv* env, jobject thiz,
   env->ReleaseFloatArrayElements(matrixObject, matrixArray, 0);
 }
 
-JNIEXPORT void Java_org_libpag_PAGLayer_setMatrix(JNIEnv* env, jobject thiz,
-                                                  jfloatArray matrixObject) {
+PAG_API void Java_org_libpag_PAGLayer_setMatrix(JNIEnv* env, jobject thiz,
+                                                jfloatArray matrixObject) {
   auto pagLayer = GetPAGLayer(env, thiz);
   if (pagLayer == nullptr) {
     return;
@@ -105,7 +105,7 @@ JNIEXPORT void Java_org_libpag_PAGLayer_setMatrix(JNIEnv* env, jobject thiz,
   env->ReleaseFloatArrayElements(matrixObject, matrixArray, 0);
 }
 
-JNIEXPORT void Java_org_libpag_PAGLayer_resetMatrix(JNIEnv* env, jobject thiz) {
+PAG_API void Java_org_libpag_PAGLayer_resetMatrix(JNIEnv* env, jobject thiz) {
   auto pagLayer = GetPAGLayer(env, thiz);
   if (pagLayer == nullptr) {
     return;
@@ -114,8 +114,8 @@ JNIEXPORT void Java_org_libpag_PAGLayer_resetMatrix(JNIEnv* env, jobject thiz) {
   pagLayer->resetMatrix();
 }
 
-JNIEXPORT void Java_org_libpag_PAGLayer_getTotalMatrix(JNIEnv* env, jobject thiz,
-                                                       jfloatArray matrixObject) {
+PAG_API void Java_org_libpag_PAGLayer_getTotalMatrix(JNIEnv* env, jobject thiz,
+                                                     jfloatArray matrixObject) {
   auto pagLayer = GetPAGLayer(env, thiz);
   if (pagLayer == nullptr) {
     return;
@@ -127,7 +127,7 @@ JNIEXPORT void Java_org_libpag_PAGLayer_getTotalMatrix(JNIEnv* env, jobject thiz
   env->ReleaseFloatArrayElements(matrixObject, matrixArray, 0);
 }
 
-JNIEXPORT jboolean Java_org_libpag_PAGLayer_visible(JNIEnv* env, jobject thiz) {
+PAG_API jboolean Java_org_libpag_PAGLayer_visible(JNIEnv* env, jobject thiz) {
   auto pagLayer = GetPAGLayer(env, thiz);
   if (pagLayer == nullptr) {
     return JNI_FALSE;
@@ -136,7 +136,7 @@ JNIEXPORT jboolean Java_org_libpag_PAGLayer_visible(JNIEnv* env, jobject thiz) {
   return static_cast<jboolean>(pagLayer->visible());
 }
 
-JNIEXPORT void Java_org_libpag_PAGLayer_setVisible(JNIEnv* env, jobject thiz, jboolean visible) {
+PAG_API void Java_org_libpag_PAGLayer_setVisible(JNIEnv* env, jobject thiz, jboolean visible) {
   auto pagLayer = GetPAGLayer(env, thiz);
   if (pagLayer == nullptr) {
     return;
@@ -145,7 +145,7 @@ JNIEXPORT void Java_org_libpag_PAGLayer_setVisible(JNIEnv* env, jobject thiz, jb
   pagLayer->setVisible(visible);
 }
 
-JNIEXPORT jint Java_org_libpag_PAGLayer_editableIndex(JNIEnv* env, jobject thiz) {
+PAG_API jint Java_org_libpag_PAGLayer_editableIndex(JNIEnv* env, jobject thiz) {
   auto pagLayer = GetPAGLayer(env, thiz);
   if (pagLayer == nullptr) {
     return -1;
@@ -154,7 +154,7 @@ JNIEXPORT jint Java_org_libpag_PAGLayer_editableIndex(JNIEnv* env, jobject thiz)
   return pagLayer->editableIndex();
 }
 
-JNIEXPORT jobject Java_org_libpag_PAGLayer_parent(JNIEnv* env, jobject thiz) {
+PAG_API jobject Java_org_libpag_PAGLayer_parent(JNIEnv* env, jobject thiz) {
   auto pagLayer = GetPAGLayer(env, thiz);
   if (pagLayer == nullptr) {
     return nullptr;
@@ -168,7 +168,7 @@ JNIEXPORT jobject Java_org_libpag_PAGLayer_parent(JNIEnv* env, jobject thiz) {
   return ToPAGLayerJavaObject(env, composition);
 }
 
-JNIEXPORT jobjectArray Java_org_libpag_PAGLayer_markers(JNIEnv* env, jobject thiz) {
+PAG_API jobjectArray Java_org_libpag_PAGLayer_markers(JNIEnv* env, jobject thiz) {
   static Global<jclass> PAGMarker_Class(env, env->FindClass("org/libpag/PAGMarker"));
   auto pagLayer = GetPAGLayer(env, thiz);
   if (pagLayer == nullptr || pagLayer->markers().empty()) {
@@ -183,7 +183,7 @@ JNIEXPORT jobjectArray Java_org_libpag_PAGLayer_markers(JNIEnv* env, jobject thi
   return markerArray;
 }
 
-JNIEXPORT jlong Java_org_libpag_PAGLayer_localTimeToGlobal(JNIEnv* env, jobject thiz, jlong time) {
+PAG_API jlong Java_org_libpag_PAGLayer_localTimeToGlobal(JNIEnv* env, jobject thiz, jlong time) {
   auto pagLayer = GetPAGLayer(env, thiz);
   if (pagLayer == nullptr) {
     return time;
@@ -191,7 +191,7 @@ JNIEXPORT jlong Java_org_libpag_PAGLayer_localTimeToGlobal(JNIEnv* env, jobject 
   return pagLayer->localTimeToGlobal(time);
 }
 
-JNIEXPORT jlong Java_org_libpag_PAGLayer_globalToLocalTime(JNIEnv* env, jobject thiz, jlong time) {
+PAG_API jlong Java_org_libpag_PAGLayer_globalToLocalTime(JNIEnv* env, jobject thiz, jlong time) {
   auto pagLayer = GetPAGLayer(env, thiz);
   if (pagLayer == nullptr) {
     return time;
@@ -199,7 +199,7 @@ JNIEXPORT jlong Java_org_libpag_PAGLayer_globalToLocalTime(JNIEnv* env, jobject 
   return pagLayer->globalToLocalTime(time);
 }
 
-JNIEXPORT jlong Java_org_libpag_PAGLayer_duration(JNIEnv* env, jobject thiz) {
+PAG_API jlong Java_org_libpag_PAGLayer_duration(JNIEnv* env, jobject thiz) {
   auto pagLayer = GetPAGLayer(env, thiz);
   if (pagLayer == nullptr) {
     return 0;
@@ -207,7 +207,7 @@ JNIEXPORT jlong Java_org_libpag_PAGLayer_duration(JNIEnv* env, jobject thiz) {
   return pagLayer->duration();
 }
 
-JNIEXPORT jfloat Java_org_libpag_PAGLayer_frameRate(JNIEnv* env, jobject thiz) {
+PAG_API jfloat Java_org_libpag_PAGLayer_frameRate(JNIEnv* env, jobject thiz) {
   auto pagLayer = GetPAGLayer(env, thiz);
   if (pagLayer == nullptr) {
     return 60;
@@ -215,7 +215,7 @@ JNIEXPORT jfloat Java_org_libpag_PAGLayer_frameRate(JNIEnv* env, jobject thiz) {
   return pagLayer->frameRate();
 }
 
-JNIEXPORT jlong Java_org_libpag_PAGLayer_startTime(JNIEnv* env, jobject thiz) {
+PAG_API jlong Java_org_libpag_PAGLayer_startTime(JNIEnv* env, jobject thiz) {
   auto pagLayer = GetPAGLayer(env, thiz);
   if (pagLayer == nullptr) {
     return 0;
@@ -223,7 +223,7 @@ JNIEXPORT jlong Java_org_libpag_PAGLayer_startTime(JNIEnv* env, jobject thiz) {
   return pagLayer->startTime();
 }
 
-JNIEXPORT void Java_org_libpag_PAGLayer_setStartTime(JNIEnv* env, jobject thiz, jlong time) {
+PAG_API void Java_org_libpag_PAGLayer_setStartTime(JNIEnv* env, jobject thiz, jlong time) {
   auto pagLayer = GetPAGLayer(env, thiz);
   if (pagLayer == nullptr) {
     return;
@@ -231,7 +231,7 @@ JNIEXPORT void Java_org_libpag_PAGLayer_setStartTime(JNIEnv* env, jobject thiz, 
   pagLayer->setStartTime(time);
 }
 
-JNIEXPORT jlong Java_org_libpag_PAGLayer_currentTime(JNIEnv* env, jobject thiz) {
+PAG_API jlong Java_org_libpag_PAGLayer_currentTime(JNIEnv* env, jobject thiz) {
   auto pagLayer = GetPAGLayer(env, thiz);
   if (pagLayer == nullptr) {
     return 0;
@@ -239,7 +239,7 @@ JNIEXPORT jlong Java_org_libpag_PAGLayer_currentTime(JNIEnv* env, jobject thiz) 
   return pagLayer->currentTime();
 }
 
-JNIEXPORT void Java_org_libpag_PAGLayer_setCurrentTime(JNIEnv* env, jobject thiz, jlong time) {
+PAG_API void Java_org_libpag_PAGLayer_setCurrentTime(JNIEnv* env, jobject thiz, jlong time) {
   auto pagLayer = GetPAGLayer(env, thiz);
   if (pagLayer == nullptr) {
     return;
@@ -247,7 +247,7 @@ JNIEXPORT void Java_org_libpag_PAGLayer_setCurrentTime(JNIEnv* env, jobject thiz
   pagLayer->setCurrentTime(time);
 }
 
-JNIEXPORT jdouble Java_org_libpag_PAGLayer_getProgress(JNIEnv* env, jobject thiz) {
+PAG_API jdouble Java_org_libpag_PAGLayer_getProgress(JNIEnv* env, jobject thiz) {
   auto pagLayer = GetPAGLayer(env, thiz);
   if (pagLayer == nullptr) {
     return 0;
@@ -255,7 +255,7 @@ JNIEXPORT jdouble Java_org_libpag_PAGLayer_getProgress(JNIEnv* env, jobject thiz
   return pagLayer->getProgress();
 }
 
-JNIEXPORT void Java_org_libpag_PAGLayer_setProgress(JNIEnv* env, jobject thiz, jdouble progress) {
+PAG_API void Java_org_libpag_PAGLayer_setProgress(JNIEnv* env, jobject thiz, jdouble progress) {
   auto pagLayer = GetPAGLayer(env, thiz);
   if (pagLayer == nullptr) {
     return;
@@ -263,7 +263,7 @@ JNIEXPORT void Java_org_libpag_PAGLayer_setProgress(JNIEnv* env, jobject thiz, j
   pagLayer->setProgress(progress);
 }
 
-JNIEXPORT jobject Java_org_libpag_PAGLayer_trackMatteLayer(JNIEnv* env, jobject thiz) {
+PAG_API jobject Java_org_libpag_PAGLayer_trackMatteLayer(JNIEnv* env, jobject thiz) {
   auto pagLayer = GetPAGLayer(env, thiz);
   if (pagLayer == nullptr) {
     return nullptr;
@@ -274,7 +274,7 @@ JNIEXPORT jobject Java_org_libpag_PAGLayer_trackMatteLayer(JNIEnv* env, jobject 
   return ToPAGLayerJavaObject(env, pagLayer->trackMatteLayer());
 }
 
-JNIEXPORT jobject Java_org_libpag_PAGLayer_getBounds(JNIEnv* env, jobject thiz) {
+PAG_API jobject Java_org_libpag_PAGLayer_getBounds(JNIEnv* env, jobject thiz) {
   auto pagLayer = GetPAGLayer(env, thiz);
   if (pagLayer == nullptr) {
     return MakeRectFObject(env, 0.0f, 0.0f, 0.0f, 0.0f);
@@ -284,7 +284,7 @@ JNIEXPORT jobject Java_org_libpag_PAGLayer_getBounds(JNIEnv* env, jobject thiz) 
   return MakeRectFObject(env, rect.x(), rect.y(), rect.width(), rect.height());
 }
 
-JNIEXPORT jboolean Java_org_libpag_PAGLayer_excludedFromTimeline(JNIEnv* env, jobject thiz) {
+PAG_API jboolean Java_org_libpag_PAGLayer_excludedFromTimeline(JNIEnv* env, jobject thiz) {
   auto pagLayer = GetPAGLayer(env, thiz);
   if (pagLayer == nullptr) {
     return JNI_FALSE;
@@ -293,8 +293,8 @@ JNIEXPORT jboolean Java_org_libpag_PAGLayer_excludedFromTimeline(JNIEnv* env, jo
   return static_cast<jboolean>(pagLayer->excludedFromTimeline());
 }
 
-JNIEXPORT void Java_org_libpag_PAGLayer_setExcludedFromTimeline(JNIEnv* env, jobject thiz,
-                                                                jboolean value) {
+PAG_API void Java_org_libpag_PAGLayer_setExcludedFromTimeline(JNIEnv* env, jobject thiz,
+                                                              jboolean value) {
   auto pagLayer = GetPAGLayer(env, thiz);
   if (pagLayer == nullptr) {
     return;

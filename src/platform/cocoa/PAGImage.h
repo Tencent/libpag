@@ -19,9 +19,10 @@
 #import <CoreGraphics/CoreGraphics.h>
 #import <CoreVideo/CoreVideo.h>
 #import <Foundation/Foundation.h>
+#import "PAG.h"
 #import "PAGScaleMode.h"
 
-__attribute__((visibility("default"))) @interface PAGImage : NSObject
+PAG_API @interface PAGImage : NSObject
 /**
  * Creates a PAGImage object from a CGImage object, return null if it's not valid CGImage object.
  */

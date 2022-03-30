@@ -19,6 +19,6 @@
 #include "JNIHelper.h"
 #include "pag/pag.h"
 
-extern "C" JNIEXPORT jstring JNICALL Java_org_libpag_PAG_SDKVersion(JNIEnv* env, jclass) {
+extern "C" PAG_API jstring JNICALL Java_org_libpag_PAG_SDKVersion(JNIEnv* env, jclass) {
   return SafeConvertToJString(env, pag::PAG::SDKVersion().c_str());
 }

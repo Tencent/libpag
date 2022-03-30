@@ -17,11 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import <Foundation/Foundation.h>
+#import "PAG.h"
 
 /**
  * Represents a time range from the content of PAGImageLayer.
  */
-__attribute__((visibility("default"))) @interface PAGVideoRange : NSObject
+PAG_API @interface PAGVideoRange : NSObject
 
 /**
  * The start time of the source video, in microseconds.

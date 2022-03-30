@@ -22,7 +22,7 @@
 
 @class PAGFont;
 
-__attribute__((visibility("default"))) @interface PAGTextLayer : PAGLayer
+PAG_API @interface PAGTextLayer : PAGLayer
 
 /**
  * Returns the TextLayer’s fill color.
