@@ -114,8 +114,7 @@ PAG_API jboolean Java_org_libpag_PAGPlayer_videoEnabled(JNIEnv* env, jobject thi
   return static_cast<jboolean>(player->videoEnabled());
 }
 
-PAG_API void Java_org_libpag_PAGPlayer_setVideoEnabled(JNIEnv* env, jobject thiz,
-                                                       jboolean value) {
+PAG_API void Java_org_libpag_PAGPlayer_setVideoEnabled(JNIEnv* env, jobject thiz, jboolean value) {
   auto player = getPAGPlayer(env, thiz);
   if (player == nullptr) {
     return;
@@ -131,8 +130,7 @@ PAG_API jboolean Java_org_libpag_PAGPlayer_cacheEnabled(JNIEnv* env, jobject thi
   return static_cast<jboolean>(player->cacheEnabled());
 }
 
-PAG_API void Java_org_libpag_PAGPlayer_setCacheEnabled(JNIEnv* env, jobject thiz,
-                                                       jboolean value) {
+PAG_API void Java_org_libpag_PAGPlayer_setCacheEnabled(JNIEnv* env, jobject thiz, jboolean value) {
   auto player = getPAGPlayer(env, thiz);
   if (player == nullptr) {
     return;
@@ -300,8 +298,7 @@ PAG_API jobjectArray Java_org_libpag_PAGPlayer_getLayersUnderPoint(JNIEnv* env, 
 }
 
 PAG_API jboolean Java_org_libpag_PAGPlayer_hitTestPoint(JNIEnv* env, jobject thiz, jobject layer,
-                                                        jfloat x, jfloat y,
-                                                        jboolean pixelHitTest) {
+                                                        jfloat x, jfloat y, jboolean pixelHitTest) {
   auto player = getPAGPlayer(env, thiz);
   if (player == nullptr) {
     return JNI_FALSE;

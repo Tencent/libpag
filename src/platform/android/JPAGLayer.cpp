@@ -73,8 +73,7 @@ PAG_API jstring Java_org_libpag_PAGLayer_layerName(JNIEnv* env, jobject thiz) {
   return SafeConvertToJString(env, name.c_str());
 }
 
-PAG_API void Java_org_libpag_PAGLayer_matrix(JNIEnv* env, jobject thiz,
-                                             jfloatArray matrixObject) {
+PAG_API void Java_org_libpag_PAGLayer_matrix(JNIEnv* env, jobject thiz, jfloatArray matrixObject) {
   auto pagLayer = GetPAGLayer(env, thiz);
   if (pagLayer == nullptr) {
     return;

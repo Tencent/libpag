@@ -139,8 +139,8 @@ PAG_API jlong Java_org_libpag_PAGImage_LoadFromAssets(JNIEnv* env, jclass, jobje
 }
 
 PAG_API jlong Java_org_libpag_PAGImage_LoadFromTexture(JNIEnv*, jclass, jint textureID,
-                                                       jint textureTarget, jint width,
-                                                       jint height, jboolean flipY) {
+                                                       jint textureTarget, jint width, jint height,
+                                                       jboolean flipY) {
   GLTextureInfo textureInfo = {};
   textureInfo.target = static_cast<unsigned>(textureTarget);
   textureInfo.id = static_cast<unsigned>(textureID);
@@ -202,9 +202,8 @@ PAG_API void Java_org_libpag_PAGImage_nativeGetMatrix(JNIEnv* env, jobject thiz,
   env->ReleaseFloatArrayElements(values, list, 0);
 }
 
-PAG_API void Java_org_libpag_PAGImage_nativeSetMatrix(JNIEnv* env, jobject thiz, jfloat a,
-                                                      jfloat b, jfloat c, jfloat d, jfloat tx,
-                                                      jfloat ty) {
+PAG_API void Java_org_libpag_PAGImage_nativeSetMatrix(JNIEnv* env, jobject thiz, jfloat a, jfloat b,
+                                                      jfloat c, jfloat d, jfloat tx, jfloat ty) {
   auto image = getPAGImage(env, thiz);
   if (image == nullptr) {
     return;

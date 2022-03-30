@@ -38,8 +38,7 @@ PAG_API void Java_org_libpag_PAGComposition_nativeInit(JNIEnv* env, jclass clazz
   PAGComposition_nativeContext = env->GetFieldID(clazz, "nativeContext", "J");
 }
 
-PAG_API jobject Java_org_libpag_PAGComposition_Make(JNIEnv* env, jclass, jint width,
-                                                    jint height) {
+PAG_API jobject Java_org_libpag_PAGComposition_Make(JNIEnv* env, jclass, jint width, jint height) {
   auto composition = PAGComposition::Make(width, height);
   if (composition == nullptr) {
     return nullptr;
@@ -110,8 +109,8 @@ PAG_API jint Java_org_libpag_PAGComposition_getLayerIndex(JNIEnv* env, jobject t
   return composition->getLayerIndex(pagLayer);
 }
 
-PAG_API void Java_org_libpag_PAGComposition_setLayerIndex(JNIEnv* env, jobject thiz,
-                                                          jobject layer, jint index) {
+PAG_API void Java_org_libpag_PAGComposition_setLayerIndex(JNIEnv* env, jobject thiz, jobject layer,
+                                                          jint index) {
   auto composition = GetPAGComposition(env, thiz);
   if (composition == nullptr) {
     return;
@@ -150,8 +149,7 @@ PAG_API void Java_org_libpag_PAGComposition_addLayerAt(JNIEnv* env, jobject thiz
   composition->addLayerAt(pagLayer, index);
 }
 
-PAG_API jboolean Java_org_libpag_PAGComposition_contains(JNIEnv* env, jobject thiz,
-                                                         jobject layer) {
+PAG_API jboolean Java_org_libpag_PAGComposition_contains(JNIEnv* env, jobject thiz, jobject layer) {
   auto composition = GetPAGComposition(env, thiz);
   if (composition == nullptr) {
     return JNI_FALSE;

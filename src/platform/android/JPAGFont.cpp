@@ -82,8 +82,7 @@ Java_org_libpag_PAGFont_RegisterFont__Landroid_content_res_AssetManager_2Ljava_l
 
 PAG_API jobject Java_org_libpag_PAGFont_RegisterFontBytes(JNIEnv* env, jclass, jbyteArray bytes,
                                                           jint length, jint ttcIndex,
-                                                          jstring font_family,
-                                                          jstring font_style) {
+                                                          jstring font_family, jstring font_style) {
   auto data = env->GetByteArrayElements(bytes, nullptr);
   auto font = PAGFont::RegisterFont(data, static_cast<size_t>(length), ttcIndex,
                                     SafeConvertToStdString(env, font_family),
