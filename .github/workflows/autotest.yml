@@ -36,7 +36,7 @@ jobs:
             /usr/local/bin/depsync
             /usr/local/Cellar/gcovr
             /usr/local/bin/gcovr
-          key: libpag-environment-autotest-20220321
+          key: libpag-environment-autotest-20220330
           restore-keys: |
             libpag-environment-
       - uses: actions/checkout@v2
