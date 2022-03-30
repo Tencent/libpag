@@ -18,6 +18,7 @@
 
 #import <Foundation/Foundation.h>
 #include "CocoaUtils.h"
+#import "PAG.h"
 
 enum {
   PAGJustificationLeftJustify = 0,
@@ -32,7 +33,7 @@ enum {
 /**
  * The PAGText object stores a value for a TextLayer's Source Text property.
  */
-__attribute__((visibility("default"))) @interface PAGText : NSObject
+PAG_API @interface PAGText : NSObject
 
 /**
  * When true, the text layer shows a fill.

@@ -17,8 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import <Foundation/Foundation.h>
+#import "PAG.h"
 
-__attribute__((visibility("default"))) @interface PAGVideoDecoder : NSObject
+PAG_API @interface PAGVideoDecoder : NSObject
 
 /**
  * Register a software decoder factory to implement the decoder fallback mechanism.

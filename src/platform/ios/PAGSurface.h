@@ -22,7 +22,7 @@
 #import <QuartzCore/QuartzCore.h>
 #import "PAGImageLayer.h"
 
-__attribute__((visibility("default"))) @interface PAGSurface : NSObject
+PAG_API @interface PAGSurface : NSObject
 
 /**
  * Creates a new PAGSurface from specified CAEAGLLayer. The GPU context will be created internally

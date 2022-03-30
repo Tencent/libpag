@@ -23,7 +23,7 @@
 #import "PAGText.h"
 #import "PAGTimeStretchMode.h"
 
-__attribute__((visibility("default"))) @interface PAGFile : PAGComposition
+PAG_API @interface PAGFile : PAGComposition
 /**
  * The maximum tag level current SDK supports.
  */

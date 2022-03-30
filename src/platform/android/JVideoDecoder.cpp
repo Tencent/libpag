@@ -20,14 +20,14 @@
 #include "platform/android/GPUDecoder.h"
 
 extern "C" {
-JNIEXPORT void Java_org_libpag_VideoDecoder_RegisterSoftwareDecoderFactory(JNIEnv *, jclass,
-                                                                           jlong factory) {
+PAG_API void Java_org_libpag_VideoDecoder_RegisterSoftwareDecoderFactory(JNIEnv*, jclass,
+                                                                         jlong factory) {
   pag::PAGVideoDecoder::RegisterSoftwareDecoderFactory(
-      reinterpret_cast<pag::SoftwareDecoderFactory *>(factory));
+      reinterpret_cast<pag::SoftwareDecoderFactory*>(factory));
 }
 
-JNIEXPORT void Java_org_libpag_VideoDecoder_SetMaxHardwareDecoderCount(JNIEnv *, jclass,
-                                                                       jint maxCount) {
+PAG_API void Java_org_libpag_VideoDecoder_SetMaxHardwareDecoderCount(JNIEnv*, jclass,
+                                                                     jint maxCount) {
   pag::PAGVideoDecoder::SetMaxHardwareDecoderCount(maxCount);
 }
 }

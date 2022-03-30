@@ -18,7 +18,15 @@
 
 #import <Foundation/Foundation.h>
 
-__attribute__((visibility("default"))) @interface PAG : NSObject
+#if !defined(PAG_API)
+#if defined(PAG_DLL)
+#define PAG_API __attribute__((visibility("default")))
+#else
+#define PAG_API
+#endif
+#endif
+
+PAG_API @interface PAG : NSObject
 /**
  * Get SDK version information.
  */
