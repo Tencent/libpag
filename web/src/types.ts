@@ -74,8 +74,13 @@ export interface PAG extends EmscriptenModule {
 export interface EmscriptenGL {
   currentContext: { GLctx: WebGLRenderingContext };
   textures: WebGLTexture[];
+  createContext: (
+    canvas: HTMLCanvasElement,
+    webGLContextAttributes: { majorVersion: number; minorVersion: number },
+  ) => number;
   registerContext: (gl: WebGLRenderingContext, options: { majorVersion: number; minorVersion: number }) => number;
   makeContextCurrent: (contextId: number) => void;
+  deleteContext: (contextId: number) => void;
 }
 
 /**
