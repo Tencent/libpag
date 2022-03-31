@@ -7,6 +7,8 @@ on:
   # Triggers the workflow on push or pull request events but only for the master branch
   pull_request:
     branches: [ main ]
+  push:
+    branches: [ main ]
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   build_linux:
@@ -34,9 +36,20 @@ jobs:
           restore-keys: third_party-linux-
 
       - uses: seanmiddleditch/gha-setup-ninja@master
-      - name: Linux build
+      - name: Run sync_deps script
         run: |
           chmod +x sync_deps.sh
           ./sync_deps.sh
+          chmod +x build_linux.sh
+          ./build_linux.sh
+
+      - if: github.event_name == 'push'
+        name: Build cache（push）
+        run: |
+          node build_vendor -p linux
+
+      - if: github.event_name == 'pull_request'
+        name: Run build_linux script
+        run: |
           chmod +x build_linux.sh
           ./build_linux.sh

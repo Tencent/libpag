@@ -7,6 +7,8 @@ on:
   # Triggers the workflow on push or pull request events but only for the master branch
   pull_request:
     branches: [ main ]
+  push:
+    branches: [ main ]
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   build_web:
@@ -26,14 +28,15 @@ jobs:
             /usr/local/Cellar/node
             /usr/local/bin/node
             /usr/local/Cellar/emscripten
-            /usr/local/bin/emscripten
+            /usr/local/bin/emcc
+            /usr/local/bin/emcmake
             /usr/local/Cellar/yasm
             /usr/local/bin/yasm
             /usr/local/Cellar/depsync
             /usr/local/bin/depsync
             /usr/local/Cellar/gcovr
             /usr/local/bin/gcovr
-          key: libpag-environment-web-20220321
+          key: libpag-environment-autotest-202203230
           restore-keys: |
             libpag-environment-
       - uses: actions/checkout@v2
@@ -51,15 +54,21 @@ jobs:
           key: third_party-web-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third_party-web-
 
-      - name: brew link emscripten
-        if: steps.cache-environment.outputs.cache-hit == 'true'
-        run: |
-          brew link emscripten
-      - name: Web build
+      - name: Run sync_deps script
         run: |
           chmod +x sync_deps.sh
           ./sync_deps.sh
+
+      - if: github.event_name == 'push'
+        name: Build cache（push）
+        run: |
+          node build_vendor -p web
+          if [ ! $(which gcovr) ]; then
+            brew install gcovr
+          fi
+      - if: github.event_name == 'pull_request'
+        name: Run build script
+        run: |
           cd web/script
           chmod +x build.sh
           ./build.sh debug
-
