@@ -56,6 +56,18 @@ void SequenceReader::prepare(Frame targetFrame) {
   }
 }
 
+void SequenceReader::prepareNext(Frame targetFrame) {
+  if (!staticContent) {
+    auto nextFrame = targetFrame + 1;
+    if (nextFrame >= totalFrames && pendingFirstFrame >= 0) {
+      // Add preparation for the first frame when reach to the end.
+      nextFrame = pendingFirstFrame;
+      pendingFirstFrame = -1;
+    }
+    prepare(nextFrame);
+  }
+}
+
 std::shared_ptr<tgfx::Texture> SequenceReader::readTexture(Frame targetFrame, RenderCache* cache) {
   if (staticContent) {
     targetFrame = 0;
@@ -77,15 +89,7 @@ std::shared_ptr<tgfx::Texture> SequenceReader::readTexture(Frame targetFrame, Re
     lastTexture = makeTexture(cache->getContext());
     lastFrame = targetFrame;
     cache->textureUploadingTime += clock.measure();
-    if (!staticContent) {
-      auto nextFrame = targetFrame + 1;
-      if (nextFrame >= totalFrames && pendingFirstFrame >= 0) {
-        // Add preparation for the first frame when reach to the end.
-        nextFrame = pendingFirstFrame;
-        pendingFirstFrame = -1;
-      }
-      prepare(nextFrame);
-    }
+    prepareNext(targetFrame);
   }
   return lastTexture;
 }

@@ -59,6 +59,11 @@ class SequenceReader {
    */
   virtual void recordPerformance(Performance* performance, int64_t decodingTime) = 0;
 
+  /**
+   * Decodes the next one of the specified target frame asynchronously.
+   */
+  virtual void prepareNext(Frame targetFrame);
+
  protected:
   std::shared_ptr<Task> lastTask = nullptr;
 

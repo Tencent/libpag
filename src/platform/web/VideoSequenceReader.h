@@ -40,6 +40,9 @@ class VideoSequenceReader : public SequenceReader {
 
   void recordPerformance(Performance* performance, int64_t decodingTime) override;
 
+  void prepareNext(Frame) override {
+  }
+
  private:
   // Keep a reference to the File in case the Sequence object is released while we are using it.
   std::shared_ptr<File> file = nullptr;
