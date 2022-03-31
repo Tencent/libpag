@@ -79,3 +79,18 @@
 
 - 修复 `PAGView` 重复调用 `init` 会多次缩放 `Canvas` 的问题
 - 修复 `PAGView` 的 `repeatCount` 为1时结束帧不是最后一帧的问题
+
+## 0.1.2
+
+### Bug Fixes
+
+- 修复视频序列帧解码过程渲染错误
+- 修复 `vector` 结构上的方法同步错误
+- 修复 `fontFamily` 格式化错误
+- 修复一个从 `texture` 创建 `PAGSurface` 的性能问题
+
+## 0.1.3
+
+### Bug Fixes
+
+- 修复 `destroy` 没有正常释放 `WebGL context` 的问题
