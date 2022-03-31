@@ -7,6 +7,13 @@
       "cmake": {
         "targets": [
           "libavcdec"
+        ],
+        "platforms": [
+          "ios",
+          "android",
+          "mac",
+          "win",
+          "linux"
         ]
       }
     },
@@ -92,6 +99,11 @@
           "${SOURCE_DIR}/png.h",
           "${SOURCE_DIR}/pngconf.h",
           "${BUILD_DIR}/pnglibconf.h"
+        ],
+        "platforms": [
+          "android",
+          "win",
+          "linux"
         ]
       }
     },
@@ -159,6 +171,11 @@
         "includes": [
           "${SOURCE_DIR}/src/rttr",
           "${BUILD_DIR}/src/rttr"
+        ],
+        "platforms": [
+          "mac",
+          "win",
+          "linux"
         ]
       }
     },
