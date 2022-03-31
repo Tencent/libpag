@@ -233,6 +233,10 @@ version and try again.**
 
 libpag is licensed under the [Apache Version 2.0 License](./LICENSE.txt)
 
+## Privacy Policy
+
+Please comply with [the personal information processing rules of PAG SDK](https://privacy.qq.com/document/preview/01e79d0cc7a2427ba774b88c6beff0fd) while using libpag SDK
+
 ## Contribution
 
 If you have any ideas or suggestions to improve libpag, welcome to submit

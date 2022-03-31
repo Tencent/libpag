@@ -219,6 +219,10 @@ depsync
 
 libpag 基于 [Apache-2.0](./LICENSE.txt) 协议开源.
 
+## 隐私政策
+
+使用 libpag SDK 时请遵守 [PAG SDK个人信息保护规则](https://privacy.qq.com/document/preview/01e79d0cc7a2427ba774b88c6beff0fd).
+
 ## 贡献
 
 我们欢迎开发人员为腾讯的开源做出贡献，如果您对改进 libpag
