@@ -20,7 +20,6 @@ if [[ $(uname) == 'Darwin' ]]; then
       echo "----install clang-format----"
       pip install clang-format
   fi
-
 fi
 
 echo "----begin to scan code format----"
