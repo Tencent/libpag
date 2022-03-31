@@ -168,8 +168,11 @@ public class PAGPlayerView {
                 int[] textures = {textureID};
                 GLES20.glDeleteTextures(1, textures, 0);
             }
+            EGL14.eglMakeCurrent(eglDisplay, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT);
             EGL14.eglDestroySurface(eglDisplay, eglSurface);
             EGL14.eglDestroyContext(eglDisplay, eglContext);
+            eglSurface = null;
+            eglContext = null;
         }
     }
 
