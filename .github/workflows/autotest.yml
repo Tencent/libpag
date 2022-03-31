@@ -28,15 +28,24 @@ jobs:
             /usr/local/Cellar/node
             /usr/local/bin/node
             /usr/local/Cellar/emscripten
+            /usr/local/bin/em++
+            /usr/local/bin/em-config
+            /usr/local/bin/emar
             /usr/local/bin/emcc
             /usr/local/bin/emcmake
+            /usr/local/bin/emconfigure
+            /usr/local/bin/emlink.py
+            /usr/local/bin/emmake
+            /usr/local/bin/emranlib
+            /usr/local/bin/emrun
+            /usr/local/bin/emscons
             /usr/local/Cellar/yasm
             /usr/local/bin/yasm
             /usr/local/Cellar/depsync
             /usr/local/bin/depsync
             /usr/local/Cellar/gcovr
             /usr/local/bin/gcovr
-          key: libpag-environment-autotest-20220330
+          key: libpag-environment-autotest-20220331
           restore-keys: |
             libpag-environment-
       - uses: actions/checkout@v2
