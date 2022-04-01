@@ -46,8 +46,16 @@ VideoSequenceReader::VideoSequenceReader(std::shared_ptr<File> file, VideoSequen
           "push", val(typed_memory_view(frame->fileBytes->length(), frame->fileBytes->data())));
       ptsList.call<void>("push", static_cast<int>(frame->frame));
     }
-    videoReader =
-        videoReaderClass.new_(width, height, sequence->frameRate, headers, frames, ptsList);
+    auto staticTimeRanges = val::array();
+    for (const auto& timeRange : sequence->staticTimeRanges) {
+      auto object = val::object();
+      object.set("start", static_cast<int>(timeRange.start));
+      object.set("end", static_cast<int>(timeRange.end));
+      staticTimeRanges.call<void>("push", object);
+    }
+
+    videoReader = videoReaderClass.new_(width, height, sequence->frameRate, headers, frames,
+                                        ptsList, staticTimeRanges);
   }
 }
 
