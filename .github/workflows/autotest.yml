@@ -60,7 +60,7 @@ jobs:
             third_party
             vendor_tools
             test/baseline/.cache
-          key: third_party-autotest-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
+          key: third_party-autotest-01-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}-${{ hashFiles('test/baseline/version.json') }}
           restore-keys: third_party-autotest-
       - name: Run sync_deps script
         run: |
@@ -76,7 +76,7 @@ jobs:
             brew install gcovr
           fi
           chmod +x update_baseline.sh
-          ./update_baseline.sh
+          ./update_baseline.sh 1
           mkdir result
           cp -r test/baseline result
 
