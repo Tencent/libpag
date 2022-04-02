@@ -38,11 +38,11 @@ class GLContext : public Context {
   }
 
   const GLFunctions* functions() const {
-    return interface->functions.get();
+    return glInterface->functions.get();
   }
 
   const Caps* caps() const override {
-    return interface->caps.get();
+    return glInterface->caps.get();
   }
 
   void resetState() override;
@@ -50,7 +50,7 @@ class GLContext : public Context {
   void bindTexture(int unitIndex, const TextureSampler* sampler);
 
  private:
-  const GLInterface* interface = nullptr;
+  const GLInterface* glInterface = nullptr;
 
   friend class GLDevice;
   friend class GLInterface;

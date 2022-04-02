@@ -41,7 +41,7 @@ static int GetGLVersion(const GLProcGetter* getter) {
 }
 
 const GLInterface* GLInterface::Get(const Context* context) {
-  return context ? static_cast<const GLContext*>(context)->interface : nullptr;
+  return context ? static_cast<const GLContext*>(context)->glInterface : nullptr;
 }
 
 const GLInterface* GLInterface::GetNative() {
