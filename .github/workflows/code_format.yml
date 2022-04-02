@@ -18,6 +18,7 @@ jobs:
       - uses: actions/checkout@v2
       - name: Run codeformat script
         run: |
+          brew install clang-format
           chmod +x codeformat.sh
           ./codeformat.sh
         shell: bash

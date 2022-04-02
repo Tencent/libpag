@@ -41,11 +41,11 @@ jobs:
             /usr/local/bin/emscons
             /usr/local/Cellar/yasm
             /usr/local/bin/yasm
-            /usr/local/Cellar/depsync
             /usr/local/bin/depsync
+            /usr/local/lib/node_modules/depsync
             /usr/local/Cellar/gcovr
             /usr/local/bin/gcovr
-          key: libpag-environment-autotest-20220331
+          key: libpag-environment-autotest-20220402
           restore-keys: |
             libpag-environment-
       - uses: actions/checkout@v3
