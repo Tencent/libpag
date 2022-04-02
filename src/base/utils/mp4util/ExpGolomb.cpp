@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ExpGolomb.h"
+
 namespace pag {
 ExpGolomb::ExpGolomb(ByteData* data) : data(data) {
-  index = 0;
   bitLength = data ? data->length() * 8 : 0;
 }
 
@@ -46,13 +46,12 @@ bool ExpGolomb::skipBytes(int size) {
 }
 
 uint8_t ExpGolomb::readBits(int size, bool moveIndex) {
-  auto result = getBits(size, index, moveIndex);
-  return result;
+  return getBits(size, index, moveIndex);
 }
 
 int ExpGolomb::skipLZ() {
   int leadingZeroCount = 0;
-  for (leadingZeroCount = 0; leadingZeroCount < bitsAvailable(); ++leadingZeroCount) {
+  for (; leadingZeroCount < bitsAvailable(); ++leadingZeroCount) {
     if (getBits(1, index + leadingZeroCount, false) != 0) {
       index += leadingZeroCount;
       return leadingZeroCount;
@@ -62,8 +61,7 @@ int ExpGolomb::skipLZ() {
 }
 
 uint8_t ExpGolomb::readUEG() {
-  auto prefix = skipLZ();
-  return readBits(prefix + 1) - 1;
+  return readBits(skipLZ() + 1) - 1;
 }
 
 uint8_t ExpGolomb::readBoolean() {

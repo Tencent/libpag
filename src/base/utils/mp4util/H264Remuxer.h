@@ -50,39 +50,36 @@ class Mp4Sample {
 
 class Mp4Track {
  public:
-  Mp4Track();
-  ~Mp4Track();
+  Mp4Track() = default;
 
-  int id;
-  std::string type;
-  int len;
+  int id = 0;
+  std::string type = "video";
+  int len = 0;
   std::vector<ByteData*> sps;
   std::vector<ByteData*> pps;
-  int width;
-  int height;
-  int timescale;
-  int32_t duration;
+  int width = 0;
+  int height = 0;
+  int timescale = 0;
+  int32_t duration = 0;
   std::vector<std::shared_ptr<Mp4Sample>> samples;
   std::vector<int32_t> pts;
-  std::string codec;
-  float fps;
-  int32_t implicitOffset;
+  std::string codec = "";
+  float fps = 0.0f;
+  int32_t implicitOffset = 0;
 };
-
-extern int trackId;
 
 class H264Remuxer {
  public:
-  H264Remuxer();
-  ~H264Remuxer();
-  static int GetTrackID();
+  H264Remuxer() = default;
   static std::unique_ptr<H264Remuxer> Remux(VideoSequence& videoSequence);
+  int getTrackID();
+  int getPayLoadSize();
   std::unique_ptr<ByteData> convertMp4();
   void writeMp4BoxesInSequence(VideoSequence& sequence);
-  int getPayLoadSize();
 
   Mp4Track mp4Track;
-  VideoSequence *videoSequence;
+  VideoSequence *videoSequence = nullptr;
+  int trackId = 0;
 
  private:
   static int32_t GetImplicitOffset(std::vector<VideoFrame*>& frames);

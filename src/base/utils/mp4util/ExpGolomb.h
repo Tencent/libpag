@@ -43,8 +43,8 @@ class ExpGolomb {
 
   int getBits(int size, int offsetBits, bool moveIndex = true);
 
-  ByteData* data;
-  int index;
-  int bitLength;
+  ByteData* data = nullptr;
+  int index = 0;
+  int bitLength = 0;
 };
 }  // namespace pag

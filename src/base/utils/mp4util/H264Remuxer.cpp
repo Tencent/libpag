@@ -21,30 +21,10 @@
 
 namespace pag {
 
-int trackId = 0;
-
-Mp4Track::Mp4Track() {
-  id = H264Remuxer::GetTrackID();
-  type = "video";
-  len = 0;
-  width = 0;
-  height = 0;
-  timescale = 0;
-  duration = 0;
-  codec = "";
-  fps = 0;
-  implicitOffset = 0;
-}
-
-Mp4Track::~Mp4Track() {}
-
-H264Remuxer::H264Remuxer() {}
-
-H264Remuxer::~H264Remuxer() { videoSequence = nullptr; }
-
 std::unique_ptr<H264Remuxer> H264Remuxer::Remux(VideoSequence& videoSequence) {
   std::unique_ptr<H264Remuxer> remuxer = std::unique_ptr<H264Remuxer>(new H264Remuxer());
   remuxer->videoSequence = &videoSequence;
+  remuxer->mp4Track.id = remuxer->getTrackID();
   remuxer->mp4Track.timescale = BASE_MEDIA_TIME_SCALE;
   remuxer->mp4Track.duration =
       std::floor((videoSequence.frames.size() / videoSequence.frameRate) * BASE_MEDIA_TIME_SCALE);
@@ -151,7 +131,7 @@ void H264Remuxer::writeMp4BoxesInSequence(VideoSequence& sequence) {
 
 int H264Remuxer::getPayLoadSize() { return mp4Track.len; }
 
-int H264Remuxer::GetTrackID() {
+int H264Remuxer::getTrackID() {
   trackId++;
   return trackId;
 }

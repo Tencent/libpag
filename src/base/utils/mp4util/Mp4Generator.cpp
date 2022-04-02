@@ -23,8 +23,6 @@ namespace pag {
 const std::string Mp4Generator::VIDEO = "video";
 const std::string Mp4Generator::AUDIO = "audio";
 
-BoxParam::~BoxParam() { videoSequence = nullptr; }
-
 void BoxParam::copy(const BoxParam &boxParam) {
   track = boxParam.track;
   tracks = boxParam.tracks;

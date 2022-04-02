@@ -15,6 +15,7 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+
 #pragma once
 #include <chrono>
 #include <map>
@@ -26,17 +27,16 @@ class Mp4Track;
 class BoxParam {
  public:
   BoxParam() = default;
-  ~BoxParam();
   void copy(const BoxParam& boxParam);
 
   int offset = 0;
-  int timescale;
-  int32_t duration;
-  int sequenceNumber;
-  int nalusBytesLen;
-  int32_t baseMediaDecodeTime;
-  Mp4Track *track;
-  VideoSequence *videoSequence;
+  int timescale = 0;
+  int32_t duration = 0;
+  int sequenceNumber = 0;
+  int nalusBytesLen = 0;
+  int32_t baseMediaDecodeTime = 0;
+  Mp4Track *track = nullptr;
+  VideoSequence *videoSequence = nullptr;
   std::vector<Mp4Track *> tracks;
 };
 

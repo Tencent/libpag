@@ -25,32 +25,34 @@
 namespace pag {
 
 std::unique_ptr<ByteData> Mp4BoxHelper::CovertToMp4(VideoSequence* videoSequence) {
-  int64_t nowTime = 0;
+  tgfx::Clock clock;
   if (!videoSequence->mp4Header) {
-    nowTime = Utils::Utils::getCurrentTimeMicrosecond();
+    clock.mark("CreateMp4");
     std::unique_ptr<ByteData> mp4Data = CreateMp4(*videoSequence);
-    LOGI("CovertToMp4 without exist mp4 header, costTime:%lld", (Utils::Utils::getCurrentTimeMicrosecond() - nowTime));
+    LOGI("CovertToMp4 without exist mp4 header, costTime:%lld", clock.measure("", "CreateMp4"));
     return mp4Data;
   }
 
-  nowTime = Utils::getCurrentTimeMicrosecond();
+  clock.mark("ConcatMp4");
   std::unique_ptr<ByteData> mp4Data = ConcatMp4(*videoSequence);
-  LOGI("CovertToMp4 with exist mp4 header, costTime:%lld", (Utils::getCurrentTimeMicrosecond() - nowTime));
+  LOGI("CovertToMp4 with exist mp4 header, costTime:%lld", clock.measure("", "ConcatMp4"));
   return mp4Data;
 }
 
 void Mp4BoxHelper::WriteMp4Header(VideoSequence* videoSequence) {
-  int64_t nowTime = Utils::getCurrentTimeMicrosecond();
+  tgfx::Clock clock;
+  clock.mark("WriteMp4Header");
   auto remuxer = H264Remuxer::Remux(*videoSequence);
   remuxer->writeMp4BoxesInSequence(*videoSequence);
-  LOGI("write mp4 header, costTime:%lld", (Utils::getCurrentTimeMicrosecond() - nowTime));
+  LOGI("write mp4 header, costTime:%lld", clock.measure("", "WriteMp4Header"));
 }
 
 std::unique_ptr<ByteData> Mp4BoxHelper::CreateMp4(VideoSequence& videoSequence) {
-  int64_t nowTime = Utils::getCurrentTimeMicrosecond();
+  tgfx::Clock clock;
+  clock.mark("CreateMp4");
   auto remuxer = H264Remuxer::Remux(videoSequence);
   std::unique_ptr<ByteData> mp4Data = remuxer->convertMp4();
-  LOGI("convertMp4, costTime:%lld", (Utils::getCurrentTimeMicrosecond() - nowTime));
+  LOGI("convertMp4, costTime:%lld", clock.measure("", "CreateMp4"));
   return mp4Data;
 }
 

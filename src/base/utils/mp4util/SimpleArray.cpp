@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SimpleArray.h"
+
 namespace pag {
 SimpleArray::SimpleArray(uint32_t capacity) {
   this->capacity = capacity;

@@ -17,20 +17,19 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <sstream>
 #include "ExpGolomb.h"
 #include "SimpleArray.h"
-#include "pag/file.h"
 #include "base/utils/Log.h"
+#include "pag/file.h"
 
 namespace pag {
 class SpsData {
  public:
   SpsData() = default;
   ByteData* sps = nullptr;
-  std::string codec;
-  int width;
-  int height;
+  std::string codec = "";
+  int width = 0;
+  int height = 0;
 };
 
 class H264Parser {
