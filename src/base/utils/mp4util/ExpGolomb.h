@@ -17,12 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+
 #include "pag/types.h"
 
 namespace pag {
 class ExpGolomb {
  public:
-  ExpGolomb(ByteData* data);
+  explicit ExpGolomb(ByteData* data);
   int bitsAvailable();
   bool skipBits(int size);
   bool skipBytes(int size);
@@ -36,15 +37,14 @@ class ExpGolomb {
 
  private:
   /**
-   * skip zero bits
-   * @return count of skip step
+   * Skips zero bits.
    */
   int skipLZ();
 
   int getBits(int size, int offsetBits, bool moveIndex = true);
 
   ByteData* data = nullptr;
-  int index = 0;
+  int position = 0;
   int bitLength = 0;
 };
 }  // namespace pag

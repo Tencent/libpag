@@ -17,8 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+
 #include <math.h>
 #include <algorithm>
+#include <memory>
+#include <string>
+#include <vector>
 #include "H264Parser.h"
 #include "Mp4Generator.h"
 #include "SimpleArray.h"
@@ -63,7 +67,7 @@ class Mp4Track {
   int32_t duration = 0;
   std::vector<std::shared_ptr<Mp4Sample>> samples;
   std::vector<int32_t> pts;
-  std::string codec = "";
+  std::string codec;
   float fps = 0.0f;
   int32_t implicitOffset = 0;
 };
@@ -71,17 +75,17 @@ class Mp4Track {
 class H264Remuxer {
  public:
   H264Remuxer() = default;
-  static std::unique_ptr<H264Remuxer> Remux(VideoSequence& videoSequence);
+  static std::unique_ptr<H264Remuxer> Remux(VideoSequence* videoSequence);
   int getTrackID();
-  int getPayLoadSize();
+  int getPayLoadSize() const;
   std::unique_ptr<ByteData> convertMp4();
-  void writeMp4BoxesInSequence(VideoSequence& sequence);
+  void writeMp4BoxesInSequence(VideoSequence* sequence);
 
   Mp4Track mp4Track;
-  VideoSequence *videoSequence = nullptr;
+  VideoSequence* videoSequence = nullptr;
   int trackId = 0;
 
  private:
-  static int32_t GetImplicitOffset(std::vector<VideoFrame*>& frames);
+  static int64_t GetImplicitOffset(std::vector<VideoFrame*>& frames);
 };
 }  // namespace pag

@@ -17,6 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+
+#include <string>
+#include <utility>
 #include "ExpGolomb.h"
 #include "SimpleArray.h"
 #include "base/utils/Log.h"
@@ -27,7 +30,7 @@ class SpsData {
  public:
   SpsData() = default;
   ByteData* sps = nullptr;
-  std::string codec = "";
+  std::string codec;
   int width = 0;
   int height = 0;
 };
@@ -38,6 +41,6 @@ class H264Parser {
 
  private:
   static std::pair<int, int> ReadSPS(ByteData* spsBytes);
-  static void SkipScalingList(ExpGolomb& decoder, int count);
+  static void SkipScalingList(ExpGolomb decoder, int count);
 };
 }  // namespace pag

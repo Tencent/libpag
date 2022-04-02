@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+
 #include "SimpleArray.h"
 #include "pag/file.h"
 
@@ -34,8 +35,8 @@ class Mp4BoxHelper {
   static void WriteMp4Header(VideoSequence* videoSequence);
 
  private:
-  static std::unique_ptr<ByteData> CreateMp4(VideoSequence& videoSequence);
-  static std::unique_ptr<ByteData> ConcatMp4(VideoSequence& videoSequence);
-  static void WriteMdatBox(VideoSequence& sequence, SimpleArray& payload, int mdatSize);
+  static std::unique_ptr<ByteData> CreateMp4(VideoSequence* videoSequence);
+  static std::unique_ptr<ByteData> ConcatMp4(VideoSequence* videoSequence);
+  static void WriteMdatBox(VideoSequence* videoSequence, SimpleArray* payload, int mdatSize);
 };
 }  // namespace pag

@@ -20,7 +20,6 @@
 #include "codec/utils/DecodeStream.h"
 
 namespace pag {
-
 SpsData H264Parser::ParseSPS(ByteData* sysBytes) {
   DecodeStream byteArray(nullptr, sysBytes->data(), sysBytes->length());
   byteArray.skip(4);
@@ -30,7 +29,7 @@ SpsData H264Parser::ParseSPS(ByteData* sysBytes) {
   std::string codec = "avc1.";
   for (int i = 0; i < 3; ++i) {
     uint8_t num = byteArray.readUint8();
-    std::string out = "";
+    std::string out;
     out.push_back(numberStr[(num >> 4) & 0xF]);
     out.push_back(numberStr[num & 0xF]);
 
@@ -49,7 +48,7 @@ SpsData H264Parser::ParseSPS(ByteData* sysBytes) {
   return spsData;
 }
 
-void H264Parser::SkipScalingList(ExpGolomb& decoder, int count) {
+void H264Parser::SkipScalingList(ExpGolomb decoder, int count) {
   int lastScale = 8;
   int nextScale = 8;
   int deltaScale;
@@ -78,7 +77,7 @@ std::pair<int, int> H264Parser::ReadSPS(ByteData* spsBytes) {
   uint8_t profileIdc = decoder.readUByte();  // profile_idc
   decoder.skipBits(6);                       // constraint_set[0-5]_flag, u(6)
   decoder.skipBits(2);                       // reserved_zero_3bits u(2),
-  decoder.skipBytes(1);                       // level_idc u(8)
+  decoder.skipBytes(1);                      // level_idc u(8)
   decoder.readUE();                          // seq_parameter_set_id
 
   std::vector<int> profileIdcMap = {100, 110, 122, 244, 44, 83, 86, 118, 128};
@@ -203,7 +202,7 @@ std::pair<int, int> H264Parser::ReadSPS(ByteData* spsBytes) {
     }
   }
   int width = std::ceil(
-      ((picWidthInMbsMinus1 + 1) * 16 - frameCropLeftOffset * 2 - frameCropRightOffset * 2) *
+      (float)((picWidthInMbsMinus1 + 1) * 16 - frameCropLeftOffset * 2 - frameCropRightOffset * 2) *
       sarScale);
   int height = (2 - frameMbsOnlyFlag) * (picHeightInMapUnitsMinus1 + 1) * 16 -
                (frameMbsOnlyFlag ? 2 : 4) * (frameCropTopOffset + frameCropBottomOffset);
