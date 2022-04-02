@@ -19,7 +19,7 @@
 #include "TGFXCast.h"
 
 namespace pag {
-static constexpr std::pair<Enum, tgfx::BlendMode> kBlendModeMap[] = {
+static constexpr std::pair<Enum, tgfx::BlendMode> BlendModeMap[] = {
     {BlendMode::Normal, tgfx::BlendMode::SrcOver},
     {BlendMode::Multiply, tgfx::BlendMode::Multiply},
     {BlendMode::Screen, tgfx::BlendMode::Screen},
@@ -39,7 +39,7 @@ static constexpr std::pair<Enum, tgfx::BlendMode> kBlendModeMap[] = {
     {BlendMode::Add, tgfx::BlendMode::Plus}};
 
 tgfx::BlendMode ToTGFXBlend(Enum blendMode) {
-  for (const auto& pair : kBlendModeMap) {
+  for (const auto& pair : BlendModeMap) {
     if (pair.first == blendMode) {
       return pair.second;
     }

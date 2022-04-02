@@ -94,7 +94,7 @@ static void ApplyClipToBounds(const tgfx::Path& clipPath, tgfx::Rect* bounds) {
   *bounds = boundsPath.getBounds();
 }
 
-static bool boundsIsEmpty(tgfx::Rect* bounds) {
+static bool BoundsIsEmpty(tgfx::Rect* bounds) {
   return bounds && bounds->isEmpty();
 }
 
@@ -103,7 +103,7 @@ void LayerRenderer::MeasureLayerBounds(tgfx::Rect* bounds, Layer* layer, Frame l
                                        tgfx::Rect* trackMatteBounds, Content* layerContent,
                                        Transform* extraTransform) {
   bounds->setEmpty();
-  if (TransformIllegal(extraTransform) || boundsIsEmpty(trackMatteBounds)) {
+  if (TransformIllegal(extraTransform) || BoundsIsEmpty(trackMatteBounds)) {
     return;
   }
   auto contentFrame = layerFrame - layer->startTime;
