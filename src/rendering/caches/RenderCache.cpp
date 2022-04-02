@@ -32,7 +32,6 @@ namespace pag {
 #define PURGEABLE_EXPIRED_FRAME 10
 #define SCALE_FACTOR_PRECISION 0.001f
 #define DECODING_VISIBLE_DISTANCE 500000  // 提前 500ms 秒开始解码。
-#define MIN_HARDWARE_PREPARE_TIME 100000  // 距离当前时刻小于100ms的视频启动软解转硬解优化。
 
 class ImageTask : public Executor {
  public:

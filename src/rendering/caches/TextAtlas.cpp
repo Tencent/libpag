@@ -46,11 +46,11 @@ class Atlas {
   friend class TextAtlas;
 };
 
-static constexpr int kDefaultPadding = 3;
+static constexpr int DefaultPadding = 3;
 
 class RectanglePack {
  public:
-  explicit RectanglePack(int padding = kDefaultPadding) : padding(padding) {
+  explicit RectanglePack(int padding = DefaultPadding) : padding(padding) {
     reset();
   }
 
@@ -96,7 +96,7 @@ class RectanglePack {
   }
 
  private:
-  int padding = kDefaultPadding;
+  int padding = DefaultPadding;
   int _width = 0;
   int _height = 0;
   int x = 0;
@@ -161,7 +161,7 @@ static std::vector<Page> CreatePages(const std::vector<GlyphHandle>& glyphs, flo
   std::vector<tgfx::BytesKey> styleKeys = {};
   std::vector<AtlasTextRun> textRuns = {};
   auto maxPageSize = static_cast<int>(std::floor(static_cast<float>(maxTextureSize) / scale));
-  int padding = static_cast<int>(ceil(static_cast<float>(kDefaultPadding) / scale));
+  int padding = static_cast<int>(ceil(static_cast<float>(DefaultPadding) / scale));
   RectanglePack pack(padding);
   Page page;
   for (auto& glyph : glyphs) {
@@ -302,7 +302,7 @@ bool Atlas::getLocator(const tgfx::BytesKey& bytesKey, AtlasLocator* locator) co
   return true;
 }
 
-static constexpr float kMaxAtlasFontSize = 256.f;
+static constexpr float MaxAtlasFontSize = 256.f;
 
 std::unique_ptr<TextAtlas> TextAtlas::Make(const TextGlyphs* textGlyphs, RenderCache* renderCache,
                                            float scale) {
@@ -310,11 +310,11 @@ std::unique_ptr<TextAtlas> TextAtlas::Make(const TextGlyphs* textGlyphs, RenderC
   auto maxTextureSize = context->caps()->maxTextureSize;
   auto maxScale = scale * textGlyphs->maxScale();
   const auto& maskGlyphs = textGlyphs->maskAtlasGlyphs();
-  if (maskGlyphs.empty() || maskGlyphs[0]->getFont().getSize() * maxScale > kMaxAtlasFontSize) {
+  if (maskGlyphs.empty() || maskGlyphs[0]->getFont().getSize() * maxScale > MaxAtlasFontSize) {
     return nullptr;
   }
   const auto& colorGlyphs = textGlyphs->colorAtlasGlyphs();
-  if (!colorGlyphs.empty() && colorGlyphs[0]->getFont().getSize() * maxScale > kMaxAtlasFontSize) {
+  if (!colorGlyphs.empty() && colorGlyphs[0]->getFont().getSize() * maxScale > MaxAtlasFontSize) {
     return nullptr;
   }
   auto maskAtlas = Atlas::Make(context, maxScale, maskGlyphs, maxTextureSize).release();
