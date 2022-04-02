@@ -31,32 +31,19 @@ jobs:
           key: third_party-win-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third_party-win-
 
-      - name: Get environment cache
-        id: cache-environment
-        uses: actions/cache@v2
-        with:
-          path: |
-            npm_cache
-          key: libpag-win-environment-20220402
-          restore-keys: libpag-win-environment
-      - name: Check cache-environment status
-        if: steps.cache-environment.outputs.cache-hit != 'true'
+      - name: Run depsync
         run: |
-          rm -rf npm_cache
-          mkdir npm_cache
-          cd npm_cache
-          npm install depsync
+          npm install depsync -g
+          depsync
         shell: bash
 
       - if: github.event_name == 'push'
         name: Build cache（push）
         run: |
-          npm_cache/node_modules/depsync/bin/depsync
           node build_vendor -p win
 
       - if: github.event_name == 'pull_request'
         name: Windows build
         run: |
-          npm_cache/node_modules/depsync/bin/depsync
           node ./vendor_tools/cmake-build pag -p win -a x64 -o ./win/paglib -v -i -DPAG_BUILD_SHARED=ON
         shell: bash
