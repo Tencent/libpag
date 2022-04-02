@@ -6,6 +6,11 @@ import { Log } from '../utils/log';
 import { ErrorCode } from '../utils/error-map';
 import { EmscriptenGL } from '../types';
 
+interface TimeRange {
+  start: number;
+  end: number;
+}
+
 const playVideoElement = (videoElement: HTMLVideoElement) => {
   if (IS_WECHAT && window.WeixinJSBridge) {
     window.WeixinJSBridge.invoke(
@@ -28,6 +33,7 @@ export class VideoReader {
   private readonly frameRate: number;
   private lastFlush: number;
   private hadPlay = false;
+  private staticTimeRanges: StaticTimeRanges;
 
   public constructor(
     width: number,
@@ -36,6 +42,7 @@ export class VideoReader {
     h264Headers: Uint8Array[],
     h264Frames: Uint8Array[],
     ptsList: number[],
+    staticTimeRanges: TimeRange[],
   ) {
     this.videoEl = document.createElement('video');
     this.videoEl.style.display = 'none';
@@ -47,6 +54,7 @@ export class VideoReader {
     const mp4 = convertMp4(h264Frames, h264Headers, width, height, this.frameRate, ptsList);
     const blob = new Blob([mp4], { type: 'video/mp4' });
     this.videoEl.src = URL.createObjectURL(blob);
+    this.staticTimeRanges = new StaticTimeRanges(staticTimeRanges);
   }
 
   public prepare(targetFrame: number) {
@@ -59,10 +67,9 @@ export class VideoReader {
         this.lastFlush = targetTime;
         if (currentTime === 0 && targetTime === 0) {
           if (this.hadPlay) {
-            // Video 初始化过
             resolve(true);
           } else {
-            // Video 首帧，等待初始化完成
+            // Wait for initialization to complete
             const canplayCallback = () => {
               if (this.videoEl === null) {
                 Log.errorByCode(ErrorCode.VideoElementNull);
@@ -83,41 +90,21 @@ export class VideoReader {
             playVideoElement(this.videoEl);
           }
         } else {
-          if (targetTime === currentTime) {
-            // 当前画面
+          if (Math.round(targetTime * this.frameRate) === Math.round(currentTime * this.frameRate)) {
+            // Current frame
             resolve(true);
+          } else if (this.staticTimeRanges.contains(targetFrame)) {
+            // Static frame
+            this.seek(resolve, targetTime, false);
           } else if (Math.abs(currentTime - targetTime) < (1 / this.frameRate) * VIDEO_DECODE_WAIT_FRAME) {
-            // 在可容忍的帧数偏差内
+            // Within tolerable frame rate deviation
             if (this.videoEl.paused) {
               playVideoElement(this.videoEl);
             }
             resolve(true);
           } else {
-            // 对其 Video 时间轴
-            let isCallback = false;
-            const timeupdateCallback = () => {
-              if (this.videoEl === null) {
-                Log.errorByCode(ErrorCode.VideoElementNull);
-              } else {
-                removeListener(this.videoEl, 'timeupdate', timeupdateCallback);
-                playVideoElement(this.videoEl);
-                isCallback = true;
-                resolve(true);
-              }
-            };
-            addListener(this.videoEl, 'timeupdate', timeupdateCallback);
-            this.videoEl.currentTime = targetTime;
-            // 超时未返回
-            setTimeout(() => {
-              if (!isCallback) {
-                if (this.videoEl === null) {
-                  Log.errorByCode(ErrorCode.VideoElementNull);
-                } else {
-                  removeListener(this.videoEl, 'timeupdate', timeupdateCallback);
-                  resolve(true);
-                }
-              }
-            }, (1000 / this.frameRate) * VIDEO_DECODE_WAIT_FRAME);
+            // Seek and play
+            this.seek(resolve, targetTime);
           }
         }
       }
@@ -147,5 +134,60 @@ export class VideoReader {
     if (currentTime - this.lastFlush >= (1 / this.frameRate) * VIDEO_DECODE_WAIT_FRAME && !this.videoEl.paused) {
       this.videoEl.pause();
     }
+  }
+
+  private seek(resolve: (value: unknown) => void, targetTime: number, play = true) {
+    let isCallback = false;
+    const timeupdateCallback = () => {
+      if (this.videoEl === null) {
+        Log.errorByCode(ErrorCode.VideoElementNull);
+      } else {
+        removeListener(this.videoEl, 'timeupdate', timeupdateCallback);
+        if (play && this.videoEl.paused) {
+          playVideoElement(this.videoEl);
+        } else if (!play && !this.videoEl.paused) {
+          this.videoEl.pause();
+        }
+        isCallback = true;
+        resolve(true);
+      }
+    };
+    if (this.videoEl === null) {
+      resolve(false);
+      Log.errorByCode(ErrorCode.VideoElementNull);
+      return;
+    }
+    addListener(this.videoEl, 'timeupdate', timeupdateCallback);
+    this.videoEl!.currentTime = targetTime;
+    // Timeout
+    setTimeout(() => {
+      if (!isCallback) {
+        if (this.videoEl === null) {
+          resolve(false);
+          Log.errorByCode(ErrorCode.VideoElementNull);
+        } else {
+          removeListener(this.videoEl, 'timeupdate', timeupdateCallback);
+          resolve(true);
+        }
+      }
+    }, (1000 / this.frameRate) * VIDEO_DECODE_WAIT_FRAME);
+  }
+}
+
+class StaticTimeRanges {
+  private timeRanges: TimeRange[];
+
+  public constructor(timeRanges: TimeRange[]) {
+    this.timeRanges = timeRanges;
+  }
+
+  public contains(targetFrame: number) {
+    if (this.timeRanges.length === 0) return false;
+    for (let timeRange of this.timeRanges) {
+      if (timeRange.start <= targetFrame && targetFrame < timeRange.end) {
+        return true;
+      }
+    }
+    return false;
   }
 }
