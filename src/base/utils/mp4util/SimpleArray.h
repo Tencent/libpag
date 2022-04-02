@@ -16,10 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#pragma once
+
 #include "codec/utils/ByteOrder.h"
 #include "pag/types.h"
 
-#pragma once
 namespace pag {
 
 class SimpleArray {

@@ -26,13 +26,13 @@ SpsData H264Parser::ParseSPS(ByteData* sysBytes) {
   byteArray.skip(4);
   byteArray.skip(1);
 
+  std::string numberStr = "0123456789ABCDEF";
   std::string codec = "avc1.";
   for (int i = 0; i < 3; ++i) {
-    uint8_t h = byteArray.readUint8();
-    std::string out;
-    std::stringstream ss;
-    ss << std::hex << h;
-    ss >> out;
+    uint8_t num = byteArray.readUint8();
+    std::string out = "";
+    out.push_back(numberStr[(num >> 4) & 0xF]);
+    out.push_back(numberStr[num & 0xF]);
 
     if (out.size() < 2) {
       out = "0" + out;

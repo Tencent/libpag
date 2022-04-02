@@ -20,11 +20,11 @@
 
 #include <stdint.h>
 #include "Utils.h"
+#include "tgfx/include/core/Clock.h"
 
 namespace pag {
 class Utils {
  public:
   static int64_t getCurrentTimeMillis();
-  static int64_t getCurrentTimeMicrosecond();
 };
 }  // namespace pag
