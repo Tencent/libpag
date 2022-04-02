@@ -100,4 +100,4 @@
 ### Bug Fixes
 
 - Fix decoding the next frame error in Web env.
-
+- Fix the frame align error when is in the static time range.
