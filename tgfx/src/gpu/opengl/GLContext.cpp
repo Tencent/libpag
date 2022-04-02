@@ -22,7 +22,7 @@
 
 namespace tgfx {
 GLContext::GLContext(Device* device, const GLInterface* glInterface)
-    : Context(device), interface(glInterface) {
+    : Context(device), glInterface(glInterface) {
 }
 
 void GLContext::resetState() {
@@ -59,8 +59,8 @@ void GLContext::bindTexture(int unitIndex, const TextureSampler* sampler) {
     return;
   }
   auto glSampler = static_cast<const GLSampler*>(sampler);
-  auto gl = interface->functions.get();
-  auto caps = interface->caps.get();
+  auto gl = glInterface->functions.get();
+  auto caps = glInterface->caps.get();
   gl->activeTexture(GL_TEXTURE0 + unitIndex);
   gl->bindTexture(glSampler->target, glSampler->id);
   gl->texParameteri(glSampler->target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
