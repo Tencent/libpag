@@ -33,6 +33,8 @@ VideoSequence::~VideoSequence() {
   for (auto header : headers) {
     delete header;
   }
+
+  delete mp4Header;
 }
 
 bool VideoSequence::verify() const {

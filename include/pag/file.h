@@ -2036,7 +2036,7 @@ class PAG_API VideoSequence : public Sequence {
 
   std::vector<TimeRange> staticTimeRanges;
 
-  ByteData* mp4Header;
+  ByteData* mp4Header = nullptr;
 
   Frame duration() const override {
     return static_cast<Frame>(frames.size());
@@ -2045,8 +2045,7 @@ class PAG_API VideoSequence : public Sequence {
   bool verify() const override;
 
   /**
-   * get mp4 data from current video sequence
-   * @return
+   * Get mp4 data from current video sequence
    */
   std::unique_ptr<ByteData> getMp4Data();
 
