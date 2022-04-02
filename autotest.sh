@@ -32,6 +32,7 @@ make_dir result
 make_dir build
 
 ./update_baseline.sh 1
+cp -r $WORKSPACE/test/baseline $WORKSPACE/result
 
 cd build
 
@@ -70,7 +71,6 @@ gcovr -r . -e='test/*.*' -e='vendor/*.*' --xml-pretty -o ./result/coverage.xml
 rm -rf build
 
 cp -r $WORKSPACE/test/out $WORKSPACE/result
-cp -r $WORKSPACE/test/baseline $WORKSPACE/result
 
 if [ "$COMPLIE_RESULT" == false ]; then
   exit 1
