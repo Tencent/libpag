@@ -17,46 +17,47 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "H264Remuxer.h"
-#include "Utils.h"
+#include <memory>
+#include "tgfx/include/core/Clock.h"
 
 namespace pag {
 
-std::unique_ptr<H264Remuxer> H264Remuxer::Remux(VideoSequence& videoSequence) {
-  std::unique_ptr<H264Remuxer> remuxer = std::unique_ptr<H264Remuxer>(new H264Remuxer());
-  remuxer->videoSequence = &videoSequence;
+std::unique_ptr<H264Remuxer> H264Remuxer::Remux(VideoSequence* videoSequence) {
+  std::unique_ptr<H264Remuxer> remuxer = std::make_unique<H264Remuxer>();
+  remuxer->videoSequence = videoSequence;
   remuxer->mp4Track.id = remuxer->getTrackID();
   remuxer->mp4Track.timescale = BASE_MEDIA_TIME_SCALE;
   remuxer->mp4Track.duration =
-      std::floor((videoSequence.frames.size() / videoSequence.frameRate) * BASE_MEDIA_TIME_SCALE);
-  remuxer->mp4Track.fps = videoSequence.frameRate;
-  remuxer->mp4Track.implicitOffset = GetImplicitOffset(videoSequence.frames);
-  if (videoSequence.headers.size() < 2) {
+      std::floor((videoSequence->frames.size() / videoSequence->frameRate) * BASE_MEDIA_TIME_SCALE);
+  remuxer->mp4Track.fps = videoSequence->frameRate;
+  remuxer->mp4Track.implicitOffset = GetImplicitOffset(videoSequence->frames);
+  if (videoSequence->headers.size() < 2) {
     LOGE("header data error in video sequence");
     return remuxer;
   }
 
-  auto spsBytes = videoSequence.headers.at(0);
+  auto spsBytes = videoSequence->headers.at(0);
   SpsData spsData = H264Parser::ParseSPS(spsBytes);
   remuxer->mp4Track.width = spsData.width;
   remuxer->mp4Track.height = spsData.height;
   remuxer->mp4Track.sps = {spsData.sps};
   remuxer->mp4Track.codec = spsData.codec;
-  auto ppsBytes = videoSequence.headers.at(1);
+  auto ppsBytes = videoSequence->headers.at(1);
   remuxer->mp4Track.pps = {ppsBytes};
 
-  if (videoSequence.frames.empty()) {
+  if (videoSequence->frames.empty()) {
     LOGE("no frame data in video sequence");
     return remuxer;
   }
 
   int headerLen = 0;
-  for (auto header : videoSequence.headers) {
+  for (auto header : videoSequence->headers) {
     headerLen += header->length();
   }
 
-  auto sampleDelta = std::floor(remuxer->mp4Track.duration / videoSequence.frames.size());
+  auto sampleDelta = std::floor(remuxer->mp4Track.duration / videoSequence->frames.size());
   int count = 0;
-  for (auto frame : videoSequence.frames) {
+  for (auto frame : videoSequence->frames) {
     int sampleSize = frame->fileBytes->length();
     if (count == 0) {
       sampleSize += headerLen;
@@ -105,7 +106,7 @@ std::unique_ptr<ByteData> H264Remuxer::convertMp4() {
   return stream.release();
 }
 
-void H264Remuxer::writeMp4BoxesInSequence(VideoSequence& sequence) {
+void H264Remuxer::writeMp4BoxesInSequence(VideoSequence* sequence) {
   int payLoadSize = getPayLoadSize();
   if (payLoadSize == 0) {
     return;
@@ -119,28 +120,30 @@ void H264Remuxer::writeMp4BoxesInSequence(VideoSequence& sequence) {
   boxParam.sequenceNumber = SEQUENCE_NUMBER;
   boxParam.baseMediaDecodeTime = BASE_MEDIA_DECODE_TIME;
 
-  SimpleArray stream(payLoadSize * 0.5);
+  SimpleArray stream(static_cast<uint32_t>(payLoadSize * 0.5));
   Mp4Generator::Clear();
   Mp4Generator::InitParam(boxParam);
   Mp4Generator::FTYP(&stream, true);
   Mp4Generator::MOOV(&stream, true);
   Mp4Generator::MOOF(&stream, true);
 
-  sequence.mp4Header = stream.release().release();
+  sequence->mp4Header = stream.release().release();
 }
 
-int H264Remuxer::getPayLoadSize() { return mp4Track.len; }
+int H264Remuxer::getPayLoadSize() const {
+  return mp4Track.len;
+}
 
 int H264Remuxer::getTrackID() {
   trackId++;
   return trackId;
 }
 
-int32_t H264Remuxer::GetImplicitOffset(std::vector<VideoFrame*>& frames) {
-  int index = 0;
-  int32_t maxOffset = 0;
+int64_t H264Remuxer::GetImplicitOffset(std::vector<VideoFrame*>& frames) {
+  int64_t index = 0;
+  int64_t maxOffset = 0;
   for (auto pts : frames) {
-    int offset = index - pts->frame;
+    int64_t offset = index - pts->frame;
     if (offset > maxOffset) {
       maxOffset = offset;
     }
@@ -148,4 +151,4 @@ int32_t H264Remuxer::GetImplicitOffset(std::vector<VideoFrame*>& frames) {
   }
   return maxOffset;
 }
-}
+}  // namespace pag

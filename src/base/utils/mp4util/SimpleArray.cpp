@@ -61,7 +61,7 @@ void SimpleArray::writeInt32(int32_t value) {
   positionChanged();
 }
 
-void SimpleArray::writeBytes(uint8_t *byteArray, uint32_t length, uint32_t offset) {
+void SimpleArray::writeBytes(uint8_t* byteArray, uint32_t length, uint32_t offset) {
   ensureCapacity(_position + length);
   memcpy(bytes + _position, byteArray + offset, length);
   _position += length;

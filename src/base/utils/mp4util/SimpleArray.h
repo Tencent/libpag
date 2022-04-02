@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <memory>
 #include "codec/utils/ByteOrder.h"
 #include "pag/types.h"
 

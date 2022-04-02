@@ -20,24 +20,24 @@
 
 namespace pag {
 ExpGolomb::ExpGolomb(ByteData* data) : data(data) {
-  bitLength = data ? data->length() * 8 : 0;
+  bitLength = data ? (int)data->length() * 8 : 0;
 }
 
 void ExpGolomb::reset(ByteData* byteData) {
   data = byteData;
-  index = 0;
-  bitLength = data ? data->length() * 8 : 0;
+  position = 0;
+  bitLength = data ? (int)data->length() * 8 : 0;
 }
 
 int ExpGolomb::bitsAvailable() {
-  return bitLength - index;
+  return bitLength - position;
 }
 
 bool ExpGolomb::skipBits(int size) {
   if (bitsAvailable() < size) {
     return false;
   }
-  index += size;
+  position += size;
   return true;
 }
 
@@ -46,14 +46,14 @@ bool ExpGolomb::skipBytes(int size) {
 }
 
 uint8_t ExpGolomb::readBits(int size, bool moveIndex) {
-  return getBits(size, index, moveIndex);
+  return getBits(size, position, moveIndex);
 }
 
 int ExpGolomb::skipLZ() {
   int leadingZeroCount = 0;
   for (; leadingZeroCount < bitsAvailable(); ++leadingZeroCount) {
-    if (getBits(1, index + leadingZeroCount, false) != 0) {
-      index += leadingZeroCount;
+    if (getBits(1, position + leadingZeroCount, false) != 0) {
+      position += leadingZeroCount;
       return leadingZeroCount;
     }
   }
@@ -102,12 +102,12 @@ int ExpGolomb::getBits(int size, int offsetBits, bool moveIndex) {
   auto bits = 8 - offsetInCurrentByte;
   if (bits >= size) {
     if (moveIndex) {
-      index += size;
+      position += size;
     }
     return byte >> (bits - size);
   }
   if (moveIndex) {
-    index += bits;
+    position += bits;
   }
   auto nextSize = size - bits;
   return (byte << nextSize) | getBits(nextSize, offsetBits + bits, moveIndex);
