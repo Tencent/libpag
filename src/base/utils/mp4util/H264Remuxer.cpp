@@ -44,8 +44,9 @@ std::unique_ptr<H264Remuxer> H264Remuxer::Remux(VideoSequence* videoSequence) {
   remuxer->mp4Track.implicitOffset = GetImplicitOffset(videoSequence->frames);
 
   SpsData spsData = H264Parser::ParseSps(videoSequence->headers.at(0));
-  remuxer->mp4Track.width = spsData.width;
-  remuxer->mp4Track.height = spsData.height;
+  auto videoSize = videoSequence->getVideoSize();
+  remuxer->mp4Track.width = videoSize.first;
+  remuxer->mp4Track.height = videoSize.second;
   remuxer->mp4Track.sps = {spsData.sps};
   remuxer->mp4Track.codec = spsData.codec;
   remuxer->mp4Track.pps = {videoSequence->headers.at(1)};
