@@ -98,6 +98,7 @@ int PAGSurface::height() {
 void PAGSurface::updateSize() {
   LockGuard autoLock(rootLocker);
   surface = nullptr;
+  drawable->freeCache();
   drawable->updateSize();
 }
 
@@ -112,6 +113,7 @@ void PAGSurface::freeCache() {
     context->purgeResourcesNotUsedIn(0);
     drawable->unlockContext();
   }
+  drawable->freeCache();
 }
 
 bool PAGSurface::clearAll() {

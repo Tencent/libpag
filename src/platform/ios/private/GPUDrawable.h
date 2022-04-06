@@ -19,7 +19,6 @@
 #pragma once
 
 #include "gpu/opengl/eagl/EAGLWindow.h"
-#include "pag/pag.h"
 #include "rendering/Drawable.h"
 
 namespace pag {
@@ -27,7 +26,7 @@ namespace pag {
 extern NSString* const kGPURenderTargetBufferPreparedNotification;
 extern NSString* const kPreparedAsync;
 
-class GPUDrawable : public BaseDrawable {
+class GPUDrawable : public Drawable {
  public:
   static std::shared_ptr<GPUDrawable> FromLayer(CAEAGLLayer* layer);
 

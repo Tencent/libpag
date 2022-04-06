@@ -24,7 +24,6 @@
 #include <QQuickItem>
 #include <QSGTexture>
 #pragma clang diagnostic pop
-#include "pag/pag.h"
 #include "rendering/Drawable.h"
 
 namespace tgfx {
@@ -32,7 +31,7 @@ class QGLWindow;
 }
 
 namespace pag {
-class GPUDrawable : public BaseDrawable {
+class GPUDrawable : public Drawable {
  public:
   static std::shared_ptr<GPUDrawable> MakeFrom(QQuickItem* quickItem,
                                                QOpenGLContext* sharedContext = nullptr);

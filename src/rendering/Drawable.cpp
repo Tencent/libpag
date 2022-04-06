@@ -22,16 +22,24 @@
 
 namespace pag {
 
-tgfx::Context* BaseDrawable::lockContext() {
-  auto device = getDevice();
-  if (device != nullptr) {
-    return device->lockContext();
+tgfx::Context* Drawable::lockContext() {
+  if (currentDevice == nullptr) {
+    currentDevice = getDevice();
   }
-  return nullptr;
+  if (currentDevice == nullptr) {
+    return nullptr;
+  }
+  return currentDevice->lockContext();
 }
 
-void BaseDrawable::unlockContext() {
-  getDevice()->unlock();
+void Drawable::unlockContext() {
+  if (currentDevice != nullptr) {
+    currentDevice->unlock();
+  }
+}
+
+void Drawable::freeCache() {
+  currentDevice = nullptr;
 }
 
 RenderTargetDrawable::RenderTargetDrawable(std::shared_ptr<tgfx::Device> device,

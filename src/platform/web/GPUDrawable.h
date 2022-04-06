@@ -19,11 +19,10 @@
 #pragma once
 
 #include "gpu/opengl/webgl/WebGLWindow.h"
-#include "pag/pag.h"
 #include "rendering/Drawable.h"
 
 namespace pag {
-class GPUDrawable : public BaseDrawable {
+class GPUDrawable : public Drawable {
  public:
   static std::shared_ptr<GPUDrawable> FromCanvasID(const std::string& canvasID);
 

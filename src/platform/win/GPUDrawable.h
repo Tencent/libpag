@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "pag/pag.h"
 #include "rendering/Drawable.h"
 
 namespace tgfx {
@@ -26,7 +25,7 @@ class EGLWindow;
 }
 
 namespace pag {
-class GPUDrawable : public BaseDrawable {
+class GPUDrawable : public Drawable {
  public:
   static std::shared_ptr<GPUDrawable> FromWindow(void* nativeWindow, void* sharedContext = nullptr);
 

@@ -19,11 +19,10 @@
 #pragma once
 
 #include "gpu/opengl/cgl/CGLWindow.h"
-#include "pag/pag.h"
 #include "rendering/Drawable.h"
 
 namespace pag {
-class GPUDrawable : public BaseDrawable {
+class GPUDrawable : public Drawable {
  public:
   static std::shared_ptr<GPUDrawable> FromView(NSView* view);
 

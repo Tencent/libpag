@@ -21,11 +21,10 @@
 #include <android/native_window.h>
 #include <android/native_window_jni.h>
 #include "gpu/opengl/egl/EGLWindow.h"
-#include "pag/pag.h"
 #include "rendering/Drawable.h"
 
 namespace pag {
-class GPUDrawable : public BaseDrawable {
+class GPUDrawable : public Drawable {
  public:
   static std::shared_ptr<GPUDrawable> FromWindow(ANativeWindow* nativeWindow,
                                                  EGLContext sharedContext = EGL_NO_CONTEXT);

@@ -19,24 +19,41 @@
 #pragma once
 
 #include "gpu/Surface.h"
-#include "pag/pag.h"
+#include "pag/gpu.h"
 
 namespace pag {
 
-class BaseDrawable : public Drawable {
+class Drawable {
  public:
-  tgfx::Context* lockContext() override;
+  virtual ~Drawable() = default;
 
-  void unlockContext() override;
+  virtual int width() const = 0;
+
+  virtual int height() const = 0;
+
+  virtual void updateSize() = 0;
+
+  virtual std::shared_ptr<tgfx::Surface> createSurface(tgfx::Context* context) = 0;
+
+  virtual void present(tgfx::Context* context) = 0;
+
+  virtual void setTimeStamp(int64_t) {
+  }
+
+  virtual tgfx::Context* lockContext();
+
+  virtual void unlockContext();
+
+  virtual void freeCache();
 
  protected:
-  /**
-   * Returns the GPU device associated with this drawable.
-   */
   virtual std::shared_ptr<tgfx::Device> getDevice() = 0;
+
+ private:
+  std::shared_ptr<tgfx::Device> currentDevice;
 };
 
-class RenderTargetDrawable : public BaseDrawable {
+class RenderTargetDrawable : public Drawable {
  public:
   RenderTargetDrawable(std::shared_ptr<tgfx::Device> device,
                        const BackendRenderTarget& renderTarget, tgfx::ImageOrigin origin);
@@ -67,7 +84,7 @@ class RenderTargetDrawable : public BaseDrawable {
   tgfx::ImageOrigin origin = tgfx::ImageOrigin::TopLeft;
 };
 
-class TextureDrawable : public BaseDrawable {
+class TextureDrawable : public Drawable {
  public:
   TextureDrawable(std::shared_ptr<tgfx::Device> device, const BackendTexture& texture,
                   tgfx::ImageOrigin origin);
@@ -98,7 +115,7 @@ class TextureDrawable : public BaseDrawable {
   tgfx::ImageOrigin origin = tgfx::ImageOrigin::TopLeft;
 };
 
-class OffscreenDrawable : public BaseDrawable {
+class OffscreenDrawable : public Drawable {
  public:
   OffscreenDrawable(int width, int height, std::shared_ptr<tgfx::Device> device);
 
