@@ -1156,7 +1156,6 @@ class Drawable {
    */
   virtual void setTimeStamp(int64_t) {
   }
-
 };
 
 class GLRestorer;
