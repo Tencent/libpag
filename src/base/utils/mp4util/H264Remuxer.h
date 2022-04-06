@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include <math.h>
 #include <algorithm>
+#include <cmath>
 #include <memory>
 #include <string>
 #include <vector>
@@ -32,8 +32,7 @@
 #define BASE_MEDIA_TIME_SCALE 6000
 
 namespace pag {
-class Mp4Flags {
- public:
+struct Mp4Flags {
   int isLeading = 0;
   int isDependedOn = 0;
   int hasRedundancy = 0;
@@ -43,8 +42,7 @@ class Mp4Flags {
   bool isKeyFrame = false;
 };
 
-class Mp4Sample {
- public:
+struct Mp4Sample {
   int index = 0;
   int size = 0;
   int32_t duration = 0;
@@ -52,10 +50,7 @@ class Mp4Sample {
   Mp4Flags flags;
 };
 
-class Mp4Track {
- public:
-  Mp4Track() = default;
-
+struct Mp4Track {
   int id = 0;
   std::string type = "video";
   int len = 0;
@@ -74,18 +69,18 @@ class Mp4Track {
 
 class H264Remuxer {
  public:
-  H264Remuxer() = default;
   static std::unique_ptr<H264Remuxer> Remux(VideoSequence* videoSequence);
   int getTrackID();
-  int getPayLoadSize() const;
+  [[nodiscard]] int getPayLoadSize() const;
   std::unique_ptr<ByteData> convertMp4();
   void writeMp4BoxesInSequence(VideoSequence* sequence);
 
   Mp4Track mp4Track;
   VideoSequence* videoSequence = nullptr;
-  int trackId = 0;
 
  private:
-  static int64_t GetImplicitOffset(std::vector<VideoFrame*>& frames);
+  static Frame GetImplicitOffset(const std::vector<VideoFrame*>& frames);
+
+  int trackId = 0;
 };
 }  // namespace pag

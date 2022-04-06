@@ -19,8 +19,7 @@
 #include "SimpleArray.h"
 
 namespace pag {
-SimpleArray::SimpleArray(uint32_t capacity) {
-  this->capacity = capacity;
+SimpleArray::SimpleArray(uint32_t capacity) : capacity(capacity) {
   bytes = new uint8_t[capacity];
 }
 

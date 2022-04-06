@@ -17,29 +17,18 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "H264Remuxer.h"
-#include "tgfx/include/core/Clock.h"
+#include "core/Clock.h"
 
 namespace pag {
 static const char* VIDEO = "video";
 static const char* AUDIO = "audio";
 
-void BoxParam::copy(const BoxParam& boxParam) {
-  track = boxParam.track;
-  tracks = boxParam.tracks;
-  videoSequence = boxParam.videoSequence;
-  offset = boxParam.offset;
-  duration = boxParam.duration;
-  timescale = boxParam.timescale;
-  nalusBytesLen = boxParam.nalusBytesLen;
-  sequenceNumber = boxParam.sequenceNumber;
-  baseMediaDecodeTime = boxParam.baseMediaDecodeTime;
-}
-
-std::map<std::string, int> Mp4Generator::BoxSizeMap = std::map<std::string, int>();
+std::unordered_map<std::string, int> Mp4Generator::BoxSizeMap =
+    std::unordered_map<std::string, int>();
 BoxParam Mp4Generator::param = BoxParam();
 
 int Mp4Generator::WriteCharCode(SimpleArray* stream, std::string stringData, bool write) {
-  int size = (int)stringData.length();
+  int size = static_cast<int>(stringData.length());
   if (!write) {
     return size;
   }
@@ -54,12 +43,12 @@ int Mp4Generator::WriteH264Nalus(SimpleArray* stream, bool write) {
     return param.nalusBytesLen;
   }
   for (auto& header : param.videoSequence->headers) {
-    int32_t payloadSize = (int32_t)header->length() - 4;
+    int32_t payloadSize = static_cast<int32_t>(header->length()) - 4;
     stream->writeInt32(payloadSize);
     stream->writeBytes(header->data(), payloadSize, 4);
   }
   for (auto& frame : param.videoSequence->frames) {
-    int32_t payloadSize = (int32_t)frame->fileBytes->length() - 4;
+    int32_t payloadSize = static_cast<int32_t>(frame->fileBytes->length()) - 4;
     stream->writeInt32(payloadSize);
     stream->writeBytes(frame->fileBytes->data(), payloadSize, 4);
   }
@@ -70,7 +59,7 @@ int Mp4Generator::FTYP(SimpleArray* stream, bool write) {
   std::vector<WriteStreamFun> writeFun;
   writeFun.reserve(1);
   auto innerWriteFun = [](SimpleArray* stream, bool write) -> int {
-    LOGI("param->duration:%d", param.duration);
+    LOGI("param->duration: %d", param.duration);
     int len = 24;
     if (!write) {
       return len;
@@ -85,7 +74,7 @@ int Mp4Generator::FTYP(SimpleArray* stream, bool write) {
   };
   writeFun.emplace_back(innerWriteFun);
 
-  return Box(stream, "ftyp", writeFun, write);
+  return Box(stream, "ftyp", &writeFun, write);
 }
 
 int Mp4Generator::MOOV(SimpleArray* stream, bool write) {
@@ -98,7 +87,7 @@ int Mp4Generator::MOOV(SimpleArray* stream, bool write) {
   }
   writeFun.emplace_back(MVEX);
 
-  return Box(stream, "moov", writeFun, write);
+  return Box(stream, "moov", &writeFun, write);
 }
 
 int Mp4Generator::MOOF(SimpleArray* stream, bool write) {
@@ -107,7 +96,7 @@ int Mp4Generator::MOOF(SimpleArray* stream, bool write) {
   writeFun.emplace_back(MFHD);
   writeFun.emplace_back(TRAF);
 
-  return Box(stream, "moof", writeFun, write);
+  return Box(stream, "moof", &writeFun, write);
 }
 
 int Mp4Generator::MDAT(SimpleArray* stream, bool write) {
@@ -115,7 +104,7 @@ int Mp4Generator::MDAT(SimpleArray* stream, bool write) {
   writeFun.reserve(1);
   writeFun.emplace_back(WriteH264Nalus);
 
-  return Box(stream, "mdat", writeFun, write);
+  return Box(stream, "mdat", &writeFun, write);
 }
 
 int Mp4Generator::HDLR(SimpleArray* stream, bool write) {
@@ -153,7 +142,7 @@ int Mp4Generator::HDLR(SimpleArray* stream, bool write) {
     };
     writeFun.emplace_back(innerWriteFun);
   }
-  return Box(stream, "hdlr", writeFun, write);
+  return Box(stream, "hdlr", &writeFun, write);
 }
 
 int Mp4Generator::MDHD(SimpleArray* stream, bool write) {
@@ -175,7 +164,7 @@ int Mp4Generator::MDHD(SimpleArray* stream, bool write) {
   };
   writeFun.emplace_back(innerWriteFun);
 
-  return Box(stream, "mdhd", writeFun, write);
+  return Box(stream, "mdhd", &writeFun, write);
 }
 
 int Mp4Generator::MDIA(SimpleArray* stream, bool write) {
@@ -185,7 +174,7 @@ int Mp4Generator::MDIA(SimpleArray* stream, bool write) {
   writeFun.emplace_back(HDLR);
   writeFun.emplace_back(MINF);
 
-  return Box(stream, "mdia", writeFun, write);
+  return Box(stream, "mdia", &writeFun, write);
 }
 
 int Mp4Generator::MFHD(SimpleArray* stream, bool write) {
@@ -202,7 +191,7 @@ int Mp4Generator::MFHD(SimpleArray* stream, bool write) {
   };
   writeFun.emplace_back(innerWriteFun);
 
-  return Box(stream, "mfhd", writeFun, write);
+  return Box(stream, "mfhd", &writeFun, write);
 }
 
 int Mp4Generator::MINF(SimpleArray* stream, bool write) {
@@ -216,7 +205,7 @@ int Mp4Generator::MINF(SimpleArray* stream, bool write) {
   writeFun.emplace_back(DINF);
   writeFun.emplace_back(STBL);
 
-  return Box(stream, "minf", writeFun, write);
+  return Box(stream, "minf", &writeFun, write);
 }
 
 int Mp4Generator::SMHD(SimpleArray* stream, bool write) {
@@ -233,7 +222,7 @@ int Mp4Generator::SMHD(SimpleArray* stream, bool write) {
   };
   writeFun.emplace_back(innerWriteFun);
 
-  return Box(stream, "smhd", writeFun, write);
+  return Box(stream, "smhd", &writeFun, write);
 }
 
 int Mp4Generator::VMHD(SimpleArray* stream, bool write) {
@@ -251,7 +240,7 @@ int Mp4Generator::VMHD(SimpleArray* stream, bool write) {
   };
   writeFun.emplace_back(innerWriteFun);
 
-  return Box(stream, "vmhd", writeFun, write);
+  return Box(stream, "vmhd", &writeFun, write);
 }
 
 int Mp4Generator::MVEX(SimpleArray* stream, bool write) {
@@ -261,7 +250,7 @@ int Mp4Generator::MVEX(SimpleArray* stream, bool write) {
     param.track = mp4Track;
     writeFun.emplace_back(TREX);
   }
-  return Box(stream, "mvex", writeFun, write);
+  return Box(stream, "mvex", &writeFun, write);
 }
 
 int Mp4Generator::MVHD(SimpleArray* stream, bool write) {
@@ -304,7 +293,7 @@ int Mp4Generator::MVHD(SimpleArray* stream, bool write) {
   };
   writeFun.emplace_back(innerWriteFun);
 
-  return Box(stream, "mvhd", writeFun, write);
+  return Box(stream, "mvhd", &writeFun, write);
 }
 
 int Mp4Generator::SDTP(SimpleArray* stream, bool write) {
@@ -330,7 +319,7 @@ int Mp4Generator::SDTP(SimpleArray* stream, bool write) {
   };
   writeFun.emplace_back(innerWriteFun);
 
-  return Box(stream, "sdtp", writeFun, write);
+  return Box(stream, "sdtp", &writeFun, write);
 }
 
 int Mp4Generator::STBL(SimpleArray* stream, bool write) {
@@ -344,7 +333,7 @@ int Mp4Generator::STBL(SimpleArray* stream, bool write) {
   writeFun.emplace_back(STSZ);
   writeFun.emplace_back(STCO);
 
-  return Box(stream, "stbl", writeFun, write);
+  return Box(stream, "stbl", &writeFun, write);
 }
 
 int Mp4Generator::STSC(SimpleArray* stream, bool write) {
@@ -361,7 +350,7 @@ int Mp4Generator::STSC(SimpleArray* stream, bool write) {
   };
   writeFun.emplace_back(innerWrite);
 
-  return Box(stream, "stsc", writeFun, write);
+  return Box(stream, "stsc", &writeFun, write);
 }
 
 int Mp4Generator::STSZ(SimpleArray* stream, bool write) {
@@ -379,7 +368,7 @@ int Mp4Generator::STSZ(SimpleArray* stream, bool write) {
   };
   writeFun.emplace_back(innerWrite);
 
-  return Box(stream, "stsz", writeFun, write);
+  return Box(stream, "stsz", &writeFun, write);
 }
 
 int Mp4Generator::STCO(SimpleArray* stream, bool write) {
@@ -396,7 +385,7 @@ int Mp4Generator::STCO(SimpleArray* stream, bool write) {
   };
   writeFun.emplace_back(innerWrite);
 
-  return Box(stream, "stco", writeFun, write);
+  return Box(stream, "stco", &writeFun, write);
 }
 
 int Mp4Generator::AVC1(SimpleArray* stream, bool write) {
@@ -440,7 +429,7 @@ int Mp4Generator::AVC1(SimpleArray* stream, bool write) {
   writeFun.emplace_back(AVCC);
 
   // generate avc1 data
-  return Box(stream, "avc1", writeFun, write);
+  return Box(stream, "avc1", &writeFun, write);
 }
 
 int Mp4Generator::AVCC(SimpleArray* stream, bool write) {
@@ -489,7 +478,7 @@ int Mp4Generator::AVCC(SimpleArray* stream, bool write) {
   };
   writeFun.emplace_back(innerWrite);
 
-  return Box(stream, "avcC", writeFun, write);
+  return Box(stream, "avcC", &writeFun, write);
 }
 
 int Mp4Generator::STSD(SimpleArray* stream, bool write) {
@@ -507,7 +496,7 @@ int Mp4Generator::STSD(SimpleArray* stream, bool write) {
     };
     writeFun.emplace_back(innerWriteFun);
     writeFun.emplace_back(AVC1);
-    return Box(stream, "stsd", writeFun, write);
+    return Box(stream, "stsd", &writeFun, write);
   }
   return 0;
 }
@@ -560,7 +549,7 @@ int Mp4Generator::TKHD(SimpleArray* stream, bool write) {
   };
   writeFun.emplace_back(innerWrite);
 
-  return Box(stream, "tkhd", writeFun, write);
+  return Box(stream, "tkhd", &writeFun, write);
 }
 
 int Mp4Generator::TRAF(SimpleArray* stream, bool write) {
@@ -573,7 +562,7 @@ int Mp4Generator::TRAF(SimpleArray* stream, bool write) {
   writeFun.emplace_back(TRUN);
   writeFun.emplace_back(SDTP);
 
-  return Box(stream, "traf", writeFun, write);
+  return Box(stream, "traf", &writeFun, write);
 }
 
 int Mp4Generator::TFHD(SimpleArray* stream, bool write) {
@@ -592,7 +581,7 @@ int Mp4Generator::TFHD(SimpleArray* stream, bool write) {
   };
   writeFun.emplace_back(innerWriteFun);
 
-  return Box(stream, "tfhd", writeFun, write);
+  return Box(stream, "tfhd", &writeFun, write);
 }
 
 int Mp4Generator::TFDT(SimpleArray* stream, bool write) {
@@ -610,7 +599,7 @@ int Mp4Generator::TFDT(SimpleArray* stream, bool write) {
   };
   writeFun.emplace_back(innerWriteFun);
 
-  return Box(stream, "tfdt", writeFun, write);
+  return Box(stream, "tfdt", &writeFun, write);
 }
 
 int Mp4Generator::TRAK(SimpleArray* stream, bool write) {
@@ -620,7 +609,7 @@ int Mp4Generator::TRAK(SimpleArray* stream, bool write) {
   writeFun.emplace_back(EDTS);
   writeFun.emplace_back(MDIA);
 
-  return Box(stream, "trak", writeFun, write);
+  return Box(stream, "trak", &writeFun, write);
 }
 
 int Mp4Generator::EDTS(SimpleArray* stream, bool write) {
@@ -628,7 +617,7 @@ int Mp4Generator::EDTS(SimpleArray* stream, bool write) {
   writeFun.reserve(1);
   writeFun.emplace_back(ELST);
 
-  return Box(stream, "edts", writeFun, write);
+  return Box(stream, "edts", &writeFun, write);
 }
 
 int Mp4Generator::ELST(SimpleArray* stream, bool write) {
@@ -650,7 +639,7 @@ int Mp4Generator::ELST(SimpleArray* stream, bool write) {
   };
   writeFun.emplace_back(innerWriteFun);
 
-  return Box(stream, "elst", writeFun, write);
+  return Box(stream, "elst", &writeFun, write);
 }
 
 int Mp4Generator::TREX(SimpleArray* stream, bool write) {
@@ -673,7 +662,7 @@ int Mp4Generator::TREX(SimpleArray* stream, bool write) {
   };
   writeFun.emplace_back(innerWriteFun);
 
-  return Box(stream, "trex", writeFun, write);
+  return Box(stream, "trex", &writeFun, write);
 }
 
 int Mp4Generator::TRUN(SimpleArray* stream, bool write) {
@@ -709,7 +698,7 @@ int Mp4Generator::TRUN(SimpleArray* stream, bool write) {
   };
   writeFun.emplace_back(innerWriteFun);
 
-  return Box(stream, "trun", writeFun, write);
+  return Box(stream, "trun", &writeFun, write);
 }
 
 int Mp4Generator::STTS(SimpleArray* stream, bool write) {
@@ -731,7 +720,7 @@ int Mp4Generator::STTS(SimpleArray* stream, bool write) {
   };
   writeFun.emplace_back(innerWriteFun);
 
-  return Box(stream, "stts", writeFun, write);
+  return Box(stream, "stts", &writeFun, write);
 }
 
 int Mp4Generator::CTTS(SimpleArray* stream, bool write) {
@@ -757,7 +746,7 @@ int Mp4Generator::CTTS(SimpleArray* stream, bool write) {
   };
   writeFun.emplace_back(innerWriteFun);
 
-  return Box(stream, "ctts", writeFun, write);
+  return Box(stream, "ctts", &writeFun, write);
 }
 
 int Mp4Generator::STSS(SimpleArray* stream, bool write) {
@@ -784,17 +773,17 @@ int Mp4Generator::STSS(SimpleArray* stream, bool write) {
   };
   writeFun.emplace_back(innerWriteFun);
 
-  return Box(stream, "stss", writeFun, write);
+  return Box(stream, "stss", &writeFun, write);
 }
 
 int Mp4Generator::Box(SimpleArray* stream, std::string type,
-                      std::vector<WriteStreamFun>& boxFunctions, bool write) {
+                      std::vector<WriteStreamFun>* boxFunctions, bool write) {
   int size = 8;
   auto iter = BoxSizeMap.find(type);
   if (iter != BoxSizeMap.end()) {
     size = iter->second;
   } else {
-    for (WriteStreamFun& writeStreamFun : boxFunctions) {
+    for (WriteStreamFun& writeStreamFun : *boxFunctions) {
       size += writeStreamFun(stream, false);
     }
     BoxSizeMap[type] = size;
@@ -805,7 +794,7 @@ int Mp4Generator::Box(SimpleArray* stream, std::string type,
   stream->writeInt32(size);
   WriteCharCode(stream, type, true);
 
-  for (WriteStreamFun& writeStreamFun : boxFunctions) {
+  for (WriteStreamFun& writeStreamFun : *boxFunctions) {
     writeStreamFun(stream, true);
   }
   return size;
@@ -815,7 +804,7 @@ int Mp4Generator::DINF(SimpleArray* stream, bool write) {
   std::vector<WriteStreamFun> writeFun;
   writeFun.reserve(1);
   writeFun.emplace_back(DREF);
-  return Box(stream, "dinf", writeFun, write);
+  return Box(stream, "dinf", &writeFun, write);
 }
 
 int Mp4Generator::DREF(SimpleArray* stream, bool write) {
@@ -835,7 +824,7 @@ int Mp4Generator::DREF(SimpleArray* stream, bool write) {
   };
   writeFun.emplace_back(innerWriteFun);
 
-  return Box(stream, "dref", writeFun, write);
+  return Box(stream, "dref", &writeFun, write);
 }
 
 int32_t Mp4Generator::GetNowTime() {
@@ -847,6 +836,6 @@ void Mp4Generator::Clear() {
 }
 
 void Mp4Generator::InitParam(const BoxParam& boxParam) {
-  param.copy(boxParam);
+  param = boxParam;
 }
 }  // namespace pag

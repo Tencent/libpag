@@ -25,18 +25,18 @@ namespace pag {
 class Mp4BoxHelper {
  public:
   /**
-   * mux h264 data in VideoSequence and return mp4 data
+   * Muxs h264 data in VideoSequence and return mp4 data
    */
   static std::unique_ptr<ByteData> CovertToMp4(VideoSequence* videoSequence);
 
   /**
-   * create mp4 header box data, and write into VideoSequence mp4Header member
+   * Creates mp4 header box data, and write into VideoSequence mp4Header member
    */
   static void WriteMp4Header(VideoSequence* videoSequence);
 
  private:
   static std::unique_ptr<ByteData> CreateMp4(VideoSequence* videoSequence);
   static std::unique_ptr<ByteData> ConcatMp4(VideoSequence* videoSequence);
-  static void WriteMdatBox(VideoSequence* videoSequence, SimpleArray* payload, int mdatSize);
+  static void WriteMdatBox(VideoSequence* videoSequence, SimpleArray* payload, int32_t mdatSize);
 };
 }  // namespace pag
