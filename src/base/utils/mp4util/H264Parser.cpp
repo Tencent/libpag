@@ -48,13 +48,13 @@ SpsData H264Parser::ParseSPS(ByteData* sysBytes) {
   return spsData;
 }
 
-void H264Parser::SkipScalingList(ExpGolomb decoder, int count) {
+void H264Parser::SkipScalingList(ExpGolomb *decoder, int count) {
   int lastScale = 8;
   int nextScale = 8;
   int deltaScale;
   for (int j = 0; j < count; j++) {
     if (nextScale != 0) {
-      deltaScale = decoder.readEG();
+      deltaScale = decoder->readEG();
       nextScale = (lastScale + deltaScale + 256) % 256;
     }
     lastScale = nextScale == 0 ? lastScale : nextScale;
@@ -97,9 +97,9 @@ std::pair<int, int> H264Parser::ReadSPS(ByteData* spsBytes) {
         if (decoder.readBoolean()) {
           // seq_scaling_list_present_flag[ i ]
           if (i < 6) {
-            SkipScalingList(decoder, 16);
+            SkipScalingList(&decoder, 16);
           } else {
-            SkipScalingList(decoder, 64);
+            SkipScalingList(&decoder, 64);
           }
         }
       }
