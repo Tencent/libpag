@@ -19,7 +19,9 @@
 #pragma once
 
 #include <string>
+#include <unordered_map>
 #include <utility>
+#include <vector>
 #include "ExpGolomb.h"
 #include "SimpleArray.h"
 #include "base/utils/Log.h"
@@ -39,6 +41,7 @@ class H264Parser {
 
  private:
   static std::pair<int, int> ReadSps(ByteData* spsBytes);
-  static void SkipScalingList(ExpGolomb *decoder, int count);
+  static void SkipScalingList(ExpGolomb* decoder, int count);
+  static std::unordered_map<uint8_t, std::pair<uint8_t, uint8_t>> SarRatioMap;
 };
 }  // namespace pag

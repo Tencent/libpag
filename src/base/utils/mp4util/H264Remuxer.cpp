@@ -20,6 +20,9 @@
 #include <memory>
 
 namespace pag {
+const static int SEQUENCE_NUMBER = 1;
+const static int BASE_MEDIA_DECODE_TIME = 0;
+const static int BASE_MEDIA_TIME_SCALE = 6000;
 
 std::unique_ptr<H264Remuxer> H264Remuxer::Remux(VideoSequence* videoSequence) {
   if (videoSequence->headers.size() < 2) {
@@ -40,14 +43,12 @@ std::unique_ptr<H264Remuxer> H264Remuxer::Remux(VideoSequence* videoSequence) {
   remuxer->mp4Track.fps = videoSequence->frameRate;
   remuxer->mp4Track.implicitOffset = GetImplicitOffset(videoSequence->frames);
 
-  auto spsBytes = videoSequence->headers.at(0);
-  SpsData spsData = H264Parser::ParseSps(spsBytes);
+  SpsData spsData = H264Parser::ParseSps(videoSequence->headers.at(0));
   remuxer->mp4Track.width = spsData.width;
   remuxer->mp4Track.height = spsData.height;
   remuxer->mp4Track.sps = {spsData.sps};
   remuxer->mp4Track.codec = spsData.codec;
-  auto ppsBytes = videoSequence->headers.at(1);
-  remuxer->mp4Track.pps = {ppsBytes};
+  remuxer->mp4Track.pps = {videoSequence->headers.at(1)};
 
   int headerLen = 0;
   for (auto header : videoSequence->headers) {
@@ -56,7 +57,7 @@ std::unique_ptr<H264Remuxer> H264Remuxer::Remux(VideoSequence* videoSequence) {
 
   auto sampleDelta = std::floor(remuxer->mp4Track.duration / videoSequence->frames.size());
   int count = 0;
-  for (auto frame : videoSequence->frames) {
+  for (const auto* frame : videoSequence->frames) {
     int sampleSize = frame->fileBytes->length();
     if (count == 0) {
       sampleSize += headerLen;
@@ -141,7 +142,7 @@ int H264Remuxer::getTrackID() {
 Frame H264Remuxer::GetImplicitOffset(const std::vector<VideoFrame*>& frames) {
   Frame index = 0;
   Frame maxOffset = 0;
-  for (auto pts : frames) {
+  for (const auto* pts : frames) {
     Frame offset = index - pts->frame;
     if (offset > maxOffset) {
       maxOffset = offset;
