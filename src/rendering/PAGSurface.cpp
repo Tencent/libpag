@@ -98,7 +98,7 @@ int PAGSurface::height() {
 void PAGSurface::updateSize() {
   LockGuard autoLock(rootLocker);
   surface = nullptr;
-  drawable->freeCache();
+  drawable->freeDevice();
   drawable->updateSize();
 }
 
@@ -113,11 +113,14 @@ void PAGSurface::freeCache() {
     context->purgeResourcesNotUsedIn(0);
     drawable->unlockContext();
   }
-  drawable->freeCache();
+  drawable->freeDevice();
 }
 
 bool PAGSurface::clearAll() {
   LockGuard autoLock(rootLocker);
+  if (!drawable->prepareDevice()) {
+    return false;
+  }
   auto context = lockContext();
   if (!context) {
     return false;
@@ -155,6 +158,9 @@ bool PAGSurface::readPixels(ColorType colorType, AlphaType alphaType, void* dstP
 
 bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
                       BackendSemaphore* signalSemaphore, bool autoClear) {
+  if (!drawable->prepareDevice()) {
+    return false;
+  }
   auto context = lockContext();
   if (!context) {
     return false;
@@ -195,6 +201,9 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
 
 bool PAGSurface::wait(const BackendSemaphore& waitSemaphore) {
   if (!waitSemaphore.isInitialized()) {
+    return false;
+  }
+  if (!drawable->prepareDevice()) {
     return false;
   }
   auto context = lockContext();
@@ -241,7 +250,7 @@ tgfx::Context* PAGSurface::lockContext() {
 }
 
 void PAGSurface::unlockContext() {
-  if (contextAdopted) {
+  if (contextAdopted && glRestorer != nullptr) {
     delete glRestorer;
     glRestorer = nullptr;
   }

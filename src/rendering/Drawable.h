@@ -44,7 +44,9 @@ class Drawable {
 
   virtual void unlockContext();
 
-  virtual void freeCache();
+  virtual bool prepareDevice();
+
+  virtual void freeDevice();
 
  protected:
   virtual std::shared_ptr<tgfx::Device> getDevice() = 0;

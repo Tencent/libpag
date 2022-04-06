@@ -24,21 +24,26 @@ namespace pag {
 
 tgfx::Context* Drawable::lockContext() {
   if (currentDevice == nullptr) {
-    currentDevice = getDevice();
-  }
-  if (currentDevice == nullptr) {
     return nullptr;
   }
   return currentDevice->lockContext();
 }
 
 void Drawable::unlockContext() {
-  if (currentDevice != nullptr) {
-    currentDevice->unlock();
+  if (currentDevice == nullptr) {
+    return;
   }
+  currentDevice->unlock();
 }
 
-void Drawable::freeCache() {
+bool Drawable::prepareDevice() {
+  if (currentDevice == nullptr) {
+    currentDevice = getDevice();
+  }
+  return currentDevice != nullptr;
+}
+
+void Drawable::freeDevice() {
   currentDevice = nullptr;
 }
 
