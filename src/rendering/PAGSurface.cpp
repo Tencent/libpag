@@ -250,7 +250,7 @@ tgfx::Context* PAGSurface::lockContext() {
 }
 
 void PAGSurface::unlockContext() {
-  if (contextAdopted && glRestorer != nullptr) {
+  if (contextAdopted) {
     delete glRestorer;
     glRestorer = nullptr;
   }
