@@ -20,7 +20,7 @@
 #include "codec/utils/DecodeStream.h"
 
 namespace pag {
-SpsData H264Parser::ParseSPS(ByteData* sysBytes) {
+SpsData H264Parser::ParseSps(ByteData* sysBytes) {
   DecodeStream byteArray(nullptr, sysBytes->data(), sysBytes->length());
   byteArray.skip(4);
   byteArray.skip(1);
@@ -39,7 +39,7 @@ SpsData H264Parser::ParseSPS(ByteData* sysBytes) {
     codec += out;
   }
 
-  std::pair<int, int> size = ReadSPS(sysBytes);
+  std::pair<int, int> size = ReadSps(sysBytes);
   SpsData spsData;
   spsData.sps = sysBytes;
   spsData.codec = codec;
@@ -61,7 +61,7 @@ void H264Parser::SkipScalingList(ExpGolomb *decoder, int count) {
   }
 }
 
-std::pair<int, int> H264Parser::ReadSPS(ByteData* spsBytes) {
+std::pair<int, int> H264Parser::ReadSps(ByteData* spsBytes) {
   ExpGolomb decoder(spsBytes);
   decoder.skipBytes(4);
   uint8_t frameCropLeftOffset = 0;
@@ -197,13 +197,13 @@ std::pair<int, int> H264Parser::ReadSPS(ByteData* spsBytes) {
         }
       }
       if (!sarRatio.empty()) {
-        sarScale = (float)sarRatio[0] / (float)sarRatio[1];
+        sarScale = static_cast<float>(sarRatio[0]) / static_cast<float>(sarRatio[1]);
       }
     }
   }
-  int width = std::ceil(
-      (float)((picWidthInMbsMinus1 + 1) * 16 - frameCropLeftOffset * 2 - frameCropRightOffset * 2) *
-      sarScale);
+  int width = std::ceil(static_cast<float>((picWidthInMbsMinus1 + 1) * 16 -
+                                           frameCropLeftOffset * 2 - frameCropRightOffset * 2) *
+                        sarScale);
   int height = (2 - frameMbsOnlyFlag) * (picHeightInMapUnitsMinus1 + 1) * 16 -
                (frameMbsOnlyFlag ? 2 : 4) * (frameCropTopOffset + frameCropBottomOffset);
   return std::pair<int, int>(width, height);

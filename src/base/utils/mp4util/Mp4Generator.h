@@ -18,19 +18,15 @@
 
 #pragma once
 
-#include <chrono>
-#include <map>
+#include <string>
+#include <unordered_map>
 #include <vector>
 #include "SimpleArray.h"
 
 namespace pag {
-class Mp4Track;
+struct Mp4Track;
 
-class BoxParam {
- public:
-  BoxParam() = default;
-  void copy(const BoxParam& boxParam);
-
+struct BoxParam {
   int offset = 0;
   int timescale = 0;
   int32_t duration = 0;
@@ -87,11 +83,11 @@ class Mp4Generator {
  private:
   static int WriteCharCode(SimpleArray* stream, std::string stringData, bool write = false);
   static int WriteH264Nalus(SimpleArray* stream, bool write = false);
-  static int Box(SimpleArray* stream, std::string type, std::vector<WriteStreamFun>& boxFunctions,
+  static int Box(SimpleArray* stream, std::string type, std::vector<WriteStreamFun>* boxFunctions,
                  bool write = false);
   static int32_t GetNowTime();
 
-  static std::map<std::string, int> BoxSizeMap;
+  static std::unordered_map<std::string, int> BoxSizeMap;
   static BoxParam param;
 };
 }  // namespace pag

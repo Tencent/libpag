@@ -18,11 +18,19 @@
 
 #include "H264Remuxer.h"
 #include <memory>
-#include "tgfx/include/core/Clock.h"
 
 namespace pag {
 
 std::unique_ptr<H264Remuxer> H264Remuxer::Remux(VideoSequence* videoSequence) {
+  if (videoSequence->headers.size() < 2) {
+    LOGE("header data error in video sequence");
+    return nullptr;
+  }
+  if (videoSequence->frames.empty()) {
+    LOGE("no frame data in video sequence");
+    return nullptr;
+  }
+
   std::unique_ptr<H264Remuxer> remuxer = std::make_unique<H264Remuxer>();
   remuxer->videoSequence = videoSequence;
   remuxer->mp4Track.id = remuxer->getTrackID();
@@ -31,24 +39,15 @@ std::unique_ptr<H264Remuxer> H264Remuxer::Remux(VideoSequence* videoSequence) {
       std::floor((videoSequence->frames.size() / videoSequence->frameRate) * BASE_MEDIA_TIME_SCALE);
   remuxer->mp4Track.fps = videoSequence->frameRate;
   remuxer->mp4Track.implicitOffset = GetImplicitOffset(videoSequence->frames);
-  if (videoSequence->headers.size() < 2) {
-    LOGE("header data error in video sequence");
-    return remuxer;
-  }
 
   auto spsBytes = videoSequence->headers.at(0);
-  SpsData spsData = H264Parser::ParseSPS(spsBytes);
+  SpsData spsData = H264Parser::ParseSps(spsBytes);
   remuxer->mp4Track.width = spsData.width;
   remuxer->mp4Track.height = spsData.height;
   remuxer->mp4Track.sps = {spsData.sps};
   remuxer->mp4Track.codec = spsData.codec;
   auto ppsBytes = videoSequence->headers.at(1);
   remuxer->mp4Track.pps = {ppsBytes};
-
-  if (videoSequence->frames.empty()) {
-    LOGE("no frame data in video sequence");
-    return remuxer;
-  }
 
   int headerLen = 0;
   for (auto header : videoSequence->headers) {
@@ -95,7 +94,7 @@ std::unique_ptr<ByteData> H264Remuxer::convertMp4() {
   boxParam.nalusBytesLen = payLoadSize;
   boxParam.videoSequence = videoSequence;
 
-  SimpleArray stream(payLoadSize * 1.5);
+  SimpleArray stream(static_cast<uint32_t>(payLoadSize * 1.5));
   Mp4Generator::Clear();
   Mp4Generator::InitParam(boxParam);
   Mp4Generator::FTYP(&stream, true);
@@ -139,11 +138,11 @@ int H264Remuxer::getTrackID() {
   return trackId;
 }
 
-int64_t H264Remuxer::GetImplicitOffset(std::vector<VideoFrame*>& frames) {
-  int64_t index = 0;
-  int64_t maxOffset = 0;
+Frame H264Remuxer::GetImplicitOffset(const std::vector<VideoFrame*>& frames) {
+  Frame index = 0;
+  Frame maxOffset = 0;
   for (auto pts : frames) {
-    int64_t offset = index - pts->frame;
+    Frame offset = index - pts->frame;
     if (offset > maxOffset) {
       maxOffset = offset;
     }

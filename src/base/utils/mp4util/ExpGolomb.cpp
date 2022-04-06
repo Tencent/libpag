@@ -20,13 +20,13 @@
 
 namespace pag {
 ExpGolomb::ExpGolomb(ByteData* data) : data(data) {
-  bitLength = data ? (int)data->length() * 8 : 0;
+  bitLength = data ? static_cast<int>(data->length()) * 8 : 0;
 }
 
 void ExpGolomb::reset(ByteData* byteData) {
   data = byteData;
   position = 0;
-  bitLength = data ? (int)data->length() * 8 : 0;
+  bitLength = data ? static_cast<int>(data->length()) * 8 : 0;
 }
 
 int ExpGolomb::bitsAvailable() {

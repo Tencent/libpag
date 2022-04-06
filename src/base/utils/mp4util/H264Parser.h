@@ -26,9 +26,7 @@
 #include "pag/file.h"
 
 namespace pag {
-class SpsData {
- public:
-  SpsData() = default;
+struct SpsData {
   ByteData* sps = nullptr;
   std::string codec;
   int width = 0;
@@ -37,10 +35,10 @@ class SpsData {
 
 class H264Parser {
  public:
-  static SpsData ParseSPS(ByteData* sysBytes);
+  static SpsData ParseSps(ByteData* sysBytes);
 
  private:
-  static std::pair<int, int> ReadSPS(ByteData* spsBytes);
+  static std::pair<int, int> ReadSps(ByteData* spsBytes);
   static void SkipScalingList(ExpGolomb *decoder, int count);
 };
 }  // namespace pag
