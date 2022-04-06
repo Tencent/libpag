@@ -8,7 +8,12 @@ include(../vendor_tools/vendor.cmake)
 option(TGFX_USE_OPENGL "Allow use of OpenGL as GPU backend" ON)
 option(TGFX_USE_QT "Allow build with QT frameworks." OFF)
 option(TGFX_USE_SWIFTSHADER "Allow build with SwiftShader library" OFF)
-option(TGFX_USE_FREETYPE "Allow use of embedded freetype library" ON)
+
+if (APPLE OR WEB)
+    option(TGFX_USE_FREETYPE "Allow use of embedded freetype library" OFF)
+else ()
+    option(TGFX_USE_FREETYPE "Allow use of embedded freetype library" ON)
+endif ()
 
 if (IOS OR WEB)
     option(TGFX_USE_WEBP_DECODE "Enable embedded WEBP decoding support" ON)
