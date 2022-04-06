@@ -20,9 +20,10 @@
 
 #include "gpu/opengl/cgl/CGLWindow.h"
 #include "pag/pag.h"
+#include "rendering/Drawable.h"
 
 namespace pag {
-class GPUDrawable : public Drawable {
+class GPUDrawable : public BaseDrawable {
  public:
   static std::shared_ptr<GPUDrawable> FromView(NSView* view);
 

@@ -25,13 +25,14 @@
 #include <QSGTexture>
 #pragma clang diagnostic pop
 #include "pag/pag.h"
+#include "rendering/Drawable.h"
 
 namespace tgfx {
 class QGLWindow;
 }
 
 namespace pag {
-class GPUDrawable : public Drawable {
+class GPUDrawable : public BaseDrawable {
  public:
   static std::shared_ptr<GPUDrawable> MakeFrom(QQuickItem* quickItem,
                                                QOpenGLContext* sharedContext = nullptr);
@@ -46,8 +47,6 @@ class GPUDrawable : public Drawable {
 
   void updateSize() override;
 
-  std::shared_ptr<tgfx::Device> getDevice() override;
-
   std::shared_ptr<tgfx::Surface> createSurface(tgfx::Context* context) override;
 
   void present(tgfx::Context* context) override;
@@ -55,6 +54,9 @@ class GPUDrawable : public Drawable {
   void moveToThread(QThread* targetThread);
 
   QSGTexture* getTexture();
+
+ protected:
+  std::shared_ptr<tgfx::Device> getDevice() override;
 
  private:
   int _width = 0;

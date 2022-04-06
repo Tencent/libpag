@@ -22,7 +22,21 @@
 #include "pag/pag.h"
 
 namespace pag {
-class RenderTargetDrawable : public Drawable {
+
+class BaseDrawable : public Drawable {
+ public:
+  tgfx::Context* lockContext() override;
+
+  void unlockContext() override;
+
+ protected:
+  /**
+   * Returns the GPU device associated with this drawable.
+   */
+  virtual std::shared_ptr<tgfx::Device> getDevice() = 0;
+};
+
+class RenderTargetDrawable : public BaseDrawable {
  public:
   RenderTargetDrawable(std::shared_ptr<tgfx::Device> device,
                        const BackendRenderTarget& renderTarget, tgfx::ImageOrigin origin);
@@ -53,7 +67,7 @@ class RenderTargetDrawable : public Drawable {
   tgfx::ImageOrigin origin = tgfx::ImageOrigin::TopLeft;
 };
 
-class TextureDrawable : public Drawable {
+class TextureDrawable : public BaseDrawable {
  public:
   TextureDrawable(std::shared_ptr<tgfx::Device> device, const BackendTexture& texture,
                   tgfx::ImageOrigin origin);
@@ -84,7 +98,7 @@ class TextureDrawable : public Drawable {
   tgfx::ImageOrigin origin = tgfx::ImageOrigin::TopLeft;
 };
 
-class OffscreenDrawable : public Drawable {
+class OffscreenDrawable : public BaseDrawable {
  public:
   OffscreenDrawable(int width, int height, std::shared_ptr<tgfx::Device> device);
 

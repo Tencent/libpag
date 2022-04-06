@@ -1137,11 +1137,6 @@ class Drawable {
   virtual void updateSize() = 0;
 
   /**
-   * Returns the GPU device associated with this drawable.
-   */
-  virtual std::shared_ptr<tgfx::Device> getDevice() = 0;
-
-  /**
    * Creates a new Surface from this drawable.
    */
   virtual std::shared_ptr<tgfx::Surface> createSurface(tgfx::Context* context) = 0;
@@ -1152,11 +1147,16 @@ class Drawable {
    */
   virtual void present(tgfx::Context* context) = 0;
 
+  virtual tgfx::Context* lockContext() = 0;
+
+  virtual void unlockContext() = 0;
+
   /**
    * Set the presenting timeStamp, used for android
    */
   virtual void setTimeStamp(int64_t) {
   }
+
 };
 
 class GLRestorer;
@@ -1230,7 +1230,6 @@ class PAG_API PAGSurface {
   PAGPlayer* pagPlayer = nullptr;
   std::shared_ptr<std::mutex> rootLocker = nullptr;
   std::shared_ptr<Drawable> drawable = nullptr;
-  std::shared_ptr<tgfx::Device> device = nullptr;
   std::shared_ptr<tgfx::Surface> surface = nullptr;
   bool contextAdopted = false;
   GLRestorer* glRestorer = nullptr;

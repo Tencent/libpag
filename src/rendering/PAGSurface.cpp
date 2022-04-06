@@ -98,7 +98,6 @@ int PAGSurface::height() {
 void PAGSurface::updateSize() {
   LockGuard autoLock(rootLocker);
   surface = nullptr;
-  device = nullptr;
   drawable->updateSize();
 }
 
@@ -108,19 +107,15 @@ void PAGSurface::freeCache() {
     pagPlayer->renderCache->releaseAll();
   }
   surface = nullptr;
-  auto context = lockContext();
+  auto context = drawable->lockContext();
   if (context) {
     context->purgeResourcesNotUsedIn(0);
-    unlockContext();
+    drawable->unlockContext();
   }
-  device = nullptr;
 }
 
 bool PAGSurface::clearAll() {
   LockGuard autoLock(rootLocker);
-  if (device == nullptr) {
-    device = drawable->getDevice();
-  }
   auto context = lockContext();
   if (!context) {
     return false;
@@ -158,9 +153,6 @@ bool PAGSurface::readPixels(ColorType colorType, AlphaType alphaType, void* dstP
 
 bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
                       BackendSemaphore* signalSemaphore, bool autoClear) {
-  if (device == nullptr) {
-    device = drawable->getDevice();
-  }
   auto context = lockContext();
   if (!context) {
     return false;
@@ -203,9 +195,6 @@ bool PAGSurface::wait(const BackendSemaphore& waitSemaphore) {
   if (!waitSemaphore.isInitialized()) {
     return false;
   }
-  if (device == nullptr) {
-    device = drawable->getDevice();
-  }
   auto context = lockContext();
   if (!context) {
     return false;
@@ -239,10 +228,7 @@ bool PAGSurface::hitTest(RenderCache* cache, std::shared_ptr<Graphic> graphic, f
 }
 
 tgfx::Context* PAGSurface::lockContext() {
-  if (device == nullptr) {
-    return nullptr;
-  }
-  auto context = device->lockContext();
+  auto context = drawable->lockContext();
   if (context != nullptr && contextAdopted) {
 #ifndef PAG_BUILD_FOR_WEB
     glRestorer = new GLRestorer(tgfx::GLFunctions::Get(context));
@@ -253,13 +239,10 @@ tgfx::Context* PAGSurface::lockContext() {
 }
 
 void PAGSurface::unlockContext() {
-  if (device == nullptr) {
-    return;
-  }
   if (contextAdopted) {
     delete glRestorer;
     glRestorer = nullptr;
   }
-  device->unlock();
+  drawable->unlockContext();
 }
 }  // namespace pag

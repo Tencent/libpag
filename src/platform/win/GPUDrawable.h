@@ -19,13 +19,14 @@
 #pragma once
 
 #include "pag/pag.h"
+#include "rendering/Drawable.h"
 
 namespace tgfx {
 class EGLWindow;
 }
 
 namespace pag {
-class GPUDrawable : public Drawable {
+class GPUDrawable : public BaseDrawable {
  public:
   static std::shared_ptr<GPUDrawable> FromWindow(void* nativeWindow, void* sharedContext = nullptr);
 
@@ -39,11 +40,12 @@ class GPUDrawable : public Drawable {
 
   void updateSize() override;
 
-  std::shared_ptr<tgfx::Device> getDevice() override;
-
   std::shared_ptr<tgfx::Surface> createSurface(tgfx::Context* context) override;
 
   void present(tgfx::Context* context) override;
+
+ protected:
+  std::shared_ptr<tgfx::Device> getDevice() override;
 
  private:
   int _width = 0;

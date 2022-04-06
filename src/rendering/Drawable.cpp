@@ -21,6 +21,19 @@
 #include "gpu/opengl/GLRenderTarget.h"
 
 namespace pag {
+
+tgfx::Context* BaseDrawable::lockContext() {
+  auto device = getDevice();
+  if (device != nullptr) {
+    return device->lockContext();
+  }
+  return nullptr;
+}
+
+void BaseDrawable::unlockContext() {
+  getDevice()->unlock();
+}
+
 RenderTargetDrawable::RenderTargetDrawable(std::shared_ptr<tgfx::Device> device,
                                            const BackendRenderTarget& renderTarget,
                                            tgfx::ImageOrigin origin)

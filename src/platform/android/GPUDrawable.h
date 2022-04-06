@@ -22,9 +22,10 @@
 #include <android/native_window_jni.h>
 #include "gpu/opengl/egl/EGLWindow.h"
 #include "pag/pag.h"
+#include "rendering/Drawable.h"
 
 namespace pag {
-class GPUDrawable : public Drawable {
+class GPUDrawable : public BaseDrawable {
  public:
   static std::shared_ptr<GPUDrawable> FromWindow(ANativeWindow* nativeWindow,
                                                  EGLContext sharedContext = EGL_NO_CONTEXT);
@@ -41,13 +42,14 @@ class GPUDrawable : public Drawable {
 
   void updateSize() override;
 
-  std::shared_ptr<tgfx::Device> getDevice() override;
-
   std::shared_ptr<tgfx::Surface> createSurface(tgfx::Context* context) override;
 
   void present(tgfx::Context* context) override;
 
   void setTimeStamp(int64_t timeStamp) override;
+
+ protected:
+  std::shared_ptr<tgfx::Device> getDevice() override;
 
  private:
   int _width = 0;
