@@ -1147,8 +1147,18 @@ class Drawable {
    */
   virtual void present(tgfx::Context* context) = 0;
 
+  /**
+   * Locks the rendering context associated with this drawable, if another thread has already locked
+   * the drawable by lockContext(), a call to lockContext() will block execution until the context
+   * is available. The returned context can be used to draw graphics. A nullptr is returned If the
+   * context can not be locked on the calling thread, and leaves the drawable unlocked.
+   */
   virtual tgfx::Context* lockContext() = 0;
 
+  /**
+   * Unlocks the context. After this method is called all subsequent calls on the previously returned
+   * context will be invalid and may lead to runtime crash.
+   */
   virtual void unlockContext() = 0;
 
   /**
