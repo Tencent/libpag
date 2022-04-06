@@ -20,6 +20,12 @@
 #include "codec/utils/DecodeStream.h"
 
 namespace pag {
+std::unordered_map<uint8_t, std::pair<uint8_t, uint8_t>> H264Parser::SarRatioMap = {
+    {1, {1, 1}},     {2, {12, 11}}, {3, {10, 11}}, {4, {16, 11}},  {5, {40, 33}},  {6, {24, 11}},
+    {7, {20, 11}},   {8, {32, 11}}, {9, {80, 33}}, {10, {18, 11}}, {11, {15, 11}}, {12, {64, 33}},
+    {13, {160, 99}}, {14, {4, 3}},  {15, {3, 2}},  {16, {2, 1}},
+};
+
 SpsData H264Parser::ParseSps(ByteData* sysBytes) {
   DecodeStream byteArray(nullptr, sysBytes->data(), sysBytes->length());
   byteArray.skip(4);
@@ -48,7 +54,7 @@ SpsData H264Parser::ParseSps(ByteData* sysBytes) {
   return spsData;
 }
 
-void H264Parser::SkipScalingList(ExpGolomb *decoder, int count) {
+void H264Parser::SkipScalingList(ExpGolomb* decoder, int count) {
   int lastScale = 8;
   int nextScale = 8;
   int deltaScale;
@@ -64,13 +70,6 @@ void H264Parser::SkipScalingList(ExpGolomb *decoder, int count) {
 std::pair<int, int> H264Parser::ReadSps(ByteData* spsBytes) {
   ExpGolomb decoder(spsBytes);
   decoder.skipBytes(4);
-  uint8_t frameCropLeftOffset = 0;
-  uint8_t frameCropRightOffset = 0;
-  uint8_t frameCropTopOffset = 0;
-  uint8_t frameCropBottomOffset = 0;
-  float sarScale = 1;
-  uint8_t numRefFramesInPicOrderCntCycle = 0;
-  uint8_t scalingListCount = 0;
   decoder.skipBits(1);                       // forbidden_zero_bit
   decoder.skipBits(2);                       // nal_ref_idc
   decoder.skipBits(5);                       // nal_unit_type
@@ -80,6 +79,13 @@ std::pair<int, int> H264Parser::ReadSps(ByteData* spsBytes) {
   decoder.skipBytes(1);                      // level_idc u(8)
   decoder.readUE();                          // seq_parameter_set_id
 
+  float sarScale = 1;
+  uint8_t frameCropLeftOffset = 0;
+  uint8_t frameCropRightOffset = 0;
+  uint8_t frameCropTopOffset = 0;
+  uint8_t frameCropBottomOffset = 0;
+  uint8_t numRefFramesInPicOrderCntCycle = 0;
+  uint8_t scalingListCount = 0;
   std::vector<int> profileIdcMap = {100, 110, 122, 244, 44, 83, 86, 118, 128};
 
   if (std::find(profileIdcMap.begin(), profileIdcMap.end(), profileIdc) != profileIdcMap.end()) {
@@ -139,65 +145,16 @@ std::pair<int, int> H264Parser::ReadSps(ByteData* spsBytes) {
   if (vuiParametersPresentFlag) {
     uint8_t aspectRatioInfoPresentFlag = decoder.readBoolean();
     if (aspectRatioInfoPresentFlag) {
-      std::vector<int> sarRatio;
       uint8_t aspectRatioIdc = decoder.readUByte();
-      switch (aspectRatioIdc) {
-        case 1:
-          sarRatio = {1, 1};
-          break;
-        case 2:
-          sarRatio = {12, 11};
-          break;
-        case 3:
-          sarRatio = {10, 11};
-          break;
-        case 4:
-          sarRatio = {16, 11};
-          break;
-        case 5:
-          sarRatio = {40, 33};
-          break;
-        case 6:
-          sarRatio = {24, 11};
-          break;
-        case 7:
-          sarRatio = {20, 11};
-          break;
-        case 8:
-          sarRatio = {32, 11};
-          break;
-        case 9:
-          sarRatio = {80, 33};
-          break;
-        case 10:
-          sarRatio = {18, 11};
-          break;
-        case 11:
-          sarRatio = {15, 11};
-          break;
-        case 12:
-          sarRatio = {64, 33};
-          break;
-        case 13:
-          sarRatio = {160, 99};
-          break;
-        case 14:
-          sarRatio = {4, 3};
-          break;
-        case 15:
-          sarRatio = {3, 2};
-          break;
-        case 16:
-          sarRatio = {2, 1};
-          break;
-        case 255: {
-          sarRatio = {(decoder.readUByte() << 8) | decoder.readUByte(),
-                      (decoder.readUByte() << 8) | decoder.readUByte()};
-          break;
+      if (aspectRatioIdc == 255) {
+        sarScale = static_cast<float>((decoder.readUByte() << 8) | decoder.readUByte()) /
+                   static_cast<float>((decoder.readUByte() << 8) | decoder.readUByte());
+      } else {
+        auto iter = SarRatioMap.find(aspectRatioIdc);
+        if (iter != SarRatioMap.end()) {
+          sarScale =
+              static_cast<float>(iter->second.first) / static_cast<float>(iter->second.second);
         }
-      }
-      if (!sarRatio.empty()) {
-        sarScale = static_cast<float>(sarRatio[0]) / static_cast<float>(sarRatio[1]);
       }
     }
   }

@@ -78,7 +78,8 @@ std::unique_ptr<ByteData> Mp4BoxHelper::ConcatMp4(VideoSequence* videoSequence) 
   return payload.release();
 }
 
-void Mp4BoxHelper::WriteMdatBox(VideoSequence* videoSequence, SimpleArray* payload, int32_t mdatSize) {
+void Mp4BoxHelper::WriteMdatBox(VideoSequence* videoSequence, SimpleArray* payload,
+                                int32_t mdatSize) {
   payload->writeInt32(mdatSize);
   payload->writeUint8('m');
   payload->writeUint8('d');
@@ -86,12 +87,12 @@ void Mp4BoxHelper::WriteMdatBox(VideoSequence* videoSequence, SimpleArray* paylo
   payload->writeUint8('t');
 
   int32_t splitSize = 4;
-  for (auto header : videoSequence->headers) {
+  for (const auto* header : videoSequence->headers) {
     int32_t payLoadSize = static_cast<int32_t>(header->length()) - splitSize;
     payload->writeInt32(payLoadSize);
     payload->writeBytes(header->data(), payLoadSize, splitSize);
   }
-  for (auto frame : videoSequence->frames) {
+  for (const auto* frame : videoSequence->frames) {
     int32_t payLoadSize = static_cast<int32_t>(frame->fileBytes->length()) - splitSize;
     payload->writeInt32(payLoadSize);
     payload->writeBytes(frame->fileBytes->data(), payLoadSize, splitSize);

@@ -42,12 +42,12 @@ int Mp4Generator::WriteH264Nalus(SimpleArray* stream, bool write) {
   if (!write) {
     return param.nalusBytesLen;
   }
-  for (auto& header : param.videoSequence->headers) {
+  for (const auto* header : param.videoSequence->headers) {
     int32_t payloadSize = static_cast<int32_t>(header->length()) - 4;
     stream->writeInt32(payloadSize);
     stream->writeBytes(header->data(), payloadSize, 4);
   }
-  for (auto& frame : param.videoSequence->frames) {
+  for (const auto* frame : param.videoSequence->frames) {
     int32_t payloadSize = static_cast<int32_t>(frame->fileBytes->length()) - 4;
     stream->writeInt32(payloadSize);
     stream->writeBytes(frame->fileBytes->data(), payloadSize, 4);
@@ -828,7 +828,7 @@ int Mp4Generator::DREF(SimpleArray* stream, bool write) {
 }
 
 int32_t Mp4Generator::GetNowTime() {
-  return tgfx::Clock::Now() * 1e-3 / 1000;
+  return tgfx::Clock::Now() * 1e-6;
 }
 
 void Mp4Generator::Clear() {

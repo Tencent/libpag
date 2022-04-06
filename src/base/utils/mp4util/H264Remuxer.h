@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <algorithm>
 #include <cmath>
 #include <memory>
 #include <string>
@@ -26,10 +25,6 @@
 #include "H264Parser.h"
 #include "Mp4Generator.h"
 #include "SimpleArray.h"
-
-#define SEQUENCE_NUMBER 1
-#define BASE_MEDIA_DECODE_TIME 0
-#define BASE_MEDIA_TIME_SCALE 6000
 
 namespace pag {
 struct Mp4Flags {
@@ -75,12 +70,11 @@ class H264Remuxer {
   std::unique_ptr<ByteData> convertMp4();
   void writeMp4BoxesInSequence(VideoSequence* sequence);
 
-  Mp4Track mp4Track;
-  VideoSequence* videoSequence = nullptr;
-
  private:
   static Frame GetImplicitOffset(const std::vector<VideoFrame*>& frames);
 
   int trackId = 0;
+  Mp4Track mp4Track;
+  VideoSequence* videoSequence = nullptr;
 };
 }  // namespace pag

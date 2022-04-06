@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <memory>
 #include "SimpleArray.h"
 #include "pag/file.h"
 
