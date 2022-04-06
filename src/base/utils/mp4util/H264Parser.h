@@ -41,6 +41,6 @@ class H264Parser {
 
  private:
   static std::pair<int, int> ReadSPS(ByteData* spsBytes);
-  static void SkipScalingList(ExpGolomb decoder, int count);
+  static void SkipScalingList(ExpGolomb *decoder, int count);
 };
 }  // namespace pag
