@@ -2049,7 +2049,9 @@ class PAG_API VideoSequence : public Sequence {
    */
   std::unique_ptr<ByteData> getMp4Data();
 
-  std::pair<int32_t, int32_t> getVideoSize();
+  int32_t getVideoWidth();
+
+  int32_t getVideoHeight();
 
   RTTR_ENABLE(Sequence)
 };

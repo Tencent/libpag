@@ -27,10 +27,9 @@
 namespace pag {
 static std::shared_ptr<Graphic> MakeVideoSequenceGraphic(VideoSequence* sequence,
                                                          Frame contentFrame) {
-  auto videoSize = sequence->getVideoSize();
   auto factory = std::make_unique<SequenceReaderFactory>(sequence);
-  auto proxy =
-      new SequenceProxy(videoSize.first, videoSize.second, std::move(factory), contentFrame);
+  auto proxy = new SequenceProxy(sequence->getVideoWidth(), sequence->getVideoHeight(),
+                                 std::move(factory), contentFrame);
   tgfx::RGBAAALayout layout = {sequence->width, sequence->height, sequence->alphaStartX,
                                sequence->alphaStartY};
   return Picture::MakeFrom(sequence->composition->uniqueID, std::unique_ptr<SequenceProxy>(proxy),

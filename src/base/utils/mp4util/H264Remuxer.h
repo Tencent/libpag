@@ -22,9 +22,9 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "H264Parser.h"
 #include "Mp4Generator.h"
 #include "SimpleArray.h"
+#include "pag/file.h"
 
 namespace pag {
 struct Mp4Flags {
@@ -66,7 +66,7 @@ class H264Remuxer {
  public:
   static std::unique_ptr<H264Remuxer> Remux(VideoSequence* videoSequence);
   int getTrackID();
-  [[nodiscard]] int getPayLoadSize() const;
+  int getPayLoadSize() const;
   std::unique_ptr<ByteData> convertMp4();
   void writeMp4BoxesInSequence(VideoSequence* sequence);
 

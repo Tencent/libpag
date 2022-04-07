@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "H264Remuxer.h"
+#include "base/utils/Log.h"
 #include "core/Clock.h"
 
 namespace pag {
@@ -301,7 +302,7 @@ int Mp4Generator::SDTP(SimpleArray* stream, bool write) {
   writeFun.reserve(1);
   auto innerWriteFun = [](SimpleArray* stream, bool write) -> int {
     auto samples = param.track->samples;
-    int dataLen = 4 + samples.size();
+    int dataLen = 4 + static_cast<int>(samples.size());
     if (!write) {
       return dataLen;
     }
@@ -438,11 +439,11 @@ int Mp4Generator::AVCC(SimpleArray* stream, bool write) {
   auto innerWrite = [](SimpleArray* stream, bool write) -> int {
     int spsDataLen = 0;
     for (auto& spsData : param.track->sps) {
-      spsDataLen += 2 + spsData->length() - 4;
+      spsDataLen += 2 + static_cast<int>(spsData->length()) - 4;
     }
     int ppsDataLen = 0;
     for (auto& ppsData : param.track->pps) {
-      ppsDataLen += 2 + ppsData->length() - 4;
+      ppsDataLen += 2 + static_cast<int>(ppsData->length()) - 4;
     }
     int avccDataLen = 7 + spsDataLen + ppsDataLen;
     if (!write) {
@@ -460,7 +461,7 @@ int Mp4Generator::AVCC(SimpleArray* stream, bool write) {
     stream->writeUint8(0xfc | 3);
     stream->writeUint8(0xe0 | param.track->sps.size());
     for (auto& spsData : param.track->sps) {
-      int len = spsData->length() - 4;
+      int len = static_cast<int>(spsData->length()) - 4;
       stream->writeUint8((len >> 8) & 0xff);
       stream->writeUint8(len & 0xff);
       stream->writeBytes(spsData->data(), len, 4);
@@ -469,7 +470,7 @@ int Mp4Generator::AVCC(SimpleArray* stream, bool write) {
     // write pps data
     stream->writeUint8(param.track->pps.size());
     for (auto& ppsData : param.track->pps) {
-      int len = ppsData->length() - 4;
+      int len = static_cast<int>(ppsData->length()) - 4;
       stream->writeUint8((len >> 8) & 0xff);
       stream->writeUint8(len & 0xff);
       stream->writeBytes(ppsData->data(), len, 4);
@@ -628,7 +629,7 @@ int Mp4Generator::ELST(SimpleArray* stream, bool write) {
     if (!write) {
       return len;
     }
-    int sampleSize = param.track->samples.size();
+    int sampleSize = static_cast<int>(param.track->samples.size());
     int sampleDelta = std::floor(param.track->duration / sampleSize);
     stream->writeInt32(0);
     stream->writeInt32(1);
@@ -670,7 +671,7 @@ int Mp4Generator::TRUN(SimpleArray* stream, bool write) {
   writeFun.reserve(1);
   auto innerWriteFun = [](SimpleArray* stream, bool write) -> int {
     auto& samples = param.track->samples;
-    int len = samples.size();
+    int len = static_cast<int>(samples.size());
     int arraylen = 12 + 16 * len;
     param.offset += 8 + arraylen;
 
@@ -710,7 +711,7 @@ int Mp4Generator::STTS(SimpleArray* stream, bool write) {
       return len;
     }
 
-    int sampleCount = param.track->samples.size();
+    int sampleCount = static_cast<int>(param.track->samples.size());
     int32_t sampleDelta = std::floor(param.track->duration / sampleCount);
     stream->writeInt32(0);
     stream->writeInt32(1);
@@ -760,12 +761,12 @@ int Mp4Generator::STSS(SimpleArray* stream, bool write) {
         iFrames.emplace_back(sample->index + 1);
       }
     }
-    int len = (2 + iFrames.size()) * 4;
+    int len = (2 + static_cast<int>(iFrames.size())) * 4;
     if (!write) {
       return len;
     }
     stream->writeInt32(0);
-    stream->writeInt32(iFrames.size());
+    stream->writeInt32(static_cast<int>(iFrames.size()));
     for (int frame : iFrames) {
       stream->writeInt32(frame);
     }
@@ -776,7 +777,7 @@ int Mp4Generator::STSS(SimpleArray* stream, bool write) {
   return Box(stream, "stss", &writeFun, write);
 }
 
-int Mp4Generator::Box(SimpleArray* stream, std::string type,
+int Mp4Generator::Box(SimpleArray* stream, const std::string& type,
                       std::vector<WriteStreamFun>* boxFunctions, bool write) {
   int size = 8;
   auto iter = BoxSizeMap.find(type);
@@ -828,7 +829,7 @@ int Mp4Generator::DREF(SimpleArray* stream, bool write) {
 }
 
 int32_t Mp4Generator::GetNowTime() {
-  return tgfx::Clock::Now() * 1e-6;
+  return static_cast<int32_t>(static_cast<double>(tgfx::Clock::Now()) * 1e-6);
 }
 
 void Mp4Generator::Clear() {

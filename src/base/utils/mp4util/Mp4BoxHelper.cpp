@@ -17,9 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Mp4BoxHelper.h"
-#include "H264Parser.h"
 #include "H264Remuxer.h"
-#include "SimpleArray.h"
+#include "base/utils/Log.h"
 #include "core/Clock.h"
 
 namespace pag {
