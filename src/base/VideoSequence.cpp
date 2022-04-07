@@ -61,15 +61,19 @@ std::unique_ptr<ByteData> VideoSequence::getMp4Data() {
   return Mp4BoxHelper::CovertToMp4(this);
 }
 
-std::pair<int32_t, int32_t> VideoSequence::getVideoSize() {
+int32_t VideoSequence::getVideoWidth() {
   auto videoWidth = alphaStartX + width;
   if (videoWidth % 2 == 1) {
     videoWidth++;
   }
+  return videoWidth;
+}
+
+int32_t VideoSequence::getVideoHeight() {
   auto videoHeight = alphaStartY + height;
   if (videoHeight % 2 == 1) {
     videoHeight++;
   }
-  return std::pair<int32_t, int32_t>(videoWidth, videoHeight);
+  return videoHeight;
 }
 }  // namespace pag

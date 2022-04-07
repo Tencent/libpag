@@ -22,6 +22,7 @@
 #include <unordered_map>
 #include <vector>
 #include "SimpleArray.h"
+#include "pag/file.h"
 
 namespace pag {
 struct Mp4Track;
@@ -83,8 +84,8 @@ class Mp4Generator {
  private:
   static int WriteCharCode(SimpleArray* stream, std::string stringData, bool write = false);
   static int WriteH264Nalus(SimpleArray* stream, bool write = false);
-  static int Box(SimpleArray* stream, std::string type, std::vector<WriteStreamFun>* boxFunctions,
-                 bool write = false);
+  static int Box(SimpleArray* stream, const std::string& type,
+                 std::vector<WriteStreamFun>* boxFunctions, bool write = false);
   static int32_t GetNowTime();
 
   static std::unordered_map<std::string, int> BoxSizeMap;
