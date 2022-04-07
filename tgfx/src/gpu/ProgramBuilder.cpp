@@ -83,6 +83,14 @@ void ProgramBuilder::emitAndInstallFragProcessors(std::string* color, std::strin
   }
 }
 
+template <typename T>
+static const T* GetPointer(const std::vector<T>& vector, size_t atIndex) {
+  if (atIndex >= vector.size()) {
+    return nullptr;
+  }
+  return &vector[atIndex];
+}
+
 std::string ProgramBuilder::emitAndInstallFragProc(
     const FragmentProcessor* processor, size_t transformedCoordVarsIdx, const std::string& input,
     std::vector<std::unique_ptr<GLFragmentProcessor>>* glslFragmentProcessors) {
@@ -106,12 +114,9 @@ std::string ProgramBuilder::emitAndInstallFragProc(
       texSamplers.emplace_back(emitSampler(sampler, name));
     }
   }
-  ShaderVar* var = nullptr;
-  if (transformedCoordVarsIdx < transformedCoordVars.size()) {
-    var = &transformedCoordVars[transformedCoordVarsIdx];
-  }
-  GLFragmentProcessor::TransformedCoordVars coords(processor, var);
-  GLFragmentProcessor::TextureSamplers textureSamplers(processor, &texSamplers[0]);
+  GLFragmentProcessor::TransformedCoordVars coords(
+      processor, GetPointer(transformedCoordVars, transformedCoordVarsIdx));
+  GLFragmentProcessor::TextureSamplers textureSamplers(processor, GetPointer(texSamplers, 0));
   GLFragmentProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), processor, output,
                                      input, &coords, &textureSamplers);
 
