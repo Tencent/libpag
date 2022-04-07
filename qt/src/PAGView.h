@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <QOpenGLContext>
 #include <QQuickItem>
 #include "pag/pag.h"
 
