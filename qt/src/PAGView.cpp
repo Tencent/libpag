@@ -58,7 +58,10 @@ class RenderThread : public QThread {
 
 PAGView::PAGView(QQuickItem* parent) : QQuickItem(parent) {
   setFlag(ItemHasContents, true);
+  connect(this, SIGNAL(windowChanged(QQuickWindow* )), this,
+          SLOT(handleWindowChanged(QQuickWindow* )));
   renderThread = new RenderThread(this);
+  renderThread->moveToThread(renderThread);
 }
 
 PAGView::~PAGView() {
@@ -66,6 +69,31 @@ PAGView::~PAGView() {
   renderThread->wait();
   delete renderThread;
   delete pagPlayer;
+}
+
+void PAGView::handleWindowChanged(QQuickWindow* window) {
+  if (drawable != nullptr || window == nullptr) {
+    return;
+  }
+  if (window->openglContext() != nullptr) {
+    onCreateDrawable(window->openglContext());
+  } else {
+    connect(window, SIGNAL(openglContextCreated(QOpenGLContext* )), this,
+            SLOT(handleOpenglContextCreated(QOpenGLContext* )));
+  }
+}
+
+void PAGView::handleOpenglContextCreated(QOpenGLContext* context) {
+  disconnect(window(), SIGNAL(openglContextCreated(QOpenGLContext* )), this,
+             SLOT(handleOpenglContextCreated(QOpenGLContext* )));
+  onCreateDrawable(context);
+}
+
+void PAGView::onCreateDrawable(QOpenGLContext* context) {
+  if (drawable == nullptr) {
+    drawable = GPUDrawable::MakeFrom(this, context);
+    drawable->moveToThread(renderThread);
+  }
 }
 
 void PAGView::geometryChanged(const QRectF& newGeometry, const QRectF& oldGeometry) {
@@ -82,12 +110,13 @@ void PAGView::setFile(const std::shared_ptr<PAGFile> pagFile) {
 
 QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData* data) {
   if (drawable == nullptr) {
-    drawable = GPUDrawable::MakeFrom(this, window()->openglContext());
-    drawable->moveToThread(renderThread);
+    return nullptr;
+  }
+
+  if (pagPlayer->getSurface() == nullptr) {
     auto pagSurface = PAGSurface::MakeFrom(drawable);
     pagPlayer->setSurface(pagSurface);
     lastDevicePixelRatio = window()->devicePixelRatio();
-    renderThread->moveToThread(renderThread);
     renderThread->start();
   }
 
@@ -109,9 +138,11 @@ QSGNode* PAGView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData* data) {
 
   if (isPlaying) {
     auto duration = pagPlayer->duration();
-    auto playTime = (tgfx::Clock::Now() - startTime) % duration;
-    auto progress = static_cast<double>(playTime) / static_cast<double>(duration);
-    pagPlayer->setProgress(progress);
+    if (duration > 0) {
+      auto playTime = (tgfx::Clock::Now() - startTime) % duration;
+      auto progress = static_cast<double>(playTime) / static_cast<double>(duration);
+      pagPlayer->setProgress(progress);
+    }
     QMetaObject::invokeMethod(renderThread, "flush", Qt::QueuedConnection);
   }
   return node;

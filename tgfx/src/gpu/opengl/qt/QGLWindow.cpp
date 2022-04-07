@@ -21,7 +21,6 @@
 #include <QQuickWindow>
 #include <QThread>
 #include "gpu/opengl/GLContext.h"
-#include "gpu/opengl/GLDefines.h"
 #include "gpu/opengl/GLRenderTarget.h"
 #include "gpu/opengl/GLSurface.h"
 #include "gpu/opengl/GLTexture.h"
@@ -57,10 +56,6 @@ void QGLWindow::moveToThread(QThread* targetThread) {
 }
 
 QSGTexture* QGLWindow::getTexture() {
-  if (QThread::currentThread() != QApplication::instance()->thread()) {
-    LOGE("QGLWindow::getTexture() can be called on the main (GUI) thread only.");
-    return nullptr;
-  }
   std::lock_guard<std::mutex> autoLock(locker);
   auto nativeWindow = quickItem->window();
   if (nativeWindow == nullptr) {

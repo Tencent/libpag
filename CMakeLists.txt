@@ -50,8 +50,12 @@ elseif (WEB)
     set(PAG_USE_LIBAVC OFF CACHE BOOL "allow use of embedded libavc as fallback video decoder" FORCE)
     set(PAG_BUILD_SHARED OFF CACHE BOOL "Build shared library" FORCE)
 elseif (MACOS)
-    # CLion project needs test targets.
-    set(PAG_BUILD_TESTS ON CACHE BOOL "Build libpag tests" FORCE)
+    if (PAG_USE_QT)
+        set(PAG_USE_FREETYPE OFF CACHE BOOL "allow use of embedded freetype library" FORCE)
+    else ()
+        # CLion project needs test targets.
+        set(PAG_BUILD_TESTS ON CACHE BOOL "Build libpag tests" FORCE)
+    endif ()
 endif ()
 
 message("PAG_USE_LIBAVC: ${PAG_USE_LIBAVC}")

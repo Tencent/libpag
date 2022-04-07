@@ -30,9 +30,6 @@ bool PAGEngineImpl::InitOnscreenRender(PAGEngineInitData init_data) {
   pag_engine_callback_ = init_data.pag_engine_callback_;
   render_window_ = init_data.hwnd;
 
-  std::vector<std::string> fallbackList = {"Microsoft YaHei"};
-  pag::PAGFont::SetFallbackFontNames(fallbackList);
-
   auto drawable = pag::GPUDrawable::FromWindow(render_window_);
   pag_drawable_ = std::shared_ptr<pag::GPUDrawable>(drawable);
 
@@ -69,9 +66,6 @@ bool PAGEngineImpl::SetPagFile(const char* file_path, int path_length) {
   pag_file_ = file;
 
   pag_player_->setComposition(pag_file_);
-  pag_player_->setScaleMode(pag::PAGScaleMode::LetterBox);
-  pag_player_->setProgress(0);
-  pag_player_->setVideoEnabled(true);
 
   return true;
 }
@@ -83,11 +77,7 @@ bool PAGEngineImpl::SetPagFileBuffer(const byte* file_buffer, int buffer_length)
   }
 
   pag_file_ = file;
-
   pag_player_->setComposition(pag_file_);
-  pag_player_->setScaleMode(pag::PAGScaleMode::LetterBox);
-  pag_player_->setProgress(0);
-  pag_player_->setVideoEnabled(true);
   return false;
 }
 
