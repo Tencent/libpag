@@ -44,9 +44,14 @@ int main(int argc, char* argv[]) {
   qmlRegisterType<pag::PAGView>("PAG", 1, 0, "PAGView");
   auto rootPath = QApplication::applicationDirPath();
 #ifdef WIN32
-  rootPath = QFileInfo(rootPath+ "/../../").absolutePath();
+  rootPath = QFileInfo(rootPath + "/../../").absolutePath();
+  auto fontRoot = std::string(rootPath.toLocal8Bit());
+  std::vector<std::string> fontPaths = {fontRoot + "/resources/font/NotoSansSC-Regular.otf",
+                                        fontRoot + "/resources/font/NotoColorEmoji.ttf"};
+  std::vector<int> ttcIndices = {0, 0};
+  pag::PAGFont::SetFallbackFontPaths(fontPaths, ttcIndices);
 #else
-  rootPath = QFileInfo(rootPath+ "/../../../../../").absolutePath();
+  rootPath = QFileInfo(rootPath + "/../../../../../").absolutePath();
 #endif
   app.OpenFile(rootPath + "/assets/test2.pag");
   return app.exec();

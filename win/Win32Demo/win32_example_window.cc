@@ -35,8 +35,11 @@ void Win32ExampleWindow::OnCreate() {
   init_data.width = size.width;
   init_data.height = size.height;
   pag_engine_->InitOnscreenRender(init_data);
-
-  std::string test_pag_file_path = "../../assets/particle_video.pag";
+  std::vector<std::string> fontPaths = {"../../resources/font/NotoSansSC-Regular.otf",
+                                         "../../resources/font/NotoColorEmoji.ttf"};
+  std::vector<int> ttcIndices = {0, 0};
+  pag::PAGFont::SetFallbackFontPaths(fontPaths, ttcIndices);
+  std::string test_pag_file_path = "../../assets/test2.pag";
   auto byte_data = pag::ByteData::FromPath(test_pag_file_path);
   if (byte_data == nullptr) {
     return;

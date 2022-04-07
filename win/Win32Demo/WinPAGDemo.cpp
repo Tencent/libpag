@@ -31,9 +31,9 @@
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance,
                       _In_ LPWSTR lpCmdLine, _In_ int nCmdShow) {
-  int width = 800;
-  int height = 600;
-  Win32Window::Point origin(60, 60);
+  int width = 600;
+  int height = 800;
+  Win32Window::Point origin(0, 0);
   Win32Window::Size size(width, height);
 
   Win32ExampleWindow client_window;
