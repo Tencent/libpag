@@ -61,7 +61,11 @@ std::unique_ptr<ByteData> VideoSequence::getMp4Data() {
   return Mp4BoxHelper::CovertToMp4(this);
 }
 
-int32_t VideoSequence::getVideoWidth() {
+// The exact total width and height of the picture were not recorded when the video sequence frame
+// was exported，You need to do the calculation yourself with width and alphaStartX，
+// If an odd size is encountered, the exporter plugin automatically increments by one，
+// This matches the rules for exporter plugin。
+int32_t VideoSequence::getVideoWidth() const {
   auto videoWidth = alphaStartX + width;
   if (videoWidth % 2 == 1) {
     videoWidth++;
@@ -69,7 +73,7 @@ int32_t VideoSequence::getVideoWidth() {
   return videoWidth;
 }
 
-int32_t VideoSequence::getVideoHeight() {
+int32_t VideoSequence::getVideoHeight() const {
   auto videoHeight = alphaStartY + height;
   if (videoHeight % 2 == 1) {
     videoHeight++;

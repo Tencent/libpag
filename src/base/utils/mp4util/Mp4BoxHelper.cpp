@@ -22,8 +22,7 @@
 #include "core/Clock.h"
 
 namespace pag {
-
-std::unique_ptr<ByteData> Mp4BoxHelper::CovertToMp4(VideoSequence* videoSequence) {
+std::unique_ptr<ByteData> Mp4BoxHelper::CovertToMp4(const VideoSequence* videoSequence) {
   tgfx::Clock clock;
   if (!videoSequence->mp4Header) {
     clock.mark("CreateMp4");
@@ -42,20 +41,26 @@ void Mp4BoxHelper::WriteMp4Header(VideoSequence* videoSequence) {
   tgfx::Clock clock;
   clock.mark("WriteMp4Header");
   auto remuxer = H264Remuxer::Remux(videoSequence);
+  if (!remuxer) {
+    return;
+  }
   remuxer->writeMp4BoxesInSequence(videoSequence);
   LOGI("write mp4 header, costTime: %lld", clock.measure("WriteMp4Header", ""));
 }
 
-std::unique_ptr<ByteData> Mp4BoxHelper::CreateMp4(VideoSequence* videoSequence) {
+std::unique_ptr<ByteData> Mp4BoxHelper::CreateMp4(const VideoSequence* videoSequence) {
   tgfx::Clock clock;
   clock.mark("CreateMp4");
   auto remuxer = H264Remuxer::Remux(videoSequence);
+  if (!remuxer) {
+    return nullptr;
+  }
   auto mp4Data = remuxer->convertMp4();
   LOGI("convertMp4, costTime: %lld", clock.measure("CreateMp4", ""));
   return mp4Data;
 }
 
-std::unique_ptr<ByteData> Mp4BoxHelper::ConcatMp4(VideoSequence* videoSequence) {
+std::unique_ptr<ByteData> Mp4BoxHelper::ConcatMp4(const VideoSequence* videoSequence) {
   auto dataSize = static_cast<int32_t>(videoSequence->mp4Header->length());
   int32_t mdatSize = 0;
   for (auto header : videoSequence->headers) {
@@ -77,7 +82,7 @@ std::unique_ptr<ByteData> Mp4BoxHelper::ConcatMp4(VideoSequence* videoSequence) 
   return payload.release();
 }
 
-void Mp4BoxHelper::WriteMdatBox(VideoSequence* videoSequence, SimpleArray* payload,
+void Mp4BoxHelper::WriteMdatBox(const VideoSequence* videoSequence, SimpleArray* payload,
                                 int32_t mdatSize) {
   payload->writeInt32(mdatSize);
   payload->writeUint8('m');

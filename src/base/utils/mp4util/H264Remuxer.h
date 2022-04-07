@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <cmath>
 #include <memory>
 #include <string>
 #include <vector>
@@ -57,24 +56,23 @@ struct Mp4Track {
   int32_t duration = 0;
   std::vector<std::shared_ptr<Mp4Sample>> samples;
   std::vector<int32_t> pts;
-  std::string codec;
-  float fps = 0.0f;
   int32_t implicitOffset = 0;
 };
 
 class H264Remuxer {
  public:
-  static std::unique_ptr<H264Remuxer> Remux(VideoSequence* videoSequence);
-  int getTrackID();
+  static std::unique_ptr<H264Remuxer> Remux(const VideoSequence* videoSequence);
+
   int getPayLoadSize() const;
+
   std::unique_ptr<ByteData> convertMp4();
+
   void writeMp4BoxesInSequence(VideoSequence* sequence);
 
  private:
   static Frame GetImplicitOffset(const std::vector<VideoFrame*>& frames);
 
-  int trackId = 0;
   Mp4Track mp4Track;
-  VideoSequence* videoSequence = nullptr;
+  const VideoSequence* videoSequence = nullptr;
 };
 }  // namespace pag
