@@ -24,28 +24,7 @@ static const int SEQUENCE_NUMBER = 1;
 static const int BASE_MEDIA_DECODE_TIME = 0;
 static const int BASE_MEDIA_TIME_SCALE = 6000;
 
-std::string ParseCodec(ByteData* sysBytes) {
-  DecodeStream byteArray(nullptr, sysBytes->data(), sysBytes->length());
-  byteArray.skip(4);
-  byteArray.skip(1);
-
-  std::string numberStr = "0123456789ABCDEF";
-  std::string codec = "avc1.";
-  for (int i = 0; i < 3; ++i) {
-    uint8_t num = byteArray.readUint8();
-    std::string out;
-    out.push_back(numberStr[(num >> 4) & 0xF]);
-    out.push_back(numberStr[num & 0xF]);
-
-    if (out.size() < 2) {
-      out = "0" + out;
-    }
-    codec += out;
-  }
-  return codec;
-}
-
-std::unique_ptr<H264Remuxer> H264Remuxer::Remux(VideoSequence* videoSequence) {
+std::unique_ptr<H264Remuxer> H264Remuxer::Remux(const VideoSequence* videoSequence) {
   if (videoSequence->headers.size() < 2) {
     LOGE("header data error in video sequence");
     return nullptr;
@@ -57,19 +36,17 @@ std::unique_ptr<H264Remuxer> H264Remuxer::Remux(VideoSequence* videoSequence) {
 
   std::unique_ptr<H264Remuxer> remuxer = std::make_unique<H264Remuxer>();
   remuxer->videoSequence = videoSequence;
-  remuxer->mp4Track.id = remuxer->getTrackID();
+  remuxer->mp4Track.id = 1;  // track id
   remuxer->mp4Track.timescale = BASE_MEDIA_TIME_SCALE;
-  remuxer->mp4Track.duration =
-      std::floor((static_cast<float>(videoSequence->frames.size()) / videoSequence->frameRate) *
-                 BASE_MEDIA_TIME_SCALE);
-  remuxer->mp4Track.fps = videoSequence->frameRate;
+  remuxer->mp4Track.duration = static_cast<int32_t>(std::floor(
+      (static_cast<float>(static_cast<int>(videoSequence->frames.size()) * BASE_MEDIA_TIME_SCALE) /
+       videoSequence->frameRate)));
   remuxer->mp4Track.implicitOffset = static_cast<int32_t>(GetImplicitOffset(videoSequence->frames));
 
   auto spsData = videoSequence->headers.at(0);
   remuxer->mp4Track.width = videoSequence->getVideoWidth();
   remuxer->mp4Track.height = videoSequence->getVideoHeight();
   remuxer->mp4Track.sps = {spsData};
-  remuxer->mp4Track.codec = ParseCodec(spsData);
   remuxer->mp4Track.pps = {videoSequence->headers.at(1)};
 
   int headerLen = 0;
@@ -119,12 +96,11 @@ std::unique_ptr<ByteData> H264Remuxer::convertMp4() {
   boxParam.videoSequence = videoSequence;
 
   SimpleArray stream(static_cast<uint32_t>(payLoadSize * 1.5));
-  Mp4Generator::Clear();
-  Mp4Generator::InitParam(boxParam);
-  Mp4Generator::FTYP(&stream, true);
-  Mp4Generator::MOOV(&stream, true);
-  Mp4Generator::MOOF(&stream, true);
-  Mp4Generator::MDAT(&stream, true);
+  Mp4Generator mp4Generator(boxParam);
+  mp4Generator.ftyp(&stream, true);
+  mp4Generator.moov(&stream, true);
+  mp4Generator.moof(&stream, true);
+  mp4Generator.mdat(&stream, true);
 
   return stream.release();
 }
@@ -144,22 +120,16 @@ void H264Remuxer::writeMp4BoxesInSequence(VideoSequence* sequence) {
   boxParam.baseMediaDecodeTime = BASE_MEDIA_DECODE_TIME;
 
   SimpleArray stream(static_cast<uint32_t>(payLoadSize * 0.5));
-  Mp4Generator::Clear();
-  Mp4Generator::InitParam(boxParam);
-  Mp4Generator::FTYP(&stream, true);
-  Mp4Generator::MOOV(&stream, true);
-  Mp4Generator::MOOF(&stream, true);
+  Mp4Generator mp4Generator(boxParam);
+  mp4Generator.ftyp(&stream, true);
+  mp4Generator.moov(&stream, true);
+  mp4Generator.moof(&stream, true);
 
   sequence->mp4Header = stream.release().release();
 }
 
 int H264Remuxer::getPayLoadSize() const {
   return mp4Track.len;
-}
-
-int H264Remuxer::getTrackID() {
-  trackId++;
-  return trackId;
 }
 
 Frame H264Remuxer::GetImplicitOffset(const std::vector<VideoFrame*>& frames) {

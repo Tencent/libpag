@@ -35,60 +35,58 @@ struct BoxParam {
   int nalusBytesLen = 0;
   int32_t baseMediaDecodeTime = 0;
   Mp4Track* track = nullptr;
-  VideoSequence* videoSequence = nullptr;
+  const VideoSequence* videoSequence = nullptr;
   std::vector<Mp4Track*> tracks;
 };
 
-typedef int (*WriteStreamFun)(SimpleArray* stream, bool write);
-
 class Mp4Generator {
  public:
-  static int FTYP(SimpleArray* stream, bool write = false);
-  static int MOOV(SimpleArray* stream, bool write = false);
-  static int MOOF(SimpleArray* stream, bool write = false);
-  static int MDAT(SimpleArray* stream, bool write = false);
-  static int MVHD(SimpleArray* stream, bool write = false);
-  static int MVEX(SimpleArray* stream, bool write = false);
-  static int MFHD(SimpleArray* stream, bool write = false);
-  static int TRAF(SimpleArray* stream, bool write = false);
-  static int MDHD(SimpleArray* stream, bool write = false);
-  static int MDIA(SimpleArray* stream, bool write = false);
-  static int MINF(SimpleArray* stream, bool write = false);
-  static int STBL(SimpleArray* stream, bool write = false);
-  static int TREX(SimpleArray* stream, bool write = false);
-  static int SDTP(SimpleArray* stream, bool write = false);
-  static int AVC1(SimpleArray* stream, bool write = false);
-  static int STSD(SimpleArray* stream, bool write = false);
-  static int TKHD(SimpleArray* stream, bool write = false);
-  static int TRAK(SimpleArray* stream, bool write = false);
-  static int EDTS(SimpleArray* stream, bool write = false);
-  static int ELST(SimpleArray* stream, bool write = false);
-  static int TRUN(SimpleArray* stream, bool write = false);
-  static int STTS(SimpleArray* stream, bool write = false);
-  static int CTTS(SimpleArray* stream, bool write = false);
-  static int STSS(SimpleArray* stream, bool write = false);
-  static int SMHD(SimpleArray* stream, bool write = false);
-  static int VMHD(SimpleArray* stream, bool write = false);
-  static int STSC(SimpleArray* stream, bool write = false);
-  static int STSZ(SimpleArray* stream, bool write = false);
-  static int STCO(SimpleArray* stream, bool write = false);
-  static int AVCC(SimpleArray* stream, bool write = false);
-  static int TFHD(SimpleArray* stream, bool write = false);
-  static int TFDT(SimpleArray* stream, bool write = false);
-  static int DREF(SimpleArray* stream, bool write = false);
-  static int HDLR(SimpleArray* stream, bool write = false);
-  static int DINF(SimpleArray* stream, bool write = false);
-  static void Clear();
-  static void InitParam(const BoxParam& boxParam);
+  explicit Mp4Generator(BoxParam param);
+
+  int ftyp(SimpleArray* stream, bool write = false);
+  int moov(SimpleArray* stream, bool write = false);
+  int moof(SimpleArray* stream, bool write = false);
+  int mdat(SimpleArray* stream, bool write = false);
 
  private:
-  static int WriteCharCode(SimpleArray* stream, std::string stringData, bool write = false);
-  static int WriteH264Nalus(SimpleArray* stream, bool write = false);
-  static int Box(SimpleArray* stream, const std::string& type,
-                 std::vector<WriteStreamFun>* boxFunctions, bool write = false);
-  static int32_t GetNowTime();
+  int mvhd(SimpleArray* stream, bool write = false);
+  int mvex(SimpleArray* stream, bool write = false);
+  int mfhd(SimpleArray* stream, bool write = false);
+  int traf(SimpleArray* stream, bool write = false);
+  int mdhd(SimpleArray* stream, bool write = false);
+  int mdia(SimpleArray* stream, bool write = false);
+  int minf(SimpleArray* stream, bool write = false);
+  int stbl(SimpleArray* stream, bool write = false);
+  int trex(SimpleArray* stream, bool write = false);
+  int sdtp(SimpleArray* stream, bool write = false);
+  int avc1(SimpleArray* stream, bool write = false);
+  int stsd(SimpleArray* stream, bool write = false);
+  int tkhd(SimpleArray* stream, bool write = false);
+  int trak(SimpleArray* stream, bool write = false);
+  int edts(SimpleArray* stream, bool write = false);
+  int elst(SimpleArray* stream, bool write = false);
+  int trun(SimpleArray* stream, bool write = false);
+  int stts(SimpleArray* stream, bool write = false);
+  int ctts(SimpleArray* stream, bool write = false);
+  int stss(SimpleArray* stream, bool write = false);
+  int smhd(SimpleArray* stream, bool write = false);
+  int vmhd(SimpleArray* stream, bool write = false);
+  int stsc(SimpleArray* stream, bool write = false);
+  int stsz(SimpleArray* stream, bool write = false);
+  int stco(SimpleArray* stream, bool write = false);
+  int avcc(SimpleArray* stream, bool write = false);
+  int tfhd(SimpleArray* stream, bool write = false);
+  int tfdt(SimpleArray* stream, bool write = false);
+  int dref(SimpleArray* stream, bool write = false);
+  int hdlr(SimpleArray* stream, bool write = false);
+  int dinf(SimpleArray* stream, bool write = false);
+  int writeH264Nalus(SimpleArray* stream, bool write = false) const;
+  int box(SimpleArray* stream, const std::string& type,
+          const std::vector<std::function<int(SimpleArray*, bool)>>& boxFunctions,
+          bool write = false);
 
-  static std::unordered_map<std::string, int> BoxSizeMap;
-  static BoxParam param;
+  std::unordered_map<std::string, int> boxSizeMap;
+  BoxParam param;
 };
+
 }  // namespace pag

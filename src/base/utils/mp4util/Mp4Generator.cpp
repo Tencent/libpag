@@ -20,15 +20,19 @@
 #include "base/utils/Log.h"
 #include "core/Clock.h"
 
+#define PushInWriteFun(funName)                                                         \
+  writeFun.emplace_back([this](auto&& PH1, auto&& PH2) -> int {                         \
+    return funName(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2)); \
+  })
+
 namespace pag {
 static const char* VIDEO = "video";
 static const char* AUDIO = "audio";
 
-std::unordered_map<std::string, int> Mp4Generator::BoxSizeMap =
-    std::unordered_map<std::string, int>();
-BoxParam Mp4Generator::param = BoxParam();
+Mp4Generator::Mp4Generator(BoxParam param) : param(std::move(param)) {
+}
 
-int Mp4Generator::WriteCharCode(SimpleArray* stream, std::string stringData, bool write) {
+static int WriteCharCode(SimpleArray* stream, std::string stringData, bool write) {
   int size = static_cast<int>(stringData.length());
   if (!write) {
     return size;
@@ -39,7 +43,11 @@ int Mp4Generator::WriteCharCode(SimpleArray* stream, std::string stringData, boo
   return size;
 }
 
-int Mp4Generator::WriteH264Nalus(SimpleArray* stream, bool write) {
+static int32_t GetNowTime() {
+  return static_cast<int32_t>(tgfx::Clock::Now() / 1000000);
+}
+
+int Mp4Generator::writeH264Nalus(SimpleArray* stream, bool write) const {
   if (!write) {
     return param.nalusBytesLen;
   }
@@ -56,10 +64,10 @@ int Mp4Generator::WriteH264Nalus(SimpleArray* stream, bool write) {
   return param.nalusBytesLen;
 }
 
-int Mp4Generator::FTYP(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::ftyp(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(1);
-  auto innerWriteFun = [](SimpleArray* stream, bool write) -> int {
+  auto innerWriteFun = [this](SimpleArray* stream, bool write) -> int {
     LOGI("param->duration: %d", param.duration);
     int len = 24;
     if (!write) {
@@ -74,42 +82,38 @@ int Mp4Generator::FTYP(SimpleArray* stream, bool write) {
     return len;
   };
   writeFun.emplace_back(innerWriteFun);
-
-  return Box(stream, "ftyp", &writeFun, write);
+  return box(stream, "ftyp", writeFun, write);
 }
 
-int Mp4Generator::MOOV(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::moov(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(1 + param.tracks.size());
-  writeFun.emplace_back(MVHD);
+  PushInWriteFun(mvhd);
   for (auto& mp4Track : param.tracks) {
     param.track = mp4Track;
-    writeFun.emplace_back(TRAK);
+    PushInWriteFun(trak);
   }
-  writeFun.emplace_back(MVEX);
-
-  return Box(stream, "moov", &writeFun, write);
+  PushInWriteFun(mvex);
+  return box(stream, "moov", writeFun, write);
 }
 
-int Mp4Generator::MOOF(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::moof(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(2);
-  writeFun.emplace_back(MFHD);
-  writeFun.emplace_back(TRAF);
-
-  return Box(stream, "moof", &writeFun, write);
+  PushInWriteFun(mfhd);
+  PushInWriteFun(traf);
+  return box(stream, "moof", writeFun, write);
 }
 
-int Mp4Generator::MDAT(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::mdat(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(1);
-  writeFun.emplace_back(WriteH264Nalus);
-
-  return Box(stream, "mdat", &writeFun, write);
+  PushInWriteFun(writeH264Nalus);
+  return box(stream, "mdat", writeFun, write);
 }
 
-int Mp4Generator::HDLR(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::hdlr(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(1);
   if (param.track->type == VIDEO) {
     auto innerWriteFun = [](SimpleArray* stream, bool write) -> int {
@@ -143,13 +147,13 @@ int Mp4Generator::HDLR(SimpleArray* stream, bool write) {
     };
     writeFun.emplace_back(innerWriteFun);
   }
-  return Box(stream, "hdlr", &writeFun, write);
+  return box(stream, "hdlr", writeFun, write);
 }
 
-int Mp4Generator::MDHD(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::mdhd(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(1);
-  auto innerWriteFun = [](SimpleArray* stream, bool write) -> int {
+  auto innerWriteFun = [&](SimpleArray* stream, bool write) -> int {
     int len = 24;
     if (!write) {
       return len;
@@ -164,24 +168,22 @@ int Mp4Generator::MDHD(SimpleArray* stream, bool write) {
     return len;
   };
   writeFun.emplace_back(innerWriteFun);
-
-  return Box(stream, "mdhd", &writeFun, write);
+  return box(stream, "mdhd", writeFun, write);
 }
 
-int Mp4Generator::MDIA(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::mdia(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(3);
-  writeFun.emplace_back(MDHD);
-  writeFun.emplace_back(HDLR);
-  writeFun.emplace_back(MINF);
-
-  return Box(stream, "mdia", &writeFun, write);
+  PushInWriteFun(mdhd);
+  PushInWriteFun(hdlr);
+  PushInWriteFun(minf);
+  return box(stream, "mdia", writeFun, write);
 }
 
-int Mp4Generator::MFHD(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::mfhd(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(1);
-  auto innerWriteFun = [](SimpleArray* stream, bool write) -> int {
+  auto innerWriteFun = [&](SimpleArray* stream, bool write) -> int {
     int len = 8;
     if (!write) {
       return len;
@@ -191,26 +193,24 @@ int Mp4Generator::MFHD(SimpleArray* stream, bool write) {
     return len;
   };
   writeFun.emplace_back(innerWriteFun);
-
-  return Box(stream, "mfhd", &writeFun, write);
+  return box(stream, "mfhd", writeFun, write);
 }
 
-int Mp4Generator::MINF(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::minf(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(3);
   if (param.track->type == AUDIO) {
-    writeFun.emplace_back(SMHD);
+    PushInWriteFun(smhd);
   } else {
-    writeFun.emplace_back(VMHD);
+    PushInWriteFun(vmhd);
   }
-  writeFun.emplace_back(DINF);
-  writeFun.emplace_back(STBL);
-
-  return Box(stream, "minf", &writeFun, write);
+  PushInWriteFun(dinf);
+  PushInWriteFun(stbl);
+  return box(stream, "minf", writeFun, write);
 }
 
-int Mp4Generator::SMHD(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::smhd(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(1);
   auto innerWriteFun = [](SimpleArray* stream, bool write) -> int {
     int len = 8;
@@ -222,12 +222,11 @@ int Mp4Generator::SMHD(SimpleArray* stream, bool write) {
     return len;
   };
   writeFun.emplace_back(innerWriteFun);
-
-  return Box(stream, "smhd", &writeFun, write);
+  return box(stream, "smhd", writeFun, write);
 }
 
-int Mp4Generator::VMHD(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::vmhd(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(1);
   auto innerWriteFun = [](SimpleArray* stream, bool write) -> int {
     int len = 12;
@@ -240,24 +239,23 @@ int Mp4Generator::VMHD(SimpleArray* stream, bool write) {
     return len;
   };
   writeFun.emplace_back(innerWriteFun);
-
-  return Box(stream, "vmhd", &writeFun, write);
+  return box(stream, "vmhd", writeFun, write);
 }
 
-int Mp4Generator::MVEX(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::mvex(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(param.tracks.size());
   for (auto& mp4Track : param.tracks) {
     param.track = mp4Track;
-    writeFun.emplace_back(TREX);
+    PushInWriteFun(trex);
   }
-  return Box(stream, "mvex", &writeFun, write);
+  return box(stream, "mvex", writeFun, write);
 }
 
-int Mp4Generator::MVHD(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::mvhd(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(1);
-  auto innerWriteFun = [](SimpleArray* stream, bool write) -> int {
+  auto innerWriteFun = [&](SimpleArray* stream, bool write) -> int {
     int len = 100;
     if (!write) {
       return len;
@@ -289,26 +287,22 @@ int Mp4Generator::MVHD(SimpleArray* stream, bool write) {
     stream->writeInt32(0);
     stream->writeInt32(0);
     stream->writeInt32(0x00000002);
-
     return len;
   };
   writeFun.emplace_back(innerWriteFun);
-
-  return Box(stream, "mvhd", &writeFun, write);
+  return box(stream, "mvhd", writeFun, write);
 }
 
-int Mp4Generator::SDTP(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::sdtp(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(1);
-  auto innerWriteFun = [](SimpleArray* stream, bool write) -> int {
+  auto innerWriteFun = [&](SimpleArray* stream, bool write) -> int {
     auto samples = param.track->samples;
     int dataLen = 4 + static_cast<int>(samples.size());
     if (!write) {
       return dataLen;
     }
-
     stream->writeInt32(0);
-
     Mp4Flags flags;
     // leave the full box header (4 byteData) all zero
     // write the sample table
@@ -319,26 +313,24 @@ int Mp4Generator::SDTP(SimpleArray* stream, bool write) {
     return dataLen;
   };
   writeFun.emplace_back(innerWriteFun);
-
-  return Box(stream, "sdtp", &writeFun, write);
+  return box(stream, "sdtp", writeFun, write);
 }
 
-int Mp4Generator::STBL(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::stbl(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(7);
-  writeFun.emplace_back(STSD);
-  writeFun.emplace_back(STTS);
-  writeFun.emplace_back(CTTS);
-  writeFun.emplace_back(STSS);
-  writeFun.emplace_back(STSC);
-  writeFun.emplace_back(STSZ);
-  writeFun.emplace_back(STCO);
-
-  return Box(stream, "stbl", &writeFun, write);
+  PushInWriteFun(stsd);
+  PushInWriteFun(stts);
+  PushInWriteFun(ctts);
+  PushInWriteFun(stss);
+  PushInWriteFun(stsc);
+  PushInWriteFun(stsz);
+  PushInWriteFun(stco);
+  return box(stream, "stbl", writeFun, write);
 }
 
-int Mp4Generator::STSC(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::stsc(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(1);
   auto innerWrite = [](SimpleArray* stream, bool write) -> int {
     int len = 8;
@@ -350,12 +342,11 @@ int Mp4Generator::STSC(SimpleArray* stream, bool write) {
     return len;
   };
   writeFun.emplace_back(innerWrite);
-
-  return Box(stream, "stsc", &writeFun, write);
+  return box(stream, "stsc", writeFun, write);
 }
 
-int Mp4Generator::STSZ(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::stsz(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(1);
   auto innerWrite = [](SimpleArray* stream, bool write) -> int {
     int len = 12;
@@ -368,12 +359,11 @@ int Mp4Generator::STSZ(SimpleArray* stream, bool write) {
     return len;
   };
   writeFun.emplace_back(innerWrite);
-
-  return Box(stream, "stsz", &writeFun, write);
+  return box(stream, "stsz", writeFun, write);
 }
 
-int Mp4Generator::STCO(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::stco(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(1);
   auto innerWrite = [](SimpleArray* stream, bool write) -> int {
     int len = 8;
@@ -386,13 +376,13 @@ int Mp4Generator::STCO(SimpleArray* stream, bool write) {
   };
   writeFun.emplace_back(innerWrite);
 
-  return Box(stream, "stco", &writeFun, write);
+  return box(stream, "stco", writeFun, write);
 }
 
-int Mp4Generator::AVC1(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::avc1(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(2);
-  auto innerWrite = [](SimpleArray* stream, bool write) -> int {
+  auto innerWrite = [&](SimpleArray* stream, bool write) -> int {
     int len = 78;
     if (!write) {
       return len;
@@ -427,16 +417,15 @@ int Mp4Generator::AVC1(SimpleArray* stream, bool write) {
     return len;
   };
   writeFun.emplace_back(innerWrite);
-  writeFun.emplace_back(AVCC);
-
+  PushInWriteFun(avcc);
   // generate avc1 data
-  return Box(stream, "avc1", &writeFun, write);
+  return box(stream, "avc1", writeFun, write);
 }
 
-int Mp4Generator::AVCC(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::avcc(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(1);
-  auto innerWrite = [](SimpleArray* stream, bool write) -> int {
+  auto innerWrite = [&](SimpleArray* stream, bool write) -> int {
     int spsDataLen = 0;
     for (auto& spsData : param.track->sps) {
       spsDataLen += 2 + static_cast<int>(spsData->length()) - 4;
@@ -478,13 +467,12 @@ int Mp4Generator::AVCC(SimpleArray* stream, bool write) {
     return avccDataLen;
   };
   writeFun.emplace_back(innerWrite);
-
-  return Box(stream, "avcC", &writeFun, write);
+  return box(stream, "avcC", writeFun, write);
 }
 
-int Mp4Generator::STSD(SimpleArray* stream, bool write) {
+int Mp4Generator::stsd(SimpleArray* stream, bool write) {
   if (param.track->type == VIDEO) {
-    std::vector<WriteStreamFun> writeFun;
+    std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
     writeFun.reserve(1);
     auto innerWriteFun = [](SimpleArray* stream, bool write) -> int {
       int len = 8;
@@ -496,16 +484,16 @@ int Mp4Generator::STSD(SimpleArray* stream, bool write) {
       return len;
     };
     writeFun.emplace_back(innerWriteFun);
-    writeFun.emplace_back(AVC1);
-    return Box(stream, "stsd", &writeFun, write);
+    PushInWriteFun(avc1);
+    return box(stream, "stsd", writeFun, write);
   }
   return 0;
 }
 
-int Mp4Generator::TKHD(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::tkhd(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(1);
-  auto innerWrite = [](SimpleArray* stream, bool write) -> int {
+  auto innerWrite = [&](SimpleArray* stream, bool write) -> int {
     int len = 84;
     if (!write) {
       return len;
@@ -549,27 +537,25 @@ int Mp4Generator::TKHD(SimpleArray* stream, bool write) {
     return len;
   };
   writeFun.emplace_back(innerWrite);
-
-  return Box(stream, "tkhd", &writeFun, write);
+  return box(stream, "tkhd", writeFun, write);
 }
 
-int Mp4Generator::TRAF(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::traf(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(4);
-  int sdtpLen = SDTP(stream, false);
+  int sdtpLen = sdtp(stream, false);
   param.offset = sdtpLen + 72;
-  writeFun.emplace_back(TFHD);
-  writeFun.emplace_back(TFDT);
-  writeFun.emplace_back(TRUN);
-  writeFun.emplace_back(SDTP);
-
-  return Box(stream, "traf", &writeFun, write);
+  PushInWriteFun(tfhd);
+  PushInWriteFun(tfdt);
+  PushInWriteFun(trun);
+  PushInWriteFun(sdtp);
+  return box(stream, "traf", writeFun, write);
 }
 
-int Mp4Generator::TFHD(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::tfhd(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(1);
-  auto innerWriteFun = [](SimpleArray* stream, bool write) -> int {
+  auto innerWriteFun = [&](SimpleArray* stream, bool write) -> int {
     int len = 8;
     if (!write) {
       return len;
@@ -581,14 +567,13 @@ int Mp4Generator::TFHD(SimpleArray* stream, bool write) {
     return len;
   };
   writeFun.emplace_back(innerWriteFun);
-
-  return Box(stream, "tfhd", &writeFun, write);
+  return box(stream, "tfhd", writeFun, write);
 }
 
-int Mp4Generator::TFDT(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::tfdt(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(1);
-  auto innerWriteFun = [](SimpleArray* stream, bool write) -> int {
+  auto innerWriteFun = [&](SimpleArray* stream, bool write) -> int {
     int len = 8;
     if (!write) {
       return len;
@@ -599,32 +584,29 @@ int Mp4Generator::TFDT(SimpleArray* stream, bool write) {
     return len;
   };
   writeFun.emplace_back(innerWriteFun);
-
-  return Box(stream, "tfdt", &writeFun, write);
+  return box(stream, "tfdt", writeFun, write);
 }
 
-int Mp4Generator::TRAK(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::trak(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(3);
-  writeFun.emplace_back(TKHD);
-  writeFun.emplace_back(EDTS);
-  writeFun.emplace_back(MDIA);
-
-  return Box(stream, "trak", &writeFun, write);
+  PushInWriteFun(tkhd);
+  PushInWriteFun(edts);
+  PushInWriteFun(mdia);
+  return box(stream, "trak", writeFun, write);
 }
 
-int Mp4Generator::EDTS(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::edts(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(1);
-  writeFun.emplace_back(ELST);
-
-  return Box(stream, "edts", &writeFun, write);
+  PushInWriteFun(elst);
+  return box(stream, "edts", writeFun, write);
 }
 
-int Mp4Generator::ELST(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::elst(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(1);
-  auto innerWriteFun = [](SimpleArray* stream, bool write) -> int {
+  auto innerWriteFun = [&](SimpleArray* stream, bool write) -> int {
     int len = 20;
     if (!write) {
       return len;
@@ -639,14 +621,13 @@ int Mp4Generator::ELST(SimpleArray* stream, bool write) {
     return len;
   };
   writeFun.emplace_back(innerWriteFun);
-
-  return Box(stream, "elst", &writeFun, write);
+  return box(stream, "elst", writeFun, write);
 }
 
-int Mp4Generator::TREX(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::trex(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(1);
-  auto innerWriteFun = [](SimpleArray* stream, bool write) -> int {
+  auto innerWriteFun = [&](SimpleArray* stream, bool write) -> int {
     int len = 24;
     if (!write) {
       return len;
@@ -662,14 +643,13 @@ int Mp4Generator::TREX(SimpleArray* stream, bool write) {
     return len;
   };
   writeFun.emplace_back(innerWriteFun);
-
-  return Box(stream, "trex", &writeFun, write);
+  return box(stream, "trex", writeFun, write);
 }
 
-int Mp4Generator::TRUN(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::trun(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(1);
-  auto innerWriteFun = [](SimpleArray* stream, bool write) -> int {
+  auto innerWriteFun = [&](SimpleArray* stream, bool write) -> int {
     auto& samples = param.track->samples;
     int len = static_cast<int>(samples.size());
     int arraylen = 12 + 16 * len;
@@ -698,14 +678,13 @@ int Mp4Generator::TRUN(SimpleArray* stream, bool write) {
     return arraylen;
   };
   writeFun.emplace_back(innerWriteFun);
-
-  return Box(stream, "trun", &writeFun, write);
+  return box(stream, "trun", writeFun, write);
 }
 
-int Mp4Generator::STTS(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::stts(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(1);
-  auto innerWriteFun = [](SimpleArray* stream, bool write) -> int {
+  auto innerWriteFun = [&](SimpleArray* stream, bool write) -> int {
     int len = 16;
     if (!write) {
       return len;
@@ -720,14 +699,13 @@ int Mp4Generator::STTS(SimpleArray* stream, bool write) {
     return len;
   };
   writeFun.emplace_back(innerWriteFun);
-
-  return Box(stream, "stts", &writeFun, write);
+  return box(stream, "stts", writeFun, write);
 }
 
-int Mp4Generator::CTTS(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::ctts(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(1);
-  auto innerWriteFun = [](SimpleArray* stream, bool write) -> int {
+  auto innerWriteFun = [&](SimpleArray* stream, bool write) -> int {
     int sampleCount = param.track->samples.size();
     int32_t sampleDelta = std::floor(param.track->duration / sampleCount);
     int len = (2 + sampleCount * 2) * 4;
@@ -746,14 +724,13 @@ int Mp4Generator::CTTS(SimpleArray* stream, bool write) {
     return len;
   };
   writeFun.emplace_back(innerWriteFun);
-
-  return Box(stream, "ctts", &writeFun, write);
+  return box(stream, "ctts", writeFun, write);
 }
 
-int Mp4Generator::STSS(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::stss(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(1);
-  auto innerWriteFun = [](SimpleArray* stream, bool write) -> int {
+  auto innerWriteFun = [&](SimpleArray* stream, bool write) -> int {
     std::vector<int> iFrames;
     iFrames.reserve(param.track->samples.size());
     for (auto& sample : param.track->samples) {
@@ -773,21 +750,21 @@ int Mp4Generator::STSS(SimpleArray* stream, bool write) {
     return len;
   };
   writeFun.emplace_back(innerWriteFun);
-
-  return Box(stream, "stss", &writeFun, write);
+  return box(stream, "stss", writeFun, write);
 }
 
-int Mp4Generator::Box(SimpleArray* stream, const std::string& type,
-                      std::vector<WriteStreamFun>* boxFunctions, bool write) {
+int Mp4Generator::box(SimpleArray* stream, const std::string& type,
+                      const std::vector<std::function<int(SimpleArray*, bool)>>& boxFunctions,
+                      bool write) {
   int size = 8;
-  auto iter = BoxSizeMap.find(type);
-  if (iter != BoxSizeMap.end()) {
+  auto iter = boxSizeMap.find(type);
+  if (iter != boxSizeMap.end()) {
     size = iter->second;
   } else {
-    for (WriteStreamFun& writeStreamFun : *boxFunctions) {
+    for (const auto& writeStreamFun : boxFunctions) {
       size += writeStreamFun(stream, false);
     }
-    BoxSizeMap[type] = size;
+    boxSizeMap[type] = size;
   }
   if (!write) {
     return size;
@@ -795,21 +772,22 @@ int Mp4Generator::Box(SimpleArray* stream, const std::string& type,
   stream->writeInt32(size);
   WriteCharCode(stream, type, true);
 
-  for (WriteStreamFun& writeStreamFun : *boxFunctions) {
+  for (const auto& writeStreamFun : boxFunctions) {
     writeStreamFun(stream, true);
   }
   return size;
 }
 
-int Mp4Generator::DINF(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::dinf(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(1);
-  writeFun.emplace_back(DREF);
-  return Box(stream, "dinf", &writeFun, write);
+  writeFun.emplace_back(
+      std::bind(&Mp4Generator::dref, this, std::placeholders::_1, std::placeholders::_2));
+  return box(stream, "dinf", writeFun, write);
 }
 
-int Mp4Generator::DREF(SimpleArray* stream, bool write) {
-  std::vector<WriteStreamFun> writeFun;
+int Mp4Generator::dref(SimpleArray* stream, bool write) {
+  std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(1);
   auto innerWriteFun = [](SimpleArray* stream, bool write) -> int {
     int len = 20;
@@ -824,19 +802,6 @@ int Mp4Generator::DREF(SimpleArray* stream, bool write) {
     return len;
   };
   writeFun.emplace_back(innerWriteFun);
-
-  return Box(stream, "dref", &writeFun, write);
-}
-
-int32_t Mp4Generator::GetNowTime() {
-  return static_cast<int32_t>(static_cast<double>(tgfx::Clock::Now()) * 1e-6);
-}
-
-void Mp4Generator::Clear() {
-  BoxSizeMap.clear();
-}
-
-void Mp4Generator::InitParam(const BoxParam& boxParam) {
-  param = boxParam;
+  return box(stream, "dref", writeFun, write);
 }
 }  // namespace pag
