@@ -106,8 +106,11 @@ std::string ProgramBuilder::emitAndInstallFragProc(
       texSamplers.emplace_back(emitSampler(sampler, name));
     }
   }
-  GLFragmentProcessor::TransformedCoordVars coords(processor,
-                                                   &transformedCoordVars[transformedCoordVarsIdx]);
+  ShaderVar* var = nullptr;
+  if (transformedCoordVarsIdx < transformedCoordVars.size()) {
+    var = &transformedCoordVars[transformedCoordVarsIdx];
+  }
+  GLFragmentProcessor::TransformedCoordVars coords(processor, var);
   GLFragmentProcessor::TextureSamplers textureSamplers(processor, &texSamplers[0]);
   GLFragmentProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), processor, output,
                                      input, &coords, &textureSamplers);
