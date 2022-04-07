@@ -112,7 +112,7 @@ void BulgeFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect& conte
   gl->uniform1f(horizontalRadiusHandle, horizontalRadius / contentBounds.width());
   gl->uniform1f(verticalRadiusHandle, verticalRadius / contentBounds.height());
   gl->uniform2f(bulgeCenterHandle, (bulgeCenter.x - contentBounds.x()) / contentBounds.width(),
-                1.0f - (bulgeCenter.y - contentBounds.y()) / contentBounds.height());
+                (bulgeCenter.y - contentBounds.y()) / contentBounds.height());
   gl->uniform1f(bulgeHeightHandle, bulgeHeight);
   gl->uniform1i(pinningHandle, pinning);
 }
