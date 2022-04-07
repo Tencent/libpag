@@ -19,9 +19,42 @@
 #pragma once
 
 #include "gpu/Surface.h"
-#include "pag/pag.h"
+#include "pag/gpu.h"
 
 namespace pag {
+
+class Drawable {
+ public:
+  virtual ~Drawable() = default;
+
+  virtual int width() const = 0;
+
+  virtual int height() const = 0;
+
+  virtual void updateSize() = 0;
+
+  virtual std::shared_ptr<tgfx::Surface> createSurface(tgfx::Context* context) = 0;
+
+  virtual void present(tgfx::Context* context) = 0;
+
+  virtual void setTimeStamp(int64_t) {
+  }
+
+  virtual tgfx::Context* lockContext();
+
+  virtual void unlockContext();
+
+  virtual bool prepareDevice();
+
+  virtual void freeDevice();
+
+ protected:
+  virtual std::shared_ptr<tgfx::Device> getDevice() = 0;
+
+ private:
+  std::shared_ptr<tgfx::Device> currentDevice;
+};
+
 class RenderTargetDrawable : public Drawable {
  public:
   RenderTargetDrawable(std::shared_ptr<tgfx::Device> device,

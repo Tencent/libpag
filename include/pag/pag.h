@@ -28,13 +28,14 @@ namespace tgfx {
 struct Rect;
 class Context;
 class Surface;
-class Device;
 }  // namespace tgfx
 
 namespace pag {
 class Recorder;
 
 class RenderCache;
+
+class Drawable;
 
 class Content {
  public:
@@ -1117,48 +1118,6 @@ class Composition;
 
 class PAGPlayer;
 
-class Drawable {
- public:
-  virtual ~Drawable() = default;
-
-  /**
-   * Returns the width of this drawable.
-   */
-  virtual int width() const = 0;
-
-  /**
-   * Returns the height of this drawable.
-   */
-  virtual int height() const = 0;
-
-  /**
-   * Update the size of the drawable, and reset the associated backend render target.
-   */
-  virtual void updateSize() = 0;
-
-  /**
-   * Returns the GPU device associated with this drawable.
-   */
-  virtual std::shared_ptr<tgfx::Device> getDevice() = 0;
-
-  /**
-   * Creates a new Surface from this drawable.
-   */
-  virtual std::shared_ptr<tgfx::Surface> createSurface(tgfx::Context* context) = 0;
-
-  /**
-   * Apply all pending changes to the drawable.
-   * Note: The associated GPUDevice must be the current rendering device on the calling thread.
-   */
-  virtual void present(tgfx::Context* context) = 0;
-
-  /**
-   * Set the presenting timeStamp, used for android
-   */
-  virtual void setTimeStamp(int64_t) {
-  }
-};
-
 class GLRestorer;
 
 class PAG_API PAGSurface {
@@ -1230,7 +1189,6 @@ class PAG_API PAGSurface {
   PAGPlayer* pagPlayer = nullptr;
   std::shared_ptr<std::mutex> rootLocker = nullptr;
   std::shared_ptr<Drawable> drawable = nullptr;
-  std::shared_ptr<tgfx::Device> device = nullptr;
   std::shared_ptr<tgfx::Surface> surface = nullptr;
   bool contextAdopted = false;
   GLRestorer* glRestorer = nullptr;

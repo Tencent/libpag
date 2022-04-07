@@ -35,7 +35,6 @@ void mockPAGView() {
   auto surface = PAGSurface::MakeOffscreen(file->width(), file->height());
   auto player = std::make_shared<PAGPlayer>();
   player->setSurface(surface);
-  surface->drawable->getDevice();
   ASSERT_NE(surface, nullptr);
   player->setComposition(file);
   int num = 20;

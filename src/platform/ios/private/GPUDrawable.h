@@ -19,7 +19,7 @@
 #pragma once
 
 #include "gpu/opengl/eagl/EAGLWindow.h"
-#include "pag/pag.h"
+#include "rendering/Drawable.h"
 
 namespace pag {
 
@@ -41,13 +41,14 @@ class GPUDrawable : public Drawable {
 
   void updateSize() override;
 
-  std::shared_ptr<tgfx::Device> getDevice() override;
-
   std::shared_ptr<tgfx::Surface> createSurface(tgfx::Context* context) override;
 
   void present(tgfx::Context* context) override;
 
   CVPixelBufferRef getCVPixelBuffer();
+
+ protected:
+  std::shared_ptr<tgfx::Device> getDevice() override;
 
  private:
   std::weak_ptr<GPUDrawable> weakThis;
