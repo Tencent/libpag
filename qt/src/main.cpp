@@ -39,32 +39,15 @@ int main(int argc, char* argv[]) {
   defaultFormat.setProfile(QSurfaceFormat::CoreProfile);
   QSurfaceFormat::setDefaultFormat(defaultFormat);
 
-#ifdef WIN32
-  QFont defaultFonts("Microsoft Yahei");
-  defaultFonts.setStyleHint(QFont::SansSerif);
-  QApplication::setFont(defaultFonts);
-  std::vector<std::string> fallbackList = {"Microsoft YaHei"};
-  pag::PAGFont::SetFallbackFontNames(fallbackList);
-#else
-  QFont defaultFonts("Helvetica Neue,PingFang SC");
-  QQuickWindow::setTextRenderType(QQuickWindow::NativeTextRendering);
-  defaultFonts.setStyleHint(QFont::SansSerif);
-  QApplication::setFont(defaultFonts);
-  std::vector<std::string> fallbackList = {"PingFang SC",       "Apple SD Gothic Neo",
-                                           "Apple Color Emoji", "Helvetica",
-                                           "Myanmar Sangam MN", "Thonburi",
-                                           "Mishafi",           "Menlo",
-                                           "Kailasa",           "Kefa",
-                                           "Kohinoor Telugu",   "Hiragino Maru Gothic ProN"};
-  pag::PAGFont::SetFallbackFontNames(fallbackList);
-#endif
-
   PAGViewer app(argc, argv);
   app.setWindowIcon(QIcon(":/images/window-icon.png"));
   qmlRegisterType<pag::PAGView>("PAG", 1, 0, "PAGView");
-  auto rootPath = QApplication::applicationDirPath() + "/../../../../../";
-  rootPath = QFileInfo(rootPath).absolutePath();
-  auto pagPath = rootPath + "/assets/test2.pag";
-  app.OpenFile(pagPath);
+  auto rootPath = QApplication::applicationDirPath();
+#ifdef WIN32
+  rootPath = QFileInfo(rootPath+ "/../../").absolutePath();
+#else
+  rootPath = QFileInfo(rootPath+ "/../../../../../").absolutePath();
+#endif
+  app.OpenFile(rootPath + "/assets/test2.pag");
   return app.exec();
 }

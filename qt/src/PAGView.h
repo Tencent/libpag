@@ -49,6 +49,13 @@ class PAGView : public QQuickItem {
   std::shared_ptr<GPUDrawable> drawable = nullptr;
 
   void onSizeChanged();
+  void onCreateDrawable(QOpenGLContext* context);
+
+  Q_SLOT
+  void handleWindowChanged(QQuickWindow* window);
+
+  Q_SLOT
+  void handleOpenglContextCreated(QOpenGLContext* context);
 
   friend class RenderThread;
 };
