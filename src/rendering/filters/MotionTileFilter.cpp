@@ -123,7 +123,7 @@ void MotionTileFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect& 
   auto isHorizontalPhaseShift = pagEffect->horizontalPhaseShift->getValueAt(layerFrame);
   auto gl = tgfx::GLFunctions::Get(context);
   gl->uniform2f(tileCenterHandle, (tileCenter.x - contentBounds.x()) / contentBounds.width(),
-                1.0f - (tileCenter.y - contentBounds.y()) / contentBounds.height());
+                (tileCenter.y - contentBounds.y()) / contentBounds.height());
   gl->uniform1f(tileWidthHandle, tileWidth / 100.f);
   gl->uniform1f(tileHeightHandle, tileHeight / 100.f);
   gl->uniform1f(outputWidthHandle, outputWidth / 100.f);

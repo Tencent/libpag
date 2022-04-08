@@ -54,8 +54,7 @@ static const char FRAGMENT_SHADER[] = R"(
             } else if (uDisplacementMapBehavior == 2) {
                 mapVertexColor = fract(vertexColor / mapTextureSize);
             }
-            // 之前外部生成的纹理错误的使用了 top-left 的朝向，现在外部修正了，这里对应要临时改一下，之后再整体修改。
-            mapVertexColor = vec2(mapVertexColor.x, 1.0 - mapVertexColor.y);
+            mapVertexColor = vec2(mapVertexColor.x, mapVertexColor.y);
 
             vec4 mapColor = mix(grayColor, texture2D(mapTexture, mapVertexColor), EdgeDetect(mapVertexColor));
 
