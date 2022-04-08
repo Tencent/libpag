@@ -41,6 +41,7 @@ jobs:
             /usr/local/bin/emscons
             /usr/local/Cellar/yasm
             /usr/local/bin/yasm
+            /usr/local/bin/depsync
             /usr/local/lib/node_modules/depsync
             /usr/local/Cellar/gcovr
             /usr/local/bin/gcovr
