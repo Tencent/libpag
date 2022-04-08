@@ -43,10 +43,6 @@ static int WriteCharCode(SimpleArray* stream, std::string stringData, bool write
   return size;
 }
 
-static int32_t GetNowTime() {
-  return static_cast<int32_t>(tgfx::Clock::Now() / 1000000);
-}
-
 int Mp4Generator::writeH264Nalus(SimpleArray* stream, bool write) const {
   if (!write) {
     return param.nalusBytesLen;
@@ -158,10 +154,9 @@ int Mp4Generator::mdhd(SimpleArray* stream, bool write) {
     if (!write) {
       return len;
     }
-    int32_t createTime = std::floor(GetNowTime());
     stream->writeInt32(0);
-    stream->writeInt32(createTime);
-    stream->writeInt32(createTime);  // modify time
+    stream->writeInt32(0);
+    stream->writeInt32(0);
     stream->writeInt32(param.track->timescale);
     stream->writeInt32(0);
     stream->writeInt32(0x55C40000);
@@ -260,11 +255,9 @@ int Mp4Generator::mvhd(SimpleArray* stream, bool write) {
     if (!write) {
       return len;
     }
-    int32_t createTime = std::floor(GetNowTime());
-    int32_t modifitime = createTime;
     stream->writeInt32(0);
-    stream->writeInt32(createTime);
-    stream->writeInt32(modifitime);
+    stream->writeInt32(0);
+    stream->writeInt32(0);
     stream->writeInt32(param.timescale);
     stream->writeInt32(param.duration);
     stream->writeInt32(0x00010000);
@@ -499,13 +492,11 @@ int Mp4Generator::tkhd(SimpleArray* stream, bool write) {
       return len;
     }
 
-    int32_t createTime = std::floor(GetNowTime());
-    int32_t modifitime = createTime;
     int volumn = 1;
 
     stream->writeInt32(1);
-    stream->writeInt32(createTime);
-    stream->writeInt32(modifitime);
+    stream->writeInt32(0);
+    stream->writeInt32(0);
     stream->writeInt32(param.track->id);
     stream->writeInt32(0);
     stream->writeInt32(param.track->duration);
