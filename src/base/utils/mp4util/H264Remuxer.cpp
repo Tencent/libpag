@@ -24,6 +24,19 @@ static const int SEQUENCE_NUMBER = 1;
 static const int BASE_MEDIA_DECODE_TIME = 0;
 static const int BASE_MEDIA_TIME_SCALE = 6000;
 
+static Frame GetImplicitOffset(const std::vector<VideoFrame*>& frames) {
+  Frame index = 0;
+  Frame maxOffset = 0;
+  for (const auto* pts : frames) {
+    Frame offset = index - pts->frame;
+    if (offset > maxOffset) {
+      maxOffset = offset;
+    }
+    index++;
+  }
+  return maxOffset;
+}
+
 std::unique_ptr<H264Remuxer> H264Remuxer::Remux(const VideoSequence* videoSequence) {
   if (videoSequence->headers.size() < 2) {
     LOGE("header data error in video sequence");
@@ -130,18 +143,5 @@ void H264Remuxer::writeMp4BoxesInSequence(VideoSequence* sequence) {
 
 int H264Remuxer::getPayLoadSize() const {
   return mp4Track.len;
-}
-
-Frame H264Remuxer::GetImplicitOffset(const std::vector<VideoFrame*>& frames) {
-  Frame index = 0;
-  Frame maxOffset = 0;
-  for (const auto* pts : frames) {
-    Frame offset = index - pts->frame;
-    if (offset > maxOffset) {
-      maxOffset = offset;
-    }
-    index++;
-  }
-  return maxOffset;
 }
 }  // namespace pag

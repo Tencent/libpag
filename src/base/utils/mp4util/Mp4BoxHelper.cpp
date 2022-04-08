@@ -22,6 +22,61 @@
 #include "core/Clock.h"
 
 namespace pag {
+static void WriteMdatBox(const VideoSequence* videoSequence, SimpleArray* payload,
+                         int32_t mdatSize) {
+  payload->writeInt32(mdatSize);
+  payload->writeUint8('m');
+  payload->writeUint8('d');
+  payload->writeUint8('a');
+  payload->writeUint8('t');
+
+  int32_t splitSize = 4;
+  for (const auto* header : videoSequence->headers) {
+    int32_t payLoadSize = static_cast<int32_t>(header->length()) - splitSize;
+    payload->writeInt32(payLoadSize);
+    payload->writeBytes(header->data(), payLoadSize, splitSize);
+  }
+  for (const auto* frame : videoSequence->frames) {
+    int32_t payLoadSize = static_cast<int32_t>(frame->fileBytes->length()) - splitSize;
+    payload->writeInt32(payLoadSize);
+    payload->writeBytes(frame->fileBytes->data(), payLoadSize, splitSize);
+  }
+}
+
+static std::unique_ptr<ByteData> ConcatMp4(const VideoSequence* videoSequence) {
+  auto dataSize = static_cast<int32_t>(videoSequence->mp4Header->length());
+  int32_t mdatSize = 0;
+  for (auto header : videoSequence->headers) {
+    auto needSize = static_cast<int32_t>(header->length());
+    mdatSize += needSize;
+  }
+  for (auto frame : videoSequence->frames) {
+    auto needSize = static_cast<int32_t>(frame->fileBytes->length());
+    mdatSize += needSize;
+  }
+  mdatSize += 8;
+  dataSize += mdatSize;
+
+  SimpleArray payload(static_cast<uint32_t>(dataSize));
+  payload.setOrder(ByteOrder::BigEndian);
+  payload.writeBytes(videoSequence->mp4Header->data(), videoSequence->mp4Header->length());
+  WriteMdatBox(videoSequence, &payload, mdatSize);
+
+  return payload.release();
+}
+
+static std::unique_ptr<ByteData> CreateMp4(const VideoSequence* videoSequence) {
+  tgfx::Clock clock;
+  clock.mark("CreateMp4");
+  auto remuxer = H264Remuxer::Remux(videoSequence);
+  if (!remuxer) {
+    return nullptr;
+  }
+  auto mp4Data = remuxer->convertMp4();
+  LOGI("convertMp4, costTime: %lld", clock.measure("CreateMp4", ""));
+  return mp4Data;
+}
+
 std::unique_ptr<ByteData> Mp4BoxHelper::CovertToMp4(const VideoSequence* videoSequence) {
   tgfx::Clock clock;
   if (!videoSequence->mp4Header) {
@@ -46,60 +101,5 @@ void Mp4BoxHelper::WriteMp4Header(VideoSequence* videoSequence) {
   }
   remuxer->writeMp4BoxesInSequence(videoSequence);
   LOGI("write mp4 header, costTime: %lld", clock.measure("WriteMp4Header", ""));
-}
-
-std::unique_ptr<ByteData> Mp4BoxHelper::CreateMp4(const VideoSequence* videoSequence) {
-  tgfx::Clock clock;
-  clock.mark("CreateMp4");
-  auto remuxer = H264Remuxer::Remux(videoSequence);
-  if (!remuxer) {
-    return nullptr;
-  }
-  auto mp4Data = remuxer->convertMp4();
-  LOGI("convertMp4, costTime: %lld", clock.measure("CreateMp4", ""));
-  return mp4Data;
-}
-
-std::unique_ptr<ByteData> Mp4BoxHelper::ConcatMp4(const VideoSequence* videoSequence) {
-  auto dataSize = static_cast<int32_t>(videoSequence->mp4Header->length());
-  int32_t mdatSize = 0;
-  for (auto header : videoSequence->headers) {
-    auto needSize = static_cast<int32_t>(header->length());
-    mdatSize += needSize;
-  }
-  for (auto frame : videoSequence->frames) {
-    auto needSize = static_cast<int32_t>(frame->fileBytes->length());
-    mdatSize += needSize;
-  }
-  mdatSize += 8;
-  dataSize += mdatSize;
-
-  SimpleArray payload(static_cast<uint32_t>(dataSize));
-  payload.setOrder(ByteOrder::BigEndian);
-  payload.writeBytes(videoSequence->mp4Header->data(), videoSequence->mp4Header->length());
-  WriteMdatBox(videoSequence, &payload, mdatSize);
-
-  return payload.release();
-}
-
-void Mp4BoxHelper::WriteMdatBox(const VideoSequence* videoSequence, SimpleArray* payload,
-                                int32_t mdatSize) {
-  payload->writeInt32(mdatSize);
-  payload->writeUint8('m');
-  payload->writeUint8('d');
-  payload->writeUint8('a');
-  payload->writeUint8('t');
-
-  int32_t splitSize = 4;
-  for (const auto* header : videoSequence->headers) {
-    int32_t payLoadSize = static_cast<int32_t>(header->length()) - splitSize;
-    payload->writeInt32(payLoadSize);
-    payload->writeBytes(header->data(), payLoadSize, splitSize);
-  }
-  for (const auto* frame : videoSequence->frames) {
-    int32_t payLoadSize = static_cast<int32_t>(frame->fileBytes->length()) - splitSize;
-    payload->writeInt32(payLoadSize);
-    payload->writeBytes(frame->fileBytes->data(), payLoadSize, splitSize);
-  }
 }
 }  // namespace pag

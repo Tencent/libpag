@@ -34,11 +34,5 @@ class Mp4BoxHelper {
    * Creates mp4 header box data, and write into VideoSequence mp4Header member
    */
   static void WriteMp4Header(VideoSequence* videoSequence);
-
- private:
-  static std::unique_ptr<ByteData> CreateMp4(const VideoSequence* videoSequence);
-  static std::unique_ptr<ByteData> ConcatMp4(const VideoSequence* videoSequence);
-  static void WriteMdatBox(const VideoSequence* videoSequence, SimpleArray* payload,
-                           int32_t mdatSize);
 };
 }  // namespace pag
