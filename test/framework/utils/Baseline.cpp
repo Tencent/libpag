@@ -167,6 +167,28 @@ bool Baseline::Compare(const std::shared_ptr<PAGSurface>& surface, const std::st
   return Baseline::Compare(bitmap, key);
 }
 
+bool Baseline::Compare(const std::shared_ptr<ByteData>& byteData, const std::string& key) {
+  if (!byteData || static_cast<int>(byteData->length()) == 0) {
+    return false;
+  }
+  std::string md5 = DumpMD5(byteData->data(), byteData->length());
+#ifdef UPDATE_BASELINE
+  SetJSONValue(OutputMD5, key, md5);
+  return true;
+#endif
+  auto baselineVersion = GetJSONValue(BaselineVersion, key);
+  auto cacheVersion = GetJSONValue(CacheVersion, key);
+  if (cacheVersion.empty() || baselineVersion.empty() ||
+      (baselineVersion == cacheVersion && GetJSONValue(CacheMD5, key) != md5)) {
+    SetJSONValue(OutputVersion, key, currentVersion);
+    SetJSONValue(OutputMD5, key, md5);
+    return false;
+  }
+  SetJSONValue(OutputVersion, key, baselineVersion);
+  std::filesystem::remove(OUT_ROOT + key + WEBP_FILE_EXT);
+  return true;
+}
+
 void Baseline::SetUp() {
   std::ifstream cacheMD5File(CACHE_MD5_PATH);
   if (cacheMD5File.is_open()) {
