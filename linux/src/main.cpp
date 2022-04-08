@@ -27,13 +27,6 @@ int64_t GetTimer() {
 }
 
 std::shared_ptr<pag::PAGFile> ReplaceImageOrText() {
-  // Register default Fonts. It should be called only once when the application is being initialized.
-  std::vector<std::string> fontPaths = {};
-  fontPaths.emplace_back("../../resources/font/NotoSerifSC-Regular.otf");
-  fontPaths.emplace_back("../../resources/font/NotoColorEmoji.ttf");
-  std::vector<int> ttcIndices(fontPaths.size());
-  pag::PAGFont::SetFallbackFontPaths(fontPaths, ttcIndices);
-
   auto pagFile = pag::PAGFile::Load("../../assets/test2.pag");
   if (pagFile == nullptr) {
     return nullptr;
@@ -98,6 +91,13 @@ void BmpWrite(unsigned char* image, int imageWidth, int imageHeight, const char*
 
 int main() {
   auto startTime = GetTimer();
+  // Register fallback fonts. It should be called only once when the application is being initialized.
+  std::vector<std::string> fallbackFontPaths = {};
+  fallbackFontPaths.emplace_back("../../resources/font/NotoSerifSC-Regular.otf");
+  fallbackFontPaths.emplace_back("../../resources/font/NotoColorEmoji.ttf");
+  std::vector<int> ttcIndices(fallbackFontPaths.size());
+  pag::PAGFont::SetFallbackFontPaths(fallbackFontPaths, ttcIndices);
+
   auto pagFile = ReplaceImageOrText();
   if (pagFile == nullptr) {
     printf("---pagFile is nullptr!!!\n");
