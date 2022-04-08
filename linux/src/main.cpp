@@ -27,6 +27,13 @@ int64_t GetTimer() {
 }
 
 std::shared_ptr<pag::PAGFile> ReplaceImageOrText() {
+  // Register default Fonts. It should be called only once when the application is being initialized.
+  std::vector<std::string> fontPaths = {};
+  fontPaths.emplace_back("../../resources/font/NotoSerifSC-Regular.otf");
+  fontPaths.emplace_back("../../resources/font/NotoColorEmoji.ttf");
+  std::vector<int> ttcIndices(fontPaths.size());
+  pag::PAGFont::SetFallbackFontPaths(fontPaths, ttcIndices);
+
   auto pagFile = pag::PAGFile::Load("../../assets/test2.pag");
   if (pagFile == nullptr) {
     return nullptr;
@@ -38,9 +45,9 @@ std::shared_ptr<pag::PAGFile> ReplaceImageOrText() {
 
   for (int i = 0; i < pagFile->numTexts(); i++) {
     auto textDocumentHandle = pagFile->getTextData(i);
-    textDocumentHandle->text = "天空不留下鸟的痕迹，但我已飞过~";
-    // Register Font
-    auto pagFont = pag::PAGFont::RegisterFont("../../resources/font/NotoSerifSC-Regular.otf", 0);
+    textDocumentHandle->text = "hah哈 哈哈哈哈👌";
+    // Use special font
+    auto pagFont = pag::PAGFont::RegisterFont("../../resources/font/NotoSansSC-Regular.otf", 0);
     textDocumentHandle->fontFamily = pagFont.fontFamily;
     textDocumentHandle->fontStyle = pagFont.fontStyle;
     pagFile->replaceText(i, textDocumentHandle);
