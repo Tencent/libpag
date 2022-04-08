@@ -52,6 +52,14 @@ int main(int argc, char* argv[]) {
   pag::PAGFont::SetFallbackFontPaths(fontPaths, ttcIndices);
 #else
   rootPath = QFileInfo(rootPath + "/../../../../../").absolutePath();
+  // for macOS 10.11+ iOS 9.0+
+  std::vector<std::string> fallbackList = {"PingFang SC",       "Apple SD Gothic Neo",
+                                           "Apple Color Emoji", "Helvetica",
+                                           "Myanmar Sangam MN", "Thonburi",
+                                           "Mishafi",           "Menlo",
+                                           "Kailasa",           "Kefa",
+                                           "Kohinoor Telugu",   "Hiragino Maru Gothic ProN"};
+  pag::PAGFont::SetFallbackFontNames(fallbackList);
 #endif
   app.OpenFile(rootPath + "/assets/test2.pag");
   return app.exec();
