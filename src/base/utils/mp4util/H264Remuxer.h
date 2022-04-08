@@ -70,8 +70,6 @@ class H264Remuxer {
   void writeMp4BoxesInSequence(VideoSequence* sequence);
 
  private:
-  static Frame GetImplicitOffset(const std::vector<VideoFrame*>& frames);
-
   Mp4Track mp4Track;
   const VideoSequence* videoSequence = nullptr;
 };

@@ -178,6 +178,10 @@ bool Baseline::Compare(const std::shared_ptr<ByteData>& byteData, const std::str
 #endif
   auto baselineVersion = GetJSONValue(BaselineVersion, key);
   auto cacheVersion = GetJSONValue(CacheVersion, key);
+
+  auto cacheMd5Value = GetJSONValue(CacheMD5, key);
+  printf("current md5: %s, cacheMd5Value: %s\n", md5.c_str(), cacheMd5Value.c_str());
+
   if (cacheVersion.empty() || baselineVersion.empty() ||
       (baselineVersion == cacheVersion && GetJSONValue(CacheMD5, key) != md5)) {
     SetJSONValue(OutputVersion, key, currentVersion);
