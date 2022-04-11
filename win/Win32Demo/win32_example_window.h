@@ -34,6 +34,7 @@ class Win32ExampleWindow : public Win32Window, public pagengine::PAGEngineCallba
   void OnDestroy() override;
   void DoPaint(HDC hdc) override;
   void OnTimer(int timer_id) override;
+  void OnSize(int w, int h) override;
 
   // pagengine::PAGEngineCallback
   void OnPagPlayEnd() override;
