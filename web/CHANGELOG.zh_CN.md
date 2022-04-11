@@ -101,3 +101,14 @@
 
 - 修复预测下一帧导致闪屏的问题
 - 修复静态帧区间Video对齐问题
+
+## 0.1.5
+
+### Feature
+
+- `PAGView.init()` 上增加 `initOptions` 参数，包含 `fullBox` 和 `useCanvas2D` 方法
+- `PAGView` 上增加 `setRenderCanvasSize` 方法
+
+### Bug Fixes
+
+- 修复 `PAGView.updateSize()` 更新 Canvas 尺寸逻辑

@@ -12,6 +12,7 @@ import { ScalerContext } from './core/scaler-context';
 import { WebMask } from './core/web-mask';
 import { NativeImage } from './core/native-image';
 import { PAGTextLayer } from './pag-text-layer';
+import { GlobalCanvas } from './core/global-canvas';
 
 /**
  * Binding pag js module on pag webassembly module.
@@ -40,6 +41,8 @@ export const binding = (module: PAG) => {
   module.ScalerContext = ScalerContext;
   module.WebMask = WebMask;
   WebMask.module = module;
+  module.GlobalCanvas = GlobalCanvas;
+  GlobalCanvas.module = module;
   module.traceImage = function (info, pixels) {
     const canvas = document.createElement('canvas');
     canvas.width = info.width;

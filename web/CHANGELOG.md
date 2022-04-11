@@ -18,7 +18,7 @@
 - Support create pag view from the canvas element.
 - Support measure text in low version browser, support Chrome 69+.
 - Add `setDuration` ， `timeStretchMode` ，and `setTimeStretchMode` on `PAGFile`.
-- Add `uniqueID` ， `layerType` ， `layerName` ， `opacity` ， `setOpacity` ， `visible` ， `setVisible`  ， `editableIndex` ， `frameRate` ， `localTimeToGlobal` ，and `globalToLocalTime` on `PAGLayer`.
+- Add `uniqueID` ， `layerType` ， `layerName` ， `opacity` ， `setOpacity` ， `visible` ， `setVisible` ， `editableIndex` ， `frameRate` ， `localTimeToGlobal` ，and `globalToLocalTime` on `PAGLayer`.
 
 ### Bug Fixes
 
@@ -29,12 +29,12 @@
 ### Breaking Changes
 
 - Eliminate the side effects caused by the `Asyncify` module in emscripten, change most of the methods that interact with wasm to `await` methods, and only keep `PAGPlayer.flush()` as an `async` method.
-- Replace  *`module*._PAGSurface`  to  *`module*.PAGSurface`.
+- Replace _`module_.\_PAGSurface` to *`module\*.PAGSurface`.
 
 ### Features
 
-- Add  `numChildren`，`setContentSize`，`getLayerAt`，`getLayersByName`，`getLayerIndex`，`swapLayer`，`swapLayerAt`，`contains`，`addLayer`，`addLayerAt`，`audioStartTime`，`audioMarkers`，`audioBytes`，`removeLayerAt`，`removeAllLayers`  on `PAGComposition`.
-- Add  `onAnimationPla`，`onAnimationPause` ，`onAnimationFlushed` on `PAGViewListenerEvent`.
+- Add `numChildren`，`setContentSize`，`getLayerAt`，`getLayersByName`，`getLayerIndex`，`swapLayer`，`swapLayerAt`，`contains`，`addLayer`，`addLayerAt`，`audioStartTime`，`audioMarkers`，`audioBytes`，`removeLayerAt`，`removeAllLayers` on `PAGComposition`.
+- Add `onAnimationPla`，`onAnimationPause` ，`onAnimationFlushed` on `PAGViewListenerEvent`.
 
 ### Bug Fixes
 
@@ -58,17 +58,17 @@
 ### Breaking Changes
 
 - Edit returns from `PAGFile.getLayersByEditableIndex` be `Vector<PAGLayer>`.
-- Replace C++ enum `LayerType` to Js enum `LayerType`,  replace `PAG.LayerType` to `libpag.types.LayerType`.
+- Replace C++ enum `LayerType` to Js enum `LayerType`, replace `PAG.LayerType` to `libpag.types.LayerType`.
 
 ### Features
 
 - Add warn message when canvas size is more than 2560 on Web env.
-- Make `PAGFile.load` support data what's type is  `Blob` or `ArrayBuffer` ，and add `maxSupportedTagLevel`, `tagLevel`, `copyOriginal` on `PAGFile`.
-- Add `freeCache` on  `PAGView`.
+- Make `PAGFile.load` support data what's type is `Blob` or `ArrayBuffer` ，and add `maxSupportedTagLevel`, `tagLevel`, `copyOriginal` on `PAGFile`.
+- Add `freeCache` on `PAGView`.
 - ADD `clearAll` on `PAGSurface.`
-- Add  `getSurface` , `matrix`, `setMatrix` , `nextFrame` ,  `preFrame` ,  `autoClear` , `setAutoClear`, `getBounds,` `getLayersUnderPoint`,  `hitTestPoint`,  `renderingTime` , `imageDecodingTime`,  `presentingTime` ,  `graphicsMemory` on `PAGPlayer`.
-- Add  `scaleMode`  ,  `setScaleMode` , `matrix` , `setMatrix` on `PAGImage`.
-- Add `matrix`, `setMatrix`, `resetMatrix`, `getTotalMatrix`, `parent`, `markers`, `setStartTime`, `currentTime`, `setCurrentTime`, `getProgress`, `setProgress`, `preFrame` , `nextFrame`, `getBounds`, `trackMatteLayer`, `excludedFromTimeline`,  `setExcludedFromTimeline`, `isPAGFile`, `isDelete` on `PAGLayer`.
+- Add `getSurface` , `matrix`, `setMatrix` , `nextFrame` , `preFrame` , `autoClear` , `setAutoClear`, `getBounds,` `getLayersUnderPoint`, `hitTestPoint`, `renderingTime` , `imageDecodingTime`, `presentingTime` , `graphicsMemory` on `PAGPlayer`.
+- Add `scaleMode` , `setScaleMode` , `matrix` , `setMatrix` on `PAGImage`.
+- Add `matrix`, `setMatrix`, `resetMatrix`, `getTotalMatrix`, `parent`, `markers`, `setStartTime`, `currentTime`, `setCurrentTime`, `getProgress`, `setProgress`, `preFrame` , `nextFrame`, `getBounds`, `trackMatteLayer`, `excludedFromTimeline`, `setExcludedFromTimeline`, `isPAGFile`, `isDelete` on `PAGLayer`.
 - Add `Make`, `removeLayer`, `getLayersUnderPoint` on `PAGComposition`.
 - Add `create`, `fontFamily`, `fontStyle` on `PAGFont`.
 - Add `PAGTextLayer`, `PAGImageLayer` Class.
@@ -101,3 +101,14 @@
 
 - Fix decoding the next frame error in Web env.
 - Fix the frame align error when is in the static time range.
+
+## 0.1.5
+
+### Feature
+
+- Add `initOptions` parameter what include `fullBox` and `useCanvas2D` on `PAGView.init()`.
+- Add `setRenderCanvasSize` on `PAGView`.
+
+### Bug Fixes
+
+- Fix `PAGView.updateSize()` update canvas size error。
