@@ -141,7 +141,7 @@ bool Baseline::Compare(const Bitmap& bitmap, const std::string& key) {
 #endif
   auto baselineVersion = GetJSONValue(BaselineVersion, key);
   auto cacheVersion = GetJSONValue(CacheVersion, key);
-  if (cacheVersion.empty() || baselineVersion.empty() ||
+  if (baselineVersion.empty() ||
       (baselineVersion == cacheVersion && GetJSONValue(CacheMD5, key) != md5)) {
     SetJSONValue(OutputVersion, key, currentVersion);
     SetJSONValue(OutputMD5, key, md5);
