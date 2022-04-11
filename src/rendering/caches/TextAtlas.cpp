@@ -165,7 +165,7 @@ static std::vector<Page> CreatePages(const std::vector<GlyphHandle>& glyphs, flo
   RectanglePack pack(padding);
   Page page;
   for (auto& glyph : glyphs) {
-    if (glyph->getName() == "\n") {
+    if (glyph->getName() == "\n" || glyph->getName() == " ") {
       continue;
     }
     tgfx::BytesKey styleKey = {};
