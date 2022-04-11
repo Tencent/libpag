@@ -2,7 +2,7 @@
 {
   CACHE_VERSION_FILE=./test/baseline/.cache/version.json
   if [ -f "$CACHE_VERSION_FILE" ]; then
-    HAS_DIFF=$(git diff --name-only main:test/baseline/version.json $CACHE_VERSION_FILE)
+    HAS_DIFF=$(git diff --name-only origin/main:test/baseline/version.json $CACHE_VERSION_FILE)
     if [[ ${HAS_DIFF} == "" ]]; then
       exit 0
     fi
