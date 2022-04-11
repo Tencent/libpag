@@ -147,7 +147,7 @@ node .\vendor_tools\cmake-build pag -p win -o .\win\paglib -v -i -DPAG_BUILD_SHA
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_WINDOWS;NOMINMAX;__gl_h_;CFLAGS=-DSK_A32_SHIFT=24 -DSK_B32_SHIFT=16 -DSK_G32_SHIFT=8 -DSK_R32_SHIFT=0;CPPFLAGS=-DSK_A32_SHIFT=24 -DSK_B32_SHIFT=16 -DSK_G32_SHIFT=8 -DSK_R32_SHIFT=0;CXXFLAGS=-DSK_A32_SHIFT=24 -DSK_B32_SHIFT=16 -DSK_G32_SHIFT=8 -DSK_R32_SHIFT=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\src\platform\win;$(SolutionDir)..\vendor\angle\include;$(SolutionDir)..\include;$(ProjectDir)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\src;$(SolutionDir)..\src\platform\win;$(SolutionDir)..\tgfx\include;$(SolutionDir)..\vendor\angle\include;$(SolutionDir)..\include;$(ProjectDir)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>

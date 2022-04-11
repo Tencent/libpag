@@ -62,4 +62,8 @@ void Win32ExampleWindow::OnTimer(int timer_id) {
   }
 }
 
+void Win32ExampleWindow::OnSize(int w, int h) {
+  pag_engine_->Resize(w, h);
+}
+
 void Win32ExampleWindow::OnPagPlayEnd() {}
