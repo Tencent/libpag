@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "H264Remuxer.h"
+#include "Mp4Generator.h"
 #include "base/utils/Log.h"
 #include "core/Clock.h"
 
@@ -297,8 +297,6 @@ int Mp4Generator::sdtp(SimpleArray* stream, bool write) {
     }
     stream->writeInt32(0);
     Mp4Flags flags;
-    // leave the full box header (4 byteData) all zero
-    // write the sample table
     for (size_t i = 0; i < samples.size(); i++) {
       flags = samples[i]->flags;
       stream->writeUint8((flags.dependsOn << 4) | (flags.isDependedOn << 2) | flags.hasRedundancy);
@@ -384,7 +382,7 @@ int Mp4Generator::avc1(SimpleArray* stream, bool write) {
     int width = param.track->width;
     int height = param.track->height;
     stream->writeInt32(0);
-    stream->writeInt32(0x00000001);
+    stream->writeInt32(1);
     stream->writeInt32(0);
     stream->writeInt32(0);
     stream->writeInt32(0);
@@ -493,7 +491,6 @@ int Mp4Generator::tkhd(SimpleArray* stream, bool write) {
     }
 
     int volumn = 1;
-
     stream->writeInt32(1);
     stream->writeInt32(0);
     stream->writeInt32(0);
@@ -772,8 +769,7 @@ int Mp4Generator::box(SimpleArray* stream, const std::string& type,
 int Mp4Generator::dinf(SimpleArray* stream, bool write) {
   std::vector<std::function<int(SimpleArray*, bool)>> writeFun;
   writeFun.reserve(1);
-  writeFun.emplace_back(
-      std::bind(&Mp4Generator::dref, this, std::placeholders::_1, std::placeholders::_2));
+  PushInWriteFun(dref);
   return box(stream, "dinf", writeFun, write);
 }
 

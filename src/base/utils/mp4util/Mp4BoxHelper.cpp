@@ -17,11 +17,85 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Mp4BoxHelper.h"
-#include "H264Remuxer.h"
+#include "Mp4Generator.h"
+#include "SimpleArray.h"
 #include "base/utils/Log.h"
 #include "core/Clock.h"
 
 namespace pag {
+static const int SEQUENCE_NUMBER = 1;
+static const int BASE_MEDIA_DECODE_TIME = 0;
+static const int BASE_MEDIA_TIME_SCALE = 6000;
+
+static Frame GetImplicitOffset(const std::vector<VideoFrame*>& frames) {
+  Frame index = 0;
+  Frame maxOffset = 0;
+  for (const auto* pts : frames) {
+    Frame offset = index - pts->frame;
+    if (offset > maxOffset) {
+      maxOffset = offset;
+    }
+    index++;
+  }
+  return maxOffset;
+}
+
+static std::shared_ptr<Mp4Track> MakeMp4Track(const VideoSequence* videoSequence) {
+  if (videoSequence->headers.size() < 2) {
+    LOGE("Bad header data in video sequence");
+    return nullptr;
+  }
+  if (videoSequence->frames.empty()) {
+    LOGE("There is no frame data in the video sequence");
+    return nullptr;
+  }
+
+  auto mp4Track = std::make_shared<Mp4Track>();
+
+  mp4Track->id = 1;  // track id
+  mp4Track->timescale = BASE_MEDIA_TIME_SCALE;
+  mp4Track->duration = static_cast<int32_t>(std::floor(
+      (static_cast<float>(static_cast<int>(videoSequence->frames.size()) * BASE_MEDIA_TIME_SCALE) /
+       videoSequence->frameRate)));
+  mp4Track->implicitOffset = static_cast<int32_t>(GetImplicitOffset(videoSequence->frames));
+
+  auto spsData = videoSequence->headers.at(0);
+  mp4Track->width = videoSequence->getVideoWidth();
+  mp4Track->height = videoSequence->getVideoHeight();
+  mp4Track->sps = {spsData};
+  mp4Track->pps = {videoSequence->headers.at(1)};
+
+  int headerLen = 0;
+  for (auto header : videoSequence->headers) {
+    headerLen += static_cast<int>(header->length());
+  }
+
+  auto sampleDelta = mp4Track->duration / static_cast<int32_t>(videoSequence->frames.size());
+  int count = 0;
+  for (const auto* frame : videoSequence->frames) {
+    int sampleSize = static_cast<int>(frame->fileBytes->length());
+    if (count == 0) {
+      sampleSize += headerLen;
+    }
+    mp4Track->len += sampleSize;
+    mp4Track->pts.emplace_back(frame->frame);
+    auto mp4Sample = std::make_shared<Mp4Sample>();
+    mp4Sample->index = count;
+    mp4Sample->size = sampleSize;
+    mp4Sample->duration = sampleDelta;
+    mp4Sample->cts = (static_cast<int32_t>(frame->frame) + mp4Track->implicitOffset -
+                      static_cast<int32_t>(count)) *
+                     sampleDelta;
+    mp4Sample->flags.isKeyFrame = frame->isKeyframe;
+    mp4Sample->flags.isNonSync = frame->isKeyframe ? 0 : 1;
+    mp4Sample->flags.dependsOn = frame->isKeyframe ? 2 : 1;
+
+    mp4Track->samples.emplace_back(mp4Sample);
+    count += 1;
+  }
+  return mp4Track;
+}
+
 static void WriteMdatBox(const VideoSequence* videoSequence, SimpleArray* payload,
                          int32_t mdatSize) {
   payload->writeInt32(mdatSize);
@@ -65,41 +139,52 @@ static std::unique_ptr<ByteData> ConcatMp4(const VideoSequence* videoSequence) {
   return payload.release();
 }
 
-static std::unique_ptr<ByteData> CreateMp4(const VideoSequence* videoSequence) {
-  tgfx::Clock clock;
-  clock.mark("CreateMp4");
-  auto remuxer = H264Remuxer::Remux(videoSequence);
-  if (!remuxer) {
+static std::unique_ptr<ByteData> MakeMp4Data(const VideoSequence* videoSequence, bool includeMdat) {
+  auto mp4Track = MakeMp4Track(videoSequence);
+  if (!mp4Track || mp4Track->len == 0) {
     return nullptr;
   }
-  auto mp4Data = remuxer->convertMp4();
-  LOGI("convertMp4, costTime: %lld", clock.measure("CreateMp4", ""));
-  return mp4Data;
+
+  BoxParam boxParam;
+  boxParam.tracks = {mp4Track};
+  boxParam.track = mp4Track;
+  boxParam.duration = mp4Track->duration;
+  boxParam.timescale = mp4Track->timescale;
+  boxParam.sequenceNumber = SEQUENCE_NUMBER;
+  boxParam.baseMediaDecodeTime = BASE_MEDIA_DECODE_TIME;
+  boxParam.nalusBytesLen = mp4Track->len;
+  boxParam.videoSequence = videoSequence;
+
+  float sizeFactor = includeMdat ? 1.5f : 0.5f;
+  SimpleArray stream(static_cast<uint32_t>(static_cast<float>(mp4Track->len) * sizeFactor));
+  Mp4Generator mp4Generator(boxParam);
+  mp4Generator.ftyp(&stream, true);
+  mp4Generator.moov(&stream, true);
+  mp4Generator.moof(&stream, true);
+  if (includeMdat) {
+    mp4Generator.mdat(&stream, true);
+  }
+  return stream.release();
 }
 
 std::unique_ptr<ByteData> Mp4BoxHelper::CovertToMp4(const VideoSequence* videoSequence) {
   tgfx::Clock clock;
   if (!videoSequence->mp4Header) {
     clock.mark("CreateMp4");
-    std::unique_ptr<ByteData> mp4Data = CreateMp4(videoSequence);
-    LOGI("CovertToMp4 without exist mp4 header, costTime: %lld", clock.measure("CreateMp4", ""));
+    auto mp4Data = MakeMp4Data(videoSequence, true);
+    LOGI("Convert to mp4 when there is no mp4 header data, costTime: %lld",
+         clock.measure("CreateMp4", ""));
     return mp4Data;
   }
 
   clock.mark("ConcatMp4");
-  std::unique_ptr<ByteData> mp4Data = ConcatMp4(videoSequence);
-  LOGI("CovertToMp4 with exist mp4 header, costTime: %lld", clock.measure("ConcatMp4", ""));
+  auto mp4Data = ConcatMp4(videoSequence);
+  LOGI("Convert to mp4 when there is mp4 header data, costTime: %lld",
+       clock.measure("ConcatMp4", ""));
   return mp4Data;
 }
 
 void Mp4BoxHelper::WriteMp4Header(VideoSequence* videoSequence) {
-  tgfx::Clock clock;
-  clock.mark("WriteMp4Header");
-  auto remuxer = H264Remuxer::Remux(videoSequence);
-  if (!remuxer) {
-    return;
-  }
-  remuxer->writeMp4BoxesInSequence(videoSequence);
-  LOGI("write mp4 header, costTime: %lld", clock.measure("WriteMp4Header", ""));
+  videoSequence->mp4Header = MakeMp4Data(videoSequence, false).release();
 }
 }  // namespace pag

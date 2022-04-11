@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -25,7 +26,38 @@
 #include "pag/file.h"
 
 namespace pag {
-struct Mp4Track;
+struct Mp4Flags {
+  int isLeading = 0;
+  int isDependedOn = 0;
+  int hasRedundancy = 0;
+  int degradPrio = 0;
+  int isNonSync = 0;
+  int dependsOn = 0;
+  bool isKeyFrame = false;
+};
+
+struct Mp4Sample {
+  int index = 0;
+  int size = 0;
+  int32_t duration = 0;
+  int32_t cts = 0;
+  Mp4Flags flags;
+};
+
+struct Mp4Track {
+  int id = 0;
+  std::string type = "video";
+  int len = 0;
+  std::vector<ByteData*> sps;
+  std::vector<ByteData*> pps;
+  int width = 0;
+  int height = 0;
+  int timescale = 0;
+  int32_t duration = 0;
+  std::vector<std::shared_ptr<Mp4Sample>> samples;
+  std::vector<int32_t> pts;
+  int32_t implicitOffset = 0;
+};
 
 struct BoxParam {
   int offset = 0;
@@ -34,9 +66,9 @@ struct BoxParam {
   int sequenceNumber = 0;
   int nalusBytesLen = 0;
   int32_t baseMediaDecodeTime = 0;
-  Mp4Track* track = nullptr;
+  std::shared_ptr<Mp4Track> track = nullptr;
   const VideoSequence* videoSequence = nullptr;
-  std::vector<Mp4Track*> tracks;
+  std::vector<std::shared_ptr<Mp4Track>> tracks;
 };
 
 class Mp4Generator {

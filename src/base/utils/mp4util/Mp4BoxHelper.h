@@ -19,19 +19,18 @@
 #pragma once
 
 #include <memory>
-#include "SimpleArray.h"
 #include "pag/file.h"
 
 namespace pag {
 class Mp4BoxHelper {
  public:
   /**
-   * Muxs h264 data in VideoSequence and return mp4 data
+   * Muxes h264 data in VideoSequence and returns mp4 data
    */
   static std::unique_ptr<ByteData> CovertToMp4(const VideoSequence* videoSequence);
 
   /**
-   * Creates mp4 header box data, and write into VideoSequence mp4Header member
+   * Creates mp4 header box data, and writes into VideoSequence mp4Header member
    */
   static void WriteMp4Header(VideoSequence* videoSequence);
 };

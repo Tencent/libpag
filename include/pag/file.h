@@ -2045,7 +2045,7 @@ class PAG_API VideoSequence : public Sequence {
   bool verify() const override;
 
   /**
-   * Get mp4 data from current video sequence
+   * Gets mp4 data from the current video sequence.
    */
   std::unique_ptr<ByteData> getMp4Data();
 
