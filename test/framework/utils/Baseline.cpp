@@ -118,9 +118,8 @@ bool Baseline::Compare(const std::shared_ptr<PixelBuffer>& pixelBuffer, const st
   return Baseline::Compare(bitmap, key);
 }
 
-static bool CompareVersionAndMd5(
-    const std::string& md5, const std::string& key,
-    std::function<void(bool)> callback = [](bool) {}) {
+static bool CompareVersionAndMd5(const std::string& md5, const std::string& key,
+                                 const std::function<void(bool)>& callback) {
 #ifdef UPDATE_BASELINE
   SetJSONValue(OutputMD5, key, md5);
   return true;
@@ -131,11 +130,15 @@ static bool CompareVersionAndMd5(
       (baselineVersion == cacheVersion && GetJSONValue(CacheMD5, key) != md5)) {
     SetJSONValue(OutputVersion, key, currentVersion);
     SetJSONValue(OutputMD5, key, md5);
-    callback(false);
+    if (callback) {
+      callback(false);
+    }
     return false;
   }
   SetJSONValue(OutputVersion, key, baselineVersion);
-  callback(true);
+  if (callback) {
+    callback(true);
+  }
   return true;
 }
 
@@ -184,7 +187,7 @@ bool Baseline::Compare(const std::shared_ptr<ByteData>& byteData, const std::str
     return false;
   }
   std::string md5 = DumpMD5(byteData->data(), byteData->length());
-  return CompareVersionAndMd5(md5, key);
+  return CompareVersionAndMd5(md5, key, {});
 }
 
 void Baseline::SetUp() {
