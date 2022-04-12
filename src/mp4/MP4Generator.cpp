@@ -16,8 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "Mp4Generator.h"
-#include "base/utils/Log.h"
+#include "MP4Generator.h"
 #include "core/Clock.h"
 
 #define PushInWriteFun(funName)                                                         \
@@ -29,7 +28,7 @@ namespace pag {
 static const char* VIDEO = "video";
 static const char* AUDIO = "audio";
 
-Mp4Generator::Mp4Generator(BoxParam param) : param(std::move(param)) {
+MP4Generator::MP4Generator(BoxParam param) : param(std::move(param)) {
 }
 
 static int WriteCharCode(EncodeStream* stream, std::string stringData, bool write) {
@@ -43,7 +42,7 @@ static int WriteCharCode(EncodeStream* stream, std::string stringData, bool writ
   return size;
 }
 
-int Mp4Generator::writeH264Nalus(EncodeStream* stream, bool write) const {
+int MP4Generator::writeH264Nalus(EncodeStream* stream, bool write) const {
   if (!write) {
     return param.nalusBytesLen;
   }
@@ -60,11 +59,10 @@ int Mp4Generator::writeH264Nalus(EncodeStream* stream, bool write) const {
   return param.nalusBytesLen;
 }
 
-int Mp4Generator::ftyp(EncodeStream* stream, bool write) {
+int MP4Generator::ftyp(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(1);
   auto innerWriteFun = [this](EncodeStream* stream, bool write) -> int {
-    LOGI("param->duration: %d", param.duration);
     int len = 24;
     if (!write) {
       return len;
@@ -81,7 +79,7 @@ int Mp4Generator::ftyp(EncodeStream* stream, bool write) {
   return box(stream, "ftyp", writeFun, write);
 }
 
-int Mp4Generator::moov(EncodeStream* stream, bool write) {
+int MP4Generator::moov(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(1 + param.tracks.size());
   PushInWriteFun(mvhd);
@@ -93,7 +91,7 @@ int Mp4Generator::moov(EncodeStream* stream, bool write) {
   return box(stream, "moov", writeFun, write);
 }
 
-int Mp4Generator::moof(EncodeStream* stream, bool write) {
+int MP4Generator::moof(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(2);
   PushInWriteFun(mfhd);
@@ -101,14 +99,14 @@ int Mp4Generator::moof(EncodeStream* stream, bool write) {
   return box(stream, "moof", writeFun, write);
 }
 
-int Mp4Generator::mdat(EncodeStream* stream, bool write) {
+int MP4Generator::mdat(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(1);
   PushInWriteFun(writeH264Nalus);
   return box(stream, "mdat", writeFun, write);
 }
 
-int Mp4Generator::hdlr(EncodeStream* stream, bool write) {
+int MP4Generator::hdlr(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(1);
   if (param.track->type == VIDEO) {
@@ -146,7 +144,7 @@ int Mp4Generator::hdlr(EncodeStream* stream, bool write) {
   return box(stream, "hdlr", writeFun, write);
 }
 
-int Mp4Generator::mdhd(EncodeStream* stream, bool write) {
+int MP4Generator::mdhd(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(1);
   auto innerWriteFun = [&](EncodeStream* stream, bool write) -> int {
@@ -166,7 +164,7 @@ int Mp4Generator::mdhd(EncodeStream* stream, bool write) {
   return box(stream, "mdhd", writeFun, write);
 }
 
-int Mp4Generator::mdia(EncodeStream* stream, bool write) {
+int MP4Generator::mdia(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(3);
   PushInWriteFun(mdhd);
@@ -175,7 +173,7 @@ int Mp4Generator::mdia(EncodeStream* stream, bool write) {
   return box(stream, "mdia", writeFun, write);
 }
 
-int Mp4Generator::mfhd(EncodeStream* stream, bool write) {
+int MP4Generator::mfhd(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(1);
   auto innerWriteFun = [&](EncodeStream* stream, bool write) -> int {
@@ -191,7 +189,7 @@ int Mp4Generator::mfhd(EncodeStream* stream, bool write) {
   return box(stream, "mfhd", writeFun, write);
 }
 
-int Mp4Generator::minf(EncodeStream* stream, bool write) {
+int MP4Generator::minf(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(3);
   if (param.track->type == AUDIO) {
@@ -204,7 +202,7 @@ int Mp4Generator::minf(EncodeStream* stream, bool write) {
   return box(stream, "minf", writeFun, write);
 }
 
-int Mp4Generator::smhd(EncodeStream* stream, bool write) {
+int MP4Generator::smhd(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(1);
   auto innerWriteFun = [](EncodeStream* stream, bool write) -> int {
@@ -220,7 +218,7 @@ int Mp4Generator::smhd(EncodeStream* stream, bool write) {
   return box(stream, "smhd", writeFun, write);
 }
 
-int Mp4Generator::vmhd(EncodeStream* stream, bool write) {
+int MP4Generator::vmhd(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(1);
   auto innerWriteFun = [](EncodeStream* stream, bool write) -> int {
@@ -237,7 +235,7 @@ int Mp4Generator::vmhd(EncodeStream* stream, bool write) {
   return box(stream, "vmhd", writeFun, write);
 }
 
-int Mp4Generator::mvex(EncodeStream* stream, bool write) {
+int MP4Generator::mvex(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(param.tracks.size());
   for (auto& mp4Track : param.tracks) {
@@ -247,7 +245,7 @@ int Mp4Generator::mvex(EncodeStream* stream, bool write) {
   return box(stream, "mvex", writeFun, write);
 }
 
-int Mp4Generator::mvhd(EncodeStream* stream, bool write) {
+int MP4Generator::mvhd(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(1);
   auto innerWriteFun = [&](EncodeStream* stream, bool write) -> int {
@@ -286,7 +284,7 @@ int Mp4Generator::mvhd(EncodeStream* stream, bool write) {
   return box(stream, "mvhd", writeFun, write);
 }
 
-int Mp4Generator::sdtp(EncodeStream* stream, bool write) {
+int MP4Generator::sdtp(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(1);
   auto innerWriteFun = [&](EncodeStream* stream, bool write) -> int {
@@ -296,7 +294,7 @@ int Mp4Generator::sdtp(EncodeStream* stream, bool write) {
       return dataLen;
     }
     stream->writeInt32(0);
-    Mp4Flags flags;
+    MP4Flags flags;
     for (size_t i = 0; i < samples.size(); i++) {
       flags = samples[i]->flags;
       stream->writeUint8((flags.dependsOn << 4) | (flags.isDependedOn << 2) | flags.hasRedundancy);
@@ -307,7 +305,7 @@ int Mp4Generator::sdtp(EncodeStream* stream, bool write) {
   return box(stream, "sdtp", writeFun, write);
 }
 
-int Mp4Generator::stbl(EncodeStream* stream, bool write) {
+int MP4Generator::stbl(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(7);
   PushInWriteFun(stsd);
@@ -320,7 +318,7 @@ int Mp4Generator::stbl(EncodeStream* stream, bool write) {
   return box(stream, "stbl", writeFun, write);
 }
 
-int Mp4Generator::stsc(EncodeStream* stream, bool write) {
+int MP4Generator::stsc(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(1);
   auto innerWrite = [](EncodeStream* stream, bool write) -> int {
@@ -336,7 +334,7 @@ int Mp4Generator::stsc(EncodeStream* stream, bool write) {
   return box(stream, "stsc", writeFun, write);
 }
 
-int Mp4Generator::stsz(EncodeStream* stream, bool write) {
+int MP4Generator::stsz(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(1);
   auto innerWrite = [](EncodeStream* stream, bool write) -> int {
@@ -353,7 +351,7 @@ int Mp4Generator::stsz(EncodeStream* stream, bool write) {
   return box(stream, "stsz", writeFun, write);
 }
 
-int Mp4Generator::stco(EncodeStream* stream, bool write) {
+int MP4Generator::stco(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(1);
   auto innerWrite = [](EncodeStream* stream, bool write) -> int {
@@ -370,7 +368,7 @@ int Mp4Generator::stco(EncodeStream* stream, bool write) {
   return box(stream, "stco", writeFun, write);
 }
 
-int Mp4Generator::avc1(EncodeStream* stream, bool write) {
+int MP4Generator::avc1(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(2);
   auto innerWrite = [&](EncodeStream* stream, bool write) -> int {
@@ -413,7 +411,7 @@ int Mp4Generator::avc1(EncodeStream* stream, bool write) {
   return box(stream, "avc1", writeFun, write);
 }
 
-int Mp4Generator::avcc(EncodeStream* stream, bool write) {
+int MP4Generator::avcc(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(1);
   auto innerWrite = [&](EncodeStream* stream, bool write) -> int {
@@ -461,7 +459,7 @@ int Mp4Generator::avcc(EncodeStream* stream, bool write) {
   return box(stream, "avcC", writeFun, write);
 }
 
-int Mp4Generator::stsd(EncodeStream* stream, bool write) {
+int MP4Generator::stsd(EncodeStream* stream, bool write) {
   if (param.track->type == VIDEO) {
     std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
     writeFun.reserve(1);
@@ -481,7 +479,7 @@ int Mp4Generator::stsd(EncodeStream* stream, bool write) {
   return 0;
 }
 
-int Mp4Generator::tkhd(EncodeStream* stream, bool write) {
+int MP4Generator::tkhd(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(1);
   auto innerWrite = [&](EncodeStream* stream, bool write) -> int {
@@ -528,7 +526,7 @@ int Mp4Generator::tkhd(EncodeStream* stream, bool write) {
   return box(stream, "tkhd", writeFun, write);
 }
 
-int Mp4Generator::traf(EncodeStream* stream, bool write) {
+int MP4Generator::traf(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(4);
   int sdtpLen = sdtp(stream, false);
@@ -540,7 +538,7 @@ int Mp4Generator::traf(EncodeStream* stream, bool write) {
   return box(stream, "traf", writeFun, write);
 }
 
-int Mp4Generator::tfhd(EncodeStream* stream, bool write) {
+int MP4Generator::tfhd(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(1);
   auto innerWriteFun = [&](EncodeStream* stream, bool write) -> int {
@@ -558,7 +556,7 @@ int Mp4Generator::tfhd(EncodeStream* stream, bool write) {
   return box(stream, "tfhd", writeFun, write);
 }
 
-int Mp4Generator::tfdt(EncodeStream* stream, bool write) {
+int MP4Generator::tfdt(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(1);
   auto innerWriteFun = [&](EncodeStream* stream, bool write) -> int {
@@ -575,7 +573,7 @@ int Mp4Generator::tfdt(EncodeStream* stream, bool write) {
   return box(stream, "tfdt", writeFun, write);
 }
 
-int Mp4Generator::trak(EncodeStream* stream, bool write) {
+int MP4Generator::trak(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(3);
   PushInWriteFun(tkhd);
@@ -584,14 +582,14 @@ int Mp4Generator::trak(EncodeStream* stream, bool write) {
   return box(stream, "trak", writeFun, write);
 }
 
-int Mp4Generator::edts(EncodeStream* stream, bool write) {
+int MP4Generator::edts(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(1);
   PushInWriteFun(elst);
   return box(stream, "edts", writeFun, write);
 }
 
-int Mp4Generator::elst(EncodeStream* stream, bool write) {
+int MP4Generator::elst(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(1);
   auto innerWriteFun = [&](EncodeStream* stream, bool write) -> int {
@@ -612,7 +610,7 @@ int Mp4Generator::elst(EncodeStream* stream, bool write) {
   return box(stream, "elst", writeFun, write);
 }
 
-int Mp4Generator::trex(EncodeStream* stream, bool write) {
+int MP4Generator::trex(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(1);
   auto innerWriteFun = [&](EncodeStream* stream, bool write) -> int {
@@ -634,7 +632,7 @@ int Mp4Generator::trex(EncodeStream* stream, bool write) {
   return box(stream, "trex", writeFun, write);
 }
 
-int Mp4Generator::trun(EncodeStream* stream, bool write) {
+int MP4Generator::trun(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(1);
   auto innerWriteFun = [&](EncodeStream* stream, bool write) -> int {
@@ -651,7 +649,7 @@ int Mp4Generator::trun(EncodeStream* stream, bool write) {
     stream->writeInt32(param.offset);
 
     for (auto& sample : samples) {
-      Mp4Flags flags = sample->flags;
+      MP4Flags flags = sample->flags;
       uint8_t paddingValue = 0;
       stream->writeInt32(sample->duration);
       stream->writeInt32(sample->size);
@@ -669,7 +667,7 @@ int Mp4Generator::trun(EncodeStream* stream, bool write) {
   return box(stream, "trun", writeFun, write);
 }
 
-int Mp4Generator::stts(EncodeStream* stream, bool write) {
+int MP4Generator::stts(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(1);
   auto innerWriteFun = [&](EncodeStream* stream, bool write) -> int {
@@ -690,7 +688,7 @@ int Mp4Generator::stts(EncodeStream* stream, bool write) {
   return box(stream, "stts", writeFun, write);
 }
 
-int Mp4Generator::ctts(EncodeStream* stream, bool write) {
+int MP4Generator::ctts(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(1);
   auto innerWriteFun = [&](EncodeStream* stream, bool write) -> int {
@@ -715,7 +713,7 @@ int Mp4Generator::ctts(EncodeStream* stream, bool write) {
   return box(stream, "ctts", writeFun, write);
 }
 
-int Mp4Generator::stss(EncodeStream* stream, bool write) {
+int MP4Generator::stss(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(1);
   auto innerWriteFun = [&](EncodeStream* stream, bool write) -> int {
@@ -741,7 +739,7 @@ int Mp4Generator::stss(EncodeStream* stream, bool write) {
   return box(stream, "stss", writeFun, write);
 }
 
-int Mp4Generator::box(EncodeStream* stream, const std::string& type,
+int MP4Generator::box(EncodeStream* stream, const std::string& type,
                       const std::vector<std::function<int(EncodeStream*, bool)>>& boxFunctions,
                       bool write) {
   int size = 8;
@@ -766,14 +764,14 @@ int Mp4Generator::box(EncodeStream* stream, const std::string& type,
   return size;
 }
 
-int Mp4Generator::dinf(EncodeStream* stream, bool write) {
+int MP4Generator::dinf(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(1);
   PushInWriteFun(dref);
   return box(stream, "dinf", writeFun, write);
 }
 
-int Mp4Generator::dref(EncodeStream* stream, bool write) {
+int MP4Generator::dref(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(1);
   auto innerWriteFun = [](EncodeStream* stream, bool write) -> int {

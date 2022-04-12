@@ -18,6 +18,7 @@
 
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
+#include "mp4/MP4BoxHelper.h"
 #include "pag/pag.h"
 #include "platform/swiftshader/NativePlatform.h"
 #include "rendering/caches/RenderCache.h"
@@ -90,8 +91,8 @@ PAG_TEST_F(PAGSequenceTest, VideoSequenceToMp4WithHeader) {
 
   VideoComposition* videoComposition = static_cast<VideoComposition*>(preComposeLayer->composition);
   ASSERT_FALSE(videoComposition->sequences.empty());
-  auto videoSequence = videoComposition->sequences.at(0);
-  auto mp4Data = videoSequence->getMp4Data();
+  const auto* videoSequence = videoComposition->sequences.at(0);
+  auto mp4Data = MP4BoxHelper::CovertToMp4(videoSequence);
   ASSERT_NE(mp4Data, nullptr);
 
   EXPECT_TRUE(
@@ -112,8 +113,8 @@ PAG_TEST_F(PAGSequenceTest, VideoSequenceToMp4WithoutHeader) {
 
   VideoComposition* videoComposition = static_cast<VideoComposition*>(preComposeLayer->composition);
   ASSERT_FALSE(videoComposition->sequences.empty());
-  auto videoSequence = videoComposition->sequences.at(0);
-  auto mp4Data = videoSequence->getMp4Data();
+  const auto* videoSequence = videoComposition->sequences.at(0);
+  auto mp4Data = MP4BoxHelper::CovertToMp4(videoSequence);
   ASSERT_NE(mp4Data, nullptr);
 
   EXPECT_TRUE(

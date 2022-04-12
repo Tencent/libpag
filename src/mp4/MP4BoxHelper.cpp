@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "Mp4BoxHelper.h"
-#include "Mp4Generator.h"
+#include "MP4BoxHelper.h"
+#include "MP4Generator.h"
 #include "base/utils/Log.h"
 #include "codec/utils/EncodeStream.h"
 #include "core/Clock.h"
@@ -40,7 +40,7 @@ static Frame GetImplicitOffset(const std::vector<VideoFrame*>& frames) {
   return maxOffset;
 }
 
-static std::shared_ptr<Mp4Track> MakeMp4Track(const VideoSequence* videoSequence) {
+static std::shared_ptr<MP4Track> MakeMP4Track(const VideoSequence* videoSequence) {
   if (videoSequence->headers.size() < 2) {
     LOGE("Bad header data in video sequence");
     return nullptr;
@@ -50,7 +50,7 @@ static std::shared_ptr<Mp4Track> MakeMp4Track(const VideoSequence* videoSequence
     return nullptr;
   }
 
-  auto mp4Track = std::make_shared<Mp4Track>();
+  auto mp4Track = std::make_shared<MP4Track>();
 
   mp4Track->id = 1;  // track id
   mp4Track->timescale = BASE_MEDIA_TIME_SCALE;
@@ -79,7 +79,7 @@ static std::shared_ptr<Mp4Track> MakeMp4Track(const VideoSequence* videoSequence
     }
     mp4Track->len += sampleSize;
     mp4Track->pts.emplace_back(frame->frame);
-    auto mp4Sample = std::make_shared<Mp4Sample>();
+    auto mp4Sample = std::make_shared<MP4Sample>();
     mp4Sample->index = count;
     mp4Sample->size = sampleSize;
     mp4Sample->duration = sampleDelta;
@@ -140,7 +140,7 @@ static std::unique_ptr<ByteData> ConcatMp4(const VideoSequence* videoSequence) {
 }
 
 static std::unique_ptr<ByteData> MakeMp4Data(const VideoSequence* videoSequence, bool includeMdat) {
-  auto mp4Track = MakeMp4Track(videoSequence);
+  auto mp4Track = MakeMP4Track(videoSequence);
   if (!mp4Track || mp4Track->len == 0) {
     return nullptr;
   }
@@ -159,7 +159,7 @@ static std::unique_ptr<ByteData> MakeMp4Data(const VideoSequence* videoSequence,
   EncodeStream stream(nullptr,
                       static_cast<uint32_t>(static_cast<float>(mp4Track->len) * sizeFactor));
   stream.setOrder(ByteOrder::BigEndian);
-  Mp4Generator mp4Generator(boxParam);
+  MP4Generator mp4Generator(boxParam);
   mp4Generator.ftyp(&stream, true);
   mp4Generator.moov(&stream, true);
   mp4Generator.moof(&stream, true);
@@ -169,24 +169,14 @@ static std::unique_ptr<ByteData> MakeMp4Data(const VideoSequence* videoSequence,
   return stream.release();
 }
 
-std::unique_ptr<ByteData> Mp4BoxHelper::CovertToMp4(const VideoSequence* videoSequence) {
-  tgfx::Clock clock;
+std::unique_ptr<ByteData> MP4BoxHelper::CovertToMp4(const VideoSequence* videoSequence) {
   if (!videoSequence->mp4Header) {
-    clock.mark("CreateMp4");
-    auto mp4Data = MakeMp4Data(videoSequence, true);
-    LOGI("Convert to mp4 when there is no mp4 header data, costTime: %lld",
-         clock.measure("CreateMp4", ""));
-    return mp4Data;
+    return MakeMp4Data(videoSequence, true);
   }
-
-  clock.mark("ConcatMp4");
-  auto mp4Data = ConcatMp4(videoSequence);
-  LOGI("Convert to mp4 when there is mp4 header data, costTime: %lld",
-       clock.measure("ConcatMp4", ""));
-  return mp4Data;
+  return ConcatMp4(videoSequence);
 }
 
-void Mp4BoxHelper::WriteMp4Header(VideoSequence* videoSequence) {
+void MP4BoxHelper::WriteMp4Header(VideoSequence* videoSequence) {
   videoSequence->mp4Header = MakeMp4Data(videoSequence, false).release();
 }
 }  // namespace pag

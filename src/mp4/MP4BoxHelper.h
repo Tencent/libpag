@@ -22,7 +22,7 @@
 #include "pag/file.h"
 
 namespace pag {
-class Mp4BoxHelper {
+class MP4BoxHelper {
  public:
   /**
    * Muxes h264 data in VideoSequence and returns mp4 data

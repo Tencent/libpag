@@ -2044,11 +2044,6 @@ class PAG_API VideoSequence : public Sequence {
 
   bool verify() const override;
 
-  /**
-   * Gets mp4 data from the current video sequence.
-   */
-  std::unique_ptr<ByteData> getMp4Data();
-
   int32_t getVideoWidth() const;
 
   int32_t getVideoHeight() const;
