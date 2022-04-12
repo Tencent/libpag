@@ -36,8 +36,8 @@ void ReadTagsOfVideoComposition(DecodeStream* stream, TagCode code,
     } break;
     case TagCode::Mp4Header: {
       for (auto sequence : composition->sequences) {
-        if (sequence->mp4Header == nullptr) {
-          sequence->mp4Header = ReadMp4Header(stream);
+        if (sequence->MP4Header == nullptr) {
+          sequence->MP4Header = ReadMp4Header(stream);
           break;
         }
       }
@@ -74,10 +74,10 @@ TagCode WriteVideoComposition(EncodeStream* stream, VideoComposition* compositio
     WriteTag(stream, &parameter, WriteVideoSequence);
   }
   for (auto sequence : sequences) {
-    if (sequence->mp4Header == nullptr) {
+    if (sequence->MP4Header == nullptr) {
       break;
     }
-    WriteTag(stream, sequence->mp4Header, WriteMp4Header);
+    WriteTag(stream, sequence->MP4Header, WriteMp4Header);
   }
   WriteEndTag(stream);
   return TagCode::VideoCompositionBlock;

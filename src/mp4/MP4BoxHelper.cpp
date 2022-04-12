@@ -118,7 +118,7 @@ static void WriteMdatBox(const VideoSequence* videoSequence, EncodeStream* paylo
 }
 
 static std::unique_ptr<ByteData> ConcatMp4(const VideoSequence* videoSequence) {
-  auto dataSize = static_cast<int32_t>(videoSequence->mp4Header->length());
+  auto dataSize = static_cast<int32_t>(videoSequence->MP4Header->length());
   int32_t mdatSize = 0;
   for (auto header : videoSequence->headers) {
     auto needSize = static_cast<int32_t>(header->length());
@@ -133,7 +133,7 @@ static std::unique_ptr<ByteData> ConcatMp4(const VideoSequence* videoSequence) {
 
   EncodeStream payload(nullptr, static_cast<uint32_t>(dataSize));
   payload.setOrder(ByteOrder::BigEndian);
-  payload.writeBytes(videoSequence->mp4Header->data(), videoSequence->mp4Header->length());
+  payload.writeBytes(videoSequence->MP4Header->data(), videoSequence->MP4Header->length());
   WriteMdatBox(videoSequence, &payload, mdatSize);
 
   return payload.release();
@@ -170,13 +170,13 @@ static std::unique_ptr<ByteData> MakeMp4Data(const VideoSequence* videoSequence,
 }
 
 std::unique_ptr<ByteData> MP4BoxHelper::CovertToMp4(const VideoSequence* videoSequence) {
-  if (!videoSequence->mp4Header) {
+  if (!videoSequence->MP4Header) {
     return MakeMp4Data(videoSequence, true);
   }
   return ConcatMp4(videoSequence);
 }
 
 void MP4BoxHelper::WriteMp4Header(VideoSequence* videoSequence) {
-  videoSequence->mp4Header = MakeMp4Data(videoSequence, false).release();
+  videoSequence->MP4Header = MakeMp4Data(videoSequence, false).release();
 }
 }  // namespace pag

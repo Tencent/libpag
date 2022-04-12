@@ -62,7 +62,7 @@ int MP4Generator::writeH264Nalus(EncodeStream* stream, bool write) const {
 int MP4Generator::ftyp(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(1);
-  auto innerWriteFun = [this](EncodeStream* stream, bool write) -> int {
+  auto innerWriteFun = [](EncodeStream* stream, bool write) -> int {
     int len = 24;
     if (!write) {
       return len;
