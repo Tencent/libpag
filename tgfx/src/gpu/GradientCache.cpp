@@ -110,7 +110,9 @@ const Texture* GradientCache::getGradient(const Color* colors, const float* posi
     return nullptr;
   }
   auto tex = pixelBuffer->makeTexture(context);
-  add(bytesKey, tex);
+  if (tex) {
+    add(bytesKey, tex);
+  }
   return tex.get();
 }
 
