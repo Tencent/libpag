@@ -59,7 +59,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif ()
 
 # collects tgfx common files.
-set(TGFX_INCLUDES ./ include src)
+set(TGFX_INCLUDES ./ src)
 file(GLOB TGFX_FILES
         src/core/*.*
         src/core/utils/*.*
@@ -323,6 +323,6 @@ if (HasParent)
 endif ()
 
 add_library(tgfx STATIC ${TGFX_VENDOR_TARGET} ${PLATFORM_VENDOR_TARGETS} ${TGFX_FILES} ${TGFX_PLATFORM_FILES} ${GPU_PLATFORM_FILES})
-target_include_directories(tgfx PUBLIC ${TGFX_INCLUDES} ${TGFX_PLATFORM_INCLUDES} ${GPU_PLATFORM_INCLUDES})
+target_include_directories(tgfx PUBLIC include PRIVATE ${TGFX_INCLUDES} ${GPU_PLATFORM_INCLUDES})
 merge_libraries_into(tgfx ${TGFX_STATIC_LIBS} ${TGFX_PLATFORM_STATIC_LIBS})
 target_link_libraries(tgfx ${TGFX_PLATFORM_SHARED_LIBS} ${GPU_PLATFORM_SHARED_LIBS})

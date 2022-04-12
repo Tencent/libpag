@@ -31,6 +31,7 @@ class NativeImage : public Image {
  private:
   std::string imagePath;
   std::shared_ptr<Data> imageBytes;
+  Global<jobject> bitmap;
 
   NativeImage(int width, int height, Orientation orientation) : Image(width, height, orientation){};
 

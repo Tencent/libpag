@@ -203,6 +203,23 @@ static ImageInfo GetImageInfo(JNIEnv* env, jobject bitmap) {
                          bitmapInfo.stride);
 }
 
+std::shared_ptr<Image> NativeCodec::MakeFrom(void* nativeImage) {
+  auto env = CurrentJNIEnv();
+  if (env == nullptr) {
+    return nullptr;
+  }
+  auto bitmap = reinterpret_cast<jobject>(nativeImage);
+  auto info = GetImageInfo(env, bitmap);
+  if (info.isEmpty()) {
+    env->ExceptionClear();
+    return nullptr;
+  }
+  auto image = std::unique_ptr<NativeImage>(
+      new NativeImage(info.width(), info.height(), Orientation::TopLeft));
+  image->bitmap.reset(env, bitmap);
+  return image;
+}
+
 bool NativeImage::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
@@ -211,40 +228,44 @@ bool NativeImage::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (env == nullptr) {
     return false;
   }
-  Local<jobject> options = {
-      env, env->NewObject(BitmapFactoryOptionsClass.get(), BitmapFactoryOptions_Constructor)};
-  if (options.empty()) {
-    env->ExceptionClear();
-    return false;
-  }
-  Local<jobject> config;
-  if (dstInfo.colorType() == ColorType::ALPHA_8) {
-    config.reset(env, env->GetStaticObjectField(BitmapConfigClass.get(), BitmapConfig_ALPHA_8));
+  Local<jobject> bitmapObject;
+  if (!bitmap.empty()) {
+    bitmapObject.reset(env, env->NewLocalRef(bitmap.get()));
   } else {
-    config.reset(env, env->GetStaticObjectField(BitmapConfigClass.get(), BitmapConfig_ARGB_8888));
+    Local<jobject> options = {
+        env, env->NewObject(BitmapFactoryOptionsClass.get(), BitmapFactoryOptions_Constructor)};
+    if (options.empty()) {
+      env->ExceptionClear();
+      return false;
+    }
+    Local<jobject> config;
+    if (dstInfo.colorType() == ColorType::ALPHA_8) {
+      config.reset(env, env->GetStaticObjectField(BitmapConfigClass.get(), BitmapConfig_ALPHA_8));
+    } else {
+      config.reset(env, env->GetStaticObjectField(BitmapConfigClass.get(), BitmapConfig_ARGB_8888));
+    }
+    env->SetObjectField(options.get(), BitmapFactoryOptions_inPreferredConfig, config.get());
+    if (dstInfo.alphaType() == AlphaType::Unpremultiplied) {
+      env->SetBooleanField(options.get(), BitmapFactoryOptions_inPremultiplied, false);
+    }
+    if (!imagePath.empty()) {
+      bitmapObject.reset(env, DecodeBitmap(env, options.get(), imagePath));
+    } else {
+      bitmapObject.reset(env, DecodeBitmap(env, options.get(), imageBytes));
+    }
   }
-  env->SetObjectField(options.get(), BitmapFactoryOptions_inPreferredConfig, config.get());
-  if (dstInfo.alphaType() == AlphaType::Unpremultiplied) {
-    env->SetBooleanField(options.get(), BitmapFactoryOptions_inPremultiplied, false);
-  }
-  Local<jobject> bitmap;
-  if (!imagePath.empty()) {
-    bitmap.reset(env, DecodeBitmap(env, options.get(), imagePath));
-  } else {
-    bitmap.reset(env, DecodeBitmap(env, options.get(), imageBytes));
-  }
-  auto info = GetImageInfo(env, bitmap.get());
+  auto info = GetImageInfo(env, bitmapObject.get());
   if (info.isEmpty()) {
     env->ExceptionClear();
     return false;
   }
   void* pixels = nullptr;
-  if (AndroidBitmap_lockPixels(env, bitmap.get(), &pixels) != 0) {
+  if (AndroidBitmap_lockPixels(env, bitmapObject.get(), &pixels) != 0) {
     env->ExceptionClear();
     return false;
   }
   auto result = Bitmap(info, pixels).readPixels(dstInfo, dstPixels);
-  AndroidBitmap_unlockPixels(env, bitmap.get());
+  AndroidBitmap_unlockPixels(env, bitmapObject.get());
   return result;
 }
 }  // namespace tgfx
