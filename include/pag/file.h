@@ -81,9 +81,9 @@ enum class TagCode {
   CachePolicy = 30,
   FileAttributes = 31,
   TimeStretchMode = 32,
-
-  // 33 ~ 44 are preserved
   Mp4Header = 33,
+
+  // 34 ~ 44 are preserved
 
   BitmapCompositionBlock = 45,
   BitmapSequence = 46,

@@ -18,8 +18,8 @@
 
 #include "Mp4BoxHelper.h"
 #include "Mp4Generator.h"
-#include "SimpleArray.h"
 #include "base/utils/Log.h"
+#include "codec/utils/EncodeStream.h"
 #include "core/Clock.h"
 
 namespace pag {
@@ -96,7 +96,7 @@ static std::shared_ptr<Mp4Track> MakeMp4Track(const VideoSequence* videoSequence
   return mp4Track;
 }
 
-static void WriteMdatBox(const VideoSequence* videoSequence, SimpleArray* payload,
+static void WriteMdatBox(const VideoSequence* videoSequence, EncodeStream* payload,
                          int32_t mdatSize) {
   payload->writeInt32(mdatSize);
   payload->writeUint8('m');
@@ -131,7 +131,7 @@ static std::unique_ptr<ByteData> ConcatMp4(const VideoSequence* videoSequence) {
   mdatSize += 8;
   dataSize += mdatSize;
 
-  SimpleArray payload(static_cast<uint32_t>(dataSize));
+  EncodeStream payload(nullptr, static_cast<uint32_t>(dataSize));
   payload.setOrder(ByteOrder::BigEndian);
   payload.writeBytes(videoSequence->mp4Header->data(), videoSequence->mp4Header->length());
   WriteMdatBox(videoSequence, &payload, mdatSize);
@@ -156,7 +156,9 @@ static std::unique_ptr<ByteData> MakeMp4Data(const VideoSequence* videoSequence,
   boxParam.videoSequence = videoSequence;
 
   float sizeFactor = includeMdat ? 1.5f : 0.5f;
-  SimpleArray stream(static_cast<uint32_t>(static_cast<float>(mp4Track->len) * sizeFactor));
+  EncodeStream stream(nullptr,
+                      static_cast<uint32_t>(static_cast<float>(mp4Track->len) * sizeFactor));
+  stream.setOrder(ByteOrder::BigEndian);
   Mp4Generator mp4Generator(boxParam);
   mp4Generator.ftyp(&stream, true);
   mp4Generator.moov(&stream, true);

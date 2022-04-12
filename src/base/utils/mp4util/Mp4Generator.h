@@ -22,7 +22,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "SimpleArray.h"
+#include "codec/utils/EncodeStream.h"
 #include "pag/file.h"
 
 namespace pag {
@@ -75,46 +75,46 @@ class Mp4Generator {
  public:
   explicit Mp4Generator(BoxParam param);
 
-  int ftyp(SimpleArray* stream, bool write = false);
-  int moov(SimpleArray* stream, bool write = false);
-  int moof(SimpleArray* stream, bool write = false);
-  int mdat(SimpleArray* stream, bool write = false);
+  int ftyp(EncodeStream* stream, bool write = false);
+  int moov(EncodeStream* stream, bool write = false);
+  int moof(EncodeStream* stream, bool write = false);
+  int mdat(EncodeStream* stream, bool write = false);
 
  private:
-  int mvhd(SimpleArray* stream, bool write = false);
-  int mvex(SimpleArray* stream, bool write = false);
-  int mfhd(SimpleArray* stream, bool write = false);
-  int traf(SimpleArray* stream, bool write = false);
-  int mdhd(SimpleArray* stream, bool write = false);
-  int mdia(SimpleArray* stream, bool write = false);
-  int minf(SimpleArray* stream, bool write = false);
-  int stbl(SimpleArray* stream, bool write = false);
-  int trex(SimpleArray* stream, bool write = false);
-  int sdtp(SimpleArray* stream, bool write = false);
-  int avc1(SimpleArray* stream, bool write = false);
-  int stsd(SimpleArray* stream, bool write = false);
-  int tkhd(SimpleArray* stream, bool write = false);
-  int trak(SimpleArray* stream, bool write = false);
-  int edts(SimpleArray* stream, bool write = false);
-  int elst(SimpleArray* stream, bool write = false);
-  int trun(SimpleArray* stream, bool write = false);
-  int stts(SimpleArray* stream, bool write = false);
-  int ctts(SimpleArray* stream, bool write = false);
-  int stss(SimpleArray* stream, bool write = false);
-  int smhd(SimpleArray* stream, bool write = false);
-  int vmhd(SimpleArray* stream, bool write = false);
-  int stsc(SimpleArray* stream, bool write = false);
-  int stsz(SimpleArray* stream, bool write = false);
-  int stco(SimpleArray* stream, bool write = false);
-  int avcc(SimpleArray* stream, bool write = false);
-  int tfhd(SimpleArray* stream, bool write = false);
-  int tfdt(SimpleArray* stream, bool write = false);
-  int dref(SimpleArray* stream, bool write = false);
-  int hdlr(SimpleArray* stream, bool write = false);
-  int dinf(SimpleArray* stream, bool write = false);
-  int writeH264Nalus(SimpleArray* stream, bool write = false) const;
-  int box(SimpleArray* stream, const std::string& type,
-          const std::vector<std::function<int(SimpleArray*, bool)>>& boxFunctions,
+  int mvhd(EncodeStream* stream, bool write = false);
+  int mvex(EncodeStream* stream, bool write = false);
+  int mfhd(EncodeStream* stream, bool write = false);
+  int traf(EncodeStream* stream, bool write = false);
+  int mdhd(EncodeStream* stream, bool write = false);
+  int mdia(EncodeStream* stream, bool write = false);
+  int minf(EncodeStream* stream, bool write = false);
+  int stbl(EncodeStream* stream, bool write = false);
+  int trex(EncodeStream* stream, bool write = false);
+  int sdtp(EncodeStream* stream, bool write = false);
+  int avc1(EncodeStream* stream, bool write = false);
+  int stsd(EncodeStream* stream, bool write = false);
+  int tkhd(EncodeStream* stream, bool write = false);
+  int trak(EncodeStream* stream, bool write = false);
+  int edts(EncodeStream* stream, bool write = false);
+  int elst(EncodeStream* stream, bool write = false);
+  int trun(EncodeStream* stream, bool write = false);
+  int stts(EncodeStream* stream, bool write = false);
+  int ctts(EncodeStream* stream, bool write = false);
+  int stss(EncodeStream* stream, bool write = false);
+  int smhd(EncodeStream* stream, bool write = false);
+  int vmhd(EncodeStream* stream, bool write = false);
+  int stsc(EncodeStream* stream, bool write = false);
+  int stsz(EncodeStream* stream, bool write = false);
+  int stco(EncodeStream* stream, bool write = false);
+  int avcc(EncodeStream* stream, bool write = false);
+  int tfhd(EncodeStream* stream, bool write = false);
+  int tfdt(EncodeStream* stream, bool write = false);
+  int dref(EncodeStream* stream, bool write = false);
+  int hdlr(EncodeStream* stream, bool write = false);
+  int dinf(EncodeStream* stream, bool write = false);
+  int writeH264Nalus(EncodeStream* stream, bool write = false) const;
+  int box(EncodeStream* stream, const std::string& type,
+          const std::vector<std::function<int(EncodeStream*, bool)>>& boxFunctions,
           bool write = false);
 
   std::unordered_map<std::string, int> boxSizeMap;
