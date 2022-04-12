@@ -7779,8 +7779,8 @@
     "PAGSequenceTest": {
         "BitmapSequenceReader": "48a897dd",
         "VideoSequenceAsMask": "48a897dd",
-        "VideoSequenceToMp4WithHeader": "48a897dd",
-        "VideoSequenceToMp4WithoutHeader": "48a897dd",
+        "VideoSequenceToMP4WithHeader": "98088929",
+        "VideoSequenceToMP4WithoutHeader": "98088929",
         "pagSequenceTest": "48a897dd"
     },
     "PAGSimplePathTest": {

@@ -27,11 +27,11 @@ class MP4BoxHelper {
   /**
    * Muxes h264 data in VideoSequence and returns mp4 data
    */
-  static std::unique_ptr<ByteData> CovertToMp4(const VideoSequence* videoSequence);
+  static std::unique_ptr<ByteData> CovertToMP4(const VideoSequence* videoSequence);
 
   /**
    * Creates mp4 header box data, and writes into VideoSequence mp4Header member
    */
-  static void WriteMp4Header(VideoSequence* videoSequence);
+  static void WriteMP4Header(VideoSequence* videoSequence);
 };
 }  // namespace pag

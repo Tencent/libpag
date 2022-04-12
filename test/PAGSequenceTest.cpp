@@ -92,17 +92,17 @@ PAG_TEST_F(PAGSequenceTest, VideoSequenceToMp4WithHeader) {
   VideoComposition* videoComposition = static_cast<VideoComposition*>(preComposeLayer->composition);
   ASSERT_FALSE(videoComposition->sequences.empty());
   const auto* videoSequence = videoComposition->sequences.at(0);
-  auto mp4Data = MP4BoxHelper::CovertToMp4(videoSequence);
-  ASSERT_NE(mp4Data, nullptr);
+  auto MP4Data = MP4BoxHelper::CovertToMP4(videoSequence);
+  ASSERT_NE(MP4Data, nullptr);
 
   EXPECT_TRUE(
-      Baseline::Compare(std::move(mp4Data), "PAGSequenceTest/VideoSequenceToMp4WithHeader"));
+      Baseline::Compare(std::move(MP4Data), "PAGSequenceTest/VideoSequenceToMP4WithHeader"));
 }
 
 /**
  * 用例描述: 不带mp4头的视频序列帧导出为mp4
  */
-PAG_TEST_F(PAGSequenceTest, VideoSequenceToMp4WithoutHeader) {
+PAG_TEST_F(PAGSequenceTest, VideoSequenceToMP4WithoutHeader) {
   auto pagFile = PAGFile::Load("../resources/apitest/video_sequence_without_mp4header.pag");
   ASSERT_NE(pagFile, nullptr);
   ASSERT_EQ(pagFile->layerType(), LayerType::PreCompose);
@@ -114,11 +114,11 @@ PAG_TEST_F(PAGSequenceTest, VideoSequenceToMp4WithoutHeader) {
   VideoComposition* videoComposition = static_cast<VideoComposition*>(preComposeLayer->composition);
   ASSERT_FALSE(videoComposition->sequences.empty());
   const auto* videoSequence = videoComposition->sequences.at(0);
-  auto mp4Data = MP4BoxHelper::CovertToMp4(videoSequence);
-  ASSERT_NE(mp4Data, nullptr);
+  auto MP4Data = MP4BoxHelper::CovertToMP4(videoSequence);
+  ASSERT_NE(MP4Data, nullptr);
 
   EXPECT_TRUE(
-      Baseline::Compare(std::move(mp4Data), "PAGSequenceTest/VideoSequenceToMp4WithoutHeader"));
+      Baseline::Compare(std::move(MP4Data), "PAGSequenceTest/VideoSequenceToMP4WithoutHeader"));
 }
 
 }  // namespace pag
