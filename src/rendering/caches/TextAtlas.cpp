@@ -264,10 +264,9 @@ static std::vector<std::shared_ptr<tgfx::Texture>> DrawPages(tgfx::Context* cont
                                                              bool alphaOnly) {
   std::vector<std::shared_ptr<tgfx::Texture>> textures;
   for (auto& page : *pages) {
-    if (alphaOnly) {
-      textures.push_back(DrawMask(context, page, scale));
-    } else {
-      textures.push_back(DrawColor(context, page, scale));
+    auto texture = alphaOnly ? DrawMask(context, page, scale) : DrawColor(context, page, scale);
+    if (texture) {
+      textures.push_back(texture);
     }
   }
   return textures;
