@@ -112,3 +112,4 @@
 ### Bug Fixes
 
 - 修复 `PAGView.updateSize()` 更新 Canvas 尺寸逻辑
+- 修复替换带空格文字的文本时渲染错误

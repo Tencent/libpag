@@ -112,3 +112,4 @@
 ### Bug Fixes
 
 - Fix `PAGView.updateSize()` update canvas size error。
+- Fix replace text when including space error.
