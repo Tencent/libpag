@@ -100,46 +100,74 @@ std::shared_ptr<Image> NativeCodec::MakeImage(std::shared_ptr<Data> imageBytes) 
   return std::unique_ptr<Image>(image);
 }
 
+std::shared_ptr<Image> NativeCodec::MakeFrom(void* nativeImage) {
+  auto cgImage = reinterpret_cast<CGImageRef>(nativeImage);
+  auto width = CGImageGetWidth(cgImage);
+  auto height = CGImageGetHeight(cgImage);
+  if (width <= 0 || height <= 0) {
+    return nullptr;
+  }
+  auto image = new NativeImage(width, height, Orientation::TopLeft);
+  CFRetain(cgImage);
+  image->cgImage = cgImage;
+  return std::unique_ptr<Image>(image);
+}
+
+
+NativeImage::~NativeImage() {
+  if (cgImage != nullptr) {
+    CFRelease(cgImage);
+  }
+}
+
 bool NativeImage::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
   }
   NSData* data = nil;
-  if (!imagePath.empty()) {
-    data =
-        [[NSData alloc] initWithContentsOfFile:[NSString stringWithUTF8String:imagePath.c_str()]];
+  CGImageSourceRef sourceRef = nil;
+  CGImageRef image = nil;
+  if (cgImage != nullptr) {
+    image = cgImage;
   } else {
-    auto bytes = const_cast<void*>(imageBytes->data());
-    data = [[NSData alloc] initWithBytesNoCopy:bytes length:imageBytes->size() freeWhenDone:NO];
-  }
-  if (data == nil) {
-    return false;
-  }
-  CFDataRef dataRef = (__bridge CFDataRef)data;
-  CGImageSourceRef sourceRef = CGImageSourceCreateWithData(dataRef, NULL);
-  if (sourceRef == NULL) {
-    [data release];
-    return false;
-  }
-  CGImageRef cgImage = CGImageSourceCreateImageAtIndex(sourceRef, 0, NULL);
-  if (cgImage == NULL) {
-    [data release];
-    CFRelease(sourceRef);
-    return false;
+    if (!imagePath.empty()) {
+      data =
+          [[NSData alloc] initWithContentsOfFile:[NSString stringWithUTF8String:imagePath.c_str()]];
+    } else {
+      auto bytes = const_cast<void*>(imageBytes->data());
+      data = [[NSData alloc] initWithBytesNoCopy:bytes length:imageBytes->size() freeWhenDone:NO];
+    }
+    if (data == nil) {
+      return false;
+    }
+    CFDataRef dataRef = (__bridge CFDataRef)data;
+    sourceRef = CGImageSourceCreateWithData(dataRef, NULL);
+    if (sourceRef == NULL) {
+      [data release];
+      return false;
+    }
+    image = CGImageSourceCreateImageAtIndex(sourceRef, 0, NULL);
+    if (image == NULL) {
+      [data release];
+      CFRelease(sourceRef);
+      return false;
+    }
   }
   auto context = CreateBitmapContext(dstInfo, dstPixels);
   auto result = context != nullptr;
   if (result) {
-    int width = static_cast<int>(CGImageGetWidth(cgImage));
-    int height = static_cast<int>(CGImageGetHeight(cgImage));
+    int width = static_cast<int>(CGImageGetWidth(image));
+    int height = static_cast<int>(CGImageGetHeight(image));
     CGRect rect = CGRectMake(0, 0, width, height);
     CGContextSetBlendMode(context, kCGBlendModeCopy);
-    CGContextDrawImage(context, rect, cgImage);
+    CGContextDrawImage(context, rect, image);
     CGContextRelease(context);
   }
-  [data release];
-  CFRelease(sourceRef);
-  CGImageRelease(cgImage);
+  if (cgImage == nullptr) {
+    [data release];
+    CFRelease(sourceRef);
+    CGImageRelease(image);
+  }
   return result;
 }
 }

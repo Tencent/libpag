@@ -46,6 +46,14 @@ class Image {
    */
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Data> imageBytes);
 
+  /**
+   * Creates a new Image object from a native image. The type of nativeImage should be either
+   * a jobject that represents a java Bitmap on android platform or a CGImageRef on the apple
+   * platform. Returns nullptr if current platform has no native image support. The returned Image
+   * object takes a reference on the nativeImage.
+   */
+  static std::shared_ptr<Image> MakeFrom(void* nativeImage);
+
   virtual ~Image() = default;
 
   /**

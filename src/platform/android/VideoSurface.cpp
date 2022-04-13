@@ -18,7 +18,8 @@
 
 #include "VideoSurface.h"
 #include "android/native_window_jni.h"
-#include "gpu/opengl/GLContext.h"
+#include "base/utils/Log.h"
+#include "gpu/opengl/GLFunctions.h"
 #include "gpu/opengl/GLTexture.h"
 
 namespace pag {

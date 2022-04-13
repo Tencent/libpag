@@ -43,6 +43,10 @@ std::shared_ptr<Image> NativeCodec::MakeImage(std::shared_ptr<Data> imageBytes) 
   return NativeImage::MakeFrom(nativeImage);
 }
 
+std::shared_ptr<Image> NativeCodec::MakeFrom(void* /*nativeImage*/) {
+  return nullptr;
+}
+
 std::shared_ptr<NativeImage> NativeImage::MakeFrom(emscripten::val nativeImage) {
   if (!nativeImage.as<bool>()) {
     return nullptr;

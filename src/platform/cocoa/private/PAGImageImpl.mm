@@ -20,7 +20,6 @@
 #include "base/utils/Log.h"
 #include "core/PixelBuffer.h"
 #include "pag/pag.h"
-#include "platform/apple/BitmapContextUtil.h"
 #include "rendering/editing/StillImage.h"
 
 @interface PAGImageImpl ()
@@ -77,28 +76,22 @@
   if (cgImage == nil) {
     return nil;
   }
-  auto width = static_cast<int>(CGImageGetWidth(cgImage));
-  auto height = static_cast<int>(CGImageGetHeight(cgImage));
-  auto pixelBuffer = tgfx::PixelBuffer::Make(width, height);
+  auto image = tgfx::Image::MakeFrom(cgImage);
+  auto pixelBuffer = tgfx::PixelBuffer::Make(image->width(), image->height());
   tgfx::Bitmap bitmap(pixelBuffer);
   if (bitmap.isEmpty()) {
     return nil;
   }
-  auto context = CreateBitmapContext(bitmap.info(), bitmap.writablePixels());
-  if (context == nullptr) {
+  if (!image->readPixels(bitmap.info(), bitmap.writablePixels())) {
     return nil;
   }
-  CGRect rect = CGRectMake(0, 0, width, height);
-  CGContextSetBlendMode(context, kCGBlendModeCopy);
-  CGContextDrawImage(context, rect, cgImage);
-  CGContextRelease(context);
   bitmap.reset();
   auto data = pag::StillImage::MakeFrom(pixelBuffer);
   if (data == nullptr) {
     return nil;
   }
-  PAGImageImpl* image = [[[PAGImageImpl alloc] initWidthPAGImage:data] autorelease];
-  return image;
+  PAGImageImpl* pagImage = [[[PAGImageImpl alloc] initWidthPAGImage:data] autorelease];
+  return pagImage;
 }
 
 - (instancetype)initWidthPAGImage:(std::shared_ptr<pag::PAGImage>)value {

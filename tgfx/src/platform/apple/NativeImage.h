@@ -24,11 +24,14 @@
 namespace tgfx {
 class NativeImage : public Image {
  public:
+  ~NativeImage() override;
+
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
 
  private:
   std::string imagePath;
-  std::shared_ptr<Data> imageBytes;
+  std::shared_ptr<Data> imageBytes = nullptr;
+  CGImageRef cgImage = nullptr;
 
   NativeImage(int width, int height, Orientation orientation) : Image(width, height, orientation) {
   }

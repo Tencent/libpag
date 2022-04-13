@@ -106,6 +106,13 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Data> imageBytes) {
   return image;
 }
 
+std::shared_ptr<Image> Image::MakeFrom(void* nativeImage) {
+  if (nativeImage == nullptr) {
+    return nullptr;
+  }
+  return NativeCodec::MakeFrom(nativeImage);
+}
+
 std::shared_ptr<Data> Image::Encode(const ImageInfo& info, const void* pixels, EncodedFormat format,
                                     int quality) {
   if (info.isEmpty() || pixels == nullptr) {
