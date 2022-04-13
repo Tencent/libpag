@@ -16,9 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "codec/mp4/MP4BoxHelper.h"
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
-#include "mp4/MP4BoxHelper.h"
 #include "pag/pag.h"
 #include "platform/swiftshader/NativePlatform.h"
 #include "rendering/caches/RenderCache.h"
