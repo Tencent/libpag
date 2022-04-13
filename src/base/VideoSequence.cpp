@@ -32,6 +32,8 @@ VideoSequence::~VideoSequence() {
   for (auto header : headers) {
     delete header;
   }
+
+  delete MP4Header;
 }
 
 bool VideoSequence::verify() const {
@@ -52,5 +54,25 @@ bool VideoSequence::verify() const {
     return false;
   }
   return true;
+}
+
+// The exact total width and height of the picture were not recorded when the video sequence frame
+// was exported，You need to do the calculation yourself with width and alphaStartX，
+// If an odd size is encountered, the exporter plugin automatically increments by one，
+// This matches the rules for exporter plugin。
+int32_t VideoSequence::getVideoWidth() const {
+  auto videoWidth = alphaStartX + width;
+  if (videoWidth % 2 == 1) {
+    videoWidth++;
+  }
+  return videoWidth;
+}
+
+int32_t VideoSequence::getVideoHeight() const {
+  auto videoHeight = alphaStartY + height;
+  if (videoHeight % 2 == 1) {
+    videoHeight++;
+  }
+  return videoHeight;
 }
 }  // namespace pag

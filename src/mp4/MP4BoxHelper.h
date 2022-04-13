@@ -18,27 +18,20 @@
 
 #pragma once
 
-#include "core/Bitmap.h"
-#include "core/PixelBuffer.h"
-#include "pag/pag.h"
+#include <memory>
+#include "pag/file.h"
 
 namespace pag {
-class Baseline {
+class MP4BoxHelper {
  public:
-  static bool Compare(const std::shared_ptr<tgfx::PixelBuffer>& pixelBuffer,
-                      const std::string& key);
+  /**
+   * Muxes h264 data in VideoSequence and returns mp4 data
+   */
+  static std::unique_ptr<ByteData> CovertToMP4(const VideoSequence* videoSequence);
 
-  static bool Compare(const tgfx::Bitmap& bitmap, const std::string& key);
-
-  static bool Compare(const std::shared_ptr<PAGSurface>& surface, const std::string& key);
-
-  static bool Compare(const std::shared_ptr<ByteData>& byteData, const std::string& key);
-
- private:
-  static void SetUp();
-
-  static void TearDown();
-
-  friend class PAGTestEnvironment;
+  /**
+   * Creates mp4 header box data, and writes into VideoSequence mp4Header member
+   */
+  static void WriteMP4Header(VideoSequence* videoSequence);
 };
 }  // namespace pag

@@ -61,9 +61,9 @@ void EncodeStream::writeInt8(int8_t value) {
 }
 
 void EncodeStream::writeUint8(uint8_t value) {
-  Bit8 data = {};
-  data.uintValue = value;
-  writeBit8(data);
+  ensureCapacity(_position + 1);
+  bytes[_position++] = value;
+  positionChanged();
 }
 
 void EncodeStream::writeInt16(int16_t value) {
@@ -85,9 +85,17 @@ void EncodeStream::writeUint24(uint32_t value) {
 }
 
 void EncodeStream::writeInt32(int32_t value) {
-  Bit32 data = {};
-  data.intValue = value;
-  writeBit32(data);
+  ensureCapacity(_position + 4);
+  if (_order == NATIVE_BYTE_ORDER) {
+    for (int i = 0; i < 4; i++) {
+      bytes[_position++] = value >> i * 8;
+    }
+  } else {
+    for (int i = 3; i >= 0; i--) {
+      bytes[_position++] = value >> i * 8;
+    }
+  }
+  positionChanged();
 }
 
 void EncodeStream::writeUint32(uint32_t value) {

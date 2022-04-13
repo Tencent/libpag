@@ -321,23 +321,21 @@ if (PAG_BUILD_TESTS)
     list(APPEND TEST_INCLUDES ${PAG_INCLUDES})
 
     file(GLOB PAG_TEST_FILES
+            src/mp4/*.*
             test/*.*
             test/framework/*.*
-            test/framework/lzma/*.*
             test/framework/utils/*.*)
 
     file(GLOB PAG_SMOKE_TEST_FILES
             test/PAGSmokeTest.cpp
             test/TestUtils.cpp
             test/framework/*.cpp
-            test/framework/lzma/*.*
             test/framework/utils/*.cpp)
 
     file(GLOB PAG_PERFORMANCE_TEST_FILES
             test/PAGPerformanceTest.cpp
             test/TestUtils.cpp
             test/framework/*.cpp
-            test/framework/lzma/*.*
             test/framework/utils/*.cpp)
 
     file(GLOB FFAVC_LIB vendor/ffavc/${LIBRARY_ENTRY}/*${CMAKE_SHARED_LIBRARY_SUFFIX})

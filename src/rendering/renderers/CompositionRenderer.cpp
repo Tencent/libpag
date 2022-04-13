@@ -27,18 +27,9 @@
 namespace pag {
 static std::shared_ptr<Graphic> MakeVideoSequenceGraphic(VideoSequence* sequence,
                                                          Frame contentFrame) {
-  // 视频序列帧导出时没有记录准确的画面总宽高，需要自己通过 width 和 alphaStartX 计算，
-  // 如果遇到奇数尺寸导出插件会自动加一，这里匹配导出插件的规则。
-  auto videoWidth = sequence->alphaStartX + sequence->width;
-  if (videoWidth % 2 == 1) {
-    videoWidth++;
-  }
-  auto videoHeight = sequence->alphaStartY + sequence->height;
-  if (videoHeight % 2 == 1) {
-    videoHeight++;
-  }
   auto factory = std::make_unique<SequenceReaderFactory>(sequence);
-  auto proxy = new SequenceProxy(videoWidth, videoHeight, std::move(factory), contentFrame);
+  auto proxy = new SequenceProxy(sequence->getVideoWidth(), sequence->getVideoHeight(),
+                                 std::move(factory), contentFrame);
   tgfx::RGBAAALayout layout = {sequence->width, sequence->height, sequence->alphaStartX,
                                sequence->alphaStartY};
   return Picture::MakeFrom(sequence->composition->uniqueID, std::unique_ptr<SequenceProxy>(proxy),

@@ -22,14 +22,8 @@
 namespace pag {
 VideoSequenceDemuxer::VideoSequenceDemuxer(std::shared_ptr<File> file, VideoSequence* sequence)
     : file(std::move(file)), sequence(sequence) {
-  format.width = sequence->alphaStartX + sequence->width;
-  if (format.width % 2 == 1) {
-    format.width++;
-  }
-  format.height = sequence->alphaStartY + sequence->height;
-  if (format.height % 2 == 1) {
-    format.height++;
-  }
+  format.width = sequence->getVideoWidth();
+  format.height = sequence->getVideoHeight();
   for (auto& header : sequence->headers) {
     auto bytes = tgfx::Data::MakeWithoutCopy(header->data(), header->length());
     format.headers.push_back(std::move(bytes));

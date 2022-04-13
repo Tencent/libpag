@@ -18,6 +18,7 @@
 
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
+#include "mp4/MP4BoxHelper.h"
 #include "pag/pag.h"
 #include "platform/swiftshader/NativePlatform.h"
 #include "rendering/caches/RenderCache.h"
@@ -75,4 +76,49 @@ PAG_TEST_F(PAGSequenceTest, VideoSequenceAsMask) {
   pagPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGSequenceTest/VideoSequenceAsMask"));
 }
+
+/**
+ * 用例描述: 带mp4头的视频序列帧导出为mp4
+ */
+PAG_TEST_F(PAGSequenceTest, VideoSequenceToMp4WithHeader) {
+  auto pagFile = PAGFile::Load("../resources/apitest/video_sequence_with_mp4header.pag");
+  ASSERT_NE(pagFile, nullptr);
+  ASSERT_EQ(pagFile->layerType(), LayerType::PreCompose);
+
+  const PreComposeLayer* preComposeLayer = static_cast<const PreComposeLayer*>(pagFile->getLayer());
+  ASSERT_NE(preComposeLayer->composition, nullptr);
+  ASSERT_EQ(preComposeLayer->composition->type(), CompositionType::Video);
+
+  VideoComposition* videoComposition = static_cast<VideoComposition*>(preComposeLayer->composition);
+  ASSERT_FALSE(videoComposition->sequences.empty());
+  const auto* videoSequence = videoComposition->sequences.at(0);
+  auto MP4Data = MP4BoxHelper::CovertToMP4(videoSequence);
+  ASSERT_NE(MP4Data, nullptr);
+
+  EXPECT_TRUE(
+      Baseline::Compare(std::move(MP4Data), "PAGSequenceTest/VideoSequenceToMP4WithHeader"));
+}
+
+/**
+ * 用例描述: 不带mp4头的视频序列帧导出为mp4
+ */
+PAG_TEST_F(PAGSequenceTest, VideoSequenceToMP4WithoutHeader) {
+  auto pagFile = PAGFile::Load("../resources/apitest/video_sequence_without_mp4header.pag");
+  ASSERT_NE(pagFile, nullptr);
+  ASSERT_EQ(pagFile->layerType(), LayerType::PreCompose);
+
+  const PreComposeLayer* preComposeLayer = static_cast<const PreComposeLayer*>(pagFile->getLayer());
+  ASSERT_NE(preComposeLayer->composition, nullptr);
+  ASSERT_EQ(preComposeLayer->composition->type(), CompositionType::Video);
+
+  VideoComposition* videoComposition = static_cast<VideoComposition*>(preComposeLayer->composition);
+  ASSERT_FALSE(videoComposition->sequences.empty());
+  const auto* videoSequence = videoComposition->sequences.at(0);
+  auto MP4Data = MP4BoxHelper::CovertToMP4(videoSequence);
+  ASSERT_NE(MP4Data, nullptr);
+
+  EXPECT_TRUE(
+      Baseline::Compare(std::move(MP4Data), "PAGSequenceTest/VideoSequenceToMP4WithoutHeader"));
+}
+
 }  // namespace pag

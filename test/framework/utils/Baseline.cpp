@@ -118,6 +118,30 @@ bool Baseline::Compare(const std::shared_ptr<PixelBuffer>& pixelBuffer, const st
   return Baseline::Compare(bitmap, key);
 }
 
+static bool CompareVersionAndMd5(const std::string& md5, const std::string& key,
+                                 const std::function<void(bool)>& callback) {
+#ifdef UPDATE_BASELINE
+  SetJSONValue(OutputMD5, key, md5);
+  return true;
+#endif
+  auto baselineVersion = GetJSONValue(BaselineVersion, key);
+  auto cacheVersion = GetJSONValue(CacheVersion, key);
+  if (baselineVersion.empty() ||
+      (baselineVersion == cacheVersion && GetJSONValue(CacheMD5, key) != md5)) {
+    SetJSONValue(OutputVersion, key, currentVersion);
+    SetJSONValue(OutputMD5, key, md5);
+    if (callback) {
+      callback(false);
+    }
+    return false;
+  }
+  SetJSONValue(OutputVersion, key, baselineVersion);
+  if (callback) {
+    callback(true);
+  }
+  return true;
+}
+
 bool Baseline::Compare(const Bitmap& bitmap, const std::string& key) {
   if (bitmap.isEmpty()) {
     return false;
@@ -135,22 +159,13 @@ bool Baseline::Compare(const Bitmap& bitmap, const std::string& key) {
     }
     md5 = DumpMD5(newBitmap.pixels(), newBitmap.byteSize());
   }
-#ifdef UPDATE_BASELINE
-  SetJSONValue(OutputMD5, key, md5);
-  return true;
-#endif
-  auto baselineVersion = GetJSONValue(BaselineVersion, key);
-  auto cacheVersion = GetJSONValue(CacheVersion, key);
-  if (baselineVersion.empty() ||
-      (baselineVersion == cacheVersion && GetJSONValue(CacheMD5, key) != md5)) {
-    SetJSONValue(OutputVersion, key, currentVersion);
-    SetJSONValue(OutputMD5, key, md5);
-    SaveImage(bitmap, key);
-    return false;
-  }
-  SetJSONValue(OutputVersion, key, baselineVersion);
-  std::filesystem::remove(OUT_ROOT + key + WEBP_FILE_EXT);
-  return true;
+  return CompareVersionAndMd5(md5, key, [key, bitmap](bool result) {
+    if (result) {
+      std::filesystem::remove(OUT_ROOT + key + WEBP_FILE_EXT);
+    } else {
+      SaveImage(bitmap, key);
+    }
+  });
 }
 
 bool Baseline::Compare(const std::shared_ptr<PAGSurface>& surface, const std::string& key) {
@@ -165,6 +180,14 @@ bool Baseline::Compare(const std::shared_ptr<PAGSurface>& surface, const std::st
     return false;
   }
   return Baseline::Compare(bitmap, key);
+}
+
+bool Baseline::Compare(const std::shared_ptr<ByteData>& byteData, const std::string& key) {
+  if (!byteData || static_cast<int>(byteData->length()) == 0) {
+    return false;
+  }
+  std::string md5 = DumpMD5(byteData->data(), byteData->length());
+  return CompareVersionAndMd5(md5, key, {});
 }
 
 void Baseline::SetUp() {
