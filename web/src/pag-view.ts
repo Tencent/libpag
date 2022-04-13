@@ -1,3 +1,4 @@
+import { DEFAULT_CANVAS_SIZE } from './constant';
 import { PAG, PAGScaleMode, PAGViewListenerEvent } from './types';
 import { PAGPlayer } from './pag-player';
 import { EventManager, Listener } from './utils/event-manager';
@@ -5,16 +6,22 @@ import { PAGSurface } from './pag-surface';
 import { PAGFile } from './pag-file';
 import { Log } from './utils/log';
 import { ErrorCode } from './utils/error-map';
-import { SCREEN_2560_RESOLUTION } from './constant';
+
+export interface PAGViewOptions {
+  fullBox?: boolean;
+  useCanvas2D?: boolean;
+}
 
 export class PAGView {
   public static module: PAG;
+
   /**
    * Create pag view.
    */
   public static async init(
     file: PAGFile,
-    canvas: string | HTMLCanvasElement | OffscreenCanvas,
+    canvas: string | HTMLCanvasElement,
+    initOptions: PAGViewOptions = {},
   ): Promise<PAGView | undefined> {
     let canvasElement: HTMLCanvasElement | null = null;
     if (typeof canvas === 'string') {
@@ -25,38 +32,40 @@ export class PAGView {
     if (!canvasElement) {
       Log.errorByCode(ErrorCode.CanvasIsNotFound);
     } else {
-      const styleWidth = Number(canvasElement.style.width.replace('px', ''));
-      const styleHeight = Number(canvasElement.style.height.replace('px', ''));
-      const displayWidth = styleWidth > 0 ? styleWidth : canvasElement.width;
-      const displayHeight = styleHeight > 0 ? styleHeight : canvasElement.height;
-      const rawWidth = displayWidth * window.devicePixelRatio;
-      const rawHeight = displayHeight * window.devicePixelRatio;
-
-      if (rawWidth > SCREEN_2560_RESOLUTION || rawHeight > SCREEN_2560_RESOLUTION) {
-        Log.warn(
-          "Don't render the target larger than 2560 px resolution. It may be a render failure in the low graphic memory device.",
-        );
-      }
-      canvasElement.style.width = `${displayWidth}px`;
-      canvasElement.style.height = `${displayHeight}px`;
-      canvasElement.width = rawWidth;
-      canvasElement.height = rawHeight;
-
       const pagPlayer = this.module.PAGPlayer.create();
-      const pagView = new PAGView(pagPlayer);
-      const gl = canvasElement.getContext('webgl');
-      if (!(gl instanceof WebGLRenderingContext)) {
+      const pagView = new PAGView(pagPlayer, canvasElement);
+      pagView.pagViewOptions = { ...pagView.pagViewOptions, ...initOptions };
+
+      if (pagView.pagViewOptions.useCanvas2D) {
+        this.module.globalCanvas.retain();
+        pagView.contextID = this.module.globalCanvas.contextID;
+      } else {
+        pagView.contextID = this.module.GL.createContext(canvasElement, { majorVersion: 1, minorVersion: 0 });
+      }
+
+      if (pagView.contextID === 0) {
         Log.errorByCode(ErrorCode.CanvasContextIsNotWebGL);
       } else {
-        pagView.contextID = this.module.GL.registerContext(gl, { majorVersion: 1, minorVersion: 0 });
-        this.module.GL.makeContextCurrent(pagView.contextID);
-        pagView.pagSurface = this.module.PAGSurface.FromFrameBuffer(0, canvasElement.width, canvasElement.height, true);
+        pagView.resetSize(pagView.pagViewOptions.fullBox);
+        pagView.frameRate = file.frameRate();
+        pagView.pagSurface = this.makePAGSurface(pagView.contextID, pagView.rawWidth, pagView.rawHeight);
         pagView.player.setSurface(pagView.pagSurface);
         pagView.player.setComposition(file);
         await pagView.setProgress(0);
         return pagView;
       }
     }
+  }
+
+  private static makePAGSurface(contextID: number, width: number, height: number): PAGSurface {
+    const oldHandle = this.module.GL.currentContext?.handle || 0;
+    this.module.GL.makeContextCurrent(contextID);
+    const pagSurface = PAGSurface.FromFrameBuffer(0, width, height, true);
+    this.module.GL.makeContextCurrent(0);
+    if (oldHandle) {
+      this.module.GL.makeContextCurrent(oldHandle);
+    }
+    return pagSurface;
   }
 
   /**
@@ -80,9 +89,20 @@ export class PAGView {
   private repeatedTimes = 0;
   private eventManager: EventManager = new EventManager();
   private contextID = 0;
+  private canvasElement: HTMLCanvasElement | null;
+  private canvasContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null | undefined;
+  private rawWidth = 0;
+  private rawHeight = 0;
+  private currentFrame = 0;
+  private frameRate = 0;
+  private pagViewOptions: PAGViewOptions = {
+    fullBox: false,
+    useCanvas2D: false,
+  };
 
-  public constructor(pagPlayer: PAGPlayer) {
+  public constructor(pagPlayer: PAGPlayer, canvasElement: HTMLCanvasElement) {
     this.player = pagPlayer;
+    this.canvasElement = canvasElement;
   }
 
   /**
@@ -239,8 +259,29 @@ export class PAGView {
    * called, there is no need to call it. Returns true if the content has changed.
    */
   public async flush() {
-    await this.player.flush();
-    this.eventManager.emit(PAGViewListenerEvent.onAnimationFlushed, this);
+    const res = await this.player.flushInternal((res) => {
+      if (this.pagViewOptions.useCanvas2D && res && PAGView.module.globalCanvas.canvas) {
+        if (!this.canvasContext) this.canvasContext = this.canvasElement?.getContext('2d');
+        const compositeOperation = this.canvasContext!.globalCompositeOperation;
+        this.canvasContext!.globalCompositeOperation = 'copy';
+        this.canvasContext?.drawImage(
+          PAGView.module.globalCanvas.canvas,
+          0,
+          PAGView.module.globalCanvas.canvas.height - this.rawHeight,
+          this.rawWidth,
+          this.rawHeight,
+          0,
+          0,
+          this.canvasContext.canvas.width,
+          this.canvasContext.canvas.height,
+        );
+        this.canvasContext!.globalCompositeOperation = compositeOperation;
+      }
+    });
+    if (res) {
+      this.eventManager.emit(PAGViewListenerEvent.onAnimationFlushed, this);
+    }
+    return res;
   }
   /**
    * Free the cache created by the pag view immediately. Can be called to reduce memory pressure.
@@ -257,8 +298,12 @@ export class PAGView {
   /**
    * Update size when changed canvas size.
    */
-  public updateSize() {
-    this.pagSurface?.updateSize();
+  public async updateSize() {
+    this.resetSize(this.pagViewOptions.fullBox);
+    const pagSurface = PAGView.makePAGSurface(this.contextID, this.rawWidth, this.rawHeight);
+    this.player.setSurface(pagSurface);
+    this.pagSurface?.destroy();
+    this.pagSurface = pagSurface;
   }
 
   public destroy() {
@@ -266,9 +311,16 @@ export class PAGView {
     this.clearTimer();
     this.player.destroy();
     this.pagSurface?.destroy();
-    if (this.contextID > 0) {
-      PAGView.module.GL.deleteContext(this.contextID);
+    if (this.pagViewOptions.useCanvas2D) {
+      PAGView.module.globalCanvas.release();
+    } else {
+      if (this.contextID > 0) {
+        PAGView.module.GL.deleteContext(this.contextID);
+      }
     }
+    this.contextID = 0;
+    this.canvasContext = null;
+    this.canvasElement = null;
     this.isDestroyed = true;
   }
 
@@ -285,20 +337,25 @@ export class PAGView {
   private async flushNextFrame() {
     const duration = this.duration();
     this.playTime = performance.now() * 1000 - this.startTime;
+    const currentFrame = Math.floor((this.playTime / 1000000) * this.frameRate);
     const count = Math.floor(this.playTime / duration);
     if (this.repeatCount >= 0 && count > this.repeatCount) {
       this.clearTimer();
       this.playTime = 0;
       this.isPlaying = false;
       this.eventManager.emit(PAGViewListenerEvent.onAnimationEnd, this);
-    } else {
-      if (this.repeatedTimes < count) {
-        this.eventManager.emit(PAGViewListenerEvent.onAnimationRepeat, this);
-      }
-      this.player.setProgress((this.playTime % duration) / duration);
-      await this.flush();
+      this.repeatedTimes = count;
+      return;
     }
-    this.repeatedTimes = count;
+    if (this.repeatedTimes === count && this.currentFrame === currentFrame) {
+      return;
+    }
+    if (this.repeatedTimes < count) {
+      this.eventManager.emit(PAGViewListenerEvent.onAnimationRepeat, this);
+    }
+    this.player.setProgress((this.playTime % duration) / duration);
+    await this.flush();
+    this.currentFrame = currentFrame;
   }
 
   private clearTimer(): void {
@@ -306,5 +363,25 @@ export class PAGView {
       window.cancelAnimationFrame(this.timer);
       this.timer = null;
     }
+  }
+
+  private resetSize(fullBox = false) {
+    if (!this.canvasElement) {
+      Log.errorByCode(ErrorCode.CanvasElementIsNoFound);
+      return;
+    }
+    if (fullBox) {
+      this.canvasElement.style.width = '100%';
+      this.canvasElement.style.height = '100%';
+    }
+    const styleDeclaration = window.getComputedStyle(this.canvasElement, null);
+    if (!fullBox) {
+      this.canvasElement.style.width = styleDeclaration.width;
+      this.canvasElement.style.height = styleDeclaration.height;
+    }
+    this.rawWidth = Number(styleDeclaration.width.replace('px', '')) * window.devicePixelRatio;
+    this.rawHeight = Number(styleDeclaration.height.replace('px', '')) * window.devicePixelRatio;
+    this.canvasElement.width = this.rawWidth;
+    this.canvasElement.height = this.rawHeight;
   }
 }

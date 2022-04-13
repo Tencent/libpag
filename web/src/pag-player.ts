@@ -35,6 +35,18 @@ export class PAGPlayer {
     return (await PAGPlayer.module.webAssemblyQueue.exec(this.wasmIns._flush, this.wasmIns)) as boolean;
   }
   /**
+   * [Internal] Apply all pending changes to the target surface immediately. Returns true if the content has
+   * changed.
+   */
+  @wasmAsyncMethod
+  public async flushInternal(callback: (res: boolean) => void): Promise<boolean> {
+    return (await PAGPlayer.module.webAssemblyQueue.exec(async () => {
+      const res = await this.wasmIns._flush();
+      callback(res);
+      return res;
+    }, this.wasmIns)) as boolean;
+  }
+  /**
    * The duration of current composition in microseconds.
    */
   public duration(): number {

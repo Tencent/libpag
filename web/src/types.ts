@@ -14,6 +14,7 @@ import { PAGComposition } from './pag-composition';
 import { NativeImage } from './core/native-image';
 import { WebMask } from './core/web-mask';
 import { PAGTextLayer } from './pag-text-layer';
+import { GlobalCanvas } from './core/global-canvas';
 
 declare global {
   interface Window {
@@ -54,6 +55,7 @@ export interface PAG extends EmscriptenModule {
   };
   VectorString: any;
   webAssemblyQueue: WebAssemblyQueue;
+  GL: EmscriptenGL;
   PAGPlayer: typeof PAGPlayer;
   PAGFile: typeof PAGFile;
   PAGView: typeof PAGView;
@@ -67,15 +69,20 @@ export interface PAG extends EmscriptenModule {
   WebMask: typeof WebMask;
   ScalerContext: typeof ScalerContext;
   VideoReader: typeof VideoReader;
+  GlobalCanvas: typeof GlobalCanvas;
   traceImage: (info: { width: number; height: number }, pixels: Uint8Array, tag: string) => void;
-  GL: EmscriptenGL;
+  globalCanvas: GlobalCanvas;
 }
 
 export interface EmscriptenGL {
-  currentContext: { GLctx: WebGLRenderingContext };
+  currentContext?: {
+    handle: number;
+    GLctx: WebGLRenderingContext;
+    attributes: { majorVersion: number; minorVersion: number };
+  };
   textures: WebGLTexture[];
   createContext: (
-    canvas: HTMLCanvasElement,
+    canvas: HTMLCanvasElement | OffscreenCanvas,
     webGLContextAttributes: { majorVersion: number; minorVersion: number },
   ) => number;
   registerContext: (gl: WebGLRenderingContext, options: { majorVersion: number; minorVersion: number }) => number;

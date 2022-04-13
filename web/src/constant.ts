@@ -11,6 +11,6 @@ export const NALU_HEADER_LENGTH = 4;
  */
 export const WEB_SAFE_FONT = 'Arial';
 /**
- * Screen 2K resolution.
+ * Default render canvas size.
  */
-export const SCREEN_2560_RESOLUTION = 2560;
+export const DEFAULT_CANVAS_SIZE = 2560;

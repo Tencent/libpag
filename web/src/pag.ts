@@ -1,22 +1,27 @@
 /* global EmscriptenModule */
 
-import { PAGFont } from './pag-font';
 import { binding } from './binding';
 import * as types from './types';
 import createPAG from './wasm/libpag';
 import { WebAssemblyQueue } from './utils/queue';
 
+export interface moduleOption {
+  /**
+   * Link to wasm file.
+   */
+  locateFile?: (file: string) => string;
+}
+
 /**
  * Initialize pag webassembly module.
  */
-const PAGInit = (moduleOption: { [fn: string]: Function } = {}): Promise<types.PAG> =>
+const PAGInit = (moduleOption: moduleOption = {}): Promise<types.PAG> =>
   createPAG(moduleOption).then((module: types.PAG) => {
     module.webAssemblyQueue = new WebAssemblyQueue();
     module.webAssemblyQueue.start();
     binding(module);
-
-    PAGFont.registerFallbackFontNames();
-
+    module.globalCanvas = new module.GlobalCanvas();
+    module.PAGFont.registerFallbackFontNames();
     return module;
   });
 
