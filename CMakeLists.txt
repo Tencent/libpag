@@ -321,7 +321,6 @@ if (PAG_BUILD_TESTS)
     list(APPEND TEST_INCLUDES ${PAG_INCLUDES})
 
     file(GLOB PAG_TEST_FILES
-            src/mp4/*.*
             test/*.*
             test/framework/*.*
             test/framework/utils/*.*)
