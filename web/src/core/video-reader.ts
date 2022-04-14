@@ -6,7 +6,7 @@ import { Log } from '../utils/log';
 import { ErrorCode } from '../utils/error-map';
 import { EmscriptenGL } from '../types';
 
-interface TimeRange {
+export interface TimeRange {
   start: number;
   end: number;
 }
@@ -113,7 +113,7 @@ export class VideoReader {
 
   public renderToTexture(GL: EmscriptenGL, textureID: number) {
     if (!this.videoEl || this.videoEl.readyState < 2) return;
-    const gl = GL.currentContext.GLctx as WebGLRenderingContext;
+    const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
     gl.bindTexture(gl.TEXTURE_2D, GL.textures[textureID]);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.videoEl);
   }
@@ -174,7 +174,7 @@ export class VideoReader {
   }
 }
 
-class StaticTimeRanges {
+export class StaticTimeRanges {
   private timeRanges: TimeRange[];
 
   public constructor(timeRanges: TimeRange[]) {

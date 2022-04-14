@@ -1,4 +1,3 @@
-import { DEFAULT_CANVAS_SIZE } from './constant';
 import { PAG, PAGScaleMode, PAGViewListenerEvent } from './types';
 import { PAGPlayer } from './pag-player';
 import { EventManager, Listener } from './utils/event-manager';
