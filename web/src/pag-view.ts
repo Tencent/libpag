@@ -50,7 +50,8 @@ export class PAGView {
         pagView.pagSurface = this.makePAGSurface(pagView.contextID, pagView.rawWidth, pagView.rawHeight);
         pagView.player.setSurface(pagView.pagSurface);
         pagView.player.setComposition(file);
-        await pagView.setProgress(0);
+        pagView.setProgress(0);
+        await pagView.flush();
         return pagView;
       }
     }
@@ -176,12 +177,11 @@ export class PAGView {
   /**
    * Set the progress of play position, the value is from 0.0 to 1.0.
    */
-  public async setProgress(progress: number): Promise<number> {
-    this.playTime = progress * (await this.duration());
+  public setProgress(progress: number): number {
+    this.playTime = progress * this.duration();
     this.startTime = performance.now() * 1000 - this.playTime;
     if (!this.isPlaying) {
       this.player.setProgress(progress);
-      await this.flush();
     }
     return progress;
   }
