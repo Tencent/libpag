@@ -9,6 +9,7 @@ import { ErrorCode } from './utils/error-map';
 export interface PAGViewOptions {
   useScale?: boolean;
   useCanvas2D?: boolean;
+  firstFrame?: boolean;
 }
 
 export class PAGView {
@@ -51,7 +52,7 @@ export class PAGView {
         pagView.player.setSurface(pagView.pagSurface);
         pagView.player.setComposition(file);
         pagView.setProgress(0);
-        await pagView.flush();
+        if (pagView.pagViewOptions.firstFrame) await pagView.flush();
         return pagView;
       }
     }
@@ -98,6 +99,7 @@ export class PAGView {
   private pagViewOptions: PAGViewOptions = {
     useScale: true,
     useCanvas2D: false,
+    firstFrame: true,
   };
 
   public constructor(pagPlayer: PAGPlayer, canvasElement: HTMLCanvasElement) {
