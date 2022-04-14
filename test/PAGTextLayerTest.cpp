@@ -394,4 +394,10 @@ PAG_TEST_F(PAGTextLayerTest, TrackMatteTextBounds) {
   }
 }
 
+PAG_TEST_F(PAGTextLayerTest, SmallFontSizeScale) {
+  auto pagFile = PAGFile::Load("../assets/tougao.pag");
+  TestPAGPlayer->setComposition(pagFile);
+  TestPAGPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/SmallFontSizeScale"));
+}
 }  // namespace pag
