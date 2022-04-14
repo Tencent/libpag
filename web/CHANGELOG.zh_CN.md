@@ -1,64 +1,67 @@
 # CHANGELOG
 
-## 0.0.1
-
-### Features
-
-- 发布 `Web` 平台 `libpag` 的 `wasm` 版本，支持全特性 `PAG`
-- 支持 `Chrome 87+` ，`Safar 11.1+` 浏览器
-
-## 0.0.2
+## 0.1.6
 
 ### Breaking Changes
 
-- 修改 `PAGView` 上的属性 `duration` 为方法 `duration()` 。使用：`PAGView.duration` ⇒ `PAGView.duration()`
+- `PAGViewOptions` 接口中移除 `fullBox` 字段，增加 `useScale` 和 `firstFrame` 字段
+- 移除 `PAGView.setProgress` 中的 flush 动作
 
-### Features
+### Feature
 
-- 支持从 `CanvasElement` 对象创建 `PAGView` 实例
-- 兼容低版本浏览器文字测量，支持 `Chrome 69+` 浏览器
-- `PAGFile` 上增加 `setDuration` ， `timeStretchMode` ， `setTimeStretchMode` 方法
-- `PAGLayer` 上增加 `uniqueID` ， `layerType` ， `layerName` ， `opacity` ， `setOpacity` ， `visible` ， `setVisible`  ， `editableIndex` ， `frameRate` ， `localTimeToGlobal` ， `globalToLocalTime` 方法
+- `PAGTextLayer` 上增加 `imageBytes` 方法
 
-### Bug Fixes
+### BugFixes
 
-- 修复 `PAGView` 的 `duration` 计算错误
+- 修复 `canvas` 未挂载到 DOM 树上时和 `display:none` 时缩放错误的问题
 
-## 0.0.3
+## 0.1.5
 
-### Breaking Changes
+### Feature
 
-- 消除 emscripten 中 `Asyncify` 模块带来的副作用，将大部分与 wasm 交互的接口改为同步接口，仅保留 `PAGPlayer.flush()` 为 `async` 方法
-- 替换 `module._PAGSurface`  为 `module.PAGSurface`
-
-### Features
-
-- `PAGComposition` 上增加  `numChildren`，`setContentSize`，`getLayerAt`，`getLayersByName`，`getLayerIndex`，`swapLayer`，`swapLayerAt`，`contains`，`addLayer`，`addLayerAt`，`audioStartTime`，`audioMarkers`，`audioBytes`，`removeLayerAt`，`removeAllLayers` 方法
-- `PAGViewListenerEvent` 上增加 `onAnimationPla`，`onAnimationPause` ，`onAnimationFlushed`
+- `PAGView.init()` 上增加 `initOptions` 参数，包含 `fullBox` 和 `useCanvas2D` 方法
+- `PAGView` 上增加 `setRenderCanvasSize` 方法
 
 ### Bug Fixes
 
-- 修复 `FontFamily` 渲染错误
-- 修复微信平台下视频序列帧无法播放
+- 修复 `PAGView.updateSize()` 更新 Canvas 尺寸逻辑
+- 修复替换带空格文字的文本时渲染错误
 
-## 0.0.4
-
-### Bug Fixes
-
-- 修复消除 emscripten 中 `Asyncify` 模块带来副作用的Typescript 装饰器遗漏了静态方法
-
-## 0.0.5
+## 0.1.4
 
 ### Bug Fixes
 
-- 修复 `PAGImage` 的 `fromSource` 方法没有回溯 `Asyncify` 的状态
+- 修复预测下一帧导致闪屏的问题
+- 修复静态帧区间 Video 对齐问题
+
+## 0.1.3
+
+### Bug Fixes
+
+- 修复 `destroy` 没有正常释放 `WebGL context` 的问题
+
+## 0.1.2
+
+### Bug Fixes
+
+- 修复视频序列帧解码过程渲染错误
+- 修复 `vector` 结构上的方法同步错误
+- 修复 `fontFamily` 格式化错误
+- 修复一个从 `texture` 创建 `PAGSurface` 的性能问题
+
+## 0.1.1
+
+### Bug Fixes
+
+- 修复 `PAGView` 重复调用 `init` 会多次缩放 `Canvas` 的问题
+- 修复 `PAGView` 的 `repeatCount` 为 1 时结束帧不是最后一帧的问题
 
 ## 0.1.0
 
 ### Breaking Changes
 
 - `PAGFile.getLayersByEditableIndex` 返回值改为 `Vector<PAGLayer>`
-- 消除 C++ enum `LayerType` 替换为 Js enum `LayerType`,  `PAG.LayerType` 替换为 `PAG.types.LayerType`
+- 消除 C++ enum `LayerType` 替换为 Js enum `LayerType`, `PAG.LayerType` 替换为 `PAG.types.LayerType`
 
 ### Features
 
@@ -73,43 +76,55 @@
 - `PAGFont` 上增加 `create` 方法和 `fontFamily` ， `fontStyle` 属性
 - 增加 `PAGTextLayer` ， `PAGImageLayer` 类
 
-## 0.1.1
+## 0.0.5
 
 ### Bug Fixes
 
-- 修复 `PAGView` 重复调用 `init` 会多次缩放 `Canvas` 的问题
-- 修复 `PAGView` 的 `repeatCount` 为1时结束帧不是最后一帧的问题
+- 修复 `PAGImage` 的 `fromSource` 方法没有回溯 `Asyncify` 的状态
 
-## 0.1.2
-
-### Bug Fixes
-
-- 修复视频序列帧解码过程渲染错误
-- 修复 `vector` 结构上的方法同步错误
-- 修复 `fontFamily` 格式化错误
-- 修复一个从 `texture` 创建 `PAGSurface` 的性能问题
-
-## 0.1.3
+## 0.0.4
 
 ### Bug Fixes
 
-- 修复 `destroy` 没有正常释放 `WebGL context` 的问题
+- 修复消除 emscripten 中 `Asyncify` 模块带来副作用的 Typescript 装饰器遗漏了静态方法
 
-## 0.1.4
+## 0.0.3
 
-### Bug Fixes
+### Breaking Changes
 
-- 修复预测下一帧导致闪屏的问题
-- 修复静态帧区间Video对齐问题
+- 消除 emscripten 中 `Asyncify` 模块带来的副作用，将大部分与 wasm 交互的接口改为同步接口，仅保留 `PAGPlayer.flush()` 为 `async` 方法
+- 替换 `module._PAGSurface` 为 `module.PAGSurface`
 
-## 0.1.5
+### Features
 
-### Feature
-
-- `PAGView.init()` 上增加 `initOptions` 参数，包含 `fullBox` 和 `useCanvas2D` 方法
-- `PAGView` 上增加 `setRenderCanvasSize` 方法
+- `PAGComposition` 上增加 `numChildren`，`setContentSize`，`getLayerAt`，`getLayersByName`，`getLayerIndex`，`swapLayer`，`swapLayerAt`，`contains`，`addLayer`，`addLayerAt`，`audioStartTime`，`audioMarkers`，`audioBytes`，`removeLayerAt`，`removeAllLayers` 方法
+- `PAGViewListenerEvent` 上增加 `onAnimationPla`，`onAnimationPause` ，`onAnimationFlushed`
 
 ### Bug Fixes
 
-- 修复 `PAGView.updateSize()` 更新 Canvas 尺寸逻辑
-- 修复替换带空格文字的文本时渲染错误
+- 修复 `FontFamily` 渲染错误
+- 修复微信平台下视频序列帧无法播放
+
+## 0.0.2
+
+### Breaking Changes
+
+- 修改 `PAGView` 上的属性 `duration` 为方法 `duration()` 。使用：`PAGView.duration` ⇒ `PAGView.duration()`
+
+### Features
+
+- 支持从 `CanvasElement` 对象创建 `PAGView` 实例
+- 兼容低版本浏览器文字测量，支持 `Chrome 69+` 浏览器
+- `PAGFile` 上增加 `setDuration` ， `timeStretchMode` ， `setTimeStretchMode` 方法
+- `PAGLayer` 上增加 `uniqueID` ， `layerType` ， `layerName` ， `opacity` ， `setOpacity` ， `visible` ， `setVisible` ， `editableIndex` ， `frameRate` ， `localTimeToGlobal` ， `globalToLocalTime` 方法
+
+### Bug Fixes
+
+- 修复 `PAGView` 的 `duration` 计算错误
+
+## 0.0.1
+
+### Features
+
+- 发布 `Web` 平台 `libpag` 的 `wasm` 版本，支持全特性 `PAG`
+- 支持 `Chrome 87+` ，`Safar 11.1+` 浏览器
