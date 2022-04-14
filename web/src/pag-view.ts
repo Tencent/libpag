@@ -1,4 +1,3 @@
-import { DEFAULT_CANVAS_SIZE } from './constant';
 import { PAG, PAGScaleMode, PAGViewListenerEvent } from './types';
 import { PAGPlayer } from './pag-player';
 import { EventManager, Listener } from './utils/event-manager';
@@ -8,8 +7,9 @@ import { Log } from './utils/log';
 import { ErrorCode } from './utils/error-map';
 
 export interface PAGViewOptions {
-  fullBox?: boolean;
+  useScale?: boolean;
   useCanvas2D?: boolean;
+  firstFrame?: boolean;
 }
 
 export class PAGView {
@@ -46,12 +46,13 @@ export class PAGView {
       if (pagView.contextID === 0) {
         Log.errorByCode(ErrorCode.CanvasContextIsNotWebGL);
       } else {
-        pagView.resetSize(pagView.pagViewOptions.fullBox);
+        pagView.resetSize(pagView.pagViewOptions.useScale);
         pagView.frameRate = file.frameRate();
         pagView.pagSurface = this.makePAGSurface(pagView.contextID, pagView.rawWidth, pagView.rawHeight);
         pagView.player.setSurface(pagView.pagSurface);
         pagView.player.setComposition(file);
-        await pagView.setProgress(0);
+        pagView.setProgress(0);
+        if (pagView.pagViewOptions.firstFrame) await pagView.flush();
         return pagView;
       }
     }
@@ -96,8 +97,9 @@ export class PAGView {
   private currentFrame = 0;
   private frameRate = 0;
   private pagViewOptions: PAGViewOptions = {
-    fullBox: false,
+    useScale: true,
     useCanvas2D: false,
+    firstFrame: true,
   };
 
   public constructor(pagPlayer: PAGPlayer, canvasElement: HTMLCanvasElement) {
@@ -177,12 +179,11 @@ export class PAGView {
   /**
    * Set the progress of play position, the value is from 0.0 to 1.0.
    */
-  public async setProgress(progress: number): Promise<number> {
-    this.playTime = progress * (await this.duration());
+  public setProgress(progress: number): number {
+    this.playTime = progress * this.duration();
     this.startTime = performance.now() * 1000 - this.playTime;
     if (!this.isPlaying) {
       this.player.setProgress(progress);
-      await this.flush();
     }
     return progress;
   }
@@ -298,8 +299,13 @@ export class PAGView {
   /**
    * Update size when changed canvas size.
    */
-  public async updateSize() {
-    this.resetSize(this.pagViewOptions.fullBox);
+  public updateSize() {
+    if (!this.canvasElement) {
+      Log.errorByCode(ErrorCode.CanvasElementIsNoFound);
+      return;
+    }
+    this.rawWidth = this.canvasElement.width;
+    this.rawHeight = this.canvasElement.height;
     const pagSurface = PAGView.makePAGSurface(this.contextID, this.rawWidth, this.rawHeight);
     this.player.setSurface(pagSurface);
     this.pagSurface?.destroy();
@@ -365,22 +371,45 @@ export class PAGView {
     }
   }
 
-  private resetSize(fullBox = false) {
+  private resetSize(useScale = true) {
     if (!this.canvasElement) {
       Log.errorByCode(ErrorCode.CanvasElementIsNoFound);
       return;
     }
-    if (fullBox) {
-      this.canvasElement.style.width = '100%';
-      this.canvasElement.style.height = '100%';
+
+    if (!useScale) {
+      this.rawWidth = this.canvasElement.width;
+      this.rawHeight = this.canvasElement.height;
+      return;
     }
+
+    let displaySize: { width: number; height: number };
     const styleDeclaration = window.getComputedStyle(this.canvasElement, null);
-    if (!fullBox) {
-      this.canvasElement.style.width = styleDeclaration.width;
-      this.canvasElement.style.height = styleDeclaration.height;
+    const computedSize = {
+      width: Number(styleDeclaration.width.replace('px', '')),
+      height: Number(styleDeclaration.height.replace('px', '')),
+    };
+    if (computedSize.width > 0 && computedSize.height > 0) {
+      displaySize = computedSize;
+    } else {
+      const styleSize = {
+        width: Number(this.canvasElement.style.width.replace('px', '')),
+        height: Number(this.canvasElement.style.height.replace('px', '')),
+      };
+      if (styleSize.width > 0 && styleSize.height > 0) {
+        displaySize = styleSize;
+      } else {
+        displaySize = {
+          width: this.canvasElement.width,
+          height: this.canvasElement.height,
+        };
+      }
     }
-    this.rawWidth = Number(styleDeclaration.width.replace('px', '')) * window.devicePixelRatio;
-    this.rawHeight = Number(styleDeclaration.height.replace('px', '')) * window.devicePixelRatio;
+
+    this.canvasElement.style.width = `${displaySize.width}px`;
+    this.canvasElement.style.height = `${displaySize.height}px`;
+    this.rawWidth = displaySize.width * window.devicePixelRatio;
+    this.rawHeight = displaySize.height * window.devicePixelRatio;
     this.canvasElement.width = this.rawWidth;
     this.canvasElement.height = this.rawHeight;
   }

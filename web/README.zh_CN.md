@@ -95,23 +95,28 @@ demo 文件夹中提供了简单的接入示例， 可以点击 [这里](https:/
 
 ## 渲染相关
 
+### PAG 渲染尺寸
+
+在 Web 平台上，设备像素分辨率与 CSS 像素分辨率是不同的，而它们之比被称为 `devicePixelRatio`。所以当我们需要显示 CSS 像素 1px 时， 需要 1px \* `devicePixelRatio` 的渲染尺寸。
+
+PAG 默认会对 Canvas 在屏幕中的可视尺寸进行缩放计算后进行渲染，因此会对 Canvas 的宽高以及 `style` 产生副作用。如果希望 PAG 不对 Canvas 产生副作用， 可以在 `PAGView.init` 的时候传入 `{ useScale: false }` 来取消缩放。
+
 ### PAGView 尺寸过大
 
-为了高清的渲染效果，PAGView 会按照 Canvas 尺寸 * `devicePixelRatio` 作为实际渲染尺寸。
+为了高清的渲染效果，PAGView 默认会按照 Canvas 尺寸 \* `devicePixelRatio` 作为实际渲染尺寸。
 受设备自身性能影响 WebGL 的最大渲染尺寸可能各不相同。会出现渲染尺寸过大导致白屏的情况。
 
 建议移动端下，实际渲染尺寸不大于 2560px。
 
 ### 多个 PAGView 实例场景
 
-首先，因为 PAG Web 版是单线程的SDK，所以我们不建议同屏播放多个 PAGView。
+首先，因为 PAG Web 版是单线程的 SDK，所以我们不建议同屏播放多个 PAGView。
 
-对于有多个 PAGView 实例的场景，我们需要先知道，浏览器环境中 WebGL 活跃的 context 数量是有限制的，Chrome 是16个，Safari是8个。因为有这个限制存在，我们应当及时使用 `destroy` 回收无用的 PAGView 实例和移除 Canvas 的引用。
+对于有多个 PAGView 实例的场景，我们需要先知道，浏览器环境中 WebGL 活跃的 context 数量是有限制的，Chrome 是 16 个，Safari 是 8 个。因为有这个限制存在，我们应当及时使用 `destroy` 回收无用的 PAGView 实例和移除 Canvas 的引用。
 
 如果你需要在 Chrome 浏览器中同屏存在多个 PAGView 实例，可以尝试使用 canvas2D 模式，需要在 `PAGView.init` 的时候传入 `{ useCanvas2D: true }` 。
 
 因为 Safari 上 [`CanvasRenderingContext2D.drawImage()`](https://developer.mozilla.org/zh-CN/docs/Web/API/CanvasRenderingContext2D/drawImage) 的性能很差，所以我们不推荐在 Safari 上使用这个模式。
-
 
 ## Roadmap
 

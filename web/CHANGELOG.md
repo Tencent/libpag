@@ -1,57 +1,60 @@
 # CHANGELOG
 
-## 0.0.1
-
-### Features
-
-- Publish PAG Web SDK
-- Support Chrome 87+ and Safari 11.1+ Browser
-
-## 0.0.2
+## 0.1.6
 
 ### Breaking Changes
 
-- Change property `duration` to be function `duration()` on PAGView. Like: `PAGView.duration` ⇒ `PAGView.duration()`
+- Remove `fullBox` parameter in `PAGViewOptions`, add `useScale` and `firstFrame`.
+- Remove flush action in `PAGView.setProgress`.
 
-### Features
+### Feature
 
-- Support create pag view from the canvas element.
-- Support measure text in low version browser, support Chrome 69+.
-- Add `setDuration` ， `timeStretchMode` ，and `setTimeStretchMode` on `PAGFile`.
-- Add `uniqueID` ， `layerType` ， `layerName` ， `opacity` ， `setOpacity` ， `visible` ， `setVisible` ， `editableIndex` ， `frameRate` ， `localTimeToGlobal` ，and `globalToLocalTime` on `PAGLayer`.
+- Add `imageBytes` on `PAGTextLayer`
 
-### Bug Fixes
+### BugFixes
 
-- Fix `duration` on `PAGView` calculate error.
+- Fix scale error when canvas hasn't mounted on DOM tree or `display:none`.
 
-## 0.0.3
+## 0.1.5
 
-### Breaking Changes
+### Feature
 
-- Eliminate the side effects caused by the `Asyncify` module in emscripten, change most of the methods that interact with wasm to `await` methods, and only keep `PAGPlayer.flush()` as an `async` method.
-- Replace _`module_.\_PAGSurface` to *`module\*.PAGSurface`.
-
-### Features
-
-- Add `numChildren`，`setContentSize`，`getLayerAt`，`getLayersByName`，`getLayerIndex`，`swapLayer`，`swapLayerAt`，`contains`，`addLayer`，`addLayerAt`，`audioStartTime`，`audioMarkers`，`audioBytes`，`removeLayerAt`，`removeAllLayers` on `PAGComposition`.
-- Add `onAnimationPla`，`onAnimationPause` ，`onAnimationFlushed` on `PAGViewListenerEvent`.
+- Add `initOptions` parameter what include `fullBox` and `useCanvas2D` on `PAGView.init()`.
+- Add `setRenderCanvasSize` on `PAGView`.
 
 ### Bug Fixes
 
-- Fix font family rending error.
-- Fix video sequence can not play on Wechat.
+- Fix `PAGView.updateSize()` update canvas size error。
+- Fix replace text when including space error.
 
-## 0.0.4
-
-### Bug Fixes
-
-- Fix some static functions that eliminate the side effects caused by the `Asyncify` module in emscripten miss in the Typescript decorator.
-
-## 0.0.5
+## 0.1.4
 
 ### Bug Fixes
 
-- Fix `PAGImage.fromSource` miss rewind `Asyncify` currData.
+- Fix decoding the next frame error in Web env.
+- Fix the frame align error when is in the static time range.
+
+## 0.1.3
+
+### Bug Fixes
+
+- Fix WebGL context release error by destroy.
+
+## 0.1.2
+
+### Bug Fixes
+
+- Fix video sequence reader decode frame error.
+- Fix vector function async error.
+- Fix font family format error.
+- Fix the performance issue of a PAGSurface made from texture.
+
+## 0.1.1
+
+### Bug Fixes
+
+- Fix canvas rescaling error when repeated call init function.
+- Fix render end frame error when repeat count is 1.
 
 ## 0.1.0
 
@@ -73,43 +76,55 @@
 - Add `create`, `fontFamily`, `fontStyle` on `PAGFont`.
 - Add `PAGTextLayer`, `PAGImageLayer` Class.
 
-## 0.1.1
+## 0.0.5
 
 ### Bug Fixes
 
-- Fix canvas rescaling error when repeated call init function.
-- Fix render end frame error when repeat count is 1.
+- Fix `PAGImage.fromSource` miss rewind `Asyncify` currData.
 
-## 0.1.2
-
-### Bug Fixes
-
-- Fix video sequence reader decode frame error.
-- Fix vector function async error.
-- Fix font family format error.
-- Fix the performance issue of a PAGSurface made from texture.
-
-## 0.1.3
+## 0.0.4
 
 ### Bug Fixes
 
-- Fix WebGL context release error by destroy.
+- Fix some static functions that eliminate the side effects caused by the `Asyncify` module in emscripten miss in the Typescript decorator.
 
-## 0.1.4
+## 0.0.3
 
-### Bug Fixes
+### Breaking Changes
 
-- Fix decoding the next frame error in Web env.
-- Fix the frame align error when is in the static time range.
+- Eliminate the side effects caused by the `Asyncify` module in emscripten, change most of the methods that interact with wasm to `await` methods, and only keep `PAGPlayer.flush()` as an `async` method.
+- Replace _`module_.\_PAGSurface` to *`module\*.PAGSurface`.
 
-## 0.1.5
+### Features
 
-### Feature
-
-- Add `initOptions` parameter what include `fullBox` and `useCanvas2D` on `PAGView.init()`.
-- Add `setRenderCanvasSize` on `PAGView`.
+- Add `numChildren`，`setContentSize`，`getLayerAt`，`getLayersByName`，`getLayerIndex`，`swapLayer`，`swapLayerAt`，`contains`，`addLayer`，`addLayerAt`，`audioStartTime`，`audioMarkers`，`audioBytes`，`removeLayerAt`，`removeAllLayers` on `PAGComposition`.
+- Add `onAnimationPla`，`onAnimationPause` ，`onAnimationFlushed` on `PAGViewListenerEvent`.
 
 ### Bug Fixes
 
-- Fix `PAGView.updateSize()` update canvas size error。
-- Fix replace text when including space error.
+- Fix font family rending error.
+- Fix video sequence can not play on Wechat.
+
+## 0.0.2
+
+### Breaking Changes
+
+- Change property `duration` to be function `duration()` on PAGView. Like: `PAGView.duration` ⇒ `PAGView.duration()`
+
+### Features
+
+- Support create pag view from the canvas element.
+- Support measure text in low version browser, support Chrome 69+.
+- Add `setDuration` ， `timeStretchMode` ，and `setTimeStretchMode` on `PAGFile`.
+- Add `uniqueID` ， `layerType` ， `layerName` ， `opacity` ， `setOpacity` ， `visible` ， `setVisible` ， `editableIndex` ， `frameRate` ， `localTimeToGlobal` ，and `globalToLocalTime` on `PAGLayer`.
+
+### Bug Fixes
+
+- Fix `duration` on `PAGView` calculate error.
+
+## 0.0.1
+
+### Features
+
+- Publish PAG Web SDK
+- Support Chrome 87+ and Safari 11.1+ Browser
