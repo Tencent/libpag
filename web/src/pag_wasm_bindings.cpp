@@ -129,7 +129,15 @@ EMSCRIPTEN_BINDINGS(pag) {
       .function("_contentTimeToLayer",
                 optional_override([](PAGImageLayer& pagImageLayer, int contentTime) {
                   return static_cast<int>(pagImageLayer.contentTimeToLayer(contentTime));
-                }));
+                }))
+      .function("_imageBytes", optional_override([](PAGImageLayer& pagImageLayer) {
+        ByteData* result = pagImageLayer.imageBytes();
+        if (result->length() == 0) {
+          uint8_t empty_arr[] = {};
+          return val(typed_memory_view(0, empty_arr));
+        }
+        return val(typed_memory_view(result->length(), result->data()));
+      }));
 
   class_<PAGTextLayer, base<PAGLayer>>("_PAGTextLayer")
       .smart_ptr<std::shared_ptr<PAGTextLayer>>("_PAGTextLayer")

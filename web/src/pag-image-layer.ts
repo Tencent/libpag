@@ -47,4 +47,10 @@ export class PAGImageLayer extends PAGLayer {
   public contentTimeToLayer(contentTime: number): number {
     return this.wasmIns._contentTimeToLayer(contentTime) as number;
   }
+  /**
+   * The default image data of this layer, which is webp format.
+   */
+  public imageBytes(): Uint8Array {
+    return this.wasmIns._imageBytes() as Uint8Array;
+  }
 }
