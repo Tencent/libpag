@@ -233,12 +233,24 @@ void GLCanvas::drawMask(const Rect& bounds, const Texture* mask, const Shader* s
 
 void GLCanvas::drawGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
                           const Font& font, const Paint& paint) {
-  auto textBlob = TextBlob::MakeFrom(glyphIDs, positions, glyphCount, font);
-  if (textBlob == nullptr) {
+  auto scaleX = state->matrix.getScaleX();
+  auto skewY = state->matrix.getSkewY();
+  auto scale = std::sqrt(scaleX * scaleX + skewY * skewY);
+  auto scaledFont = font.makeWithSize(font.getSize() * scale);
+  std::vector<Point> scaledPositions;
+  for (size_t i = 0; i < glyphCount; ++i) {
+    scaledPositions.push_back(Point::Make(positions[i].x * scale, positions[i].y * scale));
+  }
+  save();
+  concat(Matrix::MakeScale(1.f / scale));
+  if (scaledFont.getTypeface()->hasColor()) {
+    drawColorGlyphs(glyphIDs, &scaledPositions[0], glyphCount, scaledFont, paint);
+    restore();
     return;
   }
-  if (font.getTypeface()->hasColor()) {
-    drawColorGlyphs(glyphIDs, positions, glyphCount, font, paint);
+  auto textBlob = TextBlob::MakeFrom(glyphIDs, &scaledPositions[0], glyphCount, scaledFont);
+  if (textBlob == nullptr) {
+    restore();
     return;
   }
   Path path = {};
@@ -246,27 +258,24 @@ void GLCanvas::drawGlyphs(const GlyphID glyphIDs[], const Point positions[], siz
   if (textBlob->getPath(&path, stroke)) {
     auto shader = Shader::MakeColorShader(paint.getColor());
     fillPath(path, shader.get());
+    restore();
     return;
   }
   drawMaskGlyphs(textBlob.get(), paint);
+  restore();
 }
 
 void GLCanvas::drawColorGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
                                const Font& font, const Paint& paint) {
-  auto scaleX = state->matrix.getScaleX();
-  auto skewY = state->matrix.getSkewY();
-  auto scale = std::sqrt(scaleX * scaleX + skewY * skewY);
-  auto scaleFont = font.makeWithSize(font.getSize() * scale);
   for (size_t i = 0; i < glyphCount; ++i) {
     const auto& glyphID = glyphIDs[i];
     const auto& position = positions[i];
 
     auto glyphMatrix = Matrix::I();
-    auto glyphBuffer = scaleFont.getGlyphImage(glyphID, &glyphMatrix);
+    auto glyphBuffer = font.getGlyphImage(glyphID, &glyphMatrix);
     if (glyphBuffer == nullptr) {
       continue;
     }
-    glyphMatrix.postScale(1.f / scale, 1.f / scale);
     glyphMatrix.postTranslate(position.x, position.y);
     save();
     concat(glyphMatrix);
