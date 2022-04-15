@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "VideoSequenceReader.h"
+#include "codec/mp4/MP4BoxHelper.h"
 #include "gpu/opengl/GLTexture.h"
 
 using namespace emscripten;
@@ -25,27 +26,10 @@ namespace pag {
 VideoSequenceReader::VideoSequenceReader(std::shared_ptr<File> file, VideoSequence* sequence)
     : SequenceReader(sequence->duration(), sequence->composition->staticContent()),
       file(std::move(file)) {
-  width = sequence->alphaStartX + sequence->width;
-  if (width % 2 == 1) {
-    width++;
-  }
-  height = sequence->alphaStartY + sequence->height;
-  if (height % 2 == 1) {
-    height++;
-  }
+  width = sequence->getVideoWidth();
+  height = sequence->getVideoHeight();
   auto videoReaderClass = val::module_property("VideoReader");
   if (videoReaderClass.as<bool>()) {
-    auto headers = val::array();
-    for (auto* header : sequence->headers) {
-      headers.call<void>("push", val(typed_memory_view(header->length(), header->data())));
-    }
-    auto frames = val::array();
-    auto ptsList = val::array();
-    for (auto* frame : sequence->frames) {
-      frames.call<void>(
-          "push", val(typed_memory_view(frame->fileBytes->length(), frame->fileBytes->data())));
-      ptsList.call<void>("push", static_cast<int>(frame->frame));
-    }
     auto staticTimeRanges = val::array();
     for (const auto& timeRange : sequence->staticTimeRanges) {
       auto object = val::object();
@@ -53,9 +37,9 @@ VideoSequenceReader::VideoSequenceReader(std::shared_ptr<File> file, VideoSequen
       object.set("end", static_cast<int>(timeRange.end));
       staticTimeRanges.call<void>("push", object);
     }
-
-    videoReader = videoReaderClass.new_(width, height, sequence->frameRate, headers, frames,
-                                        ptsList, staticTimeRanges);
+    mp4Data = MP4BoxHelper::CovertToMP4(sequence);
+    videoReader = videoReaderClass.new_(val(typed_memory_view(mp4Data->length(), mp4Data->data())),
+                                        sequence->frameRate, staticTimeRanges);
   }
 }
 

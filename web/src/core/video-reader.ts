@@ -35,15 +35,7 @@ export class VideoReader {
   private hadPlay = false;
   private staticTimeRanges: StaticTimeRanges;
 
-  public constructor(
-    width: number,
-    height: number,
-    frameRate: number,
-    h264Headers: Uint8Array[],
-    h264Frames: Uint8Array[],
-    ptsList: number[],
-    staticTimeRanges: TimeRange[],
-  ) {
+  public constructor(mp4Data: Uint8Array, frameRate: number, staticTimeRanges: TimeRange[]) {
     this.videoEl = document.createElement('video');
     this.videoEl.style.display = 'none';
     this.videoEl.muted = true;
@@ -51,8 +43,7 @@ export class VideoReader {
     addListener(this.videoEl, 'timeupdate', this.onTimeupdate.bind(this));
     this.frameRate = frameRate;
     this.lastFlush = -1;
-    const mp4 = convertMp4(h264Frames, h264Headers, width, height, this.frameRate, ptsList);
-    const blob = new Blob([mp4], { type: 'video/mp4' });
+    const blob = new Blob([mp4Data], { type: 'video/mp4' });
     this.videoEl.src = URL.createObjectURL(blob);
     this.staticTimeRanges = new StaticTimeRanges(staticTimeRanges);
   }
