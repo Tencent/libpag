@@ -50,5 +50,6 @@ class VideoSequenceReader : public SequenceReader {
   std::shared_ptr<tgfx::Texture> texture = nullptr;
   int32_t width = 0;
   int32_t height = 0;
+  std::unique_ptr<ByteData> mp4Data = nullptr;
 };
 }  // namespace pag
