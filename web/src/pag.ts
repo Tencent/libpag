@@ -18,7 +18,6 @@ export interface moduleOption {
 const PAGInit = (moduleOption: moduleOption = {}): Promise<types.PAG> =>
   createPAG(moduleOption).then((module: types.PAG) => {
     module.webAssemblyQueue = new WebAssemblyQueue();
-    module.webAssemblyQueue.start();
     binding(module);
     module.globalCanvas = new module.GlobalCanvas();
     module.PAGFont.registerFallbackFontNames();

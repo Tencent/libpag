@@ -3,9 +3,10 @@ import { PAGFile } from './pag-file';
 import { PAGLayer } from './pag-layer';
 import { PAGSurface } from './pag-surface';
 import { Matrix, PAG, PAGScaleMode, Rect, Vector } from './types';
-import { wasmAwaitRewind, wasmAsyncMethod } from './utils/decorators';
+import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorators';
 import { proxyVector } from './utils/type-utils';
 
+@destroyVerify
 @wasmAwaitRewind
 export class PAGPlayer {
   public static module: PAG;
@@ -16,6 +17,7 @@ export class PAGPlayer {
   }
 
   public wasmIns;
+  public isDestroyed = false;
 
   public constructor(wasmIns: any) {
     this.wasmIns = wasmIns;
@@ -242,5 +244,6 @@ export class PAGPlayer {
 
   public destroy() {
     this.wasmIns.delete();
+    this.isDestroyed = true;
   }
 }

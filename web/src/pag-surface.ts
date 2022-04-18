@@ -1,6 +1,7 @@
 import { PAG } from './types';
-import { wasmAwaitRewind } from './utils/decorators';
+import { destroyVerify, wasmAwaitRewind } from './utils/decorators';
 
+@destroyVerify
 @wasmAwaitRewind
 export class PAGSurface {
   public static module: PAG;
@@ -21,6 +22,7 @@ export class PAGSurface {
   }
 
   public wasmIns;
+  public isDestroyed = false;
 
   public constructor(wasmIns: any) {
     this.wasmIns = wasmIns;
@@ -59,5 +61,6 @@ export class PAGSurface {
 
   public destroy(): void {
     this.wasmIns.delete();
+    this.isDestroyed = true;
   }
 }

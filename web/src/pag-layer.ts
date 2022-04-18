@@ -1,12 +1,14 @@
 import { PAGComposition } from './pag-composition';
 import { LayerType, Marker, Matrix, PAG, Rect, Vector } from './types';
-import { wasmAwaitRewind } from './utils/decorators';
+import { destroyVerify, wasmAwaitRewind } from './utils/decorators';
 
+@destroyVerify
 @wasmAwaitRewind
 export class PAGLayer {
   public static module: PAG;
 
   public wasmIns: any;
+  public isDestroyed: any;
 
   public constructor(wasmIns: any) {
     this.wasmIns = wasmIns;
@@ -215,5 +217,6 @@ export class PAGLayer {
 
   public destroy(): void {
     this.wasmIns.delete();
+    this.isDestroyed = true;
   }
 }

@@ -3,8 +3,9 @@ import { readFile } from './utils/common';
 import { ErrorCode } from './utils/error-map';
 import { Log } from './utils/log';
 import { defaultFontNames } from './utils/font-family';
-import { wasmAwaitRewind, wasmAsyncMethod } from './utils/decorators';
+import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorators';
 
+@destroyVerify
 @wasmAwaitRewind
 export class PAGFont {
   public static module: PAG;
@@ -49,6 +50,7 @@ export class PAGFont {
   }
 
   public wasmIns: any;
+  public isDestroyed = false;
 
   public readonly fontFamily: string;
   public readonly fontStyle: string;
@@ -57,5 +59,10 @@ export class PAGFont {
     this.wasmIns = wasmIns;
     this.fontFamily = this.wasmIns.fontFamily;
     this.fontStyle = this.wasmIns.fontStyle;
+  }
+
+  public destroy() {
+    this.wasmIns.delete();
+    this.isDestroyed = true;
   }
 }

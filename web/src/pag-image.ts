@@ -1,7 +1,8 @@
 import { Matrix, PAG, PAGScaleMode } from './types';
 import { NativeImage } from './core/native-image';
-import { wasmAwaitRewind, wasmAsyncMethod } from './utils/decorators';
+import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorators';
 
+@destroyVerify
 @wasmAwaitRewind
 export class PAGImage {
   public static module: PAG;
@@ -38,6 +39,7 @@ export class PAGImage {
   }
 
   public wasmIns;
+  public isDestroyed = false;
 
   public constructor(wasmIns: any) {
     this.wasmIns = wasmIns;
@@ -85,5 +87,6 @@ export class PAGImage {
    */
   public destroy(): void {
     this.wasmIns.delete();
+    this.isDestroyed = true;
   }
 }

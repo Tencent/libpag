@@ -1,3 +1,5 @@
+import { Log } from './log';
+
 export function wasmAwaitRewind(constructor: any) {
   const ignoreStaticFunctions = ['length', 'name', 'prototype', 'wasmAsyncMethods'];
   let staticFunctions = Object.getOwnPropertyNames(constructor).filter(
@@ -38,4 +40,22 @@ export function wasmAsyncMethod(target: any, propertyKey: string, descriptor: Pr
     target.wasmAsyncMethods = [];
   }
   target.wasmAsyncMethods.push(propertyKey);
+}
+
+export function destroyVerify(constructor: any) {
+  let functions = Object.getOwnPropertyNames(constructor.prototype).filter(
+    (name) => name !== 'constructor' && typeof constructor.prototype[name] === 'function',
+  );
+
+  const proxyFn = (target: { [prop: string]: any }, methodName: string) => {
+    const fn = target[methodName];
+    target[methodName] = function (...args: any[]) {
+      if (this['isDestroyed']) {
+        Log.error(`Don't call ${methodName} of the ${constructor.name} that is destroyed.`);
+        return;
+      }
+      return fn.call(this, ...args);
+    };
+  };
+  functions.forEach((name) => proxyFn(constructor.prototype, name));
 }
