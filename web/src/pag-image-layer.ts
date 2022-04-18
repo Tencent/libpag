@@ -1,8 +1,9 @@
 import { PAGImage } from './pag-image';
 import { PAGLayer } from './pag-layer';
 import { Vector, PAGVideoRange } from './types';
-import { wasmAwaitRewind } from './utils/decorators';
+import { destroyVerify, wasmAwaitRewind } from './utils/decorators';
 
+@destroyVerify
 @wasmAwaitRewind
 export class PAGImageLayer extends PAGLayer {
   public static Make(width: number, height: number, duration: number): PAGImageLayer {

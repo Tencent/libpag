@@ -1,8 +1,9 @@
 import { PAG, Vector, Marker } from './types';
 import { PAGLayer } from './pag-layer';
-import { wasmAwaitRewind } from './utils/decorators';
+import { destroyVerify, wasmAwaitRewind } from './utils/decorators';
 import { proxyVector } from './utils/type-utils';
 
+@destroyVerify
 @wasmAwaitRewind
 export class PAGComposition extends PAGLayer {
   public static module: PAG;
@@ -148,9 +149,5 @@ export class PAGComposition extends PAGLayer {
    */
   public getLayersUnderPoint(localX: number, localY: number): Vector<PAGLayer> {
     return proxyVector(this.wasmIns._getLayersUnderPoint(localX, localY) as Vector<any>, PAGLayer);
-  }
-
-  public destroy(): void {
-    this.wasmIns.delete();
   }
 }

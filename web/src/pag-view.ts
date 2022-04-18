@@ -3,6 +3,7 @@ import { PAGPlayer } from './pag-player';
 import { EventManager, Listener } from './utils/event-manager';
 import { PAGSurface } from './pag-surface';
 import { PAGFile } from './pag-file';
+import { destroyVerify } from './utils/decorators';
 import { Log } from './utils/log';
 import { ErrorCode } from './utils/error-map';
 
@@ -12,6 +13,7 @@ export interface PAGViewOptions {
   firstFrame?: boolean;
 }
 
+@destroyVerify
 export class PAGView {
   public static module: PAG;
 
@@ -130,7 +132,7 @@ export class PAGView {
    * Start the animation.
    */
   public async play() {
-    if (this.isPlaying || this.isDestroyed) return;
+    if (this.isPlaying) return;
     if (this.playTime === 0) {
       this.eventManager.emit(PAGViewListenerEvent.onAnimationStart, this);
     }
@@ -143,7 +145,7 @@ export class PAGView {
    * Pause the animation.
    */
   public pause() {
-    if (!this.isPlaying || this.isDestroyed) return;
+    if (!this.isPlaying) return;
     this.clearTimer();
     this.isPlaying = false;
     this.eventManager.emit(PAGViewListenerEvent.onAnimationPause, this);
@@ -152,7 +154,6 @@ export class PAGView {
    * Stop the animation.
    */
   public async stop(notification = true) {
-    if (this.isDestroyed) return;
     this.clearTimer();
     this.playTime = 0;
     this.player.setProgress(0);
@@ -313,7 +314,6 @@ export class PAGView {
   }
 
   public destroy() {
-    if (this.isDestroyed) return;
     this.clearTimer();
     this.player.destroy();
     this.pagSurface?.destroy();

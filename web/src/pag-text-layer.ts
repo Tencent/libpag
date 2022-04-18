@@ -1,8 +1,9 @@
 import { PAGFont } from './pag-font';
 import { PAGLayer } from './pag-layer';
 import { Color, TextDocument } from './types';
-import { wasmAwaitRewind } from './utils/decorators';
+import { destroyVerify, wasmAwaitRewind } from './utils/decorators';
 
+@destroyVerify
 @wasmAwaitRewind
 export class PAGTextLayer extends PAGLayer {
   public static Make(

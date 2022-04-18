@@ -6,11 +6,12 @@ import { PAGSolidLayer } from './pag-solid-layer';
 import { PAGTextLayer } from './pag-text-layer';
 import { LayerType, PAG, PAGTimeStretchMode, TextDocument, Vector } from './types';
 import { readFile } from './utils/common';
-import { wasmAwaitRewind, wasmAsyncMethod } from './utils/decorators';
+import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorators';
 import { ErrorCode } from './utils/error-map';
 import { Log } from './utils/log';
 import { proxyVector } from './utils/type-utils';
 
+@destroyVerify
 @wasmAwaitRewind
 export class PAGFile extends PAGComposition {
   public static module: PAG;
@@ -147,9 +148,5 @@ export class PAGFile extends PAGComposition {
    */
   public copyOriginal(): PAGFile {
     return new PAGFile(this.wasmIns._copyOriginal());
-  }
-
-  public destroy(): void {
-    this.wasmIns.delete();
   }
 }

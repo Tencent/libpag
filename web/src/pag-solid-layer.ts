@@ -1,7 +1,8 @@
 import { PAGLayer } from './pag-layer';
 import { Color } from './types';
-import { wasmAwaitRewind } from './utils/decorators';
+import { destroyVerify, wasmAwaitRewind } from './utils/decorators';
 
+@destroyVerify
 @wasmAwaitRewind
 export class PAGSolidLayer extends PAGLayer {
   public static Make(duration: number, width: number, height: number, solidColor: Color, opacity: number) {
