@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SW Decoder</title>
+</head>
+<body>
+<script src="../node_modules/@ffmpeg/ffmpeg/dist/ffmpeg.min.js"></script>
+<script>
+    const {createFFmpeg} = FFmpeg;
+    (async () => {
+        const ffmpeg = createFFmpeg({log: true});
+        await ffmpeg.load();
+        setTimeout(() => {
+            ffmpeg.exit(); // ffmpeg.exit() is callable only after load() stage.
+        }, 1000);
+    })();
+</script>
+</body>
+</html>

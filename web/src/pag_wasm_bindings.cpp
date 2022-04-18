@@ -27,7 +27,9 @@
 #include "pag/types.h"
 #include "platform/web/GPUDrawable.h"
 #include "platform/web/NativeImage.h"
+#include "platform/web/WebSoftwareDecoderFactory.h"
 #include "rendering/editing/StillImage.h"
+#include "rendering/video/VideoDecoder.h"
 
 using namespace emscripten;
 using namespace pag;
@@ -451,6 +453,17 @@ EMSCRIPTEN_BINDINGS(pag) {
       .value("Miter", tgfx::LineJoin::Miter)
       .value("Round", tgfx::LineJoin::Round)
       .value("Bevel", tgfx::LineJoin::Bevel);
+
+  enum_<DecoderResult>("DecoderResult")
+      .value("Success", DecoderResult::Success)
+      .value("TryAgainLater", DecoderResult::TryAgainLater)
+      .value("Error", DecoderResult::Error);
+
+  function("_RegisterSoftwareDecoderFactory", optional_override([](val factory) {
+             delete VideoDecoder::GetExternalSoftwareDecoderFactory();
+             PAGVideoDecoder::RegisterSoftwareDecoderFactory(
+                 WebSoftwareDecoderFactory::Make(factory).release());
+           }));
 
   register_vector<std::shared_ptr<PAGLayer>>("VectorPAGLayer");
   register_vector<std::string>("VectorString");

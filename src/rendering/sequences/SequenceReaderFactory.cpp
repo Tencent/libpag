@@ -18,13 +18,14 @@
 
 #include "SequenceReaderFactory.h"
 #include "BitmapSequenceReader.h"
+#include "VideoReader.h"
+#include "VideoSequenceDemuxer.h"
 
 #ifdef PAG_BUILD_FOR_WEB
 #include "platform/web/VideoSequenceReader.h"
-#else
-#include "VideoReader.h"
-#include "VideoSequenceDemuxer.h"
 #endif
+
+#include "rendering/video/VideoDecoder.h"
 
 namespace pag {
 SequenceReaderFactory::SequenceReaderFactory(Sequence* sequence) : sequence(sequence) {
@@ -48,11 +49,14 @@ std::shared_ptr<SequenceReader> SequenceReaderFactory::makeReader(
     return std::make_shared<BitmapSequenceReader>(file, static_cast<BitmapSequence*>(sequence));
   }
   auto videoSequence = static_cast<VideoSequence*>(sequence);
+
 #ifdef PAG_BUILD_FOR_WEB
-  return std::make_shared<VideoSequenceReader>(file, videoSequence);
-#else
+  if (!VideoDecoder::HasExternalSoftwareDecoder()) {
+    return std::make_shared<VideoSequenceReader>(file, videoSequence);
+  }
+#endif
+
   auto demuxer = std::make_unique<VideoSequenceDemuxer>(file, videoSequence);
   return std::make_shared<VideoReader>(std::move(demuxer));
-#endif
 }
 }  // namespace pag

@@ -15,6 +15,7 @@ import { NativeImage } from './core/native-image';
 import { WebMask } from './core/web-mask';
 import { PAGTextLayer } from './pag-text-layer';
 import { GlobalCanvas } from './core/global-canvas';
+import { SoftwareDecoderFactory } from './core/software-decoder-factory';
 
 declare global {
   interface Window {
@@ -53,6 +54,7 @@ export interface PAG extends EmscriptenModule {
     _create: (fontFamily: string, fontStyle: string) => any;
     _SetFallbackFontNames: (fontName: any) => void;
   };
+  _RegisterSoftwareDecoderFactory: (factory: SoftwareDecoderFactory) => void;
   VectorString: any;
   webAssemblyQueue: WebAssemblyQueue;
   GL: EmscriptenGL;
@@ -75,6 +77,7 @@ export interface PAG extends EmscriptenModule {
   GlobalCanvas: typeof GlobalCanvas;
   traceImage: (info: { width: number; height: number }, pixels: Uint8Array, tag: string) => void;
   globalCanvas: GlobalCanvas;
+  RegisterSoftwareDecoderFactory: (factory: SoftwareDecoderFactory) => void;
 }
 
 export interface EmscriptenGL {
@@ -314,6 +317,7 @@ export declare class Matrix {
    */
   public set: (index: number, value: number) => {};
   public setAffine: (a: number, b: number, c: number, d: number, tx: number, ty: number) => {};
+
   private constructor();
 }
 
@@ -334,6 +338,7 @@ export declare class Rect {
    * larger y-axis bounds.
    */
   public bottom: number;
+
   private constructor();
 }
 
@@ -418,23 +423,28 @@ export declare class TextDocument {
   public backgroundAlpha: number;
 
   public direction: TextDirection;
+
   private constructor();
 }
 
 export declare class PAGVideoRange {
   private constructor();
+
   /**
    * The start time of the source video, in microseconds.
    */
   public startTime(): number;
+
   /**
    * The end time of the source video (not included), in microseconds.
    */
   public endTime(): number;
+
   /**
    * The duration for playing after applying speed.
    */
   public playDuration(): number;
+
   /**
    * Indicates whether the video should play backward.
    */
@@ -443,18 +453,22 @@ export declare class PAGVideoRange {
 
 export declare class Vector<T> {
   private constructor();
+
   /**
    * Get item from Vector by index.
    */
   public get(index: number): T;
+
   /**
    * Push item into Vector.
    */
   public push_back(value: T): void;
+
   /**
    * Get item number in Vector.
    */
   public size(): number;
+
   /**
    * Delete Vector instance.
    */

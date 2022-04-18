@@ -52,4 +52,7 @@ export const binding = (module: PAG) => {
     context.putImageData(imageData, 0, 0);
     document.body.appendChild(canvas);
   };
+  module.RegisterSoftwareDecoderFactory = function (factory) {
+    module._RegisterSoftwareDecoderFactory(factory);
+  };
 };
