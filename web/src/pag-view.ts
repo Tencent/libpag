@@ -350,7 +350,7 @@ export class PAGView {
       this.playTime = 0;
       this.isPlaying = false;
       this.eventManager.emit(PAGViewListenerEvent.onAnimationEnd, this);
-      this.repeatedTimes = count;
+      this.repeatedTimes = 0;
       return;
     }
     if (this.repeatedTimes === count && this.currentFrame === currentFrame) {
@@ -362,6 +362,7 @@ export class PAGView {
     this.player.setProgress((this.playTime % duration) / duration);
     await this.flush();
     this.currentFrame = currentFrame;
+    this.repeatedTimes = count;
   }
 
   private clearTimer(): void {
