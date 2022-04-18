@@ -19,14 +19,8 @@ export class WebAssemblyQueue {
       this.queue.push({
         fn: copyFn,
       });
-    });
-  }
-
-  public start() {
-    setInterval(() => {
-      if (this.executing) return;
       this.execNextTask();
-    }, 1);
+    });
   }
 
   private execNextTask() {
