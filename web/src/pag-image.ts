@@ -32,7 +32,7 @@ export class PAGImage {
    * }
    * ```
    */
-  public static fromSource(source: HTMLVideoElement | HTMLImageElement): PAGImage {
+  public static fromSource(source: TexImageSource): PAGImage {
     const nativeImage = new NativeImage(source);
     const wasmIns = this.module._PAGImage._FromNativeImage(nativeImage);
     return new PAGImage(wasmIns);
