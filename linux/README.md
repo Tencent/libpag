@@ -31,6 +31,7 @@
      
 ## compile libpag  
     Execute in the root directory
+       ./sync_deps.sh
        ./build_linux.sh 
     You will get the library files in the vendor/pag directory
 
