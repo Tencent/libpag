@@ -18,6 +18,7 @@ import { GlobalCanvas } from './core/global-canvas';
  * Binding pag js module on pag webassembly module.
  */
 export const binding = (module: PAG) => {
+  module.PAG = module;
   module.PAGFile = PAGFile;
   PAGFile.module = module;
   module.PAGPlayer = PAGPlayer;
@@ -52,7 +53,7 @@ export const binding = (module: PAG) => {
     context.putImageData(imageData, 0, 0);
     document.body.appendChild(canvas);
   };
-  module.RegisterSoftwareDecoderFactory = function (factory) {
-    module._RegisterSoftwareDecoderFactory(factory);
+  module.registerSoftwareDecoderFactory = function (factory) {
+    module._registerSoftwareDecoderFactory(factory);
   };
 };

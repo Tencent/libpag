@@ -454,12 +454,7 @@ EMSCRIPTEN_BINDINGS(pag) {
       .value("Round", tgfx::LineJoin::Round)
       .value("Bevel", tgfx::LineJoin::Bevel);
 
-  enum_<DecoderResult>("DecoderResult")
-      .value("Success", DecoderResult::Success)
-      .value("TryAgainLater", DecoderResult::TryAgainLater)
-      .value("Error", DecoderResult::Error);
-
-  function("_RegisterSoftwareDecoderFactory", optional_override([](val factory) {
+  function("_registerSoftwareDecoderFactory", optional_override([](val factory) {
              delete VideoDecoder::GetExternalSoftwareDecoderFactory();
              PAGVideoDecoder::RegisterSoftwareDecoderFactory(
                  WebSoftwareDecoderFactory::Make(factory).release());

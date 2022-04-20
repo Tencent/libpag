@@ -15,7 +15,6 @@ import { NativeImage } from './core/native-image';
 import { WebMask } from './core/web-mask';
 import { PAGTextLayer } from './pag-text-layer';
 import { GlobalCanvas } from './core/global-canvas';
-import { SoftwareDecoderFactory } from './core/software-decoder-factory';
 
 declare global {
   interface Window {
@@ -54,13 +53,15 @@ export interface PAG extends EmscriptenModule {
     _create: (fontFamily: string, fontStyle: string) => any;
     _SetFallbackFontNames: (fontName: any) => void;
   };
-  _RegisterSoftwareDecoderFactory: (factory: SoftwareDecoderFactory) => void;
+  _registerSoftwareDecoderFactory: (factory: SoftwareDecoderFactory) => void;
   VectorString: any;
   webAssemblyQueue: WebAssemblyQueue;
   GL: EmscriptenGL;
   PathFillType: PathFillType;
   LineCap: LineCap;
   LineJoin: LineJoin;
+  globalCanvas: GlobalCanvas;
+  PAG: PAG;
   PAGPlayer: typeof PAGPlayer;
   PAGFile: typeof PAGFile;
   PAGView: typeof PAGView;
@@ -76,8 +77,7 @@ export interface PAG extends EmscriptenModule {
   VideoReader: typeof VideoReader;
   GlobalCanvas: typeof GlobalCanvas;
   traceImage: (info: { width: number; height: number }, pixels: Uint8Array, tag: string) => void;
-  globalCanvas: GlobalCanvas;
-  RegisterSoftwareDecoderFactory: (factory: SoftwareDecoderFactory) => void;
+  registerSoftwareDecoderFactory: (factory: SoftwareDecoderFactory) => void;
 }
 
 export interface EmscriptenGL {
@@ -214,6 +214,21 @@ export const enum MatrixIndex {
   ty,
 }
 
+export const enum DecoderResult {
+  /**
+   * The calling is successful.
+   */
+  Success = 0,
+  /**
+   * Output is not available in this state, need more input buffers.
+   */
+  TryAgainLater = -1,
+  /**
+   * The calling fails.
+   */
+  Error = -2,
+}
+
 export interface Point {
   x: number;
   y: number;
@@ -285,6 +300,11 @@ export interface LineJoin {
    * Connects outside edges.
    */
   Bevel: ctor;
+}
+
+export interface YUVBuffer {
+  data: number[];
+  lineSize: number[];
 }
 
 export declare class Matrix {
@@ -473,4 +493,18 @@ export declare class Vector<T> {
    * Delete Vector instance.
    */
   public delete(): void;
+}
+
+export declare class SoftwareDecoder {
+  public onConfigure(headers: Uint8Array[], mimeType: string, width: number, height: number): boolean;
+  public onSendBytes(bytes: Uint8Array, timestamp: number): DecoderResult;
+  public onDecodeFrame(): DecoderResult;
+  public onEndOfStream(): DecoderResult;
+  public onFlush(): void;
+  public onRenderFrame(): YUVBuffer;
+  public onRelease(): void;
+}
+
+export declare class SoftwareDecoderFactory {
+  public createSoftwareDecoder(pag: PAG): SoftwareDecoder;
 }

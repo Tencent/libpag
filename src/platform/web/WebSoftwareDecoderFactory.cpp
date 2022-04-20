@@ -40,16 +40,17 @@ class WebSoftwareDecoder : public SoftwareDecoder {
   }
 
   DecoderResult onSendBytes(void* bytes, size_t length, int64_t timestamp) override {
-    return decoder.call<DecoderResult>(
-        "onSendBytes", val(typed_memory_view(length, static_cast<uint8_t*>(bytes))), timestamp);
+    return static_cast<DecoderResult>(decoder.call<int>(
+        "onSendBytes", val(typed_memory_view(length, static_cast<uint8_t*>(bytes))),
+        static_cast<int>(timestamp)));
   }
 
   DecoderResult onDecodeFrame() override {
-    return decoder.call<DecoderResult>("onDecodeFrame");
+    return static_cast<DecoderResult>(decoder.call<int>("onDecodeFrame"));
   }
 
   DecoderResult onEndOfStream() override {
-    return decoder.call<DecoderResult>("onEndOfStream");
+    return static_cast<DecoderResult>(decoder.call<int>("onEndOfStream"));
   }
 
   void onFlush() override {
@@ -61,12 +62,12 @@ class WebSoftwareDecoder : public SoftwareDecoder {
     if (!buffer.as<bool>()) {
       return nullptr;
     }
-    auto data = buffer.call<val>("data");
-    if (!data.isArray() || data.call<int>("length") != 3) {
+    auto data = buffer["data"];
+    if (!data.isArray() || data["length"].as<int>() != 3) {
       return nullptr;
     }
-    auto lineSize = buffer.call<val>("lineSize");
-    if (!lineSize.isArray() || lineSize.call<int>("length") != 3) {
+    auto lineSize = buffer["lineSize"];
+    if (!lineSize.isArray() || lineSize["length"].as<int>() != 3) {
       return nullptr;
     }
     auto yuvBuffer = std::make_unique<YUVBuffer>();
@@ -93,6 +94,6 @@ std::unique_ptr<WebSoftwareDecoderFactory> WebSoftwareDecoderFactory::Make(val f
 }
 
 std::unique_ptr<SoftwareDecoder> WebSoftwareDecoderFactory::createSoftwareDecoder() {
-  return WebSoftwareDecoder::Make(factory.call<val>("createSoftwareDecoder"));
+  return WebSoftwareDecoder::Make(factory.call<val>("createSoftwareDecoder", val::module_property("PAG")));
 }
 }  // namespace pag
