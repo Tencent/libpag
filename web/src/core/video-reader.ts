@@ -1,5 +1,4 @@
 import { VIDEO_DECODE_WAIT_FRAME } from '../constant';
-import { convertMp4 } from '../h264/h264';
 import { addListener, removeListener, removeAllListeners } from '../utils/video-listener';
 import { IS_WECHAT } from '../utils/ua';
 import { Log } from '../utils/log';

@@ -1,25 +1,25 @@
-import { EmscriptenGL, Matrix, PAG, PathFillType, Vector } from '../types';
+import { ctor, EmscriptenGL, Matrix, PAG, Point, Vector } from '../types';
 import { ScalerContext } from './scaler-context';
 
 export class WebMask {
   public static module: PAG;
 
-  private static getLineCap(cap: number): CanvasLineCap {
+  private static getLineCap(cap: ctor): CanvasLineCap {
     switch (cap) {
-      case 1:
+      case this.module.LineCap.Round:
         return 'round';
-      case 2:
+      case this.module.LineCap.Square:
         return 'square';
       default:
         return 'butt';
     }
   }
 
-  private static getLineJoin(join: number): CanvasLineJoin {
+  private static getLineJoin(join: ctor): CanvasLineJoin {
     switch (join) {
-      case 1:
+      case this.module.LineJoin.Round:
         return 'round';
-      case 2:
+      case this.module.LineJoin.Bevel:
         return 'bevel';
       default:
         return 'miter';
@@ -34,14 +34,17 @@ export class WebMask {
     this.canvas.height = height;
   }
 
-  public fillPath(path: Path2D, fillType: PathFillType) {
+  public fillPath(path: Path2D, fillType: ctor) {
     const context = this.canvas.getContext('2d') as CanvasRenderingContext2D;
     context.setTransform(1, 0, 0, 1, 0, 0);
-    if (fillType === PathFillType.InverseWinding || fillType === PathFillType.InverseEvenOdd) {
-      context.clip(path, fillType === PathFillType.InverseEvenOdd ? 'evenodd' : 'nonzero');
+    if (
+      fillType === WebMask.module.PathFillType.InverseWinding ||
+      fillType === WebMask.module.PathFillType.InverseEvenOdd
+    ) {
+      context.clip(path, fillType === WebMask.module.PathFillType.InverseEvenOdd ? 'evenodd' : 'nonzero');
       context.fillRect(0, 0, this.canvas.width, this.canvas.height);
     } else {
-      context.fill(path, fillType === PathFillType.EvenOdd ? 'evenodd' : 'nonzero');
+      context.fill(path, fillType === WebMask.module.PathFillType.EvenOdd ? 'evenodd' : 'nonzero');
     }
   }
 
@@ -50,8 +53,8 @@ export class WebMask {
     fauxBold: boolean,
     fauxItalic: boolean,
     fontName: string,
-    texts: Vector<any>,
-    positions: Vector<any>,
+    texts: Vector<string>,
+    positions: Vector<Point>,
     matrix: Matrix,
   ) {
     const scalerContext = new ScalerContext(fontName, size, fauxBold, fauxItalic);
@@ -69,9 +72,9 @@ export class WebMask {
     fauxBold: boolean,
     fauxItalic: boolean,
     fontName: string,
-    stroke: any,
-    texts: Vector<any>,
-    positions: Vector<any>,
+    stroke: { width: number; cap: ctor; join: ctor; miterLimit: number },
+    texts: Vector<string>,
+    positions: Vector<Point>,
     matrix: Matrix,
   ) {
     if (stroke.width < 0.5) {
