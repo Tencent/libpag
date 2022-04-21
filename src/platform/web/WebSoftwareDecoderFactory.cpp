@@ -30,6 +30,10 @@ class WebSoftwareDecoder : public SoftwareDecoder {
     return std::unique_ptr<WebSoftwareDecoder>(new WebSoftwareDecoder(std::move(decoder)));
   }
 
+  ~WebSoftwareDecoder() {
+    decoder.call<void>("onRelease");
+  }
+
   bool onConfigure(const std::vector<HeaderData>& headerData, std::string mimeType, int width,
                    int height) override {
     auto array = val::array();
