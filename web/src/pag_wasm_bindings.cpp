@@ -131,13 +131,12 @@ EMSCRIPTEN_BINDINGS(pag) {
                   return static_cast<int>(pagImageLayer.contentTimeToLayer(contentTime));
                 }))
       .function("_imageBytes", optional_override([](PAGImageLayer& pagImageLayer) {
-        ByteData* result = pagImageLayer.imageBytes();
-        if (result->length() == 0) {
-          uint8_t empty_arr[] = {};
-          return val(typed_memory_view(0, empty_arr));
-        }
-        return val(typed_memory_view(result->length(), result->data()));
-      }));
+                  ByteData* result = pagImageLayer.imageBytes();
+                  if (result->length() == 0) {
+                    return val::null();
+                  }
+                  return val(typed_memory_view(result->length(), result->data()));
+                }));
 
   class_<PAGTextLayer, base<PAGLayer>>("_PAGTextLayer")
       .smart_ptr<std::shared_ptr<PAGTextLayer>>("_PAGTextLayer")
@@ -184,8 +183,7 @@ EMSCRIPTEN_BINDINGS(pag) {
       .function("_audioBytes", optional_override([](PAGComposition& pagComposition) {
                   ByteData* result = pagComposition.audioBytes();
                   if (result->length() == 0) {
-                    uint8_t empty_arr[] = {};
-                    return val(typed_memory_view(0, empty_arr));
+                    return val::null();
                   }
                   return val(typed_memory_view(result->length(), result->data()));
                 }))
@@ -444,12 +442,12 @@ EMSCRIPTEN_BINDINGS(pag) {
       .value("RGBA_8888", ColorType::RGBA_8888)
       .value("BGRA_8888", ColorType::BGRA_8888);
 
-  enum_<tgfx::LineCap>("Cap")
-      .value("Miter", tgfx::LineCap::Butt)
+  enum_<tgfx::LineCap>("LineCap")
+      .value("Butt", tgfx::LineCap::Butt)
       .value("Round", tgfx::LineCap::Round)
-      .value("Bevel", tgfx::LineCap::Square);
+      .value("Square", tgfx::LineCap::Square);
 
-  enum_<tgfx::LineJoin>("Join")
+  enum_<tgfx::LineJoin>("LineJoin")
       .value("Miter", tgfx::LineJoin::Miter)
       .value("Round", tgfx::LineJoin::Round)
       .value("Bevel", tgfx::LineJoin::Bevel);

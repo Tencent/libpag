@@ -4,7 +4,7 @@ export class AudioPlayer {
   private isDestroyed = false;
 
   public constructor(audioBytes: Uint8Array) {
-    if (audioBytes.byteLength > 0) {
+    if (audioBytes && audioBytes.byteLength > 0) {
       this.audioEl = document.createElement('audio');
       this.audioEl.style.display = 'none';
       this.audioEl.controls = true;

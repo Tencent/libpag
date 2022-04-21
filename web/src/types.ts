@@ -56,6 +56,9 @@ export interface PAG extends EmscriptenModule {
   VectorString: any;
   webAssemblyQueue: WebAssemblyQueue;
   GL: EmscriptenGL;
+  PathFillType: PathFillType;
+  LineCap: LineCap;
+  LineJoin: LineJoin;
   PAGPlayer: typeof PAGPlayer;
   PAGFile: typeof PAGFile;
   PAGView: typeof PAGView;
@@ -199,25 +202,6 @@ export const enum PAGTimeStretchMode {
   RepeatInverted = 3,
 }
 
-export const enum PathFillType {
-  /**
-   * Enclosed by a non-zero sum of contour directions.
-   */
-  Winding,
-  /**
-   * Enclosed by an odd number of contours.
-   */
-  EvenOdd,
-  /**
-   * Enclosed by a zero sum of contour directions.
-   */
-  InverseWinding,
-  /**
-   * Enclosed by an even number of contours.
-   */
-  InverseEvenOdd,
-}
-
 export const enum MatrixIndex {
   a,
   b,
@@ -245,6 +229,59 @@ export interface Color {
   red: number;
   green: number;
   blue: number;
+}
+
+export interface ctor {
+  value: number;
+}
+
+export interface PathFillType {
+  /**
+   * Enclosed by a non-zero sum of contour directions.
+   */
+  Winding: ctor;
+  /**
+   * Enclosed by an odd number of contours.
+   */
+  EvenOdd: ctor;
+  /**
+   * Enclosed by a zero sum of contour directions.
+   */
+  InverseWinding: ctor;
+  /**
+   * Enclosed by an even number of contours.
+   */
+  InverseEvenOdd: ctor;
+}
+
+export interface LineCap {
+  /**
+   * No stroke extension.
+   */
+  Butt: ctor;
+  /**
+   * Adds circle
+   */
+  Round: ctor;
+  /**
+   * Adds square
+   */
+  Square: ctor;
+}
+
+export interface LineJoin {
+  /**
+   * Extends to miter limit.
+   */
+  Miter: ctor;
+  /**
+   * Adds circle.
+   */
+  Round: ctor;
+  /**
+   * Connects outside edges.
+   */
+  Bevel: ctor;
 }
 
 export declare class Matrix {
