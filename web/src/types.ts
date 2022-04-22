@@ -53,12 +53,15 @@ export interface PAG extends EmscriptenModule {
     _create: (fontFamily: string, fontStyle: string) => any;
     _SetFallbackFontNames: (fontName: any) => void;
   };
+  _registerSoftwareDecoderFactory: (factory: SoftwareDecoderFactory) => void;
   VectorString: any;
   webAssemblyQueue: WebAssemblyQueue;
   GL: EmscriptenGL;
   PathFillType: PathFillType;
   LineCap: LineCap;
   LineJoin: LineJoin;
+  globalCanvas: GlobalCanvas;
+  PAG: PAG;
   PAGPlayer: typeof PAGPlayer;
   PAGFile: typeof PAGFile;
   PAGView: typeof PAGView;
@@ -74,7 +77,7 @@ export interface PAG extends EmscriptenModule {
   VideoReader: typeof VideoReader;
   GlobalCanvas: typeof GlobalCanvas;
   traceImage: (info: { width: number; height: number }, pixels: Uint8Array, tag: string) => void;
-  globalCanvas: GlobalCanvas;
+  registerSoftwareDecoderFactory: (factory: SoftwareDecoderFactory) => void;
 }
 
 export interface EmscriptenGL {
@@ -211,6 +214,21 @@ export const enum MatrixIndex {
   ty,
 }
 
+export const enum DecoderResult {
+  /**
+   * The calling is successful.
+   */
+  Success = 0,
+  /**
+   * Output is not available in this state, need more input buffers.
+   */
+  TryAgainLater = -1,
+  /**
+   * The calling fails.
+   */
+  Error = -2,
+}
+
 export interface Point {
   x: number;
   y: number;
@@ -284,6 +302,11 @@ export interface LineJoin {
   Bevel: ctor;
 }
 
+export interface YUVBuffer {
+  data: number[];
+  lineSize: number[];
+}
+
 export declare class Matrix {
   /**
    * The entry at position [1,1] in the matrix.
@@ -314,6 +337,7 @@ export declare class Matrix {
    */
   public set: (index: number, value: number) => {};
   public setAffine: (a: number, b: number, c: number, d: number, tx: number, ty: number) => {};
+
   private constructor();
 }
 
@@ -334,6 +358,7 @@ export declare class Rect {
    * larger y-axis bounds.
    */
   public bottom: number;
+
   private constructor();
 }
 
@@ -418,23 +443,28 @@ export declare class TextDocument {
   public backgroundAlpha: number;
 
   public direction: TextDirection;
+
   private constructor();
 }
 
 export declare class PAGVideoRange {
   private constructor();
+
   /**
    * The start time of the source video, in microseconds.
    */
   public startTime(): number;
+
   /**
    * The end time of the source video (not included), in microseconds.
    */
   public endTime(): number;
+
   /**
    * The duration for playing after applying speed.
    */
   public playDuration(): number;
+
   /**
    * Indicates whether the video should play backward.
    */
@@ -443,20 +473,38 @@ export declare class PAGVideoRange {
 
 export declare class Vector<T> {
   private constructor();
+
   /**
    * Get item from Vector by index.
    */
   public get(index: number): T;
+
   /**
    * Push item into Vector.
    */
   public push_back(value: T): void;
+
   /**
    * Get item number in Vector.
    */
   public size(): number;
+
   /**
    * Delete Vector instance.
    */
   public delete(): void;
+}
+
+export declare class SoftwareDecoder {
+  public onConfigure(headers: Uint8Array[], mimeType: string, width: number, height: number): boolean;
+  public onSendBytes(bytes: Uint8Array, timestamp: number): DecoderResult;
+  public onDecodeFrame(): DecoderResult;
+  public onEndOfStream(): DecoderResult;
+  public onFlush(): void;
+  public onRenderFrame(): YUVBuffer;
+  public onRelease(): void;
+}
+
+export declare class SoftwareDecoderFactory {
+  public createSoftwareDecoder(pag: PAG): SoftwareDecoder;
 }
