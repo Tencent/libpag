@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## 0.1.7
+
+### Feature
+
+- Add software decoder registration function.
+- Create MP4 container on wasm side.
+- Add decorator to verify wasm status.
+- PAGImage can be made from TexImageSource. 
+
+### BugFixes
+
+- Fix the repeat event dispatch error.
+- Optimize wasm queue. 
+- Fix some enum binding error.
+
 ## 0.1.6
 
 ### Breaking Changes
