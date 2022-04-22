@@ -98,6 +98,7 @@ std::unique_ptr<WebSoftwareDecoderFactory> WebSoftwareDecoderFactory::Make(val f
 }
 
 std::unique_ptr<SoftwareDecoder> WebSoftwareDecoderFactory::createSoftwareDecoder() {
-  return WebSoftwareDecoder::Make(factory.call<val>("createSoftwareDecoder", val::module_property("PAG")));
+  return WebSoftwareDecoder::Make(
+      factory.call<val>("createSoftwareDecoder", val::module_property("PAG")));
 }
 }  // namespace pag
