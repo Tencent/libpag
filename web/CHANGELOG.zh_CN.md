@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## 0.1.7
+
+### Feature
+
+- 增加软件解码器注册接口
+- 将 MP4 合成逻辑放到 wasm 中执行
+- 增加装饰器检查 wasm 实例状态
+- 能从 `TexImageSource` 创建 PAGImage
+
+### BugFixes
+
+- 修复循环播放事件错误
+- 优化 wasm 队列
+- 修复一些 enum 类型绑定错误
+
 ## 0.1.6
 
 ### Breaking Changes

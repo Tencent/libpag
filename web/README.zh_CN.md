@@ -118,6 +118,16 @@ PAG 默认会对 Canvas 在屏幕中的可视尺寸进行缩放计算后进行�
 
 因为 Safari 上 [`CanvasRenderingContext2D.drawImage()`](https://developer.mozilla.org/zh-CN/docs/Web/API/CanvasRenderingContext2D/drawImage) 的性能很差，所以我们不推荐在 Safari 上使用这个模式。
 
+### 注册解码器
+
+对于“用户与页面交互之后才可以使用 Video 标签进行视频播放”规则的限制，PAG Web 版提供软件解码器注入接口 `  PAG.registerSoftwareDecoderFactory()`。
+
+注入软件解码器后，PAG 会调度软件解码器去对视频序列帧进行解码与上屏，从而实现部分平台进入页面自动播放的功能。
+
+推荐解码器接入：https://github.com/libpag/ffavc/tree/main/web
+
+已知“用户与页面交互之后才可以使用 Video 标签进行视频播放”限制的平台有：移动端微信浏览器，iPhone 省电模式，部分 Android 浏览器。
+
 ## Roadmap
 
 Web SDK 未来能力支持规划可以点击 [这里](https://github.com/Tencent/libpag/wiki/PAG-Web-roadmap) 查看
