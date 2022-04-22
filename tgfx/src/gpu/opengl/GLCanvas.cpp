@@ -26,6 +26,7 @@
 #include "gpu/ColorShader.h"
 #include "gpu/TextureFragmentProcessor.h"
 #include "gpu/TextureMaskFragmentProcessor.h"
+#include "gpu/opengl/GLTriangulatingPathOp.h"
 #include "tgfx/core/Mask.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/TextBlob.h"
@@ -186,12 +187,26 @@ void GLCanvas::fillPath(const Path& path, const Shader* shader) {
   if (localBounds.isEmpty()) {
     return;
   }
-  auto op = MakeSimplePathOp(path, getViewMatrix());
+  auto viewMatrix = getViewMatrix();
+  auto op = MakeSimplePathOp(path, viewMatrix);
   if (op) {
     auto localMatrix = Matrix::MakeScale(bounds.width(), bounds.height());
     localMatrix.postTranslate(bounds.x(), bounds.y());
     auto args = FPArgs(getContext(), localMatrix);
     draw(std::move(op), shader->asFragmentProcessor(args));
+    return;
+  }
+  auto tempPath = path;
+  tempPath.transform(viewMatrix);
+  op = GLTriangulatingPathOp::Make(tempPath, state->clip.getBounds());
+  if (op) {
+    auto localMatrix = Matrix::I();
+    viewMatrix.invert(&localMatrix);
+    save();
+    resetMatrix();
+    auto args = FPArgs(getContext(), localMatrix);
+    draw(std::move(op), shader->asFragmentProcessor(args));
+    restore();
     return;
   }
   auto deviceBounds = state->matrix.mapRect(localBounds);

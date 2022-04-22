@@ -16,33 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "GLBuffer.h"
-#include "GLDrawer.h"
-#include "tgfx/core/Path.h"
+#include "DefaultGeometryProcessor.h"
+#include "core/utils/UniqueID.h"
+#include "gpu/opengl/GLDefaultGeometryProcessor.h"
 
 namespace tgfx {
-class GLRRectOp : public GLDrawOp {
- public:
-  static std::unique_ptr<GLRRectOp> Make(const RRect& rRect, const Matrix& viewMatrix);
+std::unique_ptr<DefaultGeometryProcessor> DefaultGeometryProcessor::Make(int width, int height) {
+  return std::unique_ptr<DefaultGeometryProcessor>(new DefaultGeometryProcessor(width, height));
+}
 
-  std::unique_ptr<GeometryProcessor> getGeometryProcessor(const DrawArgs& args) override;
+DefaultGeometryProcessor::DefaultGeometryProcessor(int width, int height)
+    : width(width), height(height) {
+  position = {"aPosition", ShaderVar::Type::Float2};
+  coverage = {"inCoverage", ShaderVar::Type::Float};
+  setVertexAttributes(&position, 2);
+}
 
-  std::vector<float> vertices(const DrawArgs& args) override;
+void DefaultGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
+  static auto Type = UniqueID::Next();
+  bytesKey->write(Type);
+}
 
-  void draw(const DrawArgs& args) override;
-
- private:
-  GLRRectOp(const RRect& rRect, const Matrix& viewMatrix);
-
-  RRect rRect;
-  Matrix viewMatrix = Matrix::I();
-  float xRadius = 0;
-  float yRadius = 0;
-  float innerXRadius = 0;
-  float innerYRadius = 0;
-  //  bool stroked = false;
-  //  Point strokeWidths = Point::Zero();
-};
+std::unique_ptr<GLGeometryProcessor> DefaultGeometryProcessor::createGLInstance() const {
+  return std::make_unique<GLDefaultGeometryProcessor>();
+}
 }  // namespace tgfx

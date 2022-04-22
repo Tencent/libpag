@@ -213,8 +213,9 @@ std::vector<float> GLRRectOp::vertices(const DrawArgs& args) {
   return vertices;
 }
 
-std::shared_ptr<GLBuffer> GLRRectOp::getIndexBuffer(const DrawArgs& args) {
+void GLRRectOp::draw(const DrawArgs& args) {
   static auto Type = UniqueID::Next();
-  return GLBuffer::Make(args.context, gStandardRRectIndices, kIndicesPerFillRRect, Type);
+  auto buffer = GLBuffer::Make(args.context, gStandardRRectIndices, kIndicesPerFillRRect, Type);
+  GLDrawer::DrawIndexBuffer(args.context, buffer);
 }
 }  // namespace tgfx
