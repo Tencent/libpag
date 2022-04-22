@@ -4,7 +4,6 @@
         alc*;
         JNI_OnLoad*;
         *pag*;
-        *tgfx*;
     local:
         *;
 };
