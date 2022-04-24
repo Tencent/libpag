@@ -19,6 +19,7 @@ export class WebAssemblyQueue {
       this.queue.push({
         fn: copyFn,
       });
+      if (this.executing) return;
       this.execNextTask();
     });
   }
