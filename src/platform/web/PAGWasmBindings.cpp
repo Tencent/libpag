@@ -26,10 +26,10 @@
 #include "pag/pag.h"
 #include "pag/types.h"
 #include "platform/web/GPUDrawable.h"
-#include "platform/web/NativeImage.h"
 #include "platform/web/WebSoftwareDecoderFactory.h"
 #include "rendering/editing/StillImage.h"
 #include "rendering/video/VideoDecoder.h"
+#include "tgfx/src/platform/web/NativeImage.h"
 
 using namespace emscripten;
 using namespace pag;
