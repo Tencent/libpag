@@ -129,7 +129,7 @@ void WebGLDevice::onClearCurrent() {
   }
 }
 
-bool WebGLDevice::sharableWith(void*) const {
-  return false;
+bool WebGLDevice::sharableWith(void* nativeContext) const {
+  return nativeHandle == nativeContext;
 }
 }  // namespace tgfx
