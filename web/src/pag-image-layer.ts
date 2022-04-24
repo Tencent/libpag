@@ -51,7 +51,7 @@ export class PAGImageLayer extends PAGLayer {
   /**
    * The default image data of this layer, which is webp format.
    */
-  public imageBytes(): Uint8Array {
-    return this.wasmIns._imageBytes() as Uint8Array;
+  public imageBytes(): Uint8Array | null {
+    return this.wasmIns._imageBytes();
   }
 }
