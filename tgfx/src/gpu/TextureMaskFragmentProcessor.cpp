@@ -47,16 +47,20 @@ TextureMaskFragmentProcessor::TextureMaskFragmentProcessor(const Texture* textur
     deviceCoordMatrix.postScale(1, -1);
     deviceCoordMatrix.postTranslate(0, 1);
   }
+  auto scale = texture->getTextureCoord(static_cast<float>(texture->width()),
+                                        static_cast<float>(texture->height()));
+  deviceCoordMatrix.postScale(scale.x, scale.y);
 }
 
 TextureMaskFragmentProcessor::TextureMaskFragmentProcessor(const Texture* texture,
                                                            const Matrix& localMatrix, bool inverted)
-    : useLocalCoord(true), texture(texture), coordTransform(localMatrix), inverted(inverted) {
+    : useLocalCoord(true), texture(texture), inverted(inverted) {
   setTextureSamplerCnt(1);
   if (texture->origin() == ImageOrigin::BottomLeft) {
     coordTransform.matrix.postScale(1, -1);
     coordTransform.matrix.postTranslate(0, 1);
   }
+  coordTransform.matrix.postConcat(localMatrix);
   addCoordTransform(&coordTransform);
 }
 

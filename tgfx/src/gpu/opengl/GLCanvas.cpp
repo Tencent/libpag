@@ -51,7 +51,7 @@ Texture* GLCanvas::getClipTexture() {
     return nullptr;
   }
   if (clipID != state->clipID) {
-    _clipMask->clear();
+    _clipMask = Mask::Make(surface->width(), surface->height());
     _clipMask->fillPath(state->clip);
     clipID = state->clipID;
     // recycle the clip texture.

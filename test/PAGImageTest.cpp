@@ -21,6 +21,7 @@
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
 #include "gpu/Surface.h"
+#include "gpu/opengl/GLDevice.h"
 #include "nlohmann/json.hpp"
 #include "pag/pag.h"
 
@@ -134,5 +135,33 @@ PAG_TEST_F(PAGImageTest, image3) {
   auto result = player->flush();
   EXPECT_TRUE(result);
   EXPECT_TRUE(Baseline::Compare(surface, "PAGImageTest/image3"));
+}
+
+/**
+ * 用例描述: texture 的 target 是 GL_TEXTURE_RECTANGLE，origin 是 BottomLeft，当作遮罩绘制。
+ */
+PAG_TEST_F(PAGImageTest, BottomLeftMask) {
+  int width = 140;
+  int height = 140;
+  auto device = GLDevice::Make();
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, width, height);
+  auto image1 = Image::MakeFrom("../resources/apitest/imageReplacement.webp")
+                    ->makeBuffer()
+                    ->makeTexture(context);
+  auto image2 =
+      Image::MakeFrom("../resources/apitest/image_as_mask.png")->makeBuffer()->makeTexture(context);
+  image2->_origin = tgfx::ImageOrigin::BottomLeft;
+  auto canvas = surface->getCanvas();
+  canvas->drawTexture(image1.get(), image2.get(), false);
+  auto pixelBuffer = PixelBuffer::Make(width, height);
+  ASSERT_TRUE(pixelBuffer != nullptr);
+  Bitmap bitmap(pixelBuffer);
+  bitmap.eraseAll();
+  auto result = surface->readPixels(bitmap.info(), bitmap.writablePixels());
+  ASSERT_TRUE(result);
+  device->unlock();
+  EXPECT_TRUE(Baseline::Compare(bitmap, "PAGImageTest/BottomLeftMask"));
 }
 }  // namespace pag
