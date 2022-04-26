@@ -1,6 +1,7 @@
 import { PAGInit } from '../src/pag';
 import { PAGComposition } from '../src/pag-composition';
 import { PAGFile } from '../src/pag-file';
+import { PAGPlayer } from '../src/pag-player';
 import { PAGFont } from '../src/pag-font';
 import { PAGImage } from '../src/pag-image';
 import { PAGImageLayer } from '../src/pag-image-layer';
@@ -43,7 +44,7 @@ let pagImage: PAGImage;
 const PAGImageTest = async () => {
   const imageBlob = await fetch('./assets/cat.png').then((res) => res.blob());
   pagImage = await PAG.PAGImage.fromFile(new File([imageBlob], 'cat.png'));
-  if (!!pagImage.wasmIns) {
+  if (pagImage.wasmIns) {
     console.log('PAGImage load succeed!');
   } else {
     throw new Error('PAGImage load failed!');
@@ -365,7 +366,7 @@ const PAGSolidLayerTest = async () => {
 };
 
 let pagSurface: PAGSurface;
-const PAGSurfaceTest = () => {
+const PAGSurfaceTest = async () => {
   pagSurface = PAGSurface.FromCanvas('#pag');
   console.log('PAGSurface FromCanvas:', pagSurface);
   const canvasElement = document.getElementById('pag') as HTMLCanvasElement;
@@ -377,11 +378,20 @@ const PAGSurfaceTest = () => {
       'PAGSurface FromFrameBuffer:',
       PAGSurface.module.PAGSurface.FromFrameBuffer(0, canvasElement.width, canvasElement.height, true),
     );
-  } else {
-    console.error(`PAGSurface FromFrameBuffer failed!`);
   }
   console.log('PAGSurface width:', pagSurface.width());
   console.log('PAGSurface height:', pagSurface.height());
+  const pagPlayer = PAGPlayer.create();
+  pagPlayer.setSurface(pagSurface);
+  const testPagFile = (await PAGFile.load(imagePagArrayBuffer)) as PAGFile;
+  pagPlayer.setComposition(testPagFile);
+  pagPlayer.setProgress(0.5);
+  pagPlayer.setScaleMode(types.PAGScaleMode.Stretch);
+  await pagPlayer.flush();
+  console.log(
+    'PAGSurface readPixels:',
+    pagSurface.readPixels(types.ColorType.RGBA_8888, types.AlphaType.Unpremultiplied),
+  );
 };
 
 const VectorTest = async () => {
@@ -398,13 +408,4 @@ const VectorTest = async () => {
     console.error(`Vector push_back succeed!`);
   }
   layers.delete();
-
-  // console.log('array[0]', layers[0]);
-  // console.log('array[1]', layers[1]);
-  // layers[1] = pagImageLayer;
-  // console.log('array[1]', layers[1]);
-  // layers.push(pagImageLayer);
-  // layers.pop();
-  // layers.delete();
-  // console.log('array', layers);
 };
