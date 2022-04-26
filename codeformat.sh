@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 if [[ $(uname) == 'Darwin' ]]; then
-  MAC_REQUIRED_TOOLS="python"
+  MAC_REQUIRED_TOOLS="python3"
   for TOOL in ${MAC_REQUIRED_TOOLS[@]}; do
     if [ ! $(which $TOOL) ]; then
       if [ ! $(which brew) ]; then
@@ -13,12 +13,12 @@ if [[ $(uname) == 'Darwin' ]]; then
     fi
   done
   clangformat=`clang-format --version`
-  if [[ $clangformat =~ "13." ]]
+  if [[ $clangformat =~ "14." ]]
   then
       echo "----$clangformat----"
   else
       echo "----install clang-format----"
-      pip install clang-format
+      pip3 install clang-format==14
   fi
 fi
 
