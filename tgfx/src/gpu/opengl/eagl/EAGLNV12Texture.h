@@ -19,7 +19,7 @@
 #pragma once
 
 #import <CoreVideo/CoreVideo.h>
-#include "gpu/opengl/GLYUVTexture.h"
+#include "tgfx/gpu/opengl/GLYUVTexture.h"
 
 namespace tgfx {
 class EAGLNV12Texture : public GLYUVTexture {

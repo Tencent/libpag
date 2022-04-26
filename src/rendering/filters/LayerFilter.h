@@ -19,10 +19,10 @@
 #pragma once
 
 #include "Filter.h"
-#include "gpu/Resource.h"
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "rendering/filters/utils/FilterHelper.h"
+#include "tgfx/gpu/Resource.h"
 
 namespace pag {
 std::vector<tgfx::Point> ComputeVerticesForMotionBlurAndBulge(const tgfx::Rect& inputBounds,

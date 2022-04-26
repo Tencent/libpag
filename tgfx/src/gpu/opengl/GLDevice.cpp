@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/opengl/GLDevice.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 #include "gpu/opengl/GLContext.h"
 #include "gpu/opengl/GLUtil.h"
 

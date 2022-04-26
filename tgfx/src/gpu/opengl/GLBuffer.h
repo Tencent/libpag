@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/Resource.h"
+#include "tgfx/gpu/Resource.h"
 
 namespace tgfx {
 class GLBuffer : public Resource {

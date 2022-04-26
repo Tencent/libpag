@@ -17,15 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <vector>
-#include "core/Bitmap.h"
-#include "core/Buffer.h"
-#include "core/Image.h"
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
-#include "gpu/Surface.h"
-#include "gpu/opengl/GLDevice.h"
-#include "gpu/opengl/GLTexture.h"
 #include "gpu/opengl/GLUtil.h"
+#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Buffer.h"
+#include "tgfx/core/Image.h"
+#include "tgfx/gpu/Surface.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
+#include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace pag {
 using namespace tgfx;

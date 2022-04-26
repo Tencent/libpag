@@ -23,12 +23,12 @@
 #include <vector>
 #include "base/utils/Task.h"
 #include "base/utils/TimeUtil.h"
-#include "core/Clock.h"
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
 #include "framework/utils/Semaphore.h"
 #include "nlohmann/json.hpp"
 #include "rendering/caches/RenderCache.h"
+#include "tgfx/core/Clock.h"
 
 namespace pag {
 using namespace tgfx;

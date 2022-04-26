@@ -18,7 +18,6 @@
 
 #include "GradientShader.h"
 #include "core/utils/MathExtra.h"
-#include "gpu/Caps.h"
 #include "gpu/ColorShader.h"
 #include "gpu/ConstColorProcessor.h"
 #include "gpu/GradientCache.h"
@@ -29,6 +28,7 @@
 #include "gpu/gradients/SingleIntervalGradientColorizer.h"
 #include "gpu/gradients/TextureGradientColorizer.h"
 #include "gpu/gradients/UnrolledBinaryGradientColorizer.h"
+#include "tgfx/gpu/Caps.h"
 
 namespace tgfx {
 // Intervals smaller than this (that aren't hard stops) on low-precision-only devices force us to

@@ -19,7 +19,7 @@
 #pragma once
 
 #include "ResourceHandle.h"
-#include "core/Matrix.h"
+#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
 class ProgramDataManager {

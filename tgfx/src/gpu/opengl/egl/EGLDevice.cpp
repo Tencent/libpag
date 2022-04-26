@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/opengl/egl/EGLDevice.h"
+#include "tgfx/gpu/opengl/egl/EGLDevice.h"
 #include "core/utils/Log.h"
 #include "gpu/opengl/egl/EGLGlobals.h"
 #include "gpu/opengl/egl/EGLProcGetter.h"

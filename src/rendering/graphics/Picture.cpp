@@ -18,11 +18,11 @@
 
 #include "Picture.h"
 #include "base/utils/MatrixUtil.h"
-#include "core/Clock.h"
-#include "gpu/Surface.h"
-#include "gpu/opengl/GLDevice.h"
-#include "gpu/opengl/GLTexture.h"
 #include "rendering/caches/RenderCache.h"
+#include "tgfx/core/Clock.h"
+#include "tgfx/gpu/Surface.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
+#include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace pag {
 // 若当前直接绘制纹理性能是最好的，就直接绘制，否则返回 false。

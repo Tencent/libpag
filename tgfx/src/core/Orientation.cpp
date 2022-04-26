@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/Orientation.h"
+#include "tgfx/core/Orientation.h"
 
 namespace tgfx {
 Matrix OrientationToMatrix(Orientation orientation, int width, int height) {

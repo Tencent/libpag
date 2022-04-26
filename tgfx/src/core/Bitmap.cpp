@@ -16,9 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/Bitmap.h"
-#include "core/Image.h"
+#include "tgfx/core/Bitmap.h"
 #include "skcms.h"
+#include "tgfx/core/Image.h"
 
 namespace tgfx {
 

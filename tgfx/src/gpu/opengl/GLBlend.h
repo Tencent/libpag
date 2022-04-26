@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "core/BlendMode.h"
 #include "gpu/FragmentShaderBuilder.h"
+#include "tgfx/core/BlendMode.h"
 
 namespace tgfx {
 bool BlendAsCoeff(BlendMode blendMode, unsigned* first = nullptr, unsigned* second = nullptr);

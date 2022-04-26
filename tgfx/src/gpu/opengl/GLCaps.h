@@ -23,11 +23,11 @@
 #include <vector>
 #include "core/utils/EnumHasher.h"
 #include "core/utils/Log.h"
-#include "gpu/Caps.h"
-#include "gpu/PixelFormat.h"
 #include "gpu/Swizzle.h"
-#include "gpu/opengl/GLDefines.h"
-#include "gpu/opengl/GLFunctions.h"
+#include "tgfx/gpu/Caps.h"
+#include "tgfx/gpu/PixelFormat.h"
+#include "tgfx/gpu/opengl/GLDefines.h"
+#include "tgfx/gpu/opengl/GLFunctions.h"
 
 #define GL_VER(major, minor) ((static_cast<uint32_t>(major) << 16) | static_cast<uint32_t>(minor))
 

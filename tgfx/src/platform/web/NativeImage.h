@@ -19,7 +19,7 @@
 #pragma once
 
 #include <emscripten/val.h>
-#include "core/Image.h"
+#include "tgfx/core/Image.h"
 
 namespace tgfx {
 class NativeImage : public Image {

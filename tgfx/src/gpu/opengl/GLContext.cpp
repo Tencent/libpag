@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/opengl/GLContext.h"
-#include "gpu/opengl/GLDevice.h"
 #include "gpu/opengl/GLUtil.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace tgfx {
 GLContext::GLContext(Device* device, const GLInterface* glInterface)

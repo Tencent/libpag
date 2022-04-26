@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "core/BytesKey.h"
-#include "gpu/Context.h"
+#include "tgfx/core/BytesKey.h"
+#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 class Processor {

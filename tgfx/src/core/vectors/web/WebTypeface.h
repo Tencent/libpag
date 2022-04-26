@@ -21,8 +21,8 @@
 #include <emscripten/val.h>
 #include <unordered_map>
 #include <vector>
-#include "core/Font.h"
-#include "core/Typeface.h"
+#include "tgfx/core/Font.h"
+#include "tgfx/core/Typeface.h"
 
 namespace tgfx {
 class WebTypeface : public Typeface {

@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "core/Image.h"
+#include "tgfx/core/Image.h"
 #include "webp/decode.h"
 #include "webp/demux.h"
 #include "webp/encode.h"

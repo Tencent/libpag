@@ -20,7 +20,7 @@
 
 #include <optional>
 #include "gpu/GLFragmentProcessor.h"
-#include "gpu/YUVTexture.h"
+#include "tgfx/gpu/YUVTexture.h"
 
 namespace tgfx {
 class GLYUVTextureFragmentProcessor : public GLFragmentProcessor {

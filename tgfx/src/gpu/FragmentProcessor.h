@@ -20,7 +20,7 @@
 
 #include "CoordTransform.h"
 #include "Processor.h"
-#include "gpu/Texture.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 struct FPArgs {

@@ -18,8 +18,8 @@
 
 #include "core/images/jpeg/JpegImage.h"
 #include <csetjmp>
-#include "core/Bitmap.h"
 #include "core/utils/OrientationHelper.h"
+#include "tgfx/core/Bitmap.h"
 
 extern "C" {
 #include "jerror.h"

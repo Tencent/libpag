@@ -19,9 +19,9 @@
 #pragma once
 
 #include <array>
-#include "core/Matrix.h"
-#include "gpu/opengl/GLFrameBuffer.h"
-#include "gpu/opengl/GLSampler.h"
+#include "tgfx/core/Matrix.h"
+#include "tgfx/gpu/opengl/GLFrameBuffer.h"
+#include "tgfx/gpu/opengl/GLSampler.h"
 
 namespace pag {
 struct FilterSource {

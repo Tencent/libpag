@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GPUDecoder.h"
-#include "core/Buffer.h"
 #include "platform/android/JStringUtil.h"
+#include "tgfx/core/Buffer.h"
 
 namespace pag {
 static Global<jclass> GPUDecoderClass;

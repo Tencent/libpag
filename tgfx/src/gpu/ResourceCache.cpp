@@ -16,13 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/ResourceCache.h"
+#include "tgfx/gpu/ResourceCache.h"
 #include <unordered_map>
 #include <unordered_set>
-#include "core/BytesKey.h"
-#include "core/Clock.h"
 #include "core/utils/Log.h"
-#include "gpu/Resource.h"
+#include "tgfx/core/BytesKey.h"
+#include "tgfx/core/Clock.h"
+#include "tgfx/gpu/Resource.h"
 
 namespace tgfx {
 static thread_local std::unordered_set<ResourceCache*> currentThreadCaches = {};

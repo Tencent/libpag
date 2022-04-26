@@ -20,7 +20,7 @@
 #include "GLContext.h"
 #include "GLUtil.h"
 #include "gpu/Pipeline.h"
-#include "gpu/opengl/GLTexture.h"
+#include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace tgfx {
 GLProgram::GLProgram(Context* context, unsigned programID, const std::vector<Uniform>& uniforms,

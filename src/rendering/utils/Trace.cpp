@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Trace.h"
-#include "gpu/Surface.h"
 #include "platform/Platform.h"
+#include "tgfx/gpu/Surface.h"
 
 namespace pag {
 void Trace(std::shared_ptr<tgfx::PixelBuffer> pixelBuffer, const std::string& tag) {

@@ -19,8 +19,8 @@
 #pragma once
 
 #include "CGTypeface.h"
-#include "core/ImageInfo.h"
-#include "core/PixelBuffer.h"
+#include "tgfx/core/ImageInfo.h"
+#include "tgfx/core/PixelBuffer.h"
 
 namespace tgfx {
 class CGScalerContextRec {

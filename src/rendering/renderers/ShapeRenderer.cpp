@@ -23,11 +23,11 @@
 #include "base/utils/Interpolate.h"
 #include "base/utils/MathUtil.h"
 #include "base/utils/TGFXCast.h"
-#include "core/PathEffect.h"
-#include "core/PathMeasure.h"
 #include "rendering/graphics/Graphic.h"
 #include "rendering/graphics/Shape.h"
 #include "rendering/utils/PathUtil.h"
+#include "tgfx/core/PathEffect.h"
+#include "tgfx/core/PathMeasure.h"
 
 namespace pag {
 

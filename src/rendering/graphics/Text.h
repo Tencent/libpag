@@ -18,10 +18,10 @@
 
 #pragma once
 
-#include "gpu/Paint.h"
 #include "rendering/caches/TextAtlas.h"
 #include "rendering/caches/TextGlyphs.h"
 #include "rendering/graphics/Graphic.h"
+#include "tgfx/gpu/Paint.h"
 
 namespace pag {
 class TextRun {

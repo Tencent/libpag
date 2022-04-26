@@ -18,7 +18,7 @@
 
 #include "GPUDecoder.h"
 #include "VideoImage.h"
-#include "core/Buffer.h"
+#include "tgfx/core/Buffer.h"
 
 namespace pag {
 GPUDecoder::GPUDecoder(const VideoFormat& format)

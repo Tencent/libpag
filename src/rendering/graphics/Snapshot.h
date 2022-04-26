@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "core/Matrix.h"
-#include "gpu/Texture.h"
 #include "pag/types.h"
+#include "tgfx/core/Matrix.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace pag {
 class RenderCache;

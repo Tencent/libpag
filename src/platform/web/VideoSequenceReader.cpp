@@ -18,7 +18,7 @@
 
 #include "VideoSequenceReader.h"
 #include "codec/mp4/MP4BoxHelper.h"
-#include "gpu/opengl/GLTexture.h"
+#include "tgfx/gpu/opengl/GLTexture.h"
 
 using namespace emscripten;
 

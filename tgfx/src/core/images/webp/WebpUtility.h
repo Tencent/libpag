@@ -19,7 +19,7 @@
 #pragma once
 
 #include <string>
-#include "core/Orientation.h"
+#include "tgfx/core/Orientation.h"
 
 namespace tgfx {
 

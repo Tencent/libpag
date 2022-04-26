@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "gpu/Surface.h"
 #include "pag/gpu.h"
+#include "tgfx/gpu/Surface.h"
 
 namespace pag {
 

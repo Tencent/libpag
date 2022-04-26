@@ -22,7 +22,7 @@
 #include <QSGImageNode>
 #include <QScreen>
 #include <QThread>
-#include "core/Clock.h"
+#include "tgfx/core/Clock.h"
 #include "pag/file.h"
 #include "platform/qt/GPUDrawable.h"
 

@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CGLHardwareTexture.h"
-#include "gpu/YUVTexture.h"
+#include "tgfx/gpu/YUVTexture.h"
 #include "platform/apple/HardwareBuffer.h"
 
 namespace tgfx {

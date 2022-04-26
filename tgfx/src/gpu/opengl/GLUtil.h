@@ -20,10 +20,10 @@
 
 #include <array>
 #include <string>
-#include "core/ImageOrigin.h"
-#include "core/Matrix.h"
 #include "gpu/opengl/GLContext.h"
-#include "gpu/opengl/GLSampler.h"
+#include "tgfx/core/ImageOrigin.h"
+#include "tgfx/core/Matrix.h"
+#include "tgfx/gpu/opengl/GLSampler.h"
 
 namespace tgfx {
 struct GLVersion {

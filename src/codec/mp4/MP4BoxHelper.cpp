@@ -20,7 +20,7 @@
 #include "MP4Generator.h"
 #include "base/utils/Log.h"
 #include "codec/utils/EncodeStream.h"
-#include "core/Clock.h"
+#include "tgfx/core/Clock.h"
 
 namespace pag {
 static const int SEQUENCE_NUMBER = 1;
@@ -133,7 +133,8 @@ static std::unique_ptr<ByteData> ConcatMP4(const VideoSequence* videoSequence) {
 
   EncodeStream payload(nullptr, static_cast<uint32_t>(dataSize));
   payload.setOrder(ByteOrder::BigEndian);
-  payload.writeBytes(videoSequence->MP4Header->data(), videoSequence->MP4Header->length());
+  payload.writeBytes(videoSequence->MP4Header->data(),
+                     static_cast<uint32_t>(videoSequence->MP4Header->length()));
   WriteMdatBox(videoSequence, &payload, mdatSize);
 
   return payload.release();

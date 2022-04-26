@@ -18,7 +18,7 @@
 
 #include "Drawable.h"
 #include "base/utils/TGFXCast.h"
-#include "gpu/opengl/GLRenderTarget.h"
+#include "tgfx/gpu/opengl/GLRenderTarget.h"
 
 namespace pag {
 

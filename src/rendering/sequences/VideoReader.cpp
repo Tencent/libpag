@@ -18,7 +18,7 @@
 
 #include "VideoReader.h"
 #include "base/utils/TimeUtil.h"
-#include "core/Clock.h"
+#include "tgfx/core/Clock.h"
 
 namespace pag {
 #define DECODER_TYPE_HARDWARE 1

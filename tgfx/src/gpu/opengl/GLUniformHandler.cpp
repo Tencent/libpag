@@ -18,7 +18,7 @@
 
 #include "GLUniformHandler.h"
 #include "GLProgramBuilder.h"
-#include "gpu/opengl/GLTexture.h"
+#include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace tgfx {
 UniformHandle GLUniformHandler::internalAddUniform(ShaderFlags visibility, ShaderVar::Type type,

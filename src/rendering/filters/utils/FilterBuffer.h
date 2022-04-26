@@ -18,11 +18,11 @@
 
 #pragma once
 
-#include "gpu/Surface.h"
-#include "gpu/opengl/GLRenderTarget.h"
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "rendering/filters/Filter.h"
+#include "tgfx/gpu/Surface.h"
+#include "tgfx/gpu/opengl/GLRenderTarget.h"
 
 namespace pag {
 class FilterBuffer {

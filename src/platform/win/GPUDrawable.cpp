@@ -19,7 +19,7 @@
 #include "GPUDrawable.h"
 #include <windows.h>
 #include "base/utils/Log.h"
-#include "gpu/opengl/egl/EGLWindow.h"
+#include "tgfx/gpu/opengl/egl/EGLWindow.h"
 
 namespace pag {
 std::shared_ptr<GPUDrawable> GPUDrawable::FromWindow(void* nativeWindow, void* sharedContext) {

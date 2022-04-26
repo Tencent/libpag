@@ -16,10 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/Device.h"
+#include "tgfx/gpu/Device.h"
 #include "core/utils/Log.h"
 #include "core/utils/UniqueID.h"
-#include "gpu/Context.h"
+#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 Device::Device() : _uniqueID(UniqueID::Next()) {

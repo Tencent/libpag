@@ -18,8 +18,8 @@
 
 #include "NativeImage.h"
 #include <android/bitmap.h>
-#include "core/Bitmap.h"
 #include "platform/NativeCodec.h"
+#include "tgfx/core/Bitmap.h"
 
 namespace tgfx {
 static constexpr int BITMAP_FLAGS_ALPHA_UNPREMUL = 2;

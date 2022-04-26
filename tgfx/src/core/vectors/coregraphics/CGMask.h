@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "core/Mask.h"
-#include "core/PixelBuffer.h"
+#include "tgfx/core/Mask.h"
+#include "tgfx/core/PixelBuffer.h"
 
 namespace tgfx {
 class CGMask : public Mask {

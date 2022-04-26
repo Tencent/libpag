@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "base/utils/TGFXCast.h"
-#include "core/Clock.h"
-#include "gpu/opengl/GLDevice.h"
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "rendering/Drawable.h"
@@ -26,6 +24,8 @@
 #include "rendering/graphics/Recorder.h"
 #include "rendering/utils/GLRestorer.h"
 #include "rendering/utils/LockGuard.h"
+#include "tgfx/core/Clock.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pag {
 

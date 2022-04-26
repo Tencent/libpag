@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/Stream.h"
 #include "pag/file.h"
+#include "tgfx/core/Stream.h"
 
 namespace pag {
 std::unique_ptr<ByteData> ByteData::FromPath(const std::string& filePath) {

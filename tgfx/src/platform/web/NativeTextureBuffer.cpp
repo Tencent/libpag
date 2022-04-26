@@ -18,7 +18,7 @@
 
 #include "NativeTextureBuffer.h"
 #include "gpu/opengl/GLContext.h"
-#include "gpu/opengl/GLTexture.h"
+#include "tgfx/gpu/opengl/GLTexture.h"
 
 using namespace emscripten;
 

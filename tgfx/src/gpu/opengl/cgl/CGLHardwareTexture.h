@@ -19,7 +19,7 @@
 #pragma once
 
 #import <AppKit/AppKit.h>
-#include "gpu/opengl/GLTexture.h"
+#include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace tgfx {
 class CGLHardwareTexture : public GLTexture {

@@ -22,8 +22,8 @@
 
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
-#include "gpu/opengl/GLTexture.h"
 #include "platform/android/HardwareBufferInterface.h"
+#include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace tgfx {
 class EGLHardwareTexture : public GLTexture {

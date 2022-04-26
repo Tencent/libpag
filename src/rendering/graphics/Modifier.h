@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "core/BlendMode.h"
-#include "core/Path.h"
-#include "gpu/Canvas.h"
+#include "tgfx/core/BlendMode.h"
+#include "tgfx/core/Path.h"
+#include "tgfx/gpu/Canvas.h"
 
 namespace pag {
 class Graphic;

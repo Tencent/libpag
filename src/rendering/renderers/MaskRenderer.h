@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "core/Path.h"
 #include "pag/file.h"
 #include "pag/pag.h"
+#include "tgfx/core/Path.h"
 
 namespace pag {
 void RenderMasks(tgfx::Path* maskContent, const std::vector<MaskData*>& masks, Frame layerFrame);

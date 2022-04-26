@@ -19,9 +19,9 @@
 #pragma once
 
 #include "GLCanvas.h"
-#include "gpu/Surface.h"
-#include "gpu/opengl/GLRenderTarget.h"
-#include "gpu/opengl/GLTexture.h"
+#include "tgfx/gpu/Surface.h"
+#include "tgfx/gpu/opengl/GLRenderTarget.h"
+#include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace tgfx {
 class GLSurface : public Surface {

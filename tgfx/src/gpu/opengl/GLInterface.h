@@ -20,8 +20,8 @@
 
 #include "GLCaps.h"
 #include "GLProcGetter.h"
-#include "gpu/opengl/GLDefines.h"
-#include "gpu/opengl/GLFunctions.h"
+#include "tgfx/gpu/opengl/GLDefines.h"
+#include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace tgfx {
 class GLState;

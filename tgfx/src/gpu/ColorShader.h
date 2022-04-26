@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/Shader.h"
+#include "tgfx/gpu/Shader.h"
 
 namespace tgfx {
 class ColorShader : public Shader {

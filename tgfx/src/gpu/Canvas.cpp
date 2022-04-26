@@ -16,10 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/Canvas.h"
+#include "tgfx/gpu/Canvas.h"
 #include <atomic>
 #include "CanvasState.h"
-#include "gpu/Surface.h"
+#include "tgfx/gpu/Surface.h"
 
 namespace tgfx {
 static uint32_t NextClipID() {

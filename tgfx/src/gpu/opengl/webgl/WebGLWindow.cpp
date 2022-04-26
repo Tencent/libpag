@@ -16,10 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/opengl/webgl/WebGLWindow.h"
+#include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
 #include "core/utils/Log.h"
-#include "gpu/opengl/GLDefines.h"
-#include "gpu/opengl/GLRenderTarget.h"
+#include "tgfx/gpu/opengl/GLDefines.h"
+#include "tgfx/gpu/opengl/GLRenderTarget.h"
 
 namespace tgfx {
 std::shared_ptr<WebGLWindow> WebGLWindow::MakeFrom(const std::string& canvasID) {

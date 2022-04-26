@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/opengl/GLYUVTexture.h"
+#include "tgfx/gpu/opengl/GLYUVTexture.h"
 #include "GLUtil.h"
 #include "core/utils/UniqueID.h"
 

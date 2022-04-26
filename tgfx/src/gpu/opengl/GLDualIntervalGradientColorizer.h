@@ -19,8 +19,8 @@
 #pragma once
 
 #include <optional>
-#include "core/Color.h"
 #include "gpu/GLFragmentProcessor.h"
+#include "tgfx/core/Color.h"
 
 namespace tgfx {
 class GLDualIntervalGradientColorizer : public GLFragmentProcessor {

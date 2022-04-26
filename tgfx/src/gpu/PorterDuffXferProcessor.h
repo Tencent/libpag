@@ -19,7 +19,7 @@
 #pragma once
 
 #include "XferProcessor.h"
-#include "core/BlendMode.h"
+#include "tgfx/core/BlendMode.h"
 
 namespace tgfx {
 class PorterDuffXferProcessor : public XferProcessor {

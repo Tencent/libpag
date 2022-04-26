@@ -18,10 +18,10 @@
 
 #include "TextAtlas.h"
 #include "RenderCache.h"
-#include "core/Mask.h"
-#include "gpu/Canvas.h"
-#include "gpu/Surface.h"
-#include "gpu/Texture.h"
+#include "tgfx/core/Mask.h"
+#include "tgfx/gpu/Canvas.h"
+#include "tgfx/gpu/Surface.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace pag {
 class Atlas {

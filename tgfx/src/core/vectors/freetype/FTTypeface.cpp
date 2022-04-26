@@ -21,8 +21,8 @@
 #include FT_TRUETYPE_TABLES_H
 
 #include "FTScalerContext.h"
-#include "core/UTF.h"
 #include "core/utils/UniqueID.h"
+#include "tgfx/core/UTF.h"
 
 namespace tgfx {
 class EmptyTypeface : public Typeface {

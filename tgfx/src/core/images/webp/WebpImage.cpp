@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/images/webp/WebpImage.h"
-#include "core/Bitmap.h"
-#include "core/Buffer.h"
 #include "core/images/webp/WebpUtility.h"
+#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Buffer.h"
 
 namespace tgfx {
 

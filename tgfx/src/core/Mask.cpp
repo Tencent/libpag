@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/Mask.h"
-#include "core/PathEffect.h"
+#include "tgfx/core/Mask.h"
+#include "tgfx/core/PathEffect.h"
 
 namespace tgfx {
 bool Mask::CanUseAsMask(const TextBlob* textBlob) {

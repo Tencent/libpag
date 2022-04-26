@@ -21,7 +21,7 @@
 #include <mutex>
 #include "JNIInit.h"
 #include "core/utils/Log.h"
-#include "platform/android/SetJavaVM.h"
+#include "tgfx/platform/android/SetJavaVM.h"
 
 namespace tgfx {
 static std::mutex globalLocker = {};

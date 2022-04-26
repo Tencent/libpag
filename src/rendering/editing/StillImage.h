@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "core/Image.h"
 #include "pag/pag.h"
 #include "rendering/graphics/Graphic.h"
+#include "tgfx/core/Image.h"
 
 namespace pag {
 

@@ -20,7 +20,7 @@
 
 #include "GLBuffer.h"
 #include "GLDrawer.h"
-#include "core/Path.h"
+#include "tgfx/core/Path.h"
 
 namespace tgfx {
 class GLRRectOp : public GLDrawOp {

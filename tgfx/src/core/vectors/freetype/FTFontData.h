@@ -19,7 +19,7 @@
 #pragma once
 
 #include <memory>
-#include "core/Data.h"
+#include "tgfx/core/Data.h"
 
 namespace tgfx {
 struct FTFontData {

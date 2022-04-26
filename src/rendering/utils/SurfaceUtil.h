@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/Surface.h"
+#include "tgfx/gpu/Surface.h"
 
 namespace pag {
 class SurfaceUtil {

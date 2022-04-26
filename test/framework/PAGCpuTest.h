@@ -18,12 +18,12 @@
 
 #pragma once
 
-#include "core/PixelBuffer.h"
 #include "gtest/gtest.h"
 #include "nlohmann/json.hpp"
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "pag_test.h"
+#include "tgfx/core/PixelBuffer.h"
 
 namespace pag {
 class PAGCpuTest : public testing::Test {

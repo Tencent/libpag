@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "core/Matrix.h"
-#include "core/Rect.h"
+#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Rect.h"
 
 namespace tgfx {
 class Quad {
