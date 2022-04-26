@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "core/Color.h"
 #include "gpu/FragmentProcessor.h"
+#include "tgfx/core/Color.h"
 
 namespace tgfx {
 class UnrolledBinaryGradientColorizer : public FragmentProcessor {

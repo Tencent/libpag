@@ -23,7 +23,6 @@
 #include <unordered_set>
 #include "TextAtlas.h"
 #include "TextGlyphs.h"
-#include "gpu/Device.h"
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "rendering/Performance.h"
@@ -34,6 +33,7 @@
 #include "rendering/graphics/Snapshot.h"
 #include "rendering/layers/PAGStage.h"
 #include "rendering/sequences/SequenceReaderFactory.h"
+#include "tgfx/gpu/Device.h"
 
 namespace pag {
 class RenderCache : public Performance {

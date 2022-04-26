@@ -17,13 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <thread>
-#include "core/Image.h"
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
-#include "gpu/Surface.h"
-#include "gpu/opengl/GLDevice.h"
 #include "nlohmann/json.hpp"
 #include "pag/pag.h"
+#include "tgfx/core/Image.h"
+#include "tgfx/gpu/Surface.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pag {
 using namespace tgfx;

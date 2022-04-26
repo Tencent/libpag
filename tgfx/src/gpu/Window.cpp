@@ -16,9 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/Window.h"
+#include "tgfx/gpu/Window.h"
 #include "core/utils/Log.h"
-#include "gpu/Device.h"
+#include "tgfx/gpu/Device.h"
 
 namespace tgfx {
 Window::Window(std::shared_ptr<Device> device) : device(std::move(device)) {

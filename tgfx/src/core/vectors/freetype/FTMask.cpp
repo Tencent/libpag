@@ -18,7 +18,7 @@
 
 #include "FTMask.h"
 #include "FTPath.h"
-#include "core/Bitmap.h"
+#include "tgfx/core/Bitmap.h"
 #include FT_STROKER_H
 
 namespace tgfx {

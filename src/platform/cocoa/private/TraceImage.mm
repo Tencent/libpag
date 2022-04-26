@@ -19,7 +19,7 @@
 #include "TraceImage.h"
 #include "PixelBufferUtils.h"
 #include "base/utils/Log.h"
-#include "core/Bitmap.h"
+#include "tgfx/core/Bitmap.h"
 
 namespace pag {
 void TraceImage(const tgfx::ImageInfo& info, const void* pixels, const std::string& tag) {

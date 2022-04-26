@@ -23,9 +23,9 @@
 #include <iostream>
 #include <unordered_set>
 #include "base/utils/TGFXCast.h"
-#include "core/Data.h"
-#include "core/Image.h"
 #include "nlohmann/json.hpp"
+#include "tgfx/core/Data.h"
+#include "tgfx/core/Image.h"
 
 namespace pag {
 using namespace tgfx;

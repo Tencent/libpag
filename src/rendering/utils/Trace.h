@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "core/Bitmap.h"
-#include "gpu/Texture.h"
+#include "tgfx/core/Bitmap.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace pag {
 /**

@@ -18,9 +18,9 @@
 
 #include "Shape.h"
 #include "base/utils/TGFXCast.h"
-#include "gpu/Canvas.h"
-#include "gpu/Shader.h"
 #include "pag/file.h"
+#include "tgfx/gpu/Canvas.h"
+#include "tgfx/gpu/Shader.h"
 
 namespace pag {
 std::shared_ptr<Graphic> Shape::MakeFrom(const tgfx::Path& path, tgfx::Color color) {

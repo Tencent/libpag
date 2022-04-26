@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/opengl/GLFunctions.h"
+#include "tgfx/gpu/opengl/GLFunctions.h"
 #include "gpu/opengl/GLContext.h"
 
 namespace tgfx {

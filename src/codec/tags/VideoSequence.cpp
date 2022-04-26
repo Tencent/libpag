@@ -121,8 +121,8 @@ ByteData* ReadMp4Header(DecodeStream* stream) {
 }
 
 TagCode WriteMp4Header(EncodeStream* stream, ByteData* byteData) {
-  stream->writeEncodedUint32(byteData->length());
-  stream->writeBytes(byteData->data(), byteData->length());
+  stream->writeEncodedUint32(static_cast<uint32_t>(byteData->length()));
+  stream->writeBytes(byteData->data(), static_cast<uint32_t>(byteData->length()));
   return TagCode::Mp4Header;
 }
 }  // namespace pag

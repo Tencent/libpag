@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MaskRenderer.h"
-#include "core/PathEffect.h"
 #include "pag/file.h"
 #include "rendering/utils/PathUtil.h"
+#include "tgfx/core/PathEffect.h"
 
 namespace pag {
 tgfx::PathOp ToPathOp(Enum maskMode) {

@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "core/Bitmap.h"
-#include "core/PixelBuffer.h"
 #include "pag/pag.h"
+#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/PixelBuffer.h"
 
 namespace pag {
 class Baseline {

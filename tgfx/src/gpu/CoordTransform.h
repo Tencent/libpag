@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "core/Matrix.h"
+#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
 struct CoordTransform {

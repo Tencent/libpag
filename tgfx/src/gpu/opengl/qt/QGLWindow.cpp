@@ -16,14 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/opengl/qt/QGLWindow.h"
+#include "tgfx/gpu/opengl/qt/QGLWindow.h"
 #include <QApplication>
 #include <QQuickWindow>
 #include <QThread>
 #include "gpu/opengl/GLContext.h"
-#include "gpu/opengl/GLRenderTarget.h"
 #include "gpu/opengl/GLSurface.h"
-#include "gpu/opengl/GLTexture.h"
+#include "tgfx/gpu/opengl/GLRenderTarget.h"
+#include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace tgfx {
 

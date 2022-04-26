@@ -19,8 +19,8 @@
 #pragma once
 
 #include "TextGlyphs.h"
-#include "core/BytesKey.h"
 #include "pag/types.h"
+#include "tgfx/core/BytesKey.h"
 
 namespace pag {
 class RenderCache;

@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "core/RGBAAALayout.h"
 #include "gpu/FragmentProcessor.h"
+#include "tgfx/core/RGBAAALayout.h"
 
 namespace tgfx {
 class TextureFragmentProcessor : public FragmentProcessor {

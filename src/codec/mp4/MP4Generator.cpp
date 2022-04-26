@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MP4Generator.h"
-#include "core/Clock.h"
+#include "tgfx/core/Clock.h"
 
 #define PushInWriteFun(funName)                                                         \
   writeFun.emplace_back([this](auto&& PH1, auto&& PH2) -> int {                         \
@@ -692,7 +692,7 @@ int MP4Generator::ctts(EncodeStream* stream, bool write) {
   std::vector<std::function<int(EncodeStream*, bool)>> writeFun;
   writeFun.reserve(1);
   auto innerWriteFun = [&](EncodeStream* stream, bool write) -> int {
-    int sampleCount = param.track->samples.size();
+    auto sampleCount = static_cast<int>(param.track->samples.size());
     int32_t sampleDelta = std::floor(param.track->duration / sampleCount);
     int len = (2 + sampleCount * 2) * 4;
     if (!write) {

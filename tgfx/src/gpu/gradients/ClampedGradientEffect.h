@@ -19,8 +19,8 @@
 #pragma once
 
 #include <climits>
-#include "core/Color.h"
 #include "gpu/FragmentProcessor.h"
+#include "tgfx/core/Color.h"
 
 namespace tgfx {
 class ClampedGradientEffect : public FragmentProcessor {

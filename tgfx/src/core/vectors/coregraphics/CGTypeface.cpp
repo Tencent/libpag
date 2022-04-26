@@ -18,8 +18,8 @@
 
 #include "CGTypeface.h"
 #include "CGScalerContext.h"
-#include "core/UTF.h"
 #include "core/utils/UniqueID.h"
+#include "tgfx/core/UTF.h"
 
 namespace tgfx {
 std::string StringFromCFString(CFStringRef src) {

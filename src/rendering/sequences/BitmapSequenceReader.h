@@ -20,10 +20,10 @@
 
 #include "SequenceReader.h"
 #include "base/utils/Task.h"
-#include "core/Bitmap.h"
 #include "pag/file.h"
 #include "rendering/Performance.h"
 #include "rendering/graphics/TextureProxy.h"
+#include "tgfx/core/Bitmap.h"
 
 namespace pag {
 class BitmapSequenceReader : public SequenceReader {

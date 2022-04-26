@@ -19,7 +19,7 @@
 #pragma once
 
 #include <emscripten/val.h>
-#include "gpu/TextureBuffer.h"
+#include "tgfx/gpu/TextureBuffer.h"
 
 namespace tgfx {
 class NativeTextureBuffer : public TextureBuffer {

@@ -18,7 +18,7 @@
 
 #include "EAGLNV12Texture.h"
 #include "gpu/opengl/GLContext.h"
-#include "gpu/opengl/eagl/EAGLDevice.h"
+#include "tgfx/gpu/opengl/eagl/EAGLDevice.h"
 
 namespace tgfx {
 static GLSampler ToGLSampler(CVOpenGLESTextureRef texture, PixelFormat format) {

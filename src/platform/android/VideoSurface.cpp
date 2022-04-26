@@ -19,8 +19,8 @@
 #include "VideoSurface.h"
 #include "android/native_window_jni.h"
 #include "base/utils/Log.h"
-#include "gpu/opengl/GLFunctions.h"
-#include "gpu/opengl/GLTexture.h"
+#include "tgfx/gpu/opengl/GLFunctions.h"
+#include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace pag {
 static Global<jclass> VideoSurfaceClass;

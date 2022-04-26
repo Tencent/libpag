@@ -20,10 +20,10 @@
 #include <functional>
 #include "base/utils/TimeUtil.h"
 #include "base/utils/UniqueID.h"
-#include "core/Clock.h"
 #include "rendering/caches/ImageContentCache.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/renderers/FilterRenderer.h"
+#include "tgfx/core/Clock.h"
 
 namespace pag {
 // 300M设置的大一些用于兜底，通常在大于20M时就开始随时清理。

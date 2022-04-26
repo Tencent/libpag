@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "core/BlendMode.h"
-#include "core/Path.h"
+#include "tgfx/core/BlendMode.h"
+#include "tgfx/core/Path.h"
 
 namespace tgfx {
 static constexpr uint32_t kDefaultClipID = 0;

@@ -19,7 +19,7 @@
 #include "CGLHardwareTexture.h"
 #include <OpenGL/gl3.h>
 #include "core/utils/UniqueID.h"
-#include "gpu/opengl/cgl/CGLDevice.h"
+#include "tgfx/gpu/opengl/cgl/CGLDevice.h"
 
 namespace tgfx {
 std::shared_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(Context* context,

@@ -19,7 +19,7 @@
 #pragma once
 
 #include <emscripten/val.h>
-#include "core/Mask.h"
+#include "tgfx/core/Mask.h"
 
 namespace tgfx {
 class WebMask : public Mask {

@@ -19,7 +19,7 @@
 #pragma once
 
 #include "FragmentProcessor.h"
-#include "core/Color.h"
+#include "tgfx/core/Color.h"
 
 namespace tgfx {
 class ConstColorProcessor : public FragmentProcessor {

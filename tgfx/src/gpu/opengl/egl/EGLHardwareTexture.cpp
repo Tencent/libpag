@@ -23,9 +23,9 @@
 #include <GLES/glext.h>
 #include <android/hardware_buffer.h>
 #include "core/utils/UniqueID.h"
-#include "gpu/opengl/egl/EGLDevice.h"
 #include "platform/android/HardwareBuffer.h"
 #include "platform/android/HardwareBufferInterface.h"
+#include "tgfx/gpu/opengl/egl/EGLDevice.h"
 
 namespace tgfx {
 namespace eglext {

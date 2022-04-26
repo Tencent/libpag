@@ -21,8 +21,8 @@
 #include "Modifier.h"
 #include "MutableGlyph.h"
 #include "TextureProxy.h"
-#include "core/Bitmap.h"
-#include "gpu/Paint.h"
+#include "tgfx/core/Bitmap.h"
+#include "tgfx/gpu/Paint.h"
 
 namespace pag {
 /**

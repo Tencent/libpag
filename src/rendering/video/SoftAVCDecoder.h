@@ -21,10 +21,10 @@
 #ifdef PAG_USE_LIBAVC
 
 #include "base/utils/Log.h"
-#include "core/Buffer.h"
-#include "core/Data.h"
 #include "pag/decoder.h"
 #include "pag/types.h"
+#include "tgfx/core/Buffer.h"
+#include "tgfx/core/Data.h"
 
 extern "C" {
 #pragma clang diagnostic push

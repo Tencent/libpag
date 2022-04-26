@@ -19,9 +19,9 @@
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
 #include "gpu/opengl/GLCaps.h"
-#include "gpu/opengl/GLDevice.h"
 #include "gpu/opengl/GLUtil.h"
 #include "rendering/Drawable.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pag {
 using namespace tgfx;

@@ -23,8 +23,8 @@
 
 #include "FTFace.h"
 #include "FTFontData.h"
-#include "core/Font.h"
-#include "core/Typeface.h"
+#include "tgfx/core/Font.h"
+#include "tgfx/core/Typeface.h"
 
 namespace tgfx {
 class FTTypeface : public Typeface {

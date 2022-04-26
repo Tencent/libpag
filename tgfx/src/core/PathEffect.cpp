@@ -16,9 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/PathEffect.h"
+#include "tgfx/core/PathEffect.h"
 #include "core/PathRef.h"
-#include "core/Stroke.h"
+#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
 using namespace pk;

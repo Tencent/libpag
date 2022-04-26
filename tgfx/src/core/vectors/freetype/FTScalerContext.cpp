@@ -24,10 +24,10 @@
 #include FT_SIZES_H
 #include FT_TRUETYPE_TABLES_H
 #include "FTUtil.h"
-#include "core/Bitmap.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "skcms.h"
+#include "tgfx/core/Bitmap.h"
 
 namespace tgfx {
 static float FTFixedToFloat(FT_Fixed x) {

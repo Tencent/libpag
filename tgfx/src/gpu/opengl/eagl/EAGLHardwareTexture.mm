@@ -19,7 +19,7 @@
 #include "EAGLHardwareTexture.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/opengl/GLContext.h"
-#include "gpu/opengl/eagl/EAGLDevice.h"
+#include "tgfx/gpu/opengl/eagl/EAGLDevice.h"
 
 namespace tgfx {
 static CVOpenGLESTextureRef GetTextureRef(Context* context, CVPixelBufferRef pixelBuffer,

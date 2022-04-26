@@ -19,7 +19,7 @@
 #pragma once
 
 #include <CoreText/CoreText.h>
-#include "core/Typeface.h"
+#include "tgfx/core/Typeface.h"
 
 namespace tgfx {
 class CGTypeface : public Typeface {

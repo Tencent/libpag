@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "core/TextBlob.h"
+#include "tgfx/core/TextBlob.h"
 
 namespace tgfx {
 class WebTextBlob : public TextBlob {

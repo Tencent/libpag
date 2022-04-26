@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/PixelBuffer.h"
-#include "gpu/YUVTexture.h"
+#include "tgfx/core/PixelBuffer.h"
+#include "tgfx/gpu/YUVTexture.h"
 
 namespace tgfx {
 std::shared_ptr<PixelBuffer> PixelBuffer::MakeHardwareBuffer(int, int, bool) {

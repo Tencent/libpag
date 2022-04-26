@@ -18,7 +18,7 @@
 
 #if !defined(__ANDROID__) && !defined(ANDROID)
 
-#include "platform/Print.h"
+#include "tgfx/platform/Print.h"
 #include <cstdarg>
 #include <cstdio>
 

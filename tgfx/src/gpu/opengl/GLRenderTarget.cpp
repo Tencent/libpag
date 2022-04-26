@@ -16,11 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/opengl/GLRenderTarget.h"
-#include "core/Bitmap.h"
-#include "core/Buffer.h"
+#include "tgfx/gpu/opengl/GLRenderTarget.h"
 #include "gpu/opengl/GLContext.h"
 #include "gpu/opengl/GLUtil.h"
+#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Buffer.h"
 
 namespace tgfx {
 std::shared_ptr<GLRenderTarget> GLRenderTarget::MakeFrom(Context* context,

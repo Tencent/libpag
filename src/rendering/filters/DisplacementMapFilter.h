@@ -19,7 +19,7 @@
 #pragma once
 
 #include "LayerFilter.h"
-#include "gpu/opengl/GLTexture.h"
+#include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace pag {
 class RenderCache;

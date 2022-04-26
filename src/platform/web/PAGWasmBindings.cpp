@@ -19,16 +19,16 @@
 #include <emscripten/bind.h>
 #include <emscripten/val.h>
 #include "base/utils/TGFXCast.h"
-#include "core/FontMetrics.h"
-#include "core/ImageInfo.h"
-#include "core/PathTypes.h"
-#include "gpu/opengl/GLDefines.h"
 #include "pag/pag.h"
 #include "pag/types.h"
 #include "platform/web/GPUDrawable.h"
 #include "platform/web/WebSoftwareDecoderFactory.h"
 #include "rendering/editing/StillImage.h"
 #include "rendering/video/VideoDecoder.h"
+#include "tgfx/core/FontMetrics.h"
+#include "tgfx/core/ImageInfo.h"
+#include "tgfx/core/PathTypes.h"
+#include "tgfx/gpu/opengl/GLDefines.h"
 #include "tgfx/src/platform/web/NativeImage.h"
 
 using namespace emscripten;

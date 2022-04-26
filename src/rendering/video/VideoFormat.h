@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "core/Data.h"
-#include "core/YUVInfo.h"
 #include "pag/types.h"
+#include "tgfx/core/Data.h"
+#include "tgfx/core/YUVInfo.h"
 
 namespace pag {
 struct VideoFormat {

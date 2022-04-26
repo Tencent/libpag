@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "gpu/TextureBuffer.h"
-#include "gpu/YUVTexture.h"
+#include "tgfx/gpu/TextureBuffer.h"
+#include "tgfx/gpu/YUVTexture.h"
 
 namespace pag {
 /**

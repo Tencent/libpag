@@ -20,11 +20,11 @@
 
 #include "GLBuffer.h"
 #include "GLContext.h"
-#include "core/BlendMode.h"
 #include "gpu/AAType.h"
 #include "gpu/FragmentProcessor.h"
 #include "gpu/GeometryProcessor.h"
-#include "gpu/opengl/GLRenderTarget.h"
+#include "tgfx/core/BlendMode.h"
+#include "tgfx/gpu/opengl/GLRenderTarget.h"
 
 namespace tgfx {
 struct DrawArgs {

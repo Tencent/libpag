@@ -20,11 +20,11 @@
 
 #include "base/utils/Log.h"
 #include "base/utils/TGFXCast.h"
-#include "gpu/Texture.h"
-#include "gpu/opengl/GLFunctions.h"
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "rendering/filters/Filter.h"
+#include "tgfx/gpu/Texture.h"
+#include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace pag {
 std::array<float, 9> ToGLVertexMatrix(const tgfx::Matrix& matrix, int width, int height,

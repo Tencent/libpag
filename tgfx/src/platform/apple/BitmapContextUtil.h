@@ -19,7 +19,7 @@
 #pragma once
 
 #include <CoreGraphics/CGBitmapContext.h>
-#include "core/ImageInfo.h"
+#include "tgfx/core/ImageInfo.h"
 
 namespace tgfx {
 CGContextRef CreateBitmapContext(const ImageInfo& info, void* pixels);

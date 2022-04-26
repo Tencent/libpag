@@ -23,8 +23,8 @@
 #include <string>
 #include <unordered_map>
 #include "codec/NALUType.h"
-#include "core/Data.h"
-#include "core/ImageInfo.h"
+#include "tgfx/core/Data.h"
+#include "tgfx/core/ImageInfo.h"
 
 namespace pag {
 struct VideoFormat;

@@ -21,9 +21,9 @@
 #include "base/utils/MatrixUtil.h"
 #include "base/utils/TGFXCast.h"
 #include "base/utils/UniqueID.h"
-#include "core/BlendMode.h"
-#include "gpu/Surface.h"
 #include "rendering/utils/SurfaceUtil.h"
+#include "tgfx/core/BlendMode.h"
+#include "tgfx/gpu/Surface.h"
 
 namespace pag {
 class BlendModifier : public Modifier {

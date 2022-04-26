@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "base/utils/TimeUtil.h"
-#include "core/Clock.h"
 #include "pag/file.h"
 #include "rendering/Drawable.h"
 #include "rendering/FileReporter.h"
@@ -26,6 +25,7 @@
 #include "rendering/utils/ApplyScaleMode.h"
 #include "rendering/utils/LockGuard.h"
 #include "rendering/utils/ScopedLock.h"
+#include "tgfx/core/Clock.h"
 
 namespace pag {
 PAGPlayer::PAGPlayer() {

@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Glyph.h"
-#include "core/UTF.h"
 #include "rendering/FontManager.h"
+#include "tgfx/core/UTF.h"
 
 namespace pag {
 Glyph::Glyph(tgfx::GlyphID glyphId, std::string name, tgfx::Font font, bool isVertical)

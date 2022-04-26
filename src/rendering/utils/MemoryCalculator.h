@@ -19,9 +19,9 @@
 #pragma once
 
 #include <unordered_set>
-#include "core/Point.h"
 #include "pag/file.h"
 #include "pag/pag.h"
+#include "tgfx/core/Point.h"
 
 namespace pag {
 class MemoryCalculator {

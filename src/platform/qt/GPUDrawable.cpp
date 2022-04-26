@@ -18,7 +18,7 @@
 
 #include "GPUDrawable.h"
 #include <QQuickWindow>
-#include "gpu/opengl/qt/QGLWindow.h"
+#include "tgfx/gpu/opengl/qt/QGLWindow.h"
 
 namespace pag {
 std::shared_ptr<GPUDrawable> GPUDrawable::MakeFrom(QQuickItem* quickItem,

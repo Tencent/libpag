@@ -18,13 +18,13 @@
 
 #include <vector>
 #include "base/utils/TimeUtil.h"
-#include "core/Mask.h"
 #include "core/vectors/freetype/FTMask.h"
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
-#include "gpu/Surface.h"
-#include "gpu/opengl/GLDevice.h"
 #include "nlohmann/json.hpp"
+#include "tgfx/core/Mask.h"
+#include "tgfx/gpu/Surface.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pag {
 using nlohmann::json;

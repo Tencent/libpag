@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "base/utils/Verify.h"
-#include "core/Path.h"
 #include "pag/file.h"
+#include "tgfx/core/Path.h"
 
 namespace pag {
 static void ConvertEllipseToPath(tgfx::Path* path, float centerX, float centerY, float radiusX,

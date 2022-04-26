@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/vectors/coregraphics/CGScalerContext.h"
-#include "core/PathEffect.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "platform/apple/BitmapContextUtil.h"
+#include "tgfx/core/PathEffect.h"
 
 namespace tgfx {
 inline float Interpolate(const float& a, const float& b, const float& t) {

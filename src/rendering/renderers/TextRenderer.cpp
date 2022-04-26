@@ -19,9 +19,9 @@
 #include "TextRenderer.h"
 #include "TextAnimatorRenderer.h"
 #include "base/utils/TGFXCast.h"
-#include "core/PathEffect.h"
 #include "rendering/graphics/Shape.h"
 #include "rendering/graphics/Text.h"
+#include "tgfx/core/PathEffect.h"
 
 namespace pag {
 

@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CGMask.h"
-#include "core/Bitmap.h"
-#include "core/Mask.h"
 #include "platform/apple/BitmapContextUtil.h"
+#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Mask.h"
 
 namespace tgfx {
 static void Iterator(PathVerb verb, const Point points[4], void* info) {

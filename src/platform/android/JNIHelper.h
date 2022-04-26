@@ -20,11 +20,11 @@
 
 #include <chrono>
 #include "base/utils/Log.h"
-#include "core/ImageInfo.h"
 #include "pag/pag.h"
 #include "platform/android/Global.h"
 #include "platform/android/JNIEnvironment.h"
 #include "platform/android/JStringUtil.h"
+#include "tgfx/core/ImageInfo.h"
 
 struct RectData {
   float x, y, width, height;

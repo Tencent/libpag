@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/TextBlob.h"
-#include "core/PathEffect.h"
+#include "tgfx/core/TextBlob.h"
+#include "tgfx/core/PathEffect.h"
 
 namespace tgfx {
 Rect TextBlob::getBounds(const Stroke* stroke) const {

@@ -18,18 +18,18 @@
 
 #pragma once
 
-#include "core/BlendMode.h"
-#include "core/Color.h"
-#include "core/ImageInfo.h"
-#include "core/ImageOrigin.h"
-#include "core/Matrix.h"
-#include "core/Stroke.h"
-#include "gpu/Backend.h"
-#include "gpu/opengl/GLFrameBuffer.h"
-#include "gpu/opengl/GLSampler.h"
-#include "gpu/opengl/GLSemaphore.h"
 #include "pag/file.h"
 #include "pag/gpu.h"
+#include "tgfx/core/BlendMode.h"
+#include "tgfx/core/Color.h"
+#include "tgfx/core/ImageInfo.h"
+#include "tgfx/core/ImageOrigin.h"
+#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Stroke.h"
+#include "tgfx/gpu/Backend.h"
+#include "tgfx/gpu/opengl/GLFrameBuffer.h"
+#include "tgfx/gpu/opengl/GLSampler.h"
+#include "tgfx/gpu/opengl/GLSemaphore.h"
 
 namespace pag {
 

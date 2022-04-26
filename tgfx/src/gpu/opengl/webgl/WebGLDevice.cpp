@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/opengl/webgl/WebGLDevice.h"
+#include "tgfx/gpu/opengl/webgl/WebGLDevice.h"
 #include "WebGLProcGetter.h"
 #include "core/utils/Log.h"
 

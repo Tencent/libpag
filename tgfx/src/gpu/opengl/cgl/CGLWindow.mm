@@ -16,11 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/opengl/cgl/CGLWindow.h"
+#include "tgfx/gpu/opengl/cgl/CGLWindow.h"
 #include <OpenGL/gl3.h>
 #include <thread>
 #include "CGLHardwareTexture.h"
-#include "gpu/opengl/GLRenderTarget.h"
+#include "tgfx/gpu/opengl/GLRenderTarget.h"
 
 namespace tgfx {
 static std::mutex threadCacheLocker = {};

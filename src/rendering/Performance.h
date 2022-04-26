@@ -19,8 +19,8 @@
 #pragma once
 
 #include "base/utils/Log.h"
-#include "core/Clock.h"
 #include "pag/types.h"
+#include "tgfx/core/Clock.h"
 
 namespace pag {
 class Performance {

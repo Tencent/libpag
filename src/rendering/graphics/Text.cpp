@@ -19,10 +19,10 @@
 #include "Text.h"
 #include <unordered_map>
 #include "base/utils/TGFXCast.h"
-#include "core/PathEffect.h"
-#include "gpu/Canvas.h"
 #include "pag/file.h"
 #include "rendering/caches/RenderCache.h"
+#include "tgfx/core/PathEffect.h"
+#include "tgfx/gpu/Canvas.h"
 
 namespace pag {
 static std::unique_ptr<tgfx::Paint> CreateFillPaint(const MutableGlyph* glyph) {

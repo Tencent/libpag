@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "core/Matrix.h"
-#include "gpu/Shader.h"
+#include "tgfx/core/Matrix.h"
+#include "tgfx/gpu/Shader.h"
 
 namespace tgfx {
 

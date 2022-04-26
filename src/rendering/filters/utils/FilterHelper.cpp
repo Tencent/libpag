@@ -18,9 +18,9 @@
 
 #include "FilterHelper.h"
 #include "base/utils/USE.h"
-#include "gpu/Surface.h"
-#include "gpu/opengl/GLRenderTarget.h"
-#include "gpu/opengl/GLTexture.h"
+#include "tgfx/gpu/Surface.h"
+#include "tgfx/gpu/opengl/GLRenderTarget.h"
+#include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace pag {
 static std::array<float, 9> ToGLMatrix(const tgfx::Matrix& matrix) {

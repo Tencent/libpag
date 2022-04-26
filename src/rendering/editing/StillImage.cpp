@@ -19,11 +19,11 @@
 #include "StillImage.h"
 #include "base/utils/TGFXCast.h"
 #include "base/utils/UniqueID.h"
-#include "gpu/opengl/GLDevice.h"
 #include "pag/pag.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/graphics/Graphic.h"
 #include "rendering/graphics/Picture.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pag {
 std::shared_ptr<PAGImage> PAGImage::FromPath(const std::string& filePath) {

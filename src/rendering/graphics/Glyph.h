@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "core/Font.h"
 #include "pag/types.h"
+#include "tgfx/core/Font.h"
 
 namespace pag {
 class Glyph {

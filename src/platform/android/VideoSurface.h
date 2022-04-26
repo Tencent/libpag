@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "gpu/opengl/GLTexture.h"
 #include "platform/android/Global.h"
+#include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace pag {
 class OESTexture : public tgfx::GLTexture {

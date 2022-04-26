@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/images/png/PngImage.h"
-#include "core/Bitmap.h"
-#include "core/Buffer.h"
 #include "png.h"
+#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Buffer.h"
 
 namespace tgfx {
 std::shared_ptr<Image> PngImage::MakeFrom(const std::string& filePath) {

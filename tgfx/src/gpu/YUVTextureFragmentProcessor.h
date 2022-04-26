@@ -19,8 +19,8 @@
 #pragma once
 
 #include "FragmentProcessor.h"
-#include "core/RGBAAALayout.h"
-#include "gpu/YUVTexture.h"
+#include "tgfx/core/RGBAAALayout.h"
+#include "tgfx/gpu/YUVTexture.h"
 
 namespace tgfx {
 class YUVTextureFragmentProcessor : public FragmentProcessor {

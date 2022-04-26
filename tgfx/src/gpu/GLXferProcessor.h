@@ -20,9 +20,9 @@
 
 #include "gpu/FragmentShaderBuilder.h"
 #include "gpu/ProgramDataManager.h"
-#include "gpu/Texture.h"
 #include "gpu/UniformHandler.h"
 #include "gpu/XferProcessor.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 class GLXferProcessor {

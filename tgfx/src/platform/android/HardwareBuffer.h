@@ -20,7 +20,7 @@
 
 #include <android/hardware_buffer.h>
 #include "HardwareBufferInterface.h"
-#include "core/PixelBuffer.h"
+#include "tgfx/core/PixelBuffer.h"
 
 namespace tgfx {
 class HardwareBuffer : public PixelBuffer {

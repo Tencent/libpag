@@ -19,7 +19,7 @@
 #pragma once
 
 #include "FTUtil.h"
-#include "core/Path.h"
+#include "tgfx/core/Path.h"
 #include FT_STROKER_H
 
 namespace tgfx {

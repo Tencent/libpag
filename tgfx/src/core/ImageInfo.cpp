@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/ImageInfo.h"
+#include "tgfx/core/ImageInfo.h"
 
 namespace tgfx {
 static constexpr int MaxDimension = INT32_MAX >> 2;

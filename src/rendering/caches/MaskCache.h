@@ -19,7 +19,7 @@
 #pragma once
 
 #include "FrameCache.h"
-#include "core/Path.h"
+#include "tgfx/core/Path.h"
 
 namespace pag {
 class MaskCache : public FrameCache<tgfx::Path> {

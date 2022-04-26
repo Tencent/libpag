@@ -16,14 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/Image.h"
-#include "core/Bitmap.h"
-#include "core/Buffer.h"
-#include "core/ImageInfo.h"
-#include "core/PixelBuffer.h"
-#include "core/Stream.h"
+#include "tgfx/core/Image.h"
 #include "core/utils/USE.h"
 #include "platform/NativeCodec.h"
+#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Buffer.h"
+#include "tgfx/core/ImageInfo.h"
+#include "tgfx/core/PixelBuffer.h"
+#include "tgfx/core/Stream.h"
 
 #if defined(TGFX_USE_WEBP_DECODE) || defined(TGFX_USE_WEBP_ENCODE)
 #include "core/images/webp/WebpImage.h"

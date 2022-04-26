@@ -16,10 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/opengl/egl/EGLWindow.h"
+#include "tgfx/gpu/opengl/egl/EGLWindow.h"
 #include <EGL/eglext.h>
 #include <GLES3/gl3.h>
-#include "gpu/opengl/GLRenderTarget.h"
+#include "tgfx/gpu/opengl/GLRenderTarget.h"
 
 namespace tgfx {
 std::shared_ptr<EGLWindow> EGLWindow::Current() {

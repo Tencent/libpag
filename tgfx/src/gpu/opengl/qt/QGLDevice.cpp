@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/opengl/qt/QGLDevice.h"
+#include "tgfx/gpu/opengl/qt/QGLDevice.h"
 #include <QApplication>
 #include <QThread>
 #include "QGLProcGetter.h"

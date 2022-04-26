@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/Texture.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace pag {
 class RenderCache;
