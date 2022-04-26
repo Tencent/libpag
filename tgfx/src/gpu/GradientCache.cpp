@@ -47,7 +47,7 @@ void GradientCache::add(const BytesKey& bytesKey, std::shared_ptr<Texture> textu
 
 std::shared_ptr<PixelBuffer> CreateGradient(const Color* colors, const float* positions, int count,
                                             int resolution) {
-  auto pixelBuffer = PixelBuffer::Make(resolution, 1);
+  auto pixelBuffer = PixelBuffer::Make(resolution, 1, false, false);
   Bitmap bitmap(pixelBuffer);
   if (bitmap.isEmpty()) {
     return nullptr;
