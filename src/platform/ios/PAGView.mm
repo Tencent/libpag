@@ -415,6 +415,7 @@ void DestoryFlushQueue() {
     [valueAnimator setCurrentPlayTime:(int64_t)(value * valueAnimator.duration)];
   }
   [valueAnimator setRepeatedTimes:0];
+  [self updateView];
 }
 
 - (BOOL)flush {

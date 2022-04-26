@@ -744,6 +744,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         value = Math.max(0, Math.min(value, 1));
         currentPlayTime = (long) (value * animator.getDuration());
         animator.setCurrentPlayTime(currentPlayTime);
+        onAnimationUpdate(value);
     }
 
     /**
