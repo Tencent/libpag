@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## 0.1.8
+
+### Feature
+
+- 支持从 `offscreenCanvas` 创建 `PAGView`
+- `PAGSurface` 上增加 `readPixels` 接口
+
+### BugFixes
+
+- 修复缓存没有生效的问题
+
 ## 0.1.7
 
 ### Feature

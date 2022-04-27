@@ -1,5 +1,16 @@
 # CHANGELOG
 
+## 0.1.8
+
+### Feature
+
+- Support init `PAGView` from `offscreenCanvas`. 
+- Add `readPixels` function on `PAGSurface`.
+
+### BugFixes
+
+- Fix render cache validate fail.
+
 ## 0.1.7
 
 ### Feature
