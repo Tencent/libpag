@@ -19,17 +19,29 @@
 #include "NativeImage.h"
 #include "NativeTextureBuffer.h"
 #include "platform/NativeCodec.h"
+#include "tgfx/core/Buffer.h"
+#include "tgfx/core/Stream.h"
 
 using namespace emscripten;
 
 namespace tgfx {
 std::shared_ptr<Image> NativeCodec::MakeImage(const std::string& filePath) {
-  auto nativeImageClass = val::module_property("NativeImage");
-  if (!nativeImageClass.as<bool>()) {
+  if (filePath.find("http://") == 0 || filePath.find("https://") == 0) {
+    auto nativeImageClass = val::module_property("NativeImage");
+    if (!nativeImageClass.as<bool>()) {
+      return nullptr;
+    }
+    auto nativeImage = nativeImageClass.call<val>("createFromPath", filePath).await();
+    return NativeImage::MakeFrom(nativeImage);
+  }
+  auto imageStream = Stream::MakeFromFile(filePath);
+  if (imageStream == nullptr || imageStream->size() <= 14) {
     return nullptr;
   }
-  auto nativeImage = nativeImageClass.call<val>("createFromPath", filePath).await();
-  return NativeImage::MakeFrom(nativeImage);
+  Buffer imageBuffer(imageStream->size());
+  imageStream->read(imageBuffer.data(), imageStream->size());
+  auto imageData = imageBuffer.release();
+  return NativeCodec::MakeImage(imageData);
 }
 
 std::shared_ptr<Image> NativeCodec::MakeImage(std::shared_ptr<Data> imageBytes) {
