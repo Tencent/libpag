@@ -8,8 +8,18 @@ import { Log } from './utils/log';
 import { ErrorCode } from './utils/error-map';
 
 export interface PAGViewOptions {
+  /**
+   * Use style to scale canvas. default false.
+   * When target canvas is offscreen canvas, useScale is false.
+   */
   useScale?: boolean;
+  /**
+   * Can choose Canvas2D mode in chrome. default false.
+   */
   useCanvas2D?: boolean;
+  /**
+   * Render first frame when pag view init. default true.
+   */
   firstFrame?: boolean;
 }
 
@@ -19,16 +29,22 @@ export class PAGView {
 
   /**
    * Create pag view.
+   * @param file pag file.
+   * @param canvas target render canvas.
+   * @param initOptions pag view options
+   * @returns
    */
   public static async init(
     file: PAGFile,
-    canvas: string | HTMLCanvasElement,
+    canvas: string | HTMLCanvasElement | OffscreenCanvas,
     initOptions: PAGViewOptions = {},
   ): Promise<PAGView | undefined> {
-    let canvasElement: HTMLCanvasElement | null = null;
+    let canvasElement: HTMLCanvasElement | OffscreenCanvas | null = null;
     if (typeof canvas === 'string') {
       canvasElement = document.getElementById(canvas.substr(1)) as HTMLCanvasElement;
     } else if (canvas instanceof HTMLCanvasElement) {
+      canvasElement = canvas;
+    } else if (canvas instanceof OffscreenCanvas) {
       canvasElement = canvas;
     }
     if (!canvasElement) {
@@ -92,7 +108,7 @@ export class PAGView {
   private repeatedTimes = 0;
   private eventManager: EventManager = new EventManager();
   private contextID = 0;
-  private canvasElement: HTMLCanvasElement | null;
+  private canvasElement: HTMLCanvasElement | OffscreenCanvas | null;
   private canvasContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null | undefined;
   private rawWidth = 0;
   private rawHeight = 0;
@@ -104,7 +120,7 @@ export class PAGView {
     firstFrame: true,
   };
 
-  public constructor(pagPlayer: PAGPlayer, canvasElement: HTMLCanvasElement) {
+  public constructor(pagPlayer: PAGPlayer, canvasElement: HTMLCanvasElement | OffscreenCanvas) {
     this.player = pagPlayer;
     this.canvasElement = canvasElement;
   }
@@ -378,7 +394,7 @@ export class PAGView {
       return;
     }
 
-    if (!useScale) {
+    if (!useScale || this.canvasElement instanceof OffscreenCanvas) {
       this.rawWidth = this.canvasElement.width;
       this.rawHeight = this.canvasElement.height;
       return;
