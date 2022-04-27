@@ -369,8 +369,12 @@ EMSCRIPTEN_BINDINGS(pag) {
       .property("applyStroke", &TextDocument::applyStroke)
       .property("baselineShift", &TextDocument::baselineShift)
       .property("boxText", &TextDocument::boxText)
-      .property("boxTextPos", &TextDocument::boxTextPos)
-      .property("boxTextSize", &TextDocument::boxTextSize)
+      .property("boxTextPos", optional_override([](const TextDocument& textDocument) {
+                  return ToTGFX(textDocument.boxTextPos);
+                }))
+      .property("boxTextSize", optional_override([](const TextDocument& textDocument) {
+                  return ToTGFX(textDocument.boxTextSize);
+                }))
       .property("firstBaseLine", &TextDocument::firstBaseLine)
       .property("fauxBold", &TextDocument::fauxBold)
       .property("fauxItalic", &TextDocument::fauxItalic)
