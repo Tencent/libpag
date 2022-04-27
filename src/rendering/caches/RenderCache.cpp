@@ -367,7 +367,7 @@ void RenderCache::clearExpiredSnapshots() {
     auto& snapshot = *snapshotIter;
     // 只有 Snapshot 数量可能会比较多，使用 LRU
     // 来避免遍历完整的列表，遇到第一个用过的就可以取消遍历。
-    if (usedAssets.count((snapshot->assetID) > 0)) {
+    if (usedAssets.count(snapshot->assetID) > 0) {
       break;
     }
     snapshot->idleFrames++;
