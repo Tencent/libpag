@@ -11,20 +11,34 @@ export interface TimeRange {
 }
 
 const playVideoElement = (videoElement: HTMLVideoElement) => {
-  if (IS_WECHAT && window.WeixinJSBridge) {
-    window.WeixinJSBridge.invoke(
-      'getNetworkType',
-      {},
-      () => {
-        videoElement.play();
-      },
-      () => {
-        videoElement.play();
-      },
-    );
-  } else {
-    videoElement.play();
-  }
+  return new Promise((resolve) => {
+    const play = () => {
+      videoElement
+        .play()
+        .then(() => {
+          resolve(true);
+        })
+        .catch((event: DOMException) => {
+          Log.error(event.message);
+          resolve(false);
+        });
+    };
+
+    if (IS_WECHAT && window.WeixinJSBridge) {
+      window.WeixinJSBridge.invoke(
+        'getNetworkType',
+        {},
+        () => {
+          play();
+        },
+        () => {
+          play();
+        },
+      );
+    } else {
+      play();
+    }
+  });
 };
 
 export class VideoReader {
@@ -60,24 +74,17 @@ export class VideoReader {
             resolve(true);
           } else {
             // Wait for initialization to complete
-            const canplayCallback = () => {
-              if (this.videoEl === null) {
-                Log.errorByCode(ErrorCode.VideoElementNull);
-              } else {
-                window.requestAnimationFrame(() => {
-                  if (this.videoEl === null) {
-                    Log.errorByCode(ErrorCode.VideoElementNull);
-                  } else {
-                    this.videoEl.pause();
-                    this.hadPlay = true;
-                    resolve(true);
-                  }
-                });
-                removeListener(this.videoEl, 'playing', canplayCallback);
-              }
-            };
-            addListener(this.videoEl, 'playing', canplayCallback);
-            playVideoElement(this.videoEl);
+            playVideoElement(this.videoEl).then(() => {
+              window.requestAnimationFrame(() => {
+                if (this.videoEl === null) {
+                  Log.errorByCode(ErrorCode.VideoElementNull);
+                } else {
+                  this.videoEl.pause();
+                  this.hadPlay = true;
+                  resolve(true);
+                }
+              });
+            });
           }
         } else {
           if (Math.round(targetTime * this.frameRate) === Math.round(currentTime * this.frameRate)) {
@@ -128,11 +135,11 @@ export class VideoReader {
 
   private seek(resolve: (value: unknown) => void, targetTime: number, play = true) {
     let isCallback = false;
-    const timeupdateCallback = () => {
+    const canplayCallback = () => {
       if (this.videoEl === null) {
         Log.errorByCode(ErrorCode.VideoElementNull);
       } else {
-        removeListener(this.videoEl, 'timeupdate', timeupdateCallback);
+        removeListener(this.videoEl, 'canplay', canplayCallback);
         if (play && this.videoEl.paused) {
           playVideoElement(this.videoEl);
         } else if (!play && !this.videoEl.paused) {
@@ -147,7 +154,7 @@ export class VideoReader {
       Log.errorByCode(ErrorCode.VideoElementNull);
       return;
     }
-    addListener(this.videoEl, 'timeupdate', timeupdateCallback);
+    addListener(this.videoEl, 'canplay', canplayCallback);
     this.videoEl!.currentTime = targetTime;
     // Timeout
     setTimeout(() => {
@@ -156,7 +163,7 @@ export class VideoReader {
           resolve(false);
           Log.errorByCode(ErrorCode.VideoElementNull);
         } else {
-          removeListener(this.videoEl, 'timeupdate', timeupdateCallback);
+          removeListener(this.videoEl, 'canplay', canplayCallback);
           resolve(true);
         }
       }
