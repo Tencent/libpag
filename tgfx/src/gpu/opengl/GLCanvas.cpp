@@ -353,6 +353,9 @@ void GLCanvas::drawAtlas(const Texture* atlas, const Matrix matrix[], const Rect
     }
     setMatrix(totalMatrix);
   }
+  if (rects.empty()) {
+    return;
+  }
   std::unique_ptr<FragmentProcessor> colorFP;
   std::unique_ptr<FragmentProcessor> maskFP;
   if (colors) {
