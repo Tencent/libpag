@@ -671,4 +671,33 @@ PAG_TEST_F(PAGFileBaseTest, SetStartTime) {
   TestPAGPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGFileBaseTest/SetStartTime"));
 }
+
+PAG_TEST_F(PAGFileBaseTest, EditableLayer) {
+  auto pagFile = PAGFile::Load("../resources/apitest/texture_bottom_left.pag");
+  auto editableImageLayers = pagFile->getEditableLayers(LayerType::Image);
+  ASSERT_EQ(editableImageLayers.size(), 6lu);
+  for (size_t i = 0; i < editableImageLayers.size(); i++) {
+    ASSERT_EQ(editableImageLayers[i]->editableIndex(), static_cast<int>(i));
+  }
+  pagFile = PAGFile::Load("../resources/apitest/editImageLayers.pag");
+  editableImageLayers = pagFile->getEditableLayers(LayerType::Image);
+  ASSERT_EQ(editableImageLayers.size(), 3lu);
+  ASSERT_EQ(editableImageLayers[0]->editableIndex(), 3);
+  ASSERT_EQ(editableImageLayers[1]->editableIndex(), 2);
+  ASSERT_EQ(editableImageLayers[2]->editableIndex(), 4);
+
+  pagFile = PAGFile::Load("../resources/apitest/test.pag");
+  auto editableTextLayers = pagFile->getEditableLayers(LayerType::Text);
+  ASSERT_EQ(editableTextLayers.size(), 2lu);
+  for (size_t i = 0; i < editableTextLayers.size(); i++) {
+    ASSERT_EQ(editableTextLayers[i]->editableIndex(), static_cast<int>(i));
+  }
+
+  pagFile = PAGFile::Load("../resources/apitest/editableTextLayer.pag");
+  editableTextLayers = pagFile->getEditableLayers(LayerType::Text);
+  ASSERT_EQ(editableTextLayers.size(), 2lu);
+  ASSERT_EQ(editableTextLayers[0]->editableIndex(), static_cast<int>(1));
+  ASSERT_EQ(editableTextLayers[1]->editableIndex(), static_cast<int>(0));
+}
+
 }  // namespace pag

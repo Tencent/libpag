@@ -43,6 +43,8 @@ class CodecContext : public StreamContext {
   std::unordered_map<int, FontDescriptor*> fontIDMap;
   std::vector<Composition*> compositions;
   std::vector<ImageBytes*> images;
+  std::vector<ImageLayer*> editableImageLayers;
+  std::vector<TextLayer*> editableTextLayers;
   int timeStretchMode = PAGTimeStretchMode::Repeat;
   TimeRange* scaledTimeRange = nullptr;
   FileAttributes fileAttributes = {};

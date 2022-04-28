@@ -1058,6 +1058,11 @@ class PAG_API PAGFile : public PAGComposition {
                                                                   LayerType layerType);
 
   /**
+   * Return an array of editable layers by layer type.
+   */
+  std::vector<std::shared_ptr<PAGLayer>> getEditableLayers(LayerType layerType);
+
+  /**
    * Indicate how to stretch the original duration to fit target duration when file's duration is
    * changed. The default value is PAGTimeStretchMode::Repeat.
    */

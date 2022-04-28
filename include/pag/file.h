@@ -134,7 +134,8 @@ enum class TagCode {
 
   // add new tags here...
 
-  Count
+  Count = 83,
+  EditableLayer = 84
 };
 
 struct Ratio {
@@ -2218,6 +2219,8 @@ class PAG_API File {
   std::string path = "";
   std::vector<pag::ImageBytes*> images;
   std::vector<Composition*> compositions;
+  std::vector<pag::ImageLayer*> editableImageLayers;
+  std::vector<pag::TextLayer*> editableTextLayers;
 
  private:
   PreComposeLayer* rootLayer = nullptr;
@@ -2295,5 +2298,8 @@ class PAG_API Codec {
    */
   static std::shared_ptr<PerformanceData> ReadPerformanceData(const void* bytes,
                                                               uint32_t byteLength);
+
+ private:
+  static std::shared_ptr<File>& UpdateEditableLayers(std::shared_ptr<File>& file);
 };
 }  // namespace pag
