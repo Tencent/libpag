@@ -228,6 +228,11 @@ std::shared_ptr<File> Codec::Decode(const void* bytes, uint32_t byteLength,
   file->timeStretchMode = context.timeStretchMode;
   file->fileAttributes = context.fileAttributes;
   file->path = filePath;
+
+  file->editableImageLayers = context.editableImageLayers;
+  file->editableTextLayers = context.editableTextLayers;
+
+  file = UpdateEditableLayers(file);
   return file;
 }
 
@@ -278,5 +283,38 @@ std::shared_ptr<PerformanceData> Codec::ReadPerformanceData(const void* bytes,
     }
   }
   return nullptr;
+}
+
+std::shared_ptr<File>& Codec::UpdateEditableLayers(std::shared_ptr<File>& file) {
+  if (file->_tagLevel < static_cast<int16_t>(TagCode::EditableLayer)) {
+    for (auto imageLayers : file->imageLayers) {
+      file->editableImageLayers.emplace_back(imageLayers.front());
+    }
+    file->editableTextLayers = file->textLayers;
+    return file;
+  }
+
+  for (auto& textLayer : file->editableTextLayers) {
+    auto iter = std::find_if(file->textLayers.begin(), file->textLayers.end(),
+                             [=](TextLayer* layer) -> bool { return textLayer->id == layer->id; });
+    if (iter != file->textLayers.end()) {
+      delete textLayer;
+      textLayer = *iter;
+    }
+  }
+
+  for (auto& imageLayer : file->editableImageLayers) {
+    for (auto imageLayers : file->imageLayers) {
+      auto iter =
+          std::find_if(imageLayers.begin(), imageLayers.end(),
+                       [=](ImageLayer* layer) -> bool { return imageLayer->id == layer->id; });
+      if (iter != imageLayers.end()) {
+        delete imageLayer;
+        imageLayer = *iter;
+        break;
+      }
+    }
+  }
+  return file;
 }
 }  // namespace pag

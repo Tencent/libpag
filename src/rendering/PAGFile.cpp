@@ -206,6 +206,28 @@ bool PAGFile::isPAGFile() const {
   return true;
 }
 
+std::vector<std::shared_ptr<PAGLayer>> PAGFile::getEditableLayers(LayerType layerType) {
+  if (layerType == LayerType::Solid) {
+    return getLayersBy(
+        [=](PAGLayer* pagLayer) -> bool { return layerType == pagLayer->layerType(); });
+  }
+
+  std::vector<std::shared_ptr<PAGLayer>> result;
+  std::vector<pag::Layer*> editableLayers;
+  if (layerType == LayerType::Image) {
+    editableLayers.assign(file->editableImageLayers.begin(), file->editableImageLayers.end());
+  } else if (layerType == LayerType::Text) {
+    editableLayers.assign(file->editableTextLayers.begin(), file->editableTextLayers.end());
+  }
+  for (auto& layer : editableLayers) {
+    auto layers = getLayersBy([=](PAGLayer* pagLayer) -> bool { return layer == pagLayer->layer; });
+    if (!layers.empty()) {
+      result.insert(result.end(), layers.begin(), layers.end());
+    }
+  }
+  return result;
+}
+
 Frame PAGFile::stretchedFrameDuration() const {
   return _stretchedFrameDuration;
 }
