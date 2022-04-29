@@ -27,7 +27,7 @@
 namespace tgfx {
 class WebTypeface : public Typeface {
  public:
-  static std::shared_ptr<WebTypeface> Make(const std::string& name);
+  static std::shared_ptr<WebTypeface> Make(const std::string& name, const std::string& style = "");
 
   ~WebTypeface() override;
 
@@ -40,7 +40,7 @@ class WebTypeface : public Typeface {
   }
 
   std::string fontStyle() const override {
-    return "";
+    return style;
   }
 
   int glyphsCount() const override {
@@ -74,12 +74,14 @@ class WebTypeface : public Typeface {
                                                bool fauxItalic, Matrix* matrix) const override;
 
  private:
-  explicit WebTypeface(std::string name);
+  explicit WebTypeface(std::string name, std::string style);
 
   uint32_t _uniqueID;
   std::unordered_map<float, FontMetrics>* fontMetricsMap =
       new std::unordered_map<float, FontMetrics>;
   emscripten::val scalerContextClass = emscripten::val::null();
   std::string name;
+  std::string style;
+  std::string webFontFamily;
 };
 }  // namespace tgfx

@@ -1,6 +1,6 @@
 {
   "name": "libpag",
-  "version": "0.1.8",
+  "version": "4.0.5-release.6",
   "description": "Portable Animated Graphics",
   "main": "lib/libpag.cjs.js",
   "module": "lib/libpag.esm.js",
