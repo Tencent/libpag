@@ -49,3 +49,4 @@ jobs:
           cd build
           cmake ../
           make -j8
+          time ./pag-linux
