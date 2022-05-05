@@ -215,9 +215,21 @@ std::vector<std::shared_ptr<PAGLayer>> PAGFile::getEditableLayers(LayerType laye
   std::vector<std::shared_ptr<PAGLayer>> result;
   std::vector<pag::Layer*> editableLayers;
   if (layerType == LayerType::Image) {
-    editableLayers.assign(file->editableImageLayers.begin(), file->editableImageLayers.end());
+    if (file->editableImageLayers != nullptr) {
+      editableLayers.assign(file->editableImageLayers->begin(), file->editableImageLayers->end());
+    } else {
+      for (int i = 0; i < file->numImages(); i++) {
+        editableLayers.emplace_back(file->getImageAt(i).front());
+      }
+    }
   } else if (layerType == LayerType::Text) {
-    editableLayers.assign(file->editableTextLayers.begin(), file->editableTextLayers.end());
+    if (file->editableTextLayers != nullptr) {
+      editableLayers.assign(file->editableTextLayers->begin(), file->editableTextLayers->end());
+    } else {
+      for (int i = 0; i < file->numTexts(); i++) {
+        editableLayers.emplace_back(file->getTextAt(i));
+      }
+    }
   }
   for (auto& layer : editableLayers) {
     auto layers = getLayersBy([=](PAGLayer* pagLayer) -> bool { return layer == pagLayer->layer; });

@@ -109,6 +109,8 @@ File::~File() {
     delete imageBytes;
   }
   delete rootLayer;
+  delete editableImageLayers;
+  delete editableTextLayers;
 }
 
 void File::updateEditables(Composition* composition) {

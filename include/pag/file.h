@@ -131,11 +131,10 @@ enum class TagCode {
 
   RadialBlurEffect = 81,
   MosaicEffect = 82,
-
+  EditableLayer = 83,
   // add new tags here...
 
-  Count = 83,
-  EditableLayer = 84
+  Count
 };
 
 struct Ratio {
@@ -2217,10 +2216,13 @@ class PAG_API File {
   TimeRange scaledTimeRange = {};
   FileAttributes fileAttributes = {};
   std::string path = "";
-  std::vector<pag::ImageBytes*> images;
+  std::vector<ImageBytes*> images;
   std::vector<Composition*> compositions;
-  std::vector<pag::ImageLayer*> editableImageLayers;
-  std::vector<pag::TextLayer*> editableTextLayers;
+
+  // Layers are references, no need to delete them.
+  std::vector<ImageLayer*>* editableImageLayers = nullptr;
+  // Layers are references, no need to delete them.
+  std::vector<TextLayer*>* editableTextLayers = nullptr;
 
  private:
   PreComposeLayer* rootLayer = nullptr;
