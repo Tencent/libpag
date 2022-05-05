@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## 4.0.5.6
+
+### Feature
+
+- Add font style render in WebMask.
+
+## 4.0.5.5
+
+### Feature
+
+- Publish PAG Web SDK release version🎉
+- Jump 4.0.5.5 to sync with libpag version
+
+### Bug Fixes
+
+- Fix video ready state assess error.
+
 ## 0.1.8
 
 ### Feature

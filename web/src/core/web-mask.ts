@@ -1,6 +1,14 @@
 import { ctor, EmscriptenGL, Matrix, PAG, Point, Vector } from '../types';
 import { ScalerContext } from './scaler-context';
 
+interface WebFont {
+  name: string;
+  style: string;
+  size: number;
+  bold: boolean;
+  italic: boolean;
+}
+
 export class WebMask {
   public static module: PAG;
 
@@ -48,16 +56,8 @@ export class WebMask {
     }
   }
 
-  public fillText(
-    size: number,
-    fauxBold: boolean,
-    fauxItalic: boolean,
-    fontName: string,
-    texts: Vector<string>,
-    positions: Vector<Point>,
-    matrix: Matrix,
-  ) {
-    const scalerContext = new ScalerContext(fontName, size, fauxBold, fauxItalic);
+  public fillText(webFont: WebFont, texts: Vector<string>, positions: Vector<Point>, matrix: Matrix) {
+    const scalerContext = new ScalerContext(webFont.name, webFont.style, webFont.size, webFont.bold, webFont.italic);
     const context = this.canvas.getContext('2d') as CanvasRenderingContext2D;
     context.setTransform(matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx, matrix.ty);
     context.font = scalerContext.fontString();
@@ -68,10 +68,7 @@ export class WebMask {
   }
 
   public strokeText(
-    size: number,
-    fauxBold: boolean,
-    fauxItalic: boolean,
-    fontName: string,
+    webFont: WebFont,
     stroke: { width: number; cap: ctor; join: ctor; miterLimit: number },
     texts: Vector<string>,
     positions: Vector<Point>,
@@ -80,7 +77,7 @@ export class WebMask {
     if (stroke.width < 0.5) {
       return;
     }
-    const scalerContext = new ScalerContext(fontName, size, fauxBold, fauxItalic);
+    const scalerContext = new ScalerContext(webFont.name, webFont.style, webFont.size, webFont.bold, webFont.italic);
     const context = this.canvas.getContext('2d') as CanvasRenderingContext2D;
     context.setTransform(matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx, matrix.ty);
     context.font = scalerContext.fontString();

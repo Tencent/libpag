@@ -1,6 +1,6 @@
 import { NativeImage } from './native-image';
 import { measureText } from '../utils/measure-text';
-import { defaultFontNames } from '../utils/font-family';
+import { defaultFontNames, getFontFamilys } from '../utils/font-family';
 import { Rect } from '../types';
 
 const canvas = ((): HTMLCanvasElement | OffscreenCanvas => {
@@ -39,30 +39,36 @@ export class ScalerContext {
   }
 
   private readonly fontName: string;
+  private readonly fontStyle: string;
   private readonly size: number;
   private readonly fauxBold: boolean;
   private readonly fauxItalic: boolean;
 
   private fontBoundingBoxMap: { key: string; value: Rect }[] = [];
 
-  public constructor(fontName: string, size: number, fauxBold = false, fauxItalic = false) {
+  public constructor(fontName: string, fontStyle: string, size: number, fauxBold = false, fauxItalic = false) {
     this.fontName = fontName;
+    this.fontStyle = fontStyle;
     this.size = size;
     this.fauxBold = fauxBold;
     this.fauxItalic = fauxItalic;
   }
 
   public fontString() {
-    const fallbackFontNames = defaultFontNames.concat();
-    fallbackFontNames.unshift(`"${this.fontName}"`);
     const attributes = [];
-    if (this.fauxBold) {
-      attributes.push('bold');
-    }
+    // css font-style
     if (this.fauxItalic) {
       attributes.push('italic');
     }
+    // css font-weight
+    if (this.fauxBold) {
+      attributes.push('bold');
+    }
+    // css font-size
     attributes.push(`${this.size}px`);
+    // css font-family
+    const fallbackFontNames = defaultFontNames.concat();
+    fallbackFontNames.unshift(...getFontFamilys(this.fontName, this.fontStyle));
     attributes.push(`${fallbackFontNames.join(',')}`);
     return attributes.join(' ');
   }

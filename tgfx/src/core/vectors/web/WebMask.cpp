@@ -103,12 +103,17 @@ bool WebMask::drawText(const TextBlob* textBlob, const Stroke* stroke) {
   const auto* webTextBlob = static_cast<const WebTextBlob*>(textBlob);
   webTextBlob->getTextsAndPositions(&texts, &points);
   const auto& font = webTextBlob->getFont();
+  const auto* typeFace = static_cast<WebTypeface*>(font.getTypeface().get());
+  auto webFont = val::object();
+  webFont.set("name", typeFace->fontFamily());
+  webFont.set("style", typeFace->fontStyle());
+  webFont.set("size", font.getSize());
+  webFont.set("bold", font.isFauxBold());
+  webFont.set("italic", font.isFauxItalic());
   if (stroke) {
-    webMask.call<void>("strokeText", font.getSize(), font.isFauxBold(), font.isFauxItalic(),
-                       font.getTypeface()->fontFamily(), *stroke, texts, points, matrix);
+    webMask.call<void>("strokeText", webFont, *stroke, texts, points, matrix);
   } else {
-    webMask.call<void>("fillText", font.getSize(), font.isFauxBold(), font.isFauxItalic(),
-                       font.getTypeface()->fontFamily(), texts, points, matrix);
+    webMask.call<void>("fillText", webFont, texts, points, matrix);
   }
   return true;
 }
