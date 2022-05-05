@@ -1,48 +1,26 @@
-import { IPHONE, MACOS } from './ua';
-
-const windows = [
-  'Microsoft YaHei',
-  'Microsoft JhengHei',
-  'Hiragino Sans GB',
-  'SimSun',
-  'FangSong',
-  'KaiTi',
-  'NSimSun',
-  'SimHei',
-  'DengXian',
-  'Adobe Song Std',
-  'Adobe Fangsong Std',
-  'Adobe Heiti Std',
-  'Adobe Kaiti Std',
-  'Times New Roman',
-  'Comic Sans MS',
-  'Courier New',
-  'Calibri',
-  'Impact',
-  'Microsoft Sans Serif',
-  'Symbol',
-  'Tahoma',
-  'Trebuchet MS',
-  'Verdana',
-];
-const cocoa = [
-  'PingFang SC',
-  'Apple SD Gothic Neo',
-  'Helvetica',
-  'Myanmar Sangam MN',
-  'Thonburi',
-  'Mishafi',
-  'Menlo',
-  'Kailasa',
-  'Kefa',
-  'Kohinoor Telugu',
-  'Hiragino Maru Gothic ProN',
-];
+const fontNames = ['Arial', 'Courier New', 'Georgia', 'Times New Roman', 'Trebuchet MS', 'Verdana'];
 
 export const defaultFontNames = (() => {
-  if (MACOS || IPHONE) {
-    return ['emoji'].concat(...cocoa);
-  } else {
-    return ['emoji'].concat(...windows);
-  }
+  return ['emoji'].concat(...fontNames);
 })();
+
+export const getFontFamilys = (name: string, style = ''): string[] => {
+  if (!name) return [];
+  const nameChars = name.split(' ');
+  let names = [];
+  if (nameChars.length === 1) {
+    names.push(name);
+  } else {
+    names.push(nameChars.join(''));
+    names.push(nameChars.join(' '));
+  }
+  return names.reduce((pre: string[], cur: string) => {
+    if (!style) {
+      pre.push(`${cur}`);
+    } else {
+      pre.push(`${cur} ${style}`);
+      pre.push(`${cur}-${style}`);
+    }
+    return pre;
+  }, []);
+};
