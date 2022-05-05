@@ -172,7 +172,7 @@ void WriteTagsOfFile(EncodeStream* stream, const File* file, PerformanceData* pe
   if (!file->images.empty()) {
     WriteImages(stream, &(file->images));
   }
-  if (!file->editableImageLayers.empty()) {
+  if (file->editableImageLayers != nullptr || file->editableTextLayers != nullptr) {
     WriteTag(stream, file, WriteEditableLayer);
   }
   auto func = std::bind(WriteComposition, stream, std::placeholders::_1);

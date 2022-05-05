@@ -22,27 +22,38 @@ namespace pag {
 void ReadEditableLayer(DecodeStream* stream) {
   auto context = static_cast<CodecContext*>(stream->context);
   auto count = stream->readEncodedUint32();
+  context->editableImageLayers = new std::vector<ImageLayer*>(count);
   for (uint32_t i = 0; i < count; i++) {
     auto imageLayer = new ImageLayer();
     imageLayer->id = stream->readEncodedUint32();
-    context->editableImageLayers.push_back(imageLayer);
+    context->editableImageLayers->at(i) = imageLayer;
   }
   count = stream->readEncodedUint32();
+  context->editableTextLayers = new std::vector<TextLayer*>(count);
   for (uint32_t i = 0; i < count; i++) {
     auto textLayer = new TextLayer();
     textLayer->id = stream->readEncodedUint32();
-    context->editableTextLayers.push_back(textLayer);
+    context->editableTextLayers->at(i) = textLayer;
   }
 }
 
 TagCode WriteEditableLayer(EncodeStream* stream, const File* file) {
-  stream->writeEncodedUint32(static_cast<uint32_t>(file->editableImageLayers.size()));
-  for (auto& layer : file->editableImageLayers) {
-    stream->writeEncodedUint32(layer->id);
+  if (file->editableImageLayers != nullptr) {
+    stream->writeEncodedUint32(static_cast<uint32_t>(file->editableImageLayers->size()));
+    for (auto& layer : *file->editableImageLayers) {
+      stream->writeEncodedUint32(layer->id);
+    }
+  } else {
+    stream->writeEncodedUint32(0);
   }
-  stream->writeEncodedUint32(static_cast<uint32_t>(file->editableTextLayers.size()));
-  for (auto& layer : file->editableTextLayers) {
-    stream->writeEncodedUint32(layer->id);
+
+  if (file->editableTextLayers != nullptr) {
+    stream->writeEncodedUint32(static_cast<uint32_t>(file->editableTextLayers->size()));
+    for (auto& layer : *file->editableTextLayers) {
+      stream->writeEncodedUint32(layer->id);
+    }
+  } else {
+    stream->writeEncodedUint32(0);
   }
   return TagCode::EditableLayer;
 }
