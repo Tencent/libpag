@@ -17,14 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextReplacement.h"
+#include "ReplacementHolder.h"
 
 namespace pag {
-TextReplacement::TextReplacement(PAGTextLayer* pagLayer) : pagLayer(pagLayer) {
-  auto textLayer = static_cast<TextLayer*>(pagLayer->layer);
+TextReplacement::TextReplacement(PAGTextLayer* pagLayer,
+                                 ReplacementHolder<TextDocument>* textHolder, int editableIndex)
+    : textHolder(textHolder), editableIndex(editableIndex), pagLayer(pagLayer) {
   sourceText = new Property<TextDocumentHandle>();
-  auto textData = TextDocumentHandle(new TextDocument());
-  *textData = *(textLayer->sourceText->value);
-  sourceText->value = textData;
 }
 
 TextReplacement::~TextReplacement() {
@@ -35,6 +34,7 @@ TextReplacement::~TextReplacement() {
 Content* TextReplacement::getContent(Frame contentFrame) {
   if (textContentCache == nullptr) {
     auto textLayer = static_cast<TextLayer*>(pagLayer->layer);
+    sourceText->value = textHolder->getReplacement(editableIndex);
     textContentCache = new TextContentCache(textLayer, pagLayer->uniqueID(), sourceText);
     textContentCache->update();
   }
@@ -42,6 +42,12 @@ Content* TextReplacement::getContent(Frame contentFrame) {
 }
 
 TextDocument* TextReplacement::getTextDocument() {
+  if (!textHolder->hasReplacement(editableIndex)) {
+    auto textData = TextDocumentHandle(new TextDocument());
+    *textData = *(static_cast<TextLayer*>(pagLayer->layer)->sourceText->value);
+    textHolder->setReplacement(editableIndex, textData, pagLayer);
+  }
+  sourceText->value = textHolder->getReplacement(editableIndex);
   return sourceText->value.get();
 }
 

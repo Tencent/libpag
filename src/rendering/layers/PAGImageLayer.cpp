@@ -22,7 +22,7 @@
 #include "rendering/caches/LayerCache.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/editing/ImageReplacement.h"
-#include "rendering/editing/PAGImageHolder.h"
+#include "rendering/editing/ReplacementHolder.h"
 #include "rendering/layers/PAGStage.h"
 #include "rendering/utils/LockGuard.h"
 #include "rendering/utils/ScopedLock.h"
@@ -55,7 +55,7 @@ PAGImageLayer::PAGImageLayer(int width, int height, int64_t duration) : PAGLayer
   rootLocker = std::make_shared<std::mutex>();
   contentVersion = 1;
   _editableIndex = 0;
-  imageHolder = std::make_shared<PAGImageHolder>();
+  imageHolder = std::make_shared<ReplacementHolder<PAGImage>>();
   imageHolder->addLayer(this);
   replacement = new ImageReplacement(emptyImageLayer, imageHolder.get(), _editableIndex);
 }
@@ -187,7 +187,7 @@ std::vector<PAGVideoRange> PAGImageLayer::getVideoRanges() const {
 bool PAGImageLayer::gotoTime(int64_t layerTime) {
   auto changed = PAGLayer::gotoTime(layerTime);
   if (imageHolder) {
-    auto pagImage = imageHolder->getImage(_editableIndex);
+    auto pagImage = imageHolder->getReplacement(_editableIndex);
     if (pagImage && !pagImage->isStill() && imageHolder->getOwner(_editableIndex) == this) {
       auto contentTime = getCurrentContentTime(layerTime);
       if (pagImage->setContentTime(contentTime)) {
@@ -208,7 +208,7 @@ void PAGImageLayer::replaceImageInternal(std::shared_ptr<PAGImage> image) {
     return;
   }
   if (stage) {
-    auto oldPAGImage = imageHolder->getImage(_editableIndex);
+    auto oldPAGImage = imageHolder->getReplacement(_editableIndex);
     auto pagLayers = imageHolder->getLayers(_editableIndex);
     for (auto& layer : pagLayers) {
       if (oldPAGImage) {
@@ -219,7 +219,7 @@ void PAGImageLayer::replaceImageInternal(std::shared_ptr<PAGImage> image) {
       }
     }
   }
-  imageHolder->setImage(_editableIndex, image, this);
+  imageHolder->setReplacement(_editableIndex, image, this);
   std::vector<PAGImageLayer*> imageLayers = {};
   if (rootFile) {
     auto layers = rootFile->getLayersByEditableIndexInternal(_editableIndex, LayerType::Image);
@@ -335,14 +335,14 @@ static void CutKeyframe(Keyframe<float>* keyframe, Frame position, bool cutLeft)
 }
 
 bool PAGImageLayer::hasPAGImage() const {
-  return imageHolder && imageHolder->hasImage(_editableIndex);
+  return imageHolder && imageHolder->hasReplacement(_editableIndex);
 }
 
 std::shared_ptr<PAGImage> PAGImageLayer::getPAGImage() const {
   if (!imageHolder) {
     return nullptr;
   }
-  return imageHolder->getImage(_editableIndex);
+  return imageHolder->getReplacement(_editableIndex);
 }
 
 // 输出的时间轴不包含startTime

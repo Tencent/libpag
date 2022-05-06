@@ -19,11 +19,11 @@
 #include "ImageReplacement.h"
 #include "base/utils/MatrixUtil.h"
 #include "rendering/caches/RenderCache.h"
-#include "rendering/editing/PAGImageHolder.h"
+#include "rendering/editing/ReplacementHolder.h"
 #include "rendering/graphics/Recorder.h"
 
 namespace pag {
-ImageReplacement::ImageReplacement(ImageLayer* imageLayer, PAGImageHolder* imageHolder,
+ImageReplacement::ImageReplacement(ImageLayer* imageLayer, ReplacementHolder<PAGImage>* imageHolder,
                                    int editableIndex)
     : imageHolder(imageHolder), editableIndex(editableIndex) {
   auto imageFillRule = imageLayer->imageFillRule;
@@ -34,7 +34,7 @@ ImageReplacement::ImageReplacement(ImageLayer* imageLayer, PAGImageHolder* image
 
 void ImageReplacement::measureBounds(tgfx::Rect* bounds) {
   tgfx::Rect contentBounds = {};
-  auto pagImage = imageHolder->getImage(editableIndex);
+  auto pagImage = imageHolder->getReplacement(editableIndex);
   auto graphic = pagImage->getGraphic();
   graphic->measureBounds(&contentBounds);
   auto contentMatrix = pagImage->getContentMatrix(defaultScaleMode, contentWidth, contentHeight);
@@ -47,7 +47,7 @@ void ImageReplacement::measureBounds(tgfx::Rect* bounds) {
 
 void ImageReplacement::draw(Recorder* recorder) {
   recorder->saveClip(0, 0, static_cast<float>(contentWidth), static_cast<float>(contentHeight));
-  auto pagImage = imageHolder->getImage(editableIndex);
+  auto pagImage = imageHolder->getReplacement(editableIndex);
   auto contentMatrix = pagImage->getContentMatrix(defaultScaleMode, contentWidth, contentHeight);
   recorder->concat(ToTGFX(contentMatrix));
   recorder->drawGraphic(pagImage->getGraphic());
@@ -57,7 +57,7 @@ void ImageReplacement::draw(Recorder* recorder) {
 tgfx::Point ImageReplacement::getScaleFactor() const {
   // TODO((domrjchen):
   // 当PAGImage的适配模式或者matrix发生改变时，需要补充一个通知机制让上层重置scaleFactor。
-  auto pagImage = imageHolder->getImage(editableIndex);
+  auto pagImage = imageHolder->getReplacement(editableIndex);
   auto contentMatrix = pagImage->getContentMatrix(defaultScaleMode, contentWidth, contentHeight);
   return GetScaleFactor(ToTGFX(contentMatrix));
 }

@@ -123,6 +123,13 @@ void File::updateEditables(Composition* composition) {
       if (result == textLayers.end()) {
         textLayers.push_back(textLayer);
       }
+    } else if (layer->type() == LayerType::Solid) {
+      auto solidLayer = static_cast<SolidLayer*>(layer);
+      // 多个预合成图层指向同一个预合成时，这个预合成里的Solid图层需要排重.
+      auto result = std::find(solidLayers.begin(), solidLayers.end(), solidLayer);
+      if (result == solidLayers.end()) {
+        solidLayers.push_back(solidLayer);
+      }
     } else if (layer->type() == LayerType::Image) {
       auto imageLayer = static_cast<ImageLayer*>(layer);
       auto imageBytes = imageLayer->imageBytes;
@@ -219,7 +226,7 @@ int File::getEditableIndex(TextLayer* textLayer) const {
   return -1;
 }
 
-int File::getEditableIndex(pag::ImageLayer* imageLayer) const {
+int File::getEditableIndex(ImageLayer* imageLayer) const {
   int index = 0;
   for (auto& layers : imageLayers) {
     auto result = std::find(layers.begin(), layers.end(), imageLayer);
@@ -231,11 +238,26 @@ int File::getEditableIndex(pag::ImageLayer* imageLayer) const {
   return -1;
 }
 
+int File::getEditableIndex(SolidLayer* solidLayer) const {
+  auto result = std::find(solidLayers.begin(), solidLayers.end(), solidLayer);
+  if (result != solidLayers.end()) {
+    return static_cast<int>(result - solidLayers.begin());
+  }
+  return -1;
+}
+
 std::vector<ImageLayer*> File::getImageAt(int index) const {
   if (index < 0 || static_cast<size_t>(index) >= imageLayers.size()) {
     return {};
   }
   return imageLayers[index];
+}
+
+SolidLayer* File::getSolidAt(int index) const {
+  if (index < 0 || static_cast<size_t>(index) >= solidLayers.size()) {
+    return nullptr;
+  }
+  return solidLayers[index];
 }
 
 bool File::hasScaledTimeRange() const {

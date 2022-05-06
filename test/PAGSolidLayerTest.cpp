@@ -42,4 +42,22 @@ PAG_TEST_F(PAGSolidLayerTest, SolidColor) {
   EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGSolidLayerTest/SolidColor"));
 }
 
+PAG_TEST_F(PAGSolidLayerTest, ReplaceSolidTest) {
+  auto pagFile = PAGFile::Load("../resources/apitest/test_replace_solid.pag");
+  TestPAGPlayer->setComposition(pagFile);
+  auto layers = pagFile->getLayersByEditableIndex(0, LayerType::Solid);
+  Color color;
+  color.red = 0;
+  color.blue = 0;
+  color.green = 0;
+  std::static_pointer_cast<PAGSolidLayer>(layers.at(0))->setSolidColor(color);
+  layers = pagFile->getLayersByEditableIndex(1, LayerType::Solid);
+  color.red = 0;
+  color.blue = 255;
+  color.green = 0;
+  std::static_pointer_cast<PAGSolidLayer>(layers.at(1))->setSolidColor(color);
+  TestPAGPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGSolidLayerTest/ReplaceSolidTest"));
+}
+
 }  // namespace pag

@@ -2203,9 +2203,13 @@ class PAG_API File {
 
   std::vector<ImageLayer*> getImageAt(int index) const;
 
+  SolidLayer* getSolidAt(int index) const;
+
   int getEditableIndex(TextLayer* textLayer) const;
 
   int getEditableIndex(ImageLayer* imageLayer) const;
+
+  int getEditableIndex(SolidLayer* solidLayer) const;
 
   bool hasScaledTimeRange() const;
 
@@ -2230,6 +2234,9 @@ class PAG_API File {
 
   // Just references, no need to delete them.
   std::vector<std::vector<ImageLayer*>> imageLayers = {};
+
+  // Just references, no need to delete them.
+  std::vector<SolidLayer*> solidLayers = {};
 
   File(std::vector<Composition*> compositionList, std::vector<pag::ImageBytes*> imageList);
   void updateEditables(Composition* composition);

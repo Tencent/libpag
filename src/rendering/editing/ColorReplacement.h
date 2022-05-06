@@ -18,25 +18,25 @@
 
 #pragma once
 
-#include "rendering/caches/TextContentCache.h"
+#include "rendering/caches/GraphicContent.h"
 
 namespace pag {
-class TextReplacement {
+class ColorReplacement {
  public:
-  explicit TextReplacement(PAGTextLayer* pagLayer, ReplacementHolder<TextDocument>* textHolder, int editableIndex);
-  ~TextReplacement();
+  explicit ColorReplacement(PAGSolidLayer* pagLayer, ReplacementHolder<Color>* colorHolder,
+                           int editableIndex);
+  ~ColorReplacement();
 
   Content* getContent(Frame contentFrame);
 
-  TextDocument* getTextDocument();
+  Color solidColor();
 
   void clearCache();
 
  private:
-  TextContentCache* textContentCache = nullptr;
-  ReplacementHolder<TextDocument>* textHolder = nullptr;
-  Property<TextDocumentHandle>* sourceText = nullptr;
+  GraphicContent* colorContentCache = nullptr;
+  ReplacementHolder<Color>* colorHolder = nullptr;
   int editableIndex = 0;
-  PAGTextLayer* pagLayer = nullptr;
+  PAGSolidLayer* pagLayer = nullptr;
 };
 }  // namespace pag

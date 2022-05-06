@@ -22,14 +22,15 @@
 namespace pag {
 class ImageReplacement : public Content {
  public:
-  ImageReplacement(ImageLayer* imageLayer, PAGImageHolder* imageHolder, int editableIndex);
+  ImageReplacement(ImageLayer* imageLayer, ReplacementHolder<PAGImage>* imageHolder,
+                   int editableIndex);
 
   void measureBounds(tgfx::Rect* bounds) override;
   void draw(Recorder* recorder) override;
   tgfx::Point getScaleFactor() const;
 
  private:
-  PAGImageHolder* imageHolder = nullptr;
+  ReplacementHolder<PAGImage>* imageHolder = nullptr;
   int editableIndex = 0;
   int defaultScaleMode = PAGScaleMode::LetterBox;
   int contentWidth = 0;

@@ -19,7 +19,9 @@
 #include "base/utils/TimeUtil.h"
 #include "pag/pag.h"
 #include "rendering/caches/LayerCache.h"
+#include "rendering/editing/ReplacementHolder.h"
 #include "rendering/editing/TextReplacement.h"
+#include "rendering/layers/PAGStage.h"
 #include "rendering/utils/LockGuard.h"
 
 namespace pag {
@@ -53,6 +55,11 @@ std::shared_ptr<PAGTextLayer> PAGTextLayer::Make(int64_t duration,
   auto textLayer = std::make_shared<PAGTextLayer>(nullptr, layer);
   textLayer->emptyTextLayer = layer;
   textLayer->weakThis = textLayer;
+  textLayer->_editableIndex = 0;
+  textLayer->textHolder = std::make_shared<ReplacementHolder<TextDocument>>();
+  textLayer->textHolder->addLayer(textLayer.get());
+  textLayer->replacement =
+      new TextReplacement(textLayer.get(), textLayer->textHolder.get(), textLayer->_editableIndex);
   return textLayer;
 }
 
@@ -72,7 +79,11 @@ Color PAGTextLayer::fillColor() const {
 
 void PAGTextLayer::setFillColor(const Color& value) {
   LockGuard autoLock(rootLocker);
-  textDocumentForWrite()->fillColor = value;
+  auto textDocument = textDocumentForWrite();
+  if (textDocument == nullptr) {
+    return;
+  }
+  textDocument->fillColor = value;
 }
 
 PAGFont PAGTextLayer::font() const {
@@ -84,6 +95,9 @@ PAGFont PAGTextLayer::font() const {
 void PAGTextLayer::setFont(const PAGFont& font) {
   LockGuard autoLock(rootLocker);
   auto textDocument = textDocumentForWrite();
+  if (textDocument == nullptr) {
+    return;
+  }
   textDocument->fontFamily = font.fontFamily;
   textDocument->fontStyle = font.fontStyle;
 }
@@ -95,7 +109,11 @@ float PAGTextLayer::fontSize() const {
 
 void PAGTextLayer::setFontSize(float size) {
   LockGuard autoLock(rootLocker);
-  textDocumentForWrite()->fontSize = size;
+  auto textDocument = textDocumentForWrite();
+  if (textDocument == nullptr) {
+    return;
+  }
+  textDocument->fontSize = size;
 }
 
 Color PAGTextLayer::strokeColor() const {
@@ -105,7 +123,11 @@ Color PAGTextLayer::strokeColor() const {
 
 void PAGTextLayer::setStrokeColor(const Color& color) {
   LockGuard autoLock(rootLocker);
-  textDocumentForWrite()->strokeColor = color;
+  auto textDocument = textDocumentForWrite();
+  if (textDocument == nullptr) {
+    return;
+  }
+  textDocument->strokeColor = color;
 }
 
 std::string PAGTextLayer::text() const {
@@ -115,7 +137,11 @@ std::string PAGTextLayer::text() const {
 
 void PAGTextLayer::setText(const std::string& text) {
   LockGuard autoLock(rootLocker);
-  textDocumentForWrite()->text = text;
+  auto textDocument = textDocumentForWrite();
+  if (textDocument == nullptr) {
+    return;
+  }
+  textDocument->text = text;
 }
 
 void PAGTextLayer::replaceTextInternal(std::shared_ptr<TextDocument> textData) {
@@ -123,6 +149,9 @@ void PAGTextLayer::replaceTextInternal(std::shared_ptr<TextDocument> textData) {
     reset();
   } else {
     auto textDocument = textDocumentForWrite();
+    if (textDocument == nullptr) {
+      return;
+    }
     // 仅以下属性支持外部修改：
     textDocument->applyFill = textData->applyFill;
     textDocument->applyStroke = textData->applyStroke;
@@ -142,39 +171,51 @@ void PAGTextLayer::replaceTextInternal(std::shared_ptr<TextDocument> textData) {
 }
 
 const TextDocument* PAGTextLayer::textDocumentForRead() const {
-  return replacement ? replacement->getTextDocument()
-                     : static_cast<TextLayer*>(layer)->sourceText->value.get();
+  return contentModified() ? replacement->getTextDocument()
+                           : static_cast<TextLayer*>(layer)->sourceText->value.get();
 }
 
 TextDocument* PAGTextLayer::textDocumentForWrite() {
-  if (replacement == nullptr) {
-    replacement = new TextReplacement(this);
-  } else {
-    replacement->clearCache();
+  if (textHolder == nullptr) {
+    return nullptr;
   }
-  notifyModified(true);
-  invalidateCacheScale();
+  replacement->clearCache();
+  notifyReferenceLayers();
   return replacement->getTextDocument();
 }
 
 void PAGTextLayer::reset() {
-  if (replacement != nullptr) {
-    delete replacement;
-    replacement = nullptr;
-    notifyModified(true);
-    invalidateCacheScale();
+  if (contentModified()) {
+    textHolder->setReplacement(_editableIndex, nullptr, this);
+    replacement->clearCache();
+    notifyReferenceLayers();
   }
 }
 
 Content* PAGTextLayer::getContent() {
-  if (replacement != nullptr) {
+  if (contentModified()) {
     return replacement->getContent(contentFrame);
   }
   return layerCache->getContent(contentFrame);
 }
 
 bool PAGTextLayer::contentModified() const {
-  return replacement != nullptr;
+  return textHolder && textHolder->hasReplacement(_editableIndex);
+}
+
+void PAGTextLayer::onAddToRootFile(PAGFile* pagFile) {
+  PAGLayer::onAddToRootFile(pagFile);
+  textHolder = pagFile->textHolder;
+  textHolder->addLayer(this);
+  replacement = new TextReplacement(this, textHolder.get(), _editableIndex);
+}
+
+void PAGTextLayer::onRemoveFromRootFile() {
+  PAGLayer::onRemoveFromRootFile();
+  textHolder->removeLayer(this);
+  delete replacement;
+  replacement = nullptr;
+  textHolder = nullptr;
 }
 
 void PAGTextLayer::setMatrixInternal(const Matrix& matrix) {
@@ -182,6 +223,22 @@ void PAGTextLayer::setMatrixInternal(const Matrix& matrix) {
     return;
   }
   PAGLayer::setMatrixInternal(matrix);
+}
+
+void PAGTextLayer::notifyReferenceLayers() {
+  std::vector<PAGTextLayer*> textLayers = {};
+  if (rootFile) {
+    auto layers = rootFile->getLayersByEditableIndexInternal(_editableIndex, LayerType::Text);
+    for (auto& pagLayer : layers) {
+      textLayers.push_back(static_cast<PAGTextLayer*>(pagLayer.get()));
+    }
+  } else {
+    textLayers.push_back(this);
+  }
+  std::for_each(textLayers.begin(), textLayers.end(), [](PAGTextLayer* textLayer) {
+    textLayer->notifyModified(true);
+    textLayer->invalidateCacheScale();
+  });
 }
 
 }  // namespace pag

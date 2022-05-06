@@ -400,4 +400,23 @@ PAG_TEST_F(PAGTextLayerTest, SmallFontSizeScale) {
   TestPAGPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/SmallFontSizeScale"));
 }
+
+
+PAG_TEST_F(PAGTextLayerTest, ReplaceTest) {
+  auto pagFile = PAGFile::Load("../resources/apitest/test_replace_text.pag");
+  TestPAGPlayer->setComposition(pagFile);
+  auto document = pagFile->getTextData(2);
+  document->text = "hello world 2";
+  pagFile->replaceText(2, document);
+
+  document = pagFile->getTextData(0);
+  document->text = "hello world 0";
+  pagFile->replaceText(0, document);
+
+  document = pagFile->getTextData(1);
+  document->text = "hello world 1";
+  pagFile->replaceText(1, document);
+  TestPAGPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/ReplaceTest"));
+}
 }  // namespace pag

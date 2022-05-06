@@ -19,9 +19,8 @@
 #include "base/utils/TimeUtil.h"
 #include "pag/file.h"
 #include "pag/pag.h"
-#include "rendering/editing/PAGImageHolder.h"
+#include "rendering/editing/ReplacementHolder.h"
 #include "rendering/utils/LockGuard.h"
-#include "rendering/utils/ScopedLock.h"
 
 namespace pag {
 uint16_t PAGFile::MaxSupportedTagLevel() {
@@ -62,6 +61,7 @@ std::shared_ptr<PAGLayer> PAGFile::BuildPAGLayer(std::shared_ptr<File> file, Lay
   switch (layer->type()) {
     case LayerType::Solid: {
       pagLayer = new PAGSolidLayer(file, static_cast<SolidLayer*>(layer));
+      pagLayer->_editableIndex = file->getEditableIndex(static_cast<SolidLayer*>(layer));
     } break;
     case LayerType::Text: {
       pagLayer = new PAGTextLayer(file, static_cast<TextLayer*>(layer));
@@ -108,7 +108,9 @@ std::shared_ptr<PAGLayer> PAGFile::BuildPAGLayer(std::shared_ptr<File> file, Lay
 
 PAGFile::PAGFile(std::shared_ptr<File> file, pag::PreComposeLayer* layer)
     : PAGComposition(file, layer) {
-  imageHolder = std::make_shared<PAGImageHolder>();
+  imageHolder = std::make_shared<ReplacementHolder<PAGImage>>();
+  textHolder = std::make_shared<ReplacementHolder<TextDocument>>();
+  solidColorHolder = std::make_shared<ReplacementHolder<Color>>();
 }
 
 uint16_t PAGFile::tagLevel() {
@@ -138,9 +140,8 @@ std::shared_ptr<TextDocument> PAGFile::getTextData(int editableTextIndex) {
 void PAGFile::replaceText(int editableTextIndex, std::shared_ptr<TextDocument> textData) {
   LockGuard autoLock(rootLocker);
   auto textLayers = getLayersByEditableIndexInternal(editableTextIndex, LayerType::Text);
-  for (auto& pagLayer : textLayers) {
-    auto pagTextLayer = std::static_pointer_cast<PAGTextLayer>(pagLayer);
-    pagTextLayer->replaceTextInternal(textData);
+  if (!textLayers.empty()) {
+    std::static_pointer_cast<PAGTextLayer>(textLayers[0])->replaceTextInternal(textData);
   }
 }
 

@@ -20,7 +20,8 @@
 #include "base/utils/TGFXCast.h"
 #include "pag/pag.h"
 #include "rendering/caches/LayerCache.h"
-#include "rendering/graphics/Shape.h"
+#include "rendering/editing/ColorReplacement.h"
+#include "rendering/editing/ReplacementHolder.h"
 #include "rendering/layers/PAGStage.h"
 #include "rendering/utils/LockGuard.h"
 
@@ -43,11 +44,16 @@ std::shared_ptr<PAGSolidLayer> PAGSolidLayer::Make(int64_t duration, int32_t wid
   auto pagSolidLayer = std::make_shared<PAGSolidLayer>(nullptr, layer);
   pagSolidLayer->emptySolidLayer = layer;
   pagSolidLayer->weakThis = pagSolidLayer;
+  pagSolidLayer->_editableIndex = 0;
+  pagSolidLayer->colorHolder = std::make_shared<ReplacementHolder<Color>>();
+  pagSolidLayer->colorHolder->addLayer(pagSolidLayer.get());
+  pagSolidLayer->replacement = new ColorReplacement(
+      pagSolidLayer.get(), pagSolidLayer->colorHolder.get(), pagSolidLayer->_editableIndex);
   return pagSolidLayer;
 }
 
 PAGSolidLayer::PAGSolidLayer(std::shared_ptr<pag::File> file, SolidLayer* layer)
-    : PAGLayer(file, layer), _solidColor(layer->solidColor) {
+    : PAGLayer(file, layer) {
 }
 
 PAGSolidLayer::~PAGSolidLayer() {
@@ -56,40 +62,69 @@ PAGSolidLayer::~PAGSolidLayer() {
 }
 
 Content* PAGSolidLayer::getContent() {
-  if (replacement != nullptr) {
-    return replacement;
+  if (contentModified()) {
+    return replacement->getContent(contentFrame);
   }
   return layerCache->getContent(contentFrame);
 }
 
 bool PAGSolidLayer::contentModified() const {
-  return replacement != nullptr;
+  return colorHolder && colorHolder->hasReplacement(_editableIndex);
+}
+
+void PAGSolidLayer::onAddToRootFile(PAGFile* pagFile) {
+  PAGLayer::onAddToRootFile(pagFile);
+  colorHolder = pagFile->solidColorHolder;
+  colorHolder->addLayer(this);
+  replacement = new ColorReplacement(this, colorHolder.get(), _editableIndex);
+}
+
+void PAGSolidLayer::onRemoveFromRootFile() {
+  PAGLayer::onRemoveFromRootFile();
+  colorHolder->removeLayer(this);
+  delete replacement;
+  replacement = nullptr;
+  colorHolder = nullptr;
 }
 
 Color PAGSolidLayer::solidColor() {
   LockGuard autoLock(rootLocker);
-  return _solidColor;
+  return solidColorInternal();
 }
 
 void PAGSolidLayer::setSolidColor(const pag::Color& value) {
   LockGuard autoLock(rootLocker);
-  if (_solidColor == value) {
+  auto currentColor = solidColorInternal();
+  if (currentColor == value) {
     return;
   }
-  _solidColor = value;
-  if (replacement != nullptr) {
-    delete replacement;
-    replacement = nullptr;
+  if (colorHolder == nullptr) {
+    return;
   }
-  auto solidLayer = static_cast<SolidLayer*>(layer);
-  if (solidLayer->solidColor != _solidColor) {
-    tgfx::Path path = {};
-    path.addRect(0, 0, solidLayer->width, solidLayer->height);
-    auto solid = Shape::MakeFrom(path, ToTGFX(_solidColor));
-    replacement = new GraphicContent(solid);
+  replacement->clearCache();
+  colorHolder->setReplacement(_editableIndex, std::make_shared<pag::Color>(value), this);
+  notifyReferenceLayers();
+}
+
+Color PAGSolidLayer::solidColorInternal() {
+  return contentModified() ? replacement->solidColor()
+                           : static_cast<SolidLayer*>(layer)->solidColor;
+}
+
+void PAGSolidLayer::notifyReferenceLayers() {
+  std::vector<PAGSolidLayer*> solidLayers = {};
+  if (rootFile) {
+    auto layers = rootFile->getLayersByEditableIndexInternal(_editableIndex, LayerType::Solid);
+    for (auto& pagLayer : layers) {
+      solidLayers.push_back(static_cast<PAGSolidLayer*>(pagLayer.get()));
+    }
+  } else {
+    solidLayers.push_back(this);
   }
-  notifyModified(true);
-  invalidateCacheScale();
+  std::for_each(solidLayers.begin(), solidLayers.end(), [](PAGSolidLayer* solidLayer) {
+    solidLayer->notifyModified(true);
+    solidLayer->invalidateCacheScale();
+  });
 }
 
 }  // namespace pag

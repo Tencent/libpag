@@ -514,9 +514,18 @@ class PAG_API PAGLayer : public Content {
   friend class FileReporter;
 
   friend class PAGImageLayer;
+
+  friend class PAGTextLayer;
+
+  friend class PAGSolidLayer;
 };
 
 class SolidLayer;
+
+template <typename T>
+class ReplacementHolder;
+
+class ColorReplacement;
 
 class PAG_API PAGSolidLayer : public PAGLayer {
  public:
@@ -540,11 +549,19 @@ class PAG_API PAGSolidLayer : public PAGLayer {
  protected:
   Content* getContent() override;
   bool contentModified() const override;
+  void onAddToRootFile(PAGFile* pagFile) override;
+  void onRemoveFromRootFile() override;
+
+  Color solidColorInternal();
 
  private:
+  void notifyReferenceLayers();
+
   SolidLayer* emptySolidLayer = nullptr;
-  Content* replacement = nullptr;
-  Color _solidColor = White;
+  ColorReplacement* replacement = nullptr;
+  std::shared_ptr<ReplacementHolder<Color>> colorHolder = nullptr;
+
+  friend class ColorReplacement;
 };
 
 class TextLayer;
@@ -623,11 +640,14 @@ class PAG_API PAGTextLayer : public PAGLayer {
   void setMatrixInternal(const Matrix& matrix) override;
   Content* getContent() override;
   bool contentModified() const override;
+  void onAddToRootFile(PAGFile* pagFile) override;
+  void onRemoveFromRootFile() override;
 
  private:
+  void notifyReferenceLayers();
   TextLayer* emptyTextLayer = nullptr;
-
   TextReplacement* replacement = nullptr;
+  std::shared_ptr<ReplacementHolder<TextDocument>> textHolder;
 
   const TextDocument* textDocumentForRead() const;
 
@@ -691,8 +711,6 @@ class PAG_API PAGVideoRange {
 class ImageLayer;
 
 class ImageReplacement;
-
-class PAGImageHolder;
 
 template <typename T>
 class Property;
@@ -764,7 +782,7 @@ class PAG_API PAGImageLayer : public PAGLayer {
  private:
   ImageLayer* emptyImageLayer = nullptr;
   ImageReplacement* replacement = nullptr;
-  std::shared_ptr<PAGImageHolder> imageHolder = nullptr;
+  std::shared_ptr<ReplacementHolder<PAGImage>> imageHolder = nullptr;
   std::unique_ptr<Property<float>> contentTimeRemap;
 
   PAGImageLayer(int width, int height, int64_t duration);
@@ -1105,9 +1123,13 @@ class PAG_API PAGFile : public PAGComposition {
   Frame _stretchedContentFrame = 0;
   Frame _stretchedFrameDuration = 1;
   Enum _timeStretchMode = PAGTimeStretchMode::Repeat;
-  std::shared_ptr<PAGImageHolder> imageHolder = nullptr;
+  std::shared_ptr<ReplacementHolder<PAGImage>> imageHolder = nullptr;
+  std::shared_ptr<ReplacementHolder<TextDocument>> textHolder = nullptr;
+  std::shared_ptr<ReplacementHolder<Color>> solidColorHolder = nullptr;
 
   friend class PAGImageLayer;
+  friend class PAGTextLayer;
+  friend class PAGSolidLayer;
 
   friend class LayerRenderer;
 

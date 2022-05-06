@@ -22,13 +22,15 @@
 #include "pag/pag.h"
 
 namespace pag {
-class PAGImageHolder {
+
+template <typename T>
+class ReplacementHolder {
  public:
-  bool hasImage(int editableIndex) const;
+  bool hasReplacement(int editableIndex) const;
 
-  std::shared_ptr<PAGImage> getImage(int editableIndex) const;
+  std::shared_ptr<T> getReplacement(int editableIndex) const;
 
-  void setImage(int editableIndex, std::shared_ptr<PAGImage> image, PAGLayer* layerOwner);
+  void setReplacement(int editableIndex, std::shared_ptr<T> replacement, PAGLayer* layerOwner);
 
   PAGLayer* getOwner(int editableIndex) const;
 
@@ -39,8 +41,9 @@ class PAGImageHolder {
   std::vector<PAGLayer*> getLayers(int editableIndex);
 
  private:
-  std::unordered_map<int, std::shared_ptr<PAGImage>> imageMap;
+  std::unordered_map<int, std::shared_ptr<T>> replacementMap;
   std::unordered_map<int, PAGLayer*> ownerMap;
-  std::vector<PAGLayer*> imageLayers;
+  std::vector<PAGLayer*> editableLayers;
 };
+
 }  // namespace pag
