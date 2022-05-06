@@ -6,19 +6,17 @@ English | [简体中文](./README.zh_CN.md) | [Homepage](https://pag.io)
 
 libpag is a real-time rendering library for PAG (Portable Animated Graphics) files that renders both
 vector-based and raster-based animations across most platforms, such as iOS, Android, macOS,
-Windows, Linux, and Web.
+Windows, Linux, and Web. 
 
 ## Features
 
-- Support all libpag features on the Web environment
-
-- Based on WebAssembly and WebGL.
+PAG Web SDK is built on WebAssembly and WebGL which supports all of the PAG features.
 
 ## Quick start
 
-PAG Web SDK has libpag.js and libpag.wasm.
+PAG Web SDK consists of two files: `libpag.js` and `libpag.wasm`.
 
-You could use the `locateFile` function to return the path of `libpag.wasm` file, the default path is the same as `libpag.js` 's path.
+You can use the `locateFile` function to get the path of `libpag.wasm` file. By default, the `libpag.wasm` file is located next to the `libpag.js` file.
 
 ### Browser (Recommend)
 
@@ -45,7 +43,7 @@ You could use the `locateFile` function to return the path of `libpag.wasm` file
 </script>
 ```
 
-You could use the `locateFile` function to return the path of `libpag.wasm` file, the default path is the same as `libpag.js` 's path. Like:
+You can use the `locateFile` function to get the path of `libpag.wasm` file. By default, the `libpag.wasm` file is located next to the `libpag.js` file. For example:
 
 ```js
 const PAG = await window.libpag.PAGInit({ locateFile: (file) => 'https://pag.io/file/' + file });
@@ -65,13 +63,13 @@ PAGInit().then((PAG) => {
 });
 ```
 
-**If you use ESModule to import SDK, you have to build the web program including the libpag/lib/libpag.wasm file that is under node_modules folder.Then use the `locateFile` function to return the path of the `libpag.wasm` . You need to submit the libpag.wasm that user can load from network.**
+**Note: If you are using ESModule to import PAG Web SDK, you must pack the `libpag.wasm` file manually into the final web program, because the common packing tools usually ignore the wasm file. Then use the `locateFile` function to get the path of the `libpag.wasm` . You also need to upload the `libpag.wasm` file to a server so that users can load it from network.**
 
-Offer much product in the npm package after building. You could read the [doc](./doc/develop-install.md) about them.
+There are many kinds of products in the npm package after building. You could read the [doc](./doc/develop-install.md) to know about them.
 
-That has a [repository](https://github.com/libpag/pag-web) that has some demo about HTML / Vue / React / PixiJS.
+There is also a [repository](https://github.com/libpag/pag-web) that contains some demos about using PAG Web SDK with HTML / Vue / React / PixiJS.
 
-And you find the required interface in the [API documentation](https://pag.io/docs/apis-web.html).
+You can find the API documentation [here](https://pag.io/docs/apis-web.html).
 
 ## Browser
 
@@ -79,23 +77,25 @@ And you find the required interface in the [API documentation](https://pag.io/do
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Chrome >= 69                                                                                                                                                                                                  | Safari >= 11.3                                                                                                                                                                                                | Android >= 7.0                                                                                                                                                                                                            | iOS >= 11.3                                                                                                                                                                                                          |
 
-More versions will be coming soon.
+More compatible versions are coming soon.
 
 ## Roadmap
 
-The [roadmap](https://github.com/Tencent/libpag/wiki/PAG-Web-roadmap) doc of the PAG web SDK.
+Please visit [here](https://github.com/Tencent/libpag/wiki/PAG-Web-roadmap) to see the roadmap of the PAG Web SDK.
 
 ## Development
 
+First, make sure you have installed all the tools and dependencies listed in the [README.md](../README.md#Development) located in the project root directory.
+
 ### Dependency Management
 
-Need installed C++ deps about [libpag](https://github.com/Tencent/libpag), [Emscripten](https://emscripten.org/docs/getting_started/downloads.html), and [Node](https://nodejs.org/).
+Then run the following command to install required node modules:
 
 ```bash
 $ npm install
 ```
 
-### Debug
+### Build (Debug)
 
 Execute `build.sh debug` to get `libpag.wasm` file.
 
@@ -120,7 +120,7 @@ Start HTTP server.
 $ emrun --browser chrome --serve_root . --port 8081 ./web/demo/index.html
 ```
 
-### release
+### Build (Release)
 
 ```bash
 # ./web/script
@@ -131,7 +131,7 @@ $ ./build.sh
 
 ### Build with CLion
 
-Create a new profile, and use the following **CMake options**（find them under **CLion** > **Preferences** > **Build, Execution, Deployment** > **CMake**）
+Create a new build target in CLion, and use the following **CMake options**（find them under **CLion** > **Preferences** > **Build, Execution, Deployment** > **CMake**）
 
 ```
 CMAKE_TOOLCHAIN_FILE=path/to/emscripten/emscripten/version/cmake/Modules/Platform/Emscripten.cmake
