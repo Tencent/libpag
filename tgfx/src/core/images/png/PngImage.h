@@ -21,9 +21,6 @@
 #include "tgfx/core/Image.h"
 
 namespace tgfx {
-
-struct ReadInfo;
-
 class PngImage : public Image {
  public:
   static std::shared_ptr<Image> MakeFrom(const std::string& filePath);
@@ -39,17 +36,17 @@ class PngImage : public Image {
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
 
  private:
-  std::shared_ptr<Data> fileData;
-  std::string filePath;
-
   static std::shared_ptr<Image> MakeFromData(const std::string& filePath,
                                              std::shared_ptr<Data> byteData);
-  explicit PngImage(int width, int height, Orientation orientation, std::string filePath,
-                    std::shared_ptr<Data> fileData)
+
+  PngImage(int width, int height, Orientation orientation, std::string filePath,
+           std::shared_ptr<Data> fileData)
       : Image(width, height, orientation),
         fileData(std::move(fileData)),
         filePath(std::move(filePath)) {
   }
-  bool readPixelsInternal(const ImageInfo& dstInfo, void* dstPixels, ReadInfo& readInfo) const;
+
+  std::shared_ptr<Data> fileData;
+  std::string filePath;
 };
 }  // namespace tgfx
