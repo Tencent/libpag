@@ -23,8 +23,8 @@
 namespace pag {
 class ColorReplacement {
  public:
-  explicit ColorReplacement(PAGSolidLayer* pagLayer, ReplacementHolder<Color>* colorHolder,
-                           int editableIndex);
+  ColorReplacement(PAGSolidLayer* pagLayer, ReplacementHolder<Color>* colorHolder,
+                   int editableIndex);
   ~ColorReplacement();
 
   Content* getContent(Frame contentFrame);

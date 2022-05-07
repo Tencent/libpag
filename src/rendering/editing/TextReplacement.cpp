@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextReplacement.h"
-#include "ReplacementHolder.h"
+#include "rendering/editing/ReplacementHolder.h"
 
 namespace pag {
 TextReplacement::TextReplacement(PAGTextLayer* pagLayer,

@@ -23,8 +23,8 @@
 namespace pag {
 class TextReplacement {
  public:
-  explicit TextReplacement(PAGTextLayer* pagLayer, ReplacementHolder<TextDocument>* textHolder,
-                           int editableIndex);
+  TextReplacement(PAGTextLayer* pagLayer, ReplacementHolder<TextDocument>* textHolder,
+                  int editableIndex);
   ~TextReplacement();
 
   Content* getContent(Frame contentFrame);
