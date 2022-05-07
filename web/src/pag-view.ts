@@ -6,6 +6,7 @@ import { PAGFile } from './pag-file';
 import { destroyVerify } from './utils/decorators';
 import { Log } from './utils/log';
 import { ErrorCode } from './utils/error-map';
+import { isOffscreenCanvas } from './utils/type-utils';
 
 export interface PAGViewOptions {
   /**
@@ -44,7 +45,7 @@ export class PAGView {
       canvasElement = document.getElementById(canvas.substr(1)) as HTMLCanvasElement;
     } else if (canvas instanceof HTMLCanvasElement) {
       canvasElement = canvas;
-    } else if (canvas instanceof OffscreenCanvas) {
+    } else if (isOffscreenCanvas(canvas)) {
       canvasElement = canvas;
     }
     if (!canvasElement) {
@@ -394,14 +395,15 @@ export class PAGView {
       return;
     }
 
-    if (!useScale || this.canvasElement instanceof OffscreenCanvas) {
+    if (!useScale || isOffscreenCanvas(this.canvasElement)) {
       this.rawWidth = this.canvasElement.width;
       this.rawHeight = this.canvasElement.height;
       return;
     }
 
     let displaySize: { width: number; height: number };
-    const styleDeclaration = window.getComputedStyle(this.canvasElement, null);
+    const canvas = this.canvasElement as HTMLCanvasElement;
+    const styleDeclaration = window.getComputedStyle(canvas, null);
     const computedSize = {
       width: Number(styleDeclaration.width.replace('px', '')),
       height: Number(styleDeclaration.height.replace('px', '')),
@@ -410,24 +412,24 @@ export class PAGView {
       displaySize = computedSize;
     } else {
       const styleSize = {
-        width: Number(this.canvasElement.style.width.replace('px', '')),
-        height: Number(this.canvasElement.style.height.replace('px', '')),
+        width: Number(canvas.style.width.replace('px', '')),
+        height: Number(canvas.style.height.replace('px', '')),
       };
       if (styleSize.width > 0 && styleSize.height > 0) {
         displaySize = styleSize;
       } else {
         displaySize = {
-          width: this.canvasElement.width,
-          height: this.canvasElement.height,
+          width: canvas.width,
+          height: canvas.height,
         };
       }
     }
 
-    this.canvasElement.style.width = `${displaySize.width}px`;
-    this.canvasElement.style.height = `${displaySize.height}px`;
+    canvas.style.width = `${displaySize.width}px`;
+    canvas.style.height = `${displaySize.height}px`;
     this.rawWidth = displaySize.width * window.devicePixelRatio;
     this.rawHeight = displaySize.height * window.devicePixelRatio;
-    this.canvasElement.width = this.rawWidth;
-    this.canvasElement.height = this.rawHeight;
+    canvas.width = this.rawWidth;
+    canvas.height = this.rawHeight;
   }
 }
