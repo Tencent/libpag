@@ -18,31 +18,30 @@
 
 #pragma once
 
-#include "GLBuffer.h"
-#include "GLDrawer.h"
-#include "tgfx/core/Path.h"
+#include "GeometryProcessor.h"
 
 namespace tgfx {
-class GLRRectOp : public GLDrawOp {
+class DefaultGeometryProcessor : public GeometryProcessor {
  public:
-  static std::unique_ptr<GLRRectOp> Make(const RRect& rRect, const Matrix& viewMatrix);
+  static std::unique_ptr<DefaultGeometryProcessor> Make(int width, int height);
 
-  std::unique_ptr<GeometryProcessor> getGeometryProcessor(const DrawArgs& args) override;
+  std::string name() const override {
+    return "DefaultGeometryProcessor";
+  }
 
-  std::vector<float> vertices(const DrawArgs& args) override;
-
-  void draw(const DrawArgs& args) override;
+  std::unique_ptr<GLGeometryProcessor> createGLInstance() const override;
 
  private:
-  GLRRectOp(const RRect& rRect, const Matrix& viewMatrix);
+  DefaultGeometryProcessor(int width, int height);
 
-  RRect rRect;
-  Matrix viewMatrix = Matrix::I();
-  float xRadius = 0;
-  float yRadius = 0;
-  float innerXRadius = 0;
-  float innerYRadius = 0;
-  //  bool stroked = false;
-  //  Point strokeWidths = Point::Zero();
+  void onComputeProcessorKey(BytesKey* bytesKey) const override;
+
+  Attribute position;
+  Attribute coverage;
+
+  int width = 1;
+  int height = 1;
+
+  friend class GLDefaultGeometryProcessor;
 };
 }  // namespace tgfx

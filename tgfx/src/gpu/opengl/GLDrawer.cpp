@@ -228,17 +228,23 @@ void GLDrawer::draw(DrawArgs args, std::unique_ptr<GLDrawOp> op) const {
     gl->enableVertexAttribArray(static_cast<unsigned>(attribute.location));
   }
   gl->bindBuffer(GL_ARRAY_BUFFER, 0);
-  auto indexBuffer = op->getIndexBuffer(args);
-  if (indexBuffer) {
-    gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer->bufferID());
-    gl->drawElements(GL_TRIANGLES, static_cast<int>(indexBuffer->length()), GL_UNSIGNED_SHORT, 0);
-    gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-  } else {
-    gl->drawArrays(GL_TRIANGLE_STRIP, 0, 4);
-  }
+  op->draw(args);
   if (vertexArray > 0) {
     gl->bindVertexArray(0);
   }
   CheckGLError(args.context);
+}
+
+void GLDrawer::DrawIndexBuffer(Context* context, const std::shared_ptr<GLBuffer>& indexBuffer) {
+  auto gl = GLFunctions::Get(context);
+  gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer->bufferID());
+  gl->drawElements(GL_TRIANGLES, static_cast<int>(indexBuffer->length()), GL_UNSIGNED_SHORT,
+                   nullptr);
+  gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+}
+
+void GLDrawer::DrawArrays(Context* context, unsigned int mode, int first, int count) {
+  auto gl = GLFunctions::Get(context);
+  gl->drawArrays(mode, first, count);
 }
 }  // namespace tgfx

@@ -19,18 +19,12 @@
 #pragma once
 
 #include "GLDrawer.h"
-
-#include "GLBuffer.h"
+#include "tgfx/core/Path.h"
 
 namespace tgfx {
-class GLFillRectOp : public GLDrawOp {
+class GLTriangulatingPathOp : public GLDrawOp {
  public:
-  static std::unique_ptr<GLFillRectOp> Make(const Rect& rect, const Matrix& viewMatrix);
-
-  static std::unique_ptr<GLFillRectOp> Make(const std::vector<Rect>& rects,
-                                            const std::vector<Matrix>& viewMatrices,
-                                            const std::vector<Matrix>& localMatrices,
-                                            const std::vector<Color>& colors);
+  static std::unique_ptr<GLTriangulatingPathOp> Make(const Path& path, const Rect& clipBounds);
 
   std::unique_ptr<GeometryProcessor> getGeometryProcessor(const DrawArgs& args) override;
 
@@ -39,16 +33,11 @@ class GLFillRectOp : public GLDrawOp {
   void draw(const DrawArgs& args) override;
 
  private:
-  GLFillRectOp(std::vector<Rect> rects, std::vector<Matrix> viewMatrices,
-               std::vector<Matrix> localMatrices, std::vector<Color> colors);
+  GLTriangulatingPathOp(std::vector<float> vertex, int vertexCount)
+      : vertex(std::move(vertex)), vertexCount(vertexCount) {
+  }
 
-  std::vector<float> coverageVertices() const;
-
-  std::vector<float> noCoverageVertices() const;
-
-  std::vector<Rect> rects;
-  std::vector<Matrix> viewMatrices;
-  std::vector<Matrix> localMatrices;
-  std::vector<Color> colors;
+  std::vector<float> vertex;
+  int vertexCount;
 };
 }  // namespace tgfx

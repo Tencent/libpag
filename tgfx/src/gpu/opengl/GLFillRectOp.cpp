@@ -143,7 +143,7 @@ static constexpr uint16_t kAAQuadIndexPattern[] = {
 };
 // clang-format on
 
-std::shared_ptr<GLBuffer> GLFillRectOp::getIndexBuffer(const DrawArgs& args) {
+void GLFillRectOp::draw(const DrawArgs& args) {
   if (rects.size() > 1 || args.aa == AAType::Coverage) {
     std::vector<uint16_t> indexes;
     static auto kNonAAType = UniqueID::Next();
@@ -168,8 +168,10 @@ std::shared_ptr<GLBuffer> GLFillRectOp::getIndexBuffer(const DrawArgs& args) {
         indexes.push_back(i * verticesPerQuad + indexPattern[j]);
       }
     }
-    return GLBuffer::Make(args.context, &indexes[0], indexes.size(), type);
+    auto indexBuffer = GLBuffer::Make(args.context, &indexes[0], indexes.size(), type);
+    GLDrawer::DrawIndexBuffer(args.context, indexBuffer);
+    return;
   }
-  return nullptr;
+  GLDrawer::DrawArrays(args.context, GL_TRIANGLE_STRIP, 0, 4);
 }
 }  // namespace tgfx
