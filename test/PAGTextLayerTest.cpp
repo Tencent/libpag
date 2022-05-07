@@ -401,7 +401,6 @@ PAG_TEST_F(PAGTextLayerTest, SmallFontSizeScale) {
   EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/SmallFontSizeScale"));
 }
 
-
 PAG_TEST_F(PAGTextLayerTest, ReplaceTest) {
   auto pagFile = PAGFile::Load("../resources/apitest/test_replace_text.pag");
   TestPAGPlayer->setComposition(pagFile);
@@ -418,5 +417,16 @@ PAG_TEST_F(PAGTextLayerTest, ReplaceTest) {
   pagFile->replaceText(1, document);
   TestPAGPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/ReplaceTest"));
+
+  auto layers = pagFile->getLayersByEditableIndex(0, LayerType::Text);
+  auto layer = std::static_pointer_cast<PAGTextLayer>(layers.at(0));
+  layer->parent()->removeLayer(layer);
+  layer->setText("a");
+  layer->setFontSize(30);
+  layer->setFillColor({});
+  layer->setStrokeColor({});
+  PAGFont font = {"", ""};
+  layer->setFont(font);
+  layer->reset();
 }
 }  // namespace pag

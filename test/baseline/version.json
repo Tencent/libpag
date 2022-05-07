@@ -7788,6 +7788,7 @@
         "TestRect": "48a897dd"
     },
     "PAGSolidLayerTest": {
+        "ReplaceSolidTest": "2a0d6270",
         "SolidColor": "48a897dd"
     },
     "PAGSurfaceTest": {
@@ -7799,6 +7800,7 @@
         "Emoji": "0b681af4",
         "NormalEmoji": "0b681af4",
         "PositionAnimator": "48a897dd",
+        "ReplaceTest": "2a0d6270",
         "SmallFontSizeScale": "8992f0fb",
         "TextReplacement": "0b681af4",
         "fillColor": "48a897dd",

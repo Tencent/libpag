@@ -58,6 +58,11 @@ PAG_TEST_F(PAGSolidLayerTest, ReplaceSolidTest) {
   std::static_pointer_cast<PAGSolidLayer>(layers.at(1))->setSolidColor(color);
   TestPAGPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGSolidLayerTest/ReplaceSolidTest"));
+
+  auto layer = std::static_pointer_cast<PAGSolidLayer>(layers.at(0));
+  layer->parent()->removeLayer(layer);
+  layer->setSolidColor(color);
+
 }
 
 }  // namespace pag
