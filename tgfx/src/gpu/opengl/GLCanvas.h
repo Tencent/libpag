@@ -49,8 +49,7 @@ class GLCanvas : public Canvas {
   }
 
  private:
-  std::shared_ptr<Mask> _clipMask = nullptr;
-  std::shared_ptr<Texture> _clipTexture = nullptr;
+  std::shared_ptr<Surface> _clipSurface = nullptr;
   uint32_t clipID = kDefaultClipID;
   std::shared_ptr<GLDrawer> _drawer = nullptr;
 

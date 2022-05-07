@@ -18,31 +18,22 @@
 
 #pragma once
 
-#include "GLBuffer.h"
-#include "GLDrawer.h"
-#include "tgfx/core/Path.h"
+#include <optional>
+#include "gpu/GLGeometryProcessor.h"
 
 namespace tgfx {
-class GLRRectOp : public GLDrawOp {
+class GLDefaultGeometryProcessor : public GLGeometryProcessor {
  public:
-  static std::unique_ptr<GLRRectOp> Make(const RRect& rRect, const Matrix& viewMatrix);
+  void emitCode(EmitArgs& args) override;
 
-  std::unique_ptr<GeometryProcessor> getGeometryProcessor(const DrawArgs& args) override;
-
-  std::vector<float> vertices(const DrawArgs& args) override;
-
-  void draw(const DrawArgs& args) override;
+  void setData(const ProgramDataManager& programDataManager,
+               const GeometryProcessor& geometryProcessor,
+               FPCoordTransformIter* transformIter) override;
 
  private:
-  GLRRectOp(const RRect& rRect, const Matrix& viewMatrix);
+  UniformHandle screenSizeUniform;
 
-  RRect rRect;
-  Matrix viewMatrix = Matrix::I();
-  float xRadius = 0;
-  float yRadius = 0;
-  float innerXRadius = 0;
-  float innerYRadius = 0;
-  //  bool stroked = false;
-  //  Point strokeWidths = Point::Zero();
+  std::optional<int> widthPrev;
+  std::optional<int> heightPrev;
 };
 }  // namespace tgfx
