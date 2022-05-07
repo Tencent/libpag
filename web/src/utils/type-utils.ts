@@ -40,3 +40,5 @@ export const proxyVector = <T extends { wasmIns: any }>(
   });
   return proxy;
 };
+
+export const isOffscreenCanvas = (element: any) => window.OffscreenCanvas && element instanceof OffscreenCanvas;
