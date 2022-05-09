@@ -30,3 +30,4 @@ done
 
 depsync
 git lfs prune -f > /dev/null
+git lfs pull
