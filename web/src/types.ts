@@ -89,7 +89,7 @@ export interface EmscriptenGL {
   textures: WebGLTexture[];
   createContext: (
     canvas: HTMLCanvasElement | OffscreenCanvas,
-    webGLContextAttributes: { majorVersion: number; minorVersion: number },
+    webGLContextAttributes: { majorVersion: number; minorVersion: number } & WebGLContextAttributes,
   ) => number;
   registerContext: (gl: WebGLRenderingContext, options: { majorVersion: number; minorVersion: number }) => number;
   makeContextCurrent: (contextId: number) => void;
