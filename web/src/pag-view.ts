@@ -59,7 +59,13 @@ export class PAGView {
         this.module.globalCanvas.retain();
         pagView.contextID = this.module.globalCanvas.contextID;
       } else {
-        pagView.contextID = this.module.GL.createContext(canvasElement, { majorVersion: 1, minorVersion: 0 });
+        pagView.contextID = this.module.GL.createContext(canvasElement, {
+          majorVersion: 1,
+          minorVersion: 0,
+          depth: false,
+          stencil: false,
+          antialias: false,
+        });
       }
 
       if (pagView.contextID === 0) {
