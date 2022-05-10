@@ -1,6 +1,6 @@
 import { NativeImage } from './native-image';
 import { measureText } from '../utils/measure-text';
-import { defaultFontNames, getFontFamilys } from '../utils/font-family';
+import { defaultFontNames, getFontFamilies } from '../utils/font-family';
 import { Rect } from '../types';
 
 const canvas = ((): HTMLCanvasElement | OffscreenCanvas => {
@@ -68,7 +68,7 @@ export class ScalerContext {
     attributes.push(`${this.size}px`);
     // css font-family
     const fallbackFontNames = defaultFontNames.concat();
-    fallbackFontNames.unshift(...getFontFamilys(this.fontName, this.fontStyle));
+    fallbackFontNames.unshift(...getFontFamilies(this.fontName, this.fontStyle));
     attributes.push(`${fallbackFontNames.join(',')}`);
     return attributes.join(' ');
   }
