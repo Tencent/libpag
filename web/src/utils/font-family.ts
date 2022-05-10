@@ -4,7 +4,7 @@ export const defaultFontNames = (() => {
   return ['emoji'].concat(...fontNames);
 })();
 
-export const getFontFamilys = (name: string, style = ''): string[] => {
+export const getFontFamilies = (name: string, style = ''): string[] => {
   if (!name) return [];
   const nameChars = name.split(' ');
   let names = [];
@@ -14,7 +14,7 @@ export const getFontFamilys = (name: string, style = ''): string[] => {
     names.push(nameChars.join(''));
     names.push(nameChars.join(' '));
   }
-  return names.reduce((pre: string[], cur: string) => {
+  const fontFamilies = names.reduce((pre: string[], cur: string) => {
     if (!style) {
       pre.push(`${cur}`);
     } else {
@@ -23,4 +23,9 @@ export const getFontFamilys = (name: string, style = ''): string[] => {
     }
     return pre;
   }, []);
+  // Fallback font when style is not found.
+  if (style !== '') {
+    fontFamilies.push(name);
+  }  
+  return fontFamilies;
 };
