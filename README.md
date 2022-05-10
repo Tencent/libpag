@@ -222,7 +222,11 @@ Git account and password may be required during synchronizing. Please make sure 
 
 ### Build
 
-After the synchronization, open the project with CLion, then you are good to go!
+After the synchronization, open the project with CLion, and do these steps:
+
+1. File --> Settings --> Build, Execution, Deployment --> Toolchains --> move `Visual Studio` up and make it the default, or CLion would use MinGW as the toolchain resulting a build failure with the error message `explicitly defaulted function 'constexpr pk::SkMutex::SkMutex()' cannot be declared 'constexpr'`.
+2. Make sure the environment variable `path` contains the paths to `cmake.exe` and `ninja.exe`. If there's no local installation of cmake, you could use the bundled Cmake from Clion. Sample paths of bundled Cmake are `D:\jetbrains\apps\CLion\ch-0\221.5080.224\bin\cmake\win\bin` and `D:\jetbrains\apps\CLion\ch-0\221.5080.224\bin\ninja\win`.
+3. Now you can click the build button on the toolbar and start building the project.
 
 **Note: If anything goes wrong during cmake building, please update the cmake tool to the latest
 version and try again.**
