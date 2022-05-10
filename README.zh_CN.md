@@ -207,7 +207,13 @@ depsync
 
 ### 编译项目
 
-第三方依赖项都同步完成后，直接使用 CLion 打开项目根目录即可开始编译。若第三方依赖项发生改变，刷新 CMakeLists.txt 文件即可自动同步。
+第三方依赖项都同步完成后，直接使用 CLion 打开项目根目录，执行以下操作：
+
+1. File --> Settings --> Build, Execution, Deployment --> Toolchains --> 将 Visual Studio 上移变成 default，否则会使用 MinGW 编译而导致编译失败、报错 `explicitly defaulted function 'constexpr pk::SkMutex::SkMutex()' cannot be declared 'constexpr'`。
+2. 确保环境变量 path 中有 cmake.exe 和 ninja.exe。如果本地没有独立安装 cmake，直接使用 CLion 安装自带的，则可以参照以下格式把 CLion 自带的加入 path：`D:\jetbrains\apps\CLion\ch-0\221.5080.224\bin\cmake\win\bin` 以及 `D:\jetbrains\apps\CLion\ch-0\221.5080.224\bin\ninja\win`。
+3. 现在就可以点击工具栏上的 Build 编译项目了。
+
+若第三方依赖项发生改变，刷新 CMakeLists.txt 文件即可自动同步。
 **如果在 CMake 编译过程中遇到报错，可以尝试更新 CMake 命令行工具到最新的版本然后重新编译。**
 
 注：由于团队日常主要都在 macOS 平台上进行开发，Windows
