@@ -183,13 +183,16 @@ Web 端更多接入方式请参考：[Web端接入指南](https://pag.io/docs/sd
 
 ### 依赖管理
 
-libpag 使用 depsync 命令行工具管理第三方依赖项。如果您是在 macOS 平台上进行开发，可以直接在项目根目录下运行脚本安装所有必要工具并进行第三方仓库的同步：
+libpag 使用 depsync 命令行工具管理第三方依赖项。
+
+**macOS 平台：**
+
+直接在项目根目录下运行脚本即可安装所有必要工具并进行第三方仓库的同步：
 
 ```
 ./sync_deps.sh
 ```
-
-如果在其他平台上，请参考以下步骤进行安装必要工具并进行第三方仓库同步：
+**其他平台：**
 
 首先确保您已经安装了最新版本的 [node.js](http://nodejs.org/)，然后使用 npm 安装 depsync 命令行工具 ：
 
@@ -208,9 +211,20 @@ depsync
 ### 编译项目
 
 第三方依赖项都同步完成后，直接使用 CLion 打开项目根目录即可开始编译。若第三方依赖项发生改变，刷新 CMakeLists.txt 文件即可自动同步。
-**如果在 CMake 编译过程中遇到报错，可以尝试更新 CMake 命令行工具到最新的版本然后重新编译。**
 
-注：由于团队日常主要都在 macOS 平台上进行开发，Windows
+**macOS 平台：**
+
+不需要对 CLion 进行额外配置即可立即编译。**目前只有 macOS 平台支持自动化测试用例的运行。**
+
+**Windows 平台：**
+
+请参考以下步骤配置好 CLion 之后再进行编译：
+
+- 请确保你的 VS2019 至少同时安装了 **[使用 C++ 的桌面开发]** 和 **[通用 Windows 平台开发]** 两个子模块。
+- 在 CLion 的选项菜单里搜索 **ToolChain** ，设置默认编译工具为 **Visual Studio**，并选择 **amd64（推荐）** 或 **x86**架构。
+
+注：**如果在 CMake 编译过程中遇到报错，可以尝试更新 CMake 命令行工具到最新的版本然后重新编译。**
+另外，由于团队日常主要都在 macOS 平台上进行开发，Windows
 平台偶尔可能会出现编译不通过的情况，如果遇到阻塞的问题欢迎通过提交 [issue](https://github.com/Tencent/libpag/issues/new/choose)
 或 [QQ](https://qm.qq.com/cgi-bin/qm/qr?k=Wa65DTnEKo2hnPsvY-1EgJOF8tvKQ-ZT&jump_from=webapi)
 群即时跟我们反馈。

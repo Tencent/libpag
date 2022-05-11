@@ -222,9 +222,20 @@ Git account and password may be required during synchronizing. Please make sure 
 
 ### Build
 
-After the synchronization, open the project with CLion, then you are good to go!
+After the synchronization, you can open the project with CLion and build the pag library.
 
-**Note: If anything goes wrong during cmake building, please update the cmake tool to the latest
+**For macOS platform：**
+
+There are no extra configurations of CLion required.
+
+**For Windows platform：**
+
+Please follow the following steps to configure the CLion environment correctly:
+
+- Make sure you have installed at least the **[Desktop development with C++]** and **[Universal Windows Platform development]** components for VS2019.
+- Open the **File->Setting** panel, and go to **Build, Execution, Deployment->ToolChains**, then set the toolchain of CLion to **Visual Studio** with **amd64 (Recommended)** or **x86** architecture.
+
+**Note: If anything goes wrong during cmake building, please update the cmake commandline tool to the latest
 version and try again.**
 
 ## License
