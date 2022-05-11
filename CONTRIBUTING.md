@@ -19,7 +19,7 @@ There are two main branches here:
 1. `main` branch.
 	1. It is our active developing branch. After full testing, we will periodically pull the pre-release branch based on the main branch. 
     2. **You are recommended to submit bugfix or feature PR on `main` branch.**
-2. `release` branch. 
+2. `release/{version}` branch.  
 	1. This is our stable release branch, which is fully tested and already used in many apps.
 
 Normal bugfix or feature request should be submitted to `main` branch. 
