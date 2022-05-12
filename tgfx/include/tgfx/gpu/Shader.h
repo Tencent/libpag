@@ -20,6 +20,7 @@
 
 #include <memory>
 #include "tgfx/core/Color.h"
+#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Point.h"
 
 namespace tgfx {
@@ -78,6 +79,18 @@ class Shader {
     return false;
   }
 
+  /**
+   *  Returns a shader that will apply the specified localMatrix to this shader.
+   */
+  std::shared_ptr<Shader> makeWithLocalMatrix(const Matrix& matrix) const;
+
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const = 0;
+
+ protected:
+  virtual std::shared_ptr<Shader> makeAsALocalMatrixShader(Matrix*) const {
+    return nullptr;
+  }
+
+  std::weak_ptr<Shader> weakThis;
 };
 }  // namespace tgfx

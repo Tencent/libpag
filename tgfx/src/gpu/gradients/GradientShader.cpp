@@ -18,8 +18,6 @@
 
 #include "GradientShader.h"
 #include "core/utils/MathExtra.h"
-#include "gpu/ColorShader.h"
-#include "gpu/ConstColorProcessor.h"
 #include "gpu/GradientCache.h"
 #include "gpu/gradients/ClampedGradientEffect.h"
 #include "gpu/gradients/DualIntervalGradientColorizer.h"
@@ -28,7 +26,6 @@
 #include "gpu/gradients/SingleIntervalGradientColorizer.h"
 #include "gpu/gradients/TextureGradientColorizer.h"
 #include "gpu/gradients/UnrolledBinaryGradientColorizer.h"
-#include "tgfx/gpu/Caps.h"
 
 namespace tgfx {
 // Intervals smaller than this (that aren't hard stops) on low-precision-only devices force us to
@@ -239,16 +236,18 @@ std::shared_ptr<Shader> Shader::MakeLinearGradient(const Point& startPoint, cons
     return nullptr;
   }
   if (1 == colors.size()) {
-    return std::make_shared<ColorShader>(colors[0]);
+    return Shader::MakeColorShader(colors[0]);
   }
   if (FloatNearlyZero((endPoint - startPoint).length(), DegenerateThreshold)) {
     // Degenerate gradient, the only tricky complication is when in clamp mode, the limit of
     // the gradient approaches two half planes of solid color (first and last). However, they
     // are divided by the line perpendicular to the start and end point, which becomes undefined
     // once start and end are exactly the same, so just use the end color for a stable solution.
-    return std::make_shared<ColorShader>(colors[0]);
+    return Shader::MakeColorShader(colors[0]);
   }
-  return std::make_shared<LinearGradient>(startPoint, endPoint, colors, positions);
+  auto shader = std::make_shared<LinearGradient>(startPoint, endPoint, colors, positions);
+  shader->weakThis = shader;
+  return shader;
 }
 
 std::shared_ptr<Shader> Shader::MakeRadialGradient(const Point& center, float radius,
@@ -261,13 +260,15 @@ std::shared_ptr<Shader> Shader::MakeRadialGradient(const Point& center, float ra
     return nullptr;
   }
   if (1 == colors.size()) {
-    return std::make_shared<ColorShader>(colors[0]);
+    return Shader::MakeColorShader(colors[0]);
   }
 
   if (FloatNearlyZero(radius, DegenerateThreshold)) {
     // Degenerate gradient optimization, and no special logic needed for clamped radial gradient
-    return std::make_shared<ColorShader>(colors[colors.size() - 1]);
+    return Shader::MakeColorShader(colors[colors.size() - 1]);
   }
-  return std::make_shared<RadialGradient>(center, radius, colors, positions);
+  auto shader = std::make_shared<RadialGradient>(center, radius, colors, positions);
+  shader->weakThis = shader;
+  return shader;
 }
 }  // namespace tgfx

@@ -16,22 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ColorShader.h"
-#include "gpu/ConstColorProcessor.h"
+#pragma once
+
+#include "tgfx/core/Matrix.h"
+#include "tgfx/gpu/Shader.h"
 
 namespace tgfx {
-std::shared_ptr<Shader> Shader::MakeColorShader(Color color) {
-  auto shader = std::make_shared<ColorShader>(color);
-  shader->weakThis = shader;
-  return shader;
-}
+class LocalMatrixShader final : public Shader {
+ public:
+  LocalMatrixShader(std::shared_ptr<Shader> proxy, const Matrix& localMatrix)
+      : proxyShader(std::move(proxy)), _localMatrix(localMatrix) {
+  }
 
-bool ColorShader::isOpaque() const {
-  return color.isOpaque();
-}
+  std::shared_ptr<Shader> makeAsALocalMatrixShader(Matrix* localMatrix) const override;
 
-std::unique_ptr<FragmentProcessor> ColorShader::asFragmentProcessor(const FPArgs&) const {
-  return ConstColorProcessor::Make(color);
-}
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const override;
 
+ private:
+  std::shared_ptr<Shader> proxyShader;
+  const Matrix _localMatrix;
+};
 }  // namespace tgfx
