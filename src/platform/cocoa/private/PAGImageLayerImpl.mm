@@ -68,6 +68,12 @@
   pagImageLayer->replaceImage(imageImpl.pagImage);
 }
 
+- (void)setImage:(PAGImage*)image {
+  auto pagImageLayer = std::static_pointer_cast<pag::PAGImageLayer>([super pagLayer]);
+  PAGImageImpl* imageImpl = [image image];
+  pagImageLayer->setImage(imageImpl.pagImage);
+}
+
 - (int64_t)contentDuration {
   auto pagImageLayer = std::static_pointer_cast<pag::PAGImageLayer>([super pagLayer]);
   return pagImageLayer->contentDuration();

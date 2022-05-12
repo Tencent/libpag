@@ -131,4 +131,19 @@ PAG_TEST_F(PAGImageLayerTest, getBoundsTest) {
     ASSERT_EQ(rect, bounds[i]);
   }
 }
+
+/**
+ * 用例描述: PAGImageLayer setImage接口 测试
+ */
+PAG_TEST_F(PAGImageLayerTest, setImage) {
+  auto pagFile = pag::PAGFile::Load("../resources/filter/fastblur.pag");
+
+  auto image = PAGImage::FromPath("../resources/apitest/imageReplacement.png");
+  auto pagImageLayer = pagFile->getLayersByEditableIndex(0, pag::LayerType::Image)[0];
+  std::static_pointer_cast<PAGImageLayer>(pagImageLayer)->setImage(image);
+  TestPAGPlayer->setComposition(pagFile);
+  TestPAGPlayer->setProgress(0.3);
+  TestPAGPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGImageLayerTest/setImage"));
+}
 }  // namespace pag

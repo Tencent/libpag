@@ -692,8 +692,6 @@ class ImageLayer;
 
 class ImageReplacement;
 
-class PAGImageHolder;
-
 template <typename T>
 class Property;
 
@@ -723,11 +721,20 @@ class PAG_API PAGImageLayer : public PAGLayer {
   std::vector<PAGVideoRange> getVideoRanges() const;
 
   /**
+   * [Deprecated]
+   * Replace the original image content of layers which have same editable index with the specified
+   * PAGImage object. Passing in null for the image parameter resets the layer to its default
+   * image content.
+   * @param image The PAGImage object to replace with.
+   */
+  void replaceImage(std::shared_ptr<PAGImage> image);
+
+  /**
    * Replace the original image content with the specified PAGImage object. Passing in null for the
    * image parameter resets the layer to its default image content.
    * @param image The PAGImage object to replace with.
    */
-  void replaceImage(std::shared_ptr<PAGImage> image);
+  void setImage(std::shared_ptr<PAGImage> image);
 
   /**
    * Converts the time from the PAGImageLayer's timeline to the replacement content's timeline. The
@@ -748,14 +755,13 @@ class PAG_API PAGImageLayer : public PAGLayer {
 
  protected:
   bool gotoTime(int64_t layerTime) override;
-  void replaceImageInternal(std::shared_ptr<PAGImage> image);
+  void setImageInternal(std::shared_ptr<PAGImage> image);
   int64_t getCurrentContentTime(int64_t layerTime);
   Property<float>* getContentTimeRemap();
   bool contentVisible();
   Content* getContent() override;
   bool contentModified() const override;
   bool cacheFilters() const override;
-  void onAddToRootFile(PAGFile* pagFile) override;
   void onRemoveFromRootFile() override;
   void onTimelineChanged() override;
   int64_t localFrameToFileFrame(int64_t localFrame) const;
@@ -764,7 +770,6 @@ class PAG_API PAGImageLayer : public PAGLayer {
  private:
   ImageLayer* emptyImageLayer = nullptr;
   ImageReplacement* replacement = nullptr;
-  std::shared_ptr<PAGImageHolder> imageHolder = nullptr;
   std::unique_ptr<Property<float>> contentTimeRemap;
 
   PAGImageLayer(int width, int height, int64_t duration);
@@ -1045,7 +1050,7 @@ class PAG_API PAGFile : public PAGComposition {
   void replaceText(int editableTextIndex, std::shared_ptr<TextDocument> textData);
 
   /**
-   * Replace the image content of the specified index with a PAGImage object. The index ranges from
+   * Replace file's image content of the specified index with a PAGImage object. The index ranges from
    * 0 to PAGFile.numImages - 1. Passing in null for the image parameter will reset it to default
    * image content.
    */
@@ -1101,11 +1106,11 @@ class PAG_API PAGFile : public PAGComposition {
   Frame scaledFrameToFileFrame(Frame scaledFrame, const TimeRange& scaledTimeRange) const;
   Frame fileFrameToStretchedFrame(Frame fileFrame) const;
   Frame fileFrameToScaledFrame(Frame fileFrame, const TimeRange& scaledTimeRange) const;
+  void replaceImageInternal(int editableImageIndex, std::shared_ptr<PAGImage> image);
 
   Frame _stretchedContentFrame = 0;
   Frame _stretchedFrameDuration = 1;
   Enum _timeStretchMode = PAGTimeStretchMode::Repeat;
-  std::shared_ptr<PAGImageHolder> imageHolder = nullptr;
 
   friend class PAGImageLayer;
 
