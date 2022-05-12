@@ -28,7 +28,7 @@ GraphicContent* SolidContentCache::createContent(Frame) const {
   auto solidLayer = static_cast<SolidLayer*>(layer);
   tgfx::Path path = {};
   path.addRect(0, 0, solidLayer->width, solidLayer->height);
-  auto graphic = Shape::MakeFrom(path, ToTGFX(solidLayer->solidColor));
+  auto graphic = Shape::MakeFrom(layer->uniqueID, path, ToTGFX(solidLayer->solidColor));
   return new GraphicContent(graphic);
 }
 }  // namespace pag

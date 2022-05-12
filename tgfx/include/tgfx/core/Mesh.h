@@ -18,33 +18,26 @@
 
 #pragma once
 
-#include "pathkit.h"
+#include "tgfx/core/Path.h"
 
 namespace tgfx {
-class Path;
+class GLDrawOp;
 
-// When tessellating curved paths into linear segments, this defines the maximum distance in
-// screen space which a segment may deviate from the mathematically correct value. Above this
-// value, the segment will be subdivided. This value was chosen to approximate the super sampling
-// accuracy of the raster path (16 samples, or one quarter pixel).
-static constexpr float DefaultTolerance = 0.25f;
-
-class PathRef {
+class Mesh {
  public:
-  static const pk::SkPath& ReadAccess(const Path& path);
+  /**
+   * Initialize the Mesh with the specified path. the clipBounds will be used when the path's fill
+   * type is inverse.
+   */
+  static std::unique_ptr<Mesh> MakeFrom(const Path& path, const Rect* clipBounds = nullptr);
 
-  static pk::SkPath& WriteAccess(Path& path);
+  virtual ~Mesh() = default;
 
-  PathRef() = default;
+  virtual Rect bounds() const = 0;
 
-  explicit PathRef(const pk::SkPath& path) : path(path) {
-  }
+ protected:
+  virtual std::pair<std::unique_ptr<GLDrawOp>, Matrix> getOp(const Matrix& viewMatrix) const = 0;
 
- private:
-  pk::SkPath path = {};
-
-  friend class Path;
-  friend bool operator==(const Path& a, const Path& b);
-  friend bool operator!=(const Path& a, const Path& b);
+  friend class GLCanvas;
 };
 }  // namespace tgfx

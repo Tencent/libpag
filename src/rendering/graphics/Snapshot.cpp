@@ -22,15 +22,18 @@
 #include "tgfx/gpu/Surface.h"
 
 namespace pag {
-
 size_t Snapshot::memoryUsage() const {
+  if (texture == nullptr) {
+    return 0;
+  }
   float bytesPerPixels;
   if (texture->isYUV()) {
     bytesPerPixels = 1.5f;
   } else {
     bytesPerPixels = texture->getSampler()->format == tgfx::PixelFormat::ALPHA_8 ? 1 : 4;
   }
-  return static_cast<size_t>(texture->width() * texture->height() * bytesPerPixels);
+  return static_cast<size_t>(static_cast<float>(texture->width() * texture->height()) *
+                             bytesPerPixels);
 }
 
 bool Snapshot::hitTest(RenderCache* cache, float x, float y) const {
@@ -44,7 +47,13 @@ bool Snapshot::hitTest(RenderCache* cache, float x, float y) const {
   }
   auto canvas = surface->getCanvas();
   canvas->setMatrix(tgfx::Matrix::MakeTrans(-local.x, -local.y));
-  canvas->drawTexture(texture.get());
+  if (texture) {
+    canvas->drawTexture(texture.get());
+  } else if (mesh) {
+    tgfx::Paint paint;
+    paint.setColor(tgfx::Color::White());
+    canvas->drawMesh(mesh.get(), paint);
+  }
   return surface->hitTest(0, 0);
 }
 }  // namespace pag

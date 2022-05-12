@@ -416,7 +416,8 @@ static tgfx::Path RenderBackgroundPath(const std::vector<std::vector<GlyphHandle
   return backgroundPath;
 }
 
-std::shared_ptr<Graphic> RenderTextBackground(const std::vector<std::vector<GlyphHandle>>& lines,
+std::shared_ptr<Graphic> RenderTextBackground(ID assetID,
+                                              const std::vector<std::vector<GlyphHandle>>& lines,
                                               const TextDocument* textDocument) {
   float strokeWidth = textDocument->strokeWidth;
   auto margin = textDocument->fontSize * 0.2f;
@@ -447,7 +448,7 @@ std::shared_ptr<Graphic> RenderTextBackground(const std::vector<std::vector<Glyp
   if (effect) {
     effect->applyTo(&backgroundPath);
   }
-  auto graphic = Shape::MakeFrom(backgroundPath, ToTGFX(textDocument->backgroundColor));
+  auto graphic = Shape::MakeFrom(assetID, backgroundPath, ToTGFX(textDocument->backgroundColor));
   auto modifier =
       Modifier::MakeBlend(ToAlpha(textDocument->backgroundAlpha), tgfx::BlendMode::SrcOver);
   return Graphic::MakeCompose(graphic, modifier);
@@ -474,7 +475,7 @@ std::unique_ptr<TextContent> RenderTexts(const std::shared_ptr<TextGlyphs>& text
       TextAnimatorRenderer::ApplyToGlyphs(glyphLines, animators, textDocument, layerFrame);
   std::vector<std::shared_ptr<Graphic>> contents = {};
   if (textDocument->backgroundAlpha > 0) {
-    auto background = RenderTextBackground(glyphLines, textDocument);
+    auto background = RenderTextBackground(textGlyphs->assetID(), glyphLines, textDocument);
     if (background) {
       contents.push_back(background);
     }

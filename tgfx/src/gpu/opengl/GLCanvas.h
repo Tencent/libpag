@@ -32,11 +32,13 @@ class GLCanvas : public Canvas {
   void clear() override;
   void drawTexture(const Texture* texture, const Texture* mask, bool inverted) override;
   void drawTexture(const Texture* texture, const RGBAAALayout* layout) override;
+  void drawMask(const Texture* mask, const Paint& paint) override;
   void drawPath(const Path& path, const Paint& paint) override;
   void drawGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
                   const Font& font, const Paint& paint) override;
   void drawAtlas(const Texture* atlas, const Matrix matrix[], const Rect tex[],
                  const Color colors[], size_t count) override;
+  void drawMesh(const Mesh* mesh, const Paint& paint) override;
 
  protected:
   void onSave() override {
@@ -66,7 +68,8 @@ class GLCanvas : public Canvas {
   void drawTexture(const Texture* texture, const RGBAAALayout* layout, const Texture* mask,
                    bool inverted);
 
-  void drawMask(const Rect& bounds, const Texture* mask, const Shader* shader);
+  void drawMask(const Rect& bounds, const Texture* mask, const Shader* shader,
+                bool appliedMatrix = true);
 
   void drawColorGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
                        const Font& font, const Paint& paint);

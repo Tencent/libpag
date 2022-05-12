@@ -18,32 +18,34 @@
 
 #include "GLTriangulatingPathOp.h"
 #include "core/PathRef.h"
+#include "core/TriangularPathMesh.h"
 #include "gpu/DefaultGeometryProcessor.h"
+#include "tgfx/core/Mesh.h"
 
 namespace tgfx {
 // https://chromium-review.googlesource.com/c/chromium/src/+/1099564/
 static constexpr int AA_TESSELLATOR_MAX_VERB_COUNT = 100;
 
-// When tessellating curved paths into linear segments, this defines the maximum distance in
-// screen space which a segment may deviate from the mathematically correct value. Above this
-// value, the segment will be subdivided. This value was chosen to approximate the super sampling
-// accuracy of the raster path (16 samples, or one quarter pixel).
-static constexpr float DefaultTolerance = 0.25f;
-
 std::unique_ptr<GLTriangulatingPathOp> GLTriangulatingPathOp::Make(const Path& path,
-                                                                   const Rect& clipBounds) {
+                                                                   Rect clipBounds) {
   const auto& skPath = PathRef::ReadAccess(path);
   if (skPath.countVerbs() > AA_TESSELLATOR_MAX_VERB_COUNT) {
     return nullptr;
   }
-  std::vector<float> vertex;
+  std::vector<float> vertices;
   auto skRect =
       pk::SkRect::MakeLTRB(clipBounds.left, clipBounds.top, clipBounds.right, clipBounds.bottom);
-  int count = skPath.toAATriangles(DefaultTolerance, skRect, &vertex);
+  int count = skPath.toAATriangles(DefaultTolerance, skRect, &vertices);
   if (count == 0) {
     return nullptr;
   }
-  return std::unique_ptr<GLTriangulatingPathOp>(new GLTriangulatingPathOp(vertex, count));
+  return std::make_unique<GLTriangulatingPathOp>(std::move(vertices), count, path.getBounds());
+}
+
+GLTriangulatingPathOp::GLTriangulatingPathOp(std::vector<float> vertex, int vertexCount,
+                                             Rect bounds)
+    : vertex(std::move(vertex)), vertexCount(vertexCount) {
+  setBounds(bounds);
 }
 
 std::unique_ptr<GeometryProcessor> GLTriangulatingPathOp::getGeometryProcessor(

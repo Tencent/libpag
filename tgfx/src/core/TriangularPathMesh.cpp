@@ -16,35 +16,26 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "pathkit.h"
+#include "TriangularPathMesh.h"
+#include "gpu/opengl/GLTriangulatingPathOp.h"
 
 namespace tgfx {
-class Path;
-
-// When tessellating curved paths into linear segments, this defines the maximum distance in
-// screen space which a segment may deviate from the mathematically correct value. Above this
-// value, the segment will be subdivided. This value was chosen to approximate the super sampling
-// accuracy of the raster path (16 samples, or one quarter pixel).
-static constexpr float DefaultTolerance = 0.25f;
-
-class PathRef {
- public:
-  static const pk::SkPath& ReadAccess(const Path& path);
-
-  static pk::SkPath& WriteAccess(Path& path);
-
-  PathRef() = default;
-
-  explicit PathRef(const pk::SkPath& path) : path(path) {
+std::pair<std::unique_ptr<GLDrawOp>, Matrix> TriangularPathMesh::getOp(
+    const Matrix& viewMatrix) const {
+  auto point = Point::Zero();
+  auto vertices = _vertices;
+  auto bounds = this->bounds();
+  if (!viewMatrix.isIdentity()) {
+    viewMatrix.mapRect(&bounds);
+    for (size_t i = 0; i < vertices.size(); i += 3) {
+      viewMatrix.mapXY(vertices[i], vertices[i + 1], &point);
+      vertices[i] = point.x;
+      vertices[i + 1] = point.y;
+    }
   }
-
- private:
-  pk::SkPath path = {};
-
-  friend class Path;
-  friend bool operator==(const Path& a, const Path& b);
-  friend bool operator!=(const Path& a, const Path& b);
-};
+  auto localMatrix = Matrix::I();
+  viewMatrix.invert(&localMatrix);
+  return {std::make_unique<GLTriangulatingPathOp>(std::move(vertices), _vertexCount, bounds),
+          localMatrix};
+}
 }  // namespace tgfx

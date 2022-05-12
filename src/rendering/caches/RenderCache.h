@@ -30,6 +30,7 @@
 #include "rendering/filters/LayerStylesFilter.h"
 #include "rendering/filters/MotionBlurFilter.h"
 #include "rendering/graphics/Picture.h"
+#include "rendering/graphics/Shape.h"
 #include "rendering/graphics/Snapshot.h"
 #include "rendering/layers/PAGStage.h"
 #include "rendering/sequences/SequenceReaderFactory.h"
@@ -101,6 +102,8 @@ class RenderCache : public Performance {
    */
   void removeSnapshot(ID assetID);
 
+  Snapshot* getSnapshot(const Shape* shape);
+
   TextAtlas* getTextAtlas(const TextGlyphs* textGlyphs);
 
   /**
@@ -158,6 +161,7 @@ class RenderCache : public Performance {
   std::unordered_map<ID, std::shared_ptr<SequenceReader>> sequenceCaches;
   std::unordered_map<ID, Filter*> filterCaches;
   MotionBlurFilter* motionBlurFilter = nullptr;
+  std::unordered_map<ID, std::unordered_map<tgfx::Path, Snapshot*, tgfx::PathHash>> pathCaches;
 
   // bitmap caches:
   void clearExpiredBitmaps();
@@ -181,10 +185,18 @@ class RenderCache : public Performance {
   void removeTextAtlas(ID assetID);
   TextAtlas* getTextAtlas(ID assetID) const;
 
+  // path snapshot caches:
+  Snapshot* getSnapshot(ID assetID, const tgfx::Path& path) const;
+  void removeSnapshot(ID assetID, const tgfx::Path& path);
+  void removePathSnapshots(ID assetID);
+
   void prepareLayers();
   void preparePreComposeLayer(PreComposeLayer* layer);
   void prepareImageLayer(PAGImageLayer* layer);
   std::shared_ptr<SequenceReader> getSequenceReaderInternal(const SequenceReaderFactory* factory);
+  Snapshot* makeSnapshot(float scaleFactor, const std::function<Snapshot*()>& maker);
+  void moveSnapshotToHead(Snapshot* snapshot);
+  void removeSnapshotFromLRU(Snapshot* snapshot);
 
   friend class PAGPlayer;
 };

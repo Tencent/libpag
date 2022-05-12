@@ -30,7 +30,8 @@ void ShapeContentCache::excludeVaryingRanges(std::vector<TimeRange>* timeRanges)
 }
 
 GraphicContent* ShapeContentCache::createContent(Frame layerFrame) const {
-  auto graphic = RenderShapes(static_cast<ShapeLayer*>(layer)->contents, layerFrame);
+  auto graphic =
+      RenderShapes(layer->uniqueID, static_cast<ShapeLayer*>(layer)->contents, layerFrame);
   return new GraphicContent(graphic);
 }
 }  // namespace pag

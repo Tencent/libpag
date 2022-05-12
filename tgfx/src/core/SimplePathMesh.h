@@ -18,33 +18,24 @@
 
 #pragma once
 
-#include "pathkit.h"
+#include <optional>
+#include "tgfx/core/Mesh.h"
 
 namespace tgfx {
-class Path;
-
-// When tessellating curved paths into linear segments, this defines the maximum distance in
-// screen space which a segment may deviate from the mathematically correct value. Above this
-// value, the segment will be subdivided. This value was chosen to approximate the super sampling
-// accuracy of the raster path (16 samples, or one quarter pixel).
-static constexpr float DefaultTolerance = 0.25f;
-
-class PathRef {
+class SimplePathMesh : public Mesh {
  public:
-  static const pk::SkPath& ReadAccess(const Path& path);
-
-  static pk::SkPath& WriteAccess(Path& path);
-
-  PathRef() = default;
-
-  explicit PathRef(const pk::SkPath& path) : path(path) {
+  explicit SimplePathMesh(Rect rect) : rect(rect) {
   }
 
- private:
-  pk::SkPath path = {};
+  explicit SimplePathMesh(RRect rRect) : rRect(rRect) {
+  }
 
-  friend class Path;
-  friend bool operator==(const Path& a, const Path& b);
-  friend bool operator!=(const Path& a, const Path& b);
+  Rect bounds() const override;
+
+ private:
+  std::pair<std::unique_ptr<GLDrawOp>, Matrix> getOp(const Matrix& viewMatrix) const override;
+
+  std::optional<Rect> rect;
+  std::optional<RRect> rRect;
 };
 }  // namespace tgfx

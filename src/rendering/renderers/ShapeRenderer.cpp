@@ -919,7 +919,7 @@ void ApplyStrokeToPath(tgfx::Path* path, const StrokePaint& stroke) {
   }
 }
 
-std::shared_ptr<Graphic> RenderShape(PaintElement* paint, tgfx::Path* path) {
+std::shared_ptr<Graphic> RenderShape(ID assetID, PaintElement* paint, tgfx::Path* path) {
   tgfx::Path shapePath = *path;
   auto paintType = paint->paintType;
   if (paintType == PaintType::Stroke || paintType == PaintType::GradientStroke) {
@@ -930,15 +930,15 @@ std::shared_ptr<Graphic> RenderShape(PaintElement* paint, tgfx::Path* path) {
   }
   std::shared_ptr<Graphic> shape = nullptr;
   if (paintType == PaintType::GradientStroke || paintType == PaintType::GradientFill) {
-    shape = Shape::MakeFrom(shapePath, paint->gradient);
+    shape = Shape::MakeFrom(assetID, shapePath, paint->gradient);
   } else {
-    shape = Shape::MakeFrom(shapePath, paint->color);
+    shape = Shape::MakeFrom(assetID, shapePath, paint->color);
   }
   auto modifier = Modifier::MakeBlend(paint->alpha, paint->blendMode);
   return Graphic::MakeCompose(shape, modifier);
 }
 
-std::shared_ptr<Graphic> RenderShape(GroupElement* group, tgfx::Path* path) {
+std::shared_ptr<Graphic> RenderShape(ID assetID, GroupElement* group, tgfx::Path* path) {
   std::vector<std::shared_ptr<Graphic>> contents = {};
   for (auto& element : group->elements) {
     switch (element->type()) {
@@ -948,7 +948,7 @@ std::shared_ptr<Graphic> RenderShape(GroupElement* group, tgfx::Path* path) {
       } break;
       case ElementDataType::Paint: {
         auto paint = reinterpret_cast<PaintElement*>(element);
-        auto shape = RenderShape(paint, path);
+        auto shape = RenderShape(assetID, paint, path);
         if (shape) {
           if (paint->compositeOrder == CompositeOrder::AbovePreviousInSameGroup) {
             contents.push_back(shape);
@@ -959,7 +959,7 @@ std::shared_ptr<Graphic> RenderShape(GroupElement* group, tgfx::Path* path) {
       } break;
       case ElementDataType::Group: {
         tgfx::Path tempPath = {};
-        auto shape = RenderShape(static_cast<GroupElement*>(element), &tempPath);
+        auto shape = RenderShape(assetID, static_cast<GroupElement*>(element), &tempPath);
         path->addPath(tempPath);
         if (shape) {
           contents.insert(contents.begin(), shape);
@@ -972,12 +972,12 @@ std::shared_ptr<Graphic> RenderShape(GroupElement* group, tgfx::Path* path) {
   return Graphic::MakeCompose(shape, modifier);
 }
 
-std::shared_ptr<Graphic> RenderShapes(const std::vector<ShapeElement*>& contents,
+std::shared_ptr<Graphic> RenderShapes(ID assetID, const std::vector<ShapeElement*>& contents,
                                       Frame layerFrame) {
   GroupElement rootGroup;
   auto matrix = tgfx::Matrix::I();
   RenderElements(contents, matrix, &rootGroup, layerFrame);
   tgfx::Path tempPath = {};
-  return RenderShape(&rootGroup, &tempPath);
+  return RenderShape(assetID, &rootGroup, &tempPath);
 }
 }  // namespace pag

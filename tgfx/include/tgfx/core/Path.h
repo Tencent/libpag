@@ -237,11 +237,19 @@ class Path {
    */
   void decompose(const PathIterator& iterator, void* info = nullptr) const;
 
+  int hash() const;
+
  private:
   std::shared_ptr<PathRef> pathRef = nullptr;
 
   PathRef* writableRef();
 
   friend class PathRef;
+
+  friend struct PathHash;
+};
+
+struct PathHash {
+  size_t operator()(const Path& path) const;
 };
 }  // namespace tgfx
