@@ -41,7 +41,6 @@
   [(PAGImageLayerImpl*)self.impl setImage:image];
 }
 
-
 - (int64_t)contentDuration {
   return [(PAGImageLayerImpl*)self.impl contentDuration];
 }
