@@ -27,12 +27,22 @@ export class PAGImageLayer extends PAGLayer {
     return this.wasmIns._getVideoRanges() as Vector<PAGVideoRange>;
   }
   /**
-   * Replace the original image content with the specified PAGImage object. Passing in null for the
-   * image parameter resets the layer to its default image content.
+   * [Deprecated]
+   * Replace the original image content of layers which have same editable index with the specified
+   * PAGImage object. Passing in null for the image parameter resets the layer to its default
+   * image content.
    * @param image The PAGImage object to replace with.
    */
   public replaceImage(pagImage: PAGImage) {
     this.wasmIns._replaceImage(pagImage.wasmIns);
+  }
+  /**
+   * Replace the original image content with the specified PAGImage object. Passing in null for the
+   * image parameter resets the layer to its default image content.
+   * @param image The PAGImage object to replace with.
+   */
+  public setImage(pagImage: PAGImage) {
+    this.wasmIns._setImage(pagImage.wasmIns);
   }
   /**
    * Converts the time from the PAGImageLayer's timeline to the replacement content's timeline. The

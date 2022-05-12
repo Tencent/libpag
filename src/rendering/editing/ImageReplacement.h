@@ -22,15 +22,15 @@
 namespace pag {
 class ImageReplacement : public Content {
  public:
-  ImageReplacement(ImageLayer* imageLayer, PAGImageHolder* imageHolder, int editableIndex);
+  ImageReplacement(ImageLayer* imageLayer, std::shared_ptr<PAGImage> pagImage);
 
   void measureBounds(tgfx::Rect* bounds) override;
   void draw(Recorder* recorder) override;
   tgfx::Point getScaleFactor() const;
+  std::shared_ptr<PAGImage> getImage();
 
  private:
-  PAGImageHolder* imageHolder = nullptr;
-  int editableIndex = 0;
+  std::shared_ptr<PAGImage> pagImage;
   int defaultScaleMode = PAGScaleMode::LetterBox;
   int contentWidth = 0;
   int contentHeight = 0;

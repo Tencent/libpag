@@ -36,11 +36,23 @@ PAG_API @interface PAGImageLayer : PAGLayer
 
 /**
  * Replace the original image content with the specified PAGImage object. Passing in null for the
- * image parameter resets the layer to its default image content. This method walks through the
- * whole layer tree, and replaces every PAGImageLayer which has the same content to this layer.
+ * image parameter resets the layer to its default image content.
+ *
+ * This method walks through the whole layer tree, and replaces every PAGImageLayer
+ * which has the same content to this layer.
  * @param image The PAGImage object to replace with.
  */
-- (void)replaceImage:(PAGImage*)image;
+- (void)replaceImage:(PAGImage*)image
+    DEPRECATED_MSG_ATTRIBUTE("Please use replaceImage:image instead");
+
+/**
+ * Set the original image content with the specified PAGImage object. Passing in null for the
+ * image parameter resets the layer to its default image content.
+ *
+ * This method only replaces this layer.
+ * @param image The PAGImage object to replace with.
+ */
+- (void)setImage:(PAGImage*)image;
 
 /**
  * Returns the content duration in microseconds, which indicates the minimal length required for
