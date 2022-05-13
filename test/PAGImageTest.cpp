@@ -24,7 +24,6 @@
 #include "tgfx/core/Image.h"
 #include "tgfx/gpu/Surface.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
-#include "base/utils/Log.h"
 
 namespace pag {
 using namespace tgfx;
@@ -46,7 +45,6 @@ PAG_TEST_F(PAGImageTest, contentDuration) {
  * 用例描述: PAGImage解码等功能
  */
 PAG_TEST_F(PAGImageTest, image) {
-  LOGE("Image begin");
   int target = 0;
   std::shared_ptr<PAGImageLayer> imageLayer =
       std::static_pointer_cast<PAGImageLayer>(GetLayer(TestPAGFile, LayerType::Image, target));
@@ -95,11 +93,8 @@ PAG_TEST_F(PAGImageTest, image) {
   auto image = PAGImage::FromPixels(fileData->data(), width, height, rowBytes, ColorType::RGBA_8888,
                                     AlphaType::Premultiplied);
   TestPAGFile->setCurrentTime(3000000);
-  LOGE("Image TestPAGFile setCurrentTime");
   imageLayer->replaceImage(image);
-  LOGE("Image TestPAGFile replaceImage");
   TestPAGPlayer->flush();
-  LOGE("Image TestPAGFile flush");
   EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGImageTest/image"));
 }
 
