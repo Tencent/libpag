@@ -218,11 +218,12 @@ void PAGImageLayer::setImageInternal(std::shared_ptr<PAGImage> image) {
       stage->addReference(image.get(), this);
     }
   }
-  delete replacement;
+  if (replacement != nullptr) {
+    delete replacement;
+    replacement = nullptr;
+  }
   if (image != nullptr) {
     replacement = new ImageReplacement(static_cast<ImageLayer*>(layer), image);
-  } else {
-    replacement = nullptr;
   }
   notifyModified(true);
   invalidateCacheScale();
