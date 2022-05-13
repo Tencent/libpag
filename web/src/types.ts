@@ -15,6 +15,9 @@ import { NativeImage } from './core/native-image';
 import { WebMask } from './core/web-mask';
 import { PAGTextLayer } from './pag-text-layer';
 import { GlobalCanvas } from './core/global-canvas';
+import { PAGGlTexture } from './core/pag-gl-texture';
+import { PAGGlFrameBuffer } from './core/pag-gl-framebuffer';
+import { PAGGlContext } from './core/pag-gl-context';
 
 declare global {
   interface Window {
@@ -29,6 +32,15 @@ export interface PAG extends EmscriptenModule {
   };
   _PAGImage: {
     _FromNativeImage: (nativeImage: NativeImage) => any;
+    _FromPixels: (
+      pixels: number,
+      width: number,
+      height: number,
+      rowBytes: number,
+      colorType: ColorType,
+      alphaType: AlphaType,
+    ) => any;
+    _FromTexture: (textureID: number, width: number, height: number, flipY: boolean) => any;
   };
   _PAGPlayer: any;
   _PAGSurface: {
@@ -76,26 +88,39 @@ export interface PAG extends EmscriptenModule {
   ScalerContext: typeof ScalerContext;
   VideoReader: typeof VideoReader;
   GlobalCanvas: typeof GlobalCanvas;
+  PAGGlTexture: typeof PAGGlTexture;
+  PAGGlFrameBuffer: typeof PAGGlFrameBuffer;
+  PAGGlContext: typeof PAGGlContext;
   traceImage: (info: { width: number; height: number }, pixels: Uint8Array, tag: string) => void;
   registerSoftwareDecoderFactory: (factory: SoftwareDecoderFactory) => void;
+  [key: string]: any;
 }
 
 export interface EmscriptenGL {
-  currentContext?: {
-    handle: number;
-    GLctx: WebGLRenderingContext;
-    attributes: { majorVersion: number; minorVersion: number };
-  };
-  textures: WebGLTexture[];
+  contexts: (EmscriptenGLContext | null)[];
   createContext: (
     canvas: HTMLCanvasElement | OffscreenCanvas,
-    webGLContextAttributes: { majorVersion: number; minorVersion: number } & WebGLContextAttributes,
+    webGLContextAttributes: EmscriptenGLContextAttributes,
   ) => number;
-  registerContext: (gl: WebGLRenderingContext, options: { majorVersion: number; minorVersion: number }) => number;
-  makeContextCurrent: (contextId: number) => void;
-  deleteContext: (contextId: number) => void;
+  currentContext?: EmscriptenGLContext;
+  deleteContext: (contextHandle: number) => void;
+  framebuffers: (WebGLFramebuffer | null)[];
+  getContext: (contextHandle: number) => EmscriptenGLContext;
   getNewId: (array: any[]) => number;
+  makeContextCurrent: (contextHandle: number) => void;
+  registerContext: (ctx: WebGLRenderingContext, webGLContextAttributes: EmscriptenGLContextAttributes) => number;
+  textures: (WebGLTexture | null)[];
 }
+
+export interface EmscriptenGLContext {
+  handle: number;
+  GLctx: WebGLRenderingContext;
+  attributes: EmscriptenGLContextAttributes;
+  initExtensionsDone: boolean;
+  version: number;
+}
+
+export type EmscriptenGLContextAttributes = { majorVersion: number; minorVersion: number } & WebGLContextAttributes;
 
 /**
  * Defines the rules on how to scale the content to fit the specified area.

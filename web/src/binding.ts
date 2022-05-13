@@ -6,44 +6,48 @@ import { PAGImage } from './pag-image';
 import { PAGView } from './pag-view';
 import { PAGFont } from './pag-font';
 import { PAGLayer } from './pag-layer';
-import { PAGComposition } from './pag-composition';
 import { VideoReader } from './core/video-reader';
 import { ScalerContext } from './core/scaler-context';
 import { WebMask } from './core/web-mask';
 import { NativeImage } from './core/native-image';
-import { PAGTextLayer } from './pag-text-layer';
 import { GlobalCanvas } from './core/global-canvas';
+import { PAGGlContext } from './core/pag-gl-context';
+import { PAGGlUnit } from './core/pag-gl-unit';
+import { PAGComposition } from './pag-composition';
+import { PAGTextLayer } from './pag-text-layer';
+import { PAGGlTexture } from './core/pag-gl-texture';
+import { PAGGlFrameBuffer } from './core/pag-gl-framebuffer';
+
+const interactiveBindingClasses = [
+  PAGFile,
+  PAGPlayer,
+  PAGView,
+  PAGFont,
+  PAGImage,
+  PAGLayer,
+  PAGSurface,
+  WebMask,
+  GlobalCanvas,
+  PAGGlUnit,
+  PAGGlContext,
+];
 
 /**
  * Binding pag js module on pag webassembly module.
  */
 export const binding = (module: PAG) => {
   module.PAG = module;
-  module.PAGFile = PAGFile;
-  PAGFile.module = module;
-  module.PAGPlayer = PAGPlayer;
-  PAGPlayer.module = module;
-  module.PAGView = PAGView;
-  PAGView.module = module;
-  module.PAGFont = PAGFont;
-  PAGFont.module = module;
-  module.PAGImage = PAGImage;
-  PAGImage.module = module;
-  module.PAGLayer = PAGLayer;
-  PAGLayer.module = module;
   module.PAGComposition = PAGComposition;
-  PAGComposition.module = module;
-  module.PAGSurface = PAGSurface;
-  PAGSurface.module = module;
+  module.PAGGlFrameBuffer = PAGGlFrameBuffer;
+  module.PAGGlTexture = PAGGlTexture;
   module.PAGTextLayer = PAGTextLayer;
-  PAGTextLayer.module = module;
   module.VideoReader = VideoReader;
   module.NativeImage = NativeImage;
   module.ScalerContext = ScalerContext;
-  module.WebMask = WebMask;
-  WebMask.module = module;
-  module.GlobalCanvas = GlobalCanvas;
-  GlobalCanvas.module = module;
+  interactiveBindingClasses.forEach((item) => {
+    module[item.name] = item;
+    item.module = module;
+  });
   module.traceImage = function (info, pixels) {
     const canvas = document.createElement('canvas');
     canvas.width = info.width;

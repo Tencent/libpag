@@ -56,10 +56,6 @@ export class PAGFile extends PAGComposition {
     return this.module._PAGFile._MaxSupportedTagLevel() as number;
   }
 
-  public constructor(wasmIns: any) {
-    super(wasmIns);
-  }
-
   /**
    * The tag level this pag file requires.
    */

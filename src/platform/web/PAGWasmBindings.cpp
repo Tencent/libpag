@@ -277,6 +277,23 @@ EMSCRIPTEN_BINDINGS(pag) {
                         return std::static_pointer_cast<PAGImage>(
                             StillImage::MakeFrom(tgfx::NativeImage::MakeFrom(nativeImage)));
                       }))
+      .class_function("_FromPixels",
+                      optional_override([](uintptr_t pixels, int width, int height, size_t rowBytes,
+                                           int colorType, int alphaType) {
+                        return PAGImage::FromPixels(reinterpret_cast<void*>(pixels), width, height,
+                                                    rowBytes, static_cast<ColorType>(colorType),
+                                                    static_cast<AlphaType>(alphaType));
+                      }))
+      .class_function("_FromTexture",
+                      optional_override([](int textureID, int width, int height, bool flipY) {
+                        GLTextureInfo glInfo = {};
+                        glInfo.target = GL_TEXTURE_2D;
+                        glInfo.id = static_cast<unsigned>(textureID);
+                        glInfo.format = GL_RGBA8;
+                        BackendTexture glTexture(glInfo, width, height);
+                        auto origin = flipY ? ImageOrigin::BottomLeft : ImageOrigin::TopLeft;
+                        return PAGImage::FromTexture(glTexture, origin);
+                      }))
       .function("_width", &PAGImage::width)
       .function("_height", &PAGImage::height)
       .function("_scaleMode", &PAGImage::scaleMode)

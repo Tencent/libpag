@@ -1,6 +1,7 @@
-import { Matrix, PAG, PAGScaleMode } from './types';
+import { AlphaType, ColorType, Matrix, PAG, PAGScaleMode } from './types';
 import { NativeImage } from './core/native-image';
 import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorators';
+import { PAGGlTexture } from './core/pag-gl-texture';
 
 @destroyVerify
 @wasmAwaitRewind
@@ -36,6 +37,26 @@ export class PAGImage {
     const nativeImage = new NativeImage(source);
     const wasmIns = this.module._PAGImage._FromNativeImage(nativeImage);
     return new PAGImage(wasmIns);
+  }
+
+  public static fromPixels(
+    pixels: Uint8Array,
+    width: number,
+    height: number,
+    colorType: ColorType,
+    alphaType: AlphaType,
+  ): PAGImage {
+    const rowBytes = width * (colorType === ColorType.ALPHA_8 ? 1 : 4);
+    const dataPtr = PAGImage.module._malloc(pixels.byteLength);
+    const dataOnHeap = new Uint8Array(PAGImage.module.HEAPU8.buffer, dataPtr, pixels.byteLength);
+    dataOnHeap.set(pixels);
+    const wasmIns = this.module._PAGImage._FromPixels(dataPtr, width, height, rowBytes, colorType, alphaType);
+    return new PAGImage(wasmIns);
+  }
+
+  public static fromTexture(texture: PAGGlTexture, width: number, height: number, flipY: boolean) {
+    texture.makeContextCurrent();
+    return new PAGImage(PAGImage.module._PAGImage._FromTexture(texture.id, width, height, flipY));
   }
 
   public wasmIns;
