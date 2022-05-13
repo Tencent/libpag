@@ -126,7 +126,7 @@ static int64_t GetCurrentTimeUS() {
 }
 
 - (double)getAnimatedValue {
-    return animatedValue;
+  return animatedValue;
 }
 
 - (void)setCurrentPlayTime:(int64_t)time {

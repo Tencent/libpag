@@ -127,7 +127,7 @@ static CVReturn handleDisplayLink(CVDisplayLinkRef, const CVTimeStamp*, const CV
 }
 
 - (double)getAnimatedValue {
-    return animatedValue;
+  return animatedValue;
 }
 
 - (void)setCurrentPlayTime:(int64_t)time {
