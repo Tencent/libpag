@@ -20,7 +20,7 @@
 
 @protocol PAGValueAnimatorListener <NSObject>
 
-- (void)onAnimationUpdate:(double)value;
+- (void)onAnimationUpdate;
 
 - (void)onAnimationStart;
 
@@ -38,6 +38,7 @@
   int64_t playTime;
   int repeatCount;
   int repeatedTimes;
+  double animatedValue;
   NSUInteger animatorId;
   id<PAGValueAnimatorListener> animatorListener;
 }
@@ -47,6 +48,8 @@
 - (int64_t)duration;
 
 - (void)setDuration:(int64_t)duration;
+
+- (double)getAnimatedValue;
 
 - (void)setCurrentPlayTime:(int64_t)playTime;
 

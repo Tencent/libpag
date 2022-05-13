@@ -134,10 +134,10 @@
   [self flush];
 }
 
-- (void)onAnimationUpdate:(double)value {
+- (void)onAnimationUpdate {
   [self retain];
   dispatch_async(dispatch_get_main_queue(), ^{
-    [pagPlayer setProgress:value];
+    [pagPlayer setProgress:[valueAnimator getAnimatedValue]];
     [self flush];
     [self release];
   });
@@ -337,10 +337,8 @@
 }
 
 - (void)setProgress:(double)value {
-  [pagPlayer setProgress:value];
-  if ([self isPlaying]) {
-    [valueAnimator setCurrentPlayTime:(int64_t)(value * valueAnimator.duration)];
-  }
+  [valueAnimator setCurrentPlayTime:(int64_t)(value * valueAnimator.duration)];
+  [valueAnimator setRepeatCount:0];
 }
 
 - (BOOL)flush {

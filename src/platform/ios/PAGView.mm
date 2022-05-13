@@ -38,7 +38,6 @@ void DestoryFlushQueue() {
 @property(atomic, assign) BOOL isAsyncFlushing;
 @property(atomic, assign) BOOL bufferPrepared;
 @property(atomic, assign) BOOL isInBackground;
-@property(atomic, assign) double animatorProgress;
 @end
 
 @implementation PAGView {
@@ -212,8 +211,7 @@ void DestoryFlushQueue() {
   [self updateView];
 }
 
-- (void)onAnimationUpdate:(double)value {
-  self.animatorProgress = value;
+- (void)onAnimationUpdate {
   [self updateView];
 }
 
@@ -293,7 +291,7 @@ void DestoryFlushQueue() {
 
 - (void)play {
   _isPlaying = true;
-  if (self.animatorProgress == 1.0) {
+  if ([valueAnimator getAnimatedValue] == 1.0) {
     [self setProgress:0];
   }
   [self doPlay];
@@ -303,7 +301,7 @@ void DestoryFlushQueue() {
   if (!_isVisible) {
     return;
   }
-  int64_t playTime = (int64_t)(self.animatorProgress * [valueAnimator duration]);
+  int64_t playTime = (int64_t)([valueAnimator getAnimatedValue] * [valueAnimator duration]);
   [valueAnimator setCurrentPlayTime:playTime];
   [valueAnimator start];
 }
@@ -410,12 +408,8 @@ void DestoryFlushQueue() {
 }
 
 - (void)setProgress:(double)value {
-  self.animatorProgress = value;
-  if ([self isPlaying]) {
-    [valueAnimator setCurrentPlayTime:(int64_t)(value * valueAnimator.duration)];
-  }
+  [valueAnimator setCurrentPlayTime:(int64_t)(value * valueAnimator.duration)];
   [valueAnimator setRepeatedTimes:0];
-  [self updateView];
 }
 
 - (BOOL)flush {
@@ -448,7 +442,7 @@ void DestoryFlushQueue() {
 }
 
 - (void)actualUpdateView {
-  [pagPlayer setProgress:self.animatorProgress];
+  [pagPlayer setProgress:[valueAnimator getAnimatedValue]];
   [self flush];
 }
 
