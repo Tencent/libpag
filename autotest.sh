@@ -61,7 +61,7 @@ else
   COMPLIE_RESULT=false
 fi
 
-cp -a $WORKSPACE/build/*.json $WORKSPACE/result/
+cp -a $WORKSPACE /build/* $WORKSPACE/result/
 
 cd ..
 
