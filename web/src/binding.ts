@@ -13,6 +13,8 @@ import { WebMask } from './core/web-mask';
 import { NativeImage } from './core/native-image';
 import { PAGTextLayer } from './pag-text-layer';
 import { GlobalCanvas } from './core/global-canvas';
+import { PAGGlTexture } from './core/pag-gl-texture';
+import { PAGGlFrameBuffer } from './core/pag-gl-framebuffer';
 
 /**
  * Binding pag js module on pag webassembly module.
@@ -44,6 +46,10 @@ export const binding = (module: PAG) => {
   WebMask.module = module;
   module.GlobalCanvas = GlobalCanvas;
   GlobalCanvas.module = module;
+  module.PAGGlTexture = PAGGlTexture;
+  PAGGlTexture.module = module;
+  module.PAGGlFrameBuffer = PAGGlFrameBuffer;
+  PAGGlFrameBuffer.module = module;
   module.traceImage = function (info, pixels) {
     const canvas = document.createElement('canvas');
     canvas.width = info.width;
