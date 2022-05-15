@@ -47,11 +47,7 @@ PAG_TEST_F(PAGImageTest, contentDuration) {
  */
 PAG_TEST_F(PAGImageTest, image) {
   LOGE("Image begin");
-  int target = 0;
-  std::shared_ptr<PAGImageLayer> imageLayer =
-      std::static_pointer_cast<PAGImageLayer>(GetLayer(TestPAGFile, LayerType::Image, target));
-  ASSERT_NE(imageLayer, nullptr);
-  ASSERT_EQ(imageLayer->editableIndex(), 1);
+
   int width = 110;
   int height = 110;
   size_t rowBytes = 110 * 4;
@@ -108,6 +104,11 @@ PAG_TEST_F(PAGImageTest, image) {
                                     AlphaType::Premultiplied);
   TestPAGFile->setCurrentTime(3000000);
   LOGE("Image TestPAGFile setCurrentTime");
+  int target = 0;
+  std::shared_ptr<PAGImageLayer> imageLayer =
+      std::static_pointer_cast<PAGImageLayer>(GetLayer(TestPAGFile, LayerType::Image, target));
+  ASSERT_NE(imageLayer, nullptr);
+  ASSERT_EQ(imageLayer->editableIndex(), 1);
   imageLayer->replaceImage(image);
   LOGE("Image TestPAGFile replaceImage");
   TestPAGPlayer->flush();
