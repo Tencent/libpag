@@ -58,7 +58,6 @@ PAGImageLayer::PAGImageLayer(int width, int height, int64_t duration) : PAGLayer
 
 PAGImageLayer::~PAGImageLayer() {
   setImageInternal(nullptr);
-  delete replacement;
   if (emptyImageLayer) {
     delete emptyImageLayer->imageBytes;
     delete emptyImageLayer;
