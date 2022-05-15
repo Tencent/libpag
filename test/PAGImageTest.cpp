@@ -83,10 +83,13 @@ PAG_TEST_F(PAGImageTest, image) {
   bitmap.eraseAll();
   LOGE("Image 7");
   compare = memcmp(bitmap.pixels(), emptyData->data(), emptyData->length());
+  LOGE("Image 7.1");
   ASSERT_EQ(compare, 0);
   result = bitmap.writePixels(info, fileData->data(), 20, -10);
+  LOGE("Image 7.2");
   ASSERT_TRUE(result);
   result = bitmap.readPixels(info, newFileData->data(), 20, -10);
+  LOGE("Image 7.3");
   ASSERT_TRUE(result);
   compare = memcmp(fileData->data(), newFileData->data(), fileData->length());
   ASSERT_EQ(compare, 0);
