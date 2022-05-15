@@ -55,26 +55,33 @@ PAG_TEST_F(PAGImageTest, image) {
   int width = 110;
   int height = 110;
   size_t rowBytes = 110 * 4;
+  LOGE("Image 1");
   auto fileData = ByteData::FromPath("../resources/apitest/data.rgba");
   auto pixelBuffer = PixelBuffer::Make(0, height, false, false);
   ASSERT_TRUE(pixelBuffer == nullptr);
+  LOGE("Image 2");
   pixelBuffer = PixelBuffer::Make(width, height, true, false);
   ASSERT_TRUE(pixelBuffer != nullptr);
+  LOGE("Image 3");
   EXPECT_EQ(pixelBuffer->colorType(), tgfx::ColorType::ALPHA_8);
   pixelBuffer = PixelBuffer::Make(width, height, false, false);
+  LOGE("Image 4");
   ASSERT_TRUE(pixelBuffer != nullptr);
   Bitmap bitmap(pixelBuffer);
   auto info = ImageInfo::Make(width, height, tgfx::ColorType::RGBA_8888,
                               tgfx::AlphaType::Premultiplied, rowBytes);
   auto result = bitmap.writePixels(info, fileData->data());
+  LOGE("Image 5");
   ASSERT_TRUE(result);
   auto newFileData = ByteData::Make(fileData->length());
   bitmap.readPixels(info, newFileData->data());
+  LOGE("Image 6");
   auto compare = memcmp(fileData->data(), newFileData->data(), fileData->length());
   ASSERT_EQ(compare, 0);
   auto emptyData = ByteData::Make(fileData->length());
   memset(emptyData->data(), 0, emptyData->length());
   bitmap.eraseAll();
+  LOGE("Image 7");
   compare = memcmp(bitmap.pixels(), emptyData->data(), emptyData->length());
   ASSERT_EQ(compare, 0);
   result = bitmap.writePixels(info, fileData->data(), 20, -10);
@@ -83,6 +90,7 @@ PAG_TEST_F(PAGImageTest, image) {
   ASSERT_TRUE(result);
   compare = memcmp(fileData->data(), newFileData->data(), fileData->length());
   ASSERT_EQ(compare, 0);
+  LOGE("Image 8");
   memset(emptyData->data(), 1, emptyData->length());
   auto emptyInfo = info.makeWH(100, height);
   Bitmap bitmap2(emptyInfo, emptyData->data());
@@ -92,6 +100,7 @@ PAG_TEST_F(PAGImageTest, image) {
   EXPECT_TRUE(bytes[400] == 1);
   EXPECT_TRUE(bytes[399 + info.rowBytes()] == 0);
   EXPECT_TRUE(bytes[400 + info.rowBytes()] == 1);
+  LOGE("Image 9");
   auto image = PAGImage::FromPixels(fileData->data(), width, height, rowBytes, ColorType::RGBA_8888,
                                     AlphaType::Premultiplied);
   TestPAGFile->setCurrentTime(3000000);
