@@ -167,8 +167,9 @@ bool Bitmap::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int
     return false;
   }
   auto srcPixels = _info.computeOffset(_pixels, srcX, srcY);
+  auto srcInfo = _info.makeWH(imageInfo.width(), imageInfo.height());
   dstPixels = imageInfo.computeOffset(dstPixels, -srcX, -srcY);
-  ConvertPixels(_info, srcPixels, imageInfo, dstPixels);
+  ConvertPixels(srcInfo, srcPixels, imageInfo, dstPixels);
   return true;
 }
 
@@ -180,9 +181,10 @@ bool Bitmap::writePixels(const ImageInfo& srcInfo, const void* srcPixels, int ds
   if (imageInfo.isEmpty()) {
     return false;
   }
-  auto dstPixels = _info.computeOffset(_writablePixels, dstX, dstY);
   srcPixels = imageInfo.computeOffset(srcPixels, -dstX, -dstY);
-  ConvertPixels(imageInfo, srcPixels, _info, dstPixels);
+  auto dstPixels = _info.computeOffset(_writablePixels, dstX, dstY);
+  auto dstInfo = _info.makeWH(imageInfo.width(), imageInfo.height());
+  ConvertPixels(imageInfo, srcPixels, dstInfo, dstPixels);
   return true;
 }
 
