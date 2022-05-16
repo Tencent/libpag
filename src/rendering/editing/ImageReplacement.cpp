@@ -30,6 +30,10 @@ ImageReplacement::ImageReplacement(ImageLayer* imageLayer, std::shared_ptr<PAGIm
   contentHeight = imageLayer->imageBytes->height;
 }
 
+ImageReplacement::~ImageReplacement() {
+  LOGE("replacement deleted");
+}
+
 void ImageReplacement::measureBounds(tgfx::Rect* bounds) {
   tgfx::Rect contentBounds = {};
   auto graphic = pagImage->getGraphic();
