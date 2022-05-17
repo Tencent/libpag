@@ -404,7 +404,7 @@ void DestoryFlushQueue() {
 }
 
 - (double)getProgress {
-  return [pagPlayer getProgress];
+  return [valueAnimator getAnimatedValue];
 }
 
 - (void)setProgress:(double)value {

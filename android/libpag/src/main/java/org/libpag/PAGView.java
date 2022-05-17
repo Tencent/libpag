@@ -732,7 +732,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
      * Returns the current progress of play position, the value is from 0.0 to 1.0.
      */
     public double getProgress() {
-        return pagPlayer.getProgress();
+        return (float) animator.getAnimatedValue();
     }
 
     /**
