@@ -38,7 +38,6 @@ void DestoryFlushQueue() {
 @property(atomic, assign) BOOL isAsyncFlushing;
 @property(atomic, assign) BOOL bufferPrepared;
 @property(atomic, assign) BOOL isInBackground;
-@property(atomic, assign) double animatorProgress;
 @end
 
 @implementation PAGView {
@@ -212,8 +211,7 @@ void DestoryFlushQueue() {
   [self updateView];
 }
 
-- (void)onAnimationUpdate:(double)value {
-  self.animatorProgress = value;
+- (void)onAnimationUpdate {
   [self updateView];
 }
 
@@ -293,7 +291,7 @@ void DestoryFlushQueue() {
 
 - (void)play {
   _isPlaying = true;
-  if (self.animatorProgress == 1.0) {
+  if ([valueAnimator getAnimatedFraction] == 1.0) {
     [self setProgress:0];
   }
   [self doPlay];
@@ -303,7 +301,7 @@ void DestoryFlushQueue() {
   if (!_isVisible) {
     return;
   }
-  int64_t playTime = (int64_t)(self.animatorProgress * [valueAnimator duration]);
+  int64_t playTime = (int64_t)([valueAnimator getAnimatedFraction] * [valueAnimator duration]);
   [valueAnimator setCurrentPlayTime:playTime];
   [valueAnimator start];
 }
@@ -406,22 +404,19 @@ void DestoryFlushQueue() {
 }
 
 - (double)getProgress {
-  return [pagPlayer getProgress];
+  return [valueAnimator getAnimatedFraction];
 }
 
 - (void)setProgress:(double)value {
-  self.animatorProgress = value;
-  if ([self isPlaying]) {
-    [valueAnimator setCurrentPlayTime:(int64_t)(value * valueAnimator.duration)];
-  }
+  [valueAnimator setCurrentPlayTime:(int64_t)(value * valueAnimator.duration)];
   [valueAnimator setRepeatedTimes:0];
-  [self updateView];
 }
 
 - (BOOL)flush {
   if (self.isInBackground) {
     return false;
   }
+  [pagPlayer setProgress:[valueAnimator getAnimatedFraction]];
   auto result = [pagPlayer flush];
   if (self.bufferPrepared) {
     [PAGView RegisterFlushQueueDestoryMethod];
@@ -441,15 +436,10 @@ void DestoryFlushQueue() {
 
 - (void)updateView {
   if (_sync) {
-    [self actualUpdateView];
+    [self flush];
   } else {
     [self updateViewAsync];
   }
-}
-
-- (void)actualUpdateView {
-  [pagPlayer setProgress:self.animatorProgress];
-  [self flush];
 }
 
 - (void)updateViewAsync {
@@ -460,7 +450,7 @@ void DestoryFlushQueue() {
   NSOperationQueue* flushQueue = [PAGView FlushQueue];
   [self retain];
   NSBlockOperation* operation = [NSBlockOperation blockOperationWithBlock:^{
-    [self actualUpdateView];
+    [self flush];
     self.isAsyncFlushing = FALSE;
     dispatch_async(dispatch_get_main_queue(), ^{
       [self release];

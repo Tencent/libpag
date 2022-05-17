@@ -222,7 +222,6 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
 
     private ArrayList<PAGViewListener> mViewListeners = new ArrayList<>();
     private ArrayList<PAGFlushListener> mPAGFlushListeners = new ArrayList<>();
-    private volatile double animatorProgress;
     private volatile long currentPlayTime;
 
     public PAGView(Context context) {
@@ -250,14 +249,9 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         @Override
         public void onAnimationUpdate(ValueAnimator animation) {
             PAGView.this.currentPlayTime = animation.getCurrentPlayTime();
-            PAGView.this.onAnimationUpdate((float) animator.getAnimatedValue());
+            NeedsUpdateView(PAGView.this);
         }
     };
-
-    private void onAnimationUpdate(double progress) {
-        animatorProgress = progress;
-        NeedsUpdateView(PAGView.this);
-    }
 
     private final AnimatorListenerAdapter mAnimatorListenerAdapter = new AnimatorListenerAdapter() {
         @Override
@@ -317,13 +311,13 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         animator = ValueAnimator.ofFloat(0.0f, 1.0f);
         animator.setRepeatCount(0);
         animator.setInterpolator(new LinearInterpolator());
+        animator.addUpdateListener(mAnimatorUpdateListener);
     }
 
     private void updateView() {
         if (!isAttachedToWindow) {
             return;
         }
-        pagPlayer.setProgress(animatorProgress);
         flush();
         PAGView.this.post(new Runnable() {
             @Override
@@ -370,7 +364,6 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         if (pagSurface == null) {
             return;
         }
-        animator.addUpdateListener(mAnimatorUpdateListener);
         pagSurface.clearAll();
         NeedsUpdateView(this);
         if (mListener != null) {
@@ -461,7 +454,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     public void play() {
         _isPlaying = true;
         _isAnimatorPreRunning = null;
-        if (animatorProgress == 1.0) {
+        if (animator.getAnimatedFraction() == 1.0) {
             setProgress(0);
         }
         doPlay();
@@ -734,7 +727,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
      * Returns the current progress of play position, the value is from 0.0 to 1.0.
      */
     public double getProgress() {
-        return pagPlayer.getProgress();
+        return animator.getAnimatedFraction();
     }
 
     /**
@@ -744,7 +737,6 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         value = Math.max(0, Math.min(value, 1));
         currentPlayTime = (long) (value * animator.getDuration());
         animator.setCurrentPlayTime(currentPlayTime);
-        onAnimationUpdate(value);
     }
 
     /**
@@ -766,6 +758,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
      * called, there is no need to call it. Returns true if the content has changed.
      */
     public boolean flush() {
+        pagPlayer.setProgress(animator.getAnimatedFraction());
         return pagPlayer.flush();
     }
 
