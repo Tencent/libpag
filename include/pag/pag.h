@@ -165,9 +165,13 @@ class PAG_API PAGImage {
   int _scaleMode = PAGScaleMode::LetterBox;
   Matrix _matrix = Matrix::I();
   bool hasSetScaleMode = false;
-  PAGLayer* owner = nullptr;
+  PAGLayer* _owner = nullptr;
 
   Matrix getContentMatrix(int defaultScaleMode, int contentWidth, int contentHeight);
+
+  void setOwner(PAGLayer* owner);
+
+  PAGLayer* getOwner() const;
 
   friend class ImageReplacement;
 
