@@ -42,8 +42,7 @@ PAG_API @interface PAGImageLayer : PAGLayer
  * which has the same content to this layer.
  * @param image The PAGImage object to replace with.
  */
-- (void)replaceImage:(PAGImage*)image
-    DEPRECATED_MSG_ATTRIBUTE("Please use setImage:image instead");
+- (void)replaceImage:(PAGImage*)image DEPRECATED_MSG_ATTRIBUTE("Please use setImage:image instead");
 
 /**
  * Set the original image content with the specified PAGImage object. Passing in null for the
