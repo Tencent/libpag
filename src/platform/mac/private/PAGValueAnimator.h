@@ -40,7 +40,7 @@
   int64_t playTime;
   int repeatCount;
   int lastRepeatCount;
-  double animatedValue;
+  double animatedFraction;
   int64_t animatorId;
   id<PAGValueAnimatorListener> animatorListener;
 }
@@ -53,7 +53,7 @@
 
 - (void)setCurrentPlayTime:(int64_t)playTime;
 
-- (double)getAnimatedValue;
+- (double)getAnimatedFraction;
 
 - (BOOL)isPlaying;
 

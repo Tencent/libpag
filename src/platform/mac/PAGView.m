@@ -137,7 +137,6 @@
 - (void)onAnimationUpdate {
   [self retain];
   dispatch_async(dispatch_get_main_queue(), ^{
-    [pagPlayer setProgress:[valueAnimator getAnimatedValue]];
     [self flush];
     [self release];
   });
@@ -333,7 +332,7 @@
 }
 
 - (double)getProgress {
-  return [valueAnimator getAnimatedValue];
+  return [valueAnimator getAnimatedFraction];
 }
 
 - (void)setProgress:(double)value {
@@ -342,6 +341,7 @@
 }
 
 - (BOOL)flush {
+  [pagPlayer setProgress:[valueAnimator getAnimatedFraction]];
   return [pagPlayer flush];
 }
 

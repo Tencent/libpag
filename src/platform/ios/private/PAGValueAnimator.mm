@@ -99,7 +99,7 @@ static int64_t GetCurrentTimeUS() {
   if (repeatCount >= 0 && count > repeatCount) {
     playTime = duration;
     [self stop:false];
-    animatedValue = 1.0;
+    animatedFraction = 1.0;
     [animatorListener onAnimationUpdate];
     [animatorListener onAnimationEnd];
   } else {
@@ -107,7 +107,7 @@ static int64_t GetCurrentTimeUS() {
       [animatorListener onAnimationRepeat];
     }
     playTime = (timestamp - startTime) % duration;
-    animatedValue = static_cast<double>(playTime) / duration;
+    animatedFraction = static_cast<double>(playTime) / duration;
     [animatorListener onAnimationUpdate];
   }
   repeatedTimes = (int)count;
@@ -125,8 +125,8 @@ static int64_t GetCurrentTimeUS() {
   duration = value;
 }
 
-- (double)getAnimatedValue {
-  return animatedValue;
+- (double)getAnimatedFraction {
+  return animatedFraction;
 }
 
 - (void)setCurrentPlayTime:(int64_t)time {
@@ -136,7 +136,7 @@ static int64_t GetCurrentTimeUS() {
   int64_t gapTime = playTime - time;
   playTime = time;
   startTime += gapTime % duration;
-  animatedValue = static_cast<double>(playTime) / duration;
+  animatedFraction = static_cast<double>(playTime) / duration;
   [animatorListener onAnimationUpdate];
 }
 
@@ -166,9 +166,9 @@ static int64_t GetCurrentTimeUS() {
   }
   animatorId = [PAGValueAnimator AddAnimator:self];
   startTime = GetCurrentTimeUS() - playTime % duration - repeatedTimes * duration;
-  animatedValue = static_cast<double>(playTime) / duration;
+  animatedFraction = static_cast<double>(playTime) / duration;
   [animatorListener onAnimationUpdate];
-  if (animatedValue == 0) {
+  if (animatedFraction == 0) {
     [animatorListener onAnimationStart];
   }
 }

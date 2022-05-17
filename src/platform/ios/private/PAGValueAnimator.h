@@ -38,7 +38,7 @@
   int64_t playTime;
   int repeatCount;
   int repeatedTimes;
-  double animatedValue;
+  double animatedFraction;
   NSUInteger animatorId;
   id<PAGValueAnimatorListener> animatorListener;
 }
@@ -49,7 +49,7 @@
 
 - (void)setDuration:(int64_t)duration;
 
-- (double)getAnimatedValue;
+- (double)getAnimatedFraction;
 
 - (void)setCurrentPlayTime:(int64_t)playTime;
 

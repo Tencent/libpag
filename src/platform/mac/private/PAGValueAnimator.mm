@@ -100,7 +100,7 @@ static CVReturn handleDisplayLink(CVDisplayLinkRef, const CVTimeStamp*, const CV
   if (repeatCount >= 0 && count > repeatCount) {
     playTime = duration;
     [self stop:false];
-    animatedValue = 1.0;
+    animatedFraction = 1.0;
     [animatorListener onAnimationUpdate];
     [animatorListener onAnimationEnd];
   } else {
@@ -108,7 +108,7 @@ static CVReturn handleDisplayLink(CVDisplayLinkRef, const CVTimeStamp*, const CV
       [animatorListener onAnimationRepeat];
     }
     playTime = (timestamp - startTime) % duration;
-    animatedValue = static_cast<double>(playTime) / duration;
+    animatedFraction = static_cast<double>(playTime) / duration;
     [animatorListener onAnimationUpdate];
   }
   lastRepeatCount = (int)count;
@@ -126,8 +126,8 @@ static CVReturn handleDisplayLink(CVDisplayLinkRef, const CVTimeStamp*, const CV
   duration = value;
 }
 
-- (double)getAnimatedValue {
-  return animatedValue;
+- (double)getAnimatedFraction {
+  return animatedFraction;
 }
 
 - (void)setCurrentPlayTime:(int64_t)time {
@@ -137,7 +137,7 @@ static CVReturn handleDisplayLink(CVDisplayLinkRef, const CVTimeStamp*, const CV
   int64_t gapTime = playTime - time;
   playTime = time;
   startTime += gapTime % duration;
-  animatedValue = static_cast<double>(playTime) / duration;
+  animatedFraction = static_cast<double>(playTime) / duration;
   [animatorListener onAnimationUpdate];
 }
 
@@ -159,9 +159,9 @@ static CVReturn handleDisplayLink(CVDisplayLinkRef, const CVTimeStamp*, const CV
   }
   animatorId = [PAGValueAnimator AddAnimator:self];
   startTime = GetCurrentTimeUS() - playTime % duration;
-  animatedValue = static_cast<double>(playTime) / duration;
+  animatedFraction = static_cast<double>(playTime) / duration;
   [animatorListener onAnimationUpdate];
-  if (animatedValue == 0) {
+  if (animatedFraction == 0) {
     [animatorListener onAnimationStart];
   }
 }
