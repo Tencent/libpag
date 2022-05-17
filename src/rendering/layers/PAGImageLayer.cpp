@@ -57,7 +57,6 @@ PAGImageLayer::PAGImageLayer(int width, int height, int64_t duration) : PAGLayer
 }
 
 PAGImageLayer::~PAGImageLayer() {
-  setImageInternal(nullptr);
   delete replacement;
   if (emptyImageLayer) {
     delete emptyImageLayer->imageBytes;
@@ -184,7 +183,7 @@ bool PAGImageLayer::gotoTime(int64_t layerTime) {
   auto changed = PAGLayer::gotoTime(layerTime);
   if (replacement != nullptr) {
     auto pagImage = replacement->getImage();
-    if (!pagImage->isStill()) {
+    if (!pagImage->isStill() && pagImage->owner == this) {
       auto contentTime = getCurrentContentTime(layerTime);
       if (pagImage->setContentTime(contentTime)) {
         changed = true;
@@ -198,6 +197,9 @@ void PAGImageLayer::replaceImage(std::shared_ptr<pag::PAGImage> image) {
   LockGuard autoLock(rootLocker);
   if (rootFile != nullptr) {
     rootFile->replaceImageInternal(_editableIndex, image);
+    if (image != nullptr) {
+      image->owner = this;
+    }
   } else {
     setImageInternal(image);
   }
@@ -221,6 +223,7 @@ void PAGImageLayer::setImageInternal(std::shared_ptr<PAGImage> image) {
   delete replacement;
   if (image != nullptr) {
     replacement = new ImageReplacement(static_cast<ImageLayer*>(layer), image);
+    image->owner = this;
   } else {
     replacement = nullptr;
   }

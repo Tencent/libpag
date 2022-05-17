@@ -65,6 +65,8 @@ class Content {
 
 class Graphic;
 
+class PAGLayer;
+
 /**
  * An image used to replace the contents of PAGImageLayers in a PAGFile.
  */
@@ -163,6 +165,7 @@ class PAG_API PAGImage {
   int _scaleMode = PAGScaleMode::LetterBox;
   Matrix _matrix = Matrix::I();
   bool hasSetScaleMode = false;
+  PAGLayer* owner = nullptr;
 
   Matrix getContentMatrix(int defaultScaleMode, int contentWidth, int contentHeight);
 

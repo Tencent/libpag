@@ -380,8 +380,9 @@ Frame PAGFile::fileFrameToScaledFrame(Frame fileFrame, const TimeRange& scaledTi
 
 void PAGFile::replaceImageInternal(int editableImageIndex, std::shared_ptr<PAGImage> image) {
   auto imageLayers = getLayersByEditableIndexInternal(editableImageIndex, LayerType::Image);
-  for (auto& pagLayer : imageLayers) {
-    auto pagImageLayer = std::static_pointer_cast<PAGImageLayer>(pagLayer);
+  // Need to traverse from back to front to ensure the same behavior as before
+  for (auto iter = imageLayers.rbegin(); iter != imageLayers.rend(); iter++) {
+    auto pagImageLayer = std::static_pointer_cast<PAGImageLayer>(*iter);
     pagImageLayer->setImageInternal(image);
   }
 }
