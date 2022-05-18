@@ -35,20 +35,21 @@ PAG_API @interface PAGImageLayer : PAGLayer
 - (NSArray<PAGVideoRange*>*)getVideoRanges;
 
 /**
- * Replace the original image content with the specified PAGImage object. Passing in null for the
- * image parameter resets the layer to its default image content.
+ * [Deprecated]
+ * Replace the original image content with the specified PAGImage object.
+ * Passing in null for the image parameter resets the layer to its default image content.
+ * The replaceImage() method modifies all associated PAGImageLayers that have the same
+ * editableIndex to this layer.
  *
- * This method walks through the whole layer tree, and replaces every PAGImageLayer
- * which has the same content to this layer.
  * @param image The PAGImage object to replace with.
  */
 - (void)replaceImage:(PAGImage*)image DEPRECATED_MSG_ATTRIBUTE("Please use setImage:image instead");
 
 /**
- * Set the original image content with the specified PAGImage object. Passing in null for the
- * image parameter resets the layer to its default image content.
+ * Replace the original image content with the specified PAGImage object.
+ * Passing in null for the image parameter resets the layer to its default image content.
+ * The setImage() method only modifies the content of the calling PAGImageLayer.
  *
- * This method only replaces this layer.
  * @param image The PAGImage object to replace with.
  */
 - (void)setImage:(PAGImage*)image;

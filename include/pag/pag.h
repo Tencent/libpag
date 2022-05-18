@@ -729,16 +729,20 @@ class PAG_API PAGImageLayer : public PAGLayer {
 
   /**
    * [Deprecated]
-   * Replace the original image content of layers which have same editable index with the specified
-   * PAGImage object. Passing in null for the image parameter resets the layer to its default
-   * image content.
+   * Replace the original image content with the specified PAGImage object.
+   * Passing in null for the image parameter resets the layer to its default image content.
+   * The replaceImage() method modifies all associated PAGImageLayers that have the same
+   * editableIndex to this layer.
+   *
    * @param image The PAGImage object to replace with.
    */
   void replaceImage(std::shared_ptr<PAGImage> image);
 
   /**
-   * Replace the original image content with the specified PAGImage object. Passing in null for the
-   * image parameter resets the layer to its default image content.
+   * Replace the original image content with the specified PAGImage object.
+   * Passing in null for the image parameter resets the layer to its default image content.
+   * The setImage() method only modifies the content of the calling PAGImageLayer.
+   *
    * @param image The PAGImage object to replace with.
    */
   void setImage(std::shared_ptr<PAGImage> image);

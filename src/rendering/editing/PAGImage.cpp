@@ -64,12 +64,12 @@ Matrix PAGImage::getContentMatrix(int defaultScaleMode, int contentWidth, int co
 }
 
 void PAGImage::setOwner(PAGLayer* owner) {
-  std::lock_guard autoLock(locker);
+  std::lock_guard<std::mutex> autoLock(locker);
   _owner = owner;
 }
 
 PAGLayer* PAGImage::getOwner() const {
-  std::lock_guard autoLock(locker);
+  std::lock_guard<std::mutex> autoLock(locker);
   return _owner;
 }
 }  // namespace pag
