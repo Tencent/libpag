@@ -399,5 +399,10 @@ PAG_TEST_F(PAGTextLayerTest, SmallFontSizeScale) {
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/SmallFontSizeScale"));
+
+  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  TestPAGPlayer->setSurface(pagSurface);
+  TestPAGPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGTextLayerTest/SmallFontSizeScale_LowResolution"));
 }
 }  // namespace pag

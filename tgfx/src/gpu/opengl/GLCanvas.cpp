@@ -252,6 +252,8 @@ void GLCanvas::drawGlyphs(const GlyphID glyphIDs[], const Point positions[], siz
   auto skewY = state->matrix.getSkewY();
   auto scale = std::sqrt(scaleX * scaleX + skewY * skewY);
   auto scaledFont = font.makeWithSize(font.getSize() * scale);
+  auto scaledPaint = paint;
+  scaledPaint.setStrokeWidth(paint.getStrokeWidth() * scale);
   std::vector<Point> scaledPositions;
   for (size_t i = 0; i < glyphCount; ++i) {
     scaledPositions.push_back(Point::Make(positions[i].x * scale, positions[i].y * scale));
@@ -259,7 +261,7 @@ void GLCanvas::drawGlyphs(const GlyphID glyphIDs[], const Point positions[], siz
   save();
   concat(Matrix::MakeScale(1.f / scale));
   if (scaledFont.getTypeface()->hasColor()) {
-    drawColorGlyphs(glyphIDs, &scaledPositions[0], glyphCount, scaledFont, paint);
+    drawColorGlyphs(glyphIDs, &scaledPositions[0], glyphCount, scaledFont, scaledPaint);
     restore();
     return;
   }
@@ -269,14 +271,14 @@ void GLCanvas::drawGlyphs(const GlyphID glyphIDs[], const Point positions[], siz
     return;
   }
   Path path = {};
-  auto stroke = paint.getStyle() == PaintStyle::Stroke ? paint.getStroke() : nullptr;
+  auto stroke = scaledPaint.getStyle() == PaintStyle::Stroke ? scaledPaint.getStroke() : nullptr;
   if (textBlob->getPath(&path, stroke)) {
-    auto shader = Shader::MakeColorShader(paint.getColor());
+    auto shader = Shader::MakeColorShader(scaledPaint.getColor());
     fillPath(path, shader.get());
     restore();
     return;
   }
-  drawMaskGlyphs(textBlob.get(), paint);
+  drawMaskGlyphs(textBlob.get(), scaledPaint);
   restore();
 }
 
