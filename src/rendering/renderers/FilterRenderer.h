@@ -52,7 +52,6 @@ class FilterRenderer {
 
   static void DrawWithFilter(tgfx::Canvas* parentCanvas, RenderCache* cache,
                              const FilterModifier* modifier, std::shared_ptr<Graphic> content);
-  static void ProcessFastBlur(FilterList* filterList);
 
  private:
   static std::unique_ptr<FilterList> MakeFilterList(const FilterModifier* modifier);
