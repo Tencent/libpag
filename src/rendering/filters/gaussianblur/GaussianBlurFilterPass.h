@@ -34,8 +34,7 @@ class GaussianBlurFilterPass : public LayerFilter {
 
   void onPrepareProgram(tgfx::Context* context, unsigned program) override;
 
-  void onUpdateParams(tgfx::Context* context,
-                      const tgfx::Rect& contentBounds,
+  void onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
                       const tgfx::Point& filterScale) override;
 
   std::vector<tgfx::Point> computeVertices(const tgfx::Rect& contentBounds,
@@ -45,7 +44,7 @@ class GaussianBlurFilterPass : public LayerFilter {
  private:
   int stepHandle = -1;
   int offsetHandle = -1;
-  
+
   BlurOptions options = BlurOptions::None;
   float blurriness = 0.0;
   float scale = 1.0;

@@ -18,37 +18,37 @@
 
 #pragma once
 
+#include <type_traits>
 #include "pag/file.h"
 #include "rendering/filters/utils/FilterBuffer.h"
-#include <type_traits>
 
 namespace pag {
 
-#define BLUR_LEVEL_1_LIMIT   10.0f
-#define BLUR_LEVEL_2_LIMIT   15.0f
-#define BLUR_LEVEL_3_LIMIT   55.0f
-#define BLUR_LEVEL_4_LIMIT   120.0f
-#define BLUR_LEVEL_5_LIMIT   300.0f
+#define BLUR_LEVEL_1_LIMIT 10.0f
+#define BLUR_LEVEL_2_LIMIT 15.0f
+#define BLUR_LEVEL_3_LIMIT 55.0f
+#define BLUR_LEVEL_4_LIMIT 120.0f
+#define BLUR_LEVEL_5_LIMIT 300.0f
 
 #define BLUR_LEVEL_MAX_LIMIT BLUR_LEVEL_5_LIMIT
 
-#define BLUR_LEVEL_1_DEPTH   1
-#define BLUR_LEVEL_2_DEPTH   2
-#define BLUR_LEVEL_3_DEPTH   2
-#define BLUR_LEVEL_4_DEPTH   3
-#define BLUR_LEVEL_5_DEPTH   3
+#define BLUR_LEVEL_1_DEPTH 1
+#define BLUR_LEVEL_2_DEPTH 2
+#define BLUR_LEVEL_3_DEPTH 2
+#define BLUR_LEVEL_4_DEPTH 3
+#define BLUR_LEVEL_5_DEPTH 3
 
 #define BLUR_DEPTH_MAX BLUR_LEVEL_5_DEPTH
 
-#define BLUR_LEVEL_1_SCALE   1.0f
-#define BLUR_LEVEL_2_SCALE   0.8f
-#define BLUR_LEVEL_3_SCALE   0.5f
-#define BLUR_LEVEL_4_SCALE   0.5f
-#define BLUR_LEVEL_5_SCALE   0.5f
+#define BLUR_LEVEL_1_SCALE 1.0f
+#define BLUR_LEVEL_2_SCALE 0.8f
+#define BLUR_LEVEL_3_SCALE 0.5f
+#define BLUR_LEVEL_4_SCALE 0.5f
+#define BLUR_LEVEL_5_SCALE 0.5f
 
-#define BLUR_STABLE  10.0f
+#define BLUR_STABLE 10.0f
 
-#define BLUR_EXPEND  0.1f
+#define BLUR_EXPEND 0.1f
 
 struct BlurParam {
   int depth = BLUR_LEVEL_1_DEPTH;
@@ -64,12 +64,12 @@ struct PassBounds {
 };
 
 enum class BlurOptions : unsigned {
-  None              = 0,
-  Up                = 1 << 0,
-  Down              = 1 << 1,
-  Horizontal        = 1 << 2,
-  Vertical          = 1 << 3,
-  RepeatEdgePixels  = 1 << 4
+  None = 0,
+  Up = 1 << 0,
+  Down = 1 << 1,
+  Horizontal = 1 << 2,
+  Vertical = 1 << 3,
+  RepeatEdgePixels = 1 << 4
 };
 
 inline BlurOptions operator&(BlurOptions lhs, BlurOptions rhs) {
