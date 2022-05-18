@@ -22,7 +22,6 @@
 #include "rendering/caches/LayerCache.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/editing/ImageReplacement.h"
-#include "rendering/editing/PAGImageHolder.h"
 #include "rendering/layers/PAGStage.h"
 #include "rendering/utils/LockGuard.h"
 #include "rendering/utils/ScopedLock.h"
@@ -55,13 +54,9 @@ PAGImageLayer::PAGImageLayer(int width, int height, int64_t duration) : PAGLayer
   rootLocker = std::make_shared<std::mutex>();
   contentVersion = 1;
   _editableIndex = 0;
-  imageHolder = std::make_shared<PAGImageHolder>();
-  imageHolder->addLayer(this);
-  replacement = new ImageReplacement(emptyImageLayer, imageHolder.get(), _editableIndex);
 }
 
 PAGImageLayer::~PAGImageLayer() {
-  replaceImageInternal(nullptr);
   delete replacement;
   if (emptyImageLayer) {
     delete emptyImageLayer->imageBytes;
@@ -186,9 +181,9 @@ std::vector<PAGVideoRange> PAGImageLayer::getVideoRanges() const {
 
 bool PAGImageLayer::gotoTime(int64_t layerTime) {
   auto changed = PAGLayer::gotoTime(layerTime);
-  if (imageHolder) {
-    auto pagImage = imageHolder->getImage(_editableIndex);
-    if (pagImage && !pagImage->isStill() && imageHolder->getOwner(_editableIndex) == this) {
+  if (replacement != nullptr) {
+    auto pagImage = replacement->getImage();
+    if (!pagImage->isStill() && pagImage->getOwner() == this) {
       auto contentTime = getCurrentContentTime(layerTime);
       if (pagImage->setContentTime(contentTime)) {
         changed = true;
@@ -200,39 +195,40 @@ bool PAGImageLayer::gotoTime(int64_t layerTime) {
 
 void PAGImageLayer::replaceImage(std::shared_ptr<pag::PAGImage> image) {
   LockGuard autoLock(rootLocker);
-  replaceImageInternal(image);
-}
-
-void PAGImageLayer::replaceImageInternal(std::shared_ptr<PAGImage> image) {
-  if (imageHolder == nullptr) {
-    return;
-  }
-  if (stage) {
-    auto oldPAGImage = imageHolder->getImage(_editableIndex);
-    auto pagLayers = imageHolder->getLayers(_editableIndex);
-    for (auto& layer : pagLayers) {
-      if (oldPAGImage) {
-        stage->removeReference(oldPAGImage.get(), layer);
-      }
-      if (image) {
-        stage->addReference(image.get(), layer);
-      }
-    }
-  }
-  imageHolder->setImage(_editableIndex, image, this);
-  std::vector<PAGImageLayer*> imageLayers = {};
-  if (rootFile) {
-    auto layers = rootFile->getLayersByEditableIndexInternal(_editableIndex, LayerType::Image);
-    for (auto& pagLayer : layers) {
-      imageLayers.push_back(static_cast<PAGImageLayer*>(pagLayer.get()));
+  if (rootFile != nullptr) {
+    rootFile->replaceImageInternal(_editableIndex, image);
+    if (image != nullptr) {
+      image->setOwner(this);
     }
   } else {
-    imageLayers.push_back(this);
+    setImageInternal(image);
   }
-  std::for_each(imageLayers.begin(), imageLayers.end(), [](PAGImageLayer* imageLayer) {
-    imageLayer->notifyModified(true);
-    imageLayer->invalidateCacheScale();
-  });
+}
+
+void PAGImageLayer::setImage(std::shared_ptr<PAGImage> image) {
+  LockGuard autoLock(rootLocker);
+  setImageInternal(image);
+}
+
+void PAGImageLayer::setImageInternal(std::shared_ptr<PAGImage> image) {
+  if (stage) {
+    if (replacement != nullptr) {
+      auto oldPAGImage = replacement->getImage();
+      stage->removeReference(oldPAGImage.get(), this);
+    }
+    if (image) {
+      stage->addReference(image.get(), this);
+    }
+  }
+  delete replacement;
+  if (image != nullptr) {
+    replacement = new ImageReplacement(static_cast<ImageLayer*>(layer), image);
+    image->setOwner(this);
+  } else {
+    replacement = nullptr;
+  }
+  notifyModified(true);
+  invalidateCacheScale();
 }
 
 Content* PAGImageLayer::getContent() {
@@ -247,20 +243,8 @@ bool PAGImageLayer::cacheFilters() const {
   return layerCache->cacheFilters() && !hasPAGImage();
 }
 
-void PAGImageLayer::onAddToRootFile(PAGFile* pagFile) {
-  PAGLayer::onAddToRootFile(pagFile);
-  imageHolder = pagFile->imageHolder;
-  imageHolder->addLayer(this);
-  replacement =
-      new ImageReplacement(static_cast<ImageLayer*>(layer), imageHolder.get(), _editableIndex);
-}
-
 void PAGImageLayer::onRemoveFromRootFile() {
   PAGLayer::onRemoveFromRootFile();
-  imageHolder->removeLayer(this);
-  delete replacement;
-  replacement = nullptr;
-  imageHolder = nullptr;
   contentTimeRemap = nullptr;
 }
 
@@ -335,14 +319,14 @@ static void CutKeyframe(Keyframe<float>* keyframe, Frame position, bool cutLeft)
 }
 
 bool PAGImageLayer::hasPAGImage() const {
-  return imageHolder && imageHolder->hasImage(_editableIndex);
+  return replacement != nullptr;
 }
 
 std::shared_ptr<PAGImage> PAGImageLayer::getPAGImage() const {
-  if (!imageHolder) {
+  if (replacement == nullptr) {
     return nullptr;
   }
-  return imageHolder->getImage(_editableIndex);
+  return replacement->getImage();
 }
 
 // 输出的时间轴不包含startTime

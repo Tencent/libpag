@@ -124,6 +124,7 @@ EMSCRIPTEN_BINDINGS(pag) {
                 }))
       .function("_getVideoRanges", &PAGImageLayer::getVideoRanges)
       .function("_replaceImage", &PAGImageLayer::replaceImage)
+      .function("_setImage", &PAGImageLayer::setImage)
       .function("_layerTimeToContent",
                 optional_override([](PAGImageLayer& pagImageLayer, int layerTime) {
                   return static_cast<int>(pagImageLayer.layerTimeToContent(layerTime));

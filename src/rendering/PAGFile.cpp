@@ -19,7 +19,6 @@
 #include "base/utils/TimeUtil.h"
 #include "pag/file.h"
 #include "pag/pag.h"
-#include "rendering/editing/PAGImageHolder.h"
 #include "rendering/utils/LockGuard.h"
 #include "rendering/utils/ScopedLock.h"
 
@@ -108,7 +107,6 @@ std::shared_ptr<PAGLayer> PAGFile::BuildPAGLayer(std::shared_ptr<File> file, Lay
 
 PAGFile::PAGFile(std::shared_ptr<File> file, pag::PreComposeLayer* layer)
     : PAGComposition(file, layer) {
-  imageHolder = std::make_shared<PAGImageHolder>();
 }
 
 uint16_t PAGFile::tagLevel() {
@@ -146,10 +144,7 @@ void PAGFile::replaceText(int editableTextIndex, std::shared_ptr<TextDocument> t
 
 void PAGFile::replaceImage(int editableImageIndex, std::shared_ptr<PAGImage> image) {
   LockGuard autoLock(rootLocker);
-  auto imageLayers = getLayersByEditableIndexInternal(editableImageIndex, LayerType::Image);
-  if (!imageLayers.empty()) {
-    std::static_pointer_cast<PAGImageLayer>(imageLayers[0])->replaceImageInternal(image);
-  }
+  replaceImageInternal(editableImageIndex, image);
 }
 
 std::vector<std::shared_ptr<PAGLayer>> PAGFile::getLayersByEditableIndex(int editableIndex,
@@ -381,5 +376,14 @@ Frame PAGFile::fileFrameToScaledFrame(Frame fileFrame, const TimeRange& scaledTi
                                   scaledTimeRange.end - scaledTimeRange.start);
   auto targetFrame = ProgressToFrame(progress, _stretchedFrameDuration - minDuration);
   return targetFrame + scaledTimeRange.start;
+}
+
+void PAGFile::replaceImageInternal(int editableImageIndex, std::shared_ptr<PAGImage> image) {
+  auto imageLayers = getLayersByEditableIndexInternal(editableImageIndex, LayerType::Image);
+  // Need to traverse from back to front to ensure the same behavior as before
+  for (auto iter = imageLayers.rbegin(); iter != imageLayers.rend(); iter++) {
+    auto pagImageLayer = std::static_pointer_cast<PAGImageLayer>(*iter);
+    pagImageLayer->setImageInternal(image);
+  }
 }
 }  // namespace pag

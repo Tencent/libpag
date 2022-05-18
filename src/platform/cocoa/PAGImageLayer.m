@@ -37,6 +37,10 @@
   [(PAGImageLayerImpl*)self.impl replaceImage:image];
 }
 
+- (void)setImage:(PAGImage*)image {
+  [(PAGImageLayerImpl*)self.impl setImage:image];
+}
+
 - (int64_t)contentDuration {
   return [(PAGImageLayerImpl*)self.impl contentDuration];
 }

@@ -32,8 +32,11 @@ public class PAGImageLayer extends PAGLayer {
     public native PAGVideoRange[] getVideoRanges();
 
     /**
-     * Replace the original image content with the specified PAGImage object. Passing in null for the image parameter
-     * resets the layer to its default image content.
+     * [Deprecated]
+     * Replace the original image content with the specified PAGImage object.
+     * Passing in null for the image parameter resets the layer to its default image content.
+     * The replaceImage() method modifies all associated PAGImageLayers that have the same
+     * editableIndex to this layer.
      *
      * @param image The PAGImage object to replace with.
      */
@@ -41,7 +44,20 @@ public class PAGImageLayer extends PAGLayer {
         replaceImage(image == null ? 0 : image.nativeContext);
     }
 
+    /**
+     * Replace the original image content with the specified PAGImage object.
+     * Passing in null for the image parameter resets the layer to its default image content.
+     * The setImage() method only modifies the content of the calling PAGImageLayer.
+     *
+     * @param image The PAGImage object to replace with.
+     */
+    public void setImage(PAGImage image) {
+        setImage(image == null ? 0 : image.nativeContext);
+    }
+
     private native void replaceImage(long image);
+
+    private native void setImage(long image);
 
     /**
      * The default image data of this layer, which is webp format.

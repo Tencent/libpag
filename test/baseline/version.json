@@ -7711,7 +7711,8 @@
     },
     "PAGImageLayerTest": {
         "ImageReplacement": "48a897dd",
-        "ImageReplacement_Empty": "48a897dd"
+        "ImageReplacement_Empty": "48a897dd",
+        "setImage": "a0f0772b"
     },
     "PAGImageTest": {
         "BottomLeftMask": "8992f0fb",

@@ -80,6 +80,15 @@ PAG_API void Java_org_libpag_PAGImageLayer_replaceImage(JNIEnv* env, jobject thi
   pagLayer->replaceImage(image == nullptr ? nullptr : image->get());
 }
 
+PAG_API void Java_org_libpag_PAGImageLayer_setImage(JNIEnv* env, jobject thiz, jlong imageObject) {
+  auto pagLayer = GetPAGImageLayer(env, thiz);
+  if (pagLayer == nullptr) {
+    return;
+  }
+  auto image = reinterpret_cast<JPAGImage*>(imageObject);
+  pagLayer->setImage(image == nullptr ? nullptr : image->get());
+}
+
 PAG_API jlong Java_org_libpag_PAGImageLayer_contentDuration(JNIEnv* env, jobject thiz) {
   auto pagLayer = GetPAGImageLayer(env, thiz);
   if (pagLayer == nullptr) {

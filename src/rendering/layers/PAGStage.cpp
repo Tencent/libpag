@@ -22,7 +22,6 @@
 #include "base/utils/TimeUtil.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/editing/ImageReplacement.h"
-#include "rendering/editing/PAGImageHolder.h"
 #include "rendering/renderers/CompositionRenderer.h"
 #include "rendering/utils/LockGuard.h"
 
