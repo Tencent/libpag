@@ -22,16 +22,16 @@
 namespace pag {
 GaussianBlurFilter::GaussianBlurFilter(Effect* effect) : effect(effect) {
   auto* blurEffect = static_cast<FastBlurEffect*>(effect);
-  
+
   blurParam.repeatEdgePixels = blurEffect->repeatEdgePixels->getValueAt(0);
   blurParam.blurDimensions = blurEffect->blurDimensions->getValueAt(0);
-  
+
   BlurOptions options = BlurOptions::None;
-  
+
   if (blurParam.repeatEdgePixels) {
     options |= BlurOptions::RepeatEdgePixels;
   }
-  
+
   if (blurParam.blurDimensions == BlurDimensionsDirection::Vertical) {
     options |= BlurOptions::Vertical;
   } else if (blurParam.blurDimensions == BlurDimensionsDirection::Horizontal) {
@@ -57,13 +57,12 @@ bool GaussianBlurFilter::initialize(tgfx::Context* context) {
   if (!upBlurPass->initialize(context)) {
     return false;
   }
-  
+
   return true;
 }
 
 void GaussianBlurFilter::updateBlurParam(float blurriness) {
-  blurriness = blurriness < BLUR_LEVEL_MAX_LIMIT ?
-               blurriness : BLUR_LEVEL_MAX_LIMIT;
+  blurriness = blurriness < BLUR_LEVEL_MAX_LIMIT ? blurriness : BLUR_LEVEL_MAX_LIMIT;
   if (blurriness < BLUR_LEVEL_1_LIMIT) {
     blurParam.depth = BLUR_LEVEL_1_DEPTH;
     blurParam.scale = BLUR_LEVEL_1_SCALE;
@@ -83,11 +82,13 @@ void GaussianBlurFilter::updateBlurParam(float blurriness) {
   } else {
     blurParam.depth = BLUR_LEVEL_5_DEPTH;
     blurParam.scale = BLUR_LEVEL_5_SCALE;
-    blurParam.value = 6.0 + (blurriness - BLUR_STABLE * 12.0) / (BLUR_LEVEL_5_LIMIT - BLUR_STABLE * 12.0) * 5.0;
+    blurParam.value =
+        6.0 + (blurriness - BLUR_STABLE * 12.0) / (BLUR_LEVEL_5_LIMIT - BLUR_STABLE * 12.0) * 5.0;
   }
 }
 
-std::shared_ptr<FilterBuffer> GaussianBlurFilter::getBuffer(tgfx::Context* context, int width, int height) {
+std::shared_ptr<FilterBuffer> GaussianBlurFilter::getBuffer(tgfx::Context* context, int width,
+                                                            int height) {
   std::shared_ptr<FilterBuffer> filterBuffer = nullptr;
   for (auto buffer = bufferCache.begin(); buffer != bufferCache.end(); ++buffer) {
     if ((*buffer)->width() == width && (*buffer)->height() == height) {
@@ -96,11 +97,11 @@ std::shared_ptr<FilterBuffer> GaussianBlurFilter::getBuffer(tgfx::Context* conte
       break;
     }
   }
-  
+
   if (filterBuffer == nullptr) {
     filterBuffer = FilterBuffer::Make(context, width, height);
   }
-  
+
   return filterBuffer;
 }
 
@@ -109,42 +110,45 @@ void GaussianBlurFilter::cacheBuffer(std::shared_ptr<FilterBuffer> buffer) {
 }
 
 void GaussianBlurFilter::update(Frame frame, const tgfx::Rect& contentBounds,
-                                const tgfx::Rect& transformedBounds, const tgfx::Point& filterScale) {
+                                const tgfx::Rect& transformedBounds,
+                                const tgfx::Point& filterScale) {
   LayerFilter::update(frame, contentBounds, transformedBounds, filterScale);
 
   auto blurriness = static_cast<FastBlurEffect*>(effect)->blurriness->getValueAt(layerFrame);
   updateBlurParam(blurriness);
-  
+
   auto bounds = contentBounds;
-  auto scale = blurParam.repeatEdgePixels ? tgfx::Point::Make(1.0, 1.0) :
-               tgfx::Point::Make(1.0f + BLUR_EXPEND * 2.0f, 1.0f + BLUR_EXPEND * 2.0f);
-  
-  for (int i = 0; i < blurParam.depth; i ++) {
+  auto scale = blurParam.repeatEdgePixels
+                   ? tgfx::Point::Make(1.0, 1.0)
+                   : tgfx::Point::Make(1.0f + BLUR_EXPEND * 2.0f, 1.0f + BLUR_EXPEND * 2.0f);
+
+  for (int i = 0; i < blurParam.depth; i++) {
     filtersBounds[i].inputBounds = bounds;
-    bounds = tgfx::Rect::MakeLTRB(floor(bounds.left * blurParam.scale),
-                                  floor(bounds.top * blurParam.scale),
-                                  floor(bounds.right * blurParam.scale),
-                                  floor(bounds.bottom * blurParam.scale));
-    
+    bounds = tgfx::Rect::MakeLTRB(
+        floor(bounds.left * blurParam.scale), floor(bounds.top * blurParam.scale),
+        floor(bounds.right * blurParam.scale), floor(bounds.bottom * blurParam.scale));
+
     filtersBounds[i].outputBounds = bounds;
     bounds = tgfx::Rect::MakeWH(bounds.width(), bounds.height());
   }
-  
-  for (int i = blurParam.depth; i < blurParam.depth * 2; i ++) {
+
+  for (int i = blurParam.depth; i < blurParam.depth * 2; i++) {
     filtersBounds[i].inputBounds = bounds;
     bounds = tgfx::Rect::MakeWH(floor(bounds.width() / blurParam.scale),
                                 floor(bounds.height() / blurParam.scale));
     if (!blurParam.repeatEdgePixels && i == blurParam.depth) {
       auto expandX = (blurParam.blurDimensions == BlurDimensionsDirection::All ||
                       blurParam.blurDimensions == BlurDimensionsDirection::Horizontal)
-                      ? floor(bounds.width() * BLUR_EXPEND * filterScale.x) : 0.0;
+                         ? floor(bounds.width() * BLUR_EXPEND * filterScale.x)
+                         : 0.0;
       auto expandY = (blurParam.blurDimensions == BlurDimensionsDirection::All ||
                       blurParam.blurDimensions == BlurDimensionsDirection::Vertical)
-                      ? floor(bounds.height() * BLUR_EXPEND * filterScale.x) : 0.0;
+                         ? floor(bounds.height() * BLUR_EXPEND * filterScale.x)
+                         : 0.0;
       filtersBounds[i].outputBounds = bounds;
       filtersBounds[i].outputBounds.outset(expandX, expandY);
-      bounds = tgfx::Rect::MakeWH(floor(bounds.width() * scale.x),
-                                  floor(bounds.height() * scale.y));
+      bounds =
+          tgfx::Rect::MakeWH(floor(bounds.width() * scale.x), floor(bounds.height() * scale.y));
     } else if (i == blurParam.depth * 2 - 1) {
       filtersBounds[i].outputBounds = transformedBounds;
     } else {
@@ -160,17 +164,17 @@ void GaussianBlurFilter::draw(tgfx::Context* context, const FilterSource* source
     LOGE("GaussianBlurFilter::draw() can not draw filter");
     return;
   }
-  
+
   std::shared_ptr<FilterBuffer> filterBuffer = nullptr;
   std::shared_ptr<FilterBuffer> filterBufferNeedToCache = nullptr;
-  
+
   std::unique_ptr<FilterSource> filterSourcePtr;
   std::unique_ptr<FilterTarget> filterTargetPtr;
-  
+
   FilterSource* filterSource = const_cast<FilterSource*>(source);
   FilterTarget* filterTarget = nullptr;
-  
-  for (int i = 0; i < blurParam.depth; i ++) {
+
+  for (int i = 0; i < blurParam.depth; i++) {
     auto sourceBounds = filtersBounds[i].inputBounds;
     auto targetBounds = filtersBounds[i].outputBounds;
     filterBuffer = getBuffer(context, targetBounds.width() * source->scale.x,
@@ -197,8 +201,8 @@ void GaussianBlurFilter::draw(tgfx::Context* context, const FilterSource* source
       filterBufferNeedToCache = filterBuffer;
     }
   }
-  
-  for (int i = blurParam.depth; i < blurParam.depth * 2; i ++) {
+
+  for (int i = blurParam.depth; i < blurParam.depth * 2; i++) {
     auto sourceBounds = filtersBounds[i].inputBounds;
     auto targetBounds = filtersBounds[i].outputBounds;
     if (i != blurParam.depth * 2 - 1) {
@@ -223,8 +227,8 @@ void GaussianBlurFilter::draw(tgfx::Context* context, const FilterSource* source
       filterTarget = filterTargetPtr.get();
     }
     upBlurPass->update(layerFrame, sourceBounds, targetBounds, filtersBoundsScale);
-    upBlurPass->updateParams(blurParam.value, blurParam.scale, !blurParam.repeatEdgePixels &&
-                                                               i == blurParam.depth);
+    upBlurPass->updateParams(blurParam.value, blurParam.scale,
+                             !blurParam.repeatEdgePixels && i == blurParam.depth);
     upBlurPass->draw(context, filterSource, filterTarget);
     if (i != blurParam.depth * 2 - 1) {
       filterSourcePtr = filterBuffer->toFilterSource(source->scale);

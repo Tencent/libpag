@@ -16,11 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GaussianBlurShaders.h"
 #include "GaussianBlurFilterPass.h"
+#include "GaussianBlurShaders.h"
 
 namespace pag {
-
 
 GaussianBlurFilterPass::GaussianBlurFilterPass(BlurOptions options) : options(options) {
 }
@@ -53,14 +52,14 @@ void GaussianBlurFilterPass::updateParams(float blurValue, float scaleValue,
 }
 
 void GaussianBlurFilterPass::onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
-                                          const tgfx::Point& filterScale) {
+                                            const tgfx::Point& filterScale) {
   auto gl = tgfx::GLFunctions::Get(context);
   gl->uniform2f(stepHandle, 0.5 / static_cast<float>(contentBounds.width()),
-                            0.5 / static_cast<float>(contentBounds.height()));
-  gl->uniform2f(offsetHandle, (options & BlurOptions::Horizontal) != BlurOptions::None ?
-                                                                     blurriness * filterScale.x : 0,
-                              (options & BlurOptions::Vertical) != BlurOptions::None ?
-                                                                   blurriness * filterScale.y : 0);
+                0.5 / static_cast<float>(contentBounds.height()));
+  gl->uniform2f(
+      offsetHandle,
+      (options & BlurOptions::Horizontal) != BlurOptions::None ? blurriness * filterScale.x : 0,
+      (options & BlurOptions::Vertical) != BlurOptions::None ? blurriness * filterScale.y : 0);
 }
 
 std::vector<tgfx::Point> GaussianBlurFilterPass::computeVertices(const tgfx::Rect& inputBounds,
@@ -74,7 +73,7 @@ std::vector<tgfx::Point> GaussianBlurFilterPass::computeVertices(const tgfx::Rec
                                  {outputBounds.right, outputBounds.bottom},
                                  {outputBounds.left, outputBounds.top},
                                  {outputBounds.right, outputBounds.top}};
-  
+
   auto expendX = (outputBounds.left - inputBounds.left) * scale;
   auto expendY = (outputBounds.top - inputBounds.top) * scale;
 
@@ -82,7 +81,7 @@ std::vector<tgfx::Point> GaussianBlurFilterPass::computeVertices(const tgfx::Rec
                                   {inputBounds.width() - expendX, inputBounds.height() - expendY},
                                   {expendX, expendY},
                                   {inputBounds.width() - expendX, expendY}};
-  
+
   for (int ii = 0; ii < 4; ii++) {
     vertices.push_back(contentPoint[ii]);
     vertices.push_back(texturePoints[ii]);
