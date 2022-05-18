@@ -42,12 +42,14 @@ class GaussianBlurFilter : public LayerFilter {
   GaussianBlurFilterPass* downBlurPass = nullptr;
   GaussianBlurFilterPass* upBlurPass = nullptr;
 
-  std::shared_ptr<FilterBuffer> blurFilterBuffer[BLUR_DEPTH_MAX * 2] = {};
+  std::vector<std::shared_ptr<FilterBuffer>> bufferCache = {};
   PassBounds filtersBounds[BLUR_DEPTH_MAX * 2] = {};
   tgfx::Point filtersBoundsScale = {};
   
   BlurParam blurParam = {};
   
   void updateBlurParam(float blurriness);
+  std::shared_ptr<FilterBuffer> getBuffer(tgfx::Context* context, int width, int height);
+  void cacheBuffer(std::shared_ptr<FilterBuffer> buffer);
 };
 }  // namespace pag
