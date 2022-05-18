@@ -28,14 +28,20 @@ static const char BLUR_DOWN_FRAGMENT_SHADER[] = R"(
     
     uniform vec2 uStep;
     uniform vec2 uOffset;
+    
+    float edge = 0.995;
+    
+    vec2 clampEdge(vec2 point) {
+        return clamp(point, vec2(0.0), vec2(edge));
+    }
 
     void main()
     {
-        vec4 sum = texture2D(uTextureInput, vertexColor) * 4.0;
-        sum += texture2D(uTextureInput, vertexColor - uStep.xy * uOffset);
-        sum += texture2D(uTextureInput, vertexColor + uStep.xy * uOffset);
-        sum += texture2D(uTextureInput, vertexColor + vec2(uStep.x, -uStep.y) * uOffset);
-        sum += texture2D(uTextureInput, vertexColor - vec2(uStep.x, -uStep.y) * uOffset);
+        vec4 sum = texture2D(uTextureInput, clampEdge(vertexColor)) * 4.0;
+        sum += texture2D(uTextureInput, clampEdge(vertexColor - uStep.xy * uOffset));
+        sum += texture2D(uTextureInput, clampEdge(vertexColor + uStep.xy * uOffset));
+        sum += texture2D(uTextureInput, clampEdge(vertexColor + vec2(uStep.x, -uStep.y) * uOffset));
+        sum += texture2D(uTextureInput, clampEdge(vertexColor - vec2(uStep.x, -uStep.y) * uOffset));
 
         vec4 color = sum / 8.0;
     
@@ -53,16 +59,22 @@ static const char BLUR_UP_FRAGMENT_SHADER[] = R"(
     uniform vec2 uStep;
     uniform vec2 uOffset;
     
+    float edge = 0.995;
+    
+    vec2 clampEdge(vec2 point) {
+        return clamp(point, vec2(0.0), vec2(edge));
+    }
+    
     void main()
     {
-        vec4 sum = texture2D(uTextureInput, vertexColor + vec2(-uStep.x * 2.0, 0.0) * uOffset);
-        sum += texture2D(uTextureInput, vertexColor + vec2(-uStep.x, uStep.y) * uOffset) * 2.0;
-        sum += texture2D(uTextureInput, vertexColor + vec2(0.0, uStep.y * 2.0) * uOffset);
-        sum += texture2D(uTextureInput, vertexColor + vec2(uStep.x, uStep.y) * uOffset) * 2.0;
-        sum += texture2D(uTextureInput, vertexColor + vec2(uStep.x * 2.0, 0.0) * uOffset);
-        sum += texture2D(uTextureInput, vertexColor + vec2(uStep.x, -uStep.y) * uOffset) * 2.0;
-        sum += texture2D(uTextureInput, vertexColor + vec2(0.0, -uStep.y * 2.0) * uOffset);
-        sum += texture2D(uTextureInput, vertexColor + vec2(-uStep.x, -uStep.y) * uOffset) * 2.0;
+        vec4 sum = texture2D(uTextureInput, clampEdge(vertexColor + vec2(-uStep.x * 2.0, 0.0) * uOffset));
+        sum += texture2D(uTextureInput, clampEdge(vertexColor + vec2(-uStep.x, uStep.y) * uOffset)) * 2.0;
+        sum += texture2D(uTextureInput, clampEdge(vertexColor + vec2(0.0, uStep.y * 2.0) * uOffset));
+        sum += texture2D(uTextureInput, clampEdge(vertexColor + vec2(uStep.x, uStep.y) * uOffset)) * 2.0;
+        sum += texture2D(uTextureInput, clampEdge(vertexColor + vec2(uStep.x * 2.0, 0.0) * uOffset));
+        sum += texture2D(uTextureInput, clampEdge(vertexColor + vec2(uStep.x, -uStep.y) * uOffset)) * 2.0;
+        sum += texture2D(uTextureInput, clampEdge(vertexColor + vec2(0.0, -uStep.y * 2.0) * uOffset));
+        sum += texture2D(uTextureInput, clampEdge(vertexColor + vec2(-uStep.x, -uStep.y) * uOffset)) * 2.0;
 
         vec4 color = sum / 12.0;
     
