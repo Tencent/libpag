@@ -132,12 +132,12 @@ struct AtlasTextRun {
   std::vector<tgfx::Point> positions;
 };
 
-static AtlasTextRun CreateTextRun(const GlyphHandle& glyph) {
+static AtlasTextRun CreateTextRun(const GlyphHandle& glyph, float scale) {
   AtlasTextRun textRun;
-  textRun.textFont = glyph->getFont();
+  textRun.textFont = glyph->getFont().makeWithSize(glyph->getFont().getSize() * scale);
   textRun.paint.setStyle(ToTGFX(glyph->getStyle()));
   if (glyph->getStyle() == TextStyle::Stroke) {
-    textRun.paint.setStrokeWidth(glyph->getStrokeWidth());
+    textRun.paint.setStrokeWidth(glyph->getStrokeWidth() * scale);
   }
   return textRun;
 }
@@ -174,7 +174,7 @@ static std::vector<Page> CreatePages(const std::vector<GlyphHandle>& glyphs, flo
     AtlasTextRun* textRun;
     if (iter == styleKeys.end()) {
       styleKeys.push_back(styleKey);
-      textRuns.push_back(CreateTextRun(glyph));
+      textRuns.push_back(CreateTextRun(glyph, scale));
       textRun = &textRuns.back();
     } else {
       auto index = iter - styleKeys.begin();
@@ -205,7 +205,7 @@ static std::vector<Page> CreatePages(const std::vector<GlyphHandle>& glyphs, flo
       point = pack.addRect(width, height);
     }
     textRun->glyphIDs.push_back(glyph->getGlyphID());
-    textRun->positions.push_back({-x + point.x, -y + point.y});
+    textRun->positions.push_back({(-x + point.x) * scale, (-y + point.y) * scale});
     AtlasLocator locator;
     locator.textureIndex = pages.size();
     locator.location = tgfx::Rect::MakeXYWH(point.x, point.y, static_cast<float>(width),
@@ -222,13 +222,12 @@ static std::vector<Page> CreatePages(const std::vector<GlyphHandle>& glyphs, flo
   return pages;
 }
 
-std::shared_ptr<tgfx::Texture> DrawMask(tgfx::Context* context, const Page& page, float scale) {
+std::shared_ptr<tgfx::Texture> DrawMask(tgfx::Context* context, const Page& page) {
   auto mask = tgfx::Mask::Make(page.width, page.height);
   if (mask == nullptr) {
     LOGE("Atlas: create mask failed.");
     return nullptr;
   }
-  mask->setMatrix(tgfx::Matrix::MakeScale(scale));
   for (auto& textRun : page.textRuns) {
     auto blob = tgfx::TextBlob::MakeFrom(&textRun.glyphIDs[0], &textRun.positions[0],
                                          textRun.glyphIDs.size(), textRun.textFont);
@@ -241,7 +240,7 @@ std::shared_ptr<tgfx::Texture> DrawMask(tgfx::Context* context, const Page& page
   return mask->makeTexture(context);
 }
 
-std::shared_ptr<tgfx::Texture> DrawColor(tgfx::Context* context, const Page& page, float scale) {
+std::shared_ptr<tgfx::Texture> DrawColor(tgfx::Context* context, const Page& page) {
   auto surface = tgfx::Surface::Make(context, page.width, page.height);
   if (surface == nullptr) {
     return nullptr;
@@ -250,7 +249,6 @@ std::shared_ptr<tgfx::Texture> DrawColor(tgfx::Context* context, const Page& pag
   auto totalMatrix = canvas->getMatrix();
   for (auto& textRun : page.textRuns) {
     canvas->setMatrix(totalMatrix);
-    canvas->concat(tgfx::Matrix::MakeScale(scale));
     auto glyphs = &textRun.glyphIDs[0];
     auto positions = &textRun.positions[0];
     canvas->drawGlyphs(glyphs, positions, textRun.glyphIDs.size(), textRun.textFont, textRun.paint);
@@ -260,11 +258,11 @@ std::shared_ptr<tgfx::Texture> DrawColor(tgfx::Context* context, const Page& pag
 }
 
 static std::vector<std::shared_ptr<tgfx::Texture>> DrawPages(tgfx::Context* context,
-                                                             std::vector<Page>* pages, float scale,
+                                                             std::vector<Page>* pages,
                                                              bool alphaOnly) {
   std::vector<std::shared_ptr<tgfx::Texture>> textures;
   for (auto& page : *pages) {
-    auto texture = alphaOnly ? DrawMask(context, page, scale) : DrawColor(context, page, scale);
+    auto texture = alphaOnly ? DrawMask(context, page) : DrawColor(context, page);
     if (texture) {
       textures.push_back(texture);
     }
@@ -286,7 +284,7 @@ std::unique_ptr<Atlas> Atlas::Make(tgfx::Context* context, float scale,
   for (const auto& page : pages) {
     glyphLocators.insert(page.locators.begin(), page.locators.end());
   }
-  auto textures = DrawPages(context, &pages, scale, alphaOnly);
+  auto textures = DrawPages(context, &pages, alphaOnly);
   return std::unique_ptr<Atlas>(new Atlas(std::move(textures), std::move(glyphLocators)));
 }
 
