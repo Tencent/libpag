@@ -314,11 +314,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         animator.addUpdateListener(mAnimatorUpdateListener);
     }
 
-    private void updateView() {
-        if (!isAttachedToWindow) {
-            return;
-        }
-        flush();
+    private void updateTextureView() {
         PAGView.this.post(new Runnable() {
             @Override
             public void run() {
@@ -328,6 +324,14 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
                 PAGView.this.setOpaque(opaque);
             }
         });
+    }
+
+    private void updateView() {
+        if (!isAttachedToWindow) {
+            return;
+        }
+        flush();
+        updateTextureView();
         if (!mPAGFlushListeners.isEmpty()) {
             PAGView.this.post(new Runnable() {
                 @Override
@@ -826,6 +830,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         if (!_isPlaying || animator.isRunning() ||
                 (_isAnimatorPreRunning != null && !_isAnimatorPreRunning)) {
             _isAnimatorPreRunning = null;
+            updateTextureView();
             return;
         }
         _isAnimatorPreRunning = null;
