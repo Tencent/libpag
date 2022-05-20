@@ -225,8 +225,7 @@ EMSCRIPTEN_BINDINGS(pag) {
                   return pagFile.getLayersByEditableIndex(editableIndex,
                                                           static_cast<LayerType>(layerType));
                 }))
-      .function("_getEditableIndexes",
-                optional_override([](PAGFile& pagFile, int layerType) {
+      .function("_getEditableIndexes", optional_override([](PAGFile& pagFile, int layerType) {
                   return pagFile.getEditableIndexes(static_cast<LayerType>(layerType));
                 }))
       .function("_timeStretchMode", &PAGFile::timeStretchMode)
