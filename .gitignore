@@ -71,3 +71,7 @@ win/Win32Demo/Release/
 QTCMAKE.cfg
 test/baseline/.cache
 /result
+
+
+vendor_tools/
+.vscode
