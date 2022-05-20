@@ -188,7 +188,7 @@ PAG_API jobjectArray Java_org_libpag_PAGFile_getLayersByEditableIndex(JNIEnv* en
 }
 
 PAG_API jintArray Java_org_libpag_PAGFile_getEditableIndexes(JNIEnv* env, jobject thiz,
-                                                                jint layerType) {
+                                                             jint layerType) {
   auto pagFile = getPAGFile(env, thiz);
   if (pagFile == nullptr) {
     return env->NewIntArray(0);
@@ -196,7 +196,7 @@ PAG_API jintArray Java_org_libpag_PAGFile_getEditableIndexes(JNIEnv* env, jobjec
   auto indexes = pagFile->getEditableIndexes(static_cast<pag::LayerType>(layerType));
   auto result = env->NewIntArray(indexes.size());
   env->SetIntArrayRegion(result, 0, indexes.size(), indexes.data());
-  return result ;
+  return result;
 }
 
 PAG_API jint Java_org_libpag_PAGFile_timeStretchMode(JNIEnv* env, jobject thiz) {
