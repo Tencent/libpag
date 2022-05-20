@@ -36,7 +36,7 @@ void ReadEditableLayer(DecodeStream* stream) {
 TagCode WriteEditableLayer(EncodeStream* stream, const File* file) {
   if (file->editableImages != nullptr) {
     stream->writeEncodedUint32(static_cast<uint32_t>(file->editableImages->size()));
-    for (int index: *file->editableImages) {
+    for (int index : *file->editableImages) {
       stream->writeEncodedInt32(index);
     }
   } else {
@@ -45,7 +45,7 @@ TagCode WriteEditableLayer(EncodeStream* stream, const File* file) {
 
   if (file->editableTexts != nullptr) {
     stream->writeEncodedUint32(static_cast<uint32_t>(file->editableTexts->size()));
-    for (int index: *file->editableTexts) {
+    for (int index : *file->editableTexts) {
       stream->writeEncodedInt32(index);
     }
   } else {
