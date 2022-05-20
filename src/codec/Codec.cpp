@@ -228,6 +228,9 @@ std::shared_ptr<File> Codec::Decode(const void* bytes, uint32_t byteLength,
   file->timeStretchMode = context.timeStretchMode;
   file->fileAttributes = context.fileAttributes;
   file->path = filePath;
+
+  file->editableImages = context.editableImages;
+  file->editableTexts = context.editableTexts;
   return file;
 }
 

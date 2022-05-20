@@ -91,6 +91,11 @@ PAG_API @interface PAGFile : PAGComposition
 - (NSArray<PAGLayer*>*)getLayersByEditableIndex:(int)index layerType:(PAGLayerType)type;
 
 /**
+ * Return an array of editableIndex that need to be edited by layer type.
+ */
+- (NSArray<NSNumber*>*)getEditableIndexes:(PAGLayerType)layerType;
+
+/**
  * Indicate how to stretch the original duration to fit target duration when file's duration is
  * changed. The default value is PAGTimeStretchMode::Repeat.
  */

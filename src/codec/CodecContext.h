@@ -46,6 +46,9 @@ class CodecContext : public StreamContext {
   int timeStretchMode = PAGTimeStretchMode::Repeat;
   TimeRange* scaledTimeRange = nullptr;
   FileAttributes fileAttributes = {};
+
+  std::vector<int>* editableImages = nullptr;
+  std::vector<int>* editableTexts = nullptr;
   uint16_t tagLevel = 0;
 };
 }  // namespace pag

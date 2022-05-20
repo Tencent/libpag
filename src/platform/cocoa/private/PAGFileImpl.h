@@ -52,6 +52,8 @@
 
 - (NSArray<PAGLayer*>*)getLayersByEditableIndex:(int)index layerType:(PAGLayerType)type;
 
+- (NSArray<NSNumber*>*)getEditableIndexes:(PAGLayerType)layerType;
+
 - (int)timeStretchMode;
 
 - (void)seTimeStretchMode:(int)value;

@@ -1074,6 +1074,11 @@ class PAG_API PAGFile : public PAGComposition {
                                                                   LayerType layerType);
 
   /**
+   * Return an array of editableIndex that need to be edited by layer type.
+   */
+  std::vector<int> getEditableIndexes(LayerType layerType);
+
+  /**
    * Indicate how to stretch the original duration to fit target duration when file's duration is
    * changed. The default value is PAGTimeStretchMode::Repeat.
    */

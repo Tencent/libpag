@@ -123,6 +123,12 @@ export class PAGFile extends PAGComposition {
     }
   }
   /**
+   * Return an array of editableIndex that need to be edited by layer type.
+   */
+  public getEditableIndexes(layerType: LayerType)  {
+    return this.wasmIns._getEditableIndexes(layerType) as Vector<int>;
+  }
+  /**
    * Indicate how to stretch the original duration to fit target duration when file's duration is
    * changed. The default value is PAGTimeStretchMode::Repeat.
    */

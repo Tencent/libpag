@@ -82,6 +82,10 @@
   return [(PAGFileImpl*)self.impl getLayersByEditableIndex:index layerType:type];
 }
 
+- (NSArray<NSNumber*>*)getEditableIndexes:(PAGLayerType)layerType {
+  return [self.impl getEditableIndexes:layerType];
+}
+
 - (PAGTimeStretchMode)timeStretchMode {
   return (PAGTimeStretchMode)[(PAGFileImpl*)self.impl timeStretchMode];
 }

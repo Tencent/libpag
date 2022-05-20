@@ -201,6 +201,33 @@ bool PAGFile::isPAGFile() const {
   return true;
 }
 
+std::vector<int> PAGFile::getEditableIndexes(LayerType layerType) {
+  int maxIndex = 0;
+  switch (layerType) {
+    case LayerType::Image:
+      if (file->editableImages != nullptr) {
+        return *file->editableImages;
+      }
+      maxIndex = file->numImages();
+      break;
+    case LayerType::Text:
+      if (file->editableTexts != nullptr) {
+        return *file->editableTexts;
+      }
+      maxIndex = file->numTexts();
+      break;
+    case LayerType::Solid:
+      return {-1};
+    default:
+      break;
+  }
+  std::vector<int> result;
+  for (int i = 0; i < maxIndex; i++) {
+    result.emplace_back(i);
+  }
+  return result;
+}
+
 Frame PAGFile::stretchedFrameDuration() const {
   return _stretchedFrameDuration;
 }

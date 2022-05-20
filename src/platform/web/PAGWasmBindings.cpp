@@ -225,6 +225,10 @@ EMSCRIPTEN_BINDINGS(pag) {
                   return pagFile.getLayersByEditableIndex(editableIndex,
                                                           static_cast<LayerType>(layerType));
                 }))
+      .function("_getEditableIndexes",
+                optional_override([](PAGFile& pagFile, int layerType) {
+                  return pagFile.getEditableIndexes(static_cast<LayerType>(layerType));
+                }))
       .function("_timeStretchMode", &PAGFile::timeStretchMode)
       .function("_setTimeStretchMode", &PAGFile::setTimeStretchMode)
       .function("_setDuration", optional_override([](PAGFile& pagFile, int duration) {
@@ -468,6 +472,7 @@ EMSCRIPTEN_BINDINGS(pag) {
 
   register_vector<std::shared_ptr<PAGLayer>>("VectorPAGLayer");
   register_vector<std::string>("VectorString");
+  register_vector<int>("VectorInt");
   register_vector<tgfx::Point>("VectorPoint");
   register_vector<Marker>("VectorMarker");
   register_vector<PAGVideoRange>("VectorPAGVideoRange");
