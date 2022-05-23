@@ -1074,7 +1074,7 @@ class PAG_API PAGFile : public PAGComposition {
                                                                   LayerType layerType);
 
   /**
-   * Return an array of editableIndex that need to be edited by layer type.
+   * Return an array of editableIndex that allow to be edited by layer type.
    */
   std::vector<int> getEditableIndexes(LayerType layerType);
 
