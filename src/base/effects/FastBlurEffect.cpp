@@ -18,6 +18,7 @@
 
 #include "base/utils/Verify.h"
 #include "pag/file.h"
+#include "rendering/filters/gaussianblur/GaussianBlurDefines.h"
 
 namespace pag {
 FastBlurEffect::~FastBlurEffect() {
@@ -37,16 +38,13 @@ void FastBlurEffect::transformBounds(Rect* contentBounds, const Point& filterSca
     return;
   }
   auto direction = blurDimensions->getValueAt(layerFrame);
-  auto intensity = blurriness->getValueAt(layerFrame);
-  auto blurrinessX = intensity * filterScale.x;
-  auto blurrinessY = intensity * filterScale.y;
   auto expandX = (direction == BlurDimensionsDirection::All ||
                   direction == BlurDimensionsDirection::Horizontal)
-                     ? blurrinessX
+                     ? contentBounds->width() * BLUR_EXPEND * filterScale.x
                      : 0.0;
   auto expandY =
       (direction == BlurDimensionsDirection::All || direction == BlurDimensionsDirection::Vertical)
-          ? blurrinessY
+          ? contentBounds->height() * BLUR_EXPEND * filterScale.x
           : 0.0;
   contentBounds->outset(expandX, expandY);
 }

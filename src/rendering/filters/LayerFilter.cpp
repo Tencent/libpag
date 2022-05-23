@@ -25,7 +25,7 @@
 #include "MotionTileFilter.h"
 #include "RadialBlurFilter.h"
 #include "rendering/filters/dropshadow/DropShadowFilter.h"
-#include "rendering/filters/gaussblur/GaussBlurFilter.h"
+#include "rendering/filters/gaussianblur/GaussianBlurFilter.h"
 #include "rendering/filters/glow/GlowFilter.h"
 #include "rendering/filters/utils/FilterHelper.h"
 
@@ -140,7 +140,7 @@ std::unique_ptr<LayerFilter> LayerFilter::Make(Effect* effect) {
       filter = new LevelsIndividualFilter(effect);
       break;
     case EffectType::FastBlur:
-      filter = new GaussBlurFilter(effect);
+      filter = new GaussianBlurFilter(effect);
       break;
     case EffectType::DisplacementMap:
       filter = new DisplacementMapFilter(effect);

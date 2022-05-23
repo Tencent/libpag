@@ -30,7 +30,6 @@
 #include "tgfx/gpu/Surface.h"
 
 namespace pag {
-#define FAST_BLUR_MAX_SCALE_FACTOR 0.1f
 
 float GetScaleFactorLimit(Layer* layer) {
   auto scaleFactorLimit = layer->type() == LayerType::Image ? 1.0f : FLT_MAX;
@@ -419,22 +418,6 @@ std::unique_ptr<FilterSource> ToFilterSource(tgfx::Canvas* canvas) {
   return ToFilterSource(texture.get(), scale);
 }
 
-void FilterRenderer::ProcessFastBlur(FilterList* filterList) {
-  // 注意：含有layerStyle的情况下，不能走SingleImage的优化模式，因为目前DropShadowFilter还不是shader模式，
-  // 无法实现textureMatrix的绘制，等DropShadowFilter改为shader模式后去掉这个限制。
-  // 在高分辨率下，模糊滤镜的开销会增大，需要降采样降低开销；当模糊为最后一个滤镜时，需要离屏绘制
-  for (auto effect : filterList->effects) {
-    if (effect->type() == EffectType::FastBlur) {
-      auto blurEffect = static_cast<FastBlurEffect*>(effect);
-      // 当模糊度不变化时，使用缩放提高性能
-      if (!blurEffect->blurriness->animatable()) {
-        filterList->scaleFactorLimit = FAST_BLUR_MAX_SCALE_FACTOR;
-      }
-      break;
-    }
-  }
-}
-
 void FilterRenderer::DrawWithFilter(tgfx::Canvas* parentCanvas, RenderCache* cache,
                                     const FilterModifier* modifier,
                                     std::shared_ptr<Graphic> content) {
@@ -452,7 +435,6 @@ void FilterRenderer::DrawWithFilter(tgfx::Canvas* parentCanvas, RenderCache* cac
     filterList->layerMatrix.invert(&inverted);
     parentCanvas->concat(inverted);
   }
-  ProcessFastBlur(filterList.get());
   auto contentSurface =
       SurfaceUtil::MakeContentSurface(parentCanvas, contentBounds, filterList->scaleFactorLimit);
   if (contentSurface == nullptr) {
