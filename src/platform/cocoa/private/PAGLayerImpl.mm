@@ -24,6 +24,7 @@
 #import "PAGShapeLayerImpl.h"
 #import "PAGSolidLayerImpl.h"
 #import "PAGTextLayerImpl.h"
+#import "base/utils/ExternalHandle.h"
 #import "platform/cocoa/PAGFile.h"
 #import "platform/cocoa/PAGImageLayer.h"
 #import "platform/cocoa/PAGShapeLayer.h"
@@ -164,8 +165,9 @@
   if (layer == nullptr) {
     return nil;
   }
-  if (layer->externalHandle != nullptr) {
-    return (PAGLayer*)layer->externalHandle;
+  std::lock_guard<std::mutex> autoLocker(layer->externalHandle->locker);
+  if (layer->externalHandle->nativeHandle) {
+    return static_cast<PAGLayer*>(layer->externalHandle->nativeHandle);
   }
   id result = nil;
   switch (layer->layerType()) {
@@ -201,7 +203,7 @@
       result = [[PAGLayer alloc] initWithImpl:impl];
     } break;
   }
-  layer->externalHandle = result;
+  layer->externalHandle->nativeHandle = result;
   [result autorelease];
   return result;
 }
@@ -224,7 +226,8 @@
 }
 
 - (void)dealloc {
-  _pagLayer->externalHandle = nullptr;
+  std::lock_guard<std::mutex> autoLocker(_pagLayer->externalHandle->locker);
+  _pagLayer->externalHandle->nativeHandle = nullptr;
   [super dealloc];
 }
 
