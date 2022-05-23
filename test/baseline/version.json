@@ -7563,9 +7563,9 @@
         "DisplacementMap": "42cb9f4b",
         "DisplacementMap_Scale": "21336019",
         "DropShadow": "42cb9f4b",
-        "GaussBlur_FastBlur": "7dd17756",
-        "GaussBlur_FastBlur_NoRepeat": "42cb9f4b",
-        "GaussBlur_Static": "7dd17756",
+        "GaussBlur_FastBlur": "abe84d51",
+        "GaussBlur_FastBlur_NoRepeat": "abe84d51",
+        "GaussBlur_Static": "abe84d51",
         "Glow": "48a897dd",
         "Mosaic": "48a897dd",
         "MotionBlur_200000": "42cb9f4b",
@@ -7712,7 +7712,7 @@
     "PAGImageLayerTest": {
         "ImageReplacement": "48a897dd",
         "ImageReplacement_Empty": "48a897dd",
-        "setImage": "a0f0772b"
+        "setImage": "abe84d51"
     },
     "PAGImageTest": {
         "BottomLeftMask": "8992f0fb",
@@ -7800,8 +7800,8 @@
         "Emoji": "aabe191f",
         "NormalEmoji": "aabe191f",
         "PositionAnimator": "aabe191f",
-        "SmallFontSizeScale": "21336019",
-        "SmallFontSizeScale_LowResolution": "aabe191f",
+        "SmallFontSizeScale": "abe84d51",
+        "SmallFontSizeScale_LowResolution": "abe84d51",
         "TextReplacement": "aabe191f",
         "fillColor": "48a897dd",
         "strokeColor": "48a897dd",
