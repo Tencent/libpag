@@ -229,7 +229,6 @@ void GLCaps::initGLSupport(const GLInfo& info) {
   multisampleDisableSupport = true;
   textureBarrierSupport = version >= GL_VER(4, 5) || info.hasExtension("GL_ARB_texture_barrier") ||
                           info.hasExtension("GL_NV_texture_barrier");
-  textureSwizzleSupport = version >= GL_VER(3, 3) || info.hasExtension("GL_ARB_texture_swizzle");
   semaphoreSupport = version >= GL_VER(3, 2) || info.hasExtension("GL_ARB_sync");
 }
 
@@ -241,7 +240,6 @@ void GLCaps::initGLESSupport(const GLInfo& info) {
   textureRedSupport = version >= GL_VER(3, 0) || info.hasExtension("GL_EXT_texture_rg");
   multisampleDisableSupport = info.hasExtension("GL_EXT_multisample_compatibility");
   textureBarrierSupport = info.hasExtension("GL_NV_texture_barrier");
-  textureSwizzleSupport = version >= GL_VER(3, 0);
   if (info.hasExtension("GL_EXT_shader_framebuffer_fetch")) {
     frameBufferFetchSupport = true;
     frameBufferFetchColorName = "gl_LastFragData[0]";
@@ -305,12 +303,11 @@ void GLCaps::initFormatMap(const GLInfo& info) {
     pixelFormatMap[PixelFormat::RG_88].format.externalFormat = GL_LUMINANCE_ALPHA;
     pixelFormatMap[PixelFormat::RG_88].swizzle = Swizzle::RARA();
   }
+  // Texture swizzle doesn't work when using CVPixelBuffer on iPhone 5s and iPhone 6.
   // If we don't have texture swizzle support then the shader generator must insert the
   // swizzle into shader code.
-  if (!textureSwizzleSupport) {
-    for (auto& item : pixelFormatMap) {
-      item.second.textureSwizzle = item.second.swizzle;
-    }
+  for (auto& item : pixelFormatMap) {
+    item.second.textureSwizzle = item.second.swizzle;
   }
   // ES 2.0 requires that the internal/external formats match.
   bool useSizedTexFormats =
