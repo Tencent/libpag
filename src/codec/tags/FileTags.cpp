@@ -20,6 +20,7 @@
 #include <unordered_set>
 #include "base/utils/EnumClassHash.h"
 #include "codec/tags/BitmapCompositionTag.h"
+#include "codec/tags/EditableIndices.h"
 #include "codec/tags/FileAttributes.h"
 #include "codec/tags/FontTables.h"
 #include "codec/tags/Images.h"
@@ -75,6 +76,10 @@ static void ReadTag_VideoCompositionBlock(DecodeStream* stream, CodecContext* co
   context->compositions.push_back(composition);
 }
 
+static void ReadTag_EditableIndicesBlock(DecodeStream* stream, CodecContext*) {
+  ReadEditableIndices(stream);
+}
+
 using ReadTagHandler = void(DecodeStream* stream, CodecContext* context);
 static const std::unordered_map<TagCode, std::function<ReadTagHandler>, EnumClassHash> handlers = {
     {TagCode::FontTables, ReadTag_FontTables},
@@ -87,6 +92,7 @@ static const std::unordered_map<TagCode, std::function<ReadTagHandler>, EnumClas
     {TagCode::VectorCompositionBlock, ReadTag_VectorCompositionBlock},
     {TagCode::BitmapCompositionBlock, ReadTag_BitmapCompositionBlock},
     {TagCode::VideoCompositionBlock, ReadTag_VideoCompositionBlock},
+    {TagCode::EditableIndices, ReadTag_EditableIndicesBlock},
 };
 
 void ReadTagsOfFile(DecodeStream* stream, TagCode code, CodecContext* context) {
@@ -165,6 +171,9 @@ void WriteTagsOfFile(EncodeStream* stream, const File* file, PerformanceData* pe
   }
   if (!file->images.empty()) {
     WriteImages(stream, &(file->images));
+  }
+  if (file->editableImages != nullptr || file->editableTexts != nullptr) {
+    WriteTag(stream, file, WriteEditableIndices);
   }
   auto func = std::bind(WriteComposition, stream, std::placeholders::_1);
   std::for_each(file->compositions.begin(), file->compositions.end(), func);

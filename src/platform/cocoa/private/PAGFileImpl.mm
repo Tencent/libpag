@@ -104,6 +104,16 @@
   return [PAGLayerImpl BatchConvertToPAGLayers:layerVector];
 }
 
+- (NSArray<NSNumber*>*)getEditableIndices:(PAGLayerType)type {
+  auto pagFile = std::static_pointer_cast<pag::PAGFile>(self.pagLayer);
+  auto indices = pagFile->getEditableIndices(static_cast<pag::LayerType>(type));
+  NSMutableArray<NSNumber*>* result = [NSMutableArray new];
+  for (size_t i = 0; i < indices.size(); ++i) {
+    [result addObject:[NSNumber numberWithInt:indices[i]]];
+  }
+  return result;
+}
+
 - (int)timeStretchMode {
   auto pagFile = std::static_pointer_cast<pag::PAGFile>(self.pagLayer);
   return pagFile->timeStretchMode();
