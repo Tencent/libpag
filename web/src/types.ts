@@ -15,9 +15,7 @@ import { NativeImage } from './core/native-image';
 import { WebMask } from './core/web-mask';
 import { PAGTextLayer } from './pag-text-layer';
 import { GlobalCanvas } from './core/global-canvas';
-import { PAGGlTexture } from './core/pag-gl-texture';
-import { PAGGlFrameBuffer } from './core/pag-gl-framebuffer';
-import { PAGGlContext } from './core/pag-gl-context';
+import { BackendContext } from './core/backend-context';
 
 declare global {
   interface Window {
@@ -46,7 +44,7 @@ export interface PAG extends EmscriptenModule {
   _PAGSurface: {
     _FromCanvas: (canvasID: string) => any;
     _FromTexture: (textureID: number, width: number, height: number, flipY: boolean) => any;
-    _FromFrameBuffer: (framebufferID: number, width: number, height: number, flipY: boolean) => any;
+    _FromRenderTarget: (framebufferID: number, width: number, height: number, flipY: boolean) => any;
   };
   _PAGComposition: {
     _Make: (width: number, height: number) => any;
@@ -88,9 +86,7 @@ export interface PAG extends EmscriptenModule {
   ScalerContext: typeof ScalerContext;
   VideoReader: typeof VideoReader;
   GlobalCanvas: typeof GlobalCanvas;
-  PAGGlTexture: typeof PAGGlTexture;
-  PAGGlFrameBuffer: typeof PAGGlFrameBuffer;
-  PAGGlContext: typeof PAGGlContext;
+  BackendContext: typeof BackendContext;
   traceImage: (info: { width: number; height: number }, pixels: Uint8Array, tag: string) => void;
   registerSoftwareDecoderFactory: (factory: SoftwareDecoderFactory) => void;
   [key: string]: any;
@@ -107,7 +103,7 @@ export interface EmscriptenGL {
   framebuffers: (WebGLFramebuffer | null)[];
   getContext: (contextHandle: number) => EmscriptenGLContext;
   getNewId: (array: any[]) => number;
-  makeContextCurrent: (contextHandle: number) => void;
+  makeContextCurrent: (contextHandle: number) => boolean;
   registerContext: (ctx: WebGLRenderingContext, webGLContextAttributes: EmscriptenGLContextAttributes) => number;
   textures: (WebGLTexture | null)[];
 }

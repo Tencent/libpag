@@ -246,7 +246,7 @@ EMSCRIPTEN_BINDINGS(pag) {
                         auto origin = flipY ? ImageOrigin::BottomLeft : ImageOrigin::TopLeft;
                         return PAGSurface::MakeFrom(glTexture, origin);
                       }))
-      .class_function("_FromFrameBuffer",
+      .class_function("_FromRenderTarget",
                       optional_override([](int frameBufferID, int width, int height, bool flipY) {
                         GLFrameBufferInfo glFrameBufferInfo = {};
                         glFrameBufferInfo.id = static_cast<unsigned>(frameBufferID);

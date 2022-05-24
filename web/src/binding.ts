@@ -11,43 +11,40 @@ import { ScalerContext } from './core/scaler-context';
 import { WebMask } from './core/web-mask';
 import { NativeImage } from './core/native-image';
 import { GlobalCanvas } from './core/global-canvas';
-import { PAGGlContext } from './core/pag-gl-context';
-import { PAGGlUnit } from './core/pag-gl-unit';
+import { BackendContext } from './core/backend-context';
 import { PAGComposition } from './pag-composition';
 import { PAGTextLayer } from './pag-text-layer';
-import { PAGGlTexture } from './core/pag-gl-texture';
-import { PAGGlFrameBuffer } from './core/pag-gl-framebuffer';
-
-const interactiveBindingClasses = [
-  PAGFile,
-  PAGPlayer,
-  PAGView,
-  PAGFont,
-  PAGImage,
-  PAGLayer,
-  PAGSurface,
-  WebMask,
-  GlobalCanvas,
-  PAGGlUnit,
-  PAGGlContext,
-];
 
 /**
  * Binding pag js module on pag webassembly module.
  */
 export const binding = (module: PAG) => {
   module.PAG = module;
+  module.PAGFile = PAGFile;
+  PAGFile.module = module;
+  module.PAGPlayer = PAGPlayer;
+  PAGPlayer.module = module;
+  module.PAGView = PAGView;
+  PAGView.module = module;
+  module.PAGFont = PAGFont;
+  PAGFont.module = module;
+  module.PAGImage = PAGImage;
+  PAGImage.module = module;
+  module.PAGLayer = PAGLayer;
+  PAGLayer.module = module;
   module.PAGComposition = PAGComposition;
-  module.PAGGlFrameBuffer = PAGGlFrameBuffer;
-  module.PAGGlTexture = PAGGlTexture;
+  module.PAGSurface = PAGSurface;
+  PAGSurface.module = module;
   module.PAGTextLayer = PAGTextLayer;
   module.VideoReader = VideoReader;
   module.NativeImage = NativeImage;
   module.ScalerContext = ScalerContext;
-  interactiveBindingClasses.forEach((item) => {
-    module[item.name] = item;
-    item.module = module;
-  });
+  module.WebMask = WebMask;
+  WebMask.module = module;
+  module.GlobalCanvas = GlobalCanvas;
+  GlobalCanvas.module = module;
+  module.BackendContext = BackendContext;
+  BackendContext.module = module;
   module.traceImage = function (info, pixels) {
     const canvas = document.createElement('canvas');
     canvas.width = info.width;

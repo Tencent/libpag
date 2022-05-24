@@ -1,7 +1,6 @@
 import { AlphaType, ColorType, Matrix, PAG, PAGScaleMode } from './types';
 import { NativeImage } from './core/native-image';
 import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorators';
-import { PAGGlTexture } from './core/pag-gl-texture';
 
 @destroyVerify
 @wasmAwaitRewind
@@ -38,7 +37,9 @@ export class PAGImage {
     const wasmIns = this.module._PAGImage._FromNativeImage(nativeImage);
     return new PAGImage(wasmIns);
   }
-
+  /**
+   *  Creates a PAGImage object from an array of pixel data, return null if it's not valid pixels.
+   */
   public static fromPixels(
     pixels: Uint8Array,
     width: number,
@@ -53,10 +54,12 @@ export class PAGImage {
     const wasmIns = this.module._PAGImage._FromPixels(dataPtr, width, height, rowBytes, colorType, alphaType);
     return new PAGImage(wasmIns);
   }
-
-  public static fromTexture(texture: PAGGlTexture, width: number, height: number, flipY: boolean) {
-    texture.makeContextCurrent();
-    return new PAGImage(PAGImage.module._PAGImage._FromTexture(texture.id, width, height, flipY));
+  /**
+   * Creates a PAGImage object from the specified backend texture, return null if the texture is
+   * invalid.
+   */
+  public static fromTexture(textureID: number, width: number, height: number, flipY: boolean) {
+    return new PAGImage(PAGImage.module._PAGImage._FromTexture(textureID, width, height, flipY));
   }
 
   public wasmIns;

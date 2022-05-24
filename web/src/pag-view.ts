@@ -7,6 +7,7 @@ import { destroyVerify } from './utils/decorators';
 import { Log } from './utils/log';
 import { ErrorCode } from './utils/error-map';
 import { isOffscreenCanvas } from './utils/type-utils';
+import { BackendContext } from './core/backend-context';
 
 export interface PAGViewOptions {
   /**
@@ -57,40 +58,28 @@ export class PAGView {
 
       if (pagView.pagViewOptions.useCanvas2D) {
         this.module.globalCanvas.retain();
-        pagView.contextID = this.module.globalCanvas.contextID;
+        if (!this.module.globalCanvas.glContext) throw new Error('GlobalCanvas context is not WebGL!');
+        pagView.pagGlContext = BackendContext.from(this.module.globalCanvas.glContext);
       } else {
-        pagView.contextID = this.module.GL.createContext(canvasElement, {
-          majorVersion: 1,
-          minorVersion: 0,
-          depth: false,
-          stencil: false,
-          antialias: false,
-        });
+        const gl = canvasElement.getContext('webgl');
+        if (!gl) throw new Error('Canvas context is not WebGL!');
+        pagView.pagGlContext = BackendContext.from(gl);
       }
-
-      if (pagView.contextID === 0) {
-        Log.errorByCode(ErrorCode.CanvasContextIsNotWebGL);
-      } else {
-        pagView.resetSize(pagView.pagViewOptions.useScale);
-        pagView.frameRate = file.frameRate();
-        pagView.pagSurface = this.makePAGSurface(pagView.contextID, pagView.rawWidth, pagView.rawHeight);
-        pagView.player.setSurface(pagView.pagSurface);
-        pagView.player.setComposition(file);
-        pagView.setProgress(0);
-        if (pagView.pagViewOptions.firstFrame) await pagView.flush();
-        return pagView;
-      }
+      pagView.resetSize(pagView.pagViewOptions.useScale);
+      pagView.frameRate = file.frameRate();
+      pagView.pagSurface = this.makePAGSurface(pagView.pagGlContext, pagView.rawWidth, pagView.rawHeight);
+      pagView.player.setSurface(pagView.pagSurface);
+      pagView.player.setComposition(file);
+      pagView.setProgress(0);
+      if (pagView.pagViewOptions.firstFrame) await pagView.flush();
+      return pagView;
     }
   }
 
-  private static makePAGSurface(contextID: number, width: number, height: number): PAGSurface {
-    const oldHandle = this.module.GL.currentContext?.handle || 0;
-    this.module.GL.makeContextCurrent(contextID);
-    const pagSurface = PAGSurface.FromFrameBuffer(0, width, height, true);
-    this.module.GL.makeContextCurrent(0);
-    if (oldHandle) {
-      this.module.GL.makeContextCurrent(oldHandle);
-    }
+  private static makePAGSurface(pagGlContext: BackendContext, width: number, height: number): PAGSurface {
+    if (!pagGlContext.makeCurrent()) throw new Error('Make context current fail!');
+    const pagSurface = PAGSurface.FromRenderTarget(0, width, height, true);
+    pagGlContext.clearCurrent();
     return pagSurface;
   }
 
@@ -111,10 +100,10 @@ export class PAGView {
   private playTime = 0;
   private timer: number | null = null;
   private player: PAGPlayer;
-  private pagSurface: PAGSurface | undefined;
+  private pagSurface: PAGSurface | null = null;
   private repeatedTimes = 0;
   private eventManager: EventManager = new EventManager();
-  private contextID = 0;
+  private pagGlContext: BackendContext | null = null;
   private canvasElement: HTMLCanvasElement | OffscreenCanvas | null;
   private canvasContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null | undefined;
   private rawWidth = 0;
@@ -330,7 +319,8 @@ export class PAGView {
     }
     this.rawWidth = this.canvasElement.width;
     this.rawHeight = this.canvasElement.height;
-    const pagSurface = PAGView.makePAGSurface(this.contextID, this.rawWidth, this.rawHeight);
+    if (!this.pagGlContext) return null;
+    const pagSurface = PAGView.makePAGSurface(this.pagGlContext, this.rawWidth, this.rawHeight);
     this.player.setSurface(pagSurface);
     this.pagSurface?.destroy();
     this.pagSurface = pagSurface;
@@ -342,12 +332,9 @@ export class PAGView {
     this.pagSurface?.destroy();
     if (this.pagViewOptions.useCanvas2D) {
       PAGView.module.globalCanvas.release();
-    } else {
-      if (this.contextID > 0) {
-        PAGView.module.GL.deleteContext(this.contextID);
-      }
     }
-    this.contextID = 0;
+    this.pagGlContext?.destroy();
+    this.pagGlContext = null;
     this.canvasContext = null;
     this.canvasElement = null;
     this.isDestroyed = true;
