@@ -16,10 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "EditableLayer.h"
+#include "EditableIndices.h"
 
 namespace pag {
-void ReadEditableLayer(DecodeStream* stream) {
+void ReadEditableIndices(DecodeStream* stream) {
   auto context = static_cast<CodecContext*>(stream->context);
   auto count = stream->readEncodedUint32();
   context->editableImages = new std::vector<int>(count);
@@ -33,7 +33,7 @@ void ReadEditableLayer(DecodeStream* stream) {
   }
 }
 
-TagCode WriteEditableLayer(EncodeStream* stream, const File* file) {
+TagCode WriteEditableIndices(EncodeStream* stream, const File* file) {
   if (file->editableImages != nullptr) {
     stream->writeEncodedUint32(static_cast<uint32_t>(file->editableImages->size()));
     for (int index : *file->editableImages) {
@@ -51,6 +51,6 @@ TagCode WriteEditableLayer(EncodeStream* stream, const File* file) {
   } else {
     stream->writeEncodedUint32(0);
   }
-  return TagCode::EditableLayer;
+  return TagCode::EditableIndices;
 }
 }  // namespace pag

@@ -22,7 +22,7 @@
 
 namespace pag {
 
-void ReadEditableLayer(DecodeStream* stream);
+void ReadEditableIndices(DecodeStream* stream);
 
-TagCode WriteEditableLayer(EncodeStream* stream, const File* file);
+TagCode WriteEditableIndices(EncodeStream* stream, const File* file);
 }  // namespace pag

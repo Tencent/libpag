@@ -131,7 +131,7 @@ enum class TagCode {
 
   RadialBlurEffect = 81,
   MosaicEffect = 82,
-  EditableLayer = 83,
+  EditableIndices = 83,
   // add new tags here...
 
   Count

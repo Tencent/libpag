@@ -672,7 +672,7 @@ PAG_TEST_F(PAGFileBaseTest, SetStartTime) {
   EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGFileBaseTest/SetStartTime"));
 }
 
-PAG_TEST_F(PAGFileBaseTest, EditableLayer) {
+PAG_TEST_F(PAGFileBaseTest, EditableIndices) {
   auto pagFile = PAGFile::Load("../resources/apitest/texture_bottom_left.pag");
   auto editableImages = pagFile->getEditableIndices(LayerType::Image);
   ASSERT_EQ(editableImages.size(), 6lu);
