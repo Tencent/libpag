@@ -275,4 +275,21 @@ PAG_TEST(PAGFilterTest, MultiFilter) {
   pagPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFilterTest/MultiFilter_Motiontile_Blur"));
 }
+
+/**
+ * 用例描述: LevelsIndividualFilter
+ */
+PAG_TEST(PAGFilterTest, LevelsIndividualFilter) {
+  auto pagFile = PAGFile::Load("../resources/filter/LevelsIndividualFilter.pag");
+  ASSERT_NE(pagFile, nullptr);
+  pagFile->replaceImage(0, PAGImage::FromPath("../assets/rotation.jpg"));
+  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  ASSERT_NE(pagSurface, nullptr);
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setProgress(0.7);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFilterTest/LevelsIndividualFilter"));
+}
 }  // namespace pag

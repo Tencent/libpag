@@ -58,7 +58,13 @@ static const char FRAGMENT_SHADER[] = R"(
         };
 
         float GetPixelLevel(float inPixel, LevelsIndividualParam param) {
-            return (clamp(pow(((inPixel * 255.0) - param.inBlack) / (param.inWhite - param.inBlack), 1.0 / param.gamma), 0.0, 1.0) * (param.outWhite - param.outBlack) + param.outBlack) / 255.0;
+            float x = ((inPixel * 255.0) - param.inBlack) / (param.inWhite - param.inBlack);
+            float y = 1.0 / param.gamma;
+            float p = 0.0;
+            if (!(x < 0.0 || (x == 0.0 && y <= 0.0))) {
+                p = clamp(pow(x, y), 0.0, 1.0);
+            }
+            return (p * (param.outWhite - param.outBlack) + param.outBlack) / 255.0;
         }
 
         void main() {

@@ -7567,6 +7567,7 @@
         "GaussBlur_FastBlur_NoRepeat": "abe84d51",
         "GaussBlur_Static": "abe84d51",
         "Glow": "48a897dd",
+        "LevelsIndividualFilter": "9296b81c",
         "Mosaic": "48a897dd",
         "MotionBlur_200000": "42cb9f4b",
         "MotionBlur_600000": "42cb9f4b",
