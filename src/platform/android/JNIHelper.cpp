@@ -23,6 +23,7 @@
 #include <cassert>
 #include <string>
 #include "JPAGLayerHandle.h"
+#include "base/utils/ExternalHandle.h"
 
 static constexpr int BITMAP_FLAGS_ALPHA_UNPREMUL = 2;
 static constexpr int BITMAP_FLAGS_IS_HARDWARE = 1 << 31;
@@ -130,9 +131,10 @@ jobject ToPAGLayerJavaObject(JNIEnv* env, std::shared_ptr<pag::PAGLayer> pagLaye
   if (env == nullptr || pagLayer == nullptr) {
     return nullptr;
   }
-  if (pagLayer->externalHandle != nullptr &&
-      !env->IsSameObject(static_cast<jobject>(pagLayer->externalHandle), nullptr)) {
-    return static_cast<jobject>(pagLayer->externalHandle);
+  std::lock_guard<std::mutex> autoLocker(pagLayer->externalHandle->locker);
+  auto obj = static_cast<jobject>(pagLayer->externalHandle->nativeHandle);
+  if (obj && !env->IsSameObject(obj, nullptr)) {
+    return obj;
   }
   jobject layerObject = nullptr;
   switch (pagLayer->layerType()) {
@@ -188,8 +190,7 @@ jobject ToPAGLayerJavaObject(JNIEnv* env, std::shared_ptr<pag::PAGLayer> pagLaye
       break;
     }
   }
-  auto gObject = env->NewWeakGlobalRef(layerObject);
-  pagLayer->externalHandle = gObject;
+  pagLayer->externalHandle->nativeHandle = env->NewWeakGlobalRef(layerObject);
   return layerObject;
 }
 
