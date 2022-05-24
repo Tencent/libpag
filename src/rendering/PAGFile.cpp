@@ -201,7 +201,7 @@ bool PAGFile::isPAGFile() const {
   return true;
 }
 
-std::vector<int> PAGFile::getEditableIndexes(LayerType layerType) {
+std::vector<int> PAGFile::getEditableIndices(LayerType layerType) {
   int maxIndex = 0;
   switch (layerType) {
     case LayerType::Image:

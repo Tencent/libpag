@@ -674,27 +674,27 @@ PAG_TEST_F(PAGFileBaseTest, SetStartTime) {
 
 PAG_TEST_F(PAGFileBaseTest, EditableLayer) {
   auto pagFile = PAGFile::Load("../resources/apitest/texture_bottom_left.pag");
-  auto editableImages = pagFile->getEditableIndexes(LayerType::Image);
+  auto editableImages = pagFile->getEditableIndices(LayerType::Image);
   ASSERT_EQ(editableImages.size(), 6lu);
   for (size_t i = 0; i < editableImages.size(); i++) {
     ASSERT_EQ(editableImages[i], static_cast<int>(i));
   }
   pagFile = PAGFile::Load("../resources/apitest/editImageLayers.pag");
-  editableImages = pagFile->getEditableIndexes(LayerType::Image);
+  editableImages = pagFile->getEditableIndices(LayerType::Image);
   ASSERT_EQ(editableImages.size(), 3lu);
   ASSERT_EQ(editableImages[0], 3);
   ASSERT_EQ(editableImages[1], 2);
   ASSERT_EQ(editableImages[2], 4);
 
   pagFile = PAGFile::Load("../resources/apitest/test.pag");
-  auto editableTexts = pagFile->getEditableIndexes(LayerType::Text);
+  auto editableTexts = pagFile->getEditableIndices(LayerType::Text);
   ASSERT_EQ(editableTexts.size(), 2lu);
   for (size_t i = 0; i < editableTexts.size(); i++) {
     ASSERT_EQ(editableTexts[i], static_cast<int>(i));
   }
 
   pagFile = PAGFile::Load("../resources/apitest/editableTextLayer.pag");
-  editableTexts = pagFile->getEditableIndexes(LayerType::Text);
+  editableTexts = pagFile->getEditableIndices(LayerType::Text);
   ASSERT_EQ(editableTexts.size(), 2lu);
   ASSERT_EQ(editableTexts[0], static_cast<int>(1));
   ASSERT_EQ(editableTexts[1], static_cast<int>(0));

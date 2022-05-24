@@ -102,9 +102,11 @@ public class PAGFile extends PAGComposition {
     public native PAGLayer[] getLayersByEditableIndex(int editableIndex, int layerType);
 
     /**
-     * Return an array of editableIndex that need to be edited by layer type.
+     * Returns the indices of the editable layers in this PAGFile.
+     * If the editableIndex of a PAGLayer is not present in the returned indices, the PAGLayer should
+     * not be treated as editable.
      */
-    public native int[] getEditableIndexes(int layerType);
+    public native int[] getEditableIndices(int layerType);
 
     /**
      * Indicate how to stretch the original duration to fit target duration when file's duration is changed.

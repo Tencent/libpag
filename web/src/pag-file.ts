@@ -123,10 +123,12 @@ export class PAGFile extends PAGComposition {
     }
   }
   /**
-   * Return an array of editableIndex that need to be edited by layer type.
+   * Returns the indices of the editable layers in this PAGFile.
+   * If the editableIndex of a PAGLayer is not present in the returned indices, the PAGLayer should
+   * not be treated as editable.
    */
-  public getEditableIndexes(layerType: LayerType)  {
-    return this.wasmIns._getEditableIndexes(layerType) as Vector<int>;
+  public getEditableIndices(layerType: LayerType)  {
+    return this.wasmIns._getEditableIndices(layerType) as Vector<number>;
   }
   /**
    * Indicate how to stretch the original duration to fit target duration when file's duration is
