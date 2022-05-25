@@ -27,7 +27,8 @@ TextPaint CreateTextPaint(const TextDocument* textDocument);
 
 class TextGlyphs {
  public:
-  TextGlyphs(ID assetID, TextDocument* textDocument, float maxScale);
+  TextGlyphs(ID assetID, TextDocument* textDocument, float maxScale,
+             std::vector<GlyphHandle>& layoutGlyphs);
 
   ID id() const {
     return _id;
@@ -56,6 +57,7 @@ class TextGlyphs {
   std::vector<GlyphHandle> getGlyphs() const;
 
  private:
+  void makeAtlasGlyphs();
   ID _id = 0;
   ID _assetID = 0;
   TextDocument* _textDocument;

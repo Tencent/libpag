@@ -30,11 +30,23 @@ class TextReplacement {
 
   TextDocument* getTextDocument();
 
+  void setAnimators(std::vector<TextAnimator*>* animators);
+
+  void setLayoutGlyphs(const std::vector<GlyphHandle>& glyphs, Enum justification);
+
   void clearCache();
+
+  void resetText();
+
+  void resetAnimators();
+
+  TextContentCache* contentCache();
 
  private:
   TextContentCache* textContentCache = nullptr;
   Property<TextDocumentHandle>* sourceText = nullptr;
   PAGTextLayer* pagLayer = nullptr;
+  std::vector<TextAnimator*>* _animators = nullptr;
+  std::vector<GlyphHandle> layoutGlyphs;
 };
 }  // namespace pag

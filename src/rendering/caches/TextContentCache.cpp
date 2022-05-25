@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextContentCache.h"
+#include "rendering/caches/LayerCache.h"
 #include "rendering/graphics/Picture.h"
 #include "rendering/renderers/TextRenderer.h"
 
@@ -28,9 +29,12 @@ TextContentCache::TextContentCache(TextLayer* layer)
 }
 
 TextContentCache::TextContentCache(TextLayer* layer, ID cacheID,
-                                   Property<TextDocumentHandle>* sourceText)
+                                   Property<TextDocumentHandle>* sourceText,
+                                   std::vector<pag::TextAnimator*>* animators,
+                                   const std::vector<GlyphHandle>& layoutGlyphs)
     : ContentCache(layer), cacheID(cacheID), sourceText(sourceText), pathOption(layer->pathOption),
-      moreOption(layer->moreOption), animators(&layer->animators) {
+      moreOption(layer->moreOption),
+      animators(animators == nullptr ? &layer->animators : animators), layoutGlyphs(layoutGlyphs) {
   initTextGlyphs();
 }
 
@@ -68,14 +72,17 @@ void TextContentCache::initTextGlyphs() {
   if (sourceText->animatable()) {
     auto animatableProperty = reinterpret_cast<AnimatableProperty<TextDocumentHandle>*>(sourceText);
     auto textDocument = animatableProperty->keyframes[0]->startValue.get();
-    textGlyphs[textDocument] = std::make_shared<TextGlyphs>(getCacheID(), textDocument, scale);
+    textGlyphs[textDocument] =
+        std::make_shared<TextGlyphs>(getCacheID(), textDocument, scale, layoutGlyphs);
     for (const auto& keyframe : animatableProperty->keyframes) {
       textDocument = keyframe->endValue.get();
-      textGlyphs[textDocument] = std::make_shared<TextGlyphs>(getCacheID(), textDocument, scale);
+      textGlyphs[textDocument] =
+          std::make_shared<TextGlyphs>(getCacheID(), textDocument, scale, layoutGlyphs);
     }
   } else {
     auto textDocument = sourceText->getValueAt(0).get();
-    textGlyphs[textDocument] = std::make_shared<TextGlyphs>(getCacheID(), textDocument, scale);
+    textGlyphs[textDocument] =
+        std::make_shared<TextGlyphs>(getCacheID(), textDocument, scale, layoutGlyphs);
   }
 }
 
@@ -102,10 +109,31 @@ GraphicContent* TextContentCache::createContent(Frame layerFrame) const {
   if (iter == textGlyphs.end()) {
     return nullptr;
   }
-  auto content = RenderTexts(iter->second, pathOption, moreOption, animators, layerFrame).release();
+  auto content =
+      RenderTexts(iter->second, layoutGlyphs, pathOption, moreOption, animators, layerFrame)
+          .release();
   if (_cacheEnabled) {
     content->colorGlyphs = Picture::MakeFrom(getCacheID(), content->colorGlyphs);
   }
   return content;
 }
+
+bool TextContentCache::checkFrameChanged(Frame contentFrame, Frame lastContentFrame) {
+  if (contentFrame == lastContentFrame) {
+    return false;
+  }
+  if ((contentFrame < 0 || contentFrame >= layer->duration) &&
+      (lastContentFrame < 0 || lastContentFrame >= layer->duration)) {
+    return false;
+  }
+  contentFrame = ConvertFrameByStaticTimeRanges(staticTimeRanges, contentFrame);
+  lastContentFrame = ConvertFrameByStaticTimeRanges(staticTimeRanges, lastContentFrame);
+  return contentFrame != lastContentFrame;
+}
+
+void TextContentCache::updateStaticTimeRanges() {
+  auto layerCache = LayerCache::Get(layer);
+  staticTimeRanges = layerCache->calculateStaticTimeRanges(this);
+}
+
 }  // namespace pag

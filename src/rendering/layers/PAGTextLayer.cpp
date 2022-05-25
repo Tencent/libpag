@@ -120,7 +120,11 @@ void PAGTextLayer::setText(const std::string& text) {
 
 void PAGTextLayer::replaceTextInternal(std::shared_ptr<TextDocument> textData) {
   if (textData == nullptr) {
-    reset();
+    if (replacement != nullptr) {
+      replacement->resetText();
+      notifyModified(true);
+      invalidateCacheScale();
+    }
   } else {
     auto textDocument = textDocumentForWrite();
     // 仅以下属性支持外部修改：
@@ -182,6 +186,32 @@ void PAGTextLayer::setMatrixInternal(const Matrix& matrix) {
     return;
   }
   PAGLayer::setMatrixInternal(matrix);
+}
+
+bool PAGTextLayer::gotoTime(int64_t layerTime) {
+  auto changed = false;
+  if (_trackMatteLayer != nullptr) {
+    changed = _trackMatteLayer->gotoTime(layerTime);
+  }
+  auto layerFrame = TimeToFrame(layerTime, frameRateInternal());
+  auto oldContentFrame = contentFrame;
+  contentFrame = layerFrame - startFrame;
+  if (!changed) {
+    if (replacement && replacement->contentCache()) {
+      changed = replacement->contentCache()->checkFrameChanged(contentFrame, oldContentFrame);
+    } else {
+      changed = layerCache->checkFrameChanged(contentFrame, oldContentFrame);
+    }
+  }
+  return changed;
+}
+
+TextReplacement* PAGTextLayer::textReplacementForWrite() {
+  pag::LockGuard autoLock(rootLocker);
+  if (replacement == nullptr) {
+    replacement = new TextReplacement(this);
+  }
+  return replacement;
 }
 
 }  // namespace pag

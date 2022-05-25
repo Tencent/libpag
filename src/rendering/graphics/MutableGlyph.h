@@ -227,6 +227,10 @@ class MutableGlyph {
 
   void computeAtlasKey(tgfx::BytesKey* bytesKey, TextStyle style) const;
 
+  const std::shared_ptr<Glyph> glyph() const {
+    return simpleGlyph;
+  }
+
  private:
   std::shared_ptr<Glyph> simpleGlyph;
   // read only attributes:

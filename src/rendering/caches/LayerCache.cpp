@@ -60,7 +60,7 @@ LayerCache::LayerCache(Layer* layer) : layer(layer) {
   if (!layer->masks.empty()) {
     maskCache = new MaskCache(layer);
   }
-  updateStaticTimeRanges();
+  staticTimeRanges = calculateStaticTimeRanges(contentCache);
   maxScaleFactor = ToTGFX(layer->getMaxScaleFactor());
 }
 
@@ -115,7 +115,8 @@ bool LayerCache::contentVisible(Frame contentFrame) {
   return layerTransform->visible();
 }
 
-void LayerCache::updateStaticTimeRanges() {
+std::vector<TimeRange> LayerCache::calculateStaticTimeRanges(ContentCache* cache) {
+  std::vector<TimeRange> stRanges = {};
   // layer->startTime is excluded from all time ranges.
   if (layer->type() == LayerType::PreCompose &&
       static_cast<PreComposeLayer*>(layer)->composition->type() == CompositionType::Vector) {
@@ -123,21 +124,21 @@ void LayerCache::updateStaticTimeRanges() {
     // 这里的 staticTimeRanges 只记录 Layer 自身的静态区间，
     // 避免在 Layer->gotoFrame() 里重复判断非真实子项的帧号变化。
     TimeRange range = {0, layer->duration - 1};
-    staticTimeRanges.push_back(range);
+    stRanges.push_back(range);
   } else {
-    staticTimeRanges = *contentCache->getStaticTimeRanges();
+    stRanges = *cache->getStaticTimeRanges();
   }
-  MergeTimeRanges(&staticTimeRanges, transformCache->getStaticTimeRanges());
+  MergeTimeRanges(&stRanges, transformCache->getStaticTimeRanges());
   if (maskCache) {
-    MergeTimeRanges(&staticTimeRanges, maskCache->getStaticTimeRanges());
+    MergeTimeRanges(&stRanges, maskCache->getStaticTimeRanges());
   }
   if (layer->trackMatteLayer) {
     auto timeRanges = getTrackMatteStaticTimeRanges();
-    MergeTimeRanges(&staticTimeRanges, &timeRanges);
+    MergeTimeRanges(&stRanges, &timeRanges);
   }
   if (!layer->layerStyles.empty() || !layer->effects.empty()) {
     auto timeRanges = getFilterStaticTimeRanges();
-    MergeTimeRanges(&staticTimeRanges, &timeRanges);
+    MergeTimeRanges(&stRanges, &timeRanges);
   }
   if (layer->motionBlur) {
     // MotionBlur是根据Transform来处理图像，
@@ -146,9 +147,10 @@ void LayerCache::updateStaticTimeRanges() {
     // 不重新绘制该图层，导致后续静态区间里一直显示带有MotionBlur的效果，
     // 但实际是不需要带有MotionBlur,因此需要在LayerCache的staticTimeRanges过滤掉静态区间的第一帧。
     for (auto& timeRange : *transformCache->getStaticTimeRanges()) {
-      SplitTimeRangesAt(&staticTimeRanges, timeRange.start + 1);
+      SplitTimeRangesAt(&stRanges, timeRange.start + 1);
     }
   }
+  return stRanges;
 }
 
 std::vector<TimeRange> LayerCache::getTrackMatteStaticTimeRanges() {

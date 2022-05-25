@@ -523,6 +523,8 @@ class PAG_API PAGLayer : public Content {
   friend class FileReporter;
 
   friend class PAGImageLayer;
+
+  friend class PAGTextLayer;
 };
 
 class SolidLayer;
@@ -559,6 +561,10 @@ class PAG_API PAGSolidLayer : public PAGLayer {
 class TextLayer;
 
 class TextReplacement;
+
+class TextAnimator;
+
+class MutableGlyph;
 
 class PAG_API PAGTextLayer : public PAGLayer {
  public:
@@ -627,11 +633,14 @@ class PAG_API PAGTextLayer : public PAGLayer {
    */
   void reset();
 
+  TextReplacement* textReplacementForWrite();
+
  protected:
   void replaceTextInternal(std::shared_ptr<TextDocument> textData);
   void setMatrixInternal(const Matrix& matrix) override;
   Content* getContent() override;
   bool contentModified() const override;
+  bool gotoTime(int64_t layerTime) override;
 
  private:
   TextLayer* emptyTextLayer = nullptr;

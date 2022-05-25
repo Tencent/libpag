@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextReplacement.h"
+#include "rendering/utils/LockGuard.h"
 
 namespace pag {
 TextReplacement::TextReplacement(PAGTextLayer* pagLayer) : pagLayer(pagLayer) {
@@ -35,7 +36,8 @@ TextReplacement::~TextReplacement() {
 Content* TextReplacement::getContent(Frame contentFrame) {
   if (textContentCache == nullptr) {
     auto textLayer = static_cast<TextLayer*>(pagLayer->layer);
-    textContentCache = new TextContentCache(textLayer, pagLayer->uniqueID(), sourceText);
+    textContentCache =
+        new TextContentCache(textLayer, pagLayer->uniqueID(), sourceText, _animators, layoutGlyphs);
     textContentCache->update();
   }
   return textContentCache->getCache(contentFrame);
@@ -45,8 +47,64 @@ TextDocument* TextReplacement::getTextDocument() {
   return sourceText->value.get();
 }
 
+void TextReplacement::setLayoutGlyphs(const std::vector<GlyphHandle>& glyphs, Enum justification) {
+  LockGuard autoLock(pagLayer->rootLocker);
+  std::string text = "";
+  std::shared_ptr<MutableGlyph> firstGlyph = nullptr;
+  for (auto& g : glyphs) {
+    text.append(g->getName());
+    if (firstGlyph == nullptr) {
+      firstGlyph = g;
+    }
+  }
+  auto textDocument = sourceText->value;
+  if (firstGlyph) {
+    textDocument->fontSize = firstGlyph->getFont().getSize();
+    textDocument->fauxBold = firstGlyph->getFont().isFauxBold();
+    textDocument->fauxItalic = firstGlyph->getFont().isFauxItalic();
+    textDocument->strokeColor = firstGlyph->getStrokeColor();
+    textDocument->strokeWidth = firstGlyph->getStrokeWidth();
+    textDocument->strokeOverFill = firstGlyph->getStrokeOverFill();
+    textDocument->fillColor = firstGlyph->getFillColor();
+    textDocument->direction =
+        firstGlyph->isVertical() ? TextDirection::Vertical : TextDirection::Default;
+  }
+  textDocument->text = text;
+  textDocument->justification = justification;
+  layoutGlyphs = glyphs;
+  textContentCache->updateStaticTimeRanges();
+  pagLayer->notifyModified(true);
+  pagLayer->invalidateCacheScale();
+}
+
+void TextReplacement::resetText() {
+  auto textLayer = static_cast<TextLayer*>(pagLayer->layer);
+  auto textData = TextDocumentHandle(new TextDocument());
+  *textData = *(textLayer->sourceText->value);
+  sourceText->value = textData;
+}
+
 void TextReplacement::clearCache() {
   delete textContentCache;
   textContentCache = nullptr;
 }
+
+void TextReplacement::setAnimators(std::vector<pag::TextAnimator*>* animators) {
+  LockGuard autoLock(pagLayer->rootLocker);
+  if (animators == nullptr) {
+    auto textLayer = static_cast<TextLayer*>(pagLayer->layer);
+    _animators = &textLayer->animators;
+  } else {
+    _animators = animators;
+  }
+  _animators = animators;
+  textContentCache->updateStaticTimeRanges();
+  pagLayer->notifyModified(true);
+  pagLayer->invalidateCacheScale();
+}
+
+TextContentCache* TextReplacement::contentCache() {
+  return textContentCache;
+}
+
 }  // namespace pag
