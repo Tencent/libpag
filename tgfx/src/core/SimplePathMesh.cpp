@@ -24,7 +24,7 @@
 namespace tgfx {
 Rect SimplePathMesh::bounds() const {
   if (rect.has_value()) {
-    return rect.value();
+    return *rect;
   }
   if (rRect.has_value()) {
     return rRect->rect;
@@ -35,9 +35,9 @@ Rect SimplePathMesh::bounds() const {
 std::pair<std::unique_ptr<GLDrawOp>, Matrix> SimplePathMesh::getOp(const Matrix& viewMatrix) const {
   std::unique_ptr<GLDrawOp> drawOp;
   if (rect.has_value()) {
-    drawOp = GLFillRectOp::Make(rect.value(), viewMatrix);
+    drawOp = GLFillRectOp::Make(*rect, viewMatrix);
   } else if (rRect.has_value()) {
-    drawOp = GLRRectOp::Make(rRect.value(), viewMatrix);
+    drawOp = GLRRectOp::Make(*rRect, viewMatrix);
   } else {
     return {};
   }
