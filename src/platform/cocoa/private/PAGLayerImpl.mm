@@ -167,7 +167,7 @@
   }
   std::lock_guard<std::mutex> autoLocker(layer->externalHandle->locker);
   if (layer->externalHandle->nativeHandle) {
-    return static_cast<PAGLayer*>(layer->externalHandle->nativeHandle);
+    return [[static_cast<PAGLayer*>(layer->externalHandle->nativeHandle) retain] autorelease];
   }
   id result = nil;
   switch (layer->layerType()) {

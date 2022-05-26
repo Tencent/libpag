@@ -132,11 +132,10 @@ jobject ToPAGLayerJavaObject(JNIEnv* env, std::shared_ptr<pag::PAGLayer> pagLaye
     return nullptr;
   }
   std::lock_guard<std::mutex> autoLocker(pagLayer->externalHandle->locker);
-  auto obj = static_cast<jobject>(pagLayer->externalHandle->nativeHandle);
-  if (obj && !env->IsSameObject(obj, nullptr)) {
-    return obj;
+  auto layerObject = env->NewLocalRef(static_cast<jobject>(pagLayer->externalHandle->nativeHandle));
+  if (layerObject) {
+    return layerObject;
   }
-  jobject layerObject = nullptr;
   switch (pagLayer->layerType()) {
     case pag::LayerType::Shape: {
       static auto PAGLayer_Class = Global<jclass>(env, env->FindClass("org/libpag/PAGShapeLayer"));
