@@ -29,6 +29,10 @@ std::vector<GlyphHandle> MutableGlyph::BuildFromText(
   return glyphList;
 }
 
+GlyphHandle MutableGlyph::Make(const std::shared_ptr<Glyph> glyph, const TextPaint& paint) {
+ return std::shared_ptr<MutableGlyph>(new MutableGlyph(glyph, paint));
+}
+
 MutableGlyph::MutableGlyph(std::shared_ptr<Glyph> simpleGlyph, const TextPaint& textPaint)
     : simpleGlyph(std::move(simpleGlyph)) {
   textStyle = textPaint.style;

@@ -455,26 +455,47 @@ std::shared_ptr<Graphic> RenderTextBackground(ID assetID,
 }
 
 std::unique_ptr<TextContent> RenderTexts(const std::shared_ptr<TextGlyphs>& textGlyphs,
+                                         const std::vector<GlyphHandle>& layoutGlyphs,
                                          TextPathOptions*, TextMoreOptions*,
                                          std::vector<TextAnimator*>* animators, Frame layerFrame) {
-  auto* textDocument = textGlyphs->textDocument();
-  auto glyphList = textGlyphs->getGlyphs();
-  // 无论文字朝向，都先按从(0,0)点开始的横向矩形排版。
-  // 提取出跟文字朝向无关的 GlyphInfo 列表与 TextLayout,
-  // 复用同一套排版规则。如果最终是纵向排版，再把坐标转成纵向坐标应用到 glyphList 上。
-  auto glyphInfos = CreateGlyphInfos(glyphList);
-  auto textLayout = CreateTextLayout(textDocument, glyphList);
-  if (textDocument->boxText) {
-    AdjustToFitBox(&textLayout, &glyphInfos, textDocument->fontSize);
-  }
+  std::vector<std::vector<GlyphHandle>> glyphLines;
   tgfx::Rect textBounds = tgfx::Rect::MakeEmpty();
-  auto glyphInfoLines = ApplyLayoutToGlyphInfos(textLayout, &glyphInfos, &textBounds);
-  auto glyphLines = ApplyMatrixToGlyphs(textLayout, glyphInfoLines, &glyphList);
-  textLayout.coordinateMatrix.mapRect(&textBounds);
+  auto* textDocument = textGlyphs->textDocument();
+  if (layoutGlyphs.empty()) {
+    auto glyphList = textGlyphs->getGlyphs();
+    // 无论文字朝向，都先按从(0,0)点开始的横向矩形排版。
+    // 提取出跟文字朝向无关的 GlyphInfo 列表与 TextLayout,
+    // 复用同一套排版规则。如果最终是纵向排版，再把坐标转成纵向坐标应用到 glyphList 上。
+    auto glyphInfos = CreateGlyphInfos(glyphList);
+    auto textLayout = CreateTextLayout(textDocument, glyphList);
+    if (textDocument->boxText) {
+      AdjustToFitBox(&textLayout, &glyphInfos, textDocument->fontSize);
+    }
+    auto glyphInfoLines = ApplyLayoutToGlyphInfos(textLayout, &glyphInfos, &textBounds);
+    glyphLines = ApplyMatrixToGlyphs(textLayout, glyphInfoLines, &glyphList);
+    textLayout.coordinateMatrix.mapRect(&textBounds);
+  } else {
+    std::vector<GlyphHandle> glyphLine = {};
+    for (auto g : layoutGlyphs) {
+      if (g->getName() == "\n") {
+        if (!glyphLine.empty()) {
+          glyphLines.emplace_back(glyphLine);
+          glyphLine.clear();
+        }
+      } else {
+        glyphLine.emplace_back(g);
+      }
+      textBounds.join(g->getTotalMatrix().mapRect(g->getBounds()));
+    }
+    if (!glyphLine.empty()) {
+      glyphLines.emplace_back(glyphLine);
+    }
+  }
+
   auto hasAnimators =
       TextAnimatorRenderer::ApplyToGlyphs(glyphLines, animators, textDocument, layerFrame);
   std::vector<std::shared_ptr<Graphic>> contents = {};
-  if (textDocument->backgroundAlpha > 0) {
+  if (textDocument && textDocument->backgroundAlpha > 0) {
     auto background = RenderTextBackground(textGlyphs->assetID(), glyphLines, textDocument);
     if (background) {
       contents.push_back(background);

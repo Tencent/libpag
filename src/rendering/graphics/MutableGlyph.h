@@ -53,6 +53,8 @@ class MutableGlyph {
   static std::vector<GlyphHandle> BuildFromText(const std::vector<std::shared_ptr<Glyph>>& glyphs,
                                                 const TextPaint& paint);
 
+  static GlyphHandle Make(const std::shared_ptr<Glyph> glyph, const TextPaint& paint);
+
   MutableGlyph() = default;
 
   virtual ~MutableGlyph() = default;
@@ -226,6 +228,10 @@ class MutableGlyph {
   }
 
   void computeAtlasKey(tgfx::BytesKey* bytesKey, TextStyle style) const;
+
+  const std::shared_ptr<Glyph> glyph() const {
+    return simpleGlyph;
+  }
 
  private:
   std::shared_ptr<Glyph> simpleGlyph;

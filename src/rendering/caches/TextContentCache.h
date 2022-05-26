@@ -26,7 +26,12 @@ namespace pag {
 class TextContentCache : public ContentCache {
  public:
   explicit TextContentCache(TextLayer* layer);
-  TextContentCache(TextLayer* layer, ID cacheID, Property<TextDocumentHandle>* sourceText);
+  TextContentCache(TextLayer* layer, ID cacheID, Property<TextDocumentHandle>* sourceText,
+                   std::vector<TextAnimator*>* animators,
+                   const std::vector<GlyphHandle>& layoutGlyphs = {});
+  void updateStaticTimeRanges();
+  bool checkFrameChanged(Frame contentFrame, Frame lastContentFrame);
+  void setAnimators(std::vector<pag::TextAnimator*>* animators);
 
  protected:
   void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const override;
@@ -40,7 +45,9 @@ class TextContentCache : public ContentCache {
   Property<TextDocumentHandle>* sourceText;
   TextPathOptions* pathOption;
   TextMoreOptions* moreOption;
-  std::vector<TextAnimator*>* animators;
+  std::vector<TextAnimator*>* _animators = nullptr;
+  std::vector<GlyphHandle> layoutGlyphs = {};
   std::unordered_map<TextDocument*, std::shared_ptr<TextGlyphs>> textGlyphs;
+  std::vector<TimeRange> staticTimeRanges;
 };
 }  // namespace pag

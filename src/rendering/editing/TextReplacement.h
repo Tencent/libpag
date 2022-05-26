@@ -18,23 +18,43 @@
 
 #pragma once
 
-#include "rendering/caches/TextContentCache.h"
+#include "pag/file.h"
+#include "pag/pag.h"
 
 namespace pag {
+
+class TextContentCache;
+class MutableGlyph;
+
 class TextReplacement {
  public:
+  /**
+   * Set animators to PAGTextLayer.
+   * The pointer of PAGFile which animators came from must be referenced by caller.
+   */
+  void setAnimators(std::vector<TextAnimator*>* animators);
+
+  /**
+   * Set typography information to PAGTextLayer.
+   * Enum of justification is ParagraphJustification.
+   */
+  void setLayoutGlyphs(const std::vector<std::shared_ptr<MutableGlyph>>& glyphs,
+                       Enum justification);
+
+ private:
   explicit TextReplacement(PAGTextLayer* textLayer);
   ~TextReplacement();
-
+  void clearCache();
+  void resetText();
+  TextContentCache* contentCache();
   Content* getContent(Frame contentFrame);
 
   TextDocument* getTextDocument();
-
-  void clearCache();
-
- private:
   TextContentCache* textContentCache = nullptr;
   Property<TextDocumentHandle>* sourceText = nullptr;
   PAGTextLayer* pagLayer = nullptr;
+  std::vector<TextAnimator*>* _animators = nullptr;
+  std::vector<std::shared_ptr<MutableGlyph>> layoutGlyphs;
+  friend class PAGTextLayer;
 };
 }  // namespace pag

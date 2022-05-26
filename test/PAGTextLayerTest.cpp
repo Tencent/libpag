@@ -23,6 +23,8 @@
 #include "framework/utils/PAGTestUtils.h"
 #include "nlohmann/json.hpp"
 #include "pag/file.h"
+#include "rendering/editing/TextReplacement.h"
+#include "rendering/graphics/Glyph.h"
 #include "rendering/renderers/TextRenderer.h"
 
 namespace pag {
@@ -405,4 +407,74 @@ PAG_TEST_F(PAGTextLayerTest, SmallFontSizeScale) {
   TestPAGPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGTextLayerTest/SmallFontSizeScale_LowResolution"));
 }
+
+PAG_TEST(PAGTextLayerEditTest, setAnimators) {
+  auto pagFile = PAGFile::Load("../resources/apitest/editableTextAnimators.pag");
+  auto surface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto player = std::make_shared<PAGPlayer>();
+  player->setSurface(surface);
+  player->setComposition(pagFile);
+  player->setProgress(0);
+  player->flush();
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGTextLayerEditTest/setAnimators"));
+
+  auto staticTxt = std::static_pointer_cast<PAGTextLayer>(
+      pagFile->getLayersByEditableIndex(0, LayerType::Text)[0]);
+  auto staticReplacement = staticTxt->textReplacementForWrite();
+  auto dynamicTxt = std::static_pointer_cast<PAGTextLayer>(
+      pagFile->getLayersByEditableIndex(1, LayerType::Text)[0]);
+  auto dynamicReplacement = dynamicTxt->textReplacementForWrite();
+  auto animators = dynamicTxt->textAnimators();
+  std::vector<TextAnimator*> emptyAnimator = {};
+  dynamicReplacement->setAnimators(&emptyAnimator);
+  player->flush();
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGTextLayerEditTest/setAnimators0"));
+
+  dynamicReplacement->setAnimators(&animators);
+  player->flush();
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGTextLayerEditTest/setAnimators1"));
+
+  dynamicReplacement->setAnimators(nullptr);
+  player->flush();
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGTextLayerEditTest/setAnimators2"));
+
+  staticReplacement->setAnimators(&animators);
+  player->flush();
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGTextLayerEditTest/setAnimators3"));
+}
+
+PAG_TEST(PAGTextLayerEditTest, setLayoutGlyphs) {
+  auto pagFile = PAGFile::Load("../resources/apitest/editableTextLayout.pag");
+  auto textData = pagFile->getTextData(0);
+  textData->text = "1\n\n😆2";
+  pagFile->replaceText(0, textData);
+  auto surface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto player = std::make_shared<PAGPlayer>();
+  player->setSurface(surface);
+  player->setComposition(pagFile);
+
+  std::vector<GlyphHandle> layoutGlyphs = {};
+  auto simpleGlyphs = GetSimpleGlyphs(textData.get(), false);
+  layoutGlyphs = MutableGlyph::BuildFromText(
+      simpleGlyphs, {TextStyle::StrokeAndFill, {197, 10, 10}, {32, 83, 140}, 3, true});
+  // 1
+  layoutGlyphs[0]->setMatrix(tgfx::Matrix::I());
+  // 😆
+  layoutGlyphs[3]->setMatrix(tgfx::Matrix::MakeAll(1, 0, 0, 0, 1, 120, 0, 0, 1));
+  // 2
+  layoutGlyphs[4]->setMatrix(tgfx::Matrix::MakeAll(1, 0, 125.828125, 0, 1, 120, 0, 0, 1));
+  auto textLayer = std::static_pointer_cast<PAGTextLayer>(
+      pagFile->getLayersByEditableIndex(0, LayerType::Text)[0]);
+  auto replacement = textLayer->textReplacementForWrite();
+  replacement->setLayoutGlyphs(layoutGlyphs, ParagraphJustification::LeftJustify);
+  player->flush();
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGTextLayerEditTest/setLayoutGlyphsReplace"));
+
+  // 1
+  layoutGlyphs[0]->setMatrix(tgfx::Matrix::MakeAll(1, 0, 125.828125, 0, 1, 0, 0, 0, 1));
+  replacement->setLayoutGlyphs(layoutGlyphs, ParagraphJustification::LeftJustify);
+  player->flush();
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGTextLayerEditTest/setLayoutGlyphsReplace1"));
+}
+
 }  // namespace pag

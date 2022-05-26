@@ -26,6 +26,7 @@
 
 namespace pag {
 std::unique_ptr<TextContent> RenderTexts(const std::shared_ptr<TextGlyphs>& textGlyphs,
+                                         const std::vector<GlyphHandle>& layoutGlyphs,
                                          TextPathOptions* pathOption, TextMoreOptions* moreOption,
                                          std::vector<TextAnimator*>* animators, Frame layerFrame);
 

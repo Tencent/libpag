@@ -7797,6 +7797,15 @@
         "FromTexture": "48a897dd",
         "Mask": "362d0564"
     },
+    "PAGTextLayerEditTest": {
+        "setAnimators": "a4b2ee30",
+        "setAnimators0": "a4b2ee30",
+        "setAnimators1": "a4b2ee30",
+        "setAnimators2": "a4b2ee30",
+        "setAnimators3": "a4b2ee30",
+        "setLayoutGlyphsReplace": "a4b2ee30",
+        "setLayoutGlyphsReplace1": "a4b2ee30"
+    },
     "PAGTextLayerTest": {
         "Emoji": "aabe191f",
         "NormalEmoji": "362d0564",

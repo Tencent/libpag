@@ -65,9 +65,17 @@ static void SortAtlasGlyphs(std::vector<GlyphHandle>* glyphs) {
   });
 }
 
-TextGlyphs::TextGlyphs(ID assetID, TextDocument* textDocument, float maxScale)
+TextGlyphs::TextGlyphs(ID assetID, TextDocument* textDocument, float maxScale,
+                       std::vector<GlyphHandle>& layoutGlyphs)
     : _id(UniqueID::Next()), _assetID(assetID), _textDocument(textDocument), _maxScale(maxScale) {
-  simpleGlyphs = GetSimpleGlyphs(textDocument, false);
+  if (layoutGlyphs.empty()) {
+    simpleGlyphs = GetSimpleGlyphs(textDocument, false);
+  } else {
+    for (auto g : layoutGlyphs) {
+      simpleGlyphs.emplace_back(g->glyph());
+    }
+  }
+
   std::vector<tgfx::BytesKey> atlasKeys;
   auto paint = CreateTextPaint(_textDocument);
   auto glyphList = MutableGlyph::BuildFromText(simpleGlyphs, paint);

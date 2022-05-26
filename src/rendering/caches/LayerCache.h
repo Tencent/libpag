@@ -69,8 +69,9 @@ class LayerCache : public Cache {
   std::vector<TimeRange> staticTimeRanges;
 
   explicit LayerCache(Layer* layer);
-  void updateStaticTimeRanges();
+  std::vector<TimeRange> calculateStaticTimeRanges(ContentCache* cache);
   std::vector<TimeRange> getTrackMatteStaticTimeRanges();
   std::vector<TimeRange> getFilterStaticTimeRanges();
+  friend class TextContentCache;
 };
 }  // namespace pag
