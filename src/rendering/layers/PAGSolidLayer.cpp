@@ -85,7 +85,7 @@ void PAGSolidLayer::setSolidColor(const pag::Color& value) {
   if (solidLayer->solidColor != _solidColor) {
     tgfx::Path path = {};
     path.addRect(0, 0, solidLayer->width, solidLayer->height);
-    auto solid = Shape::MakeFrom(path, ToTGFX(_solidColor));
+    auto solid = Shape::MakeFrom(uniqueID(), path, ToTGFX(_solidColor));
     replacement = new GraphicContent(solid);
   }
   notifyModified(true);

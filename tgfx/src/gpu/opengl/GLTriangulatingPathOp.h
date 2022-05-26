@@ -24,7 +24,9 @@
 namespace tgfx {
 class GLTriangulatingPathOp : public GLDrawOp {
  public:
-  static std::unique_ptr<GLTriangulatingPathOp> Make(const Path& path, const Rect& clipBounds);
+  static std::unique_ptr<GLTriangulatingPathOp> Make(const Path& path, Rect clipBounds);
+
+  GLTriangulatingPathOp(std::vector<float> vertex, int vertexCount, Rect bounds);
 
   std::unique_ptr<GeometryProcessor> getGeometryProcessor(const DrawArgs& args) override;
 
@@ -33,10 +35,6 @@ class GLTriangulatingPathOp : public GLDrawOp {
   void draw(const DrawArgs& args) override;
 
  private:
-  GLTriangulatingPathOp(std::vector<float> vertex, int vertexCount)
-      : vertex(std::move(vertex)), vertexCount(vertexCount) {
-  }
-
   std::vector<float> vertex;
   int vertexCount;
 };

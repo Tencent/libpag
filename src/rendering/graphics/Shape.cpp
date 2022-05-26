@@ -17,22 +17,24 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Shape.h"
-#include "base/utils/TGFXCast.h"
 #include "pag/file.h"
+#include "rendering/caches/RenderCache.h"
+#include "tgfx/core/Mask.h"
 #include "tgfx/gpu/Canvas.h"
 #include "tgfx/gpu/Shader.h"
+#include "tgfx/gpu/Surface.h"
 
 namespace pag {
-std::shared_ptr<Graphic> Shape::MakeFrom(const tgfx::Path& path, tgfx::Color color) {
+std::shared_ptr<Graphic> Shape::MakeFrom(ID assetID, const tgfx::Path& path, tgfx::Color color) {
   if (path.isEmpty()) {
     return nullptr;
   }
-  tgfx::Paint paint = {};
-  paint.setColor(color);
-  return std::shared_ptr<Graphic>(new Shape(path, paint));
+  auto shader = tgfx::Shader::MakeColorShader(color);
+  return std::shared_ptr<Graphic>(new Shape(assetID, path, std::move(shader)));
 }
 
-std::shared_ptr<Graphic> Shape::MakeFrom(const tgfx::Path& path, const GradientPaint& gradient) {
+std::shared_ptr<Graphic> Shape::MakeFrom(ID assetID, const tgfx::Path& path,
+                                         const GradientPaint& gradient) {
   if (path.isEmpty()) {
     return nullptr;
   }
@@ -48,12 +50,11 @@ std::shared_ptr<Graphic> Shape::MakeFrom(const tgfx::Path& path, const GradientP
   if (!shader) {
     shader = tgfx::Shader::MakeColorShader(gradient.colors.back());
   }
-  tgfx::Paint paint = {};
-  paint.setShader(shader);
-  return std::shared_ptr<Graphic>(new Shape(path, paint));
+  return std::shared_ptr<Graphic>(new Shape(assetID, path, std::move(shader)));
 }
 
-Shape::Shape(tgfx::Path path, tgfx::Paint paint) : path(std::move(path)), paint(paint) {
+Shape::Shape(ID assetID, tgfx::Path path, std::shared_ptr<tgfx::Shader> shader)
+    : assetID(assetID), path(std::move(path)), shader(std::move(shader)) {
 }
 
 void Shape::measureBounds(tgfx::Rect* bounds) const {
@@ -65,10 +66,6 @@ bool Shape::hitTest(RenderCache*, float x, float y) {
 }
 
 bool Shape::getPath(tgfx::Path* result) const {
-  if (paint.getAlpha() != 1.0f) {
-    return false;
-  }
-  auto shader = paint.getShader();
   if (shader && !shader->isOpaque()) {
     return false;
   }
@@ -79,8 +76,73 @@ bool Shape::getPath(tgfx::Path* result) const {
 void Shape::prepare(RenderCache*) const {
 }
 
-void Shape::draw(tgfx::Canvas* canvas, RenderCache*) const {
+void Shape::draw(tgfx::Canvas* canvas, RenderCache* renderCache) const {
+  tgfx::Paint paint;
+  auto snapshot = renderCache->getSnapshot(this);
+  if (snapshot) {
+    paint.setShader(shader->makeWithLocalMatrix(snapshot->getMatrix()));
+    auto oldMatrix = canvas->getMatrix();
+    canvas->concat(snapshot->getMatrix());
+    if (snapshot->getTexture()) {
+      canvas->drawMask(snapshot->getTexture(), paint);
+    } else if (snapshot->getMesh()) {
+      canvas->drawMesh(snapshot->getMesh(), paint);
+    }
+    canvas->setMatrix(oldMatrix);
+    return;
+  }
+  paint.setShader(shader);
   canvas->drawPath(path, paint);
 }
 
+std::unique_ptr<Snapshot> MakeMeshSnapshot(tgfx::Path path, RenderCache*, float scaleFactor) {
+  auto matrix = tgfx::Matrix::MakeScale(scaleFactor);
+  path.transform(matrix);
+  auto mesh = tgfx::Mesh::MakeFrom(path);
+  if (mesh == nullptr) {
+    return nullptr;
+  }
+  auto drawingMatrix = tgfx::Matrix::I();
+  matrix.invert(&drawingMatrix);
+  return std::make_unique<Snapshot>(std::move(mesh), drawingMatrix);
+}
+
+std::unique_ptr<Snapshot> MakeTextureSnapshot(const tgfx::Path& path, RenderCache* cache,
+                                              float scaleFactor) {
+  auto bounds = path.getBounds();
+  auto width = static_cast<int>(ceilf(bounds.width() * scaleFactor));
+  auto height = static_cast<int>(ceilf(bounds.height() * scaleFactor));
+  auto mask = tgfx::Mask::Make(width, height);
+  if (mask == nullptr) {
+    return nullptr;
+  }
+  auto matrix = tgfx::Matrix::MakeScale(scaleFactor);
+  matrix.preTranslate(-bounds.x(), -bounds.y());
+  mask->setMatrix(matrix);
+  mask->fillPath(path);
+  auto drawingMatrix = tgfx::Matrix::I();
+  matrix.invert(&drawingMatrix);
+  auto texture = mask->makeTexture(cache->getContext());
+  if (texture == nullptr) {
+    return nullptr;
+  }
+  return std::make_unique<Snapshot>(texture, drawingMatrix);
+}
+
+std::unique_ptr<Snapshot> Shape::makeSnapshot(RenderCache* cache, float scaleFactor) const {
+  if (path.isEmpty() || path.getBounds().isEmpty()) {
+    return nullptr;
+  }
+  auto bounds = path.getBounds();
+  auto width = static_cast<int>(ceilf(bounds.width() * scaleFactor));
+  auto height = static_cast<int>(ceilf(bounds.height() * scaleFactor));
+  static constexpr int MaxSize = 50;
+  if (path.asRect(nullptr) || path.asRRect(nullptr) || (std::max(width, height) > MaxSize)) {
+    auto snapshot = MakeMeshSnapshot(path, cache, scaleFactor);
+    if (snapshot) {
+      return snapshot;
+    }
+  }
+  return MakeTextureSnapshot(path, cache, scaleFactor);
+}
 }  // namespace pag

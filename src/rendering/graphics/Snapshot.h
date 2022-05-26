@@ -20,6 +20,8 @@
 
 #include "pag/types.h"
 #include "tgfx/core/Matrix.h"
+#include "tgfx/core/Mesh.h"
+#include "tgfx/core/Path.h"
 #include "tgfx/gpu/Texture.h"
 
 namespace pag {
@@ -38,6 +40,10 @@ class Snapshot {
       : texture(std::move(texture)), matrix(matrix) {
   }
 
+  Snapshot(std::unique_ptr<tgfx::Mesh> mesh, const tgfx::Matrix& matrix)
+      : matrix(matrix), mesh(std::move(mesh)) {
+  }
+
   /**
    * Returns the scaling factor of this snapshot to the original graphic content.
    */
@@ -51,6 +57,10 @@ class Snapshot {
 
   tgfx::Texture* getTexture() const {
     return texture.get();
+  }
+
+  const tgfx::Mesh* getMesh() const {
+    return mesh.get();
   }
 
   /**
@@ -70,7 +80,9 @@ class Snapshot {
   tgfx::Matrix matrix = tgfx::Matrix::I();
   ID assetID = 0;
   uint64_t makerKey = 0;
+  tgfx::Path path = {};
   Frame idleFrames = 0;
+  std::unique_ptr<tgfx::Mesh> mesh;
 
   friend class RenderCache;
 };

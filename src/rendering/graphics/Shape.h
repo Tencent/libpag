@@ -19,6 +19,7 @@
 #pragma once
 
 #include "rendering/graphics/Graphic.h"
+#include "rendering/graphics/Snapshot.h"
 
 namespace pag {
 class Shape : public Graphic {
@@ -26,12 +27,13 @@ class Shape : public Graphic {
   /**
    * Creates a shape Graphic with solid color fill. Returns nullptr if path is empty.
    */
-  static std::shared_ptr<Graphic> MakeFrom(const tgfx::Path& path, tgfx::Color color);
+  static std::shared_ptr<Graphic> MakeFrom(ID assetID, const tgfx::Path& path, tgfx::Color color);
 
   /**
    * Creates a shape Graphic with gradient color fill. Returns nullptr if path is empty.
    */
-  static std::shared_ptr<Graphic> MakeFrom(const tgfx::Path& path, const GradientPaint& gradient);
+  static std::shared_ptr<Graphic> MakeFrom(ID assetID, const tgfx::Path& path,
+                                           const GradientPaint& gradient);
 
   GraphicType type() const override {
     return GraphicType::Shape;
@@ -44,9 +46,14 @@ class Shape : public Graphic {
   void draw(tgfx::Canvas* canvas, RenderCache* cache) const override;
 
  private:
-  tgfx::Path path = {};
-  tgfx::Paint paint = {};
+  Shape(ID assetID, tgfx::Path path, std::shared_ptr<tgfx::Shader> shader);
 
-  Shape(tgfx::Path path, tgfx::Paint paint);
+  std::unique_ptr<Snapshot> makeSnapshot(RenderCache* cache, float scaleFactor) const;
+
+  ID assetID = 0;
+  tgfx::Path path = {};
+  std::shared_ptr<tgfx::Shader> shader;
+
+  friend class RenderCache;
 };
 }  // namespace pag

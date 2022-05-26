@@ -204,6 +204,7 @@ void RenderCache::attachToContext(tgfx::Context* current, bool forHitTest) {
   auto removedAssets = stage->getRemovedAssets();
   for (auto assetID : removedAssets) {
     removeSnapshot(assetID);
+    removePathSnapshots(assetID);
     imageTasks.erase(assetID);
     clearSequenceCache(assetID);
     clearFilterCache(assetID);
@@ -250,6 +251,19 @@ Snapshot* RenderCache::getSnapshot(ID assetID) const {
   return nullptr;
 }
 
+Snapshot* RenderCache::makeSnapshot(float scaleFactor, const std::function<Snapshot*()>& maker) {
+  if (scaleFactor < SCALE_FACTOR_PRECISION || graphicsMemory >= MAX_GRAPHICS_MEMORY) {
+    return nullptr;
+  }
+  auto snapshot = maker();
+  if (snapshot == nullptr) {
+    return nullptr;
+  }
+  graphicsMemory += snapshot->memoryUsage();
+  snapshotLRU.push_front(snapshot);
+  return snapshot;
+}
+
 Snapshot* RenderCache::getSnapshot(const Picture* image) {
   if (!_snapshotEnabled) {
     return nullptr;
@@ -264,28 +278,88 @@ Snapshot* RenderCache::getSnapshot(const Picture* image) {
     snapshot = nullptr;
   }
   if (snapshot) {
-    snapshot->idleFrames = 0;
-    auto position = std::find(snapshotLRU.begin(), snapshotLRU.end(), snapshot);
-    if (position != snapshotLRU.end()) {
-      snapshotLRU.erase(position);
-    }
-    snapshotLRU.push_front(snapshot);
+    moveSnapshotToHead(snapshot);
     return snapshot;
   }
-  if (scaleFactor < SCALE_FACTOR_PRECISION || graphicsMemory >= MAX_GRAPHICS_MEMORY) {
+  snapshot =
+      makeSnapshot(scaleFactor, [&]() { return image->makeSnapshot(this, scaleFactor).release(); });
+  if (snapshot == nullptr) {
     return nullptr;
   }
-  auto newSnapshot = image->makeSnapshot(this, scaleFactor);
-  if (newSnapshot == nullptr) {
-    return nullptr;
-  }
-  snapshot = newSnapshot.release();
   snapshot->assetID = image->assetID;
   snapshot->makerKey = image->uniqueKey;
-  graphicsMemory += snapshot->memoryUsage();
-  snapshotLRU.push_front(snapshot);
   snapshotCaches[image->assetID] = snapshot;
   return snapshot;
+}
+
+Snapshot* RenderCache::getSnapshot(ID assetID, const tgfx::Path& path) const {
+  if (!_snapshotEnabled) {
+    return nullptr;
+  }
+  auto result = pathCaches.find(assetID);
+  if (result != pathCaches.end()) {
+    auto iter = result->second.find(path);
+    if (iter != result->second.end()) {
+      return iter->second;
+    }
+  }
+  return nullptr;
+}
+
+Snapshot* RenderCache::getSnapshot(const Shape* shape) {
+  if (!_snapshotEnabled) {
+    return nullptr;
+  }
+  usedAssets.insert(shape->assetID);
+  auto scaleFactor = stage->getAssetMaxScale(shape->assetID);
+  auto snapshot = getSnapshot(shape->assetID, shape->path);
+  if (snapshot && fabsf(snapshot->scaleFactor() - scaleFactor) > SCALE_FACTOR_PRECISION) {
+    removeSnapshot(shape->assetID, shape->path);
+    snapshot = nullptr;
+  }
+  if (snapshot) {
+    moveSnapshotToHead(snapshot);
+    return snapshot;
+  }
+  snapshot =
+      makeSnapshot(scaleFactor, [&]() { return shape->makeSnapshot(this, scaleFactor).release(); });
+  if (snapshot == nullptr) {
+    return nullptr;
+  }
+  snapshot->assetID = shape->assetID;
+  snapshot->path = shape->path;
+  pathCaches[shape->assetID][shape->path] = snapshot;
+  return snapshot;
+}
+
+void RenderCache::removeSnapshot(ID assetID, const tgfx::Path& path) {
+  auto snapshotCache = pathCaches.find(assetID);
+  if (snapshotCache == pathCaches.end()) {
+    return;
+  }
+  auto snapshot = snapshotCache->second.find(path);
+  if (snapshot == snapshotCache->second.end()) {
+    return;
+  }
+  removeSnapshotFromLRU(snapshot->second);
+  graphicsMemory -= snapshot->second->memoryUsage();
+  delete snapshot->second;
+  snapshotCache->second.erase(snapshot);
+  if (snapshotCache->second.empty()) {
+    pathCaches.erase(assetID);
+  }
+}
+
+void RenderCache::removePathSnapshots(ID assetID) {
+  auto snapshotCache = pathCaches.find(assetID);
+  if (snapshotCache != pathCaches.end()) {
+    for (const auto& pair : snapshotCache->second) {
+      removeSnapshotFromLRU(pair.second);
+      graphicsMemory -= pair.second->memoryUsage();
+      delete pair.second;
+    }
+    pathCaches.erase(assetID);
+  }
 }
 
 void RenderCache::removeSnapshot(ID assetID) {
@@ -293,13 +367,23 @@ void RenderCache::removeSnapshot(ID assetID) {
   if (snapshot == snapshotCaches.end()) {
     return;
   }
-  auto position = std::find(snapshotLRU.begin(), snapshotLRU.end(), snapshot->second);
-  if (position != snapshotLRU.end()) {
-    snapshotLRU.erase(position);
-  }
+  removeSnapshotFromLRU(snapshot->second);
   graphicsMemory -= snapshot->second->memoryUsage();
   delete snapshot->second;
   snapshotCaches.erase(assetID);
+}
+
+void RenderCache::moveSnapshotToHead(Snapshot* snapshot) {
+  removeSnapshotFromLRU(snapshot);
+  snapshot->idleFrames = 0;
+  snapshotLRU.push_front(snapshot);
+}
+
+void RenderCache::removeSnapshotFromLRU(Snapshot* snapshot) {
+  auto position = std::find(snapshotLRU.begin(), snapshotLRU.end(), snapshot);
+  if (position != snapshotLRU.end()) {
+    snapshotLRU.erase(position);
+  }
 }
 
 TextAtlas* RenderCache::getTextAtlas(ID assetID) const {
@@ -356,15 +440,22 @@ void RenderCache::clearAllSnapshots() {
     delete item.second;
   }
   snapshotCaches.clear();
+  for (auto& item : pathCaches) {
+    for (auto& snapshot : item.second) {
+      graphicsMemory -= snapshot.second->memoryUsage();
+      delete snapshot.second;
+    }
+  }
+  pathCaches.clear();
   snapshotLRU.clear();
 }
 
 void RenderCache::clearExpiredSnapshots() {
-  std::vector<ID> expiredSnapshots;
+  std::vector<Snapshot*> expiredSnapshots;
   size_t releaseMemory = 0;
   for (auto snapshotIter = snapshotLRU.rbegin(); snapshotIter != snapshotLRU.rend();
        snapshotIter++) {
-    auto& snapshot = *snapshotIter;
+    auto* snapshot = *snapshotIter;
     // 只有 Snapshot 数量可能会比较多，使用 LRU
     // 来避免遍历完整的列表，遇到第一个用过的就可以取消遍历。
     if (usedAssets.count(snapshot->assetID) > 0) {
@@ -377,10 +468,14 @@ void RenderCache::clearExpiredSnapshots() {
       continue;
     }
     releaseMemory += snapshot->memoryUsage();
-    expiredSnapshots.push_back(snapshot->assetID);
+    expiredSnapshots.push_back(snapshot);
   }
   for (const auto& snapshot : expiredSnapshots) {
-    removeSnapshot(snapshot);
+    if (snapshot->path.isEmpty()) {
+      removeSnapshot(snapshot->assetID);
+    } else {
+      removeSnapshot(snapshot->assetID, snapshot->path);
+    }
   }
 }
 
