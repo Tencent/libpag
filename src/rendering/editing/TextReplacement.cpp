@@ -22,7 +22,7 @@
 
 namespace pag {
 
-void TextReplacement::setAnimators(std::vector<pag::TextAnimator*>* animators) {
+void TextReplacement::setAnimators(std::vector<TextAnimator*>* animators) {
   LockGuard autoLock(pagLayer->rootLocker);
   clearCache();
   if (animators == nullptr) {
