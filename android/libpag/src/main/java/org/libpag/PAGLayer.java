@@ -183,6 +183,8 @@ public class PAGLayer {
 
     private native void getTotalMatrix(float[] value);
 
+    private native boolean nativeEquals(PAGLayer other);
+
     @Override
     protected void finalize() {
         nativeRelease();
@@ -193,19 +195,15 @@ public class PAGLayer {
         if (this == obj) {
             return true;
         }
-
-        if (obj instanceof PAGLayer) {
-            return hashCode() == obj.hashCode();
+        if (!(obj instanceof PAGLayer)) {
+            return false;
         }
-
-        return false;
+        return nativeEquals((PAGLayer) obj);
     }
 
     @Override
     public int hashCode() {
-        int result = 17;
-        result = 31 * 17 + (int) (nativeContext ^ (nativeContext >>> 32));
-        return result;
+        return 31 * 17 + (int) (nativeContext ^ (nativeContext >>> 32));
     }
 
     static {
