@@ -18,7 +18,6 @@
 
 #include "JNIHelper.h"
 #include "JPAGLayerHandle.h"
-#include "base/utils/ExternalHandle.h"
 
 static jfieldID PAGLayer_nativeContext;
 
@@ -50,9 +49,8 @@ PAG_API void Java_org_libpag_PAGLayer_nativeInit(JNIEnv* env, jclass clazz) {
 PAG_API void Java_org_libpag_PAGLayer_nativeRelease(JNIEnv* env, jobject thiz) {
   auto pagLayer = GetPAGLayer(env, thiz);
   if (pagLayer != nullptr) {
-    std::lock_guard<std::mutex> autoLocker(pagLayer->externalHandle->locker);
-    env->DeleteWeakGlobalRef(static_cast<jobject>(pagLayer->externalHandle->nativeHandle));
-    pagLayer->externalHandle->nativeHandle = nullptr;
+    env->DeleteWeakGlobalRef(static_cast<jobject>(pagLayer->externalHandle));
+    pagLayer->externalHandle = nullptr;
   }
   SetPAGLayer(env, thiz, nullptr);
 }

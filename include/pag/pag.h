@@ -244,8 +244,6 @@ class Transform;
 
 class PAGFile;
 
-struct ExternalHandle;
-
 class PAG_API PAGLayer : public Content {
  public:
   PAGLayer(std::shared_ptr<File> file, Layer* layer);
@@ -418,7 +416,7 @@ class PAG_API PAGLayer : public Content {
   virtual bool isPAGFile() const;
 
   // internal use only.
-  ExternalHandle* externalHandle = nullptr;
+  void* externalHandle = nullptr;
   std::shared_ptr<File> getFile() const;
 
  protected:

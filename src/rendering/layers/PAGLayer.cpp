@@ -16,7 +16,6 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "base/utils/ExternalHandle.h"
 #include "base/utils/MatrixUtil.h"
 #include "base/utils/TimeUtil.h"
 #include "base/utils/UniqueID.h"
@@ -26,11 +25,11 @@
 #include "rendering/layers/PAGStage.h"
 #include "rendering/renderers/TrackMatteRenderer.h"
 #include "rendering/utils/LockGuard.h"
+#include "rendering/utils/ScopedLock.h"
 
 namespace pag {
 PAGLayer::PAGLayer(std::shared_ptr<File> file, Layer* layer)
     : layer(layer), file(std::move(file)), _uniqueID(UniqueID::Next()) {
-  externalHandle = new ExternalHandle();
   layerMatrix.setIdentity();
   if (layer != nullptr) {  // could be nullptr.
     layerCache = LayerCache::Get(layer);
@@ -44,7 +43,6 @@ PAGLayer::~PAGLayer() {
     _trackMatteLayer->detachFromTree();
     _trackMatteLayer->trackMatteOwner = nullptr;
   }
-  delete externalHandle;
 }
 
 uint32_t PAGLayer::uniqueID() const {
