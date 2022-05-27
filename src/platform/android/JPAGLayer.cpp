@@ -24,11 +24,8 @@ static jfieldID PAGLayer_nativeContext;
 using namespace pag;
 
 void SetPAGLayer(JNIEnv* env, jobject thiz, JPAGLayerHandle* nativeContext) {
-  auto old = reinterpret_cast<JPAGLayerHandle*>(env->GetLongField(thiz, PAGLayer_nativeContext));
-  if (old != nullptr) {
-    delete old;
-  }
-  env->SetLongField(thiz, PAGLayer_nativeContext, (jlong)nativeContext);
+  delete reinterpret_cast<JPAGLayerHandle*>(env->GetLongField(thiz, PAGLayer_nativeContext));
+  env->SetLongField(thiz, PAGLayer_nativeContext, reinterpret_cast<jlong>(nativeContext));
 }
 
 std::shared_ptr<PAGLayer> GetPAGLayer(JNIEnv* env, jobject thiz) {
@@ -47,12 +44,11 @@ PAG_API void Java_org_libpag_PAGLayer_nativeInit(JNIEnv* env, jclass clazz) {
 }
 
 PAG_API void Java_org_libpag_PAGLayer_nativeRelease(JNIEnv* env, jobject thiz) {
-  auto pagLayer = GetPAGLayer(env, thiz);
-  if (pagLayer != nullptr) {
-    env->DeleteWeakGlobalRef(static_cast<jobject>(pagLayer->externalHandle));
-    pagLayer->externalHandle = nullptr;
-  }
   SetPAGLayer(env, thiz, nullptr);
+}
+
+PAG_API jboolean Java_org_libpag_PAGLayer_nativeEquals(JNIEnv* env, jobject thiz, jobject other) {
+  return GetPAGLayer(env, thiz) == GetPAGLayer(env, other);
 }
 
 PAG_API jint Java_org_libpag_PAGLayer_layerType(JNIEnv* env, jobject thiz) {

@@ -130,10 +130,6 @@ jobject ToPAGLayerJavaObject(JNIEnv* env, std::shared_ptr<pag::PAGLayer> pagLaye
   if (env == nullptr || pagLayer == nullptr) {
     return nullptr;
   }
-  if (pagLayer->externalHandle != nullptr &&
-      !env->IsSameObject(static_cast<jobject>(pagLayer->externalHandle), nullptr)) {
-    return static_cast<jobject>(pagLayer->externalHandle);
-  }
   jobject layerObject = nullptr;
   switch (pagLayer->layerType()) {
     case pag::LayerType::Shape: {
@@ -188,8 +184,6 @@ jobject ToPAGLayerJavaObject(JNIEnv* env, std::shared_ptr<pag::PAGLayer> pagLaye
       break;
     }
   }
-  auto gObject = env->NewWeakGlobalRef(layerObject);
-  pagLayer->externalHandle = gObject;
   return layerObject;
 }
 
