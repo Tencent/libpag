@@ -58,6 +58,7 @@ jobs:
           path: |
             third_party
             vendor_tools
+            web/node_node_modules
           key: third_party-web-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third_party-web-
 
@@ -78,4 +79,4 @@ jobs:
         run: |
           cd web/script
           chmod +x build.sh
-          ./build.sh debug
+          ./build.sh
