@@ -16,16 +16,16 @@ export const getFontFamilies = (name: string, style = ''): string[] => {
   }
   const fontFamilies = names.reduce((pre: string[], cur: string) => {
     if (!style) {
-      pre.push(`${cur}`);
+      pre.push(`"${cur}"`);
     } else {
-      pre.push(`${cur} ${style}`);
-      pre.push(`${cur}-${style}`);
+      pre.push(`"${cur} ${style}"`);
+      pre.push(`"${cur}-${style}"`);
     }
     return pre;
   }, []);
   // Fallback font when style is not found.
   if (style !== '') {
-    fontFamilies.push(name);
-  }  
+    fontFamilies.push(`"${name}"`);
+  }
   return fontFamilies;
 };
