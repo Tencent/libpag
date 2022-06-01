@@ -1,4 +1,4 @@
-import { Matrix, PAG, PAGScaleMode } from './types';
+import { AlphaType, ColorType, Matrix, PAG, PAGScaleMode } from './types';
 import { NativeImage } from './core/native-image';
 import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorators';
 
@@ -36,6 +36,30 @@ export class PAGImage {
     const nativeImage = new NativeImage(source);
     const wasmIns = this.module._PAGImage._FromNativeImage(nativeImage);
     return new PAGImage(wasmIns);
+  }
+  /**
+   *  Creates a PAGImage object from an array of pixel data, return null if it's not valid pixels.
+   */
+  public static fromPixels(
+    pixels: Uint8Array,
+    width: number,
+    height: number,
+    colorType: ColorType,
+    alphaType: AlphaType,
+  ): PAGImage {
+    const rowBytes = width * (colorType === ColorType.ALPHA_8 ? 1 : 4);
+    const dataPtr = PAGImage.module._malloc(pixels.byteLength);
+    const dataOnHeap = new Uint8Array(PAGImage.module.HEAPU8.buffer, dataPtr, pixels.byteLength);
+    dataOnHeap.set(pixels);
+    const wasmIns = this.module._PAGImage._FromPixels(dataPtr, width, height, rowBytes, colorType, alphaType);
+    return new PAGImage(wasmIns);
+  }
+  /**
+   * Creates a PAGImage object from the specified backend texture, return null if the texture is
+   * invalid.
+   */
+  public static fromTexture(textureID: number, width: number, height: number, flipY: boolean) {
+    return new PAGImage(PAGImage.module._PAGImage._FromTexture(textureID, width, height, flipY));
   }
 
   public wasmIns;

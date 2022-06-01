@@ -15,6 +15,7 @@ export enum ErrorCode {
   CanvasContextIsNotWebGL,
   PagFileDataError,
   CanvasElementIsNoFound,
+  ParameterError,
 }
 
 export const ErrorMap = {
@@ -35,4 +36,5 @@ export const ErrorMap = {
   [ErrorCode.PagFileDataError]:
     'Initialize PAGFile data type error, please put check data type must to be File ｜ Blob | ArrayBuffer!',
   [ErrorCode.CanvasElementIsNoFound]: 'Canvas element is not found!',
+  [ErrorCode.ParameterError]: 'Parameter error!',
 };

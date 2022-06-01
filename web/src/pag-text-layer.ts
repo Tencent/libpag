@@ -28,9 +28,6 @@ export class PAGTextLayer extends PAGLayer {
     }
   }
 
-  public constructor(wasmIns: any) {
-    super(wasmIns);
-  }
   /**
    * Returns the text layer’s fill color.
    */
