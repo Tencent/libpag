@@ -63,14 +63,14 @@ static int CalculateCharactersCount(const std::vector<std::vector<GlyphHandle>>&
   // 为什么不用text的字符数，或者run->glyphIndex？因为它们是包括换行的，因此不符合
   int count = 0;
   for (auto& line : glyphList) {
-    count += line.size();
+    count += static_cast<int>(line.size());
   }
   return count;
 }
 
 bool TextAnimatorRenderer::ApplyToGlyphs(std::vector<std::vector<GlyphHandle>>& glyphList,
                                          const std::vector<TextAnimator*>* animators,
-                                         const TextDocument* textDocument, Frame layerFrame) {
+                                         Enum justification, Frame layerFrame) {
   if (!HasAnimator(animators)) {
     return false;  // 提前判断如果没有文本动画，就不必要进行下面一堆操作了。
   }
@@ -79,7 +79,7 @@ bool TextAnimatorRenderer::ApplyToGlyphs(std::vector<std::vector<GlyphHandle>>& 
     return false;  // 如果字符数为0，则提前退出
   }
   for (auto animator : *animators) {
-    TextAnimatorRenderer animatorRenderer(animator, textDocument, count, layerFrame);
+    TextAnimatorRenderer animatorRenderer(animator, justification, count, layerFrame);
     animatorRenderer.apply(glyphList);
   }
   return true;
@@ -93,8 +93,8 @@ tgfx::Point TextAnimatorRenderer::GetPositionFromAnimators(
   *pBiasFlag = false;
   if (animators != nullptr) {
     for (auto animator : *animators) {
-      TextAnimatorRenderer animatorRenderer(animator, textDocument, textDocument->text.size(),
-                                            layerFrame);
+      TextAnimatorRenderer animatorRenderer(animator, textDocument->justification,
+                                            textDocument->text.size(), layerFrame);
       bool biasFlag = false;
       auto point = animatorRenderer.getPositionByIndex(index, &biasFlag);
       *pBiasFlag |= biasFlag;
@@ -106,11 +106,9 @@ tgfx::Point TextAnimatorRenderer::GetPositionFromAnimators(
   return ret;
 }
 
-TextAnimatorRenderer::TextAnimatorRenderer(const TextAnimator* animator,
-                                           const TextDocument* textDocument, size_t textCount,
-                                           Frame frame) {
-  justification = textDocument->justification;
-  direction = textDocument->direction;
+TextAnimatorRenderer::TextAnimatorRenderer(const TextAnimator* animator, Enum justification,
+                                           size_t textCount, Frame frame)
+    : justification(justification) {
   // 读取动画属性信息
   auto typographyProperties = animator->typographyProperties;
   if (typographyProperties != nullptr) {
@@ -190,7 +188,7 @@ void TextAnimatorRenderer::apply(std::vector<std::vector<GlyphHandle>>& glyphLis
       if (index > lineIndex) {  // 行首不加字间距的before部分
         offset += trackingBefore * factor;
       }
-      if (direction != TextDirection::Vertical) {
+      if (!glyph->isVertical()) {
         matrix.postTranslate(offset, 0);
       } else {
         matrix.postTranslate(0, offset);

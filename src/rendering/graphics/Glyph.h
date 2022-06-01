@@ -43,41 +43,43 @@ class Glyph {
   }
 
   float advance() const {
-    return _advance;
+    return info->advance;
   }
 
   float ascent() const {
-    return _ascent;
+    return info->ascent;
   }
 
   float descent() const {
-    return _descent;
+    return info->descent;
   }
 
   const tgfx::Rect& getBounds() const {
-    return _bounds;
+    return info->bounds;
   }
 
   const tgfx::Matrix& extraMatrix() const {
-    return _extraMatrix;
+    return info->extraMatrix;
   }
 
-  std::shared_ptr<Glyph> makeVerticalGlyph() const;
+  std::shared_ptr<Glyph> makeHorizontalGlyph() const;
 
  private:
-  Glyph() = default;
-
-  void applyVertical();
+  struct Info {
+    float advance = 0;
+    float ascent = 0;
+    float descent = 0;
+    tgfx::Rect bounds = tgfx::Rect::MakeEmpty();
+    tgfx::Matrix extraMatrix = tgfx::Matrix::I();
+  };
 
   tgfx::GlyphID _glyphId = 0;
   std::string _name;
   tgfx::Font _font;
   bool _isVertical = false;
-  float _advance = 0;
-  float _ascent = 0;
-  float _descent = 0;
-  tgfx::Rect _bounds = tgfx::Rect::MakeEmpty();
-  tgfx::Matrix _extraMatrix = tgfx::Matrix::I();
+  std::shared_ptr<Info> horizontalInfo = std::make_shared<Info>();
+  std::shared_ptr<Info> verticalInfo;
+  const Info* info = horizontalInfo.get();
 };
 
 std::vector<std::shared_ptr<Glyph>> GetSimpleGlyphs(const TextDocument* textDocument,

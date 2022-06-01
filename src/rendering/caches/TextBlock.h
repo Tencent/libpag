@@ -18,16 +18,14 @@
 
 #pragma once
 
-#include <unordered_map>
 #include "pag/file.h"
 #include "rendering/graphics/MutableGlyph.h"
 
 namespace pag {
-TextPaint CreateTextPaint(const TextDocument* textDocument);
-
-class TextGlyphs {
+class TextBlock {
  public:
-  TextGlyphs(ID assetID, TextDocument* textDocument, float maxScale);
+  TextBlock(ID assetID, std::vector<std::vector<GlyphHandle>> lines, float maxScale,
+            const tgfx::Rect* textBounds = nullptr);
 
   ID id() const {
     return _id;
@@ -37,8 +35,8 @@ class TextGlyphs {
     return _assetID;
   }
 
-  TextDocument* textDocument() const {
-    return _textDocument;
+  const tgfx::Rect& textBounds() const {
+    return _textBounds;
   }
 
   const std::vector<GlyphHandle>& maskAtlasGlyphs() const {
@@ -53,15 +51,17 @@ class TextGlyphs {
     return _maxScale;
   }
 
-  std::vector<GlyphHandle> getGlyphs() const;
+  std::vector<std::vector<GlyphHandle>> lines() const {
+    return _lines;
+  }
 
  private:
   ID _id = 0;
   ID _assetID = 0;
-  TextDocument* _textDocument;
-  std::vector<std::shared_ptr<Glyph>> simpleGlyphs;
+  std::vector<std::vector<GlyphHandle>> _lines;
   std::vector<GlyphHandle> _maskAtlasGlyphs;
   std::vector<GlyphHandle> _colorAtlasGlyphs;
   float _maxScale = 1.0f;
+  tgfx::Rect _textBounds = tgfx::Rect::MakeEmpty();
 };
 }  // namespace pag

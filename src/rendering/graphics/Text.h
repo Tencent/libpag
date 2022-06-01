@@ -19,7 +19,7 @@
 #pragma once
 
 #include "rendering/caches/TextAtlas.h"
-#include "rendering/caches/TextGlyphs.h"
+#include "rendering/caches/TextBlock.h"
 #include "rendering/graphics/Graphic.h"
 #include "tgfx/gpu/Paint.h"
 
@@ -45,7 +45,7 @@ class Text : public Graphic {
    * are invisible.
    */
   static std::shared_ptr<Graphic> MakeFrom(const std::vector<GlyphHandle>& glyphs,
-                                           std::shared_ptr<TextGlyphs> textGlyphs,
+                                           std::shared_ptr<TextBlock> textBlock,
                                            const tgfx::Rect* calculatedBounds = nullptr);
 
   ~Text() override;
@@ -62,7 +62,7 @@ class Text : public Graphic {
 
  private:
   Text(std::vector<GlyphHandle> glyphs, std::vector<TextRun*> textRuns, const tgfx::Rect& bounds,
-       bool hasAlpha, std::shared_ptr<TextGlyphs> textGlyphs);
+       bool hasAlpha, std::shared_ptr<TextBlock> textBlock);
 
   void draw(tgfx::Canvas* canvas, const TextAtlas* textAtlas) const;
 
@@ -72,6 +72,6 @@ class Text : public Graphic {
   std::vector<TextRun*> textRuns;
   tgfx::Rect bounds = tgfx::Rect::MakeEmpty();
   bool hasAlpha = false;
-  std::shared_ptr<TextGlyphs> textGlyphs = nullptr;
+  std::shared_ptr<TextBlock> textBlock = nullptr;
 };
 }  // namespace pag

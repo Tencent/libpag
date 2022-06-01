@@ -83,7 +83,7 @@ static std::unique_ptr<TextRun> MakeTextRun(const std::vector<MutableGlyph*>& gl
 }
 
 std::shared_ptr<Graphic> Text::MakeFrom(const std::vector<GlyphHandle>& glyphs,
-                                        std::shared_ptr<TextGlyphs> textGlyphs,
+                                        std::shared_ptr<TextBlock> textBlock,
                                         const tgfx::Rect* calculatedBounds) {
   if (glyphs.empty()) {
     return nullptr;
@@ -137,13 +137,13 @@ std::shared_ptr<Graphic> Text::MakeFrom(const std::vector<GlyphHandle>& glyphs,
     return nullptr;
   }
   return std::shared_ptr<Graphic>(
-      new Text(glyphs, std::move(textRuns), bounds, hasAlpha, std::move(textGlyphs)));
+      new Text(glyphs, std::move(textRuns), bounds, hasAlpha, std::move(textBlock)));
 }
 
 Text::Text(std::vector<GlyphHandle> glyphs, std::vector<TextRun*> textRuns,
-           const tgfx::Rect& bounds, bool hasAlpha, std::shared_ptr<TextGlyphs> textGlyphs)
+           const tgfx::Rect& bounds, bool hasAlpha, std::shared_ptr<TextBlock> textBlock)
     : glyphs(std::move(glyphs)), textRuns(std::move(textRuns)), bounds(bounds), hasAlpha(hasAlpha),
-      textGlyphs(std::move(textGlyphs)) {
+      textBlock(std::move(textBlock)) {
 }
 
 Text::~Text() {
@@ -256,7 +256,7 @@ static std::vector<TextStyle> GetGlyphStyles(const GlyphHandle& glyph) {
 }
 
 void Text::draw(tgfx::Canvas* canvas, RenderCache* renderCache) const {
-  auto textAtlas = renderCache->getTextAtlas(textGlyphs.get());
+  auto textAtlas = renderCache->getTextAtlas(textBlock.get());
   if (textAtlas != nullptr) {
     draw(canvas, textAtlas);
   } else {

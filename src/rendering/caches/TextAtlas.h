@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "TextGlyphs.h"
+#include "TextBlock.h"
 #include "pag/types.h"
 #include "tgfx/core/BytesKey.h"
 
@@ -33,7 +33,7 @@ struct AtlasLocator {
 
 class TextAtlas {
  public:
-  static std::unique_ptr<TextAtlas> Make(const TextGlyphs* textGlyphs, RenderCache* renderCache,
+  static std::unique_ptr<TextAtlas> Make(const TextBlock* textBlock, RenderCache* renderCache,
                                          float scale);
 
   ~TextAtlas();
