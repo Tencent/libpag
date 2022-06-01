@@ -25,9 +25,13 @@
 #include "rendering/graphics/Recorder.h"
 
 namespace pag {
+std::pair<std::vector<GlyphLine>, tgfx::Rect> GetLines(const TextDocument* textDocument);
+
 std::unique_ptr<TextContent> RenderTexts(const std::shared_ptr<TextGlyphs>& textGlyphs,
                                          TextPathOptions* pathOption, TextMoreOptions* moreOption,
-                                         std::vector<TextAnimator*>* animators, Frame layerFrame);
+                                         std::vector<TextAnimator*>* animators, Frame layerFrame,
+                                         Color backgroundColor = White,
+                                         uint8_t backgroundAlpha = 0);
 
 void CalculateTextAscentAndDescent(const TextDocument* textDocument, float* pMinAscent,
                                    float* pMaxDescent);

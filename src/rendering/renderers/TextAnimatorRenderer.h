@@ -27,20 +27,18 @@ namespace pag {
 class TextAnimatorRenderer {
  public:
   // 应用动画到Glyphs, 如果含有动画内容返回 true
-  static bool ApplyToGlyphs(std::vector<std::vector<GlyphHandle>>& glyphList,
-                            const std::vector<TextAnimator*>* animators,
-                            const TextDocument* textDocument, Frame layerFrame);
+  static bool ApplyToGlyphs(const std::vector<GlyphLine>& glyphList,
+                            const std::vector<TextAnimator*>* animators, Frame layerFrame);
   // 根据序号获取文本动画位置（供AE导出插件在计算firstBaseLine时调用）
   static tgfx::Point GetPositionFromAnimators(const std::vector<TextAnimator*>* animators,
                                               const TextDocument* textDocument, Frame layerFrame,
                                               size_t index, bool* pBiasFlag);
-  TextAnimatorRenderer(const TextAnimator* animator, const TextDocument* textDocument,
-                       size_t textCount, Frame frame);
+  TextAnimatorRenderer(const TextAnimator* animator, size_t textCount, Frame frame);
   ~TextAnimatorRenderer();
 
  private:
   // 应用文本动画
-  void apply(std::vector<std::vector<GlyphHandle>>& glyphList);
+  void apply(const std::vector<GlyphLine>& glyphList);
   // 计算一行的字间距总长度
   float calculateTrackingLen(size_t textStart, size_t textEnd);
   // 根据字符序号计算该字符的范围因子
@@ -60,9 +58,6 @@ class TextAnimatorRenderer {
 
   float trackingBefore = 0.0f;  // 字间距-之前
   float trackingAfter = 0.0f;   // 字间距-之后
-
-  Enum justification = ParagraphJustification::LeftJustify;
-  Enum direction = TextDirection::Default;
 
   std::vector<TextSelectorRenderer*> selectorRenderers;
 };

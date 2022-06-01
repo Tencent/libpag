@@ -45,6 +45,11 @@ class MutableGlyph;
 
 typedef std::shared_ptr<MutableGlyph> GlyphHandle;
 
+struct GlyphLine {
+  Enum justification = 0;
+  std::vector<GlyphHandle> glyphs;
+};
+
 /**
  * Glyph represents a single character for drawing.
  */
@@ -52,10 +57,6 @@ class MutableGlyph {
  public:
   static std::vector<GlyphHandle> BuildFromText(const std::vector<std::shared_ptr<Glyph>>& glyphs,
                                                 const TextPaint& paint);
-
-  MutableGlyph() = default;
-
-  virtual ~MutableGlyph() = default;
 
   /**
    * Called by the Text::MakeFrom() method to merge the draw calls of glyphs with the same style.
@@ -226,6 +227,8 @@ class MutableGlyph {
   }
 
   void computeAtlasKey(tgfx::BytesKey* bytesKey, TextStyle style) const;
+
+  std::shared_ptr<MutableGlyph> makeHorizontalGlyph() const;
 
  private:
   std::shared_ptr<Glyph> simpleGlyph;

@@ -69,4 +69,13 @@ void MutableGlyph::computeAtlasKey(tgfx::BytesKey* bytesKey, TextStyle style) co
   bytesKey->write(static_cast<uint32_t>(getGlyphID()));
   bytesKey->write(static_cast<uint32_t>(style));
 }
+
+std::shared_ptr<MutableGlyph> MutableGlyph::makeHorizontalGlyph() const {
+  auto glyph = std::make_shared<MutableGlyph>(*this);
+  if (glyph->simpleGlyph->isVertical()) {
+    glyph->simpleGlyph = glyph->simpleGlyph->makeHorizontalGlyph();
+  }
+  glyph->matrix = tgfx::Matrix::I();
+  return glyph;
+}
 }  // namespace pag

@@ -337,12 +337,13 @@ static std::vector<std::vector<GlyphInfo*>> ApplyLayoutToGlyphInfos(
   return lineList;
 }
 
-static std::vector<std::vector<GlyphHandle>> ApplyMatrixToGlyphs(
+static std::vector<GlyphLine> ApplyMatrixToGlyphs(
     const TextLayout& layout, const std::vector<std::vector<GlyphInfo*>>& glyphInfoLines,
     std::vector<GlyphHandle>* glyphList) {
-  std::vector<std::vector<GlyphHandle>> glyphLines = {};
+  std::vector<GlyphLine> glyphLines = {};
   for (auto& line : glyphInfoLines) {
-    std::vector<GlyphHandle> glyphLine = {};
+    GlyphLine glyphLine;
+    glyphLine.justification = layout.justification;
     for (auto& info : line) {
       auto& glyph = (*glyphList)[info->glyphIndex];
       auto matrix = tgfx::Matrix::MakeScale(layout.glyphScale);
@@ -350,23 +351,22 @@ static std::vector<std::vector<GlyphHandle>> ApplyMatrixToGlyphs(
       layout.coordinateMatrix.mapPoints(&pos, 1);
       matrix.postTranslate(pos.x, pos.y);
       glyph->setMatrix(matrix);
-      glyphLine.push_back(glyph);
+      glyphLine.glyphs.push_back(glyph);
     }
-    if (!glyphLine.empty()) {
+    if (!glyphLine.glyphs.empty()) {
       glyphLines.push_back(glyphLine);
     }
   }
   return glyphLines;
 }
 
-static tgfx::Path RenderBackgroundPath(const std::vector<std::vector<GlyphHandle>>& glyphLines,
-                                       float margin, float lineTop, float lineBottom,
-                                       bool isVertical) {
+static tgfx::Path RenderBackgroundPath(const std::vector<GlyphLine>& glyphLines, float margin,
+                                       float lineTop, float lineBottom, bool isVertical) {
   tgfx::Path backgroundPath = {};
   std::vector<tgfx::Rect> lineRectList = {};
   for (auto& line : glyphLines) {
     tgfx::Rect lineRect = tgfx::Rect::MakeEmpty();
-    for (auto& glyph : line) {
+    for (auto& glyph : line.glyphs) {
       tgfx::Rect textBounds = {};
       if (isVertical) {
         textBounds = tgfx::Rect::MakeLTRB(-lineBottom, 0, -lineTop, glyph->getAdvance());
@@ -416,18 +416,17 @@ static tgfx::Path RenderBackgroundPath(const std::vector<std::vector<GlyphHandle
   return backgroundPath;
 }
 
-std::shared_ptr<Graphic> RenderTextBackground(ID assetID,
-                                              const std::vector<std::vector<GlyphHandle>>& lines,
-                                              const TextDocument* textDocument) {
-  float strokeWidth = textDocument->strokeWidth;
-  auto margin = textDocument->fontSize * 0.2f;
+std::shared_ptr<Graphic> RenderTextBackground(ID assetID, const std::vector<GlyphLine>& lines,
+                                              Color backgroundColor, uint8_t backgroundAlpha) {
+  float strokeWidth = lines[0].glyphs[0]->getStrokeWidth();
+  auto margin = lines[0].glyphs[0]->getFont().getSize() * 0.2f;
   if (margin < strokeWidth) {
     margin = strokeWidth;
   }
-  auto isVertical = textDocument->direction == TextDirection::Vertical;
+  auto isVertical = lines[0].glyphs[0]->isVertical();
   float lineTop = 0, lineBottom = 0;
   for (auto& line : lines) {
-    for (auto& glyph : line) {
+    for (auto& glyph : line.glyphs) {
       if (isVertical) {
         lineTop = std::min(lineTop, -glyph->getBounds().right);
         lineBottom = std::max(lineBottom, -glyph->getBounds().left);
@@ -448,17 +447,15 @@ std::shared_ptr<Graphic> RenderTextBackground(ID assetID,
   if (effect) {
     effect->applyTo(&backgroundPath);
   }
-  auto graphic = Shape::MakeFrom(assetID, backgroundPath, ToTGFX(textDocument->backgroundColor));
-  auto modifier =
-      Modifier::MakeBlend(ToAlpha(textDocument->backgroundAlpha), tgfx::BlendMode::SrcOver);
+  auto graphic = Shape::MakeFrom(assetID, backgroundPath, ToTGFX(backgroundColor));
+  auto modifier = Modifier::MakeBlend(ToAlpha(backgroundAlpha), tgfx::BlendMode::SrcOver);
   return Graphic::MakeCompose(graphic, modifier);
 }
 
-std::unique_ptr<TextContent> RenderTexts(const std::shared_ptr<TextGlyphs>& textGlyphs,
-                                         TextPathOptions*, TextMoreOptions*,
-                                         std::vector<TextAnimator*>* animators, Frame layerFrame) {
-  auto* textDocument = textGlyphs->textDocument();
-  auto glyphList = textGlyphs->getGlyphs();
+std::pair<std::vector<GlyphLine>, tgfx::Rect> GetLines(const TextDocument* textDocument) {
+  auto simpleGlyphs = GetSimpleGlyphs(textDocument);
+  auto paint = CreateTextPaint(textDocument);
+  auto glyphList = MutableGlyph::BuildFromText(simpleGlyphs, paint);
   // 无论文字朝向，都先按从(0,0)点开始的横向矩形排版。
   // 提取出跟文字朝向无关的 GlyphInfo 列表与 TextLayout,
   // 复用同一套排版规则。如果最终是纵向排版，再把坐标转成纵向坐标应用到 glyphList 上。
@@ -471,20 +468,27 @@ std::unique_ptr<TextContent> RenderTexts(const std::shared_ptr<TextGlyphs>& text
   auto glyphInfoLines = ApplyLayoutToGlyphInfos(textLayout, &glyphInfos, &textBounds);
   auto glyphLines = ApplyMatrixToGlyphs(textLayout, glyphInfoLines, &glyphList);
   textLayout.coordinateMatrix.mapRect(&textBounds);
-  auto hasAnimators =
-      TextAnimatorRenderer::ApplyToGlyphs(glyphLines, animators, textDocument, layerFrame);
+  return {std::move(glyphLines), textBounds};
+}
+
+std::unique_ptr<TextContent> RenderTexts(const std::shared_ptr<TextGlyphs>& textGlyphs,
+                                         TextPathOptions*, TextMoreOptions*,
+                                         std::vector<TextAnimator*>* animators, Frame layerFrame,
+                                         Color backgroundColor, uint8_t backgroundAlpha) {
+  auto glyphLines = textGlyphs->copyLines();
+  auto hasAnimators = TextAnimatorRenderer::ApplyToGlyphs(glyphLines, animators, layerFrame);
   std::vector<std::shared_ptr<Graphic>> contents = {};
-  if (textDocument->backgroundAlpha > 0) {
-    auto background = RenderTextBackground(textGlyphs->assetID(), glyphLines, textDocument);
+  if (backgroundAlpha > 0) {
+    auto background =
+        RenderTextBackground(textGlyphs->assetID(), glyphLines, backgroundColor, backgroundAlpha);
     if (background) {
       contents.push_back(background);
     }
   }
-
   std::vector<GlyphHandle> simpleGlyphs = {};
   std::vector<GlyphHandle> colorGlyphs = {};
   for (auto& line : glyphLines) {
-    for (auto& glyph : line) {
+    for (auto& glyph : line.glyphs) {
       simpleGlyphs.push_back(glyph);
       auto typeface = glyph->getFont().getTypeface();
       if (typeface->hasColor()) {
@@ -492,8 +496,8 @@ std::unique_ptr<TextContent> RenderTexts(const std::shared_ptr<TextGlyphs>& text
       }
     }
   }
-
-  auto normalText = Text::MakeFrom(simpleGlyphs, textGlyphs, hasAnimators ? nullptr : &textBounds);
+  auto* textBounds = textGlyphs->textBounds().isEmpty() ? nullptr : &textGlyphs->textBounds();
+  auto normalText = Text::MakeFrom(simpleGlyphs, textGlyphs, hasAnimators ? nullptr : textBounds);
   if (normalText) {
     contents.push_back(normalText);
   }

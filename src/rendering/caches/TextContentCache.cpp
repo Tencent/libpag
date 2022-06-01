@@ -65,17 +65,18 @@ static float GetMaxScale(std::vector<TextAnimator*>* animators) {
 
 void TextContentCache::initTextGlyphs() {
   auto scale = GetMaxScale(animators);
+  auto addFunc = [&](TextDocument* textDocument) {
+    auto [lines, bounds] = GetLines(textDocument);
+    textGlyphs[textDocument] = std::make_shared<TextGlyphs>(getCacheID(), lines, bounds, scale);
+  };
   if (sourceText->animatable()) {
     auto animatableProperty = reinterpret_cast<AnimatableProperty<TextDocumentHandle>*>(sourceText);
-    auto textDocument = animatableProperty->keyframes[0]->startValue.get();
-    textGlyphs[textDocument] = std::make_shared<TextGlyphs>(getCacheID(), textDocument, scale);
+    addFunc(animatableProperty->keyframes[0]->startValue.get());
     for (const auto& keyframe : animatableProperty->keyframes) {
-      textDocument = keyframe->endValue.get();
-      textGlyphs[textDocument] = std::make_shared<TextGlyphs>(getCacheID(), textDocument, scale);
+      addFunc(keyframe->endValue.get());
     }
   } else {
-    auto textDocument = sourceText->getValueAt(0).get();
-    textGlyphs[textDocument] = std::make_shared<TextGlyphs>(getCacheID(), textDocument, scale);
+    addFunc(sourceText->getValueAt(0).get());
   }
 }
 
@@ -102,7 +103,9 @@ GraphicContent* TextContentCache::createContent(Frame layerFrame) const {
   if (iter == textGlyphs.end()) {
     return nullptr;
   }
-  auto content = RenderTexts(iter->second, pathOption, moreOption, animators, layerFrame).release();
+  auto content = RenderTexts(iter->second, pathOption, moreOption, animators, layerFrame,
+                             textDocument->backgroundColor, textDocument->backgroundAlpha)
+                     .release();
   if (_cacheEnabled) {
     content->colorGlyphs = Picture::MakeFrom(getCacheID(), content->colorGlyphs);
   }

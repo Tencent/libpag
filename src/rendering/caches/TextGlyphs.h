@@ -27,7 +27,7 @@ TextPaint CreateTextPaint(const TextDocument* textDocument);
 
 class TextGlyphs {
  public:
-  TextGlyphs(ID assetID, TextDocument* textDocument, float maxScale);
+  TextGlyphs(ID assetID, std::vector<GlyphLine> lines, tgfx::Rect textBounds, float maxScale);
 
   ID id() const {
     return _id;
@@ -37,8 +37,8 @@ class TextGlyphs {
     return _assetID;
   }
 
-  TextDocument* textDocument() const {
-    return _textDocument;
+  const tgfx::Rect& textBounds() const {
+    return _textBounds;
   }
 
   const std::vector<GlyphHandle>& maskAtlasGlyphs() const {
@@ -53,13 +53,13 @@ class TextGlyphs {
     return _maxScale;
   }
 
-  std::vector<GlyphHandle> getGlyphs() const;
+  std::vector<GlyphLine> copyLines() const;
 
  private:
   ID _id = 0;
   ID _assetID = 0;
-  TextDocument* _textDocument;
-  std::vector<std::shared_ptr<Glyph>> simpleGlyphs;
+  std::vector<GlyphLine> _lines;
+  tgfx::Rect _textBounds;
   std::vector<GlyphHandle> _maskAtlasGlyphs;
   std::vector<GlyphHandle> _colorAtlasGlyphs;
   float _maxScale = 1.0f;
