@@ -10,9 +10,6 @@ export class PAGImageLayer extends PAGLayer {
     return new PAGImageLayer(this.module._PAGImageLayer._Make(width, height, duration));
   }
 
-  public constructor(wasmIns: any) {
-    super(wasmIns);
-  }
   /**
    * Returns the content duration in microseconds, which indicates the minimal length required for
    * replacement.

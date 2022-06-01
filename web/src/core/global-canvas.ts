@@ -1,11 +1,12 @@
 import { DEFAULT_CANVAS_SIZE } from '../constant';
 import { PAG } from '../types';
+import { BackendContext } from './backend-context';
 
 export class GlobalCanvas {
   public static module: PAG;
 
   private _canvas: HTMLCanvasElement | OffscreenCanvas | null = null;
-  private _contextId = 0;
+  private _glContext: BackendContext | null = null;
   private width = DEFAULT_CANVAS_SIZE;
   private height = DEFAULT_CANVAS_SIZE;
   private retainCount = 0;
@@ -19,7 +20,9 @@ export class GlobalCanvas {
       }
       this._canvas.width = this.width;
       this._canvas.height = this.height;
-      this._contextId = GlobalCanvas.module.GL.createContext(this._canvas, { majorVersion: 1, minorVersion: 0 });
+
+      const gl = this._canvas.getContext('webgl') as WebGLRenderingContext;
+      this._glContext = BackendContext.from(gl);
     }
     this.retainCount += 1;
   }
@@ -27,9 +30,9 @@ export class GlobalCanvas {
   public release() {
     this.retainCount -= 1;
     if (this.retainCount === 0) {
-      if (this._contextId === 0) return;
-      GlobalCanvas.module.GL.deleteContext(this._contextId);
-      this._contextId = 0;
+      if (!this._glContext) return;
+      this._glContext.destroy();
+      this._glContext = null;
       this._canvas = null;
     }
   }
@@ -38,14 +41,14 @@ export class GlobalCanvas {
     return this._canvas;
   }
 
-  public get contextID() {
-    return this._contextId;
+  public get glContext() {
+    return this._glContext;
   }
 
   public setCanvasSize(width = DEFAULT_CANVAS_SIZE, height = DEFAULT_CANVAS_SIZE) {
     this.width = width;
     this.height = height;
-    if (this._contextId > 0 && this._canvas) {
+    if (this._glContext && this._canvas) {
       this._canvas.width = width;
       this._canvas.height = height;
     }

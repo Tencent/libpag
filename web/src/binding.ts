@@ -6,13 +6,14 @@ import { PAGImage } from './pag-image';
 import { PAGView } from './pag-view';
 import { PAGFont } from './pag-font';
 import { PAGLayer } from './pag-layer';
-import { PAGComposition } from './pag-composition';
 import { VideoReader } from './core/video-reader';
 import { ScalerContext } from './core/scaler-context';
 import { WebMask } from './core/web-mask';
 import { NativeImage } from './core/native-image';
-import { PAGTextLayer } from './pag-text-layer';
 import { GlobalCanvas } from './core/global-canvas';
+import { BackendContext } from './core/backend-context';
+import { PAGComposition } from './pag-composition';
+import { PAGTextLayer } from './pag-text-layer';
 
 /**
  * Binding pag js module on pag webassembly module.
@@ -32,11 +33,9 @@ export const binding = (module: PAG) => {
   module.PAGLayer = PAGLayer;
   PAGLayer.module = module;
   module.PAGComposition = PAGComposition;
-  PAGComposition.module = module;
   module.PAGSurface = PAGSurface;
   PAGSurface.module = module;
   module.PAGTextLayer = PAGTextLayer;
-  PAGTextLayer.module = module;
   module.VideoReader = VideoReader;
   module.NativeImage = NativeImage;
   module.ScalerContext = ScalerContext;
@@ -44,6 +43,8 @@ export const binding = (module: PAG) => {
   WebMask.module = module;
   module.GlobalCanvas = GlobalCanvas;
   GlobalCanvas.module = module;
+  module.BackendContext = BackendContext;
+  BackendContext.module = module;
   module.traceImage = function (info, pixels) {
     const canvas = document.createElement('canvas');
     canvas.width = info.width;

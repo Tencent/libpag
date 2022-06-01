@@ -6,16 +6,11 @@ import { proxyVector } from './utils/type-utils';
 @destroyVerify
 @wasmAwaitRewind
 export class PAGComposition extends PAGLayer {
-  public static module: PAG;
   /**
    * Make a empty PAGComposition with specified size.
    */
   public static Make(width: number, height: number): PAGComposition {
     return new PAGComposition(this.module._PAGComposition._Make(width, height));
-  }
-
-  public constructor(wasmIns: any) {
-    super(wasmIns);
   }
   /**
    * Returns the width of the Composition.
