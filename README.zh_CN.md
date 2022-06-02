@@ -106,18 +106,19 @@ buildscript {
 }
 ```
 
-在 `app/build.gradle`中添加libpag依赖 (*`3.2.7.40` 应替换为最新发布版本*):
+在 `app/build.gradle`中添加libpag依赖 (*`4.0.5.10` 应替换为最新发布版本*):
 
 ```
 dependencies {
-    implementation 'com.tencent.tav:libpag:3.2.7.40'
+    implementation 'com.tencent.tav:libpag:4.0.5.10'
 }
 ```
 
 在混淆列表里面，添加libpag的keep规则
 
 ```
-  -keep class org.libpag.* {*;}
+  -keep class org.libpag.** {*;}
+  -keep class androidx.exifinterface.** {*;}
 ```
 
 配置完以后，sync一下，再编译即可。
