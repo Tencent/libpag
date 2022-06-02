@@ -227,21 +227,30 @@ static void ConvertPolyStarToPath(tgfx::Path* path, float centerX, float centerY
   }
 
   // Move to the first point.
-  auto lastDx = outerRadius * cosf(currentAngle);
-  auto lastDy = outerRadius * sinf(currentAngle);
+  auto firstDx = outerRadius * cosf(currentAngle);
+  auto firstDy = outerRadius * sinf(currentAngle);
+  auto lastDx = firstDx;
+  auto lastDy = firstDy;
   path->moveTo(lastDx + centerX, lastDy + centerY);
 
   auto outerFlag = false;
-  for (int i = 0; i < numPoints - 1; i++) {
-    auto radius = outerFlag ? outerRadius : innerRadius;
+  for (int i = 0; i < numPoints; i++) {
     auto angleDelta = angleStep * direction;
-    if (i == decimalIndex || i == decimalIndex + 1) {
-      radius = innerRadius + decimalPart * (radius - innerRadius);
-      angleDelta *= decimalPart;
+    float dx;
+    float dy;
+    if (i == numPoints - 1) {
+      dx = firstDx;
+      dy = firstDy;
+    } else {
+      auto radius = outerFlag ? outerRadius : innerRadius;
+      if (i == decimalIndex || i == decimalIndex + 1) {
+        radius = innerRadius + decimalPart * (radius - innerRadius);
+        angleDelta *= decimalPart;
+      }
+      currentAngle += angleDelta;
+      dx = radius * cosf(currentAngle);
+      dy = radius * sinf(currentAngle);
     }
-    currentAngle += angleDelta;
-    auto dx = radius * cosf(currentAngle);
-    auto dy = radius * sinf(currentAngle);
     if (innerRoundness != 0 || outerRoundness != 0) {
       float lastRoundness, roundness;
       if (outerFlag) {
@@ -271,18 +280,27 @@ static void ConvertPolygonToPath(tgfx::Path* path, float centerX, float centerY,
   auto currentAngle = (rotation - 90) * static_cast<float>(M_PI) / 180;
 
   // Move to the first point.
-  auto lastDx = radius * cosf(currentAngle);
-  auto lastDy = radius * sinf(currentAngle);
+  auto firstDx = radius * cosf(currentAngle);
+  auto firstDy = radius * sinf(currentAngle);
+  auto lastDx = firstDx;
+  auto lastDy = firstDy;
   path->moveTo(lastDx + centerX, lastDy + centerY);
 
   auto outerFlag = false;
-  for (int i = 0; i < numPoints - 1; i++) {
+  for (int i = 0; i < numPoints; i++) {
     auto angleDelta = angleStep * direction;
-    currentAngle += angleDelta;
-    auto dx = radius * cosf(currentAngle);
-    auto dy = radius * sinf(currentAngle);
+    float dx;
+    float dy;
+    if (i == numPoints - 1) {
+      dx = firstDx;
+      dy = firstDy;
+    } else {
+      currentAngle += angleDelta;
+      dx = radius * cosf(currentAngle);
+      dy = radius * sinf(currentAngle);
+    }
     if (roundness != 0) {
-      AddCurveToPath(path, centerX, centerY, angleDelta * 0.5f, lastDx, lastDy, roundness, dx, dy,
+      AddCurveToPath(path, centerX, centerY, angleDelta * 0.25f, lastDx, lastDy, roundness, dx, dy,
                      roundness);
       lastDx = dx;
       lastDy = dy;

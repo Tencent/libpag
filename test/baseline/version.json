@@ -7786,6 +7786,12 @@
         "VideoSequenceToMP4WithoutHeader": "98088929",
         "pagSequenceTest": "48a897dd"
     },
+    "PAGShapeLayerTest": {
+        "polygon": "bb1019b4",
+        "polygon_round_corner": "bb1019b4",
+        "star": "bb1019b4",
+        "star_round_corner": "bb1019b4"
+    },
     "PAGSimplePathTest": {
         "TestRect": "48a897dd"
     },
