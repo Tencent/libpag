@@ -112,18 +112,19 @@ buildscript {
 }
 ```
 
-Add libpag to `app/build.gradle` (*`3.2.7.40` should be replaced with the latest release version*):
+Add libpag to `app/build.gradle` (*`4.0.5.10` should be replaced with the latest release version*):
 
 ```
 dependencies {
-    implementation 'com.tencent.tav:libpag:3.2.7.40'
+    implementation 'com.tencent.tav:libpag:4.0.5.10'
 }
 ```
 
 Add the following rule to your proguard rules to avoid the wrong obfuscation.
 
 ```
-  -keep class org.libpag.* {*;}
+  -keep class org.libpag.** {*;}
+  -keep class androidx.exifinterface.** {*;}
 ```
 
 Finally, run gradle sync and then build the project.
