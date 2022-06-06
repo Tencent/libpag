@@ -51,12 +51,13 @@ struct StrokePaint {
     return tgfx::Stroke(strokeWidth, ToTGFXCap(lineCap), ToTGFXJoin(lineJoin), miterLimit);
   }
 
-  float strokeWidth;
-  Enum lineCap;
-  Enum lineJoin;
-  float miterLimit;
+  float strokeWidth = 0;
+  Enum lineCap = LineCap::Butt;
+  Enum lineJoin = LineJoin::Miter;
+  float miterLimit = 0;
   std::vector<float> dashes;
-  float dashOffset;
+  float dashOffset = 0;
+  tgfx::Matrix matrix = tgfx::Matrix::I();
 };
 
 class PaintElement : public ElementData {
@@ -84,7 +85,7 @@ class PaintElement : public ElementData {
     if (paintType == PaintType::Fill || paintType == PaintType::GradientFill) {
       return;
     }
-    stroke.strokeWidth *= fabsf(matrix.getMaxScale());
+    stroke.matrix.postConcat(matrix);
   }
 
   PaintType paintType = PaintType::Fill;
@@ -354,7 +355,7 @@ PaintElement* FillToPaint(FillElement* fill, Frame frame) {
   return paint;
 }
 
-PaintElement* StrokeToPaint(StrokeElement* stroke, Frame frame) {
+PaintElement* StrokeToPaint(StrokeElement* stroke, const tgfx::Matrix& matrix, Frame frame) {
   if (stroke->opacity->getValueAt(frame) <= 0 || stroke->strokeWidth->getValueAt(frame) <= 0) {
     return nullptr;
   }
@@ -373,6 +374,7 @@ PaintElement* StrokeToPaint(StrokeElement* stroke, Frame frame) {
     }
     paint->stroke.dashOffset = stroke->dashOffset->getValueAt(frame);
   }
+  paint->stroke.matrix = matrix;
   return paint;
 }
 
@@ -519,6 +521,7 @@ PaintElement* GradientStrokeToPaint(GradientStrokeElement* stroke, const tgfx::M
     }
     paint->stroke.dashOffset = stroke->dashOffset->getValueAt(frame);
   }
+  paint->stroke.matrix = matrix;
   paint->gradient = MakeGradientPaint(stroke->fillType, stroke->startPoint->getValueAt(frame),
                                       stroke->endPoint->getValueAt(frame),
                                       stroke->colors->getValueAt(frame), matrix);
@@ -828,10 +831,10 @@ void RenderElements_Fill(ShapeElement* element, const tgfx::Matrix&, GroupElemen
   }
 }
 
-void RenderElements_Stroke(ShapeElement* element, const tgfx::Matrix&, GroupElement* parentGroup,
-                           Frame frame) {
+void RenderElements_Stroke(ShapeElement* element, const tgfx::Matrix& parentMatrix,
+                           GroupElement* parentGroup, Frame frame) {
   auto stroke = static_cast<StrokeElement*>(element);
-  auto paint = StrokeToPaint(stroke, frame);
+  auto paint = StrokeToPaint(stroke, parentMatrix, frame);
   if (paint != nullptr) {
     parentGroup->elements.push_back(paint);
   }
@@ -925,15 +928,33 @@ std::unique_ptr<tgfx::PathEffect> CreateDashEffect(const std::vector<float>& das
 }
 
 void ApplyStrokeToPath(tgfx::Path* path, const StrokePaint& stroke) {
+  std::vector<std::unique_ptr<tgfx::PathEffect>> effects;
   if (!stroke.dashes.empty()) {
     auto dashEffect = CreateDashEffect(stroke.dashes, stroke.dashOffset);
     if (dashEffect) {
-      dashEffect->applyTo(path);
+      effects.emplace_back(std::move(dashEffect));
     }
   }
   auto strokeEffect = tgfx::PathEffect::MakeStroke(stroke.getStroke());
   if (strokeEffect) {
-    strokeEffect->applyTo(path);
+    effects.emplace_back(std::move(strokeEffect));
+  }
+  if (effects.empty()) {
+    return;
+  }
+  auto applyMatrix = false;
+  if (!stroke.matrix.isIdentity()) {
+    auto matrix = tgfx::Matrix::I();
+    if (stroke.matrix.invert(&matrix)) {
+      path->transform(matrix);
+      applyMatrix = true;
+    }
+  }
+  for (const auto& effect : effects) {
+    effect->applyTo(path);
+  }
+  if (applyMatrix) {
+    path->transform(stroke.matrix);
   }
 }
 
