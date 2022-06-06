@@ -386,6 +386,7 @@ export class PAGView {
     await this.flush();
     this.currentFrame = currentFrame;
     this.repeatedTimes = count;
+    this.eventManager.emit(PAGViewListenerEvent.onAnimationUpdate, this);
   }
 
   private clearTimer(): void {
