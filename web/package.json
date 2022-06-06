@@ -14,7 +14,7 @@
     "prettier": "prettier --check \"src/**/*.ts\"",
     "prettier:fix": "prettier --write \"src/**/*.ts\"",
     "test": "cypress run --browser chrome",
-    "server": "http-server -p 8080 . -c-1",
+    "server": "http-server -p 8080 . -c-1 --cors",
     "doc": "rimraf api-docs && typedoc --entryPointStrategy expand ./src"
   },
   "repository": {
