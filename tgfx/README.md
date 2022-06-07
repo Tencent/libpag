@@ -13,7 +13,7 @@ TGFX is under active development and the APIs are subject to change.
 |:--------------:|:--------------:|:----------------------------:|:-------------:|
 |    FreeType    |  OpenGL        |  All                         |   complete    |
 |  CoreGraphics  |  OpenGL        |  iOS, macOS                  |   complete    |
-|    Canvas2D    |  WebGL         |  Web                         |  in progress  |
+|    Canvas2D    |  WebGL         |  Web                         |   complete    |
 |  CoreGraphics  |  Metal         |  iOS, macOS                  |  in progress  |
 |    FreeType    |  Vulkan        |  Android, Linux              |    planned    |
 
