@@ -168,9 +168,13 @@ export const enum PAGViewListenerEvent {
    */
   onAnimationPause = 'onAnimationPause',
   /**
-   * Notifies the flushed of the animation.
+   * [deprecated] Notifies the flushed of the animation.
    */
   onAnimationFlushed = 'onAnimationFlushed',
+  /**
+   * Notifies the update of the animation.
+   */
+  onAnimationUpdate = 'onAnimationUpdate',
 }
 
 export const enum ParagraphJustification {
