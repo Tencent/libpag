@@ -2,7 +2,6 @@ import { VIDEO_DECODE_WAIT_FRAME } from '../constant';
 import { addListener, removeListener, removeAllListeners } from '../utils/video-listener';
 import { IS_WECHAT } from '../utils/ua';
 import { Log } from '../utils/log';
-import { ErrorCode } from '../utils/error-map';
 import { EmscriptenGL } from '../types';
 
 export interface TimeRange {
@@ -10,35 +9,34 @@ export interface TimeRange {
   end: number;
 }
 
-const playVideoElement = (videoElement: HTMLVideoElement) => {
-  return new Promise((resolve) => {
-    const play = () => {
-      videoElement
-        .play()
-        .then(() => {
-          resolve(true);
-        })
-        .catch((event: DOMException) => {
-          Log.error(event.message);
-          resolve(false);
-        });
-    };
-
-    if (IS_WECHAT && window.WeixinJSBridge) {
-      window.WeixinJSBridge.invoke(
-        'getNetworkType',
-        {},
-        () => {
-          play();
-        },
-        () => {
-          play();
-        },
-      );
-    } else {
-      play();
-    }
+// Get video initiated token on Wechat browser.
+const getWechatNetwork = () => {
+  return new Promise<void>((resolve) => {
+    window.WeixinJSBridge.invoke(
+      'getNetworkType',
+      {},
+      () => {
+        resolve();
+      },
+      () => {
+        resolve();
+      },
+    );
   });
+};
+
+const playVideoElement = async (videoElement: HTMLVideoElement) => {
+  if (IS_WECHAT && window.WeixinJSBridge) {
+    await getWechatNetwork();
+  }
+  try {
+    await videoElement.play();
+  } catch (error: any) {
+    Log.error(error.message);
+    throw new Error(
+      'Failed to decode video, please play PAG after user gesture. Or your can load a software decoder to decode the video.',
+    );
+  }
 };
 
 export class VideoReader {
@@ -53,6 +51,7 @@ export class VideoReader {
     this.videoEl.style.display = 'none';
     this.videoEl.muted = true;
     this.videoEl.playsInline = true;
+    this.videoEl.load();
     addListener(this.videoEl, 'timeupdate', this.onTimeupdate.bind(this));
     this.frameRate = frameRate;
     this.lastFlush = -1;
@@ -61,51 +60,52 @@ export class VideoReader {
     this.staticTimeRanges = new StaticTimeRanges(staticTimeRanges);
   }
 
-  public prepare(targetFrame: number) {
-    return new Promise((resolve) => {
-      if (this.videoEl === null) {
-        Log.errorByCode(ErrorCode.VideoElementNull);
+  public async prepare(targetFrame: number) {
+    if (!this.videoEl) {
+      console.error('Video element is null!');
+      return false;
+    }
+    const { currentTime } = this.videoEl;
+    const targetTime = targetFrame / this.frameRate;
+    this.lastFlush = targetTime;
+    if (currentTime === 0 && targetTime === 0) {
+      if (this.hadPlay) {
+        return true;
       } else {
-        const { currentTime } = this.videoEl;
-        const targetTime = targetFrame / this.frameRate;
-        this.lastFlush = targetTime;
-        if (currentTime === 0 && targetTime === 0) {
-          if (this.hadPlay) {
-            resolve(true);
-          } else {
-            // Wait for initialization to complete
-            playVideoElement(this.videoEl).then(() => {
-              window.requestAnimationFrame(() => {
-                if (this.videoEl === null) {
-                  Log.errorByCode(ErrorCode.VideoElementNull);
-                } else {
-                  this.videoEl.pause();
-                  this.hadPlay = true;
-                  resolve(true);
-                }
-              });
-            });
-          }
-        } else {
-          if (Math.round(targetTime * this.frameRate) === Math.round(currentTime * this.frameRate)) {
-            // Current frame
-            resolve(true);
-          } else if (this.staticTimeRanges.contains(targetFrame)) {
-            // Static frame
-            this.seek(resolve, targetTime, false);
-          } else if (Math.abs(currentTime - targetTime) < (1 / this.frameRate) * VIDEO_DECODE_WAIT_FRAME) {
-            // Within tolerable frame rate deviation
-            if (this.videoEl.paused) {
-              playVideoElement(this.videoEl);
+        // Wait for initialization to complete
+        await playVideoElement(this.videoEl);
+        // Pause video at first frame.
+        await new Promise<void>((resolve) => {
+          window.requestAnimationFrame(() => {
+            if (!this.videoEl) {
+              console.error('Video Element is null!');
+            } else {
+              this.videoEl.pause();
+              this.hadPlay = true;
             }
-            resolve(true);
-          } else {
-            // Seek and play
-            this.seek(resolve, targetTime);
-          }
-        }
+            resolve();
+          });
+        });
+        return true;
       }
-    });
+    } else {
+      if (Math.round(targetTime * this.frameRate) === Math.round(currentTime * this.frameRate)) {
+        // Current frame
+        return true;
+      } else if (this.staticTimeRanges.contains(targetFrame)) {
+        // Static frame
+        return await this.seek(targetTime, false);
+      } else if (Math.abs(currentTime - targetTime) < (1 / this.frameRate) * VIDEO_DECODE_WAIT_FRAME) {
+        // Within tolerable frame rate deviation
+        if (this.videoEl.paused) {
+          await playVideoElement(this.videoEl);
+        }
+        return true;
+      } else {
+        // Seek and play
+        return await this.seek(targetTime);
+      }
+    }
   }
 
   public renderToTexture(GL: EmscriptenGL, textureID: number) {
@@ -116,13 +116,13 @@ export class VideoReader {
   }
 
   public onDestroy() {
-    if (this.videoEl === null) {
-      Log.errorByCode(ErrorCode.VideoElementNull);
-    } else {
-      removeAllListeners(this.videoEl, 'playing');
-      removeAllListeners(this.videoEl, 'timeupdate');
-      this.videoEl = null;
+    if (!this.videoEl) {
+      throw new Error('Video element is null!');
     }
+
+    removeAllListeners(this.videoEl, 'playing');
+    removeAllListeners(this.videoEl, 'timeupdate');
+    this.videoEl = null;
   }
 
   private onTimeupdate() {
@@ -133,41 +133,48 @@ export class VideoReader {
     }
   }
 
-  private seek(resolve: (value: unknown) => void, targetTime: number, play = true) {
-    let isCallback = false;
-    const canplayCallback = () => {
-      if (this.videoEl === null) {
-        Log.errorByCode(ErrorCode.VideoElementNull);
-      } else {
-        removeListener(this.videoEl, 'canplay', canplayCallback);
+  private seek(targetTime: number, play = true) {
+    return new Promise<boolean>((resolve) => {
+      let isCallback = false;
+      let timer: any = null;
+      const canplayCallback = async () => {
+        if (!this.videoEl) {
+          console.error('Video element is null!');
+          resolve(false);
+          return;
+        }
+        removeListener(this.videoEl, 'seeked', canplayCallback);
         if (play && this.videoEl.paused) {
-          playVideoElement(this.videoEl);
+          await playVideoElement(this.videoEl);
         } else if (!play && !this.videoEl.paused) {
           this.videoEl.pause();
         }
         isCallback = true;
+        clearTimeout(timer);
+        timer = null;
         resolve(true);
+      };
+      if (!this.videoEl) {
+        console.error('Video element is null!');
+        resolve(false);
+        return;
       }
-    };
-    if (this.videoEl === null) {
-      resolve(false);
-      Log.errorByCode(ErrorCode.VideoElementNull);
-      return;
-    }
-    addListener(this.videoEl, 'canplay', canplayCallback);
-    this.videoEl!.currentTime = targetTime;
-    // Timeout
-    setTimeout(() => {
-      if (!isCallback) {
-        if (this.videoEl === null) {
-          resolve(false);
-          Log.errorByCode(ErrorCode.VideoElementNull);
-        } else {
-          removeListener(this.videoEl, 'canplay', canplayCallback);
-          resolve(true);
+      addListener(this.videoEl, 'seeked', canplayCallback);
+      this.videoEl!.currentTime = targetTime;
+      // Timeout
+      timer = setTimeout(() => {
+        if (!isCallback) {
+          if (!this.videoEl) {
+            console.error('Video element is null!');
+            resolve(false);
+            return;
+          } else {
+            removeListener(this.videoEl, 'seeked', canplayCallback);
+            resolve(false);
+          }
         }
-      }
-    }, (1000 / this.frameRate) * VIDEO_DECODE_WAIT_FRAME);
+      }, (1000 / this.frameRate) * VIDEO_DECODE_WAIT_FRAME);
+    });
   }
 }
 
