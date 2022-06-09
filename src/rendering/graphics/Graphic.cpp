@@ -173,7 +173,7 @@ bool LayerGraphic::getPath(tgfx::Path* path) const {
     if (!content->getPath(&temp)) {
       return false;
     }
-    fillPath.addPath(temp);
+    fillPath.addPath(temp, tgfx::PathOp::Union);
   }
   path->addPath(fillPath);
   return true;
