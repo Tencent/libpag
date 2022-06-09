@@ -89,12 +89,44 @@ static const char GRADIENT_OVERLAY_FRAGMENT_SHADER[] = R"(
     }
     )";
 
-static const char GRADIENT_OVERLAY_STYLE_LINEAR[] = R"(
+static const char GRADIENT_OVERLAY_GRADIENT_COLOR[] = R"(
+    vec3 GradientColor(vec3 color1, vec3 color2, float weight, float location) {
+        vec3 midColor = mix(color1, color2, 0.5);
+        return location < weight ? mix(color1, midColor, location / weight)
+                                 : mix(midColor, color2, (location - weight) / (1.0 - weight));
+    }
+    )";
 
+static const char GRADIENT_OVERLAY_STYLE_LINEAR[] = R"(
+    float StyleLinear(vec2 position, vec2 center, float angle, float ratio) {
+        float k = tan(-angle);
+        float b = center.y - center.x / ratio * k;
+        float len = -(k * position.x / ratio - position.y + b) / sqrt(1.0 + pow(k, 2.0));
+        return (len * 0.5 + 0.5);
+    }
     )";
 
 static const char GRADIENT_OVERLAY_STYLE_ANGLE[] = R"(
+    float StyleAngleToLinear(vec2 position, vec2 center, float angle, float ratio) {
+        float arctan = atan(position.y - center.y, (center.x - position.x) / ratio);
+        return mod((arctan + pi + angle), pi * 2.0) / (pi * 2.0);
+    }
+    )";
 
+static const char GRADIENT_OVERLAY_STYLE_RADIAL[] = R"(
+    float StyleRadialToLinear(vec2 position, vec2 center, float ratio) {
+        float len = length(position / vec2(ratio, 1.0) - center / vec2(ratio, 1.0));
+        return len / 0.5;
+    }
+    )";
+
+static const char GRADIENT_OVERLAY_STYLE_REFLECTED[] = R"(
+    float StyleReflectedToLinear(vec2 position, vec2 center, float angle, float ratio) {
+        float k = tan(-angle);
+        float b = center.y - center.x / ratio * k;
+        float len = abs(k * position.x / ratio - position.y + b) / sqrt(1.0 + pow(k, 2.0));
+        return len / 0.5;
+    }
     )";
 
 GradientOverlayFilter::GradientOverlayFilter(GradientOverlayStyle* layerStyle) : layerStyle(layerStyle) {}
