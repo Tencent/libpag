@@ -7385,8 +7385,8 @@
             "0053": "aabe191f",
             "0054": "aabe191f",
             "0055": "aabe191f",
-            "0059": "aabe191f",
-            "0060": "21336019",
+            "0059": "c945f861",
+            "0060": "c945f861",
             "0077": "48a897dd",
             "0078": "48a897dd",
             "0079": "48a897dd",
@@ -7790,7 +7790,8 @@
         "polygon": "bb1019b4",
         "polygon_round_corner": "bb1019b4",
         "star": "bb1019b4",
-        "star_round_corner": "bb1019b4"
+        "star_round_corner": "bb1019b4",
+        "track_matte_path_union": "c945f861"
     },
     "PAGSimplePathTest": {
         "TestRect": "48a897dd"

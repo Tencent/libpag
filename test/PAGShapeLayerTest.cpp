@@ -79,4 +79,18 @@ PAG_TEST_F(PAGShapeLayerTest, star_round_corner) {
   pagPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGShapeLayerTest/star_round_corner"));
 }
+
+/**
+ * 用例描述: trackMatteLayer 的 path 合并时要 union，path 的方向不一致时 append 模式会镂空。
+ */
+PAG_TEST_F(PAGShapeLayerTest, track_matte_path_union) {
+  auto pagFile = PAGFile::Load("../resources/apitest/track_matte_path_union.pag");
+  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setProgress(0.3);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGShapeLayerTest/track_matte_path_union"));
+}
 }  // namespace pag
