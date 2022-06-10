@@ -2,7 +2,7 @@
 /* global describe it expect */
 import { WebAssemblyQueue } from '../../src/utils/queue';
 
-describe('Test queue', () => {
+describe('Queue', () => {
   const webAssemblyQueue = new WebAssemblyQueue();
 
   it('Sequence exec', async () => {
