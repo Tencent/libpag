@@ -39,7 +39,6 @@ static const char GRADIENT_OVERLAY_FRAGMENT_SHADER[] = R"(
     uniform float uAlphaSize;
     uniform float uAngle;
     uniform float uStyle;
-    uniform float uAlignWithLayer;
     uniform float uScale;
     uniform float uOffset;
     
@@ -57,43 +56,40 @@ static const char GRADIENT_OVERLAY_FRAGMENT_SHADER[] = R"(
       float opacity;
     };
     
-    vec4 getColorWithPosition(float position) {
-      vec4 color;
-      for (float i = 1; i < uColorSize; i += 1.0) {
-        if (uColors[i - 1.0].position < position && uColors[i].position > position) {
-          color.rgb = mix(uColors[i - 1.0].color, uColors[i].color, position);
-          break;
-        }
-      }
-    
-      for (float i = 1; i < uAlphaSize; i += 1.0) {
-        if (uAlpha[i - 1.0].position < position && uAlpha[i].position > position) {
-          color.a = mix(uAlpha[i - 1.0].opacity, uAlpha[i].opacity, position);
-          break;
-        }
-      }
-    
-      return color;
+    vec3 GradientColor(vec3 color1, vec3 color2, float weight, float location) {
+        vec3 midColor = mix(color1, color2, 0.5);
+        return location < weight ? mix(color1, midColor, location / weight)
+                                 : mix(midColor, color2, (location - weight) / (1.0 - weight));
     }
-
-    vec4 mappingToLinearStyle() {
-      vec2 point = vertexColor * uSize;
-      float length = mix(uSize.x * 0.5, uSize.y * 0.5, cos(uAngle));
-      float distance = abs(cot(uAngle) * point.x + point.y) / sqrt(pow(cot(uAngle), 2.0), + 1.0);
-      
+    
+    float GradientAlpha(float alpha1, float alpha2, float weight, float location) {
+        vec3 midAlpha = mix(alpha1, alpha2, 0.5);
+        return location < weight ? mix(alpha1, midAlpha, location / weight)
+                                 : mix(midAlpha, alpha2, (location - weight) / (1.0 - weight));
+    }
+    
+    vec4 ColorWithPosition(float position) {
+      vec4 color;
+      for (int i = 1; i < uColorSize; i += 1) {
+        if (uColors[i - 1].position < position && uColors[i].position > position) {
+          float location = (position - uColors[i - 1].position) / (uColors[i].position - uColors[i - 1].position);
+          color.rgb = GradientColor(uColors[i - 1].color, uColors[i].color, uColors[i - 1].midpoint, location);
+          break;
+        }
+      }
+      for (int i = 1; i < uAlphaSize; i += 1) {
+        if (uAlpha[i - 1].position < position && uAlpha[i].position > position) {
+          float location = (position - uAlpha[i - 1].position) / (uAlpha[i].position - uAlpha[i - 1].position);
+          color.a = GradientAlpha(uAlpha[i - 1].opacity, uAlpha[i].opacity, uAlpha[i - 1].midpoint, location);
+          break;
+        }
+      }
+      return color;
     }
     
     
     void main() {
       if
-    }
-    )";
-
-static const char GRADIENT_OVERLAY_GRADIENT_COLOR[] = R"(
-    vec3 GradientColor(vec3 color1, vec3 color2, float weight, float location) {
-        vec3 midColor = mix(color1, color2, 0.5);
-        return location < weight ? mix(color1, midColor, location / weight)
-                                 : mix(midColor, color2, (location - weight) / (1.0 - weight));
     }
     )";
 
