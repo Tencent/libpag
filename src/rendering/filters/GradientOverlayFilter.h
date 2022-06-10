@@ -48,6 +48,7 @@ class GradientOverlayFilter : public LayerFilter {
   int alphaSizeHandle = 0;
   int angleHandle = 0;
   int styleHandle = 0;
+  int reverseHandle = 0;
   int scaleHandle = 0;
   int offsetHandle = 0;
   int sizeHandle = 0;

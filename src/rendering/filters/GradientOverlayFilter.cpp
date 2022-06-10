@@ -39,6 +39,7 @@ static const char GRADIENT_OVERLAY_FRAGMENT_SHADER[] = R"(
     uniform int uAlphaSize;
     uniform float uAngle;
     uniform int uStyle;
+    uniform int uReverse;
     uniform float uScale;
     uniform vec2 uOffset;
     
@@ -124,6 +125,7 @@ static const char GRADIENT_OVERLAY_FRAGMENT_SHADER[] = R"(
         } else {
             value = StyleLinear(vertexColor, center, uAngle, ratio);
         }
+        value = mix(1.0 - value, value, uReverse);
         vec4 color = ColorWithValue(value / uScale);
         color.a *= uOpacity;
         gl_FragColor = color;
@@ -141,6 +143,7 @@ void GradientOverlayFilter::onPrepareProgram(tgfx::Context* context, unsigned pr
   alphaSizeHandle = gl->getUniformLocation(program, "uAlphaSize");
   angleHandle = gl->getUniformLocation(program, "uAngle");
   styleHandle = gl->getUniformLocation(program, "uStyle");
+  reverseHandle = gl->getUniformLocation(program, "uReverse");
   scaleHandle = gl->getUniformLocation(program, "uScale");
   offsetHandle = gl->getUniformLocation(program, "uOffset");
   sizeHandle = gl->getUniformLocation(program, "uSize");
@@ -155,7 +158,7 @@ void GradientOverlayFilter::onUpdateParams(tgfx::Context* context, const tgfx::R
   auto alphaSize = static_cast<int>(colors->alphaStops.size());
   auto angle = layerStyle->angle->getValueAt(layerFrame);
   auto style = layerStyle->style->getValueAt(layerFrame);
-//  auto reverse = layerStyle->reverse->getValueAt(layerFrame);
+  auto reverse = layerStyle->reverse->getValueAt(layerFrame);
   auto scale = layerStyle->scale->getValueAt(layerFrame);
   auto offset = layerStyle->offset->getValueAt(layerFrame);
   
@@ -165,6 +168,7 @@ void GradientOverlayFilter::onUpdateParams(tgfx::Context* context, const tgfx::R
   gl->uniform1i(alphaSizeHandle, alphaSize);
   gl->uniform1f(angleHandle, angle);
   gl->uniform1i(styleHandle, style);
+  gl->uniform1i(reverseHandle, reverse);
   gl->uniform1f(scaleHandle, scale);
   gl->uniform2f(offsetHandle, offset.x, offset.y);
   gl->uniform2f(sizeHandle, contentBounds.width(), contentBounds.height());
