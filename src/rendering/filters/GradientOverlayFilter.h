@@ -41,5 +41,15 @@ class GradientOverlayFilter : public LayerFilter {
 
  private:
   GradientOverlayStyle* layerStyle = nullptr;
+  unsigned gradientOverlayProgram = 0;
+  
+  int opacityHandle = 0;
+  int colorSizeHandle = 0;
+  int alphaSizeHandle = 0;
+  int angleHandle = 0;
+  int styleHandle = 0;
+  int scaleHandle = 0;
+  int offsetHandle = 0;
+  int sizeHandle = 0;
 };
 }  // namespace pag
