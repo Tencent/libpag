@@ -99,10 +99,10 @@ static const char GRADIENT_OVERLAY_GRADIENT_COLOR[] = R"(
 
 static const char GRADIENT_OVERLAY_STYLE_LINEAR[] = R"(
     float StyleLinear(vec2 position, vec2 center, float angle, float ratio) {
-        float k = tan(-angle);
+        float k = tan(angle - pi * 0.5);
         float b = center.y - center.x / ratio * k;
         float len = -(k * position.x / ratio - position.y + b) / sqrt(1.0 + pow(k, 2.0));
-        return (len * 0.5 + 0.5);
+        return len * 0.5 + 0.5;
     }
     )";
 
@@ -122,7 +122,7 @@ static const char GRADIENT_OVERLAY_STYLE_RADIAL[] = R"(
 
 static const char GRADIENT_OVERLAY_STYLE_REFLECTED[] = R"(
     float StyleReflectedToLinear(vec2 position, vec2 center, float angle, float ratio) {
-        float k = tan(-angle);
+        float k = tan(angle - pi * 0.5);
         float b = center.y - center.x / ratio * k;
         float len = abs(k * position.x / ratio - position.y + b) / sqrt(1.0 + pow(k, 2.0));
         return len / 0.5;
@@ -140,13 +140,11 @@ void GradientOverlayFilter::onPrepareProgram(tgfx::Context* context, unsigned pr
 
 void GradientOverlayFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
                                            const tgfx::Point& filterScale) {
-  auto blendMode = layerStyle->blendMode->getValueAt(layerFrame);
   auto opacity = layerStyle->opacity->getValueAt(layerFrame);
   auto colors = layerStyle->colors->getValueAt(layerFrame);
   auto angle = layerStyle->angle->getValueAt(layerFrame);
   auto style = layerStyle->style->getValueAt(layerFrame);
   auto reverse = layerStyle->reverse->getValueAt(layerFrame);
-  auto alignWithLayer = layerStyle->alignWithLayer->getValueAt(layerFrame);
   auto scale = layerStyle->scale->getValueAt(layerFrame);
   auto offset = layerStyle->offset->getValueAt(layerFrame);
 
