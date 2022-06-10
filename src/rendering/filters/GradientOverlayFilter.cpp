@@ -22,7 +22,7 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GradientOverlayFilter.h"
-#include <format>
+#include <cmath>
 
 namespace pag {
 
@@ -31,19 +31,6 @@ static const char GRADIENT_OVERLAY_FRAGMENT_SHADER[] = R"(
     precision highp float;
     varying highp vec2 vertexColor;
     uniform sampler2D inputImageTexture;
-    
-    uniform float uOpacity;
-    uniform ColorStop uColors[16];
-    uniform int uColorSize;
-    uniform AlphaStop uAlpha[16];
-    uniform int uAlphaSize;
-    uniform float uAngle;
-    uniform int uStyle;
-    uniform int uReverse;
-    uniform float uScale;
-    uniform vec2 uOffset;
-    
-    uniform vec2 uSize;
     
     struct ColorStop {
         float position;
@@ -57,6 +44,21 @@ static const char GRADIENT_OVERLAY_FRAGMENT_SHADER[] = R"(
         float opacity;
     };
     
+    uniform float uOpacity;
+    uniform ColorStop uColors[16];
+    uniform int uColorSize;
+    uniform AlphaStop uAlpha[16];
+    uniform int uAlphaSize;
+    uniform float uAngle;
+    uniform int uStyle;
+    uniform float uReverse;
+    uniform float uScale;
+    uniform vec2 uOffset;
+    
+    uniform vec2 uSize;
+    
+    float PI = 3.1415926535;
+    
     vec3 GradientColor(vec3 color1, vec3 color2, float weight, float location) {
         vec3 midColor = mix(color1, color2, 0.5);
         return location < weight ? mix(color1, midColor, location / weight)
@@ -64,7 +66,7 @@ static const char GRADIENT_OVERLAY_FRAGMENT_SHADER[] = R"(
     }
     
     float GradientAlpha(float alpha1, float alpha2, float weight, float location) {
-        vec3 midAlpha = mix(alpha1, alpha2, 0.5);
+        float midAlpha = mix(alpha1, alpha2, 0.5);
         return location < weight ? mix(alpha1, midAlpha, location / weight)
                                  : mix(midAlpha, alpha2, (location - weight) / (1.0 - weight));
     }
@@ -89,7 +91,10 @@ static const char GRADIENT_OVERLAY_FRAGMENT_SHADER[] = R"(
     }
     
     float StyleLinear(vec2 position, vec2 center, float angle, float ratio) {
-        float k = tan(angle - pi * 0.5);
+        if (mod(angle, PI / 2.0) < 0.001) {
+            return (position.x - center.x) * 0.5 + 0.5;
+        }
+        float k = tan(angle - PI * 0.5);
         float b = center.y - center.x / ratio * k;
         float len = -(k * position.x / ratio - position.y + b) / sqrt(1.0 + pow(k, 2.0));
         return len * 0.5 + 0.5;
@@ -101,12 +106,12 @@ static const char GRADIENT_OVERLAY_FRAGMENT_SHADER[] = R"(
     }
     
     float StyleAngleToLinear(vec2 position, vec2 center, float angle, float ratio) {
-        float arctan = atan(position.y - center.y, (center.x - position.x) / ratio);
-        return mod((arctan + pi + angle), pi * 2.0) / (pi * 2.0);
+        float arctan = atan(position.y - center.y, (position.x - center.x) / ratio);
+        return mod((arctan + angle), PI * 2.0) / (PI * 2.0);
     }
     
     float StyleReflectedToLinear(vec2 position, vec2 center, float angle, float ratio) {
-        float k = tan(angle - pi * 0.5);
+        float k = tan(angle - PI * 0.5);
         float b = center.y - center.x / ratio * k;
         float len = abs(k * position.x / ratio - position.y + b) / sqrt(1.0 + pow(k, 2.0));
         return len / 0.5;
@@ -117,15 +122,15 @@ static const char GRADIENT_OVERLAY_FRAGMENT_SHADER[] = R"(
         vec2 center = vec2(0.5) - uOffset / uSize;
         float value;
         if (uStyle == 1) {
-            value = StyleRadialToLinear(vertexColor, center, uAngle, ratio);
+            value = StyleRadialToLinear(vertexColor, center, ratio);
         } else if (uStyle == 2) {
-            value = StyleAngleToLinear(vertexColor, center, ratio);
+            value = StyleAngleToLinear(vertexColor, center, uAngle, ratio);
         } else if (uStyle == 3) {
             value = StyleReflectedToLinear(vertexColor, center, uAngle, ratio);
         } else {
             value = StyleLinear(vertexColor, center, uAngle, ratio);
         }
-        value = mix(1.0 - value, value, uReverse);
+        value = mix(value, 1.0 - value, uReverse);
         vec4 color = ColorWithValue(value / uScale);
         color.a *= uOpacity;
         gl_FragColor = color;
@@ -156,10 +161,10 @@ void GradientOverlayFilter::onUpdateParams(tgfx::Context* context, const tgfx::R
   auto colors = layerStyle->colors->getValueAt(layerFrame);
   auto colorSize = static_cast<int>(colors->colorStops.size());
   auto alphaSize = static_cast<int>(colors->alphaStops.size());
-  auto angle = layerStyle->angle->getValueAt(layerFrame);
-  auto style = layerStyle->style->getValueAt(layerFrame);
+  auto angle = layerStyle->angle->getValueAt(layerFrame) / 180.0 * M_PI;
+  auto style = static_cast<int>(layerStyle->style->getValueAt(layerFrame));
   auto reverse = layerStyle->reverse->getValueAt(layerFrame);
-  auto scale = layerStyle->scale->getValueAt(layerFrame);
+  auto scale = layerStyle->scale->getValueAt(layerFrame) / 100.0;
   auto offset = layerStyle->offset->getValueAt(layerFrame);
   
   auto gl = tgfx::GLFunctions::Get(context);
@@ -168,7 +173,7 @@ void GradientOverlayFilter::onUpdateParams(tgfx::Context* context, const tgfx::R
   gl->uniform1i(alphaSizeHandle, alphaSize);
   gl->uniform1f(angleHandle, angle);
   gl->uniform1i(styleHandle, style);
-  gl->uniform1i(reverseHandle, reverse);
+  gl->uniform1f(reverseHandle, reverse);
   gl->uniform1f(scaleHandle, scale);
   gl->uniform2f(offsetHandle, offset.x, offset.y);
   gl->uniform2f(sizeHandle, contentBounds.width(), contentBounds.height());

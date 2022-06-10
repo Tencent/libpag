@@ -916,7 +916,7 @@ class PAG_API GradientOverlayStyle : public LayerStyle {
 
   LayerStyleType type() const override { return LayerStyleType::GradientOverlay; }
 
-  LayerStylePosition drawPosition() const override { return LayerStylePosition::Blow; }
+  LayerStylePosition drawPosition() const override { return LayerStylePosition::Above; }
 
   bool visibleAt(Frame layerFrame) const override;
 
