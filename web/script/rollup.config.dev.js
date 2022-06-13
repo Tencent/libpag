@@ -27,9 +27,4 @@ export default [
     output: { banner, file: 'demo/index.js', format: 'esm', sourcemap: true },
     plugins: [esbuild({ tsconfig: 'tsconfig.json', minify: false }), resolve(), commonJs()],
   },
-  {
-    input: 'demo/benchmarks.ts',
-    output: { banner, file: 'demo/benchmarks.js', format: 'esm', sourcemap: true },
-    plugins: [esbuild({ tsconfig: 'tsconfig.json', minify: false }), resolve(), commonJs()],
-  },
 ];
