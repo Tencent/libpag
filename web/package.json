@@ -1,6 +1,6 @@
 {
   "name": "libpag",
-  "version": "4.0.5-release.6",
+  "version": "4.0.5-release.11",
   "description": "Portable Animated Graphics",
   "main": "lib/libpag.cjs.js",
   "module": "lib/libpag.esm.js",
@@ -13,7 +13,8 @@
     "eslint:fix": "eslint --ext .ts src/ --fix",
     "prettier": "prettier --check \"src/**/*.ts\"",
     "prettier:fix": "prettier --write \"src/**/*.ts\"",
-    "test": "cypress run --browser chrome",
+    "test": "node ./script/test.js",
+    "cypress": "cypress run --browser chrome",
     "server": "http-server -p 8080 . -c-1 --cors",
     "doc": "rimraf api-docs && typedoc --entryPointStrategy expand ./src"
   },
