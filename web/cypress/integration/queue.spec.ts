@@ -1,8 +1,9 @@
+/* eslint-disable @typescript-eslint/no-invalid-this */
+/* global describe it expect */
 import { WebAssemblyQueue } from '../../src/utils/queue';
 
-describe('Test queue', () => {
+describe('Queue', () => {
   const webAssemblyQueue = new WebAssemblyQueue();
-  webAssemblyQueue.start();
 
   it('Sequence exec', async () => {
     const list = [];
