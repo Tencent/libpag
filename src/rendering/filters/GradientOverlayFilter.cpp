@@ -31,7 +31,7 @@ static const char GRADIENT_OVERLAY_FRAGMENT_SHADER[] = R"(
     #version 100
     precision highp float;
     varying highp vec2 vertexColor;
-    uniform sampler2D inputImageTexture;
+    uniform sampler2D sTexture;
     
     struct ColorStop {
         float position;
@@ -75,14 +75,14 @@ static const char GRADIENT_OVERLAY_FRAGMENT_SHADER[] = R"(
     vec4 ColorWithValue(float position) {
       vec4 color;
       for (int i = 1; i < uColorSize; i += 1) {
-        if (uColors[i - 1].position < position && uColors[i].position > position) {
+        if ((uColors[i - 1].position < position && uColors[i].position > position) || i == uColorSize - 1) {
           float location = (position - uColors[i - 1].position) / (uColors[i].position - uColors[i - 1].position);
           color.rgb = GradientColor(uColors[i - 1].color, uColors[i].color, uColors[i - 1].midpoint, location);
           break;
         }
       }
       for (int i = 1; i < uAlphaSize; i += 1) {
-        if (uAlpha[i - 1].position < position && uAlpha[i].position > position) {
+        if (uAlpha[i - 1].position < position && uAlpha[i].position > position || i == uAlphaSize - 1) {
           float location = (position - uAlpha[i - 1].position) / (uAlpha[i].position - uAlpha[i - 1].position);
           color.a = GradientAlpha(uAlpha[i - 1].opacity, uAlpha[i].opacity, uAlpha[i - 1].midpoint, location);
           break;
@@ -125,6 +125,10 @@ static const char GRADIENT_OVERLAY_FRAGMENT_SHADER[] = R"(
     }
     
     void main() {
+        vec4 sourceColor = texture2D(sTexture, vertexColor);
+        if (sourceColor.a == 0.0) {
+            discard;
+        }
         float ratio = uSize.y / uSize.x;
         vec2 center = vec2(0.5) - uOffset / uSize;
         float value;
@@ -139,7 +143,7 @@ static const char GRADIENT_OVERLAY_FRAGMENT_SHADER[] = R"(
         }
         value = mix(value, 1.0 - value, uReverse);
         vec4 color = ColorWithValue(min(1.0, value / uScale));
-        color.a *= uOpacity;
+        color.a *= (uOpacity * sourceColor.a);
         gl_FragColor = color;
     }
     )";
