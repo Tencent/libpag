@@ -17,8 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LayerStylesFilter.h"
+#include "tgfx/gpu/Surface.h"
+#include "tgfx/gpu/opengl/GLRenderTarget.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/renderers/FilterRenderer.h"
+#include "rendering/filters/utils/FilterHelper.h"
+#include "rendering/filters/GradientOverlayFilter.h"
 
 namespace pag {
 void LayerStylesFilter::TransformBounds(tgfx::Rect* bounds, const FilterList* filterList) {
@@ -69,7 +73,24 @@ void LayerStylesFilter::draw(tgfx::Context* context, const FilterSource* source,
   for (auto& layerStyle : filterList->layerStyles) {
     if (layerStyle->drawPosition() == LayerStylePosition::Above) {
       auto filter = renderCache->getFilterCache(layerStyle);
-      if (filter) {
+      if (!filter) {
+        continue;
+      }
+      if (layerStyle->type() == LayerStyleType::GradientOverlay) {
+        auto gradientOverlayFilter = static_cast<GradientOverlayFilter*>(filter);
+        auto newSurface = tgfx::Surface::Make(context, target->width, target->height, false, 1);
+        auto newTarget = ToFilterTarget(newSurface.get(), tgfx::Matrix::I());
+        newTarget->vertexMatrix = target->vertexMatrix;
+        filter->update(filterList->layerFrame, contentBounds, transformedBounds, filterScale);
+        filter->draw(context, source, newTarget.get());
+        
+        auto renderTarget = tgfx::GLRenderTarget::MakeFrom(context, target->frameBuffer,
+                                                           target->width, target->height, tgfx::ImageOrigin::TopLeft);
+        auto targetSurface = tgfx::Surface::MakeFrom(renderTarget);
+        auto targetCanvas = targetSurface->getCanvas();
+        targetCanvas->setBlendMode(gradientOverlayFilter->getBlendMode());
+        targetCanvas->drawTexture(newSurface->getTexture().get());
+      } else {
         filter->update(filterList->layerFrame, contentBounds, transformedBounds, filterScale);
         filter->draw(context, source, target);
       }

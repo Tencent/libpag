@@ -30,6 +30,8 @@ class GradientOverlayFilter : public LayerFilter {
  public:
   explicit GradientOverlayFilter(GradientOverlayStyle* layerStyle);
   ~GradientOverlayFilter() override = default;
+  
+  tgfx::BlendMode getBlendMode();
 
  protected:
   std::string onBuildFragmentShader() override;
@@ -38,7 +40,7 @@ class GradientOverlayFilter : public LayerFilter {
 
   void onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
                       const tgfx::Point& filterScale) override;
-
+  
  private:
   GradientOverlayStyle* layerStyle = nullptr;
   unsigned gradientOverlayProgram = 0;

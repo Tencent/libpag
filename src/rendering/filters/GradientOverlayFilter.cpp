@@ -22,6 +22,7 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GradientOverlayFilter.h"
+#include "base/utils/TGFXCast.h"
 #include <cmath>
 
 namespace pag {
@@ -91,17 +92,18 @@ static const char GRADIENT_OVERLAY_FRAGMENT_SHADER[] = R"(
     }
     
     float StyleLinear(vec2 position, vec2 center, float angle, float ratio) {
-        if (mod(angle, PI / 2.0) < 0.001) {
+        if (mod(angle, PI / 2.0) == 0.0) {
             return (position.x - center.x) * 0.5 + 0.5;
         }
         float k = tan(angle - PI * 0.5);
         float b = center.y - center.x / ratio * k;
         float len = -(k * position.x / ratio - position.y + b) / sqrt(1.0 + pow(k, 2.0));
-        return len * 0.5 + 0.5;
+        return len + 0.5;
     }
     
     float StyleRadialToLinear(vec2 position, vec2 center, float ratio) {
-        float len = length(position / vec2(ratio, 1.0) - center / vec2(ratio, 1.0));
+        vec2 fix = vec2(ratio < 1.0 ? ratio : 1.0, ratio > 1.0 ? ratio : 1.0);
+        float len = length(position * fix - center * fix);
         return len / 0.5;
     }
     
@@ -111,9 +113,14 @@ static const char GRADIENT_OVERLAY_FRAGMENT_SHADER[] = R"(
     }
     
     float StyleReflectedToLinear(vec2 position, vec2 center, float angle, float ratio) {
+        float progress = mod(angle, PI / 2.0) / (PI / 2.0);
+        if (progress == 0.0) {
+            return abs(position.x - center.x) / 0.5;
+        }
+        float scale = mix(ratio, 1.0, progress);
         float k = tan(angle - PI * 0.5);
-        float b = center.y - center.x / ratio * k;
-        float len = abs(k * position.x / ratio - position.y + b) / sqrt(1.0 + pow(k, 2.0));
+        float b = center.y - center.x * scale * k;
+        float len = abs(k * position.x * scale - position.y + b) / sqrt(1.0 + pow(k, 2.0));
         return len / 0.5;
     }
     
@@ -131,7 +138,7 @@ static const char GRADIENT_OVERLAY_FRAGMENT_SHADER[] = R"(
             value = StyleLinear(vertexColor, center, uAngle, ratio);
         }
         value = mix(value, 1.0 - value, uReverse);
-        vec4 color = ColorWithValue(value / uScale);
+        vec4 color = ColorWithValue(min(1.0, value / uScale));
         color.a *= uOpacity;
         gl_FragColor = color;
     }
@@ -139,7 +146,13 @@ static const char GRADIENT_OVERLAY_FRAGMENT_SHADER[] = R"(
 
 GradientOverlayFilter::GradientOverlayFilter(GradientOverlayStyle* layerStyle) : layerStyle(layerStyle) {}
 
-std::string GradientOverlayFilter::onBuildFragmentShader() { return GRADIENT_OVERLAY_FRAGMENT_SHADER; }
+tgfx::BlendMode GradientOverlayFilter::getBlendMode() {
+  return ToTGFXBlend(layerStyle->blendMode->getValueAt(0));
+}
+
+std::string GradientOverlayFilter::onBuildFragmentShader() {
+  return GRADIENT_OVERLAY_FRAGMENT_SHADER;
+}
 
 void GradientOverlayFilter::onPrepareProgram(tgfx::Context* context, unsigned program) {
   auto gl = tgfx::GLFunctions::Get(context);
