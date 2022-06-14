@@ -79,13 +79,14 @@ void LayerStylesFilter::draw(tgfx::Context* context, const FilterSource* source,
       if (layerStyle->type() == LayerStyleType::GradientOverlay) {
         auto gradientOverlayFilter = static_cast<GradientOverlayFilter*>(filter);
         auto newSurface = tgfx::Surface::Make(context, target->width, target->height, false, 1);
-        auto newTarget = ToFilterTarget(newSurface.get(), tgfx::Matrix::I());
-        newTarget->vertexMatrix = target->vertexMatrix;
+        auto offscreenTarget = ToFilterTarget(newSurface.get(), tgfx::Matrix::I());
+        offscreenTarget->vertexMatrix = target->vertexMatrix;
         filter->update(filterList->layerFrame, contentBounds, transformedBounds, filterScale);
-        filter->draw(context, source, newTarget.get());
+        filter->draw(context, source, offscreenTarget.get());
         
         auto renderTarget = tgfx::GLRenderTarget::MakeFrom(context, target->frameBuffer,
-                                                           target->width, target->height, tgfx::ImageOrigin::TopLeft);
+                                                           target->width, target->height,
+                                                           tgfx::ImageOrigin::TopLeft);
         auto targetSurface = tgfx::Surface::MakeFrom(renderTarget);
         auto targetCanvas = targetSurface->getCanvas();
         targetCanvas->setBlendMode(gradientOverlayFilter->getBlendMode());

@@ -147,8 +147,8 @@ static const char GRADIENT_OVERLAY_FRAGMENT_SHADER[] = R"(
         }
         value = mix(value, 1.0 - value, uReverse);
         vec4 color = ColorWithValue(value / uScale);
-        color.a = color.a * sourceColor.a * uOpacity;
-        gl_FragColor = color;
+        color.a *= uOpacity;
+        gl_FragColor = color * sourceColor.a;
     }
     )";
 

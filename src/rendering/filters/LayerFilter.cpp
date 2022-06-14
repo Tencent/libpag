@@ -116,8 +116,10 @@ std::unique_ptr<LayerFilter> LayerFilter::Make(LayerStyle* layerStyle) {
   switch (layerStyle->type()) {
     case LayerStyleType::DropShadow:
       filter = new DropShadowFilter(reinterpret_cast<DropShadowStyle*>(layerStyle));
+      break;
     case LayerStyleType::GradientOverlay:
       filter = new GradientOverlayFilter(reinterpret_cast<GradientOverlayStyle*>(layerStyle));
+      break;
     default:
       break;
   }
