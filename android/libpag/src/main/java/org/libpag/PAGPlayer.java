@@ -4,6 +4,7 @@ import android.graphics.Matrix;
 import android.graphics.RectF;
 
 import org.extra.tools.LibraryLoadUtils;
+import org.ffavc.DecoderFactory;
 
 public class PAGPlayer {
     private PAGSurface pagSurface = null;
@@ -228,6 +229,7 @@ public class PAGPlayer {
     static {
         LibraryLoadUtils.loadLibrary("pag");
         nativeInit();
+        VideoDecoder.RegisterSoftwareDecoderFactory(DecoderFactory.GetHandle());
     }
 
     private long nativeContext = 0;
