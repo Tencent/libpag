@@ -270,7 +270,7 @@ void MaskModifier::applyToGraphic(tgfx::Canvas* canvas, RenderCache* cache,
   auto contentMatrix = contentCanvas->getMatrix();
   graphic->draw(contentCanvas, cache);
   auto maskSurface = tgfx::Surface::Make(contentSurface->getContext(), contentSurface->width(),
-                                         contentSurface->height(), true);
+                                         contentSurface->height(), !useLumaMatte);
   if (maskSurface == nullptr) {
     maskSurface = tgfx::Surface::Make(contentSurface->getContext(), contentSurface->width(),
                                       contentSurface->height());
