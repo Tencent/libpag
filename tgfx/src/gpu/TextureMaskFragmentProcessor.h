@@ -50,6 +50,7 @@ class TextureMaskFragmentProcessor : public FragmentProcessor {
   const Texture* texture;
   CoordTransform coordTransform;
   bool inverted = false;
+  bool useLumaMatte = true;
   Matrix deviceCoordMatrix = Matrix::I();
 
   friend class GLTextureMaskFragmentProcessor;

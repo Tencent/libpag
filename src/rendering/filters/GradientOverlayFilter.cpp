@@ -75,14 +75,18 @@ static const char GRADIENT_OVERLAY_FRAGMENT_SHADER[] = R"(
     vec4 ColorWithValue(float position) {
       vec4 color;
       for (int i = 1; i < uColorSize; i += 1) {
-        if ((uColors[i - 1].position < position && uColors[i].position > position) || i == uColorSize - 1) {
+        if ((i == 1 && position < uColors[i - 1].position)
+            || (uColors[i - 1].position < position && uColors[i].position > position)
+            || i == uColorSize - 1) {
           float location = (position - uColors[i - 1].position) / (uColors[i].position - uColors[i - 1].position);
           color.rgb = GradientColor(uColors[i - 1].color, uColors[i].color, uColors[i - 1].midpoint, location);
           break;
         }
       }
       for (int i = 1; i < uAlphaSize; i += 1) {
-        if (uAlpha[i - 1].position < position && uAlpha[i].position > position || i == uAlphaSize - 1) {
+        if ((i == 1 && position < uAlpha[i - 1].position)
+            || (uAlpha[i - 1].position < position && uAlpha[i].position > position)
+            || i == uAlphaSize - 1) {
           float location = (position - uAlpha[i - 1].position) / (uAlpha[i].position - uAlpha[i - 1].position);
           color.a = GradientAlpha(uAlpha[i - 1].opacity, uAlpha[i].opacity, uAlpha[i - 1].midpoint, location);
           break;
@@ -142,8 +146,8 @@ static const char GRADIENT_OVERLAY_FRAGMENT_SHADER[] = R"(
             value = StyleLinear(vertexColor, center, uAngle, ratio);
         }
         value = mix(value, 1.0 - value, uReverse);
-        vec4 color = ColorWithValue(min(1.0, value / uScale));
-        color.a *= (uOpacity * sourceColor.a);
+        vec4 color = ColorWithValue(value / uScale);
+        color.a = color.a * sourceColor.a * uOpacity;
         gl_FragColor = color;
     }
     )";
@@ -174,7 +178,7 @@ void GradientOverlayFilter::onPrepareProgram(tgfx::Context* context, unsigned pr
 
 void GradientOverlayFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
                                            const tgfx::Point&) {
-  auto opacity = layerStyle->opacity->getValueAt(layerFrame);
+  auto opacity = layerStyle->opacity->getValueAt(layerFrame) / 255.0;
   auto colors = layerStyle->colors->getValueAt(layerFrame);
   auto colorSize = static_cast<int>(colors->colorStops.size());
   auto alphaSize = static_cast<int>(colors->alphaStops.size());

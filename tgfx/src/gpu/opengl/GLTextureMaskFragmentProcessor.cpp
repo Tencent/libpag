@@ -39,9 +39,21 @@ void GLTextureMaskFragmentProcessor::emitCode(EmitArgs& args) {
                              deviceCoordMatrixName.c_str(), scaleName.c_str());
     coordName = "deviceCoord.xy";
   }
-  fragBuilder->codeAppendf("%s = ", args.outputColor.c_str());
-  fragBuilder->appendTextureLookup((*args.textureSamplers)[0], coordName);
-  fragBuilder->codeAppendf(".aaaa * %s", args.inputColor.c_str());
+  if (textureFP->useLumaMatte) {
+    fragBuilder->addFunction("float lumaValue(vec4 color) { \
+                                return dot(color.rgb, vec3(0.299, 0.587, 0.114)); \
+                              }");
+    fragBuilder->codeAppendf("float luma = lumaValue(");
+    fragBuilder->appendTextureLookup((*args.textureSamplers)[0], coordName);
+    fragBuilder->codeAppendf(");");
+    fragBuilder->codeAppendf("%s = ", args.outputColor.c_str());
+    fragBuilder->codeAppendf("luma * %s", args.inputColor.c_str());
+
+  } else {
+    fragBuilder->codeAppendf("%s = ", args.outputColor.c_str());
+    fragBuilder->appendTextureLookup((*args.textureSamplers)[0], coordName);
+    fragBuilder->codeAppendf(".aaaa * %s", args.inputColor.c_str());
+  }
   fragBuilder->codeAppend(";");
   // 荣耀畅玩 6x may occur unexpected results.
   fragBuilder->codeAppendf("%s = clamp(%s, 0.0, 1.0);", args.outputColor.c_str(),
