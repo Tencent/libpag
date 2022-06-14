@@ -8,7 +8,8 @@
     "moduleResolution": "Node",
     "experimentalDecorators": true,
     "strict": true,
-    "outDir": "./lib"
+    "outDir": "./lib",
+    "resolveJsonModule": true
   },
   "include": ["src/**/*.ts", "demo/**/*.ts"],
   "typedocOptions": {
