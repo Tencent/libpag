@@ -31,7 +31,7 @@ class Modifier {
  public:
   static std::shared_ptr<Modifier> MakeBlend(float alpha, tgfx::BlendMode blendMode);
   static std::shared_ptr<Modifier> MakeClip(const tgfx::Path& clip);
-  static std::shared_ptr<Modifier> MakeMask(std::shared_ptr<Graphic> graphic, bool inverted);
+  static std::shared_ptr<Modifier> MakeMask(std::shared_ptr<Graphic> graphic, bool inverted, bool useLumaMatte);
 
   virtual ~Modifier() = default;
 

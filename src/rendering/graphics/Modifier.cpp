@@ -97,8 +97,8 @@ class ClipModifier : public Modifier {
 
 class MaskModifier : public Modifier {
  public:
-  MaskModifier(std::shared_ptr<Graphic> mask, bool inverted)
-      : mask(std::move(mask)), inverted(inverted) {
+  MaskModifier(std::shared_ptr<Graphic> mask, bool inverted, bool useLumaMatte)
+      : mask(std::move(mask)), inverted(inverted), useLumaMatte(useLumaMatte) {
   }
 
   ID type() const override {
@@ -131,6 +131,7 @@ class MaskModifier : public Modifier {
   // 可能是 nullptr
   std::shared_ptr<Graphic> mask = nullptr;
   bool inverted = false;
+  bool useLumaMatte = false;
 };
 
 //================================================================================
@@ -150,7 +151,8 @@ std::shared_ptr<Modifier> Modifier::MakeClip(const tgfx::Path& clip) {
   return std::make_shared<ClipModifier>(clip);
 }
 
-std::shared_ptr<Modifier> Modifier::MakeMask(std::shared_ptr<Graphic> graphic, bool inverted) {
+std::shared_ptr<Modifier> Modifier::MakeMask(std::shared_ptr<Graphic> graphic, bool inverted,
+                                             bool useLumaMatte) {
   if (graphic == nullptr && inverted) {
     // 返回空，表示保留目标对象的全部内容。
     return nullptr;
@@ -162,7 +164,7 @@ std::shared_ptr<Modifier> Modifier::MakeMask(std::shared_ptr<Graphic> graphic, b
     }
     return Modifier::MakeClip(clipPath);
   }
-  return std::make_shared<MaskModifier>(graphic, inverted);
+  return std::make_shared<MaskModifier>(graphic, inverted, useLumaMatte);
 }
 
 //================================================================================
@@ -286,7 +288,7 @@ void MaskModifier::applyToGraphic(tgfx::Canvas* canvas, RenderCache* cache,
   matrix.postTranslate(bounds.x(), bounds.y());
   canvas->save();
   canvas->concat(matrix);
-  canvas->drawTexture(texture.get(), maskTexture.get(), inverted);
+  canvas->drawTexture(texture.get(), maskTexture.get(), inverted, useLumaMatte);
   canvas->restore();
 }
 }  // namespace pag

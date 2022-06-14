@@ -30,7 +30,7 @@ class GLCanvas : public Canvas {
   explicit GLCanvas(Surface* surface);
 
   void clear() override;
-  void drawTexture(const Texture* texture, const Texture* mask, bool inverted) override;
+  void drawTexture(const Texture* texture, const Texture* mask, bool inverted, bool useLumaMatte) override;
   void drawTexture(const Texture* texture, const RGBAAALayout* layout) override;
   void drawMask(const Texture* mask, const Paint& paint) override;
   void drawPath(const Path& path, const Paint& paint) override;
@@ -66,7 +66,7 @@ class GLCanvas : public Canvas {
   Rect clipLocalBounds(Rect localBounds);
 
   void drawTexture(const Texture* texture, const RGBAAALayout* layout, const Texture* mask,
-                   bool inverted);
+                   bool inverted, bool useLumaMatte);
 
   void drawMask(const Rect& bounds, const Texture* mask, const Shader* shader,
                 bool appliedMatrix = true);

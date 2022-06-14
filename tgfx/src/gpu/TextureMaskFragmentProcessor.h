@@ -24,7 +24,8 @@ namespace tgfx {
 class TextureMaskFragmentProcessor : public FragmentProcessor {
  public:
   static std::unique_ptr<TextureMaskFragmentProcessor> MakeUseLocalCoord(
-      const Texture* texture, const Matrix& localMatrix = Matrix::I(), bool inverted = false);
+      const Texture* texture, const Matrix& localMatrix = Matrix::I(),
+      bool inverted = false, bool useLumaMatte = false);
 
   static std::unique_ptr<TextureMaskFragmentProcessor> MakeUseDeviceCoord(const Texture* texture,
                                                                           ImageOrigin deviceOrigin);
@@ -36,7 +37,8 @@ class TextureMaskFragmentProcessor : public FragmentProcessor {
  private:
   TextureMaskFragmentProcessor(const Texture* texture, ImageOrigin deviceOrigin);
 
-  TextureMaskFragmentProcessor(const Texture* texture, const Matrix& localMatrix, bool inverted);
+  TextureMaskFragmentProcessor(const Texture* texture, const Matrix& localMatrix,
+                               bool inverted, bool useLumaMatte);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
@@ -50,7 +52,7 @@ class TextureMaskFragmentProcessor : public FragmentProcessor {
   const Texture* texture;
   CoordTransform coordTransform;
   bool inverted = false;
-  bool useLumaMatte = true;
+  bool useLumaMatte = false;
   Matrix deviceCoordMatrix = Matrix::I();
 
   friend class GLTextureMaskFragmentProcessor;

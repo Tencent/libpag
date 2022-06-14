@@ -149,7 +149,7 @@ class Canvas {
    * Draws a Texture, with its top-left corner at (0, 0), using a mask texture and current alpha,
    * blend mode, clip and matrix. The mask texture has the same position and size with the texture.
    */
-  virtual void drawTexture(const Texture* texture, const Texture* mask, bool inverted) = 0;
+  virtual void drawTexture(const Texture* texture, const Texture* mask, bool inverted, bool useLumaMatte) = 0;
 
   /**
    *  Draws a RGBAAA layout Texture, with its top-left corner at (0, 0), using current alpha, blend

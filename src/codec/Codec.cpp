@@ -34,6 +34,8 @@ static bool HasTrackMatte(Enum type) {
   switch (type) {
     case TrackMatteType::Alpha:
     case TrackMatteType::AlphaInverted:
+    case TrackMatteType::Luma:
+    case TrackMatteType::LumaInverted:
       return true;
     default:
       return false;

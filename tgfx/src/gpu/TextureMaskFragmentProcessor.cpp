@@ -22,12 +22,12 @@
 
 namespace tgfx {
 std::unique_ptr<TextureMaskFragmentProcessor> TextureMaskFragmentProcessor::MakeUseLocalCoord(
-    const Texture* texture, const Matrix& localMatrix, bool inverted) {
+    const Texture* texture, const Matrix& localMatrix, bool inverted, bool useLumaMatte) {
   if (texture == nullptr) {
     return nullptr;
   }
   return std::unique_ptr<TextureMaskFragmentProcessor>(
-      new TextureMaskFragmentProcessor(texture, localMatrix, inverted));
+      new TextureMaskFragmentProcessor(texture, localMatrix, inverted, useLumaMatte));
 }
 
 std::unique_ptr<TextureMaskFragmentProcessor> TextureMaskFragmentProcessor::MakeUseDeviceCoord(
@@ -53,8 +53,9 @@ TextureMaskFragmentProcessor::TextureMaskFragmentProcessor(const Texture* textur
 }
 
 TextureMaskFragmentProcessor::TextureMaskFragmentProcessor(const Texture* texture,
-                                                           const Matrix& localMatrix, bool inverted)
-    : useLocalCoord(true), texture(texture), inverted(inverted) {
+                                                           const Matrix& localMatrix,
+                                                           bool inverted, bool useLumaMatte)
+    : useLocalCoord(true), texture(texture), inverted(inverted), useLumaMatte(useLumaMatte) {
   setTextureSamplerCnt(1);
   if (texture->origin() == ImageOrigin::BottomLeft) {
     coordTransform.matrix.postScale(1, -1);
@@ -70,6 +71,7 @@ void TextureMaskFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) con
   uint32_t flags = 0;
   flags |= (useLocalCoord ? 1 : 0) << 0;
   flags |= (inverted ? 1 : 0) << 1;
+  flags |= (useLumaMatte ? 1 : 0) << 2;
   bytesKey->write(flags);
 }
 

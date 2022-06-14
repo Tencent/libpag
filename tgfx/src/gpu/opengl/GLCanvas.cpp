@@ -40,8 +40,8 @@ void GLCanvas::clear() {
   renderTarget->clear();
 }
 
-void GLCanvas::drawTexture(const Texture* texture, const Texture* mask, bool inverted) {
-  drawTexture(texture, nullptr, mask, inverted);
+void GLCanvas::drawTexture(const Texture* texture, const Texture* mask, bool inverted, bool useLumaMatte) {
+  drawTexture(texture, nullptr, mask, inverted, useLumaMatte);
 }
 
 Texture* GLCanvas::getClipTexture() {
@@ -78,7 +78,7 @@ static bool IsPixelAligned(const Rect& rect) {
 }
 
 void GLCanvas::drawTexture(const Texture* texture, const RGBAAALayout* layout) {
-  drawTexture(texture, layout, nullptr, false);
+  drawTexture(texture, layout, nullptr, false, false);
 }
 
 std::shared_ptr<Shader> GetShader(const Paint& paint) {
@@ -146,7 +146,7 @@ Rect GLCanvas::clipLocalBounds(Rect localBounds) {
 }
 
 void GLCanvas::drawTexture(const Texture* texture, const RGBAAALayout* layout, const Texture* mask,
-                           bool inverted) {
+                           bool inverted, bool useLumaMatte) {
   if (texture == nullptr) {
     return;
   }
@@ -167,7 +167,7 @@ void GLCanvas::drawTexture(const Texture* texture, const RGBAAALayout* layout, c
     return;
   }
   draw(GLFillRectOp::Make(localBounds, getViewMatrix()), std::move(processor),
-       TextureMaskFragmentProcessor::MakeUseLocalCoord(mask, localMatrix, inverted), true);
+       TextureMaskFragmentProcessor::MakeUseLocalCoord(mask, localMatrix, inverted, useLumaMatte), true);
 }
 
 void GLCanvas::drawPath(const Path& path, const Paint& paint) {
@@ -331,7 +331,7 @@ void GLCanvas::drawColorGlyphs(const GlyphID glyphIDs[], const Point positions[]
     concat(glyphMatrix);
     state->alpha *= paint.getAlpha();
     auto texture = glyphBuffer->makeTexture(getContext());
-    drawTexture(texture.get(), nullptr, false);
+    drawTexture(texture.get(), nullptr, false, false);
     restore();
   }
 }
