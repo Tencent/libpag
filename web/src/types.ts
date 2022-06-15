@@ -16,6 +16,8 @@ import { WebMask } from './core/web-mask';
 import { PAGTextLayer } from './pag-text-layer';
 import { GlobalCanvas } from './core/global-canvas';
 import { BackendContext } from './core/backend-context';
+import { PAGImageLayer } from './pag-image-layer';
+import { PAGSolidLayer } from './pag-solid-layer';
 
 declare global {
   interface Window {
@@ -81,6 +83,8 @@ export interface PAG extends EmscriptenModule {
   PAGComposition: typeof PAGComposition;
   PAGSurface: typeof PAGSurface;
   PAGTextLayer: typeof PAGTextLayer;
+  PAGImageLayer: typeof PAGImageLayer;
+  PAGSolidLayer: typeof PAGSolidLayer;
   NativeImage: typeof NativeImage;
   WebMask: typeof WebMask;
   ScalerContext: typeof ScalerContext;
@@ -160,21 +164,24 @@ export const enum PAGViewListenerEvent {
    */
   onAnimationRepeat = 'onAnimationRepeat',
   /**
+   * Notifies the update of the animation.
+   */
+  onAnimationUpdate = 'onAnimationUpdate',
+  /**
+   * [Deprecated]
    * Notifies the play of the animation.
    */
   onAnimationPlay = 'onAnimationPlay',
   /**
+   * [Deprecated]
    * Notifies the pause of the animation.
    */
   onAnimationPause = 'onAnimationPause',
   /**
-   * [deprecated] Notifies the flushed of the animation.
+   * [Deprecated]
+   * Notifies the flushed of the animation.
    */
   onAnimationFlushed = 'onAnimationFlushed',
-  /**
-   * Notifies the update of the animation.
-   */
-  onAnimationUpdate = 'onAnimationUpdate',
 }
 
 export const enum ParagraphJustification {

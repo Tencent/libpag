@@ -1,6 +1,7 @@
 import esbuild from 'rollup-plugin-esbuild';
 import resolve from '@rollup/plugin-node-resolve';
 import commonJs from '@rollup/plugin-commonjs';
+import json from '@rollup/plugin-json';
 
 const banner = `/////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -25,6 +26,6 @@ export default [
   {
     input: 'demo/index.ts',
     output: { banner, file: 'demo/index.js', format: 'esm', sourcemap: true },
-    plugins: [esbuild({ tsconfig: 'tsconfig.json', minify: false }), resolve(), commonJs()],
+    plugins: [esbuild({ tsconfig: 'tsconfig.json', minify: false }), json(), resolve(), commonJs()],
   },
 ];

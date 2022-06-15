@@ -1,3 +1,4 @@
+import { PAGModule } from '../binding';
 import { ctor, EmscriptenGL, Matrix, PAG, Point, Vector } from '../types';
 import { ScalerContext } from './scaler-context';
 
@@ -14,9 +15,9 @@ export class WebMask {
 
   private static getLineCap(cap: ctor): CanvasLineCap {
     switch (cap) {
-      case this.module.LineCap.Round:
+      case PAGModule.LineCap.Round:
         return 'round';
-      case this.module.LineCap.Square:
+      case PAGModule.LineCap.Square:
         return 'square';
       default:
         return 'butt';
@@ -25,9 +26,9 @@ export class WebMask {
 
   private static getLineJoin(join: ctor): CanvasLineJoin {
     switch (join) {
-      case this.module.LineJoin.Round:
+      case PAGModule.LineJoin.Round:
         return 'round';
-      case this.module.LineJoin.Bevel:
+      case PAGModule.LineJoin.Bevel:
         return 'bevel';
       default:
         return 'miter';
@@ -45,14 +46,11 @@ export class WebMask {
   public fillPath(path: Path2D, fillType: ctor) {
     const context = this.canvas.getContext('2d') as CanvasRenderingContext2D;
     context.setTransform(1, 0, 0, 1, 0, 0);
-    if (
-      fillType === WebMask.module.PathFillType.InverseWinding ||
-      fillType === WebMask.module.PathFillType.InverseEvenOdd
-    ) {
-      context.clip(path, fillType === WebMask.module.PathFillType.InverseEvenOdd ? 'evenodd' : 'nonzero');
+    if (fillType === PAGModule.PathFillType.InverseWinding || fillType === PAGModule.PathFillType.InverseEvenOdd) {
+      context.clip(path, fillType === PAGModule.PathFillType.InverseEvenOdd ? 'evenodd' : 'nonzero');
       context.fillRect(0, 0, this.canvas.width, this.canvas.height);
     } else {
-      context.fill(path, fillType === WebMask.module.PathFillType.EvenOdd ? 'evenodd' : 'nonzero');
+      context.fill(path, fillType === PAGModule.PathFillType.EvenOdd ? 'evenodd' : 'nonzero');
     }
   }
 

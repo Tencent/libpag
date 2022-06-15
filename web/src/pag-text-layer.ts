@@ -1,3 +1,4 @@
+import { PAGModule } from './binding';
 import { PAGFont } from './pag-font';
 import { PAGLayer } from './pag-layer';
 import { Color, TextDocument } from './types';
@@ -22,9 +23,9 @@ export class PAGTextLayer extends PAGLayer {
     fontStyle = '',
   ): PAGTextLayer {
     if (typeof text === 'string') {
-      return new PAGTextLayer(this.module._PAGTextLayer._Make(duration, text, fontSize, fontFamily, fontStyle));
+      return new PAGTextLayer(PAGModule._PAGTextLayer._Make(duration, text, fontSize, fontFamily, fontStyle));
     } else {
-      return new PAGTextLayer(this.module._PAGTextLayer._Make(duration, text));
+      return new PAGTextLayer(PAGModule._PAGTextLayer._Make(duration, text));
     }
   }
 

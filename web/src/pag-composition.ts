@@ -2,6 +2,7 @@ import { PAG, Vector, Marker } from './types';
 import { PAGLayer } from './pag-layer';
 import { destroyVerify, wasmAwaitRewind } from './utils/decorators';
 import { proxyVector } from './utils/type-utils';
+import { PAGModule } from './binding';
 
 @destroyVerify
 @wasmAwaitRewind
@@ -10,7 +11,7 @@ export class PAGComposition extends PAGLayer {
    * Make a empty PAGComposition with specified size.
    */
   public static Make(width: number, height: number): PAGComposition {
-    return new PAGComposition(this.module._PAGComposition._Make(width, height));
+    return new PAGComposition(PAGModule._PAGComposition._Make(width, height));
   }
   /**
    * Returns the width of the Composition.

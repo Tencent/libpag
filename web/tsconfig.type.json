@@ -7,7 +7,9 @@
     "emitDeclarationOnly": true,
     "removeComments": false,
     "skipLibCheck": true,
-    "experimentalDecorators": true
+    "experimentalDecorators": true,
+    "moduleResolution": "Node",
+    "resolveJsonModule": true
   },
-  "include": ["src/pag.ts"]
+  "include": ["src/pag.ts"],
 }

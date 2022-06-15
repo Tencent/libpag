@@ -1,3 +1,4 @@
+import { PAGModule } from './binding';
 import { PAGComposition } from './pag-composition';
 import { PAGFile } from './pag-file';
 import { PAGLayer } from './pag-layer';
@@ -12,7 +13,7 @@ export class PAGPlayer {
   public static module: PAG;
 
   public static create(): PAGPlayer {
-    const wasmIns = new PAGPlayer.module._PAGPlayer();
+    const wasmIns = new PAGModule._PAGPlayer();
     return new PAGPlayer(wasmIns);
   }
 
@@ -34,7 +35,7 @@ export class PAGPlayer {
    */
   @wasmAsyncMethod
   public async flush(): Promise<boolean> {
-    return (await PAGPlayer.module.webAssemblyQueue.exec(this.wasmIns._flush, this.wasmIns)) as boolean;
+    return (await PAGModule.webAssemblyQueue.exec(this.wasmIns._flush, this.wasmIns)) as boolean;
   }
   /**
    * [Internal] Apply all pending changes to the target surface immediately. Returns true if the content has
@@ -42,7 +43,7 @@ export class PAGPlayer {
    */
   @wasmAsyncMethod
   public async flushInternal(callback: (res: boolean) => void): Promise<boolean> {
-    return (await PAGPlayer.module.webAssemblyQueue.exec(async () => {
+    return (await PAGModule.webAssemblyQueue.exec(async () => {
       const res = await this.wasmIns._flush();
       callback(res);
       return res;
@@ -203,8 +204,8 @@ export class PAGPlayer {
    * Returns an array of layers that lie under the specified point. The point is in pixels and from
    * this PAGComposition's local coordinates.
    */
-  public getLayersUnderPoint(): Vector<PAGLayer> {
-    return proxyVector(this.wasmIns._getLayersUnderPoint() as Vector<any>, PAGLayer);
+  public getLayersUnderPoint(localX: number, localY: number): Vector<PAGLayer> {
+    return proxyVector(this.wasmIns._getLayersUnderPoint(localX, localY) as Vector<any>, PAGLayer);
   }
   /**
    * Evaluates the PAGLayer to see if it overlaps or intersects with the specified point. The point

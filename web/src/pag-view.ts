@@ -1,4 +1,4 @@
-import { PAG, PAGScaleMode, PAGViewListenerEvent } from './types';
+import { Matrix, PAG, PAGScaleMode, PAGViewListenerEvent } from './types';
 import { PAGPlayer } from './pag-player';
 import { EventManager, Listener } from './utils/event-manager';
 import { PAGSurface } from './pag-surface';
@@ -8,6 +8,8 @@ import { Log } from './utils/log';
 import { ErrorCode } from './utils/error-map';
 import { isOffscreenCanvas } from './utils/type-utils';
 import { BackendContext } from './core/backend-context';
+import { PAGComposition } from './pag-composition';
+import { PAGModule } from './binding';
 
 export interface PAGViewOptions {
   /**
@@ -52,14 +54,14 @@ export class PAGView {
     if (!canvasElement) {
       Log.errorByCode(ErrorCode.CanvasIsNotFound);
     } else {
-      const pagPlayer = this.module.PAGPlayer.create();
+      const pagPlayer = PAGModule.PAGPlayer.create();
       const pagView = new PAGView(pagPlayer, canvasElement);
       pagView.pagViewOptions = { ...pagView.pagViewOptions, ...initOptions };
 
       if (pagView.pagViewOptions.useCanvas2D) {
-        this.module.globalCanvas.retain();
-        if (!this.module.globalCanvas.glContext) throw new Error('GlobalCanvas context is not WebGL!');
-        pagView.pagGlContext = BackendContext.from(this.module.globalCanvas.glContext);
+        PAGModule.globalCanvas.retain();
+        if (!PAGModule.globalCanvas.glContext) throw new Error('GlobalCanvas context is not WebGL!');
+        pagView.pagGlContext = BackendContext.from(PAGModule.globalCanvas.glContext);
       } else {
         const gl = canvasElement.getContext('webgl');
         if (!gl) throw new Error('Canvas context is not WebGL!');
@@ -274,14 +276,14 @@ export class PAGView {
    */
   public async flush() {
     const res = await this.player.flushInternal((res) => {
-      if (this.pagViewOptions.useCanvas2D && res && PAGView.module.globalCanvas.canvas) {
+      if (this.pagViewOptions.useCanvas2D && res && PAGModule.globalCanvas.canvas) {
         if (!this.canvasContext) this.canvasContext = this.canvasElement?.getContext('2d');
         const compositeOperation = this.canvasContext!.globalCompositeOperation;
         this.canvasContext!.globalCompositeOperation = 'copy';
         this.canvasContext?.drawImage(
-          PAGView.module.globalCanvas.canvas,
+          PAGModule.globalCanvas.canvas,
           0,
-          PAGView.module.globalCanvas.canvas.height - this.rawHeight,
+          PAGModule.globalCanvas.canvas.height - this.rawHeight,
           this.rawWidth,
           this.rawHeight,
           0,
@@ -310,6 +312,31 @@ export class PAGView {
     return this.player.getComposition();
   }
   /**
+   * Sets a new PAGComposition for PAGView to render as content.
+   * Note: If the composition is already added to another PAGView, it will be removed from
+   * the previous PAGView.
+   */
+  public setComposition(pagComposition: PAGComposition) {
+    this.player.setComposition(pagComposition);
+  }
+  /**
+   * Returns a copy of current matrix.
+   */
+  public matrix() {
+    return this.player.matrix();
+  }
+  /**
+   * Set the transformation which will be applied to the composition. The scaleMode property
+   * will be set to PAGScaleMode::None when this method is called.
+   */
+  public setMatrix(matrix: Matrix) {
+    this.player.setMatrix(matrix);
+  }
+
+  public getLayersUnderPoint(localX: number, localY: number) {
+    return this.player.getLayersUnderPoint(localX, localY);
+  }
+  /**
    * Update size when changed canvas size.
    */
   public updateSize() {
@@ -331,7 +358,7 @@ export class PAGView {
     this.player.destroy();
     this.pagSurface?.destroy();
     if (this.pagViewOptions.useCanvas2D) {
-      PAGView.module.globalCanvas.release();
+      PAGModule.globalCanvas.release();
     }
     this.pagGlContext?.destroy();
     this.pagGlContext = null;

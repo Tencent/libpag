@@ -14,37 +14,32 @@ import { GlobalCanvas } from './core/global-canvas';
 import { BackendContext } from './core/backend-context';
 import { PAGComposition } from './pag-composition';
 import { PAGTextLayer } from './pag-text-layer';
+import { PAGImageLayer } from './pag-image-layer';
+import { PAGSolidLayer } from './pag-solid-layer';
 
 /**
  * Binding pag js module on pag webassembly module.
  */
 export const binding = (module: PAG) => {
+  PAGModule = module;
   module.PAG = module;
   module.PAGFile = PAGFile;
-  PAGFile.module = module;
   module.PAGPlayer = PAGPlayer;
-  PAGPlayer.module = module;
   module.PAGView = PAGView;
-  PAGView.module = module;
   module.PAGFont = PAGFont;
-  PAGFont.module = module;
   module.PAGImage = PAGImage;
-  PAGImage.module = module;
   module.PAGLayer = PAGLayer;
-  PAGLayer.module = module;
   module.PAGComposition = PAGComposition;
   module.PAGSurface = PAGSurface;
-  PAGSurface.module = module;
   module.PAGTextLayer = PAGTextLayer;
+  module.PAGImageLayer = PAGImageLayer;
+  module.PAGSolidLayer = PAGSolidLayer;
   module.VideoReader = VideoReader;
   module.NativeImage = NativeImage;
   module.ScalerContext = ScalerContext;
   module.WebMask = WebMask;
-  WebMask.module = module;
   module.GlobalCanvas = GlobalCanvas;
-  GlobalCanvas.module = module;
   module.BackendContext = BackendContext;
-  BackendContext.module = module;
   module.traceImage = function (info, pixels) {
     const canvas = document.createElement('canvas');
     canvas.width = info.width;
@@ -58,3 +53,5 @@ export const binding = (module: PAG) => {
     module._registerSoftwareDecoderFactory(factory);
   };
 };
+
+export let PAGModule: PAG;

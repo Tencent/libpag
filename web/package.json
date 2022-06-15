@@ -5,7 +5,7 @@
   "main": "lib/libpag.cjs.js",
   "module": "lib/libpag.esm.js",
   "browser": "lib/libpag.umd.js",
-  "typings": "types/pag.d.ts",
+  "typings": "types/src/pag.d.ts",
   "scripts": {
     "build": "rimraf lib/*.js lib/*.map types/* && rollup -c ./script/rollup.config.js && tsc -p ./tsconfig.type.json",
     "dev": "rollup -c ./script/rollup.config.dev.js -w",

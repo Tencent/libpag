@@ -1,3 +1,4 @@
+import { PAGModule } from './binding';
 import { PAGComposition } from './pag-composition';
 import { PAGImage } from './pag-image';
 import { PAGImageLayer } from './pag-image-layer';
@@ -14,7 +15,6 @@ import { proxyVector } from './utils/type-utils';
 @destroyVerify
 @wasmAwaitRewind
 export class PAGFile extends PAGComposition {
-  public static module: PAG;
   /**
    * Load pag file from file.
    */
@@ -41,19 +41,19 @@ export class PAGFile extends PAGComposition {
     if (!buffer || !(buffer.byteLength > 0)) Log.errorByCode(ErrorCode.PagFileDataEmpty);
     const dataUint8Array = new Uint8Array(buffer);
     const numBytes = dataUint8Array.byteLength;
-    const dataPtr = this.module._malloc(numBytes);
-    const dataOnHeap = new Uint8Array(this.module.HEAPU8.buffer, dataPtr, numBytes);
+    const dataPtr = PAGModule._malloc(numBytes);
+    const dataOnHeap = new Uint8Array(PAGModule.HEAPU8.buffer, dataPtr, numBytes);
     dataOnHeap.set(dataUint8Array);
-    const wasmIns = this.module._PAGFile._Load(dataOnHeap.byteOffset, dataOnHeap.length);
+    const wasmIns = PAGModule._PAGFile._Load(dataOnHeap.byteOffset, dataOnHeap.length);
     const pagFile = new PAGFile(wasmIns);
-    this.module._free(dataPtr);
+    PAGModule._free(dataPtr);
     return pagFile;
   }
   /**
    * The maximum tag level current SDK supports.
    */
   public static maxSupportedTagLevel(): number {
-    return this.module._PAGFile._MaxSupportedTagLevel() as number;
+    return PAGModule._PAGFile._MaxSupportedTagLevel() as number;
   }
 
   /**
@@ -117,6 +117,14 @@ export class PAGFile extends PAGComposition {
       default:
         return proxyVector(vector, PAGLayer);
     }
+  }
+  /**
+   * Returns the indices of the editable layers in this PAGFile.
+   * If the editableIndex of a PAGLayer is not present in the returned indices, the PAGLayer should
+   * not be treated as editable.
+   */
+  public getEditableIndices(layerType: LayerType) {
+    return this.wasmIns._getEditableIndices(layerType) as Vector<number>;
   }
   /**
    * Indicate how to stretch the original duration to fit target duration when file's duration is

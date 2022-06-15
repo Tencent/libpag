@@ -1,3 +1,4 @@
+import { PAGModule } from './binding';
 import { PAGImage } from './pag-image';
 import { PAGLayer } from './pag-layer';
 import { Vector, PAGVideoRange } from './types';
@@ -7,7 +8,7 @@ import { destroyVerify, wasmAwaitRewind } from './utils/decorators';
 @wasmAwaitRewind
 export class PAGImageLayer extends PAGLayer {
   public static Make(width: number, height: number, duration: number): PAGImageLayer {
-    return new PAGImageLayer(this.module._PAGImageLayer._Make(width, height, duration));
+    return new PAGImageLayer(PAGModule._PAGImageLayer._Make(width, height, duration));
   }
 
   /**

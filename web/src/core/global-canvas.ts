@@ -3,8 +3,6 @@ import { PAG } from '../types';
 import { BackendContext } from './backend-context';
 
 export class GlobalCanvas {
-  public static module: PAG;
-
   private _canvas: HTMLCanvasElement | OffscreenCanvas | null = null;
   private _glContext: BackendContext | null = null;
   private width = DEFAULT_CANVAS_SIZE;
