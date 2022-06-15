@@ -64,6 +64,6 @@ export default [
       { banner, file: pkg.module, format: 'esm', sourcemap: true },
       { banner, file: pkg.main, format: 'cjs', exports: 'auto', sourcemap: true },
     ],
-    plugins: [esbuild({ tsconfig: 'tsconfig.json', minify: false }), resolve(), commonJs()],
+    plugins: [esbuild({ tsconfig: 'tsconfig.json', minify: false }), json(), resolve(), commonJs()],
   },
 ];

@@ -1,3 +1,4 @@
+import { PAGModule } from './binding';
 import { PAGLayer } from './pag-layer';
 import { Color } from './types';
 import { destroyVerify, wasmAwaitRewind } from './utils/decorators';
@@ -6,7 +7,7 @@ import { destroyVerify, wasmAwaitRewind } from './utils/decorators';
 @wasmAwaitRewind
 export class PAGSolidLayer extends PAGLayer {
   public static Make(duration: number, width: number, height: number, solidColor: Color, opacity: number) {
-    return new PAGSolidLayer(this.module._PAGSolidLayer._Make(duration, width, height, solidColor, opacity));
+    return new PAGSolidLayer(PAGModule._PAGSolidLayer._Make(duration, width, height, solidColor, opacity));
   }
   /**
    * Returns the layer's solid color.

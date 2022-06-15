@@ -4,17 +4,16 @@ import { ErrorCode } from './utils/error-map';
 import { Log } from './utils/log';
 import { defaultFontNames } from './utils/font-family';
 import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorators';
+import { PAGModule } from './binding';
 
 @destroyVerify
 @wasmAwaitRewind
 export class PAGFont {
-  public static module: PAG;
-
   /**
    * Create PAGFont instance.
    */
   public static create(fontFamily: string, fontStyle: string) {
-    return new PAGFont(this.module._PAGFont._create(fontFamily, fontStyle));
+    return new PAGFont(PAGModule._PAGFont._create(fontFamily, fontStyle));
   }
 
   /**
@@ -40,12 +39,12 @@ export class PAGFont {
      * The fonts registered here are mainly used to put words in a list in order, and the list can put up to UINT16_MAX words.
      * The emoji font family also has emoji words.
      */
-    const vectorNames = new this.module.VectorString();
+    const vectorNames = new PAGModule.VectorString();
     const names = fontNames.concat(defaultFontNames);
     for (const name of names) {
       vectorNames.push_back(name);
     }
-    this.module._PAGFont._SetFallbackFontNames(vectorNames);
+    PAGModule._PAGFont._SetFallbackFontNames(vectorNames);
     vectorNames.delete();
   }
 

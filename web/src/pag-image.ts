@@ -1,6 +1,7 @@
 import { AlphaType, ColorType, Matrix, PAG, PAGScaleMode } from './types';
 import { NativeImage } from './core/native-image';
 import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorators';
+import { PAGModule } from './binding';
 
 @destroyVerify
 @wasmAwaitRewind
@@ -34,7 +35,7 @@ export class PAGImage {
    */
   public static fromSource(source: TexImageSource): PAGImage {
     const nativeImage = new NativeImage(source);
-    const wasmIns = this.module._PAGImage._FromNativeImage(nativeImage);
+    const wasmIns = PAGModule._PAGImage._FromNativeImage(nativeImage);
     return new PAGImage(wasmIns);
   }
   /**
@@ -48,10 +49,10 @@ export class PAGImage {
     alphaType: AlphaType,
   ): PAGImage {
     const rowBytes = width * (colorType === ColorType.ALPHA_8 ? 1 : 4);
-    const dataPtr = PAGImage.module._malloc(pixels.byteLength);
-    const dataOnHeap = new Uint8Array(PAGImage.module.HEAPU8.buffer, dataPtr, pixels.byteLength);
+    const dataPtr = PAGModule._malloc(pixels.byteLength);
+    const dataOnHeap = new Uint8Array(PAGModule.HEAPU8.buffer, dataPtr, pixels.byteLength);
     dataOnHeap.set(pixels);
-    const wasmIns = this.module._PAGImage._FromPixels(dataPtr, width, height, rowBytes, colorType, alphaType);
+    const wasmIns = PAGModule._PAGImage._FromPixels(dataPtr, width, height, rowBytes, colorType, alphaType);
     return new PAGImage(wasmIns);
   }
   /**
@@ -59,7 +60,7 @@ export class PAGImage {
    * invalid.
    */
   public static fromTexture(textureID: number, width: number, height: number, flipY: boolean) {
-    return new PAGImage(PAGImage.module._PAGImage._FromTexture(textureID, width, height, flipY));
+    return new PAGImage(PAGModule._PAGImage._FromTexture(textureID, width, height, flipY));
   }
 
   public wasmIns;

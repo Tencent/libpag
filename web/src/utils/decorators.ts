@@ -1,3 +1,4 @@
+import { PAGModule } from '../binding';
 import { Log } from './log';
 
 export function wasmAwaitRewind(constructor: any) {
@@ -19,11 +20,11 @@ export function wasmAwaitRewind(constructor: any) {
   const proxyFn = (target: { [prop: string]: (...args: any[]) => any }, methodName: string) => {
     const fn = target[methodName];
     target[methodName] = function (...args) {
-      if (constructor.module.Asyncify.currData !== null) {
-        const currData = constructor.module.Asyncify.currData;
-        constructor.module.Asyncify.currData = null;
+      if (PAGModule.Asyncify.currData !== null) {
+        const currData = PAGModule.Asyncify.currData;
+        PAGModule.Asyncify.currData = null;
         const ret = fn.call(this, ...args);
-        constructor.module.Asyncify.currData = currData;
+        PAGModule.Asyncify.currData = currData;
         return ret;
       } else {
         return fn.call(this, ...args);
