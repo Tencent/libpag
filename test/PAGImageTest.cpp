@@ -155,7 +155,7 @@ PAG_TEST_F(PAGImageTest, BottomLeftMask) {
   auto image2 = imageAsMask->makeBuffer()->makeTexture(context);
   image2->_origin = tgfx::ImageOrigin::BottomLeft;
   auto canvas = surface->getCanvas();
-  canvas->drawTexture(image1.get(), image2.get(), false);
+  canvas->drawTexture(image1.get(), image2.get(), false, false);
   auto pixelBuffer = PixelBuffer::Make(width, height);
   ASSERT_TRUE(pixelBuffer != nullptr);
   Bitmap bitmap(pixelBuffer);

@@ -292,4 +292,20 @@ PAG_TEST(PAGFilterTest, LevelsIndividualFilter) {
   pagPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFilterTest/LevelsIndividualFilter"));
 }
+
+/**
+ * 用例描述: GradientOverlayFilter
+ */
+PAG_TEST(PAGFilterTest, GradientOverlayFilter) {
+  auto pagFile = PAGFile::Load("../resources/filter/GradientOverlay.pag");
+  ASSERT_NE(pagFile, nullptr);
+  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  ASSERT_NE(pagSurface, nullptr);
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setProgress(0.7);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFilterTest/GradientOverlayFilter"));
+}
 }  // namespace pag
