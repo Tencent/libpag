@@ -40,15 +40,9 @@ void GLTextureMaskFragmentProcessor::emitCode(EmitArgs& args) {
     coordName = "deviceCoord.xy";
   }
   if (textureFP->useLumaMatte) {
-    fragBuilder->addFunction("float lumaValue(vec4 color) { \
-                                return dot(color.rgb, vec3(0.299, 0.587, 0.114)); \
-                              }");
-    fragBuilder->codeAppendf("float luma = lumaValue(");
+    fragBuilder->codeAppendf("%s = dot(", args.outputColor.c_str());
     fragBuilder->appendTextureLookup((*args.textureSamplers)[0], coordName);
-    fragBuilder->codeAppendf(");");
-    fragBuilder->codeAppendf("%s = ", args.outputColor.c_str());
-    fragBuilder->codeAppendf("luma * %s", args.inputColor.c_str());
-
+    fragBuilder->codeAppendf(".rgb, vec3(0.299, 0.587, 0.114)) * %s", args.inputColor.c_str());
   } else {
     fragBuilder->codeAppendf("%s = ", args.outputColor.c_str());
     fragBuilder->appendTextureLookup((*args.textureSamplers)[0], coordName);
