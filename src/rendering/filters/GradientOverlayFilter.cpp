@@ -95,20 +95,21 @@ static const char GRADIENT_OVERLAY_FRAGMENT_SHADER[] = R"(
       return color;
     }
     
-    float StyleLinear(vec2 position, vec2 center, float angle, float ratio) {
-        if (mod(angle, PI / 2.0) == 0.0) {
-            return (position.x - center.x) * 0.5 + 0.5;
+    float StyleLinear(vec2 position, vec2 center, float angle) {
+        float newAngle = 2.0 * PI - angle;
+        if (mod(newAngle, PI * 0.5) == 0.0) {
+            return position.x - center.x + 0.5;
         }
-        float k = tan(angle - PI * 0.5);
-        float b = center.y - center.x / ratio * k;
-        float len = -(k * position.x / ratio - position.y + b) / sqrt(1.0 + pow(k, 2.0));
-        return len + 0.5;
+        float k = tan(newAngle - PI * 0.5);
+        float b = center.y - center.x * k;
+        float len = -(k * position.x - position.y + b) / sqrt(1.0 + pow(k, 2.0));
+        return mod(newAngle, PI * 2.0) < PI ? 0.5 + len : 0.5 - len;
     }
     
-    float StyleRadialToLinear(vec2 position, vec2 center, float ratio) {
+    float StyleRadialToLinear(vec2 position, vec2 center, float angle, float ratio) {
         vec2 fix = vec2(ratio < 1.0 ? ratio : 1.0, ratio > 1.0 ? ratio : 1.0);
         float len = length(position * fix - center * fix);
-        return len / 0.5;
+        return len / 0.5 - abs(sin(angle)) * 0.5;
     }
     
     float StyleAngleToLinear(vec2 position, vec2 center, float angle, float ratio) {
@@ -116,15 +117,14 @@ static const char GRADIENT_OVERLAY_FRAGMENT_SHADER[] = R"(
         return mod((arctan + angle), PI * 2.0) / (PI * 2.0);
     }
     
-    float StyleReflectedToLinear(vec2 position, vec2 center, float angle, float ratio) {
-        float progress = mod(angle, PI / 2.0) / (PI / 2.0);
-        if (progress == 0.0) {
+    float StyleReflectedToLinear(vec2 position, vec2 center, float angle) {
+        float newAngle = 2.0 * PI - angle;
+        if (mod(newAngle, PI * 0.5) == 0.0) {
             return abs(position.x - center.x) / 0.5;
         }
-        float scale = mix(ratio, 1.0, progress);
-        float k = tan(angle - PI * 0.5);
-        float b = center.y - center.x * scale * k;
-        float len = abs(k * position.x * scale - position.y + b) / sqrt(1.0 + pow(k, 2.0));
+        float k = tan(newAngle - PI * 0.5);
+        float b = center.y - center.x * k;
+        float len = abs(k * position.x - position.y + b) / sqrt(1.0 + pow(k, 2.0));
         return len / 0.5;
     }
     
@@ -137,18 +137,17 @@ static const char GRADIENT_OVERLAY_FRAGMENT_SHADER[] = R"(
         vec2 center = vec2(0.5) - uOffset / uSize;
         float value;
         if (uStyle == 1) {
-            value = StyleRadialToLinear(vertexColor, center, ratio);
+            value = StyleRadialToLinear(vertexColor, center, uAngle, ratio);
         } else if (uStyle == 2) {
             value = StyleAngleToLinear(vertexColor, center, uAngle, ratio);
         } else if (uStyle == 3) {
-            value = StyleReflectedToLinear(vertexColor, center, uAngle, ratio);
+            value = StyleReflectedToLinear(vertexColor, center, uAngle);
         } else {
-            value = StyleLinear(vertexColor, center, uAngle, ratio);
+            value = StyleLinear(vertexColor, center, uAngle);
         }
         value = mix(value, 1.0 - value, uReverse);
         vec4 color = ColorWithValue(value / uScale);
-        color.a *= uOpacity;
-        gl_FragColor = color;
+        gl_FragColor = color * uOpacity;
     }
     )";
 
