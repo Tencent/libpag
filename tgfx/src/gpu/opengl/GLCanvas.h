@@ -30,7 +30,8 @@ class GLCanvas : public Canvas {
   explicit GLCanvas(Surface* surface);
 
   void clear() override;
-  void drawTexture(const Texture* texture, const Texture* mask, bool inverted, bool useLumaMatte) override;
+  void drawTexture(const Texture* texture, const Texture* mask, bool inverted,
+                   bool useLumaMatte) override;
   void drawTexture(const Texture* texture, const RGBAAALayout* layout) override;
   void drawMask(const Texture* mask, const Paint& paint) override;
   void drawPath(const Path& path, const Paint& paint) override;

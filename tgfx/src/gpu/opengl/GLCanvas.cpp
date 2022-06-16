@@ -40,7 +40,8 @@ void GLCanvas::clear() {
   renderTarget->clear();
 }
 
-void GLCanvas::drawTexture(const Texture* texture, const Texture* mask, bool inverted, bool useLumaMatte) {
+void GLCanvas::drawTexture(const Texture* texture, const Texture* mask, bool inverted,
+                           bool useLumaMatte) {
   drawTexture(texture, nullptr, mask, inverted, useLumaMatte);
 }
 
@@ -167,7 +168,8 @@ void GLCanvas::drawTexture(const Texture* texture, const RGBAAALayout* layout, c
     return;
   }
   draw(GLFillRectOp::Make(localBounds, getViewMatrix()), std::move(processor),
-       TextureMaskFragmentProcessor::MakeUseLocalCoord(mask, localMatrix, inverted, useLumaMatte), true);
+       TextureMaskFragmentProcessor::MakeUseLocalCoord(mask, localMatrix, inverted, useLumaMatte),
+       true);
 }
 
 void GLCanvas::drawPath(const Path& path, const Paint& paint) {

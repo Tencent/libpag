@@ -17,12 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LayerStylesFilter.h"
+#include "rendering/caches/RenderCache.h"
+#include "rendering/filters/GradientOverlayFilter.h"
+#include "rendering/filters/utils/FilterHelper.h"
+#include "rendering/renderers/FilterRenderer.h"
 #include "tgfx/gpu/Surface.h"
 #include "tgfx/gpu/opengl/GLRenderTarget.h"
-#include "rendering/caches/RenderCache.h"
-#include "rendering/renderers/FilterRenderer.h"
-#include "rendering/filters/utils/FilterHelper.h"
-#include "rendering/filters/GradientOverlayFilter.h"
 
 namespace pag {
 void LayerStylesFilter::TransformBounds(tgfx::Rect* bounds, const FilterList* filterList) {
@@ -89,10 +89,10 @@ void LayerStylesFilter::draw(tgfx::Context* context, const FilterSource* source,
         offscreenTarget->vertexMatrix = target->vertexMatrix;
         filter->update(filterList->layerFrame, contentBounds, transformedBounds, filterScale);
         filter->draw(context, source, offscreenTarget.get());
-        
-        auto renderTarget = tgfx::GLRenderTarget::MakeFrom(context, target->frameBuffer,
-                                                           target->width, target->height,
-                                                           tgfx::ImageOrigin::TopLeft);
+
+        auto renderTarget =
+            tgfx::GLRenderTarget::MakeFrom(context, target->frameBuffer, target->width,
+                                           target->height, tgfx::ImageOrigin::TopLeft);
         auto targetSurface = tgfx::Surface::MakeFrom(renderTarget);
         auto targetCanvas = targetSurface->getCanvas();
         targetCanvas->setBlendMode(blendMode);

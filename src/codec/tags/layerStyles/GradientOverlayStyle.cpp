@@ -28,10 +28,12 @@ std::unique_ptr<BlockConfig> GradientOverlayStyleTag(GradientOverlayStyle* style
   auto tagConfig = new BlockConfig(TagCode::GradientOverlayStyle);
   AddAttribute(tagConfig, &style->blendMode, AttributeType::DiscreteProperty, BlendMode::Normal);
   AddAttribute(tagConfig, &style->opacity, AttributeType::SimpleProperty, Opaque);
-  AddAttribute(tagConfig, &style->colors, AttributeType::SimpleProperty, GradientColorHandle(new GradientColor()));
+  AddAttribute(tagConfig, &style->colors, AttributeType::SimpleProperty,
+               GradientColorHandle(new GradientColor()));
   AddAttribute(tagConfig, &style->gradientSmoothness, AttributeType::SimpleProperty, 100.0f);
   AddAttribute(tagConfig, &style->angle, AttributeType::SimpleProperty, 90.0f);
-  AddAttribute(tagConfig, &style->style, AttributeType::DiscreteProperty, GradientOverlayType::Linear);
+  AddAttribute(tagConfig, &style->style, AttributeType::DiscreteProperty,
+               GradientOverlayType::Linear);
   AddAttribute(tagConfig, &style->reverse, AttributeType::DiscreteProperty, false);
   AddAttribute(tagConfig, &style->alignWithLayer, AttributeType::DiscreteProperty, true);
   AddAttribute(tagConfig, &style->scale, AttributeType::SimpleProperty, 100.0f);

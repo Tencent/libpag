@@ -53,8 +53,8 @@ TextureMaskFragmentProcessor::TextureMaskFragmentProcessor(const Texture* textur
 }
 
 TextureMaskFragmentProcessor::TextureMaskFragmentProcessor(const Texture* texture,
-                                                           const Matrix& localMatrix,
-                                                           bool inverted, bool useLumaMatte)
+                                                           const Matrix& localMatrix, bool inverted,
+                                                           bool useLumaMatte)
     : useLocalCoord(true), texture(texture), inverted(inverted), useLumaMatte(useLumaMatte) {
   setTextureSamplerCnt(1);
   if (texture->origin() == ImageOrigin::BottomLeft) {

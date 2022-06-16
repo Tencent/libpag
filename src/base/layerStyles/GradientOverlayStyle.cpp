@@ -65,8 +65,8 @@ bool GradientOverlayStyle::verify() const {
     return false;
   }
   VerifyAndReturn(blendMode != nullptr && opacity != nullptr && colors != nullptr &&
-                  gradientSmoothness != nullptr && angle != nullptr &&
-                  style != nullptr && reverse != nullptr && alignWithLayer != nullptr &&
-                  scale != nullptr && offset != nullptr);
+                  gradientSmoothness != nullptr && angle != nullptr && style != nullptr &&
+                  reverse != nullptr && alignWithLayer != nullptr && scale != nullptr &&
+                  offset != nullptr);
 }
 }  // namespace pag

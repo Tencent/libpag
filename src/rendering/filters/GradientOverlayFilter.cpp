@@ -22,8 +22,8 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GradientOverlayFilter.h"
-#include "base/utils/TGFXCast.h"
 #include <cmath>
+#include "base/utils/TGFXCast.h"
 
 namespace pag {
 
@@ -151,7 +151,9 @@ static const char GRADIENT_OVERLAY_FRAGMENT_SHADER[] = R"(
     }
     )";
 
-GradientOverlayFilter::GradientOverlayFilter(GradientOverlayStyle* layerStyle) : layerStyle(layerStyle) {}
+GradientOverlayFilter::GradientOverlayFilter(GradientOverlayStyle* layerStyle)
+    : layerStyle(layerStyle) {
+}
 
 tgfx::BlendMode GradientOverlayFilter::getBlendMode() {
   return ToTGFXBlend(layerStyle->blendMode->getValueAt(0));
@@ -186,7 +188,7 @@ void GradientOverlayFilter::onUpdateParams(tgfx::Context* context, const tgfx::R
   auto reverse = layerStyle->reverse->getValueAt(layerFrame);
   auto scale = layerStyle->scale->getValueAt(layerFrame) / 100.0;
   auto offset = layerStyle->offset->getValueAt(layerFrame);
-  
+
   auto gl = tgfx::GLFunctions::Get(context);
   gl->uniform1f(opacityHandle, opacity);
   gl->uniform1i(colorSizeHandle, colorSize);
@@ -197,7 +199,7 @@ void GradientOverlayFilter::onUpdateParams(tgfx::Context* context, const tgfx::R
   gl->uniform1f(scaleHandle, scale);
   gl->uniform2f(offsetHandle, offset.x, offset.y);
   gl->uniform2f(sizeHandle, contentBounds.width(), contentBounds.height());
-  
+
   for (int i = 0; i < colorSize; i++) {
     auto positionStr = std::string("uColors[") + std::to_string(i) + std::string("].position");
     auto midpointStr = std::string("uColors[") + std::to_string(i) + std::string("].midpoint");
@@ -208,9 +210,10 @@ void GradientOverlayFilter::onUpdateParams(tgfx::Context* context, const tgfx::R
     auto colorStop = colors->colorStops[i];
     gl->uniform1f(positionHandle, colorStop.position);
     gl->uniform1f(midpointHandle, colorStop.midpoint);
-    gl->uniform3f(colorHandle, colorStop.color.red / 255.0, colorStop.color.green / 255.0, colorStop.color.blue / 255.0);
+    gl->uniform3f(colorHandle, colorStop.color.red / 255.0, colorStop.color.green / 255.0,
+                  colorStop.color.blue / 255.0);
   }
-  
+
   for (int i = 0; i < alphaSize; i++) {
     auto positionStr = std::string("uAlpha[") + std::to_string(i) + std::string("].position");
     auto midpointStr = std::string("uAlpha[") + std::to_string(i) + std::string("].midpoint");

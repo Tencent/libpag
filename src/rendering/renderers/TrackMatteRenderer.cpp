@@ -76,8 +76,8 @@ std::unique_ptr<TrackMatte> TrackMatteRenderer::Make(PAGLayer* trackMatteOwner) 
 
   auto inverted = (trackMatteType == TrackMatteType::AlphaInverted ||
                    trackMatteType == TrackMatteType::LumaInverted);
-  auto useLumaMatte = (trackMatteType == TrackMatteType::Luma ||
-                       trackMatteType == TrackMatteType::LumaInverted);
+  auto useLumaMatte =
+      (trackMatteType == TrackMatteType::Luma || trackMatteType == TrackMatteType::LumaInverted);
   auto trackMatte = std::unique_ptr<TrackMatte>(new TrackMatte());
   trackMatte->modifier = Modifier::MakeMask(content, inverted, useLumaMatte);
   if (trackMatte->modifier == nullptr) {
@@ -104,8 +104,8 @@ std::unique_ptr<TrackMatte> TrackMatteRenderer::Make(Layer* trackMatteOwner, Fra
   content = recorder.makeGraphic();
   auto inverted = (trackMatteType == TrackMatteType::AlphaInverted ||
                    trackMatteType == TrackMatteType::LumaInverted);
-  auto useLumaMatte = (trackMatteType == TrackMatteType::Luma ||
-                       trackMatteType == TrackMatteType::LumaInverted);
+  auto useLumaMatte =
+      (trackMatteType == TrackMatteType::Luma || trackMatteType == TrackMatteType::LumaInverted);
   auto trackMatte = std::unique_ptr<TrackMatte>(new TrackMatte());
   trackMatte->modifier = Modifier::MakeMask(content, inverted, useLumaMatte);
   if (trackMatte->modifier == nullptr) {
