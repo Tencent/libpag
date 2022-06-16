@@ -78,6 +78,12 @@ void LayerStylesFilter::draw(tgfx::Context* context, const FilterSource* source,
       }
       if (layerStyle->type() == LayerStyleType::GradientOverlay) {
         auto gradientOverlayFilter = static_cast<GradientOverlayFilter*>(filter);
+        auto blendMode = gradientOverlayFilter->getBlendMode();
+        if (blendMode == tgfx::BlendMode::SrcOver) {
+          filter->update(filterList->layerFrame, contentBounds, transformedBounds, filterScale);
+          filter->draw(context, source, target);
+          continue;
+        }
         auto newSurface = tgfx::Surface::Make(context, target->width, target->height, false, 1);
         auto offscreenTarget = ToFilterTarget(newSurface.get(), tgfx::Matrix::I());
         offscreenTarget->vertexMatrix = target->vertexMatrix;
@@ -89,7 +95,7 @@ void LayerStylesFilter::draw(tgfx::Context* context, const FilterSource* source,
                                                            tgfx::ImageOrigin::TopLeft);
         auto targetSurface = tgfx::Surface::MakeFrom(renderTarget);
         auto targetCanvas = targetSurface->getCanvas();
-        targetCanvas->setBlendMode(gradientOverlayFilter->getBlendMode());
+        targetCanvas->setBlendMode(blendMode);
         targetCanvas->drawTexture(newSurface->getTexture().get());
       } else {
         filter->update(filterList->layerFrame, contentBounds, transformedBounds, filterScale);
