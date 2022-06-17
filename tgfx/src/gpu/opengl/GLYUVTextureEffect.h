@@ -20,9 +20,10 @@
 
 #include <optional>
 #include "gpu/GLFragmentProcessor.h"
+#include "tgfx/gpu/YUVTexture.h"
 
 namespace tgfx {
-class GLTextureMaskFragmentProcessor : public GLFragmentProcessor {
+class GLYUVTextureEffect : public GLFragmentProcessor {
  public:
   void emitCode(EmitArgs& args) override;
 
@@ -30,11 +31,11 @@ class GLTextureMaskFragmentProcessor : public GLFragmentProcessor {
   void onSetData(const ProgramDataManager& programDataManager,
                  const FragmentProcessor& fragmentProcessor) override;
 
-  UniformHandle scaleUniform;
-  UniformHandle deviceCoordMatrixUniform;
+  UniformHandle alphaStartUniform;
+  UniformHandle mat3ColorConversionUniform;
 
-  std::optional<int> widthPrev;
-  std::optional<int> heightPrev;
-  std::optional<Matrix> deviceCoordMatrixPrev;
+  std::optional<Point> alphaStartPrev;
+  std::optional<YUVColorSpace> colorSpacePrev;
+  std::optional<YUVColorRange> colorRangePrev;
 };
 }  // namespace tgfx

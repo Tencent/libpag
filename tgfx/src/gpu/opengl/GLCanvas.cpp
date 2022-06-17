@@ -24,8 +24,9 @@
 #include "gpu/AARectEffect.h"
 #include "gpu/AlphaFragmentProcessor.h"
 #include "gpu/ColorShader.h"
-#include "gpu/TextureFragmentProcessor.h"
-#include "gpu/TextureMaskFragmentProcessor.h"
+#include "gpu/ConstColorProcessor.h"
+#include "gpu/DeviceSpaceTextureEffect.h"
+#include "gpu/TextureEffect.h"
 #include "gpu/opengl/GLTriangulatingPathOp.h"
 #include "tgfx/core/Mask.h"
 #include "tgfx/core/PathEffect.h"
@@ -123,7 +124,8 @@ std::unique_ptr<FragmentProcessor> GLCanvas::getClipMask(const Rect& deviceBound
       return AARectEffect::Make(rect);
     }
   } else {
-    return TextureMaskFragmentProcessor::MakeUseDeviceCoord(getClipTexture(), surface->origin());
+    return FragmentProcessor::MulInputByChildAlpha(
+        DeviceSpaceTextureEffect::Make(getClipTexture(), surface->origin()));
   }
 }
 
@@ -157,17 +159,16 @@ void GLCanvas::drawTexture(const Texture* texture, const RGBAAALayout* layout, c
     return;
   }
   auto localMatrix = Matrix::I();
-  auto scale = texture->getTextureCoord(localBounds.width(), localBounds.height()) -
-               texture->getTextureCoord(0, 0);
-  localMatrix.postScale(scale.x, scale.y);
-  auto translate = texture->getTextureCoord(localBounds.x(), localBounds.y());
-  localMatrix.postTranslate(translate.x, translate.y);
-  auto processor = TextureFragmentProcessor::Make(texture, layout, localMatrix);
+  localMatrix.postScale(localBounds.width(), localBounds.height());
+  localMatrix.postTranslate(localBounds.x(), localBounds.y());
+  auto processor = TextureEffect::Make(texture, localMatrix, layout);
   if (processor == nullptr) {
     return;
   }
+  auto maskProcessor =
+      FragmentProcessor::MulInputByChildAlpha(TextureEffect::Make(mask, localMatrix), inverted);
   draw(GLFillRectOp::Make(localBounds, getViewMatrix()), std::move(processor),
-       TextureMaskFragmentProcessor::MakeUseLocalCoord(mask, localMatrix, inverted), true);
+       std::move(maskProcessor), true);
 }
 
 void GLCanvas::drawPath(const Path& path, const Paint& paint) {
@@ -260,15 +261,11 @@ void GLCanvas::drawMask(const Rect& bounds, const Texture* mask, const Shader* s
       return;
     }
     localMatrix.postConcat(invert);
-    auto scale = mask->getTextureCoord(static_cast<float>(mask->width()),
-                                       static_cast<float>(mask->height()));
-    maskLocalMatrix.postScale(scale.x, scale.y);
+    maskLocalMatrix.postScale(static_cast<float>(mask->width()),
+                              static_cast<float>(mask->height()));
   } else {
-    auto scale = mask->getTextureCoord(static_cast<float>(bounds.width()),
-                                       static_cast<float>(bounds.height()));
-    auto translate = mask->getTextureCoord(bounds.x(), bounds.y());
-    maskLocalMatrix.postScale(scale.x, scale.y);
-    maskLocalMatrix.postTranslate(translate.x, translate.y);
+    maskLocalMatrix.postScale(bounds.width(), bounds.height());
+    maskLocalMatrix.postTranslate(bounds.x(), bounds.y());
   }
   auto args = FPArgs(getContext());
   if (!localMatrix.invert(&args.postLocalMatrix)) {
@@ -279,7 +276,7 @@ void GLCanvas::drawMask(const Rect& bounds, const Texture* mask, const Shader* s
     resetMatrix();
   }
   draw(GLFillRectOp::Make(bounds, getViewMatrix()), shader->asFragmentProcessor(args),
-       TextureMaskFragmentProcessor::MakeUseLocalCoord(mask, maskLocalMatrix));
+       FragmentProcessor::MulInputByChildAlpha(TextureEffect::Make(mask, maskLocalMatrix)));
   if (appliedMatrix) {
     setMatrix(oldMatrix);
   }
@@ -398,11 +395,8 @@ void GLCanvas::drawAtlas(const Texture* atlas, const Matrix matrix[], const Rect
     rects.push_back(localBounds);
     matrices.push_back(getViewMatrix());
     auto localMatrix = Matrix::I();
-    auto scale = atlas->getTextureCoord(localBounds.width(), localBounds.height());
-    localMatrix.postScale(scale.x, scale.y);
-    auto translate =
-        atlas->getTextureCoord(tex[i].x() + localBounds.x(), tex[i].y() + localBounds.y());
-    localMatrix.postTranslate(translate.x, translate.y);
+    localMatrix.postScale(localBounds.width(), localBounds.height());
+    localMatrix.postTranslate(tex[i].x() + localBounds.x(), tex[i].y() + localBounds.y());
     localMatrices.push_back(localMatrix);
     if (colors) {
       colorVector.push_back(colors[i]);
@@ -415,9 +409,9 @@ void GLCanvas::drawAtlas(const Texture* atlas, const Matrix matrix[], const Rect
   std::unique_ptr<FragmentProcessor> colorFP;
   std::unique_ptr<FragmentProcessor> maskFP;
   if (colors) {
-    maskFP = TextureMaskFragmentProcessor::MakeUseLocalCoord(atlas, Matrix::I(), false);
+    maskFP = FragmentProcessor::MulInputByChildAlpha(TextureEffect::Make(atlas));
   } else {
-    colorFP = TextureFragmentProcessor::Make(atlas, nullptr, Matrix::I());
+    colorFP = TextureEffect::Make(atlas);
   }
   draw(GLFillRectOp::Make(rects, matrices, localMatrices, colorVector), std::move(colorFP),
        std::move(maskFP), false);

@@ -16,12 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLYUVTextureFragmentProcessor.h"
-#include "gpu/YUVTextureFragmentProcessor.h"
+#include "GLYUVTextureEffect.h"
+#include "gpu/YUVTextureEffect.h"
 
 namespace tgfx {
-void GLYUVTextureFragmentProcessor::emitCode(EmitArgs& args) {
-  const auto* yuvFP = static_cast<const YUVTextureFragmentProcessor*>(args.fragmentProcessor);
+void GLYUVTextureEffect::emitCode(EmitArgs& args) {
+  const auto* yuvFP = static_cast<const YUVTextureEffect*>(args.fragmentProcessor);
   auto* fragBuilder = args.fragBuilder;
   auto* uniformHandler = args.uniformHandler;
 
@@ -98,9 +98,9 @@ static const float kColorConversion2020FullRange[] = {
     1.0, 1.0, 1.0, 0.0, -0.165, 1.881, 1.475, -0.571, 0.0,
 };
 
-void GLYUVTextureFragmentProcessor::onSetData(const ProgramDataManager& programDataManager,
-                                              const FragmentProcessor& fragmentProcessor) {
-  const auto& yuvFP = static_cast<const YUVTextureFragmentProcessor&>(fragmentProcessor);
+void GLYUVTextureEffect::onSetData(const ProgramDataManager& programDataManager,
+                                   const FragmentProcessor& fragmentProcessor) {
+  const auto& yuvFP = static_cast<const YUVTextureEffect&>(fragmentProcessor);
   if (alphaStartUniform.isValid()) {
     auto alphaStart = yuvFP.texture->getTextureCoord(static_cast<float>(yuvFP.layout->alphaStartX),
                                                      static_cast<float>(yuvFP.layout->alphaStartY));

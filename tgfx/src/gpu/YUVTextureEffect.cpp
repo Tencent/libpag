@@ -16,20 +16,19 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "YUVTextureFragmentProcessor.h"
+#include "YUVTextureEffect.h"
 #include "core/utils/UniqueID.h"
-#include "opengl/GLYUVTextureFragmentProcessor.h"
+#include "opengl/GLYUVTextureEffect.h"
 
 namespace tgfx {
-YUVTextureFragmentProcessor::YUVTextureFragmentProcessor(const YUVTexture* texture,
-                                                         const RGBAAALayout* layout,
-                                                         const Matrix& localMatrix)
+YUVTextureEffect::YUVTextureEffect(const YUVTexture* texture, const RGBAAALayout* layout,
+                                   const Matrix& localMatrix)
     : texture(texture), layout(layout), coordTransform(localMatrix) {
   setTextureSamplerCnt(texture->samplerCount());
   addCoordTransform(&coordTransform);
 }
 
-void YUVTextureFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
+void YUVTextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   static auto Type = UniqueID::Next();
   bytesKey->write(Type);
   uint32_t flags = texture->pixelFormat() == YUVPixelFormat::I420 ? 0 : 1;
@@ -38,7 +37,7 @@ void YUVTextureFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) cons
   bytesKey->write(flags);
 }
 
-std::unique_ptr<GLFragmentProcessor> YUVTextureFragmentProcessor::onCreateGLInstance() const {
-  return std::make_unique<GLYUVTextureFragmentProcessor>();
+std::unique_ptr<GLFragmentProcessor> YUVTextureEffect::onCreateGLInstance() const {
+  return std::make_unique<GLYUVTextureEffect>();
 }
 }  // namespace tgfx

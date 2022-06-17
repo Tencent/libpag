@@ -18,24 +18,35 @@
 
 #pragma once
 
-#include <optional>
-#include "gpu/GLFragmentProcessor.h"
+#include "FragmentProcessor.h"
+#include "tgfx/core/RGBAAALayout.h"
 #include "tgfx/gpu/YUVTexture.h"
 
 namespace tgfx {
-class GLYUVTextureFragmentProcessor : public GLFragmentProcessor {
+class YUVTextureEffect : public FragmentProcessor {
  public:
-  void emitCode(EmitArgs& args) override;
+  std::string name() const override {
+    return "YUVTextureEffect";
+  }
 
  private:
-  void onSetData(const ProgramDataManager& programDataManager,
-                 const FragmentProcessor& fragmentProcessor) override;
+  explicit YUVTextureEffect(const YUVTexture* texture, const RGBAAALayout* layout,
+                            const Matrix& localMatrix);
 
-  UniformHandle alphaStartUniform;
-  UniformHandle mat3ColorConversionUniform;
+  void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
-  std::optional<Point> alphaStartPrev;
-  std::optional<YUVColorSpace> colorSpacePrev;
-  std::optional<YUVColorRange> colorRangePrev;
+  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
+
+  const TextureSampler* onTextureSampler(size_t index) const override {
+    return texture->getSamplerAt(index);
+  }
+
+  const YUVTexture* texture;
+  const RGBAAALayout* layout;
+  CoordTransform coordTransform;
+
+  friend class TextureEffect;
+
+  friend class GLYUVTextureEffect;
 };
 }  // namespace tgfx
