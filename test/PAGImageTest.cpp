@@ -141,8 +141,8 @@ PAG_TEST_F(PAGImageTest, image3) {
  * 用例描述: texture 的 target 是 GL_TEXTURE_RECTANGLE，origin 是 BottomLeft，当作遮罩绘制。
  */
 PAG_TEST_F(PAGImageTest, BottomLeftMask) {
-  int width = 140;
-  int height = 140;
+  int width = 110;
+  int height = 110;
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
