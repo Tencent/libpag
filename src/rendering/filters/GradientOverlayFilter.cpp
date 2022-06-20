@@ -45,10 +45,13 @@ static const char GRADIENT_OVERLAY_FRAGMENT_SHADER[] = R"(
         float opacity;
     };
     
+    const float PI = 3.1415926535;
+    const int MaxStops = 16;
+    
     uniform float uOpacity;
-    uniform ColorStop uColors[16];
+    uniform ColorStop uColors[MaxStops];
     uniform int uColorSize;
-    uniform AlphaStop uAlpha[16];
+    uniform AlphaStop uAlpha[MaxStops];
     uniform int uAlphaSize;
     uniform float uAngle;
     uniform int uStyle;
@@ -57,8 +60,6 @@ static const char GRADIENT_OVERLAY_FRAGMENT_SHADER[] = R"(
     uniform vec2 uOffset;
     
     uniform vec2 uSize;
-    
-    float PI = 3.1415926535;
     
     vec3 GradientColor(vec3 color1, vec3 color2, float weight, float location) {
         vec3 midColor = mix(color1, color2, 0.5);
@@ -74,7 +75,10 @@ static const char GRADIENT_OVERLAY_FRAGMENT_SHADER[] = R"(
     
     vec4 ColorWithValue(float position) {
       vec4 color;
-      for (int i = 1; i < uColorSize; i += 1) {
+      for (int i = 1; i < MaxStops; i += 1) {
+        if (i >= uColorSize) {
+            break;
+        }
         if ((i == 1 && position < uColors[i - 1].position)
             || (uColors[i - 1].position < position && uColors[i].position > position)
             || i == uColorSize - 1) {
@@ -83,7 +87,10 @@ static const char GRADIENT_OVERLAY_FRAGMENT_SHADER[] = R"(
           break;
         }
       }
-      for (int i = 1; i < uAlphaSize; i += 1) {
+      for (int i = 1; i < MaxStops; i += 1) {
+        if (i >= uAlphaSize) {
+            break;
+        }
         if ((i == 1 && position < uAlpha[i - 1].position)
             || (uAlpha[i - 1].position < position && uAlpha[i].position > position)
             || i == uAlphaSize - 1) {
