@@ -18,20 +18,20 @@
 
 #pragma once
 
-#include <optional>
-#include "gpu/GLFragmentProcessor.h"
+#include "tgfx/gpu/Shader.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
-class GLAlphaFragmentProcessor : public GLFragmentProcessor {
+class TextureShader : public Shader {
  public:
-  void emitCode(EmitArgs& args) override;
+  static std::shared_ptr<Shader> Make(std::shared_ptr<Texture> texture);
+
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const override;
 
  private:
-  void onSetData(const ProgramDataManager& programDataManager,
-                 const FragmentProcessor& fragmentProcessor) override;
+  explicit TextureShader(std::shared_ptr<Texture> texture) : texture(std::move(texture)) {
+  }
 
-  UniformHandle alphaUniform;
-
-  std::optional<float> alphaPrev;
+  std::shared_ptr<Texture> texture;
 };
 }  // namespace tgfx

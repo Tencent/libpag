@@ -35,7 +35,7 @@ static constexpr float DegenerateThreshold = 1.0f / (1 << 15);
 
 // Analyze the shader's color stops and positions and chooses an appropriate colorizer to represent
 // the gradient.
-static std::unique_ptr<FragmentProcessor> MakeColorizer(Context* context, const Color* colors,
+static std::unique_ptr<FragmentProcessor> MakeColorizer(const Context* context, const Color* colors,
                                                         const float* positions, int count) {
   // If there are hard stops at the beginning or end, the first and/or last color should be
   // ignored by the colorizer since it should only be used in a clamped border color. By detecting
@@ -155,7 +155,7 @@ GradientShaderBase::GradientShaderBase(const std::vector<Color>& colors,
 
 // Combines the colorizer and layout with an appropriately configured master effect based on the
 // gradient's tile mode
-static std::unique_ptr<FragmentProcessor> MakeGradient(Context* context,
+static std::unique_ptr<FragmentProcessor> MakeGradient(const Context* context,
                                                        const GradientShaderBase& shader,
                                                        std::unique_ptr<FragmentProcessor> layout) {
   if (layout == nullptr) {

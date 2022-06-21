@@ -16,22 +16,33 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ColorShader.h"
-#include "gpu/ConstColorProcessor.h"
+#include "TextureShader.h"
+#include "TextureEffect.h"
+#include "tgfx/gpu/TextureSampler.h"
 
 namespace tgfx {
-std::shared_ptr<Shader> Shader::MakeColorShader(Color color) {
-  auto shader = std::make_shared<ColorShader>(color);
+std::shared_ptr<Shader> Shader::MakeTextureShader(std::shared_ptr<Texture> texture) {
+  return TextureShader::Make(std::move(texture));
+}
+
+std::shared_ptr<Shader> TextureShader::Make(std::shared_ptr<Texture> texture) {
+  if (texture == nullptr) {
+    return nullptr;
+  }
+  auto shader = std::shared_ptr<TextureShader>(new TextureShader(std::move(texture)));
   shader->weakThis = shader;
   return shader;
 }
 
-bool ColorShader::isOpaque() const {
-  return color.isOpaque();
+std::unique_ptr<FragmentProcessor> TextureShader::asFragmentProcessor(const FPArgs& args) const {
+  auto matrix = Matrix::I();
+  if (!ComputeTotalInverse(args, &matrix)) {
+    return nullptr;
+  }
+  auto effect = TextureEffect::Make(texture.get(), matrix);
+  if (texture->getSampler()->format == PixelFormat::ALPHA_8) {
+    return effect;
+  }
+  return FragmentProcessor::MulChildByInputAlpha(std::move(effect));
 }
-
-std::unique_ptr<FragmentProcessor> ColorShader::asFragmentProcessor(const FPArgs&) const {
-  return ConstColorProcessor::Make(color.premultiply(), InputMode::ModulateA);
-}
-
 }  // namespace tgfx

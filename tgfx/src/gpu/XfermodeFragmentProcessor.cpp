@@ -40,7 +40,7 @@ std::unique_ptr<FragmentProcessor> XfermodeFragmentProcessor::MakeFromTwoProcess
   }
   switch (mode) {
     case BlendMode::Clear:
-      return ConstColorProcessor::Make(Color::Transparent());
+      return ConstColorProcessor::Make(Color::Transparent(), InputMode::Ignore);
     case BlendMode::Src:
       return src;
     case BlendMode::Dst:

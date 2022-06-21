@@ -16,22 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ColorShader.h"
-#include "gpu/ConstColorProcessor.h"
+#pragma once
+
+#include "tgfx/gpu/Shader.h"
 
 namespace tgfx {
-std::shared_ptr<Shader> Shader::MakeColorShader(Color color) {
-  auto shader = std::make_shared<ColorShader>(color);
-  shader->weakThis = shader;
-  return shader;
-}
+class ColorFilterShader : public Shader {
+ public:
+  ColorFilterShader(std::shared_ptr<Shader> shader, std::shared_ptr<ColorFilter> colorFilter)
+      : shader(std::move(shader)), colorFilter(std::move(colorFilter)) {
+  }
 
-bool ColorShader::isOpaque() const {
-  return color.isOpaque();
-}
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const override;
 
-std::unique_ptr<FragmentProcessor> ColorShader::asFragmentProcessor(const FPArgs&) const {
-  return ConstColorProcessor::Make(color.premultiply(), InputMode::ModulateA);
-}
-
+ private:
+  std::shared_ptr<Shader> shader;
+  std::shared_ptr<ColorFilter> colorFilter;
+};
 }  // namespace tgfx

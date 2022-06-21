@@ -108,15 +108,29 @@ void Canvas::drawRect(const Rect& rect, const Paint& paint) {
   drawPath(path, paint);
 }
 
-void Canvas::drawTexture(const Texture* texture) {
-  drawTexture(texture, nullptr);
-}
-
 void Canvas::drawTexture(const Texture* texture, const Matrix& matrix) {
   auto oldMatrix = getMatrix();
   concat(matrix);
-  drawTexture(texture, nullptr);
+  drawTexture(texture);
   setMatrix(oldMatrix);
+}
+
+void Canvas::drawTexture(const Texture* texture, const Paint* paint) {
+  drawTexture(texture, nullptr, paint);
+}
+
+static Paint CleanPaintForDrawTexture(const Paint* paint) {
+  Paint cleaned;
+  if (paint) {
+    cleaned = *paint;
+    cleaned.setStyle(PaintStyle::Fill);
+  }
+  return cleaned;
+}
+
+void Canvas::drawTexture(const Texture* texture, const RGBAAALayout* layout, const Paint* paint) {
+  auto realPaint = CleanPaintForDrawTexture(paint);
+  drawTexture(texture, layout, realPaint);
 }
 
 Context* Canvas::getContext() const {

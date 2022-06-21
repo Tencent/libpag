@@ -54,7 +54,8 @@ void GLYUVTextureEffect::emitCode(EmitArgs& args) {
       ShaderFlags::Fragment, ShaderVar::Type::Float3x3, "Mat3ColorConversion", &mat3Name);
   fragBuilder->codeAppendf("vec3 rgb = clamp(%s * yuv, 0.0, 1.0);", mat3Name.c_str());
   if (yuvFP->layout == nullptr) {
-    fragBuilder->codeAppendf("%s = vec4(rgb, 1.0);", args.outputColor.c_str());
+    fragBuilder->codeAppendf("%s = vec4(rgb, 1.0) * %s;", args.outputColor.c_str(),
+                             args.inputColor.c_str());
   } else {
     std::string alphaStartName;
     alphaStartUniform = uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float2,
@@ -70,7 +71,8 @@ void GLYUVTextureEffect::emitCode(EmitArgs& args) {
     fragBuilder->codeAppend("// 下面进行了减1.0/255.0的精度修正。\n");
     fragBuilder->codeAppend("yuv_a = (yuv_a - 16.0/255.0) / (219.0/255.0 - 1.0/255.0);");
     fragBuilder->codeAppend("yuv_a = clamp(yuv_a, 0.0, 1.0);");
-    fragBuilder->codeAppendf("%s = vec4(rgb * yuv_a, yuv_a);", args.outputColor.c_str());
+    fragBuilder->codeAppendf("%s = vec4(rgb * yuv_a, yuv_a) * %s;", args.outputColor.c_str(),
+                             args.inputColor.c_str());
   }
 }
 

@@ -55,8 +55,8 @@ class Snapshot {
     return matrix;
   }
 
-  tgfx::Texture* getTexture() const {
-    return texture.get();
+  std::shared_ptr<tgfx::Texture> getTexture() const {
+    return texture;
   }
 
   const tgfx::Mesh* getMesh() const {

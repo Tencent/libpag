@@ -27,7 +27,8 @@ namespace tgfx {
 static constexpr int AA_TESSELLATOR_MAX_VERB_COUNT = 100;
 
 std::unique_ptr<GLTriangulatingPathOp> GLTriangulatingPathOp::Make(const Path& path,
-                                                                   Rect clipBounds) {
+                                                                   Rect clipBounds,
+                                                                   const Matrix& localMatrix) {
   const auto& skPath = PathRef::ReadAccess(path);
   if (skPath.countVerbs() > AA_TESSELLATOR_MAX_VERB_COUNT) {
     return nullptr;
@@ -39,7 +40,8 @@ std::unique_ptr<GLTriangulatingPathOp> GLTriangulatingPathOp::Make(const Path& p
   if (count == 0) {
     return nullptr;
   }
-  return std::make_unique<GLTriangulatingPathOp>(std::move(vertices), count, path.getBounds());
+  return std::make_unique<GLTriangulatingPathOp>(std::move(vertices), count, path.getBounds(),
+                                                 localMatrix);
 }
 
 GLTriangulatingPathOp::GLTriangulatingPathOp(std::vector<float> vertex, int vertexCount,

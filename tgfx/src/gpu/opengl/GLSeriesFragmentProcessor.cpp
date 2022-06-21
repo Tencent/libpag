@@ -16,27 +16,20 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLAlphaFragmentProcessor.h"
-#include "gpu/AlphaFragmentProcessor.h"
+#include "GLSeriesFragmentProcessor.h"
 
 namespace tgfx {
-void GLAlphaFragmentProcessor::emitCode(EmitArgs& args) {
-  auto* fragBuilder = args.fragBuilder;
-  auto* uniformHandler = args.uniformHandler;
-
-  std::string alphaUniformName;
-  alphaUniform = uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float, "Alpha",
-                                            &alphaUniformName);
-  fragBuilder->codeAppendf("%s = %s * %s;", args.outputColor.c_str(), args.inputColor.c_str(),
-                           alphaUniformName.c_str());
-}
-
-void GLAlphaFragmentProcessor::onSetData(const ProgramDataManager& programDataManager,
-                                         const FragmentProcessor& fragmentProcessor) {
-  const auto& afp = static_cast<const AlphaFragmentProcessor&>(fragmentProcessor);
-  if (alphaPrev != afp.alpha) {
-    alphaPrev = afp.alpha;
-    programDataManager.set1f(alphaUniform, afp.alpha);
+void GLSeriesFragmentProcessor::emitCode(EmitArgs& args) {
+  // First guy's input might be nil.
+  std::string temp = "out0";
+  emitChild(0, args.inputColor, &temp, args);
+  std::string input = temp;
+  for (size_t i = 1; i < numChildProcessors() - 1; ++i) {
+    temp = "out" + std::to_string(i);
+    emitChild(i, input, &temp, args);
+    input = temp;
   }
+  // Last guy writes to our output variable.
+  emitChild(numChildProcessors() - 1, input, args);
 }
 }  // namespace tgfx
