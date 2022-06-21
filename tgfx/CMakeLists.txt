@@ -286,7 +286,7 @@ elseif (WIN32)
     find_library(ws2_32_LIB ws2_32)
     list(APPEND TGFX_PLATFORM_SHARED_LIBS ${ws2_32_LIB})
     find_library(DWrite_LIB DWrite)
-    list(APPEND TGFX_PLATFORM_SHARED_LIBS ${DWrite_LIB})
+    list(APPEND TGFX_PLATFORM_STATIC_LIBS ${DWrite_LIB})
 
     file(GLOB_RECURSE PLATFORM_FILES src/platform/mock/*.*)
     list(APPEND TGFX_PLATFORM_FILES ${PLATFORM_FILES})
