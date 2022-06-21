@@ -8,7 +8,7 @@ libpag Web端是基于 WebAssembly + WebGL实现，并通过适配 Web 平台能
 
 libpag 的渲染性能受以下条件影响：
 
-- PAG 动画文件的复杂度
+- PAG 动效文件的复杂度
 - libpag 调用方式
 - Web 浏览器环境
 
@@ -28,27 +28,27 @@ libpag 的渲染性能受以下条件影响：
 
 ### Firefox (Win/Mac)
 
-除带 BMP 序列帧的 PAG 动画文件外，性能表现良好。
+除带 BMP 序列帧的 PAG 动效文件外，性能表现良好。
 
-因为 Firefox 的 Video 标签无法解析 PAG 动画文件中 BMP 序列帧转化而成的视频，所以需要注册软件解码器 ffavc 来解析。[示例Demo](https://github.com/libpag/pag-web/blob/main/pages/software-decoder.html)
+因为 Firefox 的 Video 标签无法解析 PAG 动效文件中 BMP 序列帧转化而成的视频，所以需要注册软件解码器 ffavc 来解析。[示例Demo](https://github.com/libpag/pag-web/blob/main/pages/software-decoder.html)
 
 ## 移动端
 
 ###  Safari (iOS)
 
-除带 BMP 序列帧的 PAG 动画文件外，性能表现良好。
+除带 BMP 序列帧的 PAG 动效文件外，性能表现良好。
 
-libpag 解析带 BMP 序列帧的 PAG 动画文件调用了 Video 标签的 blobURL 属性解码视频，而在 iOS Safari 浏览器上当 blobURL 为 src 的 Video 时，会存在“播放到视频末尾掉帧”、“修改currentTime后currentTime属性不变化，而video画面渲染成功”等BUG。
+libpag 解析带 BMP 序列帧的 PAG 动效文件调用了 Video 标签的 blobURL 属性解码视频，而在 iOS Safari 浏览器上当 blobURL 为 src 的 Video 时，会存在“播放到视频末尾掉帧”、“修改currentTime后currentTime属性不变化，而video画面渲染成功”等BUG。
 
-而且当 iOS 设备处于省电模式或者在微信浏览器中，存在“用户与页面交互之后才可以使用 Video 标签进行视频播放”的规则限制，所以，使用播放动画的场景需要经过用户交互之后播放。
+而且当 iOS 设备处于省电模式或者在微信浏览器中，存在“用户与页面交互之后才可以使用 Video 标签进行视频播放”的规则限制，所以，使用播放动效的场景需要经过用户交互之后播放。
 
 以上两个环境兼容性的影响，可以使用注册软件解码器 ffavc 解析视频来规避，也是当前推荐的方案。[示例Demo](https://github.com/libpag/pag-web/blob/main/pages/software-decoder.html)
 
 ### Chrome (Android)
 
-除带 BMP 序列帧的 PAG 动画文件外，性能表现良好。
+除带 BMP 序列帧的 PAG 动效文件外，性能表现良好。
 
-部分 Android 设备和在微信浏览器中，存在“用户与页面交互之后才可以使用 Video 标签进行视频播放”的规则限制，所以，使用播放动画的场景需要经过用户交互之后播放。
+部分 Android 设备和在微信浏览器中，存在“用户与页面交互之后才可以使用 Video 标签进行视频播放”的规则限制，所以，使用播放动效的场景需要经过用户交互之后播放。
 
 这里也使用注册软件解码器 ffavc 解析视频来规避，但是 ffavc 软解码在 Android 设备中的性能表现较差，所以我们并不推荐使用这个方案，后续我们会努力寻求更优秀的方案来覆盖这个场景。暂时需要接入方从业务场景中引导用户产生交互来规避“用户与页面交互之后才可以使用 Video 标签进行视频播放”的规则限制。
 
