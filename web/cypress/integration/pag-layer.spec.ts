@@ -2,11 +2,11 @@
 /* eslint-disable @typescript-eslint/no-invalid-this */
 /* global describe it expect cy Cypress beforeEach */
 import type * as Libpag from '../../src/pag';
-import type { Matrix, PAG } from '../../src/types';
+import type { PAG } from '../../src/types';
 import type { PAGFile } from '../../src/pag-file';
 import type { PAGLayer } from '../../src/pag-layer';
 
-describe('PAGImage', async () => {
+describe('PAGLayer', async () => {
   let PAG: PAG;
   let global: Cypress.AUTWindow;
   let PAGTypes: typeof Libpag.types;
@@ -37,7 +37,7 @@ describe('PAGImage', async () => {
     expect(pagLayer.layerName()).to.be.eq('');
   });
 
-  it('matrix', () => {
+  it('Get/Set matrix', () => {
     let matrix = pagLayer.matrix();
     expect([matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx, matrix.ty]).to.be.eql([1, 0, 0, 1, 0, 0]);
     matrix.set(PAGTypes.MatrixIndex.a, 2);
@@ -52,7 +52,8 @@ describe('PAGImage', async () => {
   });
 
   it('Get total matrix', () => {
-    expect(pagLayer.getTotalMatrix()).to.be.eq(undefined);
+    const matrix = pagLayer.getTotalMatrix();
+    expect(matrix.wasmIns).to.be.eq(undefined);
   });
 
   it('Get/Set alpha', () => {

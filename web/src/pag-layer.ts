@@ -1,12 +1,11 @@
 import { PAGComposition } from './pag-composition';
-import { LayerType, Marker, Matrix, PAG, Rect, Vector } from './types';
+import { LayerType, Marker, Rect, Vector } from './types';
 import { destroyVerify, wasmAwaitRewind } from './utils/decorators';
+import { Matrix } from './core/matrix';
 
 @destroyVerify
 @wasmAwaitRewind
 export class PAGLayer {
-  public static module: PAG;
-
   public wasmIns: any;
   public isDestroyed: any;
 
@@ -37,11 +36,11 @@ export class PAGLayer {
    * animation matrix for displaying.
    */
   public matrix(): Matrix {
-    return this.wasmIns._matrix() as Matrix;
+    return new Matrix(this.wasmIns._matrix());
   }
 
   public setMatrix(matrix: Matrix) {
-    this.wasmIns._setMatrix(matrix);
+    this.wasmIns._setMatrix(matrix.wasmIns);
   }
   /**
    * Resets the matrix to its default value.
@@ -54,7 +53,7 @@ export class PAGLayer {
    * matrix from animation.
    */
   public getTotalMatrix(): Matrix {
-    return this.wasmIns._resetMatrix() as Matrix;
+    return new Matrix(this.wasmIns._resetMatrix());
   }
   /**
    * Returns the current alpha of the layer if previously set.

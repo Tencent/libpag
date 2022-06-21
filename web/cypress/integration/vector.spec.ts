@@ -2,8 +2,7 @@
 /* eslint-disable @typescript-eslint/no-invalid-this */
 /* global describe it expect cy Cypress beforeEach */
 import type * as Libpag from '../../src/pag';
-import { PAG, Vector } from '../../src/types';
-import type { PAGImage } from '../../src/pag-image';
+import { PAG } from '../../src/types';
 import type { PAGImageLayer } from '../../src/pag-image-layer';
 
 describe('PAGImage', () => {

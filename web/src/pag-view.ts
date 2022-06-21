@@ -1,4 +1,4 @@
-import { Matrix, PAG, PAGScaleMode, PAGViewListenerEvent } from './types';
+import { PAGScaleMode, PAGViewListenerEvent } from './types';
 import { PAGPlayer } from './pag-player';
 import { EventManager, Listener } from './utils/event-manager';
 import { PAGSurface } from './pag-surface';
@@ -10,6 +10,7 @@ import { isOffscreenCanvas } from './utils/type-utils';
 import { BackendContext } from './core/backend-context';
 import { PAGComposition } from './pag-composition';
 import { PAGModule } from './binding';
+import { Matrix } from './core/matrix';
 
 export interface PAGViewOptions {
   /**
@@ -29,8 +30,6 @@ export interface PAGViewOptions {
 
 @destroyVerify
 export class PAGView {
-  public static module: PAG;
-
   /**
    * Create pag view.
    * @param file pag file.
