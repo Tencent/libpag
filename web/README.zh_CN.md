@@ -4,7 +4,7 @@
 
 ## 介绍
 
-libpag 是 PAG (Portable Animated Graphics) 动画文件的渲染 SDK，目前已覆盖几乎所有的主流平台，包括：iOS, Android, macOS,
+libpag 是 PAG (Portable Animated Graphics) 动效文件的渲染 SDK，目前已覆盖几乎所有的主流平台，包括：iOS, Android, macOS,
 Windows, Linux, 以及 Web 端。
 
 ## 特性
