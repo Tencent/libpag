@@ -17,11 +17,31 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "NativePlatform.h"
+#include <vector>
+#include "pag/pag.h"
 
 namespace pag {
 
 const Platform* Platform::Current() {
   static const NativePlatform platform = {};
   return &platform;
+}
+
+bool NativePlatform::registerFallbackFonts() const {
+  std::vector<std::string> fallbackList;
+#ifdef WIN32
+  fallbackList = {"Microsoft YaHei",    "Times New Roman", "Microsoft Sans Serif",
+                  "Microsoft JhengHei", "Leelawadee UI",   "MS Gothic",
+                  "Malgun Gothic",      "STSong"};
+#else
+  fallbackList = {"PingFang SC",       "Apple SD Gothic Neo",
+                  "Apple Color Emoji", "Helvetica",
+                  "Myanmar Sangam MN", "Thonburi",
+                  "Mishafi",           "Menlo",
+                  "Kailasa",           "Kefa",
+                  "Kohinoor Telugu",   "Hiragino Maru Gothic ProN"};
+#endif
+  PAGFont::SetFallbackFontNames(fallbackList);
+  return true;
 }
 }  // namespace pag
