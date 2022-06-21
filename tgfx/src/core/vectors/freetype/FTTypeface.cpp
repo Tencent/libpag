@@ -290,13 +290,16 @@ class EmptyTypeface : public Typeface {
   uint32_t _uniqueID = UniqueID::Next();
 };
 
+#ifdef _WIN32
 std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& fontFamily,
                                                  const std::string& fontStyle) {
-#ifdef _WIN32
   return MakeFromFontName(fontFamily, fontStyle);
-#endif
+}
+#else
+std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string&, const std::string&) {
   return nullptr;
 }
+#endif
 
 std::shared_ptr<Typeface> Typeface::MakeFromPath(const std::string& fontPath, int ttcIndex) {
   return FTTypeface::Make(FTFontData(fontPath, ttcIndex));
