@@ -16,22 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "NativePlatform.h"
-#include <vector>
-#include "pag/pag.h"
+#pragma once
+#include "tgfx/core/Typeface.h"
 
-namespace pag {
-
-const Platform* Platform::Current() {
-  static const NativePlatform platform = {};
-  return &platform;
-}
-
-bool NativePlatform::registerFallbackFonts() const {
-  std::vector<std::string> fallbackList = {
-      "Microsoft YaHei", "Times New Roman", "Microsoft Sans Serif", "Microsoft JhengHei",
-      "Leelawadee UI",   "MS Gothic",       "Malgun Gothic",        "STSong"};
-  PAGFont::SetFallbackFontNames(fallbackList);
-  return true;
-}
-}  // namespace pag
+namespace tgfx {
+class SystemFont {
+ public:
+  static std::shared_ptr<Typeface> MakeFromName(const std::string& fontFamily,
+                                                const std::string& fontStyle);
+};
+}  // namespace tgfx

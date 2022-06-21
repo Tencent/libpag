@@ -21,6 +21,7 @@
 #include FT_TRUETYPE_TABLES_H
 
 #include "FTScalerContext.h"
+#include "SystemFont.h"
 #include "core/utils/UniqueID.h"
 #include "tgfx/core/UTF.h"
 
@@ -84,9 +85,9 @@ class EmptyTypeface : public Typeface {
   uint32_t _uniqueID = UniqueID::Next();
 };
 
-std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& /*fontFamily*/,
-                                                 const std::string& /*fontStyle*/) {
-  return nullptr;
+std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& fontFamily,
+                                                 const std::string& fontStyle) {
+  return SystemFont::MakeFromName(fontFamily, fontStyle);
 }
 
 std::shared_ptr<Typeface> Typeface::MakeFromPath(const std::string& fontPath, int ttcIndex) {

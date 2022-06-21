@@ -23,5 +23,6 @@
 namespace pag {
 class NativePlatform : public Platform {
  public:
+  bool registerFallbackFonts() const override;
 };
 }  // namespace pag
