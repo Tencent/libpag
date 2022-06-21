@@ -20,6 +20,9 @@
 #include "tgfx/core/Typeface.h"
 
 namespace tgfx {
-std::shared_ptr<Typeface> SystemFontMakeFromName(const std::string& fontFamily,
-                                                 const std::string& fontStyle);
+class SystemFont {
+ public:
+  static std::shared_ptr<Typeface> MakeFromName(const std::string& fontFamily,
+                                                const std::string& fontStyle);
+};
 }  // namespace tgfx

@@ -227,8 +227,8 @@ std::shared_ptr<Typeface> MakeFromFontName(const std::string& fontFamily,
 }
 #endif
 
-std::shared_ptr<Typeface> SystemFontMakeFromName(const std::string& fontFamily,
-                                                 const std::string& fontStyle) {
+std::shared_ptr<Typeface> SystemFont::MakeFromName(const std::string& fontFamily,
+                                                   const std::string& fontStyle) {
 #ifdef _WIN32
   return MakeFromFontName(fontFamily, fontStyle);
 #endif

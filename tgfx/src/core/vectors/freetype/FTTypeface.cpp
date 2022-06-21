@@ -87,7 +87,7 @@ class EmptyTypeface : public Typeface {
 
 std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& fontFamily,
                                                  const std::string& fontStyle) {
-  return SystemFontMakeFromName(fontFamily, fontStyle);
+  return SystemFont::MakeFromName(fontFamily, fontStyle);
 }
 
 std::shared_ptr<Typeface> Typeface::MakeFromPath(const std::string& fontPath, int ttcIndex) {
