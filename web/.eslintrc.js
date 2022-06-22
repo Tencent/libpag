@@ -4,7 +4,7 @@ module.exports = {
     browser: true,
   },
   rules: {
-    'max-params': ['error', 8],
+    'max-params': ['error', 9],
   },
   parserOptions: {
     lib: ['dom', 'ES5', 'ES6', 'DOM.Iterable'],

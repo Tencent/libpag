@@ -1,12 +1,12 @@
-import { AlphaType, ColorType, Matrix, PAG, PAGScaleMode } from './types';
+import { AlphaType, ColorType, PAGScaleMode } from './types';
 import { NativeImage } from './core/native-image';
 import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorators';
 import { PAGModule } from './binding';
+import { Matrix } from './core/matrix';
 
 @destroyVerify
 @wasmAwaitRewind
 export class PAGImage {
-  public static module: PAG;
   /**
    * Create pag image from image file.
    */
@@ -98,14 +98,14 @@ export class PAGImage {
    * Returns a copy of current matrix.
    */
   public matrix(): Matrix {
-    return this.wasmIns._matrix() as Matrix;
+    return new Matrix(this.wasmIns._matrix());
   }
   /**
    * Set the transformation which will be applied to the content.
    * The scaleMode property will be set to PAGScaleMode::None when this method is called.
    */
   public setMatrix(matrix: Matrix) {
-    this.wasmIns._setMatrix(matrix);
+    this.wasmIns._setMatrix(matrix.wasmIns);
   }
   /**
    * Destroy the pag image.

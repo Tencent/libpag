@@ -1,12 +1,10 @@
 import { PAGModule } from './binding';
-import { AlphaType, ColorType, PAG } from './types';
+import { AlphaType, ColorType } from './types';
 import { destroyVerify, wasmAwaitRewind } from './utils/decorators';
 
 @destroyVerify
 @wasmAwaitRewind
 export class PAGSurface {
-  public static module: PAG;
-
   public static FromCanvas(canvasID: string): PAGSurface {
     const wasmIns = PAGModule._PAGSurface._FromCanvas(canvasID);
     return new PAGSurface(wasmIns);

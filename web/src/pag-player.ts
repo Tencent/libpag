@@ -3,15 +3,14 @@ import { PAGComposition } from './pag-composition';
 import { PAGFile } from './pag-file';
 import { PAGLayer } from './pag-layer';
 import { PAGSurface } from './pag-surface';
-import { Matrix, PAG, PAGScaleMode, Rect, Vector } from './types';
+import { PAGScaleMode, Rect, Vector } from './types';
 import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorators';
 import { proxyVector } from './utils/type-utils';
+import { Matrix } from './core/matrix';
 
 @destroyVerify
 @wasmAwaitRewind
 export class PAGPlayer {
-  public static module: PAG;
-
   public static create(): PAGPlayer {
     const wasmIns = new PAGModule._PAGPlayer();
     return new PAGPlayer(wasmIns);
@@ -157,14 +156,14 @@ export class PAGPlayer {
    * Returns a copy of current matrix.
    */
   public matrix(): Matrix {
-    return this.wasmIns._matrix() as Matrix;
+    return new Matrix(this.wasmIns._matrix());
   }
   /**
    * Set the transformation which will be applied to the composition. The scaleMode property
    * will be set to PAGScaleMode::None when this method is called.
    */
   public setMatrix(matrix: Matrix) {
-    this.wasmIns._setMatrix(matrix);
+    this.wasmIns._setMatrix(matrix.wasmIns);
   }
   /**
    * Set the progress of play position to next frame. It is applied only when the composition is not
