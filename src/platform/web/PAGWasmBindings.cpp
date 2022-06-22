@@ -370,15 +370,64 @@ EMSCRIPTEN_BINDINGS(pag) {
       .property("rowBytes", &tgfx::ImageInfo::rowBytes)
       .property("colorType", &tgfx::ImageInfo::colorType);
 
-  class_<tgfx::Matrix>("Matrix")
-      .property("a", &tgfx::Matrix::getScaleX)
-      .property("b", &tgfx::Matrix::getSkewY)
-      .property("c", &tgfx::Matrix::getSkewX)
-      .property("d", &tgfx::Matrix::getScaleY)
-      .property("tx", &tgfx::Matrix::getTranslateX)
-      .property("ty", &tgfx::Matrix::getTranslateY)
-      .function("set", &tgfx::Matrix::set)
-      .function("setAffine", &tgfx::Matrix::setAffine);
+  class_<tgfx::Matrix>("_Matrix")
+      .class_function("_MakeAll", tgfx::Matrix::MakeAll)
+      .class_function("_MakeScale", optional_override([](float sx, float sy) {
+                        return tgfx::Matrix::MakeScale(sx, sy);
+                      }))
+      .class_function("_MakeScale",
+                      optional_override([](float scale) { return tgfx::Matrix::MakeScale(scale); }))
+      .class_function("_MakeTrans", tgfx::Matrix::MakeTrans)
+      .function("_get", &tgfx::Matrix::get)
+      .function("_set", &tgfx::Matrix::set)
+      .function("_setAll", &tgfx::Matrix::setAll)
+      .function("_setAffine", &tgfx::Matrix::setAffine)
+      .function("_reset", &tgfx::Matrix::reset)
+      .function("_setTranslate", &tgfx::Matrix::setTranslate)
+      .function("_setScale",
+                optional_override([](tgfx::Matrix& matrix, float sx, float sy, float px, float py) {
+                  return matrix.setScale(sx, sy, px, py);
+                }))
+      .function("_setRotate",
+                optional_override([](tgfx::Matrix& matrix, float degrees, float px, float py) {
+                  return matrix.setRotate(degrees, px, py);
+                }))
+      .function("_setSinCos",
+                optional_override([](tgfx::Matrix& matrix, float sinV, float cosV, float px,
+                                     float py) { return matrix.setSinCos(sinV, cosV, px, py); }))
+      .function("_setSkew",
+                optional_override([](tgfx::Matrix& matrix, float kx, float ky, float px, float py) {
+                  return matrix.setSkew(kx, ky, px, py);
+                }))
+      .function("_setConcat", &tgfx::Matrix::setConcat)
+      .function("_preTranslate", &tgfx::Matrix::preTranslate)
+      .function("_preScale",
+                optional_override([](tgfx::Matrix& matrix, float sx, float sy, float px, float py) {
+                  return matrix.preScale(sx, sy, px, py);
+                }))
+      .function("_preRotate",
+                optional_override([](tgfx::Matrix& matrix, float degrees, float px, float py) {
+                  return matrix.preRotate(degrees, px, py);
+                }))
+      .function("_preSkew",
+                optional_override([](tgfx::Matrix& matrix, float kx, float ky, float px, float py) {
+                  return matrix.preSkew(kx, ky, px, py);
+                }))
+      .function("_preConcat", &tgfx::Matrix::preConcat)
+      .function("_postTranslate", &tgfx::Matrix::postTranslate)
+      .function("_postScale",
+                optional_override([](tgfx::Matrix& matrix, float sx, float sy, float px, float py) {
+                  return matrix.postScale(sx, sy, px, py);
+                }))
+      .function("_postRotate",
+                optional_override([](tgfx::Matrix& matrix, float degrees, float px, float py) {
+                  return matrix.postRotate(degrees, px, py);
+                }))
+      .function("_postSkew",
+                optional_override([](tgfx::Matrix& matrix, float kx, float ky, float px, float py) {
+                  return matrix.postSkew(kx, ky, px, py);
+                }))
+      .function("_postConcat", &tgfx::Matrix::postConcat);
 
   class_<TextDocument>("TextDocument")
       .smart_ptr<std::shared_ptr<TextDocument>>("TextDocument")

@@ -5,7 +5,7 @@ import type * as Libpag from '../../src/pag';
 import type { PAG } from '../../src/types';
 import type { PAGTextLayer } from '../../src/pag-text-layer';
 
-describe('PAGImage', async () => {
+describe('PAGTextLayer', async () => {
   let PAG: PAG;
   let global: Cypress.AUTWindow;
   let PAGTypes: typeof Libpag.types;

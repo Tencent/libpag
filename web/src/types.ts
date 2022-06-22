@@ -18,6 +18,7 @@ import { GlobalCanvas } from './core/global-canvas';
 import { BackendContext } from './core/backend-context';
 import { PAGImageLayer } from './pag-image-layer';
 import { PAGSolidLayer } from './pag-solid-layer';
+import { Matrix as ClassMatrix } from './core/matrix';
 
 declare global {
   interface Window {
@@ -65,6 +66,21 @@ export interface PAG extends EmscriptenModule {
     _create: (fontFamily: string, fontStyle: string) => any;
     _SetFallbackFontNames: (fontName: any) => void;
   };
+  _Matrix: {
+    _MakeAll: (
+      scaleX: number,
+      skewX: number,
+      transX: number,
+      skewY: number,
+      scaleY: number,
+      transY: number,
+      pers0: number,
+      pers1: number,
+      pers2: number,
+    ) => any;
+    _MakeScale: ((sx: number, sy: number) => any) & ((scale: number) => any);
+    _MakeTrans: (dx: number, dy: number) => any;
+  };
   _registerSoftwareDecoderFactory: (factory: SoftwareDecoderFactory) => void;
   VectorString: any;
   webAssemblyQueue: WebAssemblyQueue;
@@ -91,6 +107,7 @@ export interface PAG extends EmscriptenModule {
   VideoReader: typeof VideoReader;
   GlobalCanvas: typeof GlobalCanvas;
   BackendContext: typeof BackendContext;
+  Matrix: typeof ClassMatrix;
   traceImage: (info: { width: number; height: number }, pixels: Uint8Array, tag: string) => void;
   registerSoftwareDecoderFactory: (factory: SoftwareDecoderFactory) => void;
   [key: string]: any;
@@ -240,11 +257,14 @@ export const enum PAGTimeStretchMode {
 
 export const enum MatrixIndex {
   a,
-  b,
   c,
-  d,
   tx,
+  b,
+  d,
   ty,
+  pers0,
+  pers1,
+  pers2,
 }
 
 export const enum DecoderResult {
