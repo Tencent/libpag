@@ -418,6 +418,14 @@ void DestoryFlushQueue() {
   }
   [pagPlayer setProgress:[valueAnimator getAnimatedFraction]];
   auto result = [pagPlayer flush];
+  NSHashTable* copiedListeners = listeners.copy;
+  for (id item in copiedListeners) {
+    id<PAGViewListener> listener = (id<PAGViewListener>)item;
+    if ([listener respondsToSelector:@selector(onAnimationUpdate:)]) {
+      [listener onAnimationUpdate:self];
+    }
+  }
+  [copiedListeners release];
   if (self.bufferPrepared) {
     [PAGView RegisterFlushQueueDestoryMethod];
   }

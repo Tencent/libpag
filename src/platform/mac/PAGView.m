@@ -342,7 +342,16 @@
 
 - (BOOL)flush {
   [pagPlayer setProgress:[valueAnimator getAnimatedFraction]];
-  return [pagPlayer flush];
+  bool result = [pagPlayer flush];
+  NSHashTable* copiedListeners = listeners.copy;
+  for (id item in copiedListeners) {
+    id<PAGViewListener> listener = (id<PAGViewListener>)item;
+    if ([listener respondsToSelector:@selector(onAnimationUpdate:)]) {
+      [listener onAnimationUpdate:self];
+    }
+  }
+  [copiedListeners release];
+  return result;
 }
 
 - (NSArray<PAGLayer*>*)getLayersUnderPoint:(CGPoint)point {

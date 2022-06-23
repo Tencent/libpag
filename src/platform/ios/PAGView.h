@@ -45,6 +45,11 @@
 - (void)onAnimationRepeat:(PAGView*)pagView;
 
 /**
+ * Notifies the occurrence of another frame of the animation.
+ */
+- (void)onAnimationUpdate:(PAGView*)pagView;
+
+/**
  * Notifies the start of the animation.
  */
 - (void)onAnimationStart DEPRECATED_MSG_ATTRIBUTE("Please use onAnimationStart:pagView instead");
