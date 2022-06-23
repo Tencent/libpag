@@ -4,7 +4,7 @@
 import type * as Libpag from '../../src/pag';
 import { PAG } from '../../src/types';
 
-describe('matrix', () => {
+describe('Matrix', () => {
   let PAG: PAG;
   let global: Cypress.AUTWindow;
   let PAGTypes: typeof Libpag.types;

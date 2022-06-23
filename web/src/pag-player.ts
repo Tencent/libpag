@@ -1,12 +1,13 @@
 import { PAGModule } from './binding';
-import { PAGComposition } from './pag-composition';
 import { PAGFile } from './pag-file';
-import { PAGLayer } from './pag-layer';
 import { PAGSurface } from './pag-surface';
-import { PAGScaleMode, Rect, Vector } from './types';
 import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorators';
-import { proxyVector } from './utils/type-utils';
+import { layer2typeLayer, proxyVector } from './utils/type-utils';
 import { Matrix } from './core/matrix';
+
+import type { PAGLayer } from './pag-layer';
+import { PAGComposition } from './pag-composition';
+import type { PAGScaleMode, Rect } from './types';
 
 @destroyVerify
 @wasmAwaitRewind
@@ -135,14 +136,21 @@ export class PAGPlayer {
     this.wasmIns._setSurface(pagSurface.wasmIns);
   }
   /**
+   *
    * Returns the current PAGComposition for PAGPlayer to render as content.
    */
-  public getComposition(): PAGFile {
-    return new PAGFile(this.wasmIns._getComposition());
+  public getComposition(): PAGComposition {
+    const wasmIns = this.wasmIns._getComposition();
+    if (wasmIns._isPAGFile()) {
+      return new PAGFile(wasmIns);
+    }
+    return new PAGComposition(wasmIns);
   }
   /**
+   *
    * Sets a new PAGComposition for PAGPlayer to render as content.
    */
+
   public setComposition(pagComposition: PAGComposition) {
     this.wasmIns._setComposition(pagComposition.wasmIns);
   }
@@ -201,13 +209,15 @@ export class PAGPlayer {
   }
   /**
    * Returns an array of layers that lie under the specified point. The point is in pixels and from
+   *
    * this PAGComposition's local coordinates.
    */
-  public getLayersUnderPoint(localX: number, localY: number): Vector<PAGLayer> {
-    return proxyVector(this.wasmIns._getLayersUnderPoint(localX, localY) as Vector<any>, PAGLayer);
+  public getLayersUnderPoint(localX: number, localY: number) {
+    return proxyVector(this.wasmIns._getLayersUnderPoint(localX, localY), layer2typeLayer);
   }
   /**
    * Evaluates the PAGLayer to see if it overlaps or intersects with the specified point. The point
+   *
    * is in the coordinate space of the PAGSurface, not the PAGComposition that contains the
    * PAGLayer. It always returns false if the PAGLayer or its parent (or parent's parent...) has not
    * been added to this PAGPlayer. The pixelHitTest parameter indicates whether or not to check
