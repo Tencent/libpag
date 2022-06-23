@@ -81,7 +81,7 @@ export interface PAG extends EmscriptenModule {
     _MakeScale: ((sx: number, sy: number) => any) & ((scale: number) => any);
     _MakeTrans: (dx: number, dy: number) => any;
   };
-  _registerSoftwareDecoderFactory: (factory: SoftwareDecoderFactory) => void;
+  _registerSoftwareDecoderFactory: (factory: SoftwareDecoderFactory | null) => void;
   VectorString: any;
   webAssemblyQueue: WebAssemblyQueue;
   GL: EmscriptenGL;
@@ -109,7 +109,7 @@ export interface PAG extends EmscriptenModule {
   BackendContext: typeof BackendContext;
   Matrix: typeof ClassMatrix;
   traceImage: (info: { width: number; height: number }, pixels: Uint8Array, tag: string) => void;
-  registerSoftwareDecoderFactory: (factory: SoftwareDecoderFactory) => void;
+  registerSoftwareDecoderFactory: (factory: SoftwareDecoderFactory | null) => void;
   [key: string]: any;
 }
 
