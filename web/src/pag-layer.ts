@@ -1,7 +1,9 @@
 import { PAGComposition } from './pag-composition';
-import { LayerType, Marker, Rect, Vector } from './types';
 import { destroyVerify, wasmAwaitRewind } from './utils/decorators';
 import { Matrix } from './core/matrix';
+import { layer2typeLayer, proxyVector } from './utils/type-utils';
+
+import type { LayerType, Marker, Rect } from './types';
 
 @destroyVerify
 @wasmAwaitRewind
@@ -97,8 +99,8 @@ export class PAGLayer {
   /**
    * Returns the markers of this layer.
    */
-  public markers(): Vector<Marker> {
-    return this.wasmIns._markers() as Vector<Marker>;
+  public markers() {
+    return proxyVector(this.wasmIns._markers(), (wasmIns: any) => wasmIns as Marker);
   }
   /**
    * Converts the time from the PAGLayer's (local) timeline to the PAGSurface (global) timeline. The
@@ -188,7 +190,7 @@ export class PAGLayer {
    * Returns trackMatte layer of this layer.
    */
   public trackMatteLayer(): PAGLayer {
-    return new PAGLayer(this.wasmIns._trackMatteLayer());
+    return layer2typeLayer(this.wasmIns._trackMatteLayer());
   }
   /**
    * Indicate whether this layer is excluded from parent's timeline. If set to true, this layer's
@@ -208,6 +210,12 @@ export class PAGLayer {
    */
   public isPAGFile(): boolean {
     return this.wasmIns._isPAGFile() as boolean;
+  }
+  /**
+   * Returns this layer as a type layer.
+   */
+  public asTypeLayer() {
+    return layer2typeLayer(this);
   }
 
   public isDelete(): boolean {

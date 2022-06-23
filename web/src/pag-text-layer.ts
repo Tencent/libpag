@@ -1,8 +1,9 @@
 import { PAGModule } from './binding';
 import { PAGFont } from './pag-font';
 import { PAGLayer } from './pag-layer';
-import { Color, TextDocument } from './types';
 import { destroyVerify, wasmAwaitRewind } from './utils/decorators';
+
+import type { Color, TextDocument } from './types';
 
 @destroyVerify
 @wasmAwaitRewind

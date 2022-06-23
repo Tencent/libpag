@@ -1,4 +1,3 @@
-import { PAG } from './types';
 import { readFile } from './utils/common';
 import { ErrorCode } from './utils/error-map';
 import { Log } from './utils/log';
