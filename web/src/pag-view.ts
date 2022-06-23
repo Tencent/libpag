@@ -2,15 +2,16 @@ import { PAGScaleMode, PAGViewListenerEvent } from './types';
 import { PAGPlayer } from './pag-player';
 import { EventManager, Listener } from './utils/event-manager';
 import { PAGSurface } from './pag-surface';
-import { PAGFile } from './pag-file';
 import { destroyVerify } from './utils/decorators';
 import { Log } from './utils/log';
 import { ErrorCode } from './utils/error-map';
 import { isOffscreenCanvas } from './utils/type-utils';
 import { BackendContext } from './core/backend-context';
-import { PAGComposition } from './pag-composition';
 import { PAGModule } from './binding';
-import { Matrix } from './core/matrix';
+
+import type { PAGComposition } from './pag-composition';
+import type { PAGFile } from './pag-file';
+import type { Matrix } from './core/matrix';
 
 export interface PAGViewOptions {
   /**
@@ -38,7 +39,7 @@ export class PAGView {
    * @returns
    */
   public static async init(
-    file: PAGFile,
+    file: PAGComposition,
     canvas: string | HTMLCanvasElement | OffscreenCanvas,
     initOptions: PAGViewOptions = {},
   ): Promise<PAGView | undefined> {
@@ -307,7 +308,7 @@ export class PAGView {
   /**
    * Returns the current PAGComposition for PAGView to render as content.
    */
-  public getComposition(): PAGFile {
+  public getComposition() {
     return this.player.getComposition();
   }
   /**

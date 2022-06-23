@@ -1,8 +1,9 @@
-import { PAG, Vector, Marker } from './types';
+import { PAGModule } from './binding';
 import { PAGLayer } from './pag-layer';
 import { destroyVerify, wasmAwaitRewind } from './utils/decorators';
-import { proxyVector } from './utils/type-utils';
-import { PAGModule } from './binding';
+import { layer2typeLayer, proxyVector } from './utils/type-utils';
+
+import type { Marker } from './types';
 
 @destroyVerify
 @wasmAwaitRewind
@@ -42,9 +43,8 @@ export class PAGComposition extends PAGLayer {
    * @param index The index position of the child layer.
    * @returns The child layer at the specified index position.
    */
-  public getLayerAt(index: number): PAGLayer {
-    const wasmIns = this.wasmIns._getLayerAt(index);
-    return new PAGLayer(wasmIns);
+  public getLayerAt(index: number) {
+    return layer2typeLayer(this.wasmIns._getLayerAt(index));
   }
   /**
    * Returns the index position of a child layer.
@@ -88,14 +88,14 @@ export class PAGComposition extends PAGLayer {
   /**
    * Remove the specified PAGLayer from current PAGComposition.
    */
-  public removeLayer(pagLayer: PAGLayer): PAGLayer {
-    return new PAGLayer(this.wasmIns._removeLayer(pagLayer.wasmIns));
+  public removeLayer(pagLayer: PAGLayer) {
+    return layer2typeLayer(this.wasmIns._removeLayer(pagLayer.wasmIns));
   }
   /**
    * Remove the specified PAGLayer from current PAGComposition.
    */
-  public removeLayerAt(index: number): PAGLayer {
-    return new PAGLayer(this.wasmIns._removeLayerAt(index));
+  public removeLayerAt(index: number) {
+    return layer2typeLayer(this.wasmIns._removeLayerAt(index));
   }
   /**
    * Remove all PAGLayers from current PAGComposition.
@@ -124,8 +124,8 @@ export class PAGComposition extends PAGLayer {
   /**
    * Returns the audio markers of this composition.
    */
-  public audioMarkers(): Vector<Marker> {
-    return this.wasmIns._audioMarkers() as Vector<Marker>;
+  public audioMarkers() {
+    return proxyVector(this.wasmIns._audioMarkers(), (wasmIns: any) => wasmIns as Marker);
   }
   /**
    * Indicates when the first frame of the audio plays in the composition's timeline.
@@ -136,14 +136,14 @@ export class PAGComposition extends PAGLayer {
   /**
    * Returns an array of layers that match the specified layer name.
    */
-  public getLayersByName(layerName: string): Vector<PAGLayer> {
-    return proxyVector(this.wasmIns._getLayersByName(layerName) as Vector<any>, PAGLayer);
+  public getLayersByName(layerName: string) {
+    return proxyVector(this.wasmIns._getLayersByName(layerName), layer2typeLayer);
   }
   /**
    * Returns an array of layers that lie under the specified point. The point is in pixels and from
    * this PAGComposition's local coordinates.
    */
-  public getLayersUnderPoint(localX: number, localY: number): Vector<PAGLayer> {
-    return proxyVector(this.wasmIns._getLayersUnderPoint(localX, localY) as Vector<any>, PAGLayer);
+  public getLayersUnderPoint(localX: number, localY: number) {
+    return proxyVector(this.wasmIns._getLayersUnderPoint(localX, localY), layer2typeLayer);
   }
 }

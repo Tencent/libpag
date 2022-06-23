@@ -1,8 +1,10 @@
 import { PAGModule } from './binding';
-import { PAGImage } from './pag-image';
 import { PAGLayer } from './pag-layer';
-import { Vector, PAGVideoRange } from './types';
 import { destroyVerify, wasmAwaitRewind } from './utils/decorators';
+import { proxyVector } from './utils/type-utils';
+
+import type { PAGImage } from './pag-image';
+import type { PAGVideoRange } from './types';
 
 @destroyVerify
 @wasmAwaitRewind
@@ -21,8 +23,8 @@ export class PAGImageLayer extends PAGLayer {
   /**
    * Returns the time ranges of the source video for replacement.
    */
-  public getVideoRanges(): Vector<PAGVideoRange> {
-    return this.wasmIns._getVideoRanges() as Vector<PAGVideoRange>;
+  public getVideoRanges() {
+    return proxyVector(this.wasmIns._getVideoRanges(), (wasmIns) => wasmIns as PAGVideoRange);
   }
   /**
    * Replace the original image content with the specified PAGImage object. Passing in null for the

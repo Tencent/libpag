@@ -1,16 +1,13 @@
 import { PAGModule } from './binding';
 import { PAGComposition } from './pag-composition';
-import { PAGImage } from './pag-image';
-import { PAGImageLayer } from './pag-image-layer';
-import { PAGLayer } from './pag-layer';
-import { PAGSolidLayer } from './pag-solid-layer';
-import { PAGTextLayer } from './pag-text-layer';
-import { LayerType, PAG, PAGTimeStretchMode, TextDocument, Vector } from './types';
 import { readFile } from './utils/common';
 import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorators';
 import { ErrorCode } from './utils/error-map';
 import { Log } from './utils/log';
-import { proxyVector } from './utils/type-utils';
+import { layer2typeLayer, proxyVector } from './utils/type-utils';
+
+import type { PAGImage } from './pag-image';
+import type { LayerType, PAGTimeStretchMode, TextDocument } from './types';
 
 @destroyVerify
 @wasmAwaitRewind
@@ -91,32 +88,22 @@ export class PAGFile extends PAGComposition {
    * Replace the text data of the specified index. The index ranges from 0 to PAGFile.numTexts - 1.
    * Passing in null for the textData parameter will reset it to default text data.
    */
-  public replaceText(editableTextIndex: number, textData: TextDocument) {
-    return this.wasmIns._replaceText(editableTextIndex, textData);
+  public replaceText(editableTextIndex: number, textData: TextDocument): void {
+    this.wasmIns._replaceText(editableTextIndex, textData);
   }
   /**
    * Replace the image content of the specified index with a PAGImage object. The index ranges from
    * 0 to PAGFile.numImages - 1. Passing in null for the image parameter will reset it to default
    * image content.
    */
-  public replaceImage(editableImageIndex: number, pagImage: PAGImage) {
+  public replaceImage(editableImageIndex: number, pagImage: PAGImage): void {
     this.wasmIns._replaceImage(editableImageIndex, pagImage.wasmIns);
   }
   /**
    * Return an array of layers by specified editable index and layer type.
    */
   public getLayersByEditableIndex(editableIndex: Number, layerType: LayerType) {
-    const vector = this.wasmIns._getLayersByEditableIndex(editableIndex, layerType) as Vector<any>;
-    switch (layerType) {
-      case LayerType.Solid:
-        return proxyVector(vector, PAGSolidLayer);
-      case LayerType.Text:
-        return proxyVector(vector, PAGTextLayer);
-      case LayerType.Image:
-        return proxyVector(vector, PAGImageLayer);
-      default:
-        return proxyVector(vector, PAGLayer);
-    }
+    return proxyVector(this.wasmIns._getLayersByEditableIndex(editableIndex, layerType), layer2typeLayer);
   }
   /**
    * Returns the indices of the editable layers in this PAGFile.
@@ -124,7 +111,7 @@ export class PAGFile extends PAGComposition {
    * not be treated as editable.
    */
   public getEditableIndices(layerType: LayerType) {
-    return this.wasmIns._getEditableIndices(layerType) as Vector<number>;
+    return proxyVector(this.wasmIns._getEditableIndices(layerType), Number);
   }
   /**
    * Indicate how to stretch the original duration to fit target duration when file's duration is
