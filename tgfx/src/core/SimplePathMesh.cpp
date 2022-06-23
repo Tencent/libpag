@@ -32,18 +32,16 @@ Rect SimplePathMesh::bounds() const {
   return Rect::MakeEmpty();
 }
 
-std::pair<std::unique_ptr<GLDrawOp>, Matrix> SimplePathMesh::getOp(const Matrix& viewMatrix) const {
-  std::unique_ptr<GLDrawOp> drawOp;
-  if (rect.has_value()) {
-    drawOp = GLFillRectOp::Make(*rect, viewMatrix);
-  } else if (rRect.has_value()) {
-    drawOp = GLRRectOp::Make(*rRect, viewMatrix);
-  } else {
-    return {};
-  }
+std::unique_ptr<GLDrawOp> SimplePathMesh::getOp(const Matrix& viewMatrix) const {
   auto bounds = this->bounds();
   auto localMatrix = Matrix::MakeScale(bounds.width(), bounds.height());
   localMatrix.postTranslate(bounds.x(), bounds.y());
-  return {std::move(drawOp), localMatrix};
+  std::unique_ptr<GLDrawOp> drawOp;
+  if (rect.has_value()) {
+    drawOp = GLFillRectOp::Make(*rect, viewMatrix, localMatrix);
+  } else if (rRect.has_value()) {
+    drawOp = GLRRectOp::Make(*rRect, viewMatrix, localMatrix);
+  }
+  return drawOp;
 }
 }  // namespace tgfx

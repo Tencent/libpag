@@ -24,16 +24,20 @@
 namespace tgfx {
 class LocalMatrixShader final : public Shader {
  public:
-  LocalMatrixShader(std::shared_ptr<Shader> proxy, const Matrix& localMatrix)
-      : proxyShader(std::move(proxy)), _localMatrix(localMatrix) {
+  LocalMatrixShader(std::shared_ptr<Shader> proxy, const Matrix& preLocalMatrix,
+                    const Matrix& postLocalMatrix)
+      : proxyShader(std::move(proxy)),
+        _preLocalMatrix(preLocalMatrix),
+        _postLocalMatrix(postLocalMatrix) {
   }
 
-  std::shared_ptr<Shader> makeAsALocalMatrixShader(Matrix* localMatrix) const override;
+  std::shared_ptr<Shader> makeWithLocalMatrix(const Matrix& matrix, bool isPre) const override;
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const override;
 
  private:
   std::shared_ptr<Shader> proxyShader;
-  const Matrix _localMatrix;
+  const Matrix _preLocalMatrix;
+  const Matrix _postLocalMatrix;
 };
 }  // namespace tgfx

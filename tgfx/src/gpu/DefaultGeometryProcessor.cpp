@@ -21,12 +21,14 @@
 #include "gpu/opengl/GLDefaultGeometryProcessor.h"
 
 namespace tgfx {
-std::unique_ptr<DefaultGeometryProcessor> DefaultGeometryProcessor::Make(int width, int height) {
-  return std::unique_ptr<DefaultGeometryProcessor>(new DefaultGeometryProcessor(width, height));
+std::unique_ptr<DefaultGeometryProcessor> DefaultGeometryProcessor::Make(
+    int width, int height, const Matrix& localMatrix) {
+  return std::unique_ptr<DefaultGeometryProcessor>(
+      new DefaultGeometryProcessor(width, height, localMatrix));
 }
 
-DefaultGeometryProcessor::DefaultGeometryProcessor(int width, int height)
-    : width(width), height(height) {
+DefaultGeometryProcessor::DefaultGeometryProcessor(int width, int height, const Matrix& localMatrix)
+    : width(width), height(height), localMatrix(localMatrix) {
   position = {"aPosition", ShaderVar::Type::Float2};
   coverage = {"inCoverage", ShaderVar::Type::Float};
   setVertexAttributes(&position, 2);

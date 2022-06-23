@@ -20,8 +20,7 @@
 #include "gpu/opengl/GLTriangulatingPathOp.h"
 
 namespace tgfx {
-std::pair<std::unique_ptr<GLDrawOp>, Matrix> TriangularPathMesh::getOp(
-    const Matrix& viewMatrix) const {
+std::unique_ptr<GLDrawOp> TriangularPathMesh::getOp(const Matrix& viewMatrix) const {
   auto point = Point::Zero();
   auto vertices = _vertices;
   auto bounds = this->bounds();
@@ -34,8 +33,10 @@ std::pair<std::unique_ptr<GLDrawOp>, Matrix> TriangularPathMesh::getOp(
     }
   }
   auto localMatrix = Matrix::I();
-  viewMatrix.invert(&localMatrix);
-  return {std::make_unique<GLTriangulatingPathOp>(std::move(vertices), _vertexCount, bounds),
-          localMatrix};
+  if (!viewMatrix.invert(&localMatrix)) {
+    return nullptr;
+  }
+  return std::make_unique<GLTriangulatingPathOp>(std::move(vertices), _vertexCount, bounds,
+                                                 localMatrix);
 }
 }  // namespace tgfx

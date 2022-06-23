@@ -80,16 +80,25 @@ class Shader {
   }
 
   /**
-   *  Returns a shader that will apply the specified localMatrix to this shader.
+   * Returns a shader that will apply the specified localMatrix to this shader. The specified
+   * matrix will be applied before any matrix associated with this shader.
    */
-  std::shared_ptr<Shader> makeWithLocalMatrix(const Matrix& matrix) const;
+  std::shared_ptr<Shader> makeWithPreLocalMatrix(const Matrix& matrix) const {
+    return makeWithLocalMatrix(matrix, true);
+  }
+
+  /**
+   * Returns a shader that will apply the specified localMatrix to this shader. The specified
+   * matrix will be applied after any matrix associated with this shader.
+   */
+  std::shared_ptr<Shader> makeWithPostLocalMatrix(const Matrix& matrix) const {
+    return makeWithLocalMatrix(matrix, false);
+  }
 
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const = 0;
 
  protected:
-  virtual std::shared_ptr<Shader> makeAsALocalMatrixShader(Matrix*) const {
-    return nullptr;
-  }
+  virtual std::shared_ptr<Shader> makeWithLocalMatrix(const Matrix& matrix, bool isPre) const;
 
   std::weak_ptr<Shader> weakThis;
 };

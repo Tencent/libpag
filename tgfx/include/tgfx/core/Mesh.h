@@ -36,7 +36,7 @@ class Mesh {
   virtual Rect bounds() const = 0;
 
  protected:
-  virtual std::pair<std::unique_ptr<GLDrawOp>, Matrix> getOp(const Matrix& viewMatrix) const = 0;
+  virtual std::unique_ptr<GLDrawOp> getOp(const Matrix& viewMatrix) const = 0;
 
   friend class GLCanvas;
 };

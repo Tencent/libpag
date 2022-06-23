@@ -24,12 +24,15 @@
 
 namespace tgfx {
 struct FPArgs {
-  FPArgs(Context* context, const Matrix& localMatrix) : context(context), localMatrix(localMatrix) {
+  explicit FPArgs(Context* context) : context(context) {
   }
 
   Context* context = nullptr;
-  Matrix localMatrix = Matrix::I();
+  Matrix preLocalMatrix = Matrix::I();
+  Matrix postLocalMatrix = Matrix::I();
 };
+
+bool ComputeTotalInverse(const FPArgs& args, Matrix* totalInverse);
 
 class Pipeline;
 class GLFragmentProcessor;

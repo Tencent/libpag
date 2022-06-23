@@ -21,6 +21,20 @@
 #include "Pipeline.h"
 
 namespace tgfx {
+bool ComputeTotalInverse(const FPArgs& args, Matrix* totalInverse) {
+  if (totalInverse == nullptr) {
+    return false;
+  }
+  totalInverse->reset();
+  if (!args.preLocalMatrix.isIdentity()) {
+    totalInverse->preConcat(args.preLocalMatrix);
+  }
+  if (!args.postLocalMatrix.isIdentity()) {
+    totalInverse->postConcat(args.postLocalMatrix);
+  }
+  return totalInverse->invert(totalInverse);
+}
+
 void FragmentProcessor::computeProcessorKey(Context* context, BytesKey* bytesKey) const {
   onComputeProcessorKey(bytesKey);
   for (size_t i = 0; i < textureSamplerCount; ++i) {
