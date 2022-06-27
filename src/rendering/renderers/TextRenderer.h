@@ -19,8 +19,8 @@
 #pragma once
 
 #include "pag/file.h"
+#include "rendering/graphics/Glyph.h"
 #include "rendering/graphics/Graphic.h"
-#include "rendering/graphics/MutableGlyph.h"
 
 namespace pag {
 std::pair<std::vector<std::vector<GlyphHandle>>, tgfx::Rect> GetLines(

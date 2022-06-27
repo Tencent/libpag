@@ -19,7 +19,7 @@
 #pragma once
 
 #include "pag/file.h"
-#include "rendering/graphics/MutableGlyph.h"
+#include "rendering/graphics/Glyph.h"
 
 namespace pag {
 class TextBlock {

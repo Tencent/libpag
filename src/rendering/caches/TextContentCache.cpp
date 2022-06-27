@@ -120,7 +120,7 @@ static std::vector<std::vector<GlyphHandle>> CopyLines(
     std::vector<GlyphHandle> glyphLine;
     glyphLine.reserve(line.size());
     for (const auto& glyph : line) {
-      glyphLine.emplace_back(std::make_shared<MutableGlyph>(*glyph));
+      glyphLine.emplace_back(std::make_shared<Glyph>(*glyph));
     }
     glyphLines.emplace_back(glyphLine);
   }

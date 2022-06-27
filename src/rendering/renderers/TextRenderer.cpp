@@ -18,6 +18,7 @@
 
 #include "TextRenderer.h"
 #include "base/utils/TGFXCast.h"
+#include "rendering/FontManager.h"
 #include "rendering/graphics/Shape.h"
 #include "tgfx/core/PathEffect.h"
 
@@ -452,7 +453,7 @@ std::shared_ptr<Graphic> RenderTextBackground(ID assetID,
   return Graphic::MakeCompose(graphic, modifier);
 }
 
-TextPaint CreateTextPaint(const TextDocument* textDocument) {
+static std::vector<GlyphHandle> BuildGlyphs(const TextDocument* textDocument) {
   TextPaint textPaint = {};
   if (textDocument->applyFill && textDocument->applyStroke) {
     textPaint.style = TextStyle::StrokeAndFill;
@@ -465,14 +466,19 @@ TextPaint CreateTextPaint(const TextDocument* textDocument) {
   textPaint.strokeColor = textDocument->strokeColor;
   textPaint.strokeWidth = textDocument->strokeWidth;
   textPaint.strokeOverFill = textDocument->strokeOverFill;
-  return textPaint;
+  tgfx::Font textFont = {};
+  textFont.setFauxBold(textDocument->fauxBold);
+  textFont.setFauxItalic(textDocument->fauxItalic);
+  textFont.setSize(textDocument->fontSize);
+  textFont.setTypeface(
+      FontManager::GetTypefaceWithoutFallback(textDocument->fontFamily, textDocument->fontStyle));
+  return Glyph::BuildFromText(textDocument->text, textFont, textPaint,
+                              textDocument->direction == TextDirection::Vertical);
 }
 
 std::pair<std::vector<std::vector<GlyphHandle>>, tgfx::Rect> GetLines(
     const TextDocument* textDocument) {
-  auto simpleGlyphs = GetSimpleGlyphs(textDocument);
-  auto paint = CreateTextPaint(textDocument);
-  auto glyphList = MutableGlyph::BuildFromText(simpleGlyphs, paint);
+  auto glyphList = BuildGlyphs(textDocument);
   // 无论文字朝向，都先按从(0,0)点开始的横向矩形排版。
   // 提取出跟文字朝向无关的 GlyphInfo 列表与 TextLayout,
   // 复用同一套排版规则。如果最终是纵向排版，再把坐标转成纵向坐标应用到 glyphList 上。
@@ -490,10 +496,7 @@ std::pair<std::vector<std::vector<GlyphHandle>>, tgfx::Rect> GetLines(
 
 void CalculateTextAscentAndDescent(const TextDocument* textDocument, float* pMinAscent,
                                    float* pMaxDescent) {
-  auto glyphs = GetSimpleGlyphs(textDocument);
-  auto paint = CreateTextPaint(textDocument);
-  auto glyphList = MutableGlyph::BuildFromText(glyphs, paint);
-
+  auto glyphList = BuildGlyphs(textDocument);
   float minAscent = 0;
   float maxDescent = 0;
   for (auto& glyph : glyphList) {

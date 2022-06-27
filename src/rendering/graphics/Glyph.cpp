@@ -21,7 +21,44 @@
 #include "tgfx/core/UTF.h"
 
 namespace pag {
-Glyph::Glyph(tgfx::GlyphID glyphId, std::string name, tgfx::Font font, bool isVertical)
+std::vector<GlyphHandle> Glyph::BuildFromText(const std::string& text, const tgfx::Font& font,
+                                              const TextPaint& paint, bool isVertical) {
+  auto textFont = font;
+  auto typeface = textFont.getTypeface();
+  bool hasTypeface = typeface != nullptr;
+  std::unordered_map<std::string, GlyphHandle> glyphMap;
+  std::vector<GlyphHandle> glyphList;
+  const char* textStart = &(text[0]);
+  const char* textStop = textStart + text.size();
+  while (textStart < textStop) {
+    auto oldPosition = textStart;
+    tgfx::UTF::NextUTF8(&textStart, textStop);
+    auto length = textStart - oldPosition;
+    auto name = std::string(oldPosition, length);
+    if (glyphMap.find(name) != glyphMap.end()) {
+      glyphList.emplace_back(std::make_shared<Glyph>(*glyphMap[name]));
+      continue;
+    }
+    tgfx::GlyphID glyphId = 0;
+    if (hasTypeface) {
+      glyphId = typeface->getGlyphID(name);
+      if (glyphId != 0) {
+        textFont.setTypeface(typeface);
+      }
+    }
+    if (glyphId == 0) {
+      auto fallbackTypeface = FontManager::GetFallbackTypeface(name, &glyphId);
+      textFont.setTypeface(fallbackTypeface);
+    }
+    auto glyph = std::shared_ptr<Glyph>(new Glyph(glyphId, name, textFont, isVertical, paint));
+    glyphMap[name] = glyph;
+    glyphList.emplace_back(glyph);
+  }
+  return glyphList;
+}
+
+Glyph::Glyph(tgfx::GlyphID glyphId, std::string name, tgfx::Font font, bool isVertical,
+             const TextPaint& textPaint)
     : _glyphId(glyphId), _name(std::move(name)), _font(std::move(font)), _isVertical(isVertical) {
   horizontalInfo->advance = _font.getGlyphAdvance(_glyphId);
   horizontalInfo->bounds = _font.getGlyphBounds(_glyphId);
@@ -61,56 +98,53 @@ Glyph::Glyph(tgfx::GlyphID glyphId, std::string name, tgfx::Font font, bool isVe
     verticalInfo->extraMatrix.mapRect(&verticalInfo->bounds);
     info = verticalInfo.get();
   }
+  textStyle = textPaint.style;
+  strokeOverFill = textPaint.strokeOverFill;
+  fillColor = textPaint.fillColor;
+  strokeColor = textPaint.strokeColor;
+  strokeWidth = textPaint.strokeWidth;
+}
+
+void Glyph::computeStyleKey(tgfx::BytesKey* styleKey) const {
+  auto m = getTotalMatrix();
+  styleKey->write(m.getScaleX());
+  styleKey->write(m.getSkewX());
+  styleKey->write(m.getSkewY());
+  styleKey->write(m.getScaleY());
+  uint8_t fillValues[] = {fillColor.red, fillColor.green, fillColor.blue,
+                          static_cast<uint8_t>(alpha * 255)};
+  styleKey->write(fillValues);
+  uint8_t strokeValues[] = {strokeColor.red, strokeColor.green, strokeColor.blue,
+                            static_cast<uint8_t>(textStyle)};
+  styleKey->write(strokeValues);
+  styleKey->write(strokeWidth);
+  styleKey->write(getFont().getTypeface()->uniqueID());
+}
+
+bool Glyph::isVisible() const {
+  return matrix.invertible() && alpha != 0.0f && !getBounds().isEmpty();
+}
+
+tgfx::Matrix Glyph::getTotalMatrix() const {
+  auto m = getExtraMatrix();
+  m.postConcat(matrix);
+  return m;
+}
+
+void Glyph::computeAtlasKey(tgfx::BytesKey* bytesKey, TextStyle style) const {
+  bytesKey->write(static_cast<uint32_t>(getFont().getTypeface()->hasColor()));
+  bytesKey->write(static_cast<uint32_t>(getGlyphID()));
+  bytesKey->write(static_cast<uint32_t>(style));
 }
 
 std::shared_ptr<Glyph> Glyph::makeHorizontalGlyph() const {
   auto glyph = std::make_shared<Glyph>(*this);
-  if (glyph->isVertical()) {
+  if (_isVertical) {
     glyph->_isVertical = false;
     glyph->info = glyph->horizontalInfo.get();
     glyph->verticalInfo = nullptr;
   }
+  glyph->matrix = tgfx::Matrix::I();
   return glyph;
-}
-
-std::vector<std::shared_ptr<Glyph>> GetSimpleGlyphs(const TextDocument* textDocument,
-                                                    bool applyDirection) {
-  tgfx::Font textFont = {};
-  textFont.setFauxBold(textDocument->fauxBold);
-  textFont.setFauxItalic(textDocument->fauxItalic);
-  textFont.setSize(textDocument->fontSize);
-  auto typeface =
-      FontManager::GetTypefaceWithoutFallback(textDocument->fontFamily, textDocument->fontStyle);
-  bool hasTypeface = typeface != nullptr;
-  std::unordered_map<std::string, std::shared_ptr<Glyph>> glyphMap;
-  std::vector<std::shared_ptr<Glyph>> glyphList;
-  const char* textStart = &(textDocument->text[0]);
-  const char* textStop = textStart + textDocument->text.size();
-  while (textStart < textStop) {
-    auto oldPosition = textStart;
-    tgfx::UTF::NextUTF8(&textStart, textStop);
-    auto length = textStart - oldPosition;
-    auto name = std::string(oldPosition, length);
-    if (glyphMap.find(name) != glyphMap.end()) {
-      glyphList.push_back(glyphMap[name]);
-      continue;
-    }
-    tgfx::GlyphID glyphId = 0;
-    if (hasTypeface) {
-      glyphId = typeface->getGlyphID(name);
-      if (glyphId != 0) {
-        textFont.setTypeface(typeface);
-      }
-    }
-    if (glyphId == 0) {
-      auto fallbackTypeface = FontManager::GetFallbackTypeface(name, &glyphId);
-      textFont.setTypeface(fallbackTypeface);
-    }
-    bool isVertical = applyDirection && textDocument->direction == TextDirection::Vertical;
-    auto glyph = std::make_shared<Glyph>(glyphId, name, textFont, isVertical);
-    glyphMap[name] = glyph;
-    glyphList.push_back(glyph);
-  }
-  return glyphList;
 }
 }  // namespace pag

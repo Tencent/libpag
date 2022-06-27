@@ -69,7 +69,7 @@ TextBlock::TextBlock(ID assetID, std::vector<std::vector<GlyphHandle>> lines, fl
       if (style == TextStyle::Stroke || style == TextStyle::Fill) {
         AddGlyph(glyph, &atlasGlyphs, &atlasKeys);
       } else if (style == TextStyle::StrokeAndFill) {
-        auto strokeGlyph = std::make_shared<MutableGlyph>(*glyph);
+        auto strokeGlyph = std::make_shared<Glyph>(*glyph);
         strokeGlyph->setStyle(TextStyle::Stroke);
         AddGlyph(strokeGlyph, &atlasGlyphs, &atlasKeys);
         glyph->setStyle(TextStyle::Fill);
