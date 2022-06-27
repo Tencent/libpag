@@ -110,8 +110,8 @@ export class PAGFile extends PAGComposition {
    * If the editableIndex of a PAGLayer is not present in the returned indices, the PAGLayer should
    * not be treated as editable.
    */
-  public getEditableIndices(layerType: LayerType) {
-    return proxyVector(this.wasmIns._getEditableIndices(layerType), Number);
+  public getEditableIndices(layerType: LayerType): Array<number> {
+    return this.wasmIns._getEditableIndices(layerType);
   }
   /**
    * Indicate how to stretch the original duration to fit target duration when file's duration is
