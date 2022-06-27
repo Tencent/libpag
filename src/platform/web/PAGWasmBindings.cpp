@@ -224,6 +224,14 @@ EMSCRIPTEN_BINDINGS(pag) {
                   return pagFile.getLayersByEditableIndex(editableIndex,
                                                           static_cast<LayerType>(layerType));
                 }))
+      .function(
+          "_getEditableIndices", optional_override([](PAGFile& pagFile, int layerType) {
+            auto res = val::array();
+            for (auto indices : pagFile.getEditableIndices(static_cast<LayerType>(layerType))) {
+              res.call<int>("push", indices);
+            }
+            return res;
+          }))
       .function("_timeStretchMode", &PAGFile::timeStretchMode)
       .function("_setTimeStretchMode", &PAGFile::setTimeStretchMode)
       .function("_setDuration", optional_override([](PAGFile& pagFile, int duration) {

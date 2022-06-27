@@ -105,12 +105,16 @@ describe('PAGFile', () => {
     expect(pagLayer.text()).to.be.eq('test');
   });
 
-  it('Set timeStretchMode', () => {
+  it('Get editable indices', () => {
+    expect(pagFile.getEditableIndices(PAGTypes.LayerType.Text)).to.be.eql([0]);
+  });
+
+  it('Set/Get timeStretchMode', () => {
     pagFile.setTimeStretchMode(PAGTypes.PAGTimeStretchMode.Scale);
     expect(pagFile.timeStretchMode()).to.be.eq(PAGTypes.PAGTimeStretchMode.Scale);
   });
 
-  it('Set duration', () => {
+  it('Set/Get duration', () => {
     pagFile.setDuration(1000000);
     expect(pagFile.duration()).to.be.eq(1000000);
   });
