@@ -26,11 +26,7 @@ GaussianBlurFilterPass::GaussianBlurFilterPass(BlurOptions options) : options(op
 
 std::string GaussianBlurFilterPass::onBuildFragmentShader() {
   if ((options & BlurOptions::Down) != BlurOptions::None) {
-    if ((options & BlurOptions::RepeatEdgePixels) != BlurOptions::None) {
-      return BLUR_DOWN_FRAGMENT_SHADER;
-    } else {
-      return BLUR_DOWN_FRAGMENT_SHADER_NO_REPEAT_EDGE;
-    }
+    return BLUR_DOWN_FRAGMENT_SHADER;
   } else if ((options & BlurOptions::Up) != BlurOptions::None) {
     if ((options & BlurOptions::RepeatEdgePixels) != BlurOptions::None) {
       return BLUR_UP_FRAGMENT_SHADER;
