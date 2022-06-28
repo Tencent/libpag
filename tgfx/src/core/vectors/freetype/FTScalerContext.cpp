@@ -635,7 +635,7 @@ void CopyFTBitmap(const FT_Bitmap& bitmap, std::shared_ptr<PixelBuffer> pixelBuf
   auto dstFormat = ToPixelFormat(bm.colorType());
   for (int i = 0; i < height; i++) {
     gfx::skcmsTransform(src, srcFormat, gfx::skcms_AlphaFormat_PremulAsEncoded, nullptr, dst,
-                         dstFormat, gfx::skcms_AlphaFormat_PremulAsEncoded, nullptr, width);
+                        dstFormat, gfx::skcms_AlphaFormat_PremulAsEncoded, nullptr, width);
     src += srcRB;
     dst += dstRB;
   }
