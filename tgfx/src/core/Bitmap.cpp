@@ -69,7 +69,7 @@ static void ConvertPixels(const ImageInfo& srcInfo, const void* srcPixels, const
   auto width = dstInfo.width();
   auto height = dstInfo.height();
   for (int i = 0; i < height; i++) {
-    gfx::skcms_Transform(srcPixels, srcFormat, srcAlpha, nullptr, dstPixels, dstFormat, dstAlpha,
+    gfx::skcmsTransform(srcPixels, srcFormat, srcAlpha, nullptr, dstPixels, dstFormat, dstAlpha,
                          nullptr, width);
     dstPixels = AddOffset(dstPixels, dstInfo.rowBytes());
     srcPixels = AddOffset(srcPixels, srcInfo.rowBytes());
