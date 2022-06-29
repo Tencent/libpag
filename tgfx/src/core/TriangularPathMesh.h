@@ -32,7 +32,7 @@ class TriangularPathMesh : public Mesh {
   }
 
  private:
-  std::pair<std::unique_ptr<GLDrawOp>, Matrix> getOp(const Matrix& viewMatrix) const override;
+  std::unique_ptr<GLDrawOp> getOp(const Matrix& viewMatrix) const override;
 
   std::vector<float> _vertices;
   int _vertexCount;

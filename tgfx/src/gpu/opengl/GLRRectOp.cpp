@@ -98,15 +98,20 @@ static constexpr size_t kIndicesPerFillRRect =
 // stroke count is fill count minus center indices
 // static constexpr int kIndicesPerStrokeRRect = kCornerIndicesCount + kEdgeIndicesCount;
 
-std::unique_ptr<GLRRectOp> GLRRectOp::Make(const RRect& rRect, const Matrix& viewMatrix) {
+std::unique_ptr<GLRRectOp> GLRRectOp::Make(const RRect& rRect, const Matrix& viewMatrix,
+                                           const Matrix& localMatrix) {
   if (/*!isStrokeOnly && */ 0.5f <= rRect.radii.x && 0.5f <= rRect.radii.y) {
-    return std::unique_ptr<GLRRectOp>(new GLRRectOp(rRect, viewMatrix));
+    return std::unique_ptr<GLRRectOp>(new GLRRectOp(rRect, viewMatrix, localMatrix));
   }
   return nullptr;
 }
 
-GLRRectOp::GLRRectOp(const RRect& rRect, const Matrix& viewMatrix)
-    : rRect(rRect), viewMatrix(viewMatrix), xRadius(rRect.radii.x), yRadius(rRect.radii.y) {
+GLRRectOp::GLRRectOp(const RRect& rRect, const Matrix& viewMatrix, const Matrix& localMatrix)
+    : rRect(rRect),
+      viewMatrix(viewMatrix),
+      _localMatrix(localMatrix),
+      xRadius(rRect.radii.x),
+      yRadius(rRect.radii.y) {
   setTransformedBounds(rRect.rect, viewMatrix);
 }
 
@@ -115,9 +120,9 @@ static bool UseScale(const DrawArgs& args) {
 }
 
 std::unique_ptr<GeometryProcessor> GLRRectOp::getGeometryProcessor(const DrawArgs& args) {
-  auto localMatrix = Matrix::MakeScale(1.f / rRect.rect.width(), 1.f / rRect.rect.height());
-  localMatrix.postTranslate(-rRect.rect.left / rRect.rect.width(),
-                            -rRect.rect.top / rRect.rect.height());
+  auto localMatrix = _localMatrix;
+  localMatrix.postTranslate(-rRect.rect.left, -rRect.rect.top);
+  localMatrix.postScale(1.f / rRect.rect.width(), 1.f / rRect.rect.height());
   return EllipseGeometryProcessor::Make(args.renderTarget->width(), args.renderTarget->height(),
                                         false, UseScale(args), localMatrix, viewMatrix);
 }

@@ -187,11 +187,15 @@ void GLCanvas::drawPath(const Path& path, const Paint& paint) {
 static std::unique_ptr<GLDrawOp> MakeSimplePathOp(const Path& path, const Matrix& viewMatrix) {
   auto rect = Rect::MakeEmpty();
   if (path.asRect(&rect)) {
-    return GLFillRectOp::Make(rect, viewMatrix);
+    auto localMatrix = Matrix::MakeScale(rect.width(), rect.height());
+    localMatrix.postTranslate(rect.x(), rect.y());
+    return GLFillRectOp::Make(rect, viewMatrix, localMatrix);
   }
   RRect rRect;
   if (path.asRRect(&rRect)) {
-    return GLRRectOp::Make(rRect, viewMatrix);
+    auto localMatrix = Matrix::MakeScale(rRect.rect.width(), rRect.rect.height());
+    localMatrix.postTranslate(rRect.rect.x(), rRect.rect.y());
+    return GLRRectOp::Make(rRect, viewMatrix, localMatrix);
   }
   return nullptr;
 }
@@ -208,9 +212,7 @@ void GLCanvas::fillPath(const Path& path, const Shader* shader) {
   auto viewMatrix = getViewMatrix();
   auto op = MakeSimplePathOp(path, viewMatrix);
   if (op) {
-    auto localMatrix = Matrix::MakeScale(bounds.width(), bounds.height());
-    localMatrix.postTranslate(bounds.x(), bounds.y());
-    auto args = FPArgs(getContext(), localMatrix);
+    auto args = FPArgs(getContext());
     draw(std::move(op), shader->asFragmentProcessor(args));
     return;
   }
@@ -218,11 +220,10 @@ void GLCanvas::fillPath(const Path& path, const Shader* shader) {
   tempPath.transform(viewMatrix);
   op = GLTriangulatingPathOp::Make(tempPath, state->clip.getBounds());
   if (op) {
-    auto localMatrix = Matrix::I();
-    viewMatrix.invert(&localMatrix);
     save();
     resetMatrix();
-    auto args = FPArgs(getContext(), localMatrix);
+    auto args = FPArgs(getContext());
+    args.postLocalMatrix = viewMatrix;
     draw(std::move(op), shader->asFragmentProcessor(args));
     restore();
     return;
@@ -255,7 +256,9 @@ void GLCanvas::drawMask(const Rect& bounds, const Texture* mask, const Shader* s
   auto maskLocalMatrix = Matrix::I();
   if (appliedMatrix) {
     auto invert = Matrix::I();
-    state->matrix.invert(&invert);
+    if (!state->matrix.invert(&invert)) {
+      return;
+    }
     localMatrix.postConcat(invert);
     auto scale = mask->getTextureCoord(static_cast<float>(mask->width()),
                                        static_cast<float>(mask->height()));
@@ -267,7 +270,10 @@ void GLCanvas::drawMask(const Rect& bounds, const Texture* mask, const Shader* s
     maskLocalMatrix.postScale(scale.x, scale.y);
     maskLocalMatrix.postTranslate(translate.x, translate.y);
   }
-  auto args = FPArgs(getContext(), localMatrix);
+  auto args = FPArgs(getContext());
+  if (!localMatrix.invert(&args.postLocalMatrix)) {
+    return;
+  }
   auto oldMatrix = state->matrix;
   if (appliedMatrix) {
     resetMatrix();
@@ -431,13 +437,13 @@ void GLCanvas::drawMesh(const Mesh* mesh, const Paint& paint) {
   if (!clipBounds.intersect(bounds)) {
     return;
   }
-  auto [op, localMatrix] = mesh->getOp(viewMatrix);
+  auto op = mesh->getOp(viewMatrix);
   if (op == nullptr) {
     return;
   }
   auto oldMatrix = state->matrix;
   resetMatrix();
-  auto args = FPArgs(getContext(), localMatrix);
+  auto args = FPArgs(getContext());
   draw(std::move(op), GetShader(paint)->asFragmentProcessor(args));
   setMatrix(oldMatrix);
 }

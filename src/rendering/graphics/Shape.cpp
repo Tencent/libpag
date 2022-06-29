@@ -80,7 +80,11 @@ void Shape::draw(tgfx::Canvas* canvas, RenderCache* renderCache) const {
   tgfx::Paint paint;
   auto snapshot = renderCache->getSnapshot(this);
   if (snapshot) {
-    paint.setShader(shader->makeWithLocalMatrix(snapshot->getMatrix()));
+    auto matrix = snapshot->getMatrix();
+    if (!matrix.invert(&matrix)) {
+      return;
+    }
+    paint.setShader(shader->makeWithPostLocalMatrix(matrix));
     auto oldMatrix = canvas->getMatrix();
     canvas->concat(snapshot->getMatrix());
     if (snapshot->getTexture()) {

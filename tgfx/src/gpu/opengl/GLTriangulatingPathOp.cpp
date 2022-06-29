@@ -43,14 +43,15 @@ std::unique_ptr<GLTriangulatingPathOp> GLTriangulatingPathOp::Make(const Path& p
 }
 
 GLTriangulatingPathOp::GLTriangulatingPathOp(std::vector<float> vertex, int vertexCount,
-                                             Rect bounds)
-    : vertex(std::move(vertex)), vertexCount(vertexCount) {
+                                             Rect bounds, const Matrix& localMatrix)
+    : vertex(std::move(vertex)), vertexCount(vertexCount), localMatrix(localMatrix) {
   setBounds(bounds);
 }
 
 std::unique_ptr<GeometryProcessor> GLTriangulatingPathOp::getGeometryProcessor(
     const DrawArgs& args) {
-  return DefaultGeometryProcessor::Make(args.renderTarget->width(), args.renderTarget->height());
+  return DefaultGeometryProcessor::Make(args.renderTarget->width(), args.renderTarget->height(),
+                                        localMatrix);
 }
 
 std::vector<float> GLTriangulatingPathOp::vertices(const DrawArgs&) {

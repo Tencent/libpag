@@ -20,38 +20,48 @@
 #include "gpu/FragmentProcessor.h"
 
 namespace tgfx {
-std::shared_ptr<Shader> Shader::makeWithLocalMatrix(const Matrix& matrix) const {
+std::shared_ptr<Shader> Shader::makeWithLocalMatrix(const Matrix& matrix, bool isPre) const {
   if (matrix.isIdentity()) {
     return weakThis.lock();
   }
-  Matrix localMatrix = Matrix::I();
-  auto baseShader = makeAsALocalMatrixShader(&localMatrix);
-  if (baseShader) {
-    localMatrix.preConcat(matrix);
-  } else {
-    localMatrix = matrix;
-    baseShader = weakThis.lock();
-    if (baseShader == nullptr) {
-      return nullptr;
-    }
+  auto baseShader = weakThis.lock();
+  if (baseShader == nullptr) {
+    return nullptr;
   }
-  auto shader = std::make_shared<LocalMatrixShader>(std::move(baseShader), localMatrix);
+  std::shared_ptr<Shader> shader;
+  if (isPre) {
+    shader = std::make_shared<LocalMatrixShader>(std::move(baseShader), matrix, Matrix::I());
+  } else {
+    shader = std::make_shared<LocalMatrixShader>(std::move(baseShader), Matrix::I(), matrix);
+  }
   shader->weakThis = shader;
   return shader;
 }
 
-std::shared_ptr<Shader> LocalMatrixShader::makeAsALocalMatrixShader(Matrix* localMatrix) const {
-  if (localMatrix) {
-    *localMatrix = _localMatrix;
+std::shared_ptr<Shader> LocalMatrixShader::makeWithLocalMatrix(const Matrix& matrix,
+                                                               bool isPre) const {
+  if (matrix.isIdentity()) {
+    return weakThis.lock();
   }
-  return proxyShader;
+  std::shared_ptr<LocalMatrixShader> shader;
+  if (isPre) {
+    auto localMatrix = _preLocalMatrix;
+    localMatrix.preConcat(matrix);
+    shader = std::make_shared<LocalMatrixShader>(proxyShader, localMatrix, _postLocalMatrix);
+  } else {
+    auto localMatrix = _postLocalMatrix;
+    localMatrix.postConcat(matrix);
+    shader = std::make_shared<LocalMatrixShader>(proxyShader, _preLocalMatrix, localMatrix);
+  }
+  shader->weakThis = shader;
+  return shader;
 }
 
 std::unique_ptr<FragmentProcessor> LocalMatrixShader::asFragmentProcessor(
     const FPArgs& args) const {
-  auto matrix = _localMatrix;
-  matrix.preConcat(args.localMatrix);
-  FPArgs fpArgs(args.context, matrix);
+  FPArgs fpArgs(args);
+  fpArgs.preLocalMatrix.setConcat(_preLocalMatrix, fpArgs.preLocalMatrix);
+  fpArgs.postLocalMatrix.setConcat(fpArgs.postLocalMatrix, _postLocalMatrix);
   return proxyShader->asFragmentProcessor(fpArgs);
 }
 }  // namespace tgfx

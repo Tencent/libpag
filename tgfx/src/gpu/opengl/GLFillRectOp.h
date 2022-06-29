@@ -25,7 +25,8 @@
 namespace tgfx {
 class GLFillRectOp : public GLDrawOp {
  public:
-  static std::unique_ptr<GLFillRectOp> Make(const Rect& rect, const Matrix& viewMatrix);
+  static std::unique_ptr<GLFillRectOp> Make(const Rect& rect, const Matrix& viewMatrix,
+                                            const Matrix& localMatrix = Matrix::I());
 
   static std::unique_ptr<GLFillRectOp> Make(const std::vector<Rect>& rects,
                                             const std::vector<Matrix>& viewMatrices,

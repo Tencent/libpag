@@ -54,7 +54,7 @@ void GLDefaultGeometryProcessor::setData(const ProgramDataManager& programDataMa
                                          const GeometryProcessor& geometryProcessor,
                                          FPCoordTransformIter* transformIter) {
   const auto& gp = static_cast<const DefaultGeometryProcessor&>(geometryProcessor);
-  setTransformDataHelper(Matrix::I(), programDataManager, transformIter);
+  setTransformDataHelper(gp.localMatrix, programDataManager, transformIter);
   if (widthPrev != gp.width || heightPrev != gp.height) {
     widthPrev = gp.width;
     heightPrev = gp.height;

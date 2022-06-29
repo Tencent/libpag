@@ -99,8 +99,9 @@ std::vector<float> GLFillRectOp::vertices(const DrawArgs& args) {
   }
 }
 
-std::unique_ptr<GLFillRectOp> GLFillRectOp::Make(const Rect& rect, const Matrix& viewMatrix) {
-  return std::unique_ptr<GLFillRectOp>(new GLFillRectOp({rect}, {viewMatrix}, {Matrix::I()}, {}));
+std::unique_ptr<GLFillRectOp> GLFillRectOp::Make(const Rect& rect, const Matrix& viewMatrix,
+                                                 const Matrix& localMatrix) {
+  return std::unique_ptr<GLFillRectOp>(new GLFillRectOp({rect}, {viewMatrix}, {localMatrix}, {}));
 }
 
 std::unique_ptr<GLFillRectOp> GLFillRectOp::Make(const std::vector<Rect>& rects,

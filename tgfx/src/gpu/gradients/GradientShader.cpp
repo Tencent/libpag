@@ -203,7 +203,10 @@ LinearGradient::LinearGradient(const Point& startPoint, const Point& endPoint,
 }
 
 std::unique_ptr<FragmentProcessor> LinearGradient::asFragmentProcessor(const FPArgs& args) const {
-  auto matrix = args.localMatrix;
+  auto matrix = Matrix::I();
+  if (!ComputeTotalInverse(args, &matrix)) {
+    return nullptr;
+  }
   matrix.postConcat(pointsToUnit);
   return MakeGradient(args.context, *this, LinearGradientLayout::Make(matrix));
 }
@@ -221,7 +224,10 @@ RadialGradient::RadialGradient(const Point& center, float radius, const std::vec
 }
 
 std::unique_ptr<FragmentProcessor> RadialGradient::asFragmentProcessor(const FPArgs& args) const {
-  auto matrix = args.localMatrix;
+  auto matrix = Matrix::I();
+  if (!ComputeTotalInverse(args, &matrix)) {
+    return nullptr;
+  }
   matrix.postConcat(pointsToUnit);
   return MakeGradient(args.context, *this, RadialGradientLayout::Make(matrix));
 }
