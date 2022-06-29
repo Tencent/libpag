@@ -93,8 +93,8 @@ static const char BLUR_UP_FRAGMENT_SHADER_NO_REPEAT_EDGE[] = R"(
     uniform vec2 uOffset;
     
     float check(vec2 point) {
-        vec2 result = abs(step(vec2(1.0), point) - vec2(1.0)) * step(vec2(0.0), point);
-        return step(1.0, result.x * result.y);
+        vec2 result = step(point, vec2(1.0)) * step(vec2(0.0), point);
+        return step(0.5, result.x * result.y);
     }
     
     void main()

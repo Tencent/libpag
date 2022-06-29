@@ -259,6 +259,26 @@ bool FilterRenderer::MakeEffectNode(std::vector<FilterNode>& filterNodes, tgfx::
   return true;
 }
 
+bool NeedToSkipClipBounds(const FilterList* filterList) {
+  bool skipClipBounds = false;
+  for (auto& effect : filterList->effects) {
+    if (effect->type() == EffectType::FastBlur) {
+      auto blurEffect = static_cast<FastBlurEffect*>(effect);
+      if (blurEffect->repeatEdgePixels->getValueAt(0) == false) {
+        skipClipBounds = true;
+        break;
+      }
+    }
+  }
+  for (auto& layerStyle : filterList->layerStyles) {
+    if (layerStyle->type() == LayerStyleType::DropShadow) {
+      skipClipBounds = true;
+      break;
+    }
+  }
+  return skipClipBounds;
+}
+
 std::vector<FilterNode> FilterRenderer::MakeFilterNodes(const FilterList* filterList,
                                                         RenderCache* renderCache,
                                                         tgfx::Rect* contentBounds,
@@ -276,6 +296,8 @@ std::vector<FilterNode> FilterRenderer::MakeFilterNodes(const FilterList* filter
   auto clipBounds = clipRect;
   auto filterBounds = *contentBounds;
   auto effectScale = filterList->effectScale;
+  bool skipClipBounds = NeedToSkipClipBounds(filterList);
+
   // MotionBlur Fragment Shader中需要用到裁切区域外的像素，
   // 因此默认先把裁切区域过一次TransformBounds
   if (filterList->layer->motionBlur) {
@@ -283,7 +305,7 @@ std::vector<FilterNode> FilterRenderer::MakeFilterNodes(const FilterList* filter
                                       filterList->layerFrame);
     clipBounds.roundOut();
   }
-  if (clipIndex == -1 && !contentBounds->intersect(clipBounds)) {
+  if (!skipClipBounds && clipIndex == -1 && !contentBounds->intersect(clipBounds)) {
     return {};
   }
 
