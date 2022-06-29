@@ -214,6 +214,23 @@ PAG_TEST(PAGFilterTest, GaussBlur_Static) {
 }
 
 /**
+ * 用例描述: GaussianBlur_NoRepeat_Clip
+ */
+PAG_TEST(PAGFilterTest, GaussianBlur_NoRepeat_Clip) {
+  auto pagFile = PAGFile::Load("../resources/filter/GaussianBlur_NoRepeat_Clip.pag");
+  ASSERT_NE(pagFile, nullptr);
+  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  ASSERT_NE(pagSurface, nullptr);
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setComposition(pagFile);
+
+  pagFile->setCurrentTime(0);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFilterTest/GaussianBlur_NoRepeat_Clip"));
+}
+
+/**
  * 用例描述: RadialBlur
  */
 PAG_TEST(PAGFilterTest, RadialBlur) {
