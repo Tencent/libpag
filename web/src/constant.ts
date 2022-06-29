@@ -14,3 +14,11 @@ export const WEB_SAFE_FONT = 'Arial';
  * Default render canvas size.
  */
 export const DEFAULT_CANVAS_SIZE = 2560;
+/**
+ * Default WebGL ContextAttributes
+ */
+export const WEBGL_CONTEXT_ATTRIBUTES = {
+  depth: false,
+  stencil: false,
+  antialias: false,
+};

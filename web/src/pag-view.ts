@@ -10,8 +10,8 @@ import { BackendContext } from './core/backend-context';
 import { PAGModule } from './binding';
 
 import type { PAGComposition } from './pag-composition';
-import type { PAGFile } from './pag-file';
 import type { Matrix } from './core/matrix';
+import { WEBGL_CONTEXT_ATTRIBUTES } from './constant';
 
 export interface PAGViewOptions {
   /**
@@ -63,7 +63,7 @@ export class PAGView {
         if (!PAGModule.globalCanvas.glContext) throw new Error('GlobalCanvas context is not WebGL!');
         pagView.pagGlContext = BackendContext.from(PAGModule.globalCanvas.glContext);
       } else {
-        const gl = canvasElement.getContext('webgl');
+        const gl = canvasElement.getContext('webgl', WEBGL_CONTEXT_ATTRIBUTES);
         if (!gl) throw new Error('Canvas context is not WebGL!');
         pagView.pagGlContext = BackendContext.from(gl);
       }

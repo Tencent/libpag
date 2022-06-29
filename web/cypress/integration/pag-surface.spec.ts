@@ -24,7 +24,11 @@ describe('PAGSurface', () => {
 
   const makePAGSurfaceFromFrameBuffer = () => {
     const canvas = global.document.getElementById('pag') as HTMLCanvasElement;
-    const gl = canvas.getContext('webgl');
+    const gl = canvas.getContext('webgl', {
+      depth: false,
+      stencil: false,
+      antialias: false,
+    });
     expect(!!gl).to.be.eq(true);
     const pagGLCtx = PAG.BackendContext.from(gl);
     expect(pagGLCtx.makeCurrent()).to.be.eq(true);
