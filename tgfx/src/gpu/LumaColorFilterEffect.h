@@ -18,30 +18,21 @@
 
 #pragma once
 
-#include "tgfx/core/Matrix.h"
-#include "tgfx/gpu/Shader.h"
+#include "FragmentProcessor.h"
 
 namespace tgfx {
-class LocalMatrixShader final : public Shader {
+class LumaColorFilterEffect : public FragmentProcessor {
  public:
-  LocalMatrixShader(std::shared_ptr<Shader> proxy, const Matrix& preLocalMatrix,
-                    const Matrix& postLocalMatrix)
-      : proxyShader(std::move(proxy)),
-        _preLocalMatrix(preLocalMatrix),
-        _postLocalMatrix(postLocalMatrix) {
+  static std::unique_ptr<LumaColorFilterEffect> Make() {
+    return std::make_unique<LumaColorFilterEffect>();
   }
 
-  bool isOpaque() const override {
-    return proxyShader->isOpaque();
+  std::string name() const override {
+    return "LumaColorFilterEffect";
   }
 
-  std::shared_ptr<Shader> makeWithLocalMatrix(const Matrix& matrix, bool isPre) const override;
+  void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const override;
-
- private:
-  std::shared_ptr<Shader> proxyShader;
-  const Matrix _preLocalMatrix;
-  const Matrix _postLocalMatrix;
+  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
 };
 }  // namespace tgfx

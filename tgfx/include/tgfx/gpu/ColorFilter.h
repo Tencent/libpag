@@ -18,11 +18,15 @@
 
 #pragma once
 
+#include <memory>
+
 namespace tgfx {
 class FragmentProcessor;
 
 class ColorFilter {
  public:
+  static std::shared_ptr<ColorFilter> MakeLumaColorFilter();
+
   virtual ~ColorFilter() = default;
 
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor() const = 0;

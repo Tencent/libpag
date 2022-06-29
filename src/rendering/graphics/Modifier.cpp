@@ -97,8 +97,8 @@ class ClipModifier : public Modifier {
 
 class MaskModifier : public Modifier {
  public:
-  MaskModifier(std::shared_ptr<Graphic> mask, bool inverted)
-      : mask(std::move(mask)), inverted(inverted) {
+  MaskModifier(std::shared_ptr<Graphic> mask, bool inverted, bool useLuma)
+      : mask(std::move(mask)), inverted(inverted), useLuma(useLuma) {
   }
 
   ID type() const override {
@@ -131,6 +131,7 @@ class MaskModifier : public Modifier {
   // 可能是 nullptr
   std::shared_ptr<Graphic> mask = nullptr;
   bool inverted = false;
+  bool useLuma = false;
 };
 
 //================================================================================
@@ -150,19 +151,20 @@ std::shared_ptr<Modifier> Modifier::MakeClip(const tgfx::Path& clip) {
   return std::make_shared<ClipModifier>(clip);
 }
 
-std::shared_ptr<Modifier> Modifier::MakeMask(std::shared_ptr<Graphic> graphic, bool inverted) {
+std::shared_ptr<Modifier> Modifier::MakeMask(std::shared_ptr<Graphic> graphic, bool inverted,
+                                             bool useLuma) {
   if (graphic == nullptr && inverted) {
     // 返回空，表示保留目标对象的全部内容。
     return nullptr;
   }
   tgfx::Path clipPath = {};
-  if (graphic && graphic->getPath(&clipPath)) {
+  if (!useLuma && graphic && graphic->getPath(&clipPath)) {
     if (inverted) {
       clipPath.toggleInverseFillType();
     }
     return Modifier::MakeClip(clipPath);
   }
-  return std::make_shared<MaskModifier>(graphic, inverted);
+  return std::make_shared<MaskModifier>(graphic, inverted, useLuma);
 }
 
 //================================================================================
@@ -268,7 +270,7 @@ void MaskModifier::applyToGraphic(tgfx::Canvas* canvas, RenderCache* cache,
   auto contentMatrix = contentCanvas->getMatrix();
   graphic->draw(contentCanvas, cache);
   auto maskSurface = tgfx::Surface::Make(contentSurface->getContext(), contentSurface->width(),
-                                         contentSurface->height(), true);
+                                         contentSurface->height(), !useLuma);
   if (maskSurface == nullptr) {
     maskSurface = tgfx::Surface::Make(contentSurface->getContext(), contentSurface->width(),
                                       contentSurface->height());
@@ -279,7 +281,10 @@ void MaskModifier::applyToGraphic(tgfx::Canvas* canvas, RenderCache* cache,
   auto maskCanvas = maskSurface->getCanvas();
   maskCanvas->setMatrix(contentMatrix);
   mask->draw(maskCanvas, cache);
-  auto maskTexture = maskSurface->getTexture();
+  auto shader = tgfx::Shader::MakeTextureShader(maskSurface->getTexture());
+  if (shader == nullptr) {
+    return;
+  }
   auto texture = contentSurface->getTexture();
   auto scaleFactor = GetMaxScaleFactor(contentMatrix);
   auto matrix = tgfx::Matrix::MakeScale(1.0f / scaleFactor);
@@ -287,8 +292,10 @@ void MaskModifier::applyToGraphic(tgfx::Canvas* canvas, RenderCache* cache,
   canvas->save();
   canvas->concat(matrix);
   tgfx::Paint paint;
-  paint.setMaskFilter(
-      tgfx::MaskFilter::Make(tgfx::Shader::MakeTextureShader(maskTexture), inverted));
+  if (useLuma) {
+    shader = shader->makeWithColorFilter(tgfx::ColorFilter::MakeLumaColorFilter());
+  }
+  paint.setMaskFilter(tgfx::MaskFilter::Make(std::move(shader), inverted));
   canvas->drawTexture(texture.get(), &paint);
   canvas->restore();
 }

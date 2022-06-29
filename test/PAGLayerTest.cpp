@@ -278,4 +278,20 @@ PAG_TEST_F(PAGLayerTest, LayerAlpha) {
   pagPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGLayerTest/LayerAlpha"));
 }
+
+/**
+ * 用例描述: trackMatte-luma
+ */
+PAG_TEST_F(PAGLayerTest, trackMatte_luma) {
+  auto pagFile = PAGFile::Load("../resources/apitest/LumaTrackMatte.pag");
+  ASSERT_NE(pagFile, nullptr);
+  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  ASSERT_NE(pagSurface, nullptr);
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setProgress(0.5f);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGLayerTest/trackMatte_luma"));
+}
 }  // namespace pag

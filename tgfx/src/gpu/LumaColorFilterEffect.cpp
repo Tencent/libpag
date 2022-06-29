@@ -16,32 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "tgfx/core/Matrix.h"
-#include "tgfx/gpu/Shader.h"
+#include "LumaColorFilterEffect.h"
+#include "core/utils/UniqueID.h"
+#include "opengl/GLLumaColorFilterEffect.h"
 
 namespace tgfx {
-class LocalMatrixShader final : public Shader {
- public:
-  LocalMatrixShader(std::shared_ptr<Shader> proxy, const Matrix& preLocalMatrix,
-                    const Matrix& postLocalMatrix)
-      : proxyShader(std::move(proxy)),
-        _preLocalMatrix(preLocalMatrix),
-        _postLocalMatrix(postLocalMatrix) {
-  }
+void LumaColorFilterEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
+  static auto Type = UniqueID::Next();
+  bytesKey->write(Type);
+}
 
-  bool isOpaque() const override {
-    return proxyShader->isOpaque();
-  }
-
-  std::shared_ptr<Shader> makeWithLocalMatrix(const Matrix& matrix, bool isPre) const override;
-
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const override;
-
- private:
-  std::shared_ptr<Shader> proxyShader;
-  const Matrix _preLocalMatrix;
-  const Matrix _postLocalMatrix;
-};
+std::unique_ptr<GLFragmentProcessor> LumaColorFilterEffect::onCreateGLInstance() const {
+  return std::make_unique<GLLumaColorFilterEffect>();
+}
 }  // namespace tgfx
