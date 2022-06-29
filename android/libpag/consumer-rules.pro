@@ -1,0 +1,2 @@
+-keep class org.libpag.** {*;}
+-keep class androidx.exifinterface.** {*;}
