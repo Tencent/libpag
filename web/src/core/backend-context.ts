@@ -1,5 +1,5 @@
 import { PAGModule } from '../binding';
-import type { PAG } from '../types';
+import { WEBGL_CONTEXT_ATTRIBUTES } from '../constant';
 
 export class BackendContext {
   public static from(gl: WebGLRenderingContext | WebGL2RenderingContext | BackendContext): BackendContext {
@@ -17,9 +17,7 @@ export class BackendContext {
         id = GL.registerContext(gl, {
           majorVersion: majorVersion,
           minorVersion: 0,
-          depth: false,
-          stencil: false,
-          antialias: false,
+          ...WEBGL_CONTEXT_ATTRIBUTES,
         });
         return new BackendContext(id);
       }
