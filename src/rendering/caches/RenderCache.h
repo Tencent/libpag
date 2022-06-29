@@ -22,7 +22,7 @@
 #include <memory>
 #include <unordered_set>
 #include "TextAtlas.h"
-#include "TextGlyphs.h"
+#include "TextBlock.h"
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "rendering/Performance.h"
@@ -104,7 +104,7 @@ class RenderCache : public Performance {
 
   Snapshot* getSnapshot(const Shape* shape);
 
-  TextAtlas* getTextAtlas(const TextGlyphs* textGlyphs);
+  TextAtlas* getTextAtlas(const TextBlock* textBlock);
 
   /**
    * Prepares a bitmap task for next getImageBuffer() call.

@@ -21,82 +21,22 @@
 #include "tgfx/core/UTF.h"
 
 namespace pag {
-Glyph::Glyph(tgfx::GlyphID glyphId, std::string name, tgfx::Font font, bool isVertical)
-    : _glyphId(glyphId), _name(std::move(name)), _font(std::move(font)) {
-  _advance = _font.getGlyphAdvance(_glyphId);
-  _bounds = _font.getGlyphBounds(_glyphId);
-  auto metrics = _font.getMetrics();
-  _ascent = metrics.ascent;
-  _descent = metrics.descent;
-  if (_name == " ") {
-    // 空格字符测量的 bounds 比较异常偏上，本身也不可见，这里直接按字幕 A 的上下边界调整一下。
-    auto AGlyphID = _font.getGlyphID("A");
-    if (AGlyphID > 0) {
-      auto ABounds = _font.getGlyphBounds(AGlyphID);
-      _bounds.top = ABounds.top;
-      _bounds.bottom = ABounds.bottom;
-    }
-  }
-  if (isVertical) {
-    applyVertical();
-  }
-}
-
-std::shared_ptr<Glyph> Glyph::makeVerticalGlyph() const {
-  auto glyph = std::shared_ptr<Glyph>(new Glyph());
-  *glyph = *this;
-  glyph->applyVertical();
-  return glyph;
-}
-
-void Glyph::applyVertical() {
-  if (_isVertical) {
-    return;
-  }
-  _isVertical = true;
-  if (_name.size() == 1) {
-    // 字母，数字，标点等字符旋转 90° 绘制，原先的水平 baseline 转为垂直 baseline，
-    // 并水平向左偏移半个大写字母高度。
-    _extraMatrix.setRotate(90);
-    auto metrics = _font.getMetrics();
-    auto offsetX = (metrics.capHeight + metrics.xHeight) * 0.25f;
-    _extraMatrix.postTranslate(-offsetX, 0);
-    _ascent += offsetX;
-    _descent += offsetX;
-  } else {
-    auto offset = _font.getGlyphVerticalOffset(_glyphId);
-    _extraMatrix.postTranslate(offset.x, offset.y);
-    auto width = _advance;
-    _advance = _font.getGlyphAdvance(_glyphId, true);
-    if (_advance == 0) {
-      _advance = width;
-    }
-    _ascent = -width * 0.5f;
-    _descent = width * 0.5f;
-  }
-  _extraMatrix.mapRect(&_bounds);
-}
-
-std::vector<std::shared_ptr<Glyph>> GetSimpleGlyphs(const TextDocument* textDocument,
-                                                    bool applyDirection) {
-  tgfx::Font textFont = {};
-  textFont.setFauxBold(textDocument->fauxBold);
-  textFont.setFauxItalic(textDocument->fauxItalic);
-  textFont.setSize(textDocument->fontSize);
-  auto typeface =
-      FontManager::GetTypefaceWithoutFallback(textDocument->fontFamily, textDocument->fontStyle);
+std::vector<GlyphHandle> Glyph::BuildFromText(const std::string& text, const tgfx::Font& font,
+                                              const TextPaint& paint, bool isVertical) {
+  auto textFont = font;
+  auto typeface = textFont.getTypeface();
   bool hasTypeface = typeface != nullptr;
-  std::unordered_map<std::string, std::shared_ptr<Glyph>> glyphMap;
-  std::vector<std::shared_ptr<Glyph>> glyphList;
-  const char* textStart = &(textDocument->text[0]);
-  const char* textStop = textStart + textDocument->text.size();
+  std::unordered_map<std::string, GlyphHandle> glyphMap;
+  std::vector<GlyphHandle> glyphList;
+  const char* textStart = &(text[0]);
+  const char* textStop = textStart + text.size();
   while (textStart < textStop) {
     auto oldPosition = textStart;
     tgfx::UTF::NextUTF8(&textStart, textStop);
     auto length = textStart - oldPosition;
     auto name = std::string(oldPosition, length);
     if (glyphMap.find(name) != glyphMap.end()) {
-      glyphList.push_back(glyphMap[name]);
+      glyphList.emplace_back(std::make_shared<Glyph>(*glyphMap[name]));
       continue;
     }
     tgfx::GlyphID glyphId = 0;
@@ -110,11 +50,101 @@ std::vector<std::shared_ptr<Glyph>> GetSimpleGlyphs(const TextDocument* textDocu
       auto fallbackTypeface = FontManager::GetFallbackTypeface(name, &glyphId);
       textFont.setTypeface(fallbackTypeface);
     }
-    bool isVertical = applyDirection && textDocument->direction == TextDirection::Vertical;
-    auto glyph = std::make_shared<Glyph>(glyphId, name, textFont, isVertical);
+    auto glyph = std::shared_ptr<Glyph>(new Glyph(glyphId, name, textFont, isVertical, paint));
     glyphMap[name] = glyph;
-    glyphList.push_back(glyph);
+    glyphList.emplace_back(glyph);
   }
   return glyphList;
+}
+
+Glyph::Glyph(tgfx::GlyphID glyphId, std::string name, tgfx::Font font, bool isVertical,
+             const TextPaint& textPaint)
+    : _glyphId(glyphId), _name(std::move(name)), _font(std::move(font)), _isVertical(isVertical) {
+  horizontalInfo->advance = _font.getGlyphAdvance(_glyphId);
+  horizontalInfo->bounds = _font.getGlyphBounds(_glyphId);
+  auto metrics = _font.getMetrics();
+  horizontalInfo->ascent = metrics.ascent;
+  horizontalInfo->descent = metrics.descent;
+  if (_name == " ") {
+    // 空格字符测量的 bounds 比较异常偏上，本身也不可见，这里直接按字幕 A 的上下边界调整一下。
+    auto AGlyphID = _font.getGlyphID("A");
+    if (AGlyphID > 0) {
+      auto ABounds = _font.getGlyphBounds(AGlyphID);
+      horizontalInfo->bounds.top = ABounds.top;
+      horizontalInfo->bounds.bottom = ABounds.bottom;
+    }
+  }
+  if (isVertical) {
+    verticalInfo = std::make_shared<Info>(*horizontalInfo);
+    if (_name.size() == 1) {
+      // 字母，数字，标点等字符旋转 90° 绘制，原先的水平 baseline 转为垂直 baseline，
+      // 并水平向左偏移半个大写字母高度。
+      verticalInfo->extraMatrix.setRotate(90);
+      auto offsetX = (metrics.capHeight + metrics.xHeight) * 0.25f;
+      verticalInfo->extraMatrix.postTranslate(-offsetX, 0);
+      verticalInfo->ascent += offsetX;
+      verticalInfo->descent += offsetX;
+    } else {
+      auto offset = _font.getGlyphVerticalOffset(_glyphId);
+      verticalInfo->extraMatrix.postTranslate(offset.x, offset.y);
+      auto width = verticalInfo->advance;
+      verticalInfo->advance = _font.getGlyphAdvance(_glyphId, true);
+      if (verticalInfo->advance == 0) {
+        verticalInfo->advance = width;
+      }
+      verticalInfo->ascent = -width * 0.5f;
+      verticalInfo->descent = width * 0.5f;
+    }
+    verticalInfo->extraMatrix.mapRect(&verticalInfo->bounds);
+    info = verticalInfo.get();
+  }
+  textStyle = textPaint.style;
+  strokeOverFill = textPaint.strokeOverFill;
+  fillColor = textPaint.fillColor;
+  strokeColor = textPaint.strokeColor;
+  strokeWidth = textPaint.strokeWidth;
+}
+
+void Glyph::computeStyleKey(tgfx::BytesKey* styleKey) const {
+  auto m = getTotalMatrix();
+  styleKey->write(m.getScaleX());
+  styleKey->write(m.getSkewX());
+  styleKey->write(m.getSkewY());
+  styleKey->write(m.getScaleY());
+  uint8_t fillValues[] = {fillColor.red, fillColor.green, fillColor.blue,
+                          static_cast<uint8_t>(alpha * 255)};
+  styleKey->write(fillValues);
+  uint8_t strokeValues[] = {strokeColor.red, strokeColor.green, strokeColor.blue,
+                            static_cast<uint8_t>(textStyle)};
+  styleKey->write(strokeValues);
+  styleKey->write(strokeWidth);
+  styleKey->write(getFont().getTypeface()->uniqueID());
+}
+
+bool Glyph::isVisible() const {
+  return matrix.invertible() && alpha != 0.0f && !getBounds().isEmpty();
+}
+
+tgfx::Matrix Glyph::getTotalMatrix() const {
+  auto m = getExtraMatrix();
+  m.postConcat(matrix);
+  return m;
+}
+
+void Glyph::computeAtlasKey(tgfx::BytesKey* bytesKey, TextStyle style) const {
+  bytesKey->write(static_cast<uint32_t>(getFont().getTypeface()->hasColor()));
+  bytesKey->write(static_cast<uint32_t>(getGlyphID()));
+  bytesKey->write(static_cast<uint32_t>(style));
+}
+
+std::shared_ptr<Glyph> Glyph::makeHorizontalGlyph() const {
+  auto glyph = std::make_shared<Glyph>(*this);
+  if (_isVertical) {
+    glyph->_isVertical = false;
+    glyph->info = glyph->horizontalInfo.get();
+    glyph->verticalInfo = nullptr;
+  }
+  glyph->matrix = tgfx::Matrix::I();
+  return glyph;
 }
 }  // namespace pag

@@ -25,7 +25,7 @@
 #include "tgfx/gpu/Canvas.h"
 
 namespace pag {
-static std::unique_ptr<tgfx::Paint> CreateFillPaint(const MutableGlyph* glyph) {
+static std::unique_ptr<tgfx::Paint> CreateFillPaint(const Glyph* glyph) {
   if (glyph->getStyle() != TextStyle::Fill && glyph->getStyle() != TextStyle::StrokeAndFill) {
     return nullptr;
   }
@@ -36,7 +36,7 @@ static std::unique_ptr<tgfx::Paint> CreateFillPaint(const MutableGlyph* glyph) {
   return std::unique_ptr<tgfx::Paint>(fillPaint);
 }
 
-static std::unique_ptr<tgfx::Paint> CreateStrokePaint(const MutableGlyph* glyph) {
+static std::unique_ptr<tgfx::Paint> CreateStrokePaint(const Glyph* glyph) {
   if (glyph->getStyle() != TextStyle::Stroke && glyph->getStyle() != TextStyle::StrokeAndFill) {
     return nullptr;
   }
@@ -48,7 +48,7 @@ static std::unique_ptr<tgfx::Paint> CreateStrokePaint(const MutableGlyph* glyph)
   return std::unique_ptr<tgfx::Paint>(strokePaint);
 }
 
-static std::unique_ptr<TextRun> MakeTextRun(const std::vector<MutableGlyph*>& glyphs) {
+static std::unique_ptr<TextRun> MakeTextRun(const std::vector<Glyph*>& glyphs) {
   if (glyphs.empty()) {
     return nullptr;
   }
@@ -83,7 +83,7 @@ static std::unique_ptr<TextRun> MakeTextRun(const std::vector<MutableGlyph*>& gl
 }
 
 std::shared_ptr<Graphic> Text::MakeFrom(const std::vector<GlyphHandle>& glyphs,
-                                        std::shared_ptr<TextGlyphs> textGlyphs,
+                                        std::shared_ptr<TextBlock> textBlock,
                                         const tgfx::Rect* calculatedBounds) {
   if (glyphs.empty()) {
     return nullptr;
@@ -91,7 +91,7 @@ std::shared_ptr<Graphic> Text::MakeFrom(const std::vector<GlyphHandle>& glyphs,
   // 用 vector 存 key 的目的是让文字叠加顺序固定。
   // 不固定的话叠加区域的像素会不一样，肉眼看不出来，但是测试用例的结果不稳定。
   std::vector<tgfx::BytesKey> styleKeys = {};
-  std::unordered_map<tgfx::BytesKey, std::vector<MutableGlyph*>, tgfx::BytesHasher> styleMap = {};
+  std::unordered_map<tgfx::BytesKey, std::vector<Glyph*>, tgfx::BytesHasher> styleMap = {};
   for (auto& glyph : glyphs) {
     if (!glyph->isVisible()) {
       continue;
@@ -137,13 +137,13 @@ std::shared_ptr<Graphic> Text::MakeFrom(const std::vector<GlyphHandle>& glyphs,
     return nullptr;
   }
   return std::shared_ptr<Graphic>(
-      new Text(glyphs, std::move(textRuns), bounds, hasAlpha, std::move(textGlyphs)));
+      new Text(glyphs, std::move(textRuns), bounds, hasAlpha, std::move(textBlock)));
 }
 
 Text::Text(std::vector<GlyphHandle> glyphs, std::vector<TextRun*> textRuns,
-           const tgfx::Rect& bounds, bool hasAlpha, std::shared_ptr<TextGlyphs> textGlyphs)
+           const tgfx::Rect& bounds, bool hasAlpha, std::shared_ptr<TextBlock> textBlock)
     : glyphs(std::move(glyphs)), textRuns(std::move(textRuns)), bounds(bounds), hasAlpha(hasAlpha),
-      textGlyphs(std::move(textGlyphs)) {
+      textBlock(std::move(textBlock)) {
 }
 
 Text::~Text() {
@@ -256,7 +256,7 @@ static std::vector<TextStyle> GetGlyphStyles(const GlyphHandle& glyph) {
 }
 
 void Text::draw(tgfx::Canvas* canvas, RenderCache* renderCache) const {
-  auto textAtlas = renderCache->getTextAtlas(textGlyphs.get());
+  auto textAtlas = renderCache->getTextAtlas(textBlock.get());
   if (textAtlas != nullptr) {
     draw(canvas, textAtlas);
   } else {

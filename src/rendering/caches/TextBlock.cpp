@@ -16,26 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "TextGlyphs.h"
+#include "TextBlock.h"
 #include "base/utils/UniqueID.h"
 
 namespace pag {
-TextPaint CreateTextPaint(const TextDocument* textDocument) {
-  TextPaint textPaint = {};
-  if (textDocument->applyFill && textDocument->applyStroke) {
-    textPaint.style = TextStyle::StrokeAndFill;
-  } else if (textDocument->applyStroke) {
-    textPaint.style = TextStyle::Stroke;
-  } else {
-    textPaint.style = TextStyle::Fill;
-  }
-  textPaint.fillColor = textDocument->fillColor;
-  textPaint.strokeColor = textDocument->strokeColor;
-  textPaint.strokeWidth = textDocument->strokeWidth;
-  textPaint.strokeOverFill = textDocument->strokeOverFill;
-  return textPaint;
-}
-
 static void AddGlyph(const GlyphHandle& glyph, std::vector<GlyphHandle>* atlasGlyphs,
                      std::vector<tgfx::BytesKey>* atlasKeys) {
   if (glyph->getStyle() == TextStyle::Stroke && glyph->getStrokeWidth() < 0.1f) {
@@ -65,45 +49,36 @@ static void SortAtlasGlyphs(std::vector<GlyphHandle>* glyphs) {
   });
 }
 
-TextGlyphs::TextGlyphs(ID assetID, TextDocument* textDocument, float maxScale)
-    : _id(UniqueID::Next()), _assetID(assetID), _textDocument(textDocument), _maxScale(maxScale) {
-  simpleGlyphs = GetSimpleGlyphs(textDocument, false);
+TextBlock::TextBlock(ID assetID, std::vector<std::vector<GlyphHandle>> lines, float maxScale,
+                     const tgfx::Rect* textBounds)
+    : _id(UniqueID::Next()), _assetID(assetID), _lines(std::move(lines)), _maxScale(maxScale) {
+  if (textBounds) {
+    _textBounds = *textBounds;
+  }
   std::vector<tgfx::BytesKey> atlasKeys;
-  auto paint = CreateTextPaint(_textDocument);
-  auto glyphList = MutableGlyph::BuildFromText(simpleGlyphs, paint);
-  for (auto& glyph : glyphList) {
-    auto hasColor = glyph->getFont().getTypeface()->hasColor();
-    auto style = glyph->getStyle();
-    if (hasColor && (style == TextStyle::Stroke || style == TextStyle::StrokeAndFill)) {
-      glyph->setStrokeWidth(0);
-      glyph->setStyle(TextStyle::Fill);
-    }
-    auto& atlasGlyphs = hasColor ? _colorAtlasGlyphs : _maskAtlasGlyphs;
-    if (style == TextStyle::Stroke || style == TextStyle::Fill) {
-      AddGlyph(glyph, &atlasGlyphs, &atlasKeys);
-    } else if (style == TextStyle::StrokeAndFill) {
-      auto strokeGlyph = std::make_shared<MutableGlyph>();
-      *strokeGlyph = *glyph;
-      strokeGlyph->setStyle(TextStyle::Stroke);
-      AddGlyph(strokeGlyph, &atlasGlyphs, &atlasKeys);
-      glyph->setStyle(TextStyle::Fill);
-      glyph->setStrokeWidth(0);
-      AddGlyph(glyph, &atlasGlyphs, &atlasKeys);
+  for (const auto& line : this->lines()) {
+    for (const auto& tempGlyph : line) {
+      auto glyph = tempGlyph->makeHorizontalGlyph();
+      auto hasColor = glyph->getFont().getTypeface()->hasColor();
+      auto style = glyph->getStyle();
+      if (hasColor && (style == TextStyle::Stroke || style == TextStyle::StrokeAndFill)) {
+        glyph->setStrokeWidth(0);
+        glyph->setStyle(TextStyle::Fill);
+      }
+      auto& atlasGlyphs = hasColor ? _colorAtlasGlyphs : _maskAtlasGlyphs;
+      if (style == TextStyle::Stroke || style == TextStyle::Fill) {
+        AddGlyph(glyph, &atlasGlyphs, &atlasKeys);
+      } else if (style == TextStyle::StrokeAndFill) {
+        auto strokeGlyph = std::make_shared<Glyph>(*glyph);
+        strokeGlyph->setStyle(TextStyle::Stroke);
+        AddGlyph(strokeGlyph, &atlasGlyphs, &atlasKeys);
+        glyph->setStyle(TextStyle::Fill);
+        glyph->setStrokeWidth(0);
+        AddGlyph(glyph, &atlasGlyphs, &atlasKeys);
+      }
     }
   }
   SortAtlasGlyphs(&_maskAtlasGlyphs);
   SortAtlasGlyphs(&_colorAtlasGlyphs);
-  if (textDocument->direction == TextDirection::Vertical) {
-    std::vector<std::shared_ptr<Glyph>> glyphs = {};
-    for (const auto& glyph : simpleGlyphs) {
-      glyphs.push_back(glyph->makeVerticalGlyph());
-    }
-    simpleGlyphs = glyphs;
-  }
-}
-
-std::vector<GlyphHandle> TextGlyphs::getGlyphs() const {
-  auto paint = CreateTextPaint(_textDocument);
-  return MutableGlyph::BuildFromText(simpleGlyphs, paint);
 }
 }  // namespace pag

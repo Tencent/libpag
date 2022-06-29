@@ -394,12 +394,12 @@ TextAtlas* RenderCache::getTextAtlas(ID assetID) const {
   return textAtlas->second;
 }
 
-TextAtlas* RenderCache::getTextAtlas(const TextGlyphs* textGlyphs) {
-  auto maxScaleFactor = stage->getAssetMaxScale(textGlyphs->assetID());
-  auto textAtlas = getTextAtlas(textGlyphs->assetID());
-  if (textAtlas && (textAtlas->textGlyphsID() != textGlyphs->id() ||
+TextAtlas* RenderCache::getTextAtlas(const TextBlock* textBlock) {
+  auto maxScaleFactor = stage->getAssetMaxScale(textBlock->assetID());
+  auto textAtlas = getTextAtlas(textBlock->assetID());
+  if (textAtlas && (textAtlas->textGlyphsID() != textBlock->id() ||
                     fabsf(textAtlas->scaleFactor() - maxScaleFactor) > SCALE_FACTOR_PRECISION)) {
-    removeTextAtlas(textGlyphs->assetID());
+    removeTextAtlas(textBlock->assetID());
     textAtlas = nullptr;
   }
   if (textAtlas) {
@@ -408,10 +408,10 @@ TextAtlas* RenderCache::getTextAtlas(const TextGlyphs* textGlyphs) {
   if (maxScaleFactor < SCALE_FACTOR_PRECISION) {
     return nullptr;
   }
-  textAtlas = TextAtlas::Make(textGlyphs, this, maxScaleFactor).release();
+  textAtlas = TextAtlas::Make(textBlock, this, maxScaleFactor).release();
   if (textAtlas) {
     graphicsMemory += textAtlas->memoryUsage();
-    textAtlases[textGlyphs->assetID()] = textAtlas;
+    textAtlases[textBlock->assetID()] = textAtlas;
   }
   return textAtlas;
 }

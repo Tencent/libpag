@@ -301,16 +301,16 @@ bool Atlas::getLocator(const tgfx::BytesKey& bytesKey, AtlasLocator* locator) co
 
 static constexpr float MaxAtlasFontSize = 256.f;
 
-std::unique_ptr<TextAtlas> TextAtlas::Make(const TextGlyphs* textGlyphs, RenderCache* renderCache,
+std::unique_ptr<TextAtlas> TextAtlas::Make(const TextBlock* textBlock, RenderCache* renderCache,
                                            float scale) {
   auto context = renderCache->getContext();
   auto maxTextureSize = context->caps()->maxTextureSize;
-  auto maxScale = scale * textGlyphs->maxScale();
-  const auto& maskGlyphs = textGlyphs->maskAtlasGlyphs();
+  auto maxScale = scale * textBlock->maxScale();
+  const auto& maskGlyphs = textBlock->maskAtlasGlyphs();
   if (maskGlyphs.empty() || maskGlyphs[0]->getFont().getSize() * maxScale > MaxAtlasFontSize) {
     return nullptr;
   }
-  const auto& colorGlyphs = textGlyphs->colorAtlasGlyphs();
+  const auto& colorGlyphs = textBlock->colorAtlasGlyphs();
   if (!colorGlyphs.empty() && colorGlyphs[0]->getFont().getSize() * maxScale > MaxAtlasFontSize) {
     return nullptr;
   }
@@ -319,7 +319,7 @@ std::unique_ptr<TextAtlas> TextAtlas::Make(const TextGlyphs* textGlyphs, RenderC
     return nullptr;
   }
   auto colorAtlas = Atlas::Make(context, maxScale, colorGlyphs, maxTextureSize, false).release();
-  return std::unique_ptr<TextAtlas>(new TextAtlas(textGlyphs->id(), maskAtlas, colorAtlas, scale));
+  return std::unique_ptr<TextAtlas>(new TextAtlas(textBlock->id(), maskAtlas, colorAtlas, scale));
 }
 
 TextAtlas::~TextAtlas() {

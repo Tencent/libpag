@@ -17,10 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextRenderer.h"
-#include "TextAnimatorRenderer.h"
 #include "base/utils/TGFXCast.h"
+#include "rendering/FontManager.h"
 #include "rendering/graphics/Shape.h"
-#include "rendering/graphics/Text.h"
 #include "tgfx/core/PathEffect.h"
 
 namespace pag {
@@ -454,11 +453,32 @@ std::shared_ptr<Graphic> RenderTextBackground(ID assetID,
   return Graphic::MakeCompose(graphic, modifier);
 }
 
-std::unique_ptr<TextContent> RenderTexts(const std::shared_ptr<TextGlyphs>& textGlyphs,
-                                         TextPathOptions*, TextMoreOptions*,
-                                         std::vector<TextAnimator*>* animators, Frame layerFrame) {
-  auto* textDocument = textGlyphs->textDocument();
-  auto glyphList = textGlyphs->getGlyphs();
+static std::vector<GlyphHandle> BuildGlyphs(const TextDocument* textDocument) {
+  TextPaint textPaint = {};
+  if (textDocument->applyFill && textDocument->applyStroke) {
+    textPaint.style = TextStyle::StrokeAndFill;
+  } else if (textDocument->applyStroke) {
+    textPaint.style = TextStyle::Stroke;
+  } else {
+    textPaint.style = TextStyle::Fill;
+  }
+  textPaint.fillColor = textDocument->fillColor;
+  textPaint.strokeColor = textDocument->strokeColor;
+  textPaint.strokeWidth = textDocument->strokeWidth;
+  textPaint.strokeOverFill = textDocument->strokeOverFill;
+  tgfx::Font textFont = {};
+  textFont.setFauxBold(textDocument->fauxBold);
+  textFont.setFauxItalic(textDocument->fauxItalic);
+  textFont.setSize(textDocument->fontSize);
+  textFont.setTypeface(
+      FontManager::GetTypefaceWithoutFallback(textDocument->fontFamily, textDocument->fontStyle));
+  return Glyph::BuildFromText(textDocument->text, textFont, textPaint,
+                              textDocument->direction == TextDirection::Vertical);
+}
+
+std::pair<std::vector<std::vector<GlyphHandle>>, tgfx::Rect> GetLines(
+    const TextDocument* textDocument) {
+  auto glyphList = BuildGlyphs(textDocument);
   // 无论文字朝向，都先按从(0,0)点开始的横向矩形排版。
   // 提取出跟文字朝向无关的 GlyphInfo 列表与 TextLayout,
   // 复用同一套排版规则。如果最终是纵向排版，再把坐标转成纵向坐标应用到 glyphList 上。
@@ -469,45 +489,14 @@ std::unique_ptr<TextContent> RenderTexts(const std::shared_ptr<TextGlyphs>& text
   }
   tgfx::Rect textBounds = tgfx::Rect::MakeEmpty();
   auto glyphInfoLines = ApplyLayoutToGlyphInfos(textLayout, &glyphInfos, &textBounds);
-  auto glyphLines = ApplyMatrixToGlyphs(textLayout, glyphInfoLines, &glyphList);
+  auto lines = ApplyMatrixToGlyphs(textLayout, glyphInfoLines, &glyphList);
   textLayout.coordinateMatrix.mapRect(&textBounds);
-  auto hasAnimators =
-      TextAnimatorRenderer::ApplyToGlyphs(glyphLines, animators, textDocument, layerFrame);
-  std::vector<std::shared_ptr<Graphic>> contents = {};
-  if (textDocument->backgroundAlpha > 0) {
-    auto background = RenderTextBackground(textGlyphs->assetID(), glyphLines, textDocument);
-    if (background) {
-      contents.push_back(background);
-    }
-  }
-
-  std::vector<GlyphHandle> simpleGlyphs = {};
-  std::vector<GlyphHandle> colorGlyphs = {};
-  for (auto& line : glyphLines) {
-    for (auto& glyph : line) {
-      simpleGlyphs.push_back(glyph);
-      auto typeface = glyph->getFont().getTypeface();
-      if (typeface->hasColor()) {
-        colorGlyphs.push_back(glyph);
-      }
-    }
-  }
-
-  auto normalText = Text::MakeFrom(simpleGlyphs, textGlyphs, hasAnimators ? nullptr : &textBounds);
-  if (normalText) {
-    contents.push_back(normalText);
-  }
-  auto graphic = Graphic::MakeCompose(contents);
-  auto colorText = Text::MakeFrom(colorGlyphs, textGlyphs);
-  return std::make_unique<TextContent>(std::move(graphic), std::move(colorText));
+  return {lines, textBounds};
 }
 
 void CalculateTextAscentAndDescent(const TextDocument* textDocument, float* pMinAscent,
                                    float* pMaxDescent) {
-  auto glyphs = GetSimpleGlyphs(textDocument);
-  auto paint = CreateTextPaint(textDocument);
-  auto glyphList = MutableGlyph::BuildFromText(glyphs, paint);
-
+  auto glyphList = BuildGlyphs(textDocument);
   float minAscent = 0;
   float maxDescent = 0;
   for (auto& glyph : glyphList) {

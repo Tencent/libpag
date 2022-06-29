@@ -20,13 +20,15 @@
 
 #include <unordered_map>
 #include "ContentCache.h"
-#include "TextGlyphs.h"
+#include "TextBlock.h"
 
 namespace pag {
 class TextContentCache : public ContentCache {
  public:
   explicit TextContentCache(TextLayer* layer);
   TextContentCache(TextLayer* layer, ID cacheID, Property<TextDocumentHandle>* sourceText);
+  TextContentCache(TextLayer* layer, ID cacheID,
+                   const std::vector<std::vector<GlyphHandle>>& lines);
 
  protected:
   void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const override;
@@ -34,13 +36,14 @@ class TextContentCache : public ContentCache {
   GraphicContent* createContent(Frame layerFrame) const override;
 
  private:
-  void initTextGlyphs();
+  void initTextGlyphs(const std::vector<std::vector<GlyphHandle>>* glyphLines = nullptr);
 
   ID cacheID = 0;
   Property<TextDocumentHandle>* sourceText;
   TextPathOptions* pathOption;
   TextMoreOptions* moreOption;
   std::vector<TextAnimator*>* animators;
-  std::unordered_map<TextDocument*, std::shared_ptr<TextGlyphs>> textGlyphs;
+  std::unordered_map<TextDocument*, std::shared_ptr<TextBlock>> textBlocks;
+  std::shared_ptr<TextBlock> textBlock;
 };
 }  // namespace pag

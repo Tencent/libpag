@@ -17,7 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextContentCache.h"
+#include "TextContent.h"
+#include "base/utils/TGFXCast.h"
 #include "rendering/graphics/Picture.h"
+#include "rendering/graphics/Shape.h"
+#include "rendering/graphics/Text.h"
+#include "rendering/renderers/TextAnimatorRenderer.h"
 #include "rendering/renderers/TextRenderer.h"
 
 namespace pag {
@@ -32,6 +37,13 @@ TextContentCache::TextContentCache(TextLayer* layer, ID cacheID,
     : ContentCache(layer), cacheID(cacheID), sourceText(sourceText), pathOption(layer->pathOption),
       moreOption(layer->moreOption), animators(&layer->animators) {
   initTextGlyphs();
+}
+
+TextContentCache::TextContentCache(TextLayer* layer, ID cacheID,
+                                   const std::vector<std::vector<GlyphHandle>>& lines)
+    : ContentCache(layer), cacheID(cacheID), sourceText(layer->sourceText),
+      pathOption(layer->pathOption), moreOption(layer->moreOption), animators(&layer->animators) {
+  initTextGlyphs(&lines);
 }
 
 static float GetMaxScale(std::vector<TextAnimator*>* animators) {
@@ -63,19 +75,24 @@ static float GetMaxScale(std::vector<TextAnimator*>* animators) {
   return scale;
 }
 
-void TextContentCache::initTextGlyphs() {
+void TextContentCache::initTextGlyphs(const std::vector<std::vector<GlyphHandle>>* glyphLines) {
   auto scale = GetMaxScale(animators);
+  if (glyphLines) {
+    textBlock = std::make_shared<TextBlock>(getCacheID(), *glyphLines, scale);
+    return;
+  }
+  auto addFunc = [&](TextDocument* textDocument) {
+    auto [lines, bounds] = GetLines(textDocument);
+    textBlocks[textDocument] = std::make_shared<TextBlock>(getCacheID(), lines, scale, &bounds);
+  };
   if (sourceText->animatable()) {
     auto animatableProperty = reinterpret_cast<AnimatableProperty<TextDocumentHandle>*>(sourceText);
-    auto textDocument = animatableProperty->keyframes[0]->startValue.get();
-    textGlyphs[textDocument] = std::make_shared<TextGlyphs>(getCacheID(), textDocument, scale);
+    addFunc(animatableProperty->keyframes[0]->startValue.get());
     for (const auto& keyframe : animatableProperty->keyframes) {
-      textDocument = keyframe->endValue.get();
-      textGlyphs[textDocument] = std::make_shared<TextGlyphs>(getCacheID(), textDocument, scale);
+      addFunc(keyframe->endValue.get());
     }
   } else {
-    auto textDocument = sourceText->getValueAt(0).get();
-    textGlyphs[textDocument] = std::make_shared<TextGlyphs>(getCacheID(), textDocument, scale);
+    addFunc(sourceText->getValueAt(0).get());
   }
 }
 
@@ -96,13 +113,68 @@ ID TextContentCache::getCacheID() const {
   return cacheID > 0 ? cacheID : layer->uniqueID;
 }
 
-GraphicContent* TextContentCache::createContent(Frame layerFrame) const {
-  auto textDocument = sourceText->getValueAt(layerFrame);
-  auto iter = textGlyphs.find(textDocument.get());
-  if (iter == textGlyphs.end()) {
-    return nullptr;
+static std::vector<std::vector<GlyphHandle>> CopyLines(
+    const std::shared_ptr<TextBlock>& textBlock) {
+  std::vector<std::vector<GlyphHandle>> glyphLines;
+  for (const auto& line : textBlock->lines()) {
+    std::vector<GlyphHandle> glyphLine;
+    glyphLine.reserve(line.size());
+    for (const auto& glyph : line) {
+      glyphLine.emplace_back(std::make_shared<Glyph>(*glyph));
+    }
+    glyphLines.emplace_back(glyphLine);
   }
-  auto content = RenderTexts(iter->second, pathOption, moreOption, animators, layerFrame).release();
+  return glyphLines;
+}
+
+std::pair<std::vector<GlyphHandle>, std::vector<GlyphHandle>> GetGlyphs(
+    const std::vector<std::vector<GlyphHandle>>& glyphLines) {
+  std::vector<GlyphHandle> simpleGlyphs = {};
+  std::vector<GlyphHandle> colorGlyphs = {};
+  for (auto& line : glyphLines) {
+    for (auto& glyph : line) {
+      simpleGlyphs.push_back(glyph);
+      auto typeface = glyph->getFont().getTypeface();
+      if (typeface->hasColor()) {
+        colorGlyphs.push_back(glyph);
+      }
+    }
+  }
+  return {simpleGlyphs, colorGlyphs};
+}
+
+GraphicContent* TextContentCache::createContent(Frame layerFrame) const {
+  auto textDocument = sourceText->getValueAt(layerFrame).get();
+  auto block = textBlock;
+  if (block == nullptr) {
+    auto iter = textBlocks.find(textDocument);
+    if (iter == textBlocks.end()) {
+      return nullptr;
+    }
+    block = iter->second;
+  }
+  auto glyphLines = CopyLines(block);
+  auto hasAnimators = TextAnimatorRenderer::ApplyToGlyphs(glyphLines, animators,
+                                                          textDocument->justification, layerFrame);
+  std::vector<std::shared_ptr<Graphic>> contents = {};
+  if (block != textBlock && textDocument->backgroundAlpha > 0) {
+    auto background = RenderTextBackground(block->assetID(), glyphLines, textDocument);
+    if (background) {
+      contents.push_back(background);
+    }
+  }
+  auto [simpleGlyphs, colorGlyphs] = GetGlyphs(glyphLines);
+  const tgfx::Rect* textBounds = nullptr;
+  if (!hasAnimators && !block->textBounds().isEmpty()) {
+    textBounds = &block->textBounds();
+  }
+  auto normalText = Text::MakeFrom(simpleGlyphs, block, textBounds);
+  if (normalText) {
+    contents.push_back(normalText);
+  }
+  auto graphic = Graphic::MakeCompose(contents);
+  auto colorText = Text::MakeFrom(colorGlyphs, block);
+  auto content = new TextContent(std::move(graphic), std::move(colorText));
   if (_cacheEnabled) {
     content->colorGlyphs = Picture::MakeFrom(getCacheID(), content->colorGlyphs);
   }

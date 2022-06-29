@@ -19,67 +19,238 @@
 #pragma once
 
 #include "pag/types.h"
+#include "tgfx/core/BytesKey.h"
 #include "tgfx/core/Font.h"
 
 namespace pag {
+/**
+ * Defines values used in the style property of TextPaint.
+ */
+enum class TextStyle { Fill, Stroke, StrokeAndFill };
+
+/**
+ * Defines attributes for drawing text.
+ */
+struct TextPaint {
+  TextStyle style = TextStyle::Fill;
+  Color fillColor = Black;
+  Color strokeColor = Black;
+  float strokeWidth = 0;
+  bool strokeOverFill = true;
+};
+
+class Glyph;
+
+typedef std::shared_ptr<Glyph> GlyphHandle;
+
+/**
+ * Glyph represents a single character for drawing.
+ */
 class Glyph {
  public:
-  Glyph(tgfx::GlyphID glyphId, std::string name, tgfx::Font font, bool isVertical);
+  static std::vector<GlyphHandle> BuildFromText(const std::string& text, const tgfx::Font& font,
+                                                const TextPaint& paint, bool isVertical = false);
 
+  /**
+   * Called by the Text::MakeFrom() method to merge the draw calls of glyphs with the same style.
+   * Return false if this glyph is not visible.
+   */
+  void computeStyleKey(tgfx::BytesKey* styleKey) const;
+
+  /**
+   * Returns the Font object associated with this Glyph.
+   */
+  tgfx::Font getFont() const {
+    return _font;
+  }
+
+  /**
+   * Returns the id of this glyph in associated typeface.
+   */
   tgfx::GlyphID getGlyphID() const {
     return _glyphId;
   }
 
-  std::string getName() const {
-    return _name;
-  }
+  /**
+   * Returns true if this glyph is visible for drawing.
+   */
+  bool isVisible() const;
 
-  const tgfx::Font& getFont() const {
-    return _font;
-  }
-
+  /**
+   * Returns true if this glyph is for vertical text layouts.
+   */
   bool isVertical() const {
     return _isVertical;
   }
 
-  float advance() const {
-    return _advance;
+  /**
+   * Returns name of this glyph in utf8.
+   */
+  std::string getName() const {
+    return _name;
   }
 
-  float ascent() const {
-    return _ascent;
+  /**
+   * Returns the advance for this glyph.
+   */
+  float getAdvance() const {
+    return info->advance;
   }
 
-  float descent() const {
-    return _descent;
+  /**
+   * Returns the recommended distance to reserve above baseline
+   */
+  float getAscent() const {
+    return info->ascent;
   }
 
+  /**
+   * Returns the recommended distance to reserve below baseline
+   */
+  float getDescent() const {
+    return info->descent;
+  }
+
+  /**
+   * Returns the bounding box relative to (0, 0) of this glyph. Returned bounds may be larger than
+   * the exact bounds of this glyph.
+   */
   const tgfx::Rect& getBounds() const {
-    return _bounds;
+    return info->bounds;
   }
 
-  const tgfx::Matrix& extraMatrix() const {
-    return _extraMatrix;
+  /**
+   * Returns the matrix for this glyph.
+   */
+  tgfx::Matrix getMatrix() const {
+    return matrix;
   }
 
-  std::shared_ptr<Glyph> makeVerticalGlyph() const;
+  /**
+   * Replaces transformation with specified matrix.
+   */
+  void setMatrix(const tgfx::Matrix& m) {
+    matrix = m;
+  }
+
+  /**
+   * Returns the text style for this glyph.
+   */
+  TextStyle getStyle() const {
+    return textStyle;
+  }
+
+  /**
+   * Sets the text style for this glyph.
+   */
+  void setStyle(TextStyle style) {
+    textStyle = style;
+  }
+
+  /**
+   * Returns true if stroke is drawn on top of fill.
+   */
+  bool getStrokeOverFill() const {
+    return strokeOverFill;
+  }
+
+  /**
+   * Retrieves alpha from the color used when stroking and filling.
+   */
+  float getAlpha() const {
+    return alpha;
+  }
+
+  /**
+   * Replaces alpha of the color used when stroking and filling, leaving RGB unchanged.
+   */
+  void setAlpha(float newAlpha) {
+    alpha = newAlpha;
+  }
+
+  /**
+   * Retrieves RGB from the color used when filling.
+   */
+  Color getFillColor() const {
+    return fillColor;
+  }
+
+  /**
+   * Replaces RGB from the color used when filling.
+   */
+  void setFillColor(const Color& color) {
+    fillColor = color;
+  }
+
+  /**
+   * Retrieves RGB from the color used when stroking.
+   */
+  Color getStrokeColor() const {
+    return strokeColor;
+  }
+
+  /**
+   * Replaces RGB from the color used when stroking.
+   */
+  void setStrokeColor(const Color& color) {
+    strokeColor = color;
+  }
+
+  /**
+   * Returns the thickness of the pen used to outline the glyph.
+   */
+  float getStrokeWidth() const {
+    return strokeWidth;
+  }
+
+  /**
+   * Replaces the thickness of the pen used to outline the glyph.
+   */
+  void setStrokeWidth(float width) {
+    strokeWidth = width;
+  }
+
+  /**
+   * Returns the total matrix of this glyph which contains the style matrix.
+   */
+  tgfx::Matrix getTotalMatrix() const;
+
+  const tgfx::Matrix& getExtraMatrix() const {
+    return info->extraMatrix;
+  }
+
+  void computeAtlasKey(tgfx::BytesKey* bytesKey, TextStyle style) const;
+
+  std::shared_ptr<Glyph> makeHorizontalGlyph() const;
 
  private:
-  Glyph() = default;
+  struct Info {
+    float advance = 0;
+    float ascent = 0;
+    float descent = 0;
+    tgfx::Rect bounds = tgfx::Rect::MakeEmpty();
+    tgfx::Matrix extraMatrix = tgfx::Matrix::I();
+  };
 
-  void applyVertical();
-
+  // read only attributes:
   tgfx::GlyphID _glyphId = 0;
   std::string _name;
   tgfx::Font _font;
   bool _isVertical = false;
-  float _advance = 0;
-  float _ascent = 0;
-  float _descent = 0;
-  tgfx::Rect _bounds = tgfx::Rect::MakeEmpty();
-  tgfx::Matrix _extraMatrix = tgfx::Matrix::I();
-};
+  bool strokeOverFill = true;
+  // writable attributes:
+  tgfx::Matrix matrix = tgfx::Matrix::I();
+  TextStyle textStyle = TextStyle::Fill;
+  float alpha = 1.0f;
+  Color fillColor = Black;
+  Color strokeColor = Black;
+  float strokeWidth = 0;
 
-std::vector<std::shared_ptr<Glyph>> GetSimpleGlyphs(const TextDocument* textDocument,
-                                                    bool applyDirection = true);
+  std::shared_ptr<Info> horizontalInfo = std::make_shared<Info>();
+  std::shared_ptr<Info> verticalInfo;
+  const Info* info = horizontalInfo.get();
+
+  Glyph(tgfx::GlyphID glyphId, std::string name, tgfx::Font font, bool isVertical,
+        const TextPaint& textPaint);
+};
 }  // namespace pag
