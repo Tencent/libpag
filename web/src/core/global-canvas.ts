@@ -1,5 +1,4 @@
-import { DEFAULT_CANVAS_SIZE } from '../constant';
-import { PAG } from '../types';
+import { DEFAULT_CANVAS_SIZE, WEBGL_CONTEXT_ATTRIBUTES } from '../constant';
 import { BackendContext } from './backend-context';
 
 export class GlobalCanvas {
@@ -19,7 +18,7 @@ export class GlobalCanvas {
       this._canvas.width = this.width;
       this._canvas.height = this.height;
 
-      const gl = this._canvas.getContext('webgl') as WebGLRenderingContext;
+      const gl = this._canvas.getContext('webgl', WEBGL_CONTEXT_ATTRIBUTES) as WebGLRenderingContext;
       this._glContext = BackendContext.from(gl);
     }
     this.retainCount += 1;
