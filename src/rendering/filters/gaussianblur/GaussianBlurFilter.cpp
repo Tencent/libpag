@@ -218,7 +218,7 @@ void GaussianBlurFilter::draw(tgfx::Context* context, const FilterSource* source
     if (i == blurParam.depth * 2 - 1) {
       filterTarget = const_cast<FilterTarget*>(target);
       if (!blurParam.repeatEdgePixels) {
-        filterTarget->vertexMatrix = {1, 0, 0, 0, 1, 0, 0, 0, 1};
+        offsetMatrix.postTranslate(-source->width * BLUR_EXPEND, -source->height * BLUR_EXPEND);
       }
       PreConcatMatrix(filterTarget, offsetMatrix);
     } else {
