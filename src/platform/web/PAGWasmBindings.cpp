@@ -44,11 +44,8 @@ EMSCRIPTEN_BINDINGS(pag) {
                   return static_cast<int>(pagLayer.layerType());
                 }))
       .function("_layerName", &PAGLayer::layerName)
-      .function("_matrix",
-                optional_override([](PAGLayer& pagLayer) { return ToTGFX(pagLayer.matrix()); }))
-      .function("_setMatrix", optional_override([](PAGLayer& pagLayer, tgfx::Matrix matrix) {
-                  pagLayer.setMatrix(ToPAG(matrix));
-                }))
+      .function("_matrix", &PAGLayer::matrix)
+      .function("_setMatrix", &PAGLayer::setMatrix)
       .function("_resetMatrix", &PAGLayer::resetMatrix)
       .function("_getTotalMatrix", &PAGLayer::getTotalMatrix)
       .function("_alpha", &PAGLayer::alpha)
@@ -97,8 +94,7 @@ EMSCRIPTEN_BINDINGS(pag) {
       .function("_setProgress", &PAGLayer::setProgress)
       .function("_preFrame", &PAGLayer::preFrame)
       .function("_nextFrame", &PAGLayer::nextFrame)
-      .function("_getBounds",
-                optional_override([](PAGLayer& pagLayer) { return ToTGFX(pagLayer.getBounds()); }))
+      .function("_getBounds", &PAGLayer::getBounds)
       .function("_trackMatteLayer", &PAGLayer::trackMatteLayer)
       .function("_excludedFromTimeline", &PAGLayer::excludedFromTimeline)
       .function("_setExcludedFromTimeline", &PAGLayer::setExcludedFromTimeline)
@@ -306,11 +302,8 @@ EMSCRIPTEN_BINDINGS(pag) {
       .function("_height", &PAGImage::height)
       .function("_scaleMode", &PAGImage::scaleMode)
       .function("_setScaleMode", &PAGImage::setScaleMode)
-      .function("_matrix",
-                optional_override([](PAGImage& pagImage) { return ToTGFX(pagImage.matrix()); }))
-      .function("_setMatrix", optional_override([](PAGImage& pagImage, tgfx::Matrix matrix) {
-                  pagImage.setMatrix(ToPAG(matrix));
-                }));
+      .function("_matrix", &PAGImage::matrix)
+      .function("_setMatrix", &PAGImage::setMatrix);
 
   class_<PAGPlayer>("_PAGPlayer")
       .smart_ptr_constructor("_PAGPlayer", &std::make_shared<PAGPlayer>)
@@ -334,19 +327,13 @@ EMSCRIPTEN_BINDINGS(pag) {
       .function("_getComposition", &PAGPlayer::getComposition)
       .function("_setComposition", &PAGPlayer::setComposition)
       .function("_getSurface", &PAGPlayer::getSurface)
-      .function("_matrix",
-                optional_override([](PAGPlayer& pagPlayer) { return ToTGFX(pagPlayer.matrix()); }))
-      .function("_setMatrix", optional_override([](PAGPlayer& pagPlayer, tgfx::Matrix matrix) {
-                  pagPlayer.setMatrix(ToPAG(matrix));
-                }))
+      .function("_matrix", &PAGPlayer::matrix)
+      .function("_setMatrix", &PAGPlayer::setMatrix)
       .function("_nextFrame", &PAGPlayer::nextFrame)
       .function("_preFrame", &PAGPlayer::preFrame)
       .function("_autoClear", &PAGPlayer::autoClear)
       .function("_setAutoClear", &PAGPlayer::setAutoClear)
-      .function("_getBounds",
-                optional_override([](PAGPlayer& pagPlayer, std::shared_ptr<PAGLayer> pagLayer) {
-                  return ToTGFX(pagPlayer.getBounds(pagLayer));
-                }))
+      .function("_getBounds", &PAGPlayer::getBounds)
       .function("_getLayersUnderPoint", &PAGPlayer::getLayersUnderPoint)
       .function("_hitTestPoint", &PAGPlayer::hitTestPoint)
       .function("_renderingTime", optional_override([](PAGPlayer& pagPlayer) {
@@ -372,70 +359,65 @@ EMSCRIPTEN_BINDINGS(pag) {
       .property("fontFamily", &PAGFont::fontFamily)
       .property("fontStyle", &PAGFont::fontStyle);
 
-  class_<tgfx::ImageInfo>("ImageInfo")
-      .property("width", &tgfx::ImageInfo::width)
-      .property("height", &tgfx::ImageInfo::height)
-      .property("rowBytes", &tgfx::ImageInfo::rowBytes)
-      .property("colorType", &tgfx::ImageInfo::colorType);
-
-  class_<tgfx::Matrix>("_Matrix")
-      .class_function("_MakeAll", tgfx::Matrix::MakeAll)
+  class_<Matrix>("_Matrix")
+      .class_function("_MakeAll", Matrix::MakeAll)
       .class_function("_MakeScale", optional_override([](float sx, float sy) {
-                        return tgfx::Matrix::MakeScale(sx, sy);
+                        return Matrix::MakeScale(sx, sy);
                       }))
       .class_function("_MakeScale",
-                      optional_override([](float scale) { return tgfx::Matrix::MakeScale(scale); }))
-      .class_function("_MakeTrans", tgfx::Matrix::MakeTrans)
-      .function("_get", &tgfx::Matrix::get)
-      .function("_set", &tgfx::Matrix::set)
-      .function("_setAll", &tgfx::Matrix::setAll)
-      .function("_setAffine", &tgfx::Matrix::setAffine)
-      .function("_reset", &tgfx::Matrix::reset)
-      .function("_setTranslate", &tgfx::Matrix::setTranslate)
+                      optional_override([](float scale) { return Matrix::MakeScale(scale); }))
+      .class_function("_MakeTrans", Matrix::MakeTrans)
+      .function("_get", &Matrix::get)
+      .function("_set", &Matrix::set)
+      .function("_setAll", &Matrix::setAll)
+      .function("_setAffine", &Matrix::setAffine)
+      .function("_reset", &Matrix::reset)
+      .function("_setTranslate", &Matrix::setTranslate)
       .function("_setScale",
-                optional_override([](tgfx::Matrix& matrix, float sx, float sy, float px, float py) {
+                optional_override([](Matrix& matrix, float sx, float sy, float px, float py) {
                   return matrix.setScale(sx, sy, px, py);
                 }))
       .function("_setRotate",
-                optional_override([](tgfx::Matrix& matrix, float degrees, float px, float py) {
+                optional_override([](Matrix& matrix, float degrees, float px, float py) {
                   return matrix.setRotate(degrees, px, py);
                 }))
       .function("_setSinCos",
-                optional_override([](tgfx::Matrix& matrix, float sinV, float cosV, float px,
-                                     float py) { return matrix.setSinCos(sinV, cosV, px, py); }))
+                optional_override([](Matrix& matrix, float sinV, float cosV, float px, float py) {
+                  return matrix.setSinCos(sinV, cosV, px, py);
+                }))
       .function("_setSkew",
-                optional_override([](tgfx::Matrix& matrix, float kx, float ky, float px, float py) {
+                optional_override([](Matrix& matrix, float kx, float ky, float px, float py) {
                   return matrix.setSkew(kx, ky, px, py);
                 }))
-      .function("_setConcat", &tgfx::Matrix::setConcat)
-      .function("_preTranslate", &tgfx::Matrix::preTranslate)
+      .function("_setConcat", &Matrix::setConcat)
+      .function("_preTranslate", &Matrix::preTranslate)
       .function("_preScale",
-                optional_override([](tgfx::Matrix& matrix, float sx, float sy, float px, float py) {
+                optional_override([](Matrix& matrix, float sx, float sy, float px, float py) {
                   return matrix.preScale(sx, sy, px, py);
                 }))
       .function("_preRotate",
-                optional_override([](tgfx::Matrix& matrix, float degrees, float px, float py) {
+                optional_override([](Matrix& matrix, float degrees, float px, float py) {
                   return matrix.preRotate(degrees, px, py);
                 }))
       .function("_preSkew",
-                optional_override([](tgfx::Matrix& matrix, float kx, float ky, float px, float py) {
+                optional_override([](Matrix& matrix, float kx, float ky, float px, float py) {
                   return matrix.preSkew(kx, ky, px, py);
                 }))
-      .function("_preConcat", &tgfx::Matrix::preConcat)
-      .function("_postTranslate", &tgfx::Matrix::postTranslate)
+      .function("_preConcat", &Matrix::preConcat)
+      .function("_postTranslate", &Matrix::postTranslate)
       .function("_postScale",
-                optional_override([](tgfx::Matrix& matrix, float sx, float sy, float px, float py) {
+                optional_override([](Matrix& matrix, float sx, float sy, float px, float py) {
                   return matrix.postScale(sx, sy, px, py);
                 }))
       .function("_postRotate",
-                optional_override([](tgfx::Matrix& matrix, float degrees, float px, float py) {
+                optional_override([](Matrix& matrix, float degrees, float px, float py) {
                   return matrix.postRotate(degrees, px, py);
                 }))
       .function("_postSkew",
-                optional_override([](tgfx::Matrix& matrix, float kx, float ky, float px, float py) {
+                optional_override([](Matrix& matrix, float kx, float ky, float px, float py) {
                   return matrix.postSkew(kx, ky, px, py);
                 }))
-      .function("_postConcat", &tgfx::Matrix::postConcat);
+      .function("_postConcat", &Matrix::postConcat);
 
   class_<TextDocument>("TextDocument")
       .smart_ptr<std::shared_ptr<TextDocument>>("TextDocument")
@@ -443,12 +425,8 @@ EMSCRIPTEN_BINDINGS(pag) {
       .property("applyStroke", &TextDocument::applyStroke)
       .property("baselineShift", &TextDocument::baselineShift)
       .property("boxText", &TextDocument::boxText)
-      .property("boxTextPos", optional_override([](const TextDocument& textDocument) {
-                  return ToTGFX(textDocument.boxTextPos);
-                }))
-      .property("boxTextSize", optional_override([](const TextDocument& textDocument) {
-                  return ToTGFX(textDocument.boxTextSize);
-                }))
+      .property("boxTextPos", &TextDocument::boxTextPos)
+      .property("boxTextSize", &TextDocument::boxTextSize)
       .property("firstBaseLine", &TextDocument::firstBaseLine)
       .property("fauxBold", &TextDocument::fauxBold)
       .property("fauxItalic", &TextDocument::fauxItalic)
@@ -467,12 +445,6 @@ EMSCRIPTEN_BINDINGS(pag) {
       .property("backgroundAlpha", &TextDocument::backgroundAlpha)
       .property("direction", &TextDocument::direction);
 
-  class_<tgfx::Stroke>("Stroke")
-      .property("width", &tgfx::Stroke::width)
-      .property("cap", &tgfx::Stroke::cap)
-      .property("join", &tgfx::Stroke::join)
-      .property("miterLimit", &tgfx::Stroke::miterLimit);
-
   class_<PAGVideoRange>("PAGVideoRange")
       .function("startTime", optional_override([](PAGVideoRange& pagVideoRange) {
                   return static_cast<int>(pagVideoRange.startTime());
@@ -485,19 +457,13 @@ EMSCRIPTEN_BINDINGS(pag) {
                 }))
       .function("reversed", &PAGVideoRange::reversed);
 
-  value_object<tgfx::FontMetrics>("FontMetrics")
-      .field("ascent", &tgfx::FontMetrics::ascent)
-      .field("descent", &tgfx::FontMetrics::descent)
-      .field("xHeight", &tgfx::FontMetrics::xHeight)
-      .field("capHeight", &tgfx::FontMetrics::capHeight);
+  value_object<Rect>("Rect")
+      .field("left", &Rect::left)
+      .field("top", &Rect::top)
+      .field("right", &Rect::right)
+      .field("bottom", &Rect::bottom);
 
-  value_object<tgfx::Rect>("Rect")
-      .field("left", &tgfx::Rect::left)
-      .field("top", &tgfx::Rect::top)
-      .field("right", &tgfx::Rect::right)
-      .field("bottom", &tgfx::Rect::bottom);
-
-  value_object<tgfx::Point>("Point").field("x", &tgfx::Point::x).field("y", &tgfx::Point::y);
+  value_object<Point>("Point").field("x", &Point::x).field("y", &Point::y);
 
   value_object<Color>("Color")
       .field("red", &Color::red)
@@ -517,22 +483,6 @@ EMSCRIPTEN_BINDINGS(pag) {
                  [](Marker& marker, int value) { marker.duration = static_cast<int64_t>(value); }))
       .field("comment", &Marker::comment);
 
-  enum_<tgfx::PathFillType>("PathFillType")
-      .value("Winding", tgfx::PathFillType::Winding)
-      .value("EvenOdd", tgfx::PathFillType::EvenOdd)
-      .value("InverseWinding", tgfx::PathFillType::InverseWinding)
-      .value("InverseEvenOdd", tgfx::PathFillType::InverseEvenOdd);
-
-  enum_<tgfx::LineCap>("LineCap")
-      .value("Butt", tgfx::LineCap::Butt)
-      .value("Round", tgfx::LineCap::Round)
-      .value("Square", tgfx::LineCap::Square);
-
-  enum_<tgfx::LineJoin>("LineJoin")
-      .value("Miter", tgfx::LineJoin::Miter)
-      .value("Round", tgfx::LineJoin::Round)
-      .value("Bevel", tgfx::LineJoin::Bevel);
-
   function("_registerSoftwareDecoderFactory", optional_override([](val factory) {
              delete VideoDecoder::GetExternalSoftwareDecoderFactory();
              PAGVideoDecoder::RegisterSoftwareDecoderFactory(
@@ -541,7 +491,55 @@ EMSCRIPTEN_BINDINGS(pag) {
 
   register_vector<std::shared_ptr<PAGLayer>>("VectorPAGLayer");
   register_vector<std::string>("VectorString");
-  register_vector<tgfx::Point>("VectorPoint");
+  register_vector<int>("VectorInt");
   register_vector<Marker>("VectorMarker");
   register_vector<PAGVideoRange>("VectorPAGVideoRange");
+
+  class_<tgfx::Matrix>("TGFXMatrix")
+      .function("_get", &tgfx::Matrix::get)
+      .function("_set", &tgfx::Matrix::set);
+
+  class_<tgfx::ImageInfo>("TGFXImageInfo")
+      .property("width", &tgfx::ImageInfo::width)
+      .property("height", &tgfx::ImageInfo::height)
+      .property("rowBytes", &tgfx::ImageInfo::rowBytes)
+      .property("colorType", &tgfx::ImageInfo::colorType);
+
+  class_<tgfx::Stroke>("TGFXStroke")
+      .property("width", &tgfx::Stroke::width)
+      .property("cap", &tgfx::Stroke::cap)
+      .property("join", &tgfx::Stroke::join)
+      .property("miterLimit", &tgfx::Stroke::miterLimit);
+
+  value_object<tgfx::FontMetrics>("TGFXFontMetrics")
+      .field("ascent", &tgfx::FontMetrics::ascent)
+      .field("descent", &tgfx::FontMetrics::descent)
+      .field("xHeight", &tgfx::FontMetrics::xHeight)
+      .field("capHeight", &tgfx::FontMetrics::capHeight);
+
+  value_object<tgfx::Rect>("TGFXRect")
+      .field("left", &tgfx::Rect::left)
+      .field("top", &tgfx::Rect::top)
+      .field("right", &tgfx::Rect::right)
+      .field("bottom", &tgfx::Rect::bottom);
+
+  enum_<tgfx::PathFillType>("TGFXPathFillType")
+      .value("Winding", tgfx::PathFillType::Winding)
+      .value("EvenOdd", tgfx::PathFillType::EvenOdd)
+      .value("InverseWinding", tgfx::PathFillType::InverseWinding)
+      .value("InverseEvenOdd", tgfx::PathFillType::InverseEvenOdd);
+
+  enum_<tgfx::LineCap>("TGFXLineCap")
+      .value("Butt", tgfx::LineCap::Butt)
+      .value("Round", tgfx::LineCap::Round)
+      .value("Square", tgfx::LineCap::Square);
+
+  enum_<tgfx::LineJoin>("TGFXLineJoin")
+      .value("Miter", tgfx::LineJoin::Miter)
+      .value("Round", tgfx::LineJoin::Round)
+      .value("Bevel", tgfx::LineJoin::Bevel);
+
+  value_object<tgfx::Point>("TGFXPoint").field("x", &tgfx::Point::x).field("y", &tgfx::Point::y);
+
+  register_vector<tgfx::Point>("VectorTGFXPoint");
 }

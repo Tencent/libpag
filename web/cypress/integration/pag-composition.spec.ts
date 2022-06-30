@@ -19,7 +19,7 @@ describe('PAGImage', () => {
 
   let pagComposition: PAGComposition;
   it('Make', async () => {
-    pagComposition = PAG.PAGComposition.Make(100, 100);
+    pagComposition = PAG.PAGComposition.make(100, 100);
     expect(pagComposition.wasmIns).to.be.a('object');
   });
 

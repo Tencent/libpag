@@ -50,7 +50,7 @@ describe('PAGPlayer', () => {
     pagPlayer = createPAGPlayer();
     const pagFile = await getPAGFile();
     pagPlayer.setComposition(pagFile);
-    const pagSurface = PAG.PAGSurface.FromCanvas('#pag');
+    const pagSurface = PAG.PAGSurface.fromCanvas('#pag');
     expect(pagSurface.wasmIns).to.be.a('Object');
     pagPlayer.setSurface(pagSurface);
     expect(pagPlayer.getSurface().wasmIns).to.be.a('Object');
