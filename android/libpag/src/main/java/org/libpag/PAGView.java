@@ -405,7 +405,6 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         if (pagSurface != null) {
             pagSurface.freeCache();
         }
-        animator.removeUpdateListener(mAnimatorUpdateListener);
 
         boolean surfaceDestroy = true;
         if (g_PAGViewHandler != null && surface != null) {
@@ -852,5 +851,11 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         }
         _isAnimatorPreRunning = null;
         doPlay();
+    }
+
+    @Override
+    protected void finalize() throws Throwable {
+        super.finalize();
+        animator.removeUpdateListener(mAnimatorUpdateListener);
     }
 }
