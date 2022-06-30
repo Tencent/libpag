@@ -51,6 +51,9 @@ class Glyph {
   static std::vector<GlyphHandle> BuildFromText(const std::string& text, const tgfx::Font& font,
                                                 const TextPaint& paint, bool isVertical = false);
 
+  static GlyphHandle Make(tgfx::GlyphID glyphId, std::string name, tgfx::Font font, bool isVertical,
+                          const TextPaint& textPaint);
+
   /**
    * Called by the Text::MakeFrom() method to merge the draw calls of glyphs with the same style.
    * Return false if this glyph is not visible.

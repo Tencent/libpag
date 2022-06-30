@@ -57,6 +57,11 @@ std::vector<GlyphHandle> Glyph::BuildFromText(const std::string& text, const tgf
   return glyphList;
 }
 
+GlyphHandle Glyph::Make(tgfx::GlyphID glyphId, std::string name, tgfx::Font font, bool isVertical,
+                        const TextPaint& textPaint) {
+  return GlyphHandle(new Glyph(glyphId, name, font, isVertical, textPaint));
+}
+
 Glyph::Glyph(tgfx::GlyphID glyphId, std::string name, tgfx::Font font, bool isVertical,
              const TextPaint& textPaint)
     : _glyphId(glyphId), _name(std::move(name)), _font(std::move(font)), _isVertical(isVertical) {
