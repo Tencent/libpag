@@ -80,7 +80,7 @@ export class PAGView {
 
   private static makePAGSurface(pagGlContext: BackendContext, width: number, height: number): PAGSurface {
     if (!pagGlContext.makeCurrent()) throw new Error('Make context current fail!');
-    const pagSurface = PAGSurface.FromRenderTarget(0, width, height, true);
+    const pagSurface = PAGSurface.fromRenderTarget(0, width, height, true);
     pagGlContext.clearCurrent();
     return pagSurface;
   }
