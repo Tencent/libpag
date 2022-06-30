@@ -52,8 +52,8 @@ void WriteImages(EncodeStream* stream, const std::vector<pag::ImageBytes*>* imag
       continue;
     }
 
-    int realWidth = static_cast<int>(ceil(imageBytes->width * imageBytes->scaleFactor));
-    int realHeight = static_cast<int>(ceil(imageBytes->height * imageBytes->scaleFactor));
+    int realWidth = static_cast<int>(round(imageBytes->width * imageBytes->scaleFactor));
+    int realHeight = static_cast<int>(round(imageBytes->height * imageBytes->scaleFactor));
 
     if (scaledWidth == realWidth && scaledHeight == realHeight) {
       if (imageBytes->scaleFactor == 1.0f) {
