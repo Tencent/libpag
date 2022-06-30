@@ -27,7 +27,10 @@ class TextContentCache : public ContentCache {
  public:
   explicit TextContentCache(TextLayer* layer);
   TextContentCache(TextLayer* layer, ID cacheID, Property<TextDocumentHandle>* sourceText);
-  TextContentCache(TextLayer* layer, ID cacheID,
+  TextContentCache(TextLayer* layer, ID cacheID, Property<TextDocumentHandle>* sourceText,
+                   std::vector<TextAnimator*>* animators = nullptr);
+  TextContentCache(TextLayer* layer, ID cacheID, Property<TextDocumentHandle>* sourceText,
+                   std::vector<TextAnimator*>* animators,
                    const std::vector<std::vector<GlyphHandle>>& lines);
 
  protected:

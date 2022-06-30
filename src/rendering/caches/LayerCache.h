@@ -40,7 +40,8 @@ class LayerCache : public Cache {
 
   tgfx::Point getMaxScaleFactor() const;
 
-  bool checkFrameChanged(Frame contentFrame, Frame lastContentFrame);
+  bool checkFrameChanged(Frame contentFrame, Frame lastContentFrame,
+                         const std::vector<TimeRange>* contentStaticTimeRanges);
 
   bool contentVisible(Frame contentFrame);
 
@@ -67,6 +68,7 @@ class LayerCache : public Cache {
   ContentCache* contentCache = nullptr;
   tgfx::Point maxScaleFactor = {};
   std::vector<TimeRange> staticTimeRanges;
+  std::vector<TimeRange> contentStaticTimeRanges;
 
   explicit LayerCache(Layer* layer);
   void updateStaticTimeRanges();

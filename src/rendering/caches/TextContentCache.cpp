@@ -33,16 +33,21 @@ TextContentCache::TextContentCache(TextLayer* layer)
 }
 
 TextContentCache::TextContentCache(TextLayer* layer, ID cacheID,
-                                   Property<TextDocumentHandle>* sourceText)
+                                   Property<TextDocumentHandle>* sourceText,
+                                   std::vector<TextAnimator*>* animators)
     : ContentCache(layer), cacheID(cacheID), sourceText(sourceText), pathOption(layer->pathOption),
-      moreOption(layer->moreOption), animators(&layer->animators) {
+      moreOption(layer->moreOption),
+      animators(animators == nullptr ? &layer->animators : animators) {
   initTextGlyphs();
 }
 
 TextContentCache::TextContentCache(TextLayer* layer, ID cacheID,
+                                   Property<TextDocumentHandle>* sourceText,
+                                   std::vector<TextAnimator*>* animators,
                                    const std::vector<std::vector<GlyphHandle>>& lines)
-    : ContentCache(layer), cacheID(cacheID), sourceText(layer->sourceText),
-      pathOption(layer->pathOption), moreOption(layer->moreOption), animators(&layer->animators) {
+    : ContentCache(layer), cacheID(cacheID), sourceText(sourceText), pathOption(layer->pathOption),
+      moreOption(layer->moreOption),
+      animators(animators == nullptr ? &layer->animators : animators) {
   initTextGlyphs(&lines);
 }
 

@@ -184,4 +184,10 @@ void PAGTextLayer::setMatrixInternal(const Matrix& matrix) {
   PAGLayer::setMatrixInternal(matrix);
 }
 
+bool PAGTextLayer::gotoTime(int64_t layerTime) {
+  return gotoTimeInternal(layerTime, replacement && replacement->contentCache()
+                                         ? replacement->contentCache()->getStaticTimeRanges()
+                                         : nullptr);
+}
+
 }  // namespace pag

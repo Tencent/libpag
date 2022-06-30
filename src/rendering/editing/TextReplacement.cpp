@@ -22,20 +22,29 @@ namespace pag {
 TextReplacement::TextReplacement(PAGTextLayer* pagLayer) : pagLayer(pagLayer) {
   auto textLayer = static_cast<TextLayer*>(pagLayer->layer);
   sourceText = new Property<TextDocumentHandle>();
-  auto textData = TextDocumentHandle(new TextDocument());
-  *textData = *(textLayer->sourceText->value);
-  sourceText->value = textData;
+  sourceText->value = std::make_shared<TextDocument>();
+  *sourceText->value = *textLayer->sourceText->value;
+  _animators = new std::vector<TextAnimator*>;
+  *_animators = textLayer->animators;
 }
 
 TextReplacement::~TextReplacement() {
   delete textContentCache;
   delete sourceText;
+  delete _animators;
+  delete layoutGlyphs;
 }
 
 Content* TextReplacement::getContent(Frame contentFrame) {
   if (textContentCache == nullptr) {
     auto textLayer = static_cast<TextLayer*>(pagLayer->layer);
-    textContentCache = new TextContentCache(textLayer, pagLayer->uniqueID(), sourceText);
+    if (layoutGlyphs) {
+      textContentCache = new TextContentCache(textLayer, pagLayer->uniqueID(), sourceText,
+                                              _animators, *layoutGlyphs);
+    } else {
+      textContentCache =
+          new TextContentCache(textLayer, pagLayer->uniqueID(), sourceText, _animators);
+    }
     textContentCache->update();
   }
   return textContentCache->getCache(contentFrame);
@@ -49,4 +58,35 @@ void TextReplacement::clearCache() {
   delete textContentCache;
   textContentCache = nullptr;
 }
+
+void TextReplacement::setLayoutGlyphs(
+    const std::vector<std::vector<std::shared_ptr<Glyph>>>& glyphs) {
+  clearCache();
+  if (!layoutGlyphs) {
+    layoutGlyphs = new std::vector<std::vector<std::shared_ptr<Glyph>>>();
+  }
+  *layoutGlyphs = glyphs;
+  pagLayer->notifyModified(true);
+  pagLayer->invalidateCacheScale();
+}
+
+std::vector<TextAnimator*>* TextReplacement::animators() {
+  return _animators;
+}
+
+void TextReplacement::setAnimators(std::vector<TextAnimator*>* animators) {
+  clearCache();
+  if (animators == nullptr) {
+    *_animators = static_cast<TextLayer*>(pagLayer->layer)->animators;
+  } else {
+    *_animators = *animators;
+  }
+  pagLayer->notifyModified(true);
+  pagLayer->invalidateCacheScale();
+}
+
+TextContentCache* TextReplacement::contentCache() {
+  return textContentCache;
+}
+
 }  // namespace pag

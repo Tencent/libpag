@@ -18,33 +18,46 @@
 
 #pragma once
 
-#include "rendering/caches/TextContentCache.h"
-
+#include "pag/file.h"
+#include "pag/pag.h"
 namespace pag {
-class TextReplacement {
+
+class Transform2D;
+class Glyph;
+
+class PAGTextLayerPriv {
  public:
-  explicit TextReplacement(PAGTextLayer* textLayer);
-  ~TextReplacement();
+  static std::shared_ptr<PAGTextLayerPriv> Make(std::shared_ptr<PAGTextLayer> pagTextLayer);
 
-  Content* getContent(Frame contentFrame);
+  /**
+   * Returns the text layer's transform.
+   */
+  const Transform2D* transform() const;
 
-  TextDocument* getTextDocument();
+  /**
+   * Returns the text layer's animators.
+   */
+  std::vector<TextAnimator*> textAnimators();
 
-  void clearCache();
-
-  void setLayoutGlyphs(const std::vector<std::vector<std::shared_ptr<Glyph>>>& glyphs);
-
+  /**
+   * Set the text layer's animators.
+   */
   void setAnimators(std::vector<TextAnimator*>* animators);
 
-  std::vector<TextAnimator*>* animators();
+  /**
+   * Set the text layer's typography information.
+   */
+  void setLayoutGlyphs(const std::vector<std::vector<std::shared_ptr<Glyph>>>& glyphs);
 
-  TextContentCache* contentCache();
+  /**
+   * Set the text layer's justification.
+   */
+  void setJustification(Enum justification);
 
  private:
-  TextContentCache* textContentCache = nullptr;
-  Property<TextDocumentHandle>* sourceText = nullptr;
-  std::vector<std::vector<std::shared_ptr<Glyph>>>* layoutGlyphs = nullptr;
-  PAGTextLayer* pagLayer = nullptr;
-  std::vector<TextAnimator*>* _animators = nullptr;
+  PAGTextLayerPriv(std::shared_ptr<PAGTextLayer> pagTextLayer);
+
+  std::weak_ptr<PAGTextLayer> pagTextLayer;
 };
+
 }  // namespace pag

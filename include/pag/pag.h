@@ -458,6 +458,7 @@ class PAG_API PAGLayer : public Content {
   void preFrameInternal();
   void nextFrameInternal();
   virtual bool gotoTime(int64_t layerTime);
+  bool gotoTimeInternal(int64_t layerTime, const std::vector<TimeRange>* contentStaticTimeRanges);
   virtual Frame childFrameToLocal(Frame childFrame, float childFrameRate) const;
   virtual Frame localFrameToChild(Frame localFrame, float childFrameRate) const;
 
@@ -626,6 +627,7 @@ class PAG_API PAGTextLayer : public PAGLayer {
   void reset();
 
  protected:
+  bool gotoTime(int64_t layerTime) override;
   void replaceTextInternal(std::shared_ptr<TextDocument> textData);
   void setMatrixInternal(const Matrix& matrix) override;
   Content* getContent() override;
@@ -643,6 +645,8 @@ class PAG_API PAGTextLayer : public PAGLayer {
   friend class PAGFile;
 
   friend class TextReplacement;
+
+  friend class PAGTextLayerPriv;
 };
 
 class ShapeLayer;

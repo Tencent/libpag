@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <rendering/FontManager.h>
 #include <rendering/renderers/TextAnimatorRenderer.h>
 #include <iostream>
 #include <thread>
@@ -23,6 +24,7 @@
 #include "framework/utils/PAGTestUtils.h"
 #include "nlohmann/json.hpp"
 #include "pag/file.h"
+#include "rendering/layers/PAGTextLayerPriv.h"
 #include "rendering/renderers/TextRenderer.h"
 
 namespace pag {
@@ -405,4 +407,103 @@ PAG_TEST_F(PAGTextLayerTest, SmallFontSizeScale) {
   TestPAGPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGTextLayerTest/SmallFontSizeScale_LowResolution"));
 }
+
+PAG_TEST(PAGTextLayerPrivTest, animators) {
+  auto pagFile = PAGFile::Load("../resources/apitest/editableTextAnimators.pag");
+  auto surface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto player = std::make_shared<PAGPlayer>();
+  player->setSurface(surface);
+  player->setComposition(pagFile);
+  player->setProgress(0);
+  player->flush();
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGTextLayerEditTest/animators"));
+
+  auto staticTxt = std::static_pointer_cast<PAGTextLayer>(
+      pagFile->getLayersByEditableIndex(0, LayerType::Text)[0]);
+  auto staticPrivTxt = PAGTextLayerPriv::Make(staticTxt);
+  auto dynamicTxt = std::static_pointer_cast<PAGTextLayer>(
+      pagFile->getLayersByEditableIndex(1, LayerType::Text)[0]);
+  auto dynamicPrivTxt = PAGTextLayerPriv::Make(dynamicTxt);
+  EXPECT_TRUE(staticPrivTxt->transform() != nullptr);
+  auto animators = dynamicPrivTxt->textAnimators();
+  std::vector<TextAnimator*> emptyAnimator = {};
+  dynamicPrivTxt->setAnimators(&emptyAnimator);
+  player->flush();
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGTextLayerEditTest/animators0"));
+
+  dynamicPrivTxt->setAnimators(&animators);
+  player->flush();
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGTextLayerEditTest/animators1"));
+
+  dynamicPrivTxt->setAnimators(nullptr);
+  player->flush();
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGTextLayerEditTest/animators2"));
+
+  staticPrivTxt->setAnimators(&animators);
+  player->flush();
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGTextLayerEditTest/animators3"));
+}
+
+static std::vector<GlyphHandle> BuildGlyphs(const TextDocument* textDocument) {
+  TextPaint textPaint = {};
+  if (textDocument->applyFill && textDocument->applyStroke) {
+    textPaint.style = TextStyle::StrokeAndFill;
+  } else if (textDocument->applyStroke) {
+    textPaint.style = TextStyle::Stroke;
+  } else {
+    textPaint.style = TextStyle::Fill;
+  }
+  textPaint.fillColor = textDocument->fillColor;
+  textPaint.strokeColor = textDocument->strokeColor;
+  textPaint.strokeWidth = textDocument->strokeWidth;
+  textPaint.strokeOverFill = textDocument->strokeOverFill;
+  tgfx::Font textFont = {};
+  textFont.setFauxBold(textDocument->fauxBold);
+  textFont.setFauxItalic(textDocument->fauxItalic);
+  textFont.setSize(textDocument->fontSize);
+  textFont.setTypeface(
+      FontManager::GetTypefaceWithoutFallback(textDocument->fontFamily, textDocument->fontStyle));
+  return Glyph::BuildFromText(textDocument->text, textFont, textPaint,
+                              textDocument->direction == TextDirection::Vertical);
+}
+
+PAG_TEST(PAGTextLayerPrivTest, setLayoutGlyphs) {
+  auto pagFile = PAGFile::Load("../resources/apitest/editableTextLayout.pag");
+  auto textData = pagFile->getTextData(0);
+  textData->text = "1\n\n😆2";
+  pagFile->replaceText(0, textData);
+  auto surface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto player = std::make_shared<PAGPlayer>();
+  player->setSurface(surface);
+  player->setComposition(pagFile);
+  player->flush();
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGTextLayerEditTest/setLayoutGlyphs"));
+
+  auto glyphs = BuildGlyphs(textData.get());
+  // 1
+  glyphs[0]->setMatrix(tgfx::Matrix::I());
+  // 😆
+  glyphs[3]->setMatrix(tgfx::Matrix::MakeAll(1, 0, 0, 0, 1, 120, 0, 0, 1));
+  // 2
+  glyphs[4]->setMatrix(tgfx::Matrix::MakeAll(1, 0, 125.828125, 0, 1, 120, 0, 0, 1));
+  std::vector<std::vector<GlyphHandle>> layoutGlyphs = {};
+  layoutGlyphs.emplace_back(std::vector{glyphs[0]});
+  layoutGlyphs.emplace_back(std::vector{glyphs[3]});
+  layoutGlyphs.emplace_back(std::vector{glyphs[4]});
+  auto textLayer = std::static_pointer_cast<PAGTextLayer>(
+      pagFile->getLayersByEditableIndex(0, LayerType::Text)[0]);
+  auto textLayerPriv = PAGTextLayerPriv::Make(textLayer);
+  textLayerPriv->setJustification(ParagraphJustification::LeftJustify);
+  textLayerPriv->setLayoutGlyphs(layoutGlyphs);
+  player->flush();
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGTextLayerEditTest/setLayoutGlyphs0"));
+
+  // 1
+  glyphs[0]->setMatrix(tgfx::Matrix::MakeAll(1, 0, 125.828125, 0, 1, 0, 0, 0, 1));
+  textLayerPriv->setJustification(ParagraphJustification::LeftJustify);
+  textLayerPriv->setLayoutGlyphs(layoutGlyphs);
+  player->flush();
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGTextLayerEditTest/setLayoutGlyphs1"));
+}
+
 }  // namespace pag

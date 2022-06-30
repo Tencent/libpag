@@ -424,6 +424,11 @@ const PAGStage* PAGLayer::getStage() const {
 }
 
 bool PAGLayer::gotoTime(int64_t layerTime) {
+  return gotoTimeInternal(layerTime, nullptr);
+}
+
+bool PAGLayer::gotoTimeInternal(int64_t layerTime,
+                                const std::vector<TimeRange>* contentStaticTimeRanges) {
   auto changed = false;
   if (_trackMatteLayer != nullptr) {
     changed = _trackMatteLayer->gotoTime(layerTime);
@@ -432,7 +437,7 @@ bool PAGLayer::gotoTime(int64_t layerTime) {
   auto oldContentFrame = contentFrame;
   contentFrame = layerFrame - startFrame;
   if (!changed) {
-    changed = layerCache->checkFrameChanged(contentFrame, oldContentFrame);
+    changed = layerCache->checkFrameChanged(contentFrame, oldContentFrame, contentStaticTimeRanges);
   }
   return changed;
 }

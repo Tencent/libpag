@@ -94,7 +94,8 @@ tgfx::Point LayerCache::getMaxScaleFactor() const {
   return maxScaleFactor;
 }
 
-bool LayerCache::checkFrameChanged(Frame contentFrame, Frame lastContentFrame) {
+bool LayerCache::checkFrameChanged(Frame contentFrame, Frame lastContentFrame,
+                                   const std::vector<TimeRange>* contentRanges) {
   if (contentFrame == lastContentFrame) {
     return false;
   }
@@ -102,8 +103,14 @@ bool LayerCache::checkFrameChanged(Frame contentFrame, Frame lastContentFrame) {
       (lastContentFrame < 0 || lastContentFrame >= layer->duration)) {
     return false;
   }
-  contentFrame = ConvertFrameByStaticTimeRanges(staticTimeRanges, contentFrame);
-  lastContentFrame = ConvertFrameByStaticTimeRanges(staticTimeRanges, lastContentFrame);
+  std::vector<TimeRange> ranges = staticTimeRanges;
+  if (contentRanges) {
+    MergeTimeRanges(&ranges, contentRanges);
+  } else {
+    MergeTimeRanges(&ranges, &contentStaticTimeRanges);
+  }
+  contentFrame = ConvertFrameByStaticTimeRanges(ranges, contentFrame);
+  lastContentFrame = ConvertFrameByStaticTimeRanges(ranges, lastContentFrame);
   return contentFrame != lastContentFrame;
 }
 
@@ -117,15 +124,16 @@ bool LayerCache::contentVisible(Frame contentFrame) {
 
 void LayerCache::updateStaticTimeRanges() {
   // layer->startTime is excluded from all time ranges.
+  TimeRange range = {0, layer->duration - 1};
+  staticTimeRanges.push_back(range);
+  // 矢量预合成的内容静态区间包含了子项，
+  // 这里的 staticTimeRanges 只记录 Layer 自身的静态区间，
+  // 避免在 Layer->gotoFrame() 里重复判断非真实子项的帧号变化。
   if (layer->type() == LayerType::PreCompose &&
       static_cast<PreComposeLayer*>(layer)->composition->type() == CompositionType::Vector) {
-    // 矢量预合成的内容静态区间包含了子项，
-    // 这里的 staticTimeRanges 只记录 Layer 自身的静态区间，
-    // 避免在 Layer->gotoFrame() 里重复判断非真实子项的帧号变化。
-    TimeRange range = {0, layer->duration - 1};
-    staticTimeRanges.push_back(range);
+    contentStaticTimeRanges = {{0, layer->duration - 1}};
   } else {
-    staticTimeRanges = *contentCache->getStaticTimeRanges();
+    contentStaticTimeRanges = *contentCache->getStaticTimeRanges();
   }
   MergeTimeRanges(&staticTimeRanges, transformCache->getStaticTimeRanges());
   if (maskCache) {
