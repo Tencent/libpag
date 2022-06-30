@@ -38,19 +38,7 @@ std::shared_ptr<Graphic> Shape::MakeFrom(ID assetID, const tgfx::Path& path,
   if (path.isEmpty()) {
     return nullptr;
   }
-  std::shared_ptr<tgfx::Shader> shader;
-  if (gradient.gradientType == GradientFillType::Linear) {
-    shader = tgfx::Shader::MakeLinearGradient(gradient.startPoint, gradient.endPoint,
-                                              gradient.colors, gradient.positions);
-  } else {
-    auto radius = tgfx::Point::Distance(gradient.startPoint, gradient.endPoint);
-    shader = tgfx::Shader::MakeRadialGradient(gradient.startPoint, radius, gradient.colors,
-                                              gradient.positions);
-  }
-  if (!shader) {
-    shader = tgfx::Shader::MakeColorShader(gradient.colors.back());
-  }
-  return std::shared_ptr<Graphic>(new Shape(assetID, path, std::move(shader)));
+  return std::shared_ptr<Graphic>(new Shape(assetID, path, gradient.getShader()));
 }
 
 Shape::Shape(ID assetID, tgfx::Path path, std::shared_ptr<tgfx::Shader> shader)

@@ -20,6 +20,7 @@
 #include "BulgeFilter.h"
 #include "CornerPinFilter.h"
 #include "DisplacementMapFilter.h"
+#include "GradientOverlayFilter.h"
 #include "LevelsIndividualFilter.h"
 #include "MosaicFilter.h"
 #include "MotionTileFilter.h"
@@ -115,6 +116,10 @@ std::unique_ptr<LayerFilter> LayerFilter::Make(LayerStyle* layerStyle) {
   switch (layerStyle->type()) {
     case LayerStyleType::DropShadow:
       filter = new DropShadowFilter(reinterpret_cast<DropShadowStyle*>(layerStyle));
+      break;
+    case LayerStyleType::GradientOverlay:
+      filter = new GradientOverlayFilter(reinterpret_cast<GradientOverlayStyle*>(layerStyle));
+      break;
     default:
       break;
   }

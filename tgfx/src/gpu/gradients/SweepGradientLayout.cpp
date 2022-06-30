@@ -16,22 +16,27 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "SweepGradientLayout.h"
+#include "core/utils/UniqueID.h"
+#include "gpu/opengl/GLSweepGradientLayout.h"
 
-#include <cmath>
-
-namespace pag {
-static constexpr float FLOAT_NEARLY_ZERO = 1.0f / (1 << 12);
-
-static inline float DegreesToRadians(float degrees) {
-  return degrees * (static_cast<float>(M_PI) / 180.0f);
+namespace tgfx {
+std::unique_ptr<SweepGradientLayout> SweepGradientLayout::Make(Matrix matrix, float bias,
+                                                               float scale) {
+  return std::unique_ptr<SweepGradientLayout>(new SweepGradientLayout(matrix, bias, scale));
 }
 
-static inline float RadiansToDegrees(float radians) {
-  return radians * (180.0f / static_cast<float>(M_PI));
+void SweepGradientLayout::onComputeProcessorKey(BytesKey* bytesKey) const {
+  static auto Type = UniqueID::Next();
+  bytesKey->write(Type);
 }
 
-static inline bool FloatNearlyZero(float x, float tolerance = FLOAT_NEARLY_ZERO) {
-  return fabsf(x) <= tolerance;
+SweepGradientLayout::SweepGradientLayout(Matrix matrix, float bias, float scale)
+    : coordTransform(matrix), bias(bias), scale(scale) {
+  addCoordTransform(&coordTransform);
 }
-}  // namespace pag
+
+std::unique_ptr<GLFragmentProcessor> SweepGradientLayout::onCreateGLInstance() const {
+  return std::make_unique<GLSweepGradientLayout>();
+}
+}  // namespace tgfx

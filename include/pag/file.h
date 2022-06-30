@@ -132,6 +132,7 @@ enum class TagCode {
   RadialBlurEffect = 81,
   MosaicEffect = 82,
   EditableIndices = 83,
+  GradientOverlayStyle = 85,
   // add new tags here...
 
   Count
@@ -763,7 +764,7 @@ class PAG_API MosaicEffect : public Effect {
   RTTR_ENABLE(Effect)
 };
 
-enum class LayerStyleType { Unknown, DropShadow, Stroke };
+enum class LayerStyleType { Unknown, DropShadow, Stroke, GradientOverlay };
 
 enum class LayerStylePosition { Above, Blow };
 
@@ -874,6 +875,63 @@ class PAG_API StrokeStyle : public LayerStyle {
   Property<float>* size = nullptr;
   Property<Opacity>* opacity = nullptr;
   Property<Enum>* position = nullptr;  // StrokePosition
+
+  RTTR_ENABLE(LayerStyle)
+};
+
+struct AlphaStop {
+  float position = 0.0f;
+  float midpoint = 0.5f;
+  Opacity opacity = Opaque;
+};
+
+struct ColorStop {
+  float position = 0.0f;
+  float midpoint = 0.5f;
+  Color color = Black;
+};
+
+class PAG_API GradientColor {
+ public:
+  std::vector<AlphaStop> alphaStops;
+  std::vector<ColorStop> colorStops;
+
+  void interpolate(const GradientColor& other, GradientColor* result, float t);
+};
+
+typedef std::shared_ptr<GradientColor> GradientColorHandle;
+
+class PAG_API GradientOverlayStyle : public LayerStyle {
+ public:
+  ~GradientOverlayStyle() override;
+
+  LayerStyleType type() const override {
+    return LayerStyleType::GradientOverlay;
+  }
+
+  LayerStylePosition drawPosition() const override {
+    return LayerStylePosition::Above;
+  }
+
+  bool visibleAt(Frame layerFrame) const override;
+
+  void transformBounds(Rect* contentBounds, const Point& filterScale,
+                       Frame layerFrame) const override;
+
+  void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const override;
+
+  bool verify() const override;
+
+  Property<Enum>* blendMode = nullptr;  // BlendMode
+  Property<Opacity>* opacity = nullptr;
+  Property<GradientColorHandle>* colors = nullptr;
+  Property<float>* gradientSmoothness = nullptr;
+  Property<float>* angle = nullptr;
+  Property<Enum>* style = nullptr;  // GradientFillType
+  Property<bool>* reverse = nullptr;
+  Property<bool>* alignWithLayer = nullptr;
+  Property<float>* scale = nullptr;
+  Property<Point>* offset = nullptr;
 
   RTTR_ENABLE(LayerStyle)
 };
@@ -1094,6 +1152,9 @@ class PAG_API GradientFillType {
  public:
   static const Enum Linear = 0;
   static const Enum Radial = 1;
+  static const Enum Angle = 2;
+  static const Enum Reflected = 3;
+  static const Enum Diamond = 4;  // not supported yet
 };
 
 class PAG_API ShapeTransform {
@@ -1306,28 +1367,6 @@ class PAG_API StrokeElement : public ShapeElement {
 
   RTTR_ENABLE(ShapeElement)
 };
-
-struct AlphaStop {
-  float position = 0.0f;
-  float midpoint = 0.5f;
-  Opacity opacity = Opaque;
-};
-
-struct ColorStop {
-  float position = 0.0f;
-  float midpoint = 0.5f;
-  Color color = Black;
-};
-
-class PAG_API GradientColor {
- public:
-  std::vector<AlphaStop> alphaStops;
-  std::vector<ColorStop> colorStops;
-
-  void interpolate(const GradientColor& other, GradientColor* result, float t);
-};
-
-typedef std::shared_ptr<GradientColor> GradientColorHandle;
 
 class PAG_API GradientFillElement : public ShapeElement {
  public:

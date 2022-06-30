@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "rendering/graphics/GradientPaint.h"
 #include "rendering/graphics/Graphic.h"
 #include "rendering/graphics/Snapshot.h"
 

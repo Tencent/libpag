@@ -55,4 +55,16 @@ class RadialGradient : public GradientShaderBase {
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const override;
 };
+
+class SweepGradient : public GradientShaderBase {
+ public:
+  SweepGradient(const Point& center, float t0, float t1, const std::vector<Color>& colors,
+                const std::vector<float>& positions);
+
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const override;
+
+ private:
+  float bias;
+  float scale;
+};
 }  // namespace tgfx

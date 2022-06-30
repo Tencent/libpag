@@ -83,6 +83,7 @@ class LayerFilter : public Filter {
 
  protected:
   Frame layerFrame = 0;
+  tgfx::Point filterScale = {};
   std::shared_ptr<const FilterProgram> filterProgram = nullptr;
 
   virtual std::string onBuildVertexShader();
@@ -120,7 +121,6 @@ class LayerFilter : public Filter {
  private:
   tgfx::Rect contentBounds = {};
   tgfx::Rect transformedBounds = {};
-  tgfx::Point filterScale = {};
 
   int vertexMatrixHandle = -1;
   int textureMatrixHandle = -1;
