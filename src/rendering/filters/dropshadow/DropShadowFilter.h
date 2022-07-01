@@ -20,7 +20,7 @@
 
 #include "DropShadowSpreadFilter.h"
 #include "rendering/filters/LayerFilter.h"
-#include "rendering/filters/gaussblur/SinglePassBlurFilter.h"
+#include "rendering/filters/gaussianblur/GaussianBlurFilter.h"
 #include "rendering/filters/utils/FilterBuffer.h"
 
 namespace pag {
@@ -43,17 +43,18 @@ class DropShadowFilter : public LayerFilter {
   std::shared_ptr<FilterBuffer> spreadFilterBuffer = nullptr;
   std::shared_ptr<FilterBuffer> blurFilterBuffer = nullptr;
 
-  SinglePassBlurFilter* blurFilterV = nullptr;
-  SinglePassBlurFilter* blurFilterH = nullptr;
+  FastBlurEffect* blurEffect = nullptr;
+  GaussianBlurFilter* blurFilter = nullptr;
   DropShadowSpreadFilter* spreadFilter = nullptr;
   DropShadowSpreadFilter* spreadThickFilter = nullptr;
 
   tgfx::Color color = tgfx::Color::Black();
-  float alpha = 0.0f;
+  tgfx::Point offset = {0.0, 0.0};
+  tgfx::Rect filterContentBounds = {};
+  tgfx::Rect filterNotFullSpreadBounds = {};
   float spread = 0.0f;
-  float spreadSize = 0.0f;
-  float blurSize = 0.0f;
-  std::vector<tgfx::Rect> filtersBounds = {};
+  float size = 0.0f;
+  float expendSize = 0.0f;
 
   void updateParamModeNotSpread(Frame frame, const tgfx::Rect& contentBounds,
                                 const tgfx::Rect& transformedBounds,

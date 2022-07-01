@@ -27,6 +27,7 @@ namespace pag {
 #define BLUR_MODE_SHADOW_MAX_LEVEL (3.0f)
 #define DROPSHADOW_MAX_SPREAD_SIZE (25.0f)
 #define DROPSHADOW_SPREAD_MIN_THICK_SIZE (12.0f)
+#define DROPSHADOW_EXPEND_FACTOR (60.0f)
 
 enum class BlurMode {
   Picture = 0,

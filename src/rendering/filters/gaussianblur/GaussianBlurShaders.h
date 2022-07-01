@@ -28,6 +28,8 @@ static const char BLUR_DOWN_FRAGMENT_SHADER[] = R"(
     
     uniform vec2 uStep;
     uniform vec2 uOffset;
+    uniform float uSpeciallyColor;
+    uniform vec4 uColor;
     
     float edge = 0.995;
     
@@ -44,8 +46,8 @@ static const char BLUR_DOWN_FRAGMENT_SHADER[] = R"(
         sum += texture2D(uTextureInput, clampEdge(vertexColor - vec2(uStep.x, -uStep.y) * uOffset));
 
         vec4 color = sum / 8.0;
-    
-        gl_FragColor = color;
+
+        gl_FragColor = vec4(mix(color.rgb, uColor.rgb * color.a, uSpeciallyColor), color.a) * mix(1.0, uColor.a, uSpeciallyColor);
     }
     )";
 

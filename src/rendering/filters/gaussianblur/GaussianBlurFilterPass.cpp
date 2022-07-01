@@ -42,13 +42,17 @@ void GaussianBlurFilterPass::onPrepareProgram(tgfx::Context* context, unsigned i
   auto gl = tgfx::GLFunctions::Get(context);
   stepHandle = gl->getUniformLocation(program, "uStep");
   offsetHandle = gl->getUniformLocation(program, "uOffset");
+  speciallyColorHandle = gl->getUniformLocation(program, "uSpeciallyColor");
+  colorHandle = gl->getUniformLocation(program, "uColor");
 }
 
-void GaussianBlurFilterPass::updateParams(float blurValue, float scaleValue,
-                                          bool isExpendBoundsValue) {
+void GaussianBlurFilterPass::updateParams(float blurValue, float scaleValue, bool isExpendBoundsValue,
+                                          bool isSpeciallyColorValue, const tgfx::Color& colorValue) {
   blurriness = blurValue;
   scale = scaleValue;
   isExpendBounds = isExpendBoundsValue;
+  isSpeciallyColor = isSpeciallyColorValue;
+  color = colorValue;
 }
 
 void GaussianBlurFilterPass::onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
@@ -60,6 +64,10 @@ void GaussianBlurFilterPass::onUpdateParams(tgfx::Context* context, const tgfx::
       offsetHandle,
       (options & BlurOptions::Horizontal) != BlurOptions::None ? blurriness * filterScale.x : 0,
       (options & BlurOptions::Vertical) != BlurOptions::None ? blurriness * filterScale.y : 0);
+  gl->uniform1f(speciallyColorHandle, isSpeciallyColor);
+  if (isSpeciallyColor) {
+    gl->uniform4f(colorHandle, color.red, color.green, color.blue, color.alpha);
+  }
 }
 
 std::vector<tgfx::Point> GaussianBlurFilterPass::computeVertices(const tgfx::Rect& inputBounds,

@@ -54,6 +54,10 @@ struct BlurParam {
   int depth = BLUR_LEVEL_1_DEPTH;
   float scale = BLUR_LEVEL_1_SCALE;
   float value = 0.0;
+  float expend = 0.0;
+  tgfx::Point offset = {0.0, 0.0};
+  bool isSpeciallyColor = false;
+  tgfx::Color color = tgfx::Color::Transparent();
   bool repeatEdgePixels = true;
   Enum blurDimensions = BlurDimensionsDirection::All;
 };

@@ -19,6 +19,7 @@
 #include "base/utils/MathUtil.h"
 #include "base/utils/Verify.h"
 #include "pag/file.h"
+#include "rendering/filters/utils/FilterDefines.h"
 
 namespace pag {
 DropShadowStyle::~DropShadowStyle() {
@@ -41,12 +42,17 @@ void DropShadowStyle::transformBounds(Rect* contentBounds, const Point& filterSc
                                       Frame layerFrame) const {
   auto angleValue = angle->getValueAt(layerFrame);
   auto distanceValue = distance->getValueAt(layerFrame);
-  auto sizeValue = size->getValueAt(layerFrame);
   auto radians = DegreesToRadians(angleValue - 180);
-  float offsetX = cosf(radians) * distanceValue;
-  float offsetY = -sinf(radians) * distanceValue;
-  contentBounds->offset(offsetX * filterScale.x, offsetY * filterScale.y);
-  contentBounds->outset(sizeValue * filterScale.x, sizeValue * filterScale.y);
+  auto sizeValue = size->getValueAt(layerFrame);
+  auto expendSize = sizeValue / DROPSHADOW_EXPEND_FACTOR;
+  auto offset = Point::Make(cosf(radians) * distanceValue * filterScale.x,
+                            -sinf(radians) * distanceValue * filterScale.y);
+
+  auto filterBounds = contentBounds;
+  filterBounds->offset(offset.x, offset.y);
+  filterBounds->outset(contentBounds->width() * expendSize * filterScale.x,
+                       contentBounds->height() * expendSize * filterScale.y);
+  filterBounds->roundOut();
 }
 
 void DropShadowStyle::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {

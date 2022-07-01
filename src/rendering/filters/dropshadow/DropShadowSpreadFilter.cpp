@@ -18,7 +18,7 @@
 
 #include "DropShadowSpreadFilter.h"
 #include "base/utils/TGFXCast.h"
-#include "rendering/filters/utils/BlurTypes.h"
+#include "rendering/filters/utils/FilterDefines.h"
 
 namespace pag {
 static const char DROPSHADOW_SPREAD_FRAGMENT_SHADER[] = R"(
@@ -44,7 +44,7 @@ static const char DROPSHADOW_SPREAD_FRAGMENT_SHADER[] = R"(
                 alphaSum += texture2D(uTextureInput, vertexColor + vec2(measureX, -measureY)).a;
             }
 
-            gl_FragColor = (alphaSum > 0.0) ? vec4(uColor, uAlpha) : vec4(0.0);
+            gl_FragColor = (alphaSum > 1.0) ? vec4(uColor, uAlpha) : vec4(0.0);
         }
     )";
 
@@ -73,7 +73,7 @@ static const char DROPSHADOW_SPREAD_THICK_FRAGMENT_SHADER[] = R"(
                 alphaSum += texture2D(uTextureInput, vertexColor + vec2(measureX / 2.0, -measureY / 2.0)).a;
             }
 
-            gl_FragColor = (alphaSum > 0.0) ? vec4(uColor, uAlpha) : vec4(0.0);
+            gl_FragColor = (alphaSum > 1.0) ? vec4(uColor, uAlpha) : vec4(0.0);
         }
     )";
 
@@ -101,7 +101,6 @@ void DropShadowSpreadFilter::onUpdateParams(tgfx::Context* context, const tgfx::
   auto alpha = ToAlpha(layerStyle->opacity->getValueAt(layerFrame));
   auto spread = layerStyle->spread->getValueAt(layerFrame);
   auto size = layerStyle->size->getValueAt(layerFrame);
-  spread *= (spread == 1.0) ? 1.0 : 0.8;
 
   auto spreadSizeX = size * spread * filterScale.x;
   auto spreadSizeY = size * spread * filterScale.y;
@@ -114,7 +113,7 @@ void DropShadowSpreadFilter::onUpdateParams(tgfx::Context* context, const tgfx::
                 spreadSizeY / contentBounds.height());
 }
 
-std::vector<tgfx::Point> DropShadowSpreadFilter::computeVertices(const tgfx::Rect&,
+std::vector<tgfx::Point> DropShadowSpreadFilter::computeVertices(const tgfx::Rect& inputBounds,
                                                                  const tgfx::Rect& outputBounds,
                                                                  const tgfx::Point& filterScale) {
   std::vector<tgfx::Point> vertices = {};
@@ -123,10 +122,9 @@ std::vector<tgfx::Point> DropShadowSpreadFilter::computeVertices(const tgfx::Rec
                                  {outputBounds.left, outputBounds.top},
                                  {outputBounds.right, outputBounds.top}};
 
-  auto spread = layerStyle->spread->getValueAt(layerFrame);
   auto size = layerStyle->size->getValueAt(layerFrame);
-  auto deltaX = -size * spread * filterScale.x;
-  auto deltaY = -size * spread * filterScale.y;
+  auto deltaX = -inputBounds.width() * size * filterScale.x / DROPSHADOW_EXPEND_FACTOR;
+  auto deltaY = -inputBounds.height() * size * filterScale.y / DROPSHADOW_EXPEND_FACTOR;
 
   tgfx::Point texturePoints[4] = {
       {deltaX, (outputBounds.height() + deltaY)},
