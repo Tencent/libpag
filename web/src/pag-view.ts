@@ -3,8 +3,6 @@ import { PAGPlayer } from './pag-player';
 import { EventManager, Listener } from './utils/event-manager';
 import { PAGSurface } from './pag-surface';
 import { destroyVerify } from './utils/decorators';
-import { Log } from './utils/log';
-import { ErrorCode } from './utils/error-map';
 import { isOffscreenCanvas } from './utils/type-utils';
 import { BackendContext } from './core/backend-context';
 import { PAGModule } from './binding';
@@ -339,8 +337,7 @@ export class PAGView {
    */
   public updateSize() {
     if (!this.canvasElement) {
-      Log.errorByCode(ErrorCode.CanvasElementIsNoFound);
-      return;
+      throw new Error('Canvas element is not found!');
     }
     this.rawWidth = this.canvasElement.width;
     this.rawHeight = this.canvasElement.height;
@@ -410,8 +407,7 @@ export class PAGView {
 
   private resetSize(useScale = true) {
     if (!this.canvasElement) {
-      Log.errorByCode(ErrorCode.CanvasElementIsNoFound);
-      return;
+      throw new Error('Canvas element is not found!');
     }
 
     if (!useScale || isOffscreenCanvas(this.canvasElement)) {

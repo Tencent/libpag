@@ -1,6 +1,4 @@
 import { readFile } from './utils/common';
-import { ErrorCode } from './utils/error-map';
-import { Log } from './utils/log';
 import { defaultFontNames } from './utils/font-family';
 import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorators';
 import { PAGModule } from './binding';
@@ -23,7 +21,9 @@ export class PAGFont {
   @wasmAsyncMethod
   public static async registerFont(family: string, data: File) {
     const buffer = (await readFile(data)) as ArrayBuffer;
-    if (!buffer || !(buffer.byteLength > 0)) Log.errorByCode(ErrorCode.PagFontDataEmpty);
+    if (!buffer || !(buffer.byteLength > 0)) {
+      throw new Error('Initialize PAGFont data not be empty!');
+    }
     const dataUint8Array = new Uint8Array(buffer);
     const fontFace = new FontFace(family, dataUint8Array);
     document.fonts.add(fontFace);
