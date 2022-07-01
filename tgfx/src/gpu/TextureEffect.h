@@ -18,25 +18,23 @@
 
 #pragma once
 
-#include "FragmentProcessor.h"
+#include "gpu/FragmentProcessor.h"
+#include "tgfx/core/RGBAAALayout.h"
 
 namespace tgfx {
-class TextureMaskFragmentProcessor : public FragmentProcessor {
+class TextureEffect : public FragmentProcessor {
  public:
-  static std::unique_ptr<TextureMaskFragmentProcessor> MakeUseLocalCoord(
-      const Texture* texture, const Matrix& localMatrix = Matrix::I(), bool inverted = false);
-
-  static std::unique_ptr<TextureMaskFragmentProcessor> MakeUseDeviceCoord(const Texture* texture,
-                                                                          ImageOrigin deviceOrigin);
+  static std::unique_ptr<FragmentProcessor> Make(const Texture* texture,
+                                                 const Matrix& localMatrix = Matrix::I(),
+                                                 const RGBAAALayout* layout = nullptr);
 
   std::string name() const override {
-    return "TextureMaskFragmentProcessor";
+    return "TextureEffect";
   }
 
  private:
-  TextureMaskFragmentProcessor(const Texture* texture, ImageOrigin deviceOrigin);
-
-  TextureMaskFragmentProcessor(const Texture* texture, const Matrix& localMatrix, bool inverted);
+  explicit TextureEffect(const Texture* texture, const RGBAAALayout* layout,
+                         const Matrix& localMatrix);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
@@ -46,12 +44,10 @@ class TextureMaskFragmentProcessor : public FragmentProcessor {
     return texture->getSampler();
   }
 
-  bool useLocalCoord;
   const Texture* texture;
+  const RGBAAALayout* layout;
   CoordTransform coordTransform;
-  bool inverted = false;
-  Matrix deviceCoordMatrix = Matrix::I();
 
-  friend class GLTextureMaskFragmentProcessor;
+  friend class GLTextureEffect;
 };
 }  // namespace tgfx

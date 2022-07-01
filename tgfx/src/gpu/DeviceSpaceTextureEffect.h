@@ -18,22 +18,20 @@
 
 #pragma once
 
-#include "gpu/FragmentProcessor.h"
-#include "tgfx/core/RGBAAALayout.h"
+#include "FragmentProcessor.h"
 
 namespace tgfx {
-class TextureFragmentProcessor : public FragmentProcessor {
+class DeviceSpaceTextureEffect : public FragmentProcessor {
  public:
-  static std::unique_ptr<FragmentProcessor> Make(const Texture* texture, const RGBAAALayout* layout,
-                                                 const Matrix& localMatrix);
+  static std::unique_ptr<DeviceSpaceTextureEffect> Make(const Texture* texture,
+                                                        ImageOrigin deviceOrigin);
 
   std::string name() const override {
-    return "TextureFragmentProcessor";
+    return "DeviceSpaceTextureEffect";
   }
 
  private:
-  explicit TextureFragmentProcessor(const Texture* texture, const RGBAAALayout* layout,
-                                    const Matrix& localMatrix);
+  DeviceSpaceTextureEffect(const Texture* texture, ImageOrigin deviceOrigin);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
@@ -44,9 +42,8 @@ class TextureFragmentProcessor : public FragmentProcessor {
   }
 
   const Texture* texture;
-  const RGBAAALayout* layout;
-  CoordTransform coordTransform;
+  Matrix deviceCoordMatrix = Matrix::I();
 
-  friend class GLTextureFragmentProcessor;
+  friend class GLDeviceSpaceTextureEffect;
 };
 }  // namespace tgfx

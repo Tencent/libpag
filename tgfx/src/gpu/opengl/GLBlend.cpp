@@ -478,4 +478,14 @@ void AppendMode(FragmentShaderBuilder* fsBuilder, const std::string& srcColor,
     HandleBlendModes(fsBuilder, srcColor, dstColor, outColor, blendMode);
   }
 }
+
+const char* BlendModeName(BlendMode mode) {
+  const char* ModeStrings[] = {"Clear",     "Src",        "Dst",        "SrcOver",    "DstOver",
+                               "SrcIn",     "DstIn",      "SrcOut",     "DstOut",     "SrcATop",
+                               "DstATop",   "Xor",        "Plus",       "Modulate",   "Screen",
+                               "Overlay",   "Darken",     "Lighten",    "ColorDodge", "ColorBurn",
+                               "HardLight", "SoftLight",  "Difference", "Exclusion",  "Multiply",
+                               "Hue",       "Saturation", "Color",      "Luminosity"};
+  return ModeStrings[static_cast<int>(mode)];
+}
 }  // namespace tgfx

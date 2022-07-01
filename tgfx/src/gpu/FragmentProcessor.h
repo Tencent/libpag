@@ -39,6 +39,16 @@ class GLFragmentProcessor;
 
 class FragmentProcessor : public Processor {
  public:
+  /**
+   * Returns the input modulated by the child's alpha. The passed in FP will not receive an input
+   * color.
+   *
+   *  output = input * child.a
+   *  output = input * (1 - child.a)
+   */
+  static std::unique_ptr<FragmentProcessor> MulInputByChildAlpha(
+      std::unique_ptr<FragmentProcessor> child, bool inverted = false);
+
   std::unique_ptr<GLFragmentProcessor> createGLInstance() const;
 
   size_t numTextureSamplers() const {
