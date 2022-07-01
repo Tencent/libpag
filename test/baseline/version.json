@@ -1,4 +1,8 @@
 {
+    "CanvasTest": {
+        "greyColorMatrix": "2329bd7f",
+        "identityMatrix": "2329bd7f"
+    },
     "PAGBlendTest": {
         "Blend_Add": "48a897dd",
         "Blend_Color": "70b03f5d",

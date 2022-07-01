@@ -19,19 +19,21 @@
 #pragma once
 
 #include <array>
-#include <memory>
+#include <optional>
+#include "gpu/GLFragmentProcessor.h"
 
 namespace tgfx {
-class FragmentProcessor;
-
-class ColorFilter {
+class GLColorMatrixFragmentProcessor : public GLFragmentProcessor {
  public:
-  static std::shared_ptr<ColorFilter> MakeLumaColorFilter();
+  void emitCode(EmitArgs& args) override;
 
-  static std::shared_ptr<ColorFilter> Matrix(const std::array<float, 20>& rowMajor);
+ private:
+  void onSetData(const ProgramDataManager& programDataManager,
+                 const FragmentProcessor& fragmentProcessor) override;
 
-  virtual ~ColorFilter() = default;
+  UniformHandle matrixUniform;
+  UniformHandle vectorUniform;
 
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor() const = 0;
+  std::optional<std::array<float, 20>> matrixPrev;
 };
 }  // namespace tgfx

@@ -44,6 +44,7 @@ static constexpr std::pair<ShaderVar::Type, const char*> kSLTypes[] = {
     {ShaderVar::Type::Float3, "vec3"},
     {ShaderVar::Type::Float4, "vec4"},
     {ShaderVar::Type::Float3x3, "mat3"},
+    {ShaderVar::Type::Float4x4, "mat4"},
     {ShaderVar::Type::Texture2DRectSampler, "sampler2DRect"},
     {ShaderVar::Type::TextureExternalSampler, "samplerExternalOES"},
     {ShaderVar::Type::Texture2DSampler, "sampler2D"},

@@ -16,22 +16,22 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <array>
-#include <memory>
+#include "ColorMatrixFragmentProcessor.h"
+#include "core/utils/UniqueID.h"
+#include "opengl/GLColorMatrixFragmentProcessor.h"
 
 namespace tgfx {
-class FragmentProcessor;
+std::unique_ptr<ColorMatrixFragmentProcessor> ColorMatrixFragmentProcessor::Make(
+    const std::array<float, 20>& matrix) {
+  return std::unique_ptr<ColorMatrixFragmentProcessor>(new ColorMatrixFragmentProcessor(matrix));
+}
 
-class ColorFilter {
- public:
-  static std::shared_ptr<ColorFilter> MakeLumaColorFilter();
+void ColorMatrixFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
+  static auto Type = UniqueID::Next();
+  bytesKey->write(Type);
+}
 
-  static std::shared_ptr<ColorFilter> Matrix(const std::array<float, 20>& rowMajor);
-
-  virtual ~ColorFilter() = default;
-
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor() const = 0;
-};
+std::unique_ptr<GLFragmentProcessor> ColorMatrixFragmentProcessor::onCreateGLInstance() const {
+  return std::make_unique<GLColorMatrixFragmentProcessor>();
+}
 }  // namespace tgfx

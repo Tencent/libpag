@@ -18,20 +18,16 @@
 
 #pragma once
 
-#include <array>
-#include <memory>
+#include "tgfx/gpu/ColorFilter.h"
 
 namespace tgfx {
-class FragmentProcessor;
-
-class ColorFilter {
+class ColorMatrixFilter : public ColorFilter {
  public:
-  static std::shared_ptr<ColorFilter> MakeLumaColorFilter();
+  ColorMatrixFilter(const std::array<float, 20>& matrix);
 
-  static std::shared_ptr<ColorFilter> Matrix(const std::array<float, 20>& rowMajor);
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor() const override;
 
-  virtual ~ColorFilter() = default;
-
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor() const = 0;
+ private:
+  std::array<float, 20> matrix;
 };
 }  // namespace tgfx

@@ -36,6 +36,8 @@ class ProgramDataManager {
 
   virtual void setMatrix3f(UniformHandle handle, const float matrix[]) const = 0;
 
+  virtual void setMatrix4f(UniformHandle handle, const float matrix[]) const = 0;
+
   // convenience method for uploading a Matrix to a 3x3 matrix uniform
   virtual void setMatrix(UniformHandle u, const Matrix& matrix) const = 0;
 };
