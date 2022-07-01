@@ -1,5 +1,3 @@
-import { Log } from './log';
-
 export const readFile = (file: File): Promise<String | ArrayBuffer | null> =>
   new Promise((resolve) => {
     const reader = new FileReader();
@@ -7,7 +5,7 @@ export const readFile = (file: File): Promise<String | ArrayBuffer | null> =>
       resolve(reader.result);
     };
     reader.onerror = () => {
-      Log.error((reader.error as DOMException).message);
+      console.error((reader.error as DOMException).message);
     };
     reader.readAsArrayBuffer(file);
   });

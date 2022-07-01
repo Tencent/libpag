@@ -2,8 +2,6 @@ import { PAGModule } from './binding';
 import { PAGComposition } from './pag-composition';
 import { readFile } from './utils/common';
 import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorators';
-import { ErrorCode } from './utils/error-map';
-import { Log } from './utils/log';
 import { getLayerTypeName, layer2typeLayer, proxyVector } from './utils/type-utils';
 
 import type { PAGImage } from './pag-image';
