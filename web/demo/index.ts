@@ -477,10 +477,10 @@ const setVideoTime = (el: HTMLVideoElement, time: number) => {
 };
 
 const getEditableLayer = (pagFile: PAGFile) => {
+  const editableImageCount = pagFile.numImages();
   let res: any[] = [];
-  const indices = pagFile.getEditableIndices(types.LayerType.Image);
-  indices.forEach((index) => {
-    const imageLayers = pagFile.getLayersByEditableIndex(index, types.LayerType.Image);
+  for (let i = 0; i < editableImageCount; i++) {
+    const imageLayers = pagFile.getLayersByEditableIndex(i, types.LayerType.Image);
     for (let j = 0; j < imageLayers.size(); j++) {
       const layer = imageLayers.get(j) as PAGImageLayer;
       const uniqueID = layer.uniqueID();
@@ -495,7 +495,7 @@ const getEditableLayer = (pagFile: PAGFile) => {
       const startTime = layer.localTimeToGlobal(localStartTime);
       res.push({ uniqueID, layerType, layerName, alpha, visible, editableIndex, frameRate, startTime, duration });
     }
-  });
+  }
   return res;
 };
 
