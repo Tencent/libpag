@@ -1,14 +1,16 @@
-import { PAGInit } from '../src/pag';
-import { PAGFile } from '../src/pag-file';
-import { PAGView } from '../src/pag-view';
+import { PAGInit, types } from '../src/pag';
 import { AudioPlayer } from './module/audio-player';
-import { LayerType, PAG as PAGNamespace, PAGViewListenerEvent, ParagraphJustification } from '../src/types';
-import { PAGComposition } from '../src/pag-composition';
-import { PAGImageLayer } from '../src/pag-image-layer';
+
+import type { PAGFile } from '../src/pag-file';
+import type { PAGView } from '../src/pag-view';
+import type { PAG as PAGNamespace, ParagraphJustification } from '../src/types';
+import type { PAGComposition } from '../src/pag-composition';
+import type { PAGImageLayer } from '../src/pag-image-layer';
 
 declare global {
   interface Window {
     VConsole: any;
+    ffavc: any;
   }
 }
 
@@ -25,7 +27,7 @@ let canvasElementSize = 640;
 let isMobile = false;
 
 window.onload = async () => {
-  PAG = await PAGInit({ locateFile: (file) => '../lib/' + file });
+  PAG = await PAGInit({ locateFile: (file: string) => '../lib/' + file });
   // Mobile
   isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
   if (isMobile) {
@@ -35,7 +37,7 @@ window.onload = async () => {
         'content',
         'viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no',
       );
-    await loadScript('https://unpkg.com/vconsole@latest/dist/vconsole.min.js');
+    await loadScript('https://cdn.jsdelivr.net/npm/vconsole@latest/dist/vconsole.min.js');
     const vconsole = new window.VConsole();
     canvasElementSize = 320;
     const canvas = document.getElementById('pag') as HTMLCanvasElement;
@@ -75,10 +77,9 @@ window.onload = async () => {
   document.getElementById('btn-test-vector-pag')?.addEventListener('click', () => {
     const url = './assets/like.pag';
     fetch(url)
-      .then((response) => response.blob())
-      .then((blob) => {
-        const file = new window.File([blob], url.replace(/(.*\/)*([^.]+)/i, '$2'));
-        createPAGView(file);
+      .then((response) => response.arrayBuffer())
+      .then((arrayBuffer) => {
+        createPAGView(arrayBuffer);
       });
   });
   document.getElementById('btn-test-video-pag')?.addEventListener('click', () => {
@@ -108,7 +109,7 @@ window.onload = async () => {
     textDoc.fauxItalic = false;
     textDoc.fontFamily = 'SourceHanSerifCN';
     textDoc.fontSize = 100;
-    textDoc.justification = ParagraphJustification.CenterJustify;
+    textDoc.justification = types.ParagraphJustification.CenterJustify;
     textDoc.strokeWidth = 20;
     textDoc.strokeColor = { red: 0, green: 0, blue: 0 };
     textDoc.applyStroke = true;
@@ -117,6 +118,20 @@ window.onload = async () => {
     pagFile.replaceText(0, textDoc);
     console.log(pagFile.getTextData(0));
     await pagView.flush();
+  });
+  document.getElementById('btn-enabled-decoder')?.addEventListener('click', async () => {
+    if (!window.ffavc) await loadScript('https://cdn.jsdelivr.net/npm/ffavc@latest/lib/ffavc.min.js');
+    const FFAVC = await window.ffavc.FFAVCInit();
+    const ffavcDecoderFactory = new FFAVC.FFAVCDecoderFactory();
+    PAG.registerSoftwareDecoderFactory(ffavcDecoderFactory);
+    console.log('=== 开启 ffavc 软件解码 ===');
+  });
+  document.getElementById('btn-enabled-decoder')?.addEventListener('click', async () => {
+    if (window.ffavc) {
+      const FFAVC = await window.ffavc.FFAVCInit();
+      const ffavcDecoderFactory = new FFAVC.FFAVCDecoderFactory();
+      PAG.registerSoftwareDecoderFactory(ffavcDecoderFactory);
+    }
   });
 
   // Get PAGFile duration
@@ -372,7 +387,7 @@ const swapLayer = (type: string) => {
   );
 };
 
-const createPAGView = async (file: File) => {
+const createPAGView = async (file: File | ArrayBuffer | Blob) => {
   if (pagFile) pagFile.destroy();
   if (pagView) pagView.destroy();
   const decodeTime = performance.now();
@@ -390,16 +405,16 @@ const createPAGView = async (file: File) => {
   )}ms`;
   pagView.setRepeatCount(0);
   // 绑定事件监听
-  pagView.addListener(PAGViewListenerEvent.onAnimationStart, (event) => {
+  pagView.addListener(types.PAGViewListenerEvent.onAnimationStart, (event) => {
     console.log('onAnimationStart', event);
   });
-  pagView.addListener(PAGViewListenerEvent.onAnimationEnd, (event) => {
+  pagView.addListener(types.PAGViewListenerEvent.onAnimationEnd, (event) => {
     console.log('onAnimationEnd', event);
   });
-  pagView.addListener(PAGViewListenerEvent.onAnimationCancel, (event) => {
+  pagView.addListener(types.PAGViewListenerEvent.onAnimationCancel, (event) => {
     console.log('onAnimationCancel', event);
   });
-  pagView.addListener(PAGViewListenerEvent.onAnimationRepeat, (event) => {
+  pagView.addListener(types.PAGViewListenerEvent.onAnimationRepeat, (event) => {
     console.log('onAnimationRepeat', event);
     audioEl.stop();
     audioEl.play();
@@ -407,14 +422,14 @@ const createPAGView = async (file: File) => {
   let lastProgress = 0;
   let lastFlushedTime = 0;
   let flushCount = 0; // Every 3 times update FPSinfo.
-  pagView.addListener(PAGViewListenerEvent.onAnimationPlay, (event) => {
+  pagView.addListener(types.PAGViewListenerEvent.onAnimationPlay, (event) => {
     console.log('onAnimationPlay', event);
     lastFlushedTime = performance.now();
   });
-  pagView.addListener(PAGViewListenerEvent.onAnimationPause, (event) => {
+  pagView.addListener(types.PAGViewListenerEvent.onAnimationPause, (event) => {
     console.log('onAnimationPause', event);
   });
-  pagView.addListener(PAGViewListenerEvent.onAnimationFlushed, (pagView: PAGView) => {
+  pagView.addListener(types.PAGViewListenerEvent.onAnimationFlushed, (pagView: PAGView) => {
     // console.log('onAnimationFlushed', pagView);
     const progress = pagView.getProgress();
     const time = performance.now();
@@ -432,7 +447,6 @@ const createPAGView = async (file: File) => {
   // 图层编辑
   const editableLayers = getEditableLayer(pagFile);
   renderEditableLayer(editableLayers);
-  console.log(`已加载 ${file.name}`);
   pagComposition = pagView.getComposition();
   audioEl = new AudioPlayer(pagComposition.audioBytes());
   return pagView;
@@ -463,11 +477,10 @@ const setVideoTime = (el: HTMLVideoElement, time: number) => {
 };
 
 const getEditableLayer = (pagFile: PAGFile) => {
-  const editableImageCount = pagFile.numImages();
-  const indices = pagFile.getEditableIndices(LayerType.Image);
   let res: any[] = [];
-  for (let i = 0; i < indices.size(); i++) {
-    const imageLayers = pagFile.getLayersByEditableIndex(indices.get(i), LayerType.Image);
+  const indices = pagFile.getEditableIndices(types.LayerType.Image);
+  indices.forEach((index) => {
+    const imageLayers = pagFile.getLayersByEditableIndex(index, types.LayerType.Image);
     for (let j = 0; j < imageLayers.size(); j++) {
       const layer = imageLayers.get(j) as PAGImageLayer;
       const uniqueID = layer.uniqueID();
@@ -482,7 +495,7 @@ const getEditableLayer = (pagFile: PAGFile) => {
       const startTime = layer.localTimeToGlobal(localStartTime);
       res.push({ uniqueID, layerType, layerName, alpha, visible, editableIndex, frameRate, startTime, duration });
     }
-  }
+  });
   return res;
 };
 
@@ -526,7 +539,7 @@ const replaceImage = (element: HTMLDivElement, index: number) => {
   element.appendChild(inputEl);
   inputEl.addEventListener('change', async (event: any) => {
     const pagImage = await PAG.PAGImage.fromFile(event.target.files[0]);
-    const pagFile = pagView.getComposition();
+    const pagFile = pagView.getComposition() as PAGFile;
     pagFile.replaceImage(index, pagImage);
     await pagView.flush();
     pagImage.destroy();
@@ -546,7 +559,7 @@ const replaceVideo = (element: HTMLDivElement, index: number) => {
     await loadVideoReady(videoEl, URL.createObjectURL(event.target.files[0]));
     await setVideoTime(videoEl, 0.05);
     const pagImage = PAG.PAGImage.fromSource(videoEl);
-    const pagFile = pagView.getComposition();
+    const pagFile = pagView.getComposition() as PAGFile;
     pagFile.replaceImage(index, pagImage);
     await pagView.flush();
     pagImage.destroy();

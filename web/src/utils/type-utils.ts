@@ -61,3 +61,20 @@ export const layer2typeLayer = (wasmIns: any): PAGSolidLayer | PAGTextLayer | PA
       return new PAGModule.PAGLayer(wasmIns);
   }
 };
+
+export const getLayerTypeName = (layerType:LayerType)=> {
+  switch (layerType) {
+    case LayerType.Solid:
+      return 'Solid';
+    case LayerType.Text:
+      return 'Text';
+    case LayerType.Shape:
+      return 'Shape';
+    case LayerType.Image:
+      return 'Image';
+    case LayerType.PreCompose:
+      return 'PreCompose';
+    default:
+      return 'Unknown';
+  }
+}

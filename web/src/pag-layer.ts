@@ -38,7 +38,9 @@ export class PAGLayer {
    * animation matrix for displaying.
    */
   public matrix(): Matrix {
-    return new Matrix(this.wasmIns._matrix());
+    const wasmIns = this.wasmIns._matrix();
+    if (!wasmIns) throw new Error('Get matrix fail!');
+    return new Matrix(wasmIns);
   }
 
   public setMatrix(matrix: Matrix) {
@@ -55,7 +57,9 @@ export class PAGLayer {
    * matrix from animation.
    */
   public getTotalMatrix(): Matrix {
-    return new Matrix(this.wasmIns._resetMatrix());
+    const wasmIns = this.wasmIns._getTotalMatrix();
+    if (!wasmIns) throw new Error('Get total matrix fail!');
+    return new Matrix(this.wasmIns._getTotalMatrix());
   }
   /**
    * Returns the current alpha of the layer if previously set.
@@ -94,13 +98,17 @@ export class PAGLayer {
    * Returns the parent PAGComposition of current PAGLayer.
    */
   public parent(): PAGComposition {
-    return new PAGComposition(this.wasmIns._parent());
+    const wasmIns = this.wasmIns._parent();
+    if (!wasmIns) throw new Error('Get total matrix fail!');
+    return new PAGComposition(wasmIns);
   }
   /**
    * Returns the markers of this layer.
    */
   public markers() {
-    return proxyVector(this.wasmIns._markers(), (wasmIns: any) => wasmIns as Marker);
+    const wasmIns = this.wasmIns._markers();
+    if (!wasmIns) throw new Error('Get markers fail!');
+    return proxyVector(wasmIns, (wasmIns: any) => wasmIns as Marker);
   }
   /**
    * Converts the time from the PAGLayer's (local) timeline to the PAGSurface (global) timeline. The
@@ -190,7 +198,9 @@ export class PAGLayer {
    * Returns trackMatte layer of this layer.
    */
   public trackMatteLayer(): PAGLayer {
-    return layer2typeLayer(this.wasmIns._trackMatteLayer());
+    const wasmIns = this.wasmIns._trackMatteLayer();
+    if (!wasmIns) throw new Error('Get track matte layer fail!');
+    return layer2typeLayer(wasmIns);
   }
   /**
    * Indicate whether this layer is excluded from parent's timeline. If set to true, this layer's
@@ -202,7 +212,7 @@ export class PAGLayer {
   /**
    * Set the excludedFromTimeline flag of this layer.
    */
-  public setExcludedFromTimeline(value: boolean) {
+  public setExcludedFromTimeline(value: boolean): void {
     this.wasmIns._setExcludedFromTimeline(value);
   }
   /**

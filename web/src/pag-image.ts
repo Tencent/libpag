@@ -36,6 +36,7 @@ export class PAGImage {
   public static fromSource(source: TexImageSource): PAGImage {
     const nativeImage = new NativeImage(source);
     const wasmIns = PAGModule._PAGImage._FromNativeImage(nativeImage);
+    if (!wasmIns) throw new Error('Make PAGImage from source fail!');
     return new PAGImage(wasmIns);
   }
   /**
@@ -53,6 +54,7 @@ export class PAGImage {
     const dataOnHeap = new Uint8Array(PAGModule.HEAPU8.buffer, dataPtr, pixels.byteLength);
     dataOnHeap.set(pixels);
     const wasmIns = PAGModule._PAGImage._FromPixels(dataPtr, width, height, rowBytes, colorType, alphaType);
+    if (!wasmIns) throw new Error('Make PAGImage from pixels fail!');
     return new PAGImage(wasmIns);
   }
   /**
@@ -60,7 +62,9 @@ export class PAGImage {
    * invalid.
    */
   public static fromTexture(textureID: number, width: number, height: number, flipY: boolean) {
-    return new PAGImage(PAGModule._PAGImage._FromTexture(textureID, width, height, flipY));
+    const wasmIns = PAGModule._PAGImage._FromTexture(textureID, width, height, flipY);
+    if (!wasmIns) throw new Error('Make PAGImage from texture fail!');
+    return new PAGImage(wasmIns);
   }
 
   public wasmIns;
@@ -98,7 +102,9 @@ export class PAGImage {
    * Returns a copy of current matrix.
    */
   public matrix(): Matrix {
-    return new Matrix(this.wasmIns._matrix());
+    const wasmIns = this.wasmIns._matrix();
+    if (!wasmIns) throw new Error('Get matrix fail!');
+    return new Matrix(wasmIns);
   }
   /**
    * Set the transformation which will be applied to the content.
