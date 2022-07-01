@@ -1,7 +1,6 @@
 import { VIDEO_DECODE_WAIT_FRAME } from '../constant';
 import { addListener, removeListener, removeAllListeners } from '../utils/video-listener';
 import { IS_WECHAT } from '../utils/ua';
-import { Log } from '../utils/log';
 import { EmscriptenGL } from '../types';
 
 export interface TimeRange {
@@ -32,7 +31,7 @@ const playVideoElement = async (videoElement: HTMLVideoElement) => {
   try {
     await videoElement.play();
   } catch (error: any) {
-    Log.error(error.message);
+    console.error(error.message);
     throw new Error(
       'Failed to decode video, please play PAG after user gesture. Or your can load a software decoder to decode the video.',
     );

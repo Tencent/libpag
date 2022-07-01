@@ -1,16 +1,45 @@
 # CHANGELOG
 
-## 4.0.5.6
+## 4.0.5.16
+
+### Breaking Changes
+
+- PAGSurface 上 `fromCanvas` 替代 `FromCanvas` , `fromTexture` 替代 `FromTexture` , `fromRenderTarget` 替代 `FromRenderTarget`
+- PAGComposition 上 `make` 替代 `Make`.
+- PAGSolidLayer 上 `make` 替代 `Make`.
+- PAGImageLayer 上 `make` 替代 `Make`.
 
 ### Feature
 
-- 在 WebMask 中实现 font style
+- 增加 `backendContext` 类
+- libpag 上增加 `version`
+- PAGView 上增加 `onAnimationUpdate` 事件，增加 `setComposition` , `matrix` , `setMatrix` , `getLayersUnderPoint` 函数接口
+- 支持注销软件解码器
+- 当获取 PAGLayer 会返回对应类型的 TypeLayer
+
+## 4.0.5.11
+
+### BugFixes
+
+- 修复字体名称存在标点符号时渲染错误
+
+## 4.0.5.7
+
+### Feature
+
+- 增加字体字形渲染
+- 增加兜底字体
+
+### BugFixes
+
+- 修复 OffscreenCanvas 在 Safari 上不存在导致断言失败
+- 关闭在 iOS Safari 15.4+ WebGL 上默认开启的矢量设置
 
 ## 4.0.5.5
 
 ### Feature
 
-- 发布 PAG Web SDK 正式版🎉
+- 发布 PAG Web SDK 正式版 🎉
 - 更新到 4.0.5.5 与 libpag 的版本号同步
 
 ### Bug Fixes
