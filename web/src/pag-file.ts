@@ -4,7 +4,7 @@ import { readFile } from './utils/common';
 import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorators';
 import { ErrorCode } from './utils/error-map';
 import { Log } from './utils/log';
-import { layer2typeLayer, proxyVector } from './utils/type-utils';
+import { getLayerTypeName, layer2typeLayer, proxyVector } from './utils/type-utils';
 
 import type { PAGImage } from './pag-image';
 import type { LayerType, PAGTimeStretchMode, TextDocument } from './types';
@@ -25,23 +25,24 @@ export class PAGFile extends PAGComposition {
     } else if (data instanceof ArrayBuffer) {
       buffer = data;
     }
-    if (buffer === null) {
-      Log.errorByCode(ErrorCode.PagFileDataError);
-    } else {
-      return PAGFile.loadFromBuffer(buffer);
-    }
+    if (!buffer)
+      throw new Error(
+        'Initialize PAGFile data type error, please put check data type must to be File ｜ Blob | ArrayBuffer!',
+      );
+    return PAGFile.loadFromBuffer(buffer);
   }
   /**
    * Load pag file from arrayBuffer
    */
   public static loadFromBuffer(buffer: ArrayBuffer) {
-    if (!buffer || !(buffer.byteLength > 0)) Log.errorByCode(ErrorCode.PagFileDataEmpty);
+    if (!buffer || !(buffer.byteLength > 0)) throw new Error('Initialize PAGFile data not be empty!');
     const dataUint8Array = new Uint8Array(buffer);
     const numBytes = dataUint8Array.byteLength;
     const dataPtr = PAGModule._malloc(numBytes);
     const dataOnHeap = new Uint8Array(PAGModule.HEAPU8.buffer, dataPtr, numBytes);
     dataOnHeap.set(dataUint8Array);
     const wasmIns = PAGModule._PAGFile._Load(dataOnHeap.byteOffset, dataOnHeap.length);
+    if (!wasmIns) throw new Error('Load PAGFile fail!');
     const pagFile = new PAGFile(wasmIns);
     PAGModule._free(dataPtr);
     return pagFile;
@@ -103,7 +104,9 @@ export class PAGFile extends PAGComposition {
    * Return an array of layers by specified editable index and layer type.
    */
   public getLayersByEditableIndex(editableIndex: Number, layerType: LayerType) {
-    return proxyVector(this.wasmIns._getLayersByEditableIndex(editableIndex, layerType), layer2typeLayer);
+    const wasmIns = this.wasmIns._getLayersByEditableIndex(editableIndex, layerType);
+    if (!wasmIns) throw new Error(`Get ${getLayerTypeName(layerType)} layers by ${editableIndex} fail!`);
+    return proxyVector(wasmIns, layer2typeLayer);
   }
   /**
    * Returns the indices of the editable layers in this PAGFile.
@@ -138,6 +141,8 @@ export class PAGFile extends PAGComposition {
    * to its default value.
    */
   public copyOriginal(): PAGFile {
-    return new PAGFile(this.wasmIns._copyOriginal());
+    const wasmIns = this.wasmIns._copyOriginal();
+    if (!wasmIns) throw new Error(`Copy original fail!`);
+    return new PAGFile(wasmIns);
   }
 }

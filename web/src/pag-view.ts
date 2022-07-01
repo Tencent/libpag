@@ -51,31 +51,29 @@ export class PAGView {
     } else if (isOffscreenCanvas(canvas)) {
       canvasElement = canvas;
     }
-    if (!canvasElement) {
-      Log.errorByCode(ErrorCode.CanvasIsNotFound);
-    } else {
-      const pagPlayer = PAGModule.PAGPlayer.create();
-      const pagView = new PAGView(pagPlayer, canvasElement);
-      pagView.pagViewOptions = { ...pagView.pagViewOptions, ...initOptions };
+    if (!canvasElement) throw new Error('Canvas is not found!');
 
-      if (pagView.pagViewOptions.useCanvas2D) {
-        PAGModule.globalCanvas.retain();
-        if (!PAGModule.globalCanvas.glContext) throw new Error('GlobalCanvas context is not WebGL!');
-        pagView.pagGlContext = BackendContext.from(PAGModule.globalCanvas.glContext);
-      } else {
-        const gl = canvasElement.getContext('webgl', WEBGL_CONTEXT_ATTRIBUTES);
-        if (!gl) throw new Error('Canvas context is not WebGL!');
-        pagView.pagGlContext = BackendContext.from(gl);
-      }
-      pagView.resetSize(pagView.pagViewOptions.useScale);
-      pagView.frameRate = file.frameRate();
-      pagView.pagSurface = this.makePAGSurface(pagView.pagGlContext, pagView.rawWidth, pagView.rawHeight);
-      pagView.player.setSurface(pagView.pagSurface);
-      pagView.player.setComposition(file);
-      pagView.setProgress(0);
-      if (pagView.pagViewOptions.firstFrame) await pagView.flush();
-      return pagView;
+    const pagPlayer = PAGModule.PAGPlayer.create();
+    const pagView = new PAGView(pagPlayer, canvasElement);
+    pagView.pagViewOptions = { ...pagView.pagViewOptions, ...initOptions };
+
+    if (pagView.pagViewOptions.useCanvas2D) {
+      PAGModule.globalCanvas.retain();
+      if (!PAGModule.globalCanvas.glContext) throw new Error('GlobalCanvas context is not WebGL!');
+      pagView.pagGlContext = BackendContext.from(PAGModule.globalCanvas.glContext);
+    } else {
+      const gl = canvasElement.getContext('webgl', WEBGL_CONTEXT_ATTRIBUTES);
+      if (!gl) throw new Error('Canvas context is not WebGL!');
+      pagView.pagGlContext = BackendContext.from(gl);
     }
+    pagView.resetSize(pagView.pagViewOptions.useScale);
+    pagView.frameRate = file.frameRate();
+    pagView.pagSurface = this.makePAGSurface(pagView.pagGlContext, pagView.rawWidth, pagView.rawHeight);
+    pagView.player.setSurface(pagView.pagSurface);
+    pagView.player.setComposition(file);
+    pagView.setProgress(0);
+    if (pagView.pagViewOptions.firstFrame) await pagView.flush();
+    return pagView;
   }
 
   private static makePAGSurface(pagGlContext: BackendContext, width: number, height: number): PAGSurface {
