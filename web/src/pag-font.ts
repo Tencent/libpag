@@ -12,7 +12,9 @@ export class PAGFont {
    * Create PAGFont instance.
    */
   public static create(fontFamily: string, fontStyle: string) {
-    return new PAGFont(PAGModule._PAGFont._create(fontFamily, fontStyle));
+    const wasmIns = PAGModule._PAGFont._create(fontFamily, fontStyle);
+    if (!wasmIns) throw new Error('Create PAGFont fail!');
+    return new PAGFont(wasmIns);
   }
 
   /**

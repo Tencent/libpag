@@ -53,7 +53,7 @@ describe('PAGLayer', async () => {
 
   it('Get total matrix', () => {
     const matrix = pagLayer.getTotalMatrix();
-    expect(matrix.wasmIns).to.be.eq(undefined);
+    expect(matrix.wasmIns).to.be.a('Object');
   });
 
   it('Get/Set alpha', () => {
