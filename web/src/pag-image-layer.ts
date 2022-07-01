@@ -10,16 +10,6 @@ import type { PAGVideoRange } from './types';
 @wasmAwaitRewind
 export class PAGImageLayer extends PAGLayer {
   /**
-   * [Deprecated]
-   * Make a empty PAGImageLayer with specified size.
-   */
-  public static Make(width: number, height: number, duration: number): PAGImageLayer {
-    console.warn(
-      'Please use PAGImageLayer.make to create PAGImageLayer object! This interface will be removed in the next version!',
-    );
-    return PAGImageLayer.make(width, height, duration);
-  }
-  /**
    * Make a empty PAGImageLayer with specified size.
    */
   public static make(width: number, height: number, duration: number): PAGImageLayer {

@@ -2,7 +2,7 @@ import { PAGModule } from './binding';
 import { PAGFile } from './pag-file';
 import { PAGSurface } from './pag-surface';
 import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorators';
-import { layer2typeLayer, proxyVector } from './utils/type-utils';
+import { getWasmIns, layer2typeLayer, proxyVector } from './utils/type-utils';
 import { Matrix } from './core/matrix';
 
 import type { PAGLayer } from './pag-layer';
@@ -133,8 +133,8 @@ export class PAGPlayer {
   /**
    * Set the PAGSurface object for PAGPlayer to render onto.
    */
-  public setSurface(pagSurface: PAGSurface): void {
-    this.wasmIns._setSurface(pagSurface.wasmIns);
+  public setSurface(pagSurface: PAGSurface | null): void {
+    this.wasmIns._setSurface(getWasmIns(pagSurface));
   }
   /**
    *
@@ -153,8 +153,8 @@ export class PAGPlayer {
    * Sets a new PAGComposition for PAGPlayer to render as content.
    */
 
-  public setComposition(pagComposition: PAGComposition) {
-    this.wasmIns._setComposition(pagComposition.wasmIns);
+  public setComposition(pagComposition: PAGComposition | null) {
+    this.wasmIns._setComposition(getWasmIns(pagComposition));
   }
   /**
    * Returns the PAGSurface object for PAGPlayer to render onto.

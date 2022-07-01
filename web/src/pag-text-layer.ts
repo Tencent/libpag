@@ -8,15 +8,15 @@ import type { Color, TextDocument } from './types';
 @destroyVerify
 @wasmAwaitRewind
 export class PAGTextLayer extends PAGLayer {
-  public static Make(
+  public static make(
     duration: number,
     text: string,
     fontSize: number,
     fontFamily: string,
     fontStyle: string,
   ): PAGTextLayer;
-  public static Make(duration: number, textDocumentHandle: TextDocument): PAGTextLayer;
-  public static Make(
+  public static make(duration: number, textDocumentHandle: TextDocument): PAGTextLayer;
+  public static make(
     duration: number,
     text: string | TextDocument,
     fontSize = 0,

@@ -490,6 +490,8 @@ EMSCRIPTEN_BINDINGS(pag) {
                  WebSoftwareDecoderFactory::Make(factory).release());
            }));
 
+  function("_SDKVersion", &PAG::SDKVersion);
+
   register_vector<std::shared_ptr<PAGLayer>>("VectorPAGLayer");
   register_vector<std::string>("VectorString");
   register_vector<int>("VectorInt");

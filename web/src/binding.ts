@@ -54,6 +54,9 @@ export const binding = (module: PAG) => {
   module.registerSoftwareDecoderFactory = function (factory = null) {
     module._registerSoftwareDecoderFactory(factory);
   };
+  module.SDKVersion = function () {
+    return module._SDKVersion();
+  };
 };
 
 export let PAGModule: PAG;
