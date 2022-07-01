@@ -158,9 +158,9 @@ void DropShadowFilter::onDrawModeNotFullSpread(tgfx::Context* context, const Fil
     return;
   }
   spreadFilterBuffer->clearColor();
-  auto offsetMatrix =
-      tgfx::Matrix::MakeTrans((filterContentBounds.left - filterNotFullSpreadBounds.left) * source->scale.x,
-                              (filterContentBounds.top - filterNotFullSpreadBounds.top) * source->scale.y);
+  auto offsetMatrix = tgfx::Matrix::MakeTrans(
+      (filterContentBounds.left - filterNotFullSpreadBounds.left) * source->scale.x,
+      (filterContentBounds.top - filterNotFullSpreadBounds.top) * source->scale.y);
   auto targetSpread = spreadFilterBuffer->toFilterTarget(offsetMatrix);
   if (size < DROPSHADOW_SPREAD_MIN_THICK_SIZE) {
     spreadFilter->draw(context, source, targetSpread.get());
@@ -174,9 +174,9 @@ void DropShadowFilter::onDrawModeNotFullSpread(tgfx::Context* context, const Fil
   filterTarget->width = target->width;
   filterTarget->height = target->height;
   filterTarget->vertexMatrix = target->vertexMatrix;
-  offsetMatrix =
-      tgfx::Matrix::MakeTrans((filterNotFullSpreadBounds.left - filterContentBounds.left) * source->scale.x,
-                              (filterNotFullSpreadBounds.top - filterContentBounds.top) * source->scale.y);
+  offsetMatrix = tgfx::Matrix::MakeTrans(
+      (filterNotFullSpreadBounds.left - filterContentBounds.left) * source->scale.x,
+      (filterNotFullSpreadBounds.top - filterContentBounds.top) * source->scale.y);
   PreConcatMatrix(filterTarget, offsetMatrix);
   blurFilter->draw(context, sourceSpread.get(), filterTarget);
 }

@@ -35,9 +35,9 @@ class GaussianBlurFilter : public LayerFilter {
 
   void update(Frame frame, const tgfx::Rect& contentBounds, const tgfx::Rect& transformedBounds,
               const tgfx::Point& filterScale) override;
-  
-  void updateParams(float expendValue, const tgfx::Point& offsetValue,
-                    bool isSpeciallyColorValue, const tgfx::Color& colorValue);
+
+  void updateParams(float expendValue, const tgfx::Point& offsetValue, bool isSpeciallyColorValue,
+                    const tgfx::Color& colorValue);
 
  private:
   Effect* effect = nullptr;

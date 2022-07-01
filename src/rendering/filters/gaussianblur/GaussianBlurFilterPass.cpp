@@ -46,8 +46,9 @@ void GaussianBlurFilterPass::onPrepareProgram(tgfx::Context* context, unsigned i
   colorHandle = gl->getUniformLocation(program, "uColor");
 }
 
-void GaussianBlurFilterPass::updateParams(float blurValue, float scaleValue, bool isExpendBoundsValue,
-                                          bool isSpeciallyColorValue, const tgfx::Color& colorValue) {
+void GaussianBlurFilterPass::updateParams(float blurValue, float scaleValue,
+                                          bool isExpendBoundsValue, bool isSpeciallyColorValue,
+                                          const tgfx::Color& colorValue) {
   blurriness = blurValue;
   scale = scaleValue;
   isExpendBounds = isExpendBoundsValue;
