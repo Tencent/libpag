@@ -4,7 +4,6 @@ import { binding } from './binding';
 import * as types from './types';
 import createPAG from './wasm/libpag';
 import { WebAssemblyQueue } from './utils/queue';
-import { version } from '../package.json';
 
 export interface moduleOption {
   /**
@@ -30,4 +29,4 @@ const PAGInit = (moduleOption: moduleOption = {}): Promise<types.PAG> =>
       throw new Error('PAGInit fail! Please check .wasm file path valid.');
     });
 
-export { PAGInit, types, version };
+export { PAGInit, types };
