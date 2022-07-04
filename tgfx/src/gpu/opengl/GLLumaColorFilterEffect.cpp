@@ -16,32 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "tgfx/core/Matrix.h"
-#include "tgfx/gpu/Shader.h"
+#include "GLLumaColorFilterEffect.h"
 
 namespace tgfx {
-class LocalMatrixShader final : public Shader {
- public:
-  LocalMatrixShader(std::shared_ptr<Shader> proxy, const Matrix& preLocalMatrix,
-                    const Matrix& postLocalMatrix)
-      : proxyShader(std::move(proxy)),
-        _preLocalMatrix(preLocalMatrix),
-        _postLocalMatrix(postLocalMatrix) {
-  }
-
-  bool isOpaque() const override {
-    return proxyShader->isOpaque();
-  }
-
-  std::shared_ptr<Shader> makeWithLocalMatrix(const Matrix& matrix, bool isPre) const override;
-
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const override;
-
- private:
-  std::shared_ptr<Shader> proxyShader;
-  const Matrix _preLocalMatrix;
-  const Matrix _postLocalMatrix;
-};
+void GLLumaColorFilterEffect::emitCode(EmitArgs& args) {
+  auto* fragBuilder = args.fragBuilder;
+  fragBuilder->codeAppendf(
+      "%s = vec4(0.0, 0.0, 0.0, clamp(dot(vec3(0.21260000000000001, 0.71519999999999995, 0.0722), "
+      "%s.rgb), 0.0, 1.0));",
+      args.outputColor.c_str(), args.inputColor.c_str());
+}
 }  // namespace tgfx

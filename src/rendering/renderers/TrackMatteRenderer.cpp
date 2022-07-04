@@ -56,13 +56,21 @@ static std::shared_ptr<Graphic> RenderColorGlyphs(TextLayer* layer, Frame layerF
   return recorder.makeGraphic();
 }
 
+static std::shared_ptr<Modifier> MakeMaskModifier(std::shared_ptr<Graphic> content,
+                                                  Enum trackMatteType) {
+  auto inverted = (trackMatteType == TrackMatteType::AlphaInverted ||
+                   trackMatteType == TrackMatteType::LumaInverted);
+  auto useLuma =
+      (trackMatteType == TrackMatteType::Luma || trackMatteType == TrackMatteType::LumaInverted);
+  return Modifier::MakeMask(std::move(content), inverted, useLuma);
+}
+
 std::unique_ptr<TrackMatte> TrackMatteRenderer::Make(PAGLayer* trackMatteOwner) {
   if (trackMatteOwner == nullptr || trackMatteOwner->_trackMatteLayer == nullptr) {
     return nullptr;
   }
   auto trackMatteLayer = trackMatteOwner->_trackMatteLayer.get();
   auto trackMatteType = trackMatteOwner->layer->trackMatteType;
-  std::shared_ptr<Graphic> content = nullptr;
   auto layerFrame = trackMatteLayer->contentFrame + trackMatteLayer->layer->startTime;
   std::shared_ptr<FilterModifier> filterModifier = nullptr;
   if (!trackMatteLayer->cacheFilters()) {
@@ -72,12 +80,9 @@ std::unique_ptr<TrackMatte> TrackMatteRenderer::Make(PAGLayer* trackMatteOwner) 
   Transform extraTransform = {ToTGFX(trackMatteLayer->layerMatrix), trackMatteLayer->layerAlpha};
   LayerRenderer::DrawLayer(&recorder, trackMatteLayer->layer, layerFrame, filterModifier, nullptr,
                            trackMatteLayer, &extraTransform);
-  content = recorder.makeGraphic();
-
-  auto inverted = (trackMatteType == TrackMatteType::AlphaInverted ||
-                   trackMatteType == TrackMatteType::LumaInverted);
-  auto trackMatte = std::unique_ptr<TrackMatte>(new TrackMatte());
-  trackMatte->modifier = Modifier::MakeMask(content, inverted);
+  auto content = recorder.makeGraphic();
+  auto trackMatte = std::make_unique<TrackMatte>();
+  trackMatte->modifier = MakeMaskModifier(content, trackMatteType);
   if (trackMatte->modifier == nullptr) {
     return nullptr;
   }
@@ -95,15 +100,12 @@ std::unique_ptr<TrackMatte> TrackMatteRenderer::Make(Layer* trackMatteOwner, Fra
   }
   auto trackMatteLayer = trackMatteOwner->trackMatteLayer;
   auto trackMatteType = trackMatteOwner->trackMatteType;
-  std::shared_ptr<Graphic> content = nullptr;
   auto filterModifier = FilterModifier::Make(trackMatteLayer, layerFrame);
   Recorder recorder = {};
   LayerRenderer::DrawLayer(&recorder, trackMatteLayer, layerFrame, filterModifier, nullptr);
-  content = recorder.makeGraphic();
-  auto inverted = (trackMatteType == TrackMatteType::AlphaInverted ||
-                   trackMatteType == TrackMatteType::LumaInverted);
-  auto trackMatte = std::unique_ptr<TrackMatte>(new TrackMatte());
-  trackMatte->modifier = Modifier::MakeMask(content, inverted);
+  auto content = recorder.makeGraphic();
+  auto trackMatte = std::make_unique<TrackMatte>();
+  trackMatte->modifier = MakeMaskModifier(content, trackMatteType);
   if (trackMatte->modifier == nullptr) {
     return nullptr;
   }
