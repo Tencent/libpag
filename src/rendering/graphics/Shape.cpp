@@ -87,8 +87,12 @@ void Shape::draw(tgfx::Canvas* canvas, RenderCache* renderCache) const {
     paint.setShader(shader->makeWithPostLocalMatrix(matrix));
     auto oldMatrix = canvas->getMatrix();
     canvas->concat(snapshot->getMatrix());
-    if (snapshot->getTexture()) {
-      canvas->drawMask(snapshot->getTexture(), paint);
+    auto texture = snapshot->getTexture();
+    if (texture) {
+      paint.setMaskFilter(tgfx::MaskFilter::Make(tgfx::Shader::MakeTextureShader(texture)));
+      auto rect = tgfx::Rect::MakeWH(static_cast<float>(texture->width()),
+                                     static_cast<float>(texture->height()));
+      canvas->drawRect(rect, paint);
     } else if (snapshot->getMesh()) {
       canvas->drawMesh(snapshot->getMesh(), paint);
     }

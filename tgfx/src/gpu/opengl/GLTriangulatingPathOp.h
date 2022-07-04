@@ -24,7 +24,8 @@
 namespace tgfx {
 class GLTriangulatingPathOp : public GLDrawOp {
  public:
-  static std::unique_ptr<GLTriangulatingPathOp> Make(const Path& path, Rect clipBounds);
+  static std::unique_ptr<GLTriangulatingPathOp> Make(const Path& path, Rect clipBounds,
+                                                     const Matrix& localMatrix);
 
   GLTriangulatingPathOp(std::vector<float> vertex, int vertexCount, Rect bounds,
                         const Matrix& localMatrix = Matrix::I());

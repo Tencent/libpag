@@ -21,14 +21,14 @@
 #include "opengl/GLConstColorProcessor.h"
 
 namespace tgfx {
-std::unique_ptr<ConstColorProcessor> ConstColorProcessor::Make(Color color) {
-  return std::unique_ptr<ConstColorProcessor>(new ConstColorProcessor(color));
+std::unique_ptr<ConstColorProcessor> ConstColorProcessor::Make(Color color, InputMode mode) {
+  return std::unique_ptr<ConstColorProcessor>(new ConstColorProcessor(color, mode));
 }
 
 void ConstColorProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   static auto Type = UniqueID::Next();
   bytesKey->write(Type);
-  uint32_t flag = color.alpha != 1.0f ? 1 : 0;
+  auto flag = static_cast<uint32_t>(inputMode);
   bytesKey->write(flag);
 }
 

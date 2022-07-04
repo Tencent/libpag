@@ -24,10 +24,10 @@
 
 namespace tgfx {
 struct FPArgs {
-  explicit FPArgs(Context* context) : context(context) {
+  explicit FPArgs(const Context* context) : context(context) {
   }
 
-  Context* context = nullptr;
+  const Context* context = nullptr;
   Matrix preLocalMatrix = Matrix::I();
   Matrix postLocalMatrix = Matrix::I();
 };
@@ -40,14 +40,35 @@ class GLFragmentProcessor;
 class FragmentProcessor : public Processor {
  public:
   /**
+   *  In many instances (e.g. Shader::asFragmentProcessor() implementations) it is desirable to
+   *  only consider the input color's alpha. However, there is a competing desire to have reusable
+   *  FragmentProcessor subclasses that can be used in other scenarios where the entire input
+   *  color is considered. This function exists to filter the input color and pass it to a FP. It
+   *  does so by returning a parent FP that multiplies the passed in FPs output by the parent's
+   *  input alpha. The passed in FP will not receive an input color.
+   */
+  static std::unique_ptr<FragmentProcessor> MulChildByInputAlpha(
+      std::unique_ptr<FragmentProcessor> child);
+
+  /**
    * Returns the input modulated by the child's alpha. The passed in FP will not receive an input
    * color.
    *
-   *  output = input * child.a
-   *  output = input * (1 - child.a)
+   * @param inverted false: output = input * child.a; true: output = input * (1 - child.a)
    */
   static std::unique_ptr<FragmentProcessor> MulInputByChildAlpha(
       std::unique_ptr<FragmentProcessor> child, bool inverted = false);
+
+  /**
+   * Returns a fragment processor that runs the passed in array of fragment processors in a
+   * series. The original input is passed to the first, the first's output is passed to the
+   * second, etc. The output of the returned processor is the output of the last processor of the
+   * series.
+   *
+   * The array elements with be moved.
+   */
+  static std::unique_ptr<FragmentProcessor> RunInSeries(std::unique_ptr<FragmentProcessor>* series,
+                                                        int count);
 
   std::unique_ptr<GLFragmentProcessor> createGLInstance() const;
 

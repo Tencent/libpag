@@ -16,21 +16,35 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "AlphaFragmentProcessor.h"
+#include "SeriesFragmentProcessor.h"
 #include "core/utils/UniqueID.h"
-#include "opengl/GLAlphaFragmentProcessor.h"
+#include "opengl/GLSeriesFragmentProcessor.h"
 
 namespace tgfx {
-std::unique_ptr<AlphaFragmentProcessor> AlphaFragmentProcessor::Make(float alpha) {
-  return std::unique_ptr<AlphaFragmentProcessor>(new AlphaFragmentProcessor(alpha));
+std::unique_ptr<FragmentProcessor> SeriesFragmentProcessor::Make(
+    std::unique_ptr<FragmentProcessor>* children, int count) {
+  if (!count) {
+    return nullptr;
+  }
+  if (1 == count) {
+    return std::move(children[0]);
+  }
+  return std::unique_ptr<FragmentProcessor>(new SeriesFragmentProcessor(children, count));
 }
 
-void AlphaFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
+SeriesFragmentProcessor::SeriesFragmentProcessor(std::unique_ptr<FragmentProcessor>* children,
+                                                 int count) {
+  for (int i = 0; i < count; ++i) {
+    registerChildProcessor(std::move(children[i]));
+  }
+}
+
+void SeriesFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   static auto Type = UniqueID::Next();
   bytesKey->write(Type);
 }
 
-std::unique_ptr<GLFragmentProcessor> AlphaFragmentProcessor::onCreateGLInstance() const {
-  return std::make_unique<GLAlphaFragmentProcessor>();
+std::unique_ptr<GLFragmentProcessor> SeriesFragmentProcessor::onCreateGLInstance() const {
+  return std::make_unique<GLSeriesFragmentProcessor>();
 }
 }  // namespace tgfx

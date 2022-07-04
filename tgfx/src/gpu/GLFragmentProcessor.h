@@ -136,6 +136,11 @@ class GLFragmentProcessor {
                  EmitArgs& parentArgs);
 
   /**
+   * Variation that uses the parent's output color variable to hold the child's output.
+   */
+  void emitChild(size_t childIndex, const std::string& inputColor, EmitArgs& parentArgs);
+
+  /**
    * Pre-order traversal of a GLFP hierarchy, or of multiple trees with roots in an array of
    * GLFPs. This agrees with the traversal order of FragmentProcessor::Iter
    */

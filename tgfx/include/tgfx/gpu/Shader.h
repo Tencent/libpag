@@ -19,9 +19,12 @@
 #pragma once
 
 #include <memory>
+#include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Point.h"
+#include "tgfx/gpu/ColorFilter.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 struct FPArgs;
@@ -39,6 +42,11 @@ class Shader {
    * Create a shader that draws the specified color.
    */
   static std::shared_ptr<Shader> MakeColorShader(Color color);
+
+  static std::shared_ptr<Shader> MakeTextureShader(std::shared_ptr<Texture> texture);
+
+  static std::shared_ptr<Shader> MakeBlend(BlendMode mode, std::shared_ptr<Shader> dst,
+                                           std::shared_ptr<Shader> src);
 
   /**
    * Returns a shader that generates a linear gradient between the two specified points.
@@ -94,6 +102,8 @@ class Shader {
   std::shared_ptr<Shader> makeWithPostLocalMatrix(const Matrix& matrix) const {
     return makeWithLocalMatrix(matrix, false);
   }
+
+  std::shared_ptr<Shader> makeWithColorFilter(std::shared_ptr<ColorFilter> colorFilter) const;
 
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const = 0;
 

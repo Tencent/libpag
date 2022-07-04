@@ -43,7 +43,7 @@ void GLTextureEffect::emitCode(EmitArgs& args) {
     fragBuilder->codeAppend("alpha = clamp(alpha, 0.0, 1.0);");
     fragBuilder->codeAppend("color = vec4(color.rgb * alpha.r, alpha.r);");
   }
-  fragBuilder->codeAppendf("%s = color;", args.outputColor.c_str());
+  fragBuilder->codeAppendf("%s = color * %s;", args.outputColor.c_str(), args.inputColor.c_str());
 }
 
 void GLTextureEffect::onSetData(const ProgramDataManager& programDataManager,

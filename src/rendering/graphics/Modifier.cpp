@@ -286,7 +286,10 @@ void MaskModifier::applyToGraphic(tgfx::Canvas* canvas, RenderCache* cache,
   matrix.postTranslate(bounds.x(), bounds.y());
   canvas->save();
   canvas->concat(matrix);
-  canvas->drawTexture(texture.get(), maskTexture.get(), inverted);
+  tgfx::Paint paint;
+  paint.setMaskFilter(
+      tgfx::MaskFilter::Make(tgfx::Shader::MakeTextureShader(maskTexture), inverted));
+  canvas->drawTexture(texture.get(), &paint);
   canvas->restore();
 }
 }  // namespace pag

@@ -22,9 +22,11 @@
 #include "tgfx/core/Color.h"
 
 namespace tgfx {
+enum class InputMode { Ignore = 0, ModulateRGBA = 1, ModulateA = 2 };
+
 class ConstColorProcessor : public FragmentProcessor {
  public:
-  static std::unique_ptr<ConstColorProcessor> Make(Color color);
+  static std::unique_ptr<ConstColorProcessor> Make(Color color, InputMode inputMode);
 
   std::string name() const override {
     return "ConstColorProcessor";
@@ -35,10 +37,11 @@ class ConstColorProcessor : public FragmentProcessor {
   std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
 
  private:
-  explicit ConstColorProcessor(Color color) : color(color) {
+  ConstColorProcessor(Color color, InputMode mode) : color(color), inputMode(mode) {
   }
 
   Color color;
+  InputMode inputMode;
 
   friend class GLConstColorProcessor;
 };

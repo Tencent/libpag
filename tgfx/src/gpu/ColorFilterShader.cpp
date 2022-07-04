@@ -16,22 +16,35 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ColorShader.h"
-#include "gpu/ConstColorProcessor.h"
+#include "ColorFilterShader.h"
+#include "FragmentProcessor.h"
 
 namespace tgfx {
-std::shared_ptr<Shader> Shader::MakeColorShader(Color color) {
-  auto shader = std::make_shared<ColorShader>(color);
+std::shared_ptr<Shader> Shader::makeWithColorFilter(
+    std::shared_ptr<ColorFilter> colorFilter) const {
+  auto strongThis = weakThis.lock();
+  if (strongThis == nullptr) {
+    return nullptr;
+  }
+  if (colorFilter == nullptr) {
+    return strongThis;
+  }
+  auto shader = std::make_shared<ColorFilterShader>(std::move(strongThis), std::move(colorFilter));
   shader->weakThis = shader;
   return shader;
 }
 
-bool ColorShader::isOpaque() const {
-  return color.isOpaque();
+std::unique_ptr<FragmentProcessor> ColorFilterShader::asFragmentProcessor(
+    const FPArgs& args) const {
+  auto fp1 = shader->asFragmentProcessor(args);
+  if (fp1 == nullptr) {
+    return nullptr;
+  }
+  auto fp2 = colorFilter->asFragmentProcessor();
+  if (fp2 == nullptr) {
+    return fp1;
+  }
+  std::unique_ptr<FragmentProcessor> fpSeries[] = {std::move(fp1), std::move(fp2)};
+  return FragmentProcessor::RunInSeries(fpSeries, 2);
 }
-
-std::unique_ptr<FragmentProcessor> ColorShader::asFragmentProcessor(const FPArgs&) const {
-  return ConstColorProcessor::Make(color.premultiply(), InputMode::ModulateA);
-}
-
 }  // namespace tgfx

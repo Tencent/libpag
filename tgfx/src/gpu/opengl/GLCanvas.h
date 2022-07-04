@@ -25,14 +25,17 @@
 #include "tgfx/gpu/Canvas.h"
 
 namespace tgfx {
+struct GLPaint {
+  std::vector<std::unique_ptr<FragmentProcessor>> colorFragmentProcessors;
+  std::vector<std::unique_ptr<FragmentProcessor>> coverageFragmentProcessors;
+};
+
 class GLCanvas : public Canvas {
  public:
   explicit GLCanvas(Surface* surface);
 
   void clear() override;
-  void drawTexture(const Texture* texture, const Texture* mask, bool inverted) override;
-  void drawTexture(const Texture* texture, const RGBAAALayout* layout) override;
-  void drawMask(const Texture* mask, const Paint& paint) override;
+  void drawTexture(const Texture* texture, const RGBAAALayout* layout, const Paint& paint) override;
   void drawPath(const Path& path, const Paint& paint) override;
   void drawGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
                   const Font& font, const Paint& paint) override;
@@ -65,10 +68,7 @@ class GLCanvas : public Canvas {
 
   Rect clipLocalBounds(Rect localBounds);
 
-  void drawTexture(const Texture* texture, const RGBAAALayout* layout, const Texture* mask,
-                   bool inverted);
-
-  void drawMask(const Rect& bounds, const Texture* mask, const Shader* shader,
+  void drawMask(const Rect& bounds, const Texture* mask, const Paint& paint,
                 bool appliedMatrix = true);
 
   void drawColorGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
@@ -76,9 +76,8 @@ class GLCanvas : public Canvas {
 
   void drawMaskGlyphs(TextBlob* textBlob, const Paint& paint);
 
-  void fillPath(const Path& path, const Shader* shader);
+  void fillPath(const Path& path, const Paint& paint);
 
-  void draw(std::unique_ptr<GLDrawOp> op, std::unique_ptr<FragmentProcessor> color,
-            std::unique_ptr<FragmentProcessor> mask = nullptr, bool aa = false);
+  void draw(std::unique_ptr<GLDrawOp> op, GLPaint paint, bool aa = false);
 };
 }  // namespace tgfx
