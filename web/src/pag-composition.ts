@@ -9,16 +9,6 @@ import type { Marker } from './types';
 @wasmAwaitRewind
 export class PAGComposition extends PAGLayer {
   /**
-   * [Deprecated]
-   * Make a empty PAGComposition with specified size.
-   */
-  public static Make(width: number, height: number): PAGComposition {
-    console.warn(
-      'Please use PAGComposition.make to create PAGComposition object! This interface will be removed in the next version!',
-    );
-    return PAGComposition.make(width, height);
-  }
-  /**
    * Make a empty PAGComposition with specified size.
    */
   public static make(width: number, height: number): PAGComposition {

@@ -48,7 +48,7 @@ window.onload = async () => {
     tablecloth!.style.height = `${canvasElementSize}px`;
   }
 
-  console.log('wasm loaded!', PAG);
+  console.log(`wasm loaded! SDKVersion ${PAG.SDKVersion()}`, PAG);
 
   document.getElementById('waiting')!.style.display = 'none';
   document.getElementById('container')!.style.display = isMobile ? 'block' : '';

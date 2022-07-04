@@ -8,16 +8,6 @@ import type { Color } from './types';
 @wasmAwaitRewind
 export class PAGSolidLayer extends PAGLayer {
   /**
-   * [Deprecated]
-   * Make a empty PAGSolidLayer with specified size.
-   */
-  public static Make(duration: number, width: number, height: number, solidColor: Color, opacity: number) {
-    console.warn(
-      'Please use PAGSolidLayer.make to create PAGSolidLayer object! This interface will be removed in the next version!',
-    );
-    return PAGSolidLayer.make(duration, width, height, solidColor, opacity);
-  }
-  /**
    * Make a empty PAGSolidLayer with specified size.
    */
   public static make(duration: number, width: number, height: number, solidColor: Color, opacity: number) {

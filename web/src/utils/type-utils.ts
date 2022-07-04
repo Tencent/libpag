@@ -62,7 +62,7 @@ export const layer2typeLayer = (wasmIns: any): PAGSolidLayer | PAGTextLayer | PA
   }
 };
 
-export const getLayerTypeName = (layerType:LayerType)=> {
+export const getLayerTypeName = (layerType: LayerType) => {
   switch (layerType) {
     case LayerType.Solid:
       return 'Solid';
@@ -77,4 +77,11 @@ export const getLayerTypeName = (layerType:LayerType)=> {
     default:
       return 'Unknown';
   }
-}
+};
+
+export const getWasmIns = (value: any) => {
+  if (value?.wasmIns) {
+    return value.wasmIns;
+  }
+  return value;
+};

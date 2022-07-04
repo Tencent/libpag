@@ -45,7 +45,10 @@ export class WebMask {
   public fillPath(path: Path2D, fillType: ctor) {
     const context = this.canvas.getContext('2d') as CanvasRenderingContext2D;
     context.setTransform(1, 0, 0, 1, 0, 0);
-    if (fillType === PAGModule.TGFXPathFillType.InverseWinding || fillType === PAGModule.TGFXPathFillType.InverseEvenOdd) {
+    if (
+      fillType === PAGModule.TGFXPathFillType.InverseWinding ||
+      fillType === PAGModule.TGFXPathFillType.InverseEvenOdd
+    ) {
       context.clip(path, fillType === PAGModule.TGFXPathFillType.InverseEvenOdd ? 'evenodd' : 'nonzero');
       context.fillRect(0, 0, this.canvas.width, this.canvas.height);
     } else {
