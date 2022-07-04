@@ -16,29 +16,35 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "YUVTextureFragmentProcessor.h"
+#include "SeriesFragmentProcessor.h"
 #include "core/utils/UniqueID.h"
-#include "opengl/GLYUVTextureFragmentProcessor.h"
+#include "opengl/GLSeriesFragmentProcessor.h"
 
 namespace tgfx {
-YUVTextureFragmentProcessor::YUVTextureFragmentProcessor(const YUVTexture* texture,
-                                                         const RGBAAALayout* layout,
-                                                         const Matrix& localMatrix)
-    : texture(texture), layout(layout), coordTransform(localMatrix) {
-  setTextureSamplerCnt(texture->samplerCount());
-  addCoordTransform(&coordTransform);
+std::unique_ptr<FragmentProcessor> SeriesFragmentProcessor::Make(
+    std::unique_ptr<FragmentProcessor>* children, int count) {
+  if (!count) {
+    return nullptr;
+  }
+  if (1 == count) {
+    return std::move(children[0]);
+  }
+  return std::unique_ptr<FragmentProcessor>(new SeriesFragmentProcessor(children, count));
 }
 
-void YUVTextureFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
+SeriesFragmentProcessor::SeriesFragmentProcessor(std::unique_ptr<FragmentProcessor>* children,
+                                                 int count) {
+  for (int i = 0; i < count; ++i) {
+    registerChildProcessor(std::move(children[i]));
+  }
+}
+
+void SeriesFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   static auto Type = UniqueID::Next();
   bytesKey->write(Type);
-  uint32_t flags = texture->pixelFormat() == YUVPixelFormat::I420 ? 0 : 1;
-  flags |= layout == nullptr ? 0 : 2;
-  flags |= texture->colorRange() == YUVColorRange::MPEG ? 0 : 4;
-  bytesKey->write(flags);
 }
 
-std::unique_ptr<GLFragmentProcessor> YUVTextureFragmentProcessor::onCreateGLInstance() const {
-  return std::make_unique<GLYUVTextureFragmentProcessor>();
+std::unique_ptr<GLFragmentProcessor> SeriesFragmentProcessor::onCreateGLInstance() const {
+  return std::make_unique<GLSeriesFragmentProcessor>();
 }
 }  // namespace tgfx

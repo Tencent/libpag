@@ -16,22 +16,40 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ColorShader.h"
-#include "gpu/ConstColorProcessor.h"
+#include "ShaderBlend.h"
+#include "FragmentProcessor.h"
+#include "XfermodeFragmentProcessor.h"
 
 namespace tgfx {
-std::shared_ptr<Shader> Shader::MakeColorShader(Color color) {
-  auto shader = std::make_shared<ColorShader>(color);
+std::shared_ptr<Shader> Shader::MakeBlend(BlendMode mode, std::shared_ptr<Shader> dst,
+                                          std::shared_ptr<Shader> src) {
+  switch (mode) {
+    case BlendMode::Clear:
+      return MakeColorShader(Color::Transparent());
+    case BlendMode::Dst:
+      return dst;
+    case BlendMode::Src:
+      return src;
+    default:
+      break;
+  }
+  if (dst == nullptr || src == nullptr) {
+    return nullptr;
+  }
+  auto shader = std::make_shared<ShaderBlend>(mode, std::move(dst), std::move(src));
   shader->weakThis = shader;
   return shader;
 }
 
-bool ColorShader::isOpaque() const {
-  return color.isOpaque();
+std::unique_ptr<FragmentProcessor> ShaderBlend::asFragmentProcessor(const FPArgs& args) const {
+  auto fpA = dst->asFragmentProcessor(args);
+  if (fpA == nullptr) {
+    return nullptr;
+  }
+  auto fpB = src->asFragmentProcessor(args);
+  if (fpB == nullptr) {
+    return nullptr;
+  }
+  return XfermodeFragmentProcessor::MakeFromTwoProcessors(std::move(fpB), std::move(fpA), mode);
 }
-
-std::unique_ptr<FragmentProcessor> ColorShader::asFragmentProcessor(const FPArgs&) const {
-  return ConstColorProcessor::Make(color.premultiply(), InputMode::ModulateA);
-}
-
 }  // namespace tgfx

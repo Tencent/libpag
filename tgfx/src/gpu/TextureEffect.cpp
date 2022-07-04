@@ -16,18 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "TextureFragmentProcessor.h"
+#include "TextureEffect.h"
 #include "core/utils/Log.h"
 #include "core/utils/UniqueID.h"
-#include "gpu/YUVTextureFragmentProcessor.h"
-#include "opengl/GLTextureFragmentProcessor.h"
+#include "gpu/YUVTextureEffect.h"
+#include "opengl/GLTextureEffect.h"
 
 namespace tgfx {
-std::unique_ptr<FragmentProcessor> TextureFragmentProcessor::Make(const Texture* texture,
-                                                                  const RGBAAALayout* layout,
-                                                                  const Matrix& localMatrix) {
+static bool CheckParameter(const Texture* texture, const RGBAAALayout* layout) {
   if (texture == nullptr) {
-    return nullptr;
+    return false;
   }
   if (layout != nullptr) {
     if (layout->width <= 0 || layout->height <= 0 ||
@@ -35,37 +33,51 @@ std::unique_ptr<FragmentProcessor> TextureFragmentProcessor::Make(const Texture*
         layout->width + layout->alphaStartX > texture->width() ||
         layout->height + layout->alphaStartY > texture->height()) {
       LOGE("TextureFragmentProcessor::Make(): Invalid RGBAAALayout specified!");
-      return nullptr;
+      return false;
     }
   }
-  if (texture->isYUV()) {
-    return std::unique_ptr<YUVTextureFragmentProcessor>(new YUVTextureFragmentProcessor(
-        static_cast<const YUVTexture*>(texture), layout, localMatrix));
-  }
-  return std::unique_ptr<TextureFragmentProcessor>(
-      new TextureFragmentProcessor(texture, layout, localMatrix));
+  return true;
 }
 
-TextureFragmentProcessor::TextureFragmentProcessor(const Texture* texture,
-                                                   const RGBAAALayout* layout,
-                                                   const Matrix& localMatrix)
+std::unique_ptr<FragmentProcessor> TextureEffect::Make(const Texture* texture,
+                                                       const Matrix& localMatrix,
+                                                       const RGBAAALayout* layout) {
+  if (!CheckParameter(texture, layout)) {
+    return nullptr;
+  }
+  // normalize
+  auto scale = texture->getTextureCoord(1, 1) - texture->getTextureCoord(0, 0);
+  auto translate = texture->getTextureCoord(0, 0);
+  auto matrix = localMatrix;
+  matrix.postScale(scale.x, scale.y);
+  matrix.postTranslate(translate.x, translate.y);
+  if (texture->origin() == ImageOrigin::BottomLeft) {
+    matrix.postScale(1, -1);
+    translate = texture->getTextureCoord(0, static_cast<float>(texture->height()));
+    matrix.postTranslate(translate.x, translate.y);
+  }
+  if (texture->isYUV()) {
+    return std::unique_ptr<YUVTextureEffect>(
+        new YUVTextureEffect(static_cast<const YUVTexture*>(texture), layout, matrix));
+  }
+  return std::unique_ptr<TextureEffect>(new TextureEffect(texture, layout, matrix));
+}
+
+TextureEffect::TextureEffect(const Texture* texture, const RGBAAALayout* layout,
+                             const Matrix& localMatrix)
     : texture(texture), layout(layout), coordTransform(localMatrix) {
   setTextureSamplerCnt(1);
-  if (texture->origin() == ImageOrigin::BottomLeft) {
-    coordTransform.matrix.postScale(1, -1);
-    coordTransform.matrix.postTranslate(0, 1);
-  }
   addCoordTransform(&coordTransform);
 }
 
-void TextureFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
+void TextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   static auto Type = UniqueID::Next();
   bytesKey->write(Type);
   uint32_t flags = layout == nullptr ? 1 : 0;
   bytesKey->write(flags);
 }
 
-std::unique_ptr<GLFragmentProcessor> TextureFragmentProcessor::onCreateGLInstance() const {
-  return std::make_unique<GLTextureFragmentProcessor>();
+std::unique_ptr<GLFragmentProcessor> TextureEffect::onCreateGLInstance() const {
+  return std::make_unique<GLTextureEffect>();
 }
 }  // namespace tgfx

@@ -16,27 +16,22 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLAlphaFragmentProcessor.h"
-#include "gpu/AlphaFragmentProcessor.h"
+#pragma once
+
+#include "tgfx/gpu/Shader.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
-void GLAlphaFragmentProcessor::emitCode(EmitArgs& args) {
-  auto* fragBuilder = args.fragBuilder;
-  auto* uniformHandler = args.uniformHandler;
+class TextureShader : public Shader {
+ public:
+  static std::shared_ptr<Shader> Make(std::shared_ptr<Texture> texture);
 
-  std::string alphaUniformName;
-  alphaUniform = uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float, "Alpha",
-                                            &alphaUniformName);
-  fragBuilder->codeAppendf("%s = %s * %s;", args.outputColor.c_str(), args.inputColor.c_str(),
-                           alphaUniformName.c_str());
-}
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const override;
 
-void GLAlphaFragmentProcessor::onSetData(const ProgramDataManager& programDataManager,
-                                         const FragmentProcessor& fragmentProcessor) {
-  const auto& afp = static_cast<const AlphaFragmentProcessor&>(fragmentProcessor);
-  if (alphaPrev != afp.alpha) {
-    alphaPrev = afp.alpha;
-    programDataManager.set1f(alphaUniform, afp.alpha);
+ private:
+  explicit TextureShader(std::shared_ptr<Texture> texture) : texture(std::move(texture)) {
   }
-}
+
+  std::shared_ptr<Texture> texture;
+};
 }  // namespace tgfx

@@ -140,34 +140,29 @@ class Canvas {
   void drawRect(const Rect& rect, const Paint& paint);
 
   /**
-   * Draws a mask with specified paint, using current current alpha, blend mode, clip and
-   * matrix.
-   */
-  virtual void drawMask(const Texture* mask, const Paint& paint) = 0;
-
-  /**
-   * Draws a Texture, with its top-left corner at (0, 0), using a mask texture and current alpha,
-   * blend mode, clip and matrix. The mask texture has the same position and size with the texture.
-   */
-  virtual void drawTexture(const Texture* texture, const Texture* mask, bool inverted) = 0;
-
-  /**
-   *  Draws a RGBAAA layout Texture, with its top-left corner at (0, 0), using current alpha, blend
-   *  mode, clip and matrix.
-   */
-  virtual void drawTexture(const Texture* texture, const RGBAAALayout* layout) = 0;
-
-  /**
-   *  Draws a Texture, with its top-left corner at (0, 0), using current alpha, blend mode, clip and
-   *  Matrix.
-   */
-  void drawTexture(const Texture* texture);
-
-  /**
-   *  Draws a Texture, with its top-left corner at (0, 0), using current alpha, blend mode, clip and
-   *  matrix premultiplied with existing Matrix.
+   * Draws a Texture, with its top-left corner at (0, 0), using current alpha, blend mode, clip and
+   * matrix premultiplied with existing Matrix.
    */
   void drawTexture(const Texture* texture, const Matrix& matrix);
+
+  /**
+   * Draws a Texture, with its top-left corner at (0, 0), using current alpha, blend mode, clip,
+   * matrix and optional paint.
+   *
+   * If paint is supplied, apply ColorFilter and alpha. If texture is Alpha8, apply Shader. If paint
+   * contains MaskFilter, generate mask from image bounds.
+   */
+  void drawTexture(const Texture* texture, const Paint* paint = nullptr);
+
+  /**
+   * Draws a RGBAAA layout Texture, with its top-left corner at (0, 0), using current alpha, blend
+   * mode, clip, matrix and optional paint.
+   *
+   * If paint is supplied, apply ColorFilter and alpha. If texture is Alpha8, apply Shader. If paint
+   * contains MaskFilter, generate mask from image bounds.
+   */
+  void drawTexture(const Texture* texture, const RGBAAALayout* layout,
+                   const Paint* paint = nullptr);
 
   /**
    * Draws a path with using current clip, matrix and specified paint.
@@ -206,6 +201,9 @@ class Canvas {
   virtual void onClipPath(const Path& path) = 0;
 
  private:
+  virtual void drawTexture(const Texture* texture, const RGBAAALayout* layout,
+                           const Paint& paint) = 0;
+
   std::vector<std::shared_ptr<CanvasState>> savedStateList = {};
 };
 }  // namespace tgfx

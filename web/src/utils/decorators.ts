@@ -1,5 +1,4 @@
 import { PAGModule } from '../binding';
-import { Log } from './log';
 
 export function wasmAwaitRewind(constructor: any) {
   const ignoreStaticFunctions = ['length', 'name', 'prototype', 'wasmAsyncMethods'];
@@ -52,7 +51,7 @@ export function destroyVerify(constructor: any) {
     const fn = target[methodName];
     target[methodName] = function (...args: any[]) {
       if (this['isDestroyed']) {
-        Log.error(`Don't call ${methodName} of the ${constructor.name} that is destroyed.`);
+        console.error(`Don't call ${methodName} of the ${constructor.name} that is destroyed.`);
         return;
       }
       return fn.call(this, ...args);

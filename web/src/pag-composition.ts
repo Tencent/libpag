@@ -11,8 +11,10 @@ export class PAGComposition extends PAGLayer {
   /**
    * Make a empty PAGComposition with specified size.
    */
-  public static Make(width: number, height: number): PAGComposition {
-    return new PAGComposition(PAGModule._PAGComposition._Make(width, height));
+  public static make(width: number, height: number): PAGComposition {
+    const wasmIns = PAGModule._PAGComposition._Make(width, height);
+    if (!wasmIns) throw new Error('Make PAGComposition fail!');
+    return new PAGComposition(wasmIns);
   }
   /**
    * Returns the width of the Composition.
@@ -44,7 +46,9 @@ export class PAGComposition extends PAGLayer {
    * @returns The child layer at the specified index position.
    */
   public getLayerAt(index: number) {
-    return layer2typeLayer(this.wasmIns._getLayerAt(index));
+    const wasmIns = this.wasmIns._getLayerAt(index);
+    if (!wasmIns) throw new Error(`Get layer at ${index} fail!`);
+    return layer2typeLayer(wasmIns);
   }
   /**
    * Returns the index position of a child layer.
@@ -89,13 +93,17 @@ export class PAGComposition extends PAGLayer {
    * Remove the specified PAGLayer from current PAGComposition.
    */
   public removeLayer(pagLayer: PAGLayer) {
-    return layer2typeLayer(this.wasmIns._removeLayer(pagLayer.wasmIns));
+    const wasmIns = this.wasmIns._removeLayer(pagLayer.wasmIns);
+    if (!wasmIns) throw new Error('Remove layer fail!');
+    return layer2typeLayer(wasmIns);
   }
   /**
    * Remove the specified PAGLayer from current PAGComposition.
    */
   public removeLayerAt(index: number) {
-    return layer2typeLayer(this.wasmIns._removeLayerAt(index));
+    const wasmIns = this.wasmIns._removeLayerAt(index);
+    if (!wasmIns) throw new Error(`Remove layer at ${index} fail!`);
+    return layer2typeLayer(wasmIns);
   }
   /**
    * Remove all PAGLayers from current PAGComposition.
@@ -125,7 +133,9 @@ export class PAGComposition extends PAGLayer {
    * Returns the audio markers of this composition.
    */
   public audioMarkers() {
-    return proxyVector(this.wasmIns._audioMarkers(), (wasmIns: any) => wasmIns as Marker);
+    const wasmIns = this.wasmIns._audioMarkers();
+    if (!wasmIns) throw new Error(`Get audioMarkers fail!`);
+    return proxyVector(wasmIns, (wasmIns: any) => wasmIns as Marker);
   }
   /**
    * Indicates when the first frame of the audio plays in the composition's timeline.
@@ -137,13 +147,17 @@ export class PAGComposition extends PAGLayer {
    * Returns an array of layers that match the specified layer name.
    */
   public getLayersByName(layerName: string) {
-    return proxyVector(this.wasmIns._getLayersByName(layerName), layer2typeLayer);
+    const wasmIns = this.wasmIns._getLayersByName(layerName);
+    if (!wasmIns) throw new Error(`Get layers by ${layerName} fail!`);
+    return proxyVector(wasmIns, layer2typeLayer);
   }
   /**
    * Returns an array of layers that lie under the specified point. The point is in pixels and from
    * this PAGComposition's local coordinates.
    */
   public getLayersUnderPoint(localX: number, localY: number) {
-    return proxyVector(this.wasmIns._getLayersUnderPoint(localX, localY), layer2typeLayer);
+    const wasmIns = this.wasmIns._getLayersUnderPoint(localX, localY);
+    if (!wasmIns) throw new Error(`Get layers under point ${localX},${localY} fail!`);
+    return proxyVector(wasmIns, layer2typeLayer);
   }
 }

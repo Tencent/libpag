@@ -18,7 +18,7 @@ describe('PAGSurface', () => {
   });
 
   it('Make PAGSurface from canvas', () => {
-    const pagSurface = PAG.PAGSurface.FromCanvas('#pag');
+    const pagSurface = PAG.PAGSurface.fromCanvas('#pag');
     expect(pagSurface.wasmIns).to.be.a('Object');
   });
 
@@ -32,7 +32,7 @@ describe('PAGSurface', () => {
     expect(!!gl).to.be.eq(true);
     const pagGLCtx = PAG.BackendContext.from(gl);
     expect(pagGLCtx.makeCurrent()).to.be.eq(true);
-    const pagSurface = PAG.PAGSurface.FromRenderTarget(0, canvas.width, canvas.height, true);
+    const pagSurface = PAG.PAGSurface.fromRenderTarget(0, canvas.width, canvas.height, true);
     pagGLCtx.clearCurrent();
     expect(!!pagSurface.wasmIns).to.be.eq(true);
     return pagSurface;

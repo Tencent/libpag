@@ -18,27 +18,20 @@
 
 #pragma once
 
-#include "FragmentProcessor.h"
+#include "tgfx/gpu/Shader.h"
 
 namespace tgfx {
-class AlphaFragmentProcessor : public FragmentProcessor {
+class ShaderBlend : public Shader {
  public:
-  static std::unique_ptr<AlphaFragmentProcessor> Make(float alpha);
-
-  std::string name() const override {
-    return "AlphaFragmentProcessor";
+  ShaderBlend(BlendMode mode, std::shared_ptr<Shader> dst, std::shared_ptr<Shader> src)
+      : mode(mode), dst(std::move(dst)), src(std::move(src)) {
   }
+
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const override;
 
  private:
-  explicit AlphaFragmentProcessor(float alpha) : alpha(alpha) {
-  }
-
-  void onComputeProcessorKey(BytesKey* bytesKey) const override;
-
-  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
-
-  float alpha = 1;
-
-  friend class GLAlphaFragmentProcessor;
+  BlendMode mode;
+  std::shared_ptr<Shader> dst;
+  std::shared_ptr<Shader> src;
 };
 }  // namespace tgfx

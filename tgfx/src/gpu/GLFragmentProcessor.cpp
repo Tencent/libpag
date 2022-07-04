@@ -32,6 +32,11 @@ void GLFragmentProcessor::emitChild(size_t childIndex, const std::string& inputC
   internalEmitChild(childIndex, inputColor, *outputColor, args);
 }
 
+void GLFragmentProcessor::emitChild(size_t childIndex, const std::string& inputColor,
+                                    EmitArgs& parentArgs) {
+  internalEmitChild(childIndex, inputColor, parentArgs.outputColor, parentArgs);
+}
+
 void GLFragmentProcessor::internalEmitChild(size_t childIndex, const std::string& inputColor,
                                             const std::string& outputColor, EmitArgs& args) {
   auto* fragBuilder = args.fragBuilder;

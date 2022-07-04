@@ -9,8 +9,13 @@ import type { PAGVideoRange } from './types';
 @destroyVerify
 @wasmAwaitRewind
 export class PAGImageLayer extends PAGLayer {
-  public static Make(width: number, height: number, duration: number): PAGImageLayer {
-    return new PAGImageLayer(PAGModule._PAGImageLayer._Make(width, height, duration));
+  /**
+   * Make a empty PAGImageLayer with specified size.
+   */
+  public static make(width: number, height: number, duration: number): PAGImageLayer {
+    const wasmIns = PAGModule._PAGImageLayer._Make(width, height, duration);
+    if (!wasmIns) throw new Error('Make PAGImageLayer fail!');
+    return new PAGImageLayer(wasmIns);
   }
 
   /**
@@ -24,7 +29,9 @@ export class PAGImageLayer extends PAGLayer {
    * Returns the time ranges of the source video for replacement.
    */
   public getVideoRanges() {
-    return proxyVector(this.wasmIns._getVideoRanges(), (wasmIns) => wasmIns as PAGVideoRange);
+    const wasmIns = this.wasmIns._getVideoRanges();
+    if (!wasmIns) throw new Error('Get video ranges fail!');
+    return proxyVector(wasmIns, (wasmIns) => wasmIns as PAGVideoRange);
   }
   /**
    * [Deprecated]

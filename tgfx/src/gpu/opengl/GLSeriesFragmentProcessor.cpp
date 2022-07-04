@@ -16,37 +16,20 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/FragmentProcessor.h"
-#include "tgfx/core/RGBAAALayout.h"
+#include "GLSeriesFragmentProcessor.h"
 
 namespace tgfx {
-class TextureFragmentProcessor : public FragmentProcessor {
- public:
-  static std::unique_ptr<FragmentProcessor> Make(const Texture* texture, const RGBAAALayout* layout,
-                                                 const Matrix& localMatrix);
-
-  std::string name() const override {
-    return "TextureFragmentProcessor";
+void GLSeriesFragmentProcessor::emitCode(EmitArgs& args) {
+  // First guy's input might be nil.
+  std::string temp = "out0";
+  emitChild(0, args.inputColor, &temp, args);
+  std::string input = temp;
+  for (size_t i = 1; i < numChildProcessors() - 1; ++i) {
+    temp = "out" + std::to_string(i);
+    emitChild(i, input, &temp, args);
+    input = temp;
   }
-
- private:
-  explicit TextureFragmentProcessor(const Texture* texture, const RGBAAALayout* layout,
-                                    const Matrix& localMatrix);
-
-  void onComputeProcessorKey(BytesKey* bytesKey) const override;
-
-  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
-
-  const TextureSampler* onTextureSampler(size_t) const override {
-    return texture->getSampler();
-  }
-
-  const Texture* texture;
-  const RGBAAALayout* layout;
-  CoordTransform coordTransform;
-
-  friend class GLTextureFragmentProcessor;
-};
+  // Last guy writes to our output variable.
+  emitChild(numChildProcessors() - 1, input, args);
+}
 }  // namespace tgfx

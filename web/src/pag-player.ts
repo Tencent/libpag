@@ -2,7 +2,7 @@ import { PAGModule } from './binding';
 import { PAGFile } from './pag-file';
 import { PAGSurface } from './pag-surface';
 import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorators';
-import { layer2typeLayer, proxyVector } from './utils/type-utils';
+import { getWasmIns, layer2typeLayer, proxyVector } from './utils/type-utils';
 import { Matrix } from './core/matrix';
 
 import type { PAGLayer } from './pag-layer';
@@ -14,6 +14,7 @@ import type { PAGScaleMode, Rect } from './types';
 export class PAGPlayer {
   public static create(): PAGPlayer {
     const wasmIns = new PAGModule._PAGPlayer();
+    if (!wasmIns) throw new Error('Create PAGPlayer fail!');
     return new PAGPlayer(wasmIns);
   }
 
@@ -132,8 +133,8 @@ export class PAGPlayer {
   /**
    * Set the PAGSurface object for PAGPlayer to render onto.
    */
-  public setSurface(pagSurface: PAGSurface): void {
-    this.wasmIns._setSurface(pagSurface.wasmIns);
+  public setSurface(pagSurface: PAGSurface | null): void {
+    this.wasmIns._setSurface(getWasmIns(pagSurface));
   }
   /**
    *
@@ -141,6 +142,7 @@ export class PAGPlayer {
    */
   public getComposition(): PAGComposition {
     const wasmIns = this.wasmIns._getComposition();
+    if (!wasmIns) throw new Error('Get composition fail!');
     if (wasmIns._isPAGFile()) {
       return new PAGFile(wasmIns);
     }
@@ -151,20 +153,24 @@ export class PAGPlayer {
    * Sets a new PAGComposition for PAGPlayer to render as content.
    */
 
-  public setComposition(pagComposition: PAGComposition) {
-    this.wasmIns._setComposition(pagComposition.wasmIns);
+  public setComposition(pagComposition: PAGComposition | null) {
+    this.wasmIns._setComposition(getWasmIns(pagComposition));
   }
   /**
    * Returns the PAGSurface object for PAGPlayer to render onto.
    */
   public getSurface(): PAGSurface {
-    return new PAGSurface(this.wasmIns._getSurface());
+    const wasmIns = this.wasmIns._getSurface();
+    if (!wasmIns) throw new Error('Get surface fail!');
+    return new PAGSurface(wasmIns);
   }
   /**
    * Returns a copy of current matrix.
    */
   public matrix(): Matrix {
-    return new Matrix(this.wasmIns._matrix());
+    const wasmIns = this.wasmIns._matrix();
+    if (!wasmIns) throw new Error('Get matrix fail!');
+    return new Matrix(wasmIns);
   }
   /**
    * Set the transformation which will be applied to the composition. The scaleMode property
@@ -213,7 +219,9 @@ export class PAGPlayer {
    * this PAGComposition's local coordinates.
    */
   public getLayersUnderPoint(localX: number, localY: number) {
-    return proxyVector(this.wasmIns._getLayersUnderPoint(localX, localY), layer2typeLayer);
+    const wasmIns = this.wasmIns._getLayersUnderPoint(localX, localY);
+    if (!wasmIns) throw new Error(`Get layers under point, x: ${localX} y:${localY} fail!`);
+    return proxyVector(wasmIns, layer2typeLayer);
   }
   /**
    * Evaluates the PAGLayer to see if it overlaps or intersects with the specified point. The point

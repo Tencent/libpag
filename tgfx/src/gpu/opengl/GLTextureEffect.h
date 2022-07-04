@@ -22,7 +22,7 @@
 #include "gpu/GLFragmentProcessor.h"
 
 namespace tgfx {
-class GLAlphaFragmentProcessor : public GLFragmentProcessor {
+class GLTextureEffect : public GLFragmentProcessor {
  public:
   void emitCode(EmitArgs& args) override;
 
@@ -30,8 +30,8 @@ class GLAlphaFragmentProcessor : public GLFragmentProcessor {
   void onSetData(const ProgramDataManager& programDataManager,
                  const FragmentProcessor& fragmentProcessor) override;
 
-  UniformHandle alphaUniform;
+  UniformHandle alphaStartUniform;
 
-  std::optional<float> alphaPrev;
+  std::optional<Point> alphaStartPrev;
 };
 }  // namespace tgfx

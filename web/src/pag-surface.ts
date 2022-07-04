@@ -5,18 +5,28 @@ import { destroyVerify, wasmAwaitRewind } from './utils/decorators';
 @destroyVerify
 @wasmAwaitRewind
 export class PAGSurface {
-  public static FromCanvas(canvasID: string): PAGSurface {
+  /**
+   * Make a PAGSurface from canvas.
+   */
+  public static fromCanvas(canvasID: string): PAGSurface {
     const wasmIns = PAGModule._PAGSurface._FromCanvas(canvasID);
+    if (!wasmIns) throw new Error(`Make PAGSurface from canvas ${canvasID} fail!`);
     return new PAGSurface(wasmIns);
   }
-
-  public static FromTexture(textureID: number, width: number, height: number, flipY: boolean): PAGSurface {
+  /**
+   * Make a PAGSurface from texture.
+   */
+  public static fromTexture(textureID: number, width: number, height: number, flipY: boolean): PAGSurface {
     const wasmIns = PAGModule._PAGSurface._FromTexture(textureID, width, height, flipY);
+    if (!wasmIns) throw new Error(`Make PAGSurface from texture ${textureID} fail!`);
     return new PAGSurface(wasmIns);
   }
-
-  public static FromRenderTarget(frameBufferID: number, width: number, height: number, flipY: boolean): PAGSurface {
+  /**
+   * Make a PAGSurface from frameBuffer.
+   */
+  public static fromRenderTarget(frameBufferID: number, width: number, height: number, flipY: boolean): PAGSurface {
     const wasmIns = PAGModule._PAGSurface._FromRenderTarget(frameBufferID, width, height, flipY);
+    if (!wasmIns) throw new Error(`Make PAGSurface from frameBuffer ${frameBufferID} fail!`);
     return new PAGSurface(wasmIns);
   }
 

@@ -21,22 +21,17 @@
 #include "FragmentProcessor.h"
 
 namespace tgfx {
-class TextureMaskFragmentProcessor : public FragmentProcessor {
+class DeviceSpaceTextureEffect : public FragmentProcessor {
  public:
-  static std::unique_ptr<TextureMaskFragmentProcessor> MakeUseLocalCoord(
-      const Texture* texture, const Matrix& localMatrix = Matrix::I(), bool inverted = false);
-
-  static std::unique_ptr<TextureMaskFragmentProcessor> MakeUseDeviceCoord(const Texture* texture,
-                                                                          ImageOrigin deviceOrigin);
+  static std::unique_ptr<DeviceSpaceTextureEffect> Make(const Texture* texture,
+                                                        ImageOrigin deviceOrigin);
 
   std::string name() const override {
-    return "TextureMaskFragmentProcessor";
+    return "DeviceSpaceTextureEffect";
   }
 
  private:
-  TextureMaskFragmentProcessor(const Texture* texture, ImageOrigin deviceOrigin);
-
-  TextureMaskFragmentProcessor(const Texture* texture, const Matrix& localMatrix, bool inverted);
+  DeviceSpaceTextureEffect(const Texture* texture, ImageOrigin deviceOrigin);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
@@ -46,12 +41,9 @@ class TextureMaskFragmentProcessor : public FragmentProcessor {
     return texture->getSampler();
   }
 
-  bool useLocalCoord;
   const Texture* texture;
-  CoordTransform coordTransform;
-  bool inverted = false;
   Matrix deviceCoordMatrix = Matrix::I();
 
-  friend class GLTextureMaskFragmentProcessor;
+  friend class GLDeviceSpaceTextureEffect;
 };
 }  // namespace tgfx

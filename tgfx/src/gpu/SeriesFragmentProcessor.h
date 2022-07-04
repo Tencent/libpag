@@ -16,22 +16,27 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ColorShader.h"
-#include "gpu/ConstColorProcessor.h"
+#pragma once
+
+#include "FragmentProcessor.h"
 
 namespace tgfx {
-std::shared_ptr<Shader> Shader::MakeColorShader(Color color) {
-  auto shader = std::make_shared<ColorShader>(color);
-  shader->weakThis = shader;
-  return shader;
-}
+class SeriesFragmentProcessor : public FragmentProcessor {
+ public:
+  static std::unique_ptr<FragmentProcessor> Make(std::unique_ptr<FragmentProcessor>* children,
+                                                 int count);
 
-bool ColorShader::isOpaque() const {
-  return color.isOpaque();
-}
+  std::string name() const override {
+    return "SeriesFragmentProcessor";
+  }
 
-std::unique_ptr<FragmentProcessor> ColorShader::asFragmentProcessor(const FPArgs&) const {
-  return ConstColorProcessor::Make(color.premultiply(), InputMode::ModulateA);
-}
+  void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
+  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
+
+ private:
+  SeriesFragmentProcessor(std::unique_ptr<FragmentProcessor>* children, int count);
+
+  friend class GLSeriesFragmentProcessor;
+};
 }  // namespace tgfx

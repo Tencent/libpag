@@ -16,12 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLYUVTextureFragmentProcessor.h"
-#include "gpu/YUVTextureFragmentProcessor.h"
+#include "GLYUVTextureEffect.h"
+#include "gpu/YUVTextureEffect.h"
 
 namespace tgfx {
-void GLYUVTextureFragmentProcessor::emitCode(EmitArgs& args) {
-  const auto* yuvFP = static_cast<const YUVTextureFragmentProcessor*>(args.fragmentProcessor);
+void GLYUVTextureEffect::emitCode(EmitArgs& args) {
+  const auto* yuvFP = static_cast<const YUVTextureEffect*>(args.fragmentProcessor);
   auto* fragBuilder = args.fragBuilder;
   auto* uniformHandler = args.uniformHandler;
 
@@ -54,7 +54,8 @@ void GLYUVTextureFragmentProcessor::emitCode(EmitArgs& args) {
       ShaderFlags::Fragment, ShaderVar::Type::Float3x3, "Mat3ColorConversion", &mat3Name);
   fragBuilder->codeAppendf("vec3 rgb = clamp(%s * yuv, 0.0, 1.0);", mat3Name.c_str());
   if (yuvFP->layout == nullptr) {
-    fragBuilder->codeAppendf("%s = vec4(rgb, 1.0);", args.outputColor.c_str());
+    fragBuilder->codeAppendf("%s = vec4(rgb, 1.0) * %s;", args.outputColor.c_str(),
+                             args.inputColor.c_str());
   } else {
     std::string alphaStartName;
     alphaStartUniform = uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float2,
@@ -70,7 +71,8 @@ void GLYUVTextureFragmentProcessor::emitCode(EmitArgs& args) {
     fragBuilder->codeAppend("// 下面进行了减1.0/255.0的精度修正。\n");
     fragBuilder->codeAppend("yuv_a = (yuv_a - 16.0/255.0) / (219.0/255.0 - 1.0/255.0);");
     fragBuilder->codeAppend("yuv_a = clamp(yuv_a, 0.0, 1.0);");
-    fragBuilder->codeAppendf("%s = vec4(rgb * yuv_a, yuv_a);", args.outputColor.c_str());
+    fragBuilder->codeAppendf("%s = vec4(rgb * yuv_a, yuv_a) * %s;", args.outputColor.c_str(),
+                             args.inputColor.c_str());
   }
 }
 
@@ -98,9 +100,9 @@ static const float kColorConversion2020FullRange[] = {
     1.0, 1.0, 1.0, 0.0, -0.165, 1.881, 1.475, -0.571, 0.0,
 };
 
-void GLYUVTextureFragmentProcessor::onSetData(const ProgramDataManager& programDataManager,
-                                              const FragmentProcessor& fragmentProcessor) {
-  const auto& yuvFP = static_cast<const YUVTextureFragmentProcessor&>(fragmentProcessor);
+void GLYUVTextureEffect::onSetData(const ProgramDataManager& programDataManager,
+                                   const FragmentProcessor& fragmentProcessor) {
+  const auto& yuvFP = static_cast<const YUVTextureEffect&>(fragmentProcessor);
   if (alphaStartUniform.isValid()) {
     auto alphaStart = yuvFP.texture->getTextureCoord(static_cast<float>(yuvFP.layout->alphaStartX),
                                                      static_cast<float>(yuvFP.layout->alphaStartY));

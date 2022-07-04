@@ -16,12 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLTextureFragmentProcessor.h"
-#include "gpu/TextureFragmentProcessor.h"
+#include "GLTextureEffect.h"
+#include "gpu/TextureEffect.h"
 
 namespace tgfx {
-void GLTextureFragmentProcessor::emitCode(EmitArgs& args) {
-  const auto* textureFP = static_cast<const TextureFragmentProcessor*>(args.fragmentProcessor);
+void GLTextureEffect::emitCode(EmitArgs& args) {
+  const auto* textureFP = static_cast<const TextureEffect*>(args.fragmentProcessor);
   auto* fragBuilder = args.fragBuilder;
   auto* uniformHandler = args.uniformHandler;
 
@@ -43,12 +43,12 @@ void GLTextureFragmentProcessor::emitCode(EmitArgs& args) {
     fragBuilder->codeAppend("alpha = clamp(alpha, 0.0, 1.0);");
     fragBuilder->codeAppend("color = vec4(color.rgb * alpha.r, alpha.r);");
   }
-  fragBuilder->codeAppendf("%s = color;", args.outputColor.c_str());
+  fragBuilder->codeAppendf("%s = color * %s;", args.outputColor.c_str(), args.inputColor.c_str());
 }
 
-void GLTextureFragmentProcessor::onSetData(const ProgramDataManager& programDataManager,
-                                           const FragmentProcessor& fragmentProcessor) {
-  const auto& textureFP = static_cast<const TextureFragmentProcessor&>(fragmentProcessor);
+void GLTextureEffect::onSetData(const ProgramDataManager& programDataManager,
+                                const FragmentProcessor& fragmentProcessor) {
+  const auto& textureFP = static_cast<const TextureEffect&>(fragmentProcessor);
   if (alphaStartUniform.isValid()) {
     auto alphaStart =
         textureFP.texture->getTextureCoord(static_cast<float>(textureFP.layout->alphaStartX),

@@ -16,26 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <optional>
-#include "gpu/GLFragmentProcessor.h"
-#include "tgfx/gpu/YUVTexture.h"
+#include "ShaderMaskFilter.h"
+#include "FragmentProcessor.h"
 
 namespace tgfx {
-class GLYUVTextureFragmentProcessor : public GLFragmentProcessor {
- public:
-  void emitCode(EmitArgs& args) override;
+std::shared_ptr<MaskFilter> MaskFilter::Make(std::shared_ptr<Shader> shader, bool inverted) {
+  if (shader == nullptr) {
+    return nullptr;
+  }
+  return std::make_shared<ShaderMaskFilter>(std::move(shader), inverted);
+}
 
- private:
-  void onSetData(const ProgramDataManager& programDataManager,
-                 const FragmentProcessor& fragmentProcessor) override;
-
-  UniformHandle alphaStartUniform;
-  UniformHandle mat3ColorConversionUniform;
-
-  std::optional<Point> alphaStartPrev;
-  std::optional<YUVColorSpace> colorSpacePrev;
-  std::optional<YUVColorRange> colorRangePrev;
-};
+std::unique_ptr<FragmentProcessor> ShaderMaskFilter::asFragmentProcessor(const FPArgs& args) const {
+  return FragmentProcessor::MulInputByChildAlpha(shader->asFragmentProcessor(args), inverted);
+}
 }  // namespace tgfx

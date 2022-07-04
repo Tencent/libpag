@@ -85,9 +85,9 @@ export interface PAG extends EmscriptenModule {
   VectorString: any;
   webAssemblyQueue: WebAssemblyQueue;
   GL: EmscriptenGL;
-  PathFillType: PathFillType;
-  LineCap: LineCap;
-  LineJoin: LineJoin;
+  TGFXPathFillType: TGFXPathFillType;
+  TGFXLineCap: TGFXLineCap;
+  TGFXLineJoin: TGFXLineJoin;
   globalCanvas: GlobalCanvas;
   PAG: PAG;
   PAGPlayer: typeof PAGPlayer;
@@ -110,6 +110,7 @@ export interface PAG extends EmscriptenModule {
   Matrix: typeof ClassMatrix;
   traceImage: (info: { width: number; height: number }, pixels: Uint8Array, tag: string) => void;
   registerSoftwareDecoderFactory: (factory: SoftwareDecoderFactory | null) => void;
+  SDKVersion: () => string;
   [key: string]: any;
 }
 
@@ -185,17 +186,14 @@ export const enum PAGViewListenerEvent {
    */
   onAnimationUpdate = 'onAnimationUpdate',
   /**
-   * [Deprecated]
    * Notifies the play of the animation.
    */
   onAnimationPlay = 'onAnimationPlay',
   /**
-   * [Deprecated]
    * Notifies the pause of the animation.
    */
   onAnimationPause = 'onAnimationPause',
   /**
-   * [Deprecated]
    * Notifies the flushed of the animation.
    */
   onAnimationFlushed = 'onAnimationFlushed',
@@ -355,7 +353,7 @@ export interface ctor {
   value: number;
 }
 
-export interface PathFillType {
+export interface TGFXPathFillType {
   /**
    * Enclosed by a non-zero sum of contour directions.
    */
@@ -374,7 +372,7 @@ export interface PathFillType {
   InverseEvenOdd: ctor;
 }
 
-export interface LineCap {
+export interface TGFXLineCap {
   /**
    * No stroke extension.
    */
@@ -389,7 +387,7 @@ export interface LineCap {
   Square: ctor;
 }
 
-export interface LineJoin {
+export interface TGFXLineJoin {
   /**
    * Extends to miter limit.
    */
@@ -603,10 +601,10 @@ export declare class SoftwareDecoder {
   public onDecodeFrame(): DecoderResult;
   public onEndOfStream(): DecoderResult;
   public onFlush(): void;
-  public onRenderFrame(): YUVBuffer;
+  public onRenderFrame(): YUVBuffer | null;
   public onRelease(): void;
 }
 
 export declare class SoftwareDecoderFactory {
-  public createSoftwareDecoder(pag: PAG): SoftwareDecoder;
+  public createSoftwareDecoder(pag: PAG): SoftwareDecoder | null;
 }

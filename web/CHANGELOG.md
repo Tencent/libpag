@@ -1,10 +1,40 @@
 # CHANGELOG
 
-## 4.0.5.6
+## 4.0.5.16
+
+### Breaking Changes
+
+- Replace `FromCanvas` to `fromCanvas` , `FromTexture` to `fromTexture` , `FromRenderTarget` to `fromRenderTarget` on `PAGSurface`.
+- Replace `Make` to `make` on `PAGComposition`.
+- Replace `Make` to `make` on `PAGSolidLayer`.
+- Replace `Make` to `make` on `PAGImageLayer`.
+
+### Feature
+
+- Add `backendContext`.
+- Add onAnimationUpdate event.
+- Add `version` on `libpag`.
+- Add `setComposition` , `matrix` , `setMatrix` , `getLayersUnderPoint` on `PAGView`.
+- Support unregister software decoder.
+- Return TypeLayer when get PAGLayer.
+
+## 4.0.5.11
+
+### BugFixes
+
+- Fix text rendering error when font-family has punctuation.
+
+## 4.0.5.7
 
 ### Feature
 
 - Add font style render in WebMask.
+- Add fallback fontFamily.
+
+### BugFixes
+
+- Fix OffscreenCanvas assert error on Safari.
+- Disable antialiasing when creating WebGL context from canvas.
 
 ## 4.0.5.5
 
@@ -21,7 +51,7 @@
 
 ### Feature
 
-- Support init `PAGView` from `offscreenCanvas`. 
+- Support init `PAGView` from `offscreenCanvas`.
 - Add `readPixels` function on `PAGSurface`.
 
 ### BugFixes
@@ -35,12 +65,12 @@
 - Add software decoder registration function.
 - Create MP4 container on wasm side.
 - Add decorator to verify wasm status.
-- PAGImage can be made from TexImageSource. 
+- PAGImage can be made from TexImageSource.
 
 ### BugFixes
 
 - Fix the repeat event dispatch error.
-- Optimize wasm queue. 
+- Optimize wasm queue.
 - Fix some enum binding error.
 
 ## 0.1.6

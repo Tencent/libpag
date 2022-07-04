@@ -18,20 +18,36 @@
 
 #pragma once
 
-#include <optional>
-#include "gpu/GLFragmentProcessor.h"
+#include "gpu/FragmentProcessor.h"
+#include "tgfx/core/RGBAAALayout.h"
 
 namespace tgfx {
-class GLTextureFragmentProcessor : public GLFragmentProcessor {
+class TextureEffect : public FragmentProcessor {
  public:
-  void emitCode(EmitArgs& args) override;
+  static std::unique_ptr<FragmentProcessor> Make(const Texture* texture,
+                                                 const Matrix& localMatrix = Matrix::I(),
+                                                 const RGBAAALayout* layout = nullptr);
+
+  std::string name() const override {
+    return "TextureEffect";
+  }
 
  private:
-  void onSetData(const ProgramDataManager& programDataManager,
-                 const FragmentProcessor& fragmentProcessor) override;
+  explicit TextureEffect(const Texture* texture, const RGBAAALayout* layout,
+                         const Matrix& localMatrix);
 
-  UniformHandle alphaStartUniform;
+  void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
-  std::optional<Point> alphaStartPrev;
+  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
+
+  const TextureSampler* onTextureSampler(size_t) const override {
+    return texture->getSampler();
+  }
+
+  const Texture* texture;
+  const RGBAAALayout* layout;
+  CoordTransform coordTransform;
+
+  friend class GLTextureEffect;
 };
 }  // namespace tgfx

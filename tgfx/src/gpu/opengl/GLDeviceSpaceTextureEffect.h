@@ -16,21 +16,25 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "AlphaFragmentProcessor.h"
-#include "core/utils/UniqueID.h"
-#include "opengl/GLAlphaFragmentProcessor.h"
+#pragma once
+
+#include <optional>
+#include "gpu/GLFragmentProcessor.h"
 
 namespace tgfx {
-std::unique_ptr<AlphaFragmentProcessor> AlphaFragmentProcessor::Make(float alpha) {
-  return std::unique_ptr<AlphaFragmentProcessor>(new AlphaFragmentProcessor(alpha));
-}
+class GLDeviceSpaceTextureEffect : public GLFragmentProcessor {
+ public:
+  void emitCode(EmitArgs& args) override;
 
-void AlphaFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
-  static auto Type = UniqueID::Next();
-  bytesKey->write(Type);
-}
+ private:
+  void onSetData(const ProgramDataManager& programDataManager,
+                 const FragmentProcessor& fragmentProcessor) override;
 
-std::unique_ptr<GLFragmentProcessor> AlphaFragmentProcessor::onCreateGLInstance() const {
-  return std::make_unique<GLAlphaFragmentProcessor>();
-}
+  UniformHandle scaleUniform;
+  UniformHandle deviceCoordMatrixUniform;
+
+  std::optional<int> widthPrev;
+  std::optional<int> heightPrev;
+  std::optional<Matrix> deviceCoordMatrixPrev;
+};
 }  // namespace tgfx

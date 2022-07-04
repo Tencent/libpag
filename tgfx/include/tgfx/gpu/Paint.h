@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "MaskFilter.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/gpu/Shader.h"
@@ -176,7 +177,23 @@ class Paint {
    * instead.
    */
   void setShader(std::shared_ptr<Shader> newShader) {
-    shader = newShader;
+    shader = std::move(newShader);
+  }
+
+  std::shared_ptr<MaskFilter> getMaskFilter() const {
+    return maskFilter;
+  }
+
+  void setMaskFilter(std::shared_ptr<MaskFilter> newMaskFilter) {
+    maskFilter = std::move(newMaskFilter);
+  }
+
+  std::shared_ptr<ColorFilter> getColorFilter() const {
+    return colorFilter;
+  }
+
+  void setColorFilter(std::shared_ptr<ColorFilter> newColorFilter) {
+    colorFilter = std::move(newColorFilter);
   }
 
  private:
@@ -184,5 +201,7 @@ class Paint {
   Color color = Color::Black();
   Stroke stroke = Stroke(0);
   std::shared_ptr<Shader> shader = nullptr;
+  std::shared_ptr<MaskFilter> maskFilter = nullptr;
+  std::shared_ptr<ColorFilter> colorFilter = nullptr;
 };
 }  // namespace tgfx

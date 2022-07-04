@@ -15,7 +15,7 @@ export class AudioPlayer {
     } else {
       this.isEffective = false;
     }
-    console.log(`${audioBytes && audioBytes.byteLength === 0 ? '无音频文件' : '有音频文件'}`);
+    console.log(`${audioBytes && audioBytes.byteLength > 0 ? '有音频文件' : '无音频文件'}`);
   }
   public play() {
     if (!this.isEffective || this.isDestroyed) return;

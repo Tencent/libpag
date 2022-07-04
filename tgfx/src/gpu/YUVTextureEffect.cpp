@@ -16,37 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "FragmentProcessor.h"
-#include "tgfx/core/RGBAAALayout.h"
-#include "tgfx/gpu/YUVTexture.h"
+#include "YUVTextureEffect.h"
+#include "core/utils/UniqueID.h"
+#include "opengl/GLYUVTextureEffect.h"
 
 namespace tgfx {
-class YUVTextureFragmentProcessor : public FragmentProcessor {
- public:
-  std::string name() const override {
-    return "YUVTextureFragmentProcessor";
-  }
+YUVTextureEffect::YUVTextureEffect(const YUVTexture* texture, const RGBAAALayout* layout,
+                                   const Matrix& localMatrix)
+    : texture(texture), layout(layout), coordTransform(localMatrix) {
+  setTextureSamplerCnt(texture->samplerCount());
+  addCoordTransform(&coordTransform);
+}
 
- private:
-  explicit YUVTextureFragmentProcessor(const YUVTexture* texture, const RGBAAALayout* layout,
-                                       const Matrix& localMatrix);
+void YUVTextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
+  static auto Type = UniqueID::Next();
+  bytesKey->write(Type);
+  uint32_t flags = texture->pixelFormat() == YUVPixelFormat::I420 ? 0 : 1;
+  flags |= layout == nullptr ? 0 : 2;
+  flags |= texture->colorRange() == YUVColorRange::MPEG ? 0 : 4;
+  bytesKey->write(flags);
+}
 
-  void onComputeProcessorKey(BytesKey* bytesKey) const override;
-
-  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
-
-  const TextureSampler* onTextureSampler(size_t index) const override {
-    return texture->getSamplerAt(index);
-  }
-
-  const YUVTexture* texture;
-  const RGBAAALayout* layout;
-  CoordTransform coordTransform;
-
-  friend class TextureFragmentProcessor;
-
-  friend class GLYUVTextureFragmentProcessor;
-};
+std::unique_ptr<GLFragmentProcessor> YUVTextureEffect::onCreateGLInstance() const {
+  return std::make_unique<GLYUVTextureEffect>();
+}
 }  // namespace tgfx

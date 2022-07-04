@@ -16,22 +16,37 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ColorShader.h"
-#include "gpu/ConstColorProcessor.h"
+#pragma once
+
+#include "FragmentProcessor.h"
+#include "tgfx/core/RGBAAALayout.h"
+#include "tgfx/gpu/YUVTexture.h"
 
 namespace tgfx {
-std::shared_ptr<Shader> Shader::MakeColorShader(Color color) {
-  auto shader = std::make_shared<ColorShader>(color);
-  shader->weakThis = shader;
-  return shader;
-}
+class YUVTextureEffect : public FragmentProcessor {
+ public:
+  std::string name() const override {
+    return "YUVTextureEffect";
+  }
 
-bool ColorShader::isOpaque() const {
-  return color.isOpaque();
-}
+ private:
+  explicit YUVTextureEffect(const YUVTexture* texture, const RGBAAALayout* layout,
+                            const Matrix& localMatrix);
 
-std::unique_ptr<FragmentProcessor> ColorShader::asFragmentProcessor(const FPArgs&) const {
-  return ConstColorProcessor::Make(color.premultiply(), InputMode::ModulateA);
-}
+  void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
+  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
+
+  const TextureSampler* onTextureSampler(size_t index) const override {
+    return texture->getSamplerAt(index);
+  }
+
+  const YUVTexture* texture;
+  const RGBAAALayout* layout;
+  CoordTransform coordTransform;
+
+  friend class TextureEffect;
+
+  friend class GLYUVTextureEffect;
+};
 }  // namespace tgfx

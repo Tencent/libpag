@@ -19,6 +19,8 @@
 #include "FragmentProcessor.h"
 #include "GLFragmentProcessor.h"
 #include "Pipeline.h"
+#include "SeriesFragmentProcessor.h"
+#include "XfermodeFragmentProcessor.h"
 
 namespace tgfx {
 bool ComputeTotalInverse(const FPArgs& args, Matrix* totalInverse) {
@@ -33,6 +35,28 @@ bool ComputeTotalInverse(const FPArgs& args, Matrix* totalInverse) {
     totalInverse->postConcat(args.postLocalMatrix);
   }
   return totalInverse->invert(totalInverse);
+}
+
+std::unique_ptr<FragmentProcessor> FragmentProcessor::MulChildByInputAlpha(
+    std::unique_ptr<FragmentProcessor> child) {
+  if (child == nullptr) {
+    return nullptr;
+  }
+  return XfermodeFragmentProcessor::MakeFromDstProcessor(std::move(child), BlendMode::DstIn);
+}
+
+std::unique_ptr<FragmentProcessor> FragmentProcessor::MulInputByChildAlpha(
+    std::unique_ptr<FragmentProcessor> child, bool inverted) {
+  if (child == nullptr) {
+    return nullptr;
+  }
+  return XfermodeFragmentProcessor::MakeFromDstProcessor(
+      std::move(child), inverted ? BlendMode::SrcOut : BlendMode::SrcIn);
+}
+
+std::unique_ptr<FragmentProcessor> FragmentProcessor::RunInSeries(
+    std::unique_ptr<FragmentProcessor>* series, int count) {
+  return SeriesFragmentProcessor::Make(series, count);
 }
 
 void FragmentProcessor::computeProcessorKey(Context* context, BytesKey* bytesKey) const {

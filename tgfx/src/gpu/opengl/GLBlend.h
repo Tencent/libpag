@@ -28,4 +28,6 @@ bool BlendAsCoeff(BlendMode blendMode, unsigned* first = nullptr, unsigned* seco
 // variables to the outColor variable.
 void AppendMode(FragmentShaderBuilder* fsBuilder, const std::string& srcColor,
                 const std::string& dstColor, const std::string& outColor, BlendMode blendMode);
+
+const char* BlendModeName(BlendMode mode);
 }  // namespace tgfx

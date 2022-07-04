@@ -137,7 +137,7 @@ class TextureProxyPicture : public Picture {
     }
     auto snapshot = cache->getSnapshot(this);
     if (snapshot) {
-      canvas->drawTexture(snapshot->getTexture(), snapshot->getMatrix());
+      canvas->drawTexture(snapshot->getTexture().get(), snapshot->getMatrix());
     } else {
       auto texture = proxy->getTexture(cache);
       DrawDirectly(canvas, texture.get(), nullptr);
@@ -231,7 +231,7 @@ class RGBAAAPicture : public Picture {
     canvas->flush();
     auto snapshot = cache->getSnapshot(this);
     if (snapshot) {
-      canvas->drawTexture(snapshot->getTexture(), snapshot->getMatrix());
+      canvas->drawTexture(snapshot->getTexture().get(), snapshot->getMatrix());
       return;
     }
     auto texture = proxy->getTexture(cache);
@@ -310,7 +310,7 @@ class SnapshotPicture : public Picture {
       graphic->draw(canvas, cache);
       return;
     }
-    canvas->drawTexture(snapshot->getTexture(), snapshot->getMatrix());
+    canvas->drawTexture(snapshot->getTexture().get(), snapshot->getMatrix());
   }
 
  protected:
