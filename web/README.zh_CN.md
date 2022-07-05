@@ -18,9 +18,21 @@ PAG Web 端，由 libpag.js + libpag.wasm 文件组成。
 
 ### Browser（推荐）
 
+直接使用 `<script>` 引入，`libpag` 会被注册为一个全局变量
+
+对于生产环境我们推荐使用一个明确的版本号，以避免新版本带来不可预期的影响
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/libpag@4.0.5-release.18/lib/libpag.min.js"></script>
+```
+
+你可以在公共 CDN [cdn.jsdelivr.net/npm/libpag/](https://cdn.jsdelivr.net/npm/libpag/) 浏览 NPM 包内的内容，同时你也可以使用 `@latest` 将版本指定为最新的稳定版。
+
+也可以使用其他同步 NPM 的公共 CDN 如 [unpkg](https://unpkg.com/libpag@latest/lib/libpag.min.js)
+
 ```html
 <canvas class="canvas" id="pag"></canvas>
-<script src="https://unpkg.com/libpag@latest/lib/libpag.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/libpag@latest/lib/libpag.min.js"></script>
 <script>
   window.onload = async () => {
     // 实例化 PAG
