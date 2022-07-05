@@ -6,7 +6,7 @@ English | [简体中文](./README.zh_CN.md) | [Homepage](https://pag.io)
 
 libpag is a real-time rendering library for PAG (Portable Animated Graphics) files that renders both
 vector-based and raster-based animations across most platforms, such as iOS, Android, macOS,
-Windows, Linux, and Web. 
+Windows, Linux, and Web.
 
 ## Features
 
@@ -16,13 +16,23 @@ PAG Web SDK is built on WebAssembly and WebGL which supports all of the PAG feat
 
 PAG Web SDK consists of two files: `libpag.js` and `libpag.wasm`.
 
-You can use the `locateFile` function to get the path of `libpag.wasm` file. By default, the `libpag.wasm` file is located next to the `libpag.js` file.
-
 ### Browser (Recommend)
+
+Use <script/> to include the library directly, `libpag` will be registered as a global variable.
+
+For production use, we recommend using a specific version number of libpag to avoid unexpected breakage from newer versions:
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/libpag@4.0.5-release.18/lib/libpag.min.js"></script>
+```
+
+You can browse the files of the NPM package at the public CDN [cdn.jsdelivr.net/npm/libpag/](https://cdn.jsdelivr.net/npm/libpag/) , and you can use the keyword `@lastest` to get the lastest version.
+
+The PAG library is also available on other public CDNs that sync with NPM, such as [unpkg](https://unpkg.com/libpag@latest/lib/libpag.min.js).
 
 ```html
 <canvas class="canvas" id="pag"></canvas>
-<script src="https://unpkg.com/libpag@latest/lib/libpag.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/libpag@latest/lib/libpag.min.js"></script>
 <script>
   window.onload = async () => {
     // Initialize pag webassembly module.
