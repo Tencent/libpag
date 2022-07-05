@@ -63,17 +63,23 @@ void LayerStylesFilter::draw(tgfx::Context* context, const FilterSource* source,
     }
   }
 
-  drawFilter->update(filterList->layerFrame, contentBounds, contentBounds, filterScale);
-  drawFilter->draw(context, source, target);
-
+  // The above layer style is only GradientOverlayFilter, and the GradientOverlayFilter has drawn
+  // the source with blend.
+  bool drawSource = true;
   for (auto& layerStyle : filterList->layerStyles) {
     if (layerStyle->drawPosition() == LayerStylePosition::Above) {
       auto filter = renderCache->getFilterCache(layerStyle);
       if (filter) {
         filter->update(filterList->layerFrame, contentBounds, transformedBounds, filterScale);
         filter->draw(context, source, target);
+        drawSource = false;
       }
     }
+  }
+
+  if (drawSource) {
+    drawFilter->update(filterList->layerFrame, contentBounds, contentBounds, filterScale);
+    drawFilter->draw(context, source, target);
   }
 }
 }  // namespace pag

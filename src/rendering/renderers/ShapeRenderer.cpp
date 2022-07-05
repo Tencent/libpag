@@ -23,6 +23,7 @@
 #include "base/utils/Interpolate.h"
 #include "base/utils/MathUtil.h"
 #include "base/utils/TGFXCast.h"
+#include "rendering/graphics/GradientPaint.h"
 #include "rendering/graphics/Graphic.h"
 #include "rendering/graphics/Shape.h"
 #include "rendering/utils/PathUtil.h"
@@ -378,113 +379,6 @@ PaintElement* StrokeToPaint(StrokeElement* stroke, const tgfx::Matrix& matrix, F
   return paint;
 }
 
-void ConvertColorStop(const GradientColorHandle& gradientColor, std::vector<Color>& colorValues,
-                      std::vector<float>& colorPositions) {
-  auto colorStops = gradientColor->colorStops;
-  for (size_t i = 0; i < colorStops.size(); i++) {
-    const auto& stop = colorStops[i];
-    colorValues.push_back(stop.color);
-    colorPositions.push_back(stop.position);
-    if (stop.midpoint != 0.5f && i < colorStops.size() - 1) {
-      const auto& nextStop = colorStops[i + 1];
-      auto midColor = Interpolate(stop.color, nextStop.color, 0.5f);
-      colorValues.push_back(midColor);
-      auto position = stop.position + (nextStop.position - stop.position) * stop.midpoint;
-      colorPositions.push_back(position);
-    }
-  }
-}
-
-void ConvertAlphaStop(const GradientColorHandle& gradientColor, std::vector<Opacity>& alphaValues,
-                      std::vector<float>& alphaPositions) {
-  auto alphaStops = gradientColor->alphaStops;
-  for (size_t i = 0; i < alphaStops.size(); i++) {
-    const auto& stop = alphaStops[i];
-    alphaValues.push_back(stop.opacity);
-    alphaPositions.push_back(stop.position);
-    if (stop.midpoint != 0.5f && i < alphaStops.size() - 1) {
-      const auto& nextStop = alphaStops[i + 1];
-      auto midAlpha = Interpolate(stop.opacity, nextStop.opacity, 0.5f);
-      alphaValues.push_back(midAlpha);
-      auto position = stop.position + (nextStop.position - stop.position) * stop.midpoint;
-      alphaPositions.push_back(position);
-    }
-  }
-}
-
-GradientPaint MakeGradientPaint(Enum fillType, Point startPoint, Point endPoint,
-                                const GradientColorHandle& gradientColor,
-                                const tgfx::Matrix& matrix) {
-  tgfx::Point points[2] = {tgfx::Point::Make(startPoint.x, startPoint.y),
-                           tgfx::Point::Make(endPoint.x, endPoint.y)};
-  matrix.mapPoints(points, 2);
-  GradientPaint gradient = {};
-  gradient.gradientType = fillType;
-  gradient.startPoint = points[0];
-  gradient.endPoint = points[1];
-
-  std::vector<Color> colorValues;
-  std::vector<float> colorPositions;
-  ConvertColorStop(gradientColor, colorValues, colorPositions);
-
-  std::vector<Opacity> opacityValues;
-  std::vector<float> alphaPositions;
-  ConvertAlphaStop(gradientColor, opacityValues, alphaPositions);
-
-  size_t colorIndex = 0;
-  size_t opacityIndex = 0;
-  while (colorIndex < colorValues.size() && opacityIndex < opacityValues.size()) {
-    auto colorPosition = colorPositions[colorIndex];
-    auto alphaPosition = alphaPositions[opacityIndex];
-    if (colorPosition == alphaPosition) {
-      gradient.positions.push_back(colorPosition);
-      auto color4f = ToTGFX(colorValues[colorIndex++], opacityValues[opacityIndex++]);
-      gradient.colors.push_back(color4f);
-    } else if (colorPosition < alphaPosition) {
-      gradient.positions.push_back(colorPosition);
-      Opacity opacity;
-      if (opacityIndex > 0) {
-        auto lastPosition = alphaPositions[opacityIndex - 1];
-        auto factor = (colorPosition - lastPosition) * 1.0f / (alphaPosition - lastPosition);
-        opacity = Interpolate(opacityValues[opacityIndex - 1], opacityValues[opacityIndex], factor);
-      } else {
-        opacity = opacityValues[opacityIndex];
-      }
-      auto color4f = ToTGFX(colorValues[colorIndex++], opacity);
-      gradient.colors.push_back(color4f);
-    } else {
-      gradient.positions.push_back(alphaPosition);
-      Color color = {};
-      if (colorIndex > 0) {
-        auto lastPosition = colorPositions[colorIndex - 1];
-        auto factor = (alphaPosition - lastPosition) * 1.0f / (colorPosition - lastPosition);
-        auto lastColor = colorValues[colorIndex - 1];
-        auto currentColor = colorValues[colorIndex];
-        color = Interpolate(lastColor, currentColor, factor);
-      } else {
-        color = colorValues[colorIndex];
-      }
-      auto color4f = ToTGFX(color, opacityValues[opacityIndex++]);
-      gradient.colors.push_back(color4f);
-    }
-  }
-
-  auto lastOpacity = opacityValues.back();
-  while (colorIndex < colorValues.size()) {
-    gradient.positions.push_back(colorPositions[colorIndex]);
-    auto color4f = ToTGFX(colorValues[colorIndex++], lastOpacity);
-    gradient.colors.push_back(color4f);
-  }
-
-  auto lastColor = colorValues.back();
-  while (opacityIndex < opacityValues.size()) {
-    gradient.positions.push_back(alphaPositions[opacityIndex]);
-    auto color4f = ToTGFX(lastColor, opacityValues[opacityIndex++]);
-    gradient.colors.push_back(color4f);
-  }
-  return gradient;
-}
-
 PaintElement* GradientFillToPaint(GradientFillElement* fill, const tgfx::Matrix& matrix,
                                   Frame frame) {
   if (fill->opacity->getValueAt(frame) <= 0) {
@@ -495,8 +389,8 @@ PaintElement* GradientFillToPaint(GradientFillElement* fill, const tgfx::Matrix&
   paint->alpha = ToAlpha(fill->opacity->getValueAt(frame));
   paint->compositeOrder = fill->composite;
   paint->gradient =
-      MakeGradientPaint(fill->fillType, fill->startPoint->getValueAt(frame),
-                        fill->endPoint->getValueAt(frame), fill->colors->getValueAt(frame), matrix);
+      GradientPaint(fill->fillType, fill->startPoint->getValueAt(frame),
+                    fill->endPoint->getValueAt(frame), fill->colors->getValueAt(frame), matrix);
   paint->pathFillType = ToPathFillType(fill->fillRule);
 
   return paint;
@@ -522,9 +416,9 @@ PaintElement* GradientStrokeToPaint(GradientStrokeElement* stroke, const tgfx::M
     paint->stroke.dashOffset = stroke->dashOffset->getValueAt(frame);
   }
   paint->stroke.matrix = matrix;
-  paint->gradient = MakeGradientPaint(stroke->fillType, stroke->startPoint->getValueAt(frame),
-                                      stroke->endPoint->getValueAt(frame),
-                                      stroke->colors->getValueAt(frame), matrix);
+  paint->gradient =
+      GradientPaint(stroke->fillType, stroke->startPoint->getValueAt(frame),
+                    stroke->endPoint->getValueAt(frame), stroke->colors->getValueAt(frame), matrix);
   return paint;
 }
 

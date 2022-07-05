@@ -18,20 +18,28 @@
 
 #pragma once
 
-#include <cmath>
+#include "gpu/FragmentProcessor.h"
 
-namespace pag {
-static constexpr float FLOAT_NEARLY_ZERO = 1.0f / (1 << 12);
+namespace tgfx {
+class SweepGradientLayout : public FragmentProcessor {
+ public:
+  static std::unique_ptr<SweepGradientLayout> Make(Matrix matrix, float bias, float scale);
 
-static inline float DegreesToRadians(float degrees) {
-  return degrees * (static_cast<float>(M_PI) / 180.0f);
-}
+  std::string name() const override {
+    return "SweepGradientLayout";
+  }
 
-static inline float RadiansToDegrees(float radians) {
-  return radians * (180.0f / static_cast<float>(M_PI));
-}
+  void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
-static inline bool FloatNearlyZero(float x, float tolerance = FLOAT_NEARLY_ZERO) {
-  return fabsf(x) <= tolerance;
-}
-}  // namespace pag
+  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
+
+ private:
+  SweepGradientLayout(Matrix matrix, float bias, float scale);
+
+  CoordTransform coordTransform;
+  float bias;
+  float scale;
+
+  friend class GLSweepGradientLayout;
+};
+}  // namespace tgfx

@@ -18,20 +18,32 @@
 
 #pragma once
 
-#include <cmath>
+#include "pag/file.h"
+#include "tgfx/core/Color.h"
+#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Point.h"
+#include "tgfx/gpu/Shader.h"
 
 namespace pag {
-static constexpr float FLOAT_NEARLY_ZERO = 1.0f / (1 << 12);
+/**
+ * Defines attributes for drawing gradient colors.
+ */
+class GradientPaint {
+ public:
+  GradientPaint() = default;
 
-static inline float DegreesToRadians(float degrees) {
-  return degrees * (static_cast<float>(M_PI) / 180.0f);
-}
+  GradientPaint(Enum fillType, Point startPoint, Point endPoint,
+                const GradientColorHandle& gradientColor, const tgfx::Matrix& matrix,
+                bool reverse = false);
 
-static inline float RadiansToDegrees(float radians) {
-  return radians * (180.0f / static_cast<float>(M_PI));
-}
+  std::shared_ptr<tgfx::Shader> getShader() const;
 
-static inline bool FloatNearlyZero(float x, float tolerance = FLOAT_NEARLY_ZERO) {
-  return fabsf(x) <= tolerance;
-}
+ private:
+  Enum gradientType = GradientFillType::Linear;
+  tgfx::Point startPoint = tgfx::Point::Zero();
+  tgfx::Point endPoint = tgfx::Point::Zero();
+  std::vector<tgfx::Color> colors;
+  std::vector<float> positions;
+  tgfx::Matrix matrix = tgfx::Matrix::I();
+};
 }  // namespace pag

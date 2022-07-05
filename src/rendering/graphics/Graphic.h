@@ -25,17 +25,6 @@
 #include "tgfx/gpu/Paint.h"
 
 namespace pag {
-/**
- * Defines attributes for drawing gradient colors.
- */
-struct GradientPaint {
-  Enum gradientType;
-  tgfx::Point startPoint;
-  tgfx::Point endPoint;
-  std::vector<tgfx::Color> colors;
-  std::vector<float> positions;
-};
-
 enum class GraphicType {
   Unknown,
   Picture,

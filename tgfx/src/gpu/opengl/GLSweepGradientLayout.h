@@ -18,20 +18,21 @@
 
 #pragma once
 
-#include <cmath>
+#include <optional>
+#include "gpu/GLFragmentProcessor.h"
 
-namespace pag {
-static constexpr float FLOAT_NEARLY_ZERO = 1.0f / (1 << 12);
+namespace tgfx {
+class GLSweepGradientLayout : public GLFragmentProcessor {
+ public:
+  void emitCode(EmitArgs& args) override;
 
-static inline float DegreesToRadians(float degrees) {
-  return degrees * (static_cast<float>(M_PI) / 180.0f);
-}
+ private:
+  void onSetData(const ProgramDataManager&, const FragmentProcessor&) override;
 
-static inline float RadiansToDegrees(float radians) {
-  return radians * (180.0f / static_cast<float>(M_PI));
-}
+  UniformHandle biasUniform;
+  UniformHandle scaleUniform;
 
-static inline bool FloatNearlyZero(float x, float tolerance = FLOAT_NEARLY_ZERO) {
-  return fabsf(x) <= tolerance;
-}
-}  // namespace pag
+  std::optional<float> biasPrev;
+  std::optional<float> scalePrev;
+};
+}  // namespace tgfx
