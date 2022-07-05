@@ -55,7 +55,7 @@ static const char MOTIONBLUR_FRAGMENT_SHADER[] = R"(
         uniform sampler2D uTextureInput;
         uniform float uVelCenter;
         uniform float maxDistance;
-        const int kSamplesPerFrame = 32;
+        const int kSamplesPerFrame = 37;
         void main() {
             vec2 velocity = vCurrPosition.xy - vPrevPosition.xy;
             float distance = length(velocity);
