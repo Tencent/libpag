@@ -226,10 +226,10 @@ void EAGLDevice::finish() {
 }
 }  // namespace tgfx
 
-@interface AppMonitor : NSObject
+@interface PAGAppMonitor : NSObject
 @end
 
-@implementation AppMonitor
+@implementation PAGAppMonitor
 + (void)applicationWillResignActive:(NSNotification*)notification {
   tgfx::ApplicationWillResignActive();
 }
@@ -240,11 +240,11 @@ void EAGLDevice::finish() {
 @end
 
 static bool RegisterNotifications() {
-  [[NSNotificationCenter defaultCenter] addObserver:[AppMonitor class]
+  [[NSNotificationCenter defaultCenter] addObserver:[PAGAppMonitor class]
                                            selector:@selector(applicationWillResignActive:)
                                                name:UIApplicationWillResignActiveNotification
                                              object:nil];
-  [[NSNotificationCenter defaultCenter] addObserver:[AppMonitor class]
+  [[NSNotificationCenter defaultCenter] addObserver:[PAGAppMonitor class]
                                            selector:@selector(applicationDidBecomeActive:)
                                                name:UIApplicationDidBecomeActiveNotification
                                              object:nil];
