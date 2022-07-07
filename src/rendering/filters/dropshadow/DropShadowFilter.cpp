@@ -179,5 +179,6 @@ void DropShadowFilter::onDrawModeNotFullSpread(tgfx::Context* context, const Fil
       (filterNotFullSpreadBounds.top - filterContentBounds.top) * source->scale.y);
   PreConcatMatrix(filterTarget, offsetMatrix);
   blurFilter->draw(context, sourceSpread.get(), filterTarget);
+  delete filterTarget;
 }
 }  // namespace pag
