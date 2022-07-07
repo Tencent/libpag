@@ -90,7 +90,7 @@ void DropShadowFilter::update(Frame frame, const tgfx::Rect& contentBounds,
 void DropShadowFilter::updateParamModeNotSpread(Frame frame, const tgfx::Rect& contentBounds,
                                                 const tgfx::Rect& transformedBounds,
                                                 const tgfx::Point& filterScale) {
-  blurEffect->blurriness->value = size * 2.0;
+  blurEffect->blurriness->value = size * 1.5;
   blurFilter->updateParams(expendSize, offset, true, color);
   blurFilter->update(frame, contentBounds, transformedBounds, filterScale);
 }
@@ -103,7 +103,7 @@ void DropShadowFilter::updateParamModeNotFullSpread(Frame frame, const tgfx::Rec
   } else {
     spreadThickFilter->update(frame, contentBounds, filterNotFullSpreadBounds, filterScale);
   }
-  blurEffect->blurriness->value = size * 2.0;
+  blurEffect->blurriness->value = size * 1.5;
   blurFilter->updateParams(0.0, offset, true, color);
   blurFilter->update(frame, filterNotFullSpreadBounds, transformedBounds, filterScale);
 }
