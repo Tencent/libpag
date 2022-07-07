@@ -31,25 +31,27 @@ static const char DROPSHADOW_SPREAD_FRAGMENT_SHADER[] = R"(
 
         varying vec2 vertexColor;
 
-        float PI = 3.1415926535;
-
+        const float PI = 3.1415926535;
+        const float AlphaFloor = 0.7;
+    
         void main()
         {
-            float alphaSum = texture2D(uTextureInput, vertexColor).a;
+            vec4 srcColor = texture2D(uTextureInput, vertexColor);
+            float alphaSum = floor(srcColor.a + AlphaFloor);
             for (float i = 0.0; i <= 180.0; i += 11.25) {
                 float arc = i * PI / 180.0;
                 float measureX = cos(arc) * uSize.x;
                 float measureY = sqrt(pow(uSize.x, 2.0) - pow(measureX, 2.0)) * uSize.y / uSize.x;
-                alphaSum += texture2D(uTextureInput, vertexColor + vec2(measureX, measureY)).a;
-                alphaSum += texture2D(uTextureInput, vertexColor + vec2(measureX, -measureY)).a;
+                alphaSum += floor(texture2D(uTextureInput, vertexColor + vec2(measureX, measureY)).a + AlphaFloor);
+                alphaSum += floor(texture2D(uTextureInput, vertexColor + vec2(measureX, -measureY)).a + AlphaFloor);
             }
 
-            gl_FragColor = (alphaSum > 1.0) ? vec4(uColor, uAlpha) : vec4(0.0);
+            gl_FragColor = (alphaSum > 0.0) ? vec4(uColor * uAlpha, uAlpha) : vec4(0.0);
         }
     )";
 
 static const char DROPSHADOW_SPREAD_THICK_FRAGMENT_SHADER[] = R"(
-    #version 100
+        #version 100
         precision highp float;
         uniform sampler2D uTextureInput;
         uniform vec3 uColor;
@@ -58,22 +60,24 @@ static const char DROPSHADOW_SPREAD_THICK_FRAGMENT_SHADER[] = R"(
 
         varying vec2 vertexColor;
 
-        float PI = 3.1415926535;
+        const float PI = 3.1415926535;
+        const float AlphaFloor = 0.7;
 
         void main()
         {
-            float alphaSum = texture2D(uTextureInput, vertexColor).a;
+            vec4 srcColor = texture2D(uTextureInput, vertexColor);
+            float alphaSum = floor(srcColor.a + AlphaFloor);
             for (float i = 0.0; i <= 180.0; i += 5.625) {
                 float arc = i * PI / 180.0;
                 float measureX = cos(arc) * uSize.x;
                 float measureY = sqrt(pow(uSize.x, 2.0) - pow(measureX, 2.0)) * uSize.y / uSize.x;
-                alphaSum += texture2D(uTextureInput, vertexColor + vec2(measureX, measureY)).a;
-                alphaSum += texture2D(uTextureInput, vertexColor + vec2(measureX, -measureY)).a;
-                alphaSum += texture2D(uTextureInput, vertexColor + vec2(measureX / 2.0, measureY / 2.0)).a;
-                alphaSum += texture2D(uTextureInput, vertexColor + vec2(measureX / 2.0, -measureY / 2.0)).a;
+                alphaSum += floor(texture2D(uTextureInput, vertexColor + vec2(measureX, measureY)).a + AlphaFloor);
+                alphaSum += floor(texture2D(uTextureInput, vertexColor + vec2(measureX, -measureY)).a + AlphaFloor);
+                alphaSum += floor(texture2D(uTextureInput, vertexColor + vec2(measureX / 2.0, measureY / 2.0)).a + AlphaFloor);
+                alphaSum += floor(texture2D(uTextureInput, vertexColor + vec2(measureX / 2.0, -measureY / 2.0)).a + AlphaFloor);
             }
 
-            gl_FragColor = (alphaSum > 1.0) ? vec4(uColor, uAlpha) : vec4(0.0);
+            gl_FragColor = (alphaSum > 0.0) ? vec4(uColor * uAlpha, uAlpha) : vec4(0.0);
         }
     )";
 
