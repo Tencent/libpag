@@ -419,6 +419,9 @@ const createPAGView = async (file: File | ArrayBuffer | Blob) => {
     audioEl.stop();
     audioEl.play();
   });
+  pagView.addListener(types.PAGViewListenerEvent.onAnimationUpdate, (event) => {
+    console.log('onAnimationUpdate', event);
+  });
   let lastProgress = 0;
   let lastFlushedTime = 0;
   let flushCount = 0; // Every 3 times update FPSinfo.
