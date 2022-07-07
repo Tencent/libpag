@@ -70,7 +70,10 @@ export class PAGView {
     pagView.player.setSurface(pagView.pagSurface);
     pagView.player.setComposition(file);
     pagView.setProgress(0);
-    if (pagView.pagViewOptions.firstFrame) await pagView.flush();
+    if (pagView.pagViewOptions.firstFrame) {
+      await pagView.flush();
+      pagView.currentFrame = 0;
+    }
     return pagView;
   }
 
@@ -106,7 +109,7 @@ export class PAGView {
   private canvasContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null | undefined;
   private rawWidth = 0;
   private rawHeight = 0;
-  private currentFrame = 0;
+  private currentFrame = -1;
   private frameRate = 0;
   private pagViewOptions: PAGViewOptions = {
     useScale: true,
@@ -147,6 +150,9 @@ export class PAGView {
       this.eventManager.emit(PAGViewListenerEvent.onAnimationStart, this);
     }
     this.eventManager.emit(PAGViewListenerEvent.onAnimationPlay, this);
+    if (this.currentFrame === 0) {
+      this.eventManager.emit(PAGViewListenerEvent.onAnimationUpdate, this);
+    }
     this.isPlaying = true;
     this.startTime = performance.now() * 1000 - this.playTime;
     await this.flushLoop();
@@ -167,6 +173,7 @@ export class PAGView {
     this.clearTimer();
     this.playTime = 0;
     this.player.setProgress(0);
+    this.currentFrame = 0;
     await this.flush();
     this.isPlaying = false;
     if (notification) {
@@ -290,6 +297,7 @@ export class PAGView {
         this.canvasContext!.globalCompositeOperation = compositeOperation;
       }
     });
+    this.eventManager.emit(PAGViewListenerEvent.onAnimationUpdate, this);
     if (res) {
       this.eventManager.emit(PAGViewListenerEvent.onAnimationFlushed, this);
     }
@@ -386,6 +394,7 @@ export class PAGView {
       return;
     }
     if (this.repeatedTimes === count && this.currentFrame === currentFrame) {
+      this.eventManager.emit(PAGViewListenerEvent.onAnimationUpdate, this);
       return;
     }
     if (this.repeatedTimes < count) {
@@ -395,7 +404,6 @@ export class PAGView {
     await this.flush();
     this.currentFrame = currentFrame;
     this.repeatedTimes = count;
-    this.eventManager.emit(PAGViewListenerEvent.onAnimationUpdate, this);
   }
 
   private clearTimer(): void {
