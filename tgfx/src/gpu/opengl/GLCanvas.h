@@ -68,8 +68,7 @@ class GLCanvas : public Canvas {
 
   Rect clipLocalBounds(Rect localBounds);
 
-  void drawMask(const Rect& bounds, const Texture* mask, const Paint& paint,
-                bool appliedMatrix = true);
+  void drawMask(const Rect& bounds, const Texture* mask, const Paint& paint);
 
   void drawColorGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
                        const Font& font, const Paint& paint);

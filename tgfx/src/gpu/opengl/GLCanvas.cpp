@@ -283,8 +283,7 @@ void GLCanvas::fillPath(const Path& path, const Paint& paint) {
   drawMask(deviceBounds, maskTexture.get(), paint);
 }
 
-void GLCanvas::drawMask(const Rect& bounds, const Texture* mask, const Paint& paint,
-                        bool appliedMatrix) {
+void GLCanvas::drawMask(const Rect& bounds, const Texture* mask, const Paint& paint) {
   if (mask == nullptr) {
     return;
   }
@@ -292,23 +291,18 @@ void GLCanvas::drawMask(const Rect& bounds, const Texture* mask, const Paint& pa
   localMatrix.postScale(bounds.width(), bounds.height());
   localMatrix.postTranslate(bounds.x(), bounds.y());
   auto maskLocalMatrix = Matrix::I();
-  if (appliedMatrix) {
-    auto invert = Matrix::I();
-    if (!state->matrix.invert(&invert)) {
-      return;
-    }
-    localMatrix.postConcat(invert);
-    if (!localMatrix.invert(&invert)) {
-      return;
-    }
-    maskLocalMatrix.postConcat(invert);
-    maskLocalMatrix.postScale(static_cast<float>(mask->width()),
-                              static_cast<float>(mask->height()));
+  auto invert = Matrix::I();
+  if (!state->matrix.invert(&invert)) {
+    return;
   }
+  localMatrix.postConcat(invert);
+  if (!localMatrix.invert(&invert)) {
+    return;
+  }
+  maskLocalMatrix.postConcat(invert);
+  maskLocalMatrix.postScale(static_cast<float>(mask->width()), static_cast<float>(mask->height()));
   auto oldMatrix = state->matrix;
-  if (appliedMatrix) {
-    resetMatrix();
-  }
+  resetMatrix();
   GLPaint glPaint;
   if (!PaintToGLPaint(getContext(), paint, state->alpha, nullptr, &glPaint)) {
     return;
@@ -316,9 +310,7 @@ void GLCanvas::drawMask(const Rect& bounds, const Texture* mask, const Paint& pa
   glPaint.coverageFragmentProcessors.emplace_back(
       FragmentProcessor::MulInputByChildAlpha(TextureEffect::Make(mask, maskLocalMatrix)));
   draw(GLFillRectOp::Make(bounds, getViewMatrix(), localMatrix), std::move(glPaint));
-  if (appliedMatrix) {
-    setMatrix(oldMatrix);
-  }
+  setMatrix(oldMatrix);
 }
 
 void GLCanvas::drawGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
