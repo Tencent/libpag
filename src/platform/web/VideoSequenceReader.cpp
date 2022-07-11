@@ -42,11 +42,11 @@ VideoSequenceReader::VideoSequenceReader(std::shared_ptr<File> file, VideoSequen
       videoSequence->MP4Header = nullptr;
       std::vector<VideoFrame*> videoFrames;
       for (auto* frame : sequence->frames) {
-        if (videoFrames.size() > 0 && frame->isKeyframe) {
+        if (!videoFrames.empty() && frame->isKeyframe) {
           break;
         }
         auto* videoFrame = new VideoFrame(*frame);
-        videoFrame->frame = frame->frame + sequence->frames.size();
+        videoFrame->frame += static_cast<Frame>(sequence->frames.size());
         videoSequence->frames.emplace_back(videoFrame);
         videoFrames.emplace_back(videoFrame);
       }
