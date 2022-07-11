@@ -1,6 +1,6 @@
 import { VIDEO_DECODE_WAIT_FRAME } from '../constant';
 import { addListener, removeListener, removeAllListeners } from '../utils/video-listener';
-import { IS_WECHAT } from '../utils/ua';
+import { IPHONE, IS_WECHAT } from '../utils/ua';
 import { EmscriptenGL } from '../types';
 
 export interface TimeRange {
@@ -39,6 +39,10 @@ const playVideoElement = async (videoElement: HTMLVideoElement) => {
 };
 
 export class VideoReader {
+  public static isIOS = () => {
+    return IPHONE;
+  };
+
   private videoEl: HTMLVideoElement | null;
   private readonly frameRate: number;
   private lastFlush: number;
