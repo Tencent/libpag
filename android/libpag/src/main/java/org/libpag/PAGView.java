@@ -276,7 +276,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
             super.onAnimationEnd(animation);
             // Align with iOS platform, avoid triggering this method when stopping
             int repeatCount = ((ValueAnimator) animation).getRepeatCount();
-            if (repeatCount > 0 && (currentPlayTime / animation.getDuration() > repeatCount)) {
+            if (repeatCount >= 0 && (currentPlayTime / animation.getDuration() > repeatCount)) {
                 ArrayList<PAGViewListener> arrayList;
                 synchronized (PAGView.this) {
                     arrayList = new ArrayList<>(mViewListeners);
