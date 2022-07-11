@@ -38,7 +38,8 @@ bool DropShadowStyle::visibleAt(Frame layerFrame) const {
   return distanceValue > 0 || sizeValue > 0;
 }
 
-void DropShadowStyle::transformBounds(Rect* contentBounds, const Point& filterScale, Frame layerFrame) const {
+void DropShadowStyle::transformBounds(Rect* contentBounds, const Point& filterScale,
+                                      Frame layerFrame) const {
   auto angleValue = angle->getValueAt(layerFrame);
   auto distanceValue = distance->getValueAt(layerFrame);
   auto radians = DegreesToRadians(angleValue - 180);

@@ -61,10 +61,9 @@ void GaussianBlurFilterPass::onUpdateParams(tgfx::Context* context, const tgfx::
   auto gl = tgfx::GLFunctions::Get(context);
   gl->uniform2f(stepHandle, 0.5 / static_cast<float>(contentBounds.width()),
                 0.5 / static_cast<float>(contentBounds.height()));
-  gl->uniform2f(
-      offsetHandle,
-      (options & BlurOptions::Horizontal) != BlurOptions::None ? blurriness : 0,
-      (options & BlurOptions::Vertical) != BlurOptions::None ? blurriness : 0);
+  gl->uniform2f(offsetHandle,
+                (options & BlurOptions::Horizontal) != BlurOptions::None ? blurriness : 0,
+                (options & BlurOptions::Vertical) != BlurOptions::None ? blurriness : 0);
   gl->uniform1f(speciallyColorHandle, isSpeciallyColor);
   if (isSpeciallyColor) {
     gl->uniform4f(colorHandle, color.red, color.green, color.blue, color.alpha);

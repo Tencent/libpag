@@ -66,8 +66,7 @@ void DropShadowFilter::update(Frame frame, const tgfx::Rect& contentBounds,
   auto angle = layerStyle->angle->getValueAt(layerFrame);
   auto distance = layerStyle->distance->getValueAt(layerFrame);
   auto radians = DegreesToRadians(angle - 180);
-  offset = tgfx::Point::Make(cosf(radians) * distance,
-                             -sinf(radians) * distance);
+  offset = tgfx::Point::Make(cosf(radians) * distance, -sinf(radians) * distance);
   expendSize = DROPSHADOW_EXPEND_FACTOR;
 
   filterContentBounds = contentBounds;

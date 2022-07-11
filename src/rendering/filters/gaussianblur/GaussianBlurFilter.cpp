@@ -130,7 +130,7 @@ void GaussianBlurFilter::update(Frame frame, const tgfx::Rect& contentBounds,
   auto scale = blurParam.repeatEdgePixels ? tgfx::Point::Make(1.0, 1.0)
                                           : tgfx::Point::Make(1.0f + blurParam.expend * 2.0f,
                                                               1.0f + blurParam.expend * 2.0f);
-  
+
   for (int i = 0; i < blurParam.depth; i++) {
     filtersBounds[i].inputBounds = bounds;
     bounds = tgfx::Rect::MakeLTRB(
@@ -233,8 +233,11 @@ void GaussianBlurFilter::draw(tgfx::Context* context, const FilterSource* source
       filterTarget->vertexMatrix = target->vertexMatrix;
       filterTargetPtr = std::unique_ptr<FilterTarget>(filterTarget);
       if (!blurParam.repeatEdgePixels) {
-        offsetMatrix.postTranslate((blurParam.offset.x * source->scale.x - source->width * blurParam.expend) * filtersBoundsScale.x,
-                                   (blurParam.offset.y * source->scale.y - source->height * blurParam.expend) * filtersBoundsScale.y);
+        offsetMatrix.postTranslate(
+            (blurParam.offset.x * source->scale.x - source->width * blurParam.expend) *
+                filtersBoundsScale.x,
+            (blurParam.offset.y * source->scale.y - source->height * blurParam.expend) *
+                filtersBoundsScale.y);
       }
       PreConcatMatrix(filterTarget, offsetMatrix);
     } else {

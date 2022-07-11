@@ -39,10 +39,12 @@ void FastBlurEffect::transformBounds(Rect* contentBounds, const Point&, Frame la
   auto direction = blurDimensions->getValueAt(layerFrame);
   auto expandX = (direction == BlurDimensionsDirection::All ||
                   direction == BlurDimensionsDirection::Horizontal)
-                     ? contentBounds->width() * BLUR_EXPEND : 0.0;
+                     ? contentBounds->width() * BLUR_EXPEND
+                     : 0.0;
   auto expandY =
       (direction == BlurDimensionsDirection::All || direction == BlurDimensionsDirection::Vertical)
-          ? contentBounds->height() * BLUR_EXPEND : 0.0;
+          ? contentBounds->height() * BLUR_EXPEND
+          : 0.0;
   contentBounds->outset(expandX, expandY);
 }
 
