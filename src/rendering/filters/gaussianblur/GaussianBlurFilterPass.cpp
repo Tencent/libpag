@@ -42,24 +42,33 @@ void GaussianBlurFilterPass::onPrepareProgram(tgfx::Context* context, unsigned i
   auto gl = tgfx::GLFunctions::Get(context);
   stepHandle = gl->getUniformLocation(program, "uStep");
   offsetHandle = gl->getUniformLocation(program, "uOffset");
+  speciallyColorHandle = gl->getUniformLocation(program, "uSpeciallyColor");
+  colorHandle = gl->getUniformLocation(program, "uColor");
 }
 
 void GaussianBlurFilterPass::updateParams(float blurValue, float scaleValue,
-                                          bool isExpendBoundsValue) {
+                                          bool isExpendBoundsValue, bool isSpeciallyColorValue,
+                                          const tgfx::Color& colorValue) {
   blurriness = blurValue;
   scale = scaleValue;
   isExpendBounds = isExpendBoundsValue;
+  isSpeciallyColor = isSpeciallyColorValue;
+  color = colorValue;
 }
 
 void GaussianBlurFilterPass::onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
-                                            const tgfx::Point& filterScale) {
+                                            const tgfx::Point&) {
   auto gl = tgfx::GLFunctions::Get(context);
   gl->uniform2f(stepHandle, 0.5 / static_cast<float>(contentBounds.width()),
                 0.5 / static_cast<float>(contentBounds.height()));
   gl->uniform2f(
       offsetHandle,
-      (options & BlurOptions::Horizontal) != BlurOptions::None ? blurriness * filterScale.x : 0,
-      (options & BlurOptions::Vertical) != BlurOptions::None ? blurriness * filterScale.y : 0);
+      (options & BlurOptions::Horizontal) != BlurOptions::None ? blurriness : 0,
+      (options & BlurOptions::Vertical) != BlurOptions::None ? blurriness : 0);
+  gl->uniform1f(speciallyColorHandle, isSpeciallyColor);
+  if (isSpeciallyColor) {
+    gl->uniform4f(colorHandle, color.red, color.green, color.blue, color.alpha);
+  }
 }
 
 std::vector<tgfx::Point> GaussianBlurFilterPass::computeVertices(const tgfx::Rect& inputBounds,
@@ -74,8 +83,8 @@ std::vector<tgfx::Point> GaussianBlurFilterPass::computeVertices(const tgfx::Rec
                                  {outputBounds.left, outputBounds.top},
                                  {outputBounds.right, outputBounds.top}};
 
-  auto expendX = (outputBounds.left - inputBounds.left) * scale;
-  auto expendY = (outputBounds.top - inputBounds.top) * scale;
+  auto expendX = (outputBounds.left - inputBounds.left) * scale * filterScale.x;
+  auto expendY = (outputBounds.top - inputBounds.top) * scale * filterScale.y;
 
   tgfx::Point texturePoints[4] = {{expendX, inputBounds.height() - expendY},
                                   {inputBounds.width() - expendX, inputBounds.height() - expendY},

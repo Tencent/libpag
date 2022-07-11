@@ -27,7 +27,8 @@ class GaussianBlurFilterPass : public LayerFilter {
   explicit GaussianBlurFilterPass(BlurOptions options);
   ~GaussianBlurFilterPass() override = default;
 
-  void updateParams(float blurValue, float scale, bool isExpendBoundsValue);
+  void updateParams(float blurValue, float scaleValue, bool isExpendBoundsValue,
+                    bool isSpeciallyColorValue, const tgfx::Color& colorValue);
 
  protected:
   std::string onBuildFragmentShader() override;
@@ -44,10 +45,14 @@ class GaussianBlurFilterPass : public LayerFilter {
  private:
   int stepHandle = -1;
   int offsetHandle = -1;
+  int speciallyColorHandle = -1;
+  int colorHandle = -1;
 
   BlurOptions options = BlurOptions::None;
   float blurriness = 0.0;
   float scale = 1.0;
   bool isExpendBounds = false;
+  bool isSpeciallyColor = false;
+  tgfx::Color color = tgfx::Color::Transparent();
 };
 }  // namespace pag

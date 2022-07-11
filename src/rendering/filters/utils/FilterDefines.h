@@ -18,35 +18,24 @@
 
 #pragma once
 
-#include "SinglePassBlurFilter.h"
-#include "rendering/filters/LayerFilter.h"
-#include "rendering/filters/utils/FilterBuffer.h"
-
 namespace pag {
-class GaussBlurFilter : public LayerFilter {
- public:
-  explicit GaussBlurFilter(Effect* effect);
-  ~GaussBlurFilter() override;
 
-  bool initialize(tgfx::Context* context) override;
+#define BLUR_LIMIT_BLURRINESS (40.0f)
+#define BLUR_MODE_PIC_MAX_RADIUS (16.0f)
+#define BLUR_MODE_PIC_MAX_LEVEL (3.0f)
+#define BLUR_MODE_SHADOW_MAX_RADIUS (16.0f)
+#define BLUR_MODE_SHADOW_MAX_LEVEL (3.0f)
+#define DROPSHADOW_MAX_SPREAD_SIZE (25.0f)
+#define DROPSHADOW_SPREAD_MIN_THICK_SIZE (12.0f)
+#define DROPSHADOW_EXPEND_FACTOR (1.1f)
 
-  void draw(tgfx::Context* context, const FilterSource* source,
-            const FilterTarget* target) override;
-
-  void update(Frame frame, const tgfx::Rect& contentBounds, const tgfx::Rect& transformedBounds,
-              const tgfx::Point& filterScale) override;
-
- private:
-  Effect* effect = nullptr;
-
-  SinglePassBlurFilter* blurFilterH = nullptr;
-  SinglePassBlurFilter* blurFilterV = nullptr;
-
-  std::shared_ptr<FilterBuffer> blurFilterBuffer = nullptr;
-
-  bool repeatEdge = true;
-  BlurDirection blurDirection = BlurDirection::Both;
-  float blurriness = 0.0f;
-  std::vector<tgfx::Rect> filtersBounds = {};
+enum class BlurMode {
+  Picture = 0,
+  Shadow = 1,
+};
+enum class BlurDirection {
+  Both = 0,
+  Vertical = 1,
+  Horizontal = 2,
 };
 }  // namespace pag

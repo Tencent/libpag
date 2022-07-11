@@ -18,7 +18,7 @@
 
 #include "DropShadowSpreadFilter.h"
 #include "base/utils/TGFXCast.h"
-#include "rendering/filters/utils/BlurTypes.h"
+#include "rendering/filters/utils/FilterDefines.h"
 
 namespace pag {
 static const char DROPSHADOW_SPREAD_FRAGMENT_SHADER[] = R"(
@@ -31,25 +31,35 @@ static const char DROPSHADOW_SPREAD_FRAGMENT_SHADER[] = R"(
 
         varying vec2 vertexColor;
 
-        float PI = 3.1415926535;
-
+        const float PI = 3.1415926535;
+        const float AlphaFloor = 0.7;
+    
+        float check(vec2 point) {
+            vec2 result = clamp(vec2(1.0) - abs(floor(point)), 0.0, 1.0);
+            return result.x * result.y;
+        }
+    
         void main()
         {
-            float alphaSum = texture2D(uTextureInput, vertexColor).a;
+            vec2 point = vertexColor;
+            vec4 srcColor = texture2D(uTextureInput, point);
+            float alphaSum = floor(srcColor.a * check(point) + AlphaFloor);
             for (float i = 0.0; i <= 180.0; i += 11.25) {
                 float arc = i * PI / 180.0;
                 float measureX = cos(arc) * uSize.x;
                 float measureY = sqrt(pow(uSize.x, 2.0) - pow(measureX, 2.0)) * uSize.y / uSize.x;
-                alphaSum += texture2D(uTextureInput, vertexColor + vec2(measureX, measureY)).a;
-                alphaSum += texture2D(uTextureInput, vertexColor + vec2(measureX, -measureY)).a;
+                point = vertexColor + vec2(measureX, measureY);
+                alphaSum += floor(texture2D(uTextureInput, point).a * check(point) + AlphaFloor);
+                point = vertexColor + vec2(measureX, -measureY);
+                alphaSum += floor(texture2D(uTextureInput, point).a * check(point) + AlphaFloor);
             }
 
-            gl_FragColor = (alphaSum > 0.0) ? vec4(uColor, uAlpha) : vec4(0.0);
+            gl_FragColor = (alphaSum > 0.0) ? vec4(uColor * uAlpha, uAlpha) : vec4(0.0);
         }
     )";
 
 static const char DROPSHADOW_SPREAD_THICK_FRAGMENT_SHADER[] = R"(
-    #version 100
+        #version 100
         precision highp float;
         uniform sampler2D uTextureInput;
         uniform vec3 uColor;
@@ -58,22 +68,34 @@ static const char DROPSHADOW_SPREAD_THICK_FRAGMENT_SHADER[] = R"(
 
         varying vec2 vertexColor;
 
-        float PI = 3.1415926535;
-
+        const float PI = 3.1415926535;
+        const float AlphaFloor = 0.7;
+    
+        float check(vec2 point) {
+            vec2 result = clamp(vec2(1.0) - abs(floor(point)), 0.0, 1.0);
+            return result.x * result.y;
+        }
+    
         void main()
         {
-            float alphaSum = texture2D(uTextureInput, vertexColor).a;
+            vec2 point = vertexColor;
+            vec4 srcColor = texture2D(uTextureInput, point);
+            float alphaSum = floor(srcColor.a * check(point) + AlphaFloor);
             for (float i = 0.0; i <= 180.0; i += 5.625) {
                 float arc = i * PI / 180.0;
                 float measureX = cos(arc) * uSize.x;
                 float measureY = sqrt(pow(uSize.x, 2.0) - pow(measureX, 2.0)) * uSize.y / uSize.x;
-                alphaSum += texture2D(uTextureInput, vertexColor + vec2(measureX, measureY)).a;
-                alphaSum += texture2D(uTextureInput, vertexColor + vec2(measureX, -measureY)).a;
-                alphaSum += texture2D(uTextureInput, vertexColor + vec2(measureX / 2.0, measureY / 2.0)).a;
-                alphaSum += texture2D(uTextureInput, vertexColor + vec2(measureX / 2.0, -measureY / 2.0)).a;
+                point = vertexColor + vec2(measureX, measureY);
+                alphaSum += floor(texture2D(uTextureInput, point).a * check(point) + AlphaFloor);
+                point = vertexColor + vec2(measureX, -measureY);
+                alphaSum += floor(texture2D(uTextureInput, point).a * check(point) + AlphaFloor);
+                point = vertexColor + vec2(measureX / 2.0, measureY / 2.0);
+                alphaSum += floor(texture2D(uTextureInput, point).a * check(point) + AlphaFloor);
+                point = vertexColor + vec2(measureX / 2.0, -measureY / 2.0);
+                alphaSum += floor(texture2D(uTextureInput, point).a * check(point) + AlphaFloor);
             }
 
-            gl_FragColor = (alphaSum > 0.0) ? vec4(uColor, uAlpha) : vec4(0.0);
+            gl_FragColor = (alphaSum > 0.0) ? vec4(uColor * uAlpha, uAlpha) : vec4(0.0);
         }
     )";
 
@@ -101,7 +123,6 @@ void DropShadowSpreadFilter::onUpdateParams(tgfx::Context* context, const tgfx::
   auto alpha = ToAlpha(layerStyle->opacity->getValueAt(layerFrame));
   auto spread = layerStyle->spread->getValueAt(layerFrame);
   auto size = layerStyle->size->getValueAt(layerFrame);
-  spread *= (spread == 1.0) ? 1.0 : 0.8;
 
   auto spreadSizeX = size * spread * filterScale.x;
   auto spreadSizeY = size * spread * filterScale.y;
@@ -114,7 +135,7 @@ void DropShadowSpreadFilter::onUpdateParams(tgfx::Context* context, const tgfx::
                 spreadSizeY / contentBounds.height());
 }
 
-std::vector<tgfx::Point> DropShadowSpreadFilter::computeVertices(const tgfx::Rect&,
+std::vector<tgfx::Point> DropShadowSpreadFilter::computeVertices(const tgfx::Rect& inputBounds,
                                                                  const tgfx::Rect& outputBounds,
                                                                  const tgfx::Point& filterScale) {
   std::vector<tgfx::Point> vertices = {};
@@ -123,10 +144,8 @@ std::vector<tgfx::Point> DropShadowSpreadFilter::computeVertices(const tgfx::Rec
                                  {outputBounds.left, outputBounds.top},
                                  {outputBounds.right, outputBounds.top}};
 
-  auto spread = layerStyle->spread->getValueAt(layerFrame);
-  auto size = layerStyle->size->getValueAt(layerFrame);
-  auto deltaX = -size * spread * filterScale.x;
-  auto deltaY = -size * spread * filterScale.y;
+  auto deltaX = -inputBounds.width() * DROPSHADOW_EXPEND_FACTOR * filterScale.x;
+  auto deltaY = -inputBounds.height() * DROPSHADOW_EXPEND_FACTOR * filterScale.y;
 
   tgfx::Point texturePoints[4] = {
       {deltaX, (outputBounds.height() + deltaY)},

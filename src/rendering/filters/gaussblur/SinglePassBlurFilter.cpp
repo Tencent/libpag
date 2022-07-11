@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SinglePassBlurFilter.h"
-#include "rendering/filters/utils/BlurTypes.h"
+#include "rendering/filters/utils/FilterDefines.h"
 
 namespace pag {
 static const char BLUR_FRAGMENT_SHADER[] = R"(

@@ -31,8 +31,7 @@ bool FastBlurEffect::visibleAt(Frame layerFrame) const {
   return blurriness->getValueAt(layerFrame) != 0;
 }
 
-void FastBlurEffect::transformBounds(Rect* contentBounds, const Point& filterScale,
-                                     Frame layerFrame) const {
+void FastBlurEffect::transformBounds(Rect* contentBounds, const Point&, Frame layerFrame) const {
   auto repeatEdge = repeatEdgePixels->getValueAt(layerFrame);
   if (repeatEdge) {
     return;
@@ -40,12 +39,10 @@ void FastBlurEffect::transformBounds(Rect* contentBounds, const Point& filterSca
   auto direction = blurDimensions->getValueAt(layerFrame);
   auto expandX = (direction == BlurDimensionsDirection::All ||
                   direction == BlurDimensionsDirection::Horizontal)
-                     ? contentBounds->width() * BLUR_EXPEND * filterScale.x
-                     : 0.0;
+                     ? contentBounds->width() * BLUR_EXPEND : 0.0;
   auto expandY =
       (direction == BlurDimensionsDirection::All || direction == BlurDimensionsDirection::Vertical)
-          ? contentBounds->height() * BLUR_EXPEND * filterScale.x
-          : 0.0;
+          ? contentBounds->height() * BLUR_EXPEND : 0.0;
   contentBounds->outset(expandX, expandY);
 }
 

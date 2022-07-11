@@ -19,28 +19,31 @@
 #include "DropShadowFilter.h"
 #include "base/utils/MathUtil.h"
 #include "base/utils/TGFXCast.h"
+#include "rendering/filters/utils/FilterDefines.h"
 #include "rendering/filters/utils/FilterHelper.h"
 
 namespace pag {
 DropShadowFilter::DropShadowFilter(DropShadowStyle* layerStyle) : layerStyle(layerStyle) {
-  blurFilterV = new SinglePassBlurFilter(BlurDirection::Vertical);
-  blurFilterH = new SinglePassBlurFilter(BlurDirection::Horizontal);
+  blurEffect = new FastBlurEffect();
+  blurEffect->repeatEdgePixels = new Property<bool>;
+  blurEffect->blurDimensions = new Property<Enum>;
+  blurEffect->blurriness = new Property<float>;
+  blurEffect->repeatEdgePixels->value = false;
+  blurEffect->blurDimensions->value = BlurDimensionsDirection::All;
+  blurFilter = new GaussianBlurFilter(blurEffect);
   spreadFilter = new DropShadowSpreadFilter(layerStyle, DropShadowStyleMode::Normal);
   spreadThickFilter = new DropShadowSpreadFilter(layerStyle, DropShadowStyleMode::Thick);
 }
 
 DropShadowFilter::~DropShadowFilter() {
-  delete blurFilterV;
-  delete blurFilterH;
+  delete blurEffect;
+  delete blurFilter;
   delete spreadFilter;
   delete spreadThickFilter;
 }
 
 bool DropShadowFilter::initialize(tgfx::Context* context) {
-  if (!blurFilterV->initialize(context)) {
-    return false;
-  }
-  if (!blurFilterH->initialize(context)) {
+  if (!blurFilter->initialize(context)) {
     return false;
   }
   if (!spreadFilter->initialize(context)) {
@@ -57,21 +60,61 @@ void DropShadowFilter::update(Frame frame, const tgfx::Rect& contentBounds,
   LayerFilter::update(frame, contentBounds, transformedBounds, filterScale);
 
   color = ToTGFX(layerStyle->color->getValueAt(layerFrame));
-  alpha = ToAlpha(layerStyle->opacity->getValueAt(layerFrame));
+  color.alpha = ToAlpha(layerStyle->opacity->getValueAt(layerFrame));
   spread = layerStyle->spread->getValueAt(layerFrame);
-  auto size = layerStyle->size->getValueAt(layerFrame);
-  spread *= (spread == 1.0) ? 1.0 : 0.8;
-  blurSize = (1.0f - spread) * size;
-  spreadSize = size * spread;
+  size = layerStyle->size->getValueAt(layerFrame);
+  auto angle = layerStyle->angle->getValueAt(layerFrame);
+  auto distance = layerStyle->distance->getValueAt(layerFrame);
+  auto radians = DegreesToRadians(angle - 180);
+  offset = tgfx::Point::Make(cosf(radians) * distance,
+                             -sinf(radians) * distance);
+  expendSize = DROPSHADOW_EXPEND_FACTOR;
 
-  filtersBounds.clear();
-  filtersBounds.emplace_back(contentBounds);
+  filterContentBounds = contentBounds;
+  auto filterTransformedBounds = contentBounds;
+  filterTransformedBounds.outset(contentBounds.width() * expendSize * filterScale.x,
+                                 contentBounds.height() * expendSize * filterScale.y);
+  filterNotFullSpreadBounds = filterTransformedBounds;
+  filterTransformedBounds.offset(offset.x * filterScale.x, offset.y * filterScale.y);
+  filterTransformedBounds.roundOut();
+
   if (spread == 0.0f) {
-    updateParamModeNotSpread(frame, contentBounds, transformedBounds, filterScale);
+    updateParamModeNotSpread(frame, contentBounds, filterTransformedBounds, filterScale);
   } else if (spread == 1.0f) {
-    updateParamModeFullSpread(frame, contentBounds, transformedBounds, filterScale);
+    updateParamModeFullSpread(frame, contentBounds, filterTransformedBounds, filterScale);
   } else {
-    updateParamModeNotFullSpread(frame, contentBounds, transformedBounds, filterScale);
+    updateParamModeNotFullSpread(frame, contentBounds, filterTransformedBounds, filterScale);
+  }
+}
+
+void DropShadowFilter::updateParamModeNotSpread(Frame frame, const tgfx::Rect& contentBounds,
+                                                const tgfx::Rect& transformedBounds,
+                                                const tgfx::Point& filterScale) {
+  blurEffect->blurriness->value = size * 0.8 * (filterScale.x + filterScale.y);
+  blurFilter->updateParams(expendSize, offset, true, color);
+  blurFilter->update(frame, contentBounds, transformedBounds, filterScale);
+}
+
+void DropShadowFilter::updateParamModeNotFullSpread(Frame frame, const tgfx::Rect& contentBounds,
+                                                    const tgfx::Rect& transformedBounds,
+                                                    const tgfx::Point& filterScale) {
+  if (size < DROPSHADOW_SPREAD_MIN_THICK_SIZE) {
+    spreadFilter->update(frame, contentBounds, filterNotFullSpreadBounds, filterScale);
+  } else {
+    spreadThickFilter->update(frame, contentBounds, filterNotFullSpreadBounds, filterScale);
+  }
+  blurEffect->blurriness->value = size * 0.8 * (filterScale.x + filterScale.y);
+  blurFilter->updateParams(0.0, offset, true, color);
+  blurFilter->update(frame, filterNotFullSpreadBounds, transformedBounds, filterScale);
+}
+
+void DropShadowFilter::updateParamModeFullSpread(Frame frame, const tgfx::Rect& contentBounds,
+                                                 const tgfx::Rect& transformedBounds,
+                                                 const tgfx::Point& filterScale) {
+  if (size < DROPSHADOW_SPREAD_MIN_THICK_SIZE) {
+    spreadFilter->update(frame, contentBounds, transformedBounds, filterScale);
+  } else {
+    spreadThickFilter->update(frame, contentBounds, transformedBounds, filterScale);
   }
 }
 
@@ -89,124 +132,24 @@ void DropShadowFilter::draw(tgfx::Context* context, const FilterSource* source,
   }
 }
 
-void DropShadowFilter::updateParamModeNotSpread(Frame frame, const tgfx::Rect& contentBounds,
-                                                const tgfx::Rect&, const tgfx::Point& filterScale) {
-  auto angle = layerStyle->angle->getValueAt(layerFrame);
-  auto distance = layerStyle->distance->getValueAt(layerFrame);
-  auto radians = DegreesToRadians(angle - 180);
-  float offsetY = -sinf(radians) * distance;
-  float offsetX = cosf(radians) * distance;
-
-  auto filterVBounds = contentBounds;
-  filterVBounds.offset(0, offsetY * filterScale.y);
-  filterVBounds.outset(0, blurSize * filterScale.y);
-  filterVBounds.roundOut();
-  blurFilterV->update(frame, contentBounds, filterVBounds, filterScale);
-  filtersBounds.emplace_back(filterVBounds);
-  auto filterHBounds = filterVBounds;
-  filterHBounds.offset(offsetX * filterScale.x, 0);
-  filterHBounds.outset(blurSize * filterScale.x, 0);
-  filterHBounds.roundOut();
-  blurFilterH->update(frame, filterVBounds, filterHBounds, filterScale);
-  filtersBounds.emplace_back(filterHBounds);
-}
-
-void DropShadowFilter::updateParamModeNotFullSpread(Frame frame, const tgfx::Rect& contentBounds,
-                                                    const tgfx::Rect&,
-                                                    const tgfx::Point& filterScale) {
-  auto angle = layerStyle->angle->getValueAt(layerFrame);
-  auto distance = layerStyle->distance->getValueAt(layerFrame);
-  auto radians = DegreesToRadians(angle - 180);
-  float offsetY = -sinf(radians) * distance;
-  float offsetX = cosf(radians) * distance;
-
-  auto filterBounds = contentBounds;
-  filterBounds.outset(spreadSize * filterScale.x, spreadSize * filterScale.y);
-  filterBounds.roundOut();
-  if (spreadSize < DROPSHADOW_SPREAD_MIN_THICK_SIZE) {
-    spreadFilter->update(frame, contentBounds, filterBounds, filterScale);
-  } else {
-    spreadThickFilter->update(frame, contentBounds, filterBounds, filterScale);
-  }
-  filtersBounds.emplace_back(filterBounds);
-  auto lastBounds = filterBounds;
-  filterBounds.offset(0, offsetY * filterScale.y);
-  filterBounds.outset(0, blurSize * filterScale.y);
-  blurFilterV->update(frame, lastBounds, filterBounds, filterScale);
-  filterBounds.roundOut();
-  filtersBounds.emplace_back(filterBounds);
-  lastBounds = filterBounds;
-  filterBounds.offset(offsetX * filterScale.x, 0);
-  filterBounds.outset(blurSize * filterScale.x, 0);
-  blurFilterH->update(frame, lastBounds, filterBounds, filterScale);
-  filtersBounds.emplace_back(filterBounds);
-}
-
-void DropShadowFilter::updateParamModeFullSpread(Frame frame, const tgfx::Rect& contentBounds,
-                                                 const tgfx::Rect&,
-                                                 const tgfx::Point& filterScale) {
-  auto angle = layerStyle->angle->getValueAt(layerFrame);
-  auto distance = layerStyle->distance->getValueAt(layerFrame);
-  auto radians = DegreesToRadians(angle - 180);
-  float offsetY = -sinf(radians) * distance;
-  float offsetX = cosf(radians) * distance;
-
-  auto filterBounds = contentBounds;
-  filterBounds.outset(spreadSize * filterScale.x, spreadSize * filterScale.y);
-  filterBounds.offset(offsetX * filterScale.x, offsetY * filterScale.y);
-  filterBounds.roundOut();
-  if (spreadSize < DROPSHADOW_SPREAD_MIN_THICK_SIZE) {
-    spreadFilter->update(frame, contentBounds, filterBounds, filterScale);
-  } else {
-    spreadThickFilter->update(frame, contentBounds, filterBounds, filterScale);
-  }
-  filtersBounds.emplace_back(filterBounds);
-}
-
 void DropShadowFilter::onDrawModeNotSpread(tgfx::Context* context, const FilterSource* source,
                                            const FilterTarget* target) {
-  auto contentBounds = filtersBounds[0];
-  auto filterBounds = filtersBounds[1];
-  auto targetWidth = static_cast<int>(ceilf(filterBounds.width() * source->scale.x));
-  auto targetHeight = static_cast<int>(ceilf(filterBounds.height() * source->scale.y));
-  if (blurFilterBuffer == nullptr || blurFilterBuffer->width() != targetWidth ||
-      blurFilterBuffer->height() != targetHeight) {
-    blurFilterBuffer = FilterBuffer::Make(context, targetWidth, targetHeight);
+  blurFilter->draw(context, source, target);
+}
+
+void DropShadowFilter::onDrawModeFullSpread(tgfx::Context* context, const FilterSource* source,
+                                            const FilterTarget* target) {
+  if (size < DROPSHADOW_SPREAD_MIN_THICK_SIZE) {
+    spreadFilter->draw(context, source, target);
+  } else {
+    spreadThickFilter->draw(context, source, target);
   }
-  if (blurFilterBuffer == nullptr) {
-    return;
-  }
-  blurFilterBuffer->clearColor();
-
-  auto offsetMatrix =
-      tgfx::Matrix::MakeTrans((contentBounds.left - filterBounds.left) * source->scale.x,
-                              (contentBounds.top - filterBounds.top) * source->scale.y);
-  auto targetV = blurFilterBuffer->toFilterTarget(offsetMatrix);
-
-  blurFilterV->updateParams(blurSize, 1.0, false, BlurMode::Shadow);
-  blurFilterV->enableBlurColor(color);
-  blurFilterV->draw(context, source, targetV.get());
-  blurFilterV->disableBlurColor();
-
-  auto sourceH = blurFilterBuffer->toFilterSource(source->scale);
-
-  blurFilterH->updateParams(blurSize, alpha, false, BlurMode::Shadow);
-  tgfx::Matrix revertMatrix =
-      tgfx::Matrix::MakeTrans((filterBounds.left - contentBounds.left) * source->scale.x,
-                              (filterBounds.top - contentBounds.top) * source->scale.y);
-
-  auto targetH = *target;
-  PreConcatMatrix(&targetH, revertMatrix);
-  blurFilterH->draw(context, sourceH.get(), &targetH);
 }
 
 void DropShadowFilter::onDrawModeNotFullSpread(tgfx::Context* context, const FilterSource* source,
                                                const FilterTarget* target) {
-  auto contentBounds = filtersBounds[0];
-  auto lastBounds = contentBounds;
-  auto filterBounds = filtersBounds[1];
-  auto targetWidth = static_cast<int>(ceilf(filterBounds.width() * source->scale.x));
-  auto targetHeight = static_cast<int>(ceilf(filterBounds.height() * source->scale.y));
+  auto targetWidth = static_cast<int>(ceilf(filterNotFullSpreadBounds.width() * source->scale.x));
+  auto targetHeight = static_cast<int>(ceilf(filterNotFullSpreadBounds.height() * source->scale.y));
   if (spreadFilterBuffer == nullptr || spreadFilterBuffer->width() != targetWidth ||
       spreadFilterBuffer->height() != targetHeight) {
     spreadFilterBuffer = FilterBuffer::Make(context, targetWidth, targetHeight);
@@ -215,51 +158,27 @@ void DropShadowFilter::onDrawModeNotFullSpread(tgfx::Context* context, const Fil
     return;
   }
   spreadFilterBuffer->clearColor();
-  auto offsetMatrix =
-      tgfx::Matrix::MakeTrans((lastBounds.left - filterBounds.left) * source->scale.x,
-                              (lastBounds.top - filterBounds.top) * source->scale.y);
+  auto offsetMatrix = tgfx::Matrix::MakeTrans(
+      (filterContentBounds.left - filterNotFullSpreadBounds.left) * source->scale.x,
+      (filterContentBounds.top - filterNotFullSpreadBounds.top) * source->scale.y);
   auto targetSpread = spreadFilterBuffer->toFilterTarget(offsetMatrix);
-  if (spreadSize < DROPSHADOW_SPREAD_MIN_THICK_SIZE) {
+  if (size < DROPSHADOW_SPREAD_MIN_THICK_SIZE) {
     spreadFilter->draw(context, source, targetSpread.get());
   } else {
     spreadThickFilter->draw(context, source, targetSpread.get());
   }
 
-  auto sourceV = spreadFilterBuffer->toFilterSource(source->scale);
-  lastBounds = filterBounds;
-  filterBounds = filtersBounds[2];
-  targetWidth = static_cast<int>(ceilf(filterBounds.width() * source->scale.x));
-  targetHeight = static_cast<int>(ceilf(filterBounds.height() * source->scale.y));
-  if (blurFilterBuffer == nullptr || blurFilterBuffer->width() != targetWidth ||
-      blurFilterBuffer->height() != targetHeight) {
-    blurFilterBuffer = FilterBuffer::Make(context, targetWidth, targetHeight);
-  }
-  if (blurFilterBuffer == nullptr) {
-    return;
-  }
-  blurFilterBuffer->clearColor();
-  offsetMatrix = tgfx::Matrix::MakeTrans((lastBounds.left - filterBounds.left) * source->scale.x,
-                                         (lastBounds.top - filterBounds.top) * source->scale.y);
-  auto targetV = blurFilterBuffer->toFilterTarget(offsetMatrix);
-  blurFilterV->updateParams(blurSize, 1.0, false, BlurMode::Shadow);
-  blurFilterV->draw(context, sourceV.get(), targetV.get());
-
-  auto sourceH = blurFilterBuffer->toFilterSource(source->scale);
-  tgfx::Matrix revertMatrix =
-      tgfx::Matrix::MakeTrans((filterBounds.left - contentBounds.left) * source->scale.x,
-                              (filterBounds.top - contentBounds.top) * source->scale.y);
-  auto targetH = *target;
-  PreConcatMatrix(&targetH, revertMatrix);
-  blurFilterH->updateParams(blurSize, alpha, false, BlurMode::Shadow);
-  blurFilterH->draw(context, sourceH.get(), &targetH);
-}
-
-void DropShadowFilter::onDrawModeFullSpread(tgfx::Context* context, const FilterSource* source,
-                                            const FilterTarget* target) {
-  if (spreadSize < DROPSHADOW_SPREAD_MIN_THICK_SIZE) {
-    spreadFilter->draw(context, source, target);
-  } else {
-    spreadThickFilter->draw(context, source, target);
-  }
+  auto sourceSpread = spreadFilterBuffer->toFilterSource(source->scale);
+  FilterTarget* filterTarget = new FilterTarget();
+  filterTarget->frameBuffer = target->frameBuffer;
+  filterTarget->width = target->width;
+  filterTarget->height = target->height;
+  filterTarget->vertexMatrix = target->vertexMatrix;
+  offsetMatrix = tgfx::Matrix::MakeTrans(
+      (filterNotFullSpreadBounds.left - filterContentBounds.left) * source->scale.x,
+      (filterNotFullSpreadBounds.top - filterContentBounds.top) * source->scale.y);
+  PreConcatMatrix(filterTarget, offsetMatrix);
+  blurFilter->draw(context, sourceSpread.get(), filterTarget);
+  delete filterTarget;
 }
 }  // namespace pag
