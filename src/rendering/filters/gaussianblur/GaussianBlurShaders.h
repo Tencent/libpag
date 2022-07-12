@@ -28,6 +28,8 @@ static const char BLUR_DOWN_FRAGMENT_SHADER[] = R"(
     
     uniform vec2 uStep;
     uniform vec2 uOffset;
+    uniform float uSpeciallyColor;
+    uniform vec4 uColor;
     
     float edge = 0.995;
     
@@ -44,8 +46,8 @@ static const char BLUR_DOWN_FRAGMENT_SHADER[] = R"(
         sum += texture2D(uTextureInput, clampEdge(vertexColor - vec2(uStep.x, -uStep.y) * uOffset));
 
         vec4 color = sum / 8.0;
-    
-        gl_FragColor = color;
+
+        gl_FragColor = vec4(mix(color.rgb, uColor.rgb * color.a, uSpeciallyColor), color.a) * mix(1.0, uColor.a, uSpeciallyColor);
     }
     )";
 
@@ -93,8 +95,8 @@ static const char BLUR_UP_FRAGMENT_SHADER_NO_REPEAT_EDGE[] = R"(
     uniform vec2 uOffset;
     
     float check(vec2 point) {
-        vec2 result = step(point, vec2(1.0)) * step(vec2(0.0), point);
-        return step(0.5, result.x * result.y);
+        vec2 result = clamp(vec2(1.0) - abs(floor(point)), 0.0, 1.0);
+        return result.x * result.y;
     }
     
     void main()

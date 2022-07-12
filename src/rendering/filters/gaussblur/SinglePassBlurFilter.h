@@ -19,7 +19,7 @@
 #pragma once
 
 #include "rendering/filters/LayerFilter.h"
-#include "rendering/filters/utils/BlurTypes.h"
+#include "rendering/filters/utils/FilterDefines.h"
 
 namespace pag {
 class SinglePassBlurFilter : public LayerFilter {
