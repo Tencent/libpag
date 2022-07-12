@@ -102,7 +102,7 @@ void DropShadowFilter::updateParamModeNotFullSpread(Frame frame, const tgfx::Rec
   } else {
     spreadThickFilter->update(frame, contentBounds, filterNotFullSpreadBounds, filterScale);
   }
-  blurEffect->blurriness->value = size * 0.8 * (filterScale.x + filterScale.y);
+  blurEffect->blurriness->value = size * 0.8 * (1.0 - spread) * (filterScale.x + filterScale.y);
   blurFilter->updateParams(0.0, offset, true, color);
   blurFilter->update(frame, filterNotFullSpreadBounds, transformedBounds, filterScale);
 }

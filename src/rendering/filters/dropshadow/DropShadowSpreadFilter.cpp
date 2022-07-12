@@ -79,7 +79,7 @@ static const char DROPSHADOW_SPREAD_THICK_FRAGMENT_SHADER[] = R"(
             vec2 point = vertexColor;
             vec4 srcColor = texture2D(uTextureInput, point);
             float alphaSum = srcColor.a * check(point);
-            for (float i = 0.0; i <= 180.0; i += 5.625) {
+            for (float i = 0.0; i <= 180.0; i += 11.25) {
                 float arc = i * PI / 180.0;
                 float measureX = cos(arc) * uSize.x;
                 float measureY = sqrt(pow(uSize.x, 2.0) - pow(measureX, 2.0)) * uSize.y / uSize.x;
