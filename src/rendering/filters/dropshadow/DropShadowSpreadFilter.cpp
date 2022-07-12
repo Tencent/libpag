@@ -32,26 +32,25 @@ static const char DROPSHADOW_SPREAD_FRAGMENT_SHADER[] = R"(
         varying vec2 vertexColor;
 
         const float PI = 3.1415926535;
-        const float AlphaFloor = 0.7;
     
         float check(vec2 point) {
-            vec2 result = clamp(vec2(1.0) - abs(floor(point)), 0.0, 1.0);
-            return result.x * result.y;
+            vec2 result = step(point, vec2(1.0)) * step(vec2(0.0), point);
+            return step(0.5, result.x * result.y);
         }
     
         void main()
         {
             vec2 point = vertexColor;
             vec4 srcColor = texture2D(uTextureInput, point);
-            float alphaSum = floor(srcColor.a * check(point) + AlphaFloor);
+            float alphaSum = srcColor.a * check(point);
             for (float i = 0.0; i <= 180.0; i += 11.25) {
                 float arc = i * PI / 180.0;
                 float measureX = cos(arc) * uSize.x;
                 float measureY = sqrt(pow(uSize.x, 2.0) - pow(measureX, 2.0)) * uSize.y / uSize.x;
                 point = vertexColor + vec2(measureX, measureY);
-                alphaSum += floor(texture2D(uTextureInput, point).a * check(point) + AlphaFloor);
+                alphaSum += texture2D(uTextureInput, point).a * check(point);
                 point = vertexColor + vec2(measureX, -measureY);
-                alphaSum += floor(texture2D(uTextureInput, point).a * check(point) + AlphaFloor);
+                alphaSum += texture2D(uTextureInput, point).a * check(point);
             }
 
             gl_FragColor = (alphaSum > 0.0) ? vec4(uColor * uAlpha, uAlpha) : vec4(0.0);
@@ -69,30 +68,29 @@ static const char DROPSHADOW_SPREAD_THICK_FRAGMENT_SHADER[] = R"(
         varying vec2 vertexColor;
 
         const float PI = 3.1415926535;
-        const float AlphaFloor = 0.7;
     
         float check(vec2 point) {
-            vec2 result = clamp(vec2(1.0) - abs(floor(point)), 0.0, 1.0);
-            return result.x * result.y;
+            vec2 result = step(point, vec2(1.0)) * step(vec2(0.0), point);
+            return step(0.5, result.x * result.y);
         }
     
         void main()
         {
             vec2 point = vertexColor;
             vec4 srcColor = texture2D(uTextureInput, point);
-            float alphaSum = floor(srcColor.a * check(point) + AlphaFloor);
+            float alphaSum = srcColor.a * check(point);
             for (float i = 0.0; i <= 180.0; i += 5.625) {
                 float arc = i * PI / 180.0;
                 float measureX = cos(arc) * uSize.x;
                 float measureY = sqrt(pow(uSize.x, 2.0) - pow(measureX, 2.0)) * uSize.y / uSize.x;
                 point = vertexColor + vec2(measureX, measureY);
-                alphaSum += floor(texture2D(uTextureInput, point).a * check(point) + AlphaFloor);
+                alphaSum += texture2D(uTextureInput, point).a * check(point);
                 point = vertexColor + vec2(measureX, -measureY);
-                alphaSum += floor(texture2D(uTextureInput, point).a * check(point) + AlphaFloor);
+                alphaSum += texture2D(uTextureInput, point).a * check(point);
                 point = vertexColor + vec2(measureX / 2.0, measureY / 2.0);
-                alphaSum += floor(texture2D(uTextureInput, point).a * check(point) + AlphaFloor);
+                alphaSum += texture2D(uTextureInput, point).a * check(point);
                 point = vertexColor + vec2(measureX / 2.0, -measureY / 2.0);
-                alphaSum += floor(texture2D(uTextureInput, point).a * check(point) + AlphaFloor);
+                alphaSum += texture2D(uTextureInput, point).a * check(point);
             }
 
             gl_FragColor = (alphaSum > 0.0) ? vec4(uColor * uAlpha, uAlpha) : vec4(0.0);
