@@ -28,7 +28,7 @@ export const proxyVector = <T extends (...args: any) => any>(
         case 'get':
           return (index: number) => {
             const wasmIns = rewindData(target.get, target, index);
-            return process(wasmIns);
+            return !wasmIns ? wasmIns : process(wasmIns);
           };
         case 'push_back':
           return (value: ReturnType<T>) => {
