@@ -343,7 +343,7 @@ PAG_TEST_F(PAGTextLayerTest, TextBounds) {
   pagPlayer->flush();
   auto bounds = pagPlayer->getBounds(textLayer);
   bounds.round();
-  auto defaultBounds = Rect::MakeXYWH(347, 1456, 399, 347);
+  auto defaultBounds = Rect::MakeXYWH(331, 1441, 431, 377);
   EXPECT_TRUE(bounds == defaultBounds);
   textLayer->setText(
       "测试文本\n"
@@ -352,7 +352,7 @@ PAG_TEST_F(PAGTextLayerTest, TextBounds) {
   pagPlayer->flush();
   bounds = pagPlayer->getBounds(textLayer);
   bounds.round();
-  defaultBounds = Rect::MakeXYWH(347, 1458, 399, 324);
+  defaultBounds = Rect::MakeXYWH(331, 1444, 431, 352);
   EXPECT_TRUE(bounds == defaultBounds);
 
   textLayer->setText(
@@ -368,7 +368,7 @@ PAG_TEST_F(PAGTextLayerTest, TextBounds) {
   pagPlayer->flush();
   bounds = pagPlayer->getBounds(textLayer);
   bounds.round();
-  defaultBounds = Rect::MakeXYWH(485, 1565, 114, 123);
+  defaultBounds = Rect::MakeXYWH(480, 1560, 124, 133);
   EXPECT_TRUE(bounds == defaultBounds);
 
   delete pagPlayer;
