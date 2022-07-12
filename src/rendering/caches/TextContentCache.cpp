@@ -62,14 +62,14 @@ static float GetMaxScale(std::vector<TextAnimator*>* animators) {
     if (scaleProperty->animatable()) {
       auto animatableProperty = static_cast<AnimatableProperty<Point>*>(scaleProperty);
       auto value = animatableProperty->keyframes[0]->startValue;
-      scale *= std::max(value.x, value.y);
+      scale *= std::max(1.f, std::max(value.x, value.y));
       for (const auto& keyframe : animatableProperty->keyframes) {
         value = keyframe->endValue;
-        scale *= std::max(value.x, value.y);
+        scale *= std::max(1.f, std::max(value.x, value.y));
       }
     } else {
       auto value = scaleProperty->value;
-      scale *= std::max(value.x, value.y);
+      scale *= std::max(1.f, std::max(value.x, value.y));
     }
   }
   return scale;
