@@ -37,7 +37,30 @@ VideoSequenceReader::VideoSequenceReader(std::shared_ptr<File> file, VideoSequen
       object.set("end", static_cast<int>(timeRange.end));
       staticTimeRanges.call<void>("push", object);
     }
-    mp4Data = MP4BoxHelper::CovertToMP4(sequence);
+    if (videoReaderClass.call<bool>("isIOS")) {
+      auto* videoSequence = new VideoSequence(*sequence);
+      videoSequence->MP4Header = nullptr;
+      std::vector<VideoFrame*> videoFrames;
+      for (auto* frame : sequence->frames) {
+        if (!videoFrames.empty() && frame->isKeyframe) {
+          break;
+        }
+        auto* videoFrame = new VideoFrame(*frame);
+        videoFrame->frame += static_cast<Frame>(sequence->frames.size());
+        videoSequence->frames.emplace_back(videoFrame);
+        videoFrames.emplace_back(videoFrame);
+      }
+      mp4Data = MP4BoxHelper::CovertToMP4(videoSequence);
+      videoSequence->frames.clear();
+      videoSequence->headers.clear();
+      delete videoSequence;
+      for (auto* frame : videoFrames) {
+        frame->fileBytes = nullptr;
+        delete frame;
+      }
+    } else {
+      mp4Data = MP4BoxHelper::CovertToMP4(sequence);
+    }
     videoReader = videoReaderClass.new_(val(typed_memory_view(mp4Data->length(), mp4Data->data())),
                                         sequence->frameRate, staticTimeRanges);
   }
