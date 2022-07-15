@@ -239,6 +239,13 @@ Please follow the following steps to configure the CLion environment correctly:
 **Note: If anything goes wrong during cmake building, please update the cmake commandline tool to the latest
 version and try again.**
 
+## Support Us
+
+If you find libpag is helpful, please give us a **Star**. We sincerely appreciate your support :)
+
+
+[![Stargazers over time](https://starchart.cc/Tencent/libpag.svg)](https://starchart.cc/Tencent/libpag)
+
 ## License
 
 libpag is licensed under the [Apache Version 2.0 License](./LICENSE.txt)

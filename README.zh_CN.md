@@ -230,6 +230,13 @@ depsync
 或 [QQ](https://qm.qq.com/cgi-bin/qm/qr?k=Wa65DTnEKo2hnPsvY-1EgJOF8tvKQ-ZT&jump_from=webapi)
 群即时跟我们反馈。
 
+## 支持我们
+
+如果你觉得 PAG 方案对你有帮助，欢迎给我们的项目加个 **Star**，谢谢大家的支持与鼓励 ：）
+
+
+[![Stargazers over time](https://starchart.cc/Tencent/libpag.svg)](https://starchart.cc/Tencent/libpag)
+
 ## 协议
 
 libpag 基于 [Apache-2.0](./LICENSE.txt) 协议开源.
