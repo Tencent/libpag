@@ -244,8 +244,7 @@ version and try again.**
 If you think PAG is helpful, please give our repository a star. We sincerely appreciate your support :)
 
 
-[![Stargazers repo roster for @Tencent/libpag](https://reporoster.com/stars/Tencent/libpag)](https://github.com/Tencent/libpag/stargazers)
-
+[![Stargazers over time](https://starchart.cc/Tencent/libpag.svg)](https://starchart.cc/Tencent/libpag)
 
 ## License
 

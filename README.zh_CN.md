@@ -235,8 +235,7 @@ depsync
 如果你觉得 PAG 方案还不错，请给我们的项目加个 Star，谢谢大家的支持与鼓励 ：）
 
 
-[![Stargazers repo roster for @Tencent/libpag](https://reporoster.com/stars/Tencent/libpag)](https://github.com/Tencent/libpag/stargazers)
-
+[![Stargazers over time](https://starchart.cc/Tencent/libpag.svg)](https://starchart.cc/Tencent/libpag)
 
 ## 协议
 
