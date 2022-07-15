@@ -36,6 +36,8 @@ class GLProgramDataManager : public ProgramDataManager {
 
   void setMatrix3f(UniformHandle handle, const float matrix[]) const override;
 
+  void setMatrix4f(UniformHandle handle, const float matrix[]) const override;
+
   void setMatrix(UniformHandle u, const Matrix& matrix) const override;
 
  private:

@@ -61,6 +61,13 @@ void GLProgramDataManager::setMatrix3f(UniformHandle handle, const float matrix[
   }
 }
 
+void GLProgramDataManager::setMatrix4f(UniformHandle handle, const float matrix[]) const {
+  auto location = uniforms->at(handle.toIndex());
+  if (kUnusedUniform != location) {
+    gl->uniformMatrix4fv(location, 1, GL_FALSE, matrix);
+  }
+}
+
 void GLProgramDataManager::setMatrix(UniformHandle u, const Matrix& matrix) const {
   auto values = ToGLMatrix(matrix);
   setMatrix3f(u, &(values[0]));

@@ -16,22 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <array>
-#include <memory>
+#include "ColorMatrixFilter.h"
+#include "ColorMatrixFragmentProcessor.h"
 
 namespace tgfx {
-class FragmentProcessor;
+std::shared_ptr<ColorFilter> ColorFilter::Matrix(const std::array<float, 20>& rowMajor) {
+  return std::make_shared<ColorMatrixFilter>(rowMajor);
+}
 
-class ColorFilter {
- public:
-  static std::shared_ptr<ColorFilter> MakeLumaColorFilter();
+ColorMatrixFilter::ColorMatrixFilter(const std::array<float, 20>& matrix) : matrix(matrix) {
+}
 
-  static std::shared_ptr<ColorFilter> Matrix(const std::array<float, 20>& rowMajor);
-
-  virtual ~ColorFilter() = default;
-
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor() const = 0;
-};
+std::unique_ptr<FragmentProcessor> ColorMatrixFilter::asFragmentProcessor() const {
+  return ColorMatrixFragmentProcessor::Make(matrix);
+}
 }  // namespace tgfx

@@ -39,6 +39,7 @@ class ShaderVar {
     Float3,
     Float4,
     Float3x3,
+    Float4x4,
     Texture2DSampler,
     TextureExternalSampler,
     Texture2DRectSampler,

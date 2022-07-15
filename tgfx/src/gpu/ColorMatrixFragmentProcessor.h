@@ -19,19 +19,27 @@
 #pragma once
 
 #include <array>
-#include <memory>
+#include "FragmentProcessor.h"
 
 namespace tgfx {
-class FragmentProcessor;
-
-class ColorFilter {
+class ColorMatrixFragmentProcessor : public FragmentProcessor {
  public:
-  static std::shared_ptr<ColorFilter> MakeLumaColorFilter();
+  static std::unique_ptr<ColorMatrixFragmentProcessor> Make(const std::array<float, 20>& matrix);
 
-  static std::shared_ptr<ColorFilter> Matrix(const std::array<float, 20>& rowMajor);
+  std::string name() const override {
+    return "ColorMatrixFragmentProcessor";
+  }
 
-  virtual ~ColorFilter() = default;
+  void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor() const = 0;
+  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
+
+ private:
+  ColorMatrixFragmentProcessor(const std::array<float, 20>& matrix) : matrix(matrix) {
+  }
+
+  std::array<float, 20> matrix;
+
+  friend class GLColorMatrixFragmentProcessor;
 };
 }  // namespace tgfx
