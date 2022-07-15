@@ -239,12 +239,13 @@ Please follow the following steps to configure the CLion environment correctly:
 **Note: If anything goes wrong during cmake building, please update the cmake commandline tool to the latest
 version and try again.**
 
-## Supporters
-### Stargazers
+## Support Us
+
+If you think PAG is helpful, please give our repository a star. We sincerely appreciate your support :)
+
+
 [![Stargazers repo roster for @Tencent/libpag](https://reporoster.com/stars/Tencent/libpag)](https://github.com/Tencent/libpag/stargazers)
 
-### Forkers
-[![Forkers repo roster for @Tencent/libpag](https://reporoster.com/forks/Tencent/libpag)](https://github.com/Tencent/libpag/network/members)
 
 ## License
 

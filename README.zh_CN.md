@@ -230,12 +230,13 @@ depsync
 或 [QQ](https://qm.qq.com/cgi-bin/qm/qr?k=Wa65DTnEKo2hnPsvY-1EgJOF8tvKQ-ZT&jump_from=webapi)
 群即时跟我们反馈。
 
-## 支持者
-### Stargazers
+## 支持我们
+
+如果你觉得 PAG 方案还不错，请给我们的项目加个 Star，谢谢大家的支持与鼓励 ：）
+
+
 [![Stargazers repo roster for @Tencent/libpag](https://reporoster.com/stars/Tencent/libpag)](https://github.com/Tencent/libpag/stargazers)
 
-### Forkers
-[![Forkers repo roster for @Tencent/libpag](https://reporoster.com/forks/Tencent/libpag)](https://github.com/Tencent/libpag/network/members)
 
 ## 协议
 
