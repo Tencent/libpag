@@ -241,7 +241,7 @@ version and try again.**
 
 ## Support Us
 
-If you find libpag is helpful, please give a **Star** to it. We sincerely appreciate your support :)
+If you find libpag is helpful, please give us a **Star**. We sincerely appreciate your support :)
 
 
 [![Stargazers over time](https://starchart.cc/Tencent/libpag.svg)](https://starchart.cc/Tencent/libpag)
