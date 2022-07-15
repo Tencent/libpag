@@ -232,7 +232,7 @@ depsync
 
 ## 支持我们
 
-如果你觉得 PAG 方案还不错，请给我们的项目加个 Star，谢谢大家的支持与鼓励 ：）
+如果你觉得 PAG 方案对你有帮助，欢迎给我们的项目加个 **Star**，谢谢大家的支持与鼓励 ：）
 
 
 [![Stargazers over time](https://starchart.cc/Tencent/libpag.svg)](https://starchart.cc/Tencent/libpag)
