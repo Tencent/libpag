@@ -1,0 +1,16 @@
+export const enum ShapeType {
+  Unknown,
+  ShapeGroup,
+  Rectangle,
+  Ellipse,
+  PolyStar,
+  ShapePath,
+  Fill,
+  Stroke,
+  GradientFill,
+  GradientStroke,
+  MergePaths,
+  TrimPaths,
+  Repeater,
+  RoundCorners,
+}

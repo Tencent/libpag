@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "lib": ["ES5", "ES6", "DOM"],
+    "target": "ES2017",
+    "allowJs": true,
+    "sourceMap": true,
+    "strict": true,
+    "experimentalDecorators": true
+  },
+  "include": ["src/**/*.ts", "demo/**/*.ts"]
+}
