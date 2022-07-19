@@ -348,7 +348,9 @@ void DestoryFlushQueue() {
   }
   [pagPlayer setComposition:newComposition];
   [valueAnimator setDuration:[pagPlayer duration]];
-  [self checkVisible];
+  dispatch_async(dispatch_get_main_queue(), ^{
+    [self checkVisible];
+  });
 }
 
 - (BOOL)videoEnabled {
