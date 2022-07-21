@@ -184,7 +184,7 @@ void DestoryFlushQueue() {
 
 - (void)checkVisible {
   BOOL visible =
-      self.window && !self.isHidden && self.alpha > 0.0 && [valueAnimator duration] > 0.0;
+      self.window && !self.isHidden && self.alpha > 0.0;
   if (_isVisible == visible) {
     return;
   }
