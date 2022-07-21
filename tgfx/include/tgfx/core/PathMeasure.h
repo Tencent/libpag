@@ -44,5 +44,18 @@ class PathMeasure {
    * (0..getLength()). If startD > stopD then return false (and leave dst untouched).
    */
   virtual bool getSegment(float startD, float stopD, Path* result) = 0;
+
+  /**
+   * Pins distance to 0 <= distance <= getLength(), and then computes
+   * the corresponding position and tangent.
+   * Returns false if there is no path, or a zero-length path was specified, in which case
+   * position and tangent are unchanged.
+   */
+  virtual bool getPosTan(float distance, Point* position, Point* tangent) = 0;
+
+  /**
+   * Returns true if the current contour is closed().
+   */
+  virtual bool isClosed() = 0;
 };
 }  // namespace tgfx

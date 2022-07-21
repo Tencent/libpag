@@ -44,6 +44,24 @@ class PkPathMeasure : public PathMeasure {
     return pathMeasure->getSegment(startD, stopD, &path, true);
   }
 
+  bool getPosTan(float distance, Point* position, Point* tangent) override {
+    if (position == nullptr || tangent == nullptr) {
+      return false;
+    }
+
+    SkPoint point{};
+    SkVector tan{};
+
+    auto ret = pathMeasure->getPosTan(distance, &point, &tan);
+    position->set(point.x(), point.y());
+    tangent->set(tan.x(), tan.y());
+    return ret;
+  }
+
+  bool isClosed() override {
+    return pathMeasure->isClosed();
+  }
+
  private:
   SkPathMeasure* pathMeasure = nullptr;
 };

@@ -17,10 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextRenderer.h"
+#include "base/utils/MathUtil.h"
 #include "base/utils/TGFXCast.h"
 #include "rendering/FontManager.h"
 #include "rendering/graphics/Shape.h"
+#include "rendering/utils/PathUtil.h"
 #include "tgfx/core/PathEffect.h"
+#include "tgfx/core/PathMeasure.h"
 
 namespace pag {
 
@@ -278,8 +281,17 @@ static float CalculateLetterSpacing(Enum justification, float tracking, float li
   return letterSpacing;
 }
 
+static float FindMiniAscent(const std::vector<GlyphInfo*>& line) {
+  float minAscent = 0;
+  for (auto& info : line) {
+    minAscent = std::min(minAscent, info->bounds.top);
+  }
+  return minAscent;
+}
+
 static std::vector<std::vector<GlyphInfo*>> ApplyLayoutToGlyphInfos(
-    const TextLayout& layout, std::vector<GlyphInfo>* glyphInfos, tgfx::Rect* bounds) {
+    const TextLayout& layout, std::vector<GlyphInfo>* glyphInfos, tgfx::Rect* bounds,
+    float* firstLineMiniAscent) {
   float maxWidth, maxY;
   if (layout.boxRect.isEmpty()) {
     maxWidth = std::numeric_limits<float>::infinity();
@@ -329,6 +341,11 @@ static std::vector<std::vector<GlyphInfo*>> ApplyLayoutToGlyphInfos(
           drawX, drawY + layout.fontTop, drawX + EMPTY_LINE_WIDTH, drawY + layout.fontBottom);
       bounds->join(emptyLineBounds);
     }
+
+    if (firstLineMiniAscent && lineIndex == 0) {
+      *firstLineMiniAscent = glyphLine.empty() ? layout.fontTop : FindMiniAscent(glyphLine);
+    }
+
     baseLine += layout.lineGap;
 
     lineIndex++;
@@ -344,10 +361,11 @@ static std::vector<std::vector<GlyphHandle>> ApplyMatrixToGlyphs(
     std::vector<GlyphHandle> glyphLine = {};
     for (auto& info : line) {
       auto& glyph = (*glyphList)[info->glyphIndex];
-      auto matrix = tgfx::Matrix::MakeScale(layout.glyphScale);
+      auto matrix = tgfx::Matrix::I();
       auto pos = info->position;
       layout.coordinateMatrix.mapPoints(&pos, 1);
       matrix.postTranslate(pos.x, pos.y);
+      glyph->setScale(layout.glyphScale);
       glyph->setMatrix(matrix);
       glyphLine.push_back(glyph);
     }
@@ -372,7 +390,7 @@ static tgfx::Path RenderBackgroundPath(const std::vector<std::vector<GlyphHandle
       } else {
         textBounds = tgfx::Rect::MakeLTRB(0, lineTop, glyph->getAdvance(), lineBottom);
       }
-      glyph->getMatrix().mapRect(&textBounds);
+      glyph->getTotalMatrix().mapRect(&textBounds);
       lineRect.join(textBounds);
     }
     if (!lineRect.isEmpty()) {
@@ -477,7 +495,7 @@ static std::vector<GlyphHandle> BuildGlyphs(const TextDocument* textDocument) {
 }
 
 std::pair<std::vector<std::vector<GlyphHandle>>, tgfx::Rect> GetLines(
-    const TextDocument* textDocument) {
+    const TextDocument* textDocument, const TextPathOptions* pathOptions) {
   auto glyphList = BuildGlyphs(textDocument);
   // 无论文字朝向，都先按从(0,0)点开始的横向矩形排版。
   // 提取出跟文字朝向无关的 GlyphInfo 列表与 TextLayout,
@@ -487,8 +505,22 @@ std::pair<std::vector<std::vector<GlyphHandle>>, tgfx::Rect> GetLines(
   if (textDocument->boxText) {
     AdjustToFitBox(&textLayout, &glyphInfos, textDocument->fontSize);
   }
+  // 文字路径是根据路径重新计算Y轴的位置，这里 firstBaseLine 为零表示，
+  // 首行文字的 baseline 从路径上沿法线方向往外排列
+  if (pathOptions != nullptr && textDocument->direction != TextDirection::Vertical) {
+    textLayout.firstBaseLine = 0;
+  }
   tgfx::Rect textBounds = tgfx::Rect::MakeEmpty();
-  auto glyphInfoLines = ApplyLayoutToGlyphInfos(textLayout, &glyphInfos, &textBounds);
+  float firstLineMiniAscent = 0;
+  auto glyphInfoLines =
+      ApplyLayoutToGlyphInfos(textLayout, &glyphInfos, &textBounds, &firstLineMiniAscent);
+  if (pathOptions != nullptr && textDocument->direction != TextDirection::Vertical) {
+    // 由于框文本的路径规则是文字顶部从路径开始排列，这里需要计算出首行文字的 ascent(绝对值最大)，
+    // 把所有文字沿法线移动 ascent，使得框文字的首行顶部在路径上
+    textLayout.coordinateMatrix = textLayout.boxRect.isEmpty()
+                                      ? tgfx::Matrix::I()
+                                      : tgfx::Matrix::MakeTrans(0, -firstLineMiniAscent);
+  }
   auto lines = ApplyMatrixToGlyphs(textLayout, glyphInfoLines, &glyphList);
   textLayout.coordinateMatrix.mapRect(&textBounds);
   return {lines, textBounds};

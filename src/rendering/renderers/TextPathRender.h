@@ -20,16 +20,23 @@
 
 #include "pag/file.h"
 #include "rendering/graphics/Glyph.h"
-#include "rendering/graphics/Graphic.h"
 
 namespace pag {
-std::pair<std::vector<std::vector<GlyphHandle>>, tgfx::Rect> GetLines(
-    const TextDocument* textDocument, const TextPathOptions* pathOptions);
 
-std::shared_ptr<Graphic> RenderTextBackground(ID assetID,
-                                              const std::vector<std::vector<GlyphHandle>>& lines,
-                                              const TextDocument* textDocument);
+class TextPathRender {
+ public:
+  static std::shared_ptr<TextPathRender> MakeFrom(const TextDocument* textDocument,
+                                                  const TextPathOptions* pathOptions);
 
-void CalculateTextAscentAndDescent(const TextDocument* textDocument, float* pMinAscent,
-                                   float* pMaxDescent);
+  void applyForceAlignmentToGlyphs(const std::vector<std::vector<GlyphHandle>>& lines,
+                                   Frame layerFrame);
+
+  void applyToGlyphs(const std::vector<std::vector<GlyphHandle>>& glyphLines, Frame layerFrame);
+
+ private:
+  TextPathRender(const TextDocument* textDocument, const TextPathOptions* pathOptions);
+
+  const TextDocument* textDocument = nullptr;
+  const TextPathOptions* pathOptions = nullptr;
+};
 }  // namespace pag

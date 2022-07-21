@@ -61,6 +61,7 @@ Glyph::Glyph(tgfx::GlyphID glyphId, std::string name, tgfx::Font font, bool isVe
              const TextPaint& textPaint)
     : _glyphId(glyphId), _name(std::move(name)), _font(std::move(font)), _isVertical(isVertical) {
   horizontalInfo->advance = _font.getGlyphAdvance(_glyphId);
+  horizontalInfo->originPosition.set(horizontalInfo->advance / 2, 0);
   horizontalInfo->bounds = _font.getGlyphBounds(_glyphId);
   auto metrics = _font.getMetrics();
   horizontalInfo->ascent = metrics.ascent;
@@ -95,6 +96,7 @@ Glyph::Glyph(tgfx::GlyphID glyphId, std::string name, tgfx::Font font, bool isVe
       verticalInfo->ascent = -width * 0.5f;
       verticalInfo->descent = width * 0.5f;
     }
+    verticalInfo->originPosition.set(0, verticalInfo->advance / 2);
     verticalInfo->extraMatrix.mapRect(&verticalInfo->bounds);
     info = verticalInfo.get();
   }
@@ -127,7 +129,10 @@ bool Glyph::isVisible() const {
 
 tgfx::Matrix Glyph::getTotalMatrix() const {
   auto m = getExtraMatrix();
+  m.postConcat(tgfx::Matrix::MakeScale(scale));
+  m.postTranslate(-info->originPosition.x * scale, -info->originPosition.y * scale);
   m.postConcat(matrix);
+  m.postTranslate(info->originPosition.x * scale, info->originPosition.y * scale);
   return m;
 }
 

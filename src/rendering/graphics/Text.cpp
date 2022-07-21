@@ -112,8 +112,8 @@ std::shared_ptr<Graphic> Text::MakeFrom(const std::vector<GlyphHandle>& glyphs,
     auto& glyphList = styleMap[key];
     tgfx::Rect textBounds = tgfx::Rect::MakeEmpty();
     for (auto glyph : glyphList) {
-      auto glyphBounds = glyph->getBounds();
-      glyph->getMatrix().mapRect(&glyphBounds);
+      auto glyphBounds = glyph->getOriginBounds();
+      glyph->getTotalMatrix().mapRect(&glyphBounds);
       textBounds.join(glyphBounds);
     }
     if (textBounds.isEmpty()) {
@@ -307,10 +307,7 @@ void Text::draw(tgfx::Canvas* canvas, const TextAtlas* textAtlas) const {
         strokeWidth = glyph->getStrokeWidth();
         color = glyph->getStrokeColor();
       }
-      tgfx::Matrix invertedMatrix = tgfx::Matrix::I();
-      glyph->getExtraMatrix().invert(&invertedMatrix);
-      auto glyphBounds = glyph->getBounds();
-      invertedMatrix.mapRect(&glyphBounds);
+      auto glyphBounds = glyph->getOriginBounds();
       auto matrix = tgfx::Matrix::I();
       matrix.postScale((glyphBounds.width() + strokeWidth * 2) / locator.location.width(),
                        (glyphBounds.height() + strokeWidth * 2) / locator.location.height());

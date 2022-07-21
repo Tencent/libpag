@@ -405,4 +405,95 @@ PAG_TEST_F(PAGTextLayerTest, SmallFontSizeScale) {
   TestPAGPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGTextLayerTest/SmallFontSizeScale_LowResolution"));
 }
+
+/**
+ * 测试点文本的路径绘制
+ */
+PAG_TEST_F(PAGTextLayerTest, TextPathCommon) {
+  auto pagFile = PAGFile::Load("../assets/TextPathCommon.pag");
+  TestPAGPlayer->setComposition(pagFile);
+  TestPAGPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/TextPathCommon"));
+}
+
+/**
+ * 测试点文本的路径绘制,路径反转功能
+ */
+PAG_TEST_F(PAGTextLayerTest, TextPathReversePath) {
+  auto pagFile = PAGFile::Load("../assets/TextPathReversed.pag");
+  TestPAGPlayer->setComposition(pagFile);
+  TestPAGPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/TextPathReversed"));
+}
+
+/**
+ * 测试点文本的路径绘制,垂直于路径功能关闭
+ */
+PAG_TEST_F(PAGTextLayerTest, TextPathNotPerpendicular) {
+  auto pagFile = PAGFile::Load("../assets/TextPathNotPerpendicular.pag");
+  TestPAGPlayer->setComposition(pagFile);
+  TestPAGPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/TextPathNotPerpendicular"));
+}
+
+/**
+ * 测试点文本的路径绘制,强制对齐功能,路径起点大于终点
+ */
+PAG_TEST_F(PAGTextLayerTest, TextPathForceAlignment) {
+  auto pagFile = PAGFile::Load("../assets/TextPathForceAlignment.pag");
+  TestPAGPlayer->setComposition(pagFile);
+  TestPAGPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/TextPathForceAlignment"));
+}
+
+/**
+ * 测试点文本的路径绘制,强制对齐功能,路径终点大于起点
+ */
+PAG_TEST_F(PAGTextLayerTest, TextPathForceAlignment2) {
+  auto pagFile = PAGFile::Load("../assets/TextPathForceAlignment2.pag");
+  TestPAGPlayer->setComposition(pagFile);
+  TestPAGPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/TextPathForceAlignment2"));
+}
+
+/**
+ * 测试点文本的路径绘制,闭合路径情况绘制
+ */
+PAG_TEST_F(PAGTextLayerTest, TextPathClosedPath) {
+  auto pagFile = PAGFile::Load("../assets/TextPathClosedPath.pag");
+  TestPAGPlayer->setComposition(pagFile);
+  TestPAGPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/TextPathClosedPath"));
+}
+
+/**
+ * 测试框文本的路径绘制
+ */
+PAG_TEST_F(PAGTextLayerTest, TextPathBox) {
+  auto pagFile = PAGFile::Load("../assets/TextPathBox.pag");
+  TestPAGPlayer->setComposition(pagFile);
+  TestPAGPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/TextPathBox"));
+}
+
+/**
+ * 测试框文本的路径绘制
+ */
+PAG_TEST_F(PAGTextLayerTest, TextPathBox2) {
+  auto pagFile = PAGFile::Load("../assets/TextPathBox2.pag");
+  TestPAGPlayer->setComposition(pagFile);
+  TestPAGPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/TextPathBox2"));
+}
+
+/**
+ * 测试框文本的路径绘制,反转
+ */
+PAG_TEST_F(PAGTextLayerTest, TextPathBoxReversed) {
+  auto pagFile = PAGFile::Load("../assets/TextPathBoxReversed.pag");
+  TestPAGPlayer->setComposition(pagFile);
+  TestPAGPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/TextPathBoxReversed"));
+}
+
 }  // namespace pag
