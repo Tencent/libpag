@@ -18,24 +18,23 @@
 
 #pragma once
 
-#include <array>
-#include <memory>
-#include "tgfx/core/BlendMode.h"
-#include "tgfx/core/Color.h"
+#include "GLDrawer.h"
+#include "gpu/SurfaceDrawContext.h"
 
 namespace tgfx {
-class FragmentProcessor;
-
-class ColorFilter {
+class GLSurfaceDrawContext : public SurfaceDrawContext {
  public:
-  static std::shared_ptr<ColorFilter> MakeLumaColorFilter();
+  explicit GLSurfaceDrawContext(Surface* surface) : SurfaceDrawContext(surface) {
+  }
 
-  static std::shared_ptr<ColorFilter> Blend(Color color, BlendMode mode);
+  void fillRectWithFP(const Rect& dstRect, const Matrix& localMatrix,
+                      std::unique_ptr<FragmentProcessor> fp) override;
 
-  static std::shared_ptr<ColorFilter> Matrix(const std::array<float, 20>& rowMajor);
+  void draw(DrawArgs args, std::unique_ptr<GLDrawOp> op);
 
-  virtual ~ColorFilter() = default;
+ private:
+  GLDrawer* getDrawer();
 
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor() const = 0;
+  std::shared_ptr<GLDrawer> _drawer = nullptr;
 };
 }  // namespace tgfx

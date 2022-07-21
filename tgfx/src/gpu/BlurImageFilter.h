@@ -18,24 +18,32 @@
 
 #pragma once
 
-#include <array>
-#include <memory>
-#include "tgfx/core/BlendMode.h"
-#include "tgfx/core/Color.h"
+#include "tgfx/gpu/ImageFilter.h"
+#include "tgfx/gpu/Surface.h"
 
 namespace tgfx {
-class FragmentProcessor;
-
-class ColorFilter {
+class BlurImageFilter : public ImageFilter {
  public:
-  static std::shared_ptr<ColorFilter> MakeLumaColorFilter();
+  BlurImageFilter(Point blurOffset, float downScaling, int iteration, TileMode tileMode,
+                  const Rect& cropRect)
+      : ImageFilter(cropRect),
+        blurOffset(blurOffset),
+        downScaling(downScaling),
+        iteration(iteration),
+        tileMode(tileMode) {
+  }
 
-  static std::shared_ptr<ColorFilter> Blend(Color color, BlendMode mode);
+  std::pair<std::shared_ptr<Texture>, Point> filterImage(
+      const ImageFilterContext& context) override;
 
-  static std::shared_ptr<ColorFilter> Matrix(const std::array<float, 20>& rowMajor);
+ private:
+  Rect onFilterNodeBounds(const Rect& srcRect) const override;
 
-  virtual ~ColorFilter() = default;
+  void draw(const Texture* texture, Surface* toSurface, bool isDown);
 
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor() const = 0;
+  Point blurOffset;
+  float downScaling;
+  int iteration;
+  TileMode tileMode;
 };
 }  // namespace tgfx

@@ -18,24 +18,33 @@
 
 #pragma once
 
-#include <array>
-#include <memory>
-#include "tgfx/core/BlendMode.h"
-#include "tgfx/core/Color.h"
+#include "FragmentProcessor.h"
 
 namespace tgfx {
-class FragmentProcessor;
+enum class DualBlurPassMode { Up = 0, Down = 1 };
 
-class ColorFilter {
+class DualBlurFragmentProcessor : public FragmentProcessor {
  public:
-  static std::shared_ptr<ColorFilter> MakeLumaColorFilter();
+  static std::unique_ptr<DualBlurFragmentProcessor> Make(DualBlurPassMode passMode,
+                                                         std::unique_ptr<FragmentProcessor> texture,
+                                                         Point blurOffset, Point texelSize);
 
-  static std::shared_ptr<ColorFilter> Blend(Color color, BlendMode mode);
+  std::string name() const override {
+    return "DualBlurFragmentProcessor";
+  }
 
-  static std::shared_ptr<ColorFilter> Matrix(const std::array<float, 20>& rowMajor);
+  void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
-  virtual ~ColorFilter() = default;
+  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
 
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor() const = 0;
+ private:
+  DualBlurFragmentProcessor(DualBlurPassMode passMode, std::unique_ptr<FragmentProcessor> texture,
+                            Point blurOffset, Point texelSize);
+
+  DualBlurPassMode passMode;
+  Point blurOffset;
+  Point texelSize;
+
+  friend class GLDualBlurFragmentProcessor;
 };
 }  // namespace tgfx

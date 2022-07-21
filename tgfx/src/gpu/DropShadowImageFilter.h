@@ -18,24 +18,33 @@
 
 #pragma once
 
-#include <array>
-#include <memory>
-#include "tgfx/core/BlendMode.h"
-#include "tgfx/core/Color.h"
+#include "tgfx/gpu/ImageFilter.h"
 
 namespace tgfx {
-class FragmentProcessor;
-
-class ColorFilter {
+class DropShadowImageFilter : public ImageFilter {
  public:
-  static std::shared_ptr<ColorFilter> MakeLumaColorFilter();
+  DropShadowImageFilter(float dx, float dy, float blurrinessX, float blurrinessY,
+                        const Color& color, bool shadowOnly, const Rect& cropRect)
+      : ImageFilter(cropRect),
+        dx(dx),
+        dy(dy),
+        blurrinessX(blurrinessX),
+        blurrinessY(blurrinessY),
+        color(color),
+        shadowOnly(shadowOnly) {
+  }
 
-  static std::shared_ptr<ColorFilter> Blend(Color color, BlendMode mode);
+  std::pair<std::shared_ptr<Texture>, Point> filterImage(
+      const ImageFilterContext& context) override;
 
-  static std::shared_ptr<ColorFilter> Matrix(const std::array<float, 20>& rowMajor);
+ private:
+  Rect onFilterNodeBounds(const Rect& srcRect) const override;
 
-  virtual ~ColorFilter() = default;
-
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor() const = 0;
+  float dx;
+  float dy;
+  float blurrinessX;
+  float blurrinessY;
+  Color color;
+  bool shadowOnly;
 };
 }  // namespace tgfx

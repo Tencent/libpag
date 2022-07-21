@@ -19,6 +19,7 @@
 #pragma once
 
 #include "GLInterface.h"
+#include "gpu/SamplerState.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/opengl/GLSampler.h"
 
@@ -47,7 +48,7 @@ class GLContext : public Context {
 
   void resetState() override;
 
-  void bindTexture(int unitIndex, const TextureSampler* sampler);
+  void bindTexture(int unitIndex, const TextureSampler* sampler, SamplerState sampleState = {});
 
  private:
   const GLInterface* glInterface = nullptr;

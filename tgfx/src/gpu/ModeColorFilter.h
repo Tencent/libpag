@@ -18,24 +18,18 @@
 
 #pragma once
 
-#include <array>
-#include <memory>
-#include "tgfx/core/BlendMode.h"
-#include "tgfx/core/Color.h"
+#include "tgfx/gpu/ColorFilter.h"
 
 namespace tgfx {
-class FragmentProcessor;
-
-class ColorFilter {
+class ModeColorFilter : public ColorFilter {
  public:
-  static std::shared_ptr<ColorFilter> MakeLumaColorFilter();
+  ModeColorFilter(Color color, BlendMode mode) : color(color), mode(mode) {
+  }
 
-  static std::shared_ptr<ColorFilter> Blend(Color color, BlendMode mode);
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor() const override;
 
-  static std::shared_ptr<ColorFilter> Matrix(const std::array<float, 20>& rowMajor);
-
-  virtual ~ColorFilter() = default;
-
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor() const = 0;
+ private:
+  Color color;
+  BlendMode mode;
 };
 }  // namespace tgfx

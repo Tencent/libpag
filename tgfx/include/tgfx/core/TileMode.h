@@ -18,24 +18,27 @@
 
 #pragma once
 
-#include <array>
-#include <memory>
-#include "tgfx/core/BlendMode.h"
-#include "tgfx/core/Color.h"
-
 namespace tgfx {
-class FragmentProcessor;
+enum class TileMode {
+  /**
+   * Replicate the edge color if the shader draws outside of its original bounds.
+   */
+  Clamp,
 
-class ColorFilter {
- public:
-  static std::shared_ptr<ColorFilter> MakeLumaColorFilter();
+  /**
+   * Repeat the shader's image horizontally and vertically.
+   */
+  Repeat,
 
-  static std::shared_ptr<ColorFilter> Blend(Color color, BlendMode mode);
+  /**
+   * Repeat the shader's image horizontally and vertically, alternating mirror images so that
+   * adjacent images always seam.
+   */
+  Mirror,
 
-  static std::shared_ptr<ColorFilter> Matrix(const std::array<float, 20>& rowMajor);
-
-  virtual ~ColorFilter() = default;
-
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor() const = 0;
+  /**
+   * Only draw within the original domain, return transparent-black everywhere else.
+   */
+  Decal
 };
 }  // namespace tgfx

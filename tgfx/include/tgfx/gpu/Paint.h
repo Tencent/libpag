@@ -18,9 +18,10 @@
 
 #pragma once
 
-#include "MaskFilter.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Stroke.h"
+#include "tgfx/gpu/ImageFilter.h"
+#include "tgfx/gpu/MaskFilter.h"
 #include "tgfx/gpu/Shader.h"
 
 namespace tgfx {
@@ -196,6 +197,15 @@ class Paint {
     colorFilter = std::move(newColorFilter);
   }
 
+  // TODO(pengweilv): Used when drawing, currently only works with drawTexture.
+  void setImageFilter(std::shared_ptr<ImageFilter> newImageFilter) {
+    imageFilter = std::move(newImageFilter);
+  }
+
+  std::shared_ptr<ImageFilter> getImageFilter() const {
+    return imageFilter;
+  }
+
  private:
   PaintStyle style = PaintStyle::Fill;
   Color color = Color::Black();
@@ -203,5 +213,6 @@ class Paint {
   std::shared_ptr<Shader> shader = nullptr;
   std::shared_ptr<MaskFilter> maskFilter = nullptr;
   std::shared_ptr<ColorFilter> colorFilter = nullptr;
+  std::shared_ptr<ImageFilter> imageFilter = nullptr;
 };
 }  // namespace tgfx

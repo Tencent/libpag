@@ -130,7 +130,23 @@ static Paint CleanPaintForDrawTexture(const Paint* paint) {
 
 void Canvas::drawTexture(const Texture* texture, const RGBAAALayout* layout, const Paint* paint) {
   auto realPaint = CleanPaintForDrawTexture(paint);
+  std::shared_ptr<Texture> result;
+  auto oldMatrix = getMatrix();
+  if (realPaint.getImageFilter()) {
+    auto clipBounds = state->clip.getBounds();
+    Matrix inverted = Matrix::I();
+    if (!oldMatrix.invert(&inverted)) {
+      return;
+    }
+    inverted.mapRect(&clipBounds);
+    ImageFilterContext context(getContext(), oldMatrix, clipBounds, texture);
+    auto [image, offset] = realPaint.getImageFilter()->filterImage(context);
+    result = image;
+    texture = result.get();
+    concat(Matrix::MakeTrans(offset.x, offset.y));
+  }
   drawTexture(texture, layout, realPaint);
+  setMatrix(oldMatrix);
 }
 
 Context* Canvas::getContext() const {

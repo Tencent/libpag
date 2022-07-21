@@ -20,6 +20,7 @@
 
 #include "CoordTransform.h"
 #include "Processor.h"
+#include "SamplerState.h"
 #include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
@@ -78,6 +79,10 @@ class FragmentProcessor : public Processor {
 
   const TextureSampler* textureSampler(size_t i) const {
     return onTextureSampler(i);
+  }
+
+  SamplerState samplerState(size_t i) const {
+    return onSamplerState(i);
   }
 
   void computeProcessorKey(Context* context, BytesKey* bytesKey) const override;
@@ -177,6 +182,10 @@ class FragmentProcessor : public Processor {
 
   virtual const TextureSampler* onTextureSampler(size_t) const {
     return nullptr;
+  }
+
+  virtual SamplerState onSamplerState(size_t) const {
+    return {};
   }
 
   size_t textureSamplerCount = 0;

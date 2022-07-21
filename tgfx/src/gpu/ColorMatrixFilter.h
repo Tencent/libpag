@@ -23,7 +23,7 @@
 namespace tgfx {
 class ColorMatrixFilter : public ColorFilter {
  public:
-  ColorMatrixFilter(const std::array<float, 20>& matrix);
+  explicit ColorMatrixFilter(const std::array<float, 20>& matrix);
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor() const override;
 

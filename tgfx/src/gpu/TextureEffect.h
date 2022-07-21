@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "SamplerState.h"
 #include "gpu/FragmentProcessor.h"
 #include "tgfx/core/RGBAAALayout.h"
 
@@ -28,13 +29,17 @@ class TextureEffect : public FragmentProcessor {
                                                  const Matrix& localMatrix = Matrix::I(),
                                                  const RGBAAALayout* layout = nullptr);
 
+  static std::unique_ptr<FragmentProcessor> Make(const Texture* texture, SamplerState samplerState,
+                                                 const Matrix& localMatrix = Matrix::I(),
+                                                 const RGBAAALayout* layout = nullptr);
+
   std::string name() const override {
     return "TextureEffect";
   }
 
  private:
-  explicit TextureEffect(const Texture* texture, const RGBAAALayout* layout,
-                         const Matrix& localMatrix);
+  explicit TextureEffect(const Texture* texture, SamplerState samplerState,
+                         const RGBAAALayout* layout, const Matrix& localMatrix);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
@@ -44,7 +49,12 @@ class TextureEffect : public FragmentProcessor {
     return texture->getSampler();
   }
 
+  SamplerState onSamplerState(size_t) const override {
+    return samplerState;
+  }
+
   const Texture* texture;
+  SamplerState samplerState;
   const RGBAAALayout* layout;
   CoordTransform coordTransform;
 

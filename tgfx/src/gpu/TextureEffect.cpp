@@ -42,6 +42,13 @@ static bool CheckParameter(const Texture* texture, const RGBAAALayout* layout) {
 std::unique_ptr<FragmentProcessor> TextureEffect::Make(const Texture* texture,
                                                        const Matrix& localMatrix,
                                                        const RGBAAALayout* layout) {
+  return Make(texture, {}, localMatrix, layout);
+}
+
+std::unique_ptr<FragmentProcessor> TextureEffect::Make(const Texture* texture,
+                                                       SamplerState samplerState,
+                                                       const Matrix& localMatrix,
+                                                       const RGBAAALayout* layout) {
   if (!CheckParameter(texture, layout)) {
     return nullptr;
   }
@@ -60,12 +67,12 @@ std::unique_ptr<FragmentProcessor> TextureEffect::Make(const Texture* texture,
     return std::unique_ptr<YUVTextureEffect>(
         new YUVTextureEffect(static_cast<const YUVTexture*>(texture), layout, matrix));
   }
-  return std::unique_ptr<TextureEffect>(new TextureEffect(texture, layout, matrix));
+  return std::unique_ptr<TextureEffect>(new TextureEffect(texture, samplerState, layout, matrix));
 }
 
-TextureEffect::TextureEffect(const Texture* texture, const RGBAAALayout* layout,
-                             const Matrix& localMatrix)
-    : texture(texture), layout(layout), coordTransform(localMatrix) {
+TextureEffect::TextureEffect(const Texture* texture, SamplerState samplerState,
+                             const RGBAAALayout* layout, const Matrix& localMatrix)
+    : texture(texture), samplerState(samplerState), layout(layout), coordTransform(localMatrix) {
   setTextureSamplerCnt(1);
   addCoordTransform(&coordTransform);
 }

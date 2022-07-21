@@ -28,7 +28,28 @@ GLContext::GLContext(Device* device, const GLInterface* glInterface)
 void GLContext::resetState() {
 }
 
-void GLContext::bindTexture(int unitIndex, const TextureSampler* sampler) {
+int GetGLWrap(unsigned target, SamplerState::WrapMode wrapMode) {
+  if (target == GL_TEXTURE_RECTANGLE) {
+    if (wrapMode == SamplerState::WrapMode::ClampToBorder) {
+      return GL_CLAMP_TO_BORDER;
+    } else {
+      return GL_CLAMP_TO_EDGE;
+    }
+  }
+  switch (wrapMode) {
+    case SamplerState::WrapMode::Clamp:
+      return GL_CLAMP_TO_EDGE;
+    case SamplerState::WrapMode::Repeat:
+      return GL_REPEAT;
+    case SamplerState::WrapMode::MirrorRepeat:
+      return GL_MIRRORED_REPEAT;
+    case SamplerState::WrapMode::ClampToBorder:
+      return GL_CLAMP_TO_BORDER;
+  }
+}
+
+void GLContext::bindTexture(int unitIndex, const TextureSampler* sampler,
+                            SamplerState samplerState) {
   if (sampler == nullptr) {
     return;
   }
@@ -36,8 +57,10 @@ void GLContext::bindTexture(int unitIndex, const TextureSampler* sampler) {
   auto gl = glInterface->functions.get();
   gl->activeTexture(GL_TEXTURE0 + unitIndex);
   gl->bindTexture(glSampler->target, glSampler->id);
-  gl->texParameteri(glSampler->target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  gl->texParameteri(glSampler->target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  gl->texParameteri(glSampler->target, GL_TEXTURE_WRAP_S,
+                    GetGLWrap(glSampler->target, samplerState.wrapModeX));
+  gl->texParameteri(glSampler->target, GL_TEXTURE_WRAP_T,
+                    GetGLWrap(glSampler->target, samplerState.wrapModeY));
   gl->texParameteri(glSampler->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   gl->texParameteri(glSampler->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 }

@@ -91,6 +91,11 @@ static bool PaintToGLPaintWithTexture(const Context* context, const Paint& paint
 }
 
 GLCanvas::GLCanvas(Surface* surface) : Canvas(surface) {
+  drawContext = new GLSurfaceDrawContext(surface);
+}
+
+GLCanvas::~GLCanvas() {
+  delete drawContext;
 }
 
 void GLCanvas::clear() {
@@ -472,13 +477,6 @@ void GLCanvas::drawMesh(const Mesh* mesh, const Paint& paint) {
   setMatrix(oldMatrix);
 }
 
-GLDrawer* GLCanvas::getDrawer() {
-  if (_drawer == nullptr) {
-    _drawer = GLDrawer::Make(getContext());
-  }
-  return _drawer.get();
-}
-
 Matrix GLCanvas::getViewMatrix() {
   auto matrix = state->matrix;
   if (surface->origin() == ImageOrigin::BottomLeft) {
@@ -490,8 +488,7 @@ Matrix GLCanvas::getViewMatrix() {
 }
 
 void GLCanvas::draw(std::unique_ptr<GLDrawOp> op, GLPaint paint, bool aa) {
-  auto* drawer = getDrawer();
-  if (drawer == nullptr) {
+  if (drawContext == nullptr) {
     return;
   }
   auto renderTarget = surface->getRenderTarget();
@@ -519,6 +516,6 @@ void GLCanvas::draw(std::unique_ptr<GLDrawOp> op, GLPaint paint, bool aa) {
   args.renderTarget = renderTarget.get();
   args.renderTargetTexture = surface->getTexture();
   args.aa = aaType;
-  drawer->draw(std::move(args), std::move(op));
+  drawContext->draw(std::move(args), std::move(op));
 }
 }  // namespace tgfx

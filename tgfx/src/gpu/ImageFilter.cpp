@@ -16,26 +16,27 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <array>
-#include <memory>
-#include "tgfx/core/BlendMode.h"
-#include "tgfx/core/Color.h"
+#include "tgfx/gpu/ImageFilter.h"
 
 namespace tgfx {
-class FragmentProcessor;
+bool ImageFilter::applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* clipRect) const {
+  *dstRect = onFilterNodeBounds(srcRect);
+  if (!cropRect.isEmpty()) {
+    dstRect->intersect(cropRect);
+  }
+  if (clipRect) {
+    return dstRect->intersect(*clipRect);
+  }
+  return dstRect;
+}
 
-class ColorFilter {
- public:
-  static std::shared_ptr<ColorFilter> MakeLumaColorFilter();
+Rect ImageFilter::filterBounds(const Rect& rect) const {
+  auto dstBounds = onFilterNodeBounds(rect);
+  applyCropRect(dstBounds, &dstBounds);
+  return dstBounds;
+}
 
-  static std::shared_ptr<ColorFilter> Blend(Color color, BlendMode mode);
-
-  static std::shared_ptr<ColorFilter> Matrix(const std::array<float, 20>& rowMajor);
-
-  virtual ~ColorFilter() = default;
-
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor() const = 0;
-};
+Rect ImageFilter::onFilterNodeBounds(const Rect& srcRect) const {
+  return srcRect;
+}
 }  // namespace tgfx

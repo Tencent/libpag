@@ -92,7 +92,7 @@ void GLProgram::setFragmentData(const GLProgramDataManager& programDataManager,
   while (fp && glslFP) {
     glslFP->setData(programDataManager, *fp);
     for (size_t i = 0; i < fp->numTextureSamplers(); ++i) {
-      glContext->bindTexture((*nextTexSamplerIdx)++, fp->textureSampler(i));
+      glContext->bindTexture((*nextTexSamplerIdx)++, fp->textureSampler(i), fp->samplerState(i));
     }
     fp = iter.next();
     glslFP = glslIter.next();

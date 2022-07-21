@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "GLDrawer.h"
+#include "GLSurfaceDrawContext.h"
 #include "gpu/CanvasState.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Mask.h"
@@ -33,6 +33,8 @@ struct GLPaint {
 class GLCanvas : public Canvas {
  public:
   explicit GLCanvas(Surface* surface);
+
+  ~GLCanvas() override;
 
   void clear() override;
   void drawTexture(const Texture* texture, const RGBAAALayout* layout, const Paint& paint) override;
@@ -56,9 +58,7 @@ class GLCanvas : public Canvas {
  private:
   std::shared_ptr<Surface> _clipSurface = nullptr;
   uint32_t clipID = kDefaultClipID;
-  std::shared_ptr<GLDrawer> _drawer = nullptr;
-
-  GLDrawer* getDrawer();
+  GLSurfaceDrawContext* drawContext = nullptr;
 
   Texture* getClipTexture();
 
