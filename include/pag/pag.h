@@ -1224,6 +1224,7 @@ class PAG_API PAGSurface {
   tgfx::Context* lockContext();
   void unlockContext();
   bool wait(const BackendSemaphore& waitSemaphore);
+  void freeCacheInternal();
 
   friend class PAGPlayer;
 

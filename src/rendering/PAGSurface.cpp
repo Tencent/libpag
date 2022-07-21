@@ -97,13 +97,16 @@ int PAGSurface::height() {
 
 void PAGSurface::updateSize() {
   LockGuard autoLock(rootLocker);
-  surface = nullptr;
-  drawable->freeDevice();
+  freeCacheInternal();
   drawable->updateSize();
 }
 
 void PAGSurface::freeCache() {
   LockGuard autoLock(rootLocker);
+  freeCacheInternal();
+}
+
+void PAGSurface::freeCacheInternal() {
   if (pagPlayer) {
     pagPlayer->renderCache->releaseAll();
   }
