@@ -86,7 +86,7 @@ static float MapToPathPosition(float position, const TextPathLayout& pathLayout)
   return 0;
 }
 
-void AppendPathData(PathData& pathData, const PathData& source) {
+static void AppendPathData(PathData& pathData, const PathData& source) {
   if (source.verbs.empty()) {
     return;
   }
@@ -199,8 +199,7 @@ void TextPathRender::applyForceAlignmentToGlyphs(const std::vector<std::vector<G
   }
 
   auto textPathLayout = CreateTextPathLayout(textDocument, pathOptions, layerFrame);
-  auto forceAlignment = textPathLayout.forceAlignment;
-  if (!forceAlignment) {
+  if (!textPathLayout.forceAlignment) {
     return;
   }
 
