@@ -17,8 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "base/utils/MathUtil.h"
+#include "base/utils/TGFXCast.h"
 #include "base/utils/Verify.h"
 #include "pag/file.h"
+#include "tgfx/gpu/ImageFilter.h"
 
 namespace pag {
 DropShadowStyle::~DropShadowStyle() {
@@ -39,14 +41,30 @@ bool DropShadowStyle::visibleAt(Frame layerFrame) const {
 
 void DropShadowStyle::transformBounds(Rect* contentBounds, const Point& filterScale,
                                       Frame layerFrame) const {
-  auto angleValue = angle->getValueAt(layerFrame);
-  auto distanceValue = distance->getValueAt(layerFrame);
+  auto spreadValue = spread->getValueAt(layerFrame);
   auto sizeValue = size->getValueAt(layerFrame);
-  auto radians = DegreesToRadians(angleValue - 180);
-  float offsetX = cosf(radians) * distanceValue;
-  float offsetY = -sinf(radians) * distanceValue;
-  contentBounds->offset(offsetX * filterScale.x, offsetY * filterScale.y);
-  contentBounds->outset(sizeValue * filterScale.x, sizeValue * filterScale.y);
+  spreadValue *= (spreadValue == 1.f) ? 1.f : 0.8f;
+  auto spreadSize = sizeValue * spreadValue;
+  auto blurSize = sizeValue * (1.f - spreadValue) * 2.f;
+  auto blurXSize = blurSize * filterScale.x;
+  auto blurYSize = blurSize * filterScale.y;
+  auto distanceValue = distance->getValueAt(layerFrame);
+  float offsetX = 0.f;
+  float offsetY = 0.f;
+  if (distanceValue > 0.f) {
+    auto angleValue = angle->getValueAt(layerFrame);
+    auto radians = DegreesToRadians(angleValue - 180.f);
+    offsetX = cosf(radians) * distanceValue * filterScale.x;
+    offsetY = -sinf(radians) * distanceValue * filterScale.y;
+  }
+  contentBounds->outset(spreadSize * filterScale.x, spreadSize * filterScale.y);
+  if (spreadValue == 1.f) {
+    contentBounds->offset(offsetX, offsetY);
+  } else {
+    *contentBounds = ToPAG(tgfx::ImageFilter::DropShadowOnly(offsetX, offsetY, blurXSize, blurYSize,
+                                                             tgfx::Color::White())
+                               ->filterBounds(*ToTGFX(contentBounds)));
+  }
 }
 
 void DropShadowStyle::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {
