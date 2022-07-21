@@ -16,9 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "base/utils/TGFXCast.h"
 #include "base/utils/Verify.h"
 #include "pag/file.h"
-#include "rendering/filters/gaussianblur/GaussianBlurDefines.h"
+#include "tgfx/gpu/ImageFilter.h"
 
 namespace pag {
 FastBlurEffect::~FastBlurEffect() {
@@ -38,15 +39,17 @@ void FastBlurEffect::transformBounds(Rect* contentBounds, const Point& filterSca
     return;
   }
   auto direction = blurDimensions->getValueAt(layerFrame);
-  auto expandX = (direction == BlurDimensionsDirection::All ||
-                  direction == BlurDimensionsDirection::Horizontal)
-                     ? contentBounds->width() * BLUR_EXPEND * filterScale.x
-                     : 0.0;
-  auto expandY =
-      (direction == BlurDimensionsDirection::All || direction == BlurDimensionsDirection::Vertical)
-          ? contentBounds->height() * BLUR_EXPEND * filterScale.x
-          : 0.0;
-  contentBounds->outset(expandX, expandY);
+  auto blurrinessX = blurriness->getValueAt(layerFrame);
+  auto blurrinessY = blurrinessX;
+  if (direction == BlurDimensionsDirection::Horizontal) {
+    blurrinessY = 0;
+    blurrinessX *= filterScale.x;
+  } else if (direction == BlurDimensionsDirection::Vertical) {
+    blurrinessX = 0;
+    blurrinessY *= filterScale.y;
+  }
+  *contentBounds = ToPAG(
+      tgfx::ImageFilter::Blur(blurrinessX, blurrinessY)->filterBounds(*ToTGFX(contentBounds)));
 }
 
 void FastBlurEffect::excludeVaryingRanges(std::vector<pag::TimeRange>* timeRanges) const {
