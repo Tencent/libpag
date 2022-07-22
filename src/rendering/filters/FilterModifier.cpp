@@ -51,4 +51,16 @@ void FilterModifier::applyToGraphic(tgfx::Canvas* canvas, RenderCache* cache,
                                     std::shared_ptr<Graphic> graphic) const {
   FilterRenderer::DrawWithFilter(canvas, cache, this, graphic);
 }
+
+void FilterModifier::prepare(RenderCache* renderCache) const {
+  for (auto* effect : layer->effects) {
+    if (effect->type() != EffectType::DisplacementMap) {
+      continue;
+    }
+    auto mapEffect = static_cast<DisplacementMapEffect*>(effect);
+    auto mapLayer = static_cast<PreComposeLayer*>(mapEffect->displacementMapLayer);
+    auto content = static_cast<GraphicContent*>(LayerCache::Get(mapLayer)->getContent(layerFrame));
+    content->graphic->prepare(renderCache);
+  }
+}
 }  // namespace pag
