@@ -49,8 +49,7 @@ class FilterModifier : public Modifier {
     return true;
   }
 
-  void prepare(RenderCache*) const override {
-  }
+  void prepare(RenderCache*) const override;
 
   void applyToBounds(tgfx::Rect* bounds) const override;
 
