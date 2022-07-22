@@ -53,7 +53,7 @@ void FilterModifier::applyToGraphic(tgfx::Canvas* canvas, RenderCache* cache,
 }
 
 void FilterModifier::prepare(RenderCache* renderCache) const {
-  for (auto& effect : layer->effects) {
+  for (auto* effect : layer->effects) {
     if (effect->type() != EffectType::DisplacementMap) {
       continue;
     }
