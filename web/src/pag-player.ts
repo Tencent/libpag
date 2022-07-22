@@ -259,6 +259,14 @@ export class PAGPlayer {
   public graphicsMemory(): number {
     return this.wasmIns._graphicsMemory() as number;
   }
+  /**
+   * Prepares the player for the next flush() call. It collects all CPU tasks from the current
+   * progress of the composition and runs them asynchronously in parallel. It is usually used for
+   * speeding up the first frame rendering.
+   */
+  public prepare(): void {
+    this.wasmIns._prepare();
+  }
 
   public destroy() {
     this.wasmIns.delete();

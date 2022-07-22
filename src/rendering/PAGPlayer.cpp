@@ -242,7 +242,11 @@ void PAGPlayer::prepare() {
 }
 
 void PAGPlayer::prepareInternal() {
+#ifdef PAG_BUILD_FOR_WEB
+  renderCache->prepareLayers(duration());
+#else
   renderCache->prepareLayers();
+#endif
   if (contentVersion != stage->getContentVersion()) {
     contentVersion = stage->getContentVersion();
     Recorder recorder = {};

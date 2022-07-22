@@ -181,6 +181,11 @@ window.onload = async () => {
     console.log('销毁');
   });
 
+  document.getElementById('btn-flush')?.addEventListener('click', () => {
+    pagView.flush();
+    console.log('刷新');
+  });
+
   // 获取进度
   document.getElementById('btn-getProgress')?.addEventListener('click', () => {
     console.log(`当前进度：${pagView.getProgress()}`);

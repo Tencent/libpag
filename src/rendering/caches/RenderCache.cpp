@@ -31,7 +31,6 @@ namespace pag {
 #define PURGEABLE_GRAPHICS_MEMORY 20971520  // 20M
 #define PURGEABLE_EXPIRED_FRAME 10
 #define SCALE_FACTOR_PRECISION 0.001f
-#define DECODING_VISIBLE_DISTANCE 500000  // 提前 500ms 秒开始解码。
 
 class ImageTask : public Executor {
  public:
@@ -95,10 +94,8 @@ bool RenderCache::initFilter(Filter* filter) {
   return result;
 }
 
-void RenderCache::prepareLayers() {
-#ifndef PAG_BUILD_FOR_WEB
-  // There is no multiple-thread support on the web platform.
-  auto layerDistances = stage->findNearlyVisibleLayersIn(DECODING_VISIBLE_DISTANCE);
+void RenderCache::prepareLayers(int64_t timeDistance) {
+  auto layerDistances = stage->findNearlyVisibleLayersIn(timeDistance);
   for (auto& item : layerDistances) {
     for (auto pagLayer : item.second) {
       if (pagLayer->layerType() == LayerType::PreCompose) {
@@ -108,7 +105,6 @@ void RenderCache::prepareLayers() {
       }
     }
   }
-#endif
 }
 
 void RenderCache::preparePreComposeLayer(PreComposeLayer* layer) {
