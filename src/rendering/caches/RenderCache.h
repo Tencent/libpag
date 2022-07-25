@@ -37,7 +37,7 @@
 #include "tgfx/gpu/Device.h"
 
 namespace pag {
-#define DECODING_VISIBLE_DISTANCE 500000  // 提前 500ms 秒开始解码。
+static constexpr int64_t DECODING_VISIBLE_DISTANCE = 500000;  // 提前 500ms 开始解码。
 
 class RenderCache : public Performance {
  public:
