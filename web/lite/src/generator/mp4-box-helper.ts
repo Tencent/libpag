@@ -10,8 +10,6 @@ const BASE_MEDIA_TIME_SCALE = 6000;
 
 export const coverToMp4 = (videoSequence: VideoSequence) => {
   const sequence = IS_IOS ? getVirtualSequence(videoSequence) : videoSequence;
-  console.log('sequence', sequence);
-
   const mp4Track = makeMp4Track(sequence);
   if (!mp4Track || mp4Track.len === 0) throw new Error('mp4Track is empty');
   const boxParam: BoxParam = {

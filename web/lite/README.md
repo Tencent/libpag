@@ -37,6 +37,7 @@ libpag-lite 是 libpag 在 Web 平台的简化版 SDK
 
 ```html
 <canvas id="pag"></canvas>
+<script src="https://cdn.jsdelivr.net/npm/libpag-lite@latest/lib/pag.min.js"></script>
 <script>
   window.onload = async () => {
     const { PAGView, types } = window.libpag;
@@ -45,8 +46,7 @@ libpag-lite 是 libpag 在 Web 平台的简化版 SDK
     canvas.width = 720;
     canvas.height = 720;
     const pagView = PAGView.init(arrayBuffer, canvas, {
-      renderingMode: types.RenderingMode.WebGL,
-      scaleMode: types.ScaleMode.LetterBox,
+      renderingMode: types.RenderingMode.WebGL
     });
     pagView.play();
   };
@@ -186,10 +186,9 @@ import { PAGView, types } from 'libpag-lite';
 
 #### <span id="RenderOptions">RenderOptions</span>
 
-| 键                | 类型                                 | 说明                                                         | 默认值      | 必传 |
-| ----------------- | ------------------------------------ | ------------------------------------------------------------ | ----------- | ---- |
-| **renderingMode** | enum [RenderingMode](#RenderingMode) | 渲染模式，可选值： `WebGL` 、`Canvas`                        | `WebGL`     | N    |
-| **scaleMode**     | enum [ScaleMode](#ScaleMode)         | 缩放模式，可选值：`None` 、`Stretch` 、 `LetterBox` 和 `Zoom` | `LetterBox` | N    |
+| 键                | 类型                                 | 说明                                  | 默认值  | 必传 |
+| ----------------- | ------------------------------------ | ------------------------------------- | ------- | ---- |
+| **renderingMode** | enum [RenderingMode](#RenderingMode) | 渲染模式，可选值： `WebGL` 、`Canvas` | `WebGL` | N    |
 
 ### Enum
 

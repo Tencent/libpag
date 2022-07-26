@@ -154,8 +154,8 @@ export class PAGWebGLView extends View {
 
     this.gl.bindTexture(this.gl.TEXTURE_2D, this.originalVideoTexture);
     this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.renderingFbo);
-    this.gl.uniform2f(resolutionLocation, this.videoParam.sequenceWidth, this.videoParam.sequenceWidth);
-    this.gl.viewport(0, 0, this.videoParam.sequenceWidth, this.videoParam.sequenceWidth);
+    this.gl.uniform2f(resolutionLocation, this.videoParam.sequenceWidth, this.videoParam.sequenceHeight);
+    this.gl.viewport(0, 0, this.videoParam.sequenceWidth, this.videoParam.sequenceHeight);
     const primitiveType: number = this.gl.TRIANGLES;
     const count = 6;
     this.gl.drawArrays(primitiveType, offset, count);
