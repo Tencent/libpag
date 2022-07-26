@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <functional>
 #include "FragmentProcessor.h"
 #include "FragmentShaderBuilder.h"
 #include "ProgramDataManager.h"
@@ -62,14 +63,16 @@ class GLFragmentProcessor {
   struct EmitArgs {
     EmitArgs(FragmentShaderBuilder* fragBuilder, UniformHandler* uniformHandler,
              const FragmentProcessor* fp, std::string outputColor, std::string inputColor,
-             const TransformedCoordVars* transformedCoords, const TextureSamplers* textureSamplers)
+             const TransformedCoordVars* transformedCoords, const TextureSamplers* textureSamplers,
+             std::function<std::string(std::string_view)> coordFunc = {})
         : fragBuilder(fragBuilder),
           uniformHandler(uniformHandler),
           fragmentProcessor(fp),
           outputColor(std::move(outputColor)),
           inputColor(std::move(inputColor)),
           transformedCoords(transformedCoords),
-          textureSamplers(textureSamplers) {
+          textureSamplers(textureSamplers),
+          coordFunc(std::move(coordFunc)) {
     }
     /**
      * Interface used to emit code in the shaders.
@@ -98,6 +101,7 @@ class GLFragmentProcessor {
      * builder to emit texture reads in the generated code.
      */
     const TextureSamplers* textureSamplers;
+    const std::function<std::string(std::string_view)> coordFunc;
   };
 
   /**
@@ -119,8 +123,9 @@ class GLFragmentProcessor {
   /**
    * Emit the child with the default input color (solid white)
    */
-  void emitChild(size_t childIndex, std::string* outputColor, EmitArgs& parentArgs) {
-    emitChild(childIndex, "", outputColor, parentArgs);
+  void emitChild(size_t childIndex, std::string* outputColor, EmitArgs& parentArgs,
+                 std::function<std::string(std::string_view)> coordFunc = {}) {
+    emitChild(childIndex, "", outputColor, parentArgs, std::move(coordFunc));
   }
 
   /**
@@ -133,7 +138,7 @@ class GLFragmentProcessor {
    * without an input color.
    */
   void emitChild(size_t childIndex, const std::string& inputColor, std::string* outputColor,
-                 EmitArgs& parentArgs);
+                 EmitArgs& parentArgs, std::function<std::string(std::string_view)> coordFunc = {});
 
   /**
    * Variation that uses the parent's output color variable to hold the child's output.
@@ -169,7 +174,8 @@ class GLFragmentProcessor {
   }
 
  private:
-  void internalEmitChild(size_t, const std::string&, const std::string&, EmitArgs&);
+  void internalEmitChild(size_t, const std::string&, const std::string&, EmitArgs&,
+                         std::function<std::string(std::string_view)> = {});
 
   std::vector<std::unique_ptr<GLFragmentProcessor>> childProcessors;
 

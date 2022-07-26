@@ -25,11 +25,12 @@ void GLFragmentProcessor::setData(const ProgramDataManager& programDataManager,
 }
 
 void GLFragmentProcessor::emitChild(size_t childIndex, const std::string& inputColor,
-                                    std::string* outputColor, EmitArgs& args) {
+                                    std::string* outputColor, EmitArgs& args,
+                                    std::function<std::string(std::string_view)> coordFunc) {
   auto* fragBuilder = args.fragBuilder;
   outputColor->append(fragBuilder->mangleString());
   fragBuilder->codeAppendf("vec4 %s;", outputColor->c_str());
-  internalEmitChild(childIndex, inputColor, *outputColor, args);
+  internalEmitChild(childIndex, inputColor, *outputColor, args, std::move(coordFunc));
 }
 
 void GLFragmentProcessor::emitChild(size_t childIndex, const std::string& inputColor,
@@ -37,8 +38,9 @@ void GLFragmentProcessor::emitChild(size_t childIndex, const std::string& inputC
   internalEmitChild(childIndex, inputColor, parentArgs.outputColor, parentArgs);
 }
 
-void GLFragmentProcessor::internalEmitChild(size_t childIndex, const std::string& inputColor,
-                                            const std::string& outputColor, EmitArgs& args) {
+void GLFragmentProcessor::internalEmitChild(
+    size_t childIndex, const std::string& inputColor, const std::string& outputColor,
+    EmitArgs& args, std::function<std::string(std::string_view)> coordFunc) {
   auto* fragBuilder = args.fragBuilder;
   fragBuilder->onBeforeChildProcEmitCode();  // call first so mangleString is updated
   // Prepare a mangled input color variable if the default is not used,
@@ -63,7 +65,8 @@ void GLFragmentProcessor::internalEmitChild(size_t childIndex, const std::string
   TextureSamplers textureSamplers = args.textureSamplers->childInputs(childIndex);
 
   EmitArgs childArgs(fragBuilder, args.uniformHandler, childProc, outputColor,
-                     inputName.empty() ? "vec4(1.0)" : inputName, &coordVars, &textureSamplers);
+                     inputName.empty() ? "vec4(1.0)" : inputName, &coordVars, &textureSamplers,
+                     std::move(coordFunc));
   childProcessor(childIndex)->emitCode(childArgs);
   fragBuilder->codeAppend("}\n");
 

@@ -18,24 +18,33 @@
 
 #pragma once
 
-#include <array>
-#include <memory>
-#include "tgfx/core/BlendMode.h"
-#include "tgfx/core/Color.h"
+#include "tgfx/core/TileMode.h"
 
 namespace tgfx {
-class FragmentProcessor;
-
-class ColorFilter {
+/**
+ * Represents the tile modes used to access a texture.
+ */
+class SamplerState {
  public:
-  static std::shared_ptr<ColorFilter> MakeLumaColorFilter();
+  enum class WrapMode {
+    Clamp,
+    Repeat,
+    MirrorRepeat,
+    ClampToBorder,
+  };
 
-  static std::shared_ptr<ColorFilter> Blend(Color color, BlendMode mode);
+  SamplerState() = default;
 
-  static std::shared_ptr<ColorFilter> Matrix(const std::array<float, 20>& rowMajor);
+  explicit SamplerState(WrapMode wrapMode) : wrapModeX(wrapMode), wrapModeY(wrapMode) {
+  }
 
-  virtual ~ColorFilter() = default;
+  SamplerState(WrapMode wrapModeX, WrapMode wrapModeY)
+      : wrapModeX(wrapModeX), wrapModeY(wrapModeY) {
+  }
 
-  virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor() const = 0;
+  WrapMode wrapModeX = WrapMode::Clamp;
+  WrapMode wrapModeY = WrapMode::Clamp;
 };
+
+SamplerState::WrapMode TileModeToWrapMode(TileMode tileMode);
 }  // namespace tgfx

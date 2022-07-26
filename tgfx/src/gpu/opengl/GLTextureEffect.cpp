@@ -26,6 +26,9 @@ void GLTextureEffect::emitCode(EmitArgs& args) {
   auto* uniformHandler = args.uniformHandler;
 
   auto vertexColor = (*args.transformedCoords)[0].name();
+  if (args.coordFunc) {
+    vertexColor = args.coordFunc(vertexColor);
+  }
   fragBuilder->codeAppend("vec4 color = ");
   fragBuilder->appendTextureLookup((*args.textureSamplers)[0], vertexColor);
   fragBuilder->codeAppend(";");

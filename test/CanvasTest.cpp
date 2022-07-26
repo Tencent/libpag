@@ -19,6 +19,7 @@
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/core/PathEffect.h"
 #include "tgfx/gpu/Surface.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
 
@@ -63,6 +64,109 @@ PAG_TEST(CanvasTest, ColorMatrixFilter) {
   paint.setColorFilter(ColorFilter::Matrix(greyColorMatrix));
   canvas->drawTexture(image.get(), &paint);
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/greyColorMatrix"));
+  device->unlock();
+}
+
+PAG_TEST(CanvasTest, Blur) {
+  auto device = GLDevice::Make();
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = Image::MakeFrom("../resources/apitest/rotation.jpg");
+  ASSERT_TRUE(image != nullptr);
+  auto texture = image->makeBuffer()->makeTexture(context);
+  ASSERT_TRUE(texture != nullptr);
+  auto imageMatrix = OrientationToMatrix(image->orientation(), image->width(), image->height());
+  imageMatrix.postScale(0.2, 0.2);
+  auto width = image->width();
+  auto height = image->height();
+  ApplyOrientation(image->orientation(), &width, &height);
+  auto imageWidth = static_cast<float>(width) * 0.2f;
+  auto imageHeight = static_cast<float>(height) * 0.2f;
+  auto padding = 30.f;
+  Paint paint;
+  auto surface = Surface::Make(context, static_cast<int>(imageWidth * 2.f + padding * 3.f),
+                               static_cast<int>(imageHeight * 2.f + padding * 3.f));
+  auto canvas = surface->getCanvas();
+  canvas->concat(tgfx::Matrix::MakeTrans(padding, padding));
+  canvas->save();
+  canvas->concat(imageMatrix);
+  canvas->drawTexture(texture.get(), &paint);
+  canvas->restore();
+  Path path;
+  path.addRect(Rect::MakeWH(imageWidth, imageHeight));
+  PathEffect::MakeStroke(Stroke(1.f))->applyTo(&path);
+  paint.setImageFilter(nullptr);
+  paint.setColor(Color{1.f, 0.f, 0.f, 1.f});
+  canvas->drawPath(path, paint);
+
+  canvas->concat(tgfx::Matrix::MakeTrans(imageWidth + padding, 0));
+  canvas->save();
+  canvas->concat(imageMatrix);
+  paint.setImageFilter(ImageFilter::Blur(130, 130, TileMode::Decal));
+  canvas->drawTexture(texture.get(), &paint);
+  canvas->restore();
+  paint.setImageFilter(nullptr);
+  canvas->drawPath(path, paint);
+
+  canvas->concat(tgfx::Matrix::MakeTrans(-imageWidth - padding, imageHeight + padding));
+  canvas->save();
+  canvas->concat(imageMatrix);
+  paint.setImageFilter(ImageFilter::Blur(
+      130, 130, TileMode::Clamp,
+      tgfx::Rect::MakeWH(static_cast<float>(image->width()), static_cast<float>(image->height()))));
+  canvas->drawTexture(texture.get(), &paint);
+  canvas->restore();
+  paint.setImageFilter(nullptr);
+  canvas->drawPath(path, paint);
+
+  canvas->concat(tgfx::Matrix::MakeTrans(imageWidth + padding, 0));
+  canvas->save();
+  canvas->concat(imageMatrix);
+  paint.setImageFilter(
+      ImageFilter::Blur(130, 130, TileMode::Clamp, tgfx::Rect::MakeLTRB(-100, -100, 2000, 1000)));
+  canvas->drawTexture(texture.get(), &paint);
+  paint.setImageFilter(
+      ImageFilter::Blur(130, 130, TileMode::Clamp, tgfx::Rect::MakeXYWH(1000, 1000, 1000, 1000)));
+  canvas->drawTexture(texture.get(), &paint);
+  paint.setImageFilter(
+      ImageFilter::Blur(130, 130, TileMode::Clamp, tgfx::Rect::MakeXYWH(2000, 1000, 1000, 1000)));
+  canvas->drawTexture(texture.get(), &paint);
+  canvas->restore();
+  paint.setImageFilter(nullptr);
+  canvas->drawPath(path, paint);
+
+  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/blur"));
+  device->unlock();
+}
+
+PAG_TEST(CanvasTest, DropShadow) {
+  auto device = GLDevice::Make();
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = Image::MakeFrom("../resources/apitest/image_as_mask.png");
+  ASSERT_TRUE(image != nullptr);
+  auto texture = image->makeBuffer()->makeTexture(context);
+  ASSERT_TRUE(texture != nullptr);
+  auto imageWidth = static_cast<float>(image->width());
+  auto imageHeight = static_cast<float>(image->height());
+  auto padding = 30.f;
+  Paint paint;
+  auto surface = Surface::Make(context, static_cast<int>(imageWidth * 2.f + padding * 3.f),
+                               static_cast<int>(imageHeight * 2.f + padding * 3.f));
+  auto canvas = surface->getCanvas();
+  canvas->concat(tgfx::Matrix::MakeTrans(padding, padding));
+  paint.setImageFilter(ImageFilter::Blur(15, 15));
+  canvas->drawTexture(texture.get(), &paint);
+
+  canvas->concat(tgfx::Matrix::MakeTrans(imageWidth + padding, 0));
+  paint.setImageFilter(ImageFilter::DropShadowOnly(0, 0, 15, 15, tgfx::Color::White()));
+  canvas->drawTexture(texture.get(), &paint);
+
+  canvas->concat(tgfx::Matrix::MakeTrans(-imageWidth - padding, imageWidth + padding));
+  paint.setImageFilter(ImageFilter::DropShadow(0, 0, 15, 15, tgfx::Color::White()));
+  canvas->drawTexture(texture.get(), &paint);
+
+  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/dropShadow"));
   device->unlock();
 }
 }  // namespace tgfx
