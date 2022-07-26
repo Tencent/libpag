@@ -177,6 +177,10 @@ void PAGPlayer::setMatrix(const Matrix& matrix) {
 
 int64_t PAGPlayer::duration() {
   LockGuard autoLock(rootLocker);
+  return durationInternal();
+}
+
+int64_t PAGPlayer::durationInternal() {
   auto pagComposition = stage->getRootComposition();
   return pagComposition ? pagComposition->durationInternal() : 0;
 }
@@ -243,7 +247,8 @@ void PAGPlayer::prepare() {
 
 void PAGPlayer::prepareInternal() {
 #ifdef PAG_BUILD_FOR_WEB
-  renderCache->prepareLayers(duration());
+  auto distance = durationInternal();
+  renderCache->prepareLayers(distance);
 #else
   renderCache->prepareLayers();
 #endif
