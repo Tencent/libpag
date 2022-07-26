@@ -8,7 +8,6 @@ window.onload = async () => {
   canvas.height = 720;
   const pagView = PAGView.init(arrayBuffer, canvas, {
     renderingMode: types.RenderingMode.WebGL,
-    scaleMode: types.ScaleMode.LetterBox,
   });
   pagView.play();
 };

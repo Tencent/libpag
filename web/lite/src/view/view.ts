@@ -18,7 +18,6 @@ declare global {
 
 export interface RenderOptions {
   renderingMode?: RenderingMode;
-  scaleMode?: ScaleMode;
 }
 
 const IS_WECHAT = /MicroMessenger/i.test(navigator.userAgent);
@@ -40,6 +39,7 @@ export class View {
   protected videoParam: VideoParam;
   protected videoElement: HTMLVideoElement | null;
   protected viewportSize = { x: 0, y: 0, width: 0, height: 0, scaleX: 1, scaleY: 1 }; // viewport尺寸 WebGL坐标轴轴心在左下角|Canvas2D坐标轴轴心在左上角
+  protected canvasSize = { width: 0, height: 0 };
 
   private videoSequence: VideoSequence;
   private videoCanPlay = false;
@@ -72,6 +72,7 @@ export class View {
     this.videoParam = getVideoParam(pagFile, this.videoSequence);
     this.eventManager = new EventManager();
     this.renderingMode = options.renderingMode || RenderingMode.WebGL;
+    this.updateSize();
     this.setScaleMode();
   }
 
@@ -265,6 +266,12 @@ export class View {
       default:
         break;
     }
+  }
+
+  public updateSize() {
+    const styles = getComputedStyle(this.canvas as HTMLCanvasElement);
+    this.canvas!.width = Number(styles.getPropertyValue('width').replace('px', ''));
+    this.canvas!.height = Number(styles.getPropertyValue('height').replace('px', ''));
   }
 
   protected loadContext() {}
