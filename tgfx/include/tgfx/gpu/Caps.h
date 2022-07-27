@@ -24,5 +24,10 @@ class Caps {
   bool floatIs32Bits = true;
   int maxTextureSize = 0;
   bool multisampleDisableSupport = false;
+  /**
+   * The CLAMP_TO_BORDER wrap mode for texture coordinates was added to desktop GL in 1.3, and
+   * GLES 3.2, but is also available in extensions. Vulkan and Metal always have support.
+   */
+  bool clampToBorderSupport = true;
 };
 }  // namespace tgfx

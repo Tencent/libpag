@@ -19,6 +19,7 @@
 #pragma once
 
 #include "tgfx/core/TileMode.h"
+#include "tgfx/gpu/Caps.h"
 
 namespace tgfx {
 /**
@@ -46,5 +47,5 @@ class SamplerState {
   WrapMode wrapModeY = WrapMode::Clamp;
 };
 
-SamplerState::WrapMode TileModeToWrapMode(TileMode tileMode);
+SamplerState::WrapMode TileModeToWrapMode(TileMode tileMode, const Caps* caps);
 }  // namespace tgfx

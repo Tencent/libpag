@@ -36,7 +36,7 @@ void GLColorMatrixFragmentProcessor::emitCode(EmitArgs& args) {
   fragBuilder->codeAppendf("%s = %s * %s + %s;", args.outputColor.c_str(),
                            matrixUniformName.c_str(), args.outputColor.c_str(),
                            vectorUniformName.c_str());
-  fragBuilder->codeAppendf("%s = clamp(%s, 0, 1);", args.outputColor.c_str(),
+  fragBuilder->codeAppendf("%s = clamp(%s, 0.0, 1.0);", args.outputColor.c_str(),
                            args.outputColor.c_str());
   fragBuilder->codeAppendf("%s.rgb *= %s.a;", args.outputColor.c_str(), args.outputColor.c_str());
 }

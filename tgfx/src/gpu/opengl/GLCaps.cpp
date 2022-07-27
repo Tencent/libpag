@@ -230,6 +230,9 @@ void GLCaps::initGLSupport(const GLInfo& info) {
   textureBarrierSupport = version >= GL_VER(4, 5) || info.hasExtension("GL_ARB_texture_barrier") ||
                           info.hasExtension("GL_NV_texture_barrier");
   semaphoreSupport = version >= GL_VER(3, 2) || info.hasExtension("GL_ARB_sync");
+  if (version < GL_VER(1, 3) && !info.hasExtension("GL_ARB_texture_border_clamp")) {
+    clampToBorderSupport = false;
+  }
 }
 
 void GLCaps::initGLESSupport(const GLInfo& info) {
@@ -260,6 +263,11 @@ void GLCaps::initGLESSupport(const GLInfo& info) {
     frameBufferFetchRequiresEnablePerSample = true;
   }
   semaphoreSupport = version >= GL_VER(3, 0) || info.hasExtension("GL_APPLE_sync");
+  if (version < GL_VER(3, 2) && !info.hasExtension("GL_EXT_texture_border_clamp") &&
+      !info.hasExtension("GL_NV_texture_border_clamp") &&
+      !info.hasExtension("GL_OES_texture_border_clamp")) {
+    clampToBorderSupport = false;
+  }
 }
 
 void GLCaps::initWebGLSupport(const GLInfo& info) {
@@ -272,6 +280,7 @@ void GLCaps::initWebGLSupport(const GLInfo& info) {
   multisampleDisableSupport = false;  // no WebGL support
   textureBarrierSupport = false;
   semaphoreSupport = version >= GL_VER(2, 0);
+  clampToBorderSupport = false;
 }
 
 void GLCaps::initFormatMap(const GLInfo& info) {

@@ -19,16 +19,25 @@
 #include "SamplerState.h"
 
 namespace tgfx {
-SamplerState::WrapMode TileModeToWrapMode(TileMode tileMode) {
+SamplerState::WrapMode TileModeToWrapMode(TileMode tileMode, const Caps* caps) {
+  SamplerState::WrapMode wrapMode;
   switch (tileMode) {
     case TileMode::Clamp:
-      return SamplerState::WrapMode::Clamp;
+      wrapMode = SamplerState::WrapMode::Clamp;
+      break;
     case TileMode::Repeat:
-      return SamplerState::WrapMode::Repeat;
+      wrapMode = SamplerState::WrapMode::Repeat;
+      break;
     case TileMode::Mirror:
-      return SamplerState::WrapMode::MirrorRepeat;
+      wrapMode = SamplerState::WrapMode::MirrorRepeat;
+      break;
     case TileMode::Decal:
-      return SamplerState::WrapMode::ClampToBorder;
+      wrapMode = SamplerState::WrapMode::ClampToBorder;
+      break;
   }
+  if (wrapMode == SamplerState::WrapMode::ClampToBorder && !caps->clampToBorderSupport) {
+    return SamplerState::WrapMode::Clamp;
+  }
+  return wrapMode;
 }
 }  // namespace tgfx
