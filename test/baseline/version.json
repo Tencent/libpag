@@ -1,9 +1,9 @@
 {
     "CanvasTest": {
-        "blur": "d8039736",
-        "dropShadow": "d8039736",
-        "greyColorMatrix": "2329bd7f",
-        "identityMatrix": "2329bd7f"
+        "blur": "4e296d0d",
+        "dropShadow": "4e296d0d",
+        "greyColorMatrix": "4e296d0d",
+        "identityMatrix": "4e296d0d"
     },
     "PAGBlendTest": {
         "Blend_Add": "48a897dd",

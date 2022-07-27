@@ -41,7 +41,7 @@ void GLDualBlurFragmentProcessor::emitCode(EmitArgs& args) {
       emitChild(0, &tempColor, args,
                 [coords, i](std::string_view coord) { return std::string(coord) + coords[i]; });
       if (i == 0) {
-        fragBuilder->codeAppendf("vec4 sum = %s * 4;", tempColor.c_str());
+        fragBuilder->codeAppendf("vec4 sum = %s * 4.0;", tempColor.c_str());
       } else {
         fragBuilder->codeAppendf("sum += %s;", tempColor.c_str());
       }

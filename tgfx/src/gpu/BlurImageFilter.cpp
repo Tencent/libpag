@@ -89,8 +89,9 @@ void BlurImageFilter::draw(const Texture* texture, Surface* toSurface, bool isDo
       dstRect, localMatrix,
       DualBlurFragmentProcessor::Make(
           isDown ? DualBlurPassMode::Down : DualBlurPassMode::Up,
-          TextureEffect::Make(texture, SamplerState(TileModeToWrapMode(tileMode))), blurOffset,
-          texelSize));
+          TextureEffect::Make(
+              texture, SamplerState(TileModeToWrapMode(tileMode, toSurface->getContext()->caps()))),
+          blurOffset, texelSize));
 }
 
 static std::shared_ptr<Texture> CropImage(Context* context, const Texture* image,
@@ -105,7 +106,8 @@ static std::shared_ptr<Texture> CropImage(Context* context, const Texture* image
   localMatrix.postTranslate(dstBounds.left, dstBounds.top);
   auto dstRect = Rect::MakeWH(dstBounds.width(), dstBounds.height());
   drawContext->fillRectWithFP(
-      dstRect, localMatrix, TextureEffect::Make(image, SamplerState(TileModeToWrapMode(tileMode))));
+      dstRect, localMatrix,
+      TextureEffect::Make(image, SamplerState(TileModeToWrapMode(tileMode, context->caps()))));
   return surface->getTexture();
 }
 
