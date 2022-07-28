@@ -23,6 +23,7 @@
 #include "rendering/graphics/Shape.h"
 #include "rendering/graphics/Text.h"
 #include "rendering/renderers/TextAnimatorRenderer.h"
+#include "rendering/renderers/TextPathRender.h"
 #include "rendering/renderers/TextRenderer.h"
 
 namespace pag {
@@ -81,18 +82,18 @@ void TextContentCache::initTextGlyphs(const std::vector<std::vector<GlyphHandle>
     textBlock = std::make_shared<TextBlock>(getCacheID(), *glyphLines, scale);
     return;
   }
-  auto addFunc = [&](TextDocument* textDocument) {
-    auto [lines, bounds] = GetLines(textDocument);
+  auto addFunc = [&](TextDocument* textDocument, TextPathOptions* pathOptions) {
+    auto [lines, bounds] = GetLines(textDocument, pathOptions);
     textBlocks[textDocument] = std::make_shared<TextBlock>(getCacheID(), lines, scale, &bounds);
   };
   if (sourceText->animatable()) {
     auto animatableProperty = reinterpret_cast<AnimatableProperty<TextDocumentHandle>*>(sourceText);
-    addFunc(animatableProperty->keyframes[0]->startValue.get());
+    addFunc(animatableProperty->keyframes[0]->startValue.get(), pathOption);
     for (const auto& keyframe : animatableProperty->keyframes) {
-      addFunc(keyframe->endValue.get());
+      addFunc(keyframe->endValue.get(), pathOption);
     }
   } else {
-    addFunc(sourceText->getValueAt(0).get());
+    addFunc(sourceText->getValueAt(0).get(), pathOption);
   }
 }
 
@@ -154,8 +155,23 @@ GraphicContent* TextContentCache::createContent(Frame layerFrame) const {
     block = iter->second;
   }
   auto glyphLines = CopyLines(block);
-  auto hasAnimators = TextAnimatorRenderer::ApplyToGlyphs(glyphLines, animators,
-                                                          textDocument->justification, layerFrame);
+  bool toCalculateBounds = false;
+  auto textPathRender = TextPathRender::MakeFrom(textDocument, pathOption);
+  if (textPathRender != nullptr) {
+    toCalculateBounds = true;
+    // 强制对齐会导致重新排版
+    textPathRender->applyForceAlignmentToGlyphs(glyphLines, layerFrame);
+    // 由于动画的 position 是在文字路径上平移，而路径文字的映射是需要将排版文字的位置叠加动画位置结合路径进行计算，
+    // 因此如果先应用路径，再计算动画，还需要计算一次动画位置，
+    // 最好的方式是先应用动画，结合路径生成最后的矩阵
+    TextAnimatorRenderer::ApplyToGlyphs(glyphLines, animators, textDocument->justification,
+                                        layerFrame);
+    textPathRender->applyToGlyphs(glyphLines, layerFrame);
+  } else {
+    toCalculateBounds = TextAnimatorRenderer::ApplyToGlyphs(
+        glyphLines, animators, textDocument->justification, layerFrame);
+  }
+
   std::vector<std::shared_ptr<Graphic>> contents = {};
   if (block != textBlock && textDocument->backgroundAlpha > 0) {
     auto background = RenderTextBackground(block->assetID(), glyphLines, textDocument);
@@ -165,9 +181,10 @@ GraphicContent* TextContentCache::createContent(Frame layerFrame) const {
   }
   auto [simpleGlyphs, colorGlyphs] = GetGlyphs(glyphLines);
   const tgfx::Rect* textBounds = nullptr;
-  if (!hasAnimators && !block->textBounds().isEmpty()) {
+  if (!toCalculateBounds && !block->textBounds().isEmpty()) {
     textBounds = &block->textBounds();
   }
+
   auto normalText = Text::MakeFrom(simpleGlyphs, block, textBounds);
   if (normalText) {
     contents.push_back(normalText);

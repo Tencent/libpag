@@ -120,10 +120,24 @@ class Glyph {
   }
 
   /**
+   * Returns the original bounding box relative to (0, 0) of this glyph.
+   */
+  const tgfx::Rect getOriginBounds() const {
+    return horizontalInfo->bounds;
+  }
+
+  /**
    * Returns the matrix for this glyph.
    */
   tgfx::Matrix getMatrix() const {
     return matrix;
+  }
+
+  /**
+   * Returns the scale of this glyph when is box text.
+   */
+  void setScale(float s) {
+    scale = s;
   }
 
   /**
@@ -230,6 +244,7 @@ class Glyph {
     float descent = 0;
     tgfx::Rect bounds = tgfx::Rect::MakeEmpty();
     tgfx::Matrix extraMatrix = tgfx::Matrix::I();
+    tgfx::Point originPosition = tgfx::Point::Make(0, 0);
   };
 
   // read only attributes:
@@ -241,6 +256,7 @@ class Glyph {
   // writable attributes:
   tgfx::Matrix matrix = tgfx::Matrix::I();
   TextStyle textStyle = TextStyle::Fill;
+  float scale = 1.0f;
   float alpha = 1.0f;
   Color fillColor = Black;
   Color strokeColor = Black;
