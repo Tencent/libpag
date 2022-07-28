@@ -37,6 +37,8 @@
 #include "tgfx/gpu/Device.h"
 
 namespace pag {
+static constexpr int64_t DECODING_VISIBLE_DISTANCE = 500000;  // 提前 500ms 开始解码。
+
 class RenderCache : public Performance {
  public:
   explicit RenderCache(PAGStage* stage);
@@ -190,7 +192,7 @@ class RenderCache : public Performance {
   void removeSnapshot(ID assetID, const tgfx::Path& path);
   void removePathSnapshots(ID assetID);
 
-  void prepareLayers();
+  void prepareLayers(int64_t timeDistance = DECODING_VISIBLE_DISTANCE);
   void preparePreComposeLayer(PreComposeLayer* layer);
   void prepareImageLayer(PAGImageLayer* layer);
   std::shared_ptr<SequenceReader> getSequenceReaderInternal(const SequenceReaderFactory* factory);

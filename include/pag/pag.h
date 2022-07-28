@@ -1480,6 +1480,7 @@ class PAG_API PAGPlayer {
   void setSurfaceInternal(std::shared_ptr<PAGSurface> newSurface);
   int64_t getTimeStampInternal();
   void prepareInternal();
+  int64_t durationInternal();
 
   friend class PAGSurface;
 };

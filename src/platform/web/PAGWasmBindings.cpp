@@ -348,7 +348,8 @@ EMSCRIPTEN_BINDINGS(pag) {
                 }))
       .function("_graphicsMemory", optional_override([](PAGPlayer& pagPlayer) {
                   return static_cast<int>(pagPlayer.graphicsMemory());
-                }));
+                }))
+      .function("_prepare", &PAGPlayer::prepare);
 
   class_<PAGFont>("_PAGFont")
       .smart_ptr<std::shared_ptr<PAGFont>>("_PAGFont")
