@@ -404,6 +404,7 @@ PAG_TEST_F(PAGTextLayerTest, SmallFontSizeScale) {
   TestPAGPlayer->setSurface(pagSurface);
   TestPAGPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGTextLayerTest/SmallFontSizeScale_LowResolution"));
+  TestPAGPlayer->setSurface(TestPAGSurface);
 }
 
 /**
