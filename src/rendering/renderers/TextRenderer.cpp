@@ -304,6 +304,7 @@ static std::vector<std::vector<GlyphInfo*>> ApplyLayoutToGlyphInfos(
   std::vector<std::vector<GlyphInfo*>> lineList = {};
   auto glyphCount = glyphInfos->size();
   size_t index = 0;
+  int lineIndex = 0;
   auto baseLine = layout.firstBaseLine;
   while (index < glyphCount) {
     if (baseLine > maxY) {
@@ -346,6 +347,8 @@ static std::vector<std::vector<GlyphInfo*>> ApplyLayoutToGlyphInfos(
     }
 
     baseLine += layout.lineGap;
+
+    lineIndex++;
   }
   return lineList;
 }
