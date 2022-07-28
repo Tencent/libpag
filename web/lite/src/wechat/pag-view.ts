@@ -1,9 +1,7 @@
-import { PAGFile } from './pag-file';
-import { RenderingMode, ScaleMode } from './types';
-import { PAG2dView } from './view/pag-2d-view';
-import { PAGWebGLView } from './view/pag-webgl-view';
-
-import type { RenderOptions, View } from './view/view';
+import { PAGFile } from '../pag-file';
+import { RenderingMode } from '../types';
+import { PAGWebGLView } from './pag-webgl-view';
+import { RenderOptions, View } from './view';
 
 export class PAGView {
   /**
@@ -20,12 +18,7 @@ export class PAGView {
     };
     const pagFile = PAGFile.fromArrayBuffer(data);
     let pagView: View;
-    if (opts.renderingMode === RenderingMode.WebGL) {
-      pagView = new PAGWebGLView(pagFile, canvas, opts);
-    } else {
-      pagView = new PAG2dView(pagFile, canvas, opts);
-    }
-
+    pagView = new PAGWebGLView(pagFile, canvas, opts);
     return pagView;
   }
 }

@@ -1,49 +1,33 @@
-import { getVideoParam, getWechatNetwork } from './utils';
-import { addListener, removeListener, removeAllListeners } from './video-listener';
+import { getVideoParam, getWechatNetwork } from '../view/utils';
+import { addListener, removeListener, removeAllListeners } from '../view/video-listener';
 import { RenderingMode, EventName, ScaleMode } from '../types';
 import { IS_IOS } from '../constant';
 import { coverToMp4 } from '../generator/mp4-box-helper';
 import { EventManager, Listener } from '../base/utils/event-manager';
 import { destroyVerify } from '../decorators';
+import { removeFile, touchDirectory, writeFile } from './file-utils';
 
 import type { PAGFile } from '../pag-file';
 import type { VideoParam } from '../types';
 import type { VideoSequence } from '../base/video-sequence';
+import type { FrameDataOptions, VideoDecoder, wx } from './types';
 
-declare global {
-  interface Window {
-    WeixinJSBridge?: any;
-  }
-}
+declare const wx: wx;
 
 export interface RenderOptions {
   renderingMode?: RenderingMode;
-  useScale?: boolean;
 }
 
-const IS_WECHAT = /MicroMessenger/i.test(navigator.userAgent);
-
-export const playVideoElement = async (videoElement: HTMLVideoElement) => {
-  if (IS_WECHAT && window.WeixinJSBridge) {
-    await getWechatNetwork();
-  }
-  try {
-    await videoElement.play();
-  } catch (error: any) {
-    throw new Error(error.message);
-  }
-};
+const MP4_CACHE_PATH = `${wx.env.USER_DATA_PATH}/pag/`;
 
 @destroyVerify
 export class View {
   protected canvas: HTMLCanvasElement | null;
   protected videoParam: VideoParam;
-  protected videoElement: HTMLVideoElement | null;
   protected viewportSize = { x: 0, y: 0, width: 0, height: 0, scaleX: 1, scaleY: 1 }; // viewport尺寸 WebGL坐标轴轴心在左下角|Canvas2D坐标轴轴心在左上角
   protected canvasSize = { width: 0, height: 0 };
 
   private videoSequence: VideoSequence;
-  private videoCanPlay = false;
   private renderingMode: RenderingMode;
   private renderTimer: number | null = null;
   private playing = false;
@@ -52,29 +36,31 @@ export class View {
   private eventManager: EventManager;
   private viewScaleMode = ScaleMode.LetterBox;
 
+  private mp4Path: string;
+  private videoDecoder: VideoDecoder;
+  private flushBaseTime;
+  private currentFrame = 0;
+
   public constructor(pagFile: PAGFile, canvas: HTMLCanvasElement, options: RenderOptions) {
     const videoSequence = pagFile.getVideoSequence();
     if (!videoSequence) throw new Error('PAGFile has no BMP video sequence!');
     this.videoSequence = videoSequence;
     this.canvas = canvas;
-    this.videoElement = document.createElement('video');
-    this.videoElement.style.display = 'none';
-    this.videoElement.muted = true;
-    this.videoElement.playsInline = true;
-    addListener(this.videoElement, 'canplay', () => {
-      this.videoCanPlay = true;
-    });
-    if (!IS_IOS) {
-      addListener(this.videoElement, 'ended', () => {
-        this.repeat(false);
-      });
-    }
-    this.videoElement.src = URL.createObjectURL(new Blob([coverToMp4(this.videoSequence)], { type: 'video/mp4' }));
     this.videoParam = getVideoParam(pagFile, this.videoSequence);
     this.eventManager = new EventManager();
     this.renderingMode = options.renderingMode || RenderingMode.WebGL;
-    this.updateSize(options.useScale);
+    // this.updateSize();
     this.setScaleMode();
+
+    this.mp4Path = `${MP4_CACHE_PATH}${Date.now()}.mp4`;
+    touchDirectory(MP4_CACHE_PATH);
+    writeFile(this.mp4Path, coverToMp4(this.videoSequence));
+    this.videoDecoder = wx.createVideoDecoder();
+    this.flushBaseTime = Math.floor(1000 / this.videoSequence.frameRate);
+    this.videoDecoder.on('ended', () => {
+      this.repeat();
+    });
+    this.videoDecoder.start({ source: this.mp4Path, mode: 0 });
   }
 
   /**
@@ -83,7 +69,6 @@ export class View {
   public async play() {
     if (this.playing) return;
     this.playing = true;
-    await playVideoElement(this.videoElement as HTMLVideoElement);
     this.flushLoop();
     if (this.getProgress() === 0) {
       this.eventManager.emit(EventName.onAnimationStart);
@@ -95,7 +80,6 @@ export class View {
    */
   public pause() {
     if (!this.playing) return;
-    this.videoElement?.pause();
     this.clearRenderTimer();
     this.playing = false;
     this.eventManager.emit(EventName.onAnimationPause);
@@ -104,8 +88,8 @@ export class View {
    * 停止播放
    */
   public stop() {
-    this.videoElement?.pause();
-    this.videoElement!.currentTime = 0;
+    this.clearRenderTimer();
+    this.videoDecoder.seek(0);
     this.clearRender();
     this.playing = false;
     this.eventManager.emit(EventName.onAnimationCancel);
@@ -115,12 +99,10 @@ export class View {
    */
   public destroy() {
     this.clearRenderTimer();
+    this.videoDecoder.remove();
     this.clearRender();
     this.canvas = null;
-    if (this.videoElement) {
-      removeAllListeners(this.videoElement);
-      this.videoElement = null;
-    }
+    removeFile(this.mp4Path);
     this.destroyed = true;
   }
   /**
@@ -157,36 +139,23 @@ export class View {
    * 返回当前播放进度位置，取值范围为 0.0 到 1.0。
    */
   public getProgress() {
-    return Math.round((this.videoElement!.currentTime / this.videoElement!.duration) * 100) / 100;
+    return this.currentFrame / this.videoSequence.frameCount;
   }
   /**
    * 设置播放进度位置，取值范围为 0.0 到 1.0。
    */
   public async setProgress(progress: number) {
-    return new Promise<boolean>((resolve) => {
-      if (progress < 0 || progress > 1) {
-        console.error('progress must be between 0.0 and 1.0');
-        resolve(false);
-        return;
-      }
-      const seekCallback = () => {
-        removeListener(this.videoElement as HTMLVideoElement, 'seeked', seekCallback);
-        resolve(true);
-      };
-      addListener(this.videoElement as HTMLVideoElement, 'seeked', seekCallback);
-      this.videoElement!.currentTime = progress * this.videoElement!.duration;
-    });
+    if (progress < 0 || progress > 1) throw new Error('progress must be between 0 and 1');
+    await this.videoDecoderSeek(progress * this.duration() * 1000);
+    this.currentFrame = Math.floor(progress * this.videoSequence.frameCount);
+    const frameDataOpts = await this.getFrameData();
+    this.flush(frameDataOpts);
   }
   /**
    * 渲染当前进度画面
    */
-  public flush() {
-    // Video 初始化未完成，跳过渲染
-    if (!this.videoCanPlay) {
-      console.warn('Video is not ready yet, skip rendering.');
-      return false;
-    }
-    this.flushInternal();
+  public flush(frameDataOpts: FrameDataOptions) {
+    this.flushInternal(frameDataOpts);
     this.eventManager.emit(EventName.onAnimationUpdate);
     return true;
   }
@@ -269,85 +238,81 @@ export class View {
     }
   }
 
-  public updateSize(useScale = true) {
-    if (!this.canvas) {
-      throw new Error('Canvas element is not found!');
-    }
-    let displaySize: { width: number; height: number };
-    const styleDeclaration = getComputedStyle(this.canvas as HTMLCanvasElement);
-    const computedSize = {
-      width: Number(styleDeclaration.width.replace('px', '')),
-      height: Number(styleDeclaration.height.replace('px', '')),
-    };
-    if (computedSize.width > 0 && computedSize.height > 0) {
-      displaySize = computedSize;
-    } else {
-      const styleSize = {
-        width: Number(this.canvas.style.width.replace('px', '')),
-        height: Number(this.canvas.style.height.replace('px', '')),
-      };
-      if (styleSize.width > 0 && styleSize.height > 0) {
-        displaySize = styleSize;
-      } else {
-        displaySize = {
-          width: this.canvas.width,
-          height: this.canvas.height,
-        };
-      }
-    }
-
-    if (!useScale) {
-      this.canvas!.width = this.canvas!.width || displaySize.width;
-      this.canvas!.height = this.canvas!.height || displaySize.height;
-      return;
-    }
-    this.canvas.style.width = `${displaySize.width}px`;
-    this.canvas.style.height = `${displaySize.height}px`;
-    this.canvas.width = displaySize.width * window.devicePixelRatio;
-    this.canvas.height = displaySize.height * window.devicePixelRatio;
+  public updateSize() {
+    const styles = getComputedStyle(this.canvas as HTMLCanvasElement);
+    this.canvas!.width = Number(styles.getPropertyValue('width').replace('px', ''));
+    this.canvas!.height = Number(styles.getPropertyValue('height').replace('px', ''));
   }
 
   protected loadContext() {}
 
-  protected flushInternal() {}
+  protected flushInternal(frameDataOpts: FrameDataOptions) {}
 
   protected clearRender() {}
 
   private flushLoop() {
-    this.renderTimer = window.requestAnimationFrame(() => {
-      this.flushLoop();
-    });
-    if (IS_IOS && this.duration() - this.videoElement!.currentTime <= 1 / this.frameRate()) {
-      this.repeat(true);
+    const frameDataOpts = this.videoDecoder.getFrameData();
+    if (frameDataOpts === null) {
+      this.renderTimer = window.setTimeout(() => {
+        this.flushLoop();
+      }, 0);
+      return;
     }
-    this.flush();
+    this.flush(frameDataOpts);
+    this.currentFrame += 1;
+    this.renderTimer = window.setTimeout(() => {
+      this.flushLoop();
+    }, this.flushBaseTime);
   }
 
   private clearRenderTimer() {
     if (this.renderTimer) {
-      window.cancelAnimationFrame(this.renderTimer);
+      window.clearTimeout(this.renderTimer);
       this.renderTimer = null;
     }
   }
 
-  private repeat(isIOS = false) {
+  private repeat() {
     // 循环结束
     if (this.repeatCount === 0) {
-      this.videoElement?.pause();
       this.clearRenderTimer();
       this.clearRender();
+      this.videoDecoder.seek(0);
       this.playing = false;
       this.eventManager.emit('onAnimationEnd');
       return;
     }
     // 次数循环
     this.repeatCount -= 1;
-    if (isIOS) {
-      this.videoElement!.currentTime = 0;
-    } else {
-      playVideoElement(this.videoElement as HTMLVideoElement);
-    }
+    this.videoDecoder.seek(0);
     this.eventManager.emit('onAnimationRepeat');
     return;
+  }
+
+  private videoDecoderSeek(position: number) {
+    return new Promise<boolean>((resolve) => {
+      const onSeeked = () => {
+        this.videoDecoder.off('seek', onSeeked);
+        resolve(true);
+      };
+      this.videoDecoder.on('seek', onSeeked);
+      this.videoDecoder.seek(position);
+    });
+  }
+
+  private getFrameData() {
+    return new Promise<FrameDataOptions>((resolve) => {
+      const loop = () => {
+        const frameData = this.videoDecoder.getFrameData();
+        if (frameData !== null) {
+          resolve(frameData);
+          return;
+        }
+        window.setTimeout(() => {
+          loop();
+        }, 1);
+      };
+      loop();
+    });
   }
 }

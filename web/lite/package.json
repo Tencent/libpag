@@ -8,6 +8,7 @@
   "typings": "types/pag.d.ts",
   "scripts": {
     "build": "rimraf lib/* types/* && rollup -c ./script/rollup.config.js && tsc -p ./tsconfig.type.json",
+    "build:wx": "rimraf lib/* types/* && rollup -c ./script/rollup.config.wechat.js && tsc -p ./tsconfig.type.json",
     "dev": "rollup -c ./script/rollup.config.dev.js -w",
     "eslint": "eslint --ext .ts src/",
     "eslint:fix": "eslint --ext .ts src/ --fix",

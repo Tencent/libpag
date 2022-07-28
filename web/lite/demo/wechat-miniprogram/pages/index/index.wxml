@@ -1,0 +1,28 @@
+<!--index.wxml-->
+<view class="container">
+  <view>
+    <canvas type="webgl" id="pag" style="width: 300px; height:360px;"></canvas>
+  </view>
+  <view hidden="{{pagLoaded}}">
+    <picker bindchange="scalePickerChange" value="{{scaleIndex}}" range="{{scaleMap}}">
+      <view class="picker">
+        缩放模式：{{scaleMap[scaleIndex]}}
+      </view>
+    </picker>
+    <button class="btn" size="default" type="default" bindtap="load">加载测试PAG</button>
+  </view>
+  <view hidden="{{!pagLoaded}}">
+    <text class="title">播放次数</text>
+    <input class="input" type="number" value="{{repeatCount}}" bindinput="repeatCountChange"/>
+    <text class="title">设置进度</text>
+    <view>
+        <slider value="{{progress}}" bindchange="progressChange" min="0" max="1" step="0.01" show-value/>
+    </view>
+    <button class="btn" size="default" type="default" bindtap="setProgress">设置进度</button>
+    <button class="btn" size="default" type="default" bindtap="play">开始</button>
+    <button class="btn" size="default" type="default" bindtap="pause">暂停</button>
+    <button class="btn" size="default" type="default" bindtap="stop">停止</button>
+    <button class="btn" size="default" type="default" bindtap="destroy">销毁</button>
+    <button class="btn" size="default" type="default" bindtap="clearCache">清除缓存</button>
+  </view>
+</view>

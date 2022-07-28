@@ -1,0 +1,24 @@
+/**index.wxss**/
+.btn {
+  margin-top: 12px;
+}
+.input {
+  height: 36px;
+  border: 1px rgb(215, 215, 215) solid;
+  border-radius: 4px;
+  text-align: center;
+}
+.picker {
+  padding-top: 6px;
+  height: 36px;
+  font-size: 16px;
+  font-weight: bold;
+  background: #f2f2f2;
+  color: #06ae56;
+  border-radius: 4px;
+  text-align: center;
+}
+.title {
+  text-align: center;
+  margin-bottom: 6px;
+}
