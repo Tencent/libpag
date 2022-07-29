@@ -27,12 +27,12 @@ bool ImageFilter::applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* 
   if (clipRect) {
     return dstRect->intersect(*clipRect);
   }
-  return dstRect;
+  return true;
 }
 
 Rect ImageFilter::filterBounds(const Rect& rect) const {
-  auto dstBounds = onFilterNodeBounds(rect);
-  applyCropRect(dstBounds, &dstBounds);
+  auto dstBounds = Rect::MakeEmpty();
+  applyCropRect(rect, &dstBounds);
   return dstBounds;
 }
 
