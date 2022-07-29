@@ -37,12 +37,13 @@ Page({
       .exec(async (res) => {
         wx.showLoading({ title: '加载中' });
         const canvas = res[0].node;
-
-        const buffer = await loadFileByRequest('https://tencent-effect-1251316161.cos.ap-shanghai.myqcloud.com/particle_video.pag');
-        if (!buffer) throw('加载失败');
-        this.data.pagView = PAGView.init(buffer, canvas);
-        console.log('pagView', this.data.pagView);
-        this.setData({ pagLoaded: true });
+        const buffer = await loadFileByRequest(
+          'https://tencent-effect-1251316161.cos.ap-shanghai.myqcloud.com/particle_video.pag',
+        );
+        console.log(buffer);
+        if (!buffer) throw '加载失败';
+        const pagView = PAGView.init(buffer, canvas);
+        this.setData({ pagView: pagView, pagLoaded: true });
         wx.hideLoading();
       });
   },

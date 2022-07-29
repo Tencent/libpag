@@ -20,7 +20,7 @@ export class PAGWebGLView extends View {
 
   public constructor(pagFile: PAGFile, canvas: HTMLCanvasElement, options: RenderOptions) {
     super(pagFile, canvas, options);
-    const gl = this.canvas?.getContext('webgl');
+    const gl = this.canvas?.getContext('webgl', { alpha: true });
     if (!gl) throw new Error("Can't get WebGL context!");
     this.gl = gl;
     if (this.videoParam.hasAlpha) {

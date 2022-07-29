@@ -1,4 +1,4 @@
-import type { wx } from "./types";
+import type { wx } from './types';
 
 declare const wx: wx;
 
@@ -19,8 +19,8 @@ export const touchDirectory = (path: string) => {
 export const writeFile = (path: string, data: string | ArrayBuffer) => {
   try {
     fs.writeFileSync(path, data, 'utf8');
-  } catch (e) {
-    console.error(e);
+  } catch (e: any) {
+    throw new Error(e);
   }
 };
 

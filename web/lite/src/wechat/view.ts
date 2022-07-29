@@ -14,6 +14,8 @@ import type { FrameDataOptions, VideoDecoder, wx } from './types';
 
 declare const wx: wx;
 
+declare const setTimeout: (callback: () => void, delay: number) => number;
+
 export interface RenderOptions {
   renderingMode?: RenderingMode;
 }
@@ -44,17 +46,20 @@ export class View {
   public constructor(pagFile: PAGFile, canvas: HTMLCanvasElement, options: RenderOptions) {
     const videoSequence = pagFile.getVideoSequence();
     if (!videoSequence) throw new Error('PAGFile has no BMP video sequence!');
+    delete videoSequence.composition;
     this.videoSequence = videoSequence;
+    console.log(this.videoSequence);
+
     this.canvas = canvas;
     this.videoParam = getVideoParam(pagFile, this.videoSequence);
     this.eventManager = new EventManager();
     this.renderingMode = options.renderingMode || RenderingMode.WebGL;
-    // this.updateSize();
     this.setScaleMode();
 
     this.mp4Path = `${MP4_CACHE_PATH}${Date.now()}.mp4`;
     touchDirectory(MP4_CACHE_PATH);
-    writeFile(this.mp4Path, coverToMp4(this.videoSequence));
+    const mp4Data = coverToMp4(this.videoSequence);
+    writeFile(this.mp4Path, mp4Data.buffer);
     this.videoDecoder = wx.createVideoDecoder();
     this.flushBaseTime = Math.floor(1000 / this.videoSequence.frameRate);
     this.videoDecoder.on('ended', () => {
@@ -253,21 +258,21 @@ export class View {
   private flushLoop() {
     const frameDataOpts = this.videoDecoder.getFrameData();
     if (frameDataOpts === null) {
-      this.renderTimer = window.setTimeout(() => {
+      this.renderTimer = setTimeout(() => {
         this.flushLoop();
       }, 0);
       return;
     }
     this.flush(frameDataOpts);
     this.currentFrame += 1;
-    this.renderTimer = window.setTimeout(() => {
+    this.renderTimer = setTimeout(() => {
       this.flushLoop();
     }, this.flushBaseTime);
   }
 
   private clearRenderTimer() {
     if (this.renderTimer) {
-      window.clearTimeout(this.renderTimer);
+      clearTimeout(this.renderTimer);
       this.renderTimer = null;
     }
   }
@@ -308,7 +313,7 @@ export class View {
           resolve(frameData);
           return;
         }
-        window.setTimeout(() => {
+        setTimeout(() => {
           loop();
         }, 1);
       };
