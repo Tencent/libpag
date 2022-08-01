@@ -45,9 +45,10 @@ export class VideoReader {
 
   private videoEl: HTMLVideoElement | null;
   private readonly frameRate: number;
-  private lastFlush: number;
+  private lastVideoTime = -1;
   private hadPlay = false;
   private staticTimeRanges: StaticTimeRanges;
+  private lastPrepareTime: { frame: number; time: number }[] = [];
 
   public constructor(mp4Data: Uint8Array, frameRate: number, staticTimeRanges: TimeRange[]) {
     this.videoEl = document.createElement('video');
@@ -57,7 +58,6 @@ export class VideoReader {
     this.videoEl.load();
     addListener(this.videoEl, 'timeupdate', this.onTimeupdate.bind(this));
     this.frameRate = frameRate;
-    this.lastFlush = -1;
     const blob = new Blob([mp4Data], { type: 'video/mp4' });
     this.videoEl.src = URL.createObjectURL(blob);
     this.staticTimeRanges = new StaticTimeRanges(staticTimeRanges);
@@ -68,9 +68,10 @@ export class VideoReader {
       console.error('Video element is null!');
       return false;
     }
+    this.alignPlaybackRate(targetFrame);
     const { currentTime } = this.videoEl;
     const targetTime = targetFrame / this.frameRate;
-    this.lastFlush = targetTime;
+    this.lastVideoTime = targetTime;
     if (currentTime === 0 && targetTime === 0) {
       if (this.hadPlay) {
         return true;
@@ -129,9 +130,9 @@ export class VideoReader {
   }
 
   private onTimeupdate() {
-    if (!this.videoEl || this.lastFlush < 0) return;
+    if (!this.videoEl || this.lastVideoTime < 0) return;
     const { currentTime } = this.videoEl;
-    if (currentTime - this.lastFlush >= (1 / this.frameRate) * VIDEO_DECODE_WAIT_FRAME && !this.videoEl.paused) {
+    if (currentTime - this.lastVideoTime >= (1 / this.frameRate) * VIDEO_DECODE_WAIT_FRAME && !this.videoEl.paused) {
       this.videoEl.pause();
     }
   }
@@ -178,6 +179,27 @@ export class VideoReader {
         }
       }, (1000 / this.frameRate) * VIDEO_DECODE_WAIT_FRAME);
     });
+  }
+
+  private alignPlaybackRate(targetFrame: number) {
+    const now = performance.now();
+    if (this.lastPrepareTime.length === 0) {
+      this.lastPrepareTime.push({ frame: targetFrame, time: now });
+      return;
+    }
+    if (this.lastPrepareTime[this.lastPrepareTime.length - 1].frame === targetFrame) return;
+    if (targetFrame < this.lastPrepareTime[this.lastPrepareTime.length - 1].frame) {
+      this.lastPrepareTime = [];
+      this.lastPrepareTime.push({ frame: targetFrame, time: now });
+      return;
+    }
+    if (this.lastPrepareTime.length === 5) {
+      this.lastPrepareTime.shift();
+    }
+    this.lastPrepareTime.push({ frame: targetFrame, time: now });
+    const distance = (now - this.lastPrepareTime[0].time) / (targetFrame - this.lastPrepareTime[0].frame);
+    const playbackRate = 1000 / this.frameRate / distance;
+    this.videoEl!.playbackRate = playbackRate;
   }
 }
 
