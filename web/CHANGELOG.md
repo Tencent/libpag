@@ -1,6 +1,18 @@
 # CHANGELOG
 
-## 4.0.5.16
+## 4.0.5.26
+
+### Feature
+
+- Add BMP sequence prepare.
+- Add playbackRate support in decoder.
+
+### BugFixes
+
+- Fix video decoding failure when src is blobUrl on iOS Safari.
+- Fix displacementMapLayer not decode.
+
+## 4.0.5.17
 
 ### Breaking Changes
 

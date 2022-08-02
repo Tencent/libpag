@@ -1,6 +1,18 @@
 # CHANGELOG
 
-## 4.0.5.16
+## 4.0.5.26
+
+### Feature
+
+- 增加 BMP 序列帧预加载解码
+- 增加解码倍速支持
+
+### BugFixes
+
+- 修复 iOS Safari 上 src 使用 blobUrl 时解码错误的问题
+- 修复 displacementMapLayer 没有解码的问题
+
+## 4.0.5.17
 
 ### Breaking Changes
 
