@@ -94,20 +94,30 @@ void BlurImageFilter::draw(const Texture* texture, Surface* toSurface, bool isDo
           blurOffset, texelSize));
 }
 
-static std::shared_ptr<Texture> CropImage(Context* context, const Texture* image,
-                                          const Rect& dstBounds, TileMode tileMode) {
-  auto surface = Surface::Make(context, static_cast<int>(dstBounds.width()),
-                               static_cast<int>(dstBounds.height()));
+static std::shared_ptr<Texture> ExtendImage(Context* context, const Texture* image,
+                                            const Rect& dstBounds, TileMode tileMode) {
+  auto dstWidth = dstBounds.width();
+  auto dstHeight = dstBounds.height();
+  auto surface = Surface::Make(context, static_cast<int>(dstWidth), static_cast<int>(dstHeight));
   if (surface == nullptr) {
     return nullptr;
   }
   auto drawContext = SurfaceDrawContext::Make(surface.get());
-  auto localMatrix = Matrix::MakeScale(dstBounds.width(), dstBounds.height());
-  localMatrix.postTranslate(dstBounds.left, dstBounds.top);
-  auto dstRect = Rect::MakeWH(dstBounds.width(), dstBounds.height());
-  drawContext->fillRectWithFP(
-      dstRect, localMatrix,
-      TextureEffect::Make(image, SamplerState(TileModeToWrapMode(tileMode, context->caps()))));
+  if (tileMode == TileMode::Decal) {
+    // ClampToBorder, border color is transparent.
+    auto width = static_cast<float>(image->width());
+    auto height = static_cast<float>(image->height());
+    auto localMatrix = Matrix::MakeScale(width, height);
+    auto dstRect = Rect::MakeXYWH(-dstBounds.left, -dstBounds.top, width, height);
+    drawContext->fillRectWithFP(dstRect, localMatrix, TextureEffect::Make(image));
+  } else {
+    auto localMatrix = Matrix::MakeScale(dstWidth, dstHeight);
+    localMatrix.postTranslate(dstBounds.left, dstBounds.top);
+    auto dstRect = Rect::MakeWH(dstWidth, dstHeight);
+    drawContext->fillRectWithFP(
+        dstRect, localMatrix,
+        TextureEffect::Make(image, SamplerState(TileModeToWrapMode(tileMode, context->caps()))));
+  }
   return surface->getTexture();
 }
 
@@ -130,7 +140,7 @@ std::pair<std::shared_ptr<Texture>, Point> BlurImageFilter::filterImage(
   std::shared_ptr<Texture> last;
   if (dstBounds !=
       Rect::MakeWH(static_cast<float>(image->width()), static_cast<float>(image->height()))) {
-    last = CropImage(context.context, image, dstBounds, tileMode);
+    last = ExtendImage(context.context, image, dstBounds, tileMode);
     if (last == nullptr) {
       return {};
     }
