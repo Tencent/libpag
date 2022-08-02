@@ -395,6 +395,8 @@ export class PAGView {
     const count = Math.floor(this.playTime / duration);
     if (this.repeatCount >= 0 && count > this.repeatCount) {
       this.clearTimer();
+      this.player.setProgress(1);
+      await this.flush();
       this.playTime = 0;
       this.isPlaying = false;
       this.eventManager.emit(PAGViewListenerEvent.onAnimationEnd, this);
