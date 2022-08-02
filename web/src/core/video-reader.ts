@@ -1,4 +1,4 @@
-import { VIDEO_DECODE_WAIT_FRAME } from '../constant';
+import { VIDEO_DECODE_WAIT_FRAME, VIDEO_PLAYBACK_RATE_MAX, VIDEO_PLAYBACK_RATE_MIN } from '../constant';
 import { addListener, removeListener, removeAllListeners } from '../utils/video-listener';
 import { IPHONE, IS_WECHAT } from '../utils/ua';
 import { EmscriptenGL } from '../types';
@@ -198,7 +198,8 @@ export class VideoReader {
     }
     this.lastPrepareTime.push({ frame: targetFrame, time: now });
     const distance = (now - this.lastPrepareTime[0].time) / (targetFrame - this.lastPrepareTime[0].frame);
-    const playbackRate = 1000 / this.frameRate / distance;
+    let playbackRate = 1000 / this.frameRate / distance;
+    playbackRate = Math.min(Math.max(playbackRate, VIDEO_PLAYBACK_RATE_MIN), VIDEO_PLAYBACK_RATE_MAX);
     this.videoEl!.playbackRate = playbackRate;
   }
 }
