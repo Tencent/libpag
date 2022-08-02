@@ -50,7 +50,7 @@ export const proxyVector = <T extends (...args: any) => any>(
 export const isOffscreenCanvas = (element: any) => window.OffscreenCanvas && element instanceof OffscreenCanvas;
 
 export const layer2typeLayer = (wasmIns: any): PAGSolidLayer | PAGTextLayer | PAGImageLayer | PAGLayer => {
-  switch (wasmIns._layerType()) {
+  switch (rewindData(wasmIns._layerType, wasmIns)) {
     case LayerType.Solid:
       return new PAGModule.PAGSolidLayer(wasmIns);
     case LayerType.Text:
