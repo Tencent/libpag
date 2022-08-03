@@ -19,25 +19,26 @@
 #include "SamplerState.h"
 
 namespace tgfx {
-SamplerState::WrapMode TileModeToWrapMode(TileMode tileMode, const Caps* caps) {
-  SamplerState::WrapMode wrapMode;
+static SamplerState::WrapMode TileModeToWrapMode(TileMode tileMode) {
   switch (tileMode) {
     case TileMode::Clamp:
-      wrapMode = SamplerState::WrapMode::Clamp;
-      break;
+      return SamplerState::WrapMode::Clamp;
     case TileMode::Repeat:
-      wrapMode = SamplerState::WrapMode::Repeat;
-      break;
+      return SamplerState::WrapMode::Repeat;
     case TileMode::Mirror:
-      wrapMode = SamplerState::WrapMode::MirrorRepeat;
-      break;
+      return SamplerState::WrapMode::MirrorRepeat;
     case TileMode::Decal:
-      wrapMode = SamplerState::WrapMode::ClampToBorder;
-      break;
+      return SamplerState::WrapMode::ClampToBorder;
   }
-  if (wrapMode == SamplerState::WrapMode::ClampToBorder && !caps->clampToBorderSupport) {
-    return SamplerState::WrapMode::Clamp;
-  }
-  return wrapMode;
+}
+
+SamplerState::SamplerState(TileMode tileMode) {
+  wrapModeX = TileModeToWrapMode(tileMode);
+  wrapModeY = wrapModeX;
+}
+
+SamplerState::SamplerState(TileMode tileModeX, TileMode tileModeY) {
+  wrapModeX = TileModeToWrapMode(tileModeX);
+  wrapModeY = TileModeToWrapMode(tileModeY);
 }
 }  // namespace tgfx

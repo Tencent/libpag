@@ -18,8 +18,8 @@
 
 #include "BlurImageFilter.h"
 #include "DualBlurFragmentProcessor.h"
-#include "RGBAAATextureEffect.h"
 #include "SurfaceDrawContext.h"
+#include "TextureEffect.h"
 #include "tgfx/gpu/TextureSampler.h"
 
 namespace tgfx {
@@ -89,9 +89,8 @@ void BlurImageFilter::draw(const Texture* texture, Surface* toSurface, bool isDo
       dstRect, localMatrix,
       DualBlurFragmentProcessor::Make(
           isDown ? DualBlurPassMode::Down : DualBlurPassMode::Up,
-          RGBAAATextureEffect::Make(
-              texture, SamplerState(TileModeToWrapMode(tileMode, toSurface->getContext()->caps()))),
-          blurOffset, texelSize));
+          TextureEffect::Make(toSurface->getContext(), texture, SamplerState(tileMode)), blurOffset,
+          texelSize));
 }
 
 static std::shared_ptr<Texture> ExtendImage(Context* context, const Texture* image,
@@ -103,21 +102,11 @@ static std::shared_ptr<Texture> ExtendImage(Context* context, const Texture* ima
     return nullptr;
   }
   auto drawContext = SurfaceDrawContext::Make(surface.get());
-  if (tileMode == TileMode::Decal) {
-    // ClampToBorder, border color is transparent.
-    auto width = static_cast<float>(image->width());
-    auto height = static_cast<float>(image->height());
-    auto localMatrix = Matrix::MakeScale(width, height);
-    auto dstRect = Rect::MakeXYWH(-dstBounds.left, -dstBounds.top, width, height);
-    drawContext->fillRectWithFP(dstRect, localMatrix, RGBAAATextureEffect::Make(image));
-  } else {
-    auto localMatrix = Matrix::MakeScale(dstWidth, dstHeight);
-    localMatrix.postTranslate(dstBounds.left, dstBounds.top);
-    auto dstRect = Rect::MakeWH(dstWidth, dstHeight);
-    drawContext->fillRectWithFP(dstRect, localMatrix,
-                                RGBAAATextureEffect::Make(image, SamplerState(TileModeToWrapMode(
-                                                                     tileMode, context->caps()))));
-  }
+  auto localMatrix = Matrix::MakeScale(dstBounds.width(), dstBounds.height());
+  localMatrix.postTranslate(dstBounds.left, dstBounds.top);
+  auto dstRect = Rect::MakeWH(dstBounds.width(), dstBounds.height());
+  drawContext->fillRectWithFP(dstRect, localMatrix,
+                              TextureEffect::Make(context, image, SamplerState(tileMode)));
   return surface->getTexture();
 }
 

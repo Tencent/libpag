@@ -1,10 +1,11 @@
 {
     "CanvasTest": {
         "Clip": "6a420423",
-        "blur": "6a420423",
+        "blur": "fb98147f",
         "dropShadow": "6a420423",
         "greyColorMatrix": "6a420423",
-        "identityMatrix": "6a420423"
+        "identityMatrix": "6a420423",
+        "tileMode": "fb98147f"
     },
     "PAGBlendTest": {
         "Blend_Add": "48a897dd",

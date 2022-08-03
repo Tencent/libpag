@@ -23,6 +23,8 @@
 #include "tgfx/gpu/PixelFormat.h"
 
 namespace tgfx {
+enum class TextureType { Unknown, TwoD, Rectangle, External };
+
 /**
  * TextureSampler stores the sampling parameters for a backend texture uint.
  */
@@ -34,7 +36,11 @@ class TextureSampler {
    * The pixel format of the sampler.
    */
   PixelFormat format = PixelFormat::RGBA_8888;
-  
+
+  virtual TextureType type() const {
+    return TextureType::TwoD;
+  }
+
  protected:
   virtual void computeKey(Context* context, BytesKey* bytesKey) const = 0;
 

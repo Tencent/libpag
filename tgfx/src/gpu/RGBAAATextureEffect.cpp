@@ -17,39 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RGBAAATextureEffect.h"
-#include "core/utils/Log.h"
+#include "YUVTextureEffect.h"
 #include "core/utils/UniqueID.h"
-#include "gpu/YUVTextureEffect.h"
 #include "opengl/GLRGBAAATextureEffect.h"
 
 namespace tgfx {
-static bool CheckParameter(const Texture* texture, const RGBAAALayout* layout) {
+std::unique_ptr<FragmentProcessor> RGBAAATextureEffect::Make(const Texture* texture,
+                                                             const Matrix& localMatrix,
+                                                             const RGBAAALayout* layout) {
   if (texture == nullptr) {
-    return false;
-  }
-  if (layout != nullptr) {
-    if (layout->width <= 0 || layout->height <= 0 ||
-        (layout->alphaStartX <= 0 && layout->alphaStartY <= 0) ||
-        layout->width + layout->alphaStartX > texture->width() ||
-        layout->height + layout->alphaStartY > texture->height()) {
-      LOGE("TextureFragmentProcessor::Make(): Invalid RGBAAALayout specified!");
-      return false;
-    }
-  }
-  return true;
-}
-
-std::unique_ptr<FragmentProcessor> RGBAAATextureEffect::Make(const Texture* texture,
-                                                             const Matrix& localMatrix,
-                                                             const RGBAAALayout* layout) {
-  return Make(texture, {}, localMatrix, layout);
-}
-
-std::unique_ptr<FragmentProcessor> RGBAAATextureEffect::Make(const Texture* texture,
-                                                             SamplerState samplerState,
-                                                             const Matrix& localMatrix,
-                                                             const RGBAAALayout* layout) {
-  if (!CheckParameter(texture, layout)) {
     return nullptr;
   }
   // normalize
@@ -67,13 +43,12 @@ std::unique_ptr<FragmentProcessor> RGBAAATextureEffect::Make(const Texture* text
     return std::unique_ptr<YUVTextureEffect>(
         new YUVTextureEffect(static_cast<const YUVTexture*>(texture), layout, matrix));
   }
-  return std::unique_ptr<RGBAAATextureEffect>(
-      new RGBAAATextureEffect(texture, samplerState, layout, matrix));
+  return std::unique_ptr<RGBAAATextureEffect>(new RGBAAATextureEffect(texture, layout, matrix));
 }
 
-RGBAAATextureEffect::RGBAAATextureEffect(const Texture* texture, SamplerState samplerState,
-                                         const RGBAAALayout* layout, const Matrix& localMatrix)
-    : texture(texture), samplerState(samplerState), layout(layout), coordTransform(localMatrix) {
+RGBAAATextureEffect::RGBAAATextureEffect(const Texture* texture, const RGBAAALayout* layout,
+                                         const Matrix& localMatrix)
+    : texture(texture), layout(layout), coordTransform(localMatrix) {
   setTextureSamplerCnt(1);
   addCoordTransform(&coordTransform);
 }

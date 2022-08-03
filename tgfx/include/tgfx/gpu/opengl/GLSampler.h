@@ -36,6 +36,8 @@ class GLSampler : public TextureSampler {
    */
   unsigned target = 0x0DE1;  // GL_TEXTURE_2D;
 
+  TextureType type() const override;
+
  protected:
   void computeKey(Context* context, BytesKey* bytesKey) const override;
 };

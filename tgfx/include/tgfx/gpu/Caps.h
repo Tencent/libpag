@@ -29,5 +29,6 @@ class Caps {
    * GLES 3.2, but is also available in extensions. Vulkan and Metal always have support.
    */
   bool clampToBorderSupport = true;
+  bool npotTextureTileSupport = true;  // Vulkan and Metal always have support.
 };
 }  // namespace tgfx

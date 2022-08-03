@@ -24,14 +24,18 @@
 namespace tgfx {
 class TextureShader : public Shader {
  public:
-  static std::shared_ptr<Shader> Make(std::shared_ptr<Texture> texture);
+  static std::shared_ptr<Shader> Make(std::shared_ptr<Texture> texture, TileMode tileModeX,
+                                      TileMode tileModeY);
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const override;
 
  private:
-  explicit TextureShader(std::shared_ptr<Texture> texture) : texture(std::move(texture)) {
+  TextureShader(std::shared_ptr<Texture> texture, TileMode tileModeX, TileMode tileModeY)
+      : texture(std::move(texture)), tileModeX(tileModeX), tileModeY(tileModeY) {
   }
 
   std::shared_ptr<Texture> texture;
+  TileMode tileModeX = TileMode::Clamp;
+  TileMode tileModeY = TileMode::Clamp;
 };
 }  // namespace tgfx
