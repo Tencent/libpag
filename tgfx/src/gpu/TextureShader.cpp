@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureShader.h"
-#include "TextureEffect.h"
+#include "RGBAAATextureEffect.h"
 #include "tgfx/gpu/TextureSampler.h"
 
 namespace tgfx {
@@ -39,7 +39,7 @@ std::unique_ptr<FragmentProcessor> TextureShader::asFragmentProcessor(const FPAr
   if (!ComputeTotalInverse(args, &matrix)) {
     return nullptr;
   }
-  auto effect = TextureEffect::Make(texture.get(), matrix);
+  auto effect = RGBAAATextureEffect::Make(texture.get(), matrix);
   if (texture->getSampler()->format == PixelFormat::ALPHA_8) {
     return effect;
   }

@@ -28,47 +28,58 @@ void GLDualBlurFragmentProcessor::emitCode(EmitArgs& args) {
   std::string texelSizeName;
   texelSizeUniform = args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float2,
                                                      "TexelSize", &texelSizeName);
-  std::string tempColor;
+  std::string tempColor = "tempColor";
   const auto* fp = static_cast<const DualBlurFragmentProcessor*>(args.fragmentProcessor);
   if (fp->passMode == DualBlurPassMode::Down) {
-    std::vector<std::string> coords = {
-        "", " - " + texelSizeName + " * " + blurOffsetName,
-        " + " + texelSizeName + " * " + blurOffsetName,
-        " + vec2(" + texelSizeName + ".x, -" + texelSizeName + ".y) * " + blurOffsetName,
-        " - vec2(" + texelSizeName + ".x, -" + texelSizeName + ".y) * " + blurOffsetName};
-    for (size_t i = 0; i < coords.size(); ++i) {
-      tempColor = "tempColor" + std::to_string(i);
-      emitChild(0, &tempColor, args,
-                [coords, i](std::string_view coord) { return std::string(coord) + coords[i]; });
-      if (i == 0) {
-        fragBuilder->codeAppendf("vec4 sum = %s * 4.0;", tempColor.c_str());
-      } else {
-        fragBuilder->codeAppendf("sum += %s;", tempColor.c_str());
-      }
-    }
+    fragBuilder->codeAppend("const int size = 5;");
+    fragBuilder->codeAppendf("vec2 coords[size];");
+    fragBuilder->codeAppend("coords[0] = vec2(0.0, 0.0);");
+    fragBuilder->codeAppendf("coords[1] = -%s * %s;", texelSizeName.c_str(),
+                             blurOffsetName.c_str());
+    fragBuilder->codeAppendf("coords[2] = %s * %s;", texelSizeName.c_str(), blurOffsetName.c_str());
+    fragBuilder->codeAppendf("coords[3] = vec2(%s.x, -%s.y) * %s;", texelSizeName.c_str(),
+                             texelSizeName.c_str(), blurOffsetName.c_str());
+    fragBuilder->codeAppendf("coords[4] = -vec2(%s.x, -%s.y) * %s;", texelSizeName.c_str(),
+                             texelSizeName.c_str(), blurOffsetName.c_str());
+    fragBuilder->codeAppendf("vec4 sum;");
+    fragBuilder->codeAppend("for (int i = 0; i < size; i++) {");
+    emitChild(0, &tempColor, args,
+              [](std::string_view coord) { return std::string(coord) + " + coords[i]"; });
+    fragBuilder->codeAppend("if (i == 0) {");
+    fragBuilder->codeAppendf("sum = %s * 4.0;", tempColor.c_str());
+    fragBuilder->codeAppend("} else {");
+    fragBuilder->codeAppendf("sum += %s;", tempColor.c_str());
+    fragBuilder->codeAppend("}");
+    fragBuilder->codeAppend("}");
     fragBuilder->codeAppendf("%s = sum / 8.0;", args.outputColor.c_str());
   } else {
-    std::vector<std::string> coords = {
-        " + vec2(-" + texelSizeName + ".x * 2.0, 0.0) * " + blurOffsetName,
-        " + vec2(-" + texelSizeName + ".x, " + texelSizeName + ".y) * " + blurOffsetName,
-        " + vec2(0.0, " + texelSizeName + ".y * 2.0) * " + blurOffsetName,
-        " + " + texelSizeName + " * " + blurOffsetName,
-        " + vec2(" + texelSizeName + ".x * 2.0, 0.0) * " + blurOffsetName,
-        " + vec2(" + texelSizeName + ".x, -" + texelSizeName + ".y) * " + blurOffsetName,
-        " + vec2(0.0, -" + texelSizeName + ".y * 2.0) * " + blurOffsetName,
-        " + vec2(-" + texelSizeName + ".x, -" + texelSizeName + ".y) * " + blurOffsetName};
-    for (size_t i = 0; i < coords.size(); ++i) {
-      tempColor = "tempColor" + std::to_string(i);
-      emitChild(0, &tempColor, args,
-                [coords, i](std::string_view coord) { return std::string(coord) + coords[i]; });
-      if (i == 0) {
-        fragBuilder->codeAppendf("vec4 sum = %s;", tempColor.c_str());
-      } else if (i % 2 == 1) {
-        fragBuilder->codeAppendf("sum += %s * 2.0;", tempColor.c_str());
-      } else {
-        fragBuilder->codeAppendf("sum += %s;", tempColor.c_str());
-      }
-    }
+    fragBuilder->codeAppend("const int size = 8;");
+    fragBuilder->codeAppend("vec2 coords[size];");
+    fragBuilder->codeAppendf("coords[0] = vec2(-%s.x * 2.0, 0.0) * %s;", texelSizeName.c_str(),
+                             blurOffsetName.c_str());
+    fragBuilder->codeAppendf("coords[1] = vec2(-%s.x, %s.y) * %s;", texelSizeName.c_str(),
+                             texelSizeName.c_str(), blurOffsetName.c_str());
+    fragBuilder->codeAppendf("coords[2] = vec2(0.0, %s.y * 2.0) * %s;", texelSizeName.c_str(),
+                             blurOffsetName.c_str());
+    fragBuilder->codeAppendf("coords[3] = %s * %s;", texelSizeName.c_str(), blurOffsetName.c_str());
+    fragBuilder->codeAppendf("coords[4] = vec2(%s.x * 2.0, 0.0) * %s;", texelSizeName.c_str(),
+                             blurOffsetName.c_str());
+    fragBuilder->codeAppendf("coords[5] = vec2(%s.x, -%s.y) * %s;", texelSizeName.c_str(),
+                             texelSizeName.c_str(), blurOffsetName.c_str());
+    fragBuilder->codeAppendf("coords[6] = vec2(0.0, -%s.y * 2.0) * %s;", texelSizeName.c_str(),
+                             blurOffsetName.c_str());
+    fragBuilder->codeAppendf("coords[7] = vec2(-%s.x, -%s.y) * %s;", texelSizeName.c_str(),
+                             texelSizeName.c_str(), blurOffsetName.c_str());
+    fragBuilder->codeAppend("vec4 sum = vec4(0.0);");
+    fragBuilder->codeAppend("for (int i = 0; i < size; i++) {");
+    emitChild(0, &tempColor, args,
+              [](std::string_view coord) { return std::string(coord) + " + coords[i]"; });
+    fragBuilder->codeAppend("if (mod(float(i), 2.0) == 0.0) {");
+    fragBuilder->codeAppendf("sum += %s;", tempColor.c_str());
+    fragBuilder->codeAppend("} else {");
+    fragBuilder->codeAppendf("sum += %s * 2.0;", tempColor.c_str());
+    fragBuilder->codeAppend("}");
+    fragBuilder->codeAppend("}");
     fragBuilder->codeAppendf("%s = sum / 12.0;", args.outputColor.c_str());
   }
 }

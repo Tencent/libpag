@@ -22,7 +22,7 @@
 #include "gpu/GLFragmentProcessor.h"
 
 namespace tgfx {
-class GLTextureEffect : public GLFragmentProcessor {
+class GLRGBAAATextureEffect : public GLFragmentProcessor {
  public:
   void emitCode(EmitArgs& args) override;
 

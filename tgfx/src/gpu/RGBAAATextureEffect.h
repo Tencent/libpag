@@ -23,7 +23,7 @@
 #include "tgfx/core/RGBAAALayout.h"
 
 namespace tgfx {
-class TextureEffect : public FragmentProcessor {
+class RGBAAATextureEffect : public FragmentProcessor {
  public:
   static std::unique_ptr<FragmentProcessor> Make(const Texture* texture,
                                                  const Matrix& localMatrix = Matrix::I(),
@@ -34,12 +34,12 @@ class TextureEffect : public FragmentProcessor {
                                                  const RGBAAALayout* layout = nullptr);
 
   std::string name() const override {
-    return "TextureEffect";
+    return "RGBAAATextureEffect";
   }
 
  private:
-  explicit TextureEffect(const Texture* texture, SamplerState samplerState,
-                         const RGBAAALayout* layout, const Matrix& localMatrix);
+  explicit RGBAAATextureEffect(const Texture* texture, SamplerState samplerState,
+                               const RGBAAALayout* layout, const Matrix& localMatrix);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
@@ -58,6 +58,6 @@ class TextureEffect : public FragmentProcessor {
   const RGBAAALayout* layout;
   CoordTransform coordTransform;
 
-  friend class GLTextureEffect;
+  friend class GLRGBAAATextureEffect;
 };
 }  // namespace tgfx

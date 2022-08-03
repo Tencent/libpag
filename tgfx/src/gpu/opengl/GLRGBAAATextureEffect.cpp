@@ -16,12 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLTextureEffect.h"
-#include "gpu/TextureEffect.h"
+#include "GLRGBAAATextureEffect.h"
+#include "gpu/RGBAAATextureEffect.h"
 
 namespace tgfx {
-void GLTextureEffect::emitCode(EmitArgs& args) {
-  const auto* textureFP = static_cast<const TextureEffect*>(args.fragmentProcessor);
+void GLRGBAAATextureEffect::emitCode(EmitArgs& args) {
+  const auto* textureFP = static_cast<const RGBAAATextureEffect*>(args.fragmentProcessor);
   auto* fragBuilder = args.fragBuilder;
   auto* uniformHandler = args.uniformHandler;
 
@@ -49,9 +49,9 @@ void GLTextureEffect::emitCode(EmitArgs& args) {
   fragBuilder->codeAppendf("%s = color * %s;", args.outputColor.c_str(), args.inputColor.c_str());
 }
 
-void GLTextureEffect::onSetData(const ProgramDataManager& programDataManager,
-                                const FragmentProcessor& fragmentProcessor) {
-  const auto& textureFP = static_cast<const TextureEffect&>(fragmentProcessor);
+void GLRGBAAATextureEffect::onSetData(const ProgramDataManager& programDataManager,
+                                      const FragmentProcessor& fragmentProcessor) {
+  const auto& textureFP = static_cast<const RGBAAATextureEffect&>(fragmentProcessor);
   if (alphaStartUniform.isValid()) {
     auto alphaStart =
         textureFP.texture->getTextureCoord(static_cast<float>(textureFP.layout->alphaStartX),

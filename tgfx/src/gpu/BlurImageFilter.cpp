@@ -18,8 +18,8 @@
 
 #include "BlurImageFilter.h"
 #include "DualBlurFragmentProcessor.h"
+#include "RGBAAATextureEffect.h"
 #include "SurfaceDrawContext.h"
-#include "TextureEffect.h"
 #include "tgfx/gpu/TextureSampler.h"
 
 namespace tgfx {
@@ -89,7 +89,7 @@ void BlurImageFilter::draw(const Texture* texture, Surface* toSurface, bool isDo
       dstRect, localMatrix,
       DualBlurFragmentProcessor::Make(
           isDown ? DualBlurPassMode::Down : DualBlurPassMode::Up,
-          TextureEffect::Make(
+          RGBAAATextureEffect::Make(
               texture, SamplerState(TileModeToWrapMode(tileMode, toSurface->getContext()->caps()))),
           blurOffset, texelSize));
 }
@@ -109,14 +109,14 @@ static std::shared_ptr<Texture> ExtendImage(Context* context, const Texture* ima
     auto height = static_cast<float>(image->height());
     auto localMatrix = Matrix::MakeScale(width, height);
     auto dstRect = Rect::MakeXYWH(-dstBounds.left, -dstBounds.top, width, height);
-    drawContext->fillRectWithFP(dstRect, localMatrix, TextureEffect::Make(image));
+    drawContext->fillRectWithFP(dstRect, localMatrix, RGBAAATextureEffect::Make(image));
   } else {
     auto localMatrix = Matrix::MakeScale(dstWidth, dstHeight);
     localMatrix.postTranslate(dstBounds.left, dstBounds.top);
     auto dstRect = Rect::MakeWH(dstWidth, dstHeight);
-    drawContext->fillRectWithFP(
-        dstRect, localMatrix,
-        TextureEffect::Make(image, SamplerState(TileModeToWrapMode(tileMode, context->caps()))));
+    drawContext->fillRectWithFP(dstRect, localMatrix,
+                                RGBAAATextureEffect::Make(image, SamplerState(TileModeToWrapMode(
+                                                                     tileMode, context->caps()))));
   }
   return surface->getTexture();
 }

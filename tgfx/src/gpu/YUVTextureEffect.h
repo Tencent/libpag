@@ -45,7 +45,7 @@ class YUVTextureEffect : public FragmentProcessor {
   const RGBAAALayout* layout;
   CoordTransform coordTransform;
 
-  friend class TextureEffect;
+  friend class RGBAAATextureEffect;
 
   friend class GLYUVTextureEffect;
 };
