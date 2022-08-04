@@ -277,8 +277,7 @@ static float CalculateRangeFactorRampDown(float textStart, float textEnd, float 
 
 // 范盛金公式求解一元三次方程 a * x^3 + b * x^2 + c * x + d = 0 (a != 0)，获取实数根
 // 返回值列表为空，表示方程没有实数解
-static std::vector<double> CalRealSolutionsOfCubicEquation(double a, double b, double c,
-                                                              double d) {
+static std::vector<double> CalRealSolutionsOfCubicEquation(double a, double b, double c, double d) {
   if (a == 0) {
     return {};
   }
