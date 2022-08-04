@@ -30,6 +30,7 @@ struct VideoFormat {
   tgfx::YUVColorRange colorRange = tgfx::YUVColorRange::MPEG;
   int width = 0;
   int height = 0;
+  bool hasAlpha = false;
   int64_t duration = 0;
   float frameRate = 0.0;
   int maxReorderSize = 4;
