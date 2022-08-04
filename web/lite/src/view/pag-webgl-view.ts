@@ -7,7 +7,8 @@ import { RenderOptions, View } from './view';
 
 @destroyVerify
 export class PAGWebGLView extends View {
-  private gl: WebGLRenderingContext;
+  protected gl: WebGLRenderingContext;
+  
   private program: WebGLProgram;
   private positionLocation = 0;
   private texcoordLocation = 0;
@@ -19,7 +20,6 @@ export class PAGWebGLView extends View {
   private renderingFbo: WebGLFramebuffer | null = null;
 
   public constructor(pagFile: PAGFile, canvas: HTMLCanvasElement, options: RenderOptions) {
-    if (detectWebGLContext() === false) throw new Error('WebGL is not supported!');
     super(pagFile, canvas, options);
     const gl = this.canvas?.getContext('webgl', {
       ...WEBGL_CONTEXT_ATTRIBUTES,
@@ -102,21 +102,11 @@ export class PAGWebGLView extends View {
   protected override flushInternal() {
     this.gl.bindTexture(this.gl.TEXTURE_2D, this.originalVideoTexture);
     // Upload the video into the texture.
-    this.gl.texImage2D(
-      this.gl.TEXTURE_2D,
-      0,
-      this.gl.RGBA,
-      this.gl.RGBA,
-      this.gl.UNSIGNED_BYTE,
-      this.videoElement as HTMLVideoElement,
-    );
+    this.texImage2D();
 
     // lookup uniforms
     if (!this.program) throw new Error('program is not initialized');
     const resolutionLocation = this.gl.getUniformLocation(this.program, 'u_resolution');
-
-    // Tell WebGL how to convert from clip space to pixels
-    // this.gl.viewport(this.viewportSize.x, this.viewportSize.y, this.viewportSize.width, this.viewportSize.height);
 
     // Clear the canvas
     this.gl.clearColor(0, 0, 0, 0);
@@ -172,6 +162,21 @@ export class PAGWebGLView extends View {
   protected override clearRender() {
     this.gl.clearColor(0, 0, 0, 0);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+  }
+
+  protected detectWebGLContext() {
+    return detectWebGLContext();
+  }
+
+  protected texImage2D() {
+    this.gl.texImage2D(
+      this.gl.TEXTURE_2D,
+      0,
+      this.gl.RGBA,
+      this.gl.RGBA,
+      this.gl.UNSIGNED_BYTE,
+      this.videoReader.getVideoElement(),
+    );
   }
 
   private setRectangle(gl: WebGLRenderingContext, x: number, y: number, width: number, height: number) {

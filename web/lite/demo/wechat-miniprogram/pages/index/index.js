@@ -1,5 +1,5 @@
 // index.js
-import { PAGView, types } from '../../utils/pag-wx.esm';
+import { PAGView } from '../../utils/pag-wx.esm';
 
 const loadFileByRequest = async (url) => {
   return new Promise((resolve) => {
@@ -24,7 +24,7 @@ Page({
   data: {
     pagView: null,
     pagLoaded: false,
-    repeatCount: 0,
+    repeatCount: 1,
     scaleMap: ['None', 'Stretch', 'LetterBox', 'Zoom'],
     scaleIndex: 2,
     progress: 0,
@@ -40,15 +40,11 @@ Page({
         const buffer = await loadFileByRequest(
           'https://tencent-effect-1251316161.cos.ap-shanghai.myqcloud.com/particle_video.pag',
         );
-        console.log(buffer);
         if (!buffer) throw '加载失败';
         const pagView = PAGView.init(buffer, canvas);
         this.setData({ pagView: pagView, pagLoaded: true });
         wx.hideLoading();
       });
-  },
-  setProgress() {
-    this.data.pagView.setProgress(this.data.progress);
   },
   play() {
     this.data.pagView.play();
@@ -62,11 +58,9 @@ Page({
   destroy() {
     this.data.pagView.destroy();
   },
-  clearCache() {
-    this.data.pagView.clearCache();
-  },
   scalePickerChange(event) {
     this.setData({ scaleIndex: event.detail.value });
+    this.data.pagView.setScaleMode(this.data.scaleMap[event.detail.value]);
   },
   repeatCountChange(event) {
     this.setData({ repeatCount: event.detail.value });
@@ -74,5 +68,6 @@ Page({
   },
   progressChange(event) {
     this.setData({ progress: event.detail.value });
+    this.data.pagView.setProgress(this.data.progress);
   },
 });

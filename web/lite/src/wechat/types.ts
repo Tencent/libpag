@@ -20,7 +20,7 @@ export interface VideoDecoder {
   seek: (
     /** 跳转的解码位置，单位 ms */
     position: number,
-  ) => Promise<any>;
+  ) => Promise<void>;
   start: (option: VideoDecoderStartOption) => Promise<any>;
   remove: () => Promise<any>;
   off: (
