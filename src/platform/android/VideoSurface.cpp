@@ -103,7 +103,8 @@ std::shared_ptr<VideoSurface> VideoSurface::Make(int width, int height, bool has
   if (surface.empty()) {
     return nullptr;
   }
-  return std::shared_ptr<VideoSurface>(new VideoSurface(env, surface.get(), width, height, hasAlpha));
+  return std::shared_ptr<VideoSurface>(
+      new VideoSurface(env, surface.get(), width, height, hasAlpha));
 }
 
 VideoSurface::VideoSurface(JNIEnv* env, jobject surface, int width, int height, bool hasAlpha)
