@@ -24,6 +24,7 @@ VideoSequenceDemuxer::VideoSequenceDemuxer(std::shared_ptr<File> file, VideoSequ
     : file(std::move(file)), sequence(sequence) {
   format.width = sequence->getVideoWidth();
   format.height = sequence->getVideoHeight();
+  format.hasAlpha = sequence->alphaStartX + sequence->alphaStartY > 0;
   for (auto& header : sequence->headers) {
     auto bytes = tgfx::Data::MakeWithoutCopy(header->data(), header->length());
     format.headers.push_back(std::move(bytes));
