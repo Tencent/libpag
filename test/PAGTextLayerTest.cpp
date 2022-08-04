@@ -497,4 +497,14 @@ PAG_TEST_F(PAGTextLayerTest, TextPathBoxReversed) {
   EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/TextPathBoxReversed"));
 }
 
+/**
+ * 测试框文本的范围选择器-三角形,缓和度高低
+ */
+PAG_TEST_F(PAGTextLayerTest, TextRangeSelectorTriangleEarseHighAndLow) {
+  auto pagFile = PAGFile::Load("../assets/RangeSelectorTriangleHighLow.pag");
+  TestPAGPlayer->setComposition(pagFile);
+  TestPAGPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/RangeSelectorTriangleHighLow"));
+}
+
 }  // namespace pag

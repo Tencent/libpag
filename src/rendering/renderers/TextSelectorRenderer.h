@@ -79,6 +79,9 @@ class RangeSelectorRenderer : public TextSelectorRenderer {
   float rangeStart = 0.0f;
   float rangeEnd = 1.0f;  // AE默认范围是(0%-100%)
 
+  float easeHigh = 0.0f;  // 缓和度高(0%-100%)
+  float easeLow = 0.0f;   // 缓和度低(0%-100%)
+
   // 范围选择器的高级选项：模式(在父类里)、数量、形状、随机排序
   float amount = 1.0f;                          // 数量
   Enum shape = TextRangeSelectorShape::Square;  // 形状
