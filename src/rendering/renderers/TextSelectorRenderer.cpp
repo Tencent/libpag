@@ -275,6 +275,44 @@ static float CalculateRangeFactorRampDown(float textStart, float textEnd, float 
   return factor;
 }
 
+// 范盛金公式求解一元三次方程 a * x^3 + b * x^2 + c * x + d = 0 (a != 0)，获取实数根
+// 返回值列表为空，表示方程没有实数解
+static std::vector<double> CalRealSolutionsOfCubicEquation(double a, double b, double c,
+                                                              double d) {
+  if (a == 0) {
+    return {};
+  }
+
+  auto A = b * b - 3 * a * c;
+  auto B = b * c - 9 * a * d;
+  auto C = c * c - 3 * b * d;
+  auto delta = B * B - 4 * A * C;
+  std::vector<double> solutions;
+  if (A == 0 && B == 0) {
+    solutions.emplace_back(-b / (3 * a));
+  } else if (delta == 0 && A != 0) {
+    auto k = B / A;
+    solutions.emplace_back(-b / a + k);
+    solutions.emplace_back(-0.5 * k);
+  } else if (delta > 0) {
+    auto y1 = A * b + 1.5 * a * (-B + sqrt(delta));
+    auto y2 = A * b + 1.5 * a * (-B - sqrt(delta));
+    solutions.emplace_back((-b - cbrt(y1) - cbrt(y2)) / (3 * a));
+  } else if (delta < 0 && A > 0) {
+    auto t = (A * b - 1.5 * a * B) / (A * sqrt(A));
+    if (-1 < t && t < 1) {
+      auto theta = acos(t);
+      auto sqrtA = sqrt(A);
+      auto cosA = cos(theta / 3);
+      auto sinA = sin(theta / 3);
+      solutions.emplace_back((-b - 2 * sqrtA * cosA) / (3 * a));
+      solutions.emplace_back((-b + sqrtA * (cosA + sqrt(3) * sinA)) / (3 * a));
+      solutions.emplace_back((-b + sqrtA * (cosA - sqrt(3) * sinA)) / (3 * a));
+    }
+  }
+  return solutions;
+}
+
 static float CalculateRangeFactorTriangle(float textStart, float textEnd, float rangeStart,
                                           float rangeEnd, float easeHigh, float easeLow) {
   //
@@ -313,9 +351,9 @@ static float CalculateRangeFactorTriangle(float textStart, float textEnd, float 
   auto d = x1 - x;
 
   double t = 0;
-  for (auto solution : MathUtil::CalRealSolutionsOfCubicEquation(a, b, c, d)) {
+  for (auto solution : CalRealSolutionsOfCubicEquation(a, b, c, d)) {
     // 由于浮点计算有精确度问题，当 x = 0.5, t 会存在略大于1，因此需要做近似计算
-    if ((solution >= 0 && solution <= 1) || fabs(solution - 1) < 1e-6) {
+    if ((solution >= 0 && solution <= 1) || DoubleNearlyEqual(solution, 1, 1e-6)) {
       t = solution;
       break;
     }

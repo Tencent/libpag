@@ -19,7 +19,6 @@
 #pragma once
 
 #include <cmath>
-#include <vector>
 
 namespace pag {
 static constexpr float FLOAT_NEARLY_ZERO = 1.0f / (1 << 12);
@@ -36,11 +35,8 @@ static inline bool FloatNearlyZero(float x, float tolerance = FLOAT_NEARLY_ZERO)
   return fabsf(x) <= tolerance;
 }
 
-class MathUtil {
- public:
-  // 求解一元三次方程式，返回值列表为空，表示方程没有实数解
-  static std::vector<double> CalRealSolutionsOfCubicEquation(double a, double b, double c,
-                                                             double d);
-};
+static inline bool DoubleNearlyEqual(double x, double y, double tolerance = FLOAT_NEARLY_ZERO) {
+  return fabs(x - y) <= tolerance;
+}
 
 }  // namespace pag
