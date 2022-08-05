@@ -62,8 +62,6 @@ class GLCanvas : public Canvas {
 
   Texture* getClipTexture();
 
-  Matrix getViewMatrix();
-
   std::unique_ptr<FragmentProcessor> getClipMask(const Rect& deviceBounds, Rect* scissorRect);
 
   Rect clipLocalBounds(Rect localBounds);

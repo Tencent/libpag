@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "GLContext.h"
 #include "GLProgramDataManager.h"
 #include "GLUniformHandler.h"
@@ -25,6 +26,7 @@
 #include "gpu/GLGeometryProcessor.h"
 #include "gpu/GLXferProcessor.h"
 #include "gpu/Program.h"
+#include "tgfx/gpu/opengl/GLRenderTarget.h"
 
 namespace tgfx {
 class GLProgram : public Program {
@@ -35,7 +37,8 @@ class GLProgram : public Program {
     int location = 0;
   };
 
-  GLProgram(Context* context, unsigned programID, const std::vector<Uniform>& uniforms,
+  GLProgram(Context* context, BuiltinUniformHandles builtinUniformHandles, unsigned programID,
+            const std::vector<Uniform>& uniforms,
             std::unique_ptr<GLGeometryProcessor> geometryProcessor,
             std::unique_ptr<GLXferProcessor> xferProcessor,
             std::vector<std::unique_ptr<GLFragmentProcessor>> fragmentProcessors,
@@ -56,7 +59,8 @@ class GLProgram : public Program {
    *
    * It is the caller's responsibility to ensure the program is bound before calling.
    */
-  void updateUniformsAndTextureBindings(const GeometryProcessor& geometryProcessor,
+  void updateUniformsAndTextureBindings(const GLRenderTarget* renderTarget,
+                                        const GeometryProcessor& geometryProcessor,
                                         const Pipeline& pipeline);
 
   int vertexStride() const {
@@ -68,12 +72,23 @@ class GLProgram : public Program {
   }
 
  private:
+  struct RenderTargetState {
+    std::optional<int> width;
+    std::optional<int> height;
+    std::optional<ImageOrigin> origin;
+  };
+
   // A helper to loop over effects, set the transforms (via subclass) and bind textures
   void setFragmentData(const GLProgramDataManager& programDataManager, const Pipeline& pipeline,
                        int* nextTexSamplerIdx);
 
+  void setRenderTargetState(const GLProgramDataManager& programDataManager,
+                            const GLRenderTarget* renderTarget);
+
   void onReleaseGPU() override;
 
+  RenderTargetState renderTargetState;
+  BuiltinUniformHandles builtinUniformHandles;
   unsigned programId = 0;
 
   // the installed effects

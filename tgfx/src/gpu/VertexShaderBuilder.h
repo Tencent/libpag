@@ -21,6 +21,8 @@
 #include "ShaderBuilder.h"
 
 namespace tgfx {
+static const std::string RTAdjustName = "tgfx_RTAdjust";
+
 class VertexShaderBuilder : public ShaderBuilder {
  public:
   explicit VertexShaderBuilder(ProgramBuilder* program) : ShaderBuilder(program) {

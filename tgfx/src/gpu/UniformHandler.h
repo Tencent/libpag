@@ -28,6 +28,10 @@ static constexpr char NO_MANGLE_PREFIX[] = "tgfx_";
 
 class ProgramBuilder;
 
+struct BuiltinUniformHandles {
+  UniformHandle rtAdjustUniform;
+};
+
 class UniformHandler {
  public:
   virtual ~UniformHandler() = default;

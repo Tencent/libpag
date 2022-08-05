@@ -29,11 +29,5 @@ class GLQuadPerEdgeAAGeometryProcessor : public GLGeometryProcessor {
   void setData(const ProgramDataManager& programDataManager,
                const GeometryProcessor& geometryProcessor,
                FPCoordTransformIter* transformIter) override;
-
- private:
-  UniformHandle screenSizeUniform;
-
-  std::optional<int> widthPrev;
-  std::optional<int> heightPrev;
 };
 }  // namespace tgfx
