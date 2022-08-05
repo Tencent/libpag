@@ -84,6 +84,7 @@ class ProgramBuilder {
   std::unique_ptr<GLXferProcessor> xferProcessor;
   std::vector<std::unique_ptr<GLFragmentProcessor>> fragmentProcessors;
   int numFragmentSamplers = 0;
+  BuiltinUniformHandles uniformHandles;
 
  private:
   /**

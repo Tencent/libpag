@@ -29,14 +29,6 @@ void GLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) {
 
   varyingHandler->emitAttributes(*geometryProcessor);
 
-  std::string screenSizeUniformName;
-  screenSizeUniform = uniformHandler->addUniform(ShaderFlags::Vertex, ShaderVar::Type::Float2,
-                                                 "ScreenSize", &screenSizeUniformName);
-  vertBuilder->codeAppendf("vec2 clipSpace = (%s.xy / %s) * 2.0 - 1.0;",
-                           geometryProcessor->position.name().c_str(),
-                           screenSizeUniformName.c_str());
-  auto position = ShaderVar("clipSpace", ShaderVar::Type::Float2, ShaderVar::TypeModifier::None);
-
   emitTransforms(vertBuilder, varyingHandler, uniformHandler,
                  geometryProcessor->localCoord.asShaderVar(), args.fpCoordTransformHandler);
 
@@ -61,19 +53,12 @@ void GLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) {
   }
 
   // Emit the vertex position to the hardware in the normalized window coordinates it expects.
-  args.vertBuilder->emitNormalizedPosition(position.name());
+  args.vertBuilder->emitNormalizedPosition(geometryProcessor->position.name());
 }
 
 void GLQuadPerEdgeAAGeometryProcessor::setData(const ProgramDataManager& programDataManager,
-                                               const GeometryProcessor& geometryProcessor,
+                                               const GeometryProcessor&,
                                                FPCoordTransformIter* transformIter) {
-  const auto& gp = static_cast<const QuadPerEdgeAAGeometryProcessor&>(geometryProcessor);
   setTransformDataHelper(Matrix::I(), programDataManager, transformIter);
-  if (widthPrev != gp.width || heightPrev != gp.height) {
-    widthPrev = gp.width;
-    heightPrev = gp.height;
-    programDataManager.set2f(screenSizeUniform, static_cast<float>(gp.width),
-                             static_cast<float>(gp.height));
-  }
 }
 }  // namespace tgfx

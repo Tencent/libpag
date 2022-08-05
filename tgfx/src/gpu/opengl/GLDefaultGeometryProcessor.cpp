@@ -29,14 +29,6 @@ void GLDefaultGeometryProcessor::emitCode(EmitArgs& args) {
 
   varyingHandler->emitAttributes(*geometryProcessor);
 
-  std::string screenSizeUniformName;
-  screenSizeUniform = uniformHandler->addUniform(ShaderFlags::Vertex, ShaderVar::Type::Float2,
-                                                 "ScreenSize", &screenSizeUniformName);
-  auto clipSpace = ShaderVar("clipSpace", ShaderVar::Type::Float2, ShaderVar::TypeModifier::None);
-  vertBuilder->codeAppendf("vec2 %s = (%s / %s) * 2.0 - 1.0;", clipSpace.name().c_str(),
-                           geometryProcessor->position.name().c_str(),
-                           screenSizeUniformName.c_str());
-
   emitTransforms(vertBuilder, varyingHandler, uniformHandler,
                  geometryProcessor->position.asShaderVar(), args.fpCoordTransformHandler);
 
@@ -47,7 +39,7 @@ void GLDefaultGeometryProcessor::emitCode(EmitArgs& args) {
   fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputColor.c_str());
 
   // Emit the vertex position to the hardware in the normalized window coordinates it expects.
-  args.vertBuilder->emitNormalizedPosition(clipSpace.name());
+  args.vertBuilder->emitNormalizedPosition(geometryProcessor->position.name());
 }
 
 void GLDefaultGeometryProcessor::setData(const ProgramDataManager& programDataManager,
@@ -55,11 +47,5 @@ void GLDefaultGeometryProcessor::setData(const ProgramDataManager& programDataMa
                                          FPCoordTransformIter* transformIter) {
   const auto& gp = static_cast<const DefaultGeometryProcessor&>(geometryProcessor);
   setTransformDataHelper(gp.localMatrix, programDataManager, transformIter);
-  if (widthPrev != gp.width || heightPrev != gp.height) {
-    widthPrev = gp.width;
-    heightPrev = gp.height;
-    programDataManager.set2f(screenSizeUniform, static_cast<float>(gp.width),
-                             static_cast<float>(gp.height));
-  }
 }
 }  // namespace tgfx

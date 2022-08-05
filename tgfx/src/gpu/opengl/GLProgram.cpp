@@ -23,12 +23,14 @@
 #include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace tgfx {
-GLProgram::GLProgram(Context* context, unsigned programID, const std::vector<Uniform>& uniforms,
+GLProgram::GLProgram(Context* context, BuiltinUniformHandles builtinUniformHandles,
+                     unsigned programID, const std::vector<Uniform>& uniforms,
                      std::unique_ptr<GLGeometryProcessor> geometryProcessor,
                      std::unique_ptr<GLXferProcessor> xferProcessor,
                      std::vector<std::unique_ptr<GLFragmentProcessor>> fragmentProcessors,
                      std::vector<Attribute> attributes, int vertexStride)
     : Program(context),
+      builtinUniformHandles(builtinUniformHandles),
       programId(programID),
       glGeometryProcessor(std::move(geometryProcessor)),
       glXferProcessor(std::move(xferProcessor)),
@@ -60,7 +62,8 @@ void GLProgram::onReleaseGPU() {
   }
 }
 
-void GLProgram::updateUniformsAndTextureBindings(const GeometryProcessor& geometryProcessor,
+void GLProgram::updateUniformsAndTextureBindings(const GLRenderTarget* renderTarget,
+                                                 const GeometryProcessor& geometryProcessor,
                                                  const Pipeline& pipeline) {
   // we set the textures, and uniforms for installed processors in a generic way.
 
@@ -68,6 +71,7 @@ void GLProgram::updateUniformsAndTextureBindings(const GeometryProcessor& geomet
   // GLProgramDataManager. That is, we bind textures for processors in this order:
   // geometryProcessor, fragmentProcessors, XferProcessor.
   GLProgramDataManager programDataManager(context, &uniformLocations);
+  setRenderTargetState(programDataManager, renderTarget);
   FragmentProcessor::CoordTransformIter coordTransformIter(pipeline);
   glGeometryProcessor->setData(programDataManager, geometryProcessor, &coordTransformIter);
   int nextTexSamplerIdx = 0;
@@ -97,5 +101,34 @@ void GLProgram::setFragmentData(const GLProgramDataManager& programDataManager,
     fp = iter.next();
     glslFP = glslIter.next();
   }
+}
+
+static std::array<float, 4> GetRTAdjustArray(int width, int height, bool flipY) {
+  std::array<float, 4> result = {};
+  result[0] = 2.f / static_cast<float>(width);
+  result[2] = 2.f / static_cast<float>(height);
+  result[1] = -1.f;
+  result[3] = -1.f;
+  if (flipY) {
+    result[2] = -result[2];
+    result[3] = -result[3];
+  }
+  return result;
+}
+
+void GLProgram::setRenderTargetState(const GLProgramDataManager& programDataManager,
+                                     const GLRenderTarget* renderTarget) {
+  int width = renderTarget->width();
+  int height = renderTarget->height();
+  auto origin = renderTarget->origin();
+  if (renderTargetState.width == width && renderTargetState.height == height &&
+      renderTargetState.origin == origin) {
+    return;
+  }
+  renderTargetState.width = width;
+  renderTargetState.height = height;
+  renderTargetState.origin = origin;
+  auto v = GetRTAdjustArray(width, height, origin == ImageOrigin::BottomLeft);
+  programDataManager.set4f(builtinUniformHandles.rtAdjustUniform, v[0], v[1], v[2], v[3]);
 }
 }  // namespace tgfx

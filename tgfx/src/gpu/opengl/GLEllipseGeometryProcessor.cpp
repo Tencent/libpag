@@ -32,14 +32,9 @@ void GLEllipseGeometryProcessor::emitCode(EmitArgs& args) {
   std::string matrixUniformName;
   viewMatrixUniform = uniformHandler->addUniform(ShaderFlags::Vertex, ShaderVar::Type::Float3x3,
                                                  "Matrix", &matrixUniformName);
-  vertBuilder->codeAppendf("vec3 position = %s * vec3(%s.xy, 1);", matrixUniformName.c_str(),
-                           egp.inPosition.name().c_str());
-  std::string screenSizeUniformName;
-  screenSizeUniform = uniformHandler->addUniform(ShaderFlags::Vertex, ShaderVar::Type::Float2,
-                                                 "ScreenSize", &screenSizeUniformName);
-  vertBuilder->codeAppendf("vec2 clipSpace = (position.xy / %s) * 2.0 - 1.0;",
-                           screenSizeUniformName.c_str());
-  auto position = ShaderVar("clipSpace", ShaderVar::Type::Float2, ShaderVar::TypeModifier::None);
+  std::string position = "position";
+  vertBuilder->codeAppendf("vec3 %s = %s * vec3(%s.xy, 1);", position.c_str(),
+                           matrixUniformName.c_str(), egp.inPosition.name().c_str());
 
   auto offsetType = egp.useScale ? ShaderVar::Type::Float3 : ShaderVar::Type::Float2;
   auto ellipseOffsets = varyingHandler->addVarying("EllipseOffsets", offsetType);
@@ -56,7 +51,7 @@ void GLEllipseGeometryProcessor::emitCode(EmitArgs& args) {
   fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputColor.c_str());
 
   // Setup position
-  args.vertBuilder->emitNormalizedPosition(position.name());
+  args.vertBuilder->emitNormalizedPosition(position);
   // emit transforms
   emitTransforms(vertBuilder, varyingHandler, uniformHandler, egp.inPosition.asShaderVar(),
                  args.fpCoordTransformHandler);
@@ -134,12 +129,6 @@ void GLEllipseGeometryProcessor::setData(const ProgramDataManager& programDataMa
   if (viewMatrixPrev != egp.viewMatrix) {
     viewMatrixPrev = egp.viewMatrix;
     programDataManager.setMatrix(viewMatrixUniform, egp.viewMatrix);
-  }
-  if (widthPrev != egp.width || heightPrev != egp.height) {
-    widthPrev = egp.width;
-    heightPrev = egp.height;
-    programDataManager.set2f(screenSizeUniform, static_cast<float>(egp.width),
-                             static_cast<float>(egp.height));
   }
 }
 }  // namespace tgfx

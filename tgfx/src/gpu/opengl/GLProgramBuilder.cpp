@@ -150,7 +150,7 @@ bool GLProgramBuilder::checkSamplerCounts() {
 }
 
 std::unique_ptr<GLProgram> GLProgramBuilder::createProgram(unsigned programID) {
-  auto program = new GLProgram(context, programID, _uniformHandler.uniforms,
+  auto program = new GLProgram(context, uniformHandles, programID, _uniformHandler.uniforms,
                                std::move(glGeometryProcessor), std::move(xferProcessor),
                                std::move(fragmentProcessors), attributes, vertexStride);
   program->setupSamplerUniforms(_uniformHandler.samplers);

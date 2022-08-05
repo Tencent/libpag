@@ -25,6 +25,7 @@ GLVertexShaderBuilder::GLVertexShaderBuilder(ProgramBuilder* program)
 }
 
 void GLVertexShaderBuilder::emitNormalizedPosition(const std::string& devPos) {
-  codeAppendf("gl_Position = vec4(%s, 0, 1);", devPos.c_str());
+  codeAppendf("gl_Position = vec4(%s.xy * %s.xz + %s.yw, 0, 1);", devPos.c_str(),
+              RTAdjustName.c_str(), RTAdjustName.c_str());
 }
 }  // namespace tgfx
