@@ -1,21 +1,28 @@
 import { VideoReader } from './video-reader';
-import { EventName, RenderingMode } from '../types';
+import { DebugData, EventName, RenderingMode } from '../types';
 import { PAGWebGLView } from '../view/pag-webgl-view';
 import { PAGFile } from '../pag-file';
 import { VideoSequence } from '../base/video-sequence';
 import { FrameDataOptions } from './types';
+import { Clock } from '../base/utils/clock';
 
 declare const setTimeout: (callback: () => void, delay: number) => number;
 
 export class PAGView extends PAGWebGLView {
   public static init(data: ArrayBuffer, canvas: HTMLCanvasElement) {
+    const clock = new Clock();
     const pagFile = PAGFile.fromArrayBuffer(data);
-    return new PAGView(pagFile, canvas);
+    clock.mark('decode');
+    const pagView = new PAGView(pagFile, canvas);
+    pagView.setDebugData({ decodePAGFile: clock.measure('', 'decode') });
+    return pagView;
   }
 
   private flushBaseTime;
   private currentFrame = 0;
   private frameDataOpts: FrameDataOptions | undefined = undefined;
+  private getFrameMark = 0;
+  private startTime = 0;
 
   public constructor(pagFile: PAGFile, canvas: HTMLCanvasElement) {
     super(pagFile, canvas, { renderingMode: RenderingMode.WebGL });
@@ -30,6 +37,7 @@ export class PAGView extends PAGWebGLView {
   public async play() {
     if (this.playing) return;
     this.playing = true;
+    this.startTime = Date.now() - this.currentFrame * this.flushBaseTime;
     this.flushLoop();
     if (this.getProgress() === 0) {
       this.eventManager.emit(EventName.onAnimationStart);
@@ -50,7 +58,7 @@ export class PAGView extends PAGWebGLView {
    */
   public stop() {
     this.clearRenderTimer();
-    this.videoReader.seek(0);
+    this.seekToStart();
     this.clearRender();
     this.playing = false;
     this.eventManager.emit(EventName.onAnimationCancel);
@@ -81,14 +89,6 @@ export class PAGView extends PAGWebGLView {
     this.frameDataOpts = await this.getFrameData();
     this.flush();
   }
-  /**
-   * 渲染当前进度画面
-   */
-  public flush() {
-    this.flushInternal();
-    this.eventManager.emit(EventName.onAnimationUpdate);
-    return true;
-  }
 
   public updateSize() {
     // NOP
@@ -99,7 +99,9 @@ export class PAGView extends PAGWebGLView {
   }
 
   protected override createVideoReader(videoSequence: VideoSequence) {
-    return new VideoReader(videoSequence);
+    const { videoReader, debugData } = VideoReader.create(videoSequence);
+    this.setDebugData(debugData);
+    return videoReader;
   }
 
   protected override texImage2D() {
@@ -116,26 +118,26 @@ export class PAGView extends PAGWebGLView {
     );
   }
 
-  protected override async repeat() {    
+  protected override async repeat() {
     // 循环结束
     if (this.repeatCount === 0) {
       this.clearRenderTimer();
       this.clearRender();
-      await this.videoReader.seek(0);
+      await this.seekToStart();
       this.playing = false;
       this.eventManager.emit('onAnimationEnd');
       return;
     }
     // 次数循环
     this.repeatCount -= 1;
-    await this.videoReader.seek(0);
+    await this.seekToStart();
     this.eventManager.emit('onAnimationRepeat');
     return;
   }
 
   protected override flushLoop() {
+    if (this.getFrameMark === 0) this.getFrameMark = Date.now();
     const frameDataOpts = this.videoReader.getFrameData() as FrameDataOptions;
-    console.log(frameDataOpts);
     if (frameDataOpts === null) {
       this.renderTimer = setTimeout(() => {
         this.flushLoop();
@@ -143,11 +145,14 @@ export class PAGView extends PAGWebGLView {
       return;
     }
     this.frameDataOpts = frameDataOpts;
+    this.setDebugData({ getFrame: Date.now() - this.getFrameMark });
+    this.getFrameMark = 0;
     this.flush();
     this.currentFrame += 1;
+    let nextRenderTime = Math.max(this.flushBaseTime * this.currentFrame + this.startTime - Date.now(), 1);
     this.renderTimer = setTimeout(() => {
       this.flushLoop();
-    }, this.flushBaseTime);
+    }, nextRenderTime);
   }
 
   protected override clearRenderTimer() {
@@ -155,6 +160,13 @@ export class PAGView extends PAGWebGLView {
       clearTimeout(this.renderTimer);
       this.renderTimer = null;
     }
+  }
+
+  protected override updateFPS() {
+    const now = Date.now();
+    this.fpsBuffer = this.fpsBuffer.filter((value) => now - value <= 1000);
+    this.fpsBuffer.push(now);
+    this.setDebugData({ FPS: this.fpsBuffer.length });
   }
 
   private getFrameData() {
@@ -171,5 +183,11 @@ export class PAGView extends PAGWebGLView {
       };
       loop();
     });
+  }
+
+  private async seekToStart() {
+    await this.videoReader.seek(0);
+    this.currentFrame = 0;
+    this.startTime = 0;
   }
 }

@@ -1,12 +1,13 @@
 import { Context, RenderOptions } from './context';
 import { getWechatNetwork } from './utils';
-import { EventName } from '../types';
+import { RenderingMode, EventName } from '../types';
 import { IS_IOS } from '../constant';
 import { destroyVerify } from '../decorators';
 
 import type { PAGFile } from '../pag-file';
 import { VideoReader } from './video-reader';
 import { VideoSequence } from '../base/video-sequence';
+import { Clock } from '../base/utils/clock';
 
 declare global {
   interface Window {
@@ -30,6 +31,7 @@ export const playVideoElement = async (videoElement: HTMLVideoElement) => {
 @destroyVerify
 export class View extends Context {
   protected videoReader: VideoReader;
+  protected fpsBuffer: number[] = [];
 
   public constructor(pagFile: PAGFile, canvas: HTMLCanvasElement, options: RenderOptions) {
     super(pagFile, canvas, options);
@@ -96,7 +98,11 @@ export class View extends Context {
    * 渲染当前进度画面
    */
   public flush() {
+    const clock = new Clock();
     this.flushInternal();
+    clock.mark('flush');
+    this.setDebugData({ flush: clock.measure('', 'flush') });
+    this.updateFPS();
     this.eventManager.emit(EventName.onAnimationUpdate);
     return true;
   }
@@ -104,7 +110,7 @@ export class View extends Context {
   protected flushInternal() {}
 
   protected createVideoReader(videoSequence: VideoSequence) {
-    const videoReader = new VideoReader(videoSequence);
+    const { videoReader } = VideoReader.create(videoSequence);
     if (!IS_IOS) {
       videoReader.addListener('ended', () => {
         this.repeat();
@@ -149,5 +155,9 @@ export class View extends Context {
       window.cancelAnimationFrame(this.renderTimer);
       this.renderTimer = null;
     }
+  }
+
+  protected updateFPS() {
+    // TODO
   }
 }

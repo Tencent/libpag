@@ -4,7 +4,7 @@
     <canvas class="zebra" type="webgl" id="pag" style="width: 300px; height:300px;"></canvas>
   </view>
   <view hidden="{{pagLoaded}}">
-    <button class="btn" size="default" type="default" bindtap="load">加载测试PAG</button>
+    <button class="btn-load" size="default" type="default" bindtap="load">加载测试PAG</button>
   </view>
   <view hidden="{{!pagLoaded}}">
     <text class="title">播放次数</text>
@@ -16,9 +16,20 @@
     <picker bindchange="scalePickerChange" value="{{scaleIndex}}" range="{{scaleMap}}">
       <view class="picker">缩放模式：{{scaleMap[scaleIndex]}}</view>
     </picker>
-    <button class="btn" size="default" type="default" bindtap="play">开始</button>
-    <button class="btn" size="default" type="default" bindtap="pause">暂停</button>
-    <button class="btn" size="default" type="default" bindtap="stop">停止</button>
-    <button class="btn" size="default" type="default" bindtap="destroy">销毁</button>
+    <view class="btn-box">
+      <button class="btn" size="mini" type="default" style="padding: 0 1.5em;" bindtap="play">
+        开始
+      </button>
+      <button class="btn" size="mini" type="default" style="padding: 0 1.5em;" bindtap="pause">
+        暂停
+      </button>
+      <button class="btn" size="mini" type="default" style="padding: 0 1.5em;" bindtap="stop">
+        停止
+      </button>
+      <button class="btn" size="mini" type="default" style="padding: 0 1.5em;" bindtap="destroy">
+        销毁
+      </button>
+    </view>
+    <text class="text-debug">{{debugText}}</text>
   </view>
 </view>

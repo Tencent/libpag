@@ -4,7 +4,7 @@ import { EventManager, Listener } from '../base/utils/event-manager';
 import { destroyVerify } from '../decorators';
 
 import type { PAGFile } from '../pag-file';
-import type { VideoParam } from '../types';
+import type { VideoParam, DebugData } from '../types';
 import type { VideoSequence } from '../base/video-sequence';
 
 export interface RenderOptions {
@@ -27,6 +27,16 @@ export class Context {
 
   private renderingMode: RenderingMode;
   private viewScaleMode = ScaleMode.LetterBox;
+  private debugData: DebugData = {
+    FPS: 0,
+    decodePAGFile: 0,
+    createDir: 0,
+    coverMP4: 0,
+    writeFile: 0,
+    createDecoder: 0,
+    getFrame: 0,
+    flush: 0,
+  };
 
   public constructor(pagFile: PAGFile, canvas: HTMLCanvasElement, options: RenderOptions) {
     const videoSequence = pagFile.getVideoSequence();
@@ -186,6 +196,14 @@ export class Context {
     this.canvas.style.height = `${displaySize.height}px`;
     this.canvas.width = displaySize.width * window.devicePixelRatio;
     this.canvas.height = displaySize.height * window.devicePixelRatio;
+  }
+
+  public getDebugData() {
+    return this.debugData;
+  }
+
+  public setDebugData(data: DebugData) {
+    this.debugData = { ...this.debugData, ...data };
   }
 
   protected loadContext() {}

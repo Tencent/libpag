@@ -1,6 +1,7 @@
 import { VideoSequence } from '../base/video-sequence';
 import { destroyVerify } from '../decorators';
 import { coverToMp4 } from '../generator/mp4-box-helper';
+import { DebugData } from '../types';
 import { getWechatNetwork } from './utils';
 import { addListener, removeAllListeners, removeListener } from './video-listener';
 
@@ -27,13 +28,15 @@ const playVideoElement = async (videoElement: HTMLVideoElement) => {
 
 @destroyVerify
 export class VideoReader {
+  public static create(videoSequence: VideoSequence) {
+    const videoReader = new VideoReader();
+    const debugData = videoReader.load(videoSequence);
+    return { videoReader: videoReader, debugData: debugData };
+  }
+
   protected destroyed = false;
 
   private videoElement: HTMLVideoElement | undefined;
-
-  public constructor(videoSequence: VideoSequence) {
-    this.load(videoSequence);
-  }
 
   public getVideoElement(): HTMLVideoElement {
     return this.videoElement as HTMLVideoElement;
@@ -88,12 +91,13 @@ export class VideoReader {
     this.destroyed = true;
   }
 
-  protected load(videoSequence: VideoSequence) {
+  protected load(videoSequence: VideoSequence): any {
     this.videoElement = document.createElement('video');
     this.videoElement.style.display = 'none';
     this.videoElement.muted = true;
     this.videoElement.playsInline = true;
     this.videoElement.src = URL.createObjectURL(new Blob([coverToMp4(videoSequence)], { type: 'video/mp4' }));
     this.videoElement.load();
+    return {}; // TODO
   }
 }

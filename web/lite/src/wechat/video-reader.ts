@@ -1,3 +1,4 @@
+import { Clock } from '../base/utils/clock';
 import { VideoSequence } from '../base/video-sequence';
 import { destroyVerify } from '../decorators';
 import { coverToMp4 } from '../generator/mp4-box-helper';
@@ -14,13 +15,15 @@ const MP4_CACHE_PATH = `${wx.env.USER_DATA_PATH}/pag/`;
 
 @destroyVerify
 export class VideoReader extends Reader {
+  public static create(videoSequence: VideoSequence) {
+    const videoReader = new VideoReader();
+    const debugData = videoReader.load(videoSequence);
+    return { videoReader: videoReader, debugData: debugData };
+  }
+
   public videoDecoder: VideoDecoder | undefined;
 
   private mp4Path: string | undefined;
-
-  public constructor(videoSequence: VideoSequence) {
-    super(videoSequence);
-  }
 
   public getVideoElement(): HTMLVideoElement {
     throw new Error('WeChat mini program does not support video element as decoder!');
@@ -73,11 +76,22 @@ export class VideoReader extends Reader {
   }
 
   protected override load(videoSequence: VideoSequence) {
+    const clock = new Clock();
     this.mp4Path = `${MP4_CACHE_PATH}${Date.now()}.mp4`;
     touchDirectory(MP4_CACHE_PATH);
+    clock.mark('createDir');
     const mp4Data = coverToMp4(videoSequence);
+    clock.mark('coverMP4');
     writeFile(this.mp4Path, mp4Data.buffer);
+    clock.mark('writeFile');
     this.videoDecoder = wx.createVideoDecoder();
+    clock.mark('createDecoder');
     this.videoDecoder.start({ source: this.mp4Path, mode: 0 }); // prepare
+    return {
+      createDir: clock.measure('', 'createDir'),
+      coverMP4: clock.measure('createDir', 'coverMP4'),
+      writeFile: clock.measure('coverMP4', 'writeFile'),
+      createDecoder: clock.measure('writeFile', 'createDecoder'),
+    };
   }
 }
