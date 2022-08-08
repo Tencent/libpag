@@ -18,24 +18,20 @@
 
 #pragma once
 
-#include "tgfx/gpu/Shader.h"
-#include "tgfx/gpu/Texture.h"
+#include <optional>
+#include "gpu/GLFragmentProcessor.h"
 
 namespace tgfx {
-class TextureShader : public Shader {
+class GLRGBAAATextureEffect : public GLFragmentProcessor {
  public:
-  static std::shared_ptr<Shader> Make(std::shared_ptr<Texture> texture, TileMode tileModeX,
-                                      TileMode tileModeY);
-
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const override;
+  void emitCode(EmitArgs& args) override;
 
  private:
-  TextureShader(std::shared_ptr<Texture> texture, TileMode tileModeX, TileMode tileModeY)
-      : texture(std::move(texture)), tileModeX(tileModeX), tileModeY(tileModeY) {
-  }
+  void onSetData(const ProgramDataManager& programDataManager,
+                 const FragmentProcessor& fragmentProcessor) override;
 
-  std::shared_ptr<Texture> texture;
-  TileMode tileModeX = TileMode::Clamp;
-  TileMode tileModeY = TileMode::Clamp;
+  UniformHandle alphaStartUniform;
+
+  std::optional<Point> alphaStartPrev;
 };
 }  // namespace tgfx

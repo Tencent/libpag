@@ -268,6 +268,7 @@ void GLCaps::initGLESSupport(const GLInfo& info) {
       !info.hasExtension("GL_OES_texture_border_clamp")) {
     clampToBorderSupport = false;
   }
+  npotTextureTileSupport = version >= GL_VER(3, 0) || info.hasExtension("GL_OES_texture_npot");
 }
 
 void GLCaps::initWebGLSupport(const GLInfo& info) {
@@ -281,6 +282,7 @@ void GLCaps::initWebGLSupport(const GLInfo& info) {
   textureBarrierSupport = false;
   semaphoreSupport = version >= GL_VER(2, 0);
   clampToBorderSupport = false;
+  npotTextureTileSupport = version >= GL_VER(2, 0);
 }
 
 void GLCaps::initFormatMap(const GLInfo& info) {

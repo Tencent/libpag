@@ -18,24 +18,37 @@
 
 #pragma once
 
-#include "tgfx/gpu/Shader.h"
-#include "tgfx/gpu/Texture.h"
+#include "SamplerState.h"
+#include "gpu/FragmentProcessor.h"
+#include "tgfx/core/RGBAAALayout.h"
 
 namespace tgfx {
-class TextureShader : public Shader {
+class RGBAAATextureEffect : public FragmentProcessor {
  public:
-  static std::shared_ptr<Shader> Make(std::shared_ptr<Texture> texture, TileMode tileModeX,
-                                      TileMode tileModeY);
+  static std::unique_ptr<FragmentProcessor> Make(const Texture* texture,
+                                                 const Matrix& localMatrix = Matrix::I(),
+                                                 const RGBAAALayout* layout = nullptr);
 
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const override;
-
- private:
-  TextureShader(std::shared_ptr<Texture> texture, TileMode tileModeX, TileMode tileModeY)
-      : texture(std::move(texture)), tileModeX(tileModeX), tileModeY(tileModeY) {
+  std::string name() const override {
+    return "RGBAAATextureEffect";
   }
 
-  std::shared_ptr<Texture> texture;
-  TileMode tileModeX = TileMode::Clamp;
-  TileMode tileModeY = TileMode::Clamp;
+ private:
+  RGBAAATextureEffect(const Texture* texture, const RGBAAALayout* layout,
+                      const Matrix& localMatrix);
+
+  void onComputeProcessorKey(BytesKey* bytesKey) const override;
+
+  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
+
+  const TextureSampler* onTextureSampler(size_t) const override {
+    return texture->getSampler();
+  }
+
+  const Texture* texture;
+  const RGBAAALayout* layout;
+  CoordTransform coordTransform;
+
+  friend class GLRGBAAATextureEffect;
 };
 }  // namespace tgfx

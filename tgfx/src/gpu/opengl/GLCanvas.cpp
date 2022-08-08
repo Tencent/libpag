@@ -24,7 +24,7 @@
 #include "gpu/AARectEffect.h"
 #include "gpu/ConstColorProcessor.h"
 #include "gpu/DeviceSpaceTextureEffect.h"
-#include "gpu/TextureEffect.h"
+#include "gpu/RGBAAATextureEffect.h"
 #include "gpu/opengl/GLTriangulatingPathOp.h"
 #include "tgfx/core/Mask.h"
 #include "tgfx/core/PathEffect.h"
@@ -190,7 +190,7 @@ void GLCanvas::drawTexture(const Texture* texture, const RGBAAALayout* layout, c
   if (localBounds.isEmpty()) {
     return;
   }
-  auto processor = TextureEffect::Make(texture, Matrix::I(), layout);
+  auto processor = RGBAAATextureEffect::Make(texture, Matrix::I(), layout);
   if (processor == nullptr) {
     return;
   }
@@ -312,7 +312,7 @@ void GLCanvas::drawMask(const Rect& bounds, const Texture* mask, const Paint& pa
     return;
   }
   glPaint.coverageFragmentProcessors.emplace_back(
-      FragmentProcessor::MulInputByChildAlpha(TextureEffect::Make(mask, maskLocalMatrix)));
+      FragmentProcessor::MulInputByChildAlpha(RGBAAATextureEffect::Make(mask, maskLocalMatrix)));
   draw(GLFillRectOp::Make(bounds, state->matrix, localMatrix), std::move(glPaint));
   setMatrix(oldMatrix);
 }
@@ -441,9 +441,9 @@ void GLCanvas::drawAtlas(const Texture* atlas, const Matrix matrix[], const Rect
   GLPaint glPaint;
   if (colors) {
     glPaint.coverageFragmentProcessors.emplace_back(
-        FragmentProcessor::MulInputByChildAlpha(TextureEffect::Make(atlas)));
+        FragmentProcessor::MulInputByChildAlpha(RGBAAATextureEffect::Make(atlas)));
   } else {
-    glPaint.colorFragmentProcessors.emplace_back(TextureEffect::Make(atlas));
+    glPaint.colorFragmentProcessors.emplace_back(RGBAAATextureEffect::Make(atlas));
   }
   draw(GLFillRectOp::Make(rects, matrices, localMatrices, colorVector), std::move(glPaint), false);
 }

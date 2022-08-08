@@ -21,15 +21,18 @@
 #include "tgfx/gpu/TextureSampler.h"
 
 namespace tgfx {
-std::shared_ptr<Shader> Shader::MakeTextureShader(std::shared_ptr<Texture> texture) {
-  return TextureShader::Make(std::move(texture));
+std::shared_ptr<Shader> Shader::MakeTextureShader(std::shared_ptr<Texture> texture,
+                                                  TileMode tileModeX, TileMode tileModeY) {
+  return TextureShader::Make(std::move(texture), tileModeX, tileModeY);
 }
 
-std::shared_ptr<Shader> TextureShader::Make(std::shared_ptr<Texture> texture) {
+std::shared_ptr<Shader> TextureShader::Make(std::shared_ptr<Texture> texture, TileMode tileModeX,
+                                            TileMode tileModeY) {
   if (texture == nullptr) {
     return nullptr;
   }
-  auto shader = std::shared_ptr<TextureShader>(new TextureShader(std::move(texture)));
+  auto shader =
+      std::shared_ptr<TextureShader>(new TextureShader(std::move(texture), tileModeX, tileModeY));
   shader->weakThis = shader;
   return shader;
 }
@@ -39,7 +42,8 @@ std::unique_ptr<FragmentProcessor> TextureShader::asFragmentProcessor(const FPAr
   if (!ComputeTotalInverse(args, &matrix)) {
     return nullptr;
   }
-  auto effect = TextureEffect::Make(texture.get(), matrix);
+  auto effect =
+      TextureEffect::Make(args.context, texture.get(), SamplerState(tileModeX, tileModeY), matrix);
   if (texture->getSampler()->format == PixelFormat::ALPHA_8) {
     return effect;
   }
