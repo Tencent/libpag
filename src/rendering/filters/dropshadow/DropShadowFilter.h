@@ -20,13 +20,17 @@
 
 #include "DropShadowSpreadFilter.h"
 #include "rendering/filters/LayerFilter.h"
-#include "rendering/filters/gaussblur/SinglePassBlurFilter.h"
 #include "rendering/filters/utils/FilterBuffer.h"
 
 namespace pag {
 class DropShadowFilter : public LayerFilter {
  public:
   explicit DropShadowFilter(DropShadowStyle* layerStyle);
+
+  DropShadowFilter(const DropShadowFilter&) = delete;
+
+  DropShadowFilter(DropShadowFilter&&) = delete;
+
   ~DropShadowFilter() override;
 
   bool initialize(tgfx::Context* context) override;
@@ -38,32 +42,8 @@ class DropShadowFilter : public LayerFilter {
             const FilterTarget* target) override;
 
  private:
-  DropShadowStyle* layerStyle = nullptr;
-
-  std::shared_ptr<FilterBuffer> spreadFilterBuffer = nullptr;
-  std::shared_ptr<FilterBuffer> blurFilterBuffer = nullptr;
-
-  SinglePassBlurFilter* blurFilterV = nullptr;
-  SinglePassBlurFilter* blurFilterH = nullptr;
-  DropShadowSpreadFilter* spreadFilter = nullptr;
-  DropShadowSpreadFilter* spreadThickFilter = nullptr;
-
-  tgfx::Color color = tgfx::Color::Black();
-  float alpha = 0.0f;
-  float spread = 0.0f;
-  float spreadSize = 0.0f;
-  float blurSize = 0.0f;
-  std::vector<tgfx::Rect> filtersBounds = {};
-
-  void updateParamModeNotSpread(Frame frame, const tgfx::Rect& contentBounds,
-                                const tgfx::Rect& transformedBounds,
-                                const tgfx::Point& filterScale);
-  void updateParamModeNotFullSpread(Frame frame, const tgfx::Rect& contentBounds,
-                                    const tgfx::Rect& transformedBounds,
-                                    const tgfx::Point& filterScale);
-  void updateParamModeFullSpread(Frame frame, const tgfx::Rect& contentBounds,
-                                 const tgfx::Rect& transformedBounds,
-                                 const tgfx::Point& filterScale);
+  void updateParamModeNotFullSpread(const tgfx::Rect& contentBounds);
+  void updateParamModeFullSpread(const tgfx::Rect& contentBounds);
 
   void onDrawModeNotSpread(tgfx::Context* context, const FilterSource* source,
                            const FilterTarget* target);
@@ -71,5 +51,21 @@ class DropShadowFilter : public LayerFilter {
                                const FilterTarget* target);
   void onDrawModeFullSpread(tgfx::Context* context, const FilterSource* source,
                             const FilterTarget* target);
+
+  DropShadowStyle* layerStyle = nullptr;
+
+  std::shared_ptr<FilterBuffer> spreadFilterBuffer = nullptr;
+
+  DropShadowSpreadFilter* spreadFilter = nullptr;
+  DropShadowSpreadFilter* spreadThickFilter = nullptr;
+
+  tgfx::Color color = tgfx::Color::Black();
+  float spread = 0.f;
+  float spreadSize = 0.f;
+  float blurXSize = 0.f;
+  float blurYSize = 0.f;
+  float offsetX = 0.f;
+  float offsetY = 0.f;
+  std::vector<tgfx::Rect> filtersBounds = {};
 };
 }  // namespace pag
