@@ -340,10 +340,14 @@ static float CalculateRangeFactorTriangle(float textStart, float textEnd, float 
   double y3 = easeHigh >= 0 ? 1 : 1 + easeHigh;
   double x4 = rangeCenter, y4 = 1;
 
+  // 这里使用方程法而不使用 BezierEasing 方法拟合，是由于使用拟合法需要额外存储分段数据，
+  // easeHigh 和easeLow 不变情况下，速度上计算没有多大差异，
+  // 使用 easeHigh 和 easeLow 关键帧动画时候会有额外的生成分段数据开销和缓存开销，
+  // 因此这里采用方程法由 x 计算 t，由t计算y
   // 由 P = (1-t)^3 * P1 + 3 * (1 - t)^2 * t * P2 + 3 * (1 - t) * t^2 * P3 + t^3 * P4,
   // 推出一元三次方程式 a * t^3 + b * t^2 + c * t + d = 0,
   // 其中 a = -x1 + 3 * x2 - 3 * x3 + x4, b = 3 * x1 - 6 * x2 + 3 * x3,
-  // c = 3 -3 * x1 + 3* x2, d = x1 - x, 求解t
+  // c = -3 * x1 + 3 * x2, d = x1 - x, 求解t
   auto a = -x1 + 3 * x2 - 3 * x3 + x4;
   auto b = 3 * (x1 - 2 * x2 + x3);
   auto c = 3 * (-x1 + x2);
