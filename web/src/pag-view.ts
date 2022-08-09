@@ -9,7 +9,7 @@ import { PAGModule } from './binding';
 
 import type { PAGComposition } from './pag-composition';
 import type { Matrix } from './core/matrix';
-import { WEBGL_CONTEXT_ATTRIBUTES } from './constant';
+import { RenderCanvas } from './core/render-canvas';
 
 export interface PAGViewOptions {
   /**
@@ -57,12 +57,11 @@ export class PAGView {
 
     if (pagView.pagViewOptions.useCanvas2D) {
       PAGModule.globalCanvas.retain();
-      if (!PAGModule.globalCanvas.glContext) throw new Error('GlobalCanvas context is not WebGL!');
-      pagView.pagGlContext = BackendContext.from(PAGModule.globalCanvas.glContext);
+      pagView.pagGlContext = BackendContext.from(PAGModule.globalCanvas.glContext as BackendContext);
     } else {
-      const gl = canvasElement.getContext('webgl', WEBGL_CONTEXT_ATTRIBUTES);
-      if (!gl) throw new Error('Canvas context is not WebGL!');
-      pagView.pagGlContext = BackendContext.from(gl);
+      pagView.renderCanvas = RenderCanvas.from(canvasElement);
+      pagView.renderCanvas.retain();
+      pagView.pagGlContext = BackendContext.from(pagView.renderCanvas.glContext as BackendContext);
     }
     pagView.resetSize(pagView.pagViewOptions.useScale);
     pagView.frameRate = file.frameRate();
@@ -107,6 +106,7 @@ export class PAGView {
   private pagGlContext: BackendContext | null = null;
   private canvasElement: HTMLCanvasElement | OffscreenCanvas | null;
   private canvasContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null | undefined;
+  private renderCanvas: RenderCanvas | null = null;
   private rawWidth = 0;
   private rawHeight = 0;
   private currentFrame = -1;
@@ -370,6 +370,8 @@ export class PAGView {
     this.pagSurface?.destroy();
     if (this.pagViewOptions.useCanvas2D) {
       PAGModule.globalCanvas.release();
+    } else {
+      this.renderCanvas?.release();
     }
     this.pagGlContext?.destroy();
     this.pagGlContext = null;

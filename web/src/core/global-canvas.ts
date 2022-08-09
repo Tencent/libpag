@@ -18,7 +18,8 @@ export class GlobalCanvas {
       this._canvas.width = this.width;
       this._canvas.height = this.height;
 
-      const gl = this._canvas.getContext('webgl', WEBGL_CONTEXT_ATTRIBUTES) as WebGLRenderingContext;
+      const gl = this._canvas.getContext('webgl', WEBGL_CONTEXT_ATTRIBUTES);
+      if (!gl) throw new Error('Canvas context is not WebGL!');
       this._glContext = BackendContext.from(gl);
     }
     this.retainCount += 1;

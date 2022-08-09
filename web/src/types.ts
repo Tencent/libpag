@@ -19,6 +19,7 @@ import { BackendContext } from './core/backend-context';
 import { PAGImageLayer } from './pag-image-layer';
 import { PAGSolidLayer } from './pag-solid-layer';
 import { Matrix as ClassMatrix } from './core/matrix';
+import { RenderCanvas } from './core/render-canvas';
 
 declare global {
   interface Window {
@@ -108,6 +109,7 @@ export interface PAG extends EmscriptenModule {
   GlobalCanvas: typeof GlobalCanvas;
   BackendContext: typeof BackendContext;
   Matrix: typeof ClassMatrix;
+  RenderCanvas: typeof RenderCanvas;
   traceImage: (info: { width: number; height: number }, pixels: Uint8Array, tag: string) => void;
   registerSoftwareDecoderFactory: (factory: SoftwareDecoderFactory | null) => void;
   SDKVersion: () => string;
