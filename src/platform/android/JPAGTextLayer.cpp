@@ -109,7 +109,7 @@ PAG_API void Java_org_libpag_PAGTextLayer_reset(JNIEnv* env, jclass thiz) {
 
 PAG_API jstring Java_org_libpag_PAGTextLayer_text(JNIEnv* env, jclass thiz) {
   auto pagLayer = GetPAGTextLayer(env, thiz);
-  if (pagLayer != nullptr) {
+  if (pagLayer == nullptr) {
     std::string empty = "";
     return SafeConvertToJString(env, empty.c_str());
   }
