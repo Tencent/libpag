@@ -43,8 +43,8 @@ void VideoSurface::InitJNI(JNIEnv* env, const std::string& className) {
   VideoSurface_release = env->GetMethodID(VideoSurfaceClass.get(), "release", "()V");
 }
 
-OESTexture::OESTexture(const tgfx::GLSampler& glSampler, int width, int height)
-    : GLTexture(width, height, tgfx::ImageOrigin::TopLeft) {
+OESTexture::OESTexture(const tgfx::GLSampler& glSampler, int width, int height, bool hasAlpha)
+    : GLTexture(width, height, tgfx::ImageOrigin::TopLeft), hasAlpha(hasAlpha) {
   sampler = glSampler;
 }
 
@@ -55,7 +55,7 @@ void OESTexture::setTextureSize(int width, int height) {
 }
 
 void OESTexture::computeTransform() {
-  if (textureWidth == 0 || textureHeight == 0) {
+  if (textureWidth == 0 || textureHeight == 0 || hasAlpha) {
     return;
   }
   // https://cs.android.com/android/platform/superproject/+/master:frameworks/native/libs/nativedisplay/surfacetexture/SurfaceTexture.cpp;l=275;drc=master;bpv=0;bpt=1
@@ -79,6 +79,10 @@ void OESTexture::computeTransform() {
 }
 
 tgfx::Point OESTexture::getTextureCoord(float x, float y) const {
+  if (hasAlpha) {
+    // 如果有 alpha 通道，不需要缩小纹素，解决华为设备上的黑边问题
+    return {x / static_cast<float>(textureWidth), y / static_cast<float>(textureHeight)};
+  }
   return {x / static_cast<float>(width()) * sx + tx, y / static_cast<float>(height()) * sy + ty};
 }
 
@@ -89,7 +93,7 @@ void OESTexture::onReleaseGPU() {
   }
 }
 
-std::shared_ptr<VideoSurface> VideoSurface::Make(int width, int height) {
+std::shared_ptr<VideoSurface> VideoSurface::Make(int width, int height, bool hasAlpha) {
   auto env = JNIEnvironment::Current();
   if (env == nullptr) {
     return nullptr;
@@ -99,11 +103,12 @@ std::shared_ptr<VideoSurface> VideoSurface::Make(int width, int height) {
   if (surface.empty()) {
     return nullptr;
   }
-  return std::shared_ptr<VideoSurface>(new VideoSurface(env, surface.get(), width, height));
+  return std::shared_ptr<VideoSurface>(
+      new VideoSurface(env, surface.get(), width, height, hasAlpha));
 }
 
-VideoSurface::VideoSurface(JNIEnv* env, jobject surface, int width, int height)
-    : width(width), height(height) {
+VideoSurface::VideoSurface(JNIEnv* env, jobject surface, int width, int height, bool hasAlpha)
+    : width(width), height(height), hasAlpha(hasAlpha) {
   videoSurface.reset(env, surface);
 }
 
@@ -145,7 +150,7 @@ std::shared_ptr<tgfx::Texture> VideoSurface::makeTexture(tgfx::Context* context)
   if (oesTexture == nullptr) {
     auto textureWidth = env->CallIntMethod(videoSurface.get(), VideoSurface_videoWidth);
     auto textureHeight = env->CallIntMethod(videoSurface.get(), VideoSurface_videoHeight);
-    oesTexture = tgfx::Resource::Wrap(context, new OESTexture(glInfo, width, height));
+    oesTexture = tgfx::Resource::Wrap(context, new OESTexture(glInfo, width, height, hasAlpha));
     oesTexture->setTextureSize(textureWidth, textureHeight);
     oesTexture->attachedSurface.reset(env, videoSurface.get());
   }

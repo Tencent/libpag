@@ -22,6 +22,8 @@
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/gpu/Surface.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
+#include "tgfx/gpu/opengl/GLFunctions.h"
+#include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace tgfx {
 static bool Compare(Surface* surface, const std::string& key) {
@@ -167,6 +169,62 @@ PAG_TEST(CanvasTest, DropShadow) {
   canvas->drawTexture(texture.get(), &paint);
 
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/dropShadow"));
+  device->unlock();
+}
+
+PAG_TEST(CanvasTest, clip) {
+  auto device = GLDevice::Make();
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto width = 1080;
+  auto height = 1776;
+  tgfx::GLSampler textureInfo;
+  pag::CreateGLTexture(context, width, height, &textureInfo);
+  auto glTexture =
+      GLTexture::MakeFrom(context, textureInfo, width, height, ImageOrigin::BottomLeft);
+  auto surface = Surface::MakeFrom(glTexture);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+  canvas->setMatrix(tgfx::Matrix::MakeScale(3));
+  auto clipPath = Path();
+  clipPath.addRect(tgfx::Rect::MakeLTRB(0, 0, 200, 300));
+  auto paint = Paint();
+  paint.setColor(tgfx::Color::FromRGBA(0, 0, 0));
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStroke(Stroke(1));
+  canvas->drawPath(clipPath, paint);
+  canvas->clipPath(clipPath);
+  auto drawPath = Path();
+  drawPath.addRect(tgfx::Rect::MakeLTRB(50, 295, 150, 590));
+  paint.setColor(tgfx::Color::FromRGBA(255, 0, 0));
+  paint.setStyle(PaintStyle::Fill);
+  canvas->drawPath(drawPath, paint);
+  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/Clip"));
+  auto gl = GLFunctions::Get(context);
+  gl->deleteTextures(1, &textureInfo.id);
+  device->unlock();
+}
+
+/**
+ * 用例描述: 测试绘制 Rectangle 纹理时使用 TileMode::Repeat 和 TileMode::Mirror。
+ */
+PAG_TEST(CanvasTest, TileMode) {
+  auto device = GLDevice::Make();
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = Image::MakeFrom("../resources/apitest/rotation.jpg");
+  ASSERT_TRUE(image != nullptr);
+  auto texture = image->makeBuffer()->makeTexture(context);
+  ASSERT_TRUE(texture != nullptr);
+  auto surface = Surface::Make(context, image->width() / 2, image->height() / 2);
+  auto canvas = surface->getCanvas();
+  Paint paint;
+  paint.setShader(Shader::MakeTextureShader(texture, TileMode::Repeat, TileMode::Mirror)
+                      ->makeWithPreLocalMatrix(Matrix::MakeScale(0.125f)));
+  canvas->drawRect(Rect::MakeWH(static_cast<float>(surface->width()),
+                                static_cast<float>(surface->height()) * 0.9f),
+                   paint);
+  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/tileMode"));
   device->unlock();
 }
 }  // namespace tgfx

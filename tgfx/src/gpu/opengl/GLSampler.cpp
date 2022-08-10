@@ -20,6 +20,19 @@
 #include "GLContext.h"
 
 namespace tgfx {
+TextureType GLSampler::type() const {
+  switch (target) {
+    case GL_TEXTURE_2D:
+      return TextureType::TwoD;
+    case GL_TEXTURE_RECTANGLE:
+      return TextureType::Rectangle;
+    case GL_TEXTURE_EXTERNAL_OES:
+      return TextureType::External;
+    default:
+      return TextureType::Unknown;
+  }
+}
+
 void GLSampler::computeKey(Context* context, BytesKey* bytesKey) const {
   auto caps = GLCaps::Get(context);
   bytesKey->write(static_cast<uint32_t>(caps->getTextureSwizzle(format).asKey()));

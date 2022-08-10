@@ -59,4 +59,12 @@ static inline bool FloatsAreFinite(const float array[], int count) {
   }
   return prod == 0;
 }
+
+/**
+ * Returns true if value is a power of 2. Does not explicitly check for value <= 0.
+ */
+template <typename T>
+constexpr inline bool IsPow2(T value) {
+  return (value & (value - 1)) == 0;
+}
 }  // namespace tgfx

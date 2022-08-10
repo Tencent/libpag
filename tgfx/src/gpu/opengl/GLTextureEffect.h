@@ -20,6 +20,7 @@
 
 #include <optional>
 #include "gpu/GLFragmentProcessor.h"
+#include "gpu/TextureEffect.h"
 
 namespace tgfx {
 class GLTextureEffect : public GLFragmentProcessor {
@@ -30,8 +31,35 @@ class GLTextureEffect : public GLFragmentProcessor {
   void onSetData(const ProgramDataManager& programDataManager,
                  const FragmentProcessor& fragmentProcessor) override;
 
-  UniformHandle alphaStartUniform;
+  static bool ShaderModeRequiresUnormCoord(TextureEffect::ShaderMode m);
+
+  static bool ShaderModeUsesSubset(TextureEffect::ShaderMode m);
+
+  static bool ShaderModeUsesClamp(TextureEffect::ShaderMode m);
+
+  void readColor(EmitArgs& args, const std::string& coord, const char* out);
+
+  void subsetCoord(EmitArgs& args, TextureEffect::ShaderMode mode, const char* coordSwizzle,
+                   const char* subsetStartSwizzle, const char* subsetStopSwizzle);
+
+  void clampCoord(EmitArgs& args, bool clamp, const char* coordSwizzle,
+                  const char* clampStartSwizzle, const char* clampStopSwizzle);
+
+  void clampCoord(EmitArgs& args, const bool useClamp[2]);
+
+  void initUniform(EmitArgs& args, const bool useSubset[2], const bool useClamp[2]);
+
+  UniformHandle dimensionsUniform;
+  UniformHandle subsetUniform;
+  UniformHandle clampUniform;
+
+  std::string subsetName;
+  std::string clampName;
+  std::string dimensionsName;
 
   std::optional<Point> alphaStartPrev;
+  std::optional<Point> dimensionsPrev;
+  std::optional<Rect> subsetPrev;
+  std::optional<Rect> clampPrev;
 };
 }  // namespace tgfx

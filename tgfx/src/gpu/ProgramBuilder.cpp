@@ -49,6 +49,9 @@ void ProgramBuilder::emitAndInstallGeoProc(std::string* outputColor, std::string
   nameExpression(outputColor, "outputColor");
   nameExpression(outputCoverage, "outputCoverage");
 
+  uniformHandles.rtAdjustUniform =
+      uniformHandler()->addUniform(ShaderFlags::Vertex, ShaderVar::Type::Float4, RTAdjustName);
+
   // Enclose custom code in a block to avoid namespace conflicts
   fragmentShaderBuilder()->codeAppendf("{ // Stage %d %s\n", stageIndex,
                                        geometryProcessor->name().c_str());

@@ -23,6 +23,7 @@
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Point.h"
+#include "tgfx/core/TileMode.h"
 #include "tgfx/gpu/ColorFilter.h"
 #include "tgfx/gpu/Texture.h"
 
@@ -43,7 +44,9 @@ class Shader {
    */
   static std::shared_ptr<Shader> MakeColorShader(Color color);
 
-  static std::shared_ptr<Shader> MakeTextureShader(std::shared_ptr<Texture> texture);
+  static std::shared_ptr<Shader> MakeTextureShader(std::shared_ptr<Texture> texture,
+                                                   TileMode tileModeX = TileMode::Clamp,
+                                                   TileMode tileModeY = TileMode::Clamp);
 
   static std::shared_ptr<Shader> MakeBlend(BlendMode mode, std::shared_ptr<Shader> dst,
                                            std::shared_ptr<Shader> src);

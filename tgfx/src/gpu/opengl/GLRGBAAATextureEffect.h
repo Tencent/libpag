@@ -18,35 +18,20 @@
 
 #pragma once
 
-#include "SinglePassBlurFilter.h"
-#include "rendering/filters/LayerFilter.h"
-#include "rendering/filters/utils/FilterBuffer.h"
+#include <optional>
+#include "gpu/GLFragmentProcessor.h"
 
-namespace pag {
-class GaussBlurFilter : public LayerFilter {
+namespace tgfx {
+class GLRGBAAATextureEffect : public GLFragmentProcessor {
  public:
-  explicit GaussBlurFilter(Effect* effect);
-  ~GaussBlurFilter() override;
-
-  bool initialize(tgfx::Context* context) override;
-
-  void draw(tgfx::Context* context, const FilterSource* source,
-            const FilterTarget* target) override;
-
-  void update(Frame frame, const tgfx::Rect& contentBounds, const tgfx::Rect& transformedBounds,
-              const tgfx::Point& filterScale) override;
+  void emitCode(EmitArgs& args) override;
 
  private:
-  Effect* effect = nullptr;
+  void onSetData(const ProgramDataManager& programDataManager,
+                 const FragmentProcessor& fragmentProcessor) override;
 
-  SinglePassBlurFilter* blurFilterH = nullptr;
-  SinglePassBlurFilter* blurFilterV = nullptr;
+  UniformHandle alphaStartUniform;
 
-  std::shared_ptr<FilterBuffer> blurFilterBuffer = nullptr;
-
-  bool repeatEdge = true;
-  BlurDirection blurDirection = BlurDirection::Both;
-  float blurriness = 0.0f;
-  std::vector<tgfx::Rect> filtersBounds = {};
+  std::optional<Point> alphaStartPrev;
 };
-}  // namespace pag
+}  // namespace tgfx

@@ -83,7 +83,7 @@ GPUDecoder::~GPUDecoder() {
 }
 
 bool GPUDecoder::initDecoder(JNIEnv* env, const VideoFormat& format) {
-  videoSurface = VideoSurface::Make(format.width, format.height);
+  videoSurface = VideoSurface::Make(format.width, format.height, format.hasAlpha);
   if (videoSurface == nullptr) {
     return false;
   }

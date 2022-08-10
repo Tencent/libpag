@@ -18,19 +18,37 @@
 
 #pragma once
 
-#include "ShaderBuilder.h"
+#include "SamplerState.h"
+#include "gpu/FragmentProcessor.h"
+#include "tgfx/core/RGBAAALayout.h"
 
 namespace tgfx {
-static const std::string RTAdjustName = "tgfx_RTAdjust";
-
-class VertexShaderBuilder : public ShaderBuilder {
+class RGBAAATextureEffect : public FragmentProcessor {
  public:
-  explicit VertexShaderBuilder(ProgramBuilder* program) : ShaderBuilder(program) {
+  static std::unique_ptr<FragmentProcessor> Make(const Texture* texture,
+                                                 const Matrix& localMatrix = Matrix::I(),
+                                                 const RGBAAALayout* layout = nullptr);
+
+  std::string name() const override {
+    return "RGBAAATextureEffect";
   }
 
-  virtual void emitNormalizedPosition(const std::string& devPos) = 0;
-
  private:
-  void onFinalize() override;
+  RGBAAATextureEffect(const Texture* texture, const RGBAAALayout* layout,
+                      const Matrix& localMatrix);
+
+  void onComputeProcessorKey(BytesKey* bytesKey) const override;
+
+  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
+
+  const TextureSampler* onTextureSampler(size_t) const override {
+    return texture->getSampler();
+  }
+
+  const Texture* texture;
+  const RGBAAALayout* layout;
+  CoordTransform coordTransform;
+
+  friend class GLRGBAAATextureEffect;
 };
 }  // namespace tgfx

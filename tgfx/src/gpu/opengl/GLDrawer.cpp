@@ -109,6 +109,11 @@ static std::shared_ptr<Texture> CreateDstTexture(const DrawArgs& args, Rect dstR
   }
   auto bounds = Rect::MakeWH(static_cast<float>(args.renderTarget->width()),
                              static_cast<float>(args.renderTarget->height()));
+  if (args.renderTarget->origin() == ImageOrigin::BottomLeft) {
+    auto height = dstRect.height();
+    dstRect.top = static_cast<float>(args.renderTarget->height()) - dstRect.bottom;
+    dstRect.bottom = dstRect.top + height;
+  }
   if (!dstRect.intersect(bounds)) {
     return nullptr;
   }
@@ -212,7 +217,7 @@ void GLDrawer::draw(DrawArgs args, std::unique_ptr<GLDrawOp> op) const {
   if (pipeline.needsBarrierTexture(args.renderTargetTexture.get())) {
     gl->textureBarrier();
   }
-  program->updateUniformsAndTextureBindings(*geometryProcessor, pipeline);
+  program->updateUniformsAndTextureBindings(renderTarget, *geometryProcessor, pipeline);
   if (vertexArray > 0) {
     gl->bindVertexArray(vertexArray);
   }

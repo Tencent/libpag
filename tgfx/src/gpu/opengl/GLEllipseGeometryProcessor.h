@@ -31,10 +31,7 @@ class GLEllipseGeometryProcessor : public GLGeometryProcessor {
 
  private:
   UniformHandle viewMatrixUniform;
-  UniformHandle screenSizeUniform;
 
   std::optional<Matrix> viewMatrixPrev;
-  std::optional<int> widthPrev;
-  std::optional<int> heightPrev;
 };
 }  // namespace tgfx

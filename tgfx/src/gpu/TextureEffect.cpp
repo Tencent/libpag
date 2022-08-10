@@ -17,39 +17,98 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureEffect.h"
-#include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
 #include "core/utils/UniqueID.h"
-#include "gpu/YUVTextureEffect.h"
 #include "opengl/GLTextureEffect.h"
 
 namespace tgfx {
-static bool CheckParameter(const Texture* texture, const RGBAAALayout* layout) {
-  if (texture == nullptr) {
-    return false;
+using Wrap = SamplerState::WrapMode;
+
+struct TextureEffect::Sampling {
+  Sampling(const Texture* texture, SamplerState samplerState, const Rect& subset, const Caps* caps);
+
+  SamplerState hwSampler;
+  ShaderMode shaderModeX = ShaderMode::None;
+  ShaderMode shaderModeY = ShaderMode::None;
+  Rect shaderSubset = Rect::MakeEmpty();
+  Rect shaderClamp = Rect::MakeEmpty();
+};
+
+TextureEffect::ShaderMode TextureEffect::GetShaderMode(Wrap wrap) {
+  switch (wrap) {
+    case Wrap::MirrorRepeat:
+      return ShaderMode::MirrorRepeat;
+    case Wrap::Clamp:
+      return ShaderMode::Clamp;
+    case Wrap::Repeat:
+      return ShaderMode::Repeat;
+    case Wrap::ClampToBorder:
+      return ShaderMode::ClampToBorder;
   }
-  if (layout != nullptr) {
-    if (layout->width <= 0 || layout->height <= 0 ||
-        (layout->alphaStartX <= 0 && layout->alphaStartY <= 0) ||
-        layout->width + layout->alphaStartX > texture->width() ||
-        layout->height + layout->alphaStartY > texture->height()) {
-      LOGE("TextureFragmentProcessor::Make(): Invalid RGBAAALayout specified!");
+}
+
+TextureEffect::Sampling::Sampling(const Texture* texture, SamplerState sampler, const Rect& subset,
+                                  const Caps* caps) {
+  struct Span {
+    float a = 0.f;
+    float b = 0.f;
+
+    Span makeInset(float o) const {
+      Span r = {a + o, b - o};
+      if (r.a > r.b) {
+        r.a = r.b = (r.a + r.b) / 2;
+      }
+      return r;
+    }
+  };
+  struct Result1D {
+    ShaderMode shaderMode = ShaderMode::None;
+    Span shaderSubset;
+    Span shaderClamp;
+    Wrap hwWrap = Wrap::Clamp;
+  };
+  auto canDoWrapInHW = [&](int size, Wrap wrap) {
+    if (wrap == Wrap::ClampToBorder && !caps->clampToBorderSupport) {
       return false;
     }
-  }
-  return true;
+    if (wrap != Wrap::Clamp && !caps->npotTextureTileSupport && !IsPow2(size)) {
+      return false;
+    }
+    if (texture->getSampler()->type() != TextureType::TwoD &&
+        !(wrap == Wrap::Clamp || wrap == Wrap::ClampToBorder)) {
+      return false;
+    }
+    return true;
+  };
+  auto resolve = [&](int size, Wrap wrap, Span subset) {
+    Result1D r;
+    bool canDoModeInHW = canDoWrapInHW(size, wrap);
+    if (canDoModeInHW && subset.a <= 0 && subset.b >= static_cast<float>(size)) {
+      r.hwWrap = wrap;
+      return r;
+    }
+    r.shaderSubset = subset;
+    r.shaderClamp = subset.makeInset(0.5f);
+    r.shaderMode = GetShaderMode(wrap);
+    return r;
+  };
+
+  Span subsetX{subset.left, subset.right};
+  auto x = resolve(texture->width(), sampler.wrapModeX, subsetX);
+  Span subsetY{subset.top, subset.bottom};
+  auto y = resolve(texture->height(), sampler.wrapModeY, subsetY);
+  hwSampler = SamplerState(x.hwWrap, y.hwWrap);
+  shaderModeX = x.shaderMode;
+  shaderModeY = y.shaderMode;
+  shaderSubset = {x.shaderSubset.a, y.shaderSubset.a, x.shaderSubset.b, y.shaderSubset.b};
+  shaderClamp = {x.shaderClamp.a, y.shaderClamp.a, x.shaderClamp.b, y.shaderClamp.b};
 }
 
-std::unique_ptr<FragmentProcessor> TextureEffect::Make(const Texture* texture,
-                                                       const Matrix& localMatrix,
-                                                       const RGBAAALayout* layout) {
-  return Make(texture, {}, localMatrix, layout);
-}
-
-std::unique_ptr<FragmentProcessor> TextureEffect::Make(const Texture* texture,
+std::unique_ptr<FragmentProcessor> TextureEffect::Make(const Context* context,
+                                                       const Texture* texture,
                                                        SamplerState samplerState,
-                                                       const Matrix& localMatrix,
-                                                       const RGBAAALayout* layout) {
-  if (!CheckParameter(texture, layout)) {
+                                                       const Matrix& localMatrix) {
+  if (texture == nullptr) {
     return nullptr;
   }
   // normalize
@@ -63,16 +122,21 @@ std::unique_ptr<FragmentProcessor> TextureEffect::Make(const Texture* texture,
     translate = texture->getTextureCoord(0, static_cast<float>(texture->height()));
     matrix.postTranslate(translate.x, translate.y);
   }
-  if (texture->isYUV()) {
-    return std::unique_ptr<YUVTextureEffect>(
-        new YUVTextureEffect(static_cast<const YUVTexture*>(texture), layout, matrix));
-  }
-  return std::unique_ptr<TextureEffect>(new TextureEffect(texture, samplerState, layout, matrix));
+  auto subset =
+      Rect::MakeWH(static_cast<float>(texture->width()), static_cast<float>(texture->height()));
+  Sampling sampling(texture, samplerState, subset, context->caps());
+  return std::unique_ptr<TextureEffect>(new TextureEffect(texture, sampling, matrix));
 }
 
-TextureEffect::TextureEffect(const Texture* texture, SamplerState samplerState,
-                             const RGBAAALayout* layout, const Matrix& localMatrix)
-    : texture(texture), samplerState(samplerState), layout(layout), coordTransform(localMatrix) {
+TextureEffect::TextureEffect(const Texture* texture, const Sampling& sampling,
+                             const Matrix& localMatrix)
+    : texture(texture),
+      samplerState(sampling.hwSampler),
+      subset(sampling.shaderSubset),
+      clamp(sampling.shaderClamp),
+      shaderModeX(sampling.shaderModeX),
+      shaderModeY(sampling.shaderModeY),
+      coordTransform(localMatrix) {
   setTextureSamplerCnt(1);
   addCoordTransform(&coordTransform);
 }
@@ -80,7 +144,8 @@ TextureEffect::TextureEffect(const Texture* texture, SamplerState samplerState,
 void TextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   static auto Type = UniqueID::Next();
   bytesKey->write(Type);
-  uint32_t flags = layout == nullptr ? 1 : 0;
+  auto flags = static_cast<uint32_t>(shaderModeX);
+  flags |= static_cast<uint32_t>(shaderModeY) << 3;
   bytesKey->write(flags);
 }
 
