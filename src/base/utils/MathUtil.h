@@ -34,4 +34,9 @@ static inline float RadiansToDegrees(float radians) {
 static inline bool FloatNearlyZero(float x, float tolerance = FLOAT_NEARLY_ZERO) {
   return fabsf(x) <= tolerance;
 }
+
+static inline bool DoubleNearlyEqual(double x, double y, double tolerance = FLOAT_NEARLY_ZERO) {
+  return fabs(x - y) <= tolerance;
+}
+
 }  // namespace pag

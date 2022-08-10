@@ -18,6 +18,7 @@
 
 #include "TextSelectorRenderer.h"
 #include "base/utils/BezierEasing.h"
+#include "base/utils/MathUtil.h"
 
 namespace pag {
 
@@ -205,6 +206,8 @@ RangeSelectorRenderer::RangeSelectorRenderer(const TextRangeSelector* selector, 
   mode = selector->mode->getValueAt(frame);              // 模式
   amount = selector->amount->getValueAt(frame);          // 数量
   shape = selector->shape;                               // 形状
+  easeHigh = selector->easeHigh->getValueAt(frame);      // 缓和度高
+  easeLow = selector->easeLow->getValueAt(frame);        // 缓和度低
   randomizeOrder = selector->randomizeOrder;             // 随机排序
   randomSeed = selector->randomSeed->getValueAt(frame);  // 随机植入
 
@@ -272,8 +275,45 @@ static float CalculateRangeFactorRampDown(float textStart, float textEnd, float 
   return factor;
 }
 
+// 范盛金公式求解一元三次方程 a * x^3 + b * x^2 + c * x + d = 0 (a != 0)，获取实数根
+// 返回值列表为空，表示方程没有实数解
+static std::vector<double> CalRealSolutionsOfCubicEquation(double a, double b, double c, double d) {
+  if (a == 0) {
+    return {};
+  }
+
+  auto A = b * b - 3 * a * c;
+  auto B = b * c - 9 * a * d;
+  auto C = c * c - 3 * b * d;
+  auto delta = B * B - 4 * A * C;
+  std::vector<double> solutions;
+  if (A == 0 && B == 0) {
+    solutions.emplace_back(-b / (3 * a));
+  } else if (delta == 0 && A != 0) {
+    auto k = B / A;
+    solutions.emplace_back(-b / a + k);
+    solutions.emplace_back(-0.5 * k);
+  } else if (delta > 0) {
+    auto y1 = A * b + 1.5 * a * (-B + sqrt(delta));
+    auto y2 = A * b + 1.5 * a * (-B - sqrt(delta));
+    solutions.emplace_back((-b - cbrt(y1) - cbrt(y2)) / (3 * a));
+  } else if (delta < 0 && A > 0) {
+    auto t = (A * b - 1.5 * a * B) / (A * sqrt(A));
+    if (-1 < t && t < 1) {
+      auto theta = acos(t);
+      auto sqrtA = sqrt(A);
+      auto cosA = cos(theta / 3);
+      auto sinA = sin(theta / 3);
+      solutions.emplace_back((-b - 2 * sqrtA * cosA) / (3 * a));
+      solutions.emplace_back((-b + sqrtA * (cosA + sqrt(3) * sinA)) / (3 * a));
+      solutions.emplace_back((-b + sqrtA * (cosA - sqrt(3) * sinA)) / (3 * a));
+    }
+  }
+  return solutions;
+}
+
 static float CalculateRangeFactorTriangle(float textStart, float textEnd, float rangeStart,
-                                          float rangeEnd) {
+                                          float rangeEnd, float easeHigh, float easeLow) {
   //
   // 三角形
   //                /\
@@ -285,13 +325,45 @@ static float CalculateRangeFactorTriangle(float textStart, float textEnd, float 
   //
   auto textCenter = (textStart + textEnd) * 0.5f;
   auto rangeCenter = (rangeStart + rangeEnd) * 0.5f;
-  float factor;
-  if (textCenter < rangeCenter) {
-    factor = (textCenter - rangeStart) / (rangeCenter - rangeStart);
-  } else {
-    factor = (rangeEnd - textCenter) / (rangeEnd - rangeCenter);
+  double x = textCenter;
+
+  if (x < rangeStart || x > rangeEnd) {
+    return 0;
   }
-  return factor;
+
+  // 四阶贝塞尔曲线的四个控制点
+  double x1 = x <= rangeCenter ? rangeStart : rangeEnd, y1 = 0;
+  double step = rangeCenter - x1;
+  double x2 = easeLow >= 0 ? x1 + easeLow * step : x1;
+  double y2 = easeLow >= 0 ? 0 : -easeLow;
+  double x3 = easeHigh >= 0 ? rangeCenter - easeHigh * step : rangeCenter;
+  double y3 = easeHigh >= 0 ? 1 : 1 + easeHigh;
+  double x4 = rangeCenter, y4 = 1;
+
+  // 这里使用方程法而不使用 BezierEasing 方法拟合，是由于使用拟合法需要额外存储分段数据，
+  // easeHigh 和easeLow 不变情况下，速度上计算没有多大差异，
+  // 使用 easeHigh 和 easeLow 关键帧动画时候会有额外的生成分段数据开销和缓存开销，
+  // 因此这里采用方程法由 x 计算 t，由 t 计算 y
+  // 由 P = (1-t)^3 * P1 + 3 * (1 - t)^2 * t * P2 + 3 * (1 - t) * t^2 * P3 + t^3 * P4,
+  // 推出一元三次方程式 a * t^3 + b * t^2 + c * t + d = 0,
+  // 其中 a = -x1 + 3 * x2 - 3 * x3 + x4, b = 3 * x1 - 6 * x2 + 3 * x3,
+  // c = -3 * x1 + 3 * x2, d = x1 - x, 求解 t
+  auto a = -x1 + 3 * x2 - 3 * x3 + x4;
+  auto b = 3 * (x1 - 2 * x2 + x3);
+  auto c = 3 * (-x1 + x2);
+  auto d = x1 - x;
+
+  double t = 0;
+  for (auto solution : CalRealSolutionsOfCubicEquation(a, b, c, d)) {
+    // 由于浮点计算有精确度问题，当 x = 0.5, t 会存在略大于1，因此需要做近似计算
+    if ((solution >= 0 && solution <= 1) || DoubleNearlyEqual(solution, 1, 1e-6)) {
+      t = solution;
+      break;
+    }
+  }
+
+  return static_cast<float>(pow(1 - t, 3) * y1 + 3 * pow(1 - t, 2) * t * y2 +
+                            3 * (1 - t) * pow(t, 2) * y3 + pow(t, 3) * y4);
 }
 
 static float CalculateRangeFactorRound(float textStart, float textEnd, float rangeStart,
@@ -385,7 +457,8 @@ float RangeSelectorRenderer::calculateFactorByIndex(size_t index, bool* pBiasFla
       factor = CalculateRangeFactorRampDown(textStart, textEnd, rangeStart, rangeEnd);
       break;
     case TextRangeSelectorShape::Triangle:  // 三角形
-      factor = CalculateRangeFactorTriangle(textStart, textEnd, rangeStart, rangeEnd);
+      factor =
+          CalculateRangeFactorTriangle(textStart, textEnd, rangeStart, rangeEnd, easeHigh, easeLow);
       break;
     case TextRangeSelectorShape::Round:  // 圆形
       factor = CalculateRangeFactorRound(textStart, textEnd, rangeStart, rangeEnd);
