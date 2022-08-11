@@ -18,6 +18,7 @@ declare global {
 
 export interface RenderOptions {
   renderingMode?: RenderingMode;
+  useScale?: boolean;
 }
 
 const IS_WECHAT = /MicroMessenger/i.test(navigator.userAgent);
@@ -72,7 +73,7 @@ export class View {
     this.videoParam = getVideoParam(pagFile, this.videoSequence);
     this.eventManager = new EventManager();
     this.renderingMode = options.renderingMode || RenderingMode.WebGL;
-    this.updateSize();
+    this.updateSize(options.useScale);
     this.setScaleMode();
   }
 
@@ -268,10 +269,42 @@ export class View {
     }
   }
 
-  public updateSize() {
-    const styles = getComputedStyle(this.canvas as HTMLCanvasElement);
-    this.canvas!.width = Number(styles.getPropertyValue('width').replace('px', ''));
-    this.canvas!.height = Number(styles.getPropertyValue('height').replace('px', ''));
+  public updateSize(useScale = true) {
+    if (!this.canvas) {
+      throw new Error('Canvas element is not found!');
+    }
+    let displaySize: { width: number; height: number };
+    const styleDeclaration = getComputedStyle(this.canvas as HTMLCanvasElement);
+    const computedSize = {
+      width: Number(styleDeclaration.width.replace('px', '')),
+      height: Number(styleDeclaration.height.replace('px', '')),
+    };
+    if (computedSize.width > 0 && computedSize.height > 0) {
+      displaySize = computedSize;
+    } else {
+      const styleSize = {
+        width: Number(this.canvas.style.width.replace('px', '')),
+        height: Number(this.canvas.style.height.replace('px', '')),
+      };
+      if (styleSize.width > 0 && styleSize.height > 0) {
+        displaySize = styleSize;
+      } else {
+        displaySize = {
+          width: this.canvas.width,
+          height: this.canvas.height,
+        };
+      }
+    }
+
+    if (!useScale) {
+      this.canvas!.width = this.canvas!.width || displaySize.width;
+      this.canvas!.height = this.canvas!.height || displaySize.height;
+      return;
+    }
+    this.canvas.style.width = `${displaySize.width}px`;
+    this.canvas.style.height = `${displaySize.height}px`;
+    this.canvas.width = displaySize.width * window.devicePixelRatio;
+    this.canvas.height = displaySize.height * window.devicePixelRatio;
   }
 
   protected loadContext() {}

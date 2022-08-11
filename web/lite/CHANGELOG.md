@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.0.3
+
+### Feature
+
+- 增加 dpi 缩放
+
 ## 0.0.2
 
 ### BugFixes
