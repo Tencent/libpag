@@ -189,6 +189,7 @@ import { PAGView, types } from 'libpag-lite';
 | 键                | 类型                                 | 说明                                  | 默认值  | 必传 |
 | ----------------- | ------------------------------------ | ------------------------------------- | ------- | ---- |
 | **renderingMode** | enum [RenderingMode](#RenderingMode) | 渲染模式，可选值： `WebGL` 、`Canvas` | `WebGL` | N    |
+| **useScale** | boolean | 是否按照设备dpi进行缩放 | true | N    |
 
 ### Enum
 
