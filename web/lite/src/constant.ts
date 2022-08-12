@@ -3,6 +3,16 @@ export const ZERO_TIME = 0;
 export const OPAQUE = 255;
 export const TRANSPARENT = 0;
 
+/**
+ * Default WebGL ContextAttributes
+ */
+export const WEBGL_CONTEXT_ATTRIBUTES = {
+  alpha: true,
+  depth: false,
+  stencil: false,
+  antialias: false,
+};
+
 // 混合模式
 export const enum BlendMode {
   Normal = 0,

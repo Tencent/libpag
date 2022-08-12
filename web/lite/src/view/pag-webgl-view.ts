@@ -1,3 +1,4 @@
+import { WEBGL_CONTEXT_ATTRIBUTES } from '../constant';
 import { destroyVerify } from '../decorators';
 import { PAGFile } from '../pag-file';
 import { FRAGMENT_2D_SHADER, FRAGMENT_2D_SHADER_TRANSPARENT, VERTEX_2D_SHADER } from './shader';
@@ -20,7 +21,9 @@ export class PAGWebGLView extends View {
   public constructor(pagFile: PAGFile, canvas: HTMLCanvasElement, options: RenderOptions) {
     if (detectWebGLContext() === false) throw new Error('WebGL is not supported!');
     super(pagFile, canvas, options);
-    const gl = this.canvas?.getContext('webgl');
+    const gl = this.canvas?.getContext('webgl', {
+      ...WEBGL_CONTEXT_ATTRIBUTES,
+    });
     if (!gl) throw new Error("Can't get WebGL context!");
     this.gl = gl;
     if (this.videoParam.hasAlpha) {
