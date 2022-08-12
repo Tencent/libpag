@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "QuadPerEdgeAAGeometryProcessor.h"
-#include "core/utils/UniqueID.h"
 #include "gpu/opengl/GLQuadPerEdgeAAGeometryProcessor.h"
 #include "tgfx/gpu/YUVTexture.h"
 
@@ -30,7 +29,7 @@ std::unique_ptr<QuadPerEdgeAAGeometryProcessor> QuadPerEdgeAAGeometryProcessor::
 
 QuadPerEdgeAAGeometryProcessor::QuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa,
                                                                bool hasColor)
-    : width(width), height(height), aa(aa) {
+    : GeometryProcessor(ClassID()), width(width), height(height), aa(aa) {
   if (aa == AAType::Coverage) {
     position = {"aPositionWithCoverage", ShaderVar::Type::Float3};
   } else {
@@ -44,8 +43,6 @@ QuadPerEdgeAAGeometryProcessor::QuadPerEdgeAAGeometryProcessor(int width, int he
 }
 
 void QuadPerEdgeAAGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
-  static auto Type = UniqueID::Next();
-  bytesKey->write(Type);
   uint32_t flags = aa == AAType::Coverage ? 1 : 0;
   flags |= color.isInitialized() ? 2 : 0;
   bytesKey->write(flags);

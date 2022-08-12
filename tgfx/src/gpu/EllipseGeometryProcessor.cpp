@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "EllipseGeometryProcessor.h"
-
-#include "core/utils/UniqueID.h"
 #include "gpu/opengl/GLEllipseGeometryProcessor.h"
 
 namespace tgfx {
@@ -30,7 +28,12 @@ std::unique_ptr<EllipseGeometryProcessor> EllipseGeometryProcessor::Make(
 
 EllipseGeometryProcessor::EllipseGeometryProcessor(int width, int height, bool stroke,
                                                    bool useScale, const Matrix& localMatrix)
-    : width(width), height(height), localMatrix(localMatrix), stroke(stroke), useScale(useScale) {
+    : GeometryProcessor(ClassID()),
+      width(width),
+      height(height),
+      localMatrix(localMatrix),
+      stroke(stroke),
+      useScale(useScale) {
   inPosition = {"inPosition", ShaderVar::Type::Float2};
   inColor = {"inColor", ShaderVar::Type::Float4};
   if (useScale) {
@@ -43,8 +46,6 @@ EllipseGeometryProcessor::EllipseGeometryProcessor(int width, int height, bool s
 }
 
 void EllipseGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
-  static auto Type = UniqueID::Next();
-  bytesKey->write(Type);
   uint32_t flags = stroke ? 1 : 0;
   bytesKey->write(flags);
 }

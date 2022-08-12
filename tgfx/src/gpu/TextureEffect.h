@@ -34,6 +34,8 @@ class TextureEffect : public FragmentProcessor {
   }
 
  private:
+  DEFINE_PROCESSOR_CLASS_ID
+
   struct Sampling;
 
   enum class ShaderMode {
@@ -50,6 +52,8 @@ class TextureEffect : public FragmentProcessor {
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
+
+  bool onIsEqual(const FragmentProcessor& processor) const override;
 
   const TextureSampler* onTextureSampler(size_t) const override {
     return texture->getSampler();

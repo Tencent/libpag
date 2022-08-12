@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DualIntervalGradientColorizer.h"
-#include "core/utils/UniqueID.h"
 #include "gpu/opengl/GLDualIntervalGradientColorizer.h"
 
 namespace tgfx {
@@ -45,9 +44,10 @@ std::unique_ptr<DualIntervalGradientColorizer> DualIntervalGradientColorizer::Ma
       new DualIntervalGradientColorizer(scale01, c0, scale23, bias23, threshold));
 }
 
-void DualIntervalGradientColorizer::onComputeProcessorKey(BytesKey* bytesKey) const {
-  static auto Type = UniqueID::Next();
-  bytesKey->write(Type);
+bool DualIntervalGradientColorizer::onIsEqual(const FragmentProcessor& processor) const {
+  const auto& that = static_cast<const DualIntervalGradientColorizer&>(processor);
+  return scale01 == that.scale01 && bias01 == that.bias01 && scale23 == that.scale23 &&
+         bias23 == that.bias23 && threshold == that.threshold;
 }
 
 std::unique_ptr<GLFragmentProcessor> DualIntervalGradientColorizer::onCreateGLInstance() const {

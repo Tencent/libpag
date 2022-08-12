@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DualBlurFragmentProcessor.h"
-#include "core/utils/UniqueID.h"
 #include "opengl/GLDualBlurFragmentProcessor.h"
 
 namespace tgfx {
@@ -34,14 +33,20 @@ std::unique_ptr<DualBlurFragmentProcessor> DualBlurFragmentProcessor::Make(
 DualBlurFragmentProcessor::DualBlurFragmentProcessor(DualBlurPassMode passMode,
                                                      std::unique_ptr<FragmentProcessor> texture,
                                                      Point blurOffset, Point texelSize)
-    : passMode(passMode), blurOffset(blurOffset), texelSize(texelSize) {
+    : FragmentProcessor(ClassID()),
+      passMode(passMode),
+      blurOffset(blurOffset),
+      texelSize(texelSize) {
   registerChildProcessor(std::move(texture));
 }
 
 void DualBlurFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
-  static auto Type = UniqueID::Next();
-  bytesKey->write(Type);
   bytesKey->write(static_cast<uint32_t>(passMode));
+}
+
+bool DualBlurFragmentProcessor::onIsEqual(const FragmentProcessor& processor) const {
+  const auto& that = static_cast<const DualBlurFragmentProcessor&>(processor);
+  return passMode == that.passMode && blurOffset == that.blurOffset && texelSize == that.texelSize;
 }
 
 std::unique_ptr<GLFragmentProcessor> DualBlurFragmentProcessor::onCreateGLInstance() const {

@@ -47,6 +47,7 @@ size_t GeometryProcessor::Attribute::sizeAlign4() const {
 }
 
 void GeometryProcessor::computeProcessorKey(Context*, BytesKey* bytesKey) const {
+  bytesKey->write(classID());
   onComputeProcessorKey(bytesKey);
   for (const auto* attribute : attributes) {
     attribute->computeKey(bytesKey);

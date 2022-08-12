@@ -115,6 +115,7 @@ void DisplacementMapFilter::updateMapTexture(RenderCache* cache, const Graphic* 
     mapBounds = bounds;
   }
   mapGraphic->draw(mapSurface->getCanvas(), cache);
+  mapSurface->getCanvas()->flush();
 }
 
 void DisplacementMapFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,

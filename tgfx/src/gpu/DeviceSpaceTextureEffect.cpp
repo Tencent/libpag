@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DeviceSpaceTextureEffect.h"
-#include "core/utils/UniqueID.h"
 #include "opengl/GLDeviceSpaceTextureEffect.h"
 
 namespace tgfx {
@@ -32,7 +31,7 @@ std::unique_ptr<DeviceSpaceTextureEffect> DeviceSpaceTextureEffect::Make(
 
 DeviceSpaceTextureEffect::DeviceSpaceTextureEffect(std::shared_ptr<Texture> texture,
                                                    ImageOrigin deviceOrigin)
-    : texture(std::move(texture)) {
+    : FragmentProcessor(ClassID()), texture(std::move(texture)) {
   setTextureSamplerCnt(1);
   if (deviceOrigin == ImageOrigin::BottomLeft) {
     deviceCoordMatrix.postScale(1, -1);
@@ -43,9 +42,9 @@ DeviceSpaceTextureEffect::DeviceSpaceTextureEffect(std::shared_ptr<Texture> text
   deviceCoordMatrix.postScale(scale.x, scale.y);
 }
 
-void DeviceSpaceTextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
-  static auto Type = UniqueID::Next();
-  bytesKey->write(Type);
+bool DeviceSpaceTextureEffect::onIsEqual(const FragmentProcessor& processor) const {
+  const auto& that = static_cast<const DeviceSpaceTextureEffect&>(processor);
+  return texture == that.texture && deviceCoordMatrix == that.deviceCoordMatrix;
 }
 
 std::unique_ptr<GLFragmentProcessor> DeviceSpaceTextureEffect::onCreateGLInstance() const {

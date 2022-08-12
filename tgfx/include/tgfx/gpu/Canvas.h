@@ -129,9 +129,10 @@ class Canvas {
   void clipPath(const Path& path);
 
   /**
-   * Replacing all pixels with transparent color.
+   * Fills clip with color. This has the effect of replacing all pixels contained by clip with
+   * color.
    */
-  virtual void clear() = 0;
+  void clear(const Color& color = Color::Transparent());
 
   /**
    * Draws a rectangle with specified paint, using current current alpha, blend mode, clip and

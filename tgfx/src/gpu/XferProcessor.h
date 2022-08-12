@@ -33,5 +33,9 @@ class XferProcessor : public Processor {
    * XferProcessor.
    */
   virtual std::unique_ptr<GLXferProcessor> createGLInstance() const = 0;
+
+ protected:
+  explicit XferProcessor(uint32_t classID) : Processor(classID) {
+  }
 };
 }  // namespace tgfx

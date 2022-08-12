@@ -48,8 +48,12 @@ class Pipeline {
     return fragmentProcessors[idx].get();
   }
 
-  bool needsBarrierTexture(const Texture* texture) const {
-    return dstTexture != nullptr && texture == dstTexture.get();
+  void setRequiresBarrier(bool requiresBarrier) {
+    _requiresBarrier = requiresBarrier;
+  }
+
+  bool requiresBarrier() const {
+    return _requiresBarrier;
   }
 
   const Swizzle* outputSwizzle() const {
@@ -62,6 +66,7 @@ class Pipeline {
   size_t numColorProcessors = 0;
   std::unique_ptr<XferProcessor> xferProcessor;
   std::shared_ptr<Texture> dstTexture;
+  bool _requiresBarrier = false;
   Point dstTextureOffset = Point::Zero();
   const Swizzle* _outputSwizzle = nullptr;
 };

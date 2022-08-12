@@ -22,7 +22,6 @@
 #include "GLProgramCreator.h"
 #include "GLUtil.h"
 #include "core/utils/UniqueID.h"
-#include "gpu/PorterDuffXferProcessor.h"
 #include "gpu/ProgramCache.h"
 
 namespace tgfx {
@@ -126,7 +125,7 @@ static std::shared_ptr<Texture> CreateDstTexture(const DrawArgs& args, Rect dstR
     LOGE("Failed to create dst texture(%f*%f).", dstRect.width(), dstRect.height());
     return nullptr;
   }
-  auto renderTarget = static_cast<const GLRenderTarget*>(args.renderTarget);
+  auto renderTarget = std::static_pointer_cast<GLRenderTarget>(args.renderTarget);
   gl->bindFramebuffer(GL_FRAMEBUFFER, renderTarget->glFrameBuffer().id);
   auto glSampler = std::static_pointer_cast<GLTexture>(dstTexture)->glSampler();
   gl->bindTexture(glSampler.target, glSampler.id);
@@ -139,30 +138,23 @@ static std::shared_ptr<Texture> CreateDstTexture(const DrawArgs& args, Rect dstR
   return dstTexture;
 }
 
-static PixelFormat GetOutputPixelFormat(const DrawArgs& args) {
-  if (args.renderTargetTexture) {
-    return args.renderTargetTexture->getSampler()->format;
-  }
-  return PixelFormat::RGBA_8888;
-}
-
-static void UpdateScissor(Context* context, const DrawArgs& args) {
+static void UpdateScissor(Context* context, const Rect& scissorRect) {
   auto gl = GLFunctions::Get(context);
-  if (args.scissorRect.isEmpty()) {
+  if (scissorRect.isEmpty()) {
     gl->disable(GL_SCISSOR_TEST);
   } else {
     gl->enable(GL_SCISSOR_TEST);
-    gl->scissor(static_cast<int>(args.scissorRect.x()), static_cast<int>(args.scissorRect.y()),
-                static_cast<int>(args.scissorRect.width()),
-                static_cast<int>(args.scissorRect.height()));
+    gl->scissor(static_cast<int>(scissorRect.x()), static_cast<int>(scissorRect.y()),
+                static_cast<int>(scissorRect.width()), static_cast<int>(scissorRect.height()));
   }
 }
 
-static void UpdateBlend(Context* context, bool blendAsCoeff, unsigned first, unsigned second) {
+static void UpdateBlend(Context* context,
+                        const std::optional<std::pair<unsigned, unsigned>>& blendFactors) {
   auto gl = GLFunctions::Get(context);
-  if (blendAsCoeff) {
+  if (blendFactors.has_value()) {
     gl->enable(GL_BLEND);
-    gl->blendFunc(first, second);
+    gl->blendFunc(blendFactors->first, blendFactors->second);
     gl->blendEquation(GL_FUNC_ADD);
   } else {
     gl->disable(GL_BLEND);
@@ -173,51 +165,88 @@ static void UpdateBlend(Context* context, bool blendAsCoeff, unsigned first, uns
   }
 }
 
-void GLDrawer::draw(DrawArgs args, std::unique_ptr<GLDrawOp> op) const {
+ProgramInfo GLDrawOp::createProgram(const DrawArgs& args) {
+  auto numColorProcessors = _colors.size();
+  std::vector<std::unique_ptr<FragmentProcessor>> fragmentProcessors = {};
+  fragmentProcessors.resize(numColorProcessors + _masks.size());
+  std::move(_colors.begin(), _colors.end(), fragmentProcessors.begin());
+  std::move(_masks.begin(), _masks.end(),
+            fragmentProcessors.begin() + static_cast<int>(numColorProcessors));
+  std::shared_ptr<Texture> dstTexture;
+  Point dstTextureOffset = Point::Zero();
+  ProgramInfo info;
+  info.blendFactors = _blendFactors;
+  if (_requiresDstTexture) {
+    dstTexture = CreateDstTexture(args, _bounds, &dstTextureOffset);
+  }
+  auto config = std::static_pointer_cast<GLRenderTarget>(args.renderTarget)->glFrameBuffer().format;
+  const auto& swizzle = GLCaps::Get(args.context)->getOutputSwizzle(config);
+  info.pipeline =
+      std::make_unique<Pipeline>(std::move(fragmentProcessors), numColorProcessors,
+                                 std::move(_xferProcessor), dstTexture, dstTextureOffset, &swizzle);
+  info.pipeline->setRequiresBarrier(dstTexture != nullptr &&
+                                    dstTexture == args.renderTargetTexture);
+  info.geometryProcessor = getGeometryProcessor(args);
+  GLProgramCreator creator(info.geometryProcessor.get(), info.pipeline.get());
+  info.program = static_cast<GLProgram*>(args.context->programCache()->getProgram(&creator));
+  return info;
+}
+
+static std::atomic_uint8_t currentOpClassID = {1};
+
+uint8_t GLDrawOp::GenOpClassID() {
+  return currentOpClassID++;
+}
+
+static bool CompareFragments(const std::vector<std::unique_ptr<FragmentProcessor>>& frags1,
+                             const std::vector<std::unique_ptr<FragmentProcessor>>& frags2) {
+  if (frags1.size() != frags2.size()) {
+    return false;
+  }
+  for (size_t i = 0; i < frags1.size(); i++) {
+    if (!frags1[i]->isEqual(*frags2[i])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool GLDrawOp::combineIfPossible(GLDrawOp* that) {
+  if (classID() != that->classID() || aa != that->aa || _scissorRect != that->_scissorRect ||
+      _blendFactors != that->_blendFactors || _requiresDstTexture != that->_requiresDstTexture ||
+      !CompareFragments(_colors, that->_colors) || !CompareFragments(_masks, that->_masks) ||
+      _xferProcessor != that->_xferProcessor) {
+    return false;
+  }
+  auto result = onCombineIfPossible(that);
+  if (result) {
+    _bounds.join(that->_bounds);
+  }
+  return result;
+}
+
+void GLDrawer::draw(const DrawArgs& args, std::unique_ptr<GLDrawOp> op) const {
   if (!isDrawArgsValid(args) || op == nullptr) {
     return;
   }
-  auto numColorProcessors = args.colors.size();
-  std::vector<std::unique_ptr<FragmentProcessor>> fragmentProcessors = {};
-  fragmentProcessors.resize(numColorProcessors + args.masks.size());
-  std::move(args.colors.begin(), args.colors.end(), fragmentProcessors.begin());
-  std::move(args.masks.begin(), args.masks.end(),
-            fragmentProcessors.begin() + static_cast<int>(numColorProcessors));
-  auto gl = GLFunctions::Get(args.context);
-  auto caps = GLCaps::Get(args.context);
-  std::unique_ptr<XferProcessor> xferProcessor;
-  std::shared_ptr<Texture> dstTexture;
-  Point dstTextureOffset = Point::Zero();
-  unsigned first = -1;
-  unsigned second = -1;
-  auto blendAsCoeff = BlendAsCoeff(args.blendMode, &first, &second);
-  if (!blendAsCoeff) {
-    xferProcessor = PorterDuffXferProcessor::Make(args.blendMode);
-    if (!caps->frameBufferFetchSupport) {
-      dstTexture = CreateDstTexture(args, op->bounds(), &dstTextureOffset);
-    }
-  }
-  auto config = GetOutputPixelFormat(args);
-  const auto& swizzle = caps->getOutputSwizzle(config);
-  Pipeline pipeline(std::move(fragmentProcessors), numColorProcessors, std::move(xferProcessor),
-                    dstTexture, dstTextureOffset, &swizzle);
-  auto geometryProcessor = op->getGeometryProcessor(args);
-  GLProgramCreator creator(geometryProcessor.get(), &pipeline);
-  auto program = static_cast<GLProgram*>(args.context->programCache()->getProgram(&creator));
-  if (program == nullptr) {
+  auto info = op->createProgram(args);
+  if (info.program == nullptr) {
     return;
   }
+  auto program = info.program;
+  auto gl = GLFunctions::Get(args.context);
   CheckGLError(args.context);
-  auto renderTarget = static_cast<const GLRenderTarget*>(args.renderTarget);
+  auto renderTarget = std::static_pointer_cast<GLRenderTarget>(args.renderTarget);
   gl->useProgram(program->programID());
   gl->bindFramebuffer(GL_FRAMEBUFFER, renderTarget->glFrameBuffer().id);
   gl->viewport(0, 0, renderTarget->width(), renderTarget->height());
-  UpdateScissor(args.context, args);
-  UpdateBlend(args.context, blendAsCoeff, first, second);
-  if (pipeline.needsBarrierTexture(args.renderTargetTexture.get())) {
+  UpdateScissor(args.context, op->scissorRect());
+  UpdateBlend(args.context, info.blendFactors);
+  if (info.pipeline->requiresBarrier()) {
     gl->textureBarrier();
   }
-  program->updateUniformsAndTextureBindings(renderTarget, *geometryProcessor, pipeline);
+  program->updateUniformsAndTextureBindings(renderTarget.get(), *info.geometryProcessor,
+                                            *info.pipeline);
   if (vertexArray > 0) {
     gl->bindVertexArray(vertexArray);
   }

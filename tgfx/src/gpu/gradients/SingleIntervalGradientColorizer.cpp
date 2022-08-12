@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SingleIntervalGradientColorizer.h"
-#include "core/utils/UniqueID.h"
 #include "gpu/opengl/GLSingleIntervalGradientColorizer.h"
 
 namespace tgfx {
@@ -27,9 +26,9 @@ std::unique_ptr<SingleIntervalGradientColorizer> SingleIntervalGradientColorizer
       new SingleIntervalGradientColorizer(start, end));
 }
 
-void SingleIntervalGradientColorizer::onComputeProcessorKey(BytesKey* bytesKey) const {
-  static auto Type = UniqueID::Next();
-  bytesKey->write(Type);
+bool SingleIntervalGradientColorizer::onIsEqual(const FragmentProcessor& processor) const {
+  const auto& that = static_cast<const SingleIntervalGradientColorizer&>(processor);
+  return start == that.start && end == that.end;
 }
 
 std::unique_ptr<GLFragmentProcessor> SingleIntervalGradientColorizer::onCreateGLInstance() const {

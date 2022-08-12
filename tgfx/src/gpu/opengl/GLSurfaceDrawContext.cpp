@@ -18,20 +18,21 @@
 
 #include "GLSurfaceDrawContext.h"
 #include "GLFillRectOp.h"
+#include "GLSurface.h"
+#include "tgfx/core/PixelBuffer.h"
 
 namespace tgfx {
-std::shared_ptr<SurfaceDrawContext> SurfaceDrawContext::Make(Surface* surface) {
-  return std::make_shared<GLSurfaceDrawContext>(surface);
+SurfaceDrawContext* SurfaceDrawContext::Get(Surface* surface) {
+  return static_cast<GLCanvas*>(surface->getCanvas())->getSurfaceDrawContext();
 }
 
 void GLSurfaceDrawContext::fillRectWithFP(const Rect& dstRect, const Matrix& localMatrix,
                                           std::unique_ptr<FragmentProcessor> fp) {
-  DrawArgs args;
-  args.colors.emplace_back(std::move(fp));
-  args.context = surface->getContext();
-  args.renderTarget = surface->getRenderTarget().get();
-  args.renderTargetTexture = surface->getTexture();
-  draw(std::move(args), GLFillRectOp::Make(dstRect, Matrix::I(), localMatrix));
+  auto op = GLFillRectOp::Make(dstRect, Matrix::I(), localMatrix);
+  std::vector<std::unique_ptr<FragmentProcessor>> colors;
+  colors.emplace_back(std::move(fp));
+  op->setColors(std::move(colors));
+  addOp(std::move(op));
 }
 
 GLDrawer* GLSurfaceDrawContext::getDrawer() {
@@ -41,11 +42,34 @@ GLDrawer* GLSurfaceDrawContext::getDrawer() {
   return _drawer.get();
 }
 
-void GLSurfaceDrawContext::draw(DrawArgs args, std::unique_ptr<GLDrawOp> op) {
+GLSurfaceDrawContext::~GLSurfaceDrawContext() {
+  DEBUG_ASSERT(ops.empty());
+}
+
+void GLSurfaceDrawContext::addOp(std::unique_ptr<GLDrawOp> op) {
+  if (!ops.empty() && ops.back()->combineIfPossible(op.get())) {
+    return;
+  }
+  ops.emplace_back(std::move(op));
+}
+
+void GLSurfaceDrawContext::flush() {
+  if (ops.empty()) {
+    return;
+  }
   auto* drawer = getDrawer();
   if (drawer == nullptr) {
     return;
   }
-  drawer->draw(std::move(args), std::move(op));
+  DrawArgs args;
+  args.context = surface->getContext();
+  args.renderTarget = static_cast<GLSurface*>(surface)->renderTarget;
+  auto tempOps = std::move(ops);
+  for (auto& op : tempOps) {
+    if (op->requiresDstTexture() && args.renderTargetTexture == nullptr) {
+      args.renderTargetTexture = surface->getTexture();
+    }
+    drawer->draw(args, std::move(op));
+  }
 }
 }  // namespace tgfx

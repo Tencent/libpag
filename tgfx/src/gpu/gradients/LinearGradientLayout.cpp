@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LinearGradientLayout.h"
-#include "core/utils/UniqueID.h"
 #include "gpu/opengl/GLLinearGradientLayout.h"
 
 namespace tgfx {
@@ -25,13 +24,14 @@ std::unique_ptr<LinearGradientLayout> LinearGradientLayout::Make(Matrix matrix) 
   return std::unique_ptr<LinearGradientLayout>(new LinearGradientLayout(matrix));
 }
 
-void LinearGradientLayout::onComputeProcessorKey(BytesKey* bytesKey) const {
-  static auto Type = UniqueID::Next();
-  bytesKey->write(Type);
+LinearGradientLayout::LinearGradientLayout(Matrix matrix)
+    : FragmentProcessor(ClassID()), coordTransform(matrix) {
+  addCoordTransform(&coordTransform);
 }
 
-LinearGradientLayout::LinearGradientLayout(Matrix matrix) : coordTransform(matrix) {
-  addCoordTransform(&coordTransform);
+bool LinearGradientLayout::onIsEqual(const FragmentProcessor& processor) const {
+  return coordTransform.matrix ==
+         static_cast<const LinearGradientLayout&>(processor).coordTransform.matrix;
 }
 
 std::unique_ptr<GLFragmentProcessor> LinearGradientLayout::onCreateGLInstance() const {

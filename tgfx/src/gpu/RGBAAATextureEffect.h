@@ -34,8 +34,12 @@ class RGBAAATextureEffect : public FragmentProcessor {
   }
 
  private:
+  DEFINE_PROCESSOR_CLASS_ID
+
   RGBAAATextureEffect(std::shared_ptr<Texture> texture, const RGBAAALayout* layout,
                       const Matrix& localMatrix);
+
+  bool onIsEqual(const FragmentProcessor& processor) const override;
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 

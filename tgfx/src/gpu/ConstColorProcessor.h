@@ -37,8 +37,13 @@ class ConstColorProcessor : public FragmentProcessor {
   std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
 
  private:
-  ConstColorProcessor(Color color, InputMode mode) : color(color), inputMode(mode) {
+  DEFINE_PROCESSOR_CLASS_ID
+
+  ConstColorProcessor(Color color, InputMode mode)
+      : FragmentProcessor(ClassID()), color(color), inputMode(mode) {
   }
+
+  bool onIsEqual(const FragmentProcessor& processor) const override;
 
   Color color;
   InputMode inputMode;

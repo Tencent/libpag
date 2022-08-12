@@ -29,12 +29,14 @@ class LinearGradientLayout : public FragmentProcessor {
     return "LinearGradientLayout";
   }
 
-  void onComputeProcessorKey(BytesKey* bytesKey) const override;
-
   std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
 
  private:
+  DEFINE_PROCESSOR_CLASS_ID
+
   explicit LinearGradientLayout(Matrix matrix);
+
+  bool onIsEqual(const FragmentProcessor& processor) const override;
 
   CoordTransform coordTransform;
 };

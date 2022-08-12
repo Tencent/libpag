@@ -37,9 +37,12 @@ class UnrolledBinaryGradientColorizer : public FragmentProcessor {
   std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
 
  private:
+  DEFINE_PROCESSOR_CLASS_ID
+
   UnrolledBinaryGradientColorizer(int intervalCount, Color* scales, Color* biases,
                                   Rect thresholds1_7, Rect thresholds9_13)
-      : intervalCount(intervalCount),
+      : FragmentProcessor(ClassID()),
+        intervalCount(intervalCount),
         scale0_1(scales[0]),
         scale2_3(scales[1]),
         scale4_5(scales[2]),
@@ -59,6 +62,8 @@ class UnrolledBinaryGradientColorizer : public FragmentProcessor {
         thresholds1_7(thresholds1_7),
         thresholds9_13(thresholds9_13) {
   }
+
+  bool onIsEqual(const FragmentProcessor& processor) const override;
 
   int intervalCount;
   Color scale0_1;

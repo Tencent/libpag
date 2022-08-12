@@ -76,8 +76,6 @@ class GLRenderTarget : public RenderTarget {
 
   void onReleaseGPU() override;
 
-  void clear() const;
-
   void resolve() const;
 
   /**

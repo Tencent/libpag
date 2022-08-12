@@ -17,13 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "EmptyXferProcessor.h"
-#include "core/utils/UniqueID.h"
 #include "opengl/GLEmptyXferProcessor.h"
 
 namespace tgfx {
 void EmptyXferProcessor::computeProcessorKey(Context*, BytesKey* bytesKey) const {
-  static auto Type = UniqueID::Next();
-  bytesKey->write(Type);
+  bytesKey->write(classID());
 }
 
 std::unique_ptr<GLXferProcessor> EmptyXferProcessor::createGLInstance() const {

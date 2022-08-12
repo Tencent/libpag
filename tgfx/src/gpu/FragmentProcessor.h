@@ -107,6 +107,8 @@ class FragmentProcessor : public Processor {
     return coordTransforms[index];
   }
 
+  bool isEqual(const FragmentProcessor& that) const;
+
   /**
    * Pre-order traversal of a FP hierarchy, or of the forest of FPs in a Pipeline. In the latter
    * case the tree rooted at each FP in the Pipeline is visited successively.
@@ -143,6 +145,9 @@ class FragmentProcessor : public Processor {
   };
 
  protected:
+  explicit FragmentProcessor(uint32_t classID) : Processor(classID) {
+  }
+
   /**
    * FragmentProcessor subclasses call this from their constructor to register any child
    * FragmentProcessors they have. This must be called AFTER all texture accesses and coord
@@ -176,7 +181,8 @@ class FragmentProcessor : public Processor {
   }
 
  private:
-  virtual void onComputeProcessorKey(BytesKey* bytesKey) const = 0;
+  virtual void onComputeProcessorKey(BytesKey*) const {
+  }
 
   virtual std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const = 0;
 
@@ -186,6 +192,10 @@ class FragmentProcessor : public Processor {
 
   virtual SamplerState onSamplerState(size_t) const {
     return {};
+  }
+
+  virtual bool onIsEqual(const FragmentProcessor&) const {
+    return true;
   }
 
   size_t textureSamplerCount = 0;

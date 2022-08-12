@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SweepGradientLayout.h"
-#include "core/utils/UniqueID.h"
 #include "gpu/opengl/GLSweepGradientLayout.h"
 
 namespace tgfx {
@@ -26,14 +25,15 @@ std::unique_ptr<SweepGradientLayout> SweepGradientLayout::Make(Matrix matrix, fl
   return std::unique_ptr<SweepGradientLayout>(new SweepGradientLayout(matrix, bias, scale));
 }
 
-void SweepGradientLayout::onComputeProcessorKey(BytesKey* bytesKey) const {
-  static auto Type = UniqueID::Next();
-  bytesKey->write(Type);
+SweepGradientLayout::SweepGradientLayout(Matrix matrix, float bias, float scale)
+    : FragmentProcessor(ClassID()), coordTransform(matrix), bias(bias), scale(scale) {
+  addCoordTransform(&coordTransform);
 }
 
-SweepGradientLayout::SweepGradientLayout(Matrix matrix, float bias, float scale)
-    : coordTransform(matrix), bias(bias), scale(scale) {
-  addCoordTransform(&coordTransform);
+bool SweepGradientLayout::onIsEqual(const FragmentProcessor& processor) const {
+  const auto& that = static_cast<const SweepGradientLayout&>(processor);
+  return coordTransform.matrix == that.coordTransform.matrix && bias == that.bias &&
+         scale == that.scale;
 }
 
 std::unique_ptr<GLFragmentProcessor> SweepGradientLayout::onCreateGLInstance() const {

@@ -60,6 +60,7 @@ std::unique_ptr<FragmentProcessor> FragmentProcessor::RunInSeries(
 }
 
 void FragmentProcessor::computeProcessorKey(Context* context, BytesKey* bytesKey) const {
+  bytesKey->write(classID());
   onComputeProcessorKey(bytesKey);
   for (size_t i = 0; i < textureSamplerCount; ++i) {
     textureSampler(i)->computeKey(context, bytesKey);
@@ -118,5 +119,39 @@ const CoordTransform* FragmentProcessor::CoordTransformIter::next() {
     }
   }
   return currFP->coordTransform(currentIndex++);
+}
+
+bool FragmentProcessor::isEqual(const FragmentProcessor& that) const {
+  if (classID() != that.classID()) {
+    return false;
+  }
+  if (this->numTextureSamplers() != that.numTextureSamplers()) {
+    return false;
+  }
+  for (size_t i = 0; i < numTextureSamplers(); ++i) {
+    if (textureSampler(i) != that.textureSampler(i)) {
+      return false;
+    }
+  }
+  if (numCoordTransforms() != that.numCoordTransforms()) {
+    return false;
+  }
+  for (size_t i = 0; i < numCoordTransforms(); ++i) {
+    if (coordTransform(i)->matrix != that.coordTransform(i)->matrix) {
+      return false;
+    }
+  }
+  if (!onIsEqual(that)) {
+    return false;
+  }
+  if (numChildProcessors() != that.numChildProcessors()) {
+    return false;
+  }
+  for (size_t i = 0; i < numChildProcessors(); ++i) {
+    if (!childProcessor(i)->isEqual(*that.childProcessor(i))) {
+      return false;
+    }
+  }
+  return true;
 }
 }  // namespace tgfx

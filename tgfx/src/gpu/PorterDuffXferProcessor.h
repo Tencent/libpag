@@ -39,7 +39,9 @@ class PorterDuffXferProcessor : public XferProcessor {
   std::unique_ptr<GLXferProcessor> createGLInstance() const override;
 
  private:
-  explicit PorterDuffXferProcessor(BlendMode blend) : blend(blend) {
+  DEFINE_PROCESSOR_CLASS_ID
+
+  explicit PorterDuffXferProcessor(BlendMode blend) : XferProcessor(ClassID()), blend(blend) {
   }
 
   BlendMode blend;

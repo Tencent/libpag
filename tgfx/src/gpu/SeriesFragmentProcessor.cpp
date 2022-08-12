@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SeriesFragmentProcessor.h"
-#include "core/utils/UniqueID.h"
 #include "opengl/GLSeriesFragmentProcessor.h"
 
 namespace tgfx {
@@ -33,15 +32,11 @@ std::unique_ptr<FragmentProcessor> SeriesFragmentProcessor::Make(
 }
 
 SeriesFragmentProcessor::SeriesFragmentProcessor(std::unique_ptr<FragmentProcessor>* children,
-                                                 int count) {
+                                                 int count)
+    : FragmentProcessor(ClassID()) {
   for (int i = 0; i < count; ++i) {
     registerChildProcessor(std::move(children[i]));
   }
-}
-
-void SeriesFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
-  static auto Type = UniqueID::Next();
-  bytesKey->write(Type);
 }
 
 std::unique_ptr<GLFragmentProcessor> SeriesFragmentProcessor::onCreateGLInstance() const {

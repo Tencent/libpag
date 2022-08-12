@@ -18,7 +18,6 @@
 
 #include "RGBAAATextureEffect.h"
 #include "YUVTextureEffect.h"
-#include "core/utils/UniqueID.h"
 #include "opengl/GLRGBAAATextureEffect.h"
 
 namespace tgfx {
@@ -48,14 +47,21 @@ std::unique_ptr<FragmentProcessor> RGBAAATextureEffect::Make(std::shared_ptr<Tex
 
 RGBAAATextureEffect::RGBAAATextureEffect(std::shared_ptr<Texture> texture,
                                          const RGBAAALayout* layout, const Matrix& localMatrix)
-    : texture(std::move(texture)), layout(layout), coordTransform(localMatrix) {
+    : FragmentProcessor(ClassID()),
+      texture(std::move(texture)),
+      layout(layout),
+      coordTransform(localMatrix) {
   setTextureSamplerCnt(1);
   addCoordTransform(&coordTransform);
 }
 
+bool RGBAAATextureEffect::onIsEqual(const FragmentProcessor& processor) const {
+  const auto& that = static_cast<const RGBAAATextureEffect&>(processor);
+  return texture == that.texture && layout == that.layout &&
+         coordTransform.matrix == that.coordTransform.matrix;
+}
+
 void RGBAAATextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
-  static auto Type = UniqueID::Next();
-  bytesKey->write(Type);
   uint32_t flags = layout == nullptr ? 1 : 0;
   bytesKey->write(flags);
 }

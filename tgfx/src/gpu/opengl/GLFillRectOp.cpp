@@ -24,8 +24,8 @@
 
 namespace tgfx {
 std::unique_ptr<GeometryProcessor> GLFillRectOp::getGeometryProcessor(const DrawArgs& args) {
-  return QuadPerEdgeAAGeometryProcessor::Make(
-      args.renderTarget->width(), args.renderTarget->height(), args.aa, !colors.empty());
+  return QuadPerEdgeAAGeometryProcessor::Make(args.renderTarget->width(),
+                                              args.renderTarget->height(), aa, !colors.empty());
 }
 
 std::vector<float> GLFillRectOp::coverageVertices() const {
@@ -91,17 +91,16 @@ std::vector<float> GLFillRectOp::noCoverageVertices() const {
   return vertices;
 }
 
-std::vector<float> GLFillRectOp::vertices(const DrawArgs& args) {
-  if (args.aa != AAType::Coverage) {
+std::vector<float> GLFillRectOp::vertices(const DrawArgs&) {
+  if (aa != AAType::Coverage) {
     return noCoverageVertices();
   } else {
     return coverageVertices();
   }
 }
 
-std::unique_ptr<GLFillRectOp> GLFillRectOp::Make(const tgfx::Rect& rect,
-                                                 const tgfx::Matrix& viewMatrix,
-                                                 const tgfx::Matrix& localMatrix) {
+std::unique_ptr<GLFillRectOp> GLFillRectOp::Make(const Rect& rect, const Matrix& viewMatrix,
+                                                 const Matrix& localMatrix) {
   return std::unique_ptr<GLFillRectOp>(new GLFillRectOp({}, {rect}, {viewMatrix}, {localMatrix}));
 }
 
@@ -122,7 +121,8 @@ std::unique_ptr<GLFillRectOp> GLFillRectOp::Make(const std::vector<Color>& color
 
 GLFillRectOp::GLFillRectOp(std::vector<Color> colors, std::vector<Rect> rects,
                            std::vector<Matrix> viewMatrices, std::vector<Matrix> localMatrices)
-    : colors(std::move(colors)),
+    : GLDrawOp(ClassID()),
+      colors(std::move(colors)),
       rects(std::move(rects)),
       viewMatrices(std::move(viewMatrices)),
       localMatrices(std::move(localMatrices)) {
@@ -131,6 +131,15 @@ GLFillRectOp::GLFillRectOp(std::vector<Color> colors, std::vector<Rect> rects,
     bounds.join(this->viewMatrices[i].mapRect(this->rects[i]));
   }
   setBounds(bounds);
+}
+
+bool GLFillRectOp::onCombineIfPossible(GLDrawOp* op) {
+  auto* that = static_cast<GLFillRectOp*>(op);
+  rects.insert(rects.end(), that->rects.begin(), that->rects.end());
+  viewMatrices.insert(viewMatrices.end(), that->viewMatrices.begin(), that->viewMatrices.end());
+  localMatrices.insert(localMatrices.end(), that->localMatrices.begin(), that->localMatrices.end());
+  colors.insert(colors.end(), that->colors.begin(), that->colors.end());
+  return true;
 }
 
 static constexpr int kVerticesPerNonAAQuad = 4;
@@ -153,7 +162,7 @@ static constexpr uint16_t kAAQuadIndexPattern[] = {
 // clang-format on
 
 void GLFillRectOp::draw(const DrawArgs& args) {
-  if (rects.size() > 1 || args.aa == AAType::Coverage) {
+  if (rects.size() > 1 || aa == AAType::Coverage) {
     std::vector<uint16_t> indexes;
     static auto kNonAAType = UniqueID::Next();
     static auto kAAType = UniqueID::Next();
@@ -161,7 +170,7 @@ void GLFillRectOp::draw(const DrawArgs& args) {
     const uint16_t* indexPattern;
     int verticesPerQuad;
     int indexesPerQuad;
-    if (args.aa == AAType::Coverage) {
+    if (aa == AAType::Coverage) {
       type = kAAType;
       indexPattern = kAAQuadIndexPattern;
       verticesPerQuad = kVerticesPerAAQuad;

@@ -113,11 +113,20 @@ std::unique_ptr<GLRRectOp> GLRRectOp::Make(Color color, const RRect& rRect,
 
 GLRRectOp::GLRRectOp(Color color, const RRect& rRect, const Matrix& viewMatrix,
                      const Matrix& localMatrix)
-    : localMatrix(localMatrix) {
+    : GLDrawOp(ClassID()), localMatrix(localMatrix) {
   this->localMatrix.postTranslate(-rRect.rect.left, -rRect.rect.top);
   this->localMatrix.postScale(1.f / rRect.rect.width(), 1.f / rRect.rect.height());
   setTransformedBounds(rRect.rect, viewMatrix);
   rRects.emplace_back(RRectWrap{color, 0.f, 0.f, rRect, viewMatrix});
+}
+
+bool GLRRectOp::onCombineIfPossible(GLDrawOp* op) {
+  auto* that = static_cast<GLRRectOp*>(op);
+  if (localMatrix != that->localMatrix) {
+    return false;
+  }
+  rRects.insert(rRects.end(), that->rRects.begin(), that->rRects.end());
+  return true;
 }
 
 static bool UseScale(const DrawArgs& args) {
@@ -241,7 +250,7 @@ std::vector<float> GLRRectOp::vertices(const DrawArgs& args) {
   auto useScale = UseScale(args);
   std::vector<float> vertices;
   for (const auto& rRectWrap : rRects) {
-    rRectWrap.writeToVertices(vertices, useScale, args.aa);
+    rRectWrap.writeToVertices(vertices, useScale, aa);
   }
   return vertices;
 }
