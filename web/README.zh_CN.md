@@ -1,6 +1,6 @@
 <img src="https://pag.io/img/readme/logo.png" alt="PAG Logo" width="474"/>
 
-[English](./README.md) | 简体中文 | [Homepage](https://pag.io)
+[English](./README.md) | 简体中文 | [Homepage](https://pag.io) | [lite版本](https://github.com/Tencent/libpag/tree/main/web/lite)
 
 ## 介绍
 
@@ -91,40 +91,62 @@ Demo 项目提 [pag-web](https://github.com/libpag/pag-web) 供了简单的接�
 
 **以上的兼容表仅代表可以运行的兼容性。对于有移动端接入需要的用户，需要阅读一下这篇[兼容性情况](./doc/compatibility.md)的文章**
 
-## 渲染相关
+## 使用指南
 
-### PAG 渲染尺寸
+### 垃圾回收
+
+因为 libpag 基于 WebAssembly 做跨端应用，所以从 WebAssembly 中取出来的对象，基本都是 C++ 的指针，所以 JavaScript 的 GC 是无法释放这一部分内存的。所以，当不需要使用 libpag 产生的对象时，需要调用对象上的 destroy 方法将其释放掉。
+
+### 渲染相关
+
+#### 首帧渲染
+
+`PAGView.init` 默认会进行首帧渲染，如不需要可以在 `PAGView.init` 的第三个参数传入 `{ firstFrame: false }` 取消首帧渲染。
+
+在进行首帧渲染的过程中，当 PAG 动画文件中存在 BMP 预合成（下文说明如何确认 PAG 文件是否存在 BMP 预合成）时，会调用 VideoReader 模块。
+
+因为 VideoReader 模块在 Web 平台依赖于 VideoElement，所以在部分移动端场景下，PAGView.init 不是在用户交互产生的调用链中，可能会存在不允许播放导致无法正常渲染画面的问题。
+
+当出现这种情况，我们推荐使用  `PAGView.init(pagFile, canvas, { firstFrame: false }) ` 提前初始化 PAGView 并且取消首帧渲染，然后在用户交互产生的调用链中再调用 `pagView.play()` 进行画面渲染。
+
+#### PAG 渲染尺寸
 
 在 Web 平台上，设备像素分辨率与 CSS 像素分辨率是不同的，而它们之比被称为 `devicePixelRatio`。所以当我们需要显示 CSS 像素 1px 时， 需要 1px \* `devicePixelRatio` 的渲染尺寸。
 
-PAG 默认会对 Canvas 在屏幕中的可视尺寸进行缩放计算后进行渲染，因此会对 Canvas 的宽高以及 `style` 产生副作用。如果希望 PAG 不对 Canvas 产生副作用， 可以在 `PAGView.init` 的时候传入 `{ useScale: false }` 来取消缩放。
+PAG 默认会对 Canvas 在屏幕中的可视尺寸进行缩放计算后进行渲染，因此会对 Canvas 的宽高以及 `style` 产生副作用。如果希望 PAG 不对 Canvas 产生副作用， 可以在 `PAGView.init` 的第三个参数传入 `{ useScale: false }` 来取消缩放。
 
-### PAGView 尺寸过大
+#### PAGView 尺寸过大
 
 为了高清的渲染效果，PAGView 默认会按照 Canvas 尺寸 \* `devicePixelRatio` 作为实际渲染尺寸。
 受设备自身性能影响 WebGL 的最大渲染尺寸可能各不相同。会出现渲染尺寸过大导致白屏的情况。
 
 建议移动端下，实际渲染尺寸不大于 2560px。
 
-### 多个 PAGView 实例场景
+#### 多个 PAGView 实例场景
 
-首先，因为 PAG Web 版是单线程的 SDK，所以我们不建议同屏播放多个 PAGView。
+首先，因为 PAG Web 版是单线程的 SDK，所以我们不建议**同屏播放多个 PAGView**。
 
 对于有多个 PAGView 实例的场景，我们需要先知道，浏览器环境中 WebGL 活跃的 context 数量是有限制的，Chrome 是 16 个，Safari 是 8 个。因为有这个限制存在，我们应当及时使用 `destroy` 回收无用的 PAGView 实例和移除 Canvas 的引用。
 
-如果你需要在 Chrome 浏览器中同屏存在多个 PAGView 实例，可以尝试使用 canvas2D 模式，需要在 `PAGView.init` 的时候传入 `{ useCanvas2D: true }` 。
+以下是特殊场景的解决方法，不推荐使用：
+
+如果你需要在 Chrome 浏览器中同屏存在多个 PAGView 实例且不需要在 Safari 上使用，可以尝试使用 canvas2D 模式，需要在 `PAGView.init` 的时候传入 `{ useCanvas2D: true }` 。这个模式下，会用一个 WebGL 当作渲染器，然后往多个 canvas2D 分发画面，从而规避 WebGL 活跃 context 数量的限制。
 
 因为 Safari 上 [`CanvasRenderingContext2D.drawImage()`](https://developer.mozilla.org/zh-CN/docs/Web/API/CanvasRenderingContext2D/drawImage) 的性能很差，所以我们不推荐在 Safari 上使用这个模式。
 
-### 注册解码器
+#### 注册解码器
 
 对于“用户与页面交互之后才可以使用 Video 标签进行视频播放”规则的限制，PAG Web 版提供软件解码器注入接口 ` PAG.registerSoftwareDecoderFactory()`。
 
-注入软件解码器后，PAG 会调度软件解码器去对视频序列帧进行解码与上屏，从而实现部分平台进入页面自动播放的功能。
+注入软件解码器后，PAG 会调度软件解码器去对 BMP 预合成进行解码与上屏，从而实现部分平台进入页面自动播放的功能。
 
 推荐解码器接入：https://github.com/libpag/ffavc/tree/main/web
 
 已知“用户与页面交互之后才可以使用 Video 标签进行视频播放”限制的平台有：移动端微信浏览器，iPhone 省电模式，部分 Android 浏览器。
+
+## 关于 BMP 预合成
+
+可以下载 [PAGViewer](https://pag.io/docs/install.html) 打开 PAG 文件，点击"视图"->"显示 编辑面板"，在编辑面板中我们能看到 Video 的数量，当 Video数量大于 0 时，即为 PAG 动画文件中存在 BMP 预合成。
 
 ## Roadmap
 
