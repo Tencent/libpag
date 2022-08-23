@@ -70,5 +70,5 @@ export interface DebugData {
   writeFile?: number;
   createDecoder?: number;
   getFrame?: number;
-  flush?:number;
+  draw?:number;
 }

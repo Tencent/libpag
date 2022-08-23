@@ -39,7 +39,7 @@ Page({
         wx.showLoading({ title: '加载中' });
         const canvas = res[0].node;
         const buffer = await loadFileByRequest(
-          'https://tencent-effect-1251316161.cos.ap-shanghai.myqcloud.com/particle_video.pag',
+          'https://pag.art/file/frames.pag',
         );
         if (!buffer) throw '加载失败';
         const pagView = PAGView.init(buffer, canvas);
@@ -82,7 +82,7 @@ Page({
       调试数据：
       FPS：${Math.round(debugData.FPS)}
       当前帧获取耗时：${Math.round(debugData.getFrame * 100) / 100}ms
-      当前帧渲染耗时：${Math.round(debugData.flush * 100) / 100}ms
+      当前帧渲染耗时：${Math.round(debugData.draw * 100) / 100}ms
       PAG文件解码耗时：${Math.round(debugData.decodePAGFile * 100) / 100}ms
       创建目录耗时：${Math.round(debugData.createDir * 100) / 100}ms
       合成MP4耗时：${Math.round(debugData.coverMP4 * 100) / 100}ms

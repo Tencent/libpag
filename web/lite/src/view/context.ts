@@ -35,7 +35,7 @@ export class Context {
     writeFile: 0,
     createDecoder: 0,
     getFrame: 0,
-    flush: 0,
+    draw: 0,
   };
 
   public constructor(pagFile: PAGFile, canvas: HTMLCanvasElement, options: RenderOptions) {

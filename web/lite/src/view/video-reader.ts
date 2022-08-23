@@ -29,29 +29,34 @@ const playVideoElement = async (videoElement: HTMLVideoElement) => {
 @destroyVerify
 export class VideoReader {
   public static create(videoSequence: VideoSequence) {
-    const videoReader = new VideoReader();
+    const videoReader = new VideoReader(videoSequence);
     const debugData = videoReader.load(videoSequence);
     return { videoReader: videoReader, debugData: debugData };
   }
 
   protected destroyed = false;
 
+  private _duration: number;
   private videoElement: HTMLVideoElement | undefined;
+
+  public constructor(videoSequence: VideoSequence) {
+    this._duration = videoSequence.frameCount / videoSequence.frameRate;
+  }
 
   public getVideoElement(): HTMLVideoElement {
     return this.videoElement as HTMLVideoElement;
   }
 
   public progress() {
-    return Math.round((this.videoElement!.currentTime / this.videoElement!.duration) * 100) / 100;
+    return Math.round((this.videoElement!.currentTime / this._duration) * 100) / 100;
   }
 
   public duration() {
-    return this.videoElement!.duration;
+    return this._duration;
   }
 
   public currentTime() {
-    return this.videoElement!.currentTime;
+    return this.videoElement!.currentTime || 0;
   }
 
   public start() {
@@ -81,7 +86,11 @@ export class VideoReader {
     removeAllListeners(this.videoElement as HTMLVideoElement);
   }
 
-  public getFrameData(): any {
+  public getFrameData(callback: any): any {
+    // NOP
+  }
+
+  public clearCallback() {
     // NOP
   }
 

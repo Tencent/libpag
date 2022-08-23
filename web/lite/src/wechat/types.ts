@@ -5,6 +5,7 @@ export interface wx {
   getFileSystemManager: () => FileSystemManager;
   getFileInfo: (object: { filePath: string; success?: () => void; fail?: () => void; complete?: () => void }) => void;
   createVideoDecoder: () => VideoDecoder;
+  getSystemInfoSync: () => SystemInfo;
 }
 
 export interface FileSystemManager {
@@ -62,4 +63,9 @@ interface VideoDecoderStartOption {
   source: string;
   /** 解码模式。0：按 pts 解码；1：以最快速度解码 */
   mode?: number;
+}
+
+export interface SystemInfo {
+  /* 客户端平台	 */
+  platform: 'ios' | 'android' | 'windows' | 'mac' | 'devtools';
 }

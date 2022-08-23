@@ -32,6 +32,8 @@ export const playVideoElement = async (videoElement: HTMLVideoElement) => {
 export class View extends Context {
   protected videoReader: VideoReader;
   protected fpsBuffer: number[] = [];
+  protected currentFrame = -1;
+  protected needSeek = false;
 
   public constructor(pagFile: PAGFile, canvas: HTMLCanvasElement, options: RenderOptions) {
     super(pagFile, canvas, options);
@@ -45,7 +47,7 @@ export class View extends Context {
     if (this.playing) return;
     this.playing = true;
     await this.videoReader.start();
-    this.flushLoop();
+    await this.flushLoop();
     if (this.getProgress() === 0) {
       this.eventManager.emit(EventName.onAnimationStart);
     }
@@ -57,7 +59,7 @@ export class View extends Context {
   public pause() {
     if (!this.playing) return;
     this.videoReader.pause();
-    this.clearRenderTimer();
+    this.clearTimer();
     this.playing = false;
     this.eventManager.emit(EventName.onAnimationPause);
   }
@@ -75,7 +77,7 @@ export class View extends Context {
    * 销毁播放实例
    */
   public destroy() {
-    this.clearRenderTimer();
+    this.clearTimer();
     this.clearRender();
     this.canvas = null;
     this.videoReader.destroy();
@@ -85,29 +87,27 @@ export class View extends Context {
    * 返回当前播放进度位置，取值范围为 0.0 到 1.0。
    */
   public getProgress() {
-    return this.videoReader.progress();
+    return this.currentFrame / this.videoSequence.frameCount;
   }
   /**
    * 设置播放进度位置，取值范围为 0.0 到 1.0。
    */
   public setProgress(progress: number) {
     if (progress < 0 || progress > 1) throw new Error('progress must be between 0.0 and 1.0!');
-    return this.videoReader.seek(progress * this.videoReader.duration());
+    const currentFrame = Math.round(progress * this.videoSequence.frameCount);
+    if (this.currentFrame !== currentFrame) {
+      this.needSeek = true;
+      this.currentFrame = currentFrame;
+    }
   }
   /**
    * 渲染当前进度画面
    */
   public flush() {
-    const clock = new Clock();
-    this.flushInternal();
-    clock.mark('flush');
-    this.setDebugData({ flush: clock.measure('', 'flush') });
-    this.updateFPS();
-    this.eventManager.emit(EventName.onAnimationUpdate);
-    return true;
+    return this.flushInternal(true);
   }
 
-  protected flushInternal() {}
+  protected draw() {}
 
   protected createVideoReader(videoSequence: VideoSequence) {
     const { videoReader } = VideoReader.create(videoSequence);
@@ -122,9 +122,10 @@ export class View extends Context {
   protected async repeat() {
     // 循环结束
     if (this.repeatCount === 0) {
+      this.setProgress(1);
+      await this.flushInternal(true);
       this.videoReader.pause();
-      this.clearRenderTimer();
-      this.clearRender();
+      this.clearTimer();
       this.playing = false;
       this.eventManager.emit('onAnimationEnd');
       return;
@@ -147,10 +148,10 @@ export class View extends Context {
     if (IS_IOS && this.duration() - this.videoReader.currentTime() <= 1 / this.frameRate()) {
       this.repeat();
     }
-    this.flush();
+    return this.flushInternal(false);
   }
 
-  protected clearRenderTimer() {
+  protected clearTimer() {
     if (this.renderTimer) {
       window.cancelAnimationFrame(this.renderTimer);
       this.renderTimer = null;
@@ -159,5 +160,24 @@ export class View extends Context {
 
   protected updateFPS() {
     // TODO
+  }
+
+  protected async flushInternal(sync: boolean) {
+    const clock = new Clock();
+    if (this.needSeek) {
+      if (sync) {
+        await this.videoReader.seek(this.currentFrame / this.frameRate());
+      } else {
+        this.videoReader.seek(this.currentFrame / this.frameRate());
+      }
+      this.needSeek = false;
+    } else {
+      this.currentFrame = Math.floor(this.videoReader.currentTime() * this.frameRate());
+    }
+    this.draw();
+    clock.mark('draw');
+    this.setDebugData({ draw: clock.measure('', 'draw') });
+    this.updateFPS();
+    this.eventManager.emit(EventName.onAnimationUpdate);
   }
 }

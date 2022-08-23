@@ -3,6 +3,7 @@ export const VERTEX_2D_SHADER = `
       attribute vec2 a_texCoord;
       
       uniform vec2 u_resolution;
+      uniform vec2 u_scale;
       
       varying vec2 v_texCoord;
     
@@ -21,13 +22,12 @@ export const VERTEX_2D_SHADER = `
       
          // pass the texCoord to the fragment shader
          // The GPU will interpolate this value between points.
-         v_texCoord = a_texCoord;
+         v_texCoord = a_texCoord / u_scale;
       }
         `;
 
 export const FRAGMENT_2D_SHADER = `
       precision mediump float;
-
       // our texture
       uniform sampler2D u_image;
       

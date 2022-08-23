@@ -21,11 +21,11 @@ export class PAG2dView extends View {
     this.renderCanvas2DContext = renderCanvas2DContext;
   }
 
-  protected override flushInternal() {
+  protected override draw() {
     if (this.videoParam.hasAlpha) {
       this.renderCanvas2DContext.clearRect(0, 0, this.renderCanvas2D.width, this.renderCanvas2D.height);
       this.renderCanvas2DContext.drawImage(
-        this.videoElement as HTMLVideoElement,
+        this.videoReader.getVideoElement(),
         0,
         0,
         this.renderCanvas2D.width,
@@ -71,11 +71,11 @@ export class PAG2dView extends View {
       );
     } else {
       this.context.drawImage(
-        this.videoElement as HTMLVideoElement,
+        this.videoReader.getVideoElement(),
         0,
         0,
-        this.videoElement!.width,
-        this.videoElement!.height,
+        this.videoParam.MP4Width,
+        this.videoParam.MP4Height,
         this.viewportSize.x,
         this.viewportSize.y,
         this.viewportSize.width,
