@@ -10,11 +10,12 @@ import type { FrameDataOptions, VideoDecoder, wx } from './types';
 type K = keyof HTMLVideoElementEventMap;
 
 declare const wx: wx;
-declare const setTimeout: (callback: () => void, delay: number) => number;
+declare const setInterval: (callback: () => void, delay: number) => number;
 
 const MP4_CACHE_PATH = `${wx.env.USER_DATA_PATH}/pag/`;
 const BUFFER_MAX_SIZE = 6;
 const BUFFER_MIN_SIZE = 2;
+const GET_FRAME_DATA_INTERVAL = 10; // ms
 
 export interface FrameData {
   id: number;
@@ -47,11 +48,12 @@ export class VideoReader extends Reader {
   private started = false;
   private mp4Path: string | undefined;
   private loadedPromise: Promise<void> | undefined;
-  private frameDataBuffer: FrameData[] = [];
+  private frameDataBuffers: FrameData[] = [];
   private getFrameDataLooping = false;
   private getFrameDataCallback: ((frameData: FrameData) => void) | null = null;
   private getFrameDataLoopTimer: number | null = null;
   private currentFrame = 0;
+  private seeking = false;
 
   public getVideoElement(): HTMLVideoElement {
     throw new Error('WeChat mini program does not support video element as decoder!');
@@ -80,22 +82,40 @@ export class VideoReader extends Reader {
     // NOP
   }
 
-  public seek(time: number) {
-    return this.videoDecoder?.seek(time) as Promise<void>;
+  public async seek(time: number) {
+    const targetFrame = Math.floor(time * this.frameRate);
+    // check buffers
+    if (this.frameDataBuffers.length > 0) {
+      const index = this.frameDataBuffers.findIndex((f) => f.id === targetFrame);
+      // find in buffers
+      if (index !== -1) {
+        this.frameDataBuffers = this.frameDataBuffers.slice(index);
+        return;
+      }
+      // clear buffers
+      this.frameDataBuffers = [];
+    }
+    // current frame is the target frame
+    if (targetFrame === this.currentFrame) return;
+    // seek
+    this.seeking = true;
+    await this.videoDecoder?.seek(time);
+    this.seeking = false;
+    this.currentFrame = targetFrame;
   }
 
   public getFrameData(callback: (frameData: FrameData) => void) {
-    if (this.frameDataBuffer.length === 0) {
+    if (this.frameDataBuffers.length <= BUFFER_MIN_SIZE && !this.getFrameDataLooping) {
+      this.startGetFrameDataLoop();
+    }
+    if (this.frameDataBuffers.length === 0) {
       this.getFrameDataCallback = callback;
       return;
     }
-    const res = this.frameDataBuffer.shift();
+    const res = this.frameDataBuffers.shift();
     if (!res) {
       this.getFrameDataCallback = callback;
       return;
-    }
-    if (this.frameDataBuffer.length <= BUFFER_MIN_SIZE && !this.getFrameDataLooping) {
-      this.startGetFrameDataLoop();
     }
     callback(res);
   }
@@ -110,11 +130,8 @@ export class VideoReader extends Reader {
   }
 
   public destroy() {
-    if (this.getFrameDataLoopTimer) {
-      clearTimeout(this.getFrameDataLoopTimer);
-      this.getFrameDataLoopTimer = null;
-    }
-    if (this.getFrameDataCallback) this.getFrameDataCallback = null;
+    this.clearFrameDataLoop();
+    this.clearCallback();
     this.videoDecoder?.remove();
     this.videoDecoder = undefined;
     if (this.mp4Path) {
@@ -140,7 +157,9 @@ export class VideoReader extends Reader {
     clock.mark('createDecoder');
     this.loadedPromise = this.videoDecoder.start({ source: this.mp4Path, mode: 0 }); // prepare
     this.videoDecoder.on('ended', () => {
-      console.log('ended', this.frameDataBuffer.length, this.currentFrame);
+      this.videoDecoder?.seek(0).then(() => {
+        this.currentFrame = 0;
+      });
     });
     return {
       createDir: clock.measure('', 'createDir'),
@@ -152,25 +171,42 @@ export class VideoReader extends Reader {
 
   private startGetFrameDataLoop() {
     this.getFrameDataLooping = true;
-    this.getFrameDataLoop();
+    this.getFrameDataLoopTimer = setInterval(() => {
+      this.getFrameDataLoop();
+    }, GET_FRAME_DATA_INTERVAL);
   }
 
   private getFrameDataLoop() {
-    if (!this.videoDecoder) throw new Error('VideoDecoder is not ready!');
-    if (this.frameDataBuffer.length >= BUFFER_MAX_SIZE) {
+    if (this.seeking) return;
+
+    if (!this.videoDecoder) {
+      this.clearFrameDataLoop();
+      throw new Error('VideoDecoder is not ready!');
+    }
+
+    if (this.frameDataBuffers.length >= BUFFER_MAX_SIZE) {
       this.getFrameDataLooping = false;
+      this.clearFrameDataLoop();
       return;
     }
+
     const frameDataOptions = this.videoDecoder.getFrameData();
     if (frameDataOptions !== null) {
       if (this.getFrameDataCallback) {
         this.getFrameDataCallback(frameDataOptions2FrameData(this.currentFrame, frameDataOptions));
         this.getFrameDataCallback = null;
       } else {
-        this.frameDataBuffer.push(frameDataOptions2FrameData(this.currentFrame, frameDataOptions));
+        this.frameDataBuffers.push(frameDataOptions2FrameData(this.currentFrame, frameDataOptions));
       }
       this.currentFrame += 1;
     }
-    this.getFrameDataLoopTimer = setTimeout(() => this.getFrameDataLoop(), 2);
+  }
+
+  private clearFrameDataLoop() {
+    if (this.getFrameDataLoopTimer) {
+      clearInterval(this.getFrameDataLoopTimer);
+      this.getFrameDataLoopTimer = null;
+    }
+    this.getFrameDataLooping = false;
   }
 }

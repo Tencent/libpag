@@ -38,9 +38,7 @@ Page({
       .exec(async (res) => {
         wx.showLoading({ title: '加载中' });
         const canvas = res[0].node;
-        const buffer = await loadFileByRequest(
-          'https://pag.art/file/frames.pag',
-        );
+        const buffer = await loadFileByRequest('https://pag.art/file/frames.pag');
         if (!buffer) throw '加载失败';
         const pagView = PAGView.init(buffer, canvas);
         this.setData({ pagView: pagView, pagLoaded: true });
@@ -54,6 +52,7 @@ Page({
       });
   },
   play() {
+    this.data.pagView.setRepeatCount(this.data.repeatCount);
     this.data.pagView.play();
   },
   pause() {
@@ -71,11 +70,11 @@ Page({
   },
   repeatCountChange(event) {
     this.setData({ repeatCount: event.detail.value });
-    this.data.pagView.setRepeatCount(event.detail.value);
   },
   progressChange(event) {
     this.setData({ progress: event.detail.value });
     this.data.pagView.setProgress(this.data.progress);
+    this.data.pagView.flush();
   },
   updateDebugData(debugData) {
     const text = `

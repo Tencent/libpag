@@ -128,7 +128,7 @@ export class View extends Context {
       this.clearTimer();
       this.playing = false;
       this.eventManager.emit('onAnimationEnd');
-      return;
+      return false;
     }
     // 次数循环
     this.repeatCount -= 1;
@@ -138,7 +138,7 @@ export class View extends Context {
       this.videoReader.start();
     }
     this.eventManager.emit('onAnimationRepeat');
-    return;
+    return true;
   }
 
   protected flushLoop() {

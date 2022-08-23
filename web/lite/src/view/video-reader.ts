@@ -35,12 +35,14 @@ export class VideoReader {
   }
 
   protected destroyed = false;
+  protected frameRate = 0;
 
   private _duration: number;
   private videoElement: HTMLVideoElement | undefined;
 
   public constructor(videoSequence: VideoSequence) {
     this._duration = videoSequence.frameCount / videoSequence.frameRate;
+    this.frameRate = videoSequence.frameRate;
   }
 
   public getVideoElement(): HTMLVideoElement {

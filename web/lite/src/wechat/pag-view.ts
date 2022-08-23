@@ -4,10 +4,10 @@ import { EventName, RenderingMode } from '../types';
 import { PAGWebGLView } from '../view/pag-webgl-view';
 import { PAGFile } from '../pag-file';
 import { VideoSequence } from '../base/video-sequence';
-import { FrameDataOptions } from './types';
 import { Clock } from '../base/utils/clock';
 
 declare const setTimeout: (callback: () => void, delay: number) => number;
+declare const setInterval: (callback: () => void, delay: number) => number;
 
 const ANDROID_16_ALIGN = 16;
 
@@ -21,11 +21,8 @@ export class PAGView extends PAGWebGLView {
     return pagView;
   }
 
-  protected currentFrame = 0;
-
   private flushBaseTime;
   private frameData: FrameData | undefined = undefined;
-  private startTime = 0;
   private needGetFrame = false;
   private mark = 0;
 
@@ -33,10 +30,6 @@ export class PAGView extends PAGWebGLView {
     super(pagFile, canvas, { renderingMode: RenderingMode.WebGL });
     this.flushBaseTime = Math.floor(1000 / this.videoSequence.frameRate);
     this.videoReader.start();
-    // TODO
-    // this.videoReader.addListener('ended', () => {
-    //   this.repeat();
-    // });
   }
   /**
    * 开始播放
@@ -44,9 +37,8 @@ export class PAGView extends PAGWebGLView {
   public async play() {
     if (this.playing) return;
     this.playing = true;
-    this.startTime = Date.now() - this.currentFrame * this.flushBaseTime;
     await this.videoReader.start();
-    await this.flushLoop();
+    this.flushLoop();
     if (this.getProgress() === 0) {
       this.eventManager.emit(EventName.onAnimationStart);
     }
@@ -82,11 +74,6 @@ export class PAGView extends PAGWebGLView {
     this.destroyed = true;
   }
 
-  public next() {
-    this.needGetFrame = true;
-    this.flushInternal();
-  }
-
   public updateSize() {
     // NOP
   }
@@ -119,13 +106,15 @@ export class PAGView extends PAGWebGLView {
 
     if (this.needSeek) {
       this.needSeek = false;
-      await this.videoReader.seek(this.currentFrame / this.frameRate());
+      await this.videoReader.seek((this.currentFrame / this.frameRate()) * 1000);
     }
     if (this.needGetFrame) {
       this.needGetFrame = false;
       const getFrameMark = Date.now();
       this.videoReader.getFrameData((frameData: FrameData) => {
         this.frameData = frameData;
+        this.currentFrame = frameData.id;
+
         this.setDebugData({ getFrame: Date.now() - getFrameMark });
         if (isAndroid) {
           this.scale = {
@@ -134,6 +123,9 @@ export class PAGView extends PAGWebGLView {
           };
         }
         draw();
+        if (this.currentFrame === this.videoSequence.frameCount - 1) {
+          this.repeat();
+        }
         console.log(`flush dst: ${Date.now() - this.mark}ms`);
         this.mark = Date.now();
       });
@@ -144,12 +136,13 @@ export class PAGView extends PAGWebGLView {
     this.mark = Date.now();
   }
 
-  protected override async flushLoop() {
-    this.needGetFrame = true;
-    await this.flushInternal();
-    this.currentFrame += 1;
-    let nextRenderTime = Math.max(this.flushBaseTime * this.currentFrame + this.startTime - Date.now(), 1);
-    this.renderTimer = setTimeout(() => this.flushLoop(), nextRenderTime);
+  protected override flushLoop() {
+    const loop = async () => {
+      this.needGetFrame = true;
+      this.flushInternal();
+    };
+    this.renderTimer = setInterval(loop, this.flushBaseTime);
+    return Promise.resolve();
   }
 
   protected override detectWebGLContext() {
@@ -176,21 +169,19 @@ export class PAGView extends PAGWebGLView {
     );
   }
 
-  protected override async repeat() {
-    // 循环结束
+  protected override repeat() {
+    // end
     if (this.repeatCount === 0) {
       this.clearTimer();
-      this.clearRender();
-      await this.seekToStart();
+      this.seekToStart();
       this.playing = false;
       this.eventManager.emit('onAnimationEnd');
-      return;
+      return Promise.resolve(false);
     }
-    // 次数循环
     this.repeatCount -= 1;
-    await this.seekToStart();
+    this.seekToStart();
     this.eventManager.emit('onAnimationRepeat');
-    return;
+    return Promise.resolve(true);
   }
 
   protected override clearTimer() {
@@ -209,8 +200,7 @@ export class PAGView extends PAGWebGLView {
   }
 
   private async seekToStart() {
-    await this.videoReader.seek(0);
-    this.currentFrame = 0;
-    this.startTime = 0;
+    this.videoReader.seek(0);
+    this.currentFrame = -1;
   }
 }
