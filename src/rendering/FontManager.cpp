@@ -82,8 +82,12 @@ PAGFont FontManager::registerFont(std::shared_ptr<tgfx::Typeface> typeface,
   if (typeface == nullptr) {
     return {"", ""};
   }
-  auto family = fontFamily.empty() ? typeface->fontFamily() : fontFamily;
-  auto style = fontStyle.empty() ? typeface->fontStyle() : fontStyle;
+  std::string family = typeface->fontFamily();
+  std::string style = typeface->fontStyle();
+  if (!fontFamily.empty()) {
+    family = fontFamily;
+    style = fontStyle;
+  }
   auto key = PAGFontRegisterKey(family, style);
   auto iter = registeredFontMap.find(key);
   if (iter != registeredFontMap.end()) {
