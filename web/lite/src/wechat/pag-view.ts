@@ -24,16 +24,13 @@ export class PAGView extends PAGWebGLView {
   private flushBaseTime;
   private frameData: FrameData | undefined = undefined;
   private needGetFrame = false;
-  private mark = 0;
 
   public constructor(pagFile: PAGFile, canvas: HTMLCanvasElement) {
     super(pagFile, canvas, { renderingMode: RenderingMode.WebGL });
     this.flushBaseTime = Math.floor(1000 / this.videoSequence.frameRate);
     this.videoReader.start();
   }
-  /**
-   * 开始播放
-   */
+
   public async play() {
     if (this.playing) return;
     this.playing = true;
@@ -44,18 +41,14 @@ export class PAGView extends PAGWebGLView {
     }
     this.eventManager.emit(EventName.onAnimationPlay);
   }
-  /**
-   * 暂停播放
-   */
+
   public pause() {
     if (!this.playing) return;
     this.clearTimer();
     this.playing = false;
     this.eventManager.emit(EventName.onAnimationPause);
   }
-  /**
-   * 停止播放
-   */
+
   public stop() {
     this.clearTimer();
     this.seekToStart();
@@ -63,9 +56,7 @@ export class PAGView extends PAGWebGLView {
     this.playing = false;
     this.eventManager.emit(EventName.onAnimationCancel);
   }
-  /**
-   * 销毁播放实例
-   */
+
   public destroy() {
     this.clearTimer();
     this.videoReader.destroy();
@@ -77,9 +68,7 @@ export class PAGView extends PAGWebGLView {
   public updateSize() {
     // NOP
   }
-  /**
-   * 设置播放进度位置，取值范围为 0.0 到 1.0。
-   */
+
   public setProgress(progress: number) {
     if (progress < 0 || progress > 1) throw new Error('progress must be between 0.0 and 1.0!');
     const currentFrame = Math.round(progress * this.videoSequence.frameCount);
@@ -114,7 +103,6 @@ export class PAGView extends PAGWebGLView {
       this.videoReader.getFrameData((frameData: FrameData) => {
         this.frameData = frameData;
         this.currentFrame = frameData.id;
-
         this.setDebugData({ getFrame: Date.now() - getFrameMark });
         if (isAndroid) {
           this.scale = {
@@ -126,14 +114,10 @@ export class PAGView extends PAGWebGLView {
         if (this.currentFrame === this.videoSequence.frameCount - 1) {
           this.repeat();
         }
-        console.log(`flush dst: ${Date.now() - this.mark}ms`);
-        this.mark = Date.now();
       });
       return;
     }
     draw();
-    console.log(`flush dst: ${Date.now() - this.mark}ms`);
-    this.mark = Date.now();
   }
 
   protected override flushLoop() {
@@ -190,13 +174,6 @@ export class PAGView extends PAGWebGLView {
       this.renderTimer = null;
     }
     this.videoReader.clearCallback();
-  }
-
-  protected override updateFPS() {
-    const now = Date.now();
-    this.fpsBuffer = this.fpsBuffer.filter((value) => now - value <= 1000);
-    this.fpsBuffer.push(now);
-    this.setDebugData({ FPS: this.fpsBuffer.length });
   }
 
   private async seekToStart() {

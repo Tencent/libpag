@@ -1,7 +1,7 @@
+import { Clock } from '../base/utils/clock';
 import { VideoSequence } from '../base/video-sequence';
 import { destroyVerify } from '../decorators';
 import { coverToMp4 } from '../generator/mp4-box-helper';
-import { DebugData } from '../types';
 import { getWechatNetwork } from './utils';
 import { addListener, removeAllListeners, removeListener } from './video-listener';
 
@@ -107,8 +107,13 @@ export class VideoReader {
     this.videoElement.style.display = 'none';
     this.videoElement.muted = true;
     this.videoElement.playsInline = true;
-    this.videoElement.src = URL.createObjectURL(new Blob([coverToMp4(videoSequence)], { type: 'video/mp4' }));
+    const clock = new Clock();
+    const mp4Data = coverToMp4(videoSequence);
+    clock.mark('coverMP4');
+    this.videoElement.src = URL.createObjectURL(new Blob([mp4Data], { type: 'video/mp4' }));
     this.videoElement.load();
-    return {}; // TODO
+    return {
+      coverMP4: clock.measure('', 'coverMP4'),
+    };
   }
 }

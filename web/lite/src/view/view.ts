@@ -110,7 +110,8 @@ export class View extends Context {
   protected draw() {}
 
   protected createVideoReader(videoSequence: VideoSequence) {
-    const { videoReader } = VideoReader.create(videoSequence);
+    const { videoReader, debugData } = VideoReader.create(videoSequence);
+    this.setDebugData(debugData);
     if (!IS_IOS) {
       videoReader.addListener('ended', () => {
         this.repeat();
@@ -159,7 +160,15 @@ export class View extends Context {
   }
 
   protected updateFPS() {
-    // TODO
+    let now: number;
+    try {
+      now = performance.now();
+    } catch (e) {
+      now = Date.now();
+    }
+    this.fpsBuffer = this.fpsBuffer.filter((value) => now - value <= 1000);
+    this.fpsBuffer.push(now);
+    this.setDebugData({ FPS: this.fpsBuffer.length });
   }
 
   protected async flushInternal(sync: boolean) {

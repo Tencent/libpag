@@ -1,3 +1,4 @@
+import { Clock } from './base/utils/clock';
 import { PAGFile } from './pag-file';
 import { RenderingMode, ScaleMode } from './types';
 import { PAG2dView } from './view/pag-2d-view';
@@ -18,14 +19,16 @@ export class PAGView {
       renderingMode: RenderingMode.WebGL,
       ...options,
     };
+    const clock = new Clock();
     const pagFile = PAGFile.fromArrayBuffer(data);
+    clock.mark('decode');
     let pagView: View;
     if (opts.renderingMode === RenderingMode.WebGL) {
       pagView = new PAGWebGLView(pagFile, canvas, opts);
     } else {
       pagView = new PAG2dView(pagFile, canvas, opts);
     }
-
+    pagView.setDebugData({ decodePAGFile: clock.measure('', 'decode') });
     return pagView;
   }
 }

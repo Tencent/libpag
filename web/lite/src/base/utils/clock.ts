@@ -1,14 +1,21 @@
+let getTime: () => number;
+try {
+  getTime = performance.now.bind(performance);
+} catch (e) {
+  getTime = Date.now;
+}
+
 export class Clock {
   private startTime: number;
   private markers: { [key: string]: number };
 
   public constructor() {
-    this.startTime = Date.now();
+    this.startTime = getTime();
     this.markers = {};
   }
 
   public reset() {
-    this.startTime = Date.now();
+    this.startTime = getTime();
     this.markers = {};
   }
 
@@ -21,7 +28,7 @@ export class Clock {
       console.log(`Clock.mark(): The specified marker name '${key}' already exists!`);
       return;
     }
-    this.markers[key] = Date.now();
+    this.markers[key] = getTime();
   }
 
   public measure(makerFrom: string, makerTo: string) {
@@ -37,7 +44,7 @@ export class Clock {
       start = this.markers[makerFrom];
     }
     if (!makerTo) {
-      end = Date.now();
+      end = getTime();
     } else {
       if (!Object.keys(this.markers).find((markerKey) => markerKey === makerTo)) {
         console.log(`Clock.measure(): The specified makerTo '${makerTo}' does not exist!`);
