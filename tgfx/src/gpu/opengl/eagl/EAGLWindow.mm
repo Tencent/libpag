@@ -103,7 +103,7 @@ EAGLWindow::~EAGLWindow() {
   }
 }
 
-std::shared_ptr<Surface> EAGLWindow::onCreateSurface(Context* context) {
+std::shared_ptr<Surface> EAGLWindow::onCreateSurface(Context* context, int width, int height) {
   if (pixelBuffer != nil) {
     auto texture = EAGLHardwareTexture::MakeFrom(context, pixelBuffer);
     return GLSurface::MakeFrom(texture);
@@ -117,8 +117,6 @@ std::shared_ptr<Surface> EAGLWindow::onCreateSurface(Context* context) {
     gl->deleteRenderbuffers(1, &colorBuffer);
     colorBuffer = 0;
   }
-  auto width = layer.bounds.size.width * layer.contentsScale;
-  auto height = layer.bounds.size.height * layer.contentsScale;
   if (width <= 0 || height <= 0) {
     return nullptr;
   }

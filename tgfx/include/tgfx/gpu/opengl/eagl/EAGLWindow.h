@@ -38,7 +38,7 @@ class EAGLWindow : public Window {
   ~EAGLWindow() override;
 
  protected:
-  std::shared_ptr<Surface> onCreateSurface(Context* context) override;
+  std::shared_ptr<Surface> onCreateSurface(Context* context, int width, int height) override;
   void onPresent(Context* context, int64_t presentationTime) override;
 
  private:

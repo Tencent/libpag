@@ -38,8 +38,9 @@ class Window {
 
   /**
    * Creates a new surface connected to the window.
+   * If the rendering size changes，eglQuerySurface based on ANativeWindow may give the wrong size.
    */
-  std::shared_ptr<Surface> createSurface(Context* context);
+  std::shared_ptr<Surface> createSurface(Context* context, int width, int height);
 
   /**
    * Applies all pending graphic changes to the window. The presentationTime will be passed to the
@@ -52,7 +53,7 @@ class Window {
   std::shared_ptr<Device> device = nullptr;
 
   explicit Window(std::shared_ptr<Device> device);
-  virtual std::shared_ptr<Surface> onCreateSurface(Context* context) = 0;
+  virtual std::shared_ptr<Surface> onCreateSurface(Context* context, int width, int height) = 0;
   virtual void onPresent(Context* context, int64_t presentationTime) = 0;
 
  private:

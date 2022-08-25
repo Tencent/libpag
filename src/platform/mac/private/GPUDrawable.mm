@@ -87,7 +87,7 @@ std::shared_ptr<tgfx::Surface> GPUDrawable::createSurface(tgfx::Context* context
   if (window == nullptr) {
     return nullptr;
   }
-  return window->createSurface(context);
+  return window->createSurface(context, _width, _height);
 }
 
 void GPUDrawable::present(tgfx::Context* context) {

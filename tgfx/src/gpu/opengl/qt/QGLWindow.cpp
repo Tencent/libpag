@@ -81,14 +81,10 @@ void QGLWindow::invalidateTexture() {
   textureInvalid = true;
 }
 
-std::shared_ptr<Surface> QGLWindow::onCreateSurface(Context* context) {
+std::shared_ptr<Surface> QGLWindow::onCreateSurface(Context* context, int width, int height) {
   renderTarget = nullptr;
   frontTexture = nullptr;
   backTexture = nullptr;
-  auto nativeWindow = quickItem->window();
-  auto pixelRatio = nativeWindow ? nativeWindow->devicePixelRatio() : 1.0f;
-  auto width = static_cast<int>(ceil(quickItem->width() * pixelRatio));
-  auto height = static_cast<int>(ceil(quickItem->height() * pixelRatio));
   if (width <= 0 || height <= 0) {
     return nullptr;
   }

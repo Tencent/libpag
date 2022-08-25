@@ -24,11 +24,11 @@ namespace tgfx {
 Window::Window(std::shared_ptr<Device> device) : device(std::move(device)) {
 }
 
-std::shared_ptr<Surface> Window::createSurface(Context* context) {
+std::shared_ptr<Surface> Window::createSurface(Context* context, int width, int height) {
   if (!checkContext(context)) {
     return nullptr;
   }
-  return onCreateSurface(context);
+  return onCreateSurface(context, width, height);
 }
 
 void Window::present(Context* context, int64_t presentationTime) {

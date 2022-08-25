@@ -38,10 +38,7 @@ std::shared_ptr<WebGLWindow> WebGLWindow::MakeFrom(const std::string& canvasID) 
 WebGLWindow::WebGLWindow(std::shared_ptr<Device> device) : Window(std::move(device)) {
 }
 
-std::shared_ptr<Surface> WebGLWindow::onCreateSurface(Context* context) {
-  int width = 0;
-  int height = 0;
-  emscripten_get_canvas_element_size(canvasID.c_str(), &width, &height);
+std::shared_ptr<Surface> WebGLWindow::onCreateSurface(Context* context, int width, int height) {
   if (width <= 0 || height <= 0) {
     LOGE("WebGLWindow::onCreateSurface() Can not create a Surface with zero size.");
     return nullptr;

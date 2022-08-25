@@ -95,12 +95,11 @@ CGLWindow::~CGLWindow() {
   }
 }
 
-std::shared_ptr<Surface> CGLWindow::onCreateSurface(Context* context) {
+std::shared_ptr<Surface> CGLWindow::onCreateSurface(Context* context, int width, int height) {
   auto glContext = static_cast<CGLDevice*>(device.get())->glContext;
   [glContext update];
   if (view != nil) {
-    CGSize size = [view convertSizeToBacking:view.bounds.size];
-    if (size.width <= 0 || size.height <= 0) {
+    if (width <= 0 || height <= 0) {
       return nullptr;
     }
 #pragma clang diagnostic push
@@ -110,7 +109,7 @@ std::shared_ptr<Surface> CGLWindow::onCreateSurface(Context* context) {
     GLFrameBuffer frameBuffer = {};
     frameBuffer.id = 0;
     frameBuffer.format = PixelFormat::RGBA_8888;
-    auto renderTarget = GLRenderTarget::MakeFrom(context, frameBuffer, size.width, size.height,
+    auto renderTarget = GLRenderTarget::MakeFrom(context, frameBuffer, width, height,
                                                  ImageOrigin::BottomLeft);
     return Surface::MakeFrom(renderTarget);
   }

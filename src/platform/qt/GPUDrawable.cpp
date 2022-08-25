@@ -50,7 +50,7 @@ std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
 }
 
 std::shared_ptr<tgfx::Surface> GPUDrawable::createSurface(tgfx::Context* context) {
-  return window->createSurface(context);
+  return window->createSurface(context, _width, _height);
 }
 
 void GPUDrawable::present(tgfx::Context* context) {

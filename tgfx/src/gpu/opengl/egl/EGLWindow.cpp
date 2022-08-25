@@ -45,12 +45,7 @@ std::shared_ptr<EGLWindow> EGLWindow::MakeFrom(EGLNativeWindowType nativeWindow,
 EGLWindow::EGLWindow(std::shared_ptr<Device> device) : Window(std::move(device)) {
 }
 
-std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
-  EGLint width = 0;
-  EGLint height = 0;
-  auto eglDevice = static_cast<EGLDevice*>(device.get());
-  eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_WIDTH, &width);
-  eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_HEIGHT, &height);
+std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context, int width, int height) {
   if (width <= 0 || height <= 0) {
     return nullptr;
   }

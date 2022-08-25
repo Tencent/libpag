@@ -111,7 +111,7 @@ std::shared_ptr<tgfx::Surface> GPUDrawable::createSurface(tgfx::Context* context
     return surface;
   }
   if (layer == nil || IsInMainThread()) {
-    surface = window->createSurface(context);
+    surface = window->createSurface(context, _width, _height);
     if (layer != nil && surface != nullptr) {
       [[NSNotificationCenter defaultCenter]
           postNotificationName:kGPURenderTargetBufferPreparedNotification
@@ -133,7 +133,7 @@ std::shared_ptr<tgfx::Surface> GPUDrawable::createSurface(tgfx::Context* context
         return;
       }
       if (strongThis->bufferPreparing) {
-        strongThis->surface = strongThis->window->createSurface(glContext);
+        strongThis->surface = strongThis->window->createSurface(glContext, _width, _height);
         if (strongThis->surface) {
           [[NSNotificationCenter defaultCenter]
               postNotificationName:kGPURenderTargetBufferPreparedNotification
