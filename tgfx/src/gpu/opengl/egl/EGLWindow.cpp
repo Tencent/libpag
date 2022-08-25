@@ -22,9 +22,17 @@
 #include "tgfx/gpu/opengl/GLRenderTarget.h"
 
 namespace tgfx {
-std::shared_ptr<EGLWindow> EGLWindow::Current(int width, int height) {
+std::shared_ptr<EGLWindow> EGLWindow::Current() {
   auto device = EGLDevice::Current();
   if (device == nullptr) {
+    return nullptr;
+  }
+  EGLint width = 0;
+  EGLint height = 0;
+  auto eglDevice = static_cast<EGLDevice*>(device.get());
+  eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_WIDTH, &width);
+  eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_HEIGHT, &height);
+  if (width <= 0 || height <= 0) {
     return nullptr;
   }
   return std::shared_ptr<EGLWindow>(new EGLWindow(device, width, height));
@@ -32,7 +40,7 @@ std::shared_ptr<EGLWindow> EGLWindow::Current(int width, int height) {
 
 std::shared_ptr<EGLWindow> EGLWindow::MakeFrom(EGLNativeWindowType nativeWindow, int width,
                                                int height, EGLContext sharedContext) {
-  if (!nativeWindow) {
+  if (!nativeWindow || width <= 0 || height <= 0) {
     return nullptr;
   }
   auto device = EGLDevice::MakeFrom(nativeWindow, sharedContext);

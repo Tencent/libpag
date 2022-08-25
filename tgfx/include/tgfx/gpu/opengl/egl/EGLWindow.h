@@ -27,9 +27,8 @@ class EGLWindow : public Window {
   /**
    * Returns an EGLWindow associated with current EGLSurface. Returns nullptr if there is no current
    * EGLSurface on the calling thread.
-   * If the rendering size changes，eglQuerySurface based on ANativeWindow may give the wrong size.
    */
-  static std::shared_ptr<EGLWindow> Current(int width, int height);
+  static std::shared_ptr<EGLWindow> Current();
 
   /**
    * Creates a new window from an EGL native window with specified shared context.
