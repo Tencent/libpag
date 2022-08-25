@@ -22,16 +22,16 @@
 #include "tgfx/gpu/opengl/GLRenderTarget.h"
 
 namespace tgfx {
-std::shared_ptr<EGLWindow> EGLWindow::Current() {
+std::shared_ptr<EGLWindow> EGLWindow::Current(int width, int height) {
   auto device = EGLDevice::Current();
   if (device == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<EGLWindow>(new EGLWindow(device));
+  return std::shared_ptr<EGLWindow>(new EGLWindow(device, width, height));
 }
 
-std::shared_ptr<EGLWindow> EGLWindow::MakeFrom(EGLNativeWindowType nativeWindow,
-                                               EGLContext sharedContext) {
+std::shared_ptr<EGLWindow> EGLWindow::MakeFrom(EGLNativeWindowType nativeWindow, int width,
+                                               int height, EGLContext sharedContext) {
   if (!nativeWindow) {
     return nullptr;
   }
@@ -39,26 +39,22 @@ std::shared_ptr<EGLWindow> EGLWindow::MakeFrom(EGLNativeWindowType nativeWindow,
   if (device == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<EGLWindow>(new EGLWindow(device));
+  return std::shared_ptr<EGLWindow>(new EGLWindow(device, width, height));
 }
 
-EGLWindow::EGLWindow(std::shared_ptr<Device> device) : Window(std::move(device)) {
+EGLWindow::EGLWindow(std::shared_ptr<Device> device, int width, int height)
+    : Window(std::move(device)), _width(width), _height(height) {
 }
 
 std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
-  EGLint width = 0;
-  EGLint height = 0;
-  auto eglDevice = static_cast<EGLDevice*>(device.get());
-  eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_WIDTH, &width);
-  eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_HEIGHT, &height);
-  if (width <= 0 || height <= 0) {
+  if (_width <= 0 || _height <= 0) {
     return nullptr;
   }
   GLFrameBuffer frameBuffer = {};
   frameBuffer.id = 0;
   frameBuffer.format = PixelFormat::RGBA_8888;
   auto renderTarget =
-      GLRenderTarget::MakeFrom(context, frameBuffer, width, height, ImageOrigin::BottomLeft);
+      GLRenderTarget::MakeFrom(context, frameBuffer, _width, _height, ImageOrigin::BottomLeft);
   return Surface::MakeFrom(renderTarget);
 }
 

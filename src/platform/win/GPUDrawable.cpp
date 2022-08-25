@@ -53,8 +53,8 @@ std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
     return nullptr;
   }
   if (window == nullptr) {
-    window = tgfx::EGLWindow::MakeFrom(reinterpret_cast<EGLNativeWindowType>(nativeWindow),
-                                       sharedContext);
+    window = tgfx::EGLWindow::MakeFrom(reinterpret_cast<EGLNativeWindowType>(nativeWindow), _width,
+                                       _height, sharedContext);
   }
   return window ? window->getDevice() : nullptr;
 }

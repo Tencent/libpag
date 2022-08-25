@@ -44,6 +44,7 @@ void GPUDrawable::updateSize() {
     _width = ANativeWindow_getWidth(nativeWindow);
     _height = ANativeWindow_getHeight(nativeWindow);
   }
+  window = nullptr;
 }
 
 std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
@@ -51,7 +52,7 @@ std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
     return nullptr;
   }
   if (window == nullptr) {
-    window = tgfx::EGLWindow::MakeFrom(nativeWindow, sharedContext);
+    window = tgfx::EGLWindow::MakeFrom(nativeWindow, _width, _height, sharedContext);
   }
   return window ? window->getDevice() : nullptr;
 }

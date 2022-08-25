@@ -27,20 +27,25 @@ class EGLWindow : public Window {
   /**
    * Returns an EGLWindow associated with current EGLSurface. Returns nullptr if there is no current
    * EGLSurface on the calling thread.
+   * If the rendering size changes，eglQuerySurface based on ANativeWindow may give the wrong size.
    */
-  static std::shared_ptr<EGLWindow> Current();
+  static std::shared_ptr<EGLWindow> Current(int width, int height);
 
   /**
    * Creates a new window from an EGL native window with specified shared context.
+   * If the rendering size changes，eglQuerySurface based on ANativeWindow may give the wrong size.
    */
-  static std::shared_ptr<EGLWindow> MakeFrom(EGLNativeWindowType nativeWindow,
-                                             EGLContext sharedContext = nullptr);
+  static std::shared_ptr<EGLWindow> MakeFrom(EGLNativeWindowType nativeWindow, int width,
+                                             int height, EGLContext sharedContext = nullptr);
 
  protected:
   std::shared_ptr<Surface> onCreateSurface(Context* context) override;
   void onPresent(Context* context, int64_t presentationTime) override;
 
  private:
-  explicit EGLWindow(std::shared_ptr<Device> device);
+  int _width = 0;
+  int _height = 0;
+
+  explicit EGLWindow(std::shared_ptr<Device> device, int width, int height);
 };
 }  // namespace tgfx
