@@ -1,10 +1,11 @@
+import { MP4_CACHE_PATH } from './constant';
 import { Clock } from '../base/utils/clock';
-import { VideoSequence } from '../base/video-sequence';
 import { destroyVerify } from '../decorators';
 import { coverToMp4 } from '../generator/mp4-box-helper';
 import { VideoReader as Reader } from '../view/video-reader';
 import { removeFile, touchDirectory, writeFile } from './file-utils';
 
+import type { VideoSequence } from '../base/video-sequence';
 import type { FrameDataOptions, VideoDecoder, wx } from './types';
 
 type K = keyof HTMLVideoElementEventMap;
@@ -12,7 +13,6 @@ type K = keyof HTMLVideoElementEventMap;
 declare const wx: wx;
 declare const setInterval: (callback: () => void, delay: number) => number;
 
-const MP4_CACHE_PATH = `${wx.env.USER_DATA_PATH}/pag/`;
 const BUFFER_MAX_SIZE = 6;
 const BUFFER_MIN_SIZE = 2;
 const GET_FRAME_DATA_INTERVAL = 10; // ms

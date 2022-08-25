@@ -1,9 +1,10 @@
 import { WEBGL_CONTEXT_ATTRIBUTES } from '../constant';
 import { destroyVerify } from '../decorators';
 import { PAGFile } from '../pag-file';
+import { RenderOptions } from './context';
 import { FRAGMENT_2D_SHADER, FRAGMENT_2D_SHADER_TRANSPARENT, VERTEX_2D_SHADER } from './shader';
 import { createAndSetupTexture, createProgram, detectWebGLContext, getShaderSourceFromString } from './utils';
-import { RenderOptions, View } from './view';
+import { View } from './view';
 
 @destroyVerify
 export class PAGWebGLView extends View {

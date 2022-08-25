@@ -3,10 +3,10 @@ import { FrameData, VideoReader } from './video-reader';
 import { EventName, RenderingMode } from '../types';
 import { PAGWebGLView } from '../view/pag-webgl-view';
 import { PAGFile } from '../pag-file';
-import { VideoSequence } from '../base/video-sequence';
 import { Clock } from '../base/utils/clock';
 
-declare const setTimeout: (callback: () => void, delay: number) => number;
+import type { VideoSequence } from '../base/video-sequence';
+
 declare const setInterval: (callback: () => void, delay: number) => number;
 
 const ANDROID_16_ALIGN = 16;

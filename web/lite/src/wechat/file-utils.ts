@@ -41,8 +41,10 @@ export const clearDirectory = (path: string) => {
         fs.unlinkSync(`${path}${file}`);
       });
     }
+    return true;
   } catch (e) {
     console.error(e);
+    return false;
   }
 };
 

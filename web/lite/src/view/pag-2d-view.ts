@@ -1,6 +1,7 @@
 import { destroyVerify } from '../decorators';
 import { PAGFile } from '../pag-file';
-import { RenderOptions, View } from './view';
+import { RenderOptions } from './context';
+import { View } from './view';
 
 @destroyVerify
 export class PAG2dView extends View {

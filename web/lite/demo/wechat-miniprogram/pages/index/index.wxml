@@ -5,6 +5,7 @@
   </view>
   <view hidden="{{pagLoaded}}">
     <button class="btn-load" size="default" type="default" bindtap="load">加载测试PAG</button>
+    <button class="btn-clear" size="default" type="default" bindtap="clear">清理缓存</button>
   </view>
   <view hidden="{{!pagLoaded}}">
     <text class="title">播放次数</text>

@@ -1,9 +1,10 @@
 import { Clock } from '../base/utils/clock';
-import { VideoSequence } from '../base/video-sequence';
 import { destroyVerify } from '../decorators';
 import { coverToMp4 } from '../generator/mp4-box-helper';
 import { getWechatNetwork } from './utils';
 import { addListener, removeAllListeners, removeListener } from './video-listener';
+
+import type { VideoSequence } from '../base/video-sequence';
 
 declare global {
   interface Window {

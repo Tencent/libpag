@@ -1,6 +1,6 @@
 import { Context, RenderOptions } from './context';
 import { getWechatNetwork } from './utils';
-import { RenderingMode, EventName } from '../types';
+import { EventName } from '../types';
 import { IS_IOS } from '../constant';
 import { destroyVerify } from '../decorators';
 

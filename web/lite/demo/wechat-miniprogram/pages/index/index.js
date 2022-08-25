@@ -1,5 +1,5 @@
 // index.js
-import { PAGView } from '../../utils/pag-wx.esm';
+import { PAGView, clearCache } from '../../utils/pag-wx.esm';
 
 const loadFileByRequest = async (url) => {
   return new Promise((resolve) => {
@@ -50,6 +50,11 @@ Page({
         });
         wx.hideLoading();
       });
+  },
+  clear() {
+    if (clearCache()) {
+      console.log('清理成功');
+    }
   },
   play() {
     this.data.pagView.setRepeatCount(this.data.repeatCount);
