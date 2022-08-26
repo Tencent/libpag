@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 0.0.4
+
+### Feature
+
+- 重构代码，支持微信小程序
+- 增加 `getDebugData` 方法，用于获取调试数据
+
 ## 0.0.3
 
 ### Feature

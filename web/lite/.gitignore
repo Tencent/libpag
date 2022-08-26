@@ -25,3 +25,6 @@ yarn.lock
 package-lock.json
 lib
 types
+
+wechat/lib
+wechat/types

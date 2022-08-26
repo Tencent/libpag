@@ -1,6 +1,6 @@
 {
   "name": "libpag-lite",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Portable Animated Graphics lite.",
   "main": "lib/pag.cjs.js",
   "module": "lib/pag.esm.js",
@@ -8,7 +8,7 @@
   "typings": "types/pag.d.ts",
   "scripts": {
     "build": "rimraf lib/* types/* && rollup -c ./script/rollup.config.js && tsc -p ./tsconfig.type.json",
-    "build:wx": "rimraf lib/* types/* && rollup -c ./script/rollup.config.wechat.js && tsc -p ./tsconfig.type.json",
+    "build:wx": "rimraf wechat/lib/* wechat/types/* && rollup -c ./script/rollup.config.wechat.js && tsc -p ./wechat/tsconfig.type.json",
     "dev": "rollup -c ./script/rollup.config.dev.js -w",
     "dev:wx": "rollup -c ./script/rollup.config.wechat.dev.js -w",
     "eslint": "eslint --ext .ts src/",
@@ -49,7 +49,8 @@
     "src",
     "types",
     "README.md",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "LICENSE.txt"
   ],
   "contributors": [
     "zenoslin"

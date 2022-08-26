@@ -1,0 +1,26 @@
+{
+  "name": "libpag-lite-miniprogram",
+  "version": "0.0.4",
+  "description": "Portable Animated Graphics lite.",
+  "main": "lib/pag.cjs.js",
+  "module": "lib/pag.esm.js",
+  "browser": "lib/pag.umd.js",
+  "typings": "types/pag.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Tencent/libpag/tree/main/web/lite"
+  },
+  "files": [
+    "lib",
+    "src",
+    "types",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE.txt"
+  ],
+  "contributors": [
+    "zenoslin"
+  ],
+  "author": "libpag",
+  "browserslist": "defaults"
+}
