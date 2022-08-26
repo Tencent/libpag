@@ -1,23 +1,15 @@
-# libpag-lite
+# libpag-lite-miniprogram
 
 ## 介绍
 
-libpag-lite 是 libpag 在 Web 平台的简化版 SDK
+libpag-lite-miniprogram 是 libpag 在微信小程序平台的简化版 SDK
 
 ## 特性
 
 - 基于 Javascript + WebGL，不使用 WebAssembly
 - 仅支持播放包含单独一个 BMP 视频序列帧的 PAG 动效文件
-- 包体只有 57KB，GZip之后只有 15KB，比完整版 libpag 小很多
+- 包体minify只有 57KB，GZip之后只有 15KB，比完整版 libpag 小很多
 - 具有更好的兼容性
-
-## 关于兼容性
-
-简化版使用纯 Javascript 开发，所以它只依赖于 WebGL 与 Video BlobURL 这两个 Web 技术。
-
-所以，可以配合 [babel](https://babeljs.io/) 将代码兼容到较老的浏览器版本。
-
-**值得注意的是因为 FireFox 对 H264 视频的支持不兼容带 Bframe 的视频，所以简化版不支持 FireFox 浏览器。如果需要在 FireFox 上使用，可以参考 libpag完整版 + ffavc 软件解码的方案**
 
 ## 关于 BMP 序列帧
 
@@ -33,39 +25,49 @@ libpag-lite 是 libpag 在 Web 平台的简化版 SDK
 
 ## 快速开始
 
-### browser
-
-```html
-<canvas id="pag"></canvas>
-<script src="https://cdn.jsdelivr.net/npm/libpag-lite@latest/lib/pag.min.js"></script>
-<script>
-  window.onload = async () => {
-    const { PAGView, types } = window.libpag;
-    const arrayBuffer = await fetch('./assets/particle_video.pag').then((res) => res.arrayBuffer());
-    const canvas = document.getElementById('pag');
-    canvas.width = 720;
-    canvas.height = 720;
-    const pagView = PAGView.init(arrayBuffer, canvas, {
-      renderingMode: types.RenderingMode.WebGL
-    });
-    pagView.play();
-  };
-</script>
-```
-
-### npm
+安装 `libpag-lite-miniprogram`
 
 ```bash
-$ npm install libpag-lite
+$ npm install libpag-lite-miniprogram
+```
+
+获取画布
+
+```xml
+<!-- index.wxml -->
+<canvas type="webgl" id="pag" style="width: 300px; height:300px;"></canvas>
 ```
 
 ```js
-import { PAGView, types } from 'libpag-lite';
+import { PAGView } from 'libpag-lite';
+
+Page({
+  onReady() {
+    wx.createSelectorQuery().select('#pag').node().exec(async(res) => {
+      const canvas = res.node
+      wx.request({
+      	url,
+      	method: 'GET',
+      	responseType: 'arraybuffer',
+      	success(res) {
+          const pagView = PAGView.init(res.data, canvas);
+          pagView.play();
+      	},
+    	});
+    })
+  }
+})
 ```
+
+## 使用指南
+
+### 缓存
+
+因为 PAG 解码的时候用到了 VideoDecoder，而 VideoDecoder 的解码并不支持 blobURL，所以会把 BMP 预合成的视频数据缓存在本地。所以
 
 ## API
 
-### PAG.PAGView
+### PAGView
 
 #### static create(mp4Data, canvas, options)
 
@@ -143,13 +145,13 @@ import { PAGView, types } from 'libpag-lite';
 
 #### scaleMode(): [ScaleMode](#ScaleMode)
 
-返回当前缩放模式
+返回当前填充模式
 
 ---
 
 #### setScaleMode(scaleMode: [ScaleMode](#ScaleMode))
 
-指定缩放内容的模式
+指定内容的填充模式
 
 | 名称          | 类型      | 说明                                                          | 默认值      | 必传 |
 | ------------- | --------- | ------------------------------------------------------------- | ----------- | ---- |
@@ -184,38 +186,33 @@ import { PAGView, types } from 'libpag-lite';
 
 #### getDebugData():[DebugData](#DebugData)
 
-获取调试数据
+---
+
+### clearCache():void
+
+清理 PAG 产生的缓存
 
 ---
 
 ### Interface
-
-#### <span id="RenderOptions">RenderOptions</span>
-
-| 键                | 类型                                 | 说明                                  | 默认值  | 必传 |
-| ----------------- | ------------------------------------ | ------------------------------------- | ------- | ---- |
-| **renderingMode** | enum [RenderingMode](#RenderingMode) | 渲染模式，可选值： `WebGL` 、`Canvas` | `WebGL` | N    |
-| **useScale** | boolean | 是否按照设备dpi进行缩放 | true | N    |
 
 #### <span id="DebugData">DebugData</span>
 
 | 键                | 类型   | 说明                      | 默认值 |
 | ----------------- | ------ | ------------------------- | ------ |
 | **FPS**           | number | 过去一秒内渲染帧数量      | 0      |
+| **getFrame**      | number | 当前帧获取耗时，单位 ms   | 0      |
 | **draw**          | number | 当前帧渲染耗时，单位 ms   | 0      |
 | **decodePAGFile** | number | PAG 文件解码耗时，单位 ms | 0      |
 | **coverMP4**      | number | 合成 MP4 耗时，单位 ms    | 0      |
+| **writeFile**     | number | 写入文件耗时，单位 ms     | 0      |
+| **createDecoder** | number | 创建解码器耗时，单位 ms   |        |
 
 ### Enum
 
-#### <span id="RenderingMode">RenderingMode</span>
-
-| 键         | 类型   | 值     | 说明       |
-| ---------- | ------ | ------ | ---------- |
-| **Canvas** | String | Canvas | 2D 渲染    |
-| **WebGL**  | String | WebGL  | WebGL 渲染 |
-
 #### <span id="ScaleMode">ScaleMode</span>
+
+填充模式
 
 | 键            | 类型   | 值        | 说明                                   |
 | ------------- | ------ | --------- | -------------------------------------- |

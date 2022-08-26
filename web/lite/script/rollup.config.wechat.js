@@ -43,13 +43,13 @@ const plugins = (needBabel = false, needTerser = false) => {
 
 const cjsConfig = {
   input: 'src/wechat/pag.ts',
-  output: { banner, file: 'lib/pag-wx.cjs.js', format: 'cjs', exports: 'auto', sourcemap: true },
+  output: { banner, file: 'wechat/lib/pag.cjs.js', format: 'cjs', exports: 'auto', sourcemap: true },
   plugins: plugins(false, false),
 };
 
 const esmConfig = {
   input: 'src/wechat/pag.ts',
-  output: { banner, file: 'lib/pag-wx.esm.js', format: 'esm', sourcemap: true },
+  output: { banner, file: 'wechat/lib/pag.esm.js', format: 'esm', sourcemap: true },
   plugins: plugins(false, false),
 };
 
