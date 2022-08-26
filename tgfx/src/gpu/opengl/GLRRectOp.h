@@ -28,10 +28,6 @@ class GLRRectOp : public GLDrawOp {
   static std::unique_ptr<GLRRectOp> Make(Color color, const RRect& rRect, const Matrix& viewMatrix,
                                          const Matrix& localMatrix = Matrix::I());
 
-  std::unique_ptr<GeometryProcessor> getGeometryProcessor(const DrawArgs& args) override;
-
-  std::vector<float> vertices(const DrawArgs& args) override;
-
   void draw(const DrawArgs& args) override;
 
  private:
@@ -39,7 +35,7 @@ class GLRRectOp : public GLDrawOp {
 
   GLRRectOp(Color color, const RRect& rRect, const Matrix& viewMatrix, const Matrix& localMatrix);
 
-  bool onCombineIfPossible(GLDrawOp* op) override;
+  bool onCombineIfPossible(GLOp* op) override;
 
   struct RRectWrap {
     Color color = Color::Transparent();

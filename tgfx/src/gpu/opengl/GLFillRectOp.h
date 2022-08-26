@@ -36,9 +36,7 @@ class GLFillRectOp : public GLDrawOp {
                                             const std::vector<Matrix>& viewMatrices,
                                             const std::vector<Matrix>& localMatrices);
 
-  std::unique_ptr<GeometryProcessor> getGeometryProcessor(const DrawArgs& args) override;
-
-  std::vector<float> vertices(const DrawArgs& args) override;
+  std::vector<float> vertices();
 
   void draw(const DrawArgs& args) override;
 
@@ -48,7 +46,7 @@ class GLFillRectOp : public GLDrawOp {
   GLFillRectOp(std::vector<Color> colors, std::vector<Rect> rects, std::vector<Matrix> viewMatrices,
                std::vector<Matrix> localMatrices);
 
-  bool onCombineIfPossible(GLDrawOp* op) override;
+  bool onCombineIfPossible(GLOp* op) override;
 
   std::vector<float> coverageVertices() const;
 

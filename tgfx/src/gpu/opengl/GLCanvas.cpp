@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLCanvas.h"
+#include "ClearOp.h"
 #include "GLBlend.h"
 #include "GLFillRectOp.h"
 #include "GLRRectOp.h"
@@ -137,29 +138,47 @@ static bool IsPixelAligned(const Rect& rect) {
          fabsf(roundf(rect.bottom) - rect.bottom) <= BOUNDS_TO_LERANCE;
 }
 
+void FlipYIfNeeded(Rect* rect, const Surface* surface) {
+  if (surface->origin() == ImageOrigin::BottomLeft) {
+    auto height = rect->height();
+    rect->top = static_cast<float>(surface->height()) - rect->bottom;
+    rect->bottom = rect->top + height;
+  }
+}
+
+std::pair<std::optional<Rect>, bool> GLCanvas::getClipRect() {
+  auto rect = Rect::MakeEmpty();
+  if (state->clip.asRect(&rect)) {
+    FlipYIfNeeded(&rect, surface);
+    if (IsPixelAligned(rect)) {
+      rect.round();
+      if (rect != Rect::MakeWH(static_cast<float>(surface->width()),
+                               static_cast<float>(surface->height()))) {
+        return {rect, true};
+      } else {
+        return {Rect::MakeEmpty(), false};
+      }
+    } else {
+      return {rect, false};
+    }
+  }
+  return {{}, false};
+}
+
 std::unique_ptr<FragmentProcessor> GLCanvas::getClipMask(const Rect& deviceBounds,
                                                          Rect* scissorRect) {
   const auto& clipPath = state->clip;
   if (clipPath.contains(deviceBounds)) {
     return nullptr;
   }
-  auto rect = Rect::MakeEmpty();
-  if (clipPath.asRect(&rect)) {
-    if (surface->origin() == ImageOrigin::BottomLeft) {
-      auto height = rect.height();
-      rect.top = static_cast<float>(surface->height()) - rect.bottom;
-      rect.bottom = rect.top + height;
+  auto [rect, useScissor] = getClipRect();
+  if (rect.has_value()) {
+    if (useScissor) {
+      *scissorRect = *rect;
+    } else if (!rect->isEmpty()) {
+      return AARectEffect::Make(*rect);
     }
-    if (IsPixelAligned(rect) && scissorRect) {
-      rect.round();
-      if (static_cast<int>(rect.width()) != surface->width() ||
-          static_cast<int>(rect.height()) != surface->height()) {
-        *scissorRect = rect;
-      }
-      return nullptr;
-    } else {
-      return AARectEffect::Make(rect);
-    }
+    return nullptr;
   } else {
     return FragmentProcessor::MulInputByChildAlpha(
         DeviceSpaceTextureEffect::Make(getClipTexture(), surface->origin()));
@@ -252,6 +271,9 @@ void GLCanvas::fillPath(const Path& path, const Paint& paint) {
   auto bounds = path.getBounds();
   auto localBounds = clipLocalBounds(bounds);
   if (localBounds.isEmpty()) {
+    return;
+  }
+  if (drawAsClear(path, glPaint)) {
     return;
   }
   auto op = MakeSimplePathOp(path, glPaint, state->matrix);
@@ -474,6 +496,35 @@ void GLCanvas::drawMesh(const Mesh* mesh, const Paint& paint) {
   resetMatrix();
   draw(std::move(op), std::move(glPaint));
   setMatrix(oldMatrix);
+}
+
+bool GLCanvas::drawAsClear(const Path& path, const GLPaint& paint) {
+  if (!paint.colorFragmentProcessors.empty() || !paint.coverageFragmentProcessors.empty() ||
+      !state->matrix.rectStaysRect() || drawContext == nullptr) {
+    return false;
+  }
+  auto bounds = Rect::MakeEmpty();
+  if (!path.asRect(&bounds)) {
+    return false;
+  }
+  state->matrix.mapRect(&bounds);
+  if (!IsPixelAligned(bounds)) {
+    return false;
+  }
+  auto [rect, useScissor] = getClipRect();
+  if (rect.has_value()) {
+    if (useScissor) {
+      FlipYIfNeeded(&bounds, surface);
+      rect->intersect(bounds);
+      drawContext->addOp(ClearOp::Make(paint.color, *rect));
+      return true;
+    } else if (rect->isEmpty()) {
+      FlipYIfNeeded(&bounds, surface);
+      drawContext->addOp(ClearOp::Make(paint.color, bounds));
+      return true;
+    }
+  }
+  return false;
 }
 
 void GLCanvas::draw(std::unique_ptr<GLDrawOp> op, GLPaint paint, bool aa) {

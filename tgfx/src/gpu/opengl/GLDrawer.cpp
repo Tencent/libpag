@@ -46,10 +46,6 @@ static AttribLayout GetAttribLayout(ShaderVar::Type type) {
   return {false, 0, 0};
 }
 
-static bool isDrawArgsValid(const DrawArgs& args) {
-  return args.context != nullptr && args.renderTarget != nullptr;
-}
-
 static void ComputeRecycleKey(BytesKey* recycleKey) {
   static const uint32_t Type = UniqueID::Next();
   recycleKey->write(Type);
@@ -165,7 +161,7 @@ static void UpdateBlend(Context* context,
   }
 }
 
-ProgramInfo GLDrawOp::createProgram(const DrawArgs& args) {
+ProgramInfo GLDrawOp::createProgram(const DrawArgs& args, std::unique_ptr<GeometryProcessor> gp) {
   auto numColorProcessors = _colors.size();
   std::vector<std::unique_ptr<FragmentProcessor>> fragmentProcessors = {};
   fragmentProcessors.resize(numColorProcessors + _masks.size());
@@ -177,7 +173,7 @@ ProgramInfo GLDrawOp::createProgram(const DrawArgs& args) {
   ProgramInfo info;
   info.blendFactors = _blendFactors;
   if (_requiresDstTexture) {
-    dstTexture = CreateDstTexture(args, _bounds, &dstTextureOffset);
+    dstTexture = CreateDstTexture(args, bounds(), &dstTextureOffset);
   }
   auto config = std::static_pointer_cast<GLRenderTarget>(args.renderTarget)->glFrameBuffer().format;
   const auto& swizzle = GLCaps::Get(args.context)->getOutputSwizzle(config);
@@ -186,16 +182,27 @@ ProgramInfo GLDrawOp::createProgram(const DrawArgs& args) {
                                  std::move(_xferProcessor), dstTexture, dstTextureOffset, &swizzle);
   info.pipeline->setRequiresBarrier(dstTexture != nullptr &&
                                     dstTexture == args.renderTargetTexture);
-  info.geometryProcessor = getGeometryProcessor(args);
+  info.geometryProcessor = std::move(gp);
   GLProgramCreator creator(info.geometryProcessor.get(), info.pipeline.get());
-  info.program = static_cast<GLProgram*>(args.context->programCache()->getProgram(&creator));
+  info.program = args.context->programCache()->getProgram(&creator);
   return info;
 }
 
 static std::atomic_uint8_t currentOpClassID = {1};
 
-uint8_t GLDrawOp::GenOpClassID() {
+uint8_t GLOp::GenOpClassID() {
   return currentOpClassID++;
+}
+
+bool GLOp::combineIfPossible(GLOp* op) {
+  if (_classID != op->_classID) {
+    return false;
+  }
+  auto result = onCombineIfPossible(op);
+  if (result) {
+    _bounds.join(op->_bounds);
+  }
+  return result;
 }
 
 static bool CompareFragments(const std::vector<std::unique_ptr<FragmentProcessor>>& frags1,
@@ -211,49 +218,64 @@ static bool CompareFragments(const std::vector<std::unique_ptr<FragmentProcessor
   return true;
 }
 
-bool GLDrawOp::combineIfPossible(GLDrawOp* that) {
-  if (classID() != that->classID() || aa != that->aa || _scissorRect != that->_scissorRect ||
-      _blendFactors != that->_blendFactors || _requiresDstTexture != that->_requiresDstTexture ||
-      !CompareFragments(_colors, that->_colors) || !CompareFragments(_masks, that->_masks) ||
-      _xferProcessor != that->_xferProcessor) {
-    return false;
-  }
-  auto result = onCombineIfPossible(that);
-  if (result) {
-    _bounds.join(that->_bounds);
-  }
-  return result;
+bool GLDrawOp::onCombineIfPossible(GLOp* op) {
+  auto* that = static_cast<GLDrawOp*>(op);
+  return aa == that->aa && _scissorRect == that->_scissorRect &&
+         _blendFactors == that->_blendFactors && _requiresDstTexture == that->_requiresDstTexture &&
+         CompareFragments(_colors, that->_colors) && CompareFragments(_masks, that->_masks) &&
+         _xferProcessor == that->_xferProcessor;
 }
 
-void GLDrawer::draw(const DrawArgs& args, std::unique_ptr<GLDrawOp> op) const {
-  if (!isDrawArgsValid(args) || op == nullptr) {
-    return;
-  }
-  auto info = op->createProgram(args);
+void GLDrawer::bindPipelineAndScissorClip(const ProgramInfo& info, const Rect& drawBounds) {
   if (info.program == nullptr) {
     return;
   }
-  auto program = info.program;
-  auto gl = GLFunctions::Get(args.context);
-  CheckGLError(args.context);
-  auto renderTarget = std::static_pointer_cast<GLRenderTarget>(args.renderTarget);
+  program = static_cast<GLProgram*>(info.program);
+  auto gl = GLFunctions::Get(context);
+  CheckGLError(context);
+  auto glRT = static_cast<GLRenderTarget*>(_renderTarget);
   gl->useProgram(program->programID());
-  gl->bindFramebuffer(GL_FRAMEBUFFER, renderTarget->glFrameBuffer().id);
-  gl->viewport(0, 0, renderTarget->width(), renderTarget->height());
-  UpdateScissor(args.context, op->scissorRect());
-  UpdateBlend(args.context, info.blendFactors);
+  gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->glFrameBuffer().id);
+  gl->viewport(0, 0, glRT->width(), glRT->height());
+  UpdateScissor(context, drawBounds);
+  UpdateBlend(context, info.blendFactors);
   if (info.pipeline->requiresBarrier()) {
     gl->textureBarrier();
   }
-  program->updateUniformsAndTextureBindings(renderTarget.get(), *info.geometryProcessor,
-                                            *info.pipeline);
+  program->updateUniformsAndTextureBindings(glRT, *info.geometryProcessor, *info.pipeline);
+}
+
+void GLDrawer::bindVerticesAndIndices(std::vector<float> vertices,
+                                      std::shared_ptr<GLBuffer> indices) {
+  _vertices = std::move(vertices);
+  _indexBuffer = std::move(indices);
+}
+
+void GLDrawer::draw(unsigned primitiveType, int baseVertex, int vertexCount) {
+  draw([&]() {
+    auto gl = GLFunctions::Get(context);
+    gl->drawArrays(primitiveType, baseVertex, vertexCount);
+  });
+}
+
+void GLDrawer::drawIndexed(unsigned primitiveType, int baseIndex, int indexCount) {
+  draw([&]() {
+    auto gl = GLFunctions::Get(context);
+    gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, _indexBuffer->bufferID());
+    gl->drawElements(primitiveType, indexCount, GL_UNSIGNED_SHORT,
+                     reinterpret_cast<void*>(baseIndex * sizeof(uint16_t)));
+    gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+  });
+}
+
+void GLDrawer::draw(std::function<void()> func) {
+  auto gl = GLFunctions::Get(context);
   if (vertexArray > 0) {
     gl->bindVertexArray(vertexArray);
   }
   gl->bindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-  auto vertices = op->vertices(args);
-  gl->bufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(vertices.size()) * sizeof(float),
-                 &vertices[0], GL_STATIC_DRAW);
+  gl->bufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(_vertices.size()) * sizeof(float),
+                 &_vertices[0], GL_STATIC_DRAW);
   for (const auto& attribute : program->vertexAttributes()) {
     const AttribLayout& layout = GetAttribLayout(attribute.gpuType);
     gl->vertexAttribPointer(static_cast<unsigned>(attribute.location), layout.count, layout.type,
@@ -262,23 +284,20 @@ void GLDrawer::draw(const DrawArgs& args, std::unique_ptr<GLDrawOp> op) const {
     gl->enableVertexAttribArray(static_cast<unsigned>(attribute.location));
   }
   gl->bindBuffer(GL_ARRAY_BUFFER, 0);
-  op->draw(args);
+  func();
   if (vertexArray > 0) {
     gl->bindVertexArray(0);
   }
-  CheckGLError(args.context);
+  CheckGLError(context);
 }
 
-void GLDrawer::DrawIndexBuffer(Context* context, const std::shared_ptr<GLBuffer>& indexBuffer) {
+void GLDrawer::clear(const Rect& scissor, Color color) {
   auto gl = GLFunctions::Get(context);
-  gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer->bufferID());
-  gl->drawElements(GL_TRIANGLES, static_cast<int>(indexBuffer->length()), GL_UNSIGNED_SHORT,
-                   nullptr);
-  gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-}
-
-void GLDrawer::DrawArrays(Context* context, unsigned int mode, int first, int count) {
-  auto gl = GLFunctions::Get(context);
-  gl->drawArrays(mode, first, count);
+  auto glRT = static_cast<GLRenderTarget*>(_renderTarget);
+  gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->glFrameBuffer().id);
+  gl->viewport(0, 0, glRT->width(), glRT->height());
+  UpdateScissor(context, scissor);
+  gl->clearColor(color.red, color.green, color.blue, color.alpha);
+  gl->clear(GL_COLOR_BUFFER_BIT);
 }
 }  // namespace tgfx

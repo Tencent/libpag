@@ -16,30 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "GLDrawer.h"
-#include "tgfx/core/Path.h"
+#include "ClearOp.h"
 
 namespace tgfx {
-class GLTriangulatingPathOp : public GLDrawOp {
- public:
-  static std::unique_ptr<GLTriangulatingPathOp> Make(Color color, const Path& path, Rect clipBounds,
-                                                     const Matrix& localMatrix);
+std::unique_ptr<ClearOp> ClearOp::Make(Color color, const Rect& scissor) {
+  return std::unique_ptr<ClearOp>(new ClearOp(color, scissor));
+}
 
-  GLTriangulatingPathOp(Color color, std::vector<float> vertex, int vertexCount, Rect bounds,
-                        const Matrix& localMatrix = Matrix::I());
+bool ContainsScissor(const Rect& a, const Rect& b) {
+  return a.isEmpty() || (!b.isEmpty() && a.contains(b));
+}
 
-  void draw(const DrawArgs& args) override;
+bool ClearOp::onCombineIfPossible(GLOp* op) {
+  auto that = static_cast<ClearOp*>(op);
+  if (ContainsScissor(that->scissor, scissor)) {
+    scissor = that->scissor;
+    color = that->color;
+    return true;
+  } else if (color == that->color && ContainsScissor(scissor, that->scissor)) {
+    return true;
+  }
+  return false;
+}
 
- private:
-  DEFINE_OP_CLASS_ID
-
-  bool onCombineIfPossible(GLOp* op) override;
-
-  Color color = Color::Transparent();
-  std::vector<float> vertex;
-  int vertexCount;
-  Matrix localMatrix = Matrix::I();
-};
+void ClearOp::draw(const DrawArgs& args) {
+  args.drawer->clear(scissor, color);
+}
 }  // namespace tgfx

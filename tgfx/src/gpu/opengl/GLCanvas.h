@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "GLSurfaceDrawContext.h"
 #include "gpu/CanvasState.h"
 #include "tgfx/core/BlendMode.h"
@@ -68,6 +69,8 @@ class GLCanvas : public Canvas {
 
   std::shared_ptr<Texture> getClipTexture();
 
+  std::pair<std::optional<Rect>, bool> getClipRect();
+
   std::unique_ptr<FragmentProcessor> getClipMask(const Rect& deviceBounds, Rect* scissorRect);
 
   Rect clipLocalBounds(Rect localBounds);
@@ -80,6 +83,8 @@ class GLCanvas : public Canvas {
   void drawMaskGlyphs(TextBlob* textBlob, const Paint& paint);
 
   void fillPath(const Path& path, const Paint& paint);
+
+  bool drawAsClear(const Path& path, const GLPaint& paint);
 
   void draw(std::unique_ptr<GLDrawOp> op, GLPaint paint, bool aa = false);
 };

@@ -8,6 +8,7 @@
         "merge_draw_call_rect": "e2670834",
         "merge_draw_call_rrect": "e2670834",
         "merge_draw_call_triangle": "e2670834",
+        "merge_draw_clear_op": "d06a39e9",
         "tileMode": "fb98147f"
     },
     "PAGBlendTest": {

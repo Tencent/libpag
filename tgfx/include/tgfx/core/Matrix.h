@@ -610,6 +610,25 @@ class Matrix {
   }
 
   /**
+   * Returns true if Matrix maps Rect to another Rect. If true, Matrix is identity, or scales, or
+   * rotates a multiple of 90 degrees, or mirrors on axes. In all cases, Matrix may also have
+   * translation. Matrix form is either:
+   *
+   *         | scale-x    0    translate-x |
+   *         |    0    scale-y translate-y |
+   *         |    0       0         1      |
+   *
+   *     or
+   *
+   *        |    0     rotate-x translate-x |
+   *        | rotate-y    0     translate-y |
+   *        |    0        0          1      |
+   *
+   *    for non-zero values of scale-x, scale-y, rotate-x, and rotate-y.
+   */
+  bool rectStaysRect() const;
+
+  /**
    * Sets dst to bounds of src corners mapped by Matrix.
    */
   void mapRect(Rect* dst, const Rect& src) const;
