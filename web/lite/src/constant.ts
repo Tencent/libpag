@@ -68,4 +68,4 @@ export const enum ParagraphJustification {
   FullJustifyLastLineFull = 6,
 }
 
-export const IS_IOS = /(ios|ipad|iphone)/.test(navigator.userAgent.toLowerCase());
+export const IS_IOS = navigator && /(ios|ipad|iphone)/.test(navigator.userAgent.toLowerCase());

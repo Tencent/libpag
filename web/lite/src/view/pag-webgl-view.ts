@@ -1,17 +1,22 @@
 import { WEBGL_CONTEXT_ATTRIBUTES } from '../constant';
 import { destroyVerify } from '../decorators';
 import { PAGFile } from '../pag-file';
+import { RenderOptions } from './context';
 import { FRAGMENT_2D_SHADER, FRAGMENT_2D_SHADER_TRANSPARENT, VERTEX_2D_SHADER } from './shader';
 import { createAndSetupTexture, createProgram, detectWebGLContext, getShaderSourceFromString } from './utils';
-import { RenderOptions, View } from './view';
+import { View } from './view';
 
 @destroyVerify
 export class PAGWebGLView extends View {
-  private gl: WebGLRenderingContext;
+  protected gl: WebGLRenderingContext;
+  protected scale: { x: number; y: number } = { x: 1, y: 1 };
+
   private program: WebGLProgram;
   private positionLocation = 0;
   private texcoordLocation = 0;
   private alphaStartLocation: WebGLUniformLocation | null = null;
+  private scaleLocation: WebGLUniformLocation | null = null;
+  private resolutionLocation: WebGLUniformLocation | null = null;
   private positionBuffer: WebGLBuffer | null = null;
   private texcoordBuffer: WebGLBuffer | null = null;
   private originalVideoTexture: WebGLTexture | null = null;
@@ -19,7 +24,6 @@ export class PAGWebGLView extends View {
   private renderingFbo: WebGLFramebuffer | null = null;
 
   public constructor(pagFile: PAGFile, canvas: HTMLCanvasElement, options: RenderOptions) {
-    if (detectWebGLContext() === false) throw new Error('WebGL is not supported!');
     super(pagFile, canvas, options);
     const gl = this.canvas?.getContext('webgl', {
       ...WEBGL_CONTEXT_ATTRIBUTES,
@@ -44,12 +48,19 @@ export class PAGWebGLView extends View {
 
   protected override loadContext() {
     // look up where the vertex data needs to go.
+    if (!this.program) throw new Error('program is not initialized');
     this.positionLocation = this.gl.getAttribLocation(this.program, 'a_position');
     if (this.positionLocation === -1) throw new Error('unable to get attribute location for a_position');
+    this.scaleLocation = this.gl.getUniformLocation(this.program, 'u_scale');
+    if (this.scaleLocation === -1) throw new Error('unable to get attribute location for u_scale');
     this.texcoordLocation = this.gl.getAttribLocation(this.program, 'a_texCoord');
     if (this.texcoordLocation === -1) throw new Error('unable to get attribute location for a_texCoord');
-    this.alphaStartLocation = this.gl.getUniformLocation(this.program, 'v_alphaStart');
-    if (!this.alphaStartLocation) throw new Error('unable to get attribute location for v_alphaStart');
+    if (this.videoParam.hasAlpha) {
+      this.alphaStartLocation = this.gl.getUniformLocation(this.program, 'v_alphaStart');
+      if (!this.alphaStartLocation) throw new Error('unable to get attribute location for v_alphaStart');
+    }
+    this.resolutionLocation = this.gl.getUniformLocation(this.program, 'u_resolution');
+    if (this.positionLocation === -1) throw new Error('unable to get attribute location for u_resolution');
 
     // Create a buffer to put three 2d clip space points in
     this.positionBuffer = this.gl.createBuffer();
@@ -99,25 +110,10 @@ export class PAGWebGLView extends View {
     this.originalVideoTexture = createAndSetupTexture(this.gl);
   }
 
-  protected override flushInternal() {
+  protected override draw() {
     this.gl.bindTexture(this.gl.TEXTURE_2D, this.originalVideoTexture);
     // Upload the video into the texture.
-    this.gl.texImage2D(
-      this.gl.TEXTURE_2D,
-      0,
-      this.gl.RGBA,
-      this.gl.RGBA,
-      this.gl.UNSIGNED_BYTE,
-      this.videoElement as HTMLVideoElement,
-    );
-
-    // lookup uniforms
-    if (!this.program) throw new Error('program is not initialized');
-    const resolutionLocation = this.gl.getUniformLocation(this.program, 'u_resolution');
-
-    // Tell WebGL how to convert from clip space to pixels
-    // this.gl.viewport(this.viewportSize.x, this.viewportSize.y, this.viewportSize.width, this.viewportSize.height);
-
+    this.texImage2D();
     // Clear the canvas
     this.gl.clearColor(0, 0, 0, 0);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);
@@ -150,21 +146,21 @@ export class PAGWebGLView extends View {
     if (this.videoParam.hasAlpha) {
       this.gl.uniform2f(
         this.alphaStartLocation,
-        this.videoParam.alphaStartX / this.videoParam.MP4Width,
-        this.videoParam.alphaStartY / this.videoParam.MP4Height,
+        this.videoParam.alphaStartX / this.videoParam.MP4Width / this.scale.x,
+        this.videoParam.alphaStartY / this.videoParam.MP4Height / this.scale.y,
       );
     }
 
     this.gl.bindTexture(this.gl.TEXTURE_2D, this.originalVideoTexture);
     this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.renderingFbo);
-    this.gl.uniform2f(resolutionLocation, this.videoParam.sequenceWidth, this.videoParam.sequenceHeight);
+    this.gl.uniform2f(this.resolutionLocation, this.videoParam.sequenceWidth, this.videoParam.sequenceHeight);
+    this.gl.uniform2f(this.scaleLocation, this.scale.x, this.scale.y);
     this.gl.viewport(0, 0, this.videoParam.sequenceWidth, this.videoParam.sequenceHeight);
     const primitiveType: number = this.gl.TRIANGLES;
     const count = 6;
     this.gl.drawArrays(primitiveType, offset, count);
-
     this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
-    this.gl.uniform2f(resolutionLocation, this.videoParam.sequenceWidth, this.videoParam.sequenceHeight);
+    this.gl.uniform2f(this.resolutionLocation, this.videoParam.sequenceWidth, this.videoParam.sequenceHeight);
     this.gl.viewport(this.viewportSize.x, this.viewportSize.y, this.viewportSize.width, this.viewportSize.height);
     this.gl.drawArrays(primitiveType, offset, count);
   }
@@ -172,6 +168,21 @@ export class PAGWebGLView extends View {
   protected override clearRender() {
     this.gl.clearColor(0, 0, 0, 0);
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+  }
+
+  protected detectWebGLContext() {
+    return detectWebGLContext();
+  }
+
+  protected texImage2D() {
+    this.gl.texImage2D(
+      this.gl.TEXTURE_2D,
+      0,
+      this.gl.RGBA,
+      this.gl.RGBA,
+      this.gl.UNSIGNED_BYTE,
+      this.videoReader.getVideoElement(),
+    );
   }
 
   private setRectangle(gl: WebGLRenderingContext, x: number, y: number, width: number, height: number) {

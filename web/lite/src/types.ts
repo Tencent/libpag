@@ -61,3 +61,14 @@ export enum ScaleMode {
    */
   Zoom = 'Zoom',
 }
+
+export interface DebugData {
+  FPS?: number;
+  decodePAGFile?: number;
+  createDir?: number;
+  coverMP4?: number;
+  writeFile?: number;
+  createDecoder?: number;
+  getFrame?: number;
+  draw?:number;
+}

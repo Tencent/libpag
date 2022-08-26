@@ -5,9 +5,24 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Document</title>
+    <link rel="stylesheet" href="./index.css" />
   </head>
   <body>
-    <canvas id="pag"></canvas>
+    <div class="container">
+      <div>
+        <canvas id="pag" width="640" height="640"></canvas>
+        <div class="zebra"></div>
+      </div>
+      <div>
+        <div class="btn-box">
+          <button id="play">PLAY</button>
+          <button id="pause">PAUSE</button>
+          <button id="stop">STOP</button>
+          <button id="destroy">DESTROY</button>
+        </div>
+        <p id="info"></p>
+      </div>
+    </div>
     <script src="index.js"></script>
   </body>
 </html>

@@ -2,7 +2,6 @@ import { ByteArray } from './codec/utils/byte-array';
 import { readTags } from './codec/tags/tag-header';
 import { readTagsOfFile } from './codec/tags/file-tags';
 import { Composition } from './base/composition';
-import { ImageBytes } from './base/image-bytes';
 import { CompositionType, TagCode } from './codec/types';
 import { VectorComposition } from './base/vector-composition';
 import { LayerType } from './base/layer';

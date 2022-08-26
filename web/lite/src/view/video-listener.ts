@@ -3,7 +3,7 @@ type K = keyof HTMLVideoElementEventMap;
 let eventHandlers: {
   [key in K]?: {
     node: HTMLVideoElement;
-    handler: (this: HTMLVideoElement, ev: HTMLVideoElementEventMap[K]) => any;
+    handler: (this: HTMLVideoElement, ev: HTMLVideoElementEventMap[K]) => void;
     capture: boolean;
   }[];
 } = {};
@@ -11,7 +11,7 @@ let eventHandlers: {
 export const addListener = (
   node: HTMLVideoElement,
   event: K,
-  handler: (this: HTMLVideoElement, ev: HTMLVideoElementEventMap[K]) => any,
+  handler: (this: HTMLVideoElement, ev: HTMLVideoElementEventMap[K]) => void,
   capture = false,
 ) => {
   if (!(event in eventHandlers)) {
@@ -24,7 +24,7 @@ export const addListener = (
 export const removeListener = (
   targetNode: HTMLElement,
   event: K,
-  targetHandler?: (this: HTMLVideoElement, ev: HTMLVideoElementEventMap[K]) => any,
+  targetHandler?: (this: HTMLVideoElement, ev: HTMLVideoElementEventMap[K]) => void,
 ) => {
   if (!(event in eventHandlers)) return;
   if (targetHandler) {
