@@ -15,7 +15,7 @@ declare const setInterval: (callback: () => void, delay: number) => number;
 
 const BUFFER_MAX_SIZE = 6;
 const BUFFER_MIN_SIZE = 2;
-const GET_FRAME_DATA_INTERVAL = 10; // ms
+const GET_FRAME_DATA_INTERVAL = 2; // ms
 
 export interface FrameData {
   id: number;
@@ -155,7 +155,7 @@ export class VideoReader extends Reader {
     clock.mark('writeFile');
     this.videoDecoder = wx.createVideoDecoder();
     clock.mark('createDecoder');
-    this.loadedPromise = this.videoDecoder.start({ source: this.mp4Path, mode: 0 }); // prepare
+    this.loadedPromise = this.videoDecoder.start({ source: this.mp4Path, mode: 1 }); // prepare
     this.videoDecoder.on('ended', () => {
       this.videoDecoder?.seek(0).then(() => {
         this.currentFrame = 0;
