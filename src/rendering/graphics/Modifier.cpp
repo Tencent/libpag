@@ -296,7 +296,7 @@ void MaskModifier::applyToGraphic(tgfx::Canvas* canvas, RenderCache* cache,
     shader = shader->makeWithColorFilter(tgfx::ColorFilter::MakeLumaColorFilter());
   }
   paint.setMaskFilter(tgfx::MaskFilter::Make(std::move(shader), inverted));
-  canvas->drawTexture(texture.get(), &paint);
+  canvas->drawTexture(texture, &paint);
   canvas->restore();
 }
 }  // namespace pag

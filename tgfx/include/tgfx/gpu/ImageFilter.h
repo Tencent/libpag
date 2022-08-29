@@ -24,14 +24,15 @@
 
 namespace tgfx {
 struct ImageFilterContext {
-  ImageFilterContext(Context* context, Matrix matrix, Rect clipBounds, const Texture* texture)
-      : context(context), deviceMatrix(matrix), clipBounds(clipBounds), source(texture) {
+  ImageFilterContext(Context* context, Matrix matrix, Rect clipBounds,
+                     std::shared_ptr<Texture> texture)
+      : context(context), deviceMatrix(matrix), clipBounds(clipBounds), source(std::move(texture)) {
   }
 
   Context* context = nullptr;
   Matrix deviceMatrix = Matrix::I();
   Rect clipBounds = Rect::MakeEmpty();
-  const Texture* source = nullptr;
+  std::shared_ptr<Texture> source;
 };
 
 class ImageFilter {

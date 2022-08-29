@@ -30,8 +30,8 @@ class YUVTextureEffect : public FragmentProcessor {
   }
 
  private:
-  explicit YUVTextureEffect(const YUVTexture* texture, const RGBAAALayout* layout,
-                            const Matrix& localMatrix);
+  YUVTextureEffect(std::shared_ptr<YUVTexture> texture, const RGBAAALayout* layout,
+                   const Matrix& localMatrix);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
@@ -41,7 +41,7 @@ class YUVTextureEffect : public FragmentProcessor {
     return texture->getSamplerAt(index);
   }
 
-  const YUVTexture* texture;
+  std::shared_ptr<YUVTexture> texture;
   const RGBAAALayout* layout;
   CoordTransform coordTransform;
 

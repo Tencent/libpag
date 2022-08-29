@@ -56,7 +56,7 @@ PAG_TEST(CanvasTest, ColorMatrixFilter) {
   tgfx::Paint paint;
   std::array<float, 20> matrix = {1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0};
   paint.setColorFilter(ColorFilter::Matrix(matrix));
-  canvas->drawTexture(image.get(), &paint);
+  canvas->drawTexture(image, &paint);
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/identityMatrix"));
   canvas->clear();
   std::array<float, 20> greyColorMatrix = {0.21f, 0.72f, 0.07f, 0.41f, 0,  // red
@@ -64,7 +64,7 @@ PAG_TEST(CanvasTest, ColorMatrixFilter) {
                                            0.21f, 0.72f, 0.07f, 0.41f, 0,  // blue
                                            0,     0,     0,     1.0f,  0};
   paint.setColorFilter(ColorFilter::Matrix(greyColorMatrix));
-  canvas->drawTexture(image.get(), &paint);
+  canvas->drawTexture(image, &paint);
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/greyColorMatrix"));
   device->unlock();
 }
@@ -92,7 +92,7 @@ PAG_TEST(CanvasTest, Blur) {
   canvas->concat(tgfx::Matrix::MakeTrans(padding, padding));
   canvas->save();
   canvas->concat(imageMatrix);
-  canvas->drawTexture(texture.get(), &paint);
+  canvas->drawTexture(texture, &paint);
   canvas->restore();
   Path path;
   path.addRect(Rect::MakeWH(imageWidth, imageHeight));
@@ -105,7 +105,7 @@ PAG_TEST(CanvasTest, Blur) {
   canvas->save();
   canvas->concat(imageMatrix);
   paint.setImageFilter(ImageFilter::Blur(130, 130, TileMode::Decal));
-  canvas->drawTexture(texture.get(), &paint);
+  canvas->drawTexture(texture, &paint);
   canvas->restore();
   paint.setImageFilter(nullptr);
   canvas->drawPath(path, paint);
@@ -116,7 +116,7 @@ PAG_TEST(CanvasTest, Blur) {
   paint.setImageFilter(ImageFilter::Blur(
       130, 130, TileMode::Clamp,
       tgfx::Rect::MakeWH(static_cast<float>(image->width()), static_cast<float>(image->height()))));
-  canvas->drawTexture(texture.get(), &paint);
+  canvas->drawTexture(texture, &paint);
   canvas->restore();
   paint.setImageFilter(nullptr);
   canvas->drawPath(path, paint);
@@ -126,13 +126,13 @@ PAG_TEST(CanvasTest, Blur) {
   canvas->concat(imageMatrix);
   paint.setImageFilter(
       ImageFilter::Blur(130, 130, TileMode::Clamp, tgfx::Rect::MakeLTRB(-100, -100, 2000, 1000)));
-  canvas->drawTexture(texture.get(), &paint);
+  canvas->drawTexture(texture, &paint);
   paint.setImageFilter(
       ImageFilter::Blur(130, 130, TileMode::Clamp, tgfx::Rect::MakeXYWH(1000, 1000, 1000, 1000)));
-  canvas->drawTexture(texture.get(), &paint);
+  canvas->drawTexture(texture, &paint);
   paint.setImageFilter(
       ImageFilter::Blur(130, 130, TileMode::Clamp, tgfx::Rect::MakeXYWH(2000, 1000, 1000, 1000)));
-  canvas->drawTexture(texture.get(), &paint);
+  canvas->drawTexture(texture, &paint);
   canvas->restore();
   paint.setImageFilter(nullptr);
   canvas->drawPath(path, paint);
@@ -158,15 +158,15 @@ PAG_TEST(CanvasTest, DropShadow) {
   auto canvas = surface->getCanvas();
   canvas->concat(tgfx::Matrix::MakeTrans(padding, padding));
   paint.setImageFilter(ImageFilter::Blur(15, 15));
-  canvas->drawTexture(texture.get(), &paint);
+  canvas->drawTexture(texture, &paint);
 
   canvas->concat(tgfx::Matrix::MakeTrans(imageWidth + padding, 0));
   paint.setImageFilter(ImageFilter::DropShadowOnly(0, 0, 15, 15, tgfx::Color::White()));
-  canvas->drawTexture(texture.get(), &paint);
+  canvas->drawTexture(texture, &paint);
 
   canvas->concat(tgfx::Matrix::MakeTrans(-imageWidth - padding, imageWidth + padding));
   paint.setImageFilter(ImageFilter::DropShadow(0, 0, 15, 15, tgfx::Color::White()));
-  canvas->drawTexture(texture.get(), &paint);
+  canvas->drawTexture(texture, &paint);
 
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/dropShadow"));
   device->unlock();

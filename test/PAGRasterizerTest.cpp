@@ -56,7 +56,7 @@ PAG_TEST(PAGRasterizerTest, TestRasterizer) {
   auto surface = Surface::Make(context, mask->width(), mask->height());
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
-  canvas->drawTexture(texture.get());
+  canvas->drawTexture(texture);
   auto pixelBuffer = PixelBuffer::Make(mask->width(), mask->height(), true, false);
   ASSERT_TRUE(pixelBuffer != nullptr);
   Bitmap bitmap(pixelBuffer);

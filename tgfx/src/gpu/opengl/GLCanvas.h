@@ -37,11 +37,12 @@ class GLCanvas : public Canvas {
   ~GLCanvas() override;
 
   void clear() override;
-  void drawTexture(const Texture* texture, const RGBAAALayout* layout, const Paint& paint) override;
+  void drawTexture(std::shared_ptr<Texture> texture, const RGBAAALayout* layout,
+                   const Paint& paint) override;
   void drawPath(const Path& path, const Paint& paint) override;
   void drawGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
                   const Font& font, const Paint& paint) override;
-  void drawAtlas(const Texture* atlas, const Matrix matrix[], const Rect tex[],
+  void drawAtlas(std::shared_ptr<Texture> atlas, const Matrix matrix[], const Rect tex[],
                  const Color colors[], size_t count) override;
   void drawMesh(const Mesh* mesh, const Paint& paint) override;
 
@@ -60,13 +61,13 @@ class GLCanvas : public Canvas {
   uint32_t clipID = kDefaultClipID;
   GLSurfaceDrawContext* drawContext = nullptr;
 
-  Texture* getClipTexture();
+  std::shared_ptr<Texture> getClipTexture();
 
   std::unique_ptr<FragmentProcessor> getClipMask(const Rect& deviceBounds, Rect* scissorRect);
 
   Rect clipLocalBounds(Rect localBounds);
 
-  void drawMask(const Rect& bounds, const Texture* mask, const Paint& paint);
+  void drawMask(const Rect& bounds, std::shared_ptr<Texture> mask, const Paint& paint);
 
   void drawColorGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
                        const Font& font, const Paint& paint);

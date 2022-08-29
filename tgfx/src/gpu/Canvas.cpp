@@ -108,15 +108,15 @@ void Canvas::drawRect(const Rect& rect, const Paint& paint) {
   drawPath(path, paint);
 }
 
-void Canvas::drawTexture(const Texture* texture, const Matrix& matrix) {
+void Canvas::drawTexture(std::shared_ptr<Texture> texture, const Matrix& matrix) {
   auto oldMatrix = getMatrix();
   concat(matrix);
-  drawTexture(texture);
+  drawTexture(std::move(texture));
   setMatrix(oldMatrix);
 }
 
-void Canvas::drawTexture(const Texture* texture, const Paint* paint) {
-  drawTexture(texture, nullptr, paint);
+void Canvas::drawTexture(std::shared_ptr<Texture> texture, const Paint* paint) {
+  drawTexture(std::move(texture), nullptr, paint);
 }
 
 static Paint CleanPaintForDrawTexture(const Paint* paint) {
@@ -128,7 +128,8 @@ static Paint CleanPaintForDrawTexture(const Paint* paint) {
   return cleaned;
 }
 
-void Canvas::drawTexture(const Texture* texture, const RGBAAALayout* layout, const Paint* paint) {
+void Canvas::drawTexture(std::shared_ptr<Texture> texture, const RGBAAALayout* layout,
+                         const Paint* paint) {
   auto realPaint = CleanPaintForDrawTexture(paint);
   std::shared_ptr<Texture> result;
   auto oldMatrix = getMatrix();
@@ -141,11 +142,10 @@ void Canvas::drawTexture(const Texture* texture, const RGBAAALayout* layout, con
     inverted.mapRect(&clipBounds);
     ImageFilterContext context(getContext(), oldMatrix, clipBounds, texture);
     auto [image, offset] = realPaint.getImageFilter()->filterImage(context);
-    result = image;
-    texture = result.get();
+    texture = image;
     concat(Matrix::MakeTrans(offset.x, offset.y));
   }
-  drawTexture(texture, layout, realPaint);
+  drawTexture(std::move(texture), layout, realPaint);
   setMatrix(oldMatrix);
 }
 

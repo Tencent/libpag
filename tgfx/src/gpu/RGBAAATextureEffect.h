@@ -25,7 +25,7 @@
 namespace tgfx {
 class RGBAAATextureEffect : public FragmentProcessor {
  public:
-  static std::unique_ptr<FragmentProcessor> Make(const Texture* texture,
+  static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<Texture> texture,
                                                  const Matrix& localMatrix = Matrix::I(),
                                                  const RGBAAALayout* layout = nullptr);
 
@@ -34,7 +34,7 @@ class RGBAAATextureEffect : public FragmentProcessor {
   }
 
  private:
-  RGBAAATextureEffect(const Texture* texture, const RGBAAALayout* layout,
+  RGBAAATextureEffect(std::shared_ptr<Texture> texture, const RGBAAALayout* layout,
                       const Matrix& localMatrix);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
@@ -45,7 +45,7 @@ class RGBAAATextureEffect : public FragmentProcessor {
     return texture->getSampler();
   }
 
-  const Texture* texture;
+  std::shared_ptr<Texture> texture;
   const RGBAAALayout* layout;
   CoordTransform coordTransform;
 

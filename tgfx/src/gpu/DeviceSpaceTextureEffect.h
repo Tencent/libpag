@@ -23,7 +23,7 @@
 namespace tgfx {
 class DeviceSpaceTextureEffect : public FragmentProcessor {
  public:
-  static std::unique_ptr<DeviceSpaceTextureEffect> Make(const Texture* texture,
+  static std::unique_ptr<DeviceSpaceTextureEffect> Make(std::shared_ptr<Texture> texture,
                                                         ImageOrigin deviceOrigin);
 
   std::string name() const override {
@@ -31,7 +31,7 @@ class DeviceSpaceTextureEffect : public FragmentProcessor {
   }
 
  private:
-  DeviceSpaceTextureEffect(const Texture* texture, ImageOrigin deviceOrigin);
+  DeviceSpaceTextureEffect(std::shared_ptr<Texture> texture, ImageOrigin deviceOrigin);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
@@ -41,7 +41,7 @@ class DeviceSpaceTextureEffect : public FragmentProcessor {
     return texture->getSampler();
   }
 
-  const Texture* texture;
+  std::shared_ptr<Texture> texture;
   Matrix deviceCoordMatrix = Matrix::I();
 
   friend class GLDeviceSpaceTextureEffect;

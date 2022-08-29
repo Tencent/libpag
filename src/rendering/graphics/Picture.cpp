@@ -26,28 +26,28 @@
 
 namespace pag {
 // 若当前直接绘制纹理性能是最好的，就直接绘制，否则返回 false。
-static bool TryDrawDirectly(tgfx::Canvas* canvas, const tgfx::Texture* texture,
+static bool TryDrawDirectly(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Texture> texture,
                             const tgfx::RGBAAALayout* layout) {
   if (texture == nullptr) {
     return false;
   }
   if (!texture->isYUV() && layout == nullptr) {
     // RGBA 纹理始终可以直接上屏。
-    canvas->drawTexture(texture);
+    canvas->drawTexture(std::move(texture));
     return true;
   }
   auto totalMatrix = canvas->getMatrix();
   auto scaleFactor = GetMaxScaleFactor(totalMatrix);
   if (scaleFactor <= 1.0f) {
     // 纹理格式为 YUV 或含有 RGBAAALayout 时在缩放值小于等于 1.0f 时才直接上屏会有更好的性能。
-    canvas->drawTexture(texture, layout);
+    canvas->drawTexture(std::move(texture), layout);
     return true;
   }
   return false;
 }
 
 // 强制直接绘制纹理到 canvas。
-static void DrawDirectly(tgfx::Canvas* canvas, const tgfx::Texture* texture,
+static void DrawDirectly(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Texture> texture,
                          const tgfx::RGBAAALayout* layout) {
   if (texture == nullptr || TryDrawDirectly(canvas, texture, layout)) {
     return;
@@ -59,26 +59,27 @@ static void DrawDirectly(tgfx::Canvas* canvas, const tgfx::Texture* texture,
     return;
   }
   auto newCanvas = surface->getCanvas();
-  newCanvas->drawTexture(texture, layout);
-  canvas->drawTexture(surface->getTexture().get());
+  newCanvas->drawTexture(std::move(texture), layout);
+  canvas->drawTexture(surface->getTexture());
   // 防止临时纹理析构
   canvas->flush();
 }
 
-static std::shared_ptr<tgfx::Texture> RescaleTexture(tgfx::Context* context, tgfx::Texture* texture,
+static std::shared_ptr<tgfx::Texture> RescaleTexture(tgfx::Context* context,
+                                                     std::shared_ptr<tgfx::Texture> texture,
                                                      float scaleFactor) {
   if (texture == nullptr || scaleFactor == 0) {
     return nullptr;
   }
-  auto width = static_cast<int>(ceilf(texture->width() * scaleFactor));
-  auto height = static_cast<int>(ceilf(texture->height() * scaleFactor));
+  auto width = static_cast<int>(ceilf(static_cast<float>(texture->width()) * scaleFactor));
+  auto height = static_cast<int>(ceilf(static_cast<float>(texture->height()) * scaleFactor));
   auto surface = tgfx::Surface::Make(context, width, height);
   if (surface == nullptr) {
     return nullptr;
   }
   auto canvas = surface->getCanvas();
   canvas->setMatrix(tgfx::Matrix::MakeScale(scaleFactor));
-  canvas->drawTexture(texture);
+  canvas->drawTexture(std::move(texture));
   return surface->getTexture();
 }
 
@@ -113,7 +114,7 @@ class TextureProxyPicture : public Picture {
     }
     auto canvas = surface->getCanvas();
     canvas->setMatrix(tgfx::Matrix::MakeTrans(-x, -y));
-    canvas->drawTexture(texture.get());
+    canvas->drawTexture(std::move(texture));
     return surface->hitTest(0, 0);
   }
 
@@ -129,18 +130,16 @@ class TextureProxyPicture : public Picture {
     auto oldMatrix = canvas->getMatrix();
     canvas->concat(extraMatrix);
     if (proxy->cacheEnabled()) {
-      auto texture = proxy->getTexture(cache);
-      if (TryDrawDirectly(canvas, texture.get(), nullptr)) {
+      if (TryDrawDirectly(canvas, proxy->getTexture(cache), nullptr)) {
         canvas->setMatrix(oldMatrix);
         return;
       }
     }
     auto snapshot = cache->getSnapshot(this);
     if (snapshot) {
-      canvas->drawTexture(snapshot->getTexture().get(), snapshot->getMatrix());
+      canvas->drawTexture(snapshot->getTexture(), snapshot->getMatrix());
     } else {
-      auto texture = proxy->getTexture(cache);
-      DrawDirectly(canvas, texture.get(), nullptr);
+      DrawDirectly(canvas, proxy->getTexture(cache), nullptr);
     }
     canvas->setMatrix(oldMatrix);
   }
@@ -164,7 +163,7 @@ class TextureProxyPicture : public Picture {
       return nullptr;
     }
     if (scaleFactor != 1.0f || texture->isYUV()) {
-      texture = RescaleTexture(cache->getContext(), texture.get(), scaleFactor);
+      texture = RescaleTexture(cache->getContext(), texture, scaleFactor);
     }
     if (texture == nullptr) {
       return nullptr;
@@ -198,7 +197,6 @@ class RGBAAAPicture : public Picture {
     if (snapshot) {
       return snapshot->hitTest(cache, x, y);
     }
-    auto texture = proxy->getTexture(cache);
     auto surface = tgfx::Surface::Make(cache->getContext(), 1, 1);
     if (surface == nullptr) {
       return false;
@@ -206,7 +204,7 @@ class RGBAAAPicture : public Picture {
     auto canvas = surface->getCanvas();
     auto matrix = tgfx::Matrix::MakeTrans(static_cast<float>(-x), static_cast<float>(-y));
     canvas->setMatrix(matrix);
-    canvas->drawTexture(texture.get(), &layout);
+    canvas->drawTexture(proxy->getTexture(cache), &layout);
     return surface->hitTest(0, 0);
   }
 
@@ -222,8 +220,7 @@ class RGBAAAPicture : public Picture {
     if (proxy->cacheEnabled()) {
       // proxy在纯静态视频序列帧中不会缓存解码器
       // 如果将texture获取放在snapshot获取之前，会导致每帧都创建解码器
-      auto texture = proxy->getTexture(cache);
-      if (TryDrawDirectly(canvas, texture.get(), &layout)) {
+      if (TryDrawDirectly(canvas, proxy->getTexture(cache), &layout)) {
         return;
       }
     }
@@ -231,11 +228,10 @@ class RGBAAAPicture : public Picture {
     canvas->flush();
     auto snapshot = cache->getSnapshot(this);
     if (snapshot) {
-      canvas->drawTexture(snapshot->getTexture().get(), snapshot->getMatrix());
+      canvas->drawTexture(snapshot->getTexture(), snapshot->getMatrix());
       return;
     }
-    auto texture = proxy->getTexture(cache);
-    DrawDirectly(canvas, texture.get(), &layout);
+    DrawDirectly(canvas, proxy->getTexture(cache), &layout);
   }
 
  private:
@@ -254,10 +250,9 @@ class RGBAAAPicture : public Picture {
     if (surface == nullptr) {
       return nullptr;
     }
-    auto texture = proxy->getTexture(cache);
     auto canvas = surface->getCanvas();
     canvas->setMatrix(tgfx::Matrix::MakeScale(scaleFactor));
-    canvas->drawTexture(texture.get(), &layout);
+    canvas->drawTexture(proxy->getTexture(cache), &layout);
     auto snapshot = new Snapshot(surface->getTexture(), tgfx::Matrix::MakeScale(1 / scaleFactor));
     return std::unique_ptr<Snapshot>(snapshot);
   }
@@ -310,7 +305,7 @@ class SnapshotPicture : public Picture {
       graphic->draw(canvas, cache);
       return;
     }
-    canvas->drawTexture(snapshot->getTexture().get(), snapshot->getMatrix());
+    canvas->drawTexture(snapshot->getTexture(), snapshot->getMatrix());
   }
 
  protected:

@@ -48,7 +48,7 @@ bool Snapshot::hitTest(RenderCache* cache, float x, float y) const {
   auto canvas = surface->getCanvas();
   canvas->setMatrix(tgfx::Matrix::MakeTrans(-local.x, -local.y));
   if (texture) {
-    canvas->drawTexture(texture.get());
+    canvas->drawTexture(texture);
   } else if (mesh) {
     tgfx::Paint paint;
     paint.setColor(tgfx::Color::White());

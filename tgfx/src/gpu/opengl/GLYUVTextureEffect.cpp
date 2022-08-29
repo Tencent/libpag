@@ -25,7 +25,7 @@ void GLYUVTextureEffect::emitCode(EmitArgs& args) {
   auto* fragBuilder = args.fragBuilder;
   auto* uniformHandler = args.uniformHandler;
 
-  auto yuvTexture = static_cast<const YUVTexture*>(yuvFP->texture);
+  auto yuvTexture = yuvFP->texture;
   fragBuilder->codeAppend("vec3 yuv;");
   fragBuilder->codeAppend("yuv.x = ");
   fragBuilder->appendTextureLookup((*args.textureSamplers)[0], (*args.transformedCoords)[0].name());

@@ -77,7 +77,7 @@ std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrine
       std::max(std::get<0>(x), std::get<0>(y)), tileMode, cropRect);
 }
 
-void BlurImageFilter::draw(const Texture* texture, Surface* toSurface, bool isDown) {
+void BlurImageFilter::draw(std::shared_ptr<Texture> texture, Surface* toSurface, bool isDown) {
   auto drawContext = SurfaceDrawContext::Make(toSurface);
   auto dstRect =
       Rect::MakeWH(static_cast<float>(toSurface->width()), static_cast<float>(toSurface->height()));
@@ -89,11 +89,11 @@ void BlurImageFilter::draw(const Texture* texture, Surface* toSurface, bool isDo
       dstRect, localMatrix,
       DualBlurFragmentProcessor::Make(
           isDown ? DualBlurPassMode::Down : DualBlurPassMode::Up,
-          TextureEffect::Make(toSurface->getContext(), texture, SamplerState(tileMode)), blurOffset,
-          texelSize));
+          TextureEffect::Make(toSurface->getContext(), std::move(texture), SamplerState(tileMode)),
+          blurOffset, texelSize));
 }
 
-static std::shared_ptr<Texture> ExtendImage(Context* context, const Texture* image,
+static std::shared_ptr<Texture> ExtendImage(Context* context, std::shared_ptr<Texture> image,
                                             const Rect& dstBounds, TileMode tileMode) {
   auto dstWidth = dstBounds.width();
   auto dstHeight = dstBounds.height();
@@ -105,8 +105,8 @@ static std::shared_ptr<Texture> ExtendImage(Context* context, const Texture* ima
   auto localMatrix = Matrix::MakeScale(dstBounds.width(), dstBounds.height());
   localMatrix.postTranslate(dstBounds.left, dstBounds.top);
   auto dstRect = Rect::MakeWH(dstBounds.width(), dstBounds.height());
-  drawContext->fillRectWithFP(dstRect, localMatrix,
-                              TextureEffect::Make(context, image, SamplerState(tileMode)));
+  drawContext->fillRectWithFP(
+      dstRect, localMatrix, TextureEffect::Make(context, std::move(image), SamplerState(tileMode)));
   return surface->getTexture();
 }
 
@@ -133,7 +133,7 @@ std::pair<std::shared_ptr<Texture>, Point> BlurImageFilter::filterImage(
     if (last == nullptr) {
       return {};
     }
-    image = last.get();
+    image = last;
   }
   auto dstOffset = Point::Make(dstBounds.x(), dstBounds.y());
   int tw = static_cast<int>(dstBounds.width() * downScaling);
@@ -149,7 +149,7 @@ std::pair<std::shared_ptr<Texture>, Point> BlurImageFilter::filterImage(
     upSurfaces.emplace_back(tw, th);
     draw(image, surface.get(), true);
     last = surface->getTexture();
-    image = last.get();
+    image = last;
     tw = std::max(static_cast<int>(static_cast<float>(tw) * downScaling), 1);
     th = std::max(static_cast<int>(static_cast<float>(th) * downScaling), 1);
   }
@@ -160,7 +160,7 @@ std::pair<std::shared_ptr<Texture>, Point> BlurImageFilter::filterImage(
     if (surface == nullptr) {
       return {};
     }
-    draw(last.get(), surface.get(), false);
+    draw(last, surface.get(), false);
     last = surface->getTexture();
   }
   return {last, dstOffset};

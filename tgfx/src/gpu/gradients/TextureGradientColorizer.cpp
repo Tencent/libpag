@@ -21,8 +21,10 @@
 #include "gpu/opengl/GLTextureGradientColorizer.h"
 
 namespace tgfx {
-std::unique_ptr<TextureGradientColorizer> TextureGradientColorizer::Make(const Texture* gradient) {
-  return std::unique_ptr<TextureGradientColorizer>(new TextureGradientColorizer(gradient));
+std::unique_ptr<TextureGradientColorizer> TextureGradientColorizer::Make(
+    std::shared_ptr<Texture> gradient) {
+  return std::unique_ptr<TextureGradientColorizer>(
+      new TextureGradientColorizer(std::move(gradient)));
 }
 
 void TextureGradientColorizer::onComputeProcessorKey(BytesKey* bytesKey) const {
