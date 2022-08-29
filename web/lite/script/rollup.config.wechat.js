@@ -4,7 +4,6 @@ import babel from '@rollup/plugin-babel';
 import { terser } from 'rollup-plugin-terser';
 import esbuild from 'rollup-plugin-esbuild';
 
-
 const banner = `/////////////////////////////////////////////////////////////////////////////////////////////////
 //
 //  Tencent is pleased to support the open source community by making libpag available.
@@ -43,14 +42,8 @@ const plugins = (needBabel = false, needTerser = false) => {
 
 const cjsConfig = {
   input: 'src/wechat/pag.ts',
-  output: { banner, file: 'wechat/lib/pag.cjs.js', format: 'cjs', exports: 'auto', sourcemap: true },
-  plugins: plugins(false, false),
+  output: { banner, file: 'wechat/lib/pag.js', format: 'cjs', exports: 'auto', sourcemap: true },
+  plugins: plugins(false, true),
 };
 
-const esmConfig = {
-  input: 'src/wechat/pag.ts',
-  output: { banner, file: 'wechat/lib/pag.esm.js', format: 'esm', sourcemap: true },
-  plugins: plugins(false, false),
-};
-
-export default [cjsConfig, esmConfig];
+export default [cjsConfig];

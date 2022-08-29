@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.0.5
+
+### Feature
+
+- 发布支持小程序编译的 NPM 包
+
 ## 0.0.4
 
 ### Feature
