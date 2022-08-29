@@ -157,7 +157,7 @@ PAG_TEST_F(PAGImageTest, BottomLeftMask) {
   auto canvas = surface->getCanvas();
   tgfx::Paint paint;
   paint.setMaskFilter(tgfx::MaskFilter::Make(tgfx::Shader::MakeTextureShader(image2)));
-  canvas->drawTexture(image1.get(), &paint);
+  canvas->drawTexture(image1, &paint);
   auto pixelBuffer = PixelBuffer::Make(width, height);
   ASSERT_TRUE(pixelBuffer != nullptr);
   Bitmap bitmap(pixelBuffer);

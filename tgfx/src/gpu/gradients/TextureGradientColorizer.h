@@ -25,7 +25,7 @@
 namespace tgfx {
 class TextureGradientColorizer : public FragmentProcessor {
  public:
-  static std::unique_ptr<TextureGradientColorizer> Make(const Texture* gradient);
+  static std::unique_ptr<TextureGradientColorizer> Make(std::shared_ptr<Texture> gradient);
 
   std::string name() const override {
     return "TextureGradientColorizer";
@@ -36,7 +36,8 @@ class TextureGradientColorizer : public FragmentProcessor {
   std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
 
  private:
-  explicit TextureGradientColorizer(const Texture* gradient) : gradient(gradient) {
+  explicit TextureGradientColorizer(std::shared_ptr<Texture> gradient)
+      : gradient(std::move(gradient)) {
     setTextureSamplerCnt(1);
   }
 
@@ -44,7 +45,7 @@ class TextureGradientColorizer : public FragmentProcessor {
     return gradient->getSampler();
   }
 
-  const Texture* gradient;
+  std::shared_ptr<Texture> gradient;
 
   friend class GLTextureGradientColorizer;
 };

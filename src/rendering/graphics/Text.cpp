@@ -276,8 +276,8 @@ static void Draw(tgfx::Canvas* canvas, const TextAtlas* atlas, const Parameters&
   if (parameters.matrices.empty()) {
     return;
   }
-  auto atlasTexture = atlas->getAtlasTexture(parameters.textureIndex);
-  canvas->drawAtlas(atlasTexture.get(), &parameters.matrices[0], &parameters.rects[0],
+  canvas->drawAtlas(atlas->getAtlasTexture(parameters.textureIndex), &parameters.matrices[0],
+                    &parameters.rects[0],
                     parameters.colors.empty() ? nullptr : &parameters.colors[0],
                     parameters.matrices.size());
 }

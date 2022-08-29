@@ -24,7 +24,8 @@
 namespace tgfx {
 class TextureEffect : public FragmentProcessor {
  public:
-  static std::unique_ptr<FragmentProcessor> Make(const Context* context, const Texture* texture,
+  static std::unique_ptr<FragmentProcessor> Make(const Context* context,
+                                                 std::shared_ptr<Texture> texture,
                                                  SamplerState samplerState = {},
                                                  const Matrix& localMatrix = Matrix::I());
 
@@ -43,7 +44,8 @@ class TextureEffect : public FragmentProcessor {
     ClampToBorder
   };
 
-  TextureEffect(const Texture* texture, const Sampling& sampling, const Matrix& localMatrix);
+  TextureEffect(std::shared_ptr<Texture> texture, const Sampling& sampling,
+                const Matrix& localMatrix);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
@@ -59,7 +61,7 @@ class TextureEffect : public FragmentProcessor {
 
   static ShaderMode GetShaderMode(SamplerState::WrapMode mode);
 
-  const Texture* texture;
+  std::shared_ptr<Texture> texture;
   SamplerState samplerState;
   Rect subset;
   Rect clamp;

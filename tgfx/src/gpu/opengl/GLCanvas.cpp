@@ -103,7 +103,7 @@ void GLCanvas::clear() {
   renderTarget->clear();
 }
 
-Texture* GLCanvas::getClipTexture() {
+std::shared_ptr<Texture> GLCanvas::getClipTexture() {
   if (_clipSurface == nullptr) {
     _clipSurface = Surface::Make(getContext(), surface->width(), surface->height(), true);
     if (_clipSurface == nullptr) {
@@ -121,7 +121,7 @@ Texture* GLCanvas::getClipTexture() {
     clipCanvas->drawPath(state->clip, paint);
     clipID = state->clipID;
   }
-  return _clipSurface->getTexture().get();
+  return _clipSurface->getTexture();
 }
 
 static constexpr float BOUNDS_TO_LERANCE = 1e-3f;
@@ -180,7 +180,8 @@ Rect GLCanvas::clipLocalBounds(Rect localBounds) {
   return clippedLocalBounds;
 }
 
-void GLCanvas::drawTexture(const Texture* texture, const RGBAAALayout* layout, const Paint& paint) {
+void GLCanvas::drawTexture(std::shared_ptr<Texture> texture, const RGBAAALayout* layout,
+                           const Paint& paint) {
   if (texture == nullptr) {
     return;
   }
@@ -283,11 +284,10 @@ void GLCanvas::fillPath(const Path& path, const Paint& paint) {
   totalMatrix.postConcat(matrix);
   mask->setMatrix(totalMatrix);
   mask->fillPath(path);
-  auto maskTexture = mask->makeTexture(getContext());
-  drawMask(deviceBounds, maskTexture.get(), paint);
+  drawMask(deviceBounds, mask->makeTexture(getContext()), paint);
 }
 
-void GLCanvas::drawMask(const Rect& bounds, const Texture* mask, const Paint& paint) {
+void GLCanvas::drawMask(const Rect& bounds, std::shared_ptr<Texture> mask, const Paint& paint) {
   if (mask == nullptr) {
     return;
   }
@@ -311,8 +311,8 @@ void GLCanvas::drawMask(const Rect& bounds, const Texture* mask, const Paint& pa
   if (!PaintToGLPaint(getContext(), paint, state->alpha, nullptr, &glPaint)) {
     return;
   }
-  glPaint.coverageFragmentProcessors.emplace_back(
-      FragmentProcessor::MulInputByChildAlpha(RGBAAATextureEffect::Make(mask, maskLocalMatrix)));
+  glPaint.coverageFragmentProcessors.emplace_back(FragmentProcessor::MulInputByChildAlpha(
+      RGBAAATextureEffect::Make(std::move(mask), maskLocalMatrix)));
   draw(GLFillRectOp::Make(bounds, state->matrix, localMatrix), std::move(glPaint));
   setMatrix(oldMatrix);
 }
@@ -366,8 +366,7 @@ void GLCanvas::drawColorGlyphs(const GlyphID glyphIDs[], const Point positions[]
     glyphMatrix.postTranslate(position.x, position.y);
     save();
     concat(glyphMatrix);
-    auto texture = glyphBuffer->makeTexture(getContext());
-    Canvas::drawTexture(texture.get(), &paint);
+    Canvas::drawTexture(glyphBuffer->makeTexture(getContext()), &paint);
     restore();
   }
 }
@@ -401,11 +400,10 @@ void GLCanvas::drawMaskGlyphs(TextBlob* textBlob, const Paint& paint) {
   } else {
     mask->fillText(textBlob);
   }
-  auto texture = mask->makeTexture(getContext());
-  drawMask(deviceBounds, texture.get(), paint);
+  drawMask(deviceBounds, mask->makeTexture(getContext()), paint);
 }
 
-void GLCanvas::drawAtlas(const Texture* atlas, const Matrix matrix[], const Rect tex[],
+void GLCanvas::drawAtlas(std::shared_ptr<Texture> atlas, const Matrix matrix[], const Rect tex[],
                          const Color colors[], size_t count) {
   if (atlas == nullptr || count == 0) {
     return;

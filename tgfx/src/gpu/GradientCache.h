@@ -33,14 +33,14 @@ class GradientCache {
   explicit GradientCache(Context* context) : context(context) {
   }
 
-  const Texture* getGradient(const Color* colors, const float* positions, int count);
+  std::shared_ptr<Texture> getGradient(const Color* colors, const float* positions, int count);
 
   void releaseAll();
 
   bool empty() const;
 
  private:
-  const Texture* find(const BytesKey& bytesKey);
+  std::shared_ptr<Texture> find(const BytesKey& bytesKey);
 
   void add(const BytesKey& bytesKey, std::shared_ptr<Texture> texture);
 

@@ -122,7 +122,7 @@ void DropShadowFilter::onDrawModeNotSpread(tgfx::Context* context, const FilterS
   paint.setImageFilter(tgfx::ImageFilter::DropShadowOnly(
       offsetX * source->scale.x, offsetY * source->scale.y, blurXSize * source->scale.x,
       blurYSize * source->scale.y, color));
-  targetCanvas->drawTexture(texture.get(), &paint);
+  targetCanvas->drawTexture(std::move(texture), &paint);
 }
 
 void DropShadowFilter::onDrawModeNotFullSpread(tgfx::Context* context, const FilterSource* source,
@@ -165,7 +165,7 @@ void DropShadowFilter::onDrawModeNotFullSpread(tgfx::Context* context, const Fil
   paint.setImageFilter(tgfx::ImageFilter::DropShadowOnly(
       offsetX * source->scale.x, offsetY * source->scale.y, blurXSize * source->scale.x,
       blurYSize * source->scale.y, color));
-  targetCanvas->drawTexture(texture.get(), &paint);
+  targetCanvas->drawTexture(std::move(texture), &paint);
 }
 
 void DropShadowFilter::onDrawModeFullSpread(tgfx::Context* context, const FilterSource* source,

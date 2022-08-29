@@ -22,7 +22,7 @@
 #include "opengl/GLRGBAAATextureEffect.h"
 
 namespace tgfx {
-std::unique_ptr<FragmentProcessor> RGBAAATextureEffect::Make(const Texture* texture,
+std::unique_ptr<FragmentProcessor> RGBAAATextureEffect::Make(std::shared_ptr<Texture> texture,
                                                              const Matrix& localMatrix,
                                                              const RGBAAALayout* layout) {
   if (texture == nullptr) {
@@ -41,14 +41,14 @@ std::unique_ptr<FragmentProcessor> RGBAAATextureEffect::Make(const Texture* text
   }
   if (texture->isYUV()) {
     return std::unique_ptr<YUVTextureEffect>(
-        new YUVTextureEffect(static_cast<const YUVTexture*>(texture), layout, matrix));
+        new YUVTextureEffect(std::static_pointer_cast<YUVTexture>(texture), layout, matrix));
   }
   return std::unique_ptr<RGBAAATextureEffect>(new RGBAAATextureEffect(texture, layout, matrix));
 }
 
-RGBAAATextureEffect::RGBAAATextureEffect(const Texture* texture, const RGBAAALayout* layout,
-                                         const Matrix& localMatrix)
-    : texture(texture), layout(layout), coordTransform(localMatrix) {
+RGBAAATextureEffect::RGBAAATextureEffect(std::shared_ptr<Texture> texture,
+                                         const RGBAAALayout* layout, const Matrix& localMatrix)
+    : texture(std::move(texture)), layout(layout), coordTransform(localMatrix) {
   setTextureSamplerCnt(1);
   addCoordTransform(&coordTransform);
 }

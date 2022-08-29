@@ -60,7 +60,7 @@ void GaussianBlurFilter::draw(tgfx::Context* context, const FilterSource* source
   targetCanvas->setMatrix(ToMatrix(target));
   tgfx::Paint paint;
   paint.setImageFilter(blurFilter);
-  targetCanvas->drawTexture(texture.get(), &paint);
+  targetCanvas->drawTexture(std::move(texture), &paint);
   targetCanvas->restore();
 }
 }  // namespace pag

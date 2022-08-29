@@ -496,8 +496,7 @@ void FilterRenderer::DrawWithFilter(tgfx::Canvas* parentCanvas, RenderCache* cac
     if (!targetCanvas->getMatrix().invert(&drawingMatrix)) {
       drawingMatrix.setIdentity();
     }
-    auto targetTexture = targetSurface->getTexture();
-    parentCanvas->drawTexture(targetTexture.get(), drawingMatrix);
+    parentCanvas->drawTexture(targetSurface->getTexture(), drawingMatrix);
   }
 }
 }  // namespace pag

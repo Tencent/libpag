@@ -21,24 +21,25 @@
 #include "opengl/GLDeviceSpaceTextureEffect.h"
 
 namespace tgfx {
-std::unique_ptr<DeviceSpaceTextureEffect> DeviceSpaceTextureEffect::Make(const Texture* texture,
-                                                                         ImageOrigin deviceOrigin) {
+std::unique_ptr<DeviceSpaceTextureEffect> DeviceSpaceTextureEffect::Make(
+    std::shared_ptr<Texture> texture, ImageOrigin deviceOrigin) {
   if (texture == nullptr) {
     return nullptr;
   }
   return std::unique_ptr<DeviceSpaceTextureEffect>(
-      new DeviceSpaceTextureEffect(texture, deviceOrigin));
+      new DeviceSpaceTextureEffect(std::move(texture), deviceOrigin));
 }
 
-DeviceSpaceTextureEffect::DeviceSpaceTextureEffect(const Texture* texture, ImageOrigin deviceOrigin)
-    : texture(texture) {
+DeviceSpaceTextureEffect::DeviceSpaceTextureEffect(std::shared_ptr<Texture> texture,
+                                                   ImageOrigin deviceOrigin)
+    : texture(std::move(texture)) {
   setTextureSamplerCnt(1);
   if (deviceOrigin == ImageOrigin::BottomLeft) {
     deviceCoordMatrix.postScale(1, -1);
     deviceCoordMatrix.postTranslate(0, 1);
   }
-  auto scale = texture->getTextureCoord(static_cast<float>(texture->width()),
-                                        static_cast<float>(texture->height()));
+  auto scale = this->texture->getTextureCoord(static_cast<float>(this->texture->width()),
+                                              static_cast<float>(this->texture->height()));
   deviceCoordMatrix.postScale(scale.x, scale.y);
 }
 

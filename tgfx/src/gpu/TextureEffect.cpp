@@ -105,7 +105,7 @@ TextureEffect::Sampling::Sampling(const Texture* texture, SamplerState sampler, 
 }
 
 std::unique_ptr<FragmentProcessor> TextureEffect::Make(const Context* context,
-                                                       const Texture* texture,
+                                                       std::shared_ptr<Texture> texture,
                                                        SamplerState samplerState,
                                                        const Matrix& localMatrix) {
   if (texture == nullptr) {
@@ -124,13 +124,13 @@ std::unique_ptr<FragmentProcessor> TextureEffect::Make(const Context* context,
   }
   auto subset =
       Rect::MakeWH(static_cast<float>(texture->width()), static_cast<float>(texture->height()));
-  Sampling sampling(texture, samplerState, subset, context->caps());
-  return std::unique_ptr<TextureEffect>(new TextureEffect(texture, sampling, matrix));
+  Sampling sampling(texture.get(), samplerState, subset, context->caps());
+  return std::unique_ptr<TextureEffect>(new TextureEffect(std::move(texture), sampling, matrix));
 }
 
-TextureEffect::TextureEffect(const Texture* texture, const Sampling& sampling,
+TextureEffect::TextureEffect(std::shared_ptr<Texture> texture, const Sampling& sampling,
                              const Matrix& localMatrix)
-    : texture(texture),
+    : texture(std::move(texture)),
       samplerState(sampling.hwSampler),
       subset(sampling.shaderSubset),
       clamp(sampling.shaderClamp),

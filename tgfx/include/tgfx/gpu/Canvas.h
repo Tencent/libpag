@@ -143,7 +143,7 @@ class Canvas {
    * Draws a Texture, with its top-left corner at (0, 0), using current alpha, blend mode, clip and
    * matrix premultiplied with existing Matrix.
    */
-  void drawTexture(const Texture* texture, const Matrix& matrix);
+  void drawTexture(std::shared_ptr<Texture> texture, const Matrix& matrix);
 
   /**
    * Draws a Texture, with its top-left corner at (0, 0), using current alpha, blend mode, clip,
@@ -152,7 +152,7 @@ class Canvas {
    * If paint is supplied, apply ColorFilter and alpha. If texture is Alpha8, apply Shader. If paint
    * contains MaskFilter, generate mask from image bounds.
    */
-  void drawTexture(const Texture* texture, const Paint* paint = nullptr);
+  void drawTexture(std::shared_ptr<Texture> texture, const Paint* paint = nullptr);
 
   /**
    * Draws a RGBAAA layout Texture, with its top-left corner at (0, 0), using current alpha, blend
@@ -161,7 +161,7 @@ class Canvas {
    * If paint is supplied, apply ColorFilter and alpha. If texture is Alpha8, apply Shader. If paint
    * contains MaskFilter, generate mask from image bounds.
    */
-  void drawTexture(const Texture* texture, const RGBAAALayout* layout,
+  void drawTexture(std::shared_ptr<Texture> texture, const RGBAAALayout* layout,
                    const Paint* paint = nullptr);
 
   /**
@@ -182,7 +182,7 @@ class Canvas {
 
   // TODO(pengweilv): Support blend mode, atlas as source, colors as destination, colors can be
   //  nullptr.
-  virtual void drawAtlas(const Texture* atlas, const Matrix matrix[], const Rect tex[],
+  virtual void drawAtlas(std::shared_ptr<Texture> atlas, const Matrix matrix[], const Rect tex[],
                          const Color colors[], size_t count) = 0;
 
   /**
@@ -201,7 +201,7 @@ class Canvas {
   virtual void onClipPath(const Path& path) = 0;
 
  private:
-  virtual void drawTexture(const Texture* texture, const RGBAAALayout* layout,
+  virtual void drawTexture(std::shared_ptr<Texture> texture, const RGBAAALayout* layout,
                            const Paint& paint) = 0;
 
   std::vector<std::shared_ptr<CanvasState>> savedStateList = {};

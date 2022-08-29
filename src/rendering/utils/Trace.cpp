@@ -26,7 +26,7 @@ void Trace(std::shared_ptr<tgfx::PixelBuffer> pixelBuffer, const std::string& ta
   Trace(bitmap, tag);
 }
 
-void Trace(const tgfx::Texture* texture, const std::string& path) {
+void Trace(std::shared_ptr<tgfx::Texture> texture, const std::string& path) {
   if (texture == nullptr) {
     return;
   }
@@ -35,8 +35,8 @@ void Trace(const tgfx::Texture* texture, const std::string& path) {
     return;
   }
   auto canvas = surface->getCanvas();
-  canvas->drawTexture(texture);
-  auto pixelBuffer = tgfx::PixelBuffer::Make(texture->width(), texture->height());
+  canvas->drawTexture(std::move(texture));
+  auto pixelBuffer = tgfx::PixelBuffer::Make(surface->width(), surface->height());
   tgfx::Bitmap bitmap(pixelBuffer);
   if (bitmap.isEmpty()) {
     return;

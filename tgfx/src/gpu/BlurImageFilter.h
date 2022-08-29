@@ -39,7 +39,7 @@ class BlurImageFilter : public ImageFilter {
  private:
   Rect onFilterNodeBounds(const Rect& srcRect) const override;
 
-  void draw(const Texture* texture, Surface* toSurface, bool isDown);
+  void draw(std::shared_ptr<Texture> texture, Surface* toSurface, bool isDown);
 
   Point blurOffset;
   float downScaling;

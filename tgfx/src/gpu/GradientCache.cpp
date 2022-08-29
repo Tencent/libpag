@@ -25,14 +25,14 @@ namespace tgfx {
 static constexpr size_t kMaxNumCachedGradientBitmaps = 32;
 static constexpr int kGradientTextureSize = 256;
 
-const Texture* GradientCache::find(const BytesKey& bytesKey) {
+std::shared_ptr<Texture> GradientCache::find(const BytesKey& bytesKey) {
   auto iter = textures.find(bytesKey);
   if (iter == textures.end()) {
     return nullptr;
   }
   keys.remove(bytesKey);
   keys.push_front(bytesKey);
-  return iter->second.get();
+  return iter->second;
 }
 
 void GradientCache::add(const BytesKey& bytesKey, std::shared_ptr<Texture> texture) {
@@ -91,7 +91,8 @@ std::shared_ptr<PixelBuffer> CreateGradient(const Color* colors, const float* po
   return pixelBuffer;
 }
 
-const Texture* GradientCache::getGradient(const Color* colors, const float* positions, int count) {
+std::shared_ptr<Texture> GradientCache::getGradient(const Color* colors, const float* positions,
+                                                    int count) {
   BytesKey bytesKey = {};
   for (int i = 0; i < count; ++i) {
     bytesKey.write(colors[i].red);
@@ -101,7 +102,7 @@ const Texture* GradientCache::getGradient(const Color* colors, const float* posi
     bytesKey.write(positions[i]);
   }
 
-  const auto* texture = find(bytesKey);
+  auto texture = find(bytesKey);
   if (texture) {
     return texture;
   }
@@ -113,7 +114,7 @@ const Texture* GradientCache::getGradient(const Color* colors, const float* posi
   if (tex) {
     add(bytesKey, tex);
   }
-  return tex.get();
+  return tex;
 }
 
 void GradientCache::releaseAll() {

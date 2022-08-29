@@ -30,7 +30,7 @@ void Trace(std::shared_ptr<tgfx::PixelBuffer> pixelBuffer, const std::string& ta
 /**
  * Trace() provides a utility to view the texture.
  */
-void Trace(const tgfx::Texture* texture, const std::string& path = "");
+void Trace(std::shared_ptr<tgfx::Texture> texture, const std::string& path = "");
 
 /**
  * Trace() provides a utility to view the Bitmap.
