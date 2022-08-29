@@ -1,5 +1,5 @@
 // index.js
-import { PAGView, clearCache } from '../../utils/pag-wx.esm';
+import { PAGView, clearCache } from '../../utils/pag';
 
 const loadFileByRequest = async (url) => {
   return new Promise((resolve) => {

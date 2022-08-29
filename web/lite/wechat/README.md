@@ -25,13 +25,15 @@ libpag-lite-miniprogram 是 libpag 在微信小程序平台的简化版 SDK
 
 ## 快速开始
 
-安装 `libpag-lite-miniprogram`
+1. npm 依赖
 
 ```bash
 $ npm install libpag-lite-miniprogram
 ```
 
-获取画布
+点击「微信开发者工具」- 「工具」- 「构建npm」，进行小程序 npm 依赖构建
+
+2. 绘制
 
 ```xml
 <!-- index.wxml -->
@@ -39,6 +41,7 @@ $ npm install libpag-lite-miniprogram
 ```
 
 ```js
+// index.js
 import { PAGView } from 'libpag-lite';
 
 Page({
@@ -63,7 +66,9 @@ Page({
 
 ### 缓存
 
-因为 PAG 解码的时候用到了 VideoDecoder，而 VideoDecoder 的解码并不支持 blobURL，所以会把 BMP 预合成的视频数据缓存在本地。所以
+因为 PAG 解码的时候用到了 VideoDecoder，而 VideoDecoder 的解码并不支持 blobURL，所以会把 BMP 预合成的视频数据缓存在本地。
+
+为避免PAG的缓存把用户缓存目录内存占用过高，建议在不需要使用PAG的时候，调用 `clearCache()` 方法进行缓存清理。
 
 ## API
 
@@ -73,11 +78,10 @@ Page({
 
 创建 View 实例
 
-| 名称        | 类型                            | 说明                   | 默认值 | 必传 |
-| ----------- | ------------------------------- | ---------------------- | ------ | ---- |
-| **data**    | ArrayBuffer                     | PAG文件                |        | Y    |
-| **canvas**  | HTMLCanvasElement               | 用于绘图的 canvas 标签 |        | Y    |
-| **options** | [RenderOptions](#RenderOptions) | 渲染选项               |        | Y    |
+| 名称       | 类型              | 说明                   | 默认值 | 必传 |
+| ---------- | ----------------- | ---------------------- | ------ | ---- |
+| **data**   | ArrayBuffer       | PAG文件                |        | Y    |
+| **canvas** | HTMLCanvasElement | 用于绘图的 canvas 标签 |        | Y    |
 
 #### play(): Promise\<void\>
 
