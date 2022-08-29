@@ -133,8 +133,8 @@ GradientShaderBase::GradientShaderBase(const std::vector<Color>& colors,
     originalColors.push_back(colors[colors.size() - 1]);
   }
   if (positions.empty()) {
-    auto posScale = 1.0f / static_cast<float>(positions.size() - 1);
-    for (size_t i = 0; i < positions.size(); i++) {
+    auto posScale = 1.0f / static_cast<float>(colors.size() - 1);
+    for (size_t i = 0; i < colors.size(); i++) {
       originalPositions.push_back(static_cast<float>(i) * posScale);
     }
   } else {
