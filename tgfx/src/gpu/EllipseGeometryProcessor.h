@@ -32,8 +32,7 @@ namespace tgfx {
 class EllipseGeometryProcessor : public GeometryProcessor {
  public:
   static std::unique_ptr<EllipseGeometryProcessor> Make(int width, int height, bool stroke,
-                                                        bool useScale, const Matrix& localMatrix,
-                                                        const Matrix& viewMatrix);
+                                                        bool useScale, const Matrix& localMatrix);
 
   std::string name() const override {
     return "EllipseGeometryProcessor";
@@ -43,11 +42,12 @@ class EllipseGeometryProcessor : public GeometryProcessor {
 
  private:
   EllipseGeometryProcessor(int width, int height, bool stroke, bool useScale,
-                           const Matrix& localMatrix, const Matrix& viewMatrix);
+                           const Matrix& localMatrix);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   Attribute inPosition;
+  Attribute inColor;
   Attribute inEllipseOffset;
   Attribute inEllipseRadii;
 
@@ -55,7 +55,6 @@ class EllipseGeometryProcessor : public GeometryProcessor {
   int height = 1;
   // UV 也使用 inPosition 的坐标，localMatrix 可以把 inPosition 的坐标转换成 UV 的
   Matrix localMatrix;
-  Matrix viewMatrix;
   bool stroke;
   bool useScale;
 

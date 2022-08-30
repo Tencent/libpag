@@ -22,31 +22,24 @@
 #include "gpu/opengl/GLEllipseGeometryProcessor.h"
 
 namespace tgfx {
-std::unique_ptr<EllipseGeometryProcessor> EllipseGeometryProcessor::Make(int width, int height,
-                                                                         bool stroke, bool useScale,
-                                                                         const Matrix& localMatrix,
-                                                                         const Matrix& viewMatrix) {
+std::unique_ptr<EllipseGeometryProcessor> EllipseGeometryProcessor::Make(
+    int width, int height, bool stroke, bool useScale, const Matrix& localMatrix) {
   return std::unique_ptr<EllipseGeometryProcessor>(
-      new EllipseGeometryProcessor(width, height, stroke, useScale, localMatrix, viewMatrix));
+      new EllipseGeometryProcessor(width, height, stroke, useScale, localMatrix));
 }
 
 EllipseGeometryProcessor::EllipseGeometryProcessor(int width, int height, bool stroke,
-                                                   bool useScale, const Matrix& localMatrix,
-                                                   const Matrix& viewMatrix)
-    : width(width),
-      height(height),
-      localMatrix(localMatrix),
-      viewMatrix(viewMatrix),
-      stroke(stroke),
-      useScale(useScale) {
+                                                   bool useScale, const Matrix& localMatrix)
+    : width(width), height(height), localMatrix(localMatrix), stroke(stroke), useScale(useScale) {
   inPosition = {"inPosition", ShaderVar::Type::Float2};
+  inColor = {"inColor", ShaderVar::Type::Float4};
   if (useScale) {
     inEllipseOffset = {"inEllipseOffset", ShaderVar::Type::Float3};
   } else {
     inEllipseOffset = {"inEllipseOffset", ShaderVar::Type::Float2};
   }
   inEllipseRadii = {"inEllipseRadii", ShaderVar::Type::Float4};
-  this->setVertexAttributes(&inPosition, 3);
+  this->setVertexAttributes(&inPosition, 4);
 }
 
 void EllipseGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {

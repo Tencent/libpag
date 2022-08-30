@@ -23,7 +23,7 @@
 namespace tgfx {
 class DefaultGeometryProcessor : public GeometryProcessor {
  public:
-  static std::unique_ptr<DefaultGeometryProcessor> Make(int width, int height,
+  static std::unique_ptr<DefaultGeometryProcessor> Make(Color color, int width, int height,
                                                         const Matrix& localMatrix);
 
   std::string name() const override {
@@ -33,13 +33,14 @@ class DefaultGeometryProcessor : public GeometryProcessor {
   std::unique_ptr<GLGeometryProcessor> createGLInstance() const override;
 
  private:
-  DefaultGeometryProcessor(int width, int height, const Matrix& localMatrix);
+  DefaultGeometryProcessor(Color color, int width, int height, const Matrix& localMatrix);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   Attribute position;
   Attribute coverage;
 
+  Color color;
   int width = 1;
   int height = 1;
   Matrix localMatrix = Matrix::I();

@@ -25,7 +25,7 @@
 namespace tgfx {
 class GLRRectOp : public GLDrawOp {
  public:
-  static std::unique_ptr<GLRRectOp> Make(const RRect& rRect, const Matrix& viewMatrix,
+  static std::unique_ptr<GLRRectOp> Make(Color color, const RRect& rRect, const Matrix& viewMatrix,
                                          const Matrix& localMatrix = Matrix::I());
 
   std::unique_ptr<GeometryProcessor> getGeometryProcessor(const DrawArgs& args) override;
@@ -35,15 +35,21 @@ class GLRRectOp : public GLDrawOp {
   void draw(const DrawArgs& args) override;
 
  private:
-  GLRRectOp(const RRect& rRect, const Matrix& viewMatrix, const Matrix& localMatrix);
+  GLRRectOp(Color color, const RRect& rRect, const Matrix& viewMatrix, const Matrix& localMatrix);
 
-  RRect rRect;
-  Matrix viewMatrix = Matrix::I();
-  Matrix _localMatrix = Matrix::I();
-  float xRadius = 0;
-  float yRadius = 0;
-  float innerXRadius = 0;
-  float innerYRadius = 0;
+  struct RRectWrap {
+    Color color = Color::Transparent();
+    float innerXRadius = 0;
+    float innerYRadius = 0;
+    RRect rRect;
+    Matrix viewMatrix = Matrix::I();
+
+    void writeToVertices(std::vector<float>& vertices, bool useScale, AAType aa) const;
+  };
+
+  std::vector<RRectWrap> rRects;
+  Matrix localMatrix = Matrix::I();
+
   //  bool stroked = false;
   //  Point strokeWidths = Point::Zero();
 };

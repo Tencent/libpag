@@ -32,15 +32,15 @@ Rect SimplePathMesh::bounds() const {
   return Rect::MakeEmpty();
 }
 
-std::unique_ptr<GLDrawOp> SimplePathMesh::getOp(const Matrix& viewMatrix) const {
+std::unique_ptr<GLDrawOp> SimplePathMesh::getOp(Color color, const Matrix& viewMatrix) const {
   auto bounds = this->bounds();
   auto localMatrix = Matrix::MakeScale(bounds.width(), bounds.height());
   localMatrix.postTranslate(bounds.x(), bounds.y());
   std::unique_ptr<GLDrawOp> drawOp;
   if (rect.has_value()) {
-    drawOp = GLFillRectOp::Make(*rect, viewMatrix, localMatrix);
+    drawOp = GLFillRectOp::Make(color, *rect, viewMatrix, localMatrix);
   } else if (rRect.has_value()) {
-    drawOp = GLRRectOp::Make(*rRect, viewMatrix, localMatrix);
+    drawOp = GLRRectOp::Make(color, *rRect, viewMatrix, localMatrix);
   }
   return drawOp;
 }
