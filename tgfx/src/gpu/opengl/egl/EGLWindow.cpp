@@ -17,6 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/opengl/egl/EGLWindow.h"
+
+#if defined(__ANDROID__) || defined(ANDROID)
+#include <android/native_window.h>
+#endif
 #include <EGL/eglext.h>
 #include <GLES3/gl3.h>
 #include "tgfx/gpu/opengl/GLRenderTarget.h"
@@ -39,18 +43,30 @@ std::shared_ptr<EGLWindow> EGLWindow::MakeFrom(EGLNativeWindowType nativeWindow,
   if (device == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<EGLWindow>(new EGLWindow(device));
+  return std::shared_ptr<EGLWindow>(new EGLWindow(device, nativeWindow));
 }
 
-EGLWindow::EGLWindow(std::shared_ptr<Device> device) : Window(std::move(device)) {
+EGLWindow::EGLWindow(std::shared_ptr<Device> device, EGLNativeWindowType nativeWindow)
+    : Window(std::move(device)), _nativeWindow(nativeWindow) {
 }
 
 std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
   EGLint width = 0;
   EGLint height = 0;
-  auto eglDevice = static_cast<EGLDevice*>(device.get());
-  eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_WIDTH, &width);
-  eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_HEIGHT, &height);
+
+  // If the rendering size changes，eglQuerySurface based on ANativeWindow may give the wrong size.
+#if defined(__ANDROID__) || defined(ANDROID)
+  if (_nativeWindow) {
+    width = ANativeWindow_getWidth(_nativeWindow);
+    height = ANativeWindow_getHeight(_nativeWindow);
+  }
+#endif
+  if (width <= 0 || height <= 0) {
+    auto eglDevice = static_cast<EGLDevice*>(device.get());
+    eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_WIDTH, &width);
+    eglQuerySurface(eglDevice->eglDisplay, eglDevice->eglSurface, EGL_HEIGHT, &height);
+  }
+
   if (width <= 0 || height <= 0) {
     return nullptr;
   }

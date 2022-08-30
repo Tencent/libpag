@@ -41,6 +41,8 @@ class EGLWindow : public Window {
   void onPresent(Context* context, int64_t presentationTime) override;
 
  private:
-  explicit EGLWindow(std::shared_ptr<Device> device);
+  EGLNativeWindowType _nativeWindow = nullptr;
+
+  explicit EGLWindow(std::shared_ptr<Device> device, EGLNativeWindowType nativeWindow = nullptr);
 };
 }  // namespace tgfx
