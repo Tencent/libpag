@@ -38,7 +38,7 @@ tgfx::Matrix ToMatrix(const FilterTarget* target, bool flipY = false);
 std::unique_ptr<FilterSource> ToFilterSource(const tgfx::Texture* texture,
                                              const tgfx::Point& scale);
 
-std::unique_ptr<FilterTarget> ToFilterTarget(const tgfx::Surface* surface,
+std::unique_ptr<FilterTarget> ToFilterTarget(tgfx::Surface* surface,
                                              const tgfx::Matrix& drawingMatrix);
 
 tgfx::Point ToGLTexturePoint(const FilterSource* source, const tgfx::Point& texturePoint);

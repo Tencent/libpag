@@ -110,13 +110,13 @@ class Surface {
   /**
    * Retrieves the render target that the surface renders to.
    */
-  virtual std::shared_ptr<RenderTarget> getRenderTarget() const = 0;
+  virtual std::shared_ptr<RenderTarget> getRenderTarget() = 0;
 
   /**
    * Retrieves the texture that the surface renders to. Return nullptr if the surface was made from
    * a RenderTarget.
    */
-  virtual std::shared_ptr<Texture> getTexture() const = 0;
+  virtual std::shared_ptr<Texture> getTexture() = 0;
 
   /**
    * Returns Canvas that draws into Surface. Subsequent calls return the same Canvas. Canvas
@@ -156,20 +156,19 @@ class Surface {
    * does not exceed Surface (width(), height()). Pixels are copied only if pixel conversion is
    * possible. Returns true if pixels are copied to dstPixels.
    */
-  bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0, int srcY = 0) const;
+  bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0, int srcY = 0);
 
   /**
    * Evaluates the Surface to see if it overlaps or intersects with the specified point. The point
    * is in the coordinate space of the Surface. This method always checks against the actual pixels
    * of the Surface.
    */
-  bool hitTest(float x, float y) const;
+  bool hitTest(float x, float y);
 
  protected:
   Context* context = nullptr;
-  
-  virtual bool onReadPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX,
-                            int srcY) const = 0;
+
+  virtual bool onReadPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) = 0;
 
  private:
   std::unique_ptr<SurfaceOptions> surfaceOptions = nullptr;
