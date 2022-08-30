@@ -99,25 +99,33 @@ std::vector<float> GLFillRectOp::vertices(const DrawArgs& args) {
   }
 }
 
-std::unique_ptr<GLFillRectOp> GLFillRectOp::Make(const Rect& rect, const Matrix& viewMatrix,
+std::unique_ptr<GLFillRectOp> GLFillRectOp::Make(const tgfx::Rect& rect,
+                                                 const tgfx::Matrix& viewMatrix,
+                                                 const tgfx::Matrix& localMatrix) {
+  return std::unique_ptr<GLFillRectOp>(new GLFillRectOp({}, {rect}, {viewMatrix}, {localMatrix}));
+}
+
+std::unique_ptr<GLFillRectOp> GLFillRectOp::Make(Color color, const Rect& rect,
+                                                 const Matrix& viewMatrix,
                                                  const Matrix& localMatrix) {
-  return std::unique_ptr<GLFillRectOp>(new GLFillRectOp({rect}, {viewMatrix}, {localMatrix}, {}));
-}
-
-std::unique_ptr<GLFillRectOp> GLFillRectOp::Make(const std::vector<Rect>& rects,
-                                                 const std::vector<Matrix>& viewMatrices,
-                                                 const std::vector<Matrix>& localMatrices,
-                                                 const std::vector<Color>& colors) {
   return std::unique_ptr<GLFillRectOp>(
-      new GLFillRectOp(rects, viewMatrices, localMatrices, colors));
+      new GLFillRectOp({color}, {rect}, {viewMatrix}, {localMatrix}));
 }
 
-GLFillRectOp::GLFillRectOp(std::vector<Rect> rects, std::vector<Matrix> viewMatrices,
-                           std::vector<Matrix> localMatrices, std::vector<Color> colors)
-    : rects(std::move(rects)),
+std::unique_ptr<GLFillRectOp> GLFillRectOp::Make(const std::vector<Color>& colors,
+                                                 const std::vector<Rect>& rects,
+                                                 const std::vector<Matrix>& viewMatrices,
+                                                 const std::vector<Matrix>& localMatrices) {
+  return std::unique_ptr<GLFillRectOp>(
+      new GLFillRectOp(colors, rects, viewMatrices, localMatrices));
+}
+
+GLFillRectOp::GLFillRectOp(std::vector<Color> colors, std::vector<Rect> rects,
+                           std::vector<Matrix> viewMatrices, std::vector<Matrix> localMatrices)
+    : colors(std::move(colors)),
+      rects(std::move(rects)),
       viewMatrices(std::move(viewMatrices)),
-      localMatrices(std::move(localMatrices)),
-      colors(std::move(colors)) {
+      localMatrices(std::move(localMatrices)) {
   auto bounds = Rect::MakeEmpty();
   for (size_t i = 0; i < this->rects.size(); ++i) {
     bounds.join(this->viewMatrices[i].mapRect(this->rects[i]));

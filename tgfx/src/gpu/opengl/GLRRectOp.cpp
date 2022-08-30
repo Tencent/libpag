@@ -98,21 +98,26 @@ static constexpr size_t kIndicesPerFillRRect =
 // stroke count is fill count minus center indices
 // static constexpr int kIndicesPerStrokeRRect = kCornerIndicesCount + kEdgeIndicesCount;
 
-std::unique_ptr<GLRRectOp> GLRRectOp::Make(const RRect& rRect, const Matrix& viewMatrix,
-                                           const Matrix& localMatrix) {
+std::unique_ptr<GLRRectOp> GLRRectOp::Make(Color color, const RRect& rRect,
+                                           const Matrix& viewMatrix, const Matrix& localMatrix) {
+  Matrix matrix = Matrix::I();
+  if (!viewMatrix.invert(&matrix)) {
+    return nullptr;
+  }
+  matrix.postConcat(localMatrix);
   if (/*!isStrokeOnly && */ 0.5f <= rRect.radii.x && 0.5f <= rRect.radii.y) {
-    return std::unique_ptr<GLRRectOp>(new GLRRectOp(rRect, viewMatrix, localMatrix));
+    return std::unique_ptr<GLRRectOp>(new GLRRectOp(color, rRect, viewMatrix, matrix));
   }
   return nullptr;
 }
 
-GLRRectOp::GLRRectOp(const RRect& rRect, const Matrix& viewMatrix, const Matrix& localMatrix)
-    : rRect(rRect),
-      viewMatrix(viewMatrix),
-      _localMatrix(localMatrix),
-      xRadius(rRect.radii.x),
-      yRadius(rRect.radii.y) {
+GLRRectOp::GLRRectOp(Color color, const RRect& rRect, const Matrix& viewMatrix,
+                     const Matrix& localMatrix)
+    : localMatrix(localMatrix) {
+  this->localMatrix.postTranslate(-rRect.rect.left, -rRect.rect.top);
+  this->localMatrix.postScale(1.f / rRect.rect.width(), 1.f / rRect.rect.height());
   setTransformedBounds(rRect.rect, viewMatrix);
+  rRects.emplace_back(RRectWrap{color, 0.f, 0.f, rRect, viewMatrix});
 }
 
 static bool UseScale(const DrawArgs& args) {
@@ -120,21 +125,25 @@ static bool UseScale(const DrawArgs& args) {
 }
 
 std::unique_ptr<GeometryProcessor> GLRRectOp::getGeometryProcessor(const DrawArgs& args) {
-  auto localMatrix = _localMatrix;
-  localMatrix.postTranslate(-rRect.rect.left, -rRect.rect.top);
-  localMatrix.postScale(1.f / rRect.rect.width(), 1.f / rRect.rect.height());
   return EllipseGeometryProcessor::Make(args.renderTarget->width(), args.renderTarget->height(),
-                                        false, UseScale(args), localMatrix, viewMatrix);
+                                        false, UseScale(args), localMatrix);
 }
 
-std::vector<float> GLRRectOp::vertices(const DrawArgs& args) {
-  auto useScale = UseScale(args);
+void WriteColor(std::vector<float>& vertices, const Color& color) {
+  vertices.push_back(color.red);
+  vertices.push_back(color.green);
+  vertices.push_back(color.blue);
+  vertices.push_back(color.alpha);
+}
+
+void GLRRectOp::RRectWrap::writeToVertices(std::vector<float>& vertices, bool useScale,
+                                           AAType aa) const {
   float reciprocalRadii[4] = {1e6f, 1e6f, 1e6f, 1e6f};
-  if (xRadius > 0) {
-    reciprocalRadii[0] = 1.f / xRadius;
+  if (rRect.radii.x > 0) {
+    reciprocalRadii[0] = 1.f / rRect.radii.x;
   }
-  if (yRadius > 0) {
-    reciprocalRadii[1] = 1.f / yRadius;
+  if (rRect.radii.y > 0) {
+    reciprocalRadii[1] = 1.f / rRect.radii.y;
   }
   if (innerXRadius > 0) {
     reciprocalRadii[2] = 1.f / innerXRadius;
@@ -144,18 +153,18 @@ std::vector<float> GLRRectOp::vertices(const DrawArgs& args) {
   }
   // On MSAA, bloat enough to guarantee any pixel that might be touched by the rRect has
   // full sample coverage.
-  float aaBloat = args.aa == AAType::MSAA ? FLOAT_SQRT2 : .5f;
+  float aaBloat = aa == AAType::MSAA ? FLOAT_SQRT2 : .5f;
   // Extend out the radii to antialias.
-  float xOuterRadius = xRadius + aaBloat;
-  float yOuterRadius = yRadius + aaBloat;
+  float xOuterRadius = rRect.radii.x + aaBloat;
+  float yOuterRadius = rRect.radii.y + aaBloat;
 
   float xMaxOffset = xOuterRadius;
   float yMaxOffset = yOuterRadius;
   //  if (!stroked) {
   // For filled rRects we map a unit circle in the vertex attributes rather than
   // computing an ellipse and modifying that distance, so we normalize to 1.
-  xMaxOffset /= xRadius;
-  yMaxOffset /= yRadius;
+  xMaxOffset /= rRect.radii.x;
+  yMaxOffset /= rRect.radii.y;
   //  }
   auto bounds = rRect.rect.makeOutset(aaBloat, aaBloat);
   float yCoords[4] = {bounds.top, bounds.top + yOuterRadius, bounds.bottom - yOuterRadius,
@@ -164,11 +173,13 @@ std::vector<float> GLRRectOp::vertices(const DrawArgs& args) {
       yMaxOffset,
       FLOAT_NEARLY_ZERO,  // we're using inversesqrt() in shader, so can't be exactly 0
       FLOAT_NEARLY_ZERO, yMaxOffset};
-  std::vector<float> vertices;
-  auto maxRadius = std::max(xRadius, yRadius);
+  auto maxRadius = std::max(rRect.radii.x, rRect.radii.y);
   for (int i = 0; i < 4; ++i) {
-    vertices.push_back(bounds.left);
-    vertices.push_back(yCoords[i]);
+    auto point = Point::Make(bounds.left, yCoords[i]);
+    viewMatrix.mapPoints(&point, 1);
+    vertices.push_back(point.x);
+    vertices.push_back(point.y);
+    WriteColor(vertices, color);
     vertices.push_back(xMaxOffset);
     vertices.push_back(yOuterOffsets[i]);
     if (useScale) {
@@ -179,8 +190,11 @@ std::vector<float> GLRRectOp::vertices(const DrawArgs& args) {
     vertices.push_back(reciprocalRadii[2]);
     vertices.push_back(reciprocalRadii[3]);
 
-    vertices.push_back(bounds.left + xOuterRadius);
-    vertices.push_back(yCoords[i]);
+    point = Point::Make(bounds.left + xOuterRadius, yCoords[i]);
+    viewMatrix.mapPoints(&point, 1);
+    vertices.push_back(point.x);
+    vertices.push_back(point.y);
+    WriteColor(vertices, color);
     vertices.push_back(FLOAT_NEARLY_ZERO);
     vertices.push_back(yOuterOffsets[i]);
     if (useScale) {
@@ -191,8 +205,11 @@ std::vector<float> GLRRectOp::vertices(const DrawArgs& args) {
     vertices.push_back(reciprocalRadii[2]);
     vertices.push_back(reciprocalRadii[3]);
 
-    vertices.push_back(bounds.right - xOuterRadius);
-    vertices.push_back(yCoords[i]);
+    point = Point::Make(bounds.right - xOuterRadius, yCoords[i]);
+    viewMatrix.mapPoints(&point, 1);
+    vertices.push_back(point.x);
+    vertices.push_back(point.y);
+    WriteColor(vertices, color);
     vertices.push_back(FLOAT_NEARLY_ZERO);
     vertices.push_back(yOuterOffsets[i]);
     if (useScale) {
@@ -203,8 +220,11 @@ std::vector<float> GLRRectOp::vertices(const DrawArgs& args) {
     vertices.push_back(reciprocalRadii[2]);
     vertices.push_back(reciprocalRadii[3]);
 
-    vertices.push_back(bounds.right);
-    vertices.push_back(yCoords[i]);
+    point = Point::Make(bounds.right, yCoords[i]);
+    viewMatrix.mapPoints(&point, 1);
+    vertices.push_back(point.x);
+    vertices.push_back(point.y);
+    WriteColor(vertices, color);
     vertices.push_back(xMaxOffset);
     vertices.push_back(yOuterOffsets[i]);
     if (useScale) {
@@ -215,12 +235,27 @@ std::vector<float> GLRRectOp::vertices(const DrawArgs& args) {
     vertices.push_back(reciprocalRadii[2]);
     vertices.push_back(reciprocalRadii[3]);
   }
+}
+
+std::vector<float> GLRRectOp::vertices(const DrawArgs& args) {
+  auto useScale = UseScale(args);
+  std::vector<float> vertices;
+  for (const auto& rRectWrap : rRects) {
+    rRectWrap.writeToVertices(vertices, useScale, args.aa);
+  }
   return vertices;
 }
 
 void GLRRectOp::draw(const DrawArgs& args) {
   static auto Type = UniqueID::Next();
-  auto buffer = GLBuffer::Make(args.context, gStandardRRectIndices, kIndicesPerFillRRect, Type);
+  std::vector<uint16_t> indices;
+  for (size_t i = 0; i < rRects.size(); ++i) {
+    auto offset = i * 16;
+    for (size_t j = 0; j < kIndicesPerFillRRect; ++j) {
+      indices.emplace_back(gStandardRRectIndices[j] + offset);
+    }
+  }
+  auto buffer = GLBuffer::Make(args.context, &(indices[0]), indices.size(), Type);
   GLDrawer::DrawIndexBuffer(args.context, buffer);
 }
 }  // namespace tgfx

@@ -33,7 +33,7 @@ class SimplePathMesh : public Mesh {
   Rect bounds() const override;
 
  private:
-  std::unique_ptr<GLDrawOp> getOp(const Matrix& viewMatrix) const override;
+  std::unique_ptr<GLDrawOp> getOp(Color color, const Matrix& viewMatrix) const override;
 
   std::optional<Rect> rect;
   std::optional<RRect> rRect;

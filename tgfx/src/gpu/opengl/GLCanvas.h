@@ -26,6 +26,7 @@
 
 namespace tgfx {
 struct GLPaint {
+  Color color;
   std::vector<std::unique_ptr<FragmentProcessor>> colorFragmentProcessors;
   std::vector<std::unique_ptr<FragmentProcessor>> coverageFragmentProcessors;
 };
@@ -67,7 +68,7 @@ class GLCanvas : public Canvas {
 
   Rect clipLocalBounds(Rect localBounds);
 
-  void drawMask(const Rect& bounds, std::shared_ptr<Texture> mask, const Paint& paint);
+  void drawMask(const Rect& bounds, std::shared_ptr<Texture> mask, GLPaint paint);
 
   void drawColorGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
                        const Font& font, const Paint& paint);

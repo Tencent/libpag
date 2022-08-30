@@ -29,12 +29,6 @@ void GLEllipseGeometryProcessor::emitCode(EmitArgs& args) {
 
   // emit attributes
   varyingHandler->emitAttributes(egp);
-  std::string matrixUniformName;
-  viewMatrixUniform = uniformHandler->addUniform(ShaderFlags::Vertex, ShaderVar::Type::Float3x3,
-                                                 "Matrix", &matrixUniformName);
-  std::string position = "position";
-  vertBuilder->codeAppendf("vec3 %s = %s * vec3(%s.xy, 1);", position.c_str(),
-                           matrixUniformName.c_str(), egp.inPosition.name().c_str());
 
   auto offsetType = egp.useScale ? ShaderVar::Type::Float3 : ShaderVar::Type::Float2;
   auto ellipseOffsets = varyingHandler->addVarying("EllipseOffsets", offsetType);
@@ -47,11 +41,12 @@ void GLEllipseGeometryProcessor::emitCode(EmitArgs& args) {
 
   auto* fragBuilder = args.fragBuilder;
   // setup pass through color
-  fragBuilder->codeAppendf("vec4 %s;", args.outputColor.c_str());
-  fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputColor.c_str());
+  auto color = varyingHandler->addVarying("Color", ShaderVar::Type::Float4);
+  vertBuilder->codeAppendf("%s = %s;", color.vsOut().c_str(), egp.inColor.name().c_str());
+  fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), color.fsIn().c_str());
 
   // Setup position
-  args.vertBuilder->emitNormalizedPosition(position);
+  args.vertBuilder->emitNormalizedPosition(egp.inPosition.name());
   // emit transforms
   emitTransforms(vertBuilder, varyingHandler, uniformHandler, egp.inPosition.asShaderVar(),
                  args.fpCoordTransformHandler);
@@ -126,9 +121,5 @@ void GLEllipseGeometryProcessor::setData(const ProgramDataManager& programDataMa
                                          FPCoordTransformIter* transformIter) {
   const auto& egp = static_cast<const EllipseGeometryProcessor&>(priProc);
   setTransformDataHelper(egp.localMatrix, programDataManager, transformIter);
-  if (viewMatrixPrev != egp.viewMatrix) {
-    viewMatrixPrev = egp.viewMatrix;
-    programDataManager.setMatrix(viewMatrixUniform, egp.viewMatrix);
-  }
 }
 }  // namespace tgfx

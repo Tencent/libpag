@@ -36,7 +36,11 @@ void GLDefaultGeometryProcessor::emitCode(EmitArgs& args) {
   vertBuilder->codeAppendf("%s = %s;", coverage.vsOut().c_str(),
                            geometryProcessor->coverage.name().c_str());
   fragBuilder->codeAppendf("%s = vec4(%s);", args.outputCoverage.c_str(), coverage.fsIn().c_str());
-  fragBuilder->codeAppendf("%s = vec4(1.0);", args.outputColor.c_str());
+
+  std::string colorName;
+  colorUniform = args.uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4,
+                                                 "Color", &colorName);
+  fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
 
   // Emit the vertex position to the hardware in the normalized window coordinates it expects.
   args.vertBuilder->emitNormalizedPosition(geometryProcessor->position.name());
@@ -47,5 +51,10 @@ void GLDefaultGeometryProcessor::setData(const ProgramDataManager& programDataMa
                                          FPCoordTransformIter* transformIter) {
   const auto& gp = static_cast<const DefaultGeometryProcessor&>(geometryProcessor);
   setTransformDataHelper(gp.localMatrix, programDataManager, transformIter);
+  if (colorPrev != gp.color) {
+    colorPrev = gp.color;
+    programDataManager.set4f(colorUniform, gp.color.red, gp.color.green, gp.color.blue,
+                             gp.color.alpha);
+  }
 }
 }  // namespace tgfx

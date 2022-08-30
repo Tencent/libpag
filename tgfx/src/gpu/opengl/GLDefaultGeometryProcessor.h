@@ -29,5 +29,10 @@ class GLDefaultGeometryProcessor : public GLGeometryProcessor {
   void setData(const ProgramDataManager& programDataManager,
                const GeometryProcessor& geometryProcessor,
                FPCoordTransformIter* transformIter) override;
+
+ private:
+  UniformHandle colorUniform;
+
+  std::optional<Color> colorPrev;
 };
 }  // namespace tgfx

@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <optional>
 #include "gpu/GLGeometryProcessor.h"
 
 namespace tgfx {
@@ -28,10 +27,5 @@ class GLEllipseGeometryProcessor : public GLGeometryProcessor {
 
   void setData(const ProgramDataManager& programDataManager, const GeometryProcessor& priProc,
                FPCoordTransformIter* transformIter) override;
-
- private:
-  UniformHandle viewMatrixUniform;
-
-  std::optional<Matrix> viewMatrixPrev;
 };
 }  // namespace tgfx

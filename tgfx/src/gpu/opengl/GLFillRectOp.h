@@ -28,10 +28,13 @@ class GLFillRectOp : public GLDrawOp {
   static std::unique_ptr<GLFillRectOp> Make(const Rect& rect, const Matrix& viewMatrix,
                                             const Matrix& localMatrix = Matrix::I());
 
-  static std::unique_ptr<GLFillRectOp> Make(const std::vector<Rect>& rects,
+  static std::unique_ptr<GLFillRectOp> Make(Color color, const Rect& rect, const Matrix& viewMatrix,
+                                            const Matrix& localMatrix = Matrix::I());
+
+  static std::unique_ptr<GLFillRectOp> Make(const std::vector<Color>& colors,
+                                            const std::vector<Rect>& rects,
                                             const std::vector<Matrix>& viewMatrices,
-                                            const std::vector<Matrix>& localMatrices,
-                                            const std::vector<Color>& colors);
+                                            const std::vector<Matrix>& localMatrices);
 
   std::unique_ptr<GeometryProcessor> getGeometryProcessor(const DrawArgs& args) override;
 
@@ -40,16 +43,16 @@ class GLFillRectOp : public GLDrawOp {
   void draw(const DrawArgs& args) override;
 
  private:
-  GLFillRectOp(std::vector<Rect> rects, std::vector<Matrix> viewMatrices,
-               std::vector<Matrix> localMatrices, std::vector<Color> colors);
+  GLFillRectOp(std::vector<Color> colors, std::vector<Rect> rects, std::vector<Matrix> viewMatrices,
+               std::vector<Matrix> localMatrices);
 
   std::vector<float> coverageVertices() const;
 
   std::vector<float> noCoverageVertices() const;
 
+  std::vector<Color> colors;
   std::vector<Rect> rects;
   std::vector<Matrix> viewMatrices;
   std::vector<Matrix> localMatrices;
-  std::vector<Color> colors;
 };
 }  // namespace tgfx
