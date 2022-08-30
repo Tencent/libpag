@@ -24,11 +24,11 @@ Surface::Surface(Context* context) : context(context) {
   DEBUG_ASSERT(context != nullptr);
 }
 
-bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) const {
+bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) {
   return onReadPixels(dstInfo, dstPixels, srcX, srcY);
 }
 
-bool Surface::hitTest(float x, float y) const {
+bool Surface::hitTest(float x, float y) {
   uint8_t pixel[4];
   auto info = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
   auto result = onReadPixels(info, pixel, static_cast<int>(x), static_cast<int>(y));

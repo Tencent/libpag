@@ -102,7 +102,7 @@ std::unique_ptr<FilterSource> ToFilterSource(const tgfx::Texture* texture,
   return std::unique_ptr<FilterSource>(filterSource);
 }
 
-std::unique_ptr<FilterTarget> ToFilterTarget(const tgfx::Surface* surface,
+std::unique_ptr<FilterTarget> ToFilterTarget(tgfx::Surface* surface,
                                              const tgfx::Matrix& drawingMatrix) {
   if (surface == nullptr) {
     return nullptr;

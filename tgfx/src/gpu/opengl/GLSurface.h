@@ -46,14 +46,12 @@ class GLSurface : public Surface {
 
   bool flush(Semaphore* semaphore) override;
 
-  std::shared_ptr<RenderTarget> getRenderTarget() const override {
-    return renderTarget;
-  }
+  std::shared_ptr<RenderTarget> getRenderTarget() override;
 
-  std::shared_ptr<Texture> getTexture() const override;
+  std::shared_ptr<Texture> getTexture() override;
 
  protected:
-  bool onReadPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) const override;
+  bool onReadPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) override;
 
  private:
   std::shared_ptr<GLRenderTarget> renderTarget = nullptr;

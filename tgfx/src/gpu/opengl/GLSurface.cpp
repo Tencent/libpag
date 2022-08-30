@@ -103,10 +103,11 @@ bool GLSurface::wait(const Semaphore* semaphore) {
 }
 
 bool GLSurface::flush(Semaphore* semaphore) {
+  if (canvas) {
+    canvas->flush();
+  }
+  renderTarget->resolve();
   if (semaphore == nullptr) {
-    if (canvas) {
-      canvas->flush();
-    }
     return false;
   }
   auto caps = GLCaps::Get(context);
@@ -124,19 +125,18 @@ bool GLSurface::flush(Semaphore* semaphore) {
   return false;
 }
 
-std::shared_ptr<Texture> GLSurface::getTexture() const {
-  if (canvas) {
-    canvas->flush();
-  }
-  renderTarget->resolve();
+std::shared_ptr<RenderTarget> GLSurface::getRenderTarget() {
+  flush(nullptr);
+  return renderTarget;
+}
+
+std::shared_ptr<Texture> GLSurface::getTexture() {
+  flush(nullptr);
   return texture;
 }
 
-bool GLSurface::onReadPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) const {
-  if (canvas) {
-    canvas->flush();
-  }
-  renderTarget->resolve();
+bool GLSurface::onReadPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) {
+  flush(nullptr);
   return renderTarget->readPixels(dstInfo, dstPixels, srcX, srcY);
 }
 }  // namespace tgfx
