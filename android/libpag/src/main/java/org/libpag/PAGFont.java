@@ -309,13 +309,13 @@ public class PAGFont {
     private static boolean systemFontLoaded = false;
 
     private static void RegisterFallbackFonts() {
+        if (systemFontLoaded) {
+            return;
+        }
+        systemFontLoaded = true;
         new Thread(new Runnable() {
             @Override
             public void run() {
-                if (systemFontLoaded) {
-                    return;
-                }
-                systemFontLoaded = true;
                 FontConfig[] fontList = new FontConfig[0];
                 File lollipopFile = new File(SystemFontConfigPath_Lollipop);
                 if (lollipopFile.exists()) {
