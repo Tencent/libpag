@@ -11,6 +11,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.logging.Handler;
 import java.util.regex.Pattern;
 
 public class PAGFont {
@@ -312,47 +313,52 @@ public class PAGFont {
             return;
         }
         systemFontLoaded = true;
-        FontConfig[] fontList = new FontConfig[0];
-        File lollipopFile = new File(SystemFontConfigPath_Lollipop);
-        if (lollipopFile.exists()) {
-            try {
-                fontList = parseLollipop();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        } else {
-            try {
-                fontList = parseJellyBean();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                FontConfig[] fontList = new FontConfig[0];
+                File lollipopFile = new File(SystemFontConfigPath_Lollipop);
+                if (lollipopFile.exists()) {
+                    try {
+                        fontList = parseLollipop();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                } else {
+                    try {
+                        fontList = parseJellyBean();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
 
-        ArrayList<String> fontPaths = new ArrayList<>();
-        ArrayList<Integer> ttcList = new ArrayList<>();
-        FontConfig font = getFontByLanguage(fontList, DefaultLanguage);
-        if (font != null) {
-            addFont(font, fontPaths, ttcList);
-        }
-        for (String fileName : FallbackFontFileNames) {
-            font = new FontConfig();
-            font.fileName = fileName;
-            addFont(font, fontPaths, ttcList);
-        }
-        for (FontConfig fontConfig : fontList) {
-            addFont(fontConfig, fontPaths, ttcList);
-        }
+                ArrayList<String> fontPaths = new ArrayList<>();
+                ArrayList<Integer> ttcList = new ArrayList<>();
+                FontConfig font = getFontByLanguage(fontList, DefaultLanguage);
+                if (font != null) {
+                    addFont(font, fontPaths, ttcList);
+                }
+                for (String fileName : FallbackFontFileNames) {
+                    font = new FontConfig();
+                    font.fileName = fileName;
+                    addFont(font, fontPaths, ttcList);
+                }
+                for (FontConfig fontConfig : fontList) {
+                    addFont(fontConfig, fontPaths, ttcList);
+                }
 
-        if (!fontPaths.isEmpty()) {
-            String[] fontPathList = new String[fontPaths.size()];
-            fontPaths.toArray(fontPathList);
-            int[] ttcIndices = new int[ttcList.size()];
-            int index = 0;
-            for (Integer ttcIndex : ttcList) {
-                ttcIndices[index++] = ttcIndex;
+                if (!fontPaths.isEmpty()) {
+                    String[] fontPathList = new String[fontPaths.size()];
+                    fontPaths.toArray(fontPathList);
+                    int[] ttcIndices = new int[ttcList.size()];
+                    int index = 0;
+                    for (Integer ttcIndex : ttcList) {
+                        ttcIndices[index++] = ttcIndex;
+                    }
+                    PAGFont.SetFallbackFontPaths(fontPathList, ttcIndices);
+                }
             }
-            PAGFont.SetFallbackFontPaths(fontPathList, ttcIndices);
-        }
+        }).start();
     }
 
     static {
