@@ -1,4 +1,4 @@
-import { PAGModule } from '../binding';
+import { PAGModule } from '../pag-module';
 import { ctor, EmscriptenGL, Point, Vector } from '../types';
 import { ScalerContext } from './scaler-context';
 import { Matrix } from './matrix';
@@ -39,7 +39,7 @@ export class WebMask {
   private context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
   public constructor(width: number, height: number) {
-    this.canvas = getCanvas2D();
+    this.canvas = this.loadCanvas();
     this.canvas.width = width;
     this.canvas.height = height;
     this.context = this.canvas.getContext('2d') as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
@@ -104,5 +104,9 @@ export class WebMask {
 
   public onDestroy() {
     releaseCanvas2D(this.canvas);
+  }
+
+  protected loadCanvas(): HTMLCanvasElement | OffscreenCanvas {
+    return getCanvas2D();
   }
 }

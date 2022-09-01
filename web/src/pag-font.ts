@@ -1,7 +1,7 @@
 import { readFile } from './utils/common';
 import { defaultFontNames } from './utils/font-family';
 import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorators';
-import { PAGModule } from './binding';
+import { PAGModule } from './pag-module';
 
 @destroyVerify
 @wasmAwaitRewind

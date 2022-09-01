@@ -5,7 +5,7 @@ import { PAGSurface } from './pag-surface';
 import { destroyVerify } from './utils/decorators';
 import { isOffscreenCanvas } from './utils/canvas';
 import { BackendContext } from './core/backend-context';
-import { PAGModule } from './binding';
+import { PAGModule } from './pag-module';
 
 import type { PAGComposition } from './pag-composition';
 import type { Matrix } from './core/matrix';

@@ -1,4 +1,4 @@
-import { PAGModule } from './binding';
+import { PAGModule } from './pag-module';
 import { PAGLayer } from './pag-layer';
 import { destroyVerify, wasmAwaitRewind } from './utils/decorators';
 import { layer2typeLayer, proxyVector } from './utils/type-utils';

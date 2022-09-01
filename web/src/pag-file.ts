@@ -1,4 +1,4 @@
-import { PAGModule } from './binding';
+import { PAGModule } from './pag-module';
 import { PAGComposition } from './pag-composition';
 import { readFile } from './utils/common';
 import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorators';

@@ -1,4 +1,4 @@
-import { PAGModule } from '../binding';
+import { PAGModule } from '../pag-module';
 import { WEBGL_CONTEXT_ATTRIBUTES } from '../constant';
 
 export class BackendContext {

@@ -1,4 +1,4 @@
-import { PAGModule } from '../binding';
+import { PAGModule } from '../pag-module';
 import { LayerType, Vector } from '../types';
 
 import type { PAGLayer } from '../pag-layer';

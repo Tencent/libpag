@@ -9,6 +9,7 @@
   "scripts": {
     "build": "rimraf lib/*.js lib/*.map types/* && rollup -c ./script/rollup.config.js && tsc -p ./tsconfig.type.json",
     "dev": "rollup -c ./script/rollup.config.dev.js -w",
+    "dev:wx": "rollup -c ./script/rollup.config.wx.dev.js -w",
     "eslint": "eslint --ext .ts src/ --config .eslintrc.js",
     "eslint:fix": "eslint --ext .ts src/ --fix",
     "prettier": "prettier --check \"src/**/*.ts\"",

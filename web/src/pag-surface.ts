@@ -1,4 +1,4 @@
-import { PAGModule } from './binding';
+import { PAGModule } from './pag-module';
 import { AlphaType, ColorType } from './types';
 import { destroyVerify, wasmAwaitRewind } from './utils/decorators';
 

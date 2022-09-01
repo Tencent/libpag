@@ -1,4 +1,4 @@
-import { PAGModule } from '../binding';
+import { PAGModule } from './pag-module';
 
 export function wasmAwaitRewind(constructor: any) {
   const ignoreStaticFunctions = ['length', 'name', 'prototype', 'wasmAsyncMethods'];
