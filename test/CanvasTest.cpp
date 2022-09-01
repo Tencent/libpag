@@ -168,8 +168,19 @@ PAG_TEST(CanvasTest, DropShadow) {
   paint.setImageFilter(ImageFilter::DropShadow(0, 0, 15, 15, tgfx::Color::White()));
   canvas->drawTexture(texture, &paint);
 
+  canvas->concat(tgfx::Matrix::MakeTrans(imageWidth + padding, 0));
+  auto filter = ImageFilter::DropShadow(3, 3, 0, 0, tgfx::Color::White());
+  paint.setImageFilter(filter);
+  canvas->drawTexture(texture, &paint);
+
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/dropShadow"));
   device->unlock();
+
+  auto src = Rect::MakeXYWH(10, 10, 10, 10);
+  auto bounds = filter->filterBounds(src);
+  EXPECT_EQ(bounds, Rect::MakeXYWH(10, 10, 13, 13));
+  bounds = ImageFilter::DropShadowOnly(3, 3, 0, 0, Color::White())->filterBounds(src);
+  EXPECT_EQ(bounds, Rect::MakeXYWH(13, 13, 10, 10));
 }
 
 PAG_TEST(CanvasTest, clip) {
