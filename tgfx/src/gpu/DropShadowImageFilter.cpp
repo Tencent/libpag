@@ -73,11 +73,17 @@ std::pair<std::shared_ptr<Texture>, Point> DropShadowImageFilter::filterImage(
 }
 
 Rect DropShadowImageFilter::onFilterNodeBounds(const Rect& srcRect) const {
-  auto filter = ImageFilter::Blur(blurrinessX, blurrinessY);
-  if (filter == nullptr) {
-    return Rect::MakeEmpty();
+  auto bounds = srcRect;
+  auto shadowBounds = bounds;
+  shadowBounds.offset(dx, dy);
+  if (auto filter = ImageFilter::Blur(blurrinessX, blurrinessY)) {
+    shadowBounds = filter->filterBounds(shadowBounds);
   }
-  auto dstRect = srcRect.makeOffset(dx, dy);
-  return filter->filterBounds(dstRect);
+  if (!shadowOnly) {
+    bounds.join(shadowBounds);
+  } else {
+    bounds = shadowBounds;
+  }
+  return bounds;
 }
 }  // namespace tgfx
