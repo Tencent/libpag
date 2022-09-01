@@ -37,6 +37,10 @@ class GLTriangulatingPathOp : public GLDrawOp {
   void draw(const DrawArgs& args) override;
 
  private:
+  DEFINE_OP_CLASS_ID
+
+  bool onCombineIfPossible(GLDrawOp* op) override;
+
   Color color = Color::Transparent();
   std::vector<float> vertex;
   int vertexCount;

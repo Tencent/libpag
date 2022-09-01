@@ -38,8 +38,12 @@ class DualBlurFragmentProcessor : public FragmentProcessor {
   std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
 
  private:
+  DEFINE_PROCESSOR_CLASS_ID
+
   DualBlurFragmentProcessor(DualBlurPassMode passMode, std::unique_ptr<FragmentProcessor> texture,
                             Point blurOffset, Point texelSize);
+
+  bool onIsEqual(const FragmentProcessor& processor) const override;
 
   DualBlurPassMode passMode;
   Point blurOffset;

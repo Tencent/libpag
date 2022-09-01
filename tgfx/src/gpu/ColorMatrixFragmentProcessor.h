@@ -30,13 +30,16 @@ class ColorMatrixFragmentProcessor : public FragmentProcessor {
     return "ColorMatrixFragmentProcessor";
   }
 
-  void onComputeProcessorKey(BytesKey* bytesKey) const override;
-
   std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
 
  private:
-  ColorMatrixFragmentProcessor(const std::array<float, 20>& matrix) : matrix(matrix) {
+  DEFINE_PROCESSOR_CLASS_ID
+
+  explicit ColorMatrixFragmentProcessor(const std::array<float, 20>& matrix)
+      : FragmentProcessor(ClassID()), matrix(matrix) {
   }
+
+  bool onIsEqual(const FragmentProcessor& processor) const override;
 
   std::array<float, 20> matrix;
 

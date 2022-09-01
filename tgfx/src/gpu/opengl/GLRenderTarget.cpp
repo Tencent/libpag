@@ -187,18 +187,6 @@ GLRenderTarget::GLRenderTarget(int width, int height, ImageOrigin origin, int sa
       textureTarget(textureTarget) {
 }
 
-void GLRenderTarget::clear() const {
-  int oldFb = 0;
-  auto gl = GLFunctions::Get(context);
-  gl->getIntegerv(GL_FRAMEBUFFER_BINDING, &oldFb);
-  gl->bindFramebuffer(GL_FRAMEBUFFER, renderTargetFBInfo.id);
-  gl->viewport(0, 0, width(), height());
-  gl->scissor(0, 0, width(), height());
-  gl->clearColor(0.0f, 0.0f, 0.0f, 0.0f);
-  gl->clear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-  gl->bindFramebuffer(GL_FRAMEBUFFER, oldFb);
-}
-
 static bool CanReadDirectly(Context* context, ImageOrigin origin, const ImageInfo& srcInfo,
                             const ImageInfo& dstInfo) {
   if (origin != ImageOrigin::TopLeft || dstInfo.alphaType() != srcInfo.alphaType() ||

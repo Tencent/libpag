@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PorterDuffXferProcessor.h"
-#include "core/utils/UniqueID.h"
 #include "opengl/GLPorterDuffXferProcessor.h"
 
 namespace tgfx {
@@ -26,8 +25,7 @@ std::unique_ptr<PorterDuffXferProcessor> PorterDuffXferProcessor::Make(BlendMode
 }
 
 void PorterDuffXferProcessor::computeProcessorKey(Context*, BytesKey* bytesKey) const {
-  static auto Type = UniqueID::Next();
-  bytesKey->write(Type);
+  bytesKey->write(classID());
   bytesKey->write(static_cast<uint32_t>(blend));
 }
 

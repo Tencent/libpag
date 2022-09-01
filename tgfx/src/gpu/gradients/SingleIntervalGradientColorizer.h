@@ -30,13 +30,16 @@ class SingleIntervalGradientColorizer : public FragmentProcessor {
     return "SingleIntervalGradientColorizer";
   }
 
-  void onComputeProcessorKey(BytesKey* bytesKey) const override;
-
   std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
 
  private:
-  SingleIntervalGradientColorizer(Color start, Color end) : start(start), end(end) {
+  DEFINE_PROCESSOR_CLASS_ID
+
+  SingleIntervalGradientColorizer(Color start, Color end)
+      : FragmentProcessor(ClassID()), start(start), end(end) {
   }
+
+  bool onIsEqual(const FragmentProcessor& processor) const override;
 
   Color start;
   Color end;

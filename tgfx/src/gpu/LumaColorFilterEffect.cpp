@@ -17,15 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LumaColorFilterEffect.h"
-#include "core/utils/UniqueID.h"
 #include "opengl/GLLumaColorFilterEffect.h"
 
 namespace tgfx {
-void LumaColorFilterEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
-  static auto Type = UniqueID::Next();
-  bytesKey->write(Type);
-}
-
 std::unique_ptr<GLFragmentProcessor> LumaColorFilterEffect::onCreateGLInstance() const {
   return std::make_unique<GLLumaColorFilterEffect>();
 }

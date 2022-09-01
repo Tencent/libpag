@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ConstColorProcessor.h"
-#include "core/utils/UniqueID.h"
 #include "opengl/GLConstColorProcessor.h"
 
 namespace tgfx {
@@ -26,10 +25,12 @@ std::unique_ptr<ConstColorProcessor> ConstColorProcessor::Make(Color color, Inpu
 }
 
 void ConstColorProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
-  static auto Type = UniqueID::Next();
-  bytesKey->write(Type);
-  auto flag = static_cast<uint32_t>(inputMode);
-  bytesKey->write(flag);
+  bytesKey->write(static_cast<uint32_t>(inputMode));
+}
+
+bool ConstColorProcessor::onIsEqual(const FragmentProcessor& processor) const {
+  const auto& that = static_cast<const ConstColorProcessor&>(processor);
+  return inputMode == that.inputMode && color == that.color;
 }
 
 std::unique_ptr<GLFragmentProcessor> ConstColorProcessor::onCreateGLInstance() const {

@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureGradientColorizer.h"
-#include "core/utils/UniqueID.h"
 #include "gpu/opengl/GLTextureGradientColorizer.h"
 
 namespace tgfx {
@@ -27,9 +26,8 @@ std::unique_ptr<TextureGradientColorizer> TextureGradientColorizer::Make(
       new TextureGradientColorizer(std::move(gradient)));
 }
 
-void TextureGradientColorizer::onComputeProcessorKey(BytesKey* bytesKey) const {
-  static auto Type = UniqueID::Next();
-  bytesKey->write(Type);
+bool TextureGradientColorizer::onIsEqual(const FragmentProcessor& processor) const {
+  return gradient == static_cast<const TextureGradientColorizer&>(processor).gradient;
 }
 
 std::unique_ptr<GLFragmentProcessor> TextureGradientColorizer::onCreateGLInstance() const {

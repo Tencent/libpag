@@ -18,7 +18,6 @@
 
 #include "GLTriangulatingPathOp.h"
 #include "core/PathRef.h"
-#include "core/TriangularPathMesh.h"
 #include "gpu/DefaultGeometryProcessor.h"
 #include "tgfx/core/Mesh.h"
 
@@ -47,8 +46,22 @@ std::unique_ptr<GLTriangulatingPathOp> GLTriangulatingPathOp::Make(Color color, 
 GLTriangulatingPathOp::GLTriangulatingPathOp(Color color, std::vector<float> vertex,
                                              int vertexCount, Rect bounds,
                                              const Matrix& localMatrix)
-    : color(color), vertex(std::move(vertex)), vertexCount(vertexCount), localMatrix(localMatrix) {
+    : GLDrawOp(ClassID()),
+      color(color),
+      vertex(std::move(vertex)),
+      vertexCount(vertexCount),
+      localMatrix(localMatrix) {
   setBounds(bounds);
+}
+
+bool GLTriangulatingPathOp::onCombineIfPossible(GLDrawOp* op) {
+  auto* that = static_cast<GLTriangulatingPathOp*>(op);
+  if (localMatrix != that->localMatrix || color != that->color) {
+    return false;
+  }
+  vertex.insert(vertex.end(), that->vertex.begin(), that->vertex.end());
+  vertexCount += that->vertexCount;
+  return true;
 }
 
 std::unique_ptr<GeometryProcessor> GLTriangulatingPathOp::getGeometryProcessor(

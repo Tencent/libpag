@@ -43,8 +43,12 @@ class GLFillRectOp : public GLDrawOp {
   void draw(const DrawArgs& args) override;
 
  private:
+  DEFINE_OP_CLASS_ID
+
   GLFillRectOp(std::vector<Color> colors, std::vector<Rect> rects, std::vector<Matrix> viewMatrices,
                std::vector<Matrix> localMatrices);
+
+  bool onCombineIfPossible(GLDrawOp* op) override;
 
   std::vector<float> coverageVertices() const;
 

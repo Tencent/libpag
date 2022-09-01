@@ -37,7 +37,6 @@ class GLCanvas : public Canvas {
 
   ~GLCanvas() override;
 
-  void clear() override;
   void drawTexture(std::shared_ptr<Texture> texture, const RGBAAALayout* layout,
                    const Paint& paint) override;
   void drawPath(const Path& path, const Paint& paint) override;
@@ -46,6 +45,11 @@ class GLCanvas : public Canvas {
   void drawAtlas(std::shared_ptr<Texture> atlas, const Matrix matrix[], const Rect tex[],
                  const Color colors[], size_t count) override;
   void drawMesh(const Mesh* mesh, const Paint& paint) override;
+  void flush() override;
+
+  SurfaceDrawContext* getSurfaceDrawContext() {
+    return drawContext;
+  };
 
  protected:
   void onSave() override {

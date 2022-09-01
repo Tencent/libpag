@@ -41,6 +41,8 @@ class EllipseGeometryProcessor : public GeometryProcessor {
   std::unique_ptr<GLGeometryProcessor> createGLInstance() const override;
 
  private:
+  DEFINE_PROCESSOR_CLASS_ID
+
   EllipseGeometryProcessor(int width, int height, bool stroke, bool useScale,
                            const Matrix& localMatrix);
 

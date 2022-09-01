@@ -43,6 +43,8 @@ class SamplerState {
       : wrapModeX(wrapModeX), wrapModeY(wrapModeY) {
   }
 
+  friend bool operator==(const SamplerState& a, const SamplerState& b);
+
   WrapMode wrapModeX = WrapMode::Clamp;
   WrapMode wrapModeY = WrapMode::Clamp;
 };

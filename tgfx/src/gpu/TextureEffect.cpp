@@ -18,7 +18,6 @@
 
 #include "TextureEffect.h"
 #include "core/utils/MathExtra.h"
-#include "core/utils/UniqueID.h"
 #include "opengl/GLTextureEffect.h"
 
 namespace tgfx {
@@ -130,7 +129,8 @@ std::unique_ptr<FragmentProcessor> TextureEffect::Make(const Context* context,
 
 TextureEffect::TextureEffect(std::shared_ptr<Texture> texture, const Sampling& sampling,
                              const Matrix& localMatrix)
-    : texture(std::move(texture)),
+    : FragmentProcessor(ClassID()),
+      texture(std::move(texture)),
       samplerState(sampling.hwSampler),
       subset(sampling.shaderSubset),
       clamp(sampling.shaderClamp),
@@ -142,11 +142,16 @@ TextureEffect::TextureEffect(std::shared_ptr<Texture> texture, const Sampling& s
 }
 
 void TextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
-  static auto Type = UniqueID::Next();
-  bytesKey->write(Type);
   auto flags = static_cast<uint32_t>(shaderModeX);
   flags |= static_cast<uint32_t>(shaderModeY) << 3;
   bytesKey->write(flags);
+}
+
+bool TextureEffect::onIsEqual(const FragmentProcessor& processor) const {
+  const auto& that = static_cast<const TextureEffect&>(processor);
+  return texture == that.texture && samplerState == that.samplerState && subset == that.subset &&
+         clamp == that.clamp && shaderModeX == that.shaderModeX &&
+         shaderModeY == that.shaderModeY && coordTransform.matrix == that.coordTransform.matrix;
 }
 
 std::unique_ptr<GLFragmentProcessor> TextureEffect::onCreateGLInstance() const {

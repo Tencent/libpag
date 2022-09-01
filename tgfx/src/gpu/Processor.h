@@ -18,12 +18,22 @@
 
 #pragma once
 
+#include "core/utils/UniqueID.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
+#define DEFINE_PROCESSOR_CLASS_ID               \
+  static uint32_t ClassID() {                   \
+    static uint32_t ClassID = UniqueID::Next(); \
+    return ClassID;                             \
+  }
+
 class Processor {
  public:
+  explicit Processor(uint32_t classID) : _classID(classID) {
+  }
+
   virtual ~Processor() = default;
 
   /**
@@ -31,6 +41,13 @@ class Processor {
    */
   virtual std::string name() const = 0;
 
+  uint32_t classID() const {
+    return _classID;
+  }
+
   virtual void computeProcessorKey(Context* context, BytesKey* bytesKey) const = 0;
+
+ private:
+  uint32_t _classID = 0;
 };
 }  // namespace tgfx

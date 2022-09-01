@@ -102,6 +102,17 @@ void Canvas::clipPath(const Path& path) {
   state->clipID = NextClipID();
 }
 
+void Canvas::clear(const Color& color) {
+  auto oldBlend = getBlendMode();
+  setBlendMode(BlendMode::Src);
+  Paint paint;
+  paint.setColor(color);
+  auto rect =
+      Rect::MakeWH(static_cast<float>(surface->width()), static_cast<float>(surface->height()));
+  drawRect(rect, paint);
+  setBlendMode(oldBlend);
+}
+
 void Canvas::drawRect(const Rect& rect, const Paint& paint) {
   Path path = {};
   path.addRect(rect);

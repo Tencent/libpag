@@ -29,12 +29,14 @@ class SweepGradientLayout : public FragmentProcessor {
     return "SweepGradientLayout";
   }
 
-  void onComputeProcessorKey(BytesKey* bytesKey) const override;
-
   std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
 
  private:
+  DEFINE_PROCESSOR_CLASS_ID
+
   SweepGradientLayout(Matrix matrix, float bias, float scale);
+
+  bool onIsEqual(const FragmentProcessor& processor) const override;
 
   CoordTransform coordTransform;
   float bias;

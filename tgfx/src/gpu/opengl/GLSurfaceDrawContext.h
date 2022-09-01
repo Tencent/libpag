@@ -30,11 +30,16 @@ class GLSurfaceDrawContext : public SurfaceDrawContext {
   void fillRectWithFP(const Rect& dstRect, const Matrix& localMatrix,
                       std::unique_ptr<FragmentProcessor> fp) override;
 
-  void draw(DrawArgs args, std::unique_ptr<GLDrawOp> op);
+  void addOp(std::unique_ptr<GLDrawOp> op);
+
+  void flush() override;
+
+  ~GLSurfaceDrawContext() override;
 
  private:
   GLDrawer* getDrawer();
 
+  std::vector<std::unique_ptr<GLDrawOp>> ops;
   std::shared_ptr<GLDrawer> _drawer = nullptr;
 };
 }  // namespace tgfx

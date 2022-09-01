@@ -31,9 +31,11 @@ class DeviceSpaceTextureEffect : public FragmentProcessor {
   }
 
  private:
+  DEFINE_PROCESSOR_CLASS_ID
+
   DeviceSpaceTextureEffect(std::shared_ptr<Texture> texture, ImageOrigin deviceOrigin);
 
-  void onComputeProcessorKey(BytesKey* bytesKey) const override;
+  bool onIsEqual(const FragmentProcessor& processor) const override;
 
   std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
 

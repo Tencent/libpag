@@ -26,10 +26,12 @@
 namespace tgfx {
 class SurfaceDrawContext {
  public:
-  static std::shared_ptr<SurfaceDrawContext> Make(Surface* surface);
+  static SurfaceDrawContext* Get(Surface* surface);
 
   virtual void fillRectWithFP(const Rect& dstRect, const Matrix& localMatrix,
                               std::unique_ptr<FragmentProcessor> fp) = 0;
+
+  virtual void flush() = 0;
 
   virtual ~SurfaceDrawContext() = default;
 

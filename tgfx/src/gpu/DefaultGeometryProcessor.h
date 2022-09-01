@@ -33,9 +33,9 @@ class DefaultGeometryProcessor : public GeometryProcessor {
   std::unique_ptr<GLGeometryProcessor> createGLInstance() const override;
 
  private:
-  DefaultGeometryProcessor(Color color, int width, int height, const Matrix& localMatrix);
+  DEFINE_PROCESSOR_CLASS_ID
 
-  void onComputeProcessorKey(BytesKey* bytesKey) const override;
+  DefaultGeometryProcessor(Color color, int width, int height, const Matrix& localMatrix);
 
   Attribute position;
   Attribute coverage;

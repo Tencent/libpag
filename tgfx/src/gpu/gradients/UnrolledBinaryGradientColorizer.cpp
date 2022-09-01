@@ -18,7 +18,6 @@
 
 #include "UnrolledBinaryGradientColorizer.h"
 #include "core/utils/MathExtra.h"
-#include "core/utils/UniqueID.h"
 #include "gpu/opengl/GLUnrolledBinaryGradientColorizer.h"
 
 namespace tgfx {
@@ -87,9 +86,19 @@ std::unique_ptr<UnrolledBinaryGradientColorizer> UnrolledBinaryGradientColorizer
 }
 
 void UnrolledBinaryGradientColorizer::onComputeProcessorKey(BytesKey* bytesKey) const {
-  static auto Type = UniqueID::Next();
-  bytesKey->write(Type);
   bytesKey->write(static_cast<uint32_t>(intervalCount));
+}
+
+bool UnrolledBinaryGradientColorizer::onIsEqual(const FragmentProcessor& processor) const {
+  const auto& that = static_cast<const UnrolledBinaryGradientColorizer&>(processor);
+  return intervalCount == that.intervalCount && scale0_1 == that.scale0_1 &&
+         scale2_3 == that.scale2_3 && scale4_5 == that.scale4_5 && scale6_7 == that.scale6_7 &&
+         scale8_9 == that.scale8_9 && scale10_11 == that.scale10_11 &&
+         scale12_13 == that.scale12_13 && scale14_15 == that.scale14_15 &&
+         bias0_1 == that.bias0_1 && bias2_3 == that.bias2_3 && bias4_5 == that.bias4_5 &&
+         bias6_7 == that.bias6_7 && bias8_9 == that.bias8_9 && bias10_11 == that.bias10_11 &&
+         bias12_13 == that.bias12_13 && bias14_15 == that.bias14_15 &&
+         thresholds1_7 == that.thresholds1_7 && thresholds9_13 == that.thresholds9_13;
 }
 
 std::unique_ptr<GLFragmentProcessor> UnrolledBinaryGradientColorizer::onCreateGLInstance() const {

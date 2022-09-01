@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLCanvas.h"
+#include "GLBlend.h"
 #include "GLFillRectOp.h"
 #include "GLRRectOp.h"
 #include "GLSurface.h"
@@ -24,6 +25,7 @@
 #include "gpu/AARectEffect.h"
 #include "gpu/ConstColorProcessor.h"
 #include "gpu/DeviceSpaceTextureEffect.h"
+#include "gpu/PorterDuffXferProcessor.h"
 #include "gpu/RGBAAATextureEffect.h"
 #include "gpu/opengl/GLTriangulatingPathOp.h"
 #include "tgfx/core/Mask.h"
@@ -99,12 +101,10 @@ GLCanvas::~GLCanvas() {
   delete drawContext;
 }
 
-void GLCanvas::clear() {
-  auto renderTarget = std::static_pointer_cast<GLRenderTarget>(surface->getRenderTarget());
-  renderTarget->clear();
-}
-
 std::shared_ptr<Texture> GLCanvas::getClipTexture() {
+  if (clipID != state->clipID) {
+    _clipSurface = nullptr;
+  }
   if (_clipSurface == nullptr) {
     _clipSurface = Surface::Make(getContext(), surface->width(), surface->height(), true);
     if (_clipSurface == nullptr) {
@@ -151,8 +151,11 @@ std::unique_ptr<FragmentProcessor> GLCanvas::getClipMask(const Rect& deviceBound
       rect.bottom = rect.top + height;
     }
     if (IsPixelAligned(rect) && scissorRect) {
-      *scissorRect = rect;
-      scissorRect->round();
+      rect.round();
+      if (static_cast<int>(rect.width()) != surface->width() ||
+          static_cast<int>(rect.height()) != surface->height()) {
+        *scissorRect = rect;
+      }
       return nullptr;
     } else {
       return AARectEffect::Make(rect);
@@ -477,9 +480,8 @@ void GLCanvas::draw(std::unique_ptr<GLDrawOp> op, GLPaint paint, bool aa) {
   if (drawContext == nullptr) {
     return;
   }
-  auto renderTarget = surface->getRenderTarget();
   auto aaType = AAType::None;
-  if (renderTarget->sampleCount() > 1) {
+  if (static_cast<GLSurface*>(surface)->renderTarget->sampleCount() > 1) {
     aaType = AAType::MSAA;
   } else if (aa && !IsPixelAligned(op->bounds())) {
     aaType = AAType::Coverage;
@@ -490,18 +492,31 @@ void GLCanvas::draw(std::unique_ptr<GLDrawOp> op, GLPaint paint, bool aa) {
       aaType = AAType::Coverage;
     }
   }
-  DrawArgs args;
-  args.colors = std::move(paint.colorFragmentProcessors);
-  args.masks = std::move(paint.coverageFragmentProcessors);
-  auto clipMask = getClipMask(op->bounds(), &args.scissorRect);
+  auto masks = std::move(paint.coverageFragmentProcessors);
+  Rect scissorRect = Rect::MakeEmpty();
+  auto clipMask = getClipMask(op->bounds(), &scissorRect);
   if (clipMask) {
-    args.masks.push_back(std::move(clipMask));
+    masks.push_back(std::move(clipMask));
   }
-  args.context = surface->getContext();
-  args.blendMode = state->blendMode;
-  args.renderTarget = renderTarget.get();
-  args.renderTargetTexture = surface->getTexture();
-  args.aa = aaType;
-  drawContext->draw(std::move(args), std::move(op));
+  op->setScissorRect(scissorRect);
+  unsigned first;
+  unsigned second;
+  if (BlendAsCoeff(state->blendMode, &first, &second)) {
+    op->setBlendFactors(std::make_pair(first, second));
+  } else {
+    op->setXferProcessor(PorterDuffXferProcessor::Make(state->blendMode));
+    op->setRequireDstTexture(!GLCaps::Get(getContext())->frameBufferFetchSupport);
+  }
+  op->setAA(aaType);
+  op->setColors(std::move(paint.colorFragmentProcessors));
+  op->setMasks(std::move(masks));
+  drawContext->addOp(std::move(op));
+}
+
+void GLCanvas::flush() {
+  if (drawContext == nullptr) {
+    return;
+  }
+  drawContext->flush();
 }
 }  // namespace tgfx

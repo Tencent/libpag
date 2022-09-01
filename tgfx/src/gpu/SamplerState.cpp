@@ -41,4 +41,8 @@ SamplerState::SamplerState(TileMode tileModeX, TileMode tileModeY) {
   wrapModeX = TileModeToWrapMode(tileModeX);
   wrapModeY = TileModeToWrapMode(tileModeY);
 }
+
+bool operator==(const SamplerState& a, const SamplerState& b) {
+  return a.wrapModeX == b.wrapModeX && a.wrapModeY == b.wrapModeY;
+}
 }  // namespace tgfx

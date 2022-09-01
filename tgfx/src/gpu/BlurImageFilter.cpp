@@ -78,7 +78,7 @@ std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrine
 }
 
 void BlurImageFilter::draw(std::shared_ptr<Texture> texture, Surface* toSurface, bool isDown) {
-  auto drawContext = SurfaceDrawContext::Make(toSurface);
+  auto drawContext = SurfaceDrawContext::Get(toSurface);
   auto dstRect =
       Rect::MakeWH(static_cast<float>(toSurface->width()), static_cast<float>(toSurface->height()));
   auto localMatrix = Matrix::MakeScale(static_cast<float>(texture->width()),
@@ -101,7 +101,7 @@ static std::shared_ptr<Texture> ExtendImage(Context* context, std::shared_ptr<Te
   if (surface == nullptr) {
     return nullptr;
   }
-  auto drawContext = SurfaceDrawContext::Make(surface.get());
+  auto drawContext = SurfaceDrawContext::Get(surface.get());
   auto localMatrix = Matrix::MakeScale(dstBounds.width(), dstBounds.height());
   localMatrix.postTranslate(dstBounds.left, dstBounds.top);
   auto dstRect = Rect::MakeWH(dstBounds.width(), dstBounds.height());

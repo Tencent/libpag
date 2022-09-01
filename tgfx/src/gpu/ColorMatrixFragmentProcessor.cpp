@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ColorMatrixFragmentProcessor.h"
-#include "core/utils/UniqueID.h"
 #include "opengl/GLColorMatrixFragmentProcessor.h"
 
 namespace tgfx {
@@ -26,9 +25,8 @@ std::unique_ptr<ColorMatrixFragmentProcessor> ColorMatrixFragmentProcessor::Make
   return std::unique_ptr<ColorMatrixFragmentProcessor>(new ColorMatrixFragmentProcessor(matrix));
 }
 
-void ColorMatrixFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
-  static auto Type = UniqueID::Next();
-  bytesKey->write(Type);
+bool ColorMatrixFragmentProcessor::onIsEqual(const FragmentProcessor& processor) const {
+  return matrix == static_cast<const ColorMatrixFragmentProcessor&>(processor).matrix;
 }
 
 std::unique_ptr<GLFragmentProcessor> ColorMatrixFragmentProcessor::onCreateGLInstance() const {

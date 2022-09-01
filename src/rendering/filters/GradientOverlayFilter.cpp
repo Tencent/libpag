@@ -95,5 +95,6 @@ void GradientOverlayFilter::draw(tgfx::Context* context, const FilterSource* sou
   auto rect = tgfx::Rect::MakeWH(width, height);
   targetCanvas->drawRect(rect, paint);
   targetCanvas->restore();
+  targetCanvas->flush();
 }
 }  // namespace pag

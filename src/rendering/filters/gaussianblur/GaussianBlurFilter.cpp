@@ -62,5 +62,6 @@ void GaussianBlurFilter::draw(tgfx::Context* context, const FilterSource* source
   paint.setImageFilter(blurFilter);
   targetCanvas->drawTexture(std::move(texture), &paint);
   targetCanvas->restore();
+  targetCanvas->flush();
 }
 }  // namespace pag

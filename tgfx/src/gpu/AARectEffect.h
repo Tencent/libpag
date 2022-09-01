@@ -30,10 +30,12 @@ class AARectEffect : public FragmentProcessor {
   }
 
  private:
-  explicit AARectEffect(const Rect& rect) : rect(rect) {
+  DEFINE_PROCESSOR_CLASS_ID
+
+  explicit AARectEffect(const Rect& rect) : FragmentProcessor(ClassID()), rect(rect) {
   }
 
-  void onComputeProcessorKey(BytesKey* bytesKey) const override;
+  bool onIsEqual(const FragmentProcessor& processor) const override;
 
   std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
 

@@ -5,6 +5,9 @@
         "dropShadow": "0c2e520a",
         "greyColorMatrix": "6a420423",
         "identityMatrix": "6a420423",
+        "merge_draw_call_rect": "e2670834",
+        "merge_draw_call_rrect": "e2670834",
+        "merge_draw_call_triangle": "e2670834",
         "tileMode": "fb98147f"
     },
     "PAGBlendTest": {

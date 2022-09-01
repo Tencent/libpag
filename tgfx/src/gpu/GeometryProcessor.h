@@ -73,10 +73,14 @@ class GeometryProcessor : public Processor {
   virtual std::unique_ptr<GLGeometryProcessor> createGLInstance() const = 0;
 
  protected:
+  explicit GeometryProcessor(uint32_t classID) : Processor(classID) {
+  }
+
   void setVertexAttributes(const Attribute* attrs, int attrCount);
 
  private:
-  virtual void onComputeProcessorKey(BytesKey* bytesKey) const = 0;
+  virtual void onComputeProcessorKey(BytesKey*) const {
+  }
 
   std::vector<const Attribute*> attributes = {};
 };

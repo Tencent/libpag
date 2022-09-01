@@ -30,6 +30,8 @@ class YUVTextureEffect : public FragmentProcessor {
   }
 
  private:
+  DEFINE_PROCESSOR_CLASS_ID
+
   YUVTextureEffect(std::shared_ptr<YUVTexture> texture, const RGBAAALayout* layout,
                    const Matrix& localMatrix);
 
@@ -40,6 +42,8 @@ class YUVTextureEffect : public FragmentProcessor {
   const TextureSampler* onTextureSampler(size_t index) const override {
     return texture->getSamplerAt(index);
   }
+
+  bool onIsEqual(const FragmentProcessor& processor) const override;
 
   std::shared_ptr<YUVTexture> texture;
   const RGBAAALayout* layout;

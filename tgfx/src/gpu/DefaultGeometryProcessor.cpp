@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DefaultGeometryProcessor.h"
-#include "core/utils/UniqueID.h"
 #include "gpu/opengl/GLDefaultGeometryProcessor.h"
 
 namespace tgfx {
@@ -29,15 +28,14 @@ std::unique_ptr<DefaultGeometryProcessor> DefaultGeometryProcessor::Make(
 
 DefaultGeometryProcessor::DefaultGeometryProcessor(Color color, int width, int height,
                                                    const Matrix& localMatrix)
-    : color(color), width(width), height(height), localMatrix(localMatrix) {
+    : GeometryProcessor(ClassID()),
+      color(color),
+      width(width),
+      height(height),
+      localMatrix(localMatrix) {
   position = {"aPosition", ShaderVar::Type::Float2};
   coverage = {"inCoverage", ShaderVar::Type::Float};
   setVertexAttributes(&position, 2);
-}
-
-void DefaultGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
-  static auto Type = UniqueID::Next();
-  bytesKey->write(Type);
 }
 
 std::unique_ptr<GLGeometryProcessor> DefaultGeometryProcessor::createGLInstance() const {

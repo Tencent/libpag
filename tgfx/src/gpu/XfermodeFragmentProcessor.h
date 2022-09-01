@@ -54,10 +54,14 @@ class XfermodeFragmentProcessor : public FragmentProcessor {
   std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
 
  private:
+  DEFINE_PROCESSOR_CLASS_ID
+
   enum class Child { DstChild, SrcChild, TwoChild };
 
   XfermodeFragmentProcessor(std::unique_ptr<FragmentProcessor> src,
                             std::unique_ptr<FragmentProcessor> dst, BlendMode mode);
+
+  bool onIsEqual(const FragmentProcessor& processor) const override;
 
   Child child;
   BlendMode mode;

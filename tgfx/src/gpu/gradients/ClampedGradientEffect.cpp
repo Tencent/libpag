@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ClampedGradientEffect.h"
-#include "core/utils/UniqueID.h"
 #include "gpu/opengl/GLClampedGradientEffect.h"
 
 namespace tgfx {
@@ -30,8 +29,6 @@ std::unique_ptr<ClampedGradientEffect> ClampedGradientEffect::Make(
 }
 
 void ClampedGradientEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
-  static auto Type = UniqueID::Next();
-  bytesKey->write(Type);
   uint32_t flag = makePremultiply ? 1 : 0;
   bytesKey->write(flag);
 }
@@ -40,11 +37,18 @@ std::unique_ptr<GLFragmentProcessor> ClampedGradientEffect::onCreateGLInstance()
   return std::make_unique<GLClampedGradientEffect>();
 }
 
+bool ClampedGradientEffect::onIsEqual(const FragmentProcessor& processor) const {
+  const auto& that = static_cast<const ClampedGradientEffect&>(processor);
+  return makePremultiply == that.makePremultiply && leftBorderColor == that.leftBorderColor &&
+         rightBorderColor == that.rightBorderColor;
+}
+
 ClampedGradientEffect::ClampedGradientEffect(std::unique_ptr<FragmentProcessor> colorizer,
                                              std::unique_ptr<FragmentProcessor> gradLayout,
                                              Color leftBorderColor, Color rightBorderColor,
                                              bool makePremultiplied)
-    : leftBorderColor(leftBorderColor),
+    : FragmentProcessor(ClassID()),
+      leftBorderColor(leftBorderColor),
       rightBorderColor(rightBorderColor),
       makePremultiply(makePremultiplied) {
   colorizerIndex = registerChildProcessor(std::move(colorizer));

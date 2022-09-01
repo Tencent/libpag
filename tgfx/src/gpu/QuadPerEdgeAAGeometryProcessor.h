@@ -35,6 +35,8 @@ class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
   std::unique_ptr<GLGeometryProcessor> createGLInstance() const override;
 
  private:
+  DEFINE_PROCESSOR_CLASS_ID
+
   QuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa, bool hasColor);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;

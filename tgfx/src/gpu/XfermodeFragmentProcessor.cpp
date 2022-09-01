@@ -18,7 +18,6 @@
 
 #include "XfermodeFragmentProcessor.h"
 #include "ConstColorProcessor.h"
-#include "core/utils/UniqueID.h"
 #include "opengl/GLXfermodeFragmentProcessor.h"
 
 namespace tgfx {
@@ -65,7 +64,7 @@ std::string XfermodeFragmentProcessor::name() const {
 XfermodeFragmentProcessor::XfermodeFragmentProcessor(std::unique_ptr<FragmentProcessor> src,
                                                      std::unique_ptr<FragmentProcessor> dst,
                                                      BlendMode mode)
-    : mode(mode) {
+    : FragmentProcessor(ClassID()), mode(mode) {
   if (src && dst) {
     child = Child::TwoChild;
     registerChildProcessor(std::move(src));
@@ -80,10 +79,12 @@ XfermodeFragmentProcessor::XfermodeFragmentProcessor(std::unique_ptr<FragmentPro
 }
 
 void XfermodeFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
-  static auto Type = UniqueID::Next();
-  bytesKey->write(Type);
-  uint32_t flag = static_cast<uint32_t>(mode) | (static_cast<uint32_t>(child) << 16);
-  bytesKey->write(flag);
+  bytesKey->write(static_cast<uint32_t>(mode) | (static_cast<uint32_t>(child) << 16));
+}
+
+bool XfermodeFragmentProcessor::onIsEqual(const FragmentProcessor& processor) const {
+  const auto& that = static_cast<const XfermodeFragmentProcessor&>(processor);
+  return mode == that.mode && child == that.child;
 }
 
 std::unique_ptr<GLFragmentProcessor> XfermodeFragmentProcessor::onCreateGLInstance() const {

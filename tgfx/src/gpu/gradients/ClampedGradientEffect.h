@@ -39,9 +39,13 @@ class ClampedGradientEffect : public FragmentProcessor {
   std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
 
  private:
+  DEFINE_PROCESSOR_CLASS_ID
+
   ClampedGradientEffect(std::unique_ptr<FragmentProcessor> colorizer,
                         std::unique_ptr<FragmentProcessor> gradLayout, Color leftBorderColor,
                         Color rightBorderColor, bool makePremultiplied);
+
+  bool onIsEqual(const FragmentProcessor& processor) const override;
 
   size_t colorizerIndex = ULONG_MAX;
   size_t gradLayoutIndex = ULONG_MAX;

@@ -31,19 +31,21 @@ class TextureGradientColorizer : public FragmentProcessor {
     return "TextureGradientColorizer";
   }
 
-  void onComputeProcessorKey(BytesKey* bytesKey) const override;
-
   std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
 
  private:
+  DEFINE_PROCESSOR_CLASS_ID
+
   explicit TextureGradientColorizer(std::shared_ptr<Texture> gradient)
-      : gradient(std::move(gradient)) {
+      : FragmentProcessor(ClassID()), gradient(std::move(gradient)) {
     setTextureSamplerCnt(1);
   }
 
   const TextureSampler* onTextureSampler(size_t) const override {
     return gradient->getSampler();
   }
+
+  bool onIsEqual(const FragmentProcessor& processor) const override;
 
   std::shared_ptr<Texture> gradient;
 

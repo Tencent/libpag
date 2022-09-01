@@ -31,15 +31,22 @@ class DualIntervalGradientColorizer : public FragmentProcessor {
     return "DualIntervalGradientColorizer";
   }
 
-  void onComputeProcessorKey(BytesKey* bytesKey) const override;
-
   std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
 
  private:
+  DEFINE_PROCESSOR_CLASS_ID
+
   DualIntervalGradientColorizer(Color scale01, Color bias01, Color scale23, Color bias23,
                                 float threshold)
-      : scale01(scale01), bias01(bias01), scale23(scale23), bias23(bias23), threshold(threshold) {
+      : FragmentProcessor(ClassID()),
+        scale01(scale01),
+        bias01(bias01),
+        scale23(scale23),
+        bias23(bias23),
+        threshold(threshold) {
   }
+
+  bool onIsEqual(const FragmentProcessor& processor) const override;
 
   Color scale01;
   Color bias01;

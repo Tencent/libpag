@@ -62,5 +62,7 @@ class GLSurface : public Surface {
                      std::shared_ptr<GLTexture> texture = nullptr);
 
   friend class Surface;
+  friend class GLCanvas;
+  friend class GLSurfaceDrawContext;
 };
 }  // namespace tgfx

@@ -35,7 +35,11 @@ class GLRRectOp : public GLDrawOp {
   void draw(const DrawArgs& args) override;
 
  private:
+  DEFINE_OP_CLASS_ID
+
   GLRRectOp(Color color, const RRect& rRect, const Matrix& viewMatrix, const Matrix& localMatrix);
+
+  bool onCombineIfPossible(GLDrawOp* op) override;
 
   struct RRectWrap {
     Color color = Color::Transparent();

@@ -16,8 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "core/TriangularPathMesh.h"
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
+#include "gpu/opengl/GLCanvas.h"
+#include "gpu/opengl/GLFillRectOp.h"
+#include "gpu/opengl/GLRRectOp.h"
+#include "gpu/opengl/GLTriangulatingPathOp.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/gpu/Surface.h"
@@ -236,6 +241,145 @@ PAG_TEST(CanvasTest, TileMode) {
                                 static_cast<float>(surface->height()) * 0.9f),
                    paint);
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/tileMode"));
+  device->unlock();
+}
+
+/**
+ * 用例描述: 测试 rect 合并绘制
+ */
+PAG_TEST(CanvasTest, merge_draw_call_rect) {
+  auto device = GLDevice::Make();
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  int width = 72;
+  int height = 72;
+  auto surface = Surface::Make(context, width, height);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  Paint paint;
+  paint.setColor(Color{0.8f, 0.8f, 0.8f, 1.f});
+  paint.setColorFilter(ColorFilter::MakeLumaColorFilter());
+  int tileSize = 8;
+  size_t drawCallCount = 0;
+  for (int y = 0; y < height; y += tileSize) {
+    bool draw = (y / tileSize) % 2 == 1;
+    for (int x = 0; x < width; x += tileSize) {
+      if (draw) {
+        auto rect = Rect::MakeXYWH(static_cast<float>(x), static_cast<float>(y),
+                                   static_cast<float>(tileSize), static_cast<float>(tileSize));
+        canvas->drawRect(rect, paint);
+        drawCallCount++;
+      }
+      draw = !draw;
+    }
+  }
+  auto* drawContext = static_cast<GLCanvas*>(canvas)->drawContext;
+  EXPECT_TRUE(drawContext != nullptr);
+  EXPECT_TRUE(drawContext->_drawer == nullptr);
+  EXPECT_TRUE(drawContext->ops.size() == 2);
+  EXPECT_EQ(static_cast<GLFillRectOp*>(drawContext->ops[1].get())->rects.size(), drawCallCount);
+  canvas->flush();
+  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/merge_draw_call_rect"));
+  device->unlock();
+}
+
+/**
+ * 用例描述: 测试 path 合并绘制
+ */
+PAG_TEST(CanvasTest, merge_draw_call_triangle) {
+  auto device = GLDevice::Make();
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = Image::MakeFrom("../resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+  auto texture = image->makeBuffer()->makeTexture(context);
+  ASSERT_TRUE(texture != nullptr);
+  int width = 72;
+  int height = 72;
+  auto surface = Surface::Make(context, width, height);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  Paint paint;
+  paint.setShader(Shader::MakeTextureShader(texture)->makeWithPreLocalMatrix(
+      Matrix::MakeScale(static_cast<float>(width) / static_cast<float>(image->width()),
+                        static_cast<float>(height) / static_cast<float>(image->height()))));
+  int tileSize = 8;
+  int drawCallCount = 0;
+  int triangleCount = 0;
+  for (int y = 0; y < height; y += tileSize) {
+    bool draw = (y / tileSize) % 2 == 1;
+    for (int x = 0; x < width; x += tileSize) {
+      if (draw) {
+        auto rect = Rect::MakeXYWH(static_cast<float>(x), static_cast<float>(y),
+                                   static_cast<float>(tileSize), static_cast<float>(tileSize));
+        auto centerX = rect.x() + rect.width() / 2.f;
+        auto centerY = rect.y() + rect.height() / 2.f;
+        Path path;
+        path.addRect(rect);
+        Matrix matrix = Matrix::I();
+        matrix.postRotate(45, centerX, centerY);
+        path.transform(matrix);
+        canvas->drawPath(path, paint);
+        if (triangleCount == 0) {
+          auto mesh = Mesh::MakeFrom(path);
+          triangleCount = static_cast<TriangularPathMesh*>(mesh.get())->_vertexCount;
+        }
+        drawCallCount += triangleCount;
+      }
+      draw = !draw;
+    }
+  }
+  auto* drawContext = static_cast<GLCanvas*>(canvas)->drawContext;
+  EXPECT_TRUE(drawContext != nullptr);
+  EXPECT_TRUE(drawContext->_drawer == nullptr);
+  EXPECT_TRUE(drawContext->ops.size() == 2);
+  EXPECT_EQ(static_cast<GLTriangulatingPathOp*>(drawContext->ops[1].get())->vertexCount,
+            drawCallCount);
+  canvas->flush();
+  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/merge_draw_call_triangle"));
+  device->unlock();
+}
+
+/**
+ * 用例描述: 测试 rrect 合并绘制
+ */
+PAG_TEST(CanvasTest, merge_draw_call_rrect) {
+  auto device = GLDevice::Make();
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  int width = 72;
+  int height = 72;
+  auto surface = Surface::Make(context, width, height);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  Paint paint;
+  paint.setShader(Shader::MakeLinearGradient(
+      Point{0.f, 0.f}, Point{static_cast<float>(width), static_cast<float>(height)},
+      {Color{0.f, 1.f, 0.f, 1.f}, Color{0.f, 0.f, 0.f, 1.f}}, {}));
+  int tileSize = 8;
+  size_t drawCallCount = 0;
+  for (int y = 0; y < height; y += tileSize) {
+    bool draw = (y / tileSize) % 2 == 1;
+    for (int x = 0; x < width; x += tileSize) {
+      if (draw) {
+        auto rect = Rect::MakeXYWH(static_cast<float>(x), static_cast<float>(y),
+                                   static_cast<float>(tileSize), static_cast<float>(tileSize));
+        Path path;
+        auto radius = static_cast<float>(tileSize) / 4.f;
+        path.addRoundRect(rect, radius, radius);
+        canvas->drawPath(path, paint);
+        drawCallCount++;
+      }
+      draw = !draw;
+    }
+  }
+  auto* drawContext = static_cast<GLCanvas*>(canvas)->drawContext;
+  EXPECT_TRUE(drawContext != nullptr);
+  EXPECT_TRUE(drawContext->_drawer == nullptr);
+  EXPECT_TRUE(drawContext->ops.size() == 2);
+  EXPECT_EQ(static_cast<GLRRectOp*>(drawContext->ops[1].get())->rRects.size(), drawCallCount);
+  canvas->flush();
+  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/merge_draw_call_rrect"));
   device->unlock();
 }
 }  // namespace tgfx
