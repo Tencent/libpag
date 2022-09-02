@@ -120,7 +120,10 @@ GLRRectOp::GLRRectOp(Color color, const RRect& rRect, const Matrix& viewMatrix,
   rRects.emplace_back(RRectWrap{color, 0.f, 0.f, rRect, viewMatrix});
 }
 
-bool GLRRectOp::onCombineIfPossible(GLDrawOp* op) {
+bool GLRRectOp::onCombineIfPossible(GLOp* op) {
+  if (!GLDrawOp::onCombineIfPossible(op)) {
+    return false;
+  }
   auto* that = static_cast<GLRRectOp*>(op);
   if (localMatrix != that->localMatrix) {
     return false;
@@ -131,11 +134,6 @@ bool GLRRectOp::onCombineIfPossible(GLDrawOp* op) {
 
 static bool UseScale(const DrawArgs& args) {
   return !args.context->caps()->floatIs32Bits;
-}
-
-std::unique_ptr<GeometryProcessor> GLRRectOp::getGeometryProcessor(const DrawArgs& args) {
-  return EllipseGeometryProcessor::Make(args.renderTarget->width(), args.renderTarget->height(),
-                                        false, UseScale(args), localMatrix);
 }
 
 void WriteColor(std::vector<float>& vertices, const Color& color) {
@@ -246,16 +244,13 @@ void GLRRectOp::RRectWrap::writeToVertices(std::vector<float>& vertices, bool us
   }
 }
 
-std::vector<float> GLRRectOp::vertices(const DrawArgs& args) {
+void GLRRectOp::draw(const DrawArgs& args) {
   auto useScale = UseScale(args);
   std::vector<float> vertices;
   for (const auto& rRectWrap : rRects) {
     rRectWrap.writeToVertices(vertices, useScale, aa);
   }
-  return vertices;
-}
 
-void GLRRectOp::draw(const DrawArgs& args) {
   static auto Type = UniqueID::Next();
   std::vector<uint16_t> indices;
   for (size_t i = 0; i < rRects.size(); ++i) {
@@ -265,6 +260,12 @@ void GLRRectOp::draw(const DrawArgs& args) {
     }
   }
   auto buffer = GLBuffer::Make(args.context, &(indices[0]), indices.size(), Type);
-  GLDrawer::DrawIndexBuffer(args.context, buffer);
+
+  auto info = createProgram(
+      args, EllipseGeometryProcessor::Make(args.renderTarget->width(), args.renderTarget->height(),
+                                           false, UseScale(args), localMatrix));
+  args.drawer->bindPipelineAndScissorClip(info, scissorRect());
+  args.drawer->bindVerticesAndIndices(std::move(vertices), buffer);
+  args.drawer->drawIndexed(GL_TRIANGLES, 0, static_cast<int>(buffer->length()));
 }
 }  // namespace tgfx

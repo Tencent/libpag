@@ -19,27 +19,24 @@
 #pragma once
 
 #include "GLDrawer.h"
-#include "tgfx/core/Path.h"
 
 namespace tgfx {
-class GLTriangulatingPathOp : public GLDrawOp {
+class ClearOp : public GLOp {
  public:
-  static std::unique_ptr<GLTriangulatingPathOp> Make(Color color, const Path& path, Rect clipBounds,
-                                                     const Matrix& localMatrix);
+  static std::unique_ptr<ClearOp> Make(Color color, const Rect& scissor);
 
-  GLTriangulatingPathOp(Color color, std::vector<float> vertex, int vertexCount, Rect bounds,
-                        const Matrix& localMatrix = Matrix::I());
-
-  void draw(const DrawArgs& args) override;
+  void draw(const tgfx::DrawArgs& args) override;
 
  private:
   DEFINE_OP_CLASS_ID
 
+  explicit ClearOp(Color color, const Rect& scissor)
+      : GLOp(ClassID()), color(color), scissor(scissor) {
+  }
+
   bool onCombineIfPossible(GLOp* op) override;
 
   Color color = Color::Transparent();
-  std::vector<float> vertex;
-  int vertexCount;
-  Matrix localMatrix = Matrix::I();
+  Rect scissor = Rect::MakeEmpty();
 };
 }  // namespace tgfx

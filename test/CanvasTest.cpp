@@ -382,4 +382,47 @@ PAG_TEST(CanvasTest, merge_draw_call_rrect) {
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/merge_draw_call_rrect"));
   device->unlock();
 }
+
+/**
+ * 用例描述: 测试 ClearOp
+ */
+PAG_TEST(CanvasTest, merge_draw_clear_op) {
+  auto device = GLDevice::Make();
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  int width = 72;
+  int height = 72;
+  auto surface = Surface::Make(context, width, height);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  canvas->save();
+  Path path;
+  path.addRect(Rect::MakeXYWH(0.f, 0.f, 10.f, 10.f));
+  canvas->clipPath(path);
+  canvas->clear(Color::White());
+  canvas->restore();
+  Paint paint;
+  paint.setColor(Color{0.8f, 0.8f, 0.8f, 1.f});
+  int tileSize = 8;
+  size_t drawCallCount = 0;
+  for (int y = 0; y < height; y += tileSize) {
+    bool draw = (y / tileSize) % 2 == 1;
+    for (int x = 0; x < width; x += tileSize) {
+      if (draw) {
+        auto rect = Rect::MakeXYWH(static_cast<float>(x), static_cast<float>(y),
+                                   static_cast<float>(tileSize), static_cast<float>(tileSize));
+        canvas->drawRect(rect, paint);
+        drawCallCount++;
+      }
+      draw = !draw;
+    }
+  }
+  auto* drawContext = static_cast<GLCanvas*>(canvas)->drawContext;
+  EXPECT_TRUE(drawContext != nullptr);
+  EXPECT_TRUE(drawContext->_drawer == nullptr);
+  EXPECT_TRUE(drawContext->ops.size() == drawCallCount + 1);
+  canvas->flush();
+  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/merge_draw_clear_op"));
+  device->unlock();
+}
 }  // namespace tgfx

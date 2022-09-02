@@ -23,11 +23,6 @@
 #include "gpu/QuadPerEdgeAAGeometryProcessor.h"
 
 namespace tgfx {
-std::unique_ptr<GeometryProcessor> GLFillRectOp::getGeometryProcessor(const DrawArgs& args) {
-  return QuadPerEdgeAAGeometryProcessor::Make(args.renderTarget->width(),
-                                              args.renderTarget->height(), aa, !colors.empty());
-}
-
 std::vector<float> GLFillRectOp::coverageVertices() const {
   auto normalBounds = Rect::MakeLTRB(0, 0, 1, 1);
   std::vector<float> vertices;
@@ -91,7 +86,7 @@ std::vector<float> GLFillRectOp::noCoverageVertices() const {
   return vertices;
 }
 
-std::vector<float> GLFillRectOp::vertices(const DrawArgs&) {
+std::vector<float> GLFillRectOp::vertices() {
   if (aa != AAType::Coverage) {
     return noCoverageVertices();
   } else {
@@ -133,7 +128,10 @@ GLFillRectOp::GLFillRectOp(std::vector<Color> colors, std::vector<Rect> rects,
   setBounds(bounds);
 }
 
-bool GLFillRectOp::onCombineIfPossible(GLDrawOp* op) {
+bool GLFillRectOp::onCombineIfPossible(GLOp* op) {
+  if (!GLDrawOp::onCombineIfPossible(op)) {
+    return false;
+  }
   auto* that = static_cast<GLFillRectOp*>(op);
   rects.insert(rects.end(), that->rects.begin(), that->rects.end());
   viewMatrices.insert(viewMatrices.end(), that->viewMatrices.begin(), that->viewMatrices.end());
@@ -162,6 +160,10 @@ static constexpr uint16_t kAAQuadIndexPattern[] = {
 // clang-format on
 
 void GLFillRectOp::draw(const DrawArgs& args) {
+  auto info = createProgram(
+      args, QuadPerEdgeAAGeometryProcessor::Make(args.renderTarget->width(),
+                                                 args.renderTarget->height(), aa, !colors.empty()));
+  args.drawer->bindPipelineAndScissorClip(info, scissorRect());
   if (rects.size() > 1 || aa == AAType::Coverage) {
     std::vector<uint16_t> indexes;
     static auto kNonAAType = UniqueID::Next();
@@ -187,9 +189,11 @@ void GLFillRectOp::draw(const DrawArgs& args) {
       }
     }
     auto indexBuffer = GLBuffer::Make(args.context, &indexes[0], indexes.size(), type);
-    GLDrawer::DrawIndexBuffer(args.context, indexBuffer);
+    args.drawer->bindVerticesAndIndices(vertices(), indexBuffer);
+    args.drawer->drawIndexed(GL_TRIANGLES, 0, static_cast<int>(indexBuffer->length()));
     return;
   }
-  GLDrawer::DrawArrays(args.context, GL_TRIANGLE_STRIP, 0, 4);
+  args.drawer->bindVerticesAndIndices(vertices());
+  args.drawer->draw(GL_TRIANGLE_STRIP, 0, 4);
 }
 }  // namespace tgfx

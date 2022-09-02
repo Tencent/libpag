@@ -394,6 +394,18 @@ void Matrix::mapXY(float x, float y, Point* result) const {
   result->set(x * sx + y * kx + tx, x * ky + y * sy + ty);
 }
 
+bool Matrix::rectStaysRect() const {
+  float m00 = values[SCALE_X];
+  float m01 = values[SKEW_X];
+  float m10 = values[SKEW_Y];
+  float m11 = values[SCALE_Y];
+  if (m01 || m10) {
+    return m00 == 0 && m11 == 0 && m10 != 0 && m01 != 0;
+  } else {
+    return m00 != 0 && m11 != 0;
+  }
+}
+
 void Matrix::mapRect(Rect* dst, const Rect& src) const {
   Point quad[4];
   quad[0].set(src.left, src.top);

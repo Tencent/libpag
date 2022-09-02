@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSurfaceDrawContext.h"
+#include "GLCanvas.h"
 #include "GLFillRectOp.h"
-#include "GLSurface.h"
 #include "tgfx/core/PixelBuffer.h"
 
 namespace tgfx {
@@ -46,7 +46,7 @@ GLSurfaceDrawContext::~GLSurfaceDrawContext() {
   DEBUG_ASSERT(ops.empty());
 }
 
-void GLSurfaceDrawContext::addOp(std::unique_ptr<GLDrawOp> op) {
+void GLSurfaceDrawContext::addOp(std::unique_ptr<GLOp> op) {
   if (!ops.empty() && ops.back()->combineIfPossible(op.get())) {
     return;
   }
@@ -61,15 +61,16 @@ void GLSurfaceDrawContext::flush() {
   if (drawer == nullptr) {
     return;
   }
+  auto tempOps = std::move(ops);
   DrawArgs args;
   args.context = surface->getContext();
-  args.renderTarget = static_cast<GLSurface*>(surface)->renderTarget;
-  auto tempOps = std::move(ops);
+  args.renderTarget = surface->getRenderTarget();
+  args.renderTargetTexture = surface->getTexture();
+  args.drawer = drawer;
+  drawer->set(args.renderTarget.get());
   for (auto& op : tempOps) {
-    if (op->requiresDstTexture() && args.renderTargetTexture == nullptr) {
-      args.renderTargetTexture = surface->getTexture();
-    }
-    drawer->draw(args, std::move(op));
+    op->draw(args);
   }
+  drawer->reset();
 }
 }  // namespace tgfx
