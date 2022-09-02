@@ -91,6 +91,10 @@ GlyphID WebTypeface::getGlyphID(const std::string& text) const {
   return glyphs.size();
 }
 
+std::shared_ptr<Data> WebTypeface::getBytes() const {
+  return nullptr;
+}
+
 std::string WebTypeface::getText(GlyphID glyphID) const {
   if (glyphID == 0 || GlyphsMap().find(webFontFamily) == GlyphsMap().end()) {
     return "";

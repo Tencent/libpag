@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "tgfx/core/Data.h"
 #include "tgfx/core/FontMetrics.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/gpu/TextureBuffer.h"
@@ -27,6 +28,8 @@ namespace tgfx {
  * 16 bit unsigned integer to hold a glyph index
  */
 typedef uint16_t GlyphID;
+
+typedef uint32_t FontTableTag;
 
 /**
  * A set of character glyphs and layout information for drawing text.
@@ -95,6 +98,13 @@ class Typeface {
    * encoding. Returns 0 if the glyph name is not associated with this typeface.
    */
   virtual GlyphID getGlyphID(const std::string& name) const = 0;
+
+  virtual std::shared_ptr<Data> getBytes() const = 0;
+
+  /**
+   * Returns an immutable copy of the requested font table, or nullptr if that table was not found.
+   */
+  virtual std::shared_ptr<Data> copyTableData(FontTableTag tag) const = 0;
 
  protected:
   /**

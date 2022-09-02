@@ -16,32 +16,38 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "NativePlatform.h"
-#include <emscripten/val.h>
-#include "NativeTextShaper.h"
+#pragma once
 
-using namespace emscripten;
+#include <vector>
+#include "tgfx/core/Typeface.h"
 
 namespace pag {
-const Platform* Platform::Current() {
-  static const NativePlatform platform = {};
-  return &platform;
-}
+class PositionedGlyphs {
+ public:
+  PositionedGlyphs() = default;
 
-void NativePlatform::traceImage(const tgfx::ImageInfo& info, const void* pixels,
-                                const std::string& tag) const {
-  auto traceImage = val::module_property("traceImage");
-  auto bytes = val(typed_memory_view(info.byteSize(), static_cast<const uint8_t*>(pixels)));
-  traceImage(info, bytes, tag);
-}
+  explicit PositionedGlyphs(
+      std::vector<std::tuple<std::shared_ptr<tgfx::Typeface>, tgfx::GlyphID, uint32_t>> glyphs)
+      : glyphs(std::move(glyphs)) {
+  }
 
-std::optional<PositionedGlyphs> NativePlatform::shape(
-#ifdef PAG_USE_HARBUZZ
-    const std::string&, const std::shared_ptr<tgfx::Typeface>&) const {
-  return std::nullopt;
-#else
-    const std::string& text, const std::shared_ptr<tgfx::Typeface>& typeface) const {
-  return Shape(text, typeface);
-#endif
-}
+  std::shared_ptr<tgfx::Typeface> getTypeface(size_t atIndex) const {
+    return std::get<0>(glyphs[atIndex]);
+  }
+
+  tgfx::GlyphID getGlyphID(size_t atIndex) const {
+    return std::get<1>(glyphs[atIndex]);
+  }
+
+  uint32_t getStringIndex(size_t atIndex) const {
+    return std::get<2>(glyphs[atIndex]);
+  }
+
+  size_t glyphCount() const {
+    return glyphs.size();
+  }
+
+ private:
+  std::vector<std::tuple<std::shared_ptr<tgfx::Typeface>, tgfx::GlyphID, uint32_t>> glyphs;
+};
 }  // namespace pag

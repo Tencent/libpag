@@ -16,32 +16,33 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "NativePlatform.h"
-#include <emscripten/val.h>
-#include "NativeTextShaper.h"
-
-using namespace emscripten;
+#include "TextShaper.h"
+#ifdef PAG_USE_HARFBUZZ
+#include "TextShaperHarfbuzz.h"
+#else
+#include "TextShaperPrimitive.h"
+#include "platform/Platform.h"
+#endif
 
 namespace pag {
-const Platform* Platform::Current() {
-  static const NativePlatform platform = {};
-  return &platform;
-}
-
-void NativePlatform::traceImage(const tgfx::ImageInfo& info, const void* pixels,
-                                const std::string& tag) const {
-  auto traceImage = val::module_property("traceImage");
-  auto bytes = val(typed_memory_view(info.byteSize(), static_cast<const uint8_t*>(pixels)));
-  traceImage(info, bytes, tag);
-}
-
-std::optional<PositionedGlyphs> NativePlatform::shape(
-#ifdef PAG_USE_HARBUZZ
-    const std::string&, const std::shared_ptr<tgfx::Typeface>&) const {
-  return std::nullopt;
+PositionedGlyphs TextShaper::Shape(const std::string& text,
+                                   std::shared_ptr<tgfx::Typeface> typeface) {
+  if (text.empty()) {
+    return {};
+  }
+#ifdef PAG_USE_HARFBUZZ
+  return ShapeHarfbuzz(text, std::move(typeface));
 #else
-    const std::string& text, const std::shared_ptr<tgfx::Typeface>& typeface) const {
-  return Shape(text, typeface);
+  if (auto ret = Platform::Current()->shape(text, typeface)) {
+    return *ret;
+  }
+  return ShapePrimitive(text, std::move(typeface));
+#endif
+}
+
+void TextShaper::PurgeCaches() {
+#ifdef PAG_USE_HARFBUZZ
+  PurgeHarfbuzzCache();
 #endif
 }
 }  // namespace pag

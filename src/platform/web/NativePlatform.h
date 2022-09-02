@@ -25,5 +25,8 @@ class NativePlatform : public Platform {
  public:
   void traceImage(const tgfx::ImageInfo& info, const void* pixels,
                   const std::string& tag) const override;
+
+  std::optional<PositionedGlyphs> shape(
+      const std::string& text, const std::shared_ptr<tgfx::Typeface>& typeface) const override;
 };
 }  // namespace pag

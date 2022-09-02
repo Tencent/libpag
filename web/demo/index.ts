@@ -99,7 +99,7 @@ window.onload = async () => {
     await createPAGView(file);
     const textDoc = pagFile.getTextData(0);
     console.log(textDoc);
-    textDoc.text = '替换后的文字🤔';
+    textDoc.text = '替换后的文字🤔#️⃣#*️⃣*1️⃣🔟🇨🇳🏴󠁧󠁢󠁥󠁮󠁧󠁿🤡👨🏼‍🦱👨‍👨‍👧‍👦';
     textDoc.fillColor = { red: 255, green: 255, blue: 255 };
     textDoc.applyFill = true;
     textDoc.backgroundAlpha = 100;

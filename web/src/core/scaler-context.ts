@@ -6,19 +6,9 @@ import { NativeImage } from './native-image';
 import type { Rect } from '../types';
 import type { NativeImage as NativeImageType } from '../interfaces';
 
-export const resetTestCanvas = (testContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D) => {
-  testContext.textBaseline = 'top';
-  testContext.font = '100px -no-font-family-here-';
-  testContext.scale(0.01, 0.01);
-  testContext.fillStyle = '#000';
-  testContext.globalCompositeOperation = 'copy';
-};
-
 export class ScalerContext {
   public static canvas: HTMLCanvasElement | OffscreenCanvas;
   public static context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
-  public static testCanvas: HTMLCanvasElement | OffscreenCanvas;
-  public static testContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
   public static setCanvas(canvas: HTMLCanvasElement | OffscreenCanvas) {
     ScalerContext.canvas = canvas;
@@ -29,18 +19,8 @@ export class ScalerContext {
   }
 
   public static isEmoji(text: string): boolean {
-    if (!this.testCanvas) {
-      this.testCanvas = getCanvas2D();
-      this.testCanvas.width = 1;
-      this.testCanvas.height = 1;
-      this.testContext = this.testCanvas.getContext('2d') as
-        | CanvasRenderingContext2D
-        | OffscreenCanvasRenderingContext2D;
-      resetTestCanvas(this.testContext);
-    }
-    this.testContext.fillText(text, 0, 0);
-    const color = this.testContext.getImageData(0, 0, 1, 1).data.toString();
-    return !color.includes('0,0,0,');
+    const emojiRegExp = /\p{Extended_Pictographic}|[#*0-9]\uFE0F?\u20E3|[\uD83C\uDDE6-\uD83C\uDDFF]/u;
+    return emojiRegExp.test(text);
   }
 
   private readonly fontName: string;

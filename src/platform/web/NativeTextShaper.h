@@ -16,32 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "NativePlatform.h"
-#include <emscripten/val.h>
-#include "NativeTextShaper.h"
+#pragma once
 
-using namespace emscripten;
+#include "rendering/utils/shaper/PositionedGlyphs.h"
+#include "tgfx/core/Typeface.h"
 
 namespace pag {
-const Platform* Platform::Current() {
-  static const NativePlatform platform = {};
-  return &platform;
-}
-
-void NativePlatform::traceImage(const tgfx::ImageInfo& info, const void* pixels,
-                                const std::string& tag) const {
-  auto traceImage = val::module_property("traceImage");
-  auto bytes = val(typed_memory_view(info.byteSize(), static_cast<const uint8_t*>(pixels)));
-  traceImage(info, bytes, tag);
-}
-
-std::optional<PositionedGlyphs> NativePlatform::shape(
-#ifdef PAG_USE_HARBUZZ
-    const std::string&, const std::shared_ptr<tgfx::Typeface>&) const {
-  return std::nullopt;
-#else
-    const std::string& text, const std::shared_ptr<tgfx::Typeface>& typeface) const {
-  return Shape(text, typeface);
-#endif
-}
+PositionedGlyphs Shape(const std::string& text, const std::shared_ptr<tgfx::Typeface>& typeface);
 }  // namespace pag

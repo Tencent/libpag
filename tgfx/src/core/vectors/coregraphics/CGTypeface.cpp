@@ -22,6 +22,14 @@
 #include "tgfx/core/UTF.h"
 
 namespace tgfx {
+std::shared_ptr<Typeface> MakeTypefaceFromCTFont(const void* ctFont) {
+  return CGTypeface::Make(static_cast<CTFontRef>(ctFont));
+}
+
+const void* TypefaceGetCTFontRef(const Typeface* face) {
+  return face ? static_cast<const CGTypeface*>(face)->getCTFontRef() : nullptr;
+}
+
 std::string StringFromCFString(CFStringRef src) {
   static const CFIndex kCStringSize = 128;
   char temporaryCString[kCStringSize];
@@ -84,8 +92,13 @@ std::shared_ptr<Typeface> Typeface::MakeFromPath(const std::string& fontPath, in
 }
 
 std::shared_ptr<Typeface> Typeface::MakeFromBytes(const void* data, size_t length, int) {
+  auto copyData = Data::MakeWithCopy(data, length);
+  if (copyData->size() == 0) {
+    return nullptr;
+  }
   auto cfData =
-      CFDataCreate(kCFAllocatorNull, static_cast<const UInt8*>(data), static_cast<CFIndex>(length));
+      CFDataCreateWithBytesNoCopy(kCFAllocatorNull, static_cast<const UInt8*>(copyData->data()),
+                                  static_cast<CFIndex>(copyData->size()), kCFAllocatorNull);
   if (cfData == nullptr) {
     return nullptr;
   }
@@ -94,7 +107,7 @@ std::shared_ptr<Typeface> Typeface::MakeFromBytes(const void* data, size_t lengt
   if (cfDesc) {
     auto ctFont = CTFontCreateWithFontDescriptor(cfDesc, 0, nullptr);
     if (ctFont) {
-      typeface = CGTypeface::Make(ctFont);
+      typeface = CGTypeface::Make(ctFont, std::move(copyData));
       CFRelease(ctFont);
     }
     CFRelease(cfDesc);
@@ -108,16 +121,17 @@ std::shared_ptr<Typeface> Typeface::MakeDefault() {
   return typeface;
 }
 
-std::shared_ptr<CGTypeface> CGTypeface::Make(CTFontRef ctFont) {
+std::shared_ptr<CGTypeface> CGTypeface::Make(CTFontRef ctFont, std::shared_ptr<Data> data) {
   if (ctFont == nullptr) {
     return nullptr;
   }
-  auto typeface = std::shared_ptr<CGTypeface>(new CGTypeface(ctFont));
+  auto typeface = std::shared_ptr<CGTypeface>(new CGTypeface(ctFont, std::move(data)));
   typeface->weakThis = typeface;
   return typeface;
 }
 
-CGTypeface::CGTypeface(CTFontRef ctFont) : _uniqueID(UniqueID::Next()), ctFont(ctFont) {
+CGTypeface::CGTypeface(CTFontRef ctFont, std::shared_ptr<Data> data)
+    : _uniqueID(UniqueID::Next()), ctFont(ctFont), data(std::move(data)) {
   CFRetain(ctFont);
 }
 
@@ -183,6 +197,28 @@ GlyphID CGTypeface::getGlyphID(const std::string& name) const {
   GlyphID macGlyphs[2] = {0, 0};
   CTFontGetGlyphsForCharacters(ctFont, utf16, macGlyphs, static_cast<CFIndex>(srcCount));
   return macGlyphs[0];
+}
+
+std::shared_ptr<Data> CGTypeface::getBytes() const {
+  return data;
+}
+
+std::shared_ptr<Data> CGTypeface::copyTableData(FontTableTag tag) const {
+  auto cfData =
+      CTFontCopyTable(ctFont, static_cast<CTFontTableTag>(tag), kCTFontTableOptionNoOptions);
+  if (cfData == nullptr) {
+    auto cgFont = CTFontCopyGraphicsFont(ctFont, nullptr);
+    cfData = CGFontCopyTableForTag(cgFont, tag);
+    CGFontRelease(cgFont);
+  }
+  if (cfData == nullptr) {
+    return nullptr;
+  }
+  const auto* bytePtr = CFDataGetBytePtr(cfData);
+  auto length = CFDataGetLength(cfData);
+  return Data::MakeAdopted(
+      bytePtr, length, [](const void*, void* context) { CFRelease((CFDataRef)context); },
+      (void*)cfData);
 }
 
 FontMetrics CGTypeface::getMetrics(float size) const {

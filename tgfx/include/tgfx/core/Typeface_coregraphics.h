@@ -16,32 +16,20 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "NativePlatform.h"
-#include <emscripten/val.h>
-#include "NativeTextShaper.h"
+#pragma once
 
-using namespace emscripten;
+#include <CoreText/CoreText.h>
+#include "tgfx/core/Typeface.h"
 
-namespace pag {
-const Platform* Platform::Current() {
-  static const NativePlatform platform = {};
-  return &platform;
-}
+namespace tgfx {
+/**
+ * Creates a typeface for the specified CTFontRef.
+ */
+extern std::shared_ptr<Typeface> MakeTypefaceFromCTFont(const void* ctFont);
 
-void NativePlatform::traceImage(const tgfx::ImageInfo& info, const void* pixels,
-                                const std::string& tag) const {
-  auto traceImage = val::module_property("traceImage");
-  auto bytes = val(typed_memory_view(info.byteSize(), static_cast<const uint8_t*>(pixels)));
-  traceImage(info, bytes, tag);
-}
-
-std::optional<PositionedGlyphs> NativePlatform::shape(
-#ifdef PAG_USE_HARBUZZ
-    const std::string&, const std::shared_ptr<tgfx::Typeface>&) const {
-  return std::nullopt;
-#else
-    const std::string& text, const std::shared_ptr<tgfx::Typeface>& typeface) const {
-  return Shape(text, typeface);
-#endif
-}
-}  // namespace pag
+/**
+ * Returns the platform-specific CTFontRef handle for a given Typeface. Note that the returned
+ * CTFontRef gets released when the source Typeface is destroyed.
+ */
+extern const void* TypefaceGetCTFontRef(const Typeface* face);
+}  // namespace tgfx

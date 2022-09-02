@@ -55,6 +55,10 @@ class FTTypeface : public Typeface {
 
   GlyphID getGlyphID(const std::string& name) const override;
 
+  std::shared_ptr<Data> getBytes() const override;
+
+  std::shared_ptr<Data> copyTableData(FontTableTag tag) const override;
+
  protected:
   float getGlyphAdvance(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
                         bool verticalText) const override;

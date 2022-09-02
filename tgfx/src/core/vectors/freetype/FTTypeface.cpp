@@ -26,6 +26,14 @@
 #include "tgfx/core/UTF.h"
 
 namespace tgfx {
+std::shared_ptr<Typeface> MakeTypefaceFromCTFont(const void*) {
+  return nullptr;
+}
+
+const void* TypefaceGetCTFontRef(const Typeface*) {
+  return nullptr;
+}
+
 class EmptyTypeface : public Typeface {
  public:
   uint32_t uniqueID() const override {
@@ -54,6 +62,14 @@ class EmptyTypeface : public Typeface {
 
   GlyphID getGlyphID(const std::string&) const override {
     return 0;
+  }
+
+  std::shared_ptr<Data> getBytes() const override {
+    return nullptr;
+  }
+
+  std::shared_ptr<Data> copyTableData(tgfx::FontTableTag) const override {
+    return nullptr;
   }
 
  protected:
@@ -156,6 +172,34 @@ GlyphID FTTypeface::getGlyphID(const std::string& name) const {
   const char* start = &(name[0]);
   auto unichar = tgfx::UTF::NextUTF8(&start, start + name.size());
   return FT_Get_Char_Index(_face->face, static_cast<FT_ULong>(unichar));
+}
+
+std::shared_ptr<Data> FTTypeface::getBytes() const {
+  return data.data;
+}
+
+std::shared_ptr<Data> FTTypeface::copyTableData(FontTableTag tag) const {
+  std::lock_guard<std::mutex> lockGuard(FTMutex());
+  auto face = _face->face;
+  if (face == nullptr) {
+    return nullptr;
+  }
+
+  FT_ULong tableLength = 0;
+  auto error = FT_Load_Sfnt_Table(face, tag, 0, nullptr, &tableLength);
+  if (error) {
+    return nullptr;
+  }
+  auto tableData = new (std::nothrow) uint8_t[tableLength];
+  if (tableData == nullptr) {
+    return nullptr;
+  }
+  error = FT_Load_Sfnt_Table(face, tag, 0, reinterpret_cast<FT_Byte*>(tableData), &tableLength);
+  if (error) {
+    delete[] tableData;
+    return nullptr;
+  }
+  return Data::MakeAdopted(tableData, tableLength);
 }
 
 FontMetrics FTTypeface::getMetrics(float size) const {
