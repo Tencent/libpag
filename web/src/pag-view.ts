@@ -76,7 +76,7 @@ export class PAGView {
     return pagView;
   }
 
-  private static makePAGSurface(pagGlContext: BackendContext, width: number, height: number): PAGSurface {
+  protected static makePAGSurface(pagGlContext: BackendContext, width: number, height: number): PAGSurface {
     if (!pagGlContext.makeCurrent()) throw new Error('Make context current fail!');
     const pagSurface = PAGSurface.fromRenderTarget(0, width, height, true);
     pagGlContext.clearCurrent();
@@ -96,26 +96,27 @@ export class PAGView {
    */
   public isDestroyed = false;
 
-  private startTime = 0;
-  private playTime = 0;
-  private timer: number | null = null;
-  private player: PAGPlayer;
-  private pagSurface: PAGSurface | null = null;
-  private repeatedTimes = 0;
-  private eventManager: EventManager = new EventManager();
-  private pagGlContext: BackendContext | null = null;
-  private canvasElement: HTMLCanvasElement | OffscreenCanvas | null;
-  private canvasContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null | undefined;
-  private renderCanvas: RenderCanvas | null = null;
-  private rawWidth = 0;
-  private rawHeight = 0;
-  private currentFrame = -1;
-  private frameRate = 0;
-  private pagViewOptions: PAGViewOptions = {
+  protected pagViewOptions: PAGViewOptions = {
     useScale: true,
     useCanvas2D: false,
     firstFrame: true,
   };
+  protected renderCanvas: RenderCanvas | null = null;
+  protected pagGlContext: BackendContext | null = null;
+  protected frameRate = 0;
+  protected pagSurface: PAGSurface | null = null;
+  protected player: PAGPlayer;
+  protected currentFrame = -1;
+  protected canvasElement: HTMLCanvasElement | OffscreenCanvas | null;
+  protected timer: number | null = null;
+
+  private startTime = 0;
+  private playTime = 0;
+  private repeatedTimes = 0;
+  private eventManager: EventManager = new EventManager();
+  private canvasContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null | undefined;
+  private rawWidth = 0;
+  private rawHeight = 0;
 
   public constructor(pagPlayer: PAGPlayer, canvasElement: HTMLCanvasElement | OffscreenCanvas) {
     this.player = pagPlayer;
@@ -154,7 +155,7 @@ export class PAGView {
       this.eventManager.emit(PAGViewListenerEvent.onAnimationUpdate, this);
     }
     this.isPlaying = true;
-    this.startTime = performance.now() * 1000 - this.playTime;
+    this.startTime = this.getNowTime() * 1000 - this.playTime;
     await this.flushLoop();
   }
   /**
@@ -199,7 +200,7 @@ export class PAGView {
    */
   public setProgress(progress: number): number {
     this.playTime = progress * this.duration();
-    this.startTime = performance.now() * 1000 - this.playTime;
+    this.startTime = this.getNowTime() * 1000 - this.playTime;
     if (!this.isPlaying) {
       this.player.setProgress(progress);
     }
@@ -349,7 +350,7 @@ export class PAGView {
     }
     this.rawWidth = this.canvasElement.width;
     this.rawHeight = this.canvasElement.height;
-    if (!this.pagGlContext) return null;
+    if (!this.pagGlContext) return;
     const pagSurface = PAGView.makePAGSurface(this.pagGlContext, this.rawWidth, this.rawHeight);
     this.player.setSurface(pagSurface);
     this.pagSurface?.destroy();
@@ -380,7 +381,7 @@ export class PAGView {
     this.isDestroyed = true;
   }
 
-  private async flushLoop() {
+  protected async flushLoop() {
     if (!this.isPlaying) {
       return;
     }
@@ -390,9 +391,9 @@ export class PAGView {
     await this.flushNextFrame();
   }
 
-  private async flushNextFrame() {
+  protected async flushNextFrame() {
     const duration = this.duration();
-    this.playTime = performance.now() * 1000 - this.startTime;
+    this.playTime = this.getNowTime() * 1000 - this.startTime;
     const currentFrame = Math.floor((this.playTime / 1000000) * this.frameRate);
     const count = Math.floor(this.playTime / duration);
     if (this.repeatCount >= 0 && count > this.repeatCount) {
@@ -418,7 +419,15 @@ export class PAGView {
     this.repeatedTimes = count;
   }
 
-  private clearTimer(): void {
+  protected getNowTime() {
+    try {
+      return performance.now();
+    } catch (e) {
+      return Date.now();
+    }
+  }
+
+  protected clearTimer(): void {
     if (this.timer) {
       window.cancelAnimationFrame(this.timer);
       this.timer = null;

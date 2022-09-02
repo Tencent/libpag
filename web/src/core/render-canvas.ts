@@ -4,10 +4,10 @@ import { BackendContext } from './backend-context';
 const renderCanvasList: RenderCanvas[] = [];
 
 export class RenderCanvas {
-  public static from(canvas: HTMLCanvasElement | OffscreenCanvas) {
+  public static from(canvas: HTMLCanvasElement | OffscreenCanvas, contextAttributes?: WebGLContextAttributes) {
     let renderCanvas = renderCanvasList.find((targetCanvas) => targetCanvas.canvas === canvas);
     if (renderCanvas) return renderCanvas;
-    renderCanvas = new RenderCanvas(canvas);
+    renderCanvas = new RenderCanvas(canvas, contextAttributes);
     renderCanvasList.push(renderCanvas);
     return renderCanvas;
   }
@@ -16,9 +16,9 @@ export class RenderCanvas {
   private _glContext: BackendContext | null = null;
   private retainCount = 0;
 
-  public constructor(canvas: HTMLCanvasElement | OffscreenCanvas) {
+  public constructor(canvas: HTMLCanvasElement | OffscreenCanvas, contextAttributes?: WebGLContextAttributes) {
     this._canvas = canvas;
-    const gl = canvas.getContext('webgl', WEBGL_CONTEXT_ATTRIBUTES);
+    const gl = canvas.getContext('webgl', { ...WEBGL_CONTEXT_ATTRIBUTES, ...contextAttributes });
     if (!gl) throw new Error('Canvas context is not WebGL!');
     this._glContext = BackendContext.from(gl);
   }

@@ -1,5 +1,5 @@
 /* global EmscriptenModule */
-
+import './babel';
 import { binding } from './binding';
 import * as types from '../types';
 import { WebAssemblyQueue } from '../utils/queue';

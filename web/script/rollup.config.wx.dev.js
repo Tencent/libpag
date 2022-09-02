@@ -24,10 +24,10 @@ const banner = `////////////////////////////////////////////////////////////////
 
 export default [
   {
-    input: 'src/pag.ts',
+    input: 'src/wechat/pag.ts',
     output: [
       { banner, file: 'demo/wechat-miniprogram/utils/libpag.js', format: 'cjs', exports: 'auto', sourcemap: false },
     ],
-    plugins: [replaceFunc(), esbuild({ tsconfig: 'tsconfig.json', minify: false }), resolve(), commonJs()],
+    plugins: [esbuild({ tsconfig: 'tsconfig.json', minify: false }), resolve(), commonJs(), replaceFunc()],
   },
 ];

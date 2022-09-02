@@ -12,6 +12,7 @@ export interface wx {
     height?: number,
     compInst?: any,
   ) => OffscreenCanvas;
+  getPerformance:() => Performance;
 }
 
 export interface FileSystemManager {
@@ -72,6 +73,8 @@ interface VideoDecoderStartOption {
 }
 
 export interface SystemInfo {
-  /* 客户端平台	 */
+  /** 客户端平台	 */
   platform: 'ios' | 'android' | 'windows' | 'mac' | 'devtools';
+  /** 设备像素比 */
+  pixelRatio: number;
 }
