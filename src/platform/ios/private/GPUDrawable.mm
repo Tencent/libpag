@@ -132,19 +132,17 @@ std::shared_ptr<tgfx::Surface> GPUDrawable::createSurface(tgfx::Context* context
         [strongThis->layer release];
         return;
       }
-      if (strongThis->bufferPreparing) {
-        strongThis->surface = strongThis->window->createSurface(glContext);
-        if (strongThis->surface) {
-          [[NSNotificationCenter defaultCenter]
-              postNotificationName:kGPURenderTargetBufferPreparedNotification
-                            object:strongThis->layer
-                          userInfo:@{
-                            kPreparedAsync : @(true)
-                          }];
-        }
-      }
+      strongThis->surface = strongThis->window->createSurface(glContext);
       strongThis->bufferPreparing = false;
       strongThis->window->getDevice()->unlock();
+      if (strongThis->surface) {
+        [[NSNotificationCenter defaultCenter]
+            postNotificationName:kGPURenderTargetBufferPreparedNotification
+                          object:strongThis->layer
+                        userInfo:@{
+                          kPreparedAsync : @(true)
+                        }];
+      }
       [strongThis->layer release];
     });
     return nullptr;
