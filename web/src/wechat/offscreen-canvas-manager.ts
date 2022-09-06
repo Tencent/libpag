@@ -1,6 +1,6 @@
 import type { wx } from './interfaces';
 
-interface CanvasStackItem {
+export interface CanvasNode {
   id: number;
   free: boolean;
   canvas: OffscreenCanvas;
@@ -9,7 +9,7 @@ interface CanvasStackItem {
 declare const wx: wx;
 
 export class OffscreenManager {
-  private canvasStacks: CanvasStackItem[];
+  private canvasStacks: CanvasNode[];
   public constructor() {
     this.canvasStacks = [];
   }

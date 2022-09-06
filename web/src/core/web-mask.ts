@@ -13,6 +13,10 @@ export interface WebFont {
 }
 
 export class WebMask {
+  public static create(width: number, height: number) {
+    return new WebMask(document.createElement('canvas'), width, height);
+  }
+
   private static getLineCap(cap: ctor): CanvasLineCap {
     switch (cap) {
       case PAGModule.TGFXLineCap.Round:
@@ -35,11 +39,11 @@ export class WebMask {
     }
   }
 
-  private canvas: HTMLCanvasElement | OffscreenCanvas;
+  protected canvas: HTMLCanvasElement | OffscreenCanvas;
   private context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
-  public constructor(width: number, height: number) {
-    this.canvas = this.loadCanvas();
+  public constructor(canvas: HTMLCanvasElement | OffscreenCanvas, width: number, height: number) {
+    this.canvas = canvas;
     this.canvas.width = width;
     this.canvas.height = height;
     this.context = this.canvas.getContext('2d') as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;

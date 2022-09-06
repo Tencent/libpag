@@ -1,4 +1,4 @@
-import type { wx } from './types';
+import type { wx } from './interfaces';
 
 declare const wx: wx;
 

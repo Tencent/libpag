@@ -30,7 +30,7 @@ std::shared_ptr<Mask> Mask::Make(int width, int height) {
   if (!webMaskClass.as<bool>()) {
     return nullptr;
   }
-  auto webMask = webMaskClass.new_(width, height);
+  auto webMask = webMaskClass.call<val>("create", width, height);
   if (!webMask.as<bool>()) {
     return nullptr;
   }

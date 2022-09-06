@@ -12,7 +12,7 @@ export interface wx {
     height?: number,
     compInst?: any,
   ) => OffscreenCanvas;
-  getPerformance:() => Performance;
+  getPerformance: () => Performance;
 }
 
 export interface FileSystemManager {

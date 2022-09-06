@@ -7,3 +7,4 @@ declare const globalThis: any;
 
 globalThis.WebAssembly = WXWebAssembly;
 globalThis.isWxWebAssembly = true;
+window = globalThis;

@@ -52,4 +52,8 @@ export interface WebMask {
   update: (GL: EmscriptenGL) => void;
 }
 
-export type WebMaskConstructor = new (width: number, height: number) => WebMask;
+export type WebMaskConstructor = new (
+  canvas: HTMLCanvasElement | OffscreenCanvas,
+  width: number,
+  height: number,
+) => WebMask;

@@ -289,4 +289,10 @@ export const replaceFunctionConfig = [
     }
     `,
   },
+  {
+    name: 'fix gl initExtensions',
+    type: 'string',
+    start: `if (!ext.includes("lose_context") && !ext.includes("debug"))`,
+    replaceStr: `if (!ext.includes("lose_context") && !ext.includes("debug") && !ext.includes("WEBGL_webcodecs_video_frame"))`,
+  },
 ];

@@ -3,11 +3,10 @@ import { WEBGL_CONTEXT_ATTRIBUTES } from '../constant';
 
 export class BackendContext {
   public static from(gl: WebGLRenderingContext | WebGL2RenderingContext | BackendContext): BackendContext {
-    if (
-      gl instanceof WebGLRenderingContext ||
-      (window.WebGL2RenderingContext && gl instanceof WebGL2RenderingContext)
-    ) {
-      const majorVersion = gl instanceof WebGLRenderingContext ? 1 : 2;
+    if (gl instanceof BackendContext) {
+      return new BackendContext(gl.handle, true);
+    } else {
+      const majorVersion = window.WebGL2RenderingContext && gl instanceof window.WebGL2RenderingContext ? 2 : 1;
       const { GL } = PAGModule;
       let id = 0;
       if (GL.contexts.length > 0) {
@@ -22,10 +21,7 @@ export class BackendContext {
         return new BackendContext(id);
       }
       return new BackendContext(id, true);
-    } else if (gl instanceof BackendContext) {
-      return new BackendContext(gl.handle, true);
     }
-    throw new Error('Parameter error!');
   }
 
   public handle: number;
