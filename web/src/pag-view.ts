@@ -434,7 +434,7 @@ export class PAGView {
     }
   }
 
-  private resetSize(useScale = true) {
+  protected resetSize(useScale = true) {
     if (!this.canvasElement) {
       throw new Error('Canvas element is not found!');
     }

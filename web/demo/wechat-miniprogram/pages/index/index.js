@@ -33,6 +33,7 @@ Page({
     debugText: '',
     canvas: null,
     mp4Path: '',
+    replaceText: 'hello PAG!',
   },
   async onReady() {
     this.PAG = await PAGInit({
@@ -56,11 +57,10 @@ Page({
       return;
     }
     const canvas = this.data.canvas;
-    const buffer = await loadFileByRequest('https://pag.art/file/particle_video.pag');
+    const buffer = await loadFileByRequest('https://pag.art/file/test.pag');
     if (!buffer) throw '加载失败';
     this.pagFile = await this.PAG.PAGFile.load(buffer);
     this.pagView = await this.PAG.PAGView.init(this.pagFile, canvas);
-    console.log('pagView', this.pagView);
     this.setData({ pagLoaded: true });
     wx.hideLoading();
   },
@@ -76,8 +76,48 @@ Page({
   destroy() {
     this.pagView.destroy();
   },
-  videoErrorCallback(e) {
-    console.log('视频错误信息:');
-    console.log(e.detail.errMsg);
-  }
+  repeatCountChange(event) {
+    this.pagView.setRepeatCount(event.detail.value);
+    this.setData({ repeatCount: event.detail.value });
+  },
+  progressChange(event) {
+    this.pagView.setProgress(event.detail.value);
+    this.pagView.flush();
+    this.setData({ progress: event.detail.value });
+  },
+  scalePickerChange(event) {
+    this.pagView.setScaleMode(event.detail.value);
+    this.pagView.flush();
+    this.setData({ scaleIndex: event.detail.value });
+  },
+  replaceTextChange(event) {
+    if (!this.textDoc) {
+      this.textDoc = this.pagFile.getTextData(0);
+    }
+    this.textDoc.text = event.detail.value;
+    this.pagFile.replaceText(0, this.textDoc);
+    this.pagView.flush();
+  },
+  async replaceImage() {
+    const canvas = this.data.canvas;
+    const image = await new Promise((resolve) => {
+      wx.getImageInfo({
+        src: 'https://pag.art/img/ae.png',
+        success: async (res) => {
+          console.log(res.path);
+          const image = await new Promise((resolve) => {
+            const image = canvas.createImage();
+            image.onload = () => {
+              resolve(image);
+            };
+            image.src = res.path;
+          });
+          resolve(image);
+        },
+      });
+    });
+    const pagImage = this.PAG.PAGImage.fromSource(image);
+    this.pagFile.replaceImage(0, pagImage);
+    this.pagView.flush();
+  },
 });

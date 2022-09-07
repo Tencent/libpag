@@ -13,3 +13,5 @@ api-docs
 demo/*.js
 cypress/videos
 cypress/screenshots
+demo/wechat-miniprogram/utils/libpag.js
+demo/wechat-miniprogram/utils/libpag.wasm.br

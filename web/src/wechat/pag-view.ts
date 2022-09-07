@@ -36,6 +36,7 @@ export class PAGView extends NativePAGView {
     const pagPlayer = PAGModule.PAGPlayer.create();
     const pagView = new PAGView(pagPlayer, canvas);
     pagView.pagViewOptions = { ...pagView.pagViewOptions, ...initOptions };
+    pagView.resetSize();
     pagView.renderCanvas = RenderCanvas.from(canvas, { alpha: true });
     pagView.renderCanvas.retain();
     pagView.pagGlContext = BackendContext.from(pagView.renderCanvas.glContext as BackendContext);
@@ -59,6 +60,7 @@ export class PAGView extends NativePAGView {
    */
   public updateSize() {
     if (!this.pagGlContext) return;
+    this.resetSize();
     const pagSurface = PAGView.makePAGSurface(this.pagGlContext, this.canvasElement!.width, this.canvasElement!.height);
     this.player.setSurface(pagSurface);
     this.pagSurface?.destroy();
@@ -84,5 +86,11 @@ export class PAGView extends NativePAGView {
       clearInterval(this.timer);
       this.timer = null;
     }
+  }
+
+  protected override resetSize() {
+    const dpr = wx.getSystemInfoSync().pixelRatio;
+    this.canvasElement!.width = this.canvasElement!.width * dpr;
+    this.canvasElement!.height = this.canvasElement!.height * dpr;
   }
 }

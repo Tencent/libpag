@@ -31,6 +31,16 @@
         销毁
       </button>
     </view>
+    <text class="title">替换文字</text>
+    <input class="input" type="number" value="{{replaceText}}" bindinput="replaceTextChange" />
     <text class="text-debug">{{debugText}}</text>
+    <view class="btn-box">
+      <button class="btn" size="mini" type="default" style="padding: 0 1.5em;" bindtap="replaceImage">
+        替换图片
+      </button>
+      <button class="btn" size="mini" type="default" style="padding: 0 1.5em;" bindtap="replaceVideo">
+        替换视频
+      </button>
+    </view>
   </view>
 </view>

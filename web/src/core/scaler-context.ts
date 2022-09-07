@@ -18,6 +18,14 @@ export class ScalerContext {
   public static testCanvas: HTMLCanvasElement | OffscreenCanvas;
   public static testContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
+  public static setCanvas(canvas: HTMLCanvasElement | OffscreenCanvas) {
+    ScalerContext.canvas = canvas;
+  }
+
+  public static setContext(context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D) {
+    ScalerContext.context = context;
+  }
+
   public static isEmoji(text: string): boolean {
     if (!this.testCanvas) {
       this.testCanvas = getCanvas2D();
@@ -116,12 +124,25 @@ export class ScalerContext {
 
   protected loadCanvas() {
     if (!ScalerContext.canvas) {
-      ScalerContext.canvas = getCanvas2D();
-      ScalerContext.canvas.width = 10;
-      ScalerContext.canvas.height = 10;
-      ScalerContext.context = ScalerContext.canvas.getContext('2d') as
-        | CanvasRenderingContext2D
-        | OffscreenCanvasRenderingContext2D;
+      ScalerContext.setCanvas(
+        ((): HTMLCanvasElement | OffscreenCanvas => {
+          try {
+            const offscreenCanvas = new OffscreenCanvas(0, 0);
+            const context = offscreenCanvas.getContext('2d');
+            if (context?.measureText) return offscreenCanvas;
+            return document.createElement('canvas');
+          } catch (err) {
+            return document.createElement('canvas');
+          }
+        })(),
+      );
+      (ScalerContext.canvas as HTMLCanvasElement | OffscreenCanvas).width = 10;
+      (ScalerContext.canvas as HTMLCanvasElement | OffscreenCanvas).height = 10;
+      ScalerContext.setContext(
+        (ScalerContext.canvas as HTMLCanvasElement | OffscreenCanvas).getContext('2d') as
+          | CanvasRenderingContext2D
+          | OffscreenCanvasRenderingContext2D,
+      );
     }
   }
 

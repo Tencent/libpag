@@ -19,10 +19,10 @@ export class ScalerContext extends NativeScaleContext {
   protected override loadCanvas() {
     if (!ScalerContext.canvas) {
       const canvasNode = offscreenManager.getCanvasNode();
-      ScalerContext.canvas = canvasNode.canvas;
-      ScalerContext.canvas.width = 10;
-      ScalerContext.canvas.height = 10;
-      ScalerContext.context = ScalerContext.canvas.getContext('2d') as OffscreenCanvasRenderingContext2D;
+      ScalerContext.setCanvas(canvasNode.canvas);
+      (ScalerContext.canvas as HTMLCanvasElement | OffscreenCanvas).width = 10;
+      (ScalerContext.canvas as HTMLCanvasElement | OffscreenCanvas).height = 10;
+      ScalerContext.setContext((ScalerContext.canvas as HTMLCanvasElement | OffscreenCanvas).getContext('2d') as OffscreenCanvasRenderingContext2D)
     }
   }
 }

@@ -40,11 +40,15 @@ export class NativeImage {
   }
 
   public width(): number {
-    return this.source instanceof HTMLVideoElement ? this.source.videoWidth : this.source.width;
+    return window.HTMLVideoElement && this.source instanceof HTMLVideoElement
+      ? this.source.videoWidth
+      : this.source.width;
   }
 
   public height(): number {
-    return this.source instanceof HTMLVideoElement ? this.source.videoHeight : this.source.height;
+    return window.HTMLVideoElement && this.source instanceof HTMLVideoElement
+      ? this.source.videoHeight
+      : this.source.height;
   }
 
   public upload(GL: EmscriptenGL) {
