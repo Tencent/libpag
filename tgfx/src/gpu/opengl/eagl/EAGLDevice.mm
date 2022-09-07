@@ -96,10 +96,11 @@ std::shared_ptr<EAGLDevice> EAGLDevice::Wrap(EAGLContext* eaglContext, bool isAd
   if (glDevice) {
     return std::static_pointer_cast<EAGLDevice>(glDevice);
   }
-  auto oldEAGLContext = [EAGLContext currentContext];
+  auto oldEAGLContext = [[EAGLContext currentContext] retain];
   if (oldEAGLContext != eaglContext) {
     auto result = [EAGLContext setCurrentContext:eaglContext];
     if (!result) {
+      [oldEAGLContext release];
       return nullptr;
     }
   }
@@ -110,6 +111,7 @@ std::shared_ptr<EAGLDevice> EAGLDevice::Wrap(EAGLContext* eaglContext, bool isAd
   if (oldEAGLContext != eaglContext) {
     [EAGLContext setCurrentContext:oldEAGLContext];
   }
+  [oldEAGLContext release];
   return device;
 }
 
