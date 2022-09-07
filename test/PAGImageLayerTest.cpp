@@ -146,4 +146,71 @@ PAG_TEST_F(PAGImageLayerTest, setImage) {
   TestPAGPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGImageLayerTest/setImage"));
 }
+
+/**
+ * 用例描述: 测试当 ImageLayer 被裁剪，bounds 有小数时离屏触发重采样导致输出的图片模糊。
+ * 对比 image1 和 image2 中间内容基本没有变化。
+ */
+PAG_TEST_F(PAGImageLayerTest, mask) {
+  auto pagFile = pag::PAGFile::Load("../resources/apitest/wumengban.pag");
+  ASSERT_NE(pagFile, nullptr);
+  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  ASSERT_NE(pagSurface, nullptr);
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->flush();
+  auto pixelBuffer1 = tgfx::PixelBuffer::Make(pagFile->width(), pagFile->height(), false, false);
+  tgfx::Bitmap bitmap1(pixelBuffer1);
+  ASSERT_FALSE(bitmap1.isEmpty());
+  auto result = pagSurface->readPixels(ToPAG(bitmap1.colorType()), ToPAG(bitmap1.alphaType()),
+                                       bitmap1.writablePixels(), bitmap1.rowBytes());
+  ASSERT_TRUE(result);
+
+  pagFile = pag::PAGFile::Load("../resources/apitest/mengban.pag");
+  ASSERT_NE(pagFile, nullptr);
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->flush();
+  auto pixelBuffer2 = tgfx::PixelBuffer::Make(pagFile->width(), pagFile->height(), false, false);
+  tgfx::Bitmap bitmap2(pixelBuffer2);
+  ASSERT_FALSE(bitmap2.isEmpty());
+  result = pagSurface->readPixels(ToPAG(bitmap2.colorType()), ToPAG(bitmap2.alphaType()),
+                                  bitmap2.writablePixels(), bitmap2.rowBytes());
+  ASSERT_TRUE(result);
+
+  int left = 130;
+  int top = 400;
+  int width = 500;
+  int height = 700;
+  auto imageBuffer1 = tgfx::PixelBuffer::Make(width, height, false, false);
+  tgfx::Bitmap image1(imageBuffer1);
+  bitmap1.readPixels(image1.info(), image1.writablePixels(), left, top);
+  auto imageBuffer2 = tgfx::PixelBuffer::Make(width, height, false, false);
+  tgfx::Bitmap image2(imageBuffer2);
+  bitmap2.readPixels(image2.info(), image2.writablePixels(), left, top);
+
+  auto pixels1 = reinterpret_cast<const uint8_t*>(image1.pixels());
+  auto pixels2 = reinterpret_cast<const uint8_t*>(image2.pixels());
+  auto byteSize = image1.byteSize();
+  for (size_t index = 0; index < byteSize; index++) {
+    auto pixelA = pixels2[index];
+    auto pixelB = pixels1[index];
+    if (abs(pixelA - pixelB) > 1) {
+      result = false;
+      break;
+    }
+  }
+  if (result) {
+    RemoveImage("PAGImageLayerTest/bitmap1");
+    RemoveImage("PAGImageLayerTest/bitmap2");
+    RemoveImage("PAGImageLayerTest/image1");
+    RemoveImage("PAGImageLayerTest/image2");
+  } else {
+    SaveImage(bitmap1, "PAGImageLayerTest/bitmap1");
+    SaveImage(bitmap2, "PAGImageLayerTest/bitmap2");
+    SaveImage(image1, "PAGImageLayerTest/image1");
+    SaveImage(image2, "PAGImageLayerTest/image2");
+  }
+  EXPECT_TRUE(result);
+}
 }  // namespace pag
