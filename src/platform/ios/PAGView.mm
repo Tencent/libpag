@@ -38,6 +38,7 @@ void DestoryFlushQueue() {
 @property(atomic, assign) BOOL isAsyncFlushing;
 @property(atomic, assign) BOOL bufferPrepared;
 @property(atomic, assign) BOOL isInBackground;
+@property(atomic, strong) NSHashTable* listeners;
 @end
 
 @implementation PAGView {
@@ -50,7 +51,6 @@ void DestoryFlushQueue() {
   BOOL _isVisible;
   NSMutableDictionary* textReplacementMap;
   NSMutableDictionary* imageReplacementMap;
-  NSHashTable* listeners;
 }
 
 + (NSOperationQueue*)FlushQueue {
@@ -81,7 +81,7 @@ void DestoryFlushQueue() {
 }
 
 - (void)initPAG {
-  listeners = [[NSHashTable weakObjectsHashTable] retain];
+  self.listeners = [[NSHashTable weakObjectsHashTable] retain];
   textReplacementMap = [[NSMutableDictionary dictionary] retain];
   imageReplacementMap = [[NSMutableDictionary dictionary] retain];
   _isPlaying = FALSE;
@@ -111,7 +111,7 @@ void DestoryFlushQueue() {
 }
 
 - (void)dealloc {
-  [listeners release];
+  [self.listeners release];
   [textReplacementMap release];
   [imageReplacementMap release];
   [valueAnimator stop:false];  // must stop the animator, or it will not dealloc since it is
@@ -218,7 +218,7 @@ void DestoryFlushQueue() {
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
 - (void)onAnimationStart {
-  NSHashTable* copiedListeners = listeners.copy;
+  NSHashTable* copiedListeners = self.listeners.copy;
   for (id item in copiedListeners) {
     id<PAGViewListener> listener = (id<PAGViewListener>)item;
     if ([listener respondsToSelector:@selector(onAnimationStart:)]) {
@@ -233,7 +233,7 @@ void DestoryFlushQueue() {
 
 - (void)onAnimationEnd {
   _isPlaying = false;
-  NSHashTable* copiedListeners = listeners.copy;
+  NSHashTable* copiedListeners = self.listeners.copy;
   for (id item in copiedListeners) {
     id<PAGViewListener> listener = (id<PAGViewListener>)item;
     if ([listener respondsToSelector:@selector(onAnimationEnd:)]) {
@@ -247,7 +247,7 @@ void DestoryFlushQueue() {
 }
 
 - (void)onAnimationCancel {
-  NSHashTable* copiedListeners = listeners.copy;
+  NSHashTable* copiedListeners = self.listeners.copy;
   for (id item in copiedListeners) {
     id<PAGViewListener> listener = (id<PAGViewListener>)item;
     if ([listener respondsToSelector:@selector(onAnimationCancel:)]) {
@@ -261,7 +261,7 @@ void DestoryFlushQueue() {
 }
 
 - (void)onAnimationRepeat {
-  NSHashTable* copiedListeners = listeners.copy;
+  NSHashTable* copiedListeners = self.listeners.copy;
   for (id item in copiedListeners) {
     id<PAGViewListener> listener = (id<PAGViewListener>)item;
     if ([listener respondsToSelector:@selector(onAnimationRepeat:)]) {
@@ -277,11 +277,11 @@ void DestoryFlushQueue() {
 #pragma clang diagnostic pop
 
 - (void)addListener:(id<PAGViewListener>)listener {
-  [listeners addObject:listener];
+  [self.listeners addObject:listener];
 }
 
 - (void)removeListener:(id<PAGViewListener>)listener {
-  [listeners removeObject:listener];
+  [self.listeners removeObject:listener];
 }
 
 - (BOOL)isPlaying {
@@ -416,7 +416,7 @@ void DestoryFlushQueue() {
   }
   [pagPlayer setProgress:[valueAnimator getAnimatedFraction]];
   auto result = [pagPlayer flush];
-  NSHashTable* copiedListeners = listeners.copy;
+  NSHashTable* copiedListeners = self.listeners.copy;
   for (id item in copiedListeners) {
     id<PAGViewListener> listener = (id<PAGViewListener>)item;
     if ([listener respondsToSelector:@selector(onAnimationUpdate:)]) {
