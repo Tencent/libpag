@@ -257,10 +257,15 @@ void MaskModifier::applyToGraphic(tgfx::Canvas* canvas, RenderCache* cache,
   }
   tgfx::Rect bounds = tgfx::Rect::MakeEmpty();
   graphic->measureBounds(&bounds);
+  auto originBounds = bounds;
   applyToBounds(&bounds);
   if (bounds.isEmpty()) {
     // 与遮罩不相交，直接跳过绘制。
     return;
+  }
+  if (originBounds != bounds) {
+    // roundOut() prevents resampling when the graphic's content needs to be cropped.
+    bounds.roundOut();
   }
   auto contentSurface = SurfaceUtil::MakeContentSurface(canvas, bounds, FLT_MAX);
   if (contentSurface == nullptr) {
