@@ -97,7 +97,7 @@ static void SetJSONValue(nlohmann::json& target, const std::string& key, const s
   (*json)[jsonKey] = value;
 }
 
-static void SaveImage(const Bitmap& bitmap, const std::string& key) {
+void SaveImage(const Bitmap& bitmap, const std::string& key) {
   auto data = bitmap.encode(EncodedFormat::WEBP, 100);
   if (data == nullptr) {
     return;
@@ -108,6 +108,10 @@ static void SaveImage(const Bitmap& bitmap, const std::string& key) {
   out.write(reinterpret_cast<const char*>(data->data()),
             static_cast<std::streamsize>(data->size()));
   out.close();
+}
+
+void RemoveImage(const std::string& key) {
+  std::filesystem::remove(OUT_ROOT + key + WEBP_FILE_EXT);
 }
 
 bool Baseline::Compare(const std::shared_ptr<PixelBuffer>& pixelBuffer, const std::string& key) {
@@ -161,7 +165,7 @@ bool Baseline::Compare(const Bitmap& bitmap, const std::string& key) {
   }
   return CompareVersionAndMd5(md5, key, [key, bitmap](bool result) {
     if (result) {
-      std::filesystem::remove(OUT_ROOT + key + WEBP_FILE_EXT);
+      RemoveImage(key);
     } else {
       SaveImage(bitmap, key);
     }
