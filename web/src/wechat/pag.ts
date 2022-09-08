@@ -4,6 +4,8 @@ import { binding } from './binding';
 import * as types from '../types';
 import { WebAssemblyQueue } from '../utils/queue';
 import createPAG from '../wasm/libpag';
+import { clearDirectory } from './file-utils';
+import { MP4_CACHE_PATH } from './constant';
 
 export interface moduleOption {
   /**
@@ -29,4 +31,8 @@ const PAGInit = (moduleOption: moduleOption = {}): Promise<types.PAG> =>
       throw new Error('PAGInit fail! Please check .wasm file path valid.');
     });
 
-export { PAGInit, types };
+const clearCache = () => {
+  return clearDirectory(MP4_CACHE_PATH);
+};
+
+export { PAGInit, types, clearCache };

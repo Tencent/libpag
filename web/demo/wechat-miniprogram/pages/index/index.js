@@ -1,5 +1,5 @@
 // index.js
-import { PAGInit } from '../../utils/libpag';
+import { PAGInit, clearCache } from '../../utils/libpag';
 
 const loadFileByRequest = async (url) => {
   return new Promise((resolve) => {
@@ -63,6 +63,9 @@ Page({
     this.pagView = await this.PAG.PAGView.init(this.pagFile, canvas);
     this.setData({ pagLoaded: true });
     wx.hideLoading();
+  },
+  clear() {
+    clearCache();
   },
   play() {
     this.pagView.play();
