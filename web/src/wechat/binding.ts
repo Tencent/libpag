@@ -3,12 +3,12 @@ import { ScalerContext } from './scaler-context';
 import { WebMask } from './web-mask';
 import { PAGView } from './pag-view';
 import { PAGFile } from './pag-file';
+import { PAGImage } from './pag-image';
 
 import { PAG } from '../types';
 import { setPAGModule } from '../pag-module';
 import { PAGSurface } from '../pag-surface';
 import { PAGPlayer } from '../pag-player';
-import { PAGImage } from '../pag-image';
 import { PAGFont } from '../pag-font';
 import { PAGLayer } from '../pag-layer';
 import { NativeImage } from '../core/native-image';

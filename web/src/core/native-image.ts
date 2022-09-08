@@ -4,7 +4,7 @@ import { isCanvas, releaseCanvas2D } from '../utils/canvas';
 export class NativeImage {
   public static async createFromBytes(bytes: ArrayBuffer) {
     const blob = new Blob([bytes], { type: 'image/*' });
-    return new Promise((resolve) => {
+    return new Promise<NativeImage | null>((resolve) => {
       const image = new Image();
       image.onload = function () {
         resolve(new NativeImage(image));
@@ -18,7 +18,7 @@ export class NativeImage {
   }
 
   public static async createFromPath(path: string) {
-    return new Promise((resolve) => {
+    return new Promise<NativeImage | null>((resolve) => {
       const image = new Image();
       image.onload = function () {
         resolve(new NativeImage(image));

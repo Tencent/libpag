@@ -9,7 +9,6 @@ import { PAGFont } from './pag-font';
 import { PAGPlayer } from './pag-player';
 import { PAGLayer } from './pag-layer';
 import { PAGComposition } from './pag-composition';
-import { NativeImage } from './core/native-image';
 import { PAGTextLayer } from './pag-text-layer';
 import { GlobalCanvas } from './core/global-canvas';
 import { BackendContext } from './core/backend-context';
@@ -18,7 +17,7 @@ import { PAGSolidLayer } from './pag-solid-layer';
 import { Matrix as ClassMatrix } from './core/matrix';
 import { RenderCanvas } from './core/render-canvas';
 
-import type { ScalerContextConstructor, VideoDecoderConstructor, WebMaskConstructor } from './interfaces';
+import type { NativeImage, NativeImageConstructor, ScalerContextConstructor, VideoDecoderConstructor, WebMaskConstructor } from './interfaces';
 
 declare global {
   interface Window {
@@ -101,7 +100,7 @@ export interface PAG extends EmscriptenModule {
   PAGTextLayer: typeof PAGTextLayer;
   PAGImageLayer: typeof PAGImageLayer;
   PAGSolidLayer: typeof PAGSolidLayer;
-  NativeImage: typeof NativeImage;
+  NativeImage: NativeImageConstructor;
   WebMask: WebMaskConstructor;
   ScalerContext: ScalerContextConstructor;
   VideoReader: VideoDecoderConstructor;

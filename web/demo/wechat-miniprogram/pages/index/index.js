@@ -120,4 +120,39 @@ Page({
     this.pagFile.replaceImage(0, pagImage);
     this.pagView.flush();
   },
+  async replaceVideo() {
+    wx.downloadFile({
+      url: 'https://pag.art/file/circle.mp4',
+      success: (res) => {
+        console.log(res.tempFilePath);
+        this.videoDecoder = wx.createVideoDecoder();
+        this.videoDecoder
+          .start({
+            source: res.tempFilePath,
+            mode: 1,
+          })
+          .then(() => {
+            this.pagView.addListener('onAnimationUpdate', () => {
+              console.log('onAnimationUpdate')
+              this.replaceVideoFrame();
+            });
+          });
+      },
+      fail(res) {
+        console.log(res.errMsg);
+      },
+    });
+  },
+  replaceVideoFrame() {
+    const frameData = this.videoDecoder.getFrameData();
+    if (frameData === null) {
+      setTimeout(() => {
+        this.replaceVideoFrame();
+      }, 10);
+      return;
+    }
+    console.log("get frame data", frameData);
+    const pagImage = this.PAG.PAGImage.fromArrayBuffer(frameData.data, frameData.width, frameData.height);
+    this.pagFile.replaceImage(0, pagImage);
+  },
 });

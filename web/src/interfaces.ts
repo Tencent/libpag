@@ -1,4 +1,3 @@
-import type { NativeImage } from './core/native-image';
 import type { WebFont } from './core/web-mask';
 import type { ctor, EmscriptenGL, Point, Rect, Vector } from './types';
 
@@ -57,3 +56,15 @@ export type WebMaskConstructor = new (
   width: number,
   height: number,
 ) => WebMask;
+
+export interface NativeImage {
+  width: () => number;
+  height: () => number;
+  upload: (GL: EmscriptenGL) => void;
+}
+
+export interface NativeImageConstructor {
+  createFromBytes: (bytes: ArrayBuffer) => Promise<NativeImage | null>;
+  createFromPath: (path: string) => Promise<NativeImage | null>;
+  new (source: TexImageSource): NativeImage;
+}
