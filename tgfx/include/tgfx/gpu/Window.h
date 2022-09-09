@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <vector>
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/Surface.h"
 
@@ -50,6 +51,7 @@ class Window {
 
  protected:
   std::shared_ptr<Device> device = nullptr;
+  std::vector<std::weak_ptr<Surface>> surfaces;
 
   explicit Window(std::shared_ptr<Device> device);
   virtual std::shared_ptr<Surface> onCreateSurface(Context* context) = 0;

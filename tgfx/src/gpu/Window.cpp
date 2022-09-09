@@ -28,12 +28,25 @@ std::shared_ptr<Surface> Window::createSurface(Context* context) {
   if (!checkContext(context)) {
     return nullptr;
   }
-  return onCreateSurface(context);
+  auto surface = onCreateSurface(context);
+  if (surface) {
+    surfaces.emplace_back(surface);
+  }
+  return surface;
 }
 
 void Window::present(Context* context, int64_t presentationTime) {
   if (!checkContext(context)) {
     return;
+  }
+  auto iter = surfaces.begin();
+  while (iter != surfaces.end()) {
+    if (auto surface = iter->lock()) {
+      surface->flush();
+      ++iter;
+    } else {
+      iter = surfaces.erase(iter);
+    }
   }
   onPresent(context, presentationTime);
 }
