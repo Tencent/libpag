@@ -19,8 +19,8 @@
 #include "FeatherMask.h"
 #include "pag/file.h"
 #include "rendering/caches/RenderCache.h"
-#include "rendering/utils/PathUtil.h"
 #include "rendering/filters/gaussianblur/GaussianBlurFilter.h"
+#include "rendering/utils/PathUtil.h"
 #include "tgfx/core/Mask.h"
 #include "tgfx/gpu/Canvas.h"
 #include "tgfx/gpu/Surface.h"
@@ -58,7 +58,7 @@ tgfx::Rect MeasureFeatherMaskBounds(const std::vector<MaskData*>& masks, Frame l
 
 FeatherMask::FeatherMask(const std::vector<MaskData*>& masks, Frame layerFrame)
     : masks(std::move(masks)), layerFrame(layerFrame) {
-      bounds = MeasureFeatherMaskBounds(masks, layerFrame);
+  bounds = MeasureFeatherMaskBounds(masks, layerFrame);
 }
 
 void FeatherMask::measureBounds(tgfx::Rect* rect) const {
@@ -77,13 +77,12 @@ void FeatherMask::prepare(RenderCache*) const {
 }
 
 std::unique_ptr<Snapshot> FeatherMask::drawFeatherMask(const std::vector<MaskData*>& masks,
-                                                       Frame layerFrame,
-                                                       RenderCache* cache, float scaleFactor) const {
+                                                       Frame layerFrame, RenderCache* cache,
+                                                       float scaleFactor) const {
   bool isFirst = true;
   auto surface = tgfx::Surface::Make(cache->getContext(),
                                      static_cast<int>(ceilf(bounds.width() * scaleFactor)),
-                                     static_cast<int>(ceilf(bounds.height() * scaleFactor)),
-                                     true);
+                                     static_cast<int>(ceilf(bounds.height() * scaleFactor)), true);
   auto canvas = surface->getCanvas();
   canvas->setMatrix(tgfx::Matrix::MakeTrans(bounds.x(), bounds.y()));
   if (surface == nullptr) {
@@ -138,11 +137,11 @@ std::unique_ptr<Snapshot> FeatherMask::drawFeatherMask(const std::vector<MaskDat
   if (texture == nullptr) {
     return nullptr;
   }
-  
+
   auto matrix = tgfx::Matrix::MakeScale(scaleFactor);
   auto drawingMatrix = tgfx::Matrix::I();
   matrix.invert(&drawingMatrix);
-  
+
   return std::make_unique<Snapshot>(texture, drawingMatrix);
 }
 

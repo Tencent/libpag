@@ -105,7 +105,7 @@ class RenderCache : public Performance {
   void removeSnapshot(ID assetID);
 
   Snapshot* getSnapshot(const Shape* shape);
-  
+
   TextAtlas* getTextAtlas(const TextBlock* textBlock);
 
   /**

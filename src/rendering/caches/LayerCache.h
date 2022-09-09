@@ -18,10 +18,10 @@
 
 #pragma once
 #include "base/utils/TGFXCast.h"
-#include "rendering/graphics/Modifier.h"
 #include "rendering/caches/ContentCache.h"
 #include "rendering/caches/MaskCache.h"
 #include "rendering/caches/TransformCache.h"
+#include "rendering/graphics/Modifier.h"
 
 namespace pag {
 class LayerCache : public Cache {
@@ -33,7 +33,7 @@ class LayerCache : public Cache {
   Transform* getTransform(Frame contentFrame);
 
   tgfx::Path* getMasks(Frame contentFrame);
-  
+
   std::shared_ptr<Modifier> getFeatherMask(Frame contentFrame);
 
   Content* getContent(Frame contentFrame);

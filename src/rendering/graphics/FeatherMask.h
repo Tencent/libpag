@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "pag/pag.h"
 #include "pag/file.h"
+#include "pag/pag.h"
 #include "rendering/graphics/Graphic.h"
 #include "rendering/graphics/Snapshot.h"
 
@@ -29,8 +29,7 @@ class FeatherMask : public Graphic {
   /**
    * Creates a FeatherMask Graphic with solid color fill. Returns nullptr if path is empty.
    */
-  static std::shared_ptr<Graphic> MakeFrom(const std::vector<MaskData*>& masks,
-                                           Frame layerFrame);
+  static std::shared_ptr<Graphic> MakeFrom(const std::vector<MaskData*>& masks, Frame layerFrame);
 
   GraphicType type() const override {
     return GraphicType::FeatherMask;
@@ -44,7 +43,7 @@ class FeatherMask : public Graphic {
 
  private:
   FeatherMask(const std::vector<MaskData*>& masks, Frame layerFrame);
-  
+
   std::unique_ptr<Snapshot> drawFeatherMask(const std::vector<MaskData*>& masks, Frame layerFrame,
                                             RenderCache* cache, float scaleFactor = 1.0f) const;
 

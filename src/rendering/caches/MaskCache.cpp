@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MaskCache.h"
-#include "rendering/renderers/MaskRenderer.h"
 #include "rendering/graphics/FeatherMask.h"
+#include "rendering/renderers/MaskRenderer.h"
 
 namespace pag {
 MaskCache::MaskCache(Layer* layer)

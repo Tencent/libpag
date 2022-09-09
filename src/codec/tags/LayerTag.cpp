@@ -75,8 +75,7 @@ void ReadTagsOfLayer(DecodeStream* stream, TagCode code, Layer* layer) {
     case TagCode::MaskBlockV2: {
       auto mask = ReadTagBlock(stream, MaskTagV2);
       layer->masks.push_back(mask);
-    }
-      break;
+    } break;
     case TagCode::MarkerList: {
       ReadMarkerList(stream, &layer->markers);
     } break;
