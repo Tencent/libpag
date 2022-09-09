@@ -45,9 +45,9 @@ jobs:
             /usr/local/lib/node_modules/depsync
             /usr/local/Cellar/gcovr
             /usr/local/bin/gcovr
-          key: libpag-environment-autotest-20220402
+          key: libpag-environment-autotest-20220908
           restore-keys: |
-            libpag-environment-
+            libpag-environment-autotest-20220908
       - uses: actions/checkout@v3
         with:
           lfs: true
