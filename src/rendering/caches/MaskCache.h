@@ -19,6 +19,7 @@
 #pragma once
 
 #include "FrameCache.h"
+#include "GraphicContent.h"
 #include "tgfx/core/Path.h"
 
 namespace pag {
@@ -28,6 +29,17 @@ class MaskCache : public FrameCache<tgfx::Path> {
 
  protected:
   tgfx::Path* createCache(Frame layerFrame) override;
+
+ private:
+  Layer* layer = nullptr;
+};
+
+class FeatherMaskCache : public FrameCache<GraphicContent> {
+ public:
+  explicit FeatherMaskCache(Layer* layer);
+
+ protected:
+  GraphicContent* createCache(Frame layerFrame) override;
 
  private:
   Layer* layer = nullptr;

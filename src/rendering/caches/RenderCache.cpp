@@ -346,6 +346,31 @@ void RenderCache::removeSnapshot(ID assetID, const tgfx::Path& path) {
   }
 }
 
+Snapshot* RenderCache::getSnapshot(const FeatherMask* featherMask) {
+  if (!_snapshotEnabled) {
+    return nullptr;
+  }
+  usedAssets.insert(featherMask->snapshotID);
+  auto scaleFactor = stage->getAssetMaxScale(featherMask->assetID);
+  auto snapshot = getSnapshot(featherMask->snapshotID);
+  if (snapshot && (fabsf(snapshot->scaleFactor() - scaleFactor) > SCALE_FACTOR_PRECISION)) {
+    removeSnapshot(featherMask->snapshotID);
+    snapshot = nullptr;
+  }
+  if (snapshot) {
+    moveSnapshotToHead(snapshot);
+    return snapshot;
+  }
+  snapshot =
+      makeSnapshot(scaleFactor, [&]() { return featherMask->makeSnapshot(this, scaleFactor).release(); });
+  if (snapshot == nullptr) {
+    return nullptr;
+  }
+  snapshot->assetID = featherMask->snapshotID;
+  snapshotCaches[featherMask->snapshotID] = snapshot;
+  return snapshot;
+}
+
 void RenderCache::removePathSnapshots(ID assetID) {
   auto snapshotCache = pathCaches.find(assetID);
   if (snapshotCache != pathCaches.end()) {

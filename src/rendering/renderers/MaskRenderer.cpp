@@ -19,40 +19,8 @@
 #include "MaskRenderer.h"
 #include "pag/file.h"
 #include "rendering/utils/PathUtil.h"
-#include "tgfx/core/PathEffect.h"
 
 namespace pag {
-tgfx::PathOp ToPathOp(Enum maskMode) {
-  switch (maskMode) {
-    case MaskMode::Subtract:
-      return tgfx::PathOp::Difference;
-    case MaskMode::Intersect:
-      return tgfx::PathOp::Intersect;
-    case MaskMode::Difference:
-      return tgfx::PathOp::XOR;
-    case MaskMode::Darken:  // without the opacity blending, haven't supported it
-      return tgfx::PathOp::Intersect;
-    default:
-      return tgfx::PathOp::Union;
-  }
-}
-
-static void ExpandPath(tgfx::Path* path, float expansion) {
-  if (expansion == 0) {
-    return;
-  }
-  auto strokePath = *path;
-  auto effect = tgfx::PathEffect::MakeStroke(tgfx::Stroke(fabsf(expansion) * 2));
-  if (effect) {
-    effect->applyTo(&strokePath);
-  }
-  if (expansion < 0) {
-    path->addPath(strokePath, tgfx::PathOp::Difference);
-  } else {
-    path->addPath(strokePath, tgfx::PathOp::Union);
-  }
-}
-
 void RenderMasks(tgfx::Path* maskContent, const std::vector<MaskData*>& masks, Frame layerFrame) {
   bool isFirst = true;
   for (auto& mask : masks) {

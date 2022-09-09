@@ -72,6 +72,11 @@ void ReadTagsOfLayer(DecodeStream* stream, TagCode code, Layer* layer) {
       auto mask = ReadTagBlock(stream, MaskTag);
       layer->masks.push_back(mask);
     } break;
+    case TagCode::MaskBlockV2: {
+      auto mask = ReadTagBlock(stream, MaskTagV2);
+      layer->masks.push_back(mask);
+    }
+      break;
     case TagCode::MarkerList: {
       ReadMarkerList(stream, &layer->markers);
     } break;
@@ -193,6 +198,20 @@ Layer* ReadLayer(DecodeStream* stream) {
 
 #undef Condition
 
+static bool CheckMaskFeatherValid(Property<Point>* maskFeather) {
+  if (maskFeather == nullptr) {
+    return false;
+  }
+  if (maskFeather->animatable()) {
+    return true;
+  }
+  if (maskFeather->value.x != 0.0f || maskFeather->value.y != 0.0f) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
 TagCode WriteLayer(EncodeStream* stream, Layer* layer) {
   stream->writeUint8(static_cast<uint8_t>(layer->type()));
   stream->writeEncodedUint32(layer->id);
@@ -207,7 +226,11 @@ TagCode WriteLayer(EncodeStream* stream, Layer* layer) {
   }
 
   for (auto& mask : layer->masks) {
-    WriteTagBlock(stream, mask, MaskTag);
+    if (CheckMaskFeatherValid(mask->maskFeather)) {
+      WriteTagBlock(stream, mask, MaskTagV2);
+    } else {
+      WriteTagBlock(stream, mask, MaskTag);
+    }
   }
   if (layer->markers.size() > 0) {
     WriteTag(stream, &layer->markers, WriteMarkerList);

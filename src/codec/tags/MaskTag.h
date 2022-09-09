@@ -22,4 +22,5 @@
 
 namespace pag {
 std::unique_ptr<BlockConfig> MaskTag(MaskData* mask);
+std::unique_ptr<BlockConfig> MaskTagV2(MaskData* mask);
 }

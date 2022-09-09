@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PathUtil.h"
+#include "tgfx/core/PathEffect.h"
 
 namespace pag {
 tgfx::Path ToPath(const PathData& pathData) {
@@ -46,5 +47,38 @@ tgfx::Path ToPath(const PathData& pathData) {
     }
   }
   return path;
+}
+
+tgfx::PathOp ToPathOp(Enum maskMode) {
+  switch (maskMode) {
+    case MaskMode::Subtract:
+      return tgfx::PathOp::Difference;
+    case MaskMode::Intersect:
+      return tgfx::PathOp::Intersect;
+    case MaskMode::Difference:
+      return tgfx::PathOp::XOR;
+    case MaskMode::Darken:  // without the opacity blending, haven't supported it
+      return tgfx::PathOp::Intersect;
+    default:
+      return tgfx::PathOp::Union;
+  }
+}
+
+void ExpandPath(tgfx::Path* path, float expansion) {
+  if (expansion == 0) {
+    return;
+  }
+  auto strokePath = *path;
+  auto effect = tgfx::PathEffect::MakeStroke(tgfx::Stroke(fabsf(expansion) * 2,
+                                                          tgfx::LineCap::Butt,
+                                                          tgfx::LineJoin::Round));
+  if (effect) {
+    effect->applyTo(&strokePath);
+  }
+  if (expansion < 0) {
+    path->addPath(strokePath, tgfx::PathOp::Difference);
+  } else {
+    path->addPath(strokePath, tgfx::PathOp::Union);
+  }
 }
 }  // namespace pag
