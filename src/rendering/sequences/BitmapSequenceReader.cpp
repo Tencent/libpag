@@ -44,11 +44,7 @@ bool BitmapSequenceReader::decodeFrame(Frame targetFrame) {
     return false;
   }
   auto startFrame = findStartFrame(targetFrame);
-  if (lastDecodeFrame > startFrame && lastDecodeFrame < targetFrame) {
-    startFrame = lastDecodeFrame;
-  } else {
-    lastDecodeFrame = -1;
-  }
+  lastDecodeFrame = -1;
   auto& bitmapFrames = static_cast<BitmapSequence*>(sequence)->frames;
   tgfx::Bitmap bitmap(pixelBuffer);
   for (Frame frame = startFrame; frame <= targetFrame; frame++) {
