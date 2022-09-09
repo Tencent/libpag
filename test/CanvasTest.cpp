@@ -19,6 +19,7 @@
 #include "core/TriangularPathMesh.h"
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
+#include "gpu/DrawingManager.h"
 #include "gpu/opengl/GLCanvas.h"
 #include "gpu/opengl/GLFillRectOp.h"
 #include "gpu/opengl/GLRRectOp.h"
@@ -273,11 +274,11 @@ PAG_TEST(CanvasTest, merge_draw_call_rect) {
       draw = !draw;
     }
   }
-  auto* drawContext = static_cast<GLCanvas*>(canvas)->drawContext;
-  EXPECT_TRUE(drawContext != nullptr);
-  EXPECT_TRUE(drawContext->_drawer == nullptr);
-  EXPECT_TRUE(drawContext->ops.size() == 2);
-  EXPECT_EQ(static_cast<GLFillRectOp*>(drawContext->ops[1].get())->rects.size(), drawCallCount);
+  auto* drawingManager = context->drawingManager();
+  EXPECT_TRUE(drawingManager->tasks.size() == 1);
+  auto task = std::static_pointer_cast<OpsTask>(drawingManager->tasks[0]);
+  EXPECT_TRUE(task->ops.size() == 2);
+  EXPECT_EQ(static_cast<GLFillRectOp*>(task->ops[1].get())->rects.size(), drawCallCount);
   canvas->flush();
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/merge_draw_call_rect"));
   device->unlock();
@@ -329,12 +330,11 @@ PAG_TEST(CanvasTest, merge_draw_call_triangle) {
       draw = !draw;
     }
   }
-  auto* drawContext = static_cast<GLCanvas*>(canvas)->drawContext;
-  EXPECT_TRUE(drawContext != nullptr);
-  EXPECT_TRUE(drawContext->_drawer == nullptr);
-  EXPECT_TRUE(drawContext->ops.size() == 2);
-  EXPECT_EQ(static_cast<GLTriangulatingPathOp*>(drawContext->ops[1].get())->vertexCount,
-            drawCallCount);
+  auto* drawingManager = context->drawingManager();
+  EXPECT_TRUE(drawingManager->tasks.size() == 1);
+  auto task = std::static_pointer_cast<OpsTask>(drawingManager->tasks[0]);
+  EXPECT_TRUE(task->ops.size() == 2);
+  EXPECT_EQ(static_cast<GLTriangulatingPathOp*>(task->ops[1].get())->vertexCount, drawCallCount);
   canvas->flush();
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/merge_draw_call_triangle"));
   device->unlock();
@@ -373,11 +373,11 @@ PAG_TEST(CanvasTest, merge_draw_call_rrect) {
       draw = !draw;
     }
   }
-  auto* drawContext = static_cast<GLCanvas*>(canvas)->drawContext;
-  EXPECT_TRUE(drawContext != nullptr);
-  EXPECT_TRUE(drawContext->_drawer == nullptr);
-  EXPECT_TRUE(drawContext->ops.size() == 2);
-  EXPECT_EQ(static_cast<GLRRectOp*>(drawContext->ops[1].get())->rRects.size(), drawCallCount);
+  auto* drawingManager = context->drawingManager();
+  EXPECT_TRUE(drawingManager->tasks.size() == 1);
+  auto task = std::static_pointer_cast<OpsTask>(drawingManager->tasks[0]);
+  EXPECT_TRUE(task->ops.size() == 2);
+  EXPECT_EQ(static_cast<GLRRectOp*>(task->ops[1].get())->rRects.size(), drawCallCount);
   canvas->flush();
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/merge_draw_call_rrect"));
   device->unlock();
@@ -417,10 +417,11 @@ PAG_TEST(CanvasTest, merge_draw_clear_op) {
       draw = !draw;
     }
   }
-  auto* drawContext = static_cast<GLCanvas*>(canvas)->drawContext;
-  EXPECT_TRUE(drawContext != nullptr);
-  EXPECT_TRUE(drawContext->_drawer == nullptr);
-  EXPECT_TRUE(drawContext->ops.size() == drawCallCount + 1);
+
+  auto* drawingManager = context->drawingManager();
+  EXPECT_TRUE(drawingManager->tasks.size() == 1);
+  auto task = std::static_pointer_cast<OpsTask>(drawingManager->tasks[0]);
+  EXPECT_TRUE(task->ops.size() == drawCallCount + 1);
   canvas->flush();
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/merge_draw_clear_op"));
   device->unlock();

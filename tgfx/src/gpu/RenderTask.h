@@ -18,29 +18,36 @@
 
 #pragma once
 
-#include "FragmentProcessor.h"
-#include "OpsTask.h"
-#include "tgfx/core/Matrix.h"
-#include "tgfx/core/Rect.h"
+#include "Gpu.h"
 #include "tgfx/gpu/Surface.h"
 
 namespace tgfx {
-class SurfaceDrawContext {
+class RenderTask {
  public:
-  explicit SurfaceDrawContext(Surface* surface) : surface(surface) {
+  virtual ~RenderTask() = default;
+
+  virtual bool execute(Gpu* gpu) = 0;
+
+  void makeClosed() {
+    closed = true;
   }
 
-  void fillRectWithFP(const Rect& dstRect, const Matrix& localMatrix,
-                      std::unique_ptr<FragmentProcessor> fp);
+  bool isClosed() const {
+    return closed;
+  }
 
-  void addOp(std::unique_ptr<Op> op);
+  bool isUsed(RenderTarget* rt) const {
+    return renderTarget.get() == rt;
+  }
 
  protected:
-  OpsTask* getOpsTask();
+  explicit RenderTask(std::shared_ptr<RenderTarget> renderTarget)
+      : renderTarget(std::move(renderTarget)) {
+  }
 
-  void replaceOpsTask();
+  std::shared_ptr<RenderTarget> renderTarget = nullptr;
 
-  Surface* surface = nullptr;
-  std::shared_ptr<OpsTask> opsTask;
+ private:
+  bool closed = false;
 };
 }  // namespace tgfx

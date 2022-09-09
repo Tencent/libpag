@@ -16,31 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "FragmentProcessor.h"
-#include "OpsTask.h"
-#include "tgfx/core/Matrix.h"
-#include "tgfx/core/Rect.h"
-#include "tgfx/gpu/Surface.h"
+#include "Op.h"
+#include <atomic>
 
 namespace tgfx {
-class SurfaceDrawContext {
- public:
-  explicit SurfaceDrawContext(Surface* surface) : surface(surface) {
+static std::atomic_uint8_t currentOpClassID = {1};
+
+uint8_t Op::GenOpClassID() {
+  return currentOpClassID++;
+}
+
+bool Op::combineIfPossible(Op* op) {
+  if (_classID != op->_classID) {
+    return false;
   }
-
-  void fillRectWithFP(const Rect& dstRect, const Matrix& localMatrix,
-                      std::unique_ptr<FragmentProcessor> fp);
-
-  void addOp(std::unique_ptr<Op> op);
-
- protected:
-  OpsTask* getOpsTask();
-
-  void replaceOpsTask();
-
-  Surface* surface = nullptr;
-  std::shared_ptr<OpsTask> opsTask;
-};
+  auto result = onCombineIfPossible(op);
+  if (result) {
+    _bounds.join(op->_bounds);
+  }
+  return result;
+}
 }  // namespace tgfx

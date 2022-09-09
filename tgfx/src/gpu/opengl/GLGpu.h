@@ -18,29 +18,29 @@
 
 #pragma once
 
-#include "FragmentProcessor.h"
-#include "OpsTask.h"
-#include "tgfx/core/Matrix.h"
-#include "tgfx/core/Rect.h"
-#include "tgfx/gpu/Surface.h"
+#include "gpu/Gpu.h"
+#include "gpu/opengl/GLOpsRenderPass.h"
 
 namespace tgfx {
-class SurfaceDrawContext {
+class GLGpu : public Gpu {
  public:
-  explicit SurfaceDrawContext(Surface* surface) : surface(surface) {
+  static std::unique_ptr<Gpu> Make(Context* context);
+
+  void resolveRenderTarget(RenderTarget* renderTarget) override;
+
+  bool insertSemaphore(Semaphore* semaphore) override;
+
+  bool waitSemaphore(const Semaphore* semaphore) override;
+
+  OpsRenderPass* getOpsRenderPass(std::shared_ptr<RenderTarget> renderTarget,
+                                  std::shared_ptr<Texture> renderTargetTexture) override;
+
+  void submit(OpsRenderPass* renderPass) override;
+
+ private:
+  explicit GLGpu(Context* context) : Gpu(context) {
   }
 
-  void fillRectWithFP(const Rect& dstRect, const Matrix& localMatrix,
-                      std::unique_ptr<FragmentProcessor> fp);
-
-  void addOp(std::unique_ptr<Op> op);
-
- protected:
-  OpsTask* getOpsTask();
-
-  void replaceOpsTask();
-
-  Surface* surface = nullptr;
-  std::shared_ptr<OpsTask> opsTask;
+  std::unique_ptr<GLOpsRenderPass> opsRenderPass;
 };
 }  // namespace tgfx

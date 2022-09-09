@@ -128,7 +128,7 @@ GLFillRectOp::GLFillRectOp(std::vector<Color> colors, std::vector<Rect> rects,
   setBounds(bounds);
 }
 
-bool GLFillRectOp::onCombineIfPossible(GLOp* op) {
+bool GLFillRectOp::onCombineIfPossible(Op* op) {
   if (!GLDrawOp::onCombineIfPossible(op)) {
     return false;
   }
@@ -159,11 +159,12 @@ static constexpr uint16_t kAAQuadIndexPattern[] = {
 };
 // clang-format on
 
-void GLFillRectOp::draw(const DrawArgs& args) {
+void GLFillRectOp::execute(OpsRenderPass* opsRenderPass) {
   auto info = createProgram(
-      args, QuadPerEdgeAAGeometryProcessor::Make(args.renderTarget->width(),
-                                                 args.renderTarget->height(), aa, !colors.empty()));
-  args.drawer->bindPipelineAndScissorClip(info, scissorRect());
+      opsRenderPass, QuadPerEdgeAAGeometryProcessor::Make(opsRenderPass->renderTarget()->width(),
+                                                          opsRenderPass->renderTarget()->height(),
+                                                          aa, !colors.empty()));
+  opsRenderPass->bindPipelineAndScissorClip(info, scissorRect());
   if (rects.size() > 1 || aa == AAType::Coverage) {
     std::vector<uint16_t> indexes;
     static auto kNonAAType = UniqueID::Next();
@@ -188,12 +189,12 @@ void GLFillRectOp::draw(const DrawArgs& args) {
         indexes.push_back(i * verticesPerQuad + indexPattern[j]);
       }
     }
-    auto indexBuffer = GLBuffer::Make(args.context, &indexes[0], indexes.size(), type);
-    args.drawer->bindVerticesAndIndices(vertices(), indexBuffer);
-    args.drawer->drawIndexed(GL_TRIANGLES, 0, static_cast<int>(indexBuffer->length()));
+    auto indexBuffer = GLBuffer::Make(opsRenderPass->context(), &indexes[0], indexes.size(), type);
+    opsRenderPass->bindVerticesAndIndices(vertices(), indexBuffer);
+    opsRenderPass->drawIndexed(GL_TRIANGLES, 0, static_cast<int>(indexBuffer->length()));
     return;
   }
-  args.drawer->bindVerticesAndIndices(vertices());
-  args.drawer->draw(GL_TRIANGLE_STRIP, 0, 4);
+  opsRenderPass->bindVerticesAndIndices(vertices());
+  opsRenderPass->draw(GL_TRIANGLE_STRIP, 0, 4);
 }
 }  // namespace tgfx

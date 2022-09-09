@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SimplePathMesh.h"
-#include "gpu/opengl/GLDrawer.h"
 #include "gpu/opengl/GLFillRectOp.h"
+#include "gpu/opengl/GLOpsRenderPass.h"
 #include "gpu/opengl/GLRRectOp.h"
 
 namespace tgfx {

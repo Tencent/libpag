@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "GLDrawer.h"
+#include "GLOpsRenderPass.h"
 #include "tgfx/core/Path.h"
 
 namespace tgfx {
@@ -30,12 +30,12 @@ class GLTriangulatingPathOp : public GLDrawOp {
   GLTriangulatingPathOp(Color color, std::vector<float> vertex, int vertexCount, Rect bounds,
                         const Matrix& localMatrix = Matrix::I());
 
-  void draw(const DrawArgs& args) override;
+  void execute(OpsRenderPass* opsRenderPass) override;
 
  private:
   DEFINE_OP_CLASS_ID
 
-  bool onCombineIfPossible(GLOp* op) override;
+  bool onCombineIfPossible(Op* op) override;
 
   Color color = Color::Transparent();
   std::vector<float> vertex;

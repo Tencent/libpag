@@ -27,7 +27,7 @@ bool ContainsScissor(const Rect& a, const Rect& b) {
   return a.isEmpty() || (!b.isEmpty() && a.contains(b));
 }
 
-bool ClearOp::onCombineIfPossible(GLOp* op) {
+bool ClearOp::onCombineIfPossible(Op* op) {
   auto that = static_cast<ClearOp*>(op);
   if (ContainsScissor(that->scissor, scissor)) {
     scissor = that->scissor;
@@ -39,7 +39,7 @@ bool ClearOp::onCombineIfPossible(GLOp* op) {
   return false;
 }
 
-void ClearOp::draw(const DrawArgs& args) {
-  args.drawer->clear(scissor, color);
+void ClearOp::execute(OpsRenderPass* opsRenderPass) {
+  opsRenderPass->clear(scissor, color);
 }
 }  // namespace tgfx

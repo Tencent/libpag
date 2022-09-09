@@ -124,7 +124,6 @@ class GLCaps : public Caps {
   std::string frameBufferFetchExtensionString;
   bool textureBarrierSupport = false;
   int maxFragmentSamplers = kMaxSaneSamplers;
-  bool semaphoreSupport = false;
 
   static const GLCaps* Get(Context* context);
 

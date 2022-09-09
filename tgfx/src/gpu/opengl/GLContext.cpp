@@ -17,12 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/opengl/GLContext.h"
-#include "gpu/opengl/GLUtil.h"
+#include "GLGpu.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace tgfx {
 GLContext::GLContext(Device* device, const GLInterface* glInterface)
     : Context(device), glInterface(glInterface) {
+  _gpu = GLGpu::Make(this).release();
 }
 
 void GLContext::resetState() {

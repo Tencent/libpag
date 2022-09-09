@@ -71,9 +71,8 @@ std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, 
 
 GLSurface::GLSurface(std::shared_ptr<GLRenderTarget> renderTarget,
                      std::shared_ptr<GLTexture> texture)
-    : Surface(renderTarget->getContext()),
-      renderTarget(std::move(renderTarget)),
-      texture(std::move(texture)) {
+    : Surface(renderTarget, texture) {
+  requiresManualMSAAResolve = GLCaps::Get(renderTarget->context)->usesMSAARenderBuffers();
 }
 
 GLSurface::~GLSurface() {
@@ -87,56 +86,8 @@ Canvas* GLSurface::getCanvas() {
   return canvas;
 }
 
-bool GLSurface::wait(const Semaphore* semaphore) {
-  auto glSync = static_cast<const GLSemaphore*>(semaphore)->glSync;
-  if (glSync == nullptr) {
-    return false;
-  }
-  auto caps = GLCaps::Get(context);
-  if (!caps->semaphoreSupport) {
-    return false;
-  }
-  auto gl = GLFunctions::Get(context);
-  gl->waitSync(glSync, 0, GL_TIMEOUT_IGNORED);
-  gl->deleteSync(glSync);
-  return true;
-}
-
-bool GLSurface::flush(Semaphore* semaphore) {
-  if (canvas) {
-    canvas->flush();
-  }
-  renderTarget->resolve();
-  if (semaphore == nullptr) {
-    return false;
-  }
-  auto caps = GLCaps::Get(context);
-  if (!caps->semaphoreSupport) {
-    return false;
-  }
-  auto gl = GLFunctions::Get(context);
-  auto* sync = gl->fenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-  if (sync) {
-    static_cast<GLSemaphore*>(semaphore)->glSync = sync;
-    // If we inserted semaphores during the flush, we need to call glFlush.
-    gl->flush();
-    return true;
-  }
-  return false;
-}
-
-std::shared_ptr<RenderTarget> GLSurface::getRenderTarget() {
-  flush(nullptr);
-  return renderTarget;
-}
-
-std::shared_ptr<Texture> GLSurface::getTexture() {
-  flush(nullptr);
-  return texture;
-}
-
 bool GLSurface::onReadPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) {
-  flush(nullptr);
-  return renderTarget->readPixels(dstInfo, dstPixels, srcX, srcY);
+  return std::static_pointer_cast<GLRenderTarget>(renderTarget)
+      ->readPixels(dstInfo, dstPixels, srcX, srcY);
 }
 }  // namespace tgfx

@@ -23,6 +23,7 @@
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/Caps.h"
 #include "tgfx/gpu/Device.h"
+#include "tgfx/gpu/Semaphore.h"
 
 namespace tgfx {
 class ProgramCache;
@@ -30,6 +31,10 @@ class ProgramCache;
 class GradientCache;
 
 class ResourceCache;
+
+class DrawingManager;
+
+class Gpu;
 
 class Context {
  public:
@@ -63,10 +68,34 @@ class Context {
     return _resourceCache;
   }
 
+  DrawingManager* drawingManager() const {
+    return _drawingManager;
+  }
+
   /**
    * Purges GPU resources that haven't been used in the past 'usNotUsed' microseconds.
    */
   void purgeResourcesNotUsedIn(int64_t usNotUsed);
+
+  /**
+   * Inserts a GPU semaphore that the current GPU-backed API must wait on before executing any more
+   * commands on the GPU for this surface. Surface will take ownership of the underlying semaphore
+   * and delete it once it has been signaled and waited on. If this call returns false, then the
+   * GPU back-end will not wait on the passed semaphore, and the client will still own the
+   * semaphore. Returns true if GPU is waiting on the semaphore.
+   */
+  bool wait(const Semaphore* waitSemaphore);
+
+  /**
+   * Apply all pending changes to the render target immediately. After issuing all commands, the
+   * semaphore will be signaled by the GPU. If the signalSemaphore is not null and uninitialized,
+   * a new semaphore is created and initializes BackendSemaphore. The caller must delete the
+   * semaphore returned in signalSemaphore. BackendSemaphore can be deleted as soon as this function
+   * returns. If the back-end API is OpenGL only uninitialized backend semaphores are supported.
+   * If false is returned, the GPU back-end did not create or add a semaphore to signal on the GPU;
+   * the caller should not instruct the GPU to wait on the semaphore.
+   */
+  bool flush(Semaphore* signalSemaphore = nullptr);
 
   /**
    * Returns the GPU backend of this context.
@@ -85,14 +114,21 @@ class Context {
    */
   virtual void resetState() = 0;
 
+  Gpu* gpu() {
+    return _gpu;
+  }
+
  protected:
   explicit Context(Device* device);
+
+  Gpu* _gpu = nullptr;
 
  private:
   Device* _device = nullptr;
   GradientCache* _gradientCache = nullptr;
   ProgramCache* _programCache = nullptr;
   ResourceCache* _resourceCache = nullptr;
+  DrawingManager* _drawingManager = nullptr;
 
   void releaseAll(bool releaseGPU);
   void onLocked();

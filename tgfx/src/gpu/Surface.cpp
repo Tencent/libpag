@@ -17,21 +17,43 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Surface.h"
+#include "DrawingManager.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {
-Surface::Surface(Context* context) : context(context) {
-  DEBUG_ASSERT(context != nullptr);
+Surface::Surface(std::shared_ptr<RenderTarget> renderTarget, std::shared_ptr<Texture> texture)
+    : renderTarget(std::move(renderTarget)), texture(std::move(texture)) {
+  DEBUG_ASSERT(this->renderTarget != nullptr);
+}
+
+std::shared_ptr<RenderTarget> Surface::getRenderTarget() {
+  flush();
+  return renderTarget;
+}
+
+std::shared_ptr<Texture> Surface::getTexture() {
+  flush();
+  return texture;
+}
+
+bool Surface::wait(const Semaphore* waitSemaphore) {
+  return renderTarget->getContext()->wait(waitSemaphore);
+}
+
+bool Surface::flush(Semaphore* signalSemaphore) {
+  renderTarget->getContext()->drawingManager()->newTextureResolveRenderTask(this);
+  return renderTarget->getContext()->drawingManager()->flush(this, signalSemaphore);
 }
 
 bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) {
+  flush();
   return onReadPixels(dstInfo, dstPixels, srcX, srcY);
 }
 
 bool Surface::hitTest(float x, float y) {
   uint8_t pixel[4];
   auto info = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
-  auto result = onReadPixels(info, pixel, static_cast<int>(x), static_cast<int>(y));
+  auto result = readPixels(info, pixel, static_cast<int>(x), static_cast<int>(y));
   return result && pixel[3] > 0;
 }
 }  // namespace tgfx

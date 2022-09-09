@@ -33,6 +33,8 @@ class SurfaceOptions;
 
 struct CanvasState;
 
+class SurfaceDrawContext;
+
 /**
  * Canvas provides an interface for drawing, and how the drawing is clipped and transformed. Canvas
  * contains a stack of opacity, blend mode, matrix and clip values. Each Canvas draw call transforms
@@ -43,7 +45,7 @@ class Canvas {
  public:
   explicit Canvas(Surface* surface);
 
-  virtual ~Canvas() = default;
+  virtual ~Canvas();
 
   /**
    * Retrieves the context associated with this Surface.
@@ -189,12 +191,12 @@ class Canvas {
   /**
    * Triggers the immediate execution of all pending draw operations.
    */
-  virtual void flush() {
-  }
+  void flush();
 
  protected:
   Surface* surface = nullptr;
   std::shared_ptr<CanvasState> state = nullptr;
+  SurfaceDrawContext* drawContext = nullptr;
 
   virtual void onSave() = 0;
   virtual void onRestore() = 0;
