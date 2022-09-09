@@ -42,7 +42,7 @@ bool Surface::wait(const Semaphore* waitSemaphore) {
 
 bool Surface::flush(Semaphore* signalSemaphore) {
   renderTarget->getContext()->drawingManager()->newTextureResolveRenderTask(this);
-  return renderTarget->getContext()->drawingManager()->flush(this, signalSemaphore);
+  return renderTarget->getContext()->drawingManager()->flush(signalSemaphore);
 }
 
 bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) {

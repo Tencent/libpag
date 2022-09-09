@@ -36,10 +36,6 @@ class RenderTask {
     return closed;
   }
 
-  bool isUsed(RenderTarget* rt) const {
-    return renderTarget.get() == rt;
-  }
-
  protected:
   explicit RenderTask(std::shared_ptr<RenderTarget> renderTarget)
       : renderTarget(std::move(renderTarget)) {
