@@ -46,7 +46,7 @@ FeatherMaskCache::FeatherMaskCache(Layer* layer)
 }
 
 GraphicContent* FeatherMaskCache::createCache(Frame layerFrame) {
-  auto featherMask = FeatherMask::MakeFrom(layer->uniqueID, layer->masks, layerFrame);
+  auto featherMask = FeatherMask::MakeFrom(layer->masks, layerFrame);
   return new GraphicContent(featherMask);
 }
 }  // namespace pag

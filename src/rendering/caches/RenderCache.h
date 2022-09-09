@@ -31,7 +31,6 @@
 #include "rendering/filters/MotionBlurFilter.h"
 #include "rendering/graphics/Picture.h"
 #include "rendering/graphics/Shape.h"
-#include "rendering/graphics/FeatherMask.h"
 #include "rendering/graphics/Snapshot.h"
 #include "rendering/layers/PAGStage.h"
 #include "rendering/sequences/SequenceReaderFactory.h"
@@ -107,8 +106,6 @@ class RenderCache : public Performance {
 
   Snapshot* getSnapshot(const Shape* shape);
   
-  Snapshot* getSnapshot(const FeatherMask* featherMask);
-
   TextAtlas* getTextAtlas(const TextBlock* textBlock);
 
   /**

@@ -29,7 +29,7 @@ class FeatherMask : public Graphic {
   /**
    * Creates a FeatherMask Graphic with solid color fill. Returns nullptr if path is empty.
    */
-  static std::shared_ptr<Graphic> MakeFrom(ID assetID, const std::vector<MaskData*>& masks,
+  static std::shared_ptr<Graphic> MakeFrom(const std::vector<MaskData*>& masks,
                                            Frame layerFrame);
 
   GraphicType type() const override {
@@ -43,19 +43,13 @@ class FeatherMask : public Graphic {
   void draw(tgfx::Canvas* canvas, RenderCache* cache) const override;
 
  private:
-  FeatherMask(ID assetID, const std::vector<MaskData*>& masks, Frame layerFrame);
-
-  std::unique_ptr<Snapshot> makeSnapshot(RenderCache* cache, float scaleFactor) const;
+  FeatherMask(const std::vector<MaskData*>& masks, Frame layerFrame);
   
   std::unique_ptr<Snapshot> drawFeatherMask(const std::vector<MaskData*>& masks, Frame layerFrame,
                                             RenderCache* cache, float scaleFactor = 1.0f) const;
 
-  ID assetID = 0;
-  ID snapshotID = 0;
   std::vector<MaskData*> masks;
   Frame layerFrame;
   tgfx::Rect bounds;
-
-  friend class RenderCache;
 };
 }  // namespace pag

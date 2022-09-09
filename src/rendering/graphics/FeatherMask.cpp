@@ -26,12 +26,12 @@
 #include "tgfx/gpu/Surface.h"
 
 namespace pag {
-std::shared_ptr<Graphic> FeatherMask::MakeFrom(ID assetID, const std::vector<MaskData*>& masks,
+std::shared_ptr<Graphic> FeatherMask::MakeFrom(const std::vector<MaskData*>& masks,
                                                Frame layerFrame) {
   if (masks.empty()) {
     return nullptr;
   }
-  return std::shared_ptr<Graphic>(new FeatherMask(assetID, masks, layerFrame));
+  return std::shared_ptr<Graphic>(new FeatherMask(masks, layerFrame));
 }
 
 tgfx::Rect MeasureFeatherMaskBounds(const std::vector<MaskData*>& masks, Frame layerFrame) {
@@ -56,10 +56,9 @@ tgfx::Rect MeasureFeatherMaskBounds(const std::vector<MaskData*>& masks, Frame l
   return maskBounds;
 }
 
-FeatherMask::FeatherMask(ID assetID, const std::vector<MaskData*>& masks, Frame layerFrame)
-    : assetID(assetID), masks(std::move(masks)), layerFrame(layerFrame) {
+FeatherMask::FeatherMask(const std::vector<MaskData*>& masks, Frame layerFrame)
+    : masks(std::move(masks)), layerFrame(layerFrame) {
       bounds = MeasureFeatherMaskBounds(masks, layerFrame);
-      snapshotID = UniqueID::Next();
 }
 
 void FeatherMask::measureBounds(tgfx::Rect* rect) const {
@@ -148,18 +147,7 @@ std::unique_ptr<Snapshot> FeatherMask::drawFeatherMask(const std::vector<MaskDat
 }
 
 void FeatherMask::draw(tgfx::Canvas* canvas, RenderCache* renderCache) const {
-  tgfx::Paint paint;
-  auto snapshot = renderCache->getSnapshot(this);
-  if (!snapshot) {
-    snapshot = drawFeatherMask(masks, layerFrame, renderCache).release();
-  }
+  auto snapshot = drawFeatherMask(masks, layerFrame, renderCache);
   canvas->drawTexture(snapshot->getTexture());
-}
-
-std::unique_ptr<Snapshot> FeatherMask::makeSnapshot(RenderCache* cache, float scaleFactor) const {
-  if (masks.empty()) {
-    return nullptr;
-  }
-  return drawFeatherMask(masks, layerFrame, cache, scaleFactor);
 }
 }  // namespace pag
