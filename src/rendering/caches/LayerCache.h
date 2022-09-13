@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+
 #include "base/utils/TGFXCast.h"
 #include "rendering/caches/ContentCache.h"
 #include "rendering/caches/MaskCache.h"

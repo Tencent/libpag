@@ -83,11 +83,11 @@ std::unique_ptr<Snapshot> FeatherMask::drawFeatherMask(const std::vector<MaskDat
   auto surface = tgfx::Surface::Make(cache->getContext(),
                                      static_cast<int>(ceilf(bounds.width() * scaleFactor)),
                                      static_cast<int>(ceilf(bounds.height() * scaleFactor)), true);
-  auto canvas = surface->getCanvas();
-  canvas->setMatrix(tgfx::Matrix::MakeTrans(bounds.x(), bounds.y()));
   if (surface == nullptr) {
     return nullptr;
   }
+  auto canvas = surface->getCanvas();
+  canvas->setMatrix(tgfx::Matrix::MakeTrans(bounds.x(), bounds.y()));
   for (auto& mask : masks) {
     auto path = mask->maskPath->getValueAt(layerFrame);
     if (path == nullptr || !path->isClosed() || mask->maskMode == MaskMode::None) {
