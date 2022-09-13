@@ -204,11 +204,7 @@ static bool CheckMaskFeatherValid(Property<Point>* maskFeather) {
   if (maskFeather->animatable()) {
     return true;
   }
-  if (maskFeather->value.x != 0.0f || maskFeather->value.y != 0.0f) {
-    return true;
-  } else {
-    return false;
-  }
+  return maskFeather->value.x != 0.0f || maskFeather->value.y != 0.0f;
 }
 
 TagCode WriteLayer(EncodeStream* stream, Layer* layer) {

@@ -57,7 +57,7 @@ tgfx::Rect MeasureFeatherMaskBounds(const std::vector<MaskData*>& masks, Frame l
 }
 
 FeatherMask::FeatherMask(const std::vector<MaskData*>& masks, Frame layerFrame)
-    : masks(std::move(masks)), layerFrame(layerFrame) {
+    : masks(masks), layerFrame(layerFrame) {
   bounds = MeasureFeatherMaskBounds(masks, layerFrame);
 }
 
