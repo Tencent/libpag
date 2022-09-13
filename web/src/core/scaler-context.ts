@@ -2,24 +2,16 @@ import { NativeImage } from './native-image';
 import { measureText } from '../utils/measure-text';
 import { defaultFontNames, getFontFamilies } from '../utils/font-family';
 import { Rect } from '../types';
+import { getCanvas2D } from '../utils/canvas';
 
-const canvas = ((): HTMLCanvasElement | OffscreenCanvas => {
-  try {
-    const offscreenCanvas = new OffscreenCanvas(0, 0);
-    const context = offscreenCanvas.getContext('2d');
-    if (context?.measureText) return offscreenCanvas;
-    return document.createElement('canvas');
-  } catch (err) {
-    return document.createElement('canvas');
-  }
-})();
+const canvas = getCanvas2D();
 canvas.width = 10;
 canvas.height = 10;
 
-const testCanvas = document.createElement('canvas');
+const testCanvas = getCanvas2D();
 testCanvas.width = 1;
 testCanvas.height = 1;
-const testContext = testCanvas.getContext('2d') as CanvasRenderingContext2D;
+const testContext = testCanvas.getContext('2d') as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 testContext.textBaseline = 'top';
 testContext.font = '100px -no-font-family-here-';
 testContext.scale(0.01, 0.01);
@@ -109,13 +101,13 @@ export class ScalerContext {
   }
 
   public generateImage(text: string, bounds: Rect): NativeImage {
-    const canvas = document.createElement('canvas');
+    const canvas = getCanvas2D();
     canvas.width = bounds.right - bounds.left;
     canvas.height = bounds.bottom - bounds.top;
     const context = canvas.getContext('2d') as CanvasRenderingContext2D;
     context.font = this.fontString();
     context.fillText(text, -bounds.left, -bounds.top);
-    return new NativeImage(canvas);
+    return new NativeImage(canvas, true);
   }
 
   private measureText(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, text: string) {

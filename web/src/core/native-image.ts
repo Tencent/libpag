@@ -1,4 +1,5 @@
 import { EmscriptenGL } from '../types';
+import { isCanvas, releaseCanvas2D } from '../utils/canvas';
 
 export class NativeImage {
   public static async createFromBytes(bytes: ArrayBuffer) {
@@ -30,10 +31,12 @@ export class NativeImage {
     });
   }
 
-  private readonly source: TexImageSource;
+  private source: TexImageSource | OffscreenCanvas;
+  private reuse: boolean;
 
-  public constructor(source: TexImageSource) {
+  public constructor(source: TexImageSource | OffscreenCanvas, reuse = false) {
     this.source = source;
+    this.reuse = reuse;
   }
 
   public width(): number {
@@ -48,5 +51,11 @@ export class NativeImage {
     const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.source);
+  }
+
+  public onDestroy() {
+    if (this.reuse && isCanvas(this.source)) {
+      releaseCanvas2D(this.source as HTMLCanvasElement | OffscreenCanvas);
+    }
   }
 }

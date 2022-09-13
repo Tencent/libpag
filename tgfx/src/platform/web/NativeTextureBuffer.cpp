@@ -42,4 +42,7 @@ std::shared_ptr<Texture> NativeTextureBuffer::makeTexture(Context* context) cons
   source.call<void>("upload", val::module_property("GL"));
   return texture;
 }
+NativeTextureBuffer::~NativeTextureBuffer() {
+  source.call<void>("onDestroy");
+}
 }  // namespace tgfx
