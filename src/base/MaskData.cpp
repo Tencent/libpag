@@ -22,9 +22,7 @@
 namespace pag {
 MaskData::~MaskData() {
   delete maskPath;
-  if (maskFeather != nullptr) {
-    delete maskFeather;
-  }
+  delete maskFeather;
   delete maskOpacity;
   delete maskExpansion;
 }
