@@ -24,6 +24,8 @@
 namespace tgfx {
 class WebMask : public Mask {
  public:
+  ~WebMask() override;
+
   explicit WebMask(int width, int height, emscripten::val webMask)
       : Mask(width, height), webMask(webMask) {
   }

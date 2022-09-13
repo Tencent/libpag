@@ -49,6 +49,10 @@ std::shared_ptr<Texture> WebMask::makeTexture(Context* context) const {
   return texture;
 }
 
+WebMask::~WebMask() {
+  webMask.call<void>("onDestroy");
+}
+
 static void Iterator(PathVerb verb, const Point points[4], void* info) {
   auto path2D = reinterpret_cast<val*>(info);
   switch (verb) {

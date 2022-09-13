@@ -24,6 +24,8 @@
 namespace tgfx {
 class NativeTextureBuffer : public TextureBuffer {
  public:
+  ~NativeTextureBuffer() override;
+
   static std::shared_ptr<NativeTextureBuffer> Make(int width, int height, emscripten::val source);
 
   std::shared_ptr<Texture> makeTexture(Context* context) const override;

@@ -3,7 +3,7 @@ import { PAGPlayer } from './pag-player';
 import { EventManager, Listener } from './utils/event-manager';
 import { PAGSurface } from './pag-surface';
 import { destroyVerify } from './utils/decorators';
-import { isOffscreenCanvas } from './utils/type-utils';
+import { isOffscreenCanvas } from './utils/canvas';
 import { BackendContext } from './core/backend-context';
 import { PAGModule } from './binding';
 
