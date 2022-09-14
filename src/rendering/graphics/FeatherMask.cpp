@@ -101,15 +101,15 @@ std::unique_ptr<Snapshot> FeatherMask::drawFeatherMask(const std::vector<MaskDat
     if (inverted) {
       maskPath.toggleInverseFillType();
     }
-    tgfx::Paint maskPaint;
-    float alpha = mask->maskOpacity->getValueAt(layerFrame) / 255.0;
-    maskPaint.setAlpha(alpha);
     auto maskBounds = maskPath.getBounds();
     auto width = static_cast<int>(ceilf(maskBounds.width() * scaleFactor));
     auto height = static_cast<int>(ceilf(maskBounds.height() * scaleFactor));
     if (width == 0.0 || height == 0.0) {
       continue;
     }
+    tgfx::Paint maskPaint;
+    float alpha = mask->maskOpacity->getValueAt(layerFrame) / 255.0;
+    maskPaint.setAlpha(alpha);
     auto maskSurface = tgfx::Surface::Make(cache->getContext(), width, height, true);
     auto maskCanvas = maskSurface->getCanvas();
     maskCanvas->setMatrix(tgfx::Matrix::MakeTrans(-maskBounds.x(), -maskBounds.y()));
