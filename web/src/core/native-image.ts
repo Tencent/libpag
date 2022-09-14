@@ -1,5 +1,5 @@
 import { EmscriptenGL } from '../types';
-import { isCanvas, releaseCanvas2D } from '../utils/canvas';
+import { releaseCanvas2D } from '../utils/canvas';
 
 export class NativeImage {
   public static async createFromBytes(bytes: ArrayBuffer) {
@@ -31,8 +31,8 @@ export class NativeImage {
     });
   }
 
-  private source: TexImageSource | OffscreenCanvas;
-  private reuse: boolean;
+  protected source: TexImageSource | OffscreenCanvas;
+  protected reuse: boolean;
 
   public constructor(source: TexImageSource | OffscreenCanvas, reuse = false) {
     this.source = source;
@@ -58,7 +58,7 @@ export class NativeImage {
   }
 
   public onDestroy() {
-    if (this.reuse && isCanvas(this.source)) {
+    if (this.reuse) {
       releaseCanvas2D(this.source as HTMLCanvasElement | OffscreenCanvas);
     }
   }

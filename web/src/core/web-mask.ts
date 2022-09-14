@@ -14,7 +14,7 @@ export interface WebFont {
 
 export class WebMask {
   public static create(width: number, height: number) {
-    return new WebMask(document.createElement('canvas'), width, height);
+    return new WebMask(getCanvas2D(), width, height);
   }
 
   private static getLineCap(cap: ctor): CanvasLineCap {
@@ -108,9 +108,5 @@ export class WebMask {
 
   public onDestroy() {
     releaseCanvas2D(this.canvas);
-  }
-
-  protected loadCanvas(): HTMLCanvasElement | OffscreenCanvas {
-    return getCanvas2D();
   }
 }

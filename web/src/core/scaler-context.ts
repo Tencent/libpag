@@ -1,8 +1,10 @@
-import { NativeImage } from './native-image';
 import { measureText } from '../utils/measure-text';
 import { defaultFontNames, getFontFamilies } from '../utils/font-family';
-import { Rect } from '../types';
 import { getCanvas2D } from '../utils/canvas';
+import { NativeImage } from './native-image';
+
+import type { Rect } from '../types';
+import type { NativeImage as NativeImageType } from '../interfaces';
 
 export const resetTestCanvas = (testContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D) => {
   testContext.textBaseline = 'top';
@@ -112,7 +114,7 @@ export class ScalerContext {
     };
   }
 
-  public generateImage(text: string, bounds: Rect): NativeImage {
+  public generateImage(text: string, bounds: Rect): NativeImageType {
     const canvas = getCanvas2D();
     canvas.width = bounds.right - bounds.left;
     canvas.height = bounds.bottom - bounds.top;
@@ -124,18 +126,7 @@ export class ScalerContext {
 
   protected loadCanvas() {
     if (!ScalerContext.canvas) {
-      ScalerContext.setCanvas(
-        ((): HTMLCanvasElement | OffscreenCanvas => {
-          try {
-            const offscreenCanvas = new OffscreenCanvas(0, 0);
-            const context = offscreenCanvas.getContext('2d');
-            if (context?.measureText) return offscreenCanvas;
-            return document.createElement('canvas');
-          } catch (err) {
-            return document.createElement('canvas');
-          }
-        })(),
-      );
+      ScalerContext.setCanvas(getCanvas2D());
       (ScalerContext.canvas as HTMLCanvasElement | OffscreenCanvas).width = 10;
       (ScalerContext.canvas as HTMLCanvasElement | OffscreenCanvas).height = 10;
       ScalerContext.setContext(

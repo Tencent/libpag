@@ -1,20 +1,17 @@
-import { CanvasNode, offscreenManager } from './offscreen-canvas-manager';
 import { WebMask as NativeWebMask } from '../core/web-mask';
+import { getCanvas2D, releaseCanvas2D } from './canvas';
+
 import type { EmscriptenGL } from '../types';
 
 export class WebMask extends NativeWebMask {
   public static create(width: number, height: number) {
-    const canvasNode = offscreenManager.getCanvasNode();
-    const webMask = new WebMask(canvasNode.canvas, width, height);
-    webMask.canvasNode = canvasNode;
+    const webMask = new WebMask(getCanvas2D(), width, height);
     return webMask;
   }
 
-  private canvasNode: CanvasNode | null = null;
-
   public update(GL: EmscriptenGL) {
     const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
-    const ctx = this.canvas.getContext('2d') as CanvasRenderingContext2D;
+    const ctx = this.canvas.getContext('2d') as OffscreenCanvasRenderingContext2D;
     const imgData = ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
     gl.texImage2D(
       gl.TEXTURE_2D,
@@ -27,6 +24,9 @@ export class WebMask extends NativeWebMask {
       gl.UNSIGNED_BYTE,
       new Uint8Array(imgData.data),
     );
-    offscreenManager.freeCanvasNode(this.canvasNode!.id);
+  }
+
+  public onDestroy() {
+    releaseCanvas2D(this.canvas as OffscreenCanvas);
   }
 }

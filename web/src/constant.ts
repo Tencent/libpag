@@ -25,3 +25,5 @@ export const WEBGL_CONTEXT_ATTRIBUTES = {
 
 export const VIDEO_PLAYBACK_RATE_MIN = 0.125;
 export const VIDEO_PLAYBACK_RATE_MAX = 4;
+
+export const CANVAS_POOL_MAX_SIZE = 10;
