@@ -94,11 +94,9 @@ Page({
     this.setData({ scaleIndex: event.detail.value });
   },
   replaceTextChange(event) {
-    if (!this.textDoc) {
-      this.textDoc = this.pagFile.getTextData(0);
-    }
-    this.textDoc.text = event.detail.value;
-    this.pagFile.replaceText(0, this.textDoc);
+    const textDoc = this.pagFile.getTextData(0);
+    textDoc.text = event.detail.value;
+    this.pagFile.replaceText(0, textDoc);
     this.pagView.flush();
   },
   async replaceImage() {
@@ -136,7 +134,7 @@ Page({
           })
           .then(() => {
             this.pagView.addListener('onAnimationUpdate', () => {
-              console.log('onAnimationUpdate')
+              console.log('onAnimationUpdate');
               this.replaceVideoFrame();
             });
           });
@@ -154,8 +152,31 @@ Page({
       }, 10);
       return;
     }
-    console.log("get frame data", frameData);
+    console.log('get frame data', frameData);
     const pagImage = this.PAG.PAGImage.fromArrayBuffer(frameData.data, frameData.width, frameData.height);
     this.pagFile.replaceImage(0, pagImage);
+  },
+  registerFont() {
+    wx.showLoading({
+      title: '字体加载中',
+    });
+    wx.loadFontFace({
+      global: true,
+      family: 'SourceHanSerifCN',
+      source: 'https://pag.art/file/SourceHanSerifCN-Regular.ttf',
+      scopes: ['webview', 'native'],
+      success: (res) => {
+        wx.hideLoading();
+        console.log(res.status);
+        const textDoc = this.pagFile.getTextData(0);
+        textDoc.fontFamily = 'SourceHanSerifCN';
+        this.pagFile.replaceText(0, textDoc);
+        this.pagView.flush();
+      },
+      fail: (res) => {
+        wx.hideLoading();
+        console.error(res.status);
+      },
+    });
   },
 });

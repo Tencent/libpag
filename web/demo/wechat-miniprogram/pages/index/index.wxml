@@ -32,7 +32,7 @@
       </button>
     </view>
     <text class="title">替换文字</text>
-    <input class="input" type="number" value="{{replaceText}}" bindinput="replaceTextChange" />
+    <input class="input" type="text" value="{{replaceText}}" bindinput="replaceTextChange" />
     <text class="text-debug">{{debugText}}</text>
     <view class="btn-box">
       <button class="btn" size="mini" type="default" style="padding: 0 1.5em;" bindtap="replaceImage">
@@ -41,6 +41,10 @@
       <button class="btn" size="mini" type="default" style="padding: 0 1.5em;" bindtap="replaceVideo">
         替换视频
       </button>
+      <button class="btn" size="mini" type="default" style="padding: 0 1.5em;" bindtap="registerFont">
+        注册字体
+      </button>
     </view>
+    <canvas type="2d" id="testCanvas"></canvas>
   </view>
 </view>
