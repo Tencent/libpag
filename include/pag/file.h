@@ -132,6 +132,7 @@ enum class TagCode {
   RadialBlurEffect = 81,
   MosaicEffect = 82,
   EditableIndices = 83,
+  MaskBlockV2 = 84,
   GradientOverlayStyle = 85,
   // add new tags here...
 
@@ -375,6 +376,7 @@ class PAG_API MaskData {
   bool inverted = false;
   Enum maskMode = MaskMode::Add;
   Property<PathHandle>* maskPath = nullptr;
+  Property<Point>* maskFeather = nullptr;
   Property<Opacity>* maskOpacity = nullptr;
   Property<float>* maskExpansion = nullptr;
 

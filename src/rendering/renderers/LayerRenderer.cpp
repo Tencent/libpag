@@ -68,6 +68,11 @@ void LayerRenderer::DrawLayer(Recorder* recorder, Layer* layer, Frame layerFrame
   auto masks = layerCache->getMasks(contentFrame);
   if (masks) {
     recorder->saveClip(*masks);
+  } else {
+    auto featherMask = layerCache->getFeatherMask(contentFrame);
+    if (featherMask) {
+      recorder->saveLayer(featherMask);
+    }
   }
   content->draw(recorder);
   recorder->restoreToCount(saveCount);

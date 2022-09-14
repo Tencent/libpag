@@ -325,4 +325,20 @@ PAG_TEST(PAGFilterTest, GradientOverlayFilter) {
   pagPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFilterTest/GradientOverlayFilter"));
 }
+
+/**
+ * 用例描述: FeatherMask
+ */
+PAG_TEST(PAGFilterTest, FeatherMask) {
+  auto pagFile = PAGFile::Load("../resources/filter/FeatherMask.pag");
+  ASSERT_NE(pagFile, nullptr);
+  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  ASSERT_NE(pagSurface, nullptr);
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setProgress(0.7);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFilterTest/FeatherMask"));
+}
 }  // namespace pag

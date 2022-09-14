@@ -19,15 +19,26 @@
 #include "MaskTag.h"
 
 namespace pag {
-std::unique_ptr<BlockConfig> MaskTag(MaskData* mask) {
-  auto tagConfig = new BlockConfig(TagCode::MaskBlock);
+static std::unique_ptr<BlockConfig> MaskTagInternal(MaskData* mask, TagCode tagCode) {
+  auto tagConfig = new BlockConfig(tagCode);
   AddAttribute(tagConfig, &mask->id, AttributeType::FixedValue, ZeroID);
   AddAttribute(tagConfig, &mask->inverted, AttributeType::BitFlag, false);
   AddAttribute(tagConfig, &mask->maskMode, AttributeType::Value, MaskMode::Add);
   AddAttribute(tagConfig, &mask->maskPath, AttributeType::SimpleProperty,
                PathHandle(new PathData()));
+  if (tagCode == TagCode::MaskBlockV2) {
+    AddAttribute(tagConfig, &mask->maskFeather, AttributeType::SpatialProperty, Point::Zero());
+  }
   AddAttribute(tagConfig, &mask->maskOpacity, AttributeType::SimpleProperty, Opaque);
   AddAttribute(tagConfig, &mask->maskExpansion, AttributeType::SimpleProperty, 0.0f);
   return std::unique_ptr<BlockConfig>(tagConfig);
+}
+
+std::unique_ptr<BlockConfig> MaskTag(MaskData* mask) {
+  return MaskTagInternal(mask, TagCode::MaskBlock);
+}
+
+std::unique_ptr<BlockConfig> MaskTagV2(MaskData* mask) {
+  return MaskTagInternal(mask, TagCode::MaskBlockV2);
 }
 }  // namespace pag
