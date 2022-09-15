@@ -24,6 +24,7 @@
 #include "tgfx/core/Mesh.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/RGBAAALayout.h"
+#include "tgfx/core/SamplingOptions.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/gpu/Paint.h"
 #include "tgfx/gpu/Texture.h"
@@ -150,7 +151,8 @@ class Canvas {
    * Draws a Texture, with its top-left corner at (0, 0), using current alpha, blend mode, clip and
    * matrix premultiplied with existing Matrix.
    */
-  void drawTexture(std::shared_ptr<Texture> texture, const Matrix& matrix);
+  void drawTexture(std::shared_ptr<Texture> texture, const Matrix& matrix,
+                   SamplingOptions sampling = SamplingOptions());
 
   /**
    * Draws a Texture, with its top-left corner at (0, 0), using current alpha, blend mode, clip,
@@ -159,7 +161,12 @@ class Canvas {
    * If paint is supplied, apply ColorFilter and alpha. If texture is Alpha8, apply Shader. If paint
    * contains MaskFilter, generate mask from image bounds.
    */
-  void drawTexture(std::shared_ptr<Texture> texture, const Paint* paint = nullptr);
+  void drawTexture(std::shared_ptr<Texture> texture, const Paint* paint = nullptr) {
+    drawTexture(std::move(texture), SamplingOptions(), paint);
+  }
+
+  void drawTexture(std::shared_ptr<Texture> texture, SamplingOptions sampling,
+                   const Paint* paint = nullptr);
 
   /**
    * Draws a RGBAAA layout Texture, with its top-left corner at (0, 0), using current alpha, blend
@@ -169,7 +176,12 @@ class Canvas {
    * contains MaskFilter, generate mask from image bounds.
    */
   void drawTexture(std::shared_ptr<Texture> texture, const RGBAAALayout* layout,
-                   const Paint* paint = nullptr);
+                   const Paint* paint = nullptr) {
+    drawTexture(std::move(texture), layout, SamplingOptions(), paint);
+  }
+
+  void drawTexture(std::shared_ptr<Texture> texture, const RGBAAALayout* layout,
+                   SamplingOptions sampling, const Paint* paint = nullptr);
 
   /**
    * Draws a path with using current clip, matrix and specified paint.
@@ -190,7 +202,7 @@ class Canvas {
   // TODO(pengweilv): Support blend mode, atlas as source, colors as destination, colors can be
   //  nullptr.
   void drawAtlas(std::shared_ptr<Texture> atlas, const Matrix matrix[], const Rect tex[],
-                 const Color colors[], size_t count);
+                 const Color colors[], size_t count, SamplingOptions sampling = SamplingOptions());
 
   /**
    * Triggers the immediate execution of all pending draw operations.
@@ -199,7 +211,7 @@ class Canvas {
 
  private:
   void drawTexture(std::shared_ptr<Texture> texture, const RGBAAALayout* layout,
-                   const Paint& paint);
+                   SamplingOptions sampling, const Paint& paint);
 
   std::shared_ptr<Texture> getClipTexture();
 

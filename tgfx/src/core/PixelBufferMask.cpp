@@ -18,6 +18,7 @@
 
 #include "PixelBufferMask.h"
 #include "gpu/Gpu.h"
+#include "gpu/PixelFormat.h"
 #include "tgfx/core/Bitmap.h"
 
 namespace tgfx {
@@ -35,7 +36,9 @@ std::shared_ptr<Texture> PixelBufferMask::updateTexture(Context* context) {
       int x = static_cast<int>(dirtyRect.left);
       int y = static_cast<int>(dirtyRect.top);
       pixels += y * buffer->width() + x;
-      context->gpu()->writePixels(texture->getSampler(), dirtyRect, pixels, buffer->rowBytes());
+      context->gpu()->writePixels(texture->getSampler(), dirtyRect, pixels, buffer->rowBytes(),
+                                  ColorTypeToPixelFormat(buffer->info().colorType()));
+      context->gpu()->regenerateMipMapLevels(texture->getSampler());
       buffer->unlockPixels();
       dirtyRect.setEmpty();
     }

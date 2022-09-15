@@ -121,6 +121,11 @@ class Texture : public Resource {
 
   // Two texture types: Alpha, RGBA
   static std::shared_ptr<Texture> Make(Context* context, int width, int height, void* pixels,
-                                       size_t rowBytes, ImageOrigin origin, bool alphaOnly);
+                                       size_t rowBytes, ImageOrigin origin, bool alphaOnly,
+                                       bool mipMapped = false);
+
+  friend class HardwareBuffer;
+
+  friend class RasterPixelBuffer;
 };
 }  // namespace tgfx

@@ -22,6 +22,10 @@
 #include <EGL/eglext.h>
 #include "tgfx/gpu/opengl/GLDevice.h"
 
+#ifdef None
+#undef None
+#endif
+
 namespace tgfx {
 class EGLDevice : public GLDevice {
  public:

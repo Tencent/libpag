@@ -19,7 +19,6 @@
 #include "GLSurface.h"
 #include "GLCaps.h"
 #include "GLContext.h"
-#include "tgfx/gpu/opengl/GLSemaphore.h"
 
 namespace tgfx {
 std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<RenderTarget> renderTarget) {

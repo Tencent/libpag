@@ -39,12 +39,22 @@ class RasterPixelBuffer : public PixelBuffer {
   }
 
   std::shared_ptr<Texture> makeTexture(Context* context) const override {
+    return makeTexture(context, false);
+  }
+
+  bool mipMapSupport() const override {
+    return true;
+  }
+
+  std::shared_ptr<Texture> makeMipMappedTexture(Context* context) const override {
+    return makeTexture(context, true);
+  }
+
+  std::shared_ptr<Texture> makeTexture(Context* context, bool mipMapped) const {
     std::lock_guard<std::mutex> autoLock(locker);
-    std::shared_ptr<Texture> texture = nullptr;
-    if (_info.colorType() == ColorType::ALPHA_8) {
-      return Texture::MakeAlpha(context, _info.width(), _info.height(), _pixels, _info.rowBytes());
-    }
-    return Texture::MakeRGBA(context, _info.width(), _info.height(), _pixels, _info.rowBytes());
+    bool alphaOnly = _info.colorType() == ColorType::ALPHA_8;
+    return Texture::Make(context, _info.width(), _info.height(), _pixels, _info.rowBytes(),
+                         ImageOrigin::TopLeft, alphaOnly, mipMapped);
   }
 
  private:
@@ -75,6 +85,6 @@ std::shared_ptr<PixelBuffer> PixelBuffer::Make(int width, int height, bool alpha
   if (pixels == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<RasterPixelBuffer>(new RasterPixelBuffer(info, pixels));
+  return std::make_shared<RasterPixelBuffer>(info, pixels);
 }
 }  // namespace tgfx

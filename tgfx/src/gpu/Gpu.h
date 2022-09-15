@@ -38,13 +38,13 @@ class Gpu {
     return _context;
   }
 
-  virtual std::unique_ptr<TextureSampler> createTexture(int width, int height,
-                                                        PixelFormat format) = 0;
+  virtual std::unique_ptr<TextureSampler> createTexture(int width, int height, PixelFormat format,
+                                                        int mipLevelCount) = 0;
 
   virtual void deleteTexture(TextureSampler* sampler) = 0;
 
   virtual void writePixels(const TextureSampler* sampler, Rect rect, const void* pixels,
-                           size_t rowBytes) = 0;
+                           size_t rowBytes, PixelFormat pixelFormat) = 0;
 
   virtual void copyRenderTargetToTexture(RenderTarget* renderTarget, Texture* texture,
                                          const Rect& srcRect, const Point& dstPoint) = 0;
@@ -60,9 +60,13 @@ class Gpu {
 
   virtual void submit(OpsRenderPass* opsRenderPass) = 0;
 
+  void regenerateMipMapLevels(const TextureSampler* sampler);
+
  protected:
   explicit Gpu(Context* context) : _context(context) {
   }
+
+  virtual void onRegenerateMipMapLevels(const TextureSampler* sampler) = 0;
 
   Context* _context;
 };

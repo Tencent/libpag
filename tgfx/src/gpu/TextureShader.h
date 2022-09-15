@@ -25,17 +25,22 @@ namespace tgfx {
 class TextureShader : public Shader {
  public:
   static std::shared_ptr<Shader> Make(std::shared_ptr<Texture> texture, TileMode tileModeX,
-                                      TileMode tileModeY);
+                                      TileMode tileModeY, SamplingOptions sampling);
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const override;
 
  private:
-  TextureShader(std::shared_ptr<Texture> texture, TileMode tileModeX, TileMode tileModeY)
-      : texture(std::move(texture)), tileModeX(tileModeX), tileModeY(tileModeY) {
+  TextureShader(std::shared_ptr<Texture> texture, TileMode tileModeX, TileMode tileModeY,
+                SamplingOptions sampling)
+      : texture(std::move(texture)),
+        tileModeX(tileModeX),
+        tileModeY(tileModeY),
+        sampling(sampling) {
   }
 
   std::shared_ptr<Texture> texture;
   TileMode tileModeX = TileMode::Clamp;
   TileMode tileModeY = TileMode::Clamp;
+  SamplingOptions sampling;
 };
 }  // namespace tgfx

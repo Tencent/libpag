@@ -20,10 +20,11 @@
 #include "opengl/GLYUVTextureEffect.h"
 
 namespace tgfx {
-YUVTextureEffect::YUVTextureEffect(std::shared_ptr<YUVTexture> texture, const RGBAAALayout* layout,
-                                   const Matrix& localMatrix)
+YUVTextureEffect::YUVTextureEffect(std::shared_ptr<YUVTexture> texture, SamplingOptions sampling,
+                                   const RGBAAALayout* layout, const Matrix& localMatrix)
     : FragmentProcessor(ClassID()),
       texture(std::move(texture)),
+      sampling(sampling),
       layout(layout),
       coordTransform(localMatrix) {
   setTextureSamplerCnt(this->texture->samplerCount());

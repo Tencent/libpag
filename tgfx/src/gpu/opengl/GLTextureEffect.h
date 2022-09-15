@@ -40,7 +40,8 @@ class GLTextureEffect : public GLFragmentProcessor {
   void readColor(EmitArgs& args, const std::string& coord, const char* out);
 
   void subsetCoord(EmitArgs& args, TextureEffect::ShaderMode mode, const char* coordSwizzle,
-                   const char* subsetStartSwizzle, const char* subsetStopSwizzle);
+                   const char* subsetStartSwizzle, const char* subsetStopSwizzle,
+                   const char* extraCoord, const char* coordWeight);
 
   void clampCoord(EmitArgs& args, bool clamp, const char* coordSwizzle,
                   const char* clampStartSwizzle, const char* clampStopSwizzle);
