@@ -1,23 +1,14 @@
 // index.js
 import { PAGInit, clearCache } from '../../utils/libpag';
+import { loadFileByRequest } from '../../utils/request';
 
-const loadFileByRequest = async (url) => {
-  return new Promise((resolve) => {
-    wx.request({
-      url,
-      method: 'GET',
-      responseType: 'arraybuffer',
-      success(res) {
-        if (res.statusCode !== 200) {
-          resolve(null);
-        }
-        resolve(res.data);
-      },
-      fail() {
-        resolve(null);
-      },
-    });
-  });
+let debugData = {
+  FPS: 0,
+  decodeTime: 0,
+  flushTime: 0,
+  renderingTime: 0,
+  imageDecodingTime: 0,
+  presentingTime: 0,
 };
 
 Page({
@@ -59,8 +50,14 @@ Page({
     const canvas = this.data.canvas;
     const buffer = await loadFileByRequest('https://pag.art/file/test.pag');
     if (!buffer) throw '加载失败';
+    const time = wx.getPerformance().now();
     this.pagFile = await this.PAG.PAGFile.load(buffer);
+    debugData = { ...debugData, decodeTime: wx.getPerformance().now() - time };
     this.pagView = await this.PAG.PAGView.init(this.pagFile, canvas);
+    this.updateDebugData(this.pagView);
+    this.pagView.addListener('onAnimationUpdate', () => {
+      this.updateDebugData(this.pagView);
+    });
     this.setData({ pagLoaded: true });
     wx.hideLoading();
   },
@@ -178,5 +175,32 @@ Page({
         console.error(res.status);
       },
     });
+  },
+  benchmark() {
+    wx.redirectTo({
+      url: '/pages/benchmark/benchmark',
+    });
+  },
+  updateDebugData(pagView) {
+    debugData = {
+      ...debugData,
+      ...pagView.getDebugData(),
+      renderingTime: pagView.player.renderingTime() / 1000,
+      imageDecodingTime: pagView.player.imageDecodingTime() / 1000,
+      presentingTime: pagView.player.presentingTime() / 1000,
+    };
+    this.updateDebugText(debugData);
+  },
+  updateDebugText(debugData) {
+    const text = `
+      调试数据：
+      FPS：${Math.round(debugData.FPS)}
+      PAG文件解码耗时：${debugData.decodeTime.toFixed(2)}ms
+      当前帧渲染耗时：${debugData.flushTime.toFixed(2)}ms
+      RenderingTime: ${debugData.renderingTime.toFixed(2)}ms
+      ImageDecodingTime: ${debugData.imageDecodingTime.toFixed(2)}ms
+      PresentingTime: ${debugData.presentingTime.toFixed(2)}ms
+    `;
+    this.setData({ debugText: text });
   },
 });

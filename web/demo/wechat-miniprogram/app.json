@@ -1,9 +1,9 @@
 {
-  "pages": ["pages/index/index"],
+  "pages": ["pages/index/index", "pages/benchmark/benchmark"],
   "window": {
     "backgroundTextStyle": "light",
     "navigationBarBackgroundColor": "#fff",
-    "navigationBarTitleText": "Weixin",
+    "navigationBarTitleText": "PAG",
     "navigationBarTextStyle": "black"
   },
   "style": "v2",

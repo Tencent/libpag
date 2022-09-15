@@ -1,0 +1,22 @@
+.flex {
+  width: 720rpx;
+  display: flex;
+  flex-direction: row;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.box {
+  position: relative;
+}
+
+.canvas {
+  margin: 4px;
+}
+
+.fps {
+  position: absolute;
+  top: 0;
+  left: 0;
+}

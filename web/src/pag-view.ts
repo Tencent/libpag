@@ -1,4 +1,4 @@
-import { PAGScaleMode, PAGViewListenerEvent } from './types';
+import { DebugData, PAGScaleMode, PAGViewListenerEvent } from './types';
 import { PAGPlayer } from './pag-player';
 import { EventManager, Listener } from './utils/event-manager';
 import { PAGSurface } from './pag-surface';
@@ -6,10 +6,11 @@ import { destroyVerify } from './utils/decorators';
 import { isOffscreenCanvas } from './utils/canvas';
 import { BackendContext } from './core/backend-context';
 import { PAGModule } from './pag-module';
+import { RenderCanvas } from './core/render-canvas';
+import { Clock } from './utils/clock';
 
 import type { PAGComposition } from './pag-composition';
 import type { Matrix } from './core/matrix';
-import { RenderCanvas } from './core/render-canvas';
 
 export interface PAGViewOptions {
   /**
@@ -117,6 +118,11 @@ export class PAGView {
   private canvasContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null | undefined;
   private rawWidth = 0;
   private rawHeight = 0;
+  private debugData: DebugData = {
+    FPS: 0,
+    flushTime: 0,
+  };
+  private fpsBuffer: number[] = [];
 
   public constructor(pagPlayer: PAGPlayer, canvasElement: HTMLCanvasElement | OffscreenCanvas) {
     this.player = pagPlayer;
@@ -279,6 +285,7 @@ export class PAGView {
    * called, there is no need to call it. Returns true if the content has changed.
    */
   public async flush() {
+    const clock = new Clock();
     const res = await this.player.flushInternal((res) => {
       if (this.pagViewOptions.useCanvas2D && res && PAGModule.globalCanvas.canvas) {
         if (!this.canvasContext) this.canvasContext = this.canvasElement?.getContext('2d');
@@ -297,6 +304,9 @@ export class PAGView {
         );
         this.canvasContext!.globalCompositeOperation = compositeOperation;
       }
+      clock.mark('flush');
+      this.setDebugData({ flushTime: clock.measure('', 'flush') });
+      this.updateFPS();
     });
     this.eventManager.emit(PAGViewListenerEvent.onAnimationUpdate, this);
     if (res) {
@@ -379,6 +389,14 @@ export class PAGView {
     this.canvasContext = null;
     this.canvasElement = null;
     this.isDestroyed = true;
+  }
+
+  public getDebugData() {
+    return this.debugData;
+  }
+
+  public setDebugData(data: DebugData) {
+    this.debugData = { ...this.debugData, ...data };
   }
 
   protected async flushLoop() {
@@ -475,5 +493,17 @@ export class PAGView {
     this.rawHeight = displaySize.height * window.devicePixelRatio;
     canvas.width = this.rawWidth;
     canvas.height = this.rawHeight;
+  }
+
+  private updateFPS() {
+    let now: number;
+    try {
+      now = performance.now();
+    } catch (e) {
+      now = Date.now();
+    }
+    this.fpsBuffer = this.fpsBuffer.filter((value) => now - value <= 1000);
+    this.fpsBuffer.push(now);
+    this.setDebugData({ FPS: this.fpsBuffer.length });
   }
 }

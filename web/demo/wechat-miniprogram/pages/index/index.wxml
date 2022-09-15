@@ -5,7 +5,8 @@
   </view>
   <view hidden="{{pagLoaded}}">
     <button class="btn-load" size="default" type="default" bindtap="load">加载测试PAG</button>
-    <button class="btn-clear" size="default" type="default" bindtap="clear">清理缓存</button>
+    <button class="btn-load" size="default" type="default" bindtap="clear">清理缓存</button>
+    <button class="btn-load" size="default" type="default" bindtap="benchmark">性能测试</button>
   </view>
   <view hidden="{{!pagLoaded}}">
     <text class="title">播放次数</text>
@@ -33,7 +34,6 @@
     </view>
     <text class="title">替换文字</text>
     <input class="input" type="text" value="{{replaceText}}" bindinput="replaceTextChange" />
-    <text class="text-debug">{{debugText}}</text>
     <view class="btn-box">
       <button class="btn" size="mini" type="default" style="padding: 0 1.5em;" bindtap="replaceImage">
         替换图片
@@ -45,6 +45,6 @@
         注册字体
       </button>
     </view>
-    <canvas type="2d" id="testCanvas"></canvas>
+    <text class="text-debug">{{debugText}}</text>
   </view>
 </view>

@@ -33,6 +33,11 @@ export class VideoReader {
     touchDirectory(MP4_CACHE_PATH);
     writeFile(this.mp4Path, mp4Data.buffer.slice(mp4Data.byteOffset, mp4Data.byteLength + mp4Data.byteOffset));
     this.videoDecoder = wx.createVideoDecoder();
+    this.videoDecoder.on('ended', () => {
+      this.videoDecoder?.seek(0).then(() => {
+        this.currentFrame = -1;
+      });
+    });
     this.videoDecoderPromise = this.videoDecoder.start({ source: this.mp4Path, mode: 1 });
   }
 

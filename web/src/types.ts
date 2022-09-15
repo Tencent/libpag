@@ -17,7 +17,13 @@ import { PAGSolidLayer } from './pag-solid-layer';
 import { Matrix as ClassMatrix } from './core/matrix';
 import { RenderCanvas } from './core/render-canvas';
 
-import type { NativeImage, NativeImageConstructor, ScalerContextConstructor, VideoDecoderConstructor, WebMaskConstructor } from './interfaces';
+import type {
+  NativeImage,
+  NativeImageConstructor,
+  ScalerContextConstructor,
+  VideoDecoderConstructor,
+  WebMaskConstructor,
+} from './interfaces';
 
 declare global {
   interface Window {
@@ -405,6 +411,11 @@ export interface TGFXLineJoin {
 export interface YUVBuffer {
   data: number[];
   lineSize: number[];
+}
+
+export interface DebugData {
+  FPS?: number;
+  flushTime?: number;
 }
 
 export declare class Matrix {
