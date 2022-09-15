@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MaskCache.h"
+#include "rendering/graphics/FeatherMask.h"
 #include "rendering/renderers/MaskRenderer.h"
 
 namespace pag {
@@ -33,5 +34,19 @@ tgfx::Path* MaskCache::createCache(Frame layerFrame) {
   auto maskContent = new tgfx::Path();
   RenderMasks(maskContent, layer->masks, layerFrame);
   return maskContent;
+}
+
+FeatherMaskCache::FeatherMaskCache(Layer* layer)
+    : FrameCache<GraphicContent>(layer->startTime, layer->duration), layer(layer) {
+  std::vector<TimeRange> timeRanges = {layer->visibleRange()};
+  for (auto& mask : layer->masks) {
+    mask->excludeVaryingRanges(&timeRanges);
+  }
+  staticTimeRanges = OffsetTimeRanges(timeRanges, -layer->startTime);
+}
+
+GraphicContent* FeatherMaskCache::createCache(Frame layerFrame) {
+  auto featherMask = FeatherMask::MakeFrom(layer->masks, layerFrame);
+  return new GraphicContent(featherMask);
 }
 }  // namespace pag

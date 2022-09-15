@@ -22,12 +22,16 @@
 namespace pag {
 MaskData::~MaskData() {
   delete maskPath;
+  delete maskFeather;
   delete maskOpacity;
   delete maskExpansion;
 }
 
 void MaskData::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {
   maskPath->excludeVaryingRanges(timeRanges);
+  if (maskFeather != nullptr) {
+    maskFeather->excludeVaryingRanges(timeRanges);
+  }
   maskOpacity->excludeVaryingRanges(timeRanges);
   maskExpansion->excludeVaryingRanges(timeRanges);
 }

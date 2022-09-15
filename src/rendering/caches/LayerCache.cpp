@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LayerCache.h"
-#include "base/utils/TGFXCast.h"
 #include "rendering/caches/ImageContentCache.h"
 #include "rendering/caches/PreComposeContentCache.h"
 #include "rendering/caches/ShapeContentCache.h"
@@ -57,7 +56,13 @@ LayerCache::LayerCache(Layer* layer) : layer(layer) {
   }
   contentCache->update();
   transformCache = new TransformCache(layer);
-  if (!layer->masks.empty()) {
+  for (auto mask : layer->masks) {
+    if (mask->maskFeather != nullptr ||
+        (mask->maskOpacity->animatable() || mask->maskOpacity->value != 255)) {
+      featherMaskCache = new FeatherMaskCache(layer);
+    }
+  }
+  if (!layer->masks.empty() && featherMaskCache == nullptr) {
     maskCache = new MaskCache(layer);
   }
   updateStaticTimeRanges();
@@ -80,6 +85,14 @@ tgfx::Path* LayerCache::getMasks(Frame contentFrame) {
     return nullptr;
   }
   return mask;
+}
+
+std::shared_ptr<Modifier> LayerCache::getFeatherMask(Frame contentFrame) {
+  if (featherMaskCache == nullptr) {
+    return nullptr;
+  }
+  auto featherMaskContent = featherMaskCache->getCache(contentFrame);
+  return Modifier::MakeMask(featherMaskContent->graphic, false, false);
 }
 
 Content* LayerCache::getContent(Frame contentFrame) {
@@ -130,6 +143,9 @@ void LayerCache::updateStaticTimeRanges() {
   MergeTimeRanges(&staticTimeRanges, transformCache->getStaticTimeRanges());
   if (maskCache) {
     MergeTimeRanges(&staticTimeRanges, maskCache->getStaticTimeRanges());
+  }
+  if (featherMaskCache) {
+    MergeTimeRanges(&staticTimeRanges, featherMaskCache->getStaticTimeRanges());
   }
   if (layer->trackMatteLayer) {
     auto timeRanges = getTrackMatteStaticTimeRanges();
