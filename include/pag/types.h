@@ -1338,20 +1338,31 @@ class PAG_API TextDocument {
    */
   bool applyStroke = false;
 
+  /**
+   * Readonly, external modifications are not valid.
+   */
   float baselineShift = 0;
 
   /**
    * When true, the text layer is paragraph (bounded) text.
+   * Readonly, external modifications are not valid.
    */
   bool boxText = false;
 
+  /**
+   * Readonly, external modifications are not valid.
+   */
   Point boxTextPos = Point::Zero();
 
   /**
    * For box text, the pixel dimensions for the text bounds.
+   * Readonly, external modifications are not valid.
    */
   Point boxTextSize = Point::Zero();
 
+  /**
+   * Readonly, external modifications are not valid.
+   */
   float firstBaseLine = 0;
 
   bool fauxBold = false;
@@ -1384,6 +1395,7 @@ class PAG_API TextDocument {
 
   /**
    * Indicates the rendering order for the fill and stroke of a text layer.
+   * Readonly, external modifications are not valid.
    */
   bool strokeOverFill = true;
 
