@@ -1,12 +1,9 @@
 import { VIDEO_DECODE_WAIT_FRAME, VIDEO_PLAYBACK_RATE_MAX, VIDEO_PLAYBACK_RATE_MIN } from '../constant';
 import { addListener, removeListener, removeAllListeners } from '../utils/video-listener';
 import { IPHONE, IS_WECHAT } from '../utils/ua';
-import { EmscriptenGL } from '../types';
 
-export interface TimeRange {
-  start: number;
-  end: number;
-}
+import type { EmscriptenGL } from '../types';
+import type { TimeRange } from '../interfaces';
 
 // Get video initiated token on Wechat browser.
 const getWechatNetwork = () => {

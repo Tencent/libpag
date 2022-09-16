@@ -1,10 +1,10 @@
 import { EmscriptenGL } from '../types';
-import { isCanvas, releaseCanvas2D } from '../utils/canvas';
+import { releaseCanvas2D } from '../utils/canvas';
 
 export class NativeImage {
   public static async createFromBytes(bytes: ArrayBuffer) {
     const blob = new Blob([bytes], { type: 'image/*' });
-    return new Promise((resolve) => {
+    return new Promise<NativeImage | null>((resolve) => {
       const image = new Image();
       image.onload = function () {
         resolve(new NativeImage(image));
@@ -18,7 +18,7 @@ export class NativeImage {
   }
 
   public static async createFromPath(path: string) {
-    return new Promise((resolve) => {
+    return new Promise<NativeImage | null>((resolve) => {
       const image = new Image();
       image.onload = function () {
         resolve(new NativeImage(image));
@@ -31,8 +31,8 @@ export class NativeImage {
     });
   }
 
-  private source: TexImageSource | OffscreenCanvas;
-  private reuse: boolean;
+  protected source: TexImageSource | OffscreenCanvas;
+  protected reuse: boolean;
 
   public constructor(source: TexImageSource | OffscreenCanvas, reuse = false) {
     this.source = source;
@@ -40,11 +40,15 @@ export class NativeImage {
   }
 
   public width(): number {
-    return this.source instanceof HTMLVideoElement ? this.source.videoWidth : this.source.width;
+    return window.HTMLVideoElement && this.source instanceof HTMLVideoElement
+      ? this.source.videoWidth
+      : this.source.width;
   }
 
   public height(): number {
-    return this.source instanceof HTMLVideoElement ? this.source.videoHeight : this.source.height;
+    return window.HTMLVideoElement && this.source instanceof HTMLVideoElement
+      ? this.source.videoHeight
+      : this.source.height;
   }
 
   public upload(GL: EmscriptenGL) {
@@ -54,7 +58,7 @@ export class NativeImage {
   }
 
   public onDestroy() {
-    if (this.reuse && isCanvas(this.source)) {
+    if (this.reuse) {
       releaseCanvas2D(this.source as HTMLCanvasElement | OffscreenCanvas);
     }
   }

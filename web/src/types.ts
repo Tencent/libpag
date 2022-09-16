@@ -4,15 +4,11 @@ import { PAGFile } from './pag-file';
 import { PAGImage } from './pag-image';
 import { PAGSurface } from './pag-surface';
 import { WebAssemblyQueue } from './utils/queue';
-import { VideoReader } from './core/video-reader';
-import { ScalerContext } from './core/scaler-context';
 import { PAGView } from './pag-view';
 import { PAGFont } from './pag-font';
 import { PAGPlayer } from './pag-player';
 import { PAGLayer } from './pag-layer';
 import { PAGComposition } from './pag-composition';
-import { NativeImage } from './core/native-image';
-import { WebMask } from './core/web-mask';
 import { PAGTextLayer } from './pag-text-layer';
 import { GlobalCanvas } from './core/global-canvas';
 import { BackendContext } from './core/backend-context';
@@ -20,6 +16,14 @@ import { PAGImageLayer } from './pag-image-layer';
 import { PAGSolidLayer } from './pag-solid-layer';
 import { Matrix as ClassMatrix } from './core/matrix';
 import { RenderCanvas } from './core/render-canvas';
+
+import type {
+  NativeImage,
+  NativeImageConstructor,
+  ScalerContextConstructor,
+  VideoDecoderConstructor,
+  WebMaskConstructor,
+} from './interfaces';
 
 declare global {
   interface Window {
@@ -102,10 +106,10 @@ export interface PAG extends EmscriptenModule {
   PAGTextLayer: typeof PAGTextLayer;
   PAGImageLayer: typeof PAGImageLayer;
   PAGSolidLayer: typeof PAGSolidLayer;
-  NativeImage: typeof NativeImage;
-  WebMask: typeof WebMask;
-  ScalerContext: typeof ScalerContext;
-  VideoReader: typeof VideoReader;
+  NativeImage: NativeImageConstructor;
+  WebMask: WebMaskConstructor;
+  ScalerContext: ScalerContextConstructor;
+  VideoReader: VideoDecoderConstructor;
   GlobalCanvas: typeof GlobalCanvas;
   BackendContext: typeof BackendContext;
   Matrix: typeof ClassMatrix;
@@ -407,6 +411,11 @@ export interface TGFXLineJoin {
 export interface YUVBuffer {
   data: number[];
   lineSize: number[];
+}
+
+export interface DebugData {
+  FPS?: number;
+  flushTime?: number;
 }
 
 export declare class Matrix {

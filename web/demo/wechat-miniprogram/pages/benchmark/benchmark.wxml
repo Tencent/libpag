@@ -1,0 +1,6 @@
+<view class="flex">
+  <view class="box" wx:for="{{pagMap}}" wx:for-index="idx">
+    <canvas class="canvas" type="webgl" id="pag-{{idx}}" style="width: 150px; height:150px;"></canvas>
+    <canvas class="fps" type="2d" id="fps-{{idx}}" style="width: 50px; height:50px;"></canvas>
+  </view>
+</view>

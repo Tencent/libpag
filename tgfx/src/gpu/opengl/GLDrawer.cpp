@@ -283,11 +283,11 @@ void GLDrawer::draw(std::function<void()> func) {
                             reinterpret_cast<void*>(attribute.offset));
     gl->enableVertexAttribArray(static_cast<unsigned>(attribute.location));
   }
-  gl->bindBuffer(GL_ARRAY_BUFFER, 0);
   func();
   if (vertexArray > 0) {
     gl->bindVertexArray(0);
   }
+  gl->bindBuffer(GL_ARRAY_BUFFER, 0);
   CheckGLError(context);
 }
 

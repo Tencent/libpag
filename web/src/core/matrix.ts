@@ -1,4 +1,4 @@
-import { PAGModule } from '../binding';
+import { PAGModule } from '../pag-module';
 import { destroyVerify, wasmAwaitRewind } from '../utils/decorators';
 import { MatrixIndex } from '../types';
 

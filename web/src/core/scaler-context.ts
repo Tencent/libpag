@@ -1,32 +1,45 @@
-import { NativeImage } from './native-image';
 import { measureText } from '../utils/measure-text';
 import { defaultFontNames, getFontFamilies } from '../utils/font-family';
-import { Rect } from '../types';
 import { getCanvas2D } from '../utils/canvas';
+import { NativeImage } from './native-image';
 
-const canvas = getCanvas2D();
-canvas.width = 10;
-canvas.height = 10;
+import type { Rect } from '../types';
+import type { NativeImage as NativeImageType } from '../interfaces';
 
-const testCanvas = getCanvas2D();
-testCanvas.width = 1;
-testCanvas.height = 1;
-const testContext = testCanvas.getContext('2d') as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
-testContext.textBaseline = 'top';
-testContext.font = '100px -no-font-family-here-';
-testContext.scale(0.01, 0.01);
-testContext.fillStyle = '#000';
-testContext.globalCompositeOperation = 'copy';
+export const resetTestCanvas = (testContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D) => {
+  testContext.textBaseline = 'top';
+  testContext.font = '100px -no-font-family-here-';
+  testContext.scale(0.01, 0.01);
+  testContext.fillStyle = '#000';
+  testContext.globalCompositeOperation = 'copy';
+};
 
 export class ScalerContext {
-  public static canvas: HTMLCanvasElement | OffscreenCanvas = canvas;
-  public static context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D = canvas.getContext('2d') as
-    | CanvasRenderingContext2D
-    | OffscreenCanvasRenderingContext2D;
+  public static canvas: HTMLCanvasElement | OffscreenCanvas;
+  public static context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+  public static testCanvas: HTMLCanvasElement | OffscreenCanvas;
+  public static testContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+
+  public static setCanvas(canvas: HTMLCanvasElement | OffscreenCanvas) {
+    ScalerContext.canvas = canvas;
+  }
+
+  public static setContext(context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D) {
+    ScalerContext.context = context;
+  }
 
   public static isEmoji(text: string): boolean {
-    testContext.fillText(text, 0, 0);
-    const color = testContext.getImageData(0, 0, 1, 1).data.toString();
+    if (!this.testCanvas) {
+      this.testCanvas = getCanvas2D();
+      this.testCanvas.width = 1;
+      this.testCanvas.height = 1;
+      this.testContext = this.testCanvas.getContext('2d') as
+        | CanvasRenderingContext2D
+        | OffscreenCanvasRenderingContext2D;
+      resetTestCanvas(this.testContext);
+    }
+    this.testContext.fillText(text, 0, 0);
+    const color = this.testContext.getImageData(0, 0, 1, 1).data.toString();
     return !color.includes('0,0,0,');
   }
 
@@ -44,6 +57,7 @@ export class ScalerContext {
     this.size = size;
     this.fauxBold = fauxBold;
     this.fauxItalic = fauxItalic;
+    this.loadCanvas();
   }
 
   public fontString() {
@@ -100,7 +114,7 @@ export class ScalerContext {
     };
   }
 
-  public generateImage(text: string, bounds: Rect): NativeImage {
+  public generateImage(text: string, bounds: Rect): NativeImageType {
     const canvas = getCanvas2D();
     canvas.width = bounds.right - bounds.left;
     canvas.height = bounds.bottom - bounds.top;
@@ -110,7 +124,20 @@ export class ScalerContext {
     return new NativeImage(canvas, true);
   }
 
-  private measureText(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, text: string) {
+  protected loadCanvas() {
+    if (!ScalerContext.canvas) {
+      ScalerContext.setCanvas(getCanvas2D());
+      (ScalerContext.canvas as HTMLCanvasElement | OffscreenCanvas).width = 10;
+      (ScalerContext.canvas as HTMLCanvasElement | OffscreenCanvas).height = 10;
+      ScalerContext.setContext(
+        (ScalerContext.canvas as HTMLCanvasElement | OffscreenCanvas).getContext('2d') as
+          | CanvasRenderingContext2D
+          | OffscreenCanvasRenderingContext2D,
+      );
+    }
+  }
+
+  private measureText(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, text: string): TextMetrics {
     const metrics = ctx.measureText(text);
     if (metrics?.actualBoundingBoxAscent) return metrics;
     ctx.canvas.width = this.size * 1.5;
@@ -143,6 +170,7 @@ export class ScalerContext {
       actualBoundingBoxLeft: pos[0] - left,
       fontBoundingBoxAscent: fontMeasure.bottom - fontMeasure.top,
       fontBoundingBoxDescent: 0,
+      width: fontMeasure.right - fontMeasure.left,
     };
   }
 }

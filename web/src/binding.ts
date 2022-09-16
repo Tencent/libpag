@@ -1,4 +1,5 @@
 import { PAG } from './types';
+import { setPAGModule } from './pag-module';
 import { PAGFile } from './pag-file';
 import { PAGSurface } from './pag-surface';
 import { PAGPlayer } from './pag-player';
@@ -23,7 +24,7 @@ import { RenderCanvas } from './core/render-canvas';
  * Binding pag js module on pag webassembly module.
  */
 export const binding = (module: PAG) => {
-  PAGModule = module;
+  setPAGModule(module);
   module.PAG = module;
   module.PAGFile = PAGFile;
   module.PAGPlayer = PAGPlayer;
@@ -60,5 +61,3 @@ export const binding = (module: PAG) => {
     return module._SDKVersion();
   };
 };
-
-export let PAGModule: PAG;

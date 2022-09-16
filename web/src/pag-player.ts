@@ -1,4 +1,4 @@
-import { PAGModule } from './binding';
+import { PAGModule } from './pag-module';
 import { PAGFile } from './pag-file';
 import { PAGSurface } from './pag-surface';
 import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorators';

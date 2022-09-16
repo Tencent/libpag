@@ -1,7 +1,7 @@
 import { AlphaType, ColorType, PAGScaleMode } from './types';
 import { NativeImage } from './core/native-image';
 import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorators';
-import { PAGModule } from './binding';
+import { PAGModule } from './pag-module';
 import { Matrix } from './core/matrix';
 
 @destroyVerify
