@@ -7,7 +7,7 @@
 [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/Tencent/libpag)](https://github.com/Tencent/libpag/releases)
 
 [English](./README.md) | 简体中文 | [官网](https://pag.io)
-| [QQ群：893379574](https://qm.qq.com/cgi-bin/qm/qr?k=Wa65DTnEKo2hnPsvY-1EgJOF8tvKQ-ZT&jump_from=webapi)
+| [官方论坛](https://bbs.pag.art/)
 
 ## 介绍
 
