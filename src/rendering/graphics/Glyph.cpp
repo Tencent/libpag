@@ -152,4 +152,15 @@ std::shared_ptr<Glyph> Glyph::makeHorizontalGlyph() const {
   glyph->matrix = tgfx::Matrix::I();
   return glyph;
 }
+
+std::shared_ptr<Glyph> Glyph::makeScaledGlyph(float s) const {
+  auto scaledFont = _font.makeWithSize(_font.getSize() * s);
+  TextPaint textPaint;
+  textPaint.style = textStyle;
+  textPaint.strokeOverFill = strokeOverFill;
+  textPaint.fillColor = fillColor;
+  textPaint.strokeColor = strokeColor;
+  textPaint.strokeWidth = strokeWidth * s;
+  return std::shared_ptr<Glyph>(new Glyph(_glyphId, _name, scaledFont, _isVertical, textPaint));
+}
 }  // namespace pag

@@ -81,4 +81,22 @@ TextBlock::TextBlock(ID assetID, std::vector<std::vector<GlyphHandle>> lines, fl
   SortAtlasGlyphs(&_maskAtlasGlyphs);
   SortAtlasGlyphs(&_colorAtlasGlyphs);
 }
+
+std::vector<GlyphHandle> TextBlock::maskAtlasGlyphs(float scale) const {
+  std::vector<GlyphHandle> glyphs;
+  glyphs.reserve(_maskAtlasGlyphs.size());
+  for (const auto& glyph : _maskAtlasGlyphs) {
+    glyphs.emplace_back(glyph->makeScaledGlyph(scale));
+  }
+  return glyphs;
+}
+
+std::vector<GlyphHandle> TextBlock::colorAtlasGlyphs(float scale) const {
+  std::vector<GlyphHandle> glyphs;
+  glyphs.reserve(_colorAtlasGlyphs.size());
+  for (const auto& glyph : _colorAtlasGlyphs) {
+    glyphs.emplace_back(glyph->makeScaledGlyph(scale));
+  }
+  return glyphs;
+}
 }  // namespace pag
