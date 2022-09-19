@@ -44,18 +44,24 @@ PAG_API @interface PAGText : NSObject
  * When true, the text layer shows a stroke.
  */
 @property(nonatomic, assign) bool applyStroke;
-
+/**
+ * Readonly, external modifications are not valid.
+ */
 @property(nonatomic, assign) float baselineShift;
 /**
  * When true, the text layer is paragraph (bounded) text.
+ * Readonly, external modifications are not valid.
  */
 @property(nonatomic, assign) bool boxText;
 
 /**
  * For box text, the pixel boundary for the text bounds.
+ * Readonly, external modifications are not valid.
  */
 @property(nonatomic, assign) CGRect boxTextRect;
-
+/**
+ * Readonly, external modifications are not valid.
+ */
 @property(nonatomic, assign) float firstBaseLine;
 
 @property(nonatomic, assign) bool fauxBold;
@@ -89,6 +95,7 @@ PAG_API @interface PAGText : NSObject
 
 /**
  * Indicates the rendering order for the fill and stroke of a text layer.
+ * Readonly, external modifications are not valid.
  */
 @property(nonatomic, assign) bool strokeOverFill;
 

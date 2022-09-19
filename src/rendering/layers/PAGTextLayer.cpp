@@ -138,6 +138,8 @@ void PAGTextLayer::replaceTextInternal(std::shared_ptr<TextDocument> textData) {
     textDocument->backgroundColor = textData->backgroundColor;
     textDocument->backgroundAlpha = textData->backgroundAlpha;
     textDocument->justification = textData->justification;
+    textDocument->leading = textData->leading;
+    textDocument->tracking = textData->tracking;
   }
 }
 
