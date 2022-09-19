@@ -54,7 +54,7 @@ GLTriangulatingPathOp::GLTriangulatingPathOp(Color color, std::vector<float> ver
   setBounds(bounds);
 }
 
-bool GLTriangulatingPathOp::onCombineIfPossible(GLOp* op) {
+bool GLTriangulatingPathOp::onCombineIfPossible(Op* op) {
   if (!GLDrawOp::onCombineIfPossible(op)) {
     return false;
   }
@@ -67,12 +67,13 @@ bool GLTriangulatingPathOp::onCombineIfPossible(GLOp* op) {
   return true;
 }
 
-void GLTriangulatingPathOp::draw(const DrawArgs& args) {
-  auto info =
-      createProgram(args, DefaultGeometryProcessor::Make(color, args.renderTarget->width(),
-                                                         args.renderTarget->height(), localMatrix));
-  args.drawer->bindPipelineAndScissorClip(info, scissorRect());
-  args.drawer->bindVerticesAndIndices(vertex);
-  args.drawer->draw(GL_TRIANGLES, 0, vertexCount);
+void GLTriangulatingPathOp::execute(OpsRenderPass* opsRenderPass) {
+  auto info = createProgram(
+      opsRenderPass,
+      DefaultGeometryProcessor::Make(color, opsRenderPass->renderTarget()->width(),
+                                     opsRenderPass->renderTarget()->height(), localMatrix));
+  opsRenderPass->bindPipelineAndScissorClip(info, scissorRect());
+  opsRenderPass->bindVerticesAndIndices(vertex);
+  opsRenderPass->draw(GL_TRIANGLES, 0, vertexCount);
 }
 }  // namespace tgfx

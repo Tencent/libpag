@@ -16,31 +16,35 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "FragmentProcessor.h"
 #include "OpsTask.h"
-#include "tgfx/core/Matrix.h"
-#include "tgfx/core/Rect.h"
-#include "tgfx/gpu/Surface.h"
+#include "core/utils/Log.h"
+#include "gpu/Gpu.h"
 
 namespace tgfx {
-class SurfaceDrawContext {
- public:
-  explicit SurfaceDrawContext(Surface* surface) : surface(surface) {
+OpsTask::~OpsTask() {
+  DEBUG_ASSERT(ops.empty());
+}
+
+void OpsTask::addOp(std::unique_ptr<Op> op) {
+  if (!ops.empty() && ops.back()->combineIfPossible(op.get())) {
+    return;
   }
+  ops.emplace_back(std::move(op));
+}
 
-  void fillRectWithFP(const Rect& dstRect, const Matrix& localMatrix,
-                      std::unique_ptr<FragmentProcessor> fp);
-
-  void addOp(std::unique_ptr<Op> op);
-
- protected:
-  OpsTask* getOpsTask();
-
-  void replaceOpsTask();
-
-  Surface* surface = nullptr;
-  std::shared_ptr<OpsTask> opsTask;
-};
+bool OpsTask::execute(Gpu* gpu) {
+  if (ops.empty()) {
+    return false;
+  }
+  auto opsRenderPass = gpu->getOpsRenderPass(renderTarget, renderTargetTexture);
+  if (opsRenderPass == nullptr) {
+    return false;
+  }
+  auto tempOps = std::move(ops);
+  for (auto& op : tempOps) {
+    op->execute(opsRenderPass);
+  }
+  gpu->submit(opsRenderPass);
+  return true;
+}
 }  // namespace tgfx

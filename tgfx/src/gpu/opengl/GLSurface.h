@@ -28,34 +28,12 @@ class GLSurface : public Surface {
  public:
   ~GLSurface() override;
 
-  int width() const override {
-    return renderTarget->width();
-  }
-
-  int height() const override {
-    return renderTarget->height();
-  }
-
-  ImageOrigin origin() const override {
-    return renderTarget->origin();
-  }
-
   Canvas* getCanvas() override;
-
-  bool wait(const Semaphore* semaphore) override;
-
-  bool flush(Semaphore* semaphore) override;
-
-  std::shared_ptr<RenderTarget> getRenderTarget() override;
-
-  std::shared_ptr<Texture> getTexture() override;
 
  protected:
   bool onReadPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) override;
 
  private:
-  std::shared_ptr<GLRenderTarget> renderTarget = nullptr;
-  std::shared_ptr<GLTexture> texture = nullptr;
   GLCanvas* canvas = nullptr;
 
   explicit GLSurface(std::shared_ptr<GLRenderTarget> renderTarget,
@@ -63,6 +41,5 @@ class GLSurface : public Surface {
 
   friend class Surface;
   friend class GLCanvas;
-  friend class GLSurfaceDrawContext;
 };
 }  // namespace tgfx

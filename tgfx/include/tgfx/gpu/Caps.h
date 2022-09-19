@@ -23,6 +23,7 @@ class Caps {
  public:
   bool floatIs32Bits = true;
   int maxTextureSize = 0;
+  bool semaphoreSupport = false;
   bool multisampleDisableSupport = false;
   /**
    * The CLAMP_TO_BORDER wrap mode for texture coordinates was added to desktop GL in 1.3, and

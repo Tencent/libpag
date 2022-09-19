@@ -19,6 +19,7 @@
 #include "tgfx/gpu/Canvas.h"
 #include <atomic>
 #include "CanvasState.h"
+#include "SurfaceDrawContext.h"
 #include "tgfx/gpu/Surface.h"
 
 namespace tgfx {
@@ -33,10 +34,15 @@ static uint32_t NextClipID() {
 }
 
 Canvas::Canvas(Surface* surface) : surface(surface) {
+  drawContext = new SurfaceDrawContext(surface);
   state = std::make_shared<CanvasState>();
   state->clip.addRect(0, 0, static_cast<float>(surface->width()),
                       static_cast<float>(surface->height()));
   state->clipID = NextClipID();
+}
+
+Canvas::~Canvas() {
+  delete drawContext;
 }
 
 void Canvas::save() {
@@ -158,6 +164,10 @@ void Canvas::drawTexture(std::shared_ptr<Texture> texture, const RGBAAALayout* l
   }
   drawTexture(std::move(texture), layout, realPaint);
   setMatrix(oldMatrix);
+}
+
+void Canvas::flush() {
+  surface->flush();
 }
 
 Context* Canvas::getContext() const {

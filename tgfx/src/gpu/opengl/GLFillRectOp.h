@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "GLDrawer.h"
+#include "GLOpsRenderPass.h"
 
 #include "GLBuffer.h"
 
@@ -38,7 +38,7 @@ class GLFillRectOp : public GLDrawOp {
 
   std::vector<float> vertices();
 
-  void draw(const DrawArgs& args) override;
+  void execute(OpsRenderPass* opsRenderPass) override;
 
  private:
   DEFINE_OP_CLASS_ID
@@ -46,7 +46,7 @@ class GLFillRectOp : public GLDrawOp {
   GLFillRectOp(std::vector<Color> colors, std::vector<Rect> rects, std::vector<Matrix> viewMatrices,
                std::vector<Matrix> localMatrices);
 
-  bool onCombineIfPossible(GLOp* op) override;
+  bool onCombineIfPossible(Op* op) override;
 
   std::vector<float> coverageVertices() const;
 

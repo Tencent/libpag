@@ -28,6 +28,7 @@
 #include "gpu/DeviceSpaceTextureEffect.h"
 #include "gpu/PorterDuffXferProcessor.h"
 #include "gpu/RGBAAATextureEffect.h"
+#include "gpu/SurfaceDrawContext.h"
 #include "gpu/opengl/GLTriangulatingPathOp.h"
 #include "tgfx/core/Mask.h"
 #include "tgfx/core/PathEffect.h"
@@ -95,11 +96,6 @@ static bool PaintToGLPaintWithTexture(const Context* context, const Paint& paint
 }
 
 GLCanvas::GLCanvas(Surface* surface) : Canvas(surface) {
-  drawContext = new GLSurfaceDrawContext(surface);
-}
-
-GLCanvas::~GLCanvas() {
-  delete drawContext;
 }
 
 std::shared_ptr<Texture> GLCanvas::getClipTexture() {
@@ -562,12 +558,5 @@ void GLCanvas::draw(std::unique_ptr<GLDrawOp> op, GLPaint paint, bool aa) {
   op->setColors(std::move(paint.colorFragmentProcessors));
   op->setMasks(std::move(masks));
   drawContext->addOp(std::move(op));
-}
-
-void GLCanvas::flush() {
-  if (drawContext == nullptr) {
-    return;
-  }
-  drawContext->flush();
 }
 }  // namespace tgfx

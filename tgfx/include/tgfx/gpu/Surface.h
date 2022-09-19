@@ -67,15 +67,13 @@ class Surface {
    */
   static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<Texture> texture, int sampleCount = 1);
 
-  explicit Surface(Context* context);
-
   virtual ~Surface() = default;
 
   /**
    * Retrieves the context associated with this Surface.
    */
   Context* getContext() const {
-    return context;
+    return renderTarget->getContext();
   }
 
   /**
@@ -95,28 +93,34 @@ class Surface {
   /**
    * Returns the width of this surface.
    */
-  virtual int width() const = 0;
+  int width() const {
+    return renderTarget->width();
+  }
 
   /**
    * Returns the height of this surface.
    */
-  virtual int height() const = 0;
+  int height() const {
+    return renderTarget->height();
+  }
 
   /**
    * Returns the origin of this surface, either ImageOrigin::TopLeft or ImageOrigin::BottomLeft.
    */
-  virtual ImageOrigin origin() const = 0;
+  ImageOrigin origin() const {
+    return renderTarget->origin();
+  }
 
   /**
    * Retrieves the render target that the surface renders to.
    */
-  virtual std::shared_ptr<RenderTarget> getRenderTarget() = 0;
+  std::shared_ptr<RenderTarget> getRenderTarget();
 
   /**
    * Retrieves the texture that the surface renders to. Return nullptr if the surface was made from
    * a RenderTarget.
    */
-  virtual std::shared_ptr<Texture> getTexture() = 0;
+  std::shared_ptr<Texture> getTexture();
 
   /**
    * Returns Canvas that draws into Surface. Subsequent calls return the same Canvas. Canvas
@@ -131,7 +135,7 @@ class Surface {
    * GPU back-end will not wait on the passed semaphore, and the client will still own the
    * semaphore. Returns true if GPU is waiting on the semaphore.
    */
-  virtual bool wait(const Semaphore* waitSemaphore) = 0;
+  bool wait(const Semaphore* waitSemaphore);
 
   /**
    * Apply all pending changes to the render target immediately. After issuing all commands, the
@@ -142,14 +146,7 @@ class Surface {
    * If false is returned, the GPU back-end did not create or add a semaphore to signal on the GPU;
    * the caller should not instruct the GPU to wait on the semaphore.
    */
-  virtual bool flush(Semaphore* signalSemaphore) = 0;
-
-  /**
-   * Apply all pending changes to the render target immediately.
-   */
-  void flush() {
-    flush(nullptr);
-  }
+  bool flush(Semaphore* signalSemaphore = nullptr);
 
   /**
    * Copies a rect of pixels to dstPixels with specified ImageInfo. Copy starts at (srcX, srcY), and
@@ -166,11 +163,17 @@ class Surface {
   bool hitTest(float x, float y);
 
  protected:
-  Context* context = nullptr;
+  Surface(std::shared_ptr<RenderTarget> renderTarget, std::shared_ptr<Texture> texture);
 
   virtual bool onReadPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) = 0;
 
+  std::shared_ptr<RenderTarget> renderTarget = nullptr;
+  std::shared_ptr<Texture> texture = nullptr;
+  bool requiresManualMSAAResolve = false;
+
  private:
   std::unique_ptr<SurfaceOptions> surfaceOptions = nullptr;
+
+  friend class DrawingManager;
 };
 }  // namespace tgfx

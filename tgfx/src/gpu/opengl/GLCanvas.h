@@ -19,7 +19,6 @@
 #pragma once
 
 #include <optional>
-#include "GLSurfaceDrawContext.h"
 #include "gpu/CanvasState.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Mask.h"
@@ -36,8 +35,6 @@ class GLCanvas : public Canvas {
  public:
   explicit GLCanvas(Surface* surface);
 
-  ~GLCanvas() override;
-
   void drawTexture(std::shared_ptr<Texture> texture, const RGBAAALayout* layout,
                    const Paint& paint) override;
   void drawPath(const Path& path, const Paint& paint) override;
@@ -46,11 +43,6 @@ class GLCanvas : public Canvas {
   void drawAtlas(std::shared_ptr<Texture> atlas, const Matrix matrix[], const Rect tex[],
                  const Color colors[], size_t count) override;
   void drawMesh(const Mesh* mesh, const Paint& paint) override;
-  void flush() override;
-
-  SurfaceDrawContext* getSurfaceDrawContext() {
-    return drawContext;
-  };
 
  protected:
   void onSave() override {
@@ -65,7 +57,6 @@ class GLCanvas : public Canvas {
  private:
   std::shared_ptr<Surface> _clipSurface = nullptr;
   uint32_t clipID = kDefaultClipID;
-  GLSurfaceDrawContext* drawContext = nullptr;
 
   std::shared_ptr<Texture> getClipTexture();
 

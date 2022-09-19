@@ -120,7 +120,7 @@ GLRRectOp::GLRRectOp(Color color, const RRect& rRect, const Matrix& viewMatrix,
   rRects.emplace_back(RRectWrap{color, 0.f, 0.f, rRect, viewMatrix});
 }
 
-bool GLRRectOp::onCombineIfPossible(GLOp* op) {
+bool GLRRectOp::onCombineIfPossible(Op* op) {
   if (!GLDrawOp::onCombineIfPossible(op)) {
     return false;
   }
@@ -132,8 +132,8 @@ bool GLRRectOp::onCombineIfPossible(GLOp* op) {
   return true;
 }
 
-static bool UseScale(const DrawArgs& args) {
-  return !args.context->caps()->floatIs32Bits;
+static bool UseScale(OpsRenderPass* opsRenderPass) {
+  return !opsRenderPass->context()->caps()->floatIs32Bits;
 }
 
 void WriteColor(std::vector<float>& vertices, const Color& color) {
@@ -244,8 +244,8 @@ void GLRRectOp::RRectWrap::writeToVertices(std::vector<float>& vertices, bool us
   }
 }
 
-void GLRRectOp::draw(const DrawArgs& args) {
-  auto useScale = UseScale(args);
+void GLRRectOp::execute(OpsRenderPass* opsRenderPass) {
+  auto useScale = UseScale(opsRenderPass);
   std::vector<float> vertices;
   for (const auto& rRectWrap : rRects) {
     rRectWrap.writeToVertices(vertices, useScale, aa);
@@ -259,13 +259,14 @@ void GLRRectOp::draw(const DrawArgs& args) {
       indices.emplace_back(gStandardRRectIndices[j] + offset);
     }
   }
-  auto buffer = GLBuffer::Make(args.context, &(indices[0]), indices.size(), Type);
+  auto buffer = GLBuffer::Make(opsRenderPass->context(), &(indices[0]), indices.size(), Type);
 
   auto info = createProgram(
-      args, EllipseGeometryProcessor::Make(args.renderTarget->width(), args.renderTarget->height(),
-                                           false, UseScale(args), localMatrix));
-  args.drawer->bindPipelineAndScissorClip(info, scissorRect());
-  args.drawer->bindVerticesAndIndices(std::move(vertices), buffer);
-  args.drawer->drawIndexed(GL_TRIANGLES, 0, static_cast<int>(buffer->length()));
+      opsRenderPass, EllipseGeometryProcessor::Make(opsRenderPass->renderTarget()->width(),
+                                                    opsRenderPass->renderTarget()->height(), false,
+                                                    UseScale(opsRenderPass), localMatrix));
+  opsRenderPass->bindPipelineAndScissorClip(info, scissorRect());
+  opsRenderPass->bindVerticesAndIndices(std::move(vertices), buffer);
+  opsRenderPass->drawIndexed(GL_TRIANGLES, 0, static_cast<int>(buffer->length()));
 }
 }  // namespace tgfx

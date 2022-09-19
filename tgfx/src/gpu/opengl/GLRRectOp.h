@@ -19,7 +19,7 @@
 #pragma once
 
 #include "GLBuffer.h"
-#include "GLDrawer.h"
+#include "GLOpsRenderPass.h"
 #include "tgfx/core/Path.h"
 
 namespace tgfx {
@@ -28,14 +28,14 @@ class GLRRectOp : public GLDrawOp {
   static std::unique_ptr<GLRRectOp> Make(Color color, const RRect& rRect, const Matrix& viewMatrix,
                                          const Matrix& localMatrix = Matrix::I());
 
-  void draw(const DrawArgs& args) override;
+  void execute(OpsRenderPass* opsRenderPass) override;
 
  private:
   DEFINE_OP_CLASS_ID
 
   GLRRectOp(Color color, const RRect& rRect, const Matrix& viewMatrix, const Matrix& localMatrix);
 
-  bool onCombineIfPossible(GLOp* op) override;
+  bool onCombineIfPossible(Op* op) override;
 
   struct RRectWrap {
     Color color = Color::Transparent();

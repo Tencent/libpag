@@ -16,30 +16,32 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "GLDrawer.h"
-#include "gpu/SurfaceDrawContext.h"
+#include "SurfaceDrawContext.h"
+#include "DrawingManager.h"
+#include "gpu/opengl/GLFillRectOp.h"
 
 namespace tgfx {
-class GLSurfaceDrawContext : public SurfaceDrawContext {
- public:
-  explicit GLSurfaceDrawContext(Surface* surface) : SurfaceDrawContext(surface) {
+void SurfaceDrawContext::addOp(std::unique_ptr<Op> op) {
+  getOpsTask()->addOp(std::move(op));
+}
+
+void SurfaceDrawContext::fillRectWithFP(const Rect& dstRect, const Matrix& localMatrix,
+                                        std::unique_ptr<FragmentProcessor> fp) {
+  auto op = GLFillRectOp::Make(dstRect, Matrix::I(), localMatrix);
+  std::vector<std::unique_ptr<FragmentProcessor>> colors;
+  colors.emplace_back(std::move(fp));
+  op->setColors(std::move(colors));
+  addOp(std::move(op));
+}
+
+OpsTask* SurfaceDrawContext::getOpsTask() {
+  if (opsTask == nullptr || opsTask->isClosed()) {
+    replaceOpsTask();
   }
+  return opsTask.get();
+}
 
-  void fillRectWithFP(const Rect& dstRect, const Matrix& localMatrix,
-                      std::unique_ptr<FragmentProcessor> fp) override;
-
-  void addOp(std::unique_ptr<GLOp> op);
-
-  void flush() override;
-
-  ~GLSurfaceDrawContext() override;
-
- private:
-  GLDrawer* getDrawer();
-
-  std::vector<std::unique_ptr<GLOp>> ops;
-  std::shared_ptr<GLDrawer> _drawer = nullptr;
-};
+void SurfaceDrawContext::replaceOpsTask() {
+  opsTask = surface->getContext()->drawingManager()->newOpsTask(surface);
+}
 }  // namespace tgfx

@@ -58,6 +58,8 @@ class GLRenderTarget : public RenderTarget {
     return renderTargetFBInfo;
   }
 
+  void resolve() const;
+
  private:
   GLFrameBuffer textureFBInfo = {};
   GLFrameBuffer renderTargetFBInfo = {};
@@ -75,8 +77,6 @@ class GLRenderTarget : public RenderTarget {
                  GLFrameBuffer frameBuffer, unsigned textureTarget = 0);
 
   void onReleaseGPU() override;
-
-  void resolve() const;
 
   /**
    * Copies a rect of pixels to dstPixels with specified color type, alpha type and row bytes. Copy

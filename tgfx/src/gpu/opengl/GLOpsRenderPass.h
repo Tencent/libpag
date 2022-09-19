@@ -24,72 +24,18 @@
 #include "gpu/AAType.h"
 #include "gpu/FragmentProcessor.h"
 #include "gpu/GeometryProcessor.h"
+#include "gpu/Op.h"
+#include "gpu/OpsRenderPass.h"
 #include "gpu/Pipeline.h"
 #include "tgfx/core/BlendMode.h"
 
 namespace tgfx {
-class GLDrawer;
-struct DrawArgs {
-  Context* context = nullptr;
-  std::shared_ptr<RenderTarget> renderTarget = nullptr;
-  std::shared_ptr<Texture> renderTargetTexture = nullptr;
-  GLDrawer* drawer = nullptr;
-};
-
-struct ProgramInfo {
-  Program* program = nullptr;
-  std::unique_ptr<Pipeline> pipeline;
-  std::unique_ptr<GeometryProcessor> geometryProcessor;
-  std::optional<std::pair<unsigned, unsigned>> blendFactors;
-};
-
-#define DEFINE_OP_CLASS_ID                   \
-  static uint8_t ClassID() {                 \
-    static uint8_t ClassID = GenOpClassID(); \
-    return ClassID;                          \
-  }
-
-class GLOp {
+class GLDrawOp : public Op {
  public:
-  explicit GLOp(uint8_t classID) : _classID(classID) {
+  explicit GLDrawOp(uint8_t classID) : Op(classID) {
   }
 
-  virtual ~GLOp() = default;
-
-  virtual void draw(const DrawArgs& args) = 0;
-
-  bool combineIfPossible(GLOp* op);
-
-  const Rect& bounds() const {
-    return _bounds;
-  }
-
- protected:
-  static uint8_t GenOpClassID();
-
-  void setBounds(Rect bounds) {
-    _bounds = bounds;
-  }
-
-  void setTransformedBounds(const Rect& srcBounds, const Matrix& matrix) {
-    _bounds = matrix.mapRect(srcBounds);
-  }
-
-  virtual bool onCombineIfPossible(GLOp*) {
-    return false;
-  }
-
- private:
-  uint8_t _classID = 0;
-  Rect _bounds = Rect::MakeEmpty();
-};
-
-class GLDrawOp : public GLOp {
- public:
-  explicit GLDrawOp(uint8_t classID) : GLOp(classID) {
-  }
-
-  ProgramInfo createProgram(const DrawArgs& args, std::unique_ptr<GeometryProcessor> gp);
+  ProgramInfo createProgram(OpsRenderPass* opsRenderPass, std::unique_ptr<GeometryProcessor> gp);
 
   const Rect& scissorRect() const {
     return _scissorRect;
@@ -124,7 +70,7 @@ class GLDrawOp : public GLOp {
   }
 
  protected:
-  bool onCombineIfPossible(GLOp* op) override;
+  bool onCombineIfPossible(Op* op) override;
 
   AAType aa = AAType::None;
 
@@ -137,47 +83,50 @@ class GLDrawOp : public GLOp {
   std::unique_ptr<XferProcessor> _xferProcessor;
 };
 
-class GLDrawer : public Resource {
+class GLOpsRenderPass : public OpsRenderPass {
  public:
-  static std::shared_ptr<GLDrawer> Make(Context* context);
+  static std::unique_ptr<GLOpsRenderPass> Make(Context* context);
 
-  void set(RenderTarget* rt) {
-    _renderTarget = rt;
-  }
+  void set(std::shared_ptr<RenderTarget> renderTarget,
+           std::shared_ptr<Texture> renderTargetTexture);
 
-  void reset() {
-    program = nullptr;
-    _vertices = {};
-    _indexBuffer = nullptr;
-    _renderTarget = nullptr;
-  }
+  void reset();
 
-  void bindPipelineAndScissorClip(const ProgramInfo& info, const Rect& drawBounds);
+  void bindPipelineAndScissorClip(const ProgramInfo& info, const Rect& drawBounds) override;
 
   void bindVerticesAndIndices(std::vector<float> vertices,
-                              std::shared_ptr<GLBuffer> indices = nullptr);
+                              std::shared_ptr<Resource> indices = nullptr) override;
 
-  void draw(unsigned primitiveType, int baseVertex, int vertexCount);
+  void draw(unsigned primitiveType, int baseVertex, int vertexCount) override;
 
-  void drawIndexed(unsigned primitiveType, int baseIndex, int indexCount);
+  void drawIndexed(unsigned primitiveType, int baseIndex, int indexCount) override;
 
-  void clear(const Rect& scissor, Color color);
-
- protected:
-  void computeRecycleKey(BytesKey*) const override;
+  void clear(const Rect& scissor, Color color) override;
 
  private:
-  bool init(Context* context);
+  class Vertex : public Resource {
+   public:
+    bool init(Context* context);
 
-  void onReleaseGPU() override;
+    unsigned array = 0;
+    unsigned buffer = 0;
+
+   protected:
+    void computeRecycleKey(BytesKey*) const override;
+
+   private:
+    void onReleaseGPU() override;
+  };
+
+  explicit GLOpsRenderPass(Context* context, std::shared_ptr<Vertex> vertex)
+      : OpsRenderPass(context), vertex(std::move(vertex)) {
+  }
 
   void draw(std::function<void()> func);
 
-  unsigned vertexArray = 0;
-  unsigned vertexBuffer = 0;
   GLProgram* program = nullptr;
   std::vector<float> _vertices;
   std::shared_ptr<GLBuffer> _indexBuffer;
-  RenderTarget* _renderTarget = nullptr;
+  std::shared_ptr<Vertex> vertex;
 };
 }  // namespace tgfx

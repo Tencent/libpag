@@ -18,23 +18,23 @@
 
 #pragma once
 
-#include "GLDrawer.h"
+#include "GLOpsRenderPass.h"
 
 namespace tgfx {
-class ClearOp : public GLOp {
+class ClearOp : public Op {
  public:
   static std::unique_ptr<ClearOp> Make(Color color, const Rect& scissor);
 
-  void draw(const tgfx::DrawArgs& args) override;
+  void execute(OpsRenderPass* opsRenderPass) override;
 
  private:
   DEFINE_OP_CLASS_ID
 
   explicit ClearOp(Color color, const Rect& scissor)
-      : GLOp(ClassID()), color(color), scissor(scissor) {
+      : Op(ClassID()), color(color), scissor(scissor) {
   }
 
-  bool onCombineIfPossible(GLOp* op) override;
+  bool onCombineIfPossible(Op* op) override;
 
   Color color = Color::Transparent();
   Rect scissor = Rect::MakeEmpty();

@@ -18,29 +18,51 @@
 
 #pragma once
 
-#include "FragmentProcessor.h"
-#include "OpsTask.h"
-#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Rect.h"
-#include "tgfx/gpu/Surface.h"
+#include "tgfx/gpu/Context.h"
+#include "tgfx/gpu/RenderTarget.h"
 
 namespace tgfx {
-class SurfaceDrawContext {
- public:
-  explicit SurfaceDrawContext(Surface* surface) : surface(surface) {
+class OpsRenderPass;
+
+#define DEFINE_OP_CLASS_ID                   \
+  static uint8_t ClassID() {                 \
+    static uint8_t ClassID = GenOpClassID(); \
+    return ClassID;                          \
   }
 
-  void fillRectWithFP(const Rect& dstRect, const Matrix& localMatrix,
-                      std::unique_ptr<FragmentProcessor> fp);
+class Op {
+ public:
+  explicit Op(uint8_t classID) : _classID(classID) {
+  }
 
-  void addOp(std::unique_ptr<Op> op);
+  virtual ~Op() = default;
+
+  virtual void execute(OpsRenderPass* opsRenderPass) = 0;
+
+  bool combineIfPossible(Op* op);
+
+  const Rect& bounds() const {
+    return _bounds;
+  }
 
  protected:
-  OpsTask* getOpsTask();
+  static uint8_t GenOpClassID();
 
-  void replaceOpsTask();
+  void setBounds(Rect bounds) {
+    _bounds = bounds;
+  }
 
-  Surface* surface = nullptr;
-  std::shared_ptr<OpsTask> opsTask;
+  void setTransformedBounds(const Rect& srcBounds, const Matrix& matrix) {
+    _bounds = matrix.mapRect(srcBounds);
+  }
+
+  virtual bool onCombineIfPossible(Op*) {
+    return false;
+  }
+
+ private:
+  uint8_t _classID = 0;
+  Rect _bounds = Rect::MakeEmpty();
 };
 }  // namespace tgfx

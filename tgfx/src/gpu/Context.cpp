@@ -18,6 +18,8 @@
 
 #include "tgfx/gpu/Context.h"
 #include "core/utils/Log.h"
+#include "gpu/DrawingManager.h"
+#include "gpu/Gpu.h"
 #include "gpu/GradientCache.h"
 #include "gpu/ProgramCache.h"
 #include "tgfx/core/Clock.h"
@@ -28,6 +30,7 @@ Context::Context(Device* device) : _device(device) {
   _gradientCache = new GradientCache(this);
   _programCache = new ProgramCache(this);
   _resourceCache = new ResourceCache(this);
+  _drawingManager = new DrawingManager(this);
 }
 
 Context::~Context() {
@@ -39,6 +42,19 @@ Context::~Context() {
   delete _gradientCache;
   delete _programCache;
   delete _resourceCache;
+  delete _drawingManager;
+  delete _gpu;
+}
+
+bool Context::flush(Semaphore* signalSemaphore) {
+  return _drawingManager->flush({}, signalSemaphore);
+}
+
+bool Context::wait(const Semaphore* waitSemaphore) {
+  if (waitSemaphore == nullptr) {
+    return false;
+  }
+  return caps()->semaphoreSupport && _gpu->waitSemaphore(waitSemaphore);
 }
 
 void Context::onLocked() {

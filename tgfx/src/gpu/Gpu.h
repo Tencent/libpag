@@ -18,29 +18,40 @@
 
 #pragma once
 
-#include "FragmentProcessor.h"
-#include "OpsTask.h"
-#include "tgfx/core/Matrix.h"
-#include "tgfx/core/Rect.h"
-#include "tgfx/gpu/Surface.h"
+#include <memory>
+#include "tgfx/gpu/Context.h"
+#include "tgfx/gpu/Semaphore.h"
 
 namespace tgfx {
-class SurfaceDrawContext {
+class OpsRenderPass;
+
+class RenderTarget;
+
+class Texture;
+
+class Gpu {
  public:
-  explicit SurfaceDrawContext(Surface* surface) : surface(surface) {
+  virtual ~Gpu() = default;
+
+  Context* context() {
+    return _context;
   }
 
-  void fillRectWithFP(const Rect& dstRect, const Matrix& localMatrix,
-                      std::unique_ptr<FragmentProcessor> fp);
+  virtual void resolveRenderTarget(RenderTarget* renderTarget) = 0;
 
-  void addOp(std::unique_ptr<Op> op);
+  virtual bool insertSemaphore(Semaphore* semaphore) = 0;
+
+  virtual bool waitSemaphore(const Semaphore* semaphore) = 0;
+
+  virtual OpsRenderPass* getOpsRenderPass(std::shared_ptr<RenderTarget> renderTarget,
+                                          std::shared_ptr<Texture> renderTargetTexture) = 0;
+
+  virtual void submit(OpsRenderPass* opsRenderPass) = 0;
 
  protected:
-  OpsTask* getOpsTask();
+  explicit Gpu(Context* context) : _context(context) {
+  }
 
-  void replaceOpsTask();
-
-  Surface* surface = nullptr;
-  std::shared_ptr<OpsTask> opsTask;
+  Context* _context;
 };
 }  // namespace tgfx
