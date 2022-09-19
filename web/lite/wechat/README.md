@@ -15,13 +15,13 @@ libpag-lite-miniprogram 是 libpag 在微信小程序平台的简化版 SDK
 
 ### 导出单一 BMP 序列帧的 PAG 文件
 
-> 可参考 https://pag.io/docs/pag-export.html
+> 可参考 https://pag.art/docs/pag-export.html
 
 点击菜单“文件” -> “导出” -> “PAG File(Panel)...”，选择需要导出的合成，点击设置按钮，在根节点勾选BMP，导出全BMP预合成的PAG文件。
 
 ### 查看 PAG 文件是否为单一 BMP 序列帧
 
-可以下载 [PAGViewer](https://pag.io/docs/install.html) 打开 PAG 文件，点击"视图"->"显示 编辑面板"，在编辑面板中我们能看到 Video 的数量，当 Video数量为 1 时，即为单一 BMP 序列帧。
+可以下载 [PAGViewer](https://pag.art/docs/install.html) 打开 PAG 文件，点击"视图"->"显示 编辑面板"，在编辑面板中我们能看到 Video 的数量，当 Video数量为 1 时，即为单一 BMP 序列帧。
 
 ## 快速开始
 
