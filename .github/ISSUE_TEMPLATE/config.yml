@@ -2,10 +2,6 @@
 blank_issues_enabled: false
 contact_links:
   -
-    about: "提使用问题或功能需求请通过 Github Discussions 或加入 QQ 群 893379574 讨论。"
-    name: 使用问题 / 功能需求
-    url: "https://github.com/Tencent/libpag/discussions/new"
-  -
-    about: "Please ask usage questions or submit feature requests on Github Discussions."
-    name: Question / Feature request
-    url: "https://github.com/Tencent/libpag/discussions/new"
+    about: "请通过 PAG 官方论坛进行 Bug 反馈或使用咨询（中文用户专用）"
+    name: 问题反馈
+    url: "https://bbs.pag.art"

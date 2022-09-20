@@ -1,5 +1,5 @@
 ---
-name: Bug report
+name: Issue report
 about: Create a report to help us improve (For English Speakers.)
 title: ''
 labels: ''
@@ -9,10 +9,8 @@ assignees: 'domchen'
 
 <!--
 ## libpag bug
-Hello! Sorry you're having a bug! Please help us make libpag better by filling everything below out 
-with as much information as you can, so we can try to reproduce and fix the bug! 
-Please ask and answer usage questions or submit feature requests on Github Discussions: 
-https://github.com/Tencent/libpag/discussions. We use Github Issues to track bugs only.
+Hello! Sorry you're having an Issue! Please help us make libpag better by filling everything below out 
+with as much information as you can, so we can try to reproduce and fix the issue! 
 -->
 
 
