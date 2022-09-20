@@ -32,7 +32,7 @@ Pod::Spec.new do |s|
   s.ios.deployment_target   = '9.0'
   s.osx.deployment_target   = '10.13'
   s.summary  = 'The pag library on iOS and macOS'
-  s.homepage = 'https://pag.io'
+  s.homepage = 'https://pag.art'
   s.author   = { 'dom' => 'dom@idom.me' }
   s.requires_arc = false
   s.source   = {

@@ -58,7 +58,7 @@ void DestoryFlushQueue() {
   dispatch_once(&onceToken, ^{
     pag::flushQueue = [[[NSOperationQueue alloc] init] retain];
     pag::flushQueue.maxConcurrentOperationCount = 1;
-    pag::flushQueue.name = @"pag.io.PAGView";
+    pag::flushQueue.name = @"pag.art.PAGView";
   });
   return pag::flushQueue;
 }

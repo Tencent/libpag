@@ -1,6 +1,6 @@
-<img src="https://pag.io/img/readme/logo.png" alt="PAG Logo" width="474"/>
+<img src="https://pag.art/img/readme/logo.png" alt="PAG Logo" width="474"/>
 
-[English](./README.md) | 简体中文 | [Homepage](https://pag.io) | [lite版本](https://github.com/Tencent/libpag/tree/main/web/lite)
+[English](./README.md) | 简体中文 | [Homepage](https://pag.art) | [lite版本](https://github.com/Tencent/libpag/tree/main/web/lite)
 
 ## 介绍
 
@@ -38,7 +38,7 @@ PAG Web 端，由 libpag.js + libpag.wasm 文件组成。
     // 实例化 PAG
     const PAG = await window.libpag.PAGInit();
     // 获取 PAG 素材数据
-    const buffer = await fetch('https://pag.io/file/like.pag').then((response) => response.arrayBuffer());
+    const buffer = await fetch('https://pag.art/file/like.pag').then((response) => response.arrayBuffer());
     // 加载 PAG 素材为 PAGFile 对象
     const pagFile = await PAG.PAGFile.load(buffer);
     // 将画布尺寸设置为 PAGFile的尺寸
@@ -56,7 +56,7 @@ PAG Web 端，由 libpag.js + libpag.wasm 文件组成。
 调用 libpag.js 上的 `PAGInit()` 方法时，默认会加载 libpag.js 同一目录下的 libpag.wasm 文件。如果你希望把 libpag.wasm 放在其他目录下，则可以使用 `locateFile` 将 libpag.wasm 的路径返回给 `PAGInit()` 方法。如下
 
 ```js
-const PAG = await window.libpag.PAGInit({ locateFile: (file) => 'https://pag.io/file/' + file });
+const PAG = await window.libpag.PAGInit({ locateFile: (file) => 'https://pag.art/file/' + file });
 ```
 
 ### EsModule
@@ -79,7 +79,7 @@ npm package 中提供了多种构建产物，可以阅读 [这里](./doc/develop
 
 Demo 项目提 [pag-web](https://github.com/libpag/pag-web) 供了简单的接入示例和 Vue / React / PixiJS 等配置示例， 可以点击 [这里](https://github.com/libpag/pag-web) 查看。
 
-更多的 API 接口可以阅读 [API 文档](https://pag.io/api.html#/apis/web/)。
+更多的 API 接口可以阅读 [API 文档](https://pag.art/api.html#/apis/web/)。
 
 ## 浏览器兼容性
 
@@ -146,7 +146,7 @@ PAG 默认会对 Canvas 在屏幕中的可视尺寸进行缩放计算后进行�
 
 ## 关于 BMP 预合成
 
-可以下载 [PAGViewer](https://pag.io/docs/install.html) 打开 PAG 文件，点击"视图"->"显示 编辑面板"，在编辑面板中我们能看到 Video 的数量，当 Video数量大于 0 时，即为 PAG 动画文件中存在 BMP 预合成。
+可以下载 [PAGViewer](https://pag.art/docs/install.html) 打开 PAG 文件，点击"视图"->"显示 编辑面板"，在编辑面板中我们能看到 Video 的数量，当 Video数量大于 0 时，即为 PAG 动画文件中存在 BMP 预合成。
 
 ## Roadmap
 
