@@ -47,7 +47,7 @@ Context::~Context() {
 }
 
 bool Context::flush(Semaphore* signalSemaphore) {
-  return _drawingManager->flush({}, signalSemaphore);
+  return _drawingManager->flush(signalSemaphore);
 }
 
 bool Context::wait(const Semaphore* waitSemaphore) {

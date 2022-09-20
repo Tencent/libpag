@@ -31,7 +31,7 @@ class DrawingManager {
 
   std::shared_ptr<OpsTask> newOpsTask(Surface* surface);
 
-  bool flush(Surface* surface, Semaphore* signalSemaphore);
+  bool flush(Semaphore* signalSemaphore);
 
   void newTextureResolveRenderTask(Surface* surface);
 

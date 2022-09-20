@@ -46,16 +46,7 @@ std::shared_ptr<OpsTask> DrawingManager::newOpsTask(Surface* surface) {
   return opsTask;
 }
 
-bool DrawingManager::flush(Surface* surface, Semaphore* signalSemaphore) {
-  if (surface != nullptr && signalSemaphore == nullptr) {
-    bool used =
-        std::any_of(tasks.begin(), tasks.end(), [&](const std::shared_ptr<RenderTask>& task) {
-          return task && task->isUsed(surface->renderTarget.get());
-        });
-    if (!used) {
-      return false;
-    }
-  }
+bool DrawingManager::flush(Semaphore* signalSemaphore) {
   auto* gpu = context->gpu();
   closeAllTasks();
   activeOpsTask = nullptr;
