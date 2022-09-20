@@ -226,8 +226,7 @@ depsync
 注：**如果在 CMake 编译过程中遇到报错，可以尝试更新 CMake 命令行工具到最新的版本然后重新编译。**
 另外，由于团队日常主要都在 macOS 平台上进行开发，Windows
 平台偶尔可能会出现编译不通过的情况，如果遇到阻塞的问题欢迎通过提交 [issue](https://github.com/Tencent/libpag/issues/new/choose)
-或 [QQ](https://qm.qq.com/cgi-bin/qm/qr?k=Wa65DTnEKo2hnPsvY-1EgJOF8tvKQ-ZT&jump_from=webapi)
-群即时跟我们反馈。
+或 [官方论坛](https://bbs.pag.art/)跟我们反馈。
 
 ## 支持我们
 
