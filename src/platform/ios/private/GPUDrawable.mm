@@ -21,7 +21,7 @@
 namespace pag {
 
 NSString* const kGPURenderTargetBufferPreparedNotification =
-    @"PAG.io.GPURenderTargetBufferPrepared";
+    @"pag.art.GPURenderTargetBufferPrepared";
 NSString* const kPreparedAsync = @"async";
 
 std::shared_ptr<GPUDrawable> GPUDrawable::FromLayer(CAEAGLLayer* layer) {
