@@ -282,8 +282,23 @@ static void Draw(tgfx::Canvas* canvas, const TextAtlas* atlas, const Parameters&
                     parameters.matrices.size());
 }
 
+static bool RectStaysRectAndNoScale(const tgfx::Matrix& matrix) {
+  float m00 = matrix.getScaleX();
+  float m01 = matrix.getSkewX();
+  float m10 = matrix.getSkewY();
+  float m11 = matrix.getScaleY();
+  if (m01 != 0 || m10 != 0) {
+    return m00 == 0 && m11 == 0 && std::abs(m10) == 1.f && std::abs(m01) == 1.f;
+  } else {
+    return std::abs(m00) == 1.f && std::abs(m11) == 1.f;
+  }
+}
+
 void Text::draw(tgfx::Canvas* canvas, const TextAtlas* textAtlas) const {
   Parameters parameters = {};
+  auto viewMatrix = canvas->getMatrix();
+  canvas->setMatrix(tgfx::Matrix::I());
+  float atlasScaleInverted = 1.f / textAtlas->totalScale();
   for (auto& glyph : glyphs) {
     if (!glyph->isVisible()) {
       continue;
@@ -301,23 +316,18 @@ void Text::draw(tgfx::Canvas* canvas, const TextAtlas* textAtlas) const {
         parameters = {};
         parameters.textureIndex = locator.textureIndex;
       }
-      float strokeWidth = 0;
-      Color color = glyph->getFillColor();
-      if (style == TextStyle::Stroke) {
-        strokeWidth = glyph->getStrokeWidth();
-        color = glyph->getStrokeColor();
-      }
-      auto glyphBounds = glyph->getOriginBounds();
       auto matrix = tgfx::Matrix::I();
-      matrix.postScale((glyphBounds.width() + strokeWidth * 2) / locator.location.width(),
-                       (glyphBounds.height() + strokeWidth * 2) / locator.location.height());
-      matrix.postTranslate(glyphBounds.x() - strokeWidth, glyphBounds.y() - strokeWidth);
+      matrix.postTranslate(locator.glyphBounds.x(), locator.glyphBounds.y());
+      matrix.postScale(atlasScaleInverted, atlasScaleInverted);
       matrix.postConcat(glyph->getTotalMatrix());
-      matrix.preTranslate(-0.5f, -0.5f);
-      parameters.matrices.push_back(matrix);
-      auto rect = locator.location;
-      rect.outset(0.5f, 0.5f);
-      parameters.rects.push_back(rect);
+      matrix.postConcat(viewMatrix);
+      if (RectStaysRectAndNoScale(matrix)) {
+        auto rect = tgfx::Rect::MakeWH(locator.location.width(), locator.location.height());
+        matrix.mapRect(&rect);
+        matrix.postTranslate(std::round(rect.left) - rect.left, std::round(rect.top) - rect.top);
+      }
+      parameters.matrices.emplace_back(matrix);
+      parameters.rects.emplace_back(locator.location);
       if (glyph->getFont().getTypeface()->hasColor()) {
         auto alpha = canvas->getAlpha();
         canvas->setAlpha(alpha * glyph->getAlpha());
@@ -325,13 +335,15 @@ void Text::draw(tgfx::Canvas* canvas, const TextAtlas* textAtlas) const {
         parameters = {};
         canvas->setAlpha(alpha);
       } else {
-        auto color4f = ToTGFX(color);
-        color4f.alpha *= glyph->getAlpha();
-        parameters.colors.push_back(color4f);
+        auto color =
+            ToTGFX(style == TextStyle::Stroke ? glyph->getStrokeColor() : glyph->getFillColor());
+        color.alpha *= glyph->getAlpha();
+        parameters.colors.emplace_back(color);
       }
     }
   }
   Draw(canvas, textAtlas, parameters);
+  canvas->setMatrix(viewMatrix);
 }
 
 void Text::drawTextRuns(tgfx::Canvas* canvas, int paintIndex) const {

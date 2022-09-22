@@ -856,7 +856,7 @@
 				CODE_SIGN_STYLE = Manual;
 				COMPRESS_PNG_FILES = YES;
 				DEVELOPMENT_TEAM = 36588GHG2N;
-				ENABLE_BITCODE = YES;
+				ENABLE_BITCODE = NO;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)/PAGViewer/Full/PagDecoder",
@@ -1017,7 +1017,7 @@
 				CODE_SIGN_STYLE = Manual;
 				COMPRESS_PNG_FILES = YES;
 				DEVELOPMENT_TEAM = 36588GHG2N;
-				ENABLE_BITCODE = YES;
+				ENABLE_BITCODE = NO;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)/PAGViewer/Full/PagDecoder",
@@ -1058,7 +1058,7 @@
 				CODE_SIGN_STYLE = Manual;
 				COMPRESS_PNG_FILES = YES;
 				DEVELOPMENT_TEAM = 36588GHG2N;
-				ENABLE_BITCODE = YES;
+				ENABLE_BITCODE = NO;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(PROJECT_DIR)/PAGViewer/Full/PagDecoder",

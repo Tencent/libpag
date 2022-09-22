@@ -39,13 +39,9 @@ class TextBlock {
     return _textBounds;
   }
 
-  const std::vector<GlyphHandle>& maskAtlasGlyphs() const {
-    return _maskAtlasGlyphs;
-  }
+  std::vector<GlyphHandle> maskAtlasGlyphs(float scale) const;
 
-  const std::vector<GlyphHandle>& colorAtlasGlyphs() const {
-    return _colorAtlasGlyphs;
-  }
+  std::vector<GlyphHandle> colorAtlasGlyphs(float scale) const;
 
   float maxScale() const {
     return _maxScale;

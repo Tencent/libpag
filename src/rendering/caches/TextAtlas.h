@@ -29,6 +29,7 @@ class Atlas;
 struct AtlasLocator {
   size_t textureIndex = 0;
   tgfx::Rect location = tgfx::Rect::MakeEmpty();
+  tgfx::Rect glyphBounds = tgfx::Rect::MakeEmpty();
 };
 
 class TextAtlas {
@@ -50,16 +51,22 @@ class TextAtlas {
     return scale;
   }
 
+  float totalScale() const {
+    return _totalScale;
+  }
+
   size_t memoryUsage() const;
 
  private:
-  TextAtlas(ID textGlyphsID, Atlas* maskAtlas, Atlas* colorAtlas, float scale)
-      : _textGlyphsID(textGlyphsID), maskAtlas(maskAtlas), colorAtlas(colorAtlas), scale(scale) {
+  TextAtlas(ID textGlyphsID, Atlas* maskAtlas, Atlas* colorAtlas, float scale, float totalScale)
+      : _textGlyphsID(textGlyphsID), maskAtlas(maskAtlas), colorAtlas(colorAtlas), scale(scale),
+        _totalScale(totalScale) {
   }
 
   ID _textGlyphsID = 0;
   Atlas* maskAtlas = nullptr;
   Atlas* colorAtlas = nullptr;
   float scale = 1.0f;
+  float _totalScale = 1.f;
 };
 }  // namespace pag

@@ -237,6 +237,8 @@ class Glyph {
 
   std::shared_ptr<Glyph> makeHorizontalGlyph() const;
 
+  std::shared_ptr<Glyph> makeScaledGlyph(float scale) const;
+
  private:
   struct Info {
     float advance = 0;
