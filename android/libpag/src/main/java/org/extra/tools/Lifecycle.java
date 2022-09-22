@@ -33,9 +33,12 @@ public class Lifecycle implements Handler.Callback {
     public void addListener(final PAGView pagView) {
         if (pagView.getContext() instanceof Activity) {
             Activity activity = (Activity) pagView.getContext();
+            if (activity.isDestroyed()) {
+                return;
+            }
             FragmentManager fm = activity.getFragmentManager();
             LifecycleFragment current = pendingRequestManagerFragments.get(fm);
-            if (current == null && !activity.isDestroyed()) {
+            if (current == null) {
                 current = (LifecycleFragment) fm.findFragmentByTag(FRAGMENT_TAG);
                 if (current == null) {
                     current = new LifecycleFragment();

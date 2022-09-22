@@ -72,7 +72,7 @@ std::unique_ptr<FTFace> FTFace::Make(const FTFontData& data) {
   }
   auto face = std::make_unique<FTFace>();
   auto err = FT_Open_Face(gFTLibrary->library(), &args, data.ttcIndex, &face->face);
-  if (err) {
+  if (err || !face->face->family_name) {
     return nullptr;
   }
   if (!face->face->charmap) {
