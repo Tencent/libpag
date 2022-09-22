@@ -38,11 +38,11 @@ class FTTypeface : public Typeface {
   }
 
   std::string fontFamily() const override {
-    return _face->face->family_name;
+    return _face->face->family_name ? _face->face->family_name : "";
   }
 
   std::string fontStyle() const override {
-    return _face->face->style_name;
+    return _face->face->style_name ? _face->face->style_name : "";
   }
 
   static int GetUnitsPerEm(FT_Face face);
