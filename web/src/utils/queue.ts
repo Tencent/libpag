@@ -7,14 +7,18 @@ export class WebAssemblyQueue {
   private queue: Task[] = [];
 
   public exec(fn: (...args: any[]) => any, scope: any, ...args: any[]) {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const copyFn = async () => {
         if (!fn) {
           resolve(null);
           return;
         }
-        const res = await fn.call(scope, ...args);
-        resolve(res);
+        try {
+          const res = await fn.call(scope, ...args);
+          resolve(res);
+        } catch (e) {
+          reject(e);
+        }
       };
       this.queue.push({
         fn: copyFn,
@@ -31,13 +35,8 @@ export class WebAssemblyQueue {
     }
     this.executing = true;
     const task = this.queue.shift() as Task;
-    task
-      .fn()
-      .then(() => {
-        this.execNextTask();
-      })
-      .catch(() => {
-        this.execNextTask();
-      });
+    task.fn().then(() => {
+      this.execNextTask();
+    });
   }
 }
