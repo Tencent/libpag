@@ -166,6 +166,7 @@ GlyphMetrics CGScalerContext::generateGlyphMetrics(GlyphID glyphID) {
     rect.outset(rec.fauxBoldSize, rec.fauxBoldSize);
   }
   rect.roundOut();
+  rect.outset(1.f, 1.f);
   glyph.left = rect.left;
   glyph.top = rect.top;
   glyph.width = rect.width();
