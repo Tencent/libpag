@@ -43,6 +43,7 @@ export class PAGFile extends PAGComposition {
     if (!wasmIns) throw new Error('Load PAGFile fail!');
     const pagFile = new PAGFile(wasmIns);
     PAGModule._free(dataPtr);
+    pagFile._duration = pagFile.wasmIns._duration() as number;
     return pagFile;
   }
   /**
@@ -51,6 +52,8 @@ export class PAGFile extends PAGComposition {
   public static maxSupportedTagLevel(): number {
     return PAGModule._PAGFile._MaxSupportedTagLevel() as number;
   }
+
+  private _duration = 0;
 
   /**
    * The tag level this pag file requires.
@@ -128,10 +131,17 @@ export class PAGFile extends PAGComposition {
     this.wasmIns._setTimeStretchMode(value);
   }
   /**
+   * The duration of the layer in microseconds, indicates the length of the visible range.
+   */
+  public duration(): number {
+    return this._duration;
+  }
+  /**
    * Set the duration of this PAGFile. Passing a value less than or equal to 0 resets the duration
    * to its default value.
    */
   public setDuration(duration: number): void {
+    this._duration = duration;
     this.wasmIns._setDuration(duration);
   }
   /**

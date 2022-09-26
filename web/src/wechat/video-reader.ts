@@ -6,6 +6,29 @@ import type { EmscriptenGL } from '../types';
 import type { FrameDataOptions, VideoDecoder, wx } from './interfaces';
 
 declare const wx: wx;
+declare const setInterval: (callback: () => void, delay: number) => number;
+
+const BUFFER_MAX_SIZE = 6;
+const BUFFER_MIN_SIZE = 2;
+const GET_FRAME_DATA_INTERVAL = 2; // ms
+
+export interface FrameData {
+  id: number;
+  data: ArrayBuffer;
+  width: number;
+  height: number;
+}
+
+const frameDataOptions2FrameData = (id: number, options: FrameDataOptions): FrameData => {
+  const data = new ArrayBuffer(options.data.byteLength);
+  new Uint8Array(data).set(new Uint8Array(options.data));
+  return {
+    id: id,
+    data: data,
+    width: options.width,
+    height: options.height,
+  };
+};
 
 export interface TimeRange {
   start: number;
@@ -24,7 +47,13 @@ export class VideoReader {
   private mp4Path: string;
   private videoDecoder: VideoDecoder;
   private videoDecoderPromise: Promise<void> | undefined;
-  private frameDataOptions: FrameDataOptions | null = null;
+  private frameData: FrameData | null = null;
+  private frameDataBuffers: FrameData[] = [];
+  private bufferIndex = 0; // next frameData id
+  private getFrameDataLooping = false;
+  private getFrameDataResolve: ((frameData: FrameData) => void) | null = null;
+  private getFrameDataLoopTimer: number | null = null;
+  private seeking = false;
 
   public constructor(mp4Data: Uint8Array, frameRate: number, staticTimeRanges: TimeRange[]) {
     this.frameRate = frameRate;
@@ -35,24 +64,39 @@ export class VideoReader {
     this.videoDecoder = wx.createVideoDecoder();
     this.videoDecoder.on('ended', () => {
       this.videoDecoder?.seek(0).then(() => {
-        this.currentFrame = -1;
+        this.bufferIndex = 0;
       });
     });
-    this.videoDecoderPromise = this.videoDecoder.start({ source: this.mp4Path, mode: 1 });
+    this.videoDecoderPromise = this.videoDecoder.start({ source: this.mp4Path, mode: 1 }).then(() => {
+      this.startGetFrameDataLoop();
+    });
   }
 
   public async prepare(targetFrame: number) {
     if (targetFrame === this.currentFrame) {
       return true;
-    } else {
-      await this.videoDecoderPromise;
-      if (targetFrame !== this.currentFrame + 1) {
-        await this.videoDecoder.seek(Math.floor((targetFrame / this.frameRate) * 1000));
-      }
-      this.frameDataOptions = await this.getFrameData();
-      this.currentFrame = targetFrame;
-      return true;
     }
+    // Wait for videoDecoder ready
+    await this.videoDecoderPromise;
+    if (this.frameDataBuffers.length > 0) {
+      const index = this.frameDataBuffers.findIndex((frameData) => frameData.id === targetFrame);
+      if (index !== -1) {
+        this.frameDataBuffers = this.frameDataBuffers.slice(index);
+        this.frameData = await this.getFrameData();
+        this.currentFrame = targetFrame;
+        return true;
+      }
+      this.frameDataBuffers = [];
+    }
+
+    if (targetFrame !== this.bufferIndex) {
+      this.seeking = true;
+      await this.videoDecoder.seek(Math.floor((targetFrame / this.frameRate) * 1000));
+      this.seeking = false;
+    }
+    this.frameData = await this.getFrameData();
+    this.currentFrame = targetFrame;
+    return true;
   }
 
   public renderToTexture(GL: EmscriptenGL, textureID: number) {
@@ -62,12 +106,12 @@ export class VideoReader {
       gl.TEXTURE_2D,
       0,
       gl.RGBA,
-      this.frameDataOptions!.width,
-      this.frameDataOptions!.height,
+      this.frameData!.width,
+      this.frameData!.height,
       0,
       gl.RGBA,
       gl.UNSIGNED_BYTE,
-      new Uint8Array(this.frameDataOptions!.data),
+      new Uint8Array(this.frameData!.data),
     );
   }
 
@@ -76,18 +120,58 @@ export class VideoReader {
   }
 
   private getFrameData() {
-    return new Promise<FrameDataOptions>((resolve) => {
-      const loop = () => {
-        const frameData = this.videoDecoder.getFrameData();
-        if (frameData !== null) {
-          resolve(frameData);
-          return;
-        }
-        setTimeout(() => {
-          loop();
-        }, 1);
-      };
-      loop();
+    return new Promise<FrameData>((resolve) => {
+      if (this.frameDataBuffers.length <= BUFFER_MIN_SIZE && !this.getFrameDataLooping) {
+        this.startGetFrameDataLoop();
+      }
+      if (this.frameDataBuffers.length === 0) {
+        this.getFrameDataResolve = resolve;
+        return;
+      }
+      const res = this.frameDataBuffers.shift();
+      if (!res) {
+        this.getFrameDataResolve = resolve;
+        return;
+      }
+      resolve(res);
     });
+  }
+
+  private startGetFrameDataLoop() {
+    this.getFrameDataLooping = true;
+    this.getFrameDataLoopTimer = setInterval(() => {
+      this.getFrameDataLoop();
+    }, GET_FRAME_DATA_INTERVAL);
+  }
+
+  private getFrameDataLoop() {
+    if (this.seeking) return;
+    if (!this.videoDecoder) {
+      this.clearFrameDataLoop();
+      throw new Error('VideoDecoder is not ready!');
+    }
+    if (this.frameDataBuffers.length >= BUFFER_MAX_SIZE) {
+      this.getFrameDataLooping = false;
+      this.clearFrameDataLoop();
+      return;
+    }
+    const frameDataOptions = this.videoDecoder.getFrameData();
+    if (frameDataOptions !== null) {
+      if (this.getFrameDataResolve) {
+        this.getFrameDataResolve(frameDataOptions2FrameData(this.bufferIndex, frameDataOptions));
+        this.getFrameDataResolve = null;
+      } else {
+        this.frameDataBuffers.push(frameDataOptions2FrameData(this.bufferIndex, frameDataOptions));
+      }
+      this.bufferIndex += 1;
+    }
+  }
+
+  private clearFrameDataLoop() {
+    if (this.getFrameDataLoopTimer) {
+      clearInterval(this.getFrameDataLoopTimer);
+      this.getFrameDataLoopTimer = null;
+    }
+    this.getFrameDataLooping = false;
   }
 }

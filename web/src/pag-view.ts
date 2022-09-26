@@ -53,7 +53,7 @@ export class PAGView {
     if (!canvasElement) throw new Error('Canvas is not found!');
 
     const pagPlayer = PAGModule.PAGPlayer.create();
-    const pagView = new PAGView(pagPlayer, canvasElement);
+    const pagView = new PAGView(pagPlayer, canvasElement, file);
     pagView.pagViewOptions = { ...pagView.pagViewOptions, ...initOptions };
 
     if (pagView.pagViewOptions.useCanvas2D) {
@@ -110,11 +110,12 @@ export class PAGView {
   protected currentFrame = -1;
   protected canvasElement: HTMLCanvasElement | OffscreenCanvas | null;
   protected timer: number | null = null;
+  protected flushingNextFrame = false;
+  protected playTime = 0;
+  protected startTime = 0;
+  protected repeatedTimes = 0;
+  protected eventManager: EventManager = new EventManager();
 
-  private startTime = 0;
-  private playTime = 0;
-  private repeatedTimes = 0;
-  private eventManager: EventManager = new EventManager();
   private canvasContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null | undefined;
   private rawWidth = 0;
   private rawHeight = 0;
@@ -123,17 +124,19 @@ export class PAGView {
     flushTime: 0,
   };
   private fpsBuffer: number[] = [];
+  private file: PAGComposition;
 
-  public constructor(pagPlayer: PAGPlayer, canvasElement: HTMLCanvasElement | OffscreenCanvas) {
+  public constructor(pagPlayer: PAGPlayer, canvasElement: HTMLCanvasElement | OffscreenCanvas, file: PAGComposition) {
     this.player = pagPlayer;
     this.canvasElement = canvasElement;
+    this.file = file;
   }
 
   /**
    * The duration of current composition in microseconds.
    */
   public duration() {
-    return this.player.duration();
+    return this.file.duration();
   }
   /**
    * Adds a listener to the set of listeners that are sent events through the life of an animation,
@@ -410,6 +413,7 @@ export class PAGView {
   }
 
   protected async flushNextFrame() {
+    this.flushingNextFrame = true;
     const duration = this.duration();
     this.playTime = this.getNowTime() * 1000 - this.startTime;
     const currentFrame = Math.floor((this.playTime / 1000000) * this.frameRate);
@@ -422,19 +426,22 @@ export class PAGView {
       this.isPlaying = false;
       this.eventManager.emit(PAGViewListenerEvent.onAnimationEnd, this);
       this.repeatedTimes = 0;
-      return;
+      this.flushingNextFrame = false;
+      return true;
     }
     if (this.repeatedTimes === count && this.currentFrame === currentFrame) {
-      this.eventManager.emit(PAGViewListenerEvent.onAnimationUpdate, this);
-      return;
+      this.flushingNextFrame = false;
+      return false;
     }
     if (this.repeatedTimes < count) {
       this.eventManager.emit(PAGViewListenerEvent.onAnimationRepeat, this);
     }
     this.player.setProgress((this.playTime % duration) / duration);
-    await this.flush();
+    const res = await this.flush();
     this.currentFrame = currentFrame;
     this.repeatedTimes = count;
+    this.flushingNextFrame = false;
+    return res;
   }
 
   protected getNowTime() {
