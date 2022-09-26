@@ -20,6 +20,7 @@
 
 #include "Task.h"
 #include <algorithm>
+#include "tgfx/src/core/utils/Log.h"
 
 #ifdef __APPLE__
 
@@ -116,9 +117,15 @@ void TaskGroup::RunLoop(TaskGroup* taskGroup) {
 TaskGroup::TaskGroup() {
   static const int CPUCores = GetCPUCores();
   auto maxThreads = CPUCores > 16 ? 16 : CPUCores;
-  activeThreads = maxThreads;
-  for (int i = 0; i < maxThreads; i++) {
-    threads.emplace_back(&TaskGroup::RunLoop, this);
+  maxThreads = std::min(maxThreads, static_cast<int>(std::thread::hardware_concurrency()));
+  for (int i = 0; i < 300; i++) {
+    // Thread construction may fail and throw an exception by the system.
+    try {
+      threads.emplace_back(&TaskGroup::RunLoop, this);
+    } catch (const std::system_error& e) {
+      LOGE("Thread construction failed, thread_count:%d, error message:%s \n", e.code(), e.what());
+    }
+    activeThreads++;
   }
 }
 
