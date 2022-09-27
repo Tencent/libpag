@@ -117,7 +117,7 @@ void TaskGroup::RunLoop(TaskGroup* taskGroup) {
 TaskGroup::TaskGroup() {
   static const int CPUCores = GetCPUCores();
   auto maxThreads = CPUCores > 16 ? 16 : CPUCores;
-  for (int i = 0; i < 300; i++) {
+  for (int i = 0; i < maxThreads; i++) {
     // Thread construction may fail and throw an exception by the system.
     try {
       threads.emplace_back(&TaskGroup::RunLoop, this);
