@@ -3,10 +3,11 @@ import { PAGView as NativePAGView } from '../pag-view';
 
 import { RenderCanvas } from '../core/render-canvas';
 import { BackendContext } from '../core/backend-context';
+import { destroyVerify, wasmAwaitRewind } from '../utils/decorators';
+import { PAGViewListenerEvent } from '../types';
 
 import type { PAGComposition } from '../pag-composition';
 import type { wx } from './interfaces';
-import { destroyVerify, wasmAwaitRewind } from '../utils/decorators';
 
 declare const wx: wx;
 declare const setInterval: (callback: () => void, ms: number) => number;
@@ -17,6 +18,11 @@ export interface PAGViewOptions {
    */
   firstFrame?: boolean;
 }
+
+export type wxCanvas = (HTMLCanvasElement | OffscreenCanvas) & {
+  requestAnimationFrame: (callback: () => void) => number;
+  cancelAnimationFrame: (requestID: number) => void;
+};
 
 @destroyVerify
 @wasmAwaitRewind
@@ -34,7 +40,7 @@ export class PAGView extends NativePAGView {
     initOptions: PAGViewOptions = {},
   ): Promise<PAGView> {
     const pagPlayer = PAGModule.PAGPlayer.create();
-    const pagView = new PAGView(pagPlayer, canvas);
+    const pagView = new PAGView(pagPlayer, canvas, file);
     pagView.pagViewOptions = { ...pagView.pagViewOptions, ...initOptions };
     pagView.resetSize();
     pagView.renderCanvas = RenderCanvas.from(canvas, { alpha: true });
@@ -55,6 +61,7 @@ export class PAGView extends NativePAGView {
   protected override pagViewOptions: PAGViewOptions = {
     firstFrame: true,
   };
+
   /**
    * Update size when changed canvas size.
    */
@@ -68,9 +75,48 @@ export class PAGView extends NativePAGView {
   }
 
   protected override async flushLoop() {
-    this.timer = setInterval(() => {
+    const loop = () => {
+      if (!this.isPlaying) return;
+      this.timer = (this.canvasElement as wxCanvas).requestAnimationFrame(loop);
+      if (this.flushingNextFrame) return;
+      const now = this.getNowTime();
+      const duration = this.duration();
+      this.playTime = now * 1000 - this.startTime;
+      const currentFrame = Math.floor((this.playTime / 1000000) * this.frameRate);
+      const count = Math.floor(this.playTime / duration);
+      if (this.repeatedTimes === count && this.currentFrame === currentFrame) {
+        return;
+      }
       this.flushNextFrame();
-    }, 1000 / this.frameRate);
+    };
+    loop();
+  }
+
+  protected override async flushNextFrame() {
+    this.flushingNextFrame = true;
+    const duration = this.duration();
+    const currentFrame = Math.floor((this.playTime / 1000000) * this.frameRate);
+    const count = Math.floor(this.playTime / duration);
+    if (this.repeatCount >= 0 && count > this.repeatCount) {
+      this.clearTimer();
+      this.player.setProgress(1);
+      await this.flush();
+      this.playTime = 0;
+      this.isPlaying = false;
+      this.eventManager.emit(PAGViewListenerEvent.onAnimationEnd, this);
+      this.repeatedTimes = 0;
+      this.flushingNextFrame = false;
+      return true;
+    }
+    if (this.repeatedTimes < count) {
+      this.eventManager.emit(PAGViewListenerEvent.onAnimationRepeat, this);
+    }
+    this.player.setProgress((this.playTime % duration) / duration);
+    const res = await this.flush();
+    this.currentFrame = currentFrame;
+    this.repeatedTimes = count;
+    this.flushingNextFrame = false;
+    return res;
   }
 
   protected override getNowTime() {
@@ -83,7 +129,7 @@ export class PAGView extends NativePAGView {
 
   protected override clearTimer() {
     if (this.timer) {
-      clearInterval(this.timer);
+      (this.canvasElement as wxCanvas).cancelAnimationFrame(this.timer);
       this.timer = null;
     }
   }
