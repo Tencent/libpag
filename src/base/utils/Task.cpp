@@ -117,7 +117,6 @@ void TaskGroup::RunLoop(TaskGroup* taskGroup) {
 TaskGroup::TaskGroup() {
   static const int CPUCores = GetCPUCores();
   auto maxThreads = CPUCores > 16 ? 16 : CPUCores;
-  maxThreads = std::min(maxThreads, static_cast<int>(std::thread::hardware_concurrency()));
   for (int i = 0; i < 300; i++) {
     // Thread construction may fail and throw an exception by the system.
     try {
