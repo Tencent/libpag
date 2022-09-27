@@ -101,6 +101,9 @@ void Task::execute() {
 
 TaskGroup* TaskGroup::GetInstance() {
   static TaskGroup taskGroup = {};
+  if (taskGroup.threads.empty()) {
+    taskGroup.initThreads();
+  }
   return &taskGroup;
 }
 
@@ -115,17 +118,7 @@ void TaskGroup::RunLoop(TaskGroup* taskGroup) {
 }
 
 TaskGroup::TaskGroup() {
-  static const int CPUCores = GetCPUCores();
-  auto maxThreads = CPUCores > 16 ? 16 : CPUCores;
-  for (int i = 0; i < maxThreads; i++) {
-    // The thread constructor may fail and throw an exception by the system.
-    try {
-      threads.emplace_back(&TaskGroup::RunLoop, this);
-    } catch (const std::system_error& e) {
-      LOGE("Thread constructor failed, thread_count:%d, error message:%s \n", e.code(), e.what());
-    }
-    activeThreads++;
-  }
+  initThreads();
 }
 
 TaskGroup::~TaskGroup() {
@@ -135,6 +128,21 @@ TaskGroup::~TaskGroup() {
       thread.join();
     }
   }
+}
+
+void TaskGroup::initThreads() {
+  static const int CPUCores = GetCPUCores();
+  auto maxThreads = CPUCores > 16 ? 16 : CPUCores;
+  for (int i = 0; i < maxThreads; i++) {
+    // The thread constructor may fail and throw an exception by the system.
+    try {
+      threads.emplace_back(&TaskGroup::RunLoop, this);
+    } catch (const std::system_error& e) {
+      LOGE("Thread constructor failed, thread_count:%d, error message:%s \n", e.code(), e.what());
+      break;
+    }
+  }
+  activeThreads = static_cast<int>(threads.size());
 }
 
 void TaskGroup::pushTask(Task* task) {
