@@ -78,6 +78,7 @@ class TaskGroup {
   static void RunLoop(TaskGroup* taskGroup);
 
   TaskGroup();
+  void initThreads();
   void pushTask(Task* task);
   Task* popTask();
   bool removeTask(Task* task);
