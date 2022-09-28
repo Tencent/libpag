@@ -5,6 +5,8 @@ import { IPHONE, IS_WECHAT } from '../utils/ua';
 import type { EmscriptenGL } from '../types';
 import type { TimeRange } from '../interfaces';
 
+const UHD_RESOLUTION = 3840;
+
 // Get video initiated token on Wechat browser.
 const getWechatNetwork = () => {
   return new Promise<void>((resolve) => {
@@ -46,8 +48,15 @@ export class VideoReader {
   private hadPlay = false;
   private staticTimeRanges: StaticTimeRanges;
   private lastPrepareTime: { frame: number; time: number }[] = [];
+  private disablePlaybackRate = false;
 
-  public constructor(mp4Data: Uint8Array, frameRate: number, staticTimeRanges: TimeRange[]) {
+  public constructor(
+    mp4Data: Uint8Array,
+    width: number,
+    height: number,
+    frameRate: number,
+    staticTimeRanges: TimeRange[],
+  ) {
     this.videoEl = document.createElement('video');
     this.videoEl.style.display = 'none';
     this.videoEl.muted = true;
@@ -58,6 +67,9 @@ export class VideoReader {
     const blob = new Blob([mp4Data], { type: 'video/mp4' });
     this.videoEl.src = URL.createObjectURL(blob);
     this.staticTimeRanges = new StaticTimeRanges(staticTimeRanges);
+    if (UHD_RESOLUTION < width || UHD_RESOLUTION < height) {
+      this.disablePlaybackRate = true;
+    }
   }
 
   public async prepare(targetFrame: number) {
@@ -179,6 +191,7 @@ export class VideoReader {
   }
 
   private alignPlaybackRate(targetFrame: number) {
+    if (!this.videoEl || this.disablePlaybackRate) return;
     const now = performance.now();
     if (this.lastPrepareTime.length === 0) {
       this.lastPrepareTime.push({ frame: targetFrame, time: now });

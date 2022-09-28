@@ -55,7 +55,13 @@ export class VideoReader {
   private getFrameDataLoopTimer: number | null = null;
   private seeking = false;
 
-  public constructor(mp4Data: Uint8Array, frameRate: number, staticTimeRanges: TimeRange[]) {
+  public constructor(
+    mp4Data: Uint8Array,
+    width: number,
+    height: number,
+    frameRate: number,
+    staticTimeRanges: TimeRange[],
+  ) {
     this.frameRate = frameRate;
     this.currentFrame = -1;
     this.mp4Path = `${MP4_CACHE_PATH}${new Date().getTime()}.mp4`;

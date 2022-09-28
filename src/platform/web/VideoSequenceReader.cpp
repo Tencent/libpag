@@ -62,7 +62,7 @@ VideoSequenceReader::VideoSequenceReader(std::shared_ptr<File> file, VideoSequen
       mp4Data = MP4BoxHelper::CovertToMP4(sequence);
     }
     videoReader = videoReaderClass.new_(val(typed_memory_view(mp4Data->length(), mp4Data->data())),
-                                        sequence->frameRate, staticTimeRanges);
+                                        width, height, sequence->frameRate, staticTimeRanges);
   }
 }
 
