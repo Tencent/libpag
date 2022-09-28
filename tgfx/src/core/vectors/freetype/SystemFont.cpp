@@ -139,6 +139,9 @@ std::wstring ToWstring(const std::string& input) {
   std::wstring result;
   int len = MultiByteToWideChar(CP_ACP, 0, input.c_str(), input.size(), nullptr, 0);
   WCHAR* buffer = new (std::nothrow) wchar_t[len + 1];
+  if (buffer == nullptr) {
+    return result;
+  }
   MultiByteToWideChar(CP_ACP, 0, input.c_str(), input.size(), buffer, len);
   buffer[len] = '\0';
   result.append(buffer);
@@ -151,6 +154,9 @@ std::string ToString(const std::wstring& wstring) {
   int len =
       WideCharToMultiByte(CP_ACP, 0, wstring.c_str(), wstring.size(), nullptr, 0, nullptr, nullptr);
   char* buffer = new (std::nothrow) char[len + 1];
+  if (buffer == nullptr) {
+    return result;
+  }
   WideCharToMultiByte(CP_ACP, 0, wstring.c_str(), wstring.size(), buffer, len, nullptr, nullptr);
   buffer[len] = '\0';
   result.append(buffer);
