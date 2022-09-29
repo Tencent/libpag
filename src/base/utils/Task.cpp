@@ -134,11 +134,10 @@ void TaskGroup::initThreads() {
   static const int CPUCores = GetCPUCores();
   auto maxThreads = CPUCores > 16 ? 16 : CPUCores;
   for (int i = 0; i < maxThreads; i++) {
-    // The thread constructor may fail and throw an exception by the system.
-    try {
-      threads.emplace_back(&TaskGroup::RunLoop, this);
-    } catch (const std::system_error& e) {
-      LOGE("Thread constructor failed, thread_count:%d, error message:%s \n", e.code(), e.what());
+    std::thread thread(&TaskGroup::RunLoop, this);
+    if (thread.joinable()) {
+      threads.emplace_back(std::move(thread));
+    } else {
       break;
     }
   }
