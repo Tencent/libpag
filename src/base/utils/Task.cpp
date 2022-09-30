@@ -20,7 +20,6 @@
 
 #include "Task.h"
 #include <algorithm>
-#include "tgfx/src/core/utils/Log.h"
 
 #ifdef __APPLE__
 
