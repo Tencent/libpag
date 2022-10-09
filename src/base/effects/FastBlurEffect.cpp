@@ -48,8 +48,9 @@ void FastBlurEffect::transformBounds(Rect* contentBounds, const Point& filterSca
     blurrinessX = 0;
     blurrinessY *= filterScale.y;
   }
-  *contentBounds = ToPAG(
-      tgfx::ImageFilter::Blur(blurrinessX, blurrinessY)->filterBounds(*ToTGFX(contentBounds)));
+  if (auto blur = tgfx::ImageFilter::Blur(blurrinessX, blurrinessY)) {
+    *contentBounds = ToPAG(blur->filterBounds(*ToTGFX(contentBounds)));
+  }
 }
 
 void FastBlurEffect::excludeVaryingRanges(std::vector<pag::TimeRange>* timeRanges) const {
