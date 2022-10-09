@@ -66,7 +66,7 @@ std::unique_ptr<ByteData> ByteData::MakeAdopted(uint8_t* data, size_t length,
 std::unique_ptr<ByteData> ByteData::Make(size_t length) {
   auto data = length > 0 ? new (std::nothrow) uint8_t[length] : nullptr;
   if (length > 0 && data == nullptr) {
-    return nullptr;
+    length = 0;
   }
   auto byteData = new ByteData(data, length);
   return std::unique_ptr<ByteData>(byteData);
