@@ -2,7 +2,7 @@ name: code_format
 
 on:
   pull_request:
-    branches: [ main ]
+    branches: [ main1 ]
 
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
