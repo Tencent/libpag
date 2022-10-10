@@ -22,7 +22,7 @@
 #include <EGL/eglext.h>
 #include "WinUser.h"
 
-namespace pag {
+namespace tgfx {
 enum {
   D3D11,
   D3D11_FL_9_3,
