@@ -23,12 +23,7 @@
 #include "WinUser.h"
 
 namespace tgfx {
-enum {
-  D3D11,
-  D3D11_FL_9_3,
-  D3D11_WARP,
-  PLAN_END
-};
+enum { D3D11, D3D11_FL_9_3, D3D11_WARP, PLAN_END };
 
 // These are preferred display attributes and request ANGLE's D3D11
 // renderer. eglInitialize will only succeed with these attributes if the
@@ -82,31 +77,26 @@ EGLDisplay EGLDisplayWrapper::EGLGetPlatformDisplay() {
 
   auto hdc = GetDC(nullptr);
 
-  auto eglGetPlatformDisplayEXT =
-      reinterpret_cast<PFNEGLGETPLATFORMDISPLAYEXTPROC>(
-          eglGetProcAddress("eglGetPlatformDisplayEXT"));
+  auto eglGetPlatformDisplayEXT = reinterpret_cast<PFNEGLGETPLATFORMDISPLAYEXTPROC>(
+      eglGetProcAddress("eglGetPlatformDisplayEXT"));
   if (!eglGetPlatformDisplayEXT) {
     return nullptr;
   }
 
   if (Win32EGLDisplayPlan == D3D11) {
-    display = eglGetPlatformDisplayEXT(EGL_PLATFORM_ANGLE_ANGLE,
-                                       hdc,
-                                       d3d11_display_attributes);
+    display = eglGetPlatformDisplayEXT(EGL_PLATFORM_ANGLE_ANGLE, hdc, d3d11_display_attributes);
   } else if (Win32EGLDisplayPlan == D3D11_FL_9_3) {
-    display = eglGetPlatformDisplayEXT(EGL_PLATFORM_ANGLE_ANGLE,
-                                       hdc,
-                                       d3d11_fl_9_3_display_attributes);
+    display =
+        eglGetPlatformDisplayEXT(EGL_PLATFORM_ANGLE_ANGLE, hdc, d3d11_fl_9_3_display_attributes);
   } else if (Win32EGLDisplayPlan == D3D11_WARP) {
-    display = eglGetPlatformDisplayEXT(EGL_PLATFORM_ANGLE_ANGLE,
-                                       hdc,
-                                       d3d11_warp_display_attributes);
+    display =
+        eglGetPlatformDisplayEXT(EGL_PLATFORM_ANGLE_ANGLE, hdc, d3d11_warp_display_attributes);
   } else {
     return eglGetDisplay(EGL_DEFAULT_DISPLAY);
   }
 
   if (display == EGL_NO_DISPLAY) {
-    Win32EGLDisplayPlan ++;
+    Win32EGLDisplayPlan++;
     return EGLDisplayWrapper::EGLGetPlatformDisplay();
   }
 
@@ -114,7 +104,7 @@ EGLDisplay EGLDisplayWrapper::EGLGetPlatformDisplay() {
 }
 
 bool EGLDisplayWrapper::HasNext() {
-  Win32EGLDisplayPlan ++;
+  Win32EGLDisplayPlan++;
   return Win32EGLDisplayPlan < PLAN_END;
 }
 }  // namespace tgfx
