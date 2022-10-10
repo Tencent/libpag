@@ -24,30 +24,50 @@
 
 namespace pag {
 enum {
-  D3D11_Level10_0,
-  D3D11_Level9_3,
-  D3D11_Level11_0,
+  D3D11,
+  D3D11_FL_9_3,
+  D3D11_WARP,
   PLAN_END
 };
-static const EGLint D3D11_Level10_0_display_attributes[] = {
+
+// These are preferred display attributes and request ANGLE's D3D11
+// renderer. eglInitialize will only succeed with these attributes if the
+// hardware supports D3D11 Feature Level 10_0+.
+const EGLint d3d11_display_attributes[] = {
     EGL_PLATFORM_ANGLE_TYPE_ANGLE,
     EGL_PLATFORM_ANGLE_TYPE_D3D11_ANGLE,
+
+    // EGL_PLATFORM_ANGLE_ENABLE_AUTOMATIC_TRIM_ANGLE is an option that will
+    // enable ANGLE to automatically call the IDXGIDevice3::Trim method on
+    // behalf of the application when it gets suspended.
+    EGL_PLATFORM_ANGLE_ENABLE_AUTOMATIC_TRIM_ANGLE,
+    EGL_TRUE,
+
+    // This extension allows angle to render directly on a D3D swapchain
+    // in the correct orientation on D3D11.
+    EGL_EXPERIMENTAL_PRESENT_PATH_ANGLE,
+    EGL_EXPERIMENTAL_PRESENT_PATH_FAST_ANGLE,
+
+    EGL_NONE,
+};
+
+// These are used to request ANGLE's D3D11 renderer, with D3D11 Feature
+// Level 9_3.
+const EGLint d3d11_fl_9_3_display_attributes[] = {
+    EGL_PLATFORM_ANGLE_TYPE_ANGLE,
+    EGL_PLATFORM_ANGLE_TYPE_D3D11_ANGLE,
+    EGL_PLATFORM_ANGLE_MAX_VERSION_MAJOR_ANGLE,
+    9,
+    EGL_PLATFORM_ANGLE_MAX_VERSION_MINOR_ANGLE,
+    3,
     EGL_PLATFORM_ANGLE_ENABLE_AUTOMATIC_TRIM_ANGLE,
     EGL_TRUE,
     EGL_NONE,
 };
-static const EGLint D3D11_Level9_3_display_attributes[] = {
-    EGL_PLATFORM_ANGLE_TYPE_ANGLE,
-    EGL_PLATFORM_ANGLE_TYPE_D3D11_ANGLE,
-    EGL_PLATFORM_ANGLE_MAX_VERSION_MAJOR_ANGLE, 9,
-    EGL_PLATFORM_ANGLE_MAX_VERSION_MINOR_ANGLE, 3,
-    EGL_PLATFORM_ANGLE_ENABLE_AUTOMATIC_TRIM_ANGLE,
-    EGL_TRUE,
-    EGL_NONE,
-};
-static const EGLint D3D11_Level11_0_display_attributes[] = {
-    // These attributes request D3D11 WARP (software rendering fallback) as a
-    // last resort.
+
+// These attributes request D3D11 WARP (software rendering fallback) in case
+// hardware-backed D3D11 is unavailable.
+const EGLint d3d11_warp_display_attributes[] = {
     EGL_PLATFORM_ANGLE_TYPE_ANGLE,
     EGL_PLATFORM_ANGLE_TYPE_D3D11_ANGLE,
     EGL_PLATFORM_ANGLE_ENABLE_AUTOMATIC_TRIM_ANGLE,
@@ -55,7 +75,7 @@ static const EGLint D3D11_Level11_0_display_attributes[] = {
     EGL_NONE,
 };
 
-static int Win32EGLDisplayPlan = D3D11_Level10_0;
+static int Win32EGLDisplayPlan = D3D11;
 
 EGLDisplay EGLDisplayWrapper::EGLGetPlatformDisplay() {
   EGLDisplay display;
@@ -69,18 +89,18 @@ EGLDisplay EGLDisplayWrapper::EGLGetPlatformDisplay() {
     return nullptr;
   }
 
-  if (Win32EGLDisplayPlan == D3D11_Level10_0) {
+  if (Win32EGLDisplayPlan == D3D11) {
     display = eglGetPlatformDisplayEXT(EGL_PLATFORM_ANGLE_ANGLE,
                                        hdc,
-                                       D3D11_Level10_0_display_attributes);
-  } else if (Win32EGLDisplayPlan == D3D11_Level9_3) {
+                                       d3d11_display_attributes);
+  } else if (Win32EGLDisplayPlan == D3D11_FL_9_3) {
     display = eglGetPlatformDisplayEXT(EGL_PLATFORM_ANGLE_ANGLE,
                                        hdc,
-                                       D3D11_Level9_3_display_attributes);
-  } else if (Win32EGLDisplayPlan == D3D11_Level11_0) {
+                                       d3d11_fl_9_3_display_attributes);
+  } else if (Win32EGLDisplayPlan == D3D11_WARP) {
     display = eglGetPlatformDisplayEXT(EGL_PLATFORM_ANGLE_ANGLE,
                                        hdc,
-                                       D3D11_Level11_0_display_attributes);
+                                       d3d11_warp_display_attributes);
   } else {
     return eglGetDisplay(EGL_DEFAULT_DISPLAY);
   }
