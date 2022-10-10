@@ -25,8 +25,6 @@ jobs:
           path: |
             /usr/local/Cellar/ninja
             /usr/local/bin/ninja
-            /usr/local/Cellar/node
-            /usr/local/bin/node
             /usr/local/Cellar/emscripten
             /usr/local/bin/em++
             /usr/local/bin/em-config
@@ -45,9 +43,9 @@ jobs:
             /usr/local/lib/node_modules/depsync
             /usr/local/Cellar/gcovr
             /usr/local/bin/gcovr
-          key: libpag-environment-autotest-20221009
+          key: libpag-environment-autotest-20221010
           restore-keys: |
-            libpag-environment-autotest-20221009
+            libpag-environment-autotest-20221010
       - uses: actions/checkout@v3
         with:
           lfs: true
