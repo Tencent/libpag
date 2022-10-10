@@ -84,12 +84,14 @@ std::shared_ptr<EGLDevice> EGLDevice::MakeAdopted(EGLDisplay eglDisplay, EGLSurf
 std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLNativeWindowType nativeWindow,
                                                EGLContext sharedContext) {
   static auto eglGlobals = EGLGlobals::Get();
-  EGLint surfaceAttributes[] = {};
 #if defined(_WIN32)
-  surfaceAttributes = {EGL_DIRECT_COMPOSITION_ANGLE, EGL_TRUE, EGL_NONE};
-#endif
+  EGLint surfaceAttributes[] = {EGL_DIRECT_COMPOSITION_ANGLE, EGL_TRUE, EGL_NONE};
   auto eglSurface =
       eglCreateWindowSurface(eglGlobals->display, eglGlobals->windowConfig, nativeWindow, surfaceAttributes);
+#else
+  auto eglSurface =
+      eglCreateWindowSurface(eglGlobals->display, eglGlobals->windowConfig, nativeWindow, nullptr);
+#endif
   if (eglSurface == nullptr) {
     LOGE("EGLDevice::MakeFrom() eglCreateWindowSurface error=%d", eglGetError());
     return nullptr;
