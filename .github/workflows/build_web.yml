@@ -6,9 +6,9 @@ name: build_web
 on:
   # Triggers the workflow on push or pull request events but only for the master branch
   pull_request:
-    branches: [ main ]
+    branches: [ feature/kevingpqi_main ]
   push:
-    branches: [ main ]
+    branches: [ feature/kevingpqi_main ]
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   build_web:
@@ -26,6 +26,9 @@ jobs:
             /usr/local/Cellar/ninja
             /usr/local/bin/ninja
             /usr/local/Cellar/emscripten
+            /usr/local/Cellar/node
+            /usr/local/bin/node
+            /usr/local/opt/node/bin/node
             /usr/local/bin/em++
             /usr/local/bin/em-config
             /usr/local/bin/emar
@@ -43,9 +46,9 @@ jobs:
             /usr/local/lib/node_modules/depsync
             /usr/local/Cellar/gcovr
             /usr/local/bin/gcovr
-          key: libpag-environment-autotest-20221010
+          key: libpag-environment-autotest-20221011
           restore-keys: |
-            libpag-environment-autotest-20221010
+            libpag-environment-autotest-20221011
       - uses: actions/checkout@v3
         with:
           lfs: true
