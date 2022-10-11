@@ -25,27 +25,18 @@ jobs:
           path: |
             /usr/local/Cellar/ninja
             /usr/local/bin/ninja
-            /usr/local/Cellar/emscripten
-            /usr/local/bin/em++
-            /usr/local/bin/em-config
-            /usr/local/bin/emar
-            /usr/local/bin/emcc
-            /usr/local/bin/emcmake
-            /usr/local/bin/emconfigure
-            /usr/local/bin/emlink.py
-            /usr/local/bin/emmake
-            /usr/local/bin/emranlib
-            /usr/local/bin/emrun
-            /usr/local/bin/emscons
             /usr/local/Cellar/yasm
             /usr/local/bin/yasm
             /usr/local/bin/depsync
             /usr/local/lib/node_modules/depsync
             /usr/local/Cellar/gcovr
             /usr/local/bin/gcovr
-          key: libpag-environment-autotest-20221010
+            /usr/local/Cellar/emsdk
+            /usr/local/Cellar/emsdk/upstream/emscripten
+            /usr/local/Cellar/emsdk/node/14.18.2_64bit/bin
+          key: libpag-environment-autotest-20221012
           restore-keys: |
-            libpag-environment-autotest-20221010
+            libpag-environment-autotest-20221012
       - uses: actions/checkout@v3
         with:
           lfs: true
@@ -62,6 +53,8 @@ jobs:
 
       - name: Run sync_deps script
         run: |
+          chmod +x ./web/script/install-emscripten.sh
+          source ./web/script/install-emscripten.sh
           chmod +x sync_deps.sh
           ./sync_deps.sh
 
@@ -75,6 +68,7 @@ jobs:
       - if: github.event_name == 'pull_request'
         name: Run build script
         run: |
+          source /usr/local/Cellar/emsdk/emsdk_env.sh
           cd web/script
           chmod +x build.sh
           ./build.sh

@@ -19,9 +19,28 @@
 #pragma once
 
 #include <emscripten/val.h>
+#include <pag/gpu.h>
 #include "rendering/sequences/SequenceReaderFactory.h"
+#include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace pag {
+class WebVideoTexture : public tgfx::GLTexture {
+ public:
+  static std::shared_ptr<WebVideoTexture> Make(tgfx::Context* context, int width, int height,
+                                               bool isAndroidMiniprogram);
+
+  WebVideoTexture(const tgfx::GLSampler& sampler, int width, int height, tgfx::ImageOrigin origin,
+                  bool isMiniprogramAndroid);
+
+  tgfx::Point getTextureCoord(float x, float y) const override;
+
+ private:
+  void onReleaseGPU() override;
+
+  bool isAndroidMiniprogram = false;
+  int androidAlignment = 16;
+};
+
 class VideoSequenceReader : public SequenceReader {
  public:
   VideoSequenceReader(std::shared_ptr<File> file, VideoSequence* sequence);
@@ -47,7 +66,7 @@ class VideoSequenceReader : public SequenceReader {
   // Keep a reference to the File in case the Sequence object is released while we are using it.
   std::shared_ptr<File> file = nullptr;
   emscripten::val videoReader = emscripten::val::null();
-  std::shared_ptr<tgfx::Texture> texture = nullptr;
+  std::shared_ptr<WebVideoTexture> webVideoTexture = nullptr;
   int32_t width = 0;
   int32_t height = 0;
   std::unique_ptr<ByteData> mp4Data = nullptr;
