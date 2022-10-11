@@ -18,14 +18,25 @@
 
 #include "EGLGlobals.h"
 #include <EGL/eglext.h>
+#if defined(_WIN32)
+#include "EGLDisplayWrapper.h"
+#endif
 
 namespace tgfx {
+
 EGLGlobals InitializeEGL() {
   EGLGlobals globals = {};
-  globals.display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
   EGLint majorVersion;
   EGLint minorVersion;
+#if defined(_WIN32)
+  do {
+    globals.display = EGLDisplayWrapper::EGLGetPlatformDisplay();
+  } while (eglInitialize(globals.display, &majorVersion, &minorVersion) == EGL_FALSE &&
+           EGLDisplayWrapper::HasNext());
+#else
+  globals.display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
   eglInitialize(globals.display, &majorVersion, &minorVersion);
+#endif
   eglBindAPI(EGL_OPENGL_ES_API);
   EGLint numConfigs = 0;
   const EGLint configAttribs[] = {EGL_SURFACE_TYPE,
