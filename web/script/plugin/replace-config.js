@@ -6,7 +6,12 @@ export const replaceFunctionConfig = [
     end: 'function __emval_get_module_property(name)',
     type: 'function',
     replaceStr: function __emval_get_method_caller(argCount, argTypes) {
-      var types = __emval_lookupTypes(argCount, argTypes);
+      var types;
+      try {
+        types = __emval_lookupTypes(argCount, argTypes);
+      } catch (e) {
+        types = emval_lookupTypes(argCount, argTypes);
+      }
       var retType = types[0];
       var signatureName =
         retType.name +
@@ -71,7 +76,11 @@ export const replaceFunctionConfig = [
         });
       };
       var invokerFunction = anonymous.apply({}, args);
-      returnId = __emval_addMethodCaller(invokerFunction);
+      try {
+        returnId = __emval_addMethodCaller(invokerFunction);
+      } catch (e) {
+        returnId = emval_addMethodCaller(invokerFunction);
+      }
       emval_registeredMethods[signatureName] = returnId;
       return returnId;
     }.toString(),

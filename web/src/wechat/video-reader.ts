@@ -42,6 +42,10 @@ export class VideoReader {
     return false;
   };
 
+  public static isAndroidMiniprogram = () => {
+    return wx.getSystemInfoSync().platform === 'android';
+  };
+
   private readonly frameRate: number;
   private currentFrame: number;
   private mp4Path: string;
