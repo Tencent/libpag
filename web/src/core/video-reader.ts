@@ -42,6 +42,10 @@ export class VideoReader {
     return IPHONE;
   };
 
+  public static isAndroidMiniprogram = () => {
+    return false;
+  }
+
   private videoEl: HTMLVideoElement | null;
   private readonly frameRate: number;
   private lastVideoTime = -1;
