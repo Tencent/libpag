@@ -375,7 +375,7 @@ export class PAGView {
    * speeding up the first frame rendering.
    */
   public prepare() {
-    this.player.prepare();
+    return this.player.prepare();
   }
 
   public destroy() {
@@ -409,6 +409,7 @@ export class PAGView {
     this.timer = window.requestAnimationFrame(async () => {
       await this.flushLoop();
     });
+    if (this.flushingNextFrame) return;
     await this.flushNextFrame();
   }
 
@@ -424,9 +425,9 @@ export class PAGView {
       await this.flush();
       this.playTime = 0;
       this.isPlaying = false;
-      this.eventManager.emit(PAGViewListenerEvent.onAnimationEnd, this);
       this.repeatedTimes = 0;
       this.flushingNextFrame = false;
+      this.eventManager.emit(PAGViewListenerEvent.onAnimationEnd, this);
       return true;
     }
     if (this.repeatedTimes === count && this.currentFrame === currentFrame) {

@@ -147,6 +147,7 @@ export class VideoReader {
     const { currentTime } = this.videoEl;
     if (currentTime - this.lastVideoTime >= (1 / this.frameRate) * VIDEO_DECODE_WAIT_FRAME && !this.videoEl.paused) {
       this.videoEl.pause();
+      this.videoEl.currentTime = this.lastVideoTime;
     }
   }
 

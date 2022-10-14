@@ -6,11 +6,11 @@ export class WebAssemblyQueue {
   private executing = false;
   private queue: Task[] = [];
 
-  public exec(fn: (...args: any[]) => any, scope: any, ...args: any[]) {
+  public exec<T>(fn: (...args: any[]) => any, scope: any, ...args: any[]): Promise<T> {
     return new Promise((resolve, reject) => {
       const copyFn = async () => {
         if (!fn) {
-          resolve(null);
+          reject(new Error('Function is null!'));
           return;
         }
         try {
