@@ -35,20 +35,20 @@ export class PAGPlayer {
    * changed.
    */
   @wasmAsyncMethod
-  public async flush(): Promise<boolean> {
-    return (await PAGModule.webAssemblyQueue.exec(this.wasmIns._flush, this.wasmIns)) as boolean;
+  public async flush() {
+    return PAGModule.webAssemblyQueue.exec<boolean>(this.wasmIns._flush, this.wasmIns);
   }
   /**
    * [Internal] Apply all pending changes to the target surface immediately. Returns true if the content has
    * changed.
    */
   @wasmAsyncMethod
-  public async flushInternal(callback: (res: boolean) => void): Promise<boolean> {
-    return (await PAGModule.webAssemblyQueue.exec(async () => {
+  public async flushInternal(callback: (res: boolean) => void) {
+    return PAGModule.webAssemblyQueue.exec<boolean>(async () => {
       const res = await this.wasmIns._flush();
       callback(res);
       return res;
-    }, this.wasmIns)) as boolean;
+    }, this.wasmIns);
   }
   /**
    * The duration of current composition in microseconds.
@@ -264,8 +264,8 @@ export class PAGPlayer {
    * progress of the composition and runs them asynchronously in parallel. It is usually used for
    * speeding up the first frame rendering.
    */
-  public prepare(): void {
-    this.wasmIns._prepare();
+  public prepare(): Promise<void> {
+    return PAGModule.webAssemblyQueue.exec(this.wasmIns._prepare, this.wasmIns);
   }
 
   public destroy() {
