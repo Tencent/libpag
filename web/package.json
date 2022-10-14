@@ -1,6 +1,6 @@
 {
   "name": "libpag",
-  "version": "4.0.5-release.18",
+  "version": "4.0.0",
   "description": "Portable Animated Graphics",
   "main": "lib/libpag.cjs.js",
   "module": "lib/libpag.esm.js",
@@ -8,6 +8,7 @@
   "typings": "types/pag.d.ts",
   "scripts": {
     "build": "rimraf lib/*.js lib/*.map types/* && rollup -c ./script/rollup.config.js && tsc -p ./tsconfig.type.json",
+    "build:wx": "rimraf wechat/lib/*.js wechat/lib/*.map wechat/lib/*.br wechat/types/* && rollup -c ./script/rollup.config.wx.js && tsc -p ./wechat/tsconfig.type.json && brotli ./wechat/lib/libpag.wasm",
     "dev": "rollup -c ./script/rollup.config.dev.js -w",
     "dev:wx": "rollup -c ./script/rollup.config.wx.dev.js -w",
     "dev:wx:brotli": "./script/brotli.sh",

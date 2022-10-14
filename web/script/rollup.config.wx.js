@@ -1,7 +1,7 @@
+import commonJs from '@rollup/plugin-commonjs';
 import esbuild from 'rollup-plugin-esbuild';
 import resolve from '@rollup/plugin-node-resolve';
-import commonJs from '@rollup/plugin-commonjs';
-import json from '@rollup/plugin-json';
+import replaceFunc from './plugin/rollup-plugin-replace';
 
 const banner = `/////////////////////////////////////////////////////////////////////////////////////////////////
 //
@@ -24,8 +24,10 @@ const banner = `////////////////////////////////////////////////////////////////
 
 export default [
   {
-    input: 'demo/index.ts',
-    output: { banner, file: 'demo/index.js', format: 'esm', sourcemap: true },
-    plugins: [esbuild({ tsconfig: 'tsconfig.json', minify: false }), json(), resolve(), commonJs()],
+    input: 'src/wechat/pag.ts',
+    output: [
+      { banner, file: 'wechat/lib/libpag.js', format: 'cjs', exports: 'auto', sourcemap: true },
+    ],
+    plugins: [esbuild({ tsconfig: 'tsconfig.json', minify: false }), resolve(), commonJs(), replaceFunc()],
   },
 ];

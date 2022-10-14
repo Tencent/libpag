@@ -1,6 +1,6 @@
 <img src="https://pag.art/img/readme/logo.png" alt="PAG Logo" width="474"/>
 
-[English](./README.md) | 简体中文 | [Homepage](https://pag.art) | [lite版本](https://github.com/Tencent/libpag/tree/main/web/lite)
+[官网](https://pag.art) | [English](./README.md) | 简体中文 | [Weblite版本](./web/lite) | [小程序版本](./web/wechat) | [小程序lite版本](./web/lite/wechat)
 
 ## 介绍
 

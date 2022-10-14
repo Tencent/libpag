@@ -1,5 +1,7 @@
 # libpag-lite
 
+[官网](https://pag.art) | [English](../README.md) | [Web 版本](../README.zh_CN.md) | Web lite版本 | [小程序版本](../wechat) | [小程序lite版本](./wechat)
+
 ## 介绍
 
 libpag-lite 是 libpag 在 Web 平台的简化版 SDK
