@@ -1,6 +1,6 @@
 <img src="https://pag.art/img/readme/logo.png" alt="PAG Logo" width="474"/>
 
-English | [简体中文](./README.zh_CN.md) | [Homepage](https://pag.art)
+[Homepage](https://pag.art) | English | [简体中文](./README.zh_CN.md)
 
 ## Introduction
 

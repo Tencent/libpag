@@ -1,5 +1,7 @@
 # libpag-lite-miniprogram
 
+[官网](https://pag.art) | [English](../../README.md) | [Web 版本](../../README.zh_CN.md) | [Web lite版本](../) | [小程序版本](../../wechat) | 小程序lite版本
+
 ## 介绍
 
 libpag-lite-miniprogram 是 libpag 在微信小程序平台的简化版 SDK
@@ -25,7 +27,7 @@ libpag-lite-miniprogram 是 libpag 在微信小程序平台的简化版 SDK
 
 ## 快速开始
 
-1. npm 依赖
+1. NPM 依赖
 
 ```bash
 $ npm install libpag-lite-miniprogram
@@ -42,7 +44,7 @@ $ npm install libpag-lite-miniprogram
 
 ```js
 // index.js
-import { PAGView } from 'libpag-lite';
+import { PAGView } from 'libpag-lite-miniprogram';
 
 Page({
   onReady() {

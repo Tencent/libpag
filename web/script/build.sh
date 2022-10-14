@@ -2,7 +2,6 @@
 
 SOURCE_DIR=../..
 BUILD_DIR=../../build
-BUILD_TS="npm run build"
 
 echo "-----begin-----"
 
@@ -15,7 +14,6 @@ CMAKE_BUILD_TYPE=Relese
 if [[ $@ == *debug* ]]; then
   CMAKE_BUILD_TYPE=Debug
   RELEASE_CONF="-O0 -g3 -s SAFE_HEAP=1"
-  BUILD_TS=""
 fi
 
 emcmake cmake -S $SOURCE_DIR -B $BUILD_DIR -G Ninja -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE"
@@ -57,12 +55,20 @@ if [ ! -d "../lib" ]; then
   mkdir ../lib
 fi
 
+if [ ! -d "../wechat/lib" ]; then
+  mkdir ../wechat/lib
+fi
+
 cp -f ../src/wasm/libpag.wasm ../lib
+cp -f ../src/wasm/libpag.wasm ../wechat/lib
 
 if [ ! -d "../node_modules" ]; then
   npm install
 fi
 
-$BUILD_TS
+if [[ ! $@ == *debug* ]]; then
+npm run build
+npm run build:wx
+fi
 
 echo "-----end-----"

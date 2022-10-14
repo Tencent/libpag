@@ -1,0 +1,23 @@
+{
+  "name": "libpag-miniprogram",
+  "version": "4.0.0",
+  "description": "Portable Animated Graphics",
+  "main": "lib/libpag.js",
+  "typings": "types/wechat/pag.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Tencent/libpag/tree/main/web"
+  },
+  "files": [
+    "lib",
+    "types",
+    "README.md",
+    "LICENSE.txt"
+  ],
+  "license": "Apache-2.0",
+  "contributors": [
+    "zenoslin",
+    "lvpengwei"
+  ],
+  "author": "libpag"
+}
