@@ -19,12 +19,12 @@ PAG Web 端，由 libpag.js + libpag.wasm.br 文件组成。
 1. NPM 依赖
 
 ``` bash
-$ npm install pag-miniprogram
+$ npm install libpag-miniprogram
 ```
 
 点击「微信开发者工具」- 「工具」- 「构建npm」，进行小程序 npm 依赖构建
 
-2. 将 node_modules/pag-miniprogram/lib/libpag.wasm.br 文件复制到utils目录下
+2. 将 node_modules/libpag-miniprogram/lib/libpag.wasm.br 文件复制到utils目录下
 3. 初始化 PAG
 
 ``` javascript
