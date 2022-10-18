@@ -137,16 +137,9 @@ std::shared_ptr<tgfx::Typeface> FontManager::getTypefaceWithoutFallback(
   return typeface;
 }
 
-std::vector<std::shared_ptr<tgfx::Typeface>> FontManager::getFallbackTypefaces() {
+std::vector<std::shared_ptr<TypefaceHolder>> FontManager::getFallbackTypefaces() {
   std::lock_guard<std::mutex> autoLock(locker);
-  std::vector<std::shared_ptr<tgfx::Typeface>> typefaces;
-  for (auto& holder : fallbackFontList) {
-    auto typeface = holder->getTypeface();
-    if (typeface != nullptr) {
-      typefaces.emplace_back(std::move(typeface));
-    }
-  }
-  return typefaces;
+  return fallbackFontList;
 }
 
 void FontManager::setFallbackFontNames(const std::vector<std::string>& fontNames) {
@@ -194,7 +187,7 @@ static bool RegisterFallbackFonts() {
   return Platform::Current()->registerFallbackFonts();
 }
 
-std::vector<std::shared_ptr<tgfx::Typeface>> FontManager::GetFallbackTypefaces() {
+std::vector<std::shared_ptr<TypefaceHolder>> FontManager::GetFallbackTypefaces() {
   static auto registered = RegisterFallbackFonts();
   USE(registered);
   return fontManager.getFallbackTypefaces();

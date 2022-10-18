@@ -33,10 +33,11 @@ PositionedGlyphs ShapePrimitive(const std::string& text, std::shared_ptr<tgfx::T
     auto str = std::string(oldPosition, length);
     auto glyphID = typeface->getGlyphID(str);
     if (glyphID == 0) {
-      for (const auto& face : fallbackTypefaces) {
+      for (const auto& faceHolder : fallbackTypefaces) {
+        auto face = faceHolder->getTypeface();
         glyphID = face->getGlyphID(str);
         if (glyphID != 0) {
-          glyphs.emplace_back(face, glyphID, oldPosition - &(text[0]));
+          glyphs.emplace_back(std::move(face), glyphID, oldPosition - &(text[0]));
           break;
         }
       }

@@ -117,10 +117,11 @@ PositionedGlyphs Shape(const std::string& text, const std::shared_ptr<tgfx::Type
     auto str = text.substr(infos[i].cluster, length);
     auto glyphID = typeface->getGlyphID(str);
     if (glyphID == 0) {
-      for (const auto& face : fallbackTypefaces) {
+      for (const auto& faceHolder : fallbackTypefaces) {
+        auto face = faceHolder->getTypeface();
         glyphID = face->getGlyphID(str);
         if (glyphID != 0) {
-          glyphs.emplace_back(face, glyphID, infos[i].cluster);
+          glyphs.emplace_back(std::move(face), glyphID, infos[i].cluster);
           break;
         }
       }

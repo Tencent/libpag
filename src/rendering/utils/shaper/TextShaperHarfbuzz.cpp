@@ -173,55 +173,61 @@ static std::vector<std::tuple<uint32_t, uint32_t, uint32_t>> Shape(
   return result;
 }
 
-PositionedGlyphs ShapeHarfbuzz(const std::string& text, std::shared_ptr<tgfx::Typeface> face) {
-  auto typefaces = FontManager::GetFallbackTypefaces();
-  if (face && !face->fontFamily().empty()) {
-    typefaces.insert(typefaces.begin(), std::move(face));
-  }
-  if (typefaces.empty()) {
-    return {};
-  }
-  struct Glyph {
-    std::string text;
-    tgfx::GlyphID glyphID = 0;
-    uint32_t stringIndex = 0;
-    std::shared_ptr<tgfx::Typeface> typeface;
-  };
-  std::list<Glyph> glyphs;
-  glyphs.emplace_back(Glyph{text, {}, 0, nullptr});
-  for (const auto& typeface : typefaces) {
-    bool allShaped = true;
-    for (auto iter = glyphs.begin(); iter != glyphs.end(); ++iter) {
-      if (iter->glyphID == 0) {
-        auto string = iter->text;
-        auto infos = ::pag::Shape(string, typeface);
-        if (infos.empty()) {
-          allShaped = false;
-        } else {
-          auto stringIndex = iter->stringIndex;
-          for (size_t i = 0; i < infos.size(); ++i) {
-            auto [codepoint, cluster, length] = infos[i];
-            Glyph glyph;
-            glyph.text = string.substr(cluster, length);
-            glyph.stringIndex = stringIndex + cluster;
-            if (codepoint != 0) {
-              glyph.glyphID = codepoint;
-              glyph.typeface = typeface;
-            } else {
-              allShaped = false;
-            }
-            if (i == 0) {
-              iter = glyphs.erase(iter);
-              iter = glyphs.insert(iter, glyph);
-            } else {
-              iter = glyphs.insert(++iter, glyph);
-            }
+struct HBGlyph {
+  std::string text;
+  tgfx::GlyphID glyphID = 0;
+  uint32_t stringIndex = 0;
+  std::shared_ptr<tgfx::Typeface> typeface;
+};
+
+static bool Shape(std::list<HBGlyph>& glyphs, std::shared_ptr<tgfx::Typeface> typeface) {
+  bool allShaped = true;
+  for (auto iter = glyphs.begin(); iter != glyphs.end(); ++iter) {
+    if (iter->glyphID == 0) {
+      auto string = iter->text;
+      auto infos = ::pag::Shape(string, typeface);
+      if (infos.empty()) {
+        allShaped = false;
+      } else {
+        auto stringIndex = iter->stringIndex;
+        for (size_t i = 0; i < infos.size(); ++i) {
+          auto [codepoint, cluster, length] = infos[i];
+          HBGlyph glyph;
+          glyph.text = string.substr(cluster, length);
+          glyph.stringIndex = stringIndex + cluster;
+          if (codepoint != 0) {
+            glyph.glyphID = codepoint;
+            glyph.typeface = typeface;
+          } else {
+            allShaped = false;
+          }
+          if (i == 0) {
+            iter = glyphs.erase(iter);
+            iter = glyphs.insert(iter, glyph);
+          } else {
+            iter = glyphs.insert(++iter, glyph);
           }
         }
       }
     }
-    if (allShaped) {
-      break;
+  }
+  return allShaped;
+}
+
+PositionedGlyphs ShapeHarfbuzz(const std::string& text, std::shared_ptr<tgfx::Typeface> face) {
+  std::list<HBGlyph> glyphs;
+  glyphs.emplace_back(HBGlyph{text, {}, 0, nullptr});
+  bool allShaped = false;
+  if (face && !face->fontFamily().empty()) {
+    allShaped = ::pag::Shape(glyphs, std::move(face));
+  }
+  if (!allShaped) {
+    auto typefaces = FontManager::GetFallbackTypefaces();
+    for (const auto& faceHolder : typefaces) {
+      auto typeface = faceHolder->getTypeface();
+      if (typeface && ::pag::Shape(glyphs, std::move(typeface))) {
+        break;
+      }
     }
   }
   std::vector<std::tuple<std::shared_ptr<tgfx::Typeface>, tgfx::GlyphID, uint32_t>> glyphIDs;

@@ -46,7 +46,7 @@ class FontManager {
   static std::shared_ptr<tgfx::Typeface> GetTypefaceWithoutFallback(const std::string& fontFamily,
                                                                     const std::string& fontStyle);
 
-  static std::vector<std::shared_ptr<tgfx::Typeface>> GetFallbackTypefaces();
+  static std::vector<std::shared_ptr<TypefaceHolder>> GetFallbackTypefaces();
 
   static PAGFont RegisterFont(const std::string& fontPath, int ttcIndex,
                               const std::string& fontFamily, const std::string& fontStyle);
@@ -80,7 +80,7 @@ class FontManager {
   std::shared_ptr<tgfx::Typeface> getTypefaceWithoutFallback(const std::string& fontFamily,
                                                              const std::string& fontStyle);
 
-  std::vector<std::shared_ptr<tgfx::Typeface>> getFallbackTypefaces();
+  std::vector<std::shared_ptr<TypefaceHolder>> getFallbackTypefaces();
 
   void setFallbackFontNames(const std::vector<std::string>& fontNames);
 
