@@ -29,16 +29,12 @@ $ npm install libpag-miniprogram
 
 ``` javascript
 // index.js
+import { PAGInit } from 'libpag-miniprogram';
+
 Page({
-	async onReady() {
-		this.PAG = await PAGInit({locateFile: (file) => '/utils/' + file});
-		wx.createSelectorQuery()
-      .select('#pag')
-      .node()
-      .exec((res) => {
-        const canvas = res[0].node;
-      });
-	}
+  async onReady() {
+    this.PAG = await PAGInit({locateFile: (file) => '/utils/' + file});
+  }
 })
 ```
 
@@ -51,15 +47,16 @@ Page({
 ``` javascript
 // index.js
 wx.createSelectorQuery()
-	.select('#pag')
-	.node()
-	.exec(async (res) => {
-		const canvas = res[0].node;
-  	const buffer = await loadFileByRequest('https://pag.art/file/test.pag');
-  	const pagFile = await this.PAG.PAGFile.load(buffer);
-  	const pagView = await this.PAG.PAGView.init(this.pagFile, canvas);
-  	pagView.play();
-	});
+  .select('#pag')
+  .node()
+  .exec(async (res) => {
+    const canvas = res[0].node;
+    const buffer = await loadFileByRequest('https://pag.art/file/test.pag');
+    const pagFile = await this.PAG.PAGFile.load(buffer);
+    const pagView = await this.PAG.PAGView.init(pagFile, canvas);
+    pagView.play();
+  });
+
 const loadFileByRequest = async (url) => {
   return new Promise((resolve) => {
     wx.request({
