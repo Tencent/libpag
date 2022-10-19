@@ -53,8 +53,10 @@ class OpsRenderPass {
 
   virtual void bindPipelineAndScissorClip(const ProgramInfo& info, const Rect& drawBounds) = 0;
 
+  virtual void bindVertexBuffer(std::shared_ptr<GpuBuffer> vertexBuffer) = 0;
+
   virtual void bindVerticesAndIndices(std::vector<float> vertices,
-                                      std::shared_ptr<Resource> indices) = 0;
+                                      std::shared_ptr<GpuBuffer> indices) = 0;
 
   virtual void draw(unsigned primitiveType, int baseVertex, int vertexCount) = 0;
 

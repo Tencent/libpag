@@ -16,27 +16,33 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "TriangularPathMesh.h"
-#include "gpu/opengl/GLTriangulatingPathOp.h"
+#pragma once
+
+#include "gpu/GpuBuffer.h"
 
 namespace tgfx {
-std::unique_ptr<GLDrawOp> TriangularPathMesh::getOp(Color color, const Matrix& viewMatrix) const {
-  auto point = Point::Zero();
-  auto vertices = _vertices;
-  auto bounds = this->bounds();
-  if (!viewMatrix.isIdentity()) {
-    viewMatrix.mapRect(&bounds);
-    for (size_t i = 0; i < vertices.size(); i += 3) {
-      viewMatrix.mapXY(vertices[i], vertices[i + 1], &point);
-      vertices[i] = point.x;
-      vertices[i + 1] = point.y;
-    }
+class BufferProvider {
+ public:
+  BufferProvider(std::vector<float> vertices, int vertexCount, bool cacheEnable = false)
+      : _vertices(std::move(vertices)), _vertexCount(vertexCount), cacheEnable(cacheEnable) {
   }
-  auto localMatrix = Matrix::I();
-  if (!viewMatrix.invert(&localMatrix)) {
-    return nullptr;
+
+  std::shared_ptr<GpuBuffer> getGpuBuffer(Context* context);
+
+  const std::vector<float>& vertices() const {
+    return _vertices;
   }
-  return std::make_unique<GLTriangulatingPathOp>(color, std::move(vertices), _vertexCount, bounds,
-                                                 localMatrix);
-}
+
+  int vertexCount() const {
+    return _vertexCount;
+  }
+
+  bool canCombine(BufferProvider* that) const;
+
+ private:
+  std::vector<float> _vertices;
+  int _vertexCount;
+  bool cacheEnable;
+  std::shared_ptr<GpuBuffer> buffer;
+};
 }  // namespace tgfx

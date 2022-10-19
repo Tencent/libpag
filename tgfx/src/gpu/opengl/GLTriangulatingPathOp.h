@@ -19,6 +19,7 @@
 #pragma once
 
 #include "GLOpsRenderPass.h"
+#include "gpu/BufferProvider.h"
 #include "tgfx/core/Path.h"
 
 namespace tgfx {
@@ -27,7 +28,8 @@ class GLTriangulatingPathOp : public GLDrawOp {
   static std::unique_ptr<GLTriangulatingPathOp> Make(Color color, const Path& path, Rect clipBounds,
                                                      const Matrix& localMatrix);
 
-  GLTriangulatingPathOp(Color color, std::vector<float> vertex, int vertexCount, Rect bounds,
+  GLTriangulatingPathOp(Color color, std::shared_ptr<BufferProvider> bufferProvider, Rect bounds,
+                        const Matrix& viewMatrix = Matrix::I(),
                         const Matrix& localMatrix = Matrix::I());
 
   void execute(OpsRenderPass* opsRenderPass) override;
@@ -38,8 +40,8 @@ class GLTriangulatingPathOp : public GLDrawOp {
   bool onCombineIfPossible(Op* op) override;
 
   Color color = Color::Transparent();
-  std::vector<float> vertex;
-  int vertexCount;
+  std::vector<std::shared_ptr<BufferProvider>> providers;
+  Matrix viewMatrix = Matrix::I();
   Matrix localMatrix = Matrix::I();
 };
 }  // namespace tgfx

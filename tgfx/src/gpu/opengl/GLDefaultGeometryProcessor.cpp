@@ -29,6 +29,13 @@ void GLDefaultGeometryProcessor::emitCode(EmitArgs& args) {
 
   varyingHandler->emitAttributes(*geometryProcessor);
 
+  std::string matrixName;
+  matrixUniform = args.uniformHandler->addUniform(ShaderFlags::Vertex, ShaderVar::Type::Float3x3,
+                                                  "Matrix", &matrixName);
+  std::string position = "position";
+  vertBuilder->codeAppendf("vec2 %s = (%s * vec3(%s, 1.0)).xy;", position.c_str(),
+                           matrixName.c_str(), geometryProcessor->position.name().c_str());
+
   emitTransforms(vertBuilder, varyingHandler, uniformHandler,
                  geometryProcessor->position.asShaderVar(), args.fpCoordTransformHandler);
 
@@ -43,7 +50,7 @@ void GLDefaultGeometryProcessor::emitCode(EmitArgs& args) {
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
 
   // Emit the vertex position to the hardware in the normalized window coordinates it expects.
-  args.vertBuilder->emitNormalizedPosition(geometryProcessor->position.name());
+  args.vertBuilder->emitNormalizedPosition(position);
 }
 
 void GLDefaultGeometryProcessor::setData(const ProgramDataManager& programDataManager,
@@ -55,6 +62,10 @@ void GLDefaultGeometryProcessor::setData(const ProgramDataManager& programDataMa
     colorPrev = gp.color;
     programDataManager.set4f(colorUniform, gp.color.red, gp.color.green, gp.color.blue,
                              gp.color.alpha);
+  }
+  if (viewMatrixPrev != gp.viewMatrix) {
+    viewMatrixPrev = gp.viewMatrix;
+    programDataManager.setMatrix(matrixUniform, gp.viewMatrix);
   }
 }
 }  // namespace tgfx

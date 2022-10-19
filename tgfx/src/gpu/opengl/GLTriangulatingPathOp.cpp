@@ -39,17 +39,19 @@ std::unique_ptr<GLTriangulatingPathOp> GLTriangulatingPathOp::Make(Color color, 
   if (count == 0) {
     return nullptr;
   }
-  return std::make_unique<GLTriangulatingPathOp>(color, std::move(vertices), count,
-                                                 path.getBounds(), localMatrix);
+  return std::make_unique<GLTriangulatingPathOp>(color,
+                                                 std::make_shared<BufferProvider>(vertices, count),
+                                                 path.getBounds(), Matrix::I(), localMatrix);
 }
 
-GLTriangulatingPathOp::GLTriangulatingPathOp(Color color, std::vector<float> vertex,
-                                             int vertexCount, Rect bounds,
+GLTriangulatingPathOp::GLTriangulatingPathOp(Color color,
+                                             std::shared_ptr<BufferProvider> bufferProvider,
+                                             Rect bounds, const Matrix& viewMatrix,
                                              const Matrix& localMatrix)
     : GLDrawOp(ClassID()),
       color(color),
-      vertex(std::move(vertex)),
-      vertexCount(vertexCount),
+      providers({std::move(bufferProvider)}),
+      viewMatrix(viewMatrix),
       localMatrix(localMatrix) {
   setBounds(bounds);
 }
@@ -59,21 +61,32 @@ bool GLTriangulatingPathOp::onCombineIfPossible(Op* op) {
     return false;
   }
   auto* that = static_cast<GLTriangulatingPathOp*>(op);
-  if (localMatrix != that->localMatrix || color != that->color) {
+  if (viewMatrix != that->viewMatrix || localMatrix != that->localMatrix || color != that->color ||
+      !providers[0]->canCombine(that->providers[0].get())) {
     return false;
   }
-  vertex.insert(vertex.end(), that->vertex.begin(), that->vertex.end());
-  vertexCount += that->vertexCount;
+  providers.insert(providers.end(), that->providers.begin(), that->providers.end());
   return true;
 }
 
 void GLTriangulatingPathOp::execute(OpsRenderPass* opsRenderPass) {
   auto info = createProgram(
-      opsRenderPass,
-      DefaultGeometryProcessor::Make(color, opsRenderPass->renderTarget()->width(),
-                                     opsRenderPass->renderTarget()->height(), localMatrix));
+      opsRenderPass, DefaultGeometryProcessor::Make(color, opsRenderPass->renderTarget()->width(),
+                                                    opsRenderPass->renderTarget()->height(),
+                                                    viewMatrix, localMatrix));
   opsRenderPass->bindPipelineAndScissorClip(info, scissorRect());
-  opsRenderPass->bindVerticesAndIndices(vertex, nullptr);
+  int vertexCount = 0;
+  if (auto buffer = providers[0]->getGpuBuffer(opsRenderPass->context())) {
+    opsRenderPass->bindVertexBuffer(std::move(buffer));
+    vertexCount = providers[0]->vertexCount();
+  } else {
+    std::vector<float> vertices;
+    for (const auto& provider : providers) {
+      vertices.insert(vertices.end(), provider->vertices().begin(), provider->vertices().end());
+      vertexCount += provider->vertexCount();
+    }
+    opsRenderPass->bindVerticesAndIndices(std::move(vertices), nullptr);
+  }
   opsRenderPass->draw(GL_TRIANGLES, 0, vertexCount);
 }
 }  // namespace tgfx

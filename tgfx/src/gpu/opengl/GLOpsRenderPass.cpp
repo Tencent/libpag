@@ -224,6 +224,7 @@ void GLOpsRenderPass::reset() {
   _indexBuffer = nullptr;
   _renderTarget = nullptr;
   _renderTargetTexture = nullptr;
+  _vertexBuffer = nullptr;
 }
 
 void GLOpsRenderPass::bindPipelineAndScissorClip(const ProgramInfo& info, const Rect& drawBounds) {
@@ -245,10 +246,17 @@ void GLOpsRenderPass::bindPipelineAndScissorClip(const ProgramInfo& info, const 
   program->updateUniformsAndTextureBindings(glRT, *info.geometryProcessor, *info.pipeline);
 }
 
+void GLOpsRenderPass::bindVertexBuffer(std::shared_ptr<GpuBuffer> vertexBuffer) {
+  _vertexBuffer = std::static_pointer_cast<GLBuffer>(vertexBuffer);
+  _vertices = {};
+  _indexBuffer = nullptr;
+}
+
 void GLOpsRenderPass::bindVerticesAndIndices(std::vector<float> vertices,
-                                             std::shared_ptr<Resource> indices) {
+                                             std::shared_ptr<GpuBuffer> indices) {
   _vertices = std::move(vertices);
   _indexBuffer = std::static_pointer_cast<GLBuffer>(indices);
+  _vertexBuffer = nullptr;
 }
 
 void GLOpsRenderPass::draw(unsigned primitiveType, int baseVertex, int vertexCount) {
@@ -273,18 +281,22 @@ void GLOpsRenderPass::draw(std::function<void()> func) {
   if (vertex->array > 0) {
     gl->bindVertexArray(vertex->array);
   }
-  gl->bindBuffer(GL_ARRAY_BUFFER, vertex->buffer);
   auto resetVertexObject = [&]() {
     if (vertex->array > 0) {
       gl->bindVertexArray(0);
     }
     gl->bindBuffer(GL_ARRAY_BUFFER, 0);
   };
-  gl->bufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(_vertices.size()) * sizeof(float),
-                 &_vertices[0], GL_STATIC_DRAW);
-  if (!CheckGLError(_context)) {
-    resetVertexObject();
-    return;
+  if (_vertexBuffer) {
+    gl->bindBuffer(GL_ARRAY_BUFFER, _vertexBuffer->bufferID());
+  } else {
+    gl->bindBuffer(GL_ARRAY_BUFFER, vertex->buffer);
+    gl->bufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(_vertices.size()) * sizeof(float),
+                   &_vertices[0], GL_STATIC_DRAW);
+    if (!CheckGLError(_context)) {
+      resetVertexObject();
+      return;
+    }
   }
   for (const auto& attribute : program->vertexAttributes()) {
     const AttribLayout& layout = GetAttribLayout(attribute.gpuType);
