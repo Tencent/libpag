@@ -31,18 +31,18 @@ PositionedGlyphs TextShaper::Shape(const std::string& text,
     return {};
   }
 #ifdef PAG_USE_HARFBUZZ
-  return ShapeHarfbuzz(text, std::move(typeface));
+  return TextShaperHarfbuzz::Shape(text, std::move(typeface));
 #else
-  if (auto ret = Platform::Current()->shape(text, typeface)) {
+  if (auto ret = Platform::Current()->shapeText(text, typeface)) {
     return *ret;
   }
-  return ShapePrimitive(text, std::move(typeface));
+  return TextShaperPrimitive::Shape(text, std::move(typeface));
 #endif
 }
 
 void TextShaper::PurgeCaches() {
 #ifdef PAG_USE_HARFBUZZ
-  PurgeHarfbuzzCache();
+  TextShaperHarfbuzz::PurgeCaches();
 #endif
 }
 }  // namespace pag

@@ -74,8 +74,8 @@ class Platform {
   virtual void traceImage(const tgfx::ImageInfo& info, const void* pixels,
                           const std::string& tag) const;
 
-  virtual std::optional<PositionedGlyphs> shape(const std::string&,
-                                                const std::shared_ptr<tgfx::Typeface>&) const {
+  virtual std::optional<PositionedGlyphs> shapeText(const std::string&,
+                                                    const std::shared_ptr<tgfx::Typeface>&) const {
     return std::nullopt;
   }
 };

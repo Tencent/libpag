@@ -39,6 +39,7 @@ class TypefaceHolder {
   std::string fontPath;
   int ttcIndex = 0;
   std::shared_ptr<tgfx::Typeface> typeface = nullptr;
+  std::shared_ptr<std::mutex> _mutex = std::make_shared<std::mutex>();
 };
 
 class FontManager {

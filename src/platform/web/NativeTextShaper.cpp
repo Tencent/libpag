@@ -94,7 +94,8 @@ static void MergeClusters(std::vector<Info>& infos) {
   }
 }
 
-PositionedGlyphs Shape(const std::string& text, const std::shared_ptr<tgfx::Typeface>& typeface) {
+PositionedGlyphs NativeTextShaper::Shape(const std::string& text,
+                                         const std::shared_ptr<tgfx::Typeface>& typeface) {
   std::vector<Info> infos;
   const char* textStart = &(text[0]);
   const char* textStop = textStart + text.size();

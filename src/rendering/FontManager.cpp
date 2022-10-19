@@ -39,12 +39,22 @@ std::shared_ptr<TypefaceHolder> TypefaceHolder::MakeFromFile(const std::string& 
 }
 
 std::shared_ptr<tgfx::Typeface> TypefaceHolder::getTypeface() {
+  auto mutex = _mutex;
+  if (mutex) {
+    mutex->lock();
+  }
   if (typeface == nullptr) {
     if (!fontPath.empty()) {
       typeface = tgfx::Typeface::MakeFromPath(fontPath, ttcIndex);
     } else {
       typeface = tgfx::Typeface::MakeFromName(fontFamily, fontStyle);
     }
+    if (typeface) {
+      _mutex = nullptr;
+    }
+  }
+  if (mutex) {
+    mutex->unlock();
   }
   return typeface;
 }

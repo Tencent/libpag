@@ -21,7 +21,8 @@
 #include "tgfx/core/UTF.h"
 
 namespace pag {
-PositionedGlyphs ShapePrimitive(const std::string& text, std::shared_ptr<tgfx::Typeface> typeface) {
+PositionedGlyphs TextShaperPrimitive::Shape(const std::string& text,
+                                            std::shared_ptr<tgfx::Typeface> typeface) {
   const char* textStart = &(text[0]);
   const char* textStop = textStart + text.size();
   std::vector<std::tuple<std::shared_ptr<tgfx::Typeface>, tgfx::GlyphID, uint32_t>> glyphs;

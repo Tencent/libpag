@@ -214,7 +214,8 @@ static bool Shape(std::list<HBGlyph>& glyphs, std::shared_ptr<tgfx::Typeface> ty
   return allShaped;
 }
 
-PositionedGlyphs ShapeHarfbuzz(const std::string& text, std::shared_ptr<tgfx::Typeface> face) {
+PositionedGlyphs TextShaperHarfbuzz::Shape(const std::string& text,
+                                           std::shared_ptr<tgfx::Typeface> face) {
   std::list<HBGlyph> glyphs;
   glyphs.emplace_back(HBGlyph{text, {}, 0, nullptr});
   bool allShaped = false;
@@ -237,7 +238,7 @@ PositionedGlyphs ShapeHarfbuzz(const std::string& text, std::shared_ptr<tgfx::Ty
   return PositionedGlyphs(std::move(glyphIDs));
 }
 
-void PurgeHarfbuzzCache() {
+void TextShaperHarfbuzz::PurgeCaches() {
   auto cache = GetHBFontCache();
   cache.reset();
 }

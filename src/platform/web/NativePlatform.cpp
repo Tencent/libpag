@@ -35,13 +35,13 @@ void NativePlatform::traceImage(const tgfx::ImageInfo& info, const void* pixels,
   traceImage(info, bytes, tag);
 }
 
-std::optional<PositionedGlyphs> NativePlatform::shape(
+std::optional<PositionedGlyphs> NativePlatform::shapeText(
 #ifdef PAG_USE_HARBUZZ
     const std::string&, const std::shared_ptr<tgfx::Typeface>&) const {
   return std::nullopt;
 #else
     const std::string& text, const std::shared_ptr<tgfx::Typeface>& typeface) const {
-  return Shape(text, typeface);
+  return NativeTextShaper::Shape(text, typeface);
 #endif
 }
 }  // namespace pag

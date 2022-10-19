@@ -22,8 +22,8 @@
 #include "tgfx/core/UTF.h"
 
 namespace pag {
-std::optional<PositionedGlyphs> Shape(const std::string& text,
-                                      const std::shared_ptr<tgfx::Typeface>& typeface) {
+std::optional<PositionedGlyphs> NativeTextShaper::Shape(
+    const std::string& text, const std::shared_ptr<tgfx::Typeface>& typeface) {
   auto ctFont = tgfx::TypefaceGetCTFontRef(typeface.get());
   if (ctFont == nullptr) {
     return std::nullopt;

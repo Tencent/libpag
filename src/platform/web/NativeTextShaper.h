@@ -22,5 +22,9 @@
 #include "tgfx/core/Typeface.h"
 
 namespace pag {
-PositionedGlyphs Shape(const std::string& text, const std::shared_ptr<tgfx::Typeface>& typeface);
+class NativeTextShaper {
+ public:
+  static PositionedGlyphs Shape(const std::string& text,
+                                const std::shared_ptr<tgfx::Typeface>& typeface);
+};
 }  // namespace pag

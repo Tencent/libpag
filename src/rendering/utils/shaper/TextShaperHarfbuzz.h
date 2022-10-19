@@ -24,9 +24,12 @@
 #include "tgfx/core/Typeface.h"
 
 namespace pag {
-PositionedGlyphs ShapeHarfbuzz(const std::string& text, std::shared_ptr<tgfx::Typeface> typeface);
+class TextShaperHarfbuzz {
+ public:
+  static PositionedGlyphs Shape(const std::string& text, std::shared_ptr<tgfx::Typeface> typeface);
 
-void PurgeHarfbuzzCache();
+  static void PurgeCaches();
+};
 }  // namespace pag
 
 #endif
