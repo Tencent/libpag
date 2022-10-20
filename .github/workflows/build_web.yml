@@ -61,6 +61,7 @@ jobs:
       - if: github.event_name == 'push'
         name: Build cache（push）
         run: |
+          source /usr/local/Cellar/emsdk/emsdk_env.sh
           node build_vendor -p web
           if [ ! $(which gcovr) ]; then
             brew install gcovr
