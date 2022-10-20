@@ -19,7 +19,9 @@
 #include "CocoaPlatform.h"
 #include "TraceImage.h"
 #include "pag/pag.h"
-#ifndef PAG_USE_HARFBUZZ
+#ifdef PAG_USE_HARFBUZZ
+#include "base/utils/USE.h"
+#else
 #include "NativeTextShaper.h"
 #endif
 
@@ -60,11 +62,12 @@ void CocoaPlatform::traceImage(const tgfx::ImageInfo& info, const void* pixels,
 }
 
 std::optional<PositionedGlyphs> CocoaPlatform::shapeText(
+    const std::string& text, const std::shared_ptr<tgfx::Typeface>& typeface) const {
 #ifdef PAG_USE_HARFBUZZ
-    const std::string&, const std::shared_ptr<tgfx::Typeface>&) const {
+  USE(text);
+  USE(typeface);
   return std::nullopt;
 #else
-    const std::string& text, const std::shared_ptr<tgfx::Typeface>& typeface) const {
   return NativeTextShaper::Shape(text, typeface);
 #endif
 }
