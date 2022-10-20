@@ -426,30 +426,13 @@ const createPAGView = async (file: File | ArrayBuffer | Blob) => {
   });
   pagView.addListener(types.PAGViewListenerEvent.onAnimationUpdate, (event) => {
     console.log('onAnimationUpdate', event);
+    document.getElementById('fps')!.innerText = `PAG View FPS: ${pagView.getDebugData().FPS}`;
   });
-  let lastProgress = 0;
-  let lastFlushedTime = 0;
-  let flushCount = 0; // Every 3 times update FPSinfo.
   pagView.addListener(types.PAGViewListenerEvent.onAnimationPlay, (event) => {
     console.log('onAnimationPlay', event);
-    lastFlushedTime = performance.now();
   });
   pagView.addListener(types.PAGViewListenerEvent.onAnimationPause, (event) => {
     console.log('onAnimationPause', event);
-  });
-  pagView.addListener(types.PAGViewListenerEvent.onAnimationFlushed, (pagView: PAGView) => {
-    // console.log('onAnimationFlushed', pagView);
-    const progress = pagView.getProgress();
-    const time = performance.now();
-    if (progress !== lastProgress) {
-      flushCount += 1;
-      lastProgress = progress;
-    }
-    if (flushCount === 3) {
-      document.getElementById('fps')!.innerText = `PAG View FPS: ${Math.floor(1000 / ((time - lastFlushedTime) / 3))}`;
-      lastFlushedTime = time;
-      flushCount = 0;
-    }
   });
   document.getElementById('control')!.style.display = '';
   // 图层编辑

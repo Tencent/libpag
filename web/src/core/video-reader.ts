@@ -44,7 +44,7 @@ export class VideoReader {
 
   public static isAndroidMiniprogram = () => {
     return false;
-  }
+  };
 
   private videoEl: HTMLVideoElement | null;
   private readonly frameRate: number;
@@ -188,6 +188,11 @@ export class VideoReader {
             return;
           } else {
             removeListener(this.videoEl, 'seeked', canplayCallback);
+            if (play && this.videoEl.paused) {
+              playVideoElement(this.videoEl);
+            } else if (!play && !this.videoEl.paused) {
+              this.videoEl.pause();
+            }
             resolve(false);
           }
         }
