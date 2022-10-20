@@ -24,6 +24,7 @@
 #include "gpu/opengl/GLFillRectOp.h"
 #include "gpu/opengl/GLRRectOp.h"
 #include "gpu/opengl/GLTriangulatingPathOp.h"
+#include "rendering/utils/shaper/TextShaper.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/gpu/Surface.h"
@@ -424,6 +425,91 @@ PAG_TEST(CanvasTest, merge_draw_clear_op) {
   EXPECT_TRUE(task->ops.size() == drawCallCount + 1);
   canvas->flush();
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/merge_draw_clear_op"));
+  device->unlock();
+}
+
+/**
+ * 用例描述: 测试 shape
+ */
+PAG_TEST(CanvasTest, textShape) {
+  auto serifTypeface = Typeface::MakeFromPath("../resources/font/NotoSerifSC-Regular.otf");
+  ASSERT_TRUE(serifTypeface != nullptr);
+  std::string text =
+      "ffi fl\n"
+      "x²-y²\n"
+      "🤡👨🏼‍🦱👨‍👨‍👧‍👦\n"
+      "🇨🇳🇫🇮\n"
+      "#️⃣#*️⃣*\n"
+      "1️⃣🔟";
+  auto positionedGlyphs = pag::TextShaper::Shape(text, serifTypeface);
+
+  float fontSize = 25.f;
+  float lineHeight = fontSize * 1.2f;
+  float height = 0;
+  float width = 0;
+  float x;
+  struct TextRun {
+    std::vector<GlyphID> ids;
+    std::vector<Point> positions;
+    Font font;
+  };
+  std::vector<TextRun> textRuns;
+  Path path;
+  TextRun* run = nullptr;
+  auto count = positionedGlyphs.glyphCount();
+  auto newline = [&]() {
+    x = 0;
+    height += lineHeight;
+    path.moveTo(0, height);
+  };
+  newline();
+  for (size_t i = 0; i < count; ++i) {
+    auto typeface = positionedGlyphs.getTypeface(i);
+    if (run == nullptr || run->font.getTypeface() != typeface) {
+      run = &textRuns.emplace_back();
+      run->font = Font(typeface, fontSize);
+    }
+    auto index = positionedGlyphs.getStringIndex(i);
+    auto length = (i + 1 == count ? text.length() : positionedGlyphs.getStringIndex(i + 1)) - index;
+    auto name = text.substr(index, length);
+    if (name == "\n") {
+      newline();
+      continue;
+    }
+    auto glyphID = positionedGlyphs.getGlyphID(i);
+    run->ids.emplace_back(glyphID);
+    run->positions.push_back(Point{x, height});
+    x += run->font.getGlyphAdvance(glyphID);
+    path.lineTo(x, height);
+    if (width < x) {
+      width = x;
+    }
+  }
+  height += lineHeight;
+
+  auto device = GLDevice::Make();
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface =
+      Surface::Make(context, static_cast<int>(ceil(width)), static_cast<int>(ceil(height)));
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Paint strokePaint;
+  strokePaint.setColor(Color{1.f, 0.f, 0.f, 1.f});
+  strokePaint.setStrokeWidth(2.f);
+  strokePaint.setStyle(PaintStyle::Stroke);
+  canvas->drawPath(path, strokePaint);
+
+  Paint paint;
+  paint.setColor(Color::Black());
+  for (const auto& textRun : textRuns) {
+    canvas->drawGlyphs(&(textRun.ids[0]), &(textRun.positions[0]), textRun.ids.size(), textRun.font,
+                       paint);
+  }
+  canvas->flush();
+  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/text_shape"));
   device->unlock();
 }
 }  // namespace tgfx

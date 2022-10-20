@@ -16,17 +16,33 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
+#include "TextShaper.h"
+#ifdef PAG_USE_HARFBUZZ
+#include "TextShaperHarfbuzz.h"
+#else
+#include "TextShaperPrimitive.h"
 #include "platform/Platform.h"
+#endif
 
 namespace pag {
-class NativePlatform : public Platform {
- public:
-  void traceImage(const tgfx::ImageInfo& info, const void* pixels,
-                  const std::string& tag) const override;
+PositionedGlyphs TextShaper::Shape(const std::string& text,
+                                   std::shared_ptr<tgfx::Typeface> typeface) {
+  if (text.empty()) {
+    return {};
+  }
+#ifdef PAG_USE_HARFBUZZ
+  return TextShaperHarfbuzz::Shape(text, std::move(typeface));
+#else
+  if (auto ret = Platform::Current()->shapeText(text, typeface)) {
+    return *ret;
+  }
+  return TextShaperPrimitive::Shape(text, std::move(typeface));
+#endif
+}
 
-  std::optional<PositionedGlyphs> shapeText(
-      const std::string& text, const std::shared_ptr<tgfx::Typeface>& typeface) const override;
-};
+void TextShaper::PurgeCaches() {
+#ifdef PAG_USE_HARFBUZZ
+  TextShaperHarfbuzz::PurgeCaches();
+#endif
+}
 }  // namespace pag

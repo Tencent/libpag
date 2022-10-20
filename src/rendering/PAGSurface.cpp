@@ -24,6 +24,7 @@
 #include "rendering/graphics/Recorder.h"
 #include "rendering/utils/GLRestorer.h"
 #include "rendering/utils/LockGuard.h"
+#include "rendering/utils/shaper/TextShaper.h"
 #include "tgfx/core/Clock.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
 
@@ -107,6 +108,7 @@ void PAGSurface::freeCache() {
 }
 
 void PAGSurface::freeCacheInternal() {
+  TextShaper::PurgeCaches();
   if (pagPlayer) {
     pagPlayer->renderCache->releaseAll();
   }

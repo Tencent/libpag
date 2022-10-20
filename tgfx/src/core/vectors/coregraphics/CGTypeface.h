@@ -24,9 +24,13 @@
 namespace tgfx {
 class CGTypeface : public Typeface {
  public:
-  static std::shared_ptr<CGTypeface> Make(CTFontRef ctFont);
+  static std::shared_ptr<CGTypeface> Make(CTFontRef ctFont, std::shared_ptr<Data> data = nullptr);
 
   ~CGTypeface() override;
+
+  CTFontRef getCTFontRef() const {
+    return ctFont;
+  }
 
   uint32_t uniqueID() const override {
     return _uniqueID;
@@ -46,6 +50,10 @@ class CGTypeface : public Typeface {
 
   GlyphID getGlyphID(const std::string& name) const override;
 
+  std::shared_ptr<Data> getBytes() const override;
+
+  std::shared_ptr<Data> copyTableData(FontTableTag tag) const override;
+
  protected:
   Rect getGlyphBounds(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic) const override;
 
@@ -64,10 +72,11 @@ class CGTypeface : public Typeface {
                         bool verticalText) const override;
 
  private:
-  explicit CGTypeface(CTFontRef ctFont);
+  CGTypeface(CTFontRef ctFont, std::shared_ptr<Data> data);
 
   uint32_t _uniqueID = 0;
   CTFontRef ctFont = nullptr;
+  std::shared_ptr<Data> data;
   std::weak_ptr<CGTypeface> weakThis;
 
   friend class CGScalerContext;

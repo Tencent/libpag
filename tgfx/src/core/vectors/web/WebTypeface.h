@@ -57,6 +57,12 @@ class WebTypeface : public Typeface {
 
   GlyphID getGlyphID(const std::string&) const override;
 
+  std::shared_ptr<Data> getBytes() const override;
+
+  std::shared_ptr<Data> copyTableData(FontTableTag) const override {
+    return nullptr;
+  }
+
  protected:
   Point getGlyphVerticalOffset(GlyphID glyphID, float size, bool fauxBold,
                                bool fauxItalic) const override;

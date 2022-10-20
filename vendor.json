@@ -132,6 +132,19 @@
       }
     },
     {
+      "name": "harfbuzz",
+      "cmake": {
+        "targets": [
+          "harfbuzz"
+        ],
+        "arguments": [
+          "-DHB_HAVE_FREETYPE=OFF",
+          "-DHB_HAVE_CORETEXT=OFF",
+          "-DCMAKE_CXX_FLAGS=\"-DHB_TINY\""
+        ]
+      }
+    },
+    {
       "name": "freetype",
       "deps": {
         "ZLIB": "zlib",

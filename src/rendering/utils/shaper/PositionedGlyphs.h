@@ -18,15 +18,36 @@
 
 #pragma once
 
-#include "platform/Platform.h"
+#include <vector>
+#include "tgfx/core/Typeface.h"
 
 namespace pag {
-class NativePlatform : public Platform {
+class PositionedGlyphs {
  public:
-  void traceImage(const tgfx::ImageInfo& info, const void* pixels,
-                  const std::string& tag) const override;
+  PositionedGlyphs() = default;
 
-  std::optional<PositionedGlyphs> shapeText(
-      const std::string& text, const std::shared_ptr<tgfx::Typeface>& typeface) const override;
+  explicit PositionedGlyphs(
+      std::vector<std::tuple<std::shared_ptr<tgfx::Typeface>, tgfx::GlyphID, uint32_t>> glyphs)
+      : glyphs(std::move(glyphs)) {
+  }
+
+  std::shared_ptr<tgfx::Typeface> getTypeface(size_t atIndex) const {
+    return std::get<0>(glyphs[atIndex]);
+  }
+
+  tgfx::GlyphID getGlyphID(size_t atIndex) const {
+    return std::get<1>(glyphs[atIndex]);
+  }
+
+  uint32_t getStringIndex(size_t atIndex) const {
+    return std::get<2>(glyphs[atIndex]);
+  }
+
+  size_t glyphCount() const {
+    return glyphs.size();
+  }
+
+ private:
+  std::vector<std::tuple<std::shared_ptr<tgfx::Typeface>, tgfx::GlyphID, uint32_t>> glyphs;
 };
 }  // namespace pag

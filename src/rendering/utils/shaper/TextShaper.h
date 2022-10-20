@@ -18,15 +18,14 @@
 
 #pragma once
 
-#include "platform/Platform.h"
+#include "PositionedGlyphs.h"
+#include "tgfx/core/Typeface.h"
 
 namespace pag {
-class NativePlatform : public Platform {
+class TextShaper {
  public:
-  void traceImage(const tgfx::ImageInfo& info, const void* pixels,
-                  const std::string& tag) const override;
+  static PositionedGlyphs Shape(const std::string& text, std::shared_ptr<tgfx::Typeface> typeface);
 
-  std::optional<PositionedGlyphs> shapeText(
-      const std::string& text, const std::shared_ptr<tgfx::Typeface>& typeface) const override;
+  static void PurgeCaches();
 };
 }  // namespace pag

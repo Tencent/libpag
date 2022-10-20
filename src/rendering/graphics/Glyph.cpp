@@ -17,40 +17,28 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Glyph.h"
-#include "rendering/FontManager.h"
+#include "rendering/utils/shaper/TextShaper.h"
 #include "tgfx/core/UTF.h"
 
 namespace pag {
 std::vector<GlyphHandle> Glyph::BuildFromText(const std::string& text, const tgfx::Font& font,
                                               const TextPaint& paint, bool isVertical) {
   auto textFont = font;
-  auto typeface = textFont.getTypeface();
-  bool hasTypeface = typeface != nullptr;
   std::unordered_map<std::string, GlyphHandle> glyphMap;
   std::vector<GlyphHandle> glyphList;
-  const char* textStart = &(text[0]);
-  const char* textStop = textStart + text.size();
-  while (textStart < textStop) {
-    auto oldPosition = textStart;
-    tgfx::UTF::NextUTF8(&textStart, textStop);
-    auto length = textStart - oldPosition;
-    auto name = std::string(oldPosition, length);
+  auto positionedGlyphs = TextShaper::Shape(text, font.getTypeface());
+  auto count = positionedGlyphs.glyphCount();
+  for (size_t i = 0; i < count; ++i) {
+    auto index = positionedGlyphs.getStringIndex(i);
+    auto length = (i + 1 == count ? text.length() : positionedGlyphs.getStringIndex(i + 1)) - index;
+    auto name = text.substr(index, length);
     if (glyphMap.find(name) != glyphMap.end()) {
       glyphList.emplace_back(std::make_shared<Glyph>(*glyphMap[name]));
       continue;
     }
-    tgfx::GlyphID glyphId = 0;
-    if (hasTypeface) {
-      glyphId = typeface->getGlyphID(name);
-      if (glyphId != 0) {
-        textFont.setTypeface(typeface);
-      }
-    }
-    if (glyphId == 0) {
-      auto fallbackTypeface = FontManager::GetFallbackTypeface(name, &glyphId);
-      textFont.setTypeface(fallbackTypeface);
-    }
-    auto glyph = std::shared_ptr<Glyph>(new Glyph(glyphId, name, textFont, isVertical, paint));
+    textFont.setTypeface(positionedGlyphs.getTypeface(i));
+    auto glyph = std::shared_ptr<Glyph>(
+        new Glyph(positionedGlyphs.getGlyphID(i), name, textFont, isVertical, paint));
     glyphMap[name] = glyph;
     glyphList.emplace_back(glyph);
   }

@@ -69,6 +69,11 @@
         "url": "https://github.com/nlohmann/json.git",
         "commit": "fec56a1a16c6e1c1b1f4e116a20e79398282626c",
         "dir": "third_party/json"
+      },
+      {
+        "url": "https://github.com/harfbuzz/harfbuzz.git",
+        "commit": "f1f2be776bcd994fa9262622e1a7098a066e5cf7",
+        "dir": "third_party/harfbuzz"
       }
     ]
   },

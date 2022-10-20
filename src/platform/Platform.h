@@ -20,11 +20,14 @@
 
 #include <cstdlib>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include "codec/NALUType.h"
+#include "rendering/utils/shaper/PositionedGlyphs.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageInfo.h"
+#include "tgfx/core/Typeface.h"
 
 namespace pag {
 struct VideoFormat;
@@ -70,5 +73,10 @@ class Platform {
    */
   virtual void traceImage(const tgfx::ImageInfo& info, const void* pixels,
                           const std::string& tag) const;
+
+  virtual std::optional<PositionedGlyphs> shapeText(const std::string&,
+                                                    const std::shared_ptr<tgfx::Typeface>&) const {
+    return std::nullopt;
+  }
 };
 }  // namespace pag

@@ -18,6 +18,10 @@
 
 #include "NativePlatform.h"
 #include <emscripten/val.h>
+#include "NativeTextShaper.h"
+#ifdef PAG_USE_HARFBUZZ
+#include "base/utils/USE.h"
+#endif
 
 using namespace emscripten;
 
@@ -32,5 +36,16 @@ void NativePlatform::traceImage(const tgfx::ImageInfo& info, const void* pixels,
   auto traceImage = val::module_property("traceImage");
   auto bytes = val(typed_memory_view(info.byteSize(), static_cast<const uint8_t*>(pixels)));
   traceImage(info, bytes, tag);
+}
+
+std::optional<PositionedGlyphs> NativePlatform::shapeText(
+    const std::string& text, const std::shared_ptr<tgfx::Typeface>& typeface) const {
+#ifdef PAG_USE_HARBUZZ
+  USE(text);
+  USE(typeface);
+  return std::nullopt;
+#else
+  return NativeTextShaper::Shape(text, typeface);
+#endif
 }
 }  // namespace pag

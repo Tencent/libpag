@@ -15,6 +15,7 @@ option(PAG_USE_OPENGL "allow use of OpenGL as GPU backend" ON)
 option(PAG_USE_SWIFTSHADER "allow build with SwiftShader library" OFF)
 option(PAG_USE_QT "allow build with QT frameworks" OFF)
 option(PAG_USE_RTTR "enable RTTR support" OFF)
+option(PAG_USE_HARFBUZZ "enable HarfBuzz support" OFF)
 
 if (NOT APPLE AND NOT WEB)
     option(PAG_USE_FREETYPE "Allow use of embedded freetype library" ON)
@@ -90,6 +91,7 @@ endif ()
 
 if (PAG_BUILD_TESTS)
     set(PAG_USE_FREETYPE ON)
+    set(PAG_USE_HARFBUZZ ON)
 endif ()
 
 set(TGFX_USE_OPENGL ${PAG_USE_OPENGL})
@@ -133,6 +135,12 @@ if (PAG_USE_RTTR)
     add_definitions(-DPAG_USE_RTTR)
     list(APPEND PAG_STATIC_VENDORS rttr)
     list(APPEND PAG_INCLUDES third_party/out/rttr/${INCLUDE_ENTRY})
+endif ()
+
+if (PAG_USE_HARFBUZZ)
+    add_definitions(-DPAG_USE_HARFBUZZ)
+    list(APPEND PAG_STATIC_VENDORS harfbuzz)
+    list(APPEND PAG_INCLUDES third_party/harfbuzz/src)
 endif ()
 
 function(find_include_dirs out)

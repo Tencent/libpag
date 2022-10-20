@@ -18,15 +18,18 @@
 
 #pragma once
 
-#include "platform/Platform.h"
+#include <CoreText/CoreText.h>
+#include "tgfx/core/Typeface.h"
 
-namespace pag {
-class NativePlatform : public Platform {
- public:
-  void traceImage(const tgfx::ImageInfo& info, const void* pixels,
-                  const std::string& tag) const override;
+namespace tgfx {
+/**
+ * Creates a typeface for the specified CTFontRef.
+ */
+extern std::shared_ptr<Typeface> MakeTypefaceFromCTFont(const void* ctFont);
 
-  std::optional<PositionedGlyphs> shapeText(
-      const std::string& text, const std::shared_ptr<tgfx::Typeface>& typeface) const override;
-};
-}  // namespace pag
+/**
+ * Returns the platform-specific CTFontRef handle for a given Typeface. Note that the returned
+ * CTFontRef gets released when the source Typeface is destroyed.
+ */
+extern const void* TypefaceGetCTFontRef(const Typeface* face);
+}  // namespace tgfx

@@ -19,7 +19,7 @@
 #include "tgfx/core/Font.h"
 
 namespace tgfx {
-Font::Font() : Font(nullptr) {
+Font::Font() : Font(Typeface::MakeDefault()) {
 }
 
 Font::Font(std::shared_ptr<Typeface> tf, float textSize) {
