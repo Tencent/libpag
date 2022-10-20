@@ -79,7 +79,7 @@
 }
 
 - (void)setCacheEnabled:(BOOL)value {
-  pagPlayer->setCacheScale(value);
+  pagPlayer->setCacheEnabled(value);
 }
 
 - (float)cacheScale {
