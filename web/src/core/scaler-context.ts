@@ -109,8 +109,9 @@ export class ScalerContext {
       ScalerContext.setCanvas(getCanvas2D());
       (ScalerContext.canvas as HTMLCanvasElement | OffscreenCanvas).width = 10;
       (ScalerContext.canvas as HTMLCanvasElement | OffscreenCanvas).height = 10;
+      // https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently
       ScalerContext.setContext(
-        (ScalerContext.canvas as HTMLCanvasElement | OffscreenCanvas).getContext('2d') as
+        (ScalerContext.canvas as HTMLCanvasElement | OffscreenCanvas).getContext('2d', { willReadFrequently: true }) as
           | CanvasRenderingContext2D
           | OffscreenCanvasRenderingContext2D,
       );
