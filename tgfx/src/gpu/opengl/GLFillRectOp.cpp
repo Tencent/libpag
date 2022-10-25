@@ -194,7 +194,7 @@ void GLFillRectOp::execute(OpsRenderPass* opsRenderPass) {
     opsRenderPass->drawIndexed(GL_TRIANGLES, 0, static_cast<int>(indexBuffer->length()));
     return;
   }
-  opsRenderPass->bindVerticesAndIndices(vertices());
+  opsRenderPass->bindVerticesAndIndices(vertices(), nullptr);
   opsRenderPass->draw(GL_TRIANGLE_STRIP, 0, 4);
 }
 }  // namespace tgfx

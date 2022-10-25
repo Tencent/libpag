@@ -73,7 +73,7 @@ void GLTriangulatingPathOp::execute(OpsRenderPass* opsRenderPass) {
       DefaultGeometryProcessor::Make(color, opsRenderPass->renderTarget()->width(),
                                      opsRenderPass->renderTarget()->height(), localMatrix));
   opsRenderPass->bindPipelineAndScissorClip(info, scissorRect());
-  opsRenderPass->bindVerticesAndIndices(vertex);
+  opsRenderPass->bindVerticesAndIndices(vertex, nullptr);
   opsRenderPass->draw(GL_TRIANGLES, 0, vertexCount);
 }
 }  // namespace tgfx
