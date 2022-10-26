@@ -274,8 +274,18 @@ void GLOpsRenderPass::draw(std::function<void()> func) {
     gl->bindVertexArray(vertex->array);
   }
   gl->bindBuffer(GL_ARRAY_BUFFER, vertex->buffer);
+  auto resetVertexObject = [&]() {
+    if (vertex->array > 0) {
+      gl->bindVertexArray(0);
+    }
+    gl->bindBuffer(GL_ARRAY_BUFFER, 0);
+  };
   gl->bufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(_vertices.size()) * sizeof(float),
                  &_vertices[0], GL_STATIC_DRAW);
+  if (!CheckGLError(_context)) {
+    resetVertexObject();
+    return;
+  }
   for (const auto& attribute : program->vertexAttributes()) {
     const AttribLayout& layout = GetAttribLayout(attribute.gpuType);
     gl->vertexAttribPointer(static_cast<unsigned>(attribute.location), layout.count, layout.type,
@@ -284,10 +294,7 @@ void GLOpsRenderPass::draw(std::function<void()> func) {
     gl->enableVertexAttribArray(static_cast<unsigned>(attribute.location));
   }
   func();
-  if (vertex->array > 0) {
-    gl->bindVertexArray(0);
-  }
-  gl->bindBuffer(GL_ARRAY_BUFFER, 0);
+  resetVertexObject();
   CheckGLError(_context);
 }
 

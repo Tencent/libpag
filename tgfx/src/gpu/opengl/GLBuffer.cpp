@@ -19,6 +19,7 @@
 #include "GLBuffer.h"
 
 #include "GLContext.h"
+#include "GLUtil.h"
 #include "core/utils/UniqueID.h"
 
 namespace tgfx {
@@ -31,6 +32,9 @@ static void ComputeRecycleKey(BytesKey* recycleKey, uint32_t type, size_t length
 
 std::shared_ptr<GLBuffer> GLBuffer::Make(Context* context, const uint16_t* buffer, size_t length,
                                          uint32_t type) {
+  if (buffer == nullptr || length == 0) {
+    return nullptr;
+  }
   BytesKey recycleKey = {};
   ComputeRecycleKey(&recycleKey, type, length);
   auto glBuffer =
@@ -39,15 +43,17 @@ std::shared_ptr<GLBuffer> GLBuffer::Make(Context* context, const uint16_t* buffe
     return glBuffer;
   }
   auto gl = GLFunctions::Get(context);
-  glBuffer = Resource::Wrap(context, new GLBuffer(type, length));
-  gl->genBuffers(1, &glBuffer->_bufferID);
-  if (buffer) {
-    gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, glBuffer->_bufferID);
-    gl->bufferData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLsizeiptr>(sizeof(uint16_t) * length),
-                   buffer, GL_STATIC_DRAW);
-    gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+  unsigned bufferID = 0;
+  gl->genBuffers(1, &bufferID);
+  gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, bufferID);
+  gl->bufferData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLsizeiptr>(sizeof(uint16_t) * length),
+                 buffer, GL_STATIC_DRAW);
+  if (!CheckGLError(context)) {
+    gl->deleteBuffers(1, &bufferID);
+    return nullptr;
   }
-  return glBuffer;
+  gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+  return Resource::Wrap(context, new GLBuffer(type, length, bufferID));
 }
 
 void GLBuffer::computeRecycleKey(BytesKey* bytesKey) const {

@@ -38,7 +38,8 @@ class GLBuffer : public Resource {
   void computeRecycleKey(BytesKey*) const override;
 
  private:
-  GLBuffer(uint32_t type, size_t length) : type(type), _length(length) {
+  GLBuffer(uint32_t type, size_t length, unsigned bufferID)
+      : type(type), _length(length), _bufferID(bufferID) {
   }
 
   void onReleaseGPU() override;
