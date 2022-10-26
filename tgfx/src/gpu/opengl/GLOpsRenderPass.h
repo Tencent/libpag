@@ -95,7 +95,7 @@ class GLOpsRenderPass : public OpsRenderPass {
   void bindPipelineAndScissorClip(const ProgramInfo& info, const Rect& drawBounds) override;
 
   void bindVerticesAndIndices(std::vector<float> vertices,
-                              std::shared_ptr<Resource> indices = nullptr) override;
+                              std::shared_ptr<Resource> indices) override;
 
   void draw(unsigned primitiveType, int baseVertex, int vertexCount) override;
 
