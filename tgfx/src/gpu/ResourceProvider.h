@@ -18,29 +18,44 @@
 
 #pragma once
 
-#include <list>
-#include <unordered_map>
-
-#include "tgfx/core/Bitmap.h"
-#include "tgfx/core/BytesKey.h"
-#include "tgfx/core/Color.h"
+#include "GpuBuffer.h"
+#include "tgfx/gpu/Context.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
-class GradientCache {
+class GradientCache;
+
+class ResourceProvider {
  public:
-  std::shared_ptr<Texture> getGradient(Context* context, const Color* colors,
-                                       const float* positions, int count);
+  explicit ResourceProvider(Context* context) : context(context) {
+  }
+
+  ~ResourceProvider();
+
+  std::shared_ptr<Texture> getGradient(const Color* colors, const float* positions, int count);
+
+  std::shared_ptr<GpuBuffer> nonAAQuadIndexBuffer();
+
+  static uint16_t MaxNumNonAAQuads();
+
+  static uint16_t NumIndicesPerNonAAQuad();
+
+  std::shared_ptr<GpuBuffer> aaQuadIndexBuffer();
+
+  static uint16_t MaxNumAAQuads();
+
+  static uint16_t NumIndicesPerAAQuad();
 
   void releaseAll();
 
-  bool empty() const;
-
  private:
-  std::shared_ptr<Texture> find(const BytesKey& bytesKey);
+  std::shared_ptr<GpuBuffer> createNonAAQuadIndexBuffer();
 
-  void add(const BytesKey& bytesKey, std::shared_ptr<Texture> texture);
+  std::shared_ptr<GpuBuffer> createAAQuadIndexBuffer();
 
-  std::list<BytesKey> keys = {};
-  std::unordered_map<BytesKey, std::shared_ptr<Texture>, BytesHasher> textures = {};
+  Context* context = nullptr;
+  GradientCache* _gradientCache = nullptr;
+  std::shared_ptr<GpuBuffer> _aaQuadIndexBuffer;
+  std::shared_ptr<GpuBuffer> _nonAAQuadIndexBuffer;
 };
 }  // namespace tgfx

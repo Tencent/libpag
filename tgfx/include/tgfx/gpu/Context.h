@@ -28,13 +28,13 @@
 namespace tgfx {
 class ProgramCache;
 
-class GradientCache;
-
 class ResourceCache;
 
 class DrawingManager;
 
 class Gpu;
+
+class ResourceProvider;
 
 class Context {
  public:
@@ -45,13 +45,6 @@ class Context {
    */
   Device* device() const {
     return _device;
-  }
-
-  /**
-   * Returns the associated cache that manages the lifetime of all gradients.
-   */
-  GradientCache* gradientCache() const {
-    return _gradientCache;
   }
 
   /**
@@ -70,6 +63,10 @@ class Context {
 
   DrawingManager* drawingManager() const {
     return _drawingManager;
+  }
+
+  ResourceProvider* resourceProvider() const {
+    return _resourceProvider;
   }
 
   /**
@@ -125,10 +122,10 @@ class Context {
 
  private:
   Device* _device = nullptr;
-  GradientCache* _gradientCache = nullptr;
   ProgramCache* _programCache = nullptr;
   ResourceCache* _resourceCache = nullptr;
   DrawingManager* _drawingManager = nullptr;
+  ResourceProvider* _resourceProvider = nullptr;
 
   void releaseAll(bool releaseGPU);
   void onLocked();

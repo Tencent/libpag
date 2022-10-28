@@ -18,35 +18,33 @@
 
 #pragma once
 
-#include "GLOpsRenderPass.h"
-
+#include <optional>
 #include "GLBuffer.h"
+#include "GLOpsRenderPass.h"
 
 namespace tgfx {
 class GLFillRectOp : public GLDrawOp {
  public:
-  static std::unique_ptr<GLFillRectOp> Make(const Rect& rect, const Matrix& viewMatrix,
+  static std::unique_ptr<GLFillRectOp> Make(std::optional<Color> color, const Rect& rect,
+                                            const Matrix& viewMatrix,
                                             const Matrix& localMatrix = Matrix::I());
 
-  static std::unique_ptr<GLFillRectOp> Make(Color color, const Rect& rect, const Matrix& viewMatrix,
-                                            const Matrix& localMatrix = Matrix::I());
-
-  static std::unique_ptr<GLFillRectOp> Make(const std::vector<Color>& colors,
-                                            const std::vector<Rect>& rects,
-                                            const std::vector<Matrix>& viewMatrices,
-                                            const std::vector<Matrix>& localMatrices);
-
-  std::vector<float> vertices();
+  bool add(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
+           const Matrix& localMatrix);
 
   void execute(OpsRenderPass* opsRenderPass) override;
 
  private:
   DEFINE_OP_CLASS_ID
 
-  GLFillRectOp(std::vector<Color> colors, std::vector<Rect> rects, std::vector<Matrix> viewMatrices,
-               std::vector<Matrix> localMatrices);
+  GLFillRectOp(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
+               const Matrix& localMatrix);
 
   bool onCombineIfPossible(Op* op) override;
+
+  bool canAdd(size_t count) const;
+
+  std::vector<float> vertices();
 
   std::vector<float> coverageVertices() const;
 

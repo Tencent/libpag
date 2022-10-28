@@ -19,7 +19,7 @@
 #include "GradientShader.h"
 #include "SweepGradientLayout.h"
 #include "core/utils/MathExtra.h"
-#include "gpu/GradientCache.h"
+#include "gpu/ResourceProvider.h"
 #include "gpu/gradients/ClampedGradientEffect.h"
 #include "gpu/gradients/DualIntervalGradientColorizer.h"
 #include "gpu/gradients/LinearGradientLayout.h"
@@ -104,7 +104,7 @@ static std::unique_ptr<FragmentProcessor> MakeColorizer(const Context* context, 
   // Otherwise, fall back to a raster gradient sample by a texture, which can handle
   // arbitrary gradients (the only downside being sampling resolution).
   return TextureGradientColorizer::Make(
-      context->gradientCache()->getGradient(colors + offset, positions + offset, count));
+      context->resourceProvider()->getGradient(colors + offset, positions + offset, count));
 }
 
 GradientShaderBase::GradientShaderBase(const std::vector<Color>& colors,

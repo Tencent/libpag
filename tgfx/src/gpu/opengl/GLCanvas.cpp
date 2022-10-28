@@ -430,10 +430,8 @@ void GLCanvas::drawAtlas(std::shared_ptr<Texture> atlas, const Matrix matrix[], 
     return;
   }
   auto totalMatrix = getMatrix();
-  std::vector<Rect> rects;
-  std::vector<Matrix> matrices;
-  std::vector<Matrix> localMatrices;
-  std::vector<Color> colorVector;
+  std::vector<std::unique_ptr<GLFillRectOp>> ops;
+  GLFillRectOp* op = nullptr;
   for (size_t i = 0; i < count; ++i) {
     concat(matrix[i]);
     auto width = static_cast<float>(tex[i].width());
@@ -443,28 +441,34 @@ void GLCanvas::drawAtlas(std::shared_ptr<Texture> atlas, const Matrix matrix[], 
       setMatrix(totalMatrix);
       continue;
     }
-    rects.push_back(localBounds);
-    matrices.push_back(state->matrix);
     auto localMatrix = Matrix::I();
     localMatrix.postScale(localBounds.width(), localBounds.height());
     localMatrix.postTranslate(tex[i].x() + localBounds.x(), tex[i].y() + localBounds.y());
-    localMatrices.push_back(localMatrix);
-    if (colors) {
-      colorVector.emplace_back(colors[i].premultiply());
+    auto color = colors ? std::optional<Color>(colors[i].premultiply()) : std::nullopt;
+    if (op == nullptr) {
+      ops.emplace_back(GLFillRectOp::Make(color, localBounds, state->matrix, localMatrix));
+      op = ops.back().get();
+    } else {
+      if (!op->add(color, localBounds, state->matrix, localMatrix)) {
+        ops.emplace_back(GLFillRectOp::Make(color, localBounds, state->matrix, localMatrix));
+        op = ops.back().get();
+      }
     }
     setMatrix(totalMatrix);
   }
-  if (rects.empty()) {
+  if (ops.empty()) {
     return;
   }
-  GLPaint glPaint;
-  if (colors) {
-    glPaint.coverageFragmentProcessors.emplace_back(
-        FragmentProcessor::MulInputByChildAlpha(RGBAAATextureEffect::Make(atlas)));
-  } else {
-    glPaint.colorFragmentProcessors.emplace_back(RGBAAATextureEffect::Make(atlas));
+  for (auto& rectOp : ops) {
+    GLPaint glPaint;
+    if (colors) {
+      glPaint.coverageFragmentProcessors.emplace_back(
+          FragmentProcessor::MulInputByChildAlpha(RGBAAATextureEffect::Make(atlas)));
+    } else {
+      glPaint.colorFragmentProcessors.emplace_back(RGBAAATextureEffect::Make(atlas));
+    }
+    draw(std::move(rectOp), std::move(glPaint), false);
   }
-  draw(GLFillRectOp::Make(colorVector, rects, matrices, localMatrices), std::move(glPaint), false);
 }
 
 void GLCanvas::drawMesh(const Mesh* mesh, const Paint& paint) {

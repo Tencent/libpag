@@ -23,41 +23,43 @@
 #include "core/utils/UniqueID.h"
 
 namespace tgfx {
-static void ComputeRecycleKey(BytesKey* recycleKey, uint32_t type, size_t length) {
+static void ComputeRecycleKey(BytesKey* recycleKey, BufferType bufferType) {
   static const uint32_t Type = UniqueID::Next();
   recycleKey->write(Type);
-  recycleKey->write(type);
-  recycleKey->write(static_cast<uint32_t>(length));
+  recycleKey->write(static_cast<uint32_t>(bufferType));
 }
 
-std::shared_ptr<GLBuffer> GLBuffer::Make(Context* context, const uint16_t* buffer, size_t length,
-                                         uint32_t type) {
-  if (buffer == nullptr || length == 0) {
+std::shared_ptr<GpuBuffer> GpuBuffer::Make(Context* context, BufferType bufferType,
+                                           const void* buffer, size_t size) {
+  if (buffer == nullptr || size == 0) {
     return nullptr;
   }
+  auto target = bufferType == BufferType::Index ? GL_ELEMENT_ARRAY_BUFFER : GL_ARRAY_BUFFER;
   BytesKey recycleKey = {};
-  ComputeRecycleKey(&recycleKey, type, length);
+  ComputeRecycleKey(&recycleKey, bufferType);
   auto glBuffer =
       std::static_pointer_cast<GLBuffer>(context->resourceCache()->getRecycled(recycleKey));
-  if (glBuffer != nullptr) {
-    return glBuffer;
-  }
   auto gl = GLFunctions::Get(context);
-  unsigned bufferID = 0;
-  gl->genBuffers(1, &bufferID);
-  gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, bufferID);
-  gl->bufferData(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLsizeiptr>(sizeof(uint16_t) * length),
-                 buffer, GL_STATIC_DRAW);
+  if (glBuffer == nullptr) {
+    unsigned bufferID = 0;
+    gl->genBuffers(1, &bufferID);
+    if (bufferID == 0) {
+      return nullptr;
+    }
+    glBuffer = Resource::Wrap(context, new GLBuffer(bufferType, size, bufferID));
+  }
+  gl->bindBuffer(target, glBuffer->_bufferID);
+  gl->bufferData(target, static_cast<GLsizeiptr>(size), buffer, GL_STATIC_DRAW);
   if (!CheckGLError(context)) {
-    gl->deleteBuffers(1, &bufferID);
+    gl->bindBuffer(target, 0);
     return nullptr;
   }
-  gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-  return Resource::Wrap(context, new GLBuffer(type, length, bufferID));
+  gl->bindBuffer(target, 0);
+  return glBuffer;
 }
 
 void GLBuffer::computeRecycleKey(BytesKey* bytesKey) const {
-  ComputeRecycleKey(bytesKey, type, _length);
+  ComputeRecycleKey(bytesKey, _bufferType);
 }
 
 void GLBuffer::onReleaseGPU() {

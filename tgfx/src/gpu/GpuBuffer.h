@@ -18,29 +18,31 @@
 
 #pragma once
 
-#include <list>
-#include <unordered_map>
-
-#include "tgfx/core/Bitmap.h"
-#include "tgfx/core/BytesKey.h"
-#include "tgfx/core/Color.h"
+#include "tgfx/gpu/Resource.h"
 
 namespace tgfx {
-class GradientCache {
+enum class BufferType {
+  Index,
+  Vertex,
+};
+
+class GpuBuffer : public Resource {
  public:
-  std::shared_ptr<Texture> getGradient(Context* context, const Color* colors,
-                                       const float* positions, int count);
+  static std::shared_ptr<GpuBuffer> Make(Context* context, BufferType bufferType,
+                                         const void* buffer, size_t size);
 
-  void releaseAll();
+  size_t size() const {
+    return _sizeInBytes;
+  }
 
-  bool empty() const;
+ protected:
+  GpuBuffer(BufferType bufferType, size_t sizeInBytes)
+      : _bufferType(bufferType), _sizeInBytes(sizeInBytes) {
+  }
+
+  BufferType _bufferType;
 
  private:
-  std::shared_ptr<Texture> find(const BytesKey& bytesKey);
-
-  void add(const BytesKey& bytesKey, std::shared_ptr<Texture> texture);
-
-  std::list<BytesKey> keys = {};
-  std::unordered_map<BytesKey, std::shared_ptr<Texture>, BytesHasher> textures = {};
+  size_t _sizeInBytes;
 };
 }  // namespace tgfx
