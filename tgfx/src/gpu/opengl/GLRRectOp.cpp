@@ -251,7 +251,6 @@ void GLRRectOp::execute(OpsRenderPass* opsRenderPass) {
     rRectWrap.writeToVertices(vertices, useScale, aa);
   }
 
-  static auto Type = UniqueID::Next();
   std::vector<uint16_t> indices;
   for (size_t i = 0; i < rRects.size(); ++i) {
     auto offset = i * 16;
@@ -259,14 +258,17 @@ void GLRRectOp::execute(OpsRenderPass* opsRenderPass) {
       indices.emplace_back(gStandardRRectIndices[j] + offset);
     }
   }
-  auto buffer = GLBuffer::Make(opsRenderPass->context(), &(indices[0]), indices.size(), Type);
-
+  auto buffer = GpuBuffer::Make(opsRenderPass->context(), BufferType::Index, &(indices[0]),
+                                indices.size() * sizeof(uint16_t));
+  if (buffer == nullptr) {
+    return;
+  }
   auto info = createProgram(
       opsRenderPass, EllipseGeometryProcessor::Make(opsRenderPass->renderTarget()->width(),
                                                     opsRenderPass->renderTarget()->height(), false,
                                                     UseScale(opsRenderPass), localMatrix));
   opsRenderPass->bindPipelineAndScissorClip(info, scissorRect());
   opsRenderPass->bindVerticesAndIndices(std::move(vertices), buffer);
-  opsRenderPass->drawIndexed(GL_TRIANGLES, 0, static_cast<int>(buffer->length()));
+  opsRenderPass->drawIndexed(GL_TRIANGLES, 0, static_cast<int>(indices.size()));
 }
 }  // namespace tgfx

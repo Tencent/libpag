@@ -27,7 +27,7 @@ void SurfaceDrawContext::addOp(std::unique_ptr<Op> op) {
 
 void SurfaceDrawContext::fillRectWithFP(const Rect& dstRect, const Matrix& localMatrix,
                                         std::unique_ptr<FragmentProcessor> fp) {
-  auto op = GLFillRectOp::Make(dstRect, Matrix::I(), localMatrix);
+  auto op = GLFillRectOp::Make({}, dstRect, Matrix::I(), localMatrix);
   std::vector<std::unique_ptr<FragmentProcessor>> colors;
   colors.emplace_back(std::move(fp));
   op->setColors(std::move(colors));

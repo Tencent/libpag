@@ -18,34 +18,27 @@
 
 #pragma once
 
-#include "tgfx/gpu/Resource.h"
+#include "gpu/GpuBuffer.h"
 
 namespace tgfx {
-class GLBuffer : public Resource {
+class GLBuffer : public GpuBuffer {
  public:
-  static std::shared_ptr<GLBuffer> Make(Context* context, const uint16_t* buffer, size_t length,
-                                        uint32_t type);
-
   unsigned bufferID() const {
     return _bufferID;
-  }
-
-  size_t length() const {
-    return _length;
   }
 
  protected:
   void computeRecycleKey(BytesKey*) const override;
 
  private:
-  GLBuffer(uint32_t type, size_t length, unsigned bufferID)
-      : type(type), _length(length), _bufferID(bufferID) {
+  GLBuffer(BufferType bufferType, size_t size, unsigned bufferID)
+      : GpuBuffer(bufferType, size), _bufferID(bufferID) {
   }
 
   void onReleaseGPU() override;
 
-  uint32_t type = 0;
-  size_t _length = 0;
   unsigned _bufferID = 0;
+
+  friend class GpuBuffer;
 };
 }  // namespace tgfx

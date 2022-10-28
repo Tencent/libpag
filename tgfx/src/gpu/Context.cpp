@@ -19,18 +19,17 @@
 #include "tgfx/gpu/Context.h"
 #include "core/utils/Log.h"
 #include "gpu/DrawingManager.h"
-#include "gpu/Gpu.h"
-#include "gpu/GradientCache.h"
 #include "gpu/ProgramCache.h"
+#include "gpu/ResourceProvider.h"
 #include "tgfx/core/Clock.h"
 #include "tgfx/gpu/ResourceCache.h"
 
 namespace tgfx {
 Context::Context(Device* device) : _device(device) {
-  _gradientCache = new GradientCache(this);
   _programCache = new ProgramCache(this);
   _resourceCache = new ResourceCache(this);
   _drawingManager = new DrawingManager(this);
+  _resourceProvider = new ResourceProvider(this);
 }
 
 Context::~Context() {
@@ -38,12 +37,11 @@ Context::~Context() {
   // may leak.
   DEBUG_ASSERT(_resourceCache->empty());
   DEBUG_ASSERT(_programCache->empty());
-  DEBUG_ASSERT(_gradientCache->empty())
-  delete _gradientCache;
   delete _programCache;
   delete _resourceCache;
   delete _drawingManager;
   delete _gpu;
+  delete _resourceProvider;
 }
 
 bool Context::flush(Semaphore* signalSemaphore) {
@@ -70,7 +68,7 @@ void Context::purgeResourcesNotUsedIn(int64_t usNotUsed) {
 }
 
 void Context::releaseAll(bool releaseGPU) {
-  _gradientCache->releaseAll();
+  _resourceProvider->releaseAll();
   _programCache->releaseAll(releaseGPU);
   _resourceCache->releaseAll(releaseGPU);
 }

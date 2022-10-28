@@ -91,8 +91,8 @@ std::shared_ptr<PixelBuffer> CreateGradient(const Color* colors, const float* po
   return pixelBuffer;
 }
 
-std::shared_ptr<Texture> GradientCache::getGradient(const Color* colors, const float* positions,
-                                                    int count) {
+std::shared_ptr<Texture> GradientCache::getGradient(Context* context, const Color* colors,
+                                                    const float* positions, int count) {
   BytesKey bytesKey = {};
   for (int i = 0; i < count; ++i) {
     bytesKey.write(colors[i].red);

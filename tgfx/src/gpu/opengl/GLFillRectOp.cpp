@@ -21,6 +21,7 @@
 #include "core/utils/UniqueID.h"
 #include "gpu/Quad.h"
 #include "gpu/QuadPerEdgeAAGeometryProcessor.h"
+#include "gpu/ResourceProvider.h"
 
 namespace tgfx {
 std::vector<float> GLFillRectOp::coverageVertices() const {
@@ -94,70 +95,59 @@ std::vector<float> GLFillRectOp::vertices() {
   }
 }
 
-std::unique_ptr<GLFillRectOp> GLFillRectOp::Make(const Rect& rect, const Matrix& viewMatrix,
-                                                 const Matrix& localMatrix) {
-  return std::unique_ptr<GLFillRectOp>(new GLFillRectOp({}, {rect}, {viewMatrix}, {localMatrix}));
-}
-
-std::unique_ptr<GLFillRectOp> GLFillRectOp::Make(Color color, const Rect& rect,
+std::unique_ptr<GLFillRectOp> GLFillRectOp::Make(std::optional<Color> color, const Rect& rect,
                                                  const Matrix& viewMatrix,
                                                  const Matrix& localMatrix) {
-  return std::unique_ptr<GLFillRectOp>(
-      new GLFillRectOp({color}, {rect}, {viewMatrix}, {localMatrix}));
+  return std::unique_ptr<GLFillRectOp>(new GLFillRectOp(color, rect, viewMatrix, localMatrix));
 }
 
-std::unique_ptr<GLFillRectOp> GLFillRectOp::Make(const std::vector<Color>& colors,
-                                                 const std::vector<Rect>& rects,
-                                                 const std::vector<Matrix>& viewMatrices,
-                                                 const std::vector<Matrix>& localMatrices) {
-  return std::unique_ptr<GLFillRectOp>(
-      new GLFillRectOp(colors, rects, viewMatrices, localMatrices));
-}
-
-GLFillRectOp::GLFillRectOp(std::vector<Color> colors, std::vector<Rect> rects,
-                           std::vector<Matrix> viewMatrices, std::vector<Matrix> localMatrices)
+GLFillRectOp::GLFillRectOp(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
+                           const Matrix& localMatrix)
     : GLDrawOp(ClassID()),
-      colors(std::move(colors)),
-      rects(std::move(rects)),
-      viewMatrices(std::move(viewMatrices)),
-      localMatrices(std::move(localMatrices)) {
+      colors(color ? std::vector<Color>{*color} : std::vector<Color>()),
+      rects({rect}),
+      viewMatrices({viewMatrix}),
+      localMatrices({localMatrix}) {
   auto bounds = Rect::MakeEmpty();
-  for (size_t i = 0; i < this->rects.size(); ++i) {
-    bounds.join(this->viewMatrices[i].mapRect(this->rects[i]));
-  }
+  bounds.join(viewMatrix.mapRect(rect));
   setBounds(bounds);
 }
 
-bool GLFillRectOp::onCombineIfPossible(Op* op) {
-  if (!GLDrawOp::onCombineIfPossible(op)) {
+bool GLFillRectOp::add(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
+                       const Matrix& localMatrix) {
+  if ((!color && !colors.empty()) || (color && colors.empty()) || !canAdd(1)) {
     return false;
   }
+  auto b = bounds();
+  b.join(viewMatrix.mapRect(rect));
+  setBounds(b);
+  rects.emplace_back(rect);
+  viewMatrices.emplace_back(viewMatrix);
+  localMatrices.emplace_back(localMatrix);
+  if (color) {
+    colors.push_back(*color);
+  }
+  return true;
+}
+
+bool GLFillRectOp::canAdd(size_t count) const {
+  return rects.size() + count <= static_cast<size_t>(aa == AAType::Coverage
+                                                         ? ResourceProvider::MaxNumAAQuads()
+                                                         : ResourceProvider::MaxNumNonAAQuads());
+}
+
+bool GLFillRectOp::onCombineIfPossible(Op* op) {
   auto* that = static_cast<GLFillRectOp*>(op);
+  if (colors.empty() != that->colors.empty() || !canAdd(that->rects.size()) ||
+      !GLDrawOp::onCombineIfPossible(op)) {
+    return false;
+  }
   rects.insert(rects.end(), that->rects.begin(), that->rects.end());
   viewMatrices.insert(viewMatrices.end(), that->viewMatrices.begin(), that->viewMatrices.end());
   localMatrices.insert(localMatrices.end(), that->localMatrices.begin(), that->localMatrices.end());
   colors.insert(colors.end(), that->colors.begin(), that->colors.end());
   return true;
 }
-
-static constexpr int kVerticesPerNonAAQuad = 4;
-static constexpr int kIndicesPerNonAAQuad = 6;
-static constexpr int kVerticesPerAAQuad = 8;
-static constexpr int kIndicesPerAAQuad = 30;
-
-// clang-format off
-static constexpr uint16_t kNonAAQuadIndexPattern[] = {
-  0, 1, 2, 2, 1, 3
-};
-
-static constexpr uint16_t kAAQuadIndexPattern[] = {
-  0, 1, 2, 1, 3, 2,
-  0, 4, 1, 4, 5, 1,
-  0, 6, 4, 0, 2, 6,
-  2, 3, 6, 3, 7, 6,
-  1, 5, 3, 3, 5, 7,
-};
-// clang-format on
 
 void GLFillRectOp::execute(OpsRenderPass* opsRenderPass) {
   auto info = createProgram(
@@ -166,32 +156,20 @@ void GLFillRectOp::execute(OpsRenderPass* opsRenderPass) {
                                                           aa, !colors.empty()));
   opsRenderPass->bindPipelineAndScissorClip(info, scissorRect());
   if (rects.size() > 1 || aa == AAType::Coverage) {
-    std::vector<uint16_t> indexes;
-    static auto kNonAAType = UniqueID::Next();
-    static auto kAAType = UniqueID::Next();
-    uint32_t type;
-    const uint16_t* indexPattern;
-    int verticesPerQuad;
-    int indexesPerQuad;
+    std::shared_ptr<GpuBuffer> indexBuffer;
+    uint16_t numIndicesPerQuad;
     if (aa == AAType::Coverage) {
-      type = kAAType;
-      indexPattern = kAAQuadIndexPattern;
-      verticesPerQuad = kVerticesPerAAQuad;
-      indexesPerQuad = kIndicesPerAAQuad;
+      indexBuffer = opsRenderPass->context()->resourceProvider()->aaQuadIndexBuffer();
+      numIndicesPerQuad = ResourceProvider::NumIndicesPerAAQuad();
     } else {
-      type = kNonAAType;
-      indexPattern = kNonAAQuadIndexPattern;
-      verticesPerQuad = kVerticesPerNonAAQuad;
-      indexesPerQuad = kIndicesPerNonAAQuad;
+      indexBuffer = opsRenderPass->context()->resourceProvider()->nonAAQuadIndexBuffer();
+      numIndicesPerQuad = ResourceProvider::NumIndicesPerNonAAQuad();
     }
-    for (size_t i = 0; i < rects.size(); ++i) {
-      for (int j = 0; j < indexesPerQuad; ++j) {
-        indexes.push_back(i * verticesPerQuad + indexPattern[j]);
-      }
+    if (indexBuffer == nullptr) {
+      return;
     }
-    auto indexBuffer = GLBuffer::Make(opsRenderPass->context(), &indexes[0], indexes.size(), type);
     opsRenderPass->bindVerticesAndIndices(vertices(), indexBuffer);
-    opsRenderPass->drawIndexed(GL_TRIANGLES, 0, static_cast<int>(indexBuffer->length()));
+    opsRenderPass->drawIndexed(GL_TRIANGLES, 0, static_cast<int>(rects.size()) * numIndicesPerQuad);
     return;
   }
   opsRenderPass->bindVerticesAndIndices(vertices(), nullptr);
