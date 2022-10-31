@@ -89,4 +89,9 @@ bool PreComposeLayer::verify() const {
   }
   VerifyAndReturn(composition != nullptr);
 }
+
+Rect PreComposeLayer::getBounds() const {
+  return Rect::MakeWH(static_cast<float>(composition->width),
+                      static_cast<float>(composition->height));
+}
 }  // namespace pag

@@ -25,9 +25,10 @@ namespace pag {
 
 std::shared_ptr<tgfx::Surface> SurfaceUtil::MakeContentSurface(tgfx::Canvas* parentCanvas,
                                                                const tgfx::Rect& bounds,
-                                                               float scaleFactorLimit,
+                                                               float scaleFactorLimit, float scale,
                                                                bool usesMSAA) {
   auto maxScale = GetMaxScaleFactor(parentCanvas->getMatrix());
+  maxScale *= scale;
   if (maxScale > scaleFactorLimit) {
     maxScale = scaleFactorLimit;
   } else {

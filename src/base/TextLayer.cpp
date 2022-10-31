@@ -72,4 +72,9 @@ bool TextLayer::verify() const {
   }
   VerifyAndReturn(moreOption == nullptr || moreOption->verify());
 }
+
+Rect TextLayer::getBounds() const {
+  return Rect::MakeWH(static_cast<float>(containingComposition->width),
+                      static_cast<float>(containingComposition->width));
+}
 }  // namespace pag

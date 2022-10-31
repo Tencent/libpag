@@ -357,4 +357,20 @@ PAG_TEST(PAGFilterTest, FeatherMask) {
   pagPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFilterTest/FeatherMask"));
 }
+
+/**
+ * 用例描述: Corner Pin 缩放
+ */
+PAG_TEST(PAGFilterTest, CornerPinScale) {
+  auto pagFile = PAGFile::Load("../resources/filter/corner_pin_scale.pag");
+  ASSERT_NE(pagFile, nullptr);
+  pagFile->replaceImage(0, PAGImage::FromPath("../resources/apitest/rotation.jpg"));
+  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  ASSERT_NE(pagSurface, nullptr);
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFilterTest/CornerPinScale"));
+}
 }  // namespace pag

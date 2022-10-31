@@ -439,6 +439,10 @@ class PAG_API Effect {
   virtual void transformBounds(Rect*, const Point&, Frame) const {
   }
 
+  virtual Point getMaxScaleFactor(const Rect&) const {
+    return Point::Make(1.f, 1.f);
+  }
+
   virtual void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const;
 
   virtual bool verify() const;
@@ -542,6 +546,8 @@ class PAG_API CornerPinEffect : public Effect {
 
   void transformBounds(Rect* contentBounds, const Point& filterScale,
                        Frame layerFrame) const override;
+
+  Point getMaxScaleFactor(const Rect& bounds) const override;
 
   void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const override;
 
@@ -1650,6 +1656,7 @@ class PAG_API Layer {
   virtual bool verify() const;
   Point getMaxScaleFactor();
   TimeRange visibleRange();
+  virtual Rect getBounds() const;
 
  private:
   bool verifyExtra() const;
@@ -1689,6 +1696,8 @@ class PAG_API SolidLayer : public Layer {
 
   bool verify() const override;
 
+  Rect getBounds() const override;
+
   RTTR_ENABLE(Layer)
 };
 
@@ -1708,6 +1717,8 @@ class PAG_API TextLayer : public Layer {
   void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) override;
   bool verify() const override;
 
+  Rect getBounds() const override;
+
   std::shared_ptr<TextDocument> getTextDocument();
 
   RTTR_ENABLE(Layer)
@@ -1725,6 +1736,8 @@ class PAG_API ShapeLayer : public Layer {
 
   void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) override;
   bool verify() const override;
+
+  Rect getBounds() const override;
 
   RTTR_ENABLE(Layer)
 };
@@ -1754,6 +1767,8 @@ class PAG_API ImageLayer : public Layer {
 
   bool verify() const override;
 
+  Rect getBounds() const override;
+
   RTTR_ENABLE(Layer)
 };
 
@@ -1777,6 +1792,7 @@ class PAG_API PreComposeLayer : public Layer {
   bool verify() const override;
   std::vector<TimeRange> getContentStaticTimeRanges() const;
   Frame getCompositionFrame(Frame layerFrame);
+  Rect getBounds() const override;
 
   RTTR_ENABLE(Layer)
 };

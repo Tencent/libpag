@@ -46,7 +46,7 @@ bool DoesProcessVisibleAreaOnly(Layer* layer) {
 }
 
 std::unique_ptr<FilterList> FilterRenderer::MakeFilterList(const FilterModifier* modifier) {
-  auto filterList = std::unique_ptr<FilterList>(new FilterList());
+  auto filterList = std::make_unique<FilterList>();
   auto layer = modifier->layer;
   auto layerFrame = modifier->layerFrame;
   filterList->layer = layer;
@@ -85,35 +85,6 @@ std::unique_ptr<FilterList> FilterRenderer::MakeFilterList(const FilterModifier*
   return filterList;
 }
 
-tgfx::Rect FilterRenderer::GetParentBounds(const FilterList* filterList) {
-  auto layer = filterList->layer;
-  float width, height;
-  switch (layer->type()) {
-    case LayerType::Shape:  // fall through
-    case LayerType::Text:
-      // 对于Shape和Text一定有containingComposition。
-      width = layer->containingComposition->width;
-      height = layer->containingComposition->height;
-      break;
-    case LayerType::Solid:
-      width = static_cast<SolidLayer*>(layer)->width;
-      height = static_cast<SolidLayer*>(layer)->height;
-      break;
-    case LayerType::Image:
-      width = static_cast<ImageLayer*>(layer)->imageBytes->width;
-      height = static_cast<ImageLayer*>(layer)->imageBytes->height;
-      break;
-    case LayerType::PreCompose:
-      width = static_cast<PreComposeLayer*>(layer)->composition->width;
-      height = static_cast<PreComposeLayer*>(layer)->composition->height;
-      break;
-    default:
-      width = height = 0;
-      break;
-  }
-  return tgfx::Rect::MakeXYWH(0, 0, width, height);
-}
-
 tgfx::Rect FilterRenderer::GetContentBounds(const FilterList* filterList,
                                             std::shared_ptr<Graphic> content) {
   tgfx::Rect contentBounds = tgfx::Rect::MakeEmpty();
@@ -121,7 +92,7 @@ tgfx::Rect FilterRenderer::GetContentBounds(const FilterList* filterList,
     content->measureBounds(&contentBounds);
     contentBounds.roundOut();
   } else {
-    contentBounds = GetParentBounds(filterList);
+    contentBounds = ToTGFX(filterList->layer->getBounds());
   }
   return contentBounds;
 }
@@ -149,7 +120,7 @@ void FilterRenderer::MeasureFilterBounds(tgfx::Rect* bounds, const FilterModifie
   if (filterList->processVisibleAreaOnly) {
     bounds->roundOut();
   } else {
-    *bounds = GetParentBounds(filterList.get());
+    *bounds = ToTGFX(filterList->layer->getBounds());
   }
   TransformFilterBounds(bounds, filterList.get());
   if (filterList->useParentSizeInput) {
@@ -440,6 +411,15 @@ std::unique_ptr<FilterSource> ToFilterSource(tgfx::Canvas* canvas) {
   return ToFilterSource(texture.get(), scale);
 }
 
+static float GetScaleFactor(FilterList* filterList, const tgfx::Rect& contentBounds) {
+  float scale = 1.f;
+  for (auto& effect : filterList->effects) {
+    auto effectScale = effect->getMaxScaleFactor(ToPAG(contentBounds));
+    scale *= std::max(effectScale.x, effectScale.y);
+  }
+  return scale;
+}
+
 void FilterRenderer::DrawWithFilter(tgfx::Canvas* parentCanvas, RenderCache* cache,
                                     const FilterModifier* modifier,
                                     std::shared_ptr<Graphic> content) {
@@ -457,8 +437,9 @@ void FilterRenderer::DrawWithFilter(tgfx::Canvas* parentCanvas, RenderCache* cac
     filterList->layerMatrix.invert(&inverted);
     parentCanvas->concat(inverted);
   }
-  auto contentSurface =
-      SurfaceUtil::MakeContentSurface(parentCanvas, contentBounds, filterList->scaleFactorLimit);
+  auto scale = GetScaleFactor(filterList.get(), contentBounds);
+  auto contentSurface = SurfaceUtil::MakeContentSurface(parentCanvas, contentBounds,
+                                                        filterList->scaleFactorLimit, scale);
   if (contentSurface == nullptr) {
     return;
   }
@@ -474,7 +455,7 @@ void FilterRenderer::DrawWithFilter(tgfx::Canvas* parentCanvas, RenderCache* cac
   if (filterTarget == nullptr) {
     // 需要离屏绘制
     targetSurface = SurfaceUtil::MakeContentSurface(parentCanvas, filterNodes.back().bounds,
-                                                    filterList->scaleFactorLimit,
+                                                    filterList->scaleFactorLimit, scale,
                                                     filterNodes.back().filter->needsMSAA());
     if (targetSurface == nullptr) {
       return;
