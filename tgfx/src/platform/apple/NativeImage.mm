@@ -109,7 +109,7 @@ std::shared_ptr<ImageCodec> NativeCodec::MakeFrom(void* nativeImage) {
   }
   auto codec =
       new NativeImage(static_cast<int>(width), static_cast<int>(height), Orientation::TopLeft);
-  CFRetain(cgImage);:q
+  CFRetain(cgImage);
 
   codec->cgImage = cgImage;
   return std::unique_ptr<ImageCodec>(codec);
