@@ -18,13 +18,13 @@
 
 #pragma once
 
-#include "tgfx/core/Image.h"
+#include "tgfx/core/ImageCodec.h"
 
 namespace tgfx {
-class PngImage : public Image {
+class PngImage : public ImageCodec {
  public:
-  static std::shared_ptr<Image> MakeFrom(const std::string& filePath);
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Data> imageBytes);
+  static std::shared_ptr<ImageCodec> MakeFrom(const std::string& filePath);
+  static std::shared_ptr<ImageCodec> MakeFrom(std::shared_ptr<Data> imageBytes);
   static bool IsPng(const std::shared_ptr<Data>& data);
 
 #ifdef TGFX_USE_PNG_ENCODE
@@ -36,12 +36,12 @@ class PngImage : public Image {
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
 
  private:
-  static std::shared_ptr<Image> MakeFromData(const std::string& filePath,
-                                             std::shared_ptr<Data> byteData);
+  static std::shared_ptr<ImageCodec> MakeFromData(const std::string& filePath,
+                                                  std::shared_ptr<Data> byteData);
 
   PngImage(int width, int height, Orientation orientation, std::string filePath,
            std::shared_ptr<Data> fileData)
-      : Image(width, height, orientation),
+      : ImageCodec(width, height, orientation),
         fileData(std::move(fileData)),
         filePath(std::move(filePath)) {
   }

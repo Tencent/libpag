@@ -21,7 +21,7 @@
 #include "framework/utils/PAGTestUtils.h"
 #include "nlohmann/json.hpp"
 #include "pag/pag.h"
-#include "tgfx/core/Image.h"
+#include "tgfx/core/ImageCodec.h"
 #include "tgfx/gpu/Surface.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
 
@@ -102,16 +102,16 @@ PAG_TEST_F(PAGImageTest, image) {
  * 用例描述: PAGImage解码等功能
  */
 PAG_TEST_F(PAGImageTest, image2) {
-  auto image = Image::MakeFrom("../resources/apitest/imageReplacement.png");
-  ASSERT_TRUE(image != nullptr);
-  ASSERT_EQ(image->height(), 110);
-  ASSERT_EQ(image->width(), 110);
-  ASSERT_EQ(image->height(), 110);
-  ASSERT_EQ(image->orientation(), Orientation::TopLeft);
-  auto pixelBuffer = PixelBuffer::Make(image->width(), image->height(), false, false);
+  auto codec = ImageCodec::MakeFrom("../resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(codec != nullptr);
+  ASSERT_EQ(codec->height(), 110);
+  ASSERT_EQ(codec->width(), 110);
+  ASSERT_EQ(codec->height(), 110);
+  ASSERT_EQ(codec->orientation(), Orientation::TopLeft);
+  auto pixelBuffer = PixelBuffer::Make(codec->width(), codec->height(), false, false);
   ASSERT_TRUE(pixelBuffer != nullptr);
   Bitmap bitmap(pixelBuffer);
-  auto result = image->readPixels(bitmap.info(), bitmap.writablePixels());
+  auto result = codec->readPixels(bitmap.info(), bitmap.writablePixels());
   ASSERT_TRUE(result);
   EXPECT_TRUE(Baseline::Compare(bitmap, "PAGImageTest/image2"));
 }
@@ -147,10 +147,10 @@ PAG_TEST_F(PAGImageTest, BottomLeftMask) {
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, width, height);
-  auto image1 = Image::MakeFrom("../resources/apitest/imageReplacement.webp")
+  auto image1 = ImageCodec::MakeFrom("../resources/apitest/imageReplacement.webp")
                     ->makeBuffer()
                     ->makeTexture(context);
-  auto imageAsMask = Image::MakeFrom("../resources/apitest/image_as_mask.png");
+  auto imageAsMask = ImageCodec::MakeFrom("../resources/apitest/image_as_mask.png");
   ASSERT_TRUE(imageAsMask != nullptr);
   auto image2 = imageAsMask->makeBuffer()->makeTexture(context);
   image2->_origin = tgfx::ImageOrigin::BottomLeft;

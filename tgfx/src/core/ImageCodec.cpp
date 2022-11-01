@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/Image.h"
+#include "tgfx/core/ImageCodec.h"
 #include "core/utils/USE.h"
 #include "platform/NativeCodec.h"
 #include "tgfx/core/Bitmap.h"
@@ -40,8 +40,8 @@
 #endif
 
 namespace tgfx {
-std::shared_ptr<Image> Image::MakeFrom(const std::string& filePath) {
-  std::shared_ptr<Image> image = nullptr;
+std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(const std::string& filePath) {
+  std::shared_ptr<ImageCodec> codec = nullptr;
   auto stream = Stream::MakeFromFile(filePath);
   if (stream == nullptr || stream->size() <= 14) {
     return nullptr;
@@ -53,68 +53,68 @@ std::shared_ptr<Image> Image::MakeFrom(const std::string& filePath) {
   auto data = buffer.release();
 #ifdef TGFX_USE_WEBP_DECODE
   if (WebpImage::IsWebp(data)) {
-    image = WebpImage::MakeFrom(filePath);
+    codec = WebpImage::MakeFrom(filePath);
   }
 #endif
 
 #ifdef TGFX_USE_PNG_DECODE
   if (PngImage::IsPng(data)) {
-    image = PngImage::MakeFrom(filePath);
+    codec = PngImage::MakeFrom(filePath);
   }
 #endif
 
 #ifdef TGFX_USE_JPEG_DECODE
   if (JpegImage::IsJpeg(data)) {
-    image = JpegImage::MakeFrom(filePath);
+    codec = JpegImage::MakeFrom(filePath);
   }
 #endif
-  if (image == nullptr) {
-    image = NativeCodec::MakeImage(filePath);
+  if (codec == nullptr) {
+    codec = NativeCodec::MakeCodec(filePath);
   }
-  if (image && !ImageInfo::IsValidSize(image->width(), image->height())) {
-    image = nullptr;
+  if (codec && !ImageInfo::IsValidSize(codec->width(), codec->height())) {
+    codec = nullptr;
   }
-  return image;
+  return codec;
 }
 
-std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Data> imageBytes) {
+std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(std::shared_ptr<Data> imageBytes) {
   if (imageBytes == nullptr || imageBytes->size() == 0) {
     return nullptr;
   }
-  std::shared_ptr<Image> image = nullptr;
+  std::shared_ptr<ImageCodec> codec = nullptr;
 #ifdef TGFX_USE_WEBP_DECODE
   if (WebpImage::IsWebp(imageBytes)) {
-    image = WebpImage::MakeFrom(imageBytes);
+    codec = WebpImage::MakeFrom(imageBytes);
   }
 #endif
 #ifdef TGFX_USE_PNG_DECODE
   if (PngImage::IsPng(imageBytes)) {
-    image = PngImage::MakeFrom(imageBytes);
+    codec = PngImage::MakeFrom(imageBytes);
   }
 #endif
 #ifdef TGFX_USE_JPEG_DECODE
   if (JpegImage::IsJpeg(imageBytes)) {
-    image = JpegImage::MakeFrom(imageBytes);
+    codec = JpegImage::MakeFrom(imageBytes);
   }
 #endif
-  if (image == nullptr) {
-    image = NativeCodec::MakeImage(imageBytes);
+  if (codec == nullptr) {
+    codec = NativeCodec::MakeCodec(imageBytes);
   }
-  if (image && !ImageInfo::IsValidSize(image->width(), image->height())) {
-    image = nullptr;
+  if (codec && !ImageInfo::IsValidSize(codec->width(), codec->height())) {
+    codec = nullptr;
   }
-  return image;
+  return codec;
 }
 
-std::shared_ptr<Image> Image::MakeFrom(void* nativeImage) {
+std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(void* nativeImage) {
   if (nativeImage == nullptr) {
     return nullptr;
   }
   return NativeCodec::MakeFrom(nativeImage);
 }
 
-std::shared_ptr<Data> Image::Encode(const ImageInfo& info, const void* pixels, EncodedFormat format,
-                                    int quality) {
+std::shared_ptr<Data> ImageCodec::Encode(const ImageInfo& info, const void* pixels,
+                                         EncodedFormat format, int quality) {
   if (info.isEmpty() || pixels == nullptr) {
     return nullptr;
   }
@@ -139,7 +139,7 @@ std::shared_ptr<Data> Image::Encode(const ImageInfo& info, const void* pixels, E
   return nullptr;
 }
 
-std::shared_ptr<TextureBuffer> Image::makeBuffer() const {
+std::shared_ptr<TextureBuffer> ImageCodec::makeBuffer() const {
   auto pixelBuffer = PixelBuffer::Make(width(), height(), false);
   if (pixelBuffer == nullptr) {
     return nullptr;

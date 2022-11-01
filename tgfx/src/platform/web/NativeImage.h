@@ -19,10 +19,10 @@
 #pragma once
 
 #include <emscripten/val.h>
-#include "tgfx/core/Image.h"
+#include "tgfx/core/ImageCodec.h"
 
 namespace tgfx {
-class NativeImage : public Image {
+class NativeImage : public ImageCodec {
  public:
   static std::shared_ptr<NativeImage> MakeFrom(emscripten::val nativeImage);
 
@@ -35,7 +35,7 @@ class NativeImage : public Image {
  private:
   emscripten::val nativeImage = emscripten::val::null();
 
-  NativeImage(int width, int height) : Image(width, height, Orientation::TopLeft) {
+  NativeImage(int width, int height) : ImageCodec(width, height, Orientation::TopLeft) {
   }
 
   friend class NativeCodec;

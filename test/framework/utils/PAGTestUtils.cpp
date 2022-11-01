@@ -19,7 +19,6 @@
 #include "PAGTestUtils.h"
 #include <dirent.h>
 #include "base/utils/TGFXCast.h"
-#include "tgfx/core/Image.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace pag {

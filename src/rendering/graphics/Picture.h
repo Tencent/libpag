@@ -22,7 +22,7 @@
 #include "pag/gpu.h"
 #include "rendering/graphics/Snapshot.h"
 #include "tgfx/core/Bitmap.h"
-#include "tgfx/core/Image.h"
+#include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/RGBAAALayout.h"
 
 namespace pag {
@@ -36,9 +36,9 @@ namespace pag {
 class Picture : public Graphic {
  public:
   /**
-   * Creates a new Picture with specified Image. Return null if the proxy is null.
+   * Creates a new Picture with specified ImageCodec. Return null if the codec is null.
    */
-  static std::shared_ptr<Graphic> MakeFrom(ID assetID, std::shared_ptr<tgfx::Image> image);
+  static std::shared_ptr<Graphic> MakeFrom(ID assetID, std::shared_ptr<tgfx::ImageCodec> codec);
 
   /**
    * Creates a new Picture with specified TextureBuffer. Returns null if the bitmap is empty.

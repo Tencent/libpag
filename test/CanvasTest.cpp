@@ -25,7 +25,7 @@
 #include "gpu/opengl/GLRRectOp.h"
 #include "gpu/opengl/GLTriangulatingPathOp.h"
 #include "rendering/utils/shaper/TextShaper.h"
-#include "tgfx/core/Image.h"
+#include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/gpu/Surface.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
@@ -54,7 +54,7 @@ PAG_TEST(CanvasTest, ColorMatrixFilter) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto image = Image::MakeFrom("../resources/apitest/test_timestretch.png")
+  auto image = ImageCodec::MakeFrom("../resources/apitest/test_timestretch.png")
                    ->makeBuffer()
                    ->makeTexture(context);
   ASSERT_TRUE(image != nullptr);
@@ -80,7 +80,7 @@ PAG_TEST(CanvasTest, Blur) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto image = Image::MakeFrom("../resources/apitest/rotation.jpg");
+  auto image = ImageCodec::MakeFrom("../resources/apitest/rotation.jpg");
   ASSERT_TRUE(image != nullptr);
   auto texture = image->makeBuffer()->makeTexture(context);
   ASSERT_TRUE(texture != nullptr);
@@ -152,7 +152,7 @@ PAG_TEST(CanvasTest, DropShadow) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto image = Image::MakeFrom("../resources/apitest/image_as_mask.png");
+  auto image = ImageCodec::MakeFrom("../resources/apitest/image_as_mask.png");
   ASSERT_TRUE(image != nullptr);
   auto texture = image->makeBuffer()->makeTexture(context);
   ASSERT_TRUE(texture != nullptr);
@@ -230,11 +230,11 @@ PAG_TEST(CanvasTest, TileMode) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto image = Image::MakeFrom("../resources/apitest/rotation.jpg");
-  ASSERT_TRUE(image != nullptr);
-  auto texture = image->makeBuffer()->makeTexture(context);
+  auto codec = ImageCodec::MakeFrom("../resources/apitest/rotation.jpg");
+  ASSERT_TRUE(codec != nullptr);
+  auto texture = codec->makeBuffer()->makeTexture(context);
   ASSERT_TRUE(texture != nullptr);
-  auto surface = Surface::Make(context, image->width() / 2, image->height() / 2);
+  auto surface = Surface::Make(context, codec->width() / 2, codec->height() / 2);
   auto canvas = surface->getCanvas();
   Paint paint;
   paint.setShader(Shader::MakeTextureShader(texture, TileMode::Repeat, TileMode::Mirror)
@@ -292,9 +292,9 @@ PAG_TEST(CanvasTest, merge_draw_call_triangle) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto image = Image::MakeFrom("../resources/apitest/imageReplacement.png");
-  ASSERT_TRUE(image != nullptr);
-  auto texture = image->makeBuffer()->makeTexture(context);
+  auto codec = ImageCodec::MakeFrom("../resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(codec != nullptr);
+  auto texture = codec->makeBuffer()->makeTexture(context);
   ASSERT_TRUE(texture != nullptr);
   int width = 72;
   int height = 72;
@@ -303,8 +303,8 @@ PAG_TEST(CanvasTest, merge_draw_call_triangle) {
   canvas->clear(Color::White());
   Paint paint;
   paint.setShader(Shader::MakeTextureShader(texture)->makeWithPreLocalMatrix(
-      Matrix::MakeScale(static_cast<float>(width) / static_cast<float>(image->width()),
-                        static_cast<float>(height) / static_cast<float>(image->height()))));
+      Matrix::MakeScale(static_cast<float>(width) / static_cast<float>(codec->width()),
+                        static_cast<float>(height) / static_cast<float>(codec->height()))));
   int tileSize = 8;
   size_t drawCallCount = 0;
   for (int y = 0; y < height; y += tileSize) {

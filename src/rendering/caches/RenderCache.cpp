@@ -34,12 +34,12 @@ namespace pag {
 
 class ImageTask : public Executor {
  public:
-  static std::shared_ptr<Task> MakeAndRun(std::shared_ptr<tgfx::Image> image,
+  static std::shared_ptr<Task> MakeAndRun(std::shared_ptr<tgfx::ImageCodec> codec,
                                           std::shared_ptr<File> file) {
-    if (image == nullptr) {
+    if (codec == nullptr) {
       return nullptr;
     }
-    auto bitmap = new ImageTask(std::move(image), file);
+    auto bitmap = new ImageTask(std::move(codec), file);
     auto task = Task::Make(std::unique_ptr<ImageTask>(bitmap));
     task->run();
     return task;
@@ -51,16 +51,16 @@ class ImageTask : public Executor {
 
  private:
   std::shared_ptr<tgfx::TextureBuffer> buffer = {};
-  std::shared_ptr<tgfx::Image> image = nullptr;
+  std::shared_ptr<tgfx::ImageCodec> codec = nullptr;
   // Make a reference to file when image made from imageByte of file.
   std::shared_ptr<File> file = nullptr;
 
-  explicit ImageTask(std::shared_ptr<tgfx::Image> image, std::shared_ptr<File> file)
-      : image(std::move(image)), file(std::move(file)) {
+  explicit ImageTask(std::shared_ptr<tgfx::ImageCodec> codec, std::shared_ptr<File> file)
+      : codec(std::move(codec)), file(std::move(file)) {
   }
 
   void execute() override {
-    buffer = image->makeBuffer();
+    buffer = codec->makeBuffer();
   }
 };
 
@@ -475,12 +475,12 @@ void RenderCache::clearExpiredSnapshots() {
   }
 }
 
-void RenderCache::prepareImage(ID assetID, std::shared_ptr<tgfx::Image> image) {
+void RenderCache::prepareImage(ID assetID, std::shared_ptr<tgfx::ImageCodec> codec) {
   usedAssets.insert(assetID);
   if (imageTasks.count(assetID) != 0 || snapshotCaches.count(assetID) != 0) {
     return;
   }
-  auto task = ImageTask::MakeAndRun(std::move(image), stage->getFileFromReferenceMap(assetID));
+  auto task = ImageTask::MakeAndRun(std::move(codec), stage->getFileFromReferenceMap(assetID));
   if (task) {
     imageTasks[assetID] = task;
   }

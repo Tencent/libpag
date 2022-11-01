@@ -55,7 +55,7 @@ static CGSize GetImageSize(CGImageSourceRef imageSource, CGImagePropertyOrientat
   return CGSizeMake(width, height);
 }
 
-std::shared_ptr<Image> NativeCodec::MakeImage(const std::string& filePath) {
+std::shared_ptr<ImageCodec> NativeCodec::MakeCodec(const std::string& filePath) {
   CFStringRef imagePath = CFStringCreateWithCString(NULL, filePath.c_str(), kCFStringEncodingUTF8);
   CFURLRef imageURL = CFURLCreateWithFileSystemPath(NULL, imagePath, kCFURLPOSIXPathStyle, 0);
   CFRelease(imagePath);
@@ -72,10 +72,10 @@ std::shared_ptr<Image> NativeCodec::MakeImage(const std::string& filePath) {
   }
   auto image = new NativeImage(size.width, size.height, static_cast<Orientation>(orientation));
   image->imagePath = filePath;
-  return std::unique_ptr<Image>(image);
+  return std::unique_ptr<ImageCodec>(image);
 }
 
-std::shared_ptr<Image> NativeCodec::MakeImage(std::shared_ptr<Data> imageBytes) {
+std::shared_ptr<ImageCodec> NativeCodec::MakeCodec(std::shared_ptr<Data> imageBytes) {
   if (imageBytes == nullptr) {
     return nullptr;
   }
@@ -95,24 +95,25 @@ std::shared_ptr<Image> NativeCodec::MakeImage(std::shared_ptr<Data> imageBytes) 
   if (size.width <= 0 || size.height <= 0) {
     return nullptr;
   }
-  auto image = new NativeImage(size.width, size.height, static_cast<Orientation>(orientation));
-  image->imageBytes = imageBytes;
-  return std::unique_ptr<Image>(image);
+  auto codec = new NativeImage(size.width, size.height, static_cast<Orientation>(orientation));
+  codec->imageBytes = imageBytes;
+  return std::unique_ptr<ImageCodec>(codec);
 }
 
-std::shared_ptr<Image> NativeCodec::MakeFrom(void* nativeImage) {
+std::shared_ptr<ImageCodec> NativeCodec::MakeFrom(void* nativeImage) {
   auto cgImage = reinterpret_cast<CGImageRef>(nativeImage);
   auto width = CGImageGetWidth(cgImage);
   auto height = CGImageGetHeight(cgImage);
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
-  auto image = new NativeImage(static_cast<int>(width), static_cast<int>(height), Orientation::TopLeft);
+  auto codec =
+      new NativeImage(static_cast<int>(width), static_cast<int>(height), Orientation::TopLeft);
   CFRetain(cgImage);
-  image->cgImage = cgImage;
-  return std::unique_ptr<Image>(image);
-}
 
+  codec->cgImage = cgImage;
+  return std::unique_ptr<ImageCodec>(codec);
+}
 
 NativeImage::~NativeImage() {
   if (cgImage != nullptr) {
@@ -170,4 +171,4 @@ bool NativeImage::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   }
   return result;
 }
-}
+}  // namespace tgfx

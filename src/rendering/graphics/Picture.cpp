@@ -368,7 +368,8 @@ class TextureBufferProxy : public TextureProxy {
 
 class ImageTextureProxy : public TextureProxy {
  public:
-  explicit ImageTextureProxy(ID assetID, int width, int height, std::shared_ptr<tgfx::Image> image)
+  explicit ImageTextureProxy(ID assetID, int width, int height,
+                             std::shared_ptr<tgfx::ImageCodec> image)
       : TextureProxy(width, height), assetID(assetID), image(std::move(image)) {
   }
 
@@ -398,7 +399,7 @@ class ImageTextureProxy : public TextureProxy {
 
  private:
   ID assetID = 0;
-  std::shared_ptr<tgfx::Image> image = nullptr;
+  std::shared_ptr<tgfx::ImageCodec> image = nullptr;
 };
 
 class BackendTextureProxy : public TextureProxy {
@@ -451,16 +452,16 @@ static std::atomic_uint64_t IDCount = {1};
 Picture::Picture(ID assetID) : assetID(assetID), uniqueKey(IDCount++) {
 }
 
-std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, std::shared_ptr<tgfx::Image> image) {
-  if (image == nullptr) {
+std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, std::shared_ptr<tgfx::ImageCodec> codec) {
+  if (codec == nullptr) {
     return nullptr;
   }
-  auto extraMatrix = OrientationToMatrix(image->orientation(), image->width(), image->height());
-  auto width = image->width();
-  auto height = image->height();
-  ApplyOrientation(image->orientation(), &width, &height);
+  auto extraMatrix = OrientationToMatrix(codec->orientation(), codec->width(), codec->height());
+  auto width = codec->width();
+  auto height = codec->height();
+  ApplyOrientation(codec->orientation(), &width, &height);
   auto textureProxy =
-      new ImageTextureProxy(assetID, static_cast<int>(width), static_cast<int>(height), image);
+      new ImageTextureProxy(assetID, static_cast<int>(width), static_cast<int>(height), codec);
   auto picture = std::make_shared<TextureProxyPicture>(assetID, textureProxy, false);
   picture->extraMatrix = extraMatrix;
   return picture;

@@ -27,14 +27,14 @@
 
 namespace pag {
 std::shared_ptr<PAGImage> PAGImage::FromPath(const std::string& filePath) {
-  auto image = tgfx::Image::MakeFrom(filePath);
-  return StillImage::MakeFrom(std::move(image));
+  auto codec = tgfx::ImageCodec::MakeFrom(filePath);
+  return StillImage::MakeFrom(std::move(codec));
 }
 
 std::shared_ptr<PAGImage> PAGImage::FromBytes(const void* bytes, size_t length) {
   auto fileBytes = tgfx::Data::MakeWithCopy(bytes, length);
-  auto image = tgfx::Image::MakeFrom(std::move(fileBytes));
-  return StillImage::MakeFrom(std::move(image));
+  auto codec = tgfx::ImageCodec::MakeFrom(std::move(fileBytes));
+  return StillImage::MakeFrom(std::move(codec));
 }
 
 std::shared_ptr<PAGImage> PAGImage::FromPixels(const void* pixels, int width, int height,
@@ -67,15 +67,15 @@ std::shared_ptr<StillImage> StillImage::MakeFrom(std::shared_ptr<tgfx::PixelBuff
   return pagImage;
 }
 
-std::shared_ptr<StillImage> StillImage::MakeFrom(std::shared_ptr<tgfx::Image> image) {
-  if (image == nullptr) {
+std::shared_ptr<StillImage> StillImage::MakeFrom(std::shared_ptr<tgfx::ImageCodec> codec) {
+  if (codec == nullptr) {
     return nullptr;
   }
-  auto width = image->width();
-  auto height = image->height();
-  ApplyOrientation(image->orientation(), &width, &height);
+  auto width = codec->width();
+  auto height = codec->height();
+  ApplyOrientation(codec->orientation(), &width, &height);
   auto pagImage = std::shared_ptr<StillImage>(new StillImage(width, height));
-  auto picture = Picture::MakeFrom(pagImage->uniqueID(), image);
+  auto picture = Picture::MakeFrom(pagImage->uniqueID(), codec);
   if (!picture) {
     return nullptr;
   }

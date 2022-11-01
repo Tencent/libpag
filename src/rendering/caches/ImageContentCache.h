@@ -19,7 +19,7 @@
 #pragma once
 
 #include "ContentCache.h"
-#include "tgfx/core/Image.h"
+#include "tgfx/core/ImageCodec.h"
 
 namespace pag {
 class ImageContentCache : public ContentCache {

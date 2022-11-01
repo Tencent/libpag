@@ -19,10 +19,10 @@
 #pragma once
 
 #include <CoreImage/CoreImage.h>
-#include "tgfx/core/Image.h"
+#include "tgfx/core/ImageCodec.h"
 
 namespace tgfx {
-class NativeImage : public Image {
+class NativeImage : public ImageCodec {
  public:
   ~NativeImage() override;
 
@@ -33,7 +33,8 @@ class NativeImage : public Image {
   std::shared_ptr<Data> imageBytes = nullptr;
   CGImageRef cgImage = nullptr;
 
-  NativeImage(int width, int height, Orientation orientation) : Image(width, height, orientation) {
+  NativeImage(int width, int height, Orientation orientation)
+      : ImageCodec(width, height, orientation) {
   }
 
   friend class NativeCodec;
