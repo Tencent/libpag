@@ -94,8 +94,10 @@ class GLOpsRenderPass : public OpsRenderPass {
 
   void bindPipelineAndScissorClip(const ProgramInfo& info, const Rect& drawBounds) override;
 
+  void bindVertexBuffer(std::shared_ptr<GpuBuffer> vertexBuffer) override;
+
   void bindVerticesAndIndices(std::vector<float> vertices,
-                              std::shared_ptr<Resource> indices) override;
+                              std::shared_ptr<GpuBuffer> indices) override;
 
   void draw(unsigned primitiveType, int baseVertex, int vertexCount) override;
 
@@ -127,6 +129,7 @@ class GLOpsRenderPass : public OpsRenderPass {
   GLProgram* program = nullptr;
   std::vector<float> _vertices;
   std::shared_ptr<GLBuffer> _indexBuffer;
+  std::shared_ptr<GLBuffer> _vertexBuffer;
   std::shared_ptr<Vertex> vertex;
 };
 }  // namespace tgfx

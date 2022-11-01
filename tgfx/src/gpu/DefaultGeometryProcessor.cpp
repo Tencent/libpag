@@ -21,17 +21,19 @@
 
 namespace tgfx {
 std::unique_ptr<DefaultGeometryProcessor> DefaultGeometryProcessor::Make(
-    Color color, int width, int height, const Matrix& localMatrix) {
+    Color color, int width, int height, const Matrix& viewMatrix, const Matrix& localMatrix) {
   return std::unique_ptr<DefaultGeometryProcessor>(
-      new DefaultGeometryProcessor(color, width, height, localMatrix));
+      new DefaultGeometryProcessor(color, width, height, viewMatrix, localMatrix));
 }
 
 DefaultGeometryProcessor::DefaultGeometryProcessor(Color color, int width, int height,
+                                                   const Matrix& viewMatrix,
                                                    const Matrix& localMatrix)
     : GeometryProcessor(ClassID()),
       color(color),
       width(width),
       height(height),
+      viewMatrix(viewMatrix),
       localMatrix(localMatrix) {
   position = {"aPosition", ShaderVar::Type::Float2};
   coverage = {"inCoverage", ShaderVar::Type::Float};

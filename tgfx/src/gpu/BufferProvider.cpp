@@ -16,30 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/BufferProvider.h"
-#include "gpu/opengl/GLTriangulatingPathOp.h"
-#include "tgfx/core/Mesh.h"
+#include "BufferProvider.h"
 
 namespace tgfx {
-class TriangularPathMesh : public Mesh {
- public:
-  TriangularPathMesh(std::vector<float> vertices, int vertexCount, Rect bounds)
-      : provider(std::make_shared<BufferProvider>(std::move(vertices), vertexCount, true)),
-        _bounds(bounds) {
+std::shared_ptr<GpuBuffer> BufferProvider::getGpuBuffer(Context* context) {
+  if (!cacheEnable) {
+    return nullptr;
   }
-
-  Rect bounds() const override {
-    return _bounds;
+  if (buffer == nullptr) {
+    buffer = GpuBuffer::Make(context, BufferType::Vertex, &_vertices[0],
+                             _vertices.size() * sizeof(float));
+    if (buffer) {
+      std::vector<float>().swap(_vertices);
+    }
   }
+  return buffer;
+}
 
- private:
-  std::unique_ptr<GLDrawOp> getOp(Color color, const Matrix& viewMatrix) const override {
-    return std::make_unique<GLTriangulatingPathOp>(color, provider, bounds(), viewMatrix);
-  }
-
-  std::shared_ptr<BufferProvider> provider;
-  Rect _bounds;
-};
+bool BufferProvider::canCombine(tgfx::BufferProvider* that) const {
+  return !cacheEnable && !that->cacheEnable;
+}
 }  // namespace tgfx

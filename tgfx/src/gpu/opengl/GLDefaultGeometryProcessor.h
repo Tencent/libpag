@@ -31,8 +31,10 @@ class GLDefaultGeometryProcessor : public GLGeometryProcessor {
                FPCoordTransformIter* transformIter) override;
 
  private:
+  UniformHandle matrixUniform;
   UniformHandle colorUniform;
 
   std::optional<Color> colorPrev;
+  std::optional<Matrix> viewMatrixPrev;
 };
 }  // namespace tgfx
