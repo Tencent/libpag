@@ -40,7 +40,7 @@ class JpegImage : public ImageCodec {
   const std::string filePath;
 
   static std::shared_ptr<ImageCodec> MakeFromData(const std::string& filePath,
-                                             std::shared_ptr<Data> byteData);
+                                                  std::shared_ptr<Data> byteData);
   explicit JpegImage(int width, int height, Orientation orientation, std::string filePath,
                      std::shared_ptr<Data> fileData)
       : ImageCodec(width, height, orientation),

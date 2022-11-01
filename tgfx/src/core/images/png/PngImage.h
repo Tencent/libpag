@@ -37,7 +37,7 @@ class PngImage : public ImageCodec {
 
  private:
   static std::shared_ptr<ImageCodec> MakeFromData(const std::string& filePath,
-                                             std::shared_ptr<Data> byteData);
+                                                  std::shared_ptr<Data> byteData);
 
   PngImage(int width, int height, Orientation orientation, std::string filePath,
            std::shared_ptr<Data> fileData)

@@ -75,7 +75,7 @@ std::shared_ptr<ImageCodec> JpegImage::MakeFrom(std::shared_ptr<Data> imageBytes
 }
 
 std::shared_ptr<ImageCodec> JpegImage::MakeFromData(const std::string& filePath,
-                                               std::shared_ptr<Data> byteData) {
+                                                    std::shared_ptr<Data> byteData) {
   FILE* infile = nullptr;
   if (byteData == nullptr && (infile = fopen(filePath.c_str(), "rb")) == nullptr) {
     return nullptr;
@@ -102,8 +102,8 @@ std::shared_ptr<ImageCodec> JpegImage::MakeFromData(const std::string& filePath,
     return nullptr;
   }
   return std::shared_ptr<ImageCodec>(new JpegImage(static_cast<int>(cinfo.image_width),
-                                              static_cast<int>(cinfo.image_height), orientation,
-                                              filePath, std::move(byteData)));
+                                                   static_cast<int>(cinfo.image_height),
+                                                   orientation, filePath, std::move(byteData)));
 }
 
 bool JpegImage::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {

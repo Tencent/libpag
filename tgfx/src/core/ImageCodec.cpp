@@ -16,11 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "tgfx/core/ImageCodec.h"
 #include "core/utils/USE.h"
 #include "platform/NativeCodec.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Buffer.h"
-#include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/PixelBuffer.h"
 #include "tgfx/core/Stream.h"
@@ -113,8 +113,8 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(void* nativeImage) {
   return NativeCodec::MakeFrom(nativeImage);
 }
 
-std::shared_ptr<Data> ImageCodec::Encode(const ImageInfo& info, const void* pixels, EncodedFormat format,
-                                    int quality) {
+std::shared_ptr<Data> ImageCodec::Encode(const ImageInfo& info, const void* pixels,
+                                         EncodedFormat format, int quality) {
   if (info.isEmpty() || pixels == nullptr) {
     return nullptr;
   }

@@ -114,7 +114,7 @@ class ReadInfo {
 };
 
 std::shared_ptr<ImageCodec> PngImage::MakeFromData(const std::string& filePath,
-                                              std::shared_ptr<Data> byteData) {
+                                                   std::shared_ptr<Data> byteData) {
   auto readInfo = ReadInfo::Make(filePath, byteData);
   if (readInfo == nullptr) {
     return nullptr;
@@ -125,7 +125,8 @@ std::shared_ptr<ImageCodec> PngImage::MakeFromData(const std::string& filePath,
     return nullptr;
   }
   return std::shared_ptr<ImageCodec>(new PngImage(static_cast<int>(w), static_cast<int>(h),
-                                             Orientation::TopLeft, filePath, std::move(byteData)));
+                                                  Orientation::TopLeft, filePath,
+                                                  std::move(byteData)));
 }
 
 static void UpdateReadInfo(png_structp p, png_infop pi) {
