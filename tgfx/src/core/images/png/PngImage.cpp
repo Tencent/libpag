@@ -22,11 +22,11 @@
 #include "tgfx/core/Buffer.h"
 
 namespace tgfx {
-std::shared_ptr<Image> PngImage::MakeFrom(const std::string& filePath) {
+std::shared_ptr<ImageCodec> PngImage::MakeFrom(const std::string& filePath) {
   return MakeFromData(filePath, nullptr);
 }
 
-std::shared_ptr<Image> PngImage::MakeFrom(std::shared_ptr<Data> imageBytes) {
+std::shared_ptr<ImageCodec> PngImage::MakeFrom(std::shared_ptr<Data> imageBytes) {
   return MakeFromData("", std::move(imageBytes));
 }
 
@@ -113,7 +113,7 @@ class ReadInfo {
   unsigned char* data = nullptr;
 };
 
-std::shared_ptr<Image> PngImage::MakeFromData(const std::string& filePath,
+std::shared_ptr<ImageCodec> PngImage::MakeFromData(const std::string& filePath,
                                               std::shared_ptr<Data> byteData) {
   auto readInfo = ReadInfo::Make(filePath, byteData);
   if (readInfo == nullptr) {
@@ -124,7 +124,7 @@ std::shared_ptr<Image> PngImage::MakeFromData(const std::string& filePath,
   if (w == 0 || h == 0) {
     return nullptr;
   }
-  return std::shared_ptr<Image>(new PngImage(static_cast<int>(w), static_cast<int>(h),
+  return std::shared_ptr<ImageCodec>(new PngImage(static_cast<int>(w), static_cast<int>(h),
                                              Orientation::TopLeft, filePath, std::move(byteData)));
 }
 

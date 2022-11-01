@@ -28,33 +28,33 @@ namespace tgfx {
 class TextureBuffer;
 
 /**
- * Image describes a two dimensional array of pixels encoded in a compressed data stream. Image
- * cannot be modified after it is created. The width and height of Image are always greater than
- * zero. Creating an Image with zero width or height returns nullptr.
+ * ImageCodec describes a two dimensional array of pixels encoded in a compressed data stream.
+ * ImageCodec cannot be modified after it is created. The width and height of ImageCodec are always
+ * greater than zero. Creating an ImageCodec with zero width or height returns nullptr.
  */
-class Image {
+class ImageCodec {
  public:
   /**
-   * If this file path represents an encoded image that we know how to decode, return an Image that
-   * can decode it. Otherwise return nullptr.
+   * If this file path represents an encoded image that we know how to decode, return an ImageCodec
+   * that can decode it. Otherwise return nullptr.
    */
-  static std::shared_ptr<Image> MakeFrom(const std::string& filePath);
+  static std::shared_ptr<ImageCodec> MakeFrom(const std::string& filePath);
 
   /**
-   * If this file bytes represents an encoded image that we know how to decode, return an Image that
-   * can decode it. Otherwise return nullptr.
+   * If this file bytes represents an encoded image that we know how to decode, return an ImageCodec
+   * that can decode it. Otherwise return nullptr.
    */
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Data> imageBytes);
+  static std::shared_ptr<ImageCodec> MakeFrom(std::shared_ptr<Data> imageBytes);
 
   /**
-   * Creates a new Image object from a native image. The type of nativeImage should be either
+   * Creates a new ImageCodec object from a native image. The type of nativeImage should be either
    * a jobject that represents a java Bitmap on android platform or a CGImageRef on the apple
-   * platform. Returns nullptr if current platform has no native image support. The returned Image
-   * object takes a reference on the nativeImage.
+   * platform. Returns nullptr if current platform has no native image support. The returned
+   * ImageCodec object takes a reference on the nativeImage.
    */
-  static std::shared_ptr<Image> MakeFrom(void* nativeImage);
+  static std::shared_ptr<ImageCodec> MakeFrom(void* nativeImage);
 
-  virtual ~Image() = default;
+  virtual ~ImageCodec() = default;
 
   /**
    * Returns the width of the image.
@@ -78,8 +78,8 @@ class Image {
   }
 
   /**
-   * Crates a new texture buffer capturing the pixels in this image. Image do not cache the newly
-   * created texture buffer, each call to this method allocates additional storage.
+   * Crates a new texture buffer capturing the pixels in this image. ImageCodec do not cache the
+   * newly created texture buffer, each call to this method allocates additional storage.
    */
   virtual std::shared_ptr<TextureBuffer> makeBuffer() const;
 
@@ -92,7 +92,7 @@ class Image {
   virtual bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const = 0;
 
  protected:
-  Image(int width, int height, Orientation orientation)
+  ImageCodec(int width, int height, Orientation orientation)
       : _width(width), _height(height), _orientation(orientation) {
   }
 

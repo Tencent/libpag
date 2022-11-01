@@ -76,13 +76,13 @@
   if (cgImage == nil) {
     return nil;
   }
-  auto image = tgfx::Image::MakeFrom(cgImage);
-  auto pixelBuffer = tgfx::PixelBuffer::Make(image->width(), image->height());
+  auto codec = tgfx::ImageCodec::MakeFrom(cgImage);
+  auto pixelBuffer = tgfx::PixelBuffer::Make(codec->width(), codec->height());
   tgfx::Bitmap bitmap(pixelBuffer);
   if (bitmap.isEmpty()) {
     return nil;
   }
-  if (!image->readPixels(bitmap.info(), bitmap.writablePixels())) {
+  if (!codec->readPixels(bitmap.info(), bitmap.writablePixels())) {
     return nil;
   }
   bitmap.reset();

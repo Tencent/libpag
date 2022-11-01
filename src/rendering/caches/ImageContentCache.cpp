@@ -30,8 +30,8 @@ class ImageBytesCache : public Cache {
     auto cache = new ImageBytesCache();
     auto fileBytes =
         tgfx::Data::MakeWithoutCopy(imageBytes->fileBytes->data(), imageBytes->fileBytes->length());
-    auto image = tgfx::Image::MakeFrom(std::move(fileBytes));
-    auto picture = Picture::MakeFrom(imageBytes->uniqueID, image);
+    auto codec = tgfx::ImageCodec::MakeFrom(std::move(fileBytes));
+    auto picture = Picture::MakeFrom(imageBytes->uniqueID, codec);
     auto matrix = tgfx::Matrix::MakeScale(1 / imageBytes->scaleFactor);
     matrix.postTranslate(static_cast<float>(-imageBytes->anchorX),
                          static_cast<float>(-imageBytes->anchorY));

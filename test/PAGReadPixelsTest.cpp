@@ -22,7 +22,7 @@
 #include "gpu/opengl/GLUtil.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Buffer.h"
-#include "tgfx/core/Image.h"
+#include "tgfx/core/ImageCodec.h"
 #include "tgfx/gpu/Surface.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
 #include "tgfx/gpu/opengl/GLTexture.h"
@@ -41,16 +41,16 @@ using nlohmann::json;
  * 用例描述: 像素格式转换相关功能测试-PixelMap
  */
 PAG_TEST(PAGReadPixelsTest, TestPixelMap) {
-  auto image = Image::MakeFrom("../resources/apitest/test_timestretch.png");
-  EXPECT_TRUE(image != nullptr);
-  auto width = image->width();
-  auto height = image->height();
+  auto codec = ImageCodec::MakeFrom("../resources/apitest/test_timestretch.png");
+  EXPECT_TRUE(codec != nullptr);
+  auto width = codec->width();
+  auto height = codec->height();
   auto RGBAInfo =
       ImageInfo::Make(width, height, tgfx::ColorType::RGBA_8888, tgfx::AlphaType::Unpremultiplied);
   auto byteSize = RGBAInfo.byteSize();
   Buffer pixelsA(byteSize);
   Buffer pixelsB(byteSize);
-  auto result = image->readPixels(RGBAInfo, pixelsA.data());
+  auto result = codec->readPixels(RGBAInfo, pixelsA.data());
   EXPECT_TRUE(result);
 
   Bitmap RGBAMap(RGBAInfo, pixelsA.data());
@@ -145,12 +145,12 @@ PAG_TEST(PAGReadPixelsTest, TestPixelMap) {
  * 用例描述: 像素格式转换相关功能测试-SurfaceReadPixels
  */
 PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
-  auto image = Image::MakeFrom("../resources/apitest/test_timestretch.png");
-  ASSERT_TRUE(image != nullptr);
-  auto pixelBuffer = PixelBuffer::Make(image->width(), image->height(), false, false);
+  auto codec = ImageCodec::MakeFrom("../resources/apitest/test_timestretch.png");
+  ASSERT_TRUE(codec != nullptr);
+  auto pixelBuffer = PixelBuffer::Make(codec->width(), codec->height(), false, false);
   ASSERT_TRUE(pixelBuffer != nullptr);
   auto pixels = pixelBuffer->lockPixels();
-  auto result = image->readPixels(pixelBuffer->info(), pixels);
+  auto result = codec->readPixels(pixelBuffer->info(), pixels);
   pixelBuffer->unlockPixels();
   ASSERT_TRUE(result);
 
@@ -258,7 +258,7 @@ PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
  * 用例描述: PNG 解码器测试
  */
 PAG_TEST(PAGReadPixelsTest, PngCodec) {
-  auto image = Image::MakeFrom("../resources/apitest/test_timestretch.png");
+  auto image = ImageCodec::MakeFrom("../resources/apitest/test_timestretch.png");
   ASSERT_TRUE(image != nullptr);
   ASSERT_EQ(image->width(), 1280);
   ASSERT_EQ(image->height(), 720);
@@ -272,7 +272,7 @@ PAG_TEST(PAGReadPixelsTest, PngCodec) {
   CHECK_PIXELS(info, pixels, "PngCodec_Decode");
   Bitmap bitmap(info, pixels);
   auto bytes = bitmap.encode(EncodedFormat::PNG, 100);
-  image = Image::MakeFrom(bytes);
+  image = ImageCodec::MakeFrom(bytes);
   ASSERT_TRUE(image != nullptr);
   ASSERT_EQ(image->width(), 1280);
   ASSERT_EQ(image->height(), 720);
@@ -284,7 +284,7 @@ PAG_TEST(PAGReadPixelsTest, PngCodec) {
  * 用例描述: Webp 解码器测试
  */
 PAG_TEST(PAGReadPixelsTest, WebpCodec) {
-  auto image = Image::MakeFrom("../resources/apitest/imageReplacement.webp");
+  auto image = ImageCodec::MakeFrom("../resources/apitest/imageReplacement.webp");
   ASSERT_TRUE(image != nullptr);
   ASSERT_EQ(image->width(), 110);
   ASSERT_EQ(image->height(), 110);
@@ -297,7 +297,7 @@ PAG_TEST(PAGReadPixelsTest, WebpCodec) {
   CHECK_PIXELS(info, pixels, "WebpCodec_Decode");
   Bitmap bitmap(info, pixels);
   auto bytes = bitmap.encode(EncodedFormat::WEBP, 100);
-  image = Image::MakeFrom(bytes);
+  image = ImageCodec::MakeFrom(bytes);
   ASSERT_TRUE(image != nullptr);
   ASSERT_EQ(image->width(), 110);
   ASSERT_EQ(image->height(), 110);
@@ -308,7 +308,7 @@ PAG_TEST(PAGReadPixelsTest, WebpCodec) {
   auto a8Pixels = new (std::nothrow) uint8_t[a8Info.byteSize()];
   ASSERT_TRUE(image->readPixels(a8Info, a8Pixels));
   auto rgbaFromA8Data = Bitmap(a8Info, a8Pixels).encode(EncodedFormat::WEBP, 100);
-  auto rgbaFromA8Image = Image::MakeFrom(rgbaFromA8Data);
+  auto rgbaFromA8Image = ImageCodec::MakeFrom(rgbaFromA8Data);
   rgbaFromA8Image->readPixels(info, pixels);
   CHECK_PIXELS(info, pixels, "WebpCodec_EncodeA8");
   delete[] pixels;
@@ -319,7 +319,7 @@ PAG_TEST(PAGReadPixelsTest, WebpCodec) {
  * 用例描述: JPEG 解码器测试
  */
 PAG_TEST(PAGReadPixelsTest, JpegCodec) {
-  auto image = Image::MakeFrom("../resources/apitest/rotation.jpg");
+  auto image = ImageCodec::MakeFrom("../resources/apitest/rotation.jpg");
   ASSERT_TRUE(image != nullptr);
   ASSERT_EQ(image->width(), 4032);
   ASSERT_EQ(image->height(), 3024);
@@ -335,7 +335,7 @@ PAG_TEST(PAGReadPixelsTest, JpegCodec) {
   Bitmap bitmap(info, pixels);
 
   auto bytes = bitmap.encode(EncodedFormat::JPEG, 20);
-  image = Image::MakeFrom(bytes);
+  image = ImageCodec::MakeFrom(bytes);
   ASSERT_TRUE(image != nullptr);
   ASSERT_EQ(image->width(), 4032);
   ASSERT_EQ(image->height(), 3024);

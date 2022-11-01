@@ -18,7 +18,7 @@
 
 #include "tgfx/core/Bitmap.h"
 #include "skcms.h"
-#include "tgfx/core/Image.h"
+#include "tgfx/core/ImageCodec.h"
 
 namespace tgfx {
 
@@ -155,7 +155,7 @@ std::shared_ptr<Data> Bitmap::encode(EncodedFormat format, int quality) const {
   if (_pixels == nullptr) {
     return nullptr;
   }
-  return Image::Encode(info(), _pixels, format, quality);
+  return ImageCodec::Encode(info(), _pixels, format, quality);
 }
 
 bool Bitmap::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) const {

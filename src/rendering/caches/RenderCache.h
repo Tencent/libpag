@@ -111,7 +111,7 @@ class RenderCache : public Performance {
   /**
    * Prepares a bitmap task for next getImageBuffer() call.
    */
-  void prepareImage(ID assetID, std::shared_ptr<tgfx::Image> image);
+  void prepareImage(ID assetID, std::shared_ptr<tgfx::ImageCodec> codec);
 
   /**
    * Returns a texture buffer cache of specified asset id. Returns null if there is no associated

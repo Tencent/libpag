@@ -110,7 +110,7 @@ static jobject DecodeBitmap(JNIEnv* env, jobject options, const std::string& fil
                                      imagePath.get(), options);
 }
 
-std::shared_ptr<Image> NativeCodec::MakeImage(const std::string& filePath) {
+std::shared_ptr<ImageCodec> NativeCodec::MakeCodec(const std::string& filePath) {
   auto env = CurrentJNIEnv();
   if (env == nullptr || filePath.empty()) {
     return nullptr;
@@ -146,7 +146,7 @@ static jobject DecodeBitmap(JNIEnv* env, jobject options, std::shared_ptr<Data> 
                                      byteArray.get(), 0, imageBytes->size(), options);
 }
 
-std::shared_ptr<Image> NativeCodec::MakeImage(std::shared_ptr<Data> imageBytes) {
+std::shared_ptr<ImageCodec> NativeCodec::MakeCodec(std::shared_ptr<Data> imageBytes) {
   auto env = CurrentJNIEnv();
   if (env == nullptr || imageBytes == nullptr) {
     return nullptr;
@@ -203,7 +203,7 @@ static ImageInfo GetImageInfo(JNIEnv* env, jobject bitmap) {
                          bitmapInfo.stride);
 }
 
-std::shared_ptr<Image> NativeCodec::MakeFrom(void* nativeImage) {
+std::shared_ptr<ImageCodec> NativeCodec::MakeFrom(void* nativeImage) {
   auto env = CurrentJNIEnv();
   if (env == nullptr) {
     return nullptr;

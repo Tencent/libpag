@@ -28,7 +28,7 @@ bool WebpImage::IsWebp(const std::shared_ptr<Data>& data) {
   return data->size() >= 14 && !memcmp(bytes, "RIFF", 4) && !memcmp(&bytes[8], "WEBPVP", 6);
 }
 
-std::shared_ptr<Image> WebpImage::MakeFrom(const std::string& filePath) {
+std::shared_ptr<ImageCodec> WebpImage::MakeFrom(const std::string& filePath) {
   auto info = WebpUtility::getDecodeInfo(filePath);
   if (info.width == 0 || info.height == 0) {
     auto data = Data::MakeFromFile(filePath);
@@ -37,11 +37,11 @@ std::shared_ptr<Image> WebpImage::MakeFrom(const std::string& filePath) {
       return nullptr;
     }
   }
-  return std::shared_ptr<Image>(
+  return std::shared_ptr<ImageCodec>(
       new WebpImage(info.width, info.height, info.orientation, filePath, nullptr));
 }
 
-std::shared_ptr<Image> WebpImage::MakeFrom(std::shared_ptr<Data> imageBytes) {
+std::shared_ptr<ImageCodec> WebpImage::MakeFrom(std::shared_ptr<Data> imageBytes) {
   if (imageBytes == nullptr) {
     return nullptr;
   }
@@ -49,7 +49,7 @@ std::shared_ptr<Image> WebpImage::MakeFrom(std::shared_ptr<Data> imageBytes) {
   if (info.width == 0 || info.height == 0) {
     return nullptr;
   }
-  return std::shared_ptr<Image>(
+  return std::shared_ptr<ImageCodec>(
       new WebpImage(info.width, info.height, info.orientation, "", std::move(imageBytes)));
 }
 

@@ -20,7 +20,7 @@
 
 #include "pag/pag.h"
 #include "rendering/graphics/Graphic.h"
-#include "tgfx/core/Image.h"
+#include "tgfx/core/ImageCodec.h"
 
 namespace pag {
 
@@ -28,7 +28,7 @@ class StillImage : public PAGImage {
  public:
   static std::shared_ptr<StillImage> MakeFrom(std::shared_ptr<tgfx::PixelBuffer> pixelBuffer);
 
-  static std::shared_ptr<StillImage> MakeFrom(std::shared_ptr<tgfx::Image> image);
+  static std::shared_ptr<StillImage> MakeFrom(std::shared_ptr<tgfx::ImageCodec> codec);
 
  protected:
   std::shared_ptr<Graphic> getGraphic() override {

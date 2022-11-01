@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BitmapSequenceReader.h"
-#include "tgfx/core/Image.h"
+#include "tgfx/core/ImageCodec.h"
 
 namespace pag {
 BitmapSequenceReader::BitmapSequenceReader(std::shared_ptr<File> file, BitmapSequence* sequence)
@@ -53,16 +53,16 @@ bool BitmapSequenceReader::decodeFrame(Frame targetFrame) {
     for (auto bitmapRect : bitmapFrame->bitmaps) {
       auto imageBytes = tgfx::Data::MakeWithoutCopy(bitmapRect->fileBytes->data(),
                                                     bitmapRect->fileBytes->length());
-      auto image = tgfx::Image::MakeFrom(imageBytes);
+      auto codec = tgfx::ImageCodec::MakeFrom(imageBytes);
       // The returned image could be nullptr if the frame is an empty frame.
-      if (image != nullptr) {
+      if (codec != nullptr) {
         if (firstRead && bitmapFrame->isKeyframe &&
-            !(image->width() == bitmap.width() && image->height() == bitmap.height())) {
+            !(codec->width() == bitmap.width() && codec->height() == bitmap.height())) {
           // clear the whole screen if the size of the key frame is smaller than the screen.
           bitmap.eraseAll();
         }
         auto offset = bitmap.rowBytes() * bitmapRect->y + bitmapRect->x * 4;
-        auto result = image->readPixels(
+        auto result = codec->readPixels(
             bitmap.info(), reinterpret_cast<uint8_t*>(bitmap.writablePixels()) + offset);
         if (!result) {
           return false;

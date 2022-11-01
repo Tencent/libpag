@@ -19,10 +19,10 @@
 #pragma once
 
 #include "JNIUtil.h"
-#include "tgfx/core/Image.h"
+#include "tgfx/core/ImageCodec.h"
 
 namespace tgfx {
-class NativeImage : public Image {
+class NativeImage : public ImageCodec {
  public:
   static void JNIInit(JNIEnv* env);
 
@@ -33,7 +33,8 @@ class NativeImage : public Image {
   std::shared_ptr<Data> imageBytes;
   Global<jobject> bitmap;
 
-  NativeImage(int width, int height, Orientation orientation) : Image(width, height, orientation){};
+  NativeImage(int width, int height, Orientation orientation)
+      : ImageCodec(width, height, orientation){};
 
   static std::shared_ptr<NativeImage> Make(JNIEnv* env, jobject sizeObject, int orientation);
 

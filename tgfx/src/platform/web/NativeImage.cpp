@@ -25,7 +25,7 @@
 using namespace emscripten;
 
 namespace tgfx {
-std::shared_ptr<Image> NativeCodec::MakeImage(const std::string& filePath) {
+std::shared_ptr<ImageCodec> NativeCodec::MakeCodec(const std::string& filePath) {
   if (filePath.find("http://") == 0 || filePath.find("https://") == 0) {
     auto nativeImageClass = val::module_property("NativeImage");
     if (!nativeImageClass.as<bool>()) {
@@ -41,10 +41,10 @@ std::shared_ptr<Image> NativeCodec::MakeImage(const std::string& filePath) {
   Buffer imageBuffer(imageStream->size());
   imageStream->read(imageBuffer.data(), imageStream->size());
   auto imageData = imageBuffer.release();
-  return NativeCodec::MakeImage(imageData);
+  return NativeCodec::MakeCodec(imageData);
 }
 
-std::shared_ptr<Image> NativeCodec::MakeImage(std::shared_ptr<Data> imageBytes) {
+std::shared_ptr<ImageCodec> NativeCodec::MakeCodec(std::shared_ptr<Data> imageBytes) {
   auto nativeImageClass = val::module_property("NativeImage");
   if (!nativeImageClass.as<bool>()) {
     return nullptr;
@@ -55,7 +55,7 @@ std::shared_ptr<Image> NativeCodec::MakeImage(std::shared_ptr<Data> imageBytes) 
   return NativeImage::MakeFrom(nativeImage);
 }
 
-std::shared_ptr<Image> NativeCodec::MakeFrom(void* /*nativeImage*/) {
+std::shared_ptr<ImageCodec> NativeCodec::MakeFrom(void* /*nativeImage*/) {
   return nullptr;
 }
 

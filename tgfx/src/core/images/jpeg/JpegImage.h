@@ -18,13 +18,13 @@
 
 #pragma once
 
-#include "tgfx/core/Image.h"
+#include "tgfx/core/ImageCodec.h"
 
 namespace tgfx {
-class JpegImage : public Image {
+class JpegImage : public ImageCodec {
  public:
-  static std::shared_ptr<Image> MakeFrom(const std::string& filePath);
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Data> imageBytes);
+  static std::shared_ptr<ImageCodec> MakeFrom(const std::string& filePath);
+  static std::shared_ptr<ImageCodec> MakeFrom(std::shared_ptr<Data> imageBytes);
   static bool IsJpeg(const std::shared_ptr<Data>& data);
 
 #ifdef TGFX_USE_JPEG_ENCODE
@@ -39,11 +39,11 @@ class JpegImage : public Image {
   std::shared_ptr<Data> fileData;
   const std::string filePath;
 
-  static std::shared_ptr<Image> MakeFromData(const std::string& filePath,
+  static std::shared_ptr<ImageCodec> MakeFromData(const std::string& filePath,
                                              std::shared_ptr<Data> byteData);
   explicit JpegImage(int width, int height, Orientation orientation, std::string filePath,
                      std::shared_ptr<Data> fileData)
-      : Image(width, height, orientation),
+      : ImageCodec(width, height, orientation),
         fileData(std::move(fileData)),
         filePath(std::move(filePath)) {
   }

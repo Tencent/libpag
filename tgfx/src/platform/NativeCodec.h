@@ -18,31 +18,31 @@
 
 #pragma once
 
-#include "tgfx/core/Image.h"
+#include "tgfx/core/ImageCodec.h"
 
 namespace tgfx {
 class NativeCodec {
  private:
   /**
    * If the file path represents an encoded image that current platform knows how to decode, returns
-   * an Image that can decode it. Otherwise returns nullptr.
+   * an ImageCodec that can decode it. Otherwise returns nullptr.
    */
-  static std::shared_ptr<Image> MakeImage(const std::string& filePath);
+  static std::shared_ptr<ImageCodec> MakeCodec(const std::string& filePath);
 
   /**
    * If the file bytes represents an encoded image that current platform knows how to decode,
-   * returns an Image that can decode it. Otherwise returns nullptr.
+   * returns an ImageCodec that can decode it. Otherwise returns nullptr.
    */
-  static std::shared_ptr<Image> MakeImage(std::shared_ptr<Data> imageBytes);
+  static std::shared_ptr<ImageCodec> MakeCodec(std::shared_ptr<Data> imageBytes);
 
   /**
-   * Creates a new Image object from a native image. The type of nativeImage should be either
+   * Creates a new ImageCodec object from a native image. The type of nativeImage should be either
    * a jobject that represents a java Bitmap on android platform or a CGImageRef on the apple
-   * platform. Returns nullptr if current platform has no native image support. The returned Image
-   * object takes a reference on the nativeImage.
+   * platform. Returns nullptr if current platform has no native image support. The returned
+   * ImageCodec object takes a reference on the nativeImage.
    */
-  static std::shared_ptr<Image> MakeFrom(void* nativeImage);
+  static std::shared_ptr<ImageCodec> MakeFrom(void* nativeImage);
 
-  friend class Image;
+  friend class ImageCodec;
 };
 }  // namespace tgfx

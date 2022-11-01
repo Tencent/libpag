@@ -19,15 +19,15 @@
 #include "platform/NativeCodec.h"
 
 namespace tgfx {
-std::shared_ptr<Image> NativeCodec::MakeImage(const std::string&) {
+std::shared_ptr<ImageCodec> NativeCodec::MakeCodec(const std::string&) {
   return nullptr;
 }
 
-std::shared_ptr<Image> NativeCodec::MakeImage(std::shared_ptr<Data>) {
+std::shared_ptr<ImageCodec> NativeCodec::MakeCodec(std::shared_ptr<Data>) {
   return nullptr;
 }
 
-std::shared_ptr<Image> NativeCodec::MakeFrom(void* /*nativeImage*/) {
+std::shared_ptr<ImageCodec> NativeCodec::MakeFrom(void* /*nativeImage*/) {
   return nullptr;
 }
 }  // namespace tgfx

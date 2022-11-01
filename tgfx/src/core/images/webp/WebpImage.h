@@ -18,16 +18,16 @@
 
 #pragma once
 
-#include "tgfx/core/Image.h"
+#include "tgfx/core/ImageCodec.h"
 #include "webp/decode.h"
 #include "webp/demux.h"
 #include "webp/encode.h"
 
 namespace tgfx {
-class WebpImage : public Image {
+class WebpImage : public ImageCodec {
  public:
-  static std::shared_ptr<Image> MakeFrom(const std::string& filePath);
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Data> imageBytes);
+  static std::shared_ptr<ImageCodec> MakeFrom(const std::string& filePath);
+  static std::shared_ptr<ImageCodec> MakeFrom(std::shared_ptr<Data> imageBytes);
   static bool IsWebp(const std::shared_ptr<Data>& data);
 
 #ifdef TGFX_USE_WEBP_ENCODE
@@ -44,7 +44,7 @@ class WebpImage : public Image {
 
   explicit WebpImage(int width, int height, Orientation orientation, std::string filePath,
                      std::shared_ptr<Data> fileData)
-      : Image(width, height, orientation),
+      : ImageCodec(width, height, orientation),
         fileData(std::move(fileData)),
         filePath(std::move(filePath)) {
   }

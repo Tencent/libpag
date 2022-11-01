@@ -66,15 +66,15 @@ struct my_error_mgr {
   jmp_buf setjmp_buffer;
 };
 
-std::shared_ptr<Image> JpegImage::MakeFrom(const std::string& filePath) {
+std::shared_ptr<ImageCodec> JpegImage::MakeFrom(const std::string& filePath) {
   return MakeFromData(filePath, nullptr);
 }
 
-std::shared_ptr<Image> JpegImage::MakeFrom(std::shared_ptr<Data> imageBytes) {
+std::shared_ptr<ImageCodec> JpegImage::MakeFrom(std::shared_ptr<Data> imageBytes) {
   return MakeFromData("", std::move(imageBytes));
 }
 
-std::shared_ptr<Image> JpegImage::MakeFromData(const std::string& filePath,
+std::shared_ptr<ImageCodec> JpegImage::MakeFromData(const std::string& filePath,
                                                std::shared_ptr<Data> byteData) {
   FILE* infile = nullptr;
   if (byteData == nullptr && (infile = fopen(filePath.c_str(), "rb")) == nullptr) {
@@ -101,7 +101,7 @@ std::shared_ptr<Image> JpegImage::MakeFromData(const std::string& filePath,
   if (cinfo.image_width == 0 || cinfo.image_height == 0) {
     return nullptr;
   }
-  return std::shared_ptr<Image>(new JpegImage(static_cast<int>(cinfo.image_width),
+  return std::shared_ptr<ImageCodec>(new JpegImage(static_cast<int>(cinfo.image_width),
                                               static_cast<int>(cinfo.image_height), orientation,
                                               filePath, std::move(byteData)));
 }
