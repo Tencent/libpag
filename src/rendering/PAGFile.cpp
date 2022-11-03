@@ -435,17 +435,20 @@ Frame PAGFile::fileFrameToScaledFrame(Frame fileFrame, const TimeRange& scaledTi
 void PAGFile::replaceTextInternal(const std::vector<std::shared_ptr<PAGLayer>>& textLayers,
                                   std::shared_ptr<TextDocument> textData) {
   for (auto& pagLayer : textLayers) {
-    auto pagTextLayer = std::static_pointer_cast<PAGTextLayer>(pagLayer);
-    pagTextLayer->replaceTextInternal(textData);
+    if (pagLayer->layerType() == LayerType::Text) {
+      auto pagTextLayer = std::static_pointer_cast<PAGTextLayer>(pagLayer);
+      pagTextLayer->replaceTextInternal(textData);
+    }
   }
 }
 
 void PAGFile::replaceImageInternal(const std::vector<std::shared_ptr<PAGLayer>>& imageLayers,
                                    std::shared_ptr<PAGImage> image) {
-  // Need to traverse from back to front to ensure the same behavior as before
-  for (auto iter = imageLayers.rbegin(); iter != imageLayers.rend(); iter++) {
-    auto pagImageLayer = std::static_pointer_cast<PAGImageLayer>(*iter);
-    pagImageLayer->setImageInternal(image);
+  for (auto& pagLayer : imageLayers) {
+    if (pagLayer->layerType() == LayerType::Image) {
+      auto pagImageLayer = std::static_pointer_cast<PAGImageLayer>(pagLayer);
+      pagImageLayer->setImageInternal(image);
+    }
   }
 }
 }  // namespace pag
