@@ -410,6 +410,10 @@ void DestoryFlushQueue() {
   [valueAnimator setRepeatedTimes:0];
 }
 
+- (int64_t)currentFrame {
+  return [pagPlayer currentFrame];
+}
+
 - (BOOL)flush {
   if (self.isInBackground) {
     return false;

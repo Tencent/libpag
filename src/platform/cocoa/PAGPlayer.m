@@ -132,6 +132,10 @@
   [pagPlayer setProgress:value];
 }
 
+- (int64_t)currentFrame {
+  return [pagPlayer currentFrame];
+}
+
 - (void)prepare {
   [pagPlayer prepare];
 }

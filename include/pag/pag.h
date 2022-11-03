@@ -1359,6 +1359,11 @@ class PAG_API PAGPlayer {
   void setProgress(double percent);
 
   /**
+   * Returns the current frame.
+   */
+  Frame currentFrame() const;
+
+  /**
    * If true, PAGPlayer clears the whole content of PAGSurface before drawing anything new to it.
    * The default value is true.
    */

@@ -238,6 +238,14 @@ PAG_API void Java_org_libpag_PAGPlayer_setProgress(JNIEnv* env, jobject thiz, jd
   player->setProgress(value);
 }
 
+PAG_API jlong Java_org_libpag_PAGPlayer_currentFrame(JNIEnv* env, jobject thiz) {
+  auto player = getPAGPlayer(env, thiz);
+  if (player == nullptr) {
+    return 0;
+  }
+  return player->currentFrame();
+}
+
 PAG_API void Java_org_libpag_PAGPlayer_prepare(JNIEnv* env, jobject thiz) {
   auto player = getPAGPlayer(env, thiz);
   if (player == nullptr) {

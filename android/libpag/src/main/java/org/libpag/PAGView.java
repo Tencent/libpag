@@ -756,6 +756,13 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     }
 
     /**
+     * Returns the current frame.
+     */
+    public long currentFrame() {
+        return pagPlayer.currentFrame();
+    }
+
+    /**
      * Returns true if PAGView is playing in the main thread. The default value is false.
      */
     public boolean isSync() {
