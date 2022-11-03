@@ -88,7 +88,8 @@
     return nil;
   }
   std::string name = layerName.UTF8String;
-  auto textDocument = std::static_pointer_cast<pag::PAGFile>(self.pagLayer)->getTextDataByName(name);
+  auto textDocument =
+      std::static_pointer_cast<pag::PAGFile>(self.pagLayer)->getTextDataByName(name);
   return ToPAGText(textDocument);
 }
 

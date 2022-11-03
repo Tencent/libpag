@@ -1053,7 +1053,7 @@ class PAG_API PAGFile : public PAGComposition {
    * Note: It always returns the default text data.
    */
   std::shared_ptr<TextDocument> getTextData(int editableTextIndex);
-  
+
   /**
    * Get a text data of the specified layer name.
    * Note: It always returns the default text data.
