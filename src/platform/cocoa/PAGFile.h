@@ -83,7 +83,7 @@ PAG_API @interface PAGFile : PAGComposition
  * Replace the text data of the specified layer name.
  * Passing in null for the textData parameter will reset it to default text data.
  */
-- (void)replaceTextByName:(NSString *)layerName data:(PAGText*)value;
+- (void)replaceTextByName:(NSString*)layerName data:(PAGText*)value;
 
 /**
  * Replace the image data of the specified index. The index ranges from 0 to PAGFile.numImages - 1.
@@ -95,7 +95,7 @@ PAG_API @interface PAGFile : PAGComposition
  * Replace the image data of the specified layer name.
  * Passing in null for the image parameter will reset it to default image data.
  */
-- (void)replaceImageByName:(NSString *)layerName data:(PAGImage*)value;
+- (void)replaceImageByName:(NSString*)layerName data:(PAGImage*)value;
 
 /**
  * Return an array of layers by specified editable index and layer type.

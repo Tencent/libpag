@@ -1059,7 +1059,7 @@ class PAG_API PAGFile : public PAGComposition {
    * Passing in null for the textData parameter will reset it to default text data.
    */
   void replaceText(int editableTextIndex, std::shared_ptr<TextDocument> textData);
-  
+
   /**
    * Replace the text data of the specified layer name.
    * Passing in null for the textData parameter will reset it to default text data.
@@ -1072,7 +1072,7 @@ class PAG_API PAGFile : public PAGComposition {
    * image content.
    */
   void replaceImage(int editableImageIndex, std::shared_ptr<PAGImage> image);
-  
+
   /**
    * Replace file's image content of the specified layer name with a PAGImage object.
    * Passing in null for the image parameter will reset it to default image content.

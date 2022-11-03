@@ -161,8 +161,8 @@ PAG_API void Java_org_libpag_PAGFile_replaceText(JNIEnv* env, jobject thiz, jint
   pagFile->replaceText(index, textDocument);
 }
 
-PAG_API void Java_org_libpag_PAGFile_replaceTextByName(JNIEnv* env, jobject thiz,
-                                                       jstring layerName, jobject textData) {
+PAG_API void Java_org_libpag_PAGFile_replaceTextByName(JNIEnv* env, jobject thiz, jstring layerName,
+                                                       jobject textData) {
   auto pagFile = getPAGFile(env, thiz);
   if (pagFile == nullptr) {
     return;

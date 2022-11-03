@@ -105,7 +105,7 @@
   }
 }
 
-- (void)replaceImageByName:(NSString *)layerName data:(PAGImageImpl*)value {
+- (void)replaceImageByName:(NSString*)layerName data:(PAGImageImpl*)value {
   std::string name = layerName == nil ? "" : layerName.UTF8String;
   auto pagFile = std::static_pointer_cast<pag::PAGFile>(self.pagLayer);
   if (value != nil) {

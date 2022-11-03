@@ -139,7 +139,8 @@ void PAGFile::replaceText(int editableTextIndex, std::shared_ptr<TextDocument> t
   replaceTextInternal(textLayers, textData);
 }
 
-void PAGFile::replaceTextByName(const std::string& layerName, std::shared_ptr<TextDocument> textData) {
+void PAGFile::replaceTextByName(const std::string& layerName,
+                                std::shared_ptr<TextDocument> textData) {
   auto textLayers = getLayersByName(layerName);
   LockGuard autoLock(rootLocker);
   replaceTextInternal(textLayers, textData);
