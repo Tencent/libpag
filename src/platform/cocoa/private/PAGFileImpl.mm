@@ -89,12 +89,29 @@
   return pagFile->replaceText(editableTextIndex, textDocument);
 }
 
+- (void)replaceTextByName:(NSString*)layerName data:(PAGText*)value {
+  std::string name = layerName == nil ? "" : layerName.UTF8String;
+  auto textDocument = ToTextDocument(value);
+  auto pagFile = std::static_pointer_cast<pag::PAGFile>(self.pagLayer);
+  return pagFile->replaceTextByName(name, textDocument);
+}
+
 - (void)replaceImage:(int)editableImageIndex data:(PAGImageImpl*)value {
   auto pagFile = std::static_pointer_cast<pag::PAGFile>(self.pagLayer);
   if (value != nil) {
     pagFile->replaceImage(editableImageIndex, value.pagImage);
   } else {
     pagFile->replaceImage(editableImageIndex, nullptr);
+  }
+}
+
+- (void)replaceImageByName:(NSString *)layerName data:(PAGImageImpl*)value {
+  std::string name = layerName == nil ? "" : layerName.UTF8String;
+  auto pagFile = std::static_pointer_cast<pag::PAGFile>(self.pagLayer);
+  if (value != nil) {
+    pagFile->replaceImageByName(name, value.pagImage);
+  } else {
+    pagFile->replaceImageByName(name, nullptr);
   }
 }
 

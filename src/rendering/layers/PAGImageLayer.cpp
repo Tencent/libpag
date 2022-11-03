@@ -196,7 +196,8 @@ bool PAGImageLayer::gotoTime(int64_t layerTime) {
 void PAGImageLayer::replaceImage(std::shared_ptr<pag::PAGImage> image) {
   LockGuard autoLock(rootLocker);
   if (rootFile != nullptr) {
-    rootFile->replaceImageInternal(_editableIndex, image);
+    auto imageLayers = rootFile->getLayersByEditableIndexInternal(_editableIndex, LayerType::Image);
+    rootFile->replaceImageInternal(imageLayers, image);
     if (image != nullptr) {
       image->setOwner(this);
     }

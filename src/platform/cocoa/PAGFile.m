@@ -70,11 +70,23 @@
   [(PAGFileImpl*)self.impl replaceText:editableTextIndex data:value];
 }
 
+- (void)replaceTextByName:(NSString*)layerName data:(PAGText*)value {
+  [(PAGFileImpl*)self.impl replaceTextByName:layerName data:value];
+}
+
 - (void)replaceImage:(int)editableImageIndex data:(PAGImage*)value {
   if (value != nil) {
     [(PAGFileImpl*)self.impl replaceImage:editableImageIndex data:[value image]];
   } else {
     [(PAGFileImpl*)self.impl replaceImage:editableImageIndex data:nil];
+  }
+}
+
+- (void)replaceImageByName:(NSString*)layerName data:(PAGImage*)value {
+  if (value != nil) {
+    [(PAGFileImpl*)self.impl replaceImageByName:layerName data:[value image]];
+  } else {
+    [(PAGFileImpl*)self.impl replaceImageByName:layerName data:nil];
   }
 }
 
