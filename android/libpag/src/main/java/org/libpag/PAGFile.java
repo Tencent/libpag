@@ -83,6 +83,12 @@ public class PAGFile extends PAGComposition {
     public native void replaceText(int editableTextIndex, PAGText textData);
 
     /**
+     * Replace the text data of the specified layer name. Passing in null
+     * for the textData parameter will reset it to default text data.
+     */
+    public native void replaceTextByName(String layerName, PAGText textData);
+
+    /**
      * Replace the image data of the specified index. The index ranges from 0 to PAGFile.numImages - 1. Passing in null
      * for the image parameter will reset it to default image data.
      */
@@ -95,6 +101,20 @@ public class PAGFile extends PAGComposition {
     }
 
     public native void nativeReplaceImage(int editableImageIndex, long image);
+
+    /**
+     * Replace the image data of the specified layer name. Passing in null
+     * for the image parameter will reset it to default image data.
+     */
+    public void replaceImageByName(String layerName, PAGImage image) {
+        if (image == null) {
+            nativeReplaceImageByName(layerName, 0);
+        } else {
+            nativeReplaceImageByName(layerName, image.nativeContext);
+        }
+    }
+
+    public native void nativeReplaceImageByName(String layerName, long image);
 
     /**
      * Return an array of layers by specified editable index and layer type.

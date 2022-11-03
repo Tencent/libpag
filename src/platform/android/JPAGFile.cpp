@@ -161,6 +161,20 @@ PAG_API void Java_org_libpag_PAGFile_replaceText(JNIEnv* env, jobject thiz, jint
   pagFile->replaceText(index, textDocument);
 }
 
+PAG_API void Java_org_libpag_PAGFile_replaceTextByName(JNIEnv* env, jobject thiz,
+                                                       jstring layerName, jobject textData) {
+  auto pagFile = getPAGFile(env, thiz);
+  if (pagFile == nullptr) {
+    return;
+  }
+  auto name = SafeConvertToStdString(env, layerName);
+  if (name.empty()) {
+    return;
+  }
+  auto textDocument = ToTextDocument(env, textData);
+  pagFile->replaceTextByName(name, textDocument);
+}
+
 PAG_API void Java_org_libpag_PAGFile_nativeReplaceImage(JNIEnv* env, jobject thiz, jint index,
                                                         jlong imageObject) {
   auto pagFile = getPAGFile(env, thiz);
@@ -172,6 +186,24 @@ PAG_API void Java_org_libpag_PAGFile_nativeReplaceImage(JNIEnv* env, jobject thi
     pagFile->replaceImage(index, image->get());
   } else {
     pagFile->replaceImage(index, nullptr);
+  }
+}
+
+PAG_API void Java_org_libpag_PAGFile_nativeReplaceImageByName(JNIEnv* env, jobject thiz,
+                                                              jstring layerName, long imageObject) {
+  auto pagFile = getPAGFile(env, thiz);
+  if (pagFile == nullptr) {
+    return;
+  }
+  auto name = SafeConvertToStdString(env, layerName);
+  if (name.empty()) {
+    return;
+  }
+  auto image = reinterpret_cast<JPAGImage*>(imageObject);
+  if (image != nullptr) {
+    pagFile->replaceImageByName(name, image->get());
+  } else {
+    pagFile->replaceImageByName(name, nullptr);
   }
 }
 
