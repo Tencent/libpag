@@ -79,8 +79,16 @@ PAG_TEST_F(PAGImageLayerTest, imageMultiThreadReplace) {
       TestPAGPlayer->flush();
     }
   });
+  std::thread thread3([imageLayer, image]() {
+    for (int i = 0; i < 10; ++i) {
+      std::cout << "线程3 通过图层名字替换图片" << std::endl;
+      TestPAGFile->replaceImageByName("PAGImageLayer1", image);
+      TestPAGPlayer->flush();
+    }
+  });
   thread1.join();
   thread2.join();
+  thread3.join();
 
   imageLayer->replaceImage(image);
   TestPAGPlayer->flush();

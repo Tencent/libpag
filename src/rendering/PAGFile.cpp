@@ -133,6 +133,10 @@ std::shared_ptr<TextDocument> PAGFile::getTextData(int editableTextIndex) {
   return file->getTextData(editableTextIndex);
 }
 
+std::shared_ptr<TextDocument> PAGFile::getTextDataByName(const std::string& layerName) {
+  return file->getTextDataByName(layerName);
+}
+
 void PAGFile::replaceText(int editableTextIndex, std::shared_ptr<TextDocument> textData) {
   LockGuard autoLock(rootLocker);
   auto textLayers = getLayersByEditableIndexInternal(editableTextIndex, LayerType::Text);
@@ -141,7 +145,13 @@ void PAGFile::replaceText(int editableTextIndex, std::shared_ptr<TextDocument> t
 
 void PAGFile::replaceTextByName(const std::string& layerName,
                                 std::shared_ptr<TextDocument> textData) {
+  if (layerName.empty()) {
+    return;
+  }
   auto textLayers = getLayersByName(layerName);
+  if (textLayers.size() == 0) {
+    return;
+  }
   LockGuard autoLock(rootLocker);
   replaceTextInternal(textLayers, textData);
 }
@@ -153,7 +163,13 @@ void PAGFile::replaceImage(int editableImageIndex, std::shared_ptr<PAGImage> ima
 }
 
 void PAGFile::replaceImageByName(const std::string& layerName, std::shared_ptr<PAGImage> image) {
+  if (layerName.empty()) {
+    return;
+  }
   auto imageLayers = getLayersByName(layerName);
+  if (imageLayers.size() == 0) {
+    return;
+  }
   LockGuard autoLock(rootLocker);
   replaceImageInternal(imageLayers, image);
 }

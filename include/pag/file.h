@@ -2237,6 +2237,11 @@ class PAG_API File {
    * Get a text data of the specified index. The index ranges from 0 to numTexts - 1.
    */
   TextDocumentHandle getTextData(int index) const;
+  
+  /**
+   * Get a text data of the specified layer name.
+   */
+  TextDocumentHandle getTextDataByName(const std::string& layerName) const;
 
   PreComposeLayer* getRootLayer() const;
 

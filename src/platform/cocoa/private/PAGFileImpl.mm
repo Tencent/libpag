@@ -83,6 +83,15 @@
   return ToPAGText(textDocument);
 }
 
+- (PAGText*)getTextDataByName:(NSString*)layerName {
+  if (layerName == nil || layerName.length == 0) {
+    return nil;
+  }
+  std::string name = layerName.UTF8String;
+  auto textDocument = std::static_pointer_cast<pag::PAGFile>(self.pagLayer)->getTextDataByName(name);
+  return ToPAGText(textDocument);
+}
+
 - (void)replaceText:(int)editableTextIndex data:(PAGText*)value {
   auto textDocument = ToTextDocument(value);
   auto pagFile = std::static_pointer_cast<pag::PAGFile>(self.pagLayer);
@@ -90,7 +99,10 @@
 }
 
 - (void)replaceTextByName:(NSString*)layerName data:(PAGText*)value {
-  std::string name = layerName == nil ? "" : layerName.UTF8String;
+  if (layerName == nil || layerName.length == 0) {
+    return;
+  }
+  std::string name = layerName.UTF8String;
   auto textDocument = ToTextDocument(value);
   auto pagFile = std::static_pointer_cast<pag::PAGFile>(self.pagLayer);
   return pagFile->replaceTextByName(name, textDocument);
@@ -106,7 +118,10 @@
 }
 
 - (void)replaceImageByName:(NSString*)layerName data:(PAGImageImpl*)value {
-  std::string name = layerName == nil ? "" : layerName.UTF8String;
+  if (layerName == nil || layerName.length == 0) {
+    return;
+  }
+  std::string name = layerName.UTF8String;
   auto pagFile = std::static_pointer_cast<pag::PAGFile>(self.pagLayer);
   if (value != nil) {
     pagFile->replaceImageByName(name, value.pagImage);
