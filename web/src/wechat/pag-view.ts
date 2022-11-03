@@ -53,7 +53,7 @@ export class PAGView extends NativePAGView {
     pagView.setProgress(0);
     if (pagView.pagViewOptions.firstFrame) {
       await pagView.flush();
-      pagView.currentFrame = 0;
+      pagView.playFrame = 0;
     }
     return pagView;
   }
@@ -82,9 +82,9 @@ export class PAGView extends NativePAGView {
       const now = this.getNowTime();
       const duration = this.duration();
       this.playTime = now * 1000 - this.startTime;
-      const currentFrame = Math.floor((this.playTime / 1000000) * this.frameRate);
+      const playFrame = Math.floor((this.playTime / 1000000) * this.frameRate);
       const count = Math.floor(this.playTime / duration);
-      if (this.repeatedTimes === count && this.currentFrame === currentFrame) {
+      if (this.repeatedTimes === count && this.playFrame === playFrame) {
         return;
       }
       this.flushNextFrame();
@@ -95,7 +95,7 @@ export class PAGView extends NativePAGView {
   protected override async flushNextFrame() {
     this.flushingNextFrame = true;
     const duration = this.duration();
-    const currentFrame = Math.floor((this.playTime / 1000000) * this.frameRate);
+    const playFrame = Math.floor((this.playTime / 1000000) * this.frameRate);
     const count = Math.floor(this.playTime / duration);
     if (this.repeatCount >= 0 && count > this.repeatCount) {
       this.clearTimer();
@@ -113,7 +113,7 @@ export class PAGView extends NativePAGView {
     }
     this.player.setProgress((this.playTime % duration) / duration);
     const res = await this.flush();
-    this.currentFrame = currentFrame;
+    this.playFrame = playFrame;
     this.repeatedTimes = count;
     this.flushingNextFrame = false;
     return res;

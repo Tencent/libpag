@@ -226,6 +226,12 @@ void PAGPlayer::setProgress(double percent) {
   pagComposition->setProgressInternal(realProgress);
 }
 
+Frame PAGPlayer::currentFrame() const {
+  LockGuard autoLock(rootLocker);
+  auto pagComposition = stage->getRootComposition();
+  return pagComposition ? pagComposition->currentFrameInternal() : 0;
+}
+
 bool PAGPlayer::autoClear() {
   LockGuard autoLock(rootLocker);
   return _autoClear;

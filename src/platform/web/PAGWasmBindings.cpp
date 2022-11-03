@@ -314,6 +314,9 @@ EMSCRIPTEN_BINDINGS(pag) {
                   return static_cast<int>(pagPlayer.duration());
                 }))
       .function("_getProgress", &PAGPlayer::getProgress)
+      .function("_currentFrame", optional_override([](PAGPlayer& pagPlayer) {
+                  return static_cast<int>(pagPlayer.currentFrame());
+                }))
       .function("_videoEnabled", &PAGPlayer::videoEnabled)
       .function("_setVideoEnabled", &PAGPlayer::setVideoEnabled)
       .function("_cacheEnabled", &PAGPlayer::cacheEnabled)
