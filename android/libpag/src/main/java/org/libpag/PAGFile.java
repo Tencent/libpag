@@ -77,6 +77,12 @@ public class PAGFile extends PAGComposition {
     public native PAGText getTextData(int index);
 
     /**
+     * Get a text data of the specified layer name.
+     * Note: It always returns the default text data.
+     */
+    public native PAGText getTextDataByName(String layerName);
+
+    /**
      * Replace the text data of the specified index. The index ranges from 0 to PAGFile.numTexts - 1. Passing in null
      * for the textData parameter will reset it to default text data.
      */
