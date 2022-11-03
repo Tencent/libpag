@@ -221,6 +221,11 @@ PAG_API @interface PAGView : UIView
 - (void)setProgress:(double)value;
 
 /**
+ * Returns the current frame.
+ */
+- (int64_t)currentFrame;
+
+/**
  * Call this method to render current position immediately. If the play() method is already
  * called, there is no need to call it. Returns true if the content has changed.
  */

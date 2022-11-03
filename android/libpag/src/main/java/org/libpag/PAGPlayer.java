@@ -147,6 +147,11 @@ public class PAGPlayer {
     public native void setProgress(double value);
 
     /**
+     * Returns the current frame.
+     */
+    public native long currentFrame();
+
+    /**
      * Prepares the player for the next flush() call. It collects all CPU tasks from the current
      * progress of the composition and runs them asynchronously in parallel. It is usually used for
      * speeding up the first frame rendering.

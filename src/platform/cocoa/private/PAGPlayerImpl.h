@@ -57,6 +57,8 @@
 
 - (void)setProgress:(double)value;
 
+- (int64_t)currentFrame;
+
 - (void)prepare;
 
 - (BOOL)flush;

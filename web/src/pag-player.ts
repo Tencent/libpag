@@ -63,6 +63,12 @@ export class PAGPlayer {
     return this.wasmIns._getProgress() as number;
   }
   /**
+   * Returns the current frame.
+   */
+  public currentFrame(): number {
+    return this.wasmIns._currentFrame() as number;
+  }
+  /**
    * If set to false, the player skips rendering for video composition.
    */
   public videoEnabled(): boolean {
