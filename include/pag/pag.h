@@ -1059,7 +1059,7 @@ class PAG_API PAGFile : public PAGComposition {
    * Passing in null for the textData parameter will reset it to default text data.
    */
   void replaceText(int editableTextIndex, std::shared_ptr<TextDocument> textData);
-  
+
   /**
    * Replace file's image content of the specified index with a PAGImage object. The index ranges from
    * 0 to PAGFile.numImages - 1. Passing in null for the image parameter will reset it to default
