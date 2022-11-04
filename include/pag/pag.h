@@ -1068,6 +1068,12 @@ class PAG_API PAGFile : public PAGComposition {
   void replaceImage(int editableImageIndex, std::shared_ptr<PAGImage> image);
 
   /**
+   * Replace file's image content of the specified layer name with a PAGImage object.
+   * Passing in null for the image parameter will reset it to default image content.
+   */
+  void replaceImageByName(const std::string& layerName, std::shared_ptr<PAGImage> image);
+
+  /**
    * Return an array of layers by specified editable index and layer type.
    */
   std::vector<std::shared_ptr<PAGLayer>> getLayersByEditableIndex(int editableIndex,
@@ -1124,7 +1130,10 @@ class PAG_API PAGFile : public PAGComposition {
   Frame scaledFrameToFileFrame(Frame scaledFrame, const TimeRange& scaledTimeRange) const;
   Frame fileFrameToStretchedFrame(Frame fileFrame) const;
   Frame fileFrameToScaledFrame(Frame fileFrame, const TimeRange& scaledTimeRange) const;
-  void replaceImageInternal(int editableImageIndex, std::shared_ptr<PAGImage> image);
+  void replaceTextInternal(const std::vector<std::shared_ptr<PAGLayer>>& textLayers,
+                           std::shared_ptr<TextDocument> textData);
+  void replaceImageInternal(const std::vector<std::shared_ptr<PAGLayer>>& imageLayers,
+                            std::shared_ptr<PAGImage> image);
 
   Frame _stretchedContentFrame = 0;
   Frame _stretchedFrameDuration = 1;

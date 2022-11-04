@@ -78,6 +78,14 @@
   }
 }
 
+- (void)replaceImageByName:(NSString*)layerName data:(PAGImage*)value {
+  if (value != nil) {
+    [(PAGFileImpl*)self.impl replaceImageByName:layerName data:[value image]];
+  } else {
+    [(PAGFileImpl*)self.impl replaceImageByName:layerName data:nil];
+  }
+}
+
 - (NSArray<PAGLayer*>*)getLayersByEditableIndex:(int)index layerType:(PAGLayerType)type {
   return [(PAGFileImpl*)self.impl getLayersByEditableIndex:index layerType:type];
 }

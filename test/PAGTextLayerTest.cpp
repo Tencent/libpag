@@ -134,7 +134,7 @@ PAG_TEST_F(PAGTextLayerTest, multiThreadModify) {
 
   std::thread thread2([textLayer]() {
     for (int i = 0; i < 10; ++i) {
-      std::cout << "线程2替换文本" << std::endl;
+      std::cout << "线程2 替换文本" << std::endl;
       textLayer->setFontSize(20);
       textLayer->setFillColor(Blue);
       textLayer->setText("线程222替换文本");

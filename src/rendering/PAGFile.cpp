@@ -136,15 +136,25 @@ std::shared_ptr<TextDocument> PAGFile::getTextData(int editableTextIndex) {
 void PAGFile::replaceText(int editableTextIndex, std::shared_ptr<TextDocument> textData) {
   LockGuard autoLock(rootLocker);
   auto textLayers = getLayersByEditableIndexInternal(editableTextIndex, LayerType::Text);
-  for (auto& pagLayer : textLayers) {
-    auto pagTextLayer = std::static_pointer_cast<PAGTextLayer>(pagLayer);
-    pagTextLayer->replaceTextInternal(textData);
-  }
+  replaceTextInternal(textLayers, textData);
 }
 
 void PAGFile::replaceImage(int editableImageIndex, std::shared_ptr<PAGImage> image) {
   LockGuard autoLock(rootLocker);
-  replaceImageInternal(editableImageIndex, image);
+  auto imageLayers = getLayersByEditableIndexInternal(editableImageIndex, LayerType::Image);
+  replaceImageInternal(imageLayers, image);
+}
+
+void PAGFile::replaceImageByName(const std::string& layerName, std::shared_ptr<PAGImage> image) {
+  if (layerName.empty()) {
+    return;
+  }
+  auto imageLayers = getLayersByName(layerName);
+  if (imageLayers.size() == 0) {
+    return;
+  }
+  LockGuard autoLock(rootLocker);
+  replaceImageInternal(imageLayers, image);
 }
 
 std::vector<std::shared_ptr<PAGLayer>> PAGFile::getLayersByEditableIndex(int editableIndex,
@@ -405,12 +415,23 @@ Frame PAGFile::fileFrameToScaledFrame(Frame fileFrame, const TimeRange& scaledTi
   return targetFrame + scaledTimeRange.start;
 }
 
-void PAGFile::replaceImageInternal(int editableImageIndex, std::shared_ptr<PAGImage> image) {
-  auto imageLayers = getLayersByEditableIndexInternal(editableImageIndex, LayerType::Image);
-  // Need to traverse from back to front to ensure the same behavior as before
-  for (auto iter = imageLayers.rbegin(); iter != imageLayers.rend(); iter++) {
-    auto pagImageLayer = std::static_pointer_cast<PAGImageLayer>(*iter);
-    pagImageLayer->setImageInternal(image);
+void PAGFile::replaceTextInternal(const std::vector<std::shared_ptr<PAGLayer>>& textLayers,
+                                  std::shared_ptr<TextDocument> textData) {
+  for (auto& pagLayer : textLayers) {
+    if (pagLayer->layerType() == LayerType::Text) {
+      auto pagTextLayer = std::static_pointer_cast<PAGTextLayer>(pagLayer);
+      pagTextLayer->replaceTextInternal(textData);
+    }
+  }
+}
+
+void PAGFile::replaceImageInternal(const std::vector<std::shared_ptr<PAGLayer>>& imageLayers,
+                                   std::shared_ptr<PAGImage> image) {
+  for (auto& pagLayer : imageLayers) {
+    if (pagLayer->layerType() == LayerType::Image) {
+      auto pagImageLayer = std::static_pointer_cast<PAGImageLayer>(pagLayer);
+      pagImageLayer->setImageInternal(image);
+    }
   }
 }
 }  // namespace pag

@@ -86,6 +86,12 @@ PAG_API @interface PAGFile : PAGComposition
 - (void)replaceImage:(int)editableImageIndex data:(PAGImage*)value;
 
 /**
+ * Replace the image data of the specified layer name.
+ * Passing in null for the image parameter will reset it to default image data.
+ */
+- (void)replaceImageByName:(NSString*)layerName data:(PAGImage*)value;
+
+/**
  * Return an array of layers by specified editable index and layer type.
  */
 - (NSArray<PAGLayer*>*)getLayersByEditableIndex:(int)index layerType:(PAGLayerType)type;

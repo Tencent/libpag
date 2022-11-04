@@ -50,6 +50,8 @@
 
 - (void)replaceImage:(int)editableImageIndex data:(PAGImageImpl*)value;
 
+- (void)replaceImageByName:(NSString*)layerName data:(PAGImageImpl*)value;
+
 - (NSArray<PAGLayer*>*)getLayersByEditableIndex:(int)index layerType:(PAGLayerType)type;
 
 - (NSArray<NSNumber*>*)getEditableIndices:(PAGLayerType)layerType;

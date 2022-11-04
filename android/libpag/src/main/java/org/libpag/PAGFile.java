@@ -97,6 +97,20 @@ public class PAGFile extends PAGComposition {
     public native void nativeReplaceImage(int editableImageIndex, long image);
 
     /**
+     * Replace the image data of the specified layer name. Passing in null
+     * for the image parameter will reset it to default image data.
+     */
+    public void replaceImageByName(String layerName, PAGImage image) {
+        if (image == null) {
+            nativeReplaceImageByName(layerName, 0);
+        } else {
+            nativeReplaceImageByName(layerName, image.nativeContext);
+        }
+    }
+
+    public native void nativeReplaceImageByName(String layerName, long image);
+
+    /**
      * Return an array of layers by specified editable index and layer type.
      */
     public native PAGLayer[] getLayersByEditableIndex(int editableIndex, int layerType);

@@ -175,6 +175,24 @@ PAG_API void Java_org_libpag_PAGFile_nativeReplaceImage(JNIEnv* env, jobject thi
   }
 }
 
+PAG_API void Java_org_libpag_PAGFile_nativeReplaceImageByName(JNIEnv* env, jobject thiz,
+                                                              jstring layerName, long imageObject) {
+  auto pagFile = getPAGFile(env, thiz);
+  if (pagFile == nullptr) {
+    return;
+  }
+  auto name = SafeConvertToStdString(env, layerName);
+  if (name.empty()) {
+    return;
+  }
+  auto image = reinterpret_cast<JPAGImage*>(imageObject);
+  if (image != nullptr) {
+    pagFile->replaceImageByName(name, image->get());
+  } else {
+    pagFile->replaceImageByName(name, nullptr);
+  }
+}
+
 PAG_API jobjectArray Java_org_libpag_PAGFile_getLayersByEditableIndex(JNIEnv* env, jobject thiz,
                                                                       jint editableIndex,
                                                                       jint layerType) {

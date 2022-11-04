@@ -98,6 +98,19 @@
   }
 }
 
+- (void)replaceImageByName:(NSString*)layerName data:(PAGImageImpl*)value {
+  if (layerName == nil || layerName.length == 0) {
+    return;
+  }
+  std::string name = layerName.UTF8String;
+  auto pagFile = std::static_pointer_cast<pag::PAGFile>(self.pagLayer);
+  if (value != nil) {
+    pagFile->replaceImageByName(name, value.pagImage);
+  } else {
+    pagFile->replaceImageByName(name, nullptr);
+  }
+}
+
 - (NSArray<PAGLayer*>*)getLayersByEditableIndex:(int)index layerType:(PAGLayerType)type {
   auto pagFile = std::static_pointer_cast<pag::PAGFile>(self.pagLayer);
   auto layerVector = pagFile->getLayersByEditableIndex(index, static_cast<pag::LayerType>(type));
