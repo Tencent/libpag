@@ -22,7 +22,7 @@
 namespace pag {
 std::string Performance::getPerformanceString() const {
   char buffer[300];
-  sprintf(buffer,
+  snprintf(buffer, 300,
           "%6.1fms[Render] %6.1fms[Image] %6.1fms[Video]"
           " %6.1fms[Texture] %6.1fms[Program] %6.1fms[Present] ",
           static_cast<double>(renderingTime) / 1000.0,
