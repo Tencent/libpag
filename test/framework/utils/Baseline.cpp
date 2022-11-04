@@ -52,10 +52,10 @@ std::string DumpMD5(const void* bytes, size_t size) {
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
   CC_MD5(bytes, size, digest);
 #pragma clang diagnostic pop
-  char buffer[32];
+  char buffer[33];
   char* position = buffer;
   for (unsigned char i : digest) {
-    sprintf(position, "%02x", i);
+    snprintf(position, 3, "%02x", i);
     position += 2;
   }
   return {buffer, 32};
