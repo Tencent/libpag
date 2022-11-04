@@ -28,6 +28,8 @@
 
 namespace pag {
 
+static const uint8_t EncryptedVersion = 3;
+
 static const uint8_t KnownVersion = 3;
 
 static bool HasTrackMatte(Enum type) {
@@ -181,7 +183,7 @@ DecodeStream ReadBodyBytes(DecodeStream* stream) {
     return emptyStream;
   }
   auto version = stream->readUint8();
-  if (version == KnownVersion) {
+  if (version == EncryptedVersion) {
     Throw(stream->context, "Encrypted PAG file");
     return emptyStream;
   }
