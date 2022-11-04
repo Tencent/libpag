@@ -142,21 +142,8 @@ PAG_TEST_F(PAGTextLayerTest, multiThreadModify) {
     }
   });
 
-  std::thread thread3([textLayer]() {
-    for (int i = 0; i < 10; ++i) {
-      std::cout << "线程3 通过图层名字替换文本" << std::endl;
-      auto textData = TestPAGFile->getTextDataByName("PAGTextLayer1");
-      textData->fontSize = 20;
-      textData->fillColor = Blue;
-      textData->text = "线程333图层名字替换文本";
-      TestPAGFile->replaceTextByName("PAGTextLayer1", textData);
-      TestPAGPlayer->flush();
-    }
-  });
-
   thread1.join();
   thread2.join();
-  thread3.join();
   textLayer->setText("替换文本666666");
   TestPAGPlayer->flush();
 }

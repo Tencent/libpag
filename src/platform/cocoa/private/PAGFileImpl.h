@@ -46,11 +46,7 @@
 
 - (PAGText*)getTextData:(int)index;
 
-- (PAGText*)getTextDataByName:(NSString*)layerName;
-
 - (void)replaceText:(int)editableTextIndex data:(PAGText*)value;
-
-- (void)replaceTextByName:(NSString*)layerName data:(PAGText*)value;
 
 - (void)replaceImage:(int)editableImageIndex data:(PAGImageImpl*)value;
 

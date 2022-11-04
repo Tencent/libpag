@@ -1055,23 +1055,11 @@ class PAG_API PAGFile : public PAGComposition {
   std::shared_ptr<TextDocument> getTextData(int editableTextIndex);
 
   /**
-   * Get a text data of the specified layer name.
-   * Note: It always returns the default text data.
-   */
-  std::shared_ptr<TextDocument> getTextDataByName(const std::string& layerName);
-
-  /**
    * Replace the text data of the specified index. The index ranges from 0 to PAGFile.numTexts - 1.
    * Passing in null for the textData parameter will reset it to default text data.
    */
   void replaceText(int editableTextIndex, std::shared_ptr<TextDocument> textData);
-
-  /**
-   * Replace the text data of the specified layer name.
-   * Passing in null for the textData parameter will reset it to default text data.
-   */
-  void replaceTextByName(const std::string& layerName, std::shared_ptr<TextDocument> textData);
-
+  
   /**
    * Replace file's image content of the specified index with a PAGImage object. The index ranges from
    * 0 to PAGFile.numImages - 1. Passing in null for the image parameter will reset it to default

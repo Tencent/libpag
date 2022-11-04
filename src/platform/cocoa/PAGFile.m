@@ -66,16 +66,8 @@
   return [(PAGFileImpl*)self.impl getTextData:index];
 }
 
-- (PAGText*)getTextDataByName:(NSString*)layerName {
-  return [(PAGFileImpl*)self.impl getTextDataByName:layerName];
-}
-
 - (void)replaceText:(int)editableTextIndex data:(PAGText*)value {
   [(PAGFileImpl*)self.impl replaceText:editableTextIndex data:value];
-}
-
-- (void)replaceTextByName:(NSString*)layerName data:(PAGText*)value {
-  [(PAGFileImpl*)self.impl replaceTextByName:layerName data:value];
 }
 
 - (void)replaceImage:(int)editableImageIndex data:(PAGImage*)value {

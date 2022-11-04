@@ -202,21 +202,6 @@ TextDocumentHandle File::getTextData(int index) const {
   return TextDocumentHandle(textData);
 }
 
-TextDocumentHandle File::getTextDataByName(const std::string& layerName) const {
-  if (layerName.empty()) {
-    return nullptr;
-  }
-  for (auto textLayer : textLayers) {
-    if (textLayer->name == layerName) {
-      auto textDocument = textLayer->getTextDocument();
-      auto textData = new TextDocument();
-      *textData = *textDocument;
-      return TextDocumentHandle(textData);
-    }
-  }
-  return nullptr;
-}
-
 PreComposeLayer* File::getRootLayer() const {
   return rootLayer;
 }
