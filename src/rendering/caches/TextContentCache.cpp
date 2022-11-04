@@ -88,10 +88,11 @@ void TextContentCache::initTextGlyphs(const std::vector<std::vector<GlyphHandle>
     textBlocks[textDocument] = std::make_shared<TextBlock>(getCacheID(), lines, scale, &bounds);
   };
   if (sourceText->animatable()) {
-    auto animatableProperty = reinterpret_cast<AnimatableProperty<TextDocumentHandle>*>(sourceText);
-    addFunc(animatableProperty->keyframes[0]->startValue.get(), pathOption);
-    for (const auto& keyframe : animatableProperty->keyframes) {
-      addFunc(keyframe->endValue.get(), pathOption);
+    for (Frame frame = layer->startTime; frame < layer->startTime + layer->duration; frame++) {
+      auto textDocument = sourceText->getValueAt(frame).get();
+      if (textBlocks.find(textDocument) == textBlocks.end()) {
+        addFunc(textDocument, pathOption);
+      }
     }
   } else {
     addFunc(sourceText->getValueAt(0).get(), pathOption);

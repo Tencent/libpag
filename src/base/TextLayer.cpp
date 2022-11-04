@@ -34,12 +34,7 @@ TextDocumentHandle TextLayer::getTextDocument() {
   if (sourceText == nullptr) {
     return nullptr;
   }
-  if (sourceText->animatable()) {
-    auto keyframes =
-        reinterpret_cast<AnimatableProperty<TextDocumentHandle>*>(sourceText)->keyframes;
-    return keyframes[0]->startValue;
-  }
-  return sourceText->getValueAt(0);
+  return sourceText->getValueAt(startTime);
 }
 
 void TextLayer::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) {

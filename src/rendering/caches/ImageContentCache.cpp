@@ -17,31 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ImageContentCache.h"
-#include "rendering/graphics/Picture.h"
+#include "ImageBytesCache.h"
 
 namespace pag {
-class ImageBytesCache : public Cache {
- public:
-  static ImageBytesCache* Get(ImageBytes* imageBytes) {
-    std::lock_guard<std::mutex> autoLock(imageBytes->locker);
-    if (imageBytes->cache != nullptr) {
-      return static_cast<ImageBytesCache*>(imageBytes->cache);
-    }
-    auto cache = new ImageBytesCache();
-    auto fileBytes =
-        tgfx::Data::MakeWithoutCopy(imageBytes->fileBytes->data(), imageBytes->fileBytes->length());
-    auto codec = tgfx::ImageCodec::MakeFrom(std::move(fileBytes));
-    auto picture = Picture::MakeFrom(imageBytes->uniqueID, codec);
-    auto matrix = tgfx::Matrix::MakeScale(1 / imageBytes->scaleFactor);
-    matrix.postTranslate(static_cast<float>(-imageBytes->anchorX),
-                         static_cast<float>(-imageBytes->anchorY));
-    cache->graphic = Graphic::MakeCompose(picture, matrix);
-    imageBytes->cache = cache;
-    return cache;
-  }
-
-  std::shared_ptr<Graphic> graphic = nullptr;
-};
 
 std::shared_ptr<Graphic> ImageContentCache::GetGraphic(ImageBytes* imageBytes) {
   return ImageBytesCache::Get(imageBytes)->graphic;

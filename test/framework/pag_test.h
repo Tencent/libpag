@@ -20,11 +20,10 @@
 
 #include "PAGCpuTest.h"
 #include "PAGTestEnvironment.h"
+#include "utils/TestConstants.h"
 
 namespace pag {
 // public macro
-
-#define DEFAULT_PAG_PATH "../resources/apitest/test.pag"
 
 /**
  * Register a test case.
@@ -35,13 +34,15 @@ namespace pag {
  * Define a class, all test that use this test_fixture will execute between PagSetUp and
  * PagTearDown. All test will share a same openGL context. DEFAULT_PAG_PATH will be used to init.
  */
-#define PAG_TEST_SUIT(class_name) PAG_TEST_SUIT_WITH_PATH(class_name, DEFAULT_PAG_PATH)
+#define PAG_TEST_SUIT(class_name) \
+  PAG_TEST_SUIT_WITH_PATH(class_name, TestConstants::DEFAULT_PAG_PATH)
 
 /**
  * Define a class, Every test that use this test_fixture will execute in a new PagSetUp and
  * PagTearDown. Every test will have a independent openGL context.
  */
-#define PAG_TEST_CASE(class_name) PAG_TEST_CASE_WITH_PATH(class_name, DEFAULT_PAG_PATH)
+#define PAG_TEST_CASE(class_name) \
+  PAG_TEST_CASE_WITH_PATH(class_name, TestConstants::DEFAULT_PAG_PATH)
 
 /**
  * Register a test case that its execution environment will depend on how to define the

@@ -72,7 +72,7 @@ PAG_TEST_F(PAGCompositionTest, composition) {
   TestPAGPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGCompositionTest/composition_empty"));
 
-  auto pagFile2 = PAGFile::Load(DEFAULT_PAG_PATH);
+  auto pagFile2 = PAGFile::Load(TestConstants::DEFAULT_PAG_PATH);
   auto pagComposition2 = std::static_pointer_cast<PAGComposition>(pagFile2->getLayerAt(0));
   auto imageLayer = pagComposition2->getLayerAt(2);
   pagComposition->addLayer(imageLayer);

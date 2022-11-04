@@ -17,35 +17,21 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#include "SequenceReader.h"
-#include "base/utils/Task.h"
-#include "pag/file.h"
-#include "rendering/Performance.h"
-#include "rendering/graphics/TextureProxy.h"
-#include "tgfx/core/Bitmap.h"
+#include <string>
 
 namespace pag {
-class BitmapSequenceReader : public SequenceReader {
+class TestConstants {
  public:
-  BitmapSequenceReader(std::shared_ptr<File> file, BitmapSequence* sequence);
-
-  ~BitmapSequenceReader() override;
-
- protected:
-  bool decodeFrame(Frame targetFrame) override;
-
-  std::shared_ptr<tgfx::Texture> makeTexture(tgfx::Context* context) override;
-
-  void recordPerformance(Performance* performance, int64_t decodingTime) override;
-
-  Frame findStartFrame(Frame targetFrame);
-
-  std::mutex locker = {};
-  // Keep a reference to the File in case the Sequence object is released while we are using it.
-  std::shared_ptr<File> file = nullptr;
-  BitmapSequence* sequence = nullptr;
-  Frame lastDecodeFrame = -1;
-  std::shared_ptr<tgfx::PixelBuffer> pixelBuffer = nullptr;
+  static const std::string BASELINE_VERSION_PATH;
+  static const std::string CACHE_MD5_PATH;
+  static const std::string OUT_MD5_PATH;
+  static const std::string CACHE_VERSION_PATH;
+  static const std::string OUT_VERSION_PATH;
+  static const std::string OUT_ROOT;
+  static const std::string HEAD_PATH;
+  static const std::string WEBP_FILE_EXT;
+  static const std::string PAG_FILE_EXT;
+  static const std::string DEFAULT_PAG_PATH;
 };
+
 }  // namespace pag

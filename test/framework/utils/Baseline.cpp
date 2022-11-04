@@ -22,20 +22,13 @@
 #include <fstream>
 #include <iostream>
 #include <unordered_set>
+#include "TestConstants.h"
 #include "base/utils/TGFXCast.h"
 #include "nlohmann/json.hpp"
 #include "tgfx/core/Data.h"
 
 namespace pag {
 using namespace tgfx;
-
-#define BASELINE_VERSION_PATH "../test/baseline/version.json"
-#define CACHE_MD5_PATH "../test/baseline/.cache/md5.json"
-#define OUT_MD5_PATH "../test/out/md5.json"
-#define CACHE_VERSION_PATH "../test/baseline/.cache/version.json"
-#define OUT_VERSION_PATH "../test/out/version.json"
-#define OUT_ROOT "../test/out/"
-#define WEBP_FILE_EXT ".webp"
 
 static nlohmann::json BaselineVersion = {};
 static nlohmann::json CacheVersion = {};
@@ -101,7 +94,7 @@ void SaveImage(const Bitmap& bitmap, const std::string& key) {
   if (data == nullptr) {
     return;
   }
-  std::filesystem::path path = OUT_ROOT + key + WEBP_FILE_EXT;
+  std::filesystem::path path = TestConstants::OUT_ROOT + key + TestConstants::WEBP_FILE_EXT;
   std::filesystem::create_directories(path.parent_path());
   std::ofstream out(path);
   out.write(reinterpret_cast<const char*>(data->data()),
@@ -110,7 +103,7 @@ void SaveImage(const Bitmap& bitmap, const std::string& key) {
 }
 
 void RemoveImage(const std::string& key) {
-  std::filesystem::remove(OUT_ROOT + key + WEBP_FILE_EXT);
+  std::filesystem::remove(TestConstants::OUT_ROOT + key + TestConstants::WEBP_FILE_EXT);
 }
 
 bool Baseline::Compare(const std::shared_ptr<PixelBuffer>& pixelBuffer, const std::string& key) {
@@ -194,22 +187,22 @@ bool Baseline::Compare(const std::shared_ptr<ByteData>& byteData, const std::str
 }
 
 void Baseline::SetUp() {
-  std::ifstream cacheMD5File(CACHE_MD5_PATH);
+  std::ifstream cacheMD5File(TestConstants::CACHE_MD5_PATH);
   if (cacheMD5File.is_open()) {
     cacheMD5File >> CacheMD5;
     cacheMD5File.close();
   }
-  std::ifstream baselineVersionFile(BASELINE_VERSION_PATH);
+  std::ifstream baselineVersionFile(TestConstants::BASELINE_VERSION_PATH);
   if (baselineVersionFile.is_open()) {
     baselineVersionFile >> BaselineVersion;
     baselineVersionFile.close();
   }
-  std::ifstream cacheVersionFile(CACHE_VERSION_PATH);
+  std::ifstream cacheVersionFile(TestConstants::CACHE_VERSION_PATH);
   if (cacheVersionFile.is_open()) {
     cacheVersionFile >> CacheVersion;
     cacheVersionFile.close();
   }
-  std::ifstream headFile("./HEAD");
+  std::ifstream headFile(TestConstants::HEAD_PATH);
   if (headFile.is_open()) {
     headFile >> currentVersion;
     headFile.close();
@@ -238,27 +231,27 @@ static void CreateFolder(const std::string& path) {
 
 void Baseline::TearDown() {
 #ifdef UPDATE_BASELINE
-  CreateFolder(CACHE_MD5_PATH);
-  std::ofstream outMD5File(CACHE_MD5_PATH);
+  CreateFolder(TestConstants::CACHE_MD5_PATH);
+  std::ofstream outMD5File(TestConstants::CACHE_MD5_PATH);
   outMD5File << std::setw(4) << OutputMD5 << std::endl;
   outMD5File.close();
-  CreateFolder(CACHE_VERSION_PATH);
-  std::ofstream outVersionFile(CACHE_VERSION_PATH);
+  CreateFolder(TestConstants::CACHE_VERSION_PATH);
+  std::ofstream outVersionFile(TestConstants::CACHE_VERSION_PATH);
   outVersionFile << std::setw(4) << BaselineVersion << std::endl;
   outVersionFile.close();
 #else
-  std::filesystem::remove(OUT_MD5_PATH);
+  std::filesystem::remove(TestConstants::OUT_MD5_PATH);
   if (!OutputMD5.empty()) {
-    CreateFolder(OUT_MD5_PATH);
-    std::ofstream outMD5File(OUT_MD5_PATH);
+    CreateFolder(TestConstants::OUT_MD5_PATH);
+    std::ofstream outMD5File(TestConstants::OUT_MD5_PATH);
     outMD5File << std::setw(4) << OutputMD5 << std::endl;
     outMD5File.close();
   }
-  CreateFolder(OUT_VERSION_PATH);
-  std::ofstream versionFile(OUT_VERSION_PATH);
+  CreateFolder(TestConstants::OUT_VERSION_PATH);
+  std::ofstream versionFile(TestConstants::OUT_VERSION_PATH);
   versionFile << std::setw(4) << OutputVersion << std::endl;
   versionFile.close();
 #endif
-  RemoveEmptyFolder("../test/out");
+  RemoveEmptyFolder(TestConstants::OUT_ROOT);
 }
 }  // namespace pag

@@ -360,7 +360,7 @@ PAG_TEST_CASE(PAGFileContainerTest)
 PAG_TEST_F(PAGFileContainerTest, ContainerEditing) {
   TestPAGFile->removeAllLayers();
   ASSERT_EQ(TestPAGFile->numChildren(), 0);
-  auto rootLayer = PAGFile::Load(DEFAULT_PAG_PATH);
+  auto rootLayer = PAGFile::Load(TestConstants::DEFAULT_PAG_PATH);
   auto pagCom = std::static_pointer_cast<PAGComposition>(rootLayer->getLayerAt(0));
   int size = pagCom->numChildren();
   for (int i = 0; i < size; i++) {
@@ -426,7 +426,7 @@ PAG_TEST_F(PAGFileContainerTest, ContainerEditing) {
   ASSERT_EQ(TestPAGFile->numChildren(), 0);
   EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGFileContainerTest/removeAllLayers"));
 
-  auto pagFile2 = PAGFile::Load(DEFAULT_PAG_PATH);
+  auto pagFile2 = PAGFile::Load(TestConstants::DEFAULT_PAG_PATH);
   auto root2 = pagFile2;
   auto pagComposition2 = std::static_pointer_cast<PAGComposition>(root2->getLayerAt(0));
   auto imageLayer = pagComposition2->getLayerAt(2);

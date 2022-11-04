@@ -44,7 +44,7 @@ PAG_TEST_F(PAGPlayerTest, pagPlayer) {
   auto container = PAGComposition::Make(720, 1080);
   TestPAGPlayer->setComposition(container);
   ASSERT_NE(TestPAGPlayer->getComposition(), nullptr);
-  auto rootLayer = PAGFile::Load(DEFAULT_PAG_PATH);
+  auto rootLayer = PAGFile::Load(TestConstants::DEFAULT_PAG_PATH);
   auto pagCom = std::static_pointer_cast<PAGComposition>(rootLayer->getLayerAt(0));
   int size = pagCom->numChildren();
   for (int i = 0; i < size; i++) {
@@ -57,7 +57,7 @@ PAG_TEST_F(PAGPlayerTest, pagPlayer) {
   ASSERT_EQ(TestPAGSurface->height(), 1080);
   ASSERT_EQ(container->numChildren(), 6);
 
-  auto pagFile2 = PAGFile::Load(DEFAULT_PAG_PATH);
+  auto pagFile2 = PAGFile::Load(TestConstants::DEFAULT_PAG_PATH);
   auto pagComposition2 = std::static_pointer_cast<PAGComposition>(pagFile2->getLayerAt(0));
   TestPAGPlayer->setComposition(pagComposition2);
   TestPAGPlayer->flush();

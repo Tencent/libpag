@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "base/utils/Verify.h"
+#include "codec/utils/WebpDecoder.h"
 #include "pag/file.h"
 
 namespace pag {
@@ -41,6 +42,33 @@ BitmapSequence::~BitmapSequence() {
   for (auto frame : frames) {
     delete frame;
   }
+}
+
+bool BitmapSequence::isEmptyBitmapFrame(size_t frameIndex) {
+  // There was a bug in PAGExporter that causes an empty frame being exported as 1x1 frame, so we
+  // need to identify this kind of empty frame here.
+  if (frameIndex >= frames.size()) {
+    return false;
+  }
+  auto frame = frames[frameIndex];
+  for (auto bitmap : frame->bitmaps) {
+    if (bitmap->x != 0 || bitmap->y != 0) {
+      return false;
+    }
+    if (bitmap->fileBytes->length() > 150) {
+      return false;
+    }
+
+    int width = 0;
+    int height = 0;
+    if (!WebPGetInfo(bitmap->fileBytes->data(), bitmap->fileBytes->length(), &width, &height)) {
+      LOGE("Get webP size fail.");
+    }
+    if (width > 1 || height > 1) {
+      return false;
+    }
+  }
+  return true;
 }
 
 bool BitmapSequence::verify() const {

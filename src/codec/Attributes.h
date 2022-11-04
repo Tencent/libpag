@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "AddAttributes.h"
 #include "AttributeHelper.h"
 
 namespace pag {

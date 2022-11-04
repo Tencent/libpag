@@ -134,6 +134,7 @@ enum class TagCode {
   EditableIndices = 83,
   MaskBlockV2 = 84,
   GradientOverlayStyle = 85,
+  EncryptedData = 89,
   // add new tags here...
 
   Count
@@ -231,6 +232,10 @@ template <typename T>
 class Property {
  public:
   T value;
+  Property() = default;
+
+  explicit Property(const T& value) : value(value) {
+  }
 
   virtual ~Property() = default;
 
@@ -239,7 +244,7 @@ class Property {
   }
 
   virtual T getValueAt(Frame) {
-    return this->value;
+    return value;
   }
 
   virtual void excludeVaryingRanges(std::vector<TimeRange>*) const {
@@ -2005,6 +2010,8 @@ class PAG_API BitmapSequence : public Sequence {
    */
   std::vector<BitmapFrame*> frames;
 
+  virtual bool isEmptyBitmapFrame(size_t frameIndex);
+
   Frame duration() const override {
     return static_cast<Frame>(frames.size());
   }
@@ -2286,6 +2293,8 @@ class PAG_API File {
  */
 int64_t PAG_API CalculateGraphicsMemory(std::shared_ptr<File> file);
 
+class CodecContext;
+
 class PAG_API Codec {
  public:
   /**
@@ -2339,5 +2348,9 @@ class PAG_API Codec {
    */
   static std::shared_ptr<PerformanceData> ReadPerformanceData(const void* bytes,
                                                               uint32_t byteLength);
+
+ protected:
+  static void UpdateFileAttributes(std::shared_ptr<File> file, CodecContext* context,
+                                   const std::string& filePath);
 };
 }  // namespace pag

@@ -28,7 +28,9 @@
 
 namespace pag {
 
-static const uint8_t CompatibleVersion = 2;
+static const uint8_t EncryptedVersion = 3;
+
+static const uint8_t KnownVersion = 3;
 
 static bool HasTrackMatte(Enum type) {
   switch (type) {
@@ -181,7 +183,11 @@ DecodeStream ReadBodyBytes(DecodeStream* stream) {
     return emptyStream;
   }
   auto version = stream->readUint8();
-  if (version > CompatibleVersion) {
+  if (version == EncryptedVersion) {
+    Throw(stream->context, "Encrypted PAG file");
+    return emptyStream;
+  }
+  if (version > KnownVersion) {
     Throw(stream->context, "Invalid PAG file header.");
     return emptyStream;
   }
@@ -215,24 +221,7 @@ std::shared_ptr<File> Codec::Decode(const void* bytes, uint32_t byteLength,
     return nullptr;
   }
 
-  for (auto& composition : file->compositions) {
-    if (!composition->staticTimeRangeUpdated) {
-      composition->updateStaticTimeRanges();
-      composition->staticTimeRangeUpdated = true;
-    }
-  }
-
-  if (context.scaledTimeRange != nullptr) {
-    file->scaledTimeRange.start = std::max(static_cast<int64_t>(0), context.scaledTimeRange->start);
-    file->scaledTimeRange.end = std::min(file->duration(), context.scaledTimeRange->end);
-  }
-  file->_tagLevel = context.tagLevel;
-  file->timeStretchMode = context.timeStretchMode;
-  file->fileAttributes = context.fileAttributes;
-  file->path = filePath;
-
-  file->editableImages = context.editableImages;
-  file->editableTexts = context.editableTexts;
+  UpdateFileAttributes(file, &context, filePath);
   return file;
 }
 
@@ -283,5 +272,27 @@ std::shared_ptr<PerformanceData> Codec::ReadPerformanceData(const void* bytes,
     }
   }
   return nullptr;
+}
+
+void Codec::UpdateFileAttributes(std::shared_ptr<File> file, CodecContext* context,
+                                 const std::string& filePath) {
+  for (auto& composition : file->compositions) {
+    if (!composition->staticTimeRangeUpdated) {
+      composition->updateStaticTimeRanges();
+      composition->staticTimeRangeUpdated = true;
+    }
+  }
+
+  if (context->scaledTimeRange != nullptr) {
+    file->scaledTimeRange.start =
+        std::max(static_cast<int64_t>(0), context->scaledTimeRange->start);
+    file->scaledTimeRange.end = std::min(file->duration(), context->scaledTimeRange->end);
+  }
+  file->path = filePath;
+  file->_tagLevel = context->tagLevel;
+  file->timeStretchMode = context->timeStretchMode;
+  file->fileAttributes = context->fileAttributes;
+  file->editableImages = context->editableImages;
+  file->editableTexts = context->editableTexts;
 }
 }  // namespace pag
