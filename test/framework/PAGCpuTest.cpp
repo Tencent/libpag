@@ -61,7 +61,7 @@ void PAGCpuTest::PagTearDown() {
 }
 
 std::string PAGCpuTest::GetPagPath() {
-  return DEFAULT_PAG_PATH;
+  return TestConstants::DEFAULT_PAG_PATH;
 }
 
 }  // namespace pag

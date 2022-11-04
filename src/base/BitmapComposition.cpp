@@ -31,29 +31,6 @@ CompositionType BitmapComposition::type() const {
   return CompositionType::Bitmap;
 }
 
-static bool IsEmptyBitmapFrame(BitmapFrame* frame) {
-  // There was a bug in PAGExporter that causes an empty frame being exported as 1x1 frame, so we
-  // need to identify this kind of empty frame here.
-  for (auto bitmap : frame->bitmaps) {
-    if (bitmap->x != 0 || bitmap->y != 0) {
-      return false;
-    }
-    if (bitmap->fileBytes->length() > 150) {
-      return false;
-    }
-
-    int width = 0;
-    int height = 0;
-    if (!WebPGetInfo(bitmap->fileBytes->data(), bitmap->fileBytes->length(), &width, &height)) {
-      LOGE("Get webP size fail.");
-    }
-    if (width > 1 || height > 1) {
-      return false;
-    }
-  }
-  return true;
-}
-
 static TimeRange MakeTimeRange(Frame start, Frame end, float timeScale) {
   auto startFrame = static_cast<Frame>(roundf(start * timeScale));
   auto endFrame = static_cast<Frame>(roundf(end * timeScale));
@@ -68,7 +45,6 @@ void BitmapComposition::updateStaticTimeRanges() {
   if (!sequences.empty()) {
     Frame start = 0;
     Frame end = 0;
-    size_t index = 0;
     auto sequence = sequences[0];
     for (size_t i = 1; i < sequences.size(); i++) {
       auto item = sequences[i];
@@ -77,8 +53,8 @@ void BitmapComposition::updateStaticTimeRanges() {
       }
     }
     float timeScale = frameRate / sequence->frameRate;
-    for (auto frame : sequence->frames) {
-      if (IsEmptyBitmapFrame(frame)) {
+    for (size_t index = 0; index < sequence->frames.size(); index++) {
+      if (sequence->isEmptyBitmapFrame(index)) {
         end = index;
       } else {
         if (end > start) {
@@ -87,7 +63,6 @@ void BitmapComposition::updateStaticTimeRanges() {
         }
         start = end = index;
       }
-      index++;
     }
     if (end > start) {
       auto range = MakeTimeRange(start, end, timeScale);

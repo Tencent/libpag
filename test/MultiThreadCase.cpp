@@ -30,8 +30,8 @@ PAG_TEST_CASE(MultiThreadCase)
  * swiftshader在多线程同时创建 EGLContextExt 时候会失败，需加锁
  */
 void mockPAGView() {
-  auto file = PAGFile::Load(DEFAULT_PAG_PATH);
-  ASSERT_NE(file, nullptr) << "pag path is:" << DEFAULT_PAG_PATH << std::endl;
+  auto file = PAGFile::Load(TestConstants::DEFAULT_PAG_PATH);
+  ASSERT_NE(file, nullptr) << "pag path is:" << TestConstants::DEFAULT_PAG_PATH << std::endl;
   auto surface = PAGSurface::MakeOffscreen(file->width(), file->height());
   auto player = std::make_shared<PAGPlayer>();
   player->setSurface(surface);

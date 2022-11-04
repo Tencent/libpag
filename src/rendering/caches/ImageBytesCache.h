@@ -18,34 +18,13 @@
 
 #pragma once
 
-#include "SequenceReader.h"
-#include "base/utils/Task.h"
 #include "pag/file.h"
-#include "rendering/Performance.h"
-#include "rendering/graphics/TextureProxy.h"
-#include "tgfx/core/Bitmap.h"
+#include "rendering/graphics/Picture.h"
 
 namespace pag {
-class BitmapSequenceReader : public SequenceReader {
+class ImageBytesCache : public Cache {
  public:
-  BitmapSequenceReader(std::shared_ptr<File> file, BitmapSequence* sequence);
-
-  ~BitmapSequenceReader() override;
-
- protected:
-  bool decodeFrame(Frame targetFrame) override;
-
-  std::shared_ptr<tgfx::Texture> makeTexture(tgfx::Context* context) override;
-
-  void recordPerformance(Performance* performance, int64_t decodingTime) override;
-
-  Frame findStartFrame(Frame targetFrame);
-
-  std::mutex locker = {};
-  // Keep a reference to the File in case the Sequence object is released while we are using it.
-  std::shared_ptr<File> file = nullptr;
-  BitmapSequence* sequence = nullptr;
-  Frame lastDecodeFrame = -1;
-  std::shared_ptr<tgfx::PixelBuffer> pixelBuffer = nullptr;
+  static ImageBytesCache* Get(ImageBytes* imageBytes);
+  std::shared_ptr<Graphic> graphic = nullptr;
 };
 }  // namespace pag

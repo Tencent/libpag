@@ -35,8 +35,7 @@ TagHeader ReadTagHeader(DecodeStream* stream) {
   return header;
 }
 
-void WriteTagHeader(EncodeStream* stream, EncodeStream* tagBytes, TagCode code) {
-  auto length = tagBytes->length();
+void WriteTypeAndLength(EncodeStream* stream, TagCode code, uint32_t length) {
   uint16_t typeAndLength = static_cast<uint16_t>(code) << 6;
   if (length < 63) {
     typeAndLength = typeAndLength | static_cast<uint8_t>(length);
@@ -46,7 +45,16 @@ void WriteTagHeader(EncodeStream* stream, EncodeStream* tagBytes, TagCode code) 
     stream->writeUint16(typeAndLength);
     stream->writeUint32(length);
   }
+}
+
+void WriteTagHeader(EncodeStream* stream, EncodeStream* tagBytes, TagCode code) {
+  WriteTypeAndLength(stream, code, tagBytes->length());
   stream->writeBytes(tagBytes);
+}
+
+void WriteTagHeader(EncodeStream* stream, ByteData* tagBytes, TagCode code) {
+  WriteTypeAndLength(stream, code, tagBytes->length());
+  stream->writeBytes(tagBytes->data(), tagBytes->length());
 }
 
 void WriteEndTag(EncodeStream* stream) {

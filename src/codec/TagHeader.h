@@ -51,6 +51,8 @@ void ReadTags(DecodeStream* stream, T parameter, void (*reader)(DecodeStream*, T
 
 void WriteTagHeader(EncodeStream* stream, EncodeStream* tagBytes, TagCode code);
 
+void WriteTagHeader(EncodeStream* stream, ByteData* tagBytes, TagCode code);
+
 void WriteEndTag(EncodeStream* stream);
 
 template <typename T>
