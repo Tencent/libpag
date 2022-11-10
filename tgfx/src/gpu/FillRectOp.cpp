@@ -16,15 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLFillRectOp.h"
-
+#include "FillRectOp.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/Quad.h"
 #include "gpu/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/ResourceProvider.h"
 
 namespace tgfx {
-std::vector<float> GLFillRectOp::coverageVertices() const {
+std::vector<float> FillRectOp::coverageVertices() const {
   auto normalBounds = Rect::MakeLTRB(0, 0, 1, 1);
   std::vector<float> vertices;
   for (size_t i = 0; i < rects.size(); ++i) {
@@ -65,7 +64,7 @@ std::vector<float> GLFillRectOp::coverageVertices() const {
   return vertices;
 }
 
-std::vector<float> GLFillRectOp::noCoverageVertices() const {
+std::vector<float> FillRectOp::noCoverageVertices() const {
   auto normalBounds = Rect::MakeLTRB(0, 0, 1, 1);
   std::vector<float> vertices;
   for (size_t i = 0; i < rects.size(); ++i) {
@@ -87,7 +86,7 @@ std::vector<float> GLFillRectOp::noCoverageVertices() const {
   return vertices;
 }
 
-std::vector<float> GLFillRectOp::vertices() {
+std::vector<float> FillRectOp::vertices() {
   if (aa != AAType::Coverage) {
     return noCoverageVertices();
   } else {
@@ -95,15 +94,14 @@ std::vector<float> GLFillRectOp::vertices() {
   }
 }
 
-std::unique_ptr<GLFillRectOp> GLFillRectOp::Make(std::optional<Color> color, const Rect& rect,
-                                                 const Matrix& viewMatrix,
-                                                 const Matrix& localMatrix) {
-  return std::unique_ptr<GLFillRectOp>(new GLFillRectOp(color, rect, viewMatrix, localMatrix));
+std::unique_ptr<FillRectOp> FillRectOp::Make(std::optional<Color> color, const Rect& rect,
+                                             const Matrix& viewMatrix, const Matrix& localMatrix) {
+  return std::unique_ptr<FillRectOp>(new FillRectOp(color, rect, viewMatrix, localMatrix));
 }
 
-GLFillRectOp::GLFillRectOp(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
-                           const Matrix& localMatrix)
-    : GLDrawOp(ClassID()),
+FillRectOp::FillRectOp(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
+                       const Matrix& localMatrix)
+    : DrawOp(ClassID()),
       colors(color ? std::vector<Color>{*color} : std::vector<Color>()),
       rects({rect}),
       viewMatrices({viewMatrix}),
@@ -113,8 +111,8 @@ GLFillRectOp::GLFillRectOp(std::optional<Color> color, const Rect& rect, const M
   setBounds(bounds);
 }
 
-bool GLFillRectOp::add(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
-                       const Matrix& localMatrix) {
+bool FillRectOp::add(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
+                     const Matrix& localMatrix) {
   if ((!color && !colors.empty()) || (color && colors.empty()) || !canAdd(1)) {
     return false;
   }
@@ -130,16 +128,16 @@ bool GLFillRectOp::add(std::optional<Color> color, const Rect& rect, const Matri
   return true;
 }
 
-bool GLFillRectOp::canAdd(size_t count) const {
+bool FillRectOp::canAdd(size_t count) const {
   return rects.size() + count <= static_cast<size_t>(aa == AAType::Coverage
                                                          ? ResourceProvider::MaxNumAAQuads()
                                                          : ResourceProvider::MaxNumNonAAQuads());
 }
 
-bool GLFillRectOp::onCombineIfPossible(Op* op) {
-  auto* that = static_cast<GLFillRectOp*>(op);
+bool FillRectOp::onCombineIfPossible(Op* op) {
+  auto* that = static_cast<FillRectOp*>(op);
   if (colors.empty() != that->colors.empty() || !canAdd(that->rects.size()) ||
-      !GLDrawOp::onCombineIfPossible(op)) {
+      !DrawOp::onCombineIfPossible(op)) {
     return false;
   }
   rects.insert(rects.end(), that->rects.begin(), that->rects.end());
@@ -149,7 +147,7 @@ bool GLFillRectOp::onCombineIfPossible(Op* op) {
   return true;
 }
 
-void GLFillRectOp::execute(OpsRenderPass* opsRenderPass) {
+void FillRectOp::execute(OpsRenderPass* opsRenderPass) {
   auto info = createProgram(
       opsRenderPass, QuadPerEdgeAAGeometryProcessor::Make(opsRenderPass->renderTarget()->width(),
                                                           opsRenderPass->renderTarget()->height(),
@@ -169,10 +167,11 @@ void GLFillRectOp::execute(OpsRenderPass* opsRenderPass) {
       return;
     }
     opsRenderPass->bindVerticesAndIndices(vertices(), indexBuffer);
-    opsRenderPass->drawIndexed(GL_TRIANGLES, 0, static_cast<int>(rects.size()) * numIndicesPerQuad);
+    opsRenderPass->drawIndexed(PrimitiveType::Triangles, 0,
+                               static_cast<int>(rects.size()) * numIndicesPerQuad);
     return;
   }
   opsRenderPass->bindVerticesAndIndices(vertices(), nullptr);
-  opsRenderPass->draw(GL_TRIANGLE_STRIP, 0, 4);
+  opsRenderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
 }
 }  // namespace tgfx

@@ -18,25 +18,30 @@
 
 #pragma once
 
-#include "GLOpsRenderPass.h"
+#include "DrawOp.h"
+#include "gpu/BufferProvider.h"
+#include "tgfx/core/Path.h"
 
 namespace tgfx {
-class ClearOp : public Op {
+class TriangulatingPathOp : public DrawOp {
  public:
-  static std::unique_ptr<ClearOp> Make(Color color, const Rect& scissor);
+  static std::unique_ptr<TriangulatingPathOp> Make(Color color, const Path& path, Rect clipBounds,
+                                                     const Matrix& localMatrix);
+
+  TriangulatingPathOp(Color color, std::shared_ptr<BufferProvider> bufferProvider, Rect bounds,
+                        const Matrix& viewMatrix = Matrix::I(),
+                        const Matrix& localMatrix = Matrix::I());
 
   void execute(OpsRenderPass* opsRenderPass) override;
 
  private:
   DEFINE_OP_CLASS_ID
 
-  explicit ClearOp(Color color, const Rect& scissor)
-      : Op(ClassID()), color(color), scissor(scissor) {
-  }
-
   bool onCombineIfPossible(Op* op) override;
 
   Color color = Color::Transparent();
-  Rect scissor = Rect::MakeEmpty();
+  std::vector<std::shared_ptr<BufferProvider>> providers;
+  Matrix viewMatrix = Matrix::I();
+  Matrix localMatrix = Matrix::I();
 };
 }  // namespace tgfx

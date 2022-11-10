@@ -67,7 +67,7 @@ class Surface {
    */
   static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<Texture> texture, int sampleCount = 1);
 
-  virtual ~Surface() = default;
+  virtual ~Surface();
 
   /**
    * Retrieves the context associated with this Surface.
@@ -126,7 +126,7 @@ class Surface {
    * Returns Canvas that draws into Surface. Subsequent calls return the same Canvas. Canvas
    * returned is managed and owned by Surface, and is deleted when Surface is deleted.
    */
-  virtual Canvas* getCanvas() = 0;
+  Canvas* getCanvas();
 
   /**
    * Inserts a GPU semaphore that the current GPU-backed API must wait on before executing any more
@@ -173,7 +173,10 @@ class Surface {
 
  private:
   std::unique_ptr<SurfaceOptions> surfaceOptions = nullptr;
+  Canvas* canvas = nullptr;
 
   friend class DrawingManager;
+
+  friend class Canvas;
 };
 }  // namespace tgfx

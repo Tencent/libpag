@@ -71,19 +71,9 @@ std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, 
 
 GLSurface::GLSurface(std::shared_ptr<GLRenderTarget> renderTarget,
                      std::shared_ptr<GLTexture> texture)
-    : Surface(renderTarget, texture) {
-  requiresManualMSAAResolve = GLCaps::Get(renderTarget->context)->usesMSAARenderBuffers();
-}
-
-GLSurface::~GLSurface() {
-  delete canvas;
-}
-
-Canvas* GLSurface::getCanvas() {
-  if (canvas == nullptr) {
-    canvas = new GLCanvas(this);
-  }
-  return canvas;
+    : Surface(std::move(renderTarget), std::move(texture)) {
+  requiresManualMSAAResolve =
+      GLCaps::Get(this->renderTarget->getContext())->usesMSAARenderBuffers();
 }
 
 bool GLSurface::onReadPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) {

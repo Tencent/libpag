@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLTriangulatingPathOp.h"
+#include "TriangulatingPathOp.h"
 #include "core/PathRef.h"
 #include "gpu/DefaultGeometryProcessor.h"
 #include "tgfx/core/Mesh.h"
@@ -25,9 +25,9 @@ namespace tgfx {
 // https://chromium-review.googlesource.com/c/chromium/src/+/1099564/
 static constexpr int AA_TESSELLATOR_MAX_VERB_COUNT = 100;
 
-std::unique_ptr<GLTriangulatingPathOp> GLTriangulatingPathOp::Make(Color color, const Path& path,
-                                                                   Rect clipBounds,
-                                                                   const Matrix& localMatrix) {
+std::unique_ptr<TriangulatingPathOp> TriangulatingPathOp::Make(Color color, const Path& path,
+                                                               Rect clipBounds,
+                                                               const Matrix& localMatrix) {
   const auto& skPath = PathRef::ReadAccess(path);
   if (skPath.countVerbs() > AA_TESSELLATOR_MAX_VERB_COUNT) {
     return nullptr;
@@ -39,16 +39,16 @@ std::unique_ptr<GLTriangulatingPathOp> GLTriangulatingPathOp::Make(Color color, 
   if (count == 0) {
     return nullptr;
   }
-  return std::make_unique<GLTriangulatingPathOp>(color,
-                                                 std::make_shared<BufferProvider>(vertices, count),
-                                                 path.getBounds(), Matrix::I(), localMatrix);
+  return std::make_unique<TriangulatingPathOp>(color,
+                                               std::make_shared<BufferProvider>(vertices, count),
+                                               path.getBounds(), Matrix::I(), localMatrix);
 }
 
-GLTriangulatingPathOp::GLTriangulatingPathOp(Color color,
-                                             std::shared_ptr<BufferProvider> bufferProvider,
-                                             Rect bounds, const Matrix& viewMatrix,
-                                             const Matrix& localMatrix)
-    : GLDrawOp(ClassID()),
+TriangulatingPathOp::TriangulatingPathOp(Color color,
+                                         std::shared_ptr<BufferProvider> bufferProvider,
+                                         Rect bounds, const Matrix& viewMatrix,
+                                         const Matrix& localMatrix)
+    : DrawOp(ClassID()),
       color(color),
       providers({std::move(bufferProvider)}),
       viewMatrix(viewMatrix),
@@ -56,11 +56,11 @@ GLTriangulatingPathOp::GLTriangulatingPathOp(Color color,
   setBounds(bounds);
 }
 
-bool GLTriangulatingPathOp::onCombineIfPossible(Op* op) {
-  if (!GLDrawOp::onCombineIfPossible(op)) {
+bool TriangulatingPathOp::onCombineIfPossible(Op* op) {
+  if (!DrawOp::onCombineIfPossible(op)) {
     return false;
   }
-  auto* that = static_cast<GLTriangulatingPathOp*>(op);
+  auto* that = static_cast<TriangulatingPathOp*>(op);
   if (viewMatrix != that->viewMatrix || localMatrix != that->localMatrix || color != that->color ||
       !providers[0]->canCombine(that->providers[0].get())) {
     return false;
@@ -69,7 +69,7 @@ bool GLTriangulatingPathOp::onCombineIfPossible(Op* op) {
   return true;
 }
 
-void GLTriangulatingPathOp::execute(OpsRenderPass* opsRenderPass) {
+void TriangulatingPathOp::execute(OpsRenderPass* opsRenderPass) {
   auto info = createProgram(
       opsRenderPass, DefaultGeometryProcessor::Make(color, opsRenderPass->renderTarget()->width(),
                                                     opsRenderPass->renderTarget()->height(),
@@ -87,6 +87,6 @@ void GLTriangulatingPathOp::execute(OpsRenderPass* opsRenderPass) {
     }
     opsRenderPass->bindVerticesAndIndices(std::move(vertices), nullptr);
   }
-  opsRenderPass->draw(GL_TRIANGLES, 0, vertexCount);
+  opsRenderPass->draw(PrimitiveType::Triangles, 0, vertexCount);
 }
 }  // namespace tgfx

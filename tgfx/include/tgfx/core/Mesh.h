@@ -22,7 +22,7 @@
 #include "tgfx/core/Path.h"
 
 namespace tgfx {
-class GLDrawOp;
+class DrawOp;
 
 class Mesh {
  public:
@@ -37,8 +37,8 @@ class Mesh {
   virtual Rect bounds() const = 0;
 
  protected:
-  virtual std::unique_ptr<GLDrawOp> getOp(Color color, const Matrix& viewMatrix) const = 0;
+  virtual std::unique_ptr<DrawOp> getOp(Color color, const Matrix& viewMatrix) const = 0;
 
-  friend class GLCanvas;
+  friend class Canvas;
 };
 }  // namespace tgfx

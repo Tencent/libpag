@@ -37,6 +37,9 @@ class Gpu {
     return _context;
   }
 
+  virtual void copyRenderTargetToTexture(RenderTarget* renderTarget, Texture* texture,
+                                         const Rect& srcRect, const Point& dstPoint) = 0;
+
   virtual void resolveRenderTarget(RenderTarget* renderTarget) = 0;
 
   virtual bool insertSemaphore(Semaphore* semaphore) = 0;

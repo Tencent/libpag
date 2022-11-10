@@ -26,6 +26,9 @@ class GLGpu : public Gpu {
  public:
   static std::unique_ptr<Gpu> Make(Context* context);
 
+  void copyRenderTargetToTexture(RenderTarget* renderTarget, Texture* texture, const Rect& srcRect,
+                                 const Point& dstPoint) override;
+
   void resolveRenderTarget(RenderTarget* renderTarget) override;
 
   bool insertSemaphore(Semaphore* semaphore) override;

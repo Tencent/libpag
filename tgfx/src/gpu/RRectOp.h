@@ -16,30 +16,40 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ClearOp.h"
+#pragma once
+
+#include "DrawOp.h"
+#include "tgfx/core/Path.h"
 
 namespace tgfx {
-std::unique_ptr<ClearOp> ClearOp::Make(Color color, const Rect& scissor) {
-  return std::unique_ptr<ClearOp>(new ClearOp(color, scissor));
-}
+class RRectOp : public DrawOp {
+ public:
+  static std::unique_ptr<RRectOp> Make(Color color, const RRect& rRect, const Matrix& viewMatrix,
+                                         const Matrix& localMatrix = Matrix::I());
 
-bool ContainsScissor(const Rect& a, const Rect& b) {
-  return a.isEmpty() || (!b.isEmpty() && a.contains(b));
-}
+  void execute(OpsRenderPass* opsRenderPass) override;
 
-bool ClearOp::onCombineIfPossible(Op* op) {
-  auto that = static_cast<ClearOp*>(op);
-  if (ContainsScissor(that->scissor, scissor)) {
-    scissor = that->scissor;
-    color = that->color;
-    return true;
-  } else if (color == that->color && ContainsScissor(scissor, that->scissor)) {
-    return true;
-  }
-  return false;
-}
+ private:
+  DEFINE_OP_CLASS_ID
 
-void ClearOp::execute(OpsRenderPass* opsRenderPass) {
-  opsRenderPass->clear(scissor, color);
-}
+  RRectOp(Color color, const RRect& rRect, const Matrix& viewMatrix, const Matrix& localMatrix);
+
+  bool onCombineIfPossible(Op* op) override;
+
+  struct RRectWrap {
+    Color color = Color::Transparent();
+    float innerXRadius = 0;
+    float innerYRadius = 0;
+    RRect rRect;
+    Matrix viewMatrix = Matrix::I();
+
+    void writeToVertices(std::vector<float>& vertices, bool useScale, AAType aa) const;
+  };
+
+  std::vector<RRectWrap> rRects;
+  Matrix localMatrix = Matrix::I();
+
+  //  bool stroked = false;
+  //  Point strokeWidths = Point::Zero();
+};
 }  // namespace tgfx

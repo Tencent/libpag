@@ -18,28 +18,19 @@
 
 #pragma once
 
-#include "GLCanvas.h"
 #include "tgfx/gpu/Surface.h"
 #include "tgfx/gpu/opengl/GLRenderTarget.h"
 #include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace tgfx {
 class GLSurface : public Surface {
- public:
-  ~GLSurface() override;
-
-  Canvas* getCanvas() override;
-
  protected:
   bool onReadPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) override;
 
  private:
-  GLCanvas* canvas = nullptr;
-
   explicit GLSurface(std::shared_ptr<GLRenderTarget> renderTarget,
                      std::shared_ptr<GLTexture> texture = nullptr);
 
   friend class Surface;
-  friend class GLCanvas;
 };
 }  // namespace tgfx
