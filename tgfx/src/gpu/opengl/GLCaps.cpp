@@ -191,16 +191,12 @@ const TextureFormat& GLCaps::getTextureFormat(PixelFormat pixelFormat) const {
   return pixelFormatMap.at(pixelFormat).format;
 }
 
-const Swizzle& GLCaps::getSwizzle(PixelFormat pixelFormat) const {
-  return pixelFormatMap.at(pixelFormat).swizzle;
+const Swizzle& GLCaps::getReadSwizzle(PixelFormat pixelFormat) const {
+  return pixelFormatMap.at(pixelFormat).readSwizzle;
 }
 
-const Swizzle& GLCaps::getTextureSwizzle(PixelFormat pixelFormat) const {
-  return pixelFormatMap.at(pixelFormat).textureSwizzle;
-}
-
-const Swizzle& GLCaps::getOutputSwizzle(PixelFormat pixelFormat) const {
-  return pixelFormatMap.at(pixelFormat).outputSwizzle;
+const Swizzle& GLCaps::getWriteSwizzle(PixelFormat pixelFormat) const {
+  return pixelFormatMap.at(pixelFormat).writeSwizzle;
 }
 
 int GLCaps::getSampleCount(int requestedCount, PixelFormat pixelFormat) const {
@@ -288,37 +284,31 @@ void GLCaps::initWebGLSupport(const GLInfo& info) {
 void GLCaps::initFormatMap(const GLInfo& info) {
   pixelFormatMap[PixelFormat::RGBA_8888].format.sizedFormat = GL_RGBA8;
   pixelFormatMap[PixelFormat::RGBA_8888].format.externalFormat = GL_RGBA;
-  pixelFormatMap[PixelFormat::RGBA_8888].swizzle = Swizzle::RGBA();
+  pixelFormatMap[PixelFormat::RGBA_8888].readSwizzle = Swizzle::RGBA();
   if (textureRedSupport) {
     pixelFormatMap[PixelFormat::ALPHA_8].format.sizedFormat = GL_R8;
     pixelFormatMap[PixelFormat::ALPHA_8].format.externalFormat = GL_RED;
-    pixelFormatMap[PixelFormat::ALPHA_8].swizzle = Swizzle::RRRR();
+    pixelFormatMap[PixelFormat::ALPHA_8].readSwizzle = Swizzle::RRRR();
     // Shader output swizzles will default to RGBA. When we've use GL_RED instead of GL_ALPHA to
     // implement PixelFormat::ALPHA_8 we need to swizzle the shader outputs so the alpha channel
     // gets written to the single component.
-    pixelFormatMap[PixelFormat::ALPHA_8].outputSwizzle = Swizzle::AAAA();
+    pixelFormatMap[PixelFormat::ALPHA_8].writeSwizzle = Swizzle::AAAA();
     pixelFormatMap[PixelFormat::GRAY_8].format.sizedFormat = GL_R8;
     pixelFormatMap[PixelFormat::GRAY_8].format.externalFormat = GL_RED;
-    pixelFormatMap[PixelFormat::GRAY_8].swizzle = Swizzle::RRRA();
+    pixelFormatMap[PixelFormat::GRAY_8].readSwizzle = Swizzle::RRRA();
     pixelFormatMap[PixelFormat::RG_88].format.sizedFormat = GL_RG8;
     pixelFormatMap[PixelFormat::RG_88].format.externalFormat = GL_RG;
-    pixelFormatMap[PixelFormat::RG_88].swizzle = Swizzle::RGRG();
+    pixelFormatMap[PixelFormat::RG_88].readSwizzle = Swizzle::RGRG();
   } else {
     pixelFormatMap[PixelFormat::ALPHA_8].format.sizedFormat = GL_ALPHA8;
     pixelFormatMap[PixelFormat::ALPHA_8].format.externalFormat = GL_ALPHA;
-    pixelFormatMap[PixelFormat::ALPHA_8].swizzle = Swizzle::AAAA();
+    pixelFormatMap[PixelFormat::ALPHA_8].readSwizzle = Swizzle::AAAA();
     pixelFormatMap[PixelFormat::GRAY_8].format.sizedFormat = GL_LUMINANCE8;
     pixelFormatMap[PixelFormat::GRAY_8].format.externalFormat = GL_LUMINANCE;
-    pixelFormatMap[PixelFormat::GRAY_8].swizzle = Swizzle::RGBA();
+    pixelFormatMap[PixelFormat::GRAY_8].readSwizzle = Swizzle::RGBA();
     pixelFormatMap[PixelFormat::RG_88].format.sizedFormat = GL_LUMINANCE8_ALPHA8;
     pixelFormatMap[PixelFormat::RG_88].format.externalFormat = GL_LUMINANCE_ALPHA;
-    pixelFormatMap[PixelFormat::RG_88].swizzle = Swizzle::RARA();
-  }
-  // Texture swizzle doesn't work when using CVPixelBuffer on iPhone 5s and iPhone 6.
-  // If we don't have texture swizzle support then the shader generator must insert the
-  // swizzle into shader code.
-  for (auto& item : pixelFormatMap) {
-    item.second.textureSwizzle = item.second.swizzle;
+    pixelFormatMap[PixelFormat::RG_88].readSwizzle = Swizzle::RARA();
   }
   // ES 2.0 requires that the internal/external formats match.
   bool useSizedTexFormats =

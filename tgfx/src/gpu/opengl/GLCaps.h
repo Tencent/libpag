@@ -44,9 +44,8 @@ struct TextureFormat {
 struct ConfigInfo {
   TextureFormat format;
   std::vector<int> colorSampleCounts;
-  Swizzle swizzle = Swizzle::RGBA();
-  Swizzle textureSwizzle = Swizzle::RGBA();
-  Swizzle outputSwizzle = Swizzle::RGBA();
+  Swizzle readSwizzle = Swizzle::RGBA();
+  Swizzle writeSwizzle = Swizzle::RGBA();
 };
 
 enum class GLVendor { ARM, Google, Imagination, Intel, Qualcomm, NVIDIA, ATI, Other };
@@ -129,11 +128,9 @@ class GLCaps : public Caps {
 
   const TextureFormat& getTextureFormat(PixelFormat pixelFormat) const;
 
-  const Swizzle& getSwizzle(PixelFormat pixelFormat) const;
+  const Swizzle& getReadSwizzle(PixelFormat pixelFormat) const;
 
-  const Swizzle& getTextureSwizzle(PixelFormat pixelFormat) const;
-
-  const Swizzle& getOutputSwizzle(PixelFormat pixelFormat) const override;
+  const Swizzle& getWriteSwizzle(PixelFormat pixelFormat) const override;
 
   int getSampleCount(int requestedCount, PixelFormat pixelFormat) const;
 
