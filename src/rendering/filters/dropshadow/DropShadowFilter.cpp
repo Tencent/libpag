@@ -140,9 +140,8 @@ void DropShadowFilter::onDrawModeNotFullSpread(tgfx::Context* context, const Fil
     return;
   }
   spreadFilterBuffer->clearColor();
-  auto offsetMatrix =
-      tgfx::Matrix::MakeTrans((contentBounds.left - filterBounds.left) * source->scale.x,
-                              (contentBounds.top - filterBounds.top) * source->scale.y);
+  auto offsetMatrix = tgfx::Matrix::MakeTrans((contentBounds.left - filterBounds.left),
+                                              (contentBounds.top - filterBounds.top));
   auto targetSpread = spreadFilterBuffer->toFilterTarget(offsetMatrix);
   if (spreadSize < DROPSHADOW_SPREAD_MIN_THICK_SIZE) {
     spreadFilter->draw(context, source, targetSpread.get());
@@ -159,9 +158,9 @@ void DropShadowFilter::onDrawModeNotFullSpread(tgfx::Context* context, const Fil
   auto texture = tgfx::GLTexture::MakeFrom(context, sourceV->sampler, sourceV->width,
                                            sourceV->height, tgfx::ImageOrigin::TopLeft);
   targetCanvas->setMatrix(ToMatrix(target));
-  targetCanvas->concat(tgfx::Matrix::MakeTrans(
-      static_cast<float>((source->width - sourceV->width)) * 0.5f * source->scale.x,
-      static_cast<float>((source->height - sourceV->height)) * 0.5f * source->scale.y));
+  targetCanvas->concat(
+      tgfx::Matrix::MakeTrans(static_cast<float>((source->width - sourceV->width)) * 0.5f,
+                              static_cast<float>((source->height - sourceV->height)) * 0.5f));
   tgfx::Paint paint;
   paint.setImageFilter(tgfx::ImageFilter::DropShadowOnly(
       offsetX * source->scale.x, offsetY * source->scale.y, blurXSize * source->scale.x,

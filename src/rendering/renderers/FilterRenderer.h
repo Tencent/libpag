@@ -56,8 +56,6 @@ class FilterRenderer {
  private:
   static std::unique_ptr<FilterList> MakeFilterList(const FilterModifier* modifier);
 
-  static tgfx::Rect GetParentBounds(const FilterList* filterList);
-
   static tgfx::Rect GetContentBounds(const FilterList* filterList,
                                      std::shared_ptr<Graphic> content);
 

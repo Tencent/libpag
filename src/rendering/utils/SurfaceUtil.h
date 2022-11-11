@@ -26,6 +26,7 @@ class SurfaceUtil {
   static std::shared_ptr<tgfx::Surface> MakeContentSurface(tgfx::Canvas* parentCanvas,
                                                            const tgfx::Rect& bounds,
                                                            float scaleFactorLimit = FLT_MAX,
+                                                           float scale = 1.f,
                                                            bool usesMSAA = false);
 };
 }  // namespace pag

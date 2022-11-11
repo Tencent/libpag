@@ -99,6 +99,10 @@ bool Layer::verifyExtra() const {
   return true;
 }
 
+Rect Layer::getBounds() const {
+  return Rect::MakeEmpty();
+}
+
 Point Layer::getMaxScaleFactor() {
   auto maxScale = Point::Make(1, 1);
   auto property = transform->scale;
@@ -121,6 +125,16 @@ Point Layer::getMaxScaleFactor() {
   } else {
     maxScale.x = fabs(property->value.x);
     maxScale.y = fabs(property->value.y);
+  }
+  if (!effects.empty()) {
+    auto bounds = getBounds();
+    if (!bounds.isEmpty()) {
+      for (auto* effect : effects) {
+        auto scale = effect->getMaxScaleFactor(bounds);
+        maxScale.x *= fabs(scale.x);
+        maxScale.y *= fabs(scale.y);
+      }
+    }
   }
   if (parent != nullptr) {
     auto parentScale = parent->getMaxScaleFactor();
