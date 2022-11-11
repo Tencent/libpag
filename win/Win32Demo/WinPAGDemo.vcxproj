@@ -93,6 +93,7 @@
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <LanguageStandard_C>stdc11</LanguageStandard_C>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -120,6 +121,7 @@ node .\vendor_tools\cmake-build pag -p win -o .\win\paglib -v -i -DPAG_BUILD_SHA
       <AdditionalIncludeDirectories>$(SolutionDir)..\src\platform\win;$(SolutionDir)..\vendor\angle\include;$(SolutionDir)..\include;$(ProjectDir)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -150,6 +152,7 @@ node .\vendor_tools\cmake-build pag -p win -o .\win\paglib -v -i -DPAG_BUILD_SHA
       <AdditionalIncludeDirectories>$(SolutionDir)..\src;$(SolutionDir)..\src\platform\win;$(SolutionDir)..\tgfx\include;$(SolutionDir)..\vendor\angle\include;$(SolutionDir)..\include;$(ProjectDir)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -181,6 +184,7 @@ node .\vendor_tools\cmake-build pag -p win -o .\win\paglib -v -i -DPAG_BUILD_SHA
       <AdditionalIncludeDirectories>$(SolutionDir)..\src\platform\win;$(SolutionDir)..\vendor\angle\include;$(SolutionDir)..\include;$(ProjectDir)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
