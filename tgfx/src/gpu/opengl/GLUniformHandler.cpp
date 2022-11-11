@@ -46,7 +46,7 @@ SamplerHandle GLUniformHandler::addSampler(const TextureSampler* sampler, const 
   auto mangleName = programBuilder->nameVariable('u', name);
 
   auto caps = GLCaps::Get(programBuilder->getContext());
-  const auto& swizzle = caps->getTextureSwizzle(sampler->format);
+  const auto& swizzle = caps->getReadSwizzle(sampler->format);
 
   ShaderVar::Type type;
   switch (static_cast<const GLSampler*>(sampler)->target) {

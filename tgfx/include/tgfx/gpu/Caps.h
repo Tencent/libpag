@@ -27,7 +27,7 @@ class Caps {
  public:
   virtual ~Caps() = default;
 
-  virtual const Swizzle& getOutputSwizzle(PixelFormat pixelFormat) const = 0;
+  virtual const Swizzle& getWriteSwizzle(PixelFormat pixelFormat) const = 0;
 
   bool floatIs32Bits = true;
   int maxTextureSize = 0;

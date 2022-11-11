@@ -35,7 +35,7 @@ TextureType GLSampler::type() const {
 
 void GLSampler::computeKey(Context* context, BytesKey* bytesKey) const {
   auto caps = GLCaps::Get(context);
-  bytesKey->write(static_cast<uint32_t>(caps->getTextureSwizzle(format).asKey()));
+  bytesKey->write(static_cast<uint32_t>(caps->getReadSwizzle(format).asKey()));
   bytesKey->write(target);
 }
 }  // namespace tgfx
