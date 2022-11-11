@@ -16,26 +16,31 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <optional>
-#include "tgfx/core/Mesh.h"
+#include "ClearOp.h"
+#include "OpsRenderPass.h"
 
 namespace tgfx {
-class SimplePathMesh : public Mesh {
- public:
-  explicit SimplePathMesh(Rect rect) : rect(rect) {
+std::unique_ptr<ClearOp> ClearOp::Make(Color color, const Rect& scissor) {
+  return std::unique_ptr<ClearOp>(new ClearOp(color, scissor));
+}
+
+bool ContainsScissor(const Rect& a, const Rect& b) {
+  return a.isEmpty() || (!b.isEmpty() && a.contains(b));
+}
+
+bool ClearOp::onCombineIfPossible(Op* op) {
+  auto that = static_cast<ClearOp*>(op);
+  if (ContainsScissor(that->scissor, scissor)) {
+    scissor = that->scissor;
+    color = that->color;
+    return true;
+  } else if (color == that->color && ContainsScissor(scissor, that->scissor)) {
+    return true;
   }
+  return false;
+}
 
-  explicit SimplePathMesh(RRect rRect) : rRect(rRect) {
-  }
-
-  Rect bounds() const override;
-
- private:
-  std::unique_ptr<DrawOp> getOp(Color color, const Matrix& viewMatrix) const override;
-
-  std::optional<Rect> rect;
-  std::optional<RRect> rRect;
-};
+void ClearOp::execute(OpsRenderPass* opsRenderPass) {
+  opsRenderPass->clear(scissor, color);
+}
 }  // namespace tgfx

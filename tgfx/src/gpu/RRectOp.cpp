@@ -16,8 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLRRectOp.h"
+#include "RRectOp.h"
 
+#include "GpuBuffer.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/EllipseGeometryProcessor.h"
@@ -98,33 +99,33 @@ static constexpr size_t kIndicesPerFillRRect =
 // stroke count is fill count minus center indices
 // static constexpr int kIndicesPerStrokeRRect = kCornerIndicesCount + kEdgeIndicesCount;
 
-std::unique_ptr<GLRRectOp> GLRRectOp::Make(Color color, const RRect& rRect,
-                                           const Matrix& viewMatrix, const Matrix& localMatrix) {
+std::unique_ptr<RRectOp> RRectOp::Make(Color color, const RRect& rRect, const Matrix& viewMatrix,
+                                       const Matrix& localMatrix) {
   Matrix matrix = Matrix::I();
   if (!viewMatrix.invert(&matrix)) {
     return nullptr;
   }
   matrix.postConcat(localMatrix);
   if (/*!isStrokeOnly && */ 0.5f <= rRect.radii.x && 0.5f <= rRect.radii.y) {
-    return std::unique_ptr<GLRRectOp>(new GLRRectOp(color, rRect, viewMatrix, matrix));
+    return std::unique_ptr<RRectOp>(new RRectOp(color, rRect, viewMatrix, matrix));
   }
   return nullptr;
 }
 
-GLRRectOp::GLRRectOp(Color color, const RRect& rRect, const Matrix& viewMatrix,
-                     const Matrix& localMatrix)
-    : GLDrawOp(ClassID()), localMatrix(localMatrix) {
+RRectOp::RRectOp(Color color, const RRect& rRect, const Matrix& viewMatrix,
+                 const Matrix& localMatrix)
+    : DrawOp(ClassID()), localMatrix(localMatrix) {
   this->localMatrix.postTranslate(-rRect.rect.left, -rRect.rect.top);
   this->localMatrix.postScale(1.f / rRect.rect.width(), 1.f / rRect.rect.height());
   setTransformedBounds(rRect.rect, viewMatrix);
   rRects.emplace_back(RRectWrap{color, 0.f, 0.f, rRect, viewMatrix});
 }
 
-bool GLRRectOp::onCombineIfPossible(Op* op) {
-  if (!GLDrawOp::onCombineIfPossible(op)) {
+bool RRectOp::onCombineIfPossible(Op* op) {
+  if (!DrawOp::onCombineIfPossible(op)) {
     return false;
   }
-  auto* that = static_cast<GLRRectOp*>(op);
+  auto* that = static_cast<RRectOp*>(op);
   if (localMatrix != that->localMatrix) {
     return false;
   }
@@ -143,8 +144,8 @@ void WriteColor(std::vector<float>& vertices, const Color& color) {
   vertices.push_back(color.alpha);
 }
 
-void GLRRectOp::RRectWrap::writeToVertices(std::vector<float>& vertices, bool useScale,
-                                           AAType aa) const {
+void RRectOp::RRectWrap::writeToVertices(std::vector<float>& vertices, bool useScale,
+                                         AAType aa) const {
   float reciprocalRadii[4] = {1e6f, 1e6f, 1e6f, 1e6f};
   if (rRect.radii.x > 0) {
     reciprocalRadii[0] = 1.f / rRect.radii.x;
@@ -244,7 +245,7 @@ void GLRRectOp::RRectWrap::writeToVertices(std::vector<float>& vertices, bool us
   }
 }
 
-void GLRRectOp::execute(OpsRenderPass* opsRenderPass) {
+void RRectOp::execute(OpsRenderPass* opsRenderPass) {
   auto useScale = UseScale(opsRenderPass);
   std::vector<float> vertices;
   for (const auto& rRectWrap : rRects) {
@@ -269,6 +270,6 @@ void GLRRectOp::execute(OpsRenderPass* opsRenderPass) {
                                                     UseScale(opsRenderPass), localMatrix));
   opsRenderPass->bindPipelineAndScissorClip(info, scissorRect());
   opsRenderPass->bindVerticesAndIndices(std::move(vertices), buffer);
-  opsRenderPass->drawIndexed(GL_TRIANGLES, 0, static_cast<int>(indices.size()));
+  opsRenderPass->drawIndexed(PrimitiveType::Triangles, 0, static_cast<int>(indices.size()));
 }
 }  // namespace tgfx

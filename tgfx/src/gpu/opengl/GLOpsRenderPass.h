@@ -30,59 +30,6 @@
 #include "tgfx/core/BlendMode.h"
 
 namespace tgfx {
-class GLDrawOp : public Op {
- public:
-  explicit GLDrawOp(uint8_t classID) : Op(classID) {
-  }
-
-  ProgramInfo createProgram(OpsRenderPass* opsRenderPass, std::unique_ptr<GeometryProcessor> gp);
-
-  const Rect& scissorRect() const {
-    return _scissorRect;
-  }
-
-  void setScissorRect(Rect scissorRect) {
-    _scissorRect = scissorRect;
-  }
-
-  void setBlendFactors(std::optional<std::pair<unsigned, unsigned>> blendFactors) {
-    _blendFactors = blendFactors;
-  }
-
-  void setXferProcessor(std::unique_ptr<XferProcessor> xferProcessor) {
-    _xferProcessor = std::move(xferProcessor);
-  }
-
-  void setRequireDstTexture(bool requiresDstTexture) {
-    _requiresDstTexture = requiresDstTexture;
-  }
-
-  void setAA(AAType type) {
-    aa = type;
-  }
-
-  void setColors(std::vector<std::unique_ptr<FragmentProcessor>> colors) {
-    _colors = std::move(colors);
-  }
-
-  void setMasks(std::vector<std::unique_ptr<FragmentProcessor>> masks) {
-    _masks = std::move(masks);
-  }
-
- protected:
-  bool onCombineIfPossible(Op* op) override;
-
-  AAType aa = AAType::None;
-
- private:
-  Rect _scissorRect = Rect::MakeEmpty();
-  std::optional<std::pair<unsigned, unsigned>> _blendFactors;
-  bool _requiresDstTexture = false;
-  std::vector<std::unique_ptr<FragmentProcessor>> _colors;
-  std::vector<std::unique_ptr<FragmentProcessor>> _masks;
-  std::unique_ptr<XferProcessor> _xferProcessor;
-};
-
 class GLOpsRenderPass : public OpsRenderPass {
  public:
   static std::unique_ptr<GLOpsRenderPass> Make(Context* context);
@@ -99,9 +46,9 @@ class GLOpsRenderPass : public OpsRenderPass {
   void bindVerticesAndIndices(std::vector<float> vertices,
                               std::shared_ptr<GpuBuffer> indices) override;
 
-  void draw(unsigned primitiveType, int baseVertex, int vertexCount) override;
+  void draw(PrimitiveType primitiveType, int baseVertex, int vertexCount) override;
 
-  void drawIndexed(unsigned primitiveType, int baseIndex, int indexCount) override;
+  void drawIndexed(PrimitiveType primitiveType, int baseIndex, int indexCount) override;
 
   void clear(const Rect& scissor, Color color) override;
 

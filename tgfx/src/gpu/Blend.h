@@ -18,39 +18,55 @@
 
 #pragma once
 
-#include "GLBuffer.h"
-#include "GLOpsRenderPass.h"
-#include "tgfx/core/Path.h"
+#include "tgfx/core/BlendMode.h"
 
 namespace tgfx {
-class GLRRectOp : public GLDrawOp {
- public:
-  static std::unique_ptr<GLRRectOp> Make(Color color, const RRect& rRect, const Matrix& viewMatrix,
-                                         const Matrix& localMatrix = Matrix::I());
-
-  void execute(OpsRenderPass* opsRenderPass) override;
-
- private:
-  DEFINE_OP_CLASS_ID
-
-  GLRRectOp(Color color, const RRect& rRect, const Matrix& viewMatrix, const Matrix& localMatrix);
-
-  bool onCombineIfPossible(Op* op) override;
-
-  struct RRectWrap {
-    Color color = Color::Transparent();
-    float innerXRadius = 0;
-    float innerYRadius = 0;
-    RRect rRect;
-    Matrix viewMatrix = Matrix::I();
-
-    void writeToVertices(std::vector<float>& vertices, bool useScale, AAType aa) const;
-  };
-
-  std::vector<RRectWrap> rRects;
-  Matrix localMatrix = Matrix::I();
-
-  //  bool stroked = false;
-  //  Point strokeWidths = Point::Zero();
+enum class BlendModeCoeff {
+  /**
+   * 0
+   */
+  Zero,
+  /**
+   * 1
+   */
+  One,
+  /**
+   * src color
+   */
+  SC,
+  /**
+   * inverse src color (i.e. 1 - sc)
+   */
+  ISC,
+  /**
+   * dst color
+   */
+  DC,
+  /**
+   * inverse dst color (i.e. 1 - dc)
+   */
+  IDC,
+  /**
+   * src alpha
+   */
+  SA,
+  /**
+   * inverse src alpha (i.e. 1 - sa)
+   */
+  ISA,
+  /**
+   * dst alpha
+   */
+  DA,
+  /**
+   * inverse dst alpha (i.e. 1 - da)
+   */
+  IDA,
 };
+
+/**
+ * Returns true if 'mode' is a coefficient-based blend mode. If true is returned, the mode's src and
+ * dst coefficient functions are set in 'src' and 'dst'.
+ */
+bool BlendModeAsCoeff(BlendMode mode, BlendModeCoeff* src = nullptr, BlendModeCoeff* dst = nullptr);
 }  // namespace tgfx

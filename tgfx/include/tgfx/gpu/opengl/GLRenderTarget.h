@@ -78,6 +78,8 @@ class GLRenderTarget : public RenderTarget {
 
   void onReleaseGPU() override;
 
+  const Swizzle& writeSwizzle() const override;
+
   /**
    * Copies a rect of pixels to dstPixels with specified color type, alpha type and row bytes. Copy
    * starts at (srcX, srcY), and does not exceed Surface (width(), height()). Pixels are copied
@@ -86,8 +88,6 @@ class GLRenderTarget : public RenderTarget {
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0, int srcY = 0) const;
 
   friend class GLSurface;
-
-  friend class GLCanvas;
 
   friend class Surface;
 };

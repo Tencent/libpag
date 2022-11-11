@@ -24,6 +24,22 @@ std::unique_ptr<Gpu> GLGpu::Make(Context* context) {
   return std::unique_ptr<GLGpu>(new GLGpu(context));
 }
 
+void GLGpu::copyRenderTargetToTexture(RenderTarget* renderTarget, Texture* texture,
+                                      const Rect& srcRect, const Point& dstPoint) {
+  auto gl = GLFunctions::Get(_context);
+  auto glRenderTarget = static_cast<GLRenderTarget*>(renderTarget);
+  gl->bindFramebuffer(GL_FRAMEBUFFER, glRenderTarget->glFrameBuffer().id);
+  auto glSampler = static_cast<GLTexture*>(texture)->glSampler();
+  gl->bindTexture(glSampler.target, glSampler.id);
+  // format != BGRA && !srcHasMSAARenderBuffer && !dstHasMSAARenderBuffer && dstIsTextureable &&
+  // dstOrigin == srcOrigin && canConfigBeFBOColorAttachment(srcConfig) && (!srcIsTextureable ||
+  // srcIsGLTexture2D)
+  gl->copyTexSubImage2D(glSampler.target, 0, static_cast<int>(dstPoint.x),
+                        static_cast<int>(dstPoint.y), static_cast<int>(srcRect.x()),
+                        static_cast<int>(srcRect.y()), static_cast<int>(srcRect.width()),
+                        static_cast<int>(srcRect.height()));
+}
+
 void GLGpu::resolveRenderTarget(RenderTarget* renderTarget) {
   static_cast<GLRenderTarget*>(renderTarget)->resolve();
 }

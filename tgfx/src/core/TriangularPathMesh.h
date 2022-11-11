@@ -19,7 +19,7 @@
 #pragma once
 
 #include "gpu/BufferProvider.h"
-#include "gpu/opengl/GLTriangulatingPathOp.h"
+#include "gpu/TriangulatingPathOp.h"
 #include "tgfx/core/Mesh.h"
 
 namespace tgfx {
@@ -35,8 +35,8 @@ class TriangularPathMesh : public Mesh {
   }
 
  private:
-  std::unique_ptr<GLDrawOp> getOp(Color color, const Matrix& viewMatrix) const override {
-    return std::make_unique<GLTriangulatingPathOp>(color, provider, bounds(), viewMatrix);
+  std::unique_ptr<DrawOp> getOp(Color color, const Matrix& viewMatrix) const override {
+    return std::make_unique<TriangulatingPathOp>(color, provider, bounds(), viewMatrix);
   }
 
   std::shared_ptr<BufferProvider> provider;

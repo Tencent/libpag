@@ -18,11 +18,13 @@
 
 #pragma once
 
+#include <optional>
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Mesh.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/RGBAAALayout.h"
+#include "tgfx/core/TextBlob.h"
 #include "tgfx/gpu/Paint.h"
 #include "tgfx/gpu/Texture.h"
 
@@ -35,6 +37,8 @@ struct CanvasState;
 
 class SurfaceDrawContext;
 
+struct GpuPaint;
+
 /**
  * Canvas provides an interface for drawing, and how the drawing is clipped and transformed. Canvas
  * contains a stack of opacity, blend mode, matrix and clip values. Each Canvas draw call transforms
@@ -45,7 +49,7 @@ class Canvas {
  public:
   explicit Canvas(Surface* surface);
 
-  virtual ~Canvas();
+  ~Canvas();
 
   /**
    * Retrieves the context associated with this Surface.
@@ -170,43 +174,59 @@ class Canvas {
   /**
    * Draws a path with using current clip, matrix and specified paint.
    */
-  virtual void drawPath(const Path& path, const Paint& paint) = 0;
+  void drawPath(const Path& path, const Paint& paint);
 
   /**
    * Draws a mesh with using current clip, matrix and specified paint.
    */
-  virtual void drawMesh(const Mesh* mesh, const Paint& paint) = 0;
+  void drawMesh(const Mesh* mesh, const Paint& paint);
 
   /**
    * Draw array of glyphs with specified font, using current alpha, blend mode, clip and Matrix.
    */
-  virtual void drawGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
-                          const Font& font, const Paint& paint) = 0;
+  void drawGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
+                  const Font& font, const Paint& paint);
 
   // TODO(pengweilv): Support blend mode, atlas as source, colors as destination, colors can be
   //  nullptr.
-  virtual void drawAtlas(std::shared_ptr<Texture> atlas, const Matrix matrix[], const Rect tex[],
-                         const Color colors[], size_t count) = 0;
+  void drawAtlas(std::shared_ptr<Texture> atlas, const Matrix matrix[], const Rect tex[],
+                 const Color colors[], size_t count);
 
   /**
    * Triggers the immediate execution of all pending draw operations.
    */
   void flush();
 
- protected:
+ private:
+  void drawTexture(std::shared_ptr<Texture> texture, const RGBAAALayout* layout,
+                   const Paint& paint);
+
+  std::shared_ptr<Texture> getClipTexture();
+
+  std::pair<std::optional<Rect>, bool> getClipRect();
+
+  std::unique_ptr<FragmentProcessor> getClipMask(const Rect& deviceBounds, Rect* scissorRect);
+
+  Rect clipLocalBounds(Rect localBounds);
+
+  void drawMask(const Rect& bounds, std::shared_ptr<Texture> mask, GpuPaint paint);
+
+  void drawColorGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,
+                       const Font& font, const Paint& paint);
+
+  void drawMaskGlyphs(TextBlob* textBlob, const Paint& paint);
+
+  void fillPath(const Path& path, const Paint& paint);
+
+  bool drawAsClear(const Path& path, const GpuPaint& paint);
+
+  void draw(std::unique_ptr<DrawOp> op, GpuPaint paint, bool aa = false);
+
   Surface* surface = nullptr;
+  std::shared_ptr<Surface> _clipSurface = nullptr;
+  uint32_t clipID = 0;
   std::shared_ptr<CanvasState> state = nullptr;
   SurfaceDrawContext* drawContext = nullptr;
-
-  virtual void onSave() = 0;
-  virtual void onRestore() = 0;
-  virtual void onSetMatrix(const Matrix& matrix) = 0;
-  virtual void onClipPath(const Path& path) = 0;
-
- private:
-  virtual void drawTexture(std::shared_ptr<Texture> texture, const RGBAAALayout* layout,
-                           const Paint& paint) = 0;
-
   std::vector<std::shared_ptr<CanvasState>> savedStateList = {};
 };
 }  // namespace tgfx

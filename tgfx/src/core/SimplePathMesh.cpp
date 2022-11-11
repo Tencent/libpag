@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SimplePathMesh.h"
-#include "gpu/opengl/GLFillRectOp.h"
+#include "gpu/FillRectOp.h"
 #include "gpu/opengl/GLOpsRenderPass.h"
-#include "gpu/opengl/GLRRectOp.h"
+#include "gpu/RRectOp.h"
 
 namespace tgfx {
 Rect SimplePathMesh::bounds() const {
@@ -32,15 +32,15 @@ Rect SimplePathMesh::bounds() const {
   return Rect::MakeEmpty();
 }
 
-std::unique_ptr<GLDrawOp> SimplePathMesh::getOp(Color color, const Matrix& viewMatrix) const {
+std::unique_ptr<DrawOp> SimplePathMesh::getOp(Color color, const Matrix& viewMatrix) const {
   auto bounds = this->bounds();
   auto localMatrix = Matrix::MakeScale(bounds.width(), bounds.height());
   localMatrix.postTranslate(bounds.x(), bounds.y());
-  std::unique_ptr<GLDrawOp> drawOp;
+  std::unique_ptr<DrawOp> drawOp;
   if (rect.has_value()) {
-    drawOp = GLFillRectOp::Make(color, *rect, viewMatrix, localMatrix);
+    drawOp = FillRectOp::Make(color, *rect, viewMatrix, localMatrix);
   } else if (rRect.has_value()) {
-    drawOp = GLRRectOp::Make(color, *rRect, viewMatrix, localMatrix);
+    drawOp = RRectOp::Make(color, *rRect, viewMatrix, localMatrix);
   }
   return drawOp;
 }

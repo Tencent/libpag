@@ -18,9 +18,17 @@
 
 #pragma once
 
+#include "tgfx/gpu/PixelFormat.h"
+
 namespace tgfx {
+class Swizzle;
+
 class Caps {
  public:
+  virtual ~Caps() = default;
+
+  virtual const Swizzle& getOutputSwizzle(PixelFormat pixelFormat) const = 0;
+
   bool floatIs32Bits = true;
   int maxTextureSize = 0;
   bool semaphoreSupport = false;
@@ -31,5 +39,7 @@ class Caps {
    */
   bool clampToBorderSupport = true;
   bool npotTextureTileSupport = true;  // Vulkan and Metal always have support.
+  bool textureBarrierSupport = false;
+  bool frameBufferFetchSupport = false;
 };
 }  // namespace tgfx

@@ -305,4 +305,8 @@ void GLRenderTarget::onReleaseGPU() {
   }
   ReleaseResource(context, &textureFBInfo, &renderTargetFBInfo, &msRenderBufferID);
 }
+
+const Swizzle& GLRenderTarget::writeSwizzle() const {
+  return context->caps()->getOutputSwizzle(renderTargetFBInfo.format);
+}
 }  // namespace tgfx

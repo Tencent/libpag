@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLBlend.h"
-#include "tgfx/gpu/opengl/GLDefines.h"
+#include "gpu/Blend.h"
 
 namespace tgfx {
 static void HardLight(FragmentShaderBuilder* fsBuilder, const char* final, const char* src,
@@ -344,38 +344,6 @@ static void HandleBlendModes(FragmentShaderBuilder* fsBuilder, const std::string
   }
 }
 
-static constexpr std::pair<BlendMode, std::pair<unsigned, unsigned>> kBlendCoeffMap[] = {
-    {BlendMode::Clear, {GL_ZERO, GL_ZERO}},
-    {BlendMode::Src, {GL_ONE, GL_ZERO}},
-    {BlendMode::Dst, {GL_ZERO, GL_ONE}},
-    {BlendMode::SrcOver, {GL_ONE, GL_ONE_MINUS_SRC_ALPHA}},
-    {BlendMode::DstOver, {GL_ONE_MINUS_DST_ALPHA, GL_ONE}},
-    {BlendMode::SrcIn, {GL_DST_ALPHA, GL_ZERO}},
-    {BlendMode::DstIn, {GL_ZERO, GL_SRC_ALPHA}},
-    {BlendMode::SrcOut, {GL_ONE_MINUS_DST_ALPHA, GL_ZERO}},
-    {BlendMode::DstOut, {GL_ZERO, GL_ONE_MINUS_SRC_ALPHA}},
-    {BlendMode::SrcATop, {GL_DST_ALPHA, GL_ONE_MINUS_SRC_ALPHA}},
-    {BlendMode::DstATop, {GL_ONE_MINUS_DST_ALPHA, GL_SRC_ALPHA}},
-    {BlendMode::Xor, {GL_ONE_MINUS_DST_ALPHA, GL_ONE_MINUS_SRC_ALPHA}},
-    {BlendMode::Plus, {GL_ONE, GL_ONE}},
-    {BlendMode::Modulate, {GL_ZERO, GL_SRC_COLOR}},
-    {BlendMode::Screen, {GL_ONE, GL_ONE_MINUS_SRC_COLOR}}};
-
-bool BlendAsCoeff(BlendMode blendMode, unsigned* first, unsigned* second) {
-  for (const auto& pair : kBlendCoeffMap) {
-    if (pair.first == blendMode) {
-      if (first) {
-        *first = pair.second.first;
-      }
-      if (second) {
-        *second = pair.second.second;
-      }
-      return true;
-    }
-  }
-  return false;
-}
-
 static void CoeffHandler_ONE(FragmentShaderBuilder*, const char*, const char*) {
 }
 
@@ -422,41 +390,36 @@ static void CoeffHandler_ONE_MINUS_DST_ALPHA(FragmentShaderBuilder* fsBuilder, c
 using CoeffHandler = void (*)(FragmentShaderBuilder* fsBuilder, const char* srcColorName,
                               const char* dstColorName);
 
-static constexpr std::pair<unsigned, CoeffHandler> kCoeffHandleMap[] = {
-    {GL_ONE, CoeffHandler_ONE},
-    {GL_SRC_COLOR, CoeffHandler_SRC_COLOR},
-    {GL_ONE_MINUS_SRC_COLOR, CoeffHandler_ONE_MINUS_SRC_COLOR},
-    {GL_DST_COLOR, CoeffHandler_DST_COLOR},
-    {GL_ONE_MINUS_DST_COLOR, CoeffHandler_ONE_MINUS_DST_COLOR},
-    {GL_SRC_ALPHA, CoeffHandler_SRC_ALPHA},
-    {GL_ONE_MINUS_SRC_ALPHA, CoeffHandler_ONE_MINUS_SRC_ALPHA},
-    {GL_DST_ALPHA, CoeffHandler_DST_ALPHA},
-    {GL_ONE_MINUS_DST_ALPHA, CoeffHandler_ONE_MINUS_DST_ALPHA}};
+static constexpr CoeffHandler kCoeffHandleMap[] = {CoeffHandler_ONE,
+                                                   CoeffHandler_SRC_COLOR,
+                                                   CoeffHandler_ONE_MINUS_SRC_COLOR,
+                                                   CoeffHandler_DST_COLOR,
+                                                   CoeffHandler_ONE_MINUS_DST_COLOR,
+                                                   CoeffHandler_SRC_ALPHA,
+                                                   CoeffHandler_ONE_MINUS_SRC_ALPHA,
+                                                   CoeffHandler_DST_ALPHA,
+                                                   CoeffHandler_ONE_MINUS_DST_ALPHA};
 
-static bool AppendPorterDuffTerm(FragmentShaderBuilder* fsBuilder, unsigned coeff,
+static bool AppendPorterDuffTerm(FragmentShaderBuilder* fsBuilder, BlendModeCoeff coeff,
                                  const std::string& colorName, const std::string& srcColorName,
                                  const std::string& dstColorName, bool hasPrevious) {
-  if (GL_ZERO == coeff) {
+  if (BlendModeCoeff::Zero == coeff) {
     return hasPrevious;
   } else {
     if (hasPrevious) {
       fsBuilder->codeAppend(" + ");
     }
     fsBuilder->codeAppendf("%s", colorName.c_str());
-    for (const auto& pair : kCoeffHandleMap) {
-      if (pair.first == coeff) {
-        pair.second(fsBuilder, srcColorName.c_str(), dstColorName.c_str());
-        break;
-      }
-    }
+    kCoeffHandleMap[static_cast<int>(coeff) - 1](fsBuilder, srcColorName.c_str(),
+                                                 dstColorName.c_str());
     return true;
   }
 }
 
 void AppendMode(FragmentShaderBuilder* fsBuilder, const std::string& srcColor,
                 const std::string& dstColor, const std::string& outColor, BlendMode blendMode) {
-  unsigned srcCoeff, dstCoeff;
-  if (BlendAsCoeff(blendMode, &srcCoeff, &dstCoeff)) {
+  BlendModeCoeff srcCoeff, dstCoeff;
+  if (BlendModeAsCoeff(blendMode, &srcCoeff, &dstCoeff)) {
     // The only coeff mode that can go out of range is plus.
     bool clamp = blendMode == BlendMode::Plus;
 

@@ -16,17 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/TriangularPathMesh.h"
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
 #include "gpu/DrawingManager.h"
-#include "gpu/opengl/GLCanvas.h"
-#include "gpu/opengl/GLFillRectOp.h"
-#include "gpu/opengl/GLRRectOp.h"
-#include "gpu/opengl/GLTriangulatingPathOp.h"
+#include "gpu/FillRectOp.h"
+#include "gpu/RRectOp.h"
+#include "gpu/TriangulatingPathOp.h"
 #include "rendering/utils/shaper/TextShaper.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/PathEffect.h"
+#include "tgfx/gpu/Canvas.h"
 #include "tgfx/gpu/Surface.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
@@ -279,7 +278,7 @@ PAG_TEST(CanvasTest, merge_draw_call_rect) {
   EXPECT_TRUE(drawingManager->tasks.size() == 1);
   auto task = std::static_pointer_cast<OpsTask>(drawingManager->tasks[0]);
   EXPECT_TRUE(task->ops.size() == 2);
-  EXPECT_EQ(static_cast<GLFillRectOp*>(task->ops[1].get())->rects.size(), drawCallCount);
+  EXPECT_EQ(static_cast<FillRectOp*>(task->ops[1].get())->rects.size(), drawCallCount);
   canvas->flush();
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/merge_draw_call_rect"));
   device->unlock();
@@ -330,8 +329,7 @@ PAG_TEST(CanvasTest, merge_draw_call_triangle) {
   EXPECT_TRUE(drawingManager->tasks.size() == 1);
   auto task = std::static_pointer_cast<OpsTask>(drawingManager->tasks[0]);
   EXPECT_TRUE(task->ops.size() == 2);
-  EXPECT_EQ(static_cast<GLTriangulatingPathOp*>(task->ops[1].get())->providers.size(),
-            drawCallCount);
+  EXPECT_EQ(static_cast<TriangulatingPathOp*>(task->ops[1].get())->providers.size(), drawCallCount);
   canvas->flush();
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/merge_draw_call_triangle"));
   device->unlock();
@@ -374,7 +372,7 @@ PAG_TEST(CanvasTest, merge_draw_call_rrect) {
   EXPECT_TRUE(drawingManager->tasks.size() == 1);
   auto task = std::static_pointer_cast<OpsTask>(drawingManager->tasks[0]);
   EXPECT_TRUE(task->ops.size() == 2);
-  EXPECT_EQ(static_cast<GLRRectOp*>(task->ops[1].get())->rRects.size(), drawCallCount);
+  EXPECT_EQ(static_cast<RRectOp*>(task->ops[1].get())->rRects.size(), drawCallCount);
   canvas->flush();
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/merge_draw_call_rrect"));
   device->unlock();

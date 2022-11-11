@@ -17,12 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLOpsRenderPass.h"
-#include "GLBlend.h"
 #include "GLGpu.h"
-#include "GLProgramBuilder.h"
 #include "GLProgramCreator.h"
 #include "GLUtil.h"
-#include "core/utils/UniqueID.h"
 #include "gpu/ProgramCache.h"
 
 namespace tgfx {
@@ -94,46 +91,6 @@ void GLOpsRenderPass::Vertex::onReleaseGPU() {
   }
 }
 
-static std::shared_ptr<Texture> CreateDstTexture(OpsRenderPass* opsRenderPass, Rect dstRect,
-                                                 Point* dstOffset) {
-  auto gl = GLFunctions::Get(opsRenderPass->context());
-  auto caps = GLCaps::Get(opsRenderPass->context());
-  if (caps->textureBarrierSupport && opsRenderPass->renderTargetTexture()) {
-    *dstOffset = {0, 0};
-    return opsRenderPass->renderTargetTexture();
-  }
-  auto bounds = Rect::MakeWH(static_cast<float>(opsRenderPass->renderTarget()->width()),
-                             static_cast<float>(opsRenderPass->renderTarget()->height()));
-  if (opsRenderPass->renderTarget()->origin() == ImageOrigin::BottomLeft) {
-    auto height = dstRect.height();
-    dstRect.top = static_cast<float>(opsRenderPass->renderTarget()->height()) - dstRect.bottom;
-    dstRect.bottom = dstRect.top + height;
-  }
-  if (!dstRect.intersect(bounds)) {
-    return nullptr;
-  }
-  dstRect.roundOut();
-  *dstOffset = {dstRect.x(), dstRect.y()};
-  auto dstTexture = GLTexture::MakeRGBA(opsRenderPass->context(), static_cast<int>(dstRect.width()),
-                                        static_cast<int>(dstRect.height()),
-                                        opsRenderPass->renderTarget()->origin());
-  if (dstTexture == nullptr) {
-    LOGE("Failed to create dst texture(%f*%f).", dstRect.width(), dstRect.height());
-    return nullptr;
-  }
-  auto renderTarget = std::static_pointer_cast<GLRenderTarget>(opsRenderPass->renderTarget());
-  gl->bindFramebuffer(GL_FRAMEBUFFER, renderTarget->glFrameBuffer().id);
-  auto glSampler = std::static_pointer_cast<GLTexture>(dstTexture)->glSampler();
-  gl->bindTexture(glSampler.target, glSampler.id);
-  // format != BGRA && !srcHasMSAARenderBuffer && !dstHasMSAARenderBuffer && dstIsTextureable &&
-  // dstOrigin == srcOrigin && canConfigBeFBOColorAttachment(srcConfig) && (!srcIsTextureable ||
-  // srcIsGLTexture2D)
-  gl->copyTexSubImage2D(glSampler.target, 0, 0, 0, static_cast<int>(dstRect.x()),
-                        static_cast<int>(dstRect.y()), static_cast<int>(dstRect.width()),
-                        static_cast<int>(dstRect.height()));
-  return dstTexture;
-}
-
 static void UpdateScissor(Context* context, const Rect& scissorRect) {
   auto gl = GLFunctions::Get(context);
   if (scissorRect.isEmpty()) {
@@ -145,12 +102,22 @@ static void UpdateScissor(Context* context, const Rect& scissorRect) {
   }
 }
 
-static void UpdateBlend(Context* context,
-                        const std::optional<std::pair<unsigned, unsigned>>& blendFactors) {
+static const unsigned gXfermodeCoeff2Blend[] = {
+    GL_ZERO,      GL_ONE,
+    GL_SRC_COLOR, GL_ONE_MINUS_SRC_COLOR,
+    GL_DST_COLOR, GL_ONE_MINUS_DST_COLOR,
+    GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA,
+    GL_DST_ALPHA, GL_ONE_MINUS_DST_ALPHA,
+};
+
+static void UpdateBlend(
+    Context* context,
+    const std::optional<std::pair<BlendModeCoeff, BlendModeCoeff>>& blendFactors) {
   auto gl = GLFunctions::Get(context);
   if (blendFactors.has_value()) {
     gl->enable(GL_BLEND);
-    gl->blendFunc(blendFactors->first, blendFactors->second);
+    gl->blendFunc(gXfermodeCoeff2Blend[static_cast<int>(blendFactors->first)],
+                  gXfermodeCoeff2Blend[static_cast<int>(blendFactors->second)]);
     gl->blendEquation(GL_FUNC_ADD);
   } else {
     gl->disable(GL_BLEND);
@@ -159,57 +126,6 @@ static void UpdateBlend(Context* context,
       gl->enable(GL_FETCH_PER_SAMPLE_ARM);
     }
   }
-}
-
-ProgramInfo GLDrawOp::createProgram(OpsRenderPass* opsRenderPass,
-                                    std::unique_ptr<GeometryProcessor> gp) {
-  auto numColorProcessors = _colors.size();
-  std::vector<std::unique_ptr<FragmentProcessor>> fragmentProcessors = {};
-  fragmentProcessors.resize(numColorProcessors + _masks.size());
-  std::move(_colors.begin(), _colors.end(), fragmentProcessors.begin());
-  std::move(_masks.begin(), _masks.end(),
-            fragmentProcessors.begin() + static_cast<int>(numColorProcessors));
-  std::shared_ptr<Texture> dstTexture;
-  Point dstTextureOffset = Point::Zero();
-  ProgramInfo info;
-  info.blendFactors = _blendFactors;
-  if (_requiresDstTexture) {
-    dstTexture = CreateDstTexture(opsRenderPass, bounds(), &dstTextureOffset);
-  }
-  auto config = std::static_pointer_cast<GLRenderTarget>(opsRenderPass->renderTarget())
-                    ->glFrameBuffer()
-                    .format;
-  const auto& swizzle = GLCaps::Get(opsRenderPass->context())->getOutputSwizzle(config);
-  info.pipeline =
-      std::make_unique<Pipeline>(std::move(fragmentProcessors), numColorProcessors,
-                                 std::move(_xferProcessor), dstTexture, dstTextureOffset, &swizzle);
-  info.pipeline->setRequiresBarrier(dstTexture != nullptr &&
-                                    dstTexture == opsRenderPass->renderTargetTexture());
-  info.geometryProcessor = std::move(gp);
-  GLProgramCreator creator(info.geometryProcessor.get(), info.pipeline.get());
-  info.program = opsRenderPass->context()->programCache()->getProgram(&creator);
-  return info;
-}
-
-static bool CompareFragments(const std::vector<std::unique_ptr<FragmentProcessor>>& frags1,
-                             const std::vector<std::unique_ptr<FragmentProcessor>>& frags2) {
-  if (frags1.size() != frags2.size()) {
-    return false;
-  }
-  for (size_t i = 0; i < frags1.size(); i++) {
-    if (!frags1[i]->isEqual(*frags2[i])) {
-      return false;
-    }
-  }
-  return true;
-}
-
-bool GLDrawOp::onCombineIfPossible(Op* op) {
-  auto* that = static_cast<GLDrawOp*>(op);
-  return aa == that->aa && _scissorRect == that->_scissorRect &&
-         _blendFactors == that->_blendFactors && _requiresDstTexture == that->_requiresDstTexture &&
-         CompareFragments(_colors, that->_colors) && CompareFragments(_masks, that->_masks) &&
-         _xferProcessor == that->_xferProcessor;
 }
 
 void GLOpsRenderPass::set(std::shared_ptr<RenderTarget> renderTarget,
@@ -228,10 +144,11 @@ void GLOpsRenderPass::reset() {
 }
 
 void GLOpsRenderPass::bindPipelineAndScissorClip(const ProgramInfo& info, const Rect& drawBounds) {
-  if (info.program == nullptr) {
+  GLProgramCreator creator(info.geometryProcessor.get(), info.pipeline.get());
+  program = static_cast<GLProgram*>(_context->programCache()->getProgram(&creator));
+  if (program == nullptr) {
     return;
   }
-  program = static_cast<GLProgram*>(info.program);
   auto gl = GLFunctions::Get(_context);
   CheckGLError(_context);
   auto glRT = static_cast<GLRenderTarget*>(_renderTarget.get());
@@ -259,18 +176,20 @@ void GLOpsRenderPass::bindVerticesAndIndices(std::vector<float> vertices,
   _vertexBuffer = nullptr;
 }
 
-void GLOpsRenderPass::draw(unsigned primitiveType, int baseVertex, int vertexCount) {
+static const unsigned gPrimitiveType[] = {GL_TRIANGLES, GL_TRIANGLE_STRIP};
+
+void GLOpsRenderPass::draw(PrimitiveType primitiveType, int baseVertex, int vertexCount) {
   draw([&]() {
     auto gl = GLFunctions::Get(_context);
-    gl->drawArrays(primitiveType, baseVertex, vertexCount);
+    gl->drawArrays(gPrimitiveType[static_cast<int>(primitiveType)], baseVertex, vertexCount);
   });
 }
 
-void GLOpsRenderPass::drawIndexed(unsigned primitiveType, int baseIndex, int indexCount) {
+void GLOpsRenderPass::drawIndexed(PrimitiveType primitiveType, int baseIndex, int indexCount) {
   draw([&]() {
     auto gl = GLFunctions::Get(_context);
     gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, _indexBuffer->bufferID());
-    gl->drawElements(primitiveType, indexCount, GL_UNSIGNED_SHORT,
+    gl->drawElements(gPrimitiveType[static_cast<int>(primitiveType)], indexCount, GL_UNSIGNED_SHORT,
                      reinterpret_cast<void*>(baseIndex * sizeof(uint16_t)));
     gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
   });

@@ -118,11 +118,9 @@ class GLCaps : public Caps {
   bool unpackRowLengthSupport = false;
   bool textureRedSupport = false;
   MSFBOType msFBOType = MSFBOType::None;
-  bool frameBufferFetchSupport = false;
   bool frameBufferFetchRequiresEnablePerSample = false;
   std::string frameBufferFetchColorName;
   std::string frameBufferFetchExtensionString;
-  bool textureBarrierSupport = false;
   int maxFragmentSamplers = kMaxSaneSamplers;
 
   static const GLCaps* Get(Context* context);
@@ -135,7 +133,7 @@ class GLCaps : public Caps {
 
   const Swizzle& getTextureSwizzle(PixelFormat pixelFormat) const;
 
-  const Swizzle& getOutputSwizzle(PixelFormat pixelFormat) const;
+  const Swizzle& getOutputSwizzle(PixelFormat pixelFormat) const override;
 
   int getSampleCount(int requestedCount, PixelFormat pixelFormat) const;
 

@@ -19,13 +19,12 @@
 #pragma once
 
 #include <optional>
-#include "GLBuffer.h"
-#include "GLOpsRenderPass.h"
+#include "gpu/DrawOp.h"
 
 namespace tgfx {
-class GLFillRectOp : public GLDrawOp {
+class FillRectOp : public DrawOp {
  public:
-  static std::unique_ptr<GLFillRectOp> Make(std::optional<Color> color, const Rect& rect,
+  static std::unique_ptr<FillRectOp> Make(std::optional<Color> color, const Rect& rect,
                                             const Matrix& viewMatrix,
                                             const Matrix& localMatrix = Matrix::I());
 
@@ -37,7 +36,7 @@ class GLFillRectOp : public GLDrawOp {
  private:
   DEFINE_OP_CLASS_ID
 
-  GLFillRectOp(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
+  FillRectOp(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
                const Matrix& localMatrix);
 
   bool onCombineIfPossible(Op* op) override;

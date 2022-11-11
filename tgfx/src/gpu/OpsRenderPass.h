@@ -18,18 +18,30 @@
 
 #pragma once
 
+#include <optional>
+#include "Blend.h"
 #include "GeometryProcessor.h"
+#include "GpuBuffer.h"
 #include "Pipeline.h"
 #include "Program.h"
+#include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/gpu/Context.h"
+#include "tgfx/gpu/RenderTarget.h"
 
 namespace tgfx {
+/**
+ * Geometric primitives used for drawing.
+ */
+enum class PrimitiveType {
+  Triangles,
+  TriangleStrip,
+};
+
 struct ProgramInfo {
-  Program* program = nullptr;
   std::unique_ptr<Pipeline> pipeline;
   std::unique_ptr<GeometryProcessor> geometryProcessor;
-  std::optional<std::pair<unsigned, unsigned>> blendFactors;
+  std::optional<std::pair<BlendModeCoeff, BlendModeCoeff>> blendFactors;
 };
 
 class OpsRenderPass {
@@ -58,15 +70,15 @@ class OpsRenderPass {
   virtual void bindVerticesAndIndices(std::vector<float> vertices,
                                       std::shared_ptr<GpuBuffer> indices) = 0;
 
-  virtual void draw(unsigned primitiveType, int baseVertex, int vertexCount) = 0;
+  virtual void draw(PrimitiveType primitiveType, int baseVertex, int vertexCount) = 0;
 
-  virtual void drawIndexed(unsigned primitiveType, int baseIndex, int indexCount) = 0;
+  virtual void drawIndexed(PrimitiveType primitiveType, int baseIndex, int indexCount) = 0;
 
   virtual void clear(const Rect& scissor, Color color) = 0;
 
  protected:
   Context* _context = nullptr;
-  std::shared_ptr<RenderTarget> _renderTarget;
-  std::shared_ptr<Texture> _renderTargetTexture;
+  std::shared_ptr<RenderTarget> _renderTarget = nullptr;
+  std::shared_ptr<Texture> _renderTargetTexture = nullptr;
 };
 }  // namespace tgfx

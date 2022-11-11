@@ -26,6 +26,10 @@ Surface::Surface(std::shared_ptr<RenderTarget> renderTarget, std::shared_ptr<Tex
   DEBUG_ASSERT(this->renderTarget != nullptr);
 }
 
+Surface::~Surface() {
+  delete canvas;
+}
+
 std::shared_ptr<RenderTarget> Surface::getRenderTarget() {
   flush();
   return renderTarget;
@@ -38,6 +42,13 @@ std::shared_ptr<Texture> Surface::getTexture() {
 
 bool Surface::wait(const Semaphore* waitSemaphore) {
   return renderTarget->getContext()->wait(waitSemaphore);
+}
+
+Canvas* Surface::getCanvas() {
+  if (canvas == nullptr) {
+    canvas = new Canvas(this);
+  }
+  return canvas;
 }
 
 bool Surface::flush(Semaphore* signalSemaphore) {
