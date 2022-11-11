@@ -20,14 +20,19 @@
 
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
+#include <vector>
 
 namespace tgfx {
 class EGLGlobals {
  public:
+  static void Set(const EGLGlobals* globals);
+
   static const EGLGlobals* Get();
 
   EGLDisplay display = nullptr;
   EGLConfig windowConfig = nullptr;
   EGLConfig pbufferConfig = nullptr;
+  std::vector<EGLint> windowSurfaceAttributes;
+  std::vector<EGLint> pbufferSurfaceAttributes;
 };
 }  // namespace tgfx
