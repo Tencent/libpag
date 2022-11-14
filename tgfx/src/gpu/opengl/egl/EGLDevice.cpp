@@ -17,22 +17,21 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/opengl/egl/EGLDevice.h"
+#include <tgfx/gpu/opengl/egl/EGLGlobals.h>
 #include "core/utils/Log.h"
-#include "gpu/opengl/egl/EGLGlobals.h"
 #include "gpu/opengl/egl/EGLProcGetter.h"
 
 namespace tgfx {
-static EGLContext CreateContext(EGLContext sharedContext, EGLConfig eglConfig) {
-  static auto eglGlobals = EGLGlobals::Get();
+static EGLContext CreateContext(EGLContext sharedContext, EGLDisplay eglDisplay,
+                                EGLConfig eglConfig) {
   static const EGLint context3Attributes[] = {EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE};
-  auto eglContext =
-      eglCreateContext(eglGlobals->display, eglConfig, sharedContext, context3Attributes);
+  auto eglContext = eglCreateContext(eglDisplay, eglConfig, sharedContext, context3Attributes);
   if (eglContext != EGL_NO_CONTEXT) {
     return eglContext;
   }
   LOGE("EGLDevice CreateContext() version 3: error=%d", eglGetError());
   static const EGLint context2Attributes[] = {EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE};
-  eglContext = eglCreateContext(eglGlobals->display, eglConfig, sharedContext, context2Attributes);
+  eglContext = eglCreateContext(eglDisplay, eglConfig, sharedContext, context2Attributes);
   if (eglContext == EGL_NO_CONTEXT) {
     LOGE("EGLDevice CreateContext() version 2: error=%d", eglGetError());
   }
@@ -53,16 +52,14 @@ std::shared_ptr<GLDevice> GLDevice::Current() {
 std::shared_ptr<GLDevice> GLDevice::Make(void* sharedContext) {
   static auto eglGlobals = EGLGlobals::Get();
   auto eglContext = EGL_NO_CONTEXT;
-  EGLint surfaceAttributes[] = {EGL_WIDTH,           1,        EGL_HEIGHT, 1,
-                                EGL_LARGEST_PBUFFER, EGL_TRUE, EGL_NONE};
-  auto eglSurface =
-      eglCreatePbufferSurface(eglGlobals->display, eglGlobals->pbufferConfig, surfaceAttributes);
+  auto eglSurface = eglCreatePbufferSurface(eglGlobals->display, eglGlobals->pbufferConfig,
+                                            &eglGlobals->pbufferSurfaceAttributes[0]);
   if (eglSurface == nullptr) {
     LOGE("GLDevice::Make() eglCreatePbufferSurface error=%d", eglGetError());
     return nullptr;
   }
   auto eglShareContext = reinterpret_cast<EGLContext>(sharedContext);
-  eglContext = CreateContext(eglShareContext, eglGlobals->pbufferConfig);
+  eglContext = CreateContext(eglShareContext, eglGlobals->display, eglGlobals->pbufferConfig);
   if (eglContext == nullptr) {
     eglDestroySurface(eglGlobals->display, eglSurface);
     return nullptr;
@@ -84,19 +81,13 @@ std::shared_ptr<EGLDevice> EGLDevice::MakeAdopted(EGLDisplay eglDisplay, EGLSurf
 std::shared_ptr<EGLDevice> EGLDevice::MakeFrom(EGLNativeWindowType nativeWindow,
                                                EGLContext sharedContext) {
   static auto eglGlobals = EGLGlobals::Get();
-#if defined(_WIN32)
-  EGLint surfaceAttributes[] = {EGL_DIRECT_COMPOSITION_ANGLE, EGL_TRUE, EGL_NONE};
   auto eglSurface = eglCreateWindowSurface(eglGlobals->display, eglGlobals->windowConfig,
-                                           nativeWindow, surfaceAttributes);
-#else
-  auto eglSurface =
-      eglCreateWindowSurface(eglGlobals->display, eglGlobals->windowConfig, nativeWindow, nullptr);
-#endif
+                                           nativeWindow, &eglGlobals->windowSurfaceAttributes[0]);
   if (eglSurface == nullptr) {
     LOGE("EGLDevice::MakeFrom() eglCreateWindowSurface error=%d", eglGetError());
     return nullptr;
   }
-  auto eglContext = CreateContext(sharedContext, eglGlobals->windowConfig);
+  auto eglContext = CreateContext(sharedContext, eglGlobals->display, eglGlobals->windowConfig);
   if (eglContext == EGL_NO_CONTEXT) {
     eglDestroySurface(eglGlobals->display, eglSurface);
     return nullptr;
