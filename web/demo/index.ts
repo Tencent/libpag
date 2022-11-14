@@ -438,6 +438,9 @@ const createPAGView = async (file: File | ArrayBuffer | Blob) => {
   // 图层编辑
   const editableLayers = getEditableLayer(pagFile);
   renderEditableLayer(editableLayers);
+  if (pagComposition) {
+    pagComposition.destroy();
+  }
   pagComposition = pagView.getComposition();
   audioEl = new AudioPlayer(pagComposition.audioBytes());
   return pagView;
