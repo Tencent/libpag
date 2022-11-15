@@ -118,7 +118,7 @@ std::unique_ptr<Snapshot> MakeTextureSnapshot(const tgfx::Path& path, RenderCach
   mask->fillPath(path);
   auto drawingMatrix = tgfx::Matrix::I();
   matrix.invert(&drawingMatrix);
-  auto texture = mask->makeTexture(cache->getContext());
+  auto texture = mask->updateTexture(cache->getContext());
   if (texture == nullptr) {
     return nullptr;
   }

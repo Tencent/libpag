@@ -10,7 +10,8 @@
         "merge_draw_call_triangle": "e2670834",
         "merge_draw_clear_op": "d06a39e9",
         "text_shape": "8e63209c",
-        "tileMode": "fb98147f"
+        "tileMode": "fb98147f",
+        "update_mask": "3dc56bc8"
     },
     "PAGBlendTest": {
         "Blend_Add": "48a897dd",
