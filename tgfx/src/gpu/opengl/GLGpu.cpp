@@ -17,11 +17,44 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLGpu.h"
+#include "gpu/PixelFormat.h"
 #include "tgfx/gpu/opengl/GLSemaphore.h"
 
 namespace tgfx {
 std::unique_ptr<Gpu> GLGpu::Make(Context* context) {
   return std::unique_ptr<GLGpu>(new GLGpu(context));
+}
+
+void GLGpu::writePixels(const Texture* texture, Rect rect, const void* pixels, size_t rowBytes) {
+  auto gl = GLFunctions::Get(_context);
+  auto caps = GLCaps::Get(_context);
+  auto glSampler = static_cast<const GLTexture*>(texture)->glSampler();
+  gl->bindTexture(glSampler.target, glSampler.id);
+  const auto& format = caps->getTextureFormat(glSampler.format);
+  auto bytesPerPixel = PixelFormatBytesPerPixel(glSampler.format);
+  gl->pixelStorei(GL_UNPACK_ALIGNMENT, static_cast<int>(bytesPerPixel));
+  int x = static_cast<int>(rect.x());
+  int y = static_cast<int>(rect.y());
+  int width = static_cast<int>(rect.width());
+  int height = static_cast<int>(rect.height());
+  if (caps->unpackRowLengthSupport) {
+    // the number of pixels, not bytes
+    gl->pixelStorei(GL_UNPACK_ROW_LENGTH, static_cast<int>(rowBytes / bytesPerPixel));
+    gl->texSubImage2D(glSampler.target, 0, x, y, width, height, format.externalFormat,
+                      GL_UNSIGNED_BYTE, pixels);
+    gl->pixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+  } else {
+    if (static_cast<size_t>(width) * bytesPerPixel == rowBytes) {
+      gl->texSubImage2D(glSampler.target, 0, x, y, width, height, format.externalFormat,
+                        GL_UNSIGNED_BYTE, pixels);
+    } else {
+      auto data = reinterpret_cast<const uint8_t*>(pixels);
+      for (int row = 0; row < height; ++row) {
+        gl->texSubImage2D(glSampler.target, 0, x, y + row, width, 1, format.externalFormat,
+                          GL_UNSIGNED_BYTE, data + (row * rowBytes));
+      }
+    }
+  }
 }
 
 void GLGpu::copyRenderTargetToTexture(RenderTarget* renderTarget, Texture* texture,

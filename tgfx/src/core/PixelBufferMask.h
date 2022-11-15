@@ -18,34 +18,27 @@
 
 #pragma once
 
-#include "gpu/Gpu.h"
-#include "gpu/opengl/GLOpsRenderPass.h"
+#include "tgfx/core/Mask.h"
+#include "tgfx/core/PixelBuffer.h"
 
 namespace tgfx {
-class GLGpu : public Gpu {
+class PixelBufferMask : public Mask {
  public:
-  static std::unique_ptr<Gpu> Make(Context* context);
+  explicit PixelBufferMask(std::shared_ptr<PixelBuffer> buffer);
 
-  void writePixels(const Texture* texture, Rect rect, const void* pixels, size_t rowBytes) override;
+  void clear() override;
 
-  void copyRenderTargetToTexture(RenderTarget* renderTarget, Texture* texture, const Rect& srcRect,
-                                 const Point& dstPoint) override;
+  std::shared_ptr<Texture> uploadTextureData(Context* context) override;
 
-  void resolveRenderTarget(RenderTarget* renderTarget) override;
-
-  bool insertSemaphore(Semaphore* semaphore) override;
-
-  bool waitSemaphore(const Semaphore* semaphore) override;
-
-  OpsRenderPass* getOpsRenderPass(std::shared_ptr<RenderTarget> renderTarget,
-                                  std::shared_ptr<Texture> renderTargetTexture) override;
-
-  void submit(OpsRenderPass* renderPass) override;
-
- private:
-  explicit GLGpu(Context* context) : Gpu(context) {
+  std::shared_ptr<PixelBuffer> getBuffer() const {
+    return buffer;
   }
 
-  std::unique_ptr<GLOpsRenderPass> opsRenderPass;
+ protected:
+  void dirty(Rect rect, bool flipY = true);
+
+  std::shared_ptr<PixelBuffer> buffer = nullptr;
+  std::shared_ptr<Texture> texture;
+  Rect dirtyRect = Rect::MakeEmpty();
 };
 }  // namespace tgfx

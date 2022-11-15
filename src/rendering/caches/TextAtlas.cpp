@@ -234,7 +234,7 @@ std::shared_ptr<tgfx::Texture> DrawMask(tgfx::Context* context, const Page& page
       mask->strokeText(blob.get(), *textRun.paint.getStroke());
     }
   }
-  return mask->makeTexture(context);
+  return mask->uploadTextureData(context);
 }
 
 std::shared_ptr<tgfx::Texture> DrawColor(tgfx::Context* context, const Page& page) {

@@ -38,11 +38,13 @@ class WebMask : public Mask {
 
   void clear() override;
 
-  std::shared_ptr<Texture> makeTexture(Context* context) const override;
+  std::shared_ptr<Texture> uploadTextureData(Context* context) override;
 
  private:
   bool drawText(const TextBlob* textBlob, const Stroke* stroke = nullptr);
 
   emscripten::val webMask = emscripten::val::null();
+  std::shared_ptr<Texture> texture;
+  bool dirty = false;
 };
 }  // namespace tgfx

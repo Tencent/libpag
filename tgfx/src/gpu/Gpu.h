@@ -37,6 +37,9 @@ class Gpu {
     return _context;
   }
 
+  virtual void writePixels(const Texture* texture, Rect rect, const void* pixels,
+                           size_t rowBytes) = 0;
+
   virtual void copyRenderTargetToTexture(RenderTarget* renderTarget, Texture* texture,
                                          const Rect& srcRect, const Point& dstPoint) = 0;
 
