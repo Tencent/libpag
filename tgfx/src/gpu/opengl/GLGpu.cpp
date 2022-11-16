@@ -17,11 +17,82 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLGpu.h"
+#include "GLUtil.h"
+#include "gpu/PixelFormat.h"
 #include "tgfx/gpu/opengl/GLSemaphore.h"
 
 namespace tgfx {
 std::unique_ptr<Gpu> GLGpu::Make(Context* context) {
   return std::unique_ptr<GLGpu>(new GLGpu(context));
+}
+
+std::unique_ptr<TextureSampler> GLGpu::createTexture(int width, int height, PixelFormat format) {
+  auto gl = GLFunctions::Get(_context);
+  auto sampler = std::make_unique<GLSampler>();
+  gl->genTextures(1, &(sampler->id));
+  if (sampler->id == 0) {
+    return nullptr;
+  }
+  sampler->target = GL_TEXTURE_2D;
+  sampler->format = format;
+  gl->bindTexture(sampler->target, sampler->id);
+  gl->texParameteri(sampler->target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  gl->texParameteri(sampler->target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  gl->texParameteri(sampler->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  gl->texParameteri(sampler->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  const auto& textureFormat = GLCaps::Get(_context)->getTextureFormat(format);
+  gl->texImage2D(sampler->target, 0, static_cast<int>(textureFormat.internalFormatTexImage), width,
+                 height, 0, textureFormat.externalFormat, GL_UNSIGNED_BYTE, nullptr);
+  if (!CheckGLError(_context)) {
+    gl->deleteTextures(1, &(sampler->id));
+    return nullptr;
+  }
+  return sampler;
+}
+
+void GLGpu::deleteTexture(TextureSampler* sampler) {
+  if (sampler == nullptr) {
+    return;
+  }
+  auto glSampler = static_cast<GLSampler*>(sampler);
+  GLFunctions::Get(_context)->deleteTextures(1, &glSampler->id);
+  glSampler->id = 0;
+}
+
+void GLGpu::writePixels(const TextureSampler* sampler, Rect rect, const void* pixels,
+                        size_t rowBytes) {
+  if (sampler == nullptr) {
+    return;
+  }
+  auto gl = GLFunctions::Get(_context);
+  auto caps = GLCaps::Get(_context);
+  auto glSampler = static_cast<const GLSampler*>(sampler);
+  gl->bindTexture(glSampler->target, glSampler->id);
+  const auto& format = caps->getTextureFormat(glSampler->format);
+  auto bytesPerPixel = PixelFormatBytesPerPixel(glSampler->format);
+  gl->pixelStorei(GL_UNPACK_ALIGNMENT, static_cast<int>(bytesPerPixel));
+  int x = static_cast<int>(rect.x());
+  int y = static_cast<int>(rect.y());
+  int width = static_cast<int>(rect.width());
+  int height = static_cast<int>(rect.height());
+  if (caps->unpackRowLengthSupport) {
+    // the number of pixels, not bytes
+    gl->pixelStorei(GL_UNPACK_ROW_LENGTH, static_cast<int>(rowBytes / bytesPerPixel));
+    gl->texSubImage2D(glSampler->target, 0, x, y, width, height, format.externalFormat,
+                      GL_UNSIGNED_BYTE, pixels);
+    gl->pixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+  } else {
+    if (static_cast<size_t>(width) * bytesPerPixel == rowBytes) {
+      gl->texSubImage2D(glSampler->target, 0, x, y, width, height, format.externalFormat,
+                        GL_UNSIGNED_BYTE, pixels);
+    } else {
+      auto data = reinterpret_cast<const uint8_t*>(pixels);
+      for (int row = 0; row < height; ++row) {
+        gl->texSubImage2D(glSampler->target, 0, x, y + row, width, 1, format.externalFormat,
+                          GL_UNSIGNED_BYTE, data + (row * rowBytes));
+      }
+    }
+  }
 }
 
 void GLGpu::copyRenderTargetToTexture(RenderTarget* renderTarget, Texture* texture,

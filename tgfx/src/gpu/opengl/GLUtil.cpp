@@ -51,38 +51,6 @@ GLVersion GetGLVersion(const char* versionString) {
   return {};
 }
 
-void SubmitGLTexture(Context* context, const GLSampler& sampler, int width, int height,
-                     size_t rowBytes, int bytesPerPixel, void* pixels) {
-  if (pixels == nullptr || rowBytes == 0) {
-    return;
-  }
-  auto gl = GLFunctions::Get(context);
-  auto caps = GLCaps::Get(context);
-  const auto& format = caps->getTextureFormat(sampler.format);
-  gl->bindTexture(sampler.target, sampler.id);
-  gl->pixelStorei(GL_UNPACK_ALIGNMENT, bytesPerPixel);
-  if (caps->unpackRowLengthSupport) {
-    // the number of pixels, not bytes
-    gl->pixelStorei(GL_UNPACK_ROW_LENGTH, static_cast<int>(rowBytes / bytesPerPixel));
-    gl->texImage2D(sampler.target, 0, static_cast<int>(format.internalFormatTexImage), width,
-                   height, 0, format.externalFormat, GL_UNSIGNED_BYTE, pixels);
-    gl->pixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-  } else {
-    if (static_cast<size_t>(width) * bytesPerPixel == rowBytes) {
-      gl->texImage2D(sampler.target, 0, static_cast<int>(format.internalFormatTexImage), width,
-                     height, 0, format.externalFormat, GL_UNSIGNED_BYTE, pixels);
-    } else {
-      gl->texImage2D(sampler.target, 0, static_cast<int>(format.internalFormatTexImage), width,
-                     height, 0, format.externalFormat, GL_UNSIGNED_BYTE, nullptr);
-      auto data = reinterpret_cast<uint8_t*>(pixels);
-      for (int row = 0; row < height; ++row) {
-        gl->texSubImage2D(sampler.target, 0, 0, row, width, 1, format.externalFormat,
-                          GL_UNSIGNED_BYTE, data + (row * rowBytes));
-      }
-    }
-  }
-}
-
 unsigned CreateGLProgram(Context* context, const std::string& vertex, const std::string& fragment) {
   auto vertexShader = LoadGLShader(context, GL_VERTEX_SHADER, vertex);
   if (vertexShader == 0) {
