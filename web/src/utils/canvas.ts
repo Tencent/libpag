@@ -18,8 +18,8 @@ export const releaseCanvas2D = (canvas: HTMLCanvasElement | OffscreenCanvas) => 
 const createCanvas2D = () => {
   try {
     const offscreenCanvas = new OffscreenCanvas(0, 0);
-    const context = offscreenCanvas.getContext('2d');
-    if (context?.measureText) return offscreenCanvas;
+    const context = offscreenCanvas.getContext('2d') as OffscreenCanvasRenderingContext2D;
+    if (typeof context.measureText === 'function') return offscreenCanvas;
     return document.createElement('canvas');
   } catch (err) {
     return document.createElement('canvas');
