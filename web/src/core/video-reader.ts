@@ -24,6 +24,16 @@ const getWechatNetwork = () => {
 };
 
 const playVideoElement = async (videoElement: HTMLVideoElement) => {
+  if (document.visibilityState !== 'visible') {
+    const visibilityHandle = () => {
+      if (document.visibilityState === 'visible') {
+        if (videoElement) playVideoElement(videoElement);
+        window.removeEventListener('visibilitychange', visibilityHandle);
+      }
+    };
+    window.addEventListener('visibilitychange', visibilityHandle);
+    return false;
+  }
   if (IS_WECHAT && window.WeixinJSBridge) {
     await getWechatNetwork();
   }
