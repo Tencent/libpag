@@ -25,6 +25,9 @@ ImageBytes* ReadImageBytesV2(DecodeStream* stream) {
   auto imageBytes = new ImageBytes();
   imageBytes->id = stream->readEncodedUint32();
   imageBytes->fileBytes = stream->readByteData().release();
+  if (imageBytes->fileBytes == nullptr || imageBytes->fileBytes->length() == 0) {
+    return imageBytes;
+  }
   imageBytes->scaleFactor = stream->readFloat();
   int width;
   int height;
