@@ -297,7 +297,7 @@ export class PAGView {
     const clock = new Clock();
     const res = await this.player.flushInternal((res) => {
       if (this.pagViewOptions.useCanvas2D && res && PAGModule.globalCanvas.canvas) {
-        if (!this.canvasContext) this.canvasContext = this.canvasElement?.getContext('2d');
+        if (!this.canvasContext) this.canvasContext = this.canvasElement?.getContext('2d') as CanvasRenderingContext2D;
         const compositeOperation = this.canvasContext!.globalCompositeOperation;
         this.canvasContext!.globalCompositeOperation = 'copy';
         this.canvasContext?.drawImage(
