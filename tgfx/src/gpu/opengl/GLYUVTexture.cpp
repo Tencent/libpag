@@ -19,6 +19,7 @@
 #include "tgfx/gpu/opengl/GLYUVTexture.h"
 #include "GLUtil.h"
 #include "core/utils/UniqueID.h"
+#include "gpu/Gpu.h"
 
 namespace tgfx {
 #define I420_PLANE_COUNT 3
@@ -39,7 +40,6 @@ struct YUVConfig {
   int height = 0;
   uint8_t* pixelsPlane[3]{};
   int rowBytes[3]{};
-  int bytesPerPixel[3]{};
   PixelFormat formats[3]{};
   int planeCount = 0;
 };
@@ -91,18 +91,18 @@ class GLNV12Texture : public GLYUVTexture {
 
 static std::vector<GLSampler> MakeTexturePlanes(Context* context, const YUVConfig& yuvConfig) {
   std::vector<GLSampler> texturePlanes{};
-  unsigned yuvTextureIDs[] = {0, 0, 0};
-  auto gl = GLFunctions::Get(context);
-  gl->genTextures(yuvConfig.planeCount, yuvTextureIDs);
-  if (yuvTextureIDs[0] == 0) {
-    return texturePlanes;
-  }
+  static constexpr int factor[] = {0, 1, 1};
   for (int index = 0; index < yuvConfig.planeCount; index++) {
-    GLSampler sampler = {};
-    sampler.id = yuvTextureIDs[index];
-    sampler.target = GL_TEXTURE_2D;
-    sampler.format = yuvConfig.formats[index];
-    texturePlanes.emplace_back(sampler);
+    auto w = yuvConfig.width >> factor[index];
+    auto h = yuvConfig.height >> factor[index];
+    auto sampler = context->gpu()->createTexture(w, h, yuvConfig.formats[index]);
+    if (sampler == nullptr) {
+      for (auto& glSampler : texturePlanes) {
+        context->gpu()->deleteTexture(&glSampler);
+      }
+      return {};
+    }
+    texturePlanes.emplace_back(*static_cast<GLSampler*>(sampler.get()));
   }
   return texturePlanes;
 }
@@ -115,9 +115,9 @@ static void SubmitYUVTexture(Context* context, const YUVConfig& yuvConfig,
     auto w = yuvConfig.width >> factor[index];
     auto h = yuvConfig.height >> factor[index];
     auto rowBytes = yuvConfig.rowBytes[index];
-    auto bytesPerPixel = yuvConfig.bytesPerPixel[index];
     auto pixels = yuvConfig.pixelsPlane[index];
-    SubmitGLTexture(context, sampler, w, h, rowBytes, bytesPerPixel, pixels);
+    context->gpu()->writePixels(
+        &sampler, Rect::MakeWH(static_cast<float>(w), static_cast<float>(h)), pixels, rowBytes);
   }
 }
 
@@ -129,7 +129,6 @@ std::shared_ptr<YUVTexture> YUVTexture::MakeI420(Context* context, YUVColorSpace
     yuvConfig.pixelsPlane[i] = pixelsPlane[i];
     yuvConfig.rowBytes[i] = lineSize[i];
     yuvConfig.formats[i] = PixelFormat::GRAY_8;
-    yuvConfig.bytesPerPixel[i] = 1;
   }
 
   BytesKey recycleKey = {};
@@ -160,8 +159,6 @@ std::shared_ptr<YUVTexture> YUVTexture::MakeNV12(Context* context, YUVColorSpace
   }
   yuvConfig.formats[0] = PixelFormat::GRAY_8;
   yuvConfig.formats[1] = PixelFormat::RG_88;
-  yuvConfig.bytesPerPixel[0] = 1;
-  yuvConfig.bytesPerPixel[1] = 2;
 
   BytesKey recycleKey = {};
   GLNV12Texture::ComputeRecycleKey(&recycleKey, width, height);
@@ -198,9 +195,8 @@ const TextureSampler* GLYUVTexture::getSamplerAt(size_t index) const {
 }
 
 void GLYUVTexture::onReleaseGPU() {
-  auto gl = GLFunctions::Get(context);
-  for (const auto& sampler : samplers) {
-    gl->deleteTextures(1, &sampler.id);
+  for (auto& sampler : samplers) {
+    context->gpu()->deleteTexture(&sampler);
   }
 }
 }  // namespace tgfx

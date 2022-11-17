@@ -18,31 +18,22 @@
 
 #pragma once
 
-#include <array>
-#include <string>
-#include "gpu/opengl/GLContext.h"
-#include "tgfx/core/ImageOrigin.h"
-#include "tgfx/core/Matrix.h"
-#include "tgfx/gpu/opengl/GLSampler.h"
+#include <cstdio>
+#include "tgfx/gpu/PixelFormat.h"
 
 namespace tgfx {
-struct GLVersion {
-  int majorVersion = -1;
-  int minorVersion = -1;
-
-  GLVersion() = default;
-
-  GLVersion(int major, int minor) : majorVersion(major), minorVersion(minor) {
+static constexpr size_t PixelFormatBytesPerPixel(PixelFormat format) {
+  switch (format) {
+    case PixelFormat::ALPHA_8:
+      return 1;
+    case PixelFormat::GRAY_8:
+      return 1;
+    case PixelFormat::RG_88:
+      return 2;
+    case PixelFormat::RGBA_8888:
+      return 4;
+    default:
+      return 0;
   }
-};
-
-GLVersion GetGLVersion(const char* versionString);
-
-unsigned CreateGLProgram(Context* context, const std::string& vertex, const std::string& fragment);
-
-unsigned LoadGLShader(Context* context, unsigned shaderType, const std::string& source);
-
-bool CheckGLError(Context* context);
-
-std::array<float, 9> ToGLMatrix(const Matrix& matrix);
+}
 }  // namespace tgfx

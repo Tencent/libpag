@@ -19,6 +19,7 @@
 #include "tgfx/gpu/opengl/GLTexture.h"
 #include "GLUtil.h"
 #include "core/utils/UniqueID.h"
+#include "gpu/Gpu.h"
 
 namespace tgfx {
 class GLBackendTexture : public GLTexture {
@@ -34,8 +35,7 @@ class GLBackendTexture : public GLTexture {
 
   void onReleaseGPU() override {
     if (adopted) {
-      auto gl = GLFunctions::Get(context);
-      gl->deleteTextures(1, &sampler.id);
+      context->gpu()->deleteTexture(&sampler);
     }
   }
 };
@@ -79,8 +79,7 @@ class GLAlphaTexture : public GLTexture {
 
  private:
   void onReleaseGPU() override {
-    auto gl = GLFunctions::Get(context);
-    gl->deleteTextures(1, &sampler.id);
+    context->gpu()->deleteTexture(&sampler);
   }
 };
 
@@ -106,8 +105,7 @@ class GLRGBATexture : public GLTexture {
 
  private:
   void onReleaseGPU() override {
-    auto gl = GLFunctions::Get(context);
-    gl->deleteTextures(1, &sampler.id);
+    context->gpu()->deleteTexture(&sampler);
   }
 };
 
@@ -125,8 +123,6 @@ std::shared_ptr<Texture> Texture::Make(Context* context, int width, int height, 
   if (!CheckMaxTextureSize(caps, width, height)) {
     return nullptr;
   }
-  PixelFormat pixelFormat = alphaOnly ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
-  const auto& format = caps->getTextureFormat(pixelFormat);
   BytesKey recycleKey = {};
   if (alphaOnly) {
     GLAlphaTexture::ComputeRecycleKey(&recycleKey, width, height);
@@ -136,40 +132,25 @@ std::shared_ptr<Texture> Texture::Make(Context* context, int width, int height, 
 
   auto texture =
       std::static_pointer_cast<GLTexture>(context->resourceCache()->getRecycled(recycleKey));
-  GLSampler sampler = {};
   if (texture) {
     texture->_origin = origin;
-    sampler = texture->glSampler();
   } else {
-    sampler.target = GL_TEXTURE_2D;
-    sampler.format = pixelFormat;
-    auto gl = GLFunctions::Get(context);
-    gl->genTextures(1, &(sampler.id));
-    if (sampler.id == 0) {
+    PixelFormat pixelFormat = alphaOnly ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
+    auto sampler = context->gpu()->createTexture(width, height, pixelFormat);
+    if (sampler == nullptr) {
       return nullptr;
     }
-    gl->bindTexture(sampler.target, sampler.id);
-    gl->texParameteri(sampler.target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    gl->texParameteri(sampler.target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    gl->texParameteri(sampler.target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    gl->texParameteri(sampler.target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    if (pixels == nullptr) {
-      gl->texImage2D(sampler.target, 0, static_cast<int>(format.internalFormatTexImage), width,
-                     height, 0, format.externalFormat, GL_UNSIGNED_BYTE, nullptr);
-    }
-    if (!CheckGLError(context)) {
-      gl->deleteTextures(1, &sampler.id);
-      return nullptr;
-    }
+    auto glSampler = static_cast<GLSampler*>(sampler.get());
     if (alphaOnly) {
-      texture = Resource::Wrap(context, new GLAlphaTexture(sampler, width, height, origin));
+      texture = Resource::Wrap(context, new GLAlphaTexture(*glSampler, width, height, origin));
     } else {
-      texture = Resource::Wrap(context, new GLRGBATexture(sampler, width, height, origin));
+      texture = Resource::Wrap(context, new GLRGBATexture(*glSampler, width, height, origin));
     }
   }
   if (pixels != nullptr) {
-    int bytesPerPixel = alphaOnly ? 1 : 4;
-    SubmitGLTexture(context, sampler, width, height, rowBytes, bytesPerPixel, pixels);
+    context->gpu()->writePixels(texture->getSampler(),
+                                Rect::MakeWH(static_cast<float>(width), static_cast<float>(height)),
+                                pixels, rowBytes);
   }
   return texture;
 }

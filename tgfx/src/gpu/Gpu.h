@@ -21,6 +21,7 @@
 #include <memory>
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/Semaphore.h"
+#include "tgfx/gpu/TextureSampler.h"
 
 namespace tgfx {
 class OpsRenderPass;
@@ -36,6 +37,14 @@ class Gpu {
   Context* context() {
     return _context;
   }
+
+  virtual std::unique_ptr<TextureSampler> createTexture(int width, int height,
+                                                        PixelFormat format) = 0;
+
+  virtual void deleteTexture(TextureSampler* sampler) = 0;
+
+  virtual void writePixels(const TextureSampler* sampler, Rect rect, const void* pixels,
+                           size_t rowBytes) = 0;
 
   virtual void copyRenderTargetToTexture(RenderTarget* renderTarget, Texture* texture,
                                          const Rect& srcRect, const Point& dstPoint) = 0;
