@@ -23,7 +23,30 @@ const getWechatNetwork = () => {
   });
 };
 
+const waitVideoCanPlay = (videoElement: HTMLVideoElement) => {
+  if (videoElement.readyState >= 2) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const canplayHandle = () => {
+      videoElement.removeEventListener('canplay', canplayHandle);
+      clearTimeout(timer);
+      resolve(true);
+    };
+    videoElement.addEventListener('canplay', canplayHandle);
+    videoElement.load();
+    const timer = setTimeout(() => {
+      videoElement.removeEventListener('canplay', canplayHandle);
+      resolve(false);
+    }, 1000);
+  });
+};
+
 const playVideoElement = async (videoElement: HTMLVideoElement) => {
+  if (IS_WECHAT && window.WeixinJSBridge) {
+    await getWechatNetwork();
+  }
+  if (videoElement.readyState < 2) {
+    await waitVideoCanPlay(videoElement);
+  }
   if (document.visibilityState !== 'visible') {
     const visibilityHandle = () => {
       if (document.visibilityState === 'visible') {
@@ -33,9 +56,6 @@ const playVideoElement = async (videoElement: HTMLVideoElement) => {
     };
     window.addEventListener('visibilitychange', visibilityHandle);
     return false;
-  }
-  if (IS_WECHAT && window.WeixinJSBridge) {
-    await getWechatNetwork();
   }
   try {
     await videoElement.play();
@@ -75,7 +95,6 @@ export class VideoReader {
     this.videoEl.style.display = 'none';
     this.videoEl.muted = true;
     this.videoEl.playsInline = true;
-    this.videoEl.load();
     addListener(this.videoEl, 'timeupdate', this.onTimeupdate.bind(this));
     this.frameRate = frameRate;
     const blob = new Blob([mp4Data], { type: 'video/mp4' });
