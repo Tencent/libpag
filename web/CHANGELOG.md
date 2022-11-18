@@ -1,5 +1,29 @@
 # CHANGELOG
 
+## 4.1.20
+
+### Feature
+
+- Multiple readback operations using getImageData are faster. (#580)
+
+### BugFixes
+
+- Fix static time ranges pause error in video reader. (#573)
+- Fix play video error when document hidden.
+
+## 4.1.15
+
+### Feature
+
+- Add support for running on WeChat miniprogram. (#533)
+
+### BugFixes
+
+- Fix getLayerType crash when there has another async task. (#465)
+- Fix destroy view clash when multiple views use the same canvas. (#478)
+- Disable video playback rate when video sequence resolution is larger than 4k. (#548)
+- Fix video decoder output frame error on the Android WeChat mini-program. (#559)
+
 ## 4.0.5.26
 
 ### Feature
