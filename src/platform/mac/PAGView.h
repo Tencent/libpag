@@ -233,4 +233,9 @@ PAG_API @interface PAGView : NSView
  */
 - (void)freeCache;
 
+/**
+ * Returns a CVPixelBuffer object capturing the contents of the PAGView. Subsequent rendering of
+ * the PAGView will not be captured.
+ */
+- (CVPixelBufferRef)makeSnapshot;
 @end

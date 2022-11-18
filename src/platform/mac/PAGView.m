@@ -431,4 +431,7 @@
   [imageReplacementMap removeAllObjects];
 }
 
+- (CVPixelBufferRef)makeSnapshot {
+    return [pagSurface makeSnapshot];
+}
 @end
