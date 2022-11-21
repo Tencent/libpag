@@ -19,7 +19,6 @@
 #include "FTMask.h"
 #include "FTPath.h"
 #include "tgfx/core/Bitmap.h"
-#include FT_STROKER_H
 
 namespace tgfx {
 static const FTLibrary& GetLibrary() {
@@ -48,17 +47,13 @@ static void Iterator(PathVerb verb, const Point points[4], void* info) {
   }
 }
 
-std::shared_ptr<Mask> Mask::Make(int width, int height) {
-  auto buffer = PixelBuffer::Make(width, height, true);
+std::shared_ptr<Mask> Mask::Make(int width, int height, bool tryHardware) {
+  auto buffer = PixelBuffer::Make(width, height, true, tryHardware);
   if (buffer == nullptr) {
     return nullptr;
   }
   Bitmap(buffer).eraseAll();
   return std::make_shared<FTMask>(std::move(buffer));
-}
-
-FTMask::FTMask(std::shared_ptr<PixelBuffer> buffer)
-    : Mask(buffer->width(), buffer->height()), buffer(std::move(buffer)) {
 }
 
 void FTMask::fillPath(const Path& path) {
@@ -71,6 +66,7 @@ void FTMask::fillPath(const Path& path) {
   totalMatrix.postScale(1, -1);
   totalMatrix.postTranslate(0, static_cast<float>(buffer->height()));
   finalPath.transform(totalMatrix);
+  dirty(finalPath.getBounds());
   FTPath ftPath = {};
   finalPath.decompose(Iterator, &ftPath);
   ftPath.setFillType(path.getFillType());
@@ -87,9 +83,5 @@ void FTMask::fillPath(const Path& path) {
   for (auto& outline : outlines) {
     FT_Outline_Get_Bitmap(ftLibrary, &(outline->outline), &bitmap);
   }
-}
-
-void FTMask::clear() {
-  Bitmap(buffer).eraseAll();
 }
 }  // namespace tgfx

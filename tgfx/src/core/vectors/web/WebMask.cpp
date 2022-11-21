@@ -25,7 +25,7 @@
 using namespace emscripten;
 
 namespace tgfx {
-std::shared_ptr<Mask> Mask::Make(int width, int height) {
+std::shared_ptr<Mask> Mask::Make(int width, int height, bool) {
   auto webMaskClass = val::module_property("WebMask");
   if (!webMaskClass.as<bool>()) {
     return nullptr;
@@ -37,15 +37,19 @@ std::shared_ptr<Mask> Mask::Make(int width, int height) {
   return std::make_shared<WebMask>(width, height, webMask);
 }
 
-std::shared_ptr<Texture> WebMask::makeTexture(Context* context) const {
-  auto texture = Texture::MakeAlpha(context, width(), height(), nullptr, 0);
+std::shared_ptr<Texture> WebMask::updateTexture(Context* context) {
   if (texture == nullptr) {
-    return nullptr;
+    texture = Texture::MakeAlpha(context, width(), height(), nullptr, 0);
   }
-  auto& glInfo = std::static_pointer_cast<GLTexture>(texture)->glSampler();
-  auto gl = GLFunctions::Get(context);
-  gl->bindTexture(glInfo.target, glInfo.id);
-  webMask.call<void>("update", val::module_property("GL"));
+  if (dirty) {
+    if (texture == nullptr) {
+      return nullptr;
+    }
+    auto& glInfo = std::static_pointer_cast<GLTexture>(texture)->glSampler();
+    auto gl = GLFunctions::Get(context);
+    gl->bindTexture(glInfo.target, glInfo.id);
+    webMask.call<void>("update", val::module_property("GL"));
+  }
   return texture;
 }
 
@@ -88,6 +92,7 @@ void WebMask::fillPath(const Path& path) {
   auto path2D = path2DClass.new_();
   finalPath.decompose(Iterator, &path2D);
   webMask.call<void>("fillPath", path2D, path.getFillType());
+  dirty = true;
 }
 
 bool WebMask::fillText(const TextBlob* textBlob) {
@@ -119,10 +124,12 @@ bool WebMask::drawText(const TextBlob* textBlob, const Stroke* stroke) {
   } else {
     webMask.call<void>("fillText", webFont, texts, points, matrix);
   }
+  dirty = true;
   return true;
 }
 
 void WebMask::clear() {
   webMask.call<void>("clear");
+  dirty = true;
 }
 }  // namespace tgfx

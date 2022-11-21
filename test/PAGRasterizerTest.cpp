@@ -51,7 +51,7 @@ PAG_TEST(PAGRasterizerTest, TestRasterizer) {
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto texture = mask->makeTexture(context);
+  auto texture = mask->updateTexture(context);
   ASSERT_TRUE(texture != nullptr);
   auto surface = Surface::Make(context, mask->width(), mask->height());
   ASSERT_TRUE(surface != nullptr);
