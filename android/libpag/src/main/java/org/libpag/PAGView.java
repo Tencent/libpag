@@ -813,10 +813,13 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
 
     /**
      * Returns a bitmap capturing the contents of the PAGView. Subsequent rendering of the
-     * PAGView will not be captured.
+     * PAGView will not be captured. Returns null if the PAGView hasn't been presented yet.
      */
     public Bitmap makeSnapshot() {
-        return pagSurface.makeSnapshot();
+        if (pagSurface != null) {
+            return pagSurface.makeSnapshot();
+        }
+        return null;
     }
 
     @Override

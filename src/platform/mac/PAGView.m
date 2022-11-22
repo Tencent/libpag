@@ -432,6 +432,9 @@
 }
 
 - (CVPixelBufferRef)makeSnapshot {
-    return [pagSurface makeSnapshot];
+    if (pagSurface != nil) {
+        return [pagSurface makeSnapshot];
+    }
+    return nil;
 }
 @end

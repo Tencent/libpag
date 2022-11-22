@@ -245,7 +245,7 @@ PAG_API @interface PAGView : UIView
 
 /**
  * Returns a CVPixelBuffer object capturing the contents of the PAGView. Subsequent rendering of
- * the PAGView will not be captured.
+ * the PAGView will not be captured. Returns nil if the PAGView hasn't been presented yet.
  */
 - (CVPixelBufferRef)makeSnapshot;
 @end
