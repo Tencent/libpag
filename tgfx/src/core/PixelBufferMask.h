@@ -18,33 +18,27 @@
 
 #pragma once
 
-#include <emscripten/val.h>
 #include "tgfx/core/Mask.h"
+#include "tgfx/core/PixelBuffer.h"
 
 namespace tgfx {
-class WebMask : public Mask {
+class PixelBufferMask : public Mask {
  public:
-  ~WebMask() override;
-
-  explicit WebMask(int width, int height, emscripten::val webMask)
-      : Mask(width, height), webMask(webMask) {
-  }
-
-  void fillPath(const Path& path) override;
-
-  bool fillText(const TextBlob* textBlob) override;
-
-  bool strokeText(const TextBlob* textBlob, const Stroke& stroke) override;
+  explicit PixelBufferMask(std::shared_ptr<PixelBuffer> buffer);
 
   void clear() override;
 
   std::shared_ptr<Texture> updateTexture(Context* context) override;
 
- private:
-  bool drawText(const TextBlob* textBlob, const Stroke* stroke = nullptr);
+  std::shared_ptr<PixelBuffer> getBuffer() const {
+    return buffer;
+  }
 
-  emscripten::val webMask = emscripten::val::null();
+ protected:
+  void dirty(Rect rect, bool flipY = true);
+
+  std::shared_ptr<PixelBuffer> buffer = nullptr;
   std::shared_ptr<Texture> texture;
-  bool dirty = false;
+  Rect dirtyRect = Rect::MakeEmpty();
 };
 }  // namespace tgfx

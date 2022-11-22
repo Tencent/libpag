@@ -463,7 +463,8 @@ void Canvas::fillPath(const Path& path, const Paint& paint) {
   totalMatrix.postConcat(matrix);
   mask->setMatrix(totalMatrix);
   mask->fillPath(path);
-  drawMask(deviceBounds, mask->makeTexture(getContext()), std::move(glPaint));
+  auto texture = mask->updateTexture(getContext());
+  drawMask(deviceBounds, std::move(texture), std::move(glPaint));
 }
 
 void Canvas::drawMask(const Rect& bounds, std::shared_ptr<Texture> mask, GpuPaint glPaint) {
@@ -580,7 +581,8 @@ void Canvas::drawMaskGlyphs(TextBlob* textBlob, const Paint& paint) {
   } else {
     mask->fillText(textBlob);
   }
-  drawMask(deviceBounds, mask->makeTexture(getContext()), std::move(glPaint));
+  auto texture = mask->updateTexture(getContext());
+  drawMask(deviceBounds, std::move(texture), std::move(glPaint));
 }
 
 void Canvas::drawAtlas(std::shared_ptr<Texture> atlas, const Matrix matrix[], const Rect tex[],

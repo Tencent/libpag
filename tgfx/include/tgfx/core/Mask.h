@@ -30,13 +30,29 @@ namespace tgfx {
  * and convert it into a raster image that can be used as a drawing mask. Mask is not thread safe,
  * do not use it across multiple threads.
  */
-class Mask : public TextureBuffer {
+class Mask {
  public:
   /**
    * Creates a new Mask with specified width and height. Returns nullptr if the size is less than
    * zero or too big.
    */
-  static std::shared_ptr<Mask> Make(int width, int height);
+  static std::shared_ptr<Mask> Make(int width, int height, bool tryHardware = true);
+
+  virtual ~Mask() = default;
+
+  /**
+   * Returns the width of the mask.
+   */
+  int width() const {
+    return _width;
+  }
+
+  /**
+   * Returns the height of the mask.
+   */
+  int height() const {
+    return _height;
+  }
 
   /**
    * Returns the current total matrix.
@@ -80,12 +96,21 @@ class Mask : public TextureBuffer {
 
   virtual void clear() = 0;
 
+  /**
+   * Uploads the pixel data to a texture, and returns the texture. The texture is cached, so
+   * multiple calls to this method will return the same texture. If you don't want to update the
+   * texture, you can call this method once and use the texture returned before releasing the mask.
+   */
+  virtual std::shared_ptr<Texture> updateTexture(Context* context) = 0;
+
  protected:
+  int _width = 0;
+  int _height = 0;
   Matrix matrix = Matrix::I();
 
   static bool CanUseAsMask(const TextBlob* textBlob);
 
-  Mask(int width, int height) : TextureBuffer(width, height) {
+  Mask(int width, int height) : _width(width), _height(height) {
   }
 };
 }  // namespace tgfx

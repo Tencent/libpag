@@ -24,6 +24,7 @@
 #include "gpu/TriangulatingPathOp.h"
 #include "rendering/utils/shaper/TextShaper.h"
 #include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/Mask.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/gpu/Canvas.h"
 #include "tgfx/gpu/Surface.h"
@@ -504,6 +505,28 @@ PAG_TEST(CanvasTest, textShape) {
   }
   canvas->flush();
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/text_shape"));
+  device->unlock();
+}
+
+/**
+ * 用例描述: 测试更新 Mask
+ */
+PAG_TEST(CanvasTest, updateMask) {
+  auto device = GLDevice::Make();
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto mask = Mask::Make(100, 100);
+  auto surface = Surface::Make(context, mask->width(), mask->height());
+  auto canvas = surface->getCanvas();
+  Path path;
+  path.addRect(Rect::MakeXYWH(10, 10, 10, 10));
+  mask->fillPath(path);
+  canvas->drawTexture(mask->updateTexture(context));
+  path.reset();
+  path.addRoundRect(Rect::MakeXYWH(22, 22, 10, 10), 3, 3);
+  mask->fillPath(path);
+  canvas->drawTexture(mask->updateTexture(context));
+  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/update_mask"));
   device->unlock();
 }
 }  // namespace tgfx

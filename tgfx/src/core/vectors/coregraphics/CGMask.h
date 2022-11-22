@@ -18,27 +18,14 @@
 
 #pragma once
 
-#include "tgfx/core/Mask.h"
-#include "tgfx/core/PixelBuffer.h"
+#include "core/PixelBufferMask.h"
 
 namespace tgfx {
-class CGMask : public Mask {
+class CGMask : public PixelBufferMask {
  public:
-  explicit CGMask(std::shared_ptr<PixelBuffer> buffer);
+  explicit CGMask(std::shared_ptr<PixelBuffer> buffer) : PixelBufferMask(std::move(buffer)) {
+  }
 
   void fillPath(const Path& path) override;
-
-  void clear() override;
-
-  std::shared_ptr<Texture> makeTexture(Context* context) const override {
-    return buffer->makeTexture(context);
-  }
-
-  std::shared_ptr<PixelBuffer> getBuffer() const {
-    return buffer;
-  }
-
- private:
-  std::shared_ptr<PixelBuffer> buffer = nullptr;
 };
 }  // namespace tgfx
