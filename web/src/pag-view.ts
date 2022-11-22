@@ -383,6 +383,13 @@ export class PAGView {
   public prepare() {
     return this.player.prepare();
   }
+  /**
+   * Returns a ImageBitmap object capturing the contents of the PAGView. Subsequent rendering of
+   * the PAGView will not be captured.
+   */
+  public makeSnapshot() {
+    return createImageBitmap(this.canvasElement!);
+  }
 
   public destroy() {
     this.clearTimer();
