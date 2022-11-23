@@ -3,6 +3,10 @@
  */
 export const VIDEO_DECODE_WAIT_FRAME = 3;
 /**
+ * VideoDecode seek timeout frame num.
+ */
+export const VIDEO_DECODE_SEEK_TIMEOUT_FRAME = 12;
+/**
  * NAL unit length. [ 0, 0, 0, 1 ]
  */
 export const NALU_HEADER_LENGTH = 4;
