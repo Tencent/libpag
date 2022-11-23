@@ -4,6 +4,7 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.graphics.Matrix;
 import android.graphics.SurfaceTexture;
 import android.graphics.drawable.Drawable;
@@ -808,6 +809,17 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         if (pagSurface != null) {
             pagSurface.freeCache();
         }
+    }
+
+    /**
+     * Returns a bitmap capturing the contents of the PAGView. Subsequent rendering of the
+     * PAGView will not be captured. Returns null if the PAGView hasn't been presented yet.
+     */
+    public Bitmap makeSnapshot() {
+        if (pagSurface != null) {
+            return pagSurface.makeSnapshot();
+        }
+        return null;
     }
 
     @Override

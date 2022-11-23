@@ -255,6 +255,10 @@ window.onload = async () => {
   document.getElementById('btn-freeCache')?.addEventListener('click', () => {
     pagView.freeCache();
   });
+  // freeCache
+  document.getElementById('btn-makeSnapshot')?.addEventListener('click', () => {
+    pagView.makeSnapshot().then((bitmap) => console.log('makeSnapshot:', bitmap));
+  });
 
   // cacheScale
   globalCacheScale = 1;
