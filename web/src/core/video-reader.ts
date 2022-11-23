@@ -1,4 +1,9 @@
-import { VIDEO_DECODE_WAIT_FRAME, VIDEO_PLAYBACK_RATE_MAX, VIDEO_PLAYBACK_RATE_MIN } from '../constant';
+import {
+  VIDEO_DECODE_WAIT_FRAME,
+  VIDEO_DECODE_SEEK_TIMEOUT_FRAME,
+  VIDEO_PLAYBACK_RATE_MAX,
+  VIDEO_PLAYBACK_RATE_MIN,
+} from '../constant';
 import { addListener, removeListener, removeAllListeners } from '../utils/video-listener';
 import { IPHONE, IS_WECHAT } from '../utils/ua';
 
@@ -24,17 +29,15 @@ const getWechatNetwork = () => {
 };
 
 const waitVideoCanPlay = (videoElement: HTMLVideoElement) => {
-  if (videoElement.readyState >= 2) return Promise.resolve(true);
   return new Promise((resolve) => {
     const canplayHandle = () => {
-      videoElement.removeEventListener('canplay', canplayHandle);
+      removeListener(videoElement, 'canplay', canplayHandle);
       clearTimeout(timer);
       resolve(true);
     };
-    videoElement.addEventListener('canplay', canplayHandle);
-    videoElement.load();
+    addListener(videoElement, 'canplay', canplayHandle);
     const timer = setTimeout(() => {
-      videoElement.removeEventListener('canplay', canplayHandle);
+      removeListener(videoElement, 'canplay', canplayHandle);
       resolve(false);
     }, 1000);
   });
@@ -43,9 +46,6 @@ const waitVideoCanPlay = (videoElement: HTMLVideoElement) => {
 const playVideoElement = async (videoElement: HTMLVideoElement) => {
   if (IS_WECHAT && window.WeixinJSBridge) {
     await getWechatNetwork();
-  }
-  if (videoElement.readyState < 2) {
-    await waitVideoCanPlay(videoElement);
   }
   if (document.visibilityState !== 'visible') {
     const visibilityHandle = () => {
@@ -79,10 +79,11 @@ export class VideoReader {
   private videoEl: HTMLVideoElement | null;
   private readonly frameRate: number;
   private lastVideoTime = -1;
-  private hadPlay = false;
+  private canplay = false;
   private staticTimeRanges: StaticTimeRanges;
   private lastPrepareTime: { frame: number; time: number }[] = [];
   private disablePlaybackRate = false;
+  private onCanplayHandle: () => void;
 
   public constructor(
     mp4Data: Uint8Array,
@@ -95,6 +96,9 @@ export class VideoReader {
     this.videoEl.style.display = 'none';
     this.videoEl.muted = true;
     this.videoEl.playsInline = true;
+    this.videoEl.preload = 'auto'; // use load() will make a bug on Chrome.
+    this.onCanplayHandle = this.onCanplay.bind(this);
+    addListener(this.videoEl, 'canplay', this.onCanplayHandle);
     addListener(this.videoEl, 'timeupdate', this.onTimeupdate.bind(this));
     this.frameRate = frameRate;
     const blob = new Blob([mp4Data], { type: 'video/mp4' });
@@ -115,25 +119,9 @@ export class VideoReader {
     const targetTime = targetFrame / this.frameRate;
     this.lastVideoTime = targetTime;
     if (currentTime === 0 && targetTime === 0) {
-      if (this.hadPlay) {
-        return true;
-      } else {
-        // Wait for initialization to complete
-        await playVideoElement(this.videoEl);
-        // Pause video at first frame.
-        await new Promise<void>((resolve) => {
-          window.requestAnimationFrame(() => {
-            if (!this.videoEl) {
-              console.error('Video Element is null!');
-            } else {
-              this.videoEl.pause();
-              this.hadPlay = true;
-            }
-            resolve();
-          });
-        });
-        return true;
-      }
+      if (this.canplay) return true;
+      await waitVideoCanPlay(this.videoEl);
+      return true;
     } else {
       if (Math.round(targetTime * this.frameRate) === Math.round(currentTime * this.frameRate)) {
         // Current frame
@@ -184,13 +172,13 @@ export class VideoReader {
     return new Promise<boolean>((resolve) => {
       let isCallback = false;
       let timer: any = null;
-      const canplayCallback = async () => {
+      const seekCallback = async () => {
         if (!this.videoEl) {
           console.error('Video element is null!');
           resolve(false);
           return;
         }
-        removeListener(this.videoEl, 'seeked', canplayCallback);
+        removeListener(this.videoEl, 'seeked', seekCallback);
         if (play && this.videoEl.paused) {
           await playVideoElement(this.videoEl);
         } else if (!play && !this.videoEl.paused) {
@@ -206,7 +194,7 @@ export class VideoReader {
         resolve(false);
         return;
       }
-      addListener(this.videoEl, 'seeked', canplayCallback);
+      addListener(this.videoEl, 'seeked', seekCallback);
       this.videoEl!.currentTime = targetTime;
       // Timeout
       timer = setTimeout(() => {
@@ -216,7 +204,7 @@ export class VideoReader {
             resolve(false);
             return;
           } else {
-            removeListener(this.videoEl, 'seeked', canplayCallback);
+            removeListener(this.videoEl, 'seeked', seekCallback);
             if (play && this.videoEl.paused) {
               playVideoElement(this.videoEl);
             } else if (!play && !this.videoEl.paused) {
@@ -225,7 +213,7 @@ export class VideoReader {
             resolve(false);
           }
         }
-      }, (1000 / this.frameRate) * VIDEO_DECODE_WAIT_FRAME);
+      }, (1000 / this.frameRate) * VIDEO_DECODE_SEEK_TIMEOUT_FRAME);
     });
   }
 
@@ -250,6 +238,11 @@ export class VideoReader {
     let playbackRate = 1000 / this.frameRate / distance;
     playbackRate = Math.min(Math.max(playbackRate, VIDEO_PLAYBACK_RATE_MIN), VIDEO_PLAYBACK_RATE_MAX);
     this.videoEl!.playbackRate = playbackRate;
+  }
+
+  private onCanplay() {
+    this.canplay = true;
+    removeListener(this.videoEl!, 'canplay', this.onCanplayHandle);
   }
 }
 

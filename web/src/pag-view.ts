@@ -452,6 +452,8 @@ export class PAGView {
     }
     this.player.setProgress((this.playTime % duration) / duration);
     const res = await this.flush();
+    // Decoding BMP takes too much time and makes the video reader seek repeatedly.
+    this.startTime = this.getNowTime() * 1000 - this.playTime;
     this.playFrame = playFrame;
     this.repeatedTimes = count;
     this.flushingNextFrame = false;
