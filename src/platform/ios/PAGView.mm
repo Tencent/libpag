@@ -482,4 +482,11 @@ void DestoryFlushQueue() {
 - (void)applicationWillResignActive:(NSNotification*)notification {
   self.isInBackground = TRUE;
 }
+
+- (CVPixelBufferRef)makeSnapshot {
+    if (pagSurface != nil) {
+        return [pagSurface makeSnapshot];
+    }
+    return nil;
+}
 @end
