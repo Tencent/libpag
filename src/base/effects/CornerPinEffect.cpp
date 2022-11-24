@@ -16,9 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <set>
 #include "base/utils/Verify.h"
 #include "pag/file.h"
-#include <set>
 
 namespace pag {
 CornerPinEffect::~CornerPinEffect() {

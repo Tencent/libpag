@@ -25,8 +25,8 @@ namespace tgfx {
 class FillRectOp : public DrawOp {
  public:
   static std::unique_ptr<FillRectOp> Make(std::optional<Color> color, const Rect& rect,
-                                            const Matrix& viewMatrix,
-                                            const Matrix& localMatrix = Matrix::I());
+                                          const Matrix& viewMatrix,
+                                          const Matrix& localMatrix = Matrix::I());
 
   bool add(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
            const Matrix& localMatrix);
@@ -37,7 +37,7 @@ class FillRectOp : public DrawOp {
   DEFINE_OP_CLASS_ID
 
   FillRectOp(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
-               const Matrix& localMatrix);
+             const Matrix& localMatrix);
 
   bool onCombineIfPossible(Op* op) override;
 

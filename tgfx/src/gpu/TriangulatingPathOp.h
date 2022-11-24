@@ -26,11 +26,11 @@ namespace tgfx {
 class TriangulatingPathOp : public DrawOp {
  public:
   static std::unique_ptr<TriangulatingPathOp> Make(Color color, const Path& path, Rect clipBounds,
-                                                     const Matrix& localMatrix);
+                                                   const Matrix& localMatrix);
 
   TriangulatingPathOp(Color color, std::shared_ptr<BufferProvider> bufferProvider, Rect bounds,
-                        const Matrix& viewMatrix = Matrix::I(),
-                        const Matrix& localMatrix = Matrix::I());
+                      const Matrix& viewMatrix = Matrix::I(),
+                      const Matrix& localMatrix = Matrix::I());
 
   void execute(OpsRenderPass* opsRenderPass) override;
 
