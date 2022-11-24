@@ -32,5 +32,6 @@ export class ArrayBufferImage {
       gl.UNSIGNED_BYTE,
       new Uint8Array(this.buffer),
     );
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
   }
 }
