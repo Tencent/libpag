@@ -13,16 +13,21 @@ export class WebMask extends NativeWebMask {
     const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
     const ctx = this.canvas.getContext('2d') as OffscreenCanvasRenderingContext2D;
     const imgData = ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
-    gl.texImage2D(
+    const alphaData = imgData.data.reduce((acc, cur, idx) => {
+      if (idx % 4 === 3) acc.push(cur);
+      return acc;
+    }, [] as number[]);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texSubImage2D(
       gl.TEXTURE_2D,
       0,
-      gl.RGBA,
+      0,
+      0,
       imgData.width,
       imgData.height,
-      0,
-      gl.RGBA,
+      gl.ALPHA,
       gl.UNSIGNED_BYTE,
-      new Uint8Array(imgData.data),
+      new Uint8Array(alphaData),
     );
   }
 

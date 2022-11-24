@@ -21,13 +21,14 @@ export class ArrayBufferImage {
   public upload(GL: EmscriptenGL) {
     const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
-    gl.texImage2D(
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+    gl.texSubImage2D(
       gl.TEXTURE_2D,
       0,
-      gl.RGBA,
+      0,
+      0,
       this._width,
       this._height,
-      0,
       gl.RGBA,
       gl.UNSIGNED_BYTE,
       new Uint8Array(this.buffer),

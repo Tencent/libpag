@@ -146,7 +146,8 @@ export class VideoReader {
     if (!this.videoEl || this.videoEl.readyState < 2) return;
     const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
     gl.bindTexture(gl.TEXTURE_2D, GL.textures[textureID]);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.videoEl);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, this.videoEl);
   }
 
   public onDestroy() {
