@@ -53,7 +53,7 @@ export class PAGView {
     if (!canvasElement) throw new Error('Canvas is not found!');
 
     const pagPlayer = PAGModule.PAGPlayer.create();
-    const pagView = new PAGView(pagPlayer, canvasElement, file);
+    const pagView = new PAGView(pagPlayer, canvasElement);
     pagView.pagViewOptions = { ...pagView.pagViewOptions, ...initOptions };
 
     if (pagView.pagViewOptions.useCanvas2D) {
@@ -124,19 +124,17 @@ export class PAGView {
     flushTime: 0,
   };
   private fpsBuffer: number[] = [];
-  private file: PAGComposition;
 
-  public constructor(pagPlayer: PAGPlayer, canvasElement: HTMLCanvasElement | OffscreenCanvas, file: PAGComposition) {
+  public constructor(pagPlayer: PAGPlayer, canvasElement: HTMLCanvasElement | OffscreenCanvas) {
     this.player = pagPlayer;
     this.canvasElement = canvasElement;
-    this.file = file;
   }
 
   /**
    * The duration of current composition in microseconds.
    */
   public duration() {
-    return this.file.duration();
+    return this.player.duration();
   }
   /**
    * Adds a listener to the set of listeners that are sent events through the life of an animation,
