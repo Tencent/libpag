@@ -23,14 +23,14 @@ namespace pag {
 std::string Performance::getPerformanceString() const {
   char buffer[300];
   snprintf(buffer, 300,
-          "%6.1fms[Render] %6.1fms[Image] %6.1fms[Video]"
-          " %6.1fms[Texture] %6.1fms[Program] %6.1fms[Present] ",
-          static_cast<double>(renderingTime) / 1000.0,
-          static_cast<double>(imageDecodingTime) / 1000.0,
-          static_cast<double>(softwareDecodingTime + hardwareDecodingTime) / 1000.0,
-          static_cast<double>(textureUploadingTime) / 1000.0,
-          static_cast<double>(programCompilingTime) / 1000.0,
-          static_cast<double>(presentingTime) / 1000.0);
+           "%6.1fms[Render] %6.1fms[Image] %6.1fms[Video]"
+           " %6.1fms[Texture] %6.1fms[Program] %6.1fms[Present] ",
+           static_cast<double>(renderingTime) / 1000.0,
+           static_cast<double>(imageDecodingTime) / 1000.0,
+           static_cast<double>(softwareDecodingTime + hardwareDecodingTime) / 1000.0,
+           static_cast<double>(textureUploadingTime) / 1000.0,
+           static_cast<double>(programCompilingTime) / 1000.0,
+           static_cast<double>(presentingTime) / 1000.0);
   return buffer;
 }
 
