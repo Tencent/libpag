@@ -40,7 +40,7 @@ export class PAGView extends NativePAGView {
     initOptions: PAGViewOptions = {},
   ): Promise<PAGView> {
     const pagPlayer = PAGModule.PAGPlayer.create();
-    const pagView = new PAGView(pagPlayer, canvas, file);
+    const pagView = new PAGView(pagPlayer, canvas);
     pagView.pagViewOptions = { ...pagView.pagViewOptions, ...initOptions };
     pagView.resetSize();
     pagView.renderCanvas = RenderCanvas.from(canvas, { alpha: true });
