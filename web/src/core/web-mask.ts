@@ -103,7 +103,8 @@ export class WebMask {
 
   public update(GL: EmscriptenGL) {
     const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.ALPHA, gl.ALPHA, gl.UNSIGNED_BYTE, this.canvas);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.ALPHA, gl.UNSIGNED_BYTE, this.canvas);
   }
 
   public onDestroy() {
