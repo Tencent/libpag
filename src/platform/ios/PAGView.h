@@ -49,26 +49,6 @@
  */
 - (void)onAnimationUpdate:(PAGView*)pagView;
 
-/**
- * Notifies the start of the animation.
- */
-- (void)onAnimationStart DEPRECATED_MSG_ATTRIBUTE("Please use onAnimationStart:pagView instead");
-
-/**
- * Notifies the end of the animation.
- */
-- (void)onAnimationEnd DEPRECATED_MSG_ATTRIBUTE("Please use onAnimationEnd:pagView instead");
-
-/**
- * Notifies the cancellation of the animation.
- */
-- (void)onAnimationCancel DEPRECATED_MSG_ATTRIBUTE("Please use onAnimationCancel:pagView instead");
-
-/**
- * Notifies the repetition of the animation.
- */
-- (void)onAnimationRepeat DEPRECATED_MSG_ATTRIBUTE("Please use onAnimationRepeat:pagView instead");
-
 @end
 
 PAG_API @interface PAGView : UIView
