@@ -152,9 +152,6 @@
     if ([listener respondsToSelector:@selector(onAnimationStart:)]) {
       [listener onAnimationStart:self];
     }
-    if ([listener respondsToSelector:@selector(onAnimationStart)]) {
-      [listener onAnimationStart];
-    }
   }
   [copiedListeners release];
 }
@@ -167,9 +164,6 @@
     if ([listener respondsToSelector:@selector(onAnimationEnd:)]) {
       [listener onAnimationEnd:self];
     }
-    if ([listener respondsToSelector:@selector(onAnimationEnd)]) {
-      [listener onAnimationEnd];
-    }
   }
   [copiedListeners release];
 }
@@ -181,9 +175,6 @@
     if ([listener respondsToSelector:@selector(onAnimationCancel:)]) {
       [listener onAnimationCancel:self];
     }
-    if ([listener respondsToSelector:@selector(onAnimationCancel)]) {
-      [listener onAnimationCancel];
-    }
   }
   [copiedListeners release];
 }
@@ -194,9 +185,6 @@
     id<PAGViewListener> listener = (id<PAGViewListener>)item;
     if ([listener respondsToSelector:@selector(onAnimationRepeat:)]) {
       [listener onAnimationRepeat:self];
-    }
-    if ([listener respondsToSelector:@selector(onAnimationRepeat)]) {
-      [listener onAnimationRepeat];
     }
   }
   [copiedListeners release];
