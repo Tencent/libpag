@@ -3,7 +3,7 @@ import { AudioPlayer } from './module/audio-player';
 
 import type { PAGFile } from '../src/pag-file';
 import type { PAGView } from '../src/pag-view';
-import type { PAG as PAGNamespace, ParagraphJustification } from '../src/types';
+import type { PAG as PAGNamespace } from '../src/types';
 import type { PAGComposition } from '../src/pag-composition';
 import type { PAGImageLayer } from '../src/pag-image-layer';
 
@@ -405,8 +405,6 @@ const createPAGView = async (file: File | ArrayBuffer | Blob) => {
     performance.now() - decodeTime,
   )}ms`;
   const pagCanvas = document.getElementById('pag') as HTMLCanvasElement;
-  // pagCanvas.width = canvasElementSize;
-  // pagCanvas.height = canvasElementSize;
   const initializedTime = performance.now();
   pagView = (await PAG.PAGView.init(pagFile, pagCanvas)) as PAGView;
   document.getElementById('initialized-time')!.innerText = `PAG View initialized time: ${Math.floor(
@@ -414,28 +412,28 @@ const createPAGView = async (file: File | ArrayBuffer | Blob) => {
   )}ms`;
   pagView.setRepeatCount(0);
   // 绑定事件监听
-  pagView.addListener(types.PAGViewListenerEvent.onAnimationStart, (event) => {
+  pagView.addListener('onAnimationStart', (event) => {
     console.log('onAnimationStart', event);
   });
-  pagView.addListener(types.PAGViewListenerEvent.onAnimationEnd, (event) => {
+  pagView.addListener('onAnimationEnd', (event) => {
     console.log('onAnimationEnd', event);
   });
-  pagView.addListener(types.PAGViewListenerEvent.onAnimationCancel, (event) => {
+  pagView.addListener('onAnimationCancel', (event) => {
     console.log('onAnimationCancel', event);
   });
-  pagView.addListener(types.PAGViewListenerEvent.onAnimationRepeat, (event) => {
+  pagView.addListener('onAnimationRepeat', (event) => {
     console.log('onAnimationRepeat', event);
     audioEl.stop();
     audioEl.play();
   });
-  pagView.addListener(types.PAGViewListenerEvent.onAnimationUpdate, (event) => {
+  pagView.addListener('onAnimationUpdate', (event) => {
     console.log('onAnimationUpdate', event);
     document.getElementById('fps')!.innerText = `PAG View FPS: ${pagView.getDebugData().FPS}`;
   });
-  pagView.addListener(types.PAGViewListenerEvent.onAnimationPlay, (event) => {
+  pagView.addListener('onAnimationPlay', (event) => {
     console.log('onAnimationPlay', event);
   });
-  pagView.addListener(types.PAGViewListenerEvent.onAnimationPause, (event) => {
+  pagView.addListener('onAnimationPause', (event) => {
     console.log('onAnimationPause', event);
   });
   document.getElementById('control')!.style.display = '';

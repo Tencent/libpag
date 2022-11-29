@@ -1,4 +1,4 @@
-import { DebugData, PAGScaleMode, PAGViewListenerEvent } from './types';
+import { DebugData, PAGScaleMode, PAGViewEventMap, PAGViewListenerEvent } from './types';
 import { PAGPlayer } from './pag-player';
 import { EventManager, Listener } from './utils/event-manager';
 import { PAGSurface } from './pag-surface';
@@ -114,7 +114,7 @@ export class PAGView {
   protected playTime = 0;
   protected startTime = 0;
   protected repeatedTimes = 0;
-  protected eventManager: EventManager = new EventManager();
+  protected eventManager: EventManager<PAGViewEventMap, PAGView> = new EventManager();
 
   private canvasContext: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null | undefined;
   private rawWidth = 0;
@@ -140,13 +140,13 @@ export class PAGView {
    * Adds a listener to the set of listeners that are sent events through the life of an animation,
    * such as start, repeat, and end.
    */
-  public addListener(eventName: PAGViewListenerEvent, listener: Listener) {
+  public addListener<K extends keyof PAGViewEventMap>(eventName: K, listener: Listener<PAGViewEventMap[K]>) {
     return this.eventManager.on(eventName, listener);
   }
   /**
    * Removes a listener from the set listening to this animation.
    */
-  public removeListener(eventName: PAGViewListenerEvent, listener?: Listener) {
+  public removeListener<K extends keyof PAGViewEventMap>(eventName: K, listener?: Listener<PAGViewEventMap[K]>) {
     return this.eventManager.off(eventName, listener);
   }
   /**
@@ -155,11 +155,11 @@ export class PAGView {
   public async play() {
     if (this.isPlaying) return;
     if (this.playTime === 0) {
-      this.eventManager.emit(PAGViewListenerEvent.onAnimationStart, this);
+      this.eventManager.emit('onAnimationStart', this);
     }
-    this.eventManager.emit(PAGViewListenerEvent.onAnimationPlay, this);
+    this.eventManager.emit('onAnimationPlay', this);
     if (this.currentFrame === 0) {
-      this.eventManager.emit(PAGViewListenerEvent.onAnimationUpdate, this);
+      this.eventManager.emit('onAnimationUpdate', this);
     }
     this.isPlaying = true;
     this.startTime = this.getNowTime() * 1000 - this.playTime;
@@ -172,7 +172,7 @@ export class PAGView {
     if (!this.isPlaying) return;
     this.clearTimer();
     this.isPlaying = false;
-    this.eventManager.emit(PAGViewListenerEvent.onAnimationPause, this);
+    this.eventManager.emit('onAnimationPause', this);
   }
   /**
    * Stop the animation.
@@ -185,7 +185,7 @@ export class PAGView {
     await this.flush();
     this.isPlaying = false;
     if (notification) {
-      this.eventManager.emit(PAGViewListenerEvent.onAnimationCancel, this);
+      this.eventManager.emit('onAnimationCancel', this);
     }
   }
   /**
@@ -309,9 +309,9 @@ export class PAGView {
       this.setDebugData({ flushTime: clock.measure('', 'flush') });
       this.updateFPS();
     });
-    this.eventManager.emit(PAGViewListenerEvent.onAnimationUpdate, this);
+    this.eventManager.emit('onAnimationUpdate', this);
     if (res) {
-      this.eventManager.emit(PAGViewListenerEvent.onAnimationFlushed, this);
+      this.eventManager.emit('onAnimationFlushed', this);
     }
     return res;
   }
@@ -432,7 +432,7 @@ export class PAGView {
       this.isPlaying = false;
       this.repeatedTimes = 0;
       this.flushingNextFrame = false;
-      this.eventManager.emit(PAGViewListenerEvent.onAnimationEnd, this);
+      this.eventManager.emit('onAnimationEnd', this);
       return true;
     }
     if (this.repeatedTimes === count && this.currentFrame === currentFrame) {
@@ -440,7 +440,7 @@ export class PAGView {
       return false;
     }
     if (this.repeatedTimes < count) {
-      this.eventManager.emit(PAGViewListenerEvent.onAnimationRepeat, this);
+      this.eventManager.emit('onAnimationRepeat', this);
     }
     this.player.setProgress((this.playTime % duration) / duration);
     const res = await this.flush();
