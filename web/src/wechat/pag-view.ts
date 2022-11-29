@@ -103,13 +103,13 @@ export class PAGView extends NativePAGView {
       await this.flush();
       this.playTime = 0;
       this.isPlaying = false;
-      this.eventManager.emit(PAGViewListenerEvent.onAnimationEnd, this);
+      this.eventManager.emit('onAnimationEnd', this);
       this.repeatedTimes = 0;
       this.flushingNextFrame = false;
       return true;
     }
     if (this.repeatedTimes < count) {
-      this.eventManager.emit(PAGViewListenerEvent.onAnimationRepeat, this);
+      this.eventManager.emit('onAnimationRepeat', this);
     }
     this.player.setProgress((this.playTime % duration) / duration);
     const res = await this.flush();
