@@ -170,6 +170,7 @@ export const enum PAGScaleMode {
   Zoom = 3,
 }
 
+// [Deprecated]
 export const enum PAGViewListenerEvent {
   /**
    * Notifies the start of the animation.
@@ -200,9 +201,46 @@ export const enum PAGViewListenerEvent {
    */
   onAnimationPause = 'onAnimationPause',
   /**
+   * [Deprecated]
    * Notifies the flushed of the animation.
    */
   onAnimationFlushed = 'onAnimationFlushed',
+}
+
+export interface PAGViewEventMap {
+  /**
+   * Notifies the start of the animation.
+   */
+  onAnimationStart: PAGView;
+  /**
+   * Notifies the end of the animation.
+   */
+  onAnimationEnd: PAGView;
+  /**
+   * Notifies the cancellation of the animation.
+   */
+  onAnimationCancel: PAGView;
+  /**
+   * Notifies the repetition of the animation.
+   */
+  onAnimationRepeat: PAGView;
+  /**
+   * Notifies the update of the animation.
+   */
+  onAnimationUpdate: PAGView;
+  /**
+   * Notifies the play of the animation.
+   */
+  onAnimationPlay: PAGView;
+  /**
+   * Notifies the pause of the animation.
+   */
+  onAnimationPause: PAGView;
+  /**
+   * [Deprecated]
+   * Notifies the flushed of the animation.
+   */
+  onAnimationFlushed: PAGView;
 }
 
 export const enum ParagraphJustification {
