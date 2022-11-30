@@ -25,17 +25,6 @@
 #include "rendering/sequences/SequenceProxy.h"
 
 namespace pag {
-static std::shared_ptr<Graphic> MakeVideoSequenceGraphic(VideoSequence* sequence,
-                                                         Frame contentFrame) {
-  auto factory = std::make_unique<SequenceReaderFactory>(sequence);
-  auto proxy = new SequenceProxy(sequence->getVideoWidth(), sequence->getVideoHeight(),
-                                 std::move(factory), contentFrame);
-  tgfx::RGBAAALayout layout = {sequence->width, sequence->height, sequence->alphaStartX,
-                               sequence->alphaStartY};
-  return Picture::MakeFrom(sequence->composition->uniqueID, std::unique_ptr<SequenceProxy>(proxy),
-                           layout);
-}
-
 std::shared_ptr<Graphic> RenderVectorComposition(VectorComposition* composition,
                                                  Frame compositionFrame) {
   Recorder recorder = {};
@@ -73,11 +62,15 @@ std::shared_ptr<Graphic> RenderSequenceComposition(Composition* composition,
   auto sequenceFrame = sequence->toSequenceFrame(compositionFrame);
   std::shared_ptr<Graphic> graphic = nullptr;
   if (composition->type() == CompositionType::Video) {
-    graphic = MakeVideoSequenceGraphic(static_cast<VideoSequence*>(sequence), sequenceFrame);
+    auto videoSequence = static_cast<VideoSequence*>(sequence);
+    auto proxy = new SequenceProxy(videoSequence->getVideoWidth(), videoSequence->getVideoHeight(),
+                                   sequence, sequenceFrame);
+    tgfx::RGBAAALayout layout = {sequence->width, sequence->height, videoSequence->alphaStartX,
+                                 videoSequence->alphaStartY};
+    graphic = Picture::MakeFrom(sequence->composition->uniqueID,
+                                std::unique_ptr<SequenceProxy>(proxy), layout);
   } else {
-    auto factory = std::make_unique<SequenceReaderFactory>(sequence);
-    auto proxy =
-        new SequenceProxy(sequence->width, sequence->height, std::move(factory), sequenceFrame);
+    auto proxy = new SequenceProxy(sequence->width, sequence->height, sequence, sequenceFrame);
     graphic =
         Picture::MakeFrom(sequence->composition->uniqueID, std::unique_ptr<SequenceProxy>(proxy));
   }

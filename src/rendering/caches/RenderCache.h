@@ -33,7 +33,7 @@
 #include "rendering/graphics/Shape.h"
 #include "rendering/graphics/Snapshot.h"
 #include "rendering/layers/PAGStage.h"
-#include "rendering/sequences/SequenceReaderFactory.h"
+#include "rendering/sequences/SequenceReader.h"
 #include "tgfx/gpu/Device.h"
 
 namespace pag {
@@ -125,10 +125,9 @@ class RenderCache : public Performance {
 
   void setVideoEnabled(bool value);
 
-  void prepareSequenceReader(const SequenceReaderFactory* factory, Frame targetFrame);
+  void prepareSequence(Sequence* sequence, Frame targetFrame);
 
-  std::shared_ptr<tgfx::Texture> getSequenceFrame(const SequenceReaderFactory* factory,
-                                                  Frame targetFrame);
+  std::shared_ptr<tgfx::Texture> getSequenceFrame(Sequence* sequence, Frame targetFrame);
 
   LayerFilter* getFilterCache(LayerStyle* layerStyle);
 
@@ -196,7 +195,8 @@ class RenderCache : public Performance {
   void prepareLayers(int64_t timeDistance = DECODING_VISIBLE_DISTANCE);
   void preparePreComposeLayer(PreComposeLayer* layer);
   void prepareImageLayer(PAGImageLayer* layer);
-  SequenceReader* getSequenceReader(const SequenceReaderFactory* factory);
+  SequenceReader* getSequenceReader(Sequence* sequence);
+  std::unique_ptr<SequenceReader> makeSequenceReader(Sequence* sequence);
   Snapshot* makeSnapshot(float scaleFactor, const std::function<Snapshot*()>& maker);
   void moveSnapshotToHead(Snapshot* snapshot);
   void removeSnapshotFromLRU(Snapshot* snapshot);

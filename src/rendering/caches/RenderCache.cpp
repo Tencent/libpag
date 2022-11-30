@@ -23,7 +23,15 @@
 #include "rendering/caches/ImageContentCache.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/renderers/FilterRenderer.h"
+#include "rendering/sequences/BitmapSequenceReader.h"
+#include "rendering/sequences/VideoReader.h"
+#include "rendering/sequences/VideoSequenceDemuxer.h"
+#include "rendering/video/VideoDecoder.h"
 #include "tgfx/core/Clock.h"
+
+#ifdef PAG_BUILD_FOR_WEB
+#include "platform/web/VideoSequenceReader.h"
+#endif
 
 namespace pag {
 // 300M设置的大一些用于兜底，通常在大于20M时就开始随时清理。
@@ -135,8 +143,7 @@ void RenderCache::preparePreComposeLayer(PreComposeLayer* layer) {
     result->second->pendingFirstFrame = targetFrame;
     return;
   }
-  SequenceReaderFactory factory(sequence);
-  auto reader = getSequenceReader(&factory);
+  auto reader = getSequenceReader(sequence);
   if (reader) {
     reader->prepare(targetFrame);
   }
@@ -513,34 +520,36 @@ void RenderCache::clearExpiredBitmaps() {
 
 //===================================== sequence caches =====================================
 
-void RenderCache::prepareSequenceReader(const SequenceReaderFactory* factory, Frame targetFrame) {
-  if (factory == nullptr) {
+void RenderCache::prepareSequence(Sequence* sequence, Frame targetFrame) {
+  if (sequence == nullptr) {
     return;
   }
-  if (factory->staticContent() && hasSnapshot(factory->assetID())) {
+  auto composition = sequence->composition;
+  if (composition->staticContent() && hasSnapshot(composition->uniqueID)) {
     // 静态的序列帧采用位图的缓存逻辑，如果上层缓存过 Snapshot 就不需要预测。
     return;
   }
-  auto reader = getSequenceReader(factory);
+  auto reader = getSequenceReader(sequence);
   if (reader) {
     reader->prepare(targetFrame);
   }
 }
 
-std::shared_ptr<tgfx::Texture> RenderCache::getSequenceFrame(const SequenceReaderFactory* factory,
+std::shared_ptr<tgfx::Texture> RenderCache::getSequenceFrame(Sequence* sequence,
                                                              Frame targetFrame) {
-  if (factory == nullptr) {
+  if (sequence == nullptr) {
     return nullptr;
   }
-  auto reader = getSequenceReader(factory);
+  auto reader = getSequenceReader(sequence);
   if (reader == nullptr) {
     return nullptr;
   }
+  auto composition = sequence->composition;
   auto texture = reader->readTexture(targetFrame, this);
-  if (factory->staticContent()) {
+  if (composition->staticContent()) {
     // There is no need to cache a reader for the static sequence, it has already been cached as
     // a snapshot. We get here because the reader was created by prepare() methods.
-    auto result = sequenceCaches.find(factory->assetID());
+    auto result = sequenceCaches.find(composition->uniqueID);
     if (result != sequenceCaches.end()) {
       delete result->second;
       sequenceCaches.erase(result);
@@ -549,14 +558,15 @@ std::shared_ptr<tgfx::Texture> RenderCache::getSequenceFrame(const SequenceReade
   return texture;
 }
 
-SequenceReader* RenderCache::getSequenceReader(const SequenceReaderFactory* factory) {
-  if (factory == nullptr) {
+SequenceReader* RenderCache::getSequenceReader(Sequence* sequence) {
+  if (sequence == nullptr) {
     return nullptr;
   }
-  if (!_videoEnabled && factory->isVideo()) {
+  auto composition = sequence->composition;
+  if (!_videoEnabled && composition->type() == CompositionType::Video) {
     return nullptr;
   }
-  auto assetID = factory->assetID();
+  auto assetID = composition->uniqueID;
   usedAssets.insert(assetID);
   SequenceReader* reader = nullptr;
   auto result = sequenceCaches.find(assetID);
@@ -564,13 +574,29 @@ SequenceReader* RenderCache::getSequenceReader(const SequenceReaderFactory* fact
     reader = result->second;
   }
   if (reader == nullptr) {
-    auto file = stage->getFileFromReferenceMap(assetID);
-    reader = factory->makeReader(file).release();
+    reader = makeSequenceReader(sequence).release();
     if (reader) {
       sequenceCaches[assetID] = reader;
     }
   }
   return reader;
+}
+
+std::unique_ptr<SequenceReader> RenderCache::makeSequenceReader(Sequence* sequence) {
+  auto file = stage->getFileFromReferenceMap(sequence->composition->uniqueID);
+  if (sequence->composition->type() == CompositionType::Bitmap) {
+    return std::make_unique<BitmapSequenceReader>(file, static_cast<BitmapSequence*>(sequence));
+  }
+  auto videoSequence = static_cast<VideoSequence*>(sequence);
+
+#ifdef PAG_BUILD_FOR_WEB
+  if (!VideoDecoder::HasExternalSoftwareDecoder()) {
+    return std::make_unique<VideoSequenceReader>(file, videoSequence);
+  }
+#endif
+
+  auto demuxer = std::make_unique<VideoSequenceDemuxer>(file, videoSequence);
+  return std::make_unique<VideoReader>(std::move(demuxer));
 }
 
 void RenderCache::clearAllSequenceCaches() {

@@ -20,7 +20,8 @@
 
 #include <emscripten/val.h>
 #include <pag/gpu.h>
-#include "rendering/sequences/SequenceReaderFactory.h"
+#include "pag/file.h"
+#include "rendering/sequences/SequenceReader.h"
 #include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace pag {
