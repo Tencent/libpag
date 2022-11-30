@@ -43,20 +43,20 @@ bool SequenceReaderFactory::isVideo() const {
   return sequence->composition->type() == CompositionType::Video;
 }
 
-std::shared_ptr<SequenceReader> SequenceReaderFactory::makeReader(
+std::unique_ptr<SequenceReader> SequenceReaderFactory::makeReader(
     std::shared_ptr<File> file) const {
   if (sequence->composition->type() == CompositionType::Bitmap) {
-    return std::make_shared<BitmapSequenceReader>(file, static_cast<BitmapSequence*>(sequence));
+    return std::make_unique<BitmapSequenceReader>(file, static_cast<BitmapSequence*>(sequence));
   }
   auto videoSequence = static_cast<VideoSequence*>(sequence);
 
 #ifdef PAG_BUILD_FOR_WEB
   if (!VideoDecoder::HasExternalSoftwareDecoder()) {
-    return std::make_shared<VideoSequenceReader>(file, videoSequence);
+    return std::make_unique<VideoSequenceReader>(file, videoSequence);
   }
 #endif
 
   auto demuxer = std::make_unique<VideoSequenceDemuxer>(file, videoSequence);
-  return std::make_shared<VideoReader>(std::move(demuxer));
+  return std::make_unique<VideoReader>(std::move(demuxer));
 }
 }  // namespace pag

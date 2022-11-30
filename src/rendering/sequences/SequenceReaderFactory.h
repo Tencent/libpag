@@ -36,7 +36,7 @@ class SequenceReaderFactory {
 
   virtual bool isVideo() const;
 
-  virtual std::shared_ptr<SequenceReader> makeReader(std::shared_ptr<File> file) const;
+  virtual std::unique_ptr<SequenceReader> makeReader(std::shared_ptr<File> file) const;
 
  private:
   Sequence* sequence = nullptr;

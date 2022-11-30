@@ -29,10 +29,6 @@ void SequenceProxy::prepare(RenderCache* cache) const {
 }
 
 std::shared_ptr<tgfx::Texture> SequenceProxy::getTexture(RenderCache* cache) const {
-  auto reader = static_cast<RenderCache*>(cache)->getSequenceReader(factory.get());
-  if (reader) {
-    return reader->readTexture(targetFrame, static_cast<RenderCache*>(cache));
-  }
-  return nullptr;
+  return static_cast<RenderCache*>(cache)->getSequenceFrame(factory.get(), targetFrame);
 }
 }  // namespace pag

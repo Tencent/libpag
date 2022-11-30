@@ -127,7 +127,8 @@ class RenderCache : public Performance {
 
   void prepareSequenceReader(const SequenceReaderFactory* factory, Frame targetFrame);
 
-  std::shared_ptr<SequenceReader> getSequenceReader(const SequenceReaderFactory* factory);
+  std::shared_ptr<tgfx::Texture> getSequenceFrame(const SequenceReaderFactory* factory,
+                                                  Frame targetFrame);
 
   LayerFilter* getFilterCache(LayerStyle* layerStyle);
 
@@ -160,7 +161,7 @@ class RenderCache : public Performance {
   std::list<Snapshot*> snapshotLRU = {};
   std::unordered_map<ID, TextAtlas*> textAtlases = {};
   std::unordered_map<ID, std::shared_ptr<Task>> imageTasks;
-  std::unordered_map<ID, std::shared_ptr<SequenceReader>> sequenceCaches;
+  std::unordered_map<ID, SequenceReader*> sequenceCaches;
   std::unordered_map<ID, Filter*> filterCaches;
   MotionBlurFilter* motionBlurFilter = nullptr;
   std::unordered_map<ID, std::unordered_map<tgfx::Path, Snapshot*, tgfx::PathHash>> pathCaches;
@@ -195,7 +196,7 @@ class RenderCache : public Performance {
   void prepareLayers(int64_t timeDistance = DECODING_VISIBLE_DISTANCE);
   void preparePreComposeLayer(PreComposeLayer* layer);
   void prepareImageLayer(PAGImageLayer* layer);
-  std::shared_ptr<SequenceReader> getSequenceReaderInternal(const SequenceReaderFactory* factory);
+  SequenceReader* getSequenceReader(const SequenceReaderFactory* factory);
   Snapshot* makeSnapshot(float scaleFactor, const std::function<Snapshot*()>& maker);
   void moveSnapshotToHead(Snapshot* snapshot);
   void removeSnapshotFromLRU(Snapshot* snapshot);

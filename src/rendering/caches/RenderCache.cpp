@@ -136,7 +136,7 @@ void RenderCache::preparePreComposeLayer(PreComposeLayer* layer) {
     return;
   }
   SequenceReaderFactory factory(sequence);
-  auto reader = getSequenceReaderInternal(&factory);
+  auto reader = getSequenceReader(&factory);
   if (reader) {
     reader->prepare(targetFrame);
   }
@@ -521,28 +521,35 @@ void RenderCache::prepareSequenceReader(const SequenceReaderFactory* factory, Fr
     // 静态的序列帧采用位图的缓存逻辑，如果上层缓存过 Snapshot 就不需要预测。
     return;
   }
-  auto reader = getSequenceReaderInternal(factory);
+  auto reader = getSequenceReader(factory);
   if (reader) {
     reader->prepare(targetFrame);
   }
 }
 
-std::shared_ptr<SequenceReader> RenderCache::getSequenceReader(
-    const SequenceReaderFactory* factory) {
+std::shared_ptr<tgfx::Texture> RenderCache::getSequenceFrame(const SequenceReaderFactory* factory,
+                                                             Frame targetFrame) {
   if (factory == nullptr) {
     return nullptr;
   }
-  auto reader = getSequenceReaderInternal(factory);
-  if (reader && factory->staticContent()) {
+  auto reader = getSequenceReader(factory);
+  if (reader == nullptr) {
+    return nullptr;
+  }
+  auto texture = reader->readTexture(targetFrame, this);
+  if (factory->staticContent()) {
     // There is no need to cache a reader for the static sequence, it has already been cached as
     // a snapshot. We get here because the reader was created by prepare() methods.
-    sequenceCaches.erase(factory->assetID());
+    auto result = sequenceCaches.find(factory->assetID());
+    if (result != sequenceCaches.end()) {
+      delete result->second;
+      sequenceCaches.erase(result);
+    }
   }
-  return reader;
+  return texture;
 }
 
-std::shared_ptr<SequenceReader> RenderCache::getSequenceReaderInternal(
-    const SequenceReaderFactory* factory) {
+SequenceReader* RenderCache::getSequenceReader(const SequenceReaderFactory* factory) {
   if (factory == nullptr) {
     return nullptr;
   }
@@ -551,14 +558,14 @@ std::shared_ptr<SequenceReader> RenderCache::getSequenceReaderInternal(
   }
   auto assetID = factory->assetID();
   usedAssets.insert(assetID);
-  std::shared_ptr<SequenceReader> reader = nullptr;
+  SequenceReader* reader = nullptr;
   auto result = sequenceCaches.find(assetID);
   if (result != sequenceCaches.end()) {
     reader = result->second;
   }
   if (reader == nullptr) {
     auto file = stage->getFileFromReferenceMap(assetID);
-    reader = factory->makeReader(file);
+    reader = factory->makeReader(file).release();
     if (reader) {
       sequenceCaches[assetID] = reader;
     }
@@ -569,6 +576,7 @@ std::shared_ptr<SequenceReader> RenderCache::getSequenceReaderInternal(
 void RenderCache::clearAllSequenceCaches() {
   for (auto& item : sequenceCaches) {
     removeSnapshot(item.first);
+    delete item.second;
   }
   sequenceCaches.clear();
 }
@@ -577,6 +585,7 @@ void RenderCache::clearSequenceCache(ID uniqueID) {
   auto result = sequenceCaches.find(uniqueID);
   if (result != sequenceCaches.end()) {
     removeSnapshot(result->first);
+    delete result->second;
     sequenceCaches.erase(result);
   }
 }
