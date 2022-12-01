@@ -24,6 +24,7 @@
 #include <android/native_window_jni.h>
 #include "GPUDecoder.h"
 #include "GPUDrawable.h"
+#include "HardwareBufferDrawable.h"
 #include "JNIHelper.h"
 #include "NativePlatform.h"
 #include "VideoSurface.h"
@@ -181,4 +182,29 @@ extern "C" PAG_API jobject JNICALL Java_org_libpag_PAGSurface_makeSnapshot(JNIEn
   }
   AndroidBitmap_unlockPixels(env, newBitmap);
   return newBitmap;
+}
+
+extern "C" JNIEXPORT jobject JNICALL
+Java_org_libpag_PAGSurface_SetupFromHardwareBuffer(JNIEnv* env, jclass, jint width, jint height) {
+  auto device = tgfx::GLDevice::Make();
+  if (device == nullptr) {
+    return nullptr;
+  }
+  auto drawable =
+      HardwareBufferDrawable::Make(static_cast<int>(width), static_cast<int>(height), device);
+  auto surface = PAGSurface::MakeFrom(drawable);
+  if (surface == nullptr) {
+    LOGE("PAGSurface.SetupFromHardwareBuffer() fail.");
+    return nullptr;
+  }
+  static auto PAGSurface_Class = Global<jclass>(env, env->FindClass("org/libpag/PAGSurface"));
+  static auto PAGSurface_Constructor = env->GetMethodID(PAGSurface_Class.get(), "<init>", "(J)V");
+  auto surfaceObject = env->NewObject(PAGSurface_Class.get(), PAGSurface_Constructor,
+                                      reinterpret_cast<jlong>(new JPAGSurface(surface)));
+  static auto PAGSurface_HardwareBuffer = env->GetFieldID(PAGSurface_Class.get(), "hardwareBuffer",
+                                                          "Landroid/hardware/HardwareBuffer;");
+  env->SetObjectField(surfaceObject, PAGSurface_HardwareBuffer,
+                      tgfx::HardwareBufferInterface::AHardwareBuffer_toHardwareBuffer(
+                          env, drawable->aHardwareBuffer()));
+  return surfaceObject;
 }

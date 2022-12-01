@@ -17,31 +17,21 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include "PAGDecoder.h"
 
-#include <android/hardware_buffer.h>
-#include "HardwareBufferInterface.h"
-#include "tgfx/core/PixelBuffer.h"
-
-namespace tgfx {
-class HardwareBuffer : public PixelBuffer {
+class JPAGDecoder {
  public:
-  static std::shared_ptr<PixelBuffer> Make(int width, int height, bool alphaOnly);
+  explicit JPAGDecoder(std::shared_ptr<pag::PAGDecoder> nativeHandle) : nativeHandle(nativeHandle) {
+  }
 
-  static std::shared_ptr<PixelBuffer> MakeFrom(AHardwareBuffer* hardwareBuffer);
+  std::shared_ptr<pag::PAGDecoder> get() {
+    return nativeHandle;
+  }
 
-  ~HardwareBuffer() override;
-
-  void* lockPixels() override;
-
-  void unlockPixels() override;
-
-  std::shared_ptr<Texture> makeTexture(Context*) const override;
-
-  AHardwareBuffer *aHardwareBuffer();
-
-  explicit HardwareBuffer(AHardwareBuffer* hardwareBuffer);
+  void reset() {
+    nativeHandle = nullptr;
+  }
 
  private:
-  AHardwareBuffer* _hardwareBuffer = nullptr;
+  std::shared_ptr<pag::PAGDecoder> nativeHandle;
 };
-}  // namespace tgfx

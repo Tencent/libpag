@@ -2,6 +2,7 @@ package org.libpag;
 
 import android.graphics.Bitmap;
 import android.graphics.SurfaceTexture;
+import android.hardware.HardwareBuffer;
 import android.opengl.EGL14;
 import android.opengl.EGLContext;
 import android.os.Build;
@@ -10,6 +11,14 @@ import android.view.Surface;
 import org.extra.tools.LibraryLoadUtils;
 
 public class PAGSurface {
+
+    public static PAGSurface FromHardwareBuffer(int width, int height) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            return null;
+        }
+        return SetupFromHardwareBuffer(width, height);
+    }
+
     public static PAGSurface FromSurfaceTexture(SurfaceTexture surfaceTexture) {
         return FromSurfaceTexture(surfaceTexture, EGL14.EGL_NO_CONTEXT);
     }
@@ -125,6 +134,8 @@ public class PAGSurface {
         this.nativeSurface = nativeSurface;
     }
 
+    private native static PAGSurface SetupFromHardwareBuffer(int width, int height);
+
     private Surface surface = null;
     private boolean needsReleaseSurface = false;
     private int textureID = 0;
@@ -171,6 +182,10 @@ public class PAGSurface {
         nativeRelease();
     }
 
+    public HardwareBuffer hardwareBuffer() {
+        return hardwareBuffer;
+    }
+
     private native void nativeRelease();
 
     private static native void nativeInit();
@@ -187,4 +202,6 @@ public class PAGSurface {
     }
 
     long nativeSurface = 0;
+
+    private HardwareBuffer hardwareBuffer;
 }

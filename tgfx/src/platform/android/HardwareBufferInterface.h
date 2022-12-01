@@ -19,6 +19,7 @@
 #pragma once
 
 #include <android/hardware_buffer.h>
+#include <jni.h>
 
 namespace tgfx {
 /**
@@ -94,5 +95,8 @@ class HardwareBufferInterface {
    * any reason.
    */
   static int Unlock(AHardwareBuffer* buffer, int32_t* fence);
+
+  static jobject AHardwareBuffer_toHardwareBuffer(JNIEnv *env, AHardwareBuffer *buffer);
+
 };
 }  // namespace tgfx

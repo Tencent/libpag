@@ -17,31 +17,31 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include "JNIHelper.h"
+#include "android/hardware_buffer.h"
+#include "pag/pag.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
+#include "tgfx/gpu/opengl/GLSampler.h"
 
-#include <android/hardware_buffer.h>
-#include "HardwareBufferInterface.h"
-#include "tgfx/core/PixelBuffer.h"
-
-namespace tgfx {
-class HardwareBuffer : public PixelBuffer {
+namespace pag {
+class PAGDecoder {
  public:
-  static std::shared_ptr<PixelBuffer> Make(int width, int height, bool alphaOnly);
-
-  static std::shared_ptr<PixelBuffer> MakeFrom(AHardwareBuffer* hardwareBuffer);
-
-  ~HardwareBuffer() override;
-
-  void* lockPixels() override;
-
-  void unlockPixels() override;
-
-  std::shared_ptr<Texture> makeTexture(Context*) const override;
-
-  AHardwareBuffer *aHardwareBuffer();
-
-  explicit HardwareBuffer(AHardwareBuffer* hardwareBuffer);
+  static void initJNI(JNIEnv* env);
+  static std::shared_ptr<PAGDecoder> Make(std::shared_ptr<PAGComposition> pagComposition, int width,
+                                          int height);
+  jobject decode(double value);
+  ~PAGDecoder();
 
  private:
-  AHardwareBuffer* _hardwareBuffer = nullptr;
+  void createSurface();
+  void checkBitmap();
+  std::shared_ptr<PAGSurface> pagSurface;
+  std::shared_ptr<PAGPlayer> pagPlayer;
+  std::shared_ptr<PAGComposition> pagComposition;
+  Global<jobject> bitmap;
+  tgfx::GLSampler textureInfo;
+  int width = 0;
+  int height = 0;
+  std::shared_ptr<tgfx::GLDevice> device;
 };
-}  // namespace tgfx
+}  // namespace pag
