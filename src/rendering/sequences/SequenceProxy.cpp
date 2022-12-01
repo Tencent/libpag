@@ -19,20 +19,15 @@
 #include "SequenceProxy.h"
 
 namespace pag {
-SequenceProxy::SequenceProxy(int width, int height, std::unique_ptr<SequenceReaderFactory> factory,
-                             Frame targetFrame)
-    : TextureProxy(width, height), factory(std::move(factory)), targetFrame(targetFrame) {
+SequenceProxy::SequenceProxy(int width, int height, Sequence* sequence, Frame targetFrame)
+    : TextureProxy(width, height), sequence(sequence), targetFrame(targetFrame) {
 }
 
 void SequenceProxy::prepare(RenderCache* cache) const {
-  static_cast<RenderCache*>(cache)->prepareSequenceReader(factory.get(), targetFrame);
+  static_cast<RenderCache*>(cache)->prepareSequence(sequence, targetFrame);
 }
 
 std::shared_ptr<tgfx::Texture> SequenceProxy::getTexture(RenderCache* cache) const {
-  auto reader = static_cast<RenderCache*>(cache)->getSequenceReader(factory.get());
-  if (reader) {
-    return reader->readTexture(targetFrame, static_cast<RenderCache*>(cache));
-  }
-  return nullptr;
+  return static_cast<RenderCache*>(cache)->getSequenceFrame(sequence, targetFrame);
 }
 }  // namespace pag

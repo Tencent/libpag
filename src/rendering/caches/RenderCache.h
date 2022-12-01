@@ -33,7 +33,7 @@
 #include "rendering/graphics/Shape.h"
 #include "rendering/graphics/Snapshot.h"
 #include "rendering/layers/PAGStage.h"
-#include "rendering/sequences/SequenceReaderFactory.h"
+#include "rendering/sequences/SequenceReader.h"
 #include "tgfx/gpu/Device.h"
 
 namespace pag {
@@ -125,9 +125,9 @@ class RenderCache : public Performance {
 
   void setVideoEnabled(bool value);
 
-  void prepareSequenceReader(const SequenceReaderFactory* factory, Frame targetFrame);
+  void prepareSequence(Sequence* sequence, Frame targetFrame);
 
-  std::shared_ptr<SequenceReader> getSequenceReader(const SequenceReaderFactory* factory);
+  std::shared_ptr<tgfx::Texture> getSequenceFrame(Sequence* sequence, Frame targetFrame);
 
   LayerFilter* getFilterCache(LayerStyle* layerStyle);
 
@@ -160,7 +160,8 @@ class RenderCache : public Performance {
   std::list<Snapshot*> snapshotLRU = {};
   std::unordered_map<ID, TextAtlas*> textAtlases = {};
   std::unordered_map<ID, std::shared_ptr<Task>> imageTasks;
-  std::unordered_map<ID, std::shared_ptr<SequenceReader>> sequenceCaches;
+  std::unordered_map<ID, std::vector<SequenceReader*>> sequenceCaches = {};
+  std::unordered_map<ID, std::unordered_map<Frame, SequenceReader*>> usedSequences = {};
   std::unordered_map<ID, Filter*> filterCaches;
   MotionBlurFilter* motionBlurFilter = nullptr;
   std::unordered_map<ID, std::unordered_map<tgfx::Path, Snapshot*, tgfx::PathHash>> pathCaches;
@@ -195,7 +196,9 @@ class RenderCache : public Performance {
   void prepareLayers(int64_t timeDistance = DECODING_VISIBLE_DISTANCE);
   void preparePreComposeLayer(PreComposeLayer* layer);
   void prepareImageLayer(PAGImageLayer* layer);
-  std::shared_ptr<SequenceReader> getSequenceReaderInternal(const SequenceReaderFactory* factory);
+  SequenceReader* getSequenceReader(Sequence* sequence, Frame targetFrame);
+  SequenceReader* findNearestSequenceReader(Sequence* sequence, Frame targetFrame);
+  SequenceReader* makeSequenceReader(Sequence* sequence);
   Snapshot* makeSnapshot(float scaleFactor, const std::function<Snapshot*()>& maker);
   void moveSnapshotToHead(Snapshot* snapshot);
   void removeSnapshotFromLRU(Snapshot* snapshot);
