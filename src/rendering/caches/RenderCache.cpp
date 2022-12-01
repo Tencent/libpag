@@ -139,11 +139,12 @@ void RenderCache::preparePreComposeLayer(PreComposeLayer* layer) {
   auto targetFrame = sequence->toSequenceFrame(compositionFrame);
   auto result = sequenceCaches.find(assetID);
   if (result != sequenceCaches.end()) {
-    // 更新循环预测起点。
-    result->second->pendingFirstFrame = targetFrame;
+    // 更新循环预测起点，激活预测。
+    auto reader = result->second.front();
+    reader->pendingFirstFrame = targetFrame;
     return;
   }
-  auto reader = getSequenceReader(sequence);
+  auto reader = makeSequenceReader(sequence);
   if (reader) {
     reader->prepare(targetFrame);
   }
@@ -189,6 +190,7 @@ void RenderCache::setSnapshotEnabled(bool value) {
 
 void RenderCache::beginFrame() {
   usedAssets = {};
+  usedSequences = {};
   resetPerformance();
 }
 
@@ -529,7 +531,7 @@ void RenderCache::prepareSequence(Sequence* sequence, Frame targetFrame) {
     // 静态的序列帧采用位图的缓存逻辑，如果上层缓存过 Snapshot 就不需要预测。
     return;
   }
-  auto reader = getSequenceReader(sequence);
+  auto reader = getSequenceReader(sequence, targetFrame);
   if (reader) {
     reader->prepare(targetFrame);
   }
@@ -540,7 +542,7 @@ std::shared_ptr<tgfx::Texture> RenderCache::getSequenceFrame(Sequence* sequence,
   if (sequence == nullptr) {
     return nullptr;
   }
-  auto reader = getSequenceReader(sequence);
+  auto reader = getSequenceReader(sequence, targetFrame);
   if (reader == nullptr) {
     return nullptr;
   }
@@ -551,58 +553,118 @@ std::shared_ptr<tgfx::Texture> RenderCache::getSequenceFrame(Sequence* sequence,
     // a snapshot. We get here because the reader was created by prepare() methods.
     auto result = sequenceCaches.find(composition->uniqueID);
     if (result != sequenceCaches.end()) {
-      delete result->second;
+      for (auto item : result->second) {
+        delete item;
+      }
       sequenceCaches.erase(result);
     }
   }
   return texture;
 }
 
-SequenceReader* RenderCache::getSequenceReader(Sequence* sequence) {
-  if (sequence == nullptr) {
-    return nullptr;
+SequenceReader* RenderCache::getSequenceReader(Sequence* sequence, Frame targetFrame) {
+  if (sequence->composition->staticContent()) {
+    targetFrame = 0;
   }
-  auto composition = sequence->composition;
-  if (!_videoEnabled && composition->type() == CompositionType::Video) {
-    return nullptr;
-  }
-  auto assetID = composition->uniqueID;
+  auto assetID = sequence->composition->uniqueID;
   usedAssets.insert(assetID);
-  SequenceReader* reader = nullptr;
-  auto result = sequenceCaches.find(assetID);
-  if (result != sequenceCaches.end()) {
-    reader = result->second;
+  auto& sequenceMap = usedSequences[assetID];
+  auto readerResult = sequenceMap.find(targetFrame);
+  if (readerResult != sequenceMap.end()) {
+    return readerResult->second;
   }
+  auto reader = findNearestSequenceReader(sequence, targetFrame);
   if (reader == nullptr) {
-    reader = makeSequenceReader(sequence).release();
-    if (reader) {
-      sequenceCaches[assetID] = reader;
-    }
+    reader = makeSequenceReader(sequence);
+  }
+  if (reader != nullptr) {
+    sequenceMap[targetFrame] = reader;
   }
   return reader;
 }
 
-std::unique_ptr<SequenceReader> RenderCache::makeSequenceReader(Sequence* sequence) {
-  auto file = stage->getFileFromReferenceMap(sequence->composition->uniqueID);
-  if (sequence->composition->type() == CompositionType::Bitmap) {
-    return std::make_unique<BitmapSequenceReader>(file, static_cast<BitmapSequence*>(sequence));
+SequenceReader* RenderCache::findNearestSequenceReader(Sequence* sequence, Frame targetFrame) {
+  auto assetID = sequence->composition->uniqueID;
+  auto result = sequenceCaches.find(assetID);
+  if (result == sequenceCaches.end()) {
+    return nullptr;
   }
-  auto videoSequence = static_cast<VideoSequence*>(sequence);
+  auto& sequenceMap = usedSequences[assetID];
+  std::unordered_set<SequenceReader*> usedReaders = {};
+  for (auto& item : sequenceMap) {
+    usedReaders.insert(item.second);
+  }
+  std::vector<SequenceReader*> freeReaders = {};
+  for (auto& item : result->second) {
+    if (usedReaders.count(item) == 0) {
+      freeReaders.push_back(item);
+    }
+  }
+  if (freeReaders.empty()) {
+    return nullptr;
+  }
+  SequenceReader* reader = nullptr;
+  Frame minDistance = INT64_MAX;
+  for (auto& item : freeReaders) {
+    if (item->lastFrame == targetFrame) {
+      // use the last cached texture directly.
+      reader = item;
+      break;
+    }
+    auto distance = targetFrame - item->preparedFrame;
+    if (distance < 0) {
+      distance += sequence->duration();
+    }
+    if (distance >= 0 && distance < minDistance) {
+      reader = item;
+      minDistance = distance;
+    }
+  }
+  if (reader == nullptr) {
+    reader = freeReaders.front();
+  }
+  return reader;
+}
 
+SequenceReader* RenderCache::makeSequenceReader(Sequence* sequence) {
+  SequenceReader* reader = nullptr;
+  auto composition = sequence->composition;
+  if (!_videoEnabled && composition->type() == CompositionType::Video) {
+    return reader;
+  }
+  auto file = stage->getFileFromReferenceMap(composition->uniqueID);
+  if (composition->type() == CompositionType::Bitmap) {
+    reader = new BitmapSequenceReader(file, static_cast<BitmapSequence*>(sequence));
+  } else {
+    auto videoSequence = static_cast<VideoSequence*>(sequence);
 #ifdef PAG_BUILD_FOR_WEB
-  if (!VideoDecoder::HasExternalSoftwareDecoder()) {
-    return std::make_unique<VideoSequenceReader>(file, videoSequence);
-  }
+    if (VideoDecoder::HasExternalSoftwareDecoder()) {
+      auto demuxer = std::make_unique<VideoSequenceDemuxer>(file, videoSequence);
+      reader = new VideoReader(std::move(demuxer));
+    } else {
+      reader = new VideoSequenceReader(file, videoSequence);
+    }
+#else
+    auto demuxer = std::make_unique<VideoSequenceDemuxer>(file, videoSequence);
+    reader = new VideoReader(std::move(demuxer));
 #endif
-
-  auto demuxer = std::make_unique<VideoSequenceDemuxer>(file, videoSequence);
-  return std::make_unique<VideoReader>(std::move(demuxer));
+  }
+  auto assetID = sequence->composition->uniqueID;
+  auto result = sequenceCaches.find(assetID);
+  if (result == sequenceCaches.end()) {
+    sequenceCaches[assetID] = {reader};
+  } else {
+    result->second.push_back(reader);
+  }
+  return reader;
 }
 
 void RenderCache::clearAllSequenceCaches() {
   for (auto& item : sequenceCaches) {
     removeSnapshot(item.first);
-    delete item.second;
+    for (auto reader : item.second) {
+      delete reader;
+    }
   }
   sequenceCaches.clear();
 }
@@ -611,7 +673,9 @@ void RenderCache::clearSequenceCache(ID uniqueID) {
   auto result = sequenceCaches.find(uniqueID);
   if (result != sequenceCaches.end()) {
     removeSnapshot(result->first);
-    delete result->second;
+    for (auto reader : result->second) {
+      delete reader;
+    }
     sequenceCaches.erase(result);
   }
 }

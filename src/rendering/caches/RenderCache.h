@@ -160,7 +160,8 @@ class RenderCache : public Performance {
   std::list<Snapshot*> snapshotLRU = {};
   std::unordered_map<ID, TextAtlas*> textAtlases = {};
   std::unordered_map<ID, std::shared_ptr<Task>> imageTasks;
-  std::unordered_map<ID, SequenceReader*> sequenceCaches;
+  std::unordered_map<ID, std::vector<SequenceReader*>> sequenceCaches = {};
+  std::unordered_map<ID, std::unordered_map<Frame, SequenceReader*>> usedSequences = {};
   std::unordered_map<ID, Filter*> filterCaches;
   MotionBlurFilter* motionBlurFilter = nullptr;
   std::unordered_map<ID, std::unordered_map<tgfx::Path, Snapshot*, tgfx::PathHash>> pathCaches;
@@ -195,8 +196,9 @@ class RenderCache : public Performance {
   void prepareLayers(int64_t timeDistance = DECODING_VISIBLE_DISTANCE);
   void preparePreComposeLayer(PreComposeLayer* layer);
   void prepareImageLayer(PAGImageLayer* layer);
-  SequenceReader* getSequenceReader(Sequence* sequence);
-  std::unique_ptr<SequenceReader> makeSequenceReader(Sequence* sequence);
+  SequenceReader* getSequenceReader(Sequence* sequence, Frame targetFrame);
+  SequenceReader* findNearestSequenceReader(Sequence* sequence, Frame targetFrame);
+  SequenceReader* makeSequenceReader(Sequence* sequence);
   Snapshot* makeSnapshot(float scaleFactor, const std::function<Snapshot*()>& maker);
   void moveSnapshotToHead(Snapshot* snapshot);
   void removeSnapshotFromLRU(Snapshot* snapshot);

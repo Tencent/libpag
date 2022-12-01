@@ -52,6 +52,7 @@ void SequenceReader::prepare(Frame targetFrame) {
     targetFrame = 0;
   }
   if (lastTask == nullptr && targetFrame >= 0 && targetFrame < totalFrames) {
+    preparedFrame = targetFrame;
     lastTask = SequenceTask::MakeAndRun(this, targetFrame);
   }
 }
@@ -88,6 +89,7 @@ std::shared_ptr<tgfx::Texture> SequenceReader::readTexture(Frame targetFrame, Re
     clock.reset();
     lastTexture = makeTexture(cache->getContext());
     lastFrame = targetFrame;
+    preparedFrame = targetFrame;
     cache->textureUploadingTime += clock.measure();
     prepareNext(targetFrame);
   }
