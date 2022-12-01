@@ -285,9 +285,10 @@ void DestoryFlushQueue() {
 }
 
 - (void)doPlay {
-  if (!_isVisible) {
+  if (!_isVisible || !self.bufferPrepared) {
     return;
   }
+  [self flush];
   int64_t playTime = (int64_t)([valueAnimator getAnimatedFraction] * [valueAnimator duration]);
   [valueAnimator setCurrentPlayTime:playTime];
   [valueAnimator start];
@@ -468,6 +469,9 @@ void DestoryFlushQueue() {
   self.bufferPrepared = TRUE;
   if ([notification.userInfo[pag::kPreparedAsync] boolValue]) {
     [self updateView];
+    if (_isPlaying) {
+      [self doPlay];
+    }
   }
 }
 

@@ -381,6 +381,9 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         }
         pagSurface.clearAll();
         NeedsUpdateView(this);
+        if (_isPlaying && !animator.isRunning()) {
+            doPlay();
+        }
         if (mListener != null) {
             mListener.onSurfaceTextureAvailable(surface, width, height);
         }
@@ -487,11 +490,12 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
 
     private void doPlay() {
         pagPlayer.prepare();
-        if (!isAttachedToWindow) {
-            Log.e(TAG, "doPlay: PAGView is not attached to window");
+        if (!isAttachedToWindow || pagSurface == null) {
+            Log.e(TAG, "doPlay: PAGView is not attached to window, or PAGSurface is not initialized！");
             return;
         }
         Log.i(TAG, "doPlay");
+        flush();
         animator.setCurrentPlayTime(currentPlayTime);
         startAnimator();
     }

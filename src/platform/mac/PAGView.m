@@ -216,6 +216,7 @@
   if (!_isVisible) {
     return;
   }
+  [self flush];
   double progress = [pagPlayer getProgress];
   int64_t playTime = (int64_t)(progress * [valueAnimator duration]);
   [valueAnimator setCurrentPlayTime:playTime];
