@@ -70,8 +70,13 @@ QSGTexture* QGLWindow::getTexture() {
     auto textureID = frontTexture->glSampler().id;
     auto width = static_cast<int>(ceil(quickItem->width()));
     auto height = static_cast<int>(ceil(quickItem->height()));
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+    outTexture = QNativeInterface::QSGOpenGLTexture::fromNative(textureID, nativeWindow,
+                                QSize(width, height), QQuickWindow::TextureHasAlphaChannel);
+#else
     outTexture = nativeWindow->createTextureFromId(textureID, QSize(width, height),
                                                    QQuickWindow::TextureHasAlphaChannel);
+#endif
   }
   return outTexture;
 }

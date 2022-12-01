@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <CoreGraphics/CGBitmapContext.h>
 #include "platform/NativeCodec.h"
 
 namespace tgfx {
@@ -28,6 +29,10 @@ std::shared_ptr<ImageCodec> NativeCodec::MakeCodec(std::shared_ptr<Data>) {
 }
 
 std::shared_ptr<ImageCodec> NativeCodec::MakeFrom(void* /*nativeImage*/) {
+  return nullptr;
+}
+
+CGContextRef CreateBitmapContext(const ImageInfo&, void*) {
   return nullptr;
 }
 }  // namespace tgfx
