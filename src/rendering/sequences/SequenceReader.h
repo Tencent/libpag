@@ -72,6 +72,7 @@ class SequenceReader {
   bool staticContent = false;
   Frame pendingFirstFrame = -1;
   Frame lastFrame = -1;
+  Frame preparedFrame = -1;
   std::shared_ptr<tgfx::Texture> lastTexture = nullptr;
 
   friend class SequenceTask;

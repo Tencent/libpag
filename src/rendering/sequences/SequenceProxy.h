@@ -18,18 +18,16 @@
 
 #pragma once
 
-#include "SequenceReaderFactory.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/graphics/TextureProxy.h"
 
 namespace pag {
 class SequenceProxy : public TextureProxy {
  public:
-  SequenceProxy(int width, int height, std::unique_ptr<SequenceReaderFactory> factory,
-                Frame targetFrame);
+  SequenceProxy(int width, int height, Sequence* sequence, Frame targetFrame);
 
   bool cacheEnabled() const override {
-    return !factory->staticContent();
+    return !sequence->composition->staticContent();
   }
 
   void prepare(RenderCache* cache) const override;
@@ -37,7 +35,7 @@ class SequenceProxy : public TextureProxy {
   std::shared_ptr<tgfx::Texture> getTexture(RenderCache* cache) const override;
 
  private:
-  std::unique_ptr<SequenceReaderFactory> factory;
+  Sequence* sequence = nullptr;
   Frame targetFrame = 0;
 };
 }  // namespace pag

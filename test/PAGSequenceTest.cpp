@@ -26,7 +26,11 @@
 namespace pag {
 
 PAG_TEST_SUIT(PAGSequenceTest)
-void pagSequenceTest() {
+
+/**
+ * 用例描述: 测试直接上屏
+ */
+PAG_TEST_F(PAGSequenceTest, RenderOnScreen) {
   auto pagFile = PAGFile::Load("../resources/apitest/wz_mvp.pag");
   EXPECT_NE(pagFile, nullptr);
   auto pagSurface = PAGSurface::MakeOffscreen(750, 1334);
@@ -38,13 +42,6 @@ void pagSequenceTest() {
   pagPlayer->flush();
   EXPECT_EQ(static_cast<int>(pagPlayer->renderCache->sequenceCaches.size()), 1);
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGSequenceTest/pagSequenceTest"));
-}
-
-/**
- * 用例描述: 测试直接上屏
- */
-PAG_TEST_F(PAGSequenceTest, RenderOnScreen) {
-  pagSequenceTest();
 }
 
 /**
@@ -119,6 +116,42 @@ PAG_TEST_F(PAGSequenceTest, VideoSequenceToMP4WithoutHeader) {
 
   EXPECT_TRUE(
       Baseline::Compare(std::move(MP4Data), "PAGSequenceTest/VideoSequenceToMP4WithoutHeader"));
+}
+/**
+ * 用例描述: 同一个序列帧多图层引用且时间轴交错，测试解码器数量是否正确。
+ */
+PAG_TEST_F(PAGSequenceTest, Sequence_Multiple_References) {
+  auto pagFile = PAGFile::Load("../resources/apitest/sequence_mul_ref.pag");
+  EXPECT_NE(pagFile, nullptr);
+  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setMatrix(Matrix::I());
+  auto& sequenceCaches = pagPlayer->renderCache->sequenceCaches;
+  pagFile->setCurrentTime(0);
+  pagPlayer->flush();
+  ASSERT_EQ(static_cast<int>(sequenceCaches.size()), 1);
+  EXPECT_EQ(static_cast<int>(sequenceCaches.begin()->second.size()), 1);
+  pagFile->setCurrentTime(1000000);
+  pagPlayer->flush();
+  ASSERT_EQ(static_cast<int>(sequenceCaches.size()), 1);
+  EXPECT_EQ(static_cast<int>(sequenceCaches.begin()->second.size()), 2);
+  pagFile->setCurrentTime(3000000);
+  pagPlayer->flush();
+  ASSERT_EQ(static_cast<int>(sequenceCaches.size()), 1);
+  EXPECT_EQ(static_cast<int>(sequenceCaches.begin()->second.size()), 3);
+  pagFile->setCurrentTime(4500000);
+  pagPlayer->flush();
+  ASSERT_EQ(static_cast<int>(sequenceCaches.size()), 1);
+  EXPECT_EQ(static_cast<int>(sequenceCaches.begin()->second.size()), 3);
+  pagFile->setCurrentTime(5000000);
+  pagPlayer->flush();
+  ASSERT_EQ(static_cast<int>(sequenceCaches.size()), 0);
+  pagFile->setCurrentTime(8000000);
+  pagPlayer->flush();
+  ASSERT_EQ(static_cast<int>(sequenceCaches.size()), 1);
+  EXPECT_EQ(static_cast<int>(sequenceCaches.begin()->second.size()), 1);
 }
 
 }  // namespace pag
