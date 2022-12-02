@@ -112,14 +112,13 @@ export class VideoReader {
   public renderToTexture(GL: EmscriptenGL, textureID: number) {
     const gl = GL.currentContext!.GLctx;
     gl.bindTexture(gl.TEXTURE_2D, GL.textures[textureID]);
-    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
-    gl.texSubImage2D(
+    gl.texImage2D(
       gl.TEXTURE_2D,
       0,
-      0,
-      0,
+      gl.RGBA,
       this.frameData!.width,
       this.frameData!.height,
+      0,
       gl.RGBA,
       gl.UNSIGNED_BYTE,
       new Uint8Array(this.frameData!.data),
