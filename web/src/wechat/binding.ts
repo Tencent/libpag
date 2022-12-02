@@ -5,13 +5,13 @@ import { PAGView } from './pag-view';
 import { PAGFile } from './pag-file';
 import { PAGImage } from './pag-image';
 import { PAGFont } from './pag-font';
+import { NativeImage } from './native-image';
 
 import { PAG } from '../types';
 import { setPAGModule } from '../pag-module';
 import { PAGSurface } from '../pag-surface';
 import { PAGPlayer } from '../pag-player';
 import { PAGLayer } from '../pag-layer';
-import { NativeImage } from '../core/native-image';
 import { GlobalCanvas } from '../core/global-canvas';
 import { BackendContext } from '../core/backend-context';
 import { PAGComposition } from '../pag-composition';
