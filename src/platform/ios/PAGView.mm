@@ -39,6 +39,7 @@ void DestoryFlushQueue() {
 @property(atomic, assign) BOOL bufferPrepared;
 @property(atomic, assign) BOOL isInBackground;
 @property(atomic, strong) NSHashTable* listeners;
+@property(atomic, assign) int64_t startPlayTime;
 @end
 
 @implementation PAGView {
@@ -89,6 +90,7 @@ void DestoryFlushQueue() {
   self.isInBackground =
       [UIApplication sharedApplication].applicationState == UIApplicationStateBackground;
   self.isAsyncFlushing = FALSE;
+  self.startPlayTime = INT64_MIN;
   pagFile = nil;
   filePath = nil;
   self.contentScaleFactor = [UIScreen mainScreen].scale;
@@ -288,14 +290,14 @@ void DestoryFlushQueue() {
   if (!_isVisible || !self.bufferPrepared) {
     return;
   }
-  [self flush];
   int64_t playTime = (int64_t)([valueAnimator getAnimatedFraction] * [valueAnimator duration]);
+  self.startPlayTime = playTime;
   [valueAnimator setCurrentPlayTime:playTime];
-  [valueAnimator start];
 }
 
 - (void)stop {
   _isPlaying = false;
+  self.startPlayTime = INT64_MIN;
   [valueAnimator stop];
 }
 
@@ -395,7 +397,11 @@ void DestoryFlushQueue() {
 }
 
 - (void)setProgress:(double)value {
-  [valueAnimator setCurrentPlayTime:(int64_t)(value * valueAnimator.duration)];
+  int64_t playTime = (int64_t)(value * valueAnimator.duration);
+  if (self.startPlayTime > 0 || [valueAnimator isPlaying]) {
+    self.startPlayTime = playTime;
+  }
+  [valueAnimator setCurrentPlayTime:playTime];
   [valueAnimator setRepeatedTimes:0];
 }
 
@@ -409,6 +415,23 @@ void DestoryFlushQueue() {
   }
   [pagPlayer setProgress:[valueAnimator getAnimatedFraction]];
   auto result = [pagPlayer flush];
+
+  if (self.startPlayTime >= 0) {
+    int64_t currentFrame = [pagPlayer currentFrame];
+    int64_t startFrame =
+        (int64_t)(self.startPlayTime * [[pagPlayer getComposition] frameRate] / 1000000.0);
+    // 正在播放时设置进度可能会有一帧的偏差
+    if (currentFrame == startFrame || (currentFrame == startFrame + 1)) {
+      if ([valueAnimator isPlaying]) {
+        [valueAnimator setCurrentPlayTime:self.startPlayTime];
+      } else {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          [valueAnimator start];
+        });
+      }
+      self.startPlayTime = INT64_MIN;
+    }
+  }
   NSHashTable* copiedListeners = self.listeners.copy;
   for (id item in copiedListeners) {
     id<PAGViewListener> listener = (id<PAGViewListener>)item;

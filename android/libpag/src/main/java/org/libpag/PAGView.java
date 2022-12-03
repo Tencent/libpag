@@ -45,6 +45,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     private SparseArray<PAGText> textReplacementMap = new SparseArray<>();
     private SparseArray<PAGImage> imageReplacementMap = new SparseArray<>();
     private boolean isSync = false;
+    private long _startPlayTime = Long.MIN_VALUE;
 
     private static final Object g_HandlerLock = new Object();
     private static PAGViewHandler g_PAGViewHandler = null;
@@ -277,8 +278,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
             super.onAnimationEnd(animation);
             // Align with iOS platform, avoid triggering this method when stopping
             int repeatCount = ((ValueAnimator) animation).getRepeatCount();
-            if (repeatCount >= 0 && (animation.getDuration() > 0) &&
-                    (currentPlayTime / animation.getDuration() > repeatCount)) {
+            if (repeatCount >= 0 && (currentPlayTime / animation.getDuration() > repeatCount)) {
                 ArrayList<PAGViewListener> arrayList;
                 synchronized (PAGView.this) {
                     arrayList = new ArrayList<>(mViewListeners);
@@ -495,9 +495,8 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
             return;
         }
         Log.i(TAG, "doPlay");
-        flush();
+        _startPlayTime = currentPlayTime;
         animator.setCurrentPlayTime(currentPlayTime);
-        startAnimator();
     }
 
     private Runnable mAnimatorCancelRunnable = new Runnable() {
@@ -512,6 +511,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         Log.i(TAG, "stop");
         _isPlaying = false;
         _isAnimatorPreRunning = null;
+        _startPlayTime = Long.MIN_VALUE;
         cancelAnimator();
     }
 
@@ -757,6 +757,9 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     public void setProgress(double value) {
         value = Math.max(0, Math.min(value, 1));
         currentPlayTime = (long) (value * animator.getDuration());
+        if (_startPlayTime >= 0 || animator.isRunning()) {
+            _startPlayTime = currentPlayTime;
+        }
         animator.setCurrentPlayTime(currentPlayTime);
     }
 
@@ -788,6 +791,19 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     public boolean flush() {
         pagPlayer.setProgress(animator.getAnimatedFraction());
         boolean result = pagPlayer.flush();
+        if (_startPlayTime >= 0) {
+            long currentFrame = pagPlayer.currentFrame();
+            long startFrame = (long)(_startPlayTime * 1000 * pagPlayer.getComposition().frameRate() / 1000000.0);
+            // 正在播放时设置进度可能会有一帧的偏差
+            if (currentFrame >= startFrame && (currentFrame <= startFrame +1)) {
+                if (animator.isRunning()) {
+                    animator.setCurrentPlayTime(_startPlayTime);
+                } else {
+                    startAnimator();
+                }
+                _startPlayTime = Long.MIN_VALUE;
+            }
+        }
         ArrayList<PAGViewListener> arrayList;
         synchronized (PAGView.this) {
             arrayList = new ArrayList<>(mViewListeners);
