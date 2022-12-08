@@ -18,7 +18,7 @@
 
 #include "SurfaceDrawContext.h"
 #include "DrawingManager.h"
-#include "gpu/FillRectOp.h"
+#include "gpu/ops/FillRectOp.h"
 
 namespace tgfx {
 void SurfaceDrawContext::addOp(std::unique_ptr<Op> op) {

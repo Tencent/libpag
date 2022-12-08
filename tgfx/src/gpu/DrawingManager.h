@@ -19,8 +19,8 @@
 #pragma once
 
 #include <vector>
-#include "OpsTask.h"
 #include "RenderTask.h"
+#include "gpu/ops/OpsTask.h"
 #include "tgfx/gpu/Surface.h"
 
 namespace tgfx {

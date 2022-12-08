@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SimplePathMesh.h"
-#include "gpu/FillRectOp.h"
-#include "gpu/RRectOp.h"
 #include "gpu/opengl/GLOpsRenderPass.h"
+#include "gpu/ops/FillRectOp.h"
+#include "gpu/ops/RRectOp.h"
 
 namespace tgfx {
 Rect SimplePathMesh::bounds() const {

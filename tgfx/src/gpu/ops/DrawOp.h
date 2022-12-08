@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "AAType.h"
 #include "Op.h"
-#include "OpsRenderPass.h"
+#include "gpu/AAType.h"
+#include "gpu/OpsRenderPass.h"
 
 namespace tgfx {
 class DrawOp : public Op {
