@@ -45,6 +45,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     private SparseArray<PAGText> textReplacementMap = new SparseArray<>();
     private SparseArray<PAGImage> imageReplacementMap = new SparseArray<>();
     private boolean isSync = false;
+    private volatile boolean needUpdatePlayTime = false;
 
     private static final Object g_HandlerLock = new Object();
     private static PAGViewHandler g_PAGViewHandler = null;
@@ -255,6 +256,10 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         @Override
         public void onAnimationUpdate(ValueAnimator animation) {
             PAGView.this.currentPlayTime = animation.getCurrentPlayTime();
+            if (needUpdatePlayTime || !animation.isRunning()) {
+                return;
+            }
+            pagPlayer.setProgress(animator.getAnimatedFraction());
             NeedsUpdateView(PAGView.this);
         }
     };
@@ -275,6 +280,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         @Override
         public void onAnimationEnd(Animator animation) {
             super.onAnimationEnd(animation);
+            _isPlaying = false;
             // Align with iOS platform, avoid triggering this method when stopping
             int repeatCount = ((ValueAnimator) animation).getRepeatCount();
             if (repeatCount >= 0 && (animation.getDuration() > 0) &&
@@ -317,6 +323,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     private void setupSurfaceTexture() {
         Lifecycle.getInstance().addListener(this);
         setOpaque(false);
+        needUpdatePlayTime = true;
         pagPlayer = new PAGPlayer();
         setSurfaceTextureListener(this);
         animator = ValueAnimator.ofFloat(0.0f, 1.0f);
@@ -487,19 +494,16 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
 
     private void doPlay() {
         pagPlayer.prepare();
-        if (!isAttachedToWindow) {
-            Log.e(TAG, "doPlay: PAGView is not attached to window");
+        if (!isAttachedToWindow || pagSurface == null) {
+            Log.e(TAG, "doPlay: PAGView is not attached to window, or PAGSurface is not initialized！");
             return;
         }
         Log.i(TAG, "doPlay");
-        animator.setCurrentPlayTime(currentPlayTime);
-        startAnimator();
+        NeedsUpdateView(this);
     }
-
     private Runnable mAnimatorCancelRunnable = new Runnable() {
         @Override
         public void run() {
-            currentPlayTime = animator.getCurrentPlayTime();
             animator.cancel();
         }
     };
@@ -529,7 +533,6 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
 
     private void cancelAnimator() {
         if (isMainThread()) {
-            currentPlayTime = animator.getCurrentPlayTime();
             animator.cancel();
         } else {
             removeCallbacks(mAnimatorStartRunnable);
@@ -744,16 +747,16 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
      * Returns the current progress of play position, the value is from 0.0 to 1.0.
      */
     public double getProgress() {
-        return animator.getAnimatedFraction();
+        return pagPlayer.getProgress();
     }
 
     /**
      * Sets the progress of play position, the valid value is from 0.0 to 1.0.
      */
     public void setProgress(double value) {
-        value = Math.max(0, Math.min(value, 1));
-        currentPlayTime = (long) (value * animator.getDuration());
-        animator.setCurrentPlayTime(currentPlayTime);
+        pagPlayer.setProgress(value);
+        needUpdatePlayTime = true;
+        NeedsUpdateView(this);
     }
 
     /**
@@ -782,8 +785,15 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
      * called, there is no need to call it. Returns true if the content has changed.
      */
     public boolean flush() {
-        pagPlayer.setProgress(animator.getAnimatedFraction());
         boolean result = pagPlayer.flush();
+        if (needUpdatePlayTime) {
+            long playTime = (long) (pagPlayer.getProgress() * pagPlayer.duration() / 1000);
+            animator.setCurrentPlayTime(playTime);
+            needUpdatePlayTime = false;
+        }
+        if (_isPlaying && !animator.isRunning() && (pagSurface != null)) {
+            startAnimator();
+        }
         ArrayList<PAGViewListener> arrayList;
         synchronized (PAGView.this) {
             arrayList = new ArrayList<>(mViewListeners);

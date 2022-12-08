@@ -91,15 +91,18 @@ static int64_t GetCurrentTimeUS() {
   animatorListener = nil;
   repeatCount = 0;
   repeatedTimes = 0;
+  animatedFraction = 0;
   return self;
 }
 
 - (void)onAnimationFrame:(int64_t)timestamp {
+  valueAnimatorLocker.lock();
   auto count = (timestamp - startTime) / duration;
   if (repeatCount >= 0 && count > repeatCount) {
     playTime = duration;
-    [self stop:false];
     animatedFraction = 1.0;
+    valueAnimatorLocker.unlock();
+    [self stop:false];
     [animatorListener onAnimationUpdate];
     [animatorListener onAnimationEnd];
   } else {
@@ -108,6 +111,7 @@ static int64_t GetCurrentTimeUS() {
     }
     playTime = (timestamp - startTime) % duration;
     animatedFraction = static_cast<double>(playTime) / duration;
+    valueAnimatorLocker.unlock();
     [animatorListener onAnimationUpdate];
   }
   repeatedTimes = (int)count;
@@ -126,10 +130,12 @@ static int64_t GetCurrentTimeUS() {
 }
 
 - (double)getAnimatedFraction {
+  std::lock_guard<std::mutex> autoLock(valueAnimatorLocker);
   return animatedFraction;
 }
 
 - (void)setCurrentPlayTime:(int64_t)time {
+  std::lock_guard<std::mutex> autoLock(valueAnimatorLocker);
   if (duration <= 0) {
     return;
   }
@@ -137,7 +143,6 @@ static int64_t GetCurrentTimeUS() {
   playTime = time;
   startTime += gapTime % duration;
   animatedFraction = static_cast<double>(playTime) / duration;
-  [animatorListener onAnimationUpdate];
 }
 
 - (BOOL)isPlaying {
