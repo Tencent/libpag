@@ -28,7 +28,6 @@
   PAGValueAnimator* valueAnimator;
   BOOL _isPlaying;
   BOOL _isVisible;
-  int64_t _startPlayTime;
   NSMutableDictionary* textReplacementMap;
   NSMutableDictionary* imageReplacementMap;
   NSHashTable* listeners;
@@ -47,7 +46,6 @@
   imageReplacementMap = [[NSMutableDictionary dictionary] retain];
   _isPlaying = FALSE;
   _isVisible = FALSE;
-  _startPlayTime = INT64_MIN;
   pagFile = nil;
   filePath = nil;
   self.layer.backgroundColor = [NSColor clearColor].CGColor;
@@ -220,13 +218,12 @@
   }
   double progress = [pagPlayer getProgress];
   int64_t playTime = (int64_t)(progress * [valueAnimator duration]);
-  _startPlayTime = playTime;
   [valueAnimator setCurrentPlayTime:playTime];
+  [valueAnimator start];
 }
 
 - (void)stop {
   _isPlaying = false;
-  _startPlayTime = INT64_MIN;
   [valueAnimator stop];
 }
 
@@ -327,33 +324,13 @@
 }
 
 - (void)setProgress:(double)value {
-  int64_t playTime = (int64_t)(value * valueAnimator.duration);
-  if (_startPlayTime > 0 || [valueAnimator isPlaying]) {
-    _startPlayTime = playTime;
-  }
-  [valueAnimator setCurrentPlayTime:playTime];
+  [valueAnimator setCurrentPlayTime:(int64_t)(value * valueAnimator.duration)];
   [valueAnimator setRepeatCount:0];
 }
 
 - (BOOL)flush {
   [pagPlayer setProgress:[valueAnimator getAnimatedFraction]];
   bool result = [pagPlayer flush];
-  if (_startPlayTime >= 0) {
-    int64_t currentFrame = [pagPlayer currentFrame];
-    int64_t startFrame =
-        (int64_t)(_startPlayTime * [[pagPlayer getComposition] frameRate] / 1000000.0);
-    // 正在播放时设置进度可能会有一帧的偏差
-    if (currentFrame == startFrame || (currentFrame == startFrame + 1)) {
-      if ([valueAnimator isPlaying]) {
-        [valueAnimator setCurrentPlayTime:_startPlayTime];
-      } else {
-        dispatch_async(dispatch_get_main_queue(), ^{
-          [valueAnimator start];
-        });
-      }
-      _startPlayTime = INT64_MIN;
-    }
-  }
   NSHashTable* copiedListeners = listeners.copy;
   for (id item in copiedListeners) {
     id<PAGViewListener> listener = (id<PAGViewListener>)item;
