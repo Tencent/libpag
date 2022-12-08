@@ -787,7 +787,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     public boolean flush() {
         boolean result = pagPlayer.flush();
         if (needUpdatePlayTime) {
-            long playTime = (long) (pagPlayer.getProgress() * pagPlayer.duration());
+            long playTime = (long) (pagPlayer.getProgress() * pagPlayer.duration() / 1000);
             animator.setCurrentPlayTime(playTime);
             needUpdatePlayTime = false;
         }
