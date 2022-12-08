@@ -40,6 +40,7 @@ void DestoryFlushQueue() {
 @property(atomic, assign) BOOL isInBackground;
 @property(atomic, strong) NSHashTable* listeners;
 @property(atomic, assign) BOOL needUpdatePlayTime;
+@property(nonatomic, strong) NSLock* updateTimeLock;
 
 @end
 
@@ -93,6 +94,7 @@ void DestoryFlushQueue() {
   self.isAsyncFlushing = FALSE;
   pagFile = nil;
   filePath = nil;
+  self.updateTimeLock = [[NSLock alloc] init];
   self.needUpdatePlayTime = true;
   self.contentScaleFactor = [UIScreen mainScreen].scale;
   self.backgroundColor = [UIColor clearColor];
@@ -121,6 +123,7 @@ void DestoryFlushQueue() {
                                // referenced by global displayLink.
   [valueAnimator release];
   [pagPlayer release];
+  [self.updateTimeLock release];
   if (pagSurface != nil) {
     [pagSurface release];
   }
@@ -217,7 +220,6 @@ void DestoryFlushQueue() {
   if (self.needUpdatePlayTime) {
     return;
   }
-  [pagPlayer setProgress:[valueAnimator getAnimatedFraction]];
   [self updateView];
 }
 
@@ -399,8 +401,10 @@ void DestoryFlushQueue() {
 }
 
 - (void)setProgress:(double)value {
+  [self.updateTimeLock lock];
   [pagPlayer setProgress:value];
   self.needUpdatePlayTime = true;
+  [self.updateTimeLock unlock];
   [valueAnimator setRepeatedTimes:0];
   [self updateView];
 }
@@ -413,12 +417,19 @@ void DestoryFlushQueue() {
   if (self.isInBackground) {
     return false;
   }
+
+  [self.updateTimeLock lock];
+  if (!self.needUpdatePlayTime) {
+    [pagPlayer setProgress:[valueAnimator getAnimatedFraction]];
+  }
+
   BOOL result = [pagPlayer flush];
   if (self.needUpdatePlayTime) {
     int64_t currentPlayTime = (int64_t)([pagPlayer getProgress] * [pagPlayer duration]);
     [valueAnimator setCurrentPlayTime:currentPlayTime];
     self.needUpdatePlayTime = false;
   }
+  [self.updateTimeLock unlock];
   if (self.isPlaying && ![valueAnimator isPlaying] && self.bufferPrepared) {
     dispatch_async(dispatch_get_main_queue(), ^{
       [valueAnimator start];

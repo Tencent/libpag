@@ -36,8 +36,8 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     private PAGSurface pagSurface;
     private PAGFile pagFile;
     private ValueAnimator animator;
-    private boolean _isPlaying = false;
-    private Boolean _isAnimatorPreRunning = null;
+    private volatile boolean _isPlaying = false;
+    private volatile Boolean _isAnimatorPreRunning = null;
     private String filePath = "";
     private boolean isAttachedToWindow = false;
     private EGLContext sharedContext = null;
@@ -46,6 +46,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     private SparseArray<PAGImage> imageReplacementMap = new SparseArray<>();
     private boolean isSync = false;
     private volatile boolean needUpdatePlayTime = false;
+    private final Object updateLock = new Object();
 
     private static final Object g_HandlerLock = new Object();
     private static PAGViewHandler g_PAGViewHandler = null;
@@ -259,7 +260,6 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
             if (needUpdatePlayTime || !animation.isRunning()) {
                 return;
             }
-            pagPlayer.setProgress(animator.getAnimatedFraction());
             NeedsUpdateView(PAGView.this);
         }
     };
@@ -754,8 +754,10 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
      * Sets the progress of play position, the valid value is from 0.0 to 1.0.
      */
     public void setProgress(double value) {
-        pagPlayer.setProgress(value);
-        needUpdatePlayTime = true;
+        synchronized (updateLock) {
+            pagPlayer.setProgress(value);
+            needUpdatePlayTime = true;
+        }
         NeedsUpdateView(this);
     }
 
@@ -785,11 +787,17 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
      * called, there is no need to call it. Returns true if the content has changed.
      */
     public boolean flush() {
-        boolean result = pagPlayer.flush();
-        if (needUpdatePlayTime) {
-            long playTime = (long) (pagPlayer.getProgress() * pagPlayer.duration() / 1000);
-            animator.setCurrentPlayTime(playTime);
-            needUpdatePlayTime = false;
+        boolean result;
+        synchronized (updateLock) {
+            if (!needUpdatePlayTime) {
+                pagPlayer.setProgress(animator.getAnimatedFraction());
+            }
+            result = pagPlayer.flush();
+            if (needUpdatePlayTime) {
+                long playTime = (long) (pagPlayer.getProgress() * pagPlayer.duration() / 1000);
+                animator.setCurrentPlayTime(playTime);
+                needUpdatePlayTime = false;
+            }
         }
         if (_isPlaying && !animator.isRunning() && (pagSurface != null)) {
             startAnimator();
