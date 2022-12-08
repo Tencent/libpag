@@ -24,9 +24,9 @@
 #include "gpu/AAType.h"
 #include "gpu/FragmentProcessor.h"
 #include "gpu/GeometryProcessor.h"
-#include "gpu/Op.h"
 #include "gpu/OpsRenderPass.h"
 #include "gpu/Pipeline.h"
+#include "gpu/ops/Op.h"
 #include "tgfx/core/BlendMode.h"
 
 namespace tgfx {

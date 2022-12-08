@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ClearOp.h"
-#include "OpsRenderPass.h"
+#include "gpu/OpsRenderPass.h"
 
 namespace tgfx {
 std::unique_ptr<ClearOp> ClearOp::Make(Color color, const Rect& scissor) {

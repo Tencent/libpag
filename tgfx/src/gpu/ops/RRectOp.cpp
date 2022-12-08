@@ -17,11 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RRectOp.h"
-
-#include "GpuBuffer.h"
 #include "core/utils/MathExtra.h"
-#include "core/utils/UniqueID.h"
 #include "gpu/EllipseGeometryProcessor.h"
+#include "gpu/GpuBuffer.h"
 
 namespace tgfx {
 // We have three possible cases for geometry for a round rect.

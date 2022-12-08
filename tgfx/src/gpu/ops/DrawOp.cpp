@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawOp.h"
-#include "Gpu.h"
 #include "core/utils/Log.h"
+#include "gpu/Gpu.h"
 
 namespace tgfx {
 static std::shared_ptr<Texture> CreateDstTexture(OpsRenderPass* opsRenderPass, Rect dstRect,
