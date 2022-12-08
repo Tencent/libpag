@@ -414,16 +414,16 @@ void DestoryFlushQueue() {
     return false;
   }
   BOOL result = [pagPlayer flush];
-   if (self.needUpdatePlayTime) {
-       int64_t currentPlayTime = (int64_t)([pagPlayer getProgress] * [pagPlayer duration]);
-       [valueAnimator setCurrentPlayTime:currentPlayTime];
-       self.needUpdatePlayTime = false;
-   }
-    if (self.isPlaying && ![valueAnimator isPlaying] && self.bufferPrepared) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-          [valueAnimator start];
-        });
-    }
+  if (self.needUpdatePlayTime) {
+    int64_t currentPlayTime = (int64_t)([pagPlayer getProgress] * [pagPlayer duration]);
+    [valueAnimator setCurrentPlayTime:currentPlayTime];
+    self.needUpdatePlayTime = false;
+  }
+  if (self.isPlaying && ![valueAnimator isPlaying] && self.bufferPrepared) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+      [valueAnimator start];
+    });
+  }
   NSHashTable* copiedListeners = self.listeners.copy;
   for (id item in copiedListeners) {
     id<PAGViewListener> listener = (id<PAGViewListener>)item;
