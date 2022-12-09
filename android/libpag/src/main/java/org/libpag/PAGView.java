@@ -523,7 +523,6 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
             return;
         }
         if (isMainThread()) {
-            currentPlayTime = animator.getCurrentPlayTime();
             animator.start();
         } else {
             removeCallbacks(mAnimatorCancelRunnable);
@@ -533,6 +532,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
 
     private void cancelAnimator() {
         if (isMainThread()) {
+            currentPlayTime = animator.getCurrentPlayTime();
             animator.cancel();
         } else {
             removeCallbacks(mAnimatorStartRunnable);

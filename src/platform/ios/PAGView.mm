@@ -421,7 +421,6 @@ void DestoryFlushQueue() {
   if (!self.needUpdatePlayTime && self.bufferPrepared) {
     [pagPlayer setProgress:[valueAnimator getAnimatedFraction]];
   }
-
   BOOL result = [pagPlayer flush];
   if (self.needUpdatePlayTime && self.bufferPrepared) {
     int64_t currentPlayTime = (int64_t)([pagPlayer getProgress] * [pagPlayer duration]);
