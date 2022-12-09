@@ -489,7 +489,8 @@ void RenderCache::prepareImage(ID assetID, std::shared_ptr<tgfx::ImageCodec> cod
   if (imageTasks.count(assetID) != 0 || snapshotCaches.count(assetID) != 0) {
     return;
   }
-  auto task = ImageTask::MakeAndRun(std::move(codec), stage->getFileFromReferenceMap(assetID));
+  auto task =
+      ImageTask::MakeAndRun(std::move(codec), stage->getLayerFromReferenceMap(assetID)->getFile());
   if (task) {
     imageTasks[assetID] = task;
   }
@@ -632,20 +633,20 @@ SequenceReader* RenderCache::makeSequenceReader(Sequence* sequence) {
   if (!_videoEnabled && composition->type() == CompositionType::Video) {
     return reader;
   }
-  auto file = stage->getFileFromReferenceMap(composition->uniqueID);
+  auto pagFile = static_cast<PAGFile*>(stage->getLayerFromReferenceMap(composition->uniqueID));
   if (composition->type() == CompositionType::Bitmap) {
-    reader = new BitmapSequenceReader(file, static_cast<BitmapSequence*>(sequence));
+    reader = new BitmapSequenceReader(pagFile->getFile(), static_cast<BitmapSequence*>(sequence));
   } else {
     auto videoSequence = static_cast<VideoSequence*>(sequence);
 #ifdef PAG_BUILD_FOR_WEB
     if (VideoDecoder::HasExternalSoftwareDecoder()) {
-      auto demuxer = std::make_unique<VideoSequenceDemuxer>(file, videoSequence);
+      auto demuxer = std::make_unique<VideoSequenceDemuxer>(pagFile->getFile(), videoSequence);
       reader = new VideoReader(std::move(demuxer));
     } else {
-      reader = new VideoSequenceReader(file, videoSequence);
+      reader = new VideoSequenceReader(pagFile, videoSequence);
     }
 #else
-    auto demuxer = std::make_unique<VideoSequenceDemuxer>(file, videoSequence);
+    auto demuxer = std::make_unique<VideoSequenceDemuxer>(pagFile->getFile(), videoSequence);
     reader = new VideoReader(std::move(demuxer));
 #endif
   }

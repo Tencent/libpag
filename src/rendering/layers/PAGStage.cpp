@@ -66,12 +66,12 @@ uint32_t PAGStage::getContentVersion() const {
   return contentVersion;
 }
 
-std::shared_ptr<File> PAGStage::getFileFromReferenceMap(ID uniqueID) {
+PAGLayer* PAGStage::getLayerFromReferenceMap(ID uniqueID) {
   auto result = layerReferenceMap.find(uniqueID);
   if (result == layerReferenceMap.end()) {
     return nullptr;
   }
-  return result->second.front()->getFile();
+  return result->second.front();
 }
 
 void PAGStage::addReference(PAGLayer* pagLayer) {

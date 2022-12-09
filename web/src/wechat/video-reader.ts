@@ -46,6 +46,9 @@ export class VideoReader {
     return wx.getSystemInfoSync().platform === 'android';
   };
 
+  public isSought = false; // Web SDK use this property to check if video is seeked
+  public isPlaying = false; // Web SDK use this property to check if video is playing
+
   private readonly frameRate: number;
   private currentFrame: number;
   private mp4Path: string;
@@ -83,9 +86,7 @@ export class VideoReader {
   }
 
   public async prepare(targetFrame: number) {
-    if (targetFrame === this.currentFrame) {
-      return true;
-    }
+    if (targetFrame === this.currentFrame) return;
     // Wait for videoDecoder ready
     await this.videoDecoderPromise;
     if (this.frameDataBuffers.length > 0) {
@@ -94,7 +95,7 @@ export class VideoReader {
         this.frameDataBuffers = this.frameDataBuffers.slice(index);
         this.frameData = await this.getFrameData();
         this.currentFrame = targetFrame;
-        return true;
+        return;
       }
       this.frameDataBuffers = [];
     }
@@ -106,7 +107,7 @@ export class VideoReader {
     }
     this.frameData = await this.getFrameData();
     this.currentFrame = targetFrame;
-    return true;
+    return;
   }
 
   public renderToTexture(GL: EmscriptenGL, textureID: number) {
@@ -123,6 +124,22 @@ export class VideoReader {
       gl.UNSIGNED_BYTE,
       new Uint8Array(this.frameData!.data),
     );
+  }
+
+  public async play() {
+    // Web SDK use this function to play video.
+  }
+
+  public pause() {
+    // Web SDK use this function to pause video.
+  }
+
+  public stop() {
+    // Web SDK use this function to stop video.
+  }
+
+  public getError() {
+    // Web SDK use this function to get video error.
   }
 
   public onDestroy() {

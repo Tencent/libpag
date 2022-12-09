@@ -7,9 +7,15 @@ export interface TimeRange {
 }
 
 export interface VideoReader {
-  prepare: (targetFrame: number) => Promise<boolean>;
+  isSought: boolean;
+  isPlaying: boolean;
+  prepare: (targetFrame: number, playbackRate: number) => Promise<void>;
   renderToTexture: (GL: EmscriptenGL, textureID: number) => void;
+  getError: () => any;
   onDestroy: () => void;
+  play: () => Promise<void>;
+  pause: () => void;
+  stop: () => void;
 }
 
 export interface VideoDecoderConstructor {
