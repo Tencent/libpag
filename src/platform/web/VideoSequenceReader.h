@@ -21,6 +21,7 @@
 #include <emscripten/val.h>
 #include <pag/gpu.h>
 #include "pag/file.h"
+#include "pag/pag.h"
 #include "rendering/sequences/SequenceReader.h"
 #include "tgfx/gpu/opengl/GLTexture.h"
 
@@ -44,7 +45,7 @@ class WebVideoTexture : public tgfx::GLTexture {
 
 class VideoSequenceReader : public SequenceReader {
  public:
-  VideoSequenceReader(std::shared_ptr<File> file, VideoSequence* sequence);
+  VideoSequenceReader(PAGLayer* pagLayer, VideoSequence* sequence);
 
   ~VideoSequenceReader() override;
 
@@ -66,6 +67,7 @@ class VideoSequenceReader : public SequenceReader {
  private:
   // Keep a reference to the File in case the Sequence object is released while we are using it.
   std::shared_ptr<File> file = nullptr;
+  PAGFile* rootFile = nullptr;
   emscripten::val videoReader = emscripten::val::null();
   std::shared_ptr<WebVideoTexture> webVideoTexture = nullptr;
   int32_t width = 0;

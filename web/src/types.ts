@@ -117,6 +117,7 @@ export interface PAG extends EmscriptenModule {
   traceImage: (info: { width: number; height: number }, pixels: Uint8Array, tag: string) => void;
   registerSoftwareDecoderFactory: (factory: SoftwareDecoderFactory | null) => void;
   SDKVersion: () => string;
+  currentPlayer: PAGPlayer | null;
   [key: string]: any;
 }
 

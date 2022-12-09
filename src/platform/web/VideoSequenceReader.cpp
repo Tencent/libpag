@@ -73,9 +73,9 @@ void WebVideoTexture::onReleaseGPU() {
   }
 }
 
-VideoSequenceReader::VideoSequenceReader(std::shared_ptr<File> file, VideoSequence* sequence)
+VideoSequenceReader::VideoSequenceReader(PAGLayer* pagLayer, VideoSequence* sequence)
     : SequenceReader(sequence->duration(), sequence->composition->staticContent()),
-      file(std::move(file)) {
+      file(pagLayer->getFile()), rootFile(pagLayer->rootFile) {
   width = sequence->getVideoWidth();
   height = sequence->getVideoHeight();
   auto videoReaderClass = val::module_property("VideoReader");
@@ -126,7 +126,11 @@ VideoSequenceReader::~VideoSequenceReader() {
 void VideoSequenceReader::prepare(Frame targetFrame) {
   // Web 端渲染过程不能 await，否则会把渲染一半的 Canvas 上屏。
   if (videoReader.as<bool>()) {
-    videoReader.call<val>("prepare", static_cast<int>(targetFrame)).await();
+    float playbackRate = 1;
+    if (rootFile != nullptr && rootFile->timeStretchMode() == PAGTimeStretchMode::Scale) {
+      playbackRate = file->duration() / ((rootFile->duration() / 1000000) * rootFile->frameRate());
+    }
+    videoReader.call<val>("prepare", static_cast<int>(targetFrame), playbackRate).await();
   }
 }
 
