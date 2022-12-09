@@ -143,6 +143,7 @@ static int64_t GetCurrentTimeUS() {
   playTime = time;
   startTime += gapTime % duration;
   animatedFraction = static_cast<double>(playTime) / duration;
+  [animatorListener onAnimationUpdate];
 }
 
 - (BOOL)isPlaying {

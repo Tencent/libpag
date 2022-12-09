@@ -217,9 +217,6 @@ void DestoryFlushQueue() {
 }
 
 - (void)onAnimationUpdate {
-  if (self.needUpdatePlayTime) {
-    return;
-  }
   [self updateView];
 }
 
@@ -294,10 +291,12 @@ void DestoryFlushQueue() {
 }
 
 - (void)doPlay {
-  if (!_isVisible || !self.bufferPrepared) {
+  if (!_isVisible) {
     return;
   }
-  [self updateView];
+  int64_t playTime = (int64_t)([valueAnimator getAnimatedFraction] * [valueAnimator duration]);
+  [valueAnimator setCurrentPlayTime:playTime];
+  [valueAnimator start];
 }
 
 - (void)stop {
@@ -419,22 +418,17 @@ void DestoryFlushQueue() {
   }
 
   [self.updateTimeLock lock];
-  if (!self.needUpdatePlayTime) {
+  if (!self.needUpdatePlayTime && self.bufferPrepared) {
     [pagPlayer setProgress:[valueAnimator getAnimatedFraction]];
   }
 
   BOOL result = [pagPlayer flush];
-  if (self.needUpdatePlayTime) {
+  if (self.needUpdatePlayTime && self.bufferPrepared) {
     int64_t currentPlayTime = (int64_t)([pagPlayer getProgress] * [pagPlayer duration]);
     [valueAnimator setCurrentPlayTime:currentPlayTime];
     self.needUpdatePlayTime = false;
   }
   [self.updateTimeLock unlock];
-  if (self.isPlaying && ![valueAnimator isPlaying] && self.bufferPrepared) {
-    dispatch_async(dispatch_get_main_queue(), ^{
-      [valueAnimator start];
-    });
-  }
   NSHashTable* copiedListeners = self.listeners.copy;
   for (id item in copiedListeners) {
     id<PAGViewListener> listener = (id<PAGViewListener>)item;
