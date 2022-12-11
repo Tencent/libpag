@@ -46,7 +46,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     private SparseArray<PAGImage> imageReplacementMap = new SparseArray<>();
     private boolean isSync = false;
     private volatile boolean progressExplicitlySet = false;
-    private final Object updateLock = new Object();
+    private final Object updateTimeLock = new Object();
 
     private static final Object g_HandlerLock = new Object();
     private static PAGViewHandler g_PAGViewHandler = null;
@@ -754,7 +754,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
      * Sets the progress of play position, the valid value is from 0.0 to 1.0.
      */
     public void setProgress(double value) {
-        synchronized (updateLock) {
+        synchronized (updateTimeLock) {
             pagPlayer.setProgress(value);
             progressExplicitlySet = true;
         }
@@ -792,15 +792,15 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
             result = pagPlayer.flush();
             return result;
         }
-        synchronized (updateLock) {
-            if (!progressExplicitlySet) {
-                pagPlayer.setProgress(animator.getAnimatedFraction());
-            }
-            result = pagPlayer.flush();
+        synchronized (updateTimeLock) {
             if (progressExplicitlySet) {
+                result = pagPlayer.flush();
                 long playTime = (long) (pagPlayer.getProgress() * pagPlayer.duration() / 1000);
                 animator.setCurrentPlayTime(playTime);
                 progressExplicitlySet = false;
+            } else {
+                pagPlayer.setProgress(animator.getAnimatedFraction());
+                result = pagPlayer.flush();
             }
         }
         ArrayList<PAGViewListener> arrayList;

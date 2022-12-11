@@ -18,11 +18,11 @@
 
 #import "PAGValueAnimator.h"
 #include <chrono>
-#include <mutex>
 
 @interface PAGValueAnimator ()
 @property(atomic, assign) NSInteger animatorId;
 @end
+
 @implementation PAGValueAnimator
 
 static CADisplayLink* caDisplayLink = NULL;

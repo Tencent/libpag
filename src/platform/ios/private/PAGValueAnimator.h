@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import <QuartzCore/QuartzCore.h>
 #import <mutex>
+#import <QuartzCore/QuartzCore.h>
 
 @protocol PAGValueAnimatorListener <NSObject>
 
