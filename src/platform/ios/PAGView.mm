@@ -39,9 +39,10 @@ void DestoryFlushQueue() {
 @property(atomic, assign) BOOL bufferPrepared;
 @property(atomic, assign) BOOL isInBackground;
 @property(atomic, strong) NSHashTable* listeners;
-@property(atomic, assign) BOOL needUpdatePlayTime;
+@property(atomic, assign) BOOL progressExplicitlySet;
 @property(nonatomic, strong) NSLock* updateTimeLock;
-
+@property(atomic, assign) BOOL isVisible;
+@property(atomic, assign) BOOL isPlaying;
 @end
 
 @implementation PAGView {
@@ -50,11 +51,11 @@ void DestoryFlushQueue() {
   PAGFile* pagFile;
   NSString* filePath;
   PAGValueAnimator* valueAnimator;
-  BOOL _isPlaying;
-  BOOL _isVisible;
   NSMutableDictionary* textReplacementMap;
   NSMutableDictionary* imageReplacementMap;
 }
+
+@synthesize isPlaying = _isPlaying;
 
 + (NSOperationQueue*)FlushQueue {
   static dispatch_once_t onceToken;
@@ -87,15 +88,15 @@ void DestoryFlushQueue() {
   self.listeners = [[NSHashTable weakObjectsHashTable] retain];
   textReplacementMap = [[NSMutableDictionary dictionary] retain];
   imageReplacementMap = [[NSMutableDictionary dictionary] retain];
-  _isPlaying = FALSE;
-  _isVisible = FALSE;
+  self.isPlaying = FALSE;
+  self.isVisible = FALSE;
   self.isInBackground =
       [UIApplication sharedApplication].applicationState == UIApplicationStateBackground;
   self.isAsyncFlushing = FALSE;
   pagFile = nil;
   filePath = nil;
   self.updateTimeLock = [[NSLock alloc] init];
-  self.needUpdatePlayTime = true;
+  self.progressExplicitlySet = TRUE;
   self.contentScaleFactor = [UIScreen mainScreen].scale;
   self.backgroundColor = [UIColor clearColor];
   pagPlayer = [[PAGPlayer alloc] init];
@@ -190,20 +191,20 @@ void DestoryFlushQueue() {
 
 - (void)checkVisible {
   BOOL visible = self.window && !self.isHidden && self.alpha > 0.0;
-  if (_isVisible == visible) {
+  if (self.isVisible == visible) {
     return;
   }
-  _isVisible = visible;
-  if (_isVisible) {
+  self.isVisible = visible;
+  if (self.isVisible) {
     ///先调用doPlay·doPlay会获取composition的duration，如果先初始化PAGSurface会让composition被锁，导致异步失效
-    if (_isPlaying) {
+    if (self.isPlaying) {
       [self doPlay];
     }
     if (pagSurface == nil) {
       [self initPAGSurface];
     }
   } else {
-    if (_isPlaying) {
+    if (self.isPlaying) {
       [valueAnimator stop:false];
     }
   }
@@ -235,7 +236,7 @@ void DestoryFlushQueue() {
 }
 
 - (void)onAnimationEnd {
-  _isPlaying = false;
+  self.isPlaying = FALSE;
   NSHashTable* copiedListeners = self.listeners.copy;
   for (id item in copiedListeners) {
     id<PAGViewListener> listener = (id<PAGViewListener>)item;
@@ -282,8 +283,12 @@ void DestoryFlushQueue() {
   return _isPlaying;
 }
 
+- (void)setIsPlaying:(BOOL)value {
+  _isPlaying = value;
+}
+
 - (void)play {
-  _isPlaying = true;
+  self.isPlaying = TRUE;
   if ([valueAnimator getAnimatedFraction] == 1.0) {
     [self setProgress:0];
   }
@@ -291,7 +296,7 @@ void DestoryFlushQueue() {
 }
 
 - (void)doPlay {
-  if (!_isVisible) {
+  if (!self.isVisible) {
     return;
   }
   int64_t playTime = (int64_t)([valueAnimator getAnimatedFraction] * [valueAnimator duration]);
@@ -300,7 +305,7 @@ void DestoryFlushQueue() {
 }
 
 - (void)stop {
-  _isPlaying = false;
+  self.isPlaying = FALSE;
   [valueAnimator stop];
 }
 
@@ -402,9 +407,8 @@ void DestoryFlushQueue() {
 - (void)setProgress:(double)value {
   [self.updateTimeLock lock];
   [pagPlayer setProgress:value];
-  self.needUpdatePlayTime = true;
+  self.progressExplicitlySet = TRUE;
   [self.updateTimeLock unlock];
-  [valueAnimator setRepeatedTimes:0];
   [self updateView];
 }
 
@@ -416,16 +420,20 @@ void DestoryFlushQueue() {
   if (self.isInBackground) {
     return false;
   }
-
-  [self.updateTimeLock lock];
-  if (!self.needUpdatePlayTime && self.bufferPrepared) {
-    [pagPlayer setProgress:[valueAnimator getAnimatedFraction]];
+  BOOL result;
+  if (!self.bufferPrepared) {
+    result = [pagPlayer flush];
+    return result;
   }
-  BOOL result = [pagPlayer flush];
-  if (self.needUpdatePlayTime && self.bufferPrepared) {
+  [self.updateTimeLock lock];
+  if (self.progressExplicitlySet) {
+    result = [pagPlayer flush];
     int64_t currentPlayTime = (int64_t)([pagPlayer getProgress] * [pagPlayer duration]);
     [valueAnimator setCurrentPlayTime:currentPlayTime];
-    self.needUpdatePlayTime = false;
+    self.progressExplicitlySet = FALSE;
+  } else {
+    [pagPlayer setProgress:[valueAnimator getAnimatedFraction]];
+    result = [pagPlayer flush];
   }
   [self.updateTimeLock unlock];
   NSHashTable* copiedListeners = self.listeners.copy;
@@ -479,7 +487,7 @@ void DestoryFlushQueue() {
 
 - (void)applicationDidBecomeActive:(NSNotification*)notification {
   self.isInBackground = FALSE;
-  if (_isVisible) {
+  if (self.isVisible) {
     [self updateView];
   }
 }

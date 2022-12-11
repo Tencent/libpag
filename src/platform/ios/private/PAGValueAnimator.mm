@@ -20,6 +20,9 @@
 #include <chrono>
 #include <mutex>
 
+@interface PAGValueAnimator ()
+@property(atomic, assign) NSInteger animatorId;
+@end
 @implementation PAGValueAnimator
 
 static CADisplayLink* caDisplayLink = NULL;
@@ -87,7 +90,7 @@ static int64_t GetCurrentTimeUS() {
   duration = 0;
   startTime = 0;
   playTime = 0;
-  animatorId = NSIntegerMax;
+  self.animatorId = NSIntegerMax;
   animatorListener = nil;
   repeatCount = 0;
   repeatedTimes = 0;
@@ -96,12 +99,11 @@ static int64_t GetCurrentTimeUS() {
 }
 
 - (void)onAnimationFrame:(int64_t)timestamp {
-  valueAnimatorLocker.lock();
+  std::lock_guard<std::mutex> autoLock(lock);
   auto count = (timestamp - startTime) / duration;
   if (repeatCount >= 0 && count > repeatCount) {
     playTime = duration;
     animatedFraction = 1.0;
-    valueAnimatorLocker.unlock();
     [self stop:false];
     [animatorListener onAnimationUpdate];
     [animatorListener onAnimationEnd];
@@ -111,31 +113,33 @@ static int64_t GetCurrentTimeUS() {
     }
     playTime = (timestamp - startTime) % duration;
     animatedFraction = static_cast<double>(playTime) / duration;
-    valueAnimatorLocker.unlock();
     [animatorListener onAnimationUpdate];
   }
   repeatedTimes = (int)count;
 }
 
 - (void)setListener:(id)listener {
+  std::lock_guard<std::mutex> autoLock(lock);
   animatorListener = listener;
 }
 
 - (int64_t)duration {
+  std::lock_guard<std::mutex> autoLock(lock);
   return duration;
 }
 
 - (void)setDuration:(int64_t)value {
+  std::lock_guard<std::mutex> autoLock(lock);
   duration = value;
 }
 
 - (double)getAnimatedFraction {
-  std::lock_guard<std::mutex> autoLock(valueAnimatorLocker);
+  std::lock_guard<std::mutex> autoLock(lock);
   return animatedFraction;
 }
 
 - (void)setCurrentPlayTime:(int64_t)time {
-  std::lock_guard<std::mutex> autoLock(valueAnimatorLocker);
+  std::lock_guard<std::mutex> autoLock(lock);
   if (duration <= 0) {
     return;
   }
@@ -147,15 +151,7 @@ static int64_t GetCurrentTimeUS() {
 }
 
 - (BOOL)isPlaying {
-  return animatorId != NSIntegerMax;
-}
-
-- (int)repeatedTimes {
-  return repeatedTimes;
-}
-
-- (void)setRepeatedTimes:(int)value {
-  repeatedTimes = value;
+  return self.animatorId != NSIntegerMax;
 }
 
 /**
@@ -163,14 +159,16 @@ static int64_t GetCurrentTimeUS() {
  * will play only once. -1 means the animation will play infinity times.
  */
 - (void)setRepeatCount:(int)value {
+  std::lock_guard<std::mutex> autoLock(lock);
   repeatCount = value;
 }
 
 - (void)start {
-  if (duration <= 0 || animatorId != NSIntegerMax || animatorListener == nil) {
+  std::lock_guard<std::mutex> autoLock(lock);
+  if (duration <= 0 || self.animatorId != NSIntegerMax || animatorListener == nil) {
     return;
   }
-  animatorId = [PAGValueAnimator AddAnimator:self];
+  self.animatorId = [PAGValueAnimator AddAnimator:self];
   startTime = GetCurrentTimeUS() - playTime % duration - repeatedTimes * duration;
   animatedFraction = static_cast<double>(playTime) / duration;
   [animatorListener onAnimationUpdate];
@@ -184,18 +182,14 @@ static int64_t GetCurrentTimeUS() {
 }
 
 - (void)stop:(bool)notification {
-  if (animatorId == NSIntegerMax) {
+  if (self.animatorId == NSIntegerMax) {
     return;
   }
-  [PAGValueAnimator RemoveAnimator:animatorId];
-  animatorId = NSIntegerMax;
+  [PAGValueAnimator RemoveAnimator:self.animatorId];
+  self.animatorId = NSIntegerMax;
   if (notification) {
     [animatorListener onAnimationCancel];
   }
-}
-
-- (int64_t)animatorId {
-  return animatorId;
 }
 
 @end

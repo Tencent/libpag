@@ -45,7 +45,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     private SparseArray<PAGText> textReplacementMap = new SparseArray<>();
     private SparseArray<PAGImage> imageReplacementMap = new SparseArray<>();
     private boolean isSync = false;
-    private volatile boolean needUpdatePlayTime = false;
+    private volatile boolean progressExplicitlySet = false;
     private final Object updateLock = new Object();
 
     private static final Object g_HandlerLock = new Object();
@@ -320,7 +320,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     private void setupSurfaceTexture() {
         Lifecycle.getInstance().addListener(this);
         setOpaque(false);
-        needUpdatePlayTime = true;
+        progressExplicitlySet = true;
         pagPlayer = new PAGPlayer();
         setSurfaceTextureListener(this);
         animator = ValueAnimator.ofFloat(0.0f, 1.0f);
@@ -756,7 +756,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     public void setProgress(double value) {
         synchronized (updateLock) {
             pagPlayer.setProgress(value);
-            needUpdatePlayTime = true;
+            progressExplicitlySet = true;
         }
         NeedsUpdateView(this);
     }
@@ -788,15 +788,19 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
      */
     public boolean flush() {
         boolean result;
+        if (pagSurface == null) {
+            result = pagPlayer.flush();
+            return result;
+        }
         synchronized (updateLock) {
-            if (!needUpdatePlayTime && (pagSurface != null)) {
+            if (!progressExplicitlySet) {
                 pagPlayer.setProgress(animator.getAnimatedFraction());
             }
             result = pagPlayer.flush();
-            if (needUpdatePlayTime && (pagSurface != null)) {
+            if (progressExplicitlySet) {
                 long playTime = (long) (pagPlayer.getProgress() * pagPlayer.duration() / 1000);
                 animator.setCurrentPlayTime(playTime);
-                needUpdatePlayTime = false;
+                progressExplicitlySet = false;
             }
         }
         ArrayList<PAGViewListener> arrayList;
