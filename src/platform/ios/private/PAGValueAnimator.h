@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import <QuartzCore/QuartzCore.h>
+#import <mutex>
 
 @protocol PAGValueAnimatorListener <NSObject>
 
@@ -39,8 +40,8 @@
   int repeatCount;
   int repeatedTimes;
   double animatedFraction;
-  NSUInteger animatorId;
   id<PAGValueAnimatorListener> animatorListener;
+  std::mutex lock;
 }
 
 - (void)setListener:(id)listener;
@@ -55,10 +56,6 @@
 
 - (BOOL)isPlaying;
 
-- (int)repeatedTimes;
-
-- (void)setRepeatedTimes:(int)value;
-
 - (void)setRepeatCount:(int)value;
 
 - (void)start;
@@ -66,7 +63,5 @@
 - (void)stop;
 
 - (void)stop:(bool)notification;
-
-- (int64_t)animatorId;
 
 @end

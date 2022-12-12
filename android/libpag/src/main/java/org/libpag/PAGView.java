@@ -36,8 +36,8 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     private PAGSurface pagSurface;
     private PAGFile pagFile;
     private ValueAnimator animator;
-    private boolean _isPlaying = false;
-    private Boolean _isAnimatorPreRunning = null;
+    private volatile boolean _isPlaying = false;
+    private volatile Boolean _isAnimatorPreRunning = null;
     private String filePath = "";
     private boolean isAttachedToWindow = false;
     private EGLContext sharedContext = null;
@@ -45,6 +45,8 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     private SparseArray<PAGText> textReplacementMap = new SparseArray<>();
     private SparseArray<PAGImage> imageReplacementMap = new SparseArray<>();
     private boolean isSync = false;
+    private volatile boolean progressExplicitlySet = true;
+    private final Object updateTimeLock = new Object();
 
     private static final Object g_HandlerLock = new Object();
     private static PAGViewHandler g_PAGViewHandler = null;
@@ -275,6 +277,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         @Override
         public void onAnimationEnd(Animator animation) {
             super.onAnimationEnd(animation);
+            _isPlaying = false;
             // Align with iOS platform, avoid triggering this method when stopping
             int repeatCount = ((ValueAnimator) animation).getRepeatCount();
             if (repeatCount >= 0 && (animation.getDuration() > 0) &&
@@ -495,7 +498,6 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         animator.setCurrentPlayTime(currentPlayTime);
         startAnimator();
     }
-
     private Runnable mAnimatorCancelRunnable = new Runnable() {
         @Override
         public void run() {
@@ -636,6 +638,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         filePath = null;
         pagFile = null;
         pagPlayer.setComposition(newComposition);
+        progressExplicitlySet = true;
         long duration = pagPlayer.duration();
         animator.setDuration(duration / 1000);
     }
@@ -744,16 +747,18 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
      * Returns the current progress of play position, the value is from 0.0 to 1.0.
      */
     public double getProgress() {
-        return animator.getAnimatedFraction();
+        return pagPlayer.getProgress();
     }
 
     /**
      * Sets the progress of play position, the valid value is from 0.0 to 1.0.
      */
     public void setProgress(double value) {
-        value = Math.max(0, Math.min(value, 1));
-        currentPlayTime = (long) (value * animator.getDuration());
-        animator.setCurrentPlayTime(currentPlayTime);
+        synchronized (updateTimeLock) {
+            pagPlayer.setProgress(value);
+            progressExplicitlySet = true;
+        }
+        NeedsUpdateView(this);
     }
 
     /**
@@ -775,8 +780,22 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
      * called, there is no need to call it. Returns true if the content has changed.
      */
     public boolean flush() {
-        pagPlayer.setProgress(animator.getAnimatedFraction());
-        boolean result = pagPlayer.flush();
+        boolean result;
+        if (pagSurface == null) {
+            result = pagPlayer.flush();
+            return result;
+        }
+        synchronized (updateTimeLock) {
+            if (progressExplicitlySet) {
+                result = pagPlayer.flush();
+                long playTime = (long) (pagPlayer.getProgress() * pagPlayer.duration() / 1000);
+                animator.setCurrentPlayTime(playTime);
+                progressExplicitlySet = false;
+            } else {
+                pagPlayer.setProgress(animator.getAnimatedFraction());
+                result = pagPlayer.flush();
+            }
+        }
         ArrayList<PAGViewListener> arrayList;
         synchronized (PAGView.this) {
             arrayList = new ArrayList<>(mViewListeners);
