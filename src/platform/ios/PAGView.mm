@@ -96,7 +96,6 @@ void DestoryFlushQueue() {
   pagFile = nil;
   filePath = nil;
   self.updateTimeLock = [[NSLock alloc] init];
-  self.progressExplicitlySet = TRUE;
   self.contentScaleFactor = [UIScreen mainScreen].scale;
   self.backgroundColor = [UIColor clearColor];
   pagPlayer = [[PAGPlayer alloc] init];
@@ -345,6 +344,7 @@ void DestoryFlushQueue() {
     pagFile = nil;
   }
   [pagPlayer setComposition:newComposition];
+  self.progressExplicitlySet = TRUE;
   [valueAnimator setDuration:[pagPlayer duration]];
 }
 
@@ -422,6 +422,7 @@ void DestoryFlushQueue() {
   }
   BOOL result;
   if (!self.bufferPrepared) {
+    // surface 需要在主线程创建，子线程调用时需要先通过 flush 方法触发创建
     result = [pagPlayer flush];
     return result;
   }

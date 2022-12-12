@@ -45,7 +45,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     private SparseArray<PAGText> textReplacementMap = new SparseArray<>();
     private SparseArray<PAGImage> imageReplacementMap = new SparseArray<>();
     private boolean isSync = false;
-    private volatile boolean progressExplicitlySet = false;
+    private volatile boolean progressExplicitlySet = true;
     private final Object updateTimeLock = new Object();
 
     private static final Object g_HandlerLock = new Object();
@@ -320,7 +320,6 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     private void setupSurfaceTexture() {
         Lifecycle.getInstance().addListener(this);
         setOpaque(false);
-        progressExplicitlySet = true;
         pagPlayer = new PAGPlayer();
         setSurfaceTextureListener(this);
         animator = ValueAnimator.ofFloat(0.0f, 1.0f);
@@ -639,6 +638,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         filePath = null;
         pagFile = null;
         pagPlayer.setComposition(newComposition);
+        progressExplicitlySet = true;
         long duration = pagPlayer.duration();
         animator.setDuration(duration / 1000);
     }
