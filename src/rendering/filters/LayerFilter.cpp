@@ -239,7 +239,7 @@ void LayerFilter::draw(tgfx::Context* context, const FilterSource* source,
   gl->blendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
   gl->bindFramebuffer(GL_FRAMEBUFFER, target->frameBuffer.id);
   gl->viewport(0, 0, target->width, target->height);
-  ActiveGLTexture(context, 0, &source->sampler);
+  ActiveGLTexture(context, 0, &source->sampler, textureWrapMode());
   gl->uniformMatrix3fv(vertexMatrixHandle, 1, GL_FALSE, target->vertexMatrix.data());
   gl->uniformMatrix3fv(textureMatrixHandle, 1, GL_FALSE, source->textureMatrix.data());
   onUpdateParams(context, contentBounds, filterScale);

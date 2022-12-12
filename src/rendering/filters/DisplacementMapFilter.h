@@ -28,7 +28,12 @@ class DisplacementMapFilter : public LayerFilter {
   explicit DisplacementMapFilter(Effect* effect);
   ~DisplacementMapFilter() override = default;
 
-  void updateMapTexture(RenderCache* cache, const Graphic* mapGraphic, const tgfx::Rect& bounds);
+  void update(Frame layerFrame, const tgfx::Rect& contentBounds,
+              const tgfx::Rect& transformedBounds, const tgfx::Point& filterScale) override;
+
+  void updateMapTexture(RenderCache* cache, const Graphic* mapGraphic, const Point& size,
+                        const Point& displacementSize, const tgfx::Matrix& layerMatrix,
+                        const tgfx::Rect& contentBounds);
 
  protected:
   std::string onBuildFragmentShader() override;
@@ -38,17 +43,31 @@ class DisplacementMapFilter : public LayerFilter {
   void onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
                       const tgfx::Point& filterScale) override;
 
+  int textureWrapMode() const override;
+
  private:
   Effect* effect = nullptr;
-  tgfx::Rect mapBounds = {};
+  Enum useForHorizontalDisplacement = DisplacementMapSource::Red;
+  float maxHorizontalDisplacement = 0.f;
+  Enum useForVerticalDisplacement = DisplacementMapSource::Red;
+  float maxVerticalDisplacement = 0.f;
+  Enum displacementMapBehavior = DisplacementMapBehavior::CenterMap;
+  bool edgeBehavior = false;
+  bool expandOutput = true;
+  float effectOpacity = 1.f;
+  Point _size = Point::Zero();
+  Point _displacementSize = Point::Zero();
+  tgfx::Matrix _layerMatrix = tgfx::Matrix::I();
   std::shared_ptr<tgfx::Surface> mapSurface = nullptr;
 
-  int useForDisplacementHandle = 0;
-  int maxDisplacementHandle = 0;
-  int displacementMapBehaviorHandle = 0;
-  int edgeBehaviorHandle = 0;
-  int expandOutputHandle = 0;
+  int flagsHandle = 0;
+  int inputMatrixHandle = 0;
+  int mapMatrixHandle = 0;
+  int inputSizeHandle = 0;
+  int selectorMatrixRGBAHandle = 0;
+  int selectorMatrixHSLAHandle = 0;
+  int selectorOffsetHandle = 0;
   int mapTextureHandle = 0;
-  int mapTextureSizeHandle = 0;
+  int effectOpacityHandle = 0;
 };
 }  // namespace pag
