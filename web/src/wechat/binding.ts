@@ -61,4 +61,5 @@ export const binding = (module: PAG) => {
   module.SDKVersion = function () {
     return module._SDKVersion();
   };
+  module.currentPlayer = null;
 };

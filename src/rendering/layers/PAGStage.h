@@ -116,7 +116,7 @@ class PAGStage : public PAGComposition {
 
   static tgfx::Point GetLayerContentScaleFactor(PAGLayer* pagLayer, bool isPAGImage);
   PAGStage(int width, int height);
-  std::shared_ptr<File> getFileFromReferenceMap(ID uniqueID);
+  pag::PAGFile* getAssociatedPAGFile(ID uniqueID);
   void addToReferenceMap(ID uniqueID, PAGLayer* pagLayer);
   bool removeFromReferenceMap(ID uniqueID, PAGLayer* pagLayer);
   float getMaxScaleFactor(ID referenceID);
