@@ -101,14 +101,17 @@ PAG_TEST_F(PAGBlendTest, CopyDstTexture) {
  * 用例描述: 替换的texture是BottomLeft，renderTarget是TopLeft
  */
 PAG_TEST_F(PAGBlendTest, TextureBottomLeft) {
+  LOGI("----------line：%d----------------\n", __LINE__);
   auto width = 720;
   auto height = 1280;
   auto device = GLDevice::Make();
+  LOGI("----------line：%d----------------\n", __LINE__);
   if (device == nullptr) {
     LOGI("----------device  is nullptr-----------------\n");
   }
   auto replaceTextureInfo = GetBottomLeftImage(device, width, height);
   auto context = device->lockContext();
+  LOGI("----------line：%d----------------\n", __LINE__);
   ASSERT_TRUE(context != nullptr);
   auto backendTexture = ToBackendTexture(replaceTextureInfo, width, height);
   LOGI("----------line：%d----------------\n", __LINE__);
