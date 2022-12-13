@@ -18,25 +18,40 @@
 
 #pragma once
 
-#include "Op.h"
-#include "RenderTask.h"
-#include "tgfx/gpu/Surface.h"
+#include <optional>
+#include "gpu/ops/DrawOp.h"
 
 namespace tgfx {
-class OpsTask : public RenderTask {
+class FillRectOp : public DrawOp {
  public:
-  OpsTask(std::shared_ptr<RenderTarget> renderTarget, std::shared_ptr<Texture> texture)
-      : RenderTask(std::move(renderTarget)), renderTargetTexture(std::move(texture)) {
-  }
+  static std::unique_ptr<FillRectOp> Make(std::optional<Color> color, const Rect& rect,
+                                          const Matrix& viewMatrix,
+                                          const Matrix& localMatrix = Matrix::I());
 
-  ~OpsTask();
+  bool add(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
+           const Matrix& localMatrix);
 
-  void addOp(std::unique_ptr<Op> op);
-
-  bool execute(Gpu* gpu) override;
+  void execute(OpsRenderPass* opsRenderPass) override;
 
  private:
-  std::shared_ptr<Texture> renderTargetTexture = nullptr;
-  std::vector<std::unique_ptr<Op>> ops;
+  DEFINE_OP_CLASS_ID
+
+  FillRectOp(std::optional<Color> color, const Rect& rect, const Matrix& viewMatrix,
+             const Matrix& localMatrix);
+
+  bool onCombineIfPossible(Op* op) override;
+
+  bool canAdd(size_t count) const;
+
+  std::vector<float> vertices();
+
+  std::vector<float> coverageVertices() const;
+
+  std::vector<float> noCoverageVertices() const;
+
+  std::vector<Color> colors;
+  std::vector<Rect> rects;
+  std::vector<Matrix> viewMatrices;
+  std::vector<Matrix> localMatrices;
 };
 }  // namespace tgfx

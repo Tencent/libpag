@@ -58,12 +58,14 @@ void GLPorterDuffXferProcessor::emitCode(const EmitArgs& args) {
     fragBuilder->codeAppend(";");
   }
 
-  const char* outColor = args.outputColor.c_str();
+  const char* outColor = "localOutputColor";
+  fragBuilder->codeAppendf("vec4 %s;", outColor);
   const auto* pdXP = static_cast<const PorterDuffXferProcessor*>(args.xferProcessor);
   AppendMode(fragBuilder, args.inputColor, dstColor, outColor, pdXP->getBlend());
   fragBuilder->codeAppendf("%s = %s * %s + (vec4(1.0) - %s) * %s;", outColor,
                            args.inputCoverage.c_str(), outColor, args.inputCoverage.c_str(),
                            dstColor.c_str());
+  fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), outColor);
 }
 
 void GLPorterDuffXferProcessor::setData(const ProgramDataManager& programDataManager,

@@ -19,7 +19,7 @@
 #pragma once
 
 #include "gpu/BufferProvider.h"
-#include "gpu/TriangulatingPathOp.h"
+#include "gpu/ops/TriangulatingPathOp.h"
 #include "tgfx/core/Mesh.h"
 
 namespace tgfx {

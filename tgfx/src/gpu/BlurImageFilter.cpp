@@ -67,7 +67,7 @@ static std::tuple<int, float, float> Get(float blurriness) {
 
 std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrinessY,
                                                TileMode tileMode, const Rect& cropRect) {
-  if (blurrinessX <= 0 || blurrinessY <= 0) {
+  if (blurrinessX < 0 || blurrinessY < 0 || (blurrinessX == 0 && blurrinessY == 0)) {
     return nullptr;
   }
   auto x = Get(blurrinessX);
