@@ -104,17 +104,25 @@ PAG_TEST_F(PAGBlendTest, TextureBottomLeft) {
   auto width = 720;
   auto height = 1280;
   auto device = GLDevice::Make();
+  if (device == nullptr) {
+    LOGI("----------device  is nullptr-----------------\n");
+  }
   auto replaceTextureInfo = GetBottomLeftImage(device, width, height);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto backendTexture = ToBackendTexture(replaceTextureInfo, width, height);
+  LOGI("----------line：%d----------------\n", __LINE__);
   auto replaceImage = PAGImage::FromTexture(backendTexture, ImageOrigin::BottomLeft);
   tgfx::GLSampler textureInfo;
   CreateGLTexture(context, width, height, &textureInfo);
   backendTexture = ToBackendTexture(textureInfo, width, height);
   auto pagSurface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::TopLeft);
+  if (pagSurface == nullptr) {
+    LOGI("----------device  is nullptr-----------------\n");
+  }
   device->unlock();
 
+  LOGI("----------line：%d----------------\n", __LINE__);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
   auto pagFile = PAGFile::Load("../resources/apitest/texture_bottom_left.pag");
@@ -124,12 +132,14 @@ PAG_TEST_F(PAGBlendTest, TextureBottomLeft) {
   pagPlayer->setProgress(0.34);
   pagPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGBlendTest/TextureBottomLeft"));
-
+  
+  LOGI("----------line：%d----------------\n", __LINE__);
   context = device->lockContext();
   auto gl = GLFunctions::Get(context);
   gl->deleteTextures(1, &replaceTextureInfo.id);
   gl->deleteTextures(1, &textureInfo.id);
   device->unlock();
+  LOGI("----------line：%d----------------\n", __LINE__);
 }
 
 /**
