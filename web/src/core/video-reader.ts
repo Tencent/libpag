@@ -6,6 +6,7 @@ import {
 } from '../constant';
 import { addListener, removeListener, removeAllListeners } from '../utils/video-listener';
 import { IPHONE, IS_WECHAT } from '../utils/ua';
+import { PAGModule } from '../pag-module';
 
 import type { EmscriptenGL } from '../types';
 import type { TimeRange } from '../interfaces';
@@ -43,30 +44,6 @@ const waitVideoCanPlay = (videoElement: HTMLVideoElement) => {
   });
 };
 
-const playVideoElement = async (videoElement: HTMLVideoElement) => {
-  if (IS_WECHAT && window.WeixinJSBridge) {
-    await getWechatNetwork();
-  }
-  if (document.visibilityState !== 'visible') {
-    const visibilityHandle = () => {
-      if (document.visibilityState === 'visible') {
-        if (videoElement) playVideoElement(videoElement);
-        window.removeEventListener('visibilitychange', visibilityHandle);
-      }
-    };
-    window.addEventListener('visibilitychange', visibilityHandle);
-    return false;
-  }
-  try {
-    await videoElement.play();
-  } catch (error: any) {
-    console.error(error.message);
-    throw new Error(
-      'Failed to decode video, please play PAG after user gesture. Or your can load a software decoder to decode the video.',
-    );
-  }
-};
-
 export class VideoReader {
   public static isIOS = () => {
     return IPHONE;
@@ -76,14 +53,15 @@ export class VideoReader {
     return false;
   };
 
+  public isSought = false;
+  public isPlaying = false;
+
   private videoEl: HTMLVideoElement | null;
   private readonly frameRate: number;
-  private lastVideoTime = -1;
   private canplay = false;
   private staticTimeRanges: StaticTimeRanges;
-  private lastPrepareTime: { frame: number; time: number }[] = [];
   private disablePlaybackRate = false;
-  private onCanplayHandle: () => void;
+  private error: any = null;
 
   public constructor(
     mp4Data: Uint8Array,
@@ -96,103 +74,160 @@ export class VideoReader {
     this.videoEl.style.display = 'none';
     this.videoEl.muted = true;
     this.videoEl.playsInline = true;
-    this.videoEl.preload = 'auto'; // use load() will make a bug on Chrome.
-    this.onCanplayHandle = this.onCanplay.bind(this);
-    addListener(this.videoEl, 'canplay', this.onCanplayHandle);
-    addListener(this.videoEl, 'timeupdate', this.onTimeupdate.bind(this));
+    this.videoEl.preload = 'auto';
+    waitVideoCanPlay(this.videoEl).then(() => {
+      this.canplay = true;
+    });
     this.frameRate = frameRate;
     const blob = new Blob([mp4Data], { type: 'video/mp4' });
     this.videoEl.src = URL.createObjectURL(blob);
+    if (IPHONE) {
+      // use load() will make a bug on Chrome.
+      this.videoEl.load();
+    }
     this.staticTimeRanges = new StaticTimeRanges(staticTimeRanges);
     if (UHD_RESOLUTION < width || UHD_RESOLUTION < height) {
       this.disablePlaybackRate = true;
     }
+    PAGModule.currentPlayer?.bindingVideoReader(this);
   }
 
-  public async prepare(targetFrame: number) {
+  public async prepare(targetFrame: number, playbackRate: number) {
+    this.setError(null); // reset error
+    this.isSought = false; // reset seek status
     if (!this.videoEl) {
-      console.error('Video element is null!');
-      return false;
+      this.setError(new Error("Video element doesn't exist!"));
+      return;
     }
-    this.alignPlaybackRate(targetFrame);
     const { currentTime } = this.videoEl;
     const targetTime = targetFrame / this.frameRate;
-    this.lastVideoTime = targetTime;
     if (currentTime === 0 && targetTime === 0) {
-      if (this.canplay) return true;
-      await waitVideoCanPlay(this.videoEl);
-      return true;
+      if (!this.canplay) {
+        await waitVideoCanPlay(this.videoEl);
+      }
     } else {
       if (Math.round(targetTime * this.frameRate) === Math.round(currentTime * this.frameRate)) {
         // Current frame
-        return true;
       } else if (this.staticTimeRanges.contains(targetFrame)) {
         // Static frame
-        return await this.seek(targetTime, false);
+        await this.seek(targetTime, false);
+        return;
       } else if (Math.abs(currentTime - targetTime) < (1 / this.frameRate) * VIDEO_DECODE_WAIT_FRAME) {
         // Within tolerable frame rate deviation
-        if (this.videoEl.paused) {
-          await playVideoElement(this.videoEl);
-        }
-        return true;
       } else {
         // Seek and play
-        return await this.seek(targetTime);
+        this.isSought = true;
+        await this.seek(targetTime);
+        return;
+      }
+    }
+
+    const targetPlaybackRate = Math.min(Math.max(playbackRate, VIDEO_PLAYBACK_RATE_MIN), VIDEO_PLAYBACK_RATE_MAX);
+    if (!this.disablePlaybackRate && this.videoEl.playbackRate !== targetPlaybackRate) {
+      this.videoEl.playbackRate = targetPlaybackRate;
+    }
+
+    if (this.isPlaying && this.videoEl.paused) {
+      try {
+        await this.play();
+      } catch (e) {
+        this.setError(e);
       }
     }
   }
 
   public renderToTexture(GL: EmscriptenGL, textureID: number) {
     if (!this.videoEl || this.videoEl.readyState < 2) return;
-    const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
-    gl.bindTexture(gl.TEXTURE_2D, GL.textures[textureID]);
-    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
-    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, this.videoEl);
+    if (this.getError() !== null) return;
+    try {
+      const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
+      gl.bindTexture(gl.TEXTURE_2D, GL.textures[textureID]);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, this.videoEl);
+    } catch (e) {
+      this.setError(e);
+    }
+  }
+
+  public async play() {
+    if (!this.videoEl) {
+      throw new Error("Video element doesn't exist!");
+    }
+    if (!this.videoEl.paused) return;
+    if (IS_WECHAT && window.WeixinJSBridge) {
+      await getWechatNetwork();
+    }
+    if (document.visibilityState !== 'visible') {
+      const visibilityHandle = () => {
+        if (document.visibilityState === 'visible') {
+          if (this.videoEl) this.videoEl.play();
+          window.removeEventListener('visibilitychange', visibilityHandle);
+        }
+      };
+      window.addEventListener('visibilitychange', visibilityHandle);
+      throw new Error('The play() request was interrupted because the document was hidden!');
+    }
+    await this.videoEl?.play();
+  }
+
+  public pause() {
+    this.isPlaying = false;
+    if (this.videoEl!.paused) return;
+    this.videoEl?.pause();
+  }
+
+  public stop() {
+    this.isPlaying = false;
+    if (!this.videoEl!.paused) {
+      this.videoEl?.pause();
+    }
+    this.videoEl!.currentTime = 0;
+  }
+
+  public getError() {
+    return this.error;
   }
 
   public onDestroy() {
     if (!this.videoEl) {
-      throw new Error('Video element is null!');
+      throw new Error("Video element doesn't exist!");
     }
-
     removeAllListeners(this.videoEl, 'playing');
     removeAllListeners(this.videoEl, 'timeupdate');
     this.videoEl = null;
   }
 
-  private onTimeupdate() {
-    if (!this.videoEl || this.lastVideoTime < 0) return;
-    const { currentTime } = this.videoEl;
-    if (currentTime - this.lastVideoTime >= (1 / this.frameRate) * VIDEO_DECODE_WAIT_FRAME && !this.videoEl.paused) {
-      this.videoEl.pause();
-      this.videoEl.currentTime = this.lastVideoTime;
-    }
-  }
-
   private seek(targetTime: number, play = true) {
-    return new Promise<boolean>((resolve) => {
+    return new Promise<void>((resolve) => {
       let isCallback = false;
       let timer: any = null;
+      const setVideoState = async () => {
+        if (play && this.videoEl!.paused) {
+          try {
+            await this.play();
+          } catch (e) {
+            this.setError(e);
+          }
+        } else if (!play && !this.videoEl!.paused) {
+          this.videoEl?.pause();
+        }
+      };
       const seekCallback = async () => {
         if (!this.videoEl) {
-          console.error('Video element is null!');
-          resolve(false);
+          this.setError(new Error("Video element doesn't exist!"));
+          resolve();
           return;
         }
         removeListener(this.videoEl, 'seeked', seekCallback);
-        if (play && this.videoEl.paused) {
-          await playVideoElement(this.videoEl);
-        } else if (!play && !this.videoEl.paused) {
-          this.videoEl.pause();
-        }
+        await setVideoState();
         isCallback = true;
         clearTimeout(timer);
         timer = null;
-        resolve(true);
+        resolve();
       };
       if (!this.videoEl) {
-        console.error('Video element is null!');
-        resolve(false);
+        this.setError(new Error("Video element doesn't exist!"));
+        resolve();
         return;
       }
       addListener(this.videoEl, 'seeked', seekCallback);
@@ -201,49 +236,21 @@ export class VideoReader {
       timer = setTimeout(() => {
         if (!isCallback) {
           if (!this.videoEl) {
-            console.error('Video element is null!');
-            resolve(false);
+            this.setError(new Error("Video element doesn't exist!"));
+            resolve();
             return;
           } else {
             removeListener(this.videoEl, 'seeked', seekCallback);
-            if (play && this.videoEl.paused) {
-              playVideoElement(this.videoEl);
-            } else if (!play && !this.videoEl.paused) {
-              this.videoEl.pause();
-            }
-            resolve(false);
+            setVideoState();
+            resolve();
           }
         }
       }, (1000 / this.frameRate) * VIDEO_DECODE_SEEK_TIMEOUT_FRAME);
     });
   }
 
-  private alignPlaybackRate(targetFrame: number) {
-    if (!this.videoEl || this.disablePlaybackRate) return;
-    const now = performance.now();
-    if (this.lastPrepareTime.length === 0) {
-      this.lastPrepareTime.push({ frame: targetFrame, time: now });
-      return;
-    }
-    if (this.lastPrepareTime[this.lastPrepareTime.length - 1].frame === targetFrame) return;
-    if (targetFrame < this.lastPrepareTime[this.lastPrepareTime.length - 1].frame) {
-      this.lastPrepareTime = [];
-      this.lastPrepareTime.push({ frame: targetFrame, time: now });
-      return;
-    }
-    if (this.lastPrepareTime.length === 5) {
-      this.lastPrepareTime.shift();
-    }
-    this.lastPrepareTime.push({ frame: targetFrame, time: now });
-    const distance = (now - this.lastPrepareTime[0].time) / (targetFrame - this.lastPrepareTime[0].frame);
-    let playbackRate = 1000 / this.frameRate / distance;
-    playbackRate = Math.min(Math.max(playbackRate, VIDEO_PLAYBACK_RATE_MIN), VIDEO_PLAYBACK_RATE_MAX);
-    this.videoEl!.playbackRate = playbackRate;
-  }
-
-  private onCanplay() {
-    this.canplay = true;
-    removeListener(this.videoEl!, 'canplay', this.onCanplayHandle);
+  private setError(e: any) {
+    this.error = e;
   }
 }
 
