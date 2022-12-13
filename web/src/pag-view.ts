@@ -73,6 +73,8 @@ export class PAGView {
     if (pagView.pagViewOptions.firstFrame) {
       await pagView.flush();
       pagView.currentFrame = 0;
+    } else {
+      await pagView.prepare();
     }
     return pagView;
   }
@@ -154,6 +156,12 @@ export class PAGView {
    */
   public async play() {
     if (this.isPlaying) return;
+    this.isPlaying = true;
+    this.startTime = this.getNowTime() * 1000 - this.playTime;
+    for (const videoReader of this.player.videoReaders) {
+      videoReader.isPlaying = true;
+    }
+    await this.flushLoop(true);
     if (this.playTime === 0) {
       this.eventManager.emit('onAnimationStart', this);
     }
@@ -161,9 +169,6 @@ export class PAGView {
     if (this.currentFrame === 0) {
       this.eventManager.emit('onAnimationUpdate', this);
     }
-    this.isPlaying = true;
-    this.startTime = this.getNowTime() * 1000 - this.playTime;
-    await this.flushLoop();
   }
   /**
    * Pause the animation.
@@ -171,6 +176,9 @@ export class PAGView {
   public pause() {
     if (!this.isPlaying) return;
     this.clearTimer();
+    for (const videoReader of this.player.videoReaders) {
+      videoReader.pause();
+    }
     this.isPlaying = false;
     this.eventManager.emit('onAnimationPause', this);
   }
@@ -183,6 +191,9 @@ export class PAGView {
     this.player.setProgress(0);
     this.currentFrame = 0;
     await this.flush();
+    for (const videoReader of this.player.videoReaders) {
+      videoReader.stop();
+    }
     this.isPlaying = false;
     if (notification) {
       this.eventManager.emit('onAnimationCancel', this);
@@ -407,7 +418,7 @@ export class PAGView {
     this.debugData = { ...this.debugData, ...data };
   }
 
-  protected async flushLoop() {
+  protected async flushLoop(force = false) {
     if (!this.isPlaying) {
       return;
     }
@@ -415,28 +426,35 @@ export class PAGView {
       await this.flushLoop();
     });
     if (this.flushingNextFrame) return;
-    await this.flushNextFrame();
+    try {
+      this.flushingNextFrame = true;
+      await this.flushNextFrame(force);
+      this.flushingNextFrame = false;
+    } catch (e: any) {
+      this.flushingNextFrame = false;
+      if (e.message !== 'The play() request was interrupted because the document was hidden!') {
+        this.clearTimer();
+      }
+      throw e;
+    }
   }
 
-  protected async flushNextFrame() {
-    this.flushingNextFrame = true;
+  protected async flushNextFrame(force = false) {
     const duration = this.duration();
     this.playTime = this.getNowTime() * 1000 - this.startTime;
     const currentFrame = Math.floor((this.playTime / 1000000) * this.frameRate);
     const count = Math.floor(this.playTime / duration);
-    if (this.repeatCount >= 0 && count > this.repeatCount) {
+    if (!force && this.repeatCount >= 0 && count > this.repeatCount) {
       this.clearTimer();
       this.player.setProgress(1);
       await this.flush();
       this.playTime = 0;
       this.isPlaying = false;
       this.repeatedTimes = 0;
-      this.flushingNextFrame = false;
       this.eventManager.emit('onAnimationEnd', this);
       return true;
     }
-    if (this.repeatedTimes === count && this.currentFrame === currentFrame) {
-      this.flushingNextFrame = false;
+    if (!force && this.repeatedTimes === count && this.currentFrame === currentFrame) {
       return false;
     }
     if (this.repeatedTimes < count) {
@@ -444,11 +462,12 @@ export class PAGView {
     }
     this.player.setProgress((this.playTime % duration) / duration);
     const res = await this.flush();
+    if (this.needResetStartTime()) {
+      // Decoding BMP takes too much time and makes the video reader seek repeatedly.
+      this.startTime = this.getNowTime() * 1000 - this.playTime;
+    }
     this.currentFrame = currentFrame;
-    // Decoding BMP takes too much time and makes the video reader seek repeatedly.
-    this.startTime = this.getNowTime() * 1000 - this.playTime;
     this.repeatedTimes = count;
-    this.flushingNextFrame = false;
     return res;
   }
 
@@ -520,5 +539,12 @@ export class PAGView {
     this.fpsBuffer = this.fpsBuffer.filter((value) => now - value <= 1000);
     this.fpsBuffer.push(now);
     this.setDebugData({ FPS: this.fpsBuffer.length });
+  }
+
+  private needResetStartTime() {
+    for (const VideoReader of this.player.videoReaders) {
+      if (VideoReader.isSought) return true;
+    }
+    return false;
   }
 }

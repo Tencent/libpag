@@ -20,6 +20,7 @@
 
 #include "SequenceReader.h"
 #include "pag/file.h"
+#include "pag/pag.h"
 
 namespace pag {
 class SequenceReaderFactory {
@@ -36,7 +37,7 @@ class SequenceReaderFactory {
 
   virtual bool isVideo() const;
 
-  virtual std::shared_ptr<SequenceReader> makeReader(std::shared_ptr<File> file) const;
+  virtual std::shared_ptr<SequenceReader> makeReader(PAGLayer* file) const;
 
  private:
   Sequence* sequence = nullptr;

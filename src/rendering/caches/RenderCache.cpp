@@ -480,7 +480,8 @@ void RenderCache::prepareImage(ID assetID, std::shared_ptr<tgfx::Image> image) {
   if (imageTasks.count(assetID) != 0 || snapshotCaches.count(assetID) != 0) {
     return;
   }
-  auto task = ImageTask::MakeAndRun(std::move(image), stage->getFileFromReferenceMap(assetID));
+  auto task =
+      ImageTask::MakeAndRun(std::move(image), stage->getLayerFromReferenceMap(assetID)->getFile());
   if (task) {
     imageTasks[assetID] = task;
   }
@@ -557,8 +558,8 @@ std::shared_ptr<SequenceReader> RenderCache::getSequenceReaderInternal(
     reader = result->second;
   }
   if (reader == nullptr) {
-    auto file = stage->getFileFromReferenceMap(assetID);
-    reader = factory->makeReader(file);
+    auto layer = stage->getLayerFromReferenceMap(assetID);
+    reader = factory->makeReader(layer);
     if (reader) {
       sequenceCaches[assetID] = reader;
     }

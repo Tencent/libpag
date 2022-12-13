@@ -521,6 +521,8 @@ class PAG_API PAGLayer : public Content {
   friend class FileReporter;
 
   friend class PAGImageLayer;
+
+  friend class VideoSequenceReader;
 };
 
 class SolidLayer;
