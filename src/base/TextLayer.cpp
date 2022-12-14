@@ -75,6 +75,6 @@ bool TextLayer::verify() const {
 
 Rect TextLayer::getBounds() const {
   return Rect::MakeWH(static_cast<float>(containingComposition->width),
-                      static_cast<float>(containingComposition->width));
+                      static_cast<float>(containingComposition->height));
 }
 }  // namespace pag

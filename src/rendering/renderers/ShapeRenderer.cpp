@@ -622,9 +622,13 @@ void ApplyRepeater(RepeaterElement* repeater, GroupElement* group, Frame frame) 
   group->elements = elements;
 }
 
-void ApplyRoundCorners(RoundCornersElement* roundCorners, std::vector<tgfx::Path*> pathList,
-                       Frame frame) {
+void ApplyRoundCorners(RoundCornersElement* roundCorners, const tgfx::Matrix& parentMatrix,
+                       std::vector<tgfx::Path*> pathList, Frame frame) {
   auto radius = roundCorners->radius->getValueAt(frame);
+  auto scale = parentMatrix.getMaxScale();
+  if (scale > 0.0) {
+    radius *= scale;
+  }
   auto effect = tgfx::PathEffect::MakeCorner(radius);
   if (effect == nullptr) {
     return;
@@ -767,9 +771,10 @@ void RenderElements_TrimPaths(ShapeElement* element, const tgfx::Matrix&, GroupE
   ApplyTrimPaths(static_cast<TrimPathsElement*>(element), parentGroup->pathList(), frame);
 }
 
-void RenderElements_RoundCorners(ShapeElement* element, const tgfx::Matrix&,
+void RenderElements_RoundCorners(ShapeElement* element, const tgfx::Matrix& parentMatrix,
                                  GroupElement* parentGroup, Frame frame) {
-  ApplyRoundCorners(static_cast<RoundCornersElement*>(element), parentGroup->pathList(), frame);
+  ApplyRoundCorners(static_cast<RoundCornersElement*>(element), parentMatrix,
+                    parentGroup->pathList(), frame);
 }
 
 using RenderElementsHandler = void(ShapeElement* element, const tgfx::Matrix& parentMatrix,
