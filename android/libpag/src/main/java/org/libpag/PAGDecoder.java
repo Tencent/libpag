@@ -19,48 +19,96 @@
 package org.libpag;
 
 import android.graphics.Bitmap;
+import android.hardware.HardwareBuffer;
+import android.os.Build;
 
 import org.extra.tools.LibraryLoadUtils;
 
 public class PAGDecoder {
+    private int width;
+    private int height;
+    private int numFrames;
+    private PAGSurface pagSurface;
+    private PAGPlayer pagPlayer;
 
     /**
-     * Create PAGDecoder from specified PAGComposition and size.
+     * Make a decoder from pagComposition.
      */
-    public static PAGDecoder Make(PAGComposition pagComposition, int width,
-                                  int height) {
-        long handler = MakeNative(pagComposition, width, height);
-        return handler <= 0 ? null : new PAGDecoder(handler);
+    public static PAGDecoder Make(PAGComposition pagComposition) {
+        return Make(pagComposition, 1.0f);
     }
 
     /**
-     * Sets the progress of decoder, the value ranges from 0.0 to 1.0.
-     * Decoder will keep return the same bitmap object.
-     * But if returned Bitmap is recycled by caller, decoder will create a new bitmap object.
+     * Make a decoder from pagComposition.
+     * The size of decoder will be scaled.
      */
-    public native Bitmap decode(double progress);
-
-
-    private static native long MakeNative(PAGComposition pagComposition, int width,
-                                          int height);
-
-    private PAGDecoder(long nativeHandler) {
-        this.nativeHandler = nativeHandler;
+    public static PAGDecoder Make(PAGComposition pagComposition, float scale) {
+        if (scale <= 0) {
+            scale = 1.0f;
+        }
+        PAGDecoder pagDecoder = new PAGDecoder();
+        pagDecoder.width = (int) (pagComposition.width() * scale);
+        pagDecoder.height = (int) (pagComposition.height() * scale);
+        pagDecoder.numFrames =
+                (int) (pagComposition.duration() * pagComposition.frameRate() / 1000000);
+        pagDecoder.pagSurface = createSurface(pagDecoder.width, pagDecoder.height);
+        if (pagDecoder.pagSurface == null) {
+            return null;
+        }
+        pagDecoder.pagPlayer = new PAGPlayer();
+        pagDecoder.pagPlayer.setSurface(pagDecoder.pagSurface);
+        pagDecoder.pagPlayer.setComposition(pagComposition);
+        return pagDecoder;
     }
 
-    long nativeHandler;
+    /**
+     * Returns the width of the decoder.
+     */
+    public int width() {
+        return width;
+    }
 
-    private native void nativeFinalize();
+    /**
+     * Returns the height of the decoder.
+     */
+    public int height() {
+        return height;
+    }
 
-    private static native void nativeInit();
+    /**
+     * Returns the number of animated frames.
+     */
+    public int numFrames() {
+        return numFrames;
+    }
 
-    @Override
-    protected void finalize() {
-        nativeFinalize();
+    /**
+     * Returns the frame image from a specified index.
+     */
+    public Bitmap frameAtIndex(int index) {
+        if (index < 0 || index >= numFrames) {
+            return null;
+        }
+        float progress = (index * 1.0f + 0.1f) / numFrames;
+        pagPlayer.setProgress(progress);
+        pagPlayer.flush();
+        return pagSurface.makeSnapshot();
+    }
+
+    private static PAGSurface createSurface(int width, int height) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && false) {
+            HardwareBuffer hardwareBuffer = HardwareBuffer.create(width, height,
+                    HardwareBuffer.RGBA_8888
+                    , 1,
+                    HardwareBuffer.USAGE_CPU_READ_OFTEN | HardwareBuffer.USAGE_CPU_WRITE_OFTEN |
+                            HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE | HardwareBuffer.USAGE_GPU_COLOR_OUTPUT);
+            return PAGSurface.FromHardwareBuffer(hardwareBuffer);
+        } else {
+            return PAGSurface.FromSize(width, height);
+        }
     }
 
     static {
         LibraryLoadUtils.loadLibrary("pag");
-        nativeInit();
     }
 }

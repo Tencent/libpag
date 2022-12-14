@@ -13,18 +13,24 @@ std::shared_ptr<HardwareBufferDrawable> HardwareBufferDrawable::Make(
     return nullptr;
   }
 
-  return std::shared_ptr<HardwareBufferDrawable>(
-      new HardwareBufferDrawable(width, height, device, buffer));
+  return std::shared_ptr<HardwareBufferDrawable>(new HardwareBufferDrawable(device, buffer));
+}
+
+std::shared_ptr<HardwareBufferDrawable> HardwareBufferDrawable::Make(
+    std::shared_ptr<tgfx::HardwareBuffer> buffer, std::shared_ptr<tgfx::Device> device) {
+  if (buffer == nullptr || buffer->width() <= 0 || buffer->height() <= 0) {
+    return nullptr;
+  }
+  return std::shared_ptr<HardwareBufferDrawable>(new HardwareBufferDrawable(device, buffer));
 }
 
 void HardwareBufferDrawable::present(tgfx::Context*) {
   glFlush();
 }
 
-HardwareBufferDrawable::HardwareBufferDrawable(int width, int height,
-                                               std::shared_ptr<tgfx::Device> device,
+HardwareBufferDrawable::HardwareBufferDrawable(std::shared_ptr<tgfx::Device> device,
                                                std::shared_ptr<tgfx::HardwareBuffer> buffer)
-    : _width(width), _height(height), device(device), hardwareBuffer(buffer) {
+    : _width(buffer->width()), _height(buffer->height()), device(device), hardwareBuffer(buffer) {
 }
 
 std::shared_ptr<tgfx::Surface> HardwareBufferDrawable::createSurface(tgfx::Context* context) {

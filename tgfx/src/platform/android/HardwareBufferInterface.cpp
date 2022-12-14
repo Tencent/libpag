@@ -37,7 +37,7 @@ class AHardwareBufferFunctions {
   void (*describe)(const AHardwareBuffer* buffer, AHardwareBuffer_Desc* outDesc) = nullptr;
   void (*acquire)(AHardwareBuffer* buffer) = nullptr;
   jobject (*AHB_to_HB)(JNIEnv*, AHardwareBuffer*) = nullptr;
-
+  AHardwareBuffer* (*AHB_from_HB)(JNIEnv*, jobject) = nullptr;
 
   AHardwareBufferFunctions() {
     char sdk[PROP_VALUE_MAX] = "0";
@@ -53,6 +53,7 @@ class AHardwareBufferFunctions {
     LoadSymbol(describe, "AHardwareBuffer_describe");
     LoadSymbol(acquire, "AHardwareBuffer_acquire");
     LoadSymbol(AHB_to_HB, "AHardwareBuffer_toHardwareBuffer");
+    LoadSymbol(AHB_from_HB, "AHardwareBuffer_fromHardwareBuffer");
   }
 };
 
@@ -92,8 +93,14 @@ int HardwareBufferInterface::Unlock(AHardwareBuffer* buffer, int32_t* fence) {
   return GetFunctions()->unlock(buffer, fence);
 }
 
-jobject HardwareBufferInterface::AHardwareBuffer_toHardwareBuffer(JNIEnv *env,
-                                                                  AHardwareBuffer *buffer) {
+jobject HardwareBufferInterface::AHardwareBuffer_toHardwareBuffer(JNIEnv* env,
+                                                                  AHardwareBuffer* buffer) {
   return GetFunctions()->AHB_to_HB(env, buffer);
 }
+
+AHardwareBuffer* HardwareBufferInterface::AHardwareBuffer_fromHardwareBuffer(
+    JNIEnv* env, jobject hardwareBufferObj) {
+  return GetFunctions()->AHB_from_HB(env, hardwareBufferObj);
+}
+
 }  // namespace tgfx

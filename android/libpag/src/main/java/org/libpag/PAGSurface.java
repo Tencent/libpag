@@ -12,12 +12,15 @@ import org.extra.tools.LibraryLoadUtils;
 
 public class PAGSurface {
 
-    public static PAGSurface FromHardwareBuffer(int width, int height) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+    public static PAGSurface FromSize(int width, int height) {
+        long nativeSurface = SetupFromSize(width, height);
+        if (nativeSurface == 0) {
             return null;
         }
-        return SetupFromHardwareBuffer(width, height);
+        return new PAGSurface(nativeSurface);
     }
+
+    public native static PAGSurface FromHardwareBuffer(HardwareBuffer hardwareBuffer);
 
     public static PAGSurface FromSurfaceTexture(SurfaceTexture surfaceTexture) {
         return FromSurfaceTexture(surfaceTexture, EGL14.EGL_NO_CONTEXT);
@@ -134,7 +137,7 @@ public class PAGSurface {
         this.nativeSurface = nativeSurface;
     }
 
-    private native static PAGSurface SetupFromHardwareBuffer(int width, int height);
+    private static native long SetupFromSize(int width, int height);
 
     private Surface surface = null;
     private boolean needsReleaseSurface = false;

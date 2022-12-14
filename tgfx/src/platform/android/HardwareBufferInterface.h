@@ -96,7 +96,9 @@ class HardwareBufferInterface {
    */
   static int Unlock(AHardwareBuffer* buffer, int32_t* fence);
 
-  static jobject AHardwareBuffer_toHardwareBuffer(JNIEnv *env, AHardwareBuffer *buffer);
+  static jobject AHardwareBuffer_toHardwareBuffer(JNIEnv* env, AHardwareBuffer* buffer);
 
+  static AHardwareBuffer* AHardwareBuffer_fromHardwareBuffer(JNIEnv* env,
+                                                             jobject hardwareBufferObj);
 };
 }  // namespace tgfx

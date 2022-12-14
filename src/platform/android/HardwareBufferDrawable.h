@@ -7,6 +7,10 @@ class HardwareBufferDrawable : public Drawable {
  public:
   static std::shared_ptr<HardwareBufferDrawable> Make(int width, int height,
                                                       std::shared_ptr<tgfx::Device> device);
+
+  static std::shared_ptr<HardwareBufferDrawable> Make(std::shared_ptr<tgfx::HardwareBuffer> buffer,
+                                                      std::shared_ptr<tgfx::Device> device);
+
   int width() const override {
     return _width;
   }
@@ -33,7 +37,7 @@ class HardwareBufferDrawable : public Drawable {
   }
 
  private:
-  HardwareBufferDrawable(int width, int height, std::shared_ptr<tgfx::Device> device,
+  HardwareBufferDrawable(std::shared_ptr<tgfx::Device> device,
                          std::shared_ptr<tgfx::HardwareBuffer> buffer);
   int _width = 0;
   int _height = 0;

@@ -19,6 +19,7 @@
 #pragma once
 
 #include "pag/pag.h"
+#include "tgfx/gpu/opengl/GLSampler.h"
 
 class JPAGSurface {
  public:
@@ -34,6 +35,9 @@ class JPAGSurface {
     std::lock_guard<std::mutex> autoLock(locker);
     pagSurface = nullptr;
   }
+
+  tgfx::GLSampler textureInfo;
+  std::shared_ptr<tgfx::Device> device;
 
  private:
   std::shared_ptr<pag::PAGSurface> pagSurface;

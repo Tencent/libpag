@@ -28,20 +28,17 @@
 #include "JNIHelper.h"
 #include "NativePlatform.h"
 #include "VideoSurface.h"
+#include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace pag {
 static jfieldID PAGSurface_nativeSurface;
-}
+static Global<jclass> Bitmap_Class;
+static jmethodID Bitmap_createBitmap;
+static Global<jclass> Config_Class;
+static jfieldID Config_ARGB_888;
+}  // namespace pag
 
 using namespace pag;
-
-void setPAGSurface(JNIEnv* env, jobject thiz, JPAGSurface* surface) {
-  auto old = reinterpret_cast<JPAGSurface*>(env->GetLongField(thiz, PAGSurface_nativeSurface));
-  if (old != nullptr) {
-    delete old;
-  }
-  env->SetLongField(thiz, PAGSurface_nativeSurface, (jlong)surface);
-}
 
 std::shared_ptr<PAGSurface> getPAGSurface(JNIEnv* env, jobject thiz) {
   auto pagSurface =
@@ -59,18 +56,43 @@ PAG_API void Java_org_libpag_PAGSurface_nativeInit(JNIEnv* env, jclass clazz) {
   // 调用堆栈源头从C++触发而不是Java触发的情况下，FindClass
   // 可能会失败，因此要提前初始化这部分反射方法。
   NativePlatform::InitJNI(env);
+  Bitmap_Class.reset(env, env->FindClass("android/graphics/Bitmap"));
+  Bitmap_createBitmap =
+      env->GetStaticMethodID(Bitmap_Class.get(), "createBitmap",
+                             "(IILandroid/graphics/Bitmap$Config;)Landroid/graphics/Bitmap;");
+  Config_Class.reset(env, env->FindClass("android/graphics/Bitmap$Config"));
+  Config_ARGB_888 =
+      env->GetStaticFieldID(Config_Class.get(), "ARGB_8888", "Landroid/graphics/Bitmap$Config;");
+}
+
+static void clearTexture(JPAGSurface* jPAGSurface) {
+  if (jPAGSurface->device) {
+    auto context = jPAGSurface->device->lockContext();
+    if (context) {
+      auto gl = tgfx::GLFunctions::Get(context);
+      gl->deleteTextures(1, &jPAGSurface->textureInfo.id);
+    }
+    jPAGSurface->device->unlock();
+    jPAGSurface->device = nullptr;
+  }
 }
 
 PAG_API void Java_org_libpag_PAGSurface_nativeRelease(JNIEnv* env, jobject thiz) {
   auto jPAGSurface =
       reinterpret_cast<JPAGSurface*>(env->GetLongField(thiz, PAGSurface_nativeSurface));
   if (jPAGSurface != nullptr) {
+    clearTexture(jPAGSurface);
     jPAGSurface->clear();
   }
 }
 
 PAG_API void Java_org_libpag_PAGSurface_nativeFinalize(JNIEnv* env, jobject thiz) {
-  setPAGSurface(env, thiz, nullptr);
+  auto old = reinterpret_cast<JPAGSurface*>(env->GetLongField(thiz, PAGSurface_nativeSurface));
+  if (old != nullptr) {
+    clearTexture(old);
+    delete old;
+  }
+  env->SetLongField(thiz, PAGSurface_nativeSurface, (jlong)thiz);
 }
 
 PAG_API jint Java_org_libpag_PAGSurface_width(JNIEnv* env, jobject thiz) {
@@ -159,17 +181,9 @@ extern "C" PAG_API jobject JNICALL Java_org_libpag_PAGSurface_makeSnapshot(JNIEn
   int widht = surface->width();
   int height = surface->height();
   unsigned char* newBitmapPixels;
-  jclass bitmapCls = env->FindClass("android/graphics/Bitmap");
-  jmethodID createBitmapFunction = env->GetStaticMethodID(
-      bitmapCls, "createBitmap", "(IILandroid/graphics/Bitmap$Config;)Landroid/graphics/Bitmap;");
-  jstring configName = env->NewStringUTF("ARGB_8888");
-  jclass bitmapConfigClass = env->FindClass("android/graphics/Bitmap$Config");
-  jmethodID valueOfBitmapConfigFunction = env->GetStaticMethodID(
-      bitmapConfigClass, "valueOf", "(Ljava/lang/String;)Landroid/graphics/Bitmap$Config;");
-  jobject bitmapConfig =
-      env->CallStaticObjectMethod(bitmapConfigClass, valueOfBitmapConfigFunction, configName);
+  auto config = env->GetStaticObjectField(Config_Class.get(), Config_ARGB_888);
   jobject newBitmap =
-      env->CallStaticObjectMethod(bitmapCls, createBitmapFunction, widht, height, bitmapConfig);
+      env->CallStaticObjectMethod(Bitmap_Class.get(), Bitmap_createBitmap, widht, height, config);
   int ret;
   if ((ret = AndroidBitmap_lockPixels(env, newBitmap, (void**)&newBitmapPixels)) < 0) {
     LOGE("AndroidBitmap_lockPixels() failed ! error=%d", ret);
@@ -184,14 +198,8 @@ extern "C" PAG_API jobject JNICALL Java_org_libpag_PAGSurface_makeSnapshot(JNIEn
   return newBitmap;
 }
 
-extern "C" JNIEXPORT jobject JNICALL
-Java_org_libpag_PAGSurface_SetupFromHardwareBuffer(JNIEnv* env, jclass, jint width, jint height) {
-  auto device = tgfx::GLDevice::Make();
-  if (device == nullptr) {
-    return nullptr;
-  }
-  auto drawable =
-      HardwareBufferDrawable::Make(static_cast<int>(width), static_cast<int>(height), device);
+static jobject SetupFromHardwareBufferDrawable(JNIEnv* env,
+                                               std::shared_ptr<HardwareBufferDrawable> drawable) {
   auto surface = PAGSurface::MakeFrom(drawable);
   if (surface == nullptr) {
     LOGE("PAGSurface.SetupFromHardwareBuffer() fail.");
@@ -207,4 +215,67 @@ Java_org_libpag_PAGSurface_SetupFromHardwareBuffer(JNIEnv* env, jclass, jint wid
                       tgfx::HardwareBufferInterface::AHardwareBuffer_toHardwareBuffer(
                           env, drawable->aHardwareBuffer()));
   return surfaceObject;
+}
+
+extern "C" JNIEXPORT jobject JNICALL
+Java_org_libpag_PAGSurface_FromHardwareBuffer(JNIEnv* env, jclass, jobject hardware_buffer) {
+
+  auto device = tgfx::GLDevice::Make();
+  if (device == nullptr) {
+    return nullptr;
+  }
+  auto drawable = HardwareBufferDrawable::Make(
+      std::static_pointer_cast<tgfx::HardwareBuffer>(tgfx::HardwareBuffer::MakeFrom(
+          tgfx::HardwareBufferInterface::AHardwareBuffer_fromHardwareBuffer(env, hardware_buffer))),
+      device);
+  return SetupFromHardwareBufferDrawable(env, drawable);
+}
+
+static bool CreateGLTexture(tgfx::Context* context, int width, int height,
+                            tgfx::GLSampler* texture) {
+  texture->target = GL_TEXTURE_2D;
+  texture->format = tgfx::PixelFormat::RGBA_8888;
+  auto gl = tgfx::GLFunctions::Get(context);
+  gl->genTextures(1, &texture->id);
+  if (texture->id <= 0) {
+    return false;
+  }
+  gl->bindTexture(texture->target, texture->id);
+  gl->texParameteri(texture->target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  gl->texParameteri(texture->target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  gl->texParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  gl->texParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  gl->texImage2D(texture->target, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+  gl->bindTexture(texture->target, 0);
+  return true;
+}
+
+extern "C" JNIEXPORT jlong JNICALL Java_org_libpag_PAGSurface_SetupFromSize(JNIEnv*, jclass,
+                                                                            jint width,
+                                                                            jint height) {
+  auto device = tgfx::GLDevice::Make();
+  if (device == nullptr) {
+    return 0;
+  }
+  auto context = device->lockContext();
+  if (!context) {
+    return 0;
+  }
+  tgfx::GLSampler textureInfo;
+  if (!CreateGLTexture(context, width, height, &textureInfo)) {
+    device->unlock();
+    return 0;
+  }
+  auto surface = PAGSurface::MakeFrom(
+      BackendTexture{{textureInfo.id, textureInfo.target}, width, height}, ImageOrigin::TopLeft);
+  if (surface == nullptr) {
+    LOGE("PAGSurface.SetupFromTexture() Invalid texture specified.");
+    device->unlock();
+    return 0;
+  }
+  device->unlock();
+  auto jPAGSurface = new JPAGSurface(surface);
+  jPAGSurface->textureInfo = textureInfo;
+  jPAGSurface->device = device;
+  return reinterpret_cast<jlong>(jPAGSurface);
 }
