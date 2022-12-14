@@ -93,4 +93,18 @@ PAG_TEST_F(PAGShapeLayerTest, track_matte_path_union) {
   pagPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGShapeLayerTest/track_matte_path_union"));
 }
+
+/**
+ * 用例描述: 测试 shape transform + round corner
+ */
+PAG_TEST_F(PAGShapeLayerTest, shape_transform_round_corner) {
+  auto pagFile = PAGFile::Load("../resources/apitest/shape_transform_round_corner.pag");
+  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setProgress(0.5);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGShapeLayerTest/shape_transform_round_corner"));
+}
 }  // namespace pag

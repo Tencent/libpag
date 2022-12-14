@@ -8120,6 +8120,7 @@
     "PAGShapeLayerTest": {
         "polygon": "bb1019b4",
         "polygon_round_corner": "bb1019b4",
+        "shape_transform_round_corner": "35fc7414",
         "star": "70b03f5d",
         "star_round_corner": "bb1019b4",
         "track_matte_path_union": "c945f861"
