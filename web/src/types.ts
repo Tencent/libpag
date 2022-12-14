@@ -647,9 +647,9 @@ export declare class Vector<T> {
 
 export declare class SoftwareDecoder {
   public onConfigure(headers: Uint8Array[], mimeType: string, width: number, height: number): boolean;
-  public onSendBytes(bytes: Uint8Array, timestamp: number): DecoderResult;
-  public onDecodeFrame(): DecoderResult;
-  public onEndOfStream(): DecoderResult;
+  public onSendBytes(bytes: Uint8Array, timestamp: number): number; // 0:Success -1:TryAgainLater -2:Error
+  public onDecodeFrame(): number; // 0:Success -1:TryAgainLater -2:Error
+  public onEndOfStream(): number; // 0:Success -1:TryAgainLater -2:Error
   public onFlush(): void;
   public onRenderFrame(): YUVBuffer | null;
   public onRelease(): void;
