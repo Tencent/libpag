@@ -613,6 +613,8 @@ export declare class TextDocument {
 
   public direction: TextDirection;
 
+  public delete: () => void;
+
   private constructor();
 }
 

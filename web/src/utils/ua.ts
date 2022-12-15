@@ -5,3 +5,4 @@ export const MACOS = !(/(mobile)/i.test(nav) || MOBILE) && /Mac OS X/i.test(nav)
 export const IPHONE = /(iphone|ipad|ipod)/i.test(nav);
 export const WECHAT = /MicroMessenger/i.test(nav);
 export const APPLE = /AppleWebKit/i.test(nav);
+export const WORKER = typeof globalThis.importScripts === 'function';

@@ -1,21 +1,21 @@
-/* global EmscriptenModule */
-
 import { binding } from './binding';
 import * as types from './types';
 import createPAG from './wasm/libpag';
 import { WebAssemblyQueue } from './utils/queue';
+import { workerInit } from './worker/worker';
+import { WORKER } from './utils/ua';
 
-export interface moduleOption {
+export interface ModuleOption {
   /**
    * Link to wasm file.
    */
-  locateFile?: (file: string) => string;
+  locateFile?: (file: 'libpag.wasm') => string;
 }
 
 /**
  * Initialize pag webassembly module.
  */
-const PAGInit = (moduleOption: moduleOption = {}): Promise<types.PAG> =>
+const PAGInit = (moduleOption: ModuleOption = {}): Promise<types.PAG> =>
   createPAG(moduleOption)
     .then((module: types.PAG) => {
       binding(module);
@@ -28,5 +28,9 @@ const PAGInit = (moduleOption: moduleOption = {}): Promise<types.PAG> =>
       console.error(error);
       throw new Error('PAGInit fail! Please check .wasm file path valid.');
     });
+
+if (WORKER) {
+  workerInit(PAGInit);
+}
 
 export { PAGInit, types };

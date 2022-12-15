@@ -6,7 +6,7 @@ export class BackendContext {
     if (gl instanceof BackendContext) {
       return new BackendContext(gl.handle, true);
     } else {
-      const majorVersion = window.WebGL2RenderingContext && gl instanceof window.WebGL2RenderingContext ? 2 : 1;
+      const majorVersion = globalThis.WebGL2RenderingContext && gl instanceof globalThis.WebGL2RenderingContext ? 2 : 1;
       const { GL } = PAGModule;
       let id = 0;
       if (GL.contexts.length > 0) {

@@ -5,11 +5,14 @@ import {
   VIDEO_PLAYBACK_RATE_MIN,
 } from '../constant';
 import { addListener, removeListener, removeAllListeners } from '../utils/video-listener';
-import { IPHONE, WECHAT, APPLE } from '../utils/ua';
+import { IPHONE, WECHAT, APPLE, WORKER } from '../utils/ua';
 import { PAGModule } from '../pag-module';
+import { WorkerMessageType } from '../worker/events';
+import { WorkerVideoReader } from '../worker/video-reader';
+import { postMessage } from '../worker/utils';
 
 import type { EmscriptenGL } from '../types';
-import type { TimeRange } from '../interfaces';
+import type { TimeRange, VideoReader as VideoReaderInterfaces } from '../interfaces';
 import type { PAGPlayer } from '../pag-player';
 
 const UHD_RESOLUTION = 3840;
@@ -46,24 +49,59 @@ const waitVideoCanPlay = (videoElement: HTMLVideoElement) => {
 };
 
 export class VideoReader {
-  public static isIOS = () => {
+  public static isIOS() {
     return IPHONE;
-  };
+  }
 
-  public static isAndroidMiniprogram = () => {
+  public static isAndroidMiniprogram() {
+    // need't to check platform on Web
     return false;
-  };
+  }
+
+  public static async create(
+    mp4Data: Uint8Array,
+    width: number,
+    height: number,
+    frameRate: number,
+    staticTimeRanges: TimeRange[],
+  ): Promise<VideoReaderInterfaces> {
+    if (WORKER) {
+      const proxyId = await new Promise<number>((resolve) => {
+        const buffer = mp4Data.buffer.slice(mp4Data.byteOffset, mp4Data.byteOffset + mp4Data.byteLength);
+        postMessage(
+          self,
+          {
+            name: WorkerMessageType.VideoReader_constructor,
+            args: [buffer, width, height, frameRate, staticTimeRanges, true],
+          },
+          (res) => {
+            resolve(res);
+          },
+          [buffer],
+        );
+      });
+      const videoReader = new WorkerVideoReader(proxyId);
+      PAGModule.currentPlayer?.linkVideoReader(videoReader);
+      return videoReader;
+    }
+    return new VideoReader(mp4Data, width, height, frameRate, staticTimeRanges);
+  }
 
   public isSought = false;
   public isPlaying = false;
+  public bitmap: ImageBitmap | null = null;
 
-  private videoEl: HTMLVideoElement | null;
-  private readonly frameRate: number;
+  private videoEl: HTMLVideoElement | null = null;
+  private frameRate = 0;
   private canplay = false;
-  private staticTimeRanges: StaticTimeRanges;
+  private staticTimeRanges: StaticTimeRanges | null = null;
   private disablePlaybackRate = false;
   private error: any = null;
   private player: PAGPlayer | null = null;
+  private width = 0;
+  private height = 0;
+  private bitmapCanvas: OffscreenCanvas | null = null;
+  private bitmapCtx: OffscreenCanvasRenderingContext2D | null = null;
 
   public constructor(
     mp4Data: Uint8Array,
@@ -71,6 +109,7 @@ export class VideoReader {
     height: number,
     frameRate: number,
     staticTimeRanges: TimeRange[],
+    isWorker = false,
   ) {
     this.videoEl = document.createElement('video');
     this.videoEl.style.display = 'none';
@@ -85,11 +124,19 @@ export class VideoReader {
     const blob = new Blob([mp4Data], { type: 'video/mp4' });
     this.videoEl.src = URL.createObjectURL(blob);
     this.frameRate = frameRate;
+    if (IPHONE) {
+      // use load() will make a bug on Chrome.
+      this.videoEl.load();
+    }
+    this.width = width;
+    this.height = height;
     this.staticTimeRanges = new StaticTimeRanges(staticTimeRanges);
     if (UHD_RESOLUTION < width || UHD_RESOLUTION < height) {
       this.disablePlaybackRate = true;
     }
-    this.linkPlayer(PAGModule.currentPlayer);
+    if (!isWorker) {
+      this.linkPlayer(PAGModule.currentPlayer);
+    }
   }
 
   public async prepare(targetFrame: number, playbackRate: number) {
@@ -101,7 +148,11 @@ export class VideoReader {
       if (!this.canplay && !APPLE) {
         await waitVideoCanPlay(this.videoEl!);
       } else {
-        await this.play();
+        try {
+          await this.play();
+        } catch (e) {
+          this.setError(e);
+        }
         await new Promise<void>((resolve) => {
           requestAnimationFrame(() => {
             this.pause();
@@ -112,7 +163,7 @@ export class VideoReader {
     } else {
       if (Math.round(targetTime * this.frameRate) === Math.round(currentTime * this.frameRate)) {
         // Current frame
-      } else if (this.staticTimeRanges.contains(targetFrame)) {
+      } else if (this.staticTimeRanges?.contains(targetFrame)) {
         // Static frame
         await this.seek(targetTime, false);
         return;
@@ -151,6 +202,21 @@ export class VideoReader {
     } catch (e) {
       this.setError(e);
     }
+  }
+
+  // Only work in web worker version
+  public async generateBitmap() {
+    // Batter than createImageBitmap from video element in benchmark
+    if (!this.bitmapCanvas) {
+      this.bitmapCanvas = new OffscreenCanvas(this.width, this.height);
+      this.bitmapCanvas!.width = this.width;
+      this.bitmapCanvas!.height = this.height;
+      this.bitmapCtx = this.bitmapCanvas.getContext('2d') as OffscreenCanvasRenderingContext2D | null;
+    }
+    this.bitmapCtx?.fillRect(0, 0, this.width, this.height);
+    this.bitmapCtx?.drawImage(this.videoEl as HTMLVideoElement, 0, 0, this.width, this.height);
+    this.bitmap = await createImageBitmap(this.bitmapCanvas);
+    return this.bitmap;
   }
 
   public async play() {
@@ -196,6 +262,8 @@ export class VideoReader {
     removeAllListeners(this.videoEl!, 'playing');
     removeAllListeners(this.videoEl!, 'timeupdate');
     this.videoEl = null;
+    this.bitmapCanvas = null;
+    this.bitmapCtx = null;
   }
 
   private seek(targetTime: number, play = true) {

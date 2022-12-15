@@ -9,7 +9,7 @@ import type { LayerType, Marker, Rect } from './types';
 @wasmAwaitRewind
 export class PAGLayer {
   public wasmIns: any;
-  public isDestroyed: any;
+  public isDestroyed = false;
 
   public constructor(wasmIns: any) {
     this.wasmIns = wasmIns;

@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
-    "lib": ["ES5", "ES6", "DOM", "DOM.Iterable"],
-    "target": "ESNext",
+    "lib": ["ES5", "ES6", "DOM", "DOM.Iterable", "WebWorker"],
+    "target": "ES2017",
     "declaration": true,
     "declarationDir": "./types",
     "emitDeclarationOnly": true,
@@ -11,5 +11,5 @@
     "moduleResolution": "Node",
     "resolveJsonModule": true
   },
-  "include": ["src/pag.ts"],
+  "include": ["src/pag.ts", "src/worker/client.ts"]
 }

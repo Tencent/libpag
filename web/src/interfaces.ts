@@ -11,7 +11,7 @@ export interface VideoReader {
   isPlaying: boolean;
   prepare: (targetFrame: number, playbackRate: number) => Promise<void>;
   renderToTexture: (GL: EmscriptenGL, textureID: number) => void;
-  getError: () => any;
+  getError: () => Promise<any>;
   onDestroy: () => void;
   play: () => Promise<void>;
   pause: () => void;
