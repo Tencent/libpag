@@ -37,7 +37,7 @@ class HardwareBuffer : public PixelBuffer {
 
   std::shared_ptr<Texture> makeTexture(Context*) const override;
 
-  AHardwareBuffer *aHardwareBuffer();
+  AHardwareBuffer* aHardwareBuffer();
 
   explicit HardwareBuffer(AHardwareBuffer* hardwareBuffer);
 

@@ -84,7 +84,7 @@ HardwareBuffer::~HardwareBuffer() {
   HardwareBufferInterface::Release(_hardwareBuffer);
 }
 
-AHardwareBuffer *HardwareBuffer::aHardwareBuffer() {
+AHardwareBuffer* HardwareBuffer::aHardwareBuffer() {
   return _hardwareBuffer;
 }
 }  // namespace tgfx
