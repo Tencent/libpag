@@ -26,7 +26,7 @@
   NSInteger width;
   NSInteger height;
   NSInteger numFrames;
-  UIImage* currentImage;
+  UIImage* lastFrameImage;
 }
 
 + (instancetype)Make:(PAGComposition*)pagComposition {
@@ -51,7 +51,7 @@
   if (pagSurface == nil) {
     return nil;
   }
-  currentImage = nil;
+  lastFrameImage = nil;
   pagPlayer = [[PAGPlayer alloc] init];
   numFrames = (NSInteger)([pagComposition duration] * [pagComposition frameRate] / 1000000);
   [pagPlayer setSurface:pagSurface];
@@ -94,16 +94,16 @@
   float progress = (index * 1.0 + 0.1) / self.numFrames;
   [pagPlayer setProgress:progress];
   BOOL result = [pagPlayer flush];
-  if (!result && currentImage != nil) {
-    return currentImage;
+  if (!result && lastFrameImage != nil) {
+    return lastFrameImage;
   }
   UIImage* image = [self imageFromCVPixelBufferRef:[pagSurface getCVPixelBuffer]];
-  currentImage = image;
+  lastFrameImage = image;
   return image;
 }
 
 - (void)dealloc {
-  currentImage = nil;
+  lastFrameImage = nil;
   if (pagSurface) {
     [pagSurface freeCache];
   }
