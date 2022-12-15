@@ -44,6 +44,9 @@ public class PAGDecoder {
      * The size of decoder will be scaled.
      */
     public static PAGDecoder Make(PAGComposition pagComposition, float scale) {
+        if (pagComposition == null) {
+            return null;
+        }
         if (scale <= 0) {
             scale = 1.0f;
         }
