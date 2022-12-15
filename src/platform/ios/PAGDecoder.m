@@ -91,7 +91,7 @@
   float progress = (index * 1.0 + 0.1) / self.numFrames;
   [pagPlayer setProgress:progress];
   BOOL result = [pagPlayer flush];
-  if (!result) {
+  if (!result && currentImage != nil) {
     return currentImage;
   }
   UIImage* image = [self imageFromCVPixelBufferRef:[pagSurface getCVPixelBuffer]];
