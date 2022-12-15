@@ -185,10 +185,6 @@ public class PAGSurface {
         nativeRelease();
     }
 
-    public HardwareBuffer hardwareBuffer() {
-        return hardwareBuffer;
-    }
-
     private native void nativeRelease();
 
     private static native void nativeInit();
@@ -205,6 +201,4 @@ public class PAGSurface {
     }
 
     long nativeSurface = 0;
-
-    private HardwareBuffer hardwareBuffer;
 }

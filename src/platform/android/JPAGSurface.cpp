@@ -209,11 +209,6 @@ static jobject SetupFromHardwareBufferDrawable(JNIEnv* env,
   static auto PAGSurface_Constructor = env->GetMethodID(PAGSurface_Class.get(), "<init>", "(J)V");
   auto surfaceObject = env->NewObject(PAGSurface_Class.get(), PAGSurface_Constructor,
                                       reinterpret_cast<jlong>(new JPAGSurface(surface)));
-  static auto PAGSurface_HardwareBuffer = env->GetFieldID(PAGSurface_Class.get(), "hardwareBuffer",
-                                                          "Landroid/hardware/HardwareBuffer;");
-  env->SetObjectField(surfaceObject, PAGSurface_HardwareBuffer,
-                      tgfx::HardwareBufferInterface::AHardwareBuffer_toHardwareBuffer(
-                          env, drawable->aHardwareBuffer()));
   return surfaceObject;
 }
 
@@ -263,13 +258,14 @@ extern "C" JNIEXPORT jlong JNICALL Java_org_libpag_PAGSurface_SetupFromSize(JNIE
   }
   tgfx::GLSampler textureInfo;
   if (!CreateGLTexture(context, width, height, &textureInfo)) {
+    LOGE("PAGSurface.SetupFromSize() create texture fail.");
     device->unlock();
     return 0;
   }
   auto surface = PAGSurface::MakeFrom(
       BackendTexture{{textureInfo.id, textureInfo.target}, width, height}, ImageOrigin::TopLeft);
   if (surface == nullptr) {
-    LOGE("PAGSurface.SetupFromTexture() Invalid texture specified.");
+    LOGE("PAGSurface.SetupFromSize() Invalid texture specified.");
     device->unlock();
     return 0;
   }
