@@ -20,15 +20,14 @@
 #import "PAGPlayer.h"
 #import "PAGSurface.h"
 
-@interface PAGDecoder ()
-@property(nonatomic, assign) NSInteger width;
-@property(nonatomic, assign) NSInteger height;
-@property(nonatomic, assign) NSInteger numFrames;
-@property(nonatomic, strong) PAGPlayer* pagPlayer;
-@property(nonatomic, strong) PAGSurface* pagSurface;
-@end
-
-@implementation PAGDecoder
+@implementation PAGDecoder {
+  PAGPlayer* pagPlayer;
+  PAGSurface* pagSurface;
+  NSInteger width;
+  NSInteger height;
+  NSInteger numFrames;
+  UIImage* currentImage;
+}
 
 + (instancetype)Make:(PAGComposition*)pagComposition {
   return [PAGDecoder Make:pagComposition scale:1.0f];
@@ -38,7 +37,7 @@
   if (pagComposition == nil) {
     return nil;
   }
-  return [[PAGDecoder alloc] initWithPAGComposition:pagComposition scale:scale];
+  return [[[PAGDecoder alloc] initWithPAGComposition:pagComposition scale:scale] autorelease];
 }
 
 - (instancetype)initWithPAGComposition:(PAGComposition*)pagComposition scale:(CGFloat)scale {
@@ -46,26 +45,27 @@
   if (scale <= 0) {
     scale = 1.0;
   }
-  self.width = (NSInteger)([pagComposition width] * scale);
-  self.height = (NSInteger)([pagComposition height] * scale);
-  self.pagSurface = [PAGSurface MakeFromGPU:CGSizeMake(self.width, self.height)];
-  self.pagPlayer = [[PAGPlayer alloc] init];
-  self.numFrames = (NSInteger)([pagComposition duration] * [pagComposition frameRate] / 1000000);
-  [self.pagPlayer setSurface:self.pagSurface];
-  [self.pagPlayer setComposition:pagComposition];
+  width = (NSInteger)([pagComposition width] * scale);
+  height = (NSInteger)([pagComposition height] * scale);
+  currentImage = nil;
+  pagSurface = [PAGSurface MakeFromGPU:CGSizeMake(width, height)];
+  pagPlayer = [[PAGPlayer alloc] init];
+  numFrames = (NSInteger)([pagComposition duration] * [pagComposition frameRate] / 1000000);
+  [pagPlayer setSurface:pagSurface];
+  [pagPlayer setComposition:pagComposition];
   return self;
 }
 
 - (NSInteger)width {
-  return _width;
+  return width;
 }
 
 - (NSInteger)height {
-  return _height;
+  return height;
 }
 
 - (NSInteger)numFrames {
-  return _numFrames;
+  return numFrames;
 }
 
 - (UIImage*)imageFromCVPixelBufferRef:(CVPixelBufferRef)pixelBuffer {
@@ -84,20 +84,25 @@
 }
 
 - (UIImage*)frameAtIndex:(NSInteger)index {
-  if (index < 0 || index >= self.numFrames) {
+  if (index < 0 || index >= numFrames) {
     NSLog(@"Input index is out of bounds!");
     return nil;
   }
   float progress = (index * 1.0 + 0.1) / self.numFrames;
-  [self.pagPlayer setProgress:progress];
-  [self.pagPlayer flush];
-  CVPixelBufferRef cvPixelBuffer = [self.pagSurface getCVPixelBuffer];
-  return [self imageFromCVPixelBufferRef:cvPixelBuffer];
+  [pagPlayer setProgress:progress];
+  BOOL result = [pagPlayer flush];
+  if (!result) {
+    return currentImage;
+  }
+  UIImage* image = [self imageFromCVPixelBufferRef:[pagSurface getCVPixelBuffer]];
+  currentImage = image;
+  return image;
 }
 
 - (void)dealloc {
-  [self.pagPlayer release];
-  [self.pagSurface release];
+  currentImage = nil;
+  [pagSurface freeCache];
+  [pagPlayer release];
   [super dealloc];
 }
 
