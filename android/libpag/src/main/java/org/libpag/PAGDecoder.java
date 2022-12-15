@@ -30,6 +30,7 @@ public class PAGDecoder {
     private int numFrames;
     private PAGSurface pagSurface;
     private PAGPlayer pagPlayer;
+    private Bitmap lastFrameBitmap;
 
     /**
      * Make a decoder from pagComposition.
@@ -91,12 +92,15 @@ public class PAGDecoder {
         }
         float progress = (index * 1.0f + 0.1f) / numFrames;
         pagPlayer.setProgress(progress);
-        pagPlayer.flush();
-        return pagSurface.makeSnapshot();
+        if (!pagPlayer.flush() && lastFrameBitmap != null && !lastFrameBitmap.isRecycled()) {
+            return lastFrameBitmap;
+        }
+        lastFrameBitmap = pagSurface.makeSnapshot();
+        return lastFrameBitmap;
     }
 
     private static PAGSurface createSurface(int width, int height) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && false) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             HardwareBuffer hardwareBuffer = HardwareBuffer.create(width, height,
                     HardwareBuffer.RGBA_8888
                     , 1,
