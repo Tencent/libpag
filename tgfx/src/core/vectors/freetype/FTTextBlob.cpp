@@ -31,8 +31,8 @@ std::shared_ptr<TextBlob> TextBlob::MakeFrom(const GlyphID glyphIDs[], const Poi
   return textBlob;
 }
 
-std::shared_ptr<TextureBuffer> FTTextBlob::getImage(float /*resolutionScale*/,
-                                                    Matrix* /*matrix*/) const {
+std::shared_ptr<ImageBuffer> FTTextBlob::getImage(float /*resolutionScale*/,
+                                                  Matrix* /*matrix*/) const {
   // TODO(domrjchen): Added the implementation of generating multiple character images at once and
   //  completed GLCanvas.drawColorGlyphs().
   return nullptr;

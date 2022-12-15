@@ -53,12 +53,12 @@ class ImageTask : public Executor {
     return task;
   }
 
-  std::shared_ptr<tgfx::TextureBuffer> getBuffer() const {
+  std::shared_ptr<tgfx::ImageBuffer> getBuffer() const {
     return buffer;
   }
 
  private:
-  std::shared_ptr<tgfx::TextureBuffer> buffer = {};
+  std::shared_ptr<tgfx::ImageBuffer> buffer = {};
   std::shared_ptr<tgfx::ImageCodec> codec = nullptr;
   // Make a reference to file when image made from imageByte of file.
   std::shared_ptr<File> file = nullptr;
@@ -496,7 +496,7 @@ void RenderCache::prepareImage(ID assetID, std::shared_ptr<tgfx::ImageCodec> cod
   }
 }
 
-std::shared_ptr<tgfx::TextureBuffer> RenderCache::getImageBuffer(ID assetID) {
+std::shared_ptr<tgfx::ImageBuffer> RenderCache::getImageBuffer(ID assetID) {
   usedAssets.insert(assetID);
   auto result = imageTasks.find(assetID);
   if (result != imageTasks.end()) {

@@ -53,8 +53,8 @@ void WriteTagHeader(EncodeStream* stream, EncodeStream* tagBytes, TagCode code) 
 }
 
 void WriteTagHeader(EncodeStream* stream, ByteData* tagBytes, TagCode code) {
-  WriteTypeAndLength(stream, code, tagBytes->length());
-  stream->writeBytes(tagBytes->data(), tagBytes->length());
+  WriteTypeAndLength(stream, code, static_cast<uint32_t>(tagBytes->length()));
+  stream->writeBytes(tagBytes->data(), static_cast<uint32_t>(tagBytes->length()));
 }
 
 void WriteEndTag(EncodeStream* stream) {

@@ -23,6 +23,6 @@
 namespace tgfx {
 class FTTextBlob : public TextBlob {
  public:
-  std::shared_ptr<TextureBuffer> getImage(float resolutionScale, Matrix* matrix) const;
+  std::shared_ptr<ImageBuffer> getImage(float resolutionScale, Matrix* matrix) const;
 };
 }  // namespace tgfx

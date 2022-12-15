@@ -9,8 +9,10 @@
       <file path="$PROJECT_DIR$/build" />
       <file path="$PROJECT_DIR$/ios" />
       <file path="$PROJECT_DIR$/mac" />
+      <file path="$PROJECT_DIR$/out" />
       <file path="$PROJECT_DIR$/qt" />
       <file path="$PROJECT_DIR$/resources" />
+      <file path="$PROJECT_DIR$/result" />
       <file path="$PROJECT_DIR$/tgfx/.idea" />
       <file path="$PROJECT_DIR$/tgfx/cmake-build-debug" />
       <file path="$PROJECT_DIR$/third_party" />

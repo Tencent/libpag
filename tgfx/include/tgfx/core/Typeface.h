@@ -21,7 +21,7 @@
 #include "tgfx/core/Data.h"
 #include "tgfx/core/FontMetrics.h"
 #include "tgfx/core/Path.h"
-#include "tgfx/gpu/TextureBuffer.h"
+#include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
 /**
@@ -139,7 +139,7 @@ class Typeface {
    * Creates a texture buffer capturing the content of the specified glyph. The returned matrix
    * should apply to the glyph image when drawing.
    */
-  virtual std::shared_ptr<TextureBuffer> getGlyphImage(GlyphID glyphID, float size, bool fauxBold,
+  virtual std::shared_ptr<ImageBuffer> getGlyphImage(GlyphID glyphID, float size, bool fauxBold,
                                                        bool fauxItalic, Matrix* matrix) const = 0;
 
   /**

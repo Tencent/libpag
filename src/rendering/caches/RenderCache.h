@@ -117,7 +117,7 @@ class RenderCache : public Performance {
    * Returns a texture buffer cache of specified asset id. Returns null if there is no associated
    * cache available.
    */
-  std::shared_ptr<tgfx::TextureBuffer> getImageBuffer(ID assetID);
+  std::shared_ptr<tgfx::ImageBuffer> getImageBuffer(ID assetID);
 
   uint32_t getContentVersion() const;
 

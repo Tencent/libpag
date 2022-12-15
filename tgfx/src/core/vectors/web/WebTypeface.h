@@ -76,8 +76,8 @@ class WebTypeface : public Typeface {
                     Path* path) const override;
   Rect getGlyphBounds(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic) const override;
 
-  std::shared_ptr<TextureBuffer> getGlyphImage(GlyphID glyphID, float size, bool fauxBold,
-                                               bool fauxItalic, Matrix* matrix) const override;
+  std::shared_ptr<ImageBuffer> getGlyphImage(GlyphID glyphID, float size, bool fauxBold,
+                                             bool fauxItalic, Matrix* matrix) const override;
 
  private:
   explicit WebTypeface(std::string name, std::string style);

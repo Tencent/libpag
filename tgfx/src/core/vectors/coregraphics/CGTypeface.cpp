@@ -264,8 +264,8 @@ bool CGTypeface::getGlyphPath(GlyphID glyphID, float size, bool fauxBold, bool f
   return scalerContext->generatePath(glyphID, path);
 }
 
-std::shared_ptr<TextureBuffer> CGTypeface::getGlyphImage(GlyphID glyphID, float size, bool fauxBold,
-                                                         bool fauxItalic, Matrix* matrix) const {
+std::shared_ptr<ImageBuffer> CGTypeface::getGlyphImage(GlyphID glyphID, float size, bool fauxBold,
+                                                       bool fauxItalic, Matrix* matrix) const {
   auto scalerContext = CGScalerContext::Make(weakThis.lock(), size, fauxBold, fauxItalic);
   if (scalerContext == nullptr) {
     return nullptr;

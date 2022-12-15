@@ -139,7 +139,7 @@ std::shared_ptr<Data> ImageCodec::Encode(const ImageInfo& info, const void* pixe
   return nullptr;
 }
 
-std::shared_ptr<TextureBuffer> ImageCodec::makeBuffer() const {
+std::shared_ptr<ImageBuffer> ImageCodec::makeBuffer() const {
   auto pixelBuffer = PixelBuffer::Make(width(), height(), false);
   if (pixelBuffer == nullptr) {
     return nullptr;

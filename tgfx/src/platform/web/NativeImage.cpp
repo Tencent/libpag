@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "NativeImage.h"
-#include "NativeTextureBuffer.h"
+#include "NativeImageBuffer.h"
 #include "platform/NativeCodec.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Stream.h"
@@ -73,7 +73,7 @@ std::shared_ptr<NativeImage> NativeImage::MakeFrom(emscripten::val nativeImage) 
   return image;
 }
 
-std::shared_ptr<TextureBuffer> NativeImage::makeBuffer() const {
-  return NativeTextureBuffer::Make(width(), height(), nativeImage);
+std::shared_ptr<ImageBuffer> NativeImage::makeBuffer() const {
+  return NativeImageBuffer::Make(width(), height(), nativeImage);
 }
 }  // namespace tgfx

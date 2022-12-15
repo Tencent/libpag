@@ -50,7 +50,7 @@ class FTScalerContext {
 
   bool generatePath(GlyphID glyphID, Path* path);
 
-  std::shared_ptr<TextureBuffer> generateImage(GlyphID glyphId, Matrix* matrix);
+  std::shared_ptr<ImageBuffer> generateImage(GlyphID glyphId, Matrix* matrix);
 
  private:
   FTScalerContext(std::shared_ptr<Typeface> typeFace, FTScalerContextRec rec);

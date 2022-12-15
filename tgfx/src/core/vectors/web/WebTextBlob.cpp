@@ -41,8 +41,8 @@ void WebTextBlob::getTextsAndPositions(std::vector<std::string>* texts,
   }
 }
 
-std::shared_ptr<TextureBuffer> WebTextBlob::getImage(float /*resolutionScale*/,
-                                                     Matrix* /*matrix*/) const {
+std::shared_ptr<ImageBuffer> WebTextBlob::getImage(float /*resolutionScale*/,
+                                                   Matrix* /*matrix*/) const {
   // TODO(domrjchen): Added the implementation of generating multiple character images at once and
   //  completed GLCanvas.drawColorGlyphs().
   return nullptr;
