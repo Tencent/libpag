@@ -37,18 +37,21 @@
   if (pagComposition == nil) {
     return nil;
   }
-  return [[[PAGDecoder alloc] initWithPAGComposition:pagComposition scale:scale] autorelease];
+  return [[PAGDecoder alloc] initWithPAGComposition:pagComposition scale:scale];
 }
 
 - (instancetype)initWithPAGComposition:(PAGComposition*)pagComposition scale:(CGFloat)scale {
-  self = [super init];
+  self = [[super init] autorelease];
   if (scale <= 0) {
     scale = 1.0;
   }
   width = (NSInteger)([pagComposition width] * scale);
   height = (NSInteger)([pagComposition height] * scale);
-  currentImage = nil;
   pagSurface = [PAGSurface MakeFromGPU:CGSizeMake(width, height)];
+  if (pagSurface == nil) {
+    return nil;
+  }
+  currentImage = nil;
   pagPlayer = [[PAGPlayer alloc] init];
   numFrames = (NSInteger)([pagComposition duration] * [pagComposition frameRate] / 1000000);
   [pagPlayer setSurface:pagSurface];
@@ -101,8 +104,12 @@
 
 - (void)dealloc {
   currentImage = nil;
-  [pagSurface freeCache];
-  [pagPlayer release];
+  if (pagSurface) {
+    [pagSurface freeCache];
+  }
+  if (pagPlayer) {
+    [pagPlayer release];
+  }
   [super dealloc];
 }
 
