@@ -41,9 +41,9 @@ class Picture : public Graphic {
   static std::shared_ptr<Graphic> MakeFrom(ID assetID, std::shared_ptr<tgfx::ImageCodec> codec);
 
   /**
-   * Creates a new Picture with specified TextureBuffer. Returns null if the bitmap is empty.
+   * Creates a new Picture with specified ImageBuffer. Returns null if the bitmap is empty.
    */
-  static std::shared_ptr<Graphic> MakeFrom(ID assetID, std::shared_ptr<tgfx::TextureBuffer> buffer);
+  static std::shared_ptr<Graphic> MakeFrom(ID assetID, std::shared_ptr<tgfx::ImageBuffer> buffer);
 
   /**
    * Creates a new Picture with specified backend texture. Returns null if the texture is invalid.

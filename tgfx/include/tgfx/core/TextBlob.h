@@ -57,7 +57,7 @@ class TextBlob {
    * @param matrix The output transformation that should apply to the texture when drawing.
    * @return An alpha only texture buffer is returned if the text font is not backed by bitmaps.
    */
-  virtual std::shared_ptr<TextureBuffer> getImage(float resolutionScale, Matrix* matrix) const = 0;
+  virtual std::shared_ptr<ImageBuffer> getImage(float resolutionScale, Matrix* matrix) const = 0;
 
  protected:
   Font font = {};

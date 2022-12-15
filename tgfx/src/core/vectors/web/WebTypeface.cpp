@@ -19,7 +19,7 @@
 #include "WebTypeface.h"
 #include <vector>
 #include "core/utils/UniqueID.h"
-#include "platform/web/NativeTextureBuffer.h"
+#include "platform/web/NativeImageBuffer.h"
 
 using namespace emscripten;
 
@@ -149,9 +149,8 @@ Rect WebTypeface::getGlyphBounds(GlyphID glyphID, float size, bool fauxBold,
   return scalerContext.call<Rect>("getTextBounds", getText(glyphID));
 }
 
-std::shared_ptr<TextureBuffer> WebTypeface::getGlyphImage(GlyphID glyphID, float size,
-                                                          bool fauxBold, bool fauxItalic,
-                                                          Matrix* matrix) const {
+std::shared_ptr<ImageBuffer> WebTypeface::getGlyphImage(GlyphID glyphID, float size, bool fauxBold,
+                                                        bool fauxItalic, Matrix* matrix) const {
   if (glyphID == 0) {
     return nullptr;
   }
@@ -161,6 +160,6 @@ std::shared_ptr<TextureBuffer> WebTypeface::getGlyphImage(GlyphID glyphID, float
   if (matrix) {
     matrix->setTranslate(bounds.left, bounds.top);
   }
-  return NativeTextureBuffer::Make(buffer.call<int>("width"), buffer.call<int>("height"), buffer);
+  return NativeImageBuffer::Make(buffer.call<int>("width"), buffer.call<int>("height"), buffer);
 }
 }  // namespace tgfx

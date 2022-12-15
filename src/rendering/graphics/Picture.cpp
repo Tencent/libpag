@@ -342,9 +342,9 @@ class SnapshotPicture : public Picture {
 //===================================== SnapshotPicture ============================================
 
 //==================================== Texture Proxies =============================================
-class TextureBufferProxy : public TextureProxy {
+class ImageBufferProxy : public TextureProxy {
  public:
-  explicit TextureBufferProxy(const std::shared_ptr<tgfx::TextureBuffer> buffer)
+  explicit ImageBufferProxy(const std::shared_ptr<tgfx::ImageBuffer> buffer)
       : TextureProxy(buffer->width(), buffer->height()), buffer(buffer) {
   }
 
@@ -363,7 +363,7 @@ class TextureBufferProxy : public TextureProxy {
   }
 
  private:
-  std::shared_ptr<tgfx::TextureBuffer> buffer = nullptr;
+  std::shared_ptr<tgfx::ImageBuffer> buffer = nullptr;
 };
 
 class ImageTextureProxy : public TextureProxy {
@@ -467,12 +467,11 @@ std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, std::shared_ptr<tgfx::Ima
   return picture;
 }
 
-std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID,
-                                           std::shared_ptr<tgfx::TextureBuffer> buffer) {
+std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, std::shared_ptr<tgfx::ImageBuffer> buffer) {
   if (buffer == nullptr) {
     return nullptr;
   }
-  auto proxy = new TextureBufferProxy(buffer);
+  auto proxy = new ImageBufferProxy(buffer);
   return std::shared_ptr<Graphic>(new TextureProxyPicture(assetID, proxy, false));
 }
 

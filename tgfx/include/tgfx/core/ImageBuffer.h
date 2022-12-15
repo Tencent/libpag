@@ -18,23 +18,41 @@
 
 #pragma once
 
-#include <emscripten/val.h>
-#include "tgfx/gpu/TextureBuffer.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
-class NativeTextureBuffer : public TextureBuffer {
+/**
+ * A ImageBuffer contains an array of fully processed pixels, suitable for immediate texture
+ * uploading on the GPU.
+ */
+class ImageBuffer {
  public:
-  ~NativeTextureBuffer() override;
-
-  static std::shared_ptr<NativeTextureBuffer> Make(int width, int height, emscripten::val source);
-
-  std::shared_ptr<Texture> makeTexture(Context* context) const override;
-
- private:
-  explicit NativeTextureBuffer(int width, int height, emscripten::val source)
-      : TextureBuffer(width, height), source(source) {
+  virtual ~ImageBuffer() = default;
+  /**
+   * Returns the width of the texture buffer.
+   */
+  int width() const {
+    return _width;
   }
 
-  emscripten::val source = emscripten::val::null();
+  /**
+   * Returns the height of the texture buffer.
+   */
+  int height() const {
+    return _height;
+  }
+
+  /**
+   * Creates a new Texture capturing the pixels in this texture buffer.
+   */
+  virtual std::shared_ptr<Texture> makeTexture(Context* context) const = 0;
+
+ protected:
+  ImageBuffer(int width, int height) : _width(width), _height(height) {
+  }
+
+ private:
+  int _width = 0;
+  int _height = 0;
 };
 }  // namespace tgfx

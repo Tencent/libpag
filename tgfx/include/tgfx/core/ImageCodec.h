@@ -25,7 +25,7 @@
 
 namespace tgfx {
 
-class TextureBuffer;
+class ImageBuffer;
 
 /**
  * ImageCodec describes a two dimensional array of pixels encoded in a compressed data stream.
@@ -81,7 +81,7 @@ class ImageCodec {
    * Crates a new texture buffer capturing the pixels in this image. ImageCodec do not cache the
    * newly created texture buffer, each call to this method allocates additional storage.
    */
-  virtual std::shared_ptr<TextureBuffer> makeBuffer() const;
+  virtual std::shared_ptr<ImageBuffer> makeBuffer() const;
 
   /**
    * Decodes the image with the specified image info into the given pixels. Returns true if the

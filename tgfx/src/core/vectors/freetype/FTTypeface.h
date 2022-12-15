@@ -68,8 +68,8 @@ class FTTypeface : public Typeface {
   bool getGlyphPath(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
                     Path* path) const override;
 
-  std::shared_ptr<TextureBuffer> getGlyphImage(GlyphID glyphID, float size, bool fauxBold,
-                                               bool fauxItalic, Matrix* matrix) const override;
+  std::shared_ptr<ImageBuffer> getGlyphImage(GlyphID glyphID, float size, bool fauxBold,
+                                             bool fauxItalic, Matrix* matrix) const override;
 
   Rect getGlyphBounds(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic) const override;
 

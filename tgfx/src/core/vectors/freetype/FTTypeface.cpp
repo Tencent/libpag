@@ -89,7 +89,7 @@ class EmptyTypeface : public Typeface {
     return false;
   }
 
-  std::shared_ptr<TextureBuffer> getGlyphImage(GlyphID, float, bool, bool, Matrix*) const override {
+  std::shared_ptr<ImageBuffer> getGlyphImage(GlyphID, float, bool, bool, Matrix*) const override {
     return nullptr;
   }
 
@@ -246,8 +246,8 @@ bool FTTypeface::getGlyphPath(GlyphID glyphID, float size, bool fauxBold, bool f
   return scalerContext->generatePath(glyphID, path);
 }
 
-std::shared_ptr<TextureBuffer> FTTypeface::getGlyphImage(GlyphID glyphID, float size, bool fauxBold,
-                                                         bool fauxItalic, Matrix* matrix) const {
+std::shared_ptr<ImageBuffer> FTTypeface::getGlyphImage(GlyphID glyphID, float size, bool fauxBold,
+                                                       bool fauxItalic, Matrix* matrix) const {
   auto scalerContext = FTScalerContext::Make(weakThis.lock(), size, fauxBold, fauxItalic);
   if (scalerContext == nullptr) {
     return nullptr;

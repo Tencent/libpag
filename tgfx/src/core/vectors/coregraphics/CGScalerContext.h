@@ -46,7 +46,7 @@ class CGScalerContext {
 
   bool generatePath(GlyphID glyphID, Path* path);
 
-  std::shared_ptr<TextureBuffer> generateImage(GlyphID glyphID, Matrix* matrix);
+  std::shared_ptr<ImageBuffer> generateImage(GlyphID glyphID, Matrix* matrix);
 
  private:
   CGScalerContext(std::shared_ptr<Typeface> typeface, CGScalerContextRec);
