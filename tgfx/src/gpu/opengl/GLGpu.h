@@ -33,6 +33,9 @@ class GLGpu : public Gpu {
   void writePixels(const TextureSampler* sampler, Rect rect, const void* pixels,
                    size_t rowBytes) override;
 
+  void bindTexture(int unitIndex, const TextureSampler* sampler,
+                   SamplerState samplerState) override;
+
   void copyRenderTargetToTexture(RenderTarget* renderTarget, Texture* texture, const Rect& srcRect,
                                  const Point& dstPoint) override;
 

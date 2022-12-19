@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include "SamplerState.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/Semaphore.h"
 #include "tgfx/gpu/TextureSampler.h"
@@ -45,6 +46,9 @@ class Gpu {
 
   virtual void writePixels(const TextureSampler* sampler, Rect rect, const void* pixels,
                            size_t rowBytes) = 0;
+
+  virtual void bindTexture(int unitIndex, const TextureSampler* sampler,
+                           SamplerState samplerState) = 0;
 
   virtual void copyRenderTargetToTexture(RenderTarget* renderTarget, Texture* texture,
                                          const Rect& srcRect, const Point& dstPoint) = 0;

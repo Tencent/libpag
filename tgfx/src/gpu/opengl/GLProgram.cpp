@@ -19,6 +19,7 @@
 #include "GLProgram.h"
 #include "GLContext.h"
 #include "GLUtil.h"
+#include "gpu/Gpu.h"
 #include "gpu/Pipeline.h"
 #include "tgfx/gpu/opengl/GLTexture.h"
 
@@ -82,7 +83,7 @@ void GLProgram::updateUniformsAndTextureBindings(const GLRenderTarget* renderTar
   auto glContext = GLContext::Unwrap(context);
   if (dstTexture) {
     glXferProcessor->setData(programDataManager, *pipeline.getXferProcessor(), dstTexture, offset);
-    glContext->bindTexture(nextTexSamplerIdx++, dstTexture->getSampler());
+    glContext->gpu()->bindTexture(nextTexSamplerIdx++, dstTexture->getSampler(), SamplerState());
   }
 }
 
@@ -96,7 +97,8 @@ void GLProgram::setFragmentData(const GLProgramDataManager& programDataManager,
   while (fp && glslFP) {
     glslFP->setData(programDataManager, *fp);
     for (size_t i = 0; i < fp->numTextureSamplers(); ++i) {
-      glContext->bindTexture((*nextTexSamplerIdx)++, fp->textureSampler(i), fp->samplerState(i));
+      glContext->gpu()->bindTexture((*nextTexSamplerIdx)++, fp->textureSampler(i),
+                                    fp->samplerState(i));
     }
     fp = iter.next();
     glslFP = glslIter.next();
