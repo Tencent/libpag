@@ -1,4 +1,4 @@
-const fontNames = ['Arial', 'Courier New', 'Georgia', 'Times New Roman', 'Trebuchet MS', 'Verdana'];
+const fontNames = ['Arial', '"Courier New"', 'Georgia', '"Times New Roman"', '"Trebuchet MS"', 'Verdana'];
 
 export const defaultFontNames = (() => {
   return ['emoji'].concat(...fontNames);
