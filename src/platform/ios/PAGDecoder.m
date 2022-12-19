@@ -17,14 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGDecoder.h"
+
+#import <VideoToolbox/VideoToolbox.h>
+
 #import "PAGPlayer.h"
 #import "PAGSurface.h"
 
 @implementation PAGDecoder {
   PAGPlayer* pagPlayer;
   PAGSurface* pagSurface;
-  NSInteger width;
-  NSInteger height;
   NSInteger numFrames;
   UIImage* lastFrameImage;
 }
@@ -45,26 +46,26 @@
   if (scale <= 0) {
     scale = 1.0;
   }
-  width = (NSInteger)([pagComposition width] * scale);
-  height = (NSInteger)([pagComposition height] * scale);
-  pagSurface = [PAGSurface MakeFromGPU:CGSizeMake(width, height)];
+  pagSurface = [PAGSurface
+      MakeOffscreen:CGSizeMake([pagComposition width] * scale, [pagComposition height] * scale)];
   if (pagSurface == nil) {
     return nil;
   }
+  [pagSurface retain];
   lastFrameImage = nil;
   pagPlayer = [[PAGPlayer alloc] init];
-  numFrames = (NSInteger)([pagComposition duration] * [pagComposition frameRate] / 1000000);
+  numFrames = [pagComposition duration] * [pagComposition frameRate] / 1000000;
   [pagPlayer setSurface:pagSurface];
   [pagPlayer setComposition:pagComposition];
   return self;
 }
 
 - (NSInteger)width {
-  return width;
+  return pagSurface ? [pagSurface width] : 0;
 }
 
 - (NSInteger)height {
-  return height;
+  return pagSurface ? [pagSurface height] : 0;
 }
 
 - (NSInteger)numFrames {
@@ -72,15 +73,8 @@
 }
 
 - (UIImage*)imageFromCVPixelBufferRef:(CVPixelBufferRef)pixelBuffer {
-  CVPixelBufferLockBaseAddress(pixelBuffer, 0);
-  CIImage* ciImage = [CIImage imageWithCVPixelBuffer:pixelBuffer];
-  CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
-  CIContext* temporaryContext = [CIContext contextWithOptions:nil];
-  CGImageRef imageRef =
-      [temporaryContext createCGImage:ciImage
-                             fromRect:CGRectMake(0, 0, CVPixelBufferGetWidth(pixelBuffer),
-                                                 CVPixelBufferGetHeight(pixelBuffer))];
-
+  CGImageRef imageRef = nil;
+  VTCreateCGImageFromCVPixelBuffer(pixelBuffer, nil, &imageRef);
   UIImage* uiImage = [UIImage imageWithCGImage:imageRef];
   CGImageRelease(imageRef);
   return uiImage;
@@ -105,7 +99,7 @@
 - (void)dealloc {
   lastFrameImage = nil;
   if (pagSurface) {
-    [pagSurface freeCache];
+    [pagSurface release];
   }
   if (pagPlayer) {
     [pagPlayer release];

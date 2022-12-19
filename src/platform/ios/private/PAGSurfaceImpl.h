@@ -35,6 +35,8 @@
 
 + (PAGSurfaceImpl*)MakeFromGPU:(CGSize)size;
 
++ (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size;
+
 - (void)updateSize;
 
 - (int)width;

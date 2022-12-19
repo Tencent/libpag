@@ -43,8 +43,21 @@
 }
 
 + (PAGSurfaceImpl*)MakeFromGPU:(CGSize)size {
-  auto pixelBuffer =
-      pag::PixelBufferUtils::Make(static_cast<int>(size.width), static_cast<int>(size.height));
+  auto pixelBuffer = pag::PixelBufferUtils::Make(static_cast<int>(roundf(size.width)),
+                                                 static_cast<int>(roundf(size.height)));
+  auto drawable = pag::GPUDrawable::FromCVPixelBuffer(pixelBuffer);
+  if (drawable == nullptr) {
+    return nil;
+  }
+  auto surface = pag::PAGSurface::MakeFrom(drawable);
+  PAGSurfaceImpl* pagSurface = [[[PAGSurfaceImpl alloc] initWithSurface:surface] autorelease];
+  pagSurface.cvPixelBuffer = pixelBuffer;
+  return pagSurface;
+}
+
++ (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size {
+  auto pixelBuffer = pag::PixelBufferUtils::Make(static_cast<int>(roundf(size.width)),
+                                                 static_cast<int>(roundf(size.height)));
   auto drawable = pag::GPUDrawable::FromCVPixelBuffer(pixelBuffer);
   if (drawable == nullptr) {
     return nil;

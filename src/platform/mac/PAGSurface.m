@@ -48,6 +48,16 @@
   return pagSurface;
 }
 
++ (PAGSurface*)MakeOffscreen:(CGSize)size {
+  PAGSurfaceImpl* surface = [PAGSurfaceImpl MakeOffscreen:size];
+  if (surface == nil) {
+    return nil;
+  }
+  PAGSurface* pagSurface = [[[PAGSurface alloc] init] autorelease];
+  pagSurface.surface = surface;
+  return pagSurface;
+}
+
 - (void)dealloc {
   [_surface release];
   [super dealloc];
