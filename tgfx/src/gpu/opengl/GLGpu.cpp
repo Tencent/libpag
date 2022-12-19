@@ -95,6 +95,42 @@ void GLGpu::writePixels(const TextureSampler* sampler, Rect rect, const void* pi
   }
 }
 
+static int GetGLWrap(unsigned target, SamplerState::WrapMode wrapMode) {
+  if (target == GL_TEXTURE_RECTANGLE) {
+    if (wrapMode == SamplerState::WrapMode::ClampToBorder) {
+      return GL_CLAMP_TO_BORDER;
+    } else {
+      return GL_CLAMP_TO_EDGE;
+    }
+  }
+  switch (wrapMode) {
+    case SamplerState::WrapMode::Clamp:
+      return GL_CLAMP_TO_EDGE;
+    case SamplerState::WrapMode::Repeat:
+      return GL_REPEAT;
+    case SamplerState::WrapMode::MirrorRepeat:
+      return GL_MIRRORED_REPEAT;
+    case SamplerState::WrapMode::ClampToBorder:
+      return GL_CLAMP_TO_BORDER;
+  }
+}
+
+void GLGpu::bindTexture(int unitIndex, const TextureSampler* sampler, SamplerState samplerState) {
+  if (sampler == nullptr) {
+    return;
+  }
+  auto glSampler = static_cast<const GLSampler*>(sampler);
+  auto gl = GLFunctions::Get(_context);
+  gl->activeTexture(GL_TEXTURE0 + unitIndex);
+  gl->bindTexture(glSampler->target, glSampler->id);
+  gl->texParameteri(glSampler->target, GL_TEXTURE_WRAP_S,
+                    GetGLWrap(glSampler->target, samplerState.wrapModeX));
+  gl->texParameteri(glSampler->target, GL_TEXTURE_WRAP_T,
+                    GetGLWrap(glSampler->target, samplerState.wrapModeY));
+  gl->texParameteri(glSampler->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  gl->texParameteri(glSampler->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+}
+
 void GLGpu::copyRenderTargetToTexture(RenderTarget* renderTarget, Texture* texture,
                                       const Rect& srcRect, const Point& dstPoint) {
   auto gl = GLFunctions::Get(_context);

@@ -71,7 +71,7 @@ class GLOpsRenderPass : public OpsRenderPass {
       : OpsRenderPass(context), vertex(std::move(vertex)) {
   }
 
-  void draw(std::function<void()> func);
+  void draw(const std::function<void()>& func);
 
   GLProgram* program = nullptr;
   std::vector<float> _vertices;
