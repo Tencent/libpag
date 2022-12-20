@@ -5,7 +5,7 @@ import {
   VIDEO_PLAYBACK_RATE_MIN,
 } from '../constant';
 import { addListener, removeListener, removeAllListeners } from '../utils/video-listener';
-import { IPHONE, IS_WECHAT } from '../utils/ua';
+import { IPHONE, WECHAT, APPLE } from '../utils/ua';
 import { PAGModule } from '../pag-module';
 
 import type { EmscriptenGL } from '../types';
@@ -74,17 +74,15 @@ export class VideoReader {
     this.videoEl.style.display = 'none';
     this.videoEl.muted = true;
     this.videoEl.playsInline = true;
-    this.videoEl.preload = 'auto';
+    this.videoEl.preload = 'auto'; // use load() will make a bug on Chrome.
+    this.videoEl.width = width;
+    this.videoEl.height = height;
     waitVideoCanPlay(this.videoEl).then(() => {
       this.canplay = true;
     });
-    this.frameRate = frameRate;
     const blob = new Blob([mp4Data], { type: 'video/mp4' });
     this.videoEl.src = URL.createObjectURL(blob);
-    if (IPHONE) {
-      // use load() will make a bug on Chrome.
-      this.videoEl.load();
-    }
+    this.frameRate = frameRate;
     this.staticTimeRanges = new StaticTimeRanges(staticTimeRanges);
     if (UHD_RESOLUTION < width || UHD_RESOLUTION < height) {
       this.disablePlaybackRate = true;
@@ -102,8 +100,16 @@ export class VideoReader {
     const { currentTime } = this.videoEl;
     const targetTime = targetFrame / this.frameRate;
     if (currentTime === 0 && targetTime === 0) {
-      if (!this.canplay) {
+      if (!this.canplay && !APPLE) {
         await waitVideoCanPlay(this.videoEl);
+      } else {
+        await this.play();
+        await new Promise<void>((resolve) => {
+          requestAnimationFrame(() => {
+            this.pause();
+            resolve();
+          });
+        });
       }
     } else {
       if (Math.round(targetTime * this.frameRate) === Math.round(currentTime * this.frameRate)) {
@@ -154,7 +160,7 @@ export class VideoReader {
       throw new Error("Video element doesn't exist!");
     }
     if (!this.videoEl.paused) return;
-    if (IS_WECHAT && window.WeixinJSBridge) {
+    if (WECHAT && window.WeixinJSBridge) {
       await getWechatNetwork();
     }
     if (document.visibilityState !== 'visible') {
