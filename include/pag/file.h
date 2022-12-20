@@ -361,6 +361,28 @@ class PAG_API Transform2D {
   bool verify() const;
 };
 
+class PAG_API Transform3D {
+ public:
+  static Transform3D* MakeDefault();
+  ~Transform3D();
+
+  Property<Point3D>* anchorPoint = nullptr;  // spatial
+  Property<Point3D>* position = nullptr;     // spatial
+  Property<float>* xPosition = nullptr;
+  Property<float>* yPosition = nullptr;
+  Property<float>* zPosition = nullptr;
+  Property<Point3D>* scale = nullptr;  // multidimensional
+  Property<Point3D>* orientation = nullptr;
+  Property<float>* xRotation = nullptr;
+  Property<float>* yRotation = nullptr;
+  Property<float>* zRotation = nullptr;
+  Property<Opacity>* opacity = nullptr;
+
+  void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const;
+
+  bool verify() const;
+};
+
 class PAG_API MaskMode {
  public:
   static const Enum None = 0;  // mask shape does nothing
@@ -1626,9 +1648,17 @@ class PAG_API Layer {
    */
   bool motionBlur = false;
   /**
-   * The transformation of the layer.
+   * When true, the layer is a 3D layer;
+   */
+   bool is3DLayer = false;
+  /**
+   * The 2D transformation of the layer.
    */
   Transform2D* transform = nullptr;
+  /**
+   * The 3D transformation of the layer.
+   */
+  Transform3D* transform3D = nullptr;
   /**
    * When false, the layer should be skipped during the rendering loop.
    */
@@ -1792,6 +1822,21 @@ class PAG_API PreComposeLayer : public Layer {
   bool verify() const override;
   std::vector<TimeRange> getContentStaticTimeRanges() const;
   Frame getCompositionFrame(Frame layerFrame);
+  Rect getBounds() const override;
+
+  RTTR_ENABLE(Layer)
+};
+
+class PAG_API CameraLayer : public Layer {
+ public:
+  ~CameraLayer() override;
+
+  LayerType type() const override {
+    return LayerType::Camera;
+  };
+
+  bool verify() const override;
+
   Rect getBounds() const override;
 
   RTTR_ENABLE(Layer)
