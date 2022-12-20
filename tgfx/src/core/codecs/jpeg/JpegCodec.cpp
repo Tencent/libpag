@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <csetjmp>
 #include "core/codecs/jpeg/JpegCodec.h"
+#include <csetjmp>
 #include "core/utils/OrientationHelper.h"
 #include "tgfx/core/Bitmap.h"
 
