@@ -109,7 +109,10 @@ class GLRGBATexture : public GLTexture {
   }
 };
 
-static bool CheckMaxTextureSize(const GLCaps* caps, int width, int height) {
+static bool CheckTextureSize(const GLCaps* caps, int width, int height) {
+  if (width < 1 || height < 1) {
+    return false;
+  }
   auto maxTextureSize = caps->maxTextureSize;
   return width <= maxTextureSize && height <= maxTextureSize;
 }
@@ -120,7 +123,7 @@ std::shared_ptr<Texture> Texture::Make(Context* context, int width, int height, 
   // incorrect result.
   CheckGLError(context);
   auto caps = GLCaps::Get(context);
-  if (!CheckMaxTextureSize(caps, width, height)) {
+  if (!CheckTextureSize(caps, width, height)) {
     return nullptr;
   }
   BytesKey recycleKey = {};
