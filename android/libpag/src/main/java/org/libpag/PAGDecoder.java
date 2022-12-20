@@ -51,8 +51,8 @@ public class PAGDecoder {
             scale = 1.0f;
         }
         PAGDecoder pagDecoder = new PAGDecoder();
-        pagDecoder.width = (int) (pagComposition.width() * scale);
-        pagDecoder.height = (int) (pagComposition.height() * scale);
+        pagDecoder.width = Math.round(pagComposition.width() * scale);
+        pagDecoder.height = Math.round(pagComposition.height() * scale);
         pagDecoder.numFrames =
                 (int) (pagComposition.duration() * pagComposition.frameRate() / 1000000);
         pagDecoder.pagSurface = createSurface(pagDecoder.width, pagDecoder.height);
@@ -111,7 +111,7 @@ public class PAGDecoder {
                             HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE | HardwareBuffer.USAGE_GPU_COLOR_OUTPUT);
             return PAGSurface.FromHardwareBuffer(hardwareBuffer);
         } else {
-            return PAGSurface.FromSize(width, height);
+            return PAGSurface.MakeOffscreen(width, height);
         }
     }
 

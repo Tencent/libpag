@@ -12,8 +12,8 @@ import org.extra.tools.LibraryLoadUtils;
 
 public class PAGSurface {
 
-    public static PAGSurface FromSize(int width, int height) {
-        long nativeSurface = SetupFromSize(width, height);
+    public static PAGSurface MakeOffscreen(int width, int height) {
+        long nativeSurface = SetupOffscreen(width, height);
         if (nativeSurface == 0) {
             return null;
         }
@@ -137,7 +137,7 @@ public class PAGSurface {
         this.nativeSurface = nativeSurface;
     }
 
-    private static native long SetupFromSize(int width, int height);
+    private static native long SetupOffscreen(int width, int height);
 
     private Surface surface = null;
     private boolean needsReleaseSurface = false;
