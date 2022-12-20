@@ -19,18 +19,15 @@
 #pragma once
 
 #include "tgfx/core/ImageCodec.h"
-#include "webp/decode.h"
-#include "webp/demux.h"
-#include "webp/encode.h"
 
 namespace tgfx {
-class WebpImage : public ImageCodec {
+class PngCodec : public ImageCodec {
  public:
   static std::shared_ptr<ImageCodec> MakeFrom(const std::string& filePath);
   static std::shared_ptr<ImageCodec> MakeFrom(std::shared_ptr<Data> imageBytes);
-  static bool IsWebp(const std::shared_ptr<Data>& data);
+  static bool IsPng(const std::shared_ptr<Data>& data);
 
-#ifdef TGFX_USE_WEBP_ENCODE
+#ifdef TGFX_USE_PNG_ENCODE
   static std::shared_ptr<Data> Encode(const ImageInfo& info, const void* pixels,
                                       EncodedFormat format, int quality);
 #endif
@@ -39,15 +36,17 @@ class WebpImage : public ImageCodec {
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
 
  private:
-  std::shared_ptr<Data> fileData;
-  std::string filePath;
+  static std::shared_ptr<ImageCodec> MakeFromData(const std::string& filePath,
+                                                  std::shared_ptr<Data> byteData);
 
-  explicit WebpImage(int width, int height, Orientation orientation, std::string filePath,
-                     std::shared_ptr<Data> fileData)
+  PngCodec(int width, int height, Orientation orientation, std::string filePath,
+           std::shared_ptr<Data> fileData)
       : ImageCodec(width, height, orientation),
         fileData(std::move(fileData)),
         filePath(std::move(filePath)) {
   }
-};
 
+  std::shared_ptr<Data> fileData;
+  std::string filePath;
+};
 }  // namespace tgfx

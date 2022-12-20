@@ -26,17 +26,17 @@
 #include "tgfx/core/Stream.h"
 
 #if defined(TGFX_USE_WEBP_DECODE) || defined(TGFX_USE_WEBP_ENCODE)
-#include "core/codecs/webp/WebpImage.h"
+#include "core/codecs/webp/WebpCodec.h"
 #endif
 
 #if defined(TGFX_USE_PNG_DECODE) || defined(TGFX_USE_PNG_ENCODE)
 
-#include "core/codecs/png/PngImage.h"
+#include "core/codecs/png/PngCodec.h"
 
 #endif
 
 #if defined(TGFX_USE_JPEG_DECODE) || defined(TGFX_USE_JPEG_ENCODE)
-#include "core/codecs/jpeg/JpegImage.h"
+#include "core/codecs/jpeg/JpegCodec.h"
 #endif
 
 namespace tgfx {
@@ -52,20 +52,20 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(const std::string& filePath) {
   }
   auto data = buffer.release();
 #ifdef TGFX_USE_WEBP_DECODE
-  if (WebpImage::IsWebp(data)) {
-    codec = WebpImage::MakeFrom(filePath);
+  if (WebpCodec::IsWebp(data)) {
+    codec = WebpCodec::MakeFrom(filePath);
   }
 #endif
 
 #ifdef TGFX_USE_PNG_DECODE
-  if (PngImage::IsPng(data)) {
-    codec = PngImage::MakeFrom(filePath);
+  if (PngCodec::IsPng(data)) {
+    codec = PngCodec::MakeFrom(filePath);
   }
 #endif
 
 #ifdef TGFX_USE_JPEG_DECODE
-  if (JpegImage::IsJpeg(data)) {
-    codec = JpegImage::MakeFrom(filePath);
+  if (JpegCodec::IsJpeg(data)) {
+    codec = JpegCodec::MakeFrom(filePath);
   }
 #endif
   if (codec == nullptr) {
@@ -83,18 +83,18 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(std::shared_ptr<Data> imageByte
   }
   std::shared_ptr<ImageCodec> codec = nullptr;
 #ifdef TGFX_USE_WEBP_DECODE
-  if (WebpImage::IsWebp(imageBytes)) {
-    codec = WebpImage::MakeFrom(imageBytes);
+  if (WebpCodec::IsWebp(imageBytes)) {
+    codec = WebpCodec::MakeFrom(imageBytes);
   }
 #endif
 #ifdef TGFX_USE_PNG_DECODE
-  if (PngImage::IsPng(imageBytes)) {
-    codec = PngImage::MakeFrom(imageBytes);
+  if (PngCodec::IsPng(imageBytes)) {
+    codec = PngCodec::MakeFrom(imageBytes);
   }
 #endif
 #ifdef TGFX_USE_JPEG_DECODE
-  if (JpegImage::IsJpeg(imageBytes)) {
-    codec = JpegImage::MakeFrom(imageBytes);
+  if (JpegCodec::IsJpeg(imageBytes)) {
+    codec = JpegCodec::MakeFrom(imageBytes);
   }
 #endif
   if (codec == nullptr) {
@@ -123,17 +123,17 @@ std::shared_ptr<Data> ImageCodec::Encode(const ImageInfo& info, const void* pixe
   if (quality < 0) quality = 0;
 #ifdef TGFX_USE_JPEG_ENCODE
   if (format == EncodedFormat::JPEG) {
-    return JpegImage::Encode(info, pixels, format, quality);
+    return JpegCodec::Encode(info, pixels, format, quality);
   }
 #endif
 #ifdef TGFX_USE_WEBP_ENCODE
   if (format == EncodedFormat::WEBP) {
-    return WebpImage::Encode(info, pixels, format, quality);
+    return WebpCodec::Encode(info, pixels, format, quality);
   }
 #endif
 #ifdef TGFX_USE_PNG_ENCODE
   if (format == EncodedFormat::PNG) {
-    return PngImage::Encode(info, pixels, format, quality);
+    return PngCodec::Encode(info, pixels, format, quality);
   }
 #endif
   return nullptr;

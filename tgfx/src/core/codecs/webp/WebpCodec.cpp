@@ -16,19 +16,19 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/codecs/webp/WebpImage.h"
+#include "core/codecs/webp/WebpCodec.h"
 #include "core/codecs/webp/WebpUtility.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Buffer.h"
 
 namespace tgfx {
 
-bool WebpImage::IsWebp(const std::shared_ptr<Data>& data) {
+bool WebpCodec::IsWebp(const std::shared_ptr<Data>& data) {
   const char* bytes = static_cast<const char*>(data->data());
   return data->size() >= 14 && !memcmp(bytes, "RIFF", 4) && !memcmp(&bytes[8], "WEBPVP", 6);
 }
 
-std::shared_ptr<ImageCodec> WebpImage::MakeFrom(const std::string& filePath) {
+std::shared_ptr<ImageCodec> WebpCodec::MakeFrom(const std::string& filePath) {
   auto info = WebpUtility::getDecodeInfo(filePath);
   if (info.width == 0 || info.height == 0) {
     auto data = Data::MakeFromFile(filePath);
@@ -38,10 +38,10 @@ std::shared_ptr<ImageCodec> WebpImage::MakeFrom(const std::string& filePath) {
     }
   }
   return std::shared_ptr<ImageCodec>(
-      new WebpImage(info.width, info.height, info.orientation, filePath, nullptr));
+      new WebpCodec(info.width, info.height, info.orientation, filePath, nullptr));
 }
 
-std::shared_ptr<ImageCodec> WebpImage::MakeFrom(std::shared_ptr<Data> imageBytes) {
+std::shared_ptr<ImageCodec> WebpCodec::MakeFrom(std::shared_ptr<Data> imageBytes) {
   if (imageBytes == nullptr) {
     return nullptr;
   }
@@ -50,7 +50,7 @@ std::shared_ptr<ImageCodec> WebpImage::MakeFrom(std::shared_ptr<Data> imageBytes
     return nullptr;
   }
   return std::shared_ptr<ImageCodec>(
-      new WebpImage(info.width, info.height, info.orientation, "", std::move(imageBytes)));
+      new WebpCodec(info.width, info.height, info.orientation, "", std::move(imageBytes)));
 }
 
 static WEBP_CSP_MODE webp_decode_mode(ColorType dstCT, bool premultiply) {
@@ -64,7 +64,7 @@ static WEBP_CSP_MODE webp_decode_mode(ColorType dstCT, bool premultiply) {
   }
 }
 
-bool WebpImage::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
+bool WebpCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (dstPixels == nullptr || dstInfo.isEmpty()) {
     return false;
   }
@@ -133,7 +133,7 @@ static int webp_reader_write_data(const uint8_t* data, size_t data_size,
   return 1;
 }
 
-std::shared_ptr<Data> WebpImage::Encode(const ImageInfo& imageInfo, const void* pixels,
+std::shared_ptr<Data> WebpCodec::Encode(const ImageInfo& imageInfo, const void* pixels,
                                         EncodedFormat, int quality) {
   const uint8_t* srcPixels = static_cast<uint8_t*>(const_cast<void*>(pixels));
   std::unique_ptr<Buffer> tempPixels = nullptr;

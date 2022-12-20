@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/codecs/jpeg/JpegImage.h"
 #include <csetjmp>
+#include "core/codecs/jpeg/JpegCodec.h"
 #include "core/utils/OrientationHelper.h"
 #include "tgfx/core/Bitmap.h"
 
@@ -28,7 +28,7 @@ extern "C" {
 
 namespace tgfx {
 
-bool JpegImage::IsJpeg(const std::shared_ptr<Data>& data) {
+bool JpegCodec::IsJpeg(const std::shared_ptr<Data>& data) {
   constexpr uint8_t jpegSig[] = {0xFF, 0xD8, 0xFF};
   return data->size() >= 3 && !memcmp(data->bytes(), jpegSig, sizeof(jpegSig));
 }
@@ -66,15 +66,15 @@ struct my_error_mgr {
   jmp_buf setjmp_buffer;
 };
 
-std::shared_ptr<ImageCodec> JpegImage::MakeFrom(const std::string& filePath) {
+std::shared_ptr<ImageCodec> JpegCodec::MakeFrom(const std::string& filePath) {
   return MakeFromData(filePath, nullptr);
 }
 
-std::shared_ptr<ImageCodec> JpegImage::MakeFrom(std::shared_ptr<Data> imageBytes) {
+std::shared_ptr<ImageCodec> JpegCodec::MakeFrom(std::shared_ptr<Data> imageBytes) {
   return MakeFromData("", std::move(imageBytes));
 }
 
-std::shared_ptr<ImageCodec> JpegImage::MakeFromData(const std::string& filePath,
+std::shared_ptr<ImageCodec> JpegCodec::MakeFromData(const std::string& filePath,
                                                     std::shared_ptr<Data> byteData) {
   FILE* infile = nullptr;
   if (byteData == nullptr && (infile = fopen(filePath.c_str(), "rb")) == nullptr) {
@@ -101,12 +101,12 @@ std::shared_ptr<ImageCodec> JpegImage::MakeFromData(const std::string& filePath,
   if (cinfo.image_width == 0 || cinfo.image_height == 0) {
     return nullptr;
   }
-  return std::shared_ptr<ImageCodec>(new JpegImage(static_cast<int>(cinfo.image_width),
+  return std::shared_ptr<ImageCodec>(new JpegCodec(static_cast<int>(cinfo.image_width),
                                                    static_cast<int>(cinfo.image_height),
                                                    orientation, filePath, std::move(byteData)));
 }
 
-bool JpegImage::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
+bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (dstPixels == nullptr || dstInfo.isEmpty()) {
     return false;
   }
@@ -155,7 +155,7 @@ bool JpegImage::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
 }
 
 #ifdef TGFX_USE_JPEG_ENCODE
-std::shared_ptr<Data> JpegImage::Encode(const ImageInfo& imageInfo, const void* pixels,
+std::shared_ptr<Data> JpegCodec::Encode(const ImageInfo& imageInfo, const void* pixels,
                                         EncodedFormat, int quality) {
   auto srcPixels = static_cast<uint8_t*>(const_cast<void*>(pixels));
   if (imageInfo.colorType() == ColorType::ALPHA_8) {
