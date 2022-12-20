@@ -21,7 +21,7 @@
 #include "tgfx/core/ImageCodec.h"
 
 namespace tgfx {
-class JpegImage : public ImageCodec {
+class JpegCodec : public ImageCodec {
  public:
   static std::shared_ptr<ImageCodec> MakeFrom(const std::string& filePath);
   static std::shared_ptr<ImageCodec> MakeFrom(std::shared_ptr<Data> imageBytes);
@@ -41,7 +41,7 @@ class JpegImage : public ImageCodec {
 
   static std::shared_ptr<ImageCodec> MakeFromData(const std::string& filePath,
                                                   std::shared_ptr<Data> byteData);
-  explicit JpegImage(int width, int height, Orientation orientation, std::string filePath,
+  explicit JpegCodec(int width, int height, Orientation orientation, std::string filePath,
                      std::shared_ptr<Data> fileData)
       : ImageCodec(width, height, orientation),
         fileData(std::move(fileData)),

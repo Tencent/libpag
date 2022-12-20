@@ -20,6 +20,7 @@
 
 #include "tgfx/core/Data.h"
 #include "tgfx/core/EncodedFormat.h"
+#include "tgfx/core/ImageGenerator.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Orientation.h"
 
@@ -32,7 +33,7 @@ class ImageBuffer;
  * ImageCodec cannot be modified after it is created. The width and height of ImageCodec are always
  * greater than zero. Creating an ImageCodec with zero width or height returns nullptr.
  */
-class ImageCodec {
+class ImageCodec : public ImageGenerator {
  public:
   /**
    * If this file path represents an encoded image that we know how to decode, return an ImageCodec
@@ -54,24 +55,8 @@ class ImageCodec {
    */
   static std::shared_ptr<ImageCodec> MakeFrom(void* nativeImage);
 
-  virtual ~ImageCodec() = default;
-
   /**
-   * Returns the width of the image.
-   */
-  int width() const {
-    return _width;
-  }
-
-  /**
-   * Returns the height of the image.
-   */
-  int height() const {
-    return _height;
-  }
-
-  /**
-   * Returns the orientation of the image.
+   * Returns the orientation of target image.
    */
   Orientation orientation() const {
     return _orientation;
@@ -81,7 +66,7 @@ class ImageCodec {
    * Crates a new texture buffer capturing the pixels in this image. ImageCodec do not cache the
    * newly created texture buffer, each call to this method allocates additional storage.
    */
-  virtual std::shared_ptr<ImageBuffer> makeBuffer() const;
+  std::shared_ptr<ImageBuffer> makeBuffer() const override;
 
   /**
    * Decodes the image with the specified image info into the given pixels. Returns true if the
@@ -93,12 +78,10 @@ class ImageCodec {
 
  protected:
   ImageCodec(int width, int height, Orientation orientation)
-      : _width(width), _height(height), _orientation(orientation) {
+      : ImageGenerator(width, height), _orientation(orientation) {
   }
 
  private:
-  int _width = 0;
-  int _height = 0;
   Orientation _orientation = Orientation::TopLeft;
 
   /**

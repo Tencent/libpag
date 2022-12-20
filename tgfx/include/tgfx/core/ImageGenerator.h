@@ -18,37 +18,36 @@
 
 #pragma once
 
-#include "tgfx/gpu/Texture.h"
+#include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
-/**
- * A ImageBuffer contains an array of fully processed pixels, suitable for immediate texture
- * uploading on the GPU.
- */
-class ImageBuffer {
+class ImageGenerator {
  public:
-  virtual ~ImageBuffer() = default;
+  virtual ~ImageGenerator() = default;
+
   /**
-   * Returns the width of the image buffer.
+   * Returns the width of target image.
    */
   int width() const {
     return _width;
   }
 
   /**
-   * Returns the height of the image buffer.
+   * Returns the height of target image.
    */
   int height() const {
     return _height;
   }
 
   /**
-   * Creates a new Texture capturing the pixels in this image buffer.
+   * Crates a new image buffer capturing the pixels generated from this image generator.
+   * ImageGenerator do not cache the returned image buffer, each call to this method allocates
+   * additional storage.
    */
-  virtual std::shared_ptr<Texture> makeTexture(Context* context) const = 0;
+  virtual std::shared_ptr<ImageBuffer> makeBuffer() const = 0;
 
  protected:
-  ImageBuffer(int width, int height) : _width(width), _height(height) {
+  ImageGenerator(int width, int height) : _width(width), _height(height) {
   }
 
  private:

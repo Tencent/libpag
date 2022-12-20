@@ -136,7 +136,7 @@ class Typeface {
                             Path* path) const = 0;
 
   /**
-   * Creates a texture buffer capturing the content of the specified glyph. The returned matrix
+   * Creates an image buffer capturing the content of the specified glyph. The returned matrix
    * should apply to the glyph image when drawing.
    */
   virtual std::shared_ptr<ImageBuffer> getGlyphImage(GlyphID glyphID, float size, bool fauxBold,
