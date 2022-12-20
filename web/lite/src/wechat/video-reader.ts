@@ -170,6 +170,7 @@ export class VideoReader extends Reader {
   }
 
   private startGetFrameDataLoop() {
+    if (this.getFrameDataLooping) return;
     this.getFrameDataLooping = true;
     this.getFrameDataLoopTimer = setInterval(() => {
       this.getFrameDataLoop();
@@ -185,7 +186,6 @@ export class VideoReader extends Reader {
     }
 
     if (this.frameDataBuffers.length >= BUFFER_MAX_SIZE) {
-      this.getFrameDataLooping = false;
       this.clearFrameDataLoop();
       return;
     }
