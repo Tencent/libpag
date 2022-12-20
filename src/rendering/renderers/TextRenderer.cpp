@@ -122,6 +122,9 @@ static size_t CalculateNextLineIndex(const std::vector<GlyphInfo>& glyphList, si
   while (index < glyphCount) {
     auto& glyph = glyphList[index];
     index++;
+    if (glyph.name[0] == '\n') {
+      break;
+    }
     *lineWidth += glyph.advance * scaleFactor;
 
     if (hasPrevious) {
@@ -130,8 +133,7 @@ static size_t CalculateNextLineIndex(const std::vector<GlyphInfo>& glyphList, si
     hasPrevious = true;
 
     auto nextGlyphWidth = index < glyphCount ? glyphList[index].advance * scaleFactor : 0;
-    if (glyph.name[0] == '\n' ||  // line breaker.
-        *lineWidth + tracking + nextGlyphWidth > maxWidth) {
+    if (*lineWidth + tracking + nextGlyphWidth > maxWidth) {
       break;
     }
   }
