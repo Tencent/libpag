@@ -50,7 +50,7 @@ Pod::Spec.new do |s|
                     'src/rendering/**/*.{h,cpp}',
                     'src/platform/*.{h,cpp}',
                     'tgfx/src/core/*.{h,cpp}',
-                    'tgfx/src/core/images/*.{h,cpp}',
+                    'tgfx/src/core/codecs/*.{h,cpp}',
                     'tgfx/src/core/vectors/*.{h,cpp}',
                     'tgfx/src/gpu/*.{h,cpp}',
                     'tgfx/src/platform/*.{h,cpp}',
@@ -58,7 +58,7 @@ Pod::Spec.new do |s|
                     'tgfx/src/gpu/gradients/**/*.{h,cpp}',
                     'tgfx/src/gpu/ops/**/*.{h,cpp}',
                     'tgfx/src/gpu/opengl/*.{h,cpp,mm}',
-                    'tgfx/src/core/images/webp/**/*.{h,cpp,mm}'
+                    'tgfx/src/core/codecs/webp/**/*.{h,cpp,mm}'
 
   s.source_files = $source_files + $rasterSourceFiles;
 

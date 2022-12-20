@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/images/webp/WebpUtility.h"
+#include "core/codecs/webp/WebpUtility.h"
 #include <cstdint>
 #include <cstdio>
 #include "core/utils/Log.h"

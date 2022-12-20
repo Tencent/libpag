@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/images/jpeg/JpegImage.h"
+#include "core/codecs/jpeg/JpegImage.h"
 #include <csetjmp>
 #include "core/utils/OrientationHelper.h"
 #include "tgfx/core/Bitmap.h"

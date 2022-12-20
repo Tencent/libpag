@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/images/webp/WebpImage.h"
-#include "core/images/webp/WebpUtility.h"
+#include "core/codecs/webp/WebpImage.h"
+#include "core/codecs/webp/WebpUtility.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Buffer.h"
 

@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/images/png/PngImage.h"
+#include "core/codecs/png/PngImage.h"
 #include "png.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Buffer.h"

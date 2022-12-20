@@ -26,17 +26,17 @@
 #include "tgfx/core/Stream.h"
 
 #if defined(TGFX_USE_WEBP_DECODE) || defined(TGFX_USE_WEBP_ENCODE)
-#include "core/images/webp/WebpImage.h"
+#include "core/codecs/webp/WebpImage.h"
 #endif
 
 #if defined(TGFX_USE_PNG_DECODE) || defined(TGFX_USE_PNG_ENCODE)
 
-#include "core/images/png/PngImage.h"
+#include "core/codecs/png/PngImage.h"
 
 #endif
 
 #if defined(TGFX_USE_JPEG_DECODE) || defined(TGFX_USE_JPEG_ENCODE)
-#include "core/images/jpeg/JpegImage.h"
+#include "core/codecs/jpeg/JpegImage.h"
 #endif
 
 namespace tgfx {
