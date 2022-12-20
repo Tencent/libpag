@@ -1,5 +1,6 @@
 #include "HardwareBufferDrawable.h"
 #include <GLES/gl.h>
+#include "tgfx/core/Bitmap.h"
 
 namespace pag {
 std::shared_ptr<HardwareBufferDrawable> HardwareBufferDrawable::Make(
@@ -25,7 +26,19 @@ std::shared_ptr<HardwareBufferDrawable> HardwareBufferDrawable::Make(
 }
 
 void HardwareBufferDrawable::present(tgfx::Context*) {
-  glFlush();
+}
+
+bool HardwareBufferDrawable::readPixels(tgfx::ColorType colorType, tgfx::AlphaType alphaType,
+                                        void* dstPixels, size_t dstRowBytes) {
+  auto srcPixels = hardwareBuffer->lockPixels();
+  if (!srcPixels) {
+    return false;
+  }
+  auto dstInfo = tgfx::ImageInfo::Make(_width, _height, colorType, alphaType, dstRowBytes);
+  tgfx::Bitmap bitmap(hardwareBuffer->info(), srcPixels);
+  bitmap.readPixels(dstInfo, dstPixels);
+  hardwareBuffer->unlockPixels();
+  return true;
 }
 
 HardwareBufferDrawable::HardwareBufferDrawable(std::shared_ptr<tgfx::Device> device,

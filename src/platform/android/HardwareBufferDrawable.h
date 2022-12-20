@@ -25,6 +25,9 @@ class HardwareBufferDrawable : public Drawable {
 
   void present(tgfx::Context*) override;
 
+  bool readPixels(tgfx::ColorType colorType, tgfx::AlphaType alphaType, void* dstPixels,
+                  size_t dstRowBytes);
+
   std::shared_ptr<tgfx::Device> getDevice() override {
     return device;
   }

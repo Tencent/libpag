@@ -36,9 +36,6 @@ class JPAGSurface {
     pagSurface = nullptr;
   }
 
-  tgfx::GLSampler textureInfo;
-  std::shared_ptr<tgfx::Device> device;
-
  private:
   std::shared_ptr<pag::PAGSurface> pagSurface;
   std::mutex locker;

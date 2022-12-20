@@ -65,23 +65,10 @@ PAG_API void Java_org_libpag_PAGSurface_nativeInit(JNIEnv* env, jclass clazz) {
       env->GetStaticFieldID(Config_Class.get(), "ARGB_8888", "Landroid/graphics/Bitmap$Config;");
 }
 
-static void clearTexture(JPAGSurface* jPAGSurface) {
-  if (jPAGSurface->device) {
-    auto context = jPAGSurface->device->lockContext();
-    if (context) {
-      auto gl = tgfx::GLFunctions::Get(context);
-      gl->deleteTextures(1, &jPAGSurface->textureInfo.id);
-    }
-    jPAGSurface->device->unlock();
-    jPAGSurface->device = nullptr;
-  }
-}
-
 PAG_API void Java_org_libpag_PAGSurface_nativeRelease(JNIEnv* env, jobject thiz) {
   auto jPAGSurface =
       reinterpret_cast<JPAGSurface*>(env->GetLongField(thiz, PAGSurface_nativeSurface));
   if (jPAGSurface != nullptr) {
-    clearTexture(jPAGSurface);
     jPAGSurface->clear();
   }
 }
@@ -89,7 +76,6 @@ PAG_API void Java_org_libpag_PAGSurface_nativeRelease(JNIEnv* env, jobject thiz)
 PAG_API void Java_org_libpag_PAGSurface_nativeFinalize(JNIEnv* env, jobject thiz) {
   auto old = reinterpret_cast<JPAGSurface*>(env->GetLongField(thiz, PAGSurface_nativeSurface));
   if (old != nullptr) {
-    clearTexture(old);
     delete old;
   }
   env->SetLongField(thiz, PAGSurface_nativeSurface, (jlong)thiz);
@@ -200,16 +186,15 @@ extern "C" PAG_API jobject JNICALL Java_org_libpag_PAGSurface_makeSnapshot(JNIEn
 
 static jobject SetupFromHardwareBufferDrawable(JNIEnv* env,
                                                std::shared_ptr<HardwareBufferDrawable> drawable) {
-  auto surface = PAGSurface::MakeFrom(drawable);
+  auto surface = PAGSurface::MakeFrom(drawable, true);
   if (surface == nullptr) {
     LOGE("PAGSurface.SetupFromHardwareBuffer() fail.");
     return nullptr;
   }
   static auto PAGSurface_Class = Global<jclass>(env, env->FindClass("org/libpag/PAGSurface"));
   static auto PAGSurface_Constructor = env->GetMethodID(PAGSurface_Class.get(), "<init>", "(J)V");
-  auto surfaceObject = env->NewObject(PAGSurface_Class.get(), PAGSurface_Constructor,
-                                      reinterpret_cast<jlong>(new JPAGSurface(surface)));
-  return surfaceObject;
+  return env->NewObject(PAGSurface_Class.get(), PAGSurface_Constructor,
+                        reinterpret_cast<jlong>(new JPAGSurface(surface)));
 }
 
 extern "C" JNIEXPORT jobject JNICALL
@@ -226,52 +211,12 @@ Java_org_libpag_PAGSurface_FromHardwareBuffer(JNIEnv* env, jclass, jobject hardw
   return SetupFromHardwareBufferDrawable(env, drawable);
 }
 
-static bool CreateGLTexture(tgfx::Context* context, int width, int height,
-                            tgfx::GLSampler* texture) {
-  texture->target = GL_TEXTURE_2D;
-  texture->format = tgfx::PixelFormat::RGBA_8888;
-  auto gl = tgfx::GLFunctions::Get(context);
-  gl->genTextures(1, &texture->id);
-  if (texture->id <= 0) {
-    return false;
-  }
-  gl->bindTexture(texture->target, texture->id);
-  gl->texParameteri(texture->target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  gl->texParameteri(texture->target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  gl->texParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  gl->texParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  gl->texImage2D(texture->target, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-  gl->bindTexture(texture->target, 0);
-  return true;
-}
-
-extern "C" JNIEXPORT jlong JNICALL Java_org_libpag_PAGSurface_SetupFromSize(JNIEnv*, jclass,
-                                                                            jint width,
-                                                                            jint height) {
-  auto device = tgfx::GLDevice::Make();
-  if (device == nullptr) {
+extern "C" JNIEXPORT jlong JNICALL Java_org_libpag_PAGSurface_SetupOffscreen(JNIEnv*, jclass,
+                                                                             jint width,
+                                                                             jint height) {
+  auto pagSurface = PAGSurface::MakeOffscreen(width, height);
+  if (pagSurface == nullptr) {
     return 0;
   }
-  auto context = device->lockContext();
-  if (!context) {
-    return 0;
-  }
-  tgfx::GLSampler textureInfo;
-  if (!CreateGLTexture(context, width, height, &textureInfo)) {
-    LOGE("PAGSurface.SetupFromSize() create texture fail.");
-    device->unlock();
-    return 0;
-  }
-  auto surface = PAGSurface::MakeFrom(
-      BackendTexture{{textureInfo.id, textureInfo.target}, width, height}, ImageOrigin::TopLeft);
-  if (surface == nullptr) {
-    LOGE("PAGSurface.SetupFromSize() Invalid texture specified.");
-    device->unlock();
-    return 0;
-  }
-  device->unlock();
-  auto jPAGSurface = new JPAGSurface(surface);
-  jPAGSurface->textureInfo = textureInfo;
-  jPAGSurface->device = device;
-  return reinterpret_cast<jlong>(jPAGSurface);
+  return reinterpret_cast<jlong>(new JPAGSurface(pagSurface));
 }
