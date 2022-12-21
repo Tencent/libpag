@@ -26,7 +26,7 @@ std::unique_ptr<ByteData> ByteData::FromPath(const std::string& filePath) {
     return nullptr;
   }
   auto data = ByteData::Make(stream->size());
-  if (data == nullptr) {
+  if (data->length() != stream->size()) {
     return nullptr;
   }
   stream->read(data->data(), stream->size());
