@@ -30,8 +30,6 @@
 
 + (PAGSurfaceImpl*)FromView:(NSView*)view;
 
-+ (PAGSurfaceImpl*)MakeFromGPU:(CGSize)size;
-
 + (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size;
 
 - (void)updateSize;

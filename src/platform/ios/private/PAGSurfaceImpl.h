@@ -33,8 +33,6 @@
 + (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer
                              context:(EAGLContext*)eaglContext;
 
-+ (PAGSurfaceImpl*)MakeFromGPU:(CGSize)size;
-
 + (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size;
 
 - (void)updateSize;

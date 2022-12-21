@@ -91,7 +91,7 @@
   if (!result && lastFrameImage != nil) {
     return lastFrameImage;
   }
-  UIImage* image = [self imageFromCVPixelBufferRef:[pagSurface getCVPixelBuffer]];
+  UIImage* image = [self imageFromCVPixelBufferRef:[pagSurface makeSnapshot]];
   lastFrameImage = image;
   return image;
 }
