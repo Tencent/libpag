@@ -163,6 +163,9 @@ void GLTextureEffect::emitCode(EmitArgs& args) {
     bool useClamp[2] = {ShaderModeUsesClamp(textureFP->shaderModeX),
                         ShaderModeUsesClamp(textureFP->shaderModeY)};
     initUniform(args, useSubset, useClamp);
+    if (dimensionsUniform.isValid()) {
+      fragBuilder->codeAppendf("inCoord /= %s;", dimensionsName.c_str());
+    }
 
     fragBuilder->codeAppend("vec2 subsetCoord;");
     subsetCoord(args, textureFP->shaderModeX, "x", "x", "z");
@@ -184,7 +187,6 @@ void GLTextureEffect::emitCode(EmitArgs& args) {
       if (repeatX) {
         fragBuilder->codeAppendf("float repeatCoordX = errX > 0.0 ? %s.x : %s.z;",
                                  clampName.c_str(), clampName.c_str());
-        readColor(args, "vec2(repeatCoordX, clampedCoord.y)", repeatReadX);
       }
     }
     if (repeatY || clampToBorderY) {
@@ -192,46 +194,41 @@ void GLTextureEffect::emitCode(EmitArgs& args) {
       if (repeatY) {
         fragBuilder->codeAppendf("float repeatCoordY = errY > 0.0 ? %s.y : %s.w;",
                                  clampName.c_str(), clampName.c_str());
-        readColor(args, "vec2(clampedCoord.x, repeatCoordY)", repeatReadY);
       }
     }
 
     const char* ifStr = "if";
     if (repeatX && repeatY) {
+      readColor(args, "vec2(repeatCoordX, clampedCoord.y)", repeatReadX);
+      readColor(args, "vec2(clampedCoord.x, repeatCoordY)", repeatReadY);
       static const char* repeatReadXY = "repeatReadXY";
       readColor(args, "vec2(repeatCoordX, repeatCoordY)", repeatReadXY);
       fragBuilder->codeAppend("if (errX != 0.0 && errY != 0.0) {");
       fragBuilder->codeAppend("errX = abs(errX);");
       fragBuilder->codeAppendf(
           "textureColor = mix(mix(textureColor, %s, errX), mix(%s, %s, errX), abs(errY));",
-          repeatReadXY, repeatReadX, repeatReadY);
+          repeatReadX, repeatReadY, repeatReadXY);
       fragBuilder->codeAppend("}");
       ifStr = "else if";
     }
     if (repeatX) {
       fragBuilder->codeAppendf("%s (errX != 0.0) {", ifStr);
+      readColor(args, "vec2(repeatCoordX, clampedCoord.y)", repeatReadX);
       fragBuilder->codeAppendf("textureColor = mix(textureColor, %s, errX);", repeatReadX);
       fragBuilder->codeAppend("}");
     }
     if (repeatY) {
       fragBuilder->codeAppendf("%s (errY != 0.0) {", ifStr);
+      readColor(args, "vec2(clampedCoord.x, repeatCoordY)", repeatReadY);
       fragBuilder->codeAppendf("textureColor = mix(textureColor, %s, errY);", repeatReadY);
       fragBuilder->codeAppend("}");
     }
 
     if (clampToBorderX) {
-      fragBuilder->codeAppend("float snappedX = floor(inCoord.x + 0.001) + 0.5;");
-      fragBuilder->codeAppendf("if (snappedX < %s.x || snappedX > %s.z) {", subsetName.c_str(),
-                               subsetName.c_str());
-      fragBuilder->codeAppend("textureColor = vec4(0.0);");  // border color
-      fragBuilder->codeAppend("}");
+      fragBuilder->codeAppend("textureColor = mix(textureColor, vec4(0.0), min(abs(errX), 1.0));");
     }
     if (clampToBorderY) {
-      fragBuilder->codeAppend("float snappedY = floor(inCoord.y + 0.001) + 0.5;");
-      fragBuilder->codeAppendf("if (snappedY < %s.y || snappedY > %s.w) {", subsetName.c_str(),
-                               subsetName.c_str());
-      fragBuilder->codeAppend("textureColor = vec4(0.0);");  // border color
-      fragBuilder->codeAppend("}");
+      fragBuilder->codeAppendf("textureColor = mix(textureColor, vec4(0.0), min(abs(errY), 1.0));");
     }
     fragBuilder->codeAppendf("%s = textureColor * %s;", args.outputColor.c_str(),
                              args.inputColor.c_str());
@@ -242,9 +239,7 @@ void GLTextureEffect::onSetData(const ProgramDataManager& programDataManager,
                                 const FragmentProcessor& fragmentProcessor) {
   const auto& textureFP = static_cast<const TextureEffect&>(fragmentProcessor);
   if (dimensionsUniform.isValid()) {
-    auto dimensions =
-        textureFP.texture->getTextureCoord(static_cast<float>(textureFP.texture->width()),
-                                           static_cast<float>(textureFP.texture->height()));
+    auto dimensions = textureFP.texture->getTextureCoord(1.f, 1.f);
     if (dimensions != dimensionsPrev) {
       dimensionsPrev = dimensions;
       programDataManager.set2f(dimensionsUniform, dimensions.x, dimensions.y);
@@ -255,16 +250,23 @@ void GLTextureEffect::onSetData(const ProgramDataManager& programDataManager,
       return;
     }
     prev = subset;
-    auto lt = textureFP.texture->getTextureCoord(static_cast<float>(subset.left),
-                                                 static_cast<float>(subset.top));
-    auto rb = textureFP.texture->getTextureCoord(static_cast<float>(subset.right),
-                                                 static_cast<float>(subset.bottom));
-    float rect[4] = {lt.x, lt.y, rb.x, rb.y};
+    float rect[4] = {subset.left, subset.top, subset.right, subset.bottom};
     if (textureFP.texture->origin() == ImageOrigin::BottomLeft) {
       auto h = static_cast<float>(textureFP.texture->height());
       rect[1] = h - rect[1];
       rect[3] = h - rect[3];
       std::swap(rect[1], rect[3]);
+    }
+    auto type = textureFP.texture->getSampler()->type();
+    if (!dimensionsUniform.isValid() && type != TextureType::Rectangle) {
+      auto lt = textureFP.texture->getTextureCoord(static_cast<float>(rect[0]),
+                                                   static_cast<float>(rect[1]));
+      auto rb = textureFP.texture->getTextureCoord(static_cast<float>(rect[2]),
+                                                   static_cast<float>(rect[3]));
+      rect[0] = lt.x;
+      rect[1] = lt.y;
+      rect[2] = rb.x;
+      rect[3] = rb.y;
     }
     programDataManager.set4fv(uni, 1, rect);
   };
