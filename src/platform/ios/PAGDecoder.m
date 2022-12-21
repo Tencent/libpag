@@ -61,11 +61,11 @@
 }
 
 - (NSInteger)width {
-  return pagSurface ? [pagSurface width] : 0;
+  return [pagSurface width];
 }
 
 - (NSInteger)height {
-  return pagSurface ? [pagSurface height] : 0;
+  return [pagSurface width];
 }
 
 - (NSInteger)numFrames {
@@ -98,12 +98,8 @@
 
 - (void)dealloc {
   lastFrameImage = nil;
-  if (pagSurface) {
-    [pagSurface release];
-  }
-  if (pagPlayer) {
-    [pagPlayer release];
-  }
+  [pagSurface release];
+  [pagPlayer release];
   [super dealloc];
 }
 
