@@ -65,7 +65,8 @@ PAG_API @interface PAGSurface : NSObject
 - (void)freeCache;
 
 /**
- * Returns the CVPixelBuffer object created by MakeFromGPU.
+ * Returns the internal CVPixelBuffer object associated with this PAGSurface, returns nil if this
+ * PAGSurface is created by [PAGSurface FromLayer].
  */
 - (CVPixelBufferRef)getCVPixelBuffer;
 

@@ -94,40 +94,44 @@
   return _cvPixelBuffer;
 }
 
-- (CVPixelBufferRef)makeSnapshot {
-  CVPixelBufferRef pixelBuffer = [self getCVPixelBuffer];
+- (CVPixelBufferRef)cvPixelBufferCopyWithPixelBuffer:(CVPixelBufferRef)pixelBuffer {
+  CVPixelBufferRef pixelBufferCopy =
+      pag::PixelBufferUtils::Make(_pagSurface->width(), _pagSurface->height());
+  if (pixelBufferCopy == nil) {
+    LOGE("CVPixelBufferRef copy create failed!");
+    return nil;
+  }
   CVPixelBufferLockBaseAddress(pixelBuffer, 0);
-  int bufferWidth = (int)CVPixelBufferGetWidth(pixelBuffer);
-  int bufferHeight = (int)CVPixelBufferGetHeight(pixelBuffer);
   size_t bytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer);
   void* baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer);
-
-  // Copy the pixel buffer
-  CVPixelBufferRef pixelBufferCopy = nullptr;
-  CFDictionaryRef empty =
-      CFDictionaryCreate(kCFAllocatorDefault, nullptr, nullptr, 0, &kCFTypeDictionaryKeyCallBacks,
-                         &kCFTypeDictionaryValueCallBacks);  // our empty IOSurface
-  NSDictionary* options =
-      [NSDictionary dictionaryWithObjectsAndKeys:[NSNumber numberWithBool:YES],
-                                                 kCVPixelBufferCGImageCompatibilityKey,
-                                                 [NSNumber numberWithBool:YES],
-                                                 kCVPixelBufferCGBitmapContextCompatibilityKey,
-                                                 empty, kCVPixelBufferIOSurfacePropertiesKey, nil];
-  CVReturn status = CVPixelBufferCreate(kCFAllocatorDefault, bufferWidth, bufferHeight,
-                                        CVPixelBufferGetPixelFormatType(pixelBuffer),
-                                        (__bridge CFDictionaryRef)options, &pixelBufferCopy);
   CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
-  if (status == kCVReturnSuccess) {
-    CVPixelBufferLockBaseAddress(pixelBufferCopy, 0);
-    void* copyBaseAddress = CVPixelBufferGetBaseAddress(pixelBufferCopy);
-    memcpy(copyBaseAddress, baseAddress, bufferHeight * bytesPerRow);
-    CVPixelBufferUnlockBaseAddress(pixelBufferCopy, 0);
-  } else {
-    NSLog(@"CVPixelBufferRef copy failed!");
-  }
-  CFRelease(empty);
-  CFAutorelease(pixelBufferCopy);
+  CVPixelBufferLockBaseAddress(pixelBufferCopy, 0);
+  void* copyBaseAddress = CVPixelBufferGetBaseAddress(pixelBufferCopy);
+  memcpy(copyBaseAddress, baseAddress, _pagSurface->height() * bytesPerRow);
+  CVPixelBufferUnlockBaseAddress(pixelBufferCopy, 0);
   return pixelBufferCopy;
+}
+
+- (CVPixelBufferRef)makeSnapshot {
+  if ([self getCVPixelBuffer] != nil) {
+    return [self cvPixelBufferCopyWithPixelBuffer:[self getCVPixelBuffer]];
+  }
+  CVPixelBufferRef pixelBuffer =
+      pag::PixelBufferUtils::Make(_pagSurface->width(), _pagSurface->height());
+  if (pixelBuffer == nil) {
+    LOGE("CVPixelBufferRef copy create failed!");
+    return nil;
+  }
+  CVPixelBufferLockBaseAddress(pixelBuffer, 0);
+  size_t bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 0);
+  uint8_t* pixelBufferData = (uint8_t*)CVPixelBufferGetBaseAddress(pixelBuffer);
+  BOOL status = _pagSurface->readPixels(pag::ColorType::BGRA_8888, pag::AlphaType::Premultiplied,
+                                        pixelBufferData, bytesPerRow);
+  if (!status) {
+    LOGE("ReadPixels failed!");
+  }
+  CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
+  return pixelBuffer;
 }
 
 @end
