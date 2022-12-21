@@ -98,7 +98,7 @@
   CVPixelBufferRef pixelBufferCopy =
       pag::PixelBufferUtils::Make(_pagSurface->width(), _pagSurface->height());
   if (pixelBufferCopy == nil) {
-    LOGE("CVPixelBufferRef copy create failed!");
+    LOGE("CVPixelBufferRef create failed!");
     return nil;
   }
   CVPixelBufferLockBaseAddress(pixelBuffer, 0);
@@ -119,7 +119,7 @@
   CVPixelBufferRef pixelBuffer =
       pag::PixelBufferUtils::Make(_pagSurface->width(), _pagSurface->height());
   if (pixelBuffer == nil) {
-    LOGE("CVPixelBufferRef copy create failed!");
+    LOGE("CVPixelBufferRef create failed!");
     return nil;
   }
   CVPixelBufferLockBaseAddress(pixelBuffer, 0);
