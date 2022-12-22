@@ -28,10 +28,8 @@ export class PAGImageLayer extends PAGLayer {
   /**
    * Returns the time ranges of the source video for replacement.
    */
-  public getVideoRanges() {
-    const wasmIns = this.wasmIns._getVideoRanges();
-    if (!wasmIns) throw new Error('Get video ranges fail!');
-    return proxyVector(wasmIns, (wasmIns) => wasmIns as PAGVideoRange);
+  public getVideoRanges(): PAGVideoRange[] {
+    return this.wasmIns._getVideoRanges();
   }
   /**
    * [Deprecated]

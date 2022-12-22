@@ -118,7 +118,19 @@ EMSCRIPTEN_BINDINGS(pag) {
       .function("_contentDuration", optional_override([](PAGImageLayer& pagImageLayer) {
                   return static_cast<int>(pagImageLayer.contentDuration());
                 }))
-      .function("_getVideoRanges", &PAGImageLayer::getVideoRanges)
+      .function("_getVideoRanges", optional_override([](PAGImageLayer& pagImageLayer) {
+                  auto res = val::array();
+                  for (auto videoRange : pagImageLayer.getVideoRanges()) {
+                    auto videoRangeVal = val::object();
+                    videoRangeVal.set("startTime", static_cast<float>(videoRange.startTime()));
+                    videoRangeVal.set("endTime", static_cast<float>(videoRange.endTime()));
+                    videoRangeVal.set("playDuration",
+                                      static_cast<float>(videoRange.playDuration()));
+                    videoRangeVal.set("reversed", videoRange.reversed());
+                    res.call<int>("push", videoRangeVal);
+                  }
+                  return res;
+                }))
       .function("_replaceImage", &PAGImageLayer::replaceImage)
       .function("_setImage", &PAGImageLayer::setImage)
       .function("_layerTimeToContent",
@@ -447,18 +459,6 @@ EMSCRIPTEN_BINDINGS(pag) {
       .property("backgroundAlpha", &TextDocument::backgroundAlpha)
       .property("direction", &TextDocument::direction);
 
-  class_<PAGVideoRange>("PAGVideoRange")
-      .function("startTime", optional_override([](PAGVideoRange& pagVideoRange) {
-                  return static_cast<int>(pagVideoRange.startTime());
-                }))
-      .function("endTime", optional_override([](PAGVideoRange& pagVideoRange) {
-                  return static_cast<int>(pagVideoRange.endTime());
-                }))
-      .function("playDuration", optional_override([](PAGVideoRange& pagVideoRange) {
-                  return static_cast<int>(pagVideoRange.playDuration());
-                }))
-      .function("reversed", &PAGVideoRange::reversed);
-
   value_object<Rect>("Rect")
       .field("left", &Rect::left)
       .field("top", &Rect::top)
@@ -497,7 +497,6 @@ EMSCRIPTEN_BINDINGS(pag) {
   register_vector<std::string>("VectorString");
   register_vector<int>("VectorInt");
   register_vector<Marker>("VectorMarker");
-  register_vector<PAGVideoRange>("VectorPAGVideoRange");
 
   class_<tgfx::Matrix>("TGFXMatrix")
       .function("_get", &tgfx::Matrix::get)

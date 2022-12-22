@@ -457,6 +457,25 @@ export interface DebugData {
   flushTime?: number;
 }
 
+export interface PAGVideoRange {
+  /**
+   * The start time of the source video, in microseconds.
+   */
+  startTime: number;
+  /**
+   * The end time of the source video (not included), in microseconds.
+   */
+  endTime: number;
+  /**
+   * The duration for playing after applying speed.
+   */
+  playDuration: number;
+  /**
+   * Indicates whether the video should play backward.
+   */
+  reversed: boolean;
+}
+
 export declare class Matrix {
   /**
    * The entry at position [1,1] in the matrix.
@@ -595,30 +614,6 @@ export declare class TextDocument {
   public direction: TextDirection;
 
   private constructor();
-}
-
-export declare class PAGVideoRange {
-  private constructor();
-
-  /**
-   * The start time of the source video, in microseconds.
-   */
-  public startTime(): number;
-
-  /**
-   * The end time of the source video (not included), in microseconds.
-   */
-  public endTime(): number;
-
-  /**
-   * The duration for playing after applying speed.
-   */
-  public playDuration(): number;
-
-  /**
-   * Indicates whether the video should play backward.
-   */
-  public reversed(): boolean;
 }
 
 export declare class Vector<T> {
