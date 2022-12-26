@@ -21,6 +21,9 @@
 #include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
+/**
+ * ImageGenerator is the base class for decoding images from codec data or custom data.
+ */
 class ImageGenerator {
  public:
   virtual ~ImageGenerator() = default;
@@ -40,7 +43,7 @@ class ImageGenerator {
   }
 
   /**
-   * Crates a new image buffer capturing the pixels generated from this image generator.
+   * Crates a new image buffer capturing the pixels decoded from this image generator.
    * ImageGenerator do not cache the returned image buffer, each call to this method allocates
    * additional storage.
    */

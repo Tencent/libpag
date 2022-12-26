@@ -69,10 +69,11 @@ class Context {
     return _resourceProvider;
   }
 
-  /**
-   * Purges GPU resources that haven't been used in the past 'usNotUsed' microseconds.
-   */
-  void purgeResourcesNotUsedIn(int64_t usNotUsed);
+   /**
+    * Purges GPU resources that haven't been used since the passed in time.
+    * @param purgeTime A timestamp previously returned by Clock::Now().
+    */
+  void purgeResourcesNotUsedSince(int64_t purgeTime);
 
   /**
    * Inserts a GPU semaphore that the current GPU-backed API must wait on before executing any more

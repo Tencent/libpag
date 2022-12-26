@@ -291,7 +291,7 @@ bool PAGPlayer::flushInternal(BackendSemaphore* signalSemaphore) {
   if (pagSurface == nullptr) {
     return false;
   }
-  renderCache->beginFrame();
+  renderCache->resetPerformance();
   updateStageSize();
   tgfx::Clock clock = {};
   prepareInternal();

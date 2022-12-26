@@ -188,12 +188,6 @@ void RenderCache::setSnapshotEnabled(bool value) {
   clearAllSnapshots();
 }
 
-void RenderCache::beginFrame() {
-  usedAssets = {};
-  usedSequences = {};
-  resetPerformance();
-}
-
 void RenderCache::attachToContext(tgfx::Context* current, bool forHitTest) {
   if (deviceID > 0 && deviceID != current->device()->uniqueID()) {
     // Context 改变需要清理内部所有缓存，这里用 uniqueID
@@ -239,9 +233,10 @@ void RenderCache::detachFromContext() {
   clearExpiredSequences();
   clearExpiredBitmaps();
   clearExpiredSnapshots();
-  auto currentTimestamp = tgfx::Clock::Now();
-  context->purgeResourcesNotUsedIn(currentTimestamp - lastTimestamp);
-  lastTimestamp = currentTimestamp;
+  context->purgeResourcesNotUsedSince(lastTimestamp);
+  lastTimestamp = tgfx::Clock::Now();
+  usedAssets = {};
+  usedSequences = {};
   context = nullptr;
 }
 

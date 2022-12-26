@@ -115,7 +115,7 @@ void PAGSurface::freeCacheInternal() {
   surface = nullptr;
   auto context = drawable->lockContext();
   if (context) {
-    context->purgeResourcesNotUsedIn(0);
+    context->purgeResourcesNotUsedSince(0);
     drawable->unlockContext();
   }
   drawable->freeDevice();
