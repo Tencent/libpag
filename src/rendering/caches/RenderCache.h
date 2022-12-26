@@ -49,6 +49,8 @@ class RenderCache : public Performance {
     return _uniqueID;
   }
 
+  void beginFrame();
+
   void attachToContext(tgfx::Context* current, bool forHitTest = false);
 
   void detachFromContext();
