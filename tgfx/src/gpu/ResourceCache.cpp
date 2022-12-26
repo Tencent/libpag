@@ -96,14 +96,13 @@ void ResourceCache::releaseAll(bool releaseGPU) {
   recycledResources.clear();
 }
 
-void ResourceCache::purgeNotUsedIn(int64_t usNotUsed) {
+void ResourceCache::purgeNotUsedSince(int64_t purgeTime) {
   PurgeGuard guard(this);
-  auto currentTime = Clock::Now();
   std::unordered_map<BytesKey, std::vector<Resource*>, BytesHasher> recycledMap = {};
   for (auto& item : recycledResources) {
     std::vector<Resource*> needToRecycle = {};
     for (auto& resource : item.second) {
-      if (currentTime - resource->lastUsedTime < usNotUsed) {
+      if (resource->lastUsedTime < purgeTime) {
         needToRecycle.push_back(resource);
       } else {
         resource->onReleaseGPU();

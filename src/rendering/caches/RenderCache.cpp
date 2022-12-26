@@ -239,9 +239,8 @@ void RenderCache::detachFromContext() {
   clearExpiredSequences();
   clearExpiredBitmaps();
   clearExpiredSnapshots();
-  auto currentTimestamp = tgfx::Clock::Now();
-  context->purgeResourcesNotUsedIn(currentTimestamp - lastTimestamp);
-  lastTimestamp = currentTimestamp;
+  context->purgeResourcesNotUsedSince(lastTimestamp);
+  lastTimestamp = tgfx::Clock::Now();
   context = nullptr;
 }
 

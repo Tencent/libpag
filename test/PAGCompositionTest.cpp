@@ -96,14 +96,13 @@ PAG_TEST_F(PAGCompositionTest, composition) {
 PAG_TEST_F(PAGCompositionTest, VideoSequence) {
   auto pagFile = PAGFile::Load("../resources/apitest/video_sequence_size.pag");
   auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
-  auto pagPlayer = new PAGPlayer();
+  auto pagPlayer = std::make_unique<PAGPlayer>();
   pagPlayer->setComposition(pagFile);
   pagPlayer->setSurface(pagSurface);
   pagFile->setMatrix(Matrix::MakeScale(0.8625));
   pagPlayer->setProgress(0.5);
   pagPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGCompositionTest/VideoSequence"));
-  delete pagPlayer;
 }
 
 // ContainerTest 中会操作容器，所以此处需要声明为case，不能声明为suit

@@ -63,8 +63,8 @@ void Context::onUnlocked() {
   _resourceCache->detachFromCurrentThread();
 }
 
-void Context::purgeResourcesNotUsedIn(int64_t usNotUsed) {
-  _resourceCache->purgeNotUsedIn(usNotUsed);
+void Context::purgeResourcesNotUsedSince(int64_t purgeTime) {
+  _resourceCache->purgeNotUsedSince(purgeTime);
 }
 
 void Context::releaseAll(bool releaseGPU) {

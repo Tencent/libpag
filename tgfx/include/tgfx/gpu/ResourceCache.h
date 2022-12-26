@@ -42,9 +42,10 @@ class ResourceCache {
   std::shared_ptr<Resource> getRecycled(const BytesKey& recycleKey);
 
   /**
-   * Purges GPU resources that haven't been used in the past 'usNotUsed' microseconds.
+   * Purges GPU resources that haven't been used the passed in time.
+   * @param purgeTime A timestamp previously returned by Clock::Now().
    */
-  void purgeNotUsedIn(int64_t usNotUsed);
+  void purgeNotUsedSince(int64_t purgeTime);
 
  private:
   Context* context = nullptr;

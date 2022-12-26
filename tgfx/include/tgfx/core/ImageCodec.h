@@ -29,9 +29,7 @@ namespace tgfx {
 class ImageBuffer;
 
 /**
- * ImageCodec describes a two dimensional array of pixels encoded in a compressed data stream.
- * ImageCodec cannot be modified after it is created. The width and height of ImageCodec are always
- * greater than zero. Creating an ImageCodec with zero width or height returns nullptr.
+ * Abstraction layer directly on top of an image codec.
  */
 class ImageCodec : public ImageGenerator {
  public:
