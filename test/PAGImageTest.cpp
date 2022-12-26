@@ -129,7 +129,7 @@ PAG_TEST_F(PAGImageTest, image3) {
   pagFile->replaceImage(0, pagImage);
   auto surface = PAGSurface::MakeOffscreen(720, 720);
   ASSERT_TRUE(surface != nullptr);
-  auto player = new PAGPlayer();
+  auto player = std::make_unique<PAGPlayer>();
   player->setComposition(pagFile);
   player->setSurface(surface);
   auto result = player->flush();
