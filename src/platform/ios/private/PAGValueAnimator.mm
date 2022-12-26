@@ -99,20 +99,22 @@ static int64_t GetCurrentTimeUS() {
 }
 
 - (void)onAnimationFrame:(int64_t)timestamp {
-  std::lock_guard<std::mutex> autoLock(lock);
+  lock.lock();
   auto count = (timestamp - startTime) / duration;
   if (repeatCount >= 0 && count > repeatCount) {
     playTime = duration;
     animatedFraction = 1.0;
+    lock.unlock();
     [self stop:false];
     [animatorListener onAnimationUpdate];
     [animatorListener onAnimationEnd];
   } else {
+    playTime = (timestamp - startTime) % duration;
+    animatedFraction = static_cast<double>(playTime) / duration;
+    lock.unlock();
     if (repeatedTimes < count) {
       [animatorListener onAnimationRepeat];
     }
-    playTime = (timestamp - startTime) % duration;
-    animatedFraction = static_cast<double>(playTime) / duration;
     [animatorListener onAnimationUpdate];
   }
   repeatedTimes = (int)count;
@@ -139,14 +141,16 @@ static int64_t GetCurrentTimeUS() {
 }
 
 - (void)setCurrentPlayTime:(int64_t)time {
-  std::lock_guard<std::mutex> autoLock(lock);
+  lock.lock();
   if (duration <= 0) {
+    lock.unlock();
     return;
   }
   int64_t gapTime = playTime - time;
   playTime = time;
   startTime += gapTime % duration;
   animatedFraction = static_cast<double>(playTime) / duration;
+  lock.unlock();
   [animatorListener onAnimationUpdate];
 }
 
@@ -164,13 +168,15 @@ static int64_t GetCurrentTimeUS() {
 }
 
 - (void)start {
-  std::lock_guard<std::mutex> autoLock(lock);
+  lock.lock();
   if (duration <= 0 || self.animatorId != NSIntegerMax || animatorListener == nil) {
+    lock.unlock();
     return;
   }
   self.animatorId = [PAGValueAnimator AddAnimator:self];
   startTime = GetCurrentTimeUS() - playTime % duration - repeatedTimes * duration;
   animatedFraction = static_cast<double>(playTime) / duration;
+  lock.unlock();
   [animatorListener onAnimationUpdate];
   if (animatedFraction == 0) {
     [animatorListener onAnimationStart];
