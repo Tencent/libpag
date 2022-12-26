@@ -40,7 +40,7 @@ void DestoryFlushQueue() {
 @property(atomic, assign) BOOL isInBackground;
 @property(atomic, strong) NSHashTable* listeners;
 @property(atomic, assign) BOOL progressExplicitlySet;
-@property(nonatomic, strong) NSLock* updateTimeLock;
+@property(nonatomic, strong) NSRecursiveLock* updateTimeLock;
 @property(atomic, assign) BOOL isVisible;
 @property(atomic, assign) BOOL isPlaying;
 @end
@@ -95,7 +95,7 @@ void DestoryFlushQueue() {
   self.isAsyncFlushing = FALSE;
   pagFile = nil;
   filePath = nil;
-  self.updateTimeLock = [[NSLock alloc] init];
+  self.updateTimeLock = [[NSRecursiveLock alloc] init];
   self.contentScaleFactor = [UIScreen mainScreen].scale;
   self.backgroundColor = [UIColor clearColor];
   pagPlayer = [[PAGPlayer alloc] init];
@@ -438,8 +438,8 @@ void DestoryFlushQueue() {
   if (self.progressExplicitlySet) {
     result = [pagPlayer flush];
     int64_t currentPlayTime = (int64_t)([pagPlayer getProgress] * [pagPlayer duration]);
-    [valueAnimator setCurrentPlayTime:currentPlayTime];
     self.progressExplicitlySet = FALSE;
+    [valueAnimator setCurrentPlayTime:currentPlayTime];
   } else {
     [pagPlayer setProgress:[valueAnimator getAnimatedFraction]];
     result = [pagPlayer flush];
