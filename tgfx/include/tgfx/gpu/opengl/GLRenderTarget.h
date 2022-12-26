@@ -54,11 +54,30 @@ class GLRenderTarget : public RenderTarget {
   /**
    * Returns the GLFrameBuffer associated with this render target.
    */
-  GLFrameBuffer glFrameBuffer() const {
+  virtual GLFrameBuffer glFrameBuffer() const {
     return renderTargetFBInfo;
   }
 
-  void resolve() const;
+  virtual void resolve() const;
+
+  const Swizzle& writeSwizzle() const override;
+
+ protected:
+  GLRenderTarget(int width, int height, ImageOrigin origin, int sampleCount,
+                 GLFrameBuffer frameBuffer, unsigned textureTarget = 0);
+  /**
+   * Creates a new render target which uses specified texture as pixel storage. Caller must ensure
+   * texture is valid for the lifetime of returned render target.
+   */
+  static std::shared_ptr<GLRenderTarget> MakeFrom(const GLTexture* texture, int sampleCount = 1);
+
+  /**
+   * Copies a rect of pixels to dstPixels with specified color type, alpha type and row bytes. Copy
+   * starts at (srcX, srcY), and does not exceed Surface (width(), height()). Pixels are copied
+   * only if pixel conversion is possible. Returns true if pixels are copied to dstPixels.
+   */
+  virtual bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0,
+                          int srcY = 0) const;
 
  private:
   GLFrameBuffer textureFBInfo = {};
@@ -67,25 +86,7 @@ class GLRenderTarget : public RenderTarget {
   unsigned textureTarget = 0;
   bool externalTexture = false;
 
-  /**
-   * Creates a new render target which uses specified texture as pixel storage. Caller must ensure
-   * texture is valid for the lifetime of returned render target.
-   */
-  static std::shared_ptr<GLRenderTarget> MakeFrom(const GLTexture* texture, int sampleCount = 1);
-
-  GLRenderTarget(int width, int height, ImageOrigin origin, int sampleCount,
-                 GLFrameBuffer frameBuffer, unsigned textureTarget = 0);
-
   void onReleaseGPU() override;
-
-  const Swizzle& writeSwizzle() const override;
-
-  /**
-   * Copies a rect of pixels to dstPixels with specified color type, alpha type and row bytes. Copy
-   * starts at (srcX, srcY), and does not exceed Surface (width(), height()). Pixels are copied
-   * only if pixel conversion is possible. Returns true if pixels are copied to dstPixels.
-   */
-  bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0, int srcY = 0) const;
 
   friend class GLSurface;
 

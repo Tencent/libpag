@@ -59,7 +59,8 @@ class Surface {
   /**
    * Wraps a render target into Surface. Returns nullptr if renderTarget is nullptr.
    */
-  static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<RenderTarget> renderTarget);
+  static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<RenderTarget> renderTarget,
+                                           std::shared_ptr<Texture> texture = nullptr);
 
   /**
    * Wraps a texture into Surface. A Surface with MSAA enabled is returned if the sampleCount is

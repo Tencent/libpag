@@ -1,10 +1,11 @@
 #include "HardwareBufferDrawable.h"
-#include <GLES/gl.h>
+#include "HardwareBufferRenderTarget.h"
 #include "tgfx/core/Bitmap.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
+#include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace pag {
-std::shared_ptr<HardwareBufferDrawable> HardwareBufferDrawable::Make(
-    int width, int height, std::shared_ptr<tgfx::Device> device) {
+std::shared_ptr<HardwareBufferDrawable> HardwareBufferDrawable::Make(int width, int height) {
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
@@ -13,7 +14,10 @@ std::shared_ptr<HardwareBufferDrawable> HardwareBufferDrawable::Make(
   if (!buffer) {
     return nullptr;
   }
-
+  auto device = tgfx::GLDevice::Make();
+  if (device == nullptr) {
+    return nullptr;
+  }
   return std::shared_ptr<HardwareBufferDrawable>(new HardwareBufferDrawable(device, buffer));
 }
 
@@ -47,11 +51,16 @@ HardwareBufferDrawable::HardwareBufferDrawable(std::shared_ptr<tgfx::Device> dev
 }
 
 std::shared_ptr<tgfx::Surface> HardwareBufferDrawable::createSurface(tgfx::Context* context) {
-  auto glTexture = hardwareBuffer->makeTexture(context);
-  if (glTexture == nullptr) {
+  auto texture = hardwareBuffer->makeTexture(context);
+  if (texture == nullptr) {
     return nullptr;
   }
-  return tgfx::Surface::MakeFrom(std::move(glTexture));
+  auto glTexture = std::static_pointer_cast<tgfx::GLTexture>(texture);
+  auto renderTarget = HardwareBufferRenderTarget::MakeFrom(context, hardwareBuffer, texture);
+  if (renderTarget == nullptr) {
+    return nullptr;
+  }
+  return tgfx::Surface::MakeFrom(std::move(renderTarget), std::move(glTexture));
 }
 
 }  // namespace pag

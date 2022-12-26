@@ -164,19 +164,19 @@ extern "C" PAG_API jobject JNICALL Java_org_libpag_PAGSurface_makeSnapshot(JNIEn
   if (surface == nullptr) {
     return nullptr;
   }
-  int widht = surface->width();
+  int width = surface->width();
   int height = surface->height();
   unsigned char* newBitmapPixels;
   auto config = env->GetStaticObjectField(Config_Class.get(), Config_ARGB_888);
   jobject newBitmap =
-      env->CallStaticObjectMethod(Bitmap_Class.get(), Bitmap_createBitmap, widht, height, config);
+      env->CallStaticObjectMethod(Bitmap_Class.get(), Bitmap_createBitmap, width, height, config);
   int ret;
   if ((ret = AndroidBitmap_lockPixels(env, newBitmap, (void**)&newBitmapPixels)) < 0) {
     LOGE("AndroidBitmap_lockPixels() failed ! error=%d", ret);
     return nullptr;
   }
   bool status = surface->readPixels(pag::ColorType::RGBA_8888, pag::AlphaType::Premultiplied,
-                                    newBitmapPixels, widht * 4);
+                                    newBitmapPixels, width * 4);
   if (!status) {
     LOGE("ReadPixels failed!");
   }
@@ -184,39 +184,25 @@ extern "C" PAG_API jobject JNICALL Java_org_libpag_PAGSurface_makeSnapshot(JNIEn
   return newBitmap;
 }
 
-static jobject SetupFromHardwareBufferDrawable(JNIEnv* env,
-                                               std::shared_ptr<HardwareBufferDrawable> drawable) {
-  auto surface = PAGSurface::MakeFrom(drawable, true);
+extern "C" JNIEXPORT jobject JNICALL Java_org_libpag_PAGSurface_MakeOffscreen(JNIEnv* env, jclass,
+                                                                              jint width,
+                                                                              jint height) {
+  auto drawable = HardwareBufferDrawable::Make(static_cast<int>(width), static_cast<int>(height));
+  auto surface = PAGSurface::MakeFrom(drawable);
   if (surface == nullptr) {
-    LOGE("PAGSurface.SetupFromHardwareBuffer() fail.");
-    return nullptr;
+    surface = PAGSurface::MakeOffscreen(width, height);
   }
   static auto PAGSurface_Class = Global<jclass>(env, env->FindClass("org/libpag/PAGSurface"));
   static auto PAGSurface_Constructor = env->GetMethodID(PAGSurface_Class.get(), "<init>", "(J)V");
-  return env->NewObject(PAGSurface_Class.get(), PAGSurface_Constructor,
-                        reinterpret_cast<jlong>(new JPAGSurface(surface)));
-}
+  auto surfaceObject = env->NewObject(PAGSurface_Class.get(), PAGSurface_Constructor,
+                                      reinterpret_cast<jlong>(new JPAGSurface(surface)));
 
-extern "C" JNIEXPORT jobject JNICALL
-Java_org_libpag_PAGSurface_FromHardwareBuffer(JNIEnv* env, jclass, jobject hardware_buffer) {
-
-  auto device = tgfx::GLDevice::Make();
-  if (device == nullptr) {
-    return nullptr;
+  if (drawable != nullptr) {
+    static auto PAGSurface_HardwareBuffer = env->GetFieldID(
+        PAGSurface_Class.get(), "hardwareBuffer", "Landroid/hardware/HardwareBuffer;");
+    env->SetObjectField(surfaceObject, PAGSurface_HardwareBuffer,
+                        tgfx::HardwareBufferInterface::AHardwareBuffer_toHardwareBuffer(
+                            env, drawable->aHardwareBuffer()));
   }
-  auto drawable = HardwareBufferDrawable::Make(
-      std::static_pointer_cast<tgfx::HardwareBuffer>(tgfx::HardwareBuffer::MakeFrom(
-          tgfx::HardwareBufferInterface::AHardwareBuffer_fromHardwareBuffer(env, hardware_buffer))),
-      device);
-  return SetupFromHardwareBufferDrawable(env, drawable);
-}
-
-extern "C" JNIEXPORT jlong JNICALL Java_org_libpag_PAGSurface_SetupOffscreen(JNIEnv*, jclass,
-                                                                             jint width,
-                                                                             jint height) {
-  auto pagSurface = PAGSurface::MakeOffscreen(width, height);
-  if (pagSurface == nullptr) {
-    return 0;
-  }
-  return reinterpret_cast<jlong>(new JPAGSurface(pagSurface));
+  return surfaceObject;
 }

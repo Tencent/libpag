@@ -63,7 +63,10 @@ static const AHardwareBufferFunctions* GetFunctions() {
 }
 
 bool HardwareBufferInterface::Available() {
-  return GetFunctions()->allocate != nullptr;
+  return GetFunctions()->allocate != nullptr && GetFunctions()->release != nullptr &&
+         GetFunctions()->lock != nullptr && GetFunctions()->unlock != nullptr &&
+         GetFunctions()->describe != nullptr && GetFunctions()->acquire != nullptr &&
+         GetFunctions()->AHB_to_HB != nullptr && GetFunctions()->AHB_from_HB != nullptr;
 }
 
 int HardwareBufferInterface::Allocate(const AHardwareBuffer_Desc* desc,

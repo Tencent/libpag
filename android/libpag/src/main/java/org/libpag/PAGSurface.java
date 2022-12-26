@@ -12,15 +12,8 @@ import org.extra.tools.LibraryLoadUtils;
 
 public class PAGSurface {
 
-    public static PAGSurface MakeOffscreen(int width, int height) {
-        long nativeSurface = SetupOffscreen(width, height);
-        if (nativeSurface == 0) {
-            return null;
-        }
-        return new PAGSurface(nativeSurface);
-    }
+    public static native PAGSurface MakeOffscreen(int width, int height);
 
-    public native static PAGSurface FromHardwareBuffer(HardwareBuffer hardwareBuffer);
 
     public static PAGSurface FromSurfaceTexture(SurfaceTexture surfaceTexture) {
         return FromSurfaceTexture(surfaceTexture, EGL14.EGL_NO_CONTEXT);
@@ -137,8 +130,6 @@ public class PAGSurface {
         this.nativeSurface = nativeSurface;
     }
 
-    private static native long SetupOffscreen(int width, int height);
-
     private Surface surface = null;
     private boolean needsReleaseSurface = false;
     private int textureID = 0;
@@ -185,6 +176,10 @@ public class PAGSurface {
         nativeRelease();
     }
 
+    public HardwareBuffer hardwareBuffer() {
+        return hardwareBuffer;
+    }
+
     private native void nativeRelease();
 
     private static native void nativeInit();
@@ -201,4 +196,6 @@ public class PAGSurface {
     }
 
     long nativeSurface = 0;
+
+    private HardwareBuffer hardwareBuffer;
 }

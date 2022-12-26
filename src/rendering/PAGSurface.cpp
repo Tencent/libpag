@@ -28,18 +28,13 @@
 #include "tgfx/core/Clock.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
 
-#if defined(__ANDROID__) || defined(ANDROID)
-#include "platform/android/HardwareBufferDrawable.h"
-#endif
-
 namespace pag {
 
-std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(std::shared_ptr<Drawable> drawable,
-                                                 bool hardwareBackend) {
+std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(std::shared_ptr<Drawable> drawable) {
   if (drawable == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(drawable), false, hardwareBackend));
+  return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(drawable)));
 }
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendRenderTarget& renderTarget,
@@ -86,10 +81,8 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeOffscreen(int width, int height) {
   return std::shared_ptr<PAGSurface>(new PAGSurface(drawable));
 }
 
-PAGSurface::PAGSurface(std::shared_ptr<Drawable> drawable, bool contextAdopted,
-                       bool hardwareBackend)
-    : drawable(std::move(drawable)), contextAdopted(contextAdopted),
-      hardwareBackend(hardwareBackend) {
+PAGSurface::PAGSurface(std::shared_ptr<Drawable> drawable, bool contextAdopted)
+    : drawable(std::move(drawable)), contextAdopted(contextAdopted) {
   rootLocker = std::make_shared<std::mutex>();
 }
 
@@ -161,19 +154,9 @@ bool PAGSurface::readPixels(ColorType colorType, AlphaType alphaType, void* dstP
   if (surface == nullptr || !context) {
     return false;
   }
-  bool result;
-#if defined(__ANDROID__) || defined(ANDROID)
-  if (hardwareBackend) {
-    surface->flush();
-    result = std::static_pointer_cast<HardwareBufferDrawable>(drawable)->readPixels(
-        ToTGFX(colorType), ToTGFX(alphaType), dstPixels, dstRowBytes);
-    unlockContext();
-    return result;
-  }
-#endif
   auto info = tgfx::ImageInfo::Make(surface->width(), surface->height(), ToTGFX(colorType),
                                     ToTGFX(alphaType), dstRowBytes);
-  result = surface->readPixels(info, dstPixels);
+  auto result = surface->readPixels(info, dstPixels);
   unlockContext();
   return result;
 }

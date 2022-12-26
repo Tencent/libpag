@@ -19,7 +19,6 @@
 #pragma once
 
 #include "pag/pag.h"
-#include "tgfx/gpu/opengl/GLSampler.h"
 
 class JPAGSurface {
  public:

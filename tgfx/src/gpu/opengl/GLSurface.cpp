@@ -22,12 +22,14 @@
 #include "tgfx/gpu/opengl/GLSemaphore.h"
 
 namespace tgfx {
-std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<RenderTarget> renderTarget) {
+std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<RenderTarget> renderTarget,
+                                           std::shared_ptr<Texture> texture) {
   if (renderTarget == nullptr) {
     return nullptr;
   }
   auto glRT = std::static_pointer_cast<GLRenderTarget>(renderTarget);
-  return std::shared_ptr<GLSurface>(new GLSurface(std::move(glRT)));
+  auto glTexture = std::static_pointer_cast<GLTexture>(texture);
+  return std::shared_ptr<GLSurface>(new GLSurface(std::move(glRT), std::move(glTexture)));
 }
 
 std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<Texture> texture, int sampleCount) {

@@ -1157,8 +1157,7 @@ class PAG_API PAGSurface {
   /**
    *  Creates a new PAGSurface from specified GPUDrawable, Returns nullptr if drawable is nullptr.
    */
-  static std::shared_ptr<PAGSurface> MakeFrom(std::shared_ptr<Drawable> drawable,
-                                              bool hardwareBackend = false);
+  static std::shared_ptr<PAGSurface> MakeFrom(std::shared_ptr<Drawable> drawable);
 
   /**
    * Creates a new PAGSurface from specified backend render target and origin. The PAGSurface uses
@@ -1225,10 +1224,8 @@ class PAG_API PAGSurface {
   std::shared_ptr<tgfx::Surface> surface = nullptr;
   bool contextAdopted = false;
   GLRestorer* glRestorer = nullptr;
-  bool hardwareBackend = false;
 
-  explicit PAGSurface(std::shared_ptr<Drawable> drawable, bool contextAdopted = false,
-                      bool hardwareBackend = false);
+  explicit PAGSurface(std::shared_ptr<Drawable> drawable, bool contextAdopted = false);
 
   bool draw(RenderCache* cache, std::shared_ptr<Graphic> graphic, BackendSemaphore* signalSemaphore,
             bool autoClear = true);

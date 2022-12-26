@@ -55,7 +55,7 @@ public class PAGDecoder {
         pagDecoder.height = Math.round(pagComposition.height() * scale);
         pagDecoder.numFrames =
                 (int) (pagComposition.duration() * pagComposition.frameRate() / 1000000);
-        pagDecoder.pagSurface = createSurface(pagDecoder.width, pagDecoder.height);
+        pagDecoder.pagSurface = PAGSurface.MakeOffscreen(pagDecoder.width, pagDecoder.height);
         if (pagDecoder.pagSurface == null) {
             return null;
         }
@@ -100,19 +100,6 @@ public class PAGDecoder {
         }
         lastFrameBitmap = pagSurface.makeSnapshot();
         return lastFrameBitmap;
-    }
-
-    private static PAGSurface createSurface(int width, int height) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            HardwareBuffer hardwareBuffer = HardwareBuffer.create(width, height,
-                    HardwareBuffer.RGBA_8888
-                    , 1,
-                    HardwareBuffer.USAGE_CPU_READ_OFTEN | HardwareBuffer.USAGE_CPU_WRITE_OFTEN |
-                            HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE | HardwareBuffer.USAGE_GPU_COLOR_OUTPUT);
-            return PAGSurface.FromHardwareBuffer(hardwareBuffer);
-        } else {
-            return PAGSurface.MakeOffscreen(width, height);
-        }
     }
 
     static {
