@@ -221,4 +221,17 @@ PAG_TEST_F(PAGImageLayerTest, mask) {
   }
   EXPECT_TRUE(result);
 }
+
+/**
+ * 用例描述: 测试TrackMatteImageLayer的getVisibleRange是否正确。
+ */
+PAG_TEST_F(PAGImageLayerTest, trackmatteImageLayer) {
+  auto pagFile = pag::PAGFile::Load("../resources/apitest/TrackmatteImageLayer.pag");
+  ASSERT_NE(pagFile, nullptr);
+  auto imageLayer = std::static_pointer_cast<PAGImageLayer>(
+      pagFile->getLayersByEditableIndex(0, LayerType::Image).front());
+  auto timeRange = imageLayer->getVisibleRangeInFile();
+  EXPECT_EQ(timeRange.start, 9);
+  EXPECT_EQ(timeRange.end, 88);
+}
 }  // namespace pag
