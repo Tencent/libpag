@@ -22,14 +22,12 @@
 #include "tgfx/gpu/opengl/GLSemaphore.h"
 
 namespace tgfx {
-std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<RenderTarget> renderTarget,
-                                           std::shared_ptr<Texture> texture) {
+std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<RenderTarget> renderTarget) {
   if (renderTarget == nullptr) {
     return nullptr;
   }
   auto glRT = std::static_pointer_cast<GLRenderTarget>(renderTarget);
-  auto glTexture = std::static_pointer_cast<GLTexture>(texture);
-  return std::shared_ptr<GLSurface>(new GLSurface(std::move(glRT), std::move(glTexture)));
+  return std::shared_ptr<GLSurface>(new GLSurface(std::move(glRT)));
 }
 
 std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<Texture> texture, int sampleCount) {
@@ -79,6 +77,10 @@ GLSurface::GLSurface(std::shared_ptr<GLRenderTarget> renderTarget,
 }
 
 bool GLSurface::onReadPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) {
+  if (texture &&
+      std::static_pointer_cast<GLTexture>(texture)->readPixels(dstInfo, dstPixels, srcX, srcY)) {
+    return true;
+  }
   return std::static_pointer_cast<GLRenderTarget>(renderTarget)
       ->readPixels(dstInfo, dstPixels, srcX, srcY);
 }

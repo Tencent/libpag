@@ -177,4 +177,9 @@ GLTexture::GLTexture(int width, int height, ImageOrigin origin) : Texture(width,
 Point GLTexture::getTextureCoord(float x, float y) const {
   return {x / static_cast<float>(width()), y / static_cast<float>(height())};
 }
+
+bool GLTexture::readPixels(const ImageInfo&, void*, int, int) const {
+  return false;
+}
+
 }  // namespace tgfx

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/opengl/egl/EGLWindow.h"
+#include "platform/android/HardwareBuffer.h"
 
 #if defined(__ANDROID__) || defined(ANDROID)
 #include <android/native_window.h>
@@ -32,6 +33,23 @@ std::shared_ptr<EGLWindow> EGLWindow::Current() {
     return nullptr;
   }
   return std::shared_ptr<EGLWindow>(new EGLWindow(device));
+}
+
+std::shared_ptr<EGLWindow> EGLWindow::MakeFrom(std::shared_ptr<tgfx::HardwareBuffer> hardwareBuffer,
+                                               std::shared_ptr<GLDevice> device) {
+  if (!hardwareBuffer) {
+    return nullptr;
+  }
+  auto eglDevice = device;
+  if (!eglDevice) {
+    eglDevice = EGLDevice::Make();
+  }
+  if (!eglDevice) {
+    return nullptr;
+  }
+  auto eglWindow = std::shared_ptr<EGLWindow>(new EGLWindow(eglDevice));
+  eglWindow->hardwareBuffer = hardwareBuffer;
+  return eglWindow;
 }
 
 std::shared_ptr<EGLWindow> EGLWindow::MakeFrom(EGLNativeWindowType nativeWindow,
@@ -52,6 +70,9 @@ EGLWindow::EGLWindow(std::shared_ptr<Device> device) : Window(std::move(device))
 }
 
 std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
+  if (hardwareBuffer) {
+    return tgfx::Surface::MakeFrom(hardwareBuffer->makeTexture(context));
+  }
   EGLint width = 0;
   EGLint height = 0;
 
@@ -80,6 +101,10 @@ std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
 }
 
 void EGLWindow::onPresent(Context*, int64_t presentationTime) {
-  std::static_pointer_cast<EGLDevice>(device)->swapBuffers(presentationTime);
+  if (hardwareBuffer) {
+    glFlush();
+  } else {
+    std::static_pointer_cast<EGLDevice>(device)->swapBuffers(presentationTime);
+  }
 }
 }  // namespace tgfx

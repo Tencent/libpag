@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "tgfx/core/ImageInfo.h"
 #include "tgfx/gpu/Texture.h"
 #include "tgfx/gpu/opengl/GLSampler.h"
 
@@ -59,6 +60,14 @@ class GLTexture : public Texture {
 
   GLTexture(int width, int height, ImageOrigin origin);
 
+ private:
+  /**
+   * Only for speeding up reading pixels when using HardwareBuffer
+   */
+  virtual bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0,
+                          int srcY = 0) const;
+
   friend class Texture;
+  friend class GLSurface;
 };
 }  // namespace tgfx

@@ -30,13 +30,29 @@ std::shared_ptr<GPUDrawable> GPUDrawable::FromWindow(ANativeWindow* nativeWindow
   return std::shared_ptr<GPUDrawable>(new GPUDrawable(nativeWindow, sharedContext));
 }
 
+std::shared_ptr<GPUDrawable> GPUDrawable::FromHardwareBuffer(
+    std::shared_ptr<tgfx::HardwareBuffer> hardwareBuffer) {
+  if (hardwareBuffer == nullptr) {
+    LOGE("GPUDrawable.FromHardwareBuffer() The hardwareBuffer is null.");
+    return nullptr;
+  }
+  return std::shared_ptr<GPUDrawable>(new GPUDrawable(hardwareBuffer));
+}
+
 GPUDrawable::GPUDrawable(ANativeWindow* nativeWindow, EGLContext eglContext)
     : nativeWindow(nativeWindow), sharedContext(eglContext) {
   updateSize();
 }
 
+GPUDrawable::GPUDrawable(std::shared_ptr<tgfx::HardwareBuffer> hardwareBuffer)
+    : hardwareBuffer(hardwareBuffer) {
+  updateSize();
+}
+
 GPUDrawable::~GPUDrawable() {
-  ANativeWindow_release(nativeWindow);
+  if (nativeWindow) {
+    ANativeWindow_release(nativeWindow);
+  }
 }
 
 void GPUDrawable::updateSize() {
@@ -44,14 +60,23 @@ void GPUDrawable::updateSize() {
     _width = ANativeWindow_getWidth(nativeWindow);
     _height = ANativeWindow_getHeight(nativeWindow);
   }
+  if (hardwareBuffer) {
+    _width = hardwareBuffer->width();
+    _height = hardwareBuffer->height();
+  }
 }
 
 std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {
   if (_width <= 0 || _height <= 0) {
     return nullptr;
   }
-  if (window == nullptr) {
-    window = tgfx::EGLWindow::MakeFrom(nativeWindow, sharedContext);
+  if (!window) {
+    if (hardwareBuffer) {
+      window = tgfx::EGLWindow::MakeFrom(hardwareBuffer);
+    }
+    if (nativeWindow) {
+      window = tgfx::EGLWindow::MakeFrom(nativeWindow, sharedContext);
+    }
   }
   return window ? window->getDevice() : nullptr;
 }

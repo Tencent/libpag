@@ -176,7 +176,11 @@ public class PAGSurface {
         nativeRelease();
     }
 
-    public HardwareBuffer hardwareBuffer() {
+    /**
+     * Returns the internal HardwareBuffer object associated with this PAGSurface,
+     * returns null if this PAGSurface is created by Surface or SurfaceTexture.
+     */
+    public HardwareBuffer getHardwareBuffer() {
         return hardwareBuffer;
     }
 

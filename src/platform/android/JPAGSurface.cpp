@@ -24,7 +24,6 @@
 #include <android/native_window_jni.h>
 #include "GPUDecoder.h"
 #include "GPUDrawable.h"
-#include "HardwareBufferDrawable.h"
 #include "JNIHelper.h"
 #include "NativePlatform.h"
 #include "VideoSurface.h"
@@ -187,7 +186,12 @@ extern "C" PAG_API jobject JNICALL Java_org_libpag_PAGSurface_makeSnapshot(JNIEn
 extern "C" JNIEXPORT jobject JNICALL Java_org_libpag_PAGSurface_MakeOffscreen(JNIEnv* env, jclass,
                                                                               jint width,
                                                                               jint height) {
-  auto drawable = HardwareBufferDrawable::Make(static_cast<int>(width), static_cast<int>(height));
+  auto buffer = std::static_pointer_cast<tgfx::HardwareBuffer>(
+      tgfx::HardwareBuffer::Make(width, height, false));
+  if (!buffer) {
+    return nullptr;
+  }
+  auto drawable = GPUDrawable::FromHardwareBuffer(buffer);
   auto surface = PAGSurface::MakeFrom(drawable);
   if (surface == nullptr) {
     surface = PAGSurface::MakeOffscreen(width, height);
@@ -202,7 +206,7 @@ extern "C" JNIEXPORT jobject JNICALL Java_org_libpag_PAGSurface_MakeOffscreen(JN
         PAGSurface_Class.get(), "hardwareBuffer", "Landroid/hardware/HardwareBuffer;");
     env->SetObjectField(surfaceObject, PAGSurface_HardwareBuffer,
                         tgfx::HardwareBufferInterface::AHardwareBuffer_toHardwareBuffer(
-                            env, drawable->aHardwareBuffer()));
+                            env, buffer->aHardwareBuffer()));
   }
   return surfaceObject;
 }
