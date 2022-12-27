@@ -7,6 +7,7 @@
 #import <OpenGLES/ES2/gl.h>
 #import <OpenGLES/ES2/glext.h>
 #import <libpag/PAGImageLayer.h>
+#import <libpag/PAGDecoder.h>
 
 @implementation PAGPlayerView {
     PAGView* pagView;
@@ -139,8 +140,29 @@
 - (void)touchesBegan:(NSSet*)touches withEvent:(UIEvent*)event {
     if ([pagView isPlaying]) {
         [pagView stop];
+        PAGDecoder* pagDecoder = [PAGDecoder Make:[pagView getComposition]];
+        UIImage* image = [pagDecoder frameAtIndex:50];
+        UIImage* image1 = [pagDecoder frameAtIndex:50];
+        image = nil;
+        UIImage* image2 = [pagDecoder frameAtIndex:50];
+        UIImage* image3 = [pagDecoder frameAtIndex:51];
+        UIImage* image4 = [pagDecoder frameAtIndex:52];
+        UIImage* image5 = [pagDecoder frameAtIndex:0];
+        pagDecoder = nil;
+        
     } else {
-        [pagView play];
+//        [pagView play];
+        pagPath = [[NSBundle mainBundle] pathForResource:@"test2" ofType:@"pag"];
+        PAGFile* pagFile = [PAGFile Load:pagPath];
+        PAGDecoder* pagDecoder = [PAGDecoder Make:pagFile];
+        UIImage* image = [pagDecoder frameAtIndex:50];
+        UIImage* image1 = [pagDecoder frameAtIndex:50];
+        image = nil;
+        UIImage* image2 = [pagDecoder frameAtIndex:50];
+        UIImage* image3 = [pagDecoder frameAtIndex:51];
+        UIImage* image4 = [pagDecoder frameAtIndex:52];
+        UIImage* image5 = [pagDecoder frameAtIndex:0];
+        pagDecoder = nil;
     }
 
 }
