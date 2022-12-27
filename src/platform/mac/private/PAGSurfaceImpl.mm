@@ -94,28 +94,7 @@
   return _cvPixelBuffer;
 }
 
-- (CVPixelBufferRef)cvPixelBufferCopyWithPixelBuffer:(CVPixelBufferRef)pixelBuffer {
-  CVPixelBufferRef pixelBufferCopy =
-      pag::PixelBufferUtils::Make(_pagSurface->width(), _pagSurface->height());
-  if (pixelBufferCopy == nil) {
-    LOGE("CVPixelBufferRef create failed!");
-    return nil;
-  }
-  CVPixelBufferLockBaseAddress(pixelBuffer, 0);
-  size_t bytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer);
-  void* baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer);
-  CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
-  CVPixelBufferLockBaseAddress(pixelBufferCopy, 0);
-  void* copyBaseAddress = CVPixelBufferGetBaseAddress(pixelBufferCopy);
-  memcpy(copyBaseAddress, baseAddress, _pagSurface->height() * bytesPerRow);
-  CVPixelBufferUnlockBaseAddress(pixelBufferCopy, 0);
-  return pixelBufferCopy;
-}
-
 - (CVPixelBufferRef)makeSnapshot {
-  if ([self getCVPixelBuffer] != nil) {
-    return [self cvPixelBufferCopyWithPixelBuffer:[self getCVPixelBuffer]];
-  }
   CVPixelBufferRef pixelBuffer =
       pag::PixelBufferUtils::Make(_pagSurface->width(), _pagSurface->height());
   if (pixelBuffer == nil) {
