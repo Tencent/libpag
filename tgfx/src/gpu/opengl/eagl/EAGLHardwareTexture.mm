@@ -19,6 +19,8 @@
 #include "EAGLHardwareTexture.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/opengl/GLContext.h"
+#include "platform/apple/HardwareBuffer.h"
+#include "tgfx/core/Bitmap.h"
 #include "tgfx/gpu/opengl/eagl/EAGLDevice.h"
 
 namespace tgfx {
@@ -120,4 +122,25 @@ void EAGLHardwareTexture::onReleaseGPU() {
   static_cast<EAGLDevice*>(context->device())->releaseTexture(texture);
   texture = nil;
 }
+
+bool EAGLHardwareTexture::readPixels(const ImageInfo &dstInfo, void *dstPixels, int srcX, int srcY) const {
+    if (dstPixels == nullptr) {
+        return false;
+    }
+    dstPixels = dstInfo.computeOffset(dstPixels, -srcX, -srcY);
+    auto outInfo = dstInfo.makeIntersect(-srcX, -srcY, width(), height());
+    if (outInfo.isEmpty()) {
+      return false;
+    }
+    auto hardwareBuffer = HardwareBuffer::MakeFrom(pixelBuffer);
+    if (hardwareBuffer == nullptr) {
+        return false;
+    }
+    void* baseAddress = hardwareBuffer->lockPixels();
+    Bitmap bitmap(hardwareBuffer->info(), baseAddress);
+    bool result = bitmap.readPixels(dstInfo, dstPixels);
+    hardwareBuffer->unlockPixels();
+    return result;
+}
+
 }
