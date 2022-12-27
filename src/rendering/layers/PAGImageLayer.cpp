@@ -495,7 +495,7 @@ TimeRange PAGImageLayer::getVisibleRangeInFile() {
       break;
     }
     childFrameRate = parent->frameRateInternal();
-    parent = parent->_parent;
+    parent = parent->getTimelineOwner();
   }
   timeRange.start -= rootFile->startFrame;
   timeRange.end -= rootFile->startFrame;

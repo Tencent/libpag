@@ -231,7 +231,7 @@ PAG_TEST_F(PAGImageLayerTest, trackmatteImageLayer) {
   auto imageLayer = std::static_pointer_cast<PAGImageLayer>(
       pagFile->getLayersByEditableIndex(0, LayerType::Image).front());
   auto timeRange = imageLayer->getVisibleRangeInFile();
-  EXPECT_EQ(timeRange.start, 9);
-  EXPECT_EQ(timeRange.end, 88);
+  EXPECT_EQ(timeRange.start, -13);
+  EXPECT_EQ(timeRange.end, 66);
 }
 }  // namespace pag
