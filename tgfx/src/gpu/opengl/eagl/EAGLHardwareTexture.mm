@@ -19,7 +19,7 @@
 #include "EAGLHardwareTexture.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/opengl/GLContext.h"
-#include "platform/apple/HardwareBuffer.h"
+#include "platform/apple/CVPixelBufferUtil.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/gpu/opengl/eagl/EAGLDevice.h"
 
@@ -132,14 +132,12 @@ bool EAGLHardwareTexture::readPixels(const ImageInfo &dstInfo, void *dstPixels, 
     if (outInfo.isEmpty()) {
       return false;
     }
-    auto hardwareBuffer = HardwareBuffer::MakeFrom(pixelBuffer);
-    if (hardwareBuffer == nullptr) {
-        return false;
-    }
-    void* baseAddress = hardwareBuffer->lockPixels();
-    Bitmap bitmap(hardwareBuffer->info(), baseAddress);
+    auto srcInfo = GetImageInfo(pixelBuffer);
+    CVPixelBufferLockBaseAddress(pixelBuffer, 0);
+    void* baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer);
+    Bitmap bitmap(srcInfo, baseAddress);
     bool result = bitmap.readPixels(dstInfo, dstPixels);
-    hardwareBuffer->unlockPixels();
+    CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
     return result;
 }
 

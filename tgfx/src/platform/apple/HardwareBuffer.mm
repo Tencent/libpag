@@ -18,20 +18,11 @@
 
 #include "HardwareBuffer.h"
 #include "core/utils/USE.h"
+#include "CVPixelBufferUtil.h"
 
 namespace tgfx {
 static std::mutex cacheLocker = {};
 static std::unordered_map<CVPixelBufferRef, std::weak_ptr<HardwareBuffer>> hardwareBufferMap = {};
-
-static ImageInfo GetImageInfo(CVPixelBufferRef pixelBuffer) {
-  auto width = static_cast<int>(CVPixelBufferGetWidth(pixelBuffer));
-  auto height = static_cast<int>(CVPixelBufferGetHeight(pixelBuffer));
-  auto pixelFormat = CVPixelBufferGetPixelFormatType(pixelBuffer);
-  auto colorType =
-      pixelFormat == kCVPixelFormatType_OneComponent8 ? ColorType::ALPHA_8 : ColorType::BGRA_8888;
-  auto rowBytes = CVPixelBufferGetBytesPerRow(pixelBuffer);
-  return ImageInfo::Make(width, height, colorType, AlphaType::Premultiplied, rowBytes);
-}
 
 std::shared_ptr<HardwareBuffer> HardwareBuffer::Make(int width, int height, bool alphaOnly) {
 #if TARGET_IPHONE_SIMULATOR
