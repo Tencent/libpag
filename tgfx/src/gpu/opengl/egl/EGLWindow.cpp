@@ -24,6 +24,7 @@
 #endif
 #include <EGL/eglext.h>
 #include <GLES3/gl3.h>
+#include "core/utils/USE.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
 #include "tgfx/gpu/opengl/GLRenderTarget.h"
 
@@ -103,6 +104,7 @@ std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
 }
 
 void EGLWindow::onPresent(Context* context, int64_t presentationTime) {
+  USE(context);
 #if defined(__ANDROID__) || defined(ANDROID)
   if (hardwareBuffer) {
     auto gl = GLFunctions::Get(context);
