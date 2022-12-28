@@ -38,11 +38,14 @@ class EGLWindow : public Window {
    */
   static std::shared_ptr<EGLWindow> MakeFrom(EGLNativeWindowType nativeWindow,
                                              EGLContext sharedContext = nullptr);
+
+#if defined(__ANDROID__) || defined(ANDROID)
   /**
    * Creates a new window from a HardwareBuffer with specified device.
    */
   static std::shared_ptr<EGLWindow> MakeFrom(std::shared_ptr<HardwareBuffer> hardwareBuffer,
                                              std::shared_ptr<GLDevice> device = nullptr);
+#endif
 
  protected:
   std::shared_ptr<Surface> onCreateSurface(Context* context) override;
@@ -50,7 +53,9 @@ class EGLWindow : public Window {
 
  private:
   EGLNativeWindowType nativeWindow;
+#if defined(__ANDROID__) || defined(ANDROID)
   std::shared_ptr<HardwareBuffer> hardwareBuffer;
+#endif
 
   explicit EGLWindow(std::shared_ptr<Device> device);
 };
