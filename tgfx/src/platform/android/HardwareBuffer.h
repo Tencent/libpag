@@ -42,6 +42,6 @@ class HardwareBuffer : public PixelBuffer {
   explicit HardwareBuffer(AHardwareBuffer* hardwareBuffer);
 
  private:
-  AHardwareBuffer* _hardwareBuffer = nullptr;
+  AHardwareBuffer* hardwareBuffer = nullptr;
 };
 }  // namespace tgfx

@@ -60,31 +60,31 @@ static ImageInfo GetImageInfo(AHardwareBuffer* hardwareBuffer) {
 }
 
 HardwareBuffer::HardwareBuffer(AHardwareBuffer* hardwareBuffer)
-    : PixelBuffer(GetImageInfo(hardwareBuffer)), _hardwareBuffer(hardwareBuffer) {
+    : PixelBuffer(GetImageInfo(hardwareBuffer)), hardwareBuffer(hardwareBuffer) {
   HardwareBufferInterface::Acquire(hardwareBuffer);
 }
 
 std::shared_ptr<Texture> HardwareBuffer::makeTexture(Context* context) const {
-  return Texture::MakeFrom(context, _hardwareBuffer);
+  return Texture::MakeFrom(context, hardwareBuffer);
 }
 
 void* HardwareBuffer::lockPixels() {
   uint8_t* pixels = nullptr;
   HardwareBufferInterface::Lock(
-      _hardwareBuffer, AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN | AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN,
+      hardwareBuffer, AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN | AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN,
       -1, nullptr, reinterpret_cast<void**>(&pixels));
   return pixels;
 }
 
 void HardwareBuffer::unlockPixels() {
-  HardwareBufferInterface::Unlock(_hardwareBuffer, nullptr);
+  HardwareBufferInterface::Unlock(hardwareBuffer, nullptr);
 }
 
 HardwareBuffer::~HardwareBuffer() {
-  HardwareBufferInterface::Release(_hardwareBuffer);
+  HardwareBufferInterface::Release(hardwareBuffer);
 }
 
 AHardwareBuffer* HardwareBuffer::aHardwareBuffer() {
-  return _hardwareBuffer;
+  return hardwareBuffer;
 }
 }  // namespace tgfx

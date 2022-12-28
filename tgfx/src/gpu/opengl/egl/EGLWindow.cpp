@@ -24,6 +24,7 @@
 #endif
 #include <EGL/eglext.h>
 #include <GLES3/gl3.h>
+#include "tgfx/gpu/opengl/GLFunctions.h"
 #include "tgfx/gpu/opengl/GLRenderTarget.h"
 
 namespace tgfx {
@@ -79,8 +80,7 @@ std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
 #if defined(__ANDROID__) || defined(ANDROID)
   if (hardwareBuffer) {
     return tgfx::Surface::MakeFrom(hardwareBuffer->makeTexture(context));
-  }
-  if (nativeWindow) {
+  } else if (nativeWindow) {
     width = ANativeWindow_getWidth(nativeWindow);
     height = ANativeWindow_getHeight(nativeWindow);
   }
@@ -102,10 +102,11 @@ std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
   return Surface::MakeFrom(renderTarget);
 }
 
-void EGLWindow::onPresent(Context*, int64_t presentationTime) {
+void EGLWindow::onPresent(Context* context, int64_t presentationTime) {
 #if defined(__ANDROID__) || defined(ANDROID)
   if (hardwareBuffer) {
-    glFlush();
+    auto gl = GLFunctions::Get(context);
+    gl->flush();
     return;
   }
 #endif

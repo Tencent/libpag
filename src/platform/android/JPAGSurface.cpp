@@ -174,8 +174,14 @@ extern "C" PAG_API jobject JNICALL Java_org_libpag_PAGSurface_makeSnapshot(JNIEn
     LOGE("AndroidBitmap_lockPixels() failed ! error=%d", ret);
     return nullptr;
   }
+  AndroidBitmapInfo info;
+  AndroidBitmap_getInfo(env, newBitmap, &info);
+  int stride = info.stride;
+  if (stride == 0) {
+    stride = width * 4;
+  }
   bool status = surface->readPixels(pag::ColorType::RGBA_8888, pag::AlphaType::Premultiplied,
-                                    newBitmapPixels, width * 4);
+                                    newBitmapPixels, stride);
   if (!status) {
     LOGE("ReadPixels failed!");
   }
@@ -195,6 +201,9 @@ extern "C" JNIEXPORT jobject JNICALL Java_org_libpag_PAGSurface_MakeOffscreen(JN
   auto surface = PAGSurface::MakeFrom(drawable);
   if (surface == nullptr) {
     surface = PAGSurface::MakeOffscreen(width, height);
+  }
+  if (surface == nullptr) {
+    return nullptr;
   }
   static auto PAGSurface_Class = Global<jclass>(env, env->FindClass("org/libpag/PAGSurface"));
   static auto PAGSurface_Constructor = env->GetMethodID(PAGSurface_Class.get(), "<init>", "(J)V");

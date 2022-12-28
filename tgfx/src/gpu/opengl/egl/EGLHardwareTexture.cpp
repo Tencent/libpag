@@ -131,8 +131,10 @@ bool EGLHardwareTexture::readPixels(const ImageInfo& dstInfo, void* dstPixels, i
   if (!srcPixels) {
     return false;
   }
-  auto srcInfo = ImageInfo::Make(width(), height(), ColorType::RGBA_8888, AlphaType::Premultiplied,
-                                 static_cast<size_t>(width() * 4));
+  AHardwareBuffer_Desc desc;
+  HardwareBufferInterface::Describe(hardwareBuffer, &desc);
+  auto srcInfo = ImageInfo::Make(desc.width, desc.height, ColorType::RGBA_8888,
+                                 AlphaType::Premultiplied, desc.stride * 4);
   Bitmap bitmap(srcInfo, srcPixels);
   bitmap.readPixels(dstInfo, dstPixels);
   HardwareBufferInterface::Unlock(hardwareBuffer, nullptr);

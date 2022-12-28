@@ -178,6 +178,9 @@ Point GLTexture::getTextureCoord(float x, float y) const {
   return {x / static_cast<float>(width()), y / static_cast<float>(height())};
 }
 
+/**
+ * Overrides this method if the texture is backed by HardwareBuffer.
+ */
 bool GLTexture::readPixels(const ImageInfo&, void*, int, int) const {
   return false;
 }
