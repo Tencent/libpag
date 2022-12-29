@@ -178,16 +178,19 @@ export class VideoReader {
 
   public pause() {
     this.isPlaying = false;
-    if (this.videoEl!.paused) return;
-    this.videoEl?.pause();
+    if (!this.videoEl) return;
+    if (this.videoEl.paused) return;
+    this.videoEl.pause()
   }
 
   public stop() {
     this.isPlaying = false;
-    if (!this.videoEl!.paused) {
-      this.videoEl?.pause();
+
+    if (!this.videoEl) return;
+    if (!this.videoEl.paused) {
+      this.videoEl.pause();
     }
-    this.videoEl!.currentTime = 0;
+    this.videoEl.currentTime = 0;
   }
 
   public getError() {
