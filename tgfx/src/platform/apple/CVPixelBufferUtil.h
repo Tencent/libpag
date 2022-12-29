@@ -18,6 +18,7 @@
 
 #pragma once
 
+#import <CoreVideo/CoreVideo.h>
 #include "tgfx/core/ImageInfo.h"
 
 namespace tgfx {
