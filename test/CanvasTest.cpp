@@ -529,4 +529,112 @@ PAG_TEST(CanvasTest, updateMask) {
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/update_mask"));
   device->unlock();
 }
+
+/**
+ * 用例描述: 测试 filter mode
+ */
+PAG_TEST(CanvasTest, filterMode) {
+  auto device = GLDevice::Make();
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto codec = ImageCodec::MakeFrom("../resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(codec != nullptr);
+  auto texture = codec->makeBuffer()->makeTexture(context);
+  ASSERT_TRUE(texture != nullptr);
+  int width = texture->width() * 2;
+  int height = texture->height() * 2;
+  auto surface = Surface::Make(context, width, height);
+  auto canvas = surface->getCanvas();
+  canvas->setMatrix(Matrix::MakeScale(2.f));
+  canvas->drawTexture(texture, SamplingOptions(FilterMode::Nearest));
+  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/filter_mode_nearest"));
+  canvas->clear();
+  canvas->drawTexture(texture, SamplingOptions(FilterMode::Linear));
+  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/filter_mode_linear"));
+  device->unlock();
+}
+
+/**
+ * 用例描述: 测试 mipmap
+ */
+PAG_TEST(CanvasTest, mipmap) {
+  auto device = GLDevice::Make();
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = ImageCodec::MakeFrom("../resources/apitest/rotation.jpg");
+  ASSERT_TRUE(image != nullptr);
+  auto pixelBuffer = PixelBuffer::Make(image->width(), image->height(), false, false);
+  ASSERT_TRUE(pixelBuffer != nullptr);
+  Bitmap bitmap(pixelBuffer);
+  auto result = image->readPixels(pixelBuffer->info(), bitmap.writablePixels());
+  bitmap.reset();
+  ASSERT_TRUE(result);
+  auto texture = pixelBuffer->makeTexture(context);
+  ASSERT_TRUE(texture != nullptr);
+  auto textureMipMapped = pixelBuffer->makeMipMappedTexture(context);
+  ASSERT_TRUE(textureMipMapped != nullptr);
+  float scale = 0.03f;
+  auto width = image->width();
+  auto height = image->height();
+  auto imageWidth = static_cast<float>(width) * scale;
+  auto imageHeight = static_cast<float>(height) * scale;
+  auto imageMatrix = Matrix::MakeScale(scale);
+  auto surface =
+      Surface::Make(context, static_cast<int>(imageWidth), static_cast<int>(imageHeight));
+  auto canvas = surface->getCanvas();
+  canvas->setMatrix(imageMatrix);
+  // 绘制没有 mipmap 的 texture 时，使用 MipmapMode::Linear 会回退到 MipmapMode::None。
+  canvas->drawTexture(texture, SamplingOptions(FilterMode::Linear, MipMapMode::Linear));
+  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/mipmap_none"));
+  canvas->clear();
+  canvas->drawTexture(textureMipMapped, SamplingOptions(FilterMode::Linear, MipMapMode::Nearest));
+  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/mipmap_nearest"));
+  canvas->clear();
+  canvas->drawTexture(textureMipMapped, SamplingOptions(FilterMode::Linear, MipMapMode::Linear));
+  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/mipmap_linear"));
+  surface = Surface::Make(context, static_cast<int>(imageWidth * 4.f),
+                          static_cast<int>(imageHeight * 4.f));
+  canvas = surface->getCanvas();
+  Paint paint;
+  paint.setShader(Shader::MakeTextureShader(textureMipMapped, TileMode::Mirror, TileMode::Repeat,
+                                            SamplingOptions(FilterMode::Linear, MipMapMode::Linear))
+                      ->makeWithPreLocalMatrix(imageMatrix));
+  canvas->drawRect(
+      Rect::MakeWH(static_cast<float>(surface->width()), static_cast<float>(surface->height())),
+      paint);
+  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/mipmap_linear_texture_effect"));
+  device->unlock();
+}
+
+/**
+ * 用例描述: 测试 hardware buffer 的 mipmap
+ */
+PAG_TEST(CanvasTest, hardwareMipMap) {
+  auto device = GLDevice::Make();
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = ImageCodec::MakeFrom("../resources/apitest/rotation.jpg");
+  ASSERT_TRUE(image != nullptr);
+  auto pixelBuffer = PixelBuffer::Make(image->width(), image->height(), false);
+  ASSERT_TRUE(pixelBuffer != nullptr);
+  Bitmap bitmap(pixelBuffer);
+  auto result = image->readPixels(pixelBuffer->info(), bitmap.writablePixels());
+  bitmap.reset();
+  ASSERT_TRUE(result);
+  auto textureMipMapped = pixelBuffer->makeMipMappedTexture(context);
+  ASSERT_TRUE(textureMipMapped != nullptr);
+  float scale = 0.03f;
+  auto width = image->width();
+  auto height = image->height();
+  auto imageWidth = static_cast<float>(width) * scale;
+  auto imageHeight = static_cast<float>(height) * scale;
+  auto imageMatrix = Matrix::MakeScale(scale);
+  auto surface =
+      Surface::Make(context, static_cast<int>(imageWidth), static_cast<int>(imageHeight));
+  auto canvas = surface->getCanvas();
+  canvas->setMatrix(imageMatrix);
+  canvas->drawTexture(textureMipMapped, SamplingOptions(FilterMode::Linear, MipMapMode::Linear));
+  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/mipmap_linear_hardware"));
+  device->unlock();
+}
 }  // namespace tgfx

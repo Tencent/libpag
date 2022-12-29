@@ -140,15 +140,17 @@ void Canvas::drawRect(const Rect& rect, const Paint& paint) {
   drawPath(path, paint);
 }
 
-void Canvas::drawTexture(std::shared_ptr<Texture> texture, const Matrix& matrix) {
+void Canvas::drawTexture(std::shared_ptr<Texture> texture, const Matrix& matrix,
+                         SamplingOptions sampling) {
   auto oldMatrix = getMatrix();
   concat(matrix);
-  drawTexture(std::move(texture));
+  drawTexture(std::move(texture), sampling);
   setMatrix(oldMatrix);
 }
 
-void Canvas::drawTexture(std::shared_ptr<Texture> texture, const Paint* paint) {
-  drawTexture(std::move(texture), nullptr, paint);
+void Canvas::drawTexture(std::shared_ptr<Texture> texture, SamplingOptions sampling,
+                         const Paint* paint) {
+  drawTexture(std::move(texture), nullptr, sampling, paint);
 }
 
 static Paint CleanPaintForDrawTexture(const Paint* paint) {
@@ -161,7 +163,7 @@ static Paint CleanPaintForDrawTexture(const Paint* paint) {
 }
 
 void Canvas::drawTexture(std::shared_ptr<Texture> texture, const RGBAAALayout* layout,
-                         const Paint* paint) {
+                         SamplingOptions sampling, const Paint* paint) {
   auto realPaint = CleanPaintForDrawTexture(paint);
   std::shared_ptr<Texture> result;
   auto oldMatrix = getMatrix();
@@ -177,7 +179,7 @@ void Canvas::drawTexture(std::shared_ptr<Texture> texture, const RGBAAALayout* l
     texture = image;
     concat(Matrix::MakeTrans(offset.x, offset.y));
   }
-  drawTexture(std::move(texture), layout, realPaint);
+  drawTexture(std::move(texture), layout, sampling, realPaint);
   setMatrix(oldMatrix);
 }
 
@@ -359,7 +361,7 @@ Rect Canvas::clipLocalBounds(Rect localBounds) {
 }
 
 void Canvas::drawTexture(std::shared_ptr<Texture> texture, const RGBAAALayout* layout,
-                         const Paint& paint) {
+                         SamplingOptions sampling, const Paint& paint) {
   if (texture == nullptr) {
     return;
   }
@@ -369,7 +371,7 @@ void Canvas::drawTexture(std::shared_ptr<Texture> texture, const RGBAAALayout* l
   if (localBounds.isEmpty()) {
     return;
   }
-  auto processor = RGBAAATextureEffect::Make(texture, Matrix::I(), layout);
+  auto processor = RGBAAATextureEffect::Make(texture, sampling, Matrix::I(), layout);
   if (processor == nullptr) {
     return;
   }
@@ -488,7 +490,7 @@ void Canvas::drawMask(const Rect& bounds, std::shared_ptr<Texture> mask, GpuPain
   auto oldMatrix = state->matrix;
   resetMatrix();
   glPaint.coverageFragmentProcessors.emplace_back(FragmentProcessor::MulInputByChildAlpha(
-      RGBAAATextureEffect::Make(std::move(mask), maskLocalMatrix)));
+      RGBAAATextureEffect::Make(std::move(mask), SamplingOptions(), maskLocalMatrix)));
   auto op = FillRectOp::Make(glPaint.color, bounds, state->matrix, localMatrix);
   draw(std::move(op), std::move(glPaint));
   setMatrix(oldMatrix);
@@ -586,7 +588,7 @@ void Canvas::drawMaskGlyphs(TextBlob* textBlob, const Paint& paint) {
 }
 
 void Canvas::drawAtlas(std::shared_ptr<Texture> atlas, const Matrix matrix[], const Rect tex[],
-                       const Color colors[], size_t count) {
+                       const Color colors[], size_t count, SamplingOptions sampling) {
   if (atlas == nullptr || count == 0) {
     return;
   }
@@ -624,9 +626,9 @@ void Canvas::drawAtlas(std::shared_ptr<Texture> atlas, const Matrix matrix[], co
     GpuPaint glPaint;
     if (colors) {
       glPaint.coverageFragmentProcessors.emplace_back(
-          FragmentProcessor::MulInputByChildAlpha(RGBAAATextureEffect::Make(atlas)));
+          FragmentProcessor::MulInputByChildAlpha(RGBAAATextureEffect::Make(atlas, sampling)));
     } else {
-      glPaint.colorFragmentProcessors.emplace_back(RGBAAATextureEffect::Make(atlas));
+      glPaint.colorFragmentProcessors.emplace_back(RGBAAATextureEffect::Make(atlas, sampling));
     }
     draw(std::move(rectOp), std::move(glPaint), false);
   }

@@ -95,7 +95,7 @@ static std::vector<GLSampler> MakeTexturePlanes(Context* context, const YUVConfi
   for (int index = 0; index < yuvConfig.planeCount; index++) {
     auto w = yuvConfig.width >> factor[index];
     auto h = yuvConfig.height >> factor[index];
-    auto sampler = context->gpu()->createTexture(w, h, yuvConfig.formats[index]);
+    auto sampler = context->gpu()->createTexture(w, h, yuvConfig.formats[index], 1);
     if (sampler == nullptr) {
       for (auto& glSampler : texturePlanes) {
         context->gpu()->deleteTexture(&glSampler);
@@ -116,8 +116,10 @@ static void SubmitYUVTexture(Context* context, const YUVConfig& yuvConfig,
     auto h = yuvConfig.height >> factor[index];
     auto rowBytes = yuvConfig.rowBytes[index];
     auto pixels = yuvConfig.pixelsPlane[index];
-    context->gpu()->writePixels(
-        &sampler, Rect::MakeWH(static_cast<float>(w), static_cast<float>(h)), pixels, rowBytes);
+    auto format = yuvConfig.formats[index];
+    context->gpu()->writePixels(&sampler,
+                                Rect::MakeWH(static_cast<float>(w), static_cast<float>(h)), pixels,
+                                rowBytes, format);
   }
 }
 

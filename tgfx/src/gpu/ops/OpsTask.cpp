@@ -44,6 +44,9 @@ bool OpsTask::execute(Gpu* gpu) {
   for (auto& op : tempOps) {
     op->execute(opsRenderPass);
   }
+  if (renderTargetTexture) {
+    gpu->regenerateMipMapLevels(renderTargetTexture->getSampler());
+  }
   gpu->submit(opsRenderPass);
   return true;
 }

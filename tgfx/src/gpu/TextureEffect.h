@@ -39,11 +39,15 @@ class TextureEffect : public FragmentProcessor {
   struct Sampling;
 
   enum class ShaderMode {
-    None,  // Using HW mode
-    Clamp,
-    Repeat,
-    MirrorRepeat,
-    ClampToBorder
+    None,                 // Using HW mode
+    Clamp,                // Shader based clamp, no filter specialization
+    RepeatNearestNone,    // Simple repeat for nearest sampling, no mipmapping.
+    RepeatLinearNone,     // Filter the subset boundary for kRepeat mode, no mip mapping
+    RepeatLinearMipmap,   // Logic for linear filtering and LOD selection with kRepeat mode.
+    RepeatNearestMipmap,  // Logic for nearest filtering and LOD selection with kRepeat mode.
+    MirrorRepeat,         // Mirror repeat (doesn't depend on filter))
+    ClampToBorderNearest,
+    ClampToBorderLinear
   };
 
   TextureEffect(std::shared_ptr<Texture> texture, const Sampling& sampling,
@@ -63,7 +67,7 @@ class TextureEffect : public FragmentProcessor {
     return samplerState;
   }
 
-  static ShaderMode GetShaderMode(SamplerState::WrapMode mode);
+  static ShaderMode GetShaderMode(SamplerState::WrapMode mode, FilterMode filter, MipMapMode mm);
 
   std::shared_ptr<Texture> texture;
   SamplerState samplerState;

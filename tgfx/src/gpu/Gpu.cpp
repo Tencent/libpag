@@ -16,27 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/RenderTask.h"
-#include "gpu/ops/Op.h"
-#include "tgfx/gpu/Surface.h"
+#include "Gpu.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
-class OpsTask : public RenderTask {
- public:
-  OpsTask(std::shared_ptr<RenderTarget> renderTarget, std::shared_ptr<Texture> texture)
-      : RenderTask(std::move(renderTarget)), renderTargetTexture(std::move(texture)) {
+void Gpu::regenerateMipMapLevels(const TextureSampler* sampler) {
+  if (!sampler->mipMapped()) {
+    return;
   }
-
-  ~OpsTask() override;
-
-  void addOp(std::unique_ptr<Op> op);
-
-  bool execute(Gpu* gpu) override;
-
- private:
-  std::shared_ptr<Texture> renderTargetTexture = nullptr;
-  std::vector<std::unique_ptr<Op>> ops;
-};
+  onRegenerateMipMapLevels(sampler);
+}
 }  // namespace tgfx

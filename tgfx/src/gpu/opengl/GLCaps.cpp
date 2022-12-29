@@ -265,6 +265,7 @@ void GLCaps::initGLESSupport(const GLInfo& info) {
     clampToBorderSupport = false;
   }
   npotTextureTileSupport = version >= GL_VER(3, 0) || info.hasExtension("GL_OES_texture_npot");
+  mipMapSupport = npotTextureTileSupport || info.hasExtension("GL_IMG_texture_npot");
 }
 
 void GLCaps::initWebGLSupport(const GLInfo& info) {
@@ -279,12 +280,16 @@ void GLCaps::initWebGLSupport(const GLInfo& info) {
   semaphoreSupport = version >= GL_VER(2, 0);
   clampToBorderSupport = false;
   npotTextureTileSupport = version >= GL_VER(2, 0);
+  mipMapSupport = npotTextureTileSupport;
 }
 
 void GLCaps::initFormatMap(const GLInfo& info) {
   pixelFormatMap[PixelFormat::RGBA_8888].format.sizedFormat = GL_RGBA8;
   pixelFormatMap[PixelFormat::RGBA_8888].format.externalFormat = GL_RGBA;
   pixelFormatMap[PixelFormat::RGBA_8888].readSwizzle = Swizzle::RGBA();
+  pixelFormatMap[PixelFormat::BGRA_8888].format.sizedFormat = GL_BGRA8;
+  pixelFormatMap[PixelFormat::BGRA_8888].format.externalFormat = GL_BGRA;
+  pixelFormatMap[PixelFormat::BGRA_8888].readSwizzle = Swizzle::BGRA();
   if (textureRedSupport) {
     pixelFormatMap[PixelFormat::ALPHA_8].format.sizedFormat = GL_R8;
     pixelFormatMap[PixelFormat::ALPHA_8].format.externalFormat = GL_RED;

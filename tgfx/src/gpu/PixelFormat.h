@@ -22,15 +22,28 @@
 #include "tgfx/gpu/PixelFormat.h"
 
 namespace tgfx {
+static constexpr PixelFormat ColorTypeToPixelFormat(ColorType type) {
+  switch (type) {
+    case ColorType::ALPHA_8:
+      return PixelFormat::ALPHA_8;
+    case ColorType::RGBA_8888:
+      return PixelFormat::RGBA_8888;
+    case ColorType::BGRA_8888:
+      return PixelFormat::BGRA_8888;
+    default:
+      return PixelFormat::RGBA_8888;
+  }
+}
+
 static constexpr size_t PixelFormatBytesPerPixel(PixelFormat format) {
   switch (format) {
     case PixelFormat::ALPHA_8:
-      return 1;
     case PixelFormat::GRAY_8:
       return 1;
     case PixelFormat::RG_88:
       return 2;
     case PixelFormat::RGBA_8888:
+    case PixelFormat::BGRA_8888:
       return 4;
     default:
       return 0;
