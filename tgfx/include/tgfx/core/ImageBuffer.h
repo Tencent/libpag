@@ -56,7 +56,6 @@ class ImageBuffer {
 
   /**
    * Creates a new Texture with mip map levels capturing the pixels in this image buffer.
-   * If mip maps are not supported by the GPU, the texture will be created without mip maps.
    */
   virtual std::shared_ptr<Texture> makeMipMappedTexture(Context*) const {
     return nullptr;
