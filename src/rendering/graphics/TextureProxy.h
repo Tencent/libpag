@@ -63,6 +63,14 @@ class TextureProxy {
    */
   virtual std::shared_ptr<tgfx::Texture> getTexture(RenderCache* cache) const = 0;
 
+  virtual bool mipMapSupport() const {
+    return false;
+  }
+
+  virtual std::shared_ptr<tgfx::Texture> getMipMappedTexture(RenderCache*) const {
+    return nullptr;
+  }
+
  private:
   int _width = 0;
   int _height = 0;
