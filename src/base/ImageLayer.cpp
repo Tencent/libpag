@@ -36,8 +36,7 @@ bool ImageLayer::verify() const {
   VerifyAndReturn(imageBytes != nullptr);
 }
 
-Rect ImageLayer::getBounds() const {
-  return Rect::MakeWH(static_cast<float>(imageBytes->width),
-                      static_cast<float>(imageBytes->height));
+Point ImageLayer::getParentSize() const {
+  return Point::Make(static_cast<float>(imageBytes->width), static_cast<float>(imageBytes->height));
 }
 }  // namespace pag

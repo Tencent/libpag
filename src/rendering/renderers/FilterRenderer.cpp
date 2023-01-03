@@ -92,7 +92,8 @@ tgfx::Rect FilterRenderer::GetContentBounds(const FilterList* filterList,
     content->measureBounds(&contentBounds);
     contentBounds.roundOut();
   } else {
-    contentBounds = ToTGFX(filterList->layer->getBounds());
+    auto size = filterList->layer->getParentSize();
+    contentBounds = tgfx::Rect::MakeWH(size.x, size.y);
   }
   return contentBounds;
 }
@@ -120,7 +121,8 @@ void FilterRenderer::MeasureFilterBounds(tgfx::Rect* bounds, const FilterModifie
   if (filterList->processVisibleAreaOnly) {
     bounds->roundOut();
   } else {
-    *bounds = ToTGFX(filterList->layer->getBounds());
+    auto size = filterList->layer->getParentSize();
+    *bounds = tgfx::Rect::MakeWH(size.x, size.y);
   }
   TransformFilterBounds(bounds, filterList.get());
   if (filterList->useParentSizeInput) {

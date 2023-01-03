@@ -1656,7 +1656,7 @@ class PAG_API Layer {
   virtual bool verify() const;
   Point getMaxScaleFactor();
   TimeRange visibleRange();
-  virtual Rect getBounds() const;
+  virtual Point getParentSize() const;
 
  private:
   bool verifyExtra() const;
@@ -1696,7 +1696,7 @@ class PAG_API SolidLayer : public Layer {
 
   bool verify() const override;
 
-  Rect getBounds() const override;
+  Point getParentSize() const override;
 
   RTTR_ENABLE(Layer)
 };
@@ -1717,7 +1717,7 @@ class PAG_API TextLayer : public Layer {
   void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) override;
   bool verify() const override;
 
-  Rect getBounds() const override;
+  Point getParentSize() const override;
 
   std::shared_ptr<TextDocument> getTextDocument();
 
@@ -1737,7 +1737,7 @@ class PAG_API ShapeLayer : public Layer {
   void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) override;
   bool verify() const override;
 
-  Rect getBounds() const override;
+  Point getParentSize() const override;
 
   RTTR_ENABLE(Layer)
 };
@@ -1767,7 +1767,7 @@ class PAG_API ImageLayer : public Layer {
 
   bool verify() const override;
 
-  Rect getBounds() const override;
+  Point getParentSize() const override;
 
   RTTR_ENABLE(Layer)
 };
@@ -1792,7 +1792,7 @@ class PAG_API PreComposeLayer : public Layer {
   bool verify() const override;
   std::vector<TimeRange> getContentStaticTimeRanges() const;
   Frame getCompositionFrame(Frame layerFrame);
-  Rect getBounds() const override;
+  Point getParentSize() const override;
 
   RTTR_ENABLE(Layer)
 };

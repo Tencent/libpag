@@ -90,8 +90,8 @@ bool PreComposeLayer::verify() const {
   VerifyAndReturn(composition != nullptr);
 }
 
-Rect PreComposeLayer::getBounds() const {
-  return Rect::MakeWH(static_cast<float>(composition->width),
-                      static_cast<float>(composition->height));
+Point PreComposeLayer::getParentSize() const {
+  return Point::Make(static_cast<float>(composition->width),
+                     static_cast<float>(composition->height));
 }
 }  // namespace pag
