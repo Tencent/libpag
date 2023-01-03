@@ -23,7 +23,7 @@
 #include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace pag {
-static std::array<float, 9> ToGLMatrix(const tgfx::Matrix& matrix) {
+std::array<float, 9> ToGLMatrix(const tgfx::Matrix& matrix) {
   float values[9];
   matrix.get9(values);
   return {values[0], values[3], values[6], values[1], values[4],
@@ -183,7 +183,8 @@ unsigned CreateGLProgram(tgfx::Context* context, const std::string& vertex,
   return programHandle;
 }
 
-void ActiveGLTexture(tgfx::Context* context, int unitIndex, const tgfx::TextureSampler* sampler) {
+void ActiveGLTexture(tgfx::Context* context, int unitIndex, const tgfx::TextureSampler* sampler,
+                     int wrapMode) {
   if (sampler == nullptr) {
     return;
   }
@@ -191,8 +192,8 @@ void ActiveGLTexture(tgfx::Context* context, int unitIndex, const tgfx::TextureS
   auto gl = tgfx::GLFunctions::Get(context);
   gl->activeTexture(GL_TEXTURE0 + unitIndex);
   gl->bindTexture(glSampler->target, glSampler->id);
-  gl->texParameteri(glSampler->target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  gl->texParameteri(glSampler->target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  gl->texParameteri(glSampler->target, GL_TEXTURE_WRAP_S, wrapMode);
+  gl->texParameteri(glSampler->target, GL_TEXTURE_WRAP_T, wrapMode);
   gl->texParameteri(glSampler->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   gl->texParameteri(glSampler->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 }

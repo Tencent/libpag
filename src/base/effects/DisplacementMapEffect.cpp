@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "base/utils/MathUtil.h"
 #include "base/utils/Verify.h"
 #include "pag/file.h"
 
@@ -30,28 +31,32 @@ DisplacementMapEffect::~DisplacementMapEffect() {
   delete expandOutput;
 }
 
+static bool IsConst(Enum s) {
+  return s == DisplacementMapSource::Full || s == DisplacementMapSource::Half ||
+         s == DisplacementMapSource::Off;
+}
+
 bool DisplacementMapEffect::visibleAt(Frame layerFrame) const {
   if (displacementMapLayer == nullptr) {
     return false;
   }
-  // DisplacementMap特效只支持视频序列帧或者图片序列帧。
-  if (displacementMapLayer->type() == LayerType::PreCompose) {
-    auto preComposeLayer = static_cast<PreComposeLayer*>(displacementMapLayer);
-    auto composition = preComposeLayer->composition;
-    if (composition->type() == CompositionType::Video ||
-        composition->type() == CompositionType::Bitmap) {
-      auto mapContentFrame = layerFrame - displacementMapLayer->startTime;
-      if (mapContentFrame < 0 || mapContentFrame >= displacementMapLayer->duration) {
-        return false;
-      }
-      return maxHorizontalDisplacement->getValueAt(layerFrame) != 0 ||
-             maxVerticalDisplacement->getValueAt(layerFrame) != 0;
-    }
+  auto mapContentFrame = layerFrame - displacementMapLayer->startTime;
+  if (mapContentFrame < 0 || mapContentFrame >= displacementMapLayer->duration) {
+    return false;
   }
-  return false;
+  return !((IsConst(useForHorizontalDisplacement->getValueAt(layerFrame)) &&
+            IsConst(useForVerticalDisplacement->getValueAt(layerFrame))) ||
+           (FloatNearlyZero(maxHorizontalDisplacement->getValueAt(layerFrame)) &&
+            FloatNearlyZero(maxVerticalDisplacement->getValueAt(layerFrame))));
 }
 
-void DisplacementMapEffect::transformBounds(Rect*, const Point&, Frame) const {
+void DisplacementMapEffect::transformBounds(Rect* contentBounds, const Point&,
+                                            Frame layerFrame) const {
+  if (expandOutput->getValueAt(layerFrame)) {
+    auto horizontal = maxHorizontalDisplacement->getValueAt(layerFrame);
+    auto vertical = maxVerticalDisplacement->getValueAt(layerFrame);
+    contentBounds->outset(std::abs(horizontal), std::abs(vertical));
+  }
 }
 
 void DisplacementMapEffect::excludeVaryingRanges(std::vector<pag::TimeRange>* timeRanges) const {
