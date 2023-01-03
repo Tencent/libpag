@@ -289,9 +289,18 @@ export class PAGPlayer {
     this.isDestroyed = true;
   }
   /**
-   * Binding video-reader to PAGPlayer.
+   * Link VideoReader to PAGPlayer.
    */
-  public bindingVideoReader(videoReader: VideoReader) {
+  public linkVideoReader(videoReader: VideoReader) {
     this.videoReaders.push(videoReader);
+  }
+  /**
+   * Unlink VideoReader from PAGPlayer.
+   */
+  public unlinkVideoReader(videoReader: VideoReader) {
+    const index = this.videoReaders.indexOf(videoReader);
+    if (index !== -1) {
+      this.videoReaders.splice(index, 1);
+    }
   }
 }

@@ -10,6 +10,7 @@ import { PAGModule } from '../pag-module';
 
 import type { EmscriptenGL } from '../types';
 import type { TimeRange } from '../interfaces';
+import type { PAGPlayer } from '../pag-player';
 
 const UHD_RESOLUTION = 3840;
 
@@ -62,6 +63,7 @@ export class VideoReader {
   private staticTimeRanges: StaticTimeRanges;
   private disablePlaybackRate = false;
   private error: any = null;
+  private player: PAGPlayer | null = null;
 
   public constructor(
     mp4Data: Uint8Array,
@@ -87,21 +89,17 @@ export class VideoReader {
     if (UHD_RESOLUTION < width || UHD_RESOLUTION < height) {
       this.disablePlaybackRate = true;
     }
-    PAGModule.currentPlayer?.bindingVideoReader(this);
+    this.linkPlayer(PAGModule.currentPlayer);
   }
 
   public async prepare(targetFrame: number, playbackRate: number) {
     this.setError(null); // reset error
     this.isSought = false; // reset seek status
-    if (!this.videoEl) {
-      this.setError(new Error("Video element doesn't exist!"));
-      return;
-    }
-    const { currentTime } = this.videoEl;
+    const { currentTime } = this.videoEl!;
     const targetTime = targetFrame / this.frameRate;
     if (currentTime === 0 && targetTime === 0) {
       if (!this.canplay && !APPLE) {
-        await waitVideoCanPlay(this.videoEl);
+        await waitVideoCanPlay(this.videoEl!);
       } else {
         await this.play();
         await new Promise<void>((resolve) => {
@@ -129,11 +127,11 @@ export class VideoReader {
     }
 
     const targetPlaybackRate = Math.min(Math.max(playbackRate, VIDEO_PLAYBACK_RATE_MIN), VIDEO_PLAYBACK_RATE_MAX);
-    if (!this.disablePlaybackRate && this.videoEl.playbackRate !== targetPlaybackRate) {
-      this.videoEl.playbackRate = targetPlaybackRate;
+    if (!this.disablePlaybackRate && this.videoEl!.playbackRate !== targetPlaybackRate) {
+      this.videoEl!.playbackRate = targetPlaybackRate;
     }
 
-    if (this.isPlaying && this.videoEl.paused) {
+    if (this.isPlaying && this.videoEl!.paused) {
       try {
         await this.play();
       } catch (e) {
@@ -156,10 +154,7 @@ export class VideoReader {
   }
 
   public async play() {
-    if (!this.videoEl) {
-      throw new Error("Video element doesn't exist!");
-    }
-    if (!this.videoEl.paused) return;
+    if (!this.videoEl!.paused) return;
     if (WECHAT && window.WeixinJSBridge) {
       await getWechatNetwork();
     }
@@ -195,11 +190,11 @@ export class VideoReader {
   }
 
   public onDestroy() {
-    if (!this.videoEl) {
-      throw new Error("Video element doesn't exist!");
+    if (this.player) {
+      this.player.unlinkVideoReader(this);
     }
-    removeAllListeners(this.videoEl, 'playing');
-    removeAllListeners(this.videoEl, 'timeupdate');
+    removeAllListeners(this.videoEl!, 'playing');
+    removeAllListeners(this.videoEl!, 'timeupdate');
     this.videoEl = null;
   }
 
@@ -257,6 +252,13 @@ export class VideoReader {
 
   private setError(e: any) {
     this.error = e;
+  }
+
+  private linkPlayer(player: PAGPlayer | null) {
+    this.player = player;
+    if (player) {
+      player.linkVideoReader(this);
+    }
   }
 }
 
