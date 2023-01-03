@@ -4,13 +4,11 @@ import { PAGView as NativePAGView } from '../pag-view';
 import { RenderCanvas } from '../core/render-canvas';
 import { BackendContext } from '../core/backend-context';
 import { destroyVerify, wasmAwaitRewind } from '../utils/decorators';
-import { PAGViewListenerEvent } from '../types';
 
 import type { PAGComposition } from '../pag-composition';
 import type { wx } from './interfaces';
 
 declare const wx: wx;
-declare const setInterval: (callback: () => void, ms: number) => number;
 
 export interface PAGViewOptions {
   /**
@@ -120,11 +118,7 @@ export class PAGView extends NativePAGView {
   }
 
   protected override getNowTime() {
-    try {
-      return wx.getPerformance().now();
-    } catch (e) {
-      return Date.now();
-    }
+    return Date.now();
   }
 
   protected override clearTimer() {

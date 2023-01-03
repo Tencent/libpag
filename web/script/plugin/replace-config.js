@@ -280,7 +280,7 @@ export const replaceFunctionConfig = [
     name: 'replace performance',
     type: 'string',
     start: 'performance.now();',
-    replaceStr: 'wx.getPerformance().now();',
+    replaceStr: 'Date.now();',
   },
   {
     name: 'replace libpag.wasm name',
