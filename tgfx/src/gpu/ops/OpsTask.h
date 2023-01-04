@@ -29,7 +29,7 @@ class OpsTask : public RenderTask {
       : RenderTask(std::move(renderTarget)), renderTargetTexture(std::move(texture)) {
   }
 
-  ~OpsTask();
+  ~OpsTask() override;
 
   void addOp(std::unique_ptr<Op> op);
 

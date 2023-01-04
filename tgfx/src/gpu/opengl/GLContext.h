@@ -48,8 +48,6 @@ class GLContext : public Context {
 
   void resetState() override;
 
-  void bindTexture(int unitIndex, const TextureSampler* sampler, SamplerState sampleState = {});
-
  private:
   const GLInterface* glInterface = nullptr;
 

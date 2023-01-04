@@ -65,8 +65,8 @@ class CGTypeface : public Typeface {
   bool getGlyphPath(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
                     Path* path) const override;
 
-  std::shared_ptr<TextureBuffer> getGlyphImage(GlyphID glyphID, float size, bool fauxBold,
-                                               bool fauxItalic, Matrix* matrix) const override;
+  std::shared_ptr<ImageBuffer> getGlyphImage(GlyphID glyphID, float size, bool fauxBold,
+                                             bool fauxItalic, Matrix* matrix) const override;
 
   float getGlyphAdvance(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
                         bool verticalText) const override;

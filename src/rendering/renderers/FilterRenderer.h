@@ -67,5 +67,8 @@ class FilterRenderer {
                                                  RenderCache* renderCache,
                                                  tgfx::Rect* contentBounds,
                                                  const tgfx::Rect& clipRect);
+
+  static std::shared_ptr<Graphic> GetDisplacementMapGraphic(const FilterList* filterList,
+                                                            Layer* mapLayer);
 };
 }  // namespace pag

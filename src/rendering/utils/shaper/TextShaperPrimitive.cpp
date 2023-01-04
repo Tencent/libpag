@@ -33,17 +33,22 @@ PositionedGlyphs TextShaperPrimitive::Shape(const std::string& text,
     auto length = textStart - oldPosition;
     auto str = std::string(oldPosition, length);
     auto glyphID = typeface->getGlyphID(str);
+    bool found = false;
     if (glyphID == 0) {
       for (const auto& faceHolder : fallbackTypefaces) {
         auto face = faceHolder->getTypeface();
         glyphID = face->getGlyphID(str);
         if (glyphID != 0) {
           glyphs.emplace_back(std::move(face), glyphID, oldPosition - &(text[0]));
+          found = true;
           break;
         }
       }
+      if (!found) {
+        glyphs.emplace_back(typeface, glyphID, oldPosition - &(text[0]));
+      }
     } else {
-      glyphs.emplace_back(typeface, typeface->getGlyphID(str), oldPosition - &(text[0]));
+      glyphs.emplace_back(typeface, glyphID, oldPosition - &(text[0]));
     }
   }
   return PositionedGlyphs(glyphs);

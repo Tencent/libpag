@@ -25,9 +25,10 @@
 
 namespace tgfx {
 /**
- * Bitmap is a low level class which provides convenience functions to access raster destinations,
- * which provides a utility to convert the format of pixels from one to another or compress the
- * pixels into a image file.
+ * Bitmap is a low-level class that provides convenience functions to access raster destinations,
+ * which can convert the format of pixels from one to another or compress the pixels into an encoded
+ * file. Bitmap does not try to manage the lifetime of the pixel memory. Use PixelBuffer to manage
+ * pixel memory.
  */
 class Bitmap {
  public:

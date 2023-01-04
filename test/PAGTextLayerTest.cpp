@@ -328,7 +328,7 @@ PAG_TEST_F(PAGTextLayerTest, TextAnimatorSmooth_ID863204817) {
 PAG_TEST_F(PAGTextLayerTest, TextBounds) {
   auto pagFile = PAGFile::Load("../assets/test2.pag");
   auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
-  auto pagPlayer = new PAGPlayer();
+  auto pagPlayer = std::make_unique<PAGPlayer>();
   pagPlayer->setComposition(pagFile);
   pagPlayer->setSurface(pagSurface);
   pagPlayer->setProgress(0.5f);
@@ -371,8 +371,6 @@ PAG_TEST_F(PAGTextLayerTest, TextBounds) {
   bounds.round();
   defaultBounds = Rect::MakeXYWH(468, 1549, 148, 155);
   EXPECT_TRUE(bounds == defaultBounds);
-
-  delete pagPlayer;
 }
 
 /**

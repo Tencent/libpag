@@ -16,21 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/images/png/PngImage.h"
+#include "core/codecs/png/PngCodec.h"
 #include "png.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Buffer.h"
 
 namespace tgfx {
-std::shared_ptr<ImageCodec> PngImage::MakeFrom(const std::string& filePath) {
+std::shared_ptr<ImageCodec> PngCodec::MakeFrom(const std::string& filePath) {
   return MakeFromData(filePath, nullptr);
 }
 
-std::shared_ptr<ImageCodec> PngImage::MakeFrom(std::shared_ptr<Data> imageBytes) {
+std::shared_ptr<ImageCodec> PngCodec::MakeFrom(std::shared_ptr<Data> imageBytes) {
   return MakeFromData("", std::move(imageBytes));
 }
 
-bool PngImage::IsPng(const std::shared_ptr<Data>& data) {
+bool PngCodec::IsPng(const std::shared_ptr<Data>& data) {
   constexpr png_byte png_signature[8] = {137, 80, 78, 71, 13, 10, 26, 10};
   return data->size() >= 8 && !memcmp(data->bytes(), &png_signature[0], 8);
 }
@@ -113,7 +113,7 @@ class ReadInfo {
   unsigned char* data = nullptr;
 };
 
-std::shared_ptr<ImageCodec> PngImage::MakeFromData(const std::string& filePath,
+std::shared_ptr<ImageCodec> PngCodec::MakeFromData(const std::string& filePath,
                                                    std::shared_ptr<Data> byteData) {
   auto readInfo = ReadInfo::Make(filePath, byteData);
   if (readInfo == nullptr) {
@@ -124,7 +124,7 @@ std::shared_ptr<ImageCodec> PngImage::MakeFromData(const std::string& filePath,
   if (w == 0 || h == 0) {
     return nullptr;
   }
-  return std::shared_ptr<ImageCodec>(new PngImage(static_cast<int>(w), static_cast<int>(h),
+  return std::shared_ptr<ImageCodec>(new PngCodec(static_cast<int>(w), static_cast<int>(h),
                                                   Orientation::TopLeft, filePath,
                                                   std::move(byteData)));
 }
@@ -154,7 +154,7 @@ static void UpdateReadInfo(png_structp p, png_infop pi) {
   png_read_update_info(p, pi);
 }
 
-bool PngImage::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
+bool PngCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   auto readInfo = ReadInfo::Make(filePath, fileData);
   if (readInfo == nullptr) {
     return false;
@@ -207,7 +207,7 @@ static void png_reader_write_data(png_structp png_ptr, png_bytep data, png_size_
   writer->length += length;
 }
 
-std::shared_ptr<Data> PngImage::Encode(const ImageInfo& imageInfo, const void* pixels,
+std::shared_ptr<Data> PngCodec::Encode(const ImageInfo& imageInfo, const void* pixels,
                                        EncodedFormat, int) {
   auto srcPixels = static_cast<png_bytep>(const_cast<void*>((pixels)));
   uint8_t* alphaPixels = nullptr;

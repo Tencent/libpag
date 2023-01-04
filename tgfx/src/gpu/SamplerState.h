@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "tgfx/core/SamplingOptions.h"
 #include "tgfx/core/TileMode.h"
 
 namespace tgfx {
@@ -37,15 +38,26 @@ class SamplerState {
 
   explicit SamplerState(TileMode tileMode);
 
-  SamplerState(TileMode tileModeX, TileMode tileModeY);
+  SamplerState(TileMode tileModeX, TileMode tileModeY, SamplingOptions sampling);
 
-  SamplerState(WrapMode wrapModeX, WrapMode wrapModeY)
-      : wrapModeX(wrapModeX), wrapModeY(wrapModeY) {
+  SamplerState(WrapMode wrapModeX, WrapMode wrapModeY, FilterMode filterMode = FilterMode::Linear,
+               MipMapMode mipMapMode = MipMapMode::None)
+      : wrapModeX(wrapModeX), wrapModeY(wrapModeY), filterMode(filterMode), mipMapMode(mipMapMode) {
+  }
+
+  explicit SamplerState(SamplingOptions sampling)
+      : filterMode(sampling.filterMode), mipMapMode(sampling.mipMapMode) {
+  }
+
+  bool mipMapped() const {
+    return mipMapMode != MipMapMode::None;
   }
 
   friend bool operator==(const SamplerState& a, const SamplerState& b);
 
   WrapMode wrapModeX = WrapMode::Clamp;
   WrapMode wrapModeY = WrapMode::Clamp;
+  FilterMode filterMode = FilterMode::Linear;
+  MipMapMode mipMapMode = MipMapMode::None;
 };
 }  // namespace tgfx

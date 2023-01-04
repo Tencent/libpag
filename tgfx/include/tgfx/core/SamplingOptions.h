@@ -18,41 +18,42 @@
 
 #pragma once
 
-#include "Texture.h"
-
 namespace tgfx {
-/**
- * A TextureBuffer contains an array of fully processed pixels, suitable for immediate texture
- * uploading on the GPU.
- */
-class TextureBuffer {
- public:
-  virtual ~TextureBuffer() = default;
+enum class FilterMode {
   /**
-   * Returns the width of the texture buffer.
+   * Single sample point (nearest neighbor)
    */
-  int width() const {
-    return _width;
-  }
+  Nearest,
 
   /**
-   * Returns the height of the texture buffer.
+   * Interpolate between 2x2 sample points (bi-linear interpolation)
    */
-  int height() const {
-    return _height;
-  }
+  Linear,
+};
 
+enum class MipMapMode {
   /**
-   * Creates a new Texture capturing the pixels in this texture buffer.
+   * ignore mipmap levels, sample from the "base"
    */
-  virtual std::shared_ptr<Texture> makeTexture(Context* context) const = 0;
+  None,
+  /**
+   * Sample from the nearest level
+   */
+  Nearest,
+  /**
+   * Interpolate between the two nearest levels
+   */
+  Linear,
+};
 
- protected:
-  TextureBuffer(int width, int height) : _width(width), _height(height) {
+struct SamplingOptions {
+  SamplingOptions() = default;
+
+  explicit SamplingOptions(FilterMode filterMode, MipMapMode mipMapMode = MipMapMode::None)
+      : filterMode(filterMode), mipMapMode(mipMapMode) {
   }
 
- private:
-  int _width = 0;
-  int _height = 0;
+  const FilterMode filterMode = FilterMode::Linear;
+  const MipMapMode mipMapMode = MipMapMode::None;
 };
 }  // namespace tgfx

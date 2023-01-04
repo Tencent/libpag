@@ -19,13 +19,13 @@
 #pragma once
 
 #include "tgfx/core/ImageInfo.h"
-#include "tgfx/gpu/TextureBuffer.h"
+#include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
 /**
  * PixelBuffer describes a two dimensional array of pixels which is optimized for creating textures.
  */
-class PixelBuffer : public TextureBuffer {
+class PixelBuffer : public ImageBuffer {
  public:
   /**
    * Creates a new PixelBuffer object width specified width and height. Returns nullptr if width or
@@ -106,7 +106,7 @@ class PixelBuffer : public TextureBuffer {
   const ImageInfo _info = {};
 
   explicit PixelBuffer(const ImageInfo& info)
-      : TextureBuffer(info.width(), info.height()), _info(info) {
+      : ImageBuffer(info.width(), info.height()), _info(info) {
   }
 
  private:

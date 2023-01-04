@@ -1,6 +1,6 @@
 {
   "name": "libpag-lite",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Portable Animated Graphics lite.",
   "main": "lib/pag.cjs.js",
   "module": "lib/pag.esm.js",

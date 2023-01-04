@@ -179,23 +179,25 @@ void GLOpsRenderPass::bindVerticesAndIndices(std::vector<float> vertices,
 static const unsigned gPrimitiveType[] = {GL_TRIANGLES, GL_TRIANGLE_STRIP};
 
 void GLOpsRenderPass::draw(PrimitiveType primitiveType, int baseVertex, int vertexCount) {
-  draw([&]() {
+  auto func = [&]() {
     auto gl = GLFunctions::Get(_context);
     gl->drawArrays(gPrimitiveType[static_cast<int>(primitiveType)], baseVertex, vertexCount);
-  });
+  };
+  draw(func);
 }
 
 void GLOpsRenderPass::drawIndexed(PrimitiveType primitiveType, int baseIndex, int indexCount) {
-  draw([&]() {
+  auto func = [&]() {
     auto gl = GLFunctions::Get(_context);
     gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, _indexBuffer->bufferID());
     gl->drawElements(gPrimitiveType[static_cast<int>(primitiveType)], indexCount, GL_UNSIGNED_SHORT,
                      reinterpret_cast<void*>(baseIndex * sizeof(uint16_t)));
     gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-  });
+  };
+  draw(func);
 }
 
-void GLOpsRenderPass::draw(std::function<void()> func) {
+void GLOpsRenderPass::draw(const std::function<void()>& func) {
   auto gl = GLFunctions::Get(_context);
   if (vertex->array > 0) {
     gl->bindVertexArray(vertex->array);

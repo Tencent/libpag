@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "HardwareBuffer.h"
-#include "core/utils/USE.h"
 #include "CVPixelBufferUtil.h"
+#include "gpu/Gpu.h"
 
 namespace tgfx {
 static std::mutex cacheLocker = {};
@@ -26,13 +26,13 @@ static std::unordered_map<CVPixelBufferRef, std::weak_ptr<HardwareBuffer>> hardw
 
 std::shared_ptr<HardwareBuffer> HardwareBuffer::Make(int width, int height, bool alphaOnly) {
 #if TARGET_IPHONE_SIMULATOR
-    
+
   // We cannot bind CVPixelBuffer to GL on iOS simulator.
   USE(width);
   USE(height);
   USE(alphaOnly);
   return nullptr;
-    
+
 #else
 
   if (width == 0 || height == 0) {
@@ -62,11 +62,11 @@ std::shared_ptr<HardwareBuffer> HardwareBuffer::Make(int width, int height, bool
 
 std::shared_ptr<HardwareBuffer> HardwareBuffer::MakeFrom(CVPixelBufferRef pixelBuffer) {
 #if TARGET_IPHONE_SIMULATOR
-    
+
   // We cannot bind CVPixelBuffer to GL on iOS simulator.
   USE(pixelBuffer);
   return nullptr;
-    
+
 #else
 
   if (pixelBuffer == nil) {
@@ -88,7 +88,7 @@ std::shared_ptr<HardwareBuffer> HardwareBuffer::MakeFrom(CVPixelBufferRef pixelB
   auto hardwareBuffer = std::shared_ptr<HardwareBuffer>(new HardwareBuffer(pixelBuffer));
   hardwareBufferMap[pixelBuffer] = hardwareBuffer;
   return hardwareBuffer;
-    
+
 #endif
 }
 
@@ -116,4 +116,23 @@ std::shared_ptr<Texture> HardwareBuffer::makeTexture(Context* context) const {
   return Texture::MakeFrom(context, pixelBuffer);
 }
 
+std::shared_ptr<Texture> HardwareBuffer::makeMipMappedTexture(Context* context) const {
+  bool alphaOnly = CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_OneComponent8;
+  auto texture =
+      Texture::Make(context, width(), height(), nullptr, 0, ImageOrigin::TopLeft, alphaOnly, true);
+  if (texture == nullptr) {
+    return nullptr;
+  }
+  CVPixelBufferLockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
+  if (auto* pixels = CVPixelBufferGetBaseAddress(pixelBuffer)) {
+    auto rect = Rect::MakeWH(static_cast<float>(width()), static_cast<float>(height()));
+    context->gpu()->writePixels(texture->getSampler(), rect, pixels,
+                                CVPixelBufferGetBytesPerRow(pixelBuffer), PixelFormat::BGRA_8888);
+    context->gpu()->regenerateMipMapLevels(texture->getSampler());
+  } else {
+    texture = nullptr;
+  }
+  CVPixelBufferUnlockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
+  return texture;
 }
+}  // namespace tgfx

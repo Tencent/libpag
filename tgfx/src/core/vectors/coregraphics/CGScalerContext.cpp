@@ -281,7 +281,7 @@ bool CGScalerContext::generatePath(GlyphID glyphID, Path* path) {
   return true;
 }
 
-std::shared_ptr<TextureBuffer> CGScalerContext::generateImage(GlyphID glyphID, Matrix* matrix) {
+std::shared_ptr<ImageBuffer> CGScalerContext::generateImage(GlyphID glyphID, Matrix* matrix) {
   CGRect cgBounds;
   CTFontGetBoundingRectsForGlyphs(ctFont, kCTFontOrientationHorizontal, &glyphID, &cgBounds, 1);
   cgBounds = CGRectApplyAffineTransform(cgBounds, transform);

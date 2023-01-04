@@ -26,7 +26,9 @@ std::unique_ptr<Gpu> GLGpu::Make(Context* context) {
   return std::unique_ptr<GLGpu>(new GLGpu(context));
 }
 
-std::unique_ptr<TextureSampler> GLGpu::createTexture(int width, int height, PixelFormat format) {
+std::unique_ptr<TextureSampler> GLGpu::createTexture(int width, int height, PixelFormat format,
+                                                     int mipLevelCount) {
+  DEBUG_ASSERT(mipLevelCount > 0);
   auto gl = GLFunctions::Get(_context);
   auto sampler = std::make_unique<GLSampler>();
   gl->genTextures(1, &(sampler->id));
@@ -35,15 +37,24 @@ std::unique_ptr<TextureSampler> GLGpu::createTexture(int width, int height, Pixe
   }
   sampler->target = GL_TEXTURE_2D;
   sampler->format = format;
+  sampler->maxMipMapLevel = mipLevelCount - 1;
   gl->bindTexture(sampler->target, sampler->id);
   gl->texParameteri(sampler->target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   gl->texParameteri(sampler->target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
   gl->texParameteri(sampler->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   gl->texParameteri(sampler->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   const auto& textureFormat = GLCaps::Get(_context)->getTextureFormat(format);
-  gl->texImage2D(sampler->target, 0, static_cast<int>(textureFormat.internalFormatTexImage), width,
-                 height, 0, textureFormat.externalFormat, GL_UNSIGNED_BYTE, nullptr);
-  if (!CheckGLError(_context)) {
+  bool success = true;
+  for (int level = 0; level < mipLevelCount && success; level++) {
+    const int twoToTheMipLevel = 1 << level;
+    const int currentWidth = std::max(1, width / twoToTheMipLevel);
+    const int currentHeight = std::max(1, height / twoToTheMipLevel);
+    gl->texImage2D(sampler->target, level, static_cast<int>(textureFormat.internalFormatTexImage),
+                   currentWidth, currentHeight, 0, textureFormat.externalFormat, GL_UNSIGNED_BYTE,
+                   nullptr);
+    success = CheckGLError(_context);
+  }
+  if (!success) {
     gl->deleteTextures(1, &(sampler->id));
     return nullptr;
   }
@@ -60,7 +71,7 @@ void GLGpu::deleteTexture(TextureSampler* sampler) {
 }
 
 void GLGpu::writePixels(const TextureSampler* sampler, Rect rect, const void* pixels,
-                        size_t rowBytes) {
+                        size_t rowBytes, PixelFormat pixelFormat) {
   if (sampler == nullptr) {
     return;
   }
@@ -68,8 +79,8 @@ void GLGpu::writePixels(const TextureSampler* sampler, Rect rect, const void* pi
   auto caps = GLCaps::Get(_context);
   auto glSampler = static_cast<const GLSampler*>(sampler);
   gl->bindTexture(glSampler->target, glSampler->id);
-  const auto& format = caps->getTextureFormat(glSampler->format);
-  auto bytesPerPixel = PixelFormatBytesPerPixel(glSampler->format);
+  const auto& format = caps->getTextureFormat(pixelFormat);
+  auto bytesPerPixel = PixelFormatBytesPerPixel(pixelFormat);
   gl->pixelStorei(GL_UNPACK_ALIGNMENT, static_cast<int>(bytesPerPixel));
   int x = static_cast<int>(rect.x());
   int y = static_cast<int>(rect.y());
@@ -93,6 +104,77 @@ void GLGpu::writePixels(const TextureSampler* sampler, Rect rect, const void* pi
       }
     }
   }
+}
+
+static int FilterToGLMagFilter(FilterMode filterMode) {
+  switch (filterMode) {
+    case FilterMode::Nearest:
+      return GL_NEAREST;
+    case FilterMode::Linear:
+      return GL_LINEAR;
+  }
+}
+
+static int FilterToGLMinFilter(FilterMode filterMode, MipMapMode mipMapMode) {
+  switch (mipMapMode) {
+    case MipMapMode::None:
+      return FilterToGLMagFilter(filterMode);
+    case MipMapMode::Nearest:
+      switch (filterMode) {
+        case FilterMode::Nearest:
+          return GL_NEAREST_MIPMAP_NEAREST;
+        case FilterMode::Linear:
+          return GL_LINEAR_MIPMAP_NEAREST;
+      }
+    case MipMapMode::Linear:
+      switch (filterMode) {
+        case FilterMode::Nearest:
+          return GL_NEAREST_MIPMAP_LINEAR;
+        case FilterMode::Linear:
+          return GL_LINEAR_MIPMAP_LINEAR;
+      }
+  }
+}
+
+static int GetGLWrap(unsigned target, SamplerState::WrapMode wrapMode) {
+  if (target == GL_TEXTURE_RECTANGLE) {
+    if (wrapMode == SamplerState::WrapMode::ClampToBorder) {
+      return GL_CLAMP_TO_BORDER;
+    } else {
+      return GL_CLAMP_TO_EDGE;
+    }
+  }
+  switch (wrapMode) {
+    case SamplerState::WrapMode::Clamp:
+      return GL_CLAMP_TO_EDGE;
+    case SamplerState::WrapMode::Repeat:
+      return GL_REPEAT;
+    case SamplerState::WrapMode::MirrorRepeat:
+      return GL_MIRRORED_REPEAT;
+    case SamplerState::WrapMode::ClampToBorder:
+      return GL_CLAMP_TO_BORDER;
+  }
+}
+
+void GLGpu::bindTexture(int unitIndex, const TextureSampler* sampler, SamplerState samplerState) {
+  if (sampler == nullptr) {
+    return;
+  }
+  auto glSampler = static_cast<const GLSampler*>(sampler);
+  auto gl = GLFunctions::Get(_context);
+  gl->activeTexture(GL_TEXTURE0 + unitIndex);
+  gl->bindTexture(glSampler->target, glSampler->id);
+  gl->texParameteri(glSampler->target, GL_TEXTURE_WRAP_S,
+                    GetGLWrap(glSampler->target, samplerState.wrapModeX));
+  gl->texParameteri(glSampler->target, GL_TEXTURE_WRAP_T,
+                    GetGLWrap(glSampler->target, samplerState.wrapModeY));
+  if (samplerState.mipMapped() && (!_context->caps()->mipMapSupport || !glSampler->mipMapped())) {
+    samplerState.mipMapMode = MipMapMode::None;
+  }
+  gl->texParameteri(glSampler->target, GL_TEXTURE_MIN_FILTER,
+                    FilterToGLMinFilter(samplerState.filterMode, samplerState.mipMapMode));
+  gl->texParameteri(glSampler->target, GL_TEXTURE_MAG_FILTER,
+                    FilterToGLMagFilter(samplerState.filterMode));
 }
 
 void GLGpu::copyRenderTargetToTexture(RenderTarget* renderTarget, Texture* texture,
@@ -154,5 +236,15 @@ OpsRenderPass* GLGpu::getOpsRenderPass(std::shared_ptr<RenderTarget> renderTarge
 
 void GLGpu::submit(OpsRenderPass*) {
   opsRenderPass->reset();
+}
+
+void GLGpu::onRegenerateMipMapLevels(const TextureSampler* sampler) {
+  auto gl = GLFunctions::Get(_context);
+  auto glSampler = static_cast<const GLSampler*>(sampler);
+  if (glSampler->target != GL_TEXTURE_2D) {
+    return;
+  }
+  gl->bindTexture(glSampler->target, glSampler->id);
+  gl->generateMipmap(glSampler->target);
 }
 }  // namespace tgfx

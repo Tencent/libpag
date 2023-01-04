@@ -32,8 +32,12 @@ size_t Snapshot::memoryUsage() const {
   } else {
     bytesPerPixels = texture->getSampler()->format == tgfx::PixelFormat::ALPHA_8 ? 1 : 4;
   }
+  float mipMapFactor = 1.f;
+  if (texture->getSampler()->mipMapped()) {
+    mipMapFactor += 1.f / 3.f;
+  }
   return static_cast<size_t>(static_cast<float>(texture->width() * texture->height()) *
-                             bytesPerPixels);
+                             bytesPerPixels * mipMapFactor);
 }
 
 bool Snapshot::hitTest(RenderCache* cache, float x, float y) const {

@@ -36,9 +36,14 @@ class TextureSampler {
    * The pixel format of the sampler.
    */
   PixelFormat format = PixelFormat::RGBA_8888;
+  int maxMipMapLevel = 0;
 
   virtual TextureType type() const {
     return TextureType::TwoD;
+  }
+
+  bool mipMapped() const {
+    return maxMipMapLevel > 0;
   }
 
  protected:

@@ -16,25 +16,33 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "NativeImageBuffer.h"
+#include "gpu/opengl/GLContext.h"
+#include "tgfx/gpu/opengl/GLTexture.h"
 
-#include <emscripten/val.h>
-#include "tgfx/gpu/TextureBuffer.h"
+using namespace emscripten;
 
 namespace tgfx {
-class NativeTextureBuffer : public TextureBuffer {
- public:
-  ~NativeTextureBuffer() override;
-
-  static std::shared_ptr<NativeTextureBuffer> Make(int width, int height, emscripten::val source);
-
-  std::shared_ptr<Texture> makeTexture(Context* context) const override;
-
- private:
-  explicit NativeTextureBuffer(int width, int height, emscripten::val source)
-      : TextureBuffer(width, height), source(source) {
+std::shared_ptr<NativeImageBuffer> NativeImageBuffer::Make(int width, int height, val source) {
+  if (!source.as<bool>()) {
+    return nullptr;
   }
+  return std::shared_ptr<NativeImageBuffer>(
+      new NativeImageBuffer(width, height, std::move(source)));
+}
 
-  emscripten::val source = emscripten::val::null();
-};
+std::shared_ptr<Texture> NativeImageBuffer::makeTexture(Context* context) const {
+  auto texture = Texture::MakeRGBA(context, width(), height(), nullptr, 0);
+  if (texture == nullptr) {
+    return nullptr;
+  }
+  auto& glInfo = std::static_pointer_cast<GLTexture>(texture)->glSampler();
+  auto gl = GLFunctions::Get(context);
+  gl->bindTexture(glInfo.target, glInfo.id);
+  source.call<void>("upload", val::module_property("GL"));
+  return texture;
+}
+NativeImageBuffer::~NativeImageBuffer() {
+  source.call<void>("onDestroy");
+}
 }  // namespace tgfx

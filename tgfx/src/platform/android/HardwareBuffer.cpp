@@ -19,6 +19,7 @@
 #include "HardwareBuffer.h"
 #include "AHardwareBufferUtil.h"
 #include "HardwareBufferInterface.h"
+#include "gpu/Gpu.h"
 
 namespace tgfx {
 
@@ -60,6 +61,29 @@ HardwareBuffer::HardwareBuffer(AHardwareBuffer* hardwareBuffer)
 
 std::shared_ptr<Texture> HardwareBuffer::makeTexture(Context* context) const {
   return Texture::MakeFrom(context, hardwareBuffer);
+}
+
+std::shared_ptr<Texture> HardwareBuffer::makeMipMappedTexture(Context* context) const {
+  auto texture =
+      Texture::Make(context, width(), height(), nullptr, 0, ImageOrigin::TopLeft, false, true);
+  if (texture == nullptr) {
+    return nullptr;
+  }
+  uint8_t* pixels = nullptr;
+  HardwareBufferInterface::Lock(hardwareBuffer, AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, -1, nullptr,
+                                reinterpret_cast<void**>(&pixels));
+  if (pixels) {
+    auto rect = Rect::MakeWH(static_cast<float>(width()), static_cast<float>(height()));
+    AHardwareBuffer_Desc desc;
+    HardwareBufferInterface::Describe(hardwareBuffer, &desc);
+    context->gpu()->writePixels(texture->getSampler(), rect, pixels, desc.stride,
+                                PixelFormat::RGBA_8888);
+    context->gpu()->regenerateMipMapLevels(texture->getSampler());
+  } else {
+    texture = nullptr;
+  }
+  HardwareBufferInterface::Unlock(hardwareBuffer, nullptr);
+  return texture;
 }
 
 void* HardwareBuffer::lockPixels() {

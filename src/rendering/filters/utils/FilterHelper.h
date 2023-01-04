@@ -27,6 +27,8 @@
 #include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace pag {
+std::array<float, 9> ToGLMatrix(const tgfx::Matrix& matrix);
+
 std::array<float, 9> ToGLVertexMatrix(const tgfx::Matrix& matrix, int width, int height,
                                       tgfx::ImageOrigin origin);
 
@@ -51,7 +53,8 @@ void PreConcatMatrix(FilterTarget* target, const tgfx::Matrix& matrix);
 unsigned CreateGLProgram(tgfx::Context* context, const std::string& vertex,
                          const std::string& fragment);
 
-void ActiveGLTexture(tgfx::Context* context, int unitIndex, const tgfx::TextureSampler* sampler);
+void ActiveGLTexture(tgfx::Context* context, int unitIndex, const tgfx::TextureSampler* sampler,
+                     int wrapMode = GL_CLAMP_TO_EDGE);
 
 bool CheckGLError(tgfx::Context* context);
 

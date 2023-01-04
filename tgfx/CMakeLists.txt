@@ -63,7 +63,7 @@ set(TGFX_INCLUDES ./ src)
 file(GLOB TGFX_FILES
         src/core/*.*
         src/core/utils/*.*
-        src/core/images/*.*
+        src/core/codecs/*.*
         src/core/vectors/*.*
         src/gpu/*.*
         src/gpu/gradients/*.*
@@ -115,14 +115,14 @@ endif ()
 
 if (TGFX_USE_JPEG)
     list(APPEND TGFX_STATIC_VENDORS libjpeg-turbo)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES src/core/images/jpeg/*.*)
+    file(GLOB_RECURSE GFX_PLATFORM_FILES src/core/codecs/jpeg/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
     list(APPEND TGFX_INCLUDES ../third_party/out/libjpeg-turbo/${INCLUDE_ENTRY})
 endif ()
 
 if (TGFX_USE_WEBP)
     list(APPEND TGFX_STATIC_VENDORS libwebp)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES src/core/images/webp/*.*)
+    file(GLOB_RECURSE GFX_PLATFORM_FILES src/core/codecs/webp/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
     list(APPEND TGFX_INCLUDES ../third_party/libwebp/src)
 endif ()
@@ -130,7 +130,7 @@ endif ()
 if (TGFX_USE_PNG)
     set(TGFX_USE_ZLIB ON)
     list(APPEND TGFX_STATIC_VENDORS libpng)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES src/core/images/png/*.*)
+    file(GLOB_RECURSE GFX_PLATFORM_FILES src/core/codecs/png/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
     list(APPEND TGFX_INCLUDES ../third_party/out/libpng/${INCLUDE_ENTRY})
 endif ()

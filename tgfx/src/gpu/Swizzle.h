@@ -54,6 +54,9 @@ class Swizzle {
   static constexpr Swizzle RGBA() {
     return Swizzle("rgba");
   }
+  static constexpr Swizzle BGRA() {
+    return Swizzle("bgra");
+  }
   static constexpr Swizzle AAAA() {
     return Swizzle("aaaa");
   }

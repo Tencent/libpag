@@ -33,16 +33,38 @@ struct TextureEffect::Sampling {
   Rect shaderClamp = Rect::MakeEmpty();
 };
 
-TextureEffect::ShaderMode TextureEffect::GetShaderMode(Wrap wrap) {
+TextureEffect::ShaderMode TextureEffect::GetShaderMode(Wrap wrap, FilterMode filter,
+                                                       MipMapMode mm) {
   switch (wrap) {
     case Wrap::MirrorRepeat:
       return ShaderMode::MirrorRepeat;
     case Wrap::Clamp:
       return ShaderMode::Clamp;
     case Wrap::Repeat:
-      return ShaderMode::Repeat;
+      switch (mm) {
+        case MipMapMode::None:
+          switch (filter) {
+            case FilterMode::Nearest:
+              return ShaderMode::RepeatNearestNone;
+            case FilterMode::Linear:
+              return ShaderMode::RepeatLinearNone;
+          }
+        case MipMapMode::Nearest:
+        case MipMapMode::Linear:
+          switch (filter) {
+            case FilterMode::Nearest:
+              return ShaderMode::RepeatNearestMipmap;
+            case FilterMode::Linear:
+              return ShaderMode::RepeatLinearMipmap;
+          }
+      }
     case Wrap::ClampToBorder:
-      return ShaderMode::ClampToBorder;
+      switch (filter) {
+        case FilterMode::Nearest:
+          return ShaderMode::ClampToBorderNearest;
+        case FilterMode::Linear:
+          return ShaderMode::ClampToBorderLinear;
+      }
   }
 }
 
@@ -88,7 +110,7 @@ TextureEffect::Sampling::Sampling(const Texture* texture, SamplerState sampler, 
     }
     r.shaderSubset = subset;
     r.shaderClamp = subset.makeInset(0.5f);
-    r.shaderMode = GetShaderMode(wrap);
+    r.shaderMode = GetShaderMode(wrap, sampler.filterMode, sampler.mipMapMode);
     return r;
   };
 
@@ -96,7 +118,7 @@ TextureEffect::Sampling::Sampling(const Texture* texture, SamplerState sampler, 
   auto x = resolve(texture->width(), sampler.wrapModeX, subsetX);
   Span subsetY{subset.top, subset.bottom};
   auto y = resolve(texture->height(), sampler.wrapModeY, subsetY);
-  hwSampler = SamplerState(x.hwWrap, y.hwWrap);
+  hwSampler = SamplerState(x.hwWrap, y.hwWrap, sampler.filterMode, sampler.mipMapMode);
   shaderModeX = x.shaderMode;
   shaderModeY = y.shaderMode;
   shaderSubset = {x.shaderSubset.a, y.shaderSubset.a, x.shaderSubset.b, y.shaderSubset.b};
@@ -143,7 +165,7 @@ TextureEffect::TextureEffect(std::shared_ptr<Texture> texture, const Sampling& s
 
 void TextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   auto flags = static_cast<uint32_t>(shaderModeX);
-  flags |= static_cast<uint32_t>(shaderModeY) << 3;
+  flags |= static_cast<uint32_t>(shaderModeY) << 4;
   bytesKey->write(flags);
 }
 

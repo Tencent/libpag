@@ -73,14 +73,14 @@ PAG_TEST_F(PAGPlayerTest, pagPlayer) {
 PAG_TEST_F(PAGPlayerTest, switchPAGSurface) {
   auto pagFile1 = PAGFile::Load("../resources/apitest/test.pag");
   auto pagSurface1 = PAGSurface::MakeOffscreen(pagFile1->width(), pagFile1->height());
-  auto pagPlayer1 = new PAGPlayer();
+  auto pagPlayer1 = std::make_unique<PAGPlayer>();
   pagPlayer1->setSurface(pagSurface1);
   pagPlayer1->setComposition(pagFile1);
   pagPlayer1->setProgress(0);
   pagPlayer1->flush();
   pagPlayer1->setSurface(nullptr);
 
-  auto pagPlayer2 = new PAGPlayer();
+  auto pagPlayer2 = std::make_unique<PAGPlayer>();
   auto pagFile2 = PAGFile::Load("../resources/apitest/ZC2.pag");
   pagPlayer2->setComposition(pagFile2);
   pagPlayer2->setSurface(pagSurface1);
@@ -88,8 +88,6 @@ PAG_TEST_F(PAGPlayerTest, switchPAGSurface) {
   auto status = pagPlayer2->flush();
   ASSERT_EQ(status, true);
 
-  delete pagPlayer1;
-  delete pagPlayer2;
   EXPECT_TRUE(Baseline::Compare(pagSurface1, "PAGPlayerTest/switchPAGSurface"));
 }
 
@@ -99,7 +97,7 @@ PAG_TEST_F(PAGPlayerTest, switchPAGSurface) {
 PAG_TEST_F(PAGPlayerTest, autoClear) {
   auto pagFile = PAGFile::Load("../resources/apitest/AlphaTrackMatte.pag");
   auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
-  auto pagPlayer = new PAGPlayer();
+  auto pagPlayer = std::make_unique<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
   pagPlayer->setComposition(pagFile);
   pagPlayer->flush();

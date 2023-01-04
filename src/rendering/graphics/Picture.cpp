@@ -31,16 +31,19 @@ static bool TryDrawDirectly(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Texture>
   if (texture == nullptr) {
     return false;
   }
+  auto mipMapMode =
+      texture->getSampler()->mipMapped() ? tgfx::MipMapMode::Linear : tgfx::MipMapMode::None;
+  tgfx::SamplingOptions samplingOptions(tgfx::FilterMode::Linear, mipMapMode);
   if (!texture->isYUV() && layout == nullptr) {
     // RGBA 纹理始终可以直接上屏。
-    canvas->drawTexture(std::move(texture));
+    canvas->drawTexture(std::move(texture), samplingOptions);
     return true;
   }
   auto totalMatrix = canvas->getMatrix();
   auto scaleFactor = GetMaxScaleFactor(totalMatrix);
   if (scaleFactor <= 1.0f) {
     // 纹理格式为 YUV 或含有 RGBAAALayout 时在缩放值小于等于 1.0f 时才直接上屏会有更好的性能。
-    canvas->drawTexture(std::move(texture), layout);
+    canvas->drawTexture(std::move(texture), layout, samplingOptions);
     return true;
   }
   return false;
@@ -59,7 +62,10 @@ static void DrawDirectly(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Texture> te
     return;
   }
   auto newCanvas = surface->getCanvas();
-  newCanvas->drawTexture(std::move(texture), layout);
+  auto mipMapMode =
+      texture->getSampler()->mipMapped() ? tgfx::MipMapMode::Linear : tgfx::MipMapMode::None;
+  tgfx::SamplingOptions samplingOptions(tgfx::FilterMode::Linear, mipMapMode);
+  newCanvas->drawTexture(std::move(texture), layout, samplingOptions);
   canvas->drawTexture(surface->getTexture());
   // 防止临时纹理析构
   canvas->flush();
@@ -79,8 +85,27 @@ static std::shared_ptr<tgfx::Texture> RescaleTexture(tgfx::Context* context,
   }
   auto canvas = surface->getCanvas();
   canvas->setMatrix(tgfx::Matrix::MakeScale(scaleFactor));
-  canvas->drawTexture(std::move(texture));
+  auto mipMapMode =
+      texture->getSampler()->mipMapped() ? tgfx::MipMapMode::Linear : tgfx::MipMapMode::None;
+  tgfx::SamplingOptions samplingOptions(tgfx::FilterMode::Linear, mipMapMode);
+  canvas->drawTexture(std::move(texture), samplingOptions);
   return surface->getTexture();
+}
+
+static std::shared_ptr<tgfx::Texture> GetTexture(TextureProxy* proxy, RenderCache* cache,
+                                                 bool mipMapped) {
+  std::shared_ptr<tgfx::Texture> texture;
+  if (mipMapped && proxy->mipMapSupport()) {
+    texture = proxy->getMipMappedTexture(cache);
+  }
+  if (texture == nullptr) {
+    texture = proxy->getTexture(cache);
+  }
+  return texture;
+}
+
+static bool NeedsEnableMipMap(float scale) {
+  return scale < .4f;
 }
 
 //================================= TextureProxySnapshotPicture ====================================
@@ -130,16 +155,21 @@ class TextureProxyPicture : public Picture {
     auto oldMatrix = canvas->getMatrix();
     canvas->concat(extraMatrix);
     if (proxy->cacheEnabled()) {
-      if (TryDrawDirectly(canvas, proxy->getTexture(cache), nullptr)) {
+      bool enableMipMap = NeedsEnableMipMap(GetMaxScaleFactor(canvas->getMatrix()));
+      if (TryDrawDirectly(canvas, GetTexture(proxy, cache, enableMipMap), nullptr)) {
         canvas->setMatrix(oldMatrix);
         return;
       }
     }
     auto snapshot = cache->getSnapshot(this);
     if (snapshot) {
-      canvas->drawTexture(snapshot->getTexture(), snapshot->getMatrix());
+      auto mipMapMode = snapshot->getTexture()->getSampler()->mipMapped() ? tgfx::MipMapMode::Linear
+                                                                          : tgfx::MipMapMode::None;
+      tgfx::SamplingOptions samplingOptions(tgfx::FilterMode::Linear, mipMapMode);
+      canvas->drawTexture(snapshot->getTexture(), snapshot->getMatrix(), samplingOptions);
     } else {
-      DrawDirectly(canvas, proxy->getTexture(cache), nullptr);
+      bool enableMipMap = NeedsEnableMipMap(GetMaxScaleFactor(canvas->getMatrix()));
+      DrawDirectly(canvas, GetTexture(proxy, cache, enableMipMap), nullptr);
     }
     canvas->setMatrix(oldMatrix);
   }
@@ -158,7 +188,7 @@ class TextureProxyPicture : public Picture {
   }
 
   std::unique_ptr<Snapshot> makeSnapshot(RenderCache* cache, float scaleFactor) const override {
-    auto texture = proxy->getTexture(cache);
+    auto texture = GetTexture(proxy, cache, NeedsEnableMipMap(scaleFactor));
     if (texture == nullptr) {
       return nullptr;
     }
@@ -342,9 +372,9 @@ class SnapshotPicture : public Picture {
 //===================================== SnapshotPicture ============================================
 
 //==================================== Texture Proxies =============================================
-class TextureBufferProxy : public TextureProxy {
+class ImageBufferProxy : public TextureProxy {
  public:
-  explicit TextureBufferProxy(const std::shared_ptr<tgfx::TextureBuffer> buffer)
+  explicit ImageBufferProxy(const std::shared_ptr<tgfx::ImageBuffer> buffer)
       : TextureProxy(buffer->width(), buffer->height()), buffer(buffer) {
   }
 
@@ -356,14 +386,31 @@ class TextureBufferProxy : public TextureProxy {
   }
 
   std::shared_ptr<tgfx::Texture> getTexture(RenderCache* cache) const override {
+    return getTexture(cache, false);
+  }
+
+  bool mipMapSupport() const override {
+    return buffer->mipMapSupport();
+  }
+
+  std::shared_ptr<tgfx::Texture> getMipMappedTexture(RenderCache* cache) const override {
+    return getTexture(cache, true);
+  }
+
+  std::shared_ptr<tgfx::Texture> getTexture(RenderCache* cache, bool mipMapped) const {
     tgfx::Clock clock = {};
-    auto texture = buffer->makeTexture(cache->getContext());
+    std::shared_ptr<tgfx::Texture> texture;
+    if (mipMapped) {
+      texture = buffer->makeMipMappedTexture(cache->getContext());
+    } else {
+      texture = buffer->makeTexture(cache->getContext());
+    }
     cache->recordTextureUploadingTime(clock.measure());
     return texture;
   }
 
  private:
-  std::shared_ptr<tgfx::TextureBuffer> buffer = nullptr;
+  std::shared_ptr<tgfx::ImageBuffer> buffer = nullptr;
 };
 
 class ImageTextureProxy : public TextureProxy {
@@ -382,6 +429,18 @@ class ImageTextureProxy : public TextureProxy {
   }
 
   std::shared_ptr<tgfx::Texture> getTexture(RenderCache* cache) const override {
+    return getTexture(cache, false);
+  }
+
+  bool mipMapSupport() const override {
+    return true;
+  }
+
+  std::shared_ptr<tgfx::Texture> getMipMappedTexture(RenderCache* cache) const override {
+    return getTexture(cache, true);
+  }
+
+  std::shared_ptr<tgfx::Texture> getTexture(RenderCache* cache, bool mipMapped) const {
     tgfx::Clock clock = {};
     auto buffer = cache->getImageBuffer(assetID);
     if (buffer == nullptr) {
@@ -392,7 +451,12 @@ class ImageTextureProxy : public TextureProxy {
       return nullptr;
     }
     clock.reset();
-    auto texture = buffer->makeTexture(cache->getContext());
+    std::shared_ptr<tgfx::Texture> texture;
+    if (mipMapped) {
+      texture = buffer->makeMipMappedTexture(cache->getContext());
+    } else {
+      texture = buffer->makeTexture(cache->getContext());
+    }
     cache->recordTextureUploadingTime(clock.measure());
     return texture;
   }
@@ -467,12 +531,11 @@ std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, std::shared_ptr<tgfx::Ima
   return picture;
 }
 
-std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID,
-                                           std::shared_ptr<tgfx::TextureBuffer> buffer) {
+std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, std::shared_ptr<tgfx::ImageBuffer> buffer) {
   if (buffer == nullptr) {
     return nullptr;
   }
-  auto proxy = new TextureBufferProxy(buffer);
+  auto proxy = new ImageBufferProxy(buffer);
   return std::shared_ptr<Graphic>(new TextureProxyPicture(assetID, proxy, false));
 }
 
@@ -514,5 +577,4 @@ std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, std::shared_ptr<Graphic> 
   }
   return std::make_shared<SnapshotPicture>(assetID, graphic);
 }
-
 }  // namespace pag

@@ -16,33 +16,45 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "NativeTextureBuffer.h"
-#include "gpu/opengl/GLContext.h"
-#include "tgfx/gpu/opengl/GLTexture.h"
+#pragma once
 
-using namespace emscripten;
+#include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
-std::shared_ptr<NativeTextureBuffer> NativeTextureBuffer::Make(int width, int height, val source) {
-  if (!source.as<bool>()) {
-    return nullptr;
-  }
-  return std::shared_ptr<NativeTextureBuffer>(
-      new NativeTextureBuffer(width, height, std::move(source)));
-}
+/**
+ * ImageGenerator is the base class for decoding images from codec data or custom data.
+ */
+class ImageGenerator {
+ public:
+  virtual ~ImageGenerator() = default;
 
-std::shared_ptr<Texture> NativeTextureBuffer::makeTexture(Context* context) const {
-  auto texture = Texture::MakeRGBA(context, width(), height(), nullptr, 0);
-  if (texture == nullptr) {
-    return nullptr;
+  /**
+   * Returns the width of target image.
+   */
+  int width() const {
+    return _width;
   }
-  auto& glInfo = std::static_pointer_cast<GLTexture>(texture)->glSampler();
-  auto gl = GLFunctions::Get(context);
-  gl->bindTexture(glInfo.target, glInfo.id);
-  source.call<void>("upload", val::module_property("GL"));
-  return texture;
-}
-NativeTextureBuffer::~NativeTextureBuffer() {
-  source.call<void>("onDestroy");
-}
+
+  /**
+   * Returns the height of target image.
+   */
+  int height() const {
+    return _height;
+  }
+
+  /**
+   * Crates a new image buffer capturing the pixels decoded from this image generator.
+   * ImageGenerator do not cache the returned image buffer, each call to this method allocates
+   * additional storage.
+   */
+  virtual std::shared_ptr<ImageBuffer> makeBuffer() const = 0;
+
+ protected:
+  ImageGenerator(int width, int height) : _width(width), _height(height) {
+  }
+
+ private:
+  int _width = 0;
+  int _height = 0;
+};
 }  // namespace tgfx

@@ -144,14 +144,8 @@ tgfx::Rect GetClipBounds(tgfx::Canvas* canvas, const FilterList* filterList) {
   return clip.getBounds();
 }
 
-std::shared_ptr<Graphic> GetDisplacementMapGraphic(const FilterList* filterList, Layer* mapLayer,
-                                                   tgfx::Rect* mapBounds) {
-  // DisplacementMap只支持引用视频序列帧或者位图序列帧图层。
-  // TODO(domrjchen): DisplacementMap 支持所有图层
-  auto preComposeLayer = static_cast<PreComposeLayer*>(mapLayer);
-  auto composition = preComposeLayer->composition;
-  mapBounds->setXYWH(0, 0, static_cast<float>(composition->width),
-                     static_cast<float>(composition->height));
+std::shared_ptr<Graphic> FilterRenderer::GetDisplacementMapGraphic(const FilterList* filterList,
+                                                                   Layer* mapLayer) {
   auto contentFrame = filterList->layerFrame - mapLayer->startTime;
   auto layerCache = LayerCache::Get(mapLayer);
   auto content = layerCache->getContent(contentFrame);
@@ -214,11 +208,13 @@ bool FilterRenderer::MakeEffectNode(std::vector<FilterNode>& filterNodes, tgfx::
       if (effect->type() == EffectType::DisplacementMap) {
         auto mapEffect = static_cast<DisplacementMapEffect*>(effect);
         auto mapFilter = static_cast<DisplacementMapFilter*>(filter);
-        auto mapBounds = tgfx::Rect::MakeEmpty();
-        auto graphic =
-            GetDisplacementMapGraphic(filterList, mapEffect->displacementMapLayer, &mapBounds);
-        mapBounds.roundOut();
-        mapFilter->updateMapTexture(renderCache, graphic.get(), mapBounds);
+        auto graphic = GetDisplacementMapGraphic(filterList, mapEffect->displacementMapLayer);
+        auto bounds = filterList->layer->getBounds();
+        auto size = Point::Make(bounds.width(), bounds.height());
+        bounds = mapEffect->displacementMapLayer->getBounds();
+        auto displacementSize = Point::Make(bounds.width(), bounds.height());
+        mapFilter->updateMapTexture(renderCache, graphic.get(), size, displacementSize,
+                                    filterList->layerMatrix, oldBounds);
       }
       if (effectIndex >= clipIndex && !filterBounds.intersect(clipBounds)) {
         return false;
@@ -231,23 +227,22 @@ bool FilterRenderer::MakeEffectNode(std::vector<FilterNode>& filterNodes, tgfx::
 }
 
 bool NeedToSkipClipBounds(const FilterList* filterList) {
-  bool skipClipBounds = false;
   for (auto& effect : filterList->effects) {
     if (effect->type() == EffectType::FastBlur) {
       auto blurEffect = static_cast<FastBlurEffect*>(effect);
       if (blurEffect->repeatEdgePixels->getValueAt(0) == false) {
-        skipClipBounds = true;
-        break;
+        return true;
       }
+    } else if (effect->type() == EffectType::DisplacementMap) {
+      return true;
     }
   }
   for (auto& layerStyle : filterList->layerStyles) {
     if (layerStyle->type() == LayerStyleType::DropShadow) {
-      skipClipBounds = true;
-      break;
+      return true;
     }
   }
-  return skipClipBounds;
+  return false;
 }
 
 std::vector<FilterNode> FilterRenderer::MakeFilterNodes(const FilterList* filterList,

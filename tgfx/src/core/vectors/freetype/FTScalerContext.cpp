@@ -641,7 +641,7 @@ void CopyFTBitmap(const FT_Bitmap& bitmap, std::shared_ptr<PixelBuffer> pixelBuf
   }
 }
 
-std::shared_ptr<TextureBuffer> FTScalerContext::generateImage(GlyphID glyphId, Matrix* matrix) {
+std::shared_ptr<ImageBuffer> FTScalerContext::generateImage(GlyphID glyphId, Matrix* matrix) {
   std::lock_guard<std::mutex> lockGuard(FTMutex());
   if (setupSize()) {
     return nullptr;

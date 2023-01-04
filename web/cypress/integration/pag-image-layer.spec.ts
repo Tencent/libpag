@@ -15,22 +15,22 @@ describe('PAGImageLayer', async () => {
       global = window;
       PAG = await window.libpag.PAGInit();
       PAGTypes = window.libpag.types;
+      const buffer = await global
+        .fetch('http://127.0.0.1:8080/demo/assets/AudioMarker.pag')
+        .then((res) => res.arrayBuffer());
+      const pagFile = await PAG.PAGFile.load(buffer);
+      pagImageLayer = pagFile.getLayersByEditableIndex(0, PAGTypes.LayerType.Image).get(0) as PAGImageLayer;
     });
   });
 
   let pagImageLayer: PAGImageLayer;
 
   it('Get contentDuration', async () => {
-    const buffer = await global
-      .fetch('http://127.0.0.1:8080/demo/assets/AudioMarker.pag')
-      .then((res) => res.arrayBuffer());
-    const pagFile = await PAG.PAGFile.load(buffer);
-    pagImageLayer = pagFile.getLayersByEditableIndex(0, PAGTypes.LayerType.Image).get(0) as PAGImageLayer;
     expect(pagImageLayer.contentDuration()).to.be.eq(19440000);
   });
 
   it('Get videoRanges', async () => {
-    expect(pagImageLayer.getVideoRanges().size()).to.be.eq(5);
+    expect(pagImageLayer.getVideoRanges().length).to.be.eq(5);
   });
 
   it('layerTime to content', async () => {

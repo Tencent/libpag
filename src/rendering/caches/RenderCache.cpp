@@ -53,12 +53,12 @@ class ImageTask : public Executor {
     return task;
   }
 
-  std::shared_ptr<tgfx::TextureBuffer> getBuffer() const {
+  std::shared_ptr<tgfx::ImageBuffer> getBuffer() const {
     return buffer;
   }
 
  private:
-  std::shared_ptr<tgfx::TextureBuffer> buffer = {};
+  std::shared_ptr<tgfx::ImageBuffer> buffer = {};
   std::shared_ptr<tgfx::ImageCodec> codec = nullptr;
   // Make a reference to file when image made from imageByte of file.
   std::shared_ptr<File> file = nullptr;
@@ -239,9 +239,8 @@ void RenderCache::detachFromContext() {
   clearExpiredSequences();
   clearExpiredBitmaps();
   clearExpiredSnapshots();
-  auto currentTimestamp = tgfx::Clock::Now();
-  context->purgeResourcesNotUsedIn(currentTimestamp - lastTimestamp);
-  lastTimestamp = currentTimestamp;
+  context->purgeResourcesNotUsedSince(lastTimestamp);
+  lastTimestamp = tgfx::Clock::Now();
   context = nullptr;
 }
 
@@ -489,13 +488,14 @@ void RenderCache::prepareImage(ID assetID, std::shared_ptr<tgfx::ImageCodec> cod
   if (imageTasks.count(assetID) != 0 || snapshotCaches.count(assetID) != 0) {
     return;
   }
-  auto task = ImageTask::MakeAndRun(std::move(codec), stage->getFileFromReferenceMap(assetID));
+  auto layer = stage->getLayerFromReferenceMap(assetID);
+  auto task = ImageTask::MakeAndRun(std::move(codec), layer->getFile());
   if (task) {
     imageTasks[assetID] = task;
   }
 }
 
-std::shared_ptr<tgfx::TextureBuffer> RenderCache::getImageBuffer(ID assetID) {
+std::shared_ptr<tgfx::ImageBuffer> RenderCache::getImageBuffer(ID assetID) {
   usedAssets.insert(assetID);
   auto result = imageTasks.find(assetID);
   if (result != imageTasks.end()) {
@@ -632,20 +632,21 @@ SequenceReader* RenderCache::makeSequenceReader(Sequence* sequence) {
   if (!_videoEnabled && composition->type() == CompositionType::Video) {
     return reader;
   }
-  auto file = stage->getFileFromReferenceMap(composition->uniqueID);
+  auto layer = stage->getLayerFromReferenceMap(composition->uniqueID);
   if (composition->type() == CompositionType::Bitmap) {
-    reader = new BitmapSequenceReader(file, static_cast<BitmapSequence*>(sequence));
+    reader = new BitmapSequenceReader(layer->getFile(), static_cast<BitmapSequence*>(sequence));
   } else {
     auto videoSequence = static_cast<VideoSequence*>(sequence);
 #ifdef PAG_BUILD_FOR_WEB
     if (VideoDecoder::HasExternalSoftwareDecoder()) {
-      auto demuxer = std::make_unique<VideoSequenceDemuxer>(file, videoSequence);
+      auto demuxer =
+          std::make_unique<VideoSequenceDemuxer>(layer->rootFile->getFile(), videoSequence);
       reader = new VideoReader(std::move(demuxer));
     } else {
-      reader = new VideoSequenceReader(file, videoSequence);
+      reader = new VideoSequenceReader(layer, videoSequence);
     }
 #else
-    auto demuxer = std::make_unique<VideoSequenceDemuxer>(file, videoSequence);
+    auto demuxer = std::make_unique<VideoSequenceDemuxer>(layer->getFile(), videoSequence);
     reader = new VideoReader(std::move(demuxer));
 #endif
   }

@@ -29,6 +29,6 @@ class WebTextBlob : public TextBlob {
 
   void getTextsAndPositions(std::vector<std::string>* texts, std::vector<Point>* points) const;
 
-  std::shared_ptr<TextureBuffer> getImage(float resolutionScale, Matrix* matrix) const override;
+  std::shared_ptr<ImageBuffer> getImage(float resolutionScale, Matrix* matrix) const override;
 };
 }  // namespace tgfx

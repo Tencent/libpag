@@ -22,6 +22,7 @@
 
 namespace tgfx {
 std::unique_ptr<FragmentProcessor> RGBAAATextureEffect::Make(std::shared_ptr<Texture> texture,
+                                                             SamplingOptions sampling,
                                                              const Matrix& localMatrix,
                                                              const RGBAAALayout* layout) {
   if (texture == nullptr) {
@@ -39,16 +40,18 @@ std::unique_ptr<FragmentProcessor> RGBAAATextureEffect::Make(std::shared_ptr<Tex
     matrix.postTranslate(translate.x, translate.y);
   }
   if (texture->isYUV()) {
-    return std::unique_ptr<YUVTextureEffect>(
-        new YUVTextureEffect(std::static_pointer_cast<YUVTexture>(texture), layout, matrix));
+    return std::unique_ptr<YUVTextureEffect>(new YUVTextureEffect(
+        std::static_pointer_cast<YUVTexture>(texture), sampling, layout, matrix));
   }
-  return std::unique_ptr<RGBAAATextureEffect>(new RGBAAATextureEffect(texture, layout, matrix));
+  return std::unique_ptr<RGBAAATextureEffect>(
+      new RGBAAATextureEffect(texture, sampling, layout, matrix));
 }
 
-RGBAAATextureEffect::RGBAAATextureEffect(std::shared_ptr<Texture> texture,
+RGBAAATextureEffect::RGBAAATextureEffect(std::shared_ptr<Texture> texture, SamplingOptions sampling,
                                          const RGBAAALayout* layout, const Matrix& localMatrix)
     : FragmentProcessor(ClassID()),
       texture(std::move(texture)),
+      sampling(sampling),
       layout(layout),
       coordTransform(localMatrix) {
   setTextureSamplerCnt(1);

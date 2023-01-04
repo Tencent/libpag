@@ -50,14 +50,14 @@ class TextBlob {
   bool getPath(Path* path, const Stroke* stroke = nullptr) const;
 
   /**
-   * Creates a texture buffer capturing the pixels in the text blob.
+   * Creates an image buffer capturing the pixels in the text blob.
    * @param resolutionScale The "intended" resolution for the output. Larger values (scale > 1)
    * indicate that the result should be more precise, smaller values (0 < scale < 1) indicate that
    * the result can be less precise.
    * @param matrix The output transformation that should apply to the texture when drawing.
-   * @return An alpha only texture buffer is returned if the text font is not backed by bitmaps.
+   * @return An alpha only image buffer is returned if the text font is not backed by bitmaps.
    */
-  virtual std::shared_ptr<TextureBuffer> getImage(float resolutionScale, Matrix* matrix) const = 0;
+  virtual std::shared_ptr<ImageBuffer> getImage(float resolutionScale, Matrix* matrix) const = 0;
 
  protected:
   Font font = {};

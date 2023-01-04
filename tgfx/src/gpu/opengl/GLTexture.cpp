@@ -60,11 +60,12 @@ std::shared_ptr<GLTexture> GLTexture::MakeAdopted(Context* context, const GLSamp
 
 class GLAlphaTexture : public GLTexture {
  public:
-  static void ComputeRecycleKey(BytesKey* recycleKey, int width, int height) {
+  static void ComputeRecycleKey(BytesKey* recycleKey, int width, int height, bool mipMap) {
     static const uint32_t AlphaType = UniqueID::Next();
     recycleKey->write(AlphaType);
     recycleKey->write(static_cast<uint32_t>(width));
     recycleKey->write(static_cast<uint32_t>(height));
+    recycleKey->write(static_cast<uint32_t>(mipMap ? 1 : 0));
   }
 
   GLAlphaTexture(GLSampler textureSampler, int width, int height, ImageOrigin origin)
@@ -74,7 +75,7 @@ class GLAlphaTexture : public GLTexture {
 
  protected:
   void computeRecycleKey(BytesKey* recycleKey) const override {
-    ComputeRecycleKey(recycleKey, width(), height());
+    ComputeRecycleKey(recycleKey, width(), height(), sampler.maxMipMapLevel > 0);
   }
 
  private:
@@ -85,11 +86,12 @@ class GLAlphaTexture : public GLTexture {
 
 class GLRGBATexture : public GLTexture {
  public:
-  static void ComputeRecycleKey(BytesKey* recycleKey, int width, int height) {
+  static void ComputeRecycleKey(BytesKey* recycleKey, int width, int height, bool mipMap) {
     static const uint32_t RGBAType = UniqueID::Next();
     recycleKey->write(RGBAType);
     recycleKey->write(static_cast<uint32_t>(width));
     recycleKey->write(static_cast<uint32_t>(height));
+    recycleKey->write(static_cast<uint32_t>(mipMap ? 1 : 0));
   }
 
   GLRGBATexture(GLSampler textureSampler, int width, int height,
@@ -100,7 +102,7 @@ class GLRGBATexture : public GLTexture {
 
  protected:
   void computeRecycleKey(BytesKey* recycleKey) const override {
-    ComputeRecycleKey(recycleKey, width(), height());
+    ComputeRecycleKey(recycleKey, width(), height(), sampler.maxMipMapLevel > 0);
   }
 
  private:
@@ -109,25 +111,33 @@ class GLRGBATexture : public GLTexture {
   }
 };
 
-static bool CheckMaxTextureSize(const GLCaps* caps, int width, int height) {
+static bool CheckTextureSize(const GLCaps* caps, int width, int height) {
+  if (width < 1 || height < 1) {
+    return false;
+  }
   auto maxTextureSize = caps->maxTextureSize;
   return width <= maxTextureSize && height <= maxTextureSize;
 }
 
 std::shared_ptr<Texture> Texture::Make(Context* context, int width, int height, void* pixels,
-                                       size_t rowBytes, ImageOrigin origin, bool alphaOnly) {
+                                       size_t rowBytes, ImageOrigin origin, bool alphaOnly,
+                                       bool mipMapped) {
   // Clear the previously generated GLError, causing the subsequent CheckGLError to return an
   // incorrect result.
   CheckGLError(context);
   auto caps = GLCaps::Get(context);
-  if (!CheckMaxTextureSize(caps, width, height)) {
+  if (!CheckTextureSize(caps, width, height)) {
     return nullptr;
   }
+  bool enableMipMap = mipMapped && caps->mipMapSupport;
   BytesKey recycleKey = {};
+  PixelFormat pixelFormat;
   if (alphaOnly) {
-    GLAlphaTexture::ComputeRecycleKey(&recycleKey, width, height);
+    pixelFormat = PixelFormat::ALPHA_8;
+    GLAlphaTexture::ComputeRecycleKey(&recycleKey, width, height, enableMipMap);
   } else {
-    GLRGBATexture::ComputeRecycleKey(&recycleKey, width, height);
+    pixelFormat = PixelFormat::RGBA_8888;
+    GLRGBATexture::ComputeRecycleKey(&recycleKey, width, height, enableMipMap);
   }
 
   auto texture =
@@ -135,8 +145,11 @@ std::shared_ptr<Texture> Texture::Make(Context* context, int width, int height, 
   if (texture) {
     texture->_origin = origin;
   } else {
-    PixelFormat pixelFormat = alphaOnly ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
-    auto sampler = context->gpu()->createTexture(width, height, pixelFormat);
+    int maxMipmapLevel = 0;
+    if (enableMipMap) {
+      maxMipmapLevel = static_cast<int>(std::floor(std::log2(std::max(width, height))));
+    }
+    auto sampler = context->gpu()->createTexture(width, height, pixelFormat, maxMipmapLevel + 1);
     if (sampler == nullptr) {
       return nullptr;
     }
@@ -150,7 +163,8 @@ std::shared_ptr<Texture> Texture::Make(Context* context, int width, int height, 
   if (pixels != nullptr) {
     context->gpu()->writePixels(texture->getSampler(),
                                 Rect::MakeWH(static_cast<float>(width), static_cast<float>(height)),
-                                pixels, rowBytes);
+                                pixels, rowBytes, pixelFormat);
+    context->gpu()->regenerateMipMapLevels(texture->getSampler());
   }
   return texture;
 }

@@ -5,9 +5,10 @@ import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorat
 import { getWasmIns, layer2typeLayer, proxyVector } from './utils/type-utils';
 import { Matrix } from './core/matrix';
 
-import type { PAGLayer } from './pag-layer';
 import { PAGComposition } from './pag-composition';
+import type { PAGLayer } from './pag-layer';
 import type { PAGScaleMode, Rect } from './types';
+import type { VideoReader } from './interfaces';
 
 @destroyVerify
 @wasmAwaitRewind
@@ -20,6 +21,7 @@ export class PAGPlayer {
 
   public wasmIns;
   public isDestroyed = false;
+  public videoReaders: VideoReader[] = [];
 
   public constructor(wasmIns: any) {
     this.wasmIns = wasmIns;
@@ -44,11 +46,21 @@ export class PAGPlayer {
    */
   @wasmAsyncMethod
   public async flushInternal(callback: (res: boolean) => void) {
-    return PAGModule.webAssemblyQueue.exec<boolean>(async () => {
+    const res = await PAGModule.webAssemblyQueue.exec<boolean>(async () => {
+      PAGModule.currentPlayer = this;
       const res = await this.wasmIns._flush();
+      PAGModule.currentPlayer = null;
       callback(res);
       return res;
     }, this.wasmIns);
+    // Check if any video reader has error.
+    for (const videoReader of this.videoReaders) {
+      const error = videoReader.getError();
+      if (error !== null) {
+        throw error;
+      }
+    }
+    return res;
   }
   /**
    * The duration of current composition in microseconds.
@@ -271,11 +283,30 @@ export class PAGPlayer {
    * speeding up the first frame rendering.
    */
   public prepare(): Promise<void> {
-    return PAGModule.webAssemblyQueue.exec(this.wasmIns._prepare, this.wasmIns);
+    return PAGModule.webAssemblyQueue.exec(async () => {
+      PAGModule.currentPlayer = this;
+      await this.wasmIns._prepare();
+      PAGModule.currentPlayer = null;
+    }, this.wasmIns);
   }
 
   public destroy() {
     this.wasmIns.delete();
     this.isDestroyed = true;
+  }
+  /**
+   * Link VideoReader to PAGPlayer.
+   */
+  public linkVideoReader(videoReader: VideoReader) {
+    this.videoReaders.push(videoReader);
+  }
+  /**
+   * Unlink VideoReader from PAGPlayer.
+   */
+  public unlinkVideoReader(videoReader: VideoReader) {
+    const index = this.videoReaders.indexOf(videoReader);
+    if (index !== -1) {
+      this.videoReaders.splice(index, 1);
+    }
   }
 }
