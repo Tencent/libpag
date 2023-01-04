@@ -83,8 +83,8 @@ void GPUDrawable::updateSize() {
     width = layer.bounds.size.width * layer.contentsScale;
     height = layer.bounds.size.height * layer.contentsScale;
   }
-  _width = static_cast<int>(floor(width));
-  _height = static_cast<int>(floor(height));
+  _width = static_cast<int>(roundf(width));
+  _height = static_cast<int>(roundf(height));
   surface = nullptr;
 }
 

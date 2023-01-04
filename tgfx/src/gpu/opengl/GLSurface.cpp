@@ -76,6 +76,10 @@ GLSurface::GLSurface(std::shared_ptr<GLRenderTarget> renderTarget,
 }
 
 bool GLSurface::onReadPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) {
+  if (texture &&
+      std::static_pointer_cast<GLTexture>(texture)->readPixels(dstInfo, dstPixels, srcX, srcY)) {
+    return true;
+  }
   return std::static_pointer_cast<GLRenderTarget>(renderTarget)
       ->readPixels(dstInfo, dstPixels, srcX, srcY);
 }

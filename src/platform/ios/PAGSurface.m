@@ -63,7 +63,11 @@
 }
 
 + (PAGSurface*)MakeFromGPU:(CGSize)size {
-  PAGSurfaceImpl* surface = [PAGSurfaceImpl MakeFromGPU:size];
+  return [PAGSurface MakeOffscreen:size];
+}
+
++ (PAGSurface*)MakeOffscreen:(CGSize)size {
+  PAGSurfaceImpl* surface = [PAGSurfaceImpl MakeOffscreen:size];
   if (surface == nil) {
     return nil;
   }

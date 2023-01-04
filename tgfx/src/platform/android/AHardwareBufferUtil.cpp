@@ -16,37 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import <CoreVideo/CoreVideo.h>
-#import <Foundation/Foundation.h>
-#import <QuartzCore/QuartzCore.h>
-#import <UIKit/UIKit.h>
+#include "AHardwareBufferUtil.h"
+#include "HardwareBufferInterface.h"
 
-#import "PAGImageLayerImpl.h"
-#import "PAGLayerImpl.h"
-
-@interface PAGSurfaceImpl : NSObject
-
-+ (PAGSurfaceImpl*)FromLayer:(CAEAGLLayer*)layer;
-
-+ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer;
-
-+ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer
-                             context:(EAGLContext*)eaglContext;
-
-+ (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size;
-
-- (void)updateSize;
-
-- (int)width;
-
-- (int)height;
-
-- (BOOL)clearAll;
-
-- (void)freeCache;
-
-- (CVPixelBufferRef)getCVPixelBuffer;
-
-- (CVPixelBufferRef)makeSnapshot;
-
-@end
+namespace tgfx {
+ImageInfo GetImageInfo(AHardwareBuffer* hardwareBuffer) {
+  AHardwareBuffer_Desc desc;
+  HardwareBufferInterface::Describe(hardwareBuffer, &desc);
+  return ImageInfo::Make(desc.width, desc.height, ColorType::RGBA_8888, AlphaType::Premultiplied,
+                         desc.stride * 4);
+}
+}  // namespace tgfx

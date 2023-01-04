@@ -62,8 +62,8 @@
   return nil;
 }
 
-+ (PAGSurfaceImpl*)MakeFromGPU:(CGSize)size {
-  LOGE("The simulator does not support [PAGSurface MakeFromGPU:].");
++ (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size {
+  LOGE("The simulator does not support [PAGSurface MakeOffscreen:].");
   return nil;
 }
 
@@ -85,11 +85,11 @@
   return [pagSurface autorelease];
 }
 
-+ (PAGSurfaceImpl*)MakeFromGPU:(CGSize)size {
++ (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size {
   // 这里如果添加autoreleasePool会导致PAGSurfaceImpl也被释放，因此不加。
   // 使用时当PAGSurfaceImpl autorelease时，pixelBuffer也会析构
-  auto pixelBuffer =
-      pag::PixelBufferUtils::Make(static_cast<int>(size.width), static_cast<int>(size.height));
+  auto pixelBuffer = pag::PixelBufferUtils::Make(static_cast<int>(roundf(size.width)),
+                                                 static_cast<int>(roundf(size.height)));
   return [PAGSurfaceImpl FromCVPixelBuffer:pixelBuffer];
 }
 
@@ -129,31 +129,22 @@
 }
 
 - (CVPixelBufferRef)makeSnapshot {
-  size_t width = _pagSurface->width();
-  size_t height = _pagSurface->height();
-  size_t bytesPerRow = _pagSurface->width() * 4;
-  CVPixelBufferRef pixelBuffer = nil;
-  CFDictionaryRef empty =
-      CFDictionaryCreate(kCFAllocatorDefault, NULL, NULL, 0, &kCFTypeDictionaryKeyCallBacks,
-                         &kCFTypeDictionaryValueCallBacks);
-  CFMutableDictionaryRef attrs = CFDictionaryCreateMutable(
-      kCFAllocatorDefault, 1, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-
-  CFDictionarySetValue(attrs, kCVPixelBufferIOSurfacePropertiesKey, empty);
-  CVPixelBufferCreate(kCFAllocatorDefault, width, height, kCVPixelFormatType_32BGRA, attrs,
-                      &pixelBuffer);
-  CFRelease(attrs);
-  CFRelease(empty);
-
+  CVPixelBufferRef pixelBuffer =
+      pag::PixelBufferUtils::Make(_pagSurface->width(), _pagSurface->height());
+  if (pixelBuffer == nil) {
+    LOGE("CVPixelBufferRef create failed!");
+    return nil;
+  }
   CVPixelBufferLockBaseAddress(pixelBuffer, 0);
-  void* pixelBufferData = CVPixelBufferGetBaseAddress(pixelBuffer);
+  size_t bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 0);
+  uint8_t* pixelBufferData = (uint8_t*)CVPixelBufferGetBaseAddress(pixelBuffer);
   BOOL status = _pagSurface->readPixels(pag::ColorType::BGRA_8888, pag::AlphaType::Premultiplied,
                                         pixelBufferData, bytesPerRow);
+  CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
   if (!status) {
     LOGE("ReadPixels failed!");
+    return nil;
   }
-  CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
-  CFAutorelease(pixelBuffer);
   return pixelBuffer;
 }
 

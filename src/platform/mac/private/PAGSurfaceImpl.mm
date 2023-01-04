@@ -42,9 +42,9 @@
   return pagSurface;
 }
 
-+ (PAGSurfaceImpl*)MakeFromGPU:(CGSize)size {
-  auto pixelBuffer =
-      pag::PixelBufferUtils::Make(static_cast<int>(size.width), static_cast<int>(size.height));
++ (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size {
+  auto pixelBuffer = pag::PixelBufferUtils::Make(static_cast<int>(roundf(size.width)),
+                                                 static_cast<int>(roundf(size.height)));
   auto drawable = pag::GPUDrawable::FromCVPixelBuffer(pixelBuffer);
   if (drawable == nullptr) {
     return nil;
@@ -95,31 +95,21 @@
 }
 
 - (CVPixelBufferRef)makeSnapshot {
-  size_t width = _pagSurface->width();
-  size_t height = _pagSurface->height();
-  size_t bytesPerRow = _pagSurface->width() * 4;
-  CVPixelBufferRef pixelBuffer = nil;
-  CFDictionaryRef empty =
-      CFDictionaryCreate(kCFAllocatorDefault, NULL, NULL, 0, &kCFTypeDictionaryKeyCallBacks,
-                         &kCFTypeDictionaryValueCallBacks);
-  CFMutableDictionaryRef attrs = CFDictionaryCreateMutable(
-      kCFAllocatorDefault, 1, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-
-  CFDictionarySetValue(attrs, kCVPixelBufferIOSurfacePropertiesKey, empty);
-  CVPixelBufferCreate(kCFAllocatorDefault, width, height, kCVPixelFormatType_32BGRA, attrs,
-                      &pixelBuffer);
-  CFRelease(attrs);
-  CFRelease(empty);
-
+  CVPixelBufferRef pixelBuffer =
+      pag::PixelBufferUtils::Make(_pagSurface->width(), _pagSurface->height());
+  if (pixelBuffer == nil) {
+    LOGE("CVPixelBufferRef create failed!");
+    return nil;
+  }
   CVPixelBufferLockBaseAddress(pixelBuffer, 0);
-  void* pixelBufferData = CVPixelBufferGetBaseAddress(pixelBuffer);
+  size_t bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 0);
+  uint8_t* pixelBufferData = (uint8_t*)CVPixelBufferGetBaseAddress(pixelBuffer);
   BOOL status = _pagSurface->readPixels(pag::ColorType::BGRA_8888, pag::AlphaType::Premultiplied,
                                         pixelBufferData, bytesPerRow);
   if (!status) {
     LOGE("ReadPixels failed!");
   }
   CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
-  CFAutorelease(pixelBuffer);
   return pixelBuffer;
 }
 

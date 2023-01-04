@@ -62,8 +62,8 @@
 - (void)testMutiThread {
     pagPath = [[NSBundle mainBundle] pathForResource:@"test2" ofType:@"pag"];
     PAGFile* pagFile = [PAGFile Load:pagPath];
-    PAGSurface *pagSurface = [PAGSurface MakeFromGPU:CGSizeMake(pagFile.width, pagFile.height)];
-    PAGSurface *pagSurface1 = [PAGSurface MakeFromGPU:CGSizeMake(pagFile.width, pagFile.height)];
+    PAGSurface *pagSurface = [PAGSurface MakeOffscreen:CGSizeMake(pagFile.width, pagFile.height)];
+    PAGSurface *pagSurface1 = [PAGSurface MakeOffscreen:CGSizeMake(pagFile.width, pagFile.height)];
     PAGPlayer *player = [[PAGPlayer alloc] init];
     PAGPlayer *player2 = [[PAGPlayer alloc] init];
     [player setSurface:pagSurface];
