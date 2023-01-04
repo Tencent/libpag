@@ -19,6 +19,8 @@
 #include "EAGLHardwareTexture.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/opengl/GLContext.h"
+#include "platform/apple/CVPixelBufferUtil.h"
+#include "tgfx/core/Bitmap.h"
 #include "tgfx/gpu/opengl/eagl/EAGLDevice.h"
 
 namespace tgfx {
@@ -120,4 +122,23 @@ void EAGLHardwareTexture::onReleaseGPU() {
   static_cast<EAGLDevice*>(context->device())->releaseTexture(texture);
   texture = nil;
 }
+
+bool EAGLHardwareTexture::readPixels(const ImageInfo &dstInfo, void *dstPixels, int srcX, int srcY) const {
+    if (dstPixels == nullptr) {
+        return false;
+    }
+    dstPixels = dstInfo.computeOffset(dstPixels, -srcX, -srcY);
+    auto outInfo = dstInfo.makeIntersect(-srcX, -srcY, width(), height());
+    if (outInfo.isEmpty()) {
+      return false;
+    }
+    auto srcInfo = GetImageInfo(pixelBuffer);
+    CVPixelBufferLockBaseAddress(pixelBuffer, 0);
+    void* baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer);
+    Bitmap bitmap(srcInfo, baseAddress);
+    bool result = bitmap.readPixels(dstInfo, dstPixels);
+    CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
+    return result;
+}
+
 }

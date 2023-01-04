@@ -37,7 +37,7 @@
     NSString* pagPath = [[NSBundle mainBundle] pathForResource:@"particle_video" ofType:@"pag"];
     PAGFile* pagFile = [PAGFile Load:pagPath];
 
-    PAGSurface *pagSurface = [PAGSurface MakeFromGPU:CGSizeMake(pagFile.width, pagFile.height)];
+    PAGSurface *pagSurface = [PAGSurface MakeOffscreen:CGSizeMake(pagFile.width, pagFile.height)];
     PAGPlayer *pagPlayer = [[PAGPlayer alloc] init];
     [pagPlayer setComposition:pagFile];
     [pagPlayer setSurface:pagSurface];

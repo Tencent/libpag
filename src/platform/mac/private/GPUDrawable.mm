@@ -64,8 +64,8 @@ void GPUDrawable::updateSize() {
     width = size.width;
     height = size.height;
   }
-  _width = static_cast<int>(floor(width));
-  _height = static_cast<int>(floor(height));
+  _width = static_cast<int>(roundf(width));
+  _height = static_cast<int>(roundf(height));
 }
 
 std::shared_ptr<tgfx::Device> GPUDrawable::getDevice() {

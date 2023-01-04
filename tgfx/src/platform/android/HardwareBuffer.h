@@ -37,6 +37,8 @@ class HardwareBuffer : public PixelBuffer {
 
   std::shared_ptr<Texture> makeTexture(Context*) const override;
 
+  AHardwareBuffer* aHardwareBuffer();
+
   bool mipMapSupport() const override {
     return true;
   }

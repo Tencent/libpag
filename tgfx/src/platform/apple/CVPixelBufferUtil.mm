@@ -16,37 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import <CoreVideo/CoreVideo.h>
-#import <Foundation/Foundation.h>
-#import <QuartzCore/QuartzCore.h>
-#import <UIKit/UIKit.h>
+#import "CVPixelBufferUtil.h"
 
-#import "PAGImageLayerImpl.h"
-#import "PAGLayerImpl.h"
-
-@interface PAGSurfaceImpl : NSObject
-
-+ (PAGSurfaceImpl*)FromLayer:(CAEAGLLayer*)layer;
-
-+ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer;
-
-+ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer
-                             context:(EAGLContext*)eaglContext;
-
-+ (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size;
-
-- (void)updateSize;
-
-- (int)width;
-
-- (int)height;
-
-- (BOOL)clearAll;
-
-- (void)freeCache;
-
-- (CVPixelBufferRef)getCVPixelBuffer;
-
-- (CVPixelBufferRef)makeSnapshot;
-
-@end
+namespace tgfx {
+ImageInfo GetImageInfo(CVPixelBufferRef pixelBuffer) {
+  auto width = static_cast<int>(CVPixelBufferGetWidth(pixelBuffer));
+  auto height = static_cast<int>(CVPixelBufferGetHeight(pixelBuffer));
+  auto pixelFormat = CVPixelBufferGetPixelFormatType(pixelBuffer);
+  auto colorType =
+      pixelFormat == kCVPixelFormatType_OneComponent8 ? ColorType::ALPHA_8 : ColorType::BGRA_8888;
+  auto rowBytes = CVPixelBufferGetBytesPerRow(pixelBuffer);
+  return ImageInfo::Make(width, height, colorType, AlphaType::Premultiplied, rowBytes);
+}
+}  // namespace tgfx

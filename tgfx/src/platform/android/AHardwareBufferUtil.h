@@ -16,37 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import <CoreVideo/CoreVideo.h>
-#import <Foundation/Foundation.h>
-#import <QuartzCore/QuartzCore.h>
-#import <UIKit/UIKit.h>
+#pragma once
 
-#import "PAGImageLayerImpl.h"
-#import "PAGLayerImpl.h"
+#include <android/hardware_buffer.h>
+#include "tgfx/core/ImageInfo.h"
 
-@interface PAGSurfaceImpl : NSObject
-
-+ (PAGSurfaceImpl*)FromLayer:(CAEAGLLayer*)layer;
-
-+ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer;
-
-+ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer
-                             context:(EAGLContext*)eaglContext;
-
-+ (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size;
-
-- (void)updateSize;
-
-- (int)width;
-
-- (int)height;
-
-- (BOOL)clearAll;
-
-- (void)freeCache;
-
-- (CVPixelBufferRef)getCVPixelBuffer;
-
-- (CVPixelBufferRef)makeSnapshot;
-
-@end
+namespace tgfx {
+ImageInfo GetImageInfo(AHardwareBuffer* hardwareBuffer);
+}

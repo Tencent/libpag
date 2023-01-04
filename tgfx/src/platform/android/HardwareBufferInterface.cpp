@@ -36,6 +36,8 @@ class AHardwareBufferFunctions {
   int (*unlock)(AHardwareBuffer* buffer, int32_t* fence) = nullptr;
   void (*describe)(const AHardwareBuffer* buffer, AHardwareBuffer_Desc* outDesc) = nullptr;
   void (*acquire)(AHardwareBuffer* buffer) = nullptr;
+  jobject (*AHB_to_HB)(JNIEnv*, AHardwareBuffer*) = nullptr;
+  AHardwareBuffer* (*AHB_from_HB)(JNIEnv*, jobject) = nullptr;
 
   AHardwareBufferFunctions() {
     char sdk[PROP_VALUE_MAX] = "0";
@@ -50,6 +52,8 @@ class AHardwareBufferFunctions {
     LoadSymbol(unlock, "AHardwareBuffer_unlock");
     LoadSymbol(describe, "AHardwareBuffer_describe");
     LoadSymbol(acquire, "AHardwareBuffer_acquire");
+    LoadSymbol(AHB_to_HB, "AHardwareBuffer_toHardwareBuffer");
+    LoadSymbol(AHB_from_HB, "AHardwareBuffer_fromHardwareBuffer");
   }
 };
 
@@ -59,7 +63,10 @@ static const AHardwareBufferFunctions* GetFunctions() {
 }
 
 bool HardwareBufferInterface::Available() {
-  return GetFunctions()->allocate != nullptr;
+  return GetFunctions()->allocate != nullptr && GetFunctions()->release != nullptr &&
+         GetFunctions()->lock != nullptr && GetFunctions()->unlock != nullptr &&
+         GetFunctions()->describe != nullptr && GetFunctions()->acquire != nullptr &&
+         GetFunctions()->AHB_to_HB != nullptr && GetFunctions()->AHB_from_HB != nullptr;
 }
 
 int HardwareBufferInterface::Allocate(const AHardwareBuffer_Desc* desc,
@@ -88,4 +95,15 @@ int HardwareBufferInterface::Lock(AHardwareBuffer* buffer, uint64_t usage, int32
 int HardwareBufferInterface::Unlock(AHardwareBuffer* buffer, int32_t* fence) {
   return GetFunctions()->unlock(buffer, fence);
 }
+
+jobject HardwareBufferInterface::AHardwareBuffer_toHardwareBuffer(JNIEnv* env,
+                                                                  AHardwareBuffer* buffer) {
+  return GetFunctions()->AHB_to_HB(env, buffer);
+}
+
+AHardwareBuffer* HardwareBufferInterface::AHardwareBuffer_fromHardwareBuffer(
+    JNIEnv* env, jobject hardwareBufferObj) {
+  return GetFunctions()->AHB_from_HB(env, hardwareBufferObj);
+}
+
 }  // namespace tgfx

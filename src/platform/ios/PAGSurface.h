@@ -44,10 +44,15 @@ PAG_API @interface PAGSurface : NSObject
 + (PAGSurface*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer context:(EAGLContext*)eaglContext;
 
 /**
+ * [Deprecated] Please use MakeOffscreen:size instead.
+ */
++ (PAGSurface*)MakeFromGPU:(CGSize)size;
+
+/**
  * Creates a offscreen PAGSurface of specified size. PAGSurface internally creates a CVPixelBuffer
  * which can be accessed by [PAGSurface getCVPixelBuffer] after the first [PAGPLayer flush].
  */
-+ (PAGSurface*)MakeFromGPU:(CGSize)size;
++ (PAGSurface*)MakeOffscreen:(CGSize)size;
 
 /**
  * The width of surface in pixels.
@@ -76,7 +81,8 @@ PAG_API @interface PAGSurface : NSObject
 - (void)freeCache;
 
 /**
- * Returns the CVPixelBuffer object created by MakeFromGPU.
+ * Returns the internal CVPixelBuffer object associated with this PAGSurface, returns nil if this
+ * PAGSurface is created by [PAGSurface FromLayer].
  */
 - (CVPixelBufferRef)getCVPixelBuffer;
 

@@ -23,8 +23,10 @@
 #include <GLES/glext.h>
 #include <android/hardware_buffer.h>
 #include "core/utils/UniqueID.h"
+#include "platform/android/AHardwareBufferUtil.h"
 #include "platform/android/HardwareBuffer.h"
 #include "platform/android/HardwareBufferInterface.h"
+#include "tgfx/core/Bitmap.h"
 #include "tgfx/gpu/opengl/egl/EGLDevice.h"
 
 namespace tgfx {
@@ -115,6 +117,28 @@ void EGLHardwareTexture::onReleaseGPU() {
   auto display = static_cast<EGLDevice*>(context->device())->getDisplay();
   eglext::eglDestroyImageKHR(display, eglImage);
 }
+
+bool EGLHardwareTexture::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX,
+                                    int srcY) const {
+  dstPixels = dstInfo.computeOffset(dstPixels, -srcX, -srcY);
+  auto outInfo = dstInfo.makeIntersect(-srcX, -srcY, width(), height());
+  if (outInfo.isEmpty()) {
+    return false;
+  }
+  uint8_t* srcPixels = nullptr;
+  HardwareBufferInterface::Lock(
+      hardwareBuffer, AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN | AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN,
+      -1, nullptr, reinterpret_cast<void**>(&srcPixels));
+  if (!srcPixels) {
+    return false;
+  }
+  auto srcInfo = GetImageInfo(hardwareBuffer);
+  Bitmap bitmap(srcInfo, srcPixels);
+  bitmap.readPixels(dstInfo, dstPixels);
+  HardwareBufferInterface::Unlock(hardwareBuffer, nullptr);
+  return true;
+}
+
 }  // namespace tgfx
 
 #endif

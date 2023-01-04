@@ -27,20 +27,17 @@
 #include "JNIHelper.h"
 #include "NativePlatform.h"
 #include "VideoSurface.h"
+#include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace pag {
 static jfieldID PAGSurface_nativeSurface;
-}
+static Global<jclass> Bitmap_Class;
+static jmethodID Bitmap_createBitmap;
+static Global<jclass> Config_Class;
+static jfieldID Config_ARGB_888;
+}  // namespace pag
 
 using namespace pag;
-
-void setPAGSurface(JNIEnv* env, jobject thiz, JPAGSurface* surface) {
-  auto old = reinterpret_cast<JPAGSurface*>(env->GetLongField(thiz, PAGSurface_nativeSurface));
-  if (old != nullptr) {
-    delete old;
-  }
-  env->SetLongField(thiz, PAGSurface_nativeSurface, (jlong)surface);
-}
 
 std::shared_ptr<PAGSurface> getPAGSurface(JNIEnv* env, jobject thiz) {
   auto pagSurface =
@@ -58,6 +55,13 @@ PAG_API void Java_org_libpag_PAGSurface_nativeInit(JNIEnv* env, jclass clazz) {
   // 调用堆栈源头从C++触发而不是Java触发的情况下，FindClass
   // 可能会失败，因此要提前初始化这部分反射方法。
   NativePlatform::InitJNI(env);
+  Bitmap_Class.reset(env, env->FindClass("android/graphics/Bitmap"));
+  Bitmap_createBitmap =
+      env->GetStaticMethodID(Bitmap_Class.get(), "createBitmap",
+                             "(IILandroid/graphics/Bitmap$Config;)Landroid/graphics/Bitmap;");
+  Config_Class.reset(env, env->FindClass("android/graphics/Bitmap$Config"));
+  Config_ARGB_888 =
+      env->GetStaticFieldID(Config_Class.get(), "ARGB_8888", "Landroid/graphics/Bitmap$Config;");
 }
 
 PAG_API void Java_org_libpag_PAGSurface_nativeRelease(JNIEnv* env, jobject thiz) {
@@ -69,7 +73,11 @@ PAG_API void Java_org_libpag_PAGSurface_nativeRelease(JNIEnv* env, jobject thiz)
 }
 
 PAG_API void Java_org_libpag_PAGSurface_nativeFinalize(JNIEnv* env, jobject thiz) {
-  setPAGSurface(env, thiz, nullptr);
+  auto old = reinterpret_cast<JPAGSurface*>(env->GetLongField(thiz, PAGSurface_nativeSurface));
+  if (old != nullptr) {
+    delete old;
+  }
+  env->SetLongField(thiz, PAGSurface_nativeSurface, (jlong)thiz);
 }
 
 PAG_API jint Java_org_libpag_PAGSurface_width(JNIEnv* env, jobject thiz) {
@@ -155,30 +163,61 @@ extern "C" PAG_API jobject JNICALL Java_org_libpag_PAGSurface_makeSnapshot(JNIEn
   if (surface == nullptr) {
     return nullptr;
   }
-  int widht = surface->width();
+  int width = surface->width();
   int height = surface->height();
   unsigned char* newBitmapPixels;
-  jclass bitmapCls = env->FindClass("android/graphics/Bitmap");
-  jmethodID createBitmapFunction = env->GetStaticMethodID(
-      bitmapCls, "createBitmap", "(IILandroid/graphics/Bitmap$Config;)Landroid/graphics/Bitmap;");
-  jstring configName = env->NewStringUTF("ARGB_8888");
-  jclass bitmapConfigClass = env->FindClass("android/graphics/Bitmap$Config");
-  jmethodID valueOfBitmapConfigFunction = env->GetStaticMethodID(
-      bitmapConfigClass, "valueOf", "(Ljava/lang/String;)Landroid/graphics/Bitmap$Config;");
-  jobject bitmapConfig =
-      env->CallStaticObjectMethod(bitmapConfigClass, valueOfBitmapConfigFunction, configName);
+  auto config = env->GetStaticObjectField(Config_Class.get(), Config_ARGB_888);
   jobject newBitmap =
-      env->CallStaticObjectMethod(bitmapCls, createBitmapFunction, widht, height, bitmapConfig);
+      env->CallStaticObjectMethod(Bitmap_Class.get(), Bitmap_createBitmap, width, height, config);
   int ret;
   if ((ret = AndroidBitmap_lockPixels(env, newBitmap, (void**)&newBitmapPixels)) < 0) {
     LOGE("AndroidBitmap_lockPixels() failed ! error=%d", ret);
     return nullptr;
   }
+  AndroidBitmapInfo info;
+  AndroidBitmap_getInfo(env, newBitmap, &info);
+  int stride = info.stride;
+  if (stride == 0) {
+    stride = width * 4;
+  }
   bool status = surface->readPixels(pag::ColorType::RGBA_8888, pag::AlphaType::Premultiplied,
-                                    newBitmapPixels, widht * 4);
+                                    newBitmapPixels, stride);
+
+  AndroidBitmap_unlockPixels(env, newBitmap);
   if (!status) {
     LOGE("ReadPixels failed!");
+    return nullptr;
   }
-  AndroidBitmap_unlockPixels(env, newBitmap);
   return newBitmap;
+}
+
+extern "C" JNIEXPORT jobject JNICALL Java_org_libpag_PAGSurface_MakeOffscreen(JNIEnv* env, jclass,
+                                                                              jint width,
+                                                                              jint height) {
+  auto buffer = std::static_pointer_cast<tgfx::HardwareBuffer>(
+      tgfx::HardwareBuffer::Make(width, height, false));
+  if (!buffer) {
+    return nullptr;
+  }
+  auto drawable = GPUDrawable::FromHardwareBuffer(buffer);
+  auto surface = PAGSurface::MakeFrom(drawable);
+  if (surface == nullptr) {
+    surface = PAGSurface::MakeOffscreen(width, height);
+  }
+  if (surface == nullptr) {
+    return nullptr;
+  }
+  static auto PAGSurface_Class = Global<jclass>(env, env->FindClass("org/libpag/PAGSurface"));
+  static auto PAGSurface_Constructor = env->GetMethodID(PAGSurface_Class.get(), "<init>", "(J)V");
+  auto surfaceObject = env->NewObject(PAGSurface_Class.get(), PAGSurface_Constructor,
+                                      reinterpret_cast<jlong>(new JPAGSurface(surface)));
+
+  if (drawable != nullptr) {
+    static auto PAGSurface_HardwareBuffer = env->GetFieldID(
+        PAGSurface_Class.get(), "hardwareBuffer", "Landroid/hardware/HardwareBuffer;");
+    env->SetObjectField(surfaceObject, PAGSurface_HardwareBuffer,
+                        tgfx::HardwareBufferInterface::AHardwareBuffer_toHardwareBuffer(
+                            env, buffer->aHardwareBuffer()));
+  }
+  return surfaceObject;
 }

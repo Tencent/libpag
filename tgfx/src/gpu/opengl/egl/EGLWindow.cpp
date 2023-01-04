@@ -20,9 +20,12 @@
 
 #if defined(__ANDROID__) || defined(ANDROID)
 #include <android/native_window.h>
+#include "platform/android/HardwareBuffer.h"
 #endif
 #include <EGL/eglext.h>
 #include <GLES3/gl3.h>
+#include "core/utils/USE.h"
+#include "tgfx/gpu/opengl/GLFunctions.h"
 #include "tgfx/gpu/opengl/GLRenderTarget.h"
 
 namespace tgfx {
@@ -33,6 +36,25 @@ std::shared_ptr<EGLWindow> EGLWindow::Current() {
   }
   return std::shared_ptr<EGLWindow>(new EGLWindow(device));
 }
+
+#if defined(__ANDROID__) || defined(ANDROID)
+std::shared_ptr<EGLWindow> EGLWindow::MakeFrom(std::shared_ptr<tgfx::HardwareBuffer> hardwareBuffer,
+                                               std::shared_ptr<GLDevice> device) {
+  if (!hardwareBuffer) {
+    return nullptr;
+  }
+  auto eglDevice = device;
+  if (!eglDevice) {
+    eglDevice = EGLDevice::Make();
+  }
+  if (!eglDevice) {
+    return nullptr;
+  }
+  auto eglWindow = std::shared_ptr<EGLWindow>(new EGLWindow(eglDevice));
+  eglWindow->hardwareBuffer = hardwareBuffer;
+  return eglWindow;
+}
+#endif
 
 std::shared_ptr<EGLWindow> EGLWindow::MakeFrom(EGLNativeWindowType nativeWindow,
                                                EGLContext sharedContext) {
@@ -57,7 +79,9 @@ std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
 
   // If the rendering size changes，eglQuerySurface based on ANativeWindow may give the wrong size.
 #if defined(__ANDROID__) || defined(ANDROID)
-  if (nativeWindow) {
+  if (hardwareBuffer) {
+    return tgfx::Surface::MakeFrom(hardwareBuffer->makeTexture(context));
+  } else if (nativeWindow) {
     width = ANativeWindow_getWidth(nativeWindow);
     height = ANativeWindow_getHeight(nativeWindow);
   }
@@ -79,7 +103,15 @@ std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
   return Surface::MakeFrom(renderTarget);
 }
 
-void EGLWindow::onPresent(Context*, int64_t presentationTime) {
+void EGLWindow::onPresent(Context* context, int64_t presentationTime) {
+  USE(context);
+#if defined(__ANDROID__) || defined(ANDROID)
+  if (hardwareBuffer) {
+    auto gl = GLFunctions::Get(context);
+    gl->flush();
+    return;
+  }
+#endif
   std::static_pointer_cast<EGLDevice>(device)->swapBuffers(presentationTime);
 }
 }  // namespace tgfx
