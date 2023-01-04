@@ -82,7 +82,7 @@ std::shared_ptr<Texture> HardwareBuffer::makeMipMappedTexture(Context* context) 
     auto rect = Rect::MakeWH(static_cast<float>(width()), static_cast<float>(height()));
     AHardwareBuffer_Desc desc;
     HardwareBufferInterface::Describe(hardwareBuffer, &desc);
-    context->gpu()->writePixels(texture->getSampler(), rect, pixels, desc.stride,
+    context->gpu()->writePixels(texture->getSampler(), rect, pixels, desc.stride * 4,
                                 PixelFormat::RGBA_8888);
     context->gpu()->regenerateMipMapLevels(texture->getSampler());
   } else {
