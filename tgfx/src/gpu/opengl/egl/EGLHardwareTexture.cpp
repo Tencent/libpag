@@ -23,6 +23,7 @@
 #include <GLES/glext.h>
 #include <android/hardware_buffer.h>
 #include "core/utils/UniqueID.h"
+#include "platform/android/AHardwareBufferUtil.h"
 #include "platform/android/HardwareBuffer.h"
 #include "platform/android/HardwareBufferInterface.h"
 #include "tgfx/core/Bitmap.h"
@@ -131,10 +132,7 @@ bool EGLHardwareTexture::readPixels(const ImageInfo& dstInfo, void* dstPixels, i
   if (!srcPixels) {
     return false;
   }
-  AHardwareBuffer_Desc desc;
-  HardwareBufferInterface::Describe(hardwareBuffer, &desc);
-  auto srcInfo = ImageInfo::Make(desc.width, desc.height, ColorType::RGBA_8888,
-                                 AlphaType::Premultiplied, desc.stride * 4);
+  auto srcInfo = GetImageInfo(hardwareBuffer);
   Bitmap bitmap(srcInfo, srcPixels);
   bitmap.readPixels(dstInfo, dstPixels);
   HardwareBufferInterface::Unlock(hardwareBuffer, nullptr);

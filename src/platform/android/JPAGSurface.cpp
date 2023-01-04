@@ -182,10 +182,12 @@ extern "C" PAG_API jobject JNICALL Java_org_libpag_PAGSurface_makeSnapshot(JNIEn
   }
   bool status = surface->readPixels(pag::ColorType::RGBA_8888, pag::AlphaType::Premultiplied,
                                     newBitmapPixels, stride);
+
+  AndroidBitmap_unlockPixels(env, newBitmap);
   if (!status) {
     LOGE("ReadPixels failed!");
+    return nullptr;
   }
-  AndroidBitmap_unlockPixels(env, newBitmap);
   return newBitmap;
 }
 

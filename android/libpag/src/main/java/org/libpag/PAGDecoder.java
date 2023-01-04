@@ -19,15 +19,13 @@
 package org.libpag;
 
 import android.graphics.Bitmap;
-import android.hardware.HardwareBuffer;
-import android.os.Build;
 
 import org.extra.tools.LibraryLoadUtils;
 
 public class PAGDecoder {
-    private int width;
-    private int height;
-    private int numFrames;
+    private int _width;
+    private int _height;
+    private int _numFrames;
     private PAGSurface pagSurface;
     private PAGPlayer pagPlayer;
     private Bitmap lastFrameBitmap;
@@ -51,11 +49,11 @@ public class PAGDecoder {
             scale = 1.0f;
         }
         PAGDecoder pagDecoder = new PAGDecoder();
-        pagDecoder.width = Math.round(pagComposition.width() * scale);
-        pagDecoder.height = Math.round(pagComposition.height() * scale);
-        pagDecoder.numFrames =
+        pagDecoder._width = Math.round(pagComposition.width() * scale);
+        pagDecoder._height = Math.round(pagComposition.height() * scale);
+        pagDecoder._numFrames =
                 (int) (pagComposition.duration() * pagComposition.frameRate() / 1000000);
-        pagDecoder.pagSurface = PAGSurface.MakeOffscreen(pagDecoder.width, pagDecoder.height);
+        pagDecoder.pagSurface = PAGSurface.MakeOffscreen(pagDecoder._width, pagDecoder._height);
         if (pagDecoder.pagSurface == null) {
             return null;
         }
@@ -69,31 +67,31 @@ public class PAGDecoder {
      * Returns the width of the decoder.
      */
     public int width() {
-        return width;
+        return _width;
     }
 
     /**
      * Returns the height of the decoder.
      */
     public int height() {
-        return height;
+        return _height;
     }
 
     /**
      * Returns the number of animated frames.
      */
     public int numFrames() {
-        return numFrames;
+        return _numFrames;
     }
 
     /**
      * Returns the frame image from a specified index.
      */
     public Bitmap frameAtIndex(int index) {
-        if (index < 0 || index >= numFrames) {
+        if (index < 0 || index >= _numFrames) {
             return null;
         }
-        float progress = (index * 1.0f + 0.1f) / numFrames;
+        float progress = (index * 1.0f + 0.1f) / _numFrames;
         pagPlayer.setProgress(progress);
         if (!pagPlayer.flush() && lastFrameBitmap != null && !lastFrameBitmap.isRecycled()) {
             return lastFrameBitmap;

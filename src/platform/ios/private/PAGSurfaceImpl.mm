@@ -140,10 +140,11 @@
   uint8_t* pixelBufferData = (uint8_t*)CVPixelBufferGetBaseAddress(pixelBuffer);
   BOOL status = _pagSurface->readPixels(pag::ColorType::BGRA_8888, pag::AlphaType::Premultiplied,
                                         pixelBufferData, bytesPerRow);
+  CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
   if (!status) {
     LOGE("ReadPixels failed!");
+    return nil;
   }
-  CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
   return pixelBuffer;
 }
 

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "HardwareBuffer.h"
+#include "AHardwareBufferUtil.h"
 #include "HardwareBufferInterface.h"
 
 namespace tgfx {
@@ -50,13 +51,6 @@ std::shared_ptr<PixelBuffer> HardwareBuffer::Make(int width, int height, bool al
   auto hardwareBuffer = std::shared_ptr<HardwareBuffer>(new HardwareBuffer(buffer));
   HardwareBufferInterface::Release(buffer);
   return hardwareBuffer;
-}
-
-static ImageInfo GetImageInfo(AHardwareBuffer* hardwareBuffer) {
-  AHardwareBuffer_Desc desc;
-  HardwareBufferInterface::Describe(hardwareBuffer, &desc);
-  return ImageInfo::Make(desc.width, desc.height, ColorType::RGBA_8888, AlphaType::Premultiplied,
-                         desc.stride * 4);
 }
 
 HardwareBuffer::HardwareBuffer(AHardwareBuffer* hardwareBuffer)
