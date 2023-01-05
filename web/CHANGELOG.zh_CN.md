@@ -1,5 +1,33 @@
 # CHANGELOG
 
+## 4.1.35
+
+### BugFixes
+
+- 修复软解码器类型检查错误。(#643)
+- 修复微信小程序上字体声明验证错误。(#649)
+- 修复 Safari 上视频可播放状态时出现空帧的问题。(#655)
+
+## 4.1.33
+
+### Feature
+
+- 重构 Web 上视频解码器。(#640)
+
+### BugFixes
+
+- Web 上使用 texSubImage2D 替代 texImage2D。(#619)
+- 重构 PAGView 监听器类型检查。(#624)
+- 修复微信小程序上替换图片失败的问题。(#630)
+
+## 4.1.29
+
+### BugFixes
+
+- 修复 Chrome 上视频播放前调用 load() 产生错误的问题。(#613)
+- 修复 PAGView duration 获取错误的问题。(#614)
+- 重置 `UNPACK_PREMULTIPLY_ALPHA_WEBGL` 的默认值。(#616)
+
 ## 4.1.20
 
 ### Feature
