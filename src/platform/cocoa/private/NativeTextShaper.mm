@@ -18,8 +18,8 @@
 
 #include "NativeTextShaper.h"
 #include <CoreText/CoreText.h>
-#include "tgfx/core/Typeface_coregraphics.h"
 #include "tgfx/core/UTF.h"
+#include "tgfx/platform/apple/Typeface.h"
 
 namespace pag {
 std::optional<PositionedGlyphs> NativeTextShaper::Shape(
