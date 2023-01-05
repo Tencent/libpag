@@ -23,7 +23,7 @@ PAG Web 端，由 libpag.js + libpag.wasm 文件组成。
 对于生产环境我们推荐使用一个明确的版本号，以避免新版本带来不可预期的影响
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/libpag@4.0.5-release.18/lib/libpag.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/libpag@4.1.8/lib/libpag.min.js"></script>
 ```
 
 你可以在公共 CDN [cdn.jsdelivr.net/npm/libpag/](https://cdn.jsdelivr.net/npm/libpag/) 浏览 NPM 包内的内容，同时你也可以使用 `@latest` 将版本指定为最新的稳定版。
@@ -56,7 +56,17 @@ PAG Web 端，由 libpag.js + libpag.wasm 文件组成。
 调用 libpag.js 上的 `PAGInit()` 方法时，默认会加载 libpag.js 同一目录下的 libpag.wasm 文件。如果你希望把 libpag.wasm 放在其他目录下，则可以使用 `locateFile` 将 libpag.wasm 的路径返回给 `PAGInit()` 方法。如下
 
 ```js
-const PAG = await window.libpag.PAGInit({ locateFile: (file) => 'https://pag.art/file/' + file });
+const PAG = await window.libpag.PAGInit({
+  locateFile: () => {
+    if (location.host === 'dev.pag.art') {
+      // development environment
+      return 'https://dev.pag.art/file/libpag.wasm';
+    } else {
+      // production environment
+      return 'https://pag.art/file/libpag.wasm';
+    }
+  },
+});
 ```
 
 ### EsModule
@@ -83,9 +93,9 @@ Demo 项目提 [pag-web](https://github.com/libpag/pag-web) 供了简单的接�
 
 ## 浏览器兼容性
 
-| [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/chrome/chrome_48x48.png" alt="Chrome" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Chrome | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/safari/safari_48x48.png" alt="Safari" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Safari | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/chrome/chrome_48x48.png" alt="Chrome" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Chrome for Android | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/safari/safari_48x48.png" alt="Safari" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Safari on iOS |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Chrome >= 69                                                                                                                                                                                                  | Safari >= 11.3                                                                                                                                                                                                | Android >= 7.0                                                                                                                                                                                                            | iOS >= 11.3                                                                                                                                                                                                          |
+| [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/chrome/chrome_48x48.png" alt="Chrome" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Chrome | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/safari/safari_48x48.png" alt="Safari" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Safari | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/chrome/chrome_48x48.png" alt="Chrome" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Chrome for Android | [<img src="https://raw.githubusercontent.com/alrra/browser-logos/master/src/safari/safari_48x48.png" alt="Safari" width="24px" height="24px" />](http://godban.github.io/browsers-support-badges/)<br/>Safari on iOS | QQ Browser Mobile |
+| ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ | ----------------- |
+| Chrome >= 69                                                 | Safari >= 11.3                                               | Android >= 7.0                                               | iOS >= 11.3                                                  | last 2 versions   |
 
 更多版本的兼容工作正在进行中
 

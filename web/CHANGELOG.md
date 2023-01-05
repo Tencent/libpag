@@ -1,5 +1,33 @@
 # CHANGELOG
 
+## 4.1.35
+
+### BugFixes
+
+- Fix SoftwareDecoder type checking error. (#643)
+- Fix font family declarations is invalid on Wechat. (#649)
+- Fix empty video frame when playable state on Safari. (#655)
+
+## 4.1.33
+
+### Feature
+
+- Refactor video reader on Web. (#640)
+
+### BugFixes
+
+- Use texSubImage2D instead of texImage2D on Web. (#619)
+- Refactor PAGView listener type checker. (#624)
+- Fix replace image failed on WeChat- mini program. (#630)
+
+## 4.1.29
+
+### BugFixes
+
+- Fix video play error when called load before on Chrome. (#613)
+- Fix PAGView duration get error. (#614)
+- Restore to default value of `UNPACK_PREMULTIPLY_ALPHA_WEBGL`. (#616)
+
 ## 4.1.20
 
 ### Feature
