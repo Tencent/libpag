@@ -16,23 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <CoreGraphics/CGBitmapContext.h>
-#include "platform/NativeCodec.h"
+#pragma once
 
-namespace tgfx {
-std::shared_ptr<ImageCodec> NativeCodec::MakeCodec(const std::string&) {
-  return nullptr;
-}
+#include "base/utils/BezierEasing.h"
+#include "pag/file.h"
 
-std::shared_ptr<ImageCodec> NativeCodec::MakeCodec(std::shared_ptr<Data>) {
-  return nullptr;
-}
+namespace pag {
+class MultiDimensionPoint3DKeyframe : public Keyframe<Point3D> {
+ public:
+  ~MultiDimensionPoint3DKeyframe() override;
 
-std::shared_ptr<ImageCodec> NativeCodec::MakeFrom(void* /*nativeImage*/) {
-  return nullptr;
-}
+  void initialize() override;
 
-CGContextRef CreateBitmapContext(const ImageInfo&, void*) {
-  return nullptr;
-}
-}  // namespace tgfx
+  Point3D getValueAt(Frame time) override;
+
+ private:
+  Interpolator* xInterpolator = nullptr;
+  Interpolator* yInterpolator = nullptr;
+  Interpolator* zInterpolator = nullptr;
+};
+}  // namespace pag

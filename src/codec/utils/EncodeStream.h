@@ -210,6 +210,16 @@ class EncodeStream final {
    * Writes a list of float values to the stream.
    */
   void writeFloatList(const float* values, uint32_t count, float precision);
+  
+  /**
+   * Writes a list of Point2D values to the stream.
+   */
+  void writePoint2DList(const Point* points, uint32_t count, float precision);
+
+  /**
+   * Writes a list of Point3D values to the stream.
+   */
+  void writePoint3DList(const Point3D* points, uint32_t count, float precision);
 
   /**
    * Writes a Boolean value. A 1-bit integer is written according to the value parameter, either 1

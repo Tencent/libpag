@@ -19,5 +19,6 @@
 #pragma once
 
 #include "base/keyframes/MultiDimensionPointKeyframe.h"
+#include "base/keyframes/MultiDimensionPoint3DKeyframe.h"
 #include "base/keyframes/SingleEaseKeyframe.h"
 #include "base/keyframes/SpatialPointKeyframe.h"

@@ -23,7 +23,7 @@ namespace pag {
 CameraLayer::~CameraLayer() {
 
 }
-
+/*
 bool CameraLayer::verify() const {
   if (!Layer::verify()) {
     VerifyFailed();
@@ -35,5 +35,5 @@ bool CameraLayer::verify() const {
 Rect ImageLayer::getBounds() const {
   return Rect::MakeWH(static_cast<float>(imageBytes->width),
                       static_cast<float>(imageBytes->height));
-}
+}*/
 }  // namespace pag

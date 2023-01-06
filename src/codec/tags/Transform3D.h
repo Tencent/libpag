@@ -16,23 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <CoreGraphics/CGBitmapContext.h>
-#include "platform/NativeCodec.h"
+#pragma once
 
-namespace tgfx {
-std::shared_ptr<ImageCodec> NativeCodec::MakeCodec(const std::string&) {
-  return nullptr;
-}
+#include "codec/Attributes.h"
 
-std::shared_ptr<ImageCodec> NativeCodec::MakeCodec(std::shared_ptr<Data>) {
-  return nullptr;
+namespace pag {
+std::unique_ptr<BlockConfig> Transform3DTag(Transform3D* transform);
 }
-
-std::shared_ptr<ImageCodec> NativeCodec::MakeFrom(void* /*nativeImage*/) {
-  return nullptr;
-}
-
-CGContextRef CreateBitmapContext(const ImageInfo&, void*) {
-  return nullptr;
-}
-}  // namespace tgfx

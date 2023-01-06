@@ -60,11 +60,15 @@ void Layer::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) {
 }
 
 bool Layer::verify() const {
-  if (containingComposition == nullptr || duration <= 0 || transform == nullptr) {
+  if (containingComposition == nullptr || duration <= 0 || (transform == nullptr && transform3D == nullptr)) {
     VerifyFailed();
     return false;
   }
-  if (!transform->verify()) {
+  if (transform != nullptr && !transform->verify()) {
+    VerifyFailed();
+    return false;
+  }
+  if (transform3D != nullptr && !transform3D->verify()) {
     VerifyFailed();
     return false;
   }

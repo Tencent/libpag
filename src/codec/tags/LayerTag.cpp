@@ -28,6 +28,7 @@
 #include "ShapeTag.h"
 #include "SolidColor.h"
 #include "Transform2D.h"
+#include "Transform3D.h"
 #include "codec/tags/CachePolicy.h"
 #include "codec/tags/ImageFillRule.h"
 #include "codec/tags/text/TextAnimatorTag.h"
@@ -85,15 +86,34 @@ void ReadTagsOfLayer(DecodeStream* stream, TagCode code, Layer* layer) {
       ReadTagBlock(stream, transform, Transform2DTag);
       auto hasPosition = (transform->position->animatable() ||
                           transform->position->getValueAt(0) != Point::Zero());
-      auto hasXPosition =
-          (transform->xPosition->animatable() || transform->xPosition->getValueAt(0) != 0);
-      auto hasYPosition =
-          (transform->yPosition->animatable() || transform->yPosition->getValueAt(0) != 0);
+      auto hasXPosition = (transform->xPosition->animatable() || transform->xPosition->getValueAt(0) != 0);
+      auto hasYPosition = (transform->yPosition->animatable() || transform->yPosition->getValueAt(0) != 0);
       if (hasPosition || (!hasXPosition && !hasYPosition)) {
         delete transform->xPosition;
         transform->xPosition = nullptr;
         delete transform->yPosition;
         transform->yPosition = nullptr;
+      } else {
+        delete transform->position;
+        transform->position = nullptr;
+      }
+    } break;
+    case TagCode::Transform3D: {
+      layer->transform3D = new Transform3D();
+      auto transform = layer->transform3D;
+      ReadTagBlock(stream, transform, Transform3DTag);
+      auto hasPosition = (transform->position->animatable() ||
+                          transform->position->getValueAt(0) != Point3D::Zero());
+      auto hasXPosition = (transform->xPosition->animatable() || transform->xPosition->getValueAt(0) != 0);
+      auto hasYPosition = (transform->yPosition->animatable() || transform->yPosition->getValueAt(0) != 0);
+      auto hasZPosition = (transform->zPosition->animatable() || transform->zPosition->getValueAt(0) != 0);
+      if (hasPosition || (!hasXPosition && !hasYPosition && !hasZPosition)) {
+        delete transform->xPosition;
+        transform->xPosition = nullptr;
+        delete transform->yPosition;
+        transform->yPosition = nullptr;
+        delete transform->zPosition;
+        transform->zPosition = nullptr;
       } else {
         delete transform->position;
         transform->position = nullptr;
@@ -232,7 +252,10 @@ TagCode WriteLayer(EncodeStream* stream, Layer* layer) {
   }
   WriteEffects(stream, layer->effects);
   WriteLayerStyles(stream, layer->layerStyles);
-  if (layer->transform != nullptr) {
+  if (layer->transform3D != nullptr) {
+    WriteTagBlock(stream, layer->transform3D, Transform3DTag);
+  }
+  else if (layer->transform != nullptr) {
     WriteTagBlock(stream, layer->transform, Transform2DTag);
   }
   if (layer->cachePolicy != CachePolicy::Auto) {
