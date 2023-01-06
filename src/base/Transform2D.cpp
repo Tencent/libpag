@@ -45,6 +45,9 @@ Transform2D::~Transform2D() {
 }
 
 void Transform2D::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {
+  if (this == nullptr) {
+    return;
+  }
   anchorPoint->excludeVaryingRanges(timeRanges);
   if (position != nullptr) {
     position->excludeVaryingRanges(timeRanges);

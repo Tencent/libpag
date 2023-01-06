@@ -28,6 +28,7 @@ Layer::Layer() : uniqueID(UniqueID::Next()) {
 Layer::~Layer() {
   delete cache;
   delete transform;
+  delete transform3D;
   delete timeRemap;
   for (auto& mask : masks) {
     delete mask;
@@ -45,6 +46,7 @@ Layer::~Layer() {
 
 void Layer::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) {
   transform->excludeVaryingRanges(timeRanges);
+  transform3D->excludeVaryingRanges(timeRanges);
   if (timeRemap != nullptr) {
     timeRemap->excludeVaryingRanges(timeRanges);
   }
@@ -107,11 +109,11 @@ Rect Layer::getBounds() const {
   return Rect::MakeEmpty();
 }
 
-Point Layer::getMaxScaleFactor() {
+template<typename T>
+static Point getMaxScaleInternal(Property<T>* property) {
   auto maxScale = Point::Make(1, 1);
-  auto property = transform->scale;
   if (property->animatable()) {
-    auto keyframes = static_cast<AnimatableProperty<Point>*>(property)->keyframes;
+    auto keyframes = static_cast<AnimatableProperty<T>*>(property)->keyframes;
     float scaleX = fabs(keyframes[0]->startValue.x);
     float scaleY = fabs(keyframes[0]->startValue.y);
     for (auto& keyframe : keyframes) {
@@ -129,6 +131,16 @@ Point Layer::getMaxScaleFactor() {
   } else {
     maxScale.x = fabs(property->value.x);
     maxScale.y = fabs(property->value.y);
+  }
+  return maxScale;
+}
+
+Point Layer::getMaxScaleFactor() {
+  auto maxScale = Point::Make(1, 1);
+  if (transform != nullptr) {
+    maxScale = getMaxScaleInternal(transform->scale);
+  } else if (transform3D != nullptr) {
+    maxScale = getMaxScaleInternal(transform3D->scale);
   }
   if (!effects.empty()) {
     auto bounds = getBounds();
