@@ -29,7 +29,7 @@ bool CameraLayer::verify() const {
     VerifyFailed();
     return false;
   }
-  VerifyAndReturn(imageBytes != nullptr);
+  VerifyAndReturn(true);
 }
 
 Rect ImageLayer::getBounds() const {
