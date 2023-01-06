@@ -115,6 +115,14 @@ Point ReadPoint(DecodeStream* stream) {
   return point;
 }
 
+Point3D ReadPoint3D(DecodeStream* stream) {
+  Point3D point = {};
+  point.x = stream->readFloat();
+  point.y = stream->readFloat();
+  point.z = stream->readFloat();
+  return point;
+}
+
 static void ReadPathInternal(DecodeStream* stream, PathData* value, const Enum records[],
                              int64_t numVerbs) {
   auto numBits = stream->readNumBits();
@@ -380,6 +388,12 @@ void WriteOpacity(EncodeStream* stream, pag::Opacity value) {
 void WritePoint(EncodeStream* stream, pag::Point value) {
   stream->writeFloat(value.x);
   stream->writeFloat(value.y);
+}
+
+void WritePoint3D(EncodeStream* stream, pag::Point3D value) {
+  stream->writeFloat(value.x);
+  stream->writeFloat(value.y);
+  stream->writeFloat(value.z);
 }
 
 static void WritePathInternal(EncodeStream* stream, pag::PathHandle value) {

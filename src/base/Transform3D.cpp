@@ -74,7 +74,7 @@ void Transform3D::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const
 bool Transform3D::verify() const {
   VerifyAndReturn(anchorPoint != nullptr && (position != nullptr ||
                    (xPosition != nullptr && yPosition != nullptr && zRotation != nullptr)) &&
-                  scale != nullptr && xRotation != nullptr && yRotation != nullptr &&
-                  zRotation != nullptr && opacity != nullptr);
+                  scale != nullptr && orientation != nullptr && xRotation != nullptr &&
+                  yRotation != nullptr && zRotation != nullptr && opacity != nullptr);
 }
 }  // namespace pag

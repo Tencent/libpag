@@ -188,6 +188,22 @@ void DecodeStream::readFloatList(float* values, uint32_t count, float precision)
     values[i] = readBits(numBits) * precision;
   }
 }
+void DecodeStream::readPoint2DList(Point* points, uint32_t count, float precision) {
+  auto numBits = readNumBits();
+  for (uint32_t i = 0; i < count; i++) {
+    points[i].x = readBits(numBits) * precision;
+    points[i].y = readBits(numBits) * precision;
+  }
+}
+
+void DecodeStream::readPoint3DList(Point3D* points, uint32_t count, float precision) {
+  auto numBits = readNumBits();
+  for (uint32_t i = 0; i < count; i++) {
+    points[i].x = readBits(numBits) * precision;
+    points[i].y = readBits(numBits) * precision;
+    points[i].z = readBits(numBits) * precision;
+  }
+}
 
 Bit8 DecodeStream::readBit8() {
   Bit8 data = {};

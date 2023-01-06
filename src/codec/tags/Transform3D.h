@@ -16,24 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "base/utils/Verify.h"
-#include "pag/file.h"
+#pragma once
+
+#include "codec/Attributes.h"
 
 namespace pag {
-CameraLayer::~CameraLayer() {
-
+std::unique_ptr<BlockConfig> Transform3DTag(Transform3D* transform);
 }
-/*
-bool CameraLayer::verify() const {
-  if (!Layer::verify()) {
-    VerifyFailed();
-    return false;
-  }
-  VerifyAndReturn(imageBytes != nullptr);
-}
-
-Rect ImageLayer::getBounds() const {
-  return Rect::MakeWH(static_cast<float>(imageBytes->width),
-                      static_cast<float>(imageBytes->height));
-}*/
-}  // namespace pag

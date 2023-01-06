@@ -16,24 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "base/utils/Verify.h"
+#pragma once
+
+#include "base/utils/BezierEasing.h"
 #include "pag/file.h"
 
 namespace pag {
-CameraLayer::~CameraLayer() {
+class MultiDimensionPoint3DKeyframe : public Keyframe<Point3D> {
+ public:
+  ~MultiDimensionPoint3DKeyframe() override;
 
-}
-/*
-bool CameraLayer::verify() const {
-  if (!Layer::verify()) {
-    VerifyFailed();
-    return false;
-  }
-  VerifyAndReturn(imageBytes != nullptr);
-}
+  void initialize() override;
 
-Rect ImageLayer::getBounds() const {
-  return Rect::MakeWH(static_cast<float>(imageBytes->width),
-                      static_cast<float>(imageBytes->height));
-}*/
+  Point3D getValueAt(Frame time) override;
+
+ private:
+  Interpolator* xInterpolator = nullptr;
+  Interpolator* yInterpolator = nullptr;
+  Interpolator* zInterpolator = nullptr;
+};
 }  // namespace pag

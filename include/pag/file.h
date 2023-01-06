@@ -135,6 +135,8 @@ enum class TagCode {
   MaskBlockV2 = 84,
   GradientOverlayStyle = 85,
   EncryptedData = 89,
+  Transform3D = 90,
+
   // add new tags here...
 
   Count
