@@ -112,15 +112,18 @@ class Matrix4x4 {
   /**
    * Returns true if Matrix4x4 is identity.  Identity matrix is:
    *
-   *       | 1 0 0 |
-   *       | 0 1 0 |
-   *       | 0 0 1 |
+   *       | 1 0 0 0 |
+   *       | 0 1 0 0 |
+   *       | 0 0 1 0 |
+   *       | 0 0 0 1 |
    *
    * @return  true if Matrix4x4 has no effect
    */
   bool isIdentity() const {
-    return values[0] == 1 && values[1] == 0 && values[2] == 0 && values[3] == 0 && values[4] == 1 &&
-           values[5] == 0 && values[6] == 0 && values[7] == 0 && values[8] == 1;
+    return values[0] == 1  && values[1] == 0  && values[2] == 0  && values[3] == 0 &&
+           values[4] == 0  && values[5] == 1  && values[6] == 0  && values[7] == 0 &&
+           values[8] == 0  && values[9] == 0  && values[10] == 1 && values[11] == 0 &&
+           values[12] == 0 && values[13] == 0 && values[14] == 0 && values[15] == 1;
   }
 
   /**
@@ -149,54 +152,6 @@ class Matrix4x4 {
    */
   void set(int index, float value) {
     values[index] = value;
-  }
-
-  /**
-   * Sets horizontal scale factor.
-   * @param v  horizontal scale factor to store
-   */
-  void setScaleX(float v) {
-    this->set(SCALE_X, v);
-  }
-
-  /**
-   * Sets vertical scale factor.
-   * @param v  vertical scale factor to store
-   */
-  void setScaleY(float v) {
-    this->set(SCALE_Y, v);
-  }
-
-  /**
-   * Sets vertical skew factor.
-   * @param v  vertical skew factor to store
-   */
-  void setSkewY(float v) {
-    this->set(SKEW_Y, v);
-  }
-
-  /**
-   * Sets horizontal skew factor.
-   * @param v  horizontal skew factor to store
-   */
-  void setSkewX(float v) {
-    this->set(SKEW_X, v);
-  }
-
-  /**
-   * Sets horizontal translation.
-   * @param v  horizontal translation to store
-   */
-  void setTranslateX(float v) {
-    this->set(TRANS_X, v);
-  }
-
-  /**
-   * Sets vertical translation.
-   * @param v  vertical translation to store
-   */
-  void setTranslateY(float v) {
-    this->set(TRANS_Y, v);
   }
 
   /**
