@@ -25,6 +25,9 @@
 #include "tgfx/gpu/Resource.h"
 
 namespace tgfx {
+// Default maximum number of bytes of gpu memory of budgeted resources in the cache.
+static const size_t DefaultMaxBytes = 96 * (1 << 20);
+
 static thread_local std::unordered_set<ResourceCache*> currentThreadCaches = {};
 
 class PurgeGuard {
@@ -41,12 +44,12 @@ class PurgeGuard {
   ResourceCache* cache = nullptr;
 };
 
-ResourceCache::ResourceCache(Context* context) : context(context) {
+ResourceCache::ResourceCache(Context* context) : context(context), maxBytes(DefaultMaxBytes) {
 }
 
 bool ResourceCache::empty() const {
-  return nonpurgeableResources.empty() && pendingRemovedResources.empty() &&
-         recycledResources.empty();
+  return nonpurgeableResources.empty() && pendingPurgableResources.empty() &&
+         purgeableResources.empty();
 }
 
 void ResourceCache::attachToCurrentThread() {
@@ -66,12 +69,12 @@ void ResourceCache::detachFromCurrentThread() {
   }
   // strongReferences 保护已经开启，这时候不会再有任何外部的 Resource 会触发
   // NotifyReferenceReachedZero()。
-  std::vector<Resource*> removedResources = {};
-  std::swap(removedResources, pendingRemovedResources);
-  for (auto& resource : removedResources) {
-    removeResource(resource);
+  std::vector<Resource*> pendingResources = {};
+  std::swap(pendingResources, pendingPurgableResources);
+  for (auto& resource : pendingResources) {
+    processUnreferencedResource(resource);
   }
-  DEBUG_ASSERT(pendingRemovedResources.empty());
+  DEBUG_ASSERT(pendingPurgableResources.empty());
   currentThreadCaches.erase(this);
 }
 
@@ -85,68 +88,81 @@ void ResourceCache::releaseAll(bool releaseGPU) {
     resource->context = nullptr;
   }
   nonpurgeableResources.clear();
-  for (auto& item : recycledResources) {
-    for (auto& resource : item.second) {
-      if (releaseGPU) {
-        resource->onReleaseGPU();
-      }
-      delete resource;
+  for (auto& resource : purgeableResources) {
+    if (releaseGPU) {
+      resource->onReleaseGPU();
     }
+    delete resource;
   }
-  recycledResources.clear();
+  purgeableResources.clear();
+  recycleKeyMap.clear();
+  contentKeyMap.clear();
+  purgeableBytes = 0;
+  totalBytes = 0;
 }
 
-void ResourceCache::purgeNotUsedSince(int64_t purgeTime) {
-  PurgeGuard guard(this);
-  std::unordered_map<BytesKey, std::vector<Resource*>, BytesHasher> recycledMap = {};
-  for (auto& item : recycledResources) {
-    std::vector<Resource*> needToRecycle = {};
-    for (auto& resource : item.second) {
-      if (resource->lastUsedTime < purgeTime) {
-        needToRecycle.push_back(resource);
-      } else {
-        resource->onReleaseGPU();
-        delete resource;
-      }
-    }
-    if (!needToRecycle.empty()) {
-      recycledMap[item.first] = needToRecycle;
-    }
+void ResourceCache::setCacheLimit(size_t bytesLimit) {
+  if (maxBytes == bytesLimit) {
+    return;
   }
-  recycledResources = recycledMap;
+  maxBytes = bytesLimit;
+  purgeUntilMemoryTo(maxBytes);
 }
 
-std::shared_ptr<Resource> ResourceCache::getRecycled(const BytesKey& resourceKey) {
-  auto result = recycledResources.find(resourceKey);
-  if (result == recycledResources.end()) {
+std::shared_ptr<Resource> ResourceCache::getRecycled(const BytesKey& recycleKey) {
+  auto result = recycleKeyMap.find(recycleKey);
+  if (result == recycleKeyMap.end()) {
     return nullptr;
   }
   auto& list = result->second;
-  auto resource = list.back();
-  list.pop_back();
-  if (list.empty()) {
-    recycledResources.erase(result);
+  int index = 0;
+  bool found = false;
+  for (auto& resource : list) {
+    if (resource->isPurgeable() && !resource->hasContentOwner()) {
+      found = true;
+      break;
+    }
+    index++;
   }
+  if (!found) {
+    return nullptr;
+  }
+  auto resource = list[index];
+  RemoveFromList(purgeableResources, resource);
+  purgeableBytes -= resource->memoryUsage();
   return wrapResource(resource);
 }
 
-void ResourceCache::AddToList(std::vector<Resource*>& list, Resource* resource) {
-  auto index = list.size();
-  list.push_back(resource);
-  resource->cacheArrayIndex = index;
+std::shared_ptr<Resource> ResourceCache::findByContent(uint32_t contentKey) {
+  auto result = contentKeyMap.find(contentKey);
+  if (result == contentKeyMap.end()) {
+    return nullptr;
+  }
+  auto resource = result->second;
+  if (!resource->hasContentOwner()) {
+    contentKeyMap.erase(result);
+    return nullptr;
+  }
+  if (resource->isPurgeable()) {
+    RemoveFromList(purgeableResources, resource);
+    purgeableBytes -= resource->memoryUsage();
+    return wrapResource(resource);
+  }
+  return resource->weakThis.lock();
 }
 
-void ResourceCache::RemoveFromList(std::vector<Resource*>& list, Resource* resource) {
-  auto tail = *(list.end() - 1);
-  auto index = resource->cacheArrayIndex;
-  list[index] = tail;
-  tail->cacheArrayIndex = index;
-  list.pop_back();
+void ResourceCache::AddToList(std::list<Resource*>& list, Resource* resource) {
+  list.push_front(resource);
+  resource->cachedPosition = list.begin();
+}
+
+void ResourceCache::RemoveFromList(std::list<Resource*>& list, Resource* resource) {
+  list.erase(resource->cachedPosition);
 }
 
 void ResourceCache::NotifyReferenceReachedZero(Resource* resource) {
   if (resource->context) {
-    resource->context->resourceCache()->removeResource(resource);
+    resource->context->resourceCache()->processUnreferencedResource(resource);
   } else {
     // Resource 上的属性都是在 Context 加锁的情况下读写的，这里如果 context
     // 为空，说明已经被释放了，可以直接删除。
@@ -154,20 +170,13 @@ void ResourceCache::NotifyReferenceReachedZero(Resource* resource) {
   }
 }
 
-std::shared_ptr<Resource> ResourceCache::wrapResource(Resource* resource) {
-  AddToList(nonpurgeableResources, resource);
-  auto result = std::shared_ptr<Resource>(resource, ResourceCache::NotifyReferenceReachedZero);
-  result->weakThis = result;
-  return result;
-}
-
-void ResourceCache::removeResource(Resource* resource) {
+void ResourceCache::processUnreferencedResource(Resource* resource) {
   if (currentThreadCaches.count(this) == 0) {
     // 当 strongReferences 列表清空时，其他线程的 Resource 也有可能会触发
     // NotifyReferenceReachedZero()。 如果触发的线程不是当前 context 被锁定时的线程,
     // 先放进一个队列延后处理。
     std::lock_guard<std::mutex> autoLock(removeLocker);
-    pendingRemovedResources.push_back(resource);
+    pendingPurgableResources.push_back(resource);
     return;
   }
   // 禁止 Resource 嵌套，防止 Context 析构时无法释放子项。
@@ -177,13 +186,103 @@ void ResourceCache::removeResource(Resource* resource) {
   DEBUG_ASSERT(context->device()->contextLocked);
   RemoveFromList(nonpurgeableResources, resource);
   if (resource->recycleKey.isValid()) {
-    resource->lastUsedTime = Clock::Now();
-    recycledResources[resource->recycleKey].push_back(resource);
-  } else {
-    purgingResource = true;
-    resource->onReleaseGPU();
-    purgingResource = false;
-    delete resource;
+    auto hasBudget = purgeUntilMemoryTo(maxBytes - resource->memoryUsage());
+    if (hasBudget) {
+      AddToList(purgeableResources, resource);
+      purgeableBytes += resource->memoryUsage();
+      resource->lastUsedTime = Clock::Now();
+      return;
+    }
   }
+  removeResource(resource);
+}
+
+void ResourceCache::assignContentOwner(Resource* resource, Cacheable* owner) {
+  if (owner == nullptr) {
+    removeContentOwner(resource);
+    return;
+  }
+  auto result = contentKeyMap.find(owner->uniqueID());
+  if (result != contentKeyMap.end()) {
+    removeContentOwner(result->second);
+  }
+  if (resource->contentKey > 0) {
+    contentKeyMap.erase(resource->contentKey);
+  }
+  resource->contentKey = owner->uniqueID();
+  resource->contentOwner = owner->weakThis;
+  contentKeyMap[owner->uniqueID()] = resource;
+}
+
+void ResourceCache::removeContentOwner(Resource* resource) {
+  if (resource->contentKey == 0) {
+    return;
+  }
+  contentKeyMap.erase(resource->contentKey);
+  resource->contentKey = 0;
+  resource->contentOwner.reset();
+}
+
+std::shared_ptr<Resource> ResourceCache::wrapResource(Resource* resource) {
+  AddToList(nonpurgeableResources, resource);
+  auto result = std::shared_ptr<Resource>(resource, ResourceCache::NotifyReferenceReachedZero);
+  result->weakThis = result;
+  return result;
+}
+
+std::shared_ptr<Resource> ResourceCache::addResource(Resource* resource) {
+  if (resource->recycleKey.isValid()) {
+    recycleKeyMap[resource->recycleKey].push_back(resource);
+  }
+  totalBytes += resource->memoryUsage();
+  return wrapResource(resource);
+}
+
+void ResourceCache::removeResource(Resource* resource) {
+  if (resource->contentKey > 0) {
+    contentKeyMap.erase(resource->contentKey);
+  }
+  if (resource->recycleKey.isValid()) {
+    auto result = recycleKeyMap.find(resource->recycleKey);
+    if (result != recycleKeyMap.end()) {
+      auto& list = result->second;
+      list.erase(std::remove(list.begin(), list.end(), resource), list.end());
+      if (list.empty()) {
+        recycleKeyMap.erase(resource->recycleKey);
+      }
+    }
+  }
+  purgingResource = true;
+  resource->onReleaseGPU();
+  purgingResource = false;
+  totalBytes -= resource->memoryUsage();
+  if (resource->isPurgeable()) {
+    delete resource;
+  } else {
+    // 标记 Resource 已经被释放，等外部指针计数为 0 时可以直接 delete。
+    resource->context = nullptr;
+  }
+}
+
+void ResourceCache::purgeNotUsedSince(int64_t purgeTime) {
+  while (!purgeableResources.empty()) {
+    auto resource = purgeableResources.back();
+    if (resource->lastUsedTime >= purgeTime) {
+      break;
+    }
+    purgeableResources.pop_back();
+    purgeableBytes -= resource->memoryUsage();
+    removeResource(resource);
+  }
+}
+
+bool ResourceCache::purgeUntilMemoryTo(size_t bytesLimit) {
+  while (!purgeableResources.empty() && totalBytes > bytesLimit) {
+    auto resource = purgeableResources.back();
+    purgeableResources.pop_back();
+    purgeableBytes -= resource->memoryUsage();
+    removeResource(resource);
+  }
+  return totalBytes <= bytesLimit;
 }
 }  // namespace tgfx

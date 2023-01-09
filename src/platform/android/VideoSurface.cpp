@@ -86,6 +86,10 @@ tgfx::Point OESTexture::getTextureCoord(float x, float y) const {
   return {x / static_cast<float>(width()) * sx + tx, y / static_cast<float>(height()) * sy + ty};
 }
 
+size_t OESTexture::memoryUsage() const {
+  return textureWidth * textureHeight * 4;
+}
+
 void OESTexture::onReleaseGPU() {
   if (sampler.id > 0) {
     auto gl = tgfx::GLFunctions::Get(context);

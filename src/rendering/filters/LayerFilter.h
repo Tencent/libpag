@@ -41,6 +41,10 @@ class FilterProgram : public tgfx::Resource {
  private:
   FilterProgram() = default;
 
+  size_t memoryUsage() const override {
+    return 0;
+  }
+
   void onReleaseGPU() override;
 };
 

@@ -22,6 +22,11 @@
 #include "gpu/Gpu.h"
 
 namespace tgfx {
+static size_t ComputeSize(int width, int height, int sizePerPixel, bool mipMapped) {
+  auto colorSize = width * height * sizePerPixel;
+  return mipMapped ? colorSize * 4 / 3 : colorSize;
+}
+
 class GLBackendTexture : public GLTexture {
  public:
   GLBackendTexture(GLSampler textureSampler, int width, int height, ImageOrigin origin,
@@ -32,6 +37,10 @@ class GLBackendTexture : public GLTexture {
 
  private:
   bool adopted = false;
+
+  size_t memoryUsage() const override {
+    return 0;
+  }
 
   void onReleaseGPU() override {
     if (adopted) {
@@ -79,6 +88,10 @@ class GLAlphaTexture : public GLTexture {
   }
 
  private:
+  size_t memoryUsage() const override {
+    return ComputeSize(width(), height(), 1, sampler.maxMipMapLevel > 0);
+  }
+
   void onReleaseGPU() override {
     context->gpu()->deleteTexture(&sampler);
   }
@@ -106,6 +119,10 @@ class GLRGBATexture : public GLTexture {
   }
 
  private:
+  size_t memoryUsage() const override {
+    return ComputeSize(width(), height(), 4, sampler.maxMipMapLevel > 0);
+  }
+
   void onReleaseGPU() override {
     context->gpu()->deleteTexture(&sampler);
   }

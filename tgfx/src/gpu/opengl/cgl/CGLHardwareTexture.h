@@ -40,7 +40,7 @@ class CGLHardwareTexture : public GLTexture {
   CVOpenGLTextureRef texture = nil;
 
   static void ComputeRecycleKey(BytesKey* recycleKey, CVPixelBufferRef pixelBuffer);
-
+  size_t memoryUsage() const override;
   void onReleaseGPU() override;
 };
 }  // namespace tgfx

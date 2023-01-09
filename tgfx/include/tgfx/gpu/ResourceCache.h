@@ -18,7 +18,9 @@
 
 #pragma once
 
+#include <list>
 #include <unordered_map>
+#include "tgfx/core/Cacheable.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
@@ -37,9 +39,40 @@ class ResourceCache {
   bool empty() const;
 
   /**
-   * Returns a reusable resource in the cache.
+   * Returns the number of bytes consumed by resources.
+   */
+  size_t getResourceBytes() const {
+    return totalBytes;
+  }
+
+  /**
+   * Returns the number of bytes held by purgeable resources.
+   */
+  size_t getPurgeableBytes() const {
+    return purgeableBytes;
+  }
+
+  /**
+   * Returns current cache limits of max gpu memory byte size.
+   */
+  size_t getCacheLimit() const {
+    return maxBytes;
+  }
+
+  /**
+   * Sets the cache limits of max gpu memory byte size.
+   */
+  void setCacheLimit(size_t bytesLimit);
+
+  /**
+   * Returns a reusable resource in the cache by the specified recycleKey.
    */
   std::shared_ptr<Resource> getRecycled(const BytesKey& recycleKey);
+
+  /**
+   * Returns a unique resource in the cache by the specified contentKey.
+   */
+  std::shared_ptr<Resource> findByContent(uint32_t contentKey);
 
   /**
    * Purges GPU resources that haven't been used the passed in time.
@@ -47,23 +80,39 @@ class ResourceCache {
    */
   void purgeNotUsedSince(int64_t purgeTime);
 
+  /**
+   * Purge unreferenced resources from the cache until the the provided bytesLimit has been reached
+   * or we have purged all unreferenced resources. Returns true if the total resource bytes is not
+   * over the specified bytesLimit after purging.
+   */
+  bool purgeUntilMemoryTo(size_t bytesLimit);
+
  private:
   Context* context = nullptr;
+  size_t maxBytes = 0;
+  size_t totalBytes = 0;
+  size_t purgeableBytes = 0;
   bool purgingResource = false;
-  std::vector<Resource*> nonpurgeableResources = {};
   std::vector<std::shared_ptr<Resource>> strongReferences = {};
-  std::unordered_map<BytesKey, std::vector<Resource*>, BytesHasher> recycledResources = {};
+  std::list<Resource*> nonpurgeableResources = {};
+  std::list<Resource*> purgeableResources = {};
+  std::unordered_map<BytesKey, std::vector<Resource*>, BytesHasher> recycleKeyMap = {};
+  std::unordered_map<uint32_t, Resource*> contentKeyMap = {};
   std::mutex removeLocker = {};
-  std::vector<Resource*> pendingRemovedResources = {};
+  std::vector<Resource*> pendingPurgableResources = {};
 
-  static void AddToList(std::vector<Resource*>& list, Resource* resource);
-  static void RemoveFromList(std::vector<Resource*>& list, Resource* resource);
+  static void AddToList(std::list<Resource*>& list, Resource* resource);
+  static void RemoveFromList(std::list<Resource*>& list, Resource* resource);
   static void NotifyReferenceReachedZero(Resource* resource);
 
   void attachToCurrentThread();
   void detachFromCurrentThread();
   void releaseAll(bool releaseGPU);
+  void processUnreferencedResource(Resource* resource);
+  void assignContentOwner(Resource* resource, Cacheable* owner);
+  void removeContentOwner(Resource* resource);
   std::shared_ptr<Resource> wrapResource(Resource* resource);
+  std::shared_ptr<Resource> addResource(Resource* resource);
   void removeResource(Resource* resource);
 
   friend class Resource;

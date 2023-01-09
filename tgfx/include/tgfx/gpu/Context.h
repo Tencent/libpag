@@ -69,11 +69,38 @@ class Context {
     return _resourceProvider;
   }
 
-   /**
-    * Purges GPU resources that haven't been used since the passed in time.
-    * @param purgeTime A timestamp previously returned by Clock::Now().
-    */
+  /**
+   * Returns the number of bytes consumed by internal gpu caches.
+   */
+  size_t memoryUsage() const;
+
+  /**
+   * Returns the number of bytes held by purgeable resources.
+   */
+  size_t purgeableBytes() const;
+
+  /**
+   * Returns current cache limits of max gpu memory byte size.
+   */
+  size_t getCacheLimit() const;
+
+  /**
+   * Sets the cache limit of max gpu memory byte size.
+   */
+  void setCacheLimit(size_t bytesLimit);
+
+  /**
+   * Purges GPU resources that haven't been used since the passed in time.
+   * @param purgeTime A timestamp previously returned by Clock::Now().
+   */
   void purgeResourcesNotUsedSince(int64_t purgeTime);
+
+  /**
+   * Purge unreferenced resources from the cache until the the provided bytesLimit has been reached
+   * or we have purged all unreferenced resources. Returns true if the total resource bytes is not
+   * over the specified bytesLimit after the purging.
+   */
+  bool purgeResourcesUntilMemoryTo(size_t bytesLimit);
 
   /**
    * Inserts a GPU semaphore that the current GPU-backed API must wait on before executing any more

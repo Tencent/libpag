@@ -196,6 +196,10 @@ const TextureSampler* GLYUVTexture::getSamplerAt(size_t index) const {
   return &samplers[index];
 }
 
+size_t GLYUVTexture::memoryUsage() const {
+  return width() * height() * 3 / 2;
+}
+
 void GLYUVTexture::onReleaseGPU() {
   for (auto& sampler : samplers) {
     context->gpu()->deleteTexture(&sampler);

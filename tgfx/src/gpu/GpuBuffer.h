@@ -44,5 +44,9 @@ class GpuBuffer : public Resource {
 
  private:
   size_t _sizeInBytes;
+
+  size_t memoryUsage() const override {
+    return _sizeInBytes;
+  }
 };
 }  // namespace tgfx

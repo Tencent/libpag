@@ -201,6 +201,7 @@ void RenderCache::attachToContext(tgfx::Context* current, bool forHitTest) {
     releaseAll();
   }
   context = current;
+  context->setCacheLimit(MAX_GRAPHICS_MEMORY);
   deviceID = context->device()->uniqueID();
   hitTestOnly = forHitTest;
   if (hitTestOnly) {
