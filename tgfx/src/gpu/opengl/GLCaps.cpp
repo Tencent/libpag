@@ -287,9 +287,9 @@ void GLCaps::initFormatMap(const GLInfo& info) {
   pixelFormatMap[PixelFormat::RGBA_8888].format.sizedFormat = GL_RGBA8;
   pixelFormatMap[PixelFormat::RGBA_8888].format.externalFormat = GL_RGBA;
   pixelFormatMap[PixelFormat::RGBA_8888].readSwizzle = Swizzle::RGBA();
-  pixelFormatMap[PixelFormat::BGRA_8888].format.sizedFormat = GL_BGRA8;
+  pixelFormatMap[PixelFormat::BGRA_8888].format.sizedFormat = GL_RGBA8;
   pixelFormatMap[PixelFormat::BGRA_8888].format.externalFormat = GL_BGRA;
-  pixelFormatMap[PixelFormat::BGRA_8888].readSwizzle = Swizzle::BGRA();
+  pixelFormatMap[PixelFormat::BGRA_8888].readSwizzle = Swizzle::RGBA();
   if (textureRedSupport) {
     pixelFormatMap[PixelFormat::ALPHA_8].format.sizedFormat = GL_R8;
     pixelFormatMap[PixelFormat::ALPHA_8].format.externalFormat = GL_RED;
@@ -325,6 +325,9 @@ void GLCaps::initFormatMap(const GLInfo& info) {
     format.internalFormatTexImage = useSizedTexFormats ? format.sizedFormat : format.externalFormat;
     format.internalFormatRenderBuffer =
         useSizedRbFormats ? format.sizedFormat : format.externalFormat;
+  }
+  if (info.hasExtension("GL_APPLE_texture_format_BGRA8888")) {
+    pixelFormatMap[PixelFormat::BGRA_8888].format.internalFormatTexImage = GL_RGBA;
   }
   initColorSampleCount(info);
 }
