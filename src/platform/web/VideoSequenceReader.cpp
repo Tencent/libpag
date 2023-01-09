@@ -66,6 +66,10 @@ tgfx::Point WebVideoTexture::getTextureCoord(float x, float y) const {
   return {x / static_cast<float>(width()), y / static_cast<float>(height())};
 }
 
+size_t WebVideoTexture::memoryUsage() const {
+  return width() * height() * 4;
+}
+
 void WebVideoTexture::onReleaseGPU() {
   if (sampler.id > 0) {
     auto gl = tgfx::GLFunctions::Get(context);

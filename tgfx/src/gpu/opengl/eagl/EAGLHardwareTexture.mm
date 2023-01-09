@@ -115,6 +115,10 @@ void EAGLHardwareTexture::computeRecycleKey(BytesKey* recycleKey) const {
   ComputeRecycleKey(recycleKey, pixelBuffer);
 }
 
+size_t EAGLHardwareTexture::memoryUsage() const {
+  return CVPixelBufferGetDataSize(pixelBuffer);
+}
+
 void EAGLHardwareTexture::onReleaseGPU() {
   if (texture == nil) {
     return;

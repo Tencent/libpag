@@ -112,6 +112,12 @@ void EGLHardwareTexture::ComputeRecycleKey(BytesKey* recycleKey, void* hardwareB
   recycleKey->write(hardwareBuffer);
 }
 
+size_t EGLHardwareTexture::memoryUsage() const {
+  AHardwareBuffer_Desc desc;
+  HardwareBufferInterface::Describe(hardwareBuffer, &desc);
+  return desc.height * desc.stride * 4;
+}
+
 void EGLHardwareTexture::onReleaseGPU() {
   glDeleteTextures(1, &sampler.id);
   auto display = static_cast<EGLDevice*>(context->device())->getDisplay();

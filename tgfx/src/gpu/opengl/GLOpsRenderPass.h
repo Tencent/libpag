@@ -64,6 +64,7 @@ class GLOpsRenderPass : public OpsRenderPass {
     void computeRecycleKey(BytesKey*) const override;
 
    private:
+    size_t memoryUsage() const override;
     void onReleaseGPU() override;
   };
 

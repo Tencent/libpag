@@ -79,6 +79,10 @@ bool GLOpsRenderPass::Vertex::init(Context* context) {
   return CheckGLError(context);
 }
 
+size_t GLOpsRenderPass::Vertex::memoryUsage() const {
+  return 0;
+}
+
 void GLOpsRenderPass::Vertex::onReleaseGPU() {
   auto gl = GLFunctions::Get(context);
   if (array > 0) {

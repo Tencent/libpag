@@ -18,33 +18,31 @@
 
 #pragma once
 
-#include "tgfx/gpu/YUVTexture.h"
-#include "tgfx/gpu/opengl/GLSampler.h"
+#include <memory>
 
 namespace tgfx {
 /**
- * GLYUVTexture wraps separate texture units in the OpenGL backend for Y, U, and V planes.
+ * The base class for CPU objects that can generate GPU caches. The content of a Cacheable is
+ * immutable.
  */
-class GLYUVTexture : public YUVTexture {
+class Cacheable {
  public:
-  Point getTextureCoord(float x, float y) const override;
-
-  size_t samplerCount() const override {
-    return samplers.size();
+  /**
+   * Returns a global unique ID for this Cacheable. The content of a Cacheable cannot change after
+   * it is created. Any operation to create a new Cacheable will receive generate a new unique ID.
+   */
+  uint32_t uniqueID() const {
+    return _uniqueID;
   }
 
-  const TextureSampler* getSamplerAt(size_t index) const override;
-
  protected:
-  std::vector<GLSampler> samplers = {};
+  std::weak_ptr<Cacheable> weakThis;
 
-  GLYUVTexture(YUVColorSpace colorSpace, YUVColorRange colorRange, int width, int height);
+  Cacheable();
 
  private:
-  size_t memoryUsage() const override;
+  uint32_t _uniqueID = 0;
 
-  void onReleaseGPU() override;
-
-  friend class YUVTexture;
+  friend class ResourceCache;
 };
 }  // namespace tgfx

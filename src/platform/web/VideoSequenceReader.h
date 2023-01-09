@@ -37,6 +37,7 @@ class WebVideoTexture : public tgfx::GLTexture {
   tgfx::Point getTextureCoord(float x, float y) const override;
 
  private:
+  size_t memoryUsage() const override;
   void onReleaseGPU() override;
 
   bool isAndroidMiniprogram = false;

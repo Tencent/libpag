@@ -43,6 +43,8 @@ class EGLHardwareTexture : public GLTexture {
 
   ~EGLHardwareTexture() override;
 
+  size_t memoryUsage() const override;
+
   void onReleaseGPU() override;
 };
 }  // namespace tgfx

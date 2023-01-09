@@ -63,8 +63,28 @@ void Context::onUnlocked() {
   _resourceCache->detachFromCurrentThread();
 }
 
+size_t Context::memoryUsage() const {
+  return _resourceCache->getResourceBytes();
+}
+
+size_t Context::purgeableBytes() const {
+  return _resourceCache->getPurgeableBytes();
+}
+
+size_t Context::getCacheLimit() const {
+  return _resourceCache->getCacheLimit();
+}
+
+void Context::setCacheLimit(size_t bytesLimit) {
+  _resourceCache->setCacheLimit(bytesLimit);
+}
+
 void Context::purgeResourcesNotUsedSince(int64_t purgeTime) {
   _resourceCache->purgeNotUsedSince(purgeTime);
+}
+
+bool Context::purgeResourcesUntilMemoryTo(size_t bytesLimit) {
+  return _resourceCache->purgeUntilMemoryTo(bytesLimit);
 }
 
 void Context::releaseAll(bool releaseGPU) {

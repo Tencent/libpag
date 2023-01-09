@@ -61,6 +61,10 @@ class RenderTarget : public Resource {
   }
 
  private:
+  size_t memoryUsage() const override {
+    return 0;
+  }
+  
   virtual const Swizzle& writeSwizzle() const = 0;
 
   int _width = 0;

@@ -92,6 +92,10 @@ void CGLHardwareTexture::computeRecycleKey(BytesKey* recycleKey) const {
   ComputeRecycleKey(recycleKey, pixelBuffer);
 }
 
+size_t CGLHardwareTexture::memoryUsage() const {
+  return CVPixelBufferGetDataSize(pixelBuffer);
+}
+
 void CGLHardwareTexture::onReleaseGPU() {
   if (texture == nil) {
     return;
@@ -102,4 +106,4 @@ void CGLHardwareTexture::onReleaseGPU() {
   auto textureCache = cglDevice->getTextureCache();
   CVOpenGLTextureCacheFlush(textureCache, 0);
 }
-}
+}  // namespace tgfx

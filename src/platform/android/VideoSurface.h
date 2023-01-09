@@ -33,6 +33,8 @@ class OESTexture : public tgfx::GLTexture {
 
   void computeTransform();
 
+  size_t memoryUsage() const override;
+
   void onReleaseGPU() override;
 
   int textureWidth = 0;

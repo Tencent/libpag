@@ -18,15 +18,15 @@
 
 #pragma once
 
+#include "tgfx/core/Cacheable.h"
 #include "tgfx/gpu/ResourceCache.h"
 
 namespace tgfx {
 /**
- * The base class for GPU resource. Overrides the onReleaseGPU() method to to free all GPU resources.
- * No backend API calls should be made during destructuring since there may be no GPU context which
- * is current on the calling thread.
- * Note: Resource is not thread safe, do not access any properties of a Resource unless its
- * associated device is locked.
+ * The base class for GPU resource. Overrides the onReleaseGPU() method to to free all GPU
+ * resources. No backend API calls should be made during destructuring since there may be no GPU
+ * context which is current on the calling thread. Note: Resource is not thread safe, do not access
+ * any properties of a Resource unless its associated device is locked.
  */
 class Resource {
  public:
@@ -34,7 +34,7 @@ class Resource {
   static std::shared_ptr<T> Wrap(Context* context, T* resource) {
     resource->context = context;
     static_cast<Resource*>(resource)->computeRecycleKey(&resource->recycleKey);
-    return std::static_pointer_cast<T>(context->resourceCache()->wrapResource(resource));
+    return std::static_pointer_cast<T>(context->resourceCache()->addResource(resource));
   }
 
   virtual ~Resource() = default;
@@ -58,13 +58,30 @@ class Resource {
  private:
   std::weak_ptr<Resource> weakThis;
   BytesKey recycleKey = {};
-  size_t cacheArrayIndex = 0;
+  uint32_t contentKey = 0;
+  std::weak_ptr<Cacheable> contentOwner;
+  std::list<Resource*>::iterator cachedPosition;
   int64_t lastUsedTime = 0;
+
+  bool isPurgeable() const {
+    return weakThis.expired();
+  }
+
+  bool hasContentOwner() const {
+    return !contentOwner.expired();
+  }
+
+  /**
+   * Retrieves the amount of GPU memory used by this resource in bytes.
+   */
+  virtual size_t memoryUsage() const = 0;
 
   /**
    * Overridden to free GPU resources in the backend API.
    */
   virtual void onReleaseGPU() = 0;
+
+  void assignContentOwner(Cacheable* owner);
 
   friend class ResourceCache;
 };
