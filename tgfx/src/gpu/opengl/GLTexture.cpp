@@ -128,6 +128,27 @@ class GLRGBATexture : public GLTexture {
   }
 };
 
+class GLBGRATexture : public GLRGBATexture {
+ public:
+  static void ComputeRecycleKey(BytesKey* recycleKey, int width, int height, bool mipMap) {
+    static const uint32_t BGRAType = UniqueID::Next();
+    recycleKey->write(BGRAType);
+    recycleKey->write(static_cast<uint32_t>(width));
+    recycleKey->write(static_cast<uint32_t>(height));
+    recycleKey->write(static_cast<uint32_t>(mipMap ? 1 : 0));
+  }
+
+  GLBGRATexture(GLSampler textureSampler, int width, int height,
+                ImageOrigin origin = ImageOrigin::TopLeft)
+      : GLRGBATexture(std::move(textureSampler), width, height, origin) {
+  }
+
+ protected:
+  void computeRecycleKey(BytesKey* recycleKey) const override {
+    ComputeRecycleKey(recycleKey, width(), height(), sampler.maxMipMapLevel > 0);
+  }
+};
+
 static bool CheckTextureSize(const GLCaps* caps, int width, int height) {
   if (width < 1 || height < 1) {
     return false;
@@ -137,7 +158,7 @@ static bool CheckTextureSize(const GLCaps* caps, int width, int height) {
 }
 
 std::shared_ptr<Texture> Texture::Make(Context* context, int width, int height, void* pixels,
-                                       size_t rowBytes, ImageOrigin origin, bool alphaOnly,
+                                       size_t rowBytes, ImageOrigin origin, PixelFormat pixelFormat,
                                        bool mipMapped) {
   // Clear the previously generated GLError, causing the subsequent CheckGLError to return an
   // incorrect result.
@@ -148,12 +169,11 @@ std::shared_ptr<Texture> Texture::Make(Context* context, int width, int height, 
   }
   bool enableMipMap = mipMapped && caps->mipMapSupport;
   BytesKey recycleKey = {};
-  PixelFormat pixelFormat;
-  if (alphaOnly) {
-    pixelFormat = PixelFormat::ALPHA_8;
+  if (pixelFormat == PixelFormat::ALPHA_8) {
     GLAlphaTexture::ComputeRecycleKey(&recycleKey, width, height, enableMipMap);
+  } else if (pixelFormat == PixelFormat::BGRA_8888) {
+    GLBGRATexture::ComputeRecycleKey(&recycleKey, width, height, enableMipMap);
   } else {
-    pixelFormat = PixelFormat::RGBA_8888;
     GLRGBATexture::ComputeRecycleKey(&recycleKey, width, height, enableMipMap);
   }
 
@@ -171,8 +191,10 @@ std::shared_ptr<Texture> Texture::Make(Context* context, int width, int height, 
       return nullptr;
     }
     auto glSampler = static_cast<GLSampler*>(sampler.get());
-    if (alphaOnly) {
+    if (pixelFormat == PixelFormat::ALPHA_8) {
       texture = Resource::Wrap(context, new GLAlphaTexture(*glSampler, width, height, origin));
+    } else if (pixelFormat == PixelFormat::BGRA_8888) {
+      texture = Resource::Wrap(context, new GLBGRATexture(*glSampler, width, height, origin));
     } else {
       texture = Resource::Wrap(context, new GLRGBATexture(*glSampler, width, height, origin));
     }
@@ -191,7 +213,7 @@ std::shared_ptr<Texture> Texture::MakeAlpha(Context* context, int width, int hei
   if (context == nullptr) {
     return nullptr;
   }
-  return Make(context, width, height, pixels, rowBytes, origin, true);
+  return Make(context, width, height, pixels, rowBytes, origin, PixelFormat::ALPHA_8);
 }
 
 std::shared_ptr<Texture> Texture::MakeRGBA(Context* context, int width, int height, void* pixels,
@@ -199,7 +221,7 @@ std::shared_ptr<Texture> Texture::MakeRGBA(Context* context, int width, int heig
   if (context == nullptr) {
     return nullptr;
   }
-  return Make(context, width, height, pixels, rowBytes, origin, false);
+  return Make(context, width, height, pixels, rowBytes, origin, PixelFormat::RGBA_8888);
 }
 
 GLTexture::GLTexture(int width, int height, ImageOrigin origin) : Texture(width, height, origin) {

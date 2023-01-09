@@ -117,9 +117,11 @@ std::shared_ptr<Texture> HardwareBuffer::makeTexture(Context* context) const {
 }
 
 std::shared_ptr<Texture> HardwareBuffer::makeMipMappedTexture(Context* context) const {
-  bool alphaOnly = CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_OneComponent8;
+  auto format = CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_OneComponent8
+                    ? PixelFormat::ALPHA_8
+                    : PixelFormat::BGRA_8888;
   auto texture =
-      Texture::Make(context, width(), height(), nullptr, 0, ImageOrigin::TopLeft, alphaOnly, true);
+      Texture::Make(context, width(), height(), nullptr, 0, ImageOrigin::TopLeft, format, true);
   if (texture == nullptr) {
     return nullptr;
   }

@@ -25,6 +25,7 @@
 
 namespace tgfx {
 static CVOpenGLESTextureRef GetTextureRef(Context* context, CVPixelBufferRef pixelBuffer,
+                                          PixelFormat pixelFormat,
                                           CVOpenGLESTextureCacheRef textureCache) {
   if (textureCache == nil) {
     return nil;
@@ -32,24 +33,14 @@ static CVOpenGLESTextureRef GetTextureRef(Context* context, CVPixelBufferRef pix
   auto width = static_cast<int>(CVPixelBufferGetWidth(pixelBuffer));
   auto height = static_cast<int>(CVPixelBufferGetHeight(pixelBuffer));
   CVOpenGLESTextureRef texture = nil;
-  CVReturn result;
-  if (CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_OneComponent8) {
-    auto caps = GLCaps::Get(context);
-    const auto& format = caps->getTextureFormat(PixelFormat::ALPHA_8);
-    // 返回的 texture 对象是一个强引用计数为 1 的对象。
-    result = CVOpenGLESTextureCacheCreateTextureFromImage(
-        kCFAllocatorDefault, textureCache, pixelBuffer, NULL, /* texture attributes */
-        GL_TEXTURE_2D, format.internalFormatTexImage,         /* opengl format */
-        width, height, format.externalFormat,                 /* native iOS format */
-        GL_UNSIGNED_BYTE, 0, &texture);
-  } else {
-    // 返回的 texture 对象是一个强引用计数为 1 的对象。
-    result = CVOpenGLESTextureCacheCreateTextureFromImage(
-        kCFAllocatorDefault, textureCache, pixelBuffer, NULL, /* texture attributes */
-        GL_TEXTURE_2D, GL_RGBA,                               /* opengl format */
-        width, height, GL_BGRA,                               /* native iOS format */
-        GL_UNSIGNED_BYTE, 0, &texture);
-  }
+  auto caps = GLCaps::Get(context);
+  const auto& format = caps->getTextureFormat(pixelFormat);
+  // 返回的 texture 对象是一个强引用计数为 1 的对象。
+  CVReturn result = CVOpenGLESTextureCacheCreateTextureFromImage(
+      kCFAllocatorDefault, textureCache, pixelBuffer, NULL, /* texture attributes */
+      GL_TEXTURE_2D, format.internalFormatTexImage,         /* opengl format */
+      width, height, format.externalFormat,                 /* native iOS format */
+      GL_UNSIGNED_BYTE, 0, &texture);
   if (result != kCVReturnSuccess && texture != nil) {
     CFRelease(texture);
     texture = nil;
@@ -72,14 +63,15 @@ std::shared_ptr<EAGLHardwareTexture> EAGLHardwareTexture::MakeFrom(Context* cont
     return nullptr;
   }
 
-  auto texture = GetTextureRef(context, pixelBuffer, eaglDevice->getTextureCache());
+  auto format = CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_OneComponent8
+                    ? PixelFormat::ALPHA_8
+                    : PixelFormat::BGRA_8888;
+  auto texture = GetTextureRef(context, pixelBuffer, format, eaglDevice->getTextureCache());
   if (texture == nil) {
     return nullptr;
   }
   GLSampler glInfo = {};
-  auto oneComponent8 =
-      CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_OneComponent8;
-  glInfo.format = oneComponent8 ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
+  glInfo.format = format;
   glInfo.target = CVOpenGLESTextureGetTarget(texture);
   glInfo.id = CVOpenGLESTextureGetName(texture);
   glTexture = Resource::Wrap(context, new EAGLHardwareTexture(pixelBuffer));
@@ -144,5 +136,4 @@ bool EAGLHardwareTexture::readPixels(const ImageInfo &dstInfo, void *dstPixels, 
     CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
     return result;
 }
-
-}
+}  // namespace tgfx
