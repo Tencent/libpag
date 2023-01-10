@@ -24,11 +24,11 @@ namespace pag {
 
 #define MaxBezierTValue 0x3FFFFFFF
 
-bool TSpanBigEnough(int tSpan) {
+inline bool TSpanBigEnough(int tSpan) {
   return (tSpan >> 10) != 0;
 }
 
-float ClampTo(float value, float min, float max) {
+static float ClampTo(float value, float min, float max) {
   if (value < min) {
     value = min;
   }
@@ -38,22 +38,22 @@ float ClampTo(float value, float min, float max) {
   return value;
 }
 
-float MaxFloat(float a, float b) {
+inline float MaxFloat(float a, float b) {
   return a > b ? a : b;
 }
 
-float MinFloat(float a, float b) {
+inline float MinFloat(float a, float b) {
   return a < b ? a : b;
 }
 
-float Distance(const Point& a, const Point& b) {
+static float Distance(const Point& a, const Point& b) {
   auto dx = a.x - b.x;
   auto dy = a.y - b.y;
   return sqrtf(dx * dx + dy * dy);
 }
 
-bool PointOnLine(const Point& point1, const Point& point2, const Point& point3,
-                 const float& precision) {
+static bool PointOnLine(const Point& point1, const Point& point2, const Point& point3,
+                        const float& precision) {
   auto distance = point1.x * point2.y + point1.y * point3.x + point2.x * point3.y -
                   point3.x * point2.y - point3.y * point1.x - point2.x * point1.y;
   return fabs(distance) < precision;
@@ -63,7 +63,7 @@ bool PointOnLine(const Point& point1, const Point& point2, const Point& point3,
  * Given the cubic bezier points, split it at the specified t value, where 0 < t < 1, and return the
  * two new cubics in result: result[0..3] and result[3..6]
  */
-void SplitCubicCurveAt(const Point points[4], Point result[7], float t) {
+static void SplitCubicCurveAt(const Point points[4], Point result[7], float t) {
   auto p1 = Interpolate(points[0], points[1], t);
   auto bc = Interpolate(points[1], points[2], t);
   auto p5 = Interpolate(points[2], points[3], t);
@@ -79,11 +79,11 @@ void SplitCubicCurveAt(const Point points[4], Point result[7], float t) {
   result[6] = points[3];
 }
 
-bool DistanceExceedsLimit(const Point& pt1, const Point& pt2, const float& precision) {
+static bool DistanceExceedsLimit(const Point& pt1, const Point& pt2, const float& precision) {
   return MaxFloat(fabsf(pt2.x - pt1.x), fabsf(pt2.y - pt1.y)) > precision;
 }
 
-bool CubicTooCurvy(const Point pts[4], const float& precision) {
+static bool CubicTooCurvy(const Point pts[4], const float& precision) {
   static float oneOfThird = 1.0f / 3;
   static float twoOfThird = 2.0f / 3;
   auto pt1 = Interpolate(pts[0], pts[3], oneOfThird);
@@ -92,8 +92,8 @@ bool CubicTooCurvy(const Point pts[4], const float& precision) {
          DistanceExceedsLimit(pts[2], pt2, precision);
 }
 
-float BuildCubicSegments(const Point points[4], float distance, unsigned minT, unsigned maxT,
-                         std::vector<BezierSegment>& segments, const float& precision) {
+static float BuildCubicSegments(const Point points[4], float distance, unsigned minT, unsigned maxT,
+                                std::vector<BezierSegment>& segments, const float& precision) {
   if (TSpanBigEnough(maxT - minT) && CubicTooCurvy(points, precision)) {
     auto halfT = (minT + maxT) >> 1;
     Point result[7];
