@@ -209,19 +209,19 @@ std::shared_ptr<Texture> Texture::Make(Context* context, int width, int height, 
 }
 
 std::shared_ptr<Texture> Texture::MakeAlpha(Context* context, int width, int height, void* pixels,
-                                            size_t rowBytes, ImageOrigin origin) {
+                                            size_t rowBytes, ImageOrigin origin, bool mipMapped) {
   if (context == nullptr) {
     return nullptr;
   }
-  return Make(context, width, height, pixels, rowBytes, origin, PixelFormat::ALPHA_8);
+  return Make(context, width, height, pixels, rowBytes, origin, PixelFormat::ALPHA_8, mipMapped);
 }
 
 std::shared_ptr<Texture> Texture::MakeRGBA(Context* context, int width, int height, void* pixels,
-                                           size_t rowBytes, ImageOrigin origin) {
+                                           size_t rowBytes, ImageOrigin origin, bool mipMapped) {
   if (context == nullptr) {
     return nullptr;
   }
-  return Make(context, width, height, pixels, rowBytes, origin, PixelFormat::RGBA_8888);
+  return Make(context, width, height, pixels, rowBytes, origin, PixelFormat::RGBA_8888, mipMapped);
 }
 
 GLTexture::GLTexture(int width, int height, ImageOrigin origin) : Texture(width, height, origin) {

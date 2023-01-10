@@ -43,15 +43,17 @@ std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<Texture> texture, int
 }
 
 std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, bool alphaOnly,
-                                       int sampleCount) {
+                                       int sampleCount, bool mipMapped) {
   auto pixelFormat = alphaOnly ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
   std::shared_ptr<GLTexture> texture;
   if (alphaOnly) {
     if (GLCaps::Get(context)->textureRedSupport) {
-      texture = std::static_pointer_cast<GLTexture>(Texture::MakeAlpha(context, width, height));
+      texture = std::static_pointer_cast<GLTexture>(
+          Texture::MakeAlpha(context, width, height, ImageOrigin::TopLeft, mipMapped));
     }
   } else {
-    texture = std::static_pointer_cast<GLTexture>(Texture::MakeRGBA(context, width, height));
+    texture = std::static_pointer_cast<GLTexture>(
+        Texture::MakeRGBA(context, width, height, ImageOrigin::TopLeft, mipMapped));
   }
   if (texture == nullptr) {
     return nullptr;

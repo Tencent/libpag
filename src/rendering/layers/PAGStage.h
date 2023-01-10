@@ -20,6 +20,7 @@
 
 #include <cfloat>
 #include <map>
+#include <optional>
 #include <unordered_set>
 #include "pag/file.h"
 #include "pag/pag.h"
@@ -95,6 +96,8 @@ class PAGStage : public PAGComposition {
 
   float getAssetMaxScale(ID referenceID);
 
+  float getAssetRelativeMinScale(ID referenceID);
+
  protected:
   void invalidateCacheScale() override {
     PAGComposition::invalidateCacheScale();
@@ -109,7 +112,7 @@ class PAGStage : public PAGComposition {
   int64_t rootVersion = -1;
   std::unordered_map<PAGLayer*, Frame> layerStartTimeMap = {};
   std::unordered_map<ID, std::vector<PAGLayer*>> layerReferenceMap = {};
-  std::unordered_map<ID, float> scaleFactorCache = {};
+  std::unordered_map<ID, std::pair<float, float>> scaleFactorCache = {};
   std::unordered_map<ID, SequenceCache> sequenceCache = {};
   std::unordered_set<ID> invalidAssets = {};
   std::unordered_map<ID, PAGImage*> pagImageMap = {};
@@ -119,9 +122,9 @@ class PAGStage : public PAGComposition {
   pag::PAGLayer* getLayerFromReferenceMap(ID uniqueID);
   void addToReferenceMap(ID uniqueID, PAGLayer* pagLayer);
   bool removeFromReferenceMap(ID uniqueID, PAGLayer* pagLayer);
-  float getMaxScaleFactor(ID referenceID);
-  float calcMaxScaleFactor(ID referenceID);
-  float getLayerScaleFactor(PAGLayer* pagLayer, tgfx::Point scale);
+  std::pair<float, float> getScaleFactor(ID referenceID);
+  std::optional<std::pair<float, float>> calcScaleFactor(ID referenceID);
+  static std::pair<float, float> GetLayerScaleFactor(PAGLayer* pagLayer, tgfx::Point scale);
   void updateLayerStartTime(PAGLayer* pagLayer);
   void updateChildLayerStartTime(PAGComposition* pagComposition);
 

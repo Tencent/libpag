@@ -286,8 +286,10 @@ Snapshot* RenderCache::getSnapshot(const Picture* image) {
     moveSnapshotToHead(snapshot);
     return snapshot;
   }
-  snapshot =
-      makeSnapshot(scaleFactor, [&]() { return image->makeSnapshot(this, scaleFactor).release(); });
+  snapshot = makeSnapshot(scaleFactor, [&]() {
+    bool enableMipMap = NeedsEnableMipMap(stage->getAssetRelativeMinScale(image->assetID));
+    return image->makeSnapshot(this, scaleFactor, enableMipMap).release();
+  });
   if (snapshot == nullptr) {
     return nullptr;
   }

@@ -54,7 +54,8 @@ class Surface {
    * zero.
    */
   static std::shared_ptr<Surface> Make(Context* context, int width, int height,
-                                       bool alphaOnly = false, int sampleCount = 1);
+                                       bool alphaOnly = false, int sampleCount = 1,
+                                       bool mipMapped = false);
 
   /**
    * Wraps a render target into Surface. Returns nullptr if renderTarget is nullptr.

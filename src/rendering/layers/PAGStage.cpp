@@ -273,26 +273,33 @@ std::unordered_set<ID> PAGStage::getRemovedAssets() {
 }
 
 float PAGStage::getAssetMaxScale(ID referenceID) {
-  return getMaxScaleFactor(referenceID) * _cacheScale;
+  return getScaleFactor(referenceID).first * _cacheScale;
 }
 
-float PAGStage::getMaxScaleFactor(ID referenceID) {
+float PAGStage::getAssetRelativeMinScale(ID referenceID) {
+  auto scale = getScaleFactor(referenceID);
+  if (scale.first == 0 || scale.second == 0) {
+    return 0;
+  }
+  return scale.second / scale.first;
+}
+
+std::pair<float, float> PAGStage::getScaleFactor(ID referenceID) {
   auto result = scaleFactorCache.find(referenceID);
   if (result != scaleFactorCache.end()) {
     return result->second;
   }
-  auto maxScaleFactor = calcMaxScaleFactor(referenceID);
-  if (maxScaleFactor == FLT_MIN) {
-    return 0;
+  if (auto scaleFactor = calcScaleFactor(referenceID)) {
+    scaleFactorCache[referenceID] = *scaleFactor;
+    return *scaleFactor;
   }
-  scaleFactorCache[referenceID] = maxScaleFactor;
-  return maxScaleFactor;
+  return {0, 0};
 }
 
-float PAGStage::calcMaxScaleFactor(ID referenceID) {
+std::optional<std::pair<float, float>> PAGStage::calcScaleFactor(ID referenceID) {
   auto reference = layerReferenceMap.find(referenceID);
   if (reference == layerReferenceMap.end()) {
-    return FLT_MIN;
+    return std::nullopt;
   }
   std::vector<PAGLayer*> pagLayers = {};
   auto isPAGImage = pagImageMap.count(referenceID) > 0;
@@ -308,18 +315,21 @@ float PAGStage::calcMaxScaleFactor(ID referenceID) {
   };
   std::for_each(reference->second.begin(), reference->second.end(), func);
   if (pagLayers.empty()) {
-    return 0;
+    return std::nullopt;
   }
-  float maxScaleFactor = 0;
-  auto forEachFunc = [&maxScaleFactor, isPAGImage, this](PAGLayer* pagLayer) {
+  std::pair<float, float> result = {0, FLT_MAX};
+  auto forEachFunc = [&result, isPAGImage](PAGLayer* pagLayer) {
     auto scale = GetLayerContentScaleFactor(pagLayer, isPAGImage);
-    auto scaleFactor = getLayerScaleFactor(pagLayer, scale);
-    if (scaleFactor > maxScaleFactor) {
-      maxScaleFactor = scaleFactor;
+    auto scaleFactor = GetLayerScaleFactor(pagLayer, scale);
+    if (scaleFactor.first > result.first) {
+      result.first = scaleFactor.first;
+    }
+    if (scaleFactor.second < result.second) {
+      result.second = scaleFactor.second;
     }
   };
   std::for_each(pagLayers.begin(), pagLayers.end(), forEachFunc);
-  return maxScaleFactor;
+  return result;
 }
 
 tgfx::Point PAGStage::GetLayerContentScaleFactor(PAGLayer* pagLayer, bool isPAGImage) {
@@ -344,15 +354,21 @@ tgfx::Point PAGStage::GetLayerContentScaleFactor(PAGLayer* pagLayer, bool isPAGI
   return scale;
 }
 
-float PAGStage::getLayerScaleFactor(PAGLayer* pagLayer, tgfx::Point scale) {
+std::pair<float, float> PAGStage::GetLayerScaleFactor(PAGLayer* pagLayer, tgfx::Point scale) {
+  auto maxScale = scale;
+  auto minScale = scale;
   auto parent = pagLayer;
   while (parent) {
-    auto layerScaleFactor = parent->layerCache->getMaxScaleFactor();
-    scale.x *= fabs(layerScaleFactor.x);
-    scale.y *= fabs(layerScaleFactor.y);
+    auto layerScaleFactor = parent->layerCache->getScaleFactor();
+    maxScale.x *= fabs(layerScaleFactor.first.x);
+    maxScale.y *= fabs(layerScaleFactor.first.y);
+    minScale.x *= fabs(layerScaleFactor.second.x);
+    minScale.y *= fabs(layerScaleFactor.second.y);
     auto matrixScaleFactor = GetScaleFactor(ToTGFX(parent->layerMatrix));
-    scale.x *= fabs(matrixScaleFactor.x);
-    scale.y *= fabs(matrixScaleFactor.y);
+    maxScale.x *= fabs(matrixScaleFactor.x);
+    maxScale.y *= fabs(matrixScaleFactor.y);
+    minScale.x *= fabs(matrixScaleFactor.x);
+    minScale.y *= fabs(matrixScaleFactor.y);
     if (parent->_parent) {
       parent = parent->_parent;
     } else if (parent->trackMatteOwner) {
@@ -361,6 +377,6 @@ float PAGStage::getLayerScaleFactor(PAGLayer* pagLayer, tgfx::Point scale) {
       break;
     }
   }
-  return std::max(scale.x, scale.y);
+  return {std::max(maxScale.x, maxScale.y), std::min(minScale.x, minScale.y)};
 }
 }  // namespace pag

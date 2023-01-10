@@ -44,14 +44,16 @@ class Texture : public Resource {
    */
   static std::shared_ptr<Texture> MakeRGBA(Context* context, int width, int height, void* pixels,
                                            size_t rowBytes,
-                                           ImageOrigin origin = ImageOrigin::TopLeft);
+                                           ImageOrigin origin = ImageOrigin::TopLeft,
+                                           bool mipMapped = false);
   /**
    * Creates a empty texture with each pixel stored as 32-bit RGBA data. Returns nullptr if any of
    * the parameters is not valid.
    */
   static std::shared_ptr<Texture> MakeRGBA(Context* context, int width, int height,
-                                           ImageOrigin origin = ImageOrigin::TopLeft) {
-    return MakeRGBA(context, width, height, nullptr, 0, origin);
+                                           ImageOrigin origin = ImageOrigin::TopLeft,
+                                           bool mipMapped = false) {
+    return MakeRGBA(context, width, height, nullptr, 0, origin, mipMapped);
   }
 
   /**
@@ -61,15 +63,17 @@ class Texture : public Resource {
    */
   static std::shared_ptr<Texture> MakeAlpha(Context* context, int width, int height, void* pixels,
                                             size_t rowBytes,
-                                            ImageOrigin origin = ImageOrigin::TopLeft);
+                                            ImageOrigin origin = ImageOrigin::TopLeft,
+                                            bool mipMapped = false);
   /**
    * Creates a empty texture with each pixel stored as a single translucency (alpha) channel.
    * Returns nullptr if any of the parameters is not valid or the backend does not support creating
    * alpha only textures.
    */
   static std::shared_ptr<Texture> MakeAlpha(Context* context, int width, int height,
-                                            ImageOrigin origin = ImageOrigin::TopLeft) {
-    return MakeAlpha(context, width, height, nullptr, 0, origin);
+                                            ImageOrigin origin = ImageOrigin::TopLeft,
+                                            bool mipMapped = false) {
+    return MakeAlpha(context, width, height, nullptr, 0, origin, mipMapped);
   }
 
   Texture(int width, int height, ImageOrigin origin)
@@ -125,7 +129,5 @@ class Texture : public Resource {
                                        bool mipMapped = false);
 
   friend class HardwareBuffer;
-
-  friend class RasterPixelBuffer;
 };
 }  // namespace tgfx
