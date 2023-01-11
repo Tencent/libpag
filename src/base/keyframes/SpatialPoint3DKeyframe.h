@@ -18,8 +18,16 @@
 
 #pragma once
 
-#include "base/keyframes/MultiDimensionPointKeyframe.h"
-#include "base/keyframes/MultiDimensionPoint3DKeyframe.h"
-#include "base/keyframes/SingleEaseKeyframe.h"
-#include "base/keyframes/SpatialPointKeyframe.h"
-#include "base/keyframes/SpatialPoint3DKeyframe.h"
+#include "SingleEaseKeyframe.h"
+#include "BezierPath3D.h""
+
+namespace pag {
+class SpatialPoint3DKeyframe : public SingleEaseKeyframe<Point3D> {
+ public:
+  void initialize() override;
+  Point3D getValueAt(Frame time) override;
+
+ private:
+  std::shared_ptr<BezierPath3D> spatialBezier = nullptr;
+};
+}  // namespace pag

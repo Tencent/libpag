@@ -223,8 +223,8 @@ class Keyframe {
   Enum interpolationType = KeyframeInterpolationType::Hold;
   std::vector<Point> bezierOut;
   std::vector<Point> bezierIn;
-  Point spatialOut = Point::Zero();
-  Point spatialIn = Point::Zero();
+  Point3D spatialOut = Point3D::Zero();
+  Point3D spatialIn = Point3D::Zero();
 };
 
 /**
