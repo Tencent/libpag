@@ -19,410 +19,409 @@
 #pragma once
 
 #include <cstring>
+#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
-/***
- * Matrix4x4 holds a 3x3 matrix for transforming coordinates. This allows mapping Point and vectors
- * with translation, scaling, skewing, rotation, and perspective.
- * Matrix4x4 elements are in row major order. Matrix4x4 does not have a constructor, so it must be
- * explicitly initialized. setIdentity() initializes Matrix4x4 so it has no effect.
- * setTranslate(), setScale(), setSkew(), setRotate(), set9 and setAll() initializes all Matrix4x4
- * elements with the corresponding mapping.
+
+struct SkV2 {
+  float x, y;
+
+  bool operator==(const SkV2 v) const { return x == v.x && y == v.y; }
+  bool operator!=(const SkV2 v) const { return !(*this == v); }
+
+  static float   Dot(SkV2 a, SkV2 b) { return a.x * b.x + a.y * b.y; }
+  static float Cross(SkV2 a, SkV2 b) { return a.x * b.y - a.y * b.x; }
+  static SkV2 Normalize(SkV2 v) { return v * (1.0f / v.length()); }
+
+  SkV2 operator-() const { return {-x, -y}; }
+  SkV2 operator+(SkV2 v) const { return {x+v.x, y+v.y}; }
+  SkV2 operator-(SkV2 v) const { return {x-v.x, y-v.y}; }
+
+  SkV2 operator*(SkV2 v) const { return {x*v.x, y*v.y}; }
+  friend SkV2 operator*(SkV2 v, float s) { return {v.x*s, v.y*s}; }
+  friend SkV2 operator*(float s, SkV2 v) { return {v.x*s, v.y*s}; }
+  friend SkV2 operator/(SkV2 v, float s) { return {v.x/s, v.y/s}; }
+  friend SkV2 operator/(float s, SkV2 v) { return {s/v.x, s/v.y}; }
+
+  void operator+=(SkV2 v) { *this = *this + v; }
+  void operator-=(SkV2 v) { *this = *this - v; }
+  void operator*=(SkV2 v) { *this = *this * v; }
+  void operator*=(float s) { *this = *this * s; }
+  void operator/=(float s) { *this = *this / s; }
+
+  float lengthSquared() const { return Dot(*this, *this); }
+  float length() const { return sqrtf(this->lengthSquared()); }
+
+  float   dot(SkV2 v) const { return Dot(*this, v); }
+  float cross(SkV2 v) const { return Cross(*this, v); }
+  SkV2 normalize()       const { return Normalize(*this); }
+
+  const float* ptr() const { return &x; }
+  float* ptr() { return &x; }
+};
+
+struct SkV3 {
+  float x, y, z;
+
+  bool operator==(const SkV3& v) const {
+    return x == v.x && y == v.y && z == v.z;
+  }
+  bool operator!=(const SkV3& v) const { return !(*this == v); }
+
+  static float Dot(const SkV3& a, const SkV3& b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
+  static SkV3   Cross(const SkV3& a, const SkV3& b) {
+    return { a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x };
+  }
+  static SkV3 Normalize(const SkV3& v) { return v * (1.0f / v.length()); }
+
+  SkV3 operator-() const { return {-x, -y, -z}; }
+  SkV3 operator+(const SkV3& v) const { return { x + v.x, y + v.y, z + v.z }; }
+  SkV3 operator-(const SkV3& v) const { return { x - v.x, y - v.y, z - v.z }; }
+
+  SkV3 operator*(const SkV3& v) const {
+    return { x*v.x, y*v.y, z*v.z };
+  }
+  friend SkV3 operator*(const SkV3& v, float s) {
+    return { v.x*s, v.y*s, v.z*s };
+  }
+  friend SkV3 operator*(float s, const SkV3& v) { return v*s; }
+
+  void operator+=(SkV3 v) { *this = *this + v; }
+  void operator-=(SkV3 v) { *this = *this - v; }
+  void operator*=(SkV3 v) { *this = *this * v; }
+  void operator*=(float s) { *this = *this * s; }
+
+  float lengthSquared() const { return Dot(*this, *this); }
+  float length() const { return sqrtf(Dot(*this, *this)); }
+
+  float dot(const SkV3& v) const { return Dot(*this, v); }
+  SkV3   cross(const SkV3& v) const { return Cross(*this, v); }
+  SkV3 normalize()            const { return Normalize(*this); }
+
+  const float* ptr() const { return &x; }
+  float* ptr() { return &x; }
+};
+
+struct SkV4 {
+  float x, y, z, w;
+
+  bool operator==(const SkV4& v) const {
+    return x == v.x && y == v.y && z == v.z && w == v.w;
+  }
+  bool operator!=(const SkV4& v) const { return !(*this == v); }
+
+  static float Dot(const SkV4& a, const SkV4& b) {
+    return a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w;
+  }
+  static SkV4 Normalize(const SkV4& v) { return v * (1.0f / v.length()); }
+
+  SkV4 operator-() const { return {-x, -y, -z, -w}; }
+  SkV4 operator+(const SkV4& v) const { return { x + v.x, y + v.y, z + v.z, w + v.w }; }
+  SkV4 operator-(const SkV4& v) const { return { x - v.x, y - v.y, z - v.z, w - v.w }; }
+
+  SkV4 operator*(const SkV4& v) const {
+    return { x*v.x, y*v.y, z*v.z, w*v.w };
+  }
+  friend SkV4 operator*(const SkV4& v, float s) {
+    return { v.x*s, v.y*s, v.z*s, v.w*s };
+  }
+  friend SkV4 operator*(float s, const SkV4& v) { return v*s; }
+
+  float lengthSquared() const { return Dot(*this, *this); }
+  float length() const { return sqrtf(Dot(*this, *this)); }
+
+  float dot(const SkV4& v) const { return Dot(*this, v); }
+  SkV4 normalize()            const { return Normalize(*this); }
+
+  const float* ptr() const { return &x; }
+  float* ptr() { return &x; }
+
+  float operator[](int i) const {
+    return this->ptr()[i];
+  }
+  float& operator[](int i) {
+    return this->ptr()[i];
+  }
+};
+
+/**
+ *  4x4 matrix used by SkCanvas and other parts of Skia.
+ *
+ *  Skia assumes a right-handed coordinate system:
+ *      +X goes to the right
+ *      +Y goes down
+ *      +Z goes into the screen (away from the viewer)
  */
 class Matrix4x4 {
  public:
+  Matrix4x4(const Matrix4x4& src) = default;
+  Matrix4x4& operator=(const Matrix4x4& src) = default;
+
+  constexpr Matrix4x4()
+      : fMat{1, 0, 0, 0,
+             0, 1, 0, 0,
+             0, 0, 1, 0,
+             0, 0, 0, 1}
+  {}
+
+  Matrix4x4(const Matrix4x4& a, const Matrix4x4& b) {
+    this->setConcat(a, b);
+  }
+
+  enum Uninitialized_Constructor {
+    kUninitialized_Constructor
+  };
+  Matrix4x4(Uninitialized_Constructor) {}
+
   /**
-   * Sets Matrix4x4 to scale by (sx, sy, sz). Returned matrix is:
-   *
-   *       | sx  0  0  0|
-   *       |  0 sy  0  0|
-   *       |  0  0 sz  0|
-   *       |  0  0  0  1|
-   *
-   *  @param sx  scale factor on x-axis
-   *  @param sy  scale factor on y-axis
-   *  @param sz  scale factor on z-axis
-   *  @return    Matrix4x4 with scale
+     *  The constructor parameters are in row-major order.
    */
-  static Matrix4x4 MakeScale(float sx, float sy, float sz) {
-    Matrix4x4 m = {};
-    m.setScale(sx, sy, sz);
+  constexpr Matrix4x4(float m0, float m4, float m8,  float m12,
+                  float m1, float m5, float m9,  float m13,
+                  float m2, float m6, float m10, float m14,
+                  float m3, float m7, float m11, float m15)
+      // fMat is column-major order in memory.
+      : fMat{m0,  m1,  m2,  m3,
+             m4,  m5,  m6,  m7,
+             m8,  m9,  m10, m11,
+             m12, m13, m14, m15}
+  {}
+
+  static Matrix4x4 Rows(const SkV4& r0, const SkV4& r1, const SkV4& r2, const SkV4& r3) {
+    Matrix4x4 m(kUninitialized_Constructor);
+    m.setRow(0, r0);
+    m.setRow(1, r1);
+    m.setRow(2, r2);
+    m.setRow(3, r3);
+    return m;
+  }
+  static Matrix4x4 Cols(const SkV4& c0, const SkV4& c1, const SkV4& c2, const SkV4& c3) {
+    Matrix4x4 m(kUninitialized_Constructor);
+    m.setCol(0, c0);
+    m.setCol(1, c1);
+    m.setCol(2, c2);
+    m.setCol(3, c3);
     return m;
   }
 
-  /**
-   * Sets Matrix4x4 to scale by (scale, scale, scale). Returned matrix is:
-   *
-   *      | scale   0     0     0 |
-   *      |   0   scale   0     0 |
-   *      |   0     0   scale   0 |
-   *      |   0     0     0     1 |
-   *
-   * @param scale  x y scale factor on z-axis
-   * @return       Matrix4x4 with scale
-   */
-  static Matrix4x4 MakeScale(float scale) {
-    Matrix4x4 m = {};
-    m.setScale(scale, scale, scale);
+  static Matrix4x4 RowMajor(const float r[16]) {
+    return Matrix4x4(r[ 0], r[ 1], r[ 2], r[ 3],
+                 r[ 4], r[ 5], r[ 6], r[ 7],
+                 r[ 8], r[ 9], r[10], r[11],
+                 r[12], r[13], r[14], r[15]);
+  }
+  static Matrix4x4 ColMajor(const float c[16]) {
+    return Matrix4x4(c[0], c[4], c[ 8], c[12],
+                 c[1], c[5], c[ 9], c[13],
+                 c[2], c[6], c[10], c[14],
+                 c[3], c[7], c[11], c[15]);
+  }
+
+  static Matrix4x4 Translate(float x, float y, float z = 0) {
+    return Matrix4x4(1, 0, 0, x,
+                 0, 1, 0, y,
+                 0, 0, 1, z,
+                 0, 0, 0, 1);
+  }
+
+  static Matrix4x4 Scale(float x, float y, float z = 1) {
+    return Matrix4x4(x, 0, 0, 0,
+                 0, y, 0, 0,
+                 0, 0, z, 0,
+                 0, 0, 0, 1);
+  }
+
+  static Matrix4x4 Rotate(SkV3 axis, float radians) {
+    Matrix4x4 m(kUninitialized_Constructor);
+    m.setRotate(axis, radians);
     return m;
   }
 
-  /**
-   * Sets Matrix4x4 to translate by (dx, dy, dz). Returned matrix is:
-   *
-   *       | 1 0 0 dx |
-   *       | 0 1 0 dy |
-   *       | 0 0 1 dz |
-   *       | 0 0 0 1  |
-   *
-   * @param dx  translation on x-axis
-   * @param dy  translation on y-axis
-   * @param dz  translation on z-axis
-   * @return    Matrix4x4 with translation
-   */
-  static Matrix4x4 MakeTrans(float dx, float dy, float dz) {
-    Matrix4x4 m = {};
-    m.setTranslate(dx, dy, dz);
-    return m;
+  // Scales and translates 'src' to fill 'dst' exactly.
+  static Matrix4x4 RectToRect(const Rect& src, const Rect& dst);
+
+  static Matrix4x4 LookAt(const SkV3& eye, const SkV3& center, const SkV3& up);
+  static Matrix4x4 Perspective(float near, float far, float angle);
+
+  bool operator==(const Matrix4x4& other) const;
+  bool operator!=(const Matrix4x4& other) const {
+    return !(other == *this);
+  }
+
+  void getColMajor(float v[]) const {
+    memcpy(v, fMat, sizeof(fMat));
+  }
+  void getRowMajor(float v[]) const;
+
+  float rc(int r, int c) const {
+    return fMat[c*4 + r];
+  }
+  void setRC(int r, int c, float value) {
+    fMat[c*4 + r] = value;
+  }
+
+  SkV4 row(int i) const {
+    return {fMat[i + 0], fMat[i + 4], fMat[i + 8], fMat[i + 12]};
+  }
+  SkV4 col(int i) const {
+    return {fMat[i*4 + 0], fMat[i*4 + 1], fMat[i*4 + 2], fMat[i*4 + 3]};
+  }
+
+  void setRow(int i, const SkV4& v) {
+    fMat[i + 0]  = v.x;
+    fMat[i + 4]  = v.y;
+    fMat[i + 8]  = v.z;
+    fMat[i + 12] = v.w;
+  }
+  void setCol(int i, const SkV4& v) {
+    memcpy(&fMat[i*4], v.ptr(), sizeof(v));
+  }
+
+  Matrix4x4& setIdentity() {
+    *this = { 1, 0, 0, 0,
+             0, 1, 0, 0,
+             0, 0, 1, 0,
+             0, 0, 0, 1 };
+    return *this;
+  }
+
+  Matrix4x4& setTranslate(float x, float y, float z = 0) {
+    *this = { 1, 0, 0, x,
+             0, 1, 0, y,
+             0, 0, 1, z,
+             0, 0, 0, 1 };
+    return *this;
+  }
+
+  Matrix4x4& setScale(float x, float y, float z = 1) {
+    *this = { x, 0, 0, 0,
+             0, y, 0, 0,
+             0, 0, z, 0,
+             0, 0, 0, 1 };
+    return *this;
   }
 
   /**
-   * Sets Matrix4x4 to:
-   *
-   *      |  m1   m2   m3   m4  |
-   *      |  m5   m6   m7   m8  |
-   *      |  m9   m10  m11  m12 |
-   *      |  m13  m14  m15  m16 |
-   *
-   * @return        Matrix4x4 constructed from parameters
+     *  Set this matrix to rotate about the specified unit-length axis vector,
+     *  by an angle specified by its sin() and cos().
+     *
+     *  This does not attempt to verify that axis.length() == 1 or that the sin,cos values
+     *  are correct.
    */
-  static Matrix4x4 MakeAll(float m1,  float m2,  float m3,  float m4,
-                           float m5,  float m6,  float m7,  float m8,
-                           float m9,  float m10, float m11, float m12,
-                           float m13, float m14, float m15, float m16) {
-    Matrix4x4 m = {};
-    m.setAll(m1,  m2,  m3,  m4,
-             m5,  m6,  m7,  m8,
-             m9,  m10, m11, m12,
-             m13, m14, m15, m16);
-    return m;
+  Matrix4x4& setRotateUnitSinCos(SkV3 axis, float sinAngle, float cosAngle);
+
+  /**
+     *  Set this matrix to rotate about the specified unit-length axis vector,
+     *  by an angle specified in radians.
+     *
+     *  This does not attempt to verify that axis.length() == 1.
+   */
+  Matrix4x4& setRotateUnit(SkV3 axis, float radians) {
+    return this->setRotateUnitSinCos(axis, sin(radians), cos(radians));
   }
 
   /**
-   * Returns true if Matrix4x4 is identity.  Identity matrix is:
-   *
-   *       | 1 0 0 0 |
-   *       | 0 1 0 0 |
-   *       | 0 0 1 0 |
-   *       | 0 0 0 1 |
-   *
-   * @return  true if Matrix4x4 has no effect
+     *  Set this matrix to rotate about the specified axis vector,
+     *  by an angle specified in radians.
+     *
+     *  Note: axis is not assumed to be unit-length, so it will be normalized internally.
+     *        If axis is already unit-length, call setRotateAboutUnitRadians() instead.
    */
-  bool isIdentity() const {
-    return values[0] == 1  && values[1] == 0  && values[2] == 0  && values[3] == 0 &&
-           values[4] == 0  && values[5] == 1  && values[6] == 0  && values[7] == 0 &&
-           values[8] == 0  && values[9] == 0  && values[10] == 1 && values[11] == 0 &&
-           values[12] == 0 && values[13] == 0 && values[14] == 0 && values[15] == 1;
+  Matrix4x4& setRotate(SkV3 axis, float radians);
+
+  Matrix4x4& setConcat(const Matrix4x4& a, const Matrix4x4& b);
+
+  friend Matrix4x4 operator*(const Matrix4x4& a, const Matrix4x4& b) {
+    return Matrix4x4(a, b);
+  }
+
+  Matrix4x4& preConcat(const Matrix4x4& m) {
+    return this->setConcat(*this, m);
+  }
+
+  Matrix4x4& postConcat(const Matrix4x4& m) {
+    return this->setConcat(m, *this);
   }
 
   /**
-   * Returns one matrix value.
+     *  A matrix is categorized as 'perspective' if the bottom row is not [0, 0, 0, 1].
+     *  For most uses, a bottom row of [0, 0, 0, X] behaves like a non-perspective matrix, though
+     *  it will be categorized as perspective. Calling normalizePerspective() will change the
+     *  matrix such that, if its bottom row was [0, 0, 0, X], it will be changed to [0, 0, 0, 1]
+     *  by scaling the rest of the matrix by 1/X.
+     *
+     *  | A B C D |    | A/X B/X C/X D/X |
+     *  | E F G H | -> | E/X F/X G/X H/X |   for X != 0
+     *  | I J K L |    | I/X J/X K/X L/X |
+     *  | 0 0 0 X |    |  0   0   0   1  |
    */
-  float operator[](int index) const {
-    return values[index];
-  }
+  void normalizePerspective();
 
-  /**
-   * Returns one matrix value.
-   */
-  float get(int index) const {
-    return values[index];
-  }
+  /** Returns true if all elements of the matrix are finite. Returns false if any
+      element is infinity, or NaN.
 
-  /**
-   * Returns writable Matrix4x4 value.
-   */
-  float& operator[](int index) {
-    return values[index];
-  }
-
-  /**
-   * Sets Matrix4x4 value.
-   */
-  void set(int index, float value) {
-    values[index] = value;
-  }
-
-  /**
-   * Sets all values from parameters. Sets matrix to:
-   *
-   *      |  m1   m2   m3   m4  |
-   *      |  m5   m6   m7   m8  |
-   *      |  m9   m10  m11  m12 |
-   *      |  m13  m14  m15  m16 |
-   *
-   */
-  void setAll(float m1,  float m2,  float m3,  float m4,
-              float m5,  float m6,  float m7,  float m8,
-              float m9,  float m10, float m11, float m12,
-              float m13, float m14, float m15, float m16);
-
-  void setAffine(float a, float b, float c, float d, float tx, float ty);
-
-  /**
-   * Copies nine scalar values contained by Matrix4x4 into buffer, in member value ascending order:
-   * ScaleX, SkewX, TransX, SkewY, ScaleY, TransY, Persp0, Persp1, Persp2.
-   * @param buffer  storage for nine scalar values
-   */
-  void get16(float buffer[16]) const {
-    memcpy(buffer, values, 16 * sizeof(float));
-  }
-
-  /**
-   * Sets Matrix4x4 to nine scalar values in buffer, in member value ascending order: ScaleX,
-   * SkewX, TransX, SkewY, ScaleY, TransY, Persp0, Persp1, Persp2.
-   *
-   * Sets matrix to:
-   *
-   *     | buffer[0]  buffer[1]  buffer[2]  buffer[3]  |
-   *     | buffer[4]  buffer[5]  buffer[6]  buffer[7]  |
-   *     | buffer[8]  buffer[9]  buffer[10] buffer[11] |
-   *     | buffer[12] buffer[13] buffer[14] buffer[15] |
-   *
-   * @param buffer  nine scalar values
-   */
-  void set16(const float buffer[16]) {
-    memcpy(values, buffer, 16 * sizeof(float));
-  }
-
-  /**
-   * Sets Matrix4x4 to identity; which has no effect on mapped Point. Sets Matrix4x4 to:
-   *
-   *       | 1 0 0 0 |
-   *       | 0 1 0 0 |
-   *       | 0 0 1 0 |
-   *       | 0 0 0 1 |
-   *
-   * Also called setIdentity(); use the one that provides better inline documentation.
-   */
-  void reset();
-
-  /**
-   * Sets Matrix4x4 to identity; which has no effect on mapped Point. Sets Matrix4x4 to:
-   *
-   *       | 1 0 0 0 |
-   *       | 0 1 0 0 |
-   *       | 0 0 1 0 |
-   *       | 0 0 0 1 |
-   *
-   *  Also called reset(); use the one that provides better inline documentation.
-   */
-  void setIdentity() {
-    this->reset();
-  }
-
-  /**
-   * Sets Matrix4x4 to translate by (dx, dy, dz).
-   * @param dx  translation on x-axis
-   * @param dy  translation on y-axis
-   * @param dz  translation on z-axis
-   */
-  void setTranslate(float dx, float dy, float dz);
-
-  /**
-   * Sets Matrix4x4 to scale by sx sy and sz, about a pivot point at (px, py, pz). The pivot
-   * point is unchanged when mapped with Matrix4x4.
-   * @param sx  scale factor on x-axis
-   * @param sy  scale factor on y-axis
-   * @param sz  scale factor on z-axis
-   * @param px  pivot on x-axis
-   * @param py  pivot on y-axis
-   * @param pz  pivot on z-axis
-   */
-  void setScale(float sx, float sy, float sz, float px, float py, float pz);
-
-  /**
-   * Sets Matrix4x4 to scale by sx and sy about at pivot point at (0, 0, 0).
-   * @param sx  scale factor on x-axis
-   * @param sy  scale factor on y-axis
-   * @param sz  scale factor on z-axis
-   */
-  void setScale(float sx, float sy, float sz);
-
-  /**
-   * Sets Matrix4x4 to rotate by degrees about a pivot point at (px, py). The pivot point is
-   * unchanged when mapped with Matrix4x4. Positive degrees rotates clockwise.
-   *  @param degrees  angle of axes relative to upright axes
-   *  @param px       pivot on x-axis
-   *  @param py       pivot on y-axis
-   *  @param pz       pivot on z-axis
-   */
-  void setRotate(float degrees, float px, float py, float pz);
-
-  /**
-   * Sets Matrix4x4 to rotate by degrees about a pivot point at (0, 0). Positive degrees rotates
-   * clockwise.
-   * @param degrees  angle of axes relative to upright axes
-   */
-  void setRotate(float degrees);
-
-  /**
-   * Sets Matrix4x4 to Matrix4x4 a multiplied by Matrix4x4 b.
-   * @param a  Matrix4x4 on left side of multiply expression
-   * @param b  Matrix4x4 on right side of multiply expression
-   */
-  void setConcat(const Matrix4x4& a, const Matrix4x4& b);
-
-  /**
-   * Preconcats the matrix with the specified translation. M' = M * T(dx, dy, dz)
-   */
-  void preTranslate(float dx, float dy, float dz);
-
-  /**
-   * Postconcats the matrix with the specified scale. M' = S(sx, sy, sz, px, py, pz) * M
-   */
-  void preScale(float sx, float sy, float sz, float px, float py, float pz);
-
-  /**
-   * Preconcats the matrix with the specified scale. M' = M * S(sx, sy, sz)
-   */
-  void preScale(float sx, float sy, float sz);
-
-  /**
-   * Preconcats the matrix with the specified rotation. M' = M * R(degrees, px, py, pz)
-   */
-  void preRotate(float degrees, float px, float py, float pz);
-
-  /**
-   * Preconcats the matrix with the specified rotation. M' = M * R(degrees)
-   */
-  void preRotate(float degrees);
-
-  /**
-   * Preconcats the matrix with the specified skew. M' = M * K(kx, ky, kz, px, py, pz)
-   */
-  void preSkew(float kx, float ky, float kz, float px, float py, float pz);
-
-  /**
-   * Preconcats the matrix with the specified skew. M' = M * K(kx, ky, kz)
-   */
-  void preSkew(float kx, float ky, float kz);
-
-  /**
-   * Preconcats the matrix with the specified matrix. M' = M * other
-   */
-  void preConcat(const Matrix4x4& other);
-
-  /**
-   * Postconcats the matrix with the specified translation. M' = T(dx, dy, dz) * M
-   */
-  void postTranslate(float dx, float dy, float dz);
-
-  /**
-   * Postconcats the matrix with the specified scale. M' = S(sx, sy, sz, px, py, pz) * M
-   */
-  void postScale(float sx, float sy, float sz, float px, float py, float pz);
-
-  /**
-   * Postconcats the matrix with the specified scale. M' = S(sx, sy, sz) * M
-   */
-  void postScale(float sx, float sy, float sz);
-
-  /**
-   * Postconcats the matrix with the specified rotation. M' = R(degrees, px, py, pz) * M
-   */
-  void postRotate(float degrees, float px, float py, float pz);
-
-  /**
-   * Postconcats the matrix with the specified rotation. M' = R(degrees) * M
-   */
-  void postRotate(float degrees);
-
-  /**
-   * Postconcats the matrix with the specified skew. M' = K(kx, ky, kz, px, py, pz) * M
-   */
-  void postSkew(float kx, float ky, float kz, float px, float py, float pz);
-
-  /**
-   * Postconcats the matrix with the specified skew. M' = K(kx, ky, kz) * M
-   */
-  void postSkew(float kx, float ky, float kz);
-
-  /**
-   * Postconcats the matrix with the specified matrix. M' = other * M
-   */
-  void postConcat(const Matrix4x4& other);
-
-  /**
-   * If this matrix can be inverted, return true and if inverse is not null, set inverse to be the
-   * inverse of this matrix. If this matrix cannot be inverted, ignore inverse and return false.
-   */
-  bool invert(Matrix4x4* inverse) const {
-    if (this->isIdentity()) {
-      if (inverse) {
-        inverse->reset();
-      }
-      return true;
-    }
-    return this->invertNonIdentity(inverse);
-  }
-
-  bool invertible() const;
-
-  /** Compares a and b; returns true if a and b are numerically equal. Returns true even if sign
-   * of zero values are different. Returns false if either Matrix4x4 contains NaN, even if the other
-   * Matrix4x4 also contains NaN.
-   */
-  friend bool operator==(const Matrix4x4& a, const Matrix4x4& b);
-
-  /**
-   * Compares a and b; returns true if a and b are not numerically equal. Returns false even if
-   * sign of zero values are different. Returns true if either Matrix4x4 contains NaN, even if the
-   * other Matrix4x4 also contains NaN.
-   */
-  friend bool operator!=(const Matrix4x4& a, const Matrix4x4& b) {
-    return !(a == b);
-  }
-
-  /**
-   * Returns the minimum scaling factor of Matrix4x4 by decomposing the scaling and skewing elements.
-   * Returns -1 if scale factor overflows or Matrix4x4 contains perspective.
-   */
-  float getMinScale() const;
-
-  /**
-   * Returns the maximum scaling factor of Matrix4x4 by decomposing the scaling and skewing elements.
-   * Returns -1 if scale factor overflows or Matrix4x4 contains perspective.
-   */
-  float getMaxScale() const;
-
-  /**
-   * Returns true if all elements of the matrix are finite. Returns false if any
-   * element is infinity, or NaN.
-   */
+      @return  true if matrix has only finite elements
+  */
   bool isFinite() const;
 
-  /**
-   * Returns reference to const identity Matrix4x4. Returned Matrix4x4 is set to:
-   *
-   *       | 1 0 0 0 |
-   *       | 0 1 0 0 |
-   *       | 0 0 1 0 |
-   *       | 0 0 0 1 |
-   *
-   *   @return  const identity Matrix4x4
+  /** If this is invertible, return that in inverse and return true. If it is
+     *  not invertible, return false and leave the inverse parameter unchanged.
    */
-  static const Matrix4x4& I();
+  bool invert(Matrix4x4* inverse) const;
+
+  Matrix4x4 transpose() const;
+
+  Rect MapRect(const Matrix4x4& m, const Rect& src);
+
+  ////////////
+
+  SkV4 map(float x, float y, float z, float w) const;
+  SkV4 operator*(const SkV4& v) const {
+    return this->map(v.x, v.y, v.z, v.w);
+  }
+  SkV3 operator*(SkV3 v) const {
+    auto v4 = this->map(v.x, v.y, v.z, 0);
+    return {v4.x, v4.y, v4.z};
+  }
+  ////////////////////// Converting to/from Matrix
+
+  /* When converting from Matrix4x4 to Matrix, the third row and
+     * column is dropped.  When converting from Matrix to Matrix4x4
+     * the third row and column remain as identity:
+     * [ a b c ]      [ a b 0 c ]
+     * [ d e f ]  ->  [ d e 0 f ]
+     * [ g h i ]      [ 0 0 1 0 ]
+     *                [ g h 0 i ]
+   */
+  Matrix asM33() const {
+    return Matrix::MakeAll(fMat[0], fMat[4], fMat[12],
+                             fMat[1], fMat[5], fMat[13],
+                             fMat[3], fMat[7], fMat[15]);
+  }
+
+  explicit Matrix4x4(const Matrix& src)
+      : Matrix4x4(src[Matrix::SCALE_X], src[Matrix::SKEW_X],  0, src[Matrix::TRANS_X],
+                  src[Matrix::SKEW_Y],  src[Matrix::SCALE_Y], 0, src[Matrix::TRANS_Y],
+                  0,                       0,                       1, 0,
+                  src[Matrix::PERSP_0], src[Matrix::PERSP_1], 0, src[Matrix::PERSP_2])
+  {}
+
+  Matrix4x4& preTranslate(float x, float y, float z = 0);
+  Matrix4x4& postTranslate(float x, float y, float z = 0);
+
+  Matrix4x4& preScale(float x, float y);
+  Matrix4x4& preScale(float x, float y, float z);
+  Matrix4x4& preConcat(const Matrix&);
 
  private:
-  float values[16];
-  /**
-   * Matrix4x4 organizes its values in row order.
+  /* Stored in column-major.
+     *  Indices
+     *  0  4  8  12        1 0 0 trans_x
+     *  1  5  9  13  e.g.  0 1 0 trans_y
+     *  2  6 10  14        0 0 1 trans_z
+     *  3  7 11  15        0 0 0 1
    */
-
-  void setScaleTranslate(float sx, float sy, float sz, float tx, float ty, float tz);
-  bool invertNonIdentity(Matrix4x4* inverse) const;
-  bool getMinMaxScaleFactors(float results[2]) const;
+  float fMat[16];
 };
 }  // namespace tgfx

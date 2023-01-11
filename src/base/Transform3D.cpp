@@ -55,9 +55,6 @@ Transform3D::~Transform3D() {
 }
 
 void Transform3D::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const {
-  if (this == nullptr) {
-    return;
-  }
   anchorPoint->excludeVaryingRanges(timeRanges);
   if (position != nullptr) {
     position->excludeVaryingRanges(timeRanges);

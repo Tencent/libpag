@@ -712,5 +712,7 @@ class Matrix {
   void setScaleTranslate(float sx, float sy, float tx, float ty);
   bool invertNonIdentity(Matrix* inverse) const;
   bool getMinMaxScaleFactors(float results[2]) const;
+
+  friend class Matrix4x4;
 };
 }  // namespace tgfx
