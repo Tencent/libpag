@@ -28,22 +28,8 @@ inline bool TSpanBigEnough(int tSpan) {
   return (tSpan >> 10) != 0;
 }
 
-static float ClampTo(float value, float min, float max) {
-  if (value < min) {
-    value = min;
-  }
-  if (value > max) {
-    value = max;
-  }
-  return value;
-}
-
 inline float MaxFloat(float a, float b) {
   return a > b ? a : b;
-}
-
-inline float MinFloat(float a, float b) {
-  return a < b ? a : b;
 }
 
 static float Distance(const Point& a, const Point& b) {
