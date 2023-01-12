@@ -40,11 +40,17 @@ static float Distance(const Point3D& a, const Point3D& b) {
   return sqrtf(dx * dx + dy * dy + dz * dz);
 }
 
-static bool PointOnLine(const Point3D& point1, const Point3D& point2, const Point3D& point3,
-                        const float& precision) {
-  auto distance = point1.x * point2.y + point1.y * point3.x + point2.x * point3.y -
-                  point3.x * point2.y - point3.y * point1.x - point2.x * point1.y;
+inline bool PointOnLine(const float x1, const float y1, const float x2, const float y2,
+                        const float x3, const float y3, const float& precision) {
+  auto distance = x1 * y2 + x3 * y1 + x2 * y3 - x3 * y2 - x1 * y3 - x2 * y1;
   return fabs(distance) < precision;
+}
+
+inline bool Point3DOnLine(const Point3D& point1, const Point3D& point2, const Point3D& point3,
+                          const float& precision) {
+  return PointOnLine(point1.x, point1.y, point2.x, point2.y, point3.x, point3.y, precision)
+      && PointOnLine(point1.x, point1.z, point2.x, point2.z, point3.x, point3.z, precision)
+      && PointOnLine(point1.y, point1.z, point2.y, point2.z, point3.y, point3.z, precision);
 }
 
 /**
@@ -149,8 +155,8 @@ std::shared_ptr<BezierPath3D> BezierPath3D::Build(const pag::Point3D& start, con
   auto bezierPath = std::shared_ptr<BezierPath3D>(new BezierPath3D());
   BezierSegment3D segment = {points[0], 0, 0};
   bezierPath->segments.push_back(segment);
-  if (PointOnLine(points[0], points[3], points[1], precision) &&
-      PointOnLine(points[0], points[3], points[2], precision)) {
+  if (Point3DOnLine(points[0], points[3], points[1], precision) &&
+      Point3DOnLine(points[0], points[3], points[2], precision)) {
     bezierPath->length = Distance(points[0], points[3]);
     segment = {points[3], bezierPath->length, MaxBezierTValue};
     bezierPath->segments.push_back(segment);
