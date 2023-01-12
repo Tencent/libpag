@@ -45,8 +45,12 @@ Layer::~Layer() {
 }
 
 void Layer::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) {
-  transform->excludeVaryingRanges(timeRanges);
-  transform3D->excludeVaryingRanges(timeRanges);
+  if (transform != nullptr) {
+    transform->excludeVaryingRanges(timeRanges);
+  }
+  if (transform3D != nullptr) {
+    transform3D->excludeVaryingRanges(timeRanges);
+  }
   if (timeRemap != nullptr) {
     timeRemap->excludeVaryingRanges(timeRanges);
   }

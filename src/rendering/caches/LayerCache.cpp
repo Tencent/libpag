@@ -175,7 +175,12 @@ std::vector<TimeRange> LayerCache::getTrackMatteStaticTimeRanges() {
   SplitTimeRangesAt(&timeRanges, trackMatteLayer->startTime + trackMatteLayer->duration);
   auto parent = trackMatteLayer->parent;
   while (parent != nullptr) {
-    parent->transform->excludeVaryingRanges(&timeRanges);
+    if (parent->transform != nullptr) {
+      parent->transform->excludeVaryingRanges(&timeRanges);
+    }
+    if (parent->transform3D != nullptr) {
+      parent->transform3D->excludeVaryingRanges(&timeRanges);
+    }
     SplitTimeRangesAt(&timeRanges, parent->startTime);
     SplitTimeRangesAt(&timeRanges, parent->startTime + parent->duration);
     parent = parent->parent;
