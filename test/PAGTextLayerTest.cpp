@@ -505,4 +505,15 @@ PAG_TEST_F(PAGTextLayerTest, TextRangeSelectorTriangleEarseHighAndLow) {
   EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/RangeSelectorTriangleHighLow"));
 }
 
+/**
+ * 测试文本 layer 做缩放动画时，使用 mipmap 的情况
+ */
+PAG_TEST_F(PAGTextLayerTest, TextLayerScaleAnimationWithMipmap) {
+  auto pagFile = PAGFile::Load("../resources/apitest/text_layer_scale_mipmap.pag");
+  TestPAGPlayer->setComposition(pagFile);
+  TestPAGPlayer->setProgress(0.5f);
+  TestPAGPlayer->flush();
+  EXPECT_TRUE(
+      Baseline::Compare(TestPAGSurface, "PAGTextLayerTest/TextLayerScaleAnimationWithMipmap"));
+}
 }  // namespace pag

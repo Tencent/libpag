@@ -80,7 +80,8 @@ class Picture : public Graphic {
   ID assetID = 0;
 
   virtual float getScaleFactor(float maxScaleFactor) const = 0;
-  virtual std::unique_ptr<Snapshot> makeSnapshot(RenderCache* cache, float scaleFactor) const = 0;
+  virtual std::unique_ptr<Snapshot> makeSnapshot(RenderCache* cache, float scaleFactor,
+                                                 bool mipMapped) const = 0;
 
  private:
   uint64_t uniqueKey = 0;

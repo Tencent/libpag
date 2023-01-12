@@ -52,10 +52,12 @@ class RasterPixelBuffer : public PixelBuffer {
 
   std::shared_ptr<Texture> makeTexture(Context* context, bool mipMapped) const {
     std::lock_guard<std::mutex> autoLock(locker);
-    auto format =
-        _info.colorType() == ColorType::ALPHA_8 ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
-    return Texture::Make(context, _info.width(), _info.height(), _pixels, _info.rowBytes(),
-                         ImageOrigin::TopLeft, format, mipMapped);
+    if (_info.colorType() == ColorType::ALPHA_8) {
+      return Texture::MakeAlpha(context, _info.width(), _info.height(), _pixels, _info.rowBytes(),
+                                ImageOrigin::TopLeft, mipMapped);
+    }
+    return Texture::MakeRGBA(context, _info.width(), _info.height(), _pixels, _info.rowBytes(),
+                             ImageOrigin::TopLeft, mipMapped);
   }
 
  private:

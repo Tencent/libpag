@@ -66,7 +66,8 @@ LayerCache::LayerCache(Layer* layer) : layer(layer) {
     maskCache = new MaskCache(layer);
   }
   updateStaticTimeRanges();
-  maxScaleFactor = ToTGFX(layer->getMaxScaleFactor());
+  auto temp = layer->getScaleFactor();
+  scaleFactor = {ToTGFX(temp.first), ToTGFX(temp.second)};
 }
 
 LayerCache::~LayerCache() {
@@ -103,8 +104,8 @@ Layer* LayerCache::getLayer() const {
   return layer;
 }
 
-tgfx::Point LayerCache::getMaxScaleFactor() const {
-  return maxScaleFactor;
+std::pair<tgfx::Point, tgfx::Point> LayerCache::getScaleFactor() const {
+  return scaleFactor;
 }
 
 bool LayerCache::checkFrameChanged(Frame contentFrame, Frame lastContentFrame) {

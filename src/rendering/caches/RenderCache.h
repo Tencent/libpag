@@ -39,6 +39,10 @@
 namespace pag {
 static constexpr int64_t DECODING_VISIBLE_DISTANCE = 500000;  // 提前 500ms 开始解码。
 
+inline bool NeedsEnableMipMap(float scale) {
+  return scale < .4f;
+}
+
 class RenderCache : public Performance {
  public:
   explicit RenderCache(PAGStage* stage);

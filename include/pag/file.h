@@ -1655,6 +1655,7 @@ class PAG_API Layer {
   virtual void excludeVaryingRanges(std::vector<TimeRange>* timeRanges);
   virtual bool verify() const;
   Point getMaxScaleFactor();
+  std::pair<Point, Point> getScaleFactor();
   TimeRange visibleRange();
   virtual Rect getBounds() const;
 

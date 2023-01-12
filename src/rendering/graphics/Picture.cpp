@@ -73,13 +73,13 @@ static void DrawDirectly(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Texture> te
 
 static std::shared_ptr<tgfx::Texture> RescaleTexture(tgfx::Context* context,
                                                      std::shared_ptr<tgfx::Texture> texture,
-                                                     float scaleFactor) {
+                                                     float scaleFactor, bool mipMapped) {
   if (texture == nullptr || scaleFactor == 0) {
     return nullptr;
   }
   auto width = static_cast<int>(ceilf(static_cast<float>(texture->width()) * scaleFactor));
   auto height = static_cast<int>(ceilf(static_cast<float>(texture->height()) * scaleFactor));
-  auto surface = tgfx::Surface::Make(context, width, height);
+  auto surface = tgfx::Surface::Make(context, width, height, false, 1, mipMapped);
   if (surface == nullptr) {
     return nullptr;
   }
@@ -102,10 +102,6 @@ static std::shared_ptr<tgfx::Texture> GetTexture(TextureProxy* proxy, RenderCach
     texture = proxy->getTexture(cache);
   }
   return texture;
-}
-
-static bool NeedsEnableMipMap(float scale) {
-  return scale < .4f;
 }
 
 //================================= TextureProxySnapshotPicture ====================================
@@ -187,13 +183,15 @@ class TextureProxyPicture : public Picture {
     return std::min(maxScaleFactor, 1.0f);
   }
 
-  std::unique_ptr<Snapshot> makeSnapshot(RenderCache* cache, float scaleFactor) const override {
-    auto texture = GetTexture(proxy, cache, NeedsEnableMipMap(scaleFactor));
+  std::unique_ptr<Snapshot> makeSnapshot(RenderCache* cache, float scaleFactor,
+                                         bool mipMapped) const override {
+    bool rescale = scaleFactor != 1.0f;
+    auto texture = GetTexture(proxy, cache, rescale ? NeedsEnableMipMap(scaleFactor) : mipMapped);
     if (texture == nullptr) {
       return nullptr;
     }
-    if (scaleFactor != 1.0f || texture->isYUV()) {
-      texture = RescaleTexture(cache->getContext(), texture, scaleFactor);
+    if (rescale || texture->isYUV()) {
+      texture = RescaleTexture(cache->getContext(), texture, scaleFactor, mipMapped);
     }
     if (texture == nullptr) {
       return nullptr;
@@ -273,10 +271,11 @@ class RGBAAAPicture : public Picture {
     return std::min(maxScaleFactor, 1.0f);
   }
 
-  std::unique_ptr<Snapshot> makeSnapshot(RenderCache* cache, float scaleFactor) const override {
+  std::unique_ptr<Snapshot> makeSnapshot(RenderCache* cache, float scaleFactor,
+                                         bool mipMapped) const override {
     auto width = static_cast<int>(ceilf(static_cast<float>(layout.width) * scaleFactor));
     auto height = static_cast<int>(ceilf(static_cast<float>(layout.height) * scaleFactor));
-    auto surface = tgfx::Surface::Make(cache->getContext(), width, height);
+    auto surface = tgfx::Surface::Make(cache->getContext(), width, height, false, 1, mipMapped);
     if (surface == nullptr) {
       return nullptr;
     }
@@ -335,7 +334,10 @@ class SnapshotPicture : public Picture {
       graphic->draw(canvas, cache);
       return;
     }
-    canvas->drawTexture(snapshot->getTexture(), snapshot->getMatrix());
+    auto mipMapMode = snapshot->getTexture()->getSampler()->mipMapped() ? tgfx::MipMapMode::Linear
+                                                                        : tgfx::MipMapMode::None;
+    tgfx::SamplingOptions samplingOptions(tgfx::FilterMode::Linear, mipMapMode);
+    canvas->drawTexture(snapshot->getTexture(), snapshot->getMatrix(), samplingOptions);
   }
 
  protected:
@@ -343,12 +345,13 @@ class SnapshotPicture : public Picture {
     return maxScaleFactor;
   }
 
-  std::unique_ptr<Snapshot> makeSnapshot(RenderCache* cache, float scaleFactor) const override {
+  std::unique_ptr<Snapshot> makeSnapshot(RenderCache* cache, float scaleFactor,
+                                         bool mipMapped) const override {
     tgfx::Rect bounds = tgfx::Rect::MakeEmpty();
     graphic->measureBounds(&bounds);
     auto width = static_cast<int>(ceilf(bounds.width() * scaleFactor));
     auto height = static_cast<int>(ceilf(bounds.height() * scaleFactor));
-    auto surface = tgfx::Surface::Make(cache->getContext(), width, height);
+    auto surface = tgfx::Surface::Make(cache->getContext(), width, height, false, 1, mipMapped);
     if (surface == nullptr) {
       return nullptr;
     }
