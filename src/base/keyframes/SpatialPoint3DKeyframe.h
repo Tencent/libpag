@@ -19,7 +19,7 @@
 #pragma once
 
 #include "SingleEaseKeyframe.h"
-#include "BezierPath3D.h""
+#include "BezierPath3D.h"
 
 namespace pag {
 class SpatialPoint3DKeyframe : public SingleEaseKeyframe<Point3D> {
