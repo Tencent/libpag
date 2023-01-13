@@ -19,6 +19,7 @@
 #include "ComplexShape.h"
 #include "core/PathRef.h"
 #include "gpu/GpuPaint.h"
+#include "gpu/TextureEffect.h"
 #include "gpu/ops/FillRectOp.h"
 #include "gpu/ops/TriangulatingPathOp.h"
 #include "tgfx/core/Mask.h"
@@ -59,5 +60,31 @@ std::unique_ptr<DrawOp> ComplexShape::makePathOp(const Path& path, GpuPaint* pai
 
 std::unique_ptr<DrawOp> ComplexShape::makeTextureOp(const Path& path, GpuPaint* paint,
                                                     const Matrix& viewMatrix) const {
+  auto deviceBounds = path.getBounds();
+  auto width = ceilf(deviceBounds.width());
+  auto height = ceilf(deviceBounds.height());
+  auto mask = Mask::Make(static_cast<int>(width), static_cast<int>(height));
+  if (!mask) {
+    return nullptr;
+  }
+  auto matrix = Matrix::MakeTrans(-deviceBounds.x(), -deviceBounds.y());
+  matrix.postScale(width / deviceBounds.width(), height / deviceBounds.height());
+  mask->setMatrix(matrix);
+  mask->fillPath(path);
+  // TODO(pengweilv): mip map
+  auto texture = mask->updateTexture(paint->context);
+  auto localMatrix = Matrix::I();
+  localMatrix.postScale(deviceBounds.width(), deviceBounds.height());
+  localMatrix.postTranslate(deviceBounds.x(), deviceBounds.y());
+  auto maskLocalMatrix = Matrix::I();
+  auto invert = Matrix::I();
+  if (!localMatrix.invert(&invert)) {
+    return nullptr;
+  }
+  maskLocalMatrix.postConcat(invert);
+  maskLocalMatrix.postScale(width, height);
+  paint->coverageFragmentProcessors.emplace_back(FragmentProcessor::MulInputByChildAlpha(
+      TextureEffect::Make(paint->context, std::move(texture), SamplerState(), maskLocalMatrix)));
+  return FillRectOp::Make(paint->color, bounds, viewMatrix, localMatrix);
 }
 }  // namespace tgfx

@@ -637,4 +637,37 @@ PAG_TEST(CanvasTest, hardwareMipMap) {
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/mipmap_linear_hardware"));
   device->unlock();
 }
+
+PAG_TEST(CanvasTest, shape) {
+  auto device = GLDevice::Make();
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 500, 500);
+  auto canvas = surface->getCanvas();
+  Path path;
+  path.addRect(Rect::MakeXYWH(10, 10, 100, 100));
+  auto shape = Shape::MakeFromFill(path);
+  Paint paint;
+  paint.setColor(Color::White());
+  canvas->drawShape(shape, paint);
+  path.reset();
+  path.addRoundRect(Rect::MakeXYWH(10, 120, 100, 100), 10, 10);
+  shape = Shape::MakeFromFill(path);
+  canvas->drawShape(shape, paint);
+  path.reset();
+  path.addRect(Rect::MakeXYWH(10, 250, 100, 100));
+  auto matrix = Matrix::I();
+  matrix.postRotate(30, 60, 300);
+  path.transform(matrix);
+  shape = Shape::MakeFromFill(path);
+  canvas->drawShape(shape, paint);
+  paint.setColor(Color::Black());
+  paint.setAlpha(0.3);
+  matrix.reset();
+  matrix.postScale(0.5, 0.5, 60, 300);
+  canvas->setMatrix(matrix);
+  canvas->drawShape(shape, paint);
+  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/shape"));
+  device->unlock();
+}
 }  // namespace tgfx

@@ -398,6 +398,27 @@ void Canvas::drawPath(const Path& path, const Paint& paint) {
 }
 
 void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
+  if (shape == nullptr) {
+    return;
+  }
+  GpuPaint glPaint;
+  if (!PaintToGLPaint(getContext(), paint, state->alpha, nullptr, &glPaint)) {
+    return;
+  }
+  auto bounds = shape->getBounds();
+  if (!state->matrix.isIdentity()) {
+    state->matrix.mapRect(&bounds);
+  }
+  auto clipBounds = state->clip.getBounds();
+  clipBounds.roundOut();
+  if (!clipBounds.intersect(bounds)) {
+    return;
+  }
+  auto op = shape->makeOp(&glPaint, state->matrix);
+  if (op == nullptr) {
+    return;
+  }
+  draw(std::move(op), std::move(glPaint));
 }
 
 static std::unique_ptr<DrawOp> MakeSimplePathOp(const Path& path, const GpuPaint& glPaint,
