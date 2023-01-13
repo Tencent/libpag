@@ -18,33 +18,21 @@
 
 #pragma once
 
-#include <memory>
+#include "tgfx/core/Shape.h"
 
 namespace tgfx {
-/**
- * The base class for CPU objects that can generate GPU caches. The content of a Cacheable is
- * immutable.
- */
-class Cacheable {
+class RRectShape : public Shape {
  public:
-  virtual ~Cacheable() = default;
-
-  /**
-   * Returns a global unique ID for this Cacheable. The content of a Cacheable cannot change after
-   * it is created. Any operation to create a new Cacheable will receive generate a new unique ID.
-   */
-  uint32_t uniqueID() const {
-    return _uniqueID;
+  explicit RRectShape(const RRect& rRect) : rRect(rRect) {
   }
 
- protected:
-  std::weak_ptr<Cacheable> weakThis;
-
-  Cacheable();
+  Rect getBounds() const override {
+    return rRect.rect;
+  }
 
  private:
-  uint32_t _uniqueID = 0;
+  RRect rRect = {};
 
-  friend class ResourceCache;
+  std::unique_ptr<DrawOp> makeOp(GpuPaint* paint, const Matrix& viewMatrix) const override;
 };
 }  // namespace tgfx

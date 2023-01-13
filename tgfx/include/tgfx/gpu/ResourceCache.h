@@ -72,7 +72,7 @@ class ResourceCache {
   /**
    * Returns a unique resource in the cache by the specified contentKey.
    */
-  std::shared_ptr<Resource> findByContent(uint32_t contentKey);
+  std::shared_ptr<Resource> getByContent(uint32_t contentKey);
 
   /**
    * Purges GPU resources that haven't been used the passed in time.

@@ -18,33 +18,14 @@
 
 #pragma once
 
-#include <memory>
+#include "FragmentProcessor.h"
 
 namespace tgfx {
-/**
- * The base class for CPU objects that can generate GPU caches. The content of a Cacheable is
- * immutable.
- */
-class Cacheable {
+class GpuPaint {
  public:
-  virtual ~Cacheable() = default;
-
-  /**
-   * Returns a global unique ID for this Cacheable. The content of a Cacheable cannot change after
-   * it is created. Any operation to create a new Cacheable will receive generate a new unique ID.
-   */
-  uint32_t uniqueID() const {
-    return _uniqueID;
-  }
-
- protected:
-  std::weak_ptr<Cacheable> weakThis;
-
-  Cacheable();
-
- private:
-  uint32_t _uniqueID = 0;
-
-  friend class ResourceCache;
+  Context* context = nullptr;
+  Color color = Color::Black();
+  std::vector<std::unique_ptr<FragmentProcessor>> colorFragmentProcessors;
+  std::vector<std::unique_ptr<FragmentProcessor>> coverageFragmentProcessors;
 };
 }  // namespace tgfx

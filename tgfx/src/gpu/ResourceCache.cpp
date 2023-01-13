@@ -133,7 +133,7 @@ std::shared_ptr<Resource> ResourceCache::getRecycled(const BytesKey& recycleKey)
   return wrapResource(resource);
 }
 
-std::shared_ptr<Resource> ResourceCache::findByContent(uint32_t contentKey) {
+std::shared_ptr<Resource> ResourceCache::getByContent(uint32_t contentKey) {
   auto result = contentKeyMap.find(contentKey);
   if (result == contentKeyMap.end()) {
     return nullptr;

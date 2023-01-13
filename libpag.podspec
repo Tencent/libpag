@@ -51,6 +51,7 @@ Pod::Spec.new do |s|
                     'src/platform/*.{h,cpp}',
                     'tgfx/src/core/*.{h,cpp}',
                     'tgfx/src/core/codecs/*.{h,cpp}',
+                    'tgfx/src/core/shapes/*.{h,cpp}',
                     'tgfx/src/core/vectors/*.{h,cpp}',
                     'tgfx/src/gpu/*.{h,cpp}',
                     'tgfx/src/platform/*.{h,cpp}',

@@ -16,35 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <memory>
+#include "FillPathShape.h"
 
 namespace tgfx {
-/**
- * The base class for CPU objects that can generate GPU caches. The content of a Cacheable is
- * immutable.
- */
-class Cacheable {
- public:
-  virtual ~Cacheable() = default;
+FillPathShape::FillPathShape(const Path& path, float resolutionScale)
+    : path(path), resolutionScale(resolutionScale) {
+  bounds = path.getBounds();
+  bounds.scale(resolutionScale, resolutionScale);
+}
 
-  /**
-   * Returns a global unique ID for this Cacheable. The content of a Cacheable cannot change after
-   * it is created. Any operation to create a new Cacheable will receive generate a new unique ID.
-   */
-  uint32_t uniqueID() const {
-    return _uniqueID;
-  }
-
- protected:
-  std::weak_ptr<Cacheable> weakThis;
-
-  Cacheable();
-
- private:
-  uint32_t _uniqueID = 0;
-
-  friend class ResourceCache;
-};
+Path FillPathShape::getFinalPath() const {
+  auto fillPath = path;
+  fillPath.transform(Matrix::MakeScale(resolutionScale));
+  return fillPath;
+}
 }  // namespace tgfx

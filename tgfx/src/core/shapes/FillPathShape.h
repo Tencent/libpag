@@ -18,33 +18,19 @@
 
 #pragma once
 
-#include <memory>
+#include "core/shapes/ComplexShape.h"
 
 namespace tgfx {
-/**
- * The base class for CPU objects that can generate GPU caches. The content of a Cacheable is
- * immutable.
- */
-class Cacheable {
+class FillPathShape : public ComplexShape {
  public:
-  virtual ~Cacheable() = default;
-
-  /**
-   * Returns a global unique ID for this Cacheable. The content of a Cacheable cannot change after
-   * it is created. Any operation to create a new Cacheable will receive generate a new unique ID.
-   */
-  uint32_t uniqueID() const {
-    return _uniqueID;
-  }
+  FillPathShape(const Path& path, float resolutionScale = 1.0f);
 
  protected:
-  std::weak_ptr<Cacheable> weakThis;
-
-  Cacheable();
+  Path getFinalPath() const override;
 
  private:
-  uint32_t _uniqueID = 0;
+  Path path = {};
+  float resolutionScale = 1.0f;
 
-  friend class ResourceCache;
 };
 }  // namespace tgfx

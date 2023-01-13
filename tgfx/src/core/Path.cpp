@@ -164,7 +164,6 @@ Rect Path::getBounds() const {
   auto count = path.countPoints();
   auto points = new SkPoint[count];
   path.getPoints(points, count);
-  path.getBounds();
   auto rect = SkRect::MakeEmpty();
   rect.setBounds(points, count);
   delete[] points;

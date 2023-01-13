@@ -16,35 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <memory>
+#include "StrokePathShape.h"
+#include "core/utils/Log.h"
+#include "tgfx/core/PathEffect.h"
 
 namespace tgfx {
-/**
- * The base class for CPU objects that can generate GPU caches. The content of a Cacheable is
- * immutable.
- */
-class Cacheable {
- public:
-  virtual ~Cacheable() = default;
+StrokePathShape::StrokePathShape(const Path& path, const Stroke& stroke, float resolutionScale)
+    : path(path), stroke(stroke), resolutionScale(resolutionScale) {
+  bounds = path.getBounds();
+  bounds.makeOutset(stroke.width, stroke.width);
+  bounds.scale(resolutionScale, resolutionScale);
+}
 
-  /**
-   * Returns a global unique ID for this Cacheable. The content of a Cacheable cannot change after
-   * it is created. Any operation to create a new Cacheable will receive generate a new unique ID.
-   */
-  uint32_t uniqueID() const {
-    return _uniqueID;
-  }
-
- protected:
-  std::weak_ptr<Cacheable> weakThis;
-
-  Cacheable();
-
- private:
-  uint32_t _uniqueID = 0;
-
-  friend class ResourceCache;
-};
+Path StrokePathShape::getFinalPath() const {
+  auto strokePath = path;
+  auto effect = PathEffect::MakeStroke(stroke);
+  DEBUG_ASSERT(effect != nullptr);
+  effect->applyTo(&strokePath);
+  strokePath.transform(Matrix::MakeScale(resolutionScale));
+  return strokePath;
+}
 }  // namespace tgfx

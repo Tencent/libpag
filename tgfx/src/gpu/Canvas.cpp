@@ -25,6 +25,7 @@
 #include "gpu/AARectEffect.h"
 #include "gpu/ConstColorProcessor.h"
 #include "gpu/DeviceSpaceTextureEffect.h"
+#include "gpu/GpuPaint.h"
 #include "gpu/PorterDuffXferProcessor.h"
 #include "gpu/RGBAAATextureEffect.h"
 #include "gpu/ops/ClearOp.h"
@@ -38,12 +39,6 @@
 #include "tgfx/gpu/Surface.h"
 
 namespace tgfx {
-struct GpuPaint {
-  Color color = Color::Black();
-  std::vector<std::unique_ptr<FragmentProcessor>> colorFragmentProcessors;
-  std::vector<std::unique_ptr<FragmentProcessor>> coverageFragmentProcessors;
-};
-
 static uint32_t NextClipID() {
   static const uint32_t kFirstUnreservedClipID = 1;
   static std::atomic_uint32_t nextID{kFirstUnreservedClipID};
@@ -199,9 +194,10 @@ const SurfaceOptions* Canvas::surfaceOptions() const {
   return surface->options();
 }
 
-static bool PaintToGLPaint(const Context* context, const Paint& paint, float alpha,
+static bool PaintToGLPaint(Context* context, const Paint& paint, float alpha,
                            std::unique_ptr<FragmentProcessor> shaderProcessor, GpuPaint* glPaint) {
   FPArgs args(context);
+  glPaint->context = context;
   glPaint->color = paint.getColor().makeOpaque();
   std::unique_ptr<FragmentProcessor> shaderFP;
   if (shaderProcessor) {
@@ -238,7 +234,7 @@ static bool PaintToGLPaint(const Context* context, const Paint& paint, float alp
   return true;
 }
 
-static bool PaintToGLPaintWithTexture(const Context* context, const Paint& paint, float alpha,
+static bool PaintToGLPaintWithTexture(Context* context, const Paint& paint, float alpha,
                                       std::unique_ptr<FragmentProcessor> fp,
                                       bool textureIsAlphaOnly, GpuPaint* glPaint) {
   std::unique_ptr<FragmentProcessor> shaderFP;
@@ -394,10 +390,14 @@ void Canvas::drawPath(const Path& path, const Paint& paint) {
   }
   auto strokePath = path;
   auto strokeEffect = PathEffect::MakeStroke(*paint.getStroke());
-  if (strokeEffect) {
-    strokeEffect->applyTo(&strokePath);
+  if (strokeEffect == nullptr) {
+    return;
   }
+  strokeEffect->applyTo(&strokePath);
   fillPath(strokePath, paint);
+}
+
+void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
 }
 
 static std::unique_ptr<DrawOp> MakeSimplePathOp(const Path& path, const GpuPaint& glPaint,
