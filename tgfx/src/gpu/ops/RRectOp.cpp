@@ -97,13 +97,11 @@ static constexpr size_t kIndicesPerFillRRect =
 // stroke count is fill count minus center indices
 // static constexpr int kIndicesPerStrokeRRect = kCornerIndicesCount + kEdgeIndicesCount;
 
-std::unique_ptr<RRectOp> RRectOp::Make(Color color, const RRect& rRect, const Matrix& viewMatrix,
-                                       const Matrix& localMatrix) {
+std::unique_ptr<RRectOp> RRectOp::Make(Color color, const RRect& rRect, const Matrix& viewMatrix) {
   Matrix matrix = Matrix::I();
   if (!viewMatrix.invert(&matrix)) {
     return nullptr;
   }
-  matrix.postConcat(localMatrix);
   if (/*!isStrokeOnly && */ 0.5f <= rRect.radii.x && 0.5f <= rRect.radii.y) {
     return std::unique_ptr<RRectOp>(new RRectOp(color, rRect, viewMatrix, matrix));
   }
@@ -113,8 +111,6 @@ std::unique_ptr<RRectOp> RRectOp::Make(Color color, const RRect& rRect, const Ma
 RRectOp::RRectOp(Color color, const RRect& rRect, const Matrix& viewMatrix,
                  const Matrix& localMatrix)
     : DrawOp(ClassID()), localMatrix(localMatrix) {
-  this->localMatrix.postTranslate(-rRect.rect.left, -rRect.rect.top);
-  this->localMatrix.postScale(1.f / rRect.rect.width(), 1.f / rRect.rect.height());
   setTransformedBounds(rRect.rect, viewMatrix);
   rRects.emplace_back(RRectWrap{color, 0.f, 0.f, rRect, viewMatrix});
 }

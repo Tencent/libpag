@@ -81,8 +81,8 @@ void BlurImageFilter::draw(std::shared_ptr<Texture> texture, Surface* toSurface,
   auto drawContext = std::make_unique<SurfaceDrawContext>(toSurface);
   auto dstRect =
       Rect::MakeWH(static_cast<float>(toSurface->width()), static_cast<float>(toSurface->height()));
-  auto localMatrix = Matrix::MakeScale(static_cast<float>(texture->width()),
-                                       static_cast<float>(texture->height()));
+  auto localMatrix = Matrix::MakeScale(static_cast<float>(texture->width()) / dstRect.width(),
+                                       static_cast<float>(texture->height()) / dstRect.height());
   auto texelSize = Point::Make(0.5f / static_cast<float>(texture->width()),
                                0.5f / static_cast<float>(texture->height()));
   drawContext->fillRectWithFP(
@@ -102,8 +102,7 @@ static std::shared_ptr<Texture> ExtendImage(Context* context, std::shared_ptr<Te
     return nullptr;
   }
   auto drawContext = std::make_unique<SurfaceDrawContext>(surface.get());
-  auto localMatrix = Matrix::MakeScale(dstBounds.width(), dstBounds.height());
-  localMatrix.postTranslate(dstBounds.left, dstBounds.top);
+  auto localMatrix = Matrix::MakeTrans(dstBounds.left, dstBounds.top);
   auto dstRect = Rect::MakeWH(dstBounds.width(), dstBounds.height());
   drawContext->fillRectWithFP(
       dstRect, localMatrix, TextureEffect::Make(context, std::move(image), SamplerState(tileMode)));
