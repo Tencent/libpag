@@ -306,7 +306,7 @@ PAG_TEST(CanvasTest, merge_draw_call_triangle) {
       Matrix::MakeScale(static_cast<float>(width) / static_cast<float>(codec->width()),
                         static_cast<float>(height) / static_cast<float>(codec->height()))));
   int tileSize = 8;
-  size_t drawCallCount = 0;
+  int drawCallCount = 0;
   for (int y = 0; y < height; y += tileSize) {
     bool draw = (y / tileSize) % 2 == 1;
     for (int x = 0; x < width; x += tileSize) {
@@ -330,7 +330,7 @@ PAG_TEST(CanvasTest, merge_draw_call_triangle) {
   EXPECT_TRUE(drawingManager->tasks.size() == 1);
   auto task = std::static_pointer_cast<OpsTask>(drawingManager->tasks[0]);
   EXPECT_TRUE(task->ops.size() == 2);
-  EXPECT_EQ(static_cast<TriangulatingPathOp*>(task->ops[1].get())->providers.size(), drawCallCount);
+  EXPECT_EQ(static_cast<TriangulatingPathOp*>(task->ops[1].get())->vertexCount, drawCallCount * 30);
   canvas->flush();
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/merge_draw_call_triangle"));
   device->unlock();

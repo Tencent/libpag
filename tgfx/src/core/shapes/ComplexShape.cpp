@@ -56,7 +56,7 @@ std::unique_ptr<DrawOp> ComplexShape::makePathOp(const Path& path, GpuPaint* pai
   }
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
-  if (std::max(width, height) < MinSizeForTriangles) {
+  if (std::max(width, height) <= MinSizeForTriangles) {
     return nullptr;
   }
   std::vector<float> vertices = {};

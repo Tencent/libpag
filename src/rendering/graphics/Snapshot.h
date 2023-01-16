@@ -20,8 +20,8 @@
 
 #include "pag/types.h"
 #include "tgfx/core/Matrix.h"
-#include "tgfx/core/Mesh.h"
 #include "tgfx/core/Path.h"
+#include "tgfx/core/Shape.h"
 #include "tgfx/gpu/Texture.h"
 
 namespace pag {
@@ -40,8 +40,8 @@ class Snapshot {
       : texture(std::move(texture)), matrix(matrix) {
   }
 
-  Snapshot(std::unique_ptr<tgfx::Mesh> mesh, const tgfx::Matrix& matrix)
-      : matrix(matrix), mesh(std::move(mesh)) {
+  Snapshot(std::shared_ptr<tgfx::Shape> shape, const tgfx::Matrix& matrix)
+      : matrix(matrix), shape(std::move(shape)) {
   }
 
   /**
@@ -59,8 +59,8 @@ class Snapshot {
     return texture;
   }
 
-  const tgfx::Mesh* getMesh() const {
-    return mesh.get();
+  std::shared_ptr<tgfx::Shape> getShape() const {
+    return shape;
   }
 
   /**
@@ -82,7 +82,7 @@ class Snapshot {
   uint64_t makerKey = 0;
   tgfx::Path path = {};
   Frame idleFrames = 0;
-  std::unique_ptr<tgfx::Mesh> mesh;
+  std::shared_ptr<tgfx::Shape> shape = nullptr;
 
   friend class RenderCache;
 };

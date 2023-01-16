@@ -21,7 +21,6 @@
 #include <optional>
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Font.h"
-#include "tgfx/core/Mesh.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/RGBAAALayout.h"
 #include "tgfx/core/SamplingOptions.h"

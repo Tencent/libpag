@@ -53,10 +53,10 @@ bool Snapshot::hitTest(RenderCache* cache, float x, float y) const {
   canvas->setMatrix(tgfx::Matrix::MakeTrans(-local.x, -local.y));
   if (texture) {
     canvas->drawTexture(texture);
-  } else if (mesh) {
+  } else if (shape) {
     tgfx::Paint paint;
     paint.setColor(tgfx::Color::White());
-    canvas->drawMesh(mesh.get(), paint);
+    canvas->drawShape(shape, paint);
   }
   return surface->hitTest(0, 0);
 }

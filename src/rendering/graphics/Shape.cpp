@@ -20,6 +20,7 @@
 #include "pag/file.h"
 #include "rendering/caches/RenderCache.h"
 #include "tgfx/core/Mask.h"
+#include "tgfx/core/Shape.h"
 #include "tgfx/gpu/Canvas.h"
 #include "tgfx/gpu/Shader.h"
 #include "tgfx/gpu/Surface.h"
@@ -75,15 +76,7 @@ void Shape::draw(tgfx::Canvas* canvas, RenderCache* renderCache) const {
     paint.setShader(shader->makeWithPostLocalMatrix(matrix));
     auto oldMatrix = canvas->getMatrix();
     canvas->concat(snapshot->getMatrix());
-    auto texture = snapshot->getTexture();
-    if (texture) {
-      paint.setMaskFilter(tgfx::MaskFilter::Make(tgfx::Shader::MakeTextureShader(texture)));
-      auto rect = tgfx::Rect::MakeWH(static_cast<float>(texture->width()),
-                                     static_cast<float>(texture->height()));
-      canvas->drawRect(rect, paint);
-    } else if (snapshot->getMesh()) {
-      canvas->drawMesh(snapshot->getMesh(), paint);
-    }
+    canvas->drawShape(snapshot->getShape(), paint);
     canvas->setMatrix(oldMatrix);
     return;
   }
@@ -91,54 +84,15 @@ void Shape::draw(tgfx::Canvas* canvas, RenderCache* renderCache) const {
   canvas->drawPath(path, paint);
 }
 
-std::unique_ptr<Snapshot> MakeMeshSnapshot(tgfx::Path path, RenderCache*, float scaleFactor) {
-  auto matrix = tgfx::Matrix::MakeScale(scaleFactor);
-  path.transform(matrix);
-  auto mesh = tgfx::Mesh::MakeFrom(path);
-  if (mesh == nullptr) {
-    return nullptr;
-  }
-  auto drawingMatrix = tgfx::Matrix::I();
-  matrix.invert(&drawingMatrix);
-  return std::make_unique<Snapshot>(std::move(mesh), drawingMatrix);
-}
-
-std::unique_ptr<Snapshot> MakeTextureSnapshot(const tgfx::Path& path, RenderCache* cache,
-                                              float scaleFactor) {
-  auto bounds = path.getBounds();
-  auto width = static_cast<int>(ceilf(bounds.width() * scaleFactor));
-  auto height = static_cast<int>(ceilf(bounds.height() * scaleFactor));
-  auto mask = tgfx::Mask::Make(width, height);
-  if (mask == nullptr) {
-    return nullptr;
-  }
-  auto matrix = tgfx::Matrix::MakeScale(scaleFactor);
-  matrix.preTranslate(-bounds.x(), -bounds.y());
-  mask->setMatrix(matrix);
-  mask->fillPath(path);
-  auto drawingMatrix = tgfx::Matrix::I();
-  matrix.invert(&drawingMatrix);
-  auto texture = mask->updateTexture(cache->getContext());
-  if (texture == nullptr) {
-    return nullptr;
-  }
-  return std::make_unique<Snapshot>(texture, drawingMatrix);
-}
-
-std::unique_ptr<Snapshot> Shape::makeSnapshot(RenderCache* cache, float scaleFactor) const {
+std::unique_ptr<Snapshot> Shape::makeSnapshot(RenderCache*, float scaleFactor) const {
   if (path.isEmpty() || path.getBounds().isEmpty()) {
     return nullptr;
   }
-  auto bounds = path.getBounds();
-  auto width = static_cast<int>(ceilf(bounds.width() * scaleFactor));
-  auto height = static_cast<int>(ceilf(bounds.height() * scaleFactor));
-  static constexpr int MaxSize = 50;
-  if (path.asRect(nullptr) || path.asRRect(nullptr) || (std::max(width, height) > MaxSize)) {
-    auto snapshot = MakeMeshSnapshot(path, cache, scaleFactor);
-    if (snapshot) {
-      return snapshot;
-    }
+  auto shape = tgfx::Shape::MakeFromFill(path, scaleFactor);
+  if (shape == nullptr) {
+    return nullptr;
   }
-  return MakeTextureSnapshot(path, cache, scaleFactor);
+  auto drawingMatrix = tgfx::Matrix::MakeScale(1 / scaleFactor);
+  return std::make_unique<Snapshot>(std::move(shape), drawingMatrix);
 }
 }  // namespace pag

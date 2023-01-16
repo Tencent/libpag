@@ -19,7 +19,6 @@
 #include "TriangulatingPathOp.h"
 #include "core/PathRef.h"
 #include "gpu/DefaultGeometryProcessor.h"
-#include "tgfx/core/Mesh.h"
 
 namespace tgfx {
 // https://chromium-review.googlesource.com/c/chromium/src/+/1099564/
