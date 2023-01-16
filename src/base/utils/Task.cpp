@@ -123,19 +123,22 @@ TaskGroup::TaskGroup() {
 TaskGroup::~TaskGroup() {
   exit();
   for (auto& thread : threads) {
-    if (thread.joinable()) {
-      thread.join();
+    if (thread->joinable()) {
+      thread->join();
     }
+    delete thread;
+    thread = nullptr;
   }
+  threads.clear();
 }
 
 void TaskGroup::initThreads() {
   static const int CPUCores = GetCPUCores();
   auto maxThreads = CPUCores > 16 ? 16 : CPUCores;
   for (int i = 0; i < maxThreads; i++) {
-    std::thread thread(&TaskGroup::RunLoop, this);
-    if (thread.joinable()) {
-      threads.emplace_back(std::move(thread));
+    auto thread = new (std::nothrow) std::thread(&TaskGroup::RunLoop, this);
+    if (thread && thread->joinable()) {
+      threads.emplace_back(thread);
     } else {
       break;
     }
