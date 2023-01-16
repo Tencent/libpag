@@ -376,10 +376,7 @@ void Canvas::drawTexture(std::shared_ptr<Texture> texture, const RGBAAALayout* l
                                  texture->getSampler()->format == PixelFormat::ALPHA_8, &glPaint)) {
     return;
   }
-  auto localMatrix = Matrix::I();
-  localMatrix.postScale(localBounds.width(), localBounds.height());
-  localMatrix.postTranslate(localBounds.x(), localBounds.y());
-  auto op = FillRectOp::Make(glPaint.color, localBounds, state->matrix, localMatrix);
+  auto op = FillRectOp::Make(glPaint.color, localBounds, state->matrix);
   draw(std::move(op), std::move(glPaint), true);
 }
 
@@ -425,15 +422,11 @@ static std::unique_ptr<DrawOp> MakeSimplePathOp(const Path& path, const GpuPaint
                                                 const Matrix& viewMatrix) {
   auto rect = Rect::MakeEmpty();
   if (path.asRect(&rect)) {
-    auto localMatrix = Matrix::MakeScale(rect.width(), rect.height());
-    localMatrix.postTranslate(rect.x(), rect.y());
-    return FillRectOp::Make(glPaint.color, rect, viewMatrix, localMatrix);
+    return FillRectOp::Make(glPaint.color, rect, viewMatrix);
   }
   RRect rRect;
   if (path.asRRect(&rRect)) {
-    auto localMatrix = Matrix::MakeScale(rRect.rect.width(), rRect.rect.height());
-    localMatrix.postTranslate(rRect.rect.x(), rRect.rect.y());
-    return RRectOp::Make(glPaint.color, rRect, viewMatrix, localMatrix);
+    return RRectOp::Make(glPaint.color, rRect, viewMatrix);
   }
   return nullptr;
 }
@@ -495,8 +488,6 @@ void Canvas::drawMask(const Rect& bounds, std::shared_ptr<Texture> mask, GpuPain
     return;
   }
   auto localMatrix = Matrix::I();
-  localMatrix.postScale(bounds.width(), bounds.height());
-  localMatrix.postTranslate(bounds.x(), bounds.y());
   auto maskLocalMatrix = Matrix::I();
   auto invert = Matrix::I();
   if (!state->matrix.invert(&invert)) {
@@ -507,7 +498,9 @@ void Canvas::drawMask(const Rect& bounds, std::shared_ptr<Texture> mask, GpuPain
     return;
   }
   maskLocalMatrix.postConcat(invert);
-  maskLocalMatrix.postScale(static_cast<float>(mask->width()), static_cast<float>(mask->height()));
+  maskLocalMatrix.postTranslate(-bounds.x(), -bounds.y());
+  maskLocalMatrix.postScale(static_cast<float>(mask->width()) / bounds.width(),
+                            static_cast<float>(mask->height()) / bounds.height());
   auto oldMatrix = state->matrix;
   resetMatrix();
   glPaint.coverageFragmentProcessors.emplace_back(FragmentProcessor::MulInputByChildAlpha(
@@ -625,9 +618,7 @@ void Canvas::drawAtlas(std::shared_ptr<Texture> atlas, const Matrix matrix[], co
       setMatrix(totalMatrix);
       continue;
     }
-    auto localMatrix = Matrix::I();
-    localMatrix.postScale(localBounds.width(), localBounds.height());
-    localMatrix.postTranslate(tex[i].x() + localBounds.x(), tex[i].y() + localBounds.y());
+    auto localMatrix = Matrix::MakeTrans(tex[i].x(), tex[i].y());
     auto color = colors ? std::optional<Color>(colors[i].premultiply()) : std::nullopt;
     if (op == nullptr) {
       ops.emplace_back(FillRectOp::Make(color, localBounds, state->matrix, localMatrix));

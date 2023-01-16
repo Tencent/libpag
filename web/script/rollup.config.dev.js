@@ -28,4 +28,14 @@ export default [
     output: { banner, file: 'demo/index.js', format: 'esm', sourcemap: true },
     plugins: [esbuild({ tsconfig: 'tsconfig.json', minify: false }), json(), resolve(), commonJs()],
   },
+  {
+    input: 'demo/worker.ts',
+    output: { banner, file: 'demo/worker.js', format: 'esm', sourcemap: true },
+    plugins: [esbuild({ tsconfig: 'tsconfig.json', minify: false }), json(), resolve(), commonJs()],
+  },
+  {
+    input: 'src/pag.ts',
+    output: { name: 'libpag', banner, file: 'demo/libpag.js', format: 'umd', exports: 'named', sourcemap: true },
+    plugins: [esbuild({ tsconfig: 'tsconfig.json', minify: false }), json(), resolve(), commonJs()],
+  },
 ];

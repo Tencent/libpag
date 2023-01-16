@@ -24,8 +24,7 @@
 namespace tgfx {
 class RRectOp : public DrawOp {
  public:
-  static std::unique_ptr<RRectOp> Make(Color color, const RRect& rRect, const Matrix& viewMatrix,
-                                       const Matrix& localMatrix = Matrix::I());
+  static std::unique_ptr<RRectOp> Make(Color color, const RRect& rRect, const Matrix& viewMatrix);
 
   void execute(OpsRenderPass* opsRenderPass) override;
 

@@ -40,13 +40,13 @@ export class NativeImage {
   }
 
   public width(): number {
-    return window.HTMLVideoElement && this.source instanceof HTMLVideoElement
+    return globalThis.HTMLVideoElement && this.source instanceof HTMLVideoElement
       ? this.source.videoWidth
       : this.source.width;
   }
 
   public height(): number {
-    return window.HTMLVideoElement && this.source instanceof HTMLVideoElement
+    return globalThis.HTMLVideoElement && this.source instanceof HTMLVideoElement
       ? this.source.videoHeight
       : this.source.height;
   }
@@ -62,6 +62,9 @@ export class NativeImage {
   public onDestroy() {
     if (this.reuse) {
       releaseCanvas2D(this.source as HTMLCanvasElement | OffscreenCanvas);
+    }
+    if (this.source instanceof ImageBitmap) {
+      this.source.close();
     }
   }
 }

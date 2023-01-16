@@ -33,14 +33,11 @@ Rect SimplePathMesh::bounds() const {
 }
 
 std::unique_ptr<DrawOp> SimplePathMesh::getOp(Color color, const Matrix& viewMatrix) const {
-  auto bounds = this->bounds();
-  auto localMatrix = Matrix::MakeScale(bounds.width(), bounds.height());
-  localMatrix.postTranslate(bounds.x(), bounds.y());
   std::unique_ptr<DrawOp> drawOp;
   if (rect.has_value()) {
-    drawOp = FillRectOp::Make(color, *rect, viewMatrix, localMatrix);
+    drawOp = FillRectOp::Make(color, *rect, viewMatrix);
   } else if (rRect.has_value()) {
-    drawOp = RRectOp::Make(color, *rRect, viewMatrix, localMatrix);
+    drawOp = RRectOp::Make(color, *rRect, viewMatrix);
   }
   return drawOp;
 }
