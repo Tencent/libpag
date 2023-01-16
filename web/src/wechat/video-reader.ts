@@ -138,8 +138,9 @@ export class VideoReader {
     // Web SDK use this function to stop video.
   }
 
-  public getError() {
+  public getError(): any {
     // Web SDK use this function to get video error.
+    return null;
   }
 
   public onDestroy() {

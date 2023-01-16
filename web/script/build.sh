@@ -57,7 +57,7 @@ emcc $RELEASE_CONF -std=c++17 \
   -s ERROR_ON_UNDEFINED_SYMBOLS=0 \
   -s MODULARIZE=1 \
   -s NO_EXIT_RUNTIME=1 \
-  -s ENVIRONMENT="web" \
+  -s ENVIRONMENT="web,worker" \
   -s EXPORT_ES6=1 \
   -s USE_ES6_IMPORT_META=0 \
   -o ../src/wasm/libpag.js

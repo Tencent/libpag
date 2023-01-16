@@ -1,6 +1,6 @@
 import { PAGModule } from './pag-module';
 import { PAGComposition } from './pag-composition';
-import { readFile } from './utils/common';
+import { transferToArrayBuffer } from './utils/common';
 import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorators';
 import { getLayerTypeName, layer2typeLayer, proxyVector } from './utils/type-utils';
 
@@ -15,14 +15,7 @@ export class PAGFile extends PAGComposition {
    */
   @wasmAsyncMethod
   public static async load(data: File | Blob | ArrayBuffer) {
-    let buffer: ArrayBuffer | null = null;
-    if (data instanceof File) {
-      buffer = (await readFile(data)) as ArrayBuffer;
-    } else if (data instanceof Blob) {
-      buffer = (await readFile(new File([data], ''))) as ArrayBuffer;
-    } else if (data instanceof ArrayBuffer) {
-      buffer = data;
-    }
+    const buffer = await transferToArrayBuffer(data);
     if (!buffer)
       throw new Error(
         'Initialize PAGFile data type error, please put check data type must to be File ｜ Blob | ArrayBuffer!',

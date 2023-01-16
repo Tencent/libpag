@@ -55,7 +55,7 @@ export class PAGPlayer {
     }, this.wasmIns);
     // Check if any video reader has error.
     for (const videoReader of this.videoReaders) {
-      const error = videoReader.getError();
+      const error = await videoReader.getError();
       if (error !== null) {
         throw error;
       }

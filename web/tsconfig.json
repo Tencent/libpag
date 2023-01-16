@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "lib": ["ES5", "ES6", "DOM", "DOM.Iterable"],
+    "lib": ["ES5", "ES6", "DOM", "DOM.Iterable", "WebWorker"],
     "target": "ES2017",
     "allowJs": true,
     "sourceMap": true,
