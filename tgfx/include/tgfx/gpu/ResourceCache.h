@@ -72,7 +72,12 @@ class ResourceCache {
   /**
    * Returns a unique resource in the cache by the specified contentKey.
    */
-  std::shared_ptr<Resource> getByContent(uint32_t contentKey);
+  std::shared_ptr<Resource> getByContentOwner(const Cacheable* owner);
+
+  /**
+   * Assigns a Cacheable to the resource as its content owner.
+   */
+  void setContentOwner(Resource* resource, const Cacheable* owner);
 
   /**
    * Purges GPU resources that haven't been used the passed in time.
@@ -109,7 +114,6 @@ class ResourceCache {
   void detachFromCurrentThread();
   void releaseAll(bool releaseGPU);
   void processUnreferencedResource(Resource* resource);
-  void assignContentOwner(Resource* resource, Cacheable* owner);
   void removeContentOwner(Resource* resource);
   std::shared_ptr<Resource> wrapResource(Resource* resource);
   std::shared_ptr<Resource> addResource(Resource* resource);

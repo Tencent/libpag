@@ -26,31 +26,40 @@ namespace tgfx {
 static constexpr int AA_TESSELLATOR_MAX_VERB_COUNT = 100;
 
 std::unique_ptr<TriangulatingPathOp> TriangulatingPathOp::Make(Color color, const Path& path,
-                                                               Rect clipBounds,
+                                                               const Rect& clipBounds,
                                                                const Matrix& localMatrix) {
   const auto& skPath = PathRef::ReadAccess(path);
   if (skPath.countVerbs() > AA_TESSELLATOR_MAX_VERB_COUNT) {
     return nullptr;
   }
-  std::vector<float> vertices;
-  auto skRect =
-      pk::SkRect::MakeLTRB(clipBounds.left, clipBounds.top, clipBounds.right, clipBounds.bottom);
-  int count = skPath.toAATriangles(DefaultTolerance, skRect, &vertices);
+  std::vector<float> vertices = {};
+  int count = PathRef::ToAATriangles(path, clipBounds, &vertices);
   if (count == 0) {
     return nullptr;
   }
-  return std::make_unique<TriangulatingPathOp>(color,
-                                               std::make_shared<BufferProvider>(vertices, count),
-                                               path.getBounds(), Matrix::I(), localMatrix);
+  return std::make_unique<TriangulatingPathOp>(color, vertices, count, path.getBounds(),
+                                               Matrix::I(), localMatrix);
 }
 
-TriangulatingPathOp::TriangulatingPathOp(Color color,
-                                         std::shared_ptr<BufferProvider> bufferProvider,
-                                         Rect bounds, const Matrix& viewMatrix,
+TriangulatingPathOp::TriangulatingPathOp(Color color, std::shared_ptr<GpuBuffer> buffer,
+                                         int vertexCount, const Rect& bounds,
+                                         const Matrix& viewMatrix, const Matrix& localMatrix)
+    : DrawOp(ClassID()),
+      color(color),
+      buffer(std::move(buffer)),
+      vertexCount(vertexCount),
+      viewMatrix(viewMatrix),
+      localMatrix(localMatrix) {
+  setBounds(bounds);
+}
+
+TriangulatingPathOp::TriangulatingPathOp(Color color, std::vector<float> vertices, int vertexCount,
+                                         const Rect& bounds, const Matrix& viewMatrix,
                                          const Matrix& localMatrix)
     : DrawOp(ClassID()),
       color(color),
-      providers({std::move(bufferProvider)}),
+      vertices(std::move(vertices)),
+      vertexCount(vertexCount),
       viewMatrix(viewMatrix),
       localMatrix(localMatrix) {
   setBounds(bounds);
@@ -62,10 +71,11 @@ bool TriangulatingPathOp::onCombineIfPossible(Op* op) {
   }
   auto* that = static_cast<TriangulatingPathOp*>(op);
   if (viewMatrix != that->viewMatrix || localMatrix != that->localMatrix || color != that->color ||
-      !providers[0]->canCombine(that->providers[0].get())) {
+      buffer != nullptr || that->buffer != nullptr) {
     return false;
   }
-  providers.insert(providers.end(), that->providers.begin(), that->providers.end());
+  vertices.insert(vertices.end(), that->vertices.begin(), that->vertices.end());
+  vertexCount += that->vertexCount;
   return true;
 }
 
@@ -75,16 +85,9 @@ void TriangulatingPathOp::execute(OpsRenderPass* opsRenderPass) {
                                                     opsRenderPass->renderTarget()->height(),
                                                     viewMatrix, localMatrix));
   opsRenderPass->bindPipelineAndScissorClip(info, scissorRect());
-  int vertexCount = 0;
-  if (auto buffer = providers[0]->getGpuBuffer(opsRenderPass->context())) {
+  if (buffer != nullptr) {
     opsRenderPass->bindVertexBuffer(std::move(buffer));
-    vertexCount = providers[0]->vertexCount();
   } else {
-    std::vector<float> vertices;
-    for (const auto& provider : providers) {
-      vertices.insert(vertices.end(), provider->vertices().begin(), provider->vertices().end());
-      vertexCount += provider->vertexCount();
-    }
     opsRenderPass->bindVerticesAndIndices(std::move(vertices), nullptr);
   }
   opsRenderPass->draw(PrimitiveType::Triangles, 0, vertexCount);

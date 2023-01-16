@@ -195,11 +195,6 @@ class Canvas {
   void drawShape(std::shared_ptr<Shape> shape, const Paint& paint);
 
   /**
-   * Draws a mesh with using current clip, matrix and specified paint.
-   */
-  void drawMesh(const Mesh* mesh, const Paint& paint);
-
-  /**
    * Draw array of glyphs with specified font, using current alpha, blend mode, clip and Matrix.
    */
   void drawGlyphs(const GlyphID glyphIDs[], const Point positions[], size_t glyphCount,

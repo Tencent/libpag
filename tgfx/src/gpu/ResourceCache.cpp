@@ -133,8 +133,8 @@ std::shared_ptr<Resource> ResourceCache::getRecycled(const BytesKey& recycleKey)
   return wrapResource(resource);
 }
 
-std::shared_ptr<Resource> ResourceCache::getByContent(uint32_t contentKey) {
-  auto result = contentKeyMap.find(contentKey);
+std::shared_ptr<Resource> ResourceCache::getByContentOwner(const Cacheable* owner) {
+  auto result = contentKeyMap.find(owner->uniqueID());
   if (result == contentKeyMap.end()) {
     return nullptr;
   }
@@ -197,7 +197,7 @@ void ResourceCache::processUnreferencedResource(Resource* resource) {
   removeResource(resource);
 }
 
-void ResourceCache::assignContentOwner(Resource* resource, Cacheable* owner) {
+void ResourceCache::setContentOwner(Resource* resource, const Cacheable* owner) {
   if (owner == nullptr) {
     removeContentOwner(resource);
     return;

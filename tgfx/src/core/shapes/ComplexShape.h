@@ -39,9 +39,11 @@ class ComplexShape : public Shape {
 
   std::unique_ptr<DrawOp> makeOp(GpuPaint* glPaint, const Matrix& viewMatrix) const override;
 
-  std::unique_ptr<DrawOp> makePathOp(const Path& path, GpuPaint* glPaint,
+  std::unique_ptr<DrawOp> makePathOp(const Path& path, GpuPaint* paint,
                                      const Matrix& viewMatrix) const;
-  std::unique_ptr<DrawOp> makeTextureOp(const Path& path, GpuPaint* glPaint,
+  std::unique_ptr<DrawOp> makeTextureOp(const Path& path, GpuPaint* paint,
+                                        const Matrix& viewMatrix) const;
+  std::unique_ptr<DrawOp> makeTextureOp(std::shared_ptr<Texture> texture, GpuPaint* paint,
                                         const Matrix& viewMatrix) const;
 };
 }  // namespace tgfx

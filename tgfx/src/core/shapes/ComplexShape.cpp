@@ -25,15 +25,27 @@
 #include "tgfx/core/Mask.h"
 
 namespace tgfx {
-// https://chromium-review.googlesource.com/c/chromium/src/+/1099564/
-static constexpr int AA_TESSELLATOR_MAX_VERB_COUNT = 100;
+// Drawing a very small path using triangles may result in blurred output.
+static constexpr int MinSizeForTriangles = 50;
 
 std::unique_ptr<DrawOp> ComplexShape::makeOp(GpuPaint* paint, const Matrix& viewMatrix) const {
+  auto resourceCache = paint->context->resourceCache();
+  auto resource = resourceCache->getByContentOwner(this);
+  if (resource != nullptr) {
+    if (drawAsTexture) {
+      return makeTextureOp(std::static_pointer_cast<Texture>(resource), paint, viewMatrix);
+    }
+    auto buffer = std::static_pointer_cast<GpuBuffer>(resource);
+    auto vertexCount = buffer->size() / (sizeof(float) * 3);
+    return std::make_unique<TriangulatingPathOp>(paint->color, buffer, vertexCount, bounds,
+                                                 viewMatrix);
+  }
   auto path = getFinalPath();
   auto pathOp = makePathOp(path, paint, viewMatrix);
   if (pathOp != nullptr) {
     return pathOp;
   }
+  drawAsTexture = true;
   return makeTextureOp(path, paint, viewMatrix);
 }
 
@@ -42,47 +54,59 @@ std::unique_ptr<DrawOp> ComplexShape::makePathOp(const Path& path, GpuPaint* pai
   if (drawAsTexture) {
     return nullptr;
   }
-  const auto& skPath = PathRef::ReadAccess(path);
-  if (skPath.countVerbs() > AA_TESSELLATOR_MAX_VERB_COUNT) {
-    drawAsTexture = true;
+  auto width = static_cast<int>(ceilf(bounds.width()));
+  auto height = static_cast<int>(ceilf(bounds.height()));
+  if (std::max(width, height) < MinSizeForTriangles) {
     return nullptr;
   }
-  std::vector<float> vertices;
-  int count = skPath.toAATriangles(DefaultTolerance, *reinterpret_cast<const pk::SkRect*>(&bounds),
-                                   &vertices);
+  std::vector<float> vertices = {};
+  int count = PathRef::ToAATriangles(path, bounds, &vertices);
   if (count == 0) {
-    drawAsTexture = true;
     return nullptr;
   }
-  return std::make_unique<TriangulatingPathOp>(
-      paint->color, std::make_shared<BufferProvider>(vertices, count), bounds, viewMatrix);
+  auto buffer = GpuBuffer::Make(paint->context, BufferType::Vertex, &vertices[0],
+                                vertices.size() * sizeof(float));
+  if (buffer == nullptr) {
+    return nullptr;
+  }
+  auto resourceCache = paint->context->resourceCache();
+  resourceCache->setContentOwner(buffer.get(), this);
+  return std::make_unique<TriangulatingPathOp>(paint->color, buffer, count, bounds, viewMatrix);
 }
 
 std::unique_ptr<DrawOp> ComplexShape::makeTextureOp(const Path& path, GpuPaint* paint,
                                                     const Matrix& viewMatrix) const {
-  auto deviceBounds = path.getBounds();
-  auto width = ceilf(deviceBounds.width());
-  auto height = ceilf(deviceBounds.height());
+  auto width = ceilf(bounds.width());
+  auto height = ceilf(bounds.height());
   auto mask = Mask::Make(static_cast<int>(width), static_cast<int>(height));
   if (!mask) {
     return nullptr;
   }
-  auto matrix = Matrix::MakeTrans(-deviceBounds.x(), -deviceBounds.y());
-  matrix.postScale(width / deviceBounds.width(), height / deviceBounds.height());
+  auto matrix = Matrix::MakeTrans(-bounds.x(), -bounds.y());
+  matrix.postScale(width / bounds.width(), height / bounds.height());
   mask->setMatrix(matrix);
   mask->fillPath(path);
   // TODO(pengweilv): mip map
   auto texture = mask->updateTexture(paint->context);
+  auto resourceCache = paint->context->resourceCache();
+  resourceCache->setContentOwner(texture.get(), this);
+  return makeTextureOp(texture, paint, viewMatrix);
+}
+
+std::unique_ptr<DrawOp> ComplexShape::makeTextureOp(std::shared_ptr<Texture> texture,
+                                                    GpuPaint* paint,
+                                                    const Matrix& viewMatrix) const {
   auto localMatrix = Matrix::I();
-  localMatrix.postScale(deviceBounds.width(), deviceBounds.height());
-  localMatrix.postTranslate(deviceBounds.x(), deviceBounds.y());
-  auto maskLocalMatrix = Matrix::I();
+  localMatrix.postScale(bounds.width(), bounds.height());
+  localMatrix.postTranslate(bounds.x(), bounds.y());
   auto invert = Matrix::I();
   if (!localMatrix.invert(&invert)) {
     return nullptr;
   }
+  auto maskLocalMatrix = Matrix::I();
   maskLocalMatrix.postConcat(invert);
-  maskLocalMatrix.postScale(width, height);
+  maskLocalMatrix.postScale(static_cast<float>(texture->width()),
+                            static_cast<float>(texture->height()));
   paint->coverageFragmentProcessors.emplace_back(FragmentProcessor::MulInputByChildAlpha(
       TextureEffect::Make(paint->context, std::move(texture), SamplerState(), maskLocalMatrix)));
   return FillRectOp::Make(paint->color, bounds, viewMatrix, localMatrix);

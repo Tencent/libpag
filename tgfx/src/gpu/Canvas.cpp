@@ -655,33 +655,6 @@ void Canvas::drawAtlas(std::shared_ptr<Texture> atlas, const Matrix matrix[], co
   }
 }
 
-void Canvas::drawMesh(const Mesh* mesh, const Paint& paint) {
-  if (mesh == nullptr) {
-    return;
-  }
-  GpuPaint glPaint;
-  if (!PaintToGLPaint(getContext(), paint, state->alpha, nullptr, &glPaint)) {
-    return;
-  }
-  auto bounds = mesh->bounds();
-  if (!state->matrix.isIdentity()) {
-    state->matrix.mapRect(&bounds);
-  }
-  auto clipBounds = state->clip.getBounds();
-  clipBounds.roundOut();
-  if (!clipBounds.intersect(bounds)) {
-    return;
-  }
-  auto op = mesh->getOp(glPaint.color, state->matrix);
-  if (op == nullptr) {
-    return;
-  }
-  auto oldMatrix = state->matrix;
-  resetMatrix();
-  draw(std::move(op), std::move(glPaint));
-  setMatrix(oldMatrix);
-}
-
 bool Canvas::drawAsClear(const Path& path, const GpuPaint& paint) {
   if (!paint.colorFragmentProcessors.empty() || !paint.coverageFragmentProcessors.empty() ||
       !state->matrix.rectStaysRect() || drawContext == nullptr) {
