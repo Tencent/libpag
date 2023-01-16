@@ -24,7 +24,6 @@
 
 namespace tgfx {
 std::vector<float> FillRectOp::coverageVertices() const {
-  auto normalBounds = Rect::MakeLTRB(0, 0, 1, 1);
   std::vector<float> vertices;
   for (size_t i = 0; i < rects.size(); ++i) {
     auto scale = sqrtf(viewMatrices[i].getScaleX() * viewMatrices[i].getScaleX() +
@@ -36,11 +35,8 @@ std::vector<float> FillRectOp::coverageVertices() const {
     auto outsetBounds = rects[i].makeOutset(padding, padding);
     auto outsetQuad = Quad::MakeFromRect(outsetBounds, viewMatrices[i]);
 
-    auto normalPadding = Point::Make(padding / rects[i].width(), padding / rects[i].height());
-    auto normalInset = normalBounds.makeInset(normalPadding.x, normalPadding.y);
-    auto normalInsetQuad = Quad::MakeFromRect(normalInset, localMatrices[i]);
-    auto normalOutset = normalBounds.makeOutset(normalPadding.x, normalPadding.y);
-    auto normalOutsetQuad = Quad::MakeFromRect(normalOutset, localMatrices[i]);
+    auto normalInsetQuad = Quad::MakeFromRect(insetBounds, localMatrices[i]);
+    auto normalOutsetQuad = Quad::MakeFromRect(outsetBounds, localMatrices[i]);
 
     for (int j = 0; j < 2; ++j) {
       const auto& quad = j == 0 ? insetQuad : outsetQuad;
@@ -65,11 +61,10 @@ std::vector<float> FillRectOp::coverageVertices() const {
 }
 
 std::vector<float> FillRectOp::noCoverageVertices() const {
-  auto normalBounds = Rect::MakeLTRB(0, 0, 1, 1);
   std::vector<float> vertices;
   for (size_t i = 0; i < rects.size(); ++i) {
     auto quad = Quad::MakeFromRect(rects[i], viewMatrices[i]);
-    auto localQuad = Quad::MakeFromRect(normalBounds, localMatrices[i]);
+    auto localQuad = Quad::MakeFromRect(rects[i], localMatrices[i]);
     for (int j = 3; j >= 0; --j) {
       vertices.push_back(quad.point(j).x);
       vertices.push_back(quad.point(j).y);
