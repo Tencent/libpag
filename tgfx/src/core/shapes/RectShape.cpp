@@ -22,8 +22,6 @@
 
 namespace tgfx {
 std::unique_ptr<DrawOp> RectShape::makeOp(GpuPaint* paint, const Matrix& viewMatrix) const {
-  auto localMatrix = Matrix::MakeScale(rect.width(), rect.height());
-  localMatrix.postTranslate(rect.x(), rect.y());
-  return FillRectOp::Make(paint->color, rect, viewMatrix, localMatrix);
+  return FillRectOp::Make(paint->color, rect, viewMatrix);
 }
 }  // namespace tgfx

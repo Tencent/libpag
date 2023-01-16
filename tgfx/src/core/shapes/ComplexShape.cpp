@@ -96,19 +96,12 @@ std::unique_ptr<DrawOp> ComplexShape::makeTextureOp(const Path& path, GpuPaint* 
 std::unique_ptr<DrawOp> ComplexShape::makeTextureOp(std::shared_ptr<Texture> texture,
                                                     GpuPaint* paint,
                                                     const Matrix& viewMatrix) const {
-  auto localMatrix = Matrix::I();
-  localMatrix.postScale(bounds.width(), bounds.height());
-  localMatrix.postTranslate(bounds.x(), bounds.y());
-  auto invert = Matrix::I();
-  if (!localMatrix.invert(&invert)) {
-    return nullptr;
-  }
   auto maskLocalMatrix = Matrix::I();
-  maskLocalMatrix.postConcat(invert);
-  maskLocalMatrix.postScale(static_cast<float>(texture->width()),
-                            static_cast<float>(texture->height()));
+  maskLocalMatrix.postTranslate(-bounds.x(), -bounds.y());
+  maskLocalMatrix.postScale(static_cast<float>(texture->width()) / bounds.width(),
+                            static_cast<float>(texture->height()) / bounds.height());
   paint->coverageFragmentProcessors.emplace_back(FragmentProcessor::MulInputByChildAlpha(
       TextureEffect::Make(paint->context, std::move(texture), SamplerState(), maskLocalMatrix)));
-  return FillRectOp::Make(paint->color, bounds, viewMatrix, localMatrix);
+  return FillRectOp::Make(paint->color, bounds, viewMatrix);
 }
 }  // namespace tgfx
