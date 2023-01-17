@@ -178,9 +178,7 @@ static int64_t GetCurrentTimeUS() {
   animatedFraction = static_cast<double>(playTime) / duration;
   lock.unlock();
   [animatorListener onAnimationUpdate];
-  if (animatedFraction == 0) {
-    [animatorListener onAnimationStart];
-  }
+  [animatorListener onAnimationStart];
 }
 
 - (void)stop {
