@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <functional>
 #include <list>
 #include <unordered_map>
 #include "tgfx/core/Cacheable.h"
