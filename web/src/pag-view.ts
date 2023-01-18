@@ -162,8 +162,9 @@ export class PAGView {
     for (const videoReader of this.player.videoReaders) {
       videoReader.isPlaying = true;
     }
+    const playTime = this.playTime;
     await this.flushLoop(true);
-    if (this.playTime === 0) {
+    if (playTime === 0) {
       this.eventManager.emit('onAnimationStart', this);
     }
     this.eventManager.emit('onAnimationPlay', this);

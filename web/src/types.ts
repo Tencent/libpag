@@ -230,6 +230,7 @@ export interface PAGViewEventMap {
    */
   onAnimationUpdate: PAGView;
   /**
+   * [Deprecated]
    * Notifies the play of the animation.
    */
   onAnimationPlay: PAGView;
