@@ -20,6 +20,7 @@
 
 #include <list>
 #include <memory>
+#include <queue>
 #include <unordered_set>
 #include "TextAtlas.h"
 #include "TextBlock.h"
@@ -34,10 +35,13 @@
 #include "rendering/graphics/Snapshot.h"
 #include "rendering/layers/PAGStage.h"
 #include "rendering/sequences/SequenceReader.h"
+#include "rendering/utils/PathHasher.h"
 #include "tgfx/gpu/Device.h"
 
 namespace pag {
 static constexpr int64_t DECODING_VISIBLE_DISTANCE = 500000;  // 提前 500ms 开始解码。
+
+using ShapeMap = std::unordered_map<tgfx::Path, std::shared_ptr<tgfx::Shape>, PathHasher>;
 
 inline bool NeedsEnableMipMap(float scale) {
   return scale < .4f;
@@ -108,7 +112,7 @@ class RenderCache : public Performance {
    */
   void removeSnapshot(ID assetID);
 
-  Snapshot* getSnapshot(const Shape* shape);
+  std::shared_ptr<tgfx::Shape> getShape(ID assetID, const tgfx::Path& path);
 
   TextAtlas* getTextAtlas(const TextBlock* textBlock);
 
@@ -154,7 +158,7 @@ class RenderCache : public Performance {
   PAGStage* stage = nullptr;
   uint32_t deviceID = 0;
   tgfx::Context* context = nullptr;
-  int64_t lastTimestamp = 0;
+  std::queue<int64_t> timestamps = {};
   bool hitTestOnly = false;
   size_t graphicsMemory = 0;
   bool _videoEnabled = true;
@@ -162,13 +166,14 @@ class RenderCache : public Performance {
   std::unordered_set<ID> usedAssets = {};
   std::unordered_map<ID, Snapshot*> snapshotCaches = {};
   std::list<Snapshot*> snapshotLRU = {};
+  std::unordered_map<Snapshot*, std::list<Snapshot*>::iterator> snapshotPositions = {};
   std::unordered_map<ID, TextAtlas*> textAtlases = {};
+  std::unordered_map<ID, ShapeMap> shapeCaches = {};
   std::unordered_map<ID, std::shared_ptr<Task>> imageTasks;
   std::unordered_map<ID, std::vector<SequenceReader*>> sequenceCaches = {};
   std::unordered_map<ID, std::unordered_map<Frame, SequenceReader*>> usedSequences = {};
   std::unordered_map<ID, Filter*> filterCaches;
   MotionBlurFilter* motionBlurFilter = nullptr;
-  std::unordered_map<ID, std::unordered_map<tgfx::Path, Snapshot*, tgfx::PathHash>> pathCaches;
 
   // bitmap caches:
   void clearExpiredBitmaps();
@@ -176,6 +181,8 @@ class RenderCache : public Performance {
   // snapshot caches:
   void clearAllSnapshots();
   void clearExpiredSnapshots();
+  void moveSnapshotToHead(Snapshot* snapshot);
+  void removeSnapshotFromLRU(Snapshot* snapshot);
 
   // sequence caches:
   void clearAllSequenceCaches();
@@ -192,10 +199,9 @@ class RenderCache : public Performance {
   void removeTextAtlas(ID assetID);
   TextAtlas* getTextAtlas(ID assetID) const;
 
-  // path snapshot caches:
-  Snapshot* getSnapshot(ID assetID, const tgfx::Path& path) const;
-  void removeSnapshot(ID assetID, const tgfx::Path& path);
-  void removePathSnapshots(ID assetID);
+  // shape caches:
+  std::shared_ptr<tgfx::Shape> findShape(ID assetID, const tgfx::Path& path);
+  void removeShape(ID assetID, const tgfx::Path& path);
 
   void prepareLayers(int64_t timeDistance = DECODING_VISIBLE_DISTANCE);
   void preparePreComposeLayer(PreComposeLayer* layer);
@@ -203,9 +209,6 @@ class RenderCache : public Performance {
   SequenceReader* getSequenceReader(Sequence* sequence, Frame targetFrame);
   SequenceReader* findNearestSequenceReader(Sequence* sequence, Frame targetFrame);
   SequenceReader* makeSequenceReader(Sequence* sequence);
-  Snapshot* makeSnapshot(float scaleFactor, const std::function<Snapshot*()>& maker);
-  void moveSnapshotToHead(Snapshot* snapshot);
-  void removeSnapshotFromLRU(Snapshot* snapshot);
 
   friend class PAGPlayer;
 };

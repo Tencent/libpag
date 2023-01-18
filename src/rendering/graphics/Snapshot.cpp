@@ -23,9 +23,6 @@
 
 namespace pag {
 size_t Snapshot::memoryUsage() const {
-  if (texture == nullptr) {
-    return 0;
-  }
   float bytesPerPixels;
   if (texture->isYUV()) {
     bytesPerPixels = 1.5f;
@@ -51,13 +48,7 @@ bool Snapshot::hitTest(RenderCache* cache, float x, float y) const {
   }
   auto canvas = surface->getCanvas();
   canvas->setMatrix(tgfx::Matrix::MakeTrans(-local.x, -local.y));
-  if (texture) {
-    canvas->drawTexture(texture);
-  } else if (mesh) {
-    tgfx::Paint paint;
-    paint.setColor(tgfx::Color::White());
-    canvas->drawMesh(mesh.get(), paint);
-  }
+  canvas->drawTexture(texture);
   return surface->hitTest(0, 0);
 }
 }  // namespace pag

@@ -16,30 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/Mesh.h"
-#include "PathRef.h"
-#include "SimplePathMesh.h"
-#include "TriangularPathMesh.h"
+#include "FillPathShape.h"
 
 namespace tgfx {
-std::unique_ptr<Mesh> Mesh::MakeFrom(const Path& path, const Rect* clipBounds) {
-  Rect rect;
-  if (path.asRect(&rect)) {
-    return std::make_unique<SimplePathMesh>(rect);
-  }
-  RRect rRect;
-  if (path.asRRect(&rRect)) {
-    return std::make_unique<SimplePathMesh>(rRect);
-  }
-  const auto& skPath = PathRef::ReadAccess(path);
-  std::vector<float> vertices;
-  auto skRect = clipBounds ? pk::SkRect::MakeLTRB(clipBounds->left, clipBounds->top,
-                                                  clipBounds->right, clipBounds->bottom)
-                           : skPath.getBounds();
-  int count = skPath.toAATriangles(DefaultTolerance, skRect, &vertices);
-  if (count == 0) {
-    return nullptr;
-  }
-  return std::make_unique<TriangularPathMesh>(std::move(vertices), count, path.getBounds());
+FillPathShape::FillPathShape(const Path& path, float resolutionScale)
+    : ComplexShape(resolutionScale), path(path) {
+  bounds = path.getBounds();
+  bounds.scale(resolutionScale, resolutionScale);
+}
+
+Path FillPathShape::getFinalPath() const {
+  auto fillPath = path;
+  fillPath.transform(Matrix::MakeScale(resolutionScale()));
+  return fillPath;
 }
 }  // namespace tgfx

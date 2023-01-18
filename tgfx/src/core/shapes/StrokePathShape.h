@@ -16,29 +16,20 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "SimplePathMesh.h"
-#include "gpu/opengl/GLOpsRenderPass.h"
-#include "gpu/ops/FillRectOp.h"
-#include "gpu/ops/RRectOp.h"
+#pragma once
+
+#include "core/shapes/ComplexShape.h"
 
 namespace tgfx {
-Rect SimplePathMesh::bounds() const {
-  if (rect.has_value()) {
-    return *rect;
-  }
-  if (rRect.has_value()) {
-    return rRect->rect;
-  }
-  return Rect::MakeEmpty();
-}
+class StrokePathShape : public ComplexShape {
+ public:
+  StrokePathShape(const Path& path, const Stroke& stroke, float resolutionScale = 1.0f);
 
-std::unique_ptr<DrawOp> SimplePathMesh::getOp(Color color, const Matrix& viewMatrix) const {
-  std::unique_ptr<DrawOp> drawOp;
-  if (rect.has_value()) {
-    drawOp = FillRectOp::Make(color, *rect, viewMatrix);
-  } else if (rRect.has_value()) {
-    drawOp = RRectOp::Make(color, *rRect, viewMatrix);
-  }
-  return drawOp;
-}
+ protected:
+  Path getFinalPath() const override;
+
+ private:
+  Path path = {};
+  Stroke stroke = {};
+};
 }  // namespace tgfx

@@ -21,10 +21,10 @@
 #include <optional>
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Font.h"
-#include "tgfx/core/Mesh.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/RGBAAALayout.h"
 #include "tgfx/core/SamplingOptions.h"
+#include "tgfx/core/Shape.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/gpu/Paint.h"
 #include "tgfx/gpu/Texture.h"
@@ -38,7 +38,7 @@ struct CanvasState;
 
 class SurfaceDrawContext;
 
-struct GpuPaint;
+class GpuPaint;
 
 /**
  * Canvas provides an interface for drawing, and how the drawing is clipped and transformed. Canvas
@@ -189,9 +189,9 @@ class Canvas {
   void drawPath(const Path& path, const Paint& paint);
 
   /**
-   * Draws a mesh with using current clip, matrix and specified paint.
+   * Draws a shape with using current clip, matrix and specified paint.
    */
-  void drawMesh(const Mesh* mesh, const Paint& paint);
+  void drawShape(std::shared_ptr<Shape> shape, const Paint& paint);
 
   /**
    * Draw array of glyphs with specified font, using current alpha, blend mode, clip and Matrix.

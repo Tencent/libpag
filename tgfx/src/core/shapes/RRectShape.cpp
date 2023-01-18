@@ -16,29 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "tgfx/core/Color.h"
-#include "tgfx/core/Path.h"
+#include "RRectShape.h"
+#include "gpu/GpuPaint.h"
+#include "gpu/ops/RRectOp.h"
 
 namespace tgfx {
-class DrawOp;
+RRectShape::RRectShape(const RRect& rRect, float resolutionScale)
+    : Shape(resolutionScale), rRect(rRect) {
+  this->rRect.scale(resolutionScale, resolutionScale);
+}
 
-class Mesh {
- public:
-  /**
-   * Initialize the Mesh with the specified path. the clipBounds will be used when the path's fill
-   * type is inverse.
-   */
-  static std::unique_ptr<Mesh> MakeFrom(const Path& path, const Rect* clipBounds = nullptr);
-
-  virtual ~Mesh() = default;
-
-  virtual Rect bounds() const = 0;
-
- protected:
-  virtual std::unique_ptr<DrawOp> getOp(Color color, const Matrix& viewMatrix) const = 0;
-
-  friend class Canvas;
-};
+std::unique_ptr<DrawOp> RRectShape::makeOp(GpuPaint* paint, const Matrix& viewMatrix) const {
+  return RRectOp::Make(paint->color, rRect, viewMatrix);
+}
 }  // namespace tgfx

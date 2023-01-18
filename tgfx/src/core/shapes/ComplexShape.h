@@ -18,28 +18,34 @@
 
 #pragma once
 
-#include "gpu/BufferProvider.h"
-#include "gpu/ops/TriangulatingPathOp.h"
-#include "tgfx/core/Mesh.h"
+#include <atomic>
+#include "gpu/GpuPaint.h"
+#include "tgfx/core/Shape.h"
 
 namespace tgfx {
-class TriangularPathMesh : public Mesh {
+class ComplexShape : public Shape {
  public:
-  TriangularPathMesh(std::vector<float> vertices, int vertexCount, Rect bounds)
-      : provider(std::make_shared<BufferProvider>(std::move(vertices), vertexCount, true)),
-        _bounds(bounds) {
+  Rect getBounds() const override {
+    return bounds;
   }
 
-  Rect bounds() const override {
-    return _bounds;
-  }
+ protected:
+  Rect bounds = Rect::MakeEmpty();
+
+  explicit ComplexShape(float resolutionScale);
+
+  virtual Path getFinalPath() const = 0;
 
  private:
-  std::unique_ptr<DrawOp> getOp(Color color, const Matrix& viewMatrix) const override {
-    return std::make_unique<TriangulatingPathOp>(color, provider, bounds(), viewMatrix);
-  }
+  mutable std::atomic_bool drawAsTexture = {false};
 
-  std::shared_ptr<BufferProvider> provider;
-  Rect _bounds;
+  std::unique_ptr<DrawOp> makeOp(GpuPaint* glPaint, const Matrix& viewMatrix) const override;
+
+  std::unique_ptr<DrawOp> makePathOp(const Path& path, GpuPaint* paint,
+                                     const Matrix& viewMatrix) const;
+  std::unique_ptr<DrawOp> makeTextureOp(const Path& path, GpuPaint* paint,
+                                        const Matrix& viewMatrix) const;
+  std::unique_ptr<DrawOp> makeTextureOp(std::shared_ptr<Texture> texture, GpuPaint* paint,
+                                        const Matrix& viewMatrix) const;
 };
 }  // namespace tgfx

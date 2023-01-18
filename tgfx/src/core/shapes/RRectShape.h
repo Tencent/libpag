@@ -18,31 +18,20 @@
 
 #pragma once
 
-#include "pathkit.h"
+#include "tgfx/core/Shape.h"
 
 namespace tgfx {
-class Path;
-
-struct Rect;
-
-class PathRef {
+class RRectShape : public Shape {
  public:
-  static const pk::SkPath& ReadAccess(const Path& path);
+  explicit RRectShape(const RRect& rRect, float resolutionScale = 1.0f);
 
-  static pk::SkPath& WriteAccess(Path& path);
-
-  static int ToAATriangles(const Path& path, const Rect& clipBounds, std::vector<float>* vertices);
-
-  PathRef() = default;
-
-  explicit PathRef(const pk::SkPath& path) : path(path) {
+  Rect getBounds() const override {
+    return rRect.rect;
   }
 
  private:
-  pk::SkPath path = {};
+  RRect rRect = {};
 
-  friend class Path;
-  friend bool operator==(const Path& a, const Path& b);
-  friend bool operator!=(const Path& a, const Path& b);
+  std::unique_ptr<DrawOp> makeOp(GpuPaint* paint, const Matrix& viewMatrix) const override;
 };
 }  // namespace tgfx

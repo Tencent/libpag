@@ -16,26 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "PathHasher.h"
 
-#include <optional>
-#include "tgfx/core/Mesh.h"
-
-namespace tgfx {
-class SimplePathMesh : public Mesh {
- public:
-  explicit SimplePathMesh(Rect rect) : rect(rect) {
-  }
-
-  explicit SimplePathMesh(RRect rRect) : rRect(rRect) {
-  }
-
-  Rect bounds() const override;
-
- private:
-  std::unique_ptr<DrawOp> getOp(Color color, const Matrix& viewMatrix) const override;
-
-  std::optional<Rect> rect;
-  std::optional<RRect> rRect;
-};
-}  // namespace tgfx
+namespace pag {
+size_t PathHasher::operator()(const tgfx::Path& path) const {
+  return path.countPoints();
+}
+}  // namespace pag

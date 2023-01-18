@@ -81,8 +81,6 @@ class Resource {
    */
   virtual void onReleaseGPU() = 0;
 
-  void assignContentOwner(Cacheable* owner);
-
   friend class ResourceCache;
 };
 }  // namespace tgfx

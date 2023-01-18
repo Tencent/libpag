@@ -18,31 +18,14 @@
 
 #pragma once
 
-#include "pathkit.h"
+#include "FragmentProcessor.h"
 
 namespace tgfx {
-class Path;
-
-struct Rect;
-
-class PathRef {
+class GpuPaint {
  public:
-  static const pk::SkPath& ReadAccess(const Path& path);
-
-  static pk::SkPath& WriteAccess(Path& path);
-
-  static int ToAATriangles(const Path& path, const Rect& clipBounds, std::vector<float>* vertices);
-
-  PathRef() = default;
-
-  explicit PathRef(const pk::SkPath& path) : path(path) {
-  }
-
- private:
-  pk::SkPath path = {};
-
-  friend class Path;
-  friend bool operator==(const Path& a, const Path& b);
-  friend bool operator!=(const Path& a, const Path& b);
+  Context* context = nullptr;
+  Color color = Color::Black();
+  std::vector<std::unique_ptr<FragmentProcessor>> colorFragmentProcessors;
+  std::vector<std::unique_ptr<FragmentProcessor>> coverageFragmentProcessors;
 };
 }  // namespace tgfx

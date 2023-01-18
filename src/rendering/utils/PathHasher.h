@@ -16,12 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/gpu/Resource.h"
+#pragma once
 
-namespace tgfx {
-void Resource::assignContentOwner(Cacheable* owner) {
-  if (context != nullptr) {
-    context->resourceCache()->assignContentOwner(this, owner);
-  }
-}
-}  // namespace tgfx
+#include "tgfx/core/Path.h"
+
+namespace pag {
+struct PathHasher {
+  size_t operator()(const tgfx::Path& path) const;
+};
+}  // namespace pag

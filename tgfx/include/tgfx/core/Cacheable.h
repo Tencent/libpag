@@ -27,6 +27,8 @@ namespace tgfx {
  */
 class Cacheable {
  public:
+  virtual ~Cacheable() = default;
+
   /**
    * Returns a global unique ID for this Cacheable. The content of a Cacheable cannot change after
    * it is created. Any operation to create a new Cacheable will receive generate a new unique ID.

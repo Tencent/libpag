@@ -237,7 +237,10 @@ class Path {
    */
   void decompose(const PathIterator& iterator, void* info = nullptr) const;
 
-  int hash() const;
+  /**
+   * Returns the number of points in Path.
+   */
+  int countPoints() const;
 
  private:
   std::shared_ptr<PathRef> pathRef = nullptr;
@@ -245,11 +248,5 @@ class Path {
   PathRef* writableRef();
 
   friend class PathRef;
-
-  friend struct PathHash;
-};
-
-struct PathHash {
-  size_t operator()(const Path& path) const;
 };
 }  // namespace tgfx

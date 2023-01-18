@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <functional>
 #include <list>
 #include <unordered_map>
 #include "tgfx/core/Cacheable.h"
@@ -72,20 +73,30 @@ class ResourceCache {
   /**
    * Returns a unique resource in the cache by the specified contentKey.
    */
-  std::shared_ptr<Resource> findByContent(uint32_t contentKey);
+  std::shared_ptr<Resource> getByContentOwner(const Cacheable* owner);
+
+  /**
+   * Assigns a Cacheable to the resource as its content owner.
+   */
+  void setContentOwner(Resource* resource, const Cacheable* owner);
 
   /**
    * Purges GPU resources that haven't been used the passed in time.
    * @param purgeTime A timestamp previously returned by Clock::Now().
+   * @param recycledResourcesOnly If it is true the purgeable resources containing persistent data
+   * are spared. If it is false then all purgeable resources will be deleted.
    */
-  void purgeNotUsedSince(int64_t purgeTime);
+  void purgeNotUsedSince(int64_t purgeTime, bool recycledResourcesOnly = false);
 
   /**
    * Purge unreferenced resources from the cache until the the provided bytesLimit has been reached
    * or we have purged all unreferenced resources. Returns true if the total resource bytes is not
    * over the specified bytesLimit after purging.
+   * @param bytesLimit The desired number of bytes after puring.
+   * @param recycledResourcesOnly If it is true the purgeable resources containing persistent data
+   * are spared. If it is false then all purgeable resources will be deleted.
    */
-  bool purgeUntilMemoryTo(size_t bytesLimit);
+  bool purgeUntilMemoryTo(size_t bytesLimit, bool recycledResourcesOnly = false);
 
  private:
   Context* context = nullptr;
@@ -109,11 +120,12 @@ class ResourceCache {
   void detachFromCurrentThread();
   void releaseAll(bool releaseGPU);
   void processUnreferencedResource(Resource* resource);
-  void assignContentOwner(Resource* resource, Cacheable* owner);
   void removeContentOwner(Resource* resource);
   std::shared_ptr<Resource> wrapResource(Resource* resource);
   std::shared_ptr<Resource> addResource(Resource* resource);
   void removeResource(Resource* resource);
+  void purgeResourcesByLRU(bool recycledResourcesOnly,
+                           const std::function<bool(Resource*)>& satisfied);
 
   friend class Resource;
   friend class Context;

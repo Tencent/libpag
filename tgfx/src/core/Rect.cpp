@@ -100,4 +100,10 @@ void Rect::join(float l, float t, float r, float b) {
     bottom = bottom > b ? bottom : b;
   }
 }
+
+void RRect::scale(float scaleX, float scaleY) {
+  rect.scale(scaleX, scaleY);
+  radii.x *= scaleX;
+  radii.y *= scaleY;
+}
 }  // namespace tgfx

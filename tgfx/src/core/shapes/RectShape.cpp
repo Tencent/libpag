@@ -16,33 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "pathkit.h"
+#include "RectShape.h"
+#include "gpu/GpuPaint.h"
+#include "gpu/ops/FillRectOp.h"
 
 namespace tgfx {
-class Path;
+RectShape::RectShape(const Rect& rect, float resolutionScale) : Shape(resolutionScale), rect(rect) {
+  this->rect.scale(resolutionScale, resolutionScale);
+}
 
-struct Rect;
-
-class PathRef {
- public:
-  static const pk::SkPath& ReadAccess(const Path& path);
-
-  static pk::SkPath& WriteAccess(Path& path);
-
-  static int ToAATriangles(const Path& path, const Rect& clipBounds, std::vector<float>* vertices);
-
-  PathRef() = default;
-
-  explicit PathRef(const pk::SkPath& path) : path(path) {
-  }
-
- private:
-  pk::SkPath path = {};
-
-  friend class Path;
-  friend bool operator==(const Path& a, const Path& b);
-  friend bool operator!=(const Path& a, const Path& b);
-};
+std::unique_ptr<DrawOp> RectShape::makeOp(GpuPaint* paint, const Matrix& viewMatrix) const {
+  return FillRectOp::Make(paint->color, rect, viewMatrix);
+}
 }  // namespace tgfx

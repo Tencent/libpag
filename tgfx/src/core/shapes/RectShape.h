@@ -16,24 +16,22 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "BufferProvider.h"
+#pragma once
+
+#include "tgfx/core/Shape.h"
 
 namespace tgfx {
-std::shared_ptr<GpuBuffer> BufferProvider::getGpuBuffer(Context* context) {
-  if (!cacheEnable) {
-    return nullptr;
-  }
-  if (buffer == nullptr) {
-    buffer = GpuBuffer::Make(context, BufferType::Vertex, &_vertices[0],
-                             _vertices.size() * sizeof(float));
-    if (buffer) {
-      std::vector<float>().swap(_vertices);
-    }
-  }
-  return buffer;
-}
+class RectShape : public Shape {
+ public:
+  explicit RectShape(const Rect& rect, float resolutionScale = 1.0f);
 
-bool BufferProvider::canCombine(tgfx::BufferProvider* that) const {
-  return !cacheEnable && !that->cacheEnable;
-}
+  Rect getBounds() const override {
+    return rect;
+  }
+
+ private:
+  Rect rect = {};
+
+  std::unique_ptr<DrawOp> makeOp(GpuPaint* paint, const Matrix& viewMatrix) const override;
+};
 }  // namespace tgfx

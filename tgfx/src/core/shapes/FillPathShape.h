@@ -18,31 +18,17 @@
 
 #pragma once
 
-#include "pathkit.h"
+#include "core/shapes/ComplexShape.h"
 
 namespace tgfx {
-class Path;
-
-struct Rect;
-
-class PathRef {
+class FillPathShape : public ComplexShape {
  public:
-  static const pk::SkPath& ReadAccess(const Path& path);
+  FillPathShape(const Path& path, float resolutionScale = 1.0f);
 
-  static pk::SkPath& WriteAccess(Path& path);
-
-  static int ToAATriangles(const Path& path, const Rect& clipBounds, std::vector<float>* vertices);
-
-  PathRef() = default;
-
-  explicit PathRef(const pk::SkPath& path) : path(path) {
-  }
+ protected:
+  Path getFinalPath() const override;
 
  private:
-  pk::SkPath path = {};
-
-  friend class Path;
-  friend bool operator==(const Path& a, const Path& b);
-  friend bool operator!=(const Path& a, const Path& b);
+  Path path = {};
 };
 }  // namespace tgfx

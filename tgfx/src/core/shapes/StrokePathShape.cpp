@@ -16,33 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/GpuBuffer.h"
+#include "StrokePathShape.h"
+#include "core/utils/Log.h"
+#include "tgfx/core/PathEffect.h"
 
 namespace tgfx {
-class BufferProvider {
- public:
-  BufferProvider(std::vector<float> vertices, int vertexCount, bool cacheEnable = false)
-      : _vertices(std::move(vertices)), _vertexCount(vertexCount), cacheEnable(cacheEnable) {
-  }
+StrokePathShape::StrokePathShape(const Path& path, const Stroke& stroke, float resolutionScale)
+    : ComplexShape(resolutionScale), path(path), stroke(stroke) {
+  bounds = path.getBounds();
+  bounds.makeOutset(stroke.width, stroke.width);
+  bounds.scale(resolutionScale, resolutionScale);
+}
 
-  std::shared_ptr<GpuBuffer> getGpuBuffer(Context* context);
-
-  const std::vector<float>& vertices() const {
-    return _vertices;
-  }
-
-  int vertexCount() const {
-    return _vertexCount;
-  }
-
-  bool canCombine(BufferProvider* that) const;
-
- private:
-  std::vector<float> _vertices;
-  int _vertexCount;
-  bool cacheEnable;
-  std::shared_ptr<GpuBuffer> buffer;
-};
+Path StrokePathShape::getFinalPath() const {
+  auto strokePath = path;
+  auto effect = PathEffect::MakeStroke(stroke);
+  DEBUG_ASSERT(effect != nullptr);
+  effect->applyTo(&strokePath);
+  strokePath.transform(Matrix::MakeScale(resolutionScale()));
+  return strokePath;
+}
 }  // namespace tgfx

@@ -22,11 +22,23 @@
 namespace tgfx {
 using namespace pk;
 
+// When tessellating curved paths into linear segments, this defines the maximum distance in
+// screen space which a segment may deviate from the mathematically correct value. Above this
+// value, the segment will be subdivided. This value was chosen to approximate the super sampling
+// accuracy of the raster path (16 samples, or one quarter pixel).
+static constexpr float DEFAULT_TOLERANCE = 0.25f;
+
 const SkPath& PathRef::ReadAccess(const Path& path) {
   return path.pathRef->path;
 }
 
 SkPath& PathRef::WriteAccess(Path& path) {
   return path.writableRef()->path;
+}
+
+int PathRef::ToAATriangles(const Path& path, const Rect& clipBounds, std::vector<float>* vertices) {
+  const auto& skPath = path.pathRef->path;
+  return skPath.toAATriangles(DEFAULT_TOLERANCE, *reinterpret_cast<const pk::SkRect*>(&clipBounds),
+                              vertices);
 }
 }  // namespace tgfx
