@@ -72,7 +72,7 @@ class TaskGroup {
   int activeThreads = 0;
   bool exited = false;
   std::list<Task*> tasks = {};
-  std::vector<std::thread> threads = {};
+  std::vector<std::thread*> threads = {};
 
   static TaskGroup* GetInstance();
   static void RunLoop(TaskGroup* taskGroup);
