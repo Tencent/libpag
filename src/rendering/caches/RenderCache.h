@@ -165,6 +165,7 @@ class RenderCache : public Performance {
   std::unordered_set<ID> usedAssets = {};
   std::unordered_map<ID, Snapshot*> snapshotCaches = {};
   std::list<Snapshot*> snapshotLRU = {};
+  std::unordered_map<Snapshot*, std::list<Snapshot*>::iterator> snapshotPositions = {};
   std::unordered_map<ID, TextAtlas*> textAtlases = {};
   std::unordered_map<ID, ShapeMap> shapeCaches = {};
   std::unordered_map<ID, std::shared_ptr<Task>> imageTasks;
@@ -179,6 +180,8 @@ class RenderCache : public Performance {
   // snapshot caches:
   void clearAllSnapshots();
   void clearExpiredSnapshots();
+  void moveSnapshotToHead(Snapshot* snapshot);
+  void removeSnapshotFromLRU(Snapshot* snapshot);
 
   // sequence caches:
   void clearAllSequenceCaches();
@@ -205,9 +208,6 @@ class RenderCache : public Performance {
   SequenceReader* getSequenceReader(Sequence* sequence, Frame targetFrame);
   SequenceReader* findNearestSequenceReader(Sequence* sequence, Frame targetFrame);
   SequenceReader* makeSequenceReader(Sequence* sequence);
-  Snapshot* makeSnapshot(float scaleFactor, const std::function<Snapshot*()>& maker);
-  void moveSnapshotToHead(Snapshot* snapshot);
-  void removeSnapshotFromLRU(Snapshot* snapshot);
 
   friend class PAGPlayer;
 };

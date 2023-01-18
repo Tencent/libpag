@@ -20,7 +20,6 @@
 
 #include "pag/types.h"
 #include "tgfx/core/Matrix.h"
-#include "tgfx/core/Path.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/gpu/Texture.h"
 

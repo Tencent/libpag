@@ -257,19 +257,6 @@ Snapshot* RenderCache::getSnapshot(ID assetID) const {
   return nullptr;
 }
 
-Snapshot* RenderCache::makeSnapshot(float scaleFactor, const std::function<Snapshot*()>& maker) {
-  if (scaleFactor < SCALE_FACTOR_PRECISION || graphicsMemory >= MAX_GRAPHICS_MEMORY) {
-    return nullptr;
-  }
-  auto snapshot = maker();
-  if (snapshot == nullptr) {
-    return nullptr;
-  }
-  graphicsMemory += snapshot->memoryUsage();
-  snapshotLRU.push_front(snapshot);
-  return snapshot;
-}
-
 Snapshot* RenderCache::getSnapshot(const Picture* image) {
   if (!_snapshotEnabled) {
     return nullptr;
@@ -287,15 +274,21 @@ Snapshot* RenderCache::getSnapshot(const Picture* image) {
     moveSnapshotToHead(snapshot);
     return snapshot;
   }
-  snapshot = makeSnapshot(scaleFactor, [&]() {
-    bool enableMipMap = NeedsEnableMipMap(stage->getAssetRelativeMinScale(image->assetID));
-    return image->makeSnapshot(this, scaleFactor, enableMipMap).release();
-  });
-  if (snapshot == nullptr) {
+
+  if (scaleFactor < SCALE_FACTOR_PRECISION || graphicsMemory >= MAX_GRAPHICS_MEMORY) {
     return nullptr;
   }
+  bool enableMipMap = NeedsEnableMipMap(stage->getAssetRelativeMinScale(image->assetID));
+  auto newSnapshot = image->makeSnapshot(this, scaleFactor, enableMipMap);
+  if (newSnapshot == nullptr) {
+    return nullptr;
+  }
+  snapshot = newSnapshot.release();
   snapshot->assetID = image->assetID;
   snapshot->makerKey = image->uniqueKey;
+  graphicsMemory += snapshot->memoryUsage();
+  snapshotLRU.push_front(snapshot);
+  snapshotPositions[snapshot] = snapshotLRU.begin();
   snapshotCaches[image->assetID] = snapshot;
   return snapshot;
 }
@@ -359,12 +352,13 @@ void RenderCache::moveSnapshotToHead(Snapshot* snapshot) {
   removeSnapshotFromLRU(snapshot);
   snapshot->idleFrames = 0;
   snapshotLRU.push_front(snapshot);
+  snapshotPositions[snapshot] = snapshotLRU.begin();
 }
 
 void RenderCache::removeSnapshotFromLRU(Snapshot* snapshot) {
-  auto position = std::find(snapshotLRU.begin(), snapshotLRU.end(), snapshot);
-  if (position != snapshotLRU.end()) {
-    snapshotLRU.erase(position);
+  auto position = snapshotPositions.find(snapshot);
+  if (position != snapshotPositions.end()) {
+    snapshotLRU.erase(position->second);
   }
 }
 
@@ -423,6 +417,7 @@ void RenderCache::clearAllSnapshots() {
   }
   snapshotCaches.clear();
   snapshotLRU.clear();
+  snapshotPositions.clear();
 }
 
 void RenderCache::clearExpiredSnapshots() {
