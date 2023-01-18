@@ -22,7 +22,7 @@
 
 namespace tgfx {
 StrokePathShape::StrokePathShape(const Path& path, const Stroke& stroke, float resolutionScale)
-    : path(path), stroke(stroke), resolutionScale(resolutionScale) {
+    : ComplexShape(resolutionScale), path(path), stroke(stroke) {
   bounds = path.getBounds();
   bounds.makeOutset(stroke.width, stroke.width);
   bounds.scale(resolutionScale, resolutionScale);
@@ -33,7 +33,7 @@ Path StrokePathShape::getFinalPath() const {
   auto effect = PathEffect::MakeStroke(stroke);
   DEBUG_ASSERT(effect != nullptr);
   effect->applyTo(&strokePath);
-  strokePath.transform(Matrix::MakeScale(resolutionScale));
+  strokePath.transform(Matrix::MakeScale(resolutionScale()));
   return strokePath;
 }
 }  // namespace tgfx

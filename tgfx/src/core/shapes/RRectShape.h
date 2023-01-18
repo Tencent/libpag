@@ -23,8 +23,7 @@
 namespace tgfx {
 class RRectShape : public Shape {
  public:
-  explicit RRectShape(const RRect& rRect) : rRect(rRect) {
-  }
+  explicit RRectShape(const RRect& rRect, float resolutionScale = 1.0f);
 
   Rect getBounds() const override {
     return rRect.rect;

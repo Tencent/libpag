@@ -40,10 +40,6 @@ class Snapshot {
       : texture(std::move(texture)), matrix(matrix) {
   }
 
-  Snapshot(std::shared_ptr<tgfx::Shape> shape, const tgfx::Matrix& matrix)
-      : matrix(matrix), shape(std::move(shape)) {
-  }
-
   /**
    * Returns the scaling factor of this snapshot to the original graphic content.
    */
@@ -57,10 +53,6 @@ class Snapshot {
 
   std::shared_ptr<tgfx::Texture> getTexture() const {
     return texture;
-  }
-
-  std::shared_ptr<tgfx::Shape> getShape() const {
-    return shape;
   }
 
   /**
@@ -80,9 +72,7 @@ class Snapshot {
   tgfx::Matrix matrix = tgfx::Matrix::I();
   ID assetID = 0;
   uint64_t makerKey = 0;
-  tgfx::Path path = {};
   Frame idleFrames = 0;
-  std::shared_ptr<tgfx::Shape> shape = nullptr;
 
   friend class RenderCache;
 };

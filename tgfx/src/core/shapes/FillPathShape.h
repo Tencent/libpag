@@ -30,7 +30,5 @@ class FillPathShape : public ComplexShape {
 
  private:
   Path path = {};
-  float resolutionScale = 1.0f;
-
 };
 }  // namespace tgfx

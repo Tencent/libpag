@@ -67,32 +67,17 @@ void Shape::prepare(RenderCache*) const {
 
 void Shape::draw(tgfx::Canvas* canvas, RenderCache* renderCache) const {
   tgfx::Paint paint;
-  auto snapshot = renderCache->getSnapshot(this);
-  if (snapshot) {
-    auto matrix = snapshot->getMatrix();
-    if (!matrix.invert(&matrix)) {
-      return;
-    }
-    paint.setShader(shader->makeWithPostLocalMatrix(matrix));
-    auto oldMatrix = canvas->getMatrix();
-    canvas->concat(snapshot->getMatrix());
-    canvas->drawShape(snapshot->getShape(), paint);
-    canvas->setMatrix(oldMatrix);
+  auto shape = renderCache->getShape(assetID, path);
+  if (shape == nullptr) {
+    paint.setShader(shader);
+    canvas->drawPath(path, paint);
     return;
   }
-  paint.setShader(shader);
-  canvas->drawPath(path, paint);
-}
-
-std::unique_ptr<Snapshot> Shape::makeSnapshot(RenderCache*, float scaleFactor) const {
-  if (path.isEmpty() || path.getBounds().isEmpty()) {
-    return nullptr;
-  }
-  auto shape = tgfx::Shape::MakeFromFill(path, scaleFactor);
-  if (shape == nullptr) {
-    return nullptr;
-  }
-  auto drawingMatrix = tgfx::Matrix::MakeScale(1 / scaleFactor);
-  return std::make_unique<Snapshot>(std::move(shape), drawingMatrix);
+  auto matrix = tgfx::Matrix::MakeScale(shape->resolutionScale());
+  paint.setShader(shader->makeWithPostLocalMatrix(matrix));
+  auto oldMatrix = canvas->getMatrix();
+  canvas->concat(tgfx::Matrix::MakeScale(1 / shape->resolutionScale()));
+  canvas->drawShape(shape, paint);
+  canvas->setMatrix(oldMatrix);
 }
 }  // namespace pag

@@ -49,8 +49,6 @@ class Shape : public Graphic {
  private:
   Shape(ID assetID, tgfx::Path path, std::shared_ptr<tgfx::Shader> shader);
 
-  std::unique_ptr<Snapshot> makeSnapshot(RenderCache* cache, float scaleFactor) const;
-
   ID assetID = 0;
   tgfx::Path path = {};
   std::shared_ptr<tgfx::Shader> shader;

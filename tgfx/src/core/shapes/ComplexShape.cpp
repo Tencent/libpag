@@ -28,6 +28,9 @@ namespace tgfx {
 // Drawing a very small path using triangles may result in blurred output.
 static constexpr int MinSizeForTriangles = 50;
 
+ComplexShape::ComplexShape(float resolutionScale) : Shape(resolutionScale) {
+}
+
 std::unique_ptr<DrawOp> ComplexShape::makeOp(GpuPaint* paint, const Matrix& viewMatrix) const {
   auto resourceCache = paint->context->resourceCache();
   auto resource = resourceCache->getByContentOwner(this);

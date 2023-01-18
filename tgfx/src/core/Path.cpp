@@ -393,11 +393,7 @@ PathRef* Path::writableRef() {
   return pathRef.get();
 }
 
-int Path::hash() const {
+int Path::countPoints() const {
   return pathRef->path.countPoints();
-}
-
-size_t PathHash::operator()(const Path& path) const {
-  return static_cast<size_t>(path.hash());
 }
 }  // namespace tgfx

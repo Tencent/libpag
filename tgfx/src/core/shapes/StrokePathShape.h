@@ -23,8 +23,7 @@
 namespace tgfx {
 class StrokePathShape : public ComplexShape {
  public:
-  StrokePathShape(const Path& path, const Stroke& stroke,
-                  float resolutionScale = 1.0f);
+  StrokePathShape(const Path& path, const Stroke& stroke, float resolutionScale = 1.0f);
 
  protected:
   Path getFinalPath() const override;
@@ -32,6 +31,5 @@ class StrokePathShape : public ComplexShape {
  private:
   Path path = {};
   Stroke stroke = {};
-  float resolutionScale = 1.0f;
 };
 }  // namespace tgfx

@@ -50,11 +50,23 @@ class Shape : public Cacheable {
                                                float resolutionScale = 1.0f);
 
   /**
-   * Returns the bounds of the Shape.
+   * Returns the resolutionScale passed in when creating the Shape.
+   */
+  float resolutionScale() const {
+    return _resolutionScale;
+  }
+
+  /**
+   * Returns the bounds of the Shape after being applied the resolutionScale.
    */
   virtual Rect getBounds() const = 0;
 
+ protected:
+  explicit Shape(float resolutionScale);
+
  private:
+  float _resolutionScale = 1.0f;
+  
   virtual std::unique_ptr<DrawOp> makeOp(GpuPaint* paint, const Matrix& viewMatrix) const = 0;
 
   friend class Canvas;

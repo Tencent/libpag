@@ -210,17 +210,18 @@ void RenderCache::attachToContext(tgfx::Context* current, bool forHitTest) {
   auto removedAssets = stage->getRemovedAssets();
   for (auto assetID : removedAssets) {
     removeSnapshot(assetID);
-    removePathSnapshots(assetID);
     imageTasks.erase(assetID);
     clearSequenceCache(assetID);
     clearFilterCache(assetID);
     removeTextAtlas(assetID);
+    shapeCaches.erase(assetID);
   }
 }
 
 void RenderCache::releaseAll() {
   clearAllSnapshots();
   clearAllTextAtlas();
+  shapeCaches.clear();
   graphicsMemory = 0;
   clearAllSequenceCaches();
   for (auto& item : filterCaches) {
@@ -299,12 +300,27 @@ Snapshot* RenderCache::getSnapshot(const Picture* image) {
   return snapshot;
 }
 
-Snapshot* RenderCache::getSnapshot(ID assetID, const tgfx::Path& path) const {
-  if (!_snapshotEnabled) {
-    return nullptr;
+std::shared_ptr<tgfx::Shape> RenderCache::getShape(ID assetID, const tgfx::Path& path) {
+  usedAssets.insert(assetID);
+  auto scaleFactor = stage->getAssetMaxScale(assetID);
+  auto shape = findShape(assetID, path);
+  if (shape && fabsf(shape->resolutionScale() - scaleFactor) > SCALE_FACTOR_PRECISION) {
+    removeShape(assetID, path);
+    shape = nullptr;
   }
-  auto result = pathCaches.find(assetID);
-  if (result != pathCaches.end()) {
+  if (shape != nullptr) {
+    return shape;
+  }
+  shape = tgfx::Shape::MakeFromFill(path, scaleFactor);
+  if (shape != nullptr) {
+    shapeCaches[assetID][path] = shape;
+  }
+  return shape;
+}
+
+std::shared_ptr<tgfx::Shape> RenderCache::findShape(ID assetID, const tgfx::Path& path) {
+  auto result = shapeCaches.find(assetID);
+  if (result != shapeCaches.end()) {
     auto iter = result->second.find(path);
     if (iter != result->second.end()) {
       return iter->second;
@@ -313,59 +329,18 @@ Snapshot* RenderCache::getSnapshot(ID assetID, const tgfx::Path& path) const {
   return nullptr;
 }
 
-Snapshot* RenderCache::getSnapshot(const Shape* shape) {
-  if (!_snapshotEnabled) {
-    return nullptr;
-  }
-  usedAssets.insert(shape->assetID);
-  auto scaleFactor = stage->getAssetMaxScale(shape->assetID);
-  auto snapshot = getSnapshot(shape->assetID, shape->path);
-  if (snapshot && fabsf(snapshot->scaleFactor() - scaleFactor) > SCALE_FACTOR_PRECISION) {
-    removeSnapshot(shape->assetID, shape->path);
-    snapshot = nullptr;
-  }
-  if (snapshot) {
-    moveSnapshotToHead(snapshot);
-    return snapshot;
-  }
-  snapshot =
-      makeSnapshot(scaleFactor, [&]() { return shape->makeSnapshot(this, scaleFactor).release(); });
-  if (snapshot == nullptr) {
-    return nullptr;
-  }
-  snapshot->assetID = shape->assetID;
-  snapshot->path = shape->path;
-  pathCaches[shape->assetID][shape->path] = snapshot;
-  return snapshot;
-}
-
-void RenderCache::removeSnapshot(ID assetID, const tgfx::Path& path) {
-  auto snapshotCache = pathCaches.find(assetID);
-  if (snapshotCache == pathCaches.end()) {
+void RenderCache::removeShape(ID assetID, const tgfx::Path& path) {
+  auto shapeMap = shapeCaches.find(assetID);
+  if (shapeMap == shapeCaches.end()) {
     return;
   }
-  auto snapshot = snapshotCache->second.find(path);
-  if (snapshot == snapshotCache->second.end()) {
+  auto shape = shapeMap->second.find(path);
+  if (shape == shapeMap->second.end()) {
     return;
   }
-  removeSnapshotFromLRU(snapshot->second);
-  graphicsMemory -= snapshot->second->memoryUsage();
-  delete snapshot->second;
-  snapshotCache->second.erase(snapshot);
-  if (snapshotCache->second.empty()) {
-    pathCaches.erase(assetID);
-  }
-}
-
-void RenderCache::removePathSnapshots(ID assetID) {
-  auto snapshotCache = pathCaches.find(assetID);
-  if (snapshotCache != pathCaches.end()) {
-    for (const auto& pair : snapshotCache->second) {
-      removeSnapshotFromLRU(pair.second);
-      graphicsMemory -= pair.second->memoryUsage();
-      delete pair.second;
-    }
-    pathCaches.erase(assetID);
+  shapeMap->second.erase(shape);
+  if (shapeMap->second.empty()) {
+    shapeCaches.erase(assetID);
   }
 }
 
@@ -447,13 +422,6 @@ void RenderCache::clearAllSnapshots() {
     delete item.second;
   }
   snapshotCaches.clear();
-  for (auto& item : pathCaches) {
-    for (auto& snapshot : item.second) {
-      graphicsMemory -= snapshot.second->memoryUsage();
-      delete snapshot.second;
-    }
-  }
-  pathCaches.clear();
   snapshotLRU.clear();
 }
 
@@ -470,7 +438,7 @@ void RenderCache::clearExpiredSnapshots() {
     }
     snapshot->idleFrames++;
     if (snapshot->idleFrames < PURGEABLE_EXPIRED_FRAME &&
-        graphicsMemory + releaseMemory < PURGEABLE_GRAPHICS_MEMORY) {
+        graphicsMemory - releaseMemory < PURGEABLE_GRAPHICS_MEMORY) {
       // 总显存占用未超过20M且所有缓存均未超过10帧未使用，跳过清理。
       continue;
     }
@@ -478,11 +446,7 @@ void RenderCache::clearExpiredSnapshots() {
     expiredSnapshots.push_back(snapshot);
   }
   for (const auto& snapshot : expiredSnapshots) {
-    if (snapshot->path.isEmpty()) {
-      removeSnapshot(snapshot->assetID);
-    } else {
-      removeSnapshot(snapshot->assetID, snapshot->path);
-    }
+    removeSnapshot(snapshot->assetID);
   }
 }
 

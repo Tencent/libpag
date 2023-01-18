@@ -16,18 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "FillPathShape.h"
+#include "PathHasher.h"
 
-namespace tgfx {
-FillPathShape::FillPathShape(const Path& path, float resolutionScale)
-    : ComplexShape(resolutionScale), path(path) {
-  bounds = path.getBounds();
-  bounds.scale(resolutionScale, resolutionScale);
+namespace pag {
+size_t PathHasher::operator()(const tgfx::Path& path) const {
+  return path.countPoints();
 }
-
-Path FillPathShape::getFinalPath() const {
-  auto fillPath = path;
-  fillPath.transform(Matrix::MakeScale(resolutionScale()));
-  return fillPath;
-}
-}  // namespace tgfx
+}  // namespace pag

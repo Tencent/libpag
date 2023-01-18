@@ -31,11 +31,9 @@ std::shared_ptr<Shape> Shape::MakeFromFill(const Path& path, float resolutionSca
   Rect rect = {};
   RRect rRect = {};
   if (path.asRect(&rect)) {
-    rect.scale(resolutionScale, resolutionScale);
-    shape = std::make_shared<RectShape>(rect);
+    shape = std::make_shared<RectShape>(rect, resolutionScale);
   } else if (path.asRRect(&rRect)) {
-    rRect.scale(resolutionScale, resolutionScale);
-    shape = std::make_shared<RRectShape>(rRect);
+    shape = std::make_shared<RRectShape>(rRect, resolutionScale);
   } else {
     shape = std::make_shared<FillPathShape>(path, resolutionScale);
   }
@@ -51,5 +49,8 @@ std::shared_ptr<Shape> Shape::MakeFromStroke(const Path& path, const Stroke& str
   auto shape = std::shared_ptr<Shape>(new StrokePathShape(path, stroke, resolutionScale));
   shape->weakThis = shape;
   return shape;
+}
+
+Shape::Shape(float resolutionScale) : _resolutionScale(resolutionScale) {
 }
 }  // namespace tgfx

@@ -32,6 +32,8 @@ class ComplexShape : public Shape {
  protected:
   Rect bounds = Rect::MakeEmpty();
 
+  explicit ComplexShape(float resolutionScale);
+
   virtual Path getFinalPath() const = 0;
 
  private:
