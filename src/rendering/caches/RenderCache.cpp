@@ -35,10 +35,10 @@
 
 namespace pag {
 // 300M设置的大一些用于兜底，通常在大于20M时就开始随时清理。
-#define MAX_GRAPHICS_MEMORY 314572800
-#define PURGEABLE_GRAPHICS_MEMORY 20971520  // 20M
-#define PURGEABLE_EXPIRED_FRAME 10
-#define SCALE_FACTOR_PRECISION 0.001f
+static constexpr int MAX_GRAPHICS_MEMORY = 314572800;
+static constexpr int PURGEABLE_GRAPHICS_MEMORY = 20971520;  // 20M
+static constexpr int PURGEABLE_EXPIRED_FRAME = 10;
+static constexpr float SCALE_FACTOR_PRECISION = 0.001f;
 
 class ImageTask : public Executor {
  public:
@@ -241,8 +241,20 @@ void RenderCache::detachFromContext() {
   clearExpiredSequences();
   clearExpiredBitmaps();
   clearExpiredSnapshots();
-  context->purgeResourcesNotUsedSince(lastTimestamp);
-  lastTimestamp = tgfx::Clock::Now();
+  if (!timestamps.empty()) {
+    // Always purge recycled resources that haven't been used in 1 frame.
+    context->purgeResourcesNotUsedSince(timestamps.back(), true);
+  }
+  if (context->memoryUsage() + graphicsMemory > PURGEABLE_GRAPHICS_MEMORY &&
+      timestamps.size() == PURGEABLE_EXPIRED_FRAME) {
+    // Purge all types of resources that haven't been used in 10 frames when the total memory usage
+    // is over 20M.
+    context->purgeResourcesNotUsedSince(timestamps.front(), false);
+  }
+  timestamps.push(tgfx::Clock::Now());
+  while (timestamps.size() > PURGEABLE_EXPIRED_FRAME) {
+    timestamps.pop();
+  }
   context = nullptr;
 }
 

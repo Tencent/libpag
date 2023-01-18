@@ -20,6 +20,7 @@
 
 #include <list>
 #include <memory>
+#include <queue>
 #include <unordered_set>
 #include "TextAtlas.h"
 #include "TextBlock.h"
@@ -157,7 +158,7 @@ class RenderCache : public Performance {
   PAGStage* stage = nullptr;
   uint32_t deviceID = 0;
   tgfx::Context* context = nullptr;
-  int64_t lastTimestamp = 0;
+  std::queue<int64_t> timestamps = {};
   bool hitTestOnly = false;
   size_t graphicsMemory = 0;
   bool _videoEnabled = true;

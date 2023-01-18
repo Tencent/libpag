@@ -264,25 +264,32 @@ void ResourceCache::removeResource(Resource* resource) {
   }
 }
 
-void ResourceCache::purgeNotUsedSince(int64_t purgeTime) {
-  while (!purgeableResources.empty()) {
-    auto resource = purgeableResources.back();
-    if (resource->lastUsedTime >= purgeTime) {
-      break;
-    }
-    purgeableResources.pop_back();
-    purgeableBytes -= resource->memoryUsage();
-    removeResource(resource);
-  }
+void ResourceCache::purgeNotUsedSince(int64_t purgeTime, bool recycledResourcesOnly) {
+  purgeResourcesByLRU(recycledResourcesOnly,
+                      [&](Resource* resource) { return resource->lastUsedTime >= purgeTime; });
 }
 
-bool ResourceCache::purgeUntilMemoryTo(size_t bytesLimit) {
-  while (!purgeableResources.empty() && totalBytes > bytesLimit) {
-    auto resource = purgeableResources.back();
-    purgeableResources.pop_back();
+bool ResourceCache::purgeUntilMemoryTo(size_t bytesLimit, bool recycledResourcesOnly) {
+  purgeResourcesByLRU(recycledResourcesOnly, [&](Resource*) { return totalBytes <= bytesLimit; });
+  return totalBytes <= bytesLimit;
+}
+
+void ResourceCache::purgeResourcesByLRU(bool recycledResourcesOnly,
+                                        const std::function<bool(Resource*)>& satisfied) {
+  std::vector<Resource*> needToPurge = {};
+  for (auto item = purgeableResources.rbegin(); item != purgeableResources.rend(); item++) {
+    auto* resource = *item;
+    if (satisfied(resource)) {
+      break;
+    }
+    if (!recycledResourcesOnly || !resource->hasContentOwner()) {
+      needToPurge.push_back(resource);
+    }
+  }
+  for (auto& resource : needToPurge) {
+    RemoveFromList(purgeableResources, resource);
     purgeableBytes -= resource->memoryUsage();
     removeResource(resource);
   }
-  return totalBytes <= bytesLimit;
 }
 }  // namespace tgfx
