@@ -448,5 +448,10 @@ struct Rect {
 struct RRect {
   Rect rect = Rect::MakeEmpty();
   Point radii = Point::Zero();
+
+  /**
+   * Scale the round rectangle by scaleX and scaleY.
+   */
+  void scale(float scaleX, float scaleY);
 };
 }  // namespace tgfx

@@ -34,7 +34,7 @@ std::shared_ptr<Shape> Shape::MakeFromFill(const Path& path, float resolutionSca
     rect.scale(resolutionScale, resolutionScale);
     shape = std::make_shared<RectShape>(rect);
   } else if (path.asRRect(&rRect)) {
-    rRect.rect.scale(resolutionScale, resolutionScale);
+    rRect.scale(resolutionScale, resolutionScale);
     shape = std::make_shared<RRectShape>(rRect);
   } else {
     shape = std::make_shared<FillPathShape>(path, resolutionScale);
