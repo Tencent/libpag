@@ -16,19 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "PathShape.h"
+#include "TextureImage.h"
+#include "gpu/ProxyProvider.h"
 
 namespace tgfx {
-class TextureShape : public PathShape {
- public:
-  explicit TextureShape(std::unique_ptr<PathProxy> proxy, float resolutionScale = 1.0f);
+TextureImage::TextureImage(std::shared_ptr<Texture> texture) : texture(std::move(texture)) {
+}
 
- private:
-  std::unique_ptr<DrawOp> makeOp(GpuPaint* paint, const Matrix& viewMatrix) const override;
-  
-  std::unique_ptr<DrawOp> makeTextureOp(std::shared_ptr<Texture> texture, GpuPaint* paint,
-                                        const Matrix& viewMatrix) const;
-};
+std::shared_ptr<Image> TextureImage::onMakeTextureImage(Context* context) const {
+  if (texture->getContext() != context) {
+    return nullptr;
+  }
+  return std::static_pointer_cast<Image>(weakThis.lock());
+}
+
+std::shared_ptr<TextureProxy> TextureImage::onMakeTextureProxy(Context* context) const {
+  if (texture->getContext() != context) {
+    return nullptr;
+  }
+  return context->proxyProvider()->wrapTexture(texture);
+}
 }  // namespace tgfx

@@ -155,5 +155,6 @@ class Texture : public Resource {
    */
   static bool CheckSizeAndFormat(Context* context, int width, int height, PixelFormat format);
 
+  friend class ProxyProvider;
 };
 }  // namespace tgfx

@@ -18,17 +18,25 @@
 
 #pragma once
 
-#include "PathShape.h"
+#include "gpu/TextureProxy.h"
+#include "tgfx/core/Image.h"
+#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
-class TextureShape : public PathShape {
+class TextureImage : public Image {
  public:
-  explicit TextureShape(std::unique_ptr<PathProxy> proxy, float resolutionScale = 1.0f);
+  explicit TextureImage(std::shared_ptr<Texture> texture);
+
+  bool isTextureBacked() const override {
+    return true;
+  }
+
+ protected:
+  std::shared_ptr<Image> onMakeTextureImage(Context* context) const override;
+
+  std::shared_ptr<TextureProxy> onMakeTextureProxy(Context* context) const override;
 
  private:
-  std::unique_ptr<DrawOp> makeOp(GpuPaint* paint, const Matrix& viewMatrix) const override;
-  
-  std::unique_ptr<DrawOp> makeTextureOp(std::shared_ptr<Texture> texture, GpuPaint* paint,
-                                        const Matrix& viewMatrix) const;
+  std::shared_ptr<Texture> texture = nullptr;
 };
 }  // namespace tgfx

@@ -65,6 +65,7 @@ file(GLOB TGFX_FILES
         src/core/utils/*.*
         src/core/codecs/*.*
         src/core/shapes/*.*
+        src/core/images/*.*
         src/core/vectors/*.*
         src/gpu/*.*
         src/gpu/gradients/*.*

@@ -20,6 +20,7 @@
 #include "core/utils/Log.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProgramCache.h"
+#include "gpu/ProxyProvider.h"
 #include "gpu/ResourceProvider.h"
 #include "tgfx/core/Clock.h"
 #include "tgfx/gpu/ResourceCache.h"
@@ -30,6 +31,7 @@ Context::Context(Device* device) : _device(device) {
   _resourceCache = new ResourceCache(this);
   _drawingManager = new DrawingManager(this);
   _resourceProvider = new ResourceProvider(this);
+  _proxyProvider = new ProxyProvider(this);
 }
 
 Context::~Context() {
@@ -42,6 +44,7 @@ Context::~Context() {
   delete _drawingManager;
   delete _gpu;
   delete _resourceProvider;
+  delete _proxyProvider;
 }
 
 bool Context::flush(Semaphore* signalSemaphore) {

@@ -21,6 +21,7 @@
 #include <optional>
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Font.h"
+#include "tgfx/core/Image.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/RGBAAALayout.h"
 #include "tgfx/core/SamplingOptions.h"
@@ -192,6 +193,13 @@ class Canvas {
    * Draws a shape with using current clip, matrix and specified paint.
    */
   void drawShape(std::shared_ptr<Shape> shape, const Paint& paint);
+
+  /**
+   * Draws an image, with its top-left corner at (0, 0), using current clip, matrix and optional
+   * paint.
+   */
+  void drawImage(std::shared_ptr<Image> image, SamplingOptions sampling = SamplingOptions(),
+                 const Paint* paint = nullptr);
 
   /**
    * Draw array of glyphs with specified font, using current alpha, blend mode, clip and Matrix.

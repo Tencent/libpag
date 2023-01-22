@@ -46,5 +46,6 @@ class Cacheable {
   uint32_t _uniqueID = 0;
 
   friend class ResourceCache;
+  friend class ProxyProvider;
 };
 }  // namespace tgfx

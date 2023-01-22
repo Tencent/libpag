@@ -28,6 +28,7 @@
 #include "gpu/GpuPaint.h"
 #include "gpu/PorterDuffXferProcessor.h"
 #include "gpu/RGBAAATextureEffect.h"
+#include "gpu/TextureProxy.h"
 #include "gpu/ops/ClearOp.h"
 #include "gpu/ops/FillRectOp.h"
 #include "gpu/ops/RRectOp.h"
@@ -416,6 +417,20 @@ void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
     return;
   }
   draw(std::move(op), std::move(glPaint));
+}
+
+void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, const Paint* paint) {
+  if (image == nullptr) {
+    return;
+  }
+  auto proxy = image->lockTextureProxy(getContext());
+  if (proxy == nullptr) {
+    return;
+  }
+  if (!proxy->isInstantiated()) {
+    proxy->instantiate();
+  }
+  drawTexture(proxy->getTexture(), sampling, paint);
 }
 
 static std::unique_ptr<DrawOp> MakeSimplePathOp(const Path& path, const GpuPaint& glPaint,

@@ -36,6 +36,8 @@ class Gpu;
 
 class ResourceProvider;
 
+class ProxyProvider;
+
 class Context {
  public:
   virtual ~Context();
@@ -67,6 +69,10 @@ class Context {
 
   ResourceProvider* resourceProvider() const {
     return _resourceProvider;
+  }
+
+  ProxyProvider* proxyProvider() const {
+    return _proxyProvider;
   }
 
   /**
@@ -159,6 +165,7 @@ class Context {
   ResourceCache* _resourceCache = nullptr;
   DrawingManager* _drawingManager = nullptr;
   ResourceProvider* _resourceProvider = nullptr;
+  ProxyProvider* _proxyProvider = nullptr;
 
   void releaseAll(bool releaseGPU);
   void onLocked();
