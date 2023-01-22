@@ -36,6 +36,10 @@ void Clock::reset() {
   markers = {};
 }
 
+int64_t Clock::elapsedTime() {
+  return Now() - startTime;
+}
+
 void Clock::mark(const std::string& name) {
   if (name.empty()) {
     LOGE("Clock::mark(): An empty marker name was specified!");
