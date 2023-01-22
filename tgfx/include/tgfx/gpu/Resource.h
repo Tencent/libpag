@@ -46,6 +46,11 @@ class Resource {
     return context;
   }
 
+  /**
+   * Retrieves the amount of GPU memory used by this resource in bytes.
+   */
+  virtual size_t memoryUsage() const = 0;
+
  protected:
   Context* context = nullptr;
 
@@ -70,11 +75,6 @@ class Resource {
   bool hasContentOwner() const {
     return !contentOwner.expired();
   }
-
-  /**
-   * Retrieves the amount of GPU memory used by this resource in bytes.
-   */
-  virtual size_t memoryUsage() const = 0;
 
   /**
    * Overridden to free GPU resources in the backend API.

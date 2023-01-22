@@ -35,12 +35,12 @@ class GLBackendTexture : public GLTexture {
     sampler = std::move(textureSampler);
   }
 
- private:
-  bool adopted = false;
-
   size_t memoryUsage() const override {
     return 0;
   }
+
+ private:
+  bool adopted = false;
 
   void onReleaseGPU() override {
     if (adopted) {
@@ -82,16 +82,16 @@ class GLAlphaTexture : public GLTexture {
     sampler = std::move(textureSampler);
   }
 
+  size_t memoryUsage() const override {
+    return ComputeSize(width(), height(), 1, sampler.maxMipMapLevel > 0);
+  }
+
  protected:
   void computeRecycleKey(BytesKey* recycleKey) const override {
     ComputeRecycleKey(recycleKey, width(), height(), sampler.maxMipMapLevel > 0);
   }
 
  private:
-  size_t memoryUsage() const override {
-    return ComputeSize(width(), height(), 1, sampler.maxMipMapLevel > 0);
-  }
-
   void onReleaseGPU() override {
     context->gpu()->deleteTexture(&sampler);
   }
@@ -113,16 +113,16 @@ class GLRGBATexture : public GLTexture {
     sampler = std::move(textureSampler);
   }
 
+  size_t memoryUsage() const override {
+    return ComputeSize(width(), height(), 4, sampler.maxMipMapLevel > 0);
+  }
+
  protected:
   void computeRecycleKey(BytesKey* recycleKey) const override {
     ComputeRecycleKey(recycleKey, width(), height(), sampler.maxMipMapLevel > 0);
   }
 
  private:
-  size_t memoryUsage() const override {
-    return ComputeSize(width(), height(), 4, sampler.maxMipMapLevel > 0);
-  }
-
   void onReleaseGPU() override {
     context->gpu()->deleteTexture(&sampler);
   }

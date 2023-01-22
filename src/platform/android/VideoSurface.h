@@ -28,12 +28,12 @@ class OESTexture : public tgfx::GLTexture {
 
   tgfx::Point getTextureCoord(float x, float y) const override;
 
+  size_t memoryUsage() const override;
+
  private:
   void setTextureSize(int width, int height);
 
   void computeTransform();
-
-  size_t memoryUsage() const override;
 
   void onReleaseGPU() override;
 
