@@ -862,6 +862,8 @@ std::shared_ptr<Graphic> RenderShape(ID assetID, PaintElement* paint, tgfx::Path
   auto paintType = paint->paintType;
   if (paintType == PaintType::Stroke || paintType == PaintType::GradientStroke) {
     ApplyStrokeToPath(&shapePath, paint->stroke);
+  } else if (shapePath.isLine()) {
+    return nullptr;
   }
   if (shapePath.getFillType() == tgfx::PathFillType::Winding) {
     shapePath.setFillType(paint->pathFillType);
