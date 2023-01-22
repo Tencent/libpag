@@ -22,6 +22,7 @@
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Stroke.h"
+#include "tgfx/core/TextBlob.h"
 
 namespace tgfx {
 class DrawOp;
@@ -30,9 +31,9 @@ class GpuPaint;
 
 /**
  * Represents a geometric shape that can be used as a drawing mask. Shape is usually used to cache a
- * complex Path for frequent drawing. Unlike Path, Shape's resolution is fixed after it is created
- * unless it represents a simple rect or rrect. Therefore, drawing a Shape with scale factors great
- * than 1.0 may result in blurred output. Shape is thread safe.
+ * complex Path or TextBlob for frequent drawing. Unlike Path or TextBlob, Shape's resolution is
+ * fixed after it is created unless it represents a simple rect or rrect. Therefore, drawing a Shape
+ * with scale factors great than 1.0 may result in blurred output. Shape is thread safe.
  */
 class Shape : public Cacheable {
  public:
@@ -43,11 +44,26 @@ class Shape : public Cacheable {
   static std::shared_ptr<Shape> MakeFromFill(const Path& path, float resolutionScale = 1.0f);
 
   /**
+   * Creates a Shape from the fills of the given textBlob after being scaled by the resolutionScale.
+   * Returns nullptr if textBlob contains color glyphs or resolutionScale is less than 0.
+   */
+  static std::shared_ptr<Shape> MakeFromFill(std::shared_ptr<TextBlob> textBlob,
+                                             float resolutionScale = 1.0f);
+
+  /**
    * Creates a Shape from the strokes of the given path after being scaled by the resolutionScale.
    * Returns nullptr if path is empty or resolutionScale is less than 0.
    */
   static std::shared_ptr<Shape> MakeFromStroke(const Path& path, const Stroke& stroke,
                                                float resolutionScale = 1.0f);
+
+  /**
+   * Creates a Shape from the strokes of the given textBlob after being scaled by the
+   * resolutionScale. Returns nullptr if textBlob contains color glyphs or resolutionScale is less
+   * than 0.
+   */
+  static std::shared_ptr<Shape> MakeFromStroke(std::shared_ptr<TextBlob> textBlob,
+                                               const Stroke& stroke, float resolutionScale = 1.0f);
 
   /**
    * Returns the resolutionScale passed in when creating the Shape.
@@ -66,7 +82,7 @@ class Shape : public Cacheable {
 
  private:
   float _resolutionScale = 1.0f;
-  
+
   virtual std::unique_ptr<DrawOp> makeOp(GpuPaint* paint, const Matrix& viewMatrix) const = 0;
 
   friend class Canvas;

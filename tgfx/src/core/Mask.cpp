@@ -20,17 +20,6 @@
 #include "tgfx/core/PathEffect.h"
 
 namespace tgfx {
-bool Mask::CanUseAsMask(const TextBlob* textBlob) {
-  if (textBlob == nullptr) {
-    return false;
-  }
-  auto typeface = textBlob->font.getTypeface();
-  if (typeface->hasColor()) {
-    return false;
-  }
-  return true;
-}
-
 void Mask::strokePath(const Path& path, const Stroke& stroke) {
   std::unique_ptr<PathEffect> pathEffect = PathEffect::MakeStroke(stroke);
   if (pathEffect == nullptr) {
@@ -42,7 +31,7 @@ void Mask::strokePath(const Path& path, const Stroke& stroke) {
 }
 
 bool Mask::fillText(const TextBlob* textBlob) {
-  if (!CanUseAsMask(textBlob)) {
+  if (textBlob == nullptr || textBlob->hasColor()) {
     return false;
   }
   Path path = {};
@@ -54,7 +43,7 @@ bool Mask::fillText(const TextBlob* textBlob) {
 }
 
 bool Mask::strokeText(const TextBlob* textBlob, const Stroke& stroke) {
-  if (!CanUseAsMask(textBlob)) {
+  if (textBlob == nullptr || textBlob->hasColor()) {
     return false;
   }
   Path path = {};

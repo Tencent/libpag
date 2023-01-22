@@ -16,24 +16,19 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "StrokePathShape.h"
-#include "core/utils/Log.h"
-#include "tgfx/core/PathEffect.h"
+#pragma once
+
+#include "PathShape.h"
 
 namespace tgfx {
-StrokePathShape::StrokePathShape(const Path& path, const Stroke& stroke, float resolutionScale)
-    : ComplexShape(resolutionScale), path(path), stroke(stroke) {
-  bounds = path.getBounds();
-  bounds.makeOutset(stroke.width, stroke.width);
-  bounds.scale(resolutionScale, resolutionScale);
-}
+class TextureShape : public PathShape {
+ public:
+  explicit TextureShape(std::unique_ptr<PathProxy> proxy, float resolutionScale = 1.0f);
 
-Path StrokePathShape::getFinalPath() const {
-  auto strokePath = path;
-  auto effect = PathEffect::MakeStroke(stroke);
-  DEBUG_ASSERT(effect != nullptr);
-  effect->applyTo(&strokePath);
-  strokePath.transform(Matrix::MakeScale(resolutionScale()));
-  return strokePath;
-}
+ private:
+  std::unique_ptr<DrawOp> makeOp(GpuPaint* paint, const Matrix& viewMatrix) const override;
+
+  std::unique_ptr<DrawOp> makeTextureOp(std::shared_ptr<Texture> texture, GpuPaint* paint,
+                                        const Matrix& viewMatrix) const;
+};
 }  // namespace tgfx

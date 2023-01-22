@@ -34,16 +34,16 @@ class FilterProgram : public tgfx::Resource {
                                                    const std::string& vertex,
                                                    const std::string& fragment);
 
+  size_t memoryUsage() const override {
+    return 0;
+  }
+
   unsigned program = 0;
   unsigned int vertexArray = 0;
   unsigned int vertexBuffer = 0;
 
  private:
   FilterProgram() = default;
-
-  size_t memoryUsage() const override {
-    return 0;
-  }
 
   void onReleaseGPU() override;
 };

@@ -157,6 +157,10 @@ bool Path::asRRect(RRect* rRect) const {
   return true;
 }
 
+bool Path::isLine(Point line[2]) const {
+  return pathRef->path.isLine(reinterpret_cast<SkPoint*>(line));
+}
+
 Rect Path::getBounds() const {
   // Internally, SkPath lazily computes bounds. Use this function instead of path.getBounds()
   // for thread safety.
@@ -395,5 +399,9 @@ PathRef* Path::writableRef() {
 
 int Path::countPoints() const {
   return pathRef->path.countPoints();
+}
+
+int Path::countVerbs() const {
+  return pathRef->path.countVerbs();
 }
 }  // namespace tgfx

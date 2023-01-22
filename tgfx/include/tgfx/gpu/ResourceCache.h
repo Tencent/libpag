@@ -80,6 +80,11 @@ class ResourceCache {
    */
   void setContentOwner(Resource* resource, const Cacheable* owner);
 
+  /*
+   * Removes the content owner from the resource.
+   */
+  void removeContentOwner(Resource* resource);
+
   /**
    * Purges GPU resources that haven't been used the passed in time.
    * @param purgeTime A timestamp previously returned by Clock::Now().
@@ -110,7 +115,7 @@ class ResourceCache {
   std::unordered_map<BytesKey, std::vector<Resource*>, BytesHasher> recycleKeyMap = {};
   std::unordered_map<uint32_t, Resource*> contentKeyMap = {};
   std::mutex removeLocker = {};
-  std::vector<Resource*> pendingPurgableResources = {};
+  std::vector<Resource*> pendingPurgeableResources = {};
 
   static void AddToList(std::list<Resource*>& list, Resource* resource);
   static void RemoveFromList(std::list<Resource*>& list, Resource* resource);
@@ -120,7 +125,6 @@ class ResourceCache {
   void detachFromCurrentThread();
   void releaseAll(bool releaseGPU);
   void processUnreferencedResource(Resource* resource);
-  void removeContentOwner(Resource* resource);
   std::shared_ptr<Resource> wrapResource(Resource* resource);
   std::shared_ptr<Resource> addResource(Resource* resource);
   void removeResource(Resource* resource);

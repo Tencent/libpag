@@ -44,6 +44,11 @@ class Clock {
   void reset();
 
   /**
+   * Returns the number of microseconds elapsed since the Clock was initialized or reset.
+   */
+  int64_t elapsedTime();
+
+  /**
    * Creates a timestamp in the Clock with the given name. If the specified name is already exist,
    * throws an error and leaves the markers unchanged.
    */

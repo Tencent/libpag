@@ -31,6 +31,7 @@ class CGLHardwareTexture : public GLTexture {
 
   ~CGLHardwareTexture() override;
   Point getTextureCoord(float x, float y) const override;
+  size_t memoryUsage() const override;
 
  protected:
   void computeRecycleKey(BytesKey* recycleKey) const override;
@@ -40,7 +41,6 @@ class CGLHardwareTexture : public GLTexture {
   CVOpenGLTextureRef texture = nil;
 
   static void ComputeRecycleKey(BytesKey* recycleKey, CVPixelBufferRef pixelBuffer);
-  size_t memoryUsage() const override;
   void onReleaseGPU() override;
 };
 }  // namespace tgfx

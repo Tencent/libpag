@@ -57,6 +57,8 @@ class GLOpsRenderPass : public OpsRenderPass {
    public:
     bool init(Context* context);
 
+    size_t memoryUsage() const override;
+
     unsigned array = 0;
     unsigned buffer = 0;
 
@@ -64,7 +66,6 @@ class GLOpsRenderPass : public OpsRenderPass {
     void computeRecycleKey(BytesKey*) const override;
 
    private:
-    size_t memoryUsage() const override;
     void onReleaseGPU() override;
   };
 

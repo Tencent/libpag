@@ -29,6 +29,8 @@ class GLYUVTexture : public YUVTexture {
  public:
   Point getTextureCoord(float x, float y) const override;
 
+  size_t memoryUsage() const override;
+
   size_t samplerCount() const override {
     return samplers.size();
   }
@@ -41,8 +43,6 @@ class GLYUVTexture : public YUVTexture {
   GLYUVTexture(YUVColorSpace colorSpace, YUVColorRange colorRange, int width, int height);
 
  private:
-  size_t memoryUsage() const override;
-
   void onReleaseGPU() override;
 
   friend class YUVTexture;

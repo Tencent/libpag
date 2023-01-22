@@ -75,7 +75,16 @@ class Path {
    */
   bool asRect(Rect* rect) const;
 
+  /**
+   * Returns true if Path is equivalent to RRect when filled, Otherwise returns false, and leaves
+   * rRect unchanged.
+   */
   bool asRRect(RRect* rRect) const;
+
+  /**
+   * Returns true if Path contains only one line;
+   */
+  bool isLine(Point line[2] = nullptr) const;
 
   /**
    * Returns the bounds of the path's points. If the path contains 0 or 1 points, the bounds is set
@@ -241,6 +250,11 @@ class Path {
    * Returns the number of points in Path.
    */
   int countPoints() const;
+
+  /**
+   * Returns the number of verbs in Path.
+   */
+  int countVerbs() const;
 
  private:
   std::shared_ptr<PathRef> pathRef = nullptr;

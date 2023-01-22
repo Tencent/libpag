@@ -55,16 +55,16 @@ class RenderTarget : public Resource {
     return _sampleCount;
   }
 
+  size_t memoryUsage() const override {
+    return 0;
+  }
+
  protected:
   RenderTarget(int width, int height, ImageOrigin origin, int sampleCount = 1)
       : _width(width), _height(height), _origin(origin), _sampleCount(sampleCount) {
   }
 
  private:
-  size_t memoryUsage() const override {
-    return 0;
-  }
-  
   virtual const Swizzle& writeSwizzle() const = 0;
 
   int _width = 0;

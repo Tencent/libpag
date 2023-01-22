@@ -16,18 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "FillPathShape.h"
+#include "PathShape.h"
 
 namespace tgfx {
-FillPathShape::FillPathShape(const Path& path, float resolutionScale)
-    : ComplexShape(resolutionScale), path(path) {
-  bounds = path.getBounds();
-  bounds.scale(resolutionScale, resolutionScale);
+PathShape::PathShape(std::unique_ptr<PathProxy> pathProxy, float resolutionScale)
+    : Shape(resolutionScale), proxy(std::move(pathProxy)) {
+  bounds = proxy->getBounds(resolutionScale);
 }
 
-Path FillPathShape::getFinalPath() const {
-  auto fillPath = path;
-  fillPath.transform(Matrix::MakeScale(resolutionScale()));
-  return fillPath;
+Path PathShape::getFillPath() const {
+  return proxy->getPath(resolutionScale());
 }
 }  // namespace tgfx

@@ -48,7 +48,7 @@ ResourceCache::ResourceCache(Context* context) : context(context), maxBytes(Defa
 }
 
 bool ResourceCache::empty() const {
-  return nonpurgeableResources.empty() && pendingPurgableResources.empty() &&
+  return nonpurgeableResources.empty() && pendingPurgeableResources.empty() &&
          purgeableResources.empty();
 }
 
@@ -70,11 +70,11 @@ void ResourceCache::detachFromCurrentThread() {
   // strongReferences 保护已经开启，这时候不会再有任何外部的 Resource 会触发
   // NotifyReferenceReachedZero()。
   std::vector<Resource*> pendingResources = {};
-  std::swap(pendingResources, pendingPurgableResources);
+  std::swap(pendingResources, pendingPurgeableResources);
   for (auto& resource : pendingResources) {
     processUnreferencedResource(resource);
   }
-  DEBUG_ASSERT(pendingPurgableResources.empty());
+  DEBUG_ASSERT(pendingPurgeableResources.empty());
   currentThreadCaches.erase(this);
 }
 
@@ -134,6 +134,9 @@ std::shared_ptr<Resource> ResourceCache::getRecycled(const BytesKey& recycleKey)
 }
 
 std::shared_ptr<Resource> ResourceCache::getByContentOwner(const Cacheable* owner) {
+  if (owner == nullptr) {
+    return nullptr;
+  }
   auto result = contentKeyMap.find(owner->uniqueID());
   if (result == contentKeyMap.end()) {
     return nullptr;
@@ -176,7 +179,7 @@ void ResourceCache::processUnreferencedResource(Resource* resource) {
     // NotifyReferenceReachedZero()。 如果触发的线程不是当前 context 被锁定时的线程,
     // 先放进一个队列延后处理。
     std::lock_guard<std::mutex> autoLock(removeLocker);
-    pendingPurgableResources.push_back(resource);
+    pendingPurgeableResources.push_back(resource);
     return;
   }
   // 禁止 Resource 嵌套，防止 Context 析构时无法释放子项。
@@ -200,6 +203,9 @@ void ResourceCache::processUnreferencedResource(Resource* resource) {
 void ResourceCache::setContentOwner(Resource* resource, const Cacheable* owner) {
   if (owner == nullptr) {
     removeContentOwner(resource);
+    return;
+  }
+  if (resource->contentKey == owner->uniqueID()) {
     return;
   }
   auto result = contentKeyMap.find(owner->uniqueID());

@@ -108,8 +108,6 @@ class Mask {
   int _height = 0;
   Matrix matrix = Matrix::I();
 
-  static bool CanUseAsMask(const TextBlob* textBlob);
-
   Mask(int width, int height) : _width(width), _height(height) {
   }
 };

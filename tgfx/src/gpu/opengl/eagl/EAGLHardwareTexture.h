@@ -31,6 +31,8 @@ class EAGLHardwareTexture : public GLTexture {
 
   ~EAGLHardwareTexture() override;
 
+  size_t memoryUsage() const override;
+
  protected:
   void computeRecycleKey(BytesKey* recycleKey) const override;
 
@@ -39,7 +41,6 @@ class EAGLHardwareTexture : public GLTexture {
   CVOpenGLESTextureRef texture = nil;
 
   static void ComputeRecycleKey(BytesKey* recycleKey, CVPixelBufferRef pixelBuffer);
-  size_t memoryUsage() const override;
   void onReleaseGPU() override;
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0,
                   int srcY = 0) const override;

@@ -17,10 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Shape.h"
-#include "core/shapes/FillPathShape.h"
+#include "core/PathRef.h"
+#include "core/shapes/PathProxy.h"
 #include "core/shapes/RRectShape.h"
 #include "core/shapes/RectShape.h"
-#include "core/shapes/StrokePathShape.h"
+#include "core/shapes/TextureShape.h"
+#include "core/shapes/TriangulatingShape.h"
+#include "tgfx/core/PathEffect.h"
 
 namespace tgfx {
 std::shared_ptr<Shape> Shape::MakeFromFill(const Path& path, float resolutionScale) {
@@ -35,18 +38,59 @@ std::shared_ptr<Shape> Shape::MakeFromFill(const Path& path, float resolutionSca
   } else if (path.asRRect(&rRect)) {
     shape = std::make_shared<RRectShape>(rRect, resolutionScale);
   } else {
-    shape = std::make_shared<FillPathShape>(path, resolutionScale);
+    auto proxy = PathProxy::MakeFromFill(path);
+    auto bounds = proxy->getBounds(resolutionScale);
+    auto width = static_cast<int>(ceilf(bounds.width()));
+    auto height = static_cast<int>(ceilf(bounds.height()));
+    if (path.countVerbs() <= AA_TESSELLATOR_MAX_VERB_COUNT &&
+        width * height >= path.countPoints() * AA_TESSELLATOR_BUFFER_SIZE_FACTOR) {
+      shape = std::make_shared<TriangulatingShape>(std::move(proxy), resolutionScale);
+    } else {
+      shape = std::make_shared<TextureShape>(std::move(proxy), resolutionScale);
+    }
   }
+  shape->weakThis = shape;
+  return shape;
+}
+
+std::shared_ptr<Shape> Shape::MakeFromFill(std::shared_ptr<TextBlob> textBlob,
+                                           float resolutionScale) {
+  if (textBlob == nullptr || resolutionScale <= 0) {
+    return nullptr;
+  }
+  auto proxy = PathProxy::MakeFromFill(textBlob);
+  if (proxy == nullptr) {
+    return nullptr;
+  }
+  auto shape = std::make_shared<TextureShape>(std::move(proxy), resolutionScale);
   shape->weakThis = shape;
   return shape;
 }
 
 std::shared_ptr<Shape> Shape::MakeFromStroke(const Path& path, const Stroke& stroke,
                                              float resolutionScale) {
-  if (path.isEmpty() || stroke.width <= 0 || resolutionScale <= 0) {
+  if (path.isEmpty() || resolutionScale <= 0) {
     return nullptr;
   }
-  auto shape = std::shared_ptr<Shape>(new StrokePathShape(path, stroke, resolutionScale));
+  auto strokePath = path;
+  auto effect = PathEffect::MakeStroke(stroke);
+  if (effect == nullptr) {
+    return nullptr;
+  }
+  effect->applyTo(&strokePath);
+  return MakeFromFill(strokePath, resolutionScale);
+}
+
+std::shared_ptr<Shape> Shape::MakeFromStroke(std::shared_ptr<TextBlob> textBlob,
+                                             const Stroke& stroke, float resolutionScale) {
+  if (textBlob == nullptr || resolutionScale <= 0) {
+    return nullptr;
+  }
+  auto proxy = PathProxy::MakeFromStroke(textBlob, stroke);
+  if (proxy == nullptr) {
+    return nullptr;
+  }
+  auto shape = std::make_shared<TextureShape>(std::move(proxy), resolutionScale);
   shape->weakThis = shape;
   return shape;
 }

@@ -18,17 +18,15 @@
 
 #pragma once
 
-#include "core/shapes/ComplexShape.h"
+#include "PathProxy.h"
+#include "PathShape.h"
 
 namespace tgfx {
-class FillPathShape : public ComplexShape {
+class TriangulatingShape : public PathShape {
  public:
-  FillPathShape(const Path& path, float resolutionScale = 1.0f);
-
- protected:
-  Path getFinalPath() const override;
+  explicit TriangulatingShape(std::unique_ptr<PathProxy> proxy, float resolutionScale = 1.0f);
 
  private:
-  Path path = {};
+  std::unique_ptr<DrawOp> makeOp(GpuPaint* paint, const Matrix& viewMatrix) const override;
 };
 }  // namespace tgfx
