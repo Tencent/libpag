@@ -19,6 +19,8 @@ if [[ `uname` == 'Darwin' ]]; then
   done
 fi
 
+brew upgrade
+
 NODE_REQUIRED_TOOLS="depsync"
 
 for TOOL in ${NODE_REQUIRED_TOOLS[@]}; do
