@@ -20,6 +20,10 @@
 #include "tgfx/core/PathEffect.h"
 
 namespace tgfx {
+bool TextBlob::hasColor() const {
+  return font.getTypeface()->hasColor();
+}
+
 Rect TextBlob::getBounds(const Stroke* stroke) const {
   auto totalBounds = Rect::MakeEmpty();
   int index = 0;

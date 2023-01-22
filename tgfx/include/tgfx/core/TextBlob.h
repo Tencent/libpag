@@ -37,6 +37,11 @@ class TextBlob {
   virtual ~TextBlob() = default;
 
   /**
+   * Returns true if this TextBlob has color glyphs, for example, color emojis.
+   */
+  bool hasColor() const;
+
+  /**
    * Returns the bounds of the text blob's glyphs.
    */
   Rect getBounds(const Stroke* stroke = nullptr) const;
