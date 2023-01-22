@@ -24,6 +24,7 @@ jobs:
         with:
           path: |
             /usr/local/Cellar/ninja
+            /usr/local/Cellar/icu4c
             /usr/local/bin/ninja
             /usr/local/Cellar/yasm
             /usr/local/bin/yasm

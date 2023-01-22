@@ -19,8 +19,6 @@ if [[ `uname` == 'Darwin' ]]; then
   done
 fi
 
-brew install icu4c
-
 NODE_REQUIRED_TOOLS="depsync"
 
 for TOOL in ${NODE_REQUIRED_TOOLS[@]}; do
