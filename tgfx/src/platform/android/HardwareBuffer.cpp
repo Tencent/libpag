@@ -64,8 +64,8 @@ std::shared_ptr<Texture> HardwareBuffer::makeTexture(Context* context) const {
 }
 
 std::shared_ptr<Texture> HardwareBuffer::makeMipMappedTexture(Context* context) const {
-  auto texture = Texture::Make(context, width(), height(), nullptr, 0, ImageOrigin::TopLeft,
-                               PixelFormat::RGBA_8888, true);
+  auto texture = Texture::MakeFormat(context, width(), height(), PixelFormat::RGBA_8888,
+                                     ImageOrigin::TopLeft, true);
   if (texture == nullptr) {
     return nullptr;
   }

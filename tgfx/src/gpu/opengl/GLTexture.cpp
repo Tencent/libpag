@@ -149,24 +149,16 @@ class GLBGRATexture : public GLRGBATexture {
   }
 };
 
-static bool CheckTextureSize(const GLCaps* caps, int width, int height) {
-  if (width < 1 || height < 1) {
-    return false;
+std::shared_ptr<Texture> Texture::MakeFormat(Context* context, int width, int height, void* pixels,
+                                             size_t rowBytes, PixelFormat pixelFormat,
+                                             ImageOrigin origin, bool mipMapped) {
+  if (!CheckSizeAndFormat(context, width, height, pixelFormat)) {
+    return nullptr;
   }
-  auto maxTextureSize = caps->maxTextureSize;
-  return width <= maxTextureSize && height <= maxTextureSize;
-}
-
-std::shared_ptr<Texture> Texture::Make(Context* context, int width, int height, void* pixels,
-                                       size_t rowBytes, ImageOrigin origin, PixelFormat pixelFormat,
-                                       bool mipMapped) {
   // Clear the previously generated GLError, causing the subsequent CheckGLError to return an
   // incorrect result.
   CheckGLError(context);
   auto caps = GLCaps::Get(context);
-  if (!CheckTextureSize(caps, width, height)) {
-    return nullptr;
-  }
   bool enableMipMap = mipMapped && caps->mipMapSupport;
   BytesKey recycleKey = {};
   if (pixelFormat == PixelFormat::ALPHA_8) {
@@ -208,20 +200,17 @@ std::shared_ptr<Texture> Texture::Make(Context* context, int width, int height, 
   return texture;
 }
 
-std::shared_ptr<Texture> Texture::MakeAlpha(Context* context, int width, int height, void* pixels,
-                                            size_t rowBytes, ImageOrigin origin, bool mipMapped) {
-  if (context == nullptr) {
-    return nullptr;
+bool Texture::CheckSizeAndFormat(Context* context, int width, int height, PixelFormat format) {
+  if (context == nullptr || width < 1 || height < 1) {
+    return false;
   }
-  return Make(context, width, height, pixels, rowBytes, origin, PixelFormat::ALPHA_8, mipMapped);
-}
-
-std::shared_ptr<Texture> Texture::MakeRGBA(Context* context, int width, int height, void* pixels,
-                                           size_t rowBytes, ImageOrigin origin, bool mipMapped) {
-  if (context == nullptr) {
-    return nullptr;
+  if (format != PixelFormat::ALPHA_8 && format != PixelFormat::RGBA_8888 &&
+      format != PixelFormat::BGRA_8888) {
+    return false;
   }
-  return Make(context, width, height, pixels, rowBytes, origin, PixelFormat::RGBA_8888, mipMapped);
+  auto caps = GLCaps::Get(context);
+  auto maxTextureSize = caps->maxTextureSize;
+  return width <= maxTextureSize && height <= maxTextureSize;
 }
 
 GLTexture::GLTexture(int width, int height, ImageOrigin origin) : Texture(width, height, origin) {
