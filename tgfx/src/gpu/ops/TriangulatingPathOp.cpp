@@ -21,14 +21,10 @@
 #include "gpu/DefaultGeometryProcessor.h"
 
 namespace tgfx {
-// https://chromium-review.googlesource.com/c/chromium/src/+/1099564/
-static constexpr int AA_TESSELLATOR_MAX_VERB_COUNT = 100;
-
 std::unique_ptr<TriangulatingPathOp> TriangulatingPathOp::Make(Color color, const Path& path,
                                                                const Rect& clipBounds,
                                                                const Matrix& localMatrix) {
-  const auto& skPath = PathRef::ReadAccess(path);
-  if (skPath.countVerbs() > AA_TESSELLATOR_MAX_VERB_COUNT) {
+  if (path.countVerbs() > AA_TESSELLATOR_MAX_VERB_COUNT) {
     return nullptr;
   }
   std::vector<float> vertices = {};

@@ -16,18 +16,19 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "FillPathShape.h"
+#pragma once
+
+#include "PathShape.h"
 
 namespace tgfx {
-FillPathShape::FillPathShape(const Path& path, float resolutionScale)
-    : ComplexShape(resolutionScale), path(path) {
-  bounds = path.getBounds();
-  bounds.scale(resolutionScale, resolutionScale);
-}
+class TextureShape : public PathShape {
+ public:
+  explicit TextureShape(std::unique_ptr<PathProxy> proxy, float resolutionScale = 1.0f);
 
-Path FillPathShape::getFinalPath() const {
-  auto fillPath = path;
-  fillPath.transform(Matrix::MakeScale(resolutionScale()));
-  return fillPath;
-}
+ private:
+  std::unique_ptr<DrawOp> makeOp(GpuPaint* paint, const Matrix& viewMatrix) const override;
+  
+  std::unique_ptr<DrawOp> makeTextureOp(std::shared_ptr<Texture> texture, GpuPaint* paint,
+                                        const Matrix& viewMatrix) const;
+};
 }  // namespace tgfx

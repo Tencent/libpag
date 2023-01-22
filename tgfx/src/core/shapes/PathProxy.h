@@ -18,34 +18,25 @@
 
 #pragma once
 
-#include <atomic>
 #include "gpu/GpuPaint.h"
-#include "tgfx/core/Shape.h"
+#include "tgfx/core/Path.h"
+#include "tgfx/core/Stroke.h"
+#include "tgfx/core/TextBlob.h"
 
 namespace tgfx {
-class ComplexShape : public Shape {
+class PathProxy {
  public:
-  Rect getBounds() const override {
-    return bounds;
-  }
+  static std::unique_ptr<PathProxy> MakeFromFill(const Path& path);
 
- protected:
-  Rect bounds = Rect::MakeEmpty();
+  static std::unique_ptr<PathProxy> MakeFromFill(std::shared_ptr<TextBlob> textBlob);
 
-  explicit ComplexShape(float resolutionScale);
+  static std::unique_ptr<PathProxy> MakeFromStroke(std::shared_ptr<TextBlob> textBlob,
+                                                   const Stroke& stroke);
 
-  virtual Path getFinalPath() const = 0;
+  virtual ~PathProxy() = default;
 
- private:
-  mutable std::atomic_bool drawAsTexture = {false};
+  virtual Rect getBounds(float scale) const = 0;
 
-  std::unique_ptr<DrawOp> makeOp(GpuPaint* glPaint, const Matrix& viewMatrix) const override;
-
-  std::unique_ptr<DrawOp> makePathOp(const Path& path, GpuPaint* paint,
-                                     const Matrix& viewMatrix) const;
-  std::unique_ptr<DrawOp> makeTextureOp(const Path& path, GpuPaint* paint,
-                                        const Matrix& viewMatrix) const;
-  std::unique_ptr<DrawOp> makeTextureOp(std::shared_ptr<Texture> texture, GpuPaint* paint,
-                                        const Matrix& viewMatrix) const;
+  virtual Path getPath(float scale) const = 0;
 };
 }  // namespace tgfx

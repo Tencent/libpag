@@ -16,24 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "StrokePathShape.h"
-#include "core/utils/Log.h"
-#include "tgfx/core/PathEffect.h"
+#include "PathShape.h"
 
 namespace tgfx {
-StrokePathShape::StrokePathShape(const Path& path, const Stroke& stroke, float resolutionScale)
-    : ComplexShape(resolutionScale), path(path), stroke(stroke) {
-  bounds = path.getBounds();
-  bounds.makeOutset(stroke.width, stroke.width);
-  bounds.scale(resolutionScale, resolutionScale);
+PathShape::PathShape(std::unique_ptr<PathProxy> pathProxy, float resolutionScale)
+    : Shape(resolutionScale), proxy(std::move(pathProxy)) {
+  bounds = proxy->getBounds(resolutionScale);
 }
 
-Path StrokePathShape::getFinalPath() const {
-  auto strokePath = path;
-  auto effect = PathEffect::MakeStroke(stroke);
-  DEBUG_ASSERT(effect != nullptr);
-  effect->applyTo(&strokePath);
-  strokePath.transform(Matrix::MakeScale(resolutionScale()));
-  return strokePath;
+Path PathShape::getFillPath() const {
+  return proxy->getPath(resolutionScale());
 }
 }  // namespace tgfx

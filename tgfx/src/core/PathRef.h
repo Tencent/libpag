@@ -21,6 +21,12 @@
 #include "pathkit.h"
 
 namespace tgfx {
+// https://chromium-review.googlesource.com/c/chromium/src/+/1099564/
+static constexpr int AA_TESSELLATOR_MAX_VERB_COUNT = 100;
+// A factor used to estimate the memory size of a tessellated path, based on the average value of
+// Buffer.size() / Path.countPoints() from 4300+ tessellated path data.
+static constexpr int AA_TESSELLATOR_BUFFER_SIZE_FACTOR = 170;
+
 class Path;
 
 struct Rect;

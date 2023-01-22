@@ -18,18 +18,24 @@
 
 #pragma once
 
-#include "core/shapes/ComplexShape.h"
+#include "PathProxy.h"
+#include "tgfx/core/Shape.h"
 
 namespace tgfx {
-class StrokePathShape : public ComplexShape {
+class PathShape : public Shape {
  public:
-  StrokePathShape(const Path& path, const Stroke& stroke, float resolutionScale = 1.0f);
+  explicit PathShape(std::unique_ptr<PathProxy> proxy, float resolutionScale);
+
+  Rect getBounds() const override {
+    return bounds;
+  }
 
  protected:
-  Path getFinalPath() const override;
+  Rect bounds = Rect::MakeEmpty();
+
+  Path getFillPath() const;
 
  private:
-  Path path = {};
-  Stroke stroke = {};
+  std::unique_ptr<PathProxy> proxy = nullptr;
 };
 }  // namespace tgfx
