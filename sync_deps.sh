@@ -19,7 +19,7 @@ if [[ `uname` == 'Darwin' ]]; then
   done
 fi
 
-brew upgrade
+brew install icu4c
 
 NODE_REQUIRED_TOOLS="depsync"
 
