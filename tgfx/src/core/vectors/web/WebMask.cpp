@@ -104,11 +104,11 @@ bool WebMask::strokeText(const TextBlob* textBlob, const Stroke& stroke) {
 }
 
 bool WebMask::drawText(const TextBlob* textBlob, const Stroke* stroke) {
-  if (!CanUseAsMask(textBlob)) {
+  if (textBlob == nullptr || textBlob->hasColor()) {
     return false;
   }
-  std::vector<std::string> texts{};
-  std::vector<Point> points{};
+  std::vector<std::string> texts = {};
+  std::vector<Point> points = {};
   const auto* webTextBlob = static_cast<const WebTextBlob*>(textBlob);
   webTextBlob->getTextsAndPositions(&texts, &points);
   const auto& font = webTextBlob->getFont();
