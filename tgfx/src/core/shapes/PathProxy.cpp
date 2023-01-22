@@ -55,8 +55,7 @@ class FillTextProxy : public PathProxy {
 
   Path getPath(float scale) const override {
     Path fillPath = {};
-    auto success = textBlob->getPath(&fillPath);
-    DEBUG_ASSERT(success);
+    textBlob->getPath(&fillPath);
     fillPath.transform(Matrix::MakeScale(scale));
     return fillPath;
   }
@@ -79,8 +78,7 @@ class StrokeTextProxy : public PathProxy {
 
   Path getPath(float scale) const override {
     Path fillPath = {};
-    auto success = textBlob->getPath(&fillPath, &stroke);
-    DEBUG_ASSERT(success);
+    textBlob->getPath(&fillPath, &stroke);
     fillPath.transform(Matrix::MakeScale(scale));
     return fillPath;
   }
