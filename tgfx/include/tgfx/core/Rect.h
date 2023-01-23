@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include "tgfx/core/Point.h"
+#include "tgfx/core/Size.h"
 
 namespace tgfx {
 /**
@@ -78,6 +79,14 @@ struct Rect {
   }
 
   /**
+   * Returns constructed Rect set to (0, 0, size.width, size.height). Does not validate input;
+   * size.width or size.height may be negative.
+   */
+  static constexpr Rect MakeSize(const Size& size) {
+    return Rect{0, 0, size.width, size.height};
+  }
+
+  /**
    * Returns true if left is equal to or greater than right, or if top is equal to or greater
    * than bottom. Call sort() to reverse rectangles with negative width() or height().
    */
@@ -125,6 +134,14 @@ struct Rect {
    */
   float height() const {
     return bottom - top;
+  }
+
+  /**
+   * Returns spans on the x-axis and y-axis.
+   * @return  Size (width, height)
+   */
+  Size size() const {
+    return Size::Make(this->width(), this->height());
   }
 
   /**
@@ -398,7 +415,7 @@ struct Rect {
   }
 
   /**
-   * Sets Rect by rounding of left, top,  right and bottom.
+   * Sets Rect by rounding of left, top, right and bottom.
    */
   void round() {
     left = roundf(left);

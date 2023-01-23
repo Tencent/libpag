@@ -210,9 +210,9 @@ bool FilterRenderer::MakeEffectNode(std::vector<FilterNode>& filterNodes, tgfx::
         auto mapFilter = static_cast<DisplacementMapFilter*>(filter);
         auto graphic = GetDisplacementMapGraphic(filterList, mapEffect->displacementMapLayer);
         auto bounds = filterList->layer->getBounds();
-        auto size = Point::Make(bounds.width(), bounds.height());
+        auto size = tgfx::Size::Make(bounds.width(), bounds.height());
         bounds = mapEffect->displacementMapLayer->getBounds();
-        auto displacementSize = Point::Make(bounds.width(), bounds.height());
+        auto displacementSize = tgfx::Size::Make(bounds.width(), bounds.height());
         mapFilter->updateMapTexture(renderCache, graphic.get(), size, displacementSize,
                                     filterList->layerMatrix, oldBounds);
       }
