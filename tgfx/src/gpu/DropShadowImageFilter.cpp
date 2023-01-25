@@ -41,8 +41,7 @@ std::pair<std::shared_ptr<Texture>, Point> DropShadowImageFilter::filterImage(
   if (image == nullptr) {
     return {};
   }
-  auto inputBounds =
-      Rect::MakeWH(static_cast<float>(image->width()), static_cast<float>(image->height()));
+  auto inputBounds = Rect::MakeWH(image->width(), image->height());
   Rect dstBounds = Rect::MakeEmpty();
   if (!applyCropRect(inputBounds, &dstBounds, &context.clipBounds)) {
     return {};

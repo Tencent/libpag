@@ -120,9 +120,8 @@ PAG_TEST(CanvasTest, Blur) {
   canvas->concat(tgfx::Matrix::MakeTrans(-imageWidth - padding, imageHeight + padding));
   canvas->save();
   canvas->concat(imageMatrix);
-  paint.setImageFilter(ImageFilter::Blur(
-      130, 130, TileMode::Clamp,
-      tgfx::Rect::MakeWH(static_cast<float>(image->width()), static_cast<float>(image->height()))));
+  paint.setImageFilter(ImageFilter::Blur(130, 130, TileMode::Clamp,
+                                         tgfx::Rect::MakeWH(image->width(), image->height())));
   canvas->drawTexture(texture, &paint);
   canvas->restore();
   paint.setImageFilter(nullptr);
@@ -599,9 +598,7 @@ PAG_TEST(CanvasTest, mipmap) {
   paint.setShader(Shader::MakeTextureShader(textureMipMapped, TileMode::Mirror, TileMode::Repeat,
                                             SamplingOptions(FilterMode::Linear, MipMapMode::Linear))
                       ->makeWithPreLocalMatrix(imageMatrix));
-  canvas->drawRect(
-      Rect::MakeWH(static_cast<float>(surface->width()), static_cast<float>(surface->height())),
-      paint);
+  canvas->drawRect(Rect::MakeWH(surface->width(), surface->height()), paint);
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/mipmap_linear_texture_effect"));
   device->unlock();
 }

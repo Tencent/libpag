@@ -226,6 +226,14 @@ struct PAG_API Rect {
   }
 
   /**
+   * Returns constructed Rect set to float values (0, 0, w, h). Does not validate input; w or h may
+   * be negative.
+   */
+  static constexpr Rect MakeWH(int w, int h) {
+    return {0, 0, static_cast<float>(w), static_cast<float>(h)};
+  }
+
+  /**
    * Returns constructed Rect set to (l, t, r, b). Does not sort input; Rect may result in left
    * greater than right, or top greater than bottom.
    */

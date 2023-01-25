@@ -37,7 +37,6 @@ bool ImageLayer::verify() const {
 }
 
 Rect ImageLayer::getBounds() const {
-  return Rect::MakeWH(static_cast<float>(imageBytes->width),
-                      static_cast<float>(imageBytes->height));
+  return Rect::MakeWH(imageBytes->width, imageBytes->height);
 }
 }  // namespace pag

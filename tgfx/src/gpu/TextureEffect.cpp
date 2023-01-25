@@ -143,8 +143,7 @@ std::unique_ptr<FragmentProcessor> TextureEffect::Make(const Context* context,
     translate = texture->getTextureCoord(0, static_cast<float>(texture->height()));
     matrix.postTranslate(translate.x, translate.y);
   }
-  auto subset =
-      Rect::MakeWH(static_cast<float>(texture->width()), static_cast<float>(texture->height()));
+  auto subset = Rect::MakeWH(texture->width(), texture->height());
   Sampling sampling(texture.get(), samplerState, subset, context->caps());
   return std::unique_ptr<TextureEffect>(new TextureEffect(std::move(texture), sampling, matrix));
 }

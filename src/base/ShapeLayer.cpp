@@ -49,7 +49,6 @@ bool ShapeLayer::verify() const {
 }
 
 Rect ShapeLayer::getBounds() const {
-  return Rect::MakeWH(static_cast<float>(containingComposition->width),
-                      static_cast<float>(containingComposition->height));
+  return Rect::MakeWH(containingComposition->width, containingComposition->height);
 }
 }  // namespace pag

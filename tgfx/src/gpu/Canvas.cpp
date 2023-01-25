@@ -124,8 +124,7 @@ void Canvas::clear(const Color& color) {
   setBlendMode(BlendMode::Src);
   Paint paint;
   paint.setColor(color);
-  auto rect =
-      Rect::MakeWH(static_cast<float>(surface->width()), static_cast<float>(surface->height()));
+  auto rect = Rect::MakeWH(surface->width(), surface->height());
   drawRect(rect, paint);
   setBlendMode(oldBlend);
 }
@@ -306,8 +305,7 @@ std::pair<std::optional<Rect>, bool> Canvas::getClipRect() {
     FlipYIfNeeded(&rect, surface);
     if (IsPixelAligned(rect)) {
       rect.round();
-      if (rect != Rect::MakeWH(static_cast<float>(surface->width()),
-                               static_cast<float>(surface->height()))) {
+      if (rect != Rect::MakeWH(surface->width(), surface->height())) {
         return {rect, true};
       } else {
         return {Rect::MakeEmpty(), false};

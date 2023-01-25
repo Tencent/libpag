@@ -117,9 +117,7 @@ static void SubmitYUVTexture(Context* context, const YUVConfig& yuvConfig,
     auto rowBytes = yuvConfig.rowBytes[index];
     auto pixels = yuvConfig.pixelsPlane[index];
     auto format = yuvConfig.formats[index];
-    context->gpu()->writePixels(&sampler,
-                                Rect::MakeWH(static_cast<float>(w), static_cast<float>(h)), pixels,
-                                rowBytes, format);
+    context->gpu()->writePixels(&sampler, Rect::MakeWH(w, h), pixels, rowBytes, format);
   }
 }
 

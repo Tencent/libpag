@@ -562,7 +562,7 @@ bool PAGComposition::GetChildLayerAtPoint(PAGLayer* childLayer, float x, float y
 
 bool PAGComposition::getLayersUnderPointInternal(float x, float y,
                                                  std::vector<std::shared_ptr<PAGLayer>>* results) {
-  auto bounds = tgfx::Rect::MakeWH(static_cast<float>(_width), static_cast<float>(_height));
+  auto bounds = tgfx::Rect::MakeWH(_width, _height);
   if (hasClip() && !bounds.contains(x, y)) {
     return false;
   }
