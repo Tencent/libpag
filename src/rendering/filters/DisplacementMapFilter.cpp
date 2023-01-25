@@ -245,7 +245,9 @@ void DisplacementMapFilter::onUpdateParams(tgfx::Context* context, const tgfx::R
 
   matrix.postTranslate(contentBounds.left, contentBounds.top);
   matrix.postConcat(_layerMatrix);
-  auto size = _layerMatrix.mapSize(_size);
+  auto rect = tgfx::Rect::MakeWH(_size.width, _size.height);
+  _layerMatrix.mapRect(&rect);
+  auto size = tgfx::Size::Make(rect.width(), rect.height());
   auto mapMatrix = DisplacementMatrix(displacementMapBehavior, size, _displacementSize);
   mapMatrix.invert(&mapMatrix);
   matrix.postConcat(mapMatrix);

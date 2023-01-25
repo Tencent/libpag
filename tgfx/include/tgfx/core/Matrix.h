@@ -648,26 +648,6 @@ class Matrix {
     mapRect(&dst, src);
     return dst;
   }
-  /**
-   * Sets dst to src mapped by Matrix.
-   */
-  void mapSize(Size* dst, const Size& src) const;
-
-  /**
-   * Maps size by Matrix.
-   */
-  void mapSize(Size* size) const {
-    mapSize(size, *size);
-  }
-
-  /**
-   * Returns size of src mapped by Matrix.
-   */
-  Size mapSize(const Size& src) const {
-    Size dst = {};
-    mapSize(&dst, src);
-    return dst;
-  }
 
   /** Compares a and b; returns true if a and b are numerically equal. Returns true even if sign
    * of zero values are different. Returns false if either Matrix contains NaN, even if the other

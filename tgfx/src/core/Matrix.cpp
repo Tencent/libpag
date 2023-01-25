@@ -416,13 +416,6 @@ void Matrix::mapRect(Rect* dst, const Rect& src) const {
   dst->setBounds(quad, 4);
 }
 
-void Matrix::mapSize(Size* dst, const Size& src) const {
-  Point point = {};
-  mapXY(src.width, src.height, &point);
-  dst->width = point.x;
-  dst->height = point.y;
-}
-
 float Matrix::getMinScale() const {
   float results[2];
   if (getMinMaxScaleFactors(results)) {
