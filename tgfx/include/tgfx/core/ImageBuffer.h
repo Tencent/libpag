@@ -43,6 +43,12 @@ class ImageBuffer {
   }
 
   /**
+   * Returns true if pixels represent transparency only. If true, each pixel is packed in 8 bits as
+   * defined by ColorType::ALPHA_8.
+   */
+  virtual bool isAlphaOnly() const = 0;
+
+  /**
    * Creates a new Texture capturing the pixels in this image buffer.
    */
   virtual std::shared_ptr<Texture> makeTexture(Context* context) const = 0;

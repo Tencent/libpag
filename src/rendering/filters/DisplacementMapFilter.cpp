@@ -122,15 +122,16 @@ void DisplacementMapFilter::update(Frame layerFrame, const tgfx::Rect& contentBo
 }
 
 void DisplacementMapFilter::updateMapTexture(RenderCache* cache, const Graphic* mapGraphic,
-                                             const Point& size, const Point& displacementSize,
+                                             const tgfx::Size& size,
+                                             const tgfx::Size& displacementSize,
                                              const tgfx::Matrix& layerMatrix,
                                              const tgfx::Rect& contentBounds) {
   _size = size;
   _layerMatrix = layerMatrix;
   if (mapSurface == nullptr || _displacementSize != displacementSize) {
     _displacementSize = displacementSize;
-    mapSurface = tgfx::Surface::Make(cache->getContext(), static_cast<int>(displacementSize.x),
-                                     static_cast<int>(displacementSize.y));
+    mapSurface = tgfx::Surface::Make(cache->getContext(), static_cast<int>(displacementSize.width),
+                                     static_cast<int>(displacementSize.height));
   }
   auto canvas = mapSurface->getCanvas();
   canvas->clear();
@@ -186,13 +187,15 @@ static std::pair<int, float> DisplacementWrapMode(Enum pos) {
                                                  : std::pair{GL_CLAMP_TO_EDGE, 1.0};
 }
 
-static tgfx::Matrix DisplacementMatrix(Enum pos, const Point& size, const Point& displacementSize) {
+static tgfx::Matrix DisplacementMatrix(Enum pos, const tgfx::Size& size,
+                                       const tgfx::Size& displacementSize) {
   switch (pos) {
     case DisplacementMapBehavior::CenterMap:
-      return tgfx::Matrix::MakeTrans((size.x - displacementSize.x) / 2,
-                                     (size.y - displacementSize.y) / 2);
+      return tgfx::Matrix::MakeTrans((size.width - displacementSize.width) / 2,
+                                     (size.height - displacementSize.height) / 2);
     case DisplacementMapBehavior::StretchMapToFit:
-      return tgfx::Matrix::MakeScale(size.x / displacementSize.x, size.y / displacementSize.y);
+      return tgfx::Matrix::MakeScale(size.width / displacementSize.width,
+                                     size.height / displacementSize.height);
     case DisplacementMapBehavior::TileMap:
     default:
       return tgfx::Matrix::I();
@@ -242,13 +245,13 @@ void DisplacementMapFilter::onUpdateParams(tgfx::Context* context, const tgfx::R
 
   matrix.postTranslate(contentBounds.left, contentBounds.top);
   matrix.postConcat(_layerMatrix);
-  auto rect = tgfx::Rect::MakeWH(_size.x, _size.y);
+  auto rect = tgfx::Rect::MakeWH(_size.width, _size.height);
   _layerMatrix.mapRect(&rect);
-  auto size = Point::Make(rect.width(), rect.height());
+  auto size = tgfx::Size::Make(rect.width(), rect.height());
   auto mapMatrix = DisplacementMatrix(displacementMapBehavior, size, _displacementSize);
   mapMatrix.invert(&mapMatrix);
   matrix.postConcat(mapMatrix);
-  matrix.postScale(1.f / _displacementSize.x, 1.f / _displacementSize.y);
+  matrix.postScale(1.f / _displacementSize.width, 1.f / _displacementSize.height);
   glMatrix = ToGLMatrix(matrix);
   gl->uniformMatrix3fv(mapMatrixHandle, 1, false, glMatrix.data());
 

@@ -65,10 +65,12 @@ file(GLOB TGFX_FILES
         src/core/utils/*.*
         src/core/codecs/*.*
         src/core/shapes/*.*
+        src/core/images/*.*
         src/core/vectors/*.*
         src/gpu/*.*
         src/gpu/gradients/*.*
         src/gpu/ops/*.*
+        src/gpu/proxies/*.*
         src/platform/*.*)
 
 if (TGFX_USE_QT)

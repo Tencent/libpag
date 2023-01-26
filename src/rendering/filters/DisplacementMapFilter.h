@@ -19,6 +19,7 @@
 #pragma once
 
 #include "LayerFilter.h"
+#include "tgfx/core/Size.h"
 #include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace pag {
@@ -31,8 +32,8 @@ class DisplacementMapFilter : public LayerFilter {
   void update(Frame layerFrame, const tgfx::Rect& contentBounds,
               const tgfx::Rect& transformedBounds, const tgfx::Point& filterScale) override;
 
-  void updateMapTexture(RenderCache* cache, const Graphic* mapGraphic, const Point& size,
-                        const Point& displacementSize, const tgfx::Matrix& layerMatrix,
+  void updateMapTexture(RenderCache* cache, const Graphic* mapGraphic, const tgfx::Size& size,
+                        const tgfx::Size& displacementSize, const tgfx::Matrix& layerMatrix,
                         const tgfx::Rect& contentBounds);
 
  protected:
@@ -55,8 +56,8 @@ class DisplacementMapFilter : public LayerFilter {
   bool edgeBehavior = false;
   bool expandOutput = true;
   float effectOpacity = 1.f;
-  Point _size = Point::Zero();
-  Point _displacementSize = Point::Zero();
+  tgfx::Size _size = tgfx::Size::MakeEmpty();
+  tgfx::Size _displacementSize = tgfx::Size::MakeEmpty();
   tgfx::Matrix _layerMatrix = tgfx::Matrix::I();
   std::shared_ptr<tgfx::Surface> mapSurface = nullptr;
 

@@ -22,10 +22,9 @@
 #include "tgfx/core/ImageOrigin.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/gpu/Resource.h"
+#include "tgfx/gpu/TextureSampler.h"
 
 namespace tgfx {
-class TextureSampler;
-
 /**
  * Texture describes a two dimensional array of pixels in the GPU backend for drawing.
  */
@@ -155,5 +154,6 @@ class Texture : public Resource {
    */
   static bool CheckSizeAndFormat(Context* context, int width, int height, PixelFormat format);
 
+  friend class ProxyProvider;
 };
 }  // namespace tgfx

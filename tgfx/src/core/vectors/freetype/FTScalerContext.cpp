@@ -81,7 +81,7 @@ bool FTScalerContextRec::computeMatrices(Point* s, Matrix* sA) const {
   if (skewedOrFlipped) {
     // QR by Givens rotations. G is Q^T and GA is R. G is rotational (no reflections).
     // h is where A maps the horizontal baseline.
-    Point h = Point::Make(1.f, 0);
+    Point h = Point::Make(1, 0);
     A.mapPoints(&h, 1);
 
     // G is the Givens Matrix for A (rotational matrix where GA[0][1] == 0).

@@ -210,9 +210,9 @@ bool FilterRenderer::MakeEffectNode(std::vector<FilterNode>& filterNodes, tgfx::
         auto mapFilter = static_cast<DisplacementMapFilter*>(filter);
         auto graphic = GetDisplacementMapGraphic(filterList, mapEffect->displacementMapLayer);
         auto bounds = filterList->layer->getBounds();
-        auto size = Point::Make(bounds.width(), bounds.height());
+        auto size = tgfx::Size::Make(bounds.width(), bounds.height());
         bounds = mapEffect->displacementMapLayer->getBounds();
-        auto displacementSize = Point::Make(bounds.width(), bounds.height());
+        auto displacementSize = tgfx::Size::Make(bounds.width(), bounds.height());
         mapFilter->updateMapTexture(renderCache, graphic.get(), size, displacementSize,
                                     filterList->layerMatrix, oldBounds);
       }
@@ -344,8 +344,7 @@ static bool HasComplexPaint(tgfx::Canvas* parentCanvas, const tgfx::Rect& drawin
   auto matrix = parentCanvas->getMatrix();
   matrix.mapRect(&bounds);
   auto surface = parentCanvas->getSurface();
-  auto surfaceBounds = tgfx::Rect::MakeWH(static_cast<float>(surface->width()),
-                                          static_cast<float>(surface->height()));
+  auto surfaceBounds = tgfx::Rect::MakeWH(surface->width(), surface->height());
   bounds.intersect(surfaceBounds);
   auto clip = parentCanvas->getTotalClip();
   if (!clip.contains(bounds)) {

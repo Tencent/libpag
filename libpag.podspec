@@ -52,12 +52,14 @@ Pod::Spec.new do |s|
                     'tgfx/src/core/*.{h,cpp}',
                     'tgfx/src/core/codecs/*.{h,cpp}',
                     'tgfx/src/core/shapes/*.{h,cpp}',
+                    'tgfx/src/core/images/*.{h,cpp}',
                     'tgfx/src/core/vectors/*.{h,cpp}',
                     'tgfx/src/gpu/*.{h,cpp}',
                     'tgfx/src/platform/*.{h,cpp}',
                     'tgfx/src/core/utils/**/*.{h,cpp}',
                     'tgfx/src/gpu/gradients/**/*.{h,cpp}',
                     'tgfx/src/gpu/ops/**/*.{h,cpp}',
+                    'tgfx/src/gpu/proxies/**/*.{h,cpp}',
                     'tgfx/src/gpu/opengl/*.{h,cpp,mm}',
                     'tgfx/src/core/codecs/webp/**/*.{h,cpp,mm}'
 

@@ -46,8 +46,7 @@ void GaussianBlurFilter::draw(tgfx::Context* context, const FilterSource* source
   tgfx::Rect cropRect = tgfx::Rect::MakeEmpty();
   if (repeatEdgePixels) {
     tileMode = tgfx::TileMode::Clamp;
-    cropRect =
-        tgfx::Rect::MakeWH(static_cast<float>(source->width), static_cast<float>(source->height));
+    cropRect = tgfx::Rect::MakeWH(source->width, source->height);
   }
   auto blurFilter = tgfx::ImageFilter::Blur(blurrinessX, blurrinessY, tileMode, cropRect);
   auto renderTarget = tgfx::GLRenderTarget::MakeFrom(context, target->frameBuffer, target->width,

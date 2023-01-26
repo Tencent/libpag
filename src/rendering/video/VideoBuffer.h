@@ -27,6 +27,10 @@ namespace pag {
  */
 class VideoBuffer : public tgfx::ImageBuffer {
  public:
+  bool isAlphaOnly() const override {
+    return false;
+  }
+
   /**
    * Returns number of planes in this video buffer.
    */

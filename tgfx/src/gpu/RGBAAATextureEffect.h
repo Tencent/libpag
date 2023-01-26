@@ -27,8 +27,8 @@ class RGBAAATextureEffect : public FragmentProcessor {
  public:
   static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<Texture> texture,
                                                  SamplingOptions sampling,
-                                                 const Matrix& localMatrix = Matrix::I(),
-                                                 const RGBAAALayout* layout = nullptr);
+                                                 const Point& alphaStart = Point::Zero(),
+                                                 const Matrix* localMatrix = nullptr);
 
   std::string name() const override {
     return "RGBAAATextureEffect";
@@ -38,7 +38,7 @@ class RGBAAATextureEffect : public FragmentProcessor {
   DEFINE_PROCESSOR_CLASS_ID
 
   RGBAAATextureEffect(std::shared_ptr<Texture> texture, SamplingOptions sampling,
-                      const RGBAAALayout* layout, const Matrix& localMatrix);
+                      const Point& alphaStart, const Matrix& localMatrix);
 
   bool onIsEqual(const FragmentProcessor& processor) const override;
 
@@ -56,7 +56,7 @@ class RGBAAATextureEffect : public FragmentProcessor {
 
   std::shared_ptr<Texture> texture;
   SamplingOptions sampling;
-  const RGBAAALayout* layout;
+  Point alphaStart = Point::Zero();
   CoordTransform coordTransform;
 
   friend class GLRGBAAATextureEffect;

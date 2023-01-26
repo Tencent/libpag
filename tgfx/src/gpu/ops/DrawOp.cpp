@@ -28,8 +28,8 @@ static std::shared_ptr<Texture> CreateDstTexture(OpsRenderPass* opsRenderPass, R
     *dstOffset = {0, 0};
     return opsRenderPass->renderTargetTexture();
   }
-  auto bounds = Rect::MakeWH(static_cast<float>(opsRenderPass->renderTarget()->width()),
-                             static_cast<float>(opsRenderPass->renderTarget()->height()));
+  auto bounds =
+      Rect::MakeWH(opsRenderPass->renderTarget()->width(), opsRenderPass->renderTarget()->height());
   if (opsRenderPass->renderTarget()->origin() == ImageOrigin::BottomLeft) {
     auto height = dstRect.height();
     dstRect.top = static_cast<float>(opsRenderPass->renderTarget()->height()) - dstRect.bottom;

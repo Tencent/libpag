@@ -192,9 +192,8 @@ std::shared_ptr<Texture> Texture::MakeFormat(Context* context, int width, int he
     }
   }
   if (pixels != nullptr) {
-    context->gpu()->writePixels(texture->getSampler(),
-                                Rect::MakeWH(static_cast<float>(width), static_cast<float>(height)),
-                                pixels, rowBytes, pixelFormat);
+    context->gpu()->writePixels(texture->getSampler(), Rect::MakeWH(width, height), pixels,
+                                rowBytes, pixelFormat);
     context->gpu()->regenerateMipMapLevels(texture->getSampler());
   }
   return texture;

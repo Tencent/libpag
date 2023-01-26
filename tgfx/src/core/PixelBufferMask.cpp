@@ -47,7 +47,7 @@ std::shared_ptr<Texture> PixelBufferMask::updateTexture(Context* context) {
 }
 
 void PixelBufferMask::clear() {
-  dirty(Rect::MakeWH(static_cast<float>(width()), static_cast<float>(height())), false);
+  dirty(Rect::MakeWH(width(), height()), false);
   Bitmap(buffer).eraseAll();
 }
 

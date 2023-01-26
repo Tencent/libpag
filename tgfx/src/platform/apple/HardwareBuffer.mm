@@ -127,7 +127,7 @@ std::shared_ptr<Texture> HardwareBuffer::makeMipMappedTexture(Context* context) 
   }
   CVPixelBufferLockBaseAddress(pixelBuffer, kCVPixelBufferLock_ReadOnly);
   if (auto* pixels = CVPixelBufferGetBaseAddress(pixelBuffer)) {
-    auto rect = Rect::MakeWH(static_cast<float>(width()), static_cast<float>(height()));
+    auto rect = Rect::MakeWH(width(), height());
     context->gpu()->writePixels(texture->getSampler(), rect, pixels,
                                 CVPixelBufferGetBytesPerRow(pixelBuffer), PixelFormat::BGRA_8888);
     context->gpu()->regenerateMipMapLevels(texture->getSampler());

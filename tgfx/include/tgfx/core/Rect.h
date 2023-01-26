@@ -20,6 +20,7 @@
 
 #include <algorithm>
 #include "tgfx/core/Point.h"
+#include "tgfx/core/Size.h"
 
 namespace tgfx {
 /**
@@ -62,6 +63,14 @@ struct Rect {
   }
 
   /**
+   * Returns constructed Rect set to float values (0, 0, w, h). Does not validate input; w or h may
+   * be negative.
+   */
+  static constexpr Rect MakeWH(int w, int h) {
+    return {0, 0, static_cast<float>(w), static_cast<float>(h)};
+  }
+
+  /**
    * Returns constructed Rect set to (l, t, r, b). Does not sort input; Rect may result in left
    * greater than right, or top greater than bottom.
    */
@@ -75,6 +84,14 @@ struct Rect {
    */
   static constexpr Rect MakeXYWH(float x, float y, float w, float h) {
     return {x, y, x + w, y + h};
+  }
+
+  /**
+   * Returns constructed Rect set to (0, 0, size.width, size.height). Does not validate input;
+   * size.width or size.height may be negative.
+   */
+  static constexpr Rect MakeSize(const Size& size) {
+    return Rect{0, 0, size.width, size.height};
   }
 
   /**
@@ -125,6 +142,14 @@ struct Rect {
    */
   float height() const {
     return bottom - top;
+  }
+
+  /**
+   * Returns spans on the x-axis and y-axis.
+   * @return  Size (width, height)
+   */
+  Size size() const {
+    return Size::Make(this->width(), this->height());
   }
 
   /**
@@ -398,7 +423,7 @@ struct Rect {
   }
 
   /**
-   * Sets Rect by rounding of left, top,  right and bottom.
+   * Sets Rect by rounding of left, top, right and bottom.
    */
   void round() {
     left = roundf(left);

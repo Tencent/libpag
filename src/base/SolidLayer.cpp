@@ -29,6 +29,6 @@ bool SolidLayer::verify() const {
 }
 
 Rect SolidLayer::getBounds() const {
-  return Rect::MakeWH(static_cast<float>(width), static_cast<float>(height));
+  return Rect::MakeWH(width, height);
 }
 }  // namespace pag

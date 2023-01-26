@@ -27,7 +27,7 @@ class TextureEffect : public FragmentProcessor {
   static std::unique_ptr<FragmentProcessor> Make(const Context* context,
                                                  std::shared_ptr<Texture> texture,
                                                  SamplerState samplerState = {},
-                                                 const Matrix& localMatrix = Matrix::I());
+                                                 const Matrix* localMatrix = nullptr);
 
   std::string name() const override {
     return "TextureEffect";

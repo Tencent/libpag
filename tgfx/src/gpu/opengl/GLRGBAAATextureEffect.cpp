@@ -32,7 +32,7 @@ void GLRGBAAATextureEffect::emitCode(EmitArgs& args) {
   fragBuilder->codeAppend("vec4 color = ");
   fragBuilder->appendTextureLookup((*args.textureSamplers)[0], vertexColor);
   fragBuilder->codeAppend(";");
-  if (textureFP->layout != nullptr) {
+  if (textureFP->alphaStart != Point::Zero()) {
     fragBuilder->codeAppend("color = clamp(color, 0.0, 1.0);");
     std::string alphaStartName;
     alphaStartUniform = uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float2,
@@ -54,8 +54,7 @@ void GLRGBAAATextureEffect::onSetData(const ProgramDataManager& programDataManag
   const auto& textureFP = static_cast<const RGBAAATextureEffect&>(fragmentProcessor);
   if (alphaStartUniform.isValid()) {
     auto alphaStart =
-        textureFP.texture->getTextureCoord(static_cast<float>(textureFP.layout->alphaStartX),
-                                           static_cast<float>(textureFP.layout->alphaStartY));
+        textureFP.texture->getTextureCoord(textureFP.alphaStart.x, textureFP.alphaStart.y);
     if (alphaStartPrev != alphaStart) {
       alphaStartPrev = alphaStart;
       programDataManager.set2f(alphaStartUniform, static_cast<float>(alphaStart.x),

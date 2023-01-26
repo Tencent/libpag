@@ -28,6 +28,10 @@ class NativeImageBuffer : public ImageBuffer {
 
   static std::shared_ptr<NativeImageBuffer> Make(int width, int height, emscripten::val source);
 
+  bool isAlphaOnly() const override {
+    return false;
+  }
+
   std::shared_ptr<Texture> makeTexture(Context* context) const override;
 
  private:

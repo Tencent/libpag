@@ -51,6 +51,19 @@ class Resource {
    */
   virtual size_t memoryUsage() const = 0;
 
+  /**
+   * Assigns a cache owner to the resource. The resource will be findable via this owner using
+   * ResourceCache.findResourceByOwner(). This method is not thread safe, call it only when the
+   * associated context is locked.
+   */
+  void assignCacheOwner(const Cacheable* owner);
+
+  /*
+   * Removes the cache owner from the resource. This method is not thread safe, call it only when
+   * the associated context is locked.
+   */
+  void removeCacheOwner();
+
  protected:
   Context* context = nullptr;
 
@@ -63,8 +76,8 @@ class Resource {
  private:
   std::weak_ptr<Resource> weakThis;
   BytesKey recycleKey = {};
-  uint32_t contentKey = 0;
-  std::weak_ptr<Cacheable> contentOwner;
+  uint32_t cacheOwnerID = 0;
+  std::weak_ptr<Cacheable> cacheOwner;
   std::list<Resource*>::iterator cachedPosition;
   int64_t lastUsedTime = 0;
 
@@ -72,8 +85,8 @@ class Resource {
     return weakThis.expired();
   }
 
-  bool hasContentOwner() const {
-    return !contentOwner.expired();
+  bool hasCacheOwner() const {
+    return !cacheOwner.expired();
   }
 
   /**

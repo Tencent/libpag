@@ -44,7 +44,7 @@ std::unique_ptr<FragmentProcessor> TextureShader::asFragmentProcessor(const FPAr
     return nullptr;
   }
   auto effect = TextureEffect::Make(args.context, texture,
-                                    SamplerState(tileModeX, tileModeY, sampling), matrix);
+                                    SamplerState(tileModeX, tileModeY, sampling), &matrix);
   if (texture->getSampler()->format == PixelFormat::ALPHA_8) {
     return effect;
   }

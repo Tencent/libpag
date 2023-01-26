@@ -21,11 +21,11 @@
 
 namespace tgfx {
 YUVTextureEffect::YUVTextureEffect(std::shared_ptr<YUVTexture> texture, SamplingOptions sampling,
-                                   const RGBAAALayout* layout, const Matrix& localMatrix)
+                                   const Point& alphaStart, const Matrix& localMatrix)
     : FragmentProcessor(ClassID()),
       texture(std::move(texture)),
       sampling(sampling),
-      layout(layout),
+      alphaStart(alphaStart),
       coordTransform(localMatrix) {
   setTextureSamplerCnt(this->texture->samplerCount());
   addCoordTransform(&coordTransform);
@@ -33,14 +33,14 @@ YUVTextureEffect::YUVTextureEffect(std::shared_ptr<YUVTexture> texture, Sampling
 
 void YUVTextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   uint32_t flags = texture->pixelFormat() == YUVPixelFormat::I420 ? 0 : 1;
-  flags |= layout == nullptr ? 0 : 2;
+  flags |= alphaStart == Point::Zero() ? 0 : 2;
   flags |= texture->colorRange() == YUVColorRange::MPEG ? 0 : 4;
   bytesKey->write(flags);
 }
 
 bool YUVTextureEffect::onIsEqual(const FragmentProcessor& processor) const {
   const auto& that = static_cast<const YUVTextureEffect&>(processor);
-  return texture == that.texture && layout == that.layout &&
+  return texture == that.texture && alphaStart == that.alphaStart &&
          coordTransform.matrix == that.coordTransform.matrix;
 }
 

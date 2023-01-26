@@ -634,8 +634,7 @@ class Matrix {
   void mapRect(Rect* dst, const Rect& src) const;
 
   /**
-   * Sets rect to bounds of rect corners mapped by Matrix. Returns true if mapped corners are
-   * computed rect corners. Returned value is the same as calling rectStaysRect().
+   * Sets rect to bounds of rect corners mapped by Matrix.
    */
   void mapRect(Rect* rect) const {
     mapRect(rect, *rect);

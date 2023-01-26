@@ -33,7 +33,7 @@ class YUVTextureEffect : public FragmentProcessor {
   DEFINE_PROCESSOR_CLASS_ID
 
   YUVTextureEffect(std::shared_ptr<YUVTexture> texture, SamplingOptions sampling,
-                   const RGBAAALayout* layout, const Matrix& localMatrix);
+                   const Point& alphaStart, const Matrix& localMatrix);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
@@ -51,7 +51,7 @@ class YUVTextureEffect : public FragmentProcessor {
 
   std::shared_ptr<YUVTexture> texture;
   SamplingOptions sampling;
-  const RGBAAALayout* layout;
+  Point alphaStart = Point::Zero();
   CoordTransform coordTransform;
 
   friend class RGBAAATextureEffect;

@@ -28,7 +28,7 @@ TextureShape::TextureShape(std::unique_ptr<PathProxy> pathProxy, float resolutio
 
 std::unique_ptr<DrawOp> TextureShape::makeOp(GpuPaint* paint, const Matrix& viewMatrix) const {
   auto resourceCache = paint->context->resourceCache();
-  auto texture = std::static_pointer_cast<Texture>(resourceCache->getByContentOwner(this));
+  auto texture = std::static_pointer_cast<Texture>(resourceCache->findResourceByOwner(this));
   if (texture != nullptr) {
     return makeTextureOp(texture, paint, viewMatrix);
   }
@@ -45,7 +45,10 @@ std::unique_ptr<DrawOp> TextureShape::makeOp(GpuPaint* paint, const Matrix& view
   mask->fillPath(path);
   // TODO(pengweilv): mip map
   texture = mask->updateTexture(paint->context);
-  resourceCache->setContentOwner(texture.get(), this);
+  if (texture == nullptr) {
+    return nullptr;
+  }
+  texture->assignCacheOwner(this);
   return makeTextureOp(texture, paint, viewMatrix);
 }
 
@@ -57,7 +60,7 @@ std::unique_ptr<DrawOp> TextureShape::makeTextureOp(std::shared_ptr<Texture> tex
   maskLocalMatrix.postScale(static_cast<float>(texture->width()) / bounds.width(),
                             static_cast<float>(texture->height()) / bounds.height());
   paint->coverageFragmentProcessors.emplace_back(FragmentProcessor::MulInputByChildAlpha(
-      TextureEffect::Make(paint->context, std::move(texture), SamplerState(), maskLocalMatrix)));
+      TextureEffect::Make(paint->context, std::move(texture), SamplerState(), &maskLocalMatrix)));
   return FillRectOp::Make(paint->color, bounds, viewMatrix);
 }
 }  // namespace tgfx

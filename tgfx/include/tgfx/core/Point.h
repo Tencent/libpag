@@ -53,6 +53,13 @@ struct Point {
   }
 
   /**
+   * Creates a Point with specified x and y value.
+   */
+  static constexpr Point Make(int x, int y) {
+    return {static_cast<float>(x), static_cast<float>(y)};
+  }
+
+  /**
    * Returns true if fX and fY are both zero.
    */
   bool isZero() const {

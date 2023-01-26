@@ -421,7 +421,7 @@ static float CalculateRangeFactorSmooth(float textStart, float textEnd, float ra
 
   // 根据AE实际数据, 拟合出贝塞尔曲线两个控制点
   // P1、P2的取值分别为(0.5, 0.0)、(0.5, 1.0)
-  static BezierEasing bezier = BezierEasing(Point::Make(0.5, 0.0), Point::Make(0.5, 1.0));
+  static BezierEasing bezier = BezierEasing(Point::Make(0.5f, 0.0), Point::Make(0.5f, 1.0));
   auto factor = bezier.getInterpolation(x);
   return factor;
 }

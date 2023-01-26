@@ -73,7 +73,7 @@ std::shared_ptr<Texture> HardwareBuffer::makeMipMappedTexture(Context* context) 
   HardwareBufferInterface::Lock(hardwareBuffer, AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN, -1, nullptr,
                                 reinterpret_cast<void**>(&pixels));
   if (pixels) {
-    auto rect = Rect::MakeWH(static_cast<float>(width()), static_cast<float>(height()));
+    auto rect = Rect::MakeWH(width(), height());
     AHardwareBuffer_Desc desc;
     HardwareBufferInterface::Describe(hardwareBuffer, &desc);
     context->gpu()->writePixels(texture->getSampler(), rect, pixels, desc.stride * 4,

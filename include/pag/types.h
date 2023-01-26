@@ -113,6 +113,13 @@ struct PAG_API Point {
   }
 
   /**
+     * Creates a Point with specified x and y value.
+     */
+  static constexpr Point Make(int x, int y) {
+    return {static_cast<float>(x), static_cast<float>(y)};
+  }
+
+  /**
    * Returns true if fX and fY are both zero.
    */
   bool isZero() const {
@@ -223,6 +230,14 @@ struct PAG_API Rect {
    */
   static constexpr Rect MakeWH(float w, float h) {
     return {0, 0, w, h};
+  }
+
+  /**
+   * Returns constructed Rect set to float values (0, 0, w, h). Does not validate input; w or h may
+   * be negative.
+   */
+  static constexpr Rect MakeWH(int w, int h) {
+    return {0, 0, static_cast<float>(w), static_cast<float>(h)};
   }
 
   /**

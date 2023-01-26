@@ -79,8 +79,7 @@ std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrine
 
 void BlurImageFilter::draw(std::shared_ptr<Texture> texture, Surface* toSurface, bool isDown) {
   auto drawContext = std::make_unique<SurfaceDrawContext>(toSurface);
-  auto dstRect =
-      Rect::MakeWH(static_cast<float>(toSurface->width()), static_cast<float>(toSurface->height()));
+  auto dstRect = Rect::MakeWH(toSurface->width(), toSurface->height());
   auto localMatrix = Matrix::MakeScale(static_cast<float>(texture->width()) / dstRect.width(),
                                        static_cast<float>(texture->height()) / dstRect.height());
   auto texelSize = Point::Make(0.5f / static_cast<float>(texture->width()),
@@ -115,8 +114,7 @@ std::pair<std::shared_ptr<Texture>, Point> BlurImageFilter::filterImage(
   if (image == nullptr) {
     return {};
   }
-  auto inputBounds =
-      Rect::MakeWH(static_cast<float>(image->width()), static_cast<float>(image->height()));
+  auto inputBounds = Rect::MakeWH(image->width(), image->height());
   Rect dstBounds = Rect::MakeEmpty();
   if (!applyCropRect(inputBounds, &dstBounds, &context.clipBounds)) {
     return {};
@@ -126,8 +124,7 @@ std::pair<std::shared_ptr<Texture>, Point> BlurImageFilter::filterImage(
   }
   dstBounds.roundOut();
   std::shared_ptr<Texture> last;
-  if (dstBounds !=
-      Rect::MakeWH(static_cast<float>(image->width()), static_cast<float>(image->height()))) {
+  if (dstBounds != Rect::MakeWH(image->width(), image->height())) {
     last = ExtendImage(context.context, image, dstBounds, tileMode);
     if (last == nullptr) {
       return {};
