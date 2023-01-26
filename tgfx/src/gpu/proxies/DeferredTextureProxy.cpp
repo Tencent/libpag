@@ -16,28 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "DeferredTextureProxy.h"
 
-#include "tgfx/core/ImageBuffer.h"
-#include "tgfx/gpu/YUVTexture.h"
+namespace tgfx {
+DeferredTextureProxy::DeferredTextureProxy(ProxyProvider* provider, int width, int height,
+                                           PixelFormat format, ImageOrigin origin, bool mipMapped)
+    : CacheOwnerTextureProxy(provider),
+      _width(width),
+      _height(height),
+      format(format),
+      origin(origin),
+      mipMapped(mipMapped) {
+}
 
-namespace pag {
-/**
- * VideoBuffer describes a two dimensional array of pixels from a decoded video frame.
- */
-class VideoBuffer : public tgfx::ImageBuffer {
- public:
-  bool isAlphaOnly() const override {
-    return false;
+std::shared_ptr<Texture> DeferredTextureProxy::onMakeTexture(Context* context) {
+  if (context == nullptr) {
+    return nullptr;
   }
-
-  /**
-   * Returns number of planes in this video buffer.
-   */
-  virtual size_t planeCount() const = 0;
-
- protected:
-  VideoBuffer(int width, int height) : tgfx::ImageBuffer(width, height) {
-  }
-};
-}  // namespace pag
+  return Texture::MakeFormat(context, width(), height(), format, origin, mipMapped);
+}
+}  // namespace tgfx

@@ -667,4 +667,68 @@ PAG_TEST(CanvasTest, shape) {
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/shape"));
   device->unlock();
 }
+
+PAG_TEST(CanvasTest, image) {
+  auto device = GLDevice::Make();
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 500);
+  auto canvas = surface->getCanvas();
+  auto image = Image::MakeFromEncoded("../resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+  EXPECT_TRUE(image->isLazyGenerated());
+  EXPECT_FALSE(image->isTextureBacked());
+  EXPECT_FALSE(image->hasMipmaps());
+  canvas->drawImage(image);
+  auto subset = image->makeSubset(Rect::MakeWH(120, 120));
+  EXPECT_FALSE(subset != nullptr);
+  subset = image->makeSubset(Rect::MakeXYWH(-10, -10, 50, 50));
+  EXPECT_FALSE(subset != nullptr);
+  subset = image->makeSubset(Rect::MakeXYWH(15, 15, 80, 90));
+  ASSERT_TRUE(subset != nullptr);
+  EXPECT_EQ(subset->width(), 80);
+  EXPECT_EQ(subset->height(), 90);
+  canvas->drawImage(subset, 120, 15);
+  auto textureImage = image->makeTextureImage(context);
+  ASSERT_TRUE(textureImage != nullptr);
+  EXPECT_TRUE(textureImage->isTextureBacked());
+  EXPECT_FALSE(textureImage->isLazyGenerated());
+  canvas->drawImage(textureImage, 240, 0);
+  auto data = Data::MakeFromFile("../resources/apitest/rotation.jpg");
+  auto rotationImage = Image::MakeFromEncoded(std::move(data), true);
+  EXPECT_TRUE(rotationImage->hasMipmaps());
+  EXPECT_EQ(rotationImage->width(), 3024);
+  EXPECT_EQ(rotationImage->height(), 4032);
+  SamplingOptions sampling(FilterMode::Linear, MipMapMode::Linear);
+  auto matrix = Matrix::MakeScale(0.05);
+  matrix.postTranslate(0, 120);
+  canvas->drawImage(rotationImage, matrix, sampling);
+  subset = rotationImage->makeSubset(Rect::MakeXYWH(500, 800, 2000, 2400));
+  ASSERT_TRUE(subset != nullptr);
+  matrix.postTranslate(160, 25);
+  canvas->drawImage(subset, matrix, sampling);
+  textureImage = subset->makeTextureImage(context);
+  ASSERT_TRUE(textureImage != nullptr);
+  matrix.postTranslate(110, 0);
+  canvas->drawImage(textureImage, matrix);
+  auto codec = ImageCodec::MakeFrom("../resources/apitest/rgbaaa.png");
+  EXPECT_EQ(codec->width(), 1024);
+  EXPECT_EQ(codec->height(), 512);
+  auto rgbAAA = Image::MakeRGBAAA(codec, 512, 512, 512, 0, true);
+  EXPECT_EQ(rgbAAA->width(), 512);
+  EXPECT_EQ(rgbAAA->height(), 512);
+  matrix = Matrix::MakeScale(0.25);
+  matrix.postTranslate(0, 330);
+  canvas->drawImage(rgbAAA, matrix, sampling);
+  subset = rgbAAA->makeSubset(Rect::MakeXYWH(50, 50, 400, 400));
+  matrix.postTranslate(140, 15);
+  canvas->drawImage(subset, matrix, sampling);
+  rgbAAA = Image::MakeRGBAAA(codec, 512, 512, 0, 0, true);
+  EXPECT_EQ(rgbAAA->width(), 512);
+  EXPECT_EQ(rgbAAA->height(), 512);
+  matrix.postTranslate(110, -15);
+  canvas->drawImage(rgbAAA, matrix, sampling);
+  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/drawImage"));
+  device->unlock();
+}
 }  // namespace tgfx

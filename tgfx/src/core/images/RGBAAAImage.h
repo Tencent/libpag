@@ -18,26 +18,37 @@
 
 #pragma once
 
-#include "tgfx/core/ImageBuffer.h"
-#include "tgfx/gpu/YUVTexture.h"
+#include "tgfx/core/Image.h"
 
-namespace pag {
-/**
- * VideoBuffer describes a two dimensional array of pixels from a decoded video frame.
- */
-class VideoBuffer : public tgfx::ImageBuffer {
+namespace tgfx {
+class RGBAAAImage : public Image {
  public:
-  bool isAlphaOnly() const override {
-    return false;
+  int width() const override {
+    return bounds.width();
   }
 
-  /**
-   * Returns number of planes in this video buffer.
-   */
-  virtual size_t planeCount() const = 0;
+  int height() const override {
+    return bounds.height();
+  }
 
  protected:
-  VideoBuffer(int width, int height) : tgfx::ImageBuffer(width, height) {
-  }
+  std::shared_ptr<Image> onCloneWithSource(std::shared_ptr<ImageSource> newSource) const override;
+
+  std::shared_ptr<Image> onMakeSubset(const Rect& subset) const override;
+
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(
+      Context* context, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
+      const Matrix* localMatrix = nullptr) override;
+
+ private:
+  Rect bounds = Rect::MakeEmpty();
+  Point alphaStart = Point::Zero();
+
+  RGBAAAImage(std::shared_ptr<ImageSource> source, int displayWidth, int displayHeight,
+              int alphaStartX, int alphaStartY);
+
+  RGBAAAImage(std::shared_ptr<ImageSource> source, const Rect& bounds, const Point& alphaStart);
+
+  friend class Image;
 };
-}  // namespace pag
+}  // namespace tgfx

@@ -22,10 +22,9 @@
 #include "tgfx/core/ImageOrigin.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/gpu/Resource.h"
+#include "tgfx/gpu/TextureSampler.h"
 
 namespace tgfx {
-class TextureSampler;
-
 /**
  * Texture describes a two dimensional array of pixels in the GPU backend for drawing.
  */

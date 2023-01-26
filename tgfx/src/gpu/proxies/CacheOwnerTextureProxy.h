@@ -18,26 +18,39 @@
 
 #pragma once
 
-#include "tgfx/core/ImageBuffer.h"
-#include "tgfx/gpu/YUVTexture.h"
+#include "TextureProxy.h"
 
-namespace pag {
+namespace tgfx {
+class ProxyProvider;
+
 /**
- * VideoBuffer describes a two dimensional array of pixels from a decoded video frame.
+ * The base class for all texture proxies created from a ProxyProvider. This class and its
+ * subclasses are not thread-safe, they can be accessed only when the associated context is locked.
  */
-class VideoBuffer : public tgfx::ImageBuffer {
+class CacheOwnerTextureProxy : public TextureProxy {
  public:
-  bool isAlphaOnly() const override {
-    return false;
-  }
+  ~CacheOwnerTextureProxy() override;
 
-  /**
-   * Returns number of planes in this video buffer.
-   */
-  virtual size_t planeCount() const = 0;
+  bool instantiate() override;
+
+  void assignCacheOwner(const Cacheable* owner) override;
+
+  void removeCacheOwner() override;
 
  protected:
-  VideoBuffer(int width, int height) : tgfx::ImageBuffer(width, height) {
-  }
+  explicit CacheOwnerTextureProxy(ProxyProvider* provider,
+                                  std::shared_ptr<Texture> texture = nullptr);
+
+  /**
+   * Overrides to create a new Texture associated with specified context.
+   */
+  virtual std::shared_ptr<Texture> onMakeTexture(Context* context);
+
+ private:
+  ProxyProvider* provider = nullptr;
+  std::shared_ptr<Cacheable> cacheOwner = nullptr;
+  std::weak_ptr<CacheOwnerTextureProxy> weakThis;
+
+  friend class ProxyProvider;
 };
-}  // namespace pag
+}  // namespace tgfx

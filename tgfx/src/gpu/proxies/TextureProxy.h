@@ -21,27 +21,40 @@
 #include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
-class ProxyProvider;
-
 /**
  * This class delays the acquisition of textures until they are actually required.
  */
 class TextureProxy {
  public:
-  virtual ~TextureProxy();
+  /*
+   * Create a TextureProxy that wraps an existing texture. Different from the texture proxies
+   * created from a ProxyProvider, the returned TextureProxy is thread safe and does not implement
+   * the cache-owner methods.
+   */
+  static std::shared_ptr<TextureProxy> Wrap(std::shared_ptr<Texture> texture);
+
+  virtual ~TextureProxy() = default;
 
   /**
    * Returns the width of the texture proxy.
    */
-  int width() const {
-    return _width;
+  virtual int width() const {
+    return texture->width();
   }
 
   /**
    * Returns the height of the texture proxy.
    */
-  int height() const {
-    return _height;
+  virtual int height() const {
+    return texture->height();
+  }
+
+  /**
+   * If we are instantiated and have a texture, return the mip state of that texture. Otherwise
+   * returns the proxy's mip state from creation time.
+   */
+  virtual bool hasMipmaps() const {
+    return texture->getSampler()->mipMapped();
   }
 
   /**
@@ -62,24 +75,25 @@ class TextureProxy {
    * Actually instantiate the backing texture, if necessary. Returns true if the backing texture is
    * instantiated.
    */
-  bool instantiate();
-
- protected:
-  std::shared_ptr<Cacheable> contentOwner = nullptr;
-
-  TextureProxy(ProxyProvider* provider, int width, int height);
+  virtual bool instantiate();
 
   /**
-   * Overrides to create a new Texture associated with specified context.
+   * Assigns a cache owner to the proxy. The proxy will be findable via this owner using
+   * findProxyByOwner(). If the proxy has already been instantiated, it will also assign the owner
+   * to the target texture. Does nothing if this proxy was not created by a ProxyProvider.
    */
-  virtual std::shared_ptr<Texture> onMakeTexture(Context* context);
+  virtual void assignCacheOwner(const Cacheable* owner);
 
- private:
+  /*
+   * Removes the cache owner from a proxy. If the proxy has already been instantiated, it will
+   * also remove the owner from the target texture. Does nothing if this proxy was not created by a
+   * ProxyProvider.
+   */
+  virtual void removeCacheOwner();
+
+ protected:
   std::shared_ptr<Texture> texture = nullptr;
-  ProxyProvider* provider = nullptr;
-  int _width = 0;
-  int _height = 0;
 
-  friend class ProxyProvider;
+  explicit TextureProxy(std::shared_ptr<Texture> texture);
 };
 }  // namespace tgfx

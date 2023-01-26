@@ -18,10 +18,12 @@
 
 #pragma once
 
-#include "gpu/TextureProxy.h"
+#include "gpu/proxies/TextureProxy.h"
 #include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
+class CacheOwnerTextureProxy;
+
 /**
  * A factory for creating TextureProxy-derived objects.
  */
@@ -29,23 +31,10 @@ class ProxyProvider {
  public:
   explicit ProxyProvider(Context* context);
 
-  /**
-   * Assigns a Cacheable to the proxy as its content owner. The proxy will be findable via this
-   * owner using findProxyByUniqueKey(). If the proxy has already been instantiated, it will
-   * also assign the content owner to the target texture.
-   */
-  void setContentOwner(std::shared_ptr<TextureProxy> proxy, const Cacheable* owner);
-
   /*
-   * Removes the content owner from a proxy. If the proxy has already been instantiated, it will
-   * also remove the content owner from the target texture.
+   * Finds a proxy by cache owner.
    */
-  void removeContentOwner(std::shared_ptr<TextureProxy> proxy);
-
-  /*
-   * Finds a proxy by content owner.
-   */
-  std::shared_ptr<TextureProxy> findProxyByContentOwner(const Cacheable* owner);
+  std::shared_ptr<TextureProxy> findProxyByOwner(const Cacheable* owner);
 
   /*
    * Create a texture proxy for the image buffer. The image buffer will be released after being
@@ -68,8 +57,12 @@ class ProxyProvider {
 
  private:
   Context* context = nullptr;
-  std::unordered_map<uint32_t, std::weak_ptr<TextureProxy>> proxyMap = {};
+  std::unordered_map<uint32_t, CacheOwnerTextureProxy*> cacheOwnerMap = {};
 
-  friend class TextureProxy;
+  void changeCacheOwner(CacheOwnerTextureProxy* proxy, const Cacheable* owner);
+
+  void removeCacheOwner(CacheOwnerTextureProxy* proxy);
+
+  friend class CacheOwnerTextureProxy;
 };
 }  // namespace tgfx

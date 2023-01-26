@@ -104,6 +104,14 @@ class ImageInfo {
   }
 
   /**
+   * Returns true if pixels represent transparency only. If true, each pixel is packed in 8 bits as
+   * defined by ColorType::ALPHA_8.
+   */
+  bool isAlphaOnly() const {
+    return _colorType==ColorType::ALPHA_8;
+  }
+
+  /**
    * Returns the width of the pixels.
    */
   int width() const {

@@ -76,7 +76,7 @@ class RectanglePack {
         _height += h;
       }
     }
-    auto point = Point::Make(static_cast<float>(x), static_cast<float>(y));
+    auto point = Point::Make(x, y);
     if (x + w - _width < y + h - _height) {
       x += w;
       _height = std::max(_height, y + h);

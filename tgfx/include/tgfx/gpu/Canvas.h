@@ -195,6 +195,20 @@ class Canvas {
   void drawShape(std::shared_ptr<Shape> shape, const Paint& paint);
 
   /**
+   * Draws an image, with its top-left corner at (left, top), using current clip, matrix and
+   * optional paint.
+   */
+  void drawImage(std::shared_ptr<Image> image, float left, float top,
+                 SamplingOptions sampling = SamplingOptions(), const Paint* paint = nullptr);
+
+  /**
+   * Draws a Image, with its top-left corner at (0, 0), using current alpha, blend mode, clip and
+   * matrix premultiplied with existing Matrix.
+   */
+  void drawImage(std::shared_ptr<Image> image, const Matrix& matrix,
+                 SamplingOptions sampling = SamplingOptions(), const Paint* paint = nullptr);
+
+  /**
    * Draws an image, with its top-left corner at (0, 0), using current clip, matrix and optional
    * paint.
    */

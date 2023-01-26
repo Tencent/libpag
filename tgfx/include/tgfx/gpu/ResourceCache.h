@@ -73,17 +73,17 @@ class ResourceCache {
   /**
    * Returns a unique resource in the cache by the specified contentKey.
    */
-  std::shared_ptr<Resource> getByContentOwner(const Cacheable* owner);
+  std::shared_ptr<Resource> findResourceByOwner(const Cacheable* owner);
 
   /**
    * Assigns a Cacheable to the resource as its content owner.
    */
-  void setContentOwner(Resource* resource, const Cacheable* owner);
+  void assignCacheOwner(Resource* resource, const Cacheable* owner);
 
   /*
    * Removes the content owner from the resource.
    */
-  void removeContentOwner(Resource* resource);
+  void removeCacheOwner(Resource* resource);
 
   /**
    * Purges GPU resources that haven't been used the passed in time.
@@ -113,7 +113,7 @@ class ResourceCache {
   std::list<Resource*> nonpurgeableResources = {};
   std::list<Resource*> purgeableResources = {};
   std::unordered_map<BytesKey, std::vector<Resource*>, BytesHasher> recycleKeyMap = {};
-  std::unordered_map<uint32_t, Resource*> contentKeyMap = {};
+  std::unordered_map<uint32_t, Resource*> cacheOwnerMap = {};
   std::mutex removeLocker = {};
   std::vector<Resource*> pendingPurgeableResources = {};
 

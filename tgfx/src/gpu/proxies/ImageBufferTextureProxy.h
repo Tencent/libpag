@@ -18,26 +18,34 @@
 
 #pragma once
 
+#include "CacheOwnerTextureProxy.h"
 #include "tgfx/core/ImageBuffer.h"
-#include "tgfx/gpu/YUVTexture.h"
 
-namespace pag {
-/**
- * VideoBuffer describes a two dimensional array of pixels from a decoded video frame.
- */
-class VideoBuffer : public tgfx::ImageBuffer {
+namespace tgfx {
+class ImageBufferTextureProxy : public CacheOwnerTextureProxy {
  public:
-  bool isAlphaOnly() const override {
-    return false;
+  int width() const override {
+    return imageBuffer->width();
   }
 
-  /**
-   * Returns number of planes in this video buffer.
-   */
-  virtual size_t planeCount() const = 0;
+  int height() const override {
+    return imageBuffer->height();
+  }
+
+  bool hasMipmaps() const override {
+    return texture ? texture->getSampler()->mipMapped() : mipMapped;
+  }
 
  protected:
-  VideoBuffer(int width, int height) : tgfx::ImageBuffer(width, height) {
-  }
+  std::shared_ptr<Texture> onMakeTexture(Context* context) override;
+
+ private:
+  std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
+  bool mipMapped = false;
+
+  ImageBufferTextureProxy(ProxyProvider* provider, std::shared_ptr<ImageBuffer> imageBuffer,
+                          bool mipMapped);
+
+  friend class ProxyProvider;
 };
-}  // namespace pag
+}  // namespace tgfx

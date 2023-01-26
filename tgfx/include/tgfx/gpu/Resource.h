@@ -63,8 +63,8 @@ class Resource {
  private:
   std::weak_ptr<Resource> weakThis;
   BytesKey recycleKey = {};
-  uint32_t contentKey = 0;
-  std::weak_ptr<Cacheable> contentOwner;
+  uint32_t cacheOwnerID = 0;
+  std::weak_ptr<Cacheable> cacheOwner;
   std::list<Resource*>::iterator cachedPosition;
   int64_t lastUsedTime = 0;
 
@@ -72,8 +72,8 @@ class Resource {
     return weakThis.expired();
   }
 
-  bool hasContentOwner() const {
-    return !contentOwner.expired();
+  bool hasCacheOwner() const {
+    return !cacheOwner.expired();
   }
 
   /**

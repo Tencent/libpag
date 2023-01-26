@@ -60,6 +60,11 @@ class ImageCodec : public ImageGenerator {
     return _orientation;
   }
 
+  bool isAlphaOnly() const override {
+    // TODO: implements alpha-only checking for image codecs.
+    return false;
+  }
+
   /**
    * Crates a new texture buffer capturing the pixels in this image. ImageCodec do not cache the
    * newly created texture buffer, each call to this method allocates additional storage.

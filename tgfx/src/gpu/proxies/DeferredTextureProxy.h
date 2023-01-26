@@ -16,33 +16,38 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "TextureProxy.h"
-#include "ProxyProvider.h"
+#pragma once
+
+#include "CacheOwnerTextureProxy.h"
 
 namespace tgfx {
-TextureProxy::TextureProxy(ProxyProvider* provider, int width, int height)
-    : provider(provider), _width(width), _height(height) {
-}
-
-TextureProxy::~TextureProxy() {
-  if (contentOwner != nullptr) {
-    provider->proxyMap.erase(contentOwner->uniqueID());
+class DeferredTextureProxy : public CacheOwnerTextureProxy {
+ public:
+  int width() const override {
+    return _width;
   }
-}
 
-bool TextureProxy::instantiate() {
-  if (texture != nullptr) {
-    return true;
+  int height() const override {
+    return _height;
   }
-  auto context = provider->context;
-  texture = onMakeTexture(context);
-  if (texture != nullptr && contentOwner != nullptr) {
-    context->resourceCache()->setContentOwner(texture.get(), contentOwner.get());
-  }
-  return texture != nullptr;
-}
 
-std::shared_ptr<Texture> TextureProxy::onMakeTexture(Context*) {
-  return nullptr;
-}
+  bool hasMipmaps() const override {
+    return texture ? texture->getSampler()->mipMapped() : mipMapped;
+  }
+
+ protected:
+  std::shared_ptr<Texture> onMakeTexture(Context* context) override;
+
+ private:
+  int _width = 0;
+  int _height = 0;
+  PixelFormat format = PixelFormat::RGBA_8888;
+  ImageOrigin origin = ImageOrigin::TopLeft;
+  bool mipMapped = false;
+
+  DeferredTextureProxy(ProxyProvider* provider, int width, int height, PixelFormat format,
+                       ImageOrigin origin, bool mipMapped);
+
+  friend ProxyProvider;
+};
 }  // namespace tgfx

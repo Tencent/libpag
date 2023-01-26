@@ -40,12 +40,15 @@ std::shared_ptr<PAGImage> PAGImage::FromBytes(const void* bytes, size_t length) 
 std::shared_ptr<PAGImage> PAGImage::FromPixels(const void* pixels, int width, int height,
                                                size_t rowBytes, ColorType colorType,
                                                AlphaType alphaType) {
-  auto pixelBuffer = tgfx::PixelBuffer::Make(width, height);
+  auto info = tgfx::ImageInfo::Make(width, height, ToTGFX(colorType), ToTGFX(alphaType), rowBytes);
+  if (info.isEmpty()) {
+    return nullptr;
+  }
+  auto pixelBuffer = tgfx::PixelBuffer::Make(width, height, info.isAlphaOnly());
   tgfx::Bitmap bitmap(pixelBuffer);
   if (bitmap.isEmpty()) {
     return nullptr;
   }
-  auto info = tgfx::ImageInfo::Make(width, height, ToTGFX(colorType), ToTGFX(alphaType), rowBytes);
   auto result = bitmap.writePixels(info, pixels);
   if (!result) {
     return nullptr;

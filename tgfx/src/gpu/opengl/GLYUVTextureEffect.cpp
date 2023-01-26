@@ -53,7 +53,7 @@ void GLYUVTextureEffect::emitCode(EmitArgs& args) {
   mat3ColorConversionUniform = uniformHandler->addUniform(
       ShaderFlags::Fragment, ShaderVar::Type::Float3x3, "Mat3ColorConversion", &mat3Name);
   fragBuilder->codeAppendf("vec3 rgb = clamp(%s * yuv, 0.0, 1.0);", mat3Name.c_str());
-  if (yuvFP->layout == nullptr) {
+  if (yuvFP->alphaStart == Point::Zero()) {
     fragBuilder->codeAppendf("%s = vec4(rgb, 1.0) * %s;", args.outputColor.c_str(),
                              args.inputColor.c_str());
   } else {
@@ -104,8 +104,7 @@ void GLYUVTextureEffect::onSetData(const ProgramDataManager& programDataManager,
                                    const FragmentProcessor& fragmentProcessor) {
   const auto& yuvFP = static_cast<const YUVTextureEffect&>(fragmentProcessor);
   if (alphaStartUniform.isValid()) {
-    auto alphaStart = yuvFP.texture->getTextureCoord(static_cast<float>(yuvFP.layout->alphaStartX),
-                                                     static_cast<float>(yuvFP.layout->alphaStartY));
+    auto alphaStart = yuvFP.texture->getTextureCoord(yuvFP.alphaStart.x, yuvFP.alphaStart.y);
     if (alphaStart != alphaStartPrev) {
       alphaStartPrev = alphaStart;
       programDataManager.set2f(alphaStartUniform, alphaStart.x, alphaStart.y);

@@ -23,15 +23,15 @@
 namespace tgfx {
 std::unique_ptr<FragmentProcessor> RGBAAATextureEffect::Make(std::shared_ptr<Texture> texture,
                                                              SamplingOptions sampling,
-                                                             const Matrix& localMatrix,
-                                                             const RGBAAALayout* layout) {
+                                                             const Point& alphaStart,
+                                                             const Matrix* localMatrix) {
   if (texture == nullptr) {
     return nullptr;
   }
   // normalize
   auto scale = texture->getTextureCoord(1, 1) - texture->getTextureCoord(0, 0);
   auto translate = texture->getTextureCoord(0, 0);
-  auto matrix = localMatrix;
+  auto matrix = localMatrix ? *localMatrix : Matrix::I();
   matrix.postScale(scale.x, scale.y);
   matrix.postTranslate(translate.x, translate.y);
   if (texture->origin() == ImageOrigin::BottomLeft) {
@@ -41,18 +41,18 @@ std::unique_ptr<FragmentProcessor> RGBAAATextureEffect::Make(std::shared_ptr<Tex
   }
   if (texture->isYUV()) {
     return std::unique_ptr<YUVTextureEffect>(new YUVTextureEffect(
-        std::static_pointer_cast<YUVTexture>(texture), sampling, layout, matrix));
+        std::static_pointer_cast<YUVTexture>(texture), sampling, alphaStart, matrix));
   }
   return std::unique_ptr<RGBAAATextureEffect>(
-      new RGBAAATextureEffect(texture, sampling, layout, matrix));
+      new RGBAAATextureEffect(texture, sampling, alphaStart, matrix));
 }
 
 RGBAAATextureEffect::RGBAAATextureEffect(std::shared_ptr<Texture> texture, SamplingOptions sampling,
-                                         const RGBAAALayout* layout, const Matrix& localMatrix)
+                                         const Point& alphaStart, const Matrix& localMatrix)
     : FragmentProcessor(ClassID()),
       texture(std::move(texture)),
       sampling(sampling),
-      layout(layout),
+      alphaStart(alphaStart),
       coordTransform(localMatrix) {
   setTextureSamplerCnt(1);
   addCoordTransform(&coordTransform);
@@ -60,12 +60,12 @@ RGBAAATextureEffect::RGBAAATextureEffect(std::shared_ptr<Texture> texture, Sampl
 
 bool RGBAAATextureEffect::onIsEqual(const FragmentProcessor& processor) const {
   const auto& that = static_cast<const RGBAAATextureEffect&>(processor);
-  return texture == that.texture && layout == that.layout &&
+  return texture == that.texture && alphaStart == that.alphaStart &&
          coordTransform.matrix == that.coordTransform.matrix;
 }
 
 void RGBAAATextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
-  uint32_t flags = layout == nullptr ? 1 : 0;
+  uint32_t flags = alphaStart == Point::Zero() ? 1 : 0;
   bytesKey->write(flags);
 }
 

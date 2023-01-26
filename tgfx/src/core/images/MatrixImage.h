@@ -18,25 +18,37 @@
 
 #pragma once
 
-#include "gpu/TextureProxy.h"
+#include "gpu/FragmentProcessor.h"
 #include "tgfx/core/Image.h"
-#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
-class TextureImage : public Image {
+class MatrixImage : public Image {
  public:
-  explicit TextureImage(std::shared_ptr<Texture> texture);
+  int width() const override {
+    return _width;
+  }
 
-  bool isTextureBacked() const override {
-    return true;
+  int height() const override {
+    return _height;
   }
 
  protected:
-  std::shared_ptr<Image> onMakeTextureImage(Context* context) const override;
+  std::shared_ptr<Image> onCloneWithSource(std::shared_ptr<ImageSource> newSource) const override;
 
-  std::shared_ptr<TextureProxy> onMakeTextureProxy(Context* context) const override;
+  std::shared_ptr<Image> onMakeSubset(const Rect& subset) const override;
+
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(
+      Context* context, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
+      const Matrix* localMatrix = nullptr) override;
 
  private:
-  std::shared_ptr<Texture> texture = nullptr;
+  int _width = 0;
+  int _height = 0;
+  Matrix localMatrix = Matrix::I();
+
+  MatrixImage(std::shared_ptr<ImageSource> source, int width, int height,
+              const Matrix& localMatrix);
+
+  friend class Image;
 };
 }  // namespace tgfx

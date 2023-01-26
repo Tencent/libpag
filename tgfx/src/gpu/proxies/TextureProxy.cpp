@@ -16,24 +16,26 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "TextureImage.h"
-#include "gpu/ProxyProvider.h"
+#include "TextureProxy.h"
 
 namespace tgfx {
-TextureImage::TextureImage(std::shared_ptr<Texture> texture) : texture(std::move(texture)) {
-}
-
-std::shared_ptr<Image> TextureImage::onMakeTextureImage(Context* context) const {
-  if (texture->getContext() != context) {
+std::shared_ptr<TextureProxy> TextureProxy::Wrap(std::shared_ptr<Texture> texture) {
+  if (texture == nullptr) {
     return nullptr;
   }
-  return std::static_pointer_cast<Image>(weakThis.lock());
+  return std::shared_ptr<TextureProxy>(new TextureProxy(std::move(texture)));
 }
 
-std::shared_ptr<TextureProxy> TextureImage::onMakeTextureProxy(Context* context) const {
-  if (texture->getContext() != context) {
-    return nullptr;
-  }
-  return context->proxyProvider()->wrapTexture(texture);
+TextureProxy::TextureProxy(std::shared_ptr<Texture> texture) : texture(std::move(texture)) {
+}
+
+bool TextureProxy::instantiate() {
+  return true;
+}
+
+void TextureProxy::assignCacheOwner(const Cacheable*) {
+}
+
+void TextureProxy::removeCacheOwner() {
 }
 }  // namespace tgfx

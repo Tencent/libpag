@@ -28,11 +28,11 @@
 #include "gpu/GpuPaint.h"
 #include "gpu/PorterDuffXferProcessor.h"
 #include "gpu/RGBAAATextureEffect.h"
-#include "gpu/TextureProxy.h"
 #include "gpu/ops/ClearOp.h"
 #include "gpu/ops/FillRectOp.h"
 #include "gpu/ops/RRectOp.h"
 #include "gpu/ops/TriangulatingPathOp.h"
+#include "gpu/proxies/TextureProxy.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Mask.h"
 #include "tgfx/core/PathEffect.h"
@@ -362,11 +362,12 @@ void Canvas::drawTexture(std::shared_ptr<Texture> texture, const RGBAAALayout* l
   }
   auto width = static_cast<float>(layout ? layout->width : texture->width());
   auto height = static_cast<float>(layout ? layout->height : texture->height());
+  auto alphaStart = layout ? Point::Make(layout->alphaStartX, layout->alphaStartY) : Point::Zero();
   auto localBounds = clipLocalBounds(Rect::MakeWH(width, height));
   if (localBounds.isEmpty()) {
     return;
   }
-  auto processor = RGBAAATextureEffect::Make(texture, sampling, Matrix::I(), layout);
+  auto processor = RGBAAATextureEffect::Make(texture, sampling, alphaStart);
   if (processor == nullptr) {
     return;
   }
@@ -417,18 +418,40 @@ void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
   draw(std::move(op), std::move(glPaint));
 }
 
+void Canvas::drawImage(std::shared_ptr<Image> image, float left, float top,
+                       SamplingOptions sampling, const Paint* paint) {
+  drawImage(image, Matrix::MakeTrans(left, top), sampling, paint);
+}
+
+void Canvas::drawImage(std::shared_ptr<Image> image, const Matrix& matrix, SamplingOptions sampling,
+                       const Paint* paint) {
+  auto oldMatrix = getMatrix();
+  concat(matrix);
+  drawImage(std::move(image), sampling, paint);
+  setMatrix(oldMatrix);
+}
+
 void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, const Paint* paint) {
   if (image == nullptr) {
     return;
   }
-  auto proxy = image->lockTextureProxy(getContext());
-  if (proxy == nullptr) {
+  // TODO(domrjchen): implements image filters in paint.
+  auto realPaint = CleanPaintForDrawTexture(paint);
+  auto localBounds = clipLocalBounds(Rect::MakeWH(image->width(), image->height()));
+  if (localBounds.isEmpty()) {
     return;
   }
-  if (!proxy->isInstantiated()) {
-    proxy->instantiate();
+  auto processor = image->asFragmentProcessor(getContext(), sampling);
+  if (processor == nullptr) {
+    return;
   }
-  drawTexture(proxy->getTexture(), sampling, paint);
+  GpuPaint glPaint;
+  if (!PaintToGLPaintWithTexture(getContext(), realPaint, state->alpha, std::move(processor),
+                                 image->isAlphaOnly(), &glPaint)) {
+    return;
+  }
+  auto op = FillRectOp::Make(glPaint.color, localBounds, state->matrix);
+  draw(std::move(op), std::move(glPaint), true);
 }
 
 static std::unique_ptr<DrawOp> MakeSimplePathOp(const Path& path, const GpuPaint& glPaint,
@@ -516,8 +539,9 @@ void Canvas::drawMask(const Rect& bounds, std::shared_ptr<Texture> mask, GpuPain
                             static_cast<float>(mask->height()) / bounds.height());
   auto oldMatrix = state->matrix;
   resetMatrix();
-  glPaint.coverageFragmentProcessors.emplace_back(FragmentProcessor::MulInputByChildAlpha(
-      RGBAAATextureEffect::Make(std::move(mask), SamplingOptions(), maskLocalMatrix)));
+  glPaint.coverageFragmentProcessors.emplace_back(
+      FragmentProcessor::MulInputByChildAlpha(RGBAAATextureEffect::Make(
+          std::move(mask), SamplingOptions(), Point::Zero(), &maskLocalMatrix)));
   auto op = FillRectOp::Make(glPaint.color, bounds, state->matrix, localMatrix);
   draw(std::move(op), std::move(glPaint));
   setMatrix(oldMatrix);

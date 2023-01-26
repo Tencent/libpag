@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/ImageBuffer.h"
+#include "tgfx/core/ImageInfo.h"
 
 namespace tgfx {
 /**
@@ -90,6 +90,10 @@ class PixelBuffer : public ImageBuffer {
    */
   bool isHardwareBacked() const {
     return hardwareBacked;
+  }
+
+  bool isAlphaOnly() const override {
+    return _info.colorType() == ColorType::ALPHA_8;
   }
 
   /**

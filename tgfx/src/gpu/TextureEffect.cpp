@@ -128,14 +128,14 @@ TextureEffect::Sampling::Sampling(const Texture* texture, SamplerState sampler, 
 std::unique_ptr<FragmentProcessor> TextureEffect::Make(const Context* context,
                                                        std::shared_ptr<Texture> texture,
                                                        SamplerState samplerState,
-                                                       const Matrix& localMatrix) {
+                                                       const Matrix* localMatrix) {
   if (texture == nullptr) {
     return nullptr;
   }
   // normalize
   auto scale = texture->getTextureCoord(1, 1) - texture->getTextureCoord(0, 0);
   auto translate = texture->getTextureCoord(0, 0);
-  auto matrix = localMatrix;
+  auto matrix = localMatrix ? *localMatrix : Matrix::I();
   matrix.postScale(scale.x, scale.y);
   matrix.postTranslate(translate.x, translate.y);
   if (texture->origin() == ImageOrigin::BottomLeft) {
