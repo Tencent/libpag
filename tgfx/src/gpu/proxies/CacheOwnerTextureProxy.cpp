@@ -35,10 +35,9 @@ bool CacheOwnerTextureProxy::instantiate() {
   if (texture != nullptr) {
     return true;
   }
-  auto context = provider->context;
-  texture = onMakeTexture(context);
+  texture = onMakeTexture(provider->context);
   if (texture != nullptr && cacheOwner != nullptr) {
-    context->resourceCache()->assignCacheOwner(texture.get(), cacheOwner.get());
+    texture->assignCacheOwner(cacheOwner.get());
   }
   return texture != nullptr;
 }
@@ -53,7 +52,7 @@ void CacheOwnerTextureProxy::assignCacheOwner(const Cacheable* owner) {
   }
   provider->changeCacheOwner(this, owner);
   if (texture != nullptr) {
-    provider->context->resourceCache()->assignCacheOwner(texture.get(), owner);
+    texture->assignCacheOwner(owner);
   }
 }
 
@@ -63,7 +62,7 @@ void CacheOwnerTextureProxy::removeCacheOwner() {
   }
   provider->removeCacheOwner(this);
   if (texture != nullptr) {
-    provider->context->resourceCache()->removeCacheOwner(texture.get());
+    texture->removeCacheOwner();
   }
 }
 

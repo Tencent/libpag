@@ -16,19 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "PathShape.h"
+#include "tgfx/gpu/Resource.h"
 
 namespace tgfx {
-class TextureShape : public PathShape {
- public:
-  explicit TextureShape(std::unique_ptr<PathProxy> proxy, float resolutionScale = 1.0f);
+void Resource::assignCacheOwner(const Cacheable* owner) {
+  if (cacheOwnerID == owner->uniqueID()) {
+    return;
+  }
+  if (owner == nullptr) {
+    removeCacheOwner();
+    return;
+  }
+  context->resourceCache()->changeCacheOwner(this, owner);
+}
 
- private:
-  std::unique_ptr<DrawOp> makeOp(GpuPaint* paint, const Matrix& viewMatrix) const override;
-
-  std::unique_ptr<DrawOp> makeTextureOp(std::shared_ptr<Texture> texture, GpuPaint* paint,
-                                        const Matrix& viewMatrix) const;
-};
+void Resource::removeCacheOwner() {
+  if (cacheOwnerID == 0) {
+    return;
+  }
+  context->resourceCache()->removeCacheOwner(this);
+}
 }  // namespace tgfx

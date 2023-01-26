@@ -45,7 +45,10 @@ std::unique_ptr<DrawOp> TextureShape::makeOp(GpuPaint* paint, const Matrix& view
   mask->fillPath(path);
   // TODO(pengweilv): mip map
   texture = mask->updateTexture(paint->context);
-  resourceCache->assignCacheOwner(texture.get(), this);
+  if (texture == nullptr) {
+    return nullptr;
+  }
+  texture->assignCacheOwner(this);
   return makeTextureOp(texture, paint, viewMatrix);
 }
 

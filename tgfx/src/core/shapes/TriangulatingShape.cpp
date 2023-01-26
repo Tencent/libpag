@@ -46,7 +46,7 @@ std::unique_ptr<DrawOp> TriangulatingShape::makeOp(GpuPaint* paint,
   if (buffer == nullptr) {
     return nullptr;
   }
-  resourceCache->assignCacheOwner(buffer.get(), this);
+  buffer->assignCacheOwner(this);
   return std::make_unique<TriangulatingPathOp>(paint->color, buffer, count, bounds, viewMatrix);
 }
 }  // namespace tgfx

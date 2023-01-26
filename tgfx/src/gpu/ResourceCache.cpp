@@ -200,17 +200,10 @@ void ResourceCache::processUnreferencedResource(Resource* resource) {
   removeResource(resource);
 }
 
-void ResourceCache::assignCacheOwner(Resource* resource, const Cacheable* owner) {
-  if (owner == nullptr) {
-    removeCacheOwner(resource);
-    return;
-  }
-  if (resource->cacheOwnerID == owner->uniqueID()) {
-    return;
-  }
+void ResourceCache::changeCacheOwner(Resource* resource, const Cacheable* owner) {
   auto result = cacheOwnerMap.find(owner->uniqueID());
   if (result != cacheOwnerMap.end()) {
-    removeCacheOwner(result->second);
+    result->second->removeCacheOwner();
   }
   if (resource->cacheOwnerID > 0) {
     cacheOwnerMap.erase(resource->cacheOwnerID);
@@ -221,9 +214,6 @@ void ResourceCache::assignCacheOwner(Resource* resource, const Cacheable* owner)
 }
 
 void ResourceCache::removeCacheOwner(Resource* resource) {
-  if (resource->cacheOwnerID == 0) {
-    return;
-  }
   cacheOwnerMap.erase(resource->cacheOwnerID);
   resource->cacheOwnerID = 0;
   resource->cacheOwner.reset();

@@ -79,8 +79,9 @@ class TextureProxy {
 
   /**
    * Assigns a cache owner to the proxy. The proxy will be findable via this owner using
-   * findProxyByOwner(). If the proxy has already been instantiated, it will also assign the owner
-   * to the target texture. Does nothing if this proxy was not created by a ProxyProvider.
+   * ProxyProvider.findProxyByOwner(). If the proxy has already been instantiated, it will also
+   * assign the owner to the target texture. Does nothing if this proxy was not created by a
+   * ProxyProvider.
    */
   virtual void assignCacheOwner(const Cacheable* owner);
 

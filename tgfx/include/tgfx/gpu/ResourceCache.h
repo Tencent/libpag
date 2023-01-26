@@ -76,16 +76,6 @@ class ResourceCache {
   std::shared_ptr<Resource> findResourceByOwner(const Cacheable* owner);
 
   /**
-   * Assigns a Cacheable to the resource as its content owner.
-   */
-  void assignCacheOwner(Resource* resource, const Cacheable* owner);
-
-  /*
-   * Removes the content owner from the resource.
-   */
-  void removeCacheOwner(Resource* resource);
-
-  /**
    * Purges GPU resources that haven't been used the passed in time.
    * @param purgeTime A timestamp previously returned by Clock::Now().
    * @param recycledResourcesOnly If it is true the purgeable resources containing persistent data
@@ -130,6 +120,9 @@ class ResourceCache {
   void removeResource(Resource* resource);
   void purgeResourcesByLRU(bool recycledResourcesOnly,
                            const std::function<bool(Resource*)>& satisfied);
+
+  void changeCacheOwner(Resource* resource, const Cacheable* owner);
+  void removeCacheOwner(Resource* resource);
 
   friend class Resource;
   friend class Context;

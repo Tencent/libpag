@@ -51,6 +51,19 @@ class Resource {
    */
   virtual size_t memoryUsage() const = 0;
 
+  /**
+   * Assigns a cache owner to the resource. The resource will be findable via this owner using
+   * ResourceCache.findResourceByOwner(). This method is not thread safe, call it only when the
+   * associated context is locked.
+   */
+  void assignCacheOwner(const Cacheable* owner);
+
+  /*
+   * Removes the cache owner from the resource. This method is not thread safe, call it only when
+   * the associated context is locked.
+   */
+  void removeCacheOwner();
+
  protected:
   Context* context = nullptr;
 
