@@ -31,7 +31,9 @@ std::shared_ptr<NativeImageBuffer> NativeImageBuffer::Make(int width, int height
       new NativeImageBuffer(width, height, std::move(source)));
 }
 
-std::shared_ptr<Texture> NativeImageBuffer::makeTexture(Context* context) const {
+std::shared_ptr<Texture> NativeImageBuffer::onMakeTexture(Context* context,
+                                                          bool /*mipMapped*/) const {
+  // TODO: implements mipMapped.
   auto texture = Texture::MakeRGBA(context, width(), height(), nullptr, 0);
   if (texture == nullptr) {
     return nullptr;

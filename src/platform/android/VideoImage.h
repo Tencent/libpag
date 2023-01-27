@@ -33,7 +33,8 @@ class VideoImage : public VideoBuffer {
   }
 
  protected:
-  std::shared_ptr<tgfx::Texture> makeTexture(tgfx::Context* context) const override;
+  std::shared_ptr<tgfx::Texture> onMakeTexture(tgfx::Context* context,
+                                               bool mipMapped) const override;
 
  private:
   mutable std::mutex locker = {};

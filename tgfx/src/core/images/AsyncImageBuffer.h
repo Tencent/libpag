@@ -31,17 +31,20 @@ class AsyncImageBuffer : public ImageBuffer, public Executor {
   static std::shared_ptr<ImageBuffer> MakeFrom(std::shared_ptr<ImageGenerator> generator,
                                                bool tryHardware = true);
 
+  int width() const override {
+    return generator->width();
+  }
+
+  int height() const override {
+    return generator->height();
+  }
+
   bool isAlphaOnly() const override {
     return generator->isAlphaOnly();
   }
 
-  bool mipMapSupport() const override {
-    return true;
-  }
-
-  std::shared_ptr<Texture> makeTexture(Context* context) const override;
-
-  std::shared_ptr<Texture> makeMipMappedTexture(Context* context) const override;
+ protected:
+  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) const override;
 
  private:
   std::shared_ptr<Task> task = nullptr;

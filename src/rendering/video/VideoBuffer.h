@@ -27,6 +27,14 @@ namespace pag {
  */
 class VideoBuffer : public tgfx::ImageBuffer {
  public:
+  int width() const override {
+    return _width;
+  }
+
+  int height() const override {
+    return _height;
+  }
+
   bool isAlphaOnly() const override {
     return false;
   }
@@ -37,7 +45,11 @@ class VideoBuffer : public tgfx::ImageBuffer {
   virtual size_t planeCount() const = 0;
 
  protected:
-  VideoBuffer(int width, int height) : tgfx::ImageBuffer(width, height) {
+  VideoBuffer(int width, int height) : _width(width), _height(height) {
   }
+
+ private:
+  int _width = 0;
+  int _height = 0;
 };
 }  // namespace pag

@@ -28,27 +28,17 @@ std::shared_ptr<ImageBuffer> AsyncImageBuffer::MakeFrom(std::shared_ptr<ImageGen
 }
 
 AsyncImageBuffer::AsyncImageBuffer(std::shared_ptr<ImageGenerator> generator, bool tryHardware)
-    : ImageBuffer(generator->width(), generator->height()),
-      generator(std::move(generator)),
-      tryHardware(tryHardware) {
+    : generator(std::move(generator)), tryHardware(tryHardware) {
   task = Task::Make(this);
   task->run();
 }
 
-std::shared_ptr<Texture> AsyncImageBuffer::makeTexture(Context* context) const {
+std::shared_ptr<Texture> AsyncImageBuffer::onMakeTexture(Context* context, bool mipMapped) const {
   task->wait();
   if (imageBuffer == nullptr) {
     return nullptr;
   }
-  return imageBuffer->makeTexture(context);
-}
-
-std::shared_ptr<Texture> AsyncImageBuffer::makeMipMappedTexture(Context* context) const {
-  task->wait();
-  if (imageBuffer == nullptr) {
-    return nullptr;
-  }
-  return imageBuffer->makeMipMappedTexture(context);
+  return imageBuffer->makeTexture(context, mipMapped);
 }
 
 void AsyncImageBuffer::execute() {

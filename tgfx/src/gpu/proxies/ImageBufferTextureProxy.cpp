@@ -29,12 +29,7 @@ std::shared_ptr<Texture> ImageBufferTextureProxy::onMakeTexture(Context* context
   if (imageBuffer == nullptr) {
     return nullptr;
   }
-  std::shared_ptr<Texture> texture = nullptr;
-  if (mipMapped && imageBuffer->mipMapSupport()) {
-    texture = imageBuffer->makeMipMappedTexture(context);
-  } else {
-    texture = imageBuffer->makeTexture(context);
-  }
+  auto texture = imageBuffer->makeTexture(context, mipMapped);
   if (texture != nullptr) {
     imageBuffer = nullptr;
   }

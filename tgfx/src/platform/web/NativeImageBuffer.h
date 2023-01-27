@@ -24,21 +24,32 @@
 namespace tgfx {
 class NativeImageBuffer : public ImageBuffer {
  public:
+  static std::shared_ptr<NativeImageBuffer> Make(int width, int height, emscripten::val source);
+
   ~NativeImageBuffer() override;
 
-  static std::shared_ptr<NativeImageBuffer> Make(int width, int height, emscripten::val source);
+  int width() const override {
+    return _width;
+  }
+
+  int height() const override {
+    return _height;
+  }
 
   bool isAlphaOnly() const override {
     return false;
   }
 
-  std::shared_ptr<Texture> makeTexture(Context* context) const override;
+ protected:
+  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) const override;
 
  private:
-  explicit NativeImageBuffer(int width, int height, emscripten::val source)
-      : ImageBuffer(width, height), source(source) {
-  }
-
+  int _width = 0;
+  int _height = 0;
   emscripten::val source = emscripten::val::null();
+
+  explicit NativeImageBuffer(int width, int height, emscripten::val source)
+      : _width(width), _height(height), source(source) {
+  }
 };
 }  // namespace tgfx

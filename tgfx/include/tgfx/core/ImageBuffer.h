@@ -22,8 +22,7 @@
 
 namespace tgfx {
 /**
- * A ImageBuffer contains an array of fully processed pixels, suitable for immediate texture
- * uploading on the GPU.
+ * ImageBuffer describes a two dimensional array of pixels which is optimized for creating textures.
  */
 class ImageBuffer {
  public:
@@ -31,16 +30,12 @@ class ImageBuffer {
   /**
    * Returns the width of the image buffer.
    */
-  int width() const {
-    return _width;
-  }
+  virtual int width() const = 0;
 
   /**
    * Returns the height of the image buffer.
    */
-  int height() const {
-    return _height;
-  }
+  virtual int height() const = 0;
 
   /**
    * Returns true if pixels represent transparency only. If true, each pixel is packed in 8 bits as
@@ -49,31 +44,16 @@ class ImageBuffer {
   virtual bool isAlphaOnly() const = 0;
 
   /**
-   * Creates a new Texture capturing the pixels in this image buffer.
+   * Creates a new Texture capturing the pixels in this image buffer. The optional mipMapped
+   * parameter specifies whether created texture must allocate mip map levels.
    */
-  virtual std::shared_ptr<Texture> makeTexture(Context* context) const = 0;
-
-  /**
-   * Returns whether the current buffer can make mipMap textures.
-   */
-  virtual bool mipMapSupport() const {
-    return false;
-  }
-
-  /**
-   * Creates a new Texture with mip map levels capturing the pixels in this image buffer.
-   * Returns nullptr if mipMapSupport is false.
-   */
-  virtual std::shared_ptr<Texture> makeMipMappedTexture(Context*) const {
-    return nullptr;
+  std::shared_ptr<Texture> makeTexture(Context* context, bool mipMapped = false) const {
+    return onMakeTexture(context, mipMapped);
   }
 
  protected:
-  ImageBuffer(int width, int height) : _width(width), _height(height) {
-  }
+  ImageBuffer() = default;
 
- private:
-  int _width = 0;
-  int _height = 0;
+  virtual std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) const = 0;
 };
 }  // namespace tgfx

@@ -38,19 +38,8 @@ class RasterPixelBuffer : public PixelBuffer {
     locker.unlock();
   }
 
-  std::shared_ptr<Texture> makeTexture(Context* context) const override {
-    return makeTexture(context, false);
-  }
-
-  bool mipMapSupport() const override {
-    return true;
-  }
-
-  std::shared_ptr<Texture> makeMipMappedTexture(Context* context) const override {
-    return makeTexture(context, true);
-  }
-
-  std::shared_ptr<Texture> makeTexture(Context* context, bool mipMapped) const {
+ protected:
+  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) const override {
     std::lock_guard<std::mutex> autoLock(locker);
     if (_info.colorType() == ColorType::ALPHA_8) {
       return Texture::MakeAlpha(context, _info.width(), _info.height(), _pixels, _info.rowBytes(),

@@ -570,7 +570,7 @@ PAG_TEST(CanvasTest, mipmap) {
   ASSERT_TRUE(result);
   auto texture = pixelBuffer->makeTexture(context);
   ASSERT_TRUE(texture != nullptr);
-  auto textureMipMapped = pixelBuffer->makeMipMappedTexture(context);
+  auto textureMipMapped = pixelBuffer->makeTexture(context, true);
   ASSERT_TRUE(textureMipMapped != nullptr);
   float scale = 0.03f;
   auto width = image->width();
@@ -618,7 +618,7 @@ PAG_TEST(CanvasTest, hardwareMipMap) {
   auto result = image->readPixels(pixelBuffer->info(), bitmap.writablePixels());
   bitmap.reset();
   ASSERT_TRUE(result);
-  auto textureMipMapped = pixelBuffer->makeMipMappedTexture(context);
+  auto textureMipMapped = pixelBuffer->makeTexture(context, true);
   ASSERT_TRUE(textureMipMapped != nullptr);
   float scale = 0.03f;
   auto width = image->width();
