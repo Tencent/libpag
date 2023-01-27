@@ -25,7 +25,9 @@ class I420Buffer : public VideoBuffer {
  public:
   size_t planeCount() const override;
 
-  std::shared_ptr<tgfx::Texture> makeTexture(tgfx::Context* context) const override;
+ protected:
+  std::shared_ptr<tgfx::Texture> onMakeTexture(tgfx::Context* context,
+                                               bool mipMapped) const override;
 
  protected:
   I420Buffer(int width, int height, uint8_t* data[3], const int lineSize[3],

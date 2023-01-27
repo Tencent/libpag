@@ -16,23 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ImageBufferTextureProxy.h"
+#include "AsyncSource.h"
 
 namespace tgfx {
-ImageBufferTextureProxy::ImageBufferTextureProxy(ProxyProvider* provider,
-                                                 std::shared_ptr<ImageBuffer> imageBuffer,
-                                                 bool mipMapped)
-    : CacheOwnerTextureProxy(provider), imageBuffer(std::move(imageBuffer)), mipMapped(mipMapped) {
+AsyncSource::AsyncSource(std::shared_ptr<EncodedSource> source) : encodedSource(std::move(source)) {
+  imageBuffer = encodedSource->makeAsyncBuffer();
 }
 
-std::shared_ptr<Texture> ImageBufferTextureProxy::onMakeTexture(Context* context) {
-  if (imageBuffer == nullptr) {
+std::shared_ptr<TextureProxy> AsyncSource::lockTextureProxy(Context* context) const {
+  if (context == nullptr) {
     return nullptr;
   }
-  auto texture = imageBuffer->makeTexture(context, mipMapped);
-  if (texture != nullptr) {
-    imageBuffer = nullptr;
+  auto provider = context->proxyProvider();
+  auto proxy = provider->findProxyByOwner(encodedSource.get());
+  if (proxy != nullptr) {
+    return proxy;
   }
-  return texture;
+  proxy = onMakeTextureProxy(context);
+  if (proxy != nullptr) {
+    proxy->assignCacheOwner(encodedSource.get());
+  }
+  return proxy;
+}
+
+std::shared_ptr<TextureProxy> AsyncSource::onMakeTextureProxy(Context* context) const {
+  return context->proxyProvider()->createTextureProxy(imageBuffer, encodedSource->hasMipmaps());
 }
 }  // namespace tgfx

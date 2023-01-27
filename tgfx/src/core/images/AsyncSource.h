@@ -18,38 +18,44 @@
 
 #pragma once
 
-#include <emscripten/val.h>
-#include "tgfx/core/ImageBuffer.h"
+#include "EncodedSource.h"
+#include "core/utils/Task.h"
 
 namespace tgfx {
-class NativeImageBuffer : public ImageBuffer {
+/**
+ * AsyncSource wraps an existing EncodedSource and schedules an asynchronous decoding task
+ * immediately. AsyncSource uses the original EncodedSource as the cache owner for all generated
+ * proxies and textures.
+ */
+class AsyncSource : public ImageSource {
  public:
-  static std::shared_ptr<NativeImageBuffer> Make(int width, int height, emscripten::val source);
-
-  ~NativeImageBuffer() override;
-
   int width() const override {
-    return _width;
+    return encodedSource->width();
   }
 
   int height() const override {
-    return _height;
+    return encodedSource->height();
+  }
+
+  bool hasMipmaps() const override {
+    return encodedSource->hasMipmaps();
   }
 
   bool isAlphaOnly() const override {
-    return false;
+    return encodedSource->isAlphaOnly();
   }
+
+  std::shared_ptr<TextureProxy> lockTextureProxy(Context* context) const override;
 
  protected:
-  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) const override;
+  std::shared_ptr<TextureProxy> onMakeTextureProxy(Context* context) const override;
 
  private:
-  int _width = 0;
-  int _height = 0;
-  emscripten::val source = emscripten::val::null();
+  std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
+  std::shared_ptr<EncodedSource> encodedSource = nullptr;
 
-  explicit NativeImageBuffer(int width, int height, emscripten::val source)
-      : _width(width), _height(height), source(source) {
-  }
+  explicit AsyncSource(std::shared_ptr<EncodedSource> source);
+
+  friend class EncodedSource;
 };
 }  // namespace tgfx

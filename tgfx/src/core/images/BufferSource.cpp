@@ -16,23 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ImageBufferTextureProxy.h"
+#include "BufferSource.h"
 
 namespace tgfx {
-ImageBufferTextureProxy::ImageBufferTextureProxy(ProxyProvider* provider,
-                                                 std::shared_ptr<ImageBuffer> imageBuffer,
-                                                 bool mipMapped)
-    : CacheOwnerTextureProxy(provider), imageBuffer(std::move(imageBuffer)), mipMapped(mipMapped) {
+BufferSource::BufferSource(std::shared_ptr<ImageBuffer> buffer, bool mipMapped)
+    : imageBuffer(std::move(buffer)), mipMapped(mipMapped) {
 }
 
-std::shared_ptr<Texture> ImageBufferTextureProxy::onMakeTexture(Context* context) {
-  if (imageBuffer == nullptr) {
-    return nullptr;
-  }
-  auto texture = imageBuffer->makeTexture(context, mipMapped);
-  if (texture != nullptr) {
-    imageBuffer = nullptr;
-  }
-  return texture;
+std::shared_ptr<TextureProxy> BufferSource::onMakeTextureProxy(Context* context) const {
+  return context->proxyProvider()->createTextureProxy(imageBuffer, mipMapped);
 }
 }  // namespace tgfx

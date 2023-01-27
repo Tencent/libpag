@@ -16,23 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ImageBufferTextureProxy.h"
+#include "TextureSource.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
-ImageBufferTextureProxy::ImageBufferTextureProxy(ProxyProvider* provider,
-                                                 std::shared_ptr<ImageBuffer> imageBuffer,
-                                                 bool mipMapped)
-    : CacheOwnerTextureProxy(provider), imageBuffer(std::move(imageBuffer)), mipMapped(mipMapped) {
+TextureSource::TextureSource(std::shared_ptr<Texture> texture)
+    : proxy(TextureProxy::Wrap(std::move(texture))) {
 }
 
-std::shared_ptr<Texture> ImageBufferTextureProxy::onMakeTexture(Context* context) {
-  if (imageBuffer == nullptr) {
+bool TextureSource::isAlphaOnly() const {
+  auto texture = proxy->getTexture();
+  DEBUG_ASSERT(texture != nullptr);
+  return texture->getSampler()->format == PixelFormat::ALPHA_8;
+}
+
+std::shared_ptr<TextureProxy> TextureSource::lockTextureProxy(Context* context) const {
+  auto texture = proxy->getTexture();
+  DEBUG_ASSERT(texture != nullptr);
+  if (texture->getContext() != context) {
     return nullptr;
   }
-  auto texture = imageBuffer->makeTexture(context, mipMapped);
-  if (texture != nullptr) {
-    imageBuffer = nullptr;
-  }
-  return texture;
+  return proxy;
+}
+
+std::shared_ptr<TextureProxy> TextureSource::onMakeTextureProxy(Context*) const {
+  return nullptr;
 }
 }  // namespace tgfx

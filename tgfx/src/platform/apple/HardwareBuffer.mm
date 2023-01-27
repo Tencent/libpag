@@ -112,11 +112,10 @@ void HardwareBuffer::unlockPixels() {
   CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
 }
 
-std::shared_ptr<Texture> HardwareBuffer::makeTexture(Context* context) const {
-  return Texture::MakeFrom(context, pixelBuffer);
-}
-
-std::shared_ptr<Texture> HardwareBuffer::makeMipMappedTexture(Context* context) const {
+std::shared_ptr<Texture> HardwareBuffer::onMakeTexture(Context* context, bool mipMapped) const {
+  if (!mipMapped) {
+    return Texture::MakeFrom(context, pixelBuffer);
+  }
   auto format = CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_OneComponent8
                     ? PixelFormat::ALPHA_8
                     : PixelFormat::BGRA_8888;

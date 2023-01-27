@@ -34,7 +34,7 @@ size_t I420Buffer::planeCount() const {
   return I420_PLANE_COUNT;
 }
 
-std::shared_ptr<tgfx::Texture> I420Buffer::makeTexture(tgfx::Context* context) const {
+std::shared_ptr<tgfx::Texture> I420Buffer::onMakeTexture(tgfx::Context* context, bool) const {
   if (context == nullptr) {
     return nullptr;
   }

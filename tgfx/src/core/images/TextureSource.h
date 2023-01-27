@@ -16,23 +16,48 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ImageBufferTextureProxy.h"
+#pragma once
+
+#include "ImageSource.h"
 
 namespace tgfx {
-ImageBufferTextureProxy::ImageBufferTextureProxy(ProxyProvider* provider,
-                                                 std::shared_ptr<ImageBuffer> imageBuffer,
-                                                 bool mipMapped)
-    : CacheOwnerTextureProxy(provider), imageBuffer(std::move(imageBuffer)), mipMapped(mipMapped) {
-}
+/**
+ * TextureSource wraps an existing texture.
+ */
+class TextureSource : public ImageSource {
+ public:
+  int width() const override {
+    return proxy->width();
+  }
 
-std::shared_ptr<Texture> ImageBufferTextureProxy::onMakeTexture(Context* context) {
-  if (imageBuffer == nullptr) {
-    return nullptr;
+  int height() const override {
+    return proxy->height();
   }
-  auto texture = imageBuffer->makeTexture(context, mipMapped);
-  if (texture != nullptr) {
-    imageBuffer = nullptr;
+
+  bool hasMipmaps() const override {
+    return proxy->hasMipmaps();
   }
-  return texture;
-}
+
+  bool isAlphaOnly() const override;
+
+  bool isTextureBacked() const override {
+    return true;
+  }
+
+  std::shared_ptr<Texture> getTexture() const override {
+    return proxy->getTexture();
+  }
+
+  std::shared_ptr<TextureProxy> lockTextureProxy(Context* context) const override;
+
+ protected:
+  std::shared_ptr<TextureProxy> onMakeTextureProxy(Context*) const override;
+
+ private:
+  std::shared_ptr<TextureProxy> proxy = nullptr;
+
+  explicit TextureSource(std::shared_ptr<Texture> texture);
+
+  friend class ImageSource;
+};
 }  // namespace tgfx

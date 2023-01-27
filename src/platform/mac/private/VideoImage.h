@@ -31,7 +31,7 @@ class VideoImage : public VideoBuffer {
   size_t planeCount() const override;
 
  protected:
-  std::shared_ptr<tgfx::Texture> makeTexture(tgfx::Context* context) const override {
+  std::shared_ptr<tgfx::Texture> onMakeTexture(tgfx::Context* context, bool) const override {
     return tgfx::Texture::MakeFrom(context, pixelBuffer);
   }
 

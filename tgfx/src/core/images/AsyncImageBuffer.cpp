@@ -16,23 +16,32 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ImageBufferTextureProxy.h"
+#include "AsyncImageBuffer.h"
 
 namespace tgfx {
-ImageBufferTextureProxy::ImageBufferTextureProxy(ProxyProvider* provider,
-                                                 std::shared_ptr<ImageBuffer> imageBuffer,
-                                                 bool mipMapped)
-    : CacheOwnerTextureProxy(provider), imageBuffer(std::move(imageBuffer)), mipMapped(mipMapped) {
+std::shared_ptr<ImageBuffer> AsyncImageBuffer::MakeFrom(std::shared_ptr<ImageGenerator> generator,
+                                                        bool tryHardware) {
+  if (generator == nullptr) {
+    return nullptr;
+  }
+  return std::shared_ptr<ImageBuffer>(new AsyncImageBuffer(std::move(generator), tryHardware));
 }
 
-std::shared_ptr<Texture> ImageBufferTextureProxy::onMakeTexture(Context* context) {
+AsyncImageBuffer::AsyncImageBuffer(std::shared_ptr<ImageGenerator> generator, bool tryHardware)
+    : generator(std::move(generator)), tryHardware(tryHardware) {
+  task = Task::Make(this);
+  task->run();
+}
+
+std::shared_ptr<Texture> AsyncImageBuffer::onMakeTexture(Context* context, bool mipMapped) const {
+  task->wait();
   if (imageBuffer == nullptr) {
     return nullptr;
   }
-  auto texture = imageBuffer->makeTexture(context, mipMapped);
-  if (texture != nullptr) {
-    imageBuffer = nullptr;
-  }
-  return texture;
+  return imageBuffer->makeTexture(context, mipMapped);
+}
+
+void AsyncImageBuffer::execute() {
+  imageBuffer = generator->makeBuffer(tryHardware);
 }
 }  // namespace tgfx

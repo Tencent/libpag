@@ -29,23 +29,18 @@ class HardwareBuffer : public PixelBuffer {
 
   static std::shared_ptr<PixelBuffer> MakeFrom(AHardwareBuffer* hardwareBuffer);
 
+  explicit HardwareBuffer(AHardwareBuffer* hardwareBuffer);
+
   ~HardwareBuffer() override;
 
   void* lockPixels() override;
 
   void unlockPixels() override;
 
-  std::shared_ptr<Texture> makeTexture(Context*) const override;
-
   AHardwareBuffer* aHardwareBuffer();
 
-  bool mipMapSupport() const override {
-    return true;
-  }
-
-  std::shared_ptr<Texture> makeMipMappedTexture(Context* context) const override;
-
-  explicit HardwareBuffer(AHardwareBuffer* hardwareBuffer);
+ protected:
+  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) const override;
 
  private:
   AHardwareBuffer* hardwareBuffer = nullptr;

@@ -18,38 +18,42 @@
 
 #pragma once
 
-#include <emscripten/val.h>
-#include "tgfx/core/ImageBuffer.h"
+#include "core/utils/Task.h"
+#include "tgfx/core/ImageGenerator.h"
 
 namespace tgfx {
-class NativeImageBuffer : public ImageBuffer {
+/**
+ * A asynchronous ImageBuffer that wraps an ImageGenerator and schedules an asynchronous decoding
+ * task immediately.
+ */
+class AsyncImageBuffer : public ImageBuffer, public Executor {
  public:
-  static std::shared_ptr<NativeImageBuffer> Make(int width, int height, emscripten::val source);
-
-  ~NativeImageBuffer() override;
+  static std::shared_ptr<ImageBuffer> MakeFrom(std::shared_ptr<ImageGenerator> generator,
+                                               bool tryHardware = true);
 
   int width() const override {
-    return _width;
+    return generator->width();
   }
 
   int height() const override {
-    return _height;
+    return generator->height();
   }
 
   bool isAlphaOnly() const override {
-    return false;
+    return generator->isAlphaOnly();
   }
 
  protected:
   std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) const override;
 
  private:
-  int _width = 0;
-  int _height = 0;
-  emscripten::val source = emscripten::val::null();
+  std::shared_ptr<Task> task = nullptr;
+  std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
+  std::shared_ptr<ImageGenerator> generator = nullptr;
+  bool tryHardware = true;
 
-  explicit NativeImageBuffer(int width, int height, emscripten::val source)
-      : _width(width), _height(height), source(source) {
-  }
+  AsyncImageBuffer(std::shared_ptr<ImageGenerator> generator, bool tryHardware);
+
+  void execute() override;
 };
 }  // namespace tgfx

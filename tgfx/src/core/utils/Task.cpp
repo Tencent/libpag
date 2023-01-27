@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#ifndef PAG_BUILD_FOR_WEB
+#ifndef TGFX_BUILD_FOR_WEB
 
 #include "Task.h"
 #include <algorithm>
@@ -27,13 +27,13 @@
 
 #endif
 
-namespace pag {
+namespace tgfx {
 
 int GetCPUCores() {
   int cpuCores = 0;
 #ifdef __APPLE__
   size_t len = sizeof(cpuCores);
-  // iOS 和 macOS 平台可以准确判断出 CPU 的物理核数。
+  // We can get the exact number of physical CPUs on apple platforms.
   sysctlbyname("hw.physicalcpu", &cpuCores, &len, nullptr, 0);
 #else
   cpuCores = static_cast<int>(std::thread::hardware_concurrency());
@@ -44,12 +44,11 @@ int GetCPUCores() {
   return cpuCores;
 }
 
-std::shared_ptr<Task> Task::Make(std::unique_ptr<Executor> executor) {
-  return std::shared_ptr<Task>(new Task(std::move(executor)));
+std::shared_ptr<Task> Task::Make(Executor* executor) {
+  return std::shared_ptr<Task>(new Task(executor));
 }
 
-Task::Task(std::unique_ptr<Executor> executor) : executor(std::move(executor)) {
-  taskGroup = TaskGroup::GetInstance();
+Task::Task(Executor* executor) : executor(executor) {
 }
 
 Task::~Task() {
@@ -62,7 +61,7 @@ void Task::run() {
     return;
   }
   running = true;
-  taskGroup->pushTask(this);
+  TaskGroup::GetInstance()->pushTask(this);
 }
 
 bool Task::isRunning() {
@@ -70,13 +69,12 @@ bool Task::isRunning() {
   return running;
 }
 
-Executor* Task::wait() {
+void Task::wait() {
   std::unique_lock<std::mutex> autoLock(locker);
   if (!running) {
-    return executor.get();
+    return;
   }
   condition.wait(autoLock);
-  return executor.get();
 }
 
 void Task::cancel() {
@@ -84,7 +82,7 @@ void Task::cancel() {
   if (!running) {
     return;
   }
-  if (taskGroup->removeTask(this)) {
+  if (TaskGroup::GetInstance()->removeTask(this)) {
     running = false;
     return;
   }
@@ -182,6 +180,6 @@ void TaskGroup::exit() {
   exited = true;
   condition.notify_all();
 }
-}  // namespace pag
+}  // namespace tgfx
 
 #endif

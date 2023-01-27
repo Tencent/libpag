@@ -33,7 +33,7 @@ VideoImage::VideoImage(std::shared_ptr<VideoSurface> videoSurface, int width, in
     : VideoBuffer(width, height), videoSurface(std::move(videoSurface)) {
 }
 
-std::shared_ptr<tgfx::Texture> VideoImage::makeTexture(tgfx::Context* context) const {
+std::shared_ptr<tgfx::Texture> VideoImage::onMakeTexture(tgfx::Context* context, bool) const {
   std::lock_guard<std::mutex> autoLock(locker);
   return videoSurface->makeTexture(context);
 }

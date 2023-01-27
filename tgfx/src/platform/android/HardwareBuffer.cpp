@@ -59,11 +59,10 @@ HardwareBuffer::HardwareBuffer(AHardwareBuffer* hardwareBuffer)
   HardwareBufferInterface::Acquire(hardwareBuffer);
 }
 
-std::shared_ptr<Texture> HardwareBuffer::makeTexture(Context* context) const {
-  return Texture::MakeFrom(context, hardwareBuffer);
-}
-
-std::shared_ptr<Texture> HardwareBuffer::makeMipMappedTexture(Context* context) const {
+std::shared_ptr<Texture> HardwareBuffer::onMakeTexture(Context* context, bool mipMapped) const {
+  if (!mipMapped) {
+    return Texture::MakeFrom(context, hardwareBuffer);
+  }
   auto texture = Texture::MakeFormat(context, width(), height(), PixelFormat::RGBA_8888,
                                      ImageOrigin::TopLeft, true);
   if (texture == nullptr) {

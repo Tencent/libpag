@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "gpu/ProxyProvider.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "tgfx/core/Cacheable.h"
 #include "tgfx/core/ImageBuffer.h"
@@ -25,6 +26,9 @@
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
+/**
+ * ImageSource generates texture proxies for images.
+ */
 class ImageSource : public Cacheable {
  public:
   /**
@@ -91,6 +95,15 @@ class ImageSource : public Cacheable {
   }
 
   /**
+   * Returns a decoded ImageSource from the lazy ImageSource. Returns original Image if it is not a
+   * lazy ImageSource or decoding failed. If context is specified and there is a corresponding
+   * texture cache, returns an ImageSource wraps that texture. Otherwise, schedules an asynchronous
+   * decoding task immediately and returns an ImageSource wraps the task, which will not block the
+   * calling thread.
+   */
+  std::shared_ptr<ImageSource> makeDecodedSource(Context* context = nullptr) const;
+
+  /**
    * Returns an ImageSource backed by GPU texture associated with context. Returns original
    * ImageSource if context is compatible with backing GPU texture. Returns nullptr if context is
    * nullptr, or if ImageSource was created with another context.
@@ -103,6 +116,8 @@ class ImageSource : public Cacheable {
   virtual std::shared_ptr<TextureProxy> lockTextureProxy(Context* context) const;
 
  protected:
+  virtual std::shared_ptr<ImageSource> onMakeDecodedSource(Context* context) const;
+
   virtual std::shared_ptr<TextureProxy> onMakeTextureProxy(Context* context) const = 0;
 };
 }  // namespace tgfx

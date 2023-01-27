@@ -18,7 +18,7 @@
 
 #pragma once
 
-#ifndef PAG_BUILD_FOR_WEB
+#ifndef TGFX_BUILD_FOR_WEB
 
 #include <condition_variable>
 #include <list>
@@ -26,7 +26,7 @@
 #include <thread>
 #include <vector>
 
-namespace pag {
+namespace tgfx {
 class Executor {
  public:
   virtual ~Executor() = default;
@@ -41,22 +41,21 @@ class TaskGroup;
 
 class Task {
  public:
-  static std::shared_ptr<Task> Make(std::unique_ptr<Executor> executor);
+  static std::shared_ptr<Task> Make(Executor* executor);
   ~Task();
 
   void run();
   bool isRunning();
-  Executor* wait();
+  void wait();
   void cancel();
 
  private:
   std::mutex locker = {};
   std::condition_variable condition = {};
   bool running = false;
-  TaskGroup* taskGroup = nullptr;
-  std::unique_ptr<Executor> executor = nullptr;
+  Executor* executor = nullptr;
 
-  explicit Task(std::unique_ptr<Executor> executor);
+  explicit Task(Executor* executor);
   void execute();
 
   friend class TaskGroup;
@@ -86,12 +85,12 @@ class TaskGroup {
 
   friend class Task;
 };
-}  // namespace pag
+}  // namespace tgfx
 #else
 
 #include <memory>
 
-namespace pag {
+namespace tgfx {
 class Executor {
  public:
   virtual ~Executor() = default;
@@ -104,34 +103,37 @@ class Executor {
 
 class Task {
  public:
-  static std::shared_ptr<Task> Make(std::unique_ptr<Executor> executor) {
-    return std::shared_ptr<Task>(new Task(std::move(executor)));
+  static std::shared_ptr<Task> Make(Executor* executor) {
+    return std::shared_ptr<Task>(new Task(executor));
   }
 
   void run() {
+    running = true;
   }
 
   bool isRunning() const {
     return running;
   }
 
-  Executor* wait() {
-    running = true;
+  void wait() {
+    if (!running) {
+      return;
+    }
     executor->execute();
     running = false;
-    return executor.get();
   }
 
   void cancel() {
+    running = false;
   }
 
  private:
   bool running = false;
-  std::unique_ptr<Executor> executor = nullptr;
+  Executor* executor = nullptr;
 
-  explicit Task(std::unique_ptr<Executor> executor) : executor(std::move(executor)) {
+  explicit Task(Executor* executor) : executor(executor) {
   }
 };
-}  // namespace pag
+}  // namespace tgfx
 
 #endif

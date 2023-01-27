@@ -17,136 +17,18 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ImageSource.h"
-#include "core/utils/Log.h"
-#include "gpu/ProxyProvider.h"
-#include "tgfx/gpu/TextureSampler.h"
+#include "BufferSource.h"
+#include "EncodedSource.h"
+#include "TextureSource.h"
 
 namespace tgfx {
-class EncodedImageSource : public ImageSource {
- public:
-  EncodedImageSource(std::shared_ptr<ImageGenerator> generator, bool mipMapped)
-      : imageGenerator(std::move(generator)), mipMapped(mipMapped) {
-  }
-
-  int width() const override {
-    return imageGenerator->width();
-  }
-
-  int height() const override {
-    return imageGenerator->height();
-  }
-
-  bool hasMipmaps() const override {
-    return mipMapped;
-  }
-
-  bool isAlphaOnly() const override {
-    return imageGenerator->isAlphaOnly();
-  }
-
-  bool isLazyGenerated() const override {
-    return true;
-  }
-
- protected:
-  std::shared_ptr<TextureProxy> onMakeTextureProxy(Context* context) const override {
-    auto imageBuffer = imageGenerator->makeBuffer();
-    return context->proxyProvider()->createTextureProxy(imageBuffer, mipMapped);
-  }
-
- private:
-  std::shared_ptr<ImageGenerator> imageGenerator = nullptr;
-  bool mipMapped = false;
-};
-
-class RasterImageSource : public ImageSource {
- public:
-  RasterImageSource(std::shared_ptr<ImageBuffer> buffer, bool mipMapped)
-      : imageBuffer(std::move(buffer)), mipMapped(mipMapped) {
-  }
-
-  int width() const override {
-    return imageBuffer->width();
-  }
-
-  int height() const override {
-    return imageBuffer->height();
-  }
-
-  bool hasMipmaps() const override {
-    return mipMapped;
-  }
-
-  bool isAlphaOnly() const override {
-    return imageBuffer->isAlphaOnly();
-  }
-
- protected:
-  std::shared_ptr<TextureProxy> onMakeTextureProxy(Context* context) const override {
-    return context->proxyProvider()->createTextureProxy(imageBuffer, mipMapped);
-  }
-
- private:
-  std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
-  bool mipMapped = false;
-};
-
-class TextureImageSource : public ImageSource {
- public:
-  explicit TextureImageSource(std::shared_ptr<Texture> texture)
-      : proxy(TextureProxy::Wrap(std::move(texture))) {
-  }
-
-  int width() const override {
-    return proxy->width();
-  }
-
-  int height() const override {
-    return proxy->height();
-  }
-
-  bool hasMipmaps() const override {
-    return proxy->hasMipmaps();
-  }
-
-  bool isAlphaOnly() const override {
-    auto texture = proxy->getTexture();
-    DEBUG_ASSERT(texture != nullptr);
-    return texture->getSampler()->format == PixelFormat::ALPHA_8;
-  }
-
-  bool isTextureBacked() const override {
-    return true;
-  }
-
-  std::shared_ptr<Texture> getTexture() const override {
-    return proxy->getTexture();
-  }
-
-  std::shared_ptr<TextureProxy> lockTextureProxy(Context* context) const override {
-    auto texture = proxy->getTexture();
-    DEBUG_ASSERT(texture != nullptr);
-    if (texture->getContext() != context) {
-      return nullptr;
-    }
-    return proxy;
-  }
-
- protected:
-  std::shared_ptr<TextureProxy> onMakeTextureProxy(Context*) const override {
-    return nullptr;
-  }
-
- private:
-  std::shared_ptr<TextureProxy> proxy = nullptr;
-};
 
 std::shared_ptr<ImageSource> ImageSource::MakeFromGenerator(
     std::shared_ptr<ImageGenerator> generator, bool mipMapped) {
   if (generator == nullptr) {
     return nullptr;
   }
-  auto source = std::make_shared<EncodedImageSource>(std::move(generator), mipMapped);
+  auto source = std::shared_ptr<EncodedSource>(new EncodedSource(std::move(generator), mipMapped));
   source->weakThis = source;
   return source;
 }
@@ -156,7 +38,7 @@ std::shared_ptr<ImageSource> ImageSource::MakeFromBuffer(std::shared_ptr<ImageBu
   if (buffer == nullptr) {
     return nullptr;
   }
-  auto source = std::make_shared<RasterImageSource>(std::move(buffer), mipMapped);
+  auto source = std::shared_ptr<BufferSource>(new BufferSource(std::move(buffer), mipMapped));
   source->weakThis = source;
   return source;
 }
@@ -165,9 +47,25 @@ std::shared_ptr<ImageSource> ImageSource::MakeFromTexture(std::shared_ptr<Textur
   if (texture == nullptr) {
     return nullptr;
   }
-  auto source = std::make_shared<TextureImageSource>(std::move(texture));
+  auto source = std::shared_ptr<TextureSource>(new TextureSource(std::move(texture)));
   source->weakThis = source;
   return source;
+}
+
+std::shared_ptr<ImageSource> ImageSource::makeDecodedSource(Context* context) const {
+  if (!isLazyGenerated()) {
+    return std::static_pointer_cast<ImageSource>(weakThis.lock());
+  }
+  auto source = onMakeDecodedSource(context);
+  if (source == nullptr) {
+    return std::static_pointer_cast<ImageSource>(weakThis.lock());
+  }
+  source->weakThis = source;
+  return source;
+}
+
+std::shared_ptr<ImageSource> ImageSource::onMakeDecodedSource(Context*) const {
+  return nullptr;
 }
 
 std::shared_ptr<ImageSource> ImageSource::makeTextureSource(Context* context) const {

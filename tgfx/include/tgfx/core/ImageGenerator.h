@@ -19,7 +19,6 @@
 #pragma once
 
 #include "tgfx/core/ImageBuffer.h"
-#include "tgfx/core/Orientation.h"
 
 namespace tgfx {
 /**
@@ -47,18 +46,33 @@ class ImageGenerator {
    * Returns true if pixels represent transparency only. If true, each pixel is packed in 8
    * bits as defined by ColorType::ALPHA_8.
    */
-  virtual bool isAlphaOnly() const = 0;
+  virtual bool isAlphaOnly() const {
+    return false;
+  }
+
+  /**
+   * Returns true if ImageGenerator supports asynchronous decoding. If true, the makeBuffer() method
+   * will not block the calling thread.
+   */
+  virtual bool asyncSupport() const {
+    return false;
+  }
 
   /**
    * Crates a new image buffer capturing the pixels decoded from this image generator.
    * ImageGenerator do not cache the returned image buffer, each call to this method allocates
-   * additional storage.
+   * additional storage. Returns an ImageBuffer backed by hardware if tryHardware is true and
+   * current platform supports creating it. Otherwise, a raster ImageBuffer is returned.
    */
-  virtual std::shared_ptr<ImageBuffer> makeBuffer() const = 0;
+  std::shared_ptr<ImageBuffer> makeBuffer(bool tryHardware = true) const {
+    return onMakeBuffer(tryHardware);
+  }
 
  protected:
   ImageGenerator(int width, int height) : _width(width), _height(height) {
   }
+
+  virtual std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const = 0;
 
  private:
   int _width = 0;

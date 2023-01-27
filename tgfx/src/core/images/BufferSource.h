@@ -16,23 +16,41 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ImageBufferTextureProxy.h"
+#pragma once
+
+#include "ImageSource.h"
 
 namespace tgfx {
-ImageBufferTextureProxy::ImageBufferTextureProxy(ProxyProvider* provider,
-                                                 std::shared_ptr<ImageBuffer> imageBuffer,
-                                                 bool mipMapped)
-    : CacheOwnerTextureProxy(provider), imageBuffer(std::move(imageBuffer)), mipMapped(mipMapped) {
-}
+/**
+ * BufferSource wraps a decoded ImageBuffer that can generate textures on demand.
+ */
+class BufferSource : public ImageSource {
+ public:
+  int width() const override {
+    return imageBuffer->width();
+  }
 
-std::shared_ptr<Texture> ImageBufferTextureProxy::onMakeTexture(Context* context) {
-  if (imageBuffer == nullptr) {
-    return nullptr;
+  int height() const override {
+    return imageBuffer->height();
   }
-  auto texture = imageBuffer->makeTexture(context, mipMapped);
-  if (texture != nullptr) {
-    imageBuffer = nullptr;
+
+  bool hasMipmaps() const override {
+    return mipMapped;
   }
-  return texture;
-}
+
+  bool isAlphaOnly() const override {
+    return imageBuffer->isAlphaOnly();
+  }
+
+ protected:
+  std::shared_ptr<TextureProxy> onMakeTextureProxy(Context* context) const override;
+
+ private:
+  std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
+  bool mipMapped = false;
+
+  BufferSource(std::shared_ptr<ImageBuffer> buffer, bool mipMapped);
+
+  friend class ImageSource;
+};
 }  // namespace tgfx

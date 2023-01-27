@@ -23,7 +23,7 @@
 
 namespace tgfx {
 /**
- * PixelBuffer describes a two dimensional array of pixels which is optimized for creating textures.
+ * A container for writable pixel memory.
  */
 class PixelBuffer : public ImageBuffer {
  public:
@@ -34,8 +34,8 @@ class PixelBuffer : public ImageBuffer {
    * @param height pixel row count, must be greater than zero.
    * @param alphaOnly If true, sets colorType to ColorType::ALPHA_8, otherwise sets to the native
    * 32-bit color type of current platform.
-   * @param tryHardware If true, a hardware PixelBuffer is returned if it is available on current
-   * platform, otherwise a raster PixelBuffer is returned.
+   * @param tryHardware If true, a PixelBuffer backed by hardware is returned if it is available on
+   * current platform. Otherwise, a raster PixelBuffer is returned.
    */
   static std::shared_ptr<PixelBuffer> Make(int width, int height, bool alphaOnly = false,
                                            bool tryHardware = true);
@@ -47,6 +47,14 @@ class PixelBuffer : public ImageBuffer {
    * reference on the buffer.
    */
   static std::shared_ptr<PixelBuffer> MakeFrom(void* hardwareBuffer);
+
+  int width() const override {
+    return _info.width();
+  }
+
+  int height() const override {
+    return _info.height();
+  }
 
   /**
  * Returns a ImageInfo describing the width, height, color type, alpha type, and row bytes
@@ -109,8 +117,7 @@ class PixelBuffer : public ImageBuffer {
  protected:
   const ImageInfo _info = {};
 
-  explicit PixelBuffer(const ImageInfo& info)
-      : ImageBuffer(info.width(), info.height()), _info(info) {
+  explicit PixelBuffer(const ImageInfo& info) : _info(info) {
   }
 
  private:

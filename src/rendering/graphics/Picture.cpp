@@ -392,22 +392,13 @@ class ImageBufferProxy : public TextureProxy {
     return getTexture(cache, false);
   }
 
-  bool mipMapSupport() const override {
-    return buffer->mipMapSupport();
-  }
-
   std::shared_ptr<tgfx::Texture> getMipMappedTexture(RenderCache* cache) const override {
     return getTexture(cache, true);
   }
 
   std::shared_ptr<tgfx::Texture> getTexture(RenderCache* cache, bool mipMapped) const {
     tgfx::Clock clock = {};
-    std::shared_ptr<tgfx::Texture> texture;
-    if (mipMapped) {
-      texture = buffer->makeMipMappedTexture(cache->getContext());
-    } else {
-      texture = buffer->makeTexture(cache->getContext());
-    }
+    auto texture = buffer->makeTexture(cache->getContext(), mipMapped);
     cache->recordTextureUploadingTime(clock.measure());
     return texture;
   }
@@ -447,19 +438,14 @@ class ImageTextureProxy : public TextureProxy {
     tgfx::Clock clock = {};
     auto buffer = cache->getImageBuffer(assetID);
     if (buffer == nullptr) {
-      buffer = image->makeBuffer();
+      buffer = image->makeBuffer(!mipMapped);
     }
     cache->recordImageDecodingTime(clock.measure());
     if (buffer == nullptr) {
       return nullptr;
     }
     clock.reset();
-    std::shared_ptr<tgfx::Texture> texture;
-    if (mipMapped) {
-      texture = buffer->makeMipMappedTexture(cache->getContext());
-    } else {
-      texture = buffer->makeTexture(cache->getContext());
-    }
+    auto texture = buffer->makeTexture(cache->getContext(), mipMapped);
     cache->recordTextureUploadingTime(clock.measure());
     return texture;
   }
