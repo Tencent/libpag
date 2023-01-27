@@ -26,8 +26,6 @@ class NativeImage : public ImageCodec {
  public:
   static std::shared_ptr<NativeImage> MakeFrom(emscripten::val nativeImage);
 
-  std::shared_ptr<ImageBuffer> makeBuffer() const override;
-
   bool readPixels(const ImageInfo& /*dstInfo*/, void* /*dstPixels*/) const override {
     return false;
   }
@@ -37,6 +35,8 @@ class NativeImage : public ImageCodec {
 
   NativeImage(int width, int height) : ImageCodec(width, height, Orientation::TopLeft) {
   }
+
+  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 
   friend class NativeCodec;
 };

@@ -19,15 +19,18 @@
 #include "AsyncImageBuffer.h"
 
 namespace tgfx {
-std::shared_ptr<ImageBuffer> AsyncImageBuffer::MakeFrom(std::shared_ptr<ImageGenerator> generator) {
+std::shared_ptr<ImageBuffer> AsyncImageBuffer::MakeFrom(std::shared_ptr<ImageGenerator> generator,
+                                                        bool tryHardware) {
   if (generator == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<ImageBuffer>(new AsyncImageBuffer(std::move(generator)));
+  return std::shared_ptr<ImageBuffer>(new AsyncImageBuffer(std::move(generator), tryHardware));
 }
 
-AsyncImageBuffer::AsyncImageBuffer(std::shared_ptr<ImageGenerator> generator)
-    : ImageBuffer(generator->width(), generator->height()), generator(std::move(generator)) {
+AsyncImageBuffer::AsyncImageBuffer(std::shared_ptr<ImageGenerator> generator, bool tryHardware)
+    : ImageBuffer(generator->width(), generator->height()),
+      generator(std::move(generator)),
+      tryHardware(tryHardware) {
   task = Task::Make(this);
   task->run();
 }
@@ -49,6 +52,6 @@ std::shared_ptr<Texture> AsyncImageBuffer::makeMipMappedTexture(Context* context
 }
 
 void AsyncImageBuffer::execute() {
-  imageBuffer = generator->makeBuffer();
+  imageBuffer = generator->makeBuffer(tryHardware);
 }
 }  // namespace tgfx

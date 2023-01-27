@@ -61,13 +61,18 @@ class ImageGenerator {
   /**
    * Crates a new image buffer capturing the pixels decoded from this image generator.
    * ImageGenerator do not cache the returned image buffer, each call to this method allocates
-   * additional storage.
+   * additional storage. Returns an ImageBuffer backed by hardware if tryHardware is true and
+   * current platform supports creating it. Otherwise, a raster ImageBuffer is returned.
    */
-  virtual std::shared_ptr<ImageBuffer> makeBuffer() const = 0;
+  std::shared_ptr<ImageBuffer> makeBuffer(bool tryHardware = true) const {
+    return onMakeBuffer(tryHardware);
+  }
 
  protected:
   ImageGenerator(int width, int height) : _width(width), _height(height) {
   }
+
+  virtual std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const = 0;
 
  private:
   int _width = 0;

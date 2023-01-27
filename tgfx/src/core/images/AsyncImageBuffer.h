@@ -28,7 +28,8 @@ namespace tgfx {
  */
 class AsyncImageBuffer : public ImageBuffer, public Executor {
  public:
-  static std::shared_ptr<ImageBuffer> MakeFrom(std::shared_ptr<ImageGenerator> generator);
+  static std::shared_ptr<ImageBuffer> MakeFrom(std::shared_ptr<ImageGenerator> generator,
+                                               bool tryHardware = true);
 
   bool isAlphaOnly() const override {
     return generator->isAlphaOnly();
@@ -46,8 +47,9 @@ class AsyncImageBuffer : public ImageBuffer, public Executor {
   std::shared_ptr<Task> task = nullptr;
   std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
   std::shared_ptr<ImageGenerator> generator = nullptr;
+  bool tryHardware = true;
 
-  explicit AsyncImageBuffer(std::shared_ptr<ImageGenerator> generator);
+  AsyncImageBuffer(std::shared_ptr<ImageGenerator> generator, bool tryHardware);
 
   void execute() override;
 };

@@ -66,12 +66,6 @@ class ImageCodec : public ImageGenerator {
   }
 
   /**
-   * Crates a new texture buffer capturing the pixels in this image. ImageCodec do not cache the
-   * newly created texture buffer, each call to this method allocates additional storage.
-   */
-  std::shared_ptr<ImageBuffer> makeBuffer() const override;
-
-  /**
    * Decodes the image with the specified image info into the given pixels. Returns true if the
    * decoding was successful.
    * Note: This method is not implemented on the web platform, use makeBuffer() instead if your
@@ -83,6 +77,8 @@ class ImageCodec : public ImageGenerator {
   ImageCodec(int width, int height, Orientation orientation)
       : ImageGenerator(width, height), _orientation(orientation) {
   }
+
+  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 
  private:
   Orientation _orientation = Orientation::TopLeft;

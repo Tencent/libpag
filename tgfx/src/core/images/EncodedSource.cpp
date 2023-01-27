@@ -43,9 +43,9 @@ std::shared_ptr<TextureProxy> EncodedSource::onMakeTextureProxy(Context* context
 
 std::shared_ptr<ImageBuffer> EncodedSource::makeAsyncBuffer() const {
   if (generator->asyncSupport()) {
-    return generator->makeBuffer();
+    return generator->makeBuffer(!mipMapped);
   } else {
-    return AsyncImageBuffer::MakeFrom(generator);
+    return AsyncImageBuffer::MakeFrom(generator, !mipMapped);
   }
 }
 }  // namespace tgfx

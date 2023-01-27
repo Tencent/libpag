@@ -447,7 +447,7 @@ class ImageTextureProxy : public TextureProxy {
     tgfx::Clock clock = {};
     auto buffer = cache->getImageBuffer(assetID);
     if (buffer == nullptr) {
-      buffer = image->makeBuffer();
+      buffer = image->makeBuffer(!mipMapped);
     }
     cache->recordImageDecodingTime(clock.measure());
     if (buffer == nullptr) {
