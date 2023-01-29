@@ -154,6 +154,13 @@ std::shared_ptr<Resource> ResourceCache::findResourceByOwner(const Cacheable* ow
   return resource->weakThis.lock();
 }
 
+bool ResourceCache::hasResource(const Cacheable* owner) {
+  if (owner == nullptr) {
+    return false;
+  }
+  return cacheOwnerMap.count(owner->uniqueID()) > 0;
+}
+
 void ResourceCache::AddToList(std::list<Resource*>& list, Resource* resource) {
   list.push_front(resource);
   resource->cachedPosition = list.begin();

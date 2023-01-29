@@ -26,12 +26,8 @@ EncodedSource::EncodedSource(std::shared_ptr<ImageGenerator> generator, bool mip
 }
 
 std::shared_ptr<ImageSource> EncodedSource::onMakeDecodedSource(Context* context) const {
-  if (context != nullptr) {
-    auto texture =
-        std::static_pointer_cast<Texture>(context->resourceCache()->findResourceByOwner(this));
-    if (texture != nullptr) {
-      return ImageSource::MakeFromTexture(texture);
-    }
+  if (context != nullptr && context->resourceCache()->hasResource(this)) {
+    return nullptr;
   }
   auto encodedSource = std::static_pointer_cast<EncodedSource>(weakThis.lock());
   return std::shared_ptr<AsyncSource>(new AsyncSource(std::move(encodedSource)));

@@ -109,6 +109,7 @@ class Task {
   }
 
   void run() {
+    running = true;
   }
 
   bool isRunning() const {
@@ -116,13 +117,16 @@ class Task {
   }
 
   Executor* wait() {
-    running = true;
+    if (!running) {
+      return;
+    }
     executor->execute();
     running = false;
     return executor.get();
   }
 
   void cancel() {
+    running = false;
   }
 
  private:

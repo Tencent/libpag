@@ -171,16 +171,16 @@ std::shared_ptr<Texture> Image::getTexture() const {
 
 std::shared_ptr<Image> Image::makeDecodedImage(Context* context) const {
   auto decodedSource = source->makeDecodedSource(context);
-  if (decodedSource == source) {
-    return weakThis.lock();
+  if (decodedSource == nullptr) {
+    return nullptr;
   }
   auto decodedImage = onCloneWithSource(std::move(decodedSource));
   decodedImage->weakThis = decodedImage;
   return decodedImage;
 }
 
-std::shared_ptr<Image> Image::makeTextureImage(Context* context) const {
-  auto textureSource = source->makeTextureSource(context);
+std::shared_ptr<Image> Image::makeTextureImage(Context* context, bool wrapCacheOnly) const {
+  auto textureSource = source->makeTextureSource(context, wrapCacheOnly);
   if (textureSource == source) {
     return weakThis.lock();
   }

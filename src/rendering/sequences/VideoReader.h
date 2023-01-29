@@ -41,7 +41,6 @@ class VideoReader : public SequenceReader {
   VideoDemuxer* demuxer = nullptr;
   float frameRate = 0.0;
   int decoderTypeIndex = 0;
-  std::shared_ptr<Task> gpuDecoderTask = nullptr;
   VideoDecoder* videoDecoder = nullptr;
   VideoSample videoSample = {};
   std::shared_ptr<VideoBuffer> lastBuffer = nullptr;
@@ -61,8 +60,6 @@ class VideoReader : public SequenceReader {
   bool sendSampleData();
 
   bool onDecodeFrame(int64_t sampleTime);
-
-  bool switchToGPUDecoderOfTask();
 
   VideoDecoder* makeVideoDecoder();
 };

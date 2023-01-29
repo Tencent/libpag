@@ -177,20 +177,21 @@ class Image {
   std::shared_ptr<Texture> getTexture() const;
 
   /**
-   * Returns a decoded Image from the lazy image. Returns original Image if it is not a lazy image
-   * or decoding failed. If context is specified and there is a corresponding texture cache, returns
-   * an Image wraps that texture. Otherwise, schedules an asynchronous decoding task immediately and
-   * returns an Image wraps the task, which will not block the calling thread.
+   * Returns a decoded Image from the lazy Image. The returned Image shares the same texture cache
+   * with the original Image and immediately schedules an asynchronous decoding task, which will not
+   * block the calling thread. Returns nullptr if the Image is not lazy or has a corresponding
+   * texture cache in the specified context.
    */
   std::shared_ptr<Image> makeDecodedImage(Context* context = nullptr) const;
 
   /**
-   * Returns an Image backed by GPU texture associated with context. If the corresponding texture
-   * cache is not available, creates one immediately, which may block the calling thread. Returns
-   * original Image if context is compatible with backing GPU texture. Returns nullptr if context is
-   * nullptr, or if Image was created with another context.
+   * Returns an Image backed by GPU texture associated with the specified context. If there is a
+   * corresponding texture cache in the context, returns an Image wraps that texture. Otherwise,
+   * creates one immediately if wrapCacheOnly is false, which may block the calling thread. Returns
+   * original Image if the Image is texture backed and the context is compatible with the backing
+   * GPU texture. Otherwise, returns nullptr.
    */
-  std::shared_ptr<Image> makeTextureImage(Context* context) const;
+  std::shared_ptr<Image> makeTextureImage(Context* context, bool wrapCacheOnly = false) const;
 
   /**
    * Returns subset of Image. subset must be fully contained by Image dimensions. The implementation

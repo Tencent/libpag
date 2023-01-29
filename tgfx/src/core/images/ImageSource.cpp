@@ -54,13 +54,12 @@ std::shared_ptr<ImageSource> ImageSource::MakeFromTexture(std::shared_ptr<Textur
 
 std::shared_ptr<ImageSource> ImageSource::makeDecodedSource(Context* context) const {
   if (!isLazyGenerated()) {
-    return std::static_pointer_cast<ImageSource>(weakThis.lock());
+    return nullptr;
   }
   auto source = onMakeDecodedSource(context);
-  if (source == nullptr) {
-    return std::static_pointer_cast<ImageSource>(weakThis.lock());
+  if (source != nullptr) {
+    source->weakThis = source;
   }
-  source->weakThis = source;
   return source;
 }
 
@@ -68,10 +67,22 @@ std::shared_ptr<ImageSource> ImageSource::onMakeDecodedSource(Context*) const {
   return nullptr;
 }
 
-std::shared_ptr<ImageSource> ImageSource::makeTextureSource(Context* context) const {
+std::shared_ptr<ImageSource> ImageSource::makeTextureSource(Context* context,
+                                                            bool wrapCacheOnly) const {
   auto texture = getTexture();
-  if (texture != nullptr && texture->getContext() == context) {
-    return std::static_pointer_cast<ImageSource>(weakThis.lock());
+  if (texture != nullptr) {
+    if (texture->getContext() == context) {
+      return std::static_pointer_cast<ImageSource>(weakThis.lock());
+    }
+    return nullptr;
+  }
+  auto resourceCache = context->resourceCache();
+  texture = std::static_pointer_cast<Texture>(resourceCache->findResourceByOwner(this));
+  if (texture != nullptr) {
+    return MakeFromTexture(texture);
+  }
+  if (wrapCacheOnly) {
+    return nullptr;
   }
   auto proxy = lockTextureProxy(context);
   if (proxy == nullptr) {

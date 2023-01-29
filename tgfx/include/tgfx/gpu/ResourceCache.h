@@ -71,9 +71,15 @@ class ResourceCache {
   std::shared_ptr<Resource> getRecycled(const BytesKey& recycleKey);
 
   /**
-   * Returns a unique resource in the cache by the specified contentKey.
+   * Returns a unique resource in the cache by the specified cache owner.
    */
   std::shared_ptr<Resource> findResourceByOwner(const Cacheable* owner);
+
+  /**
+   * Returns true if there is a corresponding resource for the specified cache owner in the resource
+   * cache.
+   */
+  bool hasResource(const Cacheable* owner);
 
   /**
    * Purges GPU resources that haven't been used the passed in time.

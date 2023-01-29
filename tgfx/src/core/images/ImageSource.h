@@ -95,11 +95,10 @@ class ImageSource : public Cacheable {
   }
 
   /**
-   * Returns a decoded ImageSource from the lazy ImageSource. Returns original Image if it is not a
-   * lazy ImageSource or decoding failed. If context is specified and there is a corresponding
-   * texture cache, returns an ImageSource wraps that texture. Otherwise, schedules an asynchronous
-   * decoding task immediately and returns an ImageSource wraps the task, which will not block the
-   * calling thread.
+   * Returns a decoded ImageSource from the lazy ImageSource. The returned ImageSource shares the
+   * same texture cache with the original ImageSource and immediately schedules an asynchronous
+   * decoding task, which will not block the calling thread. Returns nullptr if the ImageSource is
+   * not lazy or has a corresponding texture cache in the specified context.
    */
   std::shared_ptr<ImageSource> makeDecodedSource(Context* context = nullptr) const;
 
@@ -108,7 +107,7 @@ class ImageSource : public Cacheable {
    * ImageSource if context is compatible with backing GPU texture. Returns nullptr if context is
    * nullptr, or if ImageSource was created with another context.
    */
-  std::shared_ptr<ImageSource> makeTextureSource(Context* context) const;
+  std::shared_ptr<ImageSource> makeTextureSource(Context* context, bool wrapCacheOnly) const;
 
   /**
    * Creates a TextureProxy with the specified context from the ImageSource.
