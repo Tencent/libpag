@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <atomic>
 #include "base/utils/Task.h"
 #include "rendering/Performance.h"
 #include "tgfx/gpu/Texture.h"
@@ -34,6 +35,16 @@ class SequenceReader {
   virtual ~SequenceReader();
 
   /**
+   * Returns the width of sequence buffers created from the reader.
+   */
+  virtual int bufferWidth() const = 0;
+
+  /**
+   * Returns the height of sequence buffers created from the reader.
+   */
+  virtual int bufferHeight() const = 0;
+
+  /**
    * Decodes the specified target frame asynchronously.
    */
   virtual void prepare(Frame targetFrame);
@@ -41,7 +52,7 @@ class SequenceReader {
   /**
    * Returns the texture of specified target frame.
    */
-  std::shared_ptr<tgfx::Texture> readTexture(Frame targetFrame, RenderCache* cache);
+  std::shared_ptr<tgfx::Texture> readTexture(tgfx::Context* context, Frame targetFrame);
 
  protected:
   /**
@@ -52,12 +63,12 @@ class SequenceReader {
   /**
    * Returns the texture of current decoded frame.
    */
-  virtual std::shared_ptr<tgfx::Texture> makeTexture(tgfx::Context* context) = 0;
+  virtual std::shared_ptr<tgfx::Texture> onMakeTexture(tgfx::Context* context) = 0;
 
   /**
    * Reports the decoding performance data.
    */
-  virtual void recordPerformance(Performance* performance, int64_t decodingTime) = 0;
+  virtual void recordPerformance(Performance* performance);
 
   /**
    * Decodes the next one of the specified target frame asynchronously.
@@ -66,6 +77,8 @@ class SequenceReader {
 
  protected:
   std::shared_ptr<Task> lastTask = nullptr;
+  std::atomic_int64_t decodingTime = 0;
+  std::atomic_int64_t textureUploadingTime = 0;
 
  private:
   Frame totalFrames = 0;
@@ -76,6 +89,8 @@ class SequenceReader {
   std::shared_ptr<tgfx::Texture> lastTexture = nullptr;
 
   friend class SequenceTask;
+
+  friend class SequenceFrameGenerator;
 
   friend class RenderCache;
 };

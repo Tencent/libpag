@@ -59,9 +59,7 @@ class VideoSequenceReader : public SequenceReader {
     return true;
   }
 
-  std::shared_ptr<tgfx::Texture> makeTexture(tgfx::Context* context) override;
-
-  void recordPerformance(Performance* performance, int64_t decodingTime) override;
+  std::shared_ptr<tgfx::Texture> onMakeTexture(tgfx::Context* context) override;
 
   void prepareNext(Frame) override {
   }

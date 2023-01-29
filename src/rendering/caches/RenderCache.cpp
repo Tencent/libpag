@@ -238,6 +238,7 @@ void RenderCache::detachFromContext() {
     context = nullptr;
     return;
   }
+  recordPerformance();
   clearExpiredSequences();
   clearExpiredBitmaps();
   clearExpiredSnapshots();
@@ -521,7 +522,7 @@ std::shared_ptr<tgfx::Texture> RenderCache::getSequenceFrame(Sequence* sequence,
     return nullptr;
   }
   auto composition = sequence->composition;
-  auto texture = reader->readTexture(targetFrame, this);
+  auto texture = reader->readTexture(context, targetFrame);
   if (composition->staticContent()) {
     // There is no need to cache a reader for the static sequence, it has already been cached as
     // a snapshot. We get here because the reader was created by prepare() methods.
@@ -720,6 +721,14 @@ void RenderCache::clearFilterCache(ID uniqueID) {
   if (result != filterCaches.end()) {
     delete result->second;
     filterCaches.erase(result);
+  }
+}
+
+void RenderCache::recordPerformance() {
+  for (auto& item : sequenceCaches) {
+    for (auto& reader : item.second) {
+      reader->recordPerformance(this);
+    }
   }
 }
 

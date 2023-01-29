@@ -93,25 +93,24 @@ bool VideoReader::decodeFrame(Frame targetFrame) {
   return lastBuffer != nullptr;
 }
 
-std::shared_ptr<tgfx::Texture> VideoReader::makeTexture(tgfx::Context* context) {
+std::shared_ptr<tgfx::Texture> VideoReader::onMakeTexture(tgfx::Context* context) {
   if (lastBuffer == nullptr) {
     return nullptr;
   }
   return lastBuffer->makeTexture(context);
 }
 
-void VideoReader::recordPerformance(Performance* performance, int64_t decodingTime) {
-  if (performance) {
-    if (decoderTypeIndex == DECODER_TYPE_HARDWARE) {
-      performance->hardwareDecodingTime += decodingTime;
-      performance->hardwareDecodingInitialTime += hardDecodingInitialTime;
-      hardDecodingInitialTime = 0;  // 只记录一次。
-    } else {
-      performance->softwareDecodingTime += decodingTime;
-      performance->softwareDecodingInitialTime += softDecodingInitialTime;
-      softDecodingInitialTime = 0;
-    }
+void VideoReader::recordPerformance(Performance* performance) {
+  if (decoderTypeIndex == DECODER_TYPE_HARDWARE) {
+    performance->hardwareDecodingTime += decodingTime;
+    performance->hardwareDecodingInitialTime += hardDecodingInitialTime;
+    hardDecodingInitialTime = 0;  // 只记录一次。
+  } else {
+    performance->softwareDecodingTime += decodingTime;
+    performance->softwareDecodingInitialTime += softDecodingInitialTime;
+    softDecodingInitialTime = 0;
   }
+  decodingTime = 0;
 }
 
 bool VideoReader::sendSampleData() {

@@ -29,12 +29,20 @@ class VideoReader : public SequenceReader {
 
   ~VideoReader() override;
 
+  int bufferWidth() const override {
+    return demuxer->getFormat().width;
+  }
+
+  int bufferHeight() const override {
+    return demuxer->getFormat().height;
+  }
+
  protected:
   bool decodeFrame(Frame targetFrame) override;
 
-  std::shared_ptr<tgfx::Texture> makeTexture(tgfx::Context* context) override;
+  std::shared_ptr<tgfx::Texture> onMakeTexture(tgfx::Context* context) override;
 
-  void recordPerformance(Performance* performance, int64_t decodingTime) override;
+  void recordPerformance(Performance* performance) override;
 
  private:
   std::mutex locker = {};

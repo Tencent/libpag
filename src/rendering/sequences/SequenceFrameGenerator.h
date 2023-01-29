@@ -19,39 +19,18 @@
 #pragma once
 
 #include "SequenceReader.h"
-#include "base/utils/Task.h"
-#include "pag/file.h"
-#include "rendering/Performance.h"
-#include "rendering/graphics/TextureProxy.h"
-#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/ImageGenerator.h"
 
 namespace pag {
-class BitmapSequenceReader : public SequenceReader {
+class SequenceFrameGenerator : public tgfx::ImageGenerator {
  public:
-  BitmapSequenceReader(std::shared_ptr<File> file, BitmapSequence* sequence);
-
-  ~BitmapSequenceReader() override;
-
-  int bufferWidth() const override {
-    return sequence->width;
-  }
-
-  int bufferHeight() const override {
-    return sequence->height;
-  }
+  SequenceFrameGenerator(std::shared_ptr<SequenceReader> reader, Frame targetFrame);
 
  protected:
-  bool decodeFrame(Frame targetFrame) override;
+  std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 
-  std::shared_ptr<tgfx::Texture> onMakeTexture(tgfx::Context* context) override;
-
-  Frame findStartFrame(Frame targetFrame);
-
-  std::mutex locker = {};
-  // Keep a reference to the File in case the Sequence object is released while we are using it.
-  std::shared_ptr<File> file = nullptr;
-  BitmapSequence* sequence = nullptr;
-  Frame lastDecodeFrame = -1;
-  std::shared_ptr<tgfx::PixelBuffer> pixelBuffer = nullptr;
+ private:
+  std::shared_ptr<SequenceReader> reader = nullptr;
+  Frame targetFrame = 0;
 };
 }  // namespace pag

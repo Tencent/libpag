@@ -141,7 +141,7 @@ void VideoSequenceReader::prepare(Frame targetFrame) {
   }
 }
 
-std::shared_ptr<tgfx::Texture> VideoSequenceReader::makeTexture(tgfx::Context* context) {
+std::shared_ptr<tgfx::Texture> VideoSequenceReader::onMakeTexture(tgfx::Context* context) {
   if (!videoReader.as<bool>()) {
     return nullptr;
   }
@@ -153,8 +153,5 @@ std::shared_ptr<tgfx::Texture> VideoSequenceReader::makeTexture(tgfx::Context* c
   auto& sampler = webVideoTexture->glSampler();
   videoReader.call<void>("renderToTexture", val::module_property("GL"), sampler.id);
   return webVideoTexture;
-}
-
-void VideoSequenceReader::recordPerformance(Performance*, int64_t) {
 }
 }  // namespace pag

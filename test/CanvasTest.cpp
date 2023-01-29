@@ -679,7 +679,14 @@ PAG_TEST(CanvasTest, image) {
   EXPECT_TRUE(image->isLazyGenerated());
   EXPECT_FALSE(image->isTextureBacked());
   EXPECT_FALSE(image->hasMipmaps());
+  auto textureImage = image->makeTextureImage(context, true);
+  EXPECT_TRUE(textureImage == nullptr);
+  textureImage = image->makeTextureImage(context, false);
+  ASSERT_TRUE(textureImage != nullptr);
+  EXPECT_TRUE(textureImage->isTextureBacked());
+  EXPECT_FALSE(textureImage->isLazyGenerated());
   canvas->drawImage(image);
+  canvas->drawImage(textureImage, 200, 0);
   auto subset = image->makeSubset(Rect::MakeWH(120, 120));
   EXPECT_FALSE(subset != nullptr);
   subset = image->makeSubset(Rect::MakeXYWH(-10, -10, 50, 50));
@@ -689,15 +696,10 @@ PAG_TEST(CanvasTest, image) {
   EXPECT_EQ(subset->width(), 80);
   EXPECT_EQ(subset->height(), 90);
   canvas->drawImage(subset, 115, 15);
-  auto textureImage = image->makeTextureImage(context);
-  ASSERT_TRUE(textureImage != nullptr);
-  EXPECT_TRUE(textureImage->isTextureBacked());
-  EXPECT_FALSE(textureImage->isLazyGenerated());
-  canvas->drawImage(textureImage, 200, 0);
   auto decodedImage = image->makeDecodedImage(context);
-  EXPECT_FALSE(decodedImage->isLazyGenerated());
-  EXPECT_TRUE(decodedImage->isTextureBacked());
+  EXPECT_TRUE(decodedImage == nullptr);
   decodedImage = image->makeDecodedImage();
+  ASSERT_TRUE(decodedImage != nullptr);
   EXPECT_FALSE(decodedImage->isLazyGenerated());
   EXPECT_FALSE(decodedImage->isTextureBacked());
   canvas->drawImage(decodedImage, 315, 0);
@@ -714,6 +716,8 @@ PAG_TEST(CanvasTest, image) {
   ASSERT_TRUE(subset != nullptr);
   matrix.postTranslate(160, 25);
   canvas->drawImage(subset, matrix, sampling);
+  //TODO(domrjchen): remove the next line when sampling bug is fixed.
+  canvas->flush();
   textureImage = subset->makeTextureImage(context);
   ASSERT_TRUE(textureImage != nullptr);
   matrix.postTranslate(110, 0);

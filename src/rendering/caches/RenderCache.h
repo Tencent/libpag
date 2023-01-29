@@ -209,6 +209,7 @@ class RenderCache : public Performance {
   SequenceReader* getSequenceReader(Sequence* sequence, Frame targetFrame);
   SequenceReader* findNearestSequenceReader(Sequence* sequence, Frame targetFrame);
   SequenceReader* makeSequenceReader(Sequence* sequence);
+  void recordPerformance();
 
   friend class PAGPlayer;
 };

@@ -69,7 +69,8 @@ void SequenceReader::prepareNext(Frame targetFrame) {
   }
 }
 
-std::shared_ptr<tgfx::Texture> SequenceReader::readTexture(Frame targetFrame, RenderCache* cache) {
+std::shared_ptr<tgfx::Texture> SequenceReader::readTexture(tgfx::Context* context,
+                                                           Frame targetFrame) {
   if (staticContent) {
     targetFrame = 0;
   }
@@ -80,19 +81,29 @@ std::shared_ptr<tgfx::Texture> SequenceReader::readTexture(Frame targetFrame, Re
   // Setting the lastTask to nullptr triggers cancel().
   lastTask = nullptr;
   auto success = decodeFrame(targetFrame);
-  auto decodingTime = clock.measure();
-  recordPerformance(cache, decodingTime);
+  decodingTime += clock.measure();
   // Release the last texture for immediately reusing.
   lastTexture = nullptr;
   lastFrame = -1;
   if (success) {
     clock.reset();
-    lastTexture = makeTexture(cache->getContext());
+    lastTexture = onMakeTexture(context);
     lastFrame = targetFrame;
     preparedFrame = targetFrame;
-    cache->textureUploadingTime += clock.measure();
+    textureUploadingTime += clock.measure();
     prepareNext(targetFrame);
   }
   return lastTexture;
+}
+
+void SequenceReader::recordPerformance(Performance* performance) {
+  if (decodingTime > 0) {
+    performance->imageDecodingTime += decodingTime;
+    decodingTime = 0;
+  }
+  if (textureUploadingTime > 0) {
+    performance->textureUploadingTime += textureUploadingTime;
+    textureUploadingTime = 0;
+  }
 }
 }  // namespace pag
