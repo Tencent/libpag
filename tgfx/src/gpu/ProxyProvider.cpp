@@ -40,7 +40,7 @@ std::shared_ptr<TextureProxy> ProxyProvider::findProxyByOwner(const Cacheable* o
   auto proxy = std::static_pointer_cast<CacheOwnerTextureProxy>(wrapTexture(texture));
   proxy->cacheOwner = owner->weakThis.lock();
   cacheOwnerMap[owner->uniqueID()] = proxy.get();
-  return nullptr;
+  return proxy;
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(

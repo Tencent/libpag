@@ -51,11 +51,11 @@ class RGBAAATextureEffect : public FragmentProcessor {
   }
 
   SamplerState onSamplerState(size_t) const override {
-    return SamplerState(sampling);
+    return samplerState;
   }
 
   std::shared_ptr<Texture> texture;
-  SamplingOptions sampling;
+  SamplerState samplerState;
   Point alphaStart = Point::Zero();
   CoordTransform coordTransform;
 
