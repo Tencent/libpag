@@ -170,8 +170,9 @@ class RenderCache : public Performance {
   std::unordered_map<ID, TextAtlas*> textAtlases = {};
   std::unordered_map<ID, ShapeMap> shapeCaches = {};
   std::unordered_map<ID, std::shared_ptr<Task>> imageTasks;
-  std::unordered_map<ID, std::vector<SequenceReader*>> sequenceCaches = {};
-  std::unordered_map<ID, std::unordered_map<Frame, SequenceReader*>> usedSequences = {};
+  std::unordered_map<ID, std::vector<std::shared_ptr<SequenceReader>>> sequenceCaches = {};
+  std::unordered_map<ID, std::unordered_map<Frame, std::shared_ptr<SequenceReader>>> usedSequences =
+      {};
   std::unordered_map<ID, Filter*> filterCaches;
   MotionBlurFilter* motionBlurFilter = nullptr;
 
@@ -206,9 +207,9 @@ class RenderCache : public Performance {
   void prepareLayers(int64_t timeDistance = DECODING_VISIBLE_DISTANCE);
   void preparePreComposeLayer(PreComposeLayer* layer);
   void prepareImageLayer(PAGImageLayer* layer);
-  SequenceReader* getSequenceReader(Sequence* sequence, Frame targetFrame);
-  SequenceReader* findNearestSequenceReader(Sequence* sequence, Frame targetFrame);
-  SequenceReader* makeSequenceReader(Sequence* sequence);
+  std::shared_ptr<SequenceReader> getSequenceReader(Sequence* sequence, Frame targetFrame);
+  std::shared_ptr<SequenceReader> findNearestSequenceReader(Sequence* sequence, Frame targetFrame);
+  std::shared_ptr<SequenceReader> makeSequenceReader(Sequence* sequence);
   void recordPerformance();
 
   friend class PAGPlayer;

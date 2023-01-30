@@ -32,16 +32,18 @@ class BitmapSequenceReader : public SequenceReader {
 
   ~BitmapSequenceReader() override;
 
-  int bufferWidth() const override {
+  int width() const override {
     return sequence->width;
   }
 
-  int bufferHeight() const override {
+  int height() const override {
     return sequence->height;
   }
 
  protected:
   bool decodeFrame(Frame targetFrame) override;
+
+  std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer() override;
 
   std::shared_ptr<tgfx::Texture> onMakeTexture(tgfx::Context* context) override;
 

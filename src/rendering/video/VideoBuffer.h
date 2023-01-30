@@ -35,10 +35,6 @@ class VideoBuffer : public tgfx::ImageBuffer {
     return _height;
   }
 
-  bool isAlphaOnly() const override {
-    return false;
-  }
-
   /**
    * Returns number of planes in this video buffer.
    */

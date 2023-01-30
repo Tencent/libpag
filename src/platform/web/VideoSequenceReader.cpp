@@ -77,9 +77,10 @@ void WebVideoTexture::onReleaseGPU() {
   }
 }
 
-VideoSequenceReader::VideoSequenceReader(PAGLayer* pagLayer, VideoSequence* sequence)
-    : SequenceReader(sequence->duration(), sequence->composition->staticContent()),
-      file(pagLayer->getFile()), rootFile(pagLayer->rootFile) {
+VideoSequenceReader::VideoSequenceReader(std::shared_ptr<File> file, VideoSequence* sequence,
+                                         PAGFile* pagFile)
+    : SequenceReader(sequence->duration(), sequence->composition->staticContent()), file(file),
+      rootFile(pagFile) {
   width = sequence->getVideoWidth();
   height = sequence->getVideoHeight();
   auto videoReaderClass = val::module_property("VideoReader");

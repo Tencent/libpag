@@ -29,16 +29,18 @@ class VideoReader : public SequenceReader {
 
   ~VideoReader() override;
 
-  int bufferWidth() const override {
+  int width() const override {
     return demuxer->getFormat().width;
   }
 
-  int bufferHeight() const override {
+  int height() const override {
     return demuxer->getFormat().height;
   }
 
  protected:
   bool decodeFrame(Frame targetFrame) override;
+
+  std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer() override;
 
   std::shared_ptr<tgfx::Texture> onMakeTexture(tgfx::Context* context) override;
 

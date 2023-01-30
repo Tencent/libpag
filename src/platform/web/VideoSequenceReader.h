@@ -47,7 +47,8 @@ class WebVideoTexture : public tgfx::GLTexture {
 
 class VideoSequenceReader : public SequenceReader {
  public:
-  VideoSequenceReader(PAGLayer* pagLayer, VideoSequence* sequence);
+  VideoSequenceReader(std::shared_ptr<File> file, VideoSequence* sequence,
+                      PAGFile* pagFile = nullptr);
 
   ~VideoSequenceReader() override;
 

@@ -93,6 +93,10 @@ bool VideoReader::decodeFrame(Frame targetFrame) {
   return lastBuffer != nullptr;
 }
 
+std::shared_ptr<tgfx::ImageBuffer> VideoReader::onMakeBuffer() {
+  return lastBuffer;
+}
+
 std::shared_ptr<tgfx::Texture> VideoReader::onMakeTexture(tgfx::Context* context) {
   if (lastBuffer == nullptr) {
     return nullptr;

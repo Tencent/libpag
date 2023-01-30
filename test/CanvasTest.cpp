@@ -716,8 +716,6 @@ PAG_TEST(CanvasTest, image) {
   ASSERT_TRUE(subset != nullptr);
   matrix.postTranslate(160, 25);
   canvas->drawImage(subset, matrix, sampling);
-  //TODO(domrjchen): remove the next line when sampling bug is fixed.
-  canvas->flush();
   textureImage = subset->makeTextureImage(context);
   ASSERT_TRUE(textureImage != nullptr);
   matrix.postTranslate(110, 0);

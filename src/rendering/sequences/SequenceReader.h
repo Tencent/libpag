@@ -20,7 +20,10 @@
 
 #include <atomic>
 #include "base/utils/Task.h"
+#include "pag/file.h"
+#include "pag/pag.h"
 #include "rendering/Performance.h"
+#include "tgfx/core/ImageBuffer.h"
 #include "tgfx/gpu/Texture.h"
 
 namespace pag {
@@ -28,6 +31,9 @@ class RenderCache;
 
 class SequenceReader {
  public:
+  static std::shared_ptr<SequenceReader> Make(std::shared_ptr<File> file, Sequence* sequence,
+                                              PAGFile* pagFile = nullptr);
+
   SequenceReader(Frame totalFrames, bool staticContent)
       : totalFrames(totalFrames), staticContent(staticContent) {
   }
@@ -37,12 +43,12 @@ class SequenceReader {
   /**
    * Returns the width of sequence buffers created from the reader.
    */
-  virtual int bufferWidth() const = 0;
+  virtual int width() const = 0;
 
   /**
    * Returns the height of sequence buffers created from the reader.
    */
-  virtual int bufferHeight() const = 0;
+  virtual int height() const = 0;
 
   /**
    * Decodes the specified target frame asynchronously.
@@ -50,15 +56,25 @@ class SequenceReader {
   virtual void prepare(Frame targetFrame);
 
   /**
+   * Decodes the specified target frame immediately and returns the decoded image buffer.
+   */
+  std::shared_ptr<tgfx::ImageBuffer> makeBuffer(Frame targetFrame);
+
+  /**
    * Returns the texture of specified target frame.
    */
-  std::shared_ptr<tgfx::Texture> readTexture(tgfx::Context* context, Frame targetFrame);
+  std::shared_ptr<tgfx::Texture> makeTexture(tgfx::Context* context, Frame targetFrame);
 
  protected:
   /**
    * Decodes the closest frame to the specified targetTime.
    */
   virtual bool decodeFrame(Frame targetFrame) = 0;
+
+  /**
+   * Return the ImageBuffer of current decoded frame.
+   */
+  virtual std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer() = 0;
 
   /**
    * Returns the texture of current decoded frame.
@@ -90,7 +106,7 @@ class SequenceReader {
 
   friend class SequenceTask;
 
-  friend class SequenceFrameGenerator;
+  friend class SequenceImageGenerator;
 
   friend class RenderCache;
 };

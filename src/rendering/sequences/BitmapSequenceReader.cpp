@@ -75,6 +75,10 @@ bool BitmapSequenceReader::decodeFrame(Frame targetFrame) {
   return true;
 }
 
+std::shared_ptr<tgfx::ImageBuffer> BitmapSequenceReader::onMakeBuffer() {
+  return pixelBuffer;
+}
+
 std::shared_ptr<tgfx::Texture> BitmapSequenceReader::onMakeTexture(tgfx::Context* context) {
   if (lastDecodeFrame == -1 || pixelBuffer == nullptr) {
     return nullptr;

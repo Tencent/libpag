@@ -19,18 +19,16 @@
 #pragma once
 
 #include "SequenceReader.h"
+#include "pag/file.h"
 #include "tgfx/core/ImageGenerator.h"
 
 namespace pag {
-class SequenceFrameGenerator : public tgfx::ImageGenerator {
+class SequenceGenerator {
  public:
-  SequenceFrameGenerator(std::shared_ptr<SequenceReader> reader, Frame targetFrame);
+  static std::shared_ptr<tgfx::ImageGenerator> MakeFromStatic(std::shared_ptr<File> file,
+                                                              Sequence* sequence);
 
- protected:
-  std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer(bool tryHardware) const override;
-
- private:
-  std::shared_ptr<SequenceReader> reader = nullptr;
-  Frame targetFrame = 0;
+  static std::shared_ptr<tgfx::ImageGenerator> MakeFromReader(
+      std::shared_ptr<SequenceReader> reader, Frame targetFrame);
 };
 }  // namespace pag
