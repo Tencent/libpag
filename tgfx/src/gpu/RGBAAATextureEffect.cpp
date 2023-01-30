@@ -51,7 +51,7 @@ RGBAAATextureEffect::RGBAAATextureEffect(std::shared_ptr<Texture> texture, Sampl
                                          const Point& alphaStart, const Matrix& localMatrix)
     : FragmentProcessor(ClassID()),
       texture(std::move(texture)),
-      sampling(sampling),
+      samplerState(sampling),
       alphaStart(alphaStart),
       coordTransform(localMatrix) {
   setTextureSamplerCnt(1);
@@ -61,7 +61,7 @@ RGBAAATextureEffect::RGBAAATextureEffect(std::shared_ptr<Texture> texture, Sampl
 bool RGBAAATextureEffect::onIsEqual(const FragmentProcessor& processor) const {
   const auto& that = static_cast<const RGBAAATextureEffect&>(processor);
   return texture == that.texture && alphaStart == that.alphaStart &&
-         coordTransform.matrix == that.coordTransform.matrix;
+         coordTransform.matrix == that.coordTransform.matrix && samplerState == that.samplerState;
 }
 
 void RGBAAATextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {

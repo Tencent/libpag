@@ -44,13 +44,13 @@ class YUVTextureEffect : public FragmentProcessor {
   }
 
   SamplerState onSamplerState(size_t) const override {
-    return SamplerState(sampling);
+    return samplerState;
   }
 
   bool onIsEqual(const FragmentProcessor& processor) const override;
 
   std::shared_ptr<YUVTexture> texture;
-  SamplingOptions sampling;
+  SamplerState samplerState;
   Point alphaStart = Point::Zero();
   CoordTransform coordTransform;
 

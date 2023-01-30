@@ -24,7 +24,7 @@ YUVTextureEffect::YUVTextureEffect(std::shared_ptr<YUVTexture> texture, Sampling
                                    const Point& alphaStart, const Matrix& localMatrix)
     : FragmentProcessor(ClassID()),
       texture(std::move(texture)),
-      sampling(sampling),
+      samplerState(sampling),
       alphaStart(alphaStart),
       coordTransform(localMatrix) {
   setTextureSamplerCnt(this->texture->samplerCount());
@@ -41,7 +41,7 @@ void YUVTextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
 bool YUVTextureEffect::onIsEqual(const FragmentProcessor& processor) const {
   const auto& that = static_cast<const YUVTextureEffect&>(processor);
   return texture == that.texture && alphaStart == that.alphaStart &&
-         coordTransform.matrix == that.coordTransform.matrix;
+         coordTransform.matrix == that.coordTransform.matrix && samplerState == that.samplerState;
 }
 
 std::unique_ptr<GLFragmentProcessor> YUVTextureEffect::onCreateGLInstance() const {
