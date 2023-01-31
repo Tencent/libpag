@@ -325,7 +325,6 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         animator = ValueAnimator.ofFloat(0.0f, 1.0f);
         animator.setRepeatCount(0);
         animator.setInterpolator(new LinearInterpolator());
-        animator.addUpdateListener(mAnimatorUpdateListener);
     }
 
     private void updateTextureView() {
@@ -429,6 +428,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     protected void onAttachedToWindow() {
         isAttachedToWindow = true;
         super.onAttachedToWindow();
+        animator.addUpdateListener(mAnimatorUpdateListener);
         animator.addListener(mAnimatorListenerAdapter);
         synchronized (g_HandlerLock) {
             StartHandlerThread();
@@ -451,6 +451,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
                 DestroyHandlerThread();
             }
         }
+        animator.removeUpdateListener(mAnimatorUpdateListener);
         animator.removeListener(mAnimatorListenerAdapter);
     }
 
@@ -895,9 +896,4 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         doPlay();
     }
 
-    @Override
-    protected void finalize() throws Throwable {
-        super.finalize();
-        animator.removeUpdateListener(mAnimatorUpdateListener);
-    }
 }
