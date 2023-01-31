@@ -21,19 +21,24 @@
 
 namespace pag {
 CameraLayer::~CameraLayer() {
-
+  delete cameraOption;
 }
-/*
+
+void CameraLayer::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) {
+  Layer::excludeVaryingRanges(timeRanges);
+  cameraOption->excludeVaryingRanges(timeRanges);
+}
+
 bool CameraLayer::verify() const {
   if (!Layer::verify()) {
     VerifyFailed();
     return false;
   }
-  VerifyAndReturn(true);
+  VerifyAndReturn(cameraOption != nullptr && cameraOption->verify());
 }
 
-Rect ImageLayer::getBounds() const {
-  return Rect::MakeWH(static_cast<float>(imageBytes->width),
-                      static_cast<float>(imageBytes->height));
-}*/
+Rect CameraLayer::getBounds() const {
+  return Rect::MakeWH(static_cast<float>(containingComposition->width),
+                      static_cast<float>(containingComposition->height));
+}
 }  // namespace pag

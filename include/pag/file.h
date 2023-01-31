@@ -136,6 +136,7 @@ enum class TagCode {
   GradientOverlayStyle = 85,
   EncryptedData = 89,
   Transform3D = 90,
+  CameraOption = 91,
 
   // add new tags here...
 
@@ -1563,6 +1564,42 @@ class PAG_API RoundCornersElement : public ShapeElement {
   RTTR_ENABLE(ShapeElement)
 };
 
+class PAG_API IrisShapeType {
+ public:
+  static const Enum FastRectangle = 0;
+  static const Enum Triangle = 1;
+  static const Enum Square = 2;
+  static const Enum Pentagon = 3;
+  static const Enum Hexagon = 4;
+  static const Enum Heptagon = 5;
+  static const Enum Octagon = 6;
+  static const Enum Nonagon = 7;
+  static const Enum Decagon = 8;
+};
+
+class PAG_API CameraOption {
+ public:
+  ~CameraOption();
+  
+  Property<float>* zoom = nullptr;
+  Property<bool>* depthOfField = nullptr;
+  Property<float>* focusDistance = nullptr;
+  Property<float>* aperture = nullptr;
+  Property<Percent>* blurLevel = nullptr;
+  Property<Enum>* irisShape = nullptr;
+  Property<float>* irisRotation = nullptr;
+  Property<Percent>* irisRoundness = nullptr;
+  Property<float>* irisAspectRatio = nullptr;
+  Property<float>* irisDiffractionFringe = nullptr;
+  Property<float>* highlightGain = nullptr;
+  Property<float>* highlightThreshold = nullptr;
+  Property<float>* highlightSaturation = nullptr;
+  
+  void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const;
+
+  bool verify() const;
+};
+
 class Composition;
 
 class VectorComposition;
@@ -1837,9 +1874,12 @@ class PAG_API CameraLayer : public Layer {
     return LayerType::Camera;
   };
 
+  void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) override;
   bool verify() const override;
 
   Rect getBounds() const override;
+  
+  CameraOption* cameraOption = nullptr;
 
   RTTR_ENABLE(Layer)
 };

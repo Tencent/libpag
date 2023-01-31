@@ -29,6 +29,7 @@
 #include "SolidColor.h"
 #include "Transform2D.h"
 #include "Transform3D.h"
+#include "CameraOption.h""
 #include "codec/tags/CachePolicy.h"
 #include "codec/tags/ImageFillRule.h"
 #include "codec/tags/text/TextAnimatorTag.h"
@@ -169,6 +170,13 @@ void ReadTagsOfLayer(DecodeStream* stream, TagCode code, Layer* layer) {
       Condition(layer->type() == LayerType::Image,
                 ReadImageFillRule(stream, static_cast<ImageLayer*>(layer), code));
       break;
+    case TagCode::CameraOption:
+      if (layer->type() == LayerType::Camera) {
+        auto cameraLayer = static_cast<CameraLayer*>(layer);
+        cameraLayer->cameraOption = new CameraOption();
+        ReadTagBlock(stream, cameraLayer->cameraOption, CameraOptionTag);
+      }
+      break;
     default:
       if (ReadEffect(stream, code, layer)) {
         break;
@@ -302,6 +310,9 @@ TagCode WriteLayer(EncodeStream* stream, Layer* layer) {
         WriteTag(stream, animator, WriteTextAnimator);
       }
     } break;
+    case LayerType::Camera: {
+      WriteTagBlock(stream, static_cast<CameraLayer*>(layer)->cameraOption, CameraOptionTag);
+    }
     default:
       break;
   }

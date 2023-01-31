@@ -16,15 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "LayerAttributesExtra.h"
+#pragma once
+
+#include "codec/Attributes.h"
 
 namespace pag {
-std::unique_ptr<BlockConfig> LayerAttributesExtraTag(Layer* layer) {
-  auto tagConfig = new BlockConfig(TagCode::LayerAttributesExtra);
-  if (layer->type() != LayerType::Camera) {
-    AddAttribute(tagConfig, &layer->name, AttributeType::Value, std::string(""));
-  }
-  AddAttribute(tagConfig, &layer->motionBlur, AttributeType::BitFlag, false);
-  return std::unique_ptr<BlockConfig>(tagConfig);
+std::unique_ptr<BlockConfig> CameraOptionTag(CameraOption* cameraOption);
 }
-}  // namespace pag
