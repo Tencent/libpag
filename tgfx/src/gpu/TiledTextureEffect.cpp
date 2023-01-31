@@ -131,17 +131,7 @@ std::unique_ptr<FragmentProcessor> TiledTextureEffect::Make(std::shared_ptr<Text
   if (texture == nullptr) {
     return nullptr;
   }
-  // normalize
-  auto scale = texture->getTextureCoord(1, 1) - texture->getTextureCoord(0, 0);
-  auto translate = texture->getTextureCoord(0, 0);
   auto matrix = localMatrix ? *localMatrix : Matrix::I();
-  matrix.postScale(scale.x, scale.y);
-  matrix.postTranslate(translate.x, translate.y);
-  if (texture->origin() == ImageOrigin::BottomLeft) {
-    matrix.postScale(1, -1);
-    translate = texture->getTextureCoord(0, static_cast<float>(texture->height()));
-    matrix.postTranslate(translate.x, translate.y);
-  }
   auto subset = Rect::MakeWH(texture->width(), texture->height());
   Sampling sampling(texture.get(), samplerState, subset, texture->getContext()->caps());
   return std::unique_ptr<TiledTextureEffect>(
@@ -157,7 +147,7 @@ TiledTextureEffect::TiledTextureEffect(std::shared_ptr<Texture> texture, const S
       clamp(sampling.shaderClamp),
       shaderModeX(sampling.shaderModeX),
       shaderModeY(sampling.shaderModeY),
-      coordTransform(localMatrix) {
+      coordTransform(localMatrix, this->texture.get()) {
   setTextureSamplerCnt(1);
   addCoordTransform(&coordTransform);
 }
