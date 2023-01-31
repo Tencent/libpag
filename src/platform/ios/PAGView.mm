@@ -42,6 +42,7 @@ void DestoryFlushQueue() {
 @property(nonatomic, strong) NSRecursiveLock* updateTimeLock;
 @property(atomic, assign) BOOL isVisible;
 @property(atomic, assign) BOOL isPlaying;
+@property(nonatomic, strong) NSLock* listenersLock;
 @end
 
 @implementation PAGView {
@@ -96,6 +97,7 @@ void DestoryFlushQueue() {
   pagFile = nil;
   filePath = nil;
   _updateTimeLock = [[NSRecursiveLock alloc] init];
+  _listenersLock = [[NSLock alloc] init];
   self.contentScaleFactor = [UIScreen mainScreen].scale;
   self.backgroundColor = [UIColor clearColor];
   pagPlayer = [[PAGPlayer alloc] init];
@@ -117,6 +119,7 @@ void DestoryFlushQueue() {
 
 - (void)dealloc {
   [listeners release];
+  [_listenersLock release];
   [textReplacementMap release];
   [imageReplacementMap release];
   [valueAnimator stop:false];  // must stop the animator, or it will not dealloc since it is
@@ -224,7 +227,9 @@ void DestoryFlushQueue() {
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
 - (void)onAnimationStart {
+  [_listenersLock lock];
   NSHashTable* copiedListeners = listeners.copy;
+  [_listenersLock unlock];
   for (id item in copiedListeners) {
     id<PAGViewListener> listener = (id<PAGViewListener>)item;
     if ([listener respondsToSelector:@selector(onAnimationStart:)]) {
@@ -236,7 +241,9 @@ void DestoryFlushQueue() {
 
 - (void)onAnimationEnd {
   self.isPlaying = FALSE;
+  [_listenersLock lock];
   NSHashTable* copiedListeners = listeners.copy;
+  [_listenersLock unlock];
   for (id item in copiedListeners) {
     id<PAGViewListener> listener = (id<PAGViewListener>)item;
     if ([listener respondsToSelector:@selector(onAnimationEnd:)]) {
@@ -247,7 +254,9 @@ void DestoryFlushQueue() {
 }
 
 - (void)onAnimationCancel {
+  [_listenersLock lock];
   NSHashTable* copiedListeners = listeners.copy;
+  [_listenersLock unlock];
   for (id item in copiedListeners) {
     id<PAGViewListener> listener = (id<PAGViewListener>)item;
     if ([listener respondsToSelector:@selector(onAnimationCancel:)]) {
@@ -258,7 +267,9 @@ void DestoryFlushQueue() {
 }
 
 - (void)onAnimationRepeat {
+  [_listenersLock lock];
   NSHashTable* copiedListeners = listeners.copy;
+  [_listenersLock unlock];
   for (id item in copiedListeners) {
     id<PAGViewListener> listener = (id<PAGViewListener>)item;
     if ([listener respondsToSelector:@selector(onAnimationRepeat:)]) {
@@ -271,11 +282,15 @@ void DestoryFlushQueue() {
 #pragma clang diagnostic pop
 
 - (void)addListener:(id<PAGViewListener>)listener {
+  [_listenersLock lock];
   [listeners addObject:listener];
+  [_listenersLock unlock];
 }
 
 - (void)removeListener:(id<PAGViewListener>)listener {
+  [_listenersLock lock];
   [listeners removeObject:listener];
+  [_listenersLock unlock];
 }
 
 - (BOOL)isPlaying {
@@ -437,7 +452,9 @@ void DestoryFlushQueue() {
     result = [pagPlayer flush];
   }
   [self.updateTimeLock unlock];
+  [_listenersLock lock];
   NSHashTable* copiedListeners = listeners.copy;
+  [_listenersLock unlock];
   for (id item in copiedListeners) {
     id<PAGViewListener> listener = (id<PAGViewListener>)item;
     if ([listener respondsToSelector:@selector(onAnimationUpdate:)]) {
