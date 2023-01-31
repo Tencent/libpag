@@ -38,7 +38,6 @@ void DestoryFlushQueue() {
 @property(atomic, assign) BOOL isAsyncFlushing;
 @property(atomic, assign) BOOL bufferPrepared;
 @property(atomic, assign) BOOL isInBackground;
-@property(atomic, strong) NSHashTable* listeners;
 @property(atomic, assign) BOOL progressExplicitlySet;
 @property(nonatomic, strong) NSRecursiveLock* updateTimeLock;
 @property(atomic, assign) BOOL isVisible;
@@ -53,6 +52,7 @@ void DestoryFlushQueue() {
   PAGValueAnimator* valueAnimator;
   NSMutableDictionary* textReplacementMap;
   NSMutableDictionary* imageReplacementMap;
+  NSHashTable* listeners;
 }
 
 @synthesize isPlaying = _isPlaying;
@@ -85,7 +85,7 @@ void DestoryFlushQueue() {
 }
 
 - (void)initPAG {
-  self.listeners = [[NSHashTable weakObjectsHashTable] retain];
+  listeners = [[NSHashTable weakObjectsHashTable] retain];
   textReplacementMap = [[NSMutableDictionary dictionary] retain];
   imageReplacementMap = [[NSMutableDictionary dictionary] retain];
   self.isPlaying = FALSE;
@@ -95,7 +95,7 @@ void DestoryFlushQueue() {
   self.isAsyncFlushing = FALSE;
   pagFile = nil;
   filePath = nil;
-  self.updateTimeLock = [[NSRecursiveLock alloc] init];
+  _updateTimeLock = [[NSRecursiveLock alloc] init];
   self.contentScaleFactor = [UIScreen mainScreen].scale;
   self.backgroundColor = [UIColor clearColor];
   pagPlayer = [[PAGPlayer alloc] init];
@@ -116,14 +116,14 @@ void DestoryFlushQueue() {
 }
 
 - (void)dealloc {
-  [self.listeners release];
+  [listeners release];
   [textReplacementMap release];
   [imageReplacementMap release];
   [valueAnimator stop:false];  // must stop the animator, or it will not dealloc since it is
                                // referenced by global displayLink.
   [valueAnimator release];
   [pagPlayer release];
-  [self.updateTimeLock release];
+  [_updateTimeLock release];
   if (pagSurface != nil) {
     [pagSurface release];
   }
@@ -224,7 +224,7 @@ void DestoryFlushQueue() {
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
 - (void)onAnimationStart {
-  NSHashTable* copiedListeners = self.listeners.copy;
+  NSHashTable* copiedListeners = listeners.copy;
   for (id item in copiedListeners) {
     id<PAGViewListener> listener = (id<PAGViewListener>)item;
     if ([listener respondsToSelector:@selector(onAnimationStart:)]) {
@@ -236,7 +236,7 @@ void DestoryFlushQueue() {
 
 - (void)onAnimationEnd {
   self.isPlaying = FALSE;
-  NSHashTable* copiedListeners = self.listeners.copy;
+  NSHashTable* copiedListeners = listeners.copy;
   for (id item in copiedListeners) {
     id<PAGViewListener> listener = (id<PAGViewListener>)item;
     if ([listener respondsToSelector:@selector(onAnimationEnd:)]) {
@@ -247,7 +247,7 @@ void DestoryFlushQueue() {
 }
 
 - (void)onAnimationCancel {
-  NSHashTable* copiedListeners = self.listeners.copy;
+  NSHashTable* copiedListeners = listeners.copy;
   for (id item in copiedListeners) {
     id<PAGViewListener> listener = (id<PAGViewListener>)item;
     if ([listener respondsToSelector:@selector(onAnimationCancel:)]) {
@@ -258,7 +258,7 @@ void DestoryFlushQueue() {
 }
 
 - (void)onAnimationRepeat {
-  NSHashTable* copiedListeners = self.listeners.copy;
+  NSHashTable* copiedListeners = listeners.copy;
   for (id item in copiedListeners) {
     id<PAGViewListener> listener = (id<PAGViewListener>)item;
     if ([listener respondsToSelector:@selector(onAnimationRepeat:)]) {
@@ -271,11 +271,11 @@ void DestoryFlushQueue() {
 #pragma clang diagnostic pop
 
 - (void)addListener:(id<PAGViewListener>)listener {
-  [self.listeners addObject:listener];
+  [listeners addObject:listener];
 }
 
 - (void)removeListener:(id<PAGViewListener>)listener {
-  [self.listeners removeObject:listener];
+  [listeners removeObject:listener];
 }
 
 - (BOOL)isPlaying {
@@ -437,7 +437,7 @@ void DestoryFlushQueue() {
     result = [pagPlayer flush];
   }
   [self.updateTimeLock unlock];
-  NSHashTable* copiedListeners = self.listeners.copy;
+  NSHashTable* copiedListeners = listeners.copy;
   for (id item in copiedListeners) {
     id<PAGViewListener> listener = (id<PAGViewListener>)item;
     if ([listener respondsToSelector:@selector(onAnimationUpdate:)]) {

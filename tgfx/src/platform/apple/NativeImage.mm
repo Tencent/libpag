@@ -86,6 +86,7 @@ std::shared_ptr<ImageCodec> NativeCodec::MakeCodec(std::shared_ptr<Data> imageBy
     return nullptr;
   }
   CGImageSourceRef imageSource = CGImageSourceCreateWithData(data, NULL);
+  CFRelease(data);
   if (imageSource == nil) {
     return nullptr;
   }
