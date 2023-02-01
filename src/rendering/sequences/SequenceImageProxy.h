@@ -38,10 +38,6 @@ class SequenceImageProxy : public ImageProxy {
     return !sequence->composition->staticContent();
   }
 
-  bool isFlat() const override {
-    return sequence->composition->type() != CompositionType::Video;
-  }
-
   void prepareImage(RenderCache* cache) const override;
 
   std::shared_ptr<tgfx::Image> getImage(RenderCache* cache) const override;

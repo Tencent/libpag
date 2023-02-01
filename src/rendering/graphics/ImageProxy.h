@@ -47,12 +47,6 @@ class ImageProxy {
   virtual bool isTemporary() const = 0;
 
   /**
-   * Returns true if the target image is not in YUV format and is guaranteed to produce a single
-   * texture sampler with a TextureType::TwoD type.
-   */
-  virtual bool isFlat() const = 0;
-
-  /**
    * Prepares the image for the next getImage() call.
    */
   virtual void prepareImage(RenderCache* cache) const = 0;
