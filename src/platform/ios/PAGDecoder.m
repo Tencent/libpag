@@ -38,17 +38,18 @@
   if (pagComposition == nil) {
     return nil;
   }
-  return [[PAGDecoder alloc] initWithPAGComposition:pagComposition scale:scale];
+  return [[[PAGDecoder alloc] initWithPAGComposition:pagComposition scale:scale] autorelease];
 }
 
 - (instancetype)initWithPAGComposition:(PAGComposition*)pagComposition scale:(CGFloat)scale {
-  self = [[super init] autorelease];
+  self = [super init];
   if (scale <= 0) {
     scale = 1.0;
   }
   pagSurface = [PAGSurface
       MakeOffscreen:CGSizeMake([pagComposition width] * scale, [pagComposition height] * scale)];
   if (pagSurface == nil) {
+    [self release];
     return nil;
   }
   [pagSurface retain];
