@@ -61,7 +61,7 @@ class ImageCodec : public ImageGenerator {
   }
 
   bool isAlphaOnly() const override {
-    return _isAlphaOnly;
+    return false;
   }
 
   /**
@@ -73,15 +73,14 @@ class ImageCodec : public ImageGenerator {
   virtual bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const = 0;
 
  protected:
-  ImageCodec(int width, int height, Orientation orientation, bool isAlphaOnly = false)
-      : ImageGenerator(width, height), _orientation(orientation), _isAlphaOnly(isAlphaOnly) {
+  ImageCodec(int width, int height, Orientation orientation)
+      : ImageGenerator(width, height), _orientation(orientation) {
   }
 
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 
  private:
   Orientation _orientation = Orientation::TopLeft;
-  bool _isAlphaOnly = false;
 
   /**
    * Encodes the specified pixels into a binary image format. Returns nullptr if encoding fails.

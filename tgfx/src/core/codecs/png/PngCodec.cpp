@@ -199,6 +199,10 @@ bool PngCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   }
 }
 
+bool PngCodec::isAlphaOnly() const {
+  return _isAlphaOnly;
+}
+
 #ifdef TGFX_USE_PNG_ENCODE
 struct PngWriter {
   unsigned char* data = nullptr;
