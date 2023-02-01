@@ -14,6 +14,7 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.Message;
+import android.provider.Settings;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.util.SparseArray;
@@ -56,6 +57,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     private static final int MSG_SURFACE_DESTROY = 1;
     private static final int MSG_HANDLER_THREAD_QUITE = 2;
     private static final int ANDROID_SDK_VERSION_O = 26;
+    private float animationScale = 1.0f;
 
     private static synchronized void StartHandlerThread() {
         g_HandlerThreadCount++;
@@ -253,6 +255,17 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         setupSurfaceTexture();
     }
 
+    public float getAnimationScale(Context context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+            return Settings.Global.getFloat(context.getContentResolver(),
+                    Settings.Global.ANIMATOR_DURATION_SCALE, 1.0f);
+        } else {
+            // noinspection deprecation
+            return Settings.System.getFloat(context.getContentResolver(),
+                    Settings.System.ANIMATOR_DURATION_SCALE, 1.0f);
+        }
+    }
+
     private final ValueAnimator.AnimatorUpdateListener mAnimatorUpdateListener = new ValueAnimator.AnimatorUpdateListener() {
         @Override
         public void onAnimationUpdate(ValueAnimator animation) {
@@ -281,14 +294,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
             int repeatCount = ((ValueAnimator) animation).getRepeatCount();
             if (repeatCount >= 0 && (animation.getDuration() > 0) &&
                     (currentPlayTime / animation.getDuration() > repeatCount)) {
-                _isPlaying = false;
-                ArrayList<PAGViewListener> arrayList;
-                synchronized (PAGView.this) {
-                    arrayList = new ArrayList<>(mViewListeners);
-                }
-                for (PAGViewListener listener : arrayList) {
-                    listener.onAnimationEnd(PAGView.this);
-                }
+                notifyEnd();
             }
         }
 
@@ -322,10 +328,10 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         setOpaque(false);
         pagPlayer = new PAGPlayer();
         setSurfaceTextureListener(this);
+        animationScale = getAnimationScale(getContext());
         animator = ValueAnimator.ofFloat(0.0f, 1.0f);
         animator.setRepeatCount(0);
         animator.setInterpolator(new LinearInterpolator());
-        animator.addUpdateListener(mAnimatorUpdateListener);
     }
 
     private void updateTextureView() {
@@ -338,6 +344,17 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
                 PAGView.this.setOpaque(opaque);
             }
         });
+    }
+
+    private void notifyEnd() {
+        _isPlaying = false;
+        ArrayList<PAGViewListener> arrayList;
+        synchronized (PAGView.this) {
+            arrayList = new ArrayList<>(mViewListeners);
+        }
+        for (PAGViewListener listener : arrayList) {
+            listener.onAnimationEnd(PAGView.this);
+        }
     }
 
     private void updateView() {
@@ -429,6 +446,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     protected void onAttachedToWindow() {
         isAttachedToWindow = true;
         super.onAttachedToWindow();
+        animator.addUpdateListener(mAnimatorUpdateListener);
         animator.addListener(mAnimatorListenerAdapter);
         synchronized (g_HandlerLock) {
             StartHandlerThread();
@@ -451,6 +469,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
                 DestroyHandlerThread();
             }
         }
+        animator.removeUpdateListener(mAnimatorUpdateListener);
         animator.removeListener(mAnimatorListenerAdapter);
     }
 
@@ -495,6 +514,11 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
             return;
         }
         Log.i(TAG, "doPlay");
+        if (animationScale == 0.0f) {
+            notifyEnd();
+            Log.e(TAG, "doPlay: The scale of animator duration is turned off");
+            return;
+        }
         animator.setCurrentPlayTime(currentPlayTime);
         startAnimator();
     }
@@ -895,9 +919,4 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         doPlay();
     }
 
-    @Override
-    protected void finalize() throws Throwable {
-        super.finalize();
-        animator.removeUpdateListener(mAnimatorUpdateListener);
-    }
 }
