@@ -122,10 +122,6 @@ class LayerFilter : public Filter {
   virtual void bindVertices(tgfx::Context* context, const FilterSource* source,
                             const FilterTarget* target, const std::vector<tgfx::Point>& points);
 
-  virtual int textureWrapMode() const {
-    return GL_CLAMP_TO_EDGE;
-  }
-
  private:
   tgfx::Rect contentBounds = {};
   tgfx::Rect transformedBounds = {};

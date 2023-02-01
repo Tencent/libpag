@@ -44,8 +44,6 @@ class DisplacementMapFilter : public LayerFilter {
   void onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
                       const tgfx::Point& filterScale) override;
 
-  int textureWrapMode() const override;
-
  private:
   Effect* effect = nullptr;
   Enum useForHorizontalDisplacement = DisplacementMapSource::Red;
