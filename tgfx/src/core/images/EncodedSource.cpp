@@ -25,16 +25,16 @@ EncodedSource::EncodedSource(std::shared_ptr<ImageGenerator> generator, bool mip
     : generator(std::move(generator)), mipMapped(mipMapped) {
 }
 
-std::shared_ptr<ImageSource> EncodedSource::onMakeDecodedSource(Context* context) const {
-  if (context != nullptr) {
-    auto texture =
-        std::static_pointer_cast<Texture>(context->resourceCache()->findResourceByOwner(this));
-    if (texture != nullptr) {
-      return ImageSource::MakeFromTexture(texture);
-    }
+std::shared_ptr<ImageSource> EncodedSource::onMakeDecoded(Context* context) const {
+  if (context != nullptr && context->resourceCache()->hasResource(this)) {
+    return nullptr;
   }
   auto encodedSource = std::static_pointer_cast<EncodedSource>(weakThis.lock());
   return std::shared_ptr<AsyncSource>(new AsyncSource(std::move(encodedSource)));
+}
+
+std::shared_ptr<ImageSource> EncodedSource::onMakeMipMapped() const {
+  return std::shared_ptr<EncodedSource>(new EncodedSource(generator, true));
 }
 
 std::shared_ptr<TextureProxy> EncodedSource::onMakeTextureProxy(Context* context) const {

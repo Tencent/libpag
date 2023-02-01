@@ -95,28 +95,42 @@ class ImageSource : public Cacheable {
   }
 
   /**
-   * Returns a decoded ImageSource from the lazy ImageSource. Returns original Image if it is not a
-   * lazy ImageSource or decoding failed. If context is specified and there is a corresponding
-   * texture cache, returns an ImageSource wraps that texture. Otherwise, schedules an asynchronous
-   * decoding task immediately and returns an ImageSource wraps the task, which will not block the
-   * calling thread.
-   */
-  std::shared_ptr<ImageSource> makeDecodedSource(Context* context = nullptr) const;
-
-  /**
    * Returns an ImageSource backed by GPU texture associated with context. Returns original
    * ImageSource if context is compatible with backing GPU texture. Returns nullptr if context is
    * nullptr, or if ImageSource was created with another context.
    */
-  std::shared_ptr<ImageSource> makeTextureSource(Context* context) const;
+  std::shared_ptr<ImageSource> makeTextureSource(Context* context, bool wrapCacheOnly) const;
 
   /**
-   * Creates a TextureProxy with the specified context from the ImageSource.
+   * Returns a decoded ImageSource from the lazy ImageSource. The returned ImageSource shares the
+   * same texture cache with the original ImageSource and immediately schedules an asynchronous
+   * decoding task, which will not block the calling thread. Returns nullptr if the ImageSource is
+   * not lazy or has a corresponding texture cache in the specified context.
+   */
+  std::shared_ptr<ImageSource> makeDecoded(Context* context = nullptr) const;
+
+  /**
+   * Returns an Image with mipmaps enabled. Returns the original Image if the Image has mipmaps
+   * enabled already or fails to enable mipmaps.
+   */
+  std::shared_ptr<ImageSource> makeMipMapped() const;
+
+  /**
+   * Returns a TextureProxy if there is a corresponding cache in the context. Otherwise, returns
+   * nullptr.
+   */
+  virtual std::shared_ptr<TextureProxy> getTextureProxy(Context* context) const;
+
+  /**
+   * Returns a TextureProxy if there is a corresponding cache in the context. Otherwise, immediately
+   * creates one.
    */
   virtual std::shared_ptr<TextureProxy> lockTextureProxy(Context* context) const;
 
  protected:
-  virtual std::shared_ptr<ImageSource> onMakeDecodedSource(Context* context) const;
+  virtual std::shared_ptr<ImageSource> onMakeDecoded(Context* context) const;
+
+  virtual std::shared_ptr<ImageSource> onMakeMipMapped() const = 0;
 
   virtual std::shared_ptr<TextureProxy> onMakeTextureProxy(Context* context) const = 0;
 };

@@ -17,118 +17,20 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureEffect.h"
-#include "core/utils/MathExtra.h"
-#include "opengl/GLTextureEffect.h"
+#include "YUVTextureEffect.h"
+#include "opengl/GLRGBAAATextureEffect.h"
 
 namespace tgfx {
-using Wrap = SamplerState::WrapMode;
-
-struct TextureEffect::Sampling {
-  Sampling(const Texture* texture, SamplerState samplerState, const Rect& subset, const Caps* caps);
-
-  SamplerState hwSampler;
-  ShaderMode shaderModeX = ShaderMode::None;
-  ShaderMode shaderModeY = ShaderMode::None;
-  Rect shaderSubset = Rect::MakeEmpty();
-  Rect shaderClamp = Rect::MakeEmpty();
-};
-
-TextureEffect::ShaderMode TextureEffect::GetShaderMode(Wrap wrap, FilterMode filter,
-                                                       MipMapMode mm) {
-  switch (wrap) {
-    case Wrap::MirrorRepeat:
-      return ShaderMode::MirrorRepeat;
-    case Wrap::Clamp:
-      return ShaderMode::Clamp;
-    case Wrap::Repeat:
-      switch (mm) {
-        case MipMapMode::None:
-          switch (filter) {
-            case FilterMode::Nearest:
-              return ShaderMode::RepeatNearestNone;
-            case FilterMode::Linear:
-              return ShaderMode::RepeatLinearNone;
-          }
-        case MipMapMode::Nearest:
-        case MipMapMode::Linear:
-          switch (filter) {
-            case FilterMode::Nearest:
-              return ShaderMode::RepeatNearestMipmap;
-            case FilterMode::Linear:
-              return ShaderMode::RepeatLinearMipmap;
-          }
-      }
-    case Wrap::ClampToBorder:
-      switch (filter) {
-        case FilterMode::Nearest:
-          return ShaderMode::ClampToBorderNearest;
-        case FilterMode::Linear:
-          return ShaderMode::ClampToBorderLinear;
-      }
-  }
-}
-
-TextureEffect::Sampling::Sampling(const Texture* texture, SamplerState sampler, const Rect& subset,
-                                  const Caps* caps) {
-  struct Span {
-    float a = 0.f;
-    float b = 0.f;
-
-    Span makeInset(float o) const {
-      Span r = {a + o, b - o};
-      if (r.a > r.b) {
-        r.a = r.b = (r.a + r.b) / 2;
-      }
-      return r;
-    }
-  };
-  struct Result1D {
-    ShaderMode shaderMode = ShaderMode::None;
-    Span shaderSubset;
-    Span shaderClamp;
-    Wrap hwWrap = Wrap::Clamp;
-  };
-  auto canDoWrapInHW = [&](int size, Wrap wrap) {
-    if (wrap == Wrap::ClampToBorder && !caps->clampToBorderSupport) {
-      return false;
-    }
-    if (wrap != Wrap::Clamp && !caps->npotTextureTileSupport && !IsPow2(size)) {
-      return false;
-    }
-    if (texture->getSampler()->type() != TextureType::TwoD &&
-        !(wrap == Wrap::Clamp || wrap == Wrap::ClampToBorder)) {
-      return false;
-    }
-    return true;
-  };
-  auto resolve = [&](int size, Wrap wrap, Span subset) {
-    Result1D r;
-    bool canDoModeInHW = canDoWrapInHW(size, wrap);
-    if (canDoModeInHW && subset.a <= 0 && subset.b >= static_cast<float>(size)) {
-      r.hwWrap = wrap;
-      return r;
-    }
-    r.shaderSubset = subset;
-    r.shaderClamp = subset.makeInset(0.5f);
-    r.shaderMode = GetShaderMode(wrap, sampler.filterMode, sampler.mipMapMode);
-    return r;
-  };
-
-  Span subsetX{subset.left, subset.right};
-  auto x = resolve(texture->width(), sampler.wrapModeX, subsetX);
-  Span subsetY{subset.top, subset.bottom};
-  auto y = resolve(texture->height(), sampler.wrapModeY, subsetY);
-  hwSampler = SamplerState(x.hwWrap, y.hwWrap, sampler.filterMode, sampler.mipMapMode);
-  shaderModeX = x.shaderMode;
-  shaderModeY = y.shaderMode;
-  shaderSubset = {x.shaderSubset.a, y.shaderSubset.a, x.shaderSubset.b, y.shaderSubset.b};
-  shaderClamp = {x.shaderClamp.a, y.shaderClamp.a, x.shaderClamp.b, y.shaderClamp.b};
-}
-
-std::unique_ptr<FragmentProcessor> TextureEffect::Make(const Context* context,
-                                                       std::shared_ptr<Texture> texture,
-                                                       SamplerState samplerState,
+std::unique_ptr<FragmentProcessor> TextureEffect::Make(std::shared_ptr<Texture> texture,
+                                                       const SamplingOptions& sampling,
                                                        const Matrix* localMatrix) {
+  return MakeRGBAAA(std::move(texture), sampling, Point::Zero(), localMatrix);
+}
+
+std::unique_ptr<FragmentProcessor> TextureEffect::MakeRGBAAA(std::shared_ptr<Texture> texture,
+                                                             const SamplingOptions& sampling,
+                                                             const Point& alphaStart,
+                                                             const Matrix* localMatrix) {
   if (texture == nullptr) {
     return nullptr;
   }
@@ -143,39 +45,36 @@ std::unique_ptr<FragmentProcessor> TextureEffect::Make(const Context* context,
     translate = texture->getTextureCoord(0, static_cast<float>(texture->height()));
     matrix.postTranslate(translate.x, translate.y);
   }
-  auto subset = Rect::MakeWH(texture->width(), texture->height());
-  Sampling sampling(texture.get(), samplerState, subset, context->caps());
-  return std::unique_ptr<TextureEffect>(new TextureEffect(std::move(texture), sampling, matrix));
+  if (texture->isYUV()) {
+    return std::unique_ptr<YUVTextureEffect>(new YUVTextureEffect(
+        std::static_pointer_cast<YUVTexture>(texture), sampling, alphaStart, matrix));
+  }
+  return std::unique_ptr<TextureEffect>(new TextureEffect(texture, sampling, alphaStart, matrix));
 }
 
-TextureEffect::TextureEffect(std::shared_ptr<Texture> texture, const Sampling& sampling,
-                             const Matrix& localMatrix)
+TextureEffect::TextureEffect(std::shared_ptr<Texture> texture, SamplingOptions sampling,
+                             const Point& alphaStart, const Matrix& localMatrix)
     : FragmentProcessor(ClassID()),
       texture(std::move(texture)),
-      samplerState(sampling.hwSampler),
-      subset(sampling.shaderSubset),
-      clamp(sampling.shaderClamp),
-      shaderModeX(sampling.shaderModeX),
-      shaderModeY(sampling.shaderModeY),
+      samplerState(sampling),
+      alphaStart(alphaStart),
       coordTransform(localMatrix) {
   setTextureSamplerCnt(1);
   addCoordTransform(&coordTransform);
 }
 
+bool TextureEffect::onIsEqual(const FragmentProcessor& processor) const {
+  const auto& that = static_cast<const TextureEffect&>(processor);
+  return texture == that.texture && alphaStart == that.alphaStart &&
+         coordTransform.matrix == that.coordTransform.matrix && samplerState == that.samplerState;
+}
+
 void TextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
-  auto flags = static_cast<uint32_t>(shaderModeX);
-  flags |= static_cast<uint32_t>(shaderModeY) << 4;
+  uint32_t flags = alphaStart == Point::Zero() ? 1 : 0;
   bytesKey->write(flags);
 }
 
-bool TextureEffect::onIsEqual(const FragmentProcessor& processor) const {
-  const auto& that = static_cast<const TextureEffect&>(processor);
-  return texture == that.texture && samplerState == that.samplerState && subset == that.subset &&
-         clamp == that.clamp && shaderModeX == that.shaderModeX &&
-         shaderModeY == that.shaderModeY && coordTransform.matrix == that.coordTransform.matrix;
-}
-
 std::unique_ptr<GLFragmentProcessor> TextureEffect::onCreateGLInstance() const {
-  return std::make_unique<GLTextureEffect>();
+  return std::make_unique<GLRGBAAATextureEffect>();
 }
 }  // namespace tgfx

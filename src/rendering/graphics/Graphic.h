@@ -20,7 +20,6 @@
 
 #include "Glyph.h"
 #include "Modifier.h"
-#include "TextureProxy.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/gpu/Paint.h"
 

@@ -155,6 +155,12 @@ class Image {
   bool isAlphaOnly() const;
 
   /**
+   * Returns true if the Image is an RGBAAA image, which takes half of the original image as its RGB
+   * channels and the other half as its alpha channel.
+   */
+  virtual bool isRGBAAA() const;
+
+  /**
    * Returns true if Image is backed by an image generator or other service that creates its pixels
    * on-demand.
    */
@@ -177,27 +183,43 @@ class Image {
   std::shared_ptr<Texture> getTexture() const;
 
   /**
-   * Returns a decoded Image from the lazy image. Returns original Image if it is not a lazy image
-   * or decoding failed. If context is specified and there is a corresponding texture cache, returns
-   * an Image wraps that texture. Otherwise, schedules an asynchronous decoding task immediately and
-   * returns an Image wraps the task, which will not block the calling thread.
+   * Returns an Image backed by GPU texture associated with the specified context. If there is a
+   * corresponding texture cache in the context, returns an Image wraps that texture. Otherwise,
+   * creates one immediately if wrapCacheOnly is false, which may block the calling thread. Returns
+   * the original Image if the Image is texture backed and the context is compatible with the
+   * backing GPU texture. Otherwise, returns nullptr.
    */
-  std::shared_ptr<Image> makeDecodedImage(Context* context = nullptr) const;
-
-  /**
-   * Returns an Image backed by GPU texture associated with context. If the corresponding texture
-   * cache is not available, creates one immediately, which may block the calling thread. Returns
-   * original Image if context is compatible with backing GPU texture. Returns nullptr if context is
-   * nullptr, or if Image was created with another context.
-   */
-  std::shared_ptr<Image> makeTextureImage(Context* context) const;
+  std::shared_ptr<Image> makeTextureImage(Context* context, bool wrapCacheOnly = false) const;
 
   /**
    * Returns subset of Image. subset must be fully contained by Image dimensions. The implementation
-   * may share pixels, or may copy them. Returns nullptr if subset is empty, or subset is not
-   * contained by bounds.
+   * always shares pixels and caches with the original Image. Returns nullptr if subset is empty, or
+   * subset is not contained by bounds.
    */
   std::shared_ptr<Image> makeSubset(const Rect& subset) const;
+
+  /**
+   * Returns a decoded Image from the lazy Image. The returned Image shares the same texture cache
+   * with the original Image and immediately schedules an asynchronous decoding task, which will not
+   * block the calling thread. Returns the original Image if the Image is not lazy or has a
+   * corresponding texture cache in the specified context.
+   */
+  std::shared_ptr<Image> makeDecoded(Context* context = nullptr) const;
+
+  /**
+   * Returns an Image with mipmaps enabled. Returns the original Image if the Image has mipmaps
+   * enabled already or fails to enable mipmaps.
+   */
+  std::shared_ptr<Image> makeMipMapped() const;
+
+  /**
+   * Marks the corresponding texture cache of the Image as expired in the context, which immediately
+   * makes the texture cache recyclable. The context will purge the texture cache when its purge
+   * methods are called or if its memory usage reaches the cache limit. Releasing the Image will
+   * automatically mark the corresponding texture cache as expired, so there is no need to call this
+   * method if the Image is about to be released. Does nothing if the context is nullptr.
+   */
+  void markCacheExpired(Context* context);
 
  protected:
   std::weak_ptr<Image> weakThis;
@@ -223,6 +245,8 @@ class Image {
 
   static std::shared_ptr<Image> MakeRGBAAA(std::shared_ptr<ImageSource> source, int displayWidth,
                                            int displayHeight, int alphaStartX, int alphaStartY);
+
+  std::shared_ptr<Image> cloneWithSource(std::shared_ptr<ImageSource> newSource) const;
 
   friend class Canvas;
 };

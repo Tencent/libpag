@@ -22,7 +22,6 @@
 #include "base/utils/Task.h"
 #include "pag/file.h"
 #include "rendering/Performance.h"
-#include "rendering/graphics/TextureProxy.h"
 #include "tgfx/core/Bitmap.h"
 
 namespace pag {
@@ -32,12 +31,20 @@ class BitmapSequenceReader : public SequenceReader {
 
   ~BitmapSequenceReader() override;
 
+  int width() const override {
+    return sequence->width;
+  }
+
+  int height() const override {
+    return sequence->height;
+  }
+
  protected:
   bool decodeFrame(Frame targetFrame) override;
 
-  std::shared_ptr<tgfx::Texture> makeTexture(tgfx::Context* context) override;
+  std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer() override;
 
-  void recordPerformance(Performance* performance, int64_t decodingTime) override;
+  std::shared_ptr<tgfx::Texture> onMakeTexture(tgfx::Context* context) override;
 
   Frame findStartFrame(Frame targetFrame);
 

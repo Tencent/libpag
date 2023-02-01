@@ -17,11 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLRGBAAATextureEffect.h"
-#include "gpu/RGBAAATextureEffect.h"
+#include "gpu/TextureEffect.h"
 
 namespace tgfx {
 void GLRGBAAATextureEffect::emitCode(EmitArgs& args) {
-  const auto* textureFP = static_cast<const RGBAAATextureEffect*>(args.fragmentProcessor);
+  const auto* textureFP = static_cast<const TextureEffect*>(args.fragmentProcessor);
   auto* fragBuilder = args.fragBuilder;
   auto* uniformHandler = args.uniformHandler;
 
@@ -51,7 +51,7 @@ void GLRGBAAATextureEffect::emitCode(EmitArgs& args) {
 
 void GLRGBAAATextureEffect::onSetData(const ProgramDataManager& programDataManager,
                                       const FragmentProcessor& fragmentProcessor) {
-  const auto& textureFP = static_cast<const RGBAAATextureEffect&>(fragmentProcessor);
+  const auto& textureFP = static_cast<const TextureEffect&>(fragmentProcessor);
   if (alphaStartUniform.isValid()) {
     auto alphaStart =
         textureFP.texture->getTextureCoord(textureFP.alphaStart.x, textureFP.alphaStart.y);

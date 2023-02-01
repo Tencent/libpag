@@ -56,6 +56,10 @@ class PixelBuffer : public ImageBuffer {
     return _info.height();
   }
 
+  bool isAlphaOnly() const override {
+    return _info.colorType() == ColorType::ALPHA_8;
+  }
+
   /**
  * Returns a ImageInfo describing the width, height, color type, alpha type, and row bytes
   of the PixelMap.
@@ -98,10 +102,6 @@ class PixelBuffer : public ImageBuffer {
    */
   bool isHardwareBacked() const {
     return hardwareBacked;
-  }
-
-  bool isAlphaOnly() const override {
-    return _info.colorType() == ColorType::ALPHA_8;
   }
 
   /**

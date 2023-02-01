@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureShader.h"
-#include "TextureEffect.h"
+#include "TiledTextureEffect.h"
 #include "tgfx/gpu/TextureSampler.h"
 
 namespace tgfx {
@@ -43,8 +43,8 @@ std::unique_ptr<FragmentProcessor> TextureShader::asFragmentProcessor(const FPAr
   if (!ComputeTotalInverse(args, &matrix)) {
     return nullptr;
   }
-  auto effect = TextureEffect::Make(args.context, texture,
-                                    SamplerState(tileModeX, tileModeY, sampling), &matrix);
+  auto effect =
+      TiledTextureEffect::Make(texture, SamplerState(tileModeX, tileModeY, sampling), &matrix);
   if (texture->getSampler()->format == PixelFormat::ALPHA_8) {
     return effect;
   }

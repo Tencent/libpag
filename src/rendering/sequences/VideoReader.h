@@ -29,19 +29,28 @@ class VideoReader : public SequenceReader {
 
   ~VideoReader() override;
 
+  int width() const override {
+    return demuxer->getFormat().width;
+  }
+
+  int height() const override {
+    return demuxer->getFormat().height;
+  }
+
  protected:
   bool decodeFrame(Frame targetFrame) override;
 
-  std::shared_ptr<tgfx::Texture> makeTexture(tgfx::Context* context) override;
+  std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer() override;
 
-  void recordPerformance(Performance* performance, int64_t decodingTime) override;
+  std::shared_ptr<tgfx::Texture> onMakeTexture(tgfx::Context* context) override;
+
+  void recordPerformance(Performance* performance) override;
 
  private:
   std::mutex locker = {};
   VideoDemuxer* demuxer = nullptr;
   float frameRate = 0.0;
   int decoderTypeIndex = 0;
-  std::shared_ptr<Task> gpuDecoderTask = nullptr;
   VideoDecoder* videoDecoder = nullptr;
   VideoSample videoSample = {};
   std::shared_ptr<VideoBuffer> lastBuffer = nullptr;
@@ -61,8 +70,6 @@ class VideoReader : public SequenceReader {
   bool sendSampleData();
 
   bool onDecodeFrame(int64_t sampleTime);
-
-  bool switchToGPUDecoderOfTask();
 
   VideoDecoder* makeVideoDecoder();
 };

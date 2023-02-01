@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Picture.h"
+#include <unordered_set>
 #include "base/utils/MatrixUtil.h"
 #include "rendering/caches/RenderCache.h"
 #include "tgfx/core/Clock.h"
@@ -25,94 +26,74 @@
 #include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace pag {
+class SkipSnapshotOptions : public tgfx::SurfaceOptions {
+ public:
+  std::unordered_set<std::shared_ptr<tgfx::Image>> drawnImages = {};
+};
+
 // 若当前直接绘制纹理性能是最好的，就直接绘制，否则返回 false。
-static bool TryDrawDirectly(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Texture> texture,
-                            const tgfx::RGBAAALayout* layout) {
-  if (texture == nullptr) {
+static bool TryDrawDirectly(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> image, bool isFlat) {
+  if (image == nullptr) {
     return false;
   }
-  auto mipMapMode =
-      texture->getSampler()->mipMapped() ? tgfx::MipMapMode::Linear : tgfx::MipMapMode::None;
-  tgfx::SamplingOptions samplingOptions(tgfx::FilterMode::Linear, mipMapMode);
-  if (!texture->isYUV() && layout == nullptr) {
+  if (isFlat && !image->isRGBAAA()) {
     // RGBA 纹理始终可以直接上屏。
-    canvas->drawTexture(std::move(texture), samplingOptions);
+    canvas->drawImage(std::move(image));
     return true;
   }
   auto totalMatrix = canvas->getMatrix();
   auto scaleFactor = GetMaxScaleFactor(totalMatrix);
   if (scaleFactor <= 1.0f) {
     // 纹理格式为 YUV 或含有 RGBAAALayout 时在缩放值小于等于 1.0f 时才直接上屏会有更好的性能。
-    canvas->drawTexture(std::move(texture), layout, samplingOptions);
+    canvas->drawImage(std::move(image));
     return true;
   }
   return false;
 }
 
 // 强制直接绘制纹理到 canvas。
-static void DrawDirectly(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Texture> texture,
-                         const tgfx::RGBAAALayout* layout) {
-  if (texture == nullptr || TryDrawDirectly(canvas, texture, layout)) {
+static void DrawDirectly(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> image, bool isFlat) {
+  if (image == nullptr || TryDrawDirectly(canvas, image, isFlat)) {
     return;
   }
-  auto width = layout ? layout->width : texture->width();
-  auto height = layout ? layout->height : texture->height();
+  auto width = image->width();
+  auto height = image->height();
   auto surface = tgfx::Surface::Make(canvas->getContext(), width, height);
   if (surface == nullptr) {
     return;
   }
   auto newCanvas = surface->getCanvas();
-  auto mipMapMode =
-      texture->getSampler()->mipMapped() ? tgfx::MipMapMode::Linear : tgfx::MipMapMode::None;
-  tgfx::SamplingOptions samplingOptions(tgfx::FilterMode::Linear, mipMapMode);
-  newCanvas->drawTexture(std::move(texture), layout, samplingOptions);
+  newCanvas->drawImage(std::move(image));
   canvas->drawTexture(surface->getTexture());
   // 防止临时纹理析构
   canvas->flush();
 }
 
-static std::shared_ptr<tgfx::Texture> RescaleTexture(tgfx::Context* context,
-                                                     std::shared_ptr<tgfx::Texture> texture,
-                                                     float scaleFactor, bool mipMapped) {
-  if (texture == nullptr || scaleFactor == 0) {
+static std::shared_ptr<tgfx::Image> RescaleImage(tgfx::Context* context,
+                                                 std::shared_ptr<tgfx::Image> image,
+                                                 float scaleFactor, bool mipMapped) {
+  if (image == nullptr || scaleFactor == 0) {
     return nullptr;
   }
-  auto width = static_cast<int>(ceilf(static_cast<float>(texture->width()) * scaleFactor));
-  auto height = static_cast<int>(ceilf(static_cast<float>(texture->height()) * scaleFactor));
+  auto width = static_cast<int>(ceilf(static_cast<float>(image->width()) * scaleFactor));
+  auto height = static_cast<int>(ceilf(static_cast<float>(image->height()) * scaleFactor));
   auto surface = tgfx::Surface::Make(context, width, height, false, 1, mipMapped);
   if (surface == nullptr) {
     return nullptr;
   }
   auto canvas = surface->getCanvas();
   canvas->setMatrix(tgfx::Matrix::MakeScale(scaleFactor));
-  auto mipMapMode =
-      texture->getSampler()->mipMapped() ? tgfx::MipMapMode::Linear : tgfx::MipMapMode::None;
-  tgfx::SamplingOptions samplingOptions(tgfx::FilterMode::Linear, mipMapMode);
-  canvas->drawTexture(std::move(texture), samplingOptions);
-  return surface->getTexture();
+  canvas->drawImage(image);
+  auto texture = surface->getTexture();
+  image->markCacheExpired(context);
+  return tgfx::Image::MakeFromTexture(std::move(texture));
 }
 
-static std::shared_ptr<tgfx::Texture> GetTexture(TextureProxy* proxy, RenderCache* cache,
-                                                 bool mipMapped) {
-  std::shared_ptr<tgfx::Texture> texture;
-  if (mipMapped && proxy->mipMapSupport()) {
-    texture = proxy->getMipMappedTexture(cache);
-  }
-  if (texture == nullptr) {
-    texture = proxy->getTexture(cache);
-  }
-  return texture;
-}
-
-//================================= TextureProxySnapshotPicture ====================================
-class TextureProxyPicture : public Picture {
+//================================= ImageProxyPicture ====================================
+class ImageProxyPicture : public Picture {
  public:
-  TextureProxyPicture(ID assetID, TextureProxy* proxy, bool externalMemory)
-      : Picture(assetID), proxy(proxy), externalMemory(externalMemory) {
-  }
-
-  ~TextureProxyPicture() override {
-    delete proxy;
+  ImageProxyPicture(ID assetID, std::shared_ptr<ImageProxy> proxy)
+      : Picture(assetID), proxy(proxy) {
   }
 
   void measureBounds(tgfx::Rect* bounds) const override {
@@ -125,8 +106,8 @@ class TextureProxyPicture : public Picture {
     if (snapshot) {
       return snapshot->hitTest(cache, x, y);
     }
-    auto texture = proxy->getTexture(cache);
-    if (texture == nullptr) {
+    auto image = proxy->getImage(cache);
+    if (image == nullptr) {
       return false;
     }
     auto surface = tgfx::Surface::Make(cache->getContext(), 1, 1);
@@ -135,7 +116,7 @@ class TextureProxyPicture : public Picture {
     }
     auto canvas = surface->getCanvas();
     canvas->setMatrix(tgfx::Matrix::MakeTrans(-x, -y));
-    canvas->drawTexture(std::move(texture));
+    canvas->drawImage(std::move(image));
     return surface->hitTest(0, 0);
   }
 
@@ -144,158 +125,62 @@ class TextureProxyPicture : public Picture {
   }
 
   void prepare(RenderCache* cache) const override {
-    proxy->prepare(cache);
+    proxy->prepareImage(cache);
   }
 
   void draw(tgfx::Canvas* canvas, RenderCache* cache) const override {
-    auto oldMatrix = canvas->getMatrix();
-    canvas->concat(extraMatrix);
-    if (proxy->cacheEnabled()) {
-      bool enableMipMap = NeedsEnableMipMap(GetMaxScaleFactor(canvas->getMatrix()));
-      if (TryDrawDirectly(canvas, GetTexture(proxy, cache, enableMipMap), nullptr)) {
-        canvas->setMatrix(oldMatrix);
+    auto image = proxy->getImage(cache);
+    auto options = static_cast<SkipSnapshotOptions*>(canvas->surfaceOptions());
+    if (options) {
+      options->drawnImages.insert(image);
+    }
+    if (proxy->isTemporary()) {
+      if (TryDrawDirectly(canvas, image, proxy->isFlat())) {
         return;
       }
     }
-    auto snapshot = cache->getSnapshot(this);
-    if (snapshot) {
-      auto mipMapMode = snapshot->getTexture()->getSampler()->mipMapped() ? tgfx::MipMapMode::Linear
-                                                                          : tgfx::MipMapMode::None;
-      tgfx::SamplingOptions samplingOptions(tgfx::FilterMode::Linear, mipMapMode);
-      canvas->drawTexture(snapshot->getTexture(), snapshot->getMatrix(), samplingOptions);
-    } else {
-      bool enableMipMap = NeedsEnableMipMap(GetMaxScaleFactor(canvas->getMatrix()));
-      DrawDirectly(canvas, GetTexture(proxy, cache, enableMipMap), nullptr);
+    if (!options) {
+      auto snapshot = cache->getSnapshot(this);
+      if (snapshot) {
+        canvas->drawImage(snapshot->getImage(), snapshot->getMatrix());
+        return;
+      }
     }
-    canvas->setMatrix(oldMatrix);
+    DrawDirectly(canvas, image, proxy->isFlat());
   }
 
  private:
-  TextureProxy* proxy = nullptr;
-  bool externalMemory = false;
-  tgfx::Matrix extraMatrix = tgfx::Matrix::I();
+  std::shared_ptr<ImageProxy> proxy = nullptr;
 
   float getScaleFactor(float maxScaleFactor) const override {
-    if (externalMemory) {
-      return 1.0f;
-    }
     // 图片缩放值不需要大于 1.0f，清晰度无法继续提高。
     return std::min(maxScaleFactor, 1.0f);
   }
 
   std::unique_ptr<Snapshot> makeSnapshot(RenderCache* cache, float scaleFactor,
                                          bool mipMapped) const override {
-    bool rescale = scaleFactor != 1.0f;
-    auto texture = GetTexture(proxy, cache, rescale ? NeedsEnableMipMap(scaleFactor) : mipMapped);
-    if (texture == nullptr) {
+    auto image = proxy->getImage(cache);
+    if (image == nullptr) {
       return nullptr;
     }
-    if (rescale || texture->isYUV()) {
-      texture = RescaleTexture(cache->getContext(), texture, scaleFactor, mipMapped);
+    bool needRescale = image->isTextureBacked() ? false : scaleFactor != 1.0f;
+    if (needRescale || image->isRGBAAA() || !proxy->isFlat()) {
+      image = RescaleImage(cache->getContext(), image, scaleFactor, mipMapped);
+    } else {
+      image = image->makeTextureImage(cache->getContext());
     }
-    if (texture == nullptr) {
+    if (image == nullptr) {
       return nullptr;
     }
-    auto snapshot = new Snapshot(texture, tgfx::Matrix::MakeScale(1 / scaleFactor));
+    auto snapshot = new Snapshot(image, tgfx::Matrix::MakeScale(1 / scaleFactor));
     return std::unique_ptr<Snapshot>(snapshot);
   }
 
   friend class Picture;
 };
-//=================================== TextureProxyPicture ==========================================
-
-//===================================== RGBAAAPicture ==============================================
-class RGBAAAPicture : public Picture {
- public:
-  RGBAAAPicture(ID assetID, TextureProxy* proxy, const tgfx::RGBAAALayout& layout)
-      : Picture(assetID), proxy(proxy), layout(layout) {
-  }
-
-  ~RGBAAAPicture() override {
-    delete proxy;
-  }
-
-  void measureBounds(tgfx::Rect* bounds) const override {
-    bounds->setWH(static_cast<float>(layout.width), static_cast<float>(layout.height));
-  }
-
-  bool hitTest(RenderCache* cache, float x, float y) override {
-    // 碰撞检测过程不允许生成新的GPU缓存，因为碰撞结束不会触发缓存清理操作，长时间不进入下一次绘制有可能导致显存泄露。
-    auto snapshot = cache->getSnapshot(assetID);
-    if (snapshot) {
-      return snapshot->hitTest(cache, x, y);
-    }
-    auto surface = tgfx::Surface::Make(cache->getContext(), 1, 1);
-    if (surface == nullptr) {
-      return false;
-    }
-    auto canvas = surface->getCanvas();
-    auto matrix = tgfx::Matrix::MakeTrans(static_cast<float>(-x), static_cast<float>(-y));
-    canvas->setMatrix(matrix);
-    canvas->drawTexture(proxy->getTexture(cache), &layout);
-    return surface->hitTest(0, 0);
-  }
-
-  bool getPath(tgfx::Path*) const override {
-    return false;
-  }
-
-  void prepare(RenderCache* cache) const override {
-    proxy->prepare(cache);
-  }
-
-  void draw(tgfx::Canvas* canvas, RenderCache* cache) const override {
-    if (proxy->cacheEnabled()) {
-      // proxy在纯静态视频序列帧中不会缓存解码器
-      // 如果将texture获取放在snapshot获取之前，会导致每帧都创建解码器
-      if (TryDrawDirectly(canvas, proxy->getTexture(cache), &layout)) {
-        return;
-      }
-    }
-    // 因为视频绘制会涉及自定义的 OpenGL 操作。
-    canvas->flush();
-    auto snapshot = cache->getSnapshot(this);
-    if (snapshot) {
-      canvas->drawTexture(snapshot->getTexture(), snapshot->getMatrix());
-      return;
-    }
-    DrawDirectly(canvas, proxy->getTexture(cache), &layout);
-  }
-
- private:
-  TextureProxy* proxy = nullptr;
-  tgfx::RGBAAALayout layout = {};
-
-  float getScaleFactor(float maxScaleFactor) const override {
-    // 视频帧缩放值不需要大于 1.0f，清晰度无法继续提高。
-    return std::min(maxScaleFactor, 1.0f);
-  }
-
-  std::unique_ptr<Snapshot> makeSnapshot(RenderCache* cache, float scaleFactor,
-                                         bool mipMapped) const override {
-    auto width = static_cast<int>(ceilf(static_cast<float>(layout.width) * scaleFactor));
-    auto height = static_cast<int>(ceilf(static_cast<float>(layout.height) * scaleFactor));
-    auto surface = tgfx::Surface::Make(cache->getContext(), width, height, false, 1, mipMapped);
-    if (surface == nullptr) {
-      return nullptr;
-    }
-    auto canvas = surface->getCanvas();
-    canvas->setMatrix(tgfx::Matrix::MakeScale(scaleFactor));
-    canvas->drawTexture(proxy->getTexture(cache), &layout);
-    auto snapshot = new Snapshot(surface->getTexture(), tgfx::Matrix::MakeScale(1 / scaleFactor));
-    return std::unique_ptr<Snapshot>(snapshot);
-  }
-
-  friend class Graphic;
-};
-//====================================== RGBAAAPicture =============================================
+//=================================== ImageProxyPicture==========================================
 
 //====================================== SnapshotPicture ===========================================
-class SnapshotPictureOptions : public tgfx::SurfaceOptions {
- public:
-  bool skipSnapshotPictureCache = false;
-};
-
 class SnapshotPicture : public Picture {
  public:
   SnapshotPicture(ID assetID, std::shared_ptr<Graphic> graphic)
@@ -324,8 +209,8 @@ class SnapshotPicture : public Picture {
   }
 
   void draw(tgfx::Canvas* canvas, RenderCache* cache) const override {
-    auto options = static_cast<const SnapshotPictureOptions*>(canvas->surfaceOptions());
-    if (options && options->skipSnapshotPictureCache) {
+    auto options = static_cast<const SkipSnapshotOptions*>(canvas->surfaceOptions());
+    if (options) {
       graphic->draw(canvas, cache);
       return;
     }
@@ -334,10 +219,7 @@ class SnapshotPicture : public Picture {
       graphic->draw(canvas, cache);
       return;
     }
-    auto mipMapMode = snapshot->getTexture()->getSampler()->mipMapped() ? tgfx::MipMapMode::Linear
-                                                                        : tgfx::MipMapMode::None;
-    tgfx::SamplingOptions samplingOptions(tgfx::FilterMode::Linear, mipMapMode);
-    canvas->drawTexture(snapshot->getTexture(), snapshot->getMatrix(), samplingOptions);
+    canvas->drawImage(snapshot->getImage(), snapshot->getMatrix());
   }
 
  protected:
@@ -355,9 +237,8 @@ class SnapshotPicture : public Picture {
     if (surface == nullptr) {
       return nullptr;
     }
-    auto options = std::make_unique<SnapshotPictureOptions>();
-    options->skipSnapshotPictureCache = true;
-    surface->setOptions(std::move(options));
+    SkipSnapshotOptions options = {};
+    surface->setOptions(&options);
     auto canvas = surface->getCanvas();
     auto matrix = tgfx::Matrix::MakeScale(scaleFactor);
     matrix.preTranslate(-bounds.x(), -bounds.y());
@@ -365,7 +246,11 @@ class SnapshotPicture : public Picture {
     graphic->draw(canvas, cache);
     auto drawingMatrix = tgfx::Matrix::I();
     matrix.invert(&drawingMatrix);
-    auto snapshot = new Snapshot(surface->getTexture(), drawingMatrix);
+    auto image = tgfx::Image::MakeFromTexture(surface->getTexture());
+    for (auto& drawnImage : options.drawnImages) {
+      drawnImage->markCacheExpired(cache->getContext());
+    }
+    auto snapshot = new Snapshot(std::move(image), drawingMatrix);
     return std::unique_ptr<Snapshot>(snapshot);
   }
 
@@ -374,102 +259,82 @@ class SnapshotPicture : public Picture {
 };
 //===================================== SnapshotPicture ============================================
 
-//==================================== Texture Proxies =============================================
-class ImageBufferProxy : public TextureProxy {
+class DefaultImageProxy : public ImageProxy {
  public:
-  explicit ImageBufferProxy(const std::shared_ptr<tgfx::ImageBuffer> buffer)
-      : TextureProxy(buffer->width(), buffer->height()), buffer(buffer) {
+  DefaultImageProxy(ID assetID, std::shared_ptr<tgfx::Image> image)
+      : assetID(assetID), image(std::move(image)) {
   }
 
-  bool cacheEnabled() const override {
+  int width() const override {
+    return image->width();
+  }
+
+  int height() const override {
+    return image->height();
+  }
+
+  bool isTemporary() const override {
     return false;
   }
 
-  void prepare(RenderCache*) const override {
-  }
-
-  std::shared_ptr<tgfx::Texture> getTexture(RenderCache* cache) const override {
-    return getTexture(cache, false);
-  }
-
-  std::shared_ptr<tgfx::Texture> getMipMappedTexture(RenderCache* cache) const override {
-    return getTexture(cache, true);
-  }
-
-  std::shared_ptr<tgfx::Texture> getTexture(RenderCache* cache, bool mipMapped) const {
-    tgfx::Clock clock = {};
-    auto texture = buffer->makeTexture(cache->getContext(), mipMapped);
-    cache->recordTextureUploadingTime(clock.measure());
-    return texture;
-  }
-
- private:
-  std::shared_ptr<tgfx::ImageBuffer> buffer = nullptr;
-};
-
-class ImageTextureProxy : public TextureProxy {
- public:
-  explicit ImageTextureProxy(ID assetID, int width, int height,
-                             std::shared_ptr<tgfx::ImageCodec> image)
-      : TextureProxy(width, height), assetID(assetID), image(std::move(image)) {
-  }
-
-  bool cacheEnabled() const override {
-    return false;
-  }
-
-  void prepare(RenderCache* cache) const override {
-    cache->prepareImage(assetID, image);
-  }
-
-  std::shared_ptr<tgfx::Texture> getTexture(RenderCache* cache) const override {
-    return getTexture(cache, false);
-  }
-
-  bool mipMapSupport() const override {
+  bool isFlat() const override {
     return true;
   }
 
-  std::shared_ptr<tgfx::Texture> getMipMappedTexture(RenderCache* cache) const override {
-    return getTexture(cache, true);
+  void prepareImage(RenderCache* cache) const override {
+    cache->prepareAssetImage(assetID, this);
   }
 
-  std::shared_ptr<tgfx::Texture> getTexture(RenderCache* cache, bool mipMapped) const {
-    tgfx::Clock clock = {};
-    auto buffer = cache->getImageBuffer(assetID);
-    if (buffer == nullptr) {
-      buffer = image->makeBuffer(!mipMapped);
-    }
-    cache->recordImageDecodingTime(clock.measure());
-    if (buffer == nullptr) {
-      return nullptr;
-    }
-    clock.reset();
-    auto texture = buffer->makeTexture(cache->getContext(), mipMapped);
-    cache->recordTextureUploadingTime(clock.measure());
-    return texture;
+  std::shared_ptr<tgfx::Image> getImage(RenderCache* cache) const override {
+    return cache->getAssetImage(assetID, this);
+  }
+
+ protected:
+  std::shared_ptr<tgfx::Image> makeImage(RenderCache*) const override {
+    return image;
   }
 
  private:
   ID assetID = 0;
-  std::shared_ptr<tgfx::ImageCodec> image = nullptr;
+  std::shared_ptr<tgfx::Image> image = nullptr;
 };
 
-class BackendTextureProxy : public TextureProxy {
+class BackendTextureProxy : public ImageProxy {
  public:
-  BackendTextureProxy(const BackendTexture& texture, tgfx::ImageOrigin origin, void* sharedContext)
-      : TextureProxy(texture.width(), texture.height()), backendTexture(texture), origin(origin),
-        sharedContext(sharedContext) {
+  BackendTextureProxy(ID assetID, const BackendTexture& texture, tgfx::ImageOrigin origin,
+                      void* sharedContext)
+      : assetID(assetID), backendTexture(texture), origin(origin), sharedContext(sharedContext) {
   }
 
-  bool cacheEnabled() const override {
+  int width() const override {
+    return backendTexture.width();
+  }
+
+  int height() const override {
+    return backendTexture.height();
+  }
+
+  bool isTemporary() const override {
     return false;
   }
 
-  void prepare(RenderCache*) const override {
+  bool isFlat() const override {
+    GLTextureInfo glInfo = {};
+    if (!backendTexture.getGLTextureInfo(&glInfo)) {
+      return false;
+    }
+    return glInfo.target == GL_TEXTURE_2D;
   }
 
-  std::shared_ptr<tgfx::Texture> getTexture(RenderCache* cache) const override {
+  void prepareImage(RenderCache*) const override {
+  }
+
+  std::shared_ptr<tgfx::Image> getImage(RenderCache* cache) const override {
+    return cache->getAssetImage(assetID, this);
+  }
+
+ protected:
+  std::shared_ptr<tgfx::Image> makeImage(RenderCache* cache) const override {
     auto context = cache->getContext();
     if (!checkContext(context)) {
       return nullptr;
@@ -478,11 +343,13 @@ class BackendTextureProxy : public TextureProxy {
     if (!GetGLSampler(backendTexture, &sampler)) {
       return nullptr;
     }
-    return tgfx::GLTexture::MakeFrom(context, sampler, backendTexture.width(),
-                                     backendTexture.height(), origin);
+    auto texture = tgfx::GLTexture::MakeFrom(context, sampler, backendTexture.width(),
+                                             backendTexture.height(), origin);
+    return tgfx::Image::MakeFromTexture(std::move(texture));
   }
 
  private:
+  ID assetID = 0;
   BackendTexture backendTexture = {};
   tgfx::ImageOrigin origin = tgfx::ImageOrigin::TopLeft;
   void* sharedContext = nullptr;
@@ -491,41 +358,32 @@ class BackendTextureProxy : public TextureProxy {
     auto glDevice = static_cast<tgfx::GLDevice*>(context->device());
     if (!glDevice->sharableWith(sharedContext)) {
       LOGE(
-          "A Graphic which made from a texture can not be drawn on to a PAGSurface"
-          " if its GPU context is not share context to the PAGSurface.");
+          "A Graphic made from a texture can not be drawn on to a PAGSurface"
+          " if its GPU context is not a share context to the PAGSurface.");
       return false;
     }
     return true;
   }
 };
-//==================================== Texture Proxies =============================================
 
 static std::atomic_uint64_t IDCount = {1};
 
 Picture::Picture(ID assetID) : assetID(assetID), uniqueKey(IDCount++) {
 }
 
-std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, std::shared_ptr<tgfx::ImageCodec> codec) {
-  if (codec == nullptr) {
+std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, std::shared_ptr<tgfx::Image> image) {
+  if (image == nullptr) {
     return nullptr;
   }
-  auto extraMatrix = OrientationToMatrix(codec->orientation(), codec->width(), codec->height());
-  auto width = codec->width();
-  auto height = codec->height();
-  ApplyOrientation(codec->orientation(), &width, &height);
-  auto textureProxy =
-      new ImageTextureProxy(assetID, static_cast<int>(width), static_cast<int>(height), codec);
-  auto picture = std::make_shared<TextureProxyPicture>(assetID, textureProxy, false);
-  picture->extraMatrix = extraMatrix;
-  return picture;
+  auto proxy = std::make_shared<DefaultImageProxy>(assetID, std::move(image));
+  return MakeFrom(assetID, std::move(proxy));
 }
 
-std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, std::shared_ptr<tgfx::ImageBuffer> buffer) {
-  if (buffer == nullptr) {
+std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, std::shared_ptr<ImageProxy> proxy) {
+  if (assetID == 0 || proxy == nullptr) {
     return nullptr;
   }
-  auto proxy = new ImageBufferProxy(buffer);
-  return std::shared_ptr<Graphic>(new TextureProxyPicture(assetID, proxy, false));
+  return std::make_shared<ImageProxyPicture>(assetID, std::move(proxy));
 }
 
 std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, const BackendTexture& texture,
@@ -537,27 +395,8 @@ std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, const BackendTexture& tex
   if (context == nullptr) {
     return nullptr;
   }
-  auto proxy = new BackendTextureProxy(texture, origin, context);
-  return std::shared_ptr<Graphic>(new TextureProxyPicture(assetID, proxy, true));
-}
-
-std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, std::unique_ptr<TextureProxy> proxy) {
-  if (proxy == nullptr) {
-    return nullptr;
-  }
-  return std::shared_ptr<Graphic>(new TextureProxyPicture(assetID, proxy.release(), true));
-}
-
-std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, std::unique_ptr<TextureProxy> proxy,
-                                           const tgfx::RGBAAALayout& layout) {
-  if (layout.alphaStartX == 0 && layout.alphaStartY == 0) {
-    return Picture::MakeFrom(assetID, std::move(proxy));
-  }
-  if (proxy == nullptr || layout.alphaStartX + layout.width > proxy->width() ||
-      layout.alphaStartY + layout.height > proxy->height()) {
-    return nullptr;
-  }
-  return std::shared_ptr<RGBAAAPicture>(new RGBAAAPicture(assetID, proxy.release(), layout));
+  auto proxy = std::make_shared<BackendTextureProxy>(assetID, texture, origin, context);
+  return std::make_shared<ImageProxyPicture>(assetID, proxy);
 }
 
 std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, std::shared_ptr<Graphic> graphic) {

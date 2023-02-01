@@ -77,11 +77,12 @@ void WebVideoTexture::onReleaseGPU() {
   }
 }
 
-VideoSequenceReader::VideoSequenceReader(PAGLayer* pagLayer, VideoSequence* sequence)
-    : SequenceReader(sequence->duration(), sequence->composition->staticContent()),
-      file(pagLayer->getFile()), rootFile(pagLayer->rootFile) {
-  width = sequence->getVideoWidth();
-  height = sequence->getVideoHeight();
+VideoSequenceReader::VideoSequenceReader(std::shared_ptr<File> file, VideoSequence* sequence,
+                                         PAGFile* pagFile)
+    : SequenceReader(sequence->duration(), sequence->composition->staticContent()), file(file),
+      rootFile(pagFile) {
+  _width = sequence->getVideoWidth();
+  _height = sequence->getVideoHeight();
   auto videoReaderClass = val::module_property("VideoReader");
   if (videoReaderClass.as<bool>()) {
     auto staticTimeRanges = val::array();
@@ -117,8 +118,8 @@ VideoSequenceReader::VideoSequenceReader(PAGLayer* pagLayer, VideoSequence* sequ
     }
     videoReader =
         videoReaderClass
-            .call<val>("create", val(typed_memory_view(mp4Data->length(), mp4Data->data())), width,
-                       height, sequence->frameRate, staticTimeRanges)
+            .call<val>("create", val(typed_memory_view(mp4Data->length(), mp4Data->data())), _width,
+                       _height, sequence->frameRate, staticTimeRanges)
             .await();
   }
 }
@@ -141,20 +142,17 @@ void VideoSequenceReader::prepare(Frame targetFrame) {
   }
 }
 
-std::shared_ptr<tgfx::Texture> VideoSequenceReader::makeTexture(tgfx::Context* context) {
+std::shared_ptr<tgfx::Texture> VideoSequenceReader::onMakeTexture(tgfx::Context* context) {
   if (!videoReader.as<bool>()) {
     return nullptr;
   }
   if (webVideoTexture == nullptr) {
     auto isAndroidMiniprogram =
         val::module_property("VideoReader").call<bool>("isAndroidMiniprogram");
-    webVideoTexture = WebVideoTexture::Make(context, width, height, isAndroidMiniprogram);
+    webVideoTexture = WebVideoTexture::Make(context, _width, _height, isAndroidMiniprogram);
   }
   auto& sampler = webVideoTexture->glSampler();
   videoReader.call<void>("renderToTexture", val::module_property("GL"), sampler.id);
   return webVideoTexture;
-}
-
-void VideoSequenceReader::recordPerformance(Performance*, int64_t) {
 }
 }  // namespace pag

@@ -20,7 +20,7 @@
 
 #include <optional>
 #include "gpu/GLFragmentProcessor.h"
-#include "gpu/TextureEffect.h"
+#include "gpu/TiledTextureEffect.h"
 
 namespace tgfx {
 class GLTextureEffect : public GLFragmentProcessor {
@@ -31,15 +31,15 @@ class GLTextureEffect : public GLFragmentProcessor {
   void onSetData(const ProgramDataManager& programDataManager,
                  const FragmentProcessor& fragmentProcessor) override;
 
-  static bool ShaderModeRequiresUnormCoord(TextureEffect::ShaderMode m);
+  static bool ShaderModeRequiresUnormCoord(TiledTextureEffect::ShaderMode m);
 
-  static bool ShaderModeUsesSubset(TextureEffect::ShaderMode m);
+  static bool ShaderModeUsesSubset(TiledTextureEffect::ShaderMode m);
 
-  static bool ShaderModeUsesClamp(TextureEffect::ShaderMode m);
+  static bool ShaderModeUsesClamp(TiledTextureEffect::ShaderMode m);
 
   void readColor(EmitArgs& args, const std::string& coord, const char* out);
 
-  void subsetCoord(EmitArgs& args, TextureEffect::ShaderMode mode, const char* coordSwizzle,
+  void subsetCoord(EmitArgs& args, TiledTextureEffect::ShaderMode mode, const char* coordSwizzle,
                    const char* subsetStartSwizzle, const char* subsetStopSwizzle,
                    const char* extraCoord, const char* coordWeight);
 

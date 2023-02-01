@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ImageBytesCache.h"
+
 namespace pag {
 
 ImageBytesCache* ImageBytesCache::Get(ImageBytes* imageBytes) {
@@ -27,8 +28,8 @@ ImageBytesCache* ImageBytesCache::Get(ImageBytes* imageBytes) {
   auto cache = new ImageBytesCache();
   auto fileBytes =
       tgfx::Data::MakeWithoutCopy(imageBytes->fileBytes->data(), imageBytes->fileBytes->length());
-  auto codec = tgfx::ImageCodec::MakeFrom(std::move(fileBytes));
-  auto picture = Picture::MakeFrom(imageBytes->uniqueID, codec);
+  auto image = tgfx::Image::MakeFromEncoded(std::move(fileBytes));
+  auto picture = Picture::MakeFrom(imageBytes->uniqueID, image);
   auto matrix = tgfx::Matrix::MakeScale(1 / imageBytes->scaleFactor);
   matrix.postTranslate(static_cast<float>(-imageBytes->anchorX),
                        static_cast<float>(-imageBytes->anchorY));

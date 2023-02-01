@@ -52,7 +52,9 @@ class EncodedSource : public ImageSource {
   std::shared_ptr<ImageBuffer> makeAsyncBuffer() const;
 
  protected:
-  std::shared_ptr<ImageSource> onMakeDecodedSource(Context* context) const override;
+  std::shared_ptr<ImageSource> onMakeDecoded(Context* context) const override;
+
+  std::shared_ptr<ImageSource> onMakeMipMapped() const override;
 
   std::shared_ptr<TextureProxy> onMakeTextureProxy(Context* context) const override;
 

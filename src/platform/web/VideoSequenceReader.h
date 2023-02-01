@@ -47,9 +47,18 @@ class WebVideoTexture : public tgfx::GLTexture {
 
 class VideoSequenceReader : public SequenceReader {
  public:
-  VideoSequenceReader(PAGLayer* pagLayer, VideoSequence* sequence);
+  VideoSequenceReader(std::shared_ptr<File> file, VideoSequence* sequence,
+                      PAGFile* pagFile = nullptr);
 
   ~VideoSequenceReader() override;
+
+  int width() const override {
+    return _width;
+  }
+
+  int height() const override {
+    return _height;
+  }
 
   void prepare(Frame targetFrame) override;
 
@@ -59,9 +68,7 @@ class VideoSequenceReader : public SequenceReader {
     return true;
   }
 
-  std::shared_ptr<tgfx::Texture> makeTexture(tgfx::Context* context) override;
-
-  void recordPerformance(Performance* performance, int64_t decodingTime) override;
+  std::shared_ptr<tgfx::Texture> onMakeTexture(tgfx::Context* context) override;
 
   void prepareNext(Frame) override {
   }
@@ -72,8 +79,8 @@ class VideoSequenceReader : public SequenceReader {
   PAGFile* rootFile = nullptr;
   emscripten::val videoReader = emscripten::val::null();
   std::shared_ptr<WebVideoTexture> webVideoTexture = nullptr;
-  int32_t width = 0;
-  int32_t height = 0;
+  int32_t _width = 0;
+  int32_t _height = 0;
   std::unique_ptr<ByteData> mp4Data = nullptr;
 };
 }  // namespace pag

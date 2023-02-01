@@ -43,6 +43,8 @@ class BufferSource : public ImageSource {
   }
 
  protected:
+  std::shared_ptr<ImageSource> onMakeMipMapped() const override;
+
   std::shared_ptr<TextureProxy> onMakeTextureProxy(Context* context) const override;
 
  private:
@@ -52,5 +54,6 @@ class BufferSource : public ImageSource {
   BufferSource(std::shared_ptr<ImageBuffer> buffer, bool mipMapped);
 
   friend class ImageSource;
+  friend class AsyncSource;
 };
 }  // namespace tgfx

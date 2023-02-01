@@ -31,6 +31,8 @@ class AsyncImageBuffer : public ImageBuffer, public Executor {
   static std::shared_ptr<ImageBuffer> MakeFrom(std::shared_ptr<ImageGenerator> generator,
                                                bool tryHardware = true);
 
+  ~AsyncImageBuffer() override;
+
   int width() const override {
     return generator->width();
   }

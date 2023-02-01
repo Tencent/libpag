@@ -27,30 +27,6 @@ namespace pag {
 #define MAX_TRY_DECODE_COUNT 100
 #define FORCE_SOFTWARE_SIZE 160000  // 400x400
 
-class GPUDecoderTask : public Executor {
- public:
-  static std::shared_ptr<Task> MakeAndRun(const VideoFormat& format) {
-    auto task = Task::Make(std::unique_ptr<GPUDecoderTask>(new GPUDecoderTask(format)));
-    task->run();
-    return task;
-  }
-
-  std::unique_ptr<VideoDecoder> getDecoder() {
-    return std::move(videoDecoder);
-  }
-
- private:
-  VideoFormat videoFormat = {};
-  std::unique_ptr<VideoDecoder> videoDecoder = nullptr;
-
-  explicit GPUDecoderTask(VideoFormat format) : videoFormat(std::move(format)) {
-  }
-
-  void execute() override {
-    videoDecoder = VideoDecoder::Make(videoFormat, true);
-  }
-};
-
 static Frame TotalFrames(VideoDemuxer* demuxer) {
   auto format = demuxer->getFormat();
   return TimeToFrame(format.duration, format.frameRate);
@@ -117,25 +93,28 @@ bool VideoReader::decodeFrame(Frame targetFrame) {
   return lastBuffer != nullptr;
 }
 
-std::shared_ptr<tgfx::Texture> VideoReader::makeTexture(tgfx::Context* context) {
+std::shared_ptr<tgfx::ImageBuffer> VideoReader::onMakeBuffer() {
+  return lastBuffer;
+}
+
+std::shared_ptr<tgfx::Texture> VideoReader::onMakeTexture(tgfx::Context* context) {
   if (lastBuffer == nullptr) {
     return nullptr;
   }
   return lastBuffer->makeTexture(context);
 }
 
-void VideoReader::recordPerformance(Performance* performance, int64_t decodingTime) {
-  if (performance) {
-    if (decoderTypeIndex == DECODER_TYPE_HARDWARE) {
-      performance->hardwareDecodingTime += decodingTime;
-      performance->hardwareDecodingInitialTime += hardDecodingInitialTime;
-      hardDecodingInitialTime = 0;  // 只记录一次。
-    } else {
-      performance->softwareDecodingTime += decodingTime;
-      performance->softwareDecodingInitialTime += softDecodingInitialTime;
-      softDecodingInitialTime = 0;
-    }
+void VideoReader::recordPerformance(Performance* performance) {
+  if (decoderTypeIndex == DECODER_TYPE_HARDWARE) {
+    performance->hardwareDecodingTime += decodingTime;
+    performance->hardwareDecodingInitialTime += hardDecodingInitialTime;
+    hardDecodingInitialTime = 0;  // 只记录一次。
+  } else {
+    performance->softwareDecodingTime += decodingTime;
+    performance->softwareDecodingInitialTime += softDecodingInitialTime;
+    softDecodingInitialTime = 0;
   }
+  decodingTime = 0;
 }
 
 bool VideoReader::sendSampleData() {
@@ -196,20 +175,11 @@ bool VideoReader::onDecodeFrame(int64_t sampleTime) {
 }
 
 bool VideoReader::checkVideoDecoder() {
-  if (gpuDecoderTask && !gpuDecoderTask->isRunning()) {
-    if (switchToGPUDecoderOfTask()) {
-      return true;
-    }
-  }
   if (videoDecoder) {
     return true;
   }
   videoDecoder = makeVideoDecoder();
   if (videoDecoder) {
-    return true;
-  }
-
-  if (gpuDecoderTask && switchToGPUDecoderOfTask()) {
     return true;
   }
   decoderTypeIndex = DECODER_TYPE_FAIL;
@@ -233,18 +203,6 @@ void VideoReader::resetParams() {
   inputEndOfStream = false;
   videoSample = {};
   demuxer->reset();
-}
-
-bool VideoReader::switchToGPUDecoderOfTask() {
-  destroyVideoDecoder();
-  auto executor = gpuDecoderTask->wait();
-  videoDecoder = static_cast<GPUDecoderTask*>(executor)->getDecoder().release();
-  gpuDecoderTask = nullptr;
-  if (videoDecoder) {
-    decoderTypeIndex = DECODER_TYPE_HARDWARE;
-    return true;
-  }
-  return false;
 }
 
 VideoDecoder* VideoReader::makeVideoDecoder() {

@@ -23,7 +23,6 @@
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Path.h"
-#include "tgfx/core/RGBAAALayout.h"
 #include "tgfx/core/SamplingOptions.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/TextBlob.h"
@@ -66,7 +65,7 @@ class Canvas {
   /**
    * Returns SurfaceOptions associated with this canvas.
    */
-  const SurfaceOptions* surfaceOptions() const;
+  SurfaceOptions* surfaceOptions() const;
 
   /**
    * Saves alpha, blend mode, matrix and clip. Calling restore() discards changes to them, restoring
@@ -170,21 +169,6 @@ class Canvas {
                    const Paint* paint = nullptr);
 
   /**
-   * Draws a RGBAAA layout Texture, with its top-left corner at (0, 0), using current alpha, blend
-   * mode, clip, matrix and optional paint.
-   *
-   * If paint is supplied, apply ColorFilter and alpha. If texture is Alpha8, apply Shader. If paint
-   * contains MaskFilter, generate mask from image bounds.
-   */
-  void drawTexture(std::shared_ptr<Texture> texture, const RGBAAALayout* layout,
-                   const Paint* paint = nullptr) {
-    drawTexture(std::move(texture), layout, SamplingOptions(), paint);
-  }
-
-  void drawTexture(std::shared_ptr<Texture> texture, const RGBAAALayout* layout,
-                   SamplingOptions sampling, const Paint* paint = nullptr);
-
-  /**
    * Draws a path with using current clip, matrix and specified paint.
    */
   void drawPath(const Path& path, const Paint& paint);
@@ -196,23 +180,33 @@ class Canvas {
 
   /**
    * Draws an image, with its top-left corner at (left, top), using current clip, matrix and
-   * optional paint.
+   * optional paint. If image->hasMipmaps() is true, uses FilterMode::Linear and MipMapMode::Linear
+   * as the sampling options. Otherwise, uses FilterMode::Linear and MipMapMode::None as the
+   * sampling options.
    */
-  void drawImage(std::shared_ptr<Image> image, float left, float top,
-                 SamplingOptions sampling = SamplingOptions(), const Paint* paint = nullptr);
+  void drawImage(std::shared_ptr<Image> image, float left, float top, const Paint* paint = nullptr);
 
   /**
-   * Draws a Image, with its top-left corner at (0, 0), using current alpha, blend mode, clip and
-   * matrix premultiplied with existing Matrix.
+   * Draws a Image, with its top-left corner at (0, 0), using current alpha, clip and matrix
+   * premultiplied with existing Matrix. If image->hasMipmaps() is true, uses FilterMode::Linear
+   * and MipMapMode::Linear as the sampling options. Otherwise, uses FilterMode::Linear and
+   * MipMapMode::None as the sampling options.
    */
-  void drawImage(std::shared_ptr<Image> image, const Matrix& matrix,
-                 SamplingOptions sampling = SamplingOptions(), const Paint* paint = nullptr);
+  void drawImage(std::shared_ptr<Image> image, const Matrix& matrix, const Paint* paint = nullptr);
 
   /**
    * Draws an image, with its top-left corner at (0, 0), using current clip, matrix and optional
-   * paint.
+   * paint. If image->hasMipmaps() is true, uses FilterMode::Linear and MipMapMode::Linear as the
+   * sampling options. Otherwise, uses FilterMode::Linear and MipMapMode::None as the sampling
+   * options.
    */
-  void drawImage(std::shared_ptr<Image> image, SamplingOptions sampling = SamplingOptions(),
+  void drawImage(std::shared_ptr<Image> image, const Paint* paint = nullptr);
+
+  /**
+   * Draws an image, with its top-left corner at (0, 0), using current clip, matrix, sampling
+   * options and optional paint.
+   */
+  void drawImage(std::shared_ptr<Image> image, SamplingOptions sampling,
                  const Paint* paint = nullptr);
 
   /**
@@ -232,8 +226,7 @@ class Canvas {
   void flush();
 
  private:
-  void drawTexture(std::shared_ptr<Texture> texture, const RGBAAALayout* layout,
-                   SamplingOptions sampling, const Paint& paint);
+  void drawTexture(std::shared_ptr<Texture> texture, SamplingOptions sampling, const Paint& paint);
 
   std::shared_ptr<Texture> getClipTexture();
 

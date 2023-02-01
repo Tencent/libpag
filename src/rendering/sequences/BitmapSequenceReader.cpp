@@ -75,7 +75,11 @@ bool BitmapSequenceReader::decodeFrame(Frame targetFrame) {
   return true;
 }
 
-std::shared_ptr<tgfx::Texture> BitmapSequenceReader::makeTexture(tgfx::Context* context) {
+std::shared_ptr<tgfx::ImageBuffer> BitmapSequenceReader::onMakeBuffer() {
+  return pixelBuffer;
+}
+
+std::shared_ptr<tgfx::Texture> BitmapSequenceReader::onMakeTexture(tgfx::Context* context) {
   if (lastDecodeFrame == -1 || pixelBuffer == nullptr) {
     return nullptr;
   }
@@ -92,9 +96,5 @@ Frame BitmapSequenceReader::findStartFrame(Frame targetFrame) {
     }
   }
   return startFrame;
-}
-
-void BitmapSequenceReader::recordPerformance(Performance* performance, int64_t decodingTime) {
-  performance->imageDecodingTime += decodingTime;
 }
 }  // namespace pag

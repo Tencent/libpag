@@ -60,7 +60,7 @@ std::unique_ptr<DrawOp> TextureShape::makeTextureOp(std::shared_ptr<Texture> tex
   maskLocalMatrix.postScale(static_cast<float>(texture->width()) / bounds.width(),
                             static_cast<float>(texture->height()) / bounds.height());
   paint->coverageFragmentProcessors.emplace_back(FragmentProcessor::MulInputByChildAlpha(
-      TextureEffect::Make(paint->context, std::move(texture), SamplerState(), &maskLocalMatrix)));
+      TextureEffect::Make(std::move(texture), SamplingOptions(), &maskLocalMatrix)));
   return FillRectOp::Make(paint->color, bounds, viewMatrix);
 }
 }  // namespace tgfx

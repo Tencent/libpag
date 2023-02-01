@@ -43,12 +43,10 @@ class ImageGenerator {
   }
 
   /**
-   * Returns true if pixels represent transparency only. If true, each pixel is packed in 8
-   * bits as defined by ColorType::ALPHA_8.
+   * Returns true if the generator is guaranteed to produce transparency only pixels. If true, each
+   * pixel is packed in 8 bits as defined by ColorType::ALPHA_8.
    */
-  virtual bool isAlphaOnly() const {
-    return false;
-  }
+  virtual bool isAlphaOnly() const = 0;
 
   /**
    * Returns true if ImageGenerator supports asynchronous decoding. If true, the makeBuffer() method
@@ -70,6 +68,10 @@ class ImageGenerator {
 
  protected:
   ImageGenerator(int width, int height) : _width(width), _height(height) {
+  }
+
+  ImageGenerator(const Size& size)
+      : _width(static_cast<int>(size.width)), _height(static_cast<int>(size.height)) {
   }
 
   virtual std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const = 0;

@@ -18,7 +18,7 @@
 
 #include "RGBAAAImage.h"
 #include "ImageSource.h"
-#include "gpu/RGBAAATextureEffect.h"
+#include "gpu/TextureEffect.h"
 
 namespace tgfx {
 
@@ -61,6 +61,6 @@ std::unique_ptr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(Context* con
   if (localMatrix != nullptr) {
     matrix.postConcat(*localMatrix);
   }
-  return RGBAAATextureEffect::Make(texture, sampling, alphaStart, &matrix);
+  return TextureEffect::MakeRGBAAA(texture, sampling, alphaStart, &matrix);
 }
 }  // namespace tgfx

@@ -20,10 +20,10 @@
 
 #include "Graphic.h"
 #include "pag/gpu.h"
+#include "rendering/graphics/ImageProxy.h"
 #include "rendering/graphics/Snapshot.h"
 #include "tgfx/core/Bitmap.h"
-#include "tgfx/core/ImageCodec.h"
-#include "tgfx/core/RGBAAALayout.h"
+#include "tgfx/core/Image.h"
 
 namespace pag {
 /**
@@ -36,32 +36,20 @@ namespace pag {
 class Picture : public Graphic {
  public:
   /**
-   * Creates a new Picture with specified ImageCodec. Return null if the codec is null.
+   * Creates a new Picture with specified Image. Return null if the image is null.
    */
-  static std::shared_ptr<Graphic> MakeFrom(ID assetID, std::shared_ptr<tgfx::ImageCodec> codec);
+  static std::shared_ptr<Graphic> MakeFrom(ID assetID, std::shared_ptr<tgfx::Image> image);
 
-  /**
-   * Creates a new Picture with specified ImageBuffer. Returns null if the bitmap is empty.
+  /*
+   * Creates a new image with specified ImageProxy. Returns nullptr if the proxy is null.
    */
-  static std::shared_ptr<Graphic> MakeFrom(ID assetID, std::shared_ptr<tgfx::ImageBuffer> buffer);
+  static std::shared_ptr<Graphic> MakeFrom(ID assetID, std::shared_ptr<ImageProxy> proxy);
 
   /**
    * Creates a new Picture with specified backend texture. Returns null if the texture is invalid.
    */
   static std::shared_ptr<Graphic> MakeFrom(ID assetID, const BackendTexture& texture,
                                            tgfx::ImageOrigin origin);
-
-  /*
-   * Creates a new image with specified TextureProxy. Returns nullptr if the proxy is null.
-   */
-  static std::shared_ptr<Graphic> MakeFrom(ID assetID, std::unique_ptr<TextureProxy> proxy);
-
-  /**
-   * Creates a new image with specified TextureProxy and RGBAAA layout. Returns null if the
-   * proxy is null or the layout is invalid.
-   */
-  static std::shared_ptr<Graphic> MakeFrom(ID assetID, std::unique_ptr<TextureProxy> proxy,
-                                           const tgfx::RGBAAALayout& layout);
 
   /**
    * Creates a new Picture with specified graphic. If the assetID is valid (not 0), the returned

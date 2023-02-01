@@ -30,6 +30,7 @@
 #include "tgfx/core/PathTypes.h"
 #include "tgfx/gpu/opengl/GLDefines.h"
 #include "tgfx/src/platform/web/NativeImage.h"
+#include "tgfx/src/platform/web/NativeImageBuffer.h"
 
 using namespace emscripten;
 using namespace pag;
@@ -291,8 +292,9 @@ EMSCRIPTEN_BINDINGS(pag) {
                         return PAGImage::FromBytes(reinterpret_cast<void*>(bytes), length);
                       }))
       .class_function("_FromNativeImage", optional_override([](val nativeImage) {
-                        return std::static_pointer_cast<PAGImage>(
-                            StillImage::MakeFrom(tgfx::NativeImage::MakeFrom(nativeImage)));
+                        auto image =
+                            tgfx::Image::MakeFromBuffer(tgfx::NativeImageBuffer::Make(nativeImage));
+                        return std::static_pointer_cast<PAGImage>(StillImage::MakeFrom(image));
                       }))
       .class_function("_FromPixels",
                       optional_override([](uintptr_t pixels, int width, int height, size_t rowBytes,

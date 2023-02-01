@@ -19,7 +19,6 @@
 #pragma once
 
 #include "FragmentProcessor.h"
-#include "tgfx/core/RGBAAALayout.h"
 #include "tgfx/gpu/YUVTexture.h"
 
 namespace tgfx {
@@ -54,7 +53,7 @@ class YUVTextureEffect : public FragmentProcessor {
   Point alphaStart = Point::Zero();
   CoordTransform coordTransform;
 
-  friend class RGBAAATextureEffect;
+  friend class TextureEffect;
 
   friend class GLYUVTextureEffect;
 };

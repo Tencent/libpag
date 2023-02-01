@@ -24,7 +24,7 @@
 namespace tgfx {
 class NativeImageBuffer : public ImageBuffer {
  public:
-  static std::shared_ptr<NativeImageBuffer> Make(int width, int height, emscripten::val source);
+  static std::shared_ptr<NativeImageBuffer> Make(emscripten::val source);
 
   ~NativeImageBuffer() override;
 

@@ -161,6 +161,9 @@ bool Baseline::Compare(const Bitmap& bitmap, const std::string& key) {
     } else {
       SaveImage(bitmap, key);
     }
+#ifdef GENERATOR_BASELINE_IMAGES
+    SaveImage(bitmap, key + "_base");
+#endif
   });
 }
 

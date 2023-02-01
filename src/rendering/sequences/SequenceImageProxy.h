@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,48 +18,39 @@
 
 #pragma once
 
-#include "ImageSource.h"
+#include "pag/file.h"
+#include "rendering/graphics/ImageProxy.h"
 
-namespace tgfx {
-/**
- * TextureSource wraps an existing texture.
- */
-class TextureSource : public ImageSource {
+namespace pag {
+class SequenceImageProxy : public ImageProxy {
  public:
+  SequenceImageProxy(Sequence* sequence, Frame targetFrame);
+
   int width() const override {
-    return proxy->width();
+    return sequence->width;
   }
 
   int height() const override {
-    return proxy->height();
+    return sequence->height;
   }
 
-  bool hasMipmaps() const override {
-    return proxy->hasMipmaps();
+  bool isTemporary() const override {
+    return !sequence->composition->staticContent();
   }
 
-  bool isAlphaOnly() const override;
-
-  bool isTextureBacked() const override {
-    return true;
+  bool isFlat() const override {
+    return sequence->composition->type() != CompositionType::Video;
   }
 
-  std::shared_ptr<Texture> getTexture() const override {
-    return proxy->getTexture();
-  }
+  void prepareImage(RenderCache* cache) const override;
 
-  std::shared_ptr<TextureProxy> lockTextureProxy(Context* context) const override;
+  std::shared_ptr<tgfx::Image> getImage(RenderCache* cache) const override;
 
  protected:
-  std::shared_ptr<ImageSource> onMakeMipMapped() const override;
-
-  std::shared_ptr<TextureProxy> onMakeTextureProxy(Context*) const override;
+  std::shared_ptr<tgfx::Image> makeImage(RenderCache* cache) const override;
 
  private:
-  std::shared_ptr<TextureProxy> proxy = nullptr;
-
-  explicit TextureSource(std::shared_ptr<Texture> texture);
-
-  friend class ImageSource;
+  Sequence* sequence = nullptr;
+  Frame targetFrame = 0;
 };
-}  // namespace tgfx
+}  // namespace pag

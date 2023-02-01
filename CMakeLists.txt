@@ -349,11 +349,19 @@ if (PAG_BUILD_TESTS)
     list(APPEND TEST_PLATFORM_LIBS ${FFAVC_LIB})
     list(APPEND TEST_INCLUDES tgfx/src vendor/ffavc/include)
 
+    # used to update the local md5 data for baseline testing.
     add_executable(PAGBaseline ${Test_VENDOR_TARGET} ${PAG_TEST_FILES})
     target_include_directories(PAGBaseline PUBLIC ${TEST_INCLUDES})
     target_compile_definitions(PAGBaseline PUBLIC UPDATE_BASELINE)
     target_link_libraries(PAGBaseline ${TEST_PLATFORM_LIBS})
     set_target_properties(PAGBaseline PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
+
+    # used to generate baseline images to the out/ directory. each image has a "_base" suffix.
+    add_executable(PAGGenerateImages ${Test_VENDOR_TARGET} ${PAG_TEST_FILES})
+    target_include_directories(PAGGenerateImages PUBLIC ${TEST_INCLUDES})
+    target_compile_definitions(PAGGenerateImages PUBLIC GENERATOR_BASELINE_IMAGES)
+    target_link_libraries(PAGGenerateImages ${TEST_PLATFORM_LIBS})
+    set_target_properties(PAGGenerateImages PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS} -fno-access-control")
 
     add_executable(PAGUnitTest ${Test_VENDOR_TARGET} ${PAG_TEST_FILES})
     target_include_directories(PAGUnitTest PUBLIC ${TEST_INCLUDES})

@@ -17,18 +17,23 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AsyncSource.h"
+#include "BufferSource.h"
 
 namespace tgfx {
 AsyncSource::AsyncSource(std::shared_ptr<EncodedSource> source) : encodedSource(std::move(source)) {
   imageBuffer = encodedSource->makeAsyncBuffer();
 }
 
-std::shared_ptr<TextureProxy> AsyncSource::lockTextureProxy(Context* context) const {
+std::shared_ptr<TextureProxy> AsyncSource::getTextureProxy(Context* context) const {
   if (context == nullptr) {
     return nullptr;
   }
   auto provider = context->proxyProvider();
-  auto proxy = provider->findProxyByOwner(encodedSource.get());
+  return provider->findProxyByOwner(encodedSource.get());
+}
+
+std::shared_ptr<TextureProxy> AsyncSource::lockTextureProxy(Context* context) const {
+  auto proxy = getTextureProxy(context);
   if (proxy != nullptr) {
     return proxy;
   }
@@ -37,6 +42,10 @@ std::shared_ptr<TextureProxy> AsyncSource::lockTextureProxy(Context* context) co
     proxy->assignCacheOwner(encodedSource.get());
   }
   return proxy;
+}
+
+std::shared_ptr<ImageSource> AsyncSource::onMakeMipMapped() const {
+  return std::shared_ptr<BufferSource>(new BufferSource(imageBuffer, true));
 }
 
 std::shared_ptr<TextureProxy> AsyncSource::onMakeTextureProxy(Context* context) const {

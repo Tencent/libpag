@@ -26,9 +26,9 @@ namespace pag {
 
 class StillImage : public PAGImage {
  public:
-  static std::shared_ptr<StillImage> MakeFrom(std::shared_ptr<tgfx::PixelBuffer> pixelBuffer);
+  static std::shared_ptr<StillImage> MakeFrom(std::shared_ptr<tgfx::Image> image);
 
-  static std::shared_ptr<StillImage> MakeFrom(std::shared_ptr<tgfx::ImageCodec> codec);
+  static std::shared_ptr<StillImage> MakeFrom(std::shared_ptr<tgfx::PixelBuffer> pixelBuffer);
 
  protected:
   std::shared_ptr<Graphic> getGraphic() override {

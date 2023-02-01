@@ -17,9 +17,43 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SequenceReader.h"
+#include "base/utils/USE.h"
 #include "rendering/caches/RenderCache.h"
+#include "rendering/sequences/BitmapSequenceReader.h"
+#include "rendering/sequences/VideoReader.h"
+#include "rendering/sequences/VideoSequenceDemuxer.h"
+#include "rendering/video/VideoDecoder.h"
+
+#ifdef PAG_BUILD_FOR_WEB
+#include "platform/web/VideoSequenceReader.h"
+#endif
 
 namespace pag {
+std::shared_ptr<SequenceReader> SequenceReader::Make(std::shared_ptr<File> file, Sequence* sequence,
+                                                     PAGFile* pagFile) {
+  std::shared_ptr<SequenceReader> reader = nullptr;
+  auto composition = sequence->composition;
+  if (composition->type() == CompositionType::Bitmap) {
+    reader = std::make_shared<BitmapSequenceReader>(std::move(file),
+                                                    static_cast<BitmapSequence*>(sequence));
+  } else {
+    auto videoSequence = static_cast<VideoSequence*>(sequence);
+#ifdef PAG_BUILD_FOR_WEB
+    if (VideoDecoder::HasExternalSoftwareDecoder()) {
+      auto demuxer = std::make_unique<VideoSequenceDemuxer>(std::move(file), videoSequence);
+      reader = std::make_shared<VideoReader>(std::move(demuxer));
+    } else {
+      reader = std::make_shared<VideoSequenceReader>(std::move(file), videoSequence, pagFile);
+    }
+#else
+    USE(pagFile);
+    auto demuxer = std::make_unique<VideoSequenceDemuxer>(std::move(file), videoSequence);
+    reader = std::make_shared<VideoReader>(std::move(demuxer));
+#endif
+  }
+  return reader;
+}
+
 class SequenceTask : public Executor {
  public:
   static std::shared_ptr<Task> MakeAndRun(SequenceReader* reader, Frame targetFrame) {
@@ -69,7 +103,20 @@ void SequenceReader::prepareNext(Frame targetFrame) {
   }
 }
 
-std::shared_ptr<tgfx::Texture> SequenceReader::readTexture(Frame targetFrame, RenderCache* cache) {
+std::shared_ptr<tgfx::ImageBuffer> SequenceReader::makeBuffer(Frame targetFrame) {
+  auto success = decodeFrame(targetFrame);
+  if (!success) {
+    return nullptr;
+  }
+  return onMakeBuffer();
+}
+
+std::shared_ptr<tgfx::ImageBuffer> SequenceReader::onMakeBuffer() {
+  return nullptr;
+}
+
+std::shared_ptr<tgfx::Texture> SequenceReader::makeTexture(tgfx::Context* context,
+                                                           Frame targetFrame) {
   if (staticContent) {
     targetFrame = 0;
   }
@@ -80,19 +127,29 @@ std::shared_ptr<tgfx::Texture> SequenceReader::readTexture(Frame targetFrame, Re
   // Setting the lastTask to nullptr triggers cancel().
   lastTask = nullptr;
   auto success = decodeFrame(targetFrame);
-  auto decodingTime = clock.measure();
-  recordPerformance(cache, decodingTime);
+  decodingTime += clock.measure();
   // Release the last texture for immediately reusing.
   lastTexture = nullptr;
   lastFrame = -1;
   if (success) {
     clock.reset();
-    lastTexture = makeTexture(cache->getContext());
+    lastTexture = onMakeTexture(context);
     lastFrame = targetFrame;
     preparedFrame = targetFrame;
-    cache->textureUploadingTime += clock.measure();
+    textureUploadingTime += clock.measure();
     prepareNext(targetFrame);
   }
   return lastTexture;
+}
+
+void SequenceReader::recordPerformance(Performance* performance) {
+  if (decodingTime > 0) {
+    performance->imageDecodingTime += decodingTime;
+    decodingTime = 0;
+  }
+  if (textureUploadingTime > 0) {
+    performance->textureUploadingTime += textureUploadingTime;
+    textureUploadingTime = 0;
+  }
 }
 }  // namespace pag

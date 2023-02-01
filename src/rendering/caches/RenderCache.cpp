@@ -23,15 +23,9 @@
 #include "rendering/caches/ImageContentCache.h"
 #include "rendering/caches/LayerCache.h"
 #include "rendering/renderers/FilterRenderer.h"
-#include "rendering/sequences/BitmapSequenceReader.h"
-#include "rendering/sequences/VideoReader.h"
-#include "rendering/sequences/VideoSequenceDemuxer.h"
-#include "rendering/video/VideoDecoder.h"
+#include "rendering/sequences/SequenceImage.h"
+#include "rendering/sequences/SequenceImageProxy.h"
 #include "tgfx/core/Clock.h"
-
-#ifdef PAG_BUILD_FOR_WEB
-#include "platform/web/VideoSequenceReader.h"
-#endif
 
 namespace pag {
 // 300M设置的大一些用于兜底，通常在大于20M时就开始随时清理。
@@ -39,38 +33,7 @@ static constexpr int MAX_GRAPHICS_MEMORY = 314572800;
 static constexpr int PURGEABLE_GRAPHICS_MEMORY = 20971520;  // 20M
 static constexpr int PURGEABLE_EXPIRED_FRAME = 10;
 static constexpr float SCALE_FACTOR_PRECISION = 0.001f;
-
-class ImageTask : public Executor {
- public:
-  static std::shared_ptr<Task> MakeAndRun(std::shared_ptr<tgfx::ImageCodec> codec,
-                                          std::shared_ptr<File> file) {
-    if (codec == nullptr) {
-      return nullptr;
-    }
-    auto bitmap = new ImageTask(std::move(codec), file);
-    auto task = Task::Make(std::unique_ptr<ImageTask>(bitmap));
-    task->run();
-    return task;
-  }
-
-  std::shared_ptr<tgfx::ImageBuffer> getBuffer() const {
-    return buffer;
-  }
-
- private:
-  std::shared_ptr<tgfx::ImageBuffer> buffer = {};
-  std::shared_ptr<tgfx::ImageCodec> codec = nullptr;
-  // Make a reference to file when image made from imageByte of file.
-  std::shared_ptr<File> file = nullptr;
-
-  explicit ImageTask(std::shared_ptr<tgfx::ImageCodec> codec, std::shared_ptr<File> file)
-      : codec(std::move(codec)), file(std::move(file)) {
-  }
-
-  void execute() override {
-    buffer = codec->makeBuffer();
-  }
-};
+static constexpr float MIPMAP_ENABLED_THRESHOLD = 0.4f;
 
 RenderCache::RenderCache(PAGStage* stage) : _uniqueID(UniqueID::Next()), stage(stage) {
 }
@@ -129,25 +92,23 @@ void RenderCache::preparePreComposeLayer(PreComposeLayer* layer) {
   if (compositionFrame < 0) {
     compositionFrame = 0;
   }
-  auto assetID = composition->uniqueID;
-  usedAssets.insert(assetID);
-  if (composition->staticContent() && hasSnapshot(assetID)) {
-    // 静态的序列帧采用位图的缓存逻辑，如果上层缓存过 Snapshot 就不需要预测。
+  auto sequence = Sequence::Get(composition);
+  if (composition->staticContent()) {
+    SequenceImageProxy proxy(sequence, 0);
+    prepareAssetImage(composition->uniqueID, &proxy);
     return;
   }
-  auto sequence = Sequence::Get(composition);
   auto targetFrame = sequence->toSequenceFrame(compositionFrame);
-  auto result = sequenceCaches.find(assetID);
+  auto result = sequenceCaches.find(composition->uniqueID);
   if (result != sequenceCaches.end()) {
     // 更新循环预测起点，激活预测。
     auto reader = result->second.front();
     reader->pendingFirstFrame = targetFrame;
     return;
   }
-  auto reader = makeSequenceReader(sequence);
-  if (reader) {
-    reader->prepare(targetFrame);
-  }
+  auto backup = usedSequences;
+  prepareSequenceImage(sequence, targetFrame);
+  usedSequences = backup;
 }
 
 void RenderCache::prepareImageLayer(PAGImageLayer* pagLayer) {
@@ -210,7 +171,9 @@ void RenderCache::attachToContext(tgfx::Context* current, bool forHitTest) {
   auto removedAssets = stage->getRemovedAssets();
   for (auto assetID : removedAssets) {
     removeSnapshot(assetID);
-    imageTasks.erase(assetID);
+    assetImages.erase(assetID);
+    decodedAssetImages.erase(assetID);
+    decodedSequenceImages.erase(assetID);
     clearSequenceCache(assetID);
     clearFilterCache(assetID);
     removeTextAtlas(assetID);
@@ -221,7 +184,6 @@ void RenderCache::attachToContext(tgfx::Context* current, bool forHitTest) {
 void RenderCache::releaseAll() {
   clearAllSnapshots();
   clearAllTextAtlas();
-  shapeCaches.clear();
   graphicsMemory = 0;
   clearAllSequenceCaches();
   for (auto& item : filterCaches) {
@@ -238,8 +200,9 @@ void RenderCache::detachFromContext() {
     context = nullptr;
     return;
   }
+  recordPerformance();
   clearExpiredSequences();
-  clearExpiredBitmaps();
+  clearExpiredDecodedImages();
   clearExpiredSnapshots();
   if (!timestamps.empty()) {
     // Always purge recycled resources that haven't been used in 1 frame.
@@ -269,17 +232,17 @@ Snapshot* RenderCache::getSnapshot(ID assetID) const {
   return nullptr;
 }
 
-Snapshot* RenderCache::getSnapshot(const Picture* image) {
+Snapshot* RenderCache::getSnapshot(const Picture* picture) {
   if (!_snapshotEnabled) {
     return nullptr;
   }
-  usedAssets.insert(image->assetID);
-  auto maxScaleFactor = stage->getAssetMaxScale(image->assetID);
-  auto scaleFactor = image->getScaleFactor(maxScaleFactor);
-  auto snapshot = getSnapshot(image->assetID);
-  if (snapshot && (snapshot->makerKey != image->uniqueKey ||
+  usedAssets.insert(picture->assetID);
+  auto maxScaleFactor = stage->getAssetMaxScale(picture->assetID);
+  auto scaleFactor = picture->getScaleFactor(maxScaleFactor);
+  auto snapshot = getSnapshot(picture->assetID);
+  if (snapshot && (snapshot->makerKey != picture->uniqueKey ||
                    fabsf(snapshot->scaleFactor() - scaleFactor) > SCALE_FACTOR_PRECISION)) {
-    removeSnapshot(image->assetID);
+    removeSnapshot(picture->assetID);
     snapshot = nullptr;
   }
   if (snapshot) {
@@ -290,18 +253,19 @@ Snapshot* RenderCache::getSnapshot(const Picture* image) {
   if (scaleFactor < SCALE_FACTOR_PRECISION || graphicsMemory >= MAX_GRAPHICS_MEMORY) {
     return nullptr;
   }
-  bool enableMipMap = NeedsEnableMipMap(stage->getAssetRelativeMinScale(image->assetID));
-  auto newSnapshot = image->makeSnapshot(this, scaleFactor, enableMipMap);
+  auto minScaleFactor = stage->getAssetMinScale(picture->assetID);
+  bool enableMipMap = minScaleFactor / scaleFactor < MIPMAP_ENABLED_THRESHOLD;
+  auto newSnapshot = picture->makeSnapshot(this, scaleFactor, enableMipMap);
   if (newSnapshot == nullptr) {
     return nullptr;
   }
   snapshot = newSnapshot.release();
-  snapshot->assetID = image->assetID;
-  snapshot->makerKey = image->uniqueKey;
+  snapshot->assetID = picture->assetID;
+  snapshot->makerKey = picture->uniqueKey;
   graphicsMemory += snapshot->memoryUsage();
   snapshotLRU.push_front(snapshot);
   snapshotPositions[snapshot] = snapshotLRU.begin();
-  snapshotCaches[image->assetID] = snapshot;
+  snapshotCaches[picture->assetID] = snapshot;
   return snapshot;
 }
 
@@ -457,91 +421,148 @@ void RenderCache::clearExpiredSnapshots() {
   }
 }
 
-void RenderCache::prepareImage(ID assetID, std::shared_ptr<tgfx::ImageCodec> codec) {
+void RenderCache::prepareAssetImage(ID assetID, const ImageProxy* proxy) {
   usedAssets.insert(assetID);
-  if (imageTasks.count(assetID) != 0 || snapshotCaches.count(assetID) != 0) {
+  if (decodedAssetImages.count(assetID) != 0 || hasSnapshot(assetID)) {
     return;
   }
-  auto layer = stage->getLayerFromReferenceMap(assetID);
-  auto task = ImageTask::MakeAndRun(std::move(codec), layer->getFile());
-  if (task) {
-    imageTasks[assetID] = task;
+  auto image = getAssetImageInternal(assetID, proxy);
+  if (image == nullptr) {
+    return;
+  }
+  // TODO(domrjchen): the context currently is always nullptr.
+  auto decodedImage = image->makeDecoded(context);
+  if (decodedImage != image) {
+    decodedAssetImages[assetID] = decodedImage;
   }
 }
 
-std::shared_ptr<tgfx::ImageBuffer> RenderCache::getImageBuffer(ID assetID) {
+std::shared_ptr<tgfx::Image> RenderCache::getAssetImage(ID assetID, const ImageProxy* proxy) {
   usedAssets.insert(assetID);
-  auto result = imageTasks.find(assetID);
-  if (result != imageTasks.end()) {
-    auto executor = result->second->wait();
-    auto buffer = static_cast<ImageTask*>(executor)->getBuffer();
-    // 预测生成的 Bitmap 取了一次就应该销毁，上层会进行缓存。
-    imageTasks.erase(result);
-    return buffer;
+  auto result = decodedAssetImages.find(assetID);
+  if (result != decodedAssetImages.end()) {
+    auto decodedImage = result->second;
+    decodedAssetImages.erase(result);
+    return decodedImage;
   }
-  return {};
+  return getAssetImageInternal(assetID, proxy);
 }
 
-void RenderCache::clearExpiredBitmaps() {
-  std::vector<ID> expiredBitmaps = {};
-  for (auto& item : imageTasks) {
+std::shared_ptr<tgfx::Image> RenderCache::getAssetImageInternal(ID assetID,
+                                                                const ImageProxy* proxy) {
+  auto image = assetImages[assetID];
+  if (image != nullptr) {
+    return image;
+  }
+  image = proxy->makeImage(this);
+  if (image == nullptr) {
+    return nullptr;
+  }
+  auto scaleFactor = stage->getAssetMinScale(assetID);
+  if (scaleFactor < MIPMAP_ENABLED_THRESHOLD) {
+    image = image->makeMipMapped();
+  }
+  assetImages[assetID] = image;
+  return image;
+}
+
+void RenderCache::clearExpiredDecodedImages() {
+  std::vector<ID> expiredList = {};
+  for (auto& item : decodedAssetImages) {
     if (usedAssets.count(item.first) == 0) {
-      expiredBitmaps.push_back(item.first);
+      expiredList.push_back(item.first);
     }
   }
-  for (auto& bitmapID : expiredBitmaps) {
-    imageTasks.erase(bitmapID);
+  for (auto& assetID : expiredList) {
+    decodedAssetImages.erase(assetID);
+  }
+  expiredList = {};
+  for (auto& item : decodedSequenceImages) {
+    if (usedAssets.count(item.first) == 0) {
+      expiredList.push_back(item.first);
+    }
+  }
+  for (auto& assetID : expiredList) {
+    decodedSequenceImages.erase(assetID);
   }
 }
 
 //===================================== sequence caches =====================================
 
-void RenderCache::prepareSequence(Sequence* sequence, Frame targetFrame) {
+void RenderCache::prepareSequenceImage(Sequence* sequence, Frame targetFrame) {
   if (sequence == nullptr) {
     return;
   }
-  auto composition = sequence->composition;
-  if (composition->staticContent() && hasSnapshot(composition->uniqueID)) {
-    // 静态的序列帧采用位图的缓存逻辑，如果上层缓存过 Snapshot 就不需要预测。
+  auto assetID = sequence->composition->uniqueID;
+  usedAssets.insert(assetID);
+  if (decodedSequenceImages.count(assetID) > 0) {
     return;
   }
-  auto reader = getSequenceReader(sequence, targetFrame);
-  if (reader) {
-    reader->prepare(targetFrame);
+  auto image = getSequenceImageInternal(sequence, targetFrame);
+  if (image == nullptr) {
+    return;
+  }
+  auto decodedImage = image->makeDecoded(context);
+  if (decodedImage != image) {
+    decodedSequenceImages[assetID][targetFrame] = image;
   }
 }
 
-std::shared_ptr<tgfx::Texture> RenderCache::getSequenceFrame(Sequence* sequence,
-                                                             Frame targetFrame) {
+std::shared_ptr<tgfx::Image> RenderCache::getSequenceImage(Sequence* sequence, Frame targetFrame) {
   if (sequence == nullptr) {
     return nullptr;
   }
+  auto assetID = sequence->composition->uniqueID;
+  auto result = decodedSequenceImages.find(assetID);
+  if (result != decodedSequenceImages.end()) {
+    auto& imageMap = result->second;
+    auto imageResult = imageMap.find(targetFrame);
+    if (imageResult != imageMap.end()) {
+      auto decodedImage = imageResult->second;
+      imageMap.erase(imageResult);
+      if (imageMap.empty()) {
+        decodedSequenceImages.erase(result);
+      }
+      return decodedImage;
+    }
+  }
+  return getSequenceImageInternal(sequence, targetFrame);
+}
+
+// We don't check mipmaps for sequences since there is currently no backend support yet.
+std::shared_ptr<tgfx::Image> RenderCache::getSequenceImageInternal(Sequence* sequence,
+                                                                   Frame targetFrame) {
+  if (sequence == nullptr) {
+    return nullptr;
+  }
+  auto composition = sequence->composition;
+  if (composition->staticContent()) {
+    // Should not get here, we treat sequences with static content as normal asset images.
+    return nullptr;
+  }
+  auto assetID = composition->uniqueID;
+  usedAssets.insert(assetID);
   auto reader = getSequenceReader(sequence, targetFrame);
   if (reader == nullptr) {
     return nullptr;
   }
-  auto composition = sequence->composition;
-  auto texture = reader->readTexture(targetFrame, this);
-  if (composition->staticContent()) {
-    // There is no need to cache a reader for the static sequence, it has already been cached as
-    // a snapshot. We get here because the reader was created by prepare() methods.
-    auto result = sequenceCaches.find(composition->uniqueID);
-    if (result != sequenceCaches.end()) {
-      for (auto item : result->second) {
-        delete item;
-      }
-      sequenceCaches.erase(result);
+  auto result = readerToSequenceImage.find(reader.get());
+  if (result != readerToSequenceImage.end()) {
+    if (result->second.second == targetFrame) {
+      return result->second.first;
     }
+    readerToSequenceImage.erase(result);
   }
-  return texture;
+  auto image = SequenceImage::MakeFrom(reader, sequence, targetFrame);
+  if (image != nullptr) {
+    readerToSequenceImage[reader.get()] = {image, targetFrame};
+  }
+  return image;
 }
 
-SequenceReader* RenderCache::getSequenceReader(Sequence* sequence, Frame targetFrame) {
-  if (sequence->composition->staticContent()) {
-    targetFrame = 0;
-  }
+std::shared_ptr<SequenceReader> RenderCache::getSequenceReader(Sequence* sequence,
+                                                               Frame targetFrame) {
   auto assetID = sequence->composition->uniqueID;
-  usedAssets.insert(assetID);
   auto& sequenceMap = usedSequences[assetID];
   auto readerResult = sequenceMap.find(targetFrame);
   if (readerResult != sequenceMap.end()) {
@@ -557,18 +578,19 @@ SequenceReader* RenderCache::getSequenceReader(Sequence* sequence, Frame targetF
   return reader;
 }
 
-SequenceReader* RenderCache::findNearestSequenceReader(Sequence* sequence, Frame targetFrame) {
+std::shared_ptr<SequenceReader> RenderCache::findNearestSequenceReader(Sequence* sequence,
+                                                                       Frame targetFrame) {
   auto assetID = sequence->composition->uniqueID;
   auto result = sequenceCaches.find(assetID);
   if (result == sequenceCaches.end()) {
     return nullptr;
   }
   auto& sequenceMap = usedSequences[assetID];
-  std::unordered_set<SequenceReader*> usedReaders = {};
+  std::unordered_set<std::shared_ptr<SequenceReader>> usedReaders = {};
   for (auto& item : sequenceMap) {
     usedReaders.insert(item.second);
   }
-  std::vector<SequenceReader*> freeReaders = {};
+  std::vector<std::shared_ptr<SequenceReader>> freeReaders = {};
   for (auto& item : result->second) {
     if (usedReaders.count(item) == 0) {
       freeReaders.push_back(item);
@@ -577,7 +599,7 @@ SequenceReader* RenderCache::findNearestSequenceReader(Sequence* sequence, Frame
   if (freeReaders.empty()) {
     return nullptr;
   }
-  SequenceReader* reader = nullptr;
+  std::shared_ptr<SequenceReader> reader = nullptr;
   Frame minDistance = INT64_MAX;
   for (auto& item : freeReaders) {
     if (item->lastFrame == targetFrame) {
@@ -600,30 +622,13 @@ SequenceReader* RenderCache::findNearestSequenceReader(Sequence* sequence, Frame
   return reader;
 }
 
-SequenceReader* RenderCache::makeSequenceReader(Sequence* sequence) {
-  SequenceReader* reader = nullptr;
+std::shared_ptr<SequenceReader> RenderCache::makeSequenceReader(Sequence* sequence) {
   auto composition = sequence->composition;
   if (!_videoEnabled && composition->type() == CompositionType::Video) {
-    return reader;
+    return nullptr;
   }
   auto layer = stage->getLayerFromReferenceMap(composition->uniqueID);
-  if (composition->type() == CompositionType::Bitmap) {
-    reader = new BitmapSequenceReader(layer->getFile(), static_cast<BitmapSequence*>(sequence));
-  } else {
-    auto videoSequence = static_cast<VideoSequence*>(sequence);
-#ifdef PAG_BUILD_FOR_WEB
-    if (VideoDecoder::HasExternalSoftwareDecoder()) {
-      auto demuxer =
-          std::make_unique<VideoSequenceDemuxer>(layer->rootFile->getFile(), videoSequence);
-      reader = new VideoReader(std::move(demuxer));
-    } else {
-      reader = new VideoSequenceReader(layer, videoSequence);
-    }
-#else
-    auto demuxer = std::make_unique<VideoSequenceDemuxer>(layer->getFile(), videoSequence);
-    reader = new VideoReader(std::move(demuxer));
-#endif
-  }
+  auto reader = SequenceReader::Make(layer->getFile(), sequence, layer->rootFile);
   auto assetID = sequence->composition->uniqueID;
   auto result = sequenceCaches.find(assetID);
   if (result == sequenceCaches.end()) {
@@ -637,19 +642,17 @@ SequenceReader* RenderCache::makeSequenceReader(Sequence* sequence) {
 void RenderCache::clearAllSequenceCaches() {
   for (auto& item : sequenceCaches) {
     removeSnapshot(item.first);
-    for (auto reader : item.second) {
-      delete reader;
-    }
   }
   sequenceCaches.clear();
+  readerToSequenceImage.clear();
 }
 
 void RenderCache::clearSequenceCache(ID uniqueID) {
   auto result = sequenceCaches.find(uniqueID);
   if (result != sequenceCaches.end()) {
     removeSnapshot(result->first);
-    for (auto reader : result->second) {
-      delete reader;
+    for (auto& reader : result->second) {
+      readerToSequenceImage.erase(reader.get());
     }
     sequenceCaches.erase(result);
   }
@@ -720,6 +723,22 @@ void RenderCache::clearFilterCache(ID uniqueID) {
   if (result != filterCaches.end()) {
     delete result->second;
     filterCaches.erase(result);
+  }
+}
+
+std::shared_ptr<File> RenderCache::getFileByAssetID(ID assetID) {
+  auto layer = stage->getLayerFromReferenceMap(assetID);
+  if (layer == nullptr) {
+    return nullptr;
+  }
+  return layer->file;
+}
+
+void RenderCache::recordPerformance() {
+  for (auto& item : sequenceCaches) {
+    for (auto& reader : item.second) {
+      reader->recordPerformance(this);
+    }
   }
 }
 
