@@ -38,25 +38,30 @@
   if (pagComposition == nil) {
     return nil;
   }
-  return [[PAGDecoder alloc] initWithPAGComposition:pagComposition scale:scale];
-}
-
-- (instancetype)initWithPAGComposition:(PAGComposition*)pagComposition scale:(CGFloat)scale {
-  self = [[super init] autorelease];
   if (scale <= 0) {
     scale = 1.0;
   }
-  pagSurface = [PAGSurface
+  PAGSurface* pagSurface = [PAGSurface
       MakeOffscreen:CGSizeMake([pagComposition width] * scale, [pagComposition height] * scale)];
   if (pagSurface == nil) {
     return nil;
   }
-  [pagSurface retain];
-  lastFrameImage = nil;
-  pagPlayer = [[PAGPlayer alloc] init];
-  numFrames = [pagComposition duration] * [pagComposition frameRate] / 1000000;
-  [pagPlayer setSurface:pagSurface];
-  [pagPlayer setComposition:pagComposition];
+
+  return [[[PAGDecoder alloc] initWithPAGComposition:pagComposition
+                                          pagSurface:pagSurface] autorelease];
+}
+
+- (instancetype)initWithPAGComposition:(PAGComposition*)composition
+                            pagSurface:(PAGSurface*)surface {
+  self = [super init];
+  if (self) {
+    pagSurface = [surface retain];
+    pagPlayer = [[PAGPlayer alloc] init];
+    [pagPlayer setComposition:composition];
+    [pagPlayer setSurface:pagSurface];
+    numFrames = [composition duration] * [composition frameRate] / 1000000;
+    lastFrameImage = nil;
+  }
   return self;
 }
 
@@ -92,11 +97,15 @@
     return lastFrameImage;
   }
   UIImage* image = [self imageFromCVPixelBufferRef:[pagSurface makeSnapshot]];
-  lastFrameImage = image;
+  if (lastFrameImage) {
+    [lastFrameImage release];
+  }
+  lastFrameImage = [image retain];
   return image;
 }
 
 - (void)dealloc {
+  [lastFrameImage release];
   lastFrameImage = nil;
   [pagSurface release];
   [pagPlayer release];

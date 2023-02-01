@@ -258,6 +258,7 @@ bool CGScalerContext::generatePath(GlyphID glyphID, Path* path) {
   }
   SInt16 format;
   CFNumberGetValue(static_cast<CFNumberRef>(fontFormat), kCFNumberSInt16Type, &format);
+  CFRelease(fontFormat);
   if (format == kCTFontFormatUnrecognized || format == kCTFontFormatBitmap) {
     return false;
   }
