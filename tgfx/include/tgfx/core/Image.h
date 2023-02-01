@@ -212,6 +212,15 @@ class Image {
    */
   std::shared_ptr<Image> makeMipMapped() const;
 
+  /**
+   * Marks the corresponding texture cache of the Image as expired in the context, which immediately
+   * makes the texture cache recyclable. The context will purge the texture cache when its purge
+   * methods are called or if its memory usage reaches the cache limit. Releasing the Image will
+   * automatically mark the corresponding texture cache as expired, so there is no need to call this
+   * method if the Image is about to be released. Does nothing if the context is nullptr.
+   */
+  void markCacheExpired(Context* context);
+
  protected:
   std::weak_ptr<Image> weakThis;
   std::shared_ptr<ImageSource> source = nullptr;

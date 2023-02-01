@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Picture.h"
+#include <unordered_set>
 #include "base/utils/MatrixUtil.h"
 #include "rendering/caches/RenderCache.h"
 #include "tgfx/core/Clock.h"
@@ -25,6 +26,11 @@
 #include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace pag {
+class SkipSnapshotOptions : public tgfx::SurfaceOptions {
+ public:
+  std::unordered_set<std::shared_ptr<tgfx::Image>> drawnImages = {};
+};
+
 // 若当前直接绘制纹理性能是最好的，就直接绘制，否则返回 false。
 static bool TryDrawDirectly(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> image, bool isFlat) {
   if (image == nullptr) {
@@ -77,8 +83,10 @@ static std::shared_ptr<tgfx::Image> RescaleImage(tgfx::Context* context,
   }
   auto canvas = surface->getCanvas();
   canvas->setMatrix(tgfx::Matrix::MakeScale(scaleFactor));
-  canvas->drawImage(std::move(image));
-  return tgfx::Image::MakeFromTexture(surface->getTexture());
+  canvas->drawImage(image);
+  auto texture = surface->getTexture();
+  image->markCacheExpired(context);
+  return tgfx::Image::MakeFromTexture(std::move(texture));
 }
 
 //================================= ImageProxyPicture ====================================
@@ -122,17 +130,23 @@ class ImageProxyPicture : public Picture {
 
   void draw(tgfx::Canvas* canvas, RenderCache* cache) const override {
     auto image = proxy->getImage(cache);
+    auto options = static_cast<SkipSnapshotOptions*>(canvas->surfaceOptions());
+    if (options) {
+      options->drawnImages.insert(image);
+    }
     if (proxy->isTemporary()) {
       if (TryDrawDirectly(canvas, image, proxy->isFlat())) {
         return;
       }
     }
-    auto snapshot = cache->getSnapshot(this);
-    if (snapshot) {
-      canvas->drawImage(snapshot->getImage(), snapshot->getMatrix());
-    } else {
-      DrawDirectly(canvas, image, proxy->isFlat());
+    if (!options) {
+      auto snapshot = cache->getSnapshot(this);
+      if (snapshot) {
+        canvas->drawImage(snapshot->getImage(), snapshot->getMatrix());
+        return;
+      }
     }
+    DrawDirectly(canvas, image, proxy->isFlat());
   }
 
  private:
@@ -167,11 +181,6 @@ class ImageProxyPicture : public Picture {
 //=================================== ImageProxyPicture==========================================
 
 //====================================== SnapshotPicture ===========================================
-class SnapshotPictureOptions : public tgfx::SurfaceOptions {
- public:
-  bool skipSnapshotPictureCache = false;
-};
-
 class SnapshotPicture : public Picture {
  public:
   SnapshotPicture(ID assetID, std::shared_ptr<Graphic> graphic)
@@ -200,8 +209,8 @@ class SnapshotPicture : public Picture {
   }
 
   void draw(tgfx::Canvas* canvas, RenderCache* cache) const override {
-    auto options = static_cast<const SnapshotPictureOptions*>(canvas->surfaceOptions());
-    if (options && options->skipSnapshotPictureCache) {
+    auto options = static_cast<const SkipSnapshotOptions*>(canvas->surfaceOptions());
+    if (options) {
       graphic->draw(canvas, cache);
       return;
     }
@@ -228,9 +237,8 @@ class SnapshotPicture : public Picture {
     if (surface == nullptr) {
       return nullptr;
     }
-    auto options = std::make_unique<SnapshotPictureOptions>();
-    options->skipSnapshotPictureCache = true;
-    surface->setOptions(std::move(options));
+    SkipSnapshotOptions options = {};
+    surface->setOptions(&options);
     auto canvas = surface->getCanvas();
     auto matrix = tgfx::Matrix::MakeScale(scaleFactor);
     matrix.preTranslate(-bounds.x(), -bounds.y());
@@ -239,6 +247,9 @@ class SnapshotPicture : public Picture {
     auto drawingMatrix = tgfx::Matrix::I();
     matrix.invert(&drawingMatrix);
     auto image = tgfx::Image::MakeFromTexture(surface->getTexture());
+    for (auto& drawnImage : options.drawnImages) {
+      drawnImage->markCacheExpired(cache->getContext());
+    }
     auto snapshot = new Snapshot(std::move(image), drawingMatrix);
     return std::unique_ptr<Snapshot>(snapshot);
   }

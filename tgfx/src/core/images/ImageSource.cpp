@@ -107,12 +107,16 @@ std::shared_ptr<ImageSource> ImageSource::makeMipMapped() const {
   return source;
 }
 
-std::shared_ptr<TextureProxy> ImageSource::lockTextureProxy(Context* context) const {
+std::shared_ptr<TextureProxy> ImageSource::getTextureProxy(Context* context) const {
   if (context == nullptr) {
     return nullptr;
   }
   auto provider = context->proxyProvider();
-  auto proxy = provider->findProxyByOwner(this);
+  return provider->findProxyByOwner(this);
+}
+
+std::shared_ptr<TextureProxy> ImageSource::lockTextureProxy(Context* context) const {
+  auto proxy = getTextureProxy(context);
   if (proxy != nullptr) {
     return proxy;
   }

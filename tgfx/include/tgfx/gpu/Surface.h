@@ -80,15 +80,16 @@ class Surface {
   /**
    * Returns SurfaceOptions for this surface.
    */
-  const SurfaceOptions* options() const {
-    return surfaceOptions.get();
+  SurfaceOptions* options() const {
+    return surfaceOptions;
   }
 
   /**
-   * Sets the options property for this surface.
+   * Sets the options property for this surface. The caller is responsible for managing the lifetime
+   * of the SurfaceOptions.
    */
-  void setOptions(std::unique_ptr<SurfaceOptions> newOptions) {
-    surfaceOptions = std::move(newOptions);
+  void setOptions(SurfaceOptions* newOptions) {
+    surfaceOptions = newOptions;
   }
 
   /**
@@ -173,7 +174,7 @@ class Surface {
   bool requiresManualMSAAResolve = false;
 
  private:
-  std::unique_ptr<SurfaceOptions> surfaceOptions = nullptr;
+  SurfaceOptions* surfaceOptions = nullptr;
   Canvas* canvas = nullptr;
 
   friend class DrawingManager;

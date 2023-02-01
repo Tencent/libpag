@@ -65,7 +65,7 @@ class Canvas {
   /**
    * Returns SurfaceOptions associated with this canvas.
    */
-  const SurfaceOptions* surfaceOptions() const;
+  SurfaceOptions* surfaceOptions() const;
 
   /**
    * Saves alpha, blend mode, matrix and clip. Calling restore() discards changes to them, restoring
