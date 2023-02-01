@@ -27,6 +27,8 @@ class PngCodec : public ImageCodec {
   static std::shared_ptr<ImageCodec> MakeFrom(std::shared_ptr<Data> imageBytes);
   static bool IsPng(const std::shared_ptr<Data>& data);
 
+  bool isAlphaOnly() const override;
+
 #ifdef TGFX_USE_PNG_ENCODE
   static std::shared_ptr<Data> Encode(const ImageInfo& info, const void* pixels,
                                       EncodedFormat format, int quality);
@@ -39,13 +41,15 @@ class PngCodec : public ImageCodec {
   static std::shared_ptr<ImageCodec> MakeFromData(const std::string& filePath,
                                                   std::shared_ptr<Data> byteData);
 
-  PngCodec(int width, int height, Orientation orientation, std::string filePath,
+  PngCodec(int width, int height, Orientation orientation, bool isAlphaOnly, std::string filePath,
            std::shared_ptr<Data> fileData)
       : ImageCodec(width, height, orientation),
+        _isAlphaOnly(isAlphaOnly),
         fileData(std::move(fileData)),
         filePath(std::move(filePath)) {
   }
 
+  bool _isAlphaOnly = false;
   std::shared_ptr<Data> fileData;
   std::string filePath;
 };
