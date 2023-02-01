@@ -168,29 +168,29 @@ PAG_TEST_F(AsyncDecode, imageDecodeTest) {
     TestPAGPlayer->flush();
     switch (currentFrame) {
       case 0: {
-        ASSERT_EQ(static_cast<int>(renderCache->imageTasks.size()), 1);
-        auto bitmapID = renderCache->imageTasks.begin()->first;
+        ASSERT_EQ(static_cast<int>(renderCache->decodedAssetImages.size()), 1);
+        auto bitmapID = renderCache->decodedAssetImages.begin()->first;
         EXPECT_EQ(bitmapID, pagImage->uniqueID());
       } break;
       case 9:
-        EXPECT_EQ(static_cast<int>(renderCache->imageTasks.size()), 1);
+        EXPECT_EQ(static_cast<int>(renderCache->decodedAssetImages.size()), 1);
         break;
       case 10:
-        ASSERT_EQ(static_cast<int>(renderCache->imageTasks.size()), 0);
+        ASSERT_EQ(static_cast<int>(renderCache->decodedAssetImages.size()), 0);
         break;
       case 25:
         // 进入第三个图片的预测
-        EXPECT_EQ(static_cast<int>(renderCache->imageTasks.size()), 1);
+        EXPECT_EQ(static_cast<int>(renderCache->decodedAssetImages.size()), 1);
         break;
       case 39:
-        EXPECT_EQ(static_cast<int>(renderCache->imageTasks.size()), 1);
+        EXPECT_EQ(static_cast<int>(renderCache->decodedAssetImages.size()), 1);
         break;
       case 40:
-        EXPECT_EQ(static_cast<int>(renderCache->imageTasks.size()), 0);
+        EXPECT_EQ(static_cast<int>(renderCache->decodedAssetImages.size()), 0);
         break;
       case 45:
         // 开始循环预测, 本应该是 1，但是第一张图的缓存还存在，所以这里是 0.
-        EXPECT_EQ(static_cast<int>(renderCache->imageTasks.size()), 0);
+        EXPECT_EQ(static_cast<int>(renderCache->decodedAssetImages.size()), 0);
         break;
       default:
         break;

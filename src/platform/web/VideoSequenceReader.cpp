@@ -81,8 +81,8 @@ VideoSequenceReader::VideoSequenceReader(std::shared_ptr<File> file, VideoSequen
                                          PAGFile* pagFile)
     : SequenceReader(sequence->duration(), sequence->composition->staticContent()), file(file),
       rootFile(pagFile) {
-  width = sequence->getVideoWidth();
-  height = sequence->getVideoHeight();
+  _width = sequence->getVideoWidth();
+  _height = sequence->getVideoHeight();
   auto videoReaderClass = val::module_property("VideoReader");
   if (videoReaderClass.as<bool>()) {
     auto staticTimeRanges = val::array();
@@ -118,8 +118,8 @@ VideoSequenceReader::VideoSequenceReader(std::shared_ptr<File> file, VideoSequen
     }
     videoReader =
         videoReaderClass
-            .call<val>("create", val(typed_memory_view(mp4Data->length(), mp4Data->data())), width,
-                       height, sequence->frameRate, staticTimeRanges)
+            .call<val>("create", val(typed_memory_view(mp4Data->length(), mp4Data->data())), _width,
+                       _height, sequence->frameRate, staticTimeRanges)
             .await();
   }
 }
@@ -149,7 +149,7 @@ std::shared_ptr<tgfx::Texture> VideoSequenceReader::onMakeTexture(tgfx::Context*
   if (webVideoTexture == nullptr) {
     auto isAndroidMiniprogram =
         val::module_property("VideoReader").call<bool>("isAndroidMiniprogram");
-    webVideoTexture = WebVideoTexture::Make(context, width, height, isAndroidMiniprogram);
+    webVideoTexture = WebVideoTexture::Make(context, _width, _height, isAndroidMiniprogram);
   }
   auto& sampler = webVideoTexture->glSampler();
   videoReader.call<void>("renderToTexture", val::module_property("GL"), sampler.id);

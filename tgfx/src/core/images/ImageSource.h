@@ -95,14 +95,6 @@ class ImageSource : public Cacheable {
   }
 
   /**
-   * Returns a decoded ImageSource from the lazy ImageSource. The returned ImageSource shares the
-   * same texture cache with the original ImageSource and immediately schedules an asynchronous
-   * decoding task, which will not block the calling thread. Returns nullptr if the ImageSource is
-   * not lazy or has a corresponding texture cache in the specified context.
-   */
-  std::shared_ptr<ImageSource> makeDecodedSource(Context* context = nullptr) const;
-
-  /**
    * Returns an ImageSource backed by GPU texture associated with context. Returns original
    * ImageSource if context is compatible with backing GPU texture. Returns nullptr if context is
    * nullptr, or if ImageSource was created with another context.
@@ -110,12 +102,28 @@ class ImageSource : public Cacheable {
   std::shared_ptr<ImageSource> makeTextureSource(Context* context, bool wrapCacheOnly) const;
 
   /**
+   * Returns a decoded ImageSource from the lazy ImageSource. The returned ImageSource shares the
+   * same texture cache with the original ImageSource and immediately schedules an asynchronous
+   * decoding task, which will not block the calling thread. Returns nullptr if the ImageSource is
+   * not lazy or has a corresponding texture cache in the specified context.
+   */
+  std::shared_ptr<ImageSource> makeDecoded(Context* context = nullptr) const;
+
+  /**
+   * Returns an Image with mipmaps enabled. Returns the original Image if the Image has mipmaps
+   * enabled already or fails to enable mipmaps.
+   */
+  std::shared_ptr<ImageSource> makeMipMapped() const;
+
+  /**
    * Creates a TextureProxy with the specified context from the ImageSource.
    */
   virtual std::shared_ptr<TextureProxy> lockTextureProxy(Context* context) const;
 
  protected:
-  virtual std::shared_ptr<ImageSource> onMakeDecodedSource(Context* context) const;
+  virtual std::shared_ptr<ImageSource> onMakeDecoded(Context* context) const;
+
+  virtual std::shared_ptr<ImageSource> onMakeMipMapped() const = 0;
 
   virtual std::shared_ptr<TextureProxy> onMakeTextureProxy(Context* context) const = 0;
 };

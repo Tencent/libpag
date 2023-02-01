@@ -19,7 +19,6 @@
 #pragma once
 
 #include "FragmentProcessor.h"
-#include "tgfx/core/RGBAAALayout.h"
 #include "tgfx/gpu/YUVTexture.h"
 
 namespace tgfx {

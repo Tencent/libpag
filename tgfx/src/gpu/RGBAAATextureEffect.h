@@ -20,7 +20,6 @@
 
 #include "SamplerState.h"
 #include "gpu/FragmentProcessor.h"
-#include "tgfx/core/RGBAAALayout.h"
 
 namespace tgfx {
 class RGBAAATextureEffect : public FragmentProcessor {

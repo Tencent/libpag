@@ -30,6 +30,7 @@
 #include "rendering/filters/LayerFilter.h"
 #include "rendering/filters/LayerStylesFilter.h"
 #include "rendering/filters/MotionBlurFilter.h"
+#include "rendering/graphics/ImageProxy.h"
 #include "rendering/graphics/Picture.h"
 #include "rendering/graphics/Shape.h"
 #include "rendering/graphics/Snapshot.h"
@@ -42,10 +43,8 @@ namespace pag {
 static constexpr int64_t DECODING_VISIBLE_DISTANCE = 500000;  // 提前 500ms 开始解码。
 
 using ShapeMap = std::unordered_map<tgfx::Path, std::shared_ptr<tgfx::Shape>, PathHasher>;
-
-inline bool NeedsEnableMipMap(float scale) {
-  return scale < .4f;
-}
+using SequenceMap = std::unordered_map<Frame, std::shared_ptr<SequenceReader>>;
+using ImageFrame = std::pair<std::shared_ptr<tgfx::Image>, Frame>;
 
 class RenderCache : public Performance {
  public:
@@ -101,11 +100,11 @@ class RenderCache : public Performance {
   Snapshot* getSnapshot(ID assetID) const;
 
   /**
-   * Returns a snapshot cache of specified Image. If there is no associated cache available,
-   * a new cache will be created by the image. Returns null if the image fails to make a
+   * Returns a snapshot cache of specified Picture. If there is no associated cache available,
+   * a new cache will be created by the Picture. Returns null if the Picture fails to make a
    * new snapshot.
    */
-  Snapshot* getSnapshot(const Picture* image);
+  Snapshot* getSnapshot(const Picture* picture);
 
   /**
    * Frees the snapshot cache associated with specified asset ID immediately.
@@ -117,15 +116,16 @@ class RenderCache : public Performance {
   TextAtlas* getTextAtlas(const TextBlock* textBlock);
 
   /**
-   * Prepares a bitmap task for next getImageBuffer() call.
+   * Prepares an image for next getAssetImage() call, which may schedule an asynchronous decoding
+   * task immediately.
    */
-  void prepareImage(ID assetID, std::shared_ptr<tgfx::ImageCodec> codec);
+  void prepareAssetImage(ID assetID, const ImageProxy* proxy);
 
   /**
-   * Returns a texture buffer cache of specified asset id. Returns null if there is no associated
-   * cache available.
+   * Returns an image of the specified assetID.Returns a decoded or mipMapped image if available.
+   * Otherwise, returns the original Image.
    */
-  std::shared_ptr<tgfx::ImageBuffer> getImageBuffer(ID assetID);
+  std::shared_ptr<tgfx::Image> getAssetImage(ID assetID, const ImageProxy* proxy);
 
   uint32_t getContentVersion() const;
 
@@ -133,9 +133,9 @@ class RenderCache : public Performance {
 
   void setVideoEnabled(bool value);
 
-  void prepareSequence(Sequence* sequence, Frame targetFrame);
+  void prepareSequenceImage(Sequence* sequence, Frame targetFrame);
 
-  std::shared_ptr<tgfx::Texture> getSequenceFrame(Sequence* sequence, Frame targetFrame);
+  std::shared_ptr<tgfx::Image> getSequenceImage(Sequence* sequence, Frame targetFrame);
 
   LayerFilter* getFilterCache(LayerStyle* layerStyle);
 
@@ -144,6 +144,8 @@ class RenderCache : public Performance {
   MotionBlurFilter* getMotionBlurFilter();
 
   LayerStylesFilter* getLayerStylesFilter(Layer* layer);
+
+  std::shared_ptr<File> getFileByAssetID(ID assetID);
 
   void recordImageDecodingTime(int64_t decodingTime);
 
@@ -169,15 +171,18 @@ class RenderCache : public Performance {
   std::unordered_map<Snapshot*, std::list<Snapshot*>::iterator> snapshotPositions = {};
   std::unordered_map<ID, TextAtlas*> textAtlases = {};
   std::unordered_map<ID, ShapeMap> shapeCaches = {};
-  std::unordered_map<ID, std::shared_ptr<Task>> imageTasks;
+  std::unordered_map<ID, std::shared_ptr<tgfx::Image>> assetImages = {};
+  std::unordered_map<ID, std::shared_ptr<tgfx::Image>> decodedAssetImages = {};
   std::unordered_map<ID, std::vector<std::shared_ptr<SequenceReader>>> sequenceCaches = {};
-  std::unordered_map<ID, std::unordered_map<Frame, std::shared_ptr<SequenceReader>>> usedSequences =
-      {};
+  std::unordered_map<SequenceReader*, ImageFrame> readerToSequenceImage = {};
+  std::unordered_map<ID, std::unordered_map<Frame, std::shared_ptr<tgfx::Image>>>
+      decodedSequenceImages = {};
+  std::unordered_map<ID, SequenceMap> usedSequences = {};
   std::unordered_map<ID, Filter*> filterCaches;
   MotionBlurFilter* motionBlurFilter = nullptr;
 
-  // bitmap caches:
-  void clearExpiredBitmaps();
+  // decoded image caches:
+  void clearExpiredDecodedImages();
 
   // snapshot caches:
   void clearAllSnapshots();
@@ -186,6 +191,10 @@ class RenderCache : public Performance {
   void removeSnapshotFromLRU(Snapshot* snapshot);
 
   // sequence caches:
+  std::shared_ptr<tgfx::Image> getSequenceImageInternal(Sequence* sequence, Frame targetFrame);
+  std::shared_ptr<SequenceReader> getSequenceReader(Sequence* sequence, Frame targetFrame);
+  std::shared_ptr<SequenceReader> findNearestSequenceReader(Sequence* sequence, Frame targetFrame);
+  std::shared_ptr<SequenceReader> makeSequenceReader(Sequence* sequence);
   void clearAllSequenceCaches();
   void clearSequenceCache(ID uniqueID);
   void clearExpiredSequences();
@@ -207,9 +216,7 @@ class RenderCache : public Performance {
   void prepareLayers(int64_t timeDistance = DECODING_VISIBLE_DISTANCE);
   void preparePreComposeLayer(PreComposeLayer* layer);
   void prepareImageLayer(PAGImageLayer* layer);
-  std::shared_ptr<SequenceReader> getSequenceReader(Sequence* sequence, Frame targetFrame);
-  std::shared_ptr<SequenceReader> findNearestSequenceReader(Sequence* sequence, Frame targetFrame);
-  std::shared_ptr<SequenceReader> makeSequenceReader(Sequence* sequence);
+  std::shared_ptr<tgfx::Image> getAssetImageInternal(ID assetID, const ImageProxy* proxy);
   void recordPerformance();
 
   friend class PAGPlayer;

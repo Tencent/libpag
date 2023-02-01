@@ -74,7 +74,7 @@ class SequenceReader {
   /**
    * Return the ImageBuffer of current decoded frame.
    */
-  virtual std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer() = 0;
+  virtual std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer();
 
   /**
    * Returns the texture of current decoded frame.
@@ -106,7 +106,7 @@ class SequenceReader {
 
   friend class SequenceTask;
 
-  friend class SequenceImageGenerator;
+  friend class SequenceFrameGenerator;
 
   friend class RenderCache;
 };

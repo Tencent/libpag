@@ -118,7 +118,7 @@ class Task {
 
   Executor* wait() {
     if (!running) {
-      return;
+      return executor.get();
     }
     executor->execute();
     running = false;

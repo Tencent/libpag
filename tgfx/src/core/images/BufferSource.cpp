@@ -23,6 +23,10 @@ BufferSource::BufferSource(std::shared_ptr<ImageBuffer> buffer, bool mipMapped)
     : imageBuffer(std::move(buffer)), mipMapped(mipMapped) {
 }
 
+std::shared_ptr<ImageSource> BufferSource::onMakeMipMapped() const {
+  return std::shared_ptr<BufferSource>(new BufferSource(imageBuffer, true));
+}
+
 std::shared_ptr<TextureProxy> BufferSource::onMakeTextureProxy(Context* context) const {
   return context->proxyProvider()->createTextureProxy(imageBuffer, mipMapped);
 }

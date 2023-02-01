@@ -94,9 +94,9 @@ class PAGStage : public PAGComposition {
 
   std::unordered_set<ID> getRemovedAssets();
 
-  float getAssetMaxScale(ID referenceID);
+  float getAssetMaxScale(ID assetID);
 
-  float getAssetRelativeMinScale(ID referenceID);
+  float getAssetMinScale(ID assetID);
 
  protected:
   void invalidateCacheScale() override {

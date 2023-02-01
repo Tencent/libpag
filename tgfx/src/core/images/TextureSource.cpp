@@ -39,6 +39,10 @@ std::shared_ptr<TextureProxy> TextureSource::lockTextureProxy(Context* context) 
   return proxy;
 }
 
+std::shared_ptr<ImageSource> TextureSource::onMakeMipMapped() const {
+  return nullptr;
+}
+
 std::shared_ptr<TextureProxy> TextureSource::onMakeTextureProxy(Context*) const {
   return nullptr;
 }

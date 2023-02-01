@@ -141,11 +141,12 @@ std::unique_ptr<Snapshot> FeatherMask::drawFeatherMask(const std::vector<MaskDat
   auto drawingMatrix = tgfx::Matrix::I();
   matrix.invert(&drawingMatrix);
 
-  return std::make_unique<Snapshot>(texture, drawingMatrix);
+  auto image = tgfx::Image::MakeFromTexture(texture);
+  return std::make_unique<Snapshot>(image, drawingMatrix);
 }
 
 void FeatherMask::draw(tgfx::Canvas* canvas, RenderCache* renderCache) const {
   auto snapshot = drawFeatherMask(masks, layerFrame, renderCache);
-  canvas->drawTexture(snapshot->getTexture());
+  canvas->drawImage(snapshot->getImage());
 }
 }  // namespace pag

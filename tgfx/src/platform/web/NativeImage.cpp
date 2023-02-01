@@ -74,6 +74,6 @@ std::shared_ptr<NativeImage> NativeImage::MakeFrom(emscripten::val nativeImage) 
 }
 
 std::shared_ptr<ImageBuffer> NativeImage::onMakeBuffer(bool) const {
-  return NativeImageBuffer::Make(width(), height(), nativeImage);
+  return NativeImageBuffer::Make(nativeImage);
 }
 }  // namespace tgfx

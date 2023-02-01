@@ -52,6 +52,14 @@ class VideoSequenceReader : public SequenceReader {
 
   ~VideoSequenceReader() override;
 
+  int width() const override {
+    return _width;
+  }
+
+  int height() const override {
+    return _height;
+  }
+
   void prepare(Frame targetFrame) override;
 
  protected:
@@ -71,8 +79,8 @@ class VideoSequenceReader : public SequenceReader {
   PAGFile* rootFile = nullptr;
   emscripten::val videoReader = emscripten::val::null();
   std::shared_ptr<WebVideoTexture> webVideoTexture = nullptr;
-  int32_t width = 0;
-  int32_t height = 0;
+  int32_t _width = 0;
+  int32_t _height = 0;
   std::unique_ptr<ByteData> mp4Data = nullptr;
 };
 }  // namespace pag

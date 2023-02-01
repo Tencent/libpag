@@ -21,6 +21,7 @@
 #include "base/utils/MatrixUtil.h"
 #include "base/utils/TimeUtil.h"
 #include "rendering/caches/LayerCache.h"
+#include "rendering/caches/RenderCache.h"
 #include "rendering/editing/ImageReplacement.h"
 #include "rendering/renderers/CompositionRenderer.h"
 #include "rendering/utils/LockGuard.h"
@@ -272,16 +273,12 @@ std::unordered_set<ID> PAGStage::getRemovedAssets() {
   return removedAssets;
 }
 
-float PAGStage::getAssetMaxScale(ID referenceID) {
-  return getScaleFactor(referenceID).first * _cacheScale;
+float PAGStage::getAssetMaxScale(ID assetID) {
+  return getScaleFactor(assetID).first * _cacheScale;
 }
 
-float PAGStage::getAssetRelativeMinScale(ID referenceID) {
-  auto scale = getScaleFactor(referenceID);
-  if (scale.first == 0 || scale.second == 0) {
-    return 0;
-  }
-  return scale.second / scale.first;
+float PAGStage::getAssetMinScale(ID assetID) {
+  return getScaleFactor(assetID).second * _cacheScale;
 }
 
 std::pair<float, float> PAGStage::getScaleFactor(ID referenceID) {

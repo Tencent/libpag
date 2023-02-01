@@ -157,6 +157,10 @@ bool Image::isAlphaOnly() const {
   return source->isAlphaOnly();
 }
 
+bool Image::isRGBAAA() const {
+  return false;
+}
+
 bool Image::isLazyGenerated() const {
   return source->isLazyGenerated();
 }
@@ -169,16 +173,6 @@ std::shared_ptr<Texture> Image::getTexture() const {
   return source->getTexture();
 }
 
-std::shared_ptr<Image> Image::makeDecodedImage(Context* context) const {
-  auto decodedSource = source->makeDecodedSource(context);
-  if (decodedSource == nullptr) {
-    return nullptr;
-  }
-  auto decodedImage = onCloneWithSource(std::move(decodedSource));
-  decodedImage->weakThis = decodedImage;
-  return decodedImage;
-}
-
 std::shared_ptr<Image> Image::makeTextureImage(Context* context, bool wrapCacheOnly) const {
   auto textureSource = source->makeTextureSource(context, wrapCacheOnly);
   if (textureSource == source) {
@@ -187,9 +181,7 @@ std::shared_ptr<Image> Image::makeTextureImage(Context* context, bool wrapCacheO
   if (textureSource == nullptr) {
     return nullptr;
   }
-  auto textureImage = onCloneWithSource(std::move(textureSource));
-  textureImage->weakThis = textureImage;
-  return textureImage;
+  return cloneWithSource(std::move(textureSource));
 }
 
 std::shared_ptr<Image> Image::onCloneWithSource(std::shared_ptr<ImageSource> newSource) const {
@@ -209,6 +201,22 @@ std::shared_ptr<Image> Image::makeSubset(const Rect& subset) const {
   auto subsetImage = onMakeSubset(rect);
   subsetImage->weakThis = subsetImage;
   return subsetImage;
+}
+
+std::shared_ptr<Image> Image::makeDecoded(Context* context) const {
+  auto decodedSource = source->makeDecoded(context);
+  if (decodedSource == source) {
+    return weakThis.lock();
+  }
+  return cloneWithSource(std::move(decodedSource));
+}
+
+std::shared_ptr<Image> Image::makeMipMapped() const {
+  auto mipMappedSource = source->makeMipMapped();
+  if (mipMappedSource == source) {
+    return weakThis.lock();
+  }
+  return cloneWithSource(std::move(mipMappedSource));
 }
 
 std::shared_ptr<Image> Image::onMakeSubset(const Rect& subset) const {
@@ -239,4 +247,9 @@ std::unique_ptr<FragmentProcessor> Image::asFragmentProcessor(Context* context, 
                              SamplerState(tileModeX, tileModeY, sampling), localMatrix);
 }
 
+std::shared_ptr<Image> Image::cloneWithSource(std::shared_ptr<ImageSource> newSource) const {
+  auto decodedImage = onCloneWithSource(std::move(newSource));
+  decodedImage->weakThis = decodedImage;
+  return decodedImage;
+}
 }  // namespace tgfx

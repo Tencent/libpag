@@ -139,13 +139,8 @@ void Canvas::drawTexture(std::shared_ptr<Texture> texture, const Matrix& matrix,
                          SamplingOptions sampling) {
   auto oldMatrix = getMatrix();
   concat(matrix);
-  drawTexture(std::move(texture), sampling);
+  drawTexture(std::move(texture), sampling, nullptr);
   setMatrix(oldMatrix);
-}
-
-void Canvas::drawTexture(std::shared_ptr<Texture> texture, SamplingOptions sampling,
-                         const Paint* paint) {
-  drawTexture(std::move(texture), nullptr, sampling, paint);
 }
 
 static Paint CleanPaintForDrawTexture(const Paint* paint) {
@@ -157,8 +152,8 @@ static Paint CleanPaintForDrawTexture(const Paint* paint) {
   return cleaned;
 }
 
-void Canvas::drawTexture(std::shared_ptr<Texture> texture, const RGBAAALayout* layout,
-                         SamplingOptions sampling, const Paint* paint) {
+void Canvas::drawTexture(std::shared_ptr<Texture> texture, SamplingOptions sampling,
+                         const Paint* paint) {
   auto realPaint = CleanPaintForDrawTexture(paint);
   std::shared_ptr<Texture> result;
   auto oldMatrix = getMatrix();
@@ -174,7 +169,7 @@ void Canvas::drawTexture(std::shared_ptr<Texture> texture, const RGBAAALayout* l
     texture = image;
     concat(Matrix::MakeTrans(offset.x, offset.y));
   }
-  drawTexture(std::move(texture), layout, sampling, realPaint);
+  drawTexture(std::move(texture), sampling, realPaint);
   setMatrix(oldMatrix);
 }
 
@@ -355,19 +350,18 @@ Rect Canvas::clipLocalBounds(Rect localBounds) {
   return clippedLocalBounds;
 }
 
-void Canvas::drawTexture(std::shared_ptr<Texture> texture, const RGBAAALayout* layout,
-                         SamplingOptions sampling, const Paint& paint) {
+void Canvas::drawTexture(std::shared_ptr<Texture> texture, SamplingOptions sampling,
+                         const Paint& paint) {
   if (texture == nullptr) {
     return;
   }
-  auto width = static_cast<float>(layout ? layout->width : texture->width());
-  auto height = static_cast<float>(layout ? layout->height : texture->height());
-  auto alphaStart = layout ? Point::Make(layout->alphaStartX, layout->alphaStartY) : Point::Zero();
+  auto width = texture->width();
+  auto height = texture->height();
   auto localBounds = clipLocalBounds(Rect::MakeWH(width, height));
   if (localBounds.isEmpty()) {
     return;
   }
-  auto processor = RGBAAATextureEffect::Make(texture, sampling, alphaStart);
+  auto processor = RGBAAATextureEffect::Make(texture, sampling);
   if (processor == nullptr) {
     return;
   }
@@ -418,17 +412,24 @@ void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
   draw(std::move(op), std::move(glPaint));
 }
 
-void Canvas::drawImage(std::shared_ptr<Image> image, float left, float top,
-                       SamplingOptions sampling, const Paint* paint) {
-  drawImage(image, Matrix::MakeTrans(left, top), sampling, paint);
+void Canvas::drawImage(std::shared_ptr<Image> image, float left, float top, const Paint* paint) {
+  drawImage(image, Matrix::MakeTrans(left, top), paint);
 }
 
-void Canvas::drawImage(std::shared_ptr<Image> image, const Matrix& matrix, SamplingOptions sampling,
-                       const Paint* paint) {
+void Canvas::drawImage(std::shared_ptr<Image> image, const Matrix& matrix, const Paint* paint) {
   auto oldMatrix = getMatrix();
   concat(matrix);
-  drawImage(std::move(image), sampling, paint);
+  drawImage(std::move(image), paint);
   setMatrix(oldMatrix);
+}
+
+void Canvas::drawImage(std::shared_ptr<Image> image, const Paint* paint) {
+  if (image == nullptr) {
+    return;
+  }
+  auto mipMapMode = image->hasMipmaps() ? tgfx::MipMapMode::Linear : tgfx::MipMapMode::None;
+  tgfx::SamplingOptions sampling(tgfx::FilterMode::Linear, mipMapMode);
+  drawImage(std::move(image), sampling, paint);
 }
 
 void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, const Paint* paint) {

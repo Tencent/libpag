@@ -23,18 +23,7 @@
 
 namespace pag {
 size_t Snapshot::memoryUsage() const {
-  float bytesPerPixels;
-  if (texture->isYUV()) {
-    bytesPerPixels = 1.5f;
-  } else {
-    bytesPerPixels = texture->getSampler()->format == tgfx::PixelFormat::ALPHA_8 ? 1 : 4;
-  }
-  float mipMapFactor = 1.f;
-  if (texture->getSampler()->mipMapped()) {
-    mipMapFactor += 1.f / 3.f;
-  }
-  return static_cast<size_t>(static_cast<float>(texture->width() * texture->height()) *
-                             bytesPerPixels * mipMapFactor);
+  return image->getTexture()->memoryUsage();
 }
 
 bool Snapshot::hitTest(RenderCache* cache, float x, float y) const {
@@ -48,7 +37,7 @@ bool Snapshot::hitTest(RenderCache* cache, float x, float y) const {
   }
   auto canvas = surface->getCanvas();
   canvas->setMatrix(tgfx::Matrix::MakeTrans(-local.x, -local.y));
-  canvas->drawTexture(texture);
+  canvas->drawImage(image);
   return surface->hitTest(0, 0);
 }
 }  // namespace pag

@@ -52,21 +52,6 @@ std::shared_ptr<ImageSource> ImageSource::MakeFromTexture(std::shared_ptr<Textur
   return source;
 }
 
-std::shared_ptr<ImageSource> ImageSource::makeDecodedSource(Context* context) const {
-  if (!isLazyGenerated()) {
-    return nullptr;
-  }
-  auto source = onMakeDecodedSource(context);
-  if (source != nullptr) {
-    source->weakThis = source;
-  }
-  return source;
-}
-
-std::shared_ptr<ImageSource> ImageSource::onMakeDecodedSource(Context*) const {
-  return nullptr;
-}
-
 std::shared_ptr<ImageSource> ImageSource::makeTextureSource(Context* context,
                                                             bool wrapCacheOnly) const {
   auto texture = getTexture();
@@ -92,6 +77,34 @@ std::shared_ptr<ImageSource> ImageSource::makeTextureSource(Context* context,
     proxy->instantiate();
   }
   return MakeFromTexture(proxy->getTexture());
+}
+
+std::shared_ptr<ImageSource> ImageSource::makeDecoded(Context* context) const {
+  if (!isLazyGenerated()) {
+    return std::static_pointer_cast<ImageSource>(weakThis.lock());
+  }
+  auto source = onMakeDecoded(context);
+  if (source == nullptr) {
+    return std::static_pointer_cast<ImageSource>(weakThis.lock());
+  }
+  source->weakThis = source;
+  return source;
+}
+
+std::shared_ptr<ImageSource> ImageSource::onMakeDecoded(Context*) const {
+  return nullptr;
+}
+
+std::shared_ptr<ImageSource> ImageSource::makeMipMapped() const {
+  if (hasMipmaps()) {
+    return std::static_pointer_cast<ImageSource>(weakThis.lock());
+  }
+  auto source = onMakeMipMapped();
+  if (source == nullptr) {
+    return std::static_pointer_cast<ImageSource>(weakThis.lock());
+  }
+  source->weakThis = source;
+  return source;
 }
 
 std::shared_ptr<TextureProxy> ImageSource::lockTextureProxy(Context* context) const {

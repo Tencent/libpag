@@ -51,6 +51,8 @@ class TextureSource : public ImageSource {
   std::shared_ptr<TextureProxy> lockTextureProxy(Context* context) const override;
 
  protected:
+  std::shared_ptr<ImageSource> onMakeMipMapped() const override;
+
   std::shared_ptr<TextureProxy> onMakeTextureProxy(Context*) const override;
 
  private:

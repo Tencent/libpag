@@ -48,6 +48,8 @@ class AsyncSource : public ImageSource {
   std::shared_ptr<TextureProxy> lockTextureProxy(Context* context) const override;
 
  protected:
+  std::shared_ptr<ImageSource> onMakeMipMapped() const override;
+
   std::shared_ptr<TextureProxy> onMakeTextureProxy(Context* context) const override;
 
  private:

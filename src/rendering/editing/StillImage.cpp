@@ -27,14 +27,14 @@
 
 namespace pag {
 std::shared_ptr<PAGImage> PAGImage::FromPath(const std::string& filePath) {
-  auto codec = tgfx::ImageCodec::MakeFrom(filePath);
-  return StillImage::MakeFrom(std::move(codec));
+  auto image = tgfx::Image::MakeFromEncoded(filePath);
+  return StillImage::MakeFrom(std::move(image));
 }
 
 std::shared_ptr<PAGImage> PAGImage::FromBytes(const void* bytes, size_t length) {
   auto fileBytes = tgfx::Data::MakeWithCopy(bytes, length);
-  auto codec = tgfx::ImageCodec::MakeFrom(std::move(fileBytes));
-  return StillImage::MakeFrom(std::move(codec));
+  auto image = tgfx::Image::MakeFromEncoded(std::move(fileBytes));
+  return StillImage::MakeFrom(std::move(image));
 }
 
 std::shared_ptr<PAGImage> PAGImage::FromPixels(const void* pixels, int width, int height,
@@ -56,13 +56,12 @@ std::shared_ptr<PAGImage> PAGImage::FromPixels(const void* pixels, int width, in
   return StillImage::MakeFrom(pixelBuffer);
 }
 
-std::shared_ptr<StillImage> StillImage::MakeFrom(std::shared_ptr<tgfx::PixelBuffer> pixelBuffer) {
-  if (pixelBuffer == nullptr) {
+std::shared_ptr<StillImage> StillImage::MakeFrom(std::shared_ptr<tgfx::Image> image) {
+  if (image == nullptr) {
     return nullptr;
   }
-  auto pagImage =
-      std::shared_ptr<StillImage>(new StillImage(pixelBuffer->width(), pixelBuffer->height()));
-  auto picture = Picture::MakeFrom(pagImage->uniqueID(), pixelBuffer);
+  auto pagImage = std::shared_ptr<StillImage>(new StillImage(image->width(), image->height()));
+  auto picture = Picture::MakeFrom(pagImage->uniqueID(), image);
   if (!picture) {
     return nullptr;
   }
@@ -70,20 +69,9 @@ std::shared_ptr<StillImage> StillImage::MakeFrom(std::shared_ptr<tgfx::PixelBuff
   return pagImage;
 }
 
-std::shared_ptr<StillImage> StillImage::MakeFrom(std::shared_ptr<tgfx::ImageCodec> codec) {
-  if (codec == nullptr) {
-    return nullptr;
-  }
-  auto width = codec->width();
-  auto height = codec->height();
-  ApplyOrientation(codec->orientation(), &width, &height);
-  auto pagImage = std::shared_ptr<StillImage>(new StillImage(width, height));
-  auto picture = Picture::MakeFrom(pagImage->uniqueID(), codec);
-  if (!picture) {
-    return nullptr;
-  }
-  pagImage->graphic = picture;
-  return pagImage;
+std::shared_ptr<StillImage> StillImage::MakeFrom(std::shared_ptr<tgfx::PixelBuffer> pixelBuffer) {
+  auto image = tgfx::Image::MakeFromBuffer(std::move(pixelBuffer));
+  return MakeFrom(std::move(image));
 }
 
 std::shared_ptr<PAGImage> PAGImage::FromTexture(const BackendTexture& texture, ImageOrigin origin) {

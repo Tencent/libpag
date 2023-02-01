@@ -33,6 +33,11 @@ AsyncImageBuffer::AsyncImageBuffer(std::shared_ptr<ImageGenerator> generator, bo
   task->run();
 }
 
+AsyncImageBuffer::~AsyncImageBuffer() {
+  // Must cancel the task, otherwise, the task may access wild pointers.
+  task = nullptr;
+}
+
 std::shared_ptr<Texture> AsyncImageBuffer::onMakeTexture(Context* context, bool mipMapped) const {
   task->wait();
   if (imageBuffer == nullptr) {

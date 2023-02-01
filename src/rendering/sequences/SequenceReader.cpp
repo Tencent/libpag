@@ -111,6 +111,10 @@ std::shared_ptr<tgfx::ImageBuffer> SequenceReader::makeBuffer(Frame targetFrame)
   return onMakeBuffer();
 }
 
+std::shared_ptr<tgfx::ImageBuffer> SequenceReader::onMakeBuffer() {
+  return nullptr;
+}
+
 std::shared_ptr<tgfx::Texture> SequenceReader::makeTexture(tgfx::Context* context,
                                                            Frame targetFrame) {
   if (staticContent) {

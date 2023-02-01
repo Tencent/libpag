@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,17 +18,39 @@
 
 #pragma once
 
-#include "SequenceReader.h"
 #include "pag/file.h"
-#include "tgfx/core/ImageGenerator.h"
+#include "rendering/graphics/ImageProxy.h"
 
 namespace pag {
-class SequenceGenerator {
+class SequenceImageProxy : public ImageProxy {
  public:
-  static std::shared_ptr<tgfx::ImageGenerator> MakeFromStatic(std::shared_ptr<File> file,
-                                                              Sequence* sequence);
+  SequenceImageProxy(Sequence* sequence, Frame targetFrame);
 
-  static std::shared_ptr<tgfx::ImageGenerator> MakeFromReader(
-      std::shared_ptr<SequenceReader> reader, Frame targetFrame);
+  int width() const override {
+    return sequence->width;
+  }
+
+  int height() const override {
+    return sequence->height;
+  }
+
+  bool isTemporary() const override {
+    return !sequence->composition->staticContent();
+  }
+
+  bool isFlat() const override {
+    return sequence->composition->type() != CompositionType::Video;
+  }
+
+  void prepareImage(RenderCache* cache) const override;
+
+  std::shared_ptr<tgfx::Image> getImage(RenderCache* cache) const override;
+
+ protected:
+  std::shared_ptr<tgfx::Image> makeImage(RenderCache* cache) const override;
+
+ private:
+  Sequence* sequence = nullptr;
+  Frame targetFrame = 0;
 };
 }  // namespace pag

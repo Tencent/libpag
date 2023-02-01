@@ -23,8 +23,13 @@
 using namespace emscripten;
 
 namespace tgfx {
-std::shared_ptr<NativeImageBuffer> NativeImageBuffer::Make(int width, int height, val source) {
+std::shared_ptr<NativeImageBuffer> NativeImageBuffer::Make(val source) {
   if (!source.as<bool>()) {
+    return nullptr;
+  }
+  auto width = source.call<int>("width");
+  auto height = source.call<int>("height");
+  if (width <= 0 || height <= 0) {
     return nullptr;
   }
   return std::shared_ptr<NativeImageBuffer>(

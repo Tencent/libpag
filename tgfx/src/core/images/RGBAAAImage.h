@@ -31,6 +31,10 @@ class RGBAAAImage : public Image {
     return bounds.height();
   }
 
+  bool isRGBAAA() const override {
+    return true;
+  }
+
  protected:
   std::shared_ptr<Image> onCloneWithSource(std::shared_ptr<ImageSource> newSource) const override;
 

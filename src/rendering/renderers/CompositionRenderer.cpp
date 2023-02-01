@@ -22,7 +22,7 @@
 #include "rendering/caches/RenderCache.h"
 #include "rendering/graphics/Picture.h"
 #include "rendering/graphics/Recorder.h"
-#include "rendering/sequences/SequenceProxy.h"
+#include "rendering/sequences/SequenceImageProxy.h"
 
 namespace pag {
 std::shared_ptr<Graphic> RenderVectorComposition(VectorComposition* composition,
@@ -60,20 +60,8 @@ std::shared_ptr<Graphic> RenderSequenceComposition(Composition* composition,
     return nullptr;
   }
   auto sequenceFrame = sequence->toSequenceFrame(compositionFrame);
-  std::shared_ptr<Graphic> graphic = nullptr;
-  if (composition->type() == CompositionType::Video) {
-    auto videoSequence = static_cast<VideoSequence*>(sequence);
-    auto proxy = new SequenceProxy(videoSequence->getVideoWidth(), videoSequence->getVideoHeight(),
-                                   sequence, sequenceFrame);
-    tgfx::RGBAAALayout layout = {sequence->width, sequence->height, videoSequence->alphaStartX,
-                                 videoSequence->alphaStartY};
-    graphic = Picture::MakeFrom(sequence->composition->uniqueID,
-                                std::unique_ptr<SequenceProxy>(proxy), layout);
-  } else {
-    auto proxy = new SequenceProxy(sequence->width, sequence->height, sequence, sequenceFrame);
-    graphic =
-        Picture::MakeFrom(sequence->composition->uniqueID, std::unique_ptr<SequenceProxy>(proxy));
-  }
+  auto proxy = std::make_shared<SequenceImageProxy>(sequence, sequenceFrame);
+  auto graphic = Picture::MakeFrom(sequence->composition->uniqueID, std::move(proxy));
   auto scaleX = static_cast<float>(composition->width) / static_cast<float>(sequence->width);
   auto scaleY = static_cast<float>(composition->height) / static_cast<float>(sequence->height);
   return Graphic::MakeCompose(graphic, tgfx::Matrix::MakeScale(scaleX, scaleY));
