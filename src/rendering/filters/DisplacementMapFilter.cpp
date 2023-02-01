@@ -68,14 +68,14 @@ vec4 rgb_to_hsl(vec3 c, float a) {
 }
 
 vec4 input_color(vec2 uv) {
-    return mix(texture2D(inputImageTexture, uv),
+    return mix(texture2D(inputImageTexture, fract(uv)),
                mix(vec4(0.0), texture2D(inputImageTexture, uv), EdgeDetect(uv)),
                step(0.5, uFlags.y));
 }
 
 void main() {
     vec2 mapUV = (uMapMatrix * vec3(vertexColor, 1.0)).xy;
-    vec4 d = mix(texture2D(mapTexture, mapUV),
+    vec4 d = mix(texture2D(mapTexture, fract(mapUV)),
                  mix(vec4(0.0), texture2D(mapTexture, mapUV), EdgeDetect(mapUV)),
                  step(0.5, uFlags.x));
     d = mix(vec4(0.0), uSelectorMatrixRGBA * vec4(d.rgb / max(d.a, kEps), d.a), step(0.5, uFlags.z))
@@ -182,9 +182,14 @@ static SelectorCoeffs Coeffs(Enum sel) {
   return gCoeffs[i];
 }
 
-static std::pair<int, float> DisplacementWrapMode(Enum pos) {
-  return pos == DisplacementMapBehavior::TileMap ? std::pair{GL_REPEAT, 0.0}
-                                                 : std::pair{GL_CLAMP_TO_EDGE, 1.0};
+// 0.0: REPEAT
+// 1.0: CLAMP_TO_BORDER
+static float DisplacementWrapMode(Enum pos) {
+  return pos == DisplacementMapBehavior::TileMap ? 0.0 : 1.0;
+}
+
+static float InputWrapMode(bool edgeBehavior) {
+  return edgeBehavior ? 0.0 : 1.0;
 }
 
 static tgfx::Matrix DisplacementMatrix(Enum pos, const tgfx::Size& size,
@@ -202,10 +207,6 @@ static tgfx::Matrix DisplacementMatrix(Enum pos, const tgfx::Size& size,
   }
 }
 
-int DisplacementMapFilter::textureWrapMode() const {
-  return edgeBehavior ? GL_REPEAT : GL_CLAMP_TO_EDGE;
-}
-
 static bool IsHSL(Enum sel) {
   return sel == DisplacementMapSource::Hue || sel == DisplacementMapSource::Saturation ||
          sel == DisplacementMapSource::Lightness;
@@ -219,12 +220,11 @@ static bool IsRGB(Enum sel) {
 void DisplacementMapFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
                                            const tgfx::Point&) {
   std::array<float, 4> flags = {0, 0, 0, 0};
-  auto wrapMode = DisplacementWrapMode(displacementMapBehavior);
-  flags[0] = wrapMode.second;
-  ActiveGLTexture(context, 1, mapSurface->getTexture()->getSampler(), wrapMode.first);
+  flags[0] = DisplacementWrapMode(displacementMapBehavior);
+  ActiveGLTexture(context, 1, mapSurface->getTexture()->getSampler());
   auto gl = tgfx::GLFunctions::Get(context);
   gl->uniform1i(mapTextureHandle, 1);
-  flags[1] = !edgeBehavior ? 1.f : 0.f;
+  flags[1] = InputWrapMode(edgeBehavior);
 
   float w = contentBounds.width();
   float h = contentBounds.height();

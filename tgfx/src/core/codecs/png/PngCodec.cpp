@@ -120,12 +120,22 @@ std::shared_ptr<ImageCodec> PngCodec::MakeFromData(const std::string& filePath,
     return nullptr;
   }
   png_uint_32 w = 0, h = 0;
-  png_get_IHDR(readInfo->p, readInfo->pi, &w, &h, nullptr, nullptr, nullptr, nullptr, nullptr);
+  int colorType = -1;
+  png_get_IHDR(readInfo->p, readInfo->pi, &w, &h, nullptr, &colorType, nullptr, nullptr, nullptr);
   if (w == 0 || h == 0) {
     return nullptr;
   }
+  bool isAlphaOnly = false;
+  if (colorType == PNG_COLOR_TYPE_GRAY_ALPHA) {
+    png_color_8p sigBits;
+    if (png_get_sBIT(readInfo->p, readInfo->pi, &sigBits)) {
+      if (8 == sigBits->alpha && 1 == sigBits->gray) {
+        isAlphaOnly = true;
+      }
+    }
+  }
   return std::shared_ptr<ImageCodec>(new PngCodec(static_cast<int>(w), static_cast<int>(h),
-                                                  Orientation::TopLeft, filePath,
+                                                  Orientation::TopLeft, isAlphaOnly, filePath,
                                                   std::move(byteData)));
 }
 
@@ -187,6 +197,10 @@ bool PngCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     png_read_image(readInfo->p, readInfo->rowPtrs);
     return true;
   }
+}
+
+bool PngCodec::isAlphaOnly() const {
+  return _isAlphaOnly;
 }
 
 #ifdef TGFX_USE_PNG_ENCODE

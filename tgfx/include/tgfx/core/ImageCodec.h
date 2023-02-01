@@ -61,7 +61,6 @@ class ImageCodec : public ImageGenerator {
   }
 
   bool isAlphaOnly() const override {
-    // TODO: implements alpha-only checking for image codecs.
     return false;
   }
 
