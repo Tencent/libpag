@@ -17,53 +17,53 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLTextureEffect.h"
-#include "gpu/TextureEffect.h"
+#include "gpu/TiledTextureEffect.h"
 
 namespace tgfx {
-bool GLTextureEffect::ShaderModeRequiresUnormCoord(TextureEffect::ShaderMode mode) {
+bool GLTextureEffect::ShaderModeRequiresUnormCoord(TiledTextureEffect::ShaderMode mode) {
   switch (mode) {
-    case TextureEffect::ShaderMode::None:
-    case TextureEffect::ShaderMode::Clamp:
-    case TextureEffect::ShaderMode::RepeatNearestNone:
-    case TextureEffect::ShaderMode::MirrorRepeat:
+    case TiledTextureEffect::ShaderMode::None:
+    case TiledTextureEffect::ShaderMode::Clamp:
+    case TiledTextureEffect::ShaderMode::RepeatNearestNone:
+    case TiledTextureEffect::ShaderMode::MirrorRepeat:
       return false;
-    case TextureEffect::ShaderMode::RepeatLinearNone:
-    case TextureEffect::ShaderMode::RepeatNearestMipmap:
-    case TextureEffect::ShaderMode::RepeatLinearMipmap:
-    case TextureEffect::ShaderMode::ClampToBorderNearest:
-    case TextureEffect::ShaderMode::ClampToBorderLinear:
+    case TiledTextureEffect::ShaderMode::RepeatLinearNone:
+    case TiledTextureEffect::ShaderMode::RepeatNearestMipmap:
+    case TiledTextureEffect::ShaderMode::RepeatLinearMipmap:
+    case TiledTextureEffect::ShaderMode::ClampToBorderNearest:
+    case TiledTextureEffect::ShaderMode::ClampToBorderLinear:
       return true;
   }
 }
 
-bool GLTextureEffect::ShaderModeUsesSubset(TextureEffect::ShaderMode m) {
+bool GLTextureEffect::ShaderModeUsesSubset(TiledTextureEffect::ShaderMode m) {
   switch (m) {
-    case TextureEffect::ShaderMode::None:
-    case TextureEffect::ShaderMode::Clamp:
+    case TiledTextureEffect::ShaderMode::None:
+    case TiledTextureEffect::ShaderMode::Clamp:
       return false;
-    case TextureEffect::ShaderMode::RepeatNearestNone:
-    case TextureEffect::ShaderMode::RepeatLinearNone:
-    case TextureEffect::ShaderMode::RepeatNearestMipmap:
-    case TextureEffect::ShaderMode::RepeatLinearMipmap:
-    case TextureEffect::ShaderMode::MirrorRepeat:
-    case TextureEffect::ShaderMode::ClampToBorderNearest:
-    case TextureEffect::ShaderMode::ClampToBorderLinear:
+    case TiledTextureEffect::ShaderMode::RepeatNearestNone:
+    case TiledTextureEffect::ShaderMode::RepeatLinearNone:
+    case TiledTextureEffect::ShaderMode::RepeatNearestMipmap:
+    case TiledTextureEffect::ShaderMode::RepeatLinearMipmap:
+    case TiledTextureEffect::ShaderMode::MirrorRepeat:
+    case TiledTextureEffect::ShaderMode::ClampToBorderNearest:
+    case TiledTextureEffect::ShaderMode::ClampToBorderLinear:
       return true;
   }
 }
 
-bool GLTextureEffect::ShaderModeUsesClamp(TextureEffect::ShaderMode m) {
+bool GLTextureEffect::ShaderModeUsesClamp(TiledTextureEffect::ShaderMode m) {
   switch (m) {
-    case TextureEffect::ShaderMode::None:
-    case TextureEffect::ShaderMode::ClampToBorderNearest:
+    case TiledTextureEffect::ShaderMode::None:
+    case TiledTextureEffect::ShaderMode::ClampToBorderNearest:
       return false;
-    case TextureEffect::ShaderMode::Clamp:
-    case TextureEffect::ShaderMode::RepeatNearestNone:
-    case TextureEffect::ShaderMode::RepeatLinearNone:
-    case TextureEffect::ShaderMode::RepeatNearestMipmap:
-    case TextureEffect::ShaderMode::RepeatLinearMipmap:
-    case TextureEffect::ShaderMode::MirrorRepeat:
-    case TextureEffect::ShaderMode::ClampToBorderLinear:
+    case TiledTextureEffect::ShaderMode::Clamp:
+    case TiledTextureEffect::ShaderMode::RepeatNearestNone:
+    case TiledTextureEffect::ShaderMode::RepeatLinearNone:
+    case TiledTextureEffect::ShaderMode::RepeatNearestMipmap:
+    case TiledTextureEffect::ShaderMode::RepeatLinearMipmap:
+    case TiledTextureEffect::ShaderMode::MirrorRepeat:
+    case TiledTextureEffect::ShaderMode::ClampToBorderLinear:
       return true;
   }
 }
@@ -82,26 +82,26 @@ void GLTextureEffect::readColor(EmitArgs& args, const std::string& coord, const 
 }
 
 void GLTextureEffect::subsetCoord(GLFragmentProcessor::EmitArgs& args,
-                                  TextureEffect::ShaderMode mode, const char* coordSwizzle,
+                                  TiledTextureEffect::ShaderMode mode, const char* coordSwizzle,
                                   const char* subsetStartSwizzle, const char* subsetStopSwizzle,
                                   const char* extraCoord, const char* coordWeight) {
   auto* fragBuilder = args.fragBuilder;
   switch (mode) {
-    case TextureEffect::ShaderMode::None:
-    case TextureEffect::ShaderMode::ClampToBorderNearest:
-    case TextureEffect::ShaderMode::ClampToBorderLinear:
-    case TextureEffect::ShaderMode::Clamp:
+    case TiledTextureEffect::ShaderMode::None:
+    case TiledTextureEffect::ShaderMode::ClampToBorderNearest:
+    case TiledTextureEffect::ShaderMode::ClampToBorderLinear:
+    case TiledTextureEffect::ShaderMode::Clamp:
       fragBuilder->codeAppendf("subsetCoord.%s = inCoord.%s;", coordSwizzle, coordSwizzle);
       break;
-    case TextureEffect::ShaderMode::RepeatNearestNone:
-    case TextureEffect::ShaderMode::RepeatLinearNone:
+    case TiledTextureEffect::ShaderMode::RepeatNearestNone:
+    case TiledTextureEffect::ShaderMode::RepeatLinearNone:
       fragBuilder->codeAppendf("subsetCoord.%s = mod(inCoord.%s - %s.%s, %s.%s - %s.%s) + %s.%s;",
                                coordSwizzle, coordSwizzle, subsetName.c_str(), subsetStartSwizzle,
                                subsetName.c_str(), subsetStopSwizzle, subsetName.c_str(),
                                subsetStartSwizzle, subsetName.c_str(), subsetStartSwizzle);
       break;
-    case TextureEffect::ShaderMode::RepeatNearestMipmap:
-    case TextureEffect::ShaderMode::RepeatLinearMipmap:
+    case TiledTextureEffect::ShaderMode::RepeatNearestMipmap:
+    case TiledTextureEffect::ShaderMode::RepeatLinearMipmap:
       fragBuilder->codeAppend("{");
       fragBuilder->codeAppendf("float w = %s.%s - %s.%s;", subsetName.c_str(), subsetStopSwizzle,
                                subsetName.c_str(), subsetStartSwizzle);
@@ -122,7 +122,7 @@ void GLTextureEffect::subsetCoord(GLFragmentProcessor::EmitArgs& args,
                                coordWeight);
       fragBuilder->codeAppend("}");
       break;
-    case TextureEffect::ShaderMode::MirrorRepeat:
+    case TiledTextureEffect::ShaderMode::MirrorRepeat:
       fragBuilder->codeAppend("{");
       fragBuilder->codeAppendf("float w = %s.%s - %s.%s;", subsetName.c_str(), subsetStopSwizzle,
                                subsetName.c_str(), subsetStartSwizzle);
@@ -169,7 +169,7 @@ void GLTextureEffect::initUniform(GLFragmentProcessor::EmitArgs& args, const boo
     clampUniform = uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4,
                                               "Clamp", &clampName);
   }
-  const auto* textureFP = static_cast<const TextureEffect*>(args.fragmentProcessor);
+  const auto* textureFP = static_cast<const TiledTextureEffect*>(args.fragmentProcessor);
   bool unormCoordsRequiredForShaderMode = ShaderModeRequiresUnormCoord(textureFP->shaderModeX) ||
                                           ShaderModeRequiresUnormCoord(textureFP->shaderModeY);
   bool sampleCoordsMustBeNormalized =
@@ -181,15 +181,15 @@ void GLTextureEffect::initUniform(GLFragmentProcessor::EmitArgs& args, const boo
 }
 
 void GLTextureEffect::emitCode(EmitArgs& args) {
-  const auto* textureFP = static_cast<const TextureEffect*>(args.fragmentProcessor);
+  const auto* textureFP = static_cast<const TiledTextureEffect*>(args.fragmentProcessor);
   auto* fragBuilder = args.fragBuilder;
 
   auto vertexColor = (*args.transformedCoords)[0].name();
   if (args.coordFunc) {
     vertexColor = args.coordFunc(vertexColor);
   }
-  if (textureFP->shaderModeX == TextureEffect::ShaderMode::None &&
-      textureFP->shaderModeY == TextureEffect::ShaderMode::None) {
+  if (textureFP->shaderModeX == TiledTextureEffect::ShaderMode::None &&
+      textureFP->shaderModeY == TiledTextureEffect::ShaderMode::None) {
     fragBuilder->codeAppendf("%s = ", args.outputColor.c_str());
     fragBuilder->appendTextureLookup((*args.textureSamplers)[0], vertexColor);
     fragBuilder->codeAppendf(" * %s;", args.inputColor.c_str());
@@ -209,10 +209,12 @@ void GLTextureEffect::emitCode(EmitArgs& args) {
     const char* extraRepeatCoordY = nullptr;
     const char* repeatCoordWeightY = nullptr;
 
-    bool mipMapRepeatX = textureFP->shaderModeX == TextureEffect::ShaderMode::RepeatNearestMipmap ||
-                         textureFP->shaderModeX == TextureEffect::ShaderMode::RepeatLinearMipmap;
-    bool mipMapRepeatY = textureFP->shaderModeY == TextureEffect::ShaderMode::RepeatNearestMipmap ||
-                         textureFP->shaderModeY == TextureEffect::ShaderMode::RepeatLinearMipmap;
+    bool mipMapRepeatX =
+        textureFP->shaderModeX == TiledTextureEffect::ShaderMode::RepeatNearestMipmap ||
+        textureFP->shaderModeX == TiledTextureEffect::ShaderMode::RepeatLinearMipmap;
+    bool mipMapRepeatY =
+        textureFP->shaderModeY == TiledTextureEffect::ShaderMode::RepeatNearestMipmap ||
+        textureFP->shaderModeY == TiledTextureEffect::ShaderMode::RepeatLinearMipmap;
 
     if (mipMapRepeatX || mipMapRepeatY) {
       fragBuilder->codeAppend("vec2 extraRepeatCoord;");
@@ -279,18 +281,18 @@ void GLTextureEffect::emitCode(EmitArgs& args) {
 
     static const char* repeatReadX = "repeatReadX";
     static const char* repeatReadY = "repeatReadY";
-    bool repeatX = textureFP->shaderModeX == TextureEffect::ShaderMode::RepeatLinearNone ||
-                   textureFP->shaderModeX == TextureEffect::ShaderMode::RepeatLinearMipmap;
-    bool repeatY = textureFP->shaderModeY == TextureEffect::ShaderMode::RepeatLinearNone ||
-                   textureFP->shaderModeY == TextureEffect::ShaderMode::RepeatLinearMipmap;
-    if (repeatX || textureFP->shaderModeX == TextureEffect::ShaderMode::ClampToBorderLinear) {
+    bool repeatX = textureFP->shaderModeX == TiledTextureEffect::ShaderMode::RepeatLinearNone ||
+                   textureFP->shaderModeX == TiledTextureEffect::ShaderMode::RepeatLinearMipmap;
+    bool repeatY = textureFP->shaderModeY == TiledTextureEffect::ShaderMode::RepeatLinearNone ||
+                   textureFP->shaderModeY == TiledTextureEffect::ShaderMode::RepeatLinearMipmap;
+    if (repeatX || textureFP->shaderModeX == TiledTextureEffect::ShaderMode::ClampToBorderLinear) {
       fragBuilder->codeAppend("float errX = subsetCoord.x - clampedCoord.x;");
       if (repeatX) {
         fragBuilder->codeAppendf("float repeatCoordX = errX > 0.0 ? %s.x : %s.z;",
                                  clampName.c_str(), clampName.c_str());
       }
     }
-    if (repeatY || textureFP->shaderModeY == TextureEffect::ShaderMode::ClampToBorderLinear) {
+    if (repeatY || textureFP->shaderModeY == TiledTextureEffect::ShaderMode::ClampToBorderLinear) {
       fragBuilder->codeAppend("float errY = subsetCoord.y - clampedCoord.y;");
       if (repeatY) {
         fragBuilder->codeAppendf("float repeatCoordY = errY > 0.0 ? %s.y : %s.w;",
@@ -325,20 +327,20 @@ void GLTextureEffect::emitCode(EmitArgs& args) {
       fragBuilder->codeAppend("}");
     }
 
-    if (textureFP->shaderModeX == TextureEffect::ShaderMode::ClampToBorderLinear) {
+    if (textureFP->shaderModeX == TiledTextureEffect::ShaderMode::ClampToBorderLinear) {
       fragBuilder->codeAppend("textureColor = mix(textureColor, vec4(0.0), min(abs(errX), 1.0));");
     }
-    if (textureFP->shaderModeY == TextureEffect::ShaderMode::ClampToBorderLinear) {
+    if (textureFP->shaderModeY == TiledTextureEffect::ShaderMode::ClampToBorderLinear) {
       fragBuilder->codeAppendf("textureColor = mix(textureColor, vec4(0.0), min(abs(errY), 1.0));");
     }
-    if (textureFP->shaderModeX == TextureEffect::ShaderMode::ClampToBorderNearest) {
+    if (textureFP->shaderModeX == TiledTextureEffect::ShaderMode::ClampToBorderNearest) {
       fragBuilder->codeAppend("float snappedX = floor(inCoord.x + 0.001) + 0.5;");
       fragBuilder->codeAppendf("if (snappedX < %s.x || snappedX > %s.z) {", subsetName.c_str(),
                                subsetName.c_str());
       fragBuilder->codeAppend("textureColor = vec4(0.0);");  // border color
       fragBuilder->codeAppend("}");
     }
-    if (textureFP->shaderModeY == TextureEffect::ShaderMode::ClampToBorderNearest) {
+    if (textureFP->shaderModeY == TiledTextureEffect::ShaderMode::ClampToBorderNearest) {
       fragBuilder->codeAppend("float snappedY = floor(inCoord.y + 0.001) + 0.5;");
       fragBuilder->codeAppendf("if (snappedY < %s.y || snappedY > %s.w) {", subsetName.c_str(),
                                subsetName.c_str());
@@ -352,7 +354,7 @@ void GLTextureEffect::emitCode(EmitArgs& args) {
 
 void GLTextureEffect::onSetData(const ProgramDataManager& programDataManager,
                                 const FragmentProcessor& fragmentProcessor) {
-  const auto& textureFP = static_cast<const TextureEffect&>(fragmentProcessor);
+  const auto& textureFP = static_cast<const TiledTextureEffect&>(fragmentProcessor);
   if (dimensionsUniform.isValid()) {
     auto dimensions = textureFP.texture->getTextureCoord(1.f, 1.f);
     if (dimensions != dimensionsPrev) {

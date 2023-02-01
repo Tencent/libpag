@@ -24,10 +24,14 @@
 namespace tgfx {
 class TextureEffect : public FragmentProcessor {
  public:
-  static std::unique_ptr<FragmentProcessor> Make(const Context* context,
-                                                 std::shared_ptr<Texture> texture,
-                                                 SamplerState samplerState = {},
+  static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<Texture> texture,
+                                                 const SamplingOptions& sampling,
                                                  const Matrix* localMatrix = nullptr);
+
+  static std::unique_ptr<FragmentProcessor> MakeRGBAAA(std::shared_ptr<Texture> texture,
+                                                       const SamplingOptions& sampling,
+                                                       const Point& alphaStart,
+                                                       const Matrix* localMatrix = nullptr);
 
   std::string name() const override {
     return "TextureEffect";
@@ -36,28 +40,14 @@ class TextureEffect : public FragmentProcessor {
  private:
   DEFINE_PROCESSOR_CLASS_ID
 
-  struct Sampling;
-
-  enum class ShaderMode {
-    None,                 // Using HW mode
-    Clamp,                // Shader based clamp, no filter specialization
-    RepeatNearestNone,    // Simple repeat for nearest sampling, no mipmapping.
-    RepeatLinearNone,     // Filter the subset boundary for kRepeat mode, no mip mapping
-    RepeatLinearMipmap,   // Logic for linear filtering and LOD selection with kRepeat mode.
-    RepeatNearestMipmap,  // Logic for nearest filtering and LOD selection with kRepeat mode.
-    MirrorRepeat,         // Mirror repeat (doesn't depend on filter))
-    ClampToBorderNearest,
-    ClampToBorderLinear
-  };
-
-  TextureEffect(std::shared_ptr<Texture> texture, const Sampling& sampling,
+  TextureEffect(std::shared_ptr<Texture> texture, SamplingOptions sampling, const Point& alphaStart,
                 const Matrix& localMatrix);
+
+  bool onIsEqual(const FragmentProcessor& processor) const override;
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
   std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
-
-  bool onIsEqual(const FragmentProcessor& processor) const override;
 
   const TextureSampler* onTextureSampler(size_t) const override {
     return texture->getSampler();
@@ -67,16 +57,11 @@ class TextureEffect : public FragmentProcessor {
     return samplerState;
   }
 
-  static ShaderMode GetShaderMode(SamplerState::WrapMode mode, FilterMode filter, MipMapMode mm);
-
   std::shared_ptr<Texture> texture;
   SamplerState samplerState;
-  Rect subset;
-  Rect clamp;
-  ShaderMode shaderModeX;
-  ShaderMode shaderModeY;
+  Point alphaStart = Point::Zero();
   CoordTransform coordTransform;
 
-  friend class GLTextureEffect;
+  friend class GLRGBAAATextureEffect;
 };
 }  // namespace tgfx

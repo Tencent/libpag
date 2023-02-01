@@ -21,6 +21,7 @@
 #include "core/images/MatrixImage.h"
 #include "core/images/RGBAAAImage.h"
 #include "gpu/TextureEffect.h"
+#include "gpu/TiledTextureEffect.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/PixelBuffer.h"
@@ -243,8 +244,11 @@ std::unique_ptr<FragmentProcessor> Image::asFragmentProcessor(Context* context, 
     proxy->instantiate();
   }
   auto texture = proxy->getTexture();
-  return TextureEffect::Make(context, std::move(texture),
-                             SamplerState(tileModeX, tileModeY, sampling), localMatrix);
+  if ((tileModeX != TileMode::Clamp || tileModeY != TileMode::Clamp) && !texture->isYUV()) {
+    return TiledTextureEffect::Make(std::move(texture),
+                                    SamplerState(tileModeX, tileModeY, sampling), localMatrix);
+  }
+  return TextureEffect::Make(std::move(texture), sampling, localMatrix);
 }
 
 std::shared_ptr<Image> Image::cloneWithSource(std::shared_ptr<ImageSource> newSource) const {

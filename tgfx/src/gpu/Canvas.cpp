@@ -27,7 +27,7 @@
 #include "gpu/DeviceSpaceTextureEffect.h"
 #include "gpu/GpuPaint.h"
 #include "gpu/PorterDuffXferProcessor.h"
-#include "gpu/RGBAAATextureEffect.h"
+#include "gpu/TextureEffect.h"
 #include "gpu/ops/ClearOp.h"
 #include "gpu/ops/FillRectOp.h"
 #include "gpu/ops/RRectOp.h"
@@ -361,7 +361,7 @@ void Canvas::drawTexture(std::shared_ptr<Texture> texture, SamplingOptions sampl
   if (localBounds.isEmpty()) {
     return;
   }
-  auto processor = RGBAAATextureEffect::Make(texture, sampling);
+  auto processor = TextureEffect::Make(texture, sampling);
   if (processor == nullptr) {
     return;
   }
@@ -540,9 +540,8 @@ void Canvas::drawMask(const Rect& bounds, std::shared_ptr<Texture> mask, GpuPain
                             static_cast<float>(mask->height()) / bounds.height());
   auto oldMatrix = state->matrix;
   resetMatrix();
-  glPaint.coverageFragmentProcessors.emplace_back(
-      FragmentProcessor::MulInputByChildAlpha(RGBAAATextureEffect::Make(
-          std::move(mask), SamplingOptions(), Point::Zero(), &maskLocalMatrix)));
+  glPaint.coverageFragmentProcessors.emplace_back(FragmentProcessor::MulInputByChildAlpha(
+      TextureEffect::Make(std::move(mask), SamplingOptions(), &maskLocalMatrix)));
   auto op = FillRectOp::Make(glPaint.color, bounds, state->matrix, localMatrix);
   draw(std::move(op), std::move(glPaint));
   setMatrix(oldMatrix);
@@ -676,9 +675,9 @@ void Canvas::drawAtlas(std::shared_ptr<Texture> atlas, const Matrix matrix[], co
     GpuPaint glPaint;
     if (colors) {
       glPaint.coverageFragmentProcessors.emplace_back(
-          FragmentProcessor::MulInputByChildAlpha(RGBAAATextureEffect::Make(atlas, sampling)));
+          FragmentProcessor::MulInputByChildAlpha(TextureEffect::Make(atlas, sampling)));
     } else {
-      glPaint.colorFragmentProcessors.emplace_back(RGBAAATextureEffect::Make(atlas, sampling));
+      glPaint.colorFragmentProcessors.emplace_back(TextureEffect::Make(atlas, sampling));
     }
     draw(std::move(rectOp), std::move(glPaint), false);
   }

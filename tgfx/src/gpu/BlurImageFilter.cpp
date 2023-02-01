@@ -19,7 +19,7 @@
 #include "BlurImageFilter.h"
 #include "DualBlurFragmentProcessor.h"
 #include "SurfaceDrawContext.h"
-#include "TextureEffect.h"
+#include "TiledTextureEffect.h"
 #include "tgfx/gpu/TextureSampler.h"
 
 namespace tgfx {
@@ -88,8 +88,8 @@ void BlurImageFilter::draw(std::shared_ptr<Texture> texture, Surface* toSurface,
       dstRect, localMatrix,
       DualBlurFragmentProcessor::Make(
           isDown ? DualBlurPassMode::Down : DualBlurPassMode::Up,
-          TextureEffect::Make(toSurface->getContext(), std::move(texture), SamplerState(tileMode)),
-          blurOffset, texelSize));
+          TiledTextureEffect::Make(std::move(texture), SamplerState(tileMode)), blurOffset,
+          texelSize));
 }
 
 static std::shared_ptr<Texture> ExtendImage(Context* context, std::shared_ptr<Texture> image,
@@ -103,8 +103,8 @@ static std::shared_ptr<Texture> ExtendImage(Context* context, std::shared_ptr<Te
   auto drawContext = std::make_unique<SurfaceDrawContext>(surface.get());
   auto localMatrix = Matrix::MakeTrans(dstBounds.left, dstBounds.top);
   auto dstRect = Rect::MakeWH(dstBounds.width(), dstBounds.height());
-  drawContext->fillRectWithFP(
-      dstRect, localMatrix, TextureEffect::Make(context, std::move(image), SamplerState(tileMode)));
+  drawContext->fillRectWithFP(dstRect, localMatrix,
+                              TiledTextureEffect::Make(std::move(image), SamplerState(tileMode)));
   return surface->getTexture();
 }
 
