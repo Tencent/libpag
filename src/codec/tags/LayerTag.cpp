@@ -265,8 +265,7 @@ TagCode WriteLayer(EncodeStream* stream, Layer* layer) {
   WriteLayerStyles(stream, layer->layerStyles);
   if (layer->transform3D != nullptr) {
     WriteTagBlock(stream, layer->transform3D, Transform3DTag);
-  }
-  else if (layer->transform != nullptr) {
+  } else if (layer->transform != nullptr) {
     WriteTagBlock(stream, layer->transform, Transform2DTag);
   }
   if (layer->cachePolicy != CachePolicy::Auto) {
