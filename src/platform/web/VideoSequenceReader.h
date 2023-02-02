@@ -60,13 +60,11 @@ class VideoSequenceReader : public SequenceReader {
     return _height;
   }
 
-  void prepare(Frame targetFrame) override;
+  void prepare(Frame) override {
+  }
 
  protected:
-  bool decodeFrame(Frame) override {
-    // NOP
-    return true;
-  }
+  bool decodeFrame(Frame targetFrame) override;
 
   std::shared_ptr<tgfx::Texture> onMakeTexture(tgfx::Context* context) override;
 

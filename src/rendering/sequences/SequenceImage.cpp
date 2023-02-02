@@ -65,6 +65,12 @@ class StaticSequenceGenerator : public tgfx::ImageGenerator {
     return false;
   }
 
+#ifdef PAG_BUILD_FOR_WEB
+  bool asyncSupport() const override {
+    return true;
+  }
+#endif
+
  protected:
   std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer(bool) const override {
     auto reader = SequenceReader::Make(file, sequence);
@@ -90,6 +96,12 @@ class SequenceFrameGenerator : public tgfx::ImageGenerator {
   bool isAlphaOnly() const override {
     return false;
   }
+
+#ifdef PAG_BUILD_FOR_WEB
+  bool asyncSupport() const override {
+    return true;
+  }
+#endif
 
  protected:
   std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer(bool) const override {
