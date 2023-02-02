@@ -131,7 +131,7 @@ VideoSequenceReader::~VideoSequenceReader() {
   }
 }
 
-void VideoSequenceReader::prepare(Frame targetFrame) {
+bool VideoSequenceReader::decodeFrame(Frame targetFrame) {
   // Web 端渲染过程不能 await，否则会把渲染一半的 Canvas 上屏。
   if (videoReader.as<bool>()) {
     float playbackRate = 1;
@@ -139,7 +139,9 @@ void VideoSequenceReader::prepare(Frame targetFrame) {
       playbackRate = file->duration() / ((rootFile->duration() / 1000000) * rootFile->frameRate());
     }
     videoReader.call<val>("prepare", static_cast<int>(targetFrame), playbackRate).await();
+    return true;
   }
+  return false;
 }
 
 std::shared_ptr<tgfx::Texture> VideoSequenceReader::onMakeTexture(tgfx::Context* context) {
