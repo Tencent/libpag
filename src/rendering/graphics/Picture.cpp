@@ -31,44 +31,6 @@ class SkipSnapshotOptions : public tgfx::SurfaceOptions {
   std::unordered_set<std::shared_ptr<tgfx::Image>> drawnImages = {};
 };
 
-// 若当前直接绘制纹理性能是最好的，就直接绘制，否则返回 false。
-static bool TryDrawDirectly(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> image, bool isFlat) {
-  if (image == nullptr) {
-    return false;
-  }
-  if (isFlat && !image->isRGBAAA()) {
-    // RGBA 纹理始终可以直接上屏。
-    canvas->drawImage(std::move(image));
-    return true;
-  }
-  auto totalMatrix = canvas->getMatrix();
-  auto scaleFactor = GetMaxScaleFactor(totalMatrix);
-  if (scaleFactor <= 1.0f) {
-    // 纹理格式为 YUV 或含有 RGBAAALayout 时在缩放值小于等于 1.0f 时才直接上屏会有更好的性能。
-    canvas->drawImage(std::move(image));
-    return true;
-  }
-  return false;
-}
-
-// 强制直接绘制纹理到 canvas。
-static void DrawDirectly(tgfx::Canvas* canvas, std::shared_ptr<tgfx::Image> image, bool isFlat) {
-  if (image == nullptr || TryDrawDirectly(canvas, image, isFlat)) {
-    return;
-  }
-  auto width = image->width();
-  auto height = image->height();
-  auto surface = tgfx::Surface::Make(canvas->getContext(), width, height);
-  if (surface == nullptr) {
-    return;
-  }
-  auto newCanvas = surface->getCanvas();
-  newCanvas->drawImage(std::move(image));
-  canvas->drawTexture(surface->getTexture());
-  // 防止临时纹理析构
-  canvas->flush();
-}
-
 static std::shared_ptr<tgfx::Image> RescaleImage(tgfx::Context* context,
                                                  std::shared_ptr<tgfx::Image> image,
                                                  float scaleFactor, bool mipMapped) {
@@ -135,9 +97,8 @@ class ImageProxyPicture : public Picture {
       options->drawnImages.insert(image);
     }
     if (proxy->isTemporary()) {
-      if (TryDrawDirectly(canvas, image, proxy->isFlat())) {
-        return;
-      }
+      canvas->drawImage(std::move(image));
+      return;
     }
     if (!options) {
       auto snapshot = cache->getSnapshot(this);
@@ -146,15 +107,20 @@ class ImageProxyPicture : public Picture {
         return;
       }
     }
-    DrawDirectly(canvas, image, proxy->isFlat());
+    canvas->drawImage(std::move(image));
   }
 
  private:
   std::shared_ptr<ImageProxy> proxy = nullptr;
 
   float getScaleFactor(float maxScaleFactor) const override {
-    // 图片缩放值不需要大于 1.0f，清晰度无法继续提高。
-    return std::min(maxScaleFactor, 1.0f);
+    // Use RescaleImage() only when the maxScaleFactor is less than 0.7f (half in memory size) to
+    // avoid the unnecessary increase of draw calls.
+    if (maxScaleFactor > 0.7f) {
+      // set to 1.0f to avoid rescale the image.
+      maxScaleFactor = 1.0f;
+    }
+    return maxScaleFactor;
   }
 
   std::unique_ptr<Snapshot> makeSnapshot(RenderCache* cache, float scaleFactor,
@@ -163,8 +129,8 @@ class ImageProxyPicture : public Picture {
     if (image == nullptr) {
       return nullptr;
     }
-    bool needRescale = image->isTextureBacked() ? false : scaleFactor != 1.0f;
-    if (needRescale || image->isRGBAAA() || !proxy->isFlat()) {
+    bool needRescale = !image->isTextureBacked() && scaleFactor != 1.0f;
+    if (needRescale || image->isRGBAAA()) {
       image = RescaleImage(cache->getContext(), image, scaleFactor, mipMapped);
     } else {
       image = image->makeTextureImage(cache->getContext());
@@ -277,10 +243,6 @@ class DefaultImageProxy : public ImageProxy {
     return false;
   }
 
-  bool isFlat() const override {
-    return true;
-  }
-
   void prepareImage(RenderCache* cache) const override {
     cache->prepareAssetImage(assetID, this);
   }
@@ -316,14 +278,6 @@ class BackendTextureProxy : public ImageProxy {
 
   bool isTemporary() const override {
     return false;
-  }
-
-  bool isFlat() const override {
-    GLTextureInfo glInfo = {};
-    if (!backendTexture.getGLTextureInfo(&glInfo)) {
-      return false;
-    }
-    return glInfo.target == GL_TEXTURE_2D;
   }
 
   void prepareImage(RenderCache*) const override {
