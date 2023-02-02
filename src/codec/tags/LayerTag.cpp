@@ -214,6 +214,9 @@ Layer* ReadLayer(DecodeStream* stream) {
     case LayerType::PreCompose:
       layer = new PreComposeLayer();
       break;
+    case LayerType::Camera:
+      layer = new CameraLayer();
+      break;
     default:
       layer = new Layer();
       break;
