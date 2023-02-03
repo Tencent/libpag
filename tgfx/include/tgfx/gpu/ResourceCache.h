@@ -76,10 +76,9 @@ class ResourceCache {
   std::shared_ptr<Resource> findResourceByOwner(const Cacheable* owner);
 
   /**
-   * Returns true if there is a corresponding resource for the specified cache owner in the resource
-   * cache.
+   * Returns true if there is a corresponding resource cache for the specified cache owner.
    */
-  bool hasResource(const Cacheable* owner);
+  bool hasCache(const Cacheable* owner);
 
   /**
    * Purges GPU resources that haven't been used the passed in time.

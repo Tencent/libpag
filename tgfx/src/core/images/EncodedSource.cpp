@@ -26,7 +26,7 @@ EncodedSource::EncodedSource(std::shared_ptr<ImageGenerator> generator, bool mip
 }
 
 std::shared_ptr<ImageSource> EncodedSource::onMakeDecoded(Context* context) const {
-  if (context != nullptr && context->resourceCache()->hasResource(this)) {
+  if (context != nullptr && context->resourceCache()->hasCache(this)) {
     return nullptr;
   }
   auto encodedSource = std::static_pointer_cast<EncodedSource>(weakThis.lock());

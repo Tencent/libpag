@@ -154,7 +154,7 @@ std::shared_ptr<Resource> ResourceCache::findResourceByOwner(const Cacheable* ow
   return resource->weakThis.lock();
 }
 
-bool ResourceCache::hasResource(const Cacheable* owner) {
+bool ResourceCache::hasCache(const Cacheable* owner) {
   if (owner == nullptr) {
     return false;
   }

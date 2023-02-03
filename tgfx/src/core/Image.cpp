@@ -174,8 +174,8 @@ std::shared_ptr<Texture> Image::getTexture() const {
   return source->getTexture();
 }
 
-std::shared_ptr<Image> Image::makeTextureImage(Context* context, bool wrapCacheOnly) const {
-  auto textureSource = source->makeTextureSource(context, wrapCacheOnly);
+std::shared_ptr<Image> Image::makeTextureImage(Context* context) const {
+  auto textureSource = source->makeTextureSource(context);
   if (textureSource == source) {
     return weakThis.lock();
   }

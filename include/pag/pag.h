@@ -522,7 +522,7 @@ class PAG_API PAGLayer : public Content {
 
   friend class PAGImageLayer;
 
-  friend class VideoSequenceReader;
+  friend class SequenceImageQueue;
 };
 
 class SolidLayer;

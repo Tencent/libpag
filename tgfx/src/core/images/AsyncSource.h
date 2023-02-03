@@ -46,7 +46,7 @@ class AsyncSource : public ImageSource {
   }
 
  protected:
-  const Cacheable* getProxyOwner() const override;
+  const Cacheable* getCacheOwner() const override;
 
   std::shared_ptr<ImageSource> onMakeMipMapped() const override;
 

@@ -35,14 +35,12 @@
 #include "rendering/graphics/Shape.h"
 #include "rendering/graphics/Snapshot.h"
 #include "rendering/layers/PAGStage.h"
-#include "rendering/sequences/SequenceReader.h"
+#include "rendering/sequences/SequenceImageQueue.h"
 #include "rendering/utils/PathHasher.h"
 #include "tgfx/gpu/Device.h"
 
 namespace pag {
 using ShapeMap = std::unordered_map<tgfx::Path, std::shared_ptr<tgfx::Shape>, PathHasher>;
-using SequenceMap = std::unordered_map<Frame, std::shared_ptr<SequenceReader>>;
-using ImageFrame = std::pair<std::shared_ptr<tgfx::Image>, Frame>;
 
 class RenderCache : public Performance {
  public:
@@ -177,11 +175,8 @@ class RenderCache : public Performance {
   std::unordered_map<ID, ShapeMap> shapeCaches = {};
   std::unordered_map<ID, std::shared_ptr<tgfx::Image>> assetImages = {};
   std::unordered_map<ID, std::shared_ptr<tgfx::Image>> decodedAssetImages = {};
-  std::unordered_map<ID, std::vector<std::shared_ptr<SequenceReader>>> sequenceCaches = {};
-  std::unordered_map<SequenceReader*, ImageFrame> readerToSequenceImage = {};
-  std::unordered_map<ID, std::unordered_map<Frame, std::shared_ptr<tgfx::Image>>>
-      decodedSequenceImages = {};
-  std::unordered_map<ID, SequenceMap> usedSequences = {};
+  std::unordered_map<ID, std::vector<SequenceImageQueue*>> sequenceCaches = {};
+  std::unordered_map<ID, std::unordered_map<Frame, SequenceImageQueue*>> usedSequences = {};
   std::unordered_map<ID, Filter*> filterCaches;
   MotionBlurFilter* motionBlurFilter = nullptr;
 
@@ -195,10 +190,9 @@ class RenderCache : public Performance {
   void removeSnapshotFromLRU(Snapshot* snapshot);
 
   // sequence caches:
-  std::shared_ptr<tgfx::Image> getSequenceImageInternal(Sequence* sequence, Frame targetFrame);
-  std::shared_ptr<SequenceReader> getSequenceReader(Sequence* sequence, Frame targetFrame);
-  std::shared_ptr<SequenceReader> findNearestSequenceReader(Sequence* sequence, Frame targetFrame);
-  std::shared_ptr<SequenceReader> makeSequenceReader(Sequence* sequence);
+  SequenceImageQueue* getSequenceImageQueue(Sequence* sequence, Frame targetFrame);
+  SequenceImageQueue* findNearestSequenceImageQueue(Sequence* sequence, Frame targetFrame);
+  SequenceImageQueue* makeSequenceImageQueue(Sequence* sequence);
   void clearAllSequenceCaches();
   void clearSequenceCache(ID uniqueID);
   void clearExpiredSequences();
@@ -219,6 +213,7 @@ class RenderCache : public Performance {
 
   void preparePreComposeLayer(PreComposeLayer* layer);
   void prepareImageLayer(PAGImageLayer* layer);
+  void prepareNextFrame();
   std::shared_ptr<tgfx::Image> getAssetImageInternal(ID assetID, const ImageProxy* proxy);
   void recordPerformance();
 

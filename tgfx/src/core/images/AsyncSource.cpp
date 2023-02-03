@@ -24,7 +24,7 @@ AsyncSource::AsyncSource(std::shared_ptr<EncodedSource> source) : encodedSource(
   imageBuffer = encodedSource->makeAsyncBuffer();
 }
 
-const Cacheable* AsyncSource::getProxyOwner() const {
+const Cacheable* AsyncSource::getCacheOwner() const {
   return encodedSource.get();
 }
 

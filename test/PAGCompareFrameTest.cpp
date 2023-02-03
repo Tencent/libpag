@@ -21,8 +21,8 @@
 #include <map>
 #include <thread>
 #include <vector>
-#include "base/utils/Task.h"
 #include "base/utils/TimeUtil.h"
+#include "core/utils/Task.h"
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
 #include "framework/utils/Semaphore.h"
@@ -104,23 +104,25 @@ void CompareFileFrames(Semaphore* semaphore, std::string pagPath) {
 
   std::shared_ptr<PixelBuffer> currentSnapshot = nullptr;
   std::shared_ptr<Task> lastTask = nullptr;
+  std::unique_ptr<CompareFrameTask> lastExecutor = nullptr;
 
   auto CompareFrame = [&](Frame currentFrame) {
     if (lastTask == nullptr) {
       return;
     }
     Clock clock = {};
-    auto task = static_cast<CompareFrameTask*>(lastTask->wait());
+    lastTask->wait();
     auto compareCost = clock.measure();
-    if (currentFrame == task->currentFrame()) {
+    if (currentFrame == lastExecutor->currentFrame()) {
       auto& cost = performanceMap[currentFrame];
       cost.compareCost = compareCost;
       cost.totalTime += compareCost;
     }
-    if (!task->isSuccess()) {
+    if (!lastExecutor->isSuccess()) {
       errorMsg += (std::to_string(currentFrame) + ";");
     }
     lastTask = nullptr;
+    lastExecutor = nullptr;
   };
 
   while (currentFrame < totalFrames) {
@@ -137,8 +139,8 @@ void CompareFileFrames(Semaphore* semaphore, std::string pagPath) {
     }
     CompareFrame(currentFrame - 1);
     if (changed) {
-      auto executor = new CompareFrameTask(fileName, currentFrame, currentSnapshot);
-      lastTask = Task::Make(std::unique_ptr<CompareFrameTask>(executor));
+      lastExecutor = std::make_unique<CompareFrameTask>(fileName, currentFrame, currentSnapshot);
+      lastTask = Task::Make(lastExecutor.get());
       lastTask->run();
     }
     pagPlayer->nextFrame();

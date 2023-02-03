@@ -679,9 +679,7 @@ PAG_TEST(CanvasTest, image) {
   EXPECT_TRUE(image->isLazyGenerated());
   EXPECT_FALSE(image->isTextureBacked());
   EXPECT_FALSE(image->hasMipmaps());
-  auto textureImage = image->makeTextureImage(context, true);
-  EXPECT_TRUE(textureImage == nullptr);
-  textureImage = image->makeTextureImage(context, false);
+  auto textureImage = image->makeTextureImage(context);
   ASSERT_TRUE(textureImage != nullptr);
   EXPECT_TRUE(textureImage->isTextureBacked());
   EXPECT_FALSE(textureImage->isLazyGenerated());

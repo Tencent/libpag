@@ -98,7 +98,7 @@ class ImageSource : public Cacheable {
    * ImageSource if context is compatible with backing GPU texture. Returns nullptr if context is
    * nullptr, or if ImageSource was created with another context.
    */
-  std::shared_ptr<ImageSource> makeTextureSource(Context* context, bool wrapCacheOnly) const;
+  std::shared_ptr<ImageSource> makeTextureSource(Context* context) const;
 
   /**
    * Returns a decoded ImageSource from the lazy ImageSource. The returned ImageSource shares the
@@ -123,7 +123,7 @@ class ImageSource : public Cacheable {
                                                  bool skipGeneratingCache = false) const;
 
  protected:
-  virtual const Cacheable* getProxyOwner() const;
+  virtual const Cacheable* getCacheOwner() const;
 
   virtual std::shared_ptr<ImageSource> onMakeDecoded(Context* context) const;
 

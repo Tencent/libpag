@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <atomic>
 #include "SequenceReader.h"
 #include "rendering/video/VideoDecoder.h"
 #include "rendering/video/VideoDemuxer.h"
@@ -44,7 +45,7 @@ class VideoReader : public SequenceReader {
 
   std::shared_ptr<tgfx::Texture> onMakeTexture(tgfx::Context* context) override;
 
-  void recordPerformance(Performance* performance) override;
+  void onReportPerformance(Performance* performance, int64_t decodingTime) override;
 
  private:
   std::mutex locker = {};
@@ -58,8 +59,8 @@ class VideoReader : public SequenceReader {
   bool inputEndOfStream = false;
   int64_t currentDecodedTime = INT64_MIN;
   int64_t currentRenderedTime = INT64_MIN;
-  int64_t hardDecodingInitialTime = 0;
-  int64_t softDecodingInitialTime = 0;
+  std::atomic_int64_t hardDecodingInitialTime = 0;
+  std::atomic_int64_t softDecodingInitialTime = 0;
 
   void destroyVideoDecoder();
 

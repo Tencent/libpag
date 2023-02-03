@@ -125,7 +125,6 @@ VideoSequenceReader::VideoSequenceReader(std::shared_ptr<File> file, VideoSequen
 }
 
 VideoSequenceReader::~VideoSequenceReader() {
-  lastTask = nullptr;
   if (videoReader.as<bool>()) {
     videoReader.call<void>("onDestroy");
   }
@@ -156,5 +155,8 @@ std::shared_ptr<tgfx::Texture> VideoSequenceReader::onMakeTexture(tgfx::Context*
   auto& sampler = webVideoTexture->glSampler();
   videoReader.call<void>("renderToTexture", val::module_property("GL"), sampler.id);
   return webVideoTexture;
+}
+
+void VideoSequenceReader::onReportPerformance(Performance*, int64_t) {
 }
 }  // namespace pag
