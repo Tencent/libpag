@@ -21,15 +21,17 @@
 #include "GLContext.h"
 
 namespace tgfx {
-std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<RenderTarget> renderTarget) {
+std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<RenderTarget> renderTarget,
+                                           const SurfaceOptions* options) {
   if (renderTarget == nullptr) {
     return nullptr;
   }
   auto glRT = std::static_pointer_cast<GLRenderTarget>(renderTarget);
-  return std::shared_ptr<GLSurface>(new GLSurface(std::move(glRT)));
+  return std::shared_ptr<GLSurface>(new GLSurface(std::move(glRT), nullptr, options));
 }
 
-std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<Texture> texture, int sampleCount) {
+std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<Texture> texture, int sampleCount,
+                                           const SurfaceOptions* options) {
   if (texture == nullptr || texture->isYUV()) {
     return nullptr;
   }
@@ -38,12 +40,13 @@ std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<Texture> texture, int
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto surface = new GLSurface(renderTarget, glTexture);
+  auto surface = new GLSurface(renderTarget, glTexture, options);
   return std::shared_ptr<GLSurface>(surface);
 }
 
 std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, bool alphaOnly,
-                                       int sampleCount, bool mipMapped) {
+                                       int sampleCount, bool mipMapped,
+                                       const SurfaceOptions* options) {
   auto pixelFormat = alphaOnly ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
   std::shared_ptr<GLTexture> texture;
   if (alphaOnly) {
@@ -64,15 +67,15 @@ std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, 
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto surface = new GLSurface(renderTarget, texture);
+  auto surface = new GLSurface(renderTarget, texture, options);
   // 对于内部创建的 RenderTarget 默认清屏。
   surface->getCanvas()->clear();
   return std::shared_ptr<Surface>(surface);
 }
 
 GLSurface::GLSurface(std::shared_ptr<GLRenderTarget> renderTarget,
-                     std::shared_ptr<GLTexture> texture)
-    : Surface(std::move(renderTarget), std::move(texture)) {
+                     std::shared_ptr<GLTexture> texture, const SurfaceOptions* options)
+    : Surface(std::move(renderTarget), std::move(texture), options) {
   requiresManualMSAAResolve =
       GLCaps::Get(this->renderTarget->getContext())->usesMSAARenderBuffers();
 }

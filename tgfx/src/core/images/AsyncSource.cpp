@@ -24,16 +24,12 @@ AsyncSource::AsyncSource(std::shared_ptr<EncodedSource> source) : encodedSource(
   imageBuffer = encodedSource->makeAsyncBuffer();
 }
 
-std::shared_ptr<TextureProxy> AsyncSource::getTextureProxy(Context* context) const {
+std::shared_ptr<TextureProxy> AsyncSource::lockTextureProxy(Context* context) const {
   if (context == nullptr) {
     return nullptr;
   }
   auto provider = context->proxyProvider();
-  return provider->findProxyByOwner(encodedSource.get());
-}
-
-std::shared_ptr<TextureProxy> AsyncSource::lockTextureProxy(Context* context) const {
-  auto proxy = getTextureProxy(context);
+  auto proxy = provider->findProxyByOwner(encodedSource.get());
   if (proxy != nullptr) {
     return proxy;
   }

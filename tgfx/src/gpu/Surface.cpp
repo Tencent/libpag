@@ -21,9 +21,13 @@
 #include "core/utils/Log.h"
 
 namespace tgfx {
-Surface::Surface(std::shared_ptr<RenderTarget> renderTarget, std::shared_ptr<Texture> texture)
+Surface::Surface(std::shared_ptr<RenderTarget> renderTarget, std::shared_ptr<Texture> texture,
+                 const SurfaceOptions* options)
     : renderTarget(std::move(renderTarget)), texture(std::move(texture)) {
   DEBUG_ASSERT(this->renderTarget != nullptr);
+  if (options != nullptr) {
+    surfaceOptions = *options;
+  }
 }
 
 Surface::~Surface() {

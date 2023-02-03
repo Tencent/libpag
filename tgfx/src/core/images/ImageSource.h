@@ -116,12 +116,6 @@ class ImageSource : public Cacheable {
   std::shared_ptr<ImageSource> makeMipMapped() const;
 
   /**
-   * Returns a TextureProxy if there is a corresponding cache in the context. Otherwise, returns
-   * nullptr.
-   */
-  virtual std::shared_ptr<TextureProxy> getTextureProxy(Context* context) const;
-
-  /**
    * Returns a TextureProxy if there is a corresponding cache in the context. Otherwise, immediately
    * creates one.
    */

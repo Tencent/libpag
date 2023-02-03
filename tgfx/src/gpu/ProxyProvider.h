@@ -25,7 +25,7 @@ namespace tgfx {
 class CacheOwnerTextureProxy;
 
 /**
- * A factory for creating TextureProxy-derived objects.
+ * A factory for creating proxy-derived objects.
  */
 class ProxyProvider {
  public:

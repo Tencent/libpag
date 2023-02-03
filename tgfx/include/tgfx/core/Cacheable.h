@@ -23,7 +23,8 @@
 namespace tgfx {
 /**
  * The base class for CPU objects that can generate GPU caches. The content of a Cacheable is
- * immutable.
+ * immutable. Releasing an Cacheable will immediately mark the corresponding GPU cache in the
+ * context as expired, which becomes recyclable and will be purged at some point in the future.
  */
 class Cacheable {
  public:

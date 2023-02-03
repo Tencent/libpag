@@ -185,7 +185,7 @@ Surface* Canvas::getSurface() const {
   return surface;
 }
 
-SurfaceOptions* Canvas::surfaceOptions() const {
+const SurfaceOptions* Canvas::surfaceOptions() const {
   return surface->options();
 }
 

@@ -220,13 +220,6 @@ std::shared_ptr<Image> Image::makeMipMapped() const {
   return cloneWithSource(std::move(mipMappedSource));
 }
 
-void Image::markCacheExpired(Context* context) {
-  auto proxy = source->getTextureProxy(context);
-  if (proxy) {
-    proxy->removeCacheOwner();
-  }
-}
-
 std::shared_ptr<Image> Image::onMakeSubset(const Rect& subset) const {
   auto localMatrix = Matrix::MakeTrans(subset.x(), subset.y());
   return std::shared_ptr<MatrixImage>(new MatrixImage(

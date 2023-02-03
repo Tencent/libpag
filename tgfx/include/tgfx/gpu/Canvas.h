@@ -63,9 +63,10 @@ class Canvas {
   Surface* getSurface() const;
 
   /**
-   * Returns SurfaceOptions associated with this canvas.
+   * Returns the SurfaceOptions associated with the Canvas. Returns nullptr if the Canvas is not
+   * created from a Surface.
    */
-  SurfaceOptions* surfaceOptions() const;
+  const SurfaceOptions* surfaceOptions() const;
 
   /**
    * Saves alpha, blend mode, matrix and clip. Calling restore() discards changes to them, restoring

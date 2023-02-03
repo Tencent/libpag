@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,19 +18,38 @@
 
 #pragma once
 
-#include "tgfx/gpu/Surface.h"
-#include "tgfx/gpu/opengl/GLRenderTarget.h"
-#include "tgfx/gpu/opengl/GLTexture.h"
-
 namespace tgfx {
-class GLSurface : public Surface {
- protected:
-  bool onReadPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) override;
+/**
+ * Describes properties and constraints of a given Surface. The rendering engine can parse these
+ * during drawing, and can sometimes optimize its performance (e.g. disabling an expensive feature).
+ */
+class SurfaceOptions {
+ public:
+  /**
+   * If this flag is set, the associated Surface will skip generating new GPU caches for all
+   * Cacheable objects drawn to the Surface.
+   */
+  static constexpr uint32_t SkipGeneratingGPUCacheFlag = 1 << 0;
+
+  SurfaceOptions() = default;
+
+  SurfaceOptions(uint32_t flags) : _flags(flags) {
+  }
+
+  uint32_t flags() const {
+    return _flags;
+  }
+
+  bool skipGeneratingGPUCache() const {
+    return _flags & SkipGeneratingGPUCacheFlag;
+  }
+
+  bool operator==(const SurfaceOptions& that) const {
+    return _flags == that._flags;
+  }
 
  private:
-  explicit GLSurface(std::shared_ptr<GLRenderTarget> renderTarget,
-                     std::shared_ptr<GLTexture> texture, const SurfaceOptions* options);
-
-  friend class Surface;
+  uint32_t _flags = 0;
 };
+
 }  // namespace tgfx

@@ -22,17 +22,9 @@
 #include "tgfx/gpu/Canvas.h"
 #include "tgfx/gpu/RenderTarget.h"
 #include "tgfx/gpu/Semaphore.h"
+#include "tgfx/gpu/SurfaceOptions.h"
 
 namespace tgfx {
-/**
- * Describes options of a given Surface. The caller can add some custom options to its subclass and
- * parse them during drawing, which can sometimes optimize the rendering performance (e.g. disabling
- * an expensive feature).
- */
-class SurfaceOptions {
- public:
-  virtual ~SurfaceOptions() = default;
-};
 
 class Canvas;
 
@@ -55,18 +47,21 @@ class Surface {
    */
   static std::shared_ptr<Surface> Make(Context* context, int width, int height,
                                        bool alphaOnly = false, int sampleCount = 1,
-                                       bool mipMapped = false);
+                                       bool mipMapped = false,
+                                       const SurfaceOptions* options = nullptr);
 
   /**
    * Wraps a render target into Surface. Returns nullptr if renderTarget is nullptr.
    */
-  static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<RenderTarget> renderTarget);
+  static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<RenderTarget> renderTarget,
+                                           const SurfaceOptions* options = nullptr);
 
   /**
    * Wraps a texture into Surface. A Surface with MSAA enabled is returned if the sampleCount is
    * greater than 1. Returns nullptr if the specified texture is not renderable.
    */
-  static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<Texture> texture, int sampleCount = 1);
+  static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<Texture> texture, int sampleCount = 1,
+                                           const SurfaceOptions* options = nullptr);
 
   virtual ~Surface();
 
@@ -78,18 +73,10 @@ class Surface {
   }
 
   /**
-   * Returns SurfaceOptions for this surface.
+   * Returns the SurfaceOptions of the Surface.
    */
-  SurfaceOptions* options() const {
-    return surfaceOptions;
-  }
-
-  /**
-   * Sets the options property for this surface. The caller is responsible for managing the lifetime
-   * of the SurfaceOptions.
-   */
-  void setOptions(SurfaceOptions* newOptions) {
-    surfaceOptions = newOptions;
+  const SurfaceOptions* options() const {
+    return &surfaceOptions;
   }
 
   /**
@@ -165,7 +152,8 @@ class Surface {
   bool hitTest(float x, float y);
 
  protected:
-  Surface(std::shared_ptr<RenderTarget> renderTarget, std::shared_ptr<Texture> texture);
+  Surface(std::shared_ptr<RenderTarget> renderTarget, std::shared_ptr<Texture> texture,
+          const SurfaceOptions* options);
 
   virtual bool onReadPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) = 0;
 
@@ -174,7 +162,7 @@ class Surface {
   bool requiresManualMSAAResolve = false;
 
  private:
-  SurfaceOptions* surfaceOptions = nullptr;
+  SurfaceOptions surfaceOptions = {};
   Canvas* canvas = nullptr;
 
   friend class DrawingManager;
