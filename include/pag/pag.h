@@ -1231,6 +1231,7 @@ class PAG_API PAGSurface {
 
   bool draw(RenderCache* cache, std::shared_ptr<Graphic> graphic, BackendSemaphore* signalSemaphore,
             bool autoClear = true);
+  bool prepare(RenderCache* cache, std::shared_ptr<Graphic> graphic);
   bool hitTest(RenderCache* cache, std::shared_ptr<Graphic> graphic, float x, float y);
   tgfx::Context* lockContext();
   void unlockContext();
@@ -1492,7 +1493,7 @@ class PAG_API PAGPlayer {
   int _scaleMode = PAGScaleMode::LetterBox;
   bool _autoClear = true;
 
-  void updateStageSize();
+  bool updateStageSize();
   void setSurfaceInternal(std::shared_ptr<PAGSurface> newSurface);
   int64_t getTimeStampInternal();
   void prepareInternal();

@@ -34,6 +34,7 @@ static constexpr int PURGEABLE_GRAPHICS_MEMORY = 20971520;  // 20M
 static constexpr int PURGEABLE_EXPIRED_FRAME = 10;
 static constexpr float SCALE_FACTOR_PRECISION = 0.001f;
 static constexpr float MIPMAP_ENABLED_THRESHOLD = 0.4f;
+static constexpr int64_t DECODING_VISIBLE_DISTANCE = 500000;  // 提前 500ms 开始解码。
 
 RenderCache::RenderCache(PAGStage* stage) : _uniqueID(UniqueID::Next()), stage(stage) {
 }
@@ -65,7 +66,13 @@ bool RenderCache::initFilter(Filter* filter) {
   return result;
 }
 
-void RenderCache::prepareLayers(int64_t timeDistance) {
+void RenderCache::prepareLayers() {
+#ifdef PAG_BUILD_FOR_WEB
+  // always prepare the whole timeline on the web platoform.
+  int64_t timeDistance = INT64_MAX;
+#else
+  int64_t timeDistance = DECODING_VISIBLE_DISTANCE;
+#endif
   auto layerDistances = stage->findNearlyVisibleLayersIn(timeDistance);
   for (auto& item : layerDistances) {
     for (auto pagLayer : item.second) {
@@ -155,7 +162,7 @@ void RenderCache::beginFrame() {
   resetPerformance();
 }
 
-void RenderCache::attachToContext(tgfx::Context* current, bool forHitTest) {
+void RenderCache::attachToContext(tgfx::Context* current, bool forDrawing) {
   if (deviceID > 0 && deviceID != current->device()->uniqueID()) {
     // Context 改变需要清理内部所有缓存，这里用 uniqueID
     // 而不用指针比较，是因为指针析构后再创建可能会地址重合。
@@ -164,8 +171,8 @@ void RenderCache::attachToContext(tgfx::Context* current, bool forHitTest) {
   context = current;
   context->setCacheLimit(MAX_GRAPHICS_MEMORY);
   deviceID = context->device()->uniqueID();
-  hitTestOnly = forHitTest;
-  if (hitTestOnly) {
+  isDrawingFrame = forDrawing;
+  if (!isDrawingFrame) {
     return;
   }
   auto removedAssets = stage->getRemovedAssets();
@@ -196,7 +203,7 @@ void RenderCache::releaseAll() {
 }
 
 void RenderCache::detachFromContext() {
-  if (hitTestOnly) {
+  if (!isDrawingFrame) {
     context = nullptr;
     return;
   }

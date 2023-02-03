@@ -40,8 +40,6 @@
 #include "tgfx/gpu/Device.h"
 
 namespace pag {
-static constexpr int64_t DECODING_VISIBLE_DISTANCE = 500000;  // 提前 500ms 开始解码。
-
 using ShapeMap = std::unordered_map<tgfx::Path, std::shared_ptr<tgfx::Shape>, PathHasher>;
 using SequenceMap = std::unordered_map<Frame, std::shared_ptr<SequenceReader>>;
 using ImageFrame = std::pair<std::shared_ptr<tgfx::Image>, Frame>;
@@ -58,7 +56,7 @@ class RenderCache : public Performance {
 
   void beginFrame();
 
-  void attachToContext(tgfx::Context* current, bool forHitTest = false);
+  void attachToContext(tgfx::Context* current, bool forDrawing = true);
 
   void detachFromContext();
 
@@ -75,6 +73,12 @@ class RenderCache : public Performance {
   tgfx::Context* getContext() const {
     return context;
   }
+
+  /**
+   * Prepares the nearly visible layers for the upcoming drawings, which collects all CPU tasks and
+   * runs them asynchronously in parallel.
+   */
+  void prepareLayers();
 
   /**
    * If set to false, the getSnapshot() always returns nullptr. The default value is true.
@@ -161,7 +165,7 @@ class RenderCache : public Performance {
   uint32_t deviceID = 0;
   tgfx::Context* context = nullptr;
   std::queue<int64_t> timestamps = {};
-  bool hitTestOnly = false;
+  bool isDrawingFrame = false;
   size_t graphicsMemory = 0;
   bool _videoEnabled = true;
   bool _snapshotEnabled = true;
@@ -213,7 +217,6 @@ class RenderCache : public Performance {
   std::shared_ptr<tgfx::Shape> findShape(ID assetID, const tgfx::Path& path);
   void removeShape(ID assetID, const tgfx::Path& path);
 
-  void prepareLayers(int64_t timeDistance = DECODING_VISIBLE_DISTANCE);
   void preparePreComposeLayer(PreComposeLayer* layer);
   void prepareImageLayer(PAGImageLayer* layer);
   std::shared_ptr<tgfx::Image> getAssetImageInternal(ID assetID, const ImageProxy* proxy);

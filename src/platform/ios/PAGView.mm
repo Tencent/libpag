@@ -18,7 +18,6 @@
 
 #import "PAGView.h"
 #import "PAGPlayer.h"
-
 #import "platform/ios/private/GPUDrawable.h"
 #import "platform/ios/private/PAGSurface+Internal.h"
 #import "platform/ios/private/PAGValueAnimator.h"
@@ -32,7 +31,7 @@ void DestoryFlushQueue() {
   [queue cancelAllOperations];
   [queue waitUntilAllOperationsAreFinished];
 }
-}
+}  // namespace pag
 
 @interface PAGView ()
 @property(atomic, assign) BOOL isAsyncFlushing;
@@ -310,6 +309,7 @@ void DestoryFlushQueue() {
 }
 
 - (void)doPlay {
+  [pagPlayer prepare];
   if (!self.isVisible) {
     return;
   }
