@@ -119,7 +119,6 @@ void RenderCache::prepareImageLayer(PAGImageLayer* pagLayer) {
 }
 
 void RenderCache::prepareNextFrame() {
-  // TODO(domrjchen): Remove the await in VideoSequenceReader->decodeFrame() on the web platform.
 #ifndef PAG_BUILD_FOR_WEB
   for (auto& item : usedSequences) {
     for (auto& map : item.second) {
