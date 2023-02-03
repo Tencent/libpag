@@ -91,6 +91,10 @@ std::shared_ptr<ImageSource> ImageSource::makeDecoded(Context* context) const {
   return source;
 }
 
+const Cacheable* ImageSource::getProxyOwner() const {
+  return this;
+}
+
 std::shared_ptr<ImageSource> ImageSource::onMakeDecoded(Context*) const {
   return nullptr;
 }
@@ -107,7 +111,8 @@ std::shared_ptr<ImageSource> ImageSource::makeMipMapped() const {
   return source;
 }
 
-std::shared_ptr<TextureProxy> ImageSource::lockTextureProxy(Context* context) const {
+std::shared_ptr<TextureProxy> ImageSource::lockTextureProxy(Context* context,
+                                                            bool skipGeneratingCache) const {
   if (context == nullptr) {
     return nullptr;
   }
@@ -118,7 +123,8 @@ std::shared_ptr<TextureProxy> ImageSource::lockTextureProxy(Context* context) co
   }
   proxy = onMakeTextureProxy(context);
   if (proxy != nullptr) {
-    proxy->assignCacheOwner(this);
+    auto updateTexture = !skipGeneratingCache && !isTextureBacked();
+    proxy->assignProxyOwner(getProxyOwner(), updateTexture);
   }
   return proxy;
 }

@@ -27,38 +27,43 @@ namespace tgfx {
 class TextureSource : public ImageSource {
  public:
   int width() const override {
-    return proxy->width();
+    return texture->width();
   }
 
   int height() const override {
-    return proxy->height();
+    return texture->height();
   }
 
   bool hasMipmaps() const override {
-    return proxy->hasMipmaps();
+    return texture->getSampler()->mipMapped();
   }
 
-  bool isAlphaOnly() const override;
+  bool isAlphaOnly() const override {
+    return texture->getSampler()->format == PixelFormat::ALPHA_8;
+  }
 
   bool isTextureBacked() const override {
     return true;
   }
 
   std::shared_ptr<Texture> getTexture() const override {
-    return proxy->getTexture();
+    return texture;
   }
 
-  std::shared_ptr<TextureProxy> lockTextureProxy(Context* context) const override;
-
  protected:
-  std::shared_ptr<ImageSource> onMakeMipMapped() const override;
+  std::shared_ptr<ImageSource> onMakeMipMapped() const override {
+    return nullptr;
+  }
 
-  std::shared_ptr<TextureProxy> onMakeTextureProxy(Context*) const override;
+  std::shared_ptr<TextureProxy> onMakeTextureProxy(Context* context) const override {
+    return context->proxyProvider()->wrapTexture(texture);
+  }
 
  private:
-  std::shared_ptr<TextureProxy> proxy = nullptr;
+  std::shared_ptr<Texture> texture = nullptr;
 
-  explicit TextureSource(std::shared_ptr<Texture> texture);
+  explicit TextureSource(std::shared_ptr<Texture> texture) : texture(std::move(texture)) {
+  }
 
   friend class ImageSource;
 };

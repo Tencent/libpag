@@ -24,20 +24,8 @@ AsyncSource::AsyncSource(std::shared_ptr<EncodedSource> source) : encodedSource(
   imageBuffer = encodedSource->makeAsyncBuffer();
 }
 
-std::shared_ptr<TextureProxy> AsyncSource::lockTextureProxy(Context* context) const {
-  if (context == nullptr) {
-    return nullptr;
-  }
-  auto provider = context->proxyProvider();
-  auto proxy = provider->findProxyByOwner(encodedSource.get());
-  if (proxy != nullptr) {
-    return proxy;
-  }
-  proxy = onMakeTextureProxy(context);
-  if (proxy != nullptr) {
-    proxy->assignCacheOwner(encodedSource.get());
-  }
-  return proxy;
+const Cacheable* AsyncSource::getProxyOwner() const {
+  return encodedSource.get();
 }
 
 std::shared_ptr<ImageSource> AsyncSource::onMakeMipMapped() const {

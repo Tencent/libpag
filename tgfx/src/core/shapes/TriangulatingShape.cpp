@@ -26,8 +26,8 @@ TriangulatingShape::TriangulatingShape(std::unique_ptr<PathProxy> pathProxy, flo
     : PathShape(std::move(pathProxy), resolutionScale) {
 }
 
-std::unique_ptr<DrawOp> TriangulatingShape::makeOp(GpuPaint* paint,
-                                                   const Matrix& viewMatrix) const {
+std::unique_ptr<DrawOp> TriangulatingShape::makeOp(GpuPaint* paint, const Matrix& viewMatrix,
+                                                   bool skipGeneratingCache) const {
   auto resourceCache = paint->context->resourceCache();
   auto buffer = std::static_pointer_cast<GpuBuffer>(resourceCache->findResourceByOwner(this));
   if (buffer != nullptr) {
@@ -46,7 +46,9 @@ std::unique_ptr<DrawOp> TriangulatingShape::makeOp(GpuPaint* paint,
   if (buffer == nullptr) {
     return nullptr;
   }
-  buffer->assignCacheOwner(this);
+  if (!skipGeneratingCache) {
+    buffer->assignCacheOwner(this);
+  }
   return std::make_unique<TriangulatingPathOp>(paint->color, buffer, count, bounds, viewMatrix);
 }
 }  // namespace tgfx

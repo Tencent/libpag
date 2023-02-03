@@ -70,7 +70,6 @@ file(GLOB TGFX_FILES
         src/gpu/*.*
         src/gpu/gradients/*.*
         src/gpu/ops/*.*
-        src/gpu/proxies/*.*
         src/platform/*.*)
 
 if (TGFX_USE_QT)

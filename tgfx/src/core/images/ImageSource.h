@@ -19,7 +19,6 @@
 #pragma once
 
 #include "gpu/ProxyProvider.h"
-#include "gpu/proxies/TextureProxy.h"
 #include "tgfx/core/Cacheable.h"
 #include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/ImageGenerator.h"
@@ -117,11 +116,15 @@ class ImageSource : public Cacheable {
 
   /**
    * Returns a TextureProxy if there is a corresponding cache in the context. Otherwise, immediately
-   * creates one.
+   * creates one. If the skipGeneratingCache is true, the ImageSource will not be assigned to the
+   * associated Texture as its cache owner.
    */
-  virtual std::shared_ptr<TextureProxy> lockTextureProxy(Context* context) const;
+  std::shared_ptr<TextureProxy> lockTextureProxy(Context* context,
+                                                 bool skipGeneratingCache = false) const;
 
  protected:
+  virtual const Cacheable* getProxyOwner() const;
+
   virtual std::shared_ptr<ImageSource> onMakeDecoded(Context* context) const;
 
   virtual std::shared_ptr<ImageSource> onMakeMipMapped() const = 0;

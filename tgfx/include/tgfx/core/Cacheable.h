@@ -48,5 +48,6 @@ class Cacheable {
 
   friend class ResourceCache;
   friend class ProxyProvider;
+  friend class TextureProxy;
 };
 }  // namespace tgfx

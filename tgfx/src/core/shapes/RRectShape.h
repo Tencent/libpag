@@ -32,6 +32,7 @@ class RRectShape : public Shape {
  private:
   RRect rRect = {};
 
-  std::unique_ptr<DrawOp> makeOp(GpuPaint* paint, const Matrix& viewMatrix) const override;
+  std::unique_ptr<DrawOp> makeOp(GpuPaint* paint, const Matrix& viewMatrix,
+                                 bool skipGeneratingCache) const override;
 };
 }  // namespace tgfx

@@ -37,7 +37,8 @@ class FragmentProcessor;
  * texture. Image is safe across threads and cannot be modified after it is created. The width and
  * height of Image are always greater than zero. Creating an Image with zero width or height returns
  * nullptr. The corresponding GPU cache is immediately marked as expired if all Images with the same
- * ImageSource are released, which becomes recyclable and will be purged at some point in the future.
+ * ImageSource are released, which becomes recyclable and will be purged at some point in the
+ * future.
  */
 class Image {
  public:
@@ -225,11 +226,12 @@ class Image {
 
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
       Context* context, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
-      const Matrix* localMatrix = nullptr);
+      const Matrix* localMatrix = nullptr, bool skipGeneratingCache = false);
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(Context* context,
                                                          const SamplingOptions& sampling,
-                                                         const Matrix* localMatrix = nullptr);
+                                                         const Matrix* localMatrix = nullptr,
+                                                         bool skipGeneratingCache = false);
 
  private:
   static std::shared_ptr<Image> MakeFromSource(std::shared_ptr<ImageSource> source,

@@ -40,9 +40,11 @@ class RGBAAAImage : public Image {
 
   std::shared_ptr<Image> onMakeSubset(const Rect& subset) const override;
 
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(
-      Context* context, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
-      const Matrix* localMatrix = nullptr) override;
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(Context* context, TileMode tileModeX,
+                                                         TileMode tileModeY,
+                                                         const SamplingOptions& sampling,
+                                                         const Matrix* localMatrix = nullptr,
+                                                         bool skipGeneratingCache = false) override;
 
  private:
   Rect bounds = Rect::MakeEmpty();
