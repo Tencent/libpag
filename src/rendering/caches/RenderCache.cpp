@@ -66,11 +66,10 @@ bool RenderCache::initFilter(Filter* filter) {
 }
 
 void RenderCache::prepareLayers() {
+  int64_t timeDistance = DECODING_VISIBLE_DISTANCE;
 #ifdef PAG_BUILD_FOR_WEB
   // always prepare the whole timeline on the web platoform.
-  int64_t timeDistance = INT64_MAX;
-#else
-  int64_t timeDistance = DECODING_VISIBLE_DISTANCE;
+  timeDistance = INT64_MAX;
 #endif
   auto layerDistances = stage->findNearlyVisibleLayersIn(timeDistance);
   for (auto& item : layerDistances) {
@@ -120,11 +119,14 @@ void RenderCache::prepareImageLayer(PAGImageLayer* pagLayer) {
 }
 
 void RenderCache::prepareNextFrame() {
+  // TODO(domrjchen): Remove the await in VideoSequenceReader->decodeFrame() on the web platform.
+#ifndef PAG_BUILD_FOR_WEB
   for (auto& item : usedSequences) {
     for (auto& map : item.second) {
       map.second->prepareNextImage();
     }
   }
+#endif
 }
 
 void RenderCache::clearExpiredSequences() {
