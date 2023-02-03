@@ -29,7 +29,7 @@
 #include "SolidColor.h"
 #include "Transform2D.h"
 #include "Transform3D.h"
-#include "CameraOption.h""
+#include "CameraOption.h"
 #include "codec/tags/CachePolicy.h"
 #include "codec/tags/ImageFillRule.h"
 #include "codec/tags/text/TextAnimatorTag.h"
