@@ -230,7 +230,7 @@ void GLTextureEffect::emitCode(EmitArgs& args) {
       repeatCoordWeightY = "repeatCoordWeightY";
     }
 
-    fragBuilder->codeAppend("vec2 subsetCoord;");
+    fragBuilder->codeAppend("highp vec2 subsetCoord;");
     subsetCoord(args, textureFP->shaderModeX, "x", "x", "z", extraRepeatCoordX, repeatCoordWeightX);
     subsetCoord(args, textureFP->shaderModeY, "y", "y", "w", extraRepeatCoordY, repeatCoordWeightY);
 
