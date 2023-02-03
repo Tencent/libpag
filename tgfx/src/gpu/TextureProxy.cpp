@@ -16,57 +16,63 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "CacheOwnerTextureProxy.h"
-#include "gpu/ProxyProvider.h"
+#include "TextureProxy.h"
+#include "ProxyProvider.h"
 
 namespace tgfx {
-CacheOwnerTextureProxy::CacheOwnerTextureProxy(ProxyProvider* provider,
-                                               std::shared_ptr<Texture> texture)
-    : TextureProxy(std::move(texture)), provider(provider) {
+TextureProxy::TextureProxy(ProxyProvider* provider, std::shared_ptr<Texture> texture)
+    : provider(provider), texture(std::move(texture)) {
 }
 
-CacheOwnerTextureProxy::~CacheOwnerTextureProxy() {
-  if (cacheOwner != nullptr) {
-    provider->cacheOwnerMap.erase(cacheOwner->uniqueID());
+TextureProxy::~TextureProxy() {
+  if (proxyOwnerID != 0) {
+    provider->proxyOwnerMap.erase(proxyOwnerID);
   }
 }
 
-bool CacheOwnerTextureProxy::instantiate() {
+bool TextureProxy::instantiate() {
   if (texture != nullptr) {
     return true;
   }
   texture = onMakeTexture(provider->context);
-  if (texture != nullptr && cacheOwner != nullptr) {
-    texture->assignCacheOwner(cacheOwner.get());
+  if (texture != nullptr && !cacheOwner.expired()) {
+    auto owner = cacheOwner.lock();
+    texture->assignCacheOwner(owner.get());
   }
   return texture != nullptr;
 }
 
-void CacheOwnerTextureProxy::assignCacheOwner(const Cacheable* owner) {
-  if (cacheOwner.get() == owner) {
-    return;
-  }
+void TextureProxy::assignProxyOwner(const Cacheable* owner, bool updateTexture) {
   if (owner == nullptr) {
-    removeCacheOwner();
+    removeProxyOwner(updateTexture);
     return;
   }
-  provider->changeCacheOwner(this, owner);
+  if (proxyOwnerID != owner->uniqueID()) {
+    provider->changeProxyOwner(this, owner->uniqueID());
+  }
+  if (!updateTexture) {
+    return;
+  }
+  cacheOwner = owner->weakThis;
   if (texture != nullptr) {
     texture->assignCacheOwner(owner);
   }
 }
 
-void CacheOwnerTextureProxy::removeCacheOwner() {
-  if (cacheOwner == nullptr) {
+void TextureProxy::removeProxyOwner(bool updateTexture) {
+  if (proxyOwnerID != 0) {
+    provider->removeProxyOwner(this);
+  }
+  if (!updateTexture) {
     return;
   }
-  provider->removeCacheOwner(this);
+  cacheOwner.reset();
   if (texture != nullptr) {
     texture->removeCacheOwner();
   }
 }
 
-std::shared_ptr<Texture> CacheOwnerTextureProxy::onMakeTexture(Context*) {
+std::shared_ptr<Texture> TextureProxy::onMakeTexture(Context*) {
   return nullptr;
 }
 }  // namespace tgfx

@@ -48,8 +48,9 @@ std::shared_ptr<Image> RGBAAAImage::onMakeSubset(const Rect& subset) const {
 std::unique_ptr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(Context* context, TileMode,
                                                                     TileMode,
                                                                     const SamplingOptions& sampling,
-                                                                    const Matrix* localMatrix) {
-  auto proxy = source->lockTextureProxy(context);
+                                                                    const Matrix* localMatrix,
+                                                                    bool skipGeneratingCache) {
+  auto proxy = source->lockTextureProxy(context, skipGeneratingCache);
   if (proxy == nullptr) {
     return nullptr;
   }

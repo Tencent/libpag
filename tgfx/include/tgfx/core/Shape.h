@@ -83,7 +83,8 @@ class Shape : public Cacheable {
  private:
   float _resolutionScale = 1.0f;
 
-  virtual std::unique_ptr<DrawOp> makeOp(GpuPaint* paint, const Matrix& viewMatrix) const = 0;
+  virtual std::unique_ptr<DrawOp> makeOp(GpuPaint* paint, const Matrix& viewMatrix,
+                                         bool skipGeneratingCache) const = 0;
 
   friend class Canvas;
 };

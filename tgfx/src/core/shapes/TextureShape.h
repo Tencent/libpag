@@ -26,7 +26,8 @@ class TextureShape : public PathShape {
   explicit TextureShape(std::unique_ptr<PathProxy> proxy, float resolutionScale = 1.0f);
 
  private:
-  std::unique_ptr<DrawOp> makeOp(GpuPaint* paint, const Matrix& viewMatrix) const override;
+  std::unique_ptr<DrawOp> makeOp(GpuPaint* paint, const Matrix& viewMatrix,
+                                 bool skipGeneratingCache) const override;
 
   std::unique_ptr<DrawOp> makeTextureOp(std::shared_ptr<Texture> texture, GpuPaint* paint,
                                         const Matrix& viewMatrix) const;

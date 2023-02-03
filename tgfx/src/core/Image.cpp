@@ -220,13 +220,6 @@ std::shared_ptr<Image> Image::makeMipMapped() const {
   return cloneWithSource(std::move(mipMappedSource));
 }
 
-void Image::markCacheExpired(Context* context) {
-  auto proxy = source->getTextureProxy(context);
-  if (proxy) {
-    proxy->removeCacheOwner();
-  }
-}
-
 std::shared_ptr<Image> Image::onMakeSubset(const Rect& subset) const {
   auto localMatrix = Matrix::MakeTrans(subset.x(), subset.y());
   return std::shared_ptr<MatrixImage>(new MatrixImage(
@@ -235,15 +228,18 @@ std::shared_ptr<Image> Image::onMakeSubset(const Rect& subset) const {
 
 std::unique_ptr<FragmentProcessor> Image::asFragmentProcessor(Context* context,
                                                               const SamplingOptions& sampling,
-                                                              const Matrix* localMatrix) {
-  return asFragmentProcessor(context, TileMode::Clamp, TileMode::Clamp, sampling, localMatrix);
+                                                              const Matrix* localMatrix,
+                                                              bool skipGeneratingCache) {
+  return asFragmentProcessor(context, TileMode::Clamp, TileMode::Clamp, sampling, localMatrix,
+                             skipGeneratingCache);
 }
 
 std::unique_ptr<FragmentProcessor> Image::asFragmentProcessor(Context* context, TileMode tileModeX,
                                                               TileMode tileModeY,
                                                               const SamplingOptions& sampling,
-                                                              const Matrix* localMatrix) {
-  auto proxy = source->lockTextureProxy(context);
+                                                              const Matrix* localMatrix,
+                                                              bool skipGeneratingCache) {
+  auto proxy = source->lockTextureProxy(context, skipGeneratingCache);
   if (proxy == nullptr) {
     return nullptr;
   }

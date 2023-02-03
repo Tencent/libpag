@@ -20,20 +20,18 @@
 
 namespace tgfx {
 void Resource::assignCacheOwner(const Cacheable* owner) {
-  if (cacheOwnerID == owner->uniqueID()) {
-    return;
-  }
   if (owner == nullptr) {
     removeCacheOwner();
     return;
   }
-  context->resourceCache()->changeCacheOwner(this, owner);
+  if (cacheOwnerID != owner->uniqueID()) {
+    context->resourceCache()->changeCacheOwner(this, owner);
+  }
 }
 
 void Resource::removeCacheOwner() {
-  if (cacheOwnerID == 0) {
-    return;
+  if (cacheOwnerID != 0) {
+    context->resourceCache()->removeCacheOwner(this);
   }
-  context->resourceCache()->removeCacheOwner(this);
 }
 }  // namespace tgfx

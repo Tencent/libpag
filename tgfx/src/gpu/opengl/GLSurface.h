@@ -29,7 +29,7 @@ class GLSurface : public Surface {
 
  private:
   explicit GLSurface(std::shared_ptr<GLRenderTarget> renderTarget,
-                     std::shared_ptr<GLTexture> texture = nullptr);
+                     std::shared_ptr<GLTexture> texture, const SurfaceOptions* options);
 
   friend class Surface;
 };

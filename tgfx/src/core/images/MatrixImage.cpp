@@ -38,15 +38,14 @@ std::shared_ptr<Image> MatrixImage::onMakeSubset(const Rect& subset) const {
                                                       static_cast<int>(subset.height()), matrix));
 }
 
-std::unique_ptr<FragmentProcessor> MatrixImage::asFragmentProcessor(Context* context,
-                                                                    TileMode tileModeX,
-                                                                    TileMode tileModeY,
-                                                                    const SamplingOptions& sampling,
-                                                                    const Matrix* extraMatrix) {
+std::unique_ptr<FragmentProcessor> MatrixImage::asFragmentProcessor(
+    Context* context, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
+    const Matrix* extraMatrix, bool skipGeneratingCache) {
   auto matrix = localMatrix;
   if (extraMatrix != nullptr) {
     matrix.postConcat(*extraMatrix);
   }
-  return Image::asFragmentProcessor(context, tileModeX, tileModeY, sampling, &matrix);
+  return Image::asFragmentProcessor(context, tileModeX, tileModeY, sampling, &matrix,
+                                    skipGeneratingCache);
 }
 }  // namespace tgfx

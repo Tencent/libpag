@@ -18,21 +18,19 @@
 
 #pragma once
 
-#include "gpu/proxies/TextureProxy.h"
+#include "TextureProxy.h"
 #include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
-class CacheOwnerTextureProxy;
-
 /**
- * A factory for creating TextureProxy-derived objects.
+ * A factory for creating proxy-derived objects.
  */
 class ProxyProvider {
  public:
   explicit ProxyProvider(Context* context);
 
   /*
-   * Finds a proxy by cache owner.
+   * Finds a proxy by the specified Cacheable owner.
    */
   std::shared_ptr<TextureProxy> findProxyByOwner(const Cacheable* owner);
 
@@ -57,12 +55,12 @@ class ProxyProvider {
 
  private:
   Context* context = nullptr;
-  std::unordered_map<uint32_t, CacheOwnerTextureProxy*> cacheOwnerMap = {};
+  std::unordered_map<uint32_t, TextureProxy*> proxyOwnerMap = {};
 
-  void changeCacheOwner(CacheOwnerTextureProxy* proxy, const Cacheable* owner);
+  void changeProxyOwner(TextureProxy* proxy, uint32_t proxyOwnerID);
 
-  void removeCacheOwner(CacheOwnerTextureProxy* proxy);
+  void removeProxyOwner(TextureProxy* proxy);
 
-  friend class CacheOwnerTextureProxy;
+  friend class TextureProxy;
 };
 }  // namespace tgfx

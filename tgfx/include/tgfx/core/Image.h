@@ -36,7 +36,9 @@ class FragmentProcessor;
  * ImageBuffer, encoded in a Picture or compressed data stream, or located in GPU memory as a GPU
  * texture. Image is safe across threads and cannot be modified after it is created. The width and
  * height of Image are always greater than zero. Creating an Image with zero width or height returns
- * nullptr.
+ * nullptr. The corresponding GPU cache is immediately marked as expired if all Images with the same
+ * ImageSource are released, which becomes recyclable and will be purged at some point in the
+ * future.
  */
 class Image {
  public:
@@ -212,15 +214,6 @@ class Image {
    */
   std::shared_ptr<Image> makeMipMapped() const;
 
-  /**
-   * Marks the corresponding texture cache of the Image as expired in the context, which immediately
-   * makes the texture cache recyclable. The context will purge the texture cache when its purge
-   * methods are called or if its memory usage reaches the cache limit. Releasing the Image will
-   * automatically mark the corresponding texture cache as expired, so there is no need to call this
-   * method if the Image is about to be released. Does nothing if the context is nullptr.
-   */
-  void markCacheExpired(Context* context);
-
  protected:
   std::weak_ptr<Image> weakThis;
   std::shared_ptr<ImageSource> source = nullptr;
@@ -233,11 +226,12 @@ class Image {
 
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
       Context* context, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
-      const Matrix* localMatrix = nullptr);
+      const Matrix* localMatrix = nullptr, bool skipGeneratingCache = false);
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(Context* context,
                                                          const SamplingOptions& sampling,
-                                                         const Matrix* localMatrix = nullptr);
+                                                         const Matrix* localMatrix = nullptr,
+                                                         bool skipGeneratingCache = false);
 
  private:
   static std::shared_ptr<Image> MakeFromSource(std::shared_ptr<ImageSource> source,

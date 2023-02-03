@@ -26,11 +26,6 @@
 #include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace pag {
-class SkipSnapshotOptions : public tgfx::SurfaceOptions {
- public:
-  std::unordered_set<std::shared_ptr<tgfx::Image>> drawnImages = {};
-};
-
 static std::shared_ptr<tgfx::Image> RescaleImage(tgfx::Context* context,
                                                  std::shared_ptr<tgfx::Image> image,
                                                  float scaleFactor, bool mipMapped) {
@@ -46,9 +41,7 @@ static std::shared_ptr<tgfx::Image> RescaleImage(tgfx::Context* context,
   auto canvas = surface->getCanvas();
   canvas->setMatrix(tgfx::Matrix::MakeScale(scaleFactor));
   canvas->drawImage(image);
-  auto texture = surface->getTexture();
-  image->markCacheExpired(context);
-  return tgfx::Image::MakeFromTexture(std::move(texture));
+  return tgfx::Image::MakeFromTexture(surface->getTexture());
 }
 
 //================================= ImageProxyPicture ====================================
@@ -92,15 +85,12 @@ class ImageProxyPicture : public Picture {
 
   void draw(tgfx::Canvas* canvas, RenderCache* cache) const override {
     auto image = proxy->getImage(cache);
-    auto options = static_cast<SkipSnapshotOptions*>(canvas->surfaceOptions());
-    if (options) {
-      options->drawnImages.insert(image);
-    }
     if (proxy->isTemporary()) {
       canvas->drawImage(std::move(image));
       return;
     }
-    if (!options) {
+    auto options = canvas->surfaceOptions();
+    if (options && !options->skipGeneratingGPUCache()) {
       auto snapshot = cache->getSnapshot(this);
       if (snapshot) {
         canvas->drawImage(snapshot->getImage(), snapshot->getMatrix());
@@ -175,8 +165,8 @@ class SnapshotPicture : public Picture {
   }
 
   void draw(tgfx::Canvas* canvas, RenderCache* cache) const override {
-    auto options = static_cast<const SkipSnapshotOptions*>(canvas->surfaceOptions());
-    if (options) {
+    auto options = canvas->surfaceOptions();
+    if (options && options->skipGeneratingGPUCache()) {
       graphic->draw(canvas, cache);
       return;
     }
@@ -199,12 +189,12 @@ class SnapshotPicture : public Picture {
     graphic->measureBounds(&bounds);
     auto width = static_cast<int>(ceilf(bounds.width() * scaleFactor));
     auto height = static_cast<int>(ceilf(bounds.height() * scaleFactor));
-    auto surface = tgfx::Surface::Make(cache->getContext(), width, height, false, 1, mipMapped);
+    tgfx::SurfaceOptions options(tgfx::SurfaceOptions::SkipGeneratingGPUCacheFlag);
+    auto surface =
+        tgfx::Surface::Make(cache->getContext(), width, height, false, 1, mipMapped, &options);
     if (surface == nullptr) {
       return nullptr;
     }
-    SkipSnapshotOptions options = {};
-    surface->setOptions(&options);
     auto canvas = surface->getCanvas();
     auto matrix = tgfx::Matrix::MakeScale(scaleFactor);
     matrix.preTranslate(-bounds.x(), -bounds.y());
@@ -213,9 +203,6 @@ class SnapshotPicture : public Picture {
     auto drawingMatrix = tgfx::Matrix::I();
     matrix.invert(&drawingMatrix);
     auto image = tgfx::Image::MakeFromTexture(surface->getTexture());
-    for (auto& drawnImage : options.drawnImages) {
-      drawnImage->markCacheExpired(cache->getContext());
-    }
     auto snapshot = new Snapshot(std::move(image), drawingMatrix);
     return std::unique_ptr<Snapshot>(snapshot);
   }

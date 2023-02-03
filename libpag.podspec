@@ -59,7 +59,6 @@ Pod::Spec.new do |s|
                     'tgfx/src/core/utils/**/*.{h,cpp}',
                     'tgfx/src/gpu/gradients/**/*.{h,cpp}',
                     'tgfx/src/gpu/ops/**/*.{h,cpp}',
-                    'tgfx/src/gpu/proxies/**/*.{h,cpp}',
                     'tgfx/src/gpu/opengl/*.{h,cpp,mm}',
                     'tgfx/src/core/codecs/webp/**/*.{h,cpp,mm}'
 

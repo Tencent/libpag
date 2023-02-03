@@ -45,11 +45,9 @@ class AsyncSource : public ImageSource {
     return encodedSource->isAlphaOnly();
   }
 
-  std::shared_ptr<TextureProxy> getTextureProxy(Context* context) const override;
-
-  std::shared_ptr<TextureProxy> lockTextureProxy(Context* context) const override;
-
  protected:
+  const Cacheable* getProxyOwner() const override;
+
   std::shared_ptr<ImageSource> onMakeMipMapped() const override;
 
   std::shared_ptr<TextureProxy> onMakeTextureProxy(Context* context) const override;

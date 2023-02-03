@@ -26,7 +26,7 @@ RRectShape::RRectShape(const RRect& rRect, float resolutionScale)
   this->rRect.scale(resolutionScale, resolutionScale);
 }
 
-std::unique_ptr<DrawOp> RRectShape::makeOp(GpuPaint* paint, const Matrix& viewMatrix) const {
+std::unique_ptr<DrawOp> RRectShape::makeOp(GpuPaint* paint, const Matrix& viewMatrix, bool) const {
   return RRectOp::Make(paint->color, rRect, viewMatrix);
 }
 }  // namespace tgfx
