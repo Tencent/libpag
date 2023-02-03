@@ -25,6 +25,7 @@
 #include "rendering/renderers/FilterRenderer.h"
 #include "rendering/sequences/SequenceImage.h"
 #include "rendering/sequences/SequenceImageProxy.h"
+#include "rendering/sequences/SequenceReaderFactory.h"
 #include "tgfx/core/Clock.h"
 
 namespace pag {
@@ -93,8 +94,9 @@ void RenderCache::preparePreComposeLayer(PreComposeLayer* layer) {
     compositionFrame = 0;
   }
   auto sequence = Sequence::Get(composition);
+  auto factory = std::make_shared<SequenceReaderFactory>(sequence);
   if (composition->staticContent()) {
-    SequenceImageProxy proxy(sequence, 0);
+    SequenceImageProxy proxy(factory, 0);
     prepareAssetImage(composition->uniqueID, &proxy);
     return;
   }
@@ -107,7 +109,7 @@ void RenderCache::preparePreComposeLayer(PreComposeLayer* layer) {
     return;
   }
   auto backup = usedSequences;
-  prepareSequenceImage(sequence, targetFrame);
+  prepareSequenceImage(factory, targetFrame);
   usedSequences = backup;
 }
 
@@ -489,11 +491,12 @@ void RenderCache::clearExpiredDecodedImages() {
 
 //===================================== sequence caches =====================================
 
-void RenderCache::prepareSequenceImage(Sequence* sequence, Frame targetFrame) {
+void RenderCache::prepareSequenceImage(std::shared_ptr<SequenceReaderFactory> sequence,
+                                       Frame targetFrame) {
   if (sequence == nullptr) {
     return;
   }
-  auto assetID = sequence->composition->uniqueID;
+  auto assetID = sequence->uniqueID();
   usedAssets.insert(assetID);
   if (decodedSequenceImages.count(assetID) > 0) {
     return;
@@ -508,11 +511,12 @@ void RenderCache::prepareSequenceImage(Sequence* sequence, Frame targetFrame) {
   }
 }
 
-std::shared_ptr<tgfx::Image> RenderCache::getSequenceImage(Sequence* sequence, Frame targetFrame) {
+std::shared_ptr<tgfx::Image> RenderCache::getSequenceImage(
+    std::shared_ptr<SequenceReaderFactory> sequence, Frame targetFrame) {
   if (sequence == nullptr) {
     return nullptr;
   }
-  auto assetID = sequence->composition->uniqueID;
+  auto assetID = sequence->uniqueID();
   auto result = decodedSequenceImages.find(assetID);
   if (result != decodedSequenceImages.end()) {
     auto& imageMap = result->second;
@@ -530,17 +534,16 @@ std::shared_ptr<tgfx::Image> RenderCache::getSequenceImage(Sequence* sequence, F
 }
 
 // We don't check mipmaps for sequences since there is currently no backend support yet.
-std::shared_ptr<tgfx::Image> RenderCache::getSequenceImageInternal(Sequence* sequence,
-                                                                   Frame targetFrame) {
+std::shared_ptr<tgfx::Image> RenderCache::getSequenceImageInternal(
+    std::shared_ptr<SequenceReaderFactory> sequence, Frame targetFrame) {
   if (sequence == nullptr) {
     return nullptr;
   }
-  auto composition = sequence->composition;
-  if (composition->staticContent()) {
+  if (sequence->staticContent()) {
     // Should not get here, we treat sequences with static content as normal asset images.
     return nullptr;
   }
-  auto assetID = composition->uniqueID;
+  auto assetID = sequence->uniqueID();
   usedAssets.insert(assetID);
   auto reader = getSequenceReader(sequence, targetFrame);
   if (reader == nullptr) {
@@ -560,9 +563,9 @@ std::shared_ptr<tgfx::Image> RenderCache::getSequenceImageInternal(Sequence* seq
   return image;
 }
 
-std::shared_ptr<SequenceReader> RenderCache::getSequenceReader(Sequence* sequence,
-                                                               Frame targetFrame) {
-  auto assetID = sequence->composition->uniqueID;
+std::shared_ptr<SequenceReader> RenderCache::getSequenceReader(
+    std::shared_ptr<SequenceReaderFactory> sequence, Frame targetFrame) {
+  auto assetID = sequence->uniqueID();
   auto& sequenceMap = usedSequences[assetID];
   auto readerResult = sequenceMap.find(targetFrame);
   if (readerResult != sequenceMap.end()) {
@@ -578,9 +581,9 @@ std::shared_ptr<SequenceReader> RenderCache::getSequenceReader(Sequence* sequenc
   return reader;
 }
 
-std::shared_ptr<SequenceReader> RenderCache::findNearestSequenceReader(Sequence* sequence,
-                                                                       Frame targetFrame) {
-  auto assetID = sequence->composition->uniqueID;
+std::shared_ptr<SequenceReader> RenderCache::findNearestSequenceReader(
+    std::shared_ptr<SequenceReaderFactory> sequence, Frame targetFrame) {
+  auto assetID = sequence->uniqueID();
   auto result = sequenceCaches.find(assetID);
   if (result == sequenceCaches.end()) {
     return nullptr;
@@ -622,14 +625,14 @@ std::shared_ptr<SequenceReader> RenderCache::findNearestSequenceReader(Sequence*
   return reader;
 }
 
-std::shared_ptr<SequenceReader> RenderCache::makeSequenceReader(Sequence* sequence) {
-  auto composition = sequence->composition;
-  if (!_videoEnabled && composition->type() == CompositionType::Video) {
+std::shared_ptr<SequenceReader> RenderCache::makeSequenceReader(
+    std::shared_ptr<SequenceReaderFactory> sequence) {
+  if (!_videoEnabled && sequence->isVideo()) {
     return nullptr;
   }
-  auto layer = stage->getLayerFromReferenceMap(composition->uniqueID);
-  auto reader = SequenceReader::Make(layer->getFile(), sequence, layer->rootFile);
-  auto assetID = sequence->composition->uniqueID;
+  auto layer = stage->getLayerFromReferenceMap(sequence->uniqueID());
+  auto reader = sequence->makeReader(layer->getFile(), layer->rootFile);
+  auto assetID = sequence->uniqueID();
   auto result = sequenceCaches.find(assetID);
   if (result == sequenceCaches.end()) {
     sequenceCaches[assetID] = {reader};

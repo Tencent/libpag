@@ -19,6 +19,7 @@
 #pragma once
 
 #include "SequenceReader.h"
+#include "rendering/sequences/SequenceReaderFactory.h"
 #include "tgfx/core/Image.h"
 
 namespace pag {
@@ -28,12 +29,14 @@ class SequenceImage {
    * Creates an Image from a static Sequence. Returns nullptr if the contents of sequence are not
    * static.
    */
-  static std::shared_ptr<tgfx::Image> MakeStatic(std::shared_ptr<File> file, Sequence* sequence);
+  static std::shared_ptr<tgfx::Image> MakeStatic(std::shared_ptr<File> file,
+                                                 std::shared_ptr<SequenceReaderFactory> sequence);
 
   /**
    * Creates an Image from the specified frame of a SequenceReader.
    */
   static std::shared_ptr<tgfx::Image> MakeFrom(std::shared_ptr<SequenceReader> reader,
-                                               Sequence* sequence, Frame targetFrame);
+                                               std::shared_ptr<SequenceReaderFactory> sequence,
+                                               Frame targetFrame);
 };
 }  // namespace pag

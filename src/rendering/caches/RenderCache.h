@@ -36,6 +36,7 @@
 #include "rendering/graphics/Snapshot.h"
 #include "rendering/layers/PAGStage.h"
 #include "rendering/sequences/SequenceReader.h"
+#include "rendering/sequences/SequenceReaderFactory.h"
 #include "rendering/utils/PathHasher.h"
 #include "tgfx/gpu/Device.h"
 
@@ -133,9 +134,10 @@ class RenderCache : public Performance {
 
   void setVideoEnabled(bool value);
 
-  void prepareSequenceImage(Sequence* sequence, Frame targetFrame);
+  void prepareSequenceImage(std::shared_ptr<SequenceReaderFactory> sequence, Frame targetFrame);
 
-  std::shared_ptr<tgfx::Image> getSequenceImage(Sequence* sequence, Frame targetFrame);
+  std::shared_ptr<tgfx::Image> getSequenceImage(std::shared_ptr<SequenceReaderFactory> sequence,
+                                                Frame targetFrame);
 
   LayerFilter* getFilterCache(LayerStyle* layerStyle);
 
@@ -191,10 +193,13 @@ class RenderCache : public Performance {
   void removeSnapshotFromLRU(Snapshot* snapshot);
 
   // sequence caches:
-  std::shared_ptr<tgfx::Image> getSequenceImageInternal(Sequence* sequence, Frame targetFrame);
-  std::shared_ptr<SequenceReader> getSequenceReader(Sequence* sequence, Frame targetFrame);
-  std::shared_ptr<SequenceReader> findNearestSequenceReader(Sequence* sequence, Frame targetFrame);
-  std::shared_ptr<SequenceReader> makeSequenceReader(Sequence* sequence);
+  std::shared_ptr<tgfx::Image> getSequenceImageInternal(std::shared_ptr<SequenceReaderFactory> sequence,
+                                                        Frame targetFrame);
+  std::shared_ptr<SequenceReader> getSequenceReader(std::shared_ptr<SequenceReaderFactory> sequence,
+                                                    Frame targetFrame);
+  std::shared_ptr<SequenceReader> findNearestSequenceReader(std::shared_ptr<SequenceReaderFactory> sequence,
+                                                            Frame targetFrame);
+  std::shared_ptr<SequenceReader> makeSequenceReader(std::shared_ptr<SequenceReaderFactory> sequence);
   void clearAllSequenceCaches();
   void clearSequenceCache(ID uniqueID);
   void clearExpiredSequences();

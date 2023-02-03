@@ -31,9 +31,6 @@ class RenderCache;
 
 class SequenceReader {
  public:
-  static std::shared_ptr<SequenceReader> Make(std::shared_ptr<File> file, Sequence* sequence,
-                                              PAGFile* pagFile = nullptr);
-
   SequenceReader(Frame totalFrames, bool staticContent)
       : totalFrames(totalFrames), staticContent(staticContent) {
   }

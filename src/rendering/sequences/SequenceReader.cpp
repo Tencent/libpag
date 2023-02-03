@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SequenceReader.h"
+#include "SequenceReaderFactory.h"
 #include "base/utils/USE.h"
 #include "rendering/caches/RenderCache.h"
 #include "rendering/sequences/BitmapSequenceReader.h"
@@ -24,36 +25,7 @@
 #include "rendering/sequences/VideoSequenceDemuxer.h"
 #include "rendering/video/VideoDecoder.h"
 
-#ifdef PAG_BUILD_FOR_WEB
-#include "platform/web/VideoSequenceReader.h"
-#endif
-
 namespace pag {
-std::shared_ptr<SequenceReader> SequenceReader::Make(std::shared_ptr<File> file, Sequence* sequence,
-                                                     PAGFile* pagFile) {
-  std::shared_ptr<SequenceReader> reader = nullptr;
-  auto composition = sequence->composition;
-  if (composition->type() == CompositionType::Bitmap) {
-    reader = std::make_shared<BitmapSequenceReader>(std::move(file),
-                                                    static_cast<BitmapSequence*>(sequence));
-  } else {
-    auto videoSequence = static_cast<VideoSequence*>(sequence);
-#ifdef PAG_BUILD_FOR_WEB
-    if (VideoDecoder::HasExternalSoftwareDecoder()) {
-      auto demuxer = std::make_unique<VideoSequenceDemuxer>(std::move(file), videoSequence);
-      reader = std::make_shared<VideoReader>(std::move(demuxer));
-    } else {
-      reader = std::make_shared<VideoSequenceReader>(std::move(file), videoSequence, pagFile);
-    }
-#else
-    USE(pagFile);
-    auto demuxer = std::make_unique<VideoSequenceDemuxer>(std::move(file), videoSequence);
-    reader = std::make_shared<VideoReader>(std::move(demuxer));
-#endif
-  }
-  return reader;
-}
-
 class SequenceTask : public Executor {
  public:
   static std::shared_ptr<Task> MakeAndRun(SequenceReader* reader, Frame targetFrame) {
