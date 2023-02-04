@@ -249,23 +249,20 @@ void PAGPlayer::setAutoClear(bool value) {
 void PAGPlayer::prepare() {
   LockGuard autoLock(rootLocker);
   prepareInternal();
+  if (pagSurface != nullptr && pagSurface->prepare(renderCache, lastGraphic)) {
+    return;
+  }
+  renderCache->prepareLayers();
 }
 
 void PAGPlayer::prepareInternal() {
-#ifdef PAG_BUILD_FOR_WEB
-  auto distance = durationInternal();
-  renderCache->prepareLayers(distance);
-#else
-  renderCache->prepareLayers();
-#endif
-  if (contentVersion != stage->getContentVersion()) {
+  renderCache->beginFrame();
+  auto result = updateStageSize();
+  if (result && contentVersion != stage->getContentVersion()) {
     contentVersion = stage->getContentVersion();
     Recorder recorder = {};
     stage->draw(&recorder);
     lastGraphic = recorder.makeGraphic();
-  }
-  if (lastGraphic) {
-    lastGraphic->prepare(renderCache);
   }
 }
 
@@ -291,8 +288,6 @@ bool PAGPlayer::flushInternal(BackendSemaphore* signalSemaphore) {
   if (pagSurface == nullptr) {
     return false;
   }
-  renderCache->beginFrame();
-  updateStageSize();
   tgfx::Clock clock = {};
   prepareInternal();
   clock.mark("rendering");
@@ -404,9 +399,9 @@ int64_t PAGPlayer::graphicsMemory() {
   return renderCache->memoryUsage();
 }
 
-void PAGPlayer::updateStageSize() {
+bool PAGPlayer::updateStageSize() {
   if (pagSurface == nullptr) {
-    return;
+    return false;
   }
   auto surfaceWidth = pagSurface->drawable->width();
   auto surfaceHeight = pagSurface->drawable->height();
@@ -414,6 +409,7 @@ void PAGPlayer::updateStageSize() {
     stage->setContentSizeInternal(surfaceWidth, surfaceHeight);
     updateScaleModeIfNeed();
   }
+  return true;
 }
 
 void PAGPlayer::updateScaleModeIfNeed() {

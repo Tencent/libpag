@@ -52,8 +52,7 @@ std::shared_ptr<ImageSource> ImageSource::MakeFromTexture(std::shared_ptr<Textur
   return source;
 }
 
-std::shared_ptr<ImageSource> ImageSource::makeTextureSource(Context* context,
-                                                            bool wrapCacheOnly) const {
+std::shared_ptr<ImageSource> ImageSource::makeTextureSource(Context* context) const {
   auto texture = getTexture();
   if (texture != nullptr) {
     if (texture->getContext() == context) {
@@ -65,9 +64,6 @@ std::shared_ptr<ImageSource> ImageSource::makeTextureSource(Context* context,
   texture = std::static_pointer_cast<Texture>(resourceCache->findResourceByOwner(this));
   if (texture != nullptr) {
     return MakeFromTexture(texture);
-  }
-  if (wrapCacheOnly) {
-    return nullptr;
   }
   auto proxy = lockTextureProxy(context);
   if (proxy == nullptr) {
@@ -91,7 +87,7 @@ std::shared_ptr<ImageSource> ImageSource::makeDecoded(Context* context) const {
   return source;
 }
 
-const Cacheable* ImageSource::getProxyOwner() const {
+const Cacheable* ImageSource::getCacheOwner() const {
   return this;
 }
 
@@ -124,7 +120,7 @@ std::shared_ptr<TextureProxy> ImageSource::lockTextureProxy(Context* context,
   proxy = onMakeTextureProxy(context);
   if (proxy != nullptr) {
     auto updateTexture = !skipGeneratingCache && !isTextureBacked();
-    proxy->assignProxyOwner(getProxyOwner(), updateTexture);
+    proxy->assignProxyOwner(getCacheOwner(), updateTexture);
   }
   return proxy;
 }

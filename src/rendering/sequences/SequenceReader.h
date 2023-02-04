@@ -19,7 +19,6 @@
 #pragma once
 
 #include <atomic>
-#include "base/utils/Task.h"
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "rendering/Performance.h"
@@ -27,8 +26,6 @@
 #include "tgfx/gpu/Texture.h"
 
 namespace pag {
-class RenderCache;
-
 class SequenceReader {
  public:
   static std::shared_ptr<SequenceReader> Make(std::shared_ptr<File> file, Sequence* sequence,
@@ -38,7 +35,7 @@ class SequenceReader {
       : totalFrames(totalFrames), staticContent(staticContent) {
   }
 
-  virtual ~SequenceReader();
+  virtual ~SequenceReader() = default;
 
   /**
    * Returns the width of sequence buffers created from the reader.
@@ -51,11 +48,6 @@ class SequenceReader {
   virtual int height() const = 0;
 
   /**
-   * Decodes the specified target frame asynchronously.
-   */
-  virtual void prepare(Frame targetFrame);
-
-  /**
    * Decodes the specified target frame immediately and returns the decoded image buffer.
    */
   std::shared_ptr<tgfx::ImageBuffer> makeBuffer(Frame targetFrame);
@@ -64,6 +56,8 @@ class SequenceReader {
    * Returns the texture of specified target frame.
    */
   std::shared_ptr<tgfx::Texture> makeTexture(tgfx::Context* context, Frame targetFrame);
+
+  void reportPerformance(Performance* performance);
 
  protected:
   /**
@@ -84,30 +78,16 @@ class SequenceReader {
   /**
    * Reports the decoding performance data.
    */
-  virtual void recordPerformance(Performance* performance);
-
-  /**
-   * Decodes the next one of the specified target frame asynchronously.
-   */
-  virtual void prepareNext(Frame targetFrame);
-
- protected:
-  std::shared_ptr<Task> lastTask = nullptr;
-  std::atomic_int64_t decodingTime = 0;
-  std::atomic_int64_t textureUploadingTime = 0;
+  virtual void onReportPerformance(Performance* performance, int64_t decodingTime) = 0;
 
  private:
   Frame totalFrames = 0;
   bool staticContent = false;
-  Frame pendingFirstFrame = -1;
   Frame lastFrame = -1;
-  Frame preparedFrame = -1;
   std::shared_ptr<tgfx::Texture> lastTexture = nullptr;
-
-  friend class SequenceTask;
+  std::atomic_int64_t decodingTime = 0;
+  std::atomic_int64_t textureUploadingTime = 0;
 
   friend class SequenceFrameGenerator;
-
-  friend class RenderCache;
 };
 }  // namespace pag

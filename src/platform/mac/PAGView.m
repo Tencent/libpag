@@ -213,6 +213,7 @@
 }
 
 - (void)doPlay {
+  [pagPlayer prepare];
   if (!_isVisible) {
     return;
   }

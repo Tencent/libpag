@@ -30,10 +30,6 @@ BitmapSequenceReader::BitmapSequenceReader(std::shared_ptr<File> file, BitmapSeq
   tgfx::Bitmap(pixelBuffer).eraseAll();
 }
 
-BitmapSequenceReader::~BitmapSequenceReader() {
-  lastTask = nullptr;
-}
-
 bool BitmapSequenceReader::decodeFrame(Frame targetFrame) {
   // a locker is required here because decodeFrame() could be called from multiple threads.
   std::lock_guard<std::mutex> autoLock(locker);
@@ -84,6 +80,10 @@ std::shared_ptr<tgfx::Texture> BitmapSequenceReader::onMakeTexture(tgfx::Context
     return nullptr;
   }
   return pixelBuffer->makeTexture(context);
+}
+
+void BitmapSequenceReader::onReportPerformance(Performance* performance, int64_t decodingTime) {
+  performance->imageDecodingTime += decodingTime;
 }
 
 Frame BitmapSequenceReader::findStartFrame(Frame targetFrame) {

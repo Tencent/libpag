@@ -60,16 +60,12 @@ class VideoSequenceReader : public SequenceReader {
     return _height;
   }
 
-  void prepare(Frame) override {
-  }
-
  protected:
   bool decodeFrame(Frame targetFrame) override;
 
   std::shared_ptr<tgfx::Texture> onMakeTexture(tgfx::Context* context) override;
 
-  void prepareNext(Frame) override {
-  }
+  void onReportPerformance(Performance* performance, int64_t decodingTime) override;
 
  private:
   // Keep a reference to the File in case the Sequence object is released while we are using it.

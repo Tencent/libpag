@@ -227,7 +227,7 @@ std::map<int64_t, std::vector<PAGLayer*>> PAGStage::findNearlyVisibleLayersIn(
       visibleStart += rootDuration;
     }
     auto distance = visibleStart - globalCurrent;
-    if (distance > 0 && distance <= timeDistance) {
+    if (distance >= 0 && distance <= timeDistance) {
       distanceMap[distance].push_back(item.first);
     }
   }
@@ -237,6 +237,9 @@ std::map<int64_t, std::vector<PAGLayer*>> PAGStage::findNearlyVisibleLayersIn(
 void PAGStage::updateLayerStartTime(PAGLayer* pagLayer) {
   if (pagLayer->layerType() == LayerType::PreCompose) {
     updateChildLayerStartTime(static_cast<PAGComposition*>(pagLayer));
+    if (pagLayer->_trackMatteLayer) {
+      updateLayerStartTime(pagLayer->_trackMatteLayer.get());
+    }
     auto composition = static_cast<PreComposeLayer*>(pagLayer->layer)->composition;
     if (composition->type() != CompositionType::Video &&
         composition->type() != CompositionType::Bitmap) {

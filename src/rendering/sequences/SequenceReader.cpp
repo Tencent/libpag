@@ -54,55 +54,6 @@ std::shared_ptr<SequenceReader> SequenceReader::Make(std::shared_ptr<File> file,
   return reader;
 }
 
-class SequenceTask : public Executor {
- public:
-  static std::shared_ptr<Task> MakeAndRun(SequenceReader* reader, Frame targetFrame) {
-    auto task = Task::Make(std::unique_ptr<SequenceTask>(new SequenceTask(reader, targetFrame)));
-    task->run();
-    return task;
-  }
-
- private:
-  SequenceReader* reader = nullptr;
-  Frame targetFrame = 0;
-
-  SequenceTask(SequenceReader* reader, Frame targetFrame)
-      : reader(reader), targetFrame(targetFrame) {
-  }
-
-  void execute() override {
-    reader->decodeFrame(targetFrame);
-  }
-};
-
-SequenceReader::~SequenceReader() {
-  // The subclass must cancel the last task in their destructor, otherwise, the task may access wild
-  // pointers.
-  DEBUG_ASSERT(lastTask == nullptr || !lastTask->isRunning());
-}
-
-void SequenceReader::prepare(Frame targetFrame) {
-  if (staticContent) {
-    targetFrame = 0;
-  }
-  if (lastTask == nullptr && targetFrame >= 0 && targetFrame < totalFrames) {
-    preparedFrame = targetFrame;
-    lastTask = SequenceTask::MakeAndRun(this, targetFrame);
-  }
-}
-
-void SequenceReader::prepareNext(Frame targetFrame) {
-  if (!staticContent) {
-    auto nextFrame = targetFrame + 1;
-    if (nextFrame >= totalFrames && pendingFirstFrame >= 0) {
-      // Add preparation for the first frame when reach to the end.
-      nextFrame = pendingFirstFrame;
-      pendingFirstFrame = -1;
-    }
-    prepare(nextFrame);
-  }
-}
-
 std::shared_ptr<tgfx::ImageBuffer> SequenceReader::makeBuffer(Frame targetFrame) {
   auto success = decodeFrame(targetFrame);
   if (!success) {
@@ -124,8 +75,6 @@ std::shared_ptr<tgfx::Texture> SequenceReader::makeTexture(tgfx::Context* contex
     return lastTexture;
   }
   tgfx::Clock clock = {};
-  // Setting the lastTask to nullptr triggers cancel().
-  lastTask = nullptr;
   auto success = decodeFrame(targetFrame);
   decodingTime += clock.measure();
   // Release the last texture for immediately reusing.
@@ -135,21 +84,19 @@ std::shared_ptr<tgfx::Texture> SequenceReader::makeTexture(tgfx::Context* contex
     clock.reset();
     lastTexture = onMakeTexture(context);
     lastFrame = targetFrame;
-    preparedFrame = targetFrame;
     textureUploadingTime += clock.measure();
-    prepareNext(targetFrame);
   }
   return lastTexture;
 }
 
-void SequenceReader::recordPerformance(Performance* performance) {
-  if (decodingTime > 0) {
-    performance->imageDecodingTime += decodingTime;
-    decodingTime = 0;
-  }
+void SequenceReader::reportPerformance(Performance* performance) {
   if (textureUploadingTime > 0) {
     performance->textureUploadingTime += textureUploadingTime;
     textureUploadingTime = 0;
+  }
+  if (decodingTime > 0) {
+    onReportPerformance(performance, decodingTime);
+    decodingTime = 0;
   }
 }
 }  // namespace pag

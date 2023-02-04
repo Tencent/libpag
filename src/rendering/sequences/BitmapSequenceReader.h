@@ -19,7 +19,6 @@
 #pragma once
 
 #include "SequenceReader.h"
-#include "base/utils/Task.h"
 #include "pag/file.h"
 #include "rendering/Performance.h"
 #include "tgfx/core/Bitmap.h"
@@ -28,8 +27,6 @@ namespace pag {
 class BitmapSequenceReader : public SequenceReader {
  public:
   BitmapSequenceReader(std::shared_ptr<File> file, BitmapSequence* sequence);
-
-  ~BitmapSequenceReader() override;
 
   int width() const override {
     return sequence->width;
@@ -45,6 +42,8 @@ class BitmapSequenceReader : public SequenceReader {
   std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer() override;
 
   std::shared_ptr<tgfx::Texture> onMakeTexture(tgfx::Context* context) override;
+
+  void onReportPerformance(Performance* performance, int64_t decodingTime) override;
 
   Frame findStartFrame(Frame targetFrame);
 

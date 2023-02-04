@@ -170,6 +170,7 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
   if (!context) {
     return false;
   }
+  cache->prepareLayers();
   if (surface != nullptr && autoClear && contentVersion == cache->getContentVersion()) {
     unlockContext();
     return false;
@@ -188,6 +189,7 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
     canvas->clear();
   }
   if (graphic) {
+    graphic->prepare(cache);
     graphic->draw(canvas, cache);
   }
   if (signalSemaphore == nullptr) {
@@ -228,6 +230,21 @@ bool PAGSurface::wait(const BackendSemaphore& waitSemaphore) {
   return ret;
 }
 
+bool PAGSurface::prepare(RenderCache* cache, std::shared_ptr<Graphic> graphic) {
+  auto context = lockContext();
+  if (!context) {
+    return false;
+  }
+  cache->attachToContext(context, false);
+  cache->prepareLayers();
+  if (graphic != nullptr) {
+    graphic->prepare(cache);
+  }
+  cache->detachFromContext();
+  unlockContext();
+  return true;
+}
+
 bool PAGSurface::hitTest(RenderCache* cache, std::shared_ptr<Graphic> graphic, float x, float y) {
   if (cache == nullptr || graphic == nullptr) {
     return false;
@@ -236,7 +253,7 @@ bool PAGSurface::hitTest(RenderCache* cache, std::shared_ptr<Graphic> graphic, f
   if (!context) {
     return false;
   }
-  cache->attachToContext(context, true);
+  cache->attachToContext(context, false);
   auto result = graphic->hitTest(cache, x, y);
   cache->detachFromContext();
   unlockContext();

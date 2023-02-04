@@ -48,7 +48,6 @@ VideoReader::VideoReader(std::unique_ptr<VideoDemuxer> videoDemuxer)
 }
 
 VideoReader::~VideoReader() {
-  lastTask = nullptr;
   destroyVideoDecoder();
   delete demuxer;
 }
@@ -104,7 +103,7 @@ std::shared_ptr<tgfx::Texture> VideoReader::onMakeTexture(tgfx::Context* context
   return lastBuffer->makeTexture(context);
 }
 
-void VideoReader::recordPerformance(Performance* performance) {
+void VideoReader::onReportPerformance(Performance* performance, int64_t decodingTime) {
   if (decoderTypeIndex == DECODER_TYPE_HARDWARE) {
     performance->hardwareDecodingTime += decodingTime;
     performance->hardwareDecodingInitialTime += hardDecodingInitialTime;
@@ -114,7 +113,6 @@ void VideoReader::recordPerformance(Performance* performance) {
     performance->softwareDecodingInitialTime += softDecodingInitialTime;
     softDecodingInitialTime = 0;
   }
-  decodingTime = 0;
 }
 
 bool VideoReader::sendSampleData() {

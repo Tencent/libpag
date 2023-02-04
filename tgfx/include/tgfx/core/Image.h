@@ -187,11 +187,11 @@ class Image {
   /**
    * Returns an Image backed by GPU texture associated with the specified context. If there is a
    * corresponding texture cache in the context, returns an Image wraps that texture. Otherwise,
-   * creates one immediately if wrapCacheOnly is false, which may block the calling thread. Returns
-   * the original Image if the Image is texture backed and the context is compatible with the
-   * backing GPU texture. Otherwise, returns nullptr.
+   * creates one immediately, which may block the calling thread. Returns the original Image if the
+   * Image is texture backed and the context is compatible with the backing GPU texture. Otherwise,
+   * returns nullptr.
    */
-  std::shared_ptr<Image> makeTextureImage(Context* context, bool wrapCacheOnly = false) const;
+  std::shared_ptr<Image> makeTextureImage(Context* context) const;
 
   /**
    * Returns subset of Image. subset must be fully contained by Image dimensions. The implementation
