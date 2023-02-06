@@ -19,43 +19,22 @@
 #include "SequenceImageQueue.h"
 
 namespace pag {
-static Frame GetFirstVisibleFrame(Sequence* sequence, const Layer* layer) {
-  if (layer->type() != LayerType::PreCompose) {
-    return 0;
-  }
-  auto preComposeLayer = static_cast<const PreComposeLayer*>(layer);
-  auto composition = preComposeLayer->composition;
-  if (composition->type() != CompositionType::Video &&
-      composition->type() != CompositionType::Bitmap) {
-    return 0;
-  }
-  auto timeScale = layer->containingComposition
-                       ? (composition->frameRate / layer->containingComposition->frameRate)
-                       : 1.0f;
-  auto compositionFrame = static_cast<Frame>(roundf(
-      static_cast<float>(layer->startTime - preComposeLayer->compositionStartTime) * timeScale));
-  if (compositionFrame < 0) {
-    compositionFrame = 0;
-  }
-  return sequence->toSequenceFrame(compositionFrame);
-}
-
-std::unique_ptr<SequenceImageQueue> SequenceImageQueue::MakeFrom(Sequence* sequence,
-                                                                 PAGLayer* pagLayer) {
-  if (sequence == nullptr || pagLayer == nullptr || sequence->composition->staticContent()) {
+std::unique_ptr<SequenceImageQueue> SequenceImageQueue::MakeFrom(
+    std::shared_ptr<SequenceReaderFactory> sequence, PAGLayer* pagLayer) {
+  if (sequence == nullptr || pagLayer == nullptr || sequence->staticContent()) {
     return nullptr;
   }
-  auto reader = SequenceReader::Make(pagLayer->getFile(), sequence, pagLayer->rootFile);
+  auto reader = sequence->makeReader(pagLayer->getFile(), pagLayer->rootFile);
   if (reader == nullptr) {
     return nullptr;
   }
-  auto firstFrame = GetFirstVisibleFrame(sequence, pagLayer->getLayer());
+  auto firstFrame = sequence->firstVisibleFrame(pagLayer->getLayer());
   return std::unique_ptr<SequenceImageQueue>(
       new SequenceImageQueue(sequence, std::move(reader), firstFrame));
 }
 
-SequenceImageQueue::SequenceImageQueue(Sequence* sequence, std::shared_ptr<SequenceReader> reader,
-                                       Frame firstFrame)
+SequenceImageQueue::SequenceImageQueue(std::shared_ptr<SequenceReaderFactory> sequence,
+                                       std::shared_ptr<SequenceReader> reader, Frame firstFrame)
     : sequence(sequence), reader(std::move(reader)), firstFrame(firstFrame),
       totalFrames(sequence->duration()) {
 }
