@@ -27,14 +27,8 @@ namespace pag {
 #define MAX_TRY_DECODE_COUNT 100
 #define FORCE_SOFTWARE_SIZE 160000  // 400x400
 
-static Frame TotalFrames(VideoDemuxer* demuxer) {
-  auto format = demuxer->getFormat();
-  return TimeToFrame(format.duration, format.frameRate);
-}
-
 VideoReader::VideoReader(std::unique_ptr<VideoDemuxer> videoDemuxer)
-    : SequenceReader(TotalFrames(videoDemuxer.get()), videoDemuxer->staticContent()),
-      demuxer(videoDemuxer.release()) {
+    : SequenceReader(videoDemuxer->staticContent()), demuxer(videoDemuxer.release()) {
   auto videoFormat = demuxer->getFormat();
   frameRate = videoFormat.frameRate;
   decoderTypeIndex = DECODER_TYPE_HARDWARE;

@@ -21,8 +21,8 @@
 
 namespace pag {
 BitmapSequenceReader::BitmapSequenceReader(std::shared_ptr<File> file, BitmapSequence* sequence)
-    : SequenceReader(sequence->duration(), sequence->composition->staticContent()),
-      file(std::move(file)), sequence(sequence) {
+    : SequenceReader(sequence->composition->staticContent()), file(std::move(file)),
+      sequence(sequence) {
   // Force allocating a raster PixelBuffer if staticContent is false, otherwise the asynchronous
   // decoding will fail due to the memory sharing mechanism.
   auto staticContent = sequence->composition->staticContent();

@@ -28,8 +28,7 @@
 namespace pag {
 class SequenceReader {
  public:
-  SequenceReader(Frame totalFrames, bool staticContent)
-      : totalFrames(totalFrames), staticContent(staticContent) {
+  explicit SequenceReader(bool staticContent) : staticContent(staticContent) {
   }
 
   virtual ~SequenceReader() = default;
@@ -78,7 +77,6 @@ class SequenceReader {
   virtual void onReportPerformance(Performance* performance, int64_t decodingTime) = 0;
 
  private:
-  Frame totalFrames = 0;
   bool staticContent = false;
   Frame lastFrame = -1;
   std::shared_ptr<tgfx::Texture> lastTexture = nullptr;
