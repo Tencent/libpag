@@ -19,6 +19,7 @@
 #include "RRectOp.h"
 #include "core/utils/MathExtra.h"
 #include "gpu/EllipseGeometryProcessor.h"
+#include "gpu/Gpu.h"
 #include "gpu/GpuBuffer.h"
 
 namespace tgfx {
@@ -127,8 +128,8 @@ bool RRectOp::onCombineIfPossible(Op* op) {
   return true;
 }
 
-static bool UseScale(OpsRenderPass* opsRenderPass) {
-  return !opsRenderPass->context()->caps()->floatIs32Bits;
+static bool UseScale(Context* context) {
+  return !context->caps()->floatIs32Bits;
 }
 
 void WriteColor(std::vector<float>& vertices, const Color& color) {
@@ -239,11 +240,17 @@ void RRectOp::RRectWrap::writeToVertices(std::vector<float>& vertices, bool useS
   }
 }
 
-void RRectOp::execute(OpsRenderPass* opsRenderPass) {
-  auto useScale = UseScale(opsRenderPass);
+void RRectOp::onPrepare(Gpu* gpu) {
+  auto* context = gpu->context();
+  auto useScale = UseScale(context);
   std::vector<float> vertices;
   for (const auto& rRectWrap : rRects) {
     rRectWrap.writeToVertices(vertices, useScale, aa);
+  }
+  vertexBuffer = GpuBuffer::Make(context, BufferType::Vertex, vertices.data(),
+                                 vertices.size() * sizeof(float));
+  if (vertexBuffer == nullptr) {
+    return;
   }
 
   std::vector<uint16_t> indices;
@@ -253,17 +260,21 @@ void RRectOp::execute(OpsRenderPass* opsRenderPass) {
       indices.emplace_back(gStandardRRectIndices[j] + offset);
     }
   }
-  auto buffer = GpuBuffer::Make(opsRenderPass->context(), BufferType::Index, &(indices[0]),
-                                indices.size() * sizeof(uint16_t));
-  if (buffer == nullptr) {
+  indexBuffer =
+      GpuBuffer::Make(context, BufferType::Index, &(indices[0]), indices.size() * sizeof(uint16_t));
+}
+
+void RRectOp::onExecute(OpsRenderPass* opsRenderPass) {
+  if (indexBuffer == nullptr || vertexBuffer == nullptr) {
     return;
   }
-  auto info = createProgram(
-      opsRenderPass, EllipseGeometryProcessor::Make(opsRenderPass->renderTarget()->width(),
-                                                    opsRenderPass->renderTarget()->height(), false,
-                                                    UseScale(opsRenderPass), localMatrix));
+  auto info = createProgram(opsRenderPass, EllipseGeometryProcessor::Make(
+                                               opsRenderPass->renderTarget()->width(),
+                                               opsRenderPass->renderTarget()->height(), false,
+                                               UseScale(opsRenderPass->context()), localMatrix));
   opsRenderPass->bindPipelineAndScissorClip(info, scissorRect());
-  opsRenderPass->bindVerticesAndIndices(std::move(vertices), buffer);
-  opsRenderPass->drawIndexed(PrimitiveType::Triangles, 0, static_cast<int>(indices.size()));
+  opsRenderPass->bindBuffers(indexBuffer, vertexBuffer);
+  opsRenderPass->drawIndexed(PrimitiveType::Triangles, 0,
+                             static_cast<int>(rRects.size() * kIndicesPerFillRRect));
 }
 }  // namespace tgfx

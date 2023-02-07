@@ -28,6 +28,10 @@ class DrawOp : public Op {
   explicit DrawOp(uint8_t classID) : Op(classID) {
   }
 
+  void prepare(Gpu* gpu) final;
+
+  void execute(OpsRenderPass* opsRenderPass) final;
+
   ProgramInfo createProgram(OpsRenderPass* opsRenderPass, std::unique_ptr<GeometryProcessor> gp);
 
   const Rect& scissorRect() const {
@@ -64,6 +68,10 @@ class DrawOp : public Op {
 
  protected:
   bool onCombineIfPossible(Op* op) override;
+
+  virtual void onPrepare(Gpu* gpu) = 0;
+
+  virtual void onExecute(OpsRenderPass* opsRenderPass) = 0;
 
   AAType aa = AAType::None;
 

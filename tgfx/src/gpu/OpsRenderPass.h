@@ -63,22 +63,34 @@ class OpsRenderPass {
 
   virtual ~OpsRenderPass() = default;
 
-  virtual void bindPipelineAndScissorClip(const ProgramInfo& info, const Rect& drawBounds) = 0;
-
-  virtual void bindVertexBuffer(std::shared_ptr<GpuBuffer> vertexBuffer) = 0;
-
-  virtual void bindVerticesAndIndices(std::vector<float> vertices,
-                                      std::shared_ptr<GpuBuffer> indices) = 0;
-
-  virtual void draw(PrimitiveType primitiveType, int baseVertex, int vertexCount) = 0;
-
-  virtual void drawIndexed(PrimitiveType primitiveType, int baseIndex, int indexCount) = 0;
-
-  virtual void clear(const Rect& scissor, Color color) = 0;
+  void begin();
+  void end();
+  void bindPipelineAndScissorClip(const ProgramInfo& info, const Rect& drawBounds);
+  void bindBuffers(std::shared_ptr<GpuBuffer> indexBuffer, std::shared_ptr<GpuBuffer> vertexBuffer);
+  void draw(PrimitiveType primitiveType, int baseVertex, int vertexCount);
+  void drawIndexed(PrimitiveType primitiveType, int baseIndex, int indexCount);
+  void clear(const Rect& scissor, Color color);
 
  protected:
+  virtual bool onBindPipelineAndScissorClip(const ProgramInfo& info, const Rect& drawBounds) = 0;
+  virtual void onBindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
+                             std::shared_ptr<GpuBuffer> vertexBuffer) = 0;
+  virtual void onDraw(PrimitiveType primitiveType, int baseVertex, int vertexCount) = 0;
+  virtual void onDrawIndexed(PrimitiveType primitiveType, int baseIndex, int indexCount) = 0;
+  virtual void onClear(const Rect& scissor, Color color) = 0;
+
   Context* _context = nullptr;
   std::shared_ptr<RenderTarget> _renderTarget = nullptr;
   std::shared_ptr<Texture> _renderTargetTexture = nullptr;
+  Program* _program = nullptr;
+  std::shared_ptr<GpuBuffer> _indexBuffer;
+  std::shared_ptr<GpuBuffer> _vertexBuffer;
+
+ private:
+  enum class DrawPipelineStatus { Ok = 0, NotConfigured, FailedToBind };
+
+  void resetActiveBuffers();
+
+  DrawPipelineStatus drawPipelineStatus = DrawPipelineStatus::NotConfigured;
 };
 }  // namespace tgfx
