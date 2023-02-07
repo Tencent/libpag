@@ -34,22 +34,13 @@ std::unique_ptr<FragmentProcessor> TextureEffect::MakeRGBAAA(std::shared_ptr<Tex
   if (texture == nullptr) {
     return nullptr;
   }
-  // normalize
-  auto scale = texture->getTextureCoord(1, 1) - texture->getTextureCoord(0, 0);
-  auto translate = texture->getTextureCoord(0, 0);
   auto matrix = localMatrix ? *localMatrix : Matrix::I();
-  matrix.postScale(scale.x, scale.y);
-  matrix.postTranslate(translate.x, translate.y);
-  if (texture->origin() == ImageOrigin::BottomLeft) {
-    matrix.postScale(1, -1);
-    translate = texture->getTextureCoord(0, static_cast<float>(texture->height()));
-    matrix.postTranslate(translate.x, translate.y);
-  }
   if (texture->isYUV()) {
     return std::unique_ptr<YUVTextureEffect>(new YUVTextureEffect(
         std::static_pointer_cast<YUVTexture>(texture), sampling, alphaStart, matrix));
   }
-  return std::unique_ptr<TextureEffect>(new TextureEffect(texture, sampling, alphaStart, matrix));
+  return std::unique_ptr<TextureEffect>(
+      new TextureEffect(std::move(texture), sampling, alphaStart, matrix));
 }
 
 TextureEffect::TextureEffect(std::shared_ptr<Texture> texture, SamplingOptions sampling,
@@ -58,7 +49,7 @@ TextureEffect::TextureEffect(std::shared_ptr<Texture> texture, SamplingOptions s
       texture(std::move(texture)),
       samplerState(sampling),
       alphaStart(alphaStart),
-      coordTransform(localMatrix) {
+      coordTransform(localMatrix, this->texture.get()) {
   setTextureSamplerCnt(1);
   addCoordTransform(&coordTransform);
 }

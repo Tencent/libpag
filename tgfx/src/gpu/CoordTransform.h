@@ -19,6 +19,7 @@
 #pragma once
 
 #include "tgfx/core/Matrix.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 struct CoordTransform {
@@ -27,6 +28,10 @@ struct CoordTransform {
   explicit CoordTransform(Matrix matrix) : matrix(matrix) {
   }
 
+  CoordTransform(Matrix matrix, const Texture* texture) : matrix(matrix), texture(texture) {
+  }
+
   Matrix matrix = Matrix::I();
+  const Texture* texture = nullptr;
 };
 }  // namespace tgfx
