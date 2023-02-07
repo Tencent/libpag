@@ -35,6 +35,8 @@ class OpsTask : public RenderTask {
 
   bool execute(Gpu* gpu) override;
 
+  void gatherProxies(std::vector<TextureProxy*>* proxies) const override;
+
  private:
   std::shared_ptr<Texture> renderTargetTexture = nullptr;
   std::vector<std::unique_ptr<Op>> ops;

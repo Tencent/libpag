@@ -50,18 +50,11 @@ std::unique_ptr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(Context* con
                                                                     const SamplingOptions& sampling,
                                                                     const Matrix* localMatrix,
                                                                     bool skipGeneratingCache) {
-  auto proxy = source->lockTextureProxy(context, skipGeneratingCache);
-  if (proxy == nullptr) {
-    return nullptr;
-  }
-  if (!proxy->isInstantiated()) {
-    proxy->instantiate();
-  }
-  auto texture = proxy->getTexture();
   auto matrix = Matrix::MakeTrans(bounds.x(), bounds.y());
   if (localMatrix != nullptr) {
     matrix.postConcat(*localMatrix);
   }
-  return TextureEffect::MakeRGBAAA(texture, sampling, alphaStart, &matrix);
+  return TextureEffect::MakeRGBAAA(source->lockTextureProxy(context, skipGeneratingCache), sampling,
+                                   alphaStart, &matrix);
 }
 }  // namespace tgfx

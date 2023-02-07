@@ -54,4 +54,12 @@ bool OpsTask::execute(Gpu* gpu) {
   gpu->submit(opsRenderPass);
   return true;
 }
+
+void OpsTask::gatherProxies(std::vector<TextureProxy*>* proxies) const {
+  if (ops.empty()) {
+    return;
+  }
+  auto func = [proxies](TextureProxy* proxy) { proxies->emplace_back(proxy); };
+  std::for_each(ops.begin(), ops.end(), [&func](auto& op) { op->visitProxies(func); });
+}
 }  // namespace tgfx

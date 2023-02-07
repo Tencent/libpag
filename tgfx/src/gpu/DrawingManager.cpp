@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawingManager.h"
+#include "TextureProxy.h"
 #include "TextureResolveRenderTask.h"
 #include "gpu/Gpu.h"
 
@@ -50,8 +51,15 @@ bool DrawingManager::flush(Semaphore* signalSemaphore) {
   auto* gpu = context->gpu();
   closeAllTasks();
   activeOpsTask = nullptr;
-  for (auto& task : tasks) {
-    task->execute(gpu);
+  std::vector<TextureProxy*> proxies;
+  std::for_each(tasks.begin(), tasks.end(),
+                [&proxies](std::shared_ptr<RenderTask>& task) { task->gatherProxies(&proxies); });
+  bool allInstantiated = std::all_of(proxies.begin(), proxies.end(), [&](TextureProxy* proxy) {
+    return proxy->isInstantiated() ? true : proxy->instantiate();
+  });
+  if (allInstantiated) {
+    std::for_each(tasks.begin(), tasks.end(),
+                  [gpu](std::shared_ptr<RenderTask>& task) { task->execute(gpu); });
   }
   removeAllTasks();
   return context->caps()->semaphoreSupport && gpu->insertSemaphore(signalSemaphore);

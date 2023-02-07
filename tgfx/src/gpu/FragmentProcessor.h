@@ -18,9 +18,11 @@
 
 #pragma once
 
+#include <functional>
 #include "CoordTransform.h"
 #include "Processor.h"
 #include "SamplerState.h"
+#include "TextureProxy.h"
 #include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
@@ -98,6 +100,10 @@ class FragmentProcessor : public Processor {
   size_t numCoordTransforms() const {
     return coordTransforms.size();
   }
+
+  void visitProxies(const std::function<void(TextureProxy*)>& func) const;
+
+  virtual std::unique_ptr<FragmentProcessor> instantiate();
 
   /**
    * Returns the coordinate transformation at index. index must be valid according to
@@ -198,10 +204,22 @@ class FragmentProcessor : public Processor {
     return true;
   }
 
+  virtual void onVisitProxies(const std::function<void(TextureProxy*)>&) const {
+  }
+
   size_t textureSamplerCount = 0;
 
   std::vector<const CoordTransform*> coordTransforms;
 
   std::vector<std::unique_ptr<FragmentProcessor>> childProcessors;
+};
+
+class FragmentProcessorProxy : public FragmentProcessor {
+ public:
+  explicit FragmentProcessorProxy(uint32_t classID) : FragmentProcessor(classID) {
+  }
+
+ private:
+  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
 };
 }  // namespace tgfx

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <functional>
 #include "Op.h"
 #include "gpu/AAType.h"
 #include "gpu/OpsRenderPass.h"
@@ -27,6 +28,8 @@ class DrawOp : public Op {
  public:
   explicit DrawOp(uint8_t classID) : Op(classID) {
   }
+
+  void visitProxies(const std::function<void(TextureProxy*)>& func) const override;
 
   void prepare(Gpu* gpu) final;
 

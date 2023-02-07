@@ -239,19 +239,8 @@ std::unique_ptr<FragmentProcessor> Image::asFragmentProcessor(Context* context, 
                                                               const SamplingOptions& sampling,
                                                               const Matrix* localMatrix,
                                                               bool skipGeneratingCache) {
-  auto proxy = source->lockTextureProxy(context, skipGeneratingCache);
-  if (proxy == nullptr) {
-    return nullptr;
-  }
-  if (!proxy->isInstantiated()) {
-    proxy->instantiate();
-  }
-  auto texture = proxy->getTexture();
-  if ((tileModeX != TileMode::Clamp || tileModeY != TileMode::Clamp) && !texture->isYUV()) {
-    return TiledTextureEffect::Make(std::move(texture),
-                                    SamplerState(tileModeX, tileModeY, sampling), localMatrix);
-  }
-  return TextureEffect::Make(std::move(texture), sampling, localMatrix);
+  return TiledTextureEffect::Make(source->lockTextureProxy(context, skipGeneratingCache), tileModeX,
+                                  tileModeY, sampling, localMatrix);
 }
 
 std::shared_ptr<Image> Image::cloneWithSource(std::shared_ptr<ImageSource> newSource) const {

@@ -20,10 +20,16 @@
 
 #include "SamplerState.h"
 #include "gpu/FragmentProcessor.h"
+#include "gpu/TextureProxy.h"
 
 namespace tgfx {
 class TiledTextureEffect : public FragmentProcessor {
  public:
+  static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<TextureProxy> textureProxy,
+                                                 TileMode tileModeX, TileMode tileModeY,
+                                                 const SamplingOptions& sampling,
+                                                 const Matrix* localMatrix = nullptr);
+
   static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<Texture> texture,
                                                  SamplerState samplerState = {},
                                                  const Matrix* localMatrix = nullptr);
