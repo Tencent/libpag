@@ -37,12 +37,14 @@ class TriangulatingPathOp : public DrawOp {
                       const Matrix& viewMatrix = Matrix::I(),
                       const Matrix& localMatrix = Matrix::I());
 
-  void execute(OpsRenderPass* opsRenderPass) override;
-
  private:
   DEFINE_OP_CLASS_ID
 
   bool onCombineIfPossible(Op* op) override;
+
+  void onPrepare(Gpu* gpu) override;
+
+  void onExecute(OpsRenderPass* opsRenderPass) override;
 
   Color color = Color::Transparent();
   std::shared_ptr<GpuBuffer> buffer = nullptr;

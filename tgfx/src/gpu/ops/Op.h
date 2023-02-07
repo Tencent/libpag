@@ -38,6 +38,9 @@ class Op {
 
   virtual ~Op() = default;
 
+  virtual void prepare(Gpu*) {
+  }
+
   virtual void execute(OpsRenderPass* opsRenderPass) = 0;
 
   bool combineIfPossible(Op* op);

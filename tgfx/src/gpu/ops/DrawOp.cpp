@@ -21,6 +21,14 @@
 #include "gpu/Gpu.h"
 
 namespace tgfx {
+void DrawOp::prepare(Gpu* gpu) {
+  onPrepare(gpu);
+}
+
+void DrawOp::execute(OpsRenderPass* opsRenderPass) {
+  onExecute(opsRenderPass);
+}
+
 static std::shared_ptr<Texture> CreateDstTexture(OpsRenderPass* opsRenderPass, Rect dstRect,
                                                  Point* dstOffset) {
   if (opsRenderPass->context()->caps()->textureBarrierSupport &&

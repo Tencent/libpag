@@ -18,6 +18,7 @@
 
 #include "FillRectOp.h"
 #include "core/utils/UniqueID.h"
+#include "gpu/Gpu.h"
 #include "gpu/Quad.h"
 #include "gpu/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/ResourceProvider.h"
@@ -142,31 +143,45 @@ bool FillRectOp::onCombineIfPossible(Op* op) {
   return true;
 }
 
-void FillRectOp::execute(OpsRenderPass* opsRenderPass) {
+bool FillRectOp::needsIndexBuffer() const {
+  return rects.size() > 1 || aa == AAType::Coverage;
+}
+
+void FillRectOp::onPrepare(Gpu* gpu) {
+  auto data = vertices();
+  vertexBuffer =
+      GpuBuffer::Make(gpu->context(), BufferType::Vertex, data.data(), data.size() * sizeof(float));
+  if (vertexBuffer == nullptr) {
+    return;
+  }
+  if (aa == AAType::Coverage) {
+    indexBuffer = gpu->context()->resourceProvider()->aaQuadIndexBuffer();
+  } else {
+    indexBuffer = gpu->context()->resourceProvider()->nonAAQuadIndexBuffer();
+  }
+}
+
+void FillRectOp::onExecute(OpsRenderPass* opsRenderPass) {
+  if (vertexBuffer == nullptr || (needsIndexBuffer() && indexBuffer == nullptr)) {
+    return;
+  }
   auto info = createProgram(
       opsRenderPass, QuadPerEdgeAAGeometryProcessor::Make(opsRenderPass->renderTarget()->width(),
                                                           opsRenderPass->renderTarget()->height(),
                                                           aa, !colors.empty()));
   opsRenderPass->bindPipelineAndScissorClip(info, scissorRect());
-  if (rects.size() > 1 || aa == AAType::Coverage) {
-    std::shared_ptr<GpuBuffer> indexBuffer;
+  opsRenderPass->bindBuffers(indexBuffer, vertexBuffer);
+  if (needsIndexBuffer()) {
     uint16_t numIndicesPerQuad;
     if (aa == AAType::Coverage) {
-      indexBuffer = opsRenderPass->context()->resourceProvider()->aaQuadIndexBuffer();
       numIndicesPerQuad = ResourceProvider::NumIndicesPerAAQuad();
     } else {
-      indexBuffer = opsRenderPass->context()->resourceProvider()->nonAAQuadIndexBuffer();
       numIndicesPerQuad = ResourceProvider::NumIndicesPerNonAAQuad();
     }
-    if (indexBuffer == nullptr) {
-      return;
-    }
-    opsRenderPass->bindVerticesAndIndices(vertices(), indexBuffer);
     opsRenderPass->drawIndexed(PrimitiveType::Triangles, 0,
                                static_cast<int>(rects.size()) * numIndicesPerQuad);
-    return;
+  } else {
+    opsRenderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
   }
-  opsRenderPass->bindVerticesAndIndices(vertices(), nullptr);
-  opsRenderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
 }
 }  // namespace tgfx
