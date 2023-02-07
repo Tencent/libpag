@@ -138,4 +138,8 @@ Frame SequenceReaderFactory::firstVisibleFrame(const Layer* layer) const {
   return sequence->toSequenceFrame(compositionFrame);
 }
 
+tgfx::Orientation SequenceReaderFactory::orientation() const {
+  return tgfx::Orientation::TopLeft;
+}
+
 }  // namespace pag

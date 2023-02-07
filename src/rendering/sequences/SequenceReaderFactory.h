@@ -21,6 +21,7 @@
 #include "pag/file.h"
 #include "rendering/sequences/SequenceReader.h"
 #include "tgfx/core/ImageGenerator.h"
+#include "tgfx/core/Orientation.h"
 
 namespace pag {
 
@@ -65,6 +66,7 @@ class SequenceReaderFactory {
   virtual bool isVideo() const;
   virtual RGBAAALayout layout() const;
   virtual Frame firstVisibleFrame(const Layer* layer) const;
+  virtual tgfx::Orientation orientation() const;
 
  private:
   Sequence* sequence;

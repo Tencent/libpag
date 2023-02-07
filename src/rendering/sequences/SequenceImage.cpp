@@ -29,7 +29,7 @@ static std::shared_ptr<tgfx::Image> MakeSequenceImage(
     return tgfx::Image::MakeRGBAAA(std::move(generator), layout.width, layout.height,
                                    layout.alphaStartX, layout.alphaStartY);
   }
-  return tgfx::Image::MakeFromGenerator(std::move(generator));
+  return tgfx::Image::MakeFromGenerator(std::move(generator), sequence->orientation());
 }
 
 std::shared_ptr<tgfx::Image> SequenceImage::MakeStatic(
