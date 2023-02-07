@@ -47,6 +47,8 @@ std::shared_ptr<GpuBuffer> GpuBuffer::Make(Context* context, BufferType bufferTy
       return nullptr;
     }
     glBuffer = Resource::Wrap(context, new GLBuffer(bufferType, size, bufferID));
+  } else {
+    glBuffer->_sizeInBytes = size;
   }
   gl->bindBuffer(target, glBuffer->_bufferID);
   gl->bufferData(target, static_cast<GLsizeiptr>(size), buffer, GL_STATIC_DRAW);
