@@ -20,11 +20,11 @@
 
 #include "DecodingResult.h"
 #include "VideoBuffer.h"
-#include "VideoFormat.h"
 #include "base/utils/Log.h"
 #include "codec/NALUType.h"
 #include "pag/decoder.h"
 #include "pag/file.h"
+#include "rendering/video/VideoFormat.h"
 
 namespace pag {
 class VideoDecoder {
