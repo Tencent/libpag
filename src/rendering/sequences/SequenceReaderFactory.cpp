@@ -37,6 +37,15 @@ static tgfx::Size GetBufferSize(Sequence* sequence) {
   return tgfx::Size::Make(sequence->width, sequence->height);
 }
 
+std::shared_ptr<SequenceReaderFactory> SequenceReaderFactory::Make(Sequence* sequence) {
+  if (sequence == nullptr) {
+    return nullptr;
+  }
+  auto factory = std::shared_ptr<SequenceReaderFactory>(new SequenceReaderFactory(sequence));
+  factory->weakThis = factory;
+  return factory;
+}
+
 SequenceReaderFactory::SequenceReaderFactory(Sequence* sequence) : sequence(sequence) {
 }
 
@@ -73,7 +82,8 @@ std::shared_ptr<tgfx::ImageGenerator> SequenceReaderFactory::makeGenerator(
   if (sequence == nullptr || file == nullptr || !staticContent()) {
     return nullptr;
   }
-  return std::make_shared<StaticSequenceGenerator>(std::move(file), this, GetBufferSize(sequence));
+  return std::make_shared<StaticSequenceGenerator>(std::move(file), weakThis.lock(),
+                                                   GetBufferSize(sequence));
 }
 
 std::shared_ptr<tgfx::ImageGenerator> SequenceReaderFactory::makeGenerator(

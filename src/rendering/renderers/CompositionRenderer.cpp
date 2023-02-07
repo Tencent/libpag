@@ -61,7 +61,7 @@ std::shared_ptr<Graphic> RenderSequenceComposition(Composition* composition,
     return nullptr;
   }
   auto sequenceFrame = sequence->toSequenceFrame(compositionFrame);
-  auto factory = std::make_shared<SequenceReaderFactory>(sequence);
+  auto factory = SequenceReaderFactory::Make(sequence);
   auto proxy = std::make_shared<SequenceImageProxy>(factory, sequenceFrame);
   auto graphic = Picture::MakeFrom(sequence->composition->uniqueID, std::move(proxy));
   auto scaleX = static_cast<float>(composition->width) / static_cast<float>(sequence->width);

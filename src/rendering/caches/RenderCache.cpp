@@ -92,7 +92,7 @@ void RenderCache::preparePreComposeLayer(PreComposeLayer* layer) {
   }
   usedAssets.insert(composition->uniqueID);
   auto sequence = Sequence::Get(composition);
-  auto factory = std::make_shared<SequenceReaderFactory>(sequence);
+  auto factory = SequenceReaderFactory::Make(sequence);
   if (composition->staticContent()) {
     SequenceImageProxy proxy(factory, 0);
     prepareAssetImage(composition->uniqueID, &proxy);

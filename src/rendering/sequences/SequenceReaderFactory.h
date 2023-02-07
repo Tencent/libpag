@@ -49,7 +49,8 @@ struct RGBAAALayout {
 
 class SequenceReaderFactory {
  public:
-  explicit SequenceReaderFactory(Sequence* sequence);
+  static std::shared_ptr<SequenceReaderFactory> Make(Sequence* sequence);
+
   virtual ~SequenceReaderFactory() = default;
 
   virtual std::shared_ptr<SequenceReader> makeReader(std::shared_ptr<File> file,
@@ -67,6 +68,12 @@ class SequenceReaderFactory {
   virtual RGBAAALayout layout() const;
   virtual Frame firstVisibleFrame(const Layer* layer) const;
   virtual tgfx::Orientation orientation() const;
+
+ public:
+  std::weak_ptr<SequenceReaderFactory> weakThis;
+
+ protected:
+  explicit SequenceReaderFactory(Sequence* sequence);
 
  private:
   Sequence* sequence;
@@ -102,8 +109,8 @@ class SequenceReaderBuffer : public tgfx::ImageBuffer {
 
 class StaticSequenceGenerator : public tgfx::ImageGenerator {
  public:
-  StaticSequenceGenerator(std::shared_ptr<File> file, SequenceReaderFactory* factory,
-                          tgfx::Size bufferSize)
+  StaticSequenceGenerator(std::shared_ptr<File> file,
+                          std::shared_ptr<SequenceReaderFactory> factory, tgfx::Size bufferSize)
       : tgfx::ImageGenerator(bufferSize), file(std::move(file)), factory(factory) {
   }
 
@@ -129,7 +136,7 @@ class StaticSequenceGenerator : public tgfx::ImageGenerator {
 
  private:
   std::shared_ptr<File> file = nullptr;
-  SequenceReaderFactory* factory = nullptr;
+  std::shared_ptr<SequenceReaderFactory> factory = nullptr;
 };
 
 class SequenceFrameGenerator : public tgfx::ImageGenerator {
