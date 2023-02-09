@@ -28,6 +28,9 @@ class RenderTask {
 
   virtual bool execute(Gpu* gpu) = 0;
 
+  virtual void gatherProxies(std::vector<TextureProxy*>*) const {
+  }
+
   void makeClosed() {
     closed = true;
   }

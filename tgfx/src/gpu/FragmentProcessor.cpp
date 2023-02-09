@@ -154,4 +154,24 @@ bool FragmentProcessor::isEqual(const FragmentProcessor& that) const {
   }
   return true;
 }
+
+void FragmentProcessor::visitProxies(const std::function<void(TextureProxy*)>& func) const {
+  onVisitProxies(func);
+  for (const auto& fp : childProcessors) {
+    fp->visitProxies(func);
+  }
+}
+
+std::unique_ptr<FragmentProcessor> FragmentProcessor::instantiate() {
+  for (auto& childFP : childProcessors) {
+    if (auto fp = childFP->instantiate()) {
+      childFP = std::move(fp);
+    }
+  }
+  return nullptr;
+}
+
+std::unique_ptr<GLFragmentProcessor> FragmentProcessorProxy::onCreateGLInstance() const {
+  return nullptr;
+}
 }  // namespace tgfx

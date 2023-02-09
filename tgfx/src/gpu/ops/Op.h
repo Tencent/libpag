@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <functional>
+#include "gpu/TextureProxy.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/RenderTarget.h"
@@ -37,6 +39,9 @@ class Op {
   }
 
   virtual ~Op() = default;
+
+  virtual void visitProxies(const std::function<void(TextureProxy*)>&) const {
+  }
 
   virtual void prepare(Gpu*) {
   }
