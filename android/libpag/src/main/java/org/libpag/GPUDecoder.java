@@ -47,7 +47,13 @@ public class GPUDecoder {
         videoSurface.retain();
         decoderThreadCount.getAndIncrement();
         HandlerThread initHandlerThread = new HandlerThread("libpag_GPUDecoder_init_decoder");
-        initHandlerThread.start();
+        try {
+            initHandlerThread.start();
+        } catch (Exception | Error e) {
+            e.printStackTrace();
+            decoderThreadCount.getAndDecrement();
+            return null;
+        }
         SynchronizeHandler initHandler = new SynchronizeHandler(initHandlerThread.getLooper());
         final MediaCodec[] initDecoder = {null};
         boolean res = initHandler.runSync(new SynchronizeHandler.TimeoutRunnable() {
@@ -277,7 +283,13 @@ public class GPUDecoder {
         }
         decoderThreadCount.getAndIncrement();
         final HandlerThread releaseHandlerThread = new HandlerThread("libpag_GPUDecoder_release_decoder");
-        releaseHandlerThread.start();
+        try {
+            releaseHandlerThread.start();
+        } catch (Exception | Error e) {
+            e.printStackTrace();
+            runnable.run();
+            return;
+        }
         Handler releaseHandler = new Handler(releaseHandlerThread.getLooper());
         releaseHandler.post(new Runnable() {
             @Override
