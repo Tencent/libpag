@@ -94,7 +94,7 @@ PAG_TEST_F(PAGCompositionTest, composition) {
  * 用例描述: VideoSequence的大小和Composition不一致
  */
 PAG_TEST_F(PAGCompositionTest, VideoSequence) {
-  auto pagFile = PAGFile::Load("../resources/apitest/video_sequence_size.pag");
+  auto pagFile = PAGFile::Load(TestConstants::RESOURCES_ROOT + "apitest/video_sequence_size.pag");
   auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_unique<PAGPlayer>();
   pagPlayer->setComposition(pagFile);
@@ -427,7 +427,8 @@ PAG_TEST_F(ContainerTest, HitTestPoint) {
   HitTestCase::HitTestPoint(TestPAGPlayer, TestPAGFile);
 }
 
-PAG_TEST_SUIT_WITH_PATH(VideoSequenceHitTestPoint, "../resources/apitest/video_sequence_test.pag")
+PAG_TEST_SUIT_WITH_PATH(VideoSequenceHitTestPoint,
+                        pag::TestConstants::RESOURCES_ROOT + "apitest/video_sequence_test.pag")
 
 /**
  * 用例描述: 视频序列帧HitTest
@@ -436,7 +437,8 @@ PAG_TEST_F(VideoSequenceHitTestPoint, VideoSequenceHitTestPoint) {
   HitTestCase::VideoSequenceHitTestPoint(TestPAGPlayer, TestPAGFile);
 }
 
-PAG_TEST_SUIT_WITH_PATH(BitmapSequenceHitTestPoint, "../resources/apitest/bitmap_sequence_test.pag")
+PAG_TEST_SUIT_WITH_PATH(BitmapSequenceHitTestPoint,
+                        pag::TestConstants::RESOURCES_ROOT + "apitest/bitmap_sequence_test.pag")
 
 /**
  * 用例描述: 图片序列帧HitTest

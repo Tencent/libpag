@@ -28,7 +28,7 @@ PAG_TEST_SUIT(PAGShapeLayerTest)
  * 用例描述: 测试 PolyStar-star
  */
 PAG_TEST_F(PAGShapeLayerTest, star) {
-  auto pagFile = PAGFile::Load("../resources/apitest/poly_star.pag");
+  auto pagFile = PAGFile::Load(TestConstants::RESOURCES_ROOT + "apitest/poly_star.pag");
   auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -42,7 +42,7 @@ PAG_TEST_F(PAGShapeLayerTest, star) {
  * 用例描述: 测试 PolyStar-polygon
  */
 PAG_TEST_F(PAGShapeLayerTest, polygon) {
-  auto pagFile = PAGFile::Load("../resources/apitest/polygon.pag");
+  auto pagFile = PAGFile::Load(TestConstants::RESOURCES_ROOT + "apitest/polygon.pag");
   auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -56,7 +56,7 @@ PAG_TEST_F(PAGShapeLayerTest, polygon) {
  * 用例描述: 测试 PolyStar-polygon + round corner
  */
 PAG_TEST_F(PAGShapeLayerTest, polygon_round_corner) {
-  auto pagFile = PAGFile::Load("../resources/apitest/polygon_round_corner.pag");
+  auto pagFile = PAGFile::Load(TestConstants::RESOURCES_ROOT + "apitest/polygon_round_corner.pag");
   auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -70,7 +70,8 @@ PAG_TEST_F(PAGShapeLayerTest, polygon_round_corner) {
  * 用例描述: 测试 PolyStar-star + round corner
  */
 PAG_TEST_F(PAGShapeLayerTest, star_round_corner) {
-  auto pagFile = PAGFile::Load("../resources/apitest/poly_star_round_corner.pag");
+  auto pagFile =
+      PAGFile::Load(TestConstants::RESOURCES_ROOT + "apitest/poly_star_round_corner.pag");
   auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -84,7 +85,8 @@ PAG_TEST_F(PAGShapeLayerTest, star_round_corner) {
  * 用例描述: trackMatteLayer 的 path 合并时要 union，path 的方向不一致时 append 模式会镂空。
  */
 PAG_TEST_F(PAGShapeLayerTest, track_matte_path_union) {
-  auto pagFile = PAGFile::Load("../resources/apitest/track_matte_path_union.pag");
+  auto pagFile =
+      PAGFile::Load(TestConstants::RESOURCES_ROOT + "apitest/track_matte_path_union.pag");
   auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -98,7 +100,8 @@ PAG_TEST_F(PAGShapeLayerTest, track_matte_path_union) {
  * 用例描述: 测试 shape transform + round corner
  */
 PAG_TEST_F(PAGShapeLayerTest, shape_transform_round_corner) {
-  auto pagFile = PAGFile::Load("../resources/apitest/shape_transform_round_corner.pag");
+  auto pagFile =
+      PAGFile::Load(TestConstants::RESOURCES_ROOT + "apitest/shape_transform_round_corner.pag");
   auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);

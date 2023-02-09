@@ -71,7 +71,7 @@ PAG_TEST_F(PAGPlayerTest, pagPlayer) {
  * 用例描述: PAGPlayerTest 切换PAGSurface
  */
 PAG_TEST_F(PAGPlayerTest, switchPAGSurface) {
-  auto pagFile1 = PAGFile::Load("../resources/apitest/test.pag");
+  auto pagFile1 = PAGFile::Load(TestConstants::RESOURCES_ROOT + "apitest/test.pag");
   auto pagSurface1 = PAGSurface::MakeOffscreen(pagFile1->width(), pagFile1->height());
   auto pagPlayer1 = std::make_unique<PAGPlayer>();
   pagPlayer1->setSurface(pagSurface1);
@@ -81,7 +81,7 @@ PAG_TEST_F(PAGPlayerTest, switchPAGSurface) {
   pagPlayer1->setSurface(nullptr);
 
   auto pagPlayer2 = std::make_unique<PAGPlayer>();
-  auto pagFile2 = PAGFile::Load("../resources/apitest/ZC2.pag");
+  auto pagFile2 = PAGFile::Load(TestConstants::RESOURCES_ROOT + "apitest/ZC2.pag");
   pagPlayer2->setComposition(pagFile2);
   pagPlayer2->setSurface(pagSurface1);
   pagPlayer2->setProgress(0.5f);
@@ -95,14 +95,14 @@ PAG_TEST_F(PAGPlayerTest, switchPAGSurface) {
  * 用例描述: PAGPlayerTest基础功能
  */
 PAG_TEST_F(PAGPlayerTest, autoClear) {
-  auto pagFile = PAGFile::Load("../resources/apitest/AlphaTrackMatte.pag");
+  auto pagFile = PAGFile::Load(TestConstants::RESOURCES_ROOT + "apitest/AlphaTrackMatte.pag");
   auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_unique<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
   pagPlayer->setComposition(pagFile);
   pagPlayer->flush();
 
-  auto pagFile2 = PAGFile::Load("../resources/gradient/grad_alpha.pag");
+  auto pagFile2 = PAGFile::Load(TestConstants::RESOURCES_ROOT + "gradient/grad_alpha.pag");
   pagPlayer->setComposition(pagFile2);
   pagPlayer->setAutoClear(false);
   pagPlayer->flush();

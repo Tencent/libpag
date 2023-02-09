@@ -22,12 +22,15 @@
 namespace pag {
 class TestConstants {
  public:
+  static const std::string ASSETS_ROOT;
+  static const std::string RESOURCES_ROOT;
+  static const std::string BASELINE_ROOT;
   static const std::string BASELINE_VERSION_PATH;
   static const std::string CACHE_MD5_PATH;
-  static const std::string OUT_MD5_PATH;
   static const std::string CACHE_VERSION_PATH;
-  static const std::string OUT_VERSION_PATH;
   static const std::string OUT_ROOT;
+  static const std::string OUT_VERSION_PATH;
+  static const std::string OUT_MD5_PATH;
   static const std::string HEAD_PATH;
   static const std::string WEBP_FILE_EXT;
   static const std::string PAG_FILE_EXT;

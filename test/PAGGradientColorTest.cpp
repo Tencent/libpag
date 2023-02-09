@@ -27,7 +27,7 @@ PAG_TEST_CASE(PAGGradientColorTest)
  */
 PAG_TEST_F(PAGGradientColorTest, GradientColor_ID84028439) {
   std::vector<std::string> files;
-  GetAllPAGFiles("../resources/gradient", files);
+  GetAllPAGFiles(TestConstants::RESOURCES_ROOT + "gradient", files);
   for (auto& file : files) {
     auto pagFile = PAGFile::Load(file);
     EXPECT_NE(pagFile, nullptr);

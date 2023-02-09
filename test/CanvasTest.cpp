@@ -18,6 +18,7 @@
 
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
+#include "framework/utils/TestConstants.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ops/FillRectOp.h"
 #include "gpu/ops/RRectOp.h"
@@ -54,9 +55,10 @@ PAG_TEST(CanvasTest, ColorMatrixFilter) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto image = ImageCodec::MakeFrom("../resources/apitest/test_timestretch.png")
-                   ->makeBuffer()
-                   ->makeTexture(context);
+  auto image =
+      ImageCodec::MakeFrom(pag::TestConstants::RESOURCES_ROOT + "apitest/test_timestretch.png")
+          ->makeBuffer()
+          ->makeTexture(context);
   ASSERT_TRUE(image != nullptr);
   auto surface = Surface::Make(context, image->width(), image->height());
   auto canvas = surface->getCanvas();
@@ -80,7 +82,7 @@ PAG_TEST(CanvasTest, Blur) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto image = ImageCodec::MakeFrom("../resources/apitest/rotation.jpg");
+  auto image = ImageCodec::MakeFrom(pag::TestConstants::RESOURCES_ROOT + "apitest/rotation.jpg");
   ASSERT_TRUE(image != nullptr);
   auto texture = image->makeBuffer()->makeTexture(context);
   ASSERT_TRUE(texture != nullptr);
@@ -151,7 +153,8 @@ PAG_TEST(CanvasTest, DropShadow) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto image = ImageCodec::MakeFrom("../resources/apitest/image_as_mask.png");
+  auto image =
+      ImageCodec::MakeFrom(pag::TestConstants::RESOURCES_ROOT + "apitest/image_as_mask.png");
   ASSERT_TRUE(image != nullptr);
   auto texture = image->makeBuffer()->makeTexture(context);
   ASSERT_TRUE(texture != nullptr);
@@ -229,7 +232,7 @@ PAG_TEST(CanvasTest, TileMode) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto codec = ImageCodec::MakeFrom("../resources/apitest/rotation.jpg");
+  auto codec = ImageCodec::MakeFrom(pag::TestConstants::RESOURCES_ROOT + "apitest/rotation.jpg");
   ASSERT_TRUE(codec != nullptr);
   auto texture = codec->makeBuffer()->makeTexture(context);
   ASSERT_TRUE(texture != nullptr);
@@ -291,7 +294,8 @@ PAG_TEST(CanvasTest, merge_draw_call_triangle) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto codec = ImageCodec::MakeFrom("../resources/apitest/imageReplacement.png");
+  auto codec =
+      ImageCodec::MakeFrom(pag::TestConstants::RESOURCES_ROOT + "apitest/imageReplacement.png");
   ASSERT_TRUE(codec != nullptr);
   auto texture = codec->makeBuffer()->makeTexture(context);
   ASSERT_TRUE(texture != nullptr);
@@ -426,7 +430,8 @@ PAG_TEST(CanvasTest, merge_draw_clear_op) {
  * 用例描述: 测试 shape
  */
 PAG_TEST(CanvasTest, textShape) {
-  auto serifTypeface = Typeface::MakeFromPath("../resources/font/NotoSerifSC-Regular.otf");
+  auto serifTypeface =
+      Typeface::MakeFromPath(pag::TestConstants::RESOURCES_ROOT + "font/NotoSerifSC-Regular.otf");
   ASSERT_TRUE(serifTypeface != nullptr);
   std::string text =
       "ffi fl\n"
@@ -536,7 +541,8 @@ PAG_TEST(CanvasTest, filterMode) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto codec = ImageCodec::MakeFrom("../resources/apitest/imageReplacement.png");
+  auto codec =
+      ImageCodec::MakeFrom(pag::TestConstants::RESOURCES_ROOT + "apitest/imageReplacement.png");
   ASSERT_TRUE(codec != nullptr);
   auto texture = codec->makeBuffer()->makeTexture(context);
   ASSERT_TRUE(texture != nullptr);
@@ -560,7 +566,7 @@ PAG_TEST(CanvasTest, mipmap) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto image = ImageCodec::MakeFrom("../resources/apitest/rotation.jpg");
+  auto image = ImageCodec::MakeFrom(pag::TestConstants::RESOURCES_ROOT + "apitest/rotation.jpg");
   ASSERT_TRUE(image != nullptr);
   auto pixelBuffer = PixelBuffer::Make(image->width(), image->height(), false, false);
   ASSERT_TRUE(pixelBuffer != nullptr);
@@ -610,7 +616,7 @@ PAG_TEST(CanvasTest, hardwareMipMap) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto image = ImageCodec::MakeFrom("../resources/apitest/rotation.jpg");
+  auto image = ImageCodec::MakeFrom(pag::TestConstants::RESOURCES_ROOT + "apitest/rotation.jpg");
   ASSERT_TRUE(image != nullptr);
   auto pixelBuffer = PixelBuffer::Make(image->width(), image->height(), false);
   ASSERT_TRUE(pixelBuffer != nullptr);
@@ -674,7 +680,8 @@ PAG_TEST(CanvasTest, image) {
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 400, 500);
   auto canvas = surface->getCanvas();
-  auto image = Image::MakeFromEncoded("../resources/apitest/imageReplacement.png");
+  auto image =
+      Image::MakeFromEncoded(pag::TestConstants::RESOURCES_ROOT + "apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);
   EXPECT_TRUE(image->isLazyGenerated());
   EXPECT_FALSE(image->isTextureBacked());
@@ -701,7 +708,7 @@ PAG_TEST(CanvasTest, image) {
   EXPECT_FALSE(decodedImage->isLazyGenerated());
   EXPECT_FALSE(decodedImage->isTextureBacked());
   canvas->drawImage(decodedImage, 315, 0);
-  auto data = Data::MakeFromFile("../resources/apitest/rotation.jpg");
+  auto data = Data::MakeFromFile(pag::TestConstants::RESOURCES_ROOT + "apitest/rotation.jpg");
   auto rotationImage = Image::MakeFromEncoded(std::move(data));
   EXPECT_EQ(rotationImage->width(), 3024);
   EXPECT_EQ(rotationImage->height(), 4032);
@@ -722,7 +729,7 @@ PAG_TEST(CanvasTest, image) {
   canvas->setMatrix(matrix);
   canvas->drawImage(textureImage, sampling);
   canvas->resetMatrix();
-  auto codec = ImageCodec::MakeFrom("../resources/apitest/rgbaaa.png");
+  auto codec = ImageCodec::MakeFrom(pag::TestConstants::RESOURCES_ROOT + "apitest/rgbaaa.png");
   EXPECT_EQ(codec->width(), 1024);
   EXPECT_EQ(codec->height(), 512);
   auto rgbAAA = Image::MakeRGBAAA(codec, 512, 512, 512, 0, true);
