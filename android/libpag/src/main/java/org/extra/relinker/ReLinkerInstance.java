@@ -121,19 +121,23 @@ public class ReLinkerInstance {
         if (listener == null) {
             loadLibraryInternal(context, library, version);
         } else {
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        loadLibraryInternal(context, library, version);
-                        listener.success();
-                    } catch (UnsatisfiedLinkError e) {
-                        listener.failure(e);
-                    } catch (MissingLibraryException e) {
-                        listener.failure(e);
+            try {
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            loadLibraryInternal(context, library, version);
+                            listener.success();
+                        } catch (UnsatisfiedLinkError e) {
+                            listener.failure(e);
+                        } catch (MissingLibraryException e) {
+                            listener.failure(e);
+                        }
                     }
-                }
-            }).start();
+                }).start();
+            } catch (Exception | Error e) {
+                listener.failure(e);
+            }
         }
     }
 

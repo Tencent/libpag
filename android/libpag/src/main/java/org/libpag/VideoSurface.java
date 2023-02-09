@@ -19,7 +19,12 @@ public class VideoSurface implements SurfaceTexture.OnFrameAvailableListener {
         HandlerThreadCount++;
         if (handlerThread == null) {
             handlerThread = new HandlerThread("libpag_VideoSurface");
-            handlerThread.start();
+            try {
+                handlerThread.start();
+            } catch (Exception | Error e) {
+                e.printStackTrace();
+                handlerThread = null;
+            }
         }
     }
 
@@ -38,6 +43,9 @@ public class VideoSurface implements SurfaceTexture.OnFrameAvailableListener {
         videoSurface.height = height;
         synchronized (handlerLock) {
             StartHandlerThread();
+            if (handlerThread == null) {
+                return null;
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 videoSurface.surfaceTexture = new SurfaceTexture(false);
             } else {
