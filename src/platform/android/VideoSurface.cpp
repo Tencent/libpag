@@ -132,14 +132,6 @@ void VideoSurface::markPendingTexImage() {
   hasPendingTextureImage = true;
 }
 
-void VideoSurface::clearPendingTexImage() {
-  auto env = JNIEnvironment::Current();
-  if (env == nullptr) {
-    return;
-  }
-  updateTexImage(env);
-}
-
 std::shared_ptr<tgfx::Texture> VideoSurface::makeTexture(tgfx::Context* context) {
   auto env = JNIEnvironment::Current();
   if (env == nullptr) {

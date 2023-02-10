@@ -189,7 +189,6 @@ std::shared_ptr<VideoBuffer> GPUDecoder::onRenderFrame() {
   if (env == nullptr) {
     return nullptr;
   }
-  videoSurface->clearPendingTexImage();
   auto result = env->CallBooleanMethod(videoDecoder.get(), GPUDecoder_onRenderFrame);
   if (!result) {
     return nullptr;
