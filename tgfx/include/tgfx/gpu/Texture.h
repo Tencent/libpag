@@ -23,6 +23,7 @@
 #include "tgfx/core/Point.h"
 #include "tgfx/gpu/Resource.h"
 #include "tgfx/gpu/TextureSampler.h"
+#include "tgfx/platform/HardwareBuffer.h"
 
 namespace tgfx {
 /**
@@ -35,7 +36,7 @@ class Texture : public Resource {
    * either AHardwareBuffer* on android platform or CVPixelBufferRef on apple platform. The returned
    * Texture takes a reference on the buffer. Returns nullptr if any of the parameters is invalid.
    */
-  static std::shared_ptr<Texture> MakeFrom(Context* context, void* hardwareBuffer);
+  static std::shared_ptr<Texture> MakeFrom(Context* context, HardwareBufferRef hardwareBuffer);
 
   /**
    * Creates a new texture from the specified pixel data with each pixel stored as 32-bit RGBA

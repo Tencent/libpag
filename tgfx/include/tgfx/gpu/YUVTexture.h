@@ -48,7 +48,8 @@ class YUVTexture : public Texture {
    * Texture takes a reference on the buffer.
    */
   static std::shared_ptr<YUVTexture> MakeFrom(Context* context, YUVColorSpace colorSpace,
-                                              YUVColorRange colorRange, void* hardwareBuffer);
+                                              YUVColorRange colorRange,
+                                              HardwareBufferRef hardwareBuffer);
 
   YUVTexture(YUVColorSpace colorSpace, YUVColorRange colorRange, int width, int height)
       : Texture(width, height, ImageOrigin::TopLeft),

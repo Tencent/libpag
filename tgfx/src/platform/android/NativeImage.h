@@ -38,6 +38,7 @@ class NativeImage : public ImageCodec {
 
   static std::shared_ptr<NativeImage> Make(JNIEnv* env, jobject sizeObject, int orientation);
 
+  friend class ImageCodec;
   friend class NativeCodec;
 };
 }  // namespace tgfx

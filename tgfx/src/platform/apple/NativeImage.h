@@ -37,6 +37,7 @@ class NativeImage : public ImageCodec {
       : ImageCodec(width, height, orientation) {
   }
 
+  friend class ImageCodec;
   friend class NativeCodec;
 };
 }  // namespace tgfx

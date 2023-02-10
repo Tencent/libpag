@@ -101,18 +101,17 @@ std::shared_ptr<ImageCodec> NativeCodec::MakeCodec(std::shared_ptr<Data> imageBy
   return std::unique_ptr<ImageCodec>(codec);
 }
 
-std::shared_ptr<ImageCodec> NativeCodec::MakeFrom(void* nativeImage) {
-  auto cgImage = reinterpret_cast<CGImageRef>(nativeImage);
-  auto width = CGImageGetWidth(cgImage);
-  auto height = CGImageGetHeight(cgImage);
+std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(NativeImageRef nativeImage) {
+  auto width = CGImageGetWidth(nativeImage);
+  auto height = CGImageGetHeight(nativeImage);
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
   auto codec =
       new NativeImage(static_cast<int>(width), static_cast<int>(height), Orientation::TopLeft);
-  CFRetain(cgImage);
+  CFRetain(nativeImage);
 
-  codec->cgImage = cgImage;
+  codec->cgImage = nativeImage;
   return std::unique_ptr<ImageCodec>(codec);
 }
 

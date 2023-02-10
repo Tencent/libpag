@@ -35,14 +35,6 @@ class NativeCodec {
    */
   static std::shared_ptr<ImageCodec> MakeCodec(std::shared_ptr<Data> imageBytes);
 
-  /**
-   * Creates a new ImageCodec object from a native image. The type of nativeImage should be either
-   * a jobject that represents a java Bitmap on android platform or a CGImageRef on the apple
-   * platform. Returns nullptr if current platform has no native image support. The returned
-   * ImageCodec object takes a reference on the nativeImage.
-   */
-  static std::shared_ptr<ImageCodec> MakeFrom(void* nativeImage);
-
   friend class ImageCodec;
 };
 }  // namespace tgfx

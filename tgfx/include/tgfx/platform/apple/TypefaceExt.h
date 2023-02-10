@@ -18,25 +18,26 @@
 
 #pragma once
 
-#include <emscripten/val.h>
-#include "tgfx/core/ImageCodec.h"
+#include <CoreText/CoreText.h>
+#include "tgfx/core/Typeface.h"
 
 namespace tgfx {
-class NativeImage : public ImageCodec {
+
+/**
+ * TypefaceExt provides convenience functions to create typefaces from platform-specific CTFontRef
+ * handles and access the CTFontRef handle in a Typeface instance.
+ */
+class TypefaceExt {
  public:
-  bool readPixels(const ImageInfo& /*dstInfo*/, void* /*dstPixels*/) const override {
-    return false;
-  }
+  /**
+   * Creates a typeface for the specified CTFontRef. Returns nullptr if the ctFont is nil.
+   */
+  static std::shared_ptr<Typeface> MakeFromCTFont(CTFontRef ctFont);
 
- private:
-  emscripten::val nativeImage = emscripten::val::null();
-
-  NativeImage(int width, int height) : ImageCodec(width, height, Orientation::TopLeft) {
-  }
-
-  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
-
-  friend class ImageCodec;
-  friend class NativeCodec;
+  /**
+   * Returns the platform-specific CTFontRef handle for a given Typeface. Note that the returned
+   * CTFontRef gets released when the source Typeface is destroyed.
+   */
+  static CTFontRef GetCTFont(const Typeface* typeface);
 };
 }  // namespace tgfx

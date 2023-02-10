@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,25 +18,30 @@
 
 #pragma once
 
+#if defined(__EMSCRIPTEN__)
 #include <emscripten/val.h>
-#include "tgfx/core/ImageCodec.h"
+#elif defined(__ANDROID__) || defined(ANDROID)
+#include <jni.h>
+#elif defined(__APPLE__)
+#include <CoreGraphics/CGImage.h>
+#endif
 
 namespace tgfx {
-class NativeImage : public ImageCodec {
- public:
-  bool readPixels(const ImageInfo& /*dstInfo*/, void* /*dstPixels*/) const override {
-    return false;
-  }
+#if defined(__EMSCRIPTEN__)
 
- private:
-  emscripten::val nativeImage = emscripten::val::null();
+typedef emscripten::val NativeImageRef;
 
-  NativeImage(int width, int height) : ImageCodec(width, height, Orientation::TopLeft) {
-  }
+#elif defined(__ANDROID__) || defined(ANDROID)
 
-  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
+typedef jobject NativeImageRef;
 
-  friend class ImageCodec;
-  friend class NativeCodec;
-};
+#elif defined(__APPLE__)
+
+typedef CGImageRef NativeImageRef;
+
+#else
+
+typedef void* NativeImageRef;
+
+#endif
 }  // namespace tgfx
