@@ -62,8 +62,6 @@ class VideoSurface {
 
   void markPendingTexImage();
 
-  void clearPendingTexImage();
-
   std::shared_ptr<tgfx::Texture> makeTexture(tgfx::Context* context);
 
  private:
