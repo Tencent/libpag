@@ -46,11 +46,6 @@ class EncodedSource : public ImageSource {
     return true;
   }
 
-  /**
-   * Crates an asynchronous ImageBuffer.
-   */
-  std::shared_ptr<ImageBuffer> makeAsyncBuffer() const;
-
  protected:
   std::shared_ptr<ImageSource> onMakeDecoded(Context* context) const override;
 
@@ -64,6 +59,7 @@ class EncodedSource : public ImageSource {
 
   EncodedSource(std::shared_ptr<ImageGenerator> generator, bool mipMapped);
 
+  friend class AsyncSource;
   friend class ImageSource;
 };
 }  // namespace tgfx

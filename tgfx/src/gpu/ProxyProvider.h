@@ -19,6 +19,7 @@
 #pragma once
 
 #include "TextureProxy.h"
+#include "core/images/ImageGeneratorTask.h"
 #include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
@@ -39,6 +40,20 @@ class ProxyProvider {
    * uploaded to the GPU.
    */
   std::shared_ptr<TextureProxy> createTextureProxy(std::shared_ptr<ImageBuffer> imageBuffer,
+                                                   bool mipMapped = false);
+
+  /*
+   * Create a texture proxy for the ImageGeneratorTask. The task will be released after the
+   * associated texture being instantiated.
+   */
+  std::shared_ptr<TextureProxy> createTextureProxy(std::shared_ptr<ImageGenerator> generator,
+                                                   bool mipMapped = false);
+
+  /*
+   * Create a texture proxy for the ImageGeneratorTask. The task will be released after the
+   * associated texture being instantiated.
+   */
+  std::shared_ptr<TextureProxy> createTextureProxy(std::shared_ptr<ImageGeneratorTask> task,
                                                    bool mipMapped = false);
 
   /**

@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "EncodedSource.h"
-#include "AsyncImageBuffer.h"
 #include "AsyncSource.h"
 
 namespace tgfx {
@@ -38,14 +37,6 @@ std::shared_ptr<ImageSource> EncodedSource::onMakeMipMapped() const {
 }
 
 std::shared_ptr<TextureProxy> EncodedSource::onMakeTextureProxy(Context* context) const {
-  return context->proxyProvider()->createTextureProxy(makeAsyncBuffer(), mipMapped);
-}
-
-std::shared_ptr<ImageBuffer> EncodedSource::makeAsyncBuffer() const {
-  if (generator->asyncSupport()) {
-    return generator->makeBuffer(!mipMapped);
-  } else {
-    return AsyncImageBuffer::MakeFrom(generator, !mipMapped);
-  }
+  return context->proxyProvider()->createTextureProxy(generator, mipMapped);
 }
 }  // namespace tgfx
