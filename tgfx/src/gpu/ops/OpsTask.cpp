@@ -17,15 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OpsTask.h"
-#include "core/utils/Log.h"
 #include "gpu/Gpu.h"
 #include "gpu/OpsRenderPass.h"
 
 namespace tgfx {
-OpsTask::~OpsTask() {
-  DEBUG_ASSERT(ops.empty());
-}
-
 void OpsTask::addOp(std::unique_ptr<Op> op) {
   if (!ops.empty() && ops.back()->combineIfPossible(op.get())) {
     return;
