@@ -73,7 +73,7 @@ class CompareFrameTask : public Executor {
   }
 };
 
-void CompareFileFrames(Semaphore* semaphore, std::string pagPath) {
+static void CompareFileFrames(Semaphore* semaphore, std::string pagPath) {
   Clock fileClock = {};
   auto fileName = pagPath.substr(pagPath.rfind('/') + 1, pagPath.size());
   auto pagFile = PAGFile::Load(pagPath);
