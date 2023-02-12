@@ -32,9 +32,10 @@ namespace tgfx {
 class Texture : public Resource {
  public:
   /**
-   * Creates a single-plane texture from a hardware buffer. The type of hardwareBuffer should be
-   * either AHardwareBuffer* on android platform or CVPixelBufferRef on apple platform. The returned
-   * Texture takes a reference on the buffer. Returns nullptr if any of the parameters is invalid.
+   * Creates a new texture from a platform-specific hardware buffer. The hardwareBuffer could be an
+   * AHardwareBuffer on the android platform or a CVPixelBufferRef on the apple platform. The
+   * returned Texture takes a reference on the hardwareBuffer. Returns nullptr if any of the
+   * parameters is nullptr.
    */
   static std::shared_ptr<Texture> MakeFrom(Context* context, HardwareBufferRef hardwareBuffer);
 

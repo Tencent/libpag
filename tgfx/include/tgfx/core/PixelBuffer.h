@@ -42,10 +42,10 @@ class PixelBuffer : public ImageBuffer {
                                            bool tryHardware = true);
 
   /**
-   * Creates a new PixelBuffer object from a hardware buffer. The hardware buffer could be an
-   * AHardwareBuffer on the android platform or a CVPixelBufferRef on the apple platform. Returns
-   * nullptr if the current platform has no hardware buffer support. The returned PixelBuffer takes
-   * a reference on the buffer.
+   * Creates a new PixelBuffer object from a platform-specific hardware buffer. The hardwareBuffer
+   * could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on the apple
+   * platform. Returns nullptr if the current platform has no hardware buffer support. The returned
+   * PixelBuffer takes a reference on the hardwareBuffer.
    */
   static std::shared_ptr<PixelBuffer> MakeFrom(HardwareBufferRef hardwareBuffer);
 

@@ -34,8 +34,8 @@ std::shared_ptr<Texture> Texture::MakeFrom(Context* context, HardwareBufferRef h
   return CGLHardwareTexture::MakeFrom(context, hardwareBuffer);
 }
 
-std::shared_ptr<YUVTexture> YUVTexture::MakeFrom(Context*, YUVColorSpace, YUVColorRange,
-                                                 HardwareBufferRef) {
+std::shared_ptr<YUVTexture> YUVTexture::MakeFrom(Context*, HardwareBufferRef, YUVColorSpace,
+                                                 YUVColorRange) {
   return nullptr;
 }
 }  // namespace tgfx

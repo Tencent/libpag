@@ -51,6 +51,9 @@ bool SetJavaVM(void* javaVM) {
 JNIEnv* CurrentJNIEnv() {
   std::lock_guard<std::mutex> autoLock(globalLocker);
   if (globalJavaVM == nullptr) {
+    LOGE(
+        "CurrentJNIEnv(): The global JavaVM has not been set yet! "
+        "Please use tgfx::SetJavaVM() to initialize the global JavaVM.");
     return nullptr;
   }
   auto env = reinterpret_cast<JNIEnv*>(pthread_getspecific(envKey));
@@ -62,7 +65,7 @@ JNIEnv* CurrentJNIEnv() {
     case JNI_EDETACHED: {
       JavaVMAttachArgs args = {JNI_VERSION_1_4, "TGFX_JNIEnv", nullptr};
       if (globalJavaVM->AttachCurrentThread(&env, &args) != JNI_OK) {
-        LOGE("GetJNIEnv(): Failed to attach the JNI environment to the current thread!");
+        LOGE("CurrentJNIEnv(): Failed to attach the JNI environment to the current thread!");
         env = nullptr;
       } else {
         pthread_setspecific(envKey, env);
@@ -71,10 +74,10 @@ JNIEnv* CurrentJNIEnv() {
     case JNI_OK:
       break;
     case JNI_EVERSION:
-      LOGE("GetJNIEnv(): The specified JNI version is not supported!");
+      LOGE("CurrentJNIEnv(): The specified JNI version is not supported!");
       break;
     default:
-      LOGE("GetJNIEnv(): Failed to get the JNI environment attached to this thread!");
+      LOGE("CurrentJNIEnv(): Failed to get the JNI environment attached to this thread!");
       break;
   }
   return env;

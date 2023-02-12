@@ -34,7 +34,7 @@ class VideoImage : public VideoBuffer {
  protected:
  protected:
   std::shared_ptr<tgfx::Texture> onMakeTexture(tgfx::Context* context, bool) const override {
-    return tgfx::YUVTexture::MakeFrom(context, _colorSpace, _colorRange, pixelBuffer);
+    return tgfx::YUVTexture::MakeFrom(context, pixelBuffer, _colorSpace, _colorRange);
   }
 
  private:
