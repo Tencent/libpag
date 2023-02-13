@@ -53,7 +53,11 @@ class ImageGenerator {
    * will not block the calling thread.
    */
   virtual bool asyncSupport() const {
+#ifdef PAG_BUILD_FOR_WEB
+    return true;
+#else
     return false;
+#endif
   }
 
   /**
