@@ -20,7 +20,7 @@
 #include "TextureEffect.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
-#include "opengl/GLTextureEffect.h"
+#include "opengl/GLTiledTextureEffect.h"
 
 namespace tgfx {
 class TiledTextureEffectProxy : public FragmentProcessorProxy {
@@ -226,6 +226,6 @@ bool TiledTextureEffect::onIsEqual(const FragmentProcessor& processor) const {
 }
 
 std::unique_ptr<GLFragmentProcessor> TiledTextureEffect::onCreateGLInstance() const {
-  return std::make_unique<GLTextureEffect>();
+  return std::make_unique<GLTiledTextureEffect>();
 }
 }  // namespace tgfx

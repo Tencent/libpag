@@ -72,6 +72,6 @@ class TextureEffect : public FragmentProcessor {
   Point alphaStart = Point::Zero();
   CoordTransform coordTransform;
 
-  friend class GLRGBAAATextureEffect;
+  friend class GLTextureEffect;
 };
 }  // namespace tgfx

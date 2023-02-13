@@ -18,7 +18,7 @@
 
 #include "TextureEffect.h"
 #include "YUVTextureEffect.h"
-#include "opengl/GLRGBAAATextureEffect.h"
+#include "opengl/GLTextureEffect.h"
 
 namespace tgfx {
 class TextureEffectProxy : public FragmentProcessorProxy {
@@ -125,6 +125,6 @@ void TextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
 }
 
 std::unique_ptr<GLFragmentProcessor> TextureEffect::onCreateGLInstance() const {
-  return std::make_unique<GLRGBAAATextureEffect>();
+  return std::make_unique<GLTextureEffect>();
 }
 }  // namespace tgfx
