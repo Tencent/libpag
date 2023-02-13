@@ -20,7 +20,7 @@
 #include <android/log.h>
 
 namespace tgfx {
-#define LOG_TAG "Log"
+#define LOG_TAG "tgfx"
 
 void PrintLog(const char format[], ...) {
   va_list args;

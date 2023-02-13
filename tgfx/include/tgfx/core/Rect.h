@@ -90,6 +90,14 @@ struct Rect {
    * Returns constructed Rect set to (0, 0, size.width, size.height). Does not validate input;
    * size.width or size.height may be negative.
    */
+  static constexpr Rect MakeSize(const ISize& size) {
+    return Rect{0, 0, static_cast<float>(size.width), static_cast<float>(size.height)};
+  }
+
+  /**
+   * Returns constructed Rect set to (0, 0, size.width, size.height). Does not validate input;
+   * size.width or size.height may be negative.
+   */
   static constexpr Rect MakeSize(const Size& size) {
     return Rect{0, 0, size.width, size.height};
   }

@@ -47,12 +47,12 @@ class SequenceReaderBuffer : public tgfx::ImageBuffer {
   Frame targetFrame = 0;
 };
 
-static tgfx::Size GetBufferSize(Sequence* sequence) {
+static tgfx::ISize GetBufferSize(Sequence* sequence) {
   if (sequence->composition->type() == CompositionType::Video) {
     auto videoSequence = static_cast<VideoSequence*>(sequence);
-    return tgfx::Size::Make(videoSequence->getVideoWidth(), videoSequence->getVideoHeight());
+    return tgfx::ISize::Make(videoSequence->getVideoWidth(), videoSequence->getVideoHeight());
   }
-  return tgfx::Size::Make(sequence->width, sequence->height);
+  return tgfx::ISize::Make(sequence->width, sequence->height);
 }
 
 class StaticSequenceGenerator : public tgfx::ImageGenerator {
