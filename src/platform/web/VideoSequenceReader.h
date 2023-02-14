@@ -31,18 +31,17 @@ class WebVideoTexture : public tgfx::GLTexture {
   static std::shared_ptr<WebVideoTexture> Make(tgfx::Context* context, int width, int height,
                                                bool isAndroidMiniprogram);
 
-  WebVideoTexture(const tgfx::GLSampler& sampler, int width, int height, tgfx::ImageOrigin origin,
-                  bool isMiniprogramAndroid);
+  WebVideoTexture(const tgfx::GLSampler& sampler, int width, int height, tgfx::ImageOrigin origin);
 
   tgfx::Point getTextureCoord(float x, float y) const override;
 
   size_t memoryUsage() const override;
 
  private:
-  void onReleaseGPU() override;
+  int textureWidth = 0;
+  int textureHeight = 0;
 
-  bool isAndroidMiniprogram = false;
-  int androidAlignment = 16;
+  void onReleaseGPU() override;
 };
 
 class VideoSequenceReader : public SequenceReader {

@@ -50,7 +50,7 @@ void GLTextureEffect::emitCode(EmitArgs& args) {
 }
 
 void GLTextureEffect::onSetData(const ProgramDataManager& programDataManager,
-                                      const FragmentProcessor& fragmentProcessor) {
+                                const FragmentProcessor& fragmentProcessor) {
   const auto& textureFP = static_cast<const TextureEffect&>(fragmentProcessor);
   if (alphaStartUniform.isValid()) {
     auto alphaStart =

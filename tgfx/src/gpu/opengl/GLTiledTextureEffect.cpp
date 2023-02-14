@@ -82,9 +82,10 @@ void GLTiledTextureEffect::readColor(EmitArgs& args, const std::string& coord, c
 }
 
 void GLTiledTextureEffect::subsetCoord(GLFragmentProcessor::EmitArgs& args,
-                                  TiledTextureEffect::ShaderMode mode, const char* coordSwizzle,
-                                  const char* subsetStartSwizzle, const char* subsetStopSwizzle,
-                                  const char* extraCoord, const char* coordWeight) {
+                                       TiledTextureEffect::ShaderMode mode,
+                                       const char* coordSwizzle, const char* subsetStartSwizzle,
+                                       const char* subsetStopSwizzle, const char* extraCoord,
+                                       const char* coordWeight) {
   auto* fragBuilder = args.fragBuilder;
   switch (mode) {
     case TiledTextureEffect::ShaderMode::None:
@@ -137,8 +138,8 @@ void GLTiledTextureEffect::subsetCoord(GLFragmentProcessor::EmitArgs& args,
 }
 
 void GLTiledTextureEffect::clampCoord(GLFragmentProcessor::EmitArgs& args, bool clamp,
-                                 const char* coordSwizzle, const char* clampStartSwizzle,
-                                 const char* clampStopSwizzle) {
+                                      const char* coordSwizzle, const char* clampStartSwizzle,
+                                      const char* clampStopSwizzle) {
   auto* fragBuilder = args.fragBuilder;
   if (clamp) {
     fragBuilder->codeAppendf("clampedCoord%s = clamp(subsetCoord%s, %s%s, %s%s);", coordSwizzle,
@@ -159,7 +160,7 @@ void GLTiledTextureEffect::clampCoord(GLFragmentProcessor::EmitArgs& args, const
 }
 
 void GLTiledTextureEffect::initUniform(GLFragmentProcessor::EmitArgs& args, const bool useSubset[2],
-                                  const bool useClamp[2]) {
+                                       const bool useClamp[2]) {
   auto* uniformHandler = args.uniformHandler;
   if (useSubset[0] || useSubset[1]) {
     subsetUniform = uniformHandler->addUniform(ShaderFlags::Fragment, ShaderVar::Type::Float4,
@@ -353,7 +354,7 @@ void GLTiledTextureEffect::emitCode(EmitArgs& args) {
 }
 
 void GLTiledTextureEffect::onSetData(const ProgramDataManager& programDataManager,
-                                const FragmentProcessor& fragmentProcessor) {
+                                     const FragmentProcessor& fragmentProcessor) {
   const auto& textureFP = static_cast<const TiledTextureEffect&>(fragmentProcessor);
   if (dimensionsUniform.isValid()) {
     auto dimensions = textureFP.texture->getTextureCoord(1.f, 1.f);

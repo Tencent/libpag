@@ -43,47 +43,18 @@ void VideoSurface::InitJNI(JNIEnv* env, const std::string& className) {
   VideoSurface_release = env->GetMethodID(VideoSurfaceClass.get(), "release", "()V");
 }
 
-OESTexture::OESTexture(const tgfx::GLSampler& glSampler, int width, int height, bool hasAlpha)
-    : GLTexture(width, height, tgfx::ImageOrigin::TopLeft), hasAlpha(hasAlpha) {
+OESTexture::OESTexture(const tgfx::GLSampler& glSampler, int width, int height)
+    : GLTexture(width, height, tgfx::ImageOrigin::TopLeft) {
   sampler = glSampler;
 }
 
 void OESTexture::setTextureSize(int width, int height) {
   textureWidth = width;
   textureHeight = height;
-  computeTransform();
-}
-
-void OESTexture::computeTransform() {
-  if (textureWidth == 0 || textureHeight == 0 || hasAlpha) {
-    return;
-  }
-  // https://cs.android.com/android/platform/superproject/+/master:frameworks/native/libs/nativedisplay/surfacetexture/SurfaceTexture.cpp;l=275;drc=master;bpv=0;bpt=1
-  // https://stackoverflow.com/questions/6023400/opengl-es-texture-coordinates-slightly-off
-
-  // In order to prevent bilinear sampling beyond the edge of the
-  // crop rectangle we may need to shrink it by 2 texels in each
-  // dimension.  Normally this would just need to take 1/2 a texel
-  // off each end, but because the chroma channels of YUV420 images
-  // are subsampled we may need to shrink the crop region by a whole
-  // texel on each side.
-  auto shrinkAmount = 1.0f;
-  if (width() < textureWidth) {
-    tx = shrinkAmount / static_cast<float>(textureWidth);
-    sx = (static_cast<float>(width()) - (2.0f * shrinkAmount)) / static_cast<float>(textureWidth);
-  }
-  if (height() < textureHeight) {
-    ty = shrinkAmount / static_cast<float>(textureHeight);
-    sy = (static_cast<float>(height()) - (2.0f * shrinkAmount)) / static_cast<float>(textureHeight);
-  }
 }
 
 tgfx::Point OESTexture::getTextureCoord(float x, float y) const {
-  if (hasAlpha) {
-    // 如果有 alpha 通道，不需要缩小纹素，解决华为设备上的黑边问题
-    return {x / static_cast<float>(textureWidth), y / static_cast<float>(textureHeight)};
-  }
-  return {x / static_cast<float>(width()) * sx + tx, y / static_cast<float>(height()) * sy + ty};
+  return {x / static_cast<float>(textureWidth), y / static_cast<float>(textureHeight)};
 }
 
 size_t OESTexture::memoryUsage() const {
@@ -97,7 +68,7 @@ void OESTexture::onReleaseGPU() {
   }
 }
 
-std::shared_ptr<VideoSurface> VideoSurface::Make(int width, int height, bool hasAlpha) {
+std::shared_ptr<VideoSurface> VideoSurface::Make(int width, int height) {
   auto env = JNIEnvironment::Current();
   if (env == nullptr) {
     return nullptr;
@@ -107,12 +78,11 @@ std::shared_ptr<VideoSurface> VideoSurface::Make(int width, int height, bool has
   if (surface.empty()) {
     return nullptr;
   }
-  return std::shared_ptr<VideoSurface>(
-      new VideoSurface(env, surface.get(), width, height, hasAlpha));
+  return std::shared_ptr<VideoSurface>(new VideoSurface(env, surface.get(), width, height));
 }
 
-VideoSurface::VideoSurface(JNIEnv* env, jobject surface, int width, int height, bool hasAlpha)
-    : width(width), height(height), hasAlpha(hasAlpha) {
+VideoSurface::VideoSurface(JNIEnv* env, jobject surface, int width, int height)
+    : width(width), height(height) {
   videoSurface.reset(env, surface);
 }
 
@@ -146,7 +116,7 @@ std::shared_ptr<tgfx::Texture> VideoSurface::makeTexture(tgfx::Context* context)
   if (oesTexture == nullptr) {
     auto textureWidth = env->CallIntMethod(videoSurface.get(), VideoSurface_videoWidth);
     auto textureHeight = env->CallIntMethod(videoSurface.get(), VideoSurface_videoHeight);
-    oesTexture = tgfx::Resource::Wrap(context, new OESTexture(glInfo, width, height, hasAlpha));
+    oesTexture = tgfx::Resource::Wrap(context, new OESTexture(glInfo, width, height));
     oesTexture->setTextureSize(textureWidth, textureHeight);
     oesTexture->attachedSurface.reset(env, videoSurface.get());
   }

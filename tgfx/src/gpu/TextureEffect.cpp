@@ -108,7 +108,7 @@ TextureEffect::TextureEffect(std::shared_ptr<Texture> texture, SamplingOptions s
       texture(std::move(texture)),
       samplerState(sampling),
       alphaStart(alphaStart),
-      coordTransform(localMatrix, this->texture.get()) {
+      coordTransform(localMatrix, this->texture.get(), alphaStart) {
   setTextureSamplerCnt(1);
   addCoordTransform(&coordTransform);
 }
