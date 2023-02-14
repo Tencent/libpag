@@ -19,6 +19,8 @@
 #pragma once
 
 #include "tgfx/gpu/Texture.h"
+#include "tgfx/platform/HardwareBuffer.h"
+#include "tgfx/core/YUVData.h"
 
 namespace tgfx {
 /**
@@ -27,6 +29,15 @@ namespace tgfx {
  */
 class ImageBuffer {
  public:
+  /**
+   * Creates a single-plane ImageBuffer from a platform-specific hardware buffer. The hardwareBuffer
+   * could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on the apple
+   * platform. The returned ImageBuffer takes a reference on the hardwareBuffer. Returns nullptr
+   * if any of the parameters is nullptr or the hardwareBuffer is not single-plane. Use the
+   * YUVBuffer::MakeFrom() method for the hardware buffer with multiple planes.
+   */
+  static std::shared_ptr<ImageBuffer> MakeFrom(HardwareBufferRef hardwareBuffer);
+
   virtual ~ImageBuffer() = default;
   /**
    * Returns the width of the image buffer.
@@ -43,6 +54,13 @@ class ImageBuffer {
    * defined by ColorType::ALPHA_8.
    */
   virtual bool isAlphaOnly() const = 0;
+
+  /**
+   * Returns true if the image buffer is a YUVBuffer.
+   */
+  virtual bool isYUV() const {
+    return false;
+  }
 
   /**
    * Creates a new Texture capturing the pixels in this image buffer. The optional mipMapped

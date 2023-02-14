@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SoftwareDecoderWrapper.h"
-#include "I420Buffer.h"
 #include "platform/Platform.h"
+#include "tgfx/core/YUVBuffer.h"
 #include "tgfx/core/YUVData.h"
 
 namespace pag {
@@ -192,15 +192,15 @@ DecodingResult SoftwareDecoderWrapper::onEndOfStream() {
   return result;
 }
 
-std::shared_ptr<VideoBuffer> SoftwareDecoderWrapper::onRenderFrame() {
+std::shared_ptr<tgfx::ImageBuffer> SoftwareDecoderWrapper::onRenderFrame() {
   auto frame = softwareDecoder->onRenderFrame();
   if (frame == nullptr) {
     return nullptr;
   }
   auto yuvData = SoftwareI420Data::Make(videoFormat.width, videoFormat.height, frame->data,
                                         frame->lineSize, softwareDecoder);
-  return std::make_shared<I420Buffer>(std::move(yuvData), videoFormat.colorSpace,
-                                      videoFormat.colorRange);
+  return tgfx::YUVBuffer::MakeI420(std::move(yuvData), videoFormat.colorSpace,
+                                   videoFormat.colorRange);
 }
 
 int64_t SoftwareDecoderWrapper::presentationTime() {

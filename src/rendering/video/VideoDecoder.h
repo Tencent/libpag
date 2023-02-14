@@ -19,12 +19,12 @@
 #pragma once
 
 #include "DecodingResult.h"
-#include "VideoBuffer.h"
 #include "VideoFormat.h"
 #include "base/utils/Log.h"
 #include "codec/NALUType.h"
 #include "pag/decoder.h"
 #include "pag/file.h"
+#include "tgfx/core/ImageBuffer.h"
 
 namespace pag {
 class VideoDecoder {
@@ -95,7 +95,7 @@ class VideoDecoder {
   /**
    * Returns decoded video frame to render.
    */
-  virtual std::shared_ptr<VideoBuffer> onRenderFrame() = 0;
+  virtual std::shared_ptr<tgfx::ImageBuffer> onRenderFrame() = 0;
 
   /**
    * Returns current presentation time.

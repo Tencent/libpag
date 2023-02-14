@@ -76,10 +76,10 @@ static std::vector<GLSampler> MakeTexturePlanes(Context* context, const YUVData*
   for (int index = 0; index < count; index++) {
     auto w = yuvData->width() >> YUV_SIZE_FACTORS[index];
     auto h = yuvData->height() >> YUV_SIZE_FACTORS[index];
-    auto sampler = context->gpu()->createTexture(w, h, formats[index], 1);
+    auto sampler = context->gpu()->createSampler(w, h, formats[index], 1);
     if (sampler == nullptr) {
       for (auto& glSampler : texturePlanes) {
-        context->gpu()->deleteTexture(&glSampler);
+        context->gpu()->deleteSampler(&glSampler);
       }
       return {};
     }
@@ -175,7 +175,7 @@ size_t GLYUVTexture::memoryUsage() const {
 
 void GLYUVTexture::onReleaseGPU() {
   for (auto& sampler : samplers) {
-    context->gpu()->deleteTexture(&sampler);
+    context->gpu()->deleteSampler(&sampler);
   }
 }
 }  // namespace tgfx

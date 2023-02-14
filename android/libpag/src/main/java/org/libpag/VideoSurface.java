@@ -7,61 +7,63 @@ import android.os.HandlerThread;
 import android.os.Looper;
 import android.view.Surface;
 
+import org.extra.tools.LibraryLoadUtils;
+
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 
-public class VideoSurface implements SurfaceTexture.OnFrameAvailableListener {
+class VideoSurface implements SurfaceTexture.OnFrameAvailableListener {
     private static HandlerThread handlerThread;
     private static int HandlerThreadCount = 0;
     private static final Object handlerLock = new Object();
 
-    private static synchronized void StartHandlerThread() {
-        HandlerThreadCount++;
-        if (handlerThread == null) {
-            handlerThread = new HandlerThread("libpag_VideoSurface");
-            try {
-                handlerThread.start();
-            } catch (Exception | Error e) {
-                e.printStackTrace();
-                handlerThread = null;
+    private static synchronized boolean StartHandlerThread() {
+        synchronized (handlerLock) {
+            if (handlerThread == null) {
+                handlerThread = new HandlerThread("libpag_VideoSurface");
+                try {
+                    handlerThread.start();
+                } catch (Exception | Error e) {
+                    e.printStackTrace();
+                    handlerThread = null;
+                    return false;
+                }
             }
+            HandlerThreadCount++;
+            return true;
         }
+
     }
 
-    private int width = 0;
-    private int height = 0;
-    private Surface outputSurface;
+    Surface outputSurface;
     private SurfaceTexture surfaceTexture;
-    private final Object frameSyncObject = new Object();
-    private boolean frameAvailable = false;
-    private boolean released = false;
-    private int retainCount = 1;
 
-    private static VideoSurface Make(int width, int height) {
-        VideoSurface videoSurface = new VideoSurface();
-        videoSurface.width = width;
-        videoSurface.height = height;
+    private boolean released = false;
+
+    static VideoSurface Make(int width, int height) {
+        if (!StartHandlerThread()) {
+            return null;
+        }
+        return new VideoSurface(width, height);
+    }
+
+    private VideoSurface(int width, int height) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            surfaceTexture = new SurfaceTexture(false);
+        } else {
+            surfaceTexture = new SurfaceTexture(0);
+            surfaceTexture.detachFromGLContext();
+        }
         synchronized (handlerLock) {
-            StartHandlerThread();
-            if (handlerThread == null) {
-                return null;
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                videoSurface.surfaceTexture = new SurfaceTexture(false);
-            } else {
-                videoSurface.surfaceTexture = new SurfaceTexture(0);
-                videoSurface.surfaceTexture.detachFromGLContext();
-            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                videoSurface.surfaceTexture.setOnFrameAvailableListener(
-                        videoSurface, new Handler(handlerThread.getLooper()));
+                surfaceTexture.setOnFrameAvailableListener(this, new Handler(handlerThread.getLooper()));
             } else {
-                videoSurface.surfaceTexture.setOnFrameAvailableListener(videoSurface);
-                videoSurface.reflectLooper();
+                surfaceTexture.setOnFrameAvailableListener(this);
+                reflectLooper();
             }
         }
-        videoSurface.outputSurface = new Surface(videoSurface.surfaceTexture);
-        return videoSurface;
+        outputSurface = new Surface(surfaceTexture);
+        nativeSetup(surfaceTexture, width, height);
     }
 
     private void reflectLooper() {
@@ -80,8 +82,7 @@ public class VideoSurface implements SurfaceTexture.OnFrameAvailableListener {
 
         Class[] paramTypes = {SurfaceTexture.class, Looper.class};
         try {
-            @SuppressWarnings("unchecked")
-            Constructor eventHandlerConstructor = eventHandlerClass.getConstructor(paramTypes);
+            @SuppressWarnings("unchecked") Constructor eventHandlerConstructor = eventHandlerClass.getConstructor(paramTypes);
             Object eventHandlerObj = eventHandlerConstructor.newInstance(surfaceTexture, handlerThread.getLooper());
             Class<?> classType = surfaceTexture.getClass();
             Field field = classType.getDeclaredField("mEventHandler");
@@ -93,89 +94,12 @@ public class VideoSurface implements SurfaceTexture.OnFrameAvailableListener {
     }
 
     public void onFrameAvailable(SurfaceTexture st) {
-        synchronized (frameSyncObject) {
-            if (frameAvailable) {
-                new RuntimeException("frameAvailable already set, frame could be dropped").printStackTrace();
-                return;
-            }
-            frameAvailable = true;
-            frameSyncObject.notifyAll();
-        }
-    }
-
-    public Surface getOutputSurface() {
-        return outputSurface;
-    }
-
-    private int videoWidth() {
-        float[] matrix = new float[16];
-        surfaceTexture.getTransformMatrix(matrix);
-        float scale = Math.abs(matrix[0]);
-        if (scale > 0) {
-            return Math.round(width / (scale + matrix[12] * 2));
-        } else {
-            return width;
-        }
-    }
-
-    private int videoHeight() {
-        float[] matrix = new float[16];
-        surfaceTexture.getTransformMatrix(matrix);
-        float scale = Math.abs(matrix[5]);
-        if (scale > 0) {
-            return Math.round(height / (scale + (matrix[13] - scale) * 2));
-        } else {
-            return height;
-        }
+        notifyFrameAvailable();
     }
 
 
-    private boolean updateTexImage() {
-        final int TIMEOUT_MS = 50;
-        int needRetryTimes = 10;
-        synchronized (frameSyncObject) {
-            while (!frameAvailable && needRetryTimes > 0) {
-                try {
-                    // Wait for onFrameAvailable() to signal us.  Use a timeout to avoid
-                    // stalling the test if it doesn't arrive.
-                    needRetryTimes--;
-                    frameSyncObject.wait(TIMEOUT_MS);
-                } catch (InterruptedException ie) {
-                    // shouldn't happen
-                    ie.printStackTrace();
-                }
-            }
-            frameAvailable = false;
-            if (needRetryTimes == 0) {
-                return false;
-            }
-        }
-        try {
-            surfaceTexture.updateTexImage();
-        } catch (Exception e) {
-            e.printStackTrace();
-            return false;
-        }
-        return true;
-    }
-
-    private boolean attachToGLContext(int texName) {
-        try {
-            surfaceTexture.attachToGLContext(texName);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return false;
-        }
-        return true;
-    }
-
-    public void retain() {
-        retainCount++;
-    }
-
-    public void release() {
-        retainCount--;
-        if (released || retainCount > 0) {
+    void release() {
+        if (released) {
             return;
         }
         released = true;
@@ -186,14 +110,37 @@ public class VideoSurface implements SurfaceTexture.OnFrameAvailableListener {
                 handlerThread = null;
             }
         }
+        nativeRelease();
         if (outputSurface != null) {
             outputSurface.release();
             outputSurface = null;
         }
-
         if (surfaceTexture != null) {
             surfaceTexture.release();
             surfaceTexture = null;
         }
     }
+
+    protected void finalize() {
+        nativeFinalize();
+    }
+
+
+    private native void nativeRelease();
+
+    private native void nativeFinalize();
+
+    private static native void nativeInit();
+
+    private native void nativeSetup(SurfaceTexture surfaceTexture, int width, int height);
+
+    private native void notifyFrameAvailable();
+
+    long nativeContext = 0;
+
+    static {
+        LibraryLoadUtils.loadLibrary("pag");
+        nativeInit();
+    }
+
 }

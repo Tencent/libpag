@@ -54,7 +54,7 @@ class VideoReader : public SequenceReader {
   int decoderTypeIndex = 0;
   VideoDecoder* videoDecoder = nullptr;
   VideoSample videoSample = {};
-  std::shared_ptr<VideoBuffer> lastBuffer = nullptr;
+  std::shared_ptr<tgfx::ImageBuffer> lastBuffer = nullptr;
   bool outputEndOfStream = false;
   bool inputEndOfStream = false;
   int64_t currentDecodedTime = INT64_MIN;

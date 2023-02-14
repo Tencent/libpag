@@ -12,7 +12,7 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicInteger;
 
 
-public class GPUDecoder {
+class GPUDecoder {
 
     private static final int SUCCESS = 0;
     private static final int TRY_AGAIN_LATER = -1;
@@ -40,11 +40,16 @@ public class GPUDecoder {
     private static final int DECODER_THREAD_MAX_COUNT = 10;
     private static final AtomicInteger decoderThreadCount = new AtomicInteger();
 
-    private static GPUDecoder Create(final VideoSurface videoSurface, final MediaFormat mediaFormat) {
-        if (videoSurface == null || decoderThreadCount.get() >= DECODER_THREAD_MAX_COUNT) {
+    private static GPUDecoder Create(final MediaFormat mediaFormat) {
+        int width = mediaFormat.getInteger(MediaFormat.KEY_WIDTH);
+        int height = mediaFormat.getInteger(MediaFormat.KEY_HEIGHT);
+        final VideoSurface videoSurface = VideoSurface.Make(width, height);
+        if (videoSurface == null) {
             return null;
         }
-        videoSurface.retain();
+        if (decoderThreadCount.get() >= DECODER_THREAD_MAX_COUNT) {
+            return null;
+        }
         decoderThreadCount.getAndIncrement();
         HandlerThread initHandlerThread = new HandlerThread("libpag_GPUDecoder_init_decoder");
         try {
@@ -65,7 +70,7 @@ public class GPUDecoder {
                 startTime = SystemClock.uptimeMillis();
                 try {
                     decoder = MediaCodec.createDecoderByType(mediaFormat.getString(MediaFormat.KEY_MIME));
-                    decoder.configure(mediaFormat, videoSurface.getOutputSurface(), null, 0);
+                    decoder.configure(mediaFormat, videoSurface.outputSurface, null, 0);
                     decoder.start();
                 } catch (Exception e) {
                     if (decoder != null) {
@@ -190,8 +195,7 @@ public class GPUDecoder {
     private int onEndOfStream() {
         int inputBufferIndex = dequeueInputBuffer();
         if (inputBufferIndex >= 0) {
-            return queueInputBuffer(inputBufferIndex, 0, 0, 0,
-                    MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+            return queueInputBuffer(inputBufferIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
         }
         return TRY_AGAIN_LATER;
     }
@@ -240,6 +244,10 @@ public class GPUDecoder {
             return success == SUCCESS;
         }
         return false;
+    }
+
+    private VideoSurface getVideoSurface() {
+        return videoSurface;
     }
 
     private boolean released = false;

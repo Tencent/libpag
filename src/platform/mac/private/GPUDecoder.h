@@ -43,7 +43,7 @@ class GPUDecoder : public VideoDecoder {
 
   int64_t presentationTime() override;
 
-  std::shared_ptr<VideoBuffer> onRenderFrame() override;
+  std::shared_ptr<tgfx::ImageBuffer> onRenderFrame() override;
 
  private:
   VTDecompressionSessionRef session = nullptr;

@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GPUDecoder.h"
-#include "VideoImage.h"
 #include "base/utils/USE.h"
+#include "tgfx/core/YUVBuffer.h"
 
 namespace pag {
 
@@ -315,10 +315,11 @@ int64_t GPUDecoder::presentationTime() {
   return outputFrame->frameTime;
 }
 
-std::shared_ptr<VideoBuffer> GPUDecoder::onRenderFrame() {
+std::shared_ptr<tgfx::ImageBuffer> GPUDecoder::onRenderFrame() {
   if (outputFrame == nullptr) {
     return nullptr;
   }
-  return VideoImage::MakeFrom(outputFrame->outputPixelBuffer, destinationColorSpace, colorRange);
+  return tgfx::YUVBuffer::MakeFrom(outputFrame->outputPixelBuffer, destinationColorSpace,
+                                   colorRange);
 }
-}
+}  // namespace pag
