@@ -31,6 +31,14 @@ export class NativeImage {
     });
   }
 
+  public static isSupportWebp() {
+    try {
+      return document.createElement('canvas').toDataURL('image/webp', 0.5).indexOf('data:image/webp') === 0;
+    } catch (err) {
+      return false;
+    }
+  }
+
   protected source: TexImageSource | OffscreenCanvas;
   protected reuse: boolean;
 

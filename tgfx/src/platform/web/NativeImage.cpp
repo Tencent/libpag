@@ -18,6 +18,7 @@
 
 #include "NativeImage.h"
 #include "NativeImageBuffer.h"
+#include "NativeImageInfo.h"
 #include "platform/NativeCodec.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Stream.h"
@@ -26,14 +27,6 @@ using namespace emscripten;
 
 namespace tgfx {
 std::shared_ptr<ImageCodec> NativeCodec::MakeCodec(const std::string& filePath) {
-  if (filePath.find("http://") == 0 || filePath.find("https://") == 0) {
-    auto nativeImageClass = val::module_property("NativeImage");
-    if (!nativeImageClass.as<bool>()) {
-      return nullptr;
-    }
-    auto nativeImage = nativeImageClass.call<val>("createFromPath", filePath).await();
-    return NativeImage::MakeFrom(nativeImage);
-  }
   auto imageStream = Stream::MakeFromFile(filePath);
   if (imageStream == nullptr || imageStream->size() <= 14) {
     return nullptr;
@@ -49,9 +42,15 @@ std::shared_ptr<ImageCodec> NativeCodec::MakeCodec(std::shared_ptr<Data> imageBy
   if (!nativeImageClass.as<bool>()) {
     return nullptr;
   }
+  auto imageInfo = GetNativeImageInfo(imageBytes);
+  if (!imageInfo) {
+    return nullptr;
+  }
   auto bytes =
       val(typed_memory_view(imageBytes->size(), static_cast<const uint8_t*>(imageBytes->data())));
-  auto nativeImage = nativeImageClass.call<val>("createFromBytes", bytes).await();
+  auto nativeImage =
+      nativeImageClass.call<val>("createFromBytes", bytes, imageInfo->width, imageInfo->height)
+          .await();
   return ImageCodec::MakeFrom(nativeImage);
 }
 
