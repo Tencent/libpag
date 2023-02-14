@@ -134,6 +134,7 @@ enum class TagCode {
   EditableIndices = 83,
   MaskBlockV2 = 84,
   GradientOverlayStyle = 85,
+  BrightnessContrastEffect = 86,
   EncryptedData = 89,
   Transform3D = 90,
   CameraOption = 91,
@@ -427,6 +428,7 @@ enum class EffectType {
   DisplacementMap,
   RadialBlur,
   Mosaic,
+  BrightnessContrast,
 };
 
 class PAG_API Effect {
@@ -798,6 +800,30 @@ class PAG_API MosaicEffect : public Effect {
   Property<uint16_t>* horizontalBlocks = nullptr;
   Property<uint16_t>* verticalBlocks = nullptr;  // spatial
   Property<bool>* sharpColors = nullptr;
+
+  RTTR_ENABLE(Effect)
+};
+
+class BrightnessContrastEffect : public Effect {
+ public:
+  ~BrightnessContrastEffect() override;
+
+  EffectType type() const override { return EffectType::BrightnessContrast; }
+
+  bool processVisibleAreaOnly() const override { return true; }
+
+  bool visibleAt(Frame layerFrame) const override;
+
+  void transformBounds(Rect* contentBounds, const Point& filterScale,
+                       Frame layerFrame) const override;
+
+  void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const override;
+
+  bool verify() const override;
+
+  Property<float>* brightness = nullptr;
+  Property<float>* contrast = nullptr;
+  Property<bool>* useOldVersion = nullptr;
 
   RTTR_ENABLE(Effect)
 };

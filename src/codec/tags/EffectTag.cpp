@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "EffectTag.h"
+#include "effects/BrightnessContrastEffect.h"
 #include "effects/BulgeEffect.h"
 #include "effects/CornerPinEffect.h"
 #include "effects/DisplacementMapEffect.h"
@@ -58,6 +59,9 @@ bool ReadEffect(DecodeStream* stream, TagCode code, Layer* layer) {
     case TagCode::MosaicEffect:
       effect = ReadTagBlock(stream, MosaicEffectTag);
       break;
+    case TagCode::BrightnessContrastEffect:
+      effect = ReadTagBlock(stream, BrightnessContrastEffectTag);
+      break;
     default:
       break;
   }
@@ -98,6 +102,9 @@ void WriteEffects(EncodeStream* stream, const std::vector<Effect*>& effects) {
         break;
       case EffectType::Mosaic:
         WriteTagBlock(stream, static_cast<MosaicEffect*>(effect), MosaicEffectTag);
+        break;
+      case EffectType::BrightnessContrast:
+        WriteTagBlock(stream, static_cast<BrightnessContrastEffect*>(effect), BrightnessContrastEffectTag);
         break;
       default:
         break;
