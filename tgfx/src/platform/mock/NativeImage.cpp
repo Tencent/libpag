@@ -27,7 +27,7 @@ std::shared_ptr<ImageCodec> NativeCodec::MakeCodec(std::shared_ptr<Data>) {
   return nullptr;
 }
 
-std::shared_ptr<ImageCodec> NativeCodec::MakeFrom(NativeImageRef) {
+std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(NativeImageRef) {
   return nullptr;
 }
 }  // namespace tgfx
