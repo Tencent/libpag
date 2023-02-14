@@ -52,14 +52,10 @@ std::shared_ptr<ImageCodec> NativeCodec::MakeCodec(std::shared_ptr<Data> imageBy
   auto bytes =
       val(typed_memory_view(imageBytes->size(), static_cast<const uint8_t*>(imageBytes->data())));
   auto nativeImage = nativeImageClass.call<val>("createFromBytes", bytes).await();
-  return NativeImage::MakeFrom(nativeImage);
+  return ImageCodec::MakeFrom(nativeImage);
 }
 
-std::shared_ptr<ImageCodec> NativeCodec::MakeFrom(void* /*nativeImage*/) {
-  return nullptr;
-}
-
-std::shared_ptr<NativeImage> NativeImage::MakeFrom(emscripten::val nativeImage) {
+std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(NativeImageRef nativeImage) {
   if (!nativeImage.as<bool>()) {
     return nullptr;
   }

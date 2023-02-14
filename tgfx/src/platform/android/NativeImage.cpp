@@ -203,20 +203,19 @@ static ImageInfo GetImageInfo(JNIEnv* env, jobject bitmap) {
                          bitmapInfo.stride);
 }
 
-std::shared_ptr<ImageCodec> NativeCodec::MakeFrom(void* nativeImage) {
+std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(NativeImageRef nativeImage) {
   auto env = CurrentJNIEnv();
   if (env == nullptr) {
     return nullptr;
   }
-  auto bitmap = reinterpret_cast<jobject>(nativeImage);
-  auto info = GetImageInfo(env, bitmap);
+  auto info = GetImageInfo(env, nativeImage);
   if (info.isEmpty()) {
     env->ExceptionClear();
     return nullptr;
   }
   auto image = std::unique_ptr<NativeImage>(
       new NativeImage(info.width(), info.height(), Orientation::TopLeft));
-  image->bitmap.reset(env, bitmap);
+  image->bitmap.reset(env, nativeImage);
   return image;
 }
 

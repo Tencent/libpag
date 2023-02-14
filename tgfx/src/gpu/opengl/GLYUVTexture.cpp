@@ -22,27 +22,7 @@
 #include "gpu/Gpu.h"
 
 namespace tgfx {
-#define I420_PLANE_COUNT 3
-#define NV12_PLANE_COUNT 2
-
-struct YUVConfig {
-  YUVConfig(YUVColorSpace colorSpace, YUVColorRange colorRange, int width, int height,
-            int planeCount)
-      : colorSpace(colorSpace),
-        colorRange(colorRange),
-        width(width),
-        height(height),
-        planeCount(planeCount) {
-  }
-  YUVColorSpace colorSpace;
-  YUVColorRange colorRange;
-  int width = 0;
-  int height = 0;
-  uint8_t* pixelsPlane[3]{};
-  int rowBytes[3]{};
-  PixelFormat formats[3]{};
-  int planeCount = 0;
-};
+static constexpr int YUV_SIZE_FACTORS[] = {0, 1, 1};
 
 class GLI420Texture : public GLYUVTexture {
  public:
@@ -53,8 +33,8 @@ class GLI420Texture : public GLYUVTexture {
     recycleKey->write(static_cast<uint32_t>(height));
   }
 
-  GLI420Texture(YUVColorSpace colorSpace, YUVColorRange colorRange, int width, int height)
-      : GLYUVTexture(colorSpace, colorRange, width, height) {
+  GLI420Texture(int width, int height, YUVColorSpace colorSpace, YUVColorRange colorRange)
+      : GLYUVTexture(width, height, colorSpace, colorRange) {
   }
 
   YUVPixelFormat pixelFormat() const override {
@@ -75,8 +55,8 @@ class GLNV12Texture : public GLYUVTexture {
     recycleKey->write(static_cast<uint32_t>(width));
     recycleKey->write(static_cast<uint32_t>(height));
   }
-  GLNV12Texture(YUVColorSpace colorSpace, YUVColorRange colorRange, int width, int height)
-      : GLYUVTexture(colorSpace, colorRange, width, height) {
+  GLNV12Texture(int width, int height, YUVColorSpace colorSpace, YUVColorRange colorRange)
+      : GLYUVTexture(width, height, colorSpace, colorRange) {
   }
 
   YUVPixelFormat pixelFormat() const override {
@@ -89,13 +69,14 @@ class GLNV12Texture : public GLYUVTexture {
   }
 };
 
-static std::vector<GLSampler> MakeTexturePlanes(Context* context, const YUVConfig& yuvConfig) {
+static std::vector<GLSampler> MakeTexturePlanes(Context* context, const YUVData* yuvData,
+                                                const PixelFormat* formats) {
   std::vector<GLSampler> texturePlanes{};
-  static constexpr int factor[] = {0, 1, 1};
-  for (int index = 0; index < yuvConfig.planeCount; index++) {
-    auto w = yuvConfig.width >> factor[index];
-    auto h = yuvConfig.height >> factor[index];
-    auto sampler = context->gpu()->createTexture(w, h, yuvConfig.formats[index], 1);
+  auto count = static_cast<int>(yuvData->planeCount());
+  for (int index = 0; index < count; index++) {
+    auto w = yuvData->width() >> YUV_SIZE_FACTORS[index];
+    auto h = yuvData->height() >> YUV_SIZE_FACTORS[index];
+    auto sampler = context->gpu()->createTexture(w, h, formats[index], 1);
     if (sampler == nullptr) {
       for (auto& glSampler : texturePlanes) {
         context->gpu()->deleteTexture(&glSampler);
@@ -107,80 +88,74 @@ static std::vector<GLSampler> MakeTexturePlanes(Context* context, const YUVConfi
   return texturePlanes;
 }
 
-static void SubmitYUVTexture(Context* context, const YUVConfig& yuvConfig,
+static void SubmitYUVTexture(Context* context, const YUVData* yuvData, const PixelFormat* formats,
                              const GLSampler yuvTextures[]) {
-  static constexpr int factor[] = {0, 1, 1};
-  for (int index = 0; index < yuvConfig.planeCount; index++) {
+  auto count = static_cast<int>(yuvData->planeCount());
+  for (int index = 0; index < count; index++) {
     const auto& sampler = yuvTextures[index];
-    auto w = yuvConfig.width >> factor[index];
-    auto h = yuvConfig.height >> factor[index];
-    auto rowBytes = yuvConfig.rowBytes[index];
-    auto pixels = yuvConfig.pixelsPlane[index];
-    auto format = yuvConfig.formats[index];
+    auto w = yuvData->width() >> YUV_SIZE_FACTORS[index];
+    auto h = yuvData->height() >> YUV_SIZE_FACTORS[index];
+    auto pixels = yuvData->getBaseAddressAt(index);
+    auto rowBytes = yuvData->getRowBytesAt(index);
+    auto format = formats[index];
     context->gpu()->writePixels(&sampler, Rect::MakeWH(w, h), pixels, rowBytes, format);
   }
 }
 
-std::shared_ptr<YUVTexture> YUVTexture::MakeI420(Context* context, YUVColorSpace colorSpace,
-                                                 YUVColorRange colorRange, int width, int height,
-                                                 uint8_t* pixelsPlane[3], const int lineSize[3]) {
-  YUVConfig yuvConfig = YUVConfig(colorSpace, colorRange, width, height, I420_PLANE_COUNT);
-  for (int i = 0; i < 3; i++) {
-    yuvConfig.pixelsPlane[i] = pixelsPlane[i];
-    yuvConfig.rowBytes[i] = lineSize[i];
-    yuvConfig.formats[i] = PixelFormat::GRAY_8;
+std::shared_ptr<YUVTexture> YUVTexture::MakeI420(Context* context, const YUVData* yuvData,
+                                                 YUVColorSpace colorSpace,
+                                                 YUVColorRange colorRange) {
+  if (context == nullptr || yuvData == nullptr ||
+      yuvData->planeCount() != YUVData::I420_PLANE_COUNT) {
+    return nullptr;
   }
-
+  PixelFormat yuvFormats[YUVData::I420_PLANE_COUNT] = {PixelFormat::GRAY_8, PixelFormat::GRAY_8,
+                                                       PixelFormat::GRAY_8};
   BytesKey recycleKey = {};
-  GLI420Texture::ComputeRecycleKey(&recycleKey, width, height);
+  GLI420Texture::ComputeRecycleKey(&recycleKey, yuvData->width(), yuvData->height());
   auto texture =
       std::static_pointer_cast<GLYUVTexture>(context->resourceCache()->getRecycled(recycleKey));
   if (texture == nullptr) {
-    auto texturePlanes = MakeTexturePlanes(context, yuvConfig);
+    auto texturePlanes = MakeTexturePlanes(context, yuvData, yuvFormats);
     if (texturePlanes.empty()) {
       return nullptr;
     }
-    texture = std::static_pointer_cast<GLYUVTexture>(
-        Resource::Wrap(context, new GLI420Texture(yuvConfig.colorSpace, yuvConfig.colorRange,
-                                                  yuvConfig.width, yuvConfig.height)));
+    texture = std::static_pointer_cast<GLYUVTexture>(Resource::Wrap(
+        context, new GLI420Texture(yuvData->width(), yuvData->height(), colorSpace, colorRange)));
     texture->samplers = texturePlanes;
   }
-  SubmitYUVTexture(context, yuvConfig, &texture->samplers[0]);
+  SubmitYUVTexture(context, yuvData, yuvFormats, &texture->samplers[0]);
   return texture;
 }
 
-std::shared_ptr<YUVTexture> YUVTexture::MakeNV12(Context* context, YUVColorSpace colorSpace,
-                                                 YUVColorRange colorRange, int width, int height,
-                                                 uint8_t* pixelsPlane[2], const int lineSize[2]) {
-  YUVConfig yuvConfig = YUVConfig(colorSpace, colorRange, width, height, NV12_PLANE_COUNT);
-  for (int i = 0; i < 2; i++) {
-    yuvConfig.pixelsPlane[i] = pixelsPlane[i];
-    yuvConfig.rowBytes[i] = lineSize[i];
+std::shared_ptr<YUVTexture> YUVTexture::MakeNV12(Context* context, const YUVData* yuvData,
+                                                 YUVColorSpace colorSpace,
+                                                 YUVColorRange colorRange) {
+  if (context == nullptr || yuvData == nullptr ||
+      yuvData->planeCount() != YUVData::NV12_PLANE_COUNT) {
+    return nullptr;
   }
-  yuvConfig.formats[0] = PixelFormat::GRAY_8;
-  yuvConfig.formats[1] = PixelFormat::RG_88;
-
+  PixelFormat yuvFormats[YUVData::NV12_PLANE_COUNT] = {PixelFormat::GRAY_8, PixelFormat::RG_88};
   BytesKey recycleKey = {};
-  GLNV12Texture::ComputeRecycleKey(&recycleKey, width, height);
+  GLNV12Texture::ComputeRecycleKey(&recycleKey, yuvData->width(), yuvData->height());
   auto texture =
       std::static_pointer_cast<GLYUVTexture>(context->resourceCache()->getRecycled(recycleKey));
   if (texture == nullptr) {
-    auto texturePlanes = MakeTexturePlanes(context, yuvConfig);
+    auto texturePlanes = MakeTexturePlanes(context, yuvData, yuvFormats);
     if (texturePlanes.empty()) {
       return nullptr;
     }
-    texture = std::static_pointer_cast<GLYUVTexture>(
-        Resource::Wrap(context, new GLNV12Texture(yuvConfig.colorSpace, yuvConfig.colorRange,
-                                                  yuvConfig.width, yuvConfig.height)));
+    texture = std::static_pointer_cast<GLYUVTexture>(Resource::Wrap(
+        context, new GLNV12Texture(yuvData->width(), yuvData->height(), colorSpace, colorRange)));
     texture->samplers = texturePlanes;
   }
-  SubmitYUVTexture(context, yuvConfig, &texture->samplers[0]);
+  SubmitYUVTexture(context, yuvData, yuvFormats, &texture->samplers[0]);
   return texture;
 }
 
-GLYUVTexture::GLYUVTexture(YUVColorSpace colorSpace, YUVColorRange colorRange, int width,
-                           int height)
-    : YUVTexture(colorSpace, colorRange, width, height) {
+GLYUVTexture::GLYUVTexture(int width, int height, YUVColorSpace colorSpace,
+                           YUVColorRange colorRange)
+    : YUVTexture(width, height, colorSpace, colorRange) {
 }
 
 Point GLYUVTexture::getTextureCoord(float x, float y) const {

@@ -19,26 +19,17 @@
 #include "I420Buffer.h"
 
 namespace pag {
-#define I420_PLANE_COUNT 3
-
-I420Buffer::I420Buffer(int width, int height, uint8_t** data, const int* lineSize,
-                       tgfx::YUVColorSpace colorSpace, tgfx::YUVColorRange colorRange)
-    : VideoBuffer(width, height), colorSpace(colorSpace), colorRange(colorRange) {
-  for (int i = 0; i < I420_PLANE_COUNT; i++) {
-    pixelsPlane[i] = data[i];
-    rowBytesPlane[i] = lineSize[i];
-  }
+I420Buffer::I420Buffer(std::shared_ptr<tgfx::YUVData> yuvData, tgfx::YUVColorSpace colorSpace,
+                       tgfx::YUVColorRange colorRange)
+    : VideoBuffer(yuvData->width(), yuvData->height()), yuvData(std::move(yuvData)),
+      colorSpace(colorSpace), colorRange(colorRange) {
 }
 
 size_t I420Buffer::planeCount() const {
-  return I420_PLANE_COUNT;
+  return tgfx::YUVData::I420_PLANE_COUNT;
 }
 
 std::shared_ptr<tgfx::Texture> I420Buffer::onMakeTexture(tgfx::Context* context, bool) const {
-  if (context == nullptr) {
-    return nullptr;
-  }
-  return tgfx::YUVTexture::MakeI420(context, colorSpace, colorRange, width(), height(),
-                                    const_cast<uint8_t**>(pixelsPlane), rowBytesPlane);
+  return tgfx::YUVTexture::MakeI420(context, yuvData.get(), colorSpace, colorRange);
 }
 }  // namespace pag

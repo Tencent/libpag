@@ -19,28 +19,57 @@
 #include "SoftwareDecoderWrapper.h"
 #include "I420Buffer.h"
 #include "platform/Platform.h"
+#include "tgfx/core/YUVData.h"
 
 namespace pag {
-class SoftwareI420Buffer : public I420Buffer {
+class SoftwareI420Data : public tgfx::YUVData {
  public:
-  static std::shared_ptr<SoftwareI420Buffer> Make(
-      int width, int height, uint8_t* data[3], const int lineSize[3],
-      tgfx::YUVColorSpace colorSpace, tgfx::YUVColorRange colorRange,
-      std::shared_ptr<SoftwareDecoder> softwareDecoder) {
-    auto buffer = new SoftwareI420Buffer(width, height, data, lineSize, colorSpace, colorRange,
-                                         std::move(softwareDecoder));
-    return std::shared_ptr<SoftwareI420Buffer>(buffer);
+  static std::shared_ptr<YUVData> Make(int width, int height, uint8_t* buffer[3],
+                                       const int lineSize[3],
+                                       std::shared_ptr<SoftwareDecoder> softwareDecoder) {
+    auto data = new SoftwareI420Data(width, height, buffer, lineSize, std::move(softwareDecoder));
+    return std::shared_ptr<YUVData>(data);
   }
 
  private:
-  // hold a reference to software decoder in case it is released before us.
+  int width() const override {
+    return _width;
+  }
+
+  int height() const override {
+    return _height;
+  }
+
+  size_t planeCount() const override {
+    return data.size();
+  }
+
+  const void* getBaseAddressAt(int planeIndex) const override {
+    return data[planeIndex];
+  }
+
+  size_t getRowBytesAt(int planeIndex) const override {
+    return rowBytes[planeIndex];
+  }
+
+ private:
+  int _width = 0;
+  int _height = 0;
+  std::vector<const void*> data = {};
+  std::vector<size_t> rowBytes = {};
+  // hold a reference to the software decoder to keep the yuv data alive.
   std::shared_ptr<SoftwareDecoder> softwareDecoder = nullptr;
 
-  SoftwareI420Buffer(int width, int height, uint8_t* data[3], const int lineSize[3],
-                     tgfx::YUVColorSpace colorSpace, tgfx::YUVColorRange colorRange,
-                     std::shared_ptr<SoftwareDecoder> softwareDecoder)
-      : I420Buffer(width, height, data, lineSize, colorSpace, colorRange),
-        softwareDecoder(std::move(softwareDecoder)) {
+  SoftwareI420Data(int width, int height, uint8_t* buffer[3], const int lineSize[3],
+                   std::shared_ptr<SoftwareDecoder> softwareDecoder)
+      : _width(width), _height(height), softwareDecoder(std::move(softwareDecoder)) {
+    auto planeCount = static_cast<int>(tgfx::YUVData::I420_PLANE_COUNT);
+    data.reserve(planeCount);
+    rowBytes.reserve(planeCount);
+    for (int i = 0; i < planeCount; i++) {
+      data.push_back(buffer[i]);
+      rowBytes.push_back(lineSize[i]);
+    }
   }
 };
 
@@ -168,9 +197,10 @@ std::shared_ptr<VideoBuffer> SoftwareDecoderWrapper::onRenderFrame() {
   if (frame == nullptr) {
     return nullptr;
   }
-  return SoftwareI420Buffer::Make(videoFormat.width, videoFormat.height, frame->data,
-                                  frame->lineSize, videoFormat.colorSpace, videoFormat.colorRange,
-                                  softwareDecoder);
+  auto yuvData = SoftwareI420Data::Make(videoFormat.width, videoFormat.height, frame->data,
+                                        frame->lineSize, softwareDecoder);
+  return std::make_shared<I420Buffer>(std::move(yuvData), videoFormat.colorSpace,
+                                      videoFormat.colorRange);
 }
 
 int64_t SoftwareDecoderWrapper::presentationTime() {

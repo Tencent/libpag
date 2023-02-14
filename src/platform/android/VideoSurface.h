@@ -24,7 +24,7 @@
 namespace pag {
 class OESTexture : public tgfx::GLTexture {
  public:
-  OESTexture(const tgfx::GLSampler& sampler, int width, int height, bool hasAlpha);
+  OESTexture(const tgfx::GLSampler& sampler, int width, int height);
 
   tgfx::Point getTextureCoord(float x, float y) const override;
 
@@ -33,19 +33,12 @@ class OESTexture : public tgfx::GLTexture {
  private:
   void setTextureSize(int width, int height);
 
-  void computeTransform();
-
   void onReleaseGPU() override;
 
   int textureWidth = 0;
   int textureHeight = 0;
-  bool hasAlpha = false;
   // 持有 Java 的 Surface，确保即使 GPUDecoder 提前释放也能正常被使用。
   Global<jobject> attachedSurface;
-  float sx = 1.0f;
-  float sy = 1.0f;
-  float tx = 0.0f;
-  float ty = 0.0f;
 
   friend class VideoSurface;
 };
@@ -54,7 +47,7 @@ class VideoSurface {
  public:
   static void InitJNI(JNIEnv* env, const std::string& className);
 
-  static std::shared_ptr<VideoSurface> Make(int width, int height, bool hasAlpha = false);
+  static std::shared_ptr<VideoSurface> Make(int width, int height);
 
   ~VideoSurface();
 
@@ -68,13 +61,12 @@ class VideoSurface {
   Global<jobject> videoSurface;
   int width = 0;
   int height = 0;
-  bool hasAlpha = false;
   uint32_t deviceID = 0;
   tgfx::GLSampler glInfo = {};
   std::shared_ptr<OESTexture> oesTexture = nullptr;
   mutable std::atomic_bool hasPendingTextureImage = {false};
 
-  VideoSurface(JNIEnv* env, jobject surface, int width, int height, bool hasAlpha);
+  VideoSurface(JNIEnv* env, jobject surface, int width, int height);
   bool attachToContext(JNIEnv* env, tgfx::Context* context);
   bool updateTexImage(JNIEnv* env);
 };

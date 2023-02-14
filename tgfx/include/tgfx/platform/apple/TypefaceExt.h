@@ -22,14 +22,22 @@
 #include "tgfx/core/Typeface.h"
 
 namespace tgfx {
-/**
- * Creates a typeface for the specified CTFontRef.
- */
-extern std::shared_ptr<Typeface> MakeTypefaceFromCTFont(const void* ctFont);
 
 /**
- * Returns the platform-specific CTFontRef handle for a given Typeface. Note that the returned
- * CTFontRef gets released when the source Typeface is destroyed.
+ * TypefaceExt provides convenience functions to create typefaces from platform-specific CTFontRef
+ * handles and access the CTFontRef handle in a Typeface instance.
  */
-extern const void* TypefaceGetCTFontRef(const Typeface* face);
+class TypefaceExt {
+ public:
+  /**
+   * Creates a typeface for the specified CTFontRef. Returns nullptr if the ctFont is nil.
+   */
+  static std::shared_ptr<Typeface> MakeFromCTFont(CTFontRef ctFont);
+
+  /**
+   * Returns the platform-specific CTFontRef handle for a given Typeface. Note that the returned
+   * CTFontRef gets released when the source Typeface is destroyed.
+   */
+  static CTFontRef GetCTFont(const Typeface* typeface);
+};
 }  // namespace tgfx

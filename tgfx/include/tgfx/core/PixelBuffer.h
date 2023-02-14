@@ -20,6 +20,7 @@
 
 #include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/ImageInfo.h"
+#include "tgfx/platform/HardwareBuffer.h"
 
 namespace tgfx {
 /**
@@ -41,12 +42,12 @@ class PixelBuffer : public ImageBuffer {
                                            bool tryHardware = true);
 
   /**
-   * Creates a new PixelBuffer object from a hardware buffer. The type of hardwareBuffer should be
-   * either AHardwareBuffer* on android platform or CVPixelBufferRef on apple platform. Returns
-   * nullptr if current platform has no hardware buffer support. The returned PixelBuffer takes a
-   * reference on the buffer.
+   * Creates a new PixelBuffer object from a platform-specific hardware buffer. The hardwareBuffer
+   * could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on the apple
+   * platform. Returns nullptr if the current platform has no hardware buffer support. The returned
+   * PixelBuffer takes a reference on the hardwareBuffer.
    */
-  static std::shared_ptr<PixelBuffer> MakeFrom(void* hardwareBuffer);
+  static std::shared_ptr<PixelBuffer> MakeFrom(HardwareBufferRef hardwareBuffer);
 
   int width() const override {
     return _info.width();

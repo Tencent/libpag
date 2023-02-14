@@ -24,6 +24,8 @@
 using namespace emscripten;
 
 namespace pag {
+static constexpr int ANDROID_ALIGNMENT = 16;
+
 std::shared_ptr<WebVideoTexture> WebVideoTexture::Make(tgfx::Context* context, int width,
                                                        int height, bool isAndroidMiniprogram) {
   tgfx::GLSampler sampler = {};
@@ -40,30 +42,26 @@ std::shared_ptr<WebVideoTexture> WebVideoTexture::Make(tgfx::Context* context, i
   gl->texParameteri(sampler.target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   gl->texParameteri(sampler.target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   gl->texImage2D(sampler.target, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-  return tgfx::Resource::Wrap(
-      context, new WebVideoTexture(sampler, width, height, tgfx::ImageOrigin::TopLeft,
-                                   isAndroidMiniprogram));
+
+  auto texture = tgfx::Resource::Wrap(
+      context, new WebVideoTexture(sampler, width, height, tgfx::ImageOrigin::TopLeft));
+  if (isAndroidMiniprogram) {
+    // https://stackoverflow.com/questions/28291204/something-about-stagefright-codec-input-format-in-android
+    // Video decoder will align to multiples of 16 on the Android WeChat mini-program.
+    texture->textureWidth += ANDROID_ALIGNMENT - width % ANDROID_ALIGNMENT;
+    texture->textureHeight += ANDROID_ALIGNMENT - height % ANDROID_ALIGNMENT;
+  }
+  return texture;
 }
 
 WebVideoTexture::WebVideoTexture(const tgfx::GLSampler& glSampler, int width, int height,
-                                 tgfx::ImageOrigin origin, bool isAndroidMiniprogram)
-    : GLTexture(width, height, origin), isAndroidMiniprogram(isAndroidMiniprogram) {
+                                 tgfx::ImageOrigin origin)
+    : GLTexture(width, height, origin), textureWidth(width), textureHeight(height) {
   sampler = glSampler;
 }
 
 tgfx::Point WebVideoTexture::getTextureCoord(float x, float y) const {
-  // https://stackoverflow.com/questions/28291204/something-about-stagefright-codec-input-format-in-android
-  // Video decoder will align to multiples of 16 on the Android WeChat mini-program.
-  if (isAndroidMiniprogram && width() &&
-      ((width() % androidAlignment != 0) || (height() % androidAlignment != 0))) {
-    return {
-        x / (ceil(static_cast<float>(width()) / static_cast<float>(androidAlignment)) *
-             static_cast<float>(androidAlignment)),
-        y / (ceil(static_cast<float>(height()) / static_cast<float>(androidAlignment)) *
-             static_cast<float>(androidAlignment)),
-    };
-  }
-  return {x / static_cast<float>(width()), y / static_cast<float>(height())};
+  return {x / static_cast<float>(textureWidth), y / static_cast<float>(textureHeight)};
 }
 
 size_t WebVideoTexture::memoryUsage() const {

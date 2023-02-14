@@ -28,7 +28,7 @@ class CGTypeface : public Typeface {
 
   ~CGTypeface() override;
 
-  CTFontRef getCTFontRef() const {
+  CTFontRef getCTFont() const {
     return ctFont;
   }
 

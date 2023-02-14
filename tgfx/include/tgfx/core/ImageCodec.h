@@ -23,6 +23,7 @@
 #include "tgfx/core/ImageGenerator.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Orientation.h"
+#include "tgfx/platform/NativeImage.h"
 
 namespace tgfx {
 
@@ -46,12 +47,12 @@ class ImageCodec : public ImageGenerator {
   static std::shared_ptr<ImageCodec> MakeFrom(std::shared_ptr<Data> imageBytes);
 
   /**
-   * Creates a new ImageCodec object from a native image. The type of nativeImage should be either
-   * a jobject that represents a java Bitmap on android platform or a CGImageRef on the apple
-   * platform. Returns nullptr if current platform has no native image support. The returned
+   * Creates a new ImageCodec object from a platform-specific image. The nativeImage could be a
+   * jobject that represents a java Bitmap on the android platform or a CGImageRef on the apple
+   * platform. Returns nullptr if the current platform has no native image support. The returned
    * ImageCodec object takes a reference on the nativeImage.
    */
-  static std::shared_ptr<ImageCodec> MakeFrom(void* nativeImage);
+  static std::shared_ptr<ImageCodec> MakeFrom(NativeImageRef nativeImage);
 
   /**
    * Returns the orientation of target image.

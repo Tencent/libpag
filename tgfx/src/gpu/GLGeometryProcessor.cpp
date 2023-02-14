@@ -25,19 +25,7 @@ void GLGeometryProcessor::setTransformDataHelper(const Matrix& localMatrix,
   int i = 0;
   while (const CoordTransform* coordTransform = transformIter->next()) {
     Matrix combined = Matrix::I();
-    combined.setConcat(coordTransform->matrix, localMatrix);
-    if (auto texture = coordTransform->texture) {
-      // normalize
-      auto scale = texture->getTextureCoord(1, 1) - texture->getTextureCoord(0, 0);
-      auto translate = texture->getTextureCoord(0, 0);
-      combined.postScale(scale.x, scale.y);
-      combined.postTranslate(translate.x, translate.y);
-      if (texture->origin() == ImageOrigin::BottomLeft) {
-        combined.postScale(1, -1);
-        translate = texture->getTextureCoord(0, static_cast<float>(texture->height()));
-        combined.postTranslate(translate.x, translate.y);
-      }
-    }
+    combined.setConcat(coordTransform->getTotalMatrix(), localMatrix);
     auto& uniform = installedTransforms[i];
     if (!uniform.updated || uniform.currentMatrix != combined) {
       uniform.updated = true;

@@ -23,8 +23,8 @@
 
 namespace tgfx {
 /**
- * Data holds an immutable data buffer. Not only is the data immutable, but the actual ptr that is
- * returned (by data() or bytes()) is guaranteed to always be the same for the life of this
+ * Data holds an immutable data buffer. Not only is the Data immutable, but the actual pointer
+ * that is returned by data() or bytes() is guaranteed to always be the same for the life of this
  * instance.
  */
 class Data {
@@ -40,8 +40,8 @@ class Data {
   static std::shared_ptr<Data> MakeWithCopy(const void* data, size_t length);
 
   /**
-   *  Call this when the data parameter is already const and will outlive the lifetime of the
-   *  Data. Suitable for with const globals.
+   * Call this when the data parameter is already const and will outlive the lifetime of the Data.
+   * Suitable for with const globals.
    */
   static std::shared_ptr<Data> MakeWithoutCopy(const void* data, size_t length);
 

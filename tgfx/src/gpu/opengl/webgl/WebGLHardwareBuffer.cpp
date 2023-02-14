@@ -24,15 +24,16 @@ std::shared_ptr<PixelBuffer> PixelBuffer::MakeHardwareBuffer(int, int, bool) {
   return nullptr;
 }
 
-std::shared_ptr<PixelBuffer> PixelBuffer::MakeFrom(void*) {
+std::shared_ptr<PixelBuffer> PixelBuffer::MakeFrom(HardwareBufferRef) {
   return nullptr;
 }
 
-std::shared_ptr<Texture> Texture::MakeFrom(Context*, void*) {
+std::shared_ptr<Texture> Texture::MakeFrom(Context*, HardwareBufferRef) {
   return nullptr;
 }
 
-std::shared_ptr<YUVTexture> YUVTexture::MakeFrom(Context*, YUVColorSpace, YUVColorRange, void*) {
+std::shared_ptr<YUVTexture> YUVTexture::MakeFrom(Context*, HardwareBufferRef, YUVColorSpace,
+                                                 YUVColorRange) {
   return nullptr;
 }
 }  // namespace tgfx

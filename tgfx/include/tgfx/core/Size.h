@@ -22,6 +22,68 @@
 
 namespace tgfx {
 /**
+ * ISize holds two 32-bit integer dimensions.
+ */
+struct ISize {
+  /**
+   * Span on the x-axis.
+   */
+  int width;
+
+  /**
+   * Span on the y-axis.
+   */
+  int height;
+
+  static ISize Make(int w, int h) {
+    return {w, h};
+  }
+
+  static ISize MakeEmpty() {
+    return {0, 0};
+  }
+
+  void set(int w, int h) {
+    *this = ISize{w, h};
+  }
+
+  /**
+   * Returns true if width == 0 && height == 0
+   */
+  bool isZero() const {
+    return 0 == width && 0 == height;
+  }
+
+  /**
+   * Returns true if either width or height are <= 0
+   */
+  bool isEmpty() const {
+    return width <= 0 || height <= 0;
+  }
+
+  /**
+   * Set the width and height to 0.
+   */
+  void setEmpty() {
+    *this = ISize{0, 0};
+  }
+
+  /**
+   * Returns true if a is equivalent to b.
+   */
+  friend bool operator==(const ISize& a, const ISize& b) {
+    return a.width == b.width && a.height == b.height;
+  }
+
+  /**
+   * Returns true if a is not equivalent to b.
+   */
+  friend bool operator!=(const ISize& a, const ISize& b) {
+    return a.width != b.width || a.height != b.height;
+  }
+};
+
+/**
  * Size holds two 32-bit floating dimensions.
  */
 struct Size {
@@ -37,6 +99,14 @@ struct Size {
 
   static Size Make(float w, float h) {
     return {w, h};
+  }
+
+  static Size Make(const ISize& src) {
+    return {static_cast<float>(src.width), static_cast<float>(src.height)};
+  }
+
+  Size& operator=(const ISize& src) {
+    return *this = Size{static_cast<float>(src.width), static_cast<float>(src.height)};
   }
 
   static Size MakeEmpty() {
@@ -69,27 +139,24 @@ struct Size {
   }
 
   /**
-   * Sets Size by rounding of width and height.
+   * Returns a ISize by rounding of width and height.
    */
-  void round() {
-    width = roundf(width);
-    height = roundf(height);
+  ISize toRound() {
+    return {static_cast<int>(roundf(width)), static_cast<int>(roundf(height))};
   }
 
   /**
-   * Sets Size by ceiling of width and height.
+   * Returns a ISize by ceiling of width and height.
    */
-  void ceil() {
-    width = ceilf(width);
-    height = ceilf(height);
+  ISize toCeil() {
+    return {static_cast<int>(ceilf(width)), static_cast<int>(ceilf(height))};
   }
 
   /**
-   * Sets Size by flooring of width and height.
+   * Returns a ISize by flooring of width and height.
    */
-  void floor() {
-    width = floorf(width);
-    height = floorf(height);
+  ISize toFloor() {
+    return {static_cast<int>(floorf(width)), static_cast<int>(floorf(height))};
   }
 
   /**

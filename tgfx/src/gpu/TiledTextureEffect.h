@@ -82,6 +82,6 @@ class TiledTextureEffect : public FragmentProcessor {
   ShaderMode shaderModeY;
   CoordTransform coordTransform;
 
-  friend class GLTextureEffect;
+  friend class GLTiledTextureEffect;
 };
 }  // namespace tgfx

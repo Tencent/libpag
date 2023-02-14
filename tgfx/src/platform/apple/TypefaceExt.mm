@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,22 +16,29 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "tgfx/platform/apple/TypefaceExt.h"
+#include "core/utils/USE.h"
 
-#include <optional>
-#include "gpu/GLFragmentProcessor.h"
+#ifndef TGFX_USE_FREETYPE
+#include "core/vectors/coregraphics/CGTypeface.h"
+#endif
 
 namespace tgfx {
-class GLRGBAAATextureEffect : public GLFragmentProcessor {
- public:
-  void emitCode(EmitArgs& args) override;
+std::shared_ptr<Typeface> TypefaceExt::MakeFromCTFont(CTFontRef ctFont) {
+#ifdef TGFX_USE_FREETYPE
+  USE(ctFont);
+  return nullptr;
+#else
+  return CGTypeface::Make(static_cast<CTFontRef>(ctFont));
+#endif
+}
 
- private:
-  void onSetData(const ProgramDataManager& programDataManager,
-                 const FragmentProcessor& fragmentProcessor) override;
-
-  UniformHandle alphaStartUniform;
-
-  std::optional<Point> alphaStartPrev;
-};
+CTFontRef TypefaceExt::GetCTFont(const Typeface* typeface) {
+#ifdef TGFX_USE_FREETYPE
+  USE(typeface);
+  return nullptr;
+#else
+  return typeface ? static_cast<const CGTypeface*>(typeface)->getCTFont() : nullptr;
+#endif
+}
 }  // namespace tgfx

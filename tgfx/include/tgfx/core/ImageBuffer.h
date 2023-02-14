@@ -23,6 +23,7 @@
 namespace tgfx {
 /**
  * ImageBuffer describes a two dimensional array of pixels which is optimized for creating textures.
+ * ImageBuffer is immutable and safe across threads.
  */
 class ImageBuffer {
  public:

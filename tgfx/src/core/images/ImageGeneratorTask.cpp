@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,37 +16,35 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "AsyncImageBuffer.h"
+#include "ImageGeneratorTask.h"
 
 namespace tgfx {
-std::shared_ptr<ImageBuffer> AsyncImageBuffer::MakeFrom(std::shared_ptr<ImageGenerator> generator,
-                                                        bool tryHardware) {
+std::shared_ptr<ImageGeneratorTask> ImageGeneratorTask::MakeFrom(
+    std::shared_ptr<ImageGenerator> generator, bool tryHardware) {
   if (generator == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<ImageBuffer>(new AsyncImageBuffer(std::move(generator), tryHardware));
+  return std::shared_ptr<ImageGeneratorTask>(
+      new ImageGeneratorTask(std::move(generator), tryHardware));
 }
 
-AsyncImageBuffer::AsyncImageBuffer(std::shared_ptr<ImageGenerator> generator, bool tryHardware)
-    : generator(std::move(generator)), tryHardware(tryHardware) {
+ImageGeneratorTask::ImageGeneratorTask(std::shared_ptr<ImageGenerator> generator, bool tryHardware)
+    : imageGenerator(std::move(generator)), tryHardware(tryHardware) {
   task = Task::Make(this);
   task->run();
 }
 
-AsyncImageBuffer::~AsyncImageBuffer() {
+ImageGeneratorTask::~ImageGeneratorTask() {
   // Must cancel the task, otherwise, the task may access wild pointers.
   task = nullptr;
 }
 
-std::shared_ptr<Texture> AsyncImageBuffer::onMakeTexture(Context* context, bool mipMapped) const {
+std::shared_ptr<ImageBuffer> ImageGeneratorTask::getBuffer() const {
   task->wait();
-  if (imageBuffer == nullptr) {
-    return nullptr;
-  }
-  return imageBuffer->makeTexture(context, mipMapped);
+  return imageBuffer;
 }
 
-void AsyncImageBuffer::execute() {
-  imageBuffer = generator->makeBuffer(tryHardware);
+void ImageGeneratorTask::execute() {
+  imageBuffer = imageGenerator->makeBuffer(tryHardware);
 }
 }  // namespace tgfx

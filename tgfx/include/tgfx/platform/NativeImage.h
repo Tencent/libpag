@@ -15,3 +15,33 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+
+#pragma once
+
+#if defined(__EMSCRIPTEN__)
+#include <emscripten/val.h>
+#elif defined(__ANDROID__) || defined(ANDROID)
+#include <jni.h>
+#elif defined(__APPLE__)
+#include <CoreGraphics/CGImage.h>
+#endif
+
+namespace tgfx {
+#if defined(__EMSCRIPTEN__)
+
+typedef emscripten::val NativeImageRef;
+
+#elif defined(__ANDROID__) || defined(ANDROID)
+
+typedef jobject NativeImageRef;
+
+#elif defined(__APPLE__)
+
+typedef CGImageRef NativeImageRef;
+
+#else
+
+typedef void* NativeImageRef;
+
+#endif
+}  // namespace tgfx

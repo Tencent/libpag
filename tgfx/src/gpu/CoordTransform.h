@@ -25,13 +25,16 @@ namespace tgfx {
 struct CoordTransform {
   CoordTransform() = default;
 
-  explicit CoordTransform(Matrix matrix) : matrix(matrix) {
+  explicit CoordTransform(Matrix matrix, const Texture* texture = nullptr,
+                          const Point& alphaStart = Point::Zero())
+      : matrix(matrix), texture(texture), alphaStart(alphaStart) {
   }
 
-  CoordTransform(Matrix matrix, const Texture* texture) : matrix(matrix), texture(texture) {
-  }
+  Matrix getTotalMatrix() const;
 
   Matrix matrix = Matrix::I();
   const Texture* texture = nullptr;
+  // The alpha start point of the RGBAAA layout.
+  Point alphaStart = Point::Zero();
 };
 }  // namespace tgfx

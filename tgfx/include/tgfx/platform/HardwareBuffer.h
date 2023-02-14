@@ -15,3 +15,27 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+
+#pragma once
+
+#if defined(__ANDROID__) || defined(ANDROID)
+#include <android/hardware_buffer.h>
+#elif defined(__APPLE__)
+#include <CoreVideo/CoreVideo.h>
+#endif
+
+namespace tgfx {
+#if defined(__ANDROID__) || defined(ANDROID)
+
+typedef AHardwareBuffer* HardwareBufferRef;
+
+#elif defined(__APPLE__)
+
+typedef CVPixelBufferRef HardwareBufferRef;
+
+#else
+
+typedef void* HardwareBufferRef;
+
+#endif
+}  // namespace tgfx

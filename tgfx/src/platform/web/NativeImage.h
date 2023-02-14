@@ -24,8 +24,6 @@
 namespace tgfx {
 class NativeImage : public ImageCodec {
  public:
-  static std::shared_ptr<NativeImage> MakeFrom(emscripten::val nativeImage);
-
   bool readPixels(const ImageInfo& /*dstInfo*/, void* /*dstPixels*/) const override {
     return false;
   }
@@ -38,6 +36,7 @@ class NativeImage : public ImageCodec {
 
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 
+  friend class ImageCodec;
   friend class NativeCodec;
 };
 }  // namespace tgfx

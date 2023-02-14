@@ -27,11 +27,11 @@ class ImageBufferTextureProxy : public TextureProxy {
   }
 
   int width() const override {
-    return imageBuffer->width();
+    return texture ? texture->width() : imageBuffer->width();
   }
 
   int height() const override {
-    return imageBuffer->height();
+    return texture ? texture->height() : imageBuffer->height();
   }
 
   bool hasMipmaps() const override {
@@ -52,6 +52,46 @@ class ImageBufferTextureProxy : public TextureProxy {
 
  private:
   std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
+  bool mipMapped = false;
+};
+
+class ImageGeneratorTextureProxy : public TextureProxy {
+ public:
+  ImageGeneratorTextureProxy(ProxyProvider* provider, std::shared_ptr<ImageGeneratorTask> task,
+                             bool mipMapped)
+      : TextureProxy(provider), task(std::move(task)), mipMapped(mipMapped) {
+  }
+
+  int width() const override {
+    return texture ? texture->width() : task->imageWidth();
+  }
+
+  int height() const override {
+    return texture ? texture->height() : task->imageHeight();
+  }
+
+  bool hasMipmaps() const override {
+    return texture ? texture->getSampler()->mipMapped() : mipMapped;
+  }
+
+ protected:
+  std::shared_ptr<Texture> onMakeTexture(Context* context) override {
+    if (task == nullptr) {
+      return nullptr;
+    }
+    auto buffer = task->getBuffer();
+    if (buffer == nullptr) {
+      return nullptr;
+    }
+    auto texture = buffer->makeTexture(context, mipMapped);
+    if (texture != nullptr) {
+      task = nullptr;
+    }
+    return texture;
+  }
+
+ private:
+  std::shared_ptr<ImageGeneratorTask> task = nullptr;
   bool mipMapped = false;
 };
 
@@ -122,6 +162,29 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
     return nullptr;
   }
   auto proxy = std::make_shared<ImageBufferTextureProxy>(this, std::move(imageBuffer), mipMapped);
+  proxy->weakThis = proxy;
+  return proxy;
+}
+
+std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
+    std::shared_ptr<ImageGenerator> generator, bool mipMapped) {
+  if (generator == nullptr) {
+    return nullptr;
+  }
+  if (generator->asyncSupport()) {
+    auto buffer = generator->makeBuffer(!mipMapped);
+    return createTextureProxy(std::move(buffer), mipMapped);
+  }
+  auto task = ImageGeneratorTask::MakeFrom(std::move(generator), !mipMapped);
+  return createTextureProxy(std::move(task), mipMapped);
+}
+
+std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
+    std::shared_ptr<ImageGeneratorTask> task, bool mipMapped) {
+  if (task == nullptr) {
+    return nullptr;
+  }
+  auto proxy = std::make_shared<ImageGeneratorTextureProxy>(this, std::move(task), mipMapped);
   proxy->weakThis = proxy;
   return proxy;
 }

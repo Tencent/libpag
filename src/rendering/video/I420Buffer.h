@@ -19,10 +19,14 @@
 #pragma once
 
 #include "VideoBuffer.h"
+#include "tgfx/core/YUVData.h"
 
 namespace pag {
 class I420Buffer : public VideoBuffer {
  public:
+  I420Buffer(std::shared_ptr<tgfx::YUVData> yuvData, tgfx::YUVColorSpace colorSpace,
+             tgfx::YUVColorRange colorRange);
+
   size_t planeCount() const override;
 
  protected:
@@ -30,13 +34,9 @@ class I420Buffer : public VideoBuffer {
                                                bool mipMapped) const override;
 
  protected:
-  I420Buffer(int width, int height, uint8_t* data[3], const int lineSize[3],
-             tgfx::YUVColorSpace colorSpace, tgfx::YUVColorRange colorRange);
-
  private:
+  std::shared_ptr<tgfx::YUVData> yuvData = nullptr;
   tgfx::YUVColorSpace colorSpace = tgfx::YUVColorSpace::Rec601;
   tgfx::YUVColorRange colorRange = tgfx::YUVColorRange::MPEG;
-  uint8_t* pixelsPlane[3] = {};
-  int rowBytesPlane[3] = {};
 };
 }  // namespace pag
