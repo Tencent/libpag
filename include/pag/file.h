@@ -135,6 +135,9 @@ enum class TagCode {
   MaskBlockV2 = 84,
   GradientOverlayStyle = 85,
   BrightnessContrastEffect = 86,
+  HueSaturationEffect = 87,
+  
+  LayerAttributesExtraV2 = 88,  // add PreserveAlpha
   EncryptedData = 89,
   Transform3D = 90,
   CameraOption = 91,
@@ -429,6 +432,7 @@ enum class EffectType {
   RadialBlur,
   Mosaic,
   BrightnessContrast,
+  HueSaturation,
 };
 
 class PAG_API Effect {
@@ -824,6 +828,47 @@ class BrightnessContrastEffect : public Effect {
   Property<float>* brightness = nullptr;
   Property<float>* contrast = nullptr;
   Property<bool>* useOldVersion = nullptr;
+
+  RTTR_ENABLE(Effect)
+};
+
+class PAG_API ChannelControlType {
+ public:
+  static const Enum Master = 0;
+  static const Enum Reds = 1;
+  static const Enum Yellows = 2;
+  static const Enum Greens = 3;
+  static const Enum Cyans = 4;
+  static const Enum Blues = 5;
+  static const Enum Magentas = 6;
+  static const int Count = 7;
+};
+
+class HueSaturationEffect : public Effect {
+ public:
+  ~HueSaturationEffect() override;
+
+  EffectType type() const override { return EffectType::HueSaturation; }
+
+  bool processVisibleAreaOnly() const override { return true; }
+
+  bool visibleAt(Frame layerFrame) const override;
+
+  void transformBounds(Rect* contentBounds, const Point& filterScale,
+                       Frame layerFrame) const override;
+
+  void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const override;
+
+  bool verify() const override;
+
+  Enum channelControl = ChannelControlType::Master;
+  float hue[ChannelControlType::Count] = {0.0f};
+  float saturation[ChannelControlType::Count] = {0.0f};
+  float lightness[ChannelControlType::Count] = {0.0f};
+  bool colorize = false;
+  Property<float>* colorizeHue = nullptr;
+  Property<float>* colorizeSaturation = nullptr;
+  Property<float>* colorizeLightness = nullptr;
 
   RTTR_ENABLE(Effect)
 };
