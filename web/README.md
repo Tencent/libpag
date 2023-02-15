@@ -139,6 +139,9 @@ Start HTTP server.
 # ./
 $ emrun --browser chrome --serve_root . --port 8081 ./web/demo/index.html
 ```
+Use Chrome to open `http://localhost:8081/web/demo/index.html` to see the demo.
+
+If you need to debug, you can install [C/C++ DevTools Support (DWARF)](https://chrome.google.com/webstore/detail/cc%20%20-devtools-support-dwa/pdcpmagijalfljmkmjngeonclgbbannb), and open Chrome DevTools > Settings > Experiments > Check the "WebAssembly Debugging: Enable DWARF support" option to enable SourceMap support. Now you can debug C++ files in Chrome DevTools.
 
 ### Build (Release)
 
@@ -154,7 +157,7 @@ $ ./build.sh
 Create a new build target in CLion, and use the following **CMake options**（find them under **CLion** > **Preferences** > **Build, Execution, Deployment** > **CMake**）
 
 ```
-CMAKE_TOOLCHAIN_FILE=path/to/emscripten/emscripten/version/cmake/Modules/Platform/Emscripten.cmake
+-DCMAKE_TOOLCHAIN_FILE=path/to/emscripten/emscripten/version/cmake/Modules/Platform/Emscripten.cmake
 ```
 
 ### Test
