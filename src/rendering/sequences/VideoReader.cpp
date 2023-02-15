@@ -25,14 +25,8 @@ namespace pag {
 static constexpr int MAX_TRY_DECODE_COUNT = 100;
 static constexpr int FORCE_SOFTWARE_SIZE = 160000;  // 400x400
 
-static Frame TotalFrames(VideoDemuxer* demuxer) {
-  auto format = demuxer->getFormat();
-  return TimeToFrame(format.duration, format.frameRate);
-}
-
 VideoReader::VideoReader(std::unique_ptr<VideoDemuxer> videoDemuxer)
-    : SequenceReader(TotalFrames(videoDemuxer.get()), videoDemuxer->staticContent()),
-      demuxer(videoDemuxer.release()) {
+    : demuxer(videoDemuxer.release()) {
   auto videoFormat = demuxer->getFormat();
   frameRate = videoFormat.frameRate;
   // Force using software decoders only when external decoders are available, because the built-in
@@ -48,36 +42,36 @@ VideoReader::~VideoReader() {
   delete demuxer;
 }
 
-bool VideoReader::decodeFrame(Frame targetFrame) {
+std::shared_ptr<tgfx::ImageBuffer> VideoReader::onMakeBuffer(Frame targetFrame) {
   // Need a locker here in case there are other threads are decoding at the same time.
   std::lock_guard<std::mutex> autoLock(locker);
   auto targetTime = FrameToTime(targetFrame, frameRate);
   auto sampleTime = demuxer->getSampleTimeAt(targetTime);
   if (sampleTime == currentRenderedTime) {
-    return true;
+    return lastBuffer;
   }
   lastBuffer = nullptr;
   currentRenderedTime = INT64_MIN;
   if (!checkVideoDecoder()) {
-    return false;
+    return nullptr;
   }
-  auto success = onDecodeFrame(sampleTime);
+  auto success = decodeFrame(sampleTime);
   if (!success) {
     // retry once.
     resetParams();
-    success = onDecodeFrame(sampleTime);
+    success = decodeFrame(sampleTime);
     if (!success) {
       // fallback to software decoder.
       destroyVideoDecoder();
       factoryIndex++;
       if (checkVideoDecoder()) {
-        success = onDecodeFrame(sampleTime);
+        success = decodeFrame(sampleTime);
       }
     }
   }
   if (!success) {
     LOGE("VideoDecoder: Error on decoding frame.\n");
-    return false;
+    return nullptr;
   }
   if (!outputEndOfStream) {
     lastBuffer = videoDecoder->onRenderFrame();
@@ -85,18 +79,7 @@ bool VideoReader::decodeFrame(Frame targetFrame) {
       currentRenderedTime = currentDecodedTime;
     }
   }
-  return lastBuffer != nullptr;
-}
-
-std::shared_ptr<tgfx::ImageBuffer> VideoReader::onMakeBuffer() {
   return lastBuffer;
-}
-
-std::shared_ptr<tgfx::Texture> VideoReader::onMakeTexture(tgfx::Context* context) {
-  if (lastBuffer == nullptr) {
-    return nullptr;
-  }
-  return lastBuffer->makeTexture(context);
 }
 
 void VideoReader::onReportPerformance(Performance* performance, int64_t decodingTime) {
@@ -141,7 +124,7 @@ bool VideoReader::sendSampleData() {
   return true;
 }
 
-bool VideoReader::onDecodeFrame(int64_t sampleTime) {
+bool VideoReader::decodeFrame(int64_t sampleTime) {
   if (demuxer->needSeeking(currentDecodedTime, sampleTime)) {
     resetParams();
     videoDecoder->onFlush();

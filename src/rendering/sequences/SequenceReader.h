@@ -31,10 +31,6 @@ class SequenceReader {
   static std::shared_ptr<SequenceReader> Make(std::shared_ptr<File> file, Sequence* sequence,
                                               PAGFile* pagFile = nullptr);
 
-  SequenceReader(Frame totalFrames, bool staticContent)
-      : totalFrames(totalFrames), staticContent(staticContent) {
-  }
-
   virtual ~SequenceReader() = default;
 
   /**
@@ -50,30 +46,15 @@ class SequenceReader {
   /**
    * Decodes the specified target frame immediately and returns the decoded image buffer.
    */
-  std::shared_ptr<tgfx::ImageBuffer> makeBuffer(Frame targetFrame);
-
-  /**
-   * Returns the texture of specified target frame.
-   */
-  std::shared_ptr<tgfx::Texture> makeTexture(tgfx::Context* context, Frame targetFrame);
+  std::shared_ptr<tgfx::ImageBuffer> readBuffer(Frame targetFrame);
 
   void reportPerformance(Performance* performance);
 
  protected:
   /**
-   * Decodes the closest frame to the specified targetTime.
+   * Return the decoded ImageBuffer of the specified frame.
    */
-  virtual bool decodeFrame(Frame targetFrame) = 0;
-
-  /**
-   * Return the ImageBuffer of current decoded frame.
-   */
-  virtual std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer() = 0;
-
-  /**
-   * Returns the texture of current decoded frame.
-   */
-  virtual std::shared_ptr<tgfx::Texture> onMakeTexture(tgfx::Context* context) = 0;
+  virtual std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer(Frame targetFrame) = 0;
 
   /**
    * Reports the decoding performance data.
@@ -81,13 +62,6 @@ class SequenceReader {
   virtual void onReportPerformance(Performance* performance, int64_t decodingTime) = 0;
 
  private:
-  Frame totalFrames = 0;
-  bool staticContent = false;
-  Frame lastFrame = -1;
-  std::shared_ptr<tgfx::Texture> lastTexture = nullptr;
   std::atomic_int64_t decodingTime = 0;
-  std::atomic_int64_t textureUploadingTime = 0;
-
-  friend class SequenceFrameGenerator;
 };
 }  // namespace pag

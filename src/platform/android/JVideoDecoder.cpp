@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "pag/pag.h"
 #include "JNIHelper.h"
+#include "pag/pag.h"
 
 extern "C" {
 PAG_API void Java_org_libpag_VideoDecoder_RegisterSoftwareDecoderFactory(JNIEnv*, jclass,

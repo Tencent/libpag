@@ -22,8 +22,8 @@
 #include <GLES3/gl3.h>
 #include <android/bitmap.h>
 #include <android/native_window_jni.h>
-#include "HardwareDecoder.h"
 #include "GPUDrawable.h"
+#include "HardwareDecoder.h"
 #include "JNIHelper.h"
 #include "NativePlatform.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"

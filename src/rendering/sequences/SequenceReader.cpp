@@ -38,42 +38,14 @@ std::shared_ptr<SequenceReader> SequenceReader::Make(std::shared_ptr<File> file,
   return reader;
 }
 
-std::shared_ptr<tgfx::ImageBuffer> SequenceReader::makeBuffer(Frame targetFrame) {
-  auto success = decodeFrame(targetFrame);
-  if (!success) {
-    return nullptr;
-  }
-  return onMakeBuffer();
-}
-
-std::shared_ptr<tgfx::Texture> SequenceReader::makeTexture(tgfx::Context* context,
-                                                           Frame targetFrame) {
-  if (staticContent) {
-    targetFrame = 0;
-  }
-  if (lastFrame == targetFrame) {
-    return lastTexture;
-  }
+std::shared_ptr<tgfx::ImageBuffer> SequenceReader::readBuffer(Frame targetFrame) {
   tgfx::Clock clock = {};
-  auto success = decodeFrame(targetFrame);
+  auto buffer = onMakeBuffer(targetFrame);
   decodingTime += clock.measure();
-  // Release the last texture for immediately reusing.
-  lastTexture = nullptr;
-  lastFrame = -1;
-  if (success) {
-    clock.reset();
-    lastTexture = onMakeTexture(context);
-    lastFrame = targetFrame;
-    textureUploadingTime += clock.measure();
-  }
-  return lastTexture;
+  return buffer;
 }
 
 void SequenceReader::reportPerformance(Performance* performance) {
-  if (textureUploadingTime > 0) {
-    performance->textureUploadingTime += textureUploadingTime;
-    textureUploadingTime = 0;
-  }
   if (decodingTime > 0) {
     onReportPerformance(performance, decodingTime);
     decodingTime = 0;

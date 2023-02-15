@@ -81,7 +81,7 @@ void DidDecompress(void*, void* sourceFrameRefCon, OSStatus status, VTDecodeInfo
 }
 
 bool HardwareDecoder::initVideoToolBox(const std::vector<std::shared_ptr<tgfx::Data>>& headers,
-                                  const std::string& mimeType) {
+                                       const std::string& mimeType) {
   if (videoFormatDescription == nullptr) {
     OSStatus status;
     int size = static_cast<int>(headers.size());
