@@ -22,7 +22,7 @@
 #include <GLES3/gl3.h>
 #include <android/bitmap.h>
 #include <android/native_window_jni.h>
-#include "GPUDecoder.h"
+#include "HardwareDecoder.h"
 #include "GPUDrawable.h"
 #include "JNIHelper.h"
 #include "NativePlatform.h"

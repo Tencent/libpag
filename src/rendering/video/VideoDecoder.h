@@ -29,38 +29,6 @@
 namespace pag {
 class VideoDecoder {
  public:
-  /**
-   * Returns true if hardware video decoders are supported on current platform.
-   */
-  static bool HasHardwareDecoder();
-
-  /**
-   * Returns true if software video decoders are supported on current platform.
-   */
-  static bool HasSoftwareDecoder();
-
-  /**
-   * Returns true if a external software decoder is registered. We assume that it has better
-   * performance than libavc.
-   */
-  static bool HasExternalSoftwareDecoder();
-
-  /**
-   * Returns the registered SoftwareDecoderFactory.
-   */
-  static SoftwareDecoderFactory* GetExternalSoftwareDecoderFactory();
-
-  /**
-   * Returns the maximum number of hardware video decoders we can create.
-   */
-  static int GetMaxHardwareDecoderCount();
-
-  /**
-   * Creates a new video decoder by specified type. Returns a hardware video decoder if useHardware
-   * is true, otherwise, returns a software video decoder.
-   */
-  static std::unique_ptr<VideoDecoder> Make(const VideoFormat& format, bool useHardware);
-
   virtual ~VideoDecoder();
 
   /**
@@ -105,7 +73,11 @@ class VideoDecoder {
  private:
   bool hardwareBacked = false;
 
-  static std::unique_ptr<VideoDecoder> CreateHardwareDecoder(const VideoFormat& format);
-  static std::unique_ptr<VideoDecoder> CreateSoftwareDecoder(const VideoFormat& format);
+  /**
+   * Returns true if the maximum number of hardware video decoders has not been reached.
+   */
+  static bool HardwareDecoderCountAvailable();
+
+  friend class VideoDecoderFactory;
 };
 }  // namespace pag

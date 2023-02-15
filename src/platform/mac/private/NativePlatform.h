@@ -27,6 +27,6 @@ class NativePlatform : public CocoaPlatform {
 
   void setNALUType(NALUType type) const;
 
-  std::unique_ptr<VideoDecoder> makeHardwareDecoder(const VideoFormat& format) const override;
+  std::vector<const VideoDecoderFactory*> getVideoDecoderFactories() const override;
 };
 }  // namespace pag

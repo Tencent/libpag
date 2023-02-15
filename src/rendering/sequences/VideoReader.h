@@ -20,7 +20,7 @@
 
 #include <atomic>
 #include "SequenceReader.h"
-#include "rendering/video/VideoDecoder.h"
+#include "rendering/video/VideoDecoderFactory.h"
 #include "rendering/video/VideoDemuxer.h"
 
 namespace pag {
@@ -51,7 +51,8 @@ class VideoReader : public SequenceReader {
   std::mutex locker = {};
   VideoDemuxer* demuxer = nullptr;
   float frameRate = 0.0;
-  int decoderTypeIndex = 0;
+  int factoryIndex = 0;
+  bool preferSoftware = false;
   VideoDecoder* videoDecoder = nullptr;
   VideoSample videoSample = {};
   std::shared_ptr<tgfx::ImageBuffer> lastBuffer = nullptr;
@@ -72,6 +73,6 @@ class VideoReader : public SequenceReader {
 
   bool onDecodeFrame(int64_t sampleTime);
 
-  VideoDecoder* makeVideoDecoder();
+  std::unique_ptr<VideoDecoder> makeVideoDecoder();
 };
 }  // namespace pag

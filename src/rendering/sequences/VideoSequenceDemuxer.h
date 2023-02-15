@@ -58,6 +58,6 @@ class VideoSequenceDemuxer : public VideoDemuxer {
     return sequence->composition->staticContent();
   }
 
-  friend class WebHardwareDecoder;
+  friend class HardwareDecoder;
 };
 }  // namespace pag

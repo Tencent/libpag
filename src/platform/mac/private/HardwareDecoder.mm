@@ -16,23 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GPUDecoder.h"
-#include "base/utils/USE.h"
-#include "tgfx/core/YUVBuffer.h"
+#include "HardwareDecoder.h"
 
 namespace pag {
-
-GPUDecoder::GPUDecoder(const VideoFormat& format)
-    : sourceColorSpace(format.colorSpace),
-      destinationColorSpace(format.colorSpace),
-      colorRange(format.colorRange),
-      maxNumReorder(format.maxReorderSize) {
+HardwareDecoder::HardwareDecoder(const VideoFormat& format)
+    : colorSpace(format.colorSpace), maxNumReorder(format.maxReorderSize) {
   isInitialized = initVideoToolBox(format.headers, format.mimeType);
 }
 
-GPUDecoder::~GPUDecoder() {
+HardwareDecoder::~HardwareDecoder() {
   if (session) {
-    VTDecompressionSessionFinishDelayedFrames(session);
     VTDecompressionSessionInvalidate(session);
     CFRelease(session);
     session = nullptr;
@@ -46,7 +39,7 @@ GPUDecoder::~GPUDecoder() {
   cleanResources();
 }
 
-void GPUDecoder::cleanResources() {
+void HardwareDecoder::cleanResources() {
   if (outputFrame) {
     CVPixelBufferRelease(outputFrame->outputPixelBuffer);
     delete outputFrame;
@@ -80,11 +73,12 @@ void DidDecompress(void*, void* sourceFrameRefCon, OSStatus status, VTDecodeInfo
   }
 }
 
-bool GPUDecoder::initVideoToolBox(const std::vector<std::shared_ptr<tgfx::Data>>& headers,
-                                  const std::string& mimeType) {
+bool HardwareDecoder::initVideoToolBox(const std::vector<std::shared_ptr<tgfx::Data>>& headers,
+                                       const std::string& mimeType) {
   if (videoFormatDescription == nullptr) {
     OSStatus status;
-    int size = static_cast<int>(headers.size());
+    auto size = headers.size();
+
     std::vector<const uint8_t*> parameterSetPointers = {};
     std::vector<size_t> parameterSetSizes = {};
     for (const auto& header : headers) {
@@ -93,15 +87,12 @@ bool GPUDecoder::initVideoToolBox(const std::vector<std::shared_ptr<tgfx::Data>>
     }
 
     if (mimeType == "video/hevc") {
-      if (@available(iOS 11.0, *)) {
-        status = CMVideoFormatDescriptionCreateFromHEVCParameterSets(
-            kCFAllocatorDefault, size, &parameterSetPointers[0], &parameterSetSizes[0], 4, NULL,
-            &videoFormatDescription);
-      } else {
-        status = -1;
-      }
+      status = CMVideoFormatDescriptionCreateFromHEVCParameterSets(
+          kCFAllocatorDefault, size, &parameterSetPointers[0], &parameterSetSizes[0], 4, NULL,
+          &videoFormatDescription);
+
       if (status != noErr) {
-        LOGE("GPUDecoder:format description create failed status = %d", status);
+        LOGE("HardwareDecoder:format description create failed status = %d", status);
         return false;
       }
     } else {
@@ -112,8 +103,9 @@ bool GPUDecoder::initVideoToolBox(const std::vector<std::shared_ptr<tgfx::Data>>
                                                                    &parameterSetSizes[0],
                                                                    4,  // nal start code size
                                                                    &videoFormatDescription);
+
       if (status != noErr) {
-        LOGE("GPUDecoder:format description create failed status = %d", status);
+        LOGE("HardwareDecoder:format description create failed status = %d", status);
         return false;
       }
     }
@@ -122,88 +114,74 @@ bool GPUDecoder::initVideoToolBox(const std::vector<std::shared_ptr<tgfx::Data>>
   return true;
 }
 
-bool GPUDecoder::resetVideoToolBox() {
+bool HardwareDecoder::resetVideoToolBox() {
   if (session) {
-    VTDecompressionSessionFinishDelayedFrames(session);
     VTDecompressionSessionInvalidate(session);
     CFRelease(session);
     session = nullptr;
   }
 
   // create decompression session
-  CFDictionaryRef attrs = NULL;
-  const void* keys[] = {kCVPixelBufferPixelFormatTypeKey, kCVPixelBufferOpenGLESCompatibilityKey,
+  CFDictionaryRef inAttrs = NULL;
+  const void* keys[] = {kCVPixelBufferPixelFormatTypeKey, kCVPixelBufferOpenGLCompatibilityKey,
                         kCVPixelBufferIOSurfacePropertiesKey};
 
-  uint32_t openGLESCompatibility = true;
-  uint32_t pixelFormatType = colorRange == tgfx::YUVColorRange::JPEG
-                                 ? kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
-                                 : kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange;
+  uint32_t pixelFormatType = kCVPixelFormatType_32BGRA;
+  uint32_t openGLCompatibility = true;
 
   CFNumberRef pixelFormatTypeValue = CFNumberCreate(NULL, kCFNumberSInt32Type, &pixelFormatType);
-  CFNumberRef openGLESCompatibilityValue =
-      CFNumberCreate(NULL, kCFNumberSInt32Type, &openGLESCompatibility);
+  CFNumberRef openGLCompatibilityValue =
+      CFNumberCreate(NULL, kCFNumberSInt32Type, &openGLCompatibility);
   CFDictionaryRef ioSurfaceParam =
       CFDictionaryCreate(kCFAllocatorDefault, NULL, NULL, 0, NULL, NULL);
 
-  const void* values[] = {pixelFormatTypeValue, openGLESCompatibilityValue, ioSurfaceParam};
-
-  attrs = CFDictionaryCreate(NULL, keys, values, 3, NULL, NULL);
-
+  const void* values[] = {pixelFormatTypeValue, openGLCompatibilityValue, ioSurfaceParam};
+  inAttrs = CFDictionaryCreate(kCFAllocatorDefault, keys, values, 3, NULL, NULL);
+  const void* combineDics[] = {inAttrs};
+  CFArrayRef combines = CFArrayCreate(NULL, combineDics, 1, NULL);
+  CFDictionaryRef outAttrs = NULL;
+  CVPixelBufferCreateResolvedAttributesDictionary(NULL, combines, &outAttrs);
   VTDecompressionOutputCallbackRecord callBackRecord;
   callBackRecord.decompressionOutputCallback = DidDecompress;
   callBackRecord.decompressionOutputRefCon = NULL;
 
-  OSStatus status;
-  status = VTDecompressionSessionCreate(kCFAllocatorDefault, videoFormatDescription, NULL, attrs,
-                                        &callBackRecord, &session);
+  OSStatus status = VTDecompressionSessionCreate(kCFAllocatorDefault, videoFormatDescription, NULL,
+                                                 outAttrs, &callBackRecord, &session);
 
-  CFRelease(attrs);
+  CFRelease(outAttrs);
+  CFRelease(combines);
+  CFRelease(inAttrs);
   CFRelease(pixelFormatTypeValue);
-  CFRelease(openGLESCompatibilityValue);
+  CFRelease(openGLCompatibilityValue);
   CFRelease(ioSurfaceParam);
 
-  if (@available(iOS 10.0, *)) {
-    if (sourceColorSpace == tgfx::YUVColorSpace::Rec2020) {
-      CFStringRef destinationColorPrimaries = CFStringCreateWithCString(
-          kCFAllocatorDefault, "DestinationColorPrimaries", kCFStringEncodingUTF8);
-      CFStringRef destinationTransferFunction = CFStringCreateWithCString(
-          kCFAllocatorDefault, "DestinationTransferFunction", kCFStringEncodingUTF8);
-      CFStringRef destinationYCbCrMatrix = CFStringCreateWithCString(
-          kCFAllocatorDefault, "DestinationYCbCrMatrix", kCFStringEncodingUTF8);
-      CFStringRef pixelTransferProperties = CFStringCreateWithCString(
-          kCFAllocatorDefault, "PixelTransferProperties", kCFStringEncodingUTF8);
-
-      CFMutableDictionaryRef pixelTransferPropertiesParam = CFDictionaryCreateMutable(
-          kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-      CFDictionarySetValue(pixelTransferPropertiesParam, destinationColorPrimaries,
-                           kCVImageBufferColorPrimaries_ITU_R_709_2);
-      CFDictionarySetValue(pixelTransferPropertiesParam, destinationTransferFunction,
-                           kCVImageBufferTransferFunction_ITU_R_709_2);
-      CFDictionarySetValue(pixelTransferPropertiesParam, destinationYCbCrMatrix,
-                           kCVImageBufferYCbCrMatrix_ITU_R_709_2);
-      VTSessionSetProperty(session, pixelTransferProperties, pixelTransferPropertiesParam);
-
-      CFRelease(destinationColorPrimaries);
-      CFRelease(destinationTransferFunction);
-      CFRelease(destinationYCbCrMatrix);
-      CFRelease(pixelTransferProperties);
-
-      destinationColorSpace = tgfx::YUVColorSpace::Rec709;
-    }
+  if (colorSpace == tgfx::YUVColorSpace::Rec2020) {
+    CFMutableDictionaryRef pixelTransferProperties = CFDictionaryCreateMutable(
+        kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    CFDictionarySetValue(pixelTransferProperties,
+                         kVTPixelTransferPropertyKey_DestinationColorPrimaries,
+                         kCVImageBufferColorPrimaries_ITU_R_709_2);
+    CFDictionarySetValue(pixelTransferProperties,
+                         kVTPixelTransferPropertyKey_DestinationTransferFunction,
+                         kCVImageBufferTransferFunction_ITU_R_709_2);
+    CFDictionarySetValue(pixelTransferProperties,
+                         kVTPixelTransferPropertyKey_DestinationYCbCrMatrix,
+                         kCVImageBufferYCbCrMatrix_ITU_R_709_2);
+    VTSessionSetProperty(session, kVTDecompressionPropertyKey_PixelTransferProperties,
+                         pixelTransferProperties);
+    CFRelease(pixelTransferProperties);
   }
 
   if (status != noErr || !session) {
-    LOGE("GPUDecoder:decoder session create failed status = %d", status);
+    LOGE("HardwareDecoder:decoder session create failed status = %d", status);
     return false;
   }
 
   return true;
 }
 
-pag::DecodingResult GPUDecoder::onSendBytes(void* bytes, size_t length, int64_t time) {
+pag::DecodingResult HardwareDecoder::onSendBytes(void* bytes, size_t length, int64_t time) {
   if (!bytes || length == 0) {
-    LOGE("GPUDecoder: Error on sending bytes for decoding.\n");
     return DecodingResult::Error;
   }
 
@@ -213,17 +191,22 @@ pag::DecodingResult GPUDecoder::onSendBytes(void* bytes, size_t length, int64_t 
                                               NULL, 0, length, 0, &blockBuffer);
 
   if (status != noErr) {
-    LOGE("GPUDecoder:CMBlockBufferRef failed status=%d", (int)status);
+    LOGE("HardwareDecoder:CMBlockBufferRef failed status=%d", (int)status);
     return DecodingResult::Error;
   }
 
   // create sample buffer
   const size_t sampleSizeArray[] = {length};
-  status = CMSampleBufferCreateReady(kCFAllocatorDefault, blockBuffer, videoFormatDescription, 1, 0,
-                                     NULL, 1, sampleSizeArray, &sampleBuffer);
+  if (@available(macOS 10.10, *)) {
+    status = CMSampleBufferCreateReady(kCFAllocatorDefault, blockBuffer, videoFormatDescription, 1,
+                                       0, NULL, 1, sampleSizeArray, &sampleBuffer);
+  } else {
+    LOGE("HardwareDecoder: Error on sending bytes for decoding.\n");
+    return DecodingResult::Error;
+  }
 
   if (status != noErr) {
-    LOGE("GPUDecoder:CMSampleBufferRef failed status=%d", (int)status);
+    LOGE("HardwareDecoder:CMSampleBufferRef failed status=%d", (int)status);
     return DecodingResult::Error;
   }
 
@@ -233,12 +216,12 @@ pag::DecodingResult GPUDecoder::onSendBytes(void* bytes, size_t length, int64_t 
   return DecodingResult::Success;
 }
 
-pag::DecodingResult GPUDecoder::onEndOfStream() {
+pag::DecodingResult HardwareDecoder::onEndOfStream() {
   inputEndOfStream = true;
   return DecodingResult::Success;
 }
 
-pag::DecodingResult GPUDecoder::onDecodeFrame() {
+pag::DecodingResult HardwareDecoder::onDecodeFrame() {
   if (outputFrame) {
     CVPixelBufferRelease(outputFrame->outputPixelBuffer);
     delete outputFrame;
@@ -255,21 +238,22 @@ pag::DecodingResult GPUDecoder::onDecodeFrame() {
         VTDecompressionSessionDecodeFrame(session, sampleBuffer, 0, &outputPixelBuffer, &infoFlags);
 
     if (status != noErr && !outputPixelBuffer) {
+      LOGE("HardwareDecoder:Decode failed status = %d", (int)status);
       if (status == kVTInvalidSessionErr) {
         cleanResources();
         isInitialized = resetVideoToolBox();
-        LOGI("GPUDecoder: Resetting VideoToolBox session, which may be caused by app entered "
-             "background, initialized = %d",
-             isInitialized);
-      } else {
-        LOGE("GPUDecoder:Decode failed status = %d", (int)status);
+        LOGI("HardwareDecoder:reset VideoToolBox, is initialized = %d", isInitialized);
       }
+      LOGE("HardwareDecoder: Error on decoding frame.\n");
       return DecodingResult::Error;
     }
 
     CFRelease(sampleBuffer);
-    CFRelease(blockBuffer);
     sampleBuffer = nullptr;
+  }
+
+  if (blockBuffer) {
+    CFRelease(blockBuffer);
     blockBuffer = nullptr;
   }
 
@@ -304,22 +288,21 @@ pag::DecodingResult GPUDecoder::onDecodeFrame() {
   return DecodingResult::TryAgainLater;
 }
 
-void GPUDecoder::onFlush() {
+void HardwareDecoder::onFlush() {
   cleanResources();
 }
 
-int64_t GPUDecoder::presentationTime() {
+int64_t HardwareDecoder::presentationTime() {
   if (outputFrame == nullptr) {
     return -1;
   }
   return outputFrame->frameTime;
 }
 
-std::shared_ptr<tgfx::ImageBuffer> GPUDecoder::onRenderFrame() {
+std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
   if (outputFrame == nullptr) {
     return nullptr;
   }
-  return tgfx::YUVBuffer::MakeFrom(outputFrame->outputPixelBuffer, destinationColorSpace,
-                                   colorRange);
+  return tgfx::ImageBuffer::MakeFrom(outputFrame->outputPixelBuffer);
 }
 }  // namespace pag

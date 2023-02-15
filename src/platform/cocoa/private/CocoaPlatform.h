@@ -23,10 +23,6 @@
 namespace pag {
 class CocoaPlatform : public Platform {
  public:
-  bool hasHardwareDecoder() const override {
-    return true;
-  }
-
   bool registerFallbackFonts() const override;
 
   NALUType naluType() const override {

@@ -25,13 +25,9 @@
 #include "rendering/video/VideoDecoder.h"
 
 namespace pag {
-class GPUDecoder : public VideoDecoder {
+class HardwareDecoder : public VideoDecoder {
  public:
-  explicit GPUDecoder(const VideoFormat& format);
-
-  ~GPUDecoder() override;
-
-  bool isInitialized = false;
+  ~HardwareDecoder() override;
 
   pag::DecodingResult onSendBytes(void* bytes, size_t length, int64_t time) override;
 
@@ -46,10 +42,14 @@ class GPUDecoder : public VideoDecoder {
   std::shared_ptr<tgfx::ImageBuffer> onRenderFrame() override;
 
  private:
+  bool isInitialized = false;
   VTDecompressionSessionRef session = nullptr;
   CMFormatDescriptionRef videoFormatDescription = nullptr;
-  tgfx::YUVColorSpace colorSpace = tgfx::YUVColorSpace::Rec601;
+  tgfx::YUVColorSpace sourceColorSpace = tgfx::YUVColorSpace::Rec601;
+  tgfx::YUVColorSpace destinationColorSpace = tgfx::YUVColorSpace::Rec601;
+  tgfx::YUVColorRange colorRange = tgfx::YUVColorRange::MPEG;
 
+  explicit HardwareDecoder(const VideoFormat& format);
   bool initVideoToolBox(const std::vector<std::shared_ptr<tgfx::Data>>& headers,
                         const std::string& mimeType);
   bool resetVideoToolBox();
@@ -62,12 +62,14 @@ class GPUDecoder : public VideoDecoder {
 
   int64_t sendFrameTime = -1;
   std::list<int64_t> pendingFrames{};
-  std::unordered_map<Frame, OutputFrame*> outputFrameCaches{};
-  size_t maxNumReorder = 0;
+  std::unordered_map<pag::Frame, OutputFrame*> outputFrameCaches{};
+  int maxNumReorder = 0;
   bool inputEndOfStream = false;
 
   CMBlockBufferRef blockBuffer = nullptr;
   CMSampleBufferRef sampleBuffer = nullptr;
   OutputFrame* outputFrame = nullptr;
+
+  friend class HardwareDecoderFactory;
 };
 }  // namespace pag

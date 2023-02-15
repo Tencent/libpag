@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pag/pag.h"
-#include "platform/android/GPUDecoder.h"
+#include "JNIHelper.h"
 
 extern "C" {
 PAG_API void Java_org_libpag_VideoDecoder_RegisterSoftwareDecoderFactory(JNIEnv*, jclass,

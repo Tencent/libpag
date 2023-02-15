@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "WebHardwareDecoder.h"
+#include "HardwareDecoder.h"
 #include "base/utils/TimeUtil.h"
 #include "codec/mp4/MP4BoxHelper.h"
 #include "rendering/sequences/VideoSequenceDemuxer.h"
@@ -98,7 +98,7 @@ std::shared_ptr<tgfx::Texture> WebVideoBuffer::onMakeTexture(tgfx::Context* cont
   return webVideoTexture;
 }
 
-WebHardwareDecoder::WebHardwareDecoder(const VideoFormat& format) {
+HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
   auto demuxer = static_cast<VideoSequenceDemuxer*>(format.demuxer);
   file = demuxer->file;
   rootFile = demuxer->pagFile;
@@ -148,17 +148,17 @@ WebHardwareDecoder::WebHardwareDecoder(const VideoFormat& format) {
   }
 }
 
-DecodingResult WebHardwareDecoder::onSendBytes(void*, size_t, int64_t time) {
+DecodingResult HardwareDecoder::onSendBytes(void*, size_t, int64_t time) {
   pendingTimeStamp = time;
   return DecodingResult::Success;
 }
 
-DecodingResult WebHardwareDecoder::onEndOfStream() {
+DecodingResult HardwareDecoder::onEndOfStream() {
   endOfStream = true;
   return DecodingResult::Success;
 }
 
-DecodingResult WebHardwareDecoder::onDecodeFrame() {
+DecodingResult HardwareDecoder::onDecodeFrame() {
   if (endOfStream) {
     return DecodingResult::EndOfStream;
   }
@@ -166,15 +166,15 @@ DecodingResult WebHardwareDecoder::onDecodeFrame() {
   return DecodingResult::Success;
 }
 
-void WebHardwareDecoder::onFlush() {
+void HardwareDecoder::onFlush() {
   endOfStream = false;
 }
 
-int64_t WebHardwareDecoder::presentationTime() {
+int64_t HardwareDecoder::presentationTime() {
   return currentTimeStamp;
 }
 
-std::shared_ptr<tgfx::ImageBuffer> WebHardwareDecoder::onRenderFrame() {
+std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
   float playbackRate = 1;
   if (rootFile != nullptr && rootFile->timeStretchMode() == PAGTimeStretchMode::Scale) {
     playbackRate = file->duration() / ((rootFile->duration() / 1000000) * rootFile->frameRate());

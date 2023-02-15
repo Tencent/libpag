@@ -21,7 +21,7 @@
 #include <emscripten/val.h>
 #include <mutex>
 #include "pag/pag.h"
-#include "rendering/video/VideoDecoder.h"
+#include "rendering/video/VideoDecoderFactory.h"
 #include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace pag {
@@ -71,17 +71,11 @@ class WebVideoBuffer : public tgfx::ImageBuffer {
   int _height = 0;
   emscripten::val videoReader = emscripten::val::null();
 
-  friend class WebHardwareDecoder;
+  friend class HardwareDecoder;
 };
 
-class WebHardwareDecoder : public VideoDecoder {
+class HardwareDecoder : public VideoDecoder {
  public:
-  explicit WebHardwareDecoder(const VideoFormat& format);
-
-  bool isValid() {
-    return videoBuffer != nullptr;
-  }
-
   DecodingResult onSendBytes(void* bytes, size_t length, int64_t time) override;
 
   DecodingResult onEndOfStream() override;
@@ -107,6 +101,9 @@ class WebHardwareDecoder : public VideoDecoder {
   float frameRate = 30.0f;
   std::unique_ptr<ByteData> mp4Data = nullptr;
 
+  explicit HardwareDecoder(const VideoFormat& format);
+
   friend class WebVideoBuffer;
+  friend class HardwareDecoderFactory;
 };
 }  // namespace pag

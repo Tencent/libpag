@@ -18,14 +18,12 @@
 
 #include "VideoReader.h"
 #include "base/utils/TimeUtil.h"
+#include "platform/Platform.h"
 #include "tgfx/core/Clock.h"
 
 namespace pag {
-#define DECODER_TYPE_HARDWARE 1
-#define DECODER_TYPE_SOFTWARE 2
-#define DECODER_TYPE_FAIL 3
-#define MAX_TRY_DECODE_COUNT 100
-#define FORCE_SOFTWARE_SIZE 160000  // 400x400
+static constexpr int MAX_TRY_DECODE_COUNT = 100;
+static constexpr int FORCE_SOFTWARE_SIZE = 160000;  // 400x400
 
 static Frame TotalFrames(VideoDemuxer* demuxer) {
   auto format = demuxer->getFormat();
@@ -37,13 +35,11 @@ VideoReader::VideoReader(std::unique_ptr<VideoDemuxer> videoDemuxer)
       demuxer(videoDemuxer.release()) {
   auto videoFormat = demuxer->getFormat();
   frameRate = videoFormat.frameRate;
-  decoderTypeIndex = DECODER_TYPE_HARDWARE;
-  auto forceSoftware =
-      (demuxer->staticContent() || videoFormat.width * videoFormat.height <= FORCE_SOFTWARE_SIZE);
   // Force using software decoders only when external decoders are available, because the built-in
   // libavc has poor performance.
-  if (forceSoftware && VideoDecoder::HasExternalSoftwareDecoder()) {
-    decoderTypeIndex = DECODER_TYPE_SOFTWARE;
+  if ((demuxer->staticContent() || videoFormat.width * videoFormat.height <= FORCE_SOFTWARE_SIZE) &&
+      VideoDecoderFactory::HasExternalSoftwareDecoder()) {
+    preferSoftware = true;
   }
 }
 
@@ -73,7 +69,7 @@ bool VideoReader::decodeFrame(Frame targetFrame) {
     if (!success) {
       // fallback to software decoder.
       destroyVideoDecoder();
-      decoderTypeIndex++;
+      factoryIndex++;
       if (checkVideoDecoder()) {
         success = onDecodeFrame(sampleTime);
       }
@@ -104,7 +100,10 @@ std::shared_ptr<tgfx::Texture> VideoReader::onMakeTexture(tgfx::Context* context
 }
 
 void VideoReader::onReportPerformance(Performance* performance, int64_t decodingTime) {
-  if (decoderTypeIndex == DECODER_TYPE_HARDWARE) {
+  if (videoDecoder == nullptr) {
+    return;
+  }
+  if (videoDecoder->isHardwareBacked()) {
     performance->hardwareDecodingTime += decodingTime;
     performance->hardwareDecodingInitialTime += hardDecodingInitialTime;
     hardDecodingInitialTime = 0;  // 只记录一次。
@@ -176,11 +175,10 @@ bool VideoReader::checkVideoDecoder() {
   if (videoDecoder) {
     return true;
   }
-  videoDecoder = makeVideoDecoder();
+  videoDecoder = makeVideoDecoder().release();
   if (videoDecoder) {
     return true;
   }
-  decoderTypeIndex = DECODER_TYPE_FAIL;
   return false;
 }
 
@@ -203,28 +201,26 @@ void VideoReader::resetParams() {
   demuxer->reset();
 }
 
-VideoDecoder* VideoReader::makeVideoDecoder() {
-  VideoDecoder* decoder = nullptr;
-  if (decoderTypeIndex <= DECODER_TYPE_HARDWARE) {
+std::unique_ptr<VideoDecoder> VideoReader::makeVideoDecoder() {
+  static const auto factories = Platform::Current()->getVideoDecoderFactories();
+  while (factoryIndex < static_cast<int>(factories.size())) {
+    auto factory = factories[factoryIndex];
+    if (factory->isHardwareBacked() && preferSoftware) {
+      factoryIndex++;
+      continue;
+    }
     tgfx::Clock clock = {};
-    // try hardware decoder.
-    decoder = VideoDecoder::Make(demuxer->getFormat(), true).release();
-    hardDecodingInitialTime = clock.measure();
-    if (decoder) {
-      decoderTypeIndex = DECODER_TYPE_HARDWARE;
+    auto decoder = factory->createDecoder(demuxer->getFormat());
+    if (decoder != nullptr) {
+      if (decoder->isHardwareBacked()) {
+        hardDecodingInitialTime = clock.elapsedTime();
+      } else {
+        softDecodingInitialTime = clock.elapsedTime();
+      }
       return decoder;
     }
+    factoryIndex++;
   }
-  if (decoderTypeIndex <= DECODER_TYPE_SOFTWARE) {
-    tgfx::Clock clock = {};
-    // try software decoder.
-    decoder = VideoDecoder::Make(demuxer->getFormat(), false).release();
-    softDecodingInitialTime = clock.measure();
-    if (decoder) {
-      decoderTypeIndex = DECODER_TYPE_SOFTWARE;
-      return decoder;
-    }
-  }
-  return decoder;
+  return nullptr;
 }
 }  // namespace pag
