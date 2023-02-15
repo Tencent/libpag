@@ -200,6 +200,10 @@ $ npm run dev
 $ emrun --browser chrome --serve_root . --port 8081 ./web/demo/index.html
 ```
 
+Chrome 浏览器打开 `http://localhost:8081/web/demo/index.html` 即可看到效果
+
+需要断点调试时，可以安装 [C/C++ DevTools Support (DWARF)](https://chrome.google.com/webstore/detail/cc%20%20-devtools-support-dwa/pdcpmagijalfljmkmjngeonclgbbannb)，并打开 Chrome DevTools > 设置 > 实验 > 勾选「WebAssembly Debugging: Enable DWARF support」选项启用 SourceMap 支持。现在就可以在 Chrome DevTools 中对 C++ 文件进行断点调试了。
+
 ### 生产流程
 
 执行 `build.sh` 脚本
@@ -218,7 +222,7 @@ $ ./build.sh
 创建一个新的 profile，然后使用下面的 **CMake options**（位置在 **CLion** > **Preferences** > **Build, Execution, Deployment** > **CMake**）
 
 ```
-CMAKE_TOOLCHAIN_FILE=path/to/emscripten/emscripten/version/cmake/Modules/Platform/Emscripten.cmake
+-DCMAKE_TOOLCHAIN_FILE=path/to/emscripten/emscripten/version/cmake/Modules/Platform/Emscripten.cmake
 ```
 
 ### 测试流程
