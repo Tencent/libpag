@@ -30,6 +30,7 @@ static jmethodID GPUDecoder_onDecodeFrame;
 static jmethodID GPUDecoder_onFlush;
 static jmethodID GPUDecoder_presentationTime;
 static jmethodID GPUDecoder_onRenderFrame;
+static jmethodID GPUDecoder_getVideoSurface;
 static jmethodID GPUDecoder_onRelease;
 
 static Global<jclass> MediaFormatClass;
@@ -41,8 +42,7 @@ void GPUDecoder::InitJNI(JNIEnv* env, const std::string& className) {
   GPUDecoderClass.reset(env, env->FindClass(className.c_str()));
   GPUDecoder_ForceSoftwareDecoder =
       env->GetStaticMethodID(GPUDecoderClass.get(), "ForceSoftwareDecoder", "()Z");
-  std::string createSig =
-      std::string("(Lorg/libpag/VideoSurface;Landroid/media/MediaFormat;)L") + className + ";";
+  std::string createSig = std::string("(Landroid/media/MediaFormat;)L") + className + ";";
   GPUDecoder_Create = env->GetStaticMethodID(GPUDecoderClass.get(), "Create", createSig.c_str());
   GPUDecoder_onSendBytes =
       env->GetMethodID(GPUDecoderClass.get(), "onSendBytes", "(Ljava/nio/ByteBuffer;J)I");
@@ -51,6 +51,8 @@ void GPUDecoder::InitJNI(JNIEnv* env, const std::string& className) {
   GPUDecoder_onFlush = env->GetMethodID(GPUDecoderClass.get(), "onFlush", "()V");
   GPUDecoder_presentationTime = env->GetMethodID(GPUDecoderClass.get(), "presentationTime", "()J");
   GPUDecoder_onRenderFrame = env->GetMethodID(GPUDecoderClass.get(), "onRenderFrame", "()Z");
+  GPUDecoder_getVideoSurface =
+      env->GetMethodID(GPUDecoderClass.get(), "getVideoSurface", "()Lorg/libpag/VideoSurface;");
   GPUDecoder_onRelease = env->GetMethodID(GPUDecoderClass.get(), "onRelease", "()V");
 
   MediaFormatClass.reset(env, env->FindClass("android/media/MediaFormat"));
@@ -83,12 +85,6 @@ GPUDecoder::~GPUDecoder() {
 }
 
 bool GPUDecoder::initDecoder(JNIEnv* env, const VideoFormat& format) {
-  videoSurface = VideoSurface::Make(format.width, format.height);
-  if (videoSurface == nullptr) {
-    return false;
-  }
-  videoWidth = format.width;
-  videoHeight = format.height;
   Local<jstring> mimeType = {env, SafeConvertToJString(env, format.mimeType.c_str())};
   Local<jobject> mediaFormat = {
       env, env->CallStaticObjectMethod(MediaFormatClass.get(), MediaFormat_createVideoFormat,
@@ -126,10 +122,15 @@ bool GPUDecoder::initDecoder(JNIEnv* env, const VideoFormat& format) {
   Local<jstring> frameRateKey = {env, SafeConvertToJString(env, frameRateKeyString)};
   env->CallVoidMethod(mediaFormat.get(), MediaFormat_setFloat, frameRateKey.get(),
                       format.frameRate);
-  Local<jobject> decoder = {
-      env, env->CallStaticObjectMethod(GPUDecoderClass.get(), GPUDecoder_Create,
-                                       videoSurface->getVideoSurface(), mediaFormat.get())};
+  Local<jobject> decoder = {env, env->CallStaticObjectMethod(GPUDecoderClass.get(),
+                                                             GPUDecoder_Create, mediaFormat.get())};
   if (decoder.empty()) {
+    return false;
+  }
+  auto videoSurface = env->CallObjectMethod(decoder.get(), GPUDecoder_getVideoSurface);
+  bufferQueue = JVideoSurface::GetBufferQueue(env, videoSurface);
+  if (bufferQueue == nullptr) {
+    env->CallVoidMethod(decoder.get(), GPUDecoder_onRelease);
     return false;
   }
   videoDecoder.reset(env, decoder.get());
@@ -184,7 +185,7 @@ DecodingResult GPUDecoder::onEndOfStream() {
       env->CallIntMethod(videoDecoder.get(), GPUDecoder_onEndOfStream));
 }
 
-std::shared_ptr<VideoBuffer> GPUDecoder::onRenderFrame() {
+std::shared_ptr<tgfx::ImageBuffer> GPUDecoder::onRenderFrame() {
   auto env = JNIEnvironment::Current();
   if (env == nullptr) {
     return nullptr;
@@ -193,7 +194,6 @@ std::shared_ptr<VideoBuffer> GPUDecoder::onRenderFrame() {
   if (!result) {
     return nullptr;
   }
-  videoSurface->markPendingTexImage();
-  return VideoImage::MakeFrom(videoSurface, videoWidth, videoHeight);
+  return bufferQueue->acquireNextBuffer();
 }
 }  // namespace pag

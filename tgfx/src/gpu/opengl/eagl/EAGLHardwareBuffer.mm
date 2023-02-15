@@ -19,6 +19,7 @@
 #include "EAGLHardwareTexture.h"
 #include "EAGLNV12Texture.h"
 #include "platform/apple/HardwareBuffer.h"
+#include "platform/apple/NV12HardwareBuffer.h"
 
 namespace tgfx {
 std::shared_ptr<PixelBuffer> PixelBuffer::MakeFrom(HardwareBufferRef hardwareBuffer) {
@@ -30,8 +31,17 @@ std::shared_ptr<PixelBuffer> PixelBuffer::MakeHardwareBuffer(int width, int heig
   return HardwareBuffer::Make(width, height, alphaOnly);
 }
 
+std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer) {
+  return HardwareBuffer::MakeFrom(hardwareBuffer);
+}
+
 std::shared_ptr<Texture> Texture::MakeFrom(Context* context, HardwareBufferRef hardwareBuffer) {
   return EAGLHardwareTexture::MakeFrom(context, hardwareBuffer);
+}
+
+std::shared_ptr<YUVBuffer> YUVBuffer::MakeFrom(HardwareBufferRef hardwareBuffer,
+                                               YUVColorSpace colorSpace, YUVColorRange colorRange) {
+  return NV12HardwareBuffer::MakeFrom(hardwareBuffer, colorSpace, colorRange);
 }
 
 std::shared_ptr<YUVTexture> YUVTexture::MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,

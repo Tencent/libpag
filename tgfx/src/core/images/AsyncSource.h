@@ -54,6 +54,7 @@ class AsyncSource : public ImageSource {
 
  private:
   std::shared_ptr<ImageGeneratorTask> imageTask = nullptr;
+  std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
   std::shared_ptr<EncodedSource> encodedSource = nullptr;
 
   explicit AsyncSource(std::shared_ptr<EncodedSource> source);

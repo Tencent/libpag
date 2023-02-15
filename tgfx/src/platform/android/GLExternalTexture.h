@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,26 +18,25 @@
 
 #pragma once
 
-#include <CoreVideo/CVPixelBuffer.h>
-#include "rendering/video/VideoBuffer.h"
+#include "tgfx/gpu/opengl/GLTexture.h"
 
-namespace pag {
-class VideoImage : public VideoBuffer {
+namespace tgfx {
+class GLExternalTexture : public GLTexture {
  public:
-  static std::shared_ptr<VideoImage> MakeFrom(CVPixelBufferRef pixelBuffer);
+  static std::shared_ptr<GLExternalTexture> Make(Context* context, int width, int height);
 
-  ~VideoImage() override;
+  tgfx::Point getTextureCoord(float x, float y) const override;
 
-  size_t planeCount() const override;
+  size_t memoryUsage() const override;
 
- protected:
-  std::shared_ptr<tgfx::Texture> onMakeTexture(tgfx::Context* context, bool) const override {
-    return tgfx::Texture::MakeFrom(context, pixelBuffer);
-  }
+  void updateTextureSize(int width, int height);
 
  private:
-  CVPixelBufferRef pixelBuffer = nullptr;
+  int textureWidth = 0;
+  int textureHeight = 0;
 
-  explicit VideoImage(CVPixelBufferRef pixelBuffer);
+  GLExternalTexture(GLSampler sampler, int width, int height);
+
+  void onReleaseGPU() override;
 };
-}  // namespace pag
+}  // namespace tgfx

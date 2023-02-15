@@ -44,7 +44,7 @@ class GLBackendTexture : public GLTexture {
 
   void onReleaseGPU() override {
     if (adopted) {
-      context->gpu()->deleteTexture(&sampler);
+      context->gpu()->deleteSampler(&sampler);
     }
   }
 };
@@ -93,7 +93,7 @@ class GLAlphaTexture : public GLTexture {
 
  private:
   void onReleaseGPU() override {
-    context->gpu()->deleteTexture(&sampler);
+    context->gpu()->deleteSampler(&sampler);
   }
 };
 
@@ -124,7 +124,7 @@ class GLRGBATexture : public GLTexture {
 
  private:
   void onReleaseGPU() override {
-    context->gpu()->deleteTexture(&sampler);
+    context->gpu()->deleteSampler(&sampler);
   }
 };
 
@@ -178,7 +178,7 @@ std::shared_ptr<Texture> Texture::MakeFormat(Context* context, int width, int he
     if (enableMipMap) {
       maxMipmapLevel = static_cast<int>(std::floor(std::log2(std::max(width, height))));
     }
-    auto sampler = context->gpu()->createTexture(width, height, pixelFormat, maxMipmapLevel + 1);
+    auto sampler = context->gpu()->createSampler(width, height, pixelFormat, maxMipmapLevel + 1);
     if (sampler == nullptr) {
       return nullptr;
     }
@@ -194,7 +194,6 @@ std::shared_ptr<Texture> Texture::MakeFormat(Context* context, int width, int he
   if (pixels != nullptr) {
     context->gpu()->writePixels(texture->getSampler(), Rect::MakeWH(width, height), pixels,
                                 rowBytes, pixelFormat);
-    context->gpu()->regenerateMipMapLevels(texture->getSampler());
   }
   return texture;
 }

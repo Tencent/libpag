@@ -26,9 +26,8 @@ std::unique_ptr<Gpu> GLGpu::Make(Context* context) {
   return std::unique_ptr<GLGpu>(new GLGpu(context));
 }
 
-std::unique_ptr<TextureSampler> GLGpu::createTexture(int width, int height, PixelFormat format,
+std::unique_ptr<TextureSampler> GLGpu::createSampler(int width, int height, PixelFormat format,
                                                      int mipLevelCount) {
-  DEBUG_ASSERT(mipLevelCount > 0);
   auto gl = GLFunctions::Get(_context);
   auto sampler = std::make_unique<GLSampler>();
   gl->genTextures(1, &(sampler->id));
@@ -61,7 +60,7 @@ std::unique_ptr<TextureSampler> GLGpu::createTexture(int width, int height, Pixe
   return sampler;
 }
 
-void GLGpu::deleteTexture(TextureSampler* sampler) {
+void GLGpu::deleteSampler(TextureSampler* sampler) {
   if (sampler == nullptr) {
     return;
   }
@@ -103,6 +102,9 @@ void GLGpu::writePixels(const TextureSampler* sampler, Rect rect, const void* pi
                           GL_UNSIGNED_BYTE, data + (row * rowBytes));
       }
     }
+  }
+  if (sampler->mipMapped()) {
+    onRegenerateMipMapLevels(sampler);
   }
 }
 

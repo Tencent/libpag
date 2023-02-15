@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,25 +16,31 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "VideoImage.h"
+#pragma once
+
+#include "tgfx/platform/android/ImageBufferQueue.h"
 
 namespace pag {
-std::shared_ptr<VideoImage> VideoImage::MakeFrom(std::shared_ptr<VideoSurface> videoSurface,
-                                                 int width, int height) {
-  if (videoSurface == nullptr) {
-    return nullptr;
+class JVideoSurface {
+ public:
+  static std::shared_ptr<tgfx::ImageBufferQueue> GetBufferQueue(JNIEnv* env, jobject videoSurface);
+
+  explicit JVideoSurface(std::shared_ptr<tgfx::ImageBufferQueue> bufferQueue)
+      : bufferQueue(bufferQueue) {
   }
-  auto videoImage =
-      std::shared_ptr<VideoImage>(new VideoImage(std::move(videoSurface), width, height));
-  return videoImage;
-}
 
-VideoImage::VideoImage(std::shared_ptr<VideoSurface> videoSurface, int width, int height)
-    : VideoBuffer(width, height), videoSurface(std::move(videoSurface)) {
-}
+  std::shared_ptr<tgfx::ImageBufferQueue> get() {
+    std::lock_guard<std::mutex> autoLock(locker);
+    return bufferQueue;
+  }
 
-std::shared_ptr<tgfx::Texture> VideoImage::onMakeTexture(tgfx::Context* context, bool) const {
-  std::lock_guard<std::mutex> autoLock(locker);
-  return videoSurface->makeTexture(context);
-}
+  void clear() {
+    std::lock_guard<std::mutex> autoLock(locker);
+    bufferQueue = nullptr;
+  }
+
+ private:
+  std::mutex locker;
+  std::shared_ptr<tgfx::ImageBufferQueue> bufferQueue = nullptr;
+};
 }  // namespace pag

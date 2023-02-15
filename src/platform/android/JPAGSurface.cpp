@@ -26,7 +26,6 @@
 #include "GPUDrawable.h"
 #include "JNIHelper.h"
 #include "NativePlatform.h"
-#include "VideoSurface.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace pag {

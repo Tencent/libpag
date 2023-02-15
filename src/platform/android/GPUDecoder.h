@@ -18,9 +18,8 @@
 
 #pragma once
 
-#include "VideoImage.h"
-#include "VideoSurface.h"
 #include "platform/android/Global.h"
+#include "platform/android/JVideoSurface.h"
 #include "rendering/video/VideoDecoder.h"
 
 namespace pag {
@@ -46,13 +45,11 @@ class GPUDecoder : public VideoDecoder {
 
   int64_t presentationTime() override;
 
-  std::shared_ptr<VideoBuffer> onRenderFrame() override;
+  std::shared_ptr<tgfx::ImageBuffer> onRenderFrame() override;
 
  private:
   bool _isValid = false;
-  int videoWidth = 0;
-  int videoHeight = 0;
-  std::shared_ptr<VideoSurface> videoSurface = nullptr;
+  std::shared_ptr<tgfx::ImageBufferQueue> bufferQueue = nullptr;
   Global<jobject> videoDecoder;
 
   bool initDecoder(JNIEnv* env, const VideoFormat& format);

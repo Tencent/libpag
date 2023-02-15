@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GPUDecoder.h"
-#include "VideoImage.h"
-#include "tgfx/core/Buffer.h"
 
 namespace pag {
 GPUDecoder::GPUDecoder(const VideoFormat& format)
@@ -301,10 +299,10 @@ int64_t GPUDecoder::presentationTime() {
   return outputFrame->frameTime;
 }
 
-std::shared_ptr<VideoBuffer> GPUDecoder::onRenderFrame() {
+std::shared_ptr<tgfx::ImageBuffer> GPUDecoder::onRenderFrame() {
   if (outputFrame == nullptr) {
     return nullptr;
   }
-  return VideoImage::MakeFrom(outputFrame->outputPixelBuffer);
+  return tgfx::ImageBuffer::MakeFrom(outputFrame->outputPixelBuffer);
 }
-}
+}  // namespace pag

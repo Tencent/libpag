@@ -129,7 +129,6 @@ std::shared_ptr<Texture> HardwareBuffer::onMakeTexture(Context* context, bool mi
     auto rect = Rect::MakeWH(width(), height());
     context->gpu()->writePixels(texture->getSampler(), rect, pixels,
                                 CVPixelBufferGetBytesPerRow(pixelBuffer), PixelFormat::BGRA_8888);
-    context->gpu()->regenerateMipMapLevels(texture->getSampler());
   } else {
     texture = nullptr;
   }
