@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -19,10 +19,9 @@
 #pragma once
 
 #include <emscripten/val.h>
-#include <pag/gpu.h>
-#include "pag/file.h"
+#include <mutex>
 #include "pag/pag.h"
-#include "rendering/sequences/SequenceReader.h"
+#include "rendering/video/VideoDecoder.h"
 #include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace pag {
@@ -44,12 +43,11 @@ class WebVideoTexture : public tgfx::GLTexture {
   void onReleaseGPU() override;
 };
 
-class VideoSequenceReader : public SequenceReader {
+class WebVideoBuffer : public tgfx::ImageBuffer {
  public:
-  VideoSequenceReader(std::shared_ptr<File> file, VideoSequence* sequence,
-                      PAGFile* pagFile = nullptr);
+  WebVideoBuffer(int width, int height, emscripten::val videoReader);
 
-  ~VideoSequenceReader() override;
+  ~WebVideoBuffer() override;
 
   int width() const override {
     return _width;
@@ -59,21 +57,56 @@ class VideoSequenceReader : public SequenceReader {
     return _height;
   }
 
+  bool isAlphaOnly() const override {
+    return false;
+  }
+
  protected:
-  bool decodeFrame(Frame targetFrame) override;
-
-  std::shared_ptr<tgfx::Texture> onMakeTexture(tgfx::Context* context) override;
-
-  void onReportPerformance(Performance* performance, int64_t decodingTime) override;
+  std::shared_ptr<tgfx::Texture> onMakeTexture(tgfx::Context* context, bool) const override;
 
  private:
+  mutable std::mutex locker = {};
+  mutable std::shared_ptr<WebVideoTexture> webVideoTexture = nullptr;
+  int _width = 0;
+  int _height = 0;
+  emscripten::val videoReader = emscripten::val::null();
+
+  friend class WebHardwareDecoder;
+};
+
+class WebHardwareDecoder : public VideoDecoder {
+ public:
+  explicit WebHardwareDecoder(const VideoFormat& format);
+
+  bool isValid() {
+    return videoBuffer != nullptr;
+  }
+
+  DecodingResult onSendBytes(void* bytes, size_t length, int64_t time) override;
+
+  DecodingResult onEndOfStream() override;
+
+  DecodingResult onDecodeFrame() override;
+
+  void onFlush() override;
+
+  int64_t presentationTime() override;
+
+  std::shared_ptr<tgfx::ImageBuffer> onRenderFrame() override;
+
+ private:
+  int64_t pendingTimeStamp = 0;
+  int64_t currentTimeStamp = 0;
+  bool endOfStream = true;
   // Keep a reference to the File in case the Sequence object is released while we are using it.
   std::shared_ptr<File> file = nullptr;
   PAGFile* rootFile = nullptr;
-  emscripten::val videoReader = emscripten::val::null();
-  std::shared_ptr<WebVideoTexture> webVideoTexture = nullptr;
+  std::shared_ptr<WebVideoBuffer> videoBuffer = nullptr;
   int32_t _width = 0;
   int32_t _height = 0;
+  float frameRate = 30.0f;
   std::unique_ptr<ByteData> mp4Data = nullptr;
+
+  friend class WebVideoBuffer;
 };
 }  // namespace pag

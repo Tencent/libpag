@@ -19,6 +19,7 @@
 #include "NativePlatform.h"
 #include <emscripten/val.h>
 #include "NativeTextShaper.h"
+#include "WebHardwareDecoder.h"
 #ifdef PAG_USE_HARFBUZZ
 #include "base/utils/USE.h"
 #endif
@@ -47,5 +48,17 @@ std::optional<PositionedGlyphs> NativePlatform::shapeText(
 #else
   return NativeTextShaper::Shape(text, typeface);
 #endif
+}
+
+std::unique_ptr<VideoDecoder> NativePlatform::makeHardwareDecoder(const VideoFormat& format) const {
+  if (format.demuxer == nullptr) {
+    return nullptr;
+  }
+  auto decoder = new WebHardwareDecoder(format);
+  if (!decoder->isValid()) {
+    delete decoder;
+    return nullptr;
+  }
+  return std::unique_ptr<WebHardwareDecoder>(decoder);
 }
 }  // namespace pag

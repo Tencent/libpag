@@ -74,11 +74,7 @@ class StaticSequenceGenerator : public tgfx::ImageGenerator {
  protected:
   std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer(bool) const override {
     auto reader = SequenceReader::Make(file, sequence);
-    auto buffer = reader->makeBuffer(0);
-    if (buffer == nullptr) {
-      buffer = std::shared_ptr<SequenceReaderBuffer>(new SequenceReaderBuffer(reader, 0));
-    }
-    return buffer;
+    return reader->makeBuffer(0);
   }
 
  private:

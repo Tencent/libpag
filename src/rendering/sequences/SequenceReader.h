@@ -68,7 +68,7 @@ class SequenceReader {
   /**
    * Return the ImageBuffer of current decoded frame.
    */
-  virtual std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer();
+  virtual std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer() = 0;
 
   /**
    * Returns the texture of current decoded frame.
