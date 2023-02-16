@@ -20,12 +20,14 @@
 
 #include <climits>
 #include "pag/file.h"
+#include "pag/pag.h"
 #include "rendering/video/VideoDemuxer.h"
 
 namespace pag {
 class VideoSequenceDemuxer : public VideoDemuxer {
  public:
-  VideoSequenceDemuxer(std::shared_ptr<File> file, VideoSequence* sequence);
+  VideoSequenceDemuxer(std::shared_ptr<File> file, VideoSequence* sequence,
+                       PAGFile* pagFile = nullptr);
 
   VideoFormat getFormat() override {
     return format;
@@ -45,6 +47,8 @@ class VideoSequenceDemuxer : public VideoDemuxer {
   // Keep a reference to the File in case the Sequence object is released while we are using it.
   std::shared_ptr<File> file = nullptr;
   VideoSequence* sequence = nullptr;
+  // used by the video decoder on the web platform.
+  PAGFile* pagFile = nullptr;
   VideoFormat format = {};
   std::vector<Frame> keyframes = {};
   Frame maxPTSFrame = -1;
@@ -53,5 +57,7 @@ class VideoSequenceDemuxer : public VideoDemuxer {
   bool staticContent() const override {
     return sequence->composition->staticContent();
   }
+
+  friend class HardwareDecoder;
 };
 }  // namespace pag

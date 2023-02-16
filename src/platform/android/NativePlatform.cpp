@@ -21,8 +21,8 @@
 #include <sys/system_properties.h>
 #include <cstdarg>
 #include "FontConfigAndroid.h"
-#include "GPUDecoder.h"
 #include "Global.h"
+#include "HardwareDecoder.h"
 #include "JNIEnvironment.h"
 #include "JTraceImage.h"
 #include "PAGText.h"
@@ -30,6 +30,24 @@
 #define LOG_TAG "libpag"
 
 namespace pag {
+class HardwareDecoderFactory : public VideoDecoderFactory {
+ public:
+  bool isHardwareBacked() const override {
+    return true;
+  }
+
+ protected:
+  std::unique_ptr<VideoDecoder> onCreateDecoder(const VideoFormat& format) const override {
+    auto decoder = new HardwareDecoder(format);
+    if (!decoder->isValid) {
+      delete decoder;
+      return nullptr;
+    }
+    return std::unique_ptr<VideoDecoder>(decoder);
+  }
+};
+
+static HardwareDecoderFactory hardwareDecoderFactory = {};
 
 const Platform* Platform::Current() {
   static const NativePlatform platform = {};
@@ -44,18 +62,13 @@ void NativePlatform::InitJNI(JNIEnv* env) {
   initialized = true;
   JTraceImage::InitJNI(env);
   FontConfigAndroid::InitJNI(env);
-  GPUDecoder::InitJNI(env, "org/libpag/GPUDecoder");
+  HardwareDecoder::InitJNI(env, "org/libpag/HardwareDecoder");
   InitPAGTextJNI(env);
 }
 
-std::unique_ptr<VideoDecoder> NativePlatform::makeHardwareDecoder(
-    const pag::VideoFormat& format) const {
-  auto decoder = new GPUDecoder(format);
-  if (!decoder->isValid()) {
-    delete decoder;
-    return nullptr;
-  }
-  return std::unique_ptr<VideoDecoder>(decoder);
+std::vector<const VideoDecoderFactory*> NativePlatform::getVideoDecoderFactories() const {
+  return {&hardwareDecoderFactory, VideoDecoderFactory::ExternalDecoderFactory(),
+          VideoDecoderFactory::SoftwareAVCDecoderFactory()};
 }
 
 bool NativePlatform::registerFallbackFonts() const {

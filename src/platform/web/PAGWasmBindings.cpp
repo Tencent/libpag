@@ -491,9 +491,10 @@ EMSCRIPTEN_BINDINGS(pag) {
       .field("comment", &Marker::comment);
 
   function("_registerSoftwareDecoderFactory", optional_override([](val factory) {
-             delete VideoDecoder::GetExternalSoftwareDecoderFactory();
-             PAGVideoDecoder::RegisterSoftwareDecoderFactory(
-                 WebSoftwareDecoderFactory::Make(factory).release());
+             static std::unique_ptr<SoftwareDecoderFactory> softwareDecoderFactory = nullptr;
+             auto webFactory = WebSoftwareDecoderFactory::Make(factory);
+             PAGVideoDecoder::RegisterSoftwareDecoderFactory(webFactory.get());
+             softwareDecoderFactory = std::move(webFactory);
            }));
 
   function("_SDKVersion", &PAG::SDKVersion);

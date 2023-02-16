@@ -86,7 +86,7 @@ org.libpag.VideoSurface {
     private native void notifyFrameAvailable();
 }
 
-org.libpag.GPUDecoder extends org.libpag.VideoDecoder{
+org.libpag.HardwareDecoder extends org.libpag.VideoDecoder{
     // inner class
     private static class OutputFrame {
         public long[] data;
@@ -97,7 +97,7 @@ org.libpag.GPUDecoder extends org.libpag.VideoDecoder{
     public void onFrameAvailable(SurfaceTexture st);
 
     // keep method
-    private static GPUDecoder Create(MediaFormat mediaFormat);
+    private static HardwareDecoder Create(MediaFormat mediaFormat);
     private int onSendBytes(ByteBuffer bytes, long frame);
     private int onEndOfStream();
     private int onDecodeFrame();

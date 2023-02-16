@@ -20,7 +20,7 @@
 
 #include <atomic>
 #include "SequenceReader.h"
-#include "rendering/video/VideoDecoder.h"
+#include "rendering/video/VideoDecoderFactory.h"
 #include "rendering/video/VideoDemuxer.h"
 
 namespace pag {
@@ -39,11 +39,7 @@ class VideoReader : public SequenceReader {
   }
 
  protected:
-  bool decodeFrame(Frame targetFrame) override;
-
-  std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer() override;
-
-  std::shared_ptr<tgfx::Texture> onMakeTexture(tgfx::Context* context) override;
+  std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer(Frame targetFrame) override;
 
   void onReportPerformance(Performance* performance, int64_t decodingTime) override;
 
@@ -51,7 +47,8 @@ class VideoReader : public SequenceReader {
   std::mutex locker = {};
   VideoDemuxer* demuxer = nullptr;
   float frameRate = 0.0;
-  int decoderTypeIndex = 0;
+  int factoryIndex = 0;
+  bool preferSoftware = false;
   VideoDecoder* videoDecoder = nullptr;
   VideoSample videoSample = {};
   std::shared_ptr<tgfx::ImageBuffer> lastBuffer = nullptr;
@@ -70,8 +67,8 @@ class VideoReader : public SequenceReader {
 
   bool sendSampleData();
 
-  bool onDecodeFrame(int64_t sampleTime);
+  bool decodeFrame(int64_t sampleTime);
 
-  VideoDecoder* makeVideoDecoder();
+  std::unique_ptr<VideoDecoder> makeVideoDecoder();
 };
 }  // namespace pag

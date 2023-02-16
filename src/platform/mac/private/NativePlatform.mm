@@ -17,10 +17,29 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "NativePlatform.h"
-#include "GPUDecoder.h"
+#include "HardwareDecoder.h"
 
 namespace pag {
 static std::atomic<NALUType> defaultType = {NALUType::AVCC};
+
+class HardwareDecoderFactory : public VideoDecoderFactory {
+ public:
+  bool isHardwareBacked() const override {
+    return true;
+  }
+
+ protected:
+  std::unique_ptr<VideoDecoder> onCreateDecoder(const VideoFormat& format) const override {
+    auto decoder = new HardwareDecoder(format);
+    if (!decoder->isInitialized) {
+      delete decoder;
+      return nullptr;
+    }
+    return std::unique_ptr<VideoDecoder>(decoder);
+  }
+};
+
+static HardwareDecoderFactory hardwareDecoderFactory = {};
 
 const Platform* Platform::Current() {
   static const NativePlatform platform = {};
@@ -35,12 +54,8 @@ void NativePlatform::setNALUType(NALUType type) const {
   defaultType = type;
 }
 
-std::unique_ptr<VideoDecoder> NativePlatform::makeHardwareDecoder(const VideoFormat& format) const {
-  auto decoder = new GPUDecoder(format);
-  if (!decoder->isInitialized) {
-    delete decoder;
-    return nullptr;
-  }
-  return std::unique_ptr<VideoDecoder>(decoder);
+std::vector<const VideoDecoderFactory*> NativePlatform::getVideoDecoderFactories() const {
+  return {&hardwareDecoderFactory, VideoDecoderFactory::ExternalDecoderFactory(),
+          VideoDecoderFactory::SoftwareAVCDecoderFactory()};
 }
-}
+}  // namespace pag

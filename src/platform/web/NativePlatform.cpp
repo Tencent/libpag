@@ -18,6 +18,7 @@
 
 #include "NativePlatform.h"
 #include <emscripten/val.h>
+#include "HardwareDecoder.h"
 #include "NativeTextShaper.h"
 #ifdef PAG_USE_HARFBUZZ
 #include "base/utils/USE.h"
@@ -26,6 +27,28 @@
 using namespace emscripten;
 
 namespace pag {
+class HardwareDecoderFactory : public VideoDecoderFactory {
+ public:
+  bool isHardwareBacked() const override {
+    return true;
+  }
+
+ protected:
+  std::unique_ptr<VideoDecoder> onCreateDecoder(const VideoFormat& format) const override {
+    if (format.demuxer == nullptr) {
+      return nullptr;
+    }
+    auto decoder = new HardwareDecoder(format);
+    if (decoder->videoBuffer == nullptr) {
+      delete decoder;
+      return nullptr;
+    }
+    return std::unique_ptr<HardwareDecoder>(decoder);
+  }
+};
+
+static HardwareDecoderFactory hardwareDecoderFactory = {};
+
 const Platform* Platform::Current() {
   static const NativePlatform platform = {};
   return &platform;
@@ -47,5 +70,10 @@ std::optional<PositionedGlyphs> NativePlatform::shapeText(
 #else
   return NativeTextShaper::Shape(text, typeface);
 #endif
+}
+
+std::vector<const VideoDecoderFactory*> NativePlatform::getVideoDecoderFactories() const {
+  return {VideoDecoderFactory::ExternalDecoderFactory(), &hardwareDecoderFactory,
+          VideoDecoderFactory::SoftwareAVCDecoderFactory()};
 }
 }  // namespace pag

@@ -16,13 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GPUDecoder.h"
+#include "HardwareDecoder.h"
 #include "base/utils/USE.h"
 #include "tgfx/core/YUVBuffer.h"
 
 namespace pag {
 
-GPUDecoder::GPUDecoder(const VideoFormat& format)
+HardwareDecoder::HardwareDecoder(const VideoFormat& format)
     : sourceColorSpace(format.colorSpace),
       destinationColorSpace(format.colorSpace),
       colorRange(format.colorRange),
@@ -30,7 +30,7 @@ GPUDecoder::GPUDecoder(const VideoFormat& format)
   isInitialized = initVideoToolBox(format.headers, format.mimeType);
 }
 
-GPUDecoder::~GPUDecoder() {
+HardwareDecoder::~HardwareDecoder() {
   if (session) {
     VTDecompressionSessionFinishDelayedFrames(session);
     VTDecompressionSessionInvalidate(session);
@@ -46,7 +46,7 @@ GPUDecoder::~GPUDecoder() {
   cleanResources();
 }
 
-void GPUDecoder::cleanResources() {
+void HardwareDecoder::cleanResources() {
   if (outputFrame) {
     CVPixelBufferRelease(outputFrame->outputPixelBuffer);
     delete outputFrame;
@@ -80,8 +80,8 @@ void DidDecompress(void*, void* sourceFrameRefCon, OSStatus status, VTDecodeInfo
   }
 }
 
-bool GPUDecoder::initVideoToolBox(const std::vector<std::shared_ptr<tgfx::Data>>& headers,
-                                  const std::string& mimeType) {
+bool HardwareDecoder::initVideoToolBox(const std::vector<std::shared_ptr<tgfx::Data>>& headers,
+                                       const std::string& mimeType) {
   if (videoFormatDescription == nullptr) {
     OSStatus status;
     int size = static_cast<int>(headers.size());
@@ -101,7 +101,7 @@ bool GPUDecoder::initVideoToolBox(const std::vector<std::shared_ptr<tgfx::Data>>
         status = -1;
       }
       if (status != noErr) {
-        LOGE("GPUDecoder:format description create failed status = %d", status);
+        LOGE("HardwareDecoder:format description create failed status = %d", status);
         return false;
       }
     } else {
@@ -113,7 +113,7 @@ bool GPUDecoder::initVideoToolBox(const std::vector<std::shared_ptr<tgfx::Data>>
                                                                    4,  // nal start code size
                                                                    &videoFormatDescription);
       if (status != noErr) {
-        LOGE("GPUDecoder:format description create failed status = %d", status);
+        LOGE("HardwareDecoder:format description create failed status = %d", status);
         return false;
       }
     }
@@ -122,7 +122,7 @@ bool GPUDecoder::initVideoToolBox(const std::vector<std::shared_ptr<tgfx::Data>>
   return true;
 }
 
-bool GPUDecoder::resetVideoToolBox() {
+bool HardwareDecoder::resetVideoToolBox() {
   if (session) {
     VTDecompressionSessionFinishDelayedFrames(session);
     VTDecompressionSessionInvalidate(session);
@@ -194,16 +194,16 @@ bool GPUDecoder::resetVideoToolBox() {
   }
 
   if (status != noErr || !session) {
-    LOGE("GPUDecoder:decoder session create failed status = %d", status);
+    LOGE("HardwareDecoder:decoder session create failed status = %d", status);
     return false;
   }
 
   return true;
 }
 
-pag::DecodingResult GPUDecoder::onSendBytes(void* bytes, size_t length, int64_t time) {
+pag::DecodingResult HardwareDecoder::onSendBytes(void* bytes, size_t length, int64_t time) {
   if (!bytes || length == 0) {
-    LOGE("GPUDecoder: Error on sending bytes for decoding.\n");
+    LOGE("HardwareDecoder: Error on sending bytes for decoding.\n");
     return DecodingResult::Error;
   }
 
@@ -213,7 +213,7 @@ pag::DecodingResult GPUDecoder::onSendBytes(void* bytes, size_t length, int64_t 
                                               NULL, 0, length, 0, &blockBuffer);
 
   if (status != noErr) {
-    LOGE("GPUDecoder:CMBlockBufferRef failed status=%d", (int)status);
+    LOGE("HardwareDecoder:CMBlockBufferRef failed status=%d", (int)status);
     return DecodingResult::Error;
   }
 
@@ -223,7 +223,7 @@ pag::DecodingResult GPUDecoder::onSendBytes(void* bytes, size_t length, int64_t 
                                      NULL, 1, sampleSizeArray, &sampleBuffer);
 
   if (status != noErr) {
-    LOGE("GPUDecoder:CMSampleBufferRef failed status=%d", (int)status);
+    LOGE("HardwareDecoder:CMSampleBufferRef failed status=%d", (int)status);
     return DecodingResult::Error;
   }
 
@@ -233,12 +233,12 @@ pag::DecodingResult GPUDecoder::onSendBytes(void* bytes, size_t length, int64_t 
   return DecodingResult::Success;
 }
 
-pag::DecodingResult GPUDecoder::onEndOfStream() {
+pag::DecodingResult HardwareDecoder::onEndOfStream() {
   inputEndOfStream = true;
   return DecodingResult::Success;
 }
 
-pag::DecodingResult GPUDecoder::onDecodeFrame() {
+pag::DecodingResult HardwareDecoder::onDecodeFrame() {
   if (outputFrame) {
     CVPixelBufferRelease(outputFrame->outputPixelBuffer);
     delete outputFrame;
@@ -258,11 +258,11 @@ pag::DecodingResult GPUDecoder::onDecodeFrame() {
       if (status == kVTInvalidSessionErr) {
         cleanResources();
         isInitialized = resetVideoToolBox();
-        LOGI("GPUDecoder: Resetting VideoToolBox session, which may be caused by app entered "
+        LOGI("HardwareDecoder: Resetting VideoToolBox session, which may be caused by app entered "
              "background, initialized = %d",
              isInitialized);
       } else {
-        LOGE("GPUDecoder:Decode failed status = %d", (int)status);
+        LOGE("HardwareDecoder:Decode failed status = %d", (int)status);
       }
       return DecodingResult::Error;
     }
@@ -304,18 +304,18 @@ pag::DecodingResult GPUDecoder::onDecodeFrame() {
   return DecodingResult::TryAgainLater;
 }
 
-void GPUDecoder::onFlush() {
+void HardwareDecoder::onFlush() {
   cleanResources();
 }
 
-int64_t GPUDecoder::presentationTime() {
+int64_t HardwareDecoder::presentationTime() {
   if (outputFrame == nullptr) {
     return -1;
   }
   return outputFrame->frameTime;
 }
 
-std::shared_ptr<tgfx::ImageBuffer> GPUDecoder::onRenderFrame() {
+std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
   if (outputFrame == nullptr) {
     return nullptr;
   }

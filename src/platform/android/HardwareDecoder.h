@@ -23,17 +23,11 @@
 #include "rendering/video/VideoDecoder.h"
 
 namespace pag {
-class GPUDecoder : public VideoDecoder {
+class HardwareDecoder : public VideoDecoder {
  public:
   static void InitJNI(JNIEnv* env, const std::string& className);
 
-  explicit GPUDecoder(const VideoFormat& format);
-
-  ~GPUDecoder() override;
-
-  bool isValid() {
-    return _isValid;
-  }
+  ~HardwareDecoder() override;
 
   DecodingResult onSendBytes(void* bytes, size_t length, int64_t time) override;
 
@@ -48,10 +42,13 @@ class GPUDecoder : public VideoDecoder {
   std::shared_ptr<tgfx::ImageBuffer> onRenderFrame() override;
 
  private:
-  bool _isValid = false;
+  bool isValid = false;
   std::shared_ptr<tgfx::ImageBufferQueue> bufferQueue = nullptr;
   Global<jobject> videoDecoder;
 
+  explicit HardwareDecoder(const VideoFormat& format);
   bool initDecoder(JNIEnv* env, const VideoFormat& format);
+
+  friend class HardwareDecoderFactory;
 };
 }  // namespace pag

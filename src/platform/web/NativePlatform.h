@@ -28,5 +28,7 @@ class NativePlatform : public Platform {
 
   std::optional<PositionedGlyphs> shapeText(
       const std::string& text, const std::shared_ptr<tgfx::Typeface>& typeface) const override;
+
+  std::vector<const VideoDecoderFactory*> getVideoDecoderFactories() const override;
 };
 }  // namespace pag

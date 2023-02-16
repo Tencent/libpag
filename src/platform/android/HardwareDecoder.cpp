@@ -16,44 +16,49 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GPUDecoder.h"
+#include "HardwareDecoder.h"
 #include "platform/android/JStringUtil.h"
 #include "tgfx/core/Buffer.h"
 
 namespace pag {
-static Global<jclass> GPUDecoderClass;
-static jmethodID GPUDecoder_ForceSoftwareDecoder;
-static jmethodID GPUDecoder_Create;
-static jmethodID GPUDecoder_onSendBytes;
-static jmethodID GPUDecoder_onEndOfStream;
-static jmethodID GPUDecoder_onDecodeFrame;
-static jmethodID GPUDecoder_onFlush;
-static jmethodID GPUDecoder_presentationTime;
-static jmethodID GPUDecoder_onRenderFrame;
-static jmethodID GPUDecoder_getVideoSurface;
-static jmethodID GPUDecoder_onRelease;
+static Global<jclass> HardwareDecoderClass;
+static jmethodID HardwareDecoder_ForceSoftwareDecoder;
+static jmethodID HardwareDecoder_Create;
+static jmethodID HardwareDecoder_onSendBytes;
+static jmethodID HardwareDecoder_onEndOfStream;
+static jmethodID HardwareDecoder_onDecodeFrame;
+static jmethodID HardwareDecoder_onFlush;
+static jmethodID HardwareDecoder_presentationTime;
+static jmethodID HardwareDecoder_onRenderFrame;
+static jmethodID HardwareDecoder_getVideoSurface;
+static jmethodID HardwareDecoder_onRelease;
 
 static Global<jclass> MediaFormatClass;
 static jmethodID MediaFormat_createVideoFormat;
 static jmethodID MediaFormat_setByteBuffer;
 static jmethodID MediaFormat_setFloat;
 
-void GPUDecoder::InitJNI(JNIEnv* env, const std::string& className) {
-  GPUDecoderClass.reset(env, env->FindClass(className.c_str()));
-  GPUDecoder_ForceSoftwareDecoder =
-      env->GetStaticMethodID(GPUDecoderClass.get(), "ForceSoftwareDecoder", "()Z");
+void HardwareDecoder::InitJNI(JNIEnv* env, const std::string& className) {
+  HardwareDecoderClass.reset(env, env->FindClass(className.c_str()));
+  HardwareDecoder_ForceSoftwareDecoder =
+      env->GetStaticMethodID(HardwareDecoderClass.get(), "ForceSoftwareDecoder", "()Z");
   std::string createSig = std::string("(Landroid/media/MediaFormat;)L") + className + ";";
-  GPUDecoder_Create = env->GetStaticMethodID(GPUDecoderClass.get(), "Create", createSig.c_str());
-  GPUDecoder_onSendBytes =
-      env->GetMethodID(GPUDecoderClass.get(), "onSendBytes", "(Ljava/nio/ByteBuffer;J)I");
-  GPUDecoder_onEndOfStream = env->GetMethodID(GPUDecoderClass.get(), "onEndOfStream", "()I");
-  GPUDecoder_onDecodeFrame = env->GetMethodID(GPUDecoderClass.get(), "onDecodeFrame", "()I");
-  GPUDecoder_onFlush = env->GetMethodID(GPUDecoderClass.get(), "onFlush", "()V");
-  GPUDecoder_presentationTime = env->GetMethodID(GPUDecoderClass.get(), "presentationTime", "()J");
-  GPUDecoder_onRenderFrame = env->GetMethodID(GPUDecoderClass.get(), "onRenderFrame", "()Z");
-  GPUDecoder_getVideoSurface =
-      env->GetMethodID(GPUDecoderClass.get(), "getVideoSurface", "()Lorg/libpag/VideoSurface;");
-  GPUDecoder_onRelease = env->GetMethodID(GPUDecoderClass.get(), "onRelease", "()V");
+  HardwareDecoder_Create =
+      env->GetStaticMethodID(HardwareDecoderClass.get(), "Create", createSig.c_str());
+  HardwareDecoder_onSendBytes =
+      env->GetMethodID(HardwareDecoderClass.get(), "onSendBytes", "(Ljava/nio/ByteBuffer;J)I");
+  HardwareDecoder_onEndOfStream =
+      env->GetMethodID(HardwareDecoderClass.get(), "onEndOfStream", "()I");
+  HardwareDecoder_onDecodeFrame =
+      env->GetMethodID(HardwareDecoderClass.get(), "onDecodeFrame", "()I");
+  HardwareDecoder_onFlush = env->GetMethodID(HardwareDecoderClass.get(), "onFlush", "()V");
+  HardwareDecoder_presentationTime =
+      env->GetMethodID(HardwareDecoderClass.get(), "presentationTime", "()J");
+  HardwareDecoder_onRenderFrame =
+      env->GetMethodID(HardwareDecoderClass.get(), "onRenderFrame", "()Z");
+  HardwareDecoder_getVideoSurface = env->GetMethodID(HardwareDecoderClass.get(), "getVideoSurface",
+                                                     "()Lorg/libpag/VideoSurface;");
+  HardwareDecoder_onRelease = env->GetMethodID(HardwareDecoderClass.get(), "onRelease", "()V");
 
   MediaFormatClass.reset(env, env->FindClass("android/media/MediaFormat"));
   MediaFormat_createVideoFormat =
@@ -65,26 +70,26 @@ void GPUDecoder::InitJNI(JNIEnv* env, const std::string& className) {
       env->GetMethodID(MediaFormatClass.get(), "setFloat", "(Ljava/lang/String;F)V");
 }
 
-GPUDecoder::GPUDecoder(const VideoFormat& format) {
+HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
   auto env = JNIEnvironment::Current();
-  if (env == nullptr ||
-      env->CallStaticBooleanMethod(GPUDecoderClass.get(), GPUDecoder_ForceSoftwareDecoder)) {
+  if (env == nullptr || env->CallStaticBooleanMethod(HardwareDecoderClass.get(),
+                                                     HardwareDecoder_ForceSoftwareDecoder)) {
     return;
   }
-  _isValid = initDecoder(env, format);
+  isValid = initDecoder(env, format);
 }
 
-GPUDecoder::~GPUDecoder() {
+HardwareDecoder::~HardwareDecoder() {
   if (videoDecoder.get() != nullptr) {
     auto env = JNIEnvironment::Current();
     if (env == nullptr) {
       return;
     }
-    env->CallVoidMethod(videoDecoder.get(), GPUDecoder_onRelease);
+    env->CallVoidMethod(videoDecoder.get(), HardwareDecoder_onRelease);
   }
 }
 
-bool GPUDecoder::initDecoder(JNIEnv* env, const VideoFormat& format) {
+bool HardwareDecoder::initDecoder(JNIEnv* env, const VideoFormat& format) {
   Local<jstring> mimeType = {env, SafeConvertToJString(env, format.mimeType.c_str())};
   Local<jobject> mediaFormat = {
       env, env->CallStaticObjectMethod(MediaFormatClass.get(), MediaFormat_createVideoFormat,
@@ -122,75 +127,76 @@ bool GPUDecoder::initDecoder(JNIEnv* env, const VideoFormat& format) {
   Local<jstring> frameRateKey = {env, SafeConvertToJString(env, frameRateKeyString)};
   env->CallVoidMethod(mediaFormat.get(), MediaFormat_setFloat, frameRateKey.get(),
                       format.frameRate);
-  Local<jobject> decoder = {env, env->CallStaticObjectMethod(GPUDecoderClass.get(),
-                                                             GPUDecoder_Create, mediaFormat.get())};
+  Local<jobject> decoder = {
+      env, env->CallStaticObjectMethod(HardwareDecoderClass.get(), HardwareDecoder_Create,
+                                       mediaFormat.get())};
   if (decoder.empty()) {
     return false;
   }
-  auto videoSurface = env->CallObjectMethod(decoder.get(), GPUDecoder_getVideoSurface);
+  auto videoSurface = env->CallObjectMethod(decoder.get(), HardwareDecoder_getVideoSurface);
   bufferQueue = JVideoSurface::GetBufferQueue(env, videoSurface);
   if (bufferQueue == nullptr) {
-    env->CallVoidMethod(decoder.get(), GPUDecoder_onRelease);
+    env->CallVoidMethod(decoder.get(), HardwareDecoder_onRelease);
     return false;
   }
   videoDecoder.reset(env, decoder.get());
   return true;
 }
 
-DecodingResult GPUDecoder::onSendBytes(void* bytes, size_t length, int64_t time) {
+DecodingResult HardwareDecoder::onSendBytes(void* bytes, size_t length, int64_t time) {
   auto env = JNIEnvironment::Current();
   if (env == nullptr) {
-    LOGE("GPUDecoder: Error on sending bytes for decoding.\n");
+    LOGE("HardwareDecoder: Error on sending bytes for decoding.\n");
     return pag::DecodingResult::Error;
   }
   Local<jobject> byteBuffer = {env, env->NewDirectByteBuffer(bytes, length)};
   auto result =
-      env->CallIntMethod(videoDecoder.get(), GPUDecoder_onSendBytes, byteBuffer.get(), time);
+      env->CallIntMethod(videoDecoder.get(), HardwareDecoder_onSendBytes, byteBuffer.get(), time);
   return static_cast<pag::DecodingResult>(result);
 }
 
-DecodingResult GPUDecoder::onDecodeFrame() {
+DecodingResult HardwareDecoder::onDecodeFrame() {
   auto env = JNIEnvironment::Current();
   if (env == nullptr) {
-    LOGE("GPUDecoder: Error on decoding frame.\n");
+    LOGE("HardwareDecoder: Error on decoding frame.\n");
     return pag::DecodingResult::Error;
   }
   return static_cast<pag::DecodingResult>(
-      env->CallIntMethod(videoDecoder.get(), GPUDecoder_onDecodeFrame));
+      env->CallIntMethod(videoDecoder.get(), HardwareDecoder_onDecodeFrame));
 }
 
-void GPUDecoder::onFlush() {
+void HardwareDecoder::onFlush() {
   auto env = JNIEnvironment::Current();
   if (env == nullptr) {
     return;
   }
-  env->CallVoidMethod(videoDecoder.get(), GPUDecoder_onFlush);
+  env->CallVoidMethod(videoDecoder.get(), HardwareDecoder_onFlush);
 }
 
-int64_t GPUDecoder::presentationTime() {
+int64_t HardwareDecoder::presentationTime() {
   auto env = JNIEnvironment::Current();
   if (env == nullptr) {
     return -1;
   }
-  return env->CallLongMethod(videoDecoder.get(), GPUDecoder_presentationTime);
+  return env->CallLongMethod(videoDecoder.get(), HardwareDecoder_presentationTime);
 }
 
-DecodingResult GPUDecoder::onEndOfStream() {
+DecodingResult HardwareDecoder::onEndOfStream() {
   auto env = JNIEnvironment::Current();
   if (env == nullptr) {
-    LOGE("GPUDecoder: Error on decoding frame.\n");
+    LOGE("HardwareDecoder: Error on decoding frame.\n");
     return pag::DecodingResult::Error;
   }
   return static_cast<pag::DecodingResult>(
-      env->CallIntMethod(videoDecoder.get(), GPUDecoder_onEndOfStream));
+      env->CallIntMethod(videoDecoder.get(), HardwareDecoder_onEndOfStream));
 }
 
-std::shared_ptr<tgfx::ImageBuffer> GPUDecoder::onRenderFrame() {
+std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
   auto env = JNIEnvironment::Current();
   if (env == nullptr) {
     return nullptr;
   }
-  auto result = env->CallBooleanMethod(videoDecoder.get(), GPUDecoder_onRenderFrame);
+  auto result = env->CallBooleanMethod(videoDecoder.get(), HardwareDecoder_onRenderFrame);
   if (!result) {
     return nullptr;
   }

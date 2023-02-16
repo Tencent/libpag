@@ -19,34 +19,6 @@
 #include "SequenceImage.h"
 
 namespace pag {
-class SequenceReaderBuffer : public tgfx::ImageBuffer {
- public:
-  SequenceReaderBuffer(std::shared_ptr<SequenceReader> reader, Frame targetFrame)
-      : reader(std::move(reader)), targetFrame(targetFrame) {
-  }
-
-  int width() const override {
-    return reader->width();
-  }
-
-  int height() const override {
-    return reader->height();
-  }
-
-  bool isAlphaOnly() const override {
-    return false;
-  }
-
- protected:
-  std::shared_ptr<tgfx::Texture> onMakeTexture(tgfx::Context* context, bool) const override {
-    return reader->makeTexture(context, targetFrame);
-  }
-
- private:
-  std::shared_ptr<SequenceReader> reader = nullptr;
-  Frame targetFrame = 0;
-};
-
 static tgfx::ISize GetBufferSize(Sequence* sequence) {
   if (sequence->composition->type() == CompositionType::Video) {
     auto videoSequence = static_cast<VideoSequence*>(sequence);
@@ -74,11 +46,7 @@ class StaticSequenceGenerator : public tgfx::ImageGenerator {
  protected:
   std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer(bool) const override {
     auto reader = SequenceReader::Make(file, sequence);
-    auto buffer = reader->makeBuffer(0);
-    if (buffer == nullptr) {
-      buffer = std::shared_ptr<SequenceReaderBuffer>(new SequenceReaderBuffer(reader, 0));
-    }
-    return buffer;
+    return reader->readBuffer(0);
   }
 
  private:
@@ -105,11 +73,7 @@ class SequenceFrameGenerator : public tgfx::ImageGenerator {
 
  protected:
   std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer(bool) const override {
-    auto success = reader->decodeFrame(targetFrame);
-    if (!success) {
-      return nullptr;
-    }
-    return std::shared_ptr<SequenceReaderBuffer>(new SequenceReaderBuffer(reader, targetFrame));
+    return reader->readBuffer(targetFrame);
   }
 
  private:

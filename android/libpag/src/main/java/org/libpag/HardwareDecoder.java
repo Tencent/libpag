@@ -12,7 +12,7 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicInteger;
 
 
-class GPUDecoder {
+class HardwareDecoder {
 
     private static final int SUCCESS = 0;
     private static final int TRY_AGAIN_LATER = -1;
@@ -40,7 +40,7 @@ class GPUDecoder {
     private static final int DECODER_THREAD_MAX_COUNT = 10;
     private static final AtomicInteger decoderThreadCount = new AtomicInteger();
 
-    private static GPUDecoder Create(final MediaFormat mediaFormat) {
+    private static HardwareDecoder Create(final MediaFormat mediaFormat) {
         int width = mediaFormat.getInteger(MediaFormat.KEY_WIDTH);
         int height = mediaFormat.getInteger(MediaFormat.KEY_HEIGHT);
         final VideoSurface videoSurface = VideoSurface.Make(width, height);
@@ -106,7 +106,7 @@ class GPUDecoder {
         }, INIT_DECODER_TIMEOUT_MS);
         initHandlerThread.quitSafely();
         if (res) {
-            GPUDecoder decoder = new GPUDecoder();
+            HardwareDecoder decoder = new HardwareDecoder();
             decoder.videoSurface = videoSurface;
             decoder.decoder = initDecoder[0];
             return decoder;
