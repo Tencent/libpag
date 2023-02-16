@@ -46,6 +46,9 @@ TransformCache::TransformCache(Layer* layer)
 
 Transform* TransformCache::createCache(Frame layerFrame) {
   auto transform = new Transform();
+  if (layer->transform == nullptr) {
+    return transform;
+  }
   RenderTransform(transform, layer->transform, layerFrame);
   auto parent = layer->parent;
   while (parent != nullptr) {

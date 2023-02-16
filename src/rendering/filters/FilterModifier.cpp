@@ -34,7 +34,7 @@ std::shared_ptr<FilterModifier> FilterModifier::Make(PAGLayer* pagLayer) {
 std::shared_ptr<FilterModifier> FilterModifier::Make(Layer* layer, Frame layerFrame) {
   if (layer == nullptr || layerFrame < layer->startTime ||
       layerFrame >= layer->startTime + layer->duration ||
-      (!layer->motionBlur && layer->effects.empty() && layer->layerStyles.empty())) {
+      (!layer->motionBlur && layer->effects.empty() && layer->layerStyles.empty() && !layer->transform3D)) {
     return nullptr;
   }
   auto modifier = std::shared_ptr<FilterModifier>(new FilterModifier());

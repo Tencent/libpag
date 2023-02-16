@@ -151,7 +151,7 @@ void LayerCache::updateStaticTimeRanges() {
     auto timeRanges = getTrackMatteStaticTimeRanges();
     MergeTimeRanges(&staticTimeRanges, &timeRanges);
   }
-  if (!layer->layerStyles.empty() || !layer->effects.empty()) {
+  if (!layer->layerStyles.empty() || !layer->effects.empty() || layer->transform3D) {
     auto timeRanges = getFilterStaticTimeRanges();
     MergeTimeRanges(&staticTimeRanges, &timeRanges);
   }

@@ -714,6 +714,17 @@ LayerFilter* RenderCache::getLayerFilterCache(ID uniqueID,
   return filter;
 }
 
+Transform3DFilter* RenderCache::getTransform3DFilter() {
+  if (transform3DFilter == nullptr) {
+    transform3DFilter = new Transform3DFilter();
+    if (!initFilter(transform3DFilter)) {
+      delete transform3DFilter;
+      transform3DFilter = nullptr;
+    }
+  }
+  return transform3DFilter;
+}
+
 MotionBlurFilter* RenderCache::getMotionBlurFilter() {
   if (motionBlurFilter == nullptr) {
     motionBlurFilter = new MotionBlurFilter();

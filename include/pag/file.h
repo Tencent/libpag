@@ -1687,10 +1687,6 @@ class PAG_API Layer {
    */
   bool motionBlur = false;
   /**
-   * When true, the layer is a 3D layer;
-   */
-   bool is3DLayer = false;
-  /**
    * The 2D transformation of the layer.
    */
   Transform2D* transform = nullptr;
