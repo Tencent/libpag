@@ -18,37 +18,25 @@
 
 #pragma once
 
-#include "pag/pag.h"
-#include "rendering/graphics/Graphic.h"
+#include "JNIUtil.h"
 #include "tgfx/core/ImageCodec.h"
 
-namespace pag {
-
-class StillImage : public PAGImage {
+namespace tgfx {
+class NativeCodec : public ImageCodec {
  public:
-  static std::shared_ptr<StillImage> MakeFrom(std::shared_ptr<tgfx::Image> image);
+  static void JNIInit(JNIEnv* env);
 
-  static std::shared_ptr<StillImage> MakeFrom(std::shared_ptr<tgfx::ImageBuffer> imageBuffer);
-
- protected:
-  std::shared_ptr<Graphic> getGraphic() override {
-    return graphic;
-  }
-
-  bool isStill() const override {
-    return true;
-  }
-
-  bool setContentTime(int64_t) override {
-    return false;
-  }
+  bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
 
  private:
-  StillImage(int width, int height) : PAGImage(width, height) {
-  }
+  std::string imagePath;
+  std::shared_ptr<Data> imageBytes;
 
-  std::shared_ptr<Graphic> graphic = nullptr;
+  NativeCodec(int width, int height, Orientation orientation)
+      : ImageCodec(width, height, orientation){};
 
-  friend class PAGImage;
+  static std::shared_ptr<NativeCodec> Make(JNIEnv* env, jobject sizeObject, int orientation);
+
+  friend class ImageCodec;
 };
-}  // namespace pag
+}  // namespace tgfx

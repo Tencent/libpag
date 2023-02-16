@@ -34,9 +34,9 @@ class PixelBuffer : public ImageBuffer {
    * @param width pixel column count, must be greater than zero.
    * @param height pixel row count, must be greater than zero.
    * @param alphaOnly If true, sets colorType to ColorType::ALPHA_8, otherwise sets to the native
-   * 32-bit color type of current platform.
+   * 32-bit color type of the current platform.
    * @param tryHardware If true, a PixelBuffer backed by hardware is returned if it is available on
-   * current platform. Otherwise, a raster PixelBuffer is returned.
+   * the current platform. Otherwise, a raster PixelBuffer is returned.
    */
   static std::shared_ptr<PixelBuffer> Make(int width, int height, bool alphaOnly = false,
                                            bool tryHardware = true);
@@ -126,7 +126,7 @@ class PixelBuffer : public ImageBuffer {
 
   /**
    * Creates a hardware backed PixelBuffer with specified width and height. Returns nullptr if
-   * current platform has no hardware buffer support. Hardware buffer is a low-level object
+   * the current platform has no hardware buffer support. Hardware buffer is a low-level object
    * representing a memory buffer accessible by various hardware units. Hardware buffer allows
    * sharing buffers across CPU and GPU, which can be used to speed up the texture uploading.
    */

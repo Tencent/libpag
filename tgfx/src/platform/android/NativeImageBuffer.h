@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,37 +18,34 @@
 
 #pragma once
 
-#include "pag/pag.h"
-#include "rendering/graphics/Graphic.h"
-#include "tgfx/core/ImageCodec.h"
+#include "JNIUtil.h"
+#include "tgfx/core/ImageBuffer.h"
 
-namespace pag {
-
-class StillImage : public PAGImage {
+namespace tgfx {
+class NativeImageBuffer : public ImageBuffer {
  public:
-  static std::shared_ptr<StillImage> MakeFrom(std::shared_ptr<tgfx::Image> image);
-
-  static std::shared_ptr<StillImage> MakeFrom(std::shared_ptr<tgfx::ImageBuffer> imageBuffer);
-
- protected:
-  std::shared_ptr<Graphic> getGraphic() override {
-    return graphic;
+  int width() const override {
+    return _width;
   }
 
-  bool isStill() const override {
-    return true;
+  int height() const override {
+    return _height;
   }
 
-  bool setContentTime(int64_t) override {
+  bool isAlphaOnly() const override {
     return false;
   }
 
+ protected:
+  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) const override;
+
  private:
-  StillImage(int width, int height) : PAGImage(width, height) {
-  }
+  int _width = 0;
+  int _height = 0;
+  Global<jobject> nativeImage;
 
-  std::shared_ptr<Graphic> graphic = nullptr;
+  NativeImageBuffer(int width, int height);
 
-  friend class PAGImage;
+  friend class ImageBuffer;
 };
-}  // namespace pag
+}  // namespace tgfx

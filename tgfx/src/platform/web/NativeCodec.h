@@ -18,37 +18,24 @@
 
 #pragma once
 
-#include "pag/pag.h"
-#include "rendering/graphics/Graphic.h"
+#include <emscripten/val.h>
 #include "tgfx/core/ImageCodec.h"
 
-namespace pag {
-
-class StillImage : public PAGImage {
+namespace tgfx {
+class NativeCodec : public ImageCodec {
  public:
-  static std::shared_ptr<StillImage> MakeFrom(std::shared_ptr<tgfx::Image> image);
+  bool asyncSupport() const override;
 
-  static std::shared_ptr<StillImage> MakeFrom(std::shared_ptr<tgfx::ImageBuffer> imageBuffer);
+  bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
 
  protected:
-  std::shared_ptr<Graphic> getGraphic() override {
-    return graphic;
-  }
-
-  bool isStill() const override {
-    return true;
-  }
-
-  bool setContentTime(int64_t) override {
-    return false;
-  }
+  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 
  private:
-  StillImage(int width, int height) : PAGImage(width, height) {
-  }
+  std::shared_ptr<Data> imageBytes = nullptr;
 
-  std::shared_ptr<Graphic> graphic = nullptr;
+  NativeCodec(int width, int height, std::shared_ptr<Data> imageBytes);
 
-  friend class PAGImage;
+  friend class ImageCodec;
 };
-}  // namespace pag
+}  // namespace tgfx

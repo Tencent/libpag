@@ -18,37 +18,26 @@
 
 #pragma once
 
-#include "pag/pag.h"
-#include "rendering/graphics/Graphic.h"
-#include "tgfx/core/ImageCodec.h"
+#include <CoreText/CoreText.h>
+#include "tgfx/core/Typeface.h"
 
-namespace pag {
+namespace tgfx {
 
-class StillImage : public PAGImage {
+/**
+ * NativeTypeface provides convenience functions to create typefaces from platform-specific
+ * CTFontRef handles and access the CTFontRef handle in a Typeface instance.
+ */
+class NativeTypeface {
  public:
-  static std::shared_ptr<StillImage> MakeFrom(std::shared_ptr<tgfx::Image> image);
+  /**
+   * Creates a typeface for the specified CTFontRef. Returns nullptr if the ctFont is nil.
+   */
+  static std::shared_ptr<Typeface> MakeFromCTFont(CTFontRef ctFont);
 
-  static std::shared_ptr<StillImage> MakeFrom(std::shared_ptr<tgfx::ImageBuffer> imageBuffer);
-
- protected:
-  std::shared_ptr<Graphic> getGraphic() override {
-    return graphic;
-  }
-
-  bool isStill() const override {
-    return true;
-  }
-
-  bool setContentTime(int64_t) override {
-    return false;
-  }
-
- private:
-  StillImage(int width, int height) : PAGImage(width, height) {
-  }
-
-  std::shared_ptr<Graphic> graphic = nullptr;
-
-  friend class PAGImage;
+  /**
+   * Returns the platform-specific CTFontRef handle for a given Typeface. Note that the returned
+   * CTFontRef gets released when the source Typeface is destroyed.
+   */
+  static CTFontRef GetCTFont(const Typeface* typeface);
 };
-}  // namespace pag
+}  // namespace tgfx

@@ -16,18 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "platform/NativeCodec.h"
+#pragma once
 
 namespace tgfx {
-std::shared_ptr<ImageCodec> NativeCodec::MakeCodec(const std::string&) {
-  return nullptr;
-}
-
-std::shared_ptr<ImageCodec> NativeCodec::MakeCodec(std::shared_ptr<Data>) {
-  return nullptr;
-}
-
-std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(NativeImageRef) {
-  return nullptr;
-}
+/**
+ * WebImage provides convenience functions to enable/disable the async support for decoding web
+ * images.
+ */
+class WebImage {
+ public:
+  /**
+   * Enables or disables the the async support for decoding web images. The default value is false.
+   * If set to true, the ImageCodec.makeBuffer() method will not trigger a promise-awaiting call and
+   * will return an ImageBuffer that contains a Promise instead of a fully decoded HTMLImageElement,
+   * which can speed up the process of decoding multiple images at the same time. Do not set it to
+   * true if your rendering process may trigger multiple flush() calls of the screen Surface during
+   * one single frame. Otherwise, it may result in screen tearing.
+   */
+  static void SetAsyncSupport(bool enabled);
+};
 }  // namespace tgfx

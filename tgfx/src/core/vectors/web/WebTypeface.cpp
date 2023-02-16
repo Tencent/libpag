@@ -19,7 +19,6 @@
 #include "WebTypeface.h"
 #include <vector>
 #include "core/utils/UniqueID.h"
-#include "platform/web/NativeImageBuffer.h"
 
 using namespace emscripten;
 
@@ -160,6 +159,6 @@ std::shared_ptr<ImageBuffer> WebTypeface::getGlyphImage(GlyphID glyphID, float s
   if (matrix) {
     matrix->setTranslate(bounds.left, bounds.top);
   }
-  return NativeImageBuffer::Make(buffer);
+  return ImageBuffer::MakeFrom(buffer);
 }
 }  // namespace tgfx

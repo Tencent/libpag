@@ -21,9 +21,13 @@
 #if defined(__EMSCRIPTEN__)
 #include <emscripten/val.h>
 #elif defined(__ANDROID__) || defined(ANDROID)
-#include <jni.h>
+
+class _jobject;
+
 #elif defined(__APPLE__)
-#include <CoreGraphics/CGImage.h>
+
+struct CGImage;
+
 #endif
 
 namespace tgfx {
@@ -33,11 +37,11 @@ typedef emscripten::val NativeImageRef;
 
 #elif defined(__ANDROID__) || defined(ANDROID)
 
-typedef jobject NativeImageRef;
+typedef _jobject* NativeImageRef;
 
 #elif defined(__APPLE__)
 
-typedef CGImageRef NativeImageRef;
+typedef CGImage* NativeImageRef;
 
 #else
 

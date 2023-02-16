@@ -34,7 +34,7 @@ void DecodeStream::setPosition(uint32_t value) {
     _position = value;
     positionChanged();
   } else {
-    Throw(context, "End of file was encountered.");
+    PAGThrowError(context, "End of file was encountered.");
   }
 }
 
@@ -43,7 +43,7 @@ void DecodeStream::skip(uint32_t numBytes) {
     _position += numBytes;
     positionChanged();
   } else {
-    Throw(context, "End of file was encountered.");
+    PAGThrowError(context, "End of file was encountered.");
   }
 }
 
@@ -54,7 +54,7 @@ DecodeStream DecodeStream::readBytes(uint32_t length) {
     positionChanged();
     return stream;
   } else {
-    Throw(context, "End of file was encountered.");
+    PAGThrowError(context, "End of file was encountered.");
   }
   return DecodeStream(context);
 }
@@ -82,7 +82,7 @@ std::string DecodeStream::readUTF8String() {
     positionChanged();
     return std::string(text, textLength);
   } else {
-    Throw(context, "End of file was encountered.");
+    PAGThrowError(context, "End of file was encountered.");
   }
   return "";
 }
@@ -100,7 +100,7 @@ uint32_t DecodeStream::readEncodedUint32() {
   uint32_t byte = 0;
   for (int i = 0; i < 32; i += 7) {
     if (_position >= _length) {
-      Throw(context, "End of file was encountered.");
+      PAGThrowError(context, "End of file was encountered.");
       break;
     }
     byte = bytes[_position++];
@@ -126,7 +126,7 @@ uint64_t DecodeStream::readEncodedUint64() {
   uint64_t byte = 0;
   for (int i = 0; i < 64; i += 7) {
     if (_position >= _length) {
-      Throw(context, "End of file was encountered.");
+      PAGThrowError(context, "End of file was encountered.");
       break;
     }
     byte = bytes[_position++];
@@ -163,7 +163,7 @@ uint32_t DecodeStream::readUBits(uint8_t numBits) {
     }
     bitPositionChanged();
   } else {
-    Throw(context, "End of file was encountered.");
+    PAGThrowError(context, "End of file was encountered.");
   }
   return value;
 }
@@ -195,7 +195,7 @@ Bit8 DecodeStream::readBit8() {
     data.uintValue = bytes[_position++];
     positionChanged();
   } else {
-    Throw(context, "End of file was encountered.");
+    PAGThrowError(context, "End of file was encountered.");
   }
   return data;
 }
@@ -212,7 +212,7 @@ Bit16 DecodeStream::readBit16() {
     }
     positionChanged();
   } else {
-    Throw(context, "End of file was encountered.");
+    PAGThrowError(context, "End of file was encountered.");
   }
   return data;
 }
@@ -231,7 +231,7 @@ Bit32 DecodeStream::readBit24() {
     }
     positionChanged();
   } else {
-    Throw(context, "End of file was encountered.");
+    PAGThrowError(context, "End of file was encountered.");
   }
   return data;
 }
@@ -250,7 +250,7 @@ Bit32 DecodeStream::readBit32() {
     }
     positionChanged();
   } else {
-    Throw(context, "End of file was encountered.");
+    PAGThrowError(context, "End of file was encountered.");
   }
   return data;
 }
@@ -269,7 +269,7 @@ Bit64 DecodeStream::readBit64() {
     }
     positionChanged();
   } else {
-    Throw(context, "End of file was encountered.");
+    PAGThrowError(context, "End of file was encountered.");
   }
   return data;
 }

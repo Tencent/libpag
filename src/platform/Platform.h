@@ -37,7 +37,7 @@ namespace pag {
 class Platform {
  public:
   /**
-   * Returns the instance of current platform.
+   * Returns the instance of the current platform.
    */
   static const Platform* Current();
 

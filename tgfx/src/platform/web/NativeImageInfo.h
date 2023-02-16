@@ -21,14 +21,12 @@
 #include <emscripten/val.h>
 #include <optional>
 #include "tgfx/core/Data.h"
+#include "tgfx/core/Size.h"
 
 namespace tgfx {
-
-struct NativeImageInfo {
-  int width;
-  int height;
+class NativeImageInfo {
+ public:
+  static ISize GetSize(std::shared_ptr<Data> imageBytes);
 };
-
-std::optional<NativeImageInfo> GetNativeImageInfo(std::shared_ptr<Data> imageBytes);
 
 }  // namespace tgfx

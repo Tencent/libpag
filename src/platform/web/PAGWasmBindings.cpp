@@ -24,13 +24,10 @@
 #include "platform/web/GPUDrawable.h"
 #include "platform/web/WebSoftwareDecoderFactory.h"
 #include "rendering/editing/StillImage.h"
-#include "rendering/video/VideoDecoder.h"
 #include "tgfx/core/FontMetrics.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/PathTypes.h"
 #include "tgfx/gpu/opengl/GLDefines.h"
-#include "tgfx/src/platform/web/NativeImage.h"
-#include "tgfx/src/platform/web/NativeImageBuffer.h"
 
 using namespace emscripten;
 using namespace pag;
@@ -293,7 +290,7 @@ EMSCRIPTEN_BINDINGS(pag) {
                       }))
       .class_function("_FromNativeImage", optional_override([](val nativeImage) {
                         auto image =
-                            tgfx::Image::MakeFromBuffer(tgfx::NativeImageBuffer::Make(nativeImage));
+                            tgfx::Image::MakeFromBuffer(tgfx::ImageBuffer::MakeFrom(nativeImage));
                         return std::static_pointer_cast<PAGImage>(StillImage::MakeFrom(image));
                       }))
       .class_function("_FromPixels",

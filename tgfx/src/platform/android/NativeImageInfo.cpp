@@ -16,25 +16,33 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "tgfx/core/ImageCodec.h"
+#include "NativeImageInfo.h"
+#include <android/bitmap.h>
 
 namespace tgfx {
-class NativeCodec {
- private:
-  /**
-   * If the file path represents an encoded image that current platform knows how to decode, returns
-   * an ImageCodec that can decode it. Otherwise returns nullptr.
-   */
-  static std::shared_ptr<ImageCodec> MakeCodec(const std::string& filePath);
+static constexpr int BITMAP_FLAGS_ALPHA_UNPREMUL = 2;
 
-  /**
-   * If the file bytes represents an encoded image that current platform knows how to decode,
-   * returns an ImageCodec that can decode it. Otherwise returns nullptr.
-   */
-  static std::shared_ptr<ImageCodec> MakeCodec(std::shared_ptr<Data> imageBytes);
-
-  friend class ImageCodec;
-};
+ImageInfo NativeImageInfo::GetInfo(JNIEnv* env, jobject bitmap) {
+  AndroidBitmapInfo bitmapInfo = {};
+  if (bitmap == nullptr || AndroidBitmap_getInfo(env, bitmap, &bitmapInfo) != 0) {
+    return {};
+  }
+  AlphaType alphaType = (bitmapInfo.flags & BITMAP_FLAGS_ALPHA_UNPREMUL)
+                            ? AlphaType::Unpremultiplied
+                            : AlphaType::Premultiplied;
+  ColorType colorType;
+  switch (bitmapInfo.format) {
+    case ANDROID_BITMAP_FORMAT_RGBA_8888:
+      colorType = ColorType::RGBA_8888;
+      break;
+    case ANDROID_BITMAP_FORMAT_A_8:
+      colorType = ColorType::ALPHA_8;
+      break;
+    default:
+      colorType = ColorType::Unknown;
+      break;
+  }
+  return ImageInfo::Make(bitmapInfo.width, bitmapInfo.height, colorType, alphaType,
+                         bitmapInfo.stride);
+}
 }  // namespace tgfx

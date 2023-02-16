@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,29 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/platform/apple/TypefaceExt.h"
-#include "core/utils/USE.h"
-
-#ifndef TGFX_USE_FREETYPE
-#include "core/vectors/coregraphics/CGTypeface.h"
-#endif
+#include "tgfx/core/ImageCodec.h"
 
 namespace tgfx {
-std::shared_ptr<Typeface> TypefaceExt::MakeFromCTFont(CTFontRef ctFont) {
-#ifdef TGFX_USE_FREETYPE
-  USE(ctFont);
+std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string&) {
   return nullptr;
-#else
-  return CGTypeface::Make(static_cast<CTFontRef>(ctFont));
-#endif
 }
 
-CTFontRef TypefaceExt::GetCTFont(const Typeface* typeface) {
-#ifdef TGFX_USE_FREETYPE
-  USE(typeface);
+std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data>) {
   return nullptr;
-#else
-  return typeface ? static_cast<const CGTypeface*>(typeface)->getCTFont() : nullptr;
-#endif
+}
+
+std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(NativeImageRef) {
+  return nullptr;
 }
 }  // namespace tgfx

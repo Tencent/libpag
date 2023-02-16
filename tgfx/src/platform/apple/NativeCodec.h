@@ -18,25 +18,22 @@
 
 #pragma once
 
-#include <emscripten/val.h>
+#include <CoreImage/CoreImage.h>
 #include "tgfx/core/ImageCodec.h"
 
 namespace tgfx {
-class NativeImage : public ImageCodec {
+class NativeCodec : public ImageCodec {
  public:
-  bool readPixels(const ImageInfo& /*dstInfo*/, void* /*dstPixels*/) const override {
-    return false;
-  }
+  bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
 
  private:
-  emscripten::val nativeImage = emscripten::val::null();
+  std::string imagePath;
+  std::shared_ptr<Data> imageBytes = nullptr;
 
-  NativeImage(int width, int height) : ImageCodec(width, height, Orientation::TopLeft) {
+  NativeCodec(int width, int height, Orientation orientation)
+      : ImageCodec(width, height, orientation) {
   }
 
-  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
-
   friend class ImageCodec;
-  friend class NativeCodec;
 };
 }  // namespace tgfx

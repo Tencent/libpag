@@ -69,8 +69,8 @@ std::shared_ptr<StillImage> StillImage::MakeFrom(std::shared_ptr<tgfx::Image> im
   return pagImage;
 }
 
-std::shared_ptr<StillImage> StillImage::MakeFrom(std::shared_ptr<tgfx::PixelBuffer> pixelBuffer) {
-  auto image = tgfx::Image::MakeFromBuffer(std::move(pixelBuffer));
+std::shared_ptr<StillImage> StillImage::MakeFrom(std::shared_ptr<tgfx::ImageBuffer> imageBuffer) {
+  auto image = tgfx::Image::MakeFromBuffer(std::move(imageBuffer));
   return MakeFrom(std::move(image));
 }
 
