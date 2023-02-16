@@ -21,7 +21,7 @@
 #include "tgfx/core/PixelBuffer.h"
 
 namespace tgfx {
-std::shared_ptr<ImageBuffer> ImageBuffer::MakeFromNativeImage(NativeImageRef nativeImage) {
+std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(NativeImageRef nativeImage) {
   if (nativeImage == nullptr) {
     return nullptr;
   }

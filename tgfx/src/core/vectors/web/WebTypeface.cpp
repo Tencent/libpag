@@ -159,6 +159,6 @@ std::shared_ptr<ImageBuffer> WebTypeface::getGlyphImage(GlyphID glyphID, float s
   if (matrix) {
     matrix->setTranslate(bounds.left, bounds.top);
   }
-  return ImageBuffer::MakeFromNativeImage(buffer);
+  return ImageBuffer::MakeFrom(buffer);
 }
 }  // namespace tgfx

@@ -37,7 +37,7 @@ std::shared_ptr<PixelBuffer> PixelBuffer::MakeHardwareBuffer(int width, int heig
   return HardwareBuffer::Make(width, height, alphaOnly);
 }
 
-std::shared_ptr<ImageBuffer> ImageBuffer::MakeFromHardwareBuffer(HardwareBufferRef hardwareBuffer) {
+std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer) {
   return HardwareBuffer::MakeFrom(hardwareBuffer);
 }
 
@@ -55,7 +55,7 @@ std::shared_ptr<PixelBuffer> PixelBuffer::MakeFrom(HardwareBufferRef) {
   return nullptr;
 }
 
-std::shared_ptr<ImageBuffer> ImageBuffer::MakeFromHardwareBuffer(HardwareBufferRef) {
+std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef) {
   return nullptr;
 }
 

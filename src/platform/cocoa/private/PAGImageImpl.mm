@@ -76,7 +76,7 @@
   if (cgImage == nil) {
     return nil;
   }
-  auto imageBuffer = tgfx::ImageBuffer::MakeFromNativeImage(cgImage);
+  auto imageBuffer = tgfx::ImageBuffer::MakeFrom(cgImage);
   if (imageBuffer == nullptr) {
     return nil;
   }
