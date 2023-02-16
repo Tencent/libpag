@@ -40,7 +40,9 @@ typedef __CVBuffer* HardwareBufferRef;
 
 #else
 
-typedef void* HardwareBufferRef;
+struct HardwareBuffer {};
+
+typedef HardwareBuffer* HardwareBufferRef;
 
 #endif
 }  // namespace tgfx

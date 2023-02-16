@@ -45,7 +45,9 @@ typedef CGImage* NativeImageRef;
 
 #else
 
-typedef void* NativeImageRef;
+struct NativeImage {};
+
+typedef NativeImage* NativeImageRef;
 
 #endif
 }  // namespace tgfx
