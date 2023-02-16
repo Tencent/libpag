@@ -18,7 +18,6 @@
 
 #include "tgfx/core/ImageCodec.h"
 #include "core/utils/USE.h"
-#include "platform/NativeCodec.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/ImageInfo.h"
@@ -69,7 +68,7 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(const std::string& filePath) {
   }
 #endif
   if (codec == nullptr) {
-    codec = NativeCodec::MakeCodec(filePath);
+    codec = MakeNativeCodec(filePath);
   }
   if (codec && !ImageInfo::IsValidSize(codec->width(), codec->height())) {
     codec = nullptr;
@@ -98,7 +97,7 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(std::shared_ptr<Data> imageByte
   }
 #endif
   if (codec == nullptr) {
-    codec = NativeCodec::MakeCodec(imageBytes);
+    codec = MakeNativeCodec(imageBytes);
   }
   if (codec && !ImageInfo::IsValidSize(codec->width(), codec->height())) {
     codec = nullptr;

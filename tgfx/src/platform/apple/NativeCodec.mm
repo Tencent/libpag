@@ -16,9 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "NativeImage.h"
+#include "NativeCodec.h"
 #include "BitmapContextUtil.h"
-#include "platform/NativeCodec.h"
 
 namespace tgfx {
 static CGImagePropertyOrientation GetOrientationFromProperties(CFDictionaryRef imageProperties) {
@@ -55,7 +54,7 @@ static CGSize GetImageSize(CGImageSourceRef imageSource, CGImagePropertyOrientat
   return CGSizeMake(width, height);
 }
 
-std::shared_ptr<ImageCodec> NativeCodec::MakeCodec(const std::string& filePath) {
+std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& filePath) {
   CFStringRef imagePath = CFStringCreateWithCString(NULL, filePath.c_str(), kCFStringEncodingUTF8);
   CFURLRef imageURL = CFURLCreateWithFileSystemPath(NULL, imagePath, kCFURLPOSIXPathStyle, 0);
   CFRelease(imagePath);
@@ -70,12 +69,12 @@ std::shared_ptr<ImageCodec> NativeCodec::MakeCodec(const std::string& filePath) 
   if (size.width <= 0 || size.height <= 0) {
     return nullptr;
   }
-  auto image = new NativeImage(size.width, size.height, static_cast<Orientation>(orientation));
+  auto image = new NativeCodec(size.width, size.height, static_cast<Orientation>(orientation));
   image->imagePath = filePath;
-  return std::unique_ptr<ImageCodec>(image);
+  return std::shared_ptr<ImageCodec>(image);
 }
 
-std::shared_ptr<ImageCodec> NativeCodec::MakeCodec(std::shared_ptr<Data> imageBytes) {
+std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> imageBytes) {
   if (imageBytes == nullptr) {
     return nullptr;
   }
@@ -96,63 +95,39 @@ std::shared_ptr<ImageCodec> NativeCodec::MakeCodec(std::shared_ptr<Data> imageBy
   if (size.width <= 0 || size.height <= 0) {
     return nullptr;
   }
-  auto codec = new NativeImage(size.width, size.height, static_cast<Orientation>(orientation));
+  auto codec = new NativeCodec(size.width, size.height, static_cast<Orientation>(orientation));
   codec->imageBytes = imageBytes;
-  return std::unique_ptr<ImageCodec>(codec);
+  return std::shared_ptr<ImageCodec>(codec);
 }
 
-std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(NativeImageRef nativeImage) {
-  auto width = CGImageGetWidth(nativeImage);
-  auto height = CGImageGetHeight(nativeImage);
-  if (width <= 0 || height <= 0) {
-    return nullptr;
-  }
-  auto codec =
-      new NativeImage(static_cast<int>(width), static_cast<int>(height), Orientation::TopLeft);
-  CFRetain(nativeImage);
-
-  codec->cgImage = nativeImage;
-  return std::unique_ptr<ImageCodec>(codec);
-}
-
-NativeImage::~NativeImage() {
-  if (cgImage != nullptr) {
-    CFRelease(cgImage);
-  }
-}
-
-bool NativeImage::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
+bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
   }
   NSData* data = nil;
   CGImageSourceRef sourceRef = nil;
   CGImageRef image = nil;
-  if (cgImage != nullptr) {
-    image = cgImage;
+  if (!imagePath.empty()) {
+    data =
+        [[NSData alloc] initWithContentsOfFile:[NSString stringWithUTF8String:imagePath.c_str()]];
   } else {
-    if (!imagePath.empty()) {
-      data =
-          [[NSData alloc] initWithContentsOfFile:[NSString stringWithUTF8String:imagePath.c_str()]];
-    } else {
-      auto bytes = const_cast<void*>(imageBytes->data());
-      data = [[NSData alloc] initWithBytesNoCopy:bytes length:imageBytes->size() freeWhenDone:NO];
-    }
-    if (data == nil) {
-      return false;
-    }
-    CFDataRef dataRef = (__bridge CFDataRef)data;
-    sourceRef = CGImageSourceCreateWithData(dataRef, NULL);
-    if (sourceRef == NULL) {
-      [data release];
-      return false;
-    }
-    image = CGImageSourceCreateImageAtIndex(sourceRef, 0, NULL);
-    if (image == NULL) {
-      [data release];
-      CFRelease(sourceRef);
-      return false;
-    }
+    auto bytes = const_cast<void*>(imageBytes->data());
+    data = [[NSData alloc] initWithBytesNoCopy:bytes length:imageBytes->size() freeWhenDone:NO];
+  }
+  if (data == nil) {
+    return false;
+  }
+  CFDataRef dataRef = (__bridge CFDataRef)data;
+  sourceRef = CGImageSourceCreateWithData(dataRef, NULL);
+  if (sourceRef == NULL) {
+    [data release];
+    return false;
+  }
+  image = CGImageSourceCreateImageAtIndex(sourceRef, 0, NULL);
+  if (image == NULL) {
+    [data release];
+    CFRelease(sourceRef);
+    return false;
   }
   auto context = CreateBitmapContext(dstInfo, dstPixels);
   auto result = context != nullptr;
@@ -164,11 +139,9 @@ bool NativeImage::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     CGContextDrawImage(context, rect, image);
     CGContextRelease(context);
   }
-  if (cgImage == nullptr) {
-    [data release];
-    CFRelease(sourceRef);
-    CGImageRelease(image);
-  }
+  [data release];
+  CFRelease(sourceRef);
+  CGImageRelease(image);
   return result;
 }
 }  // namespace tgfx

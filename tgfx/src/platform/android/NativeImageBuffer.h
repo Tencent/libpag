@@ -18,36 +18,34 @@
 
 #pragma once
 
-#if defined(__EMSCRIPTEN__)
-#include <emscripten/val.h>
-#elif defined(__ANDROID__) || defined(ANDROID)
-
-class _jobject;
-
-#elif defined(__APPLE__)
-
-struct CGImage;
-
-#endif
+#include "JNIUtil.h"
+#include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
-#if defined(__EMSCRIPTEN__)
+class NativeImageBuffer : public ImageBuffer {
+ public:
+  int width() const override {
+    return _width;
+  }
 
-typedef emscripten::val NativeImageRef;
+  int height() const override {
+    return _height;
+  }
 
-#elif defined(__ANDROID__) || defined(ANDROID)
+  bool isAlphaOnly() const override {
+    return false;
+  }
 
-typedef _jobject* NativeImageRef;
+ protected:
+  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) const override;
 
-#elif defined(__APPLE__)
+ private:
+  int _width = 0;
+  int _height = 0;
+  Global<jobject> nativeImage;
 
-typedef CGImage* NativeImageRef;
+  NativeImageBuffer(int width, int height);
 
-#else
-
-struct NativeImage {};
-
-typedef NativeImage* NativeImageRef;
-
-#endif
+  friend class ImageBuffer;
+};
 }  // namespace tgfx

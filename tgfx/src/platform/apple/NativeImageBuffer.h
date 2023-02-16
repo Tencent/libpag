@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -19,25 +19,35 @@
 #pragma once
 
 #include <CoreImage/CoreImage.h>
-#include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
-class NativeImage : public ImageCodec {
+class NativeImageBuffer : public ImageBuffer {
  public:
-  ~NativeImage() override;
+  ~NativeImageBuffer() override;
 
-  bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
-
- private:
-  std::string imagePath;
-  std::shared_ptr<Data> imageBytes = nullptr;
-  CGImageRef cgImage = nullptr;
-
-  NativeImage(int width, int height, Orientation orientation)
-      : ImageCodec(width, height, orientation) {
+  int width() const override {
+    return _width;
   }
 
-  friend class ImageCodec;
-  friend class NativeCodec;
+  int height() const override {
+    return _height;
+  }
+
+  bool isAlphaOnly() const override {
+    return false;
+  }
+
+ protected:
+  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) const override;
+
+ private:
+  int _width = 0;
+  int _height = 0;
+  CGImageRef nativeImage = nullptr;
+
+  NativeImageBuffer(int width, int height, CGImageRef nativeImage);
+
+  friend class ImageBuffer;
 };
 }  // namespace tgfx

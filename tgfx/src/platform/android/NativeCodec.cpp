@@ -16,14 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "NativeImage.h"
+#include "NativeCodec.h"
 #include <android/bitmap.h>
-#include "platform/NativeCodec.h"
+#include "NativeImageInfo.h"
 #include "tgfx/core/Bitmap.h"
 
 namespace tgfx {
-static constexpr int BITMAP_FLAGS_ALPHA_UNPREMUL = 2;
-
 static Global<jclass> BitmapFactoryOptionsClass;
 static jmethodID BitmapFactoryOptions_Constructor;
 static jfieldID BitmapFactoryOptions_inJustDecodeBounds;
@@ -44,7 +42,7 @@ static Global<jclass> BitmapConfigClass;
 static jfieldID BitmapConfig_ALPHA_8;
 static jfieldID BitmapConfig_ARGB_8888;
 
-void NativeImage::JNIInit(JNIEnv* env) {
+void NativeCodec::JNIInit(JNIEnv* env) {
   BitmapFactoryOptionsClass.reset(env, env->FindClass("android/graphics/BitmapFactory$Options"));
   BitmapFactoryOptions_Constructor =
       env->GetMethodID(BitmapFactoryOptionsClass.get(), "<init>", "()V");
@@ -81,7 +79,7 @@ void NativeImage::JNIInit(JNIEnv* env) {
                                                  "Landroid/graphics/Bitmap$Config;");
 }
 
-std::shared_ptr<NativeImage> NativeImage::Make(JNIEnv* env, jobject sizeObject, int orientation) {
+std::shared_ptr<NativeCodec> NativeCodec::Make(JNIEnv* env, jobject sizeObject, int orientation) {
   auto size = env->GetIntArrayElements(static_cast<jintArray>(sizeObject), nullptr);
   int width = size[0];
   int height = size[1];
@@ -89,8 +87,8 @@ std::shared_ptr<NativeImage> NativeImage::Make(JNIEnv* env, jobject sizeObject, 
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
-  return std::unique_ptr<NativeImage>(
-      new NativeImage(width, height, static_cast<Orientation>(orientation)));
+  return std::shared_ptr<NativeCodec>(
+      new NativeCodec(width, height, static_cast<Orientation>(orientation)));
 }
 
 static Orientation GetOrientation(JNIEnv* env, jobject exifInterface) {
@@ -110,7 +108,7 @@ static jobject DecodeBitmap(JNIEnv* env, jobject options, const std::string& fil
                                      imagePath.get(), options);
 }
 
-std::shared_ptr<ImageCodec> NativeCodec::MakeCodec(const std::string& filePath) {
+std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& filePath) {
   auto env = CurrentJNIEnv();
   if (env == nullptr || filePath.empty()) {
     return nullptr;
@@ -133,7 +131,7 @@ std::shared_ptr<ImageCodec> NativeCodec::MakeCodec(const std::string& filePath) 
       env,
       env->NewObject(ExifInterfaceClass.get(), ExifInterface_Constructor_Path, imagePath.get())};
   auto orientation = GetOrientation(env, exifInterface.get());
-  auto codec = std::unique_ptr<NativeImage>(new NativeImage(width, height, orientation));
+  auto codec = std::shared_ptr<NativeCodec>(new NativeCodec(width, height, orientation));
   codec->imagePath = filePath;
   return codec;
 }
@@ -146,7 +144,7 @@ static jobject DecodeBitmap(JNIEnv* env, jobject options, std::shared_ptr<Data> 
                                      byteArray.get(), 0, imageBytes->size(), options);
 }
 
-std::shared_ptr<ImageCodec> NativeCodec::MakeCodec(std::shared_ptr<Data> imageBytes) {
+std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> imageBytes) {
   auto env = CurrentJNIEnv();
   if (env == nullptr || imageBytes == nullptr) {
     return nullptr;
@@ -174,52 +172,12 @@ std::shared_ptr<ImageCodec> NativeCodec::MakeCodec(std::shared_ptr<Data> imageBy
       env, env->NewObject(ExifInterfaceClass.get(), ExifInterface_Constructor_Stream,
                           inputStream.get())};
   auto orientation = GetOrientation(env, exifInterface.get());
-  auto codec = std::unique_ptr<NativeImage>(new NativeImage(width, height, orientation));
+  auto codec = std::shared_ptr<NativeCodec>(new NativeCodec(width, height, orientation));
   codec->imageBytes = imageBytes;
   return codec;
 }
 
-static ImageInfo GetImageInfo(JNIEnv* env, jobject bitmap) {
-  AndroidBitmapInfo bitmapInfo = {};
-  if (bitmap == nullptr || AndroidBitmap_getInfo(env, bitmap, &bitmapInfo) != 0) {
-    return {};
-  }
-  AlphaType alphaType = (bitmapInfo.flags & BITMAP_FLAGS_ALPHA_UNPREMUL)
-                            ? AlphaType::Unpremultiplied
-                            : AlphaType::Premultiplied;
-  ColorType colorType;
-  switch (bitmapInfo.format) {
-    case ANDROID_BITMAP_FORMAT_RGBA_8888:
-      colorType = ColorType::RGBA_8888;
-      break;
-    case ANDROID_BITMAP_FORMAT_A_8:
-      colorType = ColorType::ALPHA_8;
-      break;
-    default:
-      colorType = ColorType::Unknown;
-      break;
-  }
-  return ImageInfo::Make(bitmapInfo.width, bitmapInfo.height, colorType, alphaType,
-                         bitmapInfo.stride);
-}
-
-std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(NativeImageRef nativeImage) {
-  auto env = CurrentJNIEnv();
-  if (env == nullptr) {
-    return nullptr;
-  }
-  auto info = GetImageInfo(env, nativeImage);
-  if (info.isEmpty()) {
-    env->ExceptionClear();
-    return nullptr;
-  }
-  auto image = std::unique_ptr<NativeImage>(
-      new NativeImage(info.width(), info.height(), Orientation::TopLeft));
-  image->bitmap.reset(env, nativeImage);
-  return image;
-}
-
-bool NativeImage::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
+bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
   }
@@ -227,44 +185,40 @@ bool NativeImage::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (env == nullptr) {
     return false;
   }
-  Local<jobject> bitmapObject;
-  if (!bitmap.empty()) {
-    bitmapObject.reset(env, env->NewLocalRef(bitmap.get()));
-  } else {
-    Local<jobject> options = {
-        env, env->NewObject(BitmapFactoryOptionsClass.get(), BitmapFactoryOptions_Constructor)};
-    if (options.empty()) {
-      env->ExceptionClear();
-      return false;
-    }
-    Local<jobject> config;
-    if (dstInfo.colorType() == ColorType::ALPHA_8) {
-      config.reset(env, env->GetStaticObjectField(BitmapConfigClass.get(), BitmapConfig_ALPHA_8));
-    } else {
-      config.reset(env, env->GetStaticObjectField(BitmapConfigClass.get(), BitmapConfig_ARGB_8888));
-    }
-    env->SetObjectField(options.get(), BitmapFactoryOptions_inPreferredConfig, config.get());
-    if (dstInfo.alphaType() == AlphaType::Unpremultiplied) {
-      env->SetBooleanField(options.get(), BitmapFactoryOptions_inPremultiplied, false);
-    }
-    if (!imagePath.empty()) {
-      bitmapObject.reset(env, DecodeBitmap(env, options.get(), imagePath));
-    } else {
-      bitmapObject.reset(env, DecodeBitmap(env, options.get(), imageBytes));
-    }
+  Local<jobject> bitmap;
+  Local<jobject> options = {
+      env, env->NewObject(BitmapFactoryOptionsClass.get(), BitmapFactoryOptions_Constructor)};
+  if (options.empty()) {
+    env->ExceptionClear();
+    return false;
   }
-  auto info = GetImageInfo(env, bitmapObject.get());
+  Local<jobject> config;
+  if (dstInfo.colorType() == ColorType::ALPHA_8) {
+    config.reset(env, env->GetStaticObjectField(BitmapConfigClass.get(), BitmapConfig_ALPHA_8));
+  } else {
+    config.reset(env, env->GetStaticObjectField(BitmapConfigClass.get(), BitmapConfig_ARGB_8888));
+  }
+  env->SetObjectField(options.get(), BitmapFactoryOptions_inPreferredConfig, config.get());
+  if (dstInfo.alphaType() == AlphaType::Unpremultiplied) {
+    env->SetBooleanField(options.get(), BitmapFactoryOptions_inPremultiplied, false);
+  }
+  if (!imagePath.empty()) {
+    bitmap.reset(env, DecodeBitmap(env, options.get(), imagePath));
+  } else {
+    bitmap.reset(env, DecodeBitmap(env, options.get(), imageBytes));
+  }
+  auto info = NativeImageInfo::GetInfo(env, bitmap.get());
   if (info.isEmpty()) {
     env->ExceptionClear();
     return false;
   }
   void* pixels = nullptr;
-  if (AndroidBitmap_lockPixels(env, bitmapObject.get(), &pixels) != 0) {
+  if (AndroidBitmap_lockPixels(env, bitmap.get(), &pixels) != 0) {
     env->ExceptionClear();
     return false;
   }
   auto result = Bitmap(info, pixels).readPixels(dstInfo, dstPixels);
-  AndroidBitmap_unlockPixels(env, bitmapObject.get());
+  AndroidBitmap_unlockPixels(env, bitmap.get());
   return result;
 }
 }  // namespace tgfx

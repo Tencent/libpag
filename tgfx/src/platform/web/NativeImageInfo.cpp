@@ -146,24 +146,28 @@ static bool IsWebp(const std::shared_ptr<IIBuffer>& buffer, int& width, int& hei
   return false;
 }
 
-std::optional<NativeImageInfo> GetNativeImageInfo(std::shared_ptr<Data> imageBytes) {
-  NativeImageInfo imageInfo = {};
-  auto buffer = std::make_shared<IIBuffer>(std::move(imageBytes));
-  if (IsPng(buffer, imageInfo.width, imageInfo.height)) {
-    return imageInfo;
-  } else if (IsJpeg(buffer, imageInfo.width, imageInfo.height)) {
-    return imageInfo;
-  } else if (IsWebp(buffer, imageInfo.width, imageInfo.height)) {
-    auto nativeImageClass = val::module_property("NativeImage");
-    if (!nativeImageClass.as<bool>()) {
-      return std::nullopt;
-    }
-    if (!nativeImageClass.call<bool>("isSupportWebp")) {
-      return std::nullopt;
-    }
-    return imageInfo;
+static bool CheckWebpSupport() {
+  auto nativeImageClass = val::module_property("NativeImage");
+  if (!nativeImageClass.as<bool>()) {
+    return false;
   }
-  return std::nullopt;
+  return nativeImageClass.call<bool>("hasWebpSupport");
+}
+
+ISize NativeImageInfo::GetSize(std::shared_ptr<Data> imageBytes) {
+  static const bool hasWebpSupport = CheckWebpSupport();
+  auto imageSize = ISize::MakeEmpty();
+  auto buffer = std::make_shared<IIBuffer>(std::move(imageBytes));
+  if (IsPng(buffer, imageSize.width, imageSize.height)) {
+    return imageSize;
+  }
+  if (IsJpeg(buffer, imageSize.width, imageSize.height)) {
+    return imageSize;
+  }
+  if (hasWebpSupport && IsWebp(buffer, imageSize.width, imageSize.height)) {
+    return imageSize;
+  }
+  return imageSize;
 }
 
 }  // namespace tgfx

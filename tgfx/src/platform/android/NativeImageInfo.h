@@ -19,26 +19,11 @@
 #pragma once
 
 #include "JNIUtil.h"
-#include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/ImageInfo.h"
 
 namespace tgfx {
-class NativeImage : public ImageCodec {
+class NativeImageInfo {
  public:
-  static void JNIInit(JNIEnv* env);
-
-  bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
-
- private:
-  std::string imagePath;
-  std::shared_ptr<Data> imageBytes;
-  Global<jobject> bitmap;
-
-  NativeImage(int width, int height, Orientation orientation)
-      : ImageCodec(width, height, orientation){};
-
-  static std::shared_ptr<NativeImage> Make(JNIEnv* env, jobject sizeObject, int orientation);
-
-  friend class ImageCodec;
-  friend class NativeCodec;
+  static ImageInfo GetInfo(JNIEnv* env, jobject bitmap);
 };
 }  // namespace tgfx

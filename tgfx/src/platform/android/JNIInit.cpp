@@ -17,12 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "JNIInit.h"
-#include "NativeImage.h"
+#include "NativeCodec.h"
 #include "SurfaceBufferQueue.h"
 
 namespace tgfx {
 void JNIInit(JNIEnv* env) {
-  NativeImage::JNIInit(env);
+  NativeCodec::JNIInit(env);
   SurfaceBufferQueue::JNIInit(env);
 }
 }  // namespace tgfx

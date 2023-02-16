@@ -18,9 +18,10 @@
 
 #pragma once
 
+#include "tgfx/core/YUVData.h"
 #include "tgfx/gpu/Texture.h"
 #include "tgfx/platform/HardwareBuffer.h"
-#include "tgfx/core/YUVData.h"
+#include "tgfx/platform/NativeImage.h"
 
 namespace tgfx {
 /**
@@ -37,6 +38,14 @@ class ImageBuffer {
    * YUVBuffer::MakeFrom() method for the hardware buffer with multiple planes.
    */
   static std::shared_ptr<ImageBuffer> MakeFrom(HardwareBufferRef hardwareBuffer);
+
+  /**
+   * Creates a new ImageBuffer object from a platform-specific image in the CPU. The nativeImage
+   * could be a jobject that represents a java Bitmap on the android platform or a CGImageRef on the
+   * apple platform.The returned ImageBuffer object takes a reference on the nativeImage. Returns
+   * nullptr if the nativeImage is nullptr or the current platform has no native image support.
+   */
+  static std::shared_ptr<ImageBuffer> MakeFrom(NativeImageRef nativeImage);
 
   virtual ~ImageBuffer() = default;
   /**

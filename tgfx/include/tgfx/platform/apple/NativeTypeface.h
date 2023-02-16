@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,36 +18,26 @@
 
 #pragma once
 
-#if defined(__EMSCRIPTEN__)
-#include <emscripten/val.h>
-#elif defined(__ANDROID__) || defined(ANDROID)
-
-class _jobject;
-
-#elif defined(__APPLE__)
-
-struct CGImage;
-
-#endif
+#include <CoreText/CoreText.h>
+#include "tgfx/core/Typeface.h"
 
 namespace tgfx {
-#if defined(__EMSCRIPTEN__)
 
-typedef emscripten::val NativeImageRef;
+/**
+ * NativeTypeface provides convenience functions to create typefaces from platform-specific
+ * CTFontRef handles and access the CTFontRef handle in a Typeface instance.
+ */
+class NativeTypeface {
+ public:
+  /**
+   * Creates a typeface for the specified CTFontRef. Returns nullptr if the ctFont is nil.
+   */
+  static std::shared_ptr<Typeface> MakeFromCTFont(CTFontRef ctFont);
 
-#elif defined(__ANDROID__) || defined(ANDROID)
-
-typedef _jobject* NativeImageRef;
-
-#elif defined(__APPLE__)
-
-typedef CGImage* NativeImageRef;
-
-#else
-
-struct NativeImage {};
-
-typedef NativeImage* NativeImageRef;
-
-#endif
+  /**
+   * Returns the platform-specific CTFontRef handle for a given Typeface. Note that the returned
+   * CTFontRef gets released when the source Typeface is destroyed.
+   */
+  static CTFontRef GetCTFont(const Typeface* typeface);
+};
 }  // namespace tgfx

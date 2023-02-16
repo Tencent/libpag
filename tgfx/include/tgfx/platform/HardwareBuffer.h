@@ -19,9 +19,13 @@
 #pragma once
 
 #if defined(__ANDROID__) || defined(ANDROID)
-#include <android/hardware_buffer.h>
+
+struct AHardwareBuffer;
+
 #elif defined(__APPLE__)
-#include <CoreVideo/CoreVideo.h>
+
+struct __CVBuffer;
+
 #endif
 
 namespace tgfx {
@@ -31,11 +35,14 @@ typedef AHardwareBuffer* HardwareBufferRef;
 
 #elif defined(__APPLE__)
 
-typedef CVPixelBufferRef HardwareBufferRef;
+// __CVBuffer == CVPixelBufferRef
+typedef __CVBuffer* HardwareBufferRef;
 
 #else
 
-typedef void* HardwareBufferRef;
+struct HardwareBuffer {};
+
+typedef HardwareBuffer* HardwareBufferRef;
 
 #endif
 }  // namespace tgfx
