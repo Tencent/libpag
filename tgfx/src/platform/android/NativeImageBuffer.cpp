@@ -23,7 +23,7 @@
 #include "tgfx/core/PixelBuffer.h"
 
 namespace tgfx {
-std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(NativeImageRef nativeImage) {
+std::shared_ptr<ImageBuffer> ImageBuffer::MakeFromNativeImage(NativeImageRef nativeImage) {
   auto env = CurrentJNIEnv();
   if (env == nullptr) {
     return nullptr;

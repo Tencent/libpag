@@ -303,6 +303,6 @@ std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
   if (outputFrame == nullptr) {
     return nullptr;
   }
-  return tgfx::ImageBuffer::MakeFrom(outputFrame->outputPixelBuffer);
+  return tgfx::ImageBuffer::MakeFromHardwareBuffer(outputFrame->outputPixelBuffer);
 }
 }  // namespace pag

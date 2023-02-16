@@ -37,7 +37,7 @@ class ImageBuffer {
    * if any of the parameters is nullptr or the hardwareBuffer is not single-plane. Use the
    * YUVBuffer::MakeFrom() method for the hardware buffer with multiple planes.
    */
-  static std::shared_ptr<ImageBuffer> MakeFrom(HardwareBufferRef hardwareBuffer);
+  static std::shared_ptr<ImageBuffer> MakeFromHardwareBuffer(HardwareBufferRef hardwareBuffer);
 
   /**
    * Creates a new ImageBuffer object from a platform-specific image in the CPU. The nativeImage
@@ -45,7 +45,7 @@ class ImageBuffer {
    * apple platform.The returned ImageBuffer object takes a reference on the nativeImage. Returns
    * nullptr if the nativeImage is nullptr or the current platform has no native image support.
    */
-  static std::shared_ptr<ImageBuffer> MakeFrom(NativeImageRef nativeImage);
+  static std::shared_ptr<ImageBuffer> MakeFromNativeImage(NativeImageRef nativeImage);
 
   virtual ~ImageBuffer() = default;
   /**

@@ -21,7 +21,7 @@
 #include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace tgfx {
-std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(NativeImageRef nativeImage) {
+std::shared_ptr<ImageBuffer> ImageBuffer::MakeFromNativeImage(NativeImageRef nativeImage) {
   if (!nativeImage.as<bool>()) {
     return nullptr;
   }
