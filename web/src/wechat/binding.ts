@@ -5,7 +5,7 @@ import { PAGView } from './pag-view';
 import { PAGFile } from './pag-file';
 import { PAGImage } from './pag-image';
 import { PAGFont } from './pag-font';
-import { NativeImage } from './native-image';
+import * as tgfx from './tgfx';
 
 import { PAG } from '../types';
 import { setPAGModule } from '../pag-module';
@@ -39,7 +39,6 @@ export const binding = (module: PAG) => {
   module.PAGImageLayer = PAGImageLayer;
   module.PAGSolidLayer = PAGSolidLayer;
   module.VideoReader = VideoReader;
-  module.NativeImage = NativeImage;
   module.ScalerContext = ScalerContext;
   module.WebMask = WebMask;
   module.GlobalCanvas = GlobalCanvas;
@@ -62,4 +61,5 @@ export const binding = (module: PAG) => {
     return module._SDKVersion();
   };
   module.currentPlayer = null;
+  module.tgfx = { ...tgfx };
 };
