@@ -119,22 +119,22 @@ bool Transform3DFilter::updateLayer(Layer* layer, Frame layerFrame) {
   auto zRotation = layerTransform->zRotation->getValueAt(layerFrame);
   auto opacity = layerTransform->opacity->getValueAt(layerFrame);
   
-  modelMatrix = tgfx::Matrix4x4::Translate(-anchorPoint.x / bounds.width(),
-                                           anchorPoint.y / bounds.height(),
-                                           0);
+  modelMatrix = tgfx::Matrix4x4::Translate(-anchorPoint.x / bounds.width() * 2,
+                                           anchorPoint.y / bounds.height() * 2,
+                                           anchorPoint.z / 1000);
   
-  modelMatrix.setIdentity();
-
-//  modelMatrix.preTranslate(-1.0, -1.0);
-//  auto scaleMatrix = tgfx::Matrix4x4::Scale(scale.x, scale.y, scale.z);
-//  modelMatrix.preConcat(scaleMatrix);
-//  modelMatrix.preTranslate(1.0, 1.0);
-//  modelMatrix.preTranslate(2.0, 2.0);
-//  auto xRotationMatrix = tgfx::Matrix4x4::Rotate({1.0, 0.0, 0.0}, DegreesToRadians(orientation.x + xRotation));
-//  auto yRotationMatrix = tgfx::Matrix4x4::Rotate({0.0, 1.0, 0.0}, DegreesToRadians(-(orientation.y + yRotation)));
-//  auto zRotationMatrix = tgfx::Matrix4x4::Rotate({0.0, 0.0, 1.0}, DegreesToRadians(-(orientation.z + zRotation)));
-//  modelMatrix.preConcat(xRotationMatrix).preConcat(yRotationMatrix).preConcat(zRotationMatrix);
-//  modelMatrix.preTranslate(1.0, 1.0);
+  modelMatrix.postTranslate(1.0, -1.0);
+  auto scaleMatrix = tgfx::Matrix4x4::Scale(scale.x, scale.y, scale.z);
+  modelMatrix.postConcat(scaleMatrix);
+  auto xRotationMatrix = tgfx::Matrix4x4::Rotate({1.0, 0.0, 0.0}, DegreesToRadians(orientation.x + xRotation));
+  auto yRotationMatrix = tgfx::Matrix4x4::Rotate({0.0, 1.0, 0.0}, DegreesToRadians(-(orientation.y + yRotation)));
+  auto zRotationMatrix = tgfx::Matrix4x4::Rotate({0.0, 0.0, 1.0}, DegreesToRadians(-(orientation.z + zRotation)));
+  modelMatrix.postConcat(zRotationMatrix).postConcat(yRotationMatrix).postConcat(xRotationMatrix);
+  modelMatrix.postTranslate(position.x / bounds.width() * 2,
+                            -position.y / bounds.height() * 2,
+                            position.z);
+  modelMatrix.postTranslate(-1.0, 1.0);
+  
 //  modelMatrix.preTranslate(-0.5, -0.5);
 //  auto scaleMatrix = tgfx::Matrix4x4::Scale(scale.x, scale.y, scale.z);
 //  scaleMatrix.preTranslate(0.5, -0.5);
@@ -167,6 +167,7 @@ bool Transform3DFilter::updateLayer(Layer* layer, Frame layerFrame) {
 //    viewMatrix = tgfx::Matrix4x4::Translate(0, 0, 0) * tgfx::Matrix4x4::Scale(0.5 * bounds.width() / bounds.height(), -0.5, 1.0f);
 
   } else {
+    viewMatrix = tgfx::Matrix4x4::LookAt(info.fEye, info.fCOA, info.fUp);
 //    viewMatrix = tgfx::Matrix4x4::Translate(0, 0, 0) * tgfx::Matrix4x4::Scale(0.5 * bounds.width() / bounds.height(), -0.5, 1.0f);
   }
   
