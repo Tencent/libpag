@@ -17,25 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "VideoDecoder.h"
-#include <atomic>
-#include "pag/pag.h"
-#include "platform/Platform.h"
+#include "VideoDecoderFactory.h"
 
 namespace pag {
-static std::atomic_int maxHardwareDecoderCount = {65535};
-static std::atomic_int globalHardwareDecoderCount = {0};
-
-void PAGVideoDecoder::SetMaxHardwareDecoderCount(int count) {
-  maxHardwareDecoderCount = count;
-}
-
-bool VideoDecoder::HardwareDecoderCountAvailable() {
-  return globalHardwareDecoderCount < maxHardwareDecoderCount;
-}
 
 VideoDecoder::~VideoDecoder() {
   if (hardwareBacked) {
-    globalHardwareDecoderCount--;
+    VideoDecoderFactory::NotifyHardwareVideoDecoderReleased();
   }
 }
 

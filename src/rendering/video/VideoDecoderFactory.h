@@ -19,6 +19,10 @@
 #pragma once
 
 #include "VideoDecoder.h"
+#include "base/utils/Log.h"
+#include "codec/NALUType.h"
+#include "pag/decoder.h"
+#include "pag/file.h"
 
 namespace pag {
 /**
@@ -59,5 +63,10 @@ class VideoDecoderFactory {
 
  protected:
   virtual std::unique_ptr<VideoDecoder> onCreateDecoder(const VideoFormat& format) const = 0;
+
+ private:
+  static void NotifyHardwareVideoDecoderReleased();
+
+  friend class VideoDecoder;
 };
 }  // namespace pag
