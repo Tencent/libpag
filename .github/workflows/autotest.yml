@@ -28,27 +28,18 @@ jobs:
             /usr/local/bin/ninja
             /usr/local/Cellar/node
             /usr/local/bin/node
-            /usr/local/Cellar/emscripten
-            /usr/local/bin/em++
-            /usr/local/bin/em-config
-            /usr/local/bin/emar
-            /usr/local/bin/emcc
-            /usr/local/bin/emcmake
-            /usr/local/bin/emconfigure
-            /usr/local/bin/emlink.py
-            /usr/local/bin/emmake
-            /usr/local/bin/emranlib
-            /usr/local/bin/emrun
-            /usr/local/bin/emscons
             /usr/local/Cellar/yasm
             /usr/local/bin/yasm
             /usr/local/bin/depsync
             /usr/local/lib/node_modules/depsync
             /usr/local/Cellar/gcovr
             /usr/local/bin/gcovr
-          key: libpag-environment-autotest-20220908
+            /usr/local/Cellar/emsdk
+            /usr/local/Cellar/emsdk/upstream/emscripten
+            /usr/local/Cellar/emsdk/node/14.18.2_64bit/bin
+          key: libpag-environment-autotest-20221017
           restore-keys: |
-            libpag-environment-autotest-20220908
+            libpag-environment-autotest-20221017
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
@@ -65,6 +56,8 @@ jobs:
           restore-keys: third_party-autotest-
       - name: Run sync_deps script
         run: |
+          chmod +x ./web/script/install-emscripten.sh
+          source ./web/script/install-emscripten.sh
           chmod +x sync_deps.sh
           ./sync_deps.sh
         shell: bash
