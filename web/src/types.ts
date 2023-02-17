@@ -17,13 +17,7 @@ import { PAGSolidLayer } from './pag-solid-layer';
 import { Matrix as ClassMatrix } from './core/matrix';
 import { RenderCanvas } from './core/render-canvas';
 
-import type {
-  NativeImage,
-  NativeImageConstructor,
-  ScalerContextConstructor,
-  VideoDecoderConstructor,
-  WebMaskConstructor,
-} from './interfaces';
+import type { ScalerContextConstructor, VideoDecoderConstructor, WebMaskConstructor } from './interfaces';
 
 declare global {
   interface Window {
@@ -37,7 +31,7 @@ export interface PAG extends EmscriptenModule {
     _MaxSupportedTagLevel: () => number;
   };
   _PAGImage: {
-    _FromNativeImage: (nativeImage: NativeImage) => any;
+    _FromNativeImage: (source: TexImageSource) => any;
     _FromPixels: (
       pixels: number,
       width: number,
@@ -106,7 +100,6 @@ export interface PAG extends EmscriptenModule {
   PAGTextLayer: typeof PAGTextLayer;
   PAGImageLayer: typeof PAGImageLayer;
   PAGSolidLayer: typeof PAGSolidLayer;
-  NativeImage: NativeImageConstructor;
   WebMask: WebMaskConstructor;
   ScalerContext: ScalerContextConstructor;
   VideoReader: VideoDecoderConstructor;

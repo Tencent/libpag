@@ -20,13 +20,16 @@
 #include "gpu/opengl/GLContext.h"
 #include "tgfx/gpu/opengl/GLTexture.h"
 
+using namespace emscripten;
+
 namespace tgfx {
 std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(NativeImageRef nativeImage) {
   if (!nativeImage.as<bool>()) {
     return nullptr;
   }
-  auto width = nativeImage.call<int>("width");
-  auto height = nativeImage.call<int>("height");
+  auto size = val::module_property("tgfx").call<val>("getSourceSize", nativeImage);
+  auto width = size["width"].as<int>();
+  auto height = size["height"].as<int>();
   if (width < 1 || height < 1) {
     return nullptr;
   }
@@ -43,7 +46,8 @@ std::shared_ptr<Texture> NativeImageBuffer::onMakeTexture(Context* context, bool
   auto& glInfo = std::static_pointer_cast<GLTexture>(texture)->glSampler();
   auto gl = GLFunctions::Get(context);
   gl->bindTexture(glInfo.target, glInfo.id);
-  getImage().call<void>("upload", emscripten::val::module_property("GL"));
+  val::module_property("tgfx").call<void>("uploadTexImageSource",
+                                          emscripten::val::module_property("GL"), getImage());
   return texture;
 }
 
@@ -53,7 +57,7 @@ NativeImageBuffer::NativeImageBuffer(int width, int height, emscripten::val nati
 }
 
 NativeImageBuffer::~NativeImageBuffer() {
-  getImage().call<void>("onDestroy");
+  val::module_property("tgfx").call<void>("releaseNativeImage", nativeImage);
 }
 
 emscripten::val NativeImageBuffer::getImage() const {
