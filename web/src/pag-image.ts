@@ -1,5 +1,4 @@
 import { AlphaType, ColorType, PAGScaleMode } from './types';
-import { NativeImage } from './core/native-image';
 import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorators';
 import { PAGModule } from './pag-module';
 import { Matrix } from './core/matrix';
@@ -34,8 +33,7 @@ export class PAGImage {
    * ```
    */
   public static fromSource(source: TexImageSource): PAGImage {
-    const nativeImage = new NativeImage(source);
-    const wasmIns = PAGModule._PAGImage._FromNativeImage(nativeImage);
+    const wasmIns = PAGModule._PAGImage._FromNativeImage(source);
     if (!wasmIns) throw new Error('Make PAGImage from source fail!');
     return new PAGImage(wasmIns);
   }

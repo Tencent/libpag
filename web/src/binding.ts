@@ -10,7 +10,6 @@ import { PAGLayer } from './pag-layer';
 import { VideoReader } from './core/video-reader';
 import { ScalerContext } from './core/scaler-context';
 import { WebMask } from './core/web-mask';
-import { NativeImage } from './core/native-image';
 import { GlobalCanvas } from './core/global-canvas';
 import { BackendContext } from './core/backend-context';
 import { PAGComposition } from './pag-composition';
@@ -19,6 +18,7 @@ import { PAGImageLayer } from './pag-image-layer';
 import { PAGSolidLayer } from './pag-solid-layer';
 import { Matrix } from './core/matrix';
 import { RenderCanvas } from './core/render-canvas';
+import * as tgfx from './tgfx';
 
 /**
  * Binding pag js module on pag webassembly module.
@@ -38,7 +38,6 @@ export const binding = (module: PAG) => {
   module.PAGImageLayer = PAGImageLayer;
   module.PAGSolidLayer = PAGSolidLayer;
   module.VideoReader = VideoReader;
-  module.NativeImage = NativeImage;
   module.ScalerContext = ScalerContext;
   module.WebMask = WebMask;
   module.GlobalCanvas = GlobalCanvas;
@@ -60,4 +59,5 @@ export const binding = (module: PAG) => {
   module.SDKVersion = function () {
     return module._SDKVersion();
   };
+  module.tgfx = { ...tgfx };
 };

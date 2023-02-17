@@ -110,11 +110,7 @@ static bool IsWebp(ByteBuffer buffer, int& width, int& height) {
 }
 
 static bool CheckWebpSupport() {
-  auto nativeImageClass = val::module_property("NativeImage");
-  if (!nativeImageClass.as<bool>()) {
-    return false;
-  }
-  return nativeImageClass.call<bool>("hasWebpSupport");
+  return val::module_property("tgfx").call<val>("hasWebpSupport").as<bool>();
 }
 
 ISize NativeImageInfo::GetSize(std::shared_ptr<Data> imageBytes) {

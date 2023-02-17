@@ -66,13 +66,9 @@ bool NativeCodec::readPixels(const ImageInfo&, void*) const {
 }
 
 std::shared_ptr<ImageBuffer> NativeCodec::onMakeBuffer(bool) const {
-  auto nativeImageClass = val::module_property("NativeImage");
-  if (!nativeImageClass.as<bool>()) {
-    return nullptr;
-  }
   auto bytes =
       val(typed_memory_view(imageBytes->size(), static_cast<const uint8_t*>(imageBytes->data())));
-  auto nativeImage = nativeImageClass.call<val>("createFromBytes", bytes, width(), height());
+  auto nativeImage = val::module_property("tgfx").call<val>("createImageFromBytes", bytes);
   bool usePromise = AsyncSupport;
   if (!usePromise) {
     nativeImage = nativeImage.await();
