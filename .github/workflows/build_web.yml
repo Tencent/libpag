@@ -35,9 +35,9 @@ jobs:
             /usr/local/Cellar/emsdk
             /usr/local/Cellar/emsdk/upstream/emscripten
             /usr/local/Cellar/emsdk/node/14.18.2_64bit/bin
-          key: libpag-environment-autotest-20221012
+          key: libpag-environment-autotest-20221017
           restore-keys: |
-            libpag-environment-autotest-20221012
+            libpag-environment-autotest-20221017
       - uses: actions/checkout@v3
         with:
           lfs: true
