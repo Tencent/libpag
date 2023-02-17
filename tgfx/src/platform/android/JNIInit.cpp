@@ -18,11 +18,11 @@
 
 #include "JNIInit.h"
 #include "NativeCodec.h"
-#include "SurfaceBufferQueue.h"
+#include "NativeImageReader.h"
 
 namespace tgfx {
 void JNIInit(JNIEnv* env) {
   NativeCodec::JNIInit(env);
-  SurfaceBufferQueue::JNIInit(env);
+  NativeImageReader::JNIInit(env);
 }
 }  // namespace tgfx

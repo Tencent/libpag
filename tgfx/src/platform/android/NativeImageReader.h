@@ -22,34 +22,30 @@
 #include <mutex>
 #include "GLExternalTexture.h"
 #include "JNIUtil.h"
-#include "tgfx/platform/android/ImageBufferQueue.h"
+#include "tgfx/platform/android/SurfaceTextureReader.h"
 
 namespace tgfx {
-class SurfaceBufferQueue : public ImageBufferQueue {
+class NativeImageReader : public SurfaceTextureReader {
  public:
   static void JNIInit(JNIEnv* env);
 
-  SurfaceBufferQueue(JNIEnv* env, jobject surfaceTexture, int width, int height);
+  NativeImageReader(JNIEnv* env, jobject surfaceTexture, int width, int height);
 
   std::shared_ptr<ImageBuffer> acquireNextBuffer() override;
 
   void notifyFrameAvailable() override;
 
+ protected:
+  bool onUpdateTexture(Context* context, bool mipMapped) override;
+
  private:
   std::mutex locker = {};
   std::condition_variable condition = {};
-  std::weak_ptr<SurfaceBufferQueue> weakThis;
   Global<jobject> surfaceTexture;
-  int width = 0;
-  int height = 0;
-  std::shared_ptr<GLExternalTexture> texture = nullptr;
-  bool hasNewPendingFrame = false;
   bool frameAvailable = false;
 
-  std::shared_ptr<Texture> makeTexture(Context* context, bool mipMapped = false);
   bool attachToContext(JNIEnv* env, Context* context);
 
-  friend class SurfaceBuffer;
-  friend class ImageBufferQueue;
+  friend class SurfaceTextureReader;
 };
 }  // namespace tgfx

@@ -16,7 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "SurfaceBufferQueue.h"
+#include "NativeImageReader.h"
+#include <chrono>
 #include "core/utils/Log.h"
 
 namespace tgfx {
@@ -24,7 +25,7 @@ static jmethodID SurfaceTexture_updateTexImage;
 static jmethodID SurfaceTexture_attachToGLContext;
 static jmethodID SurfaceTexture_getTransformMatrix;
 
-void SurfaceBufferQueue::JNIInit(JNIEnv* env) {
+void NativeImageReader::JNIInit(JNIEnv* env) {
   Local<jclass> SurfaceTextureClass = {env, env->FindClass("android/graphics/SurfaceTexture")};
   SurfaceTexture_updateTexImage =
       env->GetMethodID(SurfaceTextureClass.get(), "updateTexImage", "()V");
@@ -34,8 +35,8 @@ void SurfaceBufferQueue::JNIInit(JNIEnv* env) {
       env->GetMethodID(SurfaceTextureClass.get(), "getTransformMatrix", "([F)V");
 }
 
-std::shared_ptr<ImageBufferQueue> ImageBufferQueue::MakeFrom(jobject surfaceTexture, int width,
-                                                             int height) {
+std::shared_ptr<SurfaceTextureReader> SurfaceTextureReader::MakeFrom(jobject surfaceTexture,
+                                                                     int width, int height) {
   if (surfaceTexture == nullptr || width <= 0 || height <= 0) {
     return nullptr;
   }
@@ -43,50 +44,21 @@ std::shared_ptr<ImageBufferQueue> ImageBufferQueue::MakeFrom(jobject surfaceText
   if (env == nullptr) {
     return nullptr;
   }
-  auto bufferQueue = std::make_shared<SurfaceBufferQueue>(env, surfaceTexture, width, height);
+  auto bufferQueue = std::make_shared<NativeImageReader>(env, surfaceTexture, width, height);
   bufferQueue->weakThis = bufferQueue;
   return bufferQueue;
 }
 
-class SurfaceBuffer : public ImageBuffer {
- public:
-  explicit SurfaceBuffer(std::shared_ptr<SurfaceBufferQueue> bufferQueue)
-      : bufferQueue(std::move(bufferQueue)) {
-  }
-
-  int width() const override {
-    return bufferQueue->width;
-  }
-
-  int height() const override {
-    return bufferQueue->height;
-  }
-
-  bool isAlphaOnly() const override {
-    return false;
-  }
-
- protected:
-  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) const override {
-    return bufferQueue->makeTexture(context, mipMapped);
-  }
-
- private:
-  std::shared_ptr<SurfaceBufferQueue> bufferQueue = nullptr;
-};
-
-SurfaceBufferQueue::SurfaceBufferQueue(JNIEnv* env, jobject surface, int width, int height)
-    : width(width), height(height) {
+NativeImageReader::NativeImageReader(JNIEnv* env, jobject surface, int width, int height)
+    : SurfaceTextureReader(width, height) {
   surfaceTexture.reset(env, surface);
 }
 
-std::shared_ptr<ImageBuffer> SurfaceBufferQueue::acquireNextBuffer() {
-  std::lock_guard<std::mutex> autoLock(locker);
-  hasNewPendingFrame = true;
-  return std::make_shared<SurfaceBuffer>(weakThis.lock());
+std::shared_ptr<ImageBuffer> NativeImageReader::acquireNextBuffer() {
+  return makeNextBuffer();
 }
 
-void SurfaceBufferQueue::notifyFrameAvailable() {
+void NativeImageReader::notifyFrameAvailable() {
   std::lock_guard<std::mutex> autoLock(locker);
   frameAvailable = true;
   condition.notify_all();
@@ -105,49 +77,51 @@ static ISize ComputeTextureSize(float matrix[16], int width, int height) {
   return size.toRound();
 }
 
-std::shared_ptr<Texture> SurfaceBufferQueue::makeTexture(Context* context, bool) {
+bool NativeImageReader::onUpdateTexture(Context* context, bool) {
   std::unique_lock<std::mutex> autoLock(locker);
-  if (!hasNewPendingFrame) {
-    return texture;
-  }
   if (!frameAvailable) {
-    condition.wait(autoLock);
+    static const auto TIMEOUT = std::chrono::seconds(1);
+    auto status = condition.wait_for(autoLock, TIMEOUT);
+    if (status == std::cv_status::timeout) {
+      LOGE("NativeImageReader::onUpdateTexture(): timeout when waiting for the frame available!");
+      return false;
+    }
   }
   auto env = CurrentJNIEnv();
   if (env == nullptr) {
-    return nullptr;
+    return false;
   }
   if (!attachToContext(env, context)) {
-    return nullptr;
+    return false;
   }
-  hasNewPendingFrame = false;
   frameAvailable = false;
   env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_updateTexImage);
   if (env->ExceptionCheck()) {
     env->ExceptionClear();
-    LOGE("SurfaceBufferQueue::makeTexture(): failed to updateTexImage!");
-    return nullptr;
+    LOGE("NativeImageReader::onUpdateTexture(): failed to updateTexImage!");
+    return false;
   }
   Local<jfloatArray> floatArray = {env, env->NewFloatArray(16)};
   env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_getTransformMatrix, floatArray.get());
   auto matrix = env->GetFloatArrayElements(floatArray.get(), nullptr);
-  auto textureSize = ComputeTextureSize(matrix, width, height);
+  auto textureSize = ComputeTextureSize(matrix, width(), height());
   env->ReleaseFloatArrayElements(floatArray.get(), matrix, 0);
-  texture->updateTextureSize(textureSize.width, textureSize.height);
-  return texture;
+  std::static_pointer_cast<GLExternalTexture>(texture)->updateTextureSize(textureSize.width,
+                                                                          textureSize.height);
+  return true;
 }
 
-bool SurfaceBufferQueue::attachToContext(JNIEnv* env, Context* context) {
+bool NativeImageReader::attachToContext(JNIEnv* env, Context* context) {
   if (texture != nullptr) {
     if (texture->getContext() != context) {
       LOGE(
-          "SurfaceBufferQueue::attachToGLContext(): "
-          "SurfaceBufferQueue has already attached to a Context!");
+          "NativeImageReader::attachToGLContext(): "
+          "NativeImageReader has already attached to a Context!");
       return false;
     }
     return true;
   }
-  texture = GLExternalTexture::Make(context, width, height);
+  texture = GLExternalTexture::Make(context, width(), height());
   if (texture == nullptr) {
     return false;
   }
@@ -156,7 +130,7 @@ bool SurfaceBufferQueue::attachToContext(JNIEnv* env, Context* context) {
   if (env->ExceptionCheck()) {
     env->ExceptionClear();
     texture = nullptr;
-    LOGE("SurfaceBufferQueue::attachToGLContext(): failed to attached to a SurfaceTexture!");
+    LOGE("NativeImageReader::attachToGLContext(): failed to attached to a SurfaceTexture!");
     return false;
   }
   return true;

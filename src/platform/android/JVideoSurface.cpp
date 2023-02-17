@@ -22,8 +22,8 @@
 namespace pag {
 static jfieldID VideoSurface_nativeContext;
 
-std::shared_ptr<tgfx::ImageBufferQueue> JVideoSurface::GetBufferQueue(JNIEnv* env,
-                                                                      jobject videoSurface) {
+std::shared_ptr<tgfx::SurfaceTextureReader> JVideoSurface::GetImageReader(JNIEnv* env,
+                                                                          jobject videoSurface) {
   if (videoSurface == nullptr) {
     return nullptr;
   }
@@ -65,15 +65,15 @@ PAG_API void Java_org_libpag_VideoSurface_nativeFinalize(JNIEnv* env, jobject th
 PAG_API void Java_org_libpag_VideoSurface_nativeSetup(JNIEnv* env, jobject thiz,
                                                       jobject surfaceTexture, jint width,
                                                       jint height) {
-  auto bufferQueue = tgfx::ImageBufferQueue::MakeFrom(surfaceTexture, width, height);
+  auto bufferQueue = tgfx::SurfaceTextureReader::MakeFrom(surfaceTexture, width, height);
   setBufferQueue(env, thiz, new JVideoSurface(bufferQueue));
 }
 
 PAG_API void Java_org_libpag_VideoSurface_notifyFrameAvailable(JNIEnv* env, jobject thiz) {
-  auto bufferQueue = JVideoSurface::GetBufferQueue(env, thiz);
-  if (bufferQueue == nullptr) {
+  auto reader = JVideoSurface::GetImageReader(env, thiz);
+  if (reader == nullptr) {
     return;
   }
-  bufferQueue->notifyFrameAvailable();
+  reader->notifyFrameAvailable();
 }
 }
