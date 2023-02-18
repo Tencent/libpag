@@ -19,6 +19,7 @@
 #include "tgfx/platform/web/VideoImageReader.h"
 #include "GLVideoTexture.h"
 #include "core/utils/Log.h"
+#include "tgfx/platform/web/WebImage.h"
 
 namespace tgfx {
 using namespace emscripten;
@@ -39,6 +40,9 @@ VideoImageReader::VideoImageReader(emscripten::val video, int width, int height)
 std::shared_ptr<ImageBuffer> VideoImageReader::acquireNextBuffer(val promise) {
   if (promise == val::null()) {
     return nullptr;
+  }
+  if (!WebImage::AsyncSupport()) {
+    promise.await();
   }
   currentPromise = promise;
   return makeNextBuffer();
