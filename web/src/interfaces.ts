@@ -41,7 +41,7 @@ export interface ScalerContext {
   getTextAdvance: (text: string) => number;
   getTextBounds: (text: string) => Rect;
   generateFontMetrics: () => FontMetrics;
-  generateImage: (text: string, bounds: Rect) => NativeImage;
+  generateImage: (text: string, bounds: Rect) => TexImageSource | OffscreenCanvas;
 }
 
 export interface ScalerContextConstructor {
@@ -68,15 +68,3 @@ export type WebMaskConstructor = new (
   width: number,
   height: number,
 ) => WebMask;
-
-export interface NativeImage {
-  width: () => number;
-  height: () => number;
-  upload: (GL: EmscriptenGL) => void;
-}
-
-export interface NativeImageConstructor {
-  createFromBytes: (bytes: ArrayBuffer) => Promise<NativeImage | null>;
-  createFromPath: (path: string) => Promise<NativeImage | null>;
-  new (source: TexImageSource): NativeImage;
-}
