@@ -18,19 +18,19 @@
 
 #pragma once
 
-#include "tgfx/platform/android/SurfaceTextureReader.h"
+#include "tgfx/platform/android/SurfaceImageReader.h"
 
 namespace pag {
 class JVideoSurface {
  public:
-  static std::shared_ptr<tgfx::SurfaceTextureReader> GetImageReader(JNIEnv* env,
-                                                                    jobject videoSurface);
+  static std::shared_ptr<tgfx::SurfaceImageReader> GetImageReader(JNIEnv* env,
+                                                                  jobject videoSurface);
 
-  explicit JVideoSurface(std::shared_ptr<tgfx::SurfaceTextureReader> imageReader)
+  explicit JVideoSurface(std::shared_ptr<tgfx::SurfaceImageReader> imageReader)
       : imageReader(imageReader) {
   }
 
-  std::shared_ptr<tgfx::SurfaceTextureReader> get() {
+  std::shared_ptr<tgfx::SurfaceImageReader> get() {
     std::lock_guard<std::mutex> autoLock(locker);
     return imageReader;
   }
@@ -42,6 +42,6 @@ class JVideoSurface {
 
  private:
   std::mutex locker;
-  std::shared_ptr<tgfx::SurfaceTextureReader> imageReader = nullptr;
+  std::shared_ptr<tgfx::SurfaceImageReader> imageReader = nullptr;
 };
 }  // namespace pag

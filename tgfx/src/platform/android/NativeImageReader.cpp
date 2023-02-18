@@ -21,37 +21,153 @@
 #include "core/utils/Log.h"
 
 namespace tgfx {
+static Global<jclass> SurfaceTextureClass;
+static jmethodID SurfaceTexture_Constructor_singleBufferMode;
+static jmethodID SurfaceTexture_Constructor_texName;
+static jmethodID SurfaceTexture_setOnFrameAvailableListenerHandler;
+static jmethodID SurfaceTexture_setOnFrameAvailableListener;
+static jfieldID SurfaceTexture_mEventHandler;
 static jmethodID SurfaceTexture_updateTexImage;
 static jmethodID SurfaceTexture_attachToGLContext;
+static jmethodID SurfaceTexture_detachFromGLContext;
 static jmethodID SurfaceTexture_getTransformMatrix;
+static jmethodID SurfaceTexture_release;
+static Global<jclass> SurfaceClass;
+static jmethodID Surface_Constructor;
+static jmethodID Surface_release;
+static Global<jclass> HandlerClass;
+static jmethodID Handler_Constructor;
+static Global<jclass> EventHandlerClass;
+static jmethodID EventHandler_Constructor;
 
 void NativeImageReader::JNIInit(JNIEnv* env) {
-  Local<jclass> SurfaceTextureClass = {env, env->FindClass("android/graphics/SurfaceTexture")};
+  SurfaceTextureClass.reset(env, env->FindClass("android/graphics/SurfaceTexture"));
+  SurfaceTexture_Constructor_singleBufferMode =
+      env->GetMethodID(SurfaceTextureClass.get(), "<init>", "(Z)V");
+  SurfaceTexture_Constructor_texName =
+      env->GetMethodID(SurfaceTextureClass.get(), "<init>", "(I)V");
+  SurfaceTexture_setOnFrameAvailableListenerHandler = env->GetMethodID(
+      SurfaceTextureClass.get(), "setOnFrameAvailableListener",
+      "(Landroid/graphics/SurfaceTexture$OnFrameAvailableListener;Landroid/os/Handler;)V");
+  if (SurfaceTexture_setOnFrameAvailableListenerHandler != nullptr) {
+    HandlerClass.reset(env, env->FindClass("android/os/Handler"));
+    Handler_Constructor = env->GetMethodID(HandlerClass.get(), "<init>", "(Landroid/os/Looper;)V");
+  } else {
+    SurfaceTexture_setOnFrameAvailableListener =
+        env->GetMethodID(SurfaceTextureClass.get(), "setOnFrameAvailableListener",
+                         "(Landroid/graphics/SurfaceTexture$OnFrameAvailableListener;)V");
+    SurfaceTexture_mEventHandler =
+        env->GetFieldID(SurfaceTextureClass.get(), "mEventHandler",
+                        "Landroid/graphics/SurfaceTexture$EventHandler;");
+    EventHandlerClass.reset(env, env->FindClass("android/graphics/SurfaceTexture$EventHandler"));
+    EventHandler_Constructor =
+        env->GetMethodID(EventHandlerClass.get(), "<init>",
+                         "(Landroid/graphics/SurfaceTexture;Landroid/os/Looper;)V");
+  }
   SurfaceTexture_updateTexImage =
       env->GetMethodID(SurfaceTextureClass.get(), "updateTexImage", "()V");
   SurfaceTexture_attachToGLContext =
       env->GetMethodID(SurfaceTextureClass.get(), "attachToGLContext", "(I)V");
+  SurfaceTexture_detachFromGLContext =
+      env->GetMethodID(SurfaceTextureClass.get(), "detachFromGLContext", "()V");
   SurfaceTexture_getTransformMatrix =
       env->GetMethodID(SurfaceTextureClass.get(), "getTransformMatrix", "([F)V");
+  SurfaceTexture_release = env->GetMethodID(SurfaceTextureClass.get(), "release", "()V");
+  SurfaceClass.reset(env, env->FindClass("android/view/Surface"));
+  Surface_Constructor =
+      env->GetMethodID(SurfaceClass.get(), "<init>", "(Landroid/graphics/SurfaceTexture;)V");
+  Surface_release = env->GetMethodID(SurfaceClass.get(), "release", "()V");
 }
 
-std::shared_ptr<SurfaceTextureReader> SurfaceTextureReader::MakeFrom(jobject surfaceTexture,
-                                                                     int width, int height) {
-  if (surfaceTexture == nullptr || width <= 0 || height <= 0) {
+static std::mutex threadLocker = {};
+static std::weak_ptr<HandlerThread> handlerThread;
+
+static std::shared_ptr<HandlerThread> GetHandlerThread() {
+  std::lock_guard<std::mutex> autoLock(threadLocker);
+  auto thread = handlerThread.lock();
+  if (thread != nullptr) {
+    return thread;
+  }
+  thread = HandlerThread::Make();
+  handlerThread = thread;
+  return thread;
+}
+
+static void SetOnFrameAvailableListener(JNIEnv* env, jobject surfaceTexture, jobject listener,
+                                        jobject looper) {
+  if (SurfaceTexture_setOnFrameAvailableListenerHandler != nullptr) {
+    Local<jobject> handler = {env, env->NewObject(HandlerClass.get(), Handler_Constructor, looper)};
+    env->CallVoidMethod(surfaceTexture, SurfaceTexture_setOnFrameAvailableListenerHandler, listener,
+                        handler.get());
+  } else {
+    env->CallVoidMethod(surfaceTexture, SurfaceTexture_setOnFrameAvailableListener, listener);
+    Local<jobject> handler = {env, env->NewObject(EventHandlerClass.get(), EventHandler_Constructor,
+                                                  surfaceTexture, looper)};
+    env->SetObjectField(surfaceTexture, SurfaceTexture_mEventHandler, handler.get());
+  }
+}
+
+std::shared_ptr<SurfaceImageReader> SurfaceImageReader::Make(int width, int height,
+                                                             jobject listener) {
+  if (width <= 0 || height <= 0 || listener == nullptr) {
     return nullptr;
   }
   auto env = CurrentJNIEnv();
   if (env == nullptr) {
     return nullptr;
   }
-  auto bufferQueue = std::make_shared<NativeImageReader>(env, surfaceTexture, width, height);
-  bufferQueue->weakThis = bufferQueue;
-  return bufferQueue;
+  Local<jobject> surfaceTexture;
+  if (SurfaceTexture_Constructor_singleBufferMode != nullptr) {
+    surfaceTexture.reset(
+        env, env->NewObject(SurfaceTextureClass.get(), SurfaceTexture_Constructor_singleBufferMode,
+                            JNI_FALSE));
+  } else {
+    surfaceTexture.reset(
+        env, env->NewObject(SurfaceTextureClass.get(), SurfaceTexture_Constructor_texName, 0));
+    if (surfaceTexture.get() != nullptr) {
+      env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_detachFromGLContext);
+    }
+  }
+  if (env->ExceptionCheck()) {
+    env->ExceptionClear();
+    LOGE("SurfaceImageReader::MakeFrom(): failed to create a new SurfaceTexture!");
+    return nullptr;
+  }
+  auto thread = GetHandlerThread();
+  if (thread == nullptr) {
+    return nullptr;
+  }
+  SetOnFrameAvailableListener(env, surfaceTexture.get(), listener, thread->getLooper());
+  if (env->ExceptionCheck()) {
+    env->ExceptionClear();
+    LOGE("SurfaceImageReader::MakeFrom(): failed to set the OnFrameAvailableListener!");
+    return nullptr;
+  }
+  Local<jobject> surface = {
+      env, env->NewObject(SurfaceClass.get(), Surface_Constructor, surfaceTexture.get())};
+  auto imageReader = std::make_shared<NativeImageReader>(width, height, std::move(thread));
+  imageReader->weakThis = imageReader;
+  imageReader->surfaceTexture.reset(env, surfaceTexture.get());
+  imageReader->surface.reset(env, surface.get());
+  return imageReader;
 }
 
-NativeImageReader::NativeImageReader(JNIEnv* env, jobject surface, int width, int height)
-    : SurfaceTextureReader(width, height) {
-  surfaceTexture.reset(env, surface);
+NativeImageReader::NativeImageReader(int width, int height,
+                                     std::shared_ptr<HandlerThread> handlerThread)
+    : SurfaceImageReader(width, height), handlerThread(std::move(handlerThread)) {
+}
+
+NativeImageReader::~NativeImageReader() {
+  auto env = CurrentJNIEnv();
+  if (env == nullptr) {
+    return;
+  }
+  env->CallVoidMethod(surface.get(), Surface_release);
+  env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_release);
+}
+
+jobject NativeImageReader::getInputSurface() const {
+  return surface.get();
 }
 
 std::shared_ptr<ImageBuffer> NativeImageReader::acquireNextBuffer() {

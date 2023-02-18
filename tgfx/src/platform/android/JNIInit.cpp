@@ -17,12 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "JNIInit.h"
+#include "HandlerThread.h"
 #include "NativeCodec.h"
 #include "NativeImageReader.h"
 
 namespace tgfx {
 void JNIInit(JNIEnv* env) {
   NativeCodec::JNIInit(env);
+  HandlerThread::JNIInit(env);
   NativeImageReader::JNIInit(env);
 }
 }  // namespace tgfx

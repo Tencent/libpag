@@ -22,8 +22,8 @@
 namespace pag {
 static jfieldID VideoSurface_nativeContext;
 
-std::shared_ptr<tgfx::SurfaceTextureReader> JVideoSurface::GetImageReader(JNIEnv* env,
-                                                                          jobject videoSurface) {
+std::shared_ptr<tgfx::SurfaceImageReader> JVideoSurface::GetImageReader(JNIEnv* env,
+                                                                        jobject videoSurface) {
   if (videoSurface == nullptr) {
     return nullptr;
   }
@@ -62,11 +62,21 @@ PAG_API void Java_org_libpag_VideoSurface_nativeFinalize(JNIEnv* env, jobject th
   setBufferQueue(env, thiz, nullptr);
 }
 
-PAG_API void Java_org_libpag_VideoSurface_nativeSetup(JNIEnv* env, jobject thiz,
-                                                      jobject surfaceTexture, jint width,
+PAG_API void Java_org_libpag_VideoSurface_nativeSetup(JNIEnv* env, jobject thiz, jint width,
                                                       jint height) {
-  auto bufferQueue = tgfx::SurfaceTextureReader::MakeFrom(surfaceTexture, width, height);
-  setBufferQueue(env, thiz, new JVideoSurface(bufferQueue));
+  auto imageReader = tgfx::SurfaceImageReader::Make(width, height, thiz);
+  if (imageReader == nullptr) {
+    return;
+  }
+  setBufferQueue(env, thiz, new JVideoSurface(imageReader));
+}
+
+PAG_API jobject Java_org_libpag_VideoSurface_getInputSurface(JNIEnv* env, jobject thiz) {
+  auto reader = JVideoSurface::GetImageReader(env, thiz);
+  if (reader == nullptr) {
+    return nullptr;
+  }
+  return reader->getInputSurface();
 }
 
 PAG_API void Java_org_libpag_VideoSurface_notifyFrameAvailable(JNIEnv* env, jobject thiz) {
