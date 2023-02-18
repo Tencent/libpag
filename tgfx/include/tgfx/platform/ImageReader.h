@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <atomic>
 #include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
