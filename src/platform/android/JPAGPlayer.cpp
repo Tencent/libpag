@@ -22,6 +22,10 @@
 #include "JPAGSurface.h"
 #include "NativePlatform.h"
 
+#ifdef PAG_USE_FFAVC
+#include "ffavc.h"
+#endif
+
 namespace pag {
 static jfieldID PAGPlayer_nativeContext;
 }
@@ -51,6 +55,10 @@ PAG_API void Java_org_libpag_PAGPlayer_nativeInit(JNIEnv* env, jclass clazz) {
   // 调用堆栈源头从C++触发而不是Java触发的情况下，FindClass
   // 可能会失败，因此要提前初始化这部分反射方法。
   NativePlatform::InitJNI(env);
+#ifdef PAG_USE_FFAVC
+  PAGVideoDecoder::RegisterSoftwareDecoderFactory(
+          static_cast<SoftwareDecoderFactory *>(ffavc::DecoderFactory::GetHandle()));
+#endif
 }
 
 PAG_API void Java_org_libpag_PAGPlayer_nativeSetup(JNIEnv* env, jobject thiz) {
