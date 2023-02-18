@@ -230,7 +230,7 @@ bool NativeImageReader::attachToContext(JNIEnv* env, Context* context) {
     if (texture->getContext() != context) {
       LOGE(
           "NativeImageReader::attachToGLContext(): "
-          "NativeImageReader has already attached to a Context!");
+          "SurfaceTexture has already attached to a Context!");
       return false;
     }
     return true;

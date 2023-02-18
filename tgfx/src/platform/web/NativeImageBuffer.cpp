@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "NativeImageBuffer.h"
-#include "gpu/opengl/GLContext.h"
 #include "tgfx/gpu/opengl/GLTexture.h"
 
 using namespace emscripten;
@@ -37,17 +36,14 @@ std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(NativeImageRef nativeImage) {
       new NativeImageBuffer(width, height, std::move(nativeImage), false));
 }
 
-std::shared_ptr<Texture> NativeImageBuffer::onMakeTexture(Context* context, bool mipMapped) const {
-  auto texture =
-      Texture::MakeRGBA(context, width(), height(), nullptr, 0, ImageOrigin::TopLeft, mipMapped);
+std::shared_ptr<Texture> NativeImageBuffer::onMakeTexture(Context* context, bool) const {
+  auto texture = Texture::MakeRGBA(context, width(), height(), nullptr, 0, ImageOrigin::TopLeft);
   if (texture == nullptr) {
     return nullptr;
   }
   auto& glInfo = std::static_pointer_cast<GLTexture>(texture)->glSampler();
-  auto gl = GLFunctions::Get(context);
-  gl->bindTexture(glInfo.target, glInfo.id);
-  val::module_property("tgfx").call<void>("uploadTexImageSource",
-                                          emscripten::val::module_property("GL"), getImage());
+  val::module_property("tgfx").call<void>("uploadToTexture", emscripten::val::module_property("GL"),
+                                          getImage(), glInfo.id);
   return texture;
 }
 
