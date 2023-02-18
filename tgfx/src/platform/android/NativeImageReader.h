@@ -30,7 +30,7 @@ class NativeImageReader : public SurfaceImageReader {
  public:
   static void JNIInit(JNIEnv* env);
 
-  NativeImageReader(int width, int height, std::shared_ptr<HandlerThread> handlerThread);
+  NativeImageReader(int width, int height, JNIEnv* env, jobject surfaceTexture);
 
   ~NativeImageReader() override;
 
@@ -46,7 +46,6 @@ class NativeImageReader : public SurfaceImageReader {
  private:
   std::mutex locker = {};
   std::condition_variable condition = {};
-  std::shared_ptr<HandlerThread> handlerThread = nullptr;
   Global<jobject> surface;
   Global<jobject> surfaceTexture;
   bool frameAvailable = false;

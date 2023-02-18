@@ -80,17 +80,17 @@ void NativeImageReader::JNIInit(JNIEnv* env) {
 }
 
 static std::mutex threadLocker = {};
-static std::weak_ptr<HandlerThread> handlerThread;
+static std::shared_ptr<HandlerThread> handlerThread;
 
-static std::shared_ptr<HandlerThread> GetHandlerThread() {
+static jobject GetGlobalLooper() {
   std::lock_guard<std::mutex> autoLock(threadLocker);
-  auto thread = handlerThread.lock();
-  if (thread != nullptr) {
-    return thread;
+  if (handlerThread == nullptr) {
+    handlerThread = HandlerThread::Make();
   }
-  thread = HandlerThread::Make();
-  handlerThread = thread;
-  return thread;
+  if (handlerThread == nullptr) {
+    return nullptr;
+  }
+  return handlerThread->getLooper();
 }
 
 static void SetOnFrameAvailableListener(JNIEnv* env, jobject surfaceTexture, jobject listener,
@@ -133,28 +133,26 @@ std::shared_ptr<SurfaceImageReader> SurfaceImageReader::Make(int width, int heig
     LOGE("SurfaceImageReader::MakeFrom(): failed to create a new SurfaceTexture!");
     return nullptr;
   }
-  auto thread = GetHandlerThread();
-  if (thread == nullptr) {
+  auto looper = GetGlobalLooper();
+  if (looper == nullptr) {
     return nullptr;
   }
-  SetOnFrameAvailableListener(env, surfaceTexture.get(), listener, thread->getLooper());
+  SetOnFrameAvailableListener(env, surfaceTexture.get(), listener, looper);
   if (env->ExceptionCheck()) {
     env->ExceptionClear();
     LOGE("SurfaceImageReader::MakeFrom(): failed to set the OnFrameAvailableListener!");
     return nullptr;
   }
-  Local<jobject> surface = {
-      env, env->NewObject(SurfaceClass.get(), Surface_Constructor, surfaceTexture.get())};
-  auto imageReader = std::make_shared<NativeImageReader>(width, height, std::move(thread));
+
+  auto imageReader = std::make_shared<NativeImageReader>(width, height, env, surfaceTexture.get());
   imageReader->weakThis = imageReader;
-  imageReader->surfaceTexture.reset(env, surfaceTexture.get());
-  imageReader->surface.reset(env, surface.get());
   return imageReader;
 }
 
-NativeImageReader::NativeImageReader(int width, int height,
-                                     std::shared_ptr<HandlerThread> handlerThread)
-    : SurfaceImageReader(width, height), handlerThread(std::move(handlerThread)) {
+NativeImageReader::NativeImageReader(int width, int height, JNIEnv* env, jobject st)
+    : SurfaceImageReader(width, height) {
+  surfaceTexture.reset(env, st);
+  surface.reset(env, env->NewObject(SurfaceClass.get(), Surface_Constructor, st));
 }
 
 NativeImageReader::~NativeImageReader() {
