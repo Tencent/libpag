@@ -17,15 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SequenceReaderFactory.h"
-#include "base/utils/USE.h"
 #include "rendering/sequences/BitmapSequenceReader.h"
 #include "rendering/sequences/VideoReader.h"
 #include "rendering/sequences/VideoSequenceDemuxer.h"
 #include "tgfx/core/Image.h"
-
-#ifdef PAG_BUILD_FOR_WEB
-#include "platform/web/VideoSequenceReader.h"
-#endif
 
 namespace pag {
 
