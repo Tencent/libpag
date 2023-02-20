@@ -94,7 +94,7 @@ PAG_TEST_F(PAGCompositionTest, composition) {
  * 用例描述: VideoSequence的大小和Composition不一致
  */
 PAG_TEST_F(PAGCompositionTest, VideoSequence) {
-  auto pagFile = PAGFile::Load(TestConstants::RESOURCES_ROOT + "apitest/video_sequence_size.pag");
+  auto pagFile = LoadPAGFile("apitest/video_sequence_size.pag");
   auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_unique<PAGPlayer>();
   pagPlayer->setComposition(pagFile);

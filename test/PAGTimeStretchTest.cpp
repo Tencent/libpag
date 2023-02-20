@@ -40,7 +40,7 @@ void TimeStretchTest(std::string path, std::string methodName, float scaleFactor
   auto fileName = path.substr(startIndex, suffixIndex - startIndex);
   std::vector<std::string> compareVector;
 
-  auto TestPAGFile = PAGFile::Load(path);
+  auto TestPAGFile = LoadPAGFile(path);
   ASSERT_NE(TestPAGFile, nullptr);
   int64_t duartion = TestPAGFile->duration();
   std::vector<int> array;
@@ -64,8 +64,7 @@ void TimeStretchTest(std::string path, std::string methodName, float scaleFactor
 
   std::string errorMsg = "";
 
-  auto pagImage =
-      PAGImage::FromPath(TestConstants::RESOURCES_ROOT + "apitest/test_timestretch.png");
+  auto pagImage = MakePAGImage("apitest/test_timestretch.png");
   TestPAGFile->replaceImage(0, pagImage);
 
   int index = 0;
@@ -88,44 +87,42 @@ void TimeStretchTest(std::string path, std::string methodName, float scaleFactor
  * 用例描述: PAGTimeStrech渲染测试: Repeat模式-缩减
  */
 PAG_TEST_F(PAGTimeStrechTest, Repeat_Shorten) {
-  TimeStretchTest(TestConstants::RESOURCES_ROOT + "timestretch/repeat.pag", "Repeat_Shorten", 0.5);
+  TimeStretchTest("timestretch/repeat.pag", "Repeat_Shorten", 0.5);
 }
 
 /**
  * 用例描述: PAGTimeStrech渲染测试: Repeat模式-拉伸
  */
 PAG_TEST_F(PAGTimeStrechTest, Repeat_Stretch) {
-  TimeStretchTest(TestConstants::RESOURCES_ROOT + "timestretch/repeat.pag", "Repeat_Stretch", 2);
+  TimeStretchTest("timestretch/repeat.pag", "Repeat_Stretch", 2);
 }
 
 /**
  * 用例描述: PAGTimeStrech渲染测试-RepeatInverted-缩减
  */
 PAG_TEST_F(PAGTimeStrechTest, RepeatInverted_Shorten) {
-  TimeStretchTest(TestConstants::RESOURCES_ROOT + "timestretch/repeatInverted.pag",
-                  "RepeatInverted_Shorten", 0.5);
+  TimeStretchTest("timestretch/repeatInverted.pag", "RepeatInverted_Shorten", 0.5);
 }
 
 /**
  * 用例描述: PAGTimeStrech渲染测试-RepeatInverted-拉伸
  */
 PAG_TEST_F(PAGTimeStrechTest, RepeatInverted_Stretch) {
-  TimeStretchTest(TestConstants::RESOURCES_ROOT + "timestretch/repeatInverted.pag",
-                  "RepeatInverted_Stretch", 2);
+  TimeStretchTest("timestretch/repeatInverted.pag", "RepeatInverted_Stretch", 2);
 }
 
 /**
  * 用例描述: PAGTimeStrech渲染测试-Scale模式-缩减
  */
 PAG_TEST_F(PAGTimeStrechTest, Scale_Shorten) {
-  TimeStretchTest(TestConstants::RESOURCES_ROOT + "timestretch/scale.pag", "Scale_Shorten", 0.5);
+  TimeStretchTest("timestretch/scale.pag", "Scale_Shorten", 0.5);
 }
 
 /**
  * 用例描述: PAGTimeStrech渲染测试: Scale模式-拉伸
  */
 PAG_TEST_F(PAGTimeStrechTest, Scale_Stretch) {
-  TimeStretchTest(TestConstants::RESOURCES_ROOT + "timestretch/scale.pag", "Scale_Stretch", 2);
+  TimeStretchTest("timestretch/scale.pag", "Scale_Stretch", 2);
 }
 
 }  // namespace pag

@@ -18,6 +18,7 @@
 
 #include "PAGTestUtils.h"
 #include <dirent.h>
+#include "TestConstants.h"
 #include "base/utils/TGFXCast.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
 
@@ -99,5 +100,21 @@ bool CreateGLTexture(Context* context, int width, int height, GLSampler* texture
   gl->texImage2D(texture->target, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
   gl->bindTexture(texture->target, 0);
   return true;
+}
+
+std::shared_ptr<PAGFile> LoadPAGFile(const std::string& path) {
+  return PAGFile::Load(TestConstants::RESOURCES_ROOT + path);
+}
+
+std::shared_ptr<PAGFile> LoadPAGAsset(const std::string& path) {
+  return PAGFile::Load(TestConstants::ASSETS_ROOT + path);
+}
+
+std::shared_ptr<tgfx::ImageCodec> MakeImageCodec(const std::string& path) {
+  return ImageCodec::MakeFrom(TestConstants::RESOURCES_ROOT + path);
+}
+
+std::shared_ptr<PAGImage> MakePAGImage(const std::string& path) {
+  return PAGImage::FromPath(TestConstants::RESOURCES_ROOT + path);
 }
 }  // namespace pag

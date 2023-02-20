@@ -41,7 +41,7 @@ using nlohmann::json;
  * 用例描述: 像素格式转换相关功能测试-PixelMap
  */
 PAG_TEST(PAGReadPixelsTest, TestPixelMap) {
-  auto codec = ImageCodec::MakeFrom(TestConstants::RESOURCES_ROOT + "apitest/test_timestretch.png");
+  auto codec = pag::MakeImageCodec("apitest/test_timestretch.png");
   EXPECT_TRUE(codec != nullptr);
   auto width = codec->width();
   auto height = codec->height();
@@ -145,7 +145,7 @@ PAG_TEST(PAGReadPixelsTest, TestPixelMap) {
  * 用例描述: 像素格式转换相关功能测试-SurfaceReadPixels
  */
 PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
-  auto codec = ImageCodec::MakeFrom(TestConstants::RESOURCES_ROOT + "apitest/test_timestretch.png");
+  auto codec = MakeImageCodec("apitest/test_timestretch.png");
   ASSERT_TRUE(codec != nullptr);
   auto pixelBuffer = PixelBuffer::Make(codec->width(), codec->height(), false, false);
   ASSERT_TRUE(pixelBuffer != nullptr);

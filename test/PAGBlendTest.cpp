@@ -84,7 +84,7 @@ PAG_TEST_F(PAGBlendTest, CopyDstTexture) {
   device->unlock();
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
-  auto pagFile = PAGFile::Load(TestConstants::RESOURCES_ROOT + "blend/Multiply.pag");
+  auto pagFile = LoadPAGFile("blend/Multiply.pag");
   pagPlayer->setComposition(pagFile);
   pagPlayer->setMatrix(Matrix::I());
   pagPlayer->setProgress(0.5);
@@ -117,7 +117,7 @@ PAG_TEST_F(PAGBlendTest, TextureBottomLeft) {
 
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
-  auto pagFile = PAGFile::Load(TestConstants::RESOURCES_ROOT + "apitest/texture_bottom_left.pag");
+  auto pagFile = LoadPAGFile("apitest/texture_bottom_left.pag");
   pagFile->replaceImage(3, replaceImage);
   pagPlayer->setComposition(pagFile);
   pagPlayer->setMatrix(Matrix::I());

@@ -102,7 +102,7 @@ PAG_TEST_F(PAGImageTest, image) {
  * 用例描述: PAGImage解码等功能
  */
 PAG_TEST_F(PAGImageTest, image2) {
-  auto codec = ImageCodec::MakeFrom(TestConstants::RESOURCES_ROOT + "apitest/imageReplacement.png");
+  auto codec = MakeImageCodec("apitest/imageReplacement.png");
   ASSERT_TRUE(codec != nullptr);
   ASSERT_EQ(codec->height(), 110);
   ASSERT_EQ(codec->width(), 110);
@@ -124,7 +124,7 @@ PAG_TEST_F(PAGImageTest, image3) {
   ASSERT_TRUE(pagImage != nullptr);
   EXPECT_EQ(pagImage->width(), 3024);
   EXPECT_EQ(pagImage->height(), 4032);
-  auto pagFile = PAGFile::Load(TestConstants::RESOURCES_ROOT + "apitest/replace2.pag");
+  auto pagFile = LoadPAGFile("apitest/replace2.pag");
   ASSERT_TRUE(pagFile != nullptr);
   pagFile->replaceImage(0, pagImage);
   auto surface = PAGSurface::MakeOffscreen(720, 720);

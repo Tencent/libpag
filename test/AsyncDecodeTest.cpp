@@ -116,7 +116,7 @@ PAG_TEST_F(AsyncDecode, release_ID79427343) {
 PAG_TEST_F(AsyncDecode, bitmapCompDecodeTest) {
   //          25--------------------------60
   //    5----------------------45
-  auto pagFile = PAGFile::Load(TestConstants::RESOURCES_ROOT + "apitest/BitmapComp.pag");
+  auto pagFile = LoadPAGFile("apitest/BitmapComp.pag");
   EXPECT_TRUE(pagFile != nullptr);
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0);
@@ -156,10 +156,9 @@ PAG_TEST_F(AsyncDecode, imageDecodeTest) {
   // 0----------15
   //         10-----------35
   //                           40---------60
-  auto pagFile = PAGFile::Load(TestConstants::RESOURCES_ROOT + "apitest/ImageDecodeTest.pag");
+  auto pagFile = LoadPAGFile("apitest/ImageDecodeTest.pag");
   EXPECT_TRUE(pagFile != nullptr);
-  auto pagImage =
-      PAGImage::FromPath(TestConstants::RESOURCES_ROOT + +"apitest/imageReplacement.png");
+  auto pagImage = MakePAGImage("apitest/imageReplacement.png");
   pagFile->replaceImage(1, pagImage);
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0);

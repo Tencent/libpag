@@ -56,9 +56,7 @@ PAG_TEST(CanvasTest, ColorMatrixFilter) {
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto image =
-      ImageCodec::MakeFrom(pag::TestConstants::RESOURCES_ROOT + "apitest/test_timestretch.png")
-          ->makeBuffer()
-          ->makeTexture(context);
+      pag::MakeImageCodec("apitest/test_timestretch.png")->makeBuffer()->makeTexture(context);
   ASSERT_TRUE(image != nullptr);
   auto surface = Surface::Make(context, image->width(), image->height());
   auto canvas = surface->getCanvas();
@@ -82,7 +80,7 @@ PAG_TEST(CanvasTest, Blur) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto image = ImageCodec::MakeFrom(pag::TestConstants::RESOURCES_ROOT + "apitest/rotation.jpg");
+  auto image = pag::MakeImageCodec("apitest/rotation.jpg");
   ASSERT_TRUE(image != nullptr);
   auto texture = image->makeBuffer()->makeTexture(context);
   ASSERT_TRUE(texture != nullptr);
@@ -153,8 +151,7 @@ PAG_TEST(CanvasTest, DropShadow) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto image =
-      ImageCodec::MakeFrom(pag::TestConstants::RESOURCES_ROOT + "apitest/image_as_mask.png");
+  auto image = pag::MakeImageCodec("apitest/image_as_mask.png");
   ASSERT_TRUE(image != nullptr);
   auto texture = image->makeBuffer()->makeTexture(context);
   ASSERT_TRUE(texture != nullptr);
@@ -232,7 +229,7 @@ PAG_TEST(CanvasTest, TileMode) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto codec = ImageCodec::MakeFrom(pag::TestConstants::RESOURCES_ROOT + "apitest/rotation.jpg");
+  auto codec = pag::MakeImageCodec("apitest/rotation.jpg");
   ASSERT_TRUE(codec != nullptr);
   auto texture = codec->makeBuffer()->makeTexture(context);
   ASSERT_TRUE(texture != nullptr);
@@ -294,8 +291,7 @@ PAG_TEST(CanvasTest, merge_draw_call_triangle) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto codec =
-      ImageCodec::MakeFrom(pag::TestConstants::RESOURCES_ROOT + "apitest/imageReplacement.png");
+  auto codec = pag::MakeImageCodec("apitest/imageReplacement.png");
   ASSERT_TRUE(codec != nullptr);
   auto texture = codec->makeBuffer()->makeTexture(context);
   ASSERT_TRUE(texture != nullptr);
@@ -541,8 +537,7 @@ PAG_TEST(CanvasTest, filterMode) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto codec =
-      ImageCodec::MakeFrom(pag::TestConstants::RESOURCES_ROOT + "apitest/imageReplacement.png");
+  auto codec = pag::MakeImageCodec("apitest/imageReplacement.png");
   ASSERT_TRUE(codec != nullptr);
   auto texture = codec->makeBuffer()->makeTexture(context);
   ASSERT_TRUE(texture != nullptr);
@@ -566,7 +561,7 @@ PAG_TEST(CanvasTest, mipmap) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto image = ImageCodec::MakeFrom(pag::TestConstants::RESOURCES_ROOT + "apitest/rotation.jpg");
+  auto image = pag::MakeImageCodec("apitest/rotation.jpg");
   ASSERT_TRUE(image != nullptr);
   auto pixelBuffer = PixelBuffer::Make(image->width(), image->height(), false, false);
   ASSERT_TRUE(pixelBuffer != nullptr);
@@ -616,7 +611,7 @@ PAG_TEST(CanvasTest, hardwareMipMap) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto image = ImageCodec::MakeFrom(pag::TestConstants::RESOURCES_ROOT + "apitest/rotation.jpg");
+  auto image = pag::MakeImageCodec("apitest/rotation.jpg");
   ASSERT_TRUE(image != nullptr);
   auto pixelBuffer = PixelBuffer::Make(image->width(), image->height(), false);
   ASSERT_TRUE(pixelBuffer != nullptr);
@@ -729,7 +724,7 @@ PAG_TEST(CanvasTest, image) {
   canvas->setMatrix(matrix);
   canvas->drawImage(textureImage, sampling);
   canvas->resetMatrix();
-  auto codec = ImageCodec::MakeFrom(pag::TestConstants::RESOURCES_ROOT + "apitest/rgbaaa.png");
+  auto codec = pag::MakeImageCodec("apitest/rgbaaa.png");
   EXPECT_EQ(codec->width(), 1024);
   EXPECT_EQ(codec->height(), 512);
   auto rgbAAA = Image::MakeRGBAAA(codec, 512, 512, 512, 0, true);

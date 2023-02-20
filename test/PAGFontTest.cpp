@@ -32,7 +32,7 @@ using nlohmann::json;
 PAG_TEST(PAGFontTest, TestFont) {
   PAGFont::RegisterFont(TestConstants::RESOURCES_ROOT + "font/NotoSerifSC-Regular.otf", 0,
                         "TTTGBMedium", "Regular");
-  auto TestPAGFile = PAGFile::Load(TestConstants::RESOURCES_ROOT + "apitest/test_font.pag");
+  auto TestPAGFile = LoadPAGFile("apitest/test_font.pag");
   ASSERT_NE(TestPAGFile, nullptr);
   auto pagSurface = PAGSurface::MakeOffscreen(TestPAGFile->width(), TestPAGFile->height());
   ASSERT_NE(pagSurface, nullptr);
