@@ -111,10 +111,12 @@ bool SequenceReaderFactory::isVideo() const {
 RGBAAALayout SequenceReaderFactory::layout() const {
   if (sequence != nullptr && sequence->composition->type() == CompositionType::Video) {
     auto videoSequence = static_cast<VideoSequence*>(sequence);
+    LOGE("SequenceReaderFactory::video sequence layout = {%d,%d,%d,%d}", sequence->width, sequence->height,
+         videoSequence->alphaStartX, videoSequence->alphaStartY);
     return {sequence->width, sequence->height, videoSequence->alphaStartX,
             videoSequence->alphaStartY};
   }
-  return {-1, -1, -1, -1};
+  return {sequence->width, sequence->height, -1, -1};
 }
 
 Frame SequenceReaderFactory::firstVisibleFrame(const Layer* layer) const {

@@ -25,7 +25,7 @@ static std::shared_ptr<tgfx::Image> MakeSequenceImage(
     std::shared_ptr<SequenceReaderFactory> sequence) {
   std::shared_ptr<tgfx::Image> image = nullptr;
   auto layout = sequence->layout();
-  if (layout.width > 0 && layout.height > 0) {
+  if (layout.alphaStartX >= 0 && layout.alphaStartY >= 0) {
     return tgfx::Image::MakeRGBAAA(std::move(generator), layout.width, layout.height,
                                    layout.alphaStartX, layout.alphaStartY);
   }
