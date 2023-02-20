@@ -265,6 +265,9 @@ bool NeedToSkipClipBounds(const FilterList* filterList) {
       break;
     }
   }
+  if (filterList->layer->transform3D) {
+    skipClipBounds = true;
+  }
   return skipClipBounds;
 }
 
@@ -391,6 +394,9 @@ std::unique_ptr<FilterTarget> GetDirectFilterTarget(tgfx::Canvas* parentCanvas,
     return nullptr;
   }
   if (filterNodes.back().filter->needsMSAA()) {
+    return nullptr;
+  }
+  if (filterList->layer->transform3D) {
     return nullptr;
   }
   // 是否能直接上屏，应该用没有经过裁切的transformBounds来判断，

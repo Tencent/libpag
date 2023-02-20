@@ -72,6 +72,9 @@ private:
   tgfx::Rect contentBounds = {};
   tgfx::Rect transformedBounds = {};
   
+  Transform3D* layerTransform = nullptr;
+  Transform3D* cameraTransform = nullptr;
+
   tgfx::Matrix4x4 modelMatrix = {};
   tgfx::Matrix4x4 viewMatrix = {};
   tgfx::Matrix4x4 projectionMatrix = {};

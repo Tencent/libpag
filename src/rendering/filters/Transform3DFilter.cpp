@@ -88,9 +88,8 @@ bool Transform3DFilter::initialize(tgfx::Context* context) {
 Transform3DFilter::Transform3DFilter() {
 }
 
-bool Transform3DFilter::updateLayer(Layer* layer, Frame layerFrame) {
-  auto layerTransform = layer->transform3D;
-  Transform3D* cameraTransform = nullptr;
+bool Transform3DFilter::updateLayer(Layer* layer, Frame) {
+  layerTransform = layer->transform3D;
   auto containingComposition = layer->containingComposition;
   for (auto aLayer : containingComposition->layers) {
     if (aLayer->type() == LayerType::Camera) {
@@ -99,80 +98,6 @@ bool Transform3DFilter::updateLayer(Layer* layer, Frame layerFrame) {
       break;
     }
   }
-  
-  auto bounds = layer->getBounds();
-  
-  auto anchorPoint = layerTransform->anchorPoint->getValueAt(layerFrame);
-  Point3D position;
-  if (layerTransform->position) {
-    position = layerTransform->position->getValueAt(layerFrame);
-  } else {
-    float xPosition = layerTransform->xPosition->getValueAt(layerFrame);
-    float yPosition = layerTransform->yPosition->getValueAt(layerFrame);
-    float zPosition = layerTransform->zPosition->getValueAt(layerFrame);
-    position = Point3D::Make(xPosition, yPosition, zPosition);
-  }
-  auto scale = layerTransform->scale->getValueAt(layerFrame);
-  auto orientation = layerTransform->orientation->getValueAt(layerFrame);
-  auto xRotation = layerTransform->xRotation->getValueAt(layerFrame);
-  auto yRotation = layerTransform->yRotation->getValueAt(layerFrame);
-  auto zRotation = layerTransform->zRotation->getValueAt(layerFrame);
-  auto opacity = layerTransform->opacity->getValueAt(layerFrame);
-  
-  modelMatrix = tgfx::Matrix4x4::Translate(-anchorPoint.x / bounds.width() * 2,
-                                           anchorPoint.y / bounds.height() * 2,
-                                           anchorPoint.z / 1000);
-  
-  modelMatrix.postTranslate(1.0, -1.0);
-  auto scaleMatrix = tgfx::Matrix4x4::Scale(scale.x, scale.y, scale.z);
-  modelMatrix.postConcat(scaleMatrix);
-  auto xRotationMatrix = tgfx::Matrix4x4::Rotate({1.0, 0.0, 0.0}, DegreesToRadians(orientation.x + xRotation));
-  auto yRotationMatrix = tgfx::Matrix4x4::Rotate({0.0, 1.0, 0.0}, DegreesToRadians(-(orientation.y + yRotation)));
-  auto zRotationMatrix = tgfx::Matrix4x4::Rotate({0.0, 0.0, 1.0}, DegreesToRadians(-(orientation.z + zRotation)));
-  modelMatrix.postConcat(zRotationMatrix).postConcat(yRotationMatrix).postConcat(xRotationMatrix);
-  modelMatrix.postTranslate(position.x / bounds.width() * 2,
-                            -position.y / bounds.height() * 2,
-                            position.z);
-  modelMatrix.postTranslate(-1.0, 1.0);
-  
-//  modelMatrix.preTranslate(-0.5, -0.5);
-//  auto scaleMatrix = tgfx::Matrix4x4::Scale(scale.x, scale.y, scale.z);
-//  scaleMatrix.preTranslate(0.5, -0.5);
-//  scaleMatrix.postTranslate(-0.5, 0.5);
-//  modelMatrix.preConcat(scaleMatrix);
-//  modelMatrix.preTranslate(0.5, -0.5);
-//  modelMatrix.preTranslate(position.x / bounds.width() * 2,
-//                           position.y / bounds.height() * 2,
-//                           position.z / 1000 * 2);
-  CtmInfo info;
-  
-  if (cameraTransform) {
-    auto cameraPointOfInterest = cameraTransform->anchorPoint->getValueAt(layerFrame);
-    Point3D cameraPositon;
-    if (cameraTransform->position) {
-      cameraPositon = cameraTransform->position->getValueAt(layerFrame);
-    } else {
-      float xPosition = cameraTransform->xPosition->getValueAt(layerFrame);
-      float yPosition = cameraTransform->yPosition->getValueAt(layerFrame);
-      float zPosition = cameraTransform->zPosition->getValueAt(layerFrame);
-      cameraPositon = Point3D::Make(xPosition, yPosition, zPosition);
-    }
-    auto cameraOrientation = cameraTransform->orientation->getValueAt(layerFrame);
-    auto cameraXRotation = cameraTransform->xRotation->getValueAt(layerFrame);
-    auto cameraYRotation = cameraTransform->yRotation->getValueAt(layerFrame);
-    auto cameraZRotation = cameraTransform->zRotation->getValueAt(layerFrame);
-    
-//    viewMatrix = tgfx::Matrix4x4::LookAt(info.fEye, info.fCOA, info.fUp);
-    viewMatrix = tgfx::Matrix4x4::LookAt(info.fEye, info.fCOA, info.fUp);
-//    viewMatrix = tgfx::Matrix4x4::Translate(0, 0, 0) * tgfx::Matrix4x4::Scale(0.5 * bounds.width() / bounds.height(), -0.5, 1.0f);
-
-  } else {
-    viewMatrix = tgfx::Matrix4x4::LookAt(info.fEye, info.fCOA, info.fUp);
-//    viewMatrix = tgfx::Matrix4x4::Translate(0, 0, 0) * tgfx::Matrix4x4::Scale(0.5 * bounds.width() / bounds.height(), -0.5, 1.0f);
-  }
-  
-  projectionMatrix = projectionMatrix.Perspective(info.fNear, info.fFar, info.fAngle);
-  
   return true;
 }
 
@@ -244,6 +169,81 @@ void Transform3DFilter::draw(tgfx::Context* context, const FilterSource* source,
 
 void Transform3DFilter::onSubmitTransformations(tgfx::Context* context, const FilterSource* source,
                                                 const FilterTarget* target) {
+  auto anchorPoint = layerTransform->anchorPoint->getValueAt(layerFrame);
+  Point3D position;
+  if (layerTransform->position) {
+    position = layerTransform->position->getValueAt(layerFrame);
+  } else {
+    float xPosition = layerTransform->xPosition->getValueAt(layerFrame);
+    float yPosition = layerTransform->yPosition->getValueAt(layerFrame);
+    float zPosition = layerTransform->zPosition->getValueAt(layerFrame);
+    position = Point3D::Make(xPosition, yPosition, zPosition);
+  }
+  auto scale = layerTransform->scale->getValueAt(layerFrame);
+  auto orientation = layerTransform->orientation->getValueAt(layerFrame);
+  auto xRotation = layerTransform->xRotation->getValueAt(layerFrame);
+  auto yRotation = layerTransform->yRotation->getValueAt(layerFrame);
+  auto zRotation = layerTransform->zRotation->getValueAt(layerFrame);
+  auto opacity = layerTransform->opacity->getValueAt(layerFrame);
+  
+  auto bounds = Rect::MakeWH(target->width, target->height);
+  auto zValue = 415.f;
+  
+  modelMatrix = tgfx::Matrix4x4::Translate(-anchorPoint.x / bounds.width() * 2,
+                                           -anchorPoint.y / bounds.height() * 2,
+                                           anchorPoint.z / zValue);
+  
+  modelMatrix.postTranslate(1.0, 1.0);
+  auto scaleMatrix = tgfx::Matrix4x4::Scale(scale.x, scale.y, scale.z);
+  modelMatrix.postConcat(scaleMatrix);
+  
+  auto targetAspectScaleMatrix = tgfx::Matrix4x4::Scale(1.0, 1.0 * target->height / target->width);
+  auto sourceAspectScaleMatrix = tgfx::Matrix4x4::Scale(1.0, 1.0 * source->height / source->width);
+  modelMatrix.postConcat(sourceAspectScaleMatrix);
+  auto xRotationMatrix = tgfx::Matrix4x4::Rotate({1.0, 0.0, 0.0}, DegreesToRadians(-(orientation.x + xRotation)));
+  auto yRotationMatrix = tgfx::Matrix4x4::Rotate({0.0, 1.0, 0.0}, DegreesToRadians(-(orientation.y + yRotation)));
+  auto zRotationMatrix = tgfx::Matrix4x4::Rotate({0.0, 0.0, 1.0}, DegreesToRadians(orientation.z + zRotation));
+  modelMatrix.postConcat(zRotationMatrix).postConcat(yRotationMatrix).postConcat(xRotationMatrix);
+  tgfx::Matrix4x4 invertTargetAspectScaleMatrix;
+  targetAspectScaleMatrix.invert(&invertTargetAspectScaleMatrix);
+  modelMatrix.postConcat(invertTargetAspectScaleMatrix);
+  
+  modelMatrix.postTranslate(position.x / bounds.width() * 2,
+                            position.y / bounds.height() * 2,
+                            -position.z / zValue);
+  modelMatrix.postTranslate(-1.0, -1.0);
+
+  CtmInfo info;
+  
+  if (cameraTransform) {
+    auto cameraPointOfInterest = cameraTransform->anchorPoint->getValueAt(layerFrame);
+    Point3D cameraPositon;
+    if (cameraTransform->position) {
+      cameraPositon = cameraTransform->position->getValueAt(layerFrame);
+    } else {
+      float xPosition = cameraTransform->xPosition->getValueAt(layerFrame);
+      float yPosition = cameraTransform->yPosition->getValueAt(layerFrame);
+      float zPosition = cameraTransform->zPosition->getValueAt(layerFrame);
+      cameraPositon = Point3D::Make(xPosition, yPosition, zPosition);
+    }
+    auto cameraOrientation = cameraTransform->orientation->getValueAt(layerFrame);
+    auto cameraXRotation = cameraTransform->xRotation->getValueAt(layerFrame);
+    auto cameraYRotation = cameraTransform->yRotation->getValueAt(layerFrame);
+    auto cameraZRotation = cameraTransform->zRotation->getValueAt(layerFrame);
+    
+    info.fEye = {2.0f * cameraPositon.x / bounds.width() - 1.0f,
+                 2.0f * cameraPositon.y / bounds.height() - 1.0f,
+                 info.fEye.z * (1.0f - (cameraPositon.z + 1000.f) / 700.f)};
+    
+    info.fCOA = {2.0f * cameraPointOfInterest.x / bounds.width() - 1.0f, 2.0f * cameraPointOfInterest.y / bounds.height() - 1.0f, 0.f};
+
+    viewMatrix = tgfx::Matrix4x4::LookAt(info.fEye, info.fCOA, info.fUp);
+  } else {
+    viewMatrix = tgfx::Matrix4x4::LookAt(info.fEye, info.fCOA, info.fUp);
+  }
+  
+  projectionMatrix = projectionMatrix.Perspective(info.fNear, info.fFar, info.fAngle);
+  
   auto gl = tgfx::GLFunctions::Get(context);
   tgfx::Matrix matrix = {};
   auto values = target->vertexMatrix;
