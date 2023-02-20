@@ -29,8 +29,9 @@ static void RegisterSoftwareDecoder() {
 }
 
 void PAGTestEnvironment::SetUp() {
-  std::vector<std::string> fontPaths = {TestConstants::RESOURCES_ROOT + "font/NotoSansSC-Regular.otf",
-                                        TestConstants::RESOURCES_ROOT + "font/NotoColorEmoji.ttf"};
+  std::vector<std::string> fontPaths = {
+      TestConstants::RESOURCES_ROOT + "font/NotoSansSC-Regular.otf",
+      TestConstants::RESOURCES_ROOT + "font/NotoColorEmoji.ttf"};
   std::vector<int> ttcIndices = {0, 0};
   PAGFont::SetFallbackFontPaths(fontPaths, ttcIndices);
   RegisterSoftwareDecoder();

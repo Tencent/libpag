@@ -147,10 +147,12 @@ PAG_TEST_F(PAGImageTest, BottomLeftMask) {
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, width, height);
-  auto image1 = ImageCodec::MakeFrom(TestConstants::RESOURCES_ROOT + "apitest/imageReplacement.webp")
-                    ->makeBuffer()
-                    ->makeTexture(context);
-  auto imageAsMask = ImageCodec::MakeFrom(TestConstants::RESOURCES_ROOT + "apitest/image_as_mask.png");
+  auto image1 =
+      ImageCodec::MakeFrom(TestConstants::RESOURCES_ROOT + "apitest/imageReplacement.webp")
+          ->makeBuffer()
+          ->makeTexture(context);
+  auto imageAsMask =
+      ImageCodec::MakeFrom(TestConstants::RESOURCES_ROOT + "apitest/image_as_mask.png");
   ASSERT_TRUE(imageAsMask != nullptr);
   auto image2 = imageAsMask->makeBuffer()->makeTexture(context);
   image2->_origin = tgfx::ImageOrigin::BottomLeft;

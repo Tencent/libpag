@@ -284,7 +284,8 @@ PAG_TEST(PAGReadPixelsTest, PngCodec) {
  * 用例描述: Webp 解码器测试
  */
 PAG_TEST(PAGReadPixelsTest, WebpCodec) {
-  auto image = ImageCodec::MakeFrom(TestConstants::RESOURCES_ROOT + "apitest/imageReplacement.webp");
+  auto image =
+      ImageCodec::MakeFrom(TestConstants::RESOURCES_ROOT + "apitest/imageReplacement.webp");
   ASSERT_TRUE(image != nullptr);
   ASSERT_EQ(image->width(), 110);
   ASSERT_EQ(image->height(), 110);
