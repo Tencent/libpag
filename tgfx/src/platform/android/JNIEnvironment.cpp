@@ -80,20 +80,14 @@ JNIEnv* JNIEnvironment::Current() {
         "JNIEnvironment::Current(): The global JavaVM has not been set yet! "
         "Please use JNIEnvironment::SetJavaVM() to initialize the global JavaVM.");
     return nullptr;
-
-    return nullptr;
   }
   JNIEnv* env = nullptr;
   auto result = javaVM->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_4);
   if (result == JNI_EDETACHED || env == nullptr) {
     JavaVMAttachArgs args = {JNI_VERSION_1_4, "tgfx_JNIEnvironment", nullptr};
-    if (javaVM->AttachCurrentThread(&env, &args) != JNI_OK) {
-      return env;
+    if (javaVM->AttachCurrentThread(&env, &args) == JNI_OK) {
+      pthread_setspecific(envKey, (void*)env);
     }
-    pthread_setspecific(envKey, (void*)env);
-    return env;
-  } else if (result == JNI_OK) {
-    return env;
   }
   return env;
 }
