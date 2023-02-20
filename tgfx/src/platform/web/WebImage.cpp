@@ -16,29 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/utils/USE.h"
-#include "tgfx/platform/apple/NativeTypeface.h"
-
-#ifndef TGFX_USE_FREETYPE
-#include "core/vectors/coregraphics/CGTypeface.h"
-#endif
+#include "tgfx/platform/web/WebImage.h"
+#include <atomic>
 
 namespace tgfx {
-std::shared_ptr<Typeface> NativeTypeface::MakeFromCTFont(CTFontRef ctFont) {
-#ifdef TGFX_USE_FREETYPE
-  USE(ctFont);
-  return nullptr;
-#else
-  return CGTypeface::Make(static_cast<CTFontRef>(ctFont));
-#endif
+static std::atomic_bool AsyncSupportEnabled = false;
+
+bool WebImage::AsyncSupport() {
+  return AsyncSupportEnabled;
 }
 
-CTFontRef NativeTypeface::GetCTFont(const Typeface* typeface) {
-#ifdef TGFX_USE_FREETYPE
-  USE(typeface);
-  return nullptr;
-#else
-  return typeface ? static_cast<const CGTypeface*>(typeface)->getCTFont() : nullptr;
-#endif
+void WebImage::SetAsyncSupport(bool enabled) {
+  AsyncSupportEnabled = enabled;
 }
 }  // namespace tgfx

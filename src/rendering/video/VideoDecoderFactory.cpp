@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "VideoDecoderFactory.h"
+#include <atomic>
 #include "SoftAVCDecoder.h"
 #include "SoftwareDecoderWrapper.h"
 #include "base/utils/USE.h"
@@ -25,10 +26,16 @@
 namespace pag {
 static std::mutex factoryLocker = {};
 static SoftwareDecoderFactory* softwareDecoderFactory = {nullptr};
+static std::atomic_int maxHardwareDecoderCount = {65535};
+static std::atomic_int globalHardwareDecoderCount = {0};
 
 void PAGVideoDecoder::RegisterSoftwareDecoderFactory(SoftwareDecoderFactory* decoderFactory) {
   std::lock_guard<std::mutex> autoLock(factoryLocker);
   softwareDecoderFactory = decoderFactory;
+}
+
+void PAGVideoDecoder::SetMaxHardwareDecoderCount(int count) {
+  maxHardwareDecoderCount = count;
 }
 
 class ExternalDecoderFactory : public VideoDecoderFactory {
@@ -84,13 +91,21 @@ bool VideoDecoderFactory::HasExternalSoftwareDecoder() {
   return softwareDecoderFactory != nullptr;
 }
 
+void VideoDecoderFactory::NotifyHardwareVideoDecoderReleased() {
+  globalHardwareDecoderCount--;
+}
+
 std::unique_ptr<VideoDecoder> VideoDecoderFactory::createDecoder(const VideoFormat& format) const {
-  if (isHardwareBacked() && !VideoDecoder::HardwareDecoderCountAvailable()) {
+  auto hardwareBacked = isHardwareBacked();
+  if (hardwareBacked && globalHardwareDecoderCount >= maxHardwareDecoderCount) {
     return nullptr;
   }
   auto decoder = onCreateDecoder(format);
   if (decoder != nullptr) {
-    decoder->hardwareBacked = isHardwareBacked();
+    decoder->hardwareBacked = hardwareBacked;
+    if (hardwareBacked) {
+      globalHardwareDecoderCount++;
+    }
   }
   return decoder;
 }

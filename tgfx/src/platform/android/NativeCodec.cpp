@@ -119,7 +119,7 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& fileP
     return nullptr;
   }
   env->SetBooleanField(options.get(), BitmapFactoryOptions_inJustDecodeBounds, true);
-  DecodeBitmap(env, options.get(), filePath);
+  Local<jobject> bitmap = {env, DecodeBitmap(env, options.get(), filePath)};
   auto width = env->GetIntField(options.get(), BitmapFactoryOptions_outWidth);
   auto height = env->GetIntField(options.get(), BitmapFactoryOptions_outHeight);
   if (width <= 0 || height <= 0) {
@@ -155,7 +155,7 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> im
     return nullptr;
   }
   env->SetBooleanField(options.get(), BitmapFactoryOptions_inJustDecodeBounds, true);
-  DecodeBitmap(env, options.get(), imageBytes);
+  Local<jobject> bitmap = {env, DecodeBitmap(env, options.get(), imageBytes)};
   auto width = env->GetIntField(options.get(), BitmapFactoryOptions_outWidth);
   auto height = env->GetIntField(options.get(), BitmapFactoryOptions_outHeight);
   if (width <= 0 || height <= 0) {

@@ -20,10 +20,6 @@
 
 #include "DecodingResult.h"
 #include "VideoFormat.h"
-#include "base/utils/Log.h"
-#include "codec/NALUType.h"
-#include "pag/decoder.h"
-#include "pag/file.h"
 #include "tgfx/core/ImageBuffer.h"
 
 namespace pag {
@@ -72,11 +68,6 @@ class VideoDecoder {
 
  private:
   bool hardwareBacked = false;
-
-  /**
-   * Returns true if the maximum number of hardware video decoders has not been reached.
-   */
-  static bool HardwareDecoderCountAvailable();
 
   friend class VideoDecoderFactory;
 };

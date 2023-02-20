@@ -3,11 +3,13 @@ import { getSourceSize, isAndroidMiniprogram } from '../tgfx';
 
 import type { EmscriptenGL } from '../types';
 
-export const uploadTexImageSource = (
+export const uploadToTexture = (
   GL: EmscriptenGL,
   source: TexImageSource | OffscreenCanvas | { buffer: ArrayBuffer; width: number; height: number },
+  textureID: number
 ) => {
   const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
+  gl.bindTexture(gl.TEXTURE_2D, GL.textures[textureID]);
   gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
   console.log(source, source.hasOwnProperty('buffer'));
 
