@@ -61,7 +61,7 @@ PAG_TEST_F(PAGImageLayerTest, imageMultiThreadReplace) {
   ASSERT_NE(imageLayer, nullptr);
   ASSERT_EQ(imageLayer->editableIndex(), 1);
   ASSERT_EQ(imageLayer->contentDuration(), 2 * 1000000);
-  auto image = PAGImage::FromPath(TestConstants::RESOURCES_ROOT + "apitest/imageReplacement.png");
+  auto image = pag::MakePAGImage("apitest/imageReplacement.png");
 
   TestPAGFile->setCurrentTime(3000000);
   TestPAGPlayer->flush();
@@ -146,7 +146,7 @@ PAG_TEST_F(PAGImageLayerTest, getBoundsTest) {
 PAG_TEST_F(PAGImageLayerTest, setImage) {
   auto pagFile = pag::LoadPAGFile("filter/fastblur.pag");
 
-  auto image = PAGImage::FromPath(TestConstants::RESOURCES_ROOT + "apitest/imageReplacement.png");
+  auto image = pag::MakePAGImage("apitest/imageReplacement.png");
   auto pagImageLayer = pagFile->getLayersByEditableIndex(0, pag::LayerType::Image)[0];
   std::static_pointer_cast<PAGImageLayer>(pagImageLayer)->setImage(image);
   TestPAGPlayer->setComposition(pagFile);

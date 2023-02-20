@@ -32,7 +32,7 @@ PAG_TEST_CASE(PAGBlendTest)
  */
 PAG_TEST_F(PAGBlendTest, Blend) {
   std::vector<std::string> files;
-  GetAllPAGFiles(TestConstants::RESOURCES_ROOT + "blend", files);
+  GetAllPAGFiles("blend", files);
   auto pagSurface = PAGSurface::MakeOffscreen(400, 400);
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);

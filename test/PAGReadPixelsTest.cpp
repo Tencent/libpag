@@ -258,7 +258,7 @@ PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
  * 用例描述: PNG 解码器测试
  */
 PAG_TEST(PAGReadPixelsTest, PngCodec) {
-  auto image = ImageCodec::MakeFrom(TestConstants::RESOURCES_ROOT + "apitest/test_timestretch.png");
+  auto image = pag::MakeImageCodec("apitest/test_timestretch.png");
   ASSERT_TRUE(image != nullptr);
   ASSERT_EQ(image->width(), 1280);
   ASSERT_EQ(image->height(), 720);
@@ -284,8 +284,7 @@ PAG_TEST(PAGReadPixelsTest, PngCodec) {
  * 用例描述: Webp 解码器测试
  */
 PAG_TEST(PAGReadPixelsTest, WebpCodec) {
-  auto image =
-      ImageCodec::MakeFrom(TestConstants::RESOURCES_ROOT + "apitest/imageReplacement.webp");
+  auto image = pag::MakeImageCodec("apitest/imageReplacement.webp");
   ASSERT_TRUE(image != nullptr);
   ASSERT_EQ(image->width(), 110);
   ASSERT_EQ(image->height(), 110);
@@ -320,7 +319,7 @@ PAG_TEST(PAGReadPixelsTest, WebpCodec) {
  * 用例描述: JPEG 解码器测试
  */
 PAG_TEST(PAGReadPixelsTest, JpegCodec) {
-  auto image = ImageCodec::MakeFrom(TestConstants::RESOURCES_ROOT + "apitest/rotation.jpg");
+  auto image = pag::MakeImageCodec("apitest/rotation.jpg");
   ASSERT_TRUE(image != nullptr);
   ASSERT_EQ(image->width(), 4032);
   ASSERT_EQ(image->height(), 3024);

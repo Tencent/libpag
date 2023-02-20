@@ -33,9 +33,10 @@ std::string ToString(Frame frame) {
   return result;
 }
 
-void GetAllPAGFiles(std::string path, std::vector<std::string>& files) {
+void GetAllPAGFiles(const std::string& path, std::vector<std::string>& files) {
   struct dirent* dirp;
-  DIR* dir = opendir(path.c_str());
+  auto dirPath= TestConstants::RESOURCES_ROOT + path;
+  DIR* dir = opendir(dirPath.c_str());
   std::string p;
 
   while ((dirp = readdir(dir)) != nullptr) {
@@ -43,7 +44,7 @@ void GetAllPAGFiles(std::string path, std::vector<std::string>& files) {
       std::string str(dirp->d_name);
       std::string::size_type idx = str.find(".pag");
       if (idx != std::string::npos) {
-        files.push_back(p.assign(path).append("/").append(dirp->d_name));
+        files.push_back(p.assign(dirPath).append("/").append(dirp->d_name));
       }
     }
   }

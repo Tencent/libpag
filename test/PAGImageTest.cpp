@@ -120,7 +120,7 @@ PAG_TEST_F(PAGImageTest, image2) {
  * 用例描述: 带旋转图片PAGImage解码等功能
  */
 PAG_TEST_F(PAGImageTest, image3) {
-  auto pagImage = PAGImage::FromPath(TestConstants::RESOURCES_ROOT + "apitest/rotation.jpg");
+  auto pagImage = pag::MakePAGImage("apitest/rotation.jpg");
   ASSERT_TRUE(pagImage != nullptr);
   EXPECT_EQ(pagImage->width(), 3024);
   EXPECT_EQ(pagImage->height(), 4032);
@@ -148,11 +148,8 @@ PAG_TEST_F(PAGImageTest, BottomLeftMask) {
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, width, height);
   auto image1 =
-      ImageCodec::MakeFrom(TestConstants::RESOURCES_ROOT + "apitest/imageReplacement.webp")
-          ->makeBuffer()
-          ->makeTexture(context);
-  auto imageAsMask =
-      ImageCodec::MakeFrom(TestConstants::RESOURCES_ROOT + "apitest/image_as_mask.png");
+      pag::MakeImageCodec("apitest/imageReplacement.webp")->makeBuffer()->makeTexture(context);
+  auto imageAsMask = pag::MakeImageCodec("apitest/image_as_mask.png");
   ASSERT_TRUE(imageAsMask != nullptr);
   auto image2 = imageAsMask->makeBuffer()->makeTexture(context);
   image2->_origin = tgfx::ImageOrigin::BottomLeft;

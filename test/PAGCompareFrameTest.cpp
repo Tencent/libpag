@@ -177,7 +177,7 @@ static void CompareFileFrames(Semaphore* semaphore, std::string pagPath) {
  */
 PAG_TEST(PAGFrameCompareTest, RenderFiles) {
   std::vector<std::string> files;
-  GetAllPAGFiles(TestConstants::RESOURCES_ROOT + "compare", files);
+  GetAllPAGFiles("compare", files);
 
   Semaphore semaphore(MAX_THREADS);
   std::vector<std::thread> threads = {};
