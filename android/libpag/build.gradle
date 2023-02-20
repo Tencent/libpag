@@ -2,9 +2,8 @@ apply plugin: 'com.android.library'
 apply plugin: 'maven-publish'
 apply plugin: 'com.github.panpf.bintray-publish'
 apply plugin: 'signing'
-apply plugin: 'com.kezong.fat-aar'
 
-version = '4.0.0.0'
+version = '4.1.0'
 project.ext.artifactId = 'libpag'
 project.group = 'com.tencent.tav'
 
@@ -24,12 +23,18 @@ android {
         externalNativeBuild {
             cmake {
                 arguments "-DANDROID_STL=c++_static",
-                        "-DPAG_USE_LIBAVC=OFF"
+                        "-DPAG_USE_LIBAVC=OFF",
+                        "-DPAG_USE_FFAVC=ON"
             }
         }
 
         ndk {
             abiFilters "armeabi-v7a", "arm64-v8a"
+        }
+    }
+    sourceSets {
+        main {
+            jniLibs.srcDirs = ["libs"]
         }
     }
     buildTypes {
@@ -50,7 +55,6 @@ android {
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
     implementation("androidx.exifinterface:exifinterface:1.3.3")
-    embed(name: 'ffavc', ext: 'aar')
     androidTestImplementation('com.android.support.test.espresso:espresso-core:2.2.2', {
         exclude group: 'com.android.support', module: 'support-annotations'
     })
