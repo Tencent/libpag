@@ -131,7 +131,6 @@
 - (CVPixelBufferRef)makeSnapshot {
   size_t width = _pagSurface->width();
   size_t height = _pagSurface->height();
-  size_t bytesPerRow = _pagSurface->width() * 4;
   CVPixelBufferRef pixelBuffer = nil;
   CFDictionaryRef empty =
       CFDictionaryCreate(kCFAllocatorDefault, NULL, NULL, 0, &kCFTypeDictionaryKeyCallBacks,
@@ -146,6 +145,7 @@
   CFRelease(empty);
 
   CVPixelBufferLockBaseAddress(pixelBuffer, 0);
+  size_t bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 0);
   void* pixelBufferData = CVPixelBufferGetBaseAddress(pixelBuffer);
   BOOL status = _pagSurface->readPixels(pag::ColorType::BGRA_8888, pag::AlphaType::Premultiplied,
                                         pixelBufferData, bytesPerRow);

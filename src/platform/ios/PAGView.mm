@@ -530,9 +530,9 @@ void DestoryFlushQueue() {
 }
 
 - (CVPixelBufferRef)makeSnapshot {
-    if (pagSurface != nil) {
-        return [pagSurface makeSnapshot];
-    }
-    return nil;
+  if (pagSurface != nil) {
+    return [pagSurface makeSnapshot];
+  }
+  return nil;
 }
 @end
