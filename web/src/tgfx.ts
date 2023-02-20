@@ -80,3 +80,8 @@ export const releaseNativeImage = (source: TexImageSource | OffscreenCanvas) => 
     releaseCanvas2D(source);
   }
 };
+
+export const getBytesFromPath = async (module: PAG, path: string) => {
+  const buffer = await fetch(path).then((res) => res.arrayBuffer());
+  return malloc(module, buffer);
+};

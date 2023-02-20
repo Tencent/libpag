@@ -28,14 +28,30 @@ using namespace emscripten;
 
 namespace tgfx {
 std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& filePath) {
-  auto imageStream = Stream::MakeFromFile(filePath);
-  if (imageStream == nullptr || imageStream->size() <= 14) {
-    return nullptr;
+  if (filePath.find("http://") == 0 || filePath.find("https://") == 0) {
+    auto data = val::module_property("tgfx")
+                    .call<val>("getBytesFromPath", val::module_property("module"), filePath)
+                    .await();
+    if (data.isNull()) {
+      return nullptr;
+    }
+    auto byteOffset = reinterpret_cast<void*>(data["byteOffset"].as<int>());
+    auto length = data["length"].as<int>();
+    Buffer imageBuffer(length);
+    memcpy(imageBuffer.data(), byteOffset, length);
+    data.call<void>("free");
+    auto imageData = imageBuffer.release();
+    return ImageCodec::MakeNativeCodec(imageData);
+  } else {
+    auto imageStream = Stream::MakeFromFile(filePath);
+    if (imageStream == nullptr || imageStream->size() <= 14) {
+      return nullptr;
+    }
+    Buffer imageBuffer(imageStream->size());
+    imageStream->read(imageBuffer.data(), imageStream->size());
+    auto imageData = imageBuffer.release();
+    return ImageCodec::MakeNativeCodec(imageData);
   }
-  Buffer imageBuffer(imageStream->size());
-  imageStream->read(imageBuffer.data(), imageStream->size());
-  auto imageData = imageBuffer.release();
-  return ImageCodec::MakeNativeCodec(imageData);
 }
 
 std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> imageBytes) {
