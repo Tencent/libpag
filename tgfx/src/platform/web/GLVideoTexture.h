@@ -18,38 +18,23 @@
 
 #pragma once
 
-#include <condition_variable>
-#include <mutex>
-#include "GLExternalTexture.h"
-#include "JNIUtil.h"
-#include "tgfx/platform/android/ImageBufferQueue.h"
+#include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace tgfx {
-class SurfaceBufferQueue : public ImageBufferQueue {
+class GLVideoTexture : public tgfx::GLTexture {
  public:
-  static void JNIInit(JNIEnv* env);
+  static std::shared_ptr<GLVideoTexture> Make(Context* context, int width, int height);
 
-  SurfaceBufferQueue(JNIEnv* env, jobject surfaceTexture, int width, int height);
+  Point getTextureCoord(float x, float y) const override;
 
-  std::shared_ptr<ImageBuffer> acquireNextBuffer() override;
-
-  void notifyFrameAvailable() override;
+  size_t memoryUsage() const override;
 
  private:
-  std::mutex locker = {};
-  std::condition_variable condition = {};
-  std::weak_ptr<SurfaceBufferQueue> weakThis;
-  Global<jobject> surfaceTexture;
-  int width = 0;
-  int height = 0;
-  std::shared_ptr<GLExternalTexture> texture = nullptr;
-  bool hasNewPendingFrame = false;
-  bool frameAvailable = false;
+  int textureWidth = 0;
+  int textureHeight = 0;
 
-  std::shared_ptr<Texture> makeTexture(Context* context, bool mipMapped = false);
-  bool attachToContext(JNIEnv* env, Context* context);
+  GLVideoTexture(const GLSampler& sampler, int width, int height);
 
-  friend class SurfaceBuffer;
-  friend class ImageBufferQueue;
+  void onReleaseGPU() override;
 };
 }  // namespace tgfx

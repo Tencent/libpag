@@ -52,8 +52,9 @@ export const getSourceSize = (source: TexImageSource | OffscreenCanvas) => {
   return { width: source.width, height: source.height };
 };
 
-export const uploadTexImageSource = (GL: EmscriptenGL, source: TexImageSource | OffscreenCanvas) => {
+export const uploadToTexture = (GL: EmscriptenGL, source: TexImageSource | OffscreenCanvas, textureID: number) => {
   const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
+  gl.bindTexture(gl.TEXTURE_2D, GL.textures[textureID]);
   gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
   gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
   gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, source);

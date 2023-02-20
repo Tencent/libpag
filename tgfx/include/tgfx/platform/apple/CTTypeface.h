@@ -27,7 +27,7 @@ namespace tgfx {
  * NativeTypeface provides convenience functions to create typefaces from platform-specific
  * CTFontRef handles and access the CTFontRef handle in a Typeface instance.
  */
-class NativeTypeface {
+class CTTypeface {
  public:
   /**
    * Creates a typeface for the specified CTFontRef. Returns nullptr if the ctFont is nil.

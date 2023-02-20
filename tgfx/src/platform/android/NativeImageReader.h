@@ -18,30 +18,40 @@
 
 #pragma once
 
+#include <condition_variable>
+#include <mutex>
+#include "GLExternalTexture.h"
+#include "HandlerThread.h"
+#include "JNIUtil.h"
 #include "tgfx/platform/android/SurfaceImageReader.h"
 
-namespace pag {
-class JVideoSurface {
+namespace tgfx {
+class NativeImageReader : public SurfaceImageReader {
  public:
-  static std::shared_ptr<tgfx::SurfaceImageReader> GetImageReader(JNIEnv* env,
-                                                                  jobject videoSurface);
+  static void JNIInit(JNIEnv* env);
 
-  explicit JVideoSurface(std::shared_ptr<tgfx::SurfaceImageReader> imageReader)
-      : imageReader(imageReader) {
-  }
+  NativeImageReader(int width, int height, JNIEnv* env, jobject surfaceTexture);
 
-  std::shared_ptr<tgfx::SurfaceImageReader> get() {
-    std::lock_guard<std::mutex> autoLock(locker);
-    return imageReader;
-  }
+  ~NativeImageReader() override;
 
-  void clear() {
-    std::lock_guard<std::mutex> autoLock(locker);
-    imageReader = nullptr;
-  }
+  jobject getInputSurface() const override;
+
+  std::shared_ptr<ImageBuffer> acquireNextBuffer() override;
+
+  void notifyFrameAvailable() override;
+
+ protected:
+  bool onUpdateTexture(Context* context, bool mipMapped) override;
 
  private:
-  std::mutex locker;
-  std::shared_ptr<tgfx::SurfaceImageReader> imageReader = nullptr;
+  std::mutex locker = {};
+  std::condition_variable condition = {};
+  Global<jobject> surface;
+  Global<jobject> surfaceTexture;
+  bool frameAvailable = false;
+
+  bool attachToContext(JNIEnv* env, Context* context);
+
+  friend class SurfaceImageReader;
 };
-}  // namespace pag
+}  // namespace tgfx

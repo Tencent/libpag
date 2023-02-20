@@ -19,12 +19,12 @@
 #include "NativeTextShaper.h"
 #include <CoreText/CoreText.h>
 #include "tgfx/core/UTF.h"
-#include "tgfx/platform/apple/NativeTypeface.h"
+#include "tgfx/platform/apple/CTTypeface.h"
 
 namespace pag {
 std::optional<PositionedGlyphs> NativeTextShaper::Shape(
     const std::string& text, const std::shared_ptr<tgfx::Typeface>& typeface) {
-  auto ctFont = tgfx::NativeTypeface::GetCTFont(typeface.get());
+  auto ctFont = tgfx::CTTypeface::GetCTFont(typeface.get());
   if (ctFont == nullptr) {
     return std::nullopt;
   }
@@ -56,7 +56,7 @@ std::optional<PositionedGlyphs> NativeTextShaper::Shape(
     if (font == ctFont) {
       face = typeface;
     } else {
-      face = tgfx::NativeTypeface::MakeFromCTFont(font);
+      face = tgfx::CTTypeface::MakeFromCTFont(font);
       if (face == nullptr) {
         continue;
       }

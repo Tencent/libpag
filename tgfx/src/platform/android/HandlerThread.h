@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,15 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "VideoDecoder.h"
-#include "VideoDecoderFactory.h"
+#pragma once
 
-namespace pag {
+#include <memory>
+#include "JNIUtil.h"
 
-VideoDecoder::~VideoDecoder() {
-  if (hardwareBacked) {
-    VideoDecoderFactory::NotifyHardwareVideoDecoderReleased();
+namespace tgfx {
+class HandlerThread {
+ public:
+  static void JNIInit(JNIEnv* env);
+
+  static std::shared_ptr<HandlerThread> Make();
+
+  HandlerThread(JNIEnv* env, jobject thread);
+
+  ~HandlerThread();
+
+  jobject getLooper() const {
+    return looper.get();
   }
-}
 
-}  // namespace pag
+ private:
+  Global<jobject> thread;
+  Global<jobject> looper;
+};
+}  // namespace tgfx

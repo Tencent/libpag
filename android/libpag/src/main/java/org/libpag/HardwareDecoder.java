@@ -70,7 +70,7 @@ class HardwareDecoder {
                 startTime = SystemClock.uptimeMillis();
                 try {
                     decoder = MediaCodec.createDecoderByType(mediaFormat.getString(MediaFormat.KEY_MIME));
-                    decoder.configure(mediaFormat, videoSurface.outputSurface, null, 0);
+                    decoder.configure(mediaFormat, videoSurface.getInputSurface(), null, 0);
                     decoder.start();
                 } catch (Exception e) {
                     if (decoder != null) {

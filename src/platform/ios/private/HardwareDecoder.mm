@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "HardwareDecoder.h"
+#include "base/utils/Log.h"
 #include "base/utils/USE.h"
 #include "tgfx/core/YUVBuffer.h"
 

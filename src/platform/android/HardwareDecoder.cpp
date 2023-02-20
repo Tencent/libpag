@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "HardwareDecoder.h"
+#include "base/utils/Log.h"
 #include "platform/android/JStringUtil.h"
 #include "tgfx/core/Buffer.h"
 
@@ -134,8 +135,8 @@ bool HardwareDecoder::initDecoder(JNIEnv* env, const VideoFormat& format) {
     return false;
   }
   auto videoSurface = env->CallObjectMethod(decoder.get(), HardwareDecoder_getVideoSurface);
-  bufferQueue = JVideoSurface::GetBufferQueue(env, videoSurface);
-  if (bufferQueue == nullptr) {
+  imageReader = JVideoSurface::GetImageReader(env, videoSurface);
+  if (imageReader == nullptr) {
     env->CallVoidMethod(decoder.get(), HardwareDecoder_onRelease);
     return false;
   }
@@ -200,6 +201,6 @@ std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
   if (!result) {
     return nullptr;
   }
-  return bufferQueue->acquireNextBuffer();
+  return imageReader->acquireNextBuffer();
 }
 }  // namespace pag
