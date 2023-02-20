@@ -20,8 +20,10 @@
 
 #include <jni.h>
 #include <string>
-#include "Global.h"
+#include "JNIHelper.h"
 
+namespace pag {
 jstring SafeConvertToJString(JNIEnv* env, const char* text);
 
 std::string SafeConvertToStdString(JNIEnv* env, jstring jText);
+}  // namespace pag

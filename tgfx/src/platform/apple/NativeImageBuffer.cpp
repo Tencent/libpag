@@ -30,7 +30,8 @@ std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(NativeImageRef nativeImage) {
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
-  return std::shared_ptr<ImageBuffer>(new NativeImageBuffer(width, height, nativeImage));
+  return std::shared_ptr<ImageBuffer>(
+      new NativeImageBuffer(static_cast<int>(width), static_cast<int>(height), nativeImage));
 }
 
 NativeImageBuffer::NativeImageBuffer(int width, int height, CGImageRef nativeImage)

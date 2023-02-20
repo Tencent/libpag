@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,10 +18,23 @@
 
 #pragma once
 
-#include <jni.h>
-#include "Local.h"
+#include "tgfx/gpu/opengl/GLTexture.h"
 
-class JNIEnvironment {
+namespace tgfx {
+class GLVideoTexture : public tgfx::GLTexture {
  public:
-  static JNIEnv* Current();
+  static std::shared_ptr<GLVideoTexture> Make(Context* context, int width, int height);
+
+  Point getTextureCoord(float x, float y) const override;
+
+  size_t memoryUsage() const override;
+
+ private:
+  int textureWidth = 0;
+  int textureHeight = 0;
+
+  GLVideoTexture(const GLSampler& sampler, int width, int height);
+
+  void onReleaseGPU() override;
 };
+}  // namespace tgfx

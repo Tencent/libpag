@@ -27,12 +27,6 @@
 using namespace emscripten;
 
 namespace tgfx {
-static std::atomic_bool AsyncSupport = false;
-
-void WebImage::SetAsyncSupport(bool enabled) {
-  AsyncSupport = enabled;
-}
-
 std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& filePath) {
   auto imageStream = Stream::MakeFromFile(filePath);
   if (imageStream == nullptr || imageStream->size() <= 14) {
@@ -58,7 +52,7 @@ NativeCodec::NativeCodec(int width, int height, std::shared_ptr<Data> imageBytes
 }
 
 bool NativeCodec::asyncSupport() const {
-  return AsyncSupport;
+  return WebImage::AsyncSupport();
 }
 
 bool NativeCodec::readPixels(const ImageInfo&, void*) const {
@@ -69,7 +63,7 @@ std::shared_ptr<ImageBuffer> NativeCodec::onMakeBuffer(bool) const {
   auto bytes =
       val(typed_memory_view(imageBytes->size(), static_cast<const uint8_t*>(imageBytes->data())));
   auto nativeImage = val::module_property("tgfx").call<val>("createImageFromBytes", bytes);
-  bool usePromise = AsyncSupport;
+  bool usePromise = WebImage::AsyncSupport();
   if (!usePromise) {
     nativeImage = nativeImage.await();
   }

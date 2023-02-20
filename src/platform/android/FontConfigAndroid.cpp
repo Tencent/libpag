@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FontConfigAndroid.h"
-#include "JNIEnvironment.h"
 #include "JNIHelper.h"
 
 namespace pag {
@@ -27,7 +26,7 @@ static jmethodID PAGFont_RegisterFallbackFonts;
 extern "C" {
 
 void FontConfigAndroid::InitJNI(JNIEnv* env) {
-  PAGFontClass.reset(env, env->FindClass("org/libpag/PAGFont"));
+  PAGFontClass = env->FindClass("org/libpag/PAGFont");
   if (PAGFontClass.get() == nullptr) {
     LOGE("Could not run PAGFont.RegisterFallbackFonts(), class is not found!");
     return;
@@ -37,7 +36,8 @@ void FontConfigAndroid::InitJNI(JNIEnv* env) {
 }
 
 bool FontConfigAndroid::RegisterFallbackFonts() {
-  auto env = JNIEnvironment::Current();
+  JNIEnvironment environment;
+  auto env = environment.current();
   if (env == nullptr) {
     return false;
   }

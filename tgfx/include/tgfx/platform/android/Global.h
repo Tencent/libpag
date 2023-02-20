@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -20,6 +20,10 @@
 
 #include "JNIEnvironment.h"
 
+namespace tgfx {
+/**
+ * The Global class manages the lifetime of JNI objects with global references.
+ */
 template <typename T>
 class Global {
  public:
@@ -29,42 +33,46 @@ class Global {
 
   Global<T>& operator=(const Global<T>& that) = delete;
 
-  Global(JNIEnv* env, T ref) {
-    reset(env, ref);
+  Global<T>& operator=(const T& that) {
+    reset(that);
+    return *this;
+  }
+
+  Global(T ref) {
+    reset(ref);
   }
 
   ~Global() {
-    reset(nullptr, nullptr);
+    reset();
   }
 
-  void reset(JNIEnv* env, T ref) {
-    if (mRef == ref) {
+  void reset() {
+    reset(nullptr);
+  }
+
+  void reset(T localRef) {
+    if (ref == localRef) {
       return;
     }
-    if (mRef != nullptr) {
-      if (env == nullptr) {
-        env = JNIEnvironment::Current();
-        if (env == nullptr) {
-          return;
-        }
-      }
-
-      env->DeleteGlobalRef(mRef);
-      mRef = nullptr;
+    JNIEnvironment environment;
+    auto env = environment.current();
+    if (env == nullptr) {
+      return;
     }
-    mEnv = env;
-    if (ref == nullptr) {
-      mRef = nullptr;
-    } else {
-      mRef = (T)mEnv->NewGlobalRef(ref);
+    if (ref != nullptr) {
+      env->DeleteGlobalRef(ref);
+      ref = nullptr;
+    }
+    if (localRef != nullptr) {
+      ref = static_cast<T>(env->NewGlobalRef(localRef));
     }
   }
 
   T get() const {
-    return mRef;
+    return ref;
   }
 
  private:
-  JNIEnv* mEnv = nullptr;
-  T mRef = nullptr;
+  T ref = nullptr;
 };
+}  // namespace tgfx

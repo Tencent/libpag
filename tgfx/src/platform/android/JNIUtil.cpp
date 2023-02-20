@@ -19,79 +19,19 @@
 #include "JNIUtil.h"
 #include <pthread.h>
 #include <mutex>
-#include "JNIInit.h"
 #include "core/utils/Log.h"
-#include "tgfx/platform/android/SetJavaVM.h"
 
 namespace tgfx {
-static std::mutex globalLocker = {};
-static JavaVM* globalJavaVM = nullptr;
-static pthread_key_t envKey = 0;
-
-static void JNI_Thread_Destroy(void*) {
-  if (globalJavaVM != nullptr) {
-    globalJavaVM->DetachCurrentThread();
-  }
-}
-
-bool SetJavaVM(void* javaVM) {
-  {
-    std::lock_guard<std::mutex> autoLock(globalLocker);
-    if (globalJavaVM != nullptr && globalJavaVM != javaVM) {
-      return false;
-    }
-    globalJavaVM = reinterpret_cast<JavaVM*>(javaVM);
-    pthread_key_create(&envKey, JNI_Thread_Destroy);
-  }
-  auto env = CurrentJNIEnv();
-  JNIInit(env);
-  return true;
-}
-
-JNIEnv* CurrentJNIEnv() {
-  std::lock_guard<std::mutex> autoLock(globalLocker);
-  if (globalJavaVM == nullptr) {
-    LOGE(
-        "CurrentJNIEnv(): The global JavaVM has not been set yet! "
-        "Please use tgfx::SetJavaVM() to initialize the global JavaVM.");
-    return nullptr;
-  }
-  auto env = reinterpret_cast<JNIEnv*>(pthread_getspecific(envKey));
-  if (env != nullptr) {
-    return env;
-  }
-  auto result = globalJavaVM->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_4);
-  switch (result) {
-    case JNI_EDETACHED: {
-      JavaVMAttachArgs args = {JNI_VERSION_1_4, "TGFX_JNIEnv", nullptr};
-      if (globalJavaVM->AttachCurrentThread(&env, &args) != JNI_OK) {
-        LOGE("CurrentJNIEnv(): Failed to attach the JNI environment to the current thread!");
-        env = nullptr;
-      } else {
-        pthread_setspecific(envKey, env);
-      }
-    }
-    case JNI_OK:
-      break;
-    case JNI_EVERSION:
-      LOGE("CurrentJNIEnv(): The specified JNI version is not supported!");
-      break;
-    default:
-      LOGE("CurrentJNIEnv(): Failed to get the JNI environment attached to this thread!");
-      break;
-  }
-  return env;
-}
-
 jstring SafeToJString(JNIEnv* env, const std::string& text) {
-  static Global<jclass> StringClass(env, env->FindClass("java/lang/String"));
+  static Global<jclass> StringClass = env->FindClass("java/lang/String");
   static jmethodID StringConstructID =
       env->GetMethodID(StringClass.get(), "<init>", "([BLjava/lang/String;)V");
-  Local<jbyteArray> array = {env, env->NewByteArray(text.size())};
-  env->SetByteArrayRegion(array.get(), 0, text.size(),
-                          reinterpret_cast<const jbyte*>(text.c_str()));
-  Local<jstring> stringUTF = {env, env->NewStringUTF("UTF-8")};
-  return (jstring)env->NewObject(StringClass.get(), StringConstructID, array.get(),
-                                 stringUTF.get());
+  auto array = env->NewByteArray(text.size());
+  env->SetByteArrayRegion(array, 0, text.size(), reinterpret_cast<const jbyte*>(text.c_str()));
+  auto stringUTF = env->NewStringUTF("UTF-8");
+  auto result = (jstring)env->NewObject(StringClass.get(), StringConstructID, array, stringUTF);
+  env->DeleteLocalRef(array);
+  env->DeleteLocalRef(stringUTF);
+  return result;
 }
 }  // namespace tgfx

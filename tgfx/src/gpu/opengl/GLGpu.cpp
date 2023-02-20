@@ -61,10 +61,10 @@ std::unique_ptr<TextureSampler> GLGpu::createSampler(int width, int height, Pixe
 }
 
 void GLGpu::deleteSampler(TextureSampler* sampler) {
-  if (sampler == nullptr) {
+  auto glSampler = static_cast<GLSampler*>(sampler);
+  if (glSampler == nullptr || glSampler->id == 0) {
     return;
   }
-  auto glSampler = static_cast<GLSampler*>(sampler);
   GLFunctions::Get(_context)->deleteTextures(1, &glSampler->id);
   glSampler->id = 0;
 }

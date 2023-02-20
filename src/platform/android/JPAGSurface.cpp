@@ -51,14 +51,11 @@ extern "C" {
 
 PAG_API void Java_org_libpag_PAGSurface_nativeInit(JNIEnv* env, jclass clazz) {
   PAGSurface_nativeSurface = env->GetFieldID(clazz, "nativeSurface", "J");
-  // 调用堆栈源头从C++触发而不是Java触发的情况下，FindClass
-  // 可能会失败，因此要提前初始化这部分反射方法。
-  NativePlatform::InitJNI(env);
-  Bitmap_Class.reset(env, env->FindClass("android/graphics/Bitmap"));
+  Bitmap_Class = env->FindClass("android/graphics/Bitmap");
   Bitmap_createBitmap =
       env->GetStaticMethodID(Bitmap_Class.get(), "createBitmap",
                              "(IILandroid/graphics/Bitmap$Config;)Landroid/graphics/Bitmap;");
-  Config_Class.reset(env, env->FindClass("android/graphics/Bitmap$Config"));
+  Config_Class = env->FindClass("android/graphics/Bitmap$Config");
   Config_ARGB_888 =
       env->GetStaticFieldID(Config_Class.get(), "ARGB_8888", "Landroid/graphics/Bitmap$Config;");
 }
@@ -206,7 +203,7 @@ extern "C" JNIEXPORT jobject JNICALL Java_org_libpag_PAGSurface_MakeOffscreen(JN
   if (surface == nullptr) {
     return nullptr;
   }
-  static auto PAGSurface_Class = Global<jclass>(env, env->FindClass("org/libpag/PAGSurface"));
+  static Global<jclass> PAGSurface_Class = env->FindClass("org/libpag/PAGSurface");
   static auto PAGSurface_Constructor = env->GetMethodID(PAGSurface_Class.get(), "<init>", "(J)V");
   auto surfaceObject = env->NewObject(PAGSurface_Class.get(), PAGSurface_Constructor,
                                       reinterpret_cast<jlong>(new JPAGSurface(surface)));

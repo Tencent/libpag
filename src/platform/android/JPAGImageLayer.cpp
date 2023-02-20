@@ -52,7 +52,7 @@ PAG_API jlong Java_org_libpag_PAGImageLayer_nativeMake(JNIEnv*, jclass, jint wid
 }
 
 PAG_API jobjectArray Java_org_libpag_PAGImageLayer_getVideoRanges(JNIEnv* env, jobject thiz) {
-  static Global<jclass> PAGVideoRange_Class(env, env->FindClass("org/libpag/PAGVideoRange"));
+  static Global<jclass> PAGVideoRange_Class = env->FindClass("org/libpag/PAGVideoRange");
   auto pagLayer = GetPAGImageLayer(env, thiz);
   if (pagLayer == nullptr) {
     return env->NewObjectArray(0, PAGVideoRange_Class.get(), nullptr);
@@ -64,8 +64,8 @@ PAG_API jobjectArray Java_org_libpag_PAGImageLayer_getVideoRanges(JNIEnv* env, j
   int size = videoRanges.size();
   jobjectArray rangeArray = env->NewObjectArray(size, PAGVideoRange_Class.get(), nullptr);
   for (int i = 0; i < size; ++i) {
-    Local<jobject> jRange = {env, ToPAGVideoRangeObject(env, videoRanges[i])};
-    env->SetObjectArrayElement(rangeArray, i, jRange.get());
+    auto jRange = ToPAGVideoRangeObject(env, videoRanges[i]);
+    env->SetObjectArrayElement(rangeArray, i, jRange);
   }
   return rangeArray;
 }

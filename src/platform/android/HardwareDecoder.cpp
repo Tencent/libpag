@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "HardwareDecoder.h"
+#include "base/utils/Log.h"
 #include "platform/android/JStringUtil.h"
 #include "tgfx/core/Buffer.h"
 
@@ -38,13 +39,13 @@ static jmethodID MediaFormat_createVideoFormat;
 static jmethodID MediaFormat_setByteBuffer;
 static jmethodID MediaFormat_setFloat;
 
-void HardwareDecoder::InitJNI(JNIEnv* env, const std::string& className) {
-  HardwareDecoderClass.reset(env, env->FindClass(className.c_str()));
+void HardwareDecoder::InitJNI(JNIEnv* env) {
+  HardwareDecoderClass = env->FindClass("org/libpag/HardwareDecoder");
   HardwareDecoder_ForceSoftwareDecoder =
       env->GetStaticMethodID(HardwareDecoderClass.get(), "ForceSoftwareDecoder", "()Z");
-  std::string createSig = std::string("(Landroid/media/MediaFormat;)L") + className + ";";
   HardwareDecoder_Create =
-      env->GetStaticMethodID(HardwareDecoderClass.get(), "Create", createSig.c_str());
+      env->GetStaticMethodID(HardwareDecoderClass.get(), "Create",
+                             "(Landroid/media/MediaFormat;)Lorg/libpag/HardwareDecoder;");
   HardwareDecoder_onSendBytes =
       env->GetMethodID(HardwareDecoderClass.get(), "onSendBytes", "(Ljava/nio/ByteBuffer;J)I");
   HardwareDecoder_onEndOfStream =
@@ -60,7 +61,7 @@ void HardwareDecoder::InitJNI(JNIEnv* env, const std::string& className) {
                                                      "()Lorg/libpag/VideoSurface;");
   HardwareDecoder_onRelease = env->GetMethodID(HardwareDecoderClass.get(), "onRelease", "()V");
 
-  MediaFormatClass.reset(env, env->FindClass("android/media/MediaFormat"));
+  MediaFormatClass = env->FindClass("android/media/MediaFormat");
   MediaFormat_createVideoFormat =
       env->GetStaticMethodID(MediaFormatClass.get(), "createVideoFormat",
                              "(Ljava/lang/String;II)Landroid/media/MediaFormat;");
@@ -71,7 +72,8 @@ void HardwareDecoder::InitJNI(JNIEnv* env, const std::string& className) {
 }
 
 HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
-  auto env = JNIEnvironment::Current();
+  JNIEnvironment environment;
+  auto env = environment.current();
   if (env == nullptr || env->CallStaticBooleanMethod(HardwareDecoderClass.get(),
                                                      HardwareDecoder_ForceSoftwareDecoder)) {
     return;
@@ -81,7 +83,8 @@ HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
 
 HardwareDecoder::~HardwareDecoder() {
   if (videoDecoder.get() != nullptr) {
-    auto env = JNIEnvironment::Current();
+    JNIEnvironment environment;
+    auto env = environment.current();
     if (env == nullptr) {
       return;
     }
@@ -90,14 +93,13 @@ HardwareDecoder::~HardwareDecoder() {
 }
 
 bool HardwareDecoder::initDecoder(JNIEnv* env, const VideoFormat& format) {
-  Local<jstring> mimeType = {env, SafeConvertToJString(env, format.mimeType.c_str())};
-  Local<jobject> mediaFormat = {
-      env, env->CallStaticObjectMethod(MediaFormatClass.get(), MediaFormat_createVideoFormat,
-                                       mimeType.get(), format.width, format.height)};
+  auto mimeType = SafeConvertToJString(env, format.mimeType.c_str());
+  auto mediaFormat = env->CallStaticObjectMethod(
+      MediaFormatClass.get(), MediaFormat_createVideoFormat, mimeType, format.width, format.height);
   if (format.mimeType == "video/hevc") {
     if (!format.headers.empty()) {
       char keyString[] = "csd-0";
-      Local<jstring> key = {env, SafeConvertToJString(env, keyString)};
+      auto key = SafeConvertToJString(env, keyString);
       int dataLength = 0;
       for (auto& header : format.headers) {
         dataLength += header->size();
@@ -108,55 +110,54 @@ bool HardwareDecoder::initDecoder(JNIEnv* env, const VideoFormat& format) {
         buffer.writeRange(pos, header->size(), header->data());
         pos += header->size();
       }
-      Local<jobject> bytes = {env, env->NewDirectByteBuffer(buffer.data(), buffer.size())};
-      env->CallVoidMethod(mediaFormat.get(), MediaFormat_setByteBuffer, key.get(), bytes.get());
+      auto bytes = env->NewDirectByteBuffer(buffer.data(), buffer.size());
+      env->CallVoidMethod(mediaFormat, MediaFormat_setByteBuffer, key, bytes);
     }
   } else {
     int index = 0;
     for (auto& header : format.headers) {
       char keyString[6];
       snprintf(keyString, 6, "csd-%d", index);
-      Local<jstring> key = {env, SafeConvertToJString(env, keyString)};
-      Local<jobject> bytes = {
-          env, env->NewDirectByteBuffer(const_cast<uint8_t*>(header->bytes()), header->size())};
-      env->CallVoidMethod(mediaFormat.get(), MediaFormat_setByteBuffer, key.get(), bytes.get());
+      auto key = SafeConvertToJString(env, keyString);
+      auto bytes = env->NewDirectByteBuffer(const_cast<uint8_t*>(header->bytes()), header->size());
+      env->CallVoidMethod(mediaFormat, MediaFormat_setByteBuffer, key, bytes);
       index++;
     }
   }
   char frameRateKeyString[] = "frame-rate";
-  Local<jstring> frameRateKey = {env, SafeConvertToJString(env, frameRateKeyString)};
-  env->CallVoidMethod(mediaFormat.get(), MediaFormat_setFloat, frameRateKey.get(),
-                      format.frameRate);
-  Local<jobject> decoder = {
-      env, env->CallStaticObjectMethod(HardwareDecoderClass.get(), HardwareDecoder_Create,
-                                       mediaFormat.get())};
-  if (decoder.empty()) {
+  auto frameRateKey = SafeConvertToJString(env, frameRateKeyString);
+  env->CallVoidMethod(mediaFormat, MediaFormat_setFloat, frameRateKey, format.frameRate);
+  auto decoder =
+      env->CallStaticObjectMethod(HardwareDecoderClass.get(), HardwareDecoder_Create, mediaFormat);
+  if (decoder == nullptr) {
     return false;
   }
-  auto videoSurface = env->CallObjectMethod(decoder.get(), HardwareDecoder_getVideoSurface);
-  bufferQueue = JVideoSurface::GetBufferQueue(env, videoSurface);
-  if (bufferQueue == nullptr) {
-    env->CallVoidMethod(decoder.get(), HardwareDecoder_onRelease);
+  auto videoSurface = env->CallObjectMethod(decoder, HardwareDecoder_getVideoSurface);
+  imageReader = JVideoSurface::GetImageReader(env, videoSurface);
+  if (imageReader == nullptr) {
+    env->CallVoidMethod(decoder, HardwareDecoder_onRelease);
     return false;
   }
-  videoDecoder.reset(env, decoder.get());
+  videoDecoder = decoder;
   return true;
 }
 
 DecodingResult HardwareDecoder::onSendBytes(void* bytes, size_t length, int64_t time) {
-  auto env = JNIEnvironment::Current();
+  JNIEnvironment environment;
+  auto env = environment.current();
   if (env == nullptr) {
     LOGE("HardwareDecoder: Error on sending bytes for decoding.\n");
     return pag::DecodingResult::Error;
   }
-  Local<jobject> byteBuffer = {env, env->NewDirectByteBuffer(bytes, length)};
+  auto byteBuffer = env->NewDirectByteBuffer(bytes, length);
   auto result =
-      env->CallIntMethod(videoDecoder.get(), HardwareDecoder_onSendBytes, byteBuffer.get(), time);
+      env->CallIntMethod(videoDecoder.get(), HardwareDecoder_onSendBytes, byteBuffer, time);
   return static_cast<pag::DecodingResult>(result);
 }
 
 DecodingResult HardwareDecoder::onDecodeFrame() {
-  auto env = JNIEnvironment::Current();
+  JNIEnvironment environment;
+  auto env = environment.current();
   if (env == nullptr) {
     LOGE("HardwareDecoder: Error on decoding frame.\n");
     return pag::DecodingResult::Error;
@@ -166,7 +167,8 @@ DecodingResult HardwareDecoder::onDecodeFrame() {
 }
 
 void HardwareDecoder::onFlush() {
-  auto env = JNIEnvironment::Current();
+  JNIEnvironment environment;
+  auto env = environment.current();
   if (env == nullptr) {
     return;
   }
@@ -174,7 +176,8 @@ void HardwareDecoder::onFlush() {
 }
 
 int64_t HardwareDecoder::presentationTime() {
-  auto env = JNIEnvironment::Current();
+  JNIEnvironment environment;
+  auto env = environment.current();
   if (env == nullptr) {
     return -1;
   }
@@ -182,7 +185,8 @@ int64_t HardwareDecoder::presentationTime() {
 }
 
 DecodingResult HardwareDecoder::onEndOfStream() {
-  auto env = JNIEnvironment::Current();
+  JNIEnvironment environment;
+  auto env = environment.current();
   if (env == nullptr) {
     LOGE("HardwareDecoder: Error on decoding frame.\n");
     return pag::DecodingResult::Error;
@@ -192,7 +196,8 @@ DecodingResult HardwareDecoder::onEndOfStream() {
 }
 
 std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
-  auto env = JNIEnvironment::Current();
+  JNIEnvironment environment;
+  auto env = environment.current();
   if (env == nullptr) {
     return nullptr;
   }
@@ -200,6 +205,6 @@ std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
   if (!result) {
     return nullptr;
   }
-  return bufferQueue->acquireNextBuffer();
+  return imageReader->acquireNextBuffer();
 }
 }  // namespace pag

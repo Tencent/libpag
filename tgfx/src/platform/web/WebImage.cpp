@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,52 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "tgfx/platform/web/WebImage.h"
+#include <atomic>
 
-#include <jni.h>
+namespace tgfx {
+static std::atomic_bool AsyncSupportEnabled = false;
 
-template <typename T>
-class Local {
- public:
-  Local() = default;
+bool WebImage::AsyncSupport() {
+  return AsyncSupportEnabled;
+}
 
-  Local(const Local<T>& that) = delete;
-
-  Local<T>& operator=(const Local<T>& that) = delete;
-
-  Local(JNIEnv* env, T ref) : _env(env), ref(ref) {
-  }
-
-  ~Local() {
-    if (_env != nullptr) {
-      _env->DeleteLocalRef(ref);
-    }
-  }
-
-  void reset(JNIEnv* env, T reference) {
-    if (reference == ref) {
-      return;
-    }
-    if (_env != nullptr) {
-      _env->DeleteLocalRef(ref);
-    }
-    _env = env;
-    ref = reference;
-  }
-
-  bool empty() const {
-    return ref == nullptr;
-  }
-
-  T get() const {
-    return ref;
-  }
-
-  JNIEnv* env() const {
-    return _env;
-  }
-
- private:
-  JNIEnv* _env = nullptr;
-  T ref = nullptr;
-};
+void WebImage::SetAsyncSupport(bool enabled) {
+  AsyncSupportEnabled = enabled;
+}
+}  // namespace tgfx

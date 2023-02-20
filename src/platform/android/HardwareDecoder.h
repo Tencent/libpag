@@ -18,14 +18,14 @@
 
 #pragma once
 
-#include "platform/android/Global.h"
+#include "JNIHelper.h"
 #include "platform/android/JVideoSurface.h"
 #include "rendering/video/VideoDecoder.h"
 
 namespace pag {
 class HardwareDecoder : public VideoDecoder {
  public:
-  static void InitJNI(JNIEnv* env, const std::string& className);
+  static void InitJNI(JNIEnv* env);
 
   ~HardwareDecoder() override;
 
@@ -43,7 +43,7 @@ class HardwareDecoder : public VideoDecoder {
 
  private:
   bool isValid = false;
-  std::shared_ptr<tgfx::ImageBufferQueue> bufferQueue = nullptr;
+  std::shared_ptr<tgfx::SurfaceImageReader> imageReader = nullptr;
   Global<jobject> videoDecoder;
 
   explicit HardwareDecoder(const VideoFormat& format);

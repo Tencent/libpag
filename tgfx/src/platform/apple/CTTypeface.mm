@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,28 +16,29 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "core/utils/USE.h"
+#include "tgfx/platform/apple/CTTypeface.h"
 
-#include <CoreText/CoreText.h>
-#include "tgfx/core/Typeface.h"
+#ifndef TGFX_USE_FREETYPE
+#include "core/vectors/coregraphics/CGTypeface.h"
+#endif
 
 namespace tgfx {
+std::shared_ptr<Typeface> CTTypeface::MakeFromCTFont(CTFontRef ctFont) {
+#ifdef TGFX_USE_FREETYPE
+  USE(ctFont);
+  return nullptr;
+#else
+  return CGTypeface::Make(static_cast<CTFontRef>(ctFont));
+#endif
+}
 
-/**
- * NativeTypeface provides convenience functions to create typefaces from platform-specific
- * CTFontRef handles and access the CTFontRef handle in a Typeface instance.
- */
-class NativeTypeface {
- public:
-  /**
-   * Creates a typeface for the specified CTFontRef. Returns nullptr if the ctFont is nil.
-   */
-  static std::shared_ptr<Typeface> MakeFromCTFont(CTFontRef ctFont);
-
-  /**
-   * Returns the platform-specific CTFontRef handle for a given Typeface. Note that the returned
-   * CTFontRef gets released when the source Typeface is destroyed.
-   */
-  static CTFontRef GetCTFont(const Typeface* typeface);
-};
+CTFontRef CTTypeface::GetCTFont(const Typeface* typeface) {
+#ifdef TGFX_USE_FREETYPE
+  USE(typeface);
+  return nullptr;
+#else
+  return typeface ? static_cast<const CGTypeface*>(typeface)->getCTFont() : nullptr;
+#endif
+}
 }  // namespace tgfx
