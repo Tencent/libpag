@@ -56,7 +56,6 @@ class SequenceInfo {
   Sequence* sequence;
 };
 
-
 class StaticSequenceGenerator : public tgfx::ImageGenerator {
  public:
   StaticSequenceGenerator(std::shared_ptr<File> file, std::shared_ptr<SequenceInfo> info,
