@@ -36,7 +36,7 @@
 #include "rendering/graphics/Snapshot.h"
 #include "rendering/layers/PAGStage.h"
 #include "rendering/sequences/SequenceImageQueue.h"
-#include "rendering/sequences/SequenceReaderFactory.h"
+#include "rendering/sequences/SequenceInfo.h"
 #include "rendering/utils/PathHasher.h"
 #include "tgfx/gpu/Device.h"
 
@@ -136,9 +136,9 @@ class RenderCache : public Performance {
 
   void setVideoEnabled(bool value);
 
-  void prepareSequenceImage(std::shared_ptr<SequenceReaderFactory> sequence, Frame targetFrame);
+  void prepareSequenceImage(std::shared_ptr<SequenceInfo> sequence, Frame targetFrame);
 
-  std::shared_ptr<tgfx::Image> getSequenceImage(std::shared_ptr<SequenceReaderFactory> sequence,
+  std::shared_ptr<tgfx::Image> getSequenceImage(std::shared_ptr<SequenceInfo> sequence,
                                                 Frame targetFrame);
 
   LayerFilter* getFilterCache(LayerStyle* layerStyle);
@@ -192,11 +192,11 @@ class RenderCache : public Performance {
   void removeSnapshotFromLRU(Snapshot* snapshot);
 
   // sequence caches:
-  SequenceImageQueue* getSequenceImageQueue(std::shared_ptr<SequenceReaderFactory> sequence,
+  SequenceImageQueue* getSequenceImageQueue(std::shared_ptr<SequenceInfo> sequence,
                                             Frame targetFrame);
-  SequenceImageQueue* findNearestSequenceImageQueue(std::shared_ptr<SequenceReaderFactory> sequence,
+  SequenceImageQueue* findNearestSequenceImageQueue(std::shared_ptr<SequenceInfo> sequence,
                                                     Frame targetFrame);
-  SequenceImageQueue* makeSequenceImageQueue(std::shared_ptr<SequenceReaderFactory> sequence);
+  SequenceImageQueue* makeSequenceImageQueue(std::shared_ptr<SequenceInfo> sequence);
   void clearAllSequenceCaches();
   void clearSequenceCache(ID uniqueID);
   void clearExpiredSequences();

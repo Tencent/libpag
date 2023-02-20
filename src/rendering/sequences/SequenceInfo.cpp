@@ -16,14 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "SequenceReaderFactory.h"
+#include "SequenceInfo.h"
 #include "rendering/sequences/BitmapSequenceReader.h"
 #include "rendering/sequences/VideoReader.h"
 #include "rendering/sequences/VideoSequenceDemuxer.h"
 #include "tgfx/core/Image.h"
 
 namespace pag {
-
 static tgfx::ISize GetBufferSize(Sequence* sequence) {
   if (sequence->composition->type() == CompositionType::Video) {
     auto videoSequence = static_cast<VideoSequence*>(sequence);
@@ -32,20 +31,86 @@ static tgfx::ISize GetBufferSize(Sequence* sequence) {
   return tgfx::ISize::Make(sequence->width, sequence->height);
 }
 
-std::shared_ptr<SequenceReaderFactory> SequenceReaderFactory::Make(Sequence* sequence) {
+class StaticSequenceGenerator : public tgfx::ImageGenerator {
+ public:
+  StaticSequenceGenerator(std::shared_ptr<File> file, std::shared_ptr<SequenceInfo> info,
+                          tgfx::ISize bufferSize)
+      : tgfx::ImageGenerator(bufferSize), file(std::move(file)), info(info) {
+  }
+
+  bool isAlphaOnly() const override {
+    return false;
+  }
+
+#ifdef PAG_BUILD_FOR_WEB
+  bool asyncSupport() const override {
+    return true;
+  }
+#endif
+
+ protected:
+  std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer(bool) const override {
+    auto reader = info->makeReader(file);
+    return reader->readBuffer(0);
+  }
+
+ private:
+  std::shared_ptr<File> file = nullptr;
+  std::shared_ptr<SequenceInfo> info = nullptr;
+};
+
+class SequenceFrameGenerator : public tgfx::ImageGenerator {
+ public:
+  SequenceFrameGenerator(std::shared_ptr<SequenceReader> reader, Frame targetFrame)
+      : tgfx::ImageGenerator(reader->width(), reader->height()), reader(std::move(reader)),
+        targetFrame(targetFrame) {
+  }
+
+  bool isAlphaOnly() const override {
+    return false;
+  }
+
+#ifdef PAG_BUILD_FOR_WEB
+  bool asyncSupport() const override {
+    return true;
+  }
+#endif
+
+ protected:
+  std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer(bool) const override {
+    return reader->readBuffer(targetFrame);
+  }
+
+ private:
+  std::shared_ptr<SequenceReader> reader = nullptr;
+  Frame targetFrame = 0;
+};
+
+static std::shared_ptr<tgfx::Image> MakeSequenceImage(
+    std::shared_ptr<tgfx::ImageGenerator> generator, Sequence* sequence) {
+  std::shared_ptr<tgfx::Image> image = nullptr;
+  if (sequence->composition->type() == CompositionType::Video) {
+    auto videoSequence = static_cast<VideoSequence*>(sequence);
+    return tgfx::Image::MakeRGBAAA(std::move(generator), sequence->width, sequence->height,
+                                   videoSequence->alphaStartX, videoSequence->alphaStartY);
+  }
+  return tgfx::Image::MakeFromGenerator(std::move(generator));
+}
+
+std::shared_ptr<SequenceInfo> SequenceInfo::Make(Sequence* sequence) {
   if (sequence == nullptr) {
     return nullptr;
   }
-  auto factory = std::shared_ptr<SequenceReaderFactory>(new SequenceReaderFactory(sequence));
+  auto factory = std::shared_ptr<SequenceInfo>(new SequenceInfo(sequence));
   factory->weakThis = factory;
   return factory;
 }
 
-SequenceReaderFactory::SequenceReaderFactory(Sequence* sequence) : sequence(sequence) {
+SequenceInfo::SequenceInfo(Sequence* sequence) : sequence(sequence) {
 }
 
-std::shared_ptr<SequenceReader> SequenceReaderFactory::makeReader(std::shared_ptr<File> file,
-                                                                  PAGFile* pagFile) {
+std::shared_ptr<SequenceReader> SequenceInfo::makeReader(std::shared_ptr<File> file,
+                                                         PAGFile* pagFile) {
   if (sequence == nullptr || file == nullptr) {
     return nullptr;
   }
@@ -62,57 +127,49 @@ std::shared_ptr<SequenceReader> SequenceReaderFactory::makeReader(std::shared_pt
   return reader;
 }
 
-std::shared_ptr<tgfx::ImageGenerator> SequenceReaderFactory::makeGenerator(
-    std::shared_ptr<File> file) {
+std::shared_ptr<tgfx::Image> SequenceInfo::makeStatic(std::shared_ptr<File> file) {
   if (sequence == nullptr || file == nullptr || !staticContent()) {
     return nullptr;
   }
-  return std::make_shared<StaticSequenceGenerator>(std::move(file), weakThis.lock(),
-                                                   GetBufferSize(sequence));
+  auto generator = std::make_shared<StaticSequenceGenerator>(std::move(file), weakThis.lock(),
+                                                             GetBufferSize(sequence));
+  return MakeSequenceImage(std::move(generator), sequence);
 }
 
-std::shared_ptr<tgfx::ImageGenerator> SequenceReaderFactory::makeGenerator(
-    std::shared_ptr<SequenceReader> reader, Frame targetFrame) {
-  if (reader == nullptr || staticContent()) {
+std::shared_ptr<tgfx::Image> SequenceInfo::makeImage(std::shared_ptr<SequenceReader> reader,
+                                                     Frame targetFrame) {
+  if (reader == nullptr || sequence == nullptr) {
     return nullptr;
   }
-  return std::make_shared<SequenceFrameGenerator>(std::move(reader), targetFrame);
+  auto generator = std::make_shared<SequenceFrameGenerator>(std::move(reader), targetFrame);
+  return MakeSequenceImage(std::move(generator), sequence);
 }
 
-bool SequenceReaderFactory::staticContent() const {
+bool SequenceInfo::staticContent() const {
   return sequence->composition->staticContent();
 }
 
-ID SequenceReaderFactory::uniqueID() const {
+ID SequenceInfo::uniqueID() const {
   return sequence->composition->uniqueID;
 }
 
-int SequenceReaderFactory::width() const {
+int SequenceInfo::width() const {
   return sequence->width;
 }
 
-int SequenceReaderFactory::height() const {
+int SequenceInfo::height() const {
   return sequence->height;
 }
 
-Frame SequenceReaderFactory::duration() const {
+Frame SequenceInfo::duration() const {
   return sequence->duration();
 }
 
-bool SequenceReaderFactory::isVideo() const {
+bool SequenceInfo::isVideo() const {
   return sequence->composition->type() == CompositionType::Video;
 }
 
-RGBAAALayout SequenceReaderFactory::layout() const {
-  if (sequence != nullptr && sequence->composition->type() == CompositionType::Video) {
-    auto videoSequence = static_cast<VideoSequence*>(sequence);
-    return {sequence->width, sequence->height, videoSequence->alphaStartX,
-            videoSequence->alphaStartY};
-  }
-  return {sequence->width, sequence->height, -1, -1};
-}
-
-Frame SequenceReaderFactory::firstVisibleFrame(const Layer* layer) const {
+Frame SequenceInfo::firstVisibleFrame(const Layer* layer) const {
   if (sequence == nullptr || layer->type() != LayerType::PreCompose) {
     return 0;
   }
@@ -133,7 +190,7 @@ Frame SequenceReaderFactory::firstVisibleFrame(const Layer* layer) const {
   return sequence->toSequenceFrame(compositionFrame);
 }
 
-tgfx::Orientation SequenceReaderFactory::orientation() const {
+tgfx::Orientation SequenceInfo::orientation() const {
   return tgfx::Orientation::TopLeft;
 }
 

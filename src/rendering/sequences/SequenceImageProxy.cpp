@@ -18,12 +18,11 @@
 
 #include "SequenceImageProxy.h"
 #include <utility>
-#include "SequenceImage.h"
+#include "SequenceInfo.h"
 #include "rendering/caches/RenderCache.h"
 
 namespace pag {
-SequenceImageProxy::SequenceImageProxy(std::shared_ptr<SequenceReaderFactory> sequence,
-                                       Frame targetFrame)
+SequenceImageProxy::SequenceImageProxy(std::shared_ptr<SequenceInfo> sequence, Frame targetFrame)
     : sequence(std::move(sequence)), targetFrame(targetFrame) {
 }
 
@@ -48,6 +47,6 @@ std::shared_ptr<tgfx::Image> SequenceImageProxy::makeImage(RenderCache* cache) c
     return nullptr;
   }
   auto file = cache->getFileByAssetID(sequence->uniqueID());
-  return SequenceImage::MakeStatic(std::move(file), sequence);
+  return sequence->makeStatic(std::move(file));
 }
 }  // namespace pag

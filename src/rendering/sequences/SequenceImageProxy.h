@@ -20,12 +20,12 @@
 
 #include "pag/file.h"
 #include "rendering/graphics/ImageProxy.h"
-#include "rendering/sequences/SequenceReaderFactory.h"
+#include "rendering/sequences/SequenceInfo.h"
 
 namespace pag {
 class SequenceImageProxy : public ImageProxy {
  public:
-  SequenceImageProxy(std::shared_ptr<SequenceReaderFactory> sequence, Frame targetFrame);
+  SequenceImageProxy(std::shared_ptr<SequenceInfo> sequence, Frame targetFrame);
 
   int width() const override {
     return sequence->width();
@@ -47,7 +47,7 @@ class SequenceImageProxy : public ImageProxy {
   std::shared_ptr<tgfx::Image> makeImage(RenderCache* cache) const override;
 
  private:
-  std::shared_ptr<SequenceReaderFactory> sequence = nullptr;
+  std::shared_ptr<SequenceInfo> sequence = nullptr;
   Frame targetFrame = 0;
 };
 }  // namespace pag

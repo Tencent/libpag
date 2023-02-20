@@ -24,7 +24,7 @@
 #include "rendering/caches/LayerCache.h"
 #include "rendering/renderers/FilterRenderer.h"
 #include "rendering/sequences/SequenceImageProxy.h"
-#include "rendering/sequences/SequenceReaderFactory.h"
+#include "rendering/sequences/SequenceInfo.h"
 #include "tgfx/core/Clock.h"
 
 namespace pag {
@@ -92,9 +92,9 @@ void RenderCache::preparePreComposeLayer(PreComposeLayer* layer) {
   }
   usedAssets.insert(composition->uniqueID);
   auto sequence = Sequence::Get(composition);
-  auto factory = SequenceReaderFactory::Make(sequence);
+  auto info = SequenceInfo::Make(sequence);
   if (composition->staticContent()) {
-    SequenceImageProxy proxy(factory, 0);
+    SequenceImageProxy proxy(info, 0);
     prepareAssetImage(composition->uniqueID, &proxy);
     return;
   }
@@ -102,7 +102,7 @@ void RenderCache::preparePreComposeLayer(PreComposeLayer* layer) {
   if (result != sequenceCaches.end()) {
     return;
   }
-  auto queue = makeSequenceImageQueue(factory);
+  auto queue = makeSequenceImageQueue(info);
   queue->prepareNextImage();
 }
 
@@ -485,16 +485,15 @@ void RenderCache::clearExpiredDecodedImages() {
 
 //===================================== sequence caches =====================================
 
-void RenderCache::prepareSequenceImage(std::shared_ptr<SequenceReaderFactory> sequence,
-                                       Frame targetFrame) {
+void RenderCache::prepareSequenceImage(std::shared_ptr<SequenceInfo> sequence, Frame targetFrame) {
   auto queue = getSequenceImageQueue(sequence, targetFrame);
   if (queue != nullptr) {
     queue->prepare(targetFrame);
   }
 }
 
-std::shared_ptr<tgfx::Image> RenderCache::getSequenceImage(
-    std::shared_ptr<SequenceReaderFactory> sequence, Frame targetFrame) {
+std::shared_ptr<tgfx::Image> RenderCache::getSequenceImage(std::shared_ptr<SequenceInfo> sequence,
+                                                           Frame targetFrame) {
   auto queue = getSequenceImageQueue(sequence, targetFrame);
   if (queue == nullptr) {
     return nullptr;
@@ -503,8 +502,8 @@ std::shared_ptr<tgfx::Image> RenderCache::getSequenceImage(
   return queue->getImage(targetFrame);
 }
 
-SequenceImageQueue* RenderCache::getSequenceImageQueue(
-    std::shared_ptr<SequenceReaderFactory> sequence, Frame targetFrame) {
+SequenceImageQueue* RenderCache::getSequenceImageQueue(std::shared_ptr<SequenceInfo> sequence,
+                                                       Frame targetFrame) {
   if (sequence == nullptr) {
     return nullptr;
   }
@@ -530,7 +529,7 @@ SequenceImageQueue* RenderCache::getSequenceImageQueue(
 }
 
 SequenceImageQueue* RenderCache::findNearestSequenceImageQueue(
-    std::shared_ptr<SequenceReaderFactory> sequence, Frame targetFrame) {
+    std::shared_ptr<SequenceInfo> sequence, Frame targetFrame) {
   auto assetID = sequence->uniqueID();
   auto result = sequenceCaches.find(assetID);
   if (result == sequenceCaches.end()) {
@@ -573,8 +572,7 @@ SequenceImageQueue* RenderCache::findNearestSequenceImageQueue(
   return queue;
 }
 
-SequenceImageQueue* RenderCache::makeSequenceImageQueue(
-    std::shared_ptr<SequenceReaderFactory> sequence) {
+SequenceImageQueue* RenderCache::makeSequenceImageQueue(std::shared_ptr<SequenceInfo> sequence) {
   if (!_videoEnabled && sequence->isVideo()) {
     return nullptr;
   }

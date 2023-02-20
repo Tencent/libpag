@@ -23,7 +23,7 @@
 #include "rendering/graphics/Picture.h"
 #include "rendering/graphics/Recorder.h"
 #include "rendering/sequences/SequenceImageProxy.h"
-#include "rendering/sequences/SequenceReaderFactory.h"
+#include "rendering/sequences/SequenceInfo.h"
 
 namespace pag {
 std::shared_ptr<Graphic> RenderVectorComposition(VectorComposition* composition,
@@ -61,8 +61,8 @@ std::shared_ptr<Graphic> RenderSequenceComposition(Composition* composition,
     return nullptr;
   }
   auto sequenceFrame = sequence->toSequenceFrame(compositionFrame);
-  auto factory = SequenceReaderFactory::Make(sequence);
-  auto proxy = std::make_shared<SequenceImageProxy>(factory, sequenceFrame);
+  auto info = SequenceInfo::Make(sequence);
+  auto proxy = std::make_shared<SequenceImageProxy>(info, sequenceFrame);
   auto graphic = Picture::MakeFrom(sequence->composition->uniqueID, std::move(proxy));
   auto scaleX = static_cast<float>(composition->width) / static_cast<float>(sequence->width);
   auto scaleY = static_cast<float>(composition->height) / static_cast<float>(sequence->height);

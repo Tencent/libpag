@@ -20,7 +20,7 @@
 
 namespace pag {
 std::unique_ptr<SequenceImageQueue> SequenceImageQueue::MakeFrom(
-    std::shared_ptr<SequenceReaderFactory> sequence, PAGLayer* pagLayer) {
+    std::shared_ptr<SequenceInfo> sequence, PAGLayer* pagLayer) {
   if (sequence == nullptr || pagLayer == nullptr || sequence->staticContent()) {
     return nullptr;
   }
@@ -33,7 +33,7 @@ std::unique_ptr<SequenceImageQueue> SequenceImageQueue::MakeFrom(
       new SequenceImageQueue(sequence, std::move(reader), firstFrame));
 }
 
-SequenceImageQueue::SequenceImageQueue(std::shared_ptr<SequenceReaderFactory> sequence,
+SequenceImageQueue::SequenceImageQueue(std::shared_ptr<SequenceInfo> sequence,
                                        std::shared_ptr<SequenceReader> reader, Frame firstFrame)
     : sequence(sequence), reader(std::move(reader)), firstFrame(firstFrame),
       totalFrames(sequence->duration()) {
@@ -51,7 +51,7 @@ void SequenceImageQueue::prepare(Frame targetFrame) {
   if (preparedImage != nullptr || targetFrame < 0 || targetFrame >= totalFrames) {
     return;
   }
-  auto image = SequenceImage::MakeFrom(reader, sequence, targetFrame);
+  auto image = sequence->makeImage(reader, targetFrame);
   preparedImage = image->makeDecoded();
   preparedFrame = targetFrame;
 }
@@ -66,7 +66,7 @@ std::shared_ptr<tgfx::Image> SequenceImageQueue::getImage(Frame targetFrame) {
     currentFrame = preparedFrame;
     return currentImage;
   }
-  auto image = SequenceImage::MakeFrom(reader, sequence, targetFrame);
+  auto image = sequence->makeImage(reader, targetFrame);
   if (image == nullptr) {
     return nullptr;
   }
