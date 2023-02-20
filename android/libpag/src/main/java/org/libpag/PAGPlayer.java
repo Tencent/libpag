@@ -231,7 +231,6 @@ public class PAGPlayer {
     private static native final void nativeInit();
 
     static {
-        LibraryLoadUtils.loadLibrary("ffavc");
         LibraryLoadUtils.loadLibrary("pag");
         nativeInit();
     }

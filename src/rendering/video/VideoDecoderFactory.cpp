@@ -23,6 +23,10 @@
 #include "base/utils/USE.h"
 #include "pag/pag.h"
 
+#ifdef PAG_USE_FFAVC
+#include "ffavc.h"
+#endif
+
 namespace pag {
 static std::mutex factoryLocker = {};
 static SoftwareDecoderFactory* softwareDecoderFactory = {nullptr};
@@ -38,6 +42,15 @@ void PAGVideoDecoder::SetMaxHardwareDecoderCount(int count) {
   maxHardwareDecoderCount = count;
 }
 
+static SoftwareDecoderFactory* GetFFAVCDecoderFactory() {
+#ifdef PAG_USE_FFAVC
+  static SoftwareDecoderFactory* ffavcDecoderFactory =
+      static_cast<SoftwareDecoderFactory*>(ffavc::DecoderFactory::GetHandle());
+  return ffavcDecoderFactory;
+#endif
+  return nullptr;
+}
+
 class ExternalDecoderFactory : public VideoDecoderFactory {
  public:
   bool isHardwareBacked() const override {
@@ -48,8 +61,12 @@ class ExternalDecoderFactory : public VideoDecoderFactory {
   std::unique_ptr<VideoDecoder> onCreateDecoder(const VideoFormat& format) const override {
     std::lock_guard<std::mutex> autoLock(factoryLocker);
     if (softwareDecoderFactory == nullptr) {
-      return nullptr;
+      softwareDecoderFactory = GetFFAVCDecoderFactory();
+      if (softwareDecoderFactory == nullptr) {
+        return nullptr;
+      }
     }
+
     return SoftwareDecoderWrapper::Wrap(softwareDecoderFactory->createSoftwareDecoder(), format);
   }
 };
@@ -88,6 +105,9 @@ const VideoDecoderFactory* VideoDecoderFactory::SoftwareAVCDecoderFactory() {
 
 bool VideoDecoderFactory::HasExternalSoftwareDecoder() {
   std::lock_guard<std::mutex> autoLock(factoryLocker);
+  if (softwareDecoderFactory == nullptr) {
+    softwareDecoderFactory = GetFFAVCDecoderFactory();
+  }
   return softwareDecoderFactory != nullptr;
 }
 
