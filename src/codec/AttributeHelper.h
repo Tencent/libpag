@@ -227,7 +227,7 @@ Property<T>* ReadProperty(DecodeStream* stream, const AttributeConfig<T>& config
     if (flag.animatable) {
       auto keyframes = ReadKeyframes(stream, config, flag);
       if (keyframes.empty()) {
-        Throw(stream->context, "Wrong number of keyframes.");
+        PAGThrowError(stream->context, "Wrong number of keyframes.");
         return property;
       }
       ReadTimeAndValue(stream, keyframes, config);

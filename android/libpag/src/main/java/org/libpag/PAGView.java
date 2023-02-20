@@ -63,7 +63,12 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         g_HandlerThreadCount++;
         if (g_PAGViewThread == null) {
             g_PAGViewThread = new HandlerThread("pag-renderer");
-            g_PAGViewThread.start();
+            try {
+                g_PAGViewThread.start();
+            } catch (Exception | Error e) {
+                e.printStackTrace();
+                g_PAGViewThread = null;
+            }
         }
         if (g_PAGViewHandler == null) {
             g_PAGViewHandler = new PAGViewHandler(g_PAGViewThread.getLooper());

@@ -20,10 +20,20 @@
 
 #include "SamplerState.h"
 #include "gpu/FragmentProcessor.h"
+#include "gpu/TextureProxy.h"
 
 namespace tgfx {
 class TextureEffect : public FragmentProcessor {
  public:
+  static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<TextureProxy> textureProxy,
+                                                 const SamplingOptions& sampling,
+                                                 const Matrix* localMatrix = nullptr);
+
+  static std::unique_ptr<FragmentProcessor> MakeRGBAAA(std::shared_ptr<TextureProxy> textureProxy,
+                                                       const SamplingOptions& sampling,
+                                                       const Point& alphaStart,
+                                                       const Matrix* localMatrix = nullptr);
+
   static std::unique_ptr<FragmentProcessor> Make(std::shared_ptr<Texture> texture,
                                                  const SamplingOptions& sampling,
                                                  const Matrix* localMatrix = nullptr);
@@ -62,6 +72,6 @@ class TextureEffect : public FragmentProcessor {
   Point alphaStart = Point::Zero();
   CoordTransform coordTransform;
 
-  friend class GLRGBAAATextureEffect;
+  friend class GLTextureEffect;
 };
 }  // namespace tgfx

@@ -41,7 +41,7 @@ class SoftwareDecoderWrapper : public VideoDecoder {
 
   void onFlush() override;
 
-  std::shared_ptr<VideoBuffer> onRenderFrame() override;
+  std::shared_ptr<tgfx::ImageBuffer> onRenderFrame() override;
 
   int64_t presentationTime() override;
 

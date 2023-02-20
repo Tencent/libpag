@@ -236,7 +236,7 @@ PAG_API jlong Java_org_libpag_PAGComposition_audioStartTime(JNIEnv* env, jobject
 }
 
 PAG_API jobjectArray Java_org_libpag_PAGComposition_audioMarkers(JNIEnv* env, jobject thiz) {
-  static Global<jclass> PAGMarker_Class(env, env->FindClass("org/libpag/PAGMarker"));
+  static Global<jclass> PAGMarker_Class = env->FindClass("org/libpag/PAGMarker");
   auto composition = GetPAGComposition(env, thiz);
   if (composition == nullptr || composition->audioMarkers().empty()) {
     return env->NewObjectArray(0, PAGMarker_Class.get(), nullptr);
@@ -244,8 +244,8 @@ PAG_API jobjectArray Java_org_libpag_PAGComposition_audioMarkers(JNIEnv* env, jo
   int markerSize = composition->audioMarkers().size();
   jobjectArray markerArray = env->NewObjectArray(markerSize, PAGMarker_Class.get(), nullptr);
   for (int i = 0; i < markerSize; ++i) {
-    Local<jobject> jMarker = {env, ToPAGMarkerObject(env, composition->audioMarkers()[i])};
-    env->SetObjectArrayElement(markerArray, i, jMarker.get());
+    auto jMarker = ToPAGMarkerObject(env, composition->audioMarkers()[i]);
+    env->SetObjectArrayElement(markerArray, i, jMarker);
   }
   return markerArray;
 }

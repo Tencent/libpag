@@ -26,10 +26,10 @@ class GLGpu : public Gpu {
  public:
   static std::unique_ptr<Gpu> Make(Context* context);
 
-  std::unique_ptr<TextureSampler> createTexture(int width, int height, PixelFormat format,
+  std::unique_ptr<TextureSampler> createSampler(int width, int height, PixelFormat format,
                                                 int mipLevelCount) override;
 
-  void deleteTexture(TextureSampler* sampler) override;
+  void deleteSampler(TextureSampler* sampler) override;
 
   void writePixels(const TextureSampler* sampler, Rect rect, const void* pixels, size_t rowBytes,
                    PixelFormat pixelFormat) override;

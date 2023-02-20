@@ -20,12 +20,9 @@
 #include "rendering/video/VideoDecoder.h"
 
 namespace pag {
-bool Platform::hasHardwareDecoder() const {
-  return false;
-}
-
-std::unique_ptr<VideoDecoder> Platform::makeHardwareDecoder(const VideoFormat&) const {
-  return nullptr;
+std::vector<const VideoDecoderFactory*> Platform::getVideoDecoderFactories() const {
+  return {VideoDecoderFactory::ExternalDecoderFactory(),
+          VideoDecoderFactory::SoftwareAVCDecoderFactory()};
 }
 
 bool Platform::registerFallbackFonts() const {

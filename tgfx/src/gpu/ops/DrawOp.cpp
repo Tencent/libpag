@@ -21,6 +21,27 @@
 #include "gpu/Gpu.h"
 
 namespace tgfx {
+void DrawOp::visitProxies(const std::function<void(TextureProxy*)>& func) const {
+  auto f = [&](const std::unique_ptr<FragmentProcessor>& fp) { fp->visitProxies(func); };
+  std::for_each(_colors.begin(), _colors.end(), f);
+  std::for_each(_masks.begin(), _masks.end(), f);
+}
+
+void DrawOp::prepare(Gpu* gpu) {
+  auto f = [&](std::unique_ptr<FragmentProcessor>& fp) {
+    if (auto p = fp->instantiate()) {
+      fp = std::move(p);
+    }
+  };
+  std::for_each(_colors.begin(), _colors.end(), f);
+  std::for_each(_masks.begin(), _masks.end(), f);
+  onPrepare(gpu);
+}
+
+void DrawOp::execute(OpsRenderPass* opsRenderPass) {
+  onExecute(opsRenderPass);
+}
+
 static std::shared_ptr<Texture> CreateDstTexture(OpsRenderPass* opsRenderPass, Rect dstRect,
                                                  Point* dstOffset) {
   if (opsRenderPass->context()->caps()->textureBarrierSupport &&

@@ -21,7 +21,13 @@
 
 namespace tgfx {
 AsyncSource::AsyncSource(std::shared_ptr<EncodedSource> source) : encodedSource(std::move(source)) {
-  imageBuffer = encodedSource->makeAsyncBuffer();
+  auto generator = encodedSource->generator;
+  auto tryHardware = !encodedSource->mipMapped;
+  if (generator->asyncSupport()) {
+    imageBuffer = generator->makeBuffer(tryHardware);
+  } else {
+    imageTask = ImageGeneratorTask::MakeFrom(generator, tryHardware);
+  }
 }
 
 const Cacheable* AsyncSource::getCacheOwner() const {
@@ -29,10 +35,14 @@ const Cacheable* AsyncSource::getCacheOwner() const {
 }
 
 std::shared_ptr<ImageSource> AsyncSource::onMakeMipMapped() const {
-  return std::shared_ptr<BufferSource>(new BufferSource(imageBuffer, true));
+  return encodedSource->onMakeMipMapped();
 }
 
 std::shared_ptr<TextureProxy> AsyncSource::onMakeTextureProxy(Context* context) const {
-  return context->proxyProvider()->createTextureProxy(imageBuffer, encodedSource->hasMipmaps());
+  auto provider = context->proxyProvider();
+  if (imageBuffer) {
+    return provider->createTextureProxy(imageBuffer, encodedSource->mipMapped);
+  }
+  return provider->createTextureProxy(imageTask, encodedSource->mipMapped);
 }
 }  // namespace tgfx

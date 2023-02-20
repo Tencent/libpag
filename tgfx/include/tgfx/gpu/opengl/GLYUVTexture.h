@@ -40,7 +40,7 @@ class GLYUVTexture : public YUVTexture {
  protected:
   std::vector<GLSampler> samplers = {};
 
-  GLYUVTexture(YUVColorSpace colorSpace, YUVColorRange colorRange, int width, int height);
+  GLYUVTexture(int width, int height, YUVColorSpace colorSpace, YUVColorRange colorRange);
 
  private:
   void onReleaseGPU() override;

@@ -17,10 +17,70 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TiledTextureEffect.h"
+#include "TextureEffect.h"
+#include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
-#include "opengl/GLTextureEffect.h"
+#include "opengl/GLTiledTextureEffect.h"
 
 namespace tgfx {
+class TiledTextureEffectProxy : public FragmentProcessorProxy {
+ public:
+  TiledTextureEffectProxy(std::shared_ptr<TextureProxy> textureProxy, TileMode tileModeX,
+                          TileMode tileModeY, const SamplingOptions& sampling,
+                          const Matrix* localMatrix)
+      : FragmentProcessorProxy(ClassID()),
+        textureProxy(std::move(textureProxy)),
+        tileModeX(tileModeX),
+        tileModeY(tileModeY),
+        sampling(sampling),
+        localMatrix(localMatrix ? *localMatrix : Matrix::I()) {
+  }
+
+  std::string name() const override {
+    return "TiledTextureEffectProxy";
+  }
+
+  std::unique_ptr<FragmentProcessor> instantiate() override {
+    auto texture = textureProxy->getTexture();
+    DEBUG_ASSERT(texture != nullptr);
+    if ((tileModeX != TileMode::Clamp || tileModeY != TileMode::Clamp) && !texture->isYUV()) {
+      return TiledTextureEffect::Make(std::move(texture),
+                                      SamplerState(tileModeX, tileModeY, sampling), &localMatrix);
+    }
+    return TextureEffect::Make(std::move(texture), sampling, &localMatrix);
+  }
+
+  void onVisitProxies(const std::function<void(TextureProxy*)>& func) const override {
+    func(textureProxy.get());
+  }
+
+  bool onIsEqual(const FragmentProcessor& fp) const override {
+    const auto& that = static_cast<const TiledTextureEffectProxy&>(fp);
+    return textureProxy == that.textureProxy && tileModeX == that.tileModeX &&
+           tileModeY == that.tileModeY && sampling.filterMode == that.sampling.filterMode &&
+           sampling.mipMapMode == that.sampling.mipMapMode && localMatrix == that.localMatrix;
+  }
+
+ private:
+  DEFINE_PROCESSOR_CLASS_ID
+
+  std::shared_ptr<TextureProxy> textureProxy;
+  TileMode tileModeX;
+  TileMode tileModeY;
+  SamplingOptions sampling;
+  Matrix localMatrix;
+};
+
+std::unique_ptr<FragmentProcessor> TiledTextureEffect::Make(
+    std::shared_ptr<TextureProxy> textureProxy, TileMode tileModeX, TileMode tileModeY,
+    const SamplingOptions& sampling, const Matrix* localMatrix) {
+  if (textureProxy == nullptr) {
+    return nullptr;
+  }
+  return std::make_unique<TiledTextureEffectProxy>(std::move(textureProxy), tileModeX, tileModeY,
+                                                   sampling, localMatrix);
+}
+
 using Wrap = SamplerState::WrapMode;
 
 struct TiledTextureEffect::Sampling {
@@ -131,17 +191,7 @@ std::unique_ptr<FragmentProcessor> TiledTextureEffect::Make(std::shared_ptr<Text
   if (texture == nullptr) {
     return nullptr;
   }
-  // normalize
-  auto scale = texture->getTextureCoord(1, 1) - texture->getTextureCoord(0, 0);
-  auto translate = texture->getTextureCoord(0, 0);
   auto matrix = localMatrix ? *localMatrix : Matrix::I();
-  matrix.postScale(scale.x, scale.y);
-  matrix.postTranslate(translate.x, translate.y);
-  if (texture->origin() == ImageOrigin::BottomLeft) {
-    matrix.postScale(1, -1);
-    translate = texture->getTextureCoord(0, static_cast<float>(texture->height()));
-    matrix.postTranslate(translate.x, translate.y);
-  }
   auto subset = Rect::MakeWH(texture->width(), texture->height());
   Sampling sampling(texture.get(), samplerState, subset, texture->getContext()->caps());
   return std::unique_ptr<TiledTextureEffect>(
@@ -157,7 +207,7 @@ TiledTextureEffect::TiledTextureEffect(std::shared_ptr<Texture> texture, const S
       clamp(sampling.shaderClamp),
       shaderModeX(sampling.shaderModeX),
       shaderModeY(sampling.shaderModeY),
-      coordTransform(localMatrix) {
+      coordTransform(localMatrix, this->texture.get()) {
   setTextureSamplerCnt(1);
   addCoordTransform(&coordTransform);
 }
@@ -176,6 +226,6 @@ bool TiledTextureEffect::onIsEqual(const FragmentProcessor& processor) const {
 }
 
 std::unique_ptr<GLFragmentProcessor> TiledTextureEffect::onCreateGLInstance() const {
-  return std::make_unique<GLTextureEffect>();
+  return std::make_unique<GLTiledTextureEffect>();
 }
 }  // namespace tgfx

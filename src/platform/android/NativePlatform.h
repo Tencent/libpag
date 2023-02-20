@@ -24,13 +24,9 @@
 namespace pag {
 class NativePlatform : public Platform {
  public:
-  static void InitJNI(JNIEnv* env);
+  static void InitJNI();
 
-  bool hasHardwareDecoder() const override {
-    return true;
-  }
-
-  std::unique_ptr<VideoDecoder> makeHardwareDecoder(const VideoFormat& format) const override;
+  std::vector<const VideoDecoderFactory*> getVideoDecoderFactories() const override;
 
   bool registerFallbackFonts() const override;
 

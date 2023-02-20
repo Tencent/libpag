@@ -172,29 +172,29 @@ std::shared_ptr<File> Codec::VerifyAndMake(const std::vector<pag::Composition*>&
 DecodeStream ReadBodyBytes(DecodeStream* stream) {
   DecodeStream emptyStream(stream->context);
   if (stream->length() < 11) {
-    Throw(stream->context, "Length of PAG file is too short.");
+    PAGThrowError(stream->context, "Length of PAG file is too short.");
     return emptyStream;
   }
   auto P = stream->readInt8();
   auto A = stream->readInt8();
   auto G = stream->readInt8();
   if (P != 'P' || A != 'A' || G != 'G') {
-    Throw(stream->context, "Invalid PAG file header.");
+    PAGThrowError(stream->context, "Invalid PAG file header.");
     return emptyStream;
   }
   auto version = stream->readUint8();
   if (version == EncryptedVersion) {
-    Throw(stream->context, "Encrypted PAG file");
+    PAGThrowError(stream->context, "Encrypted PAG file");
     return emptyStream;
   }
   if (version > KnownVersion) {
-    Throw(stream->context, "Invalid PAG file header.");
+    PAGThrowError(stream->context, "Invalid PAG file header.");
     return emptyStream;
   }
   auto bodyLength = stream->readUint32();
   auto compression = stream->readInt8();
   if (compression != CompressionAlgorithm::UNCOMPRESSED) {
-    Throw(stream->context, "Invalid PAG file header.");
+    PAGThrowError(stream->context, "Invalid PAG file header.");
     return emptyStream;
   }
   bodyLength = std::min(bodyLength, stream->bytesAvailable());

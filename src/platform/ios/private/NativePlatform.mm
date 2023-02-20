@@ -17,27 +17,43 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "NativePlatform.h"
-#include "GPUDecoder.h"
+#include "HardwareDecoder.h"
 #include "base/utils/USE.h"
 
 namespace pag {
+
+class HardwareDecoderFactory : public VideoDecoderFactory {
+ public:
+  bool isHardwareBacked() const override {
+    return true;
+  }
+
+ protected:
+  std::unique_ptr<VideoDecoder> onCreateDecoder(const VideoFormat& format) const override {
+#if !TARGET_IPHONE_SIMULATOR
+    auto decoder = new HardwareDecoder(format);
+    if (!decoder->isInitialized) {
+      delete decoder;
+      return nullptr;
+    }
+    return std::unique_ptr<VideoDecoder>(decoder);
+#else
+    USE(format);
+    return nullptr;
+#endif
+  }
+};
+
+static HardwareDecoderFactory hardwareDecoderFactory = {};
+
 const Platform* Platform::Current() {
   static const NativePlatform platform = {};
   return &platform;
 }
 
-std::unique_ptr<VideoDecoder> NativePlatform::makeHardwareDecoder(const VideoFormat& format) const {
-#if !TARGET_IPHONE_SIMULATOR
-  auto decoder = new GPUDecoder(format);
-  if (!decoder->isInitialized) {
-    delete decoder;
-    return nullptr;
-  }
-  return std::unique_ptr<VideoDecoder>(decoder);
-#else
-  USE(format);
-  return nullptr;
-#endif
+std::vector<const VideoDecoderFactory*> NativePlatform::getVideoDecoderFactories() const {
+  return {&hardwareDecoderFactory, VideoDecoderFactory::ExternalDecoderFactory(),
+          VideoDecoderFactory::SoftwareAVCDecoderFactory()};
 }
 
-}
+}  // namespace pag

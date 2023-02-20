@@ -73,8 +73,8 @@ std::shared_ptr<EAGLNV12Texture> EAGLNV12Texture::MakeFrom(Context* context,
 
 EAGLNV12Texture::EAGLNV12Texture(CVPixelBufferRef pixelBuffer, YUVColorSpace colorSpace,
                                  YUVColorRange colorRange)
-    : GLYUVTexture(colorSpace, colorRange, static_cast<int>(CVPixelBufferGetWidth(pixelBuffer)),
-                   static_cast<int>(CVPixelBufferGetHeight(pixelBuffer))),
+    : GLYUVTexture(static_cast<int>(CVPixelBufferGetWidth(pixelBuffer)),
+                   static_cast<int>(CVPixelBufferGetHeight(pixelBuffer)), colorSpace, colorRange),
       pixelBuffer(pixelBuffer) {
   CFRetain(pixelBuffer);
 }
@@ -107,4 +107,4 @@ void EAGLNV12Texture::onReleaseGPU() {
   chromaTexture = nil;
   CVOpenGLESTextureCacheFlush(cache, 0);
 }
-}
+}  // namespace tgfx

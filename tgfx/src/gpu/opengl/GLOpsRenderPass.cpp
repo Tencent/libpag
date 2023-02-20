@@ -44,55 +44,47 @@ static AttribLayout GetAttribLayout(ShaderVar::Type type) {
   return {false, 0, 0};
 }
 
-static void ComputeRecycleKey(BytesKey* recycleKey) {
-  static const uint32_t Type = UniqueID::Next();
-  recycleKey->write(Type);
-}
+class VertexArrayObject : public Resource {
+ public:
+  static std::shared_ptr<VertexArrayObject> Make(Context* context) {
+    auto gl = GLFunctions::Get(context);
+    unsigned id = 0;
+    // Using VAO is required in the core profile.
+    gl->genVertexArrays(1, &id);
+    if (id == 0) {
+      return nullptr;
+    }
+    return Resource::Wrap(context, new VertexArrayObject(id));
+  }
 
-void GLOpsRenderPass::Vertex::computeRecycleKey(BytesKey* recycleKey) const {
-  ComputeRecycleKey(recycleKey);
-}
+  explicit VertexArrayObject(unsigned id) : id(id) {
+  }
+
+  size_t memoryUsage() const override {
+    return 0;
+  }
+
+  unsigned id = 0;
+
+ private:
+  void onReleaseGPU() override {
+    auto gl = GLFunctions::Get(context);
+    if (id > 0) {
+      gl->deleteVertexArrays(1, &id);
+      id = 0;
+    }
+  }
+};
 
 std::unique_ptr<GLOpsRenderPass> GLOpsRenderPass::Make(Context* context) {
-  BytesKey recycleKey = {};
-  ComputeRecycleKey(&recycleKey);
-  auto vertex = std::static_pointer_cast<GLOpsRenderPass::Vertex>(
-      context->resourceCache()->getRecycled(recycleKey));
-  if (vertex == nullptr) {
-    vertex = Resource::Wrap(context, new GLOpsRenderPass::Vertex());
-    if (!vertex->init(context)) {
+  std::shared_ptr<VertexArrayObject> vertexArrayObject;
+  if (GLCaps::Get(context)->vertexArrayObjectSupport) {
+    vertexArrayObject = VertexArrayObject::Make(context);
+    if (vertexArrayObject == nullptr) {
       return nullptr;
     }
   }
-  return std::unique_ptr<GLOpsRenderPass>(new GLOpsRenderPass(context, vertex));
-}
-
-bool GLOpsRenderPass::Vertex::init(Context* context) {
-  CheckGLError(context);
-  auto gl = GLFunctions::Get(context);
-  auto caps = GLCaps::Get(context);
-  if (caps->vertexArrayObjectSupport) {
-    // Using VAO is required in the core profile.
-    gl->genVertexArrays(1, &array);
-  }
-  gl->genBuffers(1, &buffer);
-  return CheckGLError(context);
-}
-
-size_t GLOpsRenderPass::Vertex::memoryUsage() const {
-  return 0;
-}
-
-void GLOpsRenderPass::Vertex::onReleaseGPU() {
-  auto gl = GLFunctions::Get(context);
-  if (array > 0) {
-    gl->deleteVertexArrays(1, &array);
-    array = 0;
-  }
-  if (buffer > 0) {
-    gl->deleteBuffers(1, &buffer);
-    buffer = 0;
-  }
+  return std::unique_ptr<GLOpsRenderPass>(new GLOpsRenderPass(context, vertexArrayObject));
 }
 
 static void UpdateScissor(Context* context, const Rect& scissorRect) {
@@ -139,23 +131,21 @@ void GLOpsRenderPass::set(std::shared_ptr<RenderTarget> renderTarget,
 }
 
 void GLOpsRenderPass::reset() {
-  program = nullptr;
-  _vertices = {};
-  _indexBuffer = nullptr;
   _renderTarget = nullptr;
   _renderTargetTexture = nullptr;
-  _vertexBuffer = nullptr;
 }
 
-void GLOpsRenderPass::bindPipelineAndScissorClip(const ProgramInfo& info, const Rect& drawBounds) {
+bool GLOpsRenderPass::onBindPipelineAndScissorClip(const ProgramInfo& info,
+                                                   const Rect& drawBounds) {
   GLProgramCreator creator(info.geometryProcessor.get(), info.pipeline.get());
-  program = static_cast<GLProgram*>(_context->programCache()->getProgram(&creator));
-  if (program == nullptr) {
-    return;
+  _program = static_cast<GLProgram*>(_context->programCache()->getProgram(&creator));
+  if (_program == nullptr) {
+    return false;
   }
   auto gl = GLFunctions::Get(_context);
   CheckGLError(_context);
   auto glRT = static_cast<GLRenderTarget*>(_renderTarget.get());
+  auto* program = static_cast<GLProgram*>(_program);
   gl->useProgram(program->programID());
   gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->glFrameBuffer().id);
   gl->viewport(0, 0, glRT->width(), glRT->height());
@@ -165,24 +155,18 @@ void GLOpsRenderPass::bindPipelineAndScissorClip(const ProgramInfo& info, const 
     gl->textureBarrier();
   }
   program->updateUniformsAndTextureBindings(glRT, *info.geometryProcessor, *info.pipeline);
+  return true;
 }
 
-void GLOpsRenderPass::bindVertexBuffer(std::shared_ptr<GpuBuffer> vertexBuffer) {
-  _vertexBuffer = std::static_pointer_cast<GLBuffer>(vertexBuffer);
-  _vertices = {};
-  _indexBuffer = nullptr;
-}
-
-void GLOpsRenderPass::bindVerticesAndIndices(std::vector<float> vertices,
-                                             std::shared_ptr<GpuBuffer> indices) {
-  _vertices = std::move(vertices);
-  _indexBuffer = std::static_pointer_cast<GLBuffer>(indices);
-  _vertexBuffer = nullptr;
+void GLOpsRenderPass::onBindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
+                                    std::shared_ptr<GpuBuffer> vertexBuffer) {
+  _indexBuffer = std::move(indexBuffer);
+  _vertexBuffer = std::move(vertexBuffer);
 }
 
 static const unsigned gPrimitiveType[] = {GL_TRIANGLES, GL_TRIANGLE_STRIP};
 
-void GLOpsRenderPass::draw(PrimitiveType primitiveType, int baseVertex, int vertexCount) {
+void GLOpsRenderPass::onDraw(PrimitiveType primitiveType, int baseVertex, int vertexCount) {
   auto func = [&]() {
     auto gl = GLFunctions::Get(_context);
     gl->drawArrays(gPrimitiveType[static_cast<int>(primitiveType)], baseVertex, vertexCount);
@@ -190,10 +174,11 @@ void GLOpsRenderPass::draw(PrimitiveType primitiveType, int baseVertex, int vert
   draw(func);
 }
 
-void GLOpsRenderPass::drawIndexed(PrimitiveType primitiveType, int baseIndex, int indexCount) {
+void GLOpsRenderPass::onDrawIndexed(PrimitiveType primitiveType, int baseIndex, int indexCount) {
   auto func = [&]() {
     auto gl = GLFunctions::Get(_context);
-    gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, _indexBuffer->bufferID());
+    gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER,
+                   std::static_pointer_cast<GLBuffer>(_indexBuffer)->bufferID());
     gl->drawElements(gPrimitiveType[static_cast<int>(primitiveType)], indexCount, GL_UNSIGNED_SHORT,
                      reinterpret_cast<void*>(baseIndex * sizeof(uint16_t)));
     gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
@@ -203,26 +188,11 @@ void GLOpsRenderPass::drawIndexed(PrimitiveType primitiveType, int baseIndex, in
 
 void GLOpsRenderPass::draw(const std::function<void()>& func) {
   auto gl = GLFunctions::Get(_context);
-  if (vertex->array > 0) {
-    gl->bindVertexArray(vertex->array);
+  if (vertexArrayObject) {
+    gl->bindVertexArray(vertexArrayObject->id);
   }
-  auto resetVertexObject = [&]() {
-    if (vertex->array > 0) {
-      gl->bindVertexArray(0);
-    }
-    gl->bindBuffer(GL_ARRAY_BUFFER, 0);
-  };
-  if (_vertexBuffer) {
-    gl->bindBuffer(GL_ARRAY_BUFFER, _vertexBuffer->bufferID());
-  } else {
-    gl->bindBuffer(GL_ARRAY_BUFFER, vertex->buffer);
-    gl->bufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(_vertices.size()) * sizeof(float),
-                   &_vertices[0], GL_STATIC_DRAW);
-    if (!CheckGLError(_context)) {
-      resetVertexObject();
-      return;
-    }
-  }
+  gl->bindBuffer(GL_ARRAY_BUFFER, std::static_pointer_cast<GLBuffer>(_vertexBuffer)->bufferID());
+  auto* program = static_cast<GLProgram*>(_program);
   for (const auto& attribute : program->vertexAttributes()) {
     const AttribLayout& layout = GetAttribLayout(attribute.gpuType);
     gl->vertexAttribPointer(static_cast<unsigned>(attribute.location), layout.count, layout.type,
@@ -231,11 +201,14 @@ void GLOpsRenderPass::draw(const std::function<void()>& func) {
     gl->enableVertexAttribArray(static_cast<unsigned>(attribute.location));
   }
   func();
-  resetVertexObject();
+  if (vertexArrayObject) {
+    gl->bindVertexArray(0);
+  }
+  gl->bindBuffer(GL_ARRAY_BUFFER, 0);
   CheckGLError(_context);
 }
 
-void GLOpsRenderPass::clear(const Rect& scissor, Color color) {
+void GLOpsRenderPass::onClear(const Rect& scissor, Color color) {
   auto gl = GLFunctions::Get(_context);
   auto glRT = static_cast<GLRenderTarget*>(_renderTarget.get());
   gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->glFrameBuffer().id);

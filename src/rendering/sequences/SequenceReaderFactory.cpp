@@ -29,12 +29,12 @@
 
 namespace pag {
 
-static tgfx::Size GetBufferSize(Sequence* sequence) {
+static tgfx::ISize GetBufferSize(Sequence* sequence) {
   if (sequence->composition->type() == CompositionType::Video) {
     auto videoSequence = static_cast<VideoSequence*>(sequence);
-    return tgfx::Size::Make(videoSequence->getVideoWidth(), videoSequence->getVideoHeight());
+    return tgfx::ISize::Make(videoSequence->getVideoWidth(), videoSequence->getVideoHeight());
   }
-  return tgfx::Size::Make(sequence->width, sequence->height);
+  return tgfx::ISize::Make(sequence->width, sequence->height);
 }
 
 std::shared_ptr<SequenceReaderFactory> SequenceReaderFactory::Make(Sequence* sequence) {
@@ -61,18 +61,8 @@ std::shared_ptr<SequenceReader> SequenceReaderFactory::makeReader(std::shared_pt
                                                     static_cast<BitmapSequence*>(sequence));
   } else {
     auto videoSequence = static_cast<VideoSequence*>(sequence);
-#ifdef PAG_BUILD_FOR_WEB
-    if (VideoDecoder::HasExternalSoftwareDecoder()) {
-      auto demuxer = std::make_unique<VideoSequenceDemuxer>(std::move(file), videoSequence);
-      reader = std::make_shared<VideoReader>(std::move(demuxer));
-    } else {
-      reader = std::make_shared<VideoSequenceReader>(std::move(file), videoSequence, pagFile);
-    }
-#else
-    USE(pagFile);
-    auto demuxer = std::make_unique<VideoSequenceDemuxer>(std::move(file), videoSequence);
+    auto demuxer = std::make_unique<VideoSequenceDemuxer>(std::move(file), videoSequence, pagFile);
     reader = std::make_shared<VideoReader>(std::move(demuxer));
-#endif
   }
   return reader;
 }

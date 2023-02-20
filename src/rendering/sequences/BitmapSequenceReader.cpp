@@ -21,8 +21,7 @@
 
 namespace pag {
 BitmapSequenceReader::BitmapSequenceReader(std::shared_ptr<File> file, BitmapSequence* sequence)
-    : SequenceReader(sequence->composition->staticContent()), file(std::move(file)),
-      sequence(sequence) {
+    : file(std::move(file)), sequence(sequence) {
   // Force allocating a raster PixelBuffer if staticContent is false, otherwise the asynchronous
   // decoding will fail due to the memory sharing mechanism.
   auto staticContent = sequence->composition->staticContent();
@@ -30,14 +29,14 @@ BitmapSequenceReader::BitmapSequenceReader(std::shared_ptr<File> file, BitmapSeq
   tgfx::Bitmap(pixelBuffer).eraseAll();
 }
 
-bool BitmapSequenceReader::decodeFrame(Frame targetFrame) {
+std::shared_ptr<tgfx::ImageBuffer> BitmapSequenceReader::onMakeBuffer(Frame targetFrame) {
   // a locker is required here because decodeFrame() could be called from multiple threads.
   std::lock_guard<std::mutex> autoLock(locker);
   if (lastDecodeFrame == targetFrame) {
-    return true;
+    return pixelBuffer;
   }
   if (pixelBuffer == nullptr) {
-    return false;
+    return nullptr;
   }
   auto startFrame = findStartFrame(targetFrame);
   lastDecodeFrame = -1;
@@ -61,25 +60,14 @@ bool BitmapSequenceReader::decodeFrame(Frame targetFrame) {
         auto result = codec->readPixels(
             bitmap.info(), reinterpret_cast<uint8_t*>(bitmap.writablePixels()) + offset);
         if (!result) {
-          return false;
+          return nullptr;
         }
         firstRead = false;
       }
     }
   }
   lastDecodeFrame = targetFrame;
-  return true;
-}
-
-std::shared_ptr<tgfx::ImageBuffer> BitmapSequenceReader::onMakeBuffer() {
   return pixelBuffer;
-}
-
-std::shared_ptr<tgfx::Texture> BitmapSequenceReader::onMakeTexture(tgfx::Context* context) {
-  if (lastDecodeFrame == -1 || pixelBuffer == nullptr) {
-    return nullptr;
-  }
-  return pixelBuffer->makeTexture(context);
 }
 
 void BitmapSequenceReader::onReportPerformance(Performance* performance, int64_t decodingTime) {

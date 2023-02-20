@@ -21,14 +21,16 @@
 #include <chrono>
 #include "base/utils/Log.h"
 #include "pag/pag.h"
-#include "platform/android/Global.h"
-#include "platform/android/JNIEnvironment.h"
 #include "platform/android/JStringUtil.h"
 #include "tgfx/core/ImageInfo.h"
+#include "tgfx/core/Rect.h"
+#include "tgfx/platform/android/Global.h"
 
-struct RectData {
-  float x, y, width, height;
-};
+namespace pag {
+template <class T>
+using Global = tgfx::Global<T>;
+
+using JNIEnvironment = tgfx::JNIEnvironment;
 
 jobject MakeRectFObject(JNIEnv* env, float x, float y, float width, float height);
 
@@ -40,7 +42,7 @@ jobject MakeByteBufferObject(JNIEnv* env, const void* bytes, size_t length);
 
 pag::Color ToColor(JNIEnv* env, jint color);
 
-RectData ToRectData(JNIEnv* env, jobject rect);
+tgfx::Rect ToRect(JNIEnv* env, jobject rect);
 
 std::unique_ptr<pag::ByteData> ReadBytesFromAssets(JNIEnv* env, jobject managerObj,
                                                    jstring pathObj);
@@ -60,3 +62,4 @@ jobject ToPAGMarkerObject(JNIEnv* env, const pag::Marker* marker);
 jobject ToPAGVideoRangeObject(JNIEnv* env, const pag::PAGVideoRange& range);
 
 tgfx::ImageInfo GetImageInfo(JNIEnv* env, jobject bitmap);
+}  // namespace pag

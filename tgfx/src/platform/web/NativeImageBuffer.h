@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -24,8 +24,6 @@
 namespace tgfx {
 class NativeImageBuffer : public ImageBuffer {
  public:
-  static std::shared_ptr<NativeImageBuffer> Make(emscripten::val source);
-
   ~NativeImageBuffer() override;
 
   int width() const override {
@@ -46,10 +44,14 @@ class NativeImageBuffer : public ImageBuffer {
  private:
   int _width = 0;
   int _height = 0;
-  emscripten::val source = emscripten::val::null();
+  emscripten::val nativeImage = emscripten::val::null();
+  bool usePromise = false;
 
-  explicit NativeImageBuffer(int width, int height, emscripten::val source)
-      : _width(width), _height(height), source(source) {
-  }
+  NativeImageBuffer(int width, int height, emscripten::val nativeImage, bool usePromise);
+
+  emscripten::val getImage() const;
+
+  friend class ImageBuffer;
+  friend class NativeCodec;
 };
 }  // namespace tgfx

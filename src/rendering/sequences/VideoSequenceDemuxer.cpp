@@ -20,11 +20,11 @@
 #include "base/utils/TimeUtil.h"
 
 namespace pag {
-VideoSequenceDemuxer::VideoSequenceDemuxer(std::shared_ptr<File> file, VideoSequence* sequence)
-    : file(std::move(file)), sequence(sequence) {
+VideoSequenceDemuxer::VideoSequenceDemuxer(std::shared_ptr<File> file, VideoSequence* sequence,
+                                           PAGFile* pagFile)
+    : file(std::move(file)), sequence(sequence), pagFile(pagFile) {
   format.width = sequence->getVideoWidth();
   format.height = sequence->getVideoHeight();
-  format.hasAlpha = sequence->alphaStartX + sequence->alphaStartY > 0;
   for (auto& header : sequence->headers) {
     auto bytes = tgfx::Data::MakeWithoutCopy(header->data(), header->length());
     format.headers.push_back(std::move(bytes));
@@ -35,6 +35,7 @@ VideoSequenceDemuxer::VideoSequenceDemuxer(std::shared_ptr<File> file, VideoSequ
   format.frameRate = sequence->frameRate;
   // The reorder size of a VideoSequence can only be one of these: 0, 1,  2.
   format.maxReorderSize = 2;
+  format.demuxer = this;
   for (auto& frame : sequence->frames) {
     if (frame->isKeyframe) {
       keyframes.push_back(frame->frame);

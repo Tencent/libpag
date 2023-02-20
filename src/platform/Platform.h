@@ -25,41 +25,34 @@
 #include <unordered_map>
 #include "codec/NALUType.h"
 #include "rendering/utils/shaper/PositionedGlyphs.h"
+#include "rendering/video/VideoDecoderFactory.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Typeface.h"
 
 namespace pag {
-struct VideoFormat;
-class VideoDecoder;
-
 /**
  * Defines methods for native platforms to implement.
  */
 class Platform {
  public:
   /**
-   * Returns the instance of current platform.
+   * Returns the instance of the current platform.
    */
   static const Platform* Current();
 
   virtual ~Platform() = default;
 
   /**
-   * Returns true if hardware video decoders are supported on current platform.
+   * Returns the VideoDecoderFactory list of the current platform. The first one has the highest
+   * priority and then fallback to other factories.
    */
-  virtual bool hasHardwareDecoder() const;
-
-  /**
-   * Creates a hardware backed VideoDecoder with the specified video format. Returns nullptr if
-   * current platform has no hardware decoder support.
-   */
-  virtual std::unique_ptr<VideoDecoder> makeHardwareDecoder(const VideoFormat& format) const;
+  virtual std::vector<const VideoDecoderFactory*> getVideoDecoderFactories() const;
 
   /**
    * Implement this method to register the default fallback font list. User should call
    * PAGFont::SetFallbackFontPaths() or PAGFont::SetFallbackFontNames() manually in host app if this
-   * method is not implemented on current platform.
+   * method is not implemented on the current platform.
    */
   virtual bool registerFallbackFonts() const;
 

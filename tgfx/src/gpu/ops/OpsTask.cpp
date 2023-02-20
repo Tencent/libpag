@@ -17,14 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OpsTask.h"
-#include "core/utils/Log.h"
 #include "gpu/Gpu.h"
+#include "gpu/OpsRenderPass.h"
 
 namespace tgfx {
-OpsTask::~OpsTask() {
-  DEBUG_ASSERT(ops.empty());
-}
-
 void OpsTask::addOp(std::unique_ptr<Op> op) {
   if (!ops.empty() && ops.back()->combineIfPossible(op.get())) {
     return;
@@ -40,6 +36,8 @@ bool OpsTask::execute(Gpu* gpu) {
   if (opsRenderPass == nullptr) {
     return false;
   }
+  std::for_each(ops.begin(), ops.end(), [gpu](auto& op) { op->prepare(gpu); });
+  opsRenderPass->begin();
   auto tempOps = std::move(ops);
   for (auto& op : tempOps) {
     op->execute(opsRenderPass);
@@ -47,7 +45,16 @@ bool OpsTask::execute(Gpu* gpu) {
   if (renderTargetTexture) {
     gpu->regenerateMipMapLevels(renderTargetTexture->getSampler());
   }
+  opsRenderPass->end();
   gpu->submit(opsRenderPass);
   return true;
+}
+
+void OpsTask::gatherProxies(std::vector<TextureProxy*>* proxies) const {
+  if (ops.empty()) {
+    return;
+  }
+  auto func = [proxies](TextureProxy* proxy) { proxies->emplace_back(proxy); };
+  std::for_each(ops.begin(), ops.end(), [&func](auto& op) { op->visitProxies(func); });
 }
 }  // namespace tgfx

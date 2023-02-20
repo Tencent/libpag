@@ -46,14 +46,6 @@ class ImageCodec : public ImageGenerator {
   static std::shared_ptr<ImageCodec> MakeFrom(std::shared_ptr<Data> imageBytes);
 
   /**
-   * Creates a new ImageCodec object from a native image. The type of nativeImage should be either
-   * a jobject that represents a java Bitmap on android platform or a CGImageRef on the apple
-   * platform. Returns nullptr if current platform has no native image support. The returned
-   * ImageCodec object takes a reference on the nativeImage.
-   */
-  static std::shared_ptr<ImageCodec> MakeFrom(void* nativeImage);
-
-  /**
    * Returns the orientation of target image.
    */
   Orientation orientation() const {
@@ -87,6 +79,19 @@ class ImageCodec : public ImageGenerator {
    */
   static std::shared_ptr<Data> Encode(const ImageInfo& info, const void* pixels,
                                       EncodedFormat format, int quality);
+
+  /**
+   * If the file path represents an encoded image that the current platform knows how to decode,
+   * returns an ImageCodec that can decode it. Otherwise returns nullptr.
+   */
+  static std::shared_ptr<ImageCodec> MakeNativeCodec(const std::string& filePath);
+
+  /**
+   * If the file bytes represents an encoded image that the current platform knows how to decode,
+   * returns an ImageCodec that can decode it. Otherwise returns nullptr.
+   */
+  static std::shared_ptr<ImageCodec> MakeNativeCodec(std::shared_ptr<Data> imageBytes);
+
 
   friend class Bitmap;
 };

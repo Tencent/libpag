@@ -38,10 +38,10 @@ class Gpu {
     return _context;
   }
 
-  virtual std::unique_ptr<TextureSampler> createTexture(int width, int height, PixelFormat format,
+  virtual std::unique_ptr<TextureSampler> createSampler(int width, int height, PixelFormat format,
                                                         int mipLevelCount) = 0;
 
-  virtual void deleteTexture(TextureSampler* sampler) = 0;
+  virtual void deleteSampler(TextureSampler* sampler) = 0;
 
   virtual void writePixels(const TextureSampler* sampler, Rect rect, const void* pixels,
                            size_t rowBytes, PixelFormat pixelFormat) = 0;

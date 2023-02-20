@@ -26,14 +26,6 @@
 #include "tgfx/core/UTF.h"
 
 namespace tgfx {
-std::shared_ptr<Typeface> MakeTypefaceFromCTFont(const void*) {
-  return nullptr;
-}
-
-const void* TypefaceGetCTFontRef(const Typeface*) {
-  return nullptr;
-}
-
 class EmptyTypeface : public Typeface {
  public:
   uint32_t uniqueID() const override {

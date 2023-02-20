@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGVideoDecoderImpl.h"
-#import <GPUDecoder.h>
+#import <HardwareDecoder.h>
 #import "pag/pag.h"
 
 @implementation PAGVideoDecoderImpl

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -17,39 +17,49 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "NativeImageBuffer.h"
-#include "gpu/opengl/GLContext.h"
 #include "tgfx/gpu/opengl/GLTexture.h"
 
 using namespace emscripten;
 
 namespace tgfx {
-std::shared_ptr<NativeImageBuffer> NativeImageBuffer::Make(val source) {
-  if (!source.as<bool>()) {
+std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(NativeImageRef nativeImage) {
+  if (!nativeImage.as<bool>()) {
     return nullptr;
   }
-  auto width = source.call<int>("width");
-  auto height = source.call<int>("height");
-  if (width <= 0 || height <= 0) {
+  auto size = val::module_property("tgfx").call<val>("getSourceSize", nativeImage);
+  auto width = size["width"].as<int>();
+  auto height = size["height"].as<int>();
+  if (width < 1 || height < 1) {
     return nullptr;
   }
   return std::shared_ptr<NativeImageBuffer>(
-      new NativeImageBuffer(width, height, std::move(source)));
+      new NativeImageBuffer(width, height, std::move(nativeImage), false));
 }
 
-std::shared_ptr<Texture> NativeImageBuffer::onMakeTexture(Context* context,
-                                                          bool /*mipMapped*/) const {
-  // TODO: implements mipMapped.
-  auto texture = Texture::MakeRGBA(context, width(), height(), nullptr, 0);
+std::shared_ptr<Texture> NativeImageBuffer::onMakeTexture(Context* context, bool) const {
+  auto texture = Texture::MakeRGBA(context, width(), height(), nullptr, 0, ImageOrigin::TopLeft);
   if (texture == nullptr) {
     return nullptr;
   }
   auto& glInfo = std::static_pointer_cast<GLTexture>(texture)->glSampler();
-  auto gl = GLFunctions::Get(context);
-  gl->bindTexture(glInfo.target, glInfo.id);
-  source.call<void>("upload", val::module_property("GL"));
+  val::module_property("tgfx").call<void>("uploadToTexture", emscripten::val::module_property("GL"),
+                                          getImage(), glInfo.id);
   return texture;
 }
+
+NativeImageBuffer::NativeImageBuffer(int width, int height, emscripten::val nativeImage,
+                                     bool usePromise)
+    : _width(width), _height(height), nativeImage(nativeImage), usePromise(usePromise) {
+}
+
 NativeImageBuffer::~NativeImageBuffer() {
-  source.call<void>("onDestroy");
+  val::module_property("tgfx").call<void>("releaseNativeImage", nativeImage);
+}
+
+emscripten::val NativeImageBuffer::getImage() const {
+  if (usePromise) {
+    return nativeImage.await();
+  }
+  return nativeImage;
 }
 }  // namespace tgfx

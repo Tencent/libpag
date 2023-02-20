@@ -29,11 +29,11 @@ class OpsTask : public RenderTask {
       : RenderTask(std::move(renderTarget)), renderTargetTexture(std::move(texture)) {
   }
 
-  ~OpsTask() override;
-
   void addOp(std::unique_ptr<Op> op);
 
   bool execute(Gpu* gpu) override;
+
+  void gatherProxies(std::vector<TextureProxy*>* proxies) const override;
 
  private:
   std::shared_ptr<Texture> renderTargetTexture = nullptr;

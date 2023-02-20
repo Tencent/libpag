@@ -41,9 +41,6 @@ extern "C" {
 
 PAG_API void Java_org_libpag_PAGFile_nativeInit(JNIEnv* env, jclass clazz) {
   PAGFile_nativeContext = env->GetFieldID(clazz, "nativeContext", "J");
-  // 调用堆栈源头从C++触发而不是Java触发的情况下，FindClass
-  // 可能会失败，因此要提前初始化这部分反射方法。
-  NativePlatform::InitJNI(env);
 }
 
 PAG_API jint Java_org_libpag_PAGFile_MaxSupportedTagLevel(JNIEnv*, jclass) {

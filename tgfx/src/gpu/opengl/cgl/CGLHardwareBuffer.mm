@@ -17,16 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CGLHardwareTexture.h"
-#include "tgfx/gpu/YUVTexture.h"
 #include "platform/apple/HardwareBuffer.h"
+#include "tgfx/core/YUVBuffer.h"
+#include "tgfx/gpu/YUVTexture.h"
 
 namespace tgfx {
-std::shared_ptr<PixelBuffer> PixelBuffer::MakeFrom(void* hardwareBuffer) {
-  auto pixelBuffer = reinterpret_cast<CVPixelBufferRef>(hardwareBuffer);
-  if (pixelBuffer == nullptr) {
-    return nullptr;
-  }
-  return HardwareBuffer::MakeFrom(pixelBuffer);
+std::shared_ptr<PixelBuffer> PixelBuffer::MakeFrom(HardwareBufferRef hardwareBuffer) {
+  return HardwareBuffer::MakeFrom(hardwareBuffer);
 }
 
 std::shared_ptr<PixelBuffer> PixelBuffer::MakeHardwareBuffer(int width, int height,
@@ -34,15 +31,20 @@ std::shared_ptr<PixelBuffer> PixelBuffer::MakeHardwareBuffer(int width, int heig
   return HardwareBuffer::Make(width, height, alphaOnly);
 }
 
-std::shared_ptr<Texture> Texture::MakeFrom(Context* context, void* hardwareBuffer) {
-  auto pixelBuffer = reinterpret_cast<CVPixelBufferRef>(hardwareBuffer);
-  if (pixelBuffer == nullptr) {
-    return nullptr;
-  }
-  return CGLHardwareTexture::MakeFrom(context, pixelBuffer);
+std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer) {
+  return HardwareBuffer::MakeFrom(hardwareBuffer);
 }
 
-std::shared_ptr<YUVTexture> YUVTexture::MakeFrom(Context*, YUVColorSpace, YUVColorRange, void*) {
+std::shared_ptr<Texture> Texture::MakeFrom(Context* context, HardwareBufferRef hardwareBuffer) {
+  return CGLHardwareTexture::MakeFrom(context, hardwareBuffer);
+}
+
+std::shared_ptr<YUVBuffer> YUVBuffer::MakeFrom(HardwareBufferRef, YUVColorSpace, YUVColorRange) {
+  return nullptr;
+}
+
+std::shared_ptr<YUVTexture> YUVTexture::MakeFrom(Context*, HardwareBufferRef, YUVColorSpace,
+                                                 YUVColorRange) {
   return nullptr;
 }
 }  // namespace tgfx

@@ -22,14 +22,6 @@
 #include "tgfx/core/UTF.h"
 
 namespace tgfx {
-std::shared_ptr<Typeface> MakeTypefaceFromCTFont(const void* ctFont) {
-  return CGTypeface::Make(static_cast<CTFontRef>(ctFont));
-}
-
-const void* TypefaceGetCTFontRef(const Typeface* face) {
-  return face ? static_cast<const CGTypeface*>(face)->getCTFontRef() : nullptr;
-}
-
 std::string StringFromCFString(CFStringRef src) {
   static const CFIndex kCStringSize = 128;
   char temporaryCString[kCStringSize];

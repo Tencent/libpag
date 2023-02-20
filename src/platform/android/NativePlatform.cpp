@@ -21,43 +21,57 @@
 #include <sys/system_properties.h>
 #include <cstdarg>
 #include "FontConfigAndroid.h"
-#include "GPUDecoder.h"
-#include "Global.h"
-#include "JNIEnvironment.h"
+#include "HardwareDecoder.h"
 #include "JTraceImage.h"
 #include "PAGText.h"
-#include "VideoSurface.h"
 
 #define LOG_TAG "libpag"
 
 namespace pag {
+class HardwareDecoderFactory : public VideoDecoderFactory {
+ public:
+  bool isHardwareBacked() const override {
+    return true;
+  }
+
+ protected:
+  std::unique_ptr<VideoDecoder> onCreateDecoder(const VideoFormat& format) const override {
+    auto decoder = new HardwareDecoder(format);
+    if (!decoder->isValid) {
+      delete decoder;
+      return nullptr;
+    }
+    return std::unique_ptr<VideoDecoder>(decoder);
+  }
+};
+
+static HardwareDecoderFactory hardwareDecoderFactory = {};
 
 const Platform* Platform::Current() {
   static const NativePlatform platform = {};
   return &platform;
 }
 
-void NativePlatform::InitJNI(JNIEnv* env) {
+void NativePlatform::InitJNI() {
   static bool initialized = false;
   if (initialized) {
+    return;
+  }
+  JNIEnvironment environment;
+  auto env = environment.current();
+  if (env == nullptr) {
     return;
   }
   initialized = true;
   JTraceImage::InitJNI(env);
   FontConfigAndroid::InitJNI(env);
-  GPUDecoder::InitJNI(env, "org/libpag/GPUDecoder");
-  VideoSurface::InitJNI(env, "org/libpag/VideoSurface");
+  HardwareDecoder::InitJNI(env);
   InitPAGTextJNI(env);
 }
 
-std::unique_ptr<VideoDecoder> NativePlatform::makeHardwareDecoder(
-    const pag::VideoFormat& format) const {
-  auto decoder = new GPUDecoder(format);
-  if (!decoder->isValid()) {
-    delete decoder;
-    return nullptr;
-  }
-  return std::unique_ptr<VideoDecoder>(decoder);
+std::vector<const VideoDecoderFactory*> NativePlatform::getVideoDecoderFactories() const {
+  return {&hardwareDecoderFactory, VideoDecoderFactory::ExternalDecoderFactory(),
+          VideoDecoderFactory::SoftwareAVCDecoderFactory()};
 }
 
 bool NativePlatform::registerFallbackFonts() const {

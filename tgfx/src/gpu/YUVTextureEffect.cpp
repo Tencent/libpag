@@ -26,7 +26,7 @@ YUVTextureEffect::YUVTextureEffect(std::shared_ptr<YUVTexture> texture, Sampling
       texture(std::move(texture)),
       samplerState(sampling),
       alphaStart(alphaStart),
-      coordTransform(localMatrix) {
+      coordTransform(localMatrix, this->texture.get(), alphaStart) {
   setTextureSamplerCnt(this->texture->samplerCount());
   addCoordTransform(&coordTransform);
 }

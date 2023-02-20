@@ -40,15 +40,15 @@ class StreamContext {
 
 #ifdef DEBUG
 
-#define Throw(context, message)                                              \
-  do {                                                                       \
-    (context)->throwException(message);                                      \
-    LOGE("PAG Decode Failed: \"%s\" at %s:%d", message, __FILE__, __LINE__); \
+#define PAGThrowError(context, message)                                        \
+  do {                                                                         \
+    (context)->throwException(message);                                        \
+    LOGE("PAG Decoding Failed: \"%s\" at %s:%d", message, __FILE__, __LINE__); \
   } while (false)
 
 #else
 
-#define Throw(context, message)         \
+#define PAGThrowError(context, message) \
   do {                                  \
     (context)->throwException(message); \
   } while (false)

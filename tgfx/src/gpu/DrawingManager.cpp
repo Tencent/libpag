@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawingManager.h"
+#include "TextureProxy.h"
 #include "TextureResolveRenderTask.h"
+#include "core/utils/Log.h"
 #include "gpu/Gpu.h"
 
 namespace tgfx {
@@ -50,8 +52,17 @@ bool DrawingManager::flush(Semaphore* signalSemaphore) {
   auto* gpu = context->gpu();
   closeAllTasks();
   activeOpsTask = nullptr;
-  for (auto& task : tasks) {
-    task->execute(gpu);
+  std::vector<TextureProxy*> proxies;
+  std::for_each(tasks.begin(), tasks.end(),
+                [&proxies](std::shared_ptr<RenderTask>& task) { task->gatherProxies(&proxies); });
+  bool allInstantiated = std::all_of(proxies.begin(), proxies.end(), [&](TextureProxy* proxy) {
+    return proxy->isInstantiated() || proxy->instantiate();
+  });
+  if (allInstantiated) {
+    std::for_each(tasks.begin(), tasks.end(),
+                  [gpu](std::shared_ptr<RenderTask>& task) { task->execute(gpu); });
+  } else {
+    LOGE("Failed to instantiate texture from proxy.");
   }
   removeAllTasks();
   return context->caps()->semaphoreSupport && gpu->insertSemaphore(signalSemaphore);

@@ -53,6 +53,7 @@ class AsyncSource : public ImageSource {
   std::shared_ptr<TextureProxy> onMakeTextureProxy(Context* context) const override;
 
  private:
+  std::shared_ptr<ImageGeneratorTask> imageTask = nullptr;
   std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
   std::shared_ptr<EncodedSource> encodedSource = nullptr;
 

@@ -30,6 +30,8 @@
 #include "tgfx/core/BlendMode.h"
 
 namespace tgfx {
+class VertexArrayObject;
+
 class GLOpsRenderPass : public OpsRenderPass {
  public:
   static std::unique_ptr<GLOpsRenderPass> Make(Context* context);
@@ -39,46 +41,20 @@ class GLOpsRenderPass : public OpsRenderPass {
 
   void reset();
 
-  void bindPipelineAndScissorClip(const ProgramInfo& info, const Rect& drawBounds) override;
-
-  void bindVertexBuffer(std::shared_ptr<GpuBuffer> vertexBuffer) override;
-
-  void bindVerticesAndIndices(std::vector<float> vertices,
-                              std::shared_ptr<GpuBuffer> indices) override;
-
-  void draw(PrimitiveType primitiveType, int baseVertex, int vertexCount) override;
-
-  void drawIndexed(PrimitiveType primitiveType, int baseIndex, int indexCount) override;
-
-  void clear(const Rect& scissor, Color color) override;
+  bool onBindPipelineAndScissorClip(const ProgramInfo& info, const Rect& drawBounds) override;
+  void onBindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
+                     std::shared_ptr<GpuBuffer> vertexBuffer) override;
+  void onDraw(PrimitiveType primitiveType, int baseVertex, int vertexCount) override;
+  void onDrawIndexed(PrimitiveType primitiveType, int baseIndex, int indexCount) override;
+  void onClear(const Rect& scissor, Color color) override;
 
  private:
-  class Vertex : public Resource {
-   public:
-    bool init(Context* context);
-
-    size_t memoryUsage() const override;
-
-    unsigned array = 0;
-    unsigned buffer = 0;
-
-   protected:
-    void computeRecycleKey(BytesKey*) const override;
-
-   private:
-    void onReleaseGPU() override;
-  };
-
-  explicit GLOpsRenderPass(Context* context, std::shared_ptr<Vertex> vertex)
-      : OpsRenderPass(context), vertex(std::move(vertex)) {
+  GLOpsRenderPass(Context* context, std::shared_ptr<VertexArrayObject> vertexArrayObject)
+      : OpsRenderPass(context), vertexArrayObject(std::move(vertexArrayObject)) {
   }
 
   void draw(const std::function<void()>& func);
 
-  GLProgram* program = nullptr;
-  std::vector<float> _vertices;
-  std::shared_ptr<GLBuffer> _indexBuffer;
-  std::shared_ptr<GLBuffer> _vertexBuffer;
-  std::shared_ptr<Vertex> vertex;
+  std::shared_ptr<VertexArrayObject> vertexArrayObject;
 };
 }  // namespace tgfx

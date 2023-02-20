@@ -23,6 +23,9 @@
 #include "tgfx/core/YUVInfo.h"
 
 namespace pag {
+
+class VideoDemuxer;
+
 struct VideoFormat {
   std::string mimeType = "video/avc";
   std::vector<std::shared_ptr<tgfx::Data>> headers = {};
@@ -30,9 +33,10 @@ struct VideoFormat {
   tgfx::YUVColorRange colorRange = tgfx::YUVColorRange::MPEG;
   int width = 0;
   int height = 0;
-  bool hasAlpha = false;
   int64_t duration = 0;
   float frameRate = 0.0;
   int maxReorderSize = 4;
+  // used by the video decoder on the web platform.
+  VideoDemuxer* demuxer = nullptr;
 };
 }  // namespace pag

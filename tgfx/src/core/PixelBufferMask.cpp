@@ -38,7 +38,6 @@ std::shared_ptr<Texture> PixelBufferMask::updateTexture(Context* context) {
       pixels += y * buffer->width() + x;
       context->gpu()->writePixels(texture->getSampler(), dirtyRect, pixels, buffer->rowBytes(),
                                   ColorTypeToPixelFormat(buffer->info().colorType()));
-      context->gpu()->regenerateMipMapLevels(texture->getSampler());
       buffer->unlockPixels();
       dirtyRect.setEmpty();
     }

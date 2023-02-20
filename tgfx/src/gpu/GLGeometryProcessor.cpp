@@ -25,7 +25,7 @@ void GLGeometryProcessor::setTransformDataHelper(const Matrix& localMatrix,
   int i = 0;
   while (const CoordTransform* coordTransform = transformIter->next()) {
     Matrix combined = Matrix::I();
-    combined.setConcat(coordTransform->matrix, localMatrix);
+    combined.setConcat(coordTransform->getTotalMatrix(), localMatrix);
     auto& uniform = installedTransforms[i];
     if (!uniform.updated || uniform.currentMatrix != combined) {
       uniform.updated = true;

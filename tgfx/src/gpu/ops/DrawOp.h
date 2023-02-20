@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <functional>
 #include "Op.h"
 #include "gpu/AAType.h"
 #include "gpu/OpsRenderPass.h"
@@ -27,6 +28,12 @@ class DrawOp : public Op {
  public:
   explicit DrawOp(uint8_t classID) : Op(classID) {
   }
+
+  void visitProxies(const std::function<void(TextureProxy*)>& func) const override;
+
+  void prepare(Gpu* gpu) final;
+
+  void execute(OpsRenderPass* opsRenderPass) final;
 
   ProgramInfo createProgram(OpsRenderPass* opsRenderPass, std::unique_ptr<GeometryProcessor> gp);
 
@@ -64,6 +71,10 @@ class DrawOp : public Op {
 
  protected:
   bool onCombineIfPossible(Op* op) override;
+
+  virtual void onPrepare(Gpu* gpu) = 0;
+
+  virtual void onExecute(OpsRenderPass* opsRenderPass) = 0;
 
   AAType aa = AAType::None;
 

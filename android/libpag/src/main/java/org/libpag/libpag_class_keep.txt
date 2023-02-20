@@ -79,16 +79,14 @@ org.libpag.VideoSurface {
     public void onFrameAvailable(SurfaceTexture st);
 
     // keep method
-    private static VideoSurface Make();
-    private Surface getOutputSurface();
-    private boolean updateTexImage();
-    private boolean attachToGLContext(int texName);
-    private int videoWidth();
-    private int videoHeight();
-    private void onRelease();
+    private native void nativeRelease();
+    private native void nativeFinalize();
+    private static native void nativeInit();
+    private native void nativeSetup(SurfaceTexture surfaceTexture, int width, int height);
+    private native void notifyFrameAvailable();
 }
 
-org.libpag.GPUDecoder extends org.libpag.VideoDecoder{
+org.libpag.HardwareDecoder extends org.libpag.VideoDecoder{
     // inner class
     private static class OutputFrame {
         public long[] data;
@@ -99,14 +97,14 @@ org.libpag.GPUDecoder extends org.libpag.VideoDecoder{
     public void onFrameAvailable(SurfaceTexture st);
 
     // keep method
-    private static GPUDecoder Create(Surface outputSurface);
-    private boolean onConfigure(MediaFormat mediaFormat);
+    private static HardwareDecoder Create(MediaFormat mediaFormat);
     private int onSendBytes(ByteBuffer bytes, long frame);
     private int onEndOfStream();
     private int onDecodeFrame();
     private void onFlush();
     private long presentationTime();
     private OutputFrame onRenderFrame();
+    private VideoSurface getVideoSurface()
     private void onRelease();
 }
 
