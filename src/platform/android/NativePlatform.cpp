@@ -21,9 +21,7 @@
 #include <sys/system_properties.h>
 #include <cstdarg>
 #include "FontConfigAndroid.h"
-#include "Global.h"
 #include "HardwareDecoder.h"
-#include "JNIEnvironment.h"
 #include "JTraceImage.h"
 #include "PAGText.h"
 
@@ -54,15 +52,20 @@ const Platform* Platform::Current() {
   return &platform;
 }
 
-void NativePlatform::InitJNI(JNIEnv* env) {
+void NativePlatform::InitJNI() {
   static bool initialized = false;
   if (initialized) {
+    return;
+  }
+  JNIEnvironment environment;
+  auto env = environment.current();
+  if (env == nullptr) {
     return;
   }
   initialized = true;
   JTraceImage::InitJNI(env);
   FontConfigAndroid::InitJNI(env);
-  HardwareDecoder::InitJNI(env, "org/libpag/HardwareDecoder");
+  HardwareDecoder::InitJNI(env);
   InitPAGTextJNI(env);
 }
 

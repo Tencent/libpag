@@ -38,7 +38,7 @@ PAG_API void Java_org_libpag_PAGSolidLayer_nativeInit(JNIEnv* env, jclass clazz)
   PAGSolidLayer_nativeContext = env->GetFieldID(clazz, "nativeContext", "J");
 }
 
-PAG_API jint Java_org_libpag_PAGSolidLayer_solidColor(JNIEnv* env, jclass thiz) {
+PAG_API jint Java_org_libpag_PAGSolidLayer_solidColor(JNIEnv* env, jobject thiz) {
   auto pagLayer = GetPAGSolidLayer(env, thiz);
   if (pagLayer == nullptr) {
     return 0;
@@ -47,7 +47,7 @@ PAG_API jint Java_org_libpag_PAGSolidLayer_solidColor(JNIEnv* env, jclass thiz) 
   return MakeColorInt(env, color.red, color.green, color.blue);
 }
 
-PAG_API void Java_org_libpag_PAGSolidLayer_setSolidColor(JNIEnv* env, jclass thiz, jint color) {
+PAG_API void Java_org_libpag_PAGSolidLayer_setSolidColor(JNIEnv* env, jobject thiz, jint color) {
   auto pagLayer = GetPAGSolidLayer(env, thiz);
   if (pagLayer == nullptr) {
     return;

@@ -25,13 +25,14 @@ static Global<jclass> TraceImageClass;
 static jmethodID TraceImage_Trace;
 
 void JTraceImage::InitJNI(JNIEnv* env) {
-  TraceImageClass.reset(env, env->FindClass("org/libpag/TraceImage"));
+  TraceImageClass = env->FindClass("org/libpag/TraceImage");
   TraceImage_Trace = env->GetStaticMethodID(TraceImageClass.get(), "Trace",
                                             "(Ljava/lang/String;Ljava/nio/ByteBuffer;II)V");
 }
 
 void JTraceImage::Trace(const tgfx::ImageInfo& info, const void* pixels, const std::string& tag) {
-  auto env = JNIEnvironment::Current();
+  JNIEnvironment environment;
+  auto env = environment.current();
   if (env == nullptr || info.isEmpty() || pixels == nullptr) {
     return;
   }
@@ -45,10 +46,12 @@ void JTraceImage::Trace(const tgfx::ImageInfo& info, const void* pixels, const s
                                        tgfx::AlphaType::Premultiplied, rowBytes);
   tgfx::Bitmap bitmap(dstInfo, dstPixels);
   bitmap.writePixels(info, pixels);
-  Local<jobject> byteBuffer = {env, MakeByteBufferObject(env, dstPixels, dstInfo.byteSize())};
-  Local<jstring> tagString = {env, SafeConvertToJString(env, tag.c_str())};
-  env->CallStaticVoidMethod(TraceImageClass.get(), TraceImage_Trace, tagString.get(),
-                            byteBuffer.get(), info.width(), info.height());
+  auto byteBuffer = MakeByteBufferObject(env, dstPixels, dstInfo.byteSize());
+  auto tagString = SafeConvertToJString(env, tag.c_str());
+  env->CallStaticVoidMethod(TraceImageClass.get(), TraceImage_Trace, tagString, byteBuffer,
+                            info.width(), info.height());
+  env->DeleteLocalRef(byteBuffer);
+  env->DeleteLocalRef(tagString);
   delete[] dstPixels;
 }
 }  // namespace pag
