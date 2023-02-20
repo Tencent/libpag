@@ -155,7 +155,7 @@ extern "C" PAG_API jobject JNICALL Java_org_libpag_PAGSurface_makeSnapshot(JNIEn
   if (surface == nullptr) {
     return nullptr;
   }
-  int widht = surface->width();
+  int width = surface->width();
   int height = surface->height();
   unsigned char* newBitmapPixels;
   jclass bitmapCls = env->FindClass("android/graphics/Bitmap");
@@ -168,14 +168,20 @@ extern "C" PAG_API jobject JNICALL Java_org_libpag_PAGSurface_makeSnapshot(JNIEn
   jobject bitmapConfig =
       env->CallStaticObjectMethod(bitmapConfigClass, valueOfBitmapConfigFunction, configName);
   jobject newBitmap =
-      env->CallStaticObjectMethod(bitmapCls, createBitmapFunction, widht, height, bitmapConfig);
+      env->CallStaticObjectMethod(bitmapCls, createBitmapFunction, width, height, bitmapConfig);
   int ret;
   if ((ret = AndroidBitmap_lockPixels(env, newBitmap, (void**)&newBitmapPixels)) < 0) {
     LOGE("AndroidBitmap_lockPixels() failed ! error=%d", ret);
     return nullptr;
   }
+  AndroidBitmapInfo info;
+  AndroidBitmap_getInfo(env, newBitmap, &info);
+  int stride = info.stride;
+  if (stride == 0) {
+    stride = width * 4;
+  }
   bool status = surface->readPixels(pag::ColorType::RGBA_8888, pag::AlphaType::Premultiplied,
-                                    newBitmapPixels, widht * 4);
+                                    newBitmapPixels, stride);
   if (!status) {
     LOGE("ReadPixels failed!");
   }
