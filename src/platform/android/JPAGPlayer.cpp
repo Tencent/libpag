@@ -52,10 +52,6 @@ extern "C" {
 
 PAG_API void Java_org_libpag_PAGPlayer_nativeInit(JNIEnv* env, jclass clazz) {
   PAGPlayer_nativeContext = env->GetFieldID(clazz, "nativeContext", "J");
-#ifdef PAG_USE_FFAVC
-  PAGVideoDecoder::RegisterSoftwareDecoderFactory(
-      static_cast<SoftwareDecoderFactory*>(ffavc::DecoderFactory::GetHandle()));
-#endif
 }
 
 PAG_API void Java_org_libpag_PAGPlayer_nativeSetup(JNIEnv* env, jobject thiz) {
