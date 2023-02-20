@@ -19,6 +19,7 @@
 #pragma once
 
 #include "BezierPath.h"
+#include "BezierPath3D.h"
 #include "Interpolator.h"
 
 namespace pag {

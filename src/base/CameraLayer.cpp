@@ -16,10 +16,29 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "base/utils/Verify.h"
+#include "pag/file.h"
 
-#include "base/keyframes/MultiDimensionPointKeyframe.h"
-#include "base/keyframes/MultiDimensionPoint3DKeyframe.h"
-#include "base/keyframes/SingleEaseKeyframe.h"
-#include "base/keyframes/SpatialPointKeyframe.h"
-#include "base/keyframes/SpatialPoint3DKeyframe.h"
+namespace pag {
+CameraLayer::~CameraLayer() {
+  delete cameraOption;
+}
+
+void CameraLayer::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) {
+  Layer::excludeVaryingRanges(timeRanges);
+  cameraOption->excludeVaryingRanges(timeRanges);
+}
+
+bool CameraLayer::verify() const {
+  if (!Layer::verify()) {
+    VerifyFailed();
+    return false;
+  }
+  VerifyAndReturn(cameraOption != nullptr && cameraOption->verify());
+}
+
+Rect CameraLayer::getBounds() const {
+  return Rect::MakeWH(static_cast<float>(containingComposition->width),
+                      static_cast<float>(containingComposition->height));
+}
+}  // namespace pag

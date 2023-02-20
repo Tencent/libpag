@@ -16,10 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "SpatialPoint3DKeyframe.h"
 
-#include "base/keyframes/MultiDimensionPointKeyframe.h"
-#include "base/keyframes/MultiDimensionPoint3DKeyframe.h"
-#include "base/keyframes/SingleEaseKeyframe.h"
-#include "base/keyframes/SpatialPointKeyframe.h"
-#include "base/keyframes/SpatialPoint3DKeyframe.h"
+namespace pag {
+void SpatialPoint3DKeyframe::initialize() {
+  SingleEaseKeyframe<Point3D>::initialize();
+  spatialBezier =
+      BezierPath3D::Build(startValue, startValue + spatialOut, endValue + spatialIn, endValue, 0.05f);
+}
+
+Point3D SpatialPoint3DKeyframe::getValueAt(Frame time) {
+  auto progress = getProgress(time);
+  return spatialBezier->getPosition(progress);
+}
+}  // namespace pag
+

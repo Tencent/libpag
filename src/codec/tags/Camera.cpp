@@ -16,10 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "SolidColor.h"
+#include "codec/TagHeader.h"
 
-#include "base/keyframes/MultiDimensionPointKeyframe.h"
-#include "base/keyframes/MultiDimensionPoint3DKeyframe.h"
-#include "base/keyframes/SingleEaseKeyframe.h"
-#include "base/keyframes/SpatialPointKeyframe.h"
-#include "base/keyframes/SpatialPoint3DKeyframe.h"
+namespace pag {
+
+}  // namespace pag

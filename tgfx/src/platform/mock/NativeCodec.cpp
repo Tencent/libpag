@@ -16,18 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/ImageCodec.h"
+#include <CoreGraphics/CGBitmapContext.h>
+#include "platform/NativeCodec.h"
 
 namespace tgfx {
-std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string&) {
+std::shared_ptr<ImageCodec> NativeCodec::MakeCodec(const std::string&) {
   return nullptr;
 }
 
-std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data>) {
+std::shared_ptr<ImageCodec> NativeCodec::MakeCodec(std::shared_ptr<Data>) {
   return nullptr;
 }
 
-std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(NativeImageRef) {
+std::shared_ptr<ImageCodec> NativeCodec::MakeFrom(void* /*nativeImage*/) {
+  return nullptr;
+}
+
+CGContextRef CreateBitmapContext(const ImageInfo&, void*) {
   return nullptr;
 }
 }  // namespace tgfx

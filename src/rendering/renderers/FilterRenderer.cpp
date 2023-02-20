@@ -98,14 +98,14 @@ tgfx::Rect FilterRenderer::GetContentBounds(const FilterList* filterList,
 }
 
 void TransformFilterBounds(tgfx::Rect* filterBounds, const FilterList* filterList) {
-  // 滤镜应用顺序：Effects->motionBlur->LayerStyles
+  // 滤镜应用顺序：Effects->motionBlur/3DLayer(withMotionBlur)->LayerStyles
   for (auto& effect : filterList->effects) {
     effect->transformBounds(ToPAG(filterBounds), ToPAG(filterList->effectScale),
                             filterList->layerFrame);
     filterBounds->roundOut();
   }
 
-  if (filterList->layer->motionBlur) {
+  if (filterList->layer->motionBlur && !filterList->layer->transform3D) {
     MotionBlurFilter::TransformBounds(filterBounds, filterList->effectScale, filterList->layer,
                                       filterList->layerFrame);
   }
@@ -173,10 +173,28 @@ static bool MakeLayerStyleNode(std::vector<FilterNode>& filterNodes, tgfx::Rect&
   return true;
 }
 
+static bool MakeThreeDLayerNode(std::vector<FilterNode>& filterNodes, tgfx::Rect& clipBounds,
+                                const FilterList* filterList, RenderCache* renderCache,
+                                tgfx::Rect& filterBounds, tgfx::Point& effectScale) {
+   if (filterList->layer->transform3D) {
+     auto filter = renderCache->getTransform3DFilter();
+     if (filter && filter->updateLayer(filterList->layer, filterList->layerFrame)) {
+       auto oldBounds = filterBounds;
+       filterBounds = ToTGFX(filterList->layer->getBounds());
+       filter->update(filterList->layerFrame, oldBounds, filterBounds, effectScale);
+       if (!filterBounds.intersect(clipBounds)) {
+         return false;
+       }
+       filterNodes.emplace_back(filter, filterBounds);
+     }
+   }
+   return true;
+ }
+
 static bool MakeMotionBlurNode(std::vector<FilterNode>& filterNodes, tgfx::Rect& clipBounds,
                                const FilterList* filterList, RenderCache* renderCache,
                                tgfx::Rect& filterBounds, tgfx::Point& effectScale) {
-  if (filterList->layer->motionBlur) {
+  if (filterList->layer->motionBlur && !filterList->layer->transform3D) {
     auto filter = renderCache->getMotionBlurFilter();
     if (filter && filter->updateLayer(filterList->layer, filterList->layerFrame)) {
       auto oldBounds = filterBounds;
@@ -242,6 +260,9 @@ bool NeedToSkipClipBounds(const FilterList* filterList) {
       return true;
     }
   }
+  if (filterList->layer->transform3D) {
+    return true;
+  }
   return false;
 }
 
@@ -266,7 +287,7 @@ std::vector<FilterNode> FilterRenderer::MakeFilterNodes(const FilterList* filter
 
   // MotionBlur Fragment Shader中需要用到裁切区域外的像素，
   // 因此默认先把裁切区域过一次TransformBounds
-  if (filterList->layer->motionBlur) {
+  if (filterList->layer->motionBlur && !filterList->layer->transform3D) {
     MotionBlurFilter::TransformBounds(&clipBounds, effectScale, filterList->layer,
                                       filterList->layerFrame);
     clipBounds.roundOut();
@@ -277,6 +298,10 @@ std::vector<FilterNode> FilterRenderer::MakeFilterNodes(const FilterList* filter
 
   if (!MakeEffectNode(filterNodes, clipBounds, filterList, renderCache, filterBounds, effectScale,
                       clipIndex)) {
+    return {};
+  }
+  
+  if (!MakeThreeDLayerNode(filterNodes, clipBounds, filterList, renderCache, filterBounds, effectScale)) {
     return {};
   }
 
@@ -363,6 +388,9 @@ std::unique_ptr<FilterTarget> GetDirectFilterTarget(tgfx::Canvas* parentCanvas,
     return nullptr;
   }
   if (filterNodes.back().filter->needsMSAA()) {
+    return nullptr;
+  }
+  if (filterList->layer->transform3D) {
     return nullptr;
   }
   // 是否能直接上屏，应该用没有经过裁切的transformBounds来判断，

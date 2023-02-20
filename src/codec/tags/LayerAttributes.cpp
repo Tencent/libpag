@@ -24,13 +24,17 @@ std::unique_ptr<BlockConfig> MakeFromLayerAttributesTag(TagCode tagCode, Layer* 
   AddAttribute(tagConfig, &layer->isActive, AttributeType::BitFlag, true);
   AddAttribute(tagConfig, &layer->autoOrientation, AttributeType::BitFlag, false);
   if (tagConfig->tagCode == TagCode::LayerAttributesV3) {
-    AddAttribute(tagConfig, &layer->motionBlur, AttributeType::BitFlag, false);
+    if (layer->type() != LayerType::Camera) {
+      AddAttribute(tagConfig, &layer->motionBlur, AttributeType::BitFlag, false);
+    }
   }
   AddAttribute(tagConfig, &layer->parent, AttributeType::Value, static_cast<Layer*>(nullptr));
   AddAttribute(tagConfig, &layer->stretch, AttributeType::Value, DefaultRatio);
   AddAttribute(tagConfig, &layer->startTime, AttributeType::Value, ZeroFrame);
-  AddAttribute(tagConfig, &layer->blendMode, AttributeType::Value, BlendMode::Normal);
-  AddAttribute(tagConfig, &layer->trackMatteType, AttributeType::Value, TrackMatteType::None);
+  if (layer->type() != LayerType::Camera) {
+    AddAttribute(tagConfig, &layer->blendMode, AttributeType::Value, BlendMode::Normal);
+    AddAttribute(tagConfig, &layer->trackMatteType, AttributeType::Value, TrackMatteType::None);
+  }
   AddAttribute(tagConfig, &layer->timeRemap, AttributeType::SimpleProperty, 0.0f);
   AddAttribute(tagConfig, &layer->duration, AttributeType::FixedValue, ZeroFrame);
   if (tagConfig->tagCode == TagCode::LayerAttributesV2 ||

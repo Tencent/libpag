@@ -152,7 +152,7 @@ void LayerCache::updateStaticTimeRanges() {
     auto timeRanges = getTrackMatteStaticTimeRanges();
     MergeTimeRanges(&staticTimeRanges, &timeRanges);
   }
-  if (!layer->layerStyles.empty() || !layer->effects.empty()) {
+  if (!layer->layerStyles.empty() || !layer->effects.empty() || layer->transform3D) {
     auto timeRanges = getFilterStaticTimeRanges();
     MergeTimeRanges(&staticTimeRanges, &timeRanges);
   }
@@ -176,7 +176,12 @@ std::vector<TimeRange> LayerCache::getTrackMatteStaticTimeRanges() {
   SplitTimeRangesAt(&timeRanges, trackMatteLayer->startTime + trackMatteLayer->duration);
   auto parent = trackMatteLayer->parent;
   while (parent != nullptr) {
-    parent->transform->excludeVaryingRanges(&timeRanges);
+    if (parent->transform != nullptr) {
+      parent->transform->excludeVaryingRanges(&timeRanges);
+    }
+    if (parent->transform3D != nullptr) {
+      parent->transform3D->excludeVaryingRanges(&timeRanges);
+    }
     SplitTimeRangesAt(&timeRanges, parent->startTime);
     SplitTimeRangesAt(&timeRanges, parent->startTime + parent->duration);
     parent = parent->parent;

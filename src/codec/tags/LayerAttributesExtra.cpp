@@ -21,7 +21,9 @@
 namespace pag {
 std::unique_ptr<BlockConfig> LayerAttributesExtraTag(Layer* layer) {
   auto tagConfig = new BlockConfig(TagCode::LayerAttributesExtra);
-  AddAttribute(tagConfig, &layer->name, AttributeType::Value, std::string(""));
+  if (layer->type() != LayerType::Camera) {
+    AddAttribute(tagConfig, &layer->name, AttributeType::Value, std::string(""));
+  }
   AddAttribute(tagConfig, &layer->motionBlur, AttributeType::BitFlag, false);
   return std::unique_ptr<BlockConfig>(tagConfig);
 }

@@ -30,6 +30,7 @@
 #include "rendering/filters/LayerFilter.h"
 #include "rendering/filters/LayerStylesFilter.h"
 #include "rendering/filters/MotionBlurFilter.h"
+#include "rendering/filters/Transform3DFilter.h"
 #include "rendering/graphics/ImageProxy.h"
 #include "rendering/graphics/Picture.h"
 #include "rendering/graphics/Shape.h"
@@ -144,6 +145,8 @@ class RenderCache : public Performance {
   LayerFilter* getFilterCache(Effect* effect);
 
   MotionBlurFilter* getMotionBlurFilter();
+  
+  Transform3DFilter* getTransform3DFilter();
 
   LayerStylesFilter* getLayerStylesFilter(Layer* layer);
 
@@ -179,6 +182,7 @@ class RenderCache : public Performance {
   std::unordered_map<ID, std::unordered_map<Frame, SequenceImageQueue*>> usedSequences = {};
   std::unordered_map<ID, Filter*> filterCaches;
   MotionBlurFilter* motionBlurFilter = nullptr;
+  Transform3DFilter* transform3DFilter = nullptr;
 
   // decoded image caches:
   void clearExpiredDecodedImages();

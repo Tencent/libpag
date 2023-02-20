@@ -193,6 +193,115 @@ struct PAG_API Point {
   }
 };
 
+
+/**
+ * Point holds three 32-bit floating point coordinates.
+ */
+struct PAG_API Point3D {
+  /**
+   * x-axis value.
+   */
+  float x;
+  /**
+   * y-axis value.
+   */
+  float y;
+  /**
+   * z-axis value.
+   */
+  float z;
+
+  /**
+   * Creates a Point set to (0, 0, 0).
+   */
+  static const Point3D& Zero() {
+    static const Point3D zero = Point3D::Make(0, 0, 0);
+    return zero;
+  }
+
+  /**
+   * Creates a Point with specified x y z value.
+   */
+  static constexpr Point3D Make(float x, float y, float z) {
+    return {x, y, z};
+  }
+
+  /**
+   * Returns true if fX fY fZ are all zero.
+   */
+  bool isZero() const {
+    return (0 == x) & (0 == y) & (0 == z);
+  }
+
+  /**
+   * Sets fX to x, fY to y and fZ to z.
+   */
+  void set(float xValue, float yValue, float zValue) {
+    x = xValue;
+    y = yValue;
+    z = zValue;
+  }
+
+  /**
+   * Adds offset (dx, dy, dz) to Point.
+   */
+  void offset(float dx, float dy, float dz) {
+    x += dx;
+    y += dy;
+    z += dz;
+  }
+
+  /**
+   * Returns the Euclidean distance from origin.
+   */
+  float length() const {
+    return Point3D::Length(x, y, z);
+  }
+
+  /**
+   * Returns true if a is equivalent to b.
+   */
+  friend bool operator==(const Point3D& a, const Point3D& b) {
+    return a.x == b.x && a.y == b.y && a.z == b.z;
+  }
+
+  /**
+   * Returns true if a is not equivalent to b.
+   */
+  friend bool operator!=(const Point3D& a, const Point3D& b) {
+    return a.x != b.x || a.y != b.y || a.z != b.z;
+  }
+
+  /**
+   * Returns a Point from b to a; computed as (a.fX - b.fX, a.fY - b.fY, a.fZ - b.fZ).
+   */
+  friend Point3D operator-(const Point3D& a, const Point3D& b) {
+    return {a.x - b.x, a.y - b.y, a.z - b.z};
+  }
+
+  /**
+   * Returns Point resulting from Point a offset by Point b, computed as:
+   * (a.fX + b.fX, a.fY + b.fY, a.fZ + b.fZ).
+   */
+  friend Point3D operator+(const Point3D& a, const Point3D& b) {
+    return {a.x + b.x, a.y + b.y, a.z + b.z};
+  }
+
+  /**
+   * Returns the Euclidean distance from origin.
+   */
+  static float Length(float x, float y, float z) {
+    return sqrt(x * x + y * y + z * z);
+  }
+
+  /**
+   * Returns the Euclidean distance between a and b.
+   */
+  static float Distance(const Point3D& a, const Point3D& b) {
+    return Length(a.x - b.x, a.y - b.y, a.z - b.z);
+  }
+};
+
 /**
  * Rect holds four float coordinates describing the upper and lower bounds of a rectangle. Rect may
  * be created from outer bounds or from position, width, and height. Rect describes an area; if its
@@ -1267,6 +1376,7 @@ enum class LayerType {
   Shape,
   Image,
   PreCompose,
+  Camera,
 };
 
 /**

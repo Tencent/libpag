@@ -66,12 +66,19 @@ Pod::Spec.new do |s|
 
   s.compiler_flags = '-Wno-documentation'
 
-  s.osx.public_header_files = 'src/platform/mac/*.h',
-                              'src/platform/cocoa/*.h'
-  s.osx.source_files =  'src/platform/mac/**/*.{h,cpp,mm,m}',
-                        'src/platform/cocoa/**/*.{h,cpp,mm,m}',
-                        'tgfx/src/gpu/opengl/cgl/*.{h,cpp,mm}',
-                        'tgfx/src/platform/apple/**/*.{h,cpp,mm,m}'
+  if ENV["libpag_config"] == 'QT'
+    s.osx.public_header_files = ['src/platform/qt/*.h']
+    s.osx.source_files = 'src/platform/qt/**/*.{h,cpp,mm,m}',
+                         'tgfx/src/gpu/opengl/qt/*.{h,cpp,mm}',
+                         'tgfx/src/platform/mock/*.{h,cpp,mm}'
+  else
+    s.osx.public_header_files = 'src/platform/mac/*.h',
+                                'src/platform/cocoa/*.h'
+    s.osx.source_files =  'src/platform/mac/**/*.{h,cpp,mm,m}',
+                          'src/platform/cocoa/**/*.{h,cpp,mm,m}',
+                          'tgfx/src/gpu/opengl/cgl/*.{h,cpp,mm}',
+                          'tgfx/src/platform/apple/**/*.{h,cpp,mm,m}'
+  end
 
   s.osx.frameworks   = ['ApplicationServices', 'AGL', 'OpenGL', 'QuartzCore', 'Cocoa', 'Foundation', 'VideoToolbox', 'CoreMedia']
   s.osx.libraries = ["iconv", "c++"]
