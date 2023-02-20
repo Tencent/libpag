@@ -42,7 +42,10 @@ void PAGVideoDecoder::SetMaxHardwareDecoderCount(int count) {
   maxHardwareDecoderCount = count;
 }
 
-static SoftwareDecoderFactory* GetFFAVCDecoderFactory() {
+static SoftwareDecoderFactory* GetSoftwareDecoderFactory() {
+  if (softwareDecoderFactory) {
+    return softwareDecoderFactory;
+  }
 #ifdef PAG_USE_FFAVC
   static SoftwareDecoderFactory* ffavcDecoderFactory =
       static_cast<SoftwareDecoderFactory*>(ffavc::DecoderFactory::GetHandle());
@@ -60,14 +63,12 @@ class ExternalDecoderFactory : public VideoDecoderFactory {
  protected:
   std::unique_ptr<VideoDecoder> onCreateDecoder(const VideoFormat& format) const override {
     std::lock_guard<std::mutex> autoLock(factoryLocker);
-    if (softwareDecoderFactory == nullptr) {
-      softwareDecoderFactory = GetFFAVCDecoderFactory();
-      if (softwareDecoderFactory == nullptr) {
-        return nullptr;
-      }
+    if (GetSoftwareDecoderFactory() == nullptr) {
+      return nullptr;
     }
 
-    return SoftwareDecoderWrapper::Wrap(softwareDecoderFactory->createSoftwareDecoder(), format);
+    return SoftwareDecoderWrapper::Wrap(GetSoftwareDecoderFactory()->createSoftwareDecoder(),
+                                        format);
   }
 };
 
@@ -105,10 +106,7 @@ const VideoDecoderFactory* VideoDecoderFactory::SoftwareAVCDecoderFactory() {
 
 bool VideoDecoderFactory::HasExternalSoftwareDecoder() {
   std::lock_guard<std::mutex> autoLock(factoryLocker);
-  if (softwareDecoderFactory == nullptr) {
-    softwareDecoderFactory = GetFFAVCDecoderFactory();
-  }
-  return softwareDecoderFactory != nullptr;
+  return GetSoftwareDecoderFactory() != nullptr;
 }
 
 void VideoDecoderFactory::NotifyHardwareVideoDecoderReleased() {
