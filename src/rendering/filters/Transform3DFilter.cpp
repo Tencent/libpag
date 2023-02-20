@@ -43,9 +43,10 @@ static constexpr char FRAGMENT_SHADER[] = R"(
     precision mediump float;
     varying vec2 vertexColor;
     uniform sampler2D sTexture;
+    uniform float uOpacity;
 
     void main() {
-        gl_FragColor = texture2D(sTexture, vertexColor);
+        gl_FragColor = texture2D(sTexture, vertexColor) * vec4(vec3(1.0), uOpacity);
     }
 )";
 
@@ -77,6 +78,7 @@ bool Transform3DFilter::initialize(tgfx::Context* context) {
   viewMatrixHandle = gl->getUniformLocation(program, "uViewMatrix");
   projectionMatrixHandle = gl->getUniformLocation(program, "uProjectionMatrix");
   textureMatrixHandle = gl->getUniformLocation(program, "uTextureMatrix");
+  opacityHandle = gl->getUniformLocation(program, "uOpacity");
   onPrepareProgram(context, program);
   if (!CheckGLError(context)) {
     filterProgram = nullptr;
@@ -95,6 +97,7 @@ bool Transform3DFilter::updateLayer(Layer* layer, Frame) {
     if (aLayer->type() == LayerType::Camera) {
       auto cameraLayer = static_cast<CameraLayer*>(aLayer);
       cameraTransform = cameraLayer->transform3D;
+      cameraOption = cameraLayer->cameraOption;
       break;
     }
   }
@@ -187,11 +190,16 @@ void Transform3DFilter::onSubmitTransformations(tgfx::Context* context, const Fi
   auto opacity = layerTransform->opacity->getValueAt(layerFrame);
   
   auto bounds = Rect::MakeWH(target->width, target->height);
-  auto zValue = 415.f;
+  float cameraZoom;
+  if (cameraOption) {
+    cameraZoom = cameraOption->zoom->getValueAt(layerFrame);
+  } else {
+    cameraZoom = 1000.f;
+  }
   
-  modelMatrix = tgfx::Matrix4x4::Translate(-anchorPoint.x / bounds.width() * 2,
-                                           -anchorPoint.y / bounds.height() * 2,
-                                           anchorPoint.z / zValue);
+  modelMatrix = tgfx::Matrix4x4::Translate(-anchorPoint.x / bounds.width() * 2.0f,
+                                           -anchorPoint.y / bounds.height() * 2.0f,
+                                           anchorPoint.z / cameraZoom * 2.0f);
   
   modelMatrix.postTranslate(1.0, 1.0);
   auto scaleMatrix = tgfx::Matrix4x4::Scale(scale.x, scale.y, scale.z);
@@ -208,9 +216,9 @@ void Transform3DFilter::onSubmitTransformations(tgfx::Context* context, const Fi
   targetAspectScaleMatrix.invert(&invertTargetAspectScaleMatrix);
   modelMatrix.postConcat(invertTargetAspectScaleMatrix);
   
-  modelMatrix.postTranslate(position.x / bounds.width() * 2,
-                            position.y / bounds.height() * 2,
-                            -position.z / zValue);
+  modelMatrix.postTranslate(position.x / bounds.width() * 2.0f,
+                            position.y / bounds.height() * 2.0f,
+                            -position.z / cameraZoom * 2.0f);
   modelMatrix.postTranslate(-1.0, -1.0);
 
   CtmInfo info;
@@ -233,9 +241,9 @@ void Transform3DFilter::onSubmitTransformations(tgfx::Context* context, const Fi
     
     info.fEye = {2.0f * cameraPositon.x / bounds.width() - 1.0f,
                  2.0f * cameraPositon.y / bounds.height() - 1.0f,
-                 info.fEye.z * (1.0f - (cameraPositon.z + 1000.f) / 700.f)};
+                 info.fEye.z * (1.0f - (cameraPositon.z + cameraZoom) / 700.f)};
     
-    info.fCOA = {2.0f * cameraPointOfInterest.x / bounds.width() - 1.0f, 2.0f * cameraPointOfInterest.y / bounds.height() - 1.0f, 0.f};
+    info.fCOA = {2.0f * cameraPointOfInterest.x / bounds.width() - 1.0f, 2.0f * cameraPointOfInterest.y / bounds.height() - 1.0f, 0.0f};
     viewMatrix = tgfx::Matrix4x4::LookAt(info.fEye, info.fCOA, info.fUp);
     viewMatrix.postConcat(sourceAspectScaleMatrix);
     auto xRotationMatrix = tgfx::Matrix4x4::Rotate({1.0, 0.0, 0.0}, DegreesToRadians(cameraOrientation.x + cameraXRotation));
@@ -269,6 +277,7 @@ void Transform3DFilter::onSubmitTransformations(tgfx::Context* context, const Fi
   gl->uniformMatrix4fv(viewMatrixHandle, 1, GL_TRUE, viewMatrixRowMajor);
   gl->uniformMatrix4fv(projectionMatrixHandle, 1, GL_TRUE, projectionMatrixRowMajor);
   gl->uniformMatrix3fv(textureMatrixHandle, 1, GL_FALSE, source->textureMatrix.data());
+  gl->uniform1f(opacityHandle, opacity / 255.0f);
 }
 
 std::vector<tgfx::Point> Transform3DFilter::computeVertices(const tgfx::Rect& bounds,

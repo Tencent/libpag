@@ -74,6 +74,7 @@ private:
   
   Transform3D* layerTransform = nullptr;
   Transform3D* cameraTransform = nullptr;
+  CameraOption* cameraOption = nullptr;
 
   tgfx::Matrix4x4 modelMatrix = {};
   tgfx::Matrix4x4 viewMatrix = {};
@@ -85,5 +86,6 @@ private:
   int textureMatrixHandle = -1;
   int positionHandle = -1;
   int textureCoordHandle = -1;
+  int opacityHandle = -1;
 };
 }  // namespace pag
