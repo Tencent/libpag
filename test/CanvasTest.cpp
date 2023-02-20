@@ -428,8 +428,8 @@ PAG_TEST(CanvasTest, merge_draw_clear_op) {
  * 用例描述: 测试 shape
  */
 PAG_TEST(CanvasTest, textShape) {
-  auto serifTypeface = Typeface::MakeFromPath(pag::TestConstants::PAG_ROOT +
-                                              "resources/font/NotoSerifSC-Regular.otf");
+  auto serifTypeface =
+      Typeface::MakeFromPath(TestConstants::PAG_ROOT + "resources/font/NotoSerifSC-Regular.otf");
   ASSERT_TRUE(serifTypeface != nullptr);
   std::string text =
       "ffi fl\n"
@@ -677,8 +677,8 @@ PAG_TEST(CanvasTest, image) {
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 400, 500);
   auto canvas = surface->getCanvas();
-  auto image = Image::MakeFromEncoded(pag::TestConstants::PAG_ROOT +
-                                      "resources/apitest/imageReplacement.png");
+  auto image =
+      Image::MakeFromEncoded(TestConstants::PAG_ROOT + "resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);
   EXPECT_TRUE(image->isLazyGenerated());
   EXPECT_FALSE(image->isTextureBacked());
@@ -705,7 +705,7 @@ PAG_TEST(CanvasTest, image) {
   EXPECT_FALSE(decodedImage->isLazyGenerated());
   EXPECT_FALSE(decodedImage->isTextureBacked());
   canvas->drawImage(decodedImage, 315, 0);
-  auto data = Data::MakeFromFile(pag::TestConstants::PAG_ROOT + "resources/apitest/rotation.jpg");
+  auto data = Data::MakeFromFile(TestConstants::PAG_ROOT + "resources/apitest/rotation.jpg");
   auto rotationImage = Image::MakeFromEncoded(std::move(data));
   EXPECT_EQ(rotationImage->width(), 3024);
   EXPECT_EQ(rotationImage->height(), 4032);

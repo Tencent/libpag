@@ -428,7 +428,7 @@ PAG_TEST_F(ContainerTest, HitTestPoint) {
 }
 
 PAG_TEST_SUIT_WITH_PATH(VideoSequenceHitTestPoint,
-                        pag::TestConstants::PAG_ROOT + "resources/apitest/video_sequence_test.pag")
+                        TestConstants::PAG_ROOT + "resources/apitest/video_sequence_test.pag")
 
 /**
  * 用例描述: 视频序列帧HitTest
@@ -438,7 +438,7 @@ PAG_TEST_F(VideoSequenceHitTestPoint, VideoSequenceHitTestPoint) {
 }
 
 PAG_TEST_SUIT_WITH_PATH(BitmapSequenceHitTestPoint,
-                        pag::TestConstants::PAG_ROOT + "resources/apitest/bitmap_sequence_test.pag")
+                        TestConstants::PAG_ROOT + "resources/apitest/bitmap_sequence_test.pag")
 
 /**
  * 用例描述: 图片序列帧HitTest
