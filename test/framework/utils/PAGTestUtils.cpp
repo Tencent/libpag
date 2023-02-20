@@ -35,7 +35,7 @@ std::string ToString(Frame frame) {
 
 void GetAllPAGFiles(const std::string& path, std::vector<std::string>& files) {
   struct dirent* dirp;
-  auto dirPath= TestConstants::RESOURCES_ROOT + path;
+  auto dirPath = TestConstants::RESOURCES_ROOT + path;
   DIR* dir = opendir(dirPath.c_str());
   std::string p;
 
