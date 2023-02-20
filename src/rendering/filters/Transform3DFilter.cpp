@@ -52,7 +52,7 @@ static constexpr char FRAGMENT_SHADER[] = R"(
 
 struct CtmInfo {
   float fNear = 0.05f;
-  float fFar = 4.f;
+  float fFar = 100.f;
   float fAngle = tgfx::M_PI_F / 4;
   
   tgfx::SkV3 fEye { 0, 0, 1.0f/tan(fAngle/2) - 1 };
@@ -189,6 +189,7 @@ void Transform3DFilter::onSubmitTransformations(tgfx::Context* context, const Fi
   auto zRotation = layerTransform->zRotation->getValueAt(layerFrame);
   auto opacity = layerTransform->opacity->getValueAt(layerFrame);
   
+  auto zFix = 0.83f;
   auto bounds = Rect::MakeWH(target->width, target->height);
   float cameraZoom;
   if (cameraOption) {
@@ -199,7 +200,7 @@ void Transform3DFilter::onSubmitTransformations(tgfx::Context* context, const Fi
   
   modelMatrix = tgfx::Matrix4x4::Translate(-anchorPoint.x / bounds.width() * 2.0f,
                                            -anchorPoint.y / bounds.height() * 2.0f,
-                                           anchorPoint.z / cameraZoom * 2.0f);
+                                           anchorPoint.z / cameraZoom * 2.0f / zFix);
   
   modelMatrix.postTranslate(1.0, 1.0);
   auto scaleMatrix = tgfx::Matrix4x4::Scale(scale.x, scale.y, scale.z);
@@ -218,7 +219,7 @@ void Transform3DFilter::onSubmitTransformations(tgfx::Context* context, const Fi
   
   modelMatrix.postTranslate(position.x / bounds.width() * 2.0f,
                             position.y / bounds.height() * 2.0f,
-                            -position.z / cameraZoom * 2.0f);
+                            -position.z / cameraZoom * 2.0f / zFix);
   modelMatrix.postTranslate(-1.0, -1.0);
 
   CtmInfo info;
@@ -241,11 +242,12 @@ void Transform3DFilter::onSubmitTransformations(tgfx::Context* context, const Fi
     
     info.fEye = {2.0f * cameraPositon.x / bounds.width() - 1.0f,
                  2.0f * cameraPositon.y / bounds.height() - 1.0f,
-                 info.fEye.z * (1.0f - (cameraPositon.z + cameraZoom) / 700.f)};
-    
+                 info.fEye.z};
+          
     info.fCOA = {2.0f * cameraPointOfInterest.x / bounds.width() - 1.0f, 2.0f * cameraPointOfInterest.y / bounds.height() - 1.0f, 0.0f};
     viewMatrix = tgfx::Matrix4x4::LookAt(info.fEye, info.fCOA, info.fUp);
     viewMatrix.postConcat(sourceAspectScaleMatrix);
+    viewMatrix.postTranslate(0.0f, 0.0f, (cameraZoom + cameraPositon.z) / cameraZoom * 2.0f / zFix);
     auto xRotationMatrix = tgfx::Matrix4x4::Rotate({1.0, 0.0, 0.0}, DegreesToRadians(cameraOrientation.x + cameraXRotation));
     auto yRotationMatrix = tgfx::Matrix4x4::Rotate({0.0, 1.0, 0.0}, DegreesToRadians(cameraOrientation.y + cameraYRotation));
     auto zRotationMatrix = tgfx::Matrix4x4::Rotate({0.0, 0.0, 1.0}, DegreesToRadians(-(cameraOrientation.z + cameraZRotation)));
