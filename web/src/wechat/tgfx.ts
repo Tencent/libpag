@@ -11,8 +11,6 @@ export const uploadToTexture = (
   const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
   gl.bindTexture(gl.TEXTURE_2D, GL.textures[textureID]);
   gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
-  console.log(source, source.hasOwnProperty('buffer'));
-
   if (source.hasOwnProperty('buffer')) {
     // ArrayBuffer ImageData
     gl.texImage2D(

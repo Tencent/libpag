@@ -25,7 +25,7 @@ import * as tgfx from './tgfx';
  */
 export const binding = (module: PAG) => {
   setPAGModule(module);
-  module.PAG = module;
+  module.module = module;
   module.PAGFile = PAGFile;
   module.PAGPlayer = PAGPlayer;
   module.PAGView = PAGView;

@@ -88,7 +88,7 @@ export interface PAG extends EmscriptenModule {
   TGFXLineCap: TGFXLineCap;
   TGFXLineJoin: TGFXLineJoin;
   globalCanvas: GlobalCanvas;
-  PAG: PAG;
+  module: PAG;
   PAGPlayer: typeof PAGPlayer;
   PAGFile: typeof PAGFile;
   PAGView: typeof PAGView;
