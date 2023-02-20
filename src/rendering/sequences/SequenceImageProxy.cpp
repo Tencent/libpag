@@ -22,7 +22,8 @@
 #include "rendering/caches/RenderCache.h"
 
 namespace pag {
-SequenceImageProxy::SequenceImageProxy(std::shared_ptr<SequenceReaderFactory> sequence, Frame targetFrame)
+SequenceImageProxy::SequenceImageProxy(std::shared_ptr<SequenceReaderFactory> sequence,
+                                       Frame targetFrame)
     : sequence(std::move(sequence)), targetFrame(targetFrame) {
 }
 
