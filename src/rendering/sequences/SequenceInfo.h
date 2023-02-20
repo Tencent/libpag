@@ -51,9 +51,64 @@ class SequenceInfo {
 
  protected:
   explicit SequenceInfo(Sequence* sequence);
-  virtual tgfx::Orientation orientation() const;
 
  private:
   Sequence* sequence;
+};
+
+
+class StaticSequenceGenerator : public tgfx::ImageGenerator {
+ public:
+  StaticSequenceGenerator(std::shared_ptr<File> file, std::shared_ptr<SequenceInfo> info,
+                          tgfx::ISize bufferSize)
+      : tgfx::ImageGenerator(bufferSize), file(std::move(file)), info(info) {
+  }
+
+  bool isAlphaOnly() const override {
+    return false;
+  }
+
+#ifdef PAG_BUILD_FOR_WEB
+  bool asyncSupport() const override {
+    return true;
+  }
+#endif
+
+ protected:
+  std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer(bool) const override {
+    auto reader = info->makeReader(file);
+    return reader->readBuffer(0);
+  }
+
+ private:
+  std::shared_ptr<File> file = nullptr;
+  std::shared_ptr<SequenceInfo> info = nullptr;
+};
+
+class SequenceFrameGenerator : public tgfx::ImageGenerator {
+ public:
+  SequenceFrameGenerator(std::shared_ptr<SequenceReader> reader, Frame targetFrame)
+      : tgfx::ImageGenerator(reader->width(), reader->height()), reader(std::move(reader)),
+        targetFrame(targetFrame) {
+  }
+
+  bool isAlphaOnly() const override {
+    return false;
+  }
+
+#ifdef PAG_BUILD_FOR_WEB
+  bool asyncSupport() const override {
+    return true;
+  }
+#endif
+
+ protected:
+  std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer(bool) const override {
+    return reader->readBuffer(targetFrame);
+  }
+
+ private:
+  std::shared_ptr<SequenceReader> reader = nullptr;
+  Frame targetFrame = 0;
 };
 }  // namespace pag
