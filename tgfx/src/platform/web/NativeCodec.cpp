@@ -55,8 +55,25 @@ bool NativeCodec::asyncSupport() const {
   return WebImage::AsyncSupport();
 }
 
-bool NativeCodec::readPixels(const ImageInfo&, void*) const {
-  return false;
+bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
+  if (dstInfo.isEmpty() || dstPixels == nullptr || dstInfo.colorType() == ColorType::ALPHA_8) {
+    return false;
+  }
+  auto bytes =
+      val(typed_memory_view(imageBytes->size(), static_cast<const uint8_t*>(imageBytes->data())));
+
+  auto data = val::module_property("tgfx")
+                  .call<val>("readImagePixels", val::module_property("module"), bytes,
+                             dstInfo.width(), dstInfo.height())
+                  .await();
+  if (data.isNull()) {
+    return false;
+  }
+  auto byteOffset = reinterpret_cast<void*>(data["byteOffset"].as<int>());
+  auto length = data["length"].as<int>();
+  memcpy(dstPixels, byteOffset, length);
+  data.call<void>("free");
+  return true;
 }
 
 std::shared_ptr<ImageBuffer> NativeCodec::onMakeBuffer(bool) const {
