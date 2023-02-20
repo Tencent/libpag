@@ -29,7 +29,7 @@
 namespace pag {
 std::string ToString(Frame frame);
 
-void GetAllPAGFiles(std::string path, std::vector<std::string>& files);
+void GetAllPAGFiles(const std::string& path, std::vector<std::string>& files);
 
 std::shared_ptr<tgfx::PixelBuffer> MakeSnapshot(std::shared_ptr<PAGSurface> pagSurface);
 
