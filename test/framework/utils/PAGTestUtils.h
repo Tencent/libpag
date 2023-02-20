@@ -40,8 +40,6 @@ bool CreateGLTexture(tgfx::Context* context, int width, int height, tgfx::GLSamp
 
 std::shared_ptr<PAGFile> LoadPAGFile(const std::string& path);
 
-std::shared_ptr<PAGFile> LoadPAGAsset(const std::string& path);
-
 std::shared_ptr<tgfx::ImageCodec> MakeImageCodec(const std::string& path);
 
 std::shared_ptr<PAGImage> MakePAGImage(const std::string& path);

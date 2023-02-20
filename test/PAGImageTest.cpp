@@ -53,7 +53,7 @@ PAG_TEST_F(PAGImageTest, image) {
   int width = 110;
   int height = 110;
   size_t rowBytes = 110 * 4;
-  auto fileData = ByteData::FromPath(TestConstants::RESOURCES_ROOT + "apitest/data.rgba");
+  auto fileData = ByteData::FromPath(TestConstants::PAG_ROOT + "resources/apitest/data.rgba");
   auto pixelBuffer = PixelBuffer::Make(0, height, false, false);
   ASSERT_TRUE(pixelBuffer == nullptr);
   pixelBuffer = PixelBuffer::Make(width, height, true, false);
@@ -102,7 +102,7 @@ PAG_TEST_F(PAGImageTest, image) {
  * 用例描述: PAGImage解码等功能
  */
 PAG_TEST_F(PAGImageTest, image2) {
-  auto codec = MakeImageCodec("apitest/imageReplacement.png");
+  auto codec = MakeImageCodec("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(codec != nullptr);
   ASSERT_EQ(codec->height(), 110);
   ASSERT_EQ(codec->width(), 110);
@@ -120,11 +120,11 @@ PAG_TEST_F(PAGImageTest, image2) {
  * 用例描述: 带旋转图片PAGImage解码等功能
  */
 PAG_TEST_F(PAGImageTest, image3) {
-  auto pagImage = pag::MakePAGImage("apitest/rotation.jpg");
+  auto pagImage = MakePAGImage("resources/apitest/rotation.jpg");
   ASSERT_TRUE(pagImage != nullptr);
   EXPECT_EQ(pagImage->width(), 3024);
   EXPECT_EQ(pagImage->height(), 4032);
-  auto pagFile = LoadPAGFile("apitest/replace2.pag");
+  auto pagFile = LoadPAGFile("resources/apitest/replace2.pag");
   ASSERT_TRUE(pagFile != nullptr);
   pagFile->replaceImage(0, pagImage);
   auto surface = PAGSurface::MakeOffscreen(720, 720);
@@ -148,8 +148,8 @@ PAG_TEST_F(PAGImageTest, BottomLeftMask) {
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, width, height);
   auto image1 =
-      pag::MakeImageCodec("apitest/imageReplacement.webp")->makeBuffer()->makeTexture(context);
-  auto imageAsMask = pag::MakeImageCodec("apitest/image_as_mask.png");
+      MakeImageCodec("resources/apitest/imageReplacement.webp")->makeBuffer()->makeTexture(context);
+  auto imageAsMask = MakeImageCodec("resources/apitest/image_as_mask.png");
   ASSERT_TRUE(imageAsMask != nullptr);
   auto image2 = imageAsMask->makeBuffer()->makeTexture(context);
   image2->_origin = tgfx::ImageOrigin::BottomLeft;

@@ -30,9 +30,9 @@ using nlohmann::json;
  * 用例描述: 字体相关功能测试
  */
 PAG_TEST(PAGFontTest, TestFont) {
-  PAGFont::RegisterFont(TestConstants::RESOURCES_ROOT + "font/NotoSerifSC-Regular.otf", 0,
+  PAGFont::RegisterFont(TestConstants::PAG_ROOT + "resources/font/NotoSerifSC-Regular.otf", 0,
                         "TTTGBMedium", "Regular");
-  auto TestPAGFile = LoadPAGFile("apitest/test_font.pag");
+  auto TestPAGFile = LoadPAGFile("resources/apitest/test_font.pag");
   ASSERT_NE(TestPAGFile, nullptr);
   auto pagSurface = PAGSurface::MakeOffscreen(TestPAGFile->width(), TestPAGFile->height());
   ASSERT_NE(pagSurface, nullptr);

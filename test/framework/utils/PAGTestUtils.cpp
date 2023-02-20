@@ -35,7 +35,7 @@ std::string ToString(Frame frame) {
 
 void GetAllPAGFiles(const std::string& path, std::vector<std::string>& files) {
   struct dirent* dirp;
-  auto dirPath = TestConstants::RESOURCES_ROOT + path;
+  auto dirPath = TestConstants::PAG_ROOT + path;
   DIR* dir = opendir(dirPath.c_str());
   std::string p;
 
@@ -104,18 +104,14 @@ bool CreateGLTexture(Context* context, int width, int height, GLSampler* texture
 }
 
 std::shared_ptr<PAGFile> LoadPAGFile(const std::string& path) {
-  return PAGFile::Load(TestConstants::RESOURCES_ROOT + path);
-}
-
-std::shared_ptr<PAGFile> LoadPAGAsset(const std::string& path) {
-  return PAGFile::Load(TestConstants::ASSETS_ROOT + path);
+  return PAGFile::Load(TestConstants::PAG_ROOT + path);
 }
 
 std::shared_ptr<tgfx::ImageCodec> MakeImageCodec(const std::string& path) {
-  return ImageCodec::MakeFrom(TestConstants::RESOURCES_ROOT + path);
+  return ImageCodec::MakeFrom(TestConstants::PAG_ROOT + path);
 }
 
 std::shared_ptr<PAGImage> MakePAGImage(const std::string& path) {
-  return PAGImage::FromPath(TestConstants::RESOURCES_ROOT + path);
+  return PAGImage::FromPath(TestConstants::PAG_ROOT + path);
 }
 }  // namespace pag

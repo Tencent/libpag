@@ -30,7 +30,7 @@ PAG_TEST_SUIT(PAGTimeUtilsTest)
  * 用例描述: 测试图层对时间的输入输出是否一致
  */
 PAG_TEST_F(PAGTimeUtilsTest, ConvertProgressAndFrame) {
-  auto pagFile = LoadPAGFile("apitest/ZC_mg_seky2_landscape.pag");
+  auto pagFile = LoadPAGFile("resources/apitest/ZC_mg_seky2_landscape.pag");
   TestPAGPlayer->setComposition(pagFile);
   auto duration = pagFile->duration();
   auto totalFrames = TimeToFrame(duration, pagFile->frameRate());

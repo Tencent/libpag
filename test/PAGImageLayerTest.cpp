@@ -35,10 +35,10 @@ PAG_TEST_F(PAGImageLayerTest, imageBasetTest) {
   std::shared_ptr<PAGImageLayer> imageLayer =
       std::static_pointer_cast<PAGImageLayer>(GetLayer(TestPAGFile, LayerType::Image, target));
   ASSERT_NE(imageLayer, nullptr);
-  auto file = MakePAGImage("font/NotoColorEmoji.ttf");
+  auto file = MakePAGImage("resources/font/NotoColorEmoji.ttf");
   // 非法文件都无法被decode成PAGImage，file是nullptr
   EXPECT_TRUE(file == nullptr);
-  auto pag = MakePAGImage("apitest/test.pag");
+  auto pag = MakePAGImage("resources/apitest/test.pag");
   EXPECT_TRUE(pag == nullptr);
   imageLayer->replaceImage(file);
   TestPAGPlayer->flush();
@@ -61,7 +61,7 @@ PAG_TEST_F(PAGImageLayerTest, imageMultiThreadReplace) {
   ASSERT_NE(imageLayer, nullptr);
   ASSERT_EQ(imageLayer->editableIndex(), 1);
   ASSERT_EQ(imageLayer->contentDuration(), 2 * 1000000);
-  auto image = pag::MakePAGImage("apitest/imageReplacement.png");
+  auto image = MakePAGImage("resources/apitest/imageReplacement.png");
 
   TestPAGFile->setCurrentTime(3000000);
   TestPAGPlayer->flush();
@@ -99,7 +99,7 @@ PAG_TEST_F(PAGImageLayerTest, imageMultiThreadReplace) {
  * 用例描述: PAGImageLayerContentDuration获取测试
  */
 PAG_TEST_F(PAGImageLayerTest, imageLayerContentDuration) {
-  auto testFile = LoadPAGFile("apitest/test_TimeRemapInFileRange.pag");
+  auto testFile = LoadPAGFile("resources/apitest/test_TimeRemapInFileRange.pag");
   // 图层 timeremap 没有超过文件显示区域
   int commonTarget = 4;
   std::shared_ptr<PAGImageLayer> imageLayer =
@@ -107,7 +107,7 @@ PAG_TEST_F(PAGImageLayerTest, imageLayerContentDuration) {
   ASSERT_NE(imageLayer, nullptr);
   ASSERT_EQ(imageLayer->contentDuration(), 1160000);
 
-  testFile = LoadPAGFile("apitest/test_TimeRemapBeyondFileRange.pag");
+  testFile = LoadPAGFile("resources/apitest/test_TimeRemapBeyondFileRange.pag");
   // 图层 timeremap 都超过了文件显示区域
   imageLayer =
       std::static_pointer_cast<PAGImageLayer>(GetLayer(testFile, LayerType::Image, commonTarget));
@@ -115,7 +115,7 @@ PAG_TEST_F(PAGImageLayerTest, imageLayerContentDuration) {
   ASSERT_EQ(imageLayer->contentDuration(), 240000);
 
   // 变速timeremap测试用例
-  testFile = LoadPAGFile("apitest/timeRemap_shift.pag");
+  testFile = LoadPAGFile("resources/apitest/timeRemap_shift.pag");
   auto pagComposition = PAGComposition::Make(testFile->width(), testFile->height());
   auto pagImageLayer = std::static_pointer_cast<PAGImageLayer>(testFile->getLayerAt(0));
   pagComposition->addLayer(pagImageLayer);
@@ -128,7 +128,7 @@ PAG_TEST_F(PAGImageLayerTest, imageLayerContentDuration) {
  * 用例描述: PAGImageLayer getBounds接口 测试
  */
 PAG_TEST_F(PAGImageLayerTest, getBoundsTest) {
-  auto pagFile = pag::LoadPAGFile("apitest/ImageLayerBounds.pag");
+  auto pagFile = LoadPAGFile("resources/apitest/ImageLayerBounds.pag");
   Rect rect1 = Rect::MakeXYWH(0, 0, 720, 1280);
   Rect rect2 = Rect::MakeXYWH(0, 0, 720, 720);
   Rect rect3 = Rect::MakeXYWH(0, 0, 720, 1280);
@@ -144,9 +144,8 @@ PAG_TEST_F(PAGImageLayerTest, getBoundsTest) {
  * 用例描述: PAGImageLayer setImage接口 测试
  */
 PAG_TEST_F(PAGImageLayerTest, setImage) {
-  auto pagFile = pag::LoadPAGFile("filter/fastblur.pag");
-
-  auto image = pag::MakePAGImage("apitest/imageReplacement.png");
+  auto pagFile = LoadPAGFile("resources/filter/fastblur.pag");
+  auto image = MakePAGImage("resources/apitest/imageReplacement.png");
   auto pagImageLayer = pagFile->getLayersByEditableIndex(0, pag::LayerType::Image)[0];
   std::static_pointer_cast<PAGImageLayer>(pagImageLayer)->setImage(image);
   TestPAGPlayer->setComposition(pagFile);
@@ -160,7 +159,7 @@ PAG_TEST_F(PAGImageLayerTest, setImage) {
  * 对比 image1 和 image2 中间内容基本没有变化。
  */
 PAG_TEST_F(PAGImageLayerTest, mask) {
-  auto pagFile = pag::LoadPAGFile("apitest/wumengban.pag");
+  auto pagFile = LoadPAGFile("resources/apitest/wumengban.pag");
   ASSERT_NE(pagFile, nullptr);
   auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
@@ -175,7 +174,7 @@ PAG_TEST_F(PAGImageLayerTest, mask) {
                                        bitmap1.writablePixels(), bitmap1.rowBytes());
   ASSERT_TRUE(result);
 
-  pagFile = pag::LoadPAGFile("apitest/mengban.pag");
+  pagFile = LoadPAGFile("resources/apitest/mengban.pag");
   ASSERT_NE(pagFile, nullptr);
   pagPlayer->setComposition(pagFile);
   pagPlayer->flush();
@@ -226,7 +225,7 @@ PAG_TEST_F(PAGImageLayerTest, mask) {
  * 用例描述: 测试TrackMatteImageLayer的getVisibleRange是否正确。
  */
 PAG_TEST_F(PAGImageLayerTest, trackmatteImageLayer) {
-  auto pagFile = pag::LoadPAGFile("apitest/TrackmatteImageLayer.pag");
+  auto pagFile = LoadPAGFile("resources/apitest/TrackmatteImageLayer.pag");
   ASSERT_NE(pagFile, nullptr);
   auto imageLayer = std::static_pointer_cast<PAGImageLayer>(
       pagFile->getLayersByEditableIndex(0, LayerType::Image).front());
