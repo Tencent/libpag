@@ -113,38 +113,37 @@ Rect Layer::getBounds() const {
   return Rect::MakeEmpty();
 }
 
-template<typename T>
-static Point getMaxScaleInternal(Property<T>* property) {
+Point Layer::getMaxScaleFactor() {
+  return getScaleFactor().first;
+}
+
+std::pair<Point, Point> Layer::getScaleFactor() {
   auto maxScale = Point::Make(1, 1);
+  auto minScale = Point::Make(1, 1);
+  auto property = transform->scale;
   if (property->animatable()) {
-    auto keyframes = static_cast<AnimatableProperty<T>*>(property)->keyframes;
-    float scaleX = fabs(keyframes[0]->startValue.x);
-    float scaleY = fabs(keyframes[0]->startValue.y);
+    auto keyframes = static_cast<AnimatableProperty<Point>*>(property)->keyframes;
+    minScale.x = maxScale.x = fabs(keyframes[0]->startValue.x);
+    minScale.y = maxScale.y = fabs(keyframes[0]->startValue.y);
     for (auto& keyframe : keyframes) {
       auto x = fabs(keyframe->endValue.x);
       auto y = fabs(keyframe->endValue.y);
-      if (scaleX < x) {
-        scaleX = x;
+      if (maxScale.x < x) {
+        maxScale.x = x;
       }
-      if (scaleY < y) {
-        scaleY = y;
+      if (maxScale.y < y) {
+        maxScale.y = y;
+      }
+      if (minScale.x > x) {
+        minScale.x = x;
+      }
+      if (minScale.y > y) {
+        minScale.y = y;
       }
     }
-    maxScale.x = scaleX;
-    maxScale.y = scaleY;
   } else {
-    maxScale.x = fabs(property->value.x);
-    maxScale.y = fabs(property->value.y);
-  }
-  return maxScale;
-}
-
-Point Layer::getMaxScaleFactor() {
-  auto maxScale = Point::Make(1, 1);
-  if (transform != nullptr) {
-    maxScale = getMaxScaleInternal(transform->scale);
-  } else if (transform3D != nullptr) {
-    maxScale = getMaxScaleInternal(transform3D->scale);
+    minScale.x = maxScale.x = fabs(property->value.x);
+    minScale.y = maxScale.y = fabs(property->value.y);
   }
   if (!effects.empty()) {
     auto bounds = getBounds();
@@ -153,15 +152,19 @@ Point Layer::getMaxScaleFactor() {
         auto scale = effect->getMaxScaleFactor(bounds);
         maxScale.x *= fabs(scale.x);
         maxScale.y *= fabs(scale.y);
+        minScale.x *= fabs(scale.x);
+        minScale.y *= fabs(scale.y);
       }
     }
   }
   if (parent != nullptr) {
-    auto parentScale = parent->getMaxScaleFactor();
-    maxScale.x *= parentScale.x;
-    maxScale.y *= parentScale.y;
+    auto parentScale = parent->getScaleFactor();
+    maxScale.x *= parentScale.first.x;
+    maxScale.y *= parentScale.first.y;
+    minScale.x *= parentScale.second.x;
+    minScale.y *= parentScale.second.y;
   }
-  return maxScale;
+  return {maxScale, minScale};
 }
 
 TimeRange Layer::visibleRange() {
