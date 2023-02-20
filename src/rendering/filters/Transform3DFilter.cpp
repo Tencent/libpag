@@ -236,8 +236,13 @@ void Transform3DFilter::onSubmitTransformations(tgfx::Context* context, const Fi
                  info.fEye.z * (1.0f - (cameraPositon.z + 1000.f) / 700.f)};
     
     info.fCOA = {2.0f * cameraPointOfInterest.x / bounds.width() - 1.0f, 2.0f * cameraPointOfInterest.y / bounds.height() - 1.0f, 0.f};
-
     viewMatrix = tgfx::Matrix4x4::LookAt(info.fEye, info.fCOA, info.fUp);
+    viewMatrix.postConcat(sourceAspectScaleMatrix);
+    auto xRotationMatrix = tgfx::Matrix4x4::Rotate({1.0, 0.0, 0.0}, DegreesToRadians(cameraOrientation.x + cameraXRotation));
+    auto yRotationMatrix = tgfx::Matrix4x4::Rotate({0.0, 1.0, 0.0}, DegreesToRadians(cameraOrientation.y + cameraYRotation));
+    auto zRotationMatrix = tgfx::Matrix4x4::Rotate({0.0, 0.0, 1.0}, DegreesToRadians(-(cameraOrientation.z + cameraZRotation)));
+    viewMatrix.postConcat(zRotationMatrix).postConcat(yRotationMatrix).postConcat(xRotationMatrix);
+    viewMatrix.postConcat(invertTargetAspectScaleMatrix);
   } else {
     viewMatrix = tgfx::Matrix4x4::LookAt(info.fEye, info.fCOA, info.fUp);
   }
