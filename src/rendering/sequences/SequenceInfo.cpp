@@ -23,14 +23,6 @@
 #include "tgfx/core/Image.h"
 
 namespace pag {
-static tgfx::ISize GetBufferSize(Sequence* sequence) {
-  if (sequence->composition->type() == CompositionType::Video) {
-    auto videoSequence = static_cast<VideoSequence*>(sequence);
-    return tgfx::ISize::Make(videoSequence->getVideoWidth(), videoSequence->getVideoHeight());
-  }
-  return tgfx::ISize::Make(sequence->width, sequence->height);
-}
-
 static std::shared_ptr<tgfx::Image> MakeSequenceImage(
     std::shared_ptr<tgfx::ImageGenerator> generator, Sequence* sequence) {
   std::shared_ptr<tgfx::Image> image = nullptr;
@@ -72,17 +64,24 @@ std::shared_ptr<SequenceReader> SequenceInfo::makeReader(std::shared_ptr<File> f
   return reader;
 }
 
-std::shared_ptr<tgfx::Image> SequenceInfo::makeStatic(std::shared_ptr<File> file) {
+std::shared_ptr<tgfx::Image> SequenceInfo::makeStaticImage(std::shared_ptr<File> file) {
   if (sequence == nullptr || file == nullptr || !staticContent()) {
     return nullptr;
   }
-  auto generator = std::make_shared<StaticSequenceGenerator>(std::move(file), weakThis.lock(),
-                                                             GetBufferSize(sequence));
+  int width = sequence->width;
+  int height = sequence->height;
+  if (sequence->composition->type() == CompositionType::Video) {
+    auto videoSequence = static_cast<VideoSequence*>(sequence);
+    width = videoSequence->getVideoWidth();
+    height = videoSequence->getVideoHeight();
+  }
+  auto generator =
+      std::make_shared<StaticSequenceGenerator>(std::move(file), weakThis.lock(), width, height);
   return MakeSequenceImage(std::move(generator), sequence);
 }
 
-std::shared_ptr<tgfx::Image> SequenceInfo::makeImage(std::shared_ptr<SequenceReader> reader,
-                                                     Frame targetFrame) {
+std::shared_ptr<tgfx::Image> SequenceInfo::makeFrameImage(std::shared_ptr<SequenceReader> reader,
+                                                          Frame targetFrame) {
   if (reader == nullptr || sequence == nullptr) {
     return nullptr;
   }

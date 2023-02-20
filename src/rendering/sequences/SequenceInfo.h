@@ -34,9 +34,9 @@ class SequenceInfo {
   virtual std::shared_ptr<SequenceReader> makeReader(std::shared_ptr<File> file,
                                                      PAGFile* pagFile = nullptr);
 
-  virtual std::shared_ptr<tgfx::Image> makeStatic(std::shared_ptr<File> file);
-  virtual std::shared_ptr<tgfx::Image> makeImage(std::shared_ptr<SequenceReader> reader,
-                                                 Frame targetFrame);
+  virtual std::shared_ptr<tgfx::Image> makeStaticImage(std::shared_ptr<File> file);
+  virtual std::shared_ptr<tgfx::Image> makeFrameImage(std::shared_ptr<SequenceReader> reader,
+                                                      Frame targetFrame);
 
   virtual bool staticContent() const;
   virtual ID uniqueID() const;
@@ -58,9 +58,9 @@ class SequenceInfo {
 
 class StaticSequenceGenerator : public tgfx::ImageGenerator {
  public:
-  StaticSequenceGenerator(std::shared_ptr<File> file, std::shared_ptr<SequenceInfo> info,
-                          tgfx::ISize bufferSize)
-      : tgfx::ImageGenerator(bufferSize), file(std::move(file)), info(info) {
+  StaticSequenceGenerator(std::shared_ptr<File> file, std::shared_ptr<SequenceInfo> info, int width,
+                          int height)
+      : tgfx::ImageGenerator(width, height), file(std::move(file)), info(info) {
   }
 
   bool isAlphaOnly() const override {

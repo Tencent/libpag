@@ -51,7 +51,7 @@ void SequenceImageQueue::prepare(Frame targetFrame) {
   if (preparedImage != nullptr || targetFrame < 0 || targetFrame >= totalFrames) {
     return;
   }
-  auto image = sequence->makeImage(reader, targetFrame);
+  auto image = sequence->makeFrameImage(reader, targetFrame);
   preparedImage = image->makeDecoded();
   preparedFrame = targetFrame;
 }
@@ -66,7 +66,7 @@ std::shared_ptr<tgfx::Image> SequenceImageQueue::getImage(Frame targetFrame) {
     currentFrame = preparedFrame;
     return currentImage;
   }
-  auto image = sequence->makeImage(reader, targetFrame);
+  auto image = sequence->makeFrameImage(reader, targetFrame);
   if (image == nullptr) {
     return nullptr;
   }
