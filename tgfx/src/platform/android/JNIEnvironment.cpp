@@ -26,8 +26,8 @@
 #include "core/utils/Log.h"
 
 namespace tgfx {
-// https://android.googlesource.com/platform/art/+/android-8.0.0_r36/runtime/jni_env_ext.h#39
-static constexpr size_t LOCALS_CAPACITY = 512;
+// https://android.googlesource.com/platform/art/+/refs/tags/android-5.0.2_r1/runtime/jni_internal.cc#63
+static constexpr size_t LOCALS_CAPACITY = 64;
 
 static std::atomic<JavaVM*> globalJavaVM = nullptr;
 static pthread_key_t envKey = 0;
@@ -95,7 +95,12 @@ JNIEnv* JNIEnvironment::Current() {
 JNIEnvironment::JNIEnvironment() {
   env = JNIEnvironment::Current();
   if (env != nullptr) {
-    env->PushLocalFrame(LOCALS_CAPACITY);
+    auto result = env->PushLocalFrame(LOCALS_CAPACITY);
+    if (result != 0) {
+      LOGE("JNIEnvironment(): Failed to call env->PushLocalFrame(%d)!", LOCALS_CAPACITY);
+      env->ExceptionClear();
+      env = nullptr;
+    }
   }
 }
 

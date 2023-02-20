@@ -44,15 +44,16 @@ void NativeImageReader::JNIInit(JNIEnv* env) {
   SurfaceTextureClass = env->FindClass("android/graphics/SurfaceTexture");
   SurfaceTexture_Constructor_singleBufferMode =
       env->GetMethodID(SurfaceTextureClass.get(), "<init>", "(Z)V");
-  SurfaceTexture_Constructor_texName =
-      env->GetMethodID(SurfaceTextureClass.get(), "<init>", "(I)V");
+  if (env->ExceptionCheck()) {
+    env->ExceptionClear();
+    SurfaceTexture_Constructor_texName =
+        env->GetMethodID(SurfaceTextureClass.get(), "<init>", "(I)V");
+  }
   SurfaceTexture_setOnFrameAvailableListenerHandler = env->GetMethodID(
       SurfaceTextureClass.get(), "setOnFrameAvailableListener",
       "(Landroid/graphics/SurfaceTexture$OnFrameAvailableListener;Landroid/os/Handler;)V");
-  if (SurfaceTexture_setOnFrameAvailableListenerHandler != nullptr) {
-    HandlerClass = env->FindClass("android/os/Handler");
-    Handler_Constructor = env->GetMethodID(HandlerClass.get(), "<init>", "(Landroid/os/Looper;)V");
-  } else {
+  if (env->ExceptionCheck()) {
+    env->ExceptionClear();
     SurfaceTexture_setOnFrameAvailableListener =
         env->GetMethodID(SurfaceTextureClass.get(), "setOnFrameAvailableListener",
                          "(Landroid/graphics/SurfaceTexture$OnFrameAvailableListener;)V");
@@ -63,6 +64,9 @@ void NativeImageReader::JNIInit(JNIEnv* env) {
     EventHandler_Constructor =
         env->GetMethodID(EventHandlerClass.get(), "<init>",
                          "(Landroid/graphics/SurfaceTexture;Landroid/os/Looper;)V");
+  } else {
+    HandlerClass = env->FindClass("android/os/Handler");
+    Handler_Constructor = env->GetMethodID(HandlerClass.get(), "<init>", "(Landroid/os/Looper;)V");
   }
   SurfaceTexture_updateTexImage =
       env->GetMethodID(SurfaceTextureClass.get(), "updateTexImage", "()V");
