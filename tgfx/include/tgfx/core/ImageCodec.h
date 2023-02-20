@@ -58,9 +58,9 @@ class ImageCodec : public ImageGenerator {
 
   /**
    * Decodes the image with the specified image info into the given pixels. Returns true if the
-   * decoding was successful.
-   * Note: This method is not implemented on the web platform, use makeBuffer() instead if your
-   * final goal is to make a texture out of the image.
+   * decoding was successful.Note: for performance reasons, we do not recommend using this method
+   * on the web platform. Use the makeBuffer() method for better performance if your final goal is
+   * to make a texture out of the image.
    */
   virtual bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const = 0;
 
