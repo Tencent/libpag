@@ -44,10 +44,9 @@ static jfieldID PAGText_leading;
 static jfieldID PAGText_tracking;
 static jfieldID PAGText_backgroundColor;
 static jfieldID PAGText_backgroundAlpha;
-}  // namespace pag
 
 void InitPAGTextJNI(JNIEnv* env) {
-  PAGTextClass.reset(env, env->FindClass("org/libpag/PAGText"));
+  PAGTextClass = env->FindClass("org/libpag/PAGText");
   PAGTextConstructID = env->GetMethodID(PAGTextClass.get(), "<init>", "()V");
   PAGText_applyFill = env->GetFieldID(PAGTextClass.get(), "applyFill", "Z");
   PAGText_applyStroke = env->GetFieldID(PAGTextClass.get(), "applyStroke", "Z");
@@ -83,10 +82,9 @@ jobject ToPAGTextObject(JNIEnv* env, pag::TextDocumentHandle textDocument) {
                        static_cast<jboolean>(textDocument->applyStroke));
   env->SetFloatField(textData, PAGText_baselineShift, textDocument->baselineShift);
   env->SetBooleanField(textData, PAGText_boxText, static_cast<jboolean>(textDocument->boxText));
-  Local<jobject> boxTextRect = {
-      env, MakeRectFObject(env, textDocument->boxTextPos.x, textDocument->boxTextPos.y,
-                           textDocument->boxTextSize.x, textDocument->boxTextSize.y)};
-  env->SetObjectField(textData, PAGText_boxTextRect, boxTextRect.get());
+  auto boxTextRect = MakeRectFObject(env, textDocument->boxTextPos.x, textDocument->boxTextPos.y,
+                                     textDocument->boxTextSize.x, textDocument->boxTextSize.y);
+  env->SetObjectField(textData, PAGText_boxTextRect, boxTextRect);
   env->SetFloatField(textData, PAGText_firstBaseLine, textDocument->firstBaseLine);
   env->SetBooleanField(textData, PAGText_fauxBold, static_cast<jboolean>(textDocument->fauxBold));
   env->SetBooleanField(textData, PAGText_fauxItalic,
@@ -94,10 +92,10 @@ jobject ToPAGTextObject(JNIEnv* env, pag::TextDocumentHandle textDocument) {
   jint fillColor = MakeColorInt(env, textDocument->fillColor.red, textDocument->fillColor.green,
                                 textDocument->fillColor.blue);
   env->SetIntField(textData, PAGText_fillColor, fillColor);
-  Local<jstring> fontFamily = {env, SafeConvertToJString(env, textDocument->fontFamily.c_str())};
-  env->SetObjectField(textData, PAGText_fontFamily, fontFamily.get());
-  Local<jstring> fontStyle = {env, SafeConvertToJString(env, textDocument->fontStyle.c_str())};
-  env->SetObjectField(textData, PAGText_fontStyle, fontStyle.get());
+  auto fontFamily = SafeConvertToJString(env, textDocument->fontFamily.c_str());
+  env->SetObjectField(textData, PAGText_fontFamily, fontFamily);
+  auto fontStyle = SafeConvertToJString(env, textDocument->fontStyle.c_str());
+  env->SetObjectField(textData, PAGText_fontStyle, fontStyle);
   env->SetFloatField(textData, PAGText_fontSize, textDocument->fontSize);
   jint strokeColor = MakeColorInt(env, textDocument->strokeColor.red,
                                   textDocument->strokeColor.green, textDocument->strokeColor.blue);
@@ -105,8 +103,8 @@ jobject ToPAGTextObject(JNIEnv* env, pag::TextDocumentHandle textDocument) {
   env->SetBooleanField(textData, PAGText_strokeOverFill,
                        static_cast<jboolean>(textDocument->strokeOverFill));
   env->SetFloatField(textData, PAGText_strokeWidth, textDocument->strokeWidth);
-  Local<jstring> text = {env, SafeConvertToJString(env, textDocument->text.c_str())};
-  env->SetObjectField(textData, PAGText_text, text.get());
+  auto text = SafeConvertToJString(env, textDocument->text.c_str());
+  env->SetObjectField(textData, PAGText_text, text);
   env->SetIntField(textData, PAGText_justification, textDocument->justification);
   env->SetFloatField(textData, PAGText_leading, textDocument->leading);
   env->SetFloatField(textData, PAGText_tracking, textDocument->tracking);
@@ -127,27 +125,26 @@ TextDocumentHandle ToTextDocument(JNIEnv* env, jobject textData) {
   textDocument->applyStroke = env->GetBooleanField(textData, PAGText_applyStroke);
   textDocument->baselineShift = env->GetFloatField(textData, PAGText_baselineShift);
   textDocument->boxText = env->GetBooleanField(textData, PAGText_boxText);
-  Local<jobject> boxTextRect = {env, env->GetObjectField(textData, PAGText_boxTextRect)};
-  auto boxRect = ToRectData(env, boxTextRect.get());
-  textDocument->boxTextPos = {boxRect.x, boxRect.y};
-  textDocument->boxTextSize = {boxRect.width, boxRect.height};
+  auto boxTextRect = env->GetObjectField(textData, PAGText_boxTextRect);
+  auto boxRect = ToRect(env, boxTextRect);
+  textDocument->boxTextPos = {boxRect.x(), boxRect.y()};
+  textDocument->boxTextSize = {boxRect.width(), boxRect.height()};
   textDocument->firstBaseLine = env->GetFloatField(textData, PAGText_firstBaseLine);
   textDocument->fauxBold = env->GetBooleanField(textData, PAGText_fauxBold);
   textDocument->fauxItalic = env->GetBooleanField(textData, PAGText_fauxItalic);
   jint fillColorObject = env->GetIntField(textData, PAGText_fillColor);
   textDocument->fillColor = ToColor(env, fillColorObject);
-  Local<jstring> fontFamilyObject = {env,
-                                     (jstring)env->GetObjectField(textData, PAGText_fontFamily)};
-  textDocument->fontFamily = SafeConvertToStdString(env, fontFamilyObject.get());
-  Local<jstring> fontStyleObject = {env, (jstring)env->GetObjectField(textData, PAGText_fontStyle)};
-  textDocument->fontStyle = SafeConvertToStdString(env, fontStyleObject.get());
+  auto fontFamilyObject = (jstring)env->GetObjectField(textData, PAGText_fontFamily);
+  textDocument->fontFamily = SafeConvertToStdString(env, fontFamilyObject);
+  auto fontStyleObject = (jstring)env->GetObjectField(textData, PAGText_fontStyle);
+  textDocument->fontStyle = SafeConvertToStdString(env, fontStyleObject);
   textDocument->fontSize = env->GetFloatField(textData, PAGText_fontSize);
   jint strokeColorObject = env->GetIntField(textData, PAGText_strokeColor);
   textDocument->strokeColor = ToColor(env, strokeColorObject);
   textDocument->strokeOverFill = env->GetBooleanField(textData, PAGText_strokeOverFill);
   textDocument->strokeWidth = env->GetFloatField(textData, PAGText_strokeWidth);
-  Local<jstring> textObject = {env, (jstring)env->GetObjectField(textData, PAGText_text)};
-  textDocument->text = SafeConvertToStdString(env, textObject.get());
+  auto textObject = (jstring)env->GetObjectField(textData, PAGText_text);
+  textDocument->text = SafeConvertToStdString(env, textObject);
   textDocument->justification =
       static_cast<Enum>(env->GetIntField(textData, PAGText_justification));
   textDocument->leading = env->GetFloatField(textData, PAGText_leading);
@@ -158,3 +155,4 @@ TextDocumentHandle ToTextDocument(JNIEnv* env, jobject textData) {
   textDocument->backgroundAlpha = static_cast<uint8_t>(backgroundAlphaObject);
   return textDocument;
 }
+}  // namespace pag

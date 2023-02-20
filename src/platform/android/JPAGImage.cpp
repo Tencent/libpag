@@ -62,9 +62,6 @@ PAG_API void Java_org_libpag_PAGImage_nativeFinalize(JNIEnv* env, jobject thiz) 
 
 PAG_API void Java_org_libpag_PAGImage_nativeInit(JNIEnv* env, jclass clazz) {
   PAGImage_nativeContext = env->GetFieldID(clazz, "nativeContext", "J");
-  // 调用堆栈源头从C++触发而不是Java触发的情况下，FindClass
-  // 可能会失败，因此要提前初始化这部分反射方法。
-  NativePlatform::InitJNI(env);
 }
 
 PAG_API jlong Java_org_libpag_PAGImage_LoadFromBitmap(JNIEnv* env, jclass, jobject bitmap) {

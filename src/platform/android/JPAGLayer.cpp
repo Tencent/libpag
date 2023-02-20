@@ -164,7 +164,7 @@ PAG_API jobject Java_org_libpag_PAGLayer_parent(JNIEnv* env, jobject thiz) {
 }
 
 PAG_API jobjectArray Java_org_libpag_PAGLayer_markers(JNIEnv* env, jobject thiz) {
-  static Global<jclass> PAGMarker_Class(env, env->FindClass("org/libpag/PAGMarker"));
+  static Global<jclass> PAGMarker_Class = env->FindClass("org/libpag/PAGMarker");
   auto pagLayer = GetPAGLayer(env, thiz);
   if (pagLayer == nullptr || pagLayer->markers().empty()) {
     return env->NewObjectArray(0, PAGMarker_Class.get(), nullptr);
@@ -172,8 +172,8 @@ PAG_API jobjectArray Java_org_libpag_PAGLayer_markers(JNIEnv* env, jobject thiz)
   int markerSize = pagLayer->markers().size();
   jobjectArray markerArray = env->NewObjectArray(markerSize, PAGMarker_Class.get(), nullptr);
   for (int i = 0; i < markerSize; ++i) {
-    Local<jobject> jMarker = {env, ToPAGMarkerObject(env, pagLayer->markers()[i])};
-    env->SetObjectArrayElement(markerArray, i, jMarker.get());
+    auto jMarker = ToPAGMarkerObject(env, pagLayer->markers()[i]);
+    env->SetObjectArrayElement(markerArray, i, jMarker);
   }
   return markerArray;
 }

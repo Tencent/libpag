@@ -40,8 +40,8 @@ PAG_API void Java_org_libpag_PAGFont_SetFallbackFontPaths(JNIEnv* env, jclass,
   length = std::min(length, ttcLength);
   auto ttcData = env->GetIntArrayElements(ttcIndices, nullptr);
   for (int index = 0; index < length; index++) {
-    Local<jstring> fontNameObject = {env, (jstring)env->GetObjectArrayElement(fontNameList, index)};
-    auto fontFamily = SafeConvertToStdString(env, fontNameObject.get());
+    auto fontNameObject = (jstring)env->GetObjectArrayElement(fontNameList, index);
+    auto fontFamily = SafeConvertToStdString(env, fontNameObject);
     fallbackList.push_back(fontFamily);
     ttcList.push_back(ttcData[index]);
   }

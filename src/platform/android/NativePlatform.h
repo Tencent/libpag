@@ -24,7 +24,7 @@
 namespace pag {
 class NativePlatform : public Platform {
  public:
-  static void InitJNI(JNIEnv* env);
+  static void InitJNI();
 
   std::vector<const VideoDecoderFactory*> getVideoDecoderFactories() const override;
 

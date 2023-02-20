@@ -38,7 +38,7 @@ PAG_API void Java_org_libpag_PAGTextLayer_nativeInit(JNIEnv* env, jclass clazz) 
   PAGTextLayer_nativeContext = env->GetFieldID(clazz, "nativeContext", "J");
 }
 
-PAG_API void Java_org_libpag_PAGTextLayer_setFont(JNIEnv* env, jclass thiz, jstring fontFamily,
+PAG_API void Java_org_libpag_PAGTextLayer_setFont(JNIEnv* env, jobject thiz, jstring fontFamily,
                                                   jstring fontStyle) {
   auto pagLayer = GetPAGTextLayer(env, thiz);
   if (pagLayer == nullptr) {
@@ -48,7 +48,7 @@ PAG_API void Java_org_libpag_PAGTextLayer_setFont(JNIEnv* env, jclass thiz, jstr
       PAGFont(SafeConvertToStdString(env, fontFamily), SafeConvertToStdString(env, fontStyle)));
 }
 
-PAG_API jobject Java_org_libpag_PAGTextLayer_font(JNIEnv* env, jclass thiz) {
+PAG_API jobject Java_org_libpag_PAGTextLayer_font(JNIEnv* env, jobject thiz) {
   auto pagLayer = GetPAGTextLayer(env, thiz);
   if (pagLayer == nullptr) {
     return nullptr;
@@ -57,7 +57,7 @@ PAG_API jobject Java_org_libpag_PAGTextLayer_font(JNIEnv* env, jclass thiz) {
                            pagLayer->font().fontStyle.c_str());
 }
 
-PAG_API jint Java_org_libpag_PAGTextLayer_fillColor(JNIEnv* env, jclass thiz) {
+PAG_API jint Java_org_libpag_PAGTextLayer_fillColor(JNIEnv* env, jobject thiz) {
   auto pagLayer = GetPAGTextLayer(env, thiz);
   if (pagLayer == nullptr) {
     return 0;
@@ -66,7 +66,7 @@ PAG_API jint Java_org_libpag_PAGTextLayer_fillColor(JNIEnv* env, jclass thiz) {
   return MakeColorInt(env, color.red, color.green, color.blue);
 }
 
-PAG_API void Java_org_libpag_PAGTextLayer_setFillColor(JNIEnv* env, jclass thiz, jint color) {
+PAG_API void Java_org_libpag_PAGTextLayer_setFillColor(JNIEnv* env, jobject thiz, jint color) {
   auto pagLayer = GetPAGTextLayer(env, thiz);
   if (pagLayer == nullptr) {
     return;
@@ -74,7 +74,7 @@ PAG_API void Java_org_libpag_PAGTextLayer_setFillColor(JNIEnv* env, jclass thiz,
   pagLayer->setFillColor(ToColor(env, color));
 }
 
-PAG_API jint Java_org_libpag_PAGTextLayer_strokeColor(JNIEnv* env, jclass thiz) {
+PAG_API jint Java_org_libpag_PAGTextLayer_strokeColor(JNIEnv* env, jobject thiz) {
   auto pagLayer = GetPAGTextLayer(env, thiz);
   if (pagLayer == nullptr) {
     return 0;
@@ -83,7 +83,7 @@ PAG_API jint Java_org_libpag_PAGTextLayer_strokeColor(JNIEnv* env, jclass thiz) 
   return MakeColorInt(env, color.red, color.green, color.blue);
 }
 
-PAG_API void Java_org_libpag_PAGTextLayer_setStrokeColor(JNIEnv* env, jclass thiz, jint color) {
+PAG_API void Java_org_libpag_PAGTextLayer_setStrokeColor(JNIEnv* env, jobject thiz, jint color) {
   auto pagLayer = GetPAGTextLayer(env, thiz);
   if (pagLayer == nullptr) {
     return;
@@ -91,7 +91,7 @@ PAG_API void Java_org_libpag_PAGTextLayer_setStrokeColor(JNIEnv* env, jclass thi
   pagLayer->setStrokeColor(ToColor(env, color));
 }
 
-PAG_API void Java_org_libpag_PAGTextLayer_setText(JNIEnv* env, jclass thiz, jstring text) {
+PAG_API void Java_org_libpag_PAGTextLayer_setText(JNIEnv* env, jobject thiz, jstring text) {
   auto pagLayer = GetPAGTextLayer(env, thiz);
   if (pagLayer == nullptr) {
     return;
@@ -99,7 +99,7 @@ PAG_API void Java_org_libpag_PAGTextLayer_setText(JNIEnv* env, jclass thiz, jstr
   pagLayer->setText(SafeConvertToStdString(env, text));
 }
 
-PAG_API void Java_org_libpag_PAGTextLayer_reset(JNIEnv* env, jclass thiz) {
+PAG_API void Java_org_libpag_PAGTextLayer_reset(JNIEnv* env, jobject thiz) {
   auto pagLayer = GetPAGTextLayer(env, thiz);
   if (pagLayer == nullptr) {
     return;
@@ -107,7 +107,7 @@ PAG_API void Java_org_libpag_PAGTextLayer_reset(JNIEnv* env, jclass thiz) {
   pagLayer->reset();
 }
 
-PAG_API jstring Java_org_libpag_PAGTextLayer_text(JNIEnv* env, jclass thiz) {
+PAG_API jstring Java_org_libpag_PAGTextLayer_text(JNIEnv* env, jobject thiz) {
   auto pagLayer = GetPAGTextLayer(env, thiz);
   if (pagLayer == nullptr) {
     std::string empty = "";
@@ -116,7 +116,7 @@ PAG_API jstring Java_org_libpag_PAGTextLayer_text(JNIEnv* env, jclass thiz) {
   return SafeConvertToJString(env, pagLayer->text().c_str());
 }
 
-PAG_API void Java_org_libpag_PAGTextLayer_setFontSize(JNIEnv* env, jclass thiz, jfloat fontSize) {
+PAG_API void Java_org_libpag_PAGTextLayer_setFontSize(JNIEnv* env, jobject thiz, jfloat fontSize) {
   auto pagLayer = GetPAGTextLayer(env, thiz);
   if (pagLayer == nullptr) {
     return;
@@ -124,7 +124,7 @@ PAG_API void Java_org_libpag_PAGTextLayer_setFontSize(JNIEnv* env, jclass thiz, 
   pagLayer->setFontSize(fontSize);
 }
 
-PAG_API jfloat Java_org_libpag_PAGTextLayer_fontSize(JNIEnv* env, jclass thiz) {
+PAG_API jfloat Java_org_libpag_PAGTextLayer_fontSize(JNIEnv* env, jobject thiz) {
   auto pagLayer = GetPAGTextLayer(env, thiz);
   if (pagLayer == nullptr) {
     return 0;

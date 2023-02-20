@@ -24,7 +24,8 @@
 
 namespace tgfx {
 std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(NativeImageRef nativeImage) {
-  auto env = CurrentJNIEnv();
+  JNIEnvironment environment;
+  auto env = environment.current();
   if (env == nullptr) {
     return nullptr;
   }
@@ -35,7 +36,7 @@ std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(NativeImageRef nativeImage) {
   }
   auto image =
       std::shared_ptr<NativeImageBuffer>(new NativeImageBuffer(info.width(), info.height()));
-  image->nativeImage.reset(env, nativeImage);
+  image->nativeImage = nativeImage;
   return image;
 }
 
@@ -43,7 +44,8 @@ NativeImageBuffer::NativeImageBuffer(int width, int height) : _width(width), _he
 }
 
 std::shared_ptr<Texture> NativeImageBuffer::onMakeTexture(Context* context, bool mipMapped) const {
-  auto env = CurrentJNIEnv();
+  JNIEnvironment environment;
+  auto env = environment.current();
   if (env == nullptr) {
     return nullptr;
   }

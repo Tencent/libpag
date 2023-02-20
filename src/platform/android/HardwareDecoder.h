@@ -18,14 +18,14 @@
 
 #pragma once
 
-#include "platform/android/Global.h"
+#include "JNIHelper.h"
 #include "platform/android/JVideoSurface.h"
 #include "rendering/video/VideoDecoder.h"
 
 namespace pag {
 class HardwareDecoder : public VideoDecoder {
  public:
-  static void InitJNI(JNIEnv* env, const std::string& className);
+  static void InitJNI(JNIEnv* env);
 
   ~HardwareDecoder() override;
 
