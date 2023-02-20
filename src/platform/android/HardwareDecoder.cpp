@@ -23,7 +23,6 @@
 
 namespace pag {
 static Global<jclass> HardwareDecoderClass;
-static jmethodID HardwareDecoder_ForceSoftwareDecoder;
 static jmethodID HardwareDecoder_Create;
 static jmethodID HardwareDecoder_onSendBytes;
 static jmethodID HardwareDecoder_onEndOfStream;
@@ -41,8 +40,6 @@ static jmethodID MediaFormat_setFloat;
 
 void HardwareDecoder::InitJNI(JNIEnv* env) {
   HardwareDecoderClass = env->FindClass("org/libpag/HardwareDecoder");
-  HardwareDecoder_ForceSoftwareDecoder =
-      env->GetStaticMethodID(HardwareDecoderClass.get(), "ForceSoftwareDecoder", "()Z");
   HardwareDecoder_Create =
       env->GetStaticMethodID(HardwareDecoderClass.get(), "Create",
                              "(Landroid/media/MediaFormat;)Lorg/libpag/HardwareDecoder;");
@@ -74,8 +71,7 @@ void HardwareDecoder::InitJNI(JNIEnv* env) {
 HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
   JNIEnvironment environment;
   auto env = environment.current();
-  if (env == nullptr || env->CallStaticBooleanMethod(HardwareDecoderClass.get(),
-                                                     HardwareDecoder_ForceSoftwareDecoder)) {
+  if (env == nullptr) {
     return;
   }
   isValid = initDecoder(env, format);

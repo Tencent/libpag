@@ -19,6 +19,7 @@
 #include "NativeCodec.h"
 #include <android/bitmap.h>
 #include "NativeImageInfo.h"
+#include "core/utils/Log.h"
 #include "tgfx/core/Bitmap.h"
 
 namespace tgfx {
@@ -104,8 +105,12 @@ static Orientation GetOrientation(JNIEnv* env, jobject exifInterface) {
 
 static jobject DecodeBitmap(JNIEnv* env, jobject options, const std::string& filePath) {
   auto imagePath = SafeToJString(env, filePath);
-  return env->CallStaticObjectMethod(BitmapFactoryClass.get(), BitmapFactory_decodeFile, imagePath,
-                                     options);
+  auto bitmap = env->CallStaticObjectMethod(BitmapFactoryClass.get(), BitmapFactory_decodeFile,
+                                            imagePath, options);
+  if (env->ExceptionCheck()) {
+    return nullptr;
+  }
+  return bitmap;
 }
 
 std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& filePath) {
@@ -124,6 +129,7 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& fileP
   auto height = env->GetIntField(options, BitmapFactoryOptions_outHeight);
   if (width <= 0 || height <= 0) {
     env->ExceptionClear();
+    LOGE("NativeCodec::readPixels(): Failed to get the size of the image!");
     return nullptr;
   }
   auto imagePath = SafeToJString(env, filePath);
@@ -139,8 +145,12 @@ static jobject DecodeBitmap(JNIEnv* env, jobject options, std::shared_ptr<Data> 
   auto byteArray = env->NewByteArray(imageBytes->size());
   env->SetByteArrayRegion(byteArray, 0, imageBytes->size(),
                           reinterpret_cast<const jbyte*>(imageBytes->data()));
-  return env->CallStaticObjectMethod(BitmapFactoryClass.get(), BitmapFactory_decodeByteArray,
-                                     byteArray, 0, imageBytes->size(), options);
+  auto bitmap = env->CallStaticObjectMethod(BitmapFactoryClass.get(), BitmapFactory_decodeByteArray,
+                                            byteArray, 0, imageBytes->size(), options);
+  if (env->ExceptionCheck()) {
+    return nullptr;
+  }
+  return bitmap;
 }
 
 std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> imageBytes) {
@@ -159,6 +169,7 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> im
   auto height = env->GetIntField(options, BitmapFactoryOptions_outHeight);
   if (width <= 0 || height <= 0) {
     env->ExceptionClear();
+    LOGE("NativeCodec::readPixels(): Failed to get the size of the image!");
     return nullptr;
   }
   auto byteArray = env->NewByteArray(imageBytes->size());
@@ -186,6 +197,7 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   auto options = env->NewObject(BitmapFactoryOptionsClass.get(), BitmapFactoryOptions_Constructor);
   if (options == nullptr) {
     env->ExceptionClear();
+    LOGE("NativeCodec::readPixels(): Failed to create a BitmapFactory.Options object!");
     return false;
   }
   jobject config;
@@ -207,11 +219,13 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   auto info = NativeImageInfo::GetInfo(env, bitmap);
   if (info.isEmpty()) {
     env->ExceptionClear();
+    LOGE("NativeCodec::readPixels(): Failed to decode the image!");
     return false;
   }
   void* pixels = nullptr;
   if (AndroidBitmap_lockPixels(env, bitmap, &pixels) != 0) {
     env->ExceptionClear();
+    LOGE("NativeCodec::readPixels(): Failed to lockPixels() of a Java bitmap!");
     return false;
   }
   auto result = Bitmap(info, pixels).readPixels(dstInfo, dstPixels);
