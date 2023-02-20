@@ -12,7 +12,7 @@ if [[ `uname` == 'Darwin' ]]; then
     fi
     if [ $TOOL == 'emcc' ]; then
       echo "emscripten not found. Trying to install..."
-      sh ./install_emscripten.sh  || exit 1
+      sh ./web/script/install-emscripten.sh  || exit 1
     else
       echo "$TOOL not found. Trying to install..."
       brew install $TOOL || exit 1
