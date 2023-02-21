@@ -30,10 +30,10 @@ namespace pag {
 std::array<float, 9> ToGLMatrix(const tgfx::Matrix& matrix);
 
 std::array<float, 9> ToGLVertexMatrix(const tgfx::Matrix& matrix, int width, int height,
-                                      tgfx::ImageOrigin origin);
+                                      tgfx::SurfaceOrigin origin);
 
 std::array<float, 9> ToGLTextureMatrix(const tgfx::Matrix& matrix, int width, int height,
-                                       tgfx::ImageOrigin origin);
+                                       tgfx::SurfaceOrigin origin);
 
 tgfx::Matrix ToMatrix(const FilterTarget* target, bool flipY = false);
 

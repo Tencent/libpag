@@ -127,7 +127,7 @@ void GLProgram::setRenderTargetState(const GLProgramDataManager& programDataMana
   renderTargetState.width = width;
   renderTargetState.height = height;
   renderTargetState.origin = origin;
-  auto v = GetRTAdjustArray(width, height, origin == ImageOrigin::BottomLeft);
+  auto v = GetRTAdjustArray(width, height, origin == SurfaceOrigin::BottomLeft);
   programDataManager.set4f(builtinUniformHandles.rtAdjustUniform, v[0], v[1], v[2], v[3]);
 }
 }  // namespace tgfx

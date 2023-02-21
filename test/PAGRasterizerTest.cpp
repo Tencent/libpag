@@ -66,7 +66,8 @@ PAG_TEST(PAGRasterizerTest, TestRasterizer) {
   device->unlock();
   EXPECT_TRUE(Baseline::Compare(bitmap, "PAGRasterizerTest/rasterizer_path_texture"));
 
-  auto typeface = Typeface::MakeFromPath("../resources/font/NotoColorEmoji.ttf");
+  auto typeface =
+      Typeface::MakeFromPath(TestConstants::PAG_ROOT + "resources/font/NotoColorEmoji.ttf");
   ASSERT_TRUE(typeface != nullptr);
   ASSERT_TRUE(typeface->hasColor());
   auto glyphID = typeface->getGlyphID("👻");

@@ -19,7 +19,7 @@
 #pragma once
 
 #include "ByteOrder.h"
-#include "StreamContext.h"
+#include "codec/utils/StreamContext.h"
 #include "pag/file.h"
 
 namespace pag {

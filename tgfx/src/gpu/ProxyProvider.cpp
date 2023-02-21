@@ -98,7 +98,7 @@ class ImageGeneratorTextureProxy : public TextureProxy {
 class DeferredTextureProxy : public TextureProxy {
  public:
   DeferredTextureProxy(ProxyProvider* provider, int width, int height, PixelFormat format,
-                       ImageOrigin origin, bool mipMapped)
+                       SurfaceOrigin origin, bool mipMapped)
       : TextureProxy(provider),
         _width(width),
         _height(height),
@@ -131,7 +131,7 @@ class DeferredTextureProxy : public TextureProxy {
   int _width = 0;
   int _height = 0;
   PixelFormat format = PixelFormat::RGBA_8888;
-  ImageOrigin origin = ImageOrigin::TopLeft;
+  SurfaceOrigin origin = SurfaceOrigin::TopLeft;
   bool mipMapped = false;
 };
 
@@ -191,7 +191,7 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(int width, int height,
                                                                 PixelFormat format,
-                                                                ImageOrigin origin,
+                                                                SurfaceOrigin origin,
                                                                 bool mipMapped) {
   if (!Texture::CheckSizeAndFormat(context, width, height, format)) {
     return nullptr;

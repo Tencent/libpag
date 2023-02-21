@@ -23,21 +23,6 @@
 #include "rendering/sequences/VideoSequenceDemuxer.h"
 
 namespace pag {
-std::shared_ptr<SequenceReader> SequenceReader::Make(std::shared_ptr<File> file, Sequence* sequence,
-                                                     PAGFile* pagFile) {
-  std::shared_ptr<SequenceReader> reader = nullptr;
-  auto composition = sequence->composition;
-  if (composition->type() == CompositionType::Bitmap) {
-    reader = std::make_shared<BitmapSequenceReader>(std::move(file),
-                                                    static_cast<BitmapSequence*>(sequence));
-  } else {
-    auto videoSequence = static_cast<VideoSequence*>(sequence);
-    auto demuxer = std::make_unique<VideoSequenceDemuxer>(std::move(file), videoSequence, pagFile);
-    reader = std::make_shared<VideoReader>(std::move(demuxer));
-  }
-  return reader;
-}
-
 std::shared_ptr<tgfx::ImageBuffer> SequenceReader::readBuffer(Frame targetFrame) {
   tgfx::Clock clock = {};
   auto buffer = onMakeBuffer(targetFrame);

@@ -31,7 +31,7 @@ std::array<float, 9> ToGLMatrix(const tgfx::Matrix& matrix) {
 }
 
 std::array<float, 9> ToGLVertexMatrix(const tgfx::Matrix& matrix, int width, int height,
-                                      tgfx::ImageOrigin origin) {
+                                      tgfx::SurfaceOrigin origin) {
   auto result = matrix;
   auto w = static_cast<float>(width);
   auto h = static_cast<float>(height);
@@ -44,14 +44,14 @@ std::array<float, 9> ToGLVertexMatrix(const tgfx::Matrix& matrix, int width, int
   if (convertMatrix.invert(&convertMatrix)) {
     result.postConcat(convertMatrix);
   }
-  if (origin == tgfx::ImageOrigin::BottomLeft) {
+  if (origin == tgfx::SurfaceOrigin::BottomLeft) {
     result.postScale(1.0f, -1.0f);
   }
   return ToGLMatrix(result);
 }
 
 std::array<float, 9> ToGLTextureMatrix(const tgfx::Matrix& matrix, int width, int height,
-                                       tgfx::ImageOrigin origin) {
+                                       tgfx::SurfaceOrigin origin) {
   auto result = matrix;
   tgfx::Matrix convertMatrix = {};
   convertMatrix.setScale(static_cast<float>(width), static_cast<float>(height));
@@ -59,7 +59,7 @@ std::array<float, 9> ToGLTextureMatrix(const tgfx::Matrix& matrix, int width, in
   if (convertMatrix.invert(&convertMatrix)) {
     result.postConcat(convertMatrix);
   }
-  if (origin == tgfx::ImageOrigin::BottomLeft) {
+  if (origin == tgfx::SurfaceOrigin::BottomLeft) {
     result.postScale(1.0f, -1.0f);
     result.postTranslate(0.0f, 1.0f);
   }
@@ -134,7 +134,7 @@ void PreConcatMatrix(FilterTarget* target, const tgfx::Matrix& matrix) {
   auto vertexMatrix = ToMatrix(target);
   vertexMatrix.preConcat(matrix);
   target->vertexMatrix =
-      ToGLVertexMatrix(vertexMatrix, target->width, target->height, tgfx::ImageOrigin::TopLeft);
+      ToGLVertexMatrix(vertexMatrix, target->width, target->height, tgfx::SurfaceOrigin::TopLeft);
 }
 
 static unsigned LoadGLShader(tgfx::Context* context, unsigned shaderType,

@@ -127,7 +127,7 @@ void MotionBlurFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect& 
                                       const tgfx::Point&) {
   auto width = static_cast<int>(contentBounds.width());
   auto height = static_cast<int>(contentBounds.height());
-  auto origin = tgfx::ImageOrigin::TopLeft;
+  auto origin = tgfx::SurfaceOrigin::TopLeft;
 
   previousMatrix.preTranslate(contentBounds.left, contentBounds.top);
   currentMatrix.preTranslate(contentBounds.left, contentBounds.top);

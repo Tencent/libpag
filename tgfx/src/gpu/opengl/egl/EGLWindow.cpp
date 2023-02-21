@@ -99,7 +99,7 @@ std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
   frameBuffer.id = 0;
   frameBuffer.format = PixelFormat::RGBA_8888;
   auto renderTarget =
-      GLRenderTarget::MakeFrom(context, frameBuffer, width, height, ImageOrigin::BottomLeft);
+      GLRenderTarget::MakeFrom(context, frameBuffer, width, height, SurfaceOrigin::BottomLeft);
   return Surface::MakeFrom(renderTarget);
 }
 

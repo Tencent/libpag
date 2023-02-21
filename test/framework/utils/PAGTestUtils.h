@@ -23,12 +23,13 @@
 #include "pag/pag.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Clock.h"
+#include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/PixelBuffer.h"
 
 namespace pag {
 std::string ToString(Frame frame);
 
-void GetAllPAGFiles(std::string path, std::vector<std::string>& files);
+void GetAllPAGFiles(const std::string& path, std::vector<std::string>& files);
 
 std::shared_ptr<tgfx::PixelBuffer> MakeSnapshot(std::shared_ptr<PAGSurface> pagSurface);
 
@@ -36,4 +37,10 @@ std::shared_ptr<PAGLayer> GetLayer(std::shared_ptr<PAGComposition> root, LayerTy
                                    int& targetIndex);
 
 bool CreateGLTexture(tgfx::Context* context, int width, int height, tgfx::GLSampler* texture);
+
+std::shared_ptr<PAGFile> LoadPAGFile(const std::string& path);
+
+std::shared_ptr<tgfx::ImageCodec> MakeImageCodec(const std::string& path);
+
+std::shared_ptr<PAGImage> MakePAGImage(const std::string& path);
 }  // namespace pag

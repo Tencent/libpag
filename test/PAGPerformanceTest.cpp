@@ -64,7 +64,7 @@ PAG_TEST(PerformanceTest, TestRender) {
   }
 
   std::vector<std::string> files;
-  GetAllPAGFiles("../resources/smoke", files);
+  GetAllPAGFiles("resources/smoke", files);
 
   for (size_t i = 0; i < files.size(); i++) {
     auto fileName = files[i].substr(files[i].rfind('/') + 1, files[i].size());

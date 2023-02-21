@@ -33,14 +33,14 @@ class GLTexture : public Texture {
    * backend texture is valid for the lifetime of returned GLTexture.
    */
   static std::shared_ptr<GLTexture> MakeFrom(Context* context, const GLSampler& sampler, int width,
-                                             int height, ImageOrigin origin);
+                                             int height, SurfaceOrigin origin);
 
   /**
    * Creates a new GLTexture which wraps the specified backend texture. The returned GLTexture takes
    * ownership of the specified backend texture.
    */
   static std::shared_ptr<GLTexture> MakeAdopted(Context* context, const GLSampler& sampler,
-                                                int width, int height, ImageOrigin origin);
+                                                int width, int height, SurfaceOrigin origin);
 
   Point getTextureCoord(float x, float y) const override;
 
@@ -58,7 +58,7 @@ class GLTexture : public Texture {
  protected:
   GLSampler sampler = {};
 
-  GLTexture(int width, int height, ImageOrigin origin);
+  GLTexture(int width, int height, SurfaceOrigin origin);
 
  private:
   /**

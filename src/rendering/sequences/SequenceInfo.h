@@ -16,21 +16,51 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "SequenceImage.h"
+#pragma once
+
+#include "pag/file.h"
+#include "rendering/sequences/SequenceReader.h"
+#include "tgfx/core/Image.h"
+#include "tgfx/core/ImageGenerator.h"
+#include "tgfx/core/ImageOrigin.h"
 
 namespace pag {
-static tgfx::ISize GetBufferSize(Sequence* sequence) {
-  if (sequence->composition->type() == CompositionType::Video) {
-    auto videoSequence = static_cast<VideoSequence*>(sequence);
-    return tgfx::ISize::Make(videoSequence->getVideoWidth(), videoSequence->getVideoHeight());
-  }
-  return tgfx::ISize::Make(sequence->width, sequence->height);
-}
+class SequenceInfo {
+ public:
+  static std::shared_ptr<SequenceInfo> Make(Sequence* sequence);
+
+  virtual ~SequenceInfo() = default;
+
+  virtual std::shared_ptr<SequenceReader> makeReader(std::shared_ptr<File> file,
+                                                     PAGFile* pagFile = nullptr);
+
+  virtual std::shared_ptr<tgfx::Image> makeStaticImage(std::shared_ptr<File> file);
+  virtual std::shared_ptr<tgfx::Image> makeFrameImage(std::shared_ptr<SequenceReader> reader,
+                                                      Frame targetFrame);
+
+  virtual bool staticContent() const;
+  virtual ID uniqueID() const;
+  virtual int width() const;
+  virtual int height() const;
+  virtual Frame duration() const;
+  virtual bool isVideo() const;
+  virtual Frame firstVisibleFrame(const Layer* layer) const;
+
+ public:
+  std::weak_ptr<SequenceInfo> weakThis;
+
+ protected:
+  explicit SequenceInfo(Sequence* sequence);
+
+ private:
+  Sequence* sequence;
+};
 
 class StaticSequenceGenerator : public tgfx::ImageGenerator {
  public:
-  StaticSequenceGenerator(std::shared_ptr<File> file, Sequence* sequence)
-      : tgfx::ImageGenerator(GetBufferSize(sequence)), file(std::move(file)), sequence(sequence) {
+  StaticSequenceGenerator(std::shared_ptr<File> file, std::shared_ptr<SequenceInfo> info, int width,
+                          int height)
+      : tgfx::ImageGenerator(width, height), file(std::move(file)), info(info) {
   }
 
   bool isAlphaOnly() const override {
@@ -45,13 +75,13 @@ class StaticSequenceGenerator : public tgfx::ImageGenerator {
 
  protected:
   std::shared_ptr<tgfx::ImageBuffer> onMakeBuffer(bool) const override {
-    auto reader = SequenceReader::Make(file, sequence);
+    auto reader = info->makeReader(file);
     return reader->readBuffer(0);
   }
 
  private:
   std::shared_ptr<File> file = nullptr;
-  Sequence* sequence = nullptr;
+  std::shared_ptr<SequenceInfo> info = nullptr;
 };
 
 class SequenceFrameGenerator : public tgfx::ImageGenerator {
@@ -80,33 +110,4 @@ class SequenceFrameGenerator : public tgfx::ImageGenerator {
   std::shared_ptr<SequenceReader> reader = nullptr;
   Frame targetFrame = 0;
 };
-
-static std::shared_ptr<tgfx::Image> MakeSequenceImage(
-    std::shared_ptr<tgfx::ImageGenerator> generator, Sequence* sequence) {
-  std::shared_ptr<tgfx::Image> image = nullptr;
-  if (sequence->composition->type() == CompositionType::Video) {
-    auto videoSequence = static_cast<VideoSequence*>(sequence);
-    return tgfx::Image::MakeRGBAAA(std::move(generator), sequence->width, sequence->height,
-                                   videoSequence->alphaStartX, videoSequence->alphaStartY);
-  }
-  return tgfx::Image::MakeFromGenerator(std::move(generator));
-}
-
-std::shared_ptr<tgfx::Image> SequenceImage::MakeStatic(std::shared_ptr<File> file,
-                                                       Sequence* sequence) {
-  if (sequence == nullptr || file == nullptr || !sequence->composition->staticContent()) {
-    return nullptr;
-  }
-  auto generator = std::make_shared<StaticSequenceGenerator>(std::move(file), sequence);
-  return MakeSequenceImage(std::move(generator), sequence);
-}
-
-std::shared_ptr<tgfx::Image> SequenceImage::MakeFrom(std::shared_ptr<SequenceReader> reader,
-                                                     Sequence* sequence, Frame targetFrame) {
-  if (reader == nullptr || sequence == nullptr) {
-    return nullptr;
-  }
-  auto generator = std::make_shared<SequenceFrameGenerator>(std::move(reader), targetFrame);
-  return MakeSequenceImage(std::move(generator), sequence);
-}
 }  // namespace pag

@@ -29,7 +29,7 @@ static size_t ComputeSize(int width, int height, int sizePerPixel, bool mipMappe
 
 class GLBackendTexture : public GLTexture {
  public:
-  GLBackendTexture(GLSampler textureSampler, int width, int height, ImageOrigin origin,
+  GLBackendTexture(GLSampler textureSampler, int width, int height, SurfaceOrigin origin,
                    bool adopted)
       : GLTexture(width, height, origin), adopted(adopted) {
     sampler = std::move(textureSampler);
@@ -50,7 +50,7 @@ class GLBackendTexture : public GLTexture {
 };
 
 std::shared_ptr<GLTexture> GLTexture::MakeFrom(Context* context, const GLSampler& sampler,
-                                               int width, int height, ImageOrigin origin) {
+                                               int width, int height, SurfaceOrigin origin) {
   if (context == nullptr || width <= 0 || height <= 0 || sampler.id == 0) {
     return nullptr;
   }
@@ -59,7 +59,7 @@ std::shared_ptr<GLTexture> GLTexture::MakeFrom(Context* context, const GLSampler
 }
 
 std::shared_ptr<GLTexture> GLTexture::MakeAdopted(Context* context, const GLSampler& sampler,
-                                                  int width, int height, ImageOrigin origin) {
+                                                  int width, int height, SurfaceOrigin origin) {
   if (context == nullptr || width <= 0 || height <= 0 || sampler.id == 0) {
     return nullptr;
   }
@@ -77,7 +77,7 @@ class GLAlphaTexture : public GLTexture {
     recycleKey->write(static_cast<uint32_t>(mipMap ? 1 : 0));
   }
 
-  GLAlphaTexture(GLSampler textureSampler, int width, int height, ImageOrigin origin)
+  GLAlphaTexture(GLSampler textureSampler, int width, int height, SurfaceOrigin origin)
       : GLTexture(width, height, origin) {
     sampler = std::move(textureSampler);
   }
@@ -108,7 +108,7 @@ class GLRGBATexture : public GLTexture {
   }
 
   GLRGBATexture(GLSampler textureSampler, int width, int height,
-                ImageOrigin origin = ImageOrigin::TopLeft)
+                SurfaceOrigin origin = SurfaceOrigin::TopLeft)
       : GLTexture(width, height, origin) {
     sampler = std::move(textureSampler);
   }
@@ -139,7 +139,7 @@ class GLBGRATexture : public GLRGBATexture {
   }
 
   GLBGRATexture(GLSampler textureSampler, int width, int height,
-                ImageOrigin origin = ImageOrigin::TopLeft)
+                SurfaceOrigin origin = SurfaceOrigin::TopLeft)
       : GLRGBATexture(std::move(textureSampler), width, height, origin) {
   }
 
@@ -151,7 +151,7 @@ class GLBGRATexture : public GLRGBATexture {
 
 std::shared_ptr<Texture> Texture::MakeFormat(Context* context, int width, int height, void* pixels,
                                              size_t rowBytes, PixelFormat pixelFormat,
-                                             ImageOrigin origin, bool mipMapped) {
+                                             SurfaceOrigin origin, bool mipMapped) {
   if (!CheckSizeAndFormat(context, width, height, pixelFormat)) {
     return nullptr;
   }
@@ -211,7 +211,7 @@ bool Texture::CheckSizeAndFormat(Context* context, int width, int height, PixelF
   return width <= maxTextureSize && height <= maxTextureSize;
 }
 
-GLTexture::GLTexture(int width, int height, ImageOrigin origin) : Texture(width, height, origin) {
+GLTexture::GLTexture(int width, int height, SurfaceOrigin origin) : Texture(width, height, origin) {
 }
 
 Point GLTexture::getTextureCoord(float x, float y) const {

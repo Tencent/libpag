@@ -28,9 +28,6 @@
 namespace pag {
 class SequenceReader {
  public:
-  static std::shared_ptr<SequenceReader> Make(std::shared_ptr<File> file, Sequence* sequence,
-                                              PAGFile* pagFile = nullptr);
-
   virtual ~SequenceReader() = default;
 
   /**

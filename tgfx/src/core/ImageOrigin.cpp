@@ -16,36 +16,36 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/Orientation.h"
+#include "tgfx/core/ImageOrigin.h"
 
 namespace tgfx {
-Matrix OrientationToMatrix(Orientation orientation, int width, int height) {
+Matrix ImageOriginToMatrix(ImageOrigin origin, int width, int height) {
   auto w = static_cast<float>(width);
   auto h = static_cast<float>(height);
-  switch (orientation) {
-    case Orientation::TopLeft:
+  switch (origin) {
+    case ImageOrigin::TopLeft:
       return Matrix::I();
-    case Orientation::TopRight:
+    case ImageOrigin::TopRight:
       return Matrix::MakeAll(-1, 0, w, 0, 1, 0, 0, 0, 1);
-    case Orientation::BottomRight:
+    case ImageOrigin::BottomRight:
       return Matrix::MakeAll(-1, 0, w, 0, -1, h, 0, 0, 1);
-    case Orientation::BottomLeft:
+    case ImageOrigin::BottomLeft:
       return Matrix::MakeAll(1, 0, 0, 0, -1, h, 0, 0, 1);
-    case Orientation::LeftTop:
+    case ImageOrigin::LeftTop:
       return Matrix::MakeAll(0, 1, 0, 1, 0, 0, 0, 0, 1);
-    case Orientation::RightTop:
+    case ImageOrigin::RightTop:
       return Matrix::MakeAll(0, -1, h, 1, 0, 0, 0, 0, 1);
-    case Orientation::RightBottom:
+    case ImageOrigin::RightBottom:
       return Matrix::MakeAll(0, -1, h, -1, 0, w, 0, 0, 1);
-    case Orientation::LeftBottom:
+    case ImageOrigin::LeftBottom:
       return Matrix::MakeAll(0, 1, 0, -1, 0, w, 0, 0, 1);
   }
   return Matrix::I();
 }
 
-void ApplyOrientation(Orientation orientation, int* width, int* height) {
-  if (orientation == Orientation::LeftTop || orientation == Orientation::RightTop ||
-      orientation == Orientation::RightBottom || orientation == Orientation::LeftBottom) {
+void ApplyImageOrigin(ImageOrigin origin, int* width, int* height) {
+  if (origin == ImageOrigin::LeftTop || origin == ImageOrigin::RightTop ||
+      origin == ImageOrigin::RightBottom || origin == ImageOrigin::LeftBottom) {
     std::swap(*width, *height);
   }
 }

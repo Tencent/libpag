@@ -1,12 +1,12 @@
-import { releaseCanvas2D } from './utils/canvas';
+import { getCanvas2D, releaseCanvas2D } from './utils/canvas';
+import { malloc } from './utils/buffer';
 
-import type { EmscriptenGL } from './types';
+import type { EmscriptenGL, PAG } from './types';
 import type { wx } from './wechat/interfaces';
 
 declare const wx: wx;
 
-export const createImageFromBytes = (bytes: ArrayBuffer) => {
-  const blob = new Blob([bytes], { type: 'image/*' });
+export const createImage = (source: string) => {
   return new Promise<HTMLImageElement | null>((resolve) => {
     const image = new Image();
     image.onload = function () {
@@ -16,22 +16,28 @@ export const createImageFromBytes = (bytes: ArrayBuffer) => {
       console.error('image create from bytes error.');
       resolve(null);
     };
-    image.src = URL.createObjectURL(blob);
+    image.src = source;
   });
 };
 
-export const createImageFromPath = (path: string) => {
-  return new Promise<HTMLImageElement | null>((resolve) => {
-    const image = new Image();
-    image.onload = function () {
-      resolve(image);
-    };
-    image.onerror = function () {
-      console.error(`image create from path error: ${path}`);
-      resolve(null);
-    };
-    image.src = path;
-  });
+export const createImageFromBytes = (bytes: ArrayBuffer) => {
+  const blob = new Blob([bytes], { type: 'image/*' });
+  return createImage(URL.createObjectURL(blob));
+};
+
+export const readImagePixels = async (module: PAG, bytes: ArrayBuffer, width: number, height: number) => {
+  const image = await createImageFromBytes(bytes);
+  if (!image) return null;
+  const canvas = getCanvas2D();
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d') as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
+  if (!ctx) return null;
+  ctx.drawImage(image, 0, 0, width, height);
+  const { data } = ctx.getImageData(0, 0, width, height);
+  releaseCanvas2D(canvas);
+  if (data.length === 0) return null;
+  return malloc(module, data);
 };
 
 export const hasWebpSupport = () => {
@@ -73,4 +79,9 @@ export const releaseNativeImage = (source: TexImageSource | OffscreenCanvas) => 
   } else if (source instanceof OffscreenCanvas || source instanceof HTMLCanvasElement) {
     releaseCanvas2D(source);
   }
+};
+
+export const getBytesFromPath = async (module: PAG, path: string) => {
+  const buffer = await fetch(path).then((res) => res.arrayBuffer());
+  return malloc(module, buffer);
 };

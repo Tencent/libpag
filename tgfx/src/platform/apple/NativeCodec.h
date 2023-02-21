@@ -30,8 +30,7 @@ class NativeCodec : public ImageCodec {
   std::string imagePath;
   std::shared_ptr<Data> imageBytes = nullptr;
 
-  NativeCodec(int width, int height, Orientation orientation)
-      : ImageCodec(width, height, orientation) {
+  NativeCodec(int width, int height, ImageOrigin origin) : ImageCodec(width, height, origin) {
   }
 
   friend class ImageCodec;

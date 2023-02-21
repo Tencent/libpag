@@ -21,13 +21,6 @@ class HardwareDecoder {
 
     private VideoSurface videoSurface = null;
 
-    /**
-     * Some devices will crash in some scenes when using MediaCodec, so exclude them.
-     */
-    private static boolean ForceSoftwareDecoder() {
-        return Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP;
-    }
-
     private MediaCodec decoder;
 
     // decoder.start();
@@ -41,13 +34,13 @@ class HardwareDecoder {
     private static final AtomicInteger decoderThreadCount = new AtomicInteger();
 
     private static HardwareDecoder Create(final MediaFormat mediaFormat) {
+        if (decoderThreadCount.get() >= DECODER_THREAD_MAX_COUNT || Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+            return null;
+        }
         int width = mediaFormat.getInteger(MediaFormat.KEY_WIDTH);
         int height = mediaFormat.getInteger(MediaFormat.KEY_HEIGHT);
         final VideoSurface videoSurface = VideoSurface.Make(width, height);
         if (videoSurface == null) {
-            return null;
-        }
-        if (decoderThreadCount.get() >= DECODER_THREAD_MAX_COUNT) {
             return null;
         }
         decoderThreadCount.getAndIncrement();

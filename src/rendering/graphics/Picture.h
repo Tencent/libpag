@@ -49,7 +49,7 @@ class Picture : public Graphic {
    * Creates a new Picture with specified backend texture. Returns null if the texture is invalid.
    */
   static std::shared_ptr<Graphic> MakeFrom(ID assetID, const BackendTexture& texture,
-                                           tgfx::ImageOrigin origin);
+                                           tgfx::SurfaceOrigin origin);
 
   /**
    * Creates a new Picture with specified graphic. If the assetID is valid (not 0), the returned

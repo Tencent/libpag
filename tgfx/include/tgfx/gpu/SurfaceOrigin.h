@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,22 +18,24 @@
 
 #pragma once
 
-#include "SequenceReader.h"
-#include "tgfx/core/Image.h"
-
-namespace pag {
-class SequenceImage {
- public:
+namespace tgfx {
+/**
+ * Textures and Surfaces can be stored such that (0, 0) in texture space may correspond to
+ * either the top-left or bottom-left content pixel.
+ */
+enum class SurfaceOrigin {
   /**
-   * Creates an Image from a static Sequence. Returns nullptr if the contents of sequence are not
-   * static.
+   * The default origin of the native coordinate system in the GPU backend. For example, the
+   * SurfaceOrigin::TopLeft is actually the bottom-left origin in the OpenGL coordinate system for
+   * textures. Textures newly created by the backend API for off-screen rendering usually have a
+   * SurfaceOrigin::TopLeft origin.
    */
-  static std::shared_ptr<tgfx::Image> MakeStatic(std::shared_ptr<File> file, Sequence* sequence);
+  TopLeft,
 
   /**
-   * Creates an Image from the specified frame of a SequenceReader.
+   * Use this origin to flip the content on the y-axis if the GPU backend has a different origin to
+   * your system views. It is usually used for on-screen rendering.
    */
-  static std::shared_ptr<tgfx::Image> MakeFrom(std::shared_ptr<SequenceReader> reader,
-                                               Sequence* sequence, Frame targetFrame);
+  BottomLeft
 };
-}  // namespace pag
+}  // namespace tgfx

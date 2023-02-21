@@ -94,9 +94,9 @@ class Surface {
   }
 
   /**
-   * Returns the origin of this surface, either ImageOrigin::TopLeft or ImageOrigin::BottomLeft.
+   * Returns the origin of this surface, either SurfaceOrigin::TopLeft or SurfaceOrigin::BottomLeft.
    */
-  ImageOrigin origin() const {
+  SurfaceOrigin origin() const {
     return renderTarget->origin();
   }
 

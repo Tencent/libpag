@@ -38,7 +38,7 @@ std::shared_ptr<ImageCodec> WebpCodec::MakeFrom(const std::string& filePath) {
     }
   }
   return std::shared_ptr<ImageCodec>(
-      new WebpCodec(info.width, info.height, info.orientation, filePath, nullptr));
+      new WebpCodec(info.width, info.height, info.origin, filePath, nullptr));
 }
 
 std::shared_ptr<ImageCodec> WebpCodec::MakeFrom(std::shared_ptr<Data> imageBytes) {
@@ -50,7 +50,7 @@ std::shared_ptr<ImageCodec> WebpCodec::MakeFrom(std::shared_ptr<Data> imageBytes
     return nullptr;
   }
   return std::shared_ptr<ImageCodec>(
-      new WebpCodec(info.width, info.height, info.orientation, "", std::move(imageBytes)));
+      new WebpCodec(info.width, info.height, info.origin, "", std::move(imageBytes)));
 }
 
 static WEBP_CSP_MODE webp_decode_mode(ColorType dstCT, bool premultiply) {

@@ -85,7 +85,7 @@ void HitTestCase::HitTestPoint(std::shared_ptr<PAGPlayer> TestPAGPlayer,
   EXPECT_TRUE(TestPAGPlayer->hitTestPoint(imageLayer, 424, 160, true));
 
   // 测试ImageReplacement
-  imageLayer->replaceImage(PAGImage::FromPath("../resources/apitest/imageReplacement.png"));
+  imageLayer->replaceImage(MakePAGImage("resources/apitest/imageReplacement.png"));
   TestPAGPlayer->flush();
   EXPECT_FALSE(TestPAGPlayer->hitTestPoint(imageLayer, -1, -1, false));
   EXPECT_FALSE(TestPAGPlayer->hitTestPoint(imageLayer, 0, 0, false));

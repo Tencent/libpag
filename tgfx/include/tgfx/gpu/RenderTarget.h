@@ -41,10 +41,10 @@ class RenderTarget : public Resource {
   }
 
   /**
-   * Returns the origin of the render target, either ImageOrigin::TopLeft or
-   * ImageOrigin::BottomLeft.
+   * Returns the origin of the render target, either SurfaceOrigin::TopLeft or
+   * SurfaceOrigin::BottomLeft.
    */
-  ImageOrigin origin() const {
+  SurfaceOrigin origin() const {
     return _origin;
   }
 
@@ -60,7 +60,7 @@ class RenderTarget : public Resource {
   }
 
  protected:
-  RenderTarget(int width, int height, ImageOrigin origin, int sampleCount = 1)
+  RenderTarget(int width, int height, SurfaceOrigin origin, int sampleCount = 1)
       : _width(width), _height(height), _origin(origin), _sampleCount(sampleCount) {
   }
 
@@ -69,7 +69,7 @@ class RenderTarget : public Resource {
 
   int _width = 0;
   int _height = 0;
-  ImageOrigin _origin = ImageOrigin::TopLeft;
+  SurfaceOrigin _origin = SurfaceOrigin::TopLeft;
   int _sampleCount = 1;
 
   friend class DrawOp;

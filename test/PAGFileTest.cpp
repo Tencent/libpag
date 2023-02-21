@@ -21,10 +21,11 @@
 #include "framework/utils/PAGTestUtils.h"
 #include "nlohmann/json.hpp"
 
-#define PAG_CORRECT_FILE_PATH "../resources/apitest/test.pag"
-#define PAG_COMPLEX_FILE_PATH "../resources/apitest/complex_test.pag"
+#define PAG_CORRECT_FILE_PATH TestConstants::PAG_ROOT + "resources/apitest/test.pag"
+#define PAG_COMPLEX_FILE_PATH TestConstants::PAG_ROOT + "resources/apitest/complex_test.pag"
 #define PAG_ERROR_FILE_PATH_ERRPATH "1.pag"
-#define PAG_ERROR_FILE_PATH_ERRFILE "../resources/apitest/imageReplacement.png"
+#define PAG_ERROR_FILE_PATH_ERRFILE \
+  TestConstants::PAG_ROOT + "resources/apitest/imageReplacement.png"
 #define PAG_ERROR_FILE_PATH_EMPTYPATH ""
 
 namespace pag {
@@ -458,7 +459,7 @@ PAG_TEST_CASE(PAGFileTimeStretchTest)
  * 用例描述: PAGFile时间伸缩属性-Repeat测试
  */
 PAG_TEST_F(PAGFileTimeStretchTest, Repeat) {
-  auto pagFile = PAGFile::Load("../resources/apitest/test_repeat.pag");
+  auto pagFile = LoadPAGFile("resources/apitest/test_repeat.pag");
   auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_unique<PAGPlayer>();
   pagPlayer->setComposition(pagFile);
@@ -478,7 +479,7 @@ PAG_TEST_F(PAGFileTimeStretchTest, Repeat) {
  * 用例描述: PAGFile时间伸缩属性-RepeatInverted测试
  */
 PAG_TEST_F(PAGFileTimeStretchTest, RepeatInverted) {
-  auto pagFile = PAGFile::Load("../resources/apitest/test_repeatInverted.pag");
+  auto pagFile = LoadPAGFile("resources/apitest/test_repeatInverted.pag");
   auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_unique<PAGPlayer>();
   pagPlayer->setComposition(pagFile);
@@ -499,7 +500,7 @@ PAG_TEST_F(PAGFileTimeStretchTest, RepeatInverted) {
  * 用例描述: PAGFile时间伸缩属性-Scale测试
  */
 PAG_TEST_F(PAGFileTimeStretchTest, Scale) {
-  auto pagFile = PAGFile::Load("../resources/apitest/test_scale.pag");
+  auto pagFile = LoadPAGFile("resources/apitest/test_scale.pag");
   auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_unique<PAGPlayer>();
   pagPlayer->setComposition(pagFile);
@@ -530,7 +531,7 @@ PAG_TEST_F(PAGFileTimeStretchTest, Scale) {
  * 用例描述: ImageFillRule编解码测试
  */
 PAG_TEST(PAGFileImageFillRuleCodec, ImageFillRuleCodec) {
-  auto testFile = PAGFile::Load("../resources/apitest/test_ImageFillRule.pag");
+  auto testFile = LoadPAGFile("resources/apitest/test_ImageFillRule.pag");
   EXPECT_NE(testFile, nullptr);
   auto byteData = Codec::Encode(testFile->getFile());
   EXPECT_NE(byteData, nullptr);
@@ -542,7 +543,7 @@ PAG_TEST(PAGFileImageFillRuleCodec, ImageFillRuleCodec) {
  * 用例描述: 竖排文本编解码测试
  */
 PAG_TEST(PAGFileTextDirectionCodec, TextDirectionCodec) {
-  auto testFile = PAGFile::Load("../resources/apitest/test_TextDirection.pag");
+  auto testFile = LoadPAGFile("resources/apitest/test_TextDirection.pag");
   EXPECT_NE(testFile, nullptr);
   auto byteData = Codec::Encode(testFile->getFile());
   EXPECT_NE(byteData, nullptr);
@@ -554,7 +555,7 @@ PAG_TEST(PAGFileTextDirectionCodec, TextDirectionCodec) {
  * 用例描述: 竖排文本编解码测试
  */
 PAG_TEST(PAGFileVerticalTextCodec, VerticalTextCodec) {
-  auto testFile = PAGFile::Load("../resources/apitest/test_VerticalText.pag");
+  auto testFile = LoadPAGFile("resources/apitest/test_VerticalText.pag");
   EXPECT_NE(testFile, nullptr);
   auto byteData = Codec::Encode(testFile->getFile());
   EXPECT_NE(byteData, nullptr);
@@ -566,7 +567,7 @@ PAG_TEST(PAGFileVerticalTextCodec, VerticalTextCodec) {
  * 用例描述: ShapeType测试
  */
 PAG_TEST_F(PAGFileBaseTest, ShapeType) {
-  auto testFile = PAGFile::Load("../resources/apitest/ShapeType.pag");
+  auto testFile = LoadPAGFile("resources/apitest/ShapeType.pag");
   EXPECT_NE(testFile, nullptr);
   TestPAGPlayer->setComposition(testFile);
   TestPAGPlayer->setProgress(0.5);
@@ -578,7 +579,7 @@ PAG_TEST_F(PAGFileBaseTest, ShapeType) {
  * 用例描述: ChildFrameToLocal接口测试，不改变时长
  */
 PAG_TEST_F(PAGFileBaseTest, ChildFrameToLocal) {
-  auto testFile = PAGFile::Load("../resources/apitest/ShapeType.pag");
+  auto testFile = LoadPAGFile("resources/apitest/ShapeType.pag");
   EXPECT_NE(testFile, nullptr);
 
   auto fileFrame = TimeToFrame(testFile->duration(), testFile->frameRate());
@@ -600,7 +601,7 @@ PAG_TEST_F(PAGFileBaseTest, ChildFrameToLocal) {
  * 用例描述: ChildFrameToLocal进阶测试，改变时长
  */
 PAG_TEST_F(PAGFileBaseTest, ChildFrameToLocalAdvanced) {
-  auto testFile = PAGFile::Load("../resources/apitest/ShapeType.pag");
+  auto testFile = LoadPAGFile("resources/apitest/ShapeType.pag");
   EXPECT_NE(testFile, nullptr);
 
   auto fileFrame = TimeToFrame(testFile->duration(), testFile->frameRate());
@@ -631,7 +632,7 @@ PAG_TEST_F(PAGFileBaseTest, ChildFrameToLocalAdvanced) {
  * 用例描述: 测试椭圆转path，iOS14圆角badcase
  */
 PAG_TEST_F(PAGFileBaseTest, EllipseToPath_ID80701969) {
-  auto pagFile = PAGFile::Load("../resources/apitest/ellipse_to_path.pag");
+  auto pagFile = LoadPAGFile("resources/apitest/ellipse_to_path.pag");
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0.5);
   TestPAGPlayer->flush();
@@ -642,7 +643,7 @@ PAG_TEST_F(PAGFileBaseTest, EllipseToPath_ID80701969) {
  * 用例描述: 测试矩形转path，iOS14badcase
  */
 PAG_TEST_F(PAGFileBaseTest, RectToPath) {
-  auto pagFile = PAGFile::Load("../resources/apitest/rect_to_path.pag");
+  auto pagFile = LoadPAGFile("resources/apitest/rect_to_path.pag");
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0.5);
   TestPAGPlayer->flush();
@@ -653,7 +654,7 @@ PAG_TEST_F(PAGFileBaseTest, RectToPath) {
  * 用例描述: 测试圆角矩形转path,iOS14badCase
  */
 PAG_TEST_F(PAGFileBaseTest, RoundRectToPath) {
-  auto pagFile = PAGFile::Load("../resources/apitest/round_rect_to_path.pag");
+  auto pagFile = LoadPAGFile("resources/apitest/round_rect_to_path.pag");
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0.5);
   TestPAGPlayer->flush();
@@ -664,7 +665,7 @@ PAG_TEST_F(PAGFileBaseTest, RoundRectToPath) {
  * 用例描述: PAGFile设置开始时间
  */
 PAG_TEST_F(PAGFileBaseTest, SetStartTime) {
-  auto pagFile = PAGFile::Load("../assets/replacement.pag");
+  auto pagFile = LoadPAGFile("assets/replacement.pag");
   TestPAGPlayer->setComposition(pagFile);
   pagFile->setStartTime(2000000);
   TestPAGPlayer->setProgress(0);
@@ -673,27 +674,27 @@ PAG_TEST_F(PAGFileBaseTest, SetStartTime) {
 }
 
 PAG_TEST_F(PAGFileBaseTest, EditableIndices) {
-  auto pagFile = PAGFile::Load("../resources/apitest/texture_bottom_left.pag");
+  auto pagFile = LoadPAGFile("resources/apitest/texture_bottom_left.pag");
   auto editableImages = pagFile->getEditableIndices(LayerType::Image);
   ASSERT_EQ(editableImages.size(), 6lu);
   for (size_t i = 0; i < editableImages.size(); i++) {
     ASSERT_EQ(editableImages[i], static_cast<int>(i));
   }
-  pagFile = PAGFile::Load("../resources/apitest/editImageLayers.pag");
+  pagFile = LoadPAGFile("resources/apitest/editImageLayers.pag");
   editableImages = pagFile->getEditableIndices(LayerType::Image);
   ASSERT_EQ(editableImages.size(), 3lu);
   ASSERT_EQ(editableImages[0], 3);
   ASSERT_EQ(editableImages[1], 2);
   ASSERT_EQ(editableImages[2], 4);
 
-  pagFile = PAGFile::Load("../resources/apitest/test.pag");
+  pagFile = LoadPAGFile("resources/apitest/test.pag");
   auto editableTexts = pagFile->getEditableIndices(LayerType::Text);
   ASSERT_EQ(editableTexts.size(), 2lu);
   for (size_t i = 0; i < editableTexts.size(); i++) {
     ASSERT_EQ(editableTexts[i], static_cast<int>(i));
   }
 
-  pagFile = PAGFile::Load("../resources/apitest/editableTextLayer.pag");
+  pagFile = LoadPAGFile("resources/apitest/editableTextLayer.pag");
   editableTexts = pagFile->getEditableIndices(LayerType::Text);
   ASSERT_EQ(editableTexts.size(), 2lu);
   ASSERT_EQ(editableTexts[0], static_cast<int>(1));

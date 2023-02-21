@@ -21,8 +21,8 @@
 #include <array>
 #include <string>
 #include "gpu/opengl/GLContext.h"
-#include "tgfx/core/ImageOrigin.h"
 #include "tgfx/core/Matrix.h"
+#include "tgfx/gpu/SurfaceOrigin.h"
 #include "tgfx/gpu/opengl/GLSampler.h"
 
 namespace tgfx {

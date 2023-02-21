@@ -19,6 +19,7 @@
 #include "NativeCodec.h"
 #include <android/bitmap.h>
 #include "NativeImageInfo.h"
+#include "core/utils/Log.h"
 #include "tgfx/core/Bitmap.h"
 
 namespace tgfx {
@@ -79,7 +80,7 @@ void NativeCodec::JNIInit(JNIEnv* env) {
                                                  "Landroid/graphics/Bitmap$Config;");
 }
 
-std::shared_ptr<NativeCodec> NativeCodec::Make(JNIEnv* env, jobject sizeObject, int orientation) {
+std::shared_ptr<NativeCodec> NativeCodec::Make(JNIEnv* env, jobject sizeObject, int origin) {
   auto size = env->GetIntArrayElements(static_cast<jintArray>(sizeObject), nullptr);
   int width = size[0];
   int height = size[1];
@@ -88,24 +89,28 @@ std::shared_ptr<NativeCodec> NativeCodec::Make(JNIEnv* env, jobject sizeObject, 
     return nullptr;
   }
   return std::shared_ptr<NativeCodec>(
-      new NativeCodec(width, height, static_cast<Orientation>(orientation)));
+      new NativeCodec(width, height, static_cast<ImageOrigin>(origin)));
 }
 
-static Orientation GetOrientation(JNIEnv* env, jobject exifInterface) {
+static ImageOrigin GetImageOrigin(JNIEnv* env, jobject exifInterface) {
   if (exifInterface == nullptr) {
     env->ExceptionClear();
-    return Orientation::TopLeft;
+    return ImageOrigin::TopLeft;
   }
   auto key = env->NewStringUTF("Orientation");
-  auto orientation = env->CallIntMethod(exifInterface, ExifInterfaceClass_getAttributeInt, key,
-                                        static_cast<int>(Orientation::TopLeft));
-  return static_cast<Orientation>(orientation);
+  auto origin = env->CallIntMethod(exifInterface, ExifInterfaceClass_getAttributeInt, key,
+                                   static_cast<int>(ImageOrigin::TopLeft));
+  return static_cast<ImageOrigin>(origin);
 }
 
 static jobject DecodeBitmap(JNIEnv* env, jobject options, const std::string& filePath) {
   auto imagePath = SafeToJString(env, filePath);
-  return env->CallStaticObjectMethod(BitmapFactoryClass.get(), BitmapFactory_decodeFile, imagePath,
-                                     options);
+  auto bitmap = env->CallStaticObjectMethod(BitmapFactoryClass.get(), BitmapFactory_decodeFile,
+                                            imagePath, options);
+  if (env->ExceptionCheck()) {
+    return nullptr;
+  }
+  return bitmap;
 }
 
 std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& filePath) {
@@ -124,13 +129,14 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& fileP
   auto height = env->GetIntField(options, BitmapFactoryOptions_outHeight);
   if (width <= 0 || height <= 0) {
     env->ExceptionClear();
+    LOGE("NativeCodec::readPixels(): Failed to get the size of the image!");
     return nullptr;
   }
   auto imagePath = SafeToJString(env, filePath);
   auto exifInterface =
       env->NewObject(ExifInterfaceClass.get(), ExifInterface_Constructor_Path, imagePath);
-  auto orientation = GetOrientation(env, exifInterface);
-  auto codec = std::shared_ptr<NativeCodec>(new NativeCodec(width, height, orientation));
+  auto origin = GetImageOrigin(env, exifInterface);
+  auto codec = std::shared_ptr<NativeCodec>(new NativeCodec(width, height, origin));
   codec->imagePath = filePath;
   return codec;
 }
@@ -139,8 +145,12 @@ static jobject DecodeBitmap(JNIEnv* env, jobject options, std::shared_ptr<Data> 
   auto byteArray = env->NewByteArray(imageBytes->size());
   env->SetByteArrayRegion(byteArray, 0, imageBytes->size(),
                           reinterpret_cast<const jbyte*>(imageBytes->data()));
-  return env->CallStaticObjectMethod(BitmapFactoryClass.get(), BitmapFactory_decodeByteArray,
-                                     byteArray, 0, imageBytes->size(), options);
+  auto bitmap = env->CallStaticObjectMethod(BitmapFactoryClass.get(), BitmapFactory_decodeByteArray,
+                                            byteArray, 0, imageBytes->size(), options);
+  if (env->ExceptionCheck()) {
+    return nullptr;
+  }
+  return bitmap;
 }
 
 std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> imageBytes) {
@@ -159,6 +169,7 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> im
   auto height = env->GetIntField(options, BitmapFactoryOptions_outHeight);
   if (width <= 0 || height <= 0) {
     env->ExceptionClear();
+    LOGE("NativeCodec::readPixels(): Failed to get the size of the image!");
     return nullptr;
   }
   auto byteArray = env->NewByteArray(imageBytes->size());
@@ -168,8 +179,8 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> im
       env->NewObject(ByteArrayInputStreamClass.get(), ByteArrayInputStream_Constructor, byteArray);
   auto exifInterface =
       env->NewObject(ExifInterfaceClass.get(), ExifInterface_Constructor_Stream, inputStream);
-  auto orientation = GetOrientation(env, exifInterface);
-  auto codec = std::shared_ptr<NativeCodec>(new NativeCodec(width, height, orientation));
+  auto origin = GetImageOrigin(env, exifInterface);
+  auto codec = std::shared_ptr<NativeCodec>(new NativeCodec(width, height, origin));
   codec->imageBytes = imageBytes;
   return codec;
 }
@@ -186,6 +197,7 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   auto options = env->NewObject(BitmapFactoryOptionsClass.get(), BitmapFactoryOptions_Constructor);
   if (options == nullptr) {
     env->ExceptionClear();
+    LOGE("NativeCodec::readPixels(): Failed to create a BitmapFactory.Options object!");
     return false;
   }
   jobject config;
@@ -207,11 +219,13 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   auto info = NativeImageInfo::GetInfo(env, bitmap);
   if (info.isEmpty()) {
     env->ExceptionClear();
+    LOGE("NativeCodec::readPixels(): Failed to decode the image!");
     return false;
   }
   void* pixels = nullptr;
   if (AndroidBitmap_lockPixels(env, bitmap, &pixels) != 0) {
     env->ExceptionClear();
+    LOGE("NativeCodec::readPixels(): Failed to lockPixels() of a Java bitmap!");
     return false;
   }
   auto result = Bitmap(info, pixels).readPixels(dstInfo, dstPixels);

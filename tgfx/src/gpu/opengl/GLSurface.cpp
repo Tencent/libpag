@@ -52,11 +52,11 @@ std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, 
   if (alphaOnly) {
     if (GLCaps::Get(context)->textureRedSupport) {
       texture = std::static_pointer_cast<GLTexture>(
-          Texture::MakeAlpha(context, width, height, ImageOrigin::TopLeft, mipMapped));
+          Texture::MakeAlpha(context, width, height, SurfaceOrigin::TopLeft, mipMapped));
     }
   } else {
     texture = std::static_pointer_cast<GLTexture>(
-        Texture::MakeRGBA(context, width, height, ImageOrigin::TopLeft, mipMapped));
+        Texture::MakeRGBA(context, width, height, SurfaceOrigin::TopLeft, mipMapped));
   }
   if (texture == nullptr) {
     return nullptr;

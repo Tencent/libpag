@@ -286,7 +286,7 @@ static bool IsPixelAligned(const Rect& rect) {
 }
 
 void FlipYIfNeeded(Rect* rect, const Surface* surface) {
-  if (surface->origin() == ImageOrigin::BottomLeft) {
+  if (surface->origin() == SurfaceOrigin::BottomLeft) {
     auto height = rect->height();
     rect->top = static_cast<float>(surface->height()) - rect->bottom;
     rect->bottom = rect->top + height;

@@ -60,7 +60,7 @@ class ProxyProvider {
    * Create a TextureProxy without any data.
    */
   std::shared_ptr<TextureProxy> createTextureProxy(int width, int height, PixelFormat format,
-                                                   ImageOrigin origin = ImageOrigin::TopLeft,
+                                                   SurfaceOrigin origin = SurfaceOrigin::TopLeft,
                                                    bool mipMapped = false);
 
   /*
