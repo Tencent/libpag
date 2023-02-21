@@ -173,14 +173,15 @@ static bool MakeLayerStyleNode(std::vector<FilterNode>& filterNodes, tgfx::Rect&
   return true;
 }
 
-static bool MakeThreeDLayerNode(std::vector<FilterNode>& filterNodes, tgfx::Rect& clipBounds,
+static bool Make3DLayerNode(std::vector<FilterNode>& filterNodes, tgfx::Rect& clipBounds,
                                 const FilterList* filterList, RenderCache* renderCache,
                                 tgfx::Rect& filterBounds, tgfx::Point& effectScale) {
    if (filterList->layer->transform3D) {
      auto filter = renderCache->getTransform3DFilter();
      if (filter && filter->updateLayer(filterList->layer, filterList->layerFrame)) {
        auto oldBounds = filterBounds;
-       filterBounds = ToTGFX(filterList->layer->getBounds());
+       auto containingComposition = filterList->layer->containingComposition;
+       filterBounds = tgfx::Rect::MakeWH(containingComposition->width , containingComposition->height);
        filter->update(filterList->layerFrame, oldBounds, filterBounds, effectScale);
        if (!filterBounds.intersect(clipBounds)) {
          return false;
@@ -270,7 +271,7 @@ std::vector<FilterNode> FilterRenderer::MakeFilterNodes(const FilterList* filter
                                                         RenderCache* renderCache,
                                                         tgfx::Rect* contentBounds,
                                                         const tgfx::Rect& clipRect) {
-  // 滤镜应用顺序：Effects->PAGFilter->motionBlur->LayerStyles
+  // 滤镜应用顺序：Effects->PAGFilter->motionBlur/3DLayer->LayerStyles
   std::vector<FilterNode> filterNodes = {};
   int clipIndex = -1;
   for (int i = static_cast<int>(filterList->effects.size()) - 1; i >= 0; i--) {
@@ -301,7 +302,7 @@ std::vector<FilterNode> FilterRenderer::MakeFilterNodes(const FilterList* filter
     return {};
   }
   
-  if (!MakeThreeDLayerNode(filterNodes, clipBounds, filterList, renderCache, filterBounds, effectScale)) {
+  if (!Make3DLayerNode(filterNodes, clipBounds, filterList, renderCache, filterBounds, effectScale)) {
     return {};
   }
 

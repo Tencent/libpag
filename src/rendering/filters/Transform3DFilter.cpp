@@ -192,26 +192,29 @@ void Transform3DFilter::onUpdateParams(tgfx::Context* context, const FilterSourc
   } else {
     cameraZoom = 1000.f;
   }
+  auto aspectScale = 1.0f * source->width / target->width;
+  auto sourceAspectScaleMatrix = tgfx::Matrix4x4::Scale(1.0, 1.0 * source->height / source->width);
+  auto targetAspectScaleMatrix = tgfx::Matrix4x4::Scale(1.0, 1.0 * target->height / target->width);
+  auto aspectScaleMatrix = tgfx::Matrix4x4::Scale(aspectScale, aspectScale);
+  sourceAspectScaleMatrix.postConcat(aspectScaleMatrix);
+  tgfx::Matrix4x4 invertTargetAspectScaleMatrix;
+  targetAspectScaleMatrix.invert(&invertTargetAspectScaleMatrix);
   
-  modelMatrix = tgfx::Matrix4x4::Translate(-anchorPoint.x / bounds.width() * 2.0f,
-                                           -anchorPoint.y / bounds.height() * 2.0f,
-                                           anchorPoint.z / cameraZoom * 2.0f / zFix);
-  
+  modelMatrix = tgfx::Matrix4x4();
   modelMatrix.postTranslate(1.0, 1.0);
+  modelMatrix.postConcat(sourceAspectScaleMatrix);
+  modelMatrix.postConcat(invertTargetAspectScaleMatrix);
+  modelMatrix.postTranslate(-anchorPoint.x / bounds.width() * 2.0f,
+                            -anchorPoint.y / bounds.height() * 2.0f,
+                            anchorPoint.z / cameraZoom * 2.0f / zFix);
+  modelMatrix.postConcat(targetAspectScaleMatrix);
   auto scaleMatrix = tgfx::Matrix4x4::Scale(scale.x, scale.y, scale.z);
   modelMatrix.postConcat(scaleMatrix);
-  
-  auto targetAspectScaleMatrix = tgfx::Matrix4x4::Scale(1.0, 1.0 * target->height / target->width);
-  auto sourceAspectScaleMatrix = tgfx::Matrix4x4::Scale(1.0, 1.0 * source->height / source->width);
-  modelMatrix.postConcat(sourceAspectScaleMatrix);
   auto xRotationMatrix = tgfx::Matrix4x4::Rotate({1.0, 0.0, 0.0}, DegreesToRadians(-(orientation.x + xRotation)));
   auto yRotationMatrix = tgfx::Matrix4x4::Rotate({0.0, 1.0, 0.0}, DegreesToRadians(-(orientation.y + yRotation)));
   auto zRotationMatrix = tgfx::Matrix4x4::Rotate({0.0, 0.0, 1.0}, DegreesToRadians(orientation.z + zRotation));
   modelMatrix.postConcat(zRotationMatrix).postConcat(yRotationMatrix).postConcat(xRotationMatrix);
-  tgfx::Matrix4x4 invertTargetAspectScaleMatrix;
-  targetAspectScaleMatrix.invert(&invertTargetAspectScaleMatrix);
   modelMatrix.postConcat(invertTargetAspectScaleMatrix);
-  
   modelMatrix.postTranslate(position.x / bounds.width() * 2.0f,
                             position.y / bounds.height() * 2.0f,
                             -position.z / cameraZoom * 2.0f / zFix);
