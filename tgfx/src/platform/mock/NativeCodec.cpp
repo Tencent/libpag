@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/ImageCodec.h"
+#include "platform/apple/BitmapContextUtil.h"
 
 namespace tgfx {
 std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string&) {
@@ -28,6 +29,10 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data>) {
 }
 
 std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(NativeImageRef) {
+  return nullptr;
+}
+
+CGContextRef CreateBitmapContext(const ImageInfo&, void*) {
   return nullptr;
 }
 }  // namespace tgfx
