@@ -37,7 +37,7 @@ std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(NativeImageRef nativeImage) {
 }
 
 std::shared_ptr<Texture> NativeImageBuffer::onMakeTexture(Context* context, bool) const {
-  auto texture = Texture::MakeRGBA(context, width(), height(), nullptr, 0, ImageOrigin::TopLeft);
+  auto texture = Texture::MakeRGBA(context, width(), height(), nullptr, 0, SurfaceOrigin::TopLeft);
   if (texture == nullptr) {
     return nullptr;
   }

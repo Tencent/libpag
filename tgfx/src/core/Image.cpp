@@ -32,7 +32,7 @@ std::shared_ptr<Image> Image::MakeFromEncoded(const std::string& filePath, bool 
   if (codec == nullptr) {
     return nullptr;
   }
-  return MakeFromGenerator(codec, codec->orientation(), mipMapped);
+  return MakeFromGenerator(codec, codec->origin(), mipMapped);
 }
 
 std::shared_ptr<Image> Image::MakeFromEncoded(std::shared_ptr<Data> encodedData, bool mipMapped) {
@@ -40,17 +40,17 @@ std::shared_ptr<Image> Image::MakeFromEncoded(std::shared_ptr<Data> encodedData,
   if (codec == nullptr) {
     return nullptr;
   }
-  return MakeFromGenerator(codec, codec->orientation(), mipMapped);
+  return MakeFromGenerator(codec, codec->origin(), mipMapped);
 }
 
 std::shared_ptr<Image> Image::MakeFromGenerator(std::shared_ptr<ImageGenerator> generator,
-                                                Orientation orientation, bool mipMapped) {
+                                                ImageOrigin origin, bool mipMapped) {
   auto source = ImageSource::MakeFromGenerator(generator, mipMapped);
-  return MakeFromSource(std::move(source), orientation);
+  return MakeFromSource(std::move(source), origin);
 }
 
 std::shared_ptr<Image> Image::MakeFromPixels(const ImageInfo& info, const void* pixels,
-                                             Orientation orientation, bool mipMapped) {
+                                             ImageOrigin origin, bool mipMapped) {
   if (info.isEmpty() || pixels == nullptr) {
     return nullptr;
   }
@@ -62,19 +62,19 @@ std::shared_ptr<Image> Image::MakeFromPixels(const ImageInfo& info, const void* 
     Bitmap bitmap(buffer);
     bitmap.writePixels(info, pixels);
   }
-  return MakeFromBuffer(std::move(buffer), orientation, mipMapped);
+  return MakeFromBuffer(std::move(buffer), origin, mipMapped);
 }
 
 std::shared_ptr<Image> Image::MakeFromBuffer(std::shared_ptr<ImageBuffer> imageBuffer,
-                                             Orientation orientation, bool mipMapped) {
+                                             ImageOrigin origin, bool mipMapped) {
   auto source = ImageSource::MakeFromBuffer(std::move(imageBuffer), mipMapped);
-  return MakeFromSource(std::move(source), orientation);
+  return MakeFromSource(std::move(source), origin);
 }
 
 std::shared_ptr<Image> Image::MakeFromTexture(std::shared_ptr<Texture> texture,
-                                              Orientation orientation) {
+                                              ImageOrigin origin) {
   auto source = ImageSource::MakeFromTexture(std::move(texture));
-  return MakeFromSource(std::move(source), orientation);
+  return MakeFromSource(std::move(source), origin);
 }
 
 std::shared_ptr<Image> Image::MakeRGBAAA(std::shared_ptr<ImageGenerator> generator,
@@ -98,17 +98,17 @@ std::shared_ptr<Image> Image::MakeRGBAAA(std::shared_ptr<Texture> texture, int d
 }
 
 std::shared_ptr<Image> Image::MakeFromSource(std::shared_ptr<ImageSource> source,
-                                             Orientation orientation) {
+                                             ImageOrigin origin) {
   if (source == nullptr) {
     return nullptr;
   }
   std::shared_ptr<Image> image = nullptr;
-  if (orientation != Orientation::TopLeft) {
-    auto matrix = OrientationToMatrix(orientation, source->width(), source->height());
+  if (origin != ImageOrigin::TopLeft) {
+    auto matrix = ImageOriginToMatrix(origin, source->width(), source->height());
     matrix.invert(&matrix);
     auto width = source->width();
     auto height = source->height();
-    ApplyOrientation(orientation, &width, &height);
+    ApplyImageOrigin(origin, &width, &height);
     image = std::shared_ptr<MatrixImage>(new MatrixImage(std::move(source), width, height, matrix));
   } else {
     image = std::shared_ptr<Image>(new Image(std::move(source)));

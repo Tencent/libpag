@@ -246,7 +246,7 @@ DecodeInfo WebpUtility::getDecodeInfo(const std::string& filePath) {
   WebpFile webpFile = {infile, 0, fileLength, fileLength};
   webpFile._start = 12;
   auto chunkHeader = static_cast<uint8_t*>(malloc(RIFF_HEADER_SIZE));
-  bool foundOrientation = false;
+  bool foundOrigin = false;
   do {
     fseek(infile, webpFile._start, SEEK_SET);
     if ((fileLength - webpFile._start) < RIFF_HEADER_SIZE) break;
@@ -271,14 +271,14 @@ DecodeInfo WebpUtility::getDecodeInfo(const std::string& filePath) {
         break;
       }
       case MKFOURCC('E', 'X', 'I', 'F'): {
-        foundOrientation = true;
+        foundOrigin = true;
         fseek(infile, webpFile._start + CHUNK_HEADER_SIZE, SEEK_SET);
         auto exifData = static_cast<uint8_t*>(malloc(chunk_size));
         if (fread(exifData, 1, chunk_size, infile) != chunk_size) {
           needBreak = true;
           break;
         }
-        is_orientation_marker(exifData, chunk_size, &decodeInfo.orientation);
+        is_orientation_marker(exifData, chunk_size, &decodeInfo.origin);
         if (chunk_size_padded <= webpFile._end - webpFile._start) {
           Skip(&webpFile, chunk_size_padded + CHUNK_HEADER_SIZE);
         } else {
@@ -296,7 +296,7 @@ DecodeInfo WebpUtility::getDecodeInfo(const std::string& filePath) {
       }
     }
     if (needBreak) break;
-  } while (!foundOrientation && (fileLength - webpFile._start) >= RIFF_HEADER_SIZE);
+  } while (!foundOrigin && (fileLength - webpFile._start) >= RIFF_HEADER_SIZE);
   free(chunkHeader);
   fclose(infile);
   return decodeInfo;
@@ -327,7 +327,7 @@ DecodeInfo WebpUtility::getDecodeInfo(const void* fileBytes, size_t byteLength) 
     }
   }
 
-  Orientation origin = Orientation::TopLeft;
+  ImageOrigin origin = ImageOrigin::TopLeft;
   {
     WebPChunkIterator chunkIterator;
     if (WebPDemuxGetChunk(demux, "EXIF", 1, &chunkIterator)) {

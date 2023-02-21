@@ -18,22 +18,58 @@
 
 #pragma once
 
+#include "tgfx/core/Matrix.h"
+
 namespace tgfx {
 /**
- * Textures and FrameBuffers can be stored such that (0, 0) in texture space may correspond to
- * either the top-left or bottom-left content pixel.
+ * These values match the orientation www.exif.org/Exif2-2.PDF.
  */
 enum class ImageOrigin {
   /**
-   * The default origin for all off-screen rendering. Use ImageOrigin::TopLeft origin for textures
-   * which are from HardwareBuffers (Android), CVPixelBuffers (iOS), or normally created by backend
-   * APIs. Note: ImageOrigin::TopLeft is actual bottom-left origin for OpenGL backend.
+   * Default
    */
-  TopLeft,
+  TopLeft = 1,
   /**
-   * Use this origin to flip the content on y-axis if the GPU backend has different origin to your
-   * system views. It is usually used when on-screen rendering.
+   * Reflected across y-axis
    */
-  BottomLeft
+  TopRight = 2,
+  /**
+   * Rotated 180
+   */
+  BottomRight = 3,
+  /**
+   * Reflected across x-axis
+   */
+  BottomLeft = 4,
+  /**
+   * Reflected across x-axis, Rotated 90 CCW
+   */
+  LeftTop = 5,
+  /**
+   * Rotated 90 CW
+   */
+  RightTop = 6,
+  /**
+   * Reflected across x-axis, Rotated 90 CW
+   */
+  RightBottom = 7,
+  /**
+   * Rotated 90 CCW
+   */
+  LeftBottom = 8
 };
+
+/**
+ * Given an image origin and the width and height of the source data, returns a matrix that
+ * transforms the source rectangle [0, 0, w, h] to a correctly oriented destination rectangle, with
+ * the upper left corner still at [0, 0].
+ */
+Matrix ImageOriginToMatrix(ImageOrigin origin, int width, int height);
+
+/**
+ * Transforms the image size (width, height) to a correctly oriented destination size by the given
+ * image origin.
+ */
+void ApplyImageOrigin(ImageOrigin origin, int* width, int* height);
+
 }  // namespace tgfx

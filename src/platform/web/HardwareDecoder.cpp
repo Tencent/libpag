@@ -45,7 +45,7 @@ std::shared_ptr<WebVideoTexture> WebVideoTexture::Make(tgfx::Context* context, i
   gl->texImage2D(sampler.target, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
 
   auto texture = tgfx::Resource::Wrap(
-      context, new WebVideoTexture(sampler, width, height, tgfx::ImageOrigin::TopLeft));
+      context, new WebVideoTexture(sampler, width, height, tgfx::SurfaceOrigin::TopLeft));
   if (isAndroidMiniprogram) {
     // https://stackoverflow.com/questions/28291204/something-about-stagefright-codec-input-format-in-android
     // Video decoder will align to multiples of 16 on the Android WeChat mini-program.
@@ -56,7 +56,7 @@ std::shared_ptr<WebVideoTexture> WebVideoTexture::Make(tgfx::Context* context, i
 }
 
 WebVideoTexture::WebVideoTexture(const tgfx::GLSampler& glSampler, int width, int height,
-                                 tgfx::ImageOrigin origin)
+                                 tgfx::SurfaceOrigin origin)
     : GLTexture(width, height, origin), textureWidth(width), textureHeight(height) {
   sampler = glSampler;
 }

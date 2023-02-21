@@ -32,10 +32,9 @@ class NativeCodec : public ImageCodec {
   std::string imagePath;
   std::shared_ptr<Data> imageBytes;
 
-  NativeCodec(int width, int height, Orientation orientation)
-      : ImageCodec(width, height, orientation){};
+  NativeCodec(int width, int height, ImageOrigin origin) : ImageCodec(width, height, origin){};
 
-  static std::shared_ptr<NativeCodec> Make(JNIEnv* env, jobject sizeObject, int orientation);
+  static std::shared_ptr<NativeCodec> Make(JNIEnv* env, jobject sizeObject, int origin);
 
   friend class ImageCodec;
 };

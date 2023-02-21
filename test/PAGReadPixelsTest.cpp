@@ -224,7 +224,7 @@ PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
   result = CreateGLTexture(context, width, height, &textureInfo);
   ASSERT_TRUE(result);
   auto glTexture =
-      GLTexture::MakeFrom(context, textureInfo, width, height, tgfx::ImageOrigin::BottomLeft);
+      GLTexture::MakeFrom(context, textureInfo, width, height, tgfx::SurfaceOrigin::BottomLeft);
   surface = Surface::MakeFrom(glTexture);
   ASSERT_TRUE(surface != nullptr);
   canvas = surface->getCanvas();
@@ -258,25 +258,25 @@ PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
  * 用例描述: PNG 解码器测试
  */
 PAG_TEST(PAGReadPixelsTest, PngCodec) {
-  auto image = MakeImageCodec("resources/apitest/test_timestretch.png");
-  ASSERT_TRUE(image != nullptr);
-  ASSERT_EQ(image->width(), 1280);
-  ASSERT_EQ(image->height(), 720);
-  ASSERT_EQ(static_cast<int>(image->orientation()), static_cast<int>(Orientation::TopLeft));
-  auto rowBytes = image->width() * 4;
-  auto pixels = new (std::nothrow) uint8_t[rowBytes * image->height()];
+  auto codec = MakeImageCodec("resources/apitest/test_timestretch.png");
+  ASSERT_TRUE(codec != nullptr);
+  ASSERT_EQ(codec->width(), 1280);
+  ASSERT_EQ(codec->height(), 720);
+  ASSERT_EQ(codec->origin(), tgfx::ImageOrigin::TopLeft);
+  auto rowBytes = codec->width() * 4;
+  auto pixels = new (std::nothrow) uint8_t[rowBytes * codec->height()];
   ASSERT_TRUE(pixels);
-  auto info = ImageInfo::Make(image->width(), image->height(), tgfx::ColorType::RGBA_8888,
+  auto info = ImageInfo::Make(codec->width(), codec->height(), tgfx::ColorType::RGBA_8888,
                               tgfx::AlphaType::Premultiplied);
-  ASSERT_TRUE(image->readPixels(info, pixels));
+  ASSERT_TRUE(codec->readPixels(info, pixels));
   CHECK_PIXELS(info, pixels, "PngCodec_Decode");
   Bitmap bitmap(info, pixels);
   auto bytes = bitmap.encode(EncodedFormat::PNG, 100);
-  image = ImageCodec::MakeFrom(bytes);
-  ASSERT_TRUE(image != nullptr);
-  ASSERT_EQ(image->width(), 1280);
-  ASSERT_EQ(image->height(), 720);
-  ASSERT_EQ(static_cast<int>(image->orientation()), static_cast<int>(Orientation::TopLeft));
+  codec = ImageCodec::MakeFrom(bytes);
+  ASSERT_TRUE(codec != nullptr);
+  ASSERT_EQ(codec->width(), 1280);
+  ASSERT_EQ(codec->height(), 720);
+  ASSERT_EQ(codec->origin(), tgfx::ImageOrigin::TopLeft);
   delete[] pixels;
 }
 
@@ -284,29 +284,29 @@ PAG_TEST(PAGReadPixelsTest, PngCodec) {
  * 用例描述: Webp 解码器测试
  */
 PAG_TEST(PAGReadPixelsTest, WebpCodec) {
-  auto image = MakeImageCodec("resources/apitest/imageReplacement.webp");
-  ASSERT_TRUE(image != nullptr);
-  ASSERT_EQ(image->width(), 110);
-  ASSERT_EQ(image->height(), 110);
-  ASSERT_EQ(static_cast<int>(image->orientation()), static_cast<int>(Orientation::TopLeft));
-  auto info = ImageInfo::Make(image->width(), image->height(), tgfx::ColorType::RGBA_8888,
+  auto codec = MakeImageCodec("resources/apitest/imageReplacement.webp");
+  ASSERT_TRUE(codec != nullptr);
+  ASSERT_EQ(codec->width(), 110);
+  ASSERT_EQ(codec->height(), 110);
+  ASSERT_EQ(codec->origin(), tgfx::ImageOrigin::TopLeft);
+  auto info = ImageInfo::Make(codec->width(), codec->height(), tgfx::ColorType::RGBA_8888,
                               tgfx::AlphaType::Premultiplied);
   auto pixels = new (std::nothrow) uint8_t[info.byteSize()];
   ASSERT_TRUE(pixels);
-  ASSERT_TRUE(image->readPixels(info, pixels));
+  ASSERT_TRUE(codec->readPixels(info, pixels));
   CHECK_PIXELS(info, pixels, "WebpCodec_Decode");
   Bitmap bitmap(info, pixels);
   auto bytes = bitmap.encode(EncodedFormat::WEBP, 100);
-  image = ImageCodec::MakeFrom(bytes);
-  ASSERT_TRUE(image != nullptr);
-  ASSERT_EQ(image->width(), 110);
-  ASSERT_EQ(image->height(), 110);
-  ASSERT_EQ(static_cast<int>(image->orientation()), static_cast<int>(Orientation::TopLeft));
+  codec = ImageCodec::MakeFrom(bytes);
+  ASSERT_TRUE(codec != nullptr);
+  ASSERT_EQ(codec->width(), 110);
+  ASSERT_EQ(codec->height(), 110);
+  ASSERT_EQ(codec->origin(), tgfx::ImageOrigin::TopLeft);
 
-  auto a8Info = ImageInfo::Make(image->width(), image->height(), tgfx::ColorType::ALPHA_8,
+  auto a8Info = ImageInfo::Make(codec->width(), codec->height(), tgfx::ColorType::ALPHA_8,
                                 tgfx::AlphaType::Premultiplied);
   auto a8Pixels = new (std::nothrow) uint8_t[a8Info.byteSize()];
-  ASSERT_TRUE(image->readPixels(a8Info, a8Pixels));
+  ASSERT_TRUE(codec->readPixels(a8Info, a8Pixels));
   auto rgbaFromA8Data = Bitmap(a8Info, a8Pixels).encode(EncodedFormat::WEBP, 100);
   auto rgbaFromA8Image = ImageCodec::MakeFrom(rgbaFromA8Data);
   rgbaFromA8Image->readPixels(info, pixels);
@@ -319,27 +319,27 @@ PAG_TEST(PAGReadPixelsTest, WebpCodec) {
  * 用例描述: JPEG 解码器测试
  */
 PAG_TEST(PAGReadPixelsTest, JpegCodec) {
-  auto image = MakeImageCodec("resources/apitest/rotation.jpg");
-  ASSERT_TRUE(image != nullptr);
-  ASSERT_EQ(image->width(), 4032);
-  ASSERT_EQ(image->height(), 3024);
-  ASSERT_EQ(static_cast<int>(image->orientation()), static_cast<int>(Orientation::RightTop));
+  auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
+  ASSERT_TRUE(codec != nullptr);
+  ASSERT_EQ(codec->width(), 4032);
+  ASSERT_EQ(codec->height(), 3024);
+  ASSERT_EQ(codec->origin(), tgfx::ImageOrigin::RightTop);
   auto outputColorType = tgfx::ColorType::RGBA_8888;
   auto pixels = new (std::nothrow)
-      uint8_t[image->height() * image->width() * ImageInfo::GetBytesPerPixel(outputColorType)];
+      uint8_t[codec->height() * codec->width() * ImageInfo::GetBytesPerPixel(outputColorType)];
   ASSERT_TRUE(pixels);
-  auto info = ImageInfo::Make(image->width(), image->height(), outputColorType,
+  auto info = ImageInfo::Make(codec->width(), codec->height(), outputColorType,
                               tgfx::AlphaType::Premultiplied);
-  bool res = image->readPixels(info, pixels);
+  bool res = codec->readPixels(info, pixels);
   CHECK_PIXELS(info, pixels, "JpegCodec_Decode");
   Bitmap bitmap(info, pixels);
 
   auto bytes = bitmap.encode(EncodedFormat::JPEG, 20);
-  image = ImageCodec::MakeFrom(bytes);
-  ASSERT_TRUE(image != nullptr);
-  ASSERT_EQ(image->width(), 4032);
-  ASSERT_EQ(image->height(), 3024);
-  ASSERT_EQ(static_cast<int>(image->orientation()), static_cast<int>(Orientation::TopLeft));
+  codec = ImageCodec::MakeFrom(bytes);
+  ASSERT_TRUE(codec != nullptr);
+  ASSERT_EQ(codec->width(), 4032);
+  ASSERT_EQ(codec->height(), 3024);
+  ASSERT_EQ(codec->origin(), tgfx::ImageOrigin::TopLeft);
   delete[] pixels;
   ASSERT_TRUE(res);
 }

@@ -53,7 +53,7 @@ std::unique_ptr<FilterSource> FilterBuffer::toFilterSource(const tgfx::Point& sc
   filterSource->height = surface->height();
   filterSource->scale = scale;
   filterSource->textureMatrix = ToGLTextureMatrix(tgfx::Matrix::I(), surface->width(),
-                                                  surface->height(), tgfx::ImageOrigin::TopLeft);
+                                                  surface->height(), tgfx::SurfaceOrigin::TopLeft);
   return std::unique_ptr<FilterSource>(filterSource);
 }
 
@@ -64,7 +64,7 @@ std::unique_ptr<FilterTarget> FilterBuffer::toFilterTarget(
   filterTarget->width = surface->width();
   filterTarget->height = surface->height();
   filterTarget->vertexMatrix = ToGLVertexMatrix(drawingMatrix, surface->width(), surface->height(),
-                                                tgfx::ImageOrigin::TopLeft);
+                                                tgfx::SurfaceOrigin::TopLeft);
   return std::unique_ptr<FilterTarget>(filterTarget);
 }
 }  // namespace pag

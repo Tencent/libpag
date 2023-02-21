@@ -22,7 +22,7 @@
 #include "rendering/sequences/SequenceReader.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageGenerator.h"
-#include "tgfx/core/Orientation.h"
+#include "tgfx/core/ImageOrigin.h"
 
 namespace pag {
 class SequenceInfo {

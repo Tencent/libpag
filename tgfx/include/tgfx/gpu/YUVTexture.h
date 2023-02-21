@@ -93,7 +93,7 @@ class YUVTexture : public Texture {
 
  protected:
   YUVTexture(int width, int height, YUVColorSpace colorSpace, YUVColorRange colorRange)
-      : Texture(width, height, ImageOrigin::TopLeft),
+      : Texture(width, height, SurfaceOrigin::TopLeft),
         _colorSpace(colorSpace),
         _colorRange(colorRange) {
   }

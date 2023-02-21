@@ -21,7 +21,7 @@
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageGenerator.h"
 #include "tgfx/core/ImageInfo.h"
-#include "tgfx/core/Orientation.h"
+#include "tgfx/core/ImageOrigin.h"
 #include "tgfx/core/SamplingOptions.h"
 #include "tgfx/core/TileMode.h"
 
@@ -64,7 +64,7 @@ class Image {
    * not supported by the GPU or the associated image source.
    */
   static std::shared_ptr<Image> MakeFromGenerator(std::shared_ptr<ImageGenerator> generator,
-                                                  Orientation orientation = Orientation::TopLeft,
+                                                  ImageOrigin origin = ImageOrigin::TopLeft,
                                                   bool mipMapped = false);
 
   /**
@@ -74,7 +74,7 @@ class Image {
    * ignored if it is not supported by the GPU or the associated image source.
    */
   static std::shared_ptr<Image> MakeFromPixels(const ImageInfo& info, const void* pixels,
-                                               Orientation orientation = Orientation::TopLeft,
+                                               ImageOrigin origin = ImageOrigin::TopLeft,
                                                bool mipMapped = false);
 
   /**
@@ -83,14 +83,14 @@ class Image {
    * by the GPU or the associated image source.
    */
   static std::shared_ptr<Image> MakeFromBuffer(std::shared_ptr<ImageBuffer> imageBuffer,
-                                               Orientation orientation = Orientation::TopLeft,
+                                               ImageOrigin origin = ImageOrigin::TopLeft,
                                                bool mipMapped = false);
 
   /**
    * Creates Image from Texture, Image is returned if texture is not nullptr.
    */
   static std::shared_ptr<Image> MakeFromTexture(std::shared_ptr<Texture> texture,
-                                                Orientation orientation = Orientation::TopLeft);
+                                                ImageOrigin origin = ImageOrigin::TopLeft);
 
   /**
    * Creates an Image with RGBAAA layout that takes half of the original image from imageGenerator
@@ -235,7 +235,7 @@ class Image {
 
  private:
   static std::shared_ptr<Image> MakeFromSource(std::shared_ptr<ImageSource> source,
-                                               Orientation orientation = Orientation::TopLeft);
+                                               ImageOrigin origin = ImageOrigin::TopLeft);
 
   static std::shared_ptr<Image> MakeRGBAAA(std::shared_ptr<ImageSource> source, int displayWidth,
                                            int displayHeight, int alphaStartX, int alphaStartY);

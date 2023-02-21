@@ -25,8 +25,8 @@
 namespace tgfx {
 std::shared_ptr<GLRenderTarget> GLRenderTarget::MakeFrom(Context* context,
                                                          const GLFrameBuffer& frameBuffer,
-                                                         int width, int height, ImageOrigin origin,
-                                                         int sampleCount) {
+                                                         int width, int height,
+                                                         SurfaceOrigin origin, int sampleCount) {
   if (context == nullptr || width <= 0 || height <= 0) {
     return nullptr;
   }
@@ -39,7 +39,7 @@ std::shared_ptr<GLRenderTarget> GLRenderTarget::MakeFrom(Context* context,
 std::shared_ptr<GLRenderTarget> GLRenderTarget::MakeAdopted(Context* context,
                                                             const GLFrameBuffer& frameBuffer,
                                                             int width, int height,
-                                                            ImageOrigin origin, int sampleCount) {
+                                                            SurfaceOrigin origin, int sampleCount) {
   if (context == nullptr || width <= 0 || height <= 0) {
     return nullptr;
   }
@@ -180,16 +180,16 @@ std::shared_ptr<GLRenderTarget> GLRenderTarget::MakeFrom(const GLTexture* textur
   return Resource::Wrap(context, rt);
 }
 
-GLRenderTarget::GLRenderTarget(int width, int height, ImageOrigin origin, int sampleCount,
+GLRenderTarget::GLRenderTarget(int width, int height, SurfaceOrigin origin, int sampleCount,
                                GLFrameBuffer frameBuffer, unsigned textureTarget)
     : RenderTarget(width, height, origin, sampleCount),
       textureFBInfo(frameBuffer),
       textureTarget(textureTarget) {
 }
 
-static bool CanReadDirectly(Context* context, ImageOrigin origin, const ImageInfo& srcInfo,
+static bool CanReadDirectly(Context* context, SurfaceOrigin origin, const ImageInfo& srcInfo,
                             const ImageInfo& dstInfo) {
-  if (origin != ImageOrigin::TopLeft || dstInfo.alphaType() != srcInfo.alphaType() ||
+  if (origin != SurfaceOrigin::TopLeft || dstInfo.alphaType() != srcInfo.alphaType() ||
       dstInfo.colorType() != srcInfo.colorType()) {
     return false;
   }
@@ -251,7 +251,7 @@ bool GLRenderTarget::readPixels(const ImageInfo& dstInfo, void* dstPixels, int s
   }
   auto alignment = pixelFormat == PixelFormat::ALPHA_8 ? 1 : 4;
   gl->pixelStorei(GL_PACK_ALIGNMENT, alignment);
-  auto flipY = origin() == ImageOrigin::BottomLeft;
+  auto flipY = origin() == SurfaceOrigin::BottomLeft;
   auto readX = std::max(0, srcX);
   auto readY = std::max(0, srcY);
   if (flipY) {

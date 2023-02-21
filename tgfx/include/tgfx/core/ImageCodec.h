@@ -22,7 +22,7 @@
 #include "tgfx/core/EncodedFormat.h"
 #include "tgfx/core/ImageGenerator.h"
 #include "tgfx/core/ImageInfo.h"
-#include "tgfx/core/Orientation.h"
+#include "tgfx/core/ImageOrigin.h"
 
 namespace tgfx {
 
@@ -46,10 +46,10 @@ class ImageCodec : public ImageGenerator {
   static std::shared_ptr<ImageCodec> MakeFrom(std::shared_ptr<Data> imageBytes);
 
   /**
-   * Returns the orientation of target image.
+   * Returns the origin of target image.
    */
-  Orientation orientation() const {
-    return _orientation;
+  ImageOrigin origin() const {
+    return _origin;
   }
 
   bool isAlphaOnly() const override {
@@ -65,14 +65,14 @@ class ImageCodec : public ImageGenerator {
   virtual bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const = 0;
 
  protected:
-  ImageCodec(int width, int height, Orientation orientation)
-      : ImageGenerator(width, height), _orientation(orientation) {
+  ImageCodec(int width, int height, ImageOrigin origin)
+      : ImageGenerator(width, height), _origin(origin) {
   }
 
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 
  private:
-  Orientation _orientation = Orientation::TopLeft;
+  ImageOrigin _origin = ImageOrigin::TopLeft;
 
   /**
    * Encodes the specified pixels into a binary image format. Returns nullptr if encoding fails.

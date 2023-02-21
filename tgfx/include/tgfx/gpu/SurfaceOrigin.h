@@ -18,34 +18,24 @@
 
 #pragma once
 
-#include "FragmentProcessor.h"
-
 namespace tgfx {
-class DeviceSpaceTextureEffect : public FragmentProcessor {
- public:
-  static std::unique_ptr<DeviceSpaceTextureEffect> Make(std::shared_ptr<Texture> texture,
-                                                        SurfaceOrigin deviceOrigin);
+/**
+ * Textures and Surfaces can be stored such that (0, 0) in texture space may correspond to
+ * either the top-left or bottom-left content pixel.
+ */
+enum class SurfaceOrigin {
+  /**
+   * The default origin of the native coordinate system in the GPU backend. For example, the
+   * SurfaceOrigin::TopLeft is actually the bottom-left origin in the OpenGL coordinate system for
+   * textures. Textures newly created by the backend API for off-screen rendering usually have a
+   * SurfaceOrigin::TopLeft origin.
+   */
+  TopLeft,
 
-  std::string name() const override {
-    return "DeviceSpaceTextureEffect";
-  }
-
- private:
-  DEFINE_PROCESSOR_CLASS_ID
-
-  DeviceSpaceTextureEffect(std::shared_ptr<Texture> texture, SurfaceOrigin deviceOrigin);
-
-  bool onIsEqual(const FragmentProcessor& processor) const override;
-
-  std::unique_ptr<GLFragmentProcessor> onCreateGLInstance() const override;
-
-  const TextureSampler* onTextureSampler(size_t) const override {
-    return texture->getSampler();
-  }
-
-  std::shared_ptr<Texture> texture;
-  Matrix deviceCoordMatrix = Matrix::I();
-
-  friend class GLDeviceSpaceTextureEffect;
+  /**
+   * Use this origin to flip the content on the y-axis if the GPU backend has a different origin to
+   * your system views. It is usually used for on-screen rendering.
+   */
+  BottomLeft
 };
 }  // namespace tgfx

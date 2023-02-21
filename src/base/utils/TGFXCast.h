@@ -23,10 +23,10 @@
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/ImageInfo.h"
-#include "tgfx/core/ImageOrigin.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/gpu/Backend.h"
+#include "tgfx/gpu/SurfaceOrigin.h"
 #include "tgfx/gpu/opengl/GLFrameBuffer.h"
 #include "tgfx/gpu/opengl/GLSampler.h"
 #include "tgfx/gpu/opengl/GLSemaphore.h"
@@ -43,9 +43,9 @@ tgfx::Color ToTGFX(Color color, Opacity opacity = Opaque);
 
 float ToAlpha(Opacity opacity);
 
-tgfx::ImageOrigin ToTGFX(ImageOrigin origin);
+tgfx::SurfaceOrigin ToTGFX(ImageOrigin origin);
 
-ImageOrigin ToPAG(tgfx::ImageOrigin origin);
+ImageOrigin ToPAG(tgfx::SurfaceOrigin origin);
 
 tgfx::AlphaType ToTGFX(AlphaType alphaType);
 

@@ -86,11 +86,11 @@ PAG_TEST(CanvasTest, Blur) {
   ASSERT_TRUE(image != nullptr);
   auto texture = image->makeBuffer()->makeTexture(context);
   ASSERT_TRUE(texture != nullptr);
-  auto imageMatrix = OrientationToMatrix(image->orientation(), image->width(), image->height());
+  auto imageMatrix = ImageOriginToMatrix(image->origin(), image->width(), image->height());
   imageMatrix.postScale(0.2, 0.2);
   auto width = image->width();
   auto height = image->height();
-  ApplyOrientation(image->orientation(), &width, &height);
+  ApplyImageOrigin(image->origin(), &width, &height);
   auto imageWidth = static_cast<float>(width) * 0.2f;
   auto imageHeight = static_cast<float>(height) * 0.2f;
   auto padding = 30.f;
@@ -200,7 +200,7 @@ PAG_TEST(CanvasTest, clip) {
   tgfx::GLSampler textureInfo;
   pag::CreateGLTexture(context, width, height, &textureInfo);
   auto glTexture =
-      GLTexture::MakeFrom(context, textureInfo, width, height, ImageOrigin::BottomLeft);
+      GLTexture::MakeFrom(context, textureInfo, width, height, SurfaceOrigin::BottomLeft);
   auto surface = Surface::MakeFrom(glTexture);
   auto canvas = surface->getCanvas();
   canvas->clear();

@@ -112,11 +112,11 @@ void DropShadowFilter::updateParamModeFullSpread(const tgfx::Rect& contentBounds
 void DropShadowFilter::onDrawModeNotSpread(tgfx::Context* context, const FilterSource* source,
                                            const FilterTarget* target) {
   auto renderTarget = tgfx::GLRenderTarget::MakeFrom(context, target->frameBuffer, target->width,
-                                                     target->height, tgfx::ImageOrigin::TopLeft);
+                                                     target->height, tgfx::SurfaceOrigin::TopLeft);
   auto targetSurface = tgfx::Surface::MakeFrom(renderTarget);
   auto targetCanvas = targetSurface->getCanvas();
   auto texture = tgfx::GLTexture::MakeFrom(context, source->sampler, source->width, source->height,
-                                           tgfx::ImageOrigin::TopLeft);
+                                           tgfx::SurfaceOrigin::TopLeft);
   targetCanvas->setMatrix(ToMatrix(target));
   tgfx::Paint paint;
   paint.setImageFilter(tgfx::ImageFilter::DropShadowOnly(
@@ -152,11 +152,11 @@ void DropShadowFilter::onDrawModeNotFullSpread(tgfx::Context* context, const Fil
   auto sourceV = spreadFilterBuffer->toFilterSource(source->scale);
 
   auto renderTarget = tgfx::GLRenderTarget::MakeFrom(context, target->frameBuffer, target->width,
-                                                     target->height, tgfx::ImageOrigin::TopLeft);
+                                                     target->height, tgfx::SurfaceOrigin::TopLeft);
   auto targetSurface = tgfx::Surface::MakeFrom(renderTarget);
   auto targetCanvas = targetSurface->getCanvas();
   auto texture = tgfx::GLTexture::MakeFrom(context, sourceV->sampler, sourceV->width,
-                                           sourceV->height, tgfx::ImageOrigin::TopLeft);
+                                           sourceV->height, tgfx::SurfaceOrigin::TopLeft);
   targetCanvas->setMatrix(ToMatrix(target));
   targetCanvas->concat(
       tgfx::Matrix::MakeTrans(static_cast<float>((source->width - sourceV->width)) * 0.5f,
