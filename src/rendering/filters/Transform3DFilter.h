@@ -68,7 +68,6 @@ protected:
 private:
   tgfx::Rect contentBounds = {};
   tgfx::Rect transformedBounds = {};
-  tgfx::Point extraOffset = {0.0f, 0.0f};
   
   Transform3D* layerTransform = nullptr;
   Transform3D* cameraTransform = nullptr;

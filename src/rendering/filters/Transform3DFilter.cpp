@@ -134,7 +134,6 @@ void Transform3DFilter::update(Frame frame, const tgfx::Rect& inputBounds, const
   contentBounds = inputBounds;
   transformedBounds = outputBounds;
   filterScale = extraScale;
-  extraOffset = {inputBounds.left, inputBounds.top};
 }
 
 void Transform3DFilter::draw(tgfx::Context* context, const FilterSource* source,
@@ -205,8 +204,8 @@ void Transform3DFilter::onUpdateParams(tgfx::Context* context, const FilterSourc
   modelMatrix.postTranslate(1.0, 1.0);
   modelMatrix.postConcat(sourceAspectScaleMatrix);
   modelMatrix.postConcat(invertTargetAspectScaleMatrix);
-  modelMatrix.postTranslate((-anchorPoint.x + extraOffset.x) / bounds.width() * 2.0f,
-                            (-anchorPoint.y + extraOffset.y) / bounds.height() * 2.0f,
+  modelMatrix.postTranslate((-anchorPoint.x + contentBounds.x()) / bounds.width() * 2.0f,
+                            (-anchorPoint.y + contentBounds.y()) / bounds.height() * 2.0f,
                             anchorPoint.z / cameraZoom * 2.0f / zFix);
   modelMatrix.postConcat(targetAspectScaleMatrix);
   auto scaleMatrix = tgfx::Matrix4x4::Scale(scale.x, scale.y, scale.z);
