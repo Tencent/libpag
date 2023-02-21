@@ -117,53 +117,62 @@ Point Layer::getMaxScaleFactor() {
   return getScaleFactor().first;
 }
 
+
+template<typename T>
+static void GetScaleFactorInternal(Property<T>* property, Point& maxScale, Point& minScale) {
+  if (property->animatable()) {
+    auto keyframes = static_cast<AnimatableProperty<T>*>(property)->keyframes;
+    minScale.x = maxScale.x = fabs(keyframes[0]->startValue.x);
+    minScale.y = maxScale.y = fabs(keyframes[0]->startValue.y);
+    for (auto& keyframe : keyframes) {
+      auto x = fabs(keyframe->endValue.x);
+      auto y = fabs(keyframe->endValue.y);
+      if (maxScale.x < x) {
+        maxScale.x = x;
+      }
+      if (maxScale.y < y) {
+        maxScale.y = y;
+      }
+      if (minScale.x > x) {
+        minScale.x = x;
+      }
+      if (minScale.y > y) {
+        minScale.y = y;
+      }
+    }
+  } else {
+    minScale.x = maxScale.x = fabs(property->value.x);
+    minScale.y = maxScale.y = fabs(property->value.y);
+  }
+}
+
 std::pair<Point, Point> Layer::getScaleFactor() {
   auto maxScale = Point::Make(1, 1);
   auto minScale = Point::Make(1, 1);
-//  auto property = transform->scale;
-//  if (property->animatable()) {
-//    auto keyframes = static_cast<AnimatableProperty<Point>*>(property)->keyframes;
-//    minScale.x = maxScale.x = fabs(keyframes[0]->startValue.x);
-//    minScale.y = maxScale.y = fabs(keyframes[0]->startValue.y);
-//    for (auto& keyframe : keyframes) {
-//      auto x = fabs(keyframe->endValue.x);
-//      auto y = fabs(keyframe->endValue.y);
-//      if (maxScale.x < x) {
-//        maxScale.x = x;
-//      }
-//      if (maxScale.y < y) {
-//        maxScale.y = y;
-//      }
-//      if (minScale.x > x) {
-//        minScale.x = x;
-//      }
-//      if (minScale.y > y) {
-//        minScale.y = y;
-//      }
-//    }
-//  } else {
-//    minScale.x = maxScale.x = fabs(property->value.x);
-//    minScale.y = maxScale.y = fabs(property->value.y);
-//  }
-//  if (!effects.empty()) {
-//    auto bounds = getBounds();
-//    if (!bounds.isEmpty()) {
-//      for (auto* effect : effects) {
-//        auto scale = effect->getMaxScaleFactor(bounds);
-//        maxScale.x *= fabs(scale.x);
-//        maxScale.y *= fabs(scale.y);
-//        minScale.x *= fabs(scale.x);
-//        minScale.y *= fabs(scale.y);
-//      }
-//    }
-//  }
-//  if (parent != nullptr) {
-//    auto parentScale = parent->getScaleFactor();
-//    maxScale.x *= parentScale.first.x;
-//    maxScale.y *= parentScale.first.y;
-//    minScale.x *= parentScale.second.x;
-//    minScale.y *= parentScale.second.y;
-//  }
+  if (transform != nullptr) {
+    GetScaleFactorInternal(transform->scale, maxScale, minScale);
+  } else if (transform3D != nullptr) {
+    GetScaleFactorInternal(transform3D->scale, maxScale, minScale);
+  }
+  if (!effects.empty()) {
+    auto bounds = getBounds();
+    if (!bounds.isEmpty()) {
+      for (auto* effect : effects) {
+        auto scale = effect->getMaxScaleFactor(bounds);
+        maxScale.x *= fabs(scale.x);
+        maxScale.y *= fabs(scale.y);
+        minScale.x *= fabs(scale.x);
+        minScale.y *= fabs(scale.y);
+      }
+    }
+  }
+  if (parent != nullptr) {
+    auto parentScale = parent->getScaleFactor();
+    maxScale.x *= parentScale.first.x;
+    maxScale.y *= parentScale.first.y;
+    minScale.x *= parentScale.second.x;
+    minScale.y *= parentScale.second.y;
+  }
   return {maxScale, minScale};
 }
 
