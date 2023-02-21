@@ -18,7 +18,6 @@
 
 #include "Transform3DFilter.h"
 #include "base/utils/MathUtil.h"
-#include "core/utils/MathExtra.h"
 #include "rendering/filters/utils/FilterHelper.h"
 
 namespace pag {
@@ -53,7 +52,7 @@ static constexpr char FRAGMENT_SHADER[] = R"(
 struct CtmInfo {
   float fNear = 0.05f;
   float fFar = 100.f;
-  float fAngle = tgfx::M_PI_F / 4;
+  float fAngle = M_PI_4;
 
   tgfx::SkV3 fEye{0, 0, 1.0f / tan(fAngle / 2) - 1};
   tgfx::SkV3 fCOA{0, 0, 0};
