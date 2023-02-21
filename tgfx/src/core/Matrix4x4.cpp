@@ -18,7 +18,7 @@
 
 #include "tgfx/core/Matrix4x4.h"
 #include <cfloat>
-#include "core/utils/MathExtra.h"
+#include "utils/MathExtra.h"
 #include "include/private/SkVx.h"
 
 namespace tgfx {
