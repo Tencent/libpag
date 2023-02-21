@@ -21,7 +21,7 @@
 #include "rendering/caches/TextAtlas.h"
 #include "rendering/caches/TextBlock.h"
 #include "rendering/graphics/Graphic.h"
-#include "tgfx/gpu/Paint.h"
+#include "tgfx/core/Paint.h"
 
 namespace pag {
 class TextRun {

@@ -18,7 +18,7 @@
 
 #include "Graphic.h"
 #include "base/utils/MatrixUtil.h"
-#include "tgfx/gpu/Canvas.h"
+#include "tgfx/core/Canvas.h"
 
 namespace pag {
 class ComposeGraphic : public Graphic {

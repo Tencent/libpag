@@ -24,10 +24,10 @@
 #include "gpu/ops/RRectOp.h"
 #include "gpu/ops/TriangulatingPathOp.h"
 #include "rendering/utils/shaper/TextShaper.h"
+#include "tgfx/core/Canvas.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Mask.h"
 #include "tgfx/core/PathEffect.h"
-#include "tgfx/gpu/Canvas.h"
 #include "tgfx/gpu/Surface.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
@@ -238,7 +238,7 @@ PAG_TEST(CanvasTest, TileMode) {
   auto surface = Surface::Make(context, codec->width() / 2, codec->height() / 2);
   auto canvas = surface->getCanvas();
   Paint paint;
-  paint.setShader(Shader::MakeTextureShader(texture, TileMode::Repeat, TileMode::Mirror)
+  paint.setShader(Shader::MakeImageShader(texture, TileMode::Repeat, TileMode::Mirror)
                       ->makeWithPreLocalMatrix(Matrix::MakeScale(0.125f)));
   canvas->drawRect(Rect::MakeWH(static_cast<float>(surface->width()),
                                 static_cast<float>(surface->height()) * 0.9f),
@@ -303,7 +303,7 @@ PAG_TEST(CanvasTest, merge_draw_call_triangle) {
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
   Paint paint;
-  paint.setShader(Shader::MakeTextureShader(texture)->makeWithPreLocalMatrix(
+  paint.setShader(Shader::MakeImageShader(texture)->makeWithPreLocalMatrix(
       Matrix::MakeScale(static_cast<float>(width) / static_cast<float>(codec->width()),
                         static_cast<float>(height) / static_cast<float>(codec->height()))));
   int tileSize = 8;
@@ -598,8 +598,8 @@ PAG_TEST(CanvasTest, mipmap) {
                           static_cast<int>(imageHeight * 4.f));
   canvas = surface->getCanvas();
   Paint paint;
-  paint.setShader(Shader::MakeTextureShader(textureMipMapped, TileMode::Mirror, TileMode::Repeat,
-                                            SamplingOptions(FilterMode::Linear, MipMapMode::Linear))
+  paint.setShader(Shader::MakeImageShader(textureMipMapped, TileMode::Mirror, TileMode::Repeat,
+                                          SamplingOptions(FilterMode::Linear, MipMapMode::Linear))
                       ->makeWithPreLocalMatrix(imageMatrix));
   canvas->drawRect(Rect::MakeWH(surface->width(), surface->height()), paint);
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/mipmap_linear_texture_effect"));

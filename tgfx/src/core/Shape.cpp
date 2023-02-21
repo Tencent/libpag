@@ -18,11 +18,11 @@
 
 #include "tgfx/core/Shape.h"
 #include "core/PathRef.h"
-#include "core/shapes/PathProxy.h"
-#include "core/shapes/RRectShape.h"
-#include "core/shapes/RectShape.h"
-#include "core/shapes/TextureShape.h"
-#include "core/shapes/TriangulatingShape.h"
+#include "shapes/PathProxy.h"
+#include "shapes/RRectShape.h"
+#include "shapes/RectShape.h"
+#include "shapes/TextureShape.h"
+#include "shapes/TriangulatingShape.h"
 #include "tgfx/core/PathEffect.h"
 
 namespace tgfx {

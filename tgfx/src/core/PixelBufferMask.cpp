@@ -18,8 +18,8 @@
 
 #include "PixelBufferMask.h"
 #include "gpu/Gpu.h"
-#include "gpu/PixelFormat.h"
 #include "tgfx/core/Bitmap.h"
+#include "utils/PixelFormatUtil.h"
 
 namespace tgfx {
 PixelBufferMask::PixelBufferMask(std::shared_ptr<PixelBuffer> buffer)

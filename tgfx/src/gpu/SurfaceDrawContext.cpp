@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "SurfaceDrawContext.h"
+#include "gpu/SurfaceDrawContext.h"
 #include "DrawingManager.h"
 #include "gpu/ops/FillRectOp.h"
 

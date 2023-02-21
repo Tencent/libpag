@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "FragmentProcessor.h"
+#include "gpu/FragmentProcessor.h"
 #include "tgfx/gpu/YUVTexture.h"
 
 namespace tgfx {

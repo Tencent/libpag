@@ -16,11 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "FragmentProcessor.h"
+#include "gpu/FragmentProcessor.h"
 #include "GLFragmentProcessor.h"
 #include "Pipeline.h"
 #include "SeriesFragmentProcessor.h"
-#include "XfermodeFragmentProcessor.h"
+#include "gpu/XfermodeFragmentProcessor.h"
 
 namespace tgfx {
 bool ComputeTotalInverse(const FPArgs& args, Matrix* totalInverse) {

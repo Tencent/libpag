@@ -18,8 +18,8 @@
 
 #include "tgfx/gpu/opengl/GLTexture.h"
 #include "GLUtil.h"
-#include "core/utils/UniqueID.h"
 #include "gpu/Gpu.h"
+#include "utils/UniqueID.h"
 
 namespace tgfx {
 static size_t ComputeSize(int width, int height, int sizePerPixel, bool mipMapped) {

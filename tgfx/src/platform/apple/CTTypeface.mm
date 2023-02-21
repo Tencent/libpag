@@ -16,11 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/utils/USE.h"
+#include "utils/USE.h"
 #include "tgfx/platform/apple/CTTypeface.h"
 
 #ifndef TGFX_USE_FREETYPE
-#include "core/vectors/coregraphics/CGTypeface.h"
+#include "vectors/coregraphics/CGTypeface.h"
 #endif
 
 namespace tgfx {

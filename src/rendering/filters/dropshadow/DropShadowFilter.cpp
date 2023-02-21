@@ -21,7 +21,7 @@
 #include "base/utils/TGFXCast.h"
 #include "rendering/filters/utils/BlurTypes.h"
 #include "rendering/filters/utils/FilterHelper.h"
-#include "tgfx/gpu/ImageFilter.h"
+#include "tgfx/core/ImageFilter.h"
 
 namespace pag {
 DropShadowFilter::DropShadowFilter(DropShadowStyle* layerStyle) : layerStyle(layerStyle) {

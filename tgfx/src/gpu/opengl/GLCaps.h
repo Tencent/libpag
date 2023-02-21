@@ -21,13 +21,13 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "core/utils/EnumHasher.h"
-#include "core/utils/Log.h"
 #include "gpu/Swizzle.h"
 #include "tgfx/gpu/Caps.h"
 #include "tgfx/gpu/PixelFormat.h"
 #include "tgfx/gpu/opengl/GLDefines.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
+#include "utils/EnumHasher.h"
+#include "utils/Log.h"
 
 #define GL_VER(major, minor) ((static_cast<uint32_t>(major) << 16) | static_cast<uint32_t>(minor))
 

@@ -18,7 +18,7 @@
 
 #include "CGLHardwareTexture.h"
 #include <OpenGL/gl3.h>
-#include "core/utils/UniqueID.h"
+#include "utils/UniqueID.h"
 #include "tgfx/gpu/opengl/cgl/CGLDevice.h"
 
 namespace tgfx {

@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ColorMatrixFragmentProcessor.h"
+#include "gpu/ColorMatrixFragmentProcessor.h"
 #include "opengl/GLColorMatrixFragmentProcessor.h"
 
 namespace tgfx {

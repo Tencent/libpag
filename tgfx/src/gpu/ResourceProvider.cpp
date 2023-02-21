@@ -18,7 +18,7 @@
 
 #include "ResourceProvider.h"
 #include "GradientCache.h"
-#include "core/utils/Log.h"
+#include "utils/Log.h"
 
 namespace tgfx {
 ResourceProvider::~ResourceProvider() {

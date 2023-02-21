@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "SweepGradientLayout.h"
+#include "gpu/gradients/SweepGradientLayout.h"
 #include "gpu/opengl/GLSweepGradientLayout.h"
 
 namespace tgfx {

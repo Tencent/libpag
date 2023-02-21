@@ -22,7 +22,7 @@
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Point.h"
-#include "tgfx/gpu/Shader.h"
+#include "tgfx/core/Shader.h"
 
 namespace pag {
 /**

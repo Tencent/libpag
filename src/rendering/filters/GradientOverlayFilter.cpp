@@ -86,7 +86,7 @@ void GradientOverlayFilter::draw(tgfx::Context* context, const FilterSource* sou
   auto texture = tgfx::GLTexture::MakeFrom(context, source->sampler, source->width, source->height,
                                            tgfx::SurfaceOrigin::TopLeft);
 
-  auto textureShader = tgfx::Shader::MakeTextureShader(texture);
+  auto textureShader = tgfx::Shader::MakeImageShader(texture);
 
   shader = tgfx::Shader::MakeBlend(tgfx::BlendMode::DstIn, shader, textureShader);
 

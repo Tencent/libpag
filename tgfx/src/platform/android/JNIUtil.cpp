@@ -19,7 +19,7 @@
 #include "JNIUtil.h"
 #include <pthread.h>
 #include <mutex>
-#include "core/utils/Log.h"
+#include "utils/Log.h"
 
 namespace tgfx {
 jstring SafeToJString(JNIEnv* env, const std::string& text) {

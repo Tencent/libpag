@@ -18,13 +18,13 @@
 
 #pragma once
 
-#include "FragmentProcessor.h"
 #include "FragmentShaderBuilder.h"
 #include "GeometryProcessor.h"
 #include "ProgramDataManager.h"
 #include "UniformHandler.h"
 #include "VaryingHandler.h"
 #include "VertexShaderBuilder.h"
+#include "gpu/FragmentProcessor.h"
 
 namespace tgfx {
 class GLGeometryProcessor {

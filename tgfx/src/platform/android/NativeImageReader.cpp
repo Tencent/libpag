@@ -18,7 +18,7 @@
 
 #include "NativeImageReader.h"
 #include <chrono>
-#include "core/utils/Log.h"
+#include "utils/Log.h"
 
 namespace tgfx {
 static Global<jclass> SurfaceTextureClass;

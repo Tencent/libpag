@@ -22,12 +22,12 @@
 #include <GLES/gl.h>
 #include <GLES/glext.h>
 #include <android/hardware_buffer.h>
-#include "core/utils/UniqueID.h"
 #include "platform/android/AHardwareBufferUtil.h"
 #include "platform/android/HardwareBuffer.h"
 #include "platform/android/HardwareBufferInterface.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/gpu/opengl/egl/EGLDevice.h"
+#include "utils/UniqueID.h"
 
 namespace tgfx {
 namespace eglext {
