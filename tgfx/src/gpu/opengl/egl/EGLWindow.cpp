@@ -24,9 +24,9 @@
 #endif
 #include <EGL/eglext.h>
 #include <GLES3/gl3.h>
-#include "core/utils/USE.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
 #include "tgfx/gpu/opengl/GLRenderTarget.h"
+#include "utils/USE.h"
 
 namespace tgfx {
 std::shared_ptr<EGLWindow> EGLWindow::Current() {

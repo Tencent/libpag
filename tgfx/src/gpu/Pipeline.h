@@ -19,8 +19,8 @@
 #pragma once
 
 #include "EmptyXferProcessor.h"
-#include "FragmentProcessor.h"
 #include "Swizzle.h"
+#include "gpu/FragmentProcessor.h"
 
 namespace tgfx {
 class Pipeline {

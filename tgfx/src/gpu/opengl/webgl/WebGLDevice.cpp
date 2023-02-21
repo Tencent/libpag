@@ -18,7 +18,7 @@
 
 #include "tgfx/gpu/opengl/webgl/WebGLDevice.h"
 #include "WebGLProcGetter.h"
-#include "core/utils/Log.h"
+#include "utils/Log.h"
 
 namespace tgfx {
 

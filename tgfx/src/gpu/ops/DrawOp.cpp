@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawOp.h"
-#include "core/utils/Log.h"
 #include "gpu/Gpu.h"
+#include "utils/Log.h"
 
 namespace tgfx {
 void DrawOp::visitProxies(const std::function<void(TextureProxy*)>& func) const {

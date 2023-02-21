@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Color.h"
-#include "core/utils/Log.h"
+#include "utils/Log.h"
 
 namespace tgfx {
 const Color& Color::Transparent() {

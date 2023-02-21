@@ -20,7 +20,7 @@
 #include "base/utils/TGFXCast.h"
 #include "base/utils/Verify.h"
 #include "pag/file.h"
-#include "tgfx/gpu/ImageFilter.h"
+#include "tgfx/core/ImageFilter.h"
 
 namespace pag {
 DropShadowStyle::~DropShadowStyle() {

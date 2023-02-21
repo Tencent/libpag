@@ -18,7 +18,7 @@
 
 #include "tgfx/core/Matrix.h"
 #include <cfloat>
-#include "core/utils/MathExtra.h"
+#include "utils/MathExtra.h"
 
 namespace tgfx {
 

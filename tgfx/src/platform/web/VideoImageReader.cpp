@@ -18,8 +18,8 @@
 
 #include "tgfx/platform/web/VideoImageReader.h"
 #include "GLVideoTexture.h"
-#include "core/utils/Log.h"
 #include "tgfx/platform/web/WebImage.h"
+#include "utils/Log.h"
 
 namespace tgfx {
 using namespace emscripten;

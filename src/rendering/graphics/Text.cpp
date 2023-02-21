@@ -21,8 +21,8 @@
 #include "base/utils/TGFXCast.h"
 #include "pag/file.h"
 #include "rendering/caches/RenderCache.h"
+#include "tgfx/core/Canvas.h"
 #include "tgfx/core/PathEffect.h"
-#include "tgfx/gpu/Canvas.h"
 
 namespace pag {
 static std::unique_ptr<tgfx::Paint> CreateFillPaint(const Glyph* glyph) {

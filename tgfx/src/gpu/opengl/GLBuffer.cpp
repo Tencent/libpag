@@ -20,7 +20,7 @@
 
 #include "GLContext.h"
 #include "GLUtil.h"
-#include "core/utils/UniqueID.h"
+#include "utils/UniqueID.h"
 
 namespace tgfx {
 static void ComputeRecycleKey(BytesKey* recycleKey, BufferType bufferType) {

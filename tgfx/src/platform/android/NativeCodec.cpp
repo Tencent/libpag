@@ -19,8 +19,8 @@
 #include "NativeCodec.h"
 #include <android/bitmap.h>
 #include "NativeImageInfo.h"
-#include "core/utils/Log.h"
 #include "tgfx/core/Bitmap.h"
+#include "utils/Log.h"
 
 namespace tgfx {
 static Global<jclass> BitmapFactoryOptionsClass;

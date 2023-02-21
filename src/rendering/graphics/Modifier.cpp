@@ -286,7 +286,7 @@ void MaskModifier::applyToGraphic(tgfx::Canvas* canvas, RenderCache* cache,
   auto maskCanvas = maskSurface->getCanvas();
   maskCanvas->setMatrix(contentMatrix);
   mask->draw(maskCanvas, cache);
-  auto shader = tgfx::Shader::MakeTextureShader(maskSurface->getTexture());
+  auto shader = tgfx::Shader::MakeImageShader(maskSurface->getTexture());
   if (shader == nullptr) {
     return;
   }

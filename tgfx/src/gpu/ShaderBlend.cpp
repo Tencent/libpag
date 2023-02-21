@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShaderBlend.h"
-#include "FragmentProcessor.h"
-#include "XfermodeFragmentProcessor.h"
+#include "gpu/FragmentProcessor.h"
+#include "gpu/XfermodeFragmentProcessor.h"
 
 namespace tgfx {
 std::shared_ptr<Shader> Shader::MakeBlend(BlendMode mode, std::shared_ptr<Shader> dst,

@@ -17,11 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Image.h"
-#include "core/images/ImageSource.h"
-#include "core/images/MatrixImage.h"
-#include "core/images/RGBAAAImage.h"
 #include "gpu/TextureEffect.h"
 #include "gpu/TiledTextureEffect.h"
+#include "images/ImageSource.h"
+#include "images/MatrixImage.h"
+#include "images/RGBAAAImage.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/PixelBuffer.h"

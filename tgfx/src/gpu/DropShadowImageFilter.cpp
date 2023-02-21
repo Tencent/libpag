@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DropShadowImageFilter.h"
-#include "tgfx/gpu/ColorFilter.h"
+#include "tgfx/core/ColorFilter.h"
 #include "tgfx/gpu/Surface.h"
 
 namespace tgfx {

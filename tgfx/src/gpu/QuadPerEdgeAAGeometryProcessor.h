@@ -20,7 +20,7 @@
 
 #include "AAType.h"
 #include "GeometryProcessor.h"
-#include "tgfx/gpu/Paint.h"
+#include "tgfx/core/Paint.h"
 
 namespace tgfx {
 class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {

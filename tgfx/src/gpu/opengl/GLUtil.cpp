@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLUtil.h"
-#include "core/utils/USE.h"
+#include "utils/USE.h"
 
 namespace tgfx {
 GLVersion GetGLVersion(const char* versionString) {

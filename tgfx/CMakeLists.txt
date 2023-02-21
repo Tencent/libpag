@@ -60,17 +60,22 @@ endif ()
 
 # collects tgfx common files.
 set(TGFX_INCLUDES ./ src)
-file(GLOB TGFX_FILES
+file(GLOB_RECURSE TGFX_FILES
         src/core/*.*
-        src/core/utils/*.*
-        src/core/codecs/*.*
-        src/core/shapes/*.*
-        src/core/images/*.*
-        src/core/vectors/*.*
-        src/gpu/*.*
+        src/effects/*.*
+        src/images/*.*
+        src/shaders/*.*
+        src/shapes/*.*
+        src/utils/*.*
         src/gpu/gradients/*.*
-        src/gpu/ops/*.*
+        src/gpu/ops/*.*)
+
+file(GLOB TGFX_PLATFORM_COMMON_FILES
+        src/codecs/*.*
+        src/vectors/*.*
+        src/gpu/*.*
         src/platform/*.*)
+list(APPEND TGFX_FILES ${TGFX_PLATFORM_COMMON_FILES})
 
 if (TGFX_USE_QT)
     set(TGFX_USE_SWIFTSHADER OFF)
@@ -117,14 +122,14 @@ endif ()
 
 if (TGFX_USE_JPEG)
     list(APPEND TGFX_STATIC_VENDORS libjpeg-turbo)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES src/core/codecs/jpeg/*.*)
+    file(GLOB_RECURSE GFX_PLATFORM_FILES src/codecs/jpeg/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
     list(APPEND TGFX_INCLUDES ../third_party/out/libjpeg-turbo/${INCLUDE_ENTRY})
 endif ()
 
 if (TGFX_USE_WEBP)
     list(APPEND TGFX_STATIC_VENDORS libwebp)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES src/core/codecs/webp/*.*)
+    file(GLOB_RECURSE GFX_PLATFORM_FILES src/codecs/webp/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
     list(APPEND TGFX_INCLUDES ../third_party/libwebp/src)
 endif ()
@@ -132,7 +137,7 @@ endif ()
 if (TGFX_USE_PNG)
     set(TGFX_USE_ZLIB ON)
     list(APPEND TGFX_STATIC_VENDORS libpng)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES src/core/codecs/png/*.*)
+    file(GLOB_RECURSE GFX_PLATFORM_FILES src/codecs/png/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
     list(APPEND TGFX_INCLUDES ../third_party/out/libpng/${INCLUDE_ENTRY})
 endif ()
@@ -144,17 +149,17 @@ endif ()
 if (TGFX_USE_FREETYPE)
     add_definitions(-DTGFX_USE_FREETYPE)
     list(APPEND TGFX_STATIC_VENDORS freetype)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES src/core/vectors/freetype/*.*)
+    file(GLOB_RECURSE GFX_PLATFORM_FILES src/vectors/freetype/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
     list(APPEND TGFX_INCLUDES ../third_party/freetype/include)
 elseif (WEB)
     add_definitions(-DTGFX_BUILD_FOR_WEB)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES src/core/vectors/web/*.*)
+    file(GLOB_RECURSE GFX_PLATFORM_FILES src/vectors/web/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
 elseif (APPLE)
     # Uses CoreGraphics instead.
     add_definitions(-DTGFX_USE_CORE_GRAPHICS)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES src/core/vectors/coregraphics/*.*)
+    file(GLOB_RECURSE GFX_PLATFORM_FILES src/vectors/coregraphics/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
 endif ()
 

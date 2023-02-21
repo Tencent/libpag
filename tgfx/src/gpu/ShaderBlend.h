@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "tgfx/gpu/Shader.h"
+#include "tgfx/core/Shader.h"
 
 namespace tgfx {
 class ShaderBlend : public Shader {

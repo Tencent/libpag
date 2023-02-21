@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "LumaColorFilterEffect.h"
+#include "gpu/LumaColorFilterEffect.h"
 #include "opengl/GLLumaColorFilterEffect.h"
 
 namespace tgfx {

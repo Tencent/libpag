@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Cacheable.h"
-#include "core/utils/UniqueID.h"
+#include "utils/UniqueID.h"
 
 namespace tgfx {
 Cacheable::Cacheable() : _uniqueID(UniqueID::Next()) {

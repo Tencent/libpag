@@ -19,7 +19,7 @@
 #pragma once
 
 #include "TextureProxy.h"
-#include "core/images/ImageGeneratorTask.h"
+#include "images/ImageGeneratorTask.h"
 #include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {

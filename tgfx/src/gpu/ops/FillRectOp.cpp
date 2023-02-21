@@ -17,11 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FillRectOp.h"
-#include "core/utils/UniqueID.h"
 #include "gpu/Gpu.h"
 #include "gpu/Quad.h"
 #include "gpu/QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/ResourceProvider.h"
+#include "utils/UniqueID.h"
 
 namespace tgfx {
 std::vector<float> FillRectOp::coverageVertices() const {
