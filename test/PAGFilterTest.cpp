@@ -373,4 +373,19 @@ PAG_TEST(PAGFilterTest, CornerPinScale) {
   pagPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFilterTest/CornerPinScale"));
 }
+
+/**
+ * 用例描述: Transform 3D
+ */
+PAG_TEST(PAGFilterTest, Transform3D) {
+  auto pagFile = LoadPAGFile("resources/filter/3Dtest.pag");
+  ASSERT_NE(pagFile, nullptr);
+  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  ASSERT_NE(pagSurface, nullptr);
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFilterTest/Transform3D"));
+}
 }  // namespace pag
