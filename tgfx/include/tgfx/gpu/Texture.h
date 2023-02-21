@@ -19,8 +19,8 @@
 #pragma once
 
 #include <string>
-#include "tgfx/core/ImageOrigin.h"
 #include "tgfx/core/Point.h"
+#include "tgfx/gpu/SurfaceOrigin.h"
 #include "tgfx/gpu/Resource.h"
 #include "tgfx/gpu/TextureSampler.h"
 #include "tgfx/platform/HardwareBuffer.h"
@@ -46,7 +46,7 @@ class Texture : public Resource {
    */
   static std::shared_ptr<Texture> MakeRGBA(Context* context, int width, int height, void* pixels,
                                            size_t rowBytes,
-                                           ImageOrigin origin = ImageOrigin::TopLeft,
+                                           SurfaceOrigin origin = SurfaceOrigin::TopLeft,
                                            bool mipMapped = false) {
     return MakeFormat(context, width, height, pixels, rowBytes, PixelFormat::RGBA_8888, origin,
                       mipMapped);
@@ -56,7 +56,7 @@ class Texture : public Resource {
    * the parameters is invalid.
    */
   static std::shared_ptr<Texture> MakeRGBA(Context* context, int width, int height,
-                                           ImageOrigin origin = ImageOrigin::TopLeft,
+                                           SurfaceOrigin origin = SurfaceOrigin::TopLeft,
                                            bool mipMapped = false) {
     return MakeFormat(context, width, height, nullptr, 0, PixelFormat::RGBA_8888, origin,
                       mipMapped);
@@ -69,7 +69,7 @@ class Texture : public Resource {
    */
   static std::shared_ptr<Texture> MakeAlpha(Context* context, int width, int height, void* pixels,
                                             size_t rowBytes,
-                                            ImageOrigin origin = ImageOrigin::TopLeft,
+                                            SurfaceOrigin origin = SurfaceOrigin::TopLeft,
                                             bool mipMapped = false) {
     return MakeFormat(context, width, height, pixels, rowBytes, PixelFormat::ALPHA_8, origin,
                       mipMapped);
@@ -80,7 +80,7 @@ class Texture : public Resource {
    * alpha only textures.
    */
   static std::shared_ptr<Texture> MakeAlpha(Context* context, int width, int height,
-                                            ImageOrigin origin = ImageOrigin::TopLeft,
+                                            SurfaceOrigin origin = SurfaceOrigin::TopLeft,
                                             bool mipMapped = false) {
     return MakeFormat(context, width, height, nullptr, 0, PixelFormat::ALPHA_8, origin, mipMapped);
   }
@@ -92,7 +92,7 @@ class Texture : public Resource {
    */
   static std::shared_ptr<Texture> MakeFormat(Context* context, int width, int height, void* pixels,
                                              size_t rowBytes, PixelFormat pixelFormat,
-                                             ImageOrigin origin, bool mipMapped = false);
+                                             SurfaceOrigin origin, bool mipMapped = false);
 
   /**
    * Creates a empty texture with each pixel store as the pixelFormat describes. Returns nullptr if
@@ -100,12 +100,12 @@ class Texture : public Resource {
    * specified pixelFormat.
    */
   static std::shared_ptr<Texture> MakeFormat(Context* context, int width, int height,
-                                             PixelFormat pixelFormat, ImageOrigin origin,
+                                             PixelFormat pixelFormat, SurfaceOrigin origin,
                                              bool mipMapped = false) {
     return MakeFormat(context, width, height, nullptr, 0, pixelFormat, origin, mipMapped);
   }
 
-  Texture(int width, int height, ImageOrigin origin)
+  Texture(int width, int height, SurfaceOrigin origin)
       : _width(width), _height(height), _origin(origin) {
   }
 
@@ -124,9 +124,9 @@ class Texture : public Resource {
   }
 
   /**
-   * Returns the origin of this texture, either ImageOrigin::TopLeft or ImageOrigin::BottomLeft.
+   * Returns the origin of this texture, either SurfaceOrigin::TopLeft or SurfaceOrigin::BottomLeft.
    */
-  ImageOrigin origin() const {
+  SurfaceOrigin origin() const {
     return _origin;
   }
 
@@ -150,7 +150,7 @@ class Texture : public Resource {
  private:
   int _width = 0;
   int _height = 0;
-  ImageOrigin _origin = ImageOrigin::TopLeft;
+  SurfaceOrigin _origin = SurfaceOrigin::TopLeft;
 
   /**
    * Returns true if the specified texture size and format are supported by the GPU backend.

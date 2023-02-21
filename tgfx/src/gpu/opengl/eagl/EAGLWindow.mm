@@ -140,7 +140,7 @@ std::shared_ptr<Surface> EAGLWindow::onCreateSurface(Context* context) {
   glInfo.id = frameBufferID;
   glInfo.format = PixelFormat::RGBA_8888;
   auto renderTarget = GLRenderTarget::MakeFrom(context, glInfo, static_cast<int>(width),
-                                               static_cast<int>(height), ImageOrigin::BottomLeft);
+                                               static_cast<int>(height), SurfaceOrigin::BottomLeft);
   return Surface::MakeFrom(renderTarget);
 }
 

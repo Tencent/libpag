@@ -96,7 +96,7 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(Context* contex
 
 EGLHardwareTexture::EGLHardwareTexture(AHardwareBuffer* hardwareBuffer, EGLImageKHR eglImage,
                                        int width, int height)
-    : GLTexture(width, height, ImageOrigin::TopLeft),
+    : GLTexture(width, height, SurfaceOrigin::TopLeft),
       hardwareBuffer(hardwareBuffer),
       eglImage(eglImage) {
   HardwareBufferInterface::Acquire(hardwareBuffer);

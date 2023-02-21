@@ -152,7 +152,7 @@ PAG_TEST_F(PAGImageTest, BottomLeftMask) {
   auto imageAsMask = MakeImageCodec("resources/apitest/image_as_mask.png");
   ASSERT_TRUE(imageAsMask != nullptr);
   auto image2 = imageAsMask->makeBuffer()->makeTexture(context);
-  image2->_origin = tgfx::ImageOrigin::BottomLeft;
+  image2->_origin = tgfx::SurfaceOrigin::BottomLeft;
   auto canvas = surface->getCanvas();
   tgfx::Paint paint;
   paint.setMaskFilter(tgfx::MaskFilter::Make(tgfx::Shader::MakeTextureShader(image2)));

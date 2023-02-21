@@ -37,7 +37,7 @@ std::shared_ptr<GLExternalTexture> GLExternalTexture::Make(Context* context, int
 }
 
 GLExternalTexture::GLExternalTexture(GLSampler glSampler, int width, int height)
-    : GLTexture(width, height, ImageOrigin::TopLeft), textureWidth(width), textureHeight(height) {
+    : GLTexture(width, height, SurfaceOrigin::TopLeft), textureWidth(width), textureHeight(height) {
   sampler = std::move(glSampler);
 }
 

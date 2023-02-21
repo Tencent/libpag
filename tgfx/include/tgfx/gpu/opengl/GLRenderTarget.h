@@ -38,7 +38,7 @@ class GLRenderTarget : public RenderTarget {
    */
   static std::shared_ptr<GLRenderTarget> MakeFrom(Context* context,
                                                   const GLFrameBuffer& frameBuffer, int width,
-                                                  int height, ImageOrigin origin,
+                                                  int height, SurfaceOrigin origin,
                                                   int sampleCount = 1);
 
   /**
@@ -48,7 +48,7 @@ class GLRenderTarget : public RenderTarget {
    */
   static std::shared_ptr<GLRenderTarget> MakeAdopted(Context* context,
                                                      const GLFrameBuffer& frameBuffer, int width,
-                                                     int height, ImageOrigin origin,
+                                                     int height, SurfaceOrigin origin,
                                                      int sampleCount = 1);
 
   /**
@@ -73,7 +73,7 @@ class GLRenderTarget : public RenderTarget {
    */
   static std::shared_ptr<GLRenderTarget> MakeFrom(const GLTexture* texture, int sampleCount = 1);
 
-  GLRenderTarget(int width, int height, ImageOrigin origin, int sampleCount,
+  GLRenderTarget(int width, int height, SurfaceOrigin origin, int sampleCount,
                  GLFrameBuffer frameBuffer, unsigned textureTarget = 0);
 
   void onReleaseGPU() override;

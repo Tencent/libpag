@@ -30,7 +30,8 @@ class WebVideoTexture : public tgfx::GLTexture {
   static std::shared_ptr<WebVideoTexture> Make(tgfx::Context* context, int width, int height,
                                                bool isAndroidMiniprogram);
 
-  WebVideoTexture(const tgfx::GLSampler& sampler, int width, int height, tgfx::ImageOrigin origin);
+  WebVideoTexture(const tgfx::GLSampler& sampler, int width, int height,
+                  tgfx::SurfaceOrigin origin);
 
   tgfx::Point getTextureCoord(float x, float y) const override;
 

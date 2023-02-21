@@ -50,7 +50,7 @@ PAG_TEST(PAGSurfaceTest, FromTexture) {
   EXPECT_TRUE(glDevice->sharableWith(nativeHandle));
 
   auto drawable =
-      std::make_shared<TextureDrawable>(device, backendTexture, tgfx::ImageOrigin::TopLeft);
+      std::make_shared<TextureDrawable>(device, backendTexture, tgfx::SurfaceOrigin::TopLeft);
   auto pagSurface2 = PAGSurface::MakeFrom(drawable);
   auto pagPlayer2 = std::make_shared<PAGPlayer>();
   pagPlayer2->setSurface(pagSurface2);
