@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "SequenceImage.h"
+#include "SequenceInfo.h"
 #include "SequenceReader.h"
 #include "pag/file.h"
 #include "pag/pag.h"
@@ -26,7 +26,8 @@
 namespace pag {
 class SequenceImageQueue {
  public:
-  static std::unique_ptr<SequenceImageQueue> MakeFrom(Sequence* sequence, PAGLayer* pagLayer);
+  static std::unique_ptr<SequenceImageQueue> MakeFrom(std::shared_ptr<SequenceInfo> sequence,
+                                                      PAGLayer* pagLayer);
 
   /**
    * Prepares the image of the next frame.
@@ -49,7 +50,7 @@ class SequenceImageQueue {
   void reportPerformance(Performance* performance);
 
  private:
-  Sequence* sequence = nullptr;
+  std::shared_ptr<SequenceInfo> sequence = nullptr;
   std::shared_ptr<SequenceReader> reader = nullptr;
   Frame firstFrame = -1;
   Frame totalFrames = 0;
@@ -58,7 +59,8 @@ class SequenceImageQueue {
   std::shared_ptr<tgfx::Image> currentImage = nullptr;
   std::shared_ptr<tgfx::Image> preparedImage = nullptr;
 
-  SequenceImageQueue(Sequence* sequence, std::shared_ptr<SequenceReader> reader, Frame firstFrame);
+  SequenceImageQueue(std::shared_ptr<SequenceInfo> sequence, std::shared_ptr<SequenceReader> reader,
+                     Frame firstFrame);
 
   friend class RenderCache;
 };

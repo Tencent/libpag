@@ -41,7 +41,7 @@ using nlohmann::json;
  * 用例描述: 像素格式转换相关功能测试-PixelMap
  */
 PAG_TEST(PAGReadPixelsTest, TestPixelMap) {
-  auto codec = ImageCodec::MakeFrom("../resources/apitest/test_timestretch.png");
+  auto codec = MakeImageCodec("resources/apitest/test_timestretch.png");
   EXPECT_TRUE(codec != nullptr);
   auto width = codec->width();
   auto height = codec->height();
@@ -145,7 +145,7 @@ PAG_TEST(PAGReadPixelsTest, TestPixelMap) {
  * 用例描述: 像素格式转换相关功能测试-SurfaceReadPixels
  */
 PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
-  auto codec = ImageCodec::MakeFrom("../resources/apitest/test_timestretch.png");
+  auto codec = MakeImageCodec("resources/apitest/test_timestretch.png");
   ASSERT_TRUE(codec != nullptr);
   auto pixelBuffer = PixelBuffer::Make(codec->width(), codec->height(), false, false);
   ASSERT_TRUE(pixelBuffer != nullptr);
@@ -258,7 +258,7 @@ PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
  * 用例描述: PNG 解码器测试
  */
 PAG_TEST(PAGReadPixelsTest, PngCodec) {
-  auto image = ImageCodec::MakeFrom("../resources/apitest/test_timestretch.png");
+  auto image = MakeImageCodec("resources/apitest/test_timestretch.png");
   ASSERT_TRUE(image != nullptr);
   ASSERT_EQ(image->width(), 1280);
   ASSERT_EQ(image->height(), 720);
@@ -284,7 +284,7 @@ PAG_TEST(PAGReadPixelsTest, PngCodec) {
  * 用例描述: Webp 解码器测试
  */
 PAG_TEST(PAGReadPixelsTest, WebpCodec) {
-  auto image = ImageCodec::MakeFrom("../resources/apitest/imageReplacement.webp");
+  auto image = MakeImageCodec("resources/apitest/imageReplacement.webp");
   ASSERT_TRUE(image != nullptr);
   ASSERT_EQ(image->width(), 110);
   ASSERT_EQ(image->height(), 110);
@@ -319,7 +319,7 @@ PAG_TEST(PAGReadPixelsTest, WebpCodec) {
  * 用例描述: JPEG 解码器测试
  */
 PAG_TEST(PAGReadPixelsTest, JpegCodec) {
-  auto image = ImageCodec::MakeFrom("../resources/apitest/rotation.jpg");
+  auto image = MakeImageCodec("resources/apitest/rotation.jpg");
   ASSERT_TRUE(image != nullptr);
   ASSERT_EQ(image->width(), 4032);
   ASSERT_EQ(image->height(), 3024);

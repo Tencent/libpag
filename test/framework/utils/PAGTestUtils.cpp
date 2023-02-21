@@ -18,6 +18,7 @@
 
 #include "PAGTestUtils.h"
 #include <dirent.h>
+#include "TestConstants.h"
 #include "base/utils/TGFXCast.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
 
@@ -32,9 +33,10 @@ std::string ToString(Frame frame) {
   return result;
 }
 
-void GetAllPAGFiles(std::string path, std::vector<std::string>& files) {
+void GetAllPAGFiles(const std::string& path, std::vector<std::string>& files) {
   struct dirent* dirp;
-  DIR* dir = opendir(path.c_str());
+  auto dirPath = TestConstants::PAG_ROOT + path;
+  DIR* dir = opendir(dirPath.c_str());
   std::string p;
 
   while ((dirp = readdir(dir)) != nullptr) {
@@ -42,7 +44,7 @@ void GetAllPAGFiles(std::string path, std::vector<std::string>& files) {
       std::string str(dirp->d_name);
       std::string::size_type idx = str.find(".pag");
       if (idx != std::string::npos) {
-        files.push_back(p.assign(path).append("/").append(dirp->d_name));
+        files.push_back(p.assign(dirPath).append("/").append(dirp->d_name));
       }
     }
   }
@@ -99,5 +101,17 @@ bool CreateGLTexture(Context* context, int width, int height, GLSampler* texture
   gl->texImage2D(texture->target, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
   gl->bindTexture(texture->target, 0);
   return true;
+}
+
+std::shared_ptr<PAGFile> LoadPAGFile(const std::string& path) {
+  return PAGFile::Load(TestConstants::PAG_ROOT + path);
+}
+
+std::shared_ptr<tgfx::ImageCodec> MakeImageCodec(const std::string& path) {
+  return ImageCodec::MakeFrom(TestConstants::PAG_ROOT + path);
+}
+
+std::shared_ptr<PAGImage> MakePAGImage(const std::string& path) {
+  return PAGImage::FromPath(TestConstants::PAG_ROOT + path);
 }
 }  // namespace pag

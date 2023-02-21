@@ -23,7 +23,8 @@
 
 namespace pag {
 
-PAG_TEST_CASE_WITH_PATH(AsyncDecode, "../resources/apitest/AsyncDecodeTest.pag")
+PAG_TEST_CASE_WITH_PATH(AsyncDecode,
+                        TestConstants::PAG_ROOT + "resources/apitest/AsyncDecodeTest.pag")
 
 /**
  * 用例描述: 异步解码时候同步删除图层
@@ -116,7 +117,7 @@ PAG_TEST_F(AsyncDecode, release_ID79427343) {
 PAG_TEST_F(AsyncDecode, bitmapCompDecodeTest) {
   //          25--------------------------60
   //    5----------------------45
-  auto pagFile = PAGFile::Load("../resources/apitest/BitmapComp.pag");
+  auto pagFile = LoadPAGFile("resources/apitest/BitmapComp.pag");
   EXPECT_TRUE(pagFile != nullptr);
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0);
@@ -156,9 +157,9 @@ PAG_TEST_F(AsyncDecode, imageDecodeTest) {
   // 0----------15
   //         10-----------35
   //                           40---------60
-  auto pagFile = PAGFile::Load("../resources/apitest/ImageDecodeTest.pag");
+  auto pagFile = LoadPAGFile("resources/apitest/ImageDecodeTest.pag");
   EXPECT_TRUE(pagFile != nullptr);
-  auto pagImage = PAGImage::FromPath("../resources/apitest/imageReplacement.png");
+  auto pagImage = MakePAGImage("resources/apitest/imageReplacement.png");
   pagFile->replaceImage(1, pagImage);
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0);

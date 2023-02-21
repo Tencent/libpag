@@ -29,7 +29,7 @@ PAG_TEST_SUIT(PAGSimplePathTest)
  * 用例描述: 测试 shader 绘制椭圆
  */
 PAG_TEST_F(PAGSimplePathTest, TestRect) {
-  auto pagFile = PAGFile::Load("../resources/apitest/ellipse.pag");
+  auto pagFile = LoadPAGFile("resources/apitest/ellipse.pag");
   auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);

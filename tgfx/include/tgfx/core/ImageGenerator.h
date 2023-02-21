@@ -70,9 +70,6 @@ class ImageGenerator {
   ImageGenerator(int width, int height) : _width(width), _height(height) {
   }
 
-  ImageGenerator(const ISize& size) : _width(size.width), _height(size.height) {
-  }
-
   virtual std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const = 0;
 
  private:

@@ -20,8 +20,8 @@
 
 #include <memory>
 #include <vector>
-#include "VideoFormat.h"
 #include "VideoSample.h"
+#include "rendering/video/VideoFormat.h"
 
 namespace pag {
 /**

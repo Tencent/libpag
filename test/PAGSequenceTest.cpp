@@ -31,7 +31,7 @@ PAG_TEST_SUIT(PAGSequenceTest)
  * 用例描述: 测试直接上屏
  */
 PAG_TEST_F(PAGSequenceTest, RenderOnScreen) {
-  auto pagFile = PAGFile::Load("../resources/apitest/wz_mvp.pag");
+  auto pagFile = LoadPAGFile("resources/apitest/wz_mvp.pag");
   EXPECT_NE(pagFile, nullptr);
   auto pagSurface = PAGSurface::MakeOffscreen(750, 1334);
   auto pagPlayer = std::make_shared<PAGPlayer>();
@@ -48,7 +48,7 @@ PAG_TEST_F(PAGSequenceTest, RenderOnScreen) {
  * 用例描述: bitmapSequence关键帧不是全屏的时候要清屏
  */
 PAG_TEST_F(PAGSequenceTest, BitmapSequenceReader) {
-  auto pagFile = PAGFile::Load("../resources/apitest/ZC_mg_seky2_landscape.pag");
+  auto pagFile = LoadPAGFile("resources/apitest/ZC_mg_seky2_landscape.pag");
   auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -64,7 +64,7 @@ PAG_TEST_F(PAGSequenceTest, BitmapSequenceReader) {
  * 用例描述: 视频序列帧作为遮罩
  */
 PAG_TEST_F(PAGSequenceTest, VideoSequenceAsMask) {
-  auto pagFile = PAGFile::Load("../resources/apitest/video_sequence_as_mask.pag");
+  auto pagFile = LoadPAGFile("resources/apitest/video_sequence_as_mask.pag");
   auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
@@ -78,7 +78,7 @@ PAG_TEST_F(PAGSequenceTest, VideoSequenceAsMask) {
  * 用例描述: 带mp4头的视频序列帧导出为mp4
  */
 PAG_TEST_F(PAGSequenceTest, VideoSequenceToMp4WithHeader) {
-  auto pagFile = PAGFile::Load("../resources/apitest/video_sequence_with_mp4header.pag");
+  auto pagFile = LoadPAGFile("resources/apitest/video_sequence_with_mp4header.pag");
   ASSERT_NE(pagFile, nullptr);
   ASSERT_EQ(pagFile->layerType(), LayerType::PreCompose);
 
@@ -100,7 +100,7 @@ PAG_TEST_F(PAGSequenceTest, VideoSequenceToMp4WithHeader) {
  * 用例描述: 不带mp4头的视频序列帧导出为mp4
  */
 PAG_TEST_F(PAGSequenceTest, VideoSequenceToMP4WithoutHeader) {
-  auto pagFile = PAGFile::Load("../resources/apitest/video_sequence_without_mp4header.pag");
+  auto pagFile = LoadPAGFile("resources/apitest/video_sequence_without_mp4header.pag");
   ASSERT_NE(pagFile, nullptr);
   ASSERT_EQ(pagFile->layerType(), LayerType::PreCompose);
 
@@ -121,7 +121,7 @@ PAG_TEST_F(PAGSequenceTest, VideoSequenceToMP4WithoutHeader) {
  * 用例描述: 同一个序列帧多图层引用且时间轴交错，测试解码器数量是否正确。
  */
 PAG_TEST_F(PAGSequenceTest, Sequence_Multiple_References) {
-  auto pagFile = PAGFile::Load("../resources/apitest/sequence_mul_ref.pag");
+  auto pagFile = LoadPAGFile("resources/apitest/sequence_mul_ref.pag");
   EXPECT_NE(pagFile, nullptr);
   auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
   auto pagPlayer = std::make_shared<PAGPlayer>();

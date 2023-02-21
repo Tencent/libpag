@@ -32,7 +32,7 @@ PAG_TEST_SUIT(PAGSurfaceTest)
  * 用例描述: 测试 PAGSurface 数据同步
  */
 PAG_TEST(PAGSurfaceTest, FromTexture) {
-  auto pagFile = PAGFile::Load("../resources/apitest/test.pag");
+  auto pagFile = LoadPAGFile("resources/apitest/test.pag");
   int width = pagFile->width();
   int height = pagFile->height();
   auto device = GLDevice::Make();
@@ -85,7 +85,7 @@ PAG_TEST(PAGSurfaceTest, FromTexture) {
  * 用例描述: 遮罩使用屏幕坐标系时origin不一致的情况
  */
 PAG_TEST(PAGSurfaceTest, Mask) {
-  auto pagFile = PAGFile::Load("../assets/test2.pag");
+  auto pagFile = LoadPAGFile("assets/test2.pag");
   auto width = pagFile->width();
   auto height = pagFile->height();
   auto device = GLDevice::Make();
@@ -116,7 +116,7 @@ PAG_TEST(PAGSurfaceTest, Mask) {
  * 用例描述: PAGSurface 的 origin 是 BottomLeft 时 scissor rect 需要 flip Y。
  */
 PAG_TEST(PAGSurfaceTest, BottomLeftScissor) {
-  auto pagFile = PAGFile::Load("../assets/test.pag");
+  auto pagFile = LoadPAGFile("assets/test.pag");
   auto width = pagFile->width();
   auto height = pagFile->height() * 2;
   auto device = GLDevice::Make();

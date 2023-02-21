@@ -24,6 +24,7 @@
 #include "rendering/caches/LayerCache.h"
 #include "rendering/renderers/FilterRenderer.h"
 #include "rendering/sequences/SequenceImageProxy.h"
+#include "rendering/sequences/SequenceInfo.h"
 #include "tgfx/core/Clock.h"
 
 namespace pag {
@@ -91,8 +92,9 @@ void RenderCache::preparePreComposeLayer(PreComposeLayer* layer) {
   }
   usedAssets.insert(composition->uniqueID);
   auto sequence = Sequence::Get(composition);
+  auto info = SequenceInfo::Make(sequence);
   if (composition->staticContent()) {
-    SequenceImageProxy proxy(sequence, 0);
+    SequenceImageProxy proxy(info, 0);
     prepareAssetImage(composition->uniqueID, &proxy);
     return;
   }
@@ -100,7 +102,7 @@ void RenderCache::preparePreComposeLayer(PreComposeLayer* layer) {
   if (result != sequenceCaches.end()) {
     return;
   }
-  auto queue = makeSequenceImageQueue(sequence);
+  auto queue = makeSequenceImageQueue(info);
   queue->prepareNextImage();
 }
 
@@ -483,14 +485,15 @@ void RenderCache::clearExpiredDecodedImages() {
 
 //===================================== sequence caches =====================================
 
-void RenderCache::prepareSequenceImage(Sequence* sequence, Frame targetFrame) {
+void RenderCache::prepareSequenceImage(std::shared_ptr<SequenceInfo> sequence, Frame targetFrame) {
   auto queue = getSequenceImageQueue(sequence, targetFrame);
   if (queue != nullptr) {
     queue->prepare(targetFrame);
   }
 }
 
-std::shared_ptr<tgfx::Image> RenderCache::getSequenceImage(Sequence* sequence, Frame targetFrame) {
+std::shared_ptr<tgfx::Image> RenderCache::getSequenceImage(std::shared_ptr<SequenceInfo> sequence,
+                                                           Frame targetFrame) {
   auto queue = getSequenceImageQueue(sequence, targetFrame);
   if (queue == nullptr) {
     return nullptr;
@@ -499,16 +502,16 @@ std::shared_ptr<tgfx::Image> RenderCache::getSequenceImage(Sequence* sequence, F
   return queue->getImage(targetFrame);
 }
 
-SequenceImageQueue* RenderCache::getSequenceImageQueue(Sequence* sequence, Frame targetFrame) {
+SequenceImageQueue* RenderCache::getSequenceImageQueue(std::shared_ptr<SequenceInfo> sequence,
+                                                       Frame targetFrame) {
   if (sequence == nullptr) {
     return nullptr;
   }
-  auto composition = sequence->composition;
-  if (composition->staticContent()) {
+  if (sequence->staticContent()) {
     // Should not get here, we treat sequences with static content as normal asset images.
     return nullptr;
   }
-  auto assetID = sequence->composition->uniqueID;
+  auto assetID = sequence->uniqueID();
   usedAssets.insert(assetID);
   auto& sequenceMap = usedSequences[assetID];
   auto result = sequenceMap.find(targetFrame);
@@ -525,9 +528,9 @@ SequenceImageQueue* RenderCache::getSequenceImageQueue(Sequence* sequence, Frame
   return queue;
 }
 
-SequenceImageQueue* RenderCache::findNearestSequenceImageQueue(Sequence* sequence,
-                                                               Frame targetFrame) {
-  auto assetID = sequence->composition->uniqueID;
+SequenceImageQueue* RenderCache::findNearestSequenceImageQueue(
+    std::shared_ptr<SequenceInfo> sequence, Frame targetFrame) {
+  auto assetID = sequence->uniqueID();
   auto result = sequenceCaches.find(assetID);
   if (result == sequenceCaches.end()) {
     return nullptr;
@@ -569,17 +572,16 @@ SequenceImageQueue* RenderCache::findNearestSequenceImageQueue(Sequence* sequenc
   return queue;
 }
 
-SequenceImageQueue* RenderCache::makeSequenceImageQueue(Sequence* sequence) {
-  auto composition = sequence->composition;
-  if (!_videoEnabled && composition->type() == CompositionType::Video) {
+SequenceImageQueue* RenderCache::makeSequenceImageQueue(std::shared_ptr<SequenceInfo> sequence) {
+  if (!_videoEnabled && sequence->isVideo()) {
     return nullptr;
   }
-  auto layer = stage->getLayerFromReferenceMap(composition->uniqueID);
+  auto layer = stage->getLayerFromReferenceMap(sequence->uniqueID());
   auto queue = SequenceImageQueue::MakeFrom(sequence, layer).release();
   if (queue == nullptr) {
     return nullptr;
   }
-  auto assetID = sequence->composition->uniqueID;
+  auto assetID = sequence->uniqueID();
   sequenceCaches[assetID].push_back(queue);
   return queue;
 }

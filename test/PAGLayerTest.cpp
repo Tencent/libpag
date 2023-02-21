@@ -206,7 +206,7 @@ PAG_TEST_F(PAGLayerTest, preFrame) {
   EXPECT_TRUE(Baseline::Compare(TestPAGSurface, "PAGLayerTest/preFrame"));
 }
 
-PAG_TEST_CASE_WITH_PATH(PAGLayerFrameTest, "../assets/repeater.pag")
+PAG_TEST_CASE_WITH_PATH(PAGLayerFrameTest, TestConstants::PAG_ROOT + "assets/repeater.pag")
 
 /**
  * 用例描述: goToFrame测试
@@ -227,7 +227,7 @@ PAG_TEST_F(PAGLayerFrameTest, goToFrame) {
  * 用例描述: alpha 遮罩
  */
 PAG_TEST_F(PAGLayerTest, AlphaMask) {
-  auto pagFile = PAGFile::Load("../resources/apitest/AlphaTrackMatte.pag");
+  auto pagFile = LoadPAGFile("resources/apitest/AlphaTrackMatte.pag");
   TestPAGPlayer->setComposition(pagFile);
   TestPAGPlayer->setProgress(0.78);
   TestPAGPlayer->flush();
@@ -238,7 +238,7 @@ PAG_TEST_F(PAGLayerTest, AlphaMask) {
  * 用例描述: 文字缩放
  */
 PAG_TEST_F(PAGLayerTest, TextScale) {
-  auto pagFile = PAGFile::Load("../resources/apitest/TEXT04.pag");
+  auto pagFile = LoadPAGFile("resources/apitest/TEXT04.pag");
   auto textData = pagFile->getTextData(0);
   textData->text = "耶";
   pagFile->replaceText(0, textData);
@@ -265,7 +265,7 @@ PAG_TEST_F(PAGLayerTest, TextScale) {
  * 用例描述: 透明度设置
  */
 PAG_TEST_F(PAGLayerTest, LayerAlpha) {
-  auto pagFile = PAGFile::Load("../resources/apitest/AlphaTrackMatte.pag");
+  auto pagFile = LoadPAGFile("resources/apitest/AlphaTrackMatte.pag");
   ASSERT_NE(pagFile, nullptr);
   pagFile->setAlpha(0.5f);
   ASSERT_TRUE(fabsf(pagFile->alpha() - 0.5f) < 0.01);
@@ -283,7 +283,7 @@ PAG_TEST_F(PAGLayerTest, LayerAlpha) {
  * 用例描述: trackMatte-luma
  */
 PAG_TEST_F(PAGLayerTest, trackMatte_luma) {
-  auto pagFile = PAGFile::Load("../resources/apitest/LumaTrackMatte.pag");
+  auto pagFile = LoadPAGFile("resources/apitest/LumaTrackMatte.pag");
   ASSERT_NE(pagFile, nullptr);
   auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);

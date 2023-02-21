@@ -17,38 +17,36 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SequenceImageProxy.h"
-#include "SequenceImage.h"
+#include <utility>
+#include "SequenceInfo.h"
 #include "rendering/caches/RenderCache.h"
 
 namespace pag {
-SequenceImageProxy::SequenceImageProxy(Sequence* sequence, Frame targetFrame)
-    : sequence(sequence), targetFrame(targetFrame) {
+SequenceImageProxy::SequenceImageProxy(std::shared_ptr<SequenceInfo> sequence, Frame targetFrame)
+    : sequence(std::move(sequence)), targetFrame(targetFrame) {
 }
 
 void SequenceImageProxy::prepareImage(RenderCache* cache) const {
-  auto composition = sequence->composition;
-  if (composition->staticContent()) {
+  if (sequence->staticContent()) {
     // We treat sequences with static content as normal asset images.
-    cache->prepareAssetImage(composition->uniqueID, this);
+    cache->prepareAssetImage(sequence->uniqueID(), this);
     return;
   }
   cache->prepareSequenceImage(sequence, targetFrame);
 }
 
 std::shared_ptr<tgfx::Image> SequenceImageProxy::getImage(RenderCache* cache) const {
-  auto composition = sequence->composition;
-  if (composition->staticContent()) {
-    return cache->getAssetImage(composition->uniqueID, this);
+  if (sequence->staticContent()) {
+    return cache->getAssetImage(sequence->uniqueID(), this);
   }
   return cache->getSequenceImage(sequence, targetFrame);
 }
 
 std::shared_ptr<tgfx::Image> SequenceImageProxy::makeImage(RenderCache* cache) const {
-  auto composition = sequence->composition;
-  if (!composition->staticContent()) {
+  if (!sequence->staticContent()) {
     return nullptr;
   }
-  auto file = cache->getFileByAssetID(composition->uniqueID);
-  return SequenceImage::MakeStatic(std::move(file), sequence);
+  auto file = cache->getFileByAssetID(sequence->uniqueID());
+  return sequence->makeStaticImage(std::move(file));
 }
 }  // namespace pag
