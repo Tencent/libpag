@@ -48,9 +48,9 @@ inline bool PointOnLine(const float x1, const float y1, const float x2, const fl
 
 inline bool Point3DOnLine(const Point3D& point1, const Point3D& point2, const Point3D& point3,
                           const float& precision) {
-  return PointOnLine(point1.x, point1.y, point2.x, point2.y, point3.x, point3.y, precision)
-      && PointOnLine(point1.x, point1.z, point2.x, point2.z, point3.x, point3.z, precision)
-      && PointOnLine(point1.y, point1.z, point2.y, point2.z, point3.y, point3.z, precision);
+  return PointOnLine(point1.x, point1.y, point2.x, point2.y, point3.x, point3.y, precision) &&
+         PointOnLine(point1.x, point1.z, point2.x, point2.z, point3.x, point3.z, precision) &&
+         PointOnLine(point1.y, point1.z, point2.y, point2.z, point3.y, point3.z, precision);
 }
 
 /**
@@ -86,8 +86,9 @@ static bool CubicTooCurvy(const Point3D pts[4], const float& precision) {
          DistanceExceedsLimit(pts[2], pt2, precision);
 }
 
-static float BuildCubicSegments(const Point3D points[4], float distance, unsigned minT, unsigned maxT,
-                                std::vector<BezierSegment3D>& segments, const float& precision) {
+static float BuildCubicSegments(const Point3D points[4], float distance, unsigned minT,
+                                unsigned maxT, std::vector<BezierSegment3D>& segments,
+                                const float& precision) {
   if (TSpanBigEnough(maxT - minT) && CubicTooCurvy(points, precision)) {
     auto halfT = (minT + maxT) >> 1;
     Point3D result[7];
@@ -134,9 +135,10 @@ static std::unordered_map<BezierKey3D, std::weak_ptr<BezierPath3D>, BezierHasher
     std::unordered_map<BezierKey3D, std::weak_ptr<BezierPath3D>, BezierHasher3D>{};
 static std::mutex locker = {};
 
-std::shared_ptr<BezierPath3D> BezierPath3D::Build(const pag::Point3D& start, const pag::Point3D& control1,
-                                                  const pag::Point3D& control2, const pag::Point3D& end,
-                                                  float precision) {
+std::shared_ptr<BezierPath3D> BezierPath3D::Build(const pag::Point3D& start,
+                                                  const pag::Point3D& control1,
+                                                  const pag::Point3D& control2,
+                                                  const pag::Point3D& end, float precision) {
   Point3D points[] = {start, control1, control2, end};
   auto bezierKey = BezierKey3D::Make(points, precision);
   {
@@ -246,7 +248,7 @@ float BezierPath3D::getLength() const {
 }
 
 void BezierPath3D::findSegmentAtDistance(float distance, int& startIndex, int& endIndex,
-                                       float& fraction) const {
+                                         float& fraction) const {
   startIndex = 0;
   endIndex = static_cast<int>(segments.size() - 1);
   while (endIndex - startIndex > 1) {

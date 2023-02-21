@@ -210,7 +210,7 @@ class EncodeStream final {
    * Writes a list of float values to the stream.
    */
   void writeFloatList(const float* values, uint32_t count, float precision);
-  
+
   /**
    * Writes a list of Point2D values to the stream.
    */

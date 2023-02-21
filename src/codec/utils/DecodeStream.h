@@ -236,12 +236,12 @@ class DecodeStream final {
    * Reads a list of float values from the stream.
    */
   void readFloatList(float* values, uint32_t count, float precision);
-  
+
   /**
    * Reads a list of Point2D values from the stream.
    */
   void readPoint2DList(Point* points, uint32_t count, float precision);
-  
+
   /**
    * Reads a list of Point3D values from the stream.
    */

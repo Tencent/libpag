@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Transform3DFilter.h"
-#include "rendering/filters/utils/FilterHelper.h"
-#include "core/utils/MathExtra.h"
 #include "base/utils/MathUtil.h"
+#include "core/utils/MathExtra.h"
+#include "rendering/filters/utils/FilterHelper.h"
 
 namespace pag {
 static constexpr char VERTEX_SHADER[] = R"(
@@ -54,10 +54,10 @@ struct CtmInfo {
   float fNear = 0.05f;
   float fFar = 100.f;
   float fAngle = tgfx::M_PI_F / 4;
-  
-  tgfx::SkV3 fEye { 0, 0, 1.0f/tan(fAngle/2) - 1 };
-  tgfx::SkV3 fCOA { 0, 0, 0 };
-  tgfx::SkV3 fUp  { 0, 1, 0 };
+
+  tgfx::SkV3 fEye{0, 0, 1.0f / tan(fAngle / 2) - 1};
+  tgfx::SkV3 fCOA{0, 0, 0};
+  tgfx::SkV3 fUp{0, 1, 0};
 };
 
 bool Transform3DFilter::initialize(tgfx::Context* context) {
@@ -128,8 +128,8 @@ static void DisableMultisample(tgfx::Context* context, bool usesMSAA) {
   }
 }
 
-void Transform3DFilter::update(Frame frame, const tgfx::Rect& inputBounds, const tgfx::Rect& outputBounds,
-                               const tgfx::Point& extraScale) {
+void Transform3DFilter::update(Frame frame, const tgfx::Rect& inputBounds,
+                               const tgfx::Rect& outputBounds, const tgfx::Point& extraScale) {
   layerFrame = frame;
   contentBounds = inputBounds;
   transformedBounds = outputBounds;
@@ -183,7 +183,7 @@ void Transform3DFilter::onUpdateParams(tgfx::Context* context, const FilterSourc
   auto yRotation = layerTransform->yRotation->getValueAt(layerFrame);
   auto zRotation = layerTransform->zRotation->getValueAt(layerFrame);
   auto opacity = layerTransform->opacity->getValueAt(layerFrame);
-  
+
   auto zFix = 0.83f;
   auto bounds = Rect::MakeWH(target->width, target->height);
   float cameraZoom;
@@ -199,7 +199,7 @@ void Transform3DFilter::onUpdateParams(tgfx::Context* context, const FilterSourc
   sourceAspectScaleMatrix.postConcat(aspectScaleMatrix);
   tgfx::Matrix4x4 invertTargetAspectScaleMatrix;
   targetAspectScaleMatrix.invert(&invertTargetAspectScaleMatrix);
-  
+
   modelMatrix = tgfx::Matrix4x4();
   modelMatrix.postTranslate(1.0, 1.0);
   modelMatrix.postConcat(sourceAspectScaleMatrix);
@@ -210,18 +210,20 @@ void Transform3DFilter::onUpdateParams(tgfx::Context* context, const FilterSourc
   modelMatrix.postConcat(targetAspectScaleMatrix);
   auto scaleMatrix = tgfx::Matrix4x4::Scale(scale.x, scale.y, scale.z);
   modelMatrix.postConcat(scaleMatrix);
-  auto xRotationMatrix = tgfx::Matrix4x4::Rotate({1.0, 0.0, 0.0}, DegreesToRadians(-(orientation.x + xRotation)));
-  auto yRotationMatrix = tgfx::Matrix4x4::Rotate({0.0, 1.0, 0.0}, DegreesToRadians(-(orientation.y + yRotation)));
-  auto zRotationMatrix = tgfx::Matrix4x4::Rotate({0.0, 0.0, 1.0}, DegreesToRadians(orientation.z + zRotation));
+  auto xRotationMatrix =
+      tgfx::Matrix4x4::Rotate({1.0, 0.0, 0.0}, DegreesToRadians(-(orientation.x + xRotation)));
+  auto yRotationMatrix =
+      tgfx::Matrix4x4::Rotate({0.0, 1.0, 0.0}, DegreesToRadians(-(orientation.y + yRotation)));
+  auto zRotationMatrix =
+      tgfx::Matrix4x4::Rotate({0.0, 0.0, 1.0}, DegreesToRadians(orientation.z + zRotation));
   modelMatrix.postConcat(zRotationMatrix).postConcat(yRotationMatrix).postConcat(xRotationMatrix);
   modelMatrix.postConcat(invertTargetAspectScaleMatrix);
-  modelMatrix.postTranslate(position.x / bounds.width() * 2.0f,
-                            position.y / bounds.height() * 2.0f,
+  modelMatrix.postTranslate(position.x / bounds.width() * 2.0f, position.y / bounds.height() * 2.0f,
                             -position.z / cameraZoom * 2.0f / zFix);
   modelMatrix.postTranslate(-1.0, -1.0);
 
   CtmInfo info;
-  
+
   if (cameraTransform) {
     auto cameraPointOfInterest = cameraTransform->anchorPoint->getValueAt(layerFrame);
     Point3D cameraPositon;
@@ -237,24 +239,27 @@ void Transform3DFilter::onUpdateParams(tgfx::Context* context, const FilterSourc
     auto cameraXRotation = cameraTransform->xRotation->getValueAt(layerFrame);
     auto cameraYRotation = cameraTransform->yRotation->getValueAt(layerFrame);
     auto cameraZRotation = cameraTransform->zRotation->getValueAt(layerFrame);
-    
+
     info.fEye = {2.0f * cameraPositon.x / bounds.width() - 1.0f,
-                 2.0f * cameraPositon.y / bounds.height() - 1.0f,
-                 info.fEye.z};
-          
-    info.fCOA = {2.0f * cameraPointOfInterest.x / bounds.width() - 1.0f, 2.0f * cameraPointOfInterest.y / bounds.height() - 1.0f, 0.0f};
+                 2.0f * cameraPositon.y / bounds.height() - 1.0f, info.fEye.z};
+
+    info.fCOA = {2.0f * cameraPointOfInterest.x / bounds.width() - 1.0f,
+                 2.0f * cameraPointOfInterest.y / bounds.height() - 1.0f, 0.0f};
     viewMatrix = tgfx::Matrix4x4::LookAt(info.fEye, info.fCOA, info.fUp);
     viewMatrix.postTranslate(0.0f, 0.0f, (cameraZoom + cameraPositon.z) / cameraZoom * 2.0f / zFix);
-    auto xRotationMatrix = tgfx::Matrix4x4::Rotate({1.0, 0.0, 0.0}, DegreesToRadians(cameraOrientation.x + cameraXRotation));
-    auto yRotationMatrix = tgfx::Matrix4x4::Rotate({0.0, 1.0, 0.0}, DegreesToRadians(cameraOrientation.y + cameraYRotation));
-    auto zRotationMatrix = tgfx::Matrix4x4::Rotate({0.0, 0.0, 1.0}, DegreesToRadians(-(cameraOrientation.z + cameraZRotation)));
+    auto xRotationMatrix = tgfx::Matrix4x4::Rotate(
+        {1.0, 0.0, 0.0}, DegreesToRadians(cameraOrientation.x + cameraXRotation));
+    auto yRotationMatrix = tgfx::Matrix4x4::Rotate(
+        {0.0, 1.0, 0.0}, DegreesToRadians(cameraOrientation.y + cameraYRotation));
+    auto zRotationMatrix = tgfx::Matrix4x4::Rotate(
+        {0.0, 0.0, 1.0}, DegreesToRadians(-(cameraOrientation.z + cameraZRotation)));
     viewMatrix.postConcat(zRotationMatrix).postConcat(yRotationMatrix).postConcat(xRotationMatrix);
   } else {
     viewMatrix = tgfx::Matrix4x4::LookAt(info.fEye, info.fCOA, info.fUp);
   }
-  
+
   projectionMatrix = projectionMatrix.Perspective(info.fNear, info.fFar, info.fAngle);
-  
+
   auto gl = tgfx::GLFunctions::Get(context);
   tgfx::Matrix matrix = {};
   auto values = target->vertexMatrix;
@@ -264,13 +269,13 @@ void Transform3DFilter::onUpdateParams(tgfx::Context* context, const FilterSourc
 
   float modelMatrixRowMajor[16];
   modelMatrix.getRowMajor(modelMatrixRowMajor);
-  
+
   float viewMatrixRowMajor[16];
   viewMatrix.getRowMajor(viewMatrixRowMajor);
-  
+
   float projectionMatrixRowMajor[16];
   projectionMatrix.getRowMajor(projectionMatrixRowMajor);
-    
+
   gl->uniformMatrix4fv(modelMatrixHandle, 1, GL_TRUE, modelMatrixRowMajor);
   gl->uniformMatrix4fv(viewMatrixHandle, 1, GL_TRUE, viewMatrixRowMajor);
   gl->uniformMatrix4fv(projectionMatrixHandle, 1, GL_TRUE, projectionMatrixRowMajor);
@@ -279,8 +284,8 @@ void Transform3DFilter::onUpdateParams(tgfx::Context* context, const FilterSourc
 }
 
 std::vector<tgfx::Point> Transform3DFilter::computeVertices(const tgfx::Rect& bounds,
-                                                      const tgfx::Rect& transformed,
-                                                      const tgfx::Point&) {
+                                                            const tgfx::Rect& transformed,
+                                                            const tgfx::Point&) {
   std::vector<tgfx::Point> vertices = {};
   tgfx::Point contentPoint[4] = {{transformed.left, transformed.bottom},
                                  {transformed.right, transformed.bottom},
@@ -298,7 +303,8 @@ std::vector<tgfx::Point> Transform3DFilter::computeVertices(const tgfx::Rect& bo
 }
 
 void Transform3DFilter::bindVertices(tgfx::Context* context, const FilterSource* source,
-                                     const FilterTarget* target, const std::vector<tgfx::Point>& points) {
+                                     const FilterTarget* target,
+                                     const std::vector<tgfx::Point>& points) {
   std::vector<float> vertices = {};
   for (size_t i = 0; i < points.size();) {
     auto vertexPoint = ToGLVertexPoint(target, source, contentBounds, points[i++]);

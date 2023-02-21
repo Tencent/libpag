@@ -21,8 +21,8 @@
 namespace pag {
 void SpatialPoint3DKeyframe::initialize() {
   SingleEaseKeyframe<Point3D>::initialize();
-  spatialBezier =
-      BezierPath3D::Build(startValue, startValue + spatialOut, endValue + spatialIn, endValue, 0.05f);
+  spatialBezier = BezierPath3D::Build(startValue, startValue + spatialOut, endValue + spatialIn,
+                                      endValue, 0.05f);
 }
 
 Point3D SpatialPoint3DKeyframe::getValueAt(Frame time) {
@@ -30,4 +30,3 @@ Point3D SpatialPoint3DKeyframe::getValueAt(Frame time) {
   return spatialBezier->getPosition(progress);
 }
 }  // namespace pag
-

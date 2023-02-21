@@ -111,7 +111,8 @@ void WriteEffects(EncodeStream* stream, const std::vector<Effect*>& effects) {
         WriteTagBlock(stream, static_cast<HueSaturationEffect*>(effect), HueSaturationEffectTag);
         break;
       case EffectType::BrightnessContrast:
-        WriteTagBlock(stream, static_cast<BrightnessContrastEffect*>(effect), BrightnessContrastEffectTag);
+        WriteTagBlock(stream, static_cast<BrightnessContrastEffect*>(effect),
+                      BrightnessContrastEffectTag);
         break;
       default:
         break;

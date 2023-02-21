@@ -35,7 +35,8 @@ bool BrightnessContrastEffect::visibleAt(Frame) const {
   return true;
 }
 
-void BrightnessContrastEffect::transformBounds(Rect*, const Point&, Frame) const {}
+void BrightnessContrastEffect::transformBounds(Rect*, const Point&, Frame) const {
+}
 
 void BrightnessContrastEffect::excludeVaryingRanges(std::vector<pag::TimeRange>* timeRanges) const {
   Effect::excludeVaryingRanges(timeRanges);

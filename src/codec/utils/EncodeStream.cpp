@@ -288,23 +288,23 @@ void EncodeStream::writeFloatList(const float* values, uint32_t count, float pre
 }
 
 void EncodeStream::writePoint2DList(const Point* points, uint32_t count, float precision) {
-  auto list = new float[count*2+1];
+  auto list = new float[count * 2 + 1];
   for (uint32_t i = 0; i < count; i++) {
-    list[i*2+0] = points[i].x;
-    list[i*2+1] = points[i].y;
+    list[i * 2 + 0] = points[i].x;
+    list[i * 2 + 1] = points[i].y;
   }
-  writeFloatList(list, count*2, precision);
+  writeFloatList(list, count * 2, precision);
   delete[] list;
 }
 
 void EncodeStream::writePoint3DList(const Point3D* points, uint32_t count, float precision) {
-  auto list = new float[count*3+1];
+  auto list = new float[count * 3 + 1];
   for (uint32_t i = 0; i < count; i++) {
-    list[i*3+0] = points[i].x;
-    list[i*3+1] = points[i].y;
-    list[i*3+2] = points[i].z;
+    list[i * 3 + 0] = points[i].x;
+    list[i * 3 + 1] = points[i].y;
+    list[i * 3 + 2] = points[i].z;
   }
-  writeFloatList(list, count*3, precision);
+  writeFloatList(list, count * 3, precision);
   delete[] list;
 }
 

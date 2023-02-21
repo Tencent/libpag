@@ -53,18 +53,11 @@ void CameraOption::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) cons
 }
 
 bool CameraOption::verify() const {
-  VerifyAndReturn(zoom != nullptr &&
-                  depthOfField != nullptr &&
-                  focusDistance != nullptr &&
-                  aperture != nullptr &&
-                  blurLevel != nullptr &&
-                  irisShape != nullptr &&
-                  irisRotation != nullptr &&
-                  irisRoundness != nullptr &&
-                  irisAspectRatio != nullptr &&
-                  irisDiffractionFringe != nullptr &&
-                  highlightGain != nullptr &&
-                  highlightThreshold != nullptr &&
+  VerifyAndReturn(zoom != nullptr && depthOfField != nullptr && focusDistance != nullptr &&
+                  aperture != nullptr && blurLevel != nullptr && irisShape != nullptr &&
+                  irisRotation != nullptr && irisRoundness != nullptr &&
+                  irisAspectRatio != nullptr && irisDiffractionFringe != nullptr &&
+                  highlightGain != nullptr && highlightThreshold != nullptr &&
                   highlightSaturation != nullptr);
 }
 }  // namespace pag

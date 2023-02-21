@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/ImageCodec.h"
 #include "platform/apple/BitmapContextUtil.h"
+#include "tgfx/core/ImageCodec.h"
 
 namespace tgfx {
 std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string&) {

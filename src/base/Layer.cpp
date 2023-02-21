@@ -66,7 +66,8 @@ void Layer::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) {
 }
 
 bool Layer::verify() const {
-  if (containingComposition == nullptr || duration <= 0 || (transform == nullptr && transform3D == nullptr)) {
+  if (containingComposition == nullptr || duration <= 0 ||
+      (transform == nullptr && transform3D == nullptr)) {
     VerifyFailed();
     return false;
   }
@@ -117,8 +118,7 @@ Point Layer::getMaxScaleFactor() {
   return getScaleFactor().first;
 }
 
-
-template<typename T>
+template <typename T>
 static void GetScaleFactorInternal(Property<T>* property, Point& maxScale, Point& minScale) {
   if (property->animatable()) {
     auto keyframes = static_cast<AnimatableProperty<T>*>(property)->keyframes;

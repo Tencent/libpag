@@ -27,7 +27,8 @@
 namespace pag {
 std::unique_ptr<BlockConfig> HueSaturationEffectTag(HueSaturationEffect* effect) {
   auto tagConfig = new BlockConfig(TagCode::HueSaturationEffect);
-  AddAttribute(tagConfig, &effect->channelControl, AttributeType::Value, ChannelControlType::Master);
+  AddAttribute(tagConfig, &effect->channelControl, AttributeType::Value,
+               ChannelControlType::Master);
   for (int i = 0; i < ChannelControlType::Count; i++) {
     AddAttribute(tagConfig, &effect->hue[i], AttributeType::Value, 0.0f);
     AddAttribute(tagConfig, &effect->saturation[i], AttributeType::Value, 0.0f);

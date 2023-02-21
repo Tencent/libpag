@@ -20,6 +20,4 @@
 
 #include "codec/Attributes.h"
 
-namespace pag {
-
-}  // namespace pag
+namespace pag {}  // namespace pag

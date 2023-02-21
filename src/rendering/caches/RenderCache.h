@@ -145,7 +145,7 @@ class RenderCache : public Performance {
   LayerFilter* getFilterCache(Effect* effect);
 
   MotionBlurFilter* getMotionBlurFilter();
-  
+
   Transform3DFilter* getTransform3DFilter();
 
   LayerStylesFilter* getLayerStylesFilter(Layer* layer);

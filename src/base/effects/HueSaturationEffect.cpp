@@ -35,7 +35,8 @@ bool HueSaturationEffect::visibleAt(Frame) const {
   return true;
 }
 
-void HueSaturationEffect::transformBounds(Rect*, const Point&, Frame) const {}
+void HueSaturationEffect::transformBounds(Rect*, const Point&, Frame) const {
+}
 
 void HueSaturationEffect::excludeVaryingRanges(std::vector<pag::TimeRange>* timeRanges) const {
   Effect::excludeVaryingRanges(timeRanges);
@@ -51,6 +52,7 @@ bool HueSaturationEffect::verify() const {
     VerifyFailed();
     return false;
   }
-  VerifyAndReturn(colorizeHue != nullptr && colorizeSaturation != nullptr && colorizeLightness != nullptr);
+  VerifyAndReturn(colorizeHue != nullptr && colorizeSaturation != nullptr &&
+                  colorizeLightness != nullptr);
 }
 }  // namespace pag

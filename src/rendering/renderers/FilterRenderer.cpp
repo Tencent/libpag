@@ -174,23 +174,24 @@ static bool MakeLayerStyleNode(std::vector<FilterNode>& filterNodes, tgfx::Rect&
 }
 
 static bool Make3DLayerNode(std::vector<FilterNode>& filterNodes, tgfx::Rect& clipBounds,
-                                const FilterList* filterList, RenderCache* renderCache,
-                                tgfx::Rect& filterBounds, tgfx::Point& effectScale) {
-   if (filterList->layer->transform3D) {
-     auto filter = renderCache->getTransform3DFilter();
-     if (filter && filter->updateLayer(filterList->layer, filterList->layerFrame)) {
-       auto oldBounds = filterBounds;
-       auto containingComposition = filterList->layer->containingComposition;
-       filterBounds = tgfx::Rect::MakeWH(containingComposition->width , containingComposition->height);
-       filter->update(filterList->layerFrame, oldBounds, filterBounds, effectScale);
-       if (!filterBounds.intersect(clipBounds)) {
-         return false;
-       }
-       filterNodes.emplace_back(filter, filterBounds);
-     }
-   }
-   return true;
- }
+                            const FilterList* filterList, RenderCache* renderCache,
+                            tgfx::Rect& filterBounds, tgfx::Point& effectScale) {
+  if (filterList->layer->transform3D) {
+    auto filter = renderCache->getTransform3DFilter();
+    if (filter && filter->updateLayer(filterList->layer, filterList->layerFrame)) {
+      auto oldBounds = filterBounds;
+      auto containingComposition = filterList->layer->containingComposition;
+      filterBounds =
+          tgfx::Rect::MakeWH(containingComposition->width, containingComposition->height);
+      filter->update(filterList->layerFrame, oldBounds, filterBounds, effectScale);
+      if (!filterBounds.intersect(clipBounds)) {
+        return false;
+      }
+      filterNodes.emplace_back(filter, filterBounds);
+    }
+  }
+  return true;
+}
 
 static bool MakeMotionBlurNode(std::vector<FilterNode>& filterNodes, tgfx::Rect& clipBounds,
                                const FilterList* filterList, RenderCache* renderCache,
@@ -301,8 +302,9 @@ std::vector<FilterNode> FilterRenderer::MakeFilterNodes(const FilterList* filter
                       clipIndex)) {
     return {};
   }
-  
-  if (!Make3DLayerNode(filterNodes, clipBounds, filterList, renderCache, filterBounds, effectScale)) {
+
+  if (!Make3DLayerNode(filterNodes, clipBounds, filterList, renderCache, filterBounds,
+                       effectScale)) {
     return {};
   }
 

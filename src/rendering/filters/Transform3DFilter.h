@@ -23,52 +23,52 @@
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "rendering/filters/utils/FilterHelper.h"
-#include "tgfx/gpu/Resource.h"
 #include "tgfx/core/Matrix4x4.h"
+#include "tgfx/gpu/Resource.h"
 
 namespace pag {
 class Transform3DFilter : public Filter {
-public:
+ public:
   Transform3DFilter();
   ~Transform3DFilter() override = default;
-  
+
   bool updateLayer(Layer* layer, Frame layerFrame);
-  
+
   bool initialize(tgfx::Context* context) override;
-  
+
   bool needsMSAA() const override;
-  
+
   void update(Frame layerFrame, const tgfx::Rect& contentBounds,
               const tgfx::Rect& transformedBounds, const tgfx::Point& filterScale);
-  
+
   void draw(tgfx::Context* context, const FilterSource* source,
             const FilterTarget* target) override;
-  
-protected:
+
+ protected:
   Frame layerFrame = 0;
   tgfx::Point filterScale = {};
   std::shared_ptr<const FilterProgram> filterProgram = nullptr;
-  
+
   std::string onBuildVertexShader();
-  
+
   std::string onBuildFragmentShader();
-  
+
   void onPrepareProgram(tgfx::Context* context, unsigned program);
-  
+
   void onUpdateParams(tgfx::Context* context, const FilterSource* source,
                       const FilterTarget* target);
-  
+
   std::vector<tgfx::Point> computeVertices(const tgfx::Rect& contentBounds,
                                            const tgfx::Rect& transformedBounds,
                                            const tgfx::Point& filterScale);
-  
-  void bindVertices(tgfx::Context* context, const FilterSource* source,
-                    const FilterTarget* target, const std::vector<tgfx::Point>& points);
-  
-private:
+
+  void bindVertices(tgfx::Context* context, const FilterSource* source, const FilterTarget* target,
+                    const std::vector<tgfx::Point>& points);
+
+ private:
   tgfx::Rect contentBounds = {};
   tgfx::Rect transformedBounds = {};
-  
+
   Transform3D* layerTransform = nullptr;
   Transform3D* cameraTransform = nullptr;
   CameraOption* cameraOption = nullptr;

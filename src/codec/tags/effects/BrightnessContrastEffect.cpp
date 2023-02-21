@@ -27,8 +27,10 @@
 namespace pag {
 std::unique_ptr<BlockConfig> BrightnessContrastEffectTag(BrightnessContrastEffect* effect) {
   auto tagConfig = new BlockConfig(TagCode::BrightnessContrastEffect);
-  AddAttribute(tagConfig, &effect->brightness, AttributeType::SimpleProperty, static_cast<float>(0.0f));
-  AddAttribute(tagConfig, &effect->contrast, AttributeType::SimpleProperty, static_cast<float>(0.0f));
+  AddAttribute(tagConfig, &effect->brightness, AttributeType::SimpleProperty,
+               static_cast<float>(0.0f));
+  AddAttribute(tagConfig, &effect->contrast, AttributeType::SimpleProperty,
+               static_cast<float>(0.0f));
   AddAttribute(tagConfig, &effect->useOldVersion, AttributeType::DiscreteProperty, false);
   EffectCompositingOptionTag(tagConfig, effect);
   return std::unique_ptr<BlockConfig>(tagConfig);

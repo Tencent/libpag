@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LayerTag.h"
+#include "CameraOption.h"
 #include "CompositionReference.h"
 #include "EffectTag.h"
 #include "ImageReference.h"
@@ -29,7 +30,6 @@
 #include "SolidColor.h"
 #include "Transform2D.h"
 #include "Transform3D.h"
-#include "CameraOption.h"
 #include "codec/tags/CachePolicy.h"
 #include "codec/tags/ImageFillRule.h"
 #include "codec/tags/text/TextAnimatorTag.h"
@@ -87,8 +87,10 @@ void ReadTagsOfLayer(DecodeStream* stream, TagCode code, Layer* layer) {
       ReadTagBlock(stream, transform, Transform2DTag);
       auto hasPosition = (transform->position->animatable() ||
                           transform->position->getValueAt(0) != Point::Zero());
-      auto hasXPosition = (transform->xPosition->animatable() || transform->xPosition->getValueAt(0) != 0);
-      auto hasYPosition = (transform->yPosition->animatable() || transform->yPosition->getValueAt(0) != 0);
+      auto hasXPosition =
+          (transform->xPosition->animatable() || transform->xPosition->getValueAt(0) != 0);
+      auto hasYPosition =
+          (transform->yPosition->animatable() || transform->yPosition->getValueAt(0) != 0);
       if (hasPosition || (!hasXPosition && !hasYPosition)) {
         delete transform->xPosition;
         transform->xPosition = nullptr;
@@ -105,9 +107,12 @@ void ReadTagsOfLayer(DecodeStream* stream, TagCode code, Layer* layer) {
       ReadTagBlock(stream, transform, Transform3DTag);
       auto hasPosition = (transform->position->animatable() ||
                           transform->position->getValueAt(0) != Point3D::Zero());
-      auto hasXPosition = (transform->xPosition->animatable() || transform->xPosition->getValueAt(0) != 0);
-      auto hasYPosition = (transform->yPosition->animatable() || transform->yPosition->getValueAt(0) != 0);
-      auto hasZPosition = (transform->zPosition->animatable() || transform->zPosition->getValueAt(0) != 0);
+      auto hasXPosition =
+          (transform->xPosition->animatable() || transform->xPosition->getValueAt(0) != 0);
+      auto hasYPosition =
+          (transform->yPosition->animatable() || transform->yPosition->getValueAt(0) != 0);
+      auto hasZPosition =
+          (transform->zPosition->animatable() || transform->zPosition->getValueAt(0) != 0);
       if (hasPosition || (!hasXPosition && !hasYPosition && !hasZPosition)) {
         delete transform->xPosition;
         transform->xPosition = nullptr;

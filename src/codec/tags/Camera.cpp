@@ -19,6 +19,4 @@
 #include "SolidColor.h"
 #include "codec/TagHeader.h"
 
-namespace pag {
-
-}  // namespace pag
+namespace pag {}  // namespace pag
