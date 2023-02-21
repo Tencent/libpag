@@ -55,15 +55,12 @@ protected:
   
   void onPrepareProgram(tgfx::Context* context, unsigned program);
   
-  void onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
-                      const tgfx::Point& filterScale);
+  void onUpdateParams(tgfx::Context* context, const FilterSource* source,
+                      const FilterTarget* target);
   
   std::vector<tgfx::Point> computeVertices(const tgfx::Rect& contentBounds,
                                            const tgfx::Rect& transformedBounds,
                                            const tgfx::Point& filterScale);
-  
-  void onSubmitTransformations(tgfx::Context* context, const FilterSource* source,
-                               const FilterTarget* target);
   
   void bindVertices(tgfx::Context* context, const FilterSource* source,
                     const FilterTarget* target, const std::vector<tgfx::Point>& points);

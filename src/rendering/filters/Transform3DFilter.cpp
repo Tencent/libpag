@@ -70,16 +70,7 @@ bool Transform3DFilter::initialize(tgfx::Context* context) {
   if (filterProgram == nullptr) {
     return false;
   }
-  auto gl = tgfx::GLFunctions::Get(context);
-  auto program = filterProgram->program;
-  positionHandle = gl->getAttribLocation(program, "aPosition");
-  textureCoordHandle = gl->getAttribLocation(program, "aTextureCoord");
-  modelMatrixHandle = gl->getUniformLocation(program, "uModelMatrix");
-  viewMatrixHandle = gl->getUniformLocation(program, "uViewMatrix");
-  projectionMatrixHandle = gl->getUniformLocation(program, "uProjectionMatrix");
-  textureMatrixHandle = gl->getUniformLocation(program, "uTextureMatrix");
-  opacityHandle = gl->getUniformLocation(program, "uOpacity");
-  onPrepareProgram(context, program);
+  onPrepareProgram(context, filterProgram->program);
   if (!CheckGLError(context)) {
     filterProgram = nullptr;
     return false;
@@ -112,10 +103,15 @@ std::string Transform3DFilter::onBuildFragmentShader() {
   return FRAGMENT_SHADER;
 }
 
-void Transform3DFilter::onPrepareProgram(tgfx::Context*, unsigned) {
-}
-
-void Transform3DFilter::onUpdateParams(tgfx::Context*, const tgfx::Rect&, const tgfx::Point&) {
+void Transform3DFilter::onPrepareProgram(tgfx::Context* context, unsigned program) {
+  auto gl = tgfx::GLFunctions::Get(context);
+  positionHandle = gl->getAttribLocation(program, "aPosition");
+  textureCoordHandle = gl->getAttribLocation(program, "aTextureCoord");
+  modelMatrixHandle = gl->getUniformLocation(program, "uModelMatrix");
+  viewMatrixHandle = gl->getUniformLocation(program, "uViewMatrix");
+  projectionMatrixHandle = gl->getUniformLocation(program, "uProjectionMatrix");
+  textureMatrixHandle = gl->getUniformLocation(program, "uTextureMatrix");
+  opacityHandle = gl->getUniformLocation(program, "uOpacity");
 }
 
 static void EnableMultisample(tgfx::Context* context, bool usesMSAA) {
@@ -158,8 +154,7 @@ void Transform3DFilter::draw(tgfx::Context* context, const FilterSource* source,
   gl->bindFramebuffer(GL_FRAMEBUFFER, target->frameBuffer.id);
   gl->viewport(0, 0, target->width, target->height);
   ActiveGLTexture(context, 0, &source->sampler);
-  onSubmitTransformations(context, source, target);
-  onUpdateParams(context, contentBounds, filterScale);
+  onUpdateParams(context, source, target);
   auto vertices = computeVertices(contentBounds, transformedBounds, filterScale);
   bindVertices(context, source, target, vertices);
   gl->drawArrays(GL_TRIANGLE_STRIP, 0, 4);
@@ -170,8 +165,8 @@ void Transform3DFilter::draw(tgfx::Context* context, const FilterSource* source,
   CheckGLError(context);
 }
 
-void Transform3DFilter::onSubmitTransformations(tgfx::Context* context, const FilterSource* source,
-                                                const FilterTarget* target) {
+void Transform3DFilter::onUpdateParams(tgfx::Context* context, const FilterSource* source,
+                                       const FilterTarget* target) {
   auto anchorPoint = layerTransform->anchorPoint->getValueAt(layerFrame);
   Point3D position;
   if (layerTransform->position) {
