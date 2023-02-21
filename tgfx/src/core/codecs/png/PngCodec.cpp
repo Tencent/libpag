@@ -135,7 +135,7 @@ std::shared_ptr<ImageCodec> PngCodec::MakeFromData(const std::string& filePath,
     }
   }
   return std::shared_ptr<ImageCodec>(new PngCodec(static_cast<int>(w), static_cast<int>(h),
-                                                  Orientation::TopLeft, isAlphaOnly, filePath,
+                                                  ImageOrigin::TopLeft, isAlphaOnly, filePath,
                                                   std::move(byteData)));
 }
 

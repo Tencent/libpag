@@ -86,11 +86,11 @@ PAG_TEST(CanvasTest, Blur) {
   ASSERT_TRUE(image != nullptr);
   auto texture = image->makeBuffer()->makeTexture(context);
   ASSERT_TRUE(texture != nullptr);
-  auto imageMatrix = OrientationToMatrix(image->orientation(), image->width(), image->height());
+  auto imageMatrix = ImageOriginToMatrix(image->origin(), image->width(), image->height());
   imageMatrix.postScale(0.2, 0.2);
   auto width = image->width();
   auto height = image->height();
-  ApplyOrientation(image->orientation(), &width, &height);
+  ApplyImageOrigin(image->origin(), &width, &height);
   auto imageWidth = static_cast<float>(width) * 0.2f;
   auto imageHeight = static_cast<float>(height) * 0.2f;
   auto padding = 30.f;

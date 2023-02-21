@@ -24,7 +24,7 @@ namespace tgfx {
 /**
  * These values match the orientation www.exif.org/Exif2-2.PDF.
  */
-enum class Orientation {
+enum class ImageOrigin {
   /**
    * Default
    */
@@ -60,16 +60,16 @@ enum class Orientation {
 };
 
 /**
- * Given an orientation and the width and height of the source data, returns a matrix that
+ * Given an image origin and the width and height of the source data, returns a matrix that
  * transforms the source rectangle [0, 0, w, h] to a correctly oriented destination rectangle, with
  * the upper left corner still at [0, 0].
  */
-Matrix OrientationToMatrix(Orientation orientation, int width, int height);
+Matrix ImageOriginToMatrix(ImageOrigin origin, int width, int height);
 
 /**
- * Transforms the source size (width, height) to a correctly oriented destination size by the given
- * an orientation.
+ * Transforms the image size (width, height) to a correctly oriented destination size by the given
+ * image origin.
  */
-void ApplyOrientation(Orientation orientation, int* width, int* height);
+void ApplyImageOrigin(ImageOrigin origin, int* width, int* height);
 
 }  // namespace tgfx

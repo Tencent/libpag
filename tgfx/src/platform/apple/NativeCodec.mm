@@ -69,7 +69,7 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& fileP
   if (size.width <= 0 || size.height <= 0) {
     return nullptr;
   }
-  auto image = new NativeCodec(size.width, size.height, static_cast<Orientation>(orientation));
+  auto image = new NativeCodec(size.width, size.height, static_cast<ImageOrigin>(orientation));
   image->imagePath = filePath;
   return std::shared_ptr<ImageCodec>(image);
 }
@@ -95,7 +95,7 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> im
   if (size.width <= 0 || size.height <= 0) {
     return nullptr;
   }
-  auto codec = new NativeCodec(size.width, size.height, static_cast<Orientation>(orientation));
+  auto codec = new NativeCodec(size.width, size.height, static_cast<ImageOrigin>(orientation));
   codec->imageBytes = imageBytes;
   return std::shared_ptr<ImageCodec>(codec);
 }

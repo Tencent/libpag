@@ -107,7 +107,7 @@ PAG_TEST_F(PAGImageTest, image2) {
   ASSERT_EQ(codec->height(), 110);
   ASSERT_EQ(codec->width(), 110);
   ASSERT_EQ(codec->height(), 110);
-  ASSERT_EQ(codec->orientation(), Orientation::TopLeft);
+  ASSERT_EQ(codec->origin(), tgfx::ImageOrigin::TopLeft);
   auto pixelBuffer = PixelBuffer::Make(codec->width(), codec->height(), false, false);
   ASSERT_TRUE(pixelBuffer != nullptr);
   Bitmap bitmap(pixelBuffer);

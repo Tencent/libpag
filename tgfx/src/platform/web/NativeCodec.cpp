@@ -64,7 +64,7 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> im
 }
 
 NativeCodec::NativeCodec(int width, int height, std::shared_ptr<Data> imageBytes)
-    : ImageCodec(width, height, Orientation::TopLeft), imageBytes(std::move(imageBytes)) {
+    : ImageCodec(width, height, ImageOrigin::TopLeft), imageBytes(std::move(imageBytes)) {
 }
 
 bool NativeCodec::asyncSupport() const {

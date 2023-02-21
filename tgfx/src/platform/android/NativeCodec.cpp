@@ -80,7 +80,7 @@ void NativeCodec::JNIInit(JNIEnv* env) {
                                                  "Landroid/graphics/Bitmap$Config;");
 }
 
-std::shared_ptr<NativeCodec> NativeCodec::Make(JNIEnv* env, jobject sizeObject, int orientation) {
+std::shared_ptr<NativeCodec> NativeCodec::Make(JNIEnv* env, jobject sizeObject, int origin) {
   auto size = env->GetIntArrayElements(static_cast<jintArray>(sizeObject), nullptr);
   int width = size[0];
   int height = size[1];
@@ -89,18 +89,18 @@ std::shared_ptr<NativeCodec> NativeCodec::Make(JNIEnv* env, jobject sizeObject, 
     return nullptr;
   }
   return std::shared_ptr<NativeCodec>(
-      new NativeCodec(width, height, static_cast<Orientation>(orientation)));
+      new NativeCodec(width, height, static_cast<ImageOrigin>(origin)));
 }
 
-static Orientation GetOrientation(JNIEnv* env, jobject exifInterface) {
+static ImageOrigin GetImageOrigin(JNIEnv* env, jobject exifInterface) {
   if (exifInterface == nullptr) {
     env->ExceptionClear();
-    return Orientation::TopLeft;
+    return ImageOrigin::TopLeft;
   }
   auto key = env->NewStringUTF("Orientation");
-  auto orientation = env->CallIntMethod(exifInterface, ExifInterfaceClass_getAttributeInt, key,
-                                        static_cast<int>(Orientation::TopLeft));
-  return static_cast<Orientation>(orientation);
+  auto origin = env->CallIntMethod(exifInterface, ExifInterfaceClass_getAttributeInt, key,
+                                   static_cast<int>(ImageOrigin::TopLeft));
+  return static_cast<ImageOrigin>(origin);
 }
 
 static jobject DecodeBitmap(JNIEnv* env, jobject options, const std::string& filePath) {
@@ -135,8 +135,8 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& fileP
   auto imagePath = SafeToJString(env, filePath);
   auto exifInterface =
       env->NewObject(ExifInterfaceClass.get(), ExifInterface_Constructor_Path, imagePath);
-  auto orientation = GetOrientation(env, exifInterface);
-  auto codec = std::shared_ptr<NativeCodec>(new NativeCodec(width, height, orientation));
+  auto origin = GetImageOrigin(env, exifInterface);
+  auto codec = std::shared_ptr<NativeCodec>(new NativeCodec(width, height, origin));
   codec->imagePath = filePath;
   return codec;
 }
@@ -179,8 +179,8 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> im
       env->NewObject(ByteArrayInputStreamClass.get(), ByteArrayInputStream_Constructor, byteArray);
   auto exifInterface =
       env->NewObject(ExifInterfaceClass.get(), ExifInterface_Constructor_Stream, inputStream);
-  auto orientation = GetOrientation(env, exifInterface);
-  auto codec = std::shared_ptr<NativeCodec>(new NativeCodec(width, height, orientation));
+  auto origin = GetImageOrigin(env, exifInterface);
+  auto codec = std::shared_ptr<NativeCodec>(new NativeCodec(width, height, origin));
   codec->imageBytes = imageBytes;
   return codec;
 }
