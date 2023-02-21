@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "XfermodeFragmentProcessor.h"
-#include "ConstColorProcessor.h"
+#include "gpu/XfermodeFragmentProcessor.h"
+#include "gpu/ConstColorProcessor.h"
 #include "opengl/GLXfermodeFragmentProcessor.h"
 
 namespace tgfx {

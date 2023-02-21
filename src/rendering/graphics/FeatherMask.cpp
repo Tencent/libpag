@@ -21,8 +21,8 @@
 #include "rendering/caches/RenderCache.h"
 #include "rendering/filters/gaussianblur/GaussianBlurFilter.h"
 #include "rendering/utils/PathUtil.h"
+#include "tgfx/core/Canvas.h"
 #include "tgfx/core/Mask.h"
-#include "tgfx/gpu/Canvas.h"
 #include "tgfx/gpu/Surface.h"
 
 namespace pag {

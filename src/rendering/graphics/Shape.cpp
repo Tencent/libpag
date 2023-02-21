@@ -19,10 +19,10 @@
 #include "Shape.h"
 #include "pag/file.h"
 #include "rendering/caches/RenderCache.h"
+#include "tgfx/core/Canvas.h"
 #include "tgfx/core/Mask.h"
+#include "tgfx/core/Shader.h"
 #include "tgfx/core/Shape.h"
-#include "tgfx/gpu/Canvas.h"
-#include "tgfx/gpu/Shader.h"
 #include "tgfx/gpu/Surface.h"
 
 namespace pag {

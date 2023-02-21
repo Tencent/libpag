@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "tgfx/gpu/ImageFilter.h"
+#include "tgfx/core/ImageFilter.h"
 
 namespace tgfx {
 class DropShadowImageFilter : public ImageFilter {

@@ -16,11 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "TiledTextureEffect.h"
+#include "gpu/TiledTextureEffect.h"
 #include "TextureEffect.h"
-#include "core/utils/Log.h"
-#include "core/utils/MathExtra.h"
 #include "opengl/GLTiledTextureEffect.h"
+#include "utils/Log.h"
+#include "utils/MathExtra.h"
 
 namespace tgfx {
 class TiledTextureEffectProxy : public FragmentProcessorProxy {

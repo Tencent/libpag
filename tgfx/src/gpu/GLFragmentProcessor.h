@@ -19,10 +19,10 @@
 #pragma once
 
 #include <functional>
-#include "FragmentProcessor.h"
 #include "FragmentShaderBuilder.h"
 #include "ProgramDataManager.h"
 #include "UniformHandler.h"
+#include "gpu/FragmentProcessor.h"
 
 namespace tgfx {
 class GLFragmentProcessor {

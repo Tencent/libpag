@@ -21,7 +21,7 @@
 #include "Glyph.h"
 #include "Modifier.h"
 #include "tgfx/core/Bitmap.h"
-#include "tgfx/gpu/Paint.h"
+#include "tgfx/core/Paint.h"
 
 namespace pag {
 enum class GraphicType {

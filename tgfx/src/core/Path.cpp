@@ -18,7 +18,7 @@
 
 #include "tgfx/core/Path.h"
 #include "core/PathRef.h"
-#include "core/utils/MathExtra.h"
+#include "utils/MathExtra.h"
 
 namespace tgfx {
 using namespace pk;

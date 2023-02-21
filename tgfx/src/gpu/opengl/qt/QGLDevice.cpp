@@ -20,7 +20,7 @@
 #include <QApplication>
 #include <QThread>
 #include "QGLProcGetter.h"
-#include "core/utils/Log.h"
+#include "utils/Log.h"
 
 namespace tgfx {
 void* GLDevice::CurrentNativeHandle() {

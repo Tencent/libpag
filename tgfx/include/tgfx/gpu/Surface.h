@@ -19,7 +19,7 @@
 #pragma once
 
 #include "tgfx/core/ImageInfo.h"
-#include "tgfx/gpu/Canvas.h"
+#include "tgfx/core/Canvas.h"
 #include "tgfx/gpu/RenderTarget.h"
 #include "tgfx/gpu/Semaphore.h"
 #include "tgfx/gpu/SurfaceOptions.h"

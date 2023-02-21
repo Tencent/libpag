@@ -18,7 +18,7 @@
 
 #include "tgfx/gpu/Surface.h"
 #include "DrawingManager.h"
-#include "core/utils/Log.h"
+#include "utils/Log.h"
 
 namespace tgfx {
 Surface::Surface(std::shared_ptr<RenderTarget> renderTarget, std::shared_ptr<Texture> texture,

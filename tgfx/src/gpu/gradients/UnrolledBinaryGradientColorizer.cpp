@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "UnrolledBinaryGradientColorizer.h"
-#include "core/utils/MathExtra.h"
 #include "gpu/opengl/GLUnrolledBinaryGradientColorizer.h"
+#include "utils/MathExtra.h"
 
 namespace tgfx {
 static constexpr int kMaxIntervals = 8;

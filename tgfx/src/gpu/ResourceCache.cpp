@@ -19,10 +19,10 @@
 #include "tgfx/gpu/ResourceCache.h"
 #include <unordered_map>
 #include <unordered_set>
-#include "core/utils/Log.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/core/Clock.h"
 #include "tgfx/gpu/Resource.h"
+#include "utils/Log.h"
 
 namespace tgfx {
 // Default maximum number of bytes of gpu memory of budgeted resources in the cache.

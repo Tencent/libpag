@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "EAGLHardwareTexture.h"
-#include "core/utils/UniqueID.h"
+#include "utils/UniqueID.h"
 #include "gpu/opengl/GLContext.h"
 #include "platform/apple/CVPixelBufferUtil.h"
 #include "tgfx/core/Bitmap.h"

@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "FragmentProcessor.h"
+#include "gpu/FragmentProcessor.h"
 #include "gpu/ops/OpsTask.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Rect.h"

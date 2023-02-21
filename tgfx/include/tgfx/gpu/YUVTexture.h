@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "Texture.h"
+#include "tgfx/gpu/Texture.h"
 #include "tgfx/core/YUVData.h"
 #include "tgfx/core/YUVInfo.h"
 

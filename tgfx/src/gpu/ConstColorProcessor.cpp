@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ConstColorProcessor.h"
+#include "gpu/ConstColorProcessor.h"
 #include "opengl/GLConstColorProcessor.h"
 
 namespace tgfx {

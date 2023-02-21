@@ -19,7 +19,7 @@
 #pragma once
 
 #include <array>
-#include "FragmentProcessor.h"
+#include "gpu/FragmentProcessor.h"
 
 namespace tgfx {
 class ColorMatrixFragmentProcessor : public FragmentProcessor {

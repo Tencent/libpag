@@ -19,8 +19,8 @@
 #include "DrawingManager.h"
 #include "TextureProxy.h"
 #include "TextureResolveRenderTask.h"
-#include "core/utils/Log.h"
 #include "gpu/Gpu.h"
+#include "utils/Log.h"
 
 namespace tgfx {
 void DrawingManager::closeActiveOpsTask() {

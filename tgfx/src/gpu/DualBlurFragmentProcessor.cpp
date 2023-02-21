@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "DualBlurFragmentProcessor.h"
+#include "gpu/DualBlurFragmentProcessor.h"
 #include "opengl/GLDualBlurFragmentProcessor.h"
 
 namespace tgfx {

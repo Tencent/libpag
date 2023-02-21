@@ -22,13 +22,13 @@
 #include <thread>
 #include <vector>
 #include "base/utils/TimeUtil.h"
-#include "core/utils/Task.h"
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
 #include "framework/utils/Semaphore.h"
 #include "nlohmann/json.hpp"
 #include "rendering/caches/RenderCache.h"
 #include "tgfx/core/Clock.h"
+#include "utils/Task.h"
 
 namespace pag {
 using namespace tgfx;

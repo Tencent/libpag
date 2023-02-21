@@ -18,8 +18,8 @@
 
 #include "GLGpu.h"
 #include "GLUtil.h"
-#include "gpu/PixelFormat.h"
 #include "tgfx/gpu/opengl/GLSemaphore.h"
+#include "utils/PixelFormatUtil.h"
 
 namespace tgfx {
 std::unique_ptr<Gpu> GLGpu::Make(Context* context) {

@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "FragmentProcessor.h"
+#include "gpu/FragmentProcessor.h"
 #include "tgfx/core/BlendMode.h"
 
 namespace tgfx {

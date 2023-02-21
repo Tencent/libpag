@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Device.h"
-#include "core/utils/Log.h"
-#include "core/utils/UniqueID.h"
 #include "tgfx/gpu/Context.h"
+#include "utils/Log.h"
+#include "utils/UniqueID.h"
 
 namespace tgfx {
 Device::Device() : _uniqueID(UniqueID::Next()) {

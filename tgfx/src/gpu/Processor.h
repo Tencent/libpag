@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "core/utils/UniqueID.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/gpu/Context.h"
+#include "utils/UniqueID.h"
 
 namespace tgfx {
 #define DEFINE_PROCESSOR_CLASS_ID               \
