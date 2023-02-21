@@ -385,6 +385,7 @@ PAG_TEST(PAGFilterTest, Transform3D) {
   auto pagPlayer = std::make_shared<PAGPlayer>();
   pagPlayer->setSurface(pagSurface);
   pagPlayer->setComposition(pagFile);
+  pagPlayer->setProgress(0.7);
   pagPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFilterTest/Transform3D"));
 }
