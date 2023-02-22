@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Surface.h"
-#include <tgfx/gpu/opengl/GLRenderTarget.h>
 #include "DrawingManager.h"
 #include "utils/Log.h"
 
