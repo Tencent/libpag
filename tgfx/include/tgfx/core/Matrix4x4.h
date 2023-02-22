@@ -401,10 +401,10 @@ class Matrix4x4 {
   }
 
   explicit Matrix4x4(const Matrix& src)
-      : Matrix4x4(src[Matrix::SCALE_X], src[Matrix::SKEW_X],  0, src[Matrix::TRANS_X],
-                  src[Matrix::SKEW_Y],  src[Matrix::SCALE_Y], 0, src[Matrix::TRANS_Y],
-                  0,                       0,                       1, 0,
-                  src[Matrix::PERSP_0], src[Matrix::PERSP_1], 0, src[Matrix::PERSP_2])
+      : Matrix4x4(src[0], src[1], 0, src[2],
+                  src[3], src[4], 0, src[5],
+                  0,      0,      1, 0,
+                  src[6], src[7], 0, src[8])
   {}
 
   Matrix4x4& preTranslate(float x, float y, float z = 0);

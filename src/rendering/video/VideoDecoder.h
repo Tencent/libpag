@@ -19,7 +19,7 @@
 #pragma once
 
 #include "DecodingResult.h"
-#include "VideoFormat.h"
+#include "rendering/video/VideoFormat.h"
 #include "tgfx/core/ImageBuffer.h"
 
 namespace pag {
