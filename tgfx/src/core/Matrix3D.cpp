@@ -16,14 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/Matrix4x4.h"
+#include "tgfx/core/Matrix3D.h"
 #include <cfloat>
 #include "include/private/SkVx.h"
 #include "utils/MathExtra.h"
 
 namespace tgfx {
 
-bool Matrix4x4::operator==(const Matrix4x4& other) const {
+bool Matrix3D::operator==(const Matrix3D& other) const {
   if (this == &other) {
     return true;
   }
@@ -61,11 +61,11 @@ static void transpose_arrays(float dst[], const float src[]) {
   dst[15] = src[15];
 }
 
-void Matrix4x4::getRowMajor(float v[]) const {
+void Matrix3D::getRowMajor(float v[]) const {
   transpose_arrays(v, fMat);
 }
 
-Matrix4x4& Matrix4x4::setConcat(const Matrix4x4& a, const Matrix4x4& b) {
+Matrix3D& Matrix3D::setConcat(const Matrix3D& a, const Matrix3D& b) {
   auto c0 = pk::skvx::float4::Load(a.fMat + 0);
   auto c1 = pk::skvx::float4::Load(a.fMat + 4);
   auto c2 = pk::skvx::float4::Load(a.fMat + 8);
@@ -87,7 +87,7 @@ Matrix4x4& Matrix4x4::setConcat(const Matrix4x4& a, const Matrix4x4& b) {
   return *this;
 }
 
-Matrix4x4& Matrix4x4::preConcat(const Matrix& b) {
+Matrix3D& Matrix3D::preConcat(const Matrix& b) {
   auto c0 = pk::skvx::float4::Load(fMat + 0);
   auto c1 = pk::skvx::float4::Load(fMat + 4);
   auto c3 = pk::skvx::float4::Load(fMat + 12);
@@ -104,7 +104,7 @@ Matrix4x4& Matrix4x4::preConcat(const Matrix& b) {
   return *this;
 }
 
-Matrix4x4& Matrix4x4::preTranslate(float x, float y, float z) {
+Matrix3D& Matrix3D::preTranslate(float x, float y, float z) {
   auto c0 = pk::skvx::float4::Load(fMat + 0);
   auto c1 = pk::skvx::float4::Load(fMat + 4);
   auto c2 = pk::skvx::float4::Load(fMat + 8);
@@ -115,7 +115,7 @@ Matrix4x4& Matrix4x4::preTranslate(float x, float y, float z) {
   return *this;
 }
 
-Matrix4x4& Matrix4x4::postTranslate(float x, float y, float z) {
+Matrix3D& Matrix3D::postTranslate(float x, float y, float z) {
   pk::skvx::float4 t = {x, y, z, 0};
   (t * fMat[3] + pk::skvx::float4::Load(fMat + 0)).store(fMat + 0);
   (t * fMat[7] + pk::skvx::float4::Load(fMat + 4)).store(fMat + 4);
@@ -124,7 +124,7 @@ Matrix4x4& Matrix4x4::postTranslate(float x, float y, float z) {
   return *this;
 }
 
-Matrix4x4& Matrix4x4::preScale(float x, float y) {
+Matrix3D& Matrix3D::preScale(float x, float y) {
   auto c0 = pk::skvx::float4::Load(fMat + 0);
   auto c1 = pk::skvx::float4::Load(fMat + 4);
 
@@ -133,7 +133,7 @@ Matrix4x4& Matrix4x4::preScale(float x, float y) {
   return *this;
 }
 
-Matrix4x4& Matrix4x4::preScale(float x, float y, float z) {
+Matrix3D& Matrix3D::preScale(float x, float y, float z) {
   auto c0 = pk::skvx::float4::Load(fMat + 0);
   auto c1 = pk::skvx::float4::Load(fMat + 4);
   auto c2 = pk::skvx::float4::Load(fMat + 8);
@@ -144,13 +144,13 @@ Matrix4x4& Matrix4x4::preScale(float x, float y, float z) {
   return *this;
 }
 
-SkV4 Matrix4x4::map(float x, float y, float z, float w) const {
+Vec4 Matrix3D::map(float x, float y, float z, float w) const {
   auto c0 = pk::skvx::float4::Load(fMat + 0);
   auto c1 = pk::skvx::float4::Load(fMat + 4);
   auto c2 = pk::skvx::float4::Load(fMat + 8);
   auto c3 = pk::skvx::float4::Load(fMat + 12);
 
-  SkV4 v;
+  Vec4 v;
   (c0 * x + (c1 * y + (c2 * z + c3 * w))).store(&v.x);
   return v;
 }
@@ -232,7 +232,7 @@ static Rect map_rect_perspective(const Rect& src, const float mat[16]) {
   return r;
 }
 
-Rect Matrix4x4::MapRect(const Matrix4x4& m, const Rect& src) {
+Rect Matrix3D::MapRect(const Matrix3D& m, const Rect& src) {
   const bool hasPerspective =
       m.fMat[3] != 0 || m.fMat[7] != 0 || m.fMat[11] != 0 || m.fMat[15] != 1;
   if (hasPerspective) {
@@ -242,7 +242,7 @@ Rect Matrix4x4::MapRect(const Matrix4x4& m, const Rect& src) {
   }
 }
 
-void Matrix4x4::normalizePerspective() {
+void Matrix3D::normalizePerspective() {
   // If the bottom row of the matrix is [0, 0, 0, not_one], we will treat the matrix as if it
   // is in perspective, even though it stills behaves like its affine. If we divide everything
   // by the not_one value, then it will behave the same, but will be treated as affine,
@@ -259,7 +259,7 @@ void Matrix4x4::normalizePerspective() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-bool Matrix4x4::isFinite() const {
+bool Matrix3D::isFinite() const {
   return FloatsAreFinite(fMat, 16);
 }
 
@@ -340,7 +340,7 @@ float Invert4x4Matrix(const float inMatrix[16], float outMatrix[16]) {
   return determinant;
 }
 
-bool Matrix4x4::invert(Matrix4x4* inverse) const {
+bool Matrix3D::invert(Matrix3D* inverse) const {
   float tmp[16];
   if (Invert4x4Matrix(fMat, tmp) == 0.0f) {
     return false;
@@ -349,13 +349,13 @@ bool Matrix4x4::invert(Matrix4x4* inverse) const {
   return true;
 }
 
-Matrix4x4 Matrix4x4::transpose() const {
-  Matrix4x4 trans(Matrix4x4::kUninitialized_Constructor);
+Matrix3D Matrix3D::transpose() const {
+  Matrix3D trans(Matrix3D::kUninitialized_Constructor);
   transpose_arrays(trans.fMat, fMat);
   return trans;
 }
 
-Matrix4x4& Matrix4x4::setRotateUnitSinCos(SkV3 axis, float sinAngle, float cosAngle) {
+Matrix3D& Matrix3D::setRotateUnitSinCos(Vec3 axis, float sinAngle, float cosAngle) {
   // Taken from "Essential Mathematics for Games and Interactive Applications"
   //             James M. Van Verth and Lars M. Bishop -- third edition
   float x = axis.x;
@@ -384,7 +384,7 @@ Matrix4x4& Matrix4x4::setRotateUnitSinCos(SkV3 axis, float sinAngle, float cosAn
   return *this;
 }
 
-Matrix4x4& Matrix4x4::setRotate(SkV3 axis, float radians) {
+Matrix3D& Matrix3D::setRotate(Vec3 axis, float radians) {
   float len = axis.length();
   if (len > 0 && (len * 0 == 0)) {
     this->setRotateUnit(axis * (1.0f / len), radians);
@@ -394,11 +394,11 @@ Matrix4x4& Matrix4x4::setRotate(SkV3 axis, float radians) {
   return *this;
 }
 
-Matrix4x4 Matrix4x4::RectToRect(const Rect& src, const Rect& dst) {
+Matrix3D Matrix3D::RectToRect(const Rect& src, const Rect& dst) {
   if (src.isEmpty()) {
-    return Matrix4x4();
+    return Matrix3D();
   } else if (dst.isEmpty()) {
-    return Matrix4x4::Scale(0.f, 0.f, 0.f);
+    return Matrix3D::Scale(0.f, 0.f, 0.f);
   }
 
   float sx = dst.width() / src.width();
@@ -407,41 +407,41 @@ Matrix4x4 Matrix4x4::RectToRect(const Rect& src, const Rect& dst) {
   float tx = dst.left - sx * src.left;
   float ty = dst.top - sy * src.top;
 
-  return Matrix4x4{sx, 0.f, 0.f, tx, 0.f, sy, 0.f, ty, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 0.f, 1.f};
+  return Matrix3D{sx, 0.f, 0.f, tx, 0.f, sy, 0.f, ty, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 0.f, 1.f};
 }
 
-static SkV3 normalize(SkV3 v) {
+static Vec3 normalize(Vec3 v) {
   const auto vlen = v.length();
 
   return FloatNearlyZero(vlen) ? v : v * (1.0f / vlen);
 }
 
-static SkV4 v4(SkV3 v, float w) {
+static Vec4 v4(Vec3 v, float w) {
   return {v.x, v.y, v.z, w};
 }
 
-Matrix4x4 Matrix4x4::LookAt(const SkV3& eye, const SkV3& center, const SkV3& up) {
-  SkV3 f = normalize(center - eye);
-  SkV3 u = normalize(up);
-  SkV3 s = normalize(f.cross(u));
+Matrix3D Matrix3D::LookAt(const Vec3& eye, const Vec3& center, const Vec3& up) {
+  Vec3 f = normalize(center - eye);
+  Vec3 u = normalize(up);
+  Vec3 s = normalize(f.cross(u));
 
-  Matrix4x4 m(Matrix4x4::kUninitialized_Constructor);
-  if (!Matrix4x4::Cols(v4(s, 0), v4(s.cross(f), 0), v4(-f, 0), v4(eye, 1)).invert(&m)) {
+  Matrix3D m(Matrix3D::kUninitialized_Constructor);
+  if (!Matrix3D::Cols(v4(s, 0), v4(s.cross(f), 0), v4(-f, 0), v4(eye, 1)).invert(&m)) {
     m.setIdentity();
   }
   return m;
 }
 
-Matrix4x4 Matrix4x4::Perspective(float near, float far, float angle) {
+Matrix3D Matrix3D::Perspective(float near, float far, float angle) {
   if (far <= near) {
-    return Matrix4x4();
+    return Matrix3D();
   }
 
   float denomInv = 1.0f / (far - near);
   float halfAngle = angle * 0.5f;
   float cot = cosf(halfAngle) / sinf(halfAngle);
 
-  Matrix4x4 m;
+  Matrix3D m;
   m.setRC(0, 0, cot);
   m.setRC(1, 1, cot);
   m.setRC(2, 2, (far + near) * denomInv);

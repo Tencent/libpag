@@ -24,115 +24,78 @@
 
 namespace tgfx {
 
-struct SkV2 {
-  float x, y;
-
-  bool operator==(const SkV2 v) const { return x == v.x && y == v.y; }
-  bool operator!=(const SkV2 v) const { return !(*this == v); }
-
-  static float   Dot(SkV2 a, SkV2 b) { return a.x * b.x + a.y * b.y; }
-  static float Cross(SkV2 a, SkV2 b) { return a.x * b.y - a.y * b.x; }
-  static SkV2 Normalize(SkV2 v) { return v * (1.0f / v.length()); }
-
-  SkV2 operator-() const { return {-x, -y}; }
-  SkV2 operator+(SkV2 v) const { return {x+v.x, y+v.y}; }
-  SkV2 operator-(SkV2 v) const { return {x-v.x, y-v.y}; }
-
-  SkV2 operator*(SkV2 v) const { return {x*v.x, y*v.y}; }
-  friend SkV2 operator*(SkV2 v, float s) { return {v.x*s, v.y*s}; }
-  friend SkV2 operator*(float s, SkV2 v) { return {v.x*s, v.y*s}; }
-  friend SkV2 operator/(SkV2 v, float s) { return {v.x/s, v.y/s}; }
-  friend SkV2 operator/(float s, SkV2 v) { return {s/v.x, s/v.y}; }
-
-  void operator+=(SkV2 v) { *this = *this + v; }
-  void operator-=(SkV2 v) { *this = *this - v; }
-  void operator*=(SkV2 v) { *this = *this * v; }
-  void operator*=(float s) { *this = *this * s; }
-  void operator/=(float s) { *this = *this / s; }
-
-  float lengthSquared() const { return Dot(*this, *this); }
-  float length() const { return sqrtf(this->lengthSquared()); }
-
-  float   dot(SkV2 v) const { return Dot(*this, v); }
-  float cross(SkV2 v) const { return Cross(*this, v); }
-  SkV2 normalize()       const { return Normalize(*this); }
-
-  const float* ptr() const { return &x; }
-  float* ptr() { return &x; }
-};
-
-struct SkV3 {
+struct Vec3 {
   float x, y, z;
 
-  bool operator==(const SkV3& v) const {
+  bool operator==(const Vec3& v) const {
     return x == v.x && y == v.y && z == v.z;
   }
-  bool operator!=(const SkV3& v) const { return !(*this == v); }
+  bool operator!=(const Vec3& v) const { return !(*this == v); }
 
-  static float Dot(const SkV3& a, const SkV3& b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
-  static SkV3   Cross(const SkV3& a, const SkV3& b) {
+  static float Dot(const Vec3& a, const Vec3& b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
+  static Vec3   Cross(const Vec3& a, const Vec3& b) {
     return { a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x };
   }
-  static SkV3 Normalize(const SkV3& v) { return v * (1.0f / v.length()); }
+  static Vec3 Normalize(const Vec3& v) { return v * (1.0f / v.length()); }
 
-  SkV3 operator-() const { return {-x, -y, -z}; }
-  SkV3 operator+(const SkV3& v) const { return { x + v.x, y + v.y, z + v.z }; }
-  SkV3 operator-(const SkV3& v) const { return { x - v.x, y - v.y, z - v.z }; }
+  Vec3 operator-() const { return {-x, -y, -z}; }
+  Vec3 operator+(const Vec3& v) const { return { x + v.x, y + v.y, z + v.z }; }
+  Vec3 operator-(const Vec3& v) const { return { x - v.x, y - v.y, z - v.z }; }
 
-  SkV3 operator*(const SkV3& v) const {
+  Vec3 operator*(const Vec3& v) const {
     return { x*v.x, y*v.y, z*v.z };
   }
-  friend SkV3 operator*(const SkV3& v, float s) {
+  friend Vec3 operator*(const Vec3& v, float s) {
     return { v.x*s, v.y*s, v.z*s };
   }
-  friend SkV3 operator*(float s, const SkV3& v) { return v*s; }
+  friend Vec3 operator*(float s, const Vec3& v) { return v*s; }
 
-  void operator+=(SkV3 v) { *this = *this + v; }
-  void operator-=(SkV3 v) { *this = *this - v; }
-  void operator*=(SkV3 v) { *this = *this * v; }
+  void operator+=(Vec3 v) { *this = *this + v; }
+  void operator-=(Vec3 v) { *this = *this - v; }
+  void operator*=(Vec3 v) { *this = *this * v; }
   void operator*=(float s) { *this = *this * s; }
 
   float lengthSquared() const { return Dot(*this, *this); }
   float length() const { return sqrtf(Dot(*this, *this)); }
 
-  float dot(const SkV3& v) const { return Dot(*this, v); }
-  SkV3   cross(const SkV3& v) const { return Cross(*this, v); }
-  SkV3 normalize()            const { return Normalize(*this); }
+  float dot(const Vec3& v) const { return Dot(*this, v); }
+  Vec3   cross(const Vec3& v) const { return Cross(*this, v); }
+  Vec3 normalize()            const { return Normalize(*this); }
 
   const float* ptr() const { return &x; }
   float* ptr() { return &x; }
 };
 
-struct SkV4 {
+struct Vec4 {
   float x, y, z, w;
 
-  bool operator==(const SkV4& v) const {
+  bool operator==(const Vec4& v) const {
     return x == v.x && y == v.y && z == v.z && w == v.w;
   }
-  bool operator!=(const SkV4& v) const { return !(*this == v); }
+  bool operator!=(const Vec4& v) const { return !(*this == v); }
 
-  static float Dot(const SkV4& a, const SkV4& b) {
+  static float Dot(const Vec4& a, const Vec4& b) {
     return a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w;
   }
-  static SkV4 Normalize(const SkV4& v) { return v * (1.0f / v.length()); }
+  static Vec4 Normalize(const Vec4& v) { return v * (1.0f / v.length()); }
 
-  SkV4 operator-() const { return {-x, -y, -z, -w}; }
-  SkV4 operator+(const SkV4& v) const { return { x + v.x, y + v.y, z + v.z, w + v.w }; }
-  SkV4 operator-(const SkV4& v) const { return { x - v.x, y - v.y, z - v.z, w - v.w }; }
+  Vec4 operator-() const { return {-x, -y, -z, -w}; }
+  Vec4 operator+(const Vec4& v) const { return { x + v.x, y + v.y, z + v.z, w + v.w }; }
+  Vec4 operator-(const Vec4& v) const { return { x - v.x, y - v.y, z - v.z, w - v.w }; }
 
-  SkV4 operator*(const SkV4& v) const {
+  Vec4 operator*(const Vec4& v) const {
     return { x*v.x, y*v.y, z*v.z, w*v.w };
   }
-  friend SkV4 operator*(const SkV4& v, float s) {
+  friend Vec4 operator*(const Vec4& v, float s) {
     return { v.x*s, v.y*s, v.z*s, v.w*s };
   }
-  friend SkV4 operator*(float s, const SkV4& v) { return v*s; }
+  friend Vec4 operator*(float s, const Vec4& v) { return v*s; }
 
   float lengthSquared() const { return Dot(*this, *this); }
   float length() const { return sqrtf(Dot(*this, *this)); }
 
-  float dot(const SkV4& v) const { return Dot(*this, v); }
-  SkV4 normalize()            const { return Normalize(*this); }
+  float dot(const Vec4& v) const { return Dot(*this, v); }
+  Vec4 normalize()            const { return Normalize(*this); }
 
   const float* ptr() const { return &x; }
   float* ptr() { return &x; }
@@ -146,38 +109,36 @@ struct SkV4 {
 };
 
 /**
- *  4x4 matrix used by SkCanvas and other parts of Skia.
- *
- *  Skia assumes a right-handed coordinate system:
+ *  Matrix3D assumes a right-handed coordinate system:
  *      +X goes to the right
  *      +Y goes down
  *      +Z goes into the screen (away from the viewer)
  */
-class Matrix4x4 {
+class Matrix3D {
  public:
-  Matrix4x4(const Matrix4x4& src) = default;
-  Matrix4x4& operator=(const Matrix4x4& src) = default;
+  Matrix3D(const Matrix3D& src) = default;
+  Matrix3D& operator=(const Matrix3D& src) = default;
 
-  constexpr Matrix4x4()
+  constexpr Matrix3D()
       : fMat{1, 0, 0, 0,
              0, 1, 0, 0,
              0, 0, 1, 0,
              0, 0, 0, 1}
   {}
 
-  Matrix4x4(const Matrix4x4& a, const Matrix4x4& b) {
+  Matrix3D(const Matrix3D& a, const Matrix3D& b) {
     this->setConcat(a, b);
   }
 
   enum Uninitialized_Constructor {
     kUninitialized_Constructor
   };
-  Matrix4x4(Uninitialized_Constructor) {}
+  Matrix3D(Uninitialized_Constructor) {}
 
   /**
      *  The constructor parameters are in row-major order.
    */
-  constexpr Matrix4x4(float m0, float m4, float m8,  float m12,
+  constexpr Matrix3D(float m0, float m4, float m8,  float m12,
                   float m1, float m5, float m9,  float m13,
                   float m2, float m6, float m10, float m14,
                   float m3, float m7, float m11, float m15)
@@ -188,16 +149,16 @@ class Matrix4x4 {
              m12, m13, m14, m15}
   {}
 
-  static Matrix4x4 Rows(const SkV4& r0, const SkV4& r1, const SkV4& r2, const SkV4& r3) {
-    Matrix4x4 m(kUninitialized_Constructor);
+  static Matrix3D Rows(const Vec4& r0, const Vec4& r1, const Vec4& r2, const Vec4& r3) {
+    Matrix3D m(kUninitialized_Constructor);
     m.setRow(0, r0);
     m.setRow(1, r1);
     m.setRow(2, r2);
     m.setRow(3, r3);
     return m;
   }
-  static Matrix4x4 Cols(const SkV4& c0, const SkV4& c1, const SkV4& c2, const SkV4& c3) {
-    Matrix4x4 m(kUninitialized_Constructor);
+  static Matrix3D Cols(const Vec4& c0, const Vec4& c1, const Vec4& c2, const Vec4& c3) {
+    Matrix3D m(kUninitialized_Constructor);
     m.setCol(0, c0);
     m.setCol(1, c1);
     m.setCol(2, c2);
@@ -205,47 +166,47 @@ class Matrix4x4 {
     return m;
   }
 
-  static Matrix4x4 RowMajor(const float r[16]) {
-    return Matrix4x4(r[ 0], r[ 1], r[ 2], r[ 3],
+  static Matrix3D RowMajor(const float r[16]) {
+    return Matrix3D(r[ 0], r[ 1], r[ 2], r[ 3],
                  r[ 4], r[ 5], r[ 6], r[ 7],
                  r[ 8], r[ 9], r[10], r[11],
                  r[12], r[13], r[14], r[15]);
   }
-  static Matrix4x4 ColMajor(const float c[16]) {
-    return Matrix4x4(c[0], c[4], c[ 8], c[12],
+  static Matrix3D ColMajor(const float c[16]) {
+    return Matrix3D(c[0], c[4], c[ 8], c[12],
                  c[1], c[5], c[ 9], c[13],
                  c[2], c[6], c[10], c[14],
                  c[3], c[7], c[11], c[15]);
   }
 
-  static Matrix4x4 Translate(float x, float y, float z = 0) {
-    return Matrix4x4(1, 0, 0, x,
+  static Matrix3D Translate(float x, float y, float z = 0) {
+    return Matrix3D(1, 0, 0, x,
                  0, 1, 0, y,
                  0, 0, 1, z,
                  0, 0, 0, 1);
   }
 
-  static Matrix4x4 Scale(float x, float y, float z = 1) {
-    return Matrix4x4(x, 0, 0, 0,
+  static Matrix3D Scale(float x, float y, float z = 1) {
+    return Matrix3D(x, 0, 0, 0,
                  0, y, 0, 0,
                  0, 0, z, 0,
                  0, 0, 0, 1);
   }
 
-  static Matrix4x4 Rotate(SkV3 axis, float radians) {
-    Matrix4x4 m(kUninitialized_Constructor);
+  static Matrix3D Rotate(Vec3 axis, float radians) {
+    Matrix3D m(kUninitialized_Constructor);
     m.setRotate(axis, radians);
     return m;
   }
 
   // Scales and translates 'src' to fill 'dst' exactly.
-  static Matrix4x4 RectToRect(const Rect& src, const Rect& dst);
+  static Matrix3D RectToRect(const Rect& src, const Rect& dst);
 
-  static Matrix4x4 LookAt(const SkV3& eye, const SkV3& center, const SkV3& up);
-  static Matrix4x4 Perspective(float near, float far, float angle);
+  static Matrix3D LookAt(const Vec3& eye, const Vec3& center, const Vec3& up);
+  static Matrix3D Perspective(float near, float far, float angle);
 
-  bool operator==(const Matrix4x4& other) const;
-  bool operator!=(const Matrix4x4& other) const {
+  bool operator==(const Matrix3D& other) const;
+  bool operator!=(const Matrix3D& other) const {
     return !(other == *this);
   }
 
@@ -261,24 +222,24 @@ class Matrix4x4 {
     fMat[c*4 + r] = value;
   }
 
-  SkV4 row(int i) const {
+  Vec4 row(int i) const {
     return {fMat[i + 0], fMat[i + 4], fMat[i + 8], fMat[i + 12]};
   }
-  SkV4 col(int i) const {
+  Vec4 col(int i) const {
     return {fMat[i*4 + 0], fMat[i*4 + 1], fMat[i*4 + 2], fMat[i*4 + 3]};
   }
 
-  void setRow(int i, const SkV4& v) {
+  void setRow(int i, const Vec4& v) {
     fMat[i + 0]  = v.x;
     fMat[i + 4]  = v.y;
     fMat[i + 8]  = v.z;
     fMat[i + 12] = v.w;
   }
-  void setCol(int i, const SkV4& v) {
+  void setCol(int i, const Vec4& v) {
     memcpy(&fMat[i*4], v.ptr(), sizeof(v));
   }
 
-  Matrix4x4& setIdentity() {
+  Matrix3D& setIdentity() {
     *this = { 1, 0, 0, 0,
              0, 1, 0, 0,
              0, 0, 1, 0,
@@ -286,7 +247,7 @@ class Matrix4x4 {
     return *this;
   }
 
-  Matrix4x4& setTranslate(float x, float y, float z = 0) {
+  Matrix3D& setTranslate(float x, float y, float z = 0) {
     *this = { 1, 0, 0, x,
              0, 1, 0, y,
              0, 0, 1, z,
@@ -294,7 +255,7 @@ class Matrix4x4 {
     return *this;
   }
 
-  Matrix4x4& setScale(float x, float y, float z = 1) {
+  Matrix3D& setScale(float x, float y, float z = 1) {
     *this = { x, 0, 0, 0,
              0, y, 0, 0,
              0, 0, z, 0,
@@ -309,7 +270,7 @@ class Matrix4x4 {
      *  This does not attempt to verify that axis.length() == 1 or that the sin,cos values
      *  are correct.
    */
-  Matrix4x4& setRotateUnitSinCos(SkV3 axis, float sinAngle, float cosAngle);
+  Matrix3D& setRotateUnitSinCos(Vec3 axis, float sinAngle, float cosAngle);
 
   /**
      *  Set this matrix to rotate about the specified unit-length axis vector,
@@ -317,7 +278,7 @@ class Matrix4x4 {
      *
      *  This does not attempt to verify that axis.length() == 1.
    */
-  Matrix4x4& setRotateUnit(SkV3 axis, float radians) {
+  Matrix3D& setRotateUnit(Vec3 axis, float radians) {
     return this->setRotateUnitSinCos(axis, sin(radians), cos(radians));
   }
 
@@ -328,19 +289,19 @@ class Matrix4x4 {
      *  Note: axis is not assumed to be unit-length, so it will be normalized internally.
      *        If axis is already unit-length, call setRotateAboutUnitRadians() instead.
    */
-  Matrix4x4& setRotate(SkV3 axis, float radians);
+  Matrix3D& setRotate(Vec3 axis, float radians);
 
-  Matrix4x4& setConcat(const Matrix4x4& a, const Matrix4x4& b);
+  Matrix3D& setConcat(const Matrix3D& a, const Matrix3D& b);
 
-  friend Matrix4x4 operator*(const Matrix4x4& a, const Matrix4x4& b) {
-    return Matrix4x4(a, b);
+  friend Matrix3D operator*(const Matrix3D& a, const Matrix3D& b) {
+    return Matrix3D(a, b);
   }
 
-  Matrix4x4& preConcat(const Matrix4x4& m) {
+  Matrix3D& preConcat(const Matrix3D& m) {
     return this->setConcat(*this, m);
   }
 
-  Matrix4x4& postConcat(const Matrix4x4& m) {
+  Matrix3D& postConcat(const Matrix3D& m) {
     return this->setConcat(m, *this);
   }
 
@@ -368,26 +329,26 @@ class Matrix4x4 {
   /** If this is invertible, return that in inverse and return true. If it is
      *  not invertible, return false and leave the inverse parameter unchanged.
    */
-  bool invert(Matrix4x4* inverse) const;
+  bool invert(Matrix3D* inverse) const;
 
-  Matrix4x4 transpose() const;
+  Matrix3D transpose() const;
 
-  Rect MapRect(const Matrix4x4& m, const Rect& src);
+  Rect MapRect(const Matrix3D& m, const Rect& src);
 
   ////////////
 
-  SkV4 map(float x, float y, float z, float w) const;
-  SkV4 operator*(const SkV4& v) const {
+  Vec4 map(float x, float y, float z, float w) const;
+  Vec4 operator*(const Vec4& v) const {
     return this->map(v.x, v.y, v.z, v.w);
   }
-  SkV3 operator*(SkV3 v) const {
+  Vec3 operator*(Vec3 v) const {
     auto v4 = this->map(v.x, v.y, v.z, 0);
     return {v4.x, v4.y, v4.z};
   }
   ////////////////////// Converting to/from Matrix
 
-  /* When converting from Matrix4x4 to Matrix, the third row and
-     * column is dropped.  When converting from Matrix to Matrix4x4
+  /* When converting from Matrix3D to Matrix, the third row and
+     * column is dropped.  When converting from Matrix to Matrix3D
      * the third row and column remain as identity:
      * [ a b c ]      [ a b 0 c ]
      * [ d e f ]  ->  [ d e 0 f ]
@@ -400,19 +361,19 @@ class Matrix4x4 {
                              fMat[3], fMat[7], fMat[15]);
   }
 
-  explicit Matrix4x4(const Matrix& src)
-      : Matrix4x4(src[0], src[1], 0, src[2],
+  explicit Matrix3D(const Matrix& src)
+      : Matrix3D(src[0], src[1], 0, src[2],
                   src[3], src[4], 0, src[5],
                   0,      0,      1, 0,
                   src[6], src[7], 0, src[8])
   {}
 
-  Matrix4x4& preTranslate(float x, float y, float z = 0);
-  Matrix4x4& postTranslate(float x, float y, float z = 0);
+  Matrix3D& preTranslate(float x, float y, float z = 0);
+  Matrix3D& postTranslate(float x, float y, float z = 0);
 
-  Matrix4x4& preScale(float x, float y);
-  Matrix4x4& preScale(float x, float y, float z);
-  Matrix4x4& preConcat(const Matrix&);
+  Matrix3D& preScale(float x, float y);
+  Matrix3D& preScale(float x, float y, float z);
+  Matrix3D& preConcat(const Matrix&);
 
  private:
   /* Stored in column-major.
