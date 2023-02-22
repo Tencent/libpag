@@ -18,6 +18,7 @@ import { Matrix as ClassMatrix } from './core/matrix';
 import { RenderCanvas } from './core/render-canvas';
 
 import type { ScalerContextConstructor, VideoDecoderConstructor, WebMaskConstructor } from './interfaces';
+import type { ArrayBufferImage } from './wechat/array-buffer-image';
 
 declare global {
   interface Window {
@@ -31,7 +32,7 @@ export interface PAG extends EmscriptenModule {
     _MaxSupportedTagLevel: () => number;
   };
   _PAGImage: {
-    _FromNativeImage: (source: TexImageSource) => any;
+    _FromNativeImage: (source: TexImageSource | ArrayBufferImage) => any;
     _FromPixels: (
       pixels: number,
       width: number,
