@@ -1,6 +1,6 @@
 import { ArrayBufferImage } from './array-buffer-image';
 import { releaseCanvas2D } from './canvas';
-import { getSourceSize, isAndroidMiniprogram } from '../tgfx';
+import { getSourceSize, isAndroidMiniprogram, isIphone } from '../tgfx';
 
 import type { EmscriptenGL } from '../types';
 
@@ -31,4 +31,4 @@ export const uploadToTexture = (
   gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
 };
 
-export { getSourceSize, isAndroidMiniprogram, releaseCanvas2D as releaseNativeImage };
+export { getSourceSize, isAndroidMiniprogram, releaseCanvas2D as releaseNativeImage, isIphone };

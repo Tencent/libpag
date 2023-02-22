@@ -106,7 +106,6 @@ HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
   _width = sequence->getVideoWidth();
   _height = sequence->getVideoHeight();
   frameRate = sequence->frameRate;
-  auto videoReaderClass = val::module_property("VideoReader");
   auto staticTimeRanges = val::array();
   for (const auto& timeRange : sequence->staticTimeRanges) {
     auto object = val::object();
@@ -114,7 +113,7 @@ HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
     object.set("end", static_cast<int>(timeRange.end));
     staticTimeRanges.call<void>("push", object);
   }
-  if (videoReaderClass.call<bool>("isIOS")) {
+  if (val::module_property("tgfx").call<bool>("isIphone")) {
     auto videoSequence = *sequence;
     videoSequence.MP4Header = nullptr;
     std::vector<VideoFrame> videoFrames;
@@ -136,6 +135,7 @@ HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
   } else {
     mp4Data = MP4BoxHelper::CovertToMP4(sequence);
   }
+  auto videoReaderClass = val::module_property("VideoReader");
   videoReader = videoReaderClass
                     .call<val>("create", val(typed_memory_view(mp4Data->length(), mp4Data->data())),
                                _width, _height, sequence->frameRate, staticTimeRanges)
