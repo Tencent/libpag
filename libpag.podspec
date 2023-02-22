@@ -68,7 +68,7 @@ Pod::Spec.new do |s|
 
   s.compiler_flags = '-Wno-documentation'
 
-  if ENV["libpag_config"] == 'QT'
+  if ENV["PAG_USE_QT"] == 'ON'
     s.osx.public_header_files = ['src/platform/qt/*.h']
     s.osx.source_files = 'src/platform/qt/**/*.{h,cpp,mm,m}',
                          'tgfx/src/gpu/opengl/qt/*.{h,cpp,mm}',
