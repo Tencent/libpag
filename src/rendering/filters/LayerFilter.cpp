@@ -25,7 +25,6 @@
 #include "MosaicFilter.h"
 #include "MotionTileFilter.h"
 #include "RadialBlurFilter.h"
-#include "Transform3DFilter.h"
 #include "rendering/filters/dropshadow/DropShadowFilter.h"
 #include "rendering/filters/gaussianblur/GaussianBlurFilter.h"
 #include "rendering/filters/glow/GlowFilter.h"
