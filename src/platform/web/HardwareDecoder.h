@@ -23,6 +23,7 @@
 #include "pag/pag.h"
 #include "rendering/video/VideoDecoderFactory.h"
 #include "tgfx/gpu/opengl/GLTexture.h"
+#include "tgfx/platform/web/VideoImageReader.h"
 
 namespace pag {
 class WebVideoTexture : public tgfx::GLTexture {
@@ -97,6 +98,8 @@ class HardwareDecoder : public VideoDecoder {
   std::shared_ptr<File> file = nullptr;
   PAGFile* rootFile = nullptr;
   std::shared_ptr<WebVideoBuffer> videoBuffer = nullptr;
+  emscripten::val videoReader = emscripten::val::null();
+  std::shared_ptr<tgfx::VideoImageReader> videoImageReader = nullptr;
   int32_t _width = 0;
   int32_t _height = 0;
   float frameRate = 30.0f;

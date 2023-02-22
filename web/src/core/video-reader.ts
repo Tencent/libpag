@@ -266,6 +266,10 @@ export class VideoReader {
     this.bitmapCtx = null;
   }
 
+  public getVideo() {
+    return this.videoEl;
+  }
+
   private seek(targetTime: number, play = true) {
     return new Promise<void>((resolve) => {
       let isCallback = false;

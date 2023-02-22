@@ -107,44 +107,42 @@ HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
   _height = sequence->getVideoHeight();
   frameRate = sequence->frameRate;
   auto videoReaderClass = val::module_property("VideoReader");
-  if (videoReaderClass.as<bool>()) {
-    auto staticTimeRanges = val::array();
-    for (const auto& timeRange : sequence->staticTimeRanges) {
-      auto object = val::object();
-      object.set("start", static_cast<int>(timeRange.start));
-      object.set("end", static_cast<int>(timeRange.end));
-      staticTimeRanges.call<void>("push", object);
-    }
-    if (videoReaderClass.call<bool>("isIOS")) {
-      auto videoSequence = *sequence;
-      videoSequence.MP4Header = nullptr;
-      std::vector<VideoFrame> videoFrames;
-      for (auto& frame : sequence->frames) {
-        if (!videoFrames.empty() && frame->isKeyframe) {
-          break;
-        }
-        videoFrames.push_back(*frame);
-        auto& videoFrame = videoFrames.back();
-        videoFrame.frame += static_cast<Frame>(sequence->frames.size());
-        videoSequence.frames.emplace_back(&videoFrame);
+  auto staticTimeRanges = val::array();
+  for (const auto& timeRange : sequence->staticTimeRanges) {
+    auto object = val::object();
+    object.set("start", static_cast<int>(timeRange.start));
+    object.set("end", static_cast<int>(timeRange.end));
+    staticTimeRanges.call<void>("push", object);
+  }
+  if (videoReaderClass.call<bool>("isIOS")) {
+    auto videoSequence = *sequence;
+    videoSequence.MP4Header = nullptr;
+    std::vector<VideoFrame> videoFrames;
+    for (auto& frame : sequence->frames) {
+      if (!videoFrames.empty() && frame->isKeyframe) {
+        break;
       }
-      mp4Data = MP4BoxHelper::CovertToMP4(&videoSequence);
-      videoSequence.frames.clear();
-      videoSequence.headers.clear();
-      for (auto& frame : videoFrames) {
-        frame.fileBytes = nullptr;
-      }
-    } else {
-      mp4Data = MP4BoxHelper::CovertToMP4(sequence);
+      videoFrames.push_back(*frame);
+      auto& videoFrame = videoFrames.back();
+      videoFrame.frame += static_cast<Frame>(sequence->frames.size());
+      videoSequence.frames.emplace_back(&videoFrame);
     }
-    auto videoReader =
-        videoReaderClass
-            .call<val>("create", val(typed_memory_view(mp4Data->length(), mp4Data->data())), _width,
-                       _height, sequence->frameRate, staticTimeRanges)
-            .await();
-    if (videoReader.as<bool>()) {
-      videoBuffer = std::make_shared<WebVideoBuffer>(_width, _height, videoReader);
+    mp4Data = MP4BoxHelper::CovertToMP4(&videoSequence);
+    videoSequence.frames.clear();
+    videoSequence.headers.clear();
+    for (auto& frame : videoFrames) {
+      frame.fileBytes = nullptr;
     }
+  } else {
+    mp4Data = MP4BoxHelper::CovertToMP4(sequence);
+  }
+  videoReader = videoReaderClass
+                    .call<val>("create", val(typed_memory_view(mp4Data->length(), mp4Data->data())),
+                               _width, _height, sequence->frameRate, staticTimeRanges)
+                    .await();
+  auto video = videoReader.call<val>("getVideo");
+  if (!video.isNull()) {
+    videoImageReader = tgfx::VideoImageReader::MakeFrom(video, _width, _height);
   }
 }
 
@@ -180,8 +178,8 @@ std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
     playbackRate = file->duration() / ((rootFile->duration() / 1000000) * rootFile->frameRate());
   }
   auto targetFrame = TimeToFrame(currentTimeStamp, frameRate);
-  videoBuffer->videoReader.call<val>("prepare", static_cast<int>(targetFrame), playbackRate)
-      .await();
-  return videoBuffer;
+  auto imageBuffer = videoImageReader->acquireNextBuffer(
+      videoReader.call<val>("prepare", static_cast<int>(targetFrame), playbackRate));
+  return imageBuffer;
 }
 }  // namespace pag

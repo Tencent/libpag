@@ -48,6 +48,8 @@ std::shared_ptr<OpsTask> DrawingManager::newOpsTask(Surface* surface) {
   return opsTask;
 }
 
+int count = 0;
+
 bool DrawingManager::flush(Semaphore* signalSemaphore) {
   auto* gpu = context->gpu();
   closeAllTasks();
@@ -55,9 +57,12 @@ bool DrawingManager::flush(Semaphore* signalSemaphore) {
   std::vector<TextureProxy*> proxies;
   std::for_each(tasks.begin(), tasks.end(),
                 [&proxies](std::shared_ptr<RenderTask>& task) { task->gatherProxies(&proxies); });
-  bool allInstantiated = std::all_of(proxies.begin(), proxies.end(), [&](TextureProxy* proxy) {
-    return proxy->isInstantiated() || proxy->instantiate();
-  });
+  bool allInstantiated = false;
+  if (count++ == 0) {
+    allInstantiated = std::all_of(proxies.begin(), proxies.end(), [&](TextureProxy* proxy) {
+      return proxy->isInstantiated() || proxy->instantiate();
+    });
+  }
   if (allInstantiated) {
     std::for_each(tasks.begin(), tasks.end(),
                   [gpu](std::shared_ptr<RenderTask>& task) { task->execute(gpu); });
