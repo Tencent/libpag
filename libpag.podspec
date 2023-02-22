@@ -72,7 +72,8 @@ Pod::Spec.new do |s|
     s.osx.public_header_files = ['src/platform/qt/*.h']
     s.osx.source_files = 'src/platform/qt/**/*.{h,cpp,mm,m}',
                          'tgfx/src/gpu/opengl/qt/*.{h,cpp,mm}',
-                         'tgfx/src/platform/mock/*.{h,cpp,mm}'
+                         'tgfx/src/platform/mock/*.{h,cpp,mm}',
+                         'tgfx/src/platform/apple/BitmapContextUtil.mm'
   else
     s.osx.public_header_files = 'src/platform/mac/*.h',
                                 'src/platform/cocoa/*.h'
