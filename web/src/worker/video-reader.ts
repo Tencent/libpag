@@ -2,6 +2,7 @@ import { WorkerMessageType } from './events';
 import { postMessage } from './utils';
 
 import type { EmscriptenGL } from '../types';
+import { BitMapImage } from '../core/bitmap-image';
 
 export class WorkerVideoReader {
   public bitmap: ImageBitmap | null = null;
@@ -9,6 +10,7 @@ export class WorkerVideoReader {
   public isPlaying = false;
 
   private proxyId: number;
+  private bitMapImage: BitMapImage = new BitMapImage(null);
 
   public constructor(proxyId: number) {
     this.proxyId = proxyId;
@@ -20,12 +22,15 @@ export class WorkerVideoReader {
         self,
         { name: WorkerMessageType.VideoReader_prepare, args: [this.proxyId, targetFrame, playbackRate] },
         (res) => {
-          this.bitmap?.close();
-          this.bitmap = res;
+          this.bitMapImage.setBitMap(res);
           resolve();
         },
       );
     });
+  }
+
+  public getVideo() {
+    return this.bitMapImage;
   }
 
   public renderToTexture(GL: EmscriptenGL, textureID: number) {
