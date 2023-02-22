@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/platform/web/VideoImageReader.h"
-#include "../../../../src/rendering/utils/Trace.h"
 #include "GLVideoTexture.h"
 #include "tgfx/platform/web/WebImage.h"
 #include "utils/Log.h"
@@ -56,11 +55,10 @@ bool VideoImageReader::onUpdateTexture(Context* context, bool) {
         "Context!");
     return false;
   }
-  context->device()->lockContext();
   if (currentPromise == val::null()) {
     return false;
   }
-//  currentPromise.await();
+  currentPromise.await();
   if (texture == nullptr) {
     texture = GLVideoTexture::Make(context, width(), height());
   }
@@ -70,8 +68,6 @@ bool VideoImageReader::onUpdateTexture(Context* context, bool) {
   auto& glInfo = std::static_pointer_cast<GLTexture>(texture)->glSampler();
   val::module_property("tgfx").call<void>("uploadToTexture", emscripten::val::module_property("GL"),
                                           video, glInfo.id);
-  pag::Trace(texture, "");
-  context->device()->unlock();
   currentPromise = val::null();
   return true;
 }
