@@ -41,13 +41,13 @@ static bool Compare(Surface* surface, const std::string& key) {
   if (pixelBuffer == nullptr) {
     return false;
   }
-  Bitmap bitmap(pixelBuffer);
-  bitmap.eraseAll();
-  auto result = surface->readPixels(bitmap.info(), bitmap.writablePixels());
+  Pixmap pixmap(pixelBuffer);
+  pixmap.eraseAll();
+  auto result = surface->readPixels(pixmap.info(), pixmap.writablePixels());
   if (!result) {
     return false;
   }
-  return pag::Baseline::Compare(bitmap, key);
+  return pag::Baseline::Compare(pixmap, key);
 }
 
 /**
@@ -567,9 +567,9 @@ PAG_TEST(CanvasTest, mipmap) {
   ASSERT_TRUE(image != nullptr);
   auto pixelBuffer = PixelBuffer::Make(image->width(), image->height(), false, false);
   ASSERT_TRUE(pixelBuffer != nullptr);
-  Bitmap bitmap(pixelBuffer);
-  auto result = image->readPixels(pixelBuffer->info(), bitmap.writablePixels());
-  bitmap.reset();
+  Pixmap pixmap(pixelBuffer);
+  auto result = image->readPixels(pixelBuffer->info(), pixmap.writablePixels());
+  pixmap.reset();
   ASSERT_TRUE(result);
   auto texture = pixelBuffer->makeTexture(context);
   ASSERT_TRUE(texture != nullptr);
@@ -617,9 +617,9 @@ PAG_TEST(CanvasTest, hardwareMipMap) {
   ASSERT_TRUE(image != nullptr);
   auto pixelBuffer = PixelBuffer::Make(image->width(), image->height(), false);
   ASSERT_TRUE(pixelBuffer != nullptr);
-  Bitmap bitmap(pixelBuffer);
-  auto result = image->readPixels(pixelBuffer->info(), bitmap.writablePixels());
-  bitmap.reset();
+  Pixmap pixmap(pixelBuffer);
+  auto result = image->readPixels(pixelBuffer->info(), pixmap.writablePixels());
+  pixmap.reset();
   ASSERT_TRUE(result);
   auto textureMipMapped = pixelBuffer->makeTexture(context, true);
   ASSERT_TRUE(textureMipMapped != nullptr);

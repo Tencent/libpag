@@ -45,15 +45,15 @@ void GradientCache::add(const BytesKey& bytesKey, std::shared_ptr<Texture> textu
   }
 }
 
-std::shared_ptr<PixelBuffer> CreateGradient(const Color* colors, const float* positions, int count,
+std::shared_ptr<ImageBuffer> CreateGradient(const Color* colors, const float* positions, int count,
                                             int resolution) {
   auto pixelBuffer = PixelBuffer::Make(resolution, 1, false, false);
-  Bitmap bitmap(pixelBuffer);
-  if (bitmap.isEmpty()) {
+  Pixmap pixmap(pixelBuffer);
+  if (pixmap.isEmpty()) {
     return nullptr;
   }
-  bitmap.eraseAll();
-  auto* pixels = reinterpret_cast<uint8_t*>(bitmap.writablePixels());
+  pixmap.eraseAll();
+  auto* pixels = reinterpret_cast<uint8_t*>(pixmap.writablePixels());
   int prevIndex = 0;
   for (int i = 1; i < count; ++i) {
     int nextIndex =

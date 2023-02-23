@@ -18,8 +18,8 @@
 
 #include "codecs/webp/WebpCodec.h"
 #include "codecs/webp/WebpUtility.h"
-#include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Buffer.h"
+#include "tgfx/core/Pixmap.h"
 
 namespace tgfx {
 
@@ -95,8 +95,8 @@ bool WebpCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
       if (decodeSuccess) {
         auto info =
             ImageInfo::Make(width(), height(), ColorType::RGBA_8888, AlphaType::Unpremultiplied);
-        Bitmap bitmap(info, pixels);
-        decodeSuccess = bitmap.readPixels(dstInfo, dstPixels);
+        Pixmap pixmap(info, pixels);
+        decodeSuccess = pixmap.readPixels(dstInfo, dstPixels);
       }
       delete[] pixels;
     }
@@ -133,19 +133,16 @@ static int webp_reader_write_data(const uint8_t* data, size_t data_size,
   return 1;
 }
 
-std::shared_ptr<Data> WebpCodec::Encode(const ImageInfo& imageInfo, const void* pixels,
-                                        EncodedFormat, int quality) {
-  const uint8_t* srcPixels = static_cast<uint8_t*>(const_cast<void*>(pixels));
+std::shared_ptr<Data> WebpCodec::Encode(const Pixmap& pixmap, EncodedFormat, int quality) {
+  const uint8_t* srcPixels = static_cast<uint8_t*>(const_cast<void*>(pixmap.pixels()));
   std::unique_ptr<Buffer> tempPixels = nullptr;
-  if (imageInfo.alphaType() == AlphaType::Premultiplied ||
-      imageInfo.colorType() == ColorType::ALPHA_8) {
-    Bitmap bitmap(imageInfo, srcPixels);
-    tempPixels = std::make_unique<Buffer>(imageInfo.width() * imageInfo.height() * 4);
+  if (pixmap.alphaType() == AlphaType::Premultiplied || pixmap.colorType() == ColorType::ALPHA_8) {
+    tempPixels = std::make_unique<Buffer>(pixmap.width() * pixmap.height() * 4);
     auto colorType =
-        imageInfo.colorType() == ColorType::ALPHA_8 ? ColorType::RGBA_8888 : imageInfo.colorType();
-    auto dstInfo = ImageInfo::Make(imageInfo.width(), imageInfo.height(), colorType,
-                                   AlphaType::Unpremultiplied);
-    if (!bitmap.readPixels(dstInfo, tempPixels->data())) {
+        pixmap.colorType() == ColorType::ALPHA_8 ? ColorType::RGBA_8888 : pixmap.colorType();
+    auto dstInfo =
+        ImageInfo::Make(pixmap.width(), pixmap.height(), colorType, AlphaType::Unpremultiplied);
+    if (!pixmap.readPixels(dstInfo, tempPixels->data())) {
       return nullptr;
     }
     srcPixels = tempPixels->bytes();
@@ -161,8 +158,8 @@ std::shared_ptr<Data> WebpCodec::Encode(const ImageInfo& imageInfo, const void* 
   }
   WebPPicture pic;
   WebPPictureInit(&pic);
-  pic.width = imageInfo.width();
-  pic.height = imageInfo.height();
+  pic.width = pixmap.width();
+  pic.height = pixmap.height();
   pic.writer = webp_reader_write_data;
   if (isLossless) {
     webp_config.lossless = 1;
@@ -178,15 +175,14 @@ std::shared_ptr<Data> WebpCodec::Encode(const ImageInfo& imageInfo, const void* 
   pic.custom_ptr = &webpWriter;
   const int rgbStride = pic.width * 4;
   auto importProc = WebPPictureImportRGBX;
-  if (ColorType::RGBA_8888 == imageInfo.colorType() ||
-      ColorType::ALPHA_8 == imageInfo.colorType()) {
-    if (AlphaType::Opaque == imageInfo.alphaType()) {
+  if (ColorType::RGBA_8888 == pixmap.colorType() || ColorType::ALPHA_8 == pixmap.colorType()) {
+    if (AlphaType::Opaque == pixmap.alphaType()) {
       importProc = WebPPictureImportRGBX;
     } else {
       importProc = WebPPictureImportRGBA;
     }
-  } else if (ColorType::BGRA_8888 == imageInfo.colorType()) {
-    if (AlphaType::Opaque == imageInfo.alphaType()) {
+  } else if (ColorType::BGRA_8888 == pixmap.colorType()) {
+    if (AlphaType::Opaque == pixmap.alphaType()) {
       importProc = WebPPictureImportBGRX;
     } else {
       importProc = WebPPictureImportBGRA;

@@ -20,7 +20,7 @@
 #include "utils/UniqueID.h"
 #include "gpu/opengl/GLContext.h"
 #include "platform/apple/CVPixelBufferUtil.h"
-#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Pixmap.h"
 #include "tgfx/gpu/opengl/eagl/EAGLDevice.h"
 
 namespace tgfx {
@@ -132,8 +132,8 @@ bool EAGLHardwareTexture::readPixels(const ImageInfo& dstInfo, void* dstPixels, 
   auto srcInfo = GetImageInfo(pixelBuffer);
   CVPixelBufferLockBaseAddress(pixelBuffer, 0);
   void* baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer);
-  Bitmap bitmap(srcInfo, baseAddress);
-  bool result = bitmap.readPixels(dstInfo, dstPixels);
+  Pixmap pixmap(srcInfo, baseAddress);
+  bool result = pixmap.readPixels(dstInfo, dstPixels);
   CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
   return result;
 }

@@ -23,6 +23,7 @@
 #include "tgfx/core/ImageGenerator.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/ImageOrigin.h"
+#include "tgfx/core/Pixmap.h"
 
 namespace tgfx {
 
@@ -44,6 +45,11 @@ class ImageCodec : public ImageGenerator {
    * that can decode it. Otherwise return nullptr.
    */
   static std::shared_ptr<ImageCodec> MakeFrom(std::shared_ptr<Data> imageBytes);
+
+  /**
+   * Encodes the specified Pixmap into a binary image format. Returns nullptr if encoding fails.
+   */
+  static std::shared_ptr<Data> Encode(const Pixmap& pixmap, EncodedFormat format, int quality);
 
   /**
    * Returns the origin of target image.
@@ -75,12 +81,6 @@ class ImageCodec : public ImageGenerator {
   ImageOrigin _origin = ImageOrigin::TopLeft;
 
   /**
-   * Encodes the specified pixels into a binary image format. Returns nullptr if encoding fails.
-   */
-  static std::shared_ptr<Data> Encode(const ImageInfo& info, const void* pixels,
-                                      EncodedFormat format, int quality);
-
-  /**
    * If the file path represents an encoded image that the current platform knows how to decode,
    * returns an ImageCodec that can decode it. Otherwise returns nullptr.
    */
@@ -92,7 +92,6 @@ class ImageCodec : public ImageGenerator {
    */
   static std::shared_ptr<ImageCodec> MakeNativeCodec(std::shared_ptr<Data> imageBytes);
 
-
-  friend class Bitmap;
+  friend class Pixmap;
 };
 }  // namespace tgfx

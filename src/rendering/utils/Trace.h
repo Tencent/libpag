@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Pixmap.h"
 #include "tgfx/gpu/Texture.h"
 
 namespace pag {
@@ -35,5 +35,5 @@ void Trace(std::shared_ptr<tgfx::Texture> texture, const std::string& path = "")
 /**
  * Trace() provides a utility to view the Bitmap.
  */
-void Trace(const tgfx::Bitmap& bitmap, const std::string& tag = "");
+void Trace(const tgfx::Pixmap& pixmap, const std::string& tag = "");
 }  // namespace pag

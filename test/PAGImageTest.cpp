@@ -61,30 +61,30 @@ PAG_TEST_F(PAGImageTest, image) {
   EXPECT_EQ(pixelBuffer->colorType(), tgfx::ColorType::ALPHA_8);
   pixelBuffer = PixelBuffer::Make(width, height, false, false);
   ASSERT_TRUE(pixelBuffer != nullptr);
-  Bitmap bitmap(pixelBuffer);
+  Pixmap pixmap(pixelBuffer);
   auto info = ImageInfo::Make(width, height, tgfx::ColorType::RGBA_8888,
                               tgfx::AlphaType::Premultiplied, rowBytes);
-  auto result = bitmap.writePixels(info, fileData->data());
+  auto result = pixmap.writePixels(info, fileData->data());
   ASSERT_TRUE(result);
   auto newFileData = ByteData::Make(fileData->length());
-  bitmap.readPixels(info, newFileData->data());
+  pixmap.readPixels(info, newFileData->data());
   auto compare = memcmp(fileData->data(), newFileData->data(), fileData->length());
   ASSERT_EQ(compare, 0);
   auto emptyData = ByteData::Make(fileData->length());
   memset(emptyData->data(), 0, emptyData->length());
-  bitmap.eraseAll();
-  compare = memcmp(bitmap.pixels(), emptyData->data(), emptyData->length());
+  pixmap.eraseAll();
+  compare = memcmp(pixmap.pixels(), emptyData->data(), emptyData->length());
   ASSERT_EQ(compare, 0);
-  result = bitmap.writePixels(info, fileData->data(), 20, -10);
+  result = pixmap.writePixels(info, fileData->data(), 20, -10);
   ASSERT_TRUE(result);
-  result = bitmap.readPixels(info, newFileData->data(), 20, -10);
+  result = pixmap.readPixels(info, newFileData->data(), 20, -10);
   ASSERT_TRUE(result);
   compare = memcmp(fileData->data(), newFileData->data(), fileData->length());
   ASSERT_EQ(compare, 0);
   memset(emptyData->data(), 1, emptyData->length());
   auto emptyInfo = info.makeWH(100, height);
-  Bitmap bitmap2(emptyInfo, emptyData->data());
-  bitmap2.eraseAll();
+  Pixmap pixmap2(emptyInfo, emptyData->data());
+  pixmap2.eraseAll();
   auto bytes = reinterpret_cast<uint8_t*>(emptyData->data());
   EXPECT_TRUE(bytes[399] == 0);
   EXPECT_TRUE(bytes[400] == 1);
@@ -110,10 +110,10 @@ PAG_TEST_F(PAGImageTest, image2) {
   ASSERT_EQ(codec->origin(), tgfx::ImageOrigin::TopLeft);
   auto pixelBuffer = PixelBuffer::Make(codec->width(), codec->height(), false, false);
   ASSERT_TRUE(pixelBuffer != nullptr);
-  Bitmap bitmap(pixelBuffer);
-  auto result = codec->readPixels(bitmap.info(), bitmap.writablePixels());
+  Pixmap pixmap(pixelBuffer);
+  auto result = codec->readPixels(pixmap.info(), pixmap.writablePixels());
   ASSERT_TRUE(result);
-  EXPECT_TRUE(Baseline::Compare(bitmap, "PAGImageTest/image2"));
+  EXPECT_TRUE(Baseline::Compare(pixmap, "PAGImageTest/image2"));
 }
 
 /**
@@ -159,11 +159,11 @@ PAG_TEST_F(PAGImageTest, BottomLeftMask) {
   canvas->drawTexture(image1, &paint);
   auto pixelBuffer = PixelBuffer::Make(width, height);
   ASSERT_TRUE(pixelBuffer != nullptr);
-  Bitmap bitmap(pixelBuffer);
-  bitmap.eraseAll();
-  auto result = surface->readPixels(bitmap.info(), bitmap.writablePixels());
+  Pixmap pixmap(pixelBuffer);
+  pixmap.eraseAll();
+  auto result = surface->readPixels(pixmap.info(), pixmap.writablePixels());
   ASSERT_TRUE(result);
   device->unlock();
-  EXPECT_TRUE(Baseline::Compare(bitmap, "PAGImageTest/BottomLeftMask"));
+  EXPECT_TRUE(Baseline::Compare(pixmap, "PAGImageTest/BottomLeftMask"));
 }
 }  // namespace pag

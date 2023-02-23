@@ -106,6 +106,11 @@ class PixelBuffer : public ImageBuffer {
   }
 
   /**
+   * Duplicates this PixelBuffer. Returns nullptr if this cannot be done.
+   */
+  std::shared_ptr<PixelBuffer> duplicate();
+
+  /**
    * Locks and returns the address of the pixels to ensure that the memory is accessible.
    */
   virtual void* lockPixels() = 0;

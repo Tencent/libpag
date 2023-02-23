@@ -18,7 +18,7 @@
 
 #include "FTMask.h"
 #include "FTPath.h"
-#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Pixmap.h"
 
 namespace tgfx {
 static const FTLibrary& GetLibrary() {
@@ -52,7 +52,7 @@ std::shared_ptr<Mask> Mask::Make(int width, int height, bool tryHardware) {
   if (buffer == nullptr) {
     return nullptr;
   }
-  Bitmap(buffer).eraseAll();
+  Pixmap(buffer).eraseAll();
   return std::make_shared<FTMask>(std::move(buffer));
 }
 
@@ -71,7 +71,7 @@ void FTMask::fillPath(const Path& path) {
   finalPath.decompose(Iterator, &ftPath);
   ftPath.setFillType(path.getFillType());
   auto outlines = ftPath.getOutlines();
-  Bitmap bm(buffer);
+  Pixmap bm(buffer);
   FT_Bitmap bitmap;
   bitmap.width = info.width();
   bitmap.rows = info.height();

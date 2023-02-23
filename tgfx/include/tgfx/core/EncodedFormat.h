@@ -21,7 +21,7 @@
 namespace tgfx {
 
 /**
- *  Describes the known formats a Bitmap can be encoded into.
+ *  Describes the known formats a Pixmap can be encoded into.
  */
 enum class EncodedFormat { JPEG, PNG, WEBP };
 

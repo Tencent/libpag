@@ -38,6 +38,6 @@ bool Snapshot::hitTest(RenderCache* cache, float x, float y) const {
   auto canvas = surface->getCanvas();
   canvas->setMatrix(tgfx::Matrix::MakeTrans(-local.x, -local.y));
   canvas->drawImage(image);
-  return surface->hitTest(0, 0);
+  return surface->getColor(0, 0).alpha > 0;
 }
 }  // namespace pag

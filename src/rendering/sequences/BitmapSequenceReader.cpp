@@ -18,6 +18,7 @@
 
 #include "BitmapSequenceReader.h"
 #include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/PixelBuffer.h"
 
 namespace pag {
 BitmapSequenceReader::BitmapSequenceReader(std::shared_ptr<File> file, BitmapSequence* sequence)
@@ -26,7 +27,7 @@ BitmapSequenceReader::BitmapSequenceReader(std::shared_ptr<File> file, BitmapSeq
   // decoding will fail due to the memory sharing mechanism.
   auto staticContent = sequence->composition->staticContent();
   pixelBuffer = tgfx::PixelBuffer::Make(sequence->width, sequence->height, false, staticContent);
-  tgfx::Bitmap(pixelBuffer).eraseAll();
+  tgfx::Pixmap(pixelBuffer).eraseAll();
 }
 
 std::shared_ptr<tgfx::ImageBuffer> BitmapSequenceReader::onMakeBuffer(Frame targetFrame) {
@@ -41,7 +42,7 @@ std::shared_ptr<tgfx::ImageBuffer> BitmapSequenceReader::onMakeBuffer(Frame targ
   auto startFrame = findStartFrame(targetFrame);
   lastDecodeFrame = -1;
   auto& bitmapFrames = static_cast<BitmapSequence*>(sequence)->frames;
-  tgfx::Bitmap bitmap(pixelBuffer);
+  tgfx::Pixmap bitmap(pixelBuffer);
   for (Frame frame = startFrame; frame <= targetFrame; frame++) {
     auto bitmapFrame = bitmapFrames[frame];
     auto firstRead = true;

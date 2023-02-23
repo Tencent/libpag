@@ -60,15 +60,17 @@ bool Surface::flush(Semaphore* signalSemaphore) {
   return renderTarget->getContext()->drawingManager()->flush(signalSemaphore);
 }
 
+Color Surface::getColor(int x, int y) {
+  uint8_t color[4];
+  auto info = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
+  if (!readPixels(info, color, x, y)) {
+    return Color::Transparent();
+  }
+  return Color::FromRGBA(color[0], color[1], color[2], color[3]);
+}
+
 bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) {
   flush();
   return onReadPixels(dstInfo, dstPixels, srcX, srcY);
-}
-
-bool Surface::hitTest(float x, float y) {
-  uint8_t pixel[4];
-  auto info = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);
-  auto result = readPixels(info, pixel, static_cast<int>(x), static_cast<int>(y));
-  return result && pixel[3] > 0;
 }
 }  // namespace tgfx

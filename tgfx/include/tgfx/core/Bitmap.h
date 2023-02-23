@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,100 +18,151 @@
 
 #pragma once
 
+#include "tgfx/core/Color.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/EncodedFormat.h"
+#include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/ImageInfo.h"
-#include "tgfx/core/PixelBuffer.h"
 
 namespace tgfx {
+class PixelBuffer;
+
 /**
- * Bitmap is a low-level class that provides convenience functions to access raster destinations,
- * which can convert the format of pixels from one to another or compress the pixels into an encoded
- * file. Bitmap does not try to manage the lifetime of the pixel memory. Use PixelBuffer to manage
- * pixel memory.
+ * Bitmap describes a two-dimensional raster pixel array. Bitmap points to PixelBuffer, which
+ * describes the physical array of pixels and is optimized for creating textures. If pixel array is
+ * primarily read-only, use Image for better performance. Declaring Bitmap const prevents altering
+ * ImageInfo: the Bitmap height, width, and so on cannot change. It does not affect PixelBuffer: a
+ * caller may write its pixels. Bitmap is not thread safe.
  */
 class Bitmap {
  public:
   /**
-   * Creates a new Bitmap with specified ImageInfo and read-only pixels. The returned bitmap does
-   * not try to manage the lifetime of the pixel memory.
-   * Note: All non-const methods are invalid if the bitmap constructed from read-only pixels, such
-   * as writePixels() and eraseAll().
+   * Creates an empty Bitmap without pixels, and with an empty ImageInfo.
    */
-  Bitmap(const ImageInfo& info, const void* pixels);
+  Bitmap() = default;
 
   /**
-   * Creates a new Bitmap with specified ImageInfo and writable pixels. The returned bitmap does not
-   * try to manage the lifetime of the pixel memory.
+   * Creates an new Bitmap and try to allocate its pixels by the specified width, height, and the
+   * native color type. and allocates pixel memory. If the alphaOnly is true, sets ImageInfo to
+   * ColorType::ALPHA_8. If the tryHardware is true and there is hardware buffer support on the
+   * current platform, a hardware backed PixelBuffer is allocated. Otherwise, a raster PixelBuffer
+   * is allocated. The isEmpty() method of the Bitmap will return true if allocation fails.
    */
-  Bitmap(const ImageInfo& info, void* pixels);
+  Bitmap(int width, int height, bool alphaOnly = false, bool tryHardware = true);
 
   /**
-   * Creates an new Bitmap with specified PixelBuffer object. Bitmap will hold a reference to The
-   * PixelBuffer and lock pixels from it. The PixelBuffer will remain locked until the returned
-   * bitmap is destructed or reset.
+   * Copies settings from src to returned Bitmap. Shares pixels if src has pixels allocated, so both
+   * bitmaps reference the same pixels.
    */
-  explicit Bitmap(std::shared_ptr<PixelBuffer> pixelBuffer);
-
-  ~Bitmap();
+  Bitmap(const Bitmap& src);
 
   /**
-   * Resets the bitmap to empty. If the pixels in this bitmap are locked from a PixelBuffer, the
-   * unlockPixels() of the PixelBuffer will be called immediately.
+   * Copies settings from src to returned Bitmap. Moves ownership of src pixels to Bitmap.
    */
-  void reset();
+  Bitmap(Bitmap&& src);
 
   /**
-   * Return true if this Bitmap describes an empty area of pixels.
+   * Copies settings from src to returned Bitmap. Shares pixels if src has pixels allocated, so both
+   * bitmaps reference the same pixels.
    */
-  bool isEmpty() const;
+  Bitmap& operator=(const Bitmap& src);
+
+  /**
+   * Copies settings from src to returned Bitmap. Moves ownership of src pixels to Bitmap.
+   */
+  Bitmap& operator=(Bitmap&& src);
+
+  /**
+   * Sets ImageInfo to width, height, and the native color type; and allocates pixel memory. If
+   * the alphaOnly is true, sets ImageInfo to ColorType::ALPHA_8. If the tryHardware is true and
+   * there is hardware buffer support on the current platform, a hardware backed PixelBuffer is
+   * allocated. Otherwise, a raster PixelBuffer is allocated. Returns true if the PixelBuffer is
+   * allocated successfully.
+   */
+  bool allocPixels(int width, int height, bool alphaOnly = false, bool tryHardware = true);
+
+  /**
+   * Locks and returns the pixel address to ensure that the memory is accessible, the base address
+   * corresponding to the pixel origin.
+   */
+  void* lockPixels();
+
+  /**
+   * Call this to balance a successful call to lockPixels().
+   */
+  void unlockPixels();
+
+  /**
+   * Return true if the Bitmap describes an empty area of pixels.
+   */
+  bool isEmpty() const {
+    return _info.isEmpty();
+  }
 
   /**
    * Returns a ImageInfo describing the width, height, color type, alpha type, and row bytes of the
    * pixels.
    */
-  const ImageInfo& info() const;
+  const ImageInfo& info() const {
+    return _info;
+  }
 
   /**
    * Returns the width of the pixels.
    */
-  int width() const;
+  int width() const {
+    return _info.width();
+  }
 
   /**
    * Returns the height of the pixels.
    */
-  int height() const;
+  int height() const {
+    return _info.height();
+  }
 
   /**
    * Returns the ColorType of the pixels.
    */
-  ColorType colorType() const;
+  ColorType colorType() const {
+    return _info.colorType();
+  }
 
   /**
    * Returns the AlphaType of the pixels.
    */
-  AlphaType alphaType() const;
+  AlphaType alphaType() const {
+    return _info.alphaType();
+  }
+
+  /**
+   * Returns true if pixels represent transparency only. If true, each pixel is packed in 8 bits as
+   * defined by ColorType::ALPHA_8.
+   */
+  bool isAlphaOnly() const {
+    return _info.isAlphaOnly();
+  }
 
   /**
    * Returns the rowBytes of the pixels.
    */
-  size_t rowBytes() const;
+  size_t rowBytes() const {
+    return _info.rowBytes();
+  }
 
   /**
    * Returns the byte size of the pixels.
    */
-  size_t byteSize() const;
+  size_t byteSize() const {
+    return _info.byteSize();
+  }
 
   /**
-   * Returns the read-only pixel address, the base address corresponding to the pixel origin.
+   * Returns true if the Bitmap is backed by a platform-specified hardware buffer. A hardware backed
+   * Bitmap allows sharing buffers across CPU and GPU, which can be used to speed up the texture
+   * uploading.
    */
-  const void* pixels() const;
-
-  /**
-   * Returns the writable pixel address, the base address corresponding to the pixel origin. Returns
-   * nullptr if the bitmap is constructed from read-only pixels.
-   */
-  void* writablePixels() const;
+  bool isHardwareBacked() const;
 
   /**
    * Encodes the pixels in Bitmap into a binary image format.
@@ -121,6 +172,13 @@ class Bitmap {
    * @return Returns nullptr if encoding fails, or if format is not supported.
    */
   std::shared_ptr<Data> encode(EncodedFormat format = EncodedFormat::PNG, int quality = 100) const;
+
+  /**
+   * Returns pixel at (x, y) as unpremultiplied color. Some color precision may be lost in the
+   * conversion to unpremultiplied color; original pixel data may have additional precision. Returns
+   * a transparent color if the point (x, y) is not contained by bounds.
+   */
+  Color getColor(int x, int y) const;
 
   /**
    * Copies a rect of pixels to dstPixels with specified ImageInfo. Copy starts at (srcX, srcY), and
@@ -137,15 +195,17 @@ class Bitmap {
   bool writePixels(const ImageInfo& srcInfo, const void* srcPixels, int dstX = 0, int dstY = 0);
 
   /**
-   * Replaces all pixel values with transparent colors. Returns false if the bitmap is constructed
-   * from read-only pixels.
+   * Replaces all pixel values with transparent colors.
    */
-  bool eraseAll();
+  void eraseAll();
 
  private:
   ImageInfo _info = {};
-  const void* _pixels = nullptr;
-  void* _writablePixels = nullptr;
   std::shared_ptr<PixelBuffer> pixelBuffer = nullptr;
+
+  PixelBuffer* writableRef();
+
+  friend class Pixmap;
+  friend class Image;
 };
 }  // namespace tgfx

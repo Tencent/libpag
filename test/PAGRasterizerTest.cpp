@@ -59,12 +59,12 @@ PAG_TEST(PAGRasterizerTest, TestRasterizer) {
   canvas->drawTexture(texture);
   auto pixelBuffer = PixelBuffer::Make(mask->width(), mask->height(), true, false);
   ASSERT_TRUE(pixelBuffer != nullptr);
-  Bitmap bitmap(pixelBuffer);
-  bitmap.eraseAll();
-  auto result = surface->readPixels(bitmap.info(), bitmap.writablePixels());
+  Pixmap pixmap(pixelBuffer);
+  pixmap.eraseAll();
+  auto result = surface->readPixels(pixmap.info(), pixmap.writablePixels());
   ASSERT_TRUE(result);
   device->unlock();
-  EXPECT_TRUE(Baseline::Compare(bitmap, "PAGRasterizerTest/rasterizer_path_texture"));
+  EXPECT_TRUE(Baseline::Compare(pixmap, "PAGRasterizerTest/rasterizer_path_texture"));
 
   auto typeface =
       Typeface::MakeFromPath(TestConstants::PAG_ROOT + "resources/font/NotoColorEmoji.ttf");

@@ -18,11 +18,13 @@
 
 #include "Trace.h"
 #include "platform/Platform.h"
+#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/PixelBuffer.h"
 #include "tgfx/gpu/Surface.h"
 
 namespace pag {
 void Trace(std::shared_ptr<tgfx::PixelBuffer> pixelBuffer, const std::string& tag) {
-  tgfx::Bitmap bitmap(pixelBuffer);
+  tgfx::Pixmap bitmap(pixelBuffer);
   Trace(bitmap, tag);
 }
 
@@ -36,19 +38,20 @@ void Trace(std::shared_ptr<tgfx::Texture> texture, const std::string& path) {
   }
   auto canvas = surface->getCanvas();
   canvas->drawTexture(std::move(texture));
-  auto pixelBuffer = tgfx::PixelBuffer::Make(surface->width(), surface->height());
-  tgfx::Bitmap bitmap(pixelBuffer);
-  if (bitmap.isEmpty()) {
+  tgfx::Bitmap bitmap = {};
+  bitmap.allocPixels(surface->width(), surface->height());
+  tgfx::Pixmap pixmap(bitmap);
+  if (pixmap.isEmpty()) {
     return;
   }
-  surface->readPixels(bitmap.info(), bitmap.writablePixels());
-  Trace(bitmap, path);
+  surface->readPixels(pixmap.info(), pixmap.writablePixels());
+  Trace(pixmap, path);
 }
 
-void Trace(const tgfx::Bitmap& bitmap, const std::string& tag) {
-  if (bitmap.isEmpty()) {
+void Trace(const tgfx::Pixmap& pixmap, const std::string& tag) {
+  if (pixmap.isEmpty()) {
     return;
   }
-  Platform::Current()->traceImage(bitmap.info(), bitmap.pixels(), tag);
+  Platform::Current()->traceImage(pixmap.info(), pixmap.pixels(), tag);
 }
 }  // namespace pag
