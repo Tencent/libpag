@@ -28,7 +28,7 @@ static constexpr int ANDROID_ALIGNMENT = 16;
 std::shared_ptr<GLVideoTexture> GLVideoTexture::Make(Context* context, int width, int height) {
   static auto isAndroidMiniprogram =
       val::module_property("tgfx").call<bool>("isAndroidMiniprogram");
-  auto sampler = context->gpu()->createSampler(width, height, PixelFormat::RGBA_8888, 0);
+  auto sampler = context->gpu()->createSampler(width, height, PixelFormat::RGBA_8888, 1);
   if (sampler == nullptr) {
     return nullptr;
   }

@@ -23,60 +23,13 @@
 #include "pag/pag.h"
 #include "rendering/video/VideoDecoderFactory.h"
 #include "tgfx/gpu/opengl/GLTexture.h"
+#include "tgfx/platform/web/VideoImageReader.h"
 
 namespace pag {
-class WebVideoTexture : public tgfx::GLTexture {
- public:
-  static std::shared_ptr<WebVideoTexture> Make(tgfx::Context* context, int width, int height,
-                                               bool isAndroidMiniprogram);
-
-  WebVideoTexture(const tgfx::GLSampler& sampler, int width, int height,
-                  tgfx::SurfaceOrigin origin);
-
-  tgfx::Point getTextureCoord(float x, float y) const override;
-
-  size_t memoryUsage() const override;
-
- private:
-  int textureWidth = 0;
-  int textureHeight = 0;
-
-  void onReleaseGPU() override;
-};
-
-class WebVideoBuffer : public tgfx::ImageBuffer {
- public:
-  WebVideoBuffer(int width, int height, emscripten::val videoReader);
-
-  ~WebVideoBuffer() override;
-
-  int width() const override {
-    return _width;
-  }
-
-  int height() const override {
-    return _height;
-  }
-
-  bool isAlphaOnly() const override {
-    return false;
-  }
-
- protected:
-  std::shared_ptr<tgfx::Texture> onMakeTexture(tgfx::Context* context, bool) const override;
-
- private:
-  mutable std::mutex locker = {};
-  mutable std::shared_ptr<WebVideoTexture> webVideoTexture = nullptr;
-  int _width = 0;
-  int _height = 0;
-  emscripten::val videoReader = emscripten::val::null();
-
-  friend class HardwareDecoder;
-};
-
 class HardwareDecoder : public VideoDecoder {
  public:
+  ~HardwareDecoder() override;
+
   DecodingResult onSendBytes(void* bytes, size_t length, int64_t time) override;
 
   DecodingResult onEndOfStream() override;
@@ -96,7 +49,8 @@ class HardwareDecoder : public VideoDecoder {
   // Keep a reference to the File in case the Sequence object is released while we are using it.
   std::shared_ptr<File> file = nullptr;
   PAGFile* rootFile = nullptr;
-  std::shared_ptr<WebVideoBuffer> videoBuffer = nullptr;
+  emscripten::val videoReader = emscripten::val::null();
+  std::shared_ptr<tgfx::VideoImageReader> videoImageReader = nullptr;
   int32_t _width = 0;
   int32_t _height = 0;
   float frameRate = 30.0f;
@@ -104,7 +58,6 @@ class HardwareDecoder : public VideoDecoder {
 
   explicit HardwareDecoder(const VideoFormat& format);
 
-  friend class WebVideoBuffer;
   friend class HardwareDecoderFactory;
 };
 }  // namespace pag

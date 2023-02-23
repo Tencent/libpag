@@ -29,7 +29,7 @@ window.onload = async () => {
             return '../lib/libpag.wasm';
           }
           if (file === 'libpag.js') {
-            return '../lib/libpag.js';
+            return './libpag.js';
           }
           return '../lib/' + file;
         },

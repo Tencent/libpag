@@ -1,3 +1,4 @@
+import { ArrayBufferImage } from './array-buffer-image';
 import { PAGImage as NativePAGImage } from '../pag-image';
 import { PAGModule } from '../pag-module';
 import { wasmAwaitRewind } from '../utils/decorators';
@@ -8,8 +9,8 @@ export class PAGImage extends NativePAGImage {
    * Create pag image from ArrayBuffer.
    */
   public static fromArrayBuffer(buffer: ArrayBuffer, width: number, height: number): PAGImage {
-    const nativeImage = { buffer, width, height };
-    const wasmIns = PAGModule._PAGImage._FromNativeImage(nativeImage as any);
+    const nativeImage = new ArrayBufferImage(buffer, width, height);
+    const wasmIns = PAGModule._PAGImage._FromNativeImage(nativeImage);
     if (!wasmIns) throw new Error('Make PAGImage from array buffer fail!');
     return new PAGImage(wasmIns);
   }

@@ -28,6 +28,8 @@ std::unique_ptr<Gpu> GLGpu::Make(Context* context) {
 
 std::unique_ptr<TextureSampler> GLGpu::createSampler(int width, int height, PixelFormat format,
                                                      int mipLevelCount) {
+  // Texture memory must be allocated first on the web platform then can write pixels.
+  DEBUG_ASSERT(mipLevelCount > 0);
   auto gl = GLFunctions::Get(_context);
   auto sampler = std::make_unique<GLSampler>();
   gl->genTextures(1, &(sampler->id));
