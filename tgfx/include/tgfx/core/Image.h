@@ -22,6 +22,7 @@
 #include "tgfx/core/ImageGenerator.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/ImageOrigin.h"
+#include "tgfx/core/Pixmap.h"
 #include "tgfx/core/SamplingOptions.h"
 #include "tgfx/core/TileMode.h"
 
@@ -44,43 +45,55 @@ class Image {
  public:
   /**
    * Creates Image from encoded file. Image is returned if format of the encoded file is recognized
-   * and supported. Recognized formats vary by platform. The mipMapped parameter may be ignored if
-   * it is not supported by the GPU or the associated image source.
+   * and supported. Recognized formats vary by platform. Note that the mipMapped parameter may be
+   * ignored if it is not supported by the GPU or the associated image source.
    */
   static std::shared_ptr<Image> MakeFromEncoded(const std::string& filePath,
                                                 bool mipMapped = false);
 
   /**
    * Creates Image from encoded data. Image is returned if format of the encoded data is recognized
-   * and supported. Recognized formats vary by platform. The mipMapped parameter may be ignored if
-   * it is not supported by the GPU or the associated image source.
+   * and supported. Recognized formats vary by platform. Note that the mipMapped parameter may be
+   * ignored if it is not supported by the GPU or the associated image source.
    */
   static std::shared_ptr<Image> MakeFromEncoded(std::shared_ptr<Data> encodedData,
                                                 bool mipMapped = false);
 
   /**
    * Creates Image from an image generator. Image is returned if generator is not nullptr. Image
-   * generator may wrap codec data or custom data. The mipMapped parameter may be ignored if it is
-   * not supported by the GPU or the associated image source.
+   * generator may wrap codec data or custom data. Note that the mipMapped parameter may be ignored
+   * if it is not supported by the GPU or the associated image source.
    */
   static std::shared_ptr<Image> MakeFromGenerator(std::shared_ptr<ImageGenerator> generator,
                                                   ImageOrigin origin = ImageOrigin::TopLeft,
                                                   bool mipMapped = false);
 
   /**
-   * Creates Image from ImageInfo, copying pixels. Image is returned if ImageInfo is not empty
-   * and pixels is not nullptr. The returned Image may convert the copied pixels to a new format
-   * which is more efficient for texture uploading on the GPU. The mipMapped parameter may be
-   * ignored if it is not supported by the GPU or the associated image source.
+   * Creates Image from Pixmap and copy of pixels. Since pixels are copied, Pixmap pixels may be
+   * modified or deleted without affecting Image. The returned Image may convert the copied pixels
+   * to a new format which is more efficient for texture uploading on the GPU. Note that the
+   * mipMapped parameter may be ignored if it is not supported by the GPU or the associated image
+   * source.
    */
-  static std::shared_ptr<Image> MakeFromPixels(const ImageInfo& info, const void* pixels,
+  static std::shared_ptr<Image> MakeRasterCopy(const Pixmap& pixmap,
                                                ImageOrigin origin = ImageOrigin::TopLeft,
                                                bool mipMapped = false);
 
   /**
+   * Creates Image from Bitmap, sharing bitmap pixels. The Bitmap will allocate a new PixelBuffer
+   * and copy the original pixels into it if there is a subsequent call of pixel writing to the
+   * Bitmap. Therefore, the content of the returned Image always remains the same. Note that the
+   * mipMapped parameter may be ignored if it is not supported by the GPU or the associated image
+   * source.
+   */
+  static std::shared_ptr<Image> MakeFromBitmap(const Bitmap& bitmap,
+                                               ImageOrigin origin = ImageOrigin::TopLeft,
+                                               bool miMapped = false);
+
+  /**
    * Creates Image from ImageBuffer, Image is returned if imageBuffer is not nullptr and its
-   * dimensions are greater than zero. The mipMapped parameter may be ignored if it is not supported
-   * by the GPU or the associated image source.
+   * dimensions are greater than zero. Note that the mipMapped parameter may be ignored if it is not
+   * supported by the GPU or the associated image source.
    */
   static std::shared_ptr<Image> MakeFromBuffer(std::shared_ptr<ImageBuffer> imageBuffer,
                                                ImageOrigin origin = ImageOrigin::TopLeft,

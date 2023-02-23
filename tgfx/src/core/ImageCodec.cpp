@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/ImageCodec.h"
-#include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/PixelBuffer.h"
+#include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Stream.h"
 #include "utils/USE.h"
 
@@ -105,9 +105,8 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(std::shared_ptr<Data> imageByte
   return codec;
 }
 
-std::shared_ptr<Data> ImageCodec::Encode(const ImageInfo& info, const void* pixels,
-                                         EncodedFormat format, int quality) {
-  if (info.isEmpty() || pixels == nullptr) {
+std::shared_ptr<Data> ImageCodec::Encode(const Pixmap& pixmap, EncodedFormat format, int quality) {
+  if (pixmap.isEmpty()) {
     return nullptr;
   }
   USE(format);
@@ -115,17 +114,17 @@ std::shared_ptr<Data> ImageCodec::Encode(const ImageInfo& info, const void* pixe
   if (quality < 0) quality = 0;
 #ifdef TGFX_USE_JPEG_ENCODE
   if (format == EncodedFormat::JPEG) {
-    return JpegCodec::Encode(info, pixels, format, quality);
+    return JpegCodec::Encode(pixmap, format, quality);
   }
 #endif
 #ifdef TGFX_USE_WEBP_ENCODE
   if (format == EncodedFormat::WEBP) {
-    return WebpCodec::Encode(info, pixels, format, quality);
+    return WebpCodec::Encode(pixmap, format, quality);
   }
 #endif
 #ifdef TGFX_USE_PNG_ENCODE
   if (format == EncodedFormat::PNG) {
-    return PngCodec::Encode(info, pixels, format, quality);
+    return PngCodec::Encode(pixmap, format, quality);
   }
 #endif
   return nullptr;
@@ -136,8 +135,9 @@ std::shared_ptr<ImageBuffer> ImageCodec::onMakeBuffer(bool tryHardware) const {
   if (pixelBuffer == nullptr) {
     return nullptr;
   }
-  Bitmap bitmap(pixelBuffer);
-  auto result = readPixels(pixelBuffer->info(), bitmap.writablePixels());
+  auto pixels = pixelBuffer->lockPixels();
+  auto result = readPixels(pixelBuffer->info(), pixels);
+  pixelBuffer->unlockPixels();
   return result ? pixelBuffer : nullptr;
 }
 }  // namespace tgfx

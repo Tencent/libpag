@@ -19,8 +19,8 @@
 #include "NativeImageBuffer.h"
 #include <android/bitmap.h>
 #include "NativeImageInfo.h"
-#include "tgfx/core/Bitmap.h"
 #include "tgfx/core/PixelBuffer.h"
+#include "tgfx/core/Pixmap.h"
 
 namespace tgfx {
 std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(NativeImageRef nativeImage) {
@@ -63,9 +63,9 @@ std::shared_ptr<Texture> NativeImageBuffer::onMakeTexture(Context* context, bool
     env->ExceptionClear();
     return nullptr;
   }
-  Bitmap bitmap(pixelBuffer);
-  auto result = bitmap.writePixels(info, pixels);
-  bitmap.reset();  // unlock the pixelBuffer.
+  Pixmap pixmap(pixelBuffer);
+  auto result = pixmap.writePixels(info, pixels);
+  pixmap.reset();  // unlock the pixelBuffer.
   AndroidBitmap_unlockPixels(env, nativeImage.get());
   return result ? pixelBuffer->makeTexture(context, mipMapped) : nullptr;
 }

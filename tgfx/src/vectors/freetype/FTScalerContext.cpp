@@ -25,7 +25,7 @@
 #include FT_TRUETYPE_TABLES_H
 #include "FTUtil.h"
 #include "skcms.h"
-#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Pixmap.h"
 #include "utils/Log.h"
 #include "utils/MathExtra.h"
 
@@ -629,7 +629,7 @@ void CopyFTBitmap(const FT_Bitmap& bitmap, std::shared_ptr<PixelBuffer> pixelBuf
   auto srcRB = bitmap.pitch;
   auto srcFormat = bitmap.pixel_mode == FT_PIXEL_MODE_GRAY ? gfx::skcms_PixelFormat_A_8
                                                            : gfx::skcms_PixelFormat_BGRA_8888;
-  Bitmap bm(pixelBuffer);
+  Pixmap bm(pixelBuffer);
   auto dst = static_cast<uint8_t*>(bm.writablePixels());
   auto dstRB = bm.rowBytes();
   auto dstFormat = ToPixelFormat(bm.colorType());

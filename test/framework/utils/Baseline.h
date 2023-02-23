@@ -19,8 +19,8 @@
 #pragma once
 
 #include "pag/pag.h"
-#include "tgfx/core/Bitmap.h"
 #include "tgfx/core/PixelBuffer.h"
+#include "tgfx/core/Pixmap.h"
 
 namespace pag {
 class Baseline {
@@ -28,7 +28,7 @@ class Baseline {
   static bool Compare(const std::shared_ptr<tgfx::PixelBuffer>& pixelBuffer,
                       const std::string& key);
 
-  static bool Compare(const tgfx::Bitmap& bitmap, const std::string& key);
+  static bool Compare(const tgfx::Pixmap& pixmap, const std::string& key);
 
   static bool Compare(const std::shared_ptr<PAGSurface>& surface, const std::string& key);
 
@@ -42,7 +42,7 @@ class Baseline {
   friend class PAGTestEnvironment;
 };
 
-void SaveImage(const tgfx::Bitmap& bitmap, const std::string& key);
+void SaveImage(const tgfx::Pixmap& pixmap, const std::string& key);
 
 void RemoveImage(const std::string& key);
 }  // namespace pag

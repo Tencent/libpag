@@ -22,9 +22,9 @@
 #include "images/ImageSource.h"
 #include "images/MatrixImage.h"
 #include "images/RGBAAAImage.h"
-#include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/PixelBuffer.h"
+#include "tgfx/core/Pixmap.h"
 
 namespace tgfx {
 std::shared_ptr<Image> Image::MakeFromEncoded(const std::string& filePath, bool mipMapped) {
@@ -49,20 +49,19 @@ std::shared_ptr<Image> Image::MakeFromGenerator(std::shared_ptr<ImageGenerator> 
   return MakeFromSource(std::move(source), origin);
 }
 
-std::shared_ptr<Image> Image::MakeFromPixels(const ImageInfo& info, const void* pixels,
-                                             ImageOrigin origin, bool mipMapped) {
-  if (info.isEmpty() || pixels == nullptr) {
+std::shared_ptr<Image> Image::MakeRasterCopy(const Pixmap& pixmap, ImageOrigin origin,
+                                             bool mipMapped) {
+  if (pixmap.isEmpty()) {
     return nullptr;
   }
-  auto buffer = PixelBuffer::Make(info.width(), info.height(), info.isAlphaOnly());
-  if (buffer == nullptr) {
-    return nullptr;
-  }
-  {  // make sure buffer is unlocked after writing pixels.
-    Bitmap bitmap(buffer);
-    bitmap.writePixels(info, pixels);
-  }
-  return MakeFromBuffer(std::move(buffer), origin, mipMapped);
+  Bitmap bitmap(pixmap.width(), pixmap.height(), pixmap.isAlphaOnly());
+  bitmap.writePixels(pixmap.info(), pixmap.pixels());
+  return MakeFromBitmap(bitmap, origin, mipMapped);
+}
+
+std::shared_ptr<Image> Image::MakeFromBitmap(const Bitmap& bitmap, ImageOrigin origin,
+                                             bool miMapped) {
+  return MakeFromBuffer(bitmap.pixelBuffer, origin, miMapped);
 }
 
 std::shared_ptr<Image> Image::MakeFromBuffer(std::shared_ptr<ImageBuffer> imageBuffer,

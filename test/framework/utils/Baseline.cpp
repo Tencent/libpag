@@ -26,6 +26,7 @@
 #include "base/utils/TGFXCast.h"
 #include "nlohmann/json.hpp"
 #include "tgfx/core/Data.h"
+#include "tgfx/core/ImageCodec.h"
 
 namespace pag {
 using namespace tgfx;
@@ -89,8 +90,8 @@ static void SetJSONValue(nlohmann::json& target, const std::string& key, const s
   (*json)[jsonKey] = value;
 }
 
-void SaveImage(const Bitmap& bitmap, const std::string& key) {
-  auto data = bitmap.encode(EncodedFormat::WEBP, 100);
+void SaveImage(const Pixmap& pixmap, const std::string& key) {
+  auto data = ImageCodec::Encode(pixmap, EncodedFormat::WEBP, 100);
   if (data == nullptr) {
     return;
   }
@@ -110,8 +111,8 @@ bool Baseline::Compare(const std::shared_ptr<PixelBuffer>& pixelBuffer, const st
   if (pixelBuffer == nullptr) {
     return false;
   }
-  Bitmap bitmap(pixelBuffer);
-  return Baseline::Compare(bitmap, key);
+  Pixmap pixmap(pixelBuffer);
+  return Baseline::Compare(pixmap, key);
 }
 
 static bool CompareVersionAndMd5(const std::string& md5, const std::string& key,
@@ -138,31 +139,31 @@ static bool CompareVersionAndMd5(const std::string& md5, const std::string& key,
   return true;
 }
 
-bool Baseline::Compare(const Bitmap& bitmap, const std::string& key) {
-  if (bitmap.isEmpty()) {
+bool Baseline::Compare(const Pixmap& pixmap, const std::string& key) {
+  if (pixmap.isEmpty()) {
     return false;
   }
   std::string md5;
-  if (bitmap.rowBytes() == bitmap.info().minRowBytes()) {
-    md5 = DumpMD5(bitmap.pixels(), bitmap.byteSize());
+  if (pixmap.rowBytes() == pixmap.info().minRowBytes()) {
+    md5 = DumpMD5(pixmap.pixels(), pixmap.byteSize());
   } else {
-    auto pixelBuffer = PixelBuffer::Make(bitmap.width(), bitmap.height(),
-                                         bitmap.colorType() == tgfx::ColorType::ALPHA_8, false);
-    Bitmap newBitmap(pixelBuffer);
-    auto result = bitmap.readPixels(newBitmap.info(), newBitmap.writablePixels());
+    auto pixelBuffer = PixelBuffer::Make(pixmap.width(), pixmap.height(),
+                                         pixmap.colorType() == tgfx::ColorType::ALPHA_8, false);
+    Pixmap newPixmap(pixelBuffer);
+    auto result = pixmap.readPixels(newPixmap.info(), newPixmap.writablePixels());
     if (!result) {
       return false;
     }
-    md5 = DumpMD5(newBitmap.pixels(), newBitmap.byteSize());
+    md5 = DumpMD5(newPixmap.pixels(), newPixmap.byteSize());
   }
-  return CompareVersionAndMd5(md5, key, [key, bitmap](bool result) {
+  return CompareVersionAndMd5(md5, key, [key, pixmap](bool result) {
     if (result) {
       RemoveImage(key);
     } else {
-      SaveImage(bitmap, key);
+      SaveImage(pixmap, key);
     }
 #ifdef GENERATOR_BASELINE_IMAGES
-    SaveImage(bitmap, key + "_base");
+    SaveImage(pixmap, key + "_base");
 #endif
   });
 }
@@ -172,13 +173,13 @@ bool Baseline::Compare(const std::shared_ptr<PAGSurface>& surface, const std::st
     return false;
   }
   auto pixelBuffer = PixelBuffer::Make(surface->width(), surface->height(), false, false);
-  Bitmap bitmap(pixelBuffer);
-  auto result = surface->readPixels(ToPAG(bitmap.colorType()), ToPAG(bitmap.alphaType()),
-                                    bitmap.writablePixels(), bitmap.rowBytes());
+  Pixmap pixmap(pixelBuffer);
+  auto result = surface->readPixels(ToPAG(pixmap.colorType()), ToPAG(pixmap.alphaType()),
+                                    pixmap.writablePixels(), pixmap.rowBytes());
   if (!result) {
     return false;
   }
-  return Baseline::Compare(bitmap, key);
+  return Baseline::Compare(pixmap, key);
 }
 
 bool Baseline::Compare(const std::shared_ptr<ByteData>& byteData, const std::string& key) {

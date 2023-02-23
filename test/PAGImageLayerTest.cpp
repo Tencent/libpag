@@ -168,10 +168,10 @@ PAG_TEST_F(PAGImageLayerTest, mask) {
   pagPlayer->setComposition(pagFile);
   pagPlayer->flush();
   auto pixelBuffer1 = tgfx::PixelBuffer::Make(pagFile->width(), pagFile->height(), false, false);
-  tgfx::Bitmap bitmap1(pixelBuffer1);
-  ASSERT_FALSE(bitmap1.isEmpty());
-  auto result = pagSurface->readPixels(ToPAG(bitmap1.colorType()), ToPAG(bitmap1.alphaType()),
-                                       bitmap1.writablePixels(), bitmap1.rowBytes());
+  tgfx::Pixmap pixmap1(pixelBuffer1);
+  ASSERT_FALSE(pixmap1.isEmpty());
+  auto result = pagSurface->readPixels(ToPAG(pixmap1.colorType()), ToPAG(pixmap1.alphaType()),
+                                       pixmap1.writablePixels(), pixmap1.rowBytes());
   ASSERT_TRUE(result);
 
   pagFile = LoadPAGFile("resources/apitest/mengban.pag");
@@ -179,10 +179,10 @@ PAG_TEST_F(PAGImageLayerTest, mask) {
   pagPlayer->setComposition(pagFile);
   pagPlayer->flush();
   auto pixelBuffer2 = tgfx::PixelBuffer::Make(pagFile->width(), pagFile->height(), false, false);
-  tgfx::Bitmap bitmap2(pixelBuffer2);
-  ASSERT_FALSE(bitmap2.isEmpty());
-  result = pagSurface->readPixels(ToPAG(bitmap2.colorType()), ToPAG(bitmap2.alphaType()),
-                                  bitmap2.writablePixels(), bitmap2.rowBytes());
+  tgfx::Pixmap pixmap2(pixelBuffer2);
+  ASSERT_FALSE(pixmap2.isEmpty());
+  result = pagSurface->readPixels(ToPAG(pixmap2.colorType()), ToPAG(pixmap2.alphaType()),
+                                  pixmap2.writablePixels(), pixmap2.rowBytes());
   ASSERT_TRUE(result);
 
   int left = 130;
@@ -190,11 +190,11 @@ PAG_TEST_F(PAGImageLayerTest, mask) {
   int width = 500;
   int height = 700;
   auto imageBuffer1 = tgfx::PixelBuffer::Make(width, height, false, false);
-  tgfx::Bitmap image1(imageBuffer1);
-  bitmap1.readPixels(image1.info(), image1.writablePixels(), left, top);
+  tgfx::Pixmap image1(imageBuffer1);
+  pixmap1.readPixels(image1.info(), image1.writablePixels(), left, top);
   auto imageBuffer2 = tgfx::PixelBuffer::Make(width, height, false, false);
-  tgfx::Bitmap image2(imageBuffer2);
-  bitmap2.readPixels(image2.info(), image2.writablePixels(), left, top);
+  tgfx::Pixmap image2(imageBuffer2);
+  pixmap2.readPixels(image2.info(), image2.writablePixels(), left, top);
 
   auto pixels1 = reinterpret_cast<const uint8_t*>(image1.pixels());
   auto pixels2 = reinterpret_cast<const uint8_t*>(image2.pixels());
@@ -213,8 +213,8 @@ PAG_TEST_F(PAGImageLayerTest, mask) {
     RemoveImage("PAGImageLayerTest/image1");
     RemoveImage("PAGImageLayerTest/image2");
   } else {
-    SaveImage(bitmap1, "PAGImageLayerTest/bitmap1");
-    SaveImage(bitmap2, "PAGImageLayerTest/bitmap2");
+    SaveImage(pixmap1, "PAGImageLayerTest/bitmap1");
+    SaveImage(pixmap2, "PAGImageLayerTest/bitmap2");
     SaveImage(image1, "PAGImageLayerTest/image1");
     SaveImage(image2, "PAGImageLayerTest/image2");
   }

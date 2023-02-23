@@ -22,8 +22,8 @@
 #include "pag/gpu.h"
 #include "rendering/graphics/ImageProxy.h"
 #include "rendering/graphics/Snapshot.h"
-#include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/core/Pixmap.h"
 
 namespace pag {
 /**

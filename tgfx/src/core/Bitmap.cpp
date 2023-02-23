@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -17,192 +17,88 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Bitmap.h"
-#include "skcms.h"
 #include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/PixelBuffer.h"
+#include "tgfx/core/Pixmap.h"
 
 namespace tgfx {
-
-static inline void* AddOffset(void* pixels, size_t offset) {
-  return reinterpret_cast<uint8_t*>(pixels) + offset;
+Bitmap::Bitmap(int width, int height, bool alphaOnly, bool tryHardware) {
+  allocPixels(width, height, alphaOnly, tryHardware);
 }
 
-static inline const void* AddOffset(const void* pixels, size_t offset) {
-  return reinterpret_cast<const uint8_t*>(pixels) + offset;
+Bitmap::Bitmap(const Bitmap& src) : _info(src._info), pixelBuffer(src.pixelBuffer) {
 }
 
-static void CopyRectMemory(const void* src, size_t srcRB, void* dst, size_t dstRB,
-                           size_t trimRowBytes, int rowCount) {
-  if (trimRowBytes == dstRB && trimRowBytes == srcRB) {
-    memcpy(dst, src, trimRowBytes * rowCount);
-    return;
-  }
-  for (int i = 0; i < rowCount; i++) {
-    memcpy(dst, src, trimRowBytes);
-    dst = AddOffset(dst, dstRB);
-    src = AddOffset(src, srcRB);
-  }
+Bitmap::Bitmap(Bitmap&& src)
+    : _info(std::move(src._info)), pixelBuffer(std::move(src.pixelBuffer)) {
 }
 
-static const std::unordered_map<ColorType, gfx::skcms_PixelFormat> ColorMapper{
-    {ColorType::RGBA_8888, gfx::skcms_PixelFormat::skcms_PixelFormat_RGBA_8888},
-    {ColorType::BGRA_8888, gfx::skcms_PixelFormat::skcms_PixelFormat_BGRA_8888},
-    {ColorType::ALPHA_8, gfx::skcms_PixelFormat::skcms_PixelFormat_A_8},
-};
-
-static const std::unordered_map<AlphaType, gfx::skcms_AlphaFormat> AlphaMapper{
-    {AlphaType::Unpremultiplied, gfx::skcms_AlphaFormat::skcms_AlphaFormat_Unpremul},
-    {AlphaType::Premultiplied, gfx::skcms_AlphaFormat::skcms_AlphaFormat_PremulAsEncoded},
-    {AlphaType::Opaque, gfx::skcms_AlphaFormat::skcms_AlphaFormat_Opaque},
-};
-
-static void ConvertPixels(const ImageInfo& srcInfo, const void* srcPixels, const ImageInfo& dstInfo,
-                          void* dstPixels) {
-  if (srcInfo.colorType() == dstInfo.colorType() && srcInfo.alphaType() == dstInfo.alphaType()) {
-    CopyRectMemory(srcPixels, srcInfo.rowBytes(), dstPixels, dstInfo.rowBytes(),
-                   dstInfo.minRowBytes(), dstInfo.height());
-    return;
+Bitmap& Bitmap::operator=(const Bitmap& src) {
+  if (this != &src) {
+    _info = src._info;
+    pixelBuffer = src.pixelBuffer;
   }
-  auto srcFormat = ColorMapper.at(srcInfo.colorType());
-  auto srcAlpha = AlphaMapper.at(srcInfo.alphaType());
-  auto dstFormat = ColorMapper.at(dstInfo.colorType());
-  auto dstAlpha = AlphaMapper.at(dstInfo.alphaType());
-  auto width = dstInfo.width();
-  auto height = dstInfo.height();
-  for (int i = 0; i < height; i++) {
-    gfx::skcmsTransform(srcPixels, srcFormat, srcAlpha, nullptr, dstPixels, dstFormat, dstAlpha,
-                        nullptr, width);
-    dstPixels = AddOffset(dstPixels, dstInfo.rowBytes());
-    srcPixels = AddOffset(srcPixels, srcInfo.rowBytes());
-  }
+  return *this;
 }
 
-Bitmap::Bitmap(const ImageInfo& info, const void* pixels) : _info(info), _pixels(pixels) {
-  if (_info.isEmpty()) {
-    _pixels = nullptr;
+Bitmap& Bitmap::operator=(Bitmap&& src) {
+  if (this != &src) {
+    _info = std::move(src._info);
+    pixelBuffer = std::move(src.pixelBuffer);
   }
+  return *this;
 }
 
-Bitmap::Bitmap(const ImageInfo& info, void* pixels)
-    : _info(info), _pixels(pixels), _writablePixels(pixels) {
-  if (_info.isEmpty()) {
-    _pixels = nullptr;
-    _writablePixels = nullptr;
-  }
-}
-
-Bitmap::Bitmap(std::shared_ptr<PixelBuffer> buffer) : pixelBuffer(std::move(buffer)) {
-  if (pixelBuffer) {
-    _writablePixels = pixelBuffer->lockPixels();
-    _pixels = _writablePixels;
+bool Bitmap::allocPixels(int width, int height, bool alphaOnly, bool tryHardware) {
+  pixelBuffer = PixelBuffer::Make(width, height, alphaOnly, tryHardware);
+  if (pixelBuffer != nullptr) {
     _info = pixelBuffer->info();
   }
+  return pixelBuffer != nullptr;
 }
 
-Bitmap::~Bitmap() {
-  reset();
+void* Bitmap::lockPixels() {
+  if (pixelBuffer == nullptr) {
+    return nullptr;
+  }
+  return pixelBuffer->lockPixels();
 }
 
-void Bitmap::reset() {
+void Bitmap::unlockPixels() {
   if (pixelBuffer != nullptr) {
     pixelBuffer->unlockPixels();
-    pixelBuffer = nullptr;
   }
-  _pixels = nullptr;
-  _info = {};
 }
 
-bool Bitmap::isEmpty() const {
-  return _pixels == nullptr;
-}
-
-const ImageInfo& Bitmap::info() const {
-  return _info;
-}
-
-int Bitmap::width() const {
-  return info().width();
-}
-
-int Bitmap::height() const {
-  return info().height();
-}
-
-AlphaType Bitmap::alphaType() const {
-  return info().alphaType();
-}
-
-ColorType Bitmap::colorType() const {
-  return info().colorType();
-}
-
-size_t Bitmap::rowBytes() const {
-  return info().rowBytes();
-}
-
-size_t Bitmap::byteSize() const {
-  return info().byteSize();
-}
-
-const void* Bitmap::pixels() const {
-  return _pixels;
-}
-
-void* Bitmap::writablePixels() const {
-  return _writablePixels;
+bool Bitmap::isHardwareBacked() const {
+  return pixelBuffer ? pixelBuffer->isHardwareBacked() : false;
 }
 
 std::shared_ptr<Data> Bitmap::encode(EncodedFormat format, int quality) const {
-  if (_pixels == nullptr) {
-    return nullptr;
-  }
-  return ImageCodec::Encode(info(), _pixels, format, quality);
+  Pixmap pixmap(*this);
+  return ImageCodec::Encode(pixmap, format, quality);
+}
+
+Color Bitmap::getColor(int x, int y) const {
+  return Pixmap(*this).getColor(x, y);
 }
 
 bool Bitmap::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) const {
-  if (_pixels == nullptr || dstPixels == nullptr) {
-    return false;
-  }
-  auto imageInfo = dstInfo.makeIntersect(-srcX, -srcY, _info.width(), _info.height());
-  if (imageInfo.isEmpty()) {
-    return false;
-  }
-  auto srcPixels = _info.computeOffset(_pixels, srcX, srcY);
-  auto srcInfo = _info.makeWH(imageInfo.width(), imageInfo.height());
-  dstPixels = imageInfo.computeOffset(dstPixels, -srcX, -srcY);
-  ConvertPixels(srcInfo, srcPixels, imageInfo, dstPixels);
-  return true;
+  return Pixmap(*this).readPixels(dstInfo, dstPixels, srcX, srcY);
 }
 
 bool Bitmap::writePixels(const ImageInfo& srcInfo, const void* srcPixels, int dstX, int dstY) {
-  if (_writablePixels == nullptr || srcPixels == nullptr) {
-    return false;
-  }
-  auto imageInfo = srcInfo.makeIntersect(-dstX, -dstY, _info.width(), _info.height());
-  if (imageInfo.isEmpty()) {
-    return false;
-  }
-  srcPixels = imageInfo.computeOffset(srcPixels, -dstX, -dstY);
-  auto dstPixels = _info.computeOffset(_writablePixels, dstX, dstY);
-  auto dstInfo = _info.makeWH(imageInfo.width(), imageInfo.height());
-  ConvertPixels(imageInfo, srcPixels, dstInfo, dstPixels);
-  return true;
+  return Pixmap(*this).writePixels(srcInfo, srcPixels, dstX, dstY);
 }
 
-bool Bitmap::eraseAll() {
-  if (_writablePixels == nullptr) {
-    return false;
+void Bitmap::eraseAll() {
+  Pixmap(*this).eraseAll();
+}
+
+PixelBuffer* Bitmap::writableRef() {
+  if (pixelBuffer.use_count() > 1) {
+    pixelBuffer = pixelBuffer->duplicate();
   }
-  if (_info.rowBytes() == _info.minRowBytes()) {
-    memset(_writablePixels, 0, byteSize());
-  } else {
-    auto rowCount = _info.height();
-    auto trimRowBytes = _info.width() * _info.bytesPerPixel();
-    auto* pixels = static_cast<char*>(_writablePixels);
-    for (int i = 0; i < rowCount; i++) {
-      memset(pixels, 0, trimRowBytes);
-      pixels += info().rowBytes();
-    }
-  }
-  return true;
+  return pixelBuffer.get();
 }
 }  // namespace tgfx

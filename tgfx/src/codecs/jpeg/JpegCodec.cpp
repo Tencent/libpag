@@ -18,7 +18,7 @@
 
 #include "codecs/jpeg/JpegCodec.h"
 #include <csetjmp>
-#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Pixmap.h"
 #include "utils/OrientationHelper.h"
 
 extern "C" {
@@ -155,10 +155,9 @@ bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
 }
 
 #ifdef TGFX_USE_JPEG_ENCODE
-std::shared_ptr<Data> JpegCodec::Encode(const ImageInfo& imageInfo, const void* pixels,
-                                        EncodedFormat, int quality) {
-  auto srcPixels = static_cast<uint8_t*>(const_cast<void*>(pixels));
-  if (imageInfo.colorType() == ColorType::ALPHA_8) {
+std::shared_ptr<Data> JpegCodec::Encode(const Pixmap& pixmap, EncodedFormat, int quality) {
+  auto srcPixels = static_cast<uint8_t*>(const_cast<void*>(pixmap.pixels()));
+  if (pixmap.colorType() == ColorType::ALPHA_8) {
     return nullptr;
   }
   jpeg_compress_struct cinfo = {};
@@ -170,10 +169,10 @@ std::shared_ptr<Data> JpegCodec::Encode(const ImageInfo& imageInfo, const void* 
   uint8_t* dstBuffer = nullptr;
   unsigned long dstBufferSize = 0;  // NOLINT
   jpeg_mem_dest(&cinfo, &dstBuffer, &dstBufferSize);
-  cinfo.image_width = imageInfo.width();
-  cinfo.image_height = imageInfo.height();
+  cinfo.image_width = pixmap.width();
+  cinfo.image_height = pixmap.height();
   cinfo.input_components = 4;
-  switch (imageInfo.colorType()) {
+  switch (pixmap.colorType()) {
     case ColorType::RGBA_8888:
     case ColorType::ALPHA_8:
       cinfo.in_color_space = JCS_EXT_RGBA;
@@ -188,7 +187,7 @@ std::shared_ptr<Data> JpegCodec::Encode(const ImageInfo& imageInfo, const void* 
   cinfo.optimize_coding = TRUE;
   jpeg_set_quality(&cinfo, quality, TRUE);
   jpeg_start_compress(&cinfo, TRUE);
-  row_stride = imageInfo.width() * 4;
+  row_stride = pixmap.width() * 4;
   while (cinfo.next_scanline < cinfo.image_height) {
     row_pointer[0] = &(srcPixels)[cinfo.next_scanline * row_stride];
     (void)jpeg_write_scanlines(&cinfo, row_pointer, 1);

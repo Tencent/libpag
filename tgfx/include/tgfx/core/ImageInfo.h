@@ -46,8 +46,7 @@ enum class AlphaType {
 };
 
 /**
- * Describes how pixel bits encode color. These values match up with the enum in Bitmap.Config on
- * Android platform.
+ * Describes how pixel bits encode color.
  */
 enum class ColorType {
   /**
@@ -176,7 +175,7 @@ class ImageInfo {
   /**
    * If (0, 0, width(), height()) intersects (x, y, targetWidth, targetHeight), returns a new
    * ImageInfo with dimensions set to the size of intersection, and keep other properties the same.
-   * Otherwise, returns a empty ImageInfo.
+   * Otherwise, returns an empty ImageInfo.
    */
   ImageInfo makeIntersect(int x, int y, int targetWidth, int targetHeight) const;
 
