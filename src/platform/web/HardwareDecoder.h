@@ -28,6 +28,8 @@
 namespace pag {
 class HardwareDecoder : public VideoDecoder {
  public:
+  ~HardwareDecoder() override;
+
   DecodingResult onSendBytes(void* bytes, size_t length, int64_t time) override;
 
   DecodingResult onEndOfStream() override;
@@ -56,7 +58,6 @@ class HardwareDecoder : public VideoDecoder {
 
   explicit HardwareDecoder(const VideoFormat& format);
 
-  friend class WebVideoBuffer;
   friend class HardwareDecoderFactory;
 };
 }  // namespace pag

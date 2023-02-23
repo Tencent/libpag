@@ -40,7 +40,8 @@ HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
     object.set("end", static_cast<int>(timeRange.end));
     staticTimeRanges.call<void>("push", object);
   }
-  if (val::module_property("tgfx").call<bool>("isIphone")) {
+  val isIPhone = val::module_property("isIPhone");
+  if (isIPhone().as<bool>()) {
     auto videoSequence = *sequence;
     videoSequence.MP4Header = nullptr;
     std::vector<VideoFrame> videoFrames;
@@ -70,6 +71,12 @@ HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
   auto video = videoReader.call<val>("getVideo");
   if (!video.isNull()) {
     videoImageReader = tgfx::VideoImageReader::MakeFrom(video, _width, _height);
+  }
+}
+
+HardwareDecoder::~HardwareDecoder() {
+  if (videoReader.as<bool>()) {
+    videoReader.call<void>("onDestroy");
   }
 }
 
@@ -105,8 +112,8 @@ std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
     playbackRate = file->duration() / ((rootFile->duration() / 1000000) * rootFile->frameRate());
   }
   auto targetFrame = TimeToFrame(currentTimeStamp, frameRate);
-  auto imageBuffer = videoImageReader->acquireNextBuffer(
-      videoReader.call<val>("prepare", static_cast<int>(targetFrame), playbackRate));
+  val promise = videoReader.call<val>("prepare", static_cast<int>(targetFrame), playbackRate);
+  auto imageBuffer = videoImageReader->acquireNextBuffer(promise);
   return imageBuffer;
 }
 }  // namespace pag

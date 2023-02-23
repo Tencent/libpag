@@ -1,7 +1,6 @@
 import { getCanvas2D, releaseCanvas2D } from './utils/canvas';
 import { malloc } from './utils/buffer';
-import { IPHONE } from './utils/ua';
-import { BitMapImage } from './core/bitmap-image';
+import { BitmapImage } from './core/bitmap-image';
 
 import type { EmscriptenGL, PAG } from './types';
 import type { wx } from './wechat/interfaces';
@@ -62,10 +61,10 @@ export const getSourceSize = (source: TexImageSource | OffscreenCanvas) => {
 
 export const uploadToTexture = (
   GL: EmscriptenGL,
-  source: TexImageSource | OffscreenCanvas | BitMapImage,
+  source: TexImageSource | OffscreenCanvas | BitmapImage,
   textureID: number,
 ) => {
-  const renderSource = source instanceof BitMapImage ? source.bitmap : source;
+  const renderSource = source instanceof BitmapImage ? source.bitmap : source;
   if (!renderSource) return;
   const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
   gl.bindTexture(gl.TEXTURE_2D, GL.textures[textureID]);
@@ -93,5 +92,3 @@ export const getBytesFromPath = async (module: PAG, path: string) => {
   const buffer = await fetch(path).then((res) => res.arrayBuffer());
   return malloc(module, buffer);
 };
-
-export const isIphone = () => IPHONE;
