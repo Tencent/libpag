@@ -19,6 +19,7 @@
 #include "NativePlatform.h"
 #include <atomic>
 #include <fstream>
+#include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
 
 namespace pag {
@@ -45,7 +46,7 @@ void NativePlatform::traceImage(const tgfx::ImageInfo& info, const void* pixels,
   } else if (path.rfind(".png") != path.size() - 4 && path.rfind(".PNG") != path.size() - 4) {
     path += ".png";
   }
-  auto bytes = tgfx::Pixmap(info, pixels).encode(tgfx::EncodedFormat::PNG, 100);
+  auto bytes = tgfx::ImageCodec::Encode(tgfx::Pixmap(info, pixels), tgfx::EncodedFormat::PNG, 100);
   if (bytes) {
     std::ofstream out(path);
     out.write(reinterpret_cast<const char*>(bytes->data()), bytes->size());
