@@ -25,7 +25,7 @@
 #include "platform/android/AHardwareBufferUtil.h"
 #include "platform/android/HardwareBuffer.h"
 #include "platform/android/HardwareBufferInterface.h"
-#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Pixmap.h"
 #include "tgfx/gpu/opengl/egl/EGLDevice.h"
 #include "utils/UniqueID.h"
 
@@ -139,8 +139,8 @@ bool EGLHardwareTexture::readPixels(const ImageInfo& dstInfo, void* dstPixels, i
     return false;
   }
   auto srcInfo = GetImageInfo(hardwareBuffer);
-  Bitmap bitmap(srcInfo, srcPixels);
-  bitmap.readPixels(dstInfo, dstPixels);
+  Pixmap pixmap(srcInfo, srcPixels);
+  pixmap.readPixels(dstInfo, dstPixels);
   HardwareBufferInterface::Unlock(hardwareBuffer, nullptr);
   return true;
 }

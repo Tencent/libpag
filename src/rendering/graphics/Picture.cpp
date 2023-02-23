@@ -72,7 +72,7 @@ class ImageProxyPicture : public Picture {
     auto canvas = surface->getCanvas();
     canvas->setMatrix(tgfx::Matrix::MakeTrans(-x, -y));
     canvas->drawImage(std::move(image));
-    return surface->hitTest(0, 0);
+    return surface->getColor(0, 0).alpha > 0;
   }
 
   bool getPath(tgfx::Path*) const override {

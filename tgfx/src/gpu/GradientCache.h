@@ -21,9 +21,10 @@
 #include <list>
 #include <unordered_map>
 
-#include "tgfx/core/Bitmap.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/core/Color.h"
+#include "tgfx/core/PixelBuffer.h"
+#include "tgfx/core/Pixmap.h"
 
 namespace tgfx {
 class GradientCache {

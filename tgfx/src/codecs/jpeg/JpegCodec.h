@@ -28,8 +28,7 @@ class JpegCodec : public ImageCodec {
   static bool IsJpeg(const std::shared_ptr<Data>& data);
 
 #ifdef TGFX_USE_JPEG_ENCODE
-  static std::shared_ptr<Data> Encode(const ImageInfo& info, const void* pixels,
-                                      EncodedFormat format, int quality);
+  static std::shared_ptr<Data> Encode(const Pixmap& pixmap, EncodedFormat format, int quality);
 #endif
 
  protected:

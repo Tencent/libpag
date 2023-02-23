@@ -33,7 +33,8 @@ class ImageBuffer {
   /**
    * Creates a single-plane ImageBuffer from a platform-specific hardware buffer. The hardwareBuffer
    * could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on the apple
-   * platform. The returned ImageBuffer takes a reference on the hardwareBuffer. Returns nullptr
+   * platform. The returned ImageBuffer takes a reference on the hardwareBuffer. The caller must
+   * ensure that pixels are unchanged for the lifetime of the returned ImageBuffer. Returns nullptr
    * if any of the parameters is nullptr or the hardwareBuffer is not single-plane. Use the
    * YUVBuffer::MakeFrom() method for the hardware buffer with multiple planes.
    */
@@ -42,7 +43,8 @@ class ImageBuffer {
   /**
    * Creates a new ImageBuffer object from a platform-specific image in the CPU. The nativeImage
    * could be a jobject that represents a java Bitmap on the android platform or a CGImageRef on the
-   * apple platform.The returned ImageBuffer object takes a reference on the nativeImage. Returns
+   * apple platform.The returned ImageBuffer object takes a reference on the nativeImage. The caller
+   * must ensure that pixels are unchanged for the lifetime of the returned ImageBuffer. Returns
    * nullptr if the nativeImage is nullptr or the current platform has no native image support.
    */
   static std::shared_ptr<ImageBuffer> MakeFrom(NativeImageRef nativeImage);

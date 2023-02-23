@@ -18,7 +18,7 @@
 
 #include "PixelBufferMask.h"
 #include "gpu/Gpu.h"
-#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Pixmap.h"
 #include "utils/PixelFormatUtil.h"
 
 namespace tgfx {
@@ -47,7 +47,7 @@ std::shared_ptr<Texture> PixelBufferMask::updateTexture(Context* context) {
 
 void PixelBufferMask::clear() {
   dirty(Rect::MakeWH(width(), height()), false);
-  Bitmap(buffer).eraseAll();
+  Pixmap(buffer).eraseAll();
 }
 
 void PixelBufferMask::dirty(Rect rect, bool flipY) {

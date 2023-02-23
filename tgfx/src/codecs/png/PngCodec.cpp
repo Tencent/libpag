@@ -18,8 +18,8 @@
 
 #include "codecs/png/PngCodec.h"
 #include "png.h"
-#include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Buffer.h"
+#include "tgfx/core/Pixmap.h"
 
 namespace tgfx {
 std::shared_ptr<ImageCodec> PngCodec::MakeFrom(const std::string& filePath) {
@@ -187,8 +187,8 @@ bool PngCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
       return false;
     }
     ImageInfo info = ImageInfo::Make(w, h, ColorType::RGBA_8888, AlphaType::Unpremultiplied);
-    Bitmap bitmap(info, readInfo->data);
-    return bitmap.readPixels(dstInfo, dstPixels);
+    Pixmap pixmap(info, readInfo->data);
+    return pixmap.readPixels(dstInfo, dstPixels);
   } else {
     if (readInfo->rowPtrs == nullptr) return false;
     for (int i = 0; i < h; i++) {
@@ -221,21 +221,19 @@ static void png_reader_write_data(png_structp png_ptr, png_bytep data, png_size_
   writer->length += length;
 }
 
-std::shared_ptr<Data> PngCodec::Encode(const ImageInfo& imageInfo, const void* pixels,
-                                       EncodedFormat, int) {
-  auto srcPixels = static_cast<png_bytep>(const_cast<void*>((pixels)));
+std::shared_ptr<Data> PngCodec::Encode(const Pixmap& pixmap, EncodedFormat, int) {
+  auto srcPixels = static_cast<png_bytep>(const_cast<void*>((pixmap.pixels())));
   uint8_t* alphaPixels = nullptr;
   std::unique_ptr<Buffer> tempPixels = nullptr;
-  if (imageInfo.colorType() == ColorType::ALPHA_8) {
-    tempPixels = std::make_unique<Buffer>(imageInfo.width() * 2);
+  if (pixmap.colorType() == ColorType::ALPHA_8) {
+    tempPixels = std::make_unique<Buffer>(pixmap.width() * 2);
     alphaPixels = tempPixels->bytes();
-  } else if (imageInfo.colorType() != ColorType::RGBA_8888 ||
-             imageInfo.alphaType() != AlphaType::Unpremultiplied) {
-    Bitmap bitmap(imageInfo, srcPixels);
-    tempPixels = std::make_unique<Buffer>(imageInfo.byteSize());
-    auto dstInfo = ImageInfo::Make(imageInfo.width(), imageInfo.height(), ColorType::RGBA_8888,
+  } else if (pixmap.colorType() != ColorType::RGBA_8888 ||
+             pixmap.alphaType() != AlphaType::Unpremultiplied) {
+    tempPixels = std::make_unique<Buffer>(pixmap.byteSize());
+    auto dstInfo = ImageInfo::Make(pixmap.width(), pixmap.height(), ColorType::RGBA_8888,
                                    AlphaType::Unpremultiplied);
-    if (!bitmap.readPixels(dstInfo, tempPixels->data())) {
+    if (!pixmap.readPixels(dstInfo, tempPixels->data())) {
       return nullptr;
     }
     srcPixels = tempPixels->bytes();
@@ -258,7 +256,7 @@ std::shared_ptr<Data> PngCodec::Encode(const ImageInfo& imageInfo, const void* p
     }
     png_color_8 sigBit = {8, 8, 8, 0, 8};
     int colorType = PNG_COLOR_TYPE_RGB_ALPHA;
-    if (imageInfo.colorType() == ColorType::ALPHA_8) {
+    if (pixmap.colorType() == ColorType::ALPHA_8) {
       // We store ALPHA_8 images as GrayAlpha in png. Our private signal is significant bits for
       // gray.
       // If that is set to 1, we assume the gray channel can be ignored, and we output just alpha.
@@ -267,7 +265,7 @@ std::shared_ptr<Data> PngCodec::Encode(const ImageInfo& imageInfo, const void* p
       sigBit = {0, 0, 0, 1, 8};
       colorType = PNG_COLOR_TYPE_GRAY_ALPHA;
     }
-    png_set_IHDR(png_ptr, info_ptr, imageInfo.width(), imageInfo.height(), 8, colorType,
+    png_set_IHDR(png_ptr, info_ptr, pixmap.width(), pixmap.height(), 8, colorType,
                  PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_BASE, PNG_FILTER_TYPE_BASE);
     png_set_sBIT(png_ptr, info_ptr, &sigBit);
     png_set_write_fn(png_ptr, &pngWriter, png_reader_write_data, nullptr);
@@ -276,18 +274,18 @@ std::shared_ptr<Data> PngCodec::Encode(const ImageInfo& imageInfo, const void* p
     if (size < 0) {
       return nullptr;
     }
-    for (int i = 0; i < imageInfo.height(); ++i) {
-      if (imageInfo.colorType() == ColorType::ALPHA_8) {
+    for (int i = 0; i < pixmap.height(); ++i) {
+      if (pixmap.colorType() == ColorType::ALPHA_8) {
         // convert alpha8 to gray
-        for (int j = 0; j < imageInfo.width(); j++) {
+        for (int j = 0; j < pixmap.width(); j++) {
           *(alphaPixels++) = 0;
           *(alphaPixels++) = *(srcPixels++);
         }
-        alphaPixels -= imageInfo.width() * 2;
+        alphaPixels -= pixmap.width() * 2;
         png_write_row(png_ptr, reinterpret_cast<png_const_bytep>(alphaPixels));
       } else {
         png_write_row(png_ptr, reinterpret_cast<png_const_bytep>(srcPixels));
-        srcPixels += imageInfo.width() * 4;
+        srcPixels += pixmap.width() * 4;
       }
     }
     png_write_end(png_ptr, info_ptr);
