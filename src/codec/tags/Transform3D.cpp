@@ -28,8 +28,7 @@ std::unique_ptr<BlockConfig> Transform3DTag(Transform3D* transform) {
   AddAttribute(tagConfig, &transform->xPosition, AttributeType::SimpleProperty, 0.0f);
   AddAttribute(tagConfig, &transform->yPosition, AttributeType::SimpleProperty, 0.0f);
   AddAttribute(tagConfig, &transform->zPosition, AttributeType::SimpleProperty, 0.0f);
-  AddAttribute(tagConfig, &transform->orientation, AttributeType::Spatial3DProperty,
-               Point3D::Zero());
+  AddAttribute(tagConfig, &transform->orientation, AttributeType::SimpleProperty, Point3D::Zero());
   AddAttribute(tagConfig, &transform->scale, AttributeType::MultiDimensionProperty,
                Point3D::Make(1, 1, 1));
   AddAttribute(tagConfig, &transform->xRotation, AttributeType::SimpleProperty, 0.0f);
