@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,33 +18,27 @@
 
 #pragma once
 
-#include <cmath>
+#include "LayerFilter.h"
 
 namespace pag {
-static constexpr float FLOAT_NEARLY_ZERO = 1.0f / (1 << 12);
+class BrightnessContrastFilter : public LayerFilter {
+ public:
+  explicit BrightnessContrastFilter(Effect* effect);
+  ~BrightnessContrastFilter() override = default;
 
-static inline float DegreesToRadians(float degrees) {
-  return degrees * (static_cast<float>(M_PI) / 180.0f);
-}
+ protected:
+  std::string onBuildFragmentShader() override;
 
-static inline float RadiansToDegrees(float radians) {
-  return radians * (180.0f / static_cast<float>(M_PI));
-}
+  void onPrepareProgram(tgfx::Context* context, unsigned program) override;
 
-static inline bool FloatNearlyZero(float x, float tolerance = FLOAT_NEARLY_ZERO) {
-  return fabsf(x) <= tolerance;
-}
+  void onUpdateParams(tgfx::Context* context, const tgfx::Rect& contentBounds,
+                      const tgfx::Point& filterScale) override;
 
-static inline bool DoubleNearlyEqual(double x, double y, double tolerance = FLOAT_NEARLY_ZERO) {
-  return fabs(x - y) <= tolerance;
-}
+ private:
+  Effect* effect = nullptr;
 
-static inline bool FloatsAreFinite(const float array[], int count) {
-  float prod = 0;
-  for (int i = 0; i < count; ++i) {
-    prod *= array[i];
-  }
-  return prod == 0;
-}
-
+  // Handle
+  int brightnessBlocksHandle = -1;
+  int contrastHandle = -1;
+};
 }  // namespace pag

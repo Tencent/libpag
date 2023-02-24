@@ -25,6 +25,7 @@
 #include "MosaicFilter.h"
 #include "MotionTileFilter.h"
 #include "RadialBlurFilter.h"
+#include "BrightnessContrastFilter.h"
 #include "rendering/filters/dropshadow/DropShadowFilter.h"
 #include "rendering/filters/gaussianblur/GaussianBlurFilter.h"
 #include "rendering/filters/glow/GlowFilter.h"
@@ -156,6 +157,8 @@ std::unique_ptr<LayerFilter> LayerFilter::Make(Effect* effect) {
     case EffectType::Mosaic:
       filter = new MosaicFilter(effect);
       break;
+    case EffectType::BrightnessContrast:
+      filter = new BrightnessContrastFilter(effect);
     default:
       break;
   }

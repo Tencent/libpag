@@ -19,9 +19,9 @@
 #include "Matrix3D.h"
 #include <cfloat>
 #include "include/private/skvx.h"
-#include "utils/MathExtra.h"
+#include "base/utils/MathUtil.h"
 
-namespace tgfx {
+namespace pag {
 
 bool Matrix3D::operator==(const Matrix3D& other) const {
   if (this == &other) {
@@ -87,7 +87,7 @@ Matrix3D& Matrix3D::setConcat(const Matrix3D& a, const Matrix3D& b) {
   return *this;
 }
 
-Matrix3D& Matrix3D::preConcat(const Matrix& b) {
+Matrix3D& Matrix3D::preConcat(const tgfx::Matrix& b) {
   auto c0 = pk::pkvx::float4::Load(fMat + 0);
   auto c1 = pk::pkvx::float4::Load(fMat + 4);
   auto c3 = pk::pkvx::float4::Load(fMat + 12);
@@ -155,7 +155,7 @@ Vec4 Matrix3D::map(float x, float y, float z, float w) const {
   return v;
 }
 
-static Rect map_rect_affine(const Rect& src, const float mat[16]) {
+static tgfx::Rect map_rect_affine(const tgfx::Rect& src, const float mat[16]) {
   // When multiplied against vectors of the form <x,y,x,y>, 'flip' allows a single min()
   // to compute both the min and "negated" max between the xy coordinates. Once finished, another
   // multiplication produces the original max.
@@ -173,12 +173,12 @@ static Rect map_rect_affine(const Rect& src, const float mat[16]) {
                       min(c0 * src.left + c1 * src.bottom, c0 * src.right + c1 * src.bottom));
 
   // minMax holds (min x, min y, max x, max y) so can be copied into an Rect expecting l,t,r,b
-  Rect r;
+  tgfx::Rect r;
   minMax.store(&r);
   return r;
 }
 
-static Rect map_rect_perspective(const Rect& src, const float mat[16]) {
+static tgfx::Rect map_rect_perspective(const tgfx::Rect& src, const float mat[16]) {
   // Like map_rect_affine, z = 0 so we can skip the 3rd column, but we do need to compute w's
   // for each corner of the src rect.
   auto c0 = pk::pkvx::float4::Load(mat + 0);
@@ -227,12 +227,12 @@ static Rect map_rect_perspective(const Rect& src, const float mat[16]) {
   auto minMax = flip * min(min(project(tl, tr, bl), project(tr, br, tl)),
                            min(project(br, bl, tr), project(bl, tl, br)));
 
-  Rect r;
+  tgfx::Rect r;
   minMax.store(&r);
   return r;
 }
 
-Rect Matrix3D::MapRect(const Matrix3D& m, const Rect& src) {
+tgfx::Rect Matrix3D::MapRect(const Matrix3D& m, const tgfx::Rect& src) {
   const bool hasPerspective =
       m.fMat[3] != 0 || m.fMat[7] != 0 || m.fMat[11] != 0 || m.fMat[15] != 1;
   if (hasPerspective) {
@@ -394,7 +394,7 @@ Matrix3D& Matrix3D::setRotate(Vec3 axis, float radians) {
   return *this;
 }
 
-Matrix3D Matrix3D::RectToRect(const Rect& src, const Rect& dst) {
+Matrix3D Matrix3D::RectToRect(const tgfx::Rect& src, const tgfx::Rect& dst) {
   if (src.isEmpty()) {
     return Matrix3D();
   } else if (dst.isEmpty()) {

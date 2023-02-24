@@ -22,7 +22,7 @@
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Rect.h"
 
-namespace tgfx {
+namespace pag {
 
 struct Vec3 {
   float x, y, z;
@@ -200,7 +200,7 @@ class Matrix3D {
   }
 
   // Scales and translates 'src' to fill 'dst' exactly.
-  static Matrix3D RectToRect(const Rect& src, const Rect& dst);
+  static Matrix3D RectToRect(const tgfx::Rect& src, const tgfx::Rect& dst);
 
   static Matrix3D LookAt(const Vec3& eye, const Vec3& center, const Vec3& up);
   static Matrix3D Perspective(float near, float far, float angle);
@@ -333,7 +333,7 @@ class Matrix3D {
 
   Matrix3D transpose() const;
 
-  Rect MapRect(const Matrix3D& m, const Rect& src);
+  tgfx::Rect MapRect(const Matrix3D& m, const tgfx::Rect& src);
 
   ////////////
 
@@ -355,13 +355,13 @@ class Matrix3D {
      * [ g h i ]      [ 0 0 1 0 ]
      *                [ g h 0 i ]
    */
-  Matrix asM33() const {
-    return Matrix::MakeAll(fMat[0], fMat[4], fMat[12],
-                             fMat[1], fMat[5], fMat[13],
-                             fMat[3], fMat[7], fMat[15]);
+  tgfx::Matrix asM33() const {
+    return tgfx::Matrix::MakeAll(fMat[0], fMat[4], fMat[12],
+                                 fMat[1], fMat[5], fMat[13],
+                                 fMat[3], fMat[7], fMat[15]);
   }
 
-  explicit Matrix3D(const Matrix& src)
+  explicit Matrix3D(const tgfx::Matrix& src)
       : Matrix3D(src[0], src[1], 0, src[2],
                   src[3], src[4], 0, src[5],
                   0,      0,      1, 0,
@@ -373,7 +373,7 @@ class Matrix3D {
 
   Matrix3D& preScale(float x, float y);
   Matrix3D& preScale(float x, float y, float z);
-  Matrix3D& preConcat(const Matrix&);
+  Matrix3D& preConcat(const tgfx::Matrix&);
 
  private:
   /* Stored in column-major.
@@ -385,4 +385,4 @@ class Matrix3D {
    */
   float fMat[16];
 };
-}  // namespace tgfx
+}  // namespace pag
