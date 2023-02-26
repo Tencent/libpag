@@ -26,6 +26,7 @@
 #include "MotionTileFilter.h"
 #include "RadialBlurFilter.h"
 #include "BrightnessContrastFilter.h"
+#include "HueSaturationFilter.h"
 #include "rendering/filters/dropshadow/DropShadowFilter.h"
 #include "rendering/filters/gaussianblur/GaussianBlurFilter.h"
 #include "rendering/filters/glow/GlowFilter.h"
@@ -159,6 +160,10 @@ std::unique_ptr<LayerFilter> LayerFilter::Make(Effect* effect) {
       break;
     case EffectType::BrightnessContrast:
       filter = new BrightnessContrastFilter(effect);
+      break;
+    case EffectType::HueSaturation:
+      filter = new HueSaturationFilter(effect);
+      break;
     default:
       break;
   }
