@@ -42,7 +42,17 @@ unsigned CreateGLProgram(Context* context, const std::string& vertex, const std:
 
 unsigned LoadGLShader(Context* context, unsigned shaderType, const std::string& source);
 
-bool CheckGLError(Context* context);
+bool CheckGLErrorImpl(Context* context, std::string file, int line);
 
 std::array<float, 9> ToGLMatrix(const Matrix& matrix);
+
+#ifdef DEBUG
+
+#define CheckGLError(context) CheckGLErrorImpl(context, __FILE__, __LINE__)
+
+#else
+
+#define CheckGLError(context) CheckGLErrorImpl(context, "", 0)
+
+#endif
 }  // namespace tgfx
