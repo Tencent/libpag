@@ -39,8 +39,7 @@ AttributeFlag ReadAttributeFlag(DecodeStream* stream, const AttributeBase* confi
     return flag;
   }
   flag.animatable = stream->readBitBoolean();
-  if (!flag.animatable || (attributeType != AttributeType::SpatialProperty &&
-                           attributeType != AttributeType::Spatial3DProperty)) {
+  if (!flag.animatable || (attributeType != AttributeType::SpatialProperty)) {
     return flag;
   }
   flag.hasSpatial = stream->readBitBoolean();
@@ -59,8 +58,7 @@ void WriteAttributeFlag(EncodeStream* stream, const AttributeFlag& flag,
     return;
   }
   stream->writeBitBoolean(flag.animatable);
-  if (!flag.animatable || (attributeType != AttributeType::SpatialProperty &&
-                           attributeType != AttributeType::Spatial3DProperty)) {
+  if (!flag.animatable || (attributeType != AttributeType::SpatialProperty)) {
     return;
   }
   stream->writeBitBoolean(flag.hasSpatial);

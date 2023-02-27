@@ -29,7 +29,6 @@ enum class AttributeType {
   DiscreteProperty,
   MultiDimensionProperty,
   SpatialProperty,
-  Spatial3DProperty,
   BitFlag,  // save bool value as a flag
   Custom    // save a flag to indicate whether it should trigger a custom reading/writing action.
 };
@@ -195,8 +194,7 @@ void ReadTimeEase(DecodeStream* stream, const std::vector<Keyframe<T>*>& keyfram
 }
 
 template <typename T>
-void ReadSpatialEase(DecodeStream* stream, const std::vector<Keyframe<T>*>& keyframes,
-                     const AttributeConfig<T>& config) {
+static void ReadSpatialEase(DecodeStream* stream, const std::vector<Keyframe<T>*>& keyframes) {
   auto spatialFlagList = new bool[keyframes.size() * 2];
   auto count = keyframes.size() * 2;
   for (size_t i = 0; i < count; i++) {
@@ -211,20 +209,40 @@ void ReadSpatialEase(DecodeStream* stream, const std::vector<Keyframe<T>*>& keyf
       if (hasSpatialIn) {
         keyframe->spatialIn.x = stream->readBits(numBits) * SPATIAL_PRECISION;
         keyframe->spatialIn.y = stream->readBits(numBits) * SPATIAL_PRECISION;
-        if (config.attributeType == AttributeType::Spatial3DProperty) {
-          keyframe->spatialIn.z = stream->readBits(numBits) * SPATIAL_PRECISION;
-        } else {
-          keyframe->spatialIn.z = 0.0f;
-        }
+        keyframe->spatialIn.z = 0.0f;
       }
       if (hasSpatialOut) {
         keyframe->spatialOut.x = stream->readBits(numBits) * SPATIAL_PRECISION;
         keyframe->spatialOut.y = stream->readBits(numBits) * SPATIAL_PRECISION;
-        if (config.attributeType == AttributeType::Spatial3DProperty) {
-          keyframe->spatialOut.z = stream->readBits(numBits) * SPATIAL_PRECISION;
-        } else {
-          keyframe->spatialOut.z = 0.0f;
-        }
+        keyframe->spatialOut.z = 0.0f;
+      }
+    }
+  }
+  delete[] spatialFlagList;
+}
+
+template <>
+void ReadSpatialEase(DecodeStream* stream, const std::vector<Keyframe<Point3D>*>& keyframes) {
+  auto spatialFlagList = new bool[keyframes.size() * 2];
+  auto count = keyframes.size() * 2;
+  for (size_t i = 0; i < count; i++) {
+    spatialFlagList[i] = stream->readBitBoolean();
+  }
+  auto numBits = stream->readNumBits();
+  int index = 0;
+  for (auto& keyframe : keyframes) {
+    auto hasSpatialIn = spatialFlagList[index++];
+    auto hasSpatialOut = spatialFlagList[index++];
+    if (hasSpatialIn || hasSpatialOut) {
+      if (hasSpatialIn) {
+        keyframe->spatialIn.x = stream->readBits(numBits) * SPATIAL_PRECISION;
+        keyframe->spatialIn.y = stream->readBits(numBits) * SPATIAL_PRECISION;
+        keyframe->spatialIn.z = stream->readBits(numBits) * SPATIAL_PRECISION;
+      }
+      if (hasSpatialOut) {
+        keyframe->spatialOut.x = stream->readBits(numBits) * SPATIAL_PRECISION;
+        keyframe->spatialOut.y = stream->readBits(numBits) * SPATIAL_PRECISION;
+        keyframe->spatialOut.z = stream->readBits(numBits) * SPATIAL_PRECISION;
       }
     }
   }
@@ -245,7 +263,7 @@ Property<T>* ReadProperty(DecodeStream* stream, const AttributeConfig<T>& config
       ReadTimeAndValue(stream, keyframes, config);
       ReadTimeEase(stream, keyframes, config);
       if (flag.hasSpatial) {
-        ReadSpatialEase(stream, keyframes, config);
+        ReadSpatialEase(stream, keyframes);
       }
       property = new AnimatableProperty<T>(keyframes);
     } else {
@@ -381,8 +399,7 @@ void WriteTimeEase(EncodeStream* stream, const std::vector<Keyframe<T>*>& keyfra
 }
 
 template <typename T>
-void WriteSpatialEase(EncodeStream* stream, const std::vector<Keyframe<T>*>& keyframes,
-                      const AttributeConfig<T>& config) {
+static void WriteSpatialEase(EncodeStream* stream, const std::vector<Keyframe<T>*>& keyframes) {
   std::vector<float> spatialList;
   for (auto& keyframe : keyframes) {
     stream->writeBitBoolean(keyframe->spatialIn != Point3D::Zero());
@@ -390,16 +407,31 @@ void WriteSpatialEase(EncodeStream* stream, const std::vector<Keyframe<T>*>& key
     if (keyframe->spatialIn != Point3D::Zero()) {
       spatialList.push_back(keyframe->spatialIn.x);
       spatialList.push_back(keyframe->spatialIn.y);
-      if (config.attributeType == AttributeType::Spatial3DProperty) {
-        spatialList.push_back(keyframe->spatialIn.z);
-      }
     }
     if (keyframe->spatialOut != Point3D::Zero()) {
       spatialList.push_back(keyframe->spatialOut.x);
       spatialList.push_back(keyframe->spatialOut.y);
-      if (config.attributeType == AttributeType::Spatial3DProperty) {
-        spatialList.push_back(keyframe->spatialOut.z);
-      }
+    }
+  }
+  auto count = static_cast<uint32_t>(spatialList.size());
+  stream->writeFloatList(&spatialList[0], count, SPATIAL_PRECISION);
+}
+
+template <>
+void WriteSpatialEase(EncodeStream* stream, const std::vector<Keyframe<Point3D>*>& keyframes) {
+  std::vector<float> spatialList;
+  for (auto& keyframe : keyframes) {
+    stream->writeBitBoolean(keyframe->spatialIn != Point3D::Zero());
+    stream->writeBitBoolean(keyframe->spatialOut != Point3D::Zero());
+    if (keyframe->spatialIn != Point3D::Zero()) {
+      spatialList.push_back(keyframe->spatialIn.x);
+      spatialList.push_back(keyframe->spatialIn.y);
+      spatialList.push_back(keyframe->spatialIn.z);
+    }
+    if (keyframe->spatialOut != Point3D::Zero()) {
+      spatialList.push_back(keyframe->spatialOut.x);
+      spatialList.push_back(keyframe->spatialOut.y);
+      spatialList.push_back(keyframe->spatialOut.z);
     }
   }
   auto count = static_cast<uint32_t>(spatialList.size());
@@ -420,8 +452,7 @@ AttributeFlag WriteProperty(EncodeStream* stream, const AttributeConfig<T>& conf
   flag.animatable = true;
   auto& keyframes = static_cast<AnimatableProperty<T>*>(property)->keyframes;
   bool hasSpatial = false;
-  if (config.attributeType == AttributeType::SpatialProperty ||
-      config.attributeType == AttributeType::Spatial3DProperty) {
+  if (config.attributeType == AttributeType::SpatialProperty) {
     for (auto keyframe : keyframes) {
       if (keyframe->spatialIn != Point3D::Zero() || keyframe->spatialOut != Point3D::Zero()) {
         hasSpatial = true;
@@ -434,7 +465,7 @@ AttributeFlag WriteProperty(EncodeStream* stream, const AttributeConfig<T>& conf
   WriteTimeAndValue(stream, keyframes, config);
   WriteTimeEase(stream, keyframes, config);
   if (hasSpatial) {
-    WriteSpatialEase(stream, keyframes, config);
+    WriteSpatialEase(stream, keyframes);
   }
   return flag;
 }

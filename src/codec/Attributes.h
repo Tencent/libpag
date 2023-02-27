@@ -298,7 +298,7 @@ class AttributeConfig<Point3D> : public AttributeConfigBase<Point3D> {
   }
 
   void readValueList(DecodeStream* stream, Point3D* list, uint32_t count) const override {
-    if (attributeType == AttributeType::Spatial3DProperty) {
+    if (attributeType == AttributeType::SpatialProperty) {
       stream->readPoint3DList(list, count, SPATIAL_PRECISION);
     } else {
       for (uint32_t i = 0; i < count; i++) {
@@ -308,7 +308,7 @@ class AttributeConfig<Point3D> : public AttributeConfigBase<Point3D> {
   }
 
   void writeValueList(EncodeStream* stream, const Point3D* list, uint32_t count) const override {
-    if (attributeType == AttributeType::Spatial3DProperty) {
+    if (attributeType == AttributeType::SpatialProperty) {
       stream->writePoint3DList(list, count, SPATIAL_PRECISION);
     } else {
       for (uint32_t i = 0; i < count; i++) {
@@ -321,7 +321,7 @@ class AttributeConfig<Point3D> : public AttributeConfigBase<Point3D> {
     switch (attributeType) {
       case AttributeType::MultiDimensionProperty:
         return new MultiDimensionPoint3DKeyframe();
-      case AttributeType::Spatial3DProperty:
+      case AttributeType::SpatialProperty:
         if (flag.hasSpatial) {
           return new SpatialPoint3DKeyframe();
         }
