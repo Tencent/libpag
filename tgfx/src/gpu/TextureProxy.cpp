@@ -30,6 +30,26 @@ TextureProxy::~TextureProxy() {
   }
 }
 
+int TextureProxy::width() const {
+  return texture->width();
+}
+
+int TextureProxy::height() const {
+  return texture->height();
+}
+
+bool TextureProxy::hasMipmaps() const {
+  return texture->getSampler()->mipMapped();
+}
+
+std::shared_ptr<Texture> TextureProxy::getTexture() const {
+  return texture;
+}
+
+bool TextureProxy::isInstantiated() const {
+  return texture != nullptr;
+}
+
 bool TextureProxy::instantiate() {
   if (texture != nullptr) {
     return true;
@@ -42,15 +62,15 @@ bool TextureProxy::instantiate() {
   return texture != nullptr;
 }
 
-void TextureProxy::assignProxyOwner(const Cacheable* owner, bool updateTexture) {
+void TextureProxy::assignProxyOwner(const Cacheable* owner, bool updateTextureOwner) {
   if (owner == nullptr) {
-    removeProxyOwner(updateTexture);
+    removeProxyOwner(updateTextureOwner);
     return;
   }
   if (proxyOwnerID != owner->uniqueID()) {
     provider->changeProxyOwner(this, owner->uniqueID());
   }
-  if (!updateTexture) {
+  if (!updateTextureOwner) {
     return;
   }
   cacheOwner = owner->weakThis;

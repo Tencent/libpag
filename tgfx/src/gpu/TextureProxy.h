@@ -33,38 +33,28 @@ class TextureProxy {
   /**
    * Returns the width of the texture proxy.
    */
-  virtual int width() const {
-    return texture->width();
-  }
+  virtual int width() const;
 
   /**
    * Returns the height of the texture proxy.
    */
-  virtual int height() const {
-    return texture->height();
-  }
+  virtual int height() const;
 
   /**
    * If we are instantiated and have a texture, return the mipmap state of that texture. Otherwise
    * returns the proxy's mipmap state from creation time.
    */
-  virtual bool hasMipmaps() const {
-    return texture->getSampler()->mipMapped();
-  }
+  virtual bool hasMipmaps() const;
 
   /**
    * Returns the the Texture of the proxy. Returns nullptr if the proxy is not instantiated yet.
    */
-  std::shared_ptr<Texture> getTexture() const {
-    return texture;
-  }
+  std::shared_ptr<Texture> getTexture() const;
 
   /**
    * Returns true if the backing texture is instantiated.
    */
-  bool isInstantiated() const {
-    return texture != nullptr;
-  }
+  bool isInstantiated() const;
 
   /**
    * Actually instantiate the backing texture, if necessary. Returns true if the backing texture is
@@ -74,10 +64,10 @@ class TextureProxy {
 
   /**
    * Assigns a Cacheable owner to the proxy. The proxy will be findable via this owner using
-   * ProxyProvider.findProxyByOwner(). If the updateTexture is true, it will also assign the owner
-   * to the target texture.
+   * ProxyProvider.findProxyByOwner(). If the updateTextureOwner is true, it will also assign the
+   * owner to the internal texture.
    */
-  void assignProxyOwner(const Cacheable* owner, bool updateTexture = true);
+  void assignProxyOwner(const Cacheable* owner, bool updateTextureOwner = true);
 
   /*
    * Removes the Cacheable owner from the proxy. If the updateTexture is true, it will also remove
