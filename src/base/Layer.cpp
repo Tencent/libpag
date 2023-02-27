@@ -152,7 +152,7 @@ std::pair<Point, Point> Layer::getScaleFactor() {
   if (transform != nullptr) {
     GetScaleFactorInternal(transform->scale, maxScale, minScale);
   } else if (transform3D != nullptr) {
-    GetScaleFactorInternal(transform3D->scale, maxScale, minScale);
+    return {maxScale, minScale};
   }
   if (!effects.empty()) {
     auto bounds = getBounds();
