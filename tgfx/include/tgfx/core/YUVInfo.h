@@ -69,11 +69,11 @@ enum class YUVColorRange {
    */
   Unknown,
   /**
-   * the normal 219*2^(n-8) "MPEG" YUV ranges
+   * Encodes the video range of 16 to 235 for all three components.
    */
   MPEG,
   /**
-   * the normal 2^n-1 "JPEG" YUV ranges
+   * Encodes the full range of 0 to 255 for all three components.
    */
   JPEG
 };
