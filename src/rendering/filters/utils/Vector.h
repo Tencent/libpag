@@ -272,12 +272,12 @@ template <typename T>
 using M = typename Mask<T>::type;
 
 // Join two Vec<N,T> into one Vec<2N,T>.
-//SINT Vec<2*N,T> join(const Vec<N,T>& lo, const Vec<N,T>& hi) {
-//   Vec<2*N,T> v;
-//   v.lo = lo;
-//   v.hi = hi;
-//   return v;
-//}
+SINT Vec<2 * N, T> join(const Vec<N, T>& lo, const Vec<N, T>& hi) {
+  Vec<2 * N, T> v;
+  v.lo = lo;
+  v.hi = hi;
+  return v;
+}
 
 // We have three strategies for implementing Vec operations:
 //    1) lean on Clang/GCC vector extensions when available;
