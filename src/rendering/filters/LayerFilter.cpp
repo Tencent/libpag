@@ -17,16 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LayerFilter.h"
+#include "BrightnessContrastFilter.h"
 #include "BulgeFilter.h"
 #include "CornerPinFilter.h"
 #include "DisplacementMapFilter.h"
 #include "GradientOverlayFilter.h"
+#include "HueSaturationFilter.h"
 #include "LevelsIndividualFilter.h"
 #include "MosaicFilter.h"
 #include "MotionTileFilter.h"
 #include "RadialBlurFilter.h"
-#include "BrightnessContrastFilter.h"
-#include "HueSaturationFilter.h"
 #include "rendering/filters/dropshadow/DropShadowFilter.h"
 #include "rendering/filters/gaussianblur/GaussianBlurFilter.h"
 #include "rendering/filters/glow/GlowFilter.h"

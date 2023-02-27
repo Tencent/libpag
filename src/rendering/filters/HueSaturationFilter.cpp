@@ -98,7 +98,8 @@ void HueSaturationFilter::onPrepareProgram(tgfx::Context* context, unsigned int 
   colorizeLightnessHandle = gl->getUniformLocation(program, "mColorizeLightness");
 }
 
-void HueSaturationFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect&, const tgfx::Point&) {
+void HueSaturationFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect&,
+                                         const tgfx::Point&) {
   auto* hueSaturationEffect = reinterpret_cast<const HueSaturationEffect*>(effect);
   auto channelControl = hueSaturationEffect->channelControl;
   auto hue = hueSaturationEffect->hue[channelControl];

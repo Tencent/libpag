@@ -80,7 +80,8 @@ void BrightnessContrastFilter::onPrepareProgram(tgfx::Context* context, unsigned
   contrastHandle = gl->getUniformLocation(program, "mContrast");
 }
 
-void BrightnessContrastFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect&, const tgfx::Point&) {
+void BrightnessContrastFilter::onUpdateParams(tgfx::Context* context, const tgfx::Rect&,
+                                              const tgfx::Point&) {
   auto* brightnessContrastEffect = reinterpret_cast<const BrightnessContrastEffect*>(effect);
   auto brightness = brightnessContrastEffect->brightness->getValueAt(layerFrame);
   auto contrast = brightnessContrastEffect->contrast->getValueAt(layerFrame);

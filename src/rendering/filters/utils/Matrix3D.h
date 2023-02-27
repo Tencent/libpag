@@ -30,40 +30,76 @@ struct Vec3 {
   bool operator==(const Vec3& v) const {
     return x == v.x && y == v.y && z == v.z;
   }
-  bool operator!=(const Vec3& v) const { return !(*this == v); }
-
-  static float Dot(const Vec3& a, const Vec3& b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
-  static Vec3   Cross(const Vec3& a, const Vec3& b) {
-    return { a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x };
+  bool operator!=(const Vec3& v) const {
+    return !(*this == v);
   }
-  static Vec3 Normalize(const Vec3& v) { return v * (1.0f / v.length()); }
 
-  Vec3 operator-() const { return {-x, -y, -z}; }
-  Vec3 operator+(const Vec3& v) const { return { x + v.x, y + v.y, z + v.z }; }
-  Vec3 operator-(const Vec3& v) const { return { x - v.x, y - v.y, z - v.z }; }
+  static float Dot(const Vec3& a, const Vec3& b) {
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+  }
+  static Vec3 Cross(const Vec3& a, const Vec3& b) {
+    return {a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x};
+  }
+  static Vec3 Normalize(const Vec3& v) {
+    return v * (1.0f / v.length());
+  }
+
+  Vec3 operator-() const {
+    return {-x, -y, -z};
+  }
+  Vec3 operator+(const Vec3& v) const {
+    return {x + v.x, y + v.y, z + v.z};
+  }
+  Vec3 operator-(const Vec3& v) const {
+    return {x - v.x, y - v.y, z - v.z};
+  }
 
   Vec3 operator*(const Vec3& v) const {
-    return { x*v.x, y*v.y, z*v.z };
+    return {x * v.x, y * v.y, z * v.z};
   }
   friend Vec3 operator*(const Vec3& v, float s) {
-    return { v.x*s, v.y*s, v.z*s };
+    return {v.x * s, v.y * s, v.z * s};
   }
-  friend Vec3 operator*(float s, const Vec3& v) { return v*s; }
+  friend Vec3 operator*(float s, const Vec3& v) {
+    return v * s;
+  }
 
-  void operator+=(Vec3 v) { *this = *this + v; }
-  void operator-=(Vec3 v) { *this = *this - v; }
-  void operator*=(Vec3 v) { *this = *this * v; }
-  void operator*=(float s) { *this = *this * s; }
+  void operator+=(Vec3 v) {
+    *this = *this + v;
+  }
+  void operator-=(Vec3 v) {
+    *this = *this - v;
+  }
+  void operator*=(Vec3 v) {
+    *this = *this * v;
+  }
+  void operator*=(float s) {
+    *this = *this * s;
+  }
 
-  float lengthSquared() const { return Dot(*this, *this); }
-  float length() const { return sqrtf(Dot(*this, *this)); }
+  float lengthSquared() const {
+    return Dot(*this, *this);
+  }
+  float length() const {
+    return sqrtf(Dot(*this, *this));
+  }
 
-  float dot(const Vec3& v) const { return Dot(*this, v); }
-  Vec3   cross(const Vec3& v) const { return Cross(*this, v); }
-  Vec3 normalize()            const { return Normalize(*this); }
+  float dot(const Vec3& v) const {
+    return Dot(*this, v);
+  }
+  Vec3 cross(const Vec3& v) const {
+    return Cross(*this, v);
+  }
+  Vec3 normalize() const {
+    return Normalize(*this);
+  }
 
-  const float* ptr() const { return &x; }
-  float* ptr() { return &x; }
+  const float* ptr() const {
+    return &x;
+  }
+  float* ptr() {
+    return &x;
+  }
 };
 
 struct Vec4 {
@@ -72,33 +108,57 @@ struct Vec4 {
   bool operator==(const Vec4& v) const {
     return x == v.x && y == v.y && z == v.z && w == v.w;
   }
-  bool operator!=(const Vec4& v) const { return !(*this == v); }
+  bool operator!=(const Vec4& v) const {
+    return !(*this == v);
+  }
 
   static float Dot(const Vec4& a, const Vec4& b) {
-    return a.x*b.x + a.y*b.y + a.z*b.z + a.w*b.w;
+    return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
   }
-  static Vec4 Normalize(const Vec4& v) { return v * (1.0f / v.length()); }
+  static Vec4 Normalize(const Vec4& v) {
+    return v * (1.0f / v.length());
+  }
 
-  Vec4 operator-() const { return {-x, -y, -z, -w}; }
-  Vec4 operator+(const Vec4& v) const { return { x + v.x, y + v.y, z + v.z, w + v.w }; }
-  Vec4 operator-(const Vec4& v) const { return { x - v.x, y - v.y, z - v.z, w - v.w }; }
+  Vec4 operator-() const {
+    return {-x, -y, -z, -w};
+  }
+  Vec4 operator+(const Vec4& v) const {
+    return {x + v.x, y + v.y, z + v.z, w + v.w};
+  }
+  Vec4 operator-(const Vec4& v) const {
+    return {x - v.x, y - v.y, z - v.z, w - v.w};
+  }
 
   Vec4 operator*(const Vec4& v) const {
-    return { x*v.x, y*v.y, z*v.z, w*v.w };
+    return {x * v.x, y * v.y, z * v.z, w * v.w};
   }
   friend Vec4 operator*(const Vec4& v, float s) {
-    return { v.x*s, v.y*s, v.z*s, v.w*s };
+    return {v.x * s, v.y * s, v.z * s, v.w * s};
   }
-  friend Vec4 operator*(float s, const Vec4& v) { return v*s; }
+  friend Vec4 operator*(float s, const Vec4& v) {
+    return v * s;
+  }
 
-  float lengthSquared() const { return Dot(*this, *this); }
-  float length() const { return sqrtf(Dot(*this, *this)); }
+  float lengthSquared() const {
+    return Dot(*this, *this);
+  }
+  float length() const {
+    return sqrtf(Dot(*this, *this));
+  }
 
-  float dot(const Vec4& v) const { return Dot(*this, v); }
-  Vec4 normalize()            const { return Normalize(*this); }
+  float dot(const Vec4& v) const {
+    return Dot(*this, v);
+  }
+  Vec4 normalize() const {
+    return Normalize(*this);
+  }
 
-  const float* ptr() const { return &x; }
-  float* ptr() { return &x; }
+  const float* ptr() const {
+    return &x;
+  }
+  float* ptr() {
+    return &x;
+  }
 
   float operator[](int i) const {
     return this->ptr()[i];
@@ -119,35 +179,26 @@ class Matrix3D {
   Matrix3D(const Matrix3D& src) = default;
   Matrix3D& operator=(const Matrix3D& src) = default;
 
-  constexpr Matrix3D()
-      : fMat{1, 0, 0, 0,
-             0, 1, 0, 0,
-             0, 0, 1, 0,
-             0, 0, 0, 1}
-  {}
+  constexpr Matrix3D() : fMat{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1} {
+  }
 
   Matrix3D(const Matrix3D& a, const Matrix3D& b) {
     this->setConcat(a, b);
   }
 
-  enum Uninitialized_Constructor {
-    kUninitialized_Constructor
-  };
-  Matrix3D(Uninitialized_Constructor) {}
+  enum Uninitialized_Constructor { kUninitialized_Constructor };
+  Matrix3D(Uninitialized_Constructor) {
+  }
 
   /**
      *  The constructor parameters are in row-major order.
    */
-  constexpr Matrix3D(float m0, float m4, float m8,  float m12,
-                  float m1, float m5, float m9,  float m13,
-                  float m2, float m6, float m10, float m14,
-                  float m3, float m7, float m11, float m15)
+  constexpr Matrix3D(float m0, float m4, float m8, float m12, float m1, float m5, float m9,
+                     float m13, float m2, float m6, float m10, float m14, float m3, float m7,
+                     float m11, float m15)
       // fMat is column-major order in memory.
-      : fMat{m0,  m1,  m2,  m3,
-             m4,  m5,  m6,  m7,
-             m8,  m9,  m10, m11,
-             m12, m13, m14, m15}
-  {}
+      : fMat{m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14, m15} {
+  }
 
   static Matrix3D Rows(const Vec4& r0, const Vec4& r1, const Vec4& r2, const Vec4& r3) {
     Matrix3D m(kUninitialized_Constructor);
@@ -167,30 +218,20 @@ class Matrix3D {
   }
 
   static Matrix3D RowMajor(const float r[16]) {
-    return Matrix3D(r[ 0], r[ 1], r[ 2], r[ 3],
-                 r[ 4], r[ 5], r[ 6], r[ 7],
-                 r[ 8], r[ 9], r[10], r[11],
-                 r[12], r[13], r[14], r[15]);
+    return Matrix3D(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10], r[11], r[12],
+                    r[13], r[14], r[15]);
   }
   static Matrix3D ColMajor(const float c[16]) {
-    return Matrix3D(c[0], c[4], c[ 8], c[12],
-                 c[1], c[5], c[ 9], c[13],
-                 c[2], c[6], c[10], c[14],
-                 c[3], c[7], c[11], c[15]);
+    return Matrix3D(c[0], c[4], c[8], c[12], c[1], c[5], c[9], c[13], c[2], c[6], c[10], c[14],
+                    c[3], c[7], c[11], c[15]);
   }
 
   static Matrix3D Translate(float x, float y, float z = 0) {
-    return Matrix3D(1, 0, 0, x,
-                 0, 1, 0, y,
-                 0, 0, 1, z,
-                 0, 0, 0, 1);
+    return Matrix3D(1, 0, 0, x, 0, 1, 0, y, 0, 0, 1, z, 0, 0, 0, 1);
   }
 
   static Matrix3D Scale(float x, float y, float z = 1) {
-    return Matrix3D(x, 0, 0, 0,
-                 0, y, 0, 0,
-                 0, 0, z, 0,
-                 0, 0, 0, 1);
+    return Matrix3D(x, 0, 0, 0, 0, y, 0, 0, 0, 0, z, 0, 0, 0, 0, 1);
   }
 
   static Matrix3D Rotate(Vec3 axis, float radians) {
@@ -216,50 +257,41 @@ class Matrix3D {
   void getRowMajor(float v[]) const;
 
   float rc(int r, int c) const {
-    return fMat[c*4 + r];
+    return fMat[c * 4 + r];
   }
   void setRC(int r, int c, float value) {
-    fMat[c*4 + r] = value;
+    fMat[c * 4 + r] = value;
   }
 
   Vec4 row(int i) const {
     return {fMat[i + 0], fMat[i + 4], fMat[i + 8], fMat[i + 12]};
   }
   Vec4 col(int i) const {
-    return {fMat[i*4 + 0], fMat[i*4 + 1], fMat[i*4 + 2], fMat[i*4 + 3]};
+    return {fMat[i * 4 + 0], fMat[i * 4 + 1], fMat[i * 4 + 2], fMat[i * 4 + 3]};
   }
 
   void setRow(int i, const Vec4& v) {
-    fMat[i + 0]  = v.x;
-    fMat[i + 4]  = v.y;
-    fMat[i + 8]  = v.z;
+    fMat[i + 0] = v.x;
+    fMat[i + 4] = v.y;
+    fMat[i + 8] = v.z;
     fMat[i + 12] = v.w;
   }
   void setCol(int i, const Vec4& v) {
-    memcpy(&fMat[i*4], v.ptr(), sizeof(v));
+    memcpy(&fMat[i * 4], v.ptr(), sizeof(v));
   }
 
   Matrix3D& setIdentity() {
-    *this = { 1, 0, 0, 0,
-             0, 1, 0, 0,
-             0, 0, 1, 0,
-             0, 0, 0, 1 };
+    *this = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
     return *this;
   }
 
   Matrix3D& setTranslate(float x, float y, float z = 0) {
-    *this = { 1, 0, 0, x,
-             0, 1, 0, y,
-             0, 0, 1, z,
-             0, 0, 0, 1 };
+    *this = {1, 0, 0, x, 0, 1, 0, y, 0, 0, 1, z, 0, 0, 0, 1};
     return *this;
   }
 
   Matrix3D& setScale(float x, float y, float z = 1) {
-    *this = { x, 0, 0, 0,
-             0, y, 0, 0,
-             0, 0, z, 0,
-             0, 0, 0, 1 };
+    *this = {x, 0, 0, 0, 0, y, 0, 0, 0, 0, z, 0, 0, 0, 0, 1};
     return *this;
   }
 
@@ -356,17 +388,14 @@ class Matrix3D {
      *                [ g h 0 i ]
    */
   tgfx::Matrix asM33() const {
-    return tgfx::Matrix::MakeAll(fMat[0], fMat[4], fMat[12],
-                                 fMat[1], fMat[5], fMat[13],
-                                 fMat[3], fMat[7], fMat[15]);
+    return tgfx::Matrix::MakeAll(fMat[0], fMat[4], fMat[12], fMat[1], fMat[5], fMat[13], fMat[3],
+                                 fMat[7], fMat[15]);
   }
 
   explicit Matrix3D(const tgfx::Matrix& src)
-      : Matrix3D(src[0], src[1], 0, src[2],
-                  src[3], src[4], 0, src[5],
-                  0,      0,      1, 0,
-                  src[6], src[7], 0, src[8])
-  {}
+      : Matrix3D(src[0], src[1], 0, src[2], src[3], src[4], 0, src[5], 0, 0, 1, 0, src[6], src[7],
+                 0, src[8]) {
+  }
 
   Matrix3D& preTranslate(float x, float y, float z = 0);
   Matrix3D& postTranslate(float x, float y, float z = 0);
