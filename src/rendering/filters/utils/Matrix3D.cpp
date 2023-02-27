@@ -18,8 +18,8 @@
 
 #include "Matrix3D.h"
 #include <cfloat>
+#include "Vector.h"
 #include "base/utils/MathUtil.h"
-#include "include/private/skvx.h"
 
 namespace pag {
 
@@ -28,15 +28,15 @@ bool Matrix3D::operator==(const Matrix3D& other) const {
     return true;
   }
 
-  auto a0 = pk::pkvx::float4::Load(fMat + 0);
-  auto a1 = pk::pkvx::float4::Load(fMat + 4);
-  auto a2 = pk::pkvx::float4::Load(fMat + 8);
-  auto a3 = pk::pkvx::float4::Load(fMat + 12);
+  auto a0 = float4::Load(fMat + 0);
+  auto a1 = float4::Load(fMat + 4);
+  auto a2 = float4::Load(fMat + 8);
+  auto a3 = float4::Load(fMat + 12);
 
-  auto b0 = pk::pkvx::float4::Load(other.fMat + 0);
-  auto b1 = pk::pkvx::float4::Load(other.fMat + 4);
-  auto b2 = pk::pkvx::float4::Load(other.fMat + 8);
-  auto b3 = pk::pkvx::float4::Load(other.fMat + 12);
+  auto b0 = float4::Load(other.fMat + 0);
+  auto b1 = float4::Load(other.fMat + 4);
+  auto b2 = float4::Load(other.fMat + 8);
+  auto b3 = float4::Load(other.fMat + 12);
 
   auto eq = (a0 == b0) & (a1 == b1) & (a2 == b2) & (a3 == b3);
   return (eq[0] & eq[1] & eq[2] & eq[3]) == ~0;
@@ -66,19 +66,17 @@ void Matrix3D::getRowMajor(float v[]) const {
 }
 
 Matrix3D& Matrix3D::setConcat(const Matrix3D& a, const Matrix3D& b) {
-  auto c0 = pk::pkvx::float4::Load(a.fMat + 0);
-  auto c1 = pk::pkvx::float4::Load(a.fMat + 4);
-  auto c2 = pk::pkvx::float4::Load(a.fMat + 8);
-  auto c3 = pk::pkvx::float4::Load(a.fMat + 12);
+  auto c0 = float4::Load(a.fMat + 0);
+  auto c1 = float4::Load(a.fMat + 4);
+  auto c2 = float4::Load(a.fMat + 8);
+  auto c3 = float4::Load(a.fMat + 12);
 
-  auto compute = [&](pk::pkvx::float4 r) {
-    return c0 * r[0] + (c1 * r[1] + (c2 * r[2] + c3 * r[3]));
-  };
+  auto compute = [&](float4 r) { return c0 * r[0] + (c1 * r[1] + (c2 * r[2] + c3 * r[3])); };
 
-  auto m0 = compute(pk::pkvx::float4::Load(b.fMat + 0));
-  auto m1 = compute(pk::pkvx::float4::Load(b.fMat + 4));
-  auto m2 = compute(pk::pkvx::float4::Load(b.fMat + 8));
-  auto m3 = compute(pk::pkvx::float4::Load(b.fMat + 12));
+  auto m0 = compute(float4::Load(b.fMat + 0));
+  auto m1 = compute(float4::Load(b.fMat + 4));
+  auto m2 = compute(float4::Load(b.fMat + 8));
+  auto m3 = compute(float4::Load(b.fMat + 12));
 
   m0.store(fMat + 0);
   m1.store(fMat + 4);
@@ -88,9 +86,9 @@ Matrix3D& Matrix3D::setConcat(const Matrix3D& a, const Matrix3D& b) {
 }
 
 Matrix3D& Matrix3D::preConcat(const tgfx::Matrix& b) {
-  auto c0 = pk::pkvx::float4::Load(fMat + 0);
-  auto c1 = pk::pkvx::float4::Load(fMat + 4);
-  auto c3 = pk::pkvx::float4::Load(fMat + 12);
+  auto c0 = float4::Load(fMat + 0);
+  auto c1 = float4::Load(fMat + 4);
+  auto c3 = float4::Load(fMat + 12);
 
   auto compute = [&](float r0, float r1, float r3) { return (c0 * r0 + (c1 * r1 + c3 * r3)); };
 
@@ -105,10 +103,10 @@ Matrix3D& Matrix3D::preConcat(const tgfx::Matrix& b) {
 }
 
 Matrix3D& Matrix3D::preTranslate(float x, float y, float z) {
-  auto c0 = pk::pkvx::float4::Load(fMat + 0);
-  auto c1 = pk::pkvx::float4::Load(fMat + 4);
-  auto c2 = pk::pkvx::float4::Load(fMat + 8);
-  auto c3 = pk::pkvx::float4::Load(fMat + 12);
+  auto c0 = float4::Load(fMat + 0);
+  auto c1 = float4::Load(fMat + 4);
+  auto c2 = float4::Load(fMat + 8);
+  auto c3 = float4::Load(fMat + 12);
 
   // only need to update the last column
   (c0 * x + (c1 * y + (c2 * z + c3))).store(fMat + 12);
@@ -116,17 +114,17 @@ Matrix3D& Matrix3D::preTranslate(float x, float y, float z) {
 }
 
 Matrix3D& Matrix3D::postTranslate(float x, float y, float z) {
-  pk::pkvx::float4 t = {x, y, z, 0};
-  (t * fMat[3] + pk::pkvx::float4::Load(fMat + 0)).store(fMat + 0);
-  (t * fMat[7] + pk::pkvx::float4::Load(fMat + 4)).store(fMat + 4);
-  (t * fMat[11] + pk::pkvx::float4::Load(fMat + 8)).store(fMat + 8);
-  (t * fMat[15] + pk::pkvx::float4::Load(fMat + 12)).store(fMat + 12);
+  float4 t = {x, y, z, 0};
+  (t * fMat[3] + float4::Load(fMat + 0)).store(fMat + 0);
+  (t * fMat[7] + float4::Load(fMat + 4)).store(fMat + 4);
+  (t * fMat[11] + float4::Load(fMat + 8)).store(fMat + 8);
+  (t * fMat[15] + float4::Load(fMat + 12)).store(fMat + 12);
   return *this;
 }
 
 Matrix3D& Matrix3D::preScale(float x, float y) {
-  auto c0 = pk::pkvx::float4::Load(fMat + 0);
-  auto c1 = pk::pkvx::float4::Load(fMat + 4);
+  auto c0 = float4::Load(fMat + 0);
+  auto c1 = float4::Load(fMat + 4);
 
   (c0 * x).store(fMat + 0);
   (c1 * y).store(fMat + 4);
@@ -134,9 +132,9 @@ Matrix3D& Matrix3D::preScale(float x, float y) {
 }
 
 Matrix3D& Matrix3D::preScale(float x, float y, float z) {
-  auto c0 = pk::pkvx::float4::Load(fMat + 0);
-  auto c1 = pk::pkvx::float4::Load(fMat + 4);
-  auto c2 = pk::pkvx::float4::Load(fMat + 8);
+  auto c0 = float4::Load(fMat + 0);
+  auto c1 = float4::Load(fMat + 4);
+  auto c2 = float4::Load(fMat + 8);
 
   (c0 * x).store(fMat + 0);
   (c1 * y).store(fMat + 4);
@@ -145,10 +143,10 @@ Matrix3D& Matrix3D::preScale(float x, float y, float z) {
 }
 
 Vec4 Matrix3D::map(float x, float y, float z, float w) const {
-  auto c0 = pk::pkvx::float4::Load(fMat + 0);
-  auto c1 = pk::pkvx::float4::Load(fMat + 4);
-  auto c2 = pk::pkvx::float4::Load(fMat + 8);
-  auto c3 = pk::pkvx::float4::Load(fMat + 12);
+  auto c0 = float4::Load(fMat + 0);
+  auto c1 = float4::Load(fMat + 4);
+  auto c2 = float4::Load(fMat + 8);
+  auto c3 = float4::Load(fMat + 12);
 
   Vec4 v;
   (c0 * x + (c1 * y + (c2 * z + c3 * w))).store(&v.x);
@@ -159,12 +157,12 @@ static tgfx::Rect map_rect_affine(const tgfx::Rect& src, const float mat[16]) {
   // When multiplied against vectors of the form <x,y,x,y>, 'flip' allows a single min()
   // to compute both the min and "negated" max between the xy coordinates. Once finished, another
   // multiplication produces the original max.
-  const pk::pkvx::float4 flip{1.f, 1.f, -1.f, -1.f};
+  const float4 flip{1.f, 1.f, -1.f, -1.f};
 
   // Since z = 0 and it's assumed ther's no perspective, only load the upper 2x2 and (tx,ty) in c3
-  auto c0 = pk::pkvx::shuffle<0, 1, 0, 1>(pk::pkvx::float2::Load(mat + 0)) * flip;
-  auto c1 = pk::pkvx::shuffle<0, 1, 0, 1>(pk::pkvx::float2::Load(mat + 4)) * flip;
-  auto c3 = pk::pkvx::shuffle<0, 1, 0, 1>(pk::pkvx::float2::Load(mat + 12));
+  auto c0 = shuffle<0, 1, 0, 1>(float2::Load(mat + 0)) * flip;
+  auto c1 = shuffle<0, 1, 0, 1>(float2::Load(mat + 4)) * flip;
+  auto c3 = shuffle<0, 1, 0, 1>(float2::Load(mat + 12));
 
   // Compute the min and max of the four transformed corners pre-translation; then translate once
   // at the end.
@@ -181,9 +179,9 @@ static tgfx::Rect map_rect_affine(const tgfx::Rect& src, const float mat[16]) {
 static tgfx::Rect map_rect_perspective(const tgfx::Rect& src, const float mat[16]) {
   // Like map_rect_affine, z = 0 so we can skip the 3rd column, but we do need to compute w's
   // for each corner of the src rect.
-  auto c0 = pk::pkvx::float4::Load(mat + 0);
-  auto c1 = pk::pkvx::float4::Load(mat + 4);
-  auto c3 = pk::pkvx::float4::Load(mat + 12);
+  auto c0 = float4::Load(mat + 0);
+  auto c1 = float4::Load(mat + 4);
+  auto c3 = float4::Load(mat + 12);
 
   // Unlike map_rect_affine, we do not defer the 4th column since we may need to homogeneous
   // coordinates to clip against the w=0 plane
@@ -194,25 +192,23 @@ static tgfx::Rect map_rect_perspective(const tgfx::Rect& src, const float mat[16
 
   // After clipping to w>0 and projecting to 2d, 'project' employs the same negation trick to
   // compute min and max at the same time.
-  const pk::pkvx::float4 flip{1.f, 1.f, -1.f, -1.f};
-  auto project = [&flip](const pk::pkvx::float4& p0, const pk::pkvx::float4& p1,
-                         const pk::pkvx::float4& p2) {
+  const float4 flip{1.f, 1.f, -1.f, -1.f};
+  auto project = [&flip](const float4& p0, const float4& p1, const float4& p2) {
     float w0 = p0[3];
     float w0PlaneDistance = 1.f / (1 << 14);
     if (w0 >= w0PlaneDistance) {
       // Unclipped, just divide by w
-      return flip * pk::pkvx::shuffle<0, 1, 0, 1>(p0) / w0;
+      return flip * shuffle<0, 1, 0, 1>(p0) / w0;
     } else {
-      auto clip = [&](const pk::pkvx::float4& p) {
+      auto clip = [&](const float4& p) {
         float w = p[3];
         if (w >= w0PlaneDistance) {
           float t = (w0PlaneDistance - w0) / (w - w0);
-          auto c = (t * pk::pkvx::shuffle<0, 1>(p) + (1.f - t) * pk::pkvx::shuffle<0, 1>(p0)) /
-                   w0PlaneDistance;
+          auto c = (t * shuffle<0, 1>(p) + (1.f - t) * shuffle<0, 1>(p0)) / w0PlaneDistance;
 
-          return flip * pk::pkvx::shuffle<0, 1, 0, 1>(c);
+          return flip * shuffle<0, 1, 0, 1>(c);
         } else {
-          return pk::pkvx::float4(std::numeric_limits<float>::infinity());
+          return float4(std::numeric_limits<float>::infinity());
         }
       };
       // Clip both edges leaving p0, and return the min/max of the two clipped points
@@ -249,10 +245,10 @@ void Matrix3D::normalizePerspective() {
   // and therefore faster (e.g. clients can forward-difference calculations).
   if (fMat[15] != 1 && fMat[15] != 0 && fMat[3] == 0 && fMat[7] == 0 && fMat[11] == 0) {
     float inv = 1.0 / fMat[15];
-    (pk::pkvx::float4::Load(fMat + 0) * inv).store(fMat + 0);
-    (pk::pkvx::float4::Load(fMat + 4) * inv).store(fMat + 4);
-    (pk::pkvx::float4::Load(fMat + 8) * inv).store(fMat + 8);
-    (pk::pkvx::float4::Load(fMat + 12) * inv).store(fMat + 12);
+    (float4::Load(fMat + 0) * inv).store(fMat + 0);
+    (float4::Load(fMat + 4) * inv).store(fMat + 4);
+    (float4::Load(fMat + 8) * inv).store(fMat + 8);
+    (float4::Load(fMat + 12) * inv).store(fMat + 12);
     fMat[15] = 1.0f;
   }
 }
