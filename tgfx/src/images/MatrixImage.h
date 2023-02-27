@@ -37,6 +37,9 @@ class MatrixImage : public Image {
 
   std::shared_ptr<Image> onMakeSubset(const Rect& subset) const override;
 
+  std::shared_ptr<Image> onMakeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
+                                      int alphaStartY) const override;
+
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(Context* context, TileMode tileModeX,
                                                          TileMode tileModeY,
                                                          const SamplingOptions& sampling,

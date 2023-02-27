@@ -38,6 +38,10 @@ std::shared_ptr<Image> MatrixImage::onMakeSubset(const Rect& subset) const {
                                                       static_cast<int>(subset.height()), matrix));
 }
 
+std::shared_ptr<Image> MatrixImage::onMakeRGBAAA(int, int, int, int) const {
+  return nullptr;
+}
+
 std::unique_ptr<FragmentProcessor> MatrixImage::asFragmentProcessor(
     Context* context, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
     const Matrix* extraMatrix, bool skipGeneratingCache) {

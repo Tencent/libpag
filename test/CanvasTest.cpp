@@ -726,10 +726,13 @@ PAG_TEST(CanvasTest, image) {
   canvas->setMatrix(matrix);
   canvas->drawImage(textureImage, sampling);
   canvas->resetMatrix();
+  auto rgbAAA = subset->makeRGBAAA(500, 500, 500, 0);
+  EXPECT_TRUE(rgbAAA == nullptr);
   auto codec = MakeImageCodec("resources/apitest/rgbaaa.png");
   EXPECT_EQ(codec->width(), 1024);
   EXPECT_EQ(codec->height(), 512);
-  auto rgbAAA = Image::MakeRGBAAA(codec, 512, 512, 512, 0, true);
+  image = Image::MakeFromGenerator(codec, tgfx::ImageOrigin::TopLeft, true);
+  rgbAAA = image->makeRGBAAA(512, 512, 512, 0);
   EXPECT_TRUE(rgbAAA->isRGBAAA());
   EXPECT_EQ(rgbAAA->width(), 512);
   EXPECT_EQ(rgbAAA->height(), 512);
@@ -739,11 +742,13 @@ PAG_TEST(CanvasTest, image) {
   subset = rgbAAA->makeSubset(Rect::MakeXYWH(50, 50, 400, 400));
   matrix.postTranslate(140, 15);
   canvas->drawImage(subset, matrix);
-  rgbAAA = Image::MakeRGBAAA(codec, 512, 512, 0, 0, true);
+  rgbAAA = image->makeRGBAAA(512, 512, 0, 0);
   EXPECT_EQ(rgbAAA->width(), 512);
   EXPECT_EQ(rgbAAA->height(), 512);
   matrix.postTranslate(110, -15);
   canvas->drawImage(rgbAAA, matrix);
+  rgbAAA = rgbAAA->makeRGBAAA(256, 512, 256, 0);
+  EXPECT_TRUE(rgbAAA == nullptr);
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/drawImage"));
   device->unlock();
 }
