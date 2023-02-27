@@ -375,10 +375,10 @@ PAG_TEST(PAGFilterTest, CornerPinScale) {
 }
 
 /**
- * 用例描述: Transform 3D
+ * 用例描述: HueSaturation
  */
-PAG_TEST(PAGFilterTest, Transform3D) {
-  auto pagFile = LoadPAGFile("resources/filter/3Dtest.pag");
+PAG_TEST(PAGFilterTest, HueSaturation) {
+  auto pagFile = LoadPAGFile("resources/filter/HueSaturation.pag");
   ASSERT_NE(pagFile, nullptr);
   auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
   ASSERT_NE(pagSurface, nullptr);
@@ -387,6 +387,22 @@ PAG_TEST(PAGFilterTest, Transform3D) {
   pagPlayer->setComposition(pagFile);
   pagPlayer->setProgress(0.7);
   pagPlayer->flush();
-  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFilterTest/Transform3D"));
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFilterTest/HueSaturation"));
+}
+
+/**
+ * 用例描述: BrightnessContrast
+ */
+PAG_TEST(PAGFilterTest, BrightnessContrast) {
+  auto pagFile = LoadPAGFile("resources/filter/BrightnessContrast.pag");
+  ASSERT_NE(pagFile, nullptr);
+  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  ASSERT_NE(pagSurface, nullptr);
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setProgress(0.7);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFilterTest/BrightnessContrast"));
 }
 }  // namespace pag
