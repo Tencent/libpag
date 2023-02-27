@@ -39,7 +39,7 @@ class HardwareDecoderFactory : public VideoDecoderFactory {
       return nullptr;
     }
     auto decoder = new HardwareDecoder(format);
-    if (decoder->videoBuffer == nullptr) {
+    if (decoder->videoImageReader == nullptr) {
       delete decoder;
       return nullptr;
     }

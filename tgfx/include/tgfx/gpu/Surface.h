@@ -138,18 +138,21 @@ class Surface {
   bool flush(Semaphore* signalSemaphore = nullptr);
 
   /**
+   * Returns pixel at (x, y) as unpremultiplied color. Some color precision may be lost in the
+   * conversion to unpremultiplied color; original pixel data may have additional precision. Returns
+   * a transparent color if the point (x, y) is not contained by the Surface bounds.
+   * @param x  column index, zero or greater, and less than width()
+   * @param y  row index, zero or greater, and less than height()
+   * @return   pixel converted to unpremultiplied color
+   */
+  Color getColor(int x, int y);
+
+  /**
    * Copies a rect of pixels to dstPixels with specified ImageInfo. Copy starts at (srcX, srcY), and
    * does not exceed Surface (width(), height()). Pixels are copied only if pixel conversion is
    * possible. Returns true if pixels are copied to dstPixels.
    */
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0, int srcY = 0);
-
-  /**
-   * Evaluates the Surface to see if it overlaps or intersects with the specified point. The point
-   * is in the coordinate space of the Surface. This method always checks against the actual pixels
-   * of the Surface.
-   */
-  bool hitTest(float x, float y);
 
  protected:
   Surface(std::shared_ptr<RenderTarget> renderTarget, std::shared_ptr<Texture> texture,

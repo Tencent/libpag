@@ -20,6 +20,7 @@ import { PAGImageLayer } from '../pag-image-layer';
 import { PAGSolidLayer } from '../pag-solid-layer';
 import { Matrix } from '../core/matrix';
 import { RenderCanvas } from '../core/render-canvas';
+import { setMixin } from '../utils/mixin';
 
 /**
  * Binding pag js module on pag webassembly module.
@@ -45,21 +46,7 @@ export const binding = (module: PAG) => {
   module.BackendContext = BackendContext;
   module.Matrix = Matrix;
   module.RenderCanvas = RenderCanvas;
-  module.traceImage = function (info, pixels) {
-    const canvas = document.createElement('canvas');
-    canvas.width = info.width;
-    canvas.height = info.height;
-    const context = canvas.getContext('2d') as CanvasRenderingContext2D;
-    const imageData = new ImageData(new Uint8ClampedArray(pixels), canvas.width, canvas.height);
-    context.putImageData(imageData, 0, 0);
-    document.body.appendChild(canvas);
-  };
-  module.registerSoftwareDecoderFactory = function (factory = null) {
-    module._registerSoftwareDecoderFactory(factory);
-  };
-  module.SDKVersion = function () {
-    return module._SDKVersion();
-  };
+  setMixin(module);
   module.currentPlayer = null;
   module.tgfx = { ...tgfx };
 };

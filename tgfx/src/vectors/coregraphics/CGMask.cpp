@@ -18,8 +18,8 @@
 
 #include "CGMask.h"
 #include "platform/apple/BitmapContextUtil.h"
-#include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Mask.h"
+#include "tgfx/core/Pixmap.h"
 
 namespace tgfx {
 static void Iterator(PathVerb verb, const Point points[4], void* info) {
@@ -50,7 +50,7 @@ std::shared_ptr<Mask> Mask::Make(int width, int height, bool tryHardware) {
   if (buffer == nullptr) {
     return nullptr;
   }
-  Bitmap(buffer).eraseAll();
+  Pixmap(buffer).eraseAll();
   return std::make_shared<CGMask>(std::move(buffer));
 }
 
@@ -59,7 +59,7 @@ void CGMask::fillPath(const Path& path) {
     return;
   }
   const auto& info = buffer->info();
-  Bitmap bm(buffer);
+  Pixmap bm(buffer);
   auto cgContext = CreateBitmapContext(info, bm.writablePixels());
   if (cgContext == nullptr) {
     return;

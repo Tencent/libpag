@@ -18,16 +18,13 @@ export interface VideoReader {
   stop: () => void;
 }
 
-export interface VideoDecoderConstructor {
-  isIOS: () => boolean;
-  new (
+export type VideoDecoderConstructor = new (
     mp4Data: Uint8Array,
     width: number,
     height: number,
     frameRate: number,
     staticTimeRanges: TimeRange[],
-  ): VideoReader;
-}
+  ) => VideoReader;
 
 export interface FontMetrics {
   ascent: number;

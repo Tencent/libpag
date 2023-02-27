@@ -49,15 +49,6 @@ const waitVideoCanPlay = (videoElement: HTMLVideoElement) => {
 };
 
 export class VideoReader {
-  public static isIOS() {
-    return IPHONE;
-  }
-
-  public static isAndroidMiniprogram() {
-    // need't to check platform on Web
-    return false;
-  }
-
   public static async create(
     mp4Data: Uint8Array,
     width: number,
@@ -189,6 +180,10 @@ export class VideoReader {
         this.setError(e);
       }
     }
+  }
+
+  public getVideo() {
+    return this.videoEl;
   }
 
   public renderToTexture(GL: EmscriptenGL, textureID: number) {

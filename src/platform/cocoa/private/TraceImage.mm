@@ -19,7 +19,7 @@
 #include "TraceImage.h"
 #include "PixelBufferUtils.h"
 #include "base/utils/Log.h"
-#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Pixmap.h"
 
 namespace pag {
 void TraceImage(const tgfx::ImageInfo& info, const void* pixels, const std::string& tag) {
@@ -36,8 +36,8 @@ void TraceImage(const tgfx::ImageInfo& info, const void* pixels, const std::stri
     auto rowBytes = CVPixelBufferGetBytesPerRow(pixelBuffer);
     auto dstInfo = tgfx::ImageInfo::Make(info.width(), info.height(), tgfx::ColorType::BGRA_8888,
                                          tgfx::AlphaType::Premultiplied, rowBytes);
-    tgfx::Bitmap bitmap(dstInfo, dstPixels);
-    bitmap.writePixels(info, pixels);
+    tgfx::Pixmap pixmap(dstInfo, dstPixels);
+    pixmap.writePixels(info, pixels);
     CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
     LOGI("%s : Image(width = %d, height = %d)", tag.c_str(), info.width(), info.height());
   }

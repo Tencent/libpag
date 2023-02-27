@@ -19,8 +19,8 @@
 #include "tgfx/gpu/opengl/GLRenderTarget.h"
 #include "gpu/opengl/GLContext.h"
 #include "gpu/opengl/GLUtil.h"
-#include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Buffer.h"
+#include "tgfx/core/Pixmap.h"
 
 namespace tgfx {
 std::shared_ptr<GLRenderTarget> GLRenderTarget::MakeFrom(Context* context,
@@ -216,8 +216,8 @@ static void CopyPixels(const ImageInfo& srcInfo, const void* srcPixels, const Im
     }
     pixels = tempPixels->data();
   }
-  Bitmap bitmap(srcInfo, pixels);
-  bitmap.readPixels(dstInfo, dstPixels);
+  Pixmap pixmap(srcInfo, pixels);
+  pixmap.readPixels(dstInfo, dstPixels);
 }
 
 bool GLRenderTarget::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX,

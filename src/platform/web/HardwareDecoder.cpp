@@ -25,79 +25,6 @@
 using namespace emscripten;
 
 namespace pag {
-static constexpr int ANDROID_ALIGNMENT = 16;
-
-std::shared_ptr<WebVideoTexture> WebVideoTexture::Make(tgfx::Context* context, int width,
-                                                       int height, bool isAndroidMiniprogram) {
-  tgfx::GLSampler sampler = {};
-  sampler.target = GL_TEXTURE_2D;
-  sampler.format = tgfx::PixelFormat::RGBA_8888;
-  auto gl = tgfx::GLFunctions::Get(context);
-  gl->genTextures(1, &sampler.id);
-  if (sampler.id == 0) {
-    return nullptr;
-  }
-  gl->bindTexture(sampler.target, sampler.id);
-  gl->texParameteri(sampler.target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  gl->texParameteri(sampler.target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  gl->texParameteri(sampler.target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  gl->texParameteri(sampler.target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  gl->texImage2D(sampler.target, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-
-  auto texture = tgfx::Resource::Wrap(
-      context, new WebVideoTexture(sampler, width, height, tgfx::SurfaceOrigin::TopLeft));
-  if (isAndroidMiniprogram) {
-    // https://stackoverflow.com/questions/28291204/something-about-stagefright-codec-input-format-in-android
-    // Video decoder will align to multiples of 16 on the Android WeChat mini-program.
-    texture->textureWidth += ANDROID_ALIGNMENT - width % ANDROID_ALIGNMENT;
-    texture->textureHeight += ANDROID_ALIGNMENT - height % ANDROID_ALIGNMENT;
-  }
-  return texture;
-}
-
-WebVideoTexture::WebVideoTexture(const tgfx::GLSampler& glSampler, int width, int height,
-                                 tgfx::SurfaceOrigin origin)
-    : GLTexture(width, height, origin), textureWidth(width), textureHeight(height) {
-  sampler = glSampler;
-}
-
-tgfx::Point WebVideoTexture::getTextureCoord(float x, float y) const {
-  return {x / static_cast<float>(textureWidth), y / static_cast<float>(textureHeight)};
-}
-
-size_t WebVideoTexture::memoryUsage() const {
-  return width() * height() * 4;
-}
-
-void WebVideoTexture::onReleaseGPU() {
-  if (sampler.id > 0) {
-    auto gl = tgfx::GLFunctions::Get(context);
-    gl->deleteTextures(1, &sampler.id);
-  }
-}
-
-WebVideoBuffer::WebVideoBuffer(int width, int height, emscripten::val videoReader)
-    : _width(width), _height(height), videoReader(videoReader) {
-}
-
-WebVideoBuffer::~WebVideoBuffer() {
-  if (videoReader.as<bool>()) {
-    videoReader.call<void>("onDestroy");
-  }
-}
-
-std::shared_ptr<tgfx::Texture> WebVideoBuffer::onMakeTexture(tgfx::Context* context, bool) const {
-  std::lock_guard<std::mutex> autoLock(locker);
-  if (webVideoTexture == nullptr) {
-    auto isAndroidMiniprogram =
-        val::module_property("VideoReader").call<bool>("isAndroidMiniprogram");
-    webVideoTexture = WebVideoTexture::Make(context, _width, _height, isAndroidMiniprogram);
-  }
-  auto& sampler = webVideoTexture->glSampler();
-  videoReader.call<void>("renderToTexture", val::module_property("GL"), sampler.id);
-  return webVideoTexture;
-}
-
 HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
   auto demuxer = static_cast<VideoSequenceDemuxer*>(format.demuxer);
   file = demuxer->file;
@@ -106,45 +33,50 @@ HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
   _width = sequence->getVideoWidth();
   _height = sequence->getVideoHeight();
   frameRate = sequence->frameRate;
+  auto staticTimeRanges = val::array();
+  for (const auto& timeRange : sequence->staticTimeRanges) {
+    auto object = val::object();
+    object.set("start", static_cast<int>(timeRange.start));
+    object.set("end", static_cast<int>(timeRange.end));
+    staticTimeRanges.call<void>("push", object);
+  }
+  val isIPhone = val::module_property("isIPhone");
+  if (isIPhone().as<bool>()) {
+    auto videoSequence = *sequence;
+    videoSequence.MP4Header = nullptr;
+    std::vector<VideoFrame> videoFrames;
+    for (auto& frame : sequence->frames) {
+      if (!videoFrames.empty() && frame->isKeyframe) {
+        break;
+      }
+      videoFrames.push_back(*frame);
+      auto& videoFrame = videoFrames.back();
+      videoFrame.frame += static_cast<Frame>(sequence->frames.size());
+      videoSequence.frames.emplace_back(&videoFrame);
+    }
+    mp4Data = MP4BoxHelper::CovertToMP4(&videoSequence);
+    videoSequence.frames.clear();
+    videoSequence.headers.clear();
+    for (auto& frame : videoFrames) {
+      frame.fileBytes = nullptr;
+    }
+  } else {
+    mp4Data = MP4BoxHelper::CovertToMP4(sequence);
+  }
   auto videoReaderClass = val::module_property("VideoReader");
-  if (videoReaderClass.as<bool>()) {
-    auto staticTimeRanges = val::array();
-    for (const auto& timeRange : sequence->staticTimeRanges) {
-      auto object = val::object();
-      object.set("start", static_cast<int>(timeRange.start));
-      object.set("end", static_cast<int>(timeRange.end));
-      staticTimeRanges.call<void>("push", object);
-    }
-    if (videoReaderClass.call<bool>("isIOS")) {
-      auto videoSequence = *sequence;
-      videoSequence.MP4Header = nullptr;
-      std::vector<VideoFrame> videoFrames;
-      for (auto& frame : sequence->frames) {
-        if (!videoFrames.empty() && frame->isKeyframe) {
-          break;
-        }
-        videoFrames.push_back(*frame);
-        auto& videoFrame = videoFrames.back();
-        videoFrame.frame += static_cast<Frame>(sequence->frames.size());
-        videoSequence.frames.emplace_back(&videoFrame);
-      }
-      mp4Data = MP4BoxHelper::CovertToMP4(&videoSequence);
-      videoSequence.frames.clear();
-      videoSequence.headers.clear();
-      for (auto& frame : videoFrames) {
-        frame.fileBytes = nullptr;
-      }
-    } else {
-      mp4Data = MP4BoxHelper::CovertToMP4(sequence);
-    }
-    auto videoReader =
-        videoReaderClass
-            .call<val>("create", val(typed_memory_view(mp4Data->length(), mp4Data->data())), _width,
-                       _height, sequence->frameRate, staticTimeRanges)
-            .await();
-    if (videoReader.as<bool>()) {
-      videoBuffer = std::make_shared<WebVideoBuffer>(_width, _height, videoReader);
-    }
+  videoReader = videoReaderClass
+                    .call<val>("create", val(typed_memory_view(mp4Data->length(), mp4Data->data())),
+                               _width, _height, sequence->frameRate, staticTimeRanges)
+                    .await();
+  auto video = videoReader.call<val>("getVideo");
+  if (!video.isNull()) {
+    videoImageReader = tgfx::VideoImageReader::MakeFrom(video, _width, _height);
+  }
+}
+
+HardwareDecoder::~HardwareDecoder() {
+  if (videoReader.as<bool>()) {
+    videoReader.call<void>("onDestroy");
   }
 }
 
@@ -180,8 +112,8 @@ std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
     playbackRate = file->duration() / ((rootFile->duration() / 1000000) * rootFile->frameRate());
   }
   auto targetFrame = TimeToFrame(currentTimeStamp, frameRate);
-  videoBuffer->videoReader.call<val>("prepare", static_cast<int>(targetFrame), playbackRate)
-      .await();
-  return videoBuffer;
+  val promise = videoReader.call<val>("prepare", static_cast<int>(targetFrame), playbackRate);
+  auto imageBuffer = videoImageReader->acquireNextBuffer(promise);
+  return imageBuffer;
 }
 }  // namespace pag

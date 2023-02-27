@@ -4,6 +4,7 @@ import { touchDirectory, writeFile } from './file-utils';
 
 import type { EmscriptenGL } from '../types';
 import type { FrameDataOptions, VideoDecoder, wx } from './interfaces';
+import { ArrayBufferImage } from './array-buffer-image';
 
 declare const wx: wx;
 declare const setInterval: (callback: () => void, delay: number) => number;
@@ -37,14 +38,15 @@ export interface TimeRange {
 
 @destroyVerify
 export class VideoReader {
-  public static isIOS = () => {
-    // need't to check platform on wechat miniprogram
-    return false;
-  };
-
-  public static isAndroidMiniprogram = () => {
-    return wx.getSystemInfoSync().platform === 'android';
-  };
+  public static async create(
+    mp4Data: Uint8Array,
+    width: number,
+    height: number,
+    frameRate: number,
+    staticTimeRanges: TimeRange[],
+  ): Promise<VideoReader> {
+    return new VideoReader(mp4Data, width, height, frameRate, staticTimeRanges);
+  }
 
   public isSought = false; // Web SDK use this property to check if video is seeked
   public isPlaying = false; // Web SDK use this property to check if video is playing
@@ -61,6 +63,7 @@ export class VideoReader {
   private getFrameDataResolve: ((frameData: FrameData) => void) | null = null;
   private getFrameDataLoopTimer: number | null = null;
   private seeking = false;
+  private arrayBufferImage = new ArrayBufferImage(new ArrayBuffer(0), 0, 0);
 
   public constructor(
     mp4Data: Uint8Array,
@@ -93,7 +96,7 @@ export class VideoReader {
       const index = this.frameDataBuffers.findIndex((frameData) => frameData.id === targetFrame);
       if (index !== -1) {
         this.frameDataBuffers = this.frameDataBuffers.slice(index);
-        this.frameData = await this.getFrameData();
+        this.arrayBufferImage.setFrameData(await this.getFrameData());
         this.currentFrame = targetFrame;
         return;
       }
@@ -105,9 +108,13 @@ export class VideoReader {
       await this.videoDecoder.seek(Math.floor((targetFrame / this.frameRate) * 1000));
       this.seeking = false;
     }
-    this.frameData = await this.getFrameData();
+    this.arrayBufferImage.setFrameData(await this.getFrameData());
     this.currentFrame = targetFrame;
     return;
+  }
+
+  public getVideo() {
+    return this.arrayBufferImage;
   }
 
   public renderToTexture(GL: EmscriptenGL, textureID: number) {

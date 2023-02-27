@@ -18,7 +18,7 @@
 
 #include "JTraceImage.h"
 #include "JNIHelper.h"
-#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Pixmap.h"
 
 namespace pag {
 static Global<jclass> TraceImageClass;
@@ -44,8 +44,8 @@ void JTraceImage::Trace(const tgfx::ImageInfo& info, const void* pixels, const s
   }
   auto dstInfo = tgfx::ImageInfo::Make(info.width(), info.height(), tgfx::ColorType::RGBA_8888,
                                        tgfx::AlphaType::Premultiplied, rowBytes);
-  tgfx::Bitmap bitmap(dstInfo, dstPixels);
-  bitmap.writePixels(info, pixels);
+  tgfx::Pixmap pixmap(dstInfo, dstPixels);
+  pixmap.writePixels(info, pixels);
   auto byteBuffer = MakeByteBufferObject(env, dstPixels, dstInfo.byteSize());
   auto tagString = SafeConvertToJString(env, tag.c_str());
   env->CallStaticVoidMethod(TraceImageClass.get(), TraceImage_Trace, tagString, byteBuffer,
