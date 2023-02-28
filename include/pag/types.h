@@ -120,14 +120,14 @@ struct PAG_API Point {
   }
 
   /**
-   * Returns true if fX and fY are both zero.
+   * Returns true if x and y are both zero.
    */
   bool isZero() const {
     return (0 == x) & (0 == y);
   }
 
   /**
-   * Sets fX to x and fY to y.
+   * Sets xValue to x and yValue to y.
    */
   void set(float xValue, float yValue) {
     x = xValue;
@@ -227,14 +227,14 @@ struct PAG_API Point3D {
   }
 
   /**
-   * Returns true if fX fY fZ are all zero.
+   * Returns true if x y z are all zero.
    */
   bool isZero() const {
     return (0 == x) & (0 == y) & (0 == z);
   }
 
   /**
-   * Sets fX to x, fY to y and fZ to z.
+   * Sets xValue to x, yValue to y and zValue to z.
    */
   void set(float xValue, float yValue, float zValue) {
     x = xValue;
@@ -281,7 +281,7 @@ struct PAG_API Point3D {
 
   /**
    * Returns Point resulting from Point a offset by Point b, computed as:
-   * (a.fX + b.fX, a.fY + b.fY, a.fZ + b.fZ).
+   * (a.x + b.x, a.y + b.y, a.z + b.z).
    */
   friend Point3D operator+(const Point3D& a, const Point3D& b) {
     return {a.x + b.x, a.y + b.y, a.z + b.z};
@@ -546,11 +546,11 @@ struct PAG_API Rect {
   }
 
   /**
-   * Offsets Rect by adding delta.fX to left, right; and by adding delta.fY to top, bottom.
-   * If delta.fX is negative, moves Rect to the left.
-   * If delta.fX is positive, moves Rect to the right.
-   * If delta.fY is negative, moves Rect upward.
-   * If delta.fY is positive, moves Rect downward.
+   * Offsets Rect by adding delta.fX to left, right; and by adding delta.y to top, bottom.
+   * If delta.x is negative, moves Rect to the left.
+   * If delta.x is positive, moves Rect to the right.
+   * If delta.y is negative, moves Rect upward.
+   * If delta.y is positive, moves Rect downward.
    */
   void offset(const Point& delta) {
     this->offset(delta.x, delta.y);
