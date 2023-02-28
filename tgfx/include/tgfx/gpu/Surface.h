@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Canvas.h"
+#include "tgfx/core/ImageInfo.h"
 #include "tgfx/gpu/RenderTarget.h"
 #include "tgfx/gpu/Semaphore.h"
 #include "tgfx/gpu/SurfaceOptions.h"
@@ -136,6 +136,16 @@ class Surface {
    * the caller should not instruct the GPU to wait on the semaphore.
    */
   bool flush(Semaphore* signalSemaphore = nullptr);
+
+  /**
+   * Call to ensure all reads/writes of the surface have been issued to the underlying 3D API.
+   * TGFX will correctly order its own draws and pixel operations. This must to be used to ensure
+   * correct ordering when the surface backing store is accessed outside TGFX (e.g. direct use of
+   * the 3D API or a windowing system). Context has additional flush and submit methods that apply
+   * to all surfaces and images created from a Context. This is equivalent to calling
+   * Surface::flush() followed by Context::submit(syncCpu).
+   */
+  void flushAndSubmit(bool syncCpu = false);
 
   /**
    * Returns pixel at (x, y) as unpremultiplied color. Some color precision may be lost in the

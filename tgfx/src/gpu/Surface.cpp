@@ -60,6 +60,11 @@ bool Surface::flush(Semaphore* signalSemaphore) {
   return renderTarget->getContext()->drawingManager()->flush(signalSemaphore);
 }
 
+void Surface::flushAndSubmit(bool syncCpu) {
+  flush();
+  renderTarget->getContext()->submit(syncCpu);
+}
+
 Color Surface::getColor(int x, int y) {
   uint8_t color[4];
   auto info = ImageInfo::Make(1, 1, ColorType::RGBA_8888, AlphaType::Premultiplied);

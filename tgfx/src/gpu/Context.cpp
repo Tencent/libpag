@@ -51,6 +51,15 @@ bool Context::flush(Semaphore* signalSemaphore) {
   return _drawingManager->flush(signalSemaphore);
 }
 
+bool Context::submit(bool syncCpu) {
+  return _gpu->submitToGpu(syncCpu);
+}
+
+void Context::flushAndSubmit(bool syncCpu) {
+  flush();
+  submit(syncCpu);
+}
+
 bool Context::wait(const Semaphore* waitSemaphore) {
   if (waitSemaphore == nullptr) {
     return false;

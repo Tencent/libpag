@@ -119,11 +119,9 @@ std::shared_ptr<Surface> CGLWindow::onCreateSurface(Context* context) {
 }
 
 void CGLWindow::onPresent(Context*, int64_t) {
-  auto glContext = static_cast<CGLDevice*>(device.get())->glContext;
   if (view) {
+    auto glContext = static_cast<CGLDevice*>(device.get())->glContext;
     [glContext flushBuffer];
-  } else {
-    glFlush();
   }
 }
 }  // namespace tgfx

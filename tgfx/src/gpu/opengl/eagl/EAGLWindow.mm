@@ -145,14 +145,12 @@ std::shared_ptr<Surface> EAGLWindow::onCreateSurface(Context* context) {
 }
 
 void EAGLWindow::onPresent(Context* context, int64_t) {
-  auto gl = GLFunctions::Get(context);
   if (layer) {
+    auto gl = GLFunctions::Get(context);
     gl->bindRenderbuffer(GL_RENDERBUFFER, colorBuffer);
     auto eaglContext = static_cast<EAGLDevice*>(context->device())->eaglContext();
     [eaglContext presentRenderbuffer:GL_RENDERBUFFER];
     gl->bindRenderbuffer(GL_RENDERBUFFER, 0);
-  } else {
-    gl->flush();
   }
 }
 }  // namespace tgfx

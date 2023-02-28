@@ -48,6 +48,8 @@ class GLGpu : public Gpu {
   OpsRenderPass* getOpsRenderPass(std::shared_ptr<RenderTarget> renderTarget,
                                   std::shared_ptr<Texture> renderTargetTexture) override;
 
+  bool submitToGpu(bool syncCpu) override;
+
   void submit(OpsRenderPass* renderPass) override;
 
  private:

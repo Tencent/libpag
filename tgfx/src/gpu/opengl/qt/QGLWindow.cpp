@@ -110,7 +110,6 @@ void QGLWindow::onPresent(Context* context, int64_t) {
   }
   auto gl = GLFunctions::Get(context);
   std::swap(frontTexture, backTexture);
-  gl->flush();
   gl->bindFramebuffer(GL_FRAMEBUFFER, renderTarget->glFrameBuffer().id);
   gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
                            backTexture->glSampler().id, 0);
