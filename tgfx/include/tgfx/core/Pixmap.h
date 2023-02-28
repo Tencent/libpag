@@ -36,35 +36,30 @@ class Pixmap {
   Pixmap() = default;
 
   /**
-   * Creates a new Pixmap with the specified ImageInfo and read-only pixels. Not that the caller
-   * must ensure that the pixel memory is valid for the lifetime of the Pixmap.
+   * Creates a new Pixmap with the specified ImageInfo and read-only pixels. The memory lifetime of
+   * pixels is managed by the caller. When Pixmap goes out of scope, the pixels is unaffected.
    */
   Pixmap(const ImageInfo& info, const void* pixels);
 
   /**
-   * Creates a new Bitmap with specified ImageInfo and writable pixels. Not that the caller must
-   * ensure that the pixel memory is valid for the lifetime of the Pixmap.
+   * Creates a new Bitmap with specified ImageInfo and writable pixels. The memory lifetime of
+   * pixels is managed by the caller. When Pixmap goes out of scope, the pixels is unaffected.
    */
   Pixmap(const ImageInfo& info, void* pixels);
 
   /**
    * Creates a new Pixmap from the specified read-only Bitmap. Pixmap will lock pixels from the
-   * Bitmap and hold a reference to it. The Bitmap will remain locked until the Pixmap goes out of
-   * scope or reset. Not that the caller must ensure that the Bitmap is valid for the lifetime of
-   * the Pixmap.
+   * Bitmap and take a reference on its PixelRef object. The Bitmap will remain locked until the
+   * Pixmap goes out of scope or reset.
    */
   explicit Pixmap(const Bitmap& bitmap);
 
   /**
    * Creates a new Pixmap from the specified writable Bitmap. Pixmap will lock pixels from the
-   * Bitmap and hold a reference to it. The Bitmap will remain locked until the Pixmap goes out of
-   * scope or reset. Note that the caller must ensure that the Bitmap is valid for the lifetime of
-   * the Pixmap.
+   * Bitmap and take a reference on its PixelRef object. The Bitmap will remain locked until the
+   * Pixmap goes out of scope or reset.
    */
   explicit Pixmap(Bitmap& bitmap);
-
-  //TODO(domrjchen): remove this method.
-  explicit Pixmap(std::shared_ptr<PixelBuffer> pixelBuffer);
 
   ~Pixmap();
 
@@ -205,8 +200,6 @@ class Pixmap {
   ImageInfo _info = {};
   const void* _pixels = nullptr;
   void* _writablePixels = nullptr;
-  PixelBuffer* pixelBuffer = nullptr;
-
-  void reset(PixelBuffer* pixelBuffer);
+  std::shared_ptr<PixelRef> pixelRef = nullptr;
 };
 }  // namespace tgfx

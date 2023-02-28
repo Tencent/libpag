@@ -25,14 +25,14 @@
 #include "tgfx/core/ImageInfo.h"
 
 namespace tgfx {
-class PixelBuffer;
+class PixelRef;
 
 /**
- * Bitmap describes a two-dimensional raster pixel array. Bitmap points to PixelBuffer, which
- * describes the physical array of pixels and is optimized for creating textures. If pixel array is
- * primarily read-only, use Image for better performance. Declaring Bitmap const prevents altering
- * ImageInfo: the Bitmap height, width, and so on cannot change. It does not affect PixelBuffer: a
- * caller may write its pixels. Bitmap is not thread safe.
+ * Bitmap describes a two-dimensional raster pixel array. Bitmap points to PixelRef, which describes
+ * the physical array of pixels and is optimized for creating textures. If pixel array is primarily
+ * read-only, use Image for better performance. Declaring Bitmap const prevents altering ImageInfo:
+ * the Bitmap height, width, and so on cannot change. It does not affect PixelRef: a caller may
+ * write its pixels. Bitmap is not thread safe.
  */
 class Bitmap {
  public:
@@ -45,8 +45,8 @@ class Bitmap {
    * Creates an new Bitmap and try to allocate its pixels by the specified width, height, and the
    * native color type. and allocates pixel memory. If the alphaOnly is true, sets ImageInfo to
    * ColorType::ALPHA_8. If the tryHardware is true and there is hardware buffer support on the
-   * current platform, a hardware backed PixelBuffer is allocated. Otherwise, a raster PixelBuffer
-   * is allocated. The isEmpty() method of the Bitmap will return true if allocation fails.
+   * current platform, a hardware backed PixelRef is allocated. Otherwise, a raster PixelRef is
+   * allocated. The isEmpty() method of the Bitmap will return true if allocation fails.
    */
   Bitmap(int width, int height, bool alphaOnly = false, bool tryHardware = true);
 
@@ -75,22 +75,26 @@ class Bitmap {
   /**
    * Sets ImageInfo to width, height, and the native color type; and allocates pixel memory. If
    * the alphaOnly is true, sets ImageInfo to ColorType::ALPHA_8. If the tryHardware is true and
-   * there is hardware buffer support on the current platform, a hardware backed PixelBuffer is
-   * allocated. Otherwise, a raster PixelBuffer is allocated. Returns true if the PixelBuffer is
+   * there is hardware buffer support on the current platform, a hardware backed PixelRef is
+   * allocated. Otherwise, a raster PixelRef is allocated. Returns true if the PixelRef is
    * allocated successfully.
    */
   bool allocPixels(int width, int height, bool alphaOnly = false, bool tryHardware = true);
 
   /**
-   * Locks and returns the pixel address to ensure that the memory is accessible, the base address
-   * corresponding to the pixel origin.
+   * Locks and returns the writable pixels, the base address corresponding to the pixel origin.
    */
   void* lockPixels();
 
   /**
+   * Locks and returns the read-only pixels, the base address corresponding to the pixel origin.
+   */
+  const void* lockPixels() const;
+
+  /**
    * Call this to balance a successful call to lockPixels().
    */
-  void unlockPixels();
+  void unlockPixels() const;
 
   /**
    * Return true if the Bitmap describes an empty area of pixels.
@@ -199,13 +203,16 @@ class Bitmap {
    */
   void eraseAll();
 
+  /**
+   * Returns an ImageBuffer object capturing the pixels in the Bitmap. Subsequent writing of the
+   * Bitmap will not be captured. Returns nullptr if the Bitmap is empty.
+   */
+  std::shared_ptr<ImageBuffer> makeBuffer() const;
+
  private:
   ImageInfo _info = {};
-  std::shared_ptr<PixelBuffer> pixelBuffer = nullptr;
-
-  PixelBuffer* writableRef();
+  std::shared_ptr<PixelRef> pixelRef = nullptr;
 
   friend class Pixmap;
-  friend class Image;
 };
 }  // namespace tgfx

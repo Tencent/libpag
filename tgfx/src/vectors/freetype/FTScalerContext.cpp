@@ -621,15 +621,20 @@ static gfx::skcms_PixelFormat ToPixelFormat(ColorType colorType) {
   }
 }
 
-void CopyFTBitmap(const FT_Bitmap& bitmap, std::shared_ptr<PixelBuffer> pixelBuffer) {
-  auto width = static_cast<int>(bitmap.width);
-  auto height = static_cast<int>(bitmap.rows);
-  auto src = reinterpret_cast<const uint8_t*>(bitmap.buffer);
+std::shared_ptr<ImageBuffer> CopyFTBitmap(const FT_Bitmap& ftBitmap) {
+  auto alphaOnly = ftBitmap.pixel_mode == FT_PIXEL_MODE_GRAY;
+  Bitmap bitmap(static_cast<int>(ftBitmap.width), static_cast<int>(ftBitmap.rows), alphaOnly);
+  if (bitmap.isEmpty()) {
+    return nullptr;
+  }
+  auto width = static_cast<int>(ftBitmap.width);
+  auto height = static_cast<int>(ftBitmap.rows);
+  auto src = reinterpret_cast<const uint8_t*>(ftBitmap.buffer);
   // FT_Bitmap::pitch is an int and allowed to be negative.
-  auto srcRB = bitmap.pitch;
-  auto srcFormat = bitmap.pixel_mode == FT_PIXEL_MODE_GRAY ? gfx::skcms_PixelFormat_A_8
-                                                           : gfx::skcms_PixelFormat_BGRA_8888;
-  Pixmap bm(pixelBuffer);
+  auto srcRB = ftBitmap.pitch;
+  auto srcFormat = ftBitmap.pixel_mode == FT_PIXEL_MODE_GRAY ? gfx::skcms_PixelFormat_A_8
+                                                             : gfx::skcms_PixelFormat_BGRA_8888;
+  Pixmap bm(bitmap);
   auto dst = static_cast<uint8_t*>(bm.writablePixels());
   auto dstRB = bm.rowBytes();
   auto dstFormat = ToPixelFormat(bm.colorType());
@@ -639,6 +644,7 @@ void CopyFTBitmap(const FT_Bitmap& bitmap, std::shared_ptr<PixelBuffer> pixelBuf
     src += srcRB;
     dst += dstRB;
   }
+  return bitmap.makeBuffer();
 }
 
 std::shared_ptr<ImageBuffer> FTScalerContext::generateImage(GlyphID glyphId, Matrix* matrix) {
@@ -654,22 +660,15 @@ std::shared_ptr<ImageBuffer> FTScalerContext::generateImage(GlyphID glyphId, Mat
   if (err != FT_Err_Ok || face->glyph->format != FT_GLYPH_FORMAT_BITMAP) {
     return nullptr;
   }
-  auto bitmap = face->glyph->bitmap;
-  if (bitmap.pixel_mode != FT_PIXEL_MODE_BGRA && bitmap.pixel_mode != FT_PIXEL_MODE_GRAY) {
+  auto ftBitmap = face->glyph->bitmap;
+  if (ftBitmap.pixel_mode != FT_PIXEL_MODE_BGRA && ftBitmap.pixel_mode != FT_PIXEL_MODE_GRAY) {
     return nullptr;
   }
-  auto alphaOnly = bitmap.pixel_mode == FT_PIXEL_MODE_GRAY;
-  auto pixelBuffer = PixelBuffer::Make(static_cast<int>(face->glyph->bitmap.width),
-                                       static_cast<int>(face->glyph->bitmap.rows), alphaOnly);
-  if (pixelBuffer == nullptr) {
-    return nullptr;
-  }
-  CopyFTBitmap(face->glyph->bitmap, pixelBuffer);
   if (matrix) {
     matrix->setTranslate(static_cast<float>(face->glyph->bitmap_left),
                          -static_cast<float>(face->glyph->bitmap_top));
     matrix->postConcat(matrix22Scalar);
   }
-  return pixelBuffer;
+  return CopyFTBitmap(ftBitmap);
 }
 }  // namespace tgfx

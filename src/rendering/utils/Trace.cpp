@@ -19,15 +19,9 @@
 #include "Trace.h"
 #include "platform/Platform.h"
 #include "tgfx/core/Bitmap.h"
-#include "tgfx/core/PixelBuffer.h"
 #include "tgfx/gpu/Surface.h"
 
 namespace pag {
-void Trace(std::shared_ptr<tgfx::PixelBuffer> pixelBuffer, const std::string& tag) {
-  tgfx::Pixmap bitmap(pixelBuffer);
-  Trace(bitmap, tag);
-}
-
 void Trace(std::shared_ptr<tgfx::Texture> texture, const std::string& path) {
   if (texture == nullptr) {
     return;
@@ -46,6 +40,11 @@ void Trace(std::shared_ptr<tgfx::Texture> texture, const std::string& path) {
   }
   surface->readPixels(pixmap.info(), pixmap.writablePixels());
   Trace(pixmap, path);
+}
+
+void Trace(const tgfx::Bitmap& bitmap, const std::string& tag) {
+  tgfx::Pixmap pixmap(bitmap);
+  Trace(pixmap, tag);
 }
 
 void Trace(const tgfx::Pixmap& pixmap, const std::string& tag) {

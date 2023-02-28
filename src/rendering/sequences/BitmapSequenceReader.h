@@ -21,7 +21,7 @@
 #include "SequenceReader.h"
 #include "pag/file.h"
 #include "rendering/Performance.h"
-#include "tgfx/core/Pixmap.h"
+#include "tgfx/core/PixelBuffer.h"
 
 namespace pag {
 class BitmapSequenceReader : public SequenceReader {

@@ -62,7 +62,7 @@
 #else
 
 + (PAGImageImpl*)FromPixelBuffer:(CVPixelBufferRef)pixelBuffer {
-  auto hardwareBuffer = tgfx::PixelBuffer::MakeFrom(pixelBuffer);
+  auto hardwareBuffer = tgfx::ImageBuffer::MakeFrom(pixelBuffer);
   auto image = pag::StillImage::MakeFrom(hardwareBuffer);
   if (image == nullptr) {
     return nil;

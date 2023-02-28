@@ -20,11 +20,10 @@
 
 #include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/ImageInfo.h"
-#include "tgfx/platform/HardwareBuffer.h"
 
 namespace tgfx {
 /**
- * A container for writable pixel memory.
+ * A container for writable pixel memory. PixelBuffer is thread safe.
  */
 class PixelBuffer : public ImageBuffer {
  public:
@@ -41,14 +40,6 @@ class PixelBuffer : public ImageBuffer {
   static std::shared_ptr<PixelBuffer> Make(int width, int height, bool alphaOnly = false,
                                            bool tryHardware = true);
 
-  /**
-   * Creates a new PixelBuffer object from a platform-specific hardware buffer. The hardwareBuffer
-   * could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on the apple
-   * platform. Returns nullptr if the current platform has no hardware buffer support. The returned
-   * PixelBuffer takes a reference on the hardwareBuffer.
-   */
-  static std::shared_ptr<PixelBuffer> MakeFrom(HardwareBufferRef hardwareBuffer);
-
   int width() const override {
     return _info.width();
   }
@@ -62,39 +53,11 @@ class PixelBuffer : public ImageBuffer {
   }
 
   /**
- * Returns a ImageInfo describing the width, height, color type, alpha type, and row bytes
-  of the PixelMap.
-  */
+   * Returns an ImageInfo describing the width, height, color type, alpha type, and row bytes of the
+   * PixelBuffer.
+   */
   const ImageInfo& info() const {
     return _info;
-  }
-
-  /**
-   * Returns the AlphaType of the pixel buffer, which is always AlphaType::Premultiplied.
-   */
-  AlphaType alphaType() const {
-    return _info.alphaType();
-  }
-
-  /**
-   * Returns the ColorType of the pixel buffer.
-   */
-  ColorType colorType() const {
-    return _info.colorType();
-  }
-
-  /**
-   * Returns the rowBytes of the pixel buffer.
-   */
-  size_t rowBytes() const {
-    return _info.rowBytes();
-  }
-
-  /**
-   * Returns the byte size of the pixel buffer.
-   */
-  size_t byteSize() const {
-    return _info.byteSize();
   }
 
   /**
@@ -104,11 +67,6 @@ class PixelBuffer : public ImageBuffer {
   bool isHardwareBacked() const {
     return hardwareBacked;
   }
-
-  /**
-   * Duplicates this PixelBuffer. Returns nullptr if this cannot be done.
-   */
-  std::shared_ptr<PixelBuffer> duplicate();
 
   /**
    * Locks and returns the address of the pixels to ensure that the memory is accessible.

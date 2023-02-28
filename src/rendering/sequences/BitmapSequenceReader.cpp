@@ -18,7 +18,7 @@
 
 #include "BitmapSequenceReader.h"
 #include "tgfx/core/ImageCodec.h"
-#include "tgfx/core/PixelBuffer.h"
+#include "tgfx/core/Pixmap.h"
 
 namespace pag {
 BitmapSequenceReader::BitmapSequenceReader(std::shared_ptr<File> file, BitmapSequence* sequence)
@@ -27,7 +27,11 @@ BitmapSequenceReader::BitmapSequenceReader(std::shared_ptr<File> file, BitmapSeq
   // decoding will fail due to the memory sharing mechanism.
   auto staticContent = sequence->composition->staticContent();
   pixelBuffer = tgfx::PixelBuffer::Make(sequence->width, sequence->height, false, staticContent);
-  tgfx::Pixmap(pixelBuffer).eraseAll();
+  if (pixelBuffer != nullptr) {
+    auto pixels = pixelBuffer->lockPixels();
+    tgfx::Pixmap(pixelBuffer->info(), pixels).eraseAll();
+    pixelBuffer->unlockPixels();
+  }
 }
 
 std::shared_ptr<tgfx::ImageBuffer> BitmapSequenceReader::onMakeBuffer(Frame targetFrame) {
@@ -42,7 +46,9 @@ std::shared_ptr<tgfx::ImageBuffer> BitmapSequenceReader::onMakeBuffer(Frame targ
   auto startFrame = findStartFrame(targetFrame);
   lastDecodeFrame = -1;
   auto& bitmapFrames = static_cast<BitmapSequence*>(sequence)->frames;
-  tgfx::Pixmap bitmap(pixelBuffer);
+  auto pixels = pixelBuffer->lockPixels();
+  tgfx::Pixmap pixmap(pixelBuffer->info(), pixels);
+  bool result = true;
   for (Frame frame = startFrame; frame <= targetFrame; frame++) {
     auto bitmapFrame = bitmapFrames[frame];
     auto firstRead = true;
@@ -53,19 +59,23 @@ std::shared_ptr<tgfx::ImageBuffer> BitmapSequenceReader::onMakeBuffer(Frame targ
       // The returned image could be nullptr if the frame is an empty frame.
       if (codec != nullptr) {
         if (firstRead && bitmapFrame->isKeyframe &&
-            !(codec->width() == bitmap.width() && codec->height() == bitmap.height())) {
+            !(codec->width() == pixmap.width() && codec->height() == pixmap.height())) {
           // clear the whole screen if the size of the key frame is smaller than the screen.
-          bitmap.eraseAll();
+          pixmap.eraseAll();
         }
-        auto offset = bitmap.rowBytes() * bitmapRect->y + bitmapRect->x * 4;
-        auto result = codec->readPixels(
-            bitmap.info(), reinterpret_cast<uint8_t*>(bitmap.writablePixels()) + offset);
+        auto offset = pixmap.rowBytes() * bitmapRect->y + bitmapRect->x * 4;
+        result = codec->readPixels(pixmap.info(),
+                                   reinterpret_cast<uint8_t*>(pixmap.writablePixels()) + offset);
         if (!result) {
-          return nullptr;
+          break;
         }
         firstRead = false;
       }
     }
+  }
+  pixelBuffer->unlockPixels();
+  if (!result) {
+    return nullptr;
   }
   lastDecodeFrame = targetFrame;
   return pixelBuffer;

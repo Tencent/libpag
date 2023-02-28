@@ -147,16 +147,17 @@ PAG_TEST(PAGReadPixelsTest, TestPixelMap) {
 PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
   auto codec = MakeImageCodec("resources/apitest/test_timestretch.png");
   ASSERT_TRUE(codec != nullptr);
-  auto pixelBuffer = PixelBuffer::Make(codec->width(), codec->height(), false, false);
-  ASSERT_TRUE(pixelBuffer != nullptr);
-  auto pixels = pixelBuffer->lockPixels();
-  auto result = codec->readPixels(pixelBuffer->info(), pixels);
-  pixelBuffer->unlockPixels();
+  Bitmap bitmap(codec->width(), codec->height(), false, false);
+  ASSERT_FALSE(bitmap.isEmpty());
+  auto pixels = bitmap.lockPixels();
+  auto result = codec->readPixels(bitmap.info(), pixels);
+  bitmap.unlockPixels();
   ASSERT_TRUE(result);
 
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
+  auto pixelBuffer = bitmap.makeBuffer();
   auto texture = pixelBuffer->makeTexture(context);
   ASSERT_TRUE(texture != nullptr);
   auto surface = Surface::Make(context, pixelBuffer->width(), pixelBuffer->height());
@@ -164,10 +165,9 @@ PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
   auto canvas = surface->getCanvas();
   canvas->drawTexture(texture);
 
-  Pixmap pixmap(pixelBuffer);
-  auto width = pixmap.width();
-  auto height = pixmap.height();
-  pixels = pixmap.writablePixels();
+  auto width = bitmap.width();
+  auto height = bitmap.height();
+  pixels = bitmap.lockPixels();
 
   auto RGBAInfo =
       ImageInfo::Make(width, height, tgfx::ColorType::RGBA_8888, tgfx::AlphaType::Premultiplied);
@@ -198,7 +198,7 @@ PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
   ASSERT_TRUE(result);
   CHECK_PIXELS(RGBARectInfo, pixels, "Surface_rgb_A_to_rgb_A_100_-100");
 
-  surface = Surface::Make(context, pixmap.width(), pixmap.height(), true);
+  surface = Surface::Make(context, width, height, true);
   ASSERT_TRUE(surface != nullptr);
   canvas = surface->getCanvas();
   canvas->drawTexture(texture);
@@ -252,6 +252,7 @@ PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
   auto gl = GLFunctions::Get(context);
   gl->deleteTextures(1, &textureInfo.id);
   device->unlock();
+  bitmap.unlockPixels();
 }
 
 /**

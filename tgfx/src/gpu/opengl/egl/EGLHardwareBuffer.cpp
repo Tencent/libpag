@@ -28,10 +28,6 @@
 namespace tgfx {
 #if defined(__ANDROID__) || defined(ANDROID)
 
-std::shared_ptr<PixelBuffer> PixelBuffer::MakeFrom(HardwareBufferRef hardwareBuffer) {
-  return HardwareBuffer::MakeFrom(hardwareBuffer);
-}
-
 std::shared_ptr<PixelBuffer> PixelBuffer::MakeHardwareBuffer(int width, int height,
                                                              bool alphaOnly) {
   return HardwareBuffer::Make(width, height, alphaOnly);
@@ -48,10 +44,6 @@ std::shared_ptr<Texture> Texture::MakeFrom(Context* context, HardwareBufferRef h
 #else
 
 std::shared_ptr<PixelBuffer> PixelBuffer::MakeHardwareBuffer(int, int, bool) {
-  return nullptr;
-}
-
-std::shared_ptr<PixelBuffer> PixelBuffer::MakeFrom(HardwareBufferRef) {
   return nullptr;
 }
 

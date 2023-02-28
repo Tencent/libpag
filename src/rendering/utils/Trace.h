@@ -23,14 +23,14 @@
 
 namespace pag {
 /**
- * Trace() provides a utility to view the PixelBuffer.
- */
-void Trace(std::shared_ptr<tgfx::PixelBuffer> pixelBuffer, const std::string& tag = "");
-
-/**
  * Trace() provides a utility to view the texture.
  */
 void Trace(std::shared_ptr<tgfx::Texture> texture, const std::string& path = "");
+
+/**
+ * Trace() provides a utility to view the Bitmap.
+ */
+void Trace(const tgfx::Bitmap& bitmap, const std::string& tag = "");
 
 /**
  * Trace() provides a utility to view the Bitmap.

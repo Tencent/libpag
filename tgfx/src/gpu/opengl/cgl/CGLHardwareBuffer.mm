@@ -22,10 +22,6 @@
 #include "tgfx/gpu/YUVTexture.h"
 
 namespace tgfx {
-std::shared_ptr<PixelBuffer> PixelBuffer::MakeFrom(HardwareBufferRef hardwareBuffer) {
-  return HardwareBuffer::MakeFrom(hardwareBuffer);
-}
-
 std::shared_ptr<PixelBuffer> PixelBuffer::MakeHardwareBuffer(int width, int height,
                                                              bool alphaOnly) {
   return HardwareBuffer::Make(width, height, alphaOnly);

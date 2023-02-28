@@ -52,7 +52,9 @@ std::shared_ptr<Mask> Mask::Make(int width, int height, bool tryHardware) {
   if (buffer == nullptr) {
     return nullptr;
   }
-  Pixmap(buffer).eraseAll();
+  auto pixels = buffer->lockPixels();
+  Pixmap(buffer->info(), pixels).eraseAll();
+  buffer->unlockPixels();
   return std::make_shared<FTMask>(std::move(buffer));
 }
 
@@ -71,17 +73,18 @@ void FTMask::fillPath(const Path& path) {
   finalPath.decompose(Iterator, &ftPath);
   ftPath.setFillType(path.getFillType());
   auto outlines = ftPath.getOutlines();
-  Pixmap bm(buffer);
+  auto pixels = buffer->lockPixels();
   FT_Bitmap bitmap;
   bitmap.width = info.width();
   bitmap.rows = info.height();
   bitmap.pitch = static_cast<int>(info.rowBytes());
-  bitmap.buffer = static_cast<unsigned char*>(bm.writablePixels());
+  bitmap.buffer = static_cast<unsigned char*>(pixels);
   bitmap.pixel_mode = FT_PIXEL_MODE_GRAY;
   bitmap.num_grays = 256;
   auto ftLibrary = GetLibrary().library();
   for (auto& outline : outlines) {
     FT_Outline_Get_Bitmap(ftLibrary, &(outline->outline), &bitmap);
   }
+  buffer->unlockPixels();
 }
 }  // namespace tgfx

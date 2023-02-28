@@ -23,7 +23,6 @@
 #include "images/MatrixImage.h"
 #include "images/RGBAAAImage.h"
 #include "tgfx/core/ImageCodec.h"
-#include "tgfx/core/PixelBuffer.h"
 #include "tgfx/core/Pixmap.h"
 
 namespace tgfx {
@@ -61,7 +60,7 @@ std::shared_ptr<Image> Image::MakeRasterCopy(const Pixmap& pixmap, ImageOrigin o
 
 std::shared_ptr<Image> Image::MakeFromBitmap(const Bitmap& bitmap, ImageOrigin origin,
                                              bool miMapped) {
-  return MakeFromBuffer(bitmap.pixelBuffer, origin, miMapped);
+  return MakeFromBuffer(bitmap.makeBuffer(), origin, miMapped);
 }
 
 std::shared_ptr<Image> Image::MakeFromBuffer(std::shared_ptr<ImageBuffer> imageBuffer,

@@ -37,11 +37,11 @@ using namespace pag;
 
 namespace tgfx {
 static bool Compare(Surface* surface, const std::string& key) {
-  auto pixelBuffer = PixelBuffer::Make(surface->width(), surface->height());
-  if (pixelBuffer == nullptr) {
+  Bitmap bitmap(surface->width(), surface->height());
+  if (bitmap.isEmpty()) {
     return false;
   }
-  Pixmap pixmap(pixelBuffer);
+  Pixmap pixmap(bitmap);
   pixmap.eraseAll();
   auto result = surface->readPixels(pixmap.info(), pixmap.writablePixels());
   if (!result) {
@@ -565,15 +565,16 @@ PAG_TEST(CanvasTest, mipmap) {
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImageCodec("resources/apitest/rotation.jpg");
   ASSERT_TRUE(image != nullptr);
-  auto pixelBuffer = PixelBuffer::Make(image->width(), image->height(), false, false);
-  ASSERT_TRUE(pixelBuffer != nullptr);
-  Pixmap pixmap(pixelBuffer);
-  auto result = image->readPixels(pixelBuffer->info(), pixmap.writablePixels());
+  Bitmap bitmap(image->width(), image->height(), false, false);
+  ASSERT_FALSE(bitmap.isEmpty());
+  Pixmap pixmap(bitmap);
+  auto result = image->readPixels(pixmap.info(), pixmap.writablePixels());
   pixmap.reset();
   ASSERT_TRUE(result);
-  auto texture = pixelBuffer->makeTexture(context);
+  auto imageBuffer = bitmap.makeBuffer();
+  auto texture = imageBuffer->makeTexture(context);
   ASSERT_TRUE(texture != nullptr);
-  auto textureMipMapped = pixelBuffer->makeTexture(context, true);
+  auto textureMipMapped = imageBuffer->makeTexture(context, true);
   ASSERT_TRUE(textureMipMapped != nullptr);
   float scale = 0.03f;
   auto width = image->width();
@@ -615,13 +616,14 @@ PAG_TEST(CanvasTest, hardwareMipMap) {
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImageCodec("resources/apitest/rotation.jpg");
   ASSERT_TRUE(image != nullptr);
-  auto pixelBuffer = PixelBuffer::Make(image->width(), image->height(), false);
-  ASSERT_TRUE(pixelBuffer != nullptr);
-  Pixmap pixmap(pixelBuffer);
-  auto result = image->readPixels(pixelBuffer->info(), pixmap.writablePixels());
+  Bitmap bitmap(image->width(), image->height(), false);
+  ASSERT_FALSE(bitmap.isEmpty());
+  Pixmap pixmap(bitmap);
+  auto result = image->readPixels(pixmap.info(), pixmap.writablePixels());
   pixmap.reset();
   ASSERT_TRUE(result);
-  auto textureMipMapped = pixelBuffer->makeTexture(context, true);
+  auto imageBuffer = bitmap.makeBuffer();
+  auto textureMipMapped = imageBuffer->makeTexture(context, true);
   ASSERT_TRUE(textureMipMapped != nullptr);
   float scale = 0.03f;
   auto width = image->width();

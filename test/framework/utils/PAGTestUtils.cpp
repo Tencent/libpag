@@ -51,15 +51,18 @@ void GetAllPAGFiles(const std::string& path, std::vector<std::string>& files) {
   closedir(dir);
 }
 
-std::shared_ptr<PixelBuffer> MakeSnapshot(std::shared_ptr<PAGSurface> pagSurface) {
-  auto pixelBuffer = PixelBuffer::Make(pagSurface->width(), pagSurface->height(), false, false);
-  if (pixelBuffer == nullptr) {
-    return nullptr;
+Bitmap MakeSnapshot(std::shared_ptr<PAGSurface> pagSurface) {
+  Bitmap bitmap(pagSurface->width(), pagSurface->height(), false, false);
+  if (bitmap.isEmpty()) {
+    return {};
   }
-  Pixmap pixmap(pixelBuffer);
+  Pixmap pixmap(bitmap);
   auto result = pagSurface->readPixels(ToPAG(pixmap.colorType()), ToPAG(pixmap.alphaType()),
                                        pixmap.writablePixels(), pixmap.rowBytes());
-  return result ? pixelBuffer : nullptr;
+  if (!result) {
+    return {};
+  }
+  return bitmap;
 }
 
 std::shared_ptr<PAGLayer> GetLayer(std::shared_ptr<PAGComposition> root, LayerType type,
