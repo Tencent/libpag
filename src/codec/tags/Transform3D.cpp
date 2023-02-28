@@ -22,8 +22,7 @@ namespace pag {
 
 std::unique_ptr<BlockConfig> Transform3DTag(Transform3D* transform) {
   auto tagConfig = new BlockConfig(TagCode::Transform3D);
-  AddAttribute(tagConfig, &transform->anchorPoint, AttributeType::SpatialProperty,
-               Point3D::Zero());
+  AddAttribute(tagConfig, &transform->anchorPoint, AttributeType::SpatialProperty, Point3D::Zero());
   AddAttribute(tagConfig, &transform->position, AttributeType::SpatialProperty, Point3D::Zero());
   AddAttribute(tagConfig, &transform->xPosition, AttributeType::SimpleProperty, 0.0f);
   AddAttribute(tagConfig, &transform->yPosition, AttributeType::SimpleProperty, 0.0f);
