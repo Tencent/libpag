@@ -228,6 +228,33 @@ class Keyframe {
   Enum interpolationType = KeyframeInterpolationType::Hold;
   std::vector<Point> bezierOut;
   std::vector<Point> bezierIn;
+  Point spatialOut = Point::Zero();
+  Point spatialIn = Point::Zero();
+};
+
+template <>
+class Keyframe<Point3D> {
+ public:
+  virtual ~Keyframe() = default;
+
+  virtual void initialize() {
+  }
+
+  virtual Point3D getValueAt(Frame) {
+    return startValue;
+  }
+
+  bool containsTime(Frame time) const {
+    return time >= startTime && time < endTime;
+  }
+
+  Point3D startValue;
+  Point3D endValue;
+  Frame startTime = ZeroFrame;
+  Frame endTime = ZeroFrame;
+  Enum interpolationType = KeyframeInterpolationType::Hold;
+  std::vector<Point> bezierOut;
+  std::vector<Point> bezierIn;
   Point3D spatialOut = Point3D::Zero();
   Point3D spatialIn = Point3D::Zero();
 };
