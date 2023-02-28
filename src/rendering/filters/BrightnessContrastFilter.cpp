@@ -45,7 +45,7 @@ static const char FRAGMENT_SHADER[] = R"(
             return vec3(H, C, Q.x);
         }
 
-        vec3 RGBtoHSV(in vec3 RGB) {
+        vec3 RGBtoHSV(vec3 RGB) {
             vec3 HCV = RGBtoHCV(RGB);
             float S = HCV.y / (HCV.z + EPSILON);
             return vec3(HCV.x, S, HCV.z);
