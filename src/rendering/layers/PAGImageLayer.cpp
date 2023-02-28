@@ -42,7 +42,7 @@ PAGImageLayer::PAGImageLayer(std::shared_ptr<pag::File> file, ImageLayer* layer)
 
 PAGImageLayer::PAGImageLayer(int width, int height, int64_t duration) : PAGLayer(nullptr, nullptr) {
   emptyImageLayer = new ImageLayer();
-  emptyImageLayer->transform = Transform2D::MakeDefault();
+  emptyImageLayer->transform = Transform2D::MakeDefault().release();
   emptyImageLayer->imageBytes = new ImageBytes();
   emptyImageLayer->imageBytes->width = width;
   emptyImageLayer->imageBytes->height = height;

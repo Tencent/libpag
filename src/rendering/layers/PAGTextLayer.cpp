@@ -44,7 +44,7 @@ std::shared_ptr<PAGTextLayer> PAGTextLayer::Make(int64_t duration,
   auto layer = new TextLayer();
   auto transform = Transform2D::MakeDefault();
   transform->position->value = Point::Make(0.0, textDocumentHandle->fontSize);
-  layer->transform = transform;
+  layer->transform = transform.release();
   auto sourceText = new Property<TextDocumentHandle>();
   sourceText->value = std::move(textDocumentHandle);
   layer->sourceText = sourceText;
