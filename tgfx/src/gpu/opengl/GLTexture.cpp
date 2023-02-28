@@ -215,6 +215,9 @@ GLTexture::GLTexture(int width, int height, SurfaceOrigin origin) : Texture(widt
 }
 
 Point GLTexture::getTextureCoord(float x, float y) const {
+  if (sampler.target == GL_TEXTURE_RECTANGLE) {
+    return {x, y};
+  }
   return {x / static_cast<float>(width()), y / static_cast<float>(height())};
 }
 
@@ -224,5 +227,4 @@ Point GLTexture::getTextureCoord(float x, float y) const {
 bool GLTexture::readPixels(const ImageInfo&, void*, int, int) const {
   return false;
 }
-
 }  // namespace tgfx
