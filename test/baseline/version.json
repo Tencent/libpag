@@ -8351,8 +8351,7 @@
         "MotionTile": "6a420423",
         "MultiFilter_CornerPin_Bulge": "761b5d2cf",
         "MultiFilter_Motiontile_Blur": "18c6d9060",
-        "RadialBlur": "6a420423",
-        "Transform3D": "031ab6ea"
+        "RadialBlur": "6a420423"
     },
     "PAGFontTest": {
         "TestFont": {

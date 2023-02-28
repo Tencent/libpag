@@ -30,5 +30,4 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data>) {
 std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(NativeImageRef) {
   return nullptr;
 }
-
 }  // namespace tgfx
