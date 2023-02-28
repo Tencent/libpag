@@ -196,10 +196,10 @@ void ReadTimeEase(DecodeStream* stream, const std::vector<Keyframe<T>*>& keyfram
 template <typename T>
 class SpatialOperater {
  public:
-  static float ReadZ(pag::DecodeStream *, unsigned char) {
+  static float ReadZ(pag::DecodeStream*, unsigned char) {
     return 0.0f;
   }
-  
+
   static void WriteZ(std::vector<float>&, float) {
   }
 };
@@ -207,10 +207,10 @@ class SpatialOperater {
 template <>
 class SpatialOperater<Point3D> {
  public:
-  static float ReadZ(pag::DecodeStream *stream, unsigned char numBits) {
+  static float ReadZ(pag::DecodeStream* stream, unsigned char numBits) {
     return stream->readBits(numBits) * SPATIAL_PRECISION;
   }
-  
+
   static void WriteZ(std::vector<float>& spatialList, float z) {
     spatialList.push_back(z);
   }
