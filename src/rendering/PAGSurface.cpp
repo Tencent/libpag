@@ -200,6 +200,7 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
     signalSemaphore->initGL(semaphore.glSync);
   }
   cache->detachFromContext();
+  context->submit();
   drawable->setTimeStamp(pagPlayer->getTimeStampInternal());
   drawable->present(context);
   unlockContext();

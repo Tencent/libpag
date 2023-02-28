@@ -238,6 +238,16 @@ OpsRenderPass* GLGpu::getOpsRenderPass(std::shared_ptr<RenderTarget> renderTarge
   return opsRenderPass.get();
 }
 
+bool GLGpu::submitToGpu(bool syncCpu) {
+  auto gl = GLFunctions::Get(_context);
+  if (syncCpu) {
+    gl->finish();
+  } else {
+    gl->flush();
+  }
+  return true;
+}
+
 void GLGpu::submit(OpsRenderPass*) {
   opsRenderPass->reset();
 }

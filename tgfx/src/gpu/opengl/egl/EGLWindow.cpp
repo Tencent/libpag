@@ -103,12 +103,9 @@ std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
   return Surface::MakeFrom(renderTarget);
 }
 
-void EGLWindow::onPresent(Context* context, int64_t presentationTime) {
-  USE(context);
+void EGLWindow::onPresent(Context*, int64_t presentationTime) {
 #if defined(__ANDROID__) || defined(ANDROID)
   if (hardwareBuffer) {
-    auto gl = GLFunctions::Get(context);
-    gl->flush();
     return;
   }
 #endif
