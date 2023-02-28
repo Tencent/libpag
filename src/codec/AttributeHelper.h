@@ -221,34 +221,6 @@ static void ReadSpatialEase(DecodeStream* stream, const std::vector<Keyframe<T>*
   delete[] spatialFlagList;
 }
 
-template <>
-void ReadSpatialEase(DecodeStream* stream, const std::vector<Keyframe<Point3D>*>& keyframes) {
-  auto spatialFlagList = new bool[keyframes.size() * 2];
-  auto count = keyframes.size() * 2;
-  for (size_t i = 0; i < count; i++) {
-    spatialFlagList[i] = stream->readBitBoolean();
-  }
-  auto numBits = stream->readNumBits();
-  int index = 0;
-  for (auto& keyframe : keyframes) {
-    auto hasSpatialIn = spatialFlagList[index++];
-    auto hasSpatialOut = spatialFlagList[index++];
-    if (hasSpatialIn || hasSpatialOut) {
-      if (hasSpatialIn) {
-        keyframe->spatialIn.x = stream->readBits(numBits) * SPATIAL_PRECISION;
-        keyframe->spatialIn.y = stream->readBits(numBits) * SPATIAL_PRECISION;
-        keyframe->spatialIn.z = stream->readBits(numBits) * SPATIAL_PRECISION;
-      }
-      if (hasSpatialOut) {
-        keyframe->spatialOut.x = stream->readBits(numBits) * SPATIAL_PRECISION;
-        keyframe->spatialOut.y = stream->readBits(numBits) * SPATIAL_PRECISION;
-        keyframe->spatialOut.z = stream->readBits(numBits) * SPATIAL_PRECISION;
-      }
-    }
-  }
-  delete[] spatialFlagList;
-}
-
 template <typename T>
 Property<T>* ReadProperty(DecodeStream* stream, const AttributeConfig<T>& config,
                           const AttributeFlag& flag) {
@@ -411,27 +383,6 @@ static void WriteSpatialEase(EncodeStream* stream, const std::vector<Keyframe<T>
     if (keyframe->spatialOut != Point3D::Zero()) {
       spatialList.push_back(keyframe->spatialOut.x);
       spatialList.push_back(keyframe->spatialOut.y);
-    }
-  }
-  auto count = static_cast<uint32_t>(spatialList.size());
-  stream->writeFloatList(&spatialList[0], count, SPATIAL_PRECISION);
-}
-
-template <>
-void WriteSpatialEase(EncodeStream* stream, const std::vector<Keyframe<Point3D>*>& keyframes) {
-  std::vector<float> spatialList;
-  for (auto& keyframe : keyframes) {
-    stream->writeBitBoolean(keyframe->spatialIn != Point3D::Zero());
-    stream->writeBitBoolean(keyframe->spatialOut != Point3D::Zero());
-    if (keyframe->spatialIn != Point3D::Zero()) {
-      spatialList.push_back(keyframe->spatialIn.x);
-      spatialList.push_back(keyframe->spatialIn.y);
-      spatialList.push_back(keyframe->spatialIn.z);
-    }
-    if (keyframe->spatialOut != Point3D::Zero()) {
-      spatialList.push_back(keyframe->spatialOut.x);
-      spatialList.push_back(keyframe->spatialOut.y);
-      spatialList.push_back(keyframe->spatialOut.z);
     }
   }
   auto count = static_cast<uint32_t>(spatialList.size());
