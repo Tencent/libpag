@@ -30,7 +30,6 @@ class CGLHardwareTexture : public GLTexture {
   explicit CGLHardwareTexture(CVPixelBufferRef pixelBuffer);
 
   ~CGLHardwareTexture() override;
-  Point getTextureCoord(float x, float y) const override;
   size_t memoryUsage() const override;
 
  protected:

@@ -18,8 +18,8 @@
 
 #include "CGLHardwareTexture.h"
 #include <OpenGL/gl3.h>
-#include "utils/UniqueID.h"
 #include "tgfx/gpu/opengl/cgl/CGLDevice.h"
+#include "utils/UniqueID.h"
 
 namespace tgfx {
 std::shared_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(Context* context,
@@ -79,13 +79,6 @@ CGLHardwareTexture::~CGLHardwareTexture() {
   if (texture) {
     CFRelease(texture);
   }
-}
-
-Point CGLHardwareTexture::getTextureCoord(float x, float y) const {
-  if (sampler.target == GL_TEXTURE_RECTANGLE) {
-    return {x, y};
-  }
-  return GLTexture::getTextureCoord(x, y);
 }
 
 void CGLHardwareTexture::computeRecycleKey(BytesKey* recycleKey) const {
