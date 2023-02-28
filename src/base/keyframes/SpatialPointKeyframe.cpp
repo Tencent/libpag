@@ -21,8 +21,9 @@
 namespace pag {
 void SpatialPointKeyframe::initialize() {
   SingleEaseKeyframe<Point>::initialize();
-  spatialBezier =
-      BezierPath::Build(startValue, startValue + spatialOut, endValue + spatialIn, endValue, 0.05f);
+  auto point1 = Point::Make(startValue.x + spatialOut.x, startValue.y + spatialOut.y);
+  auto point2 = Point::Make(endValue.x + spatialIn.x, endValue.y + spatialIn.y);
+  spatialBezier = BezierPath::Build(startValue, point1, point2, endValue, 0.05f);
 }
 
 Point SpatialPointKeyframe::getValueAt(Frame time) {

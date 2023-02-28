@@ -47,6 +47,11 @@ inline Point Interpolate(const Point& a, const Point& b, const float& t) {
 }
 
 template <>
+inline Point3D Interpolate(const Point3D& a, const Point3D& b, const float& t) {
+  return {Interpolate(a.x, b.x, t), Interpolate(a.y, b.y, t), Interpolate(a.z, b.z, t)};
+}
+
+template <>
 inline Color Interpolate(const Color& a, const Color& b, const float& t) {
   return {Interpolate(a.red, b.red, t), Interpolate(a.green, b.green, t),
           Interpolate(a.blue, b.blue, t)};

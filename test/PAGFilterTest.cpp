@@ -373,4 +373,36 @@ PAG_TEST(PAGFilterTest, CornerPinScale) {
   pagPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFilterTest/CornerPinScale"));
 }
+
+/**
+ * 用例描述: HueSaturation
+ */
+PAG_TEST(PAGFilterTest, HueSaturation) {
+  auto pagFile = LoadPAGFile("resources/filter/HueSaturation.pag");
+  ASSERT_NE(pagFile, nullptr);
+  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  ASSERT_NE(pagSurface, nullptr);
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setProgress(0.7);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFilterTest/HueSaturation"));
+}
+
+/**
+ * 用例描述: BrightnessContrast
+ */
+PAG_TEST(PAGFilterTest, BrightnessContrast) {
+  auto pagFile = LoadPAGFile("resources/filter/BrightnessContrast.pag");
+  ASSERT_NE(pagFile, nullptr);
+  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  ASSERT_NE(pagSurface, nullptr);
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setProgress(0.7);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFilterTest/BrightnessContrast"));
+}
 }  // namespace pag

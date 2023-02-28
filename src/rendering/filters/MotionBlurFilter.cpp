@@ -29,7 +29,7 @@ static const char MOTIONBLUR_VERTEX_SHADER[] = R"(
         attribute vec2 aTextureCoord;
         uniform mat3 uVertexMatrix;
         uniform mat3 uTextureMatrix;
-		uniform mat3 uPrevTransform;
+		    uniform mat3 uPrevTransform;
         uniform mat3 uTransform;
         varying vec2 vertexColor;
         varying vec2 vCurrPosition;

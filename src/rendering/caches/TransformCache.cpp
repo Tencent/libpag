@@ -23,10 +23,20 @@ namespace pag {
 TransformCache::TransformCache(Layer* layer)
     : FrameCache<Transform>(layer->startTime, layer->duration), layer(layer) {
   std::vector<TimeRange> timeRanges = {layer->visibleRange()};
-  layer->transform->excludeVaryingRanges(&timeRanges);
+  if (layer->transform != nullptr) {
+    layer->transform->excludeVaryingRanges(&timeRanges);
+  }
+  if (layer->transform3D != nullptr) {
+    layer->transform3D->excludeVaryingRanges(&timeRanges);
+  }
   auto parent = layer->parent;
   while (parent != nullptr) {
-    parent->transform->excludeVaryingRanges(&timeRanges);
+    if (parent->transform != nullptr) {
+      parent->transform->excludeVaryingRanges(&timeRanges);
+    }
+    if (parent->transform3D != nullptr) {
+      parent->transform3D->excludeVaryingRanges(&timeRanges);
+    }
     SplitTimeRangesAt(&timeRanges, parent->startTime);
     SplitTimeRangesAt(&timeRanges, parent->startTime + parent->duration);
     parent = parent->parent;
@@ -36,6 +46,9 @@ TransformCache::TransformCache(Layer* layer)
 
 Transform* TransformCache::createCache(Frame layerFrame) {
   auto transform = new Transform();
+  if (layer->transform == nullptr) {
+    return transform;
+  }
   RenderTransform(transform, layer->transform, layerFrame);
   auto parent = layer->parent;
   while (parent != nullptr) {

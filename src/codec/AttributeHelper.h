@@ -194,6 +194,29 @@ void ReadTimeEase(DecodeStream* stream, const std::vector<Keyframe<T>*>& keyfram
 }
 
 template <typename T>
+class SpatialOperater {
+ public:
+  static float ReadZ(pag::DecodeStream*, unsigned char) {
+    return 0.0f;
+  }
+
+  static void WriteZ(std::vector<float>&, float) {
+  }
+};
+
+template <>
+class SpatialOperater<Point3D> {
+ public:
+  static float ReadZ(pag::DecodeStream* stream, unsigned char numBits) {
+    return stream->readBits(numBits) * SPATIAL_PRECISION;
+  }
+
+  static void WriteZ(std::vector<float>& spatialList, float z) {
+    spatialList.push_back(z);
+  }
+};
+
+template <typename T>
 void ReadSpatialEase(DecodeStream* stream, const std::vector<Keyframe<T>*>& keyframes) {
   auto spatialFlagList = new bool[keyframes.size() * 2];
   auto count = keyframes.size() * 2;
@@ -209,10 +232,12 @@ void ReadSpatialEase(DecodeStream* stream, const std::vector<Keyframe<T>*>& keyf
       if (hasSpatialIn) {
         keyframe->spatialIn.x = stream->readBits(numBits) * SPATIAL_PRECISION;
         keyframe->spatialIn.y = stream->readBits(numBits) * SPATIAL_PRECISION;
+        keyframe->spatialIn.z = SpatialOperater<T>::ReadZ(stream, numBits);
       }
       if (hasSpatialOut) {
         keyframe->spatialOut.x = stream->readBits(numBits) * SPATIAL_PRECISION;
         keyframe->spatialOut.y = stream->readBits(numBits) * SPATIAL_PRECISION;
+        keyframe->spatialOut.z = SpatialOperater<T>::ReadZ(stream, numBits);
       }
     }
   }
@@ -372,15 +397,17 @@ template <typename T>
 void WriteSpatialEase(EncodeStream* stream, const std::vector<Keyframe<T>*>& keyframes) {
   std::vector<float> spatialList;
   for (auto& keyframe : keyframes) {
-    stream->writeBitBoolean(keyframe->spatialIn != Point::Zero());
-    stream->writeBitBoolean(keyframe->spatialOut != Point::Zero());
-    if (keyframe->spatialIn != Point::Zero()) {
+    stream->writeBitBoolean(keyframe->spatialIn != Point3D::Zero());
+    stream->writeBitBoolean(keyframe->spatialOut != Point3D::Zero());
+    if (keyframe->spatialIn != Point3D::Zero()) {
       spatialList.push_back(keyframe->spatialIn.x);
       spatialList.push_back(keyframe->spatialIn.y);
+      SpatialOperater<T>::WriteZ(spatialList, keyframe->spatialIn.z);
     }
-    if (keyframe->spatialOut != Point::Zero()) {
+    if (keyframe->spatialOut != Point3D::Zero()) {
       spatialList.push_back(keyframe->spatialOut.x);
       spatialList.push_back(keyframe->spatialOut.y);
+      SpatialOperater<T>::WriteZ(spatialList, keyframe->spatialOut.z);
     }
   }
   auto count = static_cast<uint32_t>(spatialList.size());
@@ -403,7 +430,7 @@ AttributeFlag WriteProperty(EncodeStream* stream, const AttributeConfig<T>& conf
   bool hasSpatial = false;
   if (config.attributeType == AttributeType::SpatialProperty) {
     for (auto keyframe : keyframes) {
-      if (keyframe->spatialIn != Point::Zero() || keyframe->spatialOut != Point::Zero()) {
+      if (keyframe->spatialIn != Point3D::Zero() || keyframe->spatialOut != Point3D::Zero()) {
         hasSpatial = true;
         break;
       }

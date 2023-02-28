@@ -238,6 +238,16 @@ class DecodeStream final {
   void readFloatList(float* values, uint32_t count, float precision);
 
   /**
+   * Reads a list of Point2D values from the stream.
+   */
+  void readPoint2DList(Point* points, uint32_t count, float precision);
+
+  /**
+   * Reads a list of Point3D values from the stream.
+   */
+  void readPoint3DList(Point3D* points, uint32_t count, float precision);
+
+  /**
    * Reads a Boolean value from the byte stream. A 1-bit integer is read, and true is returned if
    * the integer is nonzero, false otherwise.
    */

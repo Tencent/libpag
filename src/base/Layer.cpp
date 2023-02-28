@@ -28,6 +28,7 @@ Layer::Layer() : uniqueID(UniqueID::Next()) {
 Layer::~Layer() {
   delete cache;
   delete transform;
+  delete transform3D;
   delete timeRemap;
   for (auto& mask : masks) {
     delete mask;
@@ -44,7 +45,12 @@ Layer::~Layer() {
 }
 
 void Layer::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) {
-  transform->excludeVaryingRanges(timeRanges);
+  if (transform != nullptr) {
+    transform->excludeVaryingRanges(timeRanges);
+  }
+  if (transform3D != nullptr) {
+    transform3D->excludeVaryingRanges(timeRanges);
+  }
   if (timeRemap != nullptr) {
     timeRemap->excludeVaryingRanges(timeRanges);
   }
@@ -60,11 +66,16 @@ void Layer::excludeVaryingRanges(std::vector<TimeRange>* timeRanges) {
 }
 
 bool Layer::verify() const {
-  if (containingComposition == nullptr || duration <= 0 || transform == nullptr) {
+  if (containingComposition == nullptr || duration <= 0 ||
+      (transform == nullptr && transform3D == nullptr)) {
     VerifyFailed();
     return false;
   }
-  if (!transform->verify()) {
+  if (transform != nullptr && !transform->verify()) {
+    VerifyFailed();
+    return false;
+  }
+  if (transform3D != nullptr && !transform3D->verify()) {
     VerifyFailed();
     return false;
   }
@@ -107,12 +118,10 @@ Point Layer::getMaxScaleFactor() {
   return getScaleFactor().first;
 }
 
-std::pair<Point, Point> Layer::getScaleFactor() {
-  auto maxScale = Point::Make(1, 1);
-  auto minScale = Point::Make(1, 1);
-  auto property = transform->scale;
+template <typename T>
+static void GetScaleFactorInternal(Property<T>* property, Point& maxScale, Point& minScale) {
   if (property->animatable()) {
-    auto keyframes = static_cast<AnimatableProperty<Point>*>(property)->keyframes;
+    auto keyframes = static_cast<AnimatableProperty<T>*>(property)->keyframes;
     minScale.x = maxScale.x = fabs(keyframes[0]->startValue.x);
     minScale.y = maxScale.y = fabs(keyframes[0]->startValue.y);
     for (auto& keyframe : keyframes) {
@@ -134,6 +143,16 @@ std::pair<Point, Point> Layer::getScaleFactor() {
   } else {
     minScale.x = maxScale.x = fabs(property->value.x);
     minScale.y = maxScale.y = fabs(property->value.y);
+  }
+}
+
+std::pair<Point, Point> Layer::getScaleFactor() {
+  auto maxScale = Point::Make(1, 1);
+  auto minScale = Point::Make(1, 1);
+  if (transform != nullptr) {
+    GetScaleFactorInternal(transform->scale, maxScale, minScale);
+  } else if (transform3D != nullptr) {
+    GetScaleFactorInternal(transform3D->scale, maxScale, minScale);
   }
   if (!effects.empty()) {
     auto bounds = getBounds();

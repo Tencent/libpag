@@ -17,10 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LayerFilter.h"
+#include "BrightnessContrastFilter.h"
 #include "BulgeFilter.h"
 #include "CornerPinFilter.h"
 #include "DisplacementMapFilter.h"
 #include "GradientOverlayFilter.h"
+#include "HueSaturationFilter.h"
 #include "LevelsIndividualFilter.h"
 #include "MosaicFilter.h"
 #include "MotionTileFilter.h"
@@ -155,6 +157,12 @@ std::unique_ptr<LayerFilter> LayerFilter::Make(Effect* effect) {
       break;
     case EffectType::Mosaic:
       filter = new MosaicFilter(effect);
+      break;
+    case EffectType::BrightnessContrast:
+      filter = new BrightnessContrastFilter(effect);
+      break;
+    case EffectType::HueSaturation:
+      filter = new HueSaturationFilter(effect);
       break;
     default:
       break;

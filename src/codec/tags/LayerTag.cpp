@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LayerTag.h"
+#include "CameraOption.h"
 #include "CompositionReference.h"
 #include "EffectTag.h"
 #include "ImageReference.h"
@@ -28,6 +29,7 @@
 #include "ShapeTag.h"
 #include "SolidColor.h"
 #include "Transform2D.h"
+#include "Transform3D.h"
 #include "codec/tags/CachePolicy.h"
 #include "codec/tags/ImageFillRule.h"
 #include "codec/tags/text/TextAnimatorTag.h"
@@ -99,6 +101,30 @@ void ReadTagsOfLayer(DecodeStream* stream, TagCode code, Layer* layer) {
         transform->position = nullptr;
       }
     } break;
+    case TagCode::Transform3D: {
+      layer->transform3D = new Transform3D();
+      auto transform = layer->transform3D;
+      ReadTagBlock(stream, transform, Transform3DTag);
+      auto hasPosition = (transform->position->animatable() ||
+                          transform->position->getValueAt(0) != Point3D::Zero());
+      auto hasXPosition =
+          (transform->xPosition->animatable() || transform->xPosition->getValueAt(0) != 0);
+      auto hasYPosition =
+          (transform->yPosition->animatable() || transform->yPosition->getValueAt(0) != 0);
+      auto hasZPosition =
+          (transform->zPosition->animatable() || transform->zPosition->getValueAt(0) != 0);
+      if (hasPosition || (!hasXPosition && !hasYPosition && !hasZPosition)) {
+        delete transform->xPosition;
+        transform->xPosition = nullptr;
+        delete transform->yPosition;
+        transform->yPosition = nullptr;
+        delete transform->zPosition;
+        transform->zPosition = nullptr;
+      } else {
+        delete transform->position;
+        transform->position = nullptr;
+      }
+    } break;
     case TagCode::CachePolicy:
       ReadCachePolicy(stream, layer);
       break;
@@ -149,6 +175,13 @@ void ReadTagsOfLayer(DecodeStream* stream, TagCode code, Layer* layer) {
       Condition(layer->type() == LayerType::Image,
                 ReadImageFillRule(stream, static_cast<ImageLayer*>(layer), code));
       break;
+    case TagCode::CameraOption:
+      if (layer->type() == LayerType::Camera) {
+        auto cameraLayer = static_cast<CameraLayer*>(layer);
+        cameraLayer->cameraOption = new CameraOption();
+        ReadTagBlock(stream, cameraLayer->cameraOption, CameraOptionTag);
+      }
+      break;
     default:
       if (ReadEffect(stream, code, layer)) {
         break;
@@ -185,6 +218,9 @@ Layer* ReadLayer(DecodeStream* stream) {
       break;
     case LayerType::PreCompose:
       layer = new PreComposeLayer();
+      break;
+    case LayerType::Camera:
+      layer = new CameraLayer();
       break;
     default:
       layer = new Layer();
@@ -232,7 +268,9 @@ TagCode WriteLayer(EncodeStream* stream, Layer* layer) {
   }
   WriteEffects(stream, layer->effects);
   WriteLayerStyles(stream, layer->layerStyles);
-  if (layer->transform != nullptr) {
+  if (layer->transform3D != nullptr) {
+    WriteTagBlock(stream, layer->transform3D, Transform3DTag);
+  } else if (layer->transform != nullptr) {
     WriteTagBlock(stream, layer->transform, Transform2DTag);
   }
   if (layer->cachePolicy != CachePolicy::Auto) {
@@ -279,6 +317,9 @@ TagCode WriteLayer(EncodeStream* stream, Layer* layer) {
         WriteTag(stream, animator, WriteTextAnimator);
       }
     } break;
+    case LayerType::Camera: {
+      WriteTagBlock(stream, static_cast<CameraLayer*>(layer)->cameraOption, CameraOptionTag);
+    }
     default:
       break;
   }

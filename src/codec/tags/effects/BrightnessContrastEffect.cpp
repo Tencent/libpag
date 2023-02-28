@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,35 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <cmath>
+#include "BrightnessContrastEffect.h"
+#include "EffectCompositingOption.h"
 
 namespace pag {
-static constexpr float FLOAT_NEARLY_ZERO = 1.0f / (1 << 12);
-
-static inline float DegreesToRadians(float degrees) {
-  return degrees * (static_cast<float>(M_PI) / 180.0f);
+std::unique_ptr<BlockConfig> BrightnessContrastEffectTag(BrightnessContrastEffect* effect) {
+  auto tagConfig = new BlockConfig(TagCode::BrightnessContrastEffect);
+  AddAttribute(tagConfig, &effect->brightness, AttributeType::SimpleProperty,
+               static_cast<float>(0.0f));
+  AddAttribute(tagConfig, &effect->contrast, AttributeType::SimpleProperty,
+               static_cast<float>(0.0f));
+  AddAttribute(tagConfig, &effect->useOldVersion, AttributeType::DiscreteProperty, false);
+  EffectCompositingOptionTag(tagConfig, effect);
+  return std::unique_ptr<BlockConfig>(tagConfig);
 }
-
-static inline float RadiansToDegrees(float radians) {
-  return radians * (180.0f / static_cast<float>(M_PI));
-}
-
-static inline bool FloatNearlyZero(float x, float tolerance = FLOAT_NEARLY_ZERO) {
-  return fabsf(x) <= tolerance;
-}
-
-static inline bool DoubleNearlyEqual(double x, double y, double tolerance = FLOAT_NEARLY_ZERO) {
-  return fabs(x - y) <= tolerance;
-}
-
-static inline bool FloatsAreFinite(const float array[], int count) {
-  float prod = 0;
-  for (int i = 0; i < count; ++i) {
-    prod *= array[i];
-  }
-  return prod == 0;
-}
-
 }  // namespace pag
