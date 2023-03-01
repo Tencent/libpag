@@ -25,13 +25,13 @@
 namespace pag {
 static std::shared_ptr<tgfx::Image> MakeSequenceImage(
     std::shared_ptr<tgfx::ImageGenerator> generator, Sequence* sequence) {
-  std::shared_ptr<tgfx::Image> image = nullptr;
+  auto image = tgfx::Image::MakeFromGenerator(std::move(generator));
   if (sequence->composition->type() == CompositionType::Video) {
     auto videoSequence = static_cast<VideoSequence*>(sequence);
-    return tgfx::Image::MakeRGBAAA(std::move(generator), sequence->width, sequence->height,
-                                   videoSequence->alphaStartX, videoSequence->alphaStartY);
+    image = image->makeRGBAAA(sequence->width, sequence->height, videoSequence->alphaStartX,
+                              videoSequence->alphaStartY);
   }
-  return tgfx::Image::MakeFromGenerator(std::move(generator));
+  return image;
 }
 
 std::shared_ptr<SequenceInfo> SequenceInfo::Make(Sequence* sequence) {

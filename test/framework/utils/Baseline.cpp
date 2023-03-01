@@ -107,11 +107,22 @@ void RemoveImage(const std::string& key) {
   std::filesystem::remove(TestConstants::OUT_ROOT + key + TestConstants::WEBP_FILE_EXT);
 }
 
-bool Baseline::Compare(const std::shared_ptr<PixelBuffer>& pixelBuffer, const std::string& key) {
+bool Baseline::Compare(std::shared_ptr<tgfx::PixelBuffer> pixelBuffer, const std::string& key) {
   if (pixelBuffer == nullptr) {
     return false;
   }
-  Pixmap pixmap(pixelBuffer);
+  auto pixels = pixelBuffer->lockPixels();
+  Pixmap pixmap(pixelBuffer->info(), pixels);
+  auto result = Baseline::Compare(pixmap, key);
+  pixelBuffer->unlockPixels();
+  return result;
+}
+
+bool Baseline::Compare(const Bitmap& bitmap, const std::string& key) {
+  if (bitmap.isEmpty()) {
+    return false;
+  }
+  Pixmap pixmap(bitmap);
   return Baseline::Compare(pixmap, key);
 }
 
@@ -147,9 +158,9 @@ bool Baseline::Compare(const Pixmap& pixmap, const std::string& key) {
   if (pixmap.rowBytes() == pixmap.info().minRowBytes()) {
     md5 = DumpMD5(pixmap.pixels(), pixmap.byteSize());
   } else {
-    auto pixelBuffer = PixelBuffer::Make(pixmap.width(), pixmap.height(),
-                                         pixmap.colorType() == tgfx::ColorType::ALPHA_8, false);
-    Pixmap newPixmap(pixelBuffer);
+    Bitmap newBitmap(pixmap.width(), pixmap.height(),
+                     pixmap.colorType() == tgfx::ColorType::ALPHA_8, false);
+    Pixmap newPixmap(newBitmap);
     auto result = pixmap.readPixels(newPixmap.info(), newPixmap.writablePixels());
     if (!result) {
       return false;
@@ -172,8 +183,8 @@ bool Baseline::Compare(const std::shared_ptr<PAGSurface>& surface, const std::st
   if (surface == nullptr) {
     return false;
   }
-  auto pixelBuffer = PixelBuffer::Make(surface->width(), surface->height(), false, false);
-  Pixmap pixmap(pixelBuffer);
+  Bitmap bitmap(surface->width(), surface->height(), false, false);
+  Pixmap pixmap(bitmap);
   auto result = surface->readPixels(ToPAG(pixmap.colorType()), ToPAG(pixmap.alphaType()),
                                     pixmap.writablePixels(), pixmap.rowBytes());
   if (!result) {

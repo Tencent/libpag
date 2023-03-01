@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -20,62 +20,28 @@
 
 namespace tgfx {
 /**
- * Defines pixel formats for YUV pixels.
+ * Describes how pixel bits encode color.
  */
-enum class YUVPixelFormat {
+enum class ColorType {
   /**
    * uninitialized.
    */
   Unknown,
   /**
-   * 8 bit Y plane followed by 8 bit 2x2 subsampled U and V planes.
+   * Each pixel is stored as a single translucency (alpha) channel. This is very useful to
+   * efficiently store masks for instance. No color information is stored. With this configuration,
+   * each pixel requires 1 byte of memory.
    */
-  I420,
+  ALPHA_8,
   /**
-   * 8-bit Y plane followed by an interleaved U/V plane with 2x2 subsampling.
+   * Each pixel is stored on 4 bytes. Each channel (RGB and alpha for translucency) is stored with 8
+   * bits of precision (256 possible values). The channel order is: red, green, blue, alpha.
    */
-  NV12
+  RGBA_8888,
+  /**
+   * Each pixel is stored on 4 bytes. Each channel (RGB and alpha for translucency) is stored with 8
+   * bits of precision (256 possible values). The channel order is: blue, green, red, alpha.
+   */
+  BGRA_8888,
 };
-
-/**
- *  Describes color space of YUV pixels. The color mapping from YUV to RGB varies depending on the
- *  source.
- */
-enum class YUVColorSpace {
-  /**
-   * uninitialized.
-   */
-  Unknown,
-  /**
-   * Describes SDTV range.
-   */
-  Rec601,
-  /**
-   * Describes HDTV range.
-   */
-  Rec709,
-  /**
-   * Describes UHDTV range.
-   */
-  Rec2020
-};
-
-/**
- *  Describes color range of YUV pixels.
- */
-enum class YUVColorRange {
-  /**
-   * uninitialized.
-   */
-  Unknown,
-  /**
-   * Encodes the video range of 16 to 235 for all three components.
-   */
-  MPEG,
-  /**
-   * Encodes the full range of 0 to 255 for all three components.
-   */
-  JPEG
-};
-
 }  // namespace tgfx

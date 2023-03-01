@@ -20,26 +20,6 @@
 #include "pag/file.h"
 
 namespace pag {
-Transform3D* Transform3D::MakeDefault() {
-  auto transform = new Transform3D();
-  transform->anchorPoint = new Property<Point3D>();
-  transform->anchorPoint->value = Point3D::Zero();
-  transform->position = new Property<Point3D>();
-  transform->position->value = Point3D::Zero();
-  transform->scale = new Property<Point3D>();
-  transform->scale->value = Point3D::Make(1, 1, 1);
-  transform->orientation = new Property<Point3D>();
-  transform->orientation->value = Point3D::Make(0, 0, 0);
-  transform->xRotation = new Property<float>();
-  transform->xRotation->value = 0.0f;
-  transform->yRotation = new Property<float>();
-  transform->yRotation->value = 0.0f;
-  transform->zRotation = new Property<float>();
-  transform->zRotation->value = 0.0f;
-  transform->opacity = new Property<Opacity>();
-  transform->opacity->value = Opaque;
-  return transform;
-}
 Transform3D::~Transform3D() {
   delete anchorPoint;
   delete position;

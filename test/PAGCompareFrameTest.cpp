@@ -47,9 +47,8 @@ struct RenderCost {
 
 class CompareFrameTask : public Executor {
  public:
-  CompareFrameTask(const std::string& fileName, Frame currentFrame,
-                   std::shared_ptr<PixelBuffer> pixelBuffer)
-      : fileName(fileName), _currentFrame(currentFrame), pixelBuffer(std::move(pixelBuffer)) {
+  CompareFrameTask(const std::string& fileName, Frame currentFrame, const Bitmap& bitmap)
+      : fileName(fileName), _currentFrame(currentFrame), bitmap(std::move(bitmap)) {
   }
 
   Frame currentFrame() const {
@@ -63,12 +62,12 @@ class CompareFrameTask : public Executor {
  private:
   const std::string fileName = "";
   Frame _currentFrame = 0;
-  std::shared_ptr<PixelBuffer> pixelBuffer = nullptr;
+  Bitmap bitmap = {};
   bool success = false;
 
   void execute() override {
 
-    success = Baseline::Compare(pixelBuffer,
+    success = Baseline::Compare(bitmap,
                                 "PAGCompareFrameTest/" + fileName + "/" + ToString(_currentFrame));
   }
 };
@@ -102,7 +101,7 @@ static void CompareFileFrames(Semaphore* semaphore, std::string pagPath) {
   std::string errorMsg;
   std::map<Frame, RenderCost> performanceMap = {};
 
-  std::shared_ptr<PixelBuffer> currentSnapshot = nullptr;
+  Bitmap currentSnapshot = {};
   std::shared_ptr<Task> lastTask = nullptr;
   std::unique_ptr<CompareFrameTask> lastExecutor = nullptr;
 

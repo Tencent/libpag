@@ -57,9 +57,9 @@ PAG_TEST(PAGRasterizerTest, TestRasterizer) {
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
   canvas->drawTexture(texture);
-  auto pixelBuffer = PixelBuffer::Make(mask->width(), mask->height(), true, false);
-  ASSERT_TRUE(pixelBuffer != nullptr);
-  Pixmap pixmap(pixelBuffer);
+  Bitmap bitmap(mask->width(), mask->height(), true, false);
+  ASSERT_FALSE(bitmap.isEmpty());
+  Pixmap pixmap(bitmap);
   pixmap.eraseAll();
   auto result = surface->readPixels(pixmap.info(), pixmap.writablePixels());
   ASSERT_TRUE(result);

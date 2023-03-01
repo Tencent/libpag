@@ -37,11 +37,11 @@ using namespace pag;
 
 namespace tgfx {
 static bool Compare(Surface* surface, const std::string& key) {
-  auto pixelBuffer = PixelBuffer::Make(surface->width(), surface->height());
-  if (pixelBuffer == nullptr) {
+  Bitmap bitmap(surface->width(), surface->height());
+  if (bitmap.isEmpty()) {
     return false;
   }
-  Pixmap pixmap(pixelBuffer);
+  Pixmap pixmap(bitmap);
   pixmap.eraseAll();
   auto result = surface->readPixels(pixmap.info(), pixmap.writablePixels());
   if (!result) {
@@ -565,15 +565,16 @@ PAG_TEST(CanvasTest, mipmap) {
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImageCodec("resources/apitest/rotation.jpg");
   ASSERT_TRUE(image != nullptr);
-  auto pixelBuffer = PixelBuffer::Make(image->width(), image->height(), false, false);
-  ASSERT_TRUE(pixelBuffer != nullptr);
-  Pixmap pixmap(pixelBuffer);
-  auto result = image->readPixels(pixelBuffer->info(), pixmap.writablePixels());
+  Bitmap bitmap(image->width(), image->height(), false, false);
+  ASSERT_FALSE(bitmap.isEmpty());
+  Pixmap pixmap(bitmap);
+  auto result = image->readPixels(pixmap.info(), pixmap.writablePixels());
   pixmap.reset();
   ASSERT_TRUE(result);
-  auto texture = pixelBuffer->makeTexture(context);
+  auto imageBuffer = bitmap.makeBuffer();
+  auto texture = imageBuffer->makeTexture(context);
   ASSERT_TRUE(texture != nullptr);
-  auto textureMipMapped = pixelBuffer->makeTexture(context, true);
+  auto textureMipMapped = imageBuffer->makeTexture(context, true);
   ASSERT_TRUE(textureMipMapped != nullptr);
   float scale = 0.03f;
   auto width = image->width();
@@ -615,13 +616,14 @@ PAG_TEST(CanvasTest, hardwareMipMap) {
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImageCodec("resources/apitest/rotation.jpg");
   ASSERT_TRUE(image != nullptr);
-  auto pixelBuffer = PixelBuffer::Make(image->width(), image->height(), false);
-  ASSERT_TRUE(pixelBuffer != nullptr);
-  Pixmap pixmap(pixelBuffer);
-  auto result = image->readPixels(pixelBuffer->info(), pixmap.writablePixels());
+  Bitmap bitmap(image->width(), image->height(), false);
+  ASSERT_FALSE(bitmap.isEmpty());
+  Pixmap pixmap(bitmap);
+  auto result = image->readPixels(pixmap.info(), pixmap.writablePixels());
   pixmap.reset();
   ASSERT_TRUE(result);
-  auto textureMipMapped = pixelBuffer->makeTexture(context, true);
+  auto imageBuffer = bitmap.makeBuffer();
+  auto textureMipMapped = imageBuffer->makeTexture(context, true);
   ASSERT_TRUE(textureMipMapped != nullptr);
   float scale = 0.03f;
   auto width = image->width();
@@ -726,10 +728,13 @@ PAG_TEST(CanvasTest, image) {
   canvas->setMatrix(matrix);
   canvas->drawImage(textureImage, sampling);
   canvas->resetMatrix();
+  auto rgbAAA = subset->makeRGBAAA(500, 500, 500, 0);
+  EXPECT_TRUE(rgbAAA == nullptr);
   auto codec = MakeImageCodec("resources/apitest/rgbaaa.png");
   EXPECT_EQ(codec->width(), 1024);
   EXPECT_EQ(codec->height(), 512);
-  auto rgbAAA = Image::MakeRGBAAA(codec, 512, 512, 512, 0, true);
+  image = Image::MakeFromGenerator(codec, tgfx::ImageOrigin::TopLeft, true);
+  rgbAAA = image->makeRGBAAA(512, 512, 512, 0);
   EXPECT_TRUE(rgbAAA->isRGBAAA());
   EXPECT_EQ(rgbAAA->width(), 512);
   EXPECT_EQ(rgbAAA->height(), 512);
@@ -739,11 +744,13 @@ PAG_TEST(CanvasTest, image) {
   subset = rgbAAA->makeSubset(Rect::MakeXYWH(50, 50, 400, 400));
   matrix.postTranslate(140, 15);
   canvas->drawImage(subset, matrix);
-  rgbAAA = Image::MakeRGBAAA(codec, 512, 512, 0, 0, true);
+  rgbAAA = image->makeRGBAAA(512, 512, 0, 0);
   EXPECT_EQ(rgbAAA->width(), 512);
   EXPECT_EQ(rgbAAA->height(), 512);
   matrix.postTranslate(110, -15);
   canvas->drawImage(rgbAAA, matrix);
+  rgbAAA = rgbAAA->makeRGBAAA(256, 512, 256, 0);
+  EXPECT_TRUE(rgbAAA == nullptr);
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/drawImage"));
   device->unlock();
 }

@@ -41,8 +41,6 @@ class HardwareBuffer : public PixelBuffer {
   CVPixelBufferRef pixelBuffer = nullptr;
 
   explicit HardwareBuffer(CVPixelBufferRef pixelBuffer);
-
-  friend class CocoaPlatform;
 };
 
 }  // namespace tgfx

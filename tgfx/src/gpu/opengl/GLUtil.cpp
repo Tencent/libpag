@@ -97,9 +97,11 @@ unsigned LoadGLShader(Context* context, unsigned shaderType, const std::string& 
   return shader;
 }
 
-bool CheckGLError(Context* context) {
+bool CheckGLErrorImpl(Context* context, std::string file, int line) {
 #ifdef TGFX_BUILD_FOR_WEB
   USE(context);
+  USE(file);
+  USE(line);
   return true;
 #else
   auto gl = GLFunctions::Get(context);
@@ -107,7 +109,11 @@ bool CheckGLError(Context* context) {
   unsigned errorCode;
   while ((errorCode = gl->getError()) != GL_NO_ERROR) {
     success = false;
-    LOGE("glCheckError: %d", errorCode);
+    if (file.empty()) {
+      LOGE("CheckGLError: %d", errorCode);
+    } else {
+      LOGE("CheckGLError: %d at %s:%d", errorCode, file.c_str(), line);
+    }
   }
   return success;
 #endif

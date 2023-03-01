@@ -79,18 +79,4 @@ std::shared_ptr<PixelBuffer> PixelBuffer::Make(int width, int height, bool alpha
   }
   return std::make_shared<RasterPixelBuffer>(info, pixels);
 }
-
-std::shared_ptr<PixelBuffer> PixelBuffer::duplicate() {
-  auto newBuffer =
-      PixelBuffer::Make(_info.width(), _info.height(), _info.isAlphaOnly(), hardwareBacked);
-  if (newBuffer == nullptr) {
-    return nullptr;
-  }
-  auto srcPixels = lockPixels();
-  auto dstPixels = newBuffer->lockPixels();
-  memcpy(dstPixels, srcPixels, _info.byteSize());
-  newBuffer->unlockPixels();
-  unlockPixels();
-  return newBuffer;
-}
 }  // namespace tgfx

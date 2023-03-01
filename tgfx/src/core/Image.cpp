@@ -23,7 +23,6 @@
 #include "images/MatrixImage.h"
 #include "images/RGBAAAImage.h"
 #include "tgfx/core/ImageCodec.h"
-#include "tgfx/core/PixelBuffer.h"
 #include "tgfx/core/Pixmap.h"
 
 namespace tgfx {
@@ -61,7 +60,7 @@ std::shared_ptr<Image> Image::MakeRasterCopy(const Pixmap& pixmap, ImageOrigin o
 
 std::shared_ptr<Image> Image::MakeFromBitmap(const Bitmap& bitmap, ImageOrigin origin,
                                              bool miMapped) {
-  return MakeFromBuffer(bitmap.pixelBuffer, origin, miMapped);
+  return MakeFromBuffer(bitmap.makeBuffer(), origin, miMapped);
 }
 
 std::shared_ptr<Image> Image::MakeFromBuffer(std::shared_ptr<ImageBuffer> imageBuffer,
@@ -74,26 +73,6 @@ std::shared_ptr<Image> Image::MakeFromTexture(std::shared_ptr<Texture> texture,
                                               ImageOrigin origin) {
   auto source = ImageSource::MakeFromTexture(std::move(texture));
   return MakeFromSource(std::move(source), origin);
-}
-
-std::shared_ptr<Image> Image::MakeRGBAAA(std::shared_ptr<ImageGenerator> generator,
-                                         int displayWidth, int displayHeight, int alphaStartX,
-                                         int alphaStartY, bool mipMapped) {
-  auto source = ImageSource::MakeFromGenerator(std::move(generator), mipMapped);
-  return MakeRGBAAA(std::move(source), displayWidth, displayHeight, alphaStartX, alphaStartY);
-}
-
-std::shared_ptr<Image> Image::MakeRGBAAA(std::shared_ptr<ImageBuffer> imageBuffer, int displayWidth,
-                                         int displayHeight, int alphaStartX, int alphaStartY,
-                                         bool mipMapped) {
-  auto source = ImageSource::MakeFromBuffer(std::move(imageBuffer), mipMapped);
-  return MakeRGBAAA(std::move(source), displayWidth, displayHeight, alphaStartX, alphaStartY);
-}
-
-std::shared_ptr<Image> Image::MakeRGBAAA(std::shared_ptr<Texture> texture, int displayWidth,
-                                         int displayHeight, int alphaStartX, int alphaStartY) {
-  auto source = ImageSource::MakeFromTexture(std::move(texture));
-  return MakeRGBAAA(std::move(source), displayWidth, displayHeight, alphaStartX, alphaStartY);
 }
 
 std::shared_ptr<Image> Image::MakeFromSource(std::shared_ptr<ImageSource> source,
@@ -112,28 +91,6 @@ std::shared_ptr<Image> Image::MakeFromSource(std::shared_ptr<ImageSource> source
   } else {
     image = std::shared_ptr<Image>(new Image(std::move(source)));
   }
-  image->weakThis = image;
-  return image;
-}
-
-std::shared_ptr<Image> Image::MakeRGBAAA(std::shared_ptr<ImageSource> source, int displayWidth,
-                                         int displayHeight, int alphaStartX, int alphaStartY) {
-  if (source == nullptr) {
-    return nullptr;
-  }
-  if (alphaStartX == 0 && alphaStartY == 0) {
-    auto image = MakeFromSource(std::move(source));
-    if (displayWidth != image->width() || displayHeight != image->height()) {
-      image = image->makeSubset(Rect::MakeWH(displayWidth, displayHeight));
-    }
-    return image;
-  }
-  if (alphaStartX + displayWidth > source->width() ||
-      alphaStartY + displayHeight > source->height()) {
-    return nullptr;
-  }
-  auto image = std::shared_ptr<Image>(
-      new RGBAAAImage(std::move(source), displayWidth, displayHeight, alphaStartX, alphaStartY));
   image->weakThis = image;
   return image;
 }
@@ -203,6 +160,12 @@ std::shared_ptr<Image> Image::makeSubset(const Rect& subset) const {
   return subsetImage;
 }
 
+std::shared_ptr<Image> Image::onMakeSubset(const Rect& subset) const {
+  auto localMatrix = Matrix::MakeTrans(subset.x(), subset.y());
+  return std::shared_ptr<MatrixImage>(new MatrixImage(
+      source, static_cast<int>(subset.width()), static_cast<int>(subset.height()), localMatrix));
+}
+
 std::shared_ptr<Image> Image::makeDecoded(Context* context) const {
   auto decodedSource = source->makeDecoded(context);
   if (decodedSource == source) {
@@ -219,10 +182,26 @@ std::shared_ptr<Image> Image::makeMipMapped() const {
   return cloneWithSource(std::move(mipMappedSource));
 }
 
-std::shared_ptr<Image> Image::onMakeSubset(const Rect& subset) const {
-  auto localMatrix = Matrix::MakeTrans(subset.x(), subset.y());
-  return std::shared_ptr<MatrixImage>(new MatrixImage(
-      source, static_cast<int>(subset.width()), static_cast<int>(subset.height()), localMatrix));
+std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
+                                         int alphaStartY) {
+  if (alphaStartX == 0 && alphaStartY == 0) {
+    return makeSubset(Rect::MakeWH(displayWidth, displayHeight));
+  }
+  auto image = onMakeRGBAAA(displayWidth, displayHeight, alphaStartX, alphaStartY);
+  if (image != nullptr) {
+    image->weakThis = image;
+  }
+  return image;
+}
+
+std::shared_ptr<Image> Image::onMakeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
+                                           int alphaStartY) const {
+  if (alphaStartX + displayWidth > source->width() ||
+      alphaStartY + displayHeight > source->height()) {
+    return nullptr;
+  }
+  return std::shared_ptr<Image>(
+      new RGBAAAImage(source, displayWidth, displayHeight, alphaStartX, alphaStartY));
 }
 
 std::unique_ptr<FragmentProcessor> Image::asFragmentProcessor(Context* context,

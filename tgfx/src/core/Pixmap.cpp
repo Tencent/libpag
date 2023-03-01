@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Pixmap.h"
+#include "core/PixelRef.h"
 #include "skcms.h"
-#include "tgfx/core/PixelBuffer.h"
 
 namespace tgfx {
 
@@ -93,15 +93,22 @@ Pixmap::Pixmap(const ImageInfo& info, void* pixels)
 }
 
 Pixmap::Pixmap(const Bitmap& bitmap) {
-  reset(bitmap.pixelBuffer.get());
+  _pixels = bitmap.lockPixels();
+  if (_pixels == nullptr) {
+    return;
+  }
+  pixelRef = bitmap.pixelRef;
+  _info = pixelRef->info();
 }
 
 Pixmap::Pixmap(Bitmap& bitmap) {
-  reset(bitmap.writableRef());
-}
-
-Pixmap::Pixmap(std::shared_ptr<PixelBuffer> pixelBuffer) {
-  reset(pixelBuffer.get());
+  _writablePixels = bitmap.lockPixels();
+  if (_writablePixels == nullptr) {
+    return;
+  }
+  pixelRef = bitmap.pixelRef;
+  _pixels = _writablePixels;
+  _info = pixelRef->info();
 }
 
 Pixmap::~Pixmap() {
@@ -109,9 +116,9 @@ Pixmap::~Pixmap() {
 }
 
 void Pixmap::reset() {
-  if (pixelBuffer != nullptr) {
-    pixelBuffer->unlockPixels();
-    pixelBuffer = nullptr;
+  if (pixelRef != nullptr) {
+    pixelRef->unlockPixels();
+    pixelRef = nullptr;
   }
   _pixels = nullptr;
   _info = {};
@@ -132,16 +139,6 @@ void Pixmap::reset(const ImageInfo& info, void* pixels) {
     _pixels = pixels;
     _writablePixels = pixels;
   }
-}
-
-void Pixmap::reset(PixelBuffer* buffer) {
-  if (buffer == nullptr) {
-    return;
-  }
-  pixelBuffer = buffer;
-  _writablePixels = pixelBuffer->lockPixels();
-  _pixels = _writablePixels;
-  _info = pixelBuffer->info();
 }
 
 Color Pixmap::getColor(int x, int y) const {

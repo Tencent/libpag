@@ -54,14 +54,14 @@ PAG_TEST_F(PAGImageTest, image) {
   int height = 110;
   size_t rowBytes = 110 * 4;
   auto fileData = ByteData::FromPath(TestConstants::PAG_ROOT + "resources/apitest/data.rgba");
-  auto pixelBuffer = PixelBuffer::Make(0, height, false, false);
-  ASSERT_TRUE(pixelBuffer == nullptr);
-  pixelBuffer = PixelBuffer::Make(width, height, true, false);
-  ASSERT_TRUE(pixelBuffer != nullptr);
-  EXPECT_EQ(pixelBuffer->colorType(), tgfx::ColorType::ALPHA_8);
-  pixelBuffer = PixelBuffer::Make(width, height, false, false);
-  ASSERT_TRUE(pixelBuffer != nullptr);
-  Pixmap pixmap(pixelBuffer);
+  Bitmap bitmap(0, height, false, false);
+  ASSERT_TRUE(bitmap.isEmpty());
+  bitmap.allocPixels(width, height, true, false);
+  ASSERT_FALSE(bitmap.isEmpty());
+  EXPECT_EQ(bitmap.colorType(), tgfx::ColorType::ALPHA_8);
+  bitmap.allocPixels(width, height, false, false);
+  ASSERT_FALSE(bitmap.isEmpty());
+  Pixmap pixmap(bitmap);
   auto info = ImageInfo::Make(width, height, tgfx::ColorType::RGBA_8888,
                               tgfx::AlphaType::Premultiplied, rowBytes);
   auto result = pixmap.writePixels(info, fileData->data());
@@ -108,9 +108,9 @@ PAG_TEST_F(PAGImageTest, image2) {
   ASSERT_EQ(codec->width(), 110);
   ASSERT_EQ(codec->height(), 110);
   ASSERT_EQ(codec->origin(), tgfx::ImageOrigin::TopLeft);
-  auto pixelBuffer = PixelBuffer::Make(codec->width(), codec->height(), false, false);
-  ASSERT_TRUE(pixelBuffer != nullptr);
-  Pixmap pixmap(pixelBuffer);
+  Bitmap bitmap(codec->width(), codec->height(), false, false);
+  ASSERT_FALSE(bitmap.isEmpty());
+  Pixmap pixmap(bitmap);
   auto result = codec->readPixels(pixmap.info(), pixmap.writablePixels());
   ASSERT_TRUE(result);
   EXPECT_TRUE(Baseline::Compare(pixmap, "PAGImageTest/image2"));
@@ -157,9 +157,9 @@ PAG_TEST_F(PAGImageTest, BottomLeftMask) {
   tgfx::Paint paint;
   paint.setMaskFilter(tgfx::MaskFilter::Make(tgfx::Shader::MakeImageShader(image2)));
   canvas->drawTexture(image1, &paint);
-  auto pixelBuffer = PixelBuffer::Make(width, height);
-  ASSERT_TRUE(pixelBuffer != nullptr);
-  Pixmap pixmap(pixelBuffer);
+  Bitmap bitmap(width, height);
+  ASSERT_FALSE(bitmap.isEmpty());
+  Pixmap pixmap(bitmap);
   pixmap.eraseAll();
   auto result = surface->readPixels(pixmap.info(), pixmap.writablePixels());
   ASSERT_TRUE(result);

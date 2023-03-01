@@ -36,7 +36,8 @@ std::shared_ptr<Texture> PixelBufferMask::updateTexture(Context* context) {
       int x = static_cast<int>(dirtyRect.left);
       int y = static_cast<int>(dirtyRect.top);
       pixels += y * buffer->width() + x;
-      context->gpu()->writePixels(texture->getSampler(), dirtyRect, pixels, buffer->rowBytes(),
+      auto rowBytes = buffer->info().rowBytes();
+      context->gpu()->writePixels(texture->getSampler(), dirtyRect, pixels, rowBytes,
                                   ColorTypeToPixelFormat(buffer->info().colorType()));
       buffer->unlockPixels();
       dirtyRect.setEmpty();
@@ -47,7 +48,9 @@ std::shared_ptr<Texture> PixelBufferMask::updateTexture(Context* context) {
 
 void PixelBufferMask::clear() {
   dirty(Rect::MakeWH(width(), height()), false);
-  Pixmap(buffer).eraseAll();
+  auto pixels = buffer->lockPixels();
+  Pixmap(buffer->info(), pixels).eraseAll();
+  buffer->unlockPixels();
 }
 
 void PixelBufferMask::dirty(Rect rect, bool flipY) {

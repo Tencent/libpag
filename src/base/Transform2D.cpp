@@ -20,7 +20,7 @@
 #include "pag/file.h"
 
 namespace pag {
-Transform2D* Transform2D::MakeDefault() {
+std::unique_ptr<Transform2D> Transform2D::MakeDefault() {
   auto transform = new Transform2D();
   transform->anchorPoint = new Property<Point>();
   transform->anchorPoint->value = Point::Zero();
@@ -32,7 +32,7 @@ Transform2D* Transform2D::MakeDefault() {
   transform->rotation->value = 0.0f;
   transform->opacity = new Property<Opacity>();
   transform->opacity->value = Opaque;
-  return transform;
+  return std::unique_ptr<Transform2D>(transform);
 }
 Transform2D::~Transform2D() {
   delete anchorPoint;

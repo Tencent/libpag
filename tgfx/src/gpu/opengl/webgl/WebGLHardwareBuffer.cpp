@@ -25,10 +25,6 @@ std::shared_ptr<PixelBuffer> PixelBuffer::MakeHardwareBuffer(int, int, bool) {
   return nullptr;
 }
 
-std::shared_ptr<PixelBuffer> PixelBuffer::MakeFrom(HardwareBufferRef) {
-  return nullptr;
-}
-
 std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef) {
   return nullptr;
 }

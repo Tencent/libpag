@@ -45,6 +45,10 @@ std::shared_ptr<Image> RGBAAAImage::onMakeSubset(const Rect& subset) const {
   return std::shared_ptr<Image>(new RGBAAAImage(source, newBounds, alphaStart));
 }
 
+std::shared_ptr<Image> RGBAAAImage::onMakeRGBAAA(int, int, int, int) const {
+  return nullptr;
+}
+
 std::unique_ptr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(Context* context, TileMode,
                                                                     TileMode,
                                                                     const SamplingOptions& sampling,

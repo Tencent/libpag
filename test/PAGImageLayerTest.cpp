@@ -167,8 +167,8 @@ PAG_TEST_F(PAGImageLayerTest, mask) {
   pagPlayer->setSurface(pagSurface);
   pagPlayer->setComposition(pagFile);
   pagPlayer->flush();
-  auto pixelBuffer1 = tgfx::PixelBuffer::Make(pagFile->width(), pagFile->height(), false, false);
-  tgfx::Pixmap pixmap1(pixelBuffer1);
+  tgfx::Bitmap bitmap(pagFile->width(), pagFile->height(), false, false);
+  tgfx::Pixmap pixmap1(bitmap);
   ASSERT_FALSE(pixmap1.isEmpty());
   auto result = pagSurface->readPixels(ToPAG(pixmap1.colorType()), ToPAG(pixmap1.alphaType()),
                                        pixmap1.writablePixels(), pixmap1.rowBytes());
@@ -178,8 +178,8 @@ PAG_TEST_F(PAGImageLayerTest, mask) {
   ASSERT_NE(pagFile, nullptr);
   pagPlayer->setComposition(pagFile);
   pagPlayer->flush();
-  auto pixelBuffer2 = tgfx::PixelBuffer::Make(pagFile->width(), pagFile->height(), false, false);
-  tgfx::Pixmap pixmap2(pixelBuffer2);
+  tgfx::Bitmap bitmap2(pagFile->width(), pagFile->height(), false, false);
+  tgfx::Pixmap pixmap2(bitmap2);
   ASSERT_FALSE(pixmap2.isEmpty());
   result = pagSurface->readPixels(ToPAG(pixmap2.colorType()), ToPAG(pixmap2.alphaType()),
                                   pixmap2.writablePixels(), pixmap2.rowBytes());
@@ -189,11 +189,11 @@ PAG_TEST_F(PAGImageLayerTest, mask) {
   int top = 400;
   int width = 500;
   int height = 700;
-  auto imageBuffer1 = tgfx::PixelBuffer::Make(width, height, false, false);
-  tgfx::Pixmap image1(imageBuffer1);
+  tgfx::Bitmap imageBitmap1(width, height, false, false);
+  tgfx::Pixmap image1(imageBitmap1);
   pixmap1.readPixels(image1.info(), image1.writablePixels(), left, top);
-  auto imageBuffer2 = tgfx::PixelBuffer::Make(width, height, false, false);
-  tgfx::Pixmap image2(imageBuffer2);
+  tgfx::Bitmap imageBitmap2(width, height, false, false);
+  tgfx::Pixmap image2(imageBitmap2);
   pixmap2.readPixels(image2.info(), image2.writablePixels(), left, top);
 
   auto pixels1 = reinterpret_cast<const uint8_t*>(image1.pixels());

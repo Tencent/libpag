@@ -136,7 +136,7 @@ enum class TagCode {
   GradientOverlayStyle = 85,
   BrightnessContrastEffect = 86,
   HueSaturationEffect = 87,
-  
+
   LayerAttributesExtraV2 = 88,  // add PreserveAlpha
   EncryptedData = 89,
   Transform3D = 90,
@@ -352,7 +352,7 @@ class AnimatableProperty : public Property<T> {
 
 class PAG_API Transform2D {
  public:
-  static Transform2D* MakeDefault();
+  static std::unique_ptr<Transform2D> MakeDefault();
   ~Transform2D();
 
   Property<Point>* anchorPoint = nullptr;  // spatial
@@ -370,7 +370,6 @@ class PAG_API Transform2D {
 
 class PAG_API Transform3D {
  public:
-  static Transform3D* MakeDefault();
   ~Transform3D();
 
   Property<Point3D>* anchorPoint = nullptr;  // spatial
@@ -812,9 +811,13 @@ class BrightnessContrastEffect : public Effect {
  public:
   ~BrightnessContrastEffect() override;
 
-  EffectType type() const override { return EffectType::BrightnessContrast; }
+  EffectType type() const override {
+    return EffectType::BrightnessContrast;
+  }
 
-  bool processVisibleAreaOnly() const override { return true; }
+  bool processVisibleAreaOnly() const override {
+    return true;
+  }
 
   bool visibleAt(Frame layerFrame) const override;
 
@@ -848,9 +851,13 @@ class HueSaturationEffect : public Effect {
  public:
   ~HueSaturationEffect() override;
 
-  EffectType type() const override { return EffectType::HueSaturation; }
+  EffectType type() const override {
+    return EffectType::HueSaturation;
+  }
 
-  bool processVisibleAreaOnly() const override { return true; }
+  bool processVisibleAreaOnly() const override {
+    return true;
+  }
 
   bool visibleAt(Frame layerFrame) const override;
 
@@ -1651,7 +1658,7 @@ class PAG_API IrisShapeType {
 class PAG_API CameraOption {
  public:
   ~CameraOption();
-  
+
   Property<float>* zoom = nullptr;
   Property<bool>* depthOfField = nullptr;
   Property<float>* focusDistance = nullptr;
@@ -1665,7 +1672,7 @@ class PAG_API CameraOption {
   Property<float>* highlightGain = nullptr;
   Property<float>* highlightThreshold = nullptr;
   Property<float>* highlightSaturation = nullptr;
-  
+
   void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const;
 
   bool verify() const;
@@ -1946,7 +1953,7 @@ class PAG_API CameraLayer : public Layer {
   bool verify() const override;
 
   Rect getBounds() const override;
-  
+
   CameraOption* cameraOption = nullptr;
 
   RTTR_ENABLE(Layer)

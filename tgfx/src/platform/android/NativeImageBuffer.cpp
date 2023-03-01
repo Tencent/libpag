@@ -54,8 +54,8 @@ std::shared_ptr<Texture> NativeImageBuffer::onMakeTexture(Context* context, bool
     env->ExceptionClear();
     return nullptr;
   }
-  auto pixelBuffer = PixelBuffer::Make(_width, _height, false, !mipMapped);
-  if (pixelBuffer == nullptr) {
+  Bitmap bitmap(_width, _height, false, !mipMapped);
+  if (bitmap.isEmpty()) {
     return nullptr;
   }
   void* pixels = nullptr;
@@ -63,11 +63,15 @@ std::shared_ptr<Texture> NativeImageBuffer::onMakeTexture(Context* context, bool
     env->ExceptionClear();
     return nullptr;
   }
-  Pixmap pixmap(pixelBuffer);
+  Pixmap pixmap(bitmap);
   auto result = pixmap.writePixels(info, pixels);
   pixmap.reset();  // unlock the pixelBuffer.
   AndroidBitmap_unlockPixels(env, nativeImage.get());
-  return result ? pixelBuffer->makeTexture(context, mipMapped) : nullptr;
+  if (!result) {
+    return nullptr;
+  }
+  auto imageBuffer = bitmap.makeBuffer();
+  return imageBuffer->makeTexture(context);
 }
 
 }  // namespace tgfx

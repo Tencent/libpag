@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Bitmap.h"
+#include "core/PixelRef.h"
 #include "tgfx/core/ImageCodec.h"
-#include "tgfx/core/PixelBuffer.h"
 #include "tgfx/core/Pixmap.h"
 
 namespace tgfx {
@@ -26,52 +26,58 @@ Bitmap::Bitmap(int width, int height, bool alphaOnly, bool tryHardware) {
   allocPixels(width, height, alphaOnly, tryHardware);
 }
 
-Bitmap::Bitmap(const Bitmap& src) : _info(src._info), pixelBuffer(src.pixelBuffer) {
+Bitmap::Bitmap(const Bitmap& src) : _info(src._info), pixelRef(src.pixelRef) {
 }
 
-Bitmap::Bitmap(Bitmap&& src)
-    : _info(std::move(src._info)), pixelBuffer(std::move(src.pixelBuffer)) {
+Bitmap::Bitmap(Bitmap&& src) : _info(src._info), pixelRef(std::move(src.pixelRef)) {
 }
 
 Bitmap& Bitmap::operator=(const Bitmap& src) {
   if (this != &src) {
     _info = src._info;
-    pixelBuffer = src.pixelBuffer;
+    pixelRef = src.pixelRef;
   }
   return *this;
 }
 
 Bitmap& Bitmap::operator=(Bitmap&& src) {
   if (this != &src) {
-    _info = std::move(src._info);
-    pixelBuffer = std::move(src.pixelBuffer);
+    _info = src._info;
+    pixelRef = std::move(src.pixelRef);
   }
   return *this;
 }
 
 bool Bitmap::allocPixels(int width, int height, bool alphaOnly, bool tryHardware) {
-  pixelBuffer = PixelBuffer::Make(width, height, alphaOnly, tryHardware);
-  if (pixelBuffer != nullptr) {
-    _info = pixelBuffer->info();
+  pixelRef = PixelRef::Make(width, height, alphaOnly, tryHardware);
+  if (pixelRef != nullptr) {
+    _info = pixelRef->info();
   }
-  return pixelBuffer != nullptr;
+  return pixelRef != nullptr;
 }
 
 void* Bitmap::lockPixels() {
-  if (pixelBuffer == nullptr) {
+  if (pixelRef == nullptr) {
     return nullptr;
   }
-  return pixelBuffer->lockPixels();
+  return pixelRef->lockWritablePixels();
 }
 
-void Bitmap::unlockPixels() {
-  if (pixelBuffer != nullptr) {
-    pixelBuffer->unlockPixels();
+const void* Bitmap::lockPixels() const {
+  if (pixelRef == nullptr) {
+    return nullptr;
+  }
+  return pixelRef->lockPixels();
+}
+
+void Bitmap::unlockPixels() const {
+  if (pixelRef != nullptr) {
+    pixelRef->unlockPixels();
   }
 }
 
 bool Bitmap::isHardwareBacked() const {
-  return pixelBuffer ? pixelBuffer->isHardwareBacked() : false;
+  return pixelRef ? pixelRef->isHardwareBacked() : false;
 }
 
 std::shared_ptr<Data> Bitmap::encode(EncodedFormat format, int quality) const {
@@ -95,10 +101,10 @@ void Bitmap::eraseAll() {
   Pixmap(*this).eraseAll();
 }
 
-PixelBuffer* Bitmap::writableRef() {
-  if (pixelBuffer.use_count() > 1) {
-    pixelBuffer = pixelBuffer->duplicate();
+std::shared_ptr<ImageBuffer> Bitmap::makeBuffer() const {
+  if (pixelRef == nullptr) {
+    return nullptr;
   }
-  return pixelBuffer.get();
+  return pixelRef->makeBuffer();
 }
 }  // namespace tgfx

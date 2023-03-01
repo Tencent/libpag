@@ -34,7 +34,7 @@ std::shared_ptr<PAGSolidLayer> PAGSolidLayer::Make(int64_t duration, int32_t wid
   auto layer = new SolidLayer();
   auto transform = Transform2D::MakeDefault();
   transform->opacity->value = opacity;
-  layer->transform = transform;
+  layer->transform = transform.release();
   layer->width = width;
   layer->height = height;
   layer->solidColor = solidColor;

@@ -23,7 +23,7 @@ namespace pag {
 std::unique_ptr<PreComposeLayer> PreComposeLayer::Wrap(pag::Composition* composition) {
   auto layer = new PreComposeLayer();
   layer->duration = composition->duration;
-  layer->transform = Transform2D::MakeDefault();
+  layer->transform = Transform2D::MakeDefault().release();
   layer->composition = composition;
   return std::unique_ptr<PreComposeLayer>(layer);
 }

@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GradientCache.h"
-
 #include <utility>
 
 namespace tgfx {
@@ -47,13 +46,13 @@ void GradientCache::add(const BytesKey& bytesKey, std::shared_ptr<Texture> textu
 
 std::shared_ptr<ImageBuffer> CreateGradient(const Color* colors, const float* positions, int count,
                                             int resolution) {
-  auto pixelBuffer = PixelBuffer::Make(resolution, 1, false, false);
-  Pixmap pixmap(pixelBuffer);
+  Bitmap bitmap(resolution, 1, false, false);
+  Pixmap pixmap(bitmap);
   if (pixmap.isEmpty()) {
     return nullptr;
   }
   pixmap.eraseAll();
-  auto* pixels = reinterpret_cast<uint8_t*>(pixmap.writablePixels());
+  auto pixels = reinterpret_cast<uint8_t*>(pixmap.writablePixels());
   int prevIndex = 0;
   for (int i = 1; i < count; ++i) {
     int nextIndex =
@@ -88,7 +87,7 @@ std::shared_ptr<ImageBuffer> CreateGradient(const Color* colors, const float* po
     }
     prevIndex = nextIndex;
   }
-  return pixelBuffer;
+  return bitmap.makeBuffer();
 }
 
 std::shared_ptr<Texture> GradientCache::getGradient(Context* context, const Color* colors,

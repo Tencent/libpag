@@ -105,52 +105,6 @@ class Image {
   static std::shared_ptr<Image> MakeFromTexture(std::shared_ptr<Texture> texture,
                                                 ImageOrigin origin = ImageOrigin::TopLeft);
 
-  /**
-   * Creates an Image with RGBAAA layout that takes half of the original image from imageGenerator
-   * as its RGB channels and the other half as its alpha channel. Returns a non-RGBAAA Image if both
-   * alphaStartX and alphaStartY are zero. Returns nullptr if imageGenerator is nullptr or the
-   * RGBAAA layout is not contained by the bounds of the original image.
-   * @param imageGenerator An ImageGenerator generates the original image.
-   * @param displayWidth The display width of the RGBAAA image.
-   * @param displayHeight The display height of the RGBAAA image.
-   * @param alphaStartX The x position of where alpha area begins in the original image.
-   * @param alphaStartY The y position of where alpha area begins in the original image.
-   * @param mipMapped Whether created Image texture must allocate mip map levels.
-   */
-  static std::shared_ptr<Image> MakeRGBAAA(std::shared_ptr<ImageGenerator> imageGenerator,
-                                           int displayWidth, int displayHeight, int alphaStartX,
-                                           int alphaStartY, bool mipMapped = false);
-
-  /**
-   * Creates an Image with RGBAAA layout that takes half of the original image from imageBuffer as
-   * its RGB channels and the other half as its alpha channel. Returns a non-RGBAAA Image if
-   * both alphaStartX and alphaStartY are zero. Returns nullptr if imageBuffer is nullptr or the
-   * RGBAAA layout is not contained by the bounds of the original image.
-   * @param imageBuffer An ImageBuffer represents the original image.
-   * @param displayWidth The display width of the RGBAAA image.
-   * @param displayHeight The display height of the RGBAAA image.
-   * @param alphaStartX The x position of where alpha area begins in the original image.
-   * @param alphaStartY The y position of where alpha area begins in the original image.
-   * @param mipMapped whether created Image texture must allocate mip map levels.
-   */
-  static std::shared_ptr<Image> MakeRGBAAA(std::shared_ptr<ImageBuffer> imageBuffer,
-                                           int displayWidth, int displayHeight, int alphaStartX,
-                                           int alphaStartY, bool mipMapped = false);
-
-  /**
-   * Creates an Image with RGBAAA layout that takes half of the pixels in texture as its RGB
-   * channels and the other half as its alpha channel. Returns a non-RGBAAA Image if both
-   * alphaStartX and alphaStartY are zero. Returns nullptr if imageBuffer is nullptr or the
-   * RGBAAA layout is not contained by the bounds of the original image.
-   * @param texture A Texture represents the original image.
-   * @param displayWidth The display width of the RGBAAA image.
-   * @param displayHeight The display height of the RGBAAA image.
-   * @param alphaStartX The x position of where alpha area begins in the original image.
-   * @param alphaStartY The y position of where alpha area begins in the original image.
-   */
-  static std::shared_ptr<Image> MakeRGBAAA(std::shared_ptr<Texture> texture, int displayWidth,
-                                           int displayHeight, int alphaStartX, int alphaStartY);
-
   virtual ~Image() = default;
 
   /**
@@ -227,6 +181,19 @@ class Image {
    */
   std::shared_ptr<Image> makeMipMapped() const;
 
+  /**
+   * Returns an Image with the RGBAAA layout that takes half of the original Image as its RGB
+   * channels and the other half as its alpha channel. Returns a subset Image if both alphaStartX
+   * and alphaStartY are zero. Returns nullptr if the Image contains a custom origin or is an RGBAAA
+   * Image, or the RGBAAA layout is invalid.
+   * @param displayWidth The display width of the RGBAAA image.
+   * @param displayHeight The display height of the RGBAAA image.
+   * @param alphaStartX The x position of where alpha area begins in the original image.
+   * @param alphaStartY The y position of where alpha area begins in the original image.
+   */
+  std::shared_ptr<Image> makeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
+                                    int alphaStartY);
+
  protected:
   std::weak_ptr<Image> weakThis;
   std::shared_ptr<ImageSource> source = nullptr;
@@ -236,6 +203,9 @@ class Image {
   virtual std::shared_ptr<Image> onCloneWithSource(std::shared_ptr<ImageSource> newSource) const;
 
   virtual std::shared_ptr<Image> onMakeSubset(const Rect& subset) const;
+
+  virtual std::shared_ptr<Image> onMakeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
+                                              int alphaStartY) const;
 
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
       Context* context, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
@@ -249,9 +219,6 @@ class Image {
  private:
   static std::shared_ptr<Image> MakeFromSource(std::shared_ptr<ImageSource> source,
                                                ImageOrigin origin = ImageOrigin::TopLeft);
-
-  static std::shared_ptr<Image> MakeRGBAAA(std::shared_ptr<ImageSource> source, int displayWidth,
-                                           int displayHeight, int alphaStartX, int alphaStartY);
 
   std::shared_ptr<Image> cloneWithSource(std::shared_ptr<ImageSource> newSource) const;
 

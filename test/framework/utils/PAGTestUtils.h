@@ -31,7 +31,7 @@ std::string ToString(Frame frame);
 
 void GetAllPAGFiles(const std::string& path, std::vector<std::string>& files);
 
-std::shared_ptr<tgfx::PixelBuffer> MakeSnapshot(std::shared_ptr<PAGSurface> pagSurface);
+tgfx::Bitmap MakeSnapshot(std::shared_ptr<PAGSurface> pagSurface);
 
 std::shared_ptr<PAGLayer> GetLayer(std::shared_ptr<PAGComposition> root, LayerType type,
                                    int& targetIndex);

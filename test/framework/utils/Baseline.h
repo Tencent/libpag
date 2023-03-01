@@ -25,8 +25,9 @@
 namespace pag {
 class Baseline {
  public:
-  static bool Compare(const std::shared_ptr<tgfx::PixelBuffer>& pixelBuffer,
-                      const std::string& key);
+  static bool Compare(std::shared_ptr<tgfx::PixelBuffer> pixelBuffer, const std::string& key);
+
+  static bool Compare(const tgfx::Bitmap& bitmap, const std::string& key);
 
   static bool Compare(const tgfx::Pixmap& pixmap, const std::string& key);
 

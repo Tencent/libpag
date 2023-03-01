@@ -50,8 +50,10 @@ std::shared_ptr<Mask> Mask::Make(int width, int height, bool tryHardware) {
   if (buffer == nullptr) {
     return nullptr;
   }
-  Pixmap(buffer).eraseAll();
-  return std::make_shared<CGMask>(std::move(buffer));
+  auto pixels = buffer->lockPixels();
+  Pixmap(buffer->info(), pixels).eraseAll();
+  buffer->unlockPixels();
+  return std::make_shared<CGMask>(buffer);
 }
 
 void CGMask::fillPath(const Path& path) {
@@ -59,9 +61,10 @@ void CGMask::fillPath(const Path& path) {
     return;
   }
   const auto& info = buffer->info();
-  Pixmap bm(buffer);
-  auto cgContext = CreateBitmapContext(info, bm.writablePixels());
+  auto pixels = buffer->lockPixels();
+  auto cgContext = CreateBitmapContext(info, pixels);
   if (cgContext == nullptr) {
+    buffer->unlockPixels();
     return;
   }
 
@@ -97,8 +100,8 @@ void CGMask::fillPath(const Path& path) {
       CGContextEOFillPath(cgContext);
     }
   }
-
   CGContextRelease(cgContext);
   CGPathRelease(cgPath);
+  buffer->unlockPixels();
 }
 }  // namespace tgfx
