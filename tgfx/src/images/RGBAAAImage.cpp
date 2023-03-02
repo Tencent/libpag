@@ -53,12 +53,12 @@ std::unique_ptr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(Context* con
                                                                     TileMode,
                                                                     const SamplingOptions& sampling,
                                                                     const Matrix* localMatrix,
-                                                                    bool skipGeneratingCache) {
+                                                                    uint32_t surfaceFlags) {
   auto matrix = Matrix::MakeTrans(bounds.x(), bounds.y());
   if (localMatrix != nullptr) {
     matrix.postConcat(*localMatrix);
   }
-  return TextureEffect::MakeRGBAAA(source->lockTextureProxy(context, skipGeneratingCache), sampling,
+  return TextureEffect::MakeRGBAAA(source->lockTextureProxy(context, surfaceFlags), sampling,
                                    alphaStart, &matrix);
 }
 }  // namespace tgfx

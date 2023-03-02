@@ -84,19 +84,21 @@ class ImageProxyPicture : public Picture {
   }
 
   void draw(tgfx::Canvas* canvas, RenderCache* cache) const override {
-    auto image = proxy->getImage(cache);
+    // Do not call proxy->getImage() here, which will clear the decoded image in the render cache.
     if (proxy->isTemporary()) {
+      auto image = proxy->getImage(cache);
       canvas->drawImage(std::move(image));
       return;
     }
     auto options = canvas->surfaceOptions();
-    if (options && !options->skipGeneratingGPUCache()) {
+    if (options && !options->cacheDisabled()) {
       auto snapshot = cache->getSnapshot(this);
       if (snapshot) {
         canvas->drawImage(snapshot->getImage(), snapshot->getMatrix());
         return;
       }
     }
+    auto image = proxy->getImage(cache);
     canvas->drawImage(std::move(image));
   }
 
@@ -166,7 +168,7 @@ class SnapshotPicture : public Picture {
 
   void draw(tgfx::Canvas* canvas, RenderCache* cache) const override {
     auto options = canvas->surfaceOptions();
-    if (options && options->skipGeneratingGPUCache()) {
+    if (options && options->cacheDisabled()) {
       graphic->draw(canvas, cache);
       return;
     }
@@ -189,7 +191,7 @@ class SnapshotPicture : public Picture {
     graphic->measureBounds(&bounds);
     auto width = static_cast<int>(ceilf(bounds.width() * scaleFactor));
     auto height = static_cast<int>(ceilf(bounds.height() * scaleFactor));
-    tgfx::SurfaceOptions options(tgfx::SurfaceOptions::SkipGeneratingGPUCacheFlag);
+    tgfx::SurfaceOptions options(tgfx::SurfaceOptions::DisableCacheFlag);
     auto surface =
         tgfx::Surface::Make(cache->getContext(), width, height, false, 1, mipMapped, &options);
     if (surface == nullptr) {

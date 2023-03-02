@@ -24,6 +24,10 @@
 namespace tgfx {
 class NativeImageInfo {
  public:
+  /**
+   * Returns an ImageInfo describing the width, height, color type, alpha type, and row bytes of the
+   * specified Java Bitmap object.
+   */
   static ImageInfo GetInfo(JNIEnv* env, jobject bitmap);
 };
 }  // namespace tgfx

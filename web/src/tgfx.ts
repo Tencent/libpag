@@ -26,18 +26,23 @@ export const createImageFromBytes = (bytes: ArrayBuffer) => {
   return createImage(URL.createObjectURL(blob));
 };
 
-export const readImagePixels = async (module: PAG, bytes: ArrayBuffer, width: number, height: number) => {
-  const image = await createImageFromBytes(bytes);
-  if (!image) return null;
+export const readImagePixels = (module: PAG, image: CanvasImageSource, width: number, height: number) => {
+  if (!image) {
+    return null;
+  }
   const canvas = getCanvas2D();
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d') as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
-  if (!ctx) return null;
+  if (!ctx) {
+    return null;
+  }
   ctx.drawImage(image, 0, 0, width, height);
   const { data } = ctx.getImageData(0, 0, width, height);
   releaseCanvas2D(canvas);
-  if (data.length === 0) return null;
+  if (data.length === 0) {
+    return null;
+  }
   return malloc(module, data);
 };
 

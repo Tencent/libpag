@@ -21,6 +21,7 @@
 #include "gpu/opengl/GLUtil.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Pixmap.h"
+#include "utils/PixelFormatUtil.h"
 
 namespace tgfx {
 std::shared_ptr<GLRenderTarget> GLRenderTarget::MakeFrom(Context* context,
@@ -203,18 +204,18 @@ static bool CanReadDirectly(Context* context, SurfaceOrigin origin, const ImageI
 static void CopyPixels(const ImageInfo& srcInfo, const void* srcPixels, const ImageInfo& dstInfo,
                        void* dstPixels, bool flipY) {
   auto pixels = srcPixels;
-  std::unique_ptr<Buffer> tempPixels = nullptr;
+  Buffer tempBuffer = {};
   if (flipY) {
-    tempPixels = std::make_unique<Buffer>(srcInfo.byteSize());
+    tempBuffer.alloc(srcInfo.byteSize());
     auto rowCount = srcInfo.height();
     auto rowBytes = srcInfo.rowBytes();
-    auto dst = tempPixels->bytes();
+    auto dst = tempBuffer.bytes();
     for (int i = 0; i < rowCount; i++) {
       auto src = reinterpret_cast<const uint8_t*>(srcPixels) + (rowCount - i - 1) * rowBytes;
       memcpy(dst, src, rowBytes);
       dst += rowBytes;
     }
-    pixels = tempPixels->data();
+    pixels = tempBuffer.data();
   }
   Pixmap pixmap(srcInfo, pixels);
   pixmap.readPixels(dstInfo, dstPixels);
@@ -232,11 +233,12 @@ bool GLRenderTarget::readPixels(const ImageInfo& dstInfo, void* dstPixels, int s
   auto caps = GLCaps::Get(context);
   const auto& format = caps->getTextureFormat(pixelFormat);
   gl->bindFramebuffer(GL_FRAMEBUFFER, renderTargetFBInfo.id);
-  auto colorType = pixelFormat == PixelFormat::ALPHA_8 ? ColorType::ALPHA_8 : ColorType::RGBA_8888;
+
+  auto colorType = PixelFormatToColorType(pixelFormat);
   auto srcInfo =
       ImageInfo::Make(outInfo.width(), outInfo.height(), colorType, AlphaType::Premultiplied);
   void* pixels = nullptr;
-  std::unique_ptr<Buffer> tempPixels = nullptr;
+  Buffer tempBuffer = {};
   auto restoreGLRowLength = false;
   if (CanReadDirectly(context, origin(), srcInfo, outInfo)) {
     pixels = dstPixels;
@@ -246,8 +248,8 @@ bool GLRenderTarget::readPixels(const ImageInfo& dstInfo, void* dstPixels, int s
       restoreGLRowLength = true;
     }
   } else {
-    tempPixels = std::make_unique<Buffer>(srcInfo.byteSize());
-    pixels = tempPixels->data();
+    tempBuffer.alloc(srcInfo.byteSize());
+    pixels = tempBuffer.data();
   }
   auto alignment = pixelFormat == PixelFormat::ALPHA_8 ? 1 : 4;
   gl->pixelStorei(GL_PACK_ALIGNMENT, alignment);
@@ -262,8 +264,8 @@ bool GLRenderTarget::readPixels(const ImageInfo& dstInfo, void* dstPixels, int s
   if (restoreGLRowLength) {
     gl->pixelStorei(GL_PACK_ROW_LENGTH, 0);
   }
-  if (tempPixels != nullptr) {
-    CopyPixels(srcInfo, tempPixels->data(), outInfo, dstPixels, flipY);
+  if (!tempBuffer.isEmpty()) {
+    CopyPixels(srcInfo, tempBuffer.data(), outInfo, dstPixels, flipY);
   }
   return true;
 }

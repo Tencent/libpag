@@ -110,21 +110,25 @@ std::shared_ptr<Data> ImageCodec::Encode(const Pixmap& pixmap, EncodedFormat for
     return nullptr;
   }
   USE(format);
-  if (quality > 100) quality = 100;
-  if (quality < 0) quality = 0;
+  if (quality > 100) {
+    quality = 100;
+  }
+  if (quality < 0) {
+    quality = 0;
+  }
 #ifdef TGFX_USE_JPEG_ENCODE
   if (format == EncodedFormat::JPEG) {
-    return JpegCodec::Encode(pixmap, format, quality);
+    return JpegCodec::Encode(pixmap, quality);
   }
 #endif
 #ifdef TGFX_USE_WEBP_ENCODE
   if (format == EncodedFormat::WEBP) {
-    return WebpCodec::Encode(pixmap, format, quality);
+    return WebpCodec::Encode(pixmap, quality);
   }
 #endif
 #ifdef TGFX_USE_PNG_ENCODE
   if (format == EncodedFormat::PNG) {
-    return PngCodec::Encode(pixmap, format, quality);
+    return PngCodec::Encode(pixmap, quality);
   }
 #endif
   return nullptr;

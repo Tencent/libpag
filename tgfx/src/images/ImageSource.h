@@ -23,6 +23,7 @@
 #include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/ImageGenerator.h"
 #include "tgfx/gpu/Context.h"
+#include "tgfx/gpu/SurfaceOptions.h"
 
 namespace tgfx {
 /**
@@ -32,14 +33,14 @@ class ImageSource : public Cacheable {
  public:
   /**
    * Creates ImageSource from an image generator. ImageSource is returned if generator is not
-   * nullptr. Image generator may wrap codec data or custom data.
+   * nullptr. The image generator may wrap codec data or custom data.
    */
   static std::shared_ptr<ImageSource> MakeFromGenerator(std::shared_ptr<ImageGenerator> generator,
                                                         bool mipMapped);
 
   /**
-   * Creates ImageSource from ImageBuffer, ImageSource is returned if imageBuffer is not nullptr and
-   * its dimensions are greater than zero.
+   * Creates ImageSource from ImageBuffer, ImageSource is returned if the imageBuffer is not nullptr
+   * and its dimensions are greater than zero.
    */
   static std::shared_ptr<ImageSource> MakeFromBuffer(std::shared_ptr<ImageBuffer> buffer,
                                                      bool mipMapped);
@@ -50,12 +51,12 @@ class ImageSource : public Cacheable {
   static std::shared_ptr<ImageSource> MakeFromTexture(std::shared_ptr<Texture> texture);
 
   /**
-   * Returns the width of target image.
+   * Returns the width of the target image.
    */
   virtual int width() const = 0;
 
   /**
-   * Returns the height of target image.
+   * Returns the height of the target image.
    */
   virtual int height() const = 0;
 
@@ -72,7 +73,7 @@ class ImageSource : public Cacheable {
   virtual bool isAlphaOnly() const = 0;
 
   /**
-   * Returns true if ImageSource is backed by an image generator or other service that creates its
+   * Returns true if ImageSource is backed by an image generator or other services that create its
    * pixels on-demand.
    */
   virtual bool isLazyGenerated() const {
@@ -87,7 +88,7 @@ class ImageSource : public Cacheable {
   }
 
   /**
-   * Retrieves the backend texture. Returns nullptr if ImageSource is not texture backed.
+   * Retrieves the backend texture. Returns nullptr if ImageSource is not backed by texture.
    */
   virtual std::shared_ptr<Texture> getTexture() const {
     return nullptr;
@@ -116,11 +117,9 @@ class ImageSource : public Cacheable {
 
   /**
    * Returns a TextureProxy if there is a corresponding cache in the context. Otherwise, immediately
-   * creates one. If the skipGeneratingCache is true, the ImageSource will not be assigned to the
-   * associated Texture as its cache owner.
+   * creates one.
    */
-  std::shared_ptr<TextureProxy> lockTextureProxy(Context* context,
-                                                 bool skipGeneratingCache = false) const;
+  std::shared_ptr<TextureProxy> lockTextureProxy(Context* context, uint32_t surfaceFlags = 0) const;
 
  protected:
   virtual const Cacheable* getCacheOwner() const;
@@ -129,6 +128,7 @@ class ImageSource : public Cacheable {
 
   virtual std::shared_ptr<ImageSource> onMakeMipMapped() const = 0;
 
-  virtual std::shared_ptr<TextureProxy> onMakeTextureProxy(Context* context) const = 0;
+  virtual std::shared_ptr<TextureProxy> onMakeTextureProxy(Context* context,
+                                                           uint32_t surfaceFlags) const = 0;
 };
 }  // namespace tgfx

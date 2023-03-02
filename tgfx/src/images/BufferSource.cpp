@@ -27,7 +27,7 @@ std::shared_ptr<ImageSource> BufferSource::onMakeMipMapped() const {
   return std::shared_ptr<BufferSource>(new BufferSource(imageBuffer, true));
 }
 
-std::shared_ptr<TextureProxy> BufferSource::onMakeTextureProxy(Context* context) const {
+std::shared_ptr<TextureProxy> BufferSource::onMakeTextureProxy(Context* context, uint32_t) const {
   return context->proxyProvider()->createTextureProxy(imageBuffer, mipMapped);
 }
 }  // namespace tgfx

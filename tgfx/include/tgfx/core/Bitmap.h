@@ -42,7 +42,7 @@ class Bitmap {
   Bitmap() = default;
 
   /**
-   * Creates an new Bitmap and try to allocate its pixels by the specified width, height, and the
+   * Creates a new Bitmap and try to allocate its pixels by the specified width, height, and the
    * native color type. and allocates pixel memory. If the alphaOnly is true, sets ImageInfo to
    * ColorType::ALPHA_8. If the tryHardware is true and there is hardware buffer support on the
    * current platform, a hardware backed PixelRef is allocated. Otherwise, a raster PixelRef is
@@ -104,7 +104,7 @@ class Bitmap {
   }
 
   /**
-   * Returns a ImageInfo describing the width, height, color type, alpha type, and row bytes of the
+   * Returns an ImageInfo describing the width, height, color type, alpha type, and row bytes of the
    * pixels.
    */
   const ImageInfo& info() const {

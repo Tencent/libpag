@@ -27,8 +27,8 @@ class Texture;
 /**
  * The ImageReader class allows direct access to image buffers generated from a video-related object
  * of the native platform. The video-related object could be a Surface on the android platform or an
- * HTMLVideoElement on the web platform. ImageReader is an abstract class. Use its
- * subclass from each native platform instead.
+ * HTMLVideoElement on the web platform. ImageReader is an abstract class. Use its subclass on the
+ * native platform instead.
  */
 class ImageReader {
  public:

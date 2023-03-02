@@ -100,5 +100,7 @@ class HardwareBufferInterface {
 
   static AHardwareBuffer* AHardwareBuffer_fromHardwareBuffer(JNIEnv* env,
                                                              jobject hardwareBufferObj);
+
+  static AHardwareBuffer* AHardwareBuffer_fromBitmap(JNIEnv* env, jobject bitmap);
 };
 }  // namespace tgfx

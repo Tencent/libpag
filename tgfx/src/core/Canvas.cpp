@@ -404,8 +404,7 @@ void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
   if (!clipBounds.intersect(bounds)) {
     return;
   }
-  auto skipGeneratingCache = surface->options()->skipGeneratingGPUCache();
-  auto op = shape->makeOp(&glPaint, state->matrix, skipGeneratingCache);
+  auto op = shape->makeOp(&glPaint, state->matrix, surface->options()->flags());
   if (op == nullptr) {
     return;
   }
@@ -442,8 +441,8 @@ void Canvas::drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, c
   if (localBounds.isEmpty()) {
     return;
   }
-  auto skipGeneratingCache = surface->options()->skipGeneratingGPUCache();
-  auto processor = image->asFragmentProcessor(getContext(), sampling, nullptr, skipGeneratingCache);
+  auto processor =
+      image->asFragmentProcessor(getContext(), sampling, nullptr, surface->options()->flags());
   if (processor == nullptr) {
     return;
   }

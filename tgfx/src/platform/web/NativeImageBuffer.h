@@ -24,6 +24,20 @@
 namespace tgfx {
 class NativeImageBuffer : public ImageBuffer {
  public:
+  /**
+   * Function that, if provided, will be called when the NativeImageBuffer goes out of scope,
+   * allowing for custom freeing of the nativeImage.
+   */
+  typedef void (*ReleaseProc)(emscripten::val nativeImage);
+
+  /**
+   * Creates a new ImageBuffer object from the platform-specific nativeImage in the CPU. The
+   * returned ImageBuffer object takes a reference to the nativeImage. Returns nullptr if the
+   * nativeImage is nullptr or has a size of zero.
+   */
+  static std::shared_ptr<ImageBuffer> MakeFrom(emscripten::val nativeImage,
+                                               ReleaseProc releaseProc = nullptr);
+
   ~NativeImageBuffer() override;
 
   int width() const override {
@@ -46,12 +60,12 @@ class NativeImageBuffer : public ImageBuffer {
   int _height = 0;
   emscripten::val nativeImage = emscripten::val::null();
   bool usePromise = false;
+  ReleaseProc releaseProc = nullptr;
 
   NativeImageBuffer(int width, int height, emscripten::val nativeImage, bool usePromise);
 
   emscripten::val getImage() const;
 
-  friend class ImageBuffer;
   friend class NativeCodec;
 };
 }  // namespace tgfx

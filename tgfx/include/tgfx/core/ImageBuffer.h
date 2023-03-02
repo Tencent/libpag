@@ -25,7 +25,7 @@
 
 namespace tgfx {
 /**
- * ImageBuffer describes a two dimensional array of pixels which is optimized for creating textures.
+ * ImageBuffer describes a two-dimensional array of pixels which is optimized for creating textures.
  * ImageBuffer is immutable and safe across threads.
  */
 class ImageBuffer {
@@ -33,21 +33,12 @@ class ImageBuffer {
   /**
    * Creates a single-plane ImageBuffer from a platform-specific hardware buffer. The hardwareBuffer
    * could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on the apple
-   * platform. The returned ImageBuffer takes a reference on the hardwareBuffer. The caller must
+   * platform. The returned ImageBuffer takes a reference to the hardwareBuffer. The caller must
    * ensure that pixels are unchanged for the lifetime of the returned ImageBuffer. Returns nullptr
-   * if any of the parameters is nullptr or the hardwareBuffer is not single-plane. Use the
+   * if any of the parameters are nullptr or the hardwareBuffer is not single-plane. Use the
    * YUVBuffer::MakeFrom() method for the hardware buffer with multiple planes.
    */
   static std::shared_ptr<ImageBuffer> MakeFrom(HardwareBufferRef hardwareBuffer);
-
-  /**
-   * Creates a new ImageBuffer object from a platform-specific image in the CPU. The nativeImage
-   * could be a jobject that represents a java Bitmap on the android platform or a CGImageRef on the
-   * apple platform.The returned ImageBuffer object takes a reference on the nativeImage. The caller
-   * must ensure that pixels are unchanged for the lifetime of the returned ImageBuffer. Returns
-   * nullptr if the nativeImage is nullptr or the current platform has no native image support.
-   */
-  static std::shared_ptr<ImageBuffer> MakeFrom(NativeImageRef nativeImage);
 
   virtual ~ImageBuffer() = default;
   /**

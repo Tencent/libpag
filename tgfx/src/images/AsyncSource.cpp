@@ -38,7 +38,7 @@ std::shared_ptr<ImageSource> AsyncSource::onMakeMipMapped() const {
   return encodedSource->onMakeMipMapped();
 }
 
-std::shared_ptr<TextureProxy> AsyncSource::onMakeTextureProxy(Context* context) const {
+std::shared_ptr<TextureProxy> AsyncSource::onMakeTextureProxy(Context* context, uint32_t) const {
   auto provider = context->proxyProvider();
   if (imageBuffer) {
     return provider->createTextureProxy(imageBuffer, encodedSource->mipMapped);

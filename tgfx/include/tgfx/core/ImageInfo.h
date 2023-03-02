@@ -141,10 +141,11 @@ class ImageInfo {
   }
 
   /**
-   * Creates ImageInfo with colorType set to newColorType, and keep other properties the same.
+   * Creates ImageInfo with colorType set to newColorType, rowBytes set to newRowBytes, and keep
+   * other properties the same.
    */
-  ImageInfo makeColorType(ColorType newColorType) const {
-    return Make(_width, _height, newColorType, _alphaType, _rowBytes);
+  ImageInfo makeColorType(ColorType newColorType, size_t newRowBytes = 0) const {
+    return Make(_width, _height, newColorType, _alphaType, newRowBytes);
   }
 
   /**

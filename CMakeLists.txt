@@ -7,6 +7,8 @@ project(PAG)
 #    SET(CMAKE_OSX_ARCHITECTURES x86_64)
 #endif ()
 
+# Uncomment the next line to enable debug mode for third-party libraries.
+#set(VENDOR_DEBUG ON)
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 include(./vendor_tools/vendor.cmake)
 
@@ -355,7 +357,7 @@ if (PAG_BUILD_TESTS)
             test/framework/*.cpp
             test/framework/utils/*.cpp)
 
-    file(GLOB FFAVC_LIB vendor/ffavc/${LIBRARY_ENTRY}/*${CMAKE_SHARED_LIBRARY_SUFFIX})
+    file(GLOB FFAVC_LIB vendor/ffavc/${PLATFORM}/${ARCH}/*${CMAKE_SHARED_LIBRARY_SUFFIX})
     list(APPEND TEST_PLATFORM_LIBS ${FFAVC_LIB})
     list(APPEND TEST_INCLUDES tgfx/src vendor/ffavc/include)
 

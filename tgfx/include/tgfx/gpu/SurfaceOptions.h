@@ -26,10 +26,16 @@ namespace tgfx {
 class SurfaceOptions {
  public:
   /**
-   * If this flag is set, the associated Surface will skip generating new GPU caches for all
-   * Cacheable objects drawn to the Surface.
+   * If this flag is set, the Surface will skip generating new caches to the associated Context for
+   * Cacheable objects during drawing.
    */
-  static constexpr uint32_t SkipGeneratingGPUCacheFlag = 1 << 0;
+  static constexpr uint32_t DisableCacheFlag = 1 << 0;
+
+  /**
+   * If this flag is set, the Surface will perform all CPU-side tasks in the current thread rather
+   * than run them in parallel asynchronously.
+   */
+  static constexpr uint32_t DisableAsyncTaskFlag = 1 << 1;
 
   SurfaceOptions() = default;
 
@@ -40,8 +46,12 @@ class SurfaceOptions {
     return _flags;
   }
 
-  bool skipGeneratingGPUCache() const {
-    return _flags & SkipGeneratingGPUCacheFlag;
+  bool cacheDisabled() const {
+    return _flags & DisableCacheFlag;
+  }
+
+  bool asyncTaskDisabled() const {
+    return _flags & DisableAsyncTaskFlag;
   }
 
   bool operator==(const SurfaceOptions& that) const {

@@ -207,17 +207,17 @@ std::shared_ptr<Image> Image::onMakeRGBAAA(int displayWidth, int displayHeight, 
 std::unique_ptr<FragmentProcessor> Image::asFragmentProcessor(Context* context,
                                                               const SamplingOptions& sampling,
                                                               const Matrix* localMatrix,
-                                                              bool skipGeneratingCache) {
+                                                              uint32_t surfaceFlags) {
   return asFragmentProcessor(context, TileMode::Clamp, TileMode::Clamp, sampling, localMatrix,
-                             skipGeneratingCache);
+                             surfaceFlags);
 }
 
 std::unique_ptr<FragmentProcessor> Image::asFragmentProcessor(Context* context, TileMode tileModeX,
                                                               TileMode tileModeY,
                                                               const SamplingOptions& sampling,
                                                               const Matrix* localMatrix,
-                                                              bool skipGeneratingCache) {
-  return TiledTextureEffect::Make(source->lockTextureProxy(context, skipGeneratingCache), tileModeX,
+                                                              uint32_t surfaceFlags) {
+  return TiledTextureEffect::Make(source->lockTextureProxy(context, surfaceFlags), tileModeX,
                                   tileModeY, sampling, localMatrix);
 }
 

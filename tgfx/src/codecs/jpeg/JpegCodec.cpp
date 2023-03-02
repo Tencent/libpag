@@ -18,6 +18,7 @@
 
 #include "codecs/jpeg/JpegCodec.h"
 #include <csetjmp>
+#include "tgfx/core/Buffer.h"
 #include "tgfx/core/Pixmap.h"
 #include "utils/OrientationHelper.h"
 
@@ -114,6 +115,36 @@ bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     memset(dstPixels, 255, dstInfo.rowBytes() * height());
     return true;
   }
+  Bitmap bitmap = {};
+  auto outPixels = dstPixels;
+  auto outRowBytes = dstInfo.rowBytes();
+  J_COLOR_SPACE out_color_space;
+  switch (dstInfo.colorType()) {
+    case ColorType::RGBA_8888:
+      out_color_space = JCS_EXT_RGBA;
+      break;
+    case ColorType::BGRA_8888:
+      out_color_space = JCS_EXT_BGRA;
+      break;
+    case ColorType::Gray_8:
+      out_color_space = JCS_GRAYSCALE;
+      break;
+    case ColorType::RGB_565:
+      out_color_space = JCS_RGB565;
+      break;
+    default:
+      auto success = bitmap.allocPixels(dstInfo.width(), dstInfo.height(), false, false);
+      if (!success) {
+        return false;
+      }
+      out_color_space = JCS_EXT_RGBA;
+      break;
+  }
+  Pixmap pixmap(bitmap);
+  if (!pixmap.isEmpty()) {
+    outPixels = pixmap.writablePixels();
+    outRowBytes = pixmap.rowBytes();
+  }
   FILE* infile = nullptr;
   if (fileData == nullptr && (infile = fopen(filePath.c_str(), "rb")) == nullptr) {
     return false;
@@ -121,7 +152,7 @@ bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   jpeg_decompress_struct cinfo = {};
   my_error_mgr jerr = {};
   cinfo.err = jpeg_std_error(&jerr.pub);
-  bool readRes = false;
+  bool result = false;
   do {
     if (setjmp(jerr.setjmp_buffer)) break;
     jpeg_create_decompress(&cinfo);
@@ -130,40 +161,40 @@ bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     } else {
       jpeg_mem_src(&cinfo, fileData->bytes(), fileData->size());
     }
-    if (jpeg_read_header(&cinfo, TRUE) != JPEG_HEADER_OK) break;
-    if (dstInfo.colorType() == ColorType::RGBA_8888) {
-      cinfo.out_color_space = JCS_EXT_RGBA;
-    } else if (dstInfo.colorType() == ColorType::BGRA_8888) {
-      cinfo.out_color_space = JCS_EXT_BGRA;
+    if (jpeg_read_header(&cinfo, TRUE) != JPEG_HEADER_OK) {
+      break;
     }
-    if (!jpeg_start_decompress(&cinfo)) break;
+    cinfo.out_color_space = out_color_space;
+    if (!jpeg_start_decompress(&cinfo)) {
+      break;
+    }
     JSAMPROW pRow[1];
     int line = 0;
     JDIMENSION h = height();
     while (cinfo.output_scanline < h) {
-      pRow[0] = (JSAMPROW)(static_cast<unsigned char*>(dstPixels) + dstInfo.rowBytes() * line);
+      pRow[0] = (JSAMPROW)(static_cast<unsigned char*>(outPixels) + outRowBytes * line);
       jpeg_read_scanlines(&cinfo, pRow, 1);
       line++;
     }
-    readRes = jpeg_finish_decompress(&cinfo);
+    result = jpeg_finish_decompress(&cinfo);
   } while (false);
   jpeg_destroy_decompress(&cinfo);
   if (infile) {
     fclose(infile);
   }
-  return readRes;
+  if (result && !pixmap.isEmpty()) {
+    pixmap.readPixels(dstInfo, dstPixels);
+  }
+  return result;
 }
 
 #ifdef TGFX_USE_JPEG_ENCODE
-std::shared_ptr<Data> JpegCodec::Encode(const Pixmap& pixmap, EncodedFormat, int quality) {
+std::shared_ptr<Data> JpegCodec::Encode(const Pixmap& pixmap, int quality) {
   auto srcPixels = static_cast<uint8_t*>(const_cast<void*>(pixmap.pixels()));
-  if (pixmap.colorType() == ColorType::ALPHA_8) {
-    return nullptr;
-  }
+  int srcRowBytes = static_cast<int>(pixmap.rowBytes());
   jpeg_compress_struct cinfo = {};
   jpeg_error_mgr jerr = {};
   JSAMPROW row_pointer[1];
-  int row_stride;
   cinfo.err = jpeg_std_error(&jerr);
   jpeg_create_compress(&cinfo);
   uint8_t* dstBuffer = nullptr;
@@ -171,25 +202,39 @@ std::shared_ptr<Data> JpegCodec::Encode(const Pixmap& pixmap, EncodedFormat, int
   jpeg_mem_dest(&cinfo, &dstBuffer, &dstBufferSize);
   cinfo.image_width = pixmap.width();
   cinfo.image_height = pixmap.height();
-  cinfo.input_components = 4;
+  Buffer buffer = {};
   switch (pixmap.colorType()) {
     case ColorType::RGBA_8888:
-    case ColorType::ALPHA_8:
       cinfo.in_color_space = JCS_EXT_RGBA;
+      cinfo.input_components = 4;
       break;
     case ColorType::BGRA_8888:
       cinfo.in_color_space = JCS_EXT_BGRA;
+      cinfo.input_components = 4;
+      break;
+    case ColorType::Gray_8:
+      cinfo.in_color_space = JCS_GRAYSCALE;
+      cinfo.input_components = 1;
       break;
     default:
-      return nullptr;
+      auto info = ImageInfo::Make(pixmap.width(), pixmap.height(), ColorType::RGBA_8888);
+      buffer.alloc(info.byteSize());
+      if (buffer.isEmpty()) {
+        return nullptr;
+      }
+      srcPixels = buffer.bytes();
+      srcRowBytes = static_cast<int>(info.rowBytes());
+      Pixmap(info, srcPixels).writePixels(pixmap.info(), pixmap.pixels());
+      cinfo.in_color_space = JCS_EXT_RGBA;
+      cinfo.input_components = 4;
+      break;
   }
   jpeg_set_defaults(&cinfo);
   cinfo.optimize_coding = TRUE;
   jpeg_set_quality(&cinfo, quality, TRUE);
   jpeg_start_compress(&cinfo, TRUE);
-  row_stride = pixmap.width() * 4;
   while (cinfo.next_scanline < cinfo.image_height) {
-    row_pointer[0] = &(srcPixels)[cinfo.next_scanline * row_stride];
+    row_pointer[0] = &(srcPixels)[cinfo.next_scanline * srcRowBytes];
     (void)jpeg_write_scanlines(&cinfo, row_pointer, 1);
   }
 

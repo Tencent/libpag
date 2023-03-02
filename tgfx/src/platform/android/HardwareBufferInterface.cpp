@@ -38,22 +38,25 @@ class AHardwareBufferFunctions {
   void (*acquire)(AHardwareBuffer* buffer) = nullptr;
   jobject (*AHB_to_HB)(JNIEnv*, AHardwareBuffer*) = nullptr;
   AHardwareBuffer* (*AHB_from_HB)(JNIEnv*, jobject) = nullptr;
+  int (*AHB_from_Bitmap)(JNIEnv*, jobject, AHardwareBuffer**) = nullptr;
 
   AHardwareBufferFunctions() {
     char sdk[PROP_VALUE_MAX] = "0";
     __system_property_get("ro.build.version.sdk", sdk);
     auto version = atoi(sdk);
-    if (version < 26) {
-      return;
+    if (version >= 26) {
+      LoadSymbol(allocate, "AHardwareBuffer_allocate");
+      LoadSymbol(release, "AHardwareBuffer_release");
+      LoadSymbol(lock, "AHardwareBuffer_lock");
+      LoadSymbol(unlock, "AHardwareBuffer_unlock");
+      LoadSymbol(describe, "AHardwareBuffer_describe");
+      LoadSymbol(acquire, "AHardwareBuffer_acquire");
+      LoadSymbol(AHB_to_HB, "AHardwareBuffer_toHardwareBuffer");
+      LoadSymbol(AHB_from_HB, "AHardwareBuffer_fromHardwareBuffer");
     }
-    LoadSymbol(allocate, "AHardwareBuffer_allocate");
-    LoadSymbol(release, "AHardwareBuffer_release");
-    LoadSymbol(lock, "AHardwareBuffer_lock");
-    LoadSymbol(unlock, "AHardwareBuffer_unlock");
-    LoadSymbol(describe, "AHardwareBuffer_describe");
-    LoadSymbol(acquire, "AHardwareBuffer_acquire");
-    LoadSymbol(AHB_to_HB, "AHardwareBuffer_toHardwareBuffer");
-    LoadSymbol(AHB_from_HB, "AHardwareBuffer_fromHardwareBuffer");
+    if (version >= 30) {
+      LoadSymbol(AHB_from_Bitmap, "AndroidBitmap_getHardwareBuffer");
+    }
   }
 };
 
@@ -63,10 +66,12 @@ static const AHardwareBufferFunctions* GetFunctions() {
 }
 
 bool HardwareBufferInterface::Available() {
-  return GetFunctions()->allocate != nullptr && GetFunctions()->release != nullptr &&
-         GetFunctions()->lock != nullptr && GetFunctions()->unlock != nullptr &&
-         GetFunctions()->describe != nullptr && GetFunctions()->acquire != nullptr &&
-         GetFunctions()->AHB_to_HB != nullptr && GetFunctions()->AHB_from_HB != nullptr;
+  static const bool available =
+      GetFunctions()->allocate != nullptr && GetFunctions()->release != nullptr &&
+      GetFunctions()->lock != nullptr && GetFunctions()->unlock != nullptr &&
+      GetFunctions()->describe != nullptr && GetFunctions()->acquire != nullptr &&
+      GetFunctions()->AHB_to_HB != nullptr && GetFunctions()->AHB_from_HB != nullptr;
+  return available;
 }
 
 int HardwareBufferInterface::Allocate(const AHardwareBuffer_Desc* desc,
@@ -104,6 +109,15 @@ jobject HardwareBufferInterface::AHardwareBuffer_toHardwareBuffer(JNIEnv* env,
 AHardwareBuffer* HardwareBufferInterface::AHardwareBuffer_fromHardwareBuffer(
     JNIEnv* env, jobject hardwareBufferObj) {
   return GetFunctions()->AHB_from_HB(env, hardwareBufferObj);
+}
+
+AHardwareBuffer* HardwareBufferInterface::AHardwareBuffer_fromBitmap(JNIEnv* env, jobject bitmap) {
+  if (GetFunctions()->AHB_from_Bitmap == nullptr) {
+    return nullptr;
+  }
+  AHardwareBuffer* hardwareBuffer = nullptr;
+  auto result = GetFunctions()->AHB_from_Bitmap(env, bitmap, &hardwareBuffer);
+  return result == 0 ? hardwareBuffer : nullptr;
 }
 
 }  // namespace tgfx

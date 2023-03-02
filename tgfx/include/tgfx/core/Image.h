@@ -33,43 +33,43 @@ class TextureProxy;
 class FragmentProcessor;
 
 /**
- * Image describes a two dimensional array of pixels to draw. The pixels may be decoded in a
+ * Image describes a two-dimensional array of pixels to draw. The pixels may be decoded in an
  * ImageBuffer, encoded in a Picture or compressed data stream, or located in GPU memory as a GPU
- * texture. Image is safe across threads and cannot be modified after it is created. The width and
- * height of Image are always greater than zero. Creating an Image with zero width or height returns
- * nullptr. The corresponding GPU cache is immediately marked as expired if all Images with the same
- * ImageSource are released, which becomes recyclable and will be purged at some point in the
- * future.
+ * texture. The Image class is safe across threads and cannot be modified after it is created. The
+ * width and height of an Image are always greater than zero. Creating an Image with zero width or
+ * height returns nullptr. The corresponding GPU cache is immediately marked as expired if all
+ * Images with the same ImageSource are released, which becomes recyclable and will be purged at
+ * some point in the future.
  */
 class Image {
  public:
   /**
-   * Creates Image from encoded file. Image is returned if format of the encoded file is recognized
-   * and supported. Recognized formats vary by platform. Note that the mipMapped parameter may be
-   * ignored if it is not supported by the GPU or the associated image source.
+   * Creates Image from encoded file. Image is returned if the format of the encoded file is
+   * recognized and supported. Recognized formats vary by platform. Note that the mipMapped
+   * parameter may be ignored if it is not supported by the GPU or the associated image source.
    */
   static std::shared_ptr<Image> MakeFromEncoded(const std::string& filePath,
                                                 bool mipMapped = false);
 
   /**
-   * Creates Image from encoded data. Image is returned if format of the encoded data is recognized
-   * and supported. Recognized formats vary by platform. Note that the mipMapped parameter may be
-   * ignored if it is not supported by the GPU or the associated image source.
+   * Creates Image from encoded data. An Image is returned if the format of the encoded data is
+   * recognized and supported. Recognized formats vary by platform. Note that the mipMapped
+   * parameter may be ignored if it is not supported by the GPU or the associated image source.
    */
   static std::shared_ptr<Image> MakeFromEncoded(std::shared_ptr<Data> encodedData,
                                                 bool mipMapped = false);
 
   /**
-   * Creates Image from an image generator. Image is returned if generator is not nullptr. Image
-   * generator may wrap codec data or custom data. Note that the mipMapped parameter may be ignored
-   * if it is not supported by the GPU or the associated image source.
+   * Creates Image from an image generator. An Image is returned if the generator is not nullptr.
+   * The image generator may wrap codec data or custom data. Note that the mipMapped parameter may
+   * be ignored if it is not supported by the GPU or the associated image source.
    */
   static std::shared_ptr<Image> MakeFromGenerator(std::shared_ptr<ImageGenerator> generator,
                                                   ImageOrigin origin = ImageOrigin::TopLeft,
                                                   bool mipMapped = false);
 
   /**
-   * Creates Image from Pixmap and copy of pixels. Since pixels are copied, Pixmap pixels may be
+   * Creates Image from Pixmap and a copy of pixels. Since pixels are copied, Pixmap pixels may be
    * modified or deleted without affecting Image. The returned Image may convert the copied pixels
    * to a new format which is more efficient for texture uploading on the GPU. Note that the
    * mipMapped parameter may be ignored if it is not supported by the GPU or the associated image
@@ -130,8 +130,8 @@ class Image {
   virtual bool isRGBAAA() const;
 
   /**
-   * Returns true if Image is backed by an image generator or other service that creates its pixels
-   * on-demand.
+   * Returns true if Image is backed by an image generator or other services that create their
+   * pixels on-demand.
    */
   bool isLazyGenerated() const;
 
@@ -147,7 +147,7 @@ class Image {
   bool hasMipmaps() const;
 
   /**
-   * Retrieves the backend texture. Returns nullptr if Image is not texture backed.
+   * Retrieves the backend texture. Returns nullptr if the Image is not backed by texture.
    */
   std::shared_ptr<Texture> getTexture() const;
 
@@ -161,9 +161,9 @@ class Image {
   std::shared_ptr<Image> makeTextureImage(Context* context) const;
 
   /**
-   * Returns subset of Image. subset must be fully contained by Image dimensions. The implementation
-   * always shares pixels and caches with the original Image. Returns nullptr if subset is empty, or
-   * subset is not contained by bounds.
+   * Returns subset of Image. The subset must be fully contained by Image dimensions. The
+   * implementation always shares pixels and caches with the original Image. Returns nullptr if the
+   * subset is empty, or the subset is not contained by bounds.
    */
   std::shared_ptr<Image> makeSubset(const Rect& subset) const;
 
@@ -184,8 +184,8 @@ class Image {
   /**
    * Returns an Image with the RGBAAA layout that takes half of the original Image as its RGB
    * channels and the other half as its alpha channel. Returns a subset Image if both alphaStartX
-   * and alphaStartY are zero. Returns nullptr if the Image contains a custom origin or is an RGBAAA
-   * Image, or the RGBAAA layout is invalid.
+   * and alphaStartY are zero. Returns nullptr if the original Image has an extra matrix or an
+   * RGBAAA layout, or the specified layout is invalid.
    * @param displayWidth The display width of the RGBAAA image.
    * @param displayHeight The display height of the RGBAAA image.
    * @param alphaStartX The x position of where alpha area begins in the original image.
@@ -209,12 +209,12 @@ class Image {
 
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
       Context* context, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
-      const Matrix* localMatrix = nullptr, bool skipGeneratingCache = false);
+      const Matrix* localMatrix = nullptr, uint32_t surfaceFlags = 0);
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(Context* context,
                                                          const SamplingOptions& sampling,
                                                          const Matrix* localMatrix = nullptr,
-                                                         bool skipGeneratingCache = false);
+                                                         uint32_t surfaceFlags = 0);
 
  private:
   static std::shared_ptr<Image> MakeFromSource(std::shared_ptr<ImageSource> source,

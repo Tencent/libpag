@@ -90,17 +90,21 @@ static void SetJSONValue(nlohmann::json& target, const std::string& key, const s
   (*json)[jsonKey] = value;
 }
 
-void SaveImage(const Pixmap& pixmap, const std::string& key) {
-  auto data = ImageCodec::Encode(pixmap, EncodedFormat::WEBP, 100);
-  if (data == nullptr) {
-    return;
-  }
+void SaveFile(std::shared_ptr<tgfx::Data> data, const std::string& key) {
   std::filesystem::path path = TestConstants::OUT_ROOT + key + TestConstants::WEBP_FILE_EXT;
   std::filesystem::create_directories(path.parent_path());
   std::ofstream out(path);
   out.write(reinterpret_cast<const char*>(data->data()),
             static_cast<std::streamsize>(data->size()));
   out.close();
+}
+
+void SaveImage(const Pixmap& pixmap, const std::string& key) {
+  auto data = ImageCodec::Encode(pixmap, EncodedFormat::WEBP, 100);
+  if (data == nullptr) {
+    return;
+  }
+  SaveFile(data, key);
 }
 
 void RemoveImage(const std::string& key) {
@@ -158,8 +162,7 @@ bool Baseline::Compare(const Pixmap& pixmap, const std::string& key) {
   if (pixmap.rowBytes() == pixmap.info().minRowBytes()) {
     md5 = DumpMD5(pixmap.pixels(), pixmap.byteSize());
   } else {
-    Bitmap newBitmap(pixmap.width(), pixmap.height(),
-                     pixmap.colorType() == tgfx::ColorType::ALPHA_8, false);
+    Bitmap newBitmap(pixmap.width(), pixmap.height(), pixmap.isAlphaOnly(), false);
     Pixmap newPixmap(newBitmap);
     auto result = pixmap.readPixels(newPixmap.info(), newPixmap.writablePixels());
     if (!result) {

@@ -23,6 +23,7 @@
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/core/TextBlob.h"
+#include "tgfx/gpu/SurfaceOptions.h"
 
 namespace tgfx {
 class DrawOp;
@@ -84,7 +85,7 @@ class Shape : public Cacheable {
   float _resolutionScale = 1.0f;
 
   virtual std::unique_ptr<DrawOp> makeOp(GpuPaint* paint, const Matrix& viewMatrix,
-                                         bool skipGeneratingCache) const = 0;
+                                         uint32_t surfaceFlags) const = 0;
 
   friend class Canvas;
 };

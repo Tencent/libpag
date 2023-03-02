@@ -18,6 +18,7 @@
 
 #include "NativeCodec.h"
 #include "BitmapContextUtil.h"
+#include "tgfx/core/Buffer.h"
 
 namespace tgfx {
 static CGImagePropertyOrientation GetOrientationFromProperties(CFDictionaryRef imageProperties) {
@@ -100,6 +101,28 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> im
   return std::shared_ptr<ImageCodec>(codec);
 }
 
+std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(NativeImageRef nativeImage) {
+  if (nativeImage == nullptr) {
+    return nullptr;
+  }
+  auto width = CGImageGetWidth(nativeImage);
+  auto height = CGImageGetHeight(nativeImage);
+  if (width <= 0 || height <= 0) {
+    return nullptr;
+  }
+  auto codec =
+      new NativeCodec(static_cast<int>(width), static_cast<int>(height), ImageOrigin::TopLeft);
+  CFRetain(nativeImage);
+  codec->nativeImage = nativeImage;
+  return std::shared_ptr<ImageCodec>(codec);
+}
+
+NativeCodec::~NativeCodec() {
+  if (nativeImage != nullptr) {
+    CFRelease(nativeImage);
+  }
+}
+
 bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
@@ -107,29 +130,43 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   NSData* data = nil;
   CGImageSourceRef sourceRef = nil;
   CGImageRef image = nil;
-  if (!imagePath.empty()) {
-    data =
-        [[NSData alloc] initWithContentsOfFile:[NSString stringWithUTF8String:imagePath.c_str()]];
+  if (nativeImage != nullptr) {
+    image = nativeImage;
   } else {
-    auto bytes = const_cast<void*>(imageBytes->data());
-    data = [[NSData alloc] initWithBytesNoCopy:bytes length:imageBytes->size() freeWhenDone:NO];
+    if (!imagePath.empty()) {
+      data =
+          [[NSData alloc] initWithContentsOfFile:[NSString stringWithUTF8String:imagePath.c_str()]];
+    } else {
+      auto bytes = const_cast<void*>(imageBytes->data());
+      data = [[NSData alloc] initWithBytesNoCopy:bytes length:imageBytes->size() freeWhenDone:NO];
+    }
+    if (data == nil) {
+      return false;
+    }
+    CFDataRef dataRef = (__bridge CFDataRef)data;
+    sourceRef = CGImageSourceCreateWithData(dataRef, NULL);
+    if (sourceRef == NULL) {
+      [data release];
+      return false;
+    }
+    image = CGImageSourceCreateImageAtIndex(sourceRef, 0, NULL);
+    if (image == NULL) {
+      [data release];
+      CFRelease(sourceRef);
+      return false;
+    }
   }
-  if (data == nil) {
-    return false;
+  Buffer tempBuffer = {};
+  auto colorType = dstInfo.colorType();
+  auto info = dstInfo;
+  auto pixels = dstPixels;
+  if (colorType != ColorType::RGBA_8888 && colorType != ColorType::BGRA_8888 &&
+      colorType != ColorType::ALPHA_8) {
+    info = dstInfo.makeColorType(ColorType::RGBA_8888);
+    tempBuffer.alloc(info.byteSize());
+    pixels = tempBuffer.data();
   }
-  CFDataRef dataRef = (__bridge CFDataRef)data;
-  sourceRef = CGImageSourceCreateWithData(dataRef, NULL);
-  if (sourceRef == NULL) {
-    [data release];
-    return false;
-  }
-  image = CGImageSourceCreateImageAtIndex(sourceRef, 0, NULL);
-  if (image == NULL) {
-    [data release];
-    CFRelease(sourceRef);
-    return false;
-  }
-  auto context = CreateBitmapContext(dstInfo, dstPixels);
+  auto context = CreateBitmapContext(info, pixels);
   auto result = context != nullptr;
   if (result) {
     int width = static_cast<int>(CGImageGetWidth(image));
@@ -139,9 +176,14 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     CGContextDrawImage(context, rect, image);
     CGContextRelease(context);
   }
-  [data release];
-  CFRelease(sourceRef);
-  CGImageRelease(image);
+  if (nativeImage == nullptr) {
+    [data release];
+    CFRelease(sourceRef);
+    CGImageRelease(image);
+  }
+  if (!tempBuffer.isEmpty()) {
+    Pixmap(info, pixels).readPixels(dstInfo, dstPixels);
+  }
   return result;
 }
 }  // namespace tgfx
