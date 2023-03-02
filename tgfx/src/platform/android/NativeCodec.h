@@ -28,11 +28,16 @@ class NativeCodec : public ImageCodec {
 
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
 
+ protected:
+  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
+
  private:
   std::string imagePath;
   std::shared_ptr<Data> imageBytes;
+  Global<jobject> nativeImage;
 
-  NativeCodec(int width, int height, ImageOrigin origin) : ImageCodec(width, height, origin){};
+  NativeCodec(int width, int height, ImageOrigin origin) : ImageCodec(width, height, origin) {
+  }
 
   static std::shared_ptr<NativeCodec> Make(JNIEnv* env, jobject sizeObject, int origin);
 

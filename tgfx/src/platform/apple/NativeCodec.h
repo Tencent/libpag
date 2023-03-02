@@ -24,11 +24,14 @@
 namespace tgfx {
 class NativeCodec : public ImageCodec {
  public:
+  ~NativeCodec() override;
+
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
 
  private:
   std::string imagePath;
   std::shared_ptr<Data> imageBytes = nullptr;
+  CGImageRef nativeImage = nullptr;
 
   NativeCodec(int width, int height, ImageOrigin origin) : ImageCodec(width, height, origin) {
   }

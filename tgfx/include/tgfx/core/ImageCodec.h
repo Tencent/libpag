@@ -24,6 +24,7 @@
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/ImageOrigin.h"
 #include "tgfx/core/Pixmap.h"
+#include "tgfx/platform/NativeImage.h"
 
 namespace tgfx {
 
@@ -36,15 +37,23 @@ class ImageCodec : public ImageGenerator {
  public:
   /**
    * If this file path represents an encoded image that we know how to decode, return an ImageCodec
-   * that can decode it. Otherwise return nullptr.
+   * that can decode it. Otherwise, return nullptr.
    */
   static std::shared_ptr<ImageCodec> MakeFrom(const std::string& filePath);
 
   /**
-   * If this file bytes represents an encoded image that we know how to decode, return an ImageCodec
-   * that can decode it. Otherwise return nullptr.
+   * If the file bytes represent an encoded image that we know how to decode, return an ImageCodec
+   * that can decode it. Otherwise, return nullptr.
    */
   static std::shared_ptr<ImageCodec> MakeFrom(std::shared_ptr<Data> imageBytes);
+
+  /**
+   * Creates a new ImageCodec object from a platform-specific image in the CPU. The nativeImage
+   * could be a jobject that represents a java Bitmap on the android platform or a CGImageRef on the
+   * apple platform.The returned ImageCodec object takes a reference on the nativeImage. Returns
+   * nullptr if the nativeImage is nullptr or the current platform has no native image support.
+   */
+  static std::shared_ptr<ImageCodec> MakeFrom(NativeImageRef nativeImage);
 
   /**
    * Encodes the specified Pixmap into a binary image format. Returns nullptr if encoding fails.
@@ -64,9 +73,9 @@ class ImageCodec : public ImageGenerator {
 
   /**
    * Decodes the image with the specified image info into the given pixels. Returns true if the
-   * decoding was successful.Note: for performance reasons, we do not recommend using this method
-   * on the web platform. Use the makeBuffer() method for better performance if your final goal is
-   * to make a texture out of the image.
+   * decoding was successful. Note that we do not recommend calling this method due to performance
+   * reasons, especially on the web platform. Use the makeBuffer() method for better performance if
+   * your final goal is to draw the image.
    */
   virtual bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const = 0;
 

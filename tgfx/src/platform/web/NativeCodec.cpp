@@ -63,8 +63,25 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> im
       new NativeCodec(imageSize.width, imageSize.height, std::move(imageBytes)));
 }
 
+std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(NativeImageRef nativeImage) {
+  if (nativeImage.isNull()) {
+    return nullptr;
+  }
+  auto size = val::module_property("tgfx").call<val>("getSourceSize", nativeImage);
+  auto width = size["width"].as<int>();
+  auto height = size["height"].as<int>();
+  if (width < 1 || height < 1) {
+    return nullptr;
+  }
+  return std::shared_ptr<NativeCodec>(new NativeCodec(width, height, std::move(nativeImage)));
+}
+
 NativeCodec::NativeCodec(int width, int height, std::shared_ptr<Data> imageBytes)
     : ImageCodec(width, height, ImageOrigin::TopLeft), imageBytes(std::move(imageBytes)) {
+}
+
+NativeCodec::NativeCodec(int width, int height, emscripten::val nativeImage)
+    : ImageCodec(width, height, ImageOrigin::TopLeft), nativeImage(std::move(nativeImage)) {
 }
 
 bool NativeCodec::asyncSupport() const {
@@ -72,35 +89,42 @@ bool NativeCodec::asyncSupport() const {
 }
 
 bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
-  if (dstInfo.isEmpty() || dstPixels == nullptr || dstInfo.colorType() == ColorType::ALPHA_8) {
+  if (dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
   }
-  auto bytes =
-      val(typed_memory_view(imageBytes->size(), static_cast<const uint8_t*>(imageBytes->data())));
+  auto image = nativeImage;
+  if (image.isNull()) {
+    auto bytes =
+        val(typed_memory_view(imageBytes->size(), static_cast<const uint8_t*>(imageBytes->data())));
+    image = val::module_property("tgfx").call<val>("createImageFromBytes", bytes).await();
+  }
 
-  auto data = val::module_property("tgfx")
-                  .call<val>("readImagePixels", val::module_property("module"), bytes,
-                             dstInfo.width(), dstInfo.height())
-                  .await();
+  auto data = val::module_property("tgfx").call<val>(
+      "readImagePixels", val::module_property("module"), image, dstInfo.width(), dstInfo.height());
   if (data.isNull()) {
     return false;
   }
-  auto byteOffset = reinterpret_cast<void*>(data["byteOffset"].as<int>());
-  auto length = data["length"].as<int>();
-  memcpy(dstPixels, byteOffset, length);
+  auto pixels = reinterpret_cast<void*>(data["byteOffset"].as<int>());
+  auto info = ImageInfo::Make(width(), height(), ColorType::RGBA_8888, AlphaType::Unpremultiplied);
+  Pixmap pixmap(info, pixels);
+  auto result = pixmap.readPixels(dstInfo, dstPixels);
   data.call<void>("free");
-  return true;
+  return result;
 }
 
 std::shared_ptr<ImageBuffer> NativeCodec::onMakeBuffer(bool) const {
-  auto bytes =
-      val(typed_memory_view(imageBytes->size(), static_cast<const uint8_t*>(imageBytes->data())));
-  auto nativeImage = val::module_property("tgfx").call<val>("createImageFromBytes", bytes);
-  bool usePromise = WebImage::AsyncSupport();
-  if (!usePromise) {
-    nativeImage = nativeImage.await();
+  auto image = nativeImage;
+  bool usePromise = false;
+  if (image.isNull()) {
+    auto bytes =
+        val(typed_memory_view(imageBytes->size(), static_cast<const uint8_t*>(imageBytes->data())));
+    image = val::module_property("tgfx").call<val>("createImageFromBytes", bytes);
+    usePromise = WebImage::AsyncSupport();
+    if (!usePromise) {
+      image = image.await();
+    }
   }
   return std::shared_ptr<NativeImageBuffer>(
-      new NativeImageBuffer(width(), height(), std::move(nativeImage), usePromise));
+      new NativeImageBuffer(width(), height(), std::move(image), usePromise));
 }
 }  // namespace tgfx

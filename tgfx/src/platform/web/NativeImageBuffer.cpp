@@ -17,23 +17,21 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "NativeImageBuffer.h"
+#include "tgfx/core/ImageCodec.h"
 #include "tgfx/gpu/opengl/GLTexture.h"
 
 using namespace emscripten;
 
 namespace tgfx {
-std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(NativeImageRef nativeImage) {
-  if (!nativeImage.as<bool>()) {
+std::shared_ptr<ImageBuffer> NativeImageBuffer::MakeFrom(emscripten::val nativeImage,
+                                                         ReleaseProc releaseProc) {
+  auto codec = ImageCodec::MakeFrom(nativeImage);
+  if (codec == nullptr) {
     return nullptr;
   }
-  auto size = val::module_property("tgfx").call<val>("getSourceSize", nativeImage);
-  auto width = size["width"].as<int>();
-  auto height = size["height"].as<int>();
-  if (width < 1 || height < 1) {
-    return nullptr;
-  }
-  return std::shared_ptr<NativeImageBuffer>(
-      new NativeImageBuffer(width, height, std::move(nativeImage), false));
+  auto nativeBuffer = std::static_pointer_cast<NativeImageBuffer>(codec->makeBuffer());
+  nativeBuffer->releaseProc = releaseProc;
+  return nativeBuffer;
 }
 
 std::shared_ptr<Texture> NativeImageBuffer::onMakeTexture(Context* context, bool) const {
@@ -53,7 +51,9 @@ NativeImageBuffer::NativeImageBuffer(int width, int height, emscripten::val nati
 }
 
 NativeImageBuffer::~NativeImageBuffer() {
-  val::module_property("tgfx").call<void>("releaseNativeImage", nativeImage);
+  if (releaseProc != nullptr) {
+    releaseProc(nativeImage);
+  }
 }
 
 emscripten::val NativeImageBuffer::getImage() const {

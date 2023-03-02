@@ -76,11 +76,9 @@
   if (cgImage == nil) {
     return nil;
   }
-  auto imageBuffer = tgfx::ImageBuffer::MakeFrom(cgImage);
-  if (imageBuffer == nullptr) {
-    return nil;
-  }
-  auto data = pag::StillImage::MakeFrom(std::move(imageBuffer));
+  auto codec = tgfx::ImageCodec::MakeFrom(cgImage);
+  auto image = tgfx::Image::MakeFromGenerator(std::move(codec));
+  auto data = pag::StillImage::MakeFrom(std::move(image));
   if (data == nullptr) {
     return nil;
   }

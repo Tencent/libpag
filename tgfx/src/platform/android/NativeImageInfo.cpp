@@ -25,6 +25,7 @@ static constexpr int BITMAP_FLAGS_ALPHA_UNPREMUL = 2;
 ImageInfo NativeImageInfo::GetInfo(JNIEnv* env, jobject bitmap) {
   AndroidBitmapInfo bitmapInfo = {};
   if (bitmap == nullptr || AndroidBitmap_getInfo(env, bitmap, &bitmapInfo) != 0) {
+    env->ExceptionClear();
     return {};
   }
   AlphaType alphaType = (bitmapInfo.flags & BITMAP_FLAGS_ALPHA_UNPREMUL)
@@ -42,7 +43,7 @@ ImageInfo NativeImageInfo::GetInfo(JNIEnv* env, jobject bitmap) {
       colorType = ColorType::Unknown;
       break;
   }
-  return ImageInfo::Make(bitmapInfo.width, bitmapInfo.height, colorType, alphaType,
-                         bitmapInfo.stride);
+  return ImageInfo::Make(static_cast<int>(bitmapInfo.width), static_cast<int>(bitmapInfo.height),
+                         colorType, alphaType, bitmapInfo.stride);
 }
 }  // namespace tgfx

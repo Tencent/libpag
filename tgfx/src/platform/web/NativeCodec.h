@@ -33,8 +33,11 @@ class NativeCodec : public ImageCodec {
 
  private:
   std::shared_ptr<Data> imageBytes = nullptr;
+  emscripten::val nativeImage = emscripten::val::null();
 
   NativeCodec(int width, int height, std::shared_ptr<Data> imageBytes);
+
+  NativeCodec(int width, int height, emscripten::val nativeImage);
 
   friend class ImageCodec;
 };

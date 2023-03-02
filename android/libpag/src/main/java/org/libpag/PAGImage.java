@@ -22,10 +22,6 @@ public class PAGImage {
             return null;
         }
         Bitmap.Config config = bitmap.getConfig();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && config == Bitmap.Config.HARDWARE) {
-            Log.e("libpag", "PAGImage.LoadFromBitmap() does not support Bitmap with hardware config.");
-            return null;
-        }
         if (config != Bitmap.Config.ALPHA_8 && (config != Bitmap.Config.ARGB_8888 || !bitmap.isPremultiplied())) {
             Bitmap newBitmap = Bitmap.createBitmap(bitmap.getWidth(), bitmap.getHeight(), Bitmap.Config.ARGB_8888);
             Canvas canvas = new Canvas(newBitmap);

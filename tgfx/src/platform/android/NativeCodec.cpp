@@ -18,6 +18,7 @@
 
 #include "NativeCodec.h"
 #include <android/bitmap.h>
+#include "HardwareBuffer.h"
 #include "NativeImageInfo.h"
 #include "tgfx/core/Pixmap.h"
 #include "utils/Log.h"
@@ -39,9 +40,14 @@ static Global<jclass> ExifInterfaceClass;
 static jmethodID ExifInterface_Constructor_Path;
 static jmethodID ExifInterface_Constructor_Stream;
 static jmethodID ExifInterfaceClass_getAttributeInt;
+static Global<jclass> BitmapClass;
+static jmethodID Bitmap_copy;
+static jmethodID Bitmap_getConfig;
 static Global<jclass> BitmapConfigClass;
+static jmethodID BitmapConfig_equals;
 static jfieldID BitmapConfig_ALPHA_8;
 static jfieldID BitmapConfig_ARGB_8888;
+static jfieldID BitmapConfig_HARDWARE;
 
 void NativeCodec::JNIInit(JNIEnv* env) {
   BitmapFactoryOptionsClass = env->FindClass("android/graphics/BitmapFactory$Options");
@@ -73,11 +79,24 @@ void NativeCodec::JNIInit(JNIEnv* env) {
   BitmapFactory_decodeByteArray = env->GetStaticMethodID(
       BitmapFactoryClass.get(), "decodeByteArray",
       "([BIILandroid/graphics/BitmapFactory$Options;)Landroid/graphics/Bitmap;");
+  BitmapClass = env->FindClass("android/graphics/Bitmap");
+  Bitmap_copy = env->GetMethodID(BitmapClass.get(), "copy",
+                                 "(Landroid/graphics/Bitmap$Config;Z)Landroid/graphics/Bitmap;");
+  Bitmap_getConfig =
+      env->GetMethodID(BitmapClass.get(), "getConfig", "()Landroid/graphics/Bitmap$Config;");
   BitmapConfigClass = env->FindClass("android/graphics/Bitmap$Config");
+  BitmapConfig_equals =
+      env->GetMethodID(BitmapConfigClass.get(), "equals", "(Ljava/lang/Object;)Z");
   BitmapConfig_ALPHA_8 =
       env->GetStaticFieldID(BitmapConfigClass.get(), "ALPHA_8", "Landroid/graphics/Bitmap$Config;");
   BitmapConfig_ARGB_8888 = env->GetStaticFieldID(BitmapConfigClass.get(), "ARGB_8888",
                                                  "Landroid/graphics/Bitmap$Config;");
+  BitmapConfig_HARDWARE = env->GetStaticFieldID(BitmapConfigClass.get(), "HARDWARE",
+                                                "Landroid/graphics/Bitmap$Config;");
+  // BitmapConfig_HARDWARE may be nullptr.
+  if (env->ExceptionCheck()) {
+    env->ExceptionClear();
+  }
 }
 
 std::shared_ptr<NativeCodec> NativeCodec::Make(JNIEnv* env, jobject sizeObject, int origin) {
@@ -185,6 +204,43 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> im
   return codec;
 }
 
+std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(NativeImageRef nativeImage) {
+  JNIEnvironment environment;
+  auto env = environment.current();
+  if (env == nullptr) {
+    return nullptr;
+  }
+  auto info = NativeImageInfo::GetInfo(env, nativeImage);
+  if (info.isEmpty()) {
+    return nullptr;
+  }
+  auto image = std::shared_ptr<NativeCodec>(
+      new NativeCodec(info.width(), info.height(), ImageOrigin::TopLeft));
+  image->nativeImage = nativeImage;
+  return image;
+}
+
+static jobject ConvertHardwareBitmap(JNIEnv* env, jobject bitmap) {
+  // The AndroidBitmapInfo does not contain the ANDROID_BITMAP_FLAGS_IS_HARDWARE flag in the old
+  // versions of Android NDK, even when the Java Bitmap has the hardware config. So we check it here
+  // by the Java-side methods.
+  auto config = env->CallObjectMethod(bitmap, Bitmap_getConfig);
+  static Global<jobject> HardwareConfig =
+      env->GetStaticObjectField(BitmapConfigClass.get(), BitmapConfig_HARDWARE);
+  auto result = env->CallBooleanMethod(config, BitmapConfig_equals, HardwareConfig.get());
+  if (result) {
+    static Global<jobject> RGBA_Config =
+        env->GetStaticObjectField(BitmapConfigClass.get(), BitmapConfig_ARGB_8888);
+    auto newBitmap = env->CallObjectMethod(bitmap, Bitmap_copy, RGBA_Config.get(), JNI_FALSE);
+    if (env->ExceptionCheck()) {
+      env->ExceptionClear();
+      return bitmap;
+    }
+    bitmap = newBitmap;
+  }
+  return bitmap;
+}
+
 bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
@@ -194,42 +250,63 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (env == nullptr) {
     return false;
   }
-  auto options = env->NewObject(BitmapFactoryOptionsClass.get(), BitmapFactoryOptions_Constructor);
-  if (options == nullptr) {
-    env->ExceptionClear();
-    LOGE("NativeCodec::readPixels(): Failed to create a BitmapFactory.Options object!");
-    return false;
-  }
-  jobject config;
-  if (dstInfo.colorType() == ColorType::ALPHA_8) {
-    config = env->GetStaticObjectField(BitmapConfigClass.get(), BitmapConfig_ALPHA_8);
-  } else {
-    config = env->GetStaticObjectField(BitmapConfigClass.get(), BitmapConfig_ARGB_8888);
-  }
-  env->SetObjectField(options, BitmapFactoryOptions_inPreferredConfig, config);
-  if (dstInfo.alphaType() == AlphaType::Unpremultiplied) {
-    env->SetBooleanField(options, BitmapFactoryOptions_inPremultiplied, false);
-  }
   jobject bitmap;
-  if (!imagePath.empty()) {
-    bitmap = DecodeBitmap(env, options, imagePath);
+  if (!nativeImage.isEmpty()) {
+    bitmap = ConvertHardwareBitmap(env, nativeImage.get());
   } else {
-    bitmap = DecodeBitmap(env, options, imageBytes);
+    auto options =
+        env->NewObject(BitmapFactoryOptionsClass.get(), BitmapFactoryOptions_Constructor);
+    if (options == nullptr) {
+      env->ExceptionClear();
+      LOGE("NativeCodec::readPixels(): Failed to create a BitmapFactory.Options object!");
+      return false;
+    }
+    jobject config;
+    if (dstInfo.colorType() == ColorType::ALPHA_8) {
+      config = env->GetStaticObjectField(BitmapConfigClass.get(), BitmapConfig_ALPHA_8);
+    } else {
+      config = env->GetStaticObjectField(BitmapConfigClass.get(), BitmapConfig_ARGB_8888);
+    }
+    env->SetObjectField(options, BitmapFactoryOptions_inPreferredConfig, config);
+    if (dstInfo.alphaType() == AlphaType::Unpremultiplied) {
+      env->SetBooleanField(options, BitmapFactoryOptions_inPremultiplied, false);
+    }
+    if (!imagePath.empty()) {
+      bitmap = DecodeBitmap(env, options, imagePath);
+    } else {
+      bitmap = DecodeBitmap(env, options, imageBytes);
+    }
   }
   auto info = NativeImageInfo::GetInfo(env, bitmap);
   if (info.isEmpty()) {
-    env->ExceptionClear();
     LOGE("NativeCodec::readPixels(): Failed to decode the image!");
     return false;
   }
   void* pixels = nullptr;
   if (AndroidBitmap_lockPixels(env, bitmap, &pixels) != 0) {
     env->ExceptionClear();
-    LOGE("NativeCodec::readPixels(): Failed to lockPixels() of a Java bitmap!");
+    LOGE("NativeCodec::readPixels(): Failed to lockPixels() of a Java Bitmap!");
     return false;
   }
   auto result = tgfx::Pixmap(info, pixels).readPixels(dstInfo, dstPixels);
   AndroidBitmap_unlockPixels(env, bitmap);
   return result;
+}
+
+std::shared_ptr<ImageBuffer> NativeCodec::onMakeBuffer(bool tryHardware) const {
+  if (tryHardware && !nativeImage.isEmpty()) {
+    JNIEnvironment environment;
+    auto env = environment.current();
+    if (env == nullptr) {
+      return nullptr;
+    }
+    auto buffer = HardwareBufferInterface::AHardwareBuffer_fromBitmap(env, nativeImage.get());
+    if (buffer != nullptr) {
+      auto hardwareBuffer = HardwareBuffer::MakeFrom(buffer);
+      HardwareBufferInterface::Release(buffer);
+      return hardwareBuffer;
+    }
+  }
+  return ImageCodec::onMakeBuffer(tryHardware);
 }
 }  // namespace tgfx

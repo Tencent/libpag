@@ -24,7 +24,7 @@ namespace tgfx {
 /**
  * The Global class manages the lifetime of JNI objects with global references.
  */
-template <typename T>
+template<typename T>
 class Global {
  public:
   Global() = default;
@@ -70,6 +70,10 @@ class Global {
 
   T get() const {
     return ref;
+  }
+
+  bool isEmpty() const {
+    return ref == nullptr;
   }
 
  private:

@@ -290,7 +290,7 @@ EMSCRIPTEN_BINDINGS(pag) {
                       }))
       .class_function("_FromNativeImage", optional_override([](val nativeImage) {
                         auto image =
-                            tgfx::Image::MakeFromBuffer(tgfx::ImageBuffer::MakeFrom(nativeImage));
+                            tgfx::Image::MakeFromGenerator(tgfx::ImageCodec::MakeFrom(nativeImage));
                         return std::static_pointer_cast<PAGImage>(StillImage::MakeFrom(image));
                       }))
       .class_function("_FromPixels",

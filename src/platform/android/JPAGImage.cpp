@@ -24,6 +24,7 @@
 #include "JNIHelper.h"
 #include "NativePlatform.h"
 #include "base/utils/TGFXCast.h"
+#include "rendering/editing/StillImage.h"
 
 namespace pag {
 static jfieldID PAGImage_nativeContext;
@@ -64,22 +65,12 @@ PAG_API void Java_org_libpag_PAGImage_nativeInit(JNIEnv* env, jclass clazz) {
   PAGImage_nativeContext = env->GetFieldID(clazz, "nativeContext", "J");
 }
 
-PAG_API jlong Java_org_libpag_PAGImage_LoadFromBitmap(JNIEnv* env, jclass, jobject bitmap) {
-  auto info = GetImageInfo(env, bitmap);
-  if (info.isEmpty()) {
-    LOGE("PAGImage.LoadFromBitmap() Invalid bitmap specified.");
-    return 0;
-  }
-  void* pixels = nullptr;
-  if (AndroidBitmap_lockPixels(env, bitmap, &pixels) != 0) {
-    LOGE("PAGImage.LoadFromBitmap() Invalid bitmap specified.");
-    return 0;
-  }
-  auto pagImage = PAGImage::FromPixels(pixels, info.width(), info.height(), info.rowBytes(),
-                                       ToPAG(info.colorType()), ToPAG(info.alphaType()));
-  AndroidBitmap_unlockPixels(env, bitmap);
+PAG_API jlong Java_org_libpag_PAGImage_LoadFromBitmap(JNIEnv*, jclass, jobject bitmap) {
+  auto codec = tgfx::ImageCodec::MakeFrom(bitmap);
+  auto image = tgfx::Image::MakeFromGenerator(std::move(codec));
+  auto pagImage = StillImage::MakeFrom(std::move(image));
   if (pagImage == nullptr) {
-    LOGE("PAGImage.LoadFromPixels() Invalid pixels specified.");
+    LOGE("PAGImage.LoadFromBitmap() Invalid bitmap specified.");
     return 0;
   }
   return reinterpret_cast<jlong>(new JPAGImage(pagImage));
