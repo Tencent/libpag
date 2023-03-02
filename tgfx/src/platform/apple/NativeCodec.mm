@@ -18,6 +18,7 @@
 
 #include "NativeCodec.h"
 #include "BitmapContextUtil.h"
+#include "tgfx/core/Buffer.h"
 
 namespace tgfx {
 static CGImagePropertyOrientation GetOrientationFromProperties(CFDictionaryRef imageProperties) {
@@ -155,7 +156,17 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
       return false;
     }
   }
-  auto context = CreateBitmapContext(dstInfo, dstPixels);
+  Buffer tempBuffer = {};
+  auto colorType = dstInfo.colorType();
+  auto info = dstInfo;
+  auto pixels = dstPixels;
+  if (colorType != ColorType::RGBA_8888 && colorType != ColorType::BGRA_8888 &&
+      colorType != ColorType::ALPHA_8) {
+    info = dstInfo.makeColorType(ColorType::RGBA_8888);
+    tempBuffer.alloc(info.byteSize());
+    pixels = tempBuffer.data();
+  }
+  auto context = CreateBitmapContext(info, pixels);
   auto result = context != nullptr;
   if (result) {
     int width = static_cast<int>(CGImageGetWidth(image));
@@ -169,6 +180,9 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     [data release];
     CFRelease(sourceRef);
     CGImageRelease(image);
+  }
+  if (!tempBuffer.isEmpty()) {
+    Pixmap(info, pixels).readPixels(dstInfo, dstPixels);
   }
   return result;
 }

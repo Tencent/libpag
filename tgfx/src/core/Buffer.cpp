@@ -21,18 +21,17 @@
 #include "utils/Log.h"
 
 namespace tgfx {
-Buffer::Buffer(size_t length) : _size(length) {
-  _data = length > 0 ? new (std::nothrow) uint8_t[length] : nullptr;
-  if (_data == nullptr) {
-    _size = 0;
-  }
+Buffer::Buffer(size_t size) {
+  alloc(size);
 }
 
-Buffer::Buffer(const void* data, size_t length) {
-  _data = length > 0 ? new (std::nothrow) uint8_t[length] : nullptr;
-  if (data != nullptr) {
-    _size = length;
-    memcpy(_data, data, length);
+Buffer::Buffer(const void* data, size_t size) {
+  if (data == nullptr || size == 0) {
+    return;
+  }
+  alloc(size);
+  if (_data != nullptr) {
+    memcpy(_data, data, size);
   }
 }
 
@@ -40,13 +39,24 @@ Buffer::Buffer(std::shared_ptr<Data> data) : Buffer(data->data(), data->size()) 
 }
 
 Buffer::~Buffer() {
+  delete[] _data;
+}
+
+bool Buffer::alloc(size_t size) {
   if (_data != nullptr) {
     delete[] _data;
+    _data = nullptr;
+    _size = 0;
   }
+  _data = size > 0 ? new (std::nothrow) uint8_t[size] : nullptr;
+  if (_data != nullptr) {
+    _size = size;
+  }
+  return _data != nullptr;
 }
 
 std::shared_ptr<Data> Buffer::release() {
-  if (empty()) {
+  if (isEmpty()) {
     return nullptr;
   }
   auto data = Data::MakeAdopted(_data, _size, Data::DeleteProc);
@@ -56,7 +66,7 @@ std::shared_ptr<Data> Buffer::release() {
 }
 
 void Buffer::clear() {
-  if (empty()) {
+  if (isEmpty()) {
     return;
   }
   memset(_data, 0, _size);

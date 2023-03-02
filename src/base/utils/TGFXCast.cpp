@@ -124,6 +124,14 @@ tgfx::ColorType ToTGFX(ColorType colorType) {
       return tgfx::ColorType::RGBA_8888;
     case ColorType::BGRA_8888:
       return tgfx::ColorType::BGRA_8888;
+    case ColorType::RGB_565:
+      return tgfx::ColorType::RGB_565;
+    case ColorType::Gray_8:
+      return tgfx::ColorType::Gray_8;
+    case ColorType::RGBA_F16:
+      return tgfx::ColorType::RGBA_F16;
+    case ColorType::RGBA_1010102:
+      return tgfx::ColorType::RGBA_1010102;
     default:
       return tgfx::ColorType::Unknown;
   }

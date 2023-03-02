@@ -47,6 +47,10 @@ static const std::unordered_map<ColorType, gfx::skcms_PixelFormat> ColorMapper{
     {ColorType::RGBA_8888, gfx::skcms_PixelFormat::skcms_PixelFormat_RGBA_8888},
     {ColorType::BGRA_8888, gfx::skcms_PixelFormat::skcms_PixelFormat_BGRA_8888},
     {ColorType::ALPHA_8, gfx::skcms_PixelFormat::skcms_PixelFormat_A_8},
+    {ColorType::RGB_565, gfx::skcms_PixelFormat::skcms_PixelFormat_BGR_565},
+    {ColorType::Gray_8, gfx::skcms_PixelFormat::skcms_PixelFormat_G_8},
+    {ColorType::RGBA_F16, gfx::skcms_PixelFormat::skcms_PixelFormat_RGBA_hhhh},
+    {ColorType::RGBA_1010102, gfx::skcms_PixelFormat::skcms_PixelFormat_RGBA_1010102},
 };
 
 static const std::unordered_map<AlphaType, gfx::skcms_AlphaFormat> AlphaMapper{

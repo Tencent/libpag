@@ -81,33 +81,32 @@ bool WebpCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     return false;
   }
   config.output.is_external_memory = 1;
+  config.output.colorspace =
+      webp_decode_mode(dstInfo.colorType(), dstInfo.alphaType() == AlphaType::Premultiplied);
   bool decodeSuccess = true;
-  if (dstInfo.colorType() == ColorType::ALPHA_8) {
+  if (config.output.colorspace == MODE_LAST) {
     // decode to RGBA_8888
-    config.output.colorspace = webp_decode_mode(ColorType::RGBA_8888, false);
-    config.output.u.RGBA.stride = width() * ImageInfo::GetBytesPerPixel(ColorType::RGBA_8888);
-    config.output.u.RGBA.size = config.output.u.RGBA.stride * height();
-    auto pixels = new (std::nothrow) uint8_t[config.output.u.RGBA.size];
+    auto info = dstInfo.makeColorType(ColorType::RGBA_8888);
+    config.output.colorspace =
+        webp_decode_mode(info.colorType(), info.alphaType() == AlphaType::Premultiplied);
+    config.output.u.RGBA.stride = static_cast<int>(info.rowBytes());
+    config.output.u.RGBA.size = info.byteSize();
+    Buffer buffer(info.byteSize());
+    auto pixels = buffer.bytes();
     if (pixels) {
       config.output.u.RGBA.rgba = pixels;
       decodeSuccess = WebPDecode(byteData->bytes(), byteData->size(), &config) == VP8_STATUS_OK;
-      // convert to ALPHA_8
       if (decodeSuccess) {
-        auto info =
-            ImageInfo::Make(width(), height(), ColorType::RGBA_8888, AlphaType::Unpremultiplied);
         Pixmap pixmap(info, pixels);
         decodeSuccess = pixmap.readPixels(dstInfo, dstPixels);
       }
-      delete[] pixels;
     }
   } else {
-    config.output.colorspace =
-        webp_decode_mode(dstInfo.colorType(), dstInfo.alphaType() == AlphaType::Premultiplied);
     config.output.u.RGBA.rgba = reinterpret_cast<uint8_t*>(dstPixels);
     config.output.u.RGBA.stride = static_cast<int>(dstInfo.rowBytes());
-    config.output.u.RGBA.size = dstInfo.rowBytes() * height();
+    config.output.u.RGBA.size = dstInfo.byteSize();
     auto code = WebPDecode(byteData->bytes(), byteData->size(), &config);
-    decodeSuccess = code == VP8_STATUS_OK;
+    decodeSuccess = (code == VP8_STATUS_OK);
   }
   WebPFreeDecBuffer(&config.output);
   return decodeSuccess;
@@ -133,19 +132,20 @@ static int webp_reader_write_data(const uint8_t* data, size_t data_size,
   return 1;
 }
 
-std::shared_ptr<Data> WebpCodec::Encode(const Pixmap& pixmap, EncodedFormat, int quality) {
+std::shared_ptr<Data> WebpCodec::Encode(const Pixmap& pixmap, int quality) {
   const uint8_t* srcPixels = static_cast<uint8_t*>(const_cast<void*>(pixmap.pixels()));
-  std::unique_ptr<Buffer> tempPixels = nullptr;
-  if (pixmap.alphaType() == AlphaType::Premultiplied || pixmap.colorType() == ColorType::ALPHA_8) {
-    tempPixels = std::make_unique<Buffer>(pixmap.width() * pixmap.height() * 4);
-    auto colorType =
-        pixmap.colorType() == ColorType::ALPHA_8 ? ColorType::RGBA_8888 : pixmap.colorType();
-    auto dstInfo =
-        ImageInfo::Make(pixmap.width(), pixmap.height(), colorType, AlphaType::Unpremultiplied);
-    if (!pixmap.readPixels(dstInfo, tempPixels->data())) {
+  auto srcInfo = pixmap.info();
+  Buffer tempBuffer = {};
+  if (pixmap.alphaType() == AlphaType::Premultiplied ||
+      (pixmap.colorType() != ColorType::RGBA_8888 && pixmap.colorType() != ColorType::BGRA_8888)) {
+    auto alphaType =
+        pixmap.alphaType() == AlphaType::Opaque ? AlphaType::Opaque : AlphaType::Unpremultiplied;
+    srcInfo = ImageInfo::Make(pixmap.width(), pixmap.height(), ColorType::RGBA_8888, alphaType);
+    tempBuffer.alloc(srcInfo.byteSize());
+    srcPixels = tempBuffer.bytes();
+    if (!pixmap.readPixels(srcInfo, tempBuffer.data())) {
       return nullptr;
     }
-    srcPixels = tempPixels->bytes();
   }
   WebPConfig webp_config;
   bool isLossless = false;
@@ -158,8 +158,8 @@ std::shared_ptr<Data> WebpCodec::Encode(const Pixmap& pixmap, EncodedFormat, int
   }
   WebPPicture pic;
   WebPPictureInit(&pic);
-  pic.width = pixmap.width();
-  pic.height = pixmap.height();
+  pic.width = srcInfo.width();
+  pic.height = srcInfo.height();
   pic.writer = webp_reader_write_data;
   if (isLossless) {
     webp_config.lossless = 1;
@@ -173,22 +173,22 @@ std::shared_ptr<Data> WebpCodec::Encode(const Pixmap& pixmap, EncodedFormat, int
 
   WebpWriter webpWriter;
   pic.custom_ptr = &webpWriter;
-  const int rgbStride = pic.width * 4;
   auto importProc = WebPPictureImportRGBX;
-  if (ColorType::RGBA_8888 == pixmap.colorType() || ColorType::ALPHA_8 == pixmap.colorType()) {
-    if (AlphaType::Opaque == pixmap.alphaType()) {
+  if (ColorType::RGBA_8888 == srcInfo.colorType()) {
+    if (AlphaType::Opaque == srcInfo.alphaType()) {
       importProc = WebPPictureImportRGBX;
     } else {
       importProc = WebPPictureImportRGBA;
     }
-  } else if (ColorType::BGRA_8888 == pixmap.colorType()) {
-    if (AlphaType::Opaque == pixmap.alphaType()) {
+  } else if (ColorType::BGRA_8888 == srcInfo.colorType()) {
+    if (AlphaType::Opaque == srcInfo.alphaType()) {
       importProc = WebPPictureImportBGRX;
     } else {
       importProc = WebPPictureImportBGRA;
     }
   }
-  if (!importProc(&pic, &srcPixels[0], rgbStride) || !WebPEncode(&webp_config, &pic)) {
+  auto rowBytes = static_cast<int>(srcInfo.rowBytes());
+  if (!importProc(&pic, srcPixels, rowBytes) || !WebPEncode(&webp_config, &pic)) {
     WebPPictureFree(&pic);
     if (webpWriter.data) {
       free(webpWriter.data);

@@ -25,5 +25,7 @@
 namespace tgfx {
 PixelFormat ColorTypeToPixelFormat(ColorType type);
 
+ColorType PixelFormatToColorType(PixelFormat format);
+
 size_t PixelFormatBytesPerPixel(PixelFormat format);
 }  // namespace tgfx

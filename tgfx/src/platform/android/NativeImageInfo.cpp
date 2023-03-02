@@ -21,6 +21,8 @@
 
 namespace tgfx {
 static constexpr int BITMAP_FLAGS_ALPHA_UNPREMUL = 2;
+static constexpr int BITMAP_FORMAT_RGBA_F16 = 9;
+static constexpr int BITMAP_FORMAT_RGBA_1010102 = 10;
 
 ImageInfo NativeImageInfo::GetInfo(JNIEnv* env, jobject bitmap) {
   AndroidBitmapInfo bitmapInfo = {};
@@ -38,6 +40,15 @@ ImageInfo NativeImageInfo::GetInfo(JNIEnv* env, jobject bitmap) {
       break;
     case ANDROID_BITMAP_FORMAT_A_8:
       colorType = ColorType::ALPHA_8;
+      break;
+    case ANDROID_BITMAP_FORMAT_RGB_565:
+      colorType = ColorType::RGB_565;
+      break;
+    case BITMAP_FORMAT_RGBA_F16:
+      colorType = ColorType::RGBA_F16;
+      break;
+    case BITMAP_FORMAT_RGBA_1010102:
+      colorType = ColorType::RGBA_1010102;
       break;
     default:
       colorType = ColorType::Unknown;

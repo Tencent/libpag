@@ -24,12 +24,12 @@ namespace tgfx {
  */
 enum class PixelFormat {
   /**
-   * Pixel with 8 bits for alpha. Each pixel is stored on 1 bytes.
+   * Pixel with 8 bits for alpha. Each pixel is stored on 1 byte.
    */
   ALPHA_8,
 
   /**
-   * Pixel with 8 bits for grayscale. Each pixel is stored on 1 bytes.
+   * Pixel with 8 bits for grayscale. Each pixel is stored on 1 byte.
    */
   GRAY_8,
 

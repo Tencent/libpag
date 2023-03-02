@@ -47,6 +47,7 @@ static Global<jclass> BitmapConfigClass;
 static jmethodID BitmapConfig_equals;
 static jfieldID BitmapConfig_ALPHA_8;
 static jfieldID BitmapConfig_ARGB_8888;
+static jfieldID BitmapConfig_RGB_565;
 static jfieldID BitmapConfig_HARDWARE;
 
 void NativeCodec::JNIInit(JNIEnv* env) {
@@ -91,6 +92,8 @@ void NativeCodec::JNIInit(JNIEnv* env) {
       env->GetStaticFieldID(BitmapConfigClass.get(), "ALPHA_8", "Landroid/graphics/Bitmap$Config;");
   BitmapConfig_ARGB_8888 = env->GetStaticFieldID(BitmapConfigClass.get(), "ARGB_8888",
                                                  "Landroid/graphics/Bitmap$Config;");
+  BitmapConfig_RGB_565 =
+      env->GetStaticFieldID(BitmapConfigClass.get(), "RGB_565", "Landroid/graphics/Bitmap$Config;");
   BitmapConfig_HARDWARE = env->GetStaticFieldID(BitmapConfigClass.get(), "HARDWARE",
                                                 "Landroid/graphics/Bitmap$Config;");
   // BitmapConfig_HARDWARE may be nullptr.
@@ -264,6 +267,8 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     jobject config;
     if (dstInfo.colorType() == ColorType::ALPHA_8) {
       config = env->GetStaticObjectField(BitmapConfigClass.get(), BitmapConfig_ALPHA_8);
+    } else if (dstInfo.colorType() == ColorType::RGB_565) {
+      config = env->GetStaticObjectField(BitmapConfigClass.get(), BitmapConfig_RGB_565);
     } else {
       config = env->GetStaticObjectField(BitmapConfigClass.get(), BitmapConfig_ARGB_8888);
     }

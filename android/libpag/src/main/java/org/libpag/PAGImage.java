@@ -18,16 +18,8 @@ public class PAGImage {
      * valid Bitmap.
      */
     public static PAGImage FromBitmap(Bitmap bitmap) {
-        if (bitmap == null) {
-            return null;
-        }
-        Bitmap.Config config = bitmap.getConfig();
-        if (config != Bitmap.Config.ALPHA_8 && (config != Bitmap.Config.ARGB_8888 || !bitmap.isPremultiplied())) {
-            Bitmap newBitmap = Bitmap.createBitmap(bitmap.getWidth(), bitmap.getHeight(), Bitmap.Config.ARGB_8888);
-            Canvas canvas = new Canvas(newBitmap);
-            Paint paint = new Paint();
-            canvas.drawBitmap(bitmap, 0, 0, paint);
-            bitmap = newBitmap;
+        if (bitmap != null && bitmap.getConfig() == Bitmap.Config.ARGB_4444) {
+            bitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false);
         }
         long context = LoadFromBitmap(bitmap);
         if (context == 0) {

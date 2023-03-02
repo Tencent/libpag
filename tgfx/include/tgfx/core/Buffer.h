@@ -35,12 +35,12 @@ class Buffer {
   /**
    * Creates a new Buffer with the specified length. The contents are uninitialized.
    */
-  explicit Buffer(size_t length);
+  explicit Buffer(size_t size);
 
   /**
    * Creates a new Buffer by copying the specified data.
    */
-  Buffer(const void* data, size_t length);
+  Buffer(const void* data, size_t size);
 
   /**
    * Creates a new Buffer by copying the specified Data object.
@@ -48,6 +48,12 @@ class Buffer {
   explicit Buffer(std::shared_ptr<Data> data);
 
   ~Buffer();
+
+  /**
+   * Allocates the buffer memory with the specified size. Returns true if the memory is allocated
+   * successfully.
+   */
+  bool alloc(size_t size);
 
   /**
    * Returns the memory address of the data.
@@ -74,7 +80,7 @@ class Buffer {
   /**
    * Returns true if the Buffer is empty.
    */
-  bool empty() const {
+  bool isEmpty() const {
     return _size == 0;
   }
 

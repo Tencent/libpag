@@ -614,10 +614,10 @@ static gfx::skcms_PixelFormat ToPixelFormat(ColorType colorType) {
   switch (colorType) {
     case ColorType::ALPHA_8:
       return gfx::skcms_PixelFormat_A_8;
-    case ColorType::RGBA_8888:
-      return gfx::skcms_PixelFormat_RGBA_8888;
-    default:
+    case ColorType::BGRA_8888:
       return gfx::skcms_PixelFormat_BGRA_8888;
+    default:
+      return gfx::skcms_PixelFormat_RGBA_8888;
   }
 }
 

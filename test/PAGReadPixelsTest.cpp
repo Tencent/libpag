@@ -49,7 +49,7 @@ PAG_TEST(PAGReadPixelsTest, TestPixelMap) {
       ImageInfo::Make(width, height, tgfx::ColorType::RGBA_8888, tgfx::AlphaType::Unpremultiplied);
   auto byteSize = RGBAInfo.byteSize();
   Buffer pixelsA(byteSize);
-  Buffer pixelsB(byteSize);
+  Buffer pixelsB(byteSize * 2);
   auto result = codec->readPixels(RGBAInfo, pixelsA.data());
   EXPECT_TRUE(result);
 
@@ -59,6 +59,30 @@ PAG_TEST(PAGReadPixelsTest, TestPixelMap) {
   result = RGBAMap.readPixels(RGBAInfo, pixelsB.data());
   EXPECT_TRUE(result);
   CHECK_PIXELS(RGBAInfo, pixelsB.data(), "PixelMap_RGBA_to_RGBA");
+
+  pixelsB.clear();
+  auto RGB565Info = RGBAInfo.makeColorType(tgfx::ColorType::RGB_565);
+  result = RGBAMap.readPixels(RGB565Info, pixelsB.data());
+  ASSERT_TRUE(result);
+  CHECK_PIXELS(RGB565Info, pixelsB.data(), "PixelMap_RGBA_to_RGB565");
+
+  pixelsB.clear();
+  auto Gray8Info = RGBAInfo.makeColorType(tgfx::ColorType::Gray_8);
+  result = RGBAMap.readPixels(Gray8Info, pixelsB.data());
+  ASSERT_TRUE(result);
+  CHECK_PIXELS(Gray8Info, pixelsB.data(), "PixelMap_RGBA_to_Gray8");
+
+  pixelsB.clear();
+  auto RGBAF16Info = RGBAInfo.makeColorType(tgfx::ColorType::RGBA_F16);
+  result = RGBAMap.readPixels(RGBAF16Info, pixelsB.data());
+  ASSERT_TRUE(result);
+  CHECK_PIXELS(RGBAF16Info, pixelsB.data(), "PixelMap_RGBA_to_RGBA_F16");
+
+  pixelsB.clear();
+  auto RGBA1010102Info = RGBAInfo.makeColorType(tgfx::ColorType::RGBA_1010102);
+  result = RGBAMap.readPixels(RGBA1010102Info, pixelsB.data());
+  ASSERT_TRUE(result);
+  CHECK_PIXELS(RGBA1010102Info, pixelsB.data(), "PixelMap_RGBA_to_RGBA_1010102");
 
   pixelsB.clear();
   result = RGBAMap.readPixels(RGBAInfo, pixelsB.data(), 100, 100);
@@ -259,90 +283,186 @@ PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
  * 用例描述: PNG 解码器测试
  */
 PAG_TEST(PAGReadPixelsTest, PngCodec) {
-  auto codec = MakeImageCodec("resources/apitest/test_timestretch.png");
+  auto rgbaCodec = MakeImageCodec("resources/apitest/test_timestretch.png");
+  ASSERT_TRUE(rgbaCodec != nullptr);
+  ASSERT_EQ(rgbaCodec->width(), 1280);
+  ASSERT_EQ(rgbaCodec->height(), 720);
+  ASSERT_EQ(rgbaCodec->origin(), tgfx::ImageOrigin::TopLeft);
+  auto rowBytes = rgbaCodec->width() * 4;
+  Buffer buffer(rowBytes * rgbaCodec->height());
+  auto pixels = buffer.data();
+  ASSERT_TRUE(pixels);
+  auto RGBAInfo = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(),
+                                  tgfx::ColorType::RGBA_8888, tgfx::AlphaType::Premultiplied);
+  ASSERT_TRUE(rgbaCodec->readPixels(RGBAInfo, pixels));
+  CHECK_PIXELS(RGBAInfo, pixels, "PngCodec_Decode_RGBA");
+  auto bytes = ImageCodec::Encode(Pixmap(RGBAInfo, pixels), EncodedFormat::PNG, 100);
+  auto codec = ImageCodec::MakeFrom(bytes);
   ASSERT_TRUE(codec != nullptr);
   ASSERT_EQ(codec->width(), 1280);
   ASSERT_EQ(codec->height(), 720);
   ASSERT_EQ(codec->origin(), tgfx::ImageOrigin::TopLeft);
-  auto rowBytes = codec->width() * 4;
-  auto pixels = new (std::nothrow) uint8_t[rowBytes * codec->height()];
-  ASSERT_TRUE(pixels);
-  auto info = ImageInfo::Make(codec->width(), codec->height(), tgfx::ColorType::RGBA_8888,
-                              tgfx::AlphaType::Premultiplied);
-  ASSERT_TRUE(codec->readPixels(info, pixels));
-  CHECK_PIXELS(info, pixels, "PngCodec_Decode");
-  Pixmap pixmap(info, pixels);
-  auto bytes = ImageCodec::Encode(pixmap, EncodedFormat::PNG, 100);
+  buffer.clear();
+  ASSERT_TRUE(codec->readPixels(RGBAInfo, pixels));
+  CHECK_PIXELS(RGBAInfo, pixels, "PngCodec_Encode_RGBA");
+
+  auto A8Info = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(), tgfx::ColorType::ALPHA_8,
+                                tgfx::AlphaType::Premultiplied);
+  buffer.clear();
+  ASSERT_TRUE(rgbaCodec->readPixels(A8Info, pixels));
+  CHECK_PIXELS(A8Info, pixels, "PngCodec_Decode_Alpha8");
+  bytes = ImageCodec::Encode(Pixmap(A8Info, pixels), EncodedFormat::PNG, 100);
   codec = ImageCodec::MakeFrom(bytes);
   ASSERT_TRUE(codec != nullptr);
-  ASSERT_EQ(codec->width(), 1280);
-  ASSERT_EQ(codec->height(), 720);
-  ASSERT_EQ(codec->origin(), tgfx::ImageOrigin::TopLeft);
-  delete[] pixels;
+  buffer.clear();
+  ASSERT_TRUE(codec->readPixels(A8Info, pixels));
+  CHECK_PIXELS(A8Info, pixels, "PngCodec_Encode_Alpha8");
+
+  auto Gray8Info = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(), tgfx::ColorType::Gray_8,
+                                   tgfx::AlphaType::Opaque);
+  buffer.clear();
+  ASSERT_TRUE(rgbaCodec->readPixels(Gray8Info, pixels));
+  CHECK_PIXELS(Gray8Info, pixels, "PngCodec_Decode_Gray8");
+  bytes = ImageCodec::Encode(Pixmap(Gray8Info, pixels), EncodedFormat::PNG, 100);
+  codec = ImageCodec::MakeFrom(bytes);
+  ASSERT_TRUE(codec != nullptr);
+  buffer.clear();
+  ASSERT_TRUE(codec->readPixels(Gray8Info, pixels));
+  CHECK_PIXELS(Gray8Info, pixels, "PngCodec_Encode_Gray8");
+
+  auto RGB565Info = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(),
+                                    tgfx::ColorType::RGB_565, tgfx::AlphaType::Opaque);
+  buffer.clear();
+  ASSERT_TRUE(rgbaCodec->readPixels(RGB565Info, pixels));
+  CHECK_PIXELS(RGB565Info, pixels, "PngCodec_Decode_RGB565");
+  bytes = ImageCodec::Encode(Pixmap(RGB565Info, pixels), EncodedFormat::PNG, 100);
+  codec = ImageCodec::MakeFrom(bytes);
+  ASSERT_TRUE(codec != nullptr);
+  buffer.clear();
+  ASSERT_TRUE(codec->readPixels(RGB565Info, pixels));
+  CHECK_PIXELS(RGB565Info, pixels, "PngCodec_Encode_RGB565");
 }
 
 /**
  * 用例描述: Webp 解码器测试
  */
 PAG_TEST(PAGReadPixelsTest, WebpCodec) {
-  auto codec = MakeImageCodec("resources/apitest/imageReplacement.webp");
-  ASSERT_TRUE(codec != nullptr);
-  ASSERT_EQ(codec->width(), 110);
-  ASSERT_EQ(codec->height(), 110);
-  ASSERT_EQ(codec->origin(), tgfx::ImageOrigin::TopLeft);
-  auto info = ImageInfo::Make(codec->width(), codec->height(), tgfx::ColorType::RGBA_8888,
-                              tgfx::AlphaType::Premultiplied);
-  auto pixels = new (std::nothrow) uint8_t[info.byteSize()];
-  ASSERT_TRUE(pixels);
-  ASSERT_TRUE(codec->readPixels(info, pixels));
-  CHECK_PIXELS(info, pixels, "WebpCodec_Decode");
-  Pixmap pixmap(info, pixels);
-  auto bytes = ImageCodec::Encode(pixmap, EncodedFormat::WEBP, 100);
-  codec = ImageCodec::MakeFrom(bytes);
-  ASSERT_TRUE(codec != nullptr);
-  ASSERT_EQ(codec->width(), 110);
-  ASSERT_EQ(codec->height(), 110);
-  ASSERT_EQ(codec->origin(), tgfx::ImageOrigin::TopLeft);
+  auto rgbaCodec = MakeImageCodec("resources/apitest/imageReplacement.webp");
+  ASSERT_TRUE(rgbaCodec != nullptr);
+  ASSERT_EQ(rgbaCodec->width(), 110);
+  ASSERT_EQ(rgbaCodec->height(), 110);
+  ASSERT_EQ(rgbaCodec->origin(), tgfx::ImageOrigin::TopLeft);
+  auto RGBAInfo = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(),
+                                  tgfx::ColorType::RGBA_8888, tgfx::AlphaType::Premultiplied);
 
-  auto a8Info = ImageInfo::Make(codec->width(), codec->height(), tgfx::ColorType::ALPHA_8,
+  Buffer buffer(RGBAInfo.byteSize());
+  auto pixels = buffer.data();
+  ASSERT_TRUE(pixels);
+  ASSERT_TRUE(rgbaCodec->readPixels(RGBAInfo, pixels));
+  CHECK_PIXELS(RGBAInfo, pixels, "WebpCodec_Decode_RGBA");
+  Pixmap pixmap(RGBAInfo, pixels);
+  auto bytes = ImageCodec::Encode(pixmap, EncodedFormat::WEBP, 100);
+  auto codec = ImageCodec::MakeFrom(bytes);
+  ASSERT_TRUE(codec != nullptr);
+  ASSERT_EQ(codec->width(), 110);
+  ASSERT_EQ(codec->height(), 110);
+  ASSERT_EQ(codec->origin(), tgfx::ImageOrigin::TopLeft);
+  buffer.clear();
+  ASSERT_TRUE(codec->readPixels(RGBAInfo, pixels));
+  CHECK_PIXELS(RGBAInfo, pixels, "WebpCodec_Encode_RGBA");
+
+  auto A8Info = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(), tgfx::ColorType::ALPHA_8,
                                 tgfx::AlphaType::Premultiplied);
-  auto a8Pixels = new (std::nothrow) uint8_t[a8Info.byteSize()];
-  ASSERT_TRUE(codec->readPixels(a8Info, a8Pixels));
-  auto rgbaFromA8Data = ImageCodec::Encode(Pixmap(a8Info, a8Pixels), EncodedFormat::WEBP, 100);
-  auto rgbaFromA8Image = ImageCodec::MakeFrom(rgbaFromA8Data);
-  rgbaFromA8Image->readPixels(info, pixels);
-  CHECK_PIXELS(info, pixels, "WebpCodec_EncodeA8");
-  delete[] pixels;
-  delete[] a8Pixels;
+  buffer.clear();
+  ASSERT_TRUE(rgbaCodec->readPixels(A8Info, pixels));
+  CHECK_PIXELS(A8Info, pixels, "WebpCodec_Decode_Alpha8");
+  bytes = ImageCodec::Encode(Pixmap(A8Info, pixels), EncodedFormat::WEBP, 100);
+  codec = ImageCodec::MakeFrom(bytes);
+  buffer.clear();
+  ASSERT_TRUE(codec->readPixels(A8Info, pixels));
+  CHECK_PIXELS(A8Info, pixels, "WebpCodec_Encode_Alpha8");
+
+  auto Gray8Info = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(), tgfx::ColorType::Gray_8,
+                                   tgfx::AlphaType::Opaque);
+  buffer.clear();
+  ASSERT_TRUE(rgbaCodec->readPixels(Gray8Info, pixels));
+  CHECK_PIXELS(Gray8Info, pixels, "WebpCodec_Decode_Gray8");
+  bytes = ImageCodec::Encode(Pixmap(Gray8Info, pixels), EncodedFormat::WEBP, 100);
+  codec = ImageCodec::MakeFrom(bytes);
+  buffer.clear();
+  ASSERT_TRUE(codec->readPixels(Gray8Info, pixels));
+  CHECK_PIXELS(Gray8Info, pixels, "WebpCodec_Encode_Gray8");
+
+  auto RGB565Info = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(),
+                                    tgfx::ColorType::RGB_565, tgfx::AlphaType::Opaque);
+  buffer.clear();
+  ASSERT_TRUE(rgbaCodec->readPixels(RGB565Info, pixels));
+  CHECK_PIXELS(RGB565Info, pixels, "WebpCodec_Decode_RGB565");
+  bytes = ImageCodec::Encode(Pixmap(RGB565Info, pixels), EncodedFormat::WEBP, 100);
+  codec = ImageCodec::MakeFrom(bytes);
+  buffer.clear();
+  ASSERT_TRUE(codec->readPixels(RGB565Info, pixels));
+  CHECK_PIXELS(RGB565Info, pixels, "WebpCodec_Encode_RGB565");
 }
 
 /**
  * 用例描述: JPEG 解码器测试
  */
 PAG_TEST(PAGReadPixelsTest, JpegCodec) {
-  auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
-  ASSERT_TRUE(codec != nullptr);
-  ASSERT_EQ(codec->width(), 4032);
-  ASSERT_EQ(codec->height(), 3024);
-  ASSERT_EQ(codec->origin(), tgfx::ImageOrigin::RightTop);
-  auto outputColorType = tgfx::ColorType::RGBA_8888;
-  auto pixels = new (std::nothrow)
-      uint8_t[codec->height() * codec->width() * ImageInfo::GetBytesPerPixel(outputColorType)];
+  auto rgbaCodec = MakeImageCodec("resources/apitest/rotation.jpg");
+  ASSERT_TRUE(rgbaCodec != nullptr);
+  ASSERT_EQ(rgbaCodec->width(), 4032);
+  ASSERT_EQ(rgbaCodec->height(), 3024);
+  ASSERT_EQ(rgbaCodec->origin(), tgfx::ImageOrigin::RightTop);
+  auto RGBAInfo = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(),
+                                  tgfx::ColorType::RGBA_8888, tgfx::AlphaType::Premultiplied);
+  Buffer buffer(RGBAInfo.byteSize());
+  auto pixels = buffer.data();
   ASSERT_TRUE(pixels);
-  auto info = ImageInfo::Make(codec->width(), codec->height(), outputColorType,
-                              tgfx::AlphaType::Premultiplied);
-  bool res = codec->readPixels(info, pixels);
-  CHECK_PIXELS(info, pixels, "JpegCodec_Decode");
-  Pixmap pixmap(info, pixels);
-
-  auto bytes = ImageCodec::Encode(pixmap, EncodedFormat::JPEG, 20);
-  codec = ImageCodec::MakeFrom(bytes);
+  ASSERT_TRUE(rgbaCodec->readPixels(RGBAInfo, pixels));
+  CHECK_PIXELS(RGBAInfo, pixels, "JpegCodec_Decode_RGBA");
+  auto bytes = ImageCodec::Encode(Pixmap(RGBAInfo, pixels), EncodedFormat::JPEG, 20);
+  auto codec = ImageCodec::MakeFrom(bytes);
   ASSERT_TRUE(codec != nullptr);
   ASSERT_EQ(codec->width(), 4032);
   ASSERT_EQ(codec->height(), 3024);
   ASSERT_EQ(codec->origin(), tgfx::ImageOrigin::TopLeft);
-  delete[] pixels;
-  ASSERT_TRUE(res);
+  buffer.clear();
+  ASSERT_TRUE(codec->readPixels(RGBAInfo, pixels));
+  CHECK_PIXELS(RGBAInfo, pixels, "JpegCodec_Encode_RGBA");
+
+  auto A8Info = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(), tgfx::ColorType::ALPHA_8,
+                                tgfx::AlphaType::Premultiplied);
+  buffer.clear();
+  ASSERT_TRUE(rgbaCodec->readPixels(A8Info, pixels));
+  CHECK_PIXELS(A8Info, pixels, "JpegCodec_Decode_Alpha8");
+  bytes = ImageCodec::Encode(Pixmap(A8Info, pixels), EncodedFormat::JPEG, 100);
+  codec = ImageCodec::MakeFrom(bytes);
+  buffer.clear();
+  ASSERT_TRUE(codec->readPixels(A8Info, pixels));
+  CHECK_PIXELS(A8Info, pixels, "JpegCodec_Encode_Alpha8");
+
+  auto Gray8Info = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(), tgfx::ColorType::Gray_8,
+                                   tgfx::AlphaType::Opaque);
+  buffer.clear();
+  ASSERT_TRUE(rgbaCodec->readPixels(Gray8Info, pixels));
+  CHECK_PIXELS(Gray8Info, pixels, "JpegCodec_Decode_Gray8");
+  bytes = ImageCodec::Encode(Pixmap(Gray8Info, pixels), EncodedFormat::JPEG, 70);
+  codec = ImageCodec::MakeFrom(bytes);
+  buffer.clear();
+  ASSERT_TRUE(codec->readPixels(Gray8Info, pixels));
+  CHECK_PIXELS(Gray8Info, pixels, "JpegCodec_Encode_Gray8");
+
+  auto RGB565Info = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(),
+                                    tgfx::ColorType::RGB_565, tgfx::AlphaType::Opaque);
+  buffer.clear();
+  ASSERT_TRUE(rgbaCodec->readPixels(RGB565Info, pixels));
+  CHECK_PIXELS(RGB565Info, pixels, "JpegCodec_Decode_RGB565");
+  bytes = ImageCodec::Encode(Pixmap(RGB565Info, pixels), EncodedFormat::JPEG, 80);
+  codec = ImageCodec::MakeFrom(bytes);
+  buffer.clear();
+  ASSERT_TRUE(codec->readPixels(RGB565Info, pixels));
+  CHECK_PIXELS(RGB565Info, pixels, "JpegCodec_Encode_RGB565");
 }
 
 }  // namespace pag

@@ -28,10 +28,16 @@ bool ImageInfo::IsValidSize(int width, int height) {
 int ImageInfo::GetBytesPerPixel(ColorType colorType) {
   switch (colorType) {
     case ColorType::ALPHA_8:
+    case ColorType::Gray_8:
       return 1;
+    case ColorType::RGB_565:
+      return 2;
     case ColorType::RGBA_8888:
     case ColorType::BGRA_8888:
+    case ColorType::RGBA_1010102:
       return 4;
+    case ColorType::RGBA_F16:
+      return 8;
     default:
       return 0;
   }
@@ -54,6 +60,8 @@ ImageInfo ImageInfo::Make(int width, int height, ColorType colorType, AlphaType 
   }
   if (colorType == ColorType::ALPHA_8) {
     alphaType = AlphaType::Premultiplied;
+  } else if (colorType == ColorType::RGB_565) {
+    alphaType = AlphaType::Opaque;
   }
   return {width, height, colorType, alphaType, rowBytes};
 }
