@@ -84,8 +84,9 @@ class ImageProxyPicture : public Picture {
   }
 
   void draw(tgfx::Canvas* canvas, RenderCache* cache) const override {
-    auto image = proxy->getImage(cache);
+    // Do not call proxy->getImage() here, which will clear the decoded image in the render cache.
     if (proxy->isTemporary()) {
+      auto image = proxy->getImage(cache);
       canvas->drawImage(std::move(image));
       return;
     }
@@ -97,6 +98,7 @@ class ImageProxyPicture : public Picture {
         return;
       }
     }
+    auto image = proxy->getImage(cache);
     canvas->drawImage(std::move(image));
   }
 
