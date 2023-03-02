@@ -167,11 +167,11 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
-    std::shared_ptr<ImageGenerator> generator, bool mipMapped) {
+    std::shared_ptr<ImageGenerator> generator, bool mipMapped, bool disableAsyncTask) {
   if (generator == nullptr) {
     return nullptr;
   }
-  if (generator->asyncSupport()) {
+  if (disableAsyncTask || generator->asyncSupport()) {
     auto buffer = generator->makeBuffer(!mipMapped);
     return createTextureProxy(std::move(buffer), mipMapped);
   }

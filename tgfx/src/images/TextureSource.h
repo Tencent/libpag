@@ -55,7 +55,7 @@ class TextureSource : public ImageSource {
     return nullptr;
   }
 
-  std::shared_ptr<TextureProxy> onMakeTextureProxy(Context* context) const override {
+  std::shared_ptr<TextureProxy> onMakeTextureProxy(Context* context, uint32_t) const override {
     return context->proxyProvider()->wrapTexture(texture);
   }
 

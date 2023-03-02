@@ -28,6 +28,6 @@ class TriangulatingShape : public PathShape {
 
  private:
   std::unique_ptr<DrawOp> makeOp(GpuPaint* paint, const Matrix& viewMatrix,
-                                 bool skipGeneratingCache) const override;
+                                 uint32_t surfaceFlags) const override;
 };
 }  // namespace tgfx

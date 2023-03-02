@@ -47,7 +47,7 @@ class RGBAAAImage : public Image {
                                                          TileMode tileModeY,
                                                          const SamplingOptions& sampling,
                                                          const Matrix* localMatrix = nullptr,
-                                                         bool skipGeneratingCache = false) override;
+                                                         uint32_t surfaceFlags = 0) override;
 
  private:
   Rect bounds = Rect::MakeEmpty();

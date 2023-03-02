@@ -47,7 +47,8 @@ class ProxyProvider {
    * associated texture being instantiated.
    */
   std::shared_ptr<TextureProxy> createTextureProxy(std::shared_ptr<ImageGenerator> generator,
-                                                   bool mipMapped = false);
+                                                   bool mipMapped = false,
+                                                   bool disableAsyncTask = false);
 
   /*
    * Create a texture proxy for the ImageGeneratorTask. The task will be released after the

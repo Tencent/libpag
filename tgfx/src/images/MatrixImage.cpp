@@ -44,12 +44,11 @@ std::shared_ptr<Image> MatrixImage::onMakeRGBAAA(int, int, int, int) const {
 
 std::unique_ptr<FragmentProcessor> MatrixImage::asFragmentProcessor(
     Context* context, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
-    const Matrix* extraMatrix, bool skipGeneratingCache) {
+    const Matrix* extraMatrix, uint32_t surfaceFlags) {
   auto matrix = localMatrix;
   if (extraMatrix != nullptr) {
     matrix.postConcat(*extraMatrix);
   }
-  return Image::asFragmentProcessor(context, tileModeX, tileModeY, sampling, &matrix,
-                                    skipGeneratingCache);
+  return Image::asFragmentProcessor(context, tileModeX, tileModeY, sampling, &matrix, surfaceFlags);
 }
 }  // namespace tgfx

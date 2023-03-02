@@ -44,7 +44,7 @@ class MatrixImage : public Image {
                                                          TileMode tileModeY,
                                                          const SamplingOptions& sampling,
                                                          const Matrix* localMatrix = nullptr,
-                                                         bool skipGeneratingCache = false) override;
+                                                         uint32_t surfaceFlags = 0) override;
 
  private:
   int _width = 0;
