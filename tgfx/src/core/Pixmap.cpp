@@ -97,22 +97,11 @@ Pixmap::Pixmap(const ImageInfo& info, void* pixels)
 }
 
 Pixmap::Pixmap(const Bitmap& bitmap) {
-  _pixels = bitmap.lockPixels();
-  if (_pixels == nullptr) {
-    return;
-  }
-  pixelRef = bitmap.pixelRef;
-  _info = pixelRef->info();
+  reset(bitmap);
 }
 
 Pixmap::Pixmap(Bitmap& bitmap) {
-  _writablePixels = bitmap.lockPixels();
-  if (_writablePixels == nullptr) {
-    return;
-  }
-  pixelRef = bitmap.pixelRef;
-  _pixels = _writablePixels;
-  _info = pixelRef->info();
+  reset(bitmap);
 }
 
 Pixmap::~Pixmap() {
@@ -143,6 +132,27 @@ void Pixmap::reset(const ImageInfo& info, void* pixels) {
     _pixels = pixels;
     _writablePixels = pixels;
   }
+}
+
+void Pixmap::reset(const Bitmap& bitmap) {
+  reset();
+  _pixels = bitmap.lockPixels();
+  if (_pixels == nullptr) {
+    return;
+  }
+  pixelRef = bitmap.pixelRef;
+  _info = pixelRef->info();
+}
+
+void Pixmap::reset(Bitmap& bitmap) {
+  reset();
+  _writablePixels = bitmap.lockPixels();
+  if (_writablePixels == nullptr) {
+    return;
+  }
+  pixelRef = bitmap.pixelRef;
+  _pixels = _writablePixels;
+  _info = pixelRef->info();
 }
 
 Color Pixmap::getColor(int x, int y) const {

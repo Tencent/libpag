@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,35 +18,27 @@
 
 #pragma once
 
-#include "pag/pag.h"
-#include "rendering/graphics/Graphic.h"
-#include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/Data.h"
+#include "tgfx/core/ImageGenerator.h"
+#include "tgfx/core/ImageInfo.h"
 
-namespace pag {
-
-class StillImage : public PAGImage {
+namespace tgfx {
+class RasterGenerator : public ImageGenerator {
  public:
-  static std::shared_ptr<StillImage> MakeFrom(std::shared_ptr<tgfx::Image> image);
+  static std::shared_ptr<ImageGenerator> MakeFrom(const ImageInfo& info,
+                                                  std::shared_ptr<Data> pixels);
+
+  bool isAlphaOnly() const override {
+    return info.isAlphaOnly();
+  }
 
  protected:
-  std::shared_ptr<Graphic> getGraphic() override {
-    return graphic;
-  }
-
-  bool isStill() const override {
-    return true;
-  }
-
-  bool setContentTime(int64_t) override {
-    return false;
-  }
+  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 
  private:
-  StillImage(int width, int height) : PAGImage(width, height) {
-  }
+  ImageInfo info = {};
+  std::shared_ptr<Data> pixels = nullptr;
 
-  std::shared_ptr<Graphic> graphic = nullptr;
-
-  friend class PAGImage;
+  RasterGenerator(const ImageInfo& info, std::shared_ptr<Data> pixels);
 };
-}  // namespace pag
+}  // namespace tgfx

@@ -21,7 +21,7 @@
 #include "SequenceReader.h"
 #include "pag/file.h"
 #include "rendering/Performance.h"
-#include "tgfx/core/PixelBuffer.h"
+#include "tgfx/core/Bitmap.h"
 
 namespace pag {
 class BitmapSequenceReader : public SequenceReader {
@@ -48,6 +48,9 @@ class BitmapSequenceReader : public SequenceReader {
   std::shared_ptr<File> file = nullptr;
   BitmapSequence* sequence = nullptr;
   Frame lastDecodeFrame = -1;
-  std::shared_ptr<tgfx::PixelBuffer> pixelBuffer = nullptr;
+  std::shared_ptr<tgfx::ImageBuffer> imageBuffer = nullptr;
+  tgfx::Bitmap bitmap = {};
+  tgfx::ImageInfo info = {};
+  std::shared_ptr<tgfx::Data> pixels = nullptr;
 };
 }  // namespace pag

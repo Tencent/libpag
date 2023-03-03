@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,37 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "tgfx/core/ImageBuffer.h"
+#include "RasterBuffer.h"
+#include "RasterGenerator.h"
 
-#include "pag/pag.h"
-#include "rendering/graphics/Graphic.h"
-#include "tgfx/core/ImageCodec.h"
-
-namespace pag {
-
-class StillImage : public PAGImage {
- public:
-  static std::shared_ptr<StillImage> MakeFrom(std::shared_ptr<tgfx::Image> image);
-
- protected:
-  std::shared_ptr<Graphic> getGraphic() override {
-    return graphic;
+namespace tgfx {
+std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(const ImageInfo& info,
+                                                   std::shared_ptr<Data> pixels) {
+  auto buffer = RasterBuffer::MakeFrom(info, pixels);
+  if (buffer != nullptr) {
+    return buffer;
   }
-
-  bool isStill() const override {
-    return true;
-  }
-
-  bool setContentTime(int64_t) override {
-    return false;
-  }
-
- private:
-  StillImage(int width, int height) : PAGImage(width, height) {
-  }
-
-  std::shared_ptr<Graphic> graphic = nullptr;
-
-  friend class PAGImage;
-};
-}  // namespace pag
+  auto generator = RasterGenerator::MakeFrom(info, pixels);
+  return generator->makeBuffer();
+}
+}  // namespace tgfx

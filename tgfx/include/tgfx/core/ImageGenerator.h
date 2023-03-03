@@ -29,14 +29,14 @@ class ImageGenerator {
   virtual ~ImageGenerator() = default;
 
   /**
-   * Returns the width of target image.
+   * Returns the width of the target image.
    */
   int width() const {
     return _width;
   }
 
   /**
-   * Returns the height of target image.
+   * Returns the height of the target image.
    */
   int height() const {
     return _height;
@@ -58,7 +58,7 @@ class ImageGenerator {
 
   /**
    * Crates a new image buffer capturing the pixels decoded from this image generator.
-   * ImageGenerator do not cache the returned image buffer, each call to this method allocates
+   * ImageGenerator does not cache the returned image buffer, each call to this method allocates
    * additional storage. Returns an ImageBuffer backed by hardware if tryHardware is true and
    * the current platform supports creating it. Otherwise, a raster ImageBuffer is returned.
    */

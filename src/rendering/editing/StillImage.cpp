@@ -60,11 +60,6 @@ std::shared_ptr<StillImage> StillImage::MakeFrom(std::shared_ptr<tgfx::Image> im
   return pagImage;
 }
 
-std::shared_ptr<StillImage> StillImage::MakeFrom(std::shared_ptr<tgfx::ImageBuffer> imageBuffer) {
-  auto image = tgfx::Image::MakeFromBuffer(std::move(imageBuffer));
-  return MakeFrom(std::move(image));
-}
-
 std::shared_ptr<PAGImage> PAGImage::FromTexture(const BackendTexture& texture, ImageOrigin origin) {
   auto context = tgfx::GLDevice::CurrentNativeHandle();
   if (context == nullptr) {

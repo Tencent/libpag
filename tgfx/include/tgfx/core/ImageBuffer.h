@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include "tgfx/core/Data.h"
+#include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/YUVData.h"
 #include "tgfx/gpu/Texture.h"
 #include "tgfx/platform/HardwareBuffer.h"
@@ -34,11 +36,24 @@ class ImageBuffer {
    * Creates a single-plane ImageBuffer from a platform-specific hardware buffer. The hardwareBuffer
    * could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on the apple
    * platform. The returned ImageBuffer takes a reference to the hardwareBuffer. The caller must
-   * ensure that pixels are unchanged for the lifetime of the returned ImageBuffer. Returns nullptr
-   * if any of the parameters are nullptr or the hardwareBuffer is not single-plane. Use the
+   * ensure the pixels will always be the same for the lifetime of the returned ImageBuffer. Returns
+   * nullptr if the hardwareBuffer is nullptr or the hardwareBuffer is not single-plane. Use the
    * YUVBuffer::MakeFrom() method for the hardware buffer with multiple planes.
    */
   static std::shared_ptr<ImageBuffer> MakeFrom(HardwareBufferRef hardwareBuffer);
+
+  /**
+   * Creates an ImageBuffer from the specified ImageInfo and pixel data. The pixel data may be
+   * copied and converted to a new format which is more efficient for texture uploading. However,
+   * if the ImageInfo is suitable for direct texture uploading, the pixel data will be shared
+   * instead of copied. In that case, the caller must ensure the pixel data will always be the same
+   * for the lifetime of the returned ImageBuffer. Returns nullptr if the info is empty or the
+   * pixel data is nullptr.
+   * ImageInfo parameters suitable for direct texture uploading include:
+   * The alpha type is not AlphaType::Unpremultiplied;
+   * The color type is one of ColorType::ALPHA_8, ColorType::RGBA_8888, and ColorType::BGRA_8888.
+   */
+  static std::shared_ptr<ImageBuffer> MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels);
 
   virtual ~ImageBuffer() = default;
   /**

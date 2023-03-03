@@ -25,7 +25,7 @@
 
 namespace tgfx {
 /**
- * YUVBuffer represents a two dimensional array of pixels described in the YUV format.
+ * YUVBuffer represents a two-dimensional array of pixels described in the YUV format.
  */
 class YUVBuffer : public ImageBuffer {
  public:

@@ -149,9 +149,10 @@ class GLBGRATexture : public GLRGBATexture {
   }
 };
 
-std::shared_ptr<Texture> Texture::MakeFormat(Context* context, int width, int height, void* pixels,
-                                             size_t rowBytes, PixelFormat pixelFormat,
-                                             SurfaceOrigin origin, bool mipMapped) {
+std::shared_ptr<Texture> Texture::MakeFormat(Context* context, int width, int height,
+                                             const void* pixels, size_t rowBytes,
+                                             PixelFormat pixelFormat, SurfaceOrigin origin,
+                                             bool mipMapped) {
   if (!CheckSizeAndFormat(context, width, height, pixelFormat)) {
     return nullptr;
   }

@@ -22,6 +22,8 @@
 #include "images/ImageSource.h"
 #include "images/MatrixImage.h"
 #include "images/RGBAAAImage.h"
+#include "images/RasterBuffer.h"
+#include "images/RasterGenerator.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
 
@@ -42,6 +44,12 @@ std::shared_ptr<Image> Image::MakeFromEncoded(std::shared_ptr<Data> encodedData,
   return MakeFromGenerator(codec, codec->origin(), mipMapped);
 }
 
+std::shared_ptr<Image> Image::MakeFromNativeImage(NativeImageRef nativeImage, ImageOrigin origin,
+                                                  bool mipMapped) {
+  auto codec = ImageCodec::MakeFrom(nativeImage);
+  return MakeFromGenerator(std::move(codec), origin, mipMapped);
+}
+
 std::shared_ptr<Image> Image::MakeFromGenerator(std::shared_ptr<ImageGenerator> generator,
                                                 ImageOrigin origin, bool mipMapped) {
   auto source = ImageSource::MakeFromGenerator(generator, mipMapped);
@@ -58,13 +66,35 @@ std::shared_ptr<Image> Image::MakeRasterCopy(const Pixmap& pixmap, ImageOrigin o
   return MakeFromBitmap(bitmap, origin, mipMapped);
 }
 
-std::shared_ptr<Image> Image::MakeFromBitmap(const Bitmap& bitmap, ImageOrigin origin,
-                                             bool miMapped) {
-  return MakeFromBuffer(bitmap.makeBuffer(), origin, miMapped);
+std::shared_ptr<Image> Image::MakeFromRaster(const Pixmap& pixmap, ImageOrigin origin,
+                                             bool mipMapped) {
+  auto data = Data::MakeWithoutCopy(pixmap.pixels(), pixmap.byteSize());
+  return MakeRasterData(pixmap.info(), std::move(data), origin, mipMapped);
 }
 
-std::shared_ptr<Image> Image::MakeFromBuffer(std::shared_ptr<ImageBuffer> imageBuffer,
+std::shared_ptr<Image> Image::MakeRasterData(const ImageInfo& info, std::shared_ptr<Data> pixels,
                                              ImageOrigin origin, bool mipMapped) {
+  auto imageBuffer = RasterBuffer::MakeFrom(info, pixels);
+  if (imageBuffer != nullptr) {
+    return MakeFromImageBuffer(std::move(imageBuffer), origin, mipMapped);
+  }
+  auto imageGenerator = RasterGenerator::MakeFrom(info, pixels);
+  return MakeFromGenerator(std::move(imageGenerator), origin, mipMapped);
+}
+
+std::shared_ptr<Image> Image::MakeFromBitmap(const Bitmap& bitmap, ImageOrigin origin,
+                                             bool mipMapped) {
+  return MakeFromImageBuffer(bitmap.makeBuffer(), origin, mipMapped);
+}
+
+std::shared_ptr<Image> Image::MakeFromHardwareBuffer(HardwareBufferRef hardwareBuffer,
+                                                     ImageOrigin origin, bool mipMapped) {
+  auto buffer = ImageBuffer::MakeFrom(hardwareBuffer);
+  return MakeFromImageBuffer(std::move(buffer), origin, mipMapped);
+}
+
+std::shared_ptr<Image> Image::MakeFromImageBuffer(std::shared_ptr<ImageBuffer> imageBuffer,
+                                                  ImageOrigin origin, bool mipMapped) {
   auto source = ImageSource::MakeFromBuffer(std::move(imageBuffer), mipMapped);
   return MakeFromSource(std::move(source), origin);
 }
