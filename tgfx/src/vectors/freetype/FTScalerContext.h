@@ -23,7 +23,7 @@
 #include FT_FREETYPE_H
 #include "FTFace.h"
 #include "FTTypeface.h"
-#include "tgfx/core/PixelBuffer.h"
+#include "core/PixelBuffer.h"
 
 namespace tgfx {
 class FTScalerContextRec {

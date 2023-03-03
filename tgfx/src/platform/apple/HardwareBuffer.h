@@ -19,7 +19,7 @@
 #pragma once
 
 #import <CoreVideo/CoreVideo.h>
-#include "tgfx/core/PixelBuffer.h"
+#include "core/PixelBuffer.h"
 
 namespace tgfx {
 class HardwareBuffer : public PixelBuffer {

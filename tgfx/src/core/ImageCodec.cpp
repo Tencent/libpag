@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/ImageCodec.h"
+#include "core/PixelBuffer.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/ImageInfo.h"
-#include "tgfx/core/PixelBuffer.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Stream.h"
 #include "utils/USE.h"
