@@ -27,7 +27,7 @@
 
 namespace pag {
 std::shared_ptr<PAGImage> PAGImage::FromPath(const std::string& filePath) {
-  auto image = tgfx::Image::MakeFromEncoded(filePath);
+  auto image = tgfx::Image::MakeFromFile(filePath);
   return StillImage::MakeFrom(std::move(image));
 }
 
@@ -43,7 +43,7 @@ std::shared_ptr<PAGImage> PAGImage::FromPixels(const void* pixels, int width, in
   auto info = tgfx::ImageInfo::Make(width, height, ToTGFX(colorType), ToTGFX(alphaType), rowBytes);
   tgfx::Bitmap bitmap(width, height, info.isAlphaOnly());
   bitmap.writePixels(info, pixels);
-  auto image = tgfx::Image::MakeFromBitmap(bitmap);
+  auto image = tgfx::Image::MakeFrom(bitmap);
   return StillImage::MakeFrom(image);
 }
 

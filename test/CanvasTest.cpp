@@ -680,7 +680,7 @@ PAG_TEST(CanvasTest, image) {
   auto surface = Surface::Make(context, 400, 500);
   auto canvas = surface->getCanvas();
   auto image =
-      Image::MakeFromEncoded(TestConstants::PAG_ROOT + "resources/apitest/imageReplacement.png");
+      Image::MakeFromFile(TestConstants::PAG_ROOT + "resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);
   EXPECT_TRUE(image->isLazyGenerated());
   EXPECT_FALSE(image->isTextureBacked());
@@ -733,7 +733,8 @@ PAG_TEST(CanvasTest, image) {
   auto codec = MakeImageCodec("resources/apitest/rgbaaa.png");
   EXPECT_EQ(codec->width(), 1024);
   EXPECT_EQ(codec->height(), 512);
-  image = Image::MakeFromGenerator(codec, tgfx::ImageOrigin::TopLeft, true);
+  image = Image::MakeFrom(codec, tgfx::ImageOrigin::TopLeft);
+  image = image->makeMipMapped();
   rgbAAA = image->makeRGBAAA(512, 512, 512, 0);
   EXPECT_TRUE(rgbAAA->isRGBAAA());
   EXPECT_EQ(rgbAAA->width(), 512);

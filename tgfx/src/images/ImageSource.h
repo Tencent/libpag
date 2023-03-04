@@ -32,23 +32,21 @@ namespace tgfx {
 class ImageSource : public Cacheable {
  public:
   /**
-   * Creates ImageSource from an image generator. ImageSource is returned if generator is not
+   * Creates ImageSource from an image generator. ImageSource is returned if the generator is not
    * nullptr. The image generator may wrap codec data or custom data.
    */
-  static std::shared_ptr<ImageSource> MakeFromGenerator(std::shared_ptr<ImageGenerator> generator,
-                                                        bool mipMapped);
+  static std::shared_ptr<ImageSource> MakeFrom(std::shared_ptr<ImageGenerator> generator);
 
   /**
    * Creates ImageSource from ImageBuffer, ImageSource is returned if the imageBuffer is not nullptr
    * and its dimensions are greater than zero.
    */
-  static std::shared_ptr<ImageSource> MakeFromBuffer(std::shared_ptr<ImageBuffer> buffer,
-                                                     bool mipMapped);
+  static std::shared_ptr<ImageSource> MakeFrom(std::shared_ptr<ImageBuffer> buffer);
 
   /**
    * Creates ImageSource from Texture, ImageSource is returned if texture is not nullptr.
    */
-  static std::shared_ptr<ImageSource> MakeFromTexture(std::shared_ptr<Texture> texture);
+  static std::shared_ptr<ImageSource> MakeFrom(std::shared_ptr<Texture> texture);
 
   /**
    * Returns the width of the target image.

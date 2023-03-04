@@ -61,7 +61,7 @@
 #else
 
 + (PAGImageImpl*)FromPixelBuffer:(CVPixelBufferRef)pixelBuffer {
-  auto image = tgfx::Image::MakeFromHardwareBuffer(pixelBuffer);
+  auto image = tgfx::Image::MakeFrom(pixelBuffer);
   auto pagImage = pag::StillImage::MakeFrom(std::move(image));
   if (pagImage == nullptr) {
     return nil;
@@ -75,7 +75,7 @@
   if (cgImage == nil) {
     return nil;
   }
-  auto image = tgfx::Image::MakeFromNativeImage(cgImage);
+  auto image = tgfx::Image::MakeFrom(cgImage);
   auto data = pag::StillImage::MakeFrom(std::move(image));
   if (data == nullptr) {
     return nil;

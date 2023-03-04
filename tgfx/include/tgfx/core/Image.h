@@ -46,59 +46,32 @@ class FragmentProcessor;
 class Image {
  public:
   /**
-   * Creates an Image from the encoded file. An Image is returned if the format of the encoded file
-   * is recognized and supported. Recognized formats vary by platform. Note that the mipMapped
-   * parameter may be ignored if not supported by the GPU or the associated image source.
+   * Creates an Image from the file path. An Image is returned if the format of the image file is
+   * recognized and supported. Recognized formats vary by platform.
    */
-  static std::shared_ptr<Image> MakeFromEncoded(const std::string& filePath,
-                                                bool mipMapped = false);
+  static std::shared_ptr<Image> MakeFromFile(const std::string& filePath);
 
   /**
    * Creates an Image from the encoded data. An Image is returned if the format of the encoded data
-   * is recognized and supported. Recognized formats vary by platform. Note that the mipMapped
-   * parameter may be ignored if not supported by the GPU or the associated image source.
+   * is recognized and supported. Recognized formats vary by platform.
    */
-  static std::shared_ptr<Image> MakeFromEncoded(std::shared_ptr<Data> encodedData,
-                                                bool mipMapped = false);
+  static std::shared_ptr<Image> MakeFromEncoded(std::shared_ptr<Data> encodedData);
 
   /**
-   * Creates an Image from the platform-specific image in the CPU. The nativeImage could be a
-   * jobject that represents a java Bitmap on the android platform or a CGImageRef on the apple
+   * Creates an Image from the platform-specific NativeImage. For example, the NativeImage could be
+   * a jobject that represents a java Bitmap on the android platform or a CGImageRef on the apple
    * platform. The returned Image object takes a reference to the nativeImage. Returns nullptr if
-   * the nativeImage is nullptr or the current platform has no native image support.
+   * the nativeImage is nullptr or the current platform has no NativeImage support.
    */
-  static std::shared_ptr<Image> MakeFromNativeImage(NativeImageRef nativeImage,
-                                                    ImageOrigin origin = ImageOrigin::TopLeft,
-                                                    bool mipMapped = false);
+  static std::shared_ptr<Image> MakeFrom(NativeImageRef nativeImage,
+                                         ImageOrigin origin = ImageOrigin::TopLeft);
 
   /**
    * Creates an Image from the image generator. An Image is returned if the generator is not
-   * nullptr. The image generator may wrap codec data or custom data. Note that the mipMapped
-   * parameter may be ignored if not supported by the GPU or the associated image source.
+   * nullptr. The image generator may wrap codec data or custom data.
    */
-  static std::shared_ptr<Image> MakeFromGenerator(std::shared_ptr<ImageGenerator> generator,
-                                                  ImageOrigin origin = ImageOrigin::TopLeft,
-                                                  bool mipMapped = false);
-
-  /**
-   * Creates an Image from the Pixmap and a copy of its pixels. Since pixels are copied, Pixmap
-   * pixels may be modified or deleted without affecting Image. The returned Image may convert the
-   * copied pixels to a new format which is more efficient for texture uploading on the GPU. Note
-   * that the mipMapped parameter may be ignored if not supported by the GPU or the associated image
-   * source.
-   */
-  static std::shared_ptr<Image> MakeRasterCopy(const Pixmap& pixmap,
-                                               ImageOrigin origin = ImageOrigin::TopLeft,
-                                               bool mipMapped = false);
-
-  /**
-   * Creates an Image from the Pixmap, sharing pixels. The caller must ensure the pixmap is always
-   * the same and alive for the lifetime of the returned Image. Note that the mipMapped parameter
-   * may be ignored if not supported by the GPU or the associated image source.
-   */
-  static std::shared_ptr<Image> MakeFromRaster(const Pixmap& pixmap,
-                                               ImageOrigin origin = ImageOrigin::TopLeft,
-                                               bool mipMapped = false);
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageGenerator> generator,
+                                         ImageOrigin origin = ImageOrigin::TopLeft);
 
   /**
    * Creates an Image from the ImageInfo and shares pixels from the immutable Data object. The
@@ -106,23 +79,18 @@ class Image {
    * the same for the lifetime of the returned Image. If the ImageInfo is unsuitable for direct
    * texture uploading, the Image will internally create an ImageGenerator for pixel format
    * conventing instead of an ImageBuffer. Returns nullptr if the ImageInfo is empty or the pixels
-   * are nullptr. Note that the mipMapped parameter may be ignored if not supported by the GPU or
-   * the associated image source.
+   * are nullptr.
    */
-  static std::shared_ptr<Image> MakeRasterData(const ImageInfo& info, std::shared_ptr<Data> pixels,
-                                               ImageOrigin origin = ImageOrigin::TopLeft,
-                                               bool mipMapped = false);
+  static std::shared_ptr<Image> MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels,
+                                         ImageOrigin origin = ImageOrigin::TopLeft);
 
   /**
-   * Creates an Image from the Bitmap, sharing bitmap pixels. The Bitmap will allocate a new
-   * PixelBuffer and copy the original pixels into it if there is a subsequent call of pixel writing
-   * to the Bitmap. Therefore, the content of the returned Image always remains the same. Note that
-   * the mipMapped parameter may be ignored if not supported by the GPU or the associated image
-   * source.
+   * Creates an Image from the Bitmap, sharing bitmap pixels. The Bitmap will allocate new internal
+   * pixel memory and copy the original pixels into it if there is a subsequent call of pixel
+   * writing to the Bitmap. Therefore, the content of the returned Image will always be the same.
    */
-  static std::shared_ptr<Image> MakeFromBitmap(const Bitmap& bitmap,
-                                               ImageOrigin origin = ImageOrigin::TopLeft,
-                                               bool mipMapped = false);
+  static std::shared_ptr<Image> MakeFrom(const Bitmap& bitmap,
+                                         ImageOrigin origin = ImageOrigin::TopLeft);
 
   /**
    * Creates an Image from the platform-specific hardware buffer. For example, the hardware buffer
@@ -130,27 +98,24 @@ class Image {
    * platform. The returned Image takes a reference to the hardwareBuffer. The caller must
    * ensure the buffer content is always the same for the lifetime of the returned Image. The
    * colorSpace is ignored if the hardwareBuffer contains only one plane, which is not in the YUV
-   * format. Returns nullptr if the hardwareBuffer is nullptr. Note that the mipMapped parameter may
-   * be ignored if not supported by the GPU or the associated image source.
+   * format. Returns nullptr if the hardwareBuffer is nullptr.
    */
-  static std::shared_ptr<Image> MakeFromHardwareBuffer(
-      HardwareBufferRef hardwareBuffer, YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED,
-      ImageOrigin origin = ImageOrigin::TopLeft, bool mipMapped = false);
+  static std::shared_ptr<Image> MakeFrom(HardwareBufferRef hardwareBuffer,
+                                         YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED,
+                                         ImageOrigin origin = ImageOrigin::TopLeft);
 
   /**
    * Creates an Image from the ImageBuffer, An Image is returned if the imageBuffer is not nullptr
-   * and its dimensions are greater than zero. Note that the mipMapped parameter may be ignored if
-   * not supported by the GPU or the associated image source.
+   * and its dimensions are greater than zero.
    */
-  static std::shared_ptr<Image> MakeFromImageBuffer(std::shared_ptr<ImageBuffer> imageBuffer,
-                                                    ImageOrigin origin = ImageOrigin::TopLeft,
-                                                    bool mipMapped = false);
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageBuffer> imageBuffer,
+                                         ImageOrigin origin = ImageOrigin::TopLeft);
 
   /**
    * Creates an Image from the Texture, An Image is returned if texture is not nullptr.
    */
-  static std::shared_ptr<Image> MakeFromTexture(std::shared_ptr<Texture> texture,
-                                                ImageOrigin origin = ImageOrigin::TopLeft);
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Texture> texture,
+                                         ImageOrigin origin = ImageOrigin::TopLeft);
 
   virtual ~Image() = default;
 
