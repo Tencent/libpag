@@ -40,14 +40,16 @@ class Context;
 class Surface {
  public:
   /**
-   * Creates a new Surface on GPU indicated by context. Allocates memory for pixels, based on the
-   * width, height and color type (alphaOnly). A Surface with MSAA enabled is returned if the
-   * sampleCount is greater than 1. Return nullptr if alphaOnly is not supported or the size is
-   * zero.
+   * Creates a new Surface on GPU indicated by context. Allocates memory for pixels based on the
+   * width, height, and color type (alphaOnly). If the sampleCount is greater than 1, the Surface
+   * will have MSAA support enabled. If the tryHardware is true, the Surface will try to allocate a
+   * hardware-backed texture which can speed up the pixel reading process. Note that the tryHardware
+   * will be ignored if the mipMapped is true. Return nullptr if the alphaOnly is not supported or
+   * the size is zero.
    */
   static std::shared_ptr<Surface> Make(Context* context, int width, int height,
                                        bool alphaOnly = false, int sampleCount = 1,
-                                       bool mipMapped = false,
+                                       bool mipMapped = false, bool tryHardware = false,
                                        const SurfaceOptions* options = nullptr);
 
   /**

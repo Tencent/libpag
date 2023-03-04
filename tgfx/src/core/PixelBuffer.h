@@ -29,16 +29,21 @@ class PixelBuffer : public ImageBuffer {
  public:
   /**
    * Creates a new PixelBuffer object width specified width and height. Returns nullptr if width or
-   * height is not greater thant zero.
-   * @param width pixel column count, must be greater than zero.
-   * @param height pixel row count, must be greater than zero.
-   * @param alphaOnly If true, sets colorType to ColorType::ALPHA_8, otherwise sets to the native
-   * 32-bit color type of the current platform.
-   * @param tryHardware If true, a PixelBuffer backed by hardware is returned if it is available on
-   * the current platform. Otherwise, a raster PixelBuffer is returned.
+   * height is not greater than zero. If the alphaOnly is true, sets colorType to
+   * ColorType::ALPHA_8, otherwise sets to the native 32-bit color type of the current platform. If
+   * the tryHardware is true, a PixelBuffer backed by hardware is returned if it is available on the
+   * current platform. Otherwise, a raster PixelBuffer is returned.
    */
   static std::shared_ptr<PixelBuffer> Make(int width, int height, bool alphaOnly = false,
                                            bool tryHardware = true);
+
+  /**
+   * Creates a hardware-backed PixelBuffer with the specified width and height. Returns nullptr if
+   * the current platform has no hardware buffer support. Hardware buffer is a low-level object
+   * representing a memory buffer accessible by various hardware units. Hardware buffer allows
+   * sharing buffers across CPU and GPU, which can be used to speed up the texture uploading.
+   */
+  static std::shared_ptr<PixelBuffer> MakeHardwareBuffer(int width, int height, bool alphaOnly);
 
   int width() const override {
     return _info.width();
@@ -64,9 +69,7 @@ class PixelBuffer : public ImageBuffer {
    * Returns true if this pixel buffer is hardware backed. A hardware backed PixelBuffer allows
    * sharing buffers across CPU and GPU, which can be used to speed up the texture uploading.
    */
-  bool isHardwareBacked() const {
-    return hardwareBacked;
-  }
+  virtual bool isHardwareBacked() const = 0;
 
   /**
    * Locks and returns the address of the pixels to ensure that the memory is accessible.
@@ -83,16 +86,5 @@ class PixelBuffer : public ImageBuffer {
 
   explicit PixelBuffer(const ImageInfo& info) : _info(info) {
   }
-
- private:
-  bool hardwareBacked = false;
-
-  /**
-   * Creates a hardware backed PixelBuffer with specified width and height. Returns nullptr if
-   * the current platform has no hardware buffer support. Hardware buffer is a low-level object
-   * representing a memory buffer accessible by various hardware units. Hardware buffer allows
-   * sharing buffers across CPU and GPU, which can be used to speed up the texture uploading.
-   */
-  static std::shared_ptr<PixelBuffer> MakeHardwareBuffer(int width, int height, bool alphaOnly);
 };
 }  // namespace tgfx

@@ -26,7 +26,8 @@ void Trace(std::shared_ptr<tgfx::Texture> texture, const std::string& path) {
   if (texture == nullptr) {
     return;
   }
-  auto surface = tgfx::Surface::Make(texture->getContext(), texture->width(), texture->height());
+  auto surface = tgfx::Surface::Make(texture->getContext(), texture->width(), texture->height(),
+                                     false, 1, false, true);
   if (surface == nullptr) {
     return;
   }

@@ -2,7 +2,6 @@ package org.libpag;
 
 import android.graphics.Bitmap;
 import android.graphics.SurfaceTexture;
-import android.hardware.HardwareBuffer;
 import android.opengl.EGL14;
 import android.opengl.EGLContext;
 import android.os.Build;
@@ -12,7 +11,13 @@ import org.extra.tools.LibraryLoadUtils;
 
 public class PAGSurface {
 
-    public static native PAGSurface MakeOffscreen(int width, int height);
+    public static PAGSurface MakeOffscreen(int width, int height) {
+        long nativeSurface = SetupOffscreen(width, height);
+        if (nativeSurface == 0) {
+            return null;
+        }
+        return new PAGSurface(nativeSurface);
+    }
 
 
     public static PAGSurface FromSurfaceTexture(SurfaceTexture surfaceTexture) {
@@ -122,6 +127,8 @@ public class PAGSurface {
         return pagSurface;
     }
 
+    private static native long SetupOffscreen(int width, int height);
+
     private static native long SetupFromSurfaceWithGLContext(Surface surface, long shareContext);
 
     public static native long SetupFromTexture(int textureID, int width, int height, boolean flipY, boolean forAsyncThread);
@@ -176,14 +183,6 @@ public class PAGSurface {
         nativeRelease();
     }
 
-    /**
-     * Returns the internal HardwareBuffer object associated with this PAGSurface,
-     * returns null if this PAGSurface is created by Surface or SurfaceTexture.
-     */
-    public HardwareBuffer getHardwareBuffer() {
-        return hardwareBuffer;
-    }
-
     private native void nativeRelease();
 
     private static native void nativeInit();
@@ -200,6 +199,4 @@ public class PAGSurface {
     }
 
     long nativeSurface = 0;
-
-    private HardwareBuffer hardwareBuffer;
 }

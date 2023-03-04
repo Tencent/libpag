@@ -29,6 +29,10 @@ class RasterPixelBuffer : public PixelBuffer {
     delete[] _pixels;
   }
 
+  bool isHardwareBacked() const override {
+    return false;
+  }
+
   void* lockPixels() override {
     locker.lock();
     return _pixels;
@@ -63,7 +67,6 @@ std::shared_ptr<PixelBuffer> PixelBuffer::Make(int width, int height, bool alpha
   if (tryHardware) {
     pixelBuffer = MakeHardwareBuffer(width, height, alphaOnly);
     if (pixelBuffer != nullptr) {
-      pixelBuffer->hardwareBacked = true;
       return pixelBuffer;
     }
   }

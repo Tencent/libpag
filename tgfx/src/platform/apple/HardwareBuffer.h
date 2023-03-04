@@ -30,6 +30,10 @@ class HardwareBuffer : public PixelBuffer {
 
   ~HardwareBuffer() override;
 
+  bool isHardwareBacked() const override {
+    return true;
+  }
+
   void* lockPixels() override;
 
   void unlockPixels() override;
