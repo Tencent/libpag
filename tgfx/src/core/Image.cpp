@@ -78,7 +78,7 @@ std::shared_ptr<Image> Image::MakeRasterData(const ImageInfo& info, std::shared_
   if (imageBuffer != nullptr) {
     return MakeFromImageBuffer(std::move(imageBuffer), origin, mipMapped);
   }
-  auto imageGenerator = RasterGenerator::MakeFrom(info, pixels);
+  auto imageGenerator = RasterGenerator::MakeFrom(info, std::move(pixels));
   return MakeFromGenerator(std::move(imageGenerator), origin, mipMapped);
 }
 
@@ -88,8 +88,9 @@ std::shared_ptr<Image> Image::MakeFromBitmap(const Bitmap& bitmap, ImageOrigin o
 }
 
 std::shared_ptr<Image> Image::MakeFromHardwareBuffer(HardwareBufferRef hardwareBuffer,
-                                                     ImageOrigin origin, bool mipMapped) {
-  auto buffer = ImageBuffer::MakeFrom(hardwareBuffer);
+                                                     YUVColorSpace colorSpace, ImageOrigin origin,
+                                                     bool mipMapped) {
+  auto buffer = ImageBuffer::MakeFrom(hardwareBuffer, colorSpace);
   return MakeFromImageBuffer(std::move(buffer), origin, mipMapped);
 }
 

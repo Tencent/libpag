@@ -20,7 +20,7 @@
 
 #include "pag/types.h"
 #include "tgfx/core/Data.h"
-#include "tgfx/core/YUVInfo.h"
+#include "tgfx/core/YUVColorSpace.h"
 
 namespace pag {
 
@@ -29,8 +29,7 @@ class VideoDemuxer;
 struct VideoFormat {
   std::string mimeType = "video/avc";
   std::vector<std::shared_ptr<tgfx::Data>> headers = {};
-  tgfx::YUVColorSpace colorSpace = tgfx::YUVColorSpace::Rec601;
-  tgfx::YUVColorRange colorRange = tgfx::YUVColorRange::MPEG;
+  tgfx::YUVColorSpace colorSpace = tgfx::YUVColorSpace::BT601_LIMITED;
   int width = 0;
   int height = 0;
   int64_t duration = 0;

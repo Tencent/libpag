@@ -45,7 +45,7 @@ class HardwareDecoder : public VideoDecoder {
   bool isInitialized = false;
   VTDecompressionSessionRef session = nullptr;
   CMFormatDescriptionRef videoFormatDescription = nullptr;
-  tgfx::YUVColorSpace colorSpace = tgfx::YUVColorSpace::Rec601;
+  tgfx::YUVColorSpace colorSpace = tgfx::YUVColorSpace::BT601_LIMITED;
 
   explicit HardwareDecoder(const VideoFormat& format);
 

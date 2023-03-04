@@ -27,7 +27,7 @@ namespace tgfx {
 class GLInterface;
 
 /**
- * Represents a OpenGL 2D buffer of pixels that can be rendered to.
+ * Represents an OpenGL 2D buffer of pixels that can be rendered to.
  */
 class GLRenderTarget : public RenderTarget {
  public:

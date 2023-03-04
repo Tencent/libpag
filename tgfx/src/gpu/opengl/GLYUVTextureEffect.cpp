@@ -45,7 +45,7 @@ void GLYUVTextureEffect::emitCode(EmitArgs& args) {
                                      (*args.transformedCoords)[0].name());
     fragBuilder->codeAppend(".ra;");
   }
-  if (yuvFP->texture->colorRange() == YUVColorRange::MPEG) {
+  if (IsLimitedYUVColorRange(yuvFP->texture->colorSpace())) {
     fragBuilder->codeAppend("yuv.x -= (16.0 / 255.0);");
   }
   fragBuilder->codeAppend("yuv.yz -= vec2(0.5, 0.5);");
@@ -76,28 +76,32 @@ void GLYUVTextureEffect::emitCode(EmitArgs& args) {
   }
 }
 
-static const float kColorConversion601LimitRange[] = {
-    1.164, 1.164, 1.164, 0.0, -0.392f, 2.017, 1.596, -0.813f, 0.0,
+static const float ColorConversion601LimitRange[] = {
+    1.164384f, 1.164384f, 1.164384f, 0.0f, -0.391762f, 2.017232f, 1.596027f, -0.812968f, 0.0f,
 };
 
-static const float kColorConversion601FullRange[] = {
-    1.0, 1.0, 1.0, 0.0, -0.344f, 1.772, 1.402, -0.714f, 0.0,
+static const float ColorConversion601FullRange[] = {
+    1.0f, 1.0f, 1.0f, 0.0f, -0.344136f, 1.772f, 1.402f, -0.714136f, 0.0f,
 };
 
-static const float kColorConversion709LimitRange[] = {
-    1.164, 1.164, 1.164, 0.0, -0.213, 2.112, 1.793, -0.533, 0.0,
+static const float ColorConversion709LimitRange[] = {
+    1.164384f, 1.164384f, 1.164384f, 0.0f, -0.213249f, 2.112402f, 1.792741f, -0.532909f, 0.0f,
 };
 
-static const float kColorConversion709FullRange[] = {
-    1.0, 1.0, 1.0, 0.0, -0.187, 1.856, 1.575, -0.468, 0.0,
+static const float ColorConversion709FullRange[] = {
+    1.0f, 1.0f, 1.0f, 0.0f, -0.187324f, 1.8556f, 1.5748f, -0.468124f, 0.0f,
 };
 
-static const float kColorConversion2020LimitRange[] = {
-    1.168, 1.168, 1.168, 0.0, -0.188, 2.148, 1.684, -0.652, 0.0,
+static const float ColorConversion2020LimitRange[] = {
+    1.164384f, 1.164384f, 1.164384f, 0.0f, -0.187326f, 2.141772f, 1.678674f, -0.650424f, 0.0f,
 };
 
-static const float kColorConversion2020FullRange[] = {
-    1.0, 1.0, 1.0, 0.0, -0.165, 1.881, 1.475, -0.571, 0.0,
+static const float ColorConversion2020FullRange[] = {
+    1.0f, 1.0f, 1.0f, 0.0f, -0.164553f, 1.8814f, 1.4746f, -0.571353f, 0.0f,
+};
+
+static const float ColorConversionJPEGFullRange[] = {
+    1.0f, 1.0f, 1.0f, 0.0f, -0.344136f, 1.772000f, 1.402f, -0.714136f, 0.0f,
 };
 
 void GLYUVTextureEffect::onSetData(const ProgramDataManager& programDataManager,
@@ -110,36 +114,30 @@ void GLYUVTextureEffect::onSetData(const ProgramDataManager& programDataManager,
       programDataManager.set2f(alphaStartUniform, alphaStart.x, alphaStart.y);
     }
   }
-  if (yuvFP.texture->colorSpace() != colorSpacePrev ||
-      yuvFP.texture->colorRange() != colorRangePrev) {
+  if (yuvFP.texture->colorSpace() != colorSpacePrev) {
     colorSpacePrev = yuvFP.texture->colorSpace();
-    colorRangePrev = yuvFP.texture->colorRange();
     switch (yuvFP.texture->colorSpace()) {
-      case YUVColorSpace::Rec601: {
-        if (yuvFP.texture->colorRange() == YUVColorRange::JPEG) {
-          programDataManager.setMatrix3f(mat3ColorConversionUniform, kColorConversion601FullRange);
-        } else {
-          programDataManager.setMatrix3f(mat3ColorConversionUniform, kColorConversion601LimitRange);
-        }
+      case YUVColorSpace::BT601_LIMITED:
+        programDataManager.setMatrix3f(mat3ColorConversionUniform, ColorConversion601LimitRange);
         break;
-      }
-      case YUVColorSpace::Rec709: {
-        if (yuvFP.texture->colorRange() == YUVColorRange::JPEG) {
-          programDataManager.setMatrix3f(mat3ColorConversionUniform, kColorConversion709FullRange);
-        } else {
-          programDataManager.setMatrix3f(mat3ColorConversionUniform, kColorConversion709LimitRange);
-        }
+      case YUVColorSpace::BT601_FULL:
+        programDataManager.setMatrix3f(mat3ColorConversionUniform, ColorConversion601FullRange);
         break;
-      }
-      case YUVColorSpace::Rec2020: {
-        if (yuvFP.texture->colorRange() == YUVColorRange::JPEG) {
-          programDataManager.setMatrix3f(mat3ColorConversionUniform, kColorConversion2020FullRange);
-        } else {
-          programDataManager.setMatrix3f(mat3ColorConversionUniform,
-                                         kColorConversion2020LimitRange);
-        }
+      case YUVColorSpace::BT709_LIMITED:
+        programDataManager.setMatrix3f(mat3ColorConversionUniform, ColorConversion709LimitRange);
         break;
-      }
+      case YUVColorSpace::BT709_FULL:
+        programDataManager.setMatrix3f(mat3ColorConversionUniform, ColorConversion709FullRange);
+        break;
+      case YUVColorSpace::BT2020_LIMITED:
+        programDataManager.setMatrix3f(mat3ColorConversionUniform, ColorConversion2020LimitRange);
+        break;
+      case YUVColorSpace::BT2020_FULL:
+        programDataManager.setMatrix3f(mat3ColorConversionUniform, ColorConversion2020FullRange);
+        break;
+      case YUVColorSpace::JPEG_FULL:
+        programDataManager.setMatrix3f(mat3ColorConversionUniform, ColorConversionJPEGFullRange);
+        break;
       default:
         break;
     }

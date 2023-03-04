@@ -34,7 +34,7 @@ YUVTextureEffect::YUVTextureEffect(std::shared_ptr<YUVTexture> texture, Sampling
 void YUVTextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   uint32_t flags = texture->pixelFormat() == YUVPixelFormat::I420 ? 0 : 1;
   flags |= alphaStart == Point::Zero() ? 0 : 2;
-  flags |= texture->colorRange() == YUVColorRange::MPEG ? 0 : 4;
+  flags |= IsLimitedYUVColorRange(texture->colorSpace()) ? 0 : 4;
   bytesKey->write(flags);
 }
 

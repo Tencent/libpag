@@ -19,7 +19,6 @@
 #pragma once
 
 #include "tgfx/core/ImageBuffer.h"
-#include "tgfx/core/ImageInfo.h"
 
 namespace tgfx {
 /**

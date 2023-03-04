@@ -141,7 +141,7 @@ class Surface {
 
   /**
    * Call to ensure all reads/writes of the surface have been issued to the underlying 3D API.
-   * TGFX will correctly order its own draws and pixel operations. This must to be used to ensure
+   * TGFX will correctly order its own draws and pixel operations. This must be used to ensure
    * correct ordering when the surface backing store is accessed outside TGFX (e.g. direct use of
    * the 3D API or a windowing system). Context has additional flush and submit methods that apply
    * to all surfaces and images created from a Context. This is equivalent to calling

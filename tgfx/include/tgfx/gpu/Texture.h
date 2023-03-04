@@ -32,10 +32,10 @@ namespace tgfx {
 class Texture : public Resource {
  public:
   /**
-   * Creates a single-plane texture from a platform-specific hardware buffer. The hardwareBuffer
-   * could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on the apple
-   * platform. The returned Texture takes a reference on the hardwareBuffer. Returns nullptr if any
-   * of the parameters are nullptr or the hardwareBuffer is not single-plane. Use the
+   * Creates a single-plane texture from a platform-specific hardware buffer. For example, the
+   * hardware buffer could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on
+   * the apple platform. The returned Texture takes a reference on the hardwareBuffer. Returns
+   * nullptr if any of the parameters are nullptr or the hardwareBuffer is not single-plane. Use the
    * YUVTexture::MakeFrom() method for the hardware buffer with multiple planes.
    */
   static std::shared_ptr<Texture> MakeFrom(Context* context, HardwareBufferRef hardwareBuffer);

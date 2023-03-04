@@ -16,18 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/ImageBuffer.h"
-#include "RasterBuffer.h"
-#include "RasterGenerator.h"
+#pragma once
 
 namespace tgfx {
-std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(const ImageInfo& info,
-                                                   std::shared_ptr<Data> pixels) {
-  auto buffer = RasterBuffer::MakeFrom(info, pixels);
-  if (buffer != nullptr) {
-    return buffer;
-  }
-  auto generator = RasterGenerator::MakeFrom(info, pixels);
-  return generator->makeBuffer();
-}
+/**
+ * Defines pixel formats for YUV textures.
+ */
+enum class YUVPixelFormat {
+  /**
+   * uninitialized.
+   */
+  Unknown,
+  /**
+   * 8-bit Y plane followed by 8 bit 2x2 subsampled U and V planes.
+   */
+  I420,
+  /**
+   * 8-bit Y plane followed by an interleaved U/V plane with 2x2 subsampling.
+   */
+  NV12
+};
 }  // namespace tgfx

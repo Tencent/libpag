@@ -18,18 +18,19 @@
 
 #include "NV12HardwareBuffer.h"
 #include "tgfx/gpu/YUVTexture.h"
+#include "utils/USE.h"
 
 namespace tgfx {
 static std::mutex cacheLocker = {};
 static std::unordered_map<CVPixelBufferRef, std::weak_ptr<NV12HardwareBuffer>> nv12BufferMap = {};
 
 std::shared_ptr<NV12HardwareBuffer> NV12HardwareBuffer::MakeFrom(CVPixelBufferRef pixelBuffer,
-                                                                 YUVColorSpace colorSpace,
-                                                                 YUVColorRange colorRange) {
+                                                                 YUVColorSpace colorSpace) {
 #if TARGET_IPHONE_SIMULATOR
 
   // We cannot bind CVPixelBuffer to GL on iOS simulator.
   USE(pixelBuffer);
+  USE(colorSpace);
   return nullptr;
 
 #else
@@ -51,17 +52,16 @@ std::shared_ptr<NV12HardwareBuffer> NV12HardwareBuffer::MakeFrom(CVPixelBufferRe
     }
     nv12BufferMap.erase(result);
   }
-  auto buffer = std::shared_ptr<NV12HardwareBuffer>(
-      new NV12HardwareBuffer(pixelBuffer, colorSpace, colorRange));
+  auto buffer =
+      std::shared_ptr<NV12HardwareBuffer>(new NV12HardwareBuffer(pixelBuffer, colorSpace));
   nv12BufferMap[pixelBuffer] = buffer;
   return buffer;
 
 #endif
 }
 
-NV12HardwareBuffer::NV12HardwareBuffer(CVPixelBufferRef pixelBuffer, YUVColorSpace colorSpace,
-                                       YUVColorRange colorRange)
-    : YUVBuffer(colorSpace, colorRange), pixelBuffer(pixelBuffer) {
+NV12HardwareBuffer::NV12HardwareBuffer(CVPixelBufferRef pixelBuffer, YUVColorSpace colorSpace)
+    : pixelBuffer(pixelBuffer), colorSpace(colorSpace) {
   CFRetain(pixelBuffer);
 }
 
@@ -80,6 +80,6 @@ int NV12HardwareBuffer::height() const {
 }
 
 std::shared_ptr<Texture> NV12HardwareBuffer::onMakeTexture(Context* context, bool) const {
-  return YUVTexture::MakeFrom(context, pixelBuffer, colorSpace(), colorRange());
+  return YUVTexture::MakeFrom(context, pixelBuffer, colorSpace);
 }
 }  // namespace tgfx

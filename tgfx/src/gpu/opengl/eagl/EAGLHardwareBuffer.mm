@@ -27,7 +27,15 @@ std::shared_ptr<PixelBuffer> PixelBuffer::MakeHardwareBuffer(int width, int heig
   return HardwareBuffer::Make(width, height, alphaOnly);
 }
 
-std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer) {
+std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer,
+                                                   YUVColorSpace colorSpace) {
+  if (hardwareBuffer == nullptr) {
+    return nullptr;
+  }
+  auto planeCount = CVPixelBufferGetPlaneCount(hardwareBuffer);
+  if (planeCount > 1) {
+    return NV12HardwareBuffer::MakeFrom(hardwareBuffer, colorSpace);
+  }
   return HardwareBuffer::MakeFrom(hardwareBuffer);
 }
 
@@ -35,14 +43,8 @@ std::shared_ptr<Texture> Texture::MakeFrom(Context* context, HardwareBufferRef h
   return EAGLHardwareTexture::MakeFrom(context, hardwareBuffer);
 }
 
-std::shared_ptr<YUVBuffer> YUVBuffer::MakeFrom(HardwareBufferRef hardwareBuffer,
-                                               YUVColorSpace colorSpace, YUVColorRange colorRange) {
-  return NV12HardwareBuffer::MakeFrom(hardwareBuffer, colorSpace, colorRange);
-}
-
 std::shared_ptr<YUVTexture> YUVTexture::MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
-                                                 YUVColorSpace colorSpace,
-                                                 YUVColorRange colorRange) {
-  return EAGLNV12Texture::MakeFrom(context, hardwareBuffer, colorSpace, colorRange);
+                                                 YUVColorSpace colorSpace) {
+  return EAGLNV12Texture::MakeFrom(context, hardwareBuffer, colorSpace);
 }
 }  // namespace tgfx

@@ -59,7 +59,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif ()
 
 # collects tgfx common files.
-set(TGFX_INCLUDES ./ src)
+set(TGFX_INCLUDES ./ include src)
 file(GLOB_RECURSE TGFX_FILES
         src/core/*.*
         src/effects/*.*

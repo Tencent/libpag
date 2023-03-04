@@ -30,7 +30,7 @@ VideoSequenceDemuxer::VideoSequenceDemuxer(std::shared_ptr<File> file, VideoSequ
     format.headers.push_back(std::move(bytes));
   }
   format.mimeType = "video/avc";
-  format.colorSpace = tgfx::YUVColorSpace::Rec601;
+  format.colorSpace = tgfx::YUVColorSpace::BT601_LIMITED;
   format.duration = FrameToTime(sequence->duration(), sequence->frameRate);
   format.frameRate = sequence->frameRate;
   // The reorder size of a VideoSequence can only be one of these: 0, 1,  2.

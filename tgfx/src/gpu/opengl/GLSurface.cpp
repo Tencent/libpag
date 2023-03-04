@@ -54,6 +54,7 @@ std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, 
   }
   std::shared_ptr<Texture> texture = nullptr;
   if (tryHardware && !mipMapped && caps->standard != GLStandard::GL) {
+    // TODO: fix the rendering issue when surface is backed by a rectangle texture.
     auto hardwareBuffer = PixelBuffer::MakeHardwareBuffer(width, height, alphaOnly);
     if (hardwareBuffer != nullptr) {
       texture = hardwareBuffer->makeTexture(context);

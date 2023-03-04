@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/PixelBuffer.h"
-#include "tgfx/core/YUVBuffer.h"
 #include "tgfx/gpu/YUVTexture.h"
 
 #if defined(__ANDROID__) || defined(ANDROID)
@@ -33,7 +32,8 @@ std::shared_ptr<PixelBuffer> PixelBuffer::MakeHardwareBuffer(int width, int heig
   return HardwareBuffer::Make(width, height, alphaOnly);
 }
 
-std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer) {
+std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer,
+                                                   YUVColorSpace) {
   return HardwareBuffer::MakeFrom(hardwareBuffer);
 }
 
@@ -47,7 +47,7 @@ std::shared_ptr<PixelBuffer> PixelBuffer::MakeHardwareBuffer(int, int, bool) {
   return nullptr;
 }
 
-std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef) {
+std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef, YUVColorSpace) {
   return nullptr;
 }
 
@@ -57,12 +57,7 @@ std::shared_ptr<Texture> Texture::MakeFrom(Context*, HardwareBufferRef) {
 
 #endif
 
-std::shared_ptr<YUVBuffer> YUVBuffer::MakeFrom(HardwareBufferRef, YUVColorSpace, YUVColorRange) {
-  return nullptr;
-}
-
-std::shared_ptr<YUVTexture> YUVTexture::MakeFrom(Context*, HardwareBufferRef, YUVColorSpace,
-                                                 YUVColorRange) {
+std::shared_ptr<YUVTexture> YUVTexture::MakeFrom(Context*, HardwareBufferRef, YUVColorSpace) {
   return nullptr;
 }
 }  // namespace tgfx

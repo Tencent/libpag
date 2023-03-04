@@ -19,14 +19,13 @@
 #pragma once
 
 #import <CoreVideo/CoreVideo.h>
-#include "tgfx/core/YUVBuffer.h"
+#include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
-class NV12HardwareBuffer : public YUVBuffer {
+class NV12HardwareBuffer : public ImageBuffer {
  public:
   static std::shared_ptr<NV12HardwareBuffer> MakeFrom(CVPixelBufferRef pixelBuffer,
-                                                      YUVColorSpace colorSpace,
-                                                      YUVColorRange colorRange);
+                                                      YUVColorSpace colorSpace);
 
   ~NV12HardwareBuffer() override;
 
@@ -34,12 +33,8 @@ class NV12HardwareBuffer : public YUVBuffer {
 
   int height() const override;
 
-  size_t planeCount() const override {
-    return YUVData::NV12_PLANE_COUNT;
-  }
-
-  YUVPixelFormat pixelFormat() const override {
-    return YUVPixelFormat::NV12;
+  bool isAlphaOnly() const final {
+    return false;
   }
 
  protected:
@@ -47,9 +42,9 @@ class NV12HardwareBuffer : public YUVBuffer {
 
  private:
   CVPixelBufferRef pixelBuffer = nullptr;
+  YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED;
 
-  NV12HardwareBuffer(CVPixelBufferRef pixelBuffer, YUVColorSpace colorSpace,
-                     YUVColorRange colorRange);
+  NV12HardwareBuffer(CVPixelBufferRef pixelBuffer, YUVColorSpace colorSpace);
 };
 
 }  // namespace tgfx

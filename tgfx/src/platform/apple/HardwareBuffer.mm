@@ -19,6 +19,7 @@
 #include "HardwareBuffer.h"
 #include "CVPixelBufferUtil.h"
 #include "gpu/Gpu.h"
+#include "utils/USE.h"
 
 namespace tgfx {
 static std::mutex cacheLocker = {};
