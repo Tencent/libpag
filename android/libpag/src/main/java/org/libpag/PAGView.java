@@ -430,10 +430,21 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
             mListener.onSurfaceTextureDestroyed(surface);
         }
         if (pagSurface != null) {
-            //pagSurface.freeCache();
+            pagSurface.freeCache();
         }
-        surface.release();;
-        return true;
+
+        boolean surfaceDestroy = true;
+        if (g_PAGViewHandler != null && surface != null) {
+            SendMessage(MSG_SURFACE_DESTROY, surface);
+            surfaceDestroy = false;
+        }
+
+        if (Build.VERSION.SDK_INT >= ANDROID_SDK_VERSION_O) {
+            synchronized (g_HandlerLock) {
+                DestroyHandlerThread();
+            }
+        }
+        return surfaceDestroy;
     }
 
     @Override
@@ -510,7 +521,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         Log.i(TAG, "doPlay");
         if (animationScale == 0.0f) {
             notifyEnd();
-            Log.w(TAG, "doPlay: The scale of animator duration is turned off");
+            Log.e(TAG, "doPlay: The scale of animator duration is turned off");
             return;
         }
         animator.setCurrentPlayTime(currentPlayTime);
