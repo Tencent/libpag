@@ -105,6 +105,22 @@ class Image {
                                          ImageOrigin origin = ImageOrigin::TopLeft);
 
   /**
+   * Creates an Image in the I420 format with the specified YUVData and the YUVColorSpace. Returns
+   * nullptr if the yuvData is invalid.
+   */
+  static std::shared_ptr<Image> MakeI420(std::shared_ptr<YUVData> yuvData,
+                                         YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED,
+                                         ImageOrigin origin = ImageOrigin::TopLeft);
+
+  /**
+   * Creates an Image in the NV12 format with the specified YUVData and the YUVColorSpace. Returns
+   * nullptr if the yuvData is invalid.
+   */
+  static std::shared_ptr<Image> MakeNV12(std::shared_ptr<YUVData> yuvData,
+                                         YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED,
+                                         ImageOrigin origin = ImageOrigin::TopLeft);
+
+  /**
    * Creates an Image from the ImageBuffer, An Image is returned if the imageBuffer is not nullptr
    * and its dimensions are greater than zero.
    */

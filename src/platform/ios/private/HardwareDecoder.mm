@@ -136,8 +136,8 @@ bool HardwareDecoder::resetVideoToolBox() {
 
   uint32_t openGLESCompatibility = true;
   uint32_t pixelFormatType = tgfx::IsLimitedYUVColorRange(sourceColorSpace)
-                                 ? kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
-                                 : kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange;
+                                 ? kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
+                                 : kCVPixelFormatType_420YpCbCr8BiPlanarFullRange;
 
   CFNumberRef pixelFormatTypeValue = CFNumberCreate(NULL, kCFNumberSInt32Type, &pixelFormatType);
   CFNumberRef openGLESCompatibilityValue =
