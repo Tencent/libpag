@@ -40,8 +40,9 @@ class Data {
   static std::shared_ptr<Data> MakeWithCopy(const void* data, size_t length);
 
   /**
-   * Call this when the data parameter is already const and will outlive the lifetime of the Data.
-   * Suitable for with const globals.
+   * Call this when the data parameter is already const, suitable for const globals. The caller must
+   * ensure the data parameter will always be the same and alive for the lifetime of the returned
+   * Data.
    */
   static std::shared_ptr<Data> MakeWithoutCopy(const void* data, size_t length);
 

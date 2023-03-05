@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BitmapSequenceReader.h"
+#include "tgfx/core/Buffer.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
 
@@ -26,11 +27,14 @@ BitmapSequenceReader::BitmapSequenceReader(std::shared_ptr<File> file, BitmapSeq
   // Force allocating a raster PixelBuffer if staticContent is false, otherwise the asynchronous
   // decoding will fail due to the memory sharing mechanism.
   auto staticContent = sequence->composition->staticContent();
-  pixelBuffer = tgfx::PixelBuffer::Make(sequence->width, sequence->height, false, staticContent);
-  if (pixelBuffer != nullptr) {
-    auto pixels = pixelBuffer->lockPixels();
-    tgfx::Pixmap(pixelBuffer->info(), pixels).eraseAll();
-    pixelBuffer->unlockPixels();
+  if (staticContent) {
+    bitmap.allocPixels(sequence->width, sequence->height, false);
+    bitmap.eraseAll();
+  } else {
+    info = tgfx::ImageInfo::Make(sequence->width, sequence->height, tgfx::ColorType::RGBA_8888);
+    tgfx::Buffer buffer(info.byteSize());
+    buffer.clear();
+    pixels = buffer.release();
   }
 }
 
@@ -38,17 +42,21 @@ std::shared_ptr<tgfx::ImageBuffer> BitmapSequenceReader::onMakeBuffer(Frame targ
   // a locker is required here because decodeFrame() could be called from multiple threads.
   std::lock_guard<std::mutex> autoLock(locker);
   if (lastDecodeFrame == targetFrame) {
-    return pixelBuffer;
+    return imageBuffer;
   }
-  if (pixelBuffer == nullptr) {
+  if (bitmap.isEmpty() && pixels == nullptr) {
     return nullptr;
   }
-  auto startFrame = findStartFrame(targetFrame);
+  imageBuffer = nullptr;
   lastDecodeFrame = -1;
+  tgfx::Pixmap pixmap = {};
+  if (!bitmap.isEmpty()) {
+    pixmap.reset(bitmap);
+  } else {
+    pixmap.reset(info, const_cast<void*>(pixels->data()));
+  }
+  auto startFrame = findStartFrame(targetFrame);
   auto& bitmapFrames = static_cast<BitmapSequence*>(sequence)->frames;
-  auto pixels = pixelBuffer->lockPixels();
-  tgfx::Pixmap pixmap(pixelBuffer->info(), pixels);
-  bool result = true;
   for (Frame frame = startFrame; frame <= targetFrame; frame++) {
     auto bitmapFrame = bitmapFrames[frame];
     auto firstRead = true;
@@ -64,21 +72,22 @@ std::shared_ptr<tgfx::ImageBuffer> BitmapSequenceReader::onMakeBuffer(Frame targ
           pixmap.eraseAll();
         }
         auto offset = pixmap.rowBytes() * bitmapRect->y + bitmapRect->x * 4;
-        result = codec->readPixels(pixmap.info(),
-                                   reinterpret_cast<uint8_t*>(pixmap.writablePixels()) + offset);
+        auto result = codec->readPixels(
+            pixmap.info(), reinterpret_cast<uint8_t*>(pixmap.writablePixels()) + offset);
         if (!result) {
-          break;
+          return nullptr;
         }
         firstRead = false;
       }
     }
   }
-  pixelBuffer->unlockPixels();
-  if (!result) {
-    return nullptr;
+  if (!bitmap.isEmpty()) {
+    imageBuffer = bitmap.makeBuffer();
+  } else {
+    imageBuffer = tgfx::ImageBuffer::MakeFrom(info, pixels);
   }
   lastDecodeFrame = targetFrame;
-  return pixelBuffer;
+  return imageBuffer;
 }
 
 void BitmapSequenceReader::onReportPerformance(Performance* performance, int64_t decodingTime) {

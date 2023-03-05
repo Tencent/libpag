@@ -25,7 +25,7 @@
 namespace pag {
 static std::shared_ptr<tgfx::Image> MakeSequenceImage(
     std::shared_ptr<tgfx::ImageGenerator> generator, Sequence* sequence) {
-  auto image = tgfx::Image::MakeFromGenerator(std::move(generator));
+  auto image = tgfx::Image::MakeFrom(std::move(generator));
   if (sequence->composition->type() == CompositionType::Video) {
     auto videoSequence = static_cast<VideoSequence*>(sequence);
     image = image->makeRGBAAA(sequence->width, sequence->height, videoSequence->alphaStartX,

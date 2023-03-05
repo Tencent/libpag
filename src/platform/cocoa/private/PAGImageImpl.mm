@@ -20,7 +20,6 @@
 #include "base/utils/Log.h"
 #include "pag/pag.h"
 #include "rendering/editing/StillImage.h"
-#include "tgfx/core/PixelBuffer.h"
 
 @interface PAGImageImpl ()
 
@@ -62,12 +61,12 @@
 #else
 
 + (PAGImageImpl*)FromPixelBuffer:(CVPixelBufferRef)pixelBuffer {
-  auto hardwareBuffer = tgfx::ImageBuffer::MakeFrom(pixelBuffer);
-  auto image = pag::StillImage::MakeFrom(hardwareBuffer);
-  if (image == nullptr) {
+  auto image = tgfx::Image::MakeFrom(pixelBuffer);
+  auto pagImage = pag::StillImage::MakeFrom(std::move(image));
+  if (pagImage == nullptr) {
     return nil;
   }
-  return [[[PAGImageImpl alloc] initWidthPAGImage:image] autorelease];
+  return [[[PAGImageImpl alloc] initWidthPAGImage:pagImage] autorelease];
 }
 
 #endif
@@ -76,8 +75,7 @@
   if (cgImage == nil) {
     return nil;
   }
-  auto codec = tgfx::ImageCodec::MakeFrom(cgImage);
-  auto image = tgfx::Image::MakeFromGenerator(std::move(codec));
+  auto image = tgfx::Image::MakeFrom(cgImage);
   auto data = pag::StillImage::MakeFrom(std::move(image));
   if (data == nullptr) {
     return nil;

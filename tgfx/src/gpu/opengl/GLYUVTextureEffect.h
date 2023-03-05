@@ -36,6 +36,5 @@ class GLYUVTextureEffect : public GLFragmentProcessor {
 
   std::optional<Point> alphaStartPrev;
   std::optional<YUVColorSpace> colorSpacePrev;
-  std::optional<YUVColorRange> colorRangePrev;
 };
 }  // namespace tgfx

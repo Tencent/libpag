@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/PixelBuffer.h"
+#include "core/PixelBuffer.h"
 #include "tgfx/gpu/Device.h"
 
 namespace tgfx {
@@ -27,6 +27,10 @@ class RasterPixelBuffer : public PixelBuffer {
 
   ~RasterPixelBuffer() override {
     delete[] _pixels;
+  }
+
+  bool isHardwareBacked() const override {
+    return false;
   }
 
   void* lockPixels() override {
@@ -63,7 +67,6 @@ std::shared_ptr<PixelBuffer> PixelBuffer::Make(int width, int height, bool alpha
   if (tryHardware) {
     pixelBuffer = MakeHardwareBuffer(width, height, alphaOnly);
     if (pixelBuffer != nullptr) {
-      pixelBuffer->hardwareBacked = true;
       return pixelBuffer;
     }
   }

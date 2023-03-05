@@ -16,35 +16,31 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#import <CoreVideo/CoreVideo.h>
-#include "tgfx/core/ImageBuffer.h"
+#include "RasterGenerator.h"
+#include "tgfx/core/Bitmap.h"
 
 namespace tgfx {
-class NV12HardwareBuffer : public ImageBuffer {
- public:
-  static std::shared_ptr<NV12HardwareBuffer> MakeFrom(CVPixelBufferRef pixelBuffer,
-                                                      YUVColorSpace colorSpace);
-
-  ~NV12HardwareBuffer() override;
-
-  int width() const override;
-
-  int height() const override;
-
-  bool isAlphaOnly() const final {
-    return false;
+std::shared_ptr<ImageGenerator> RasterGenerator::MakeFrom(const ImageInfo& info,
+                                                          std::shared_ptr<Data> pixels) {
+  if (info.isEmpty() || pixels == nullptr || info.byteSize() > pixels->size()) {
+    return nullptr;
   }
+  return std::shared_ptr<ImageGenerator>(new RasterGenerator(info, std::move(pixels)));
+}
 
- protected:
-  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) const override;
+RasterGenerator::RasterGenerator(const ImageInfo& info, std::shared_ptr<Data> pixels)
+    : ImageGenerator(info.width(), info.height()), info(info), pixels(std::move(pixels)) {
+}
 
- private:
-  CVPixelBufferRef pixelBuffer = nullptr;
-  YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED;
-
-  NV12HardwareBuffer(CVPixelBufferRef pixelBuffer, YUVColorSpace colorSpace);
-};
-
+std::shared_ptr<ImageBuffer> RasterGenerator::onMakeBuffer(bool tryHardware) const {
+  Bitmap bitmap(width(), height(), isAlphaOnly(), tryHardware);
+  if (bitmap.isEmpty()) {
+    return nullptr;
+  }
+  auto success = bitmap.writePixels(info, pixels->data());
+  if (!success) {
+    return nullptr;
+  }
+  return bitmap.makeBuffer();
+}
 }  // namespace tgfx

@@ -18,6 +18,9 @@
 
 #pragma once
 
+#include "tgfx/core/Data.h"
+#include "tgfx/core/ImageInfo.h"
+#include "tgfx/core/YUVColorSpace.h"
 #include "tgfx/core/YUVData.h"
 #include "tgfx/gpu/Texture.h"
 #include "tgfx/platform/HardwareBuffer.h"
@@ -31,14 +34,40 @@ namespace tgfx {
 class ImageBuffer {
  public:
   /**
-   * Creates a single-plane ImageBuffer from a platform-specific hardware buffer. The hardwareBuffer
-   * could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on the apple
+   * Creates an ImageBuffer from the platform-specific hardware buffer. For example, the hardware
+   * buffer could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on the apple
    * platform. The returned ImageBuffer takes a reference to the hardwareBuffer. The caller must
-   * ensure that pixels are unchanged for the lifetime of the returned ImageBuffer. Returns nullptr
-   * if any of the parameters are nullptr or the hardwareBuffer is not single-plane. Use the
-   * YUVBuffer::MakeFrom() method for the hardware buffer with multiple planes.
+   * ensure the buffer content is always the same for the lifetime of the returned ImageBuffer. The
+   * colorSpace is ignored if the hardwareBuffer contains only one plane, which is not in the YUV
+   * format. Returns nullptr if the hardwareBuffer is nullptr.
    */
-  static std::shared_ptr<ImageBuffer> MakeFrom(HardwareBufferRef hardwareBuffer);
+  static std::shared_ptr<ImageBuffer> MakeFrom(
+      HardwareBufferRef hardwareBuffer, YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED);
+
+  /**
+   * Creates an ImageBuffer from the ImageInfo and shares pixels from the immutable Data object. The
+   * pixel data may be copied and converted to a new format which is more efficient for texture
+   * uploading. However, if the ImageInfo is suitable for direct texture uploading, the pixel data
+   * will be shared instead of copied. In that case, the caller must ensure the pixel data are
+   * always the same for the lifetime of the returned ImageBuffer. Returns nullptr if the info is
+   * empty or the pixels are nullptr.
+   * ImageInfo parameters suitable for direct texture uploading include:
+   * The alpha type is not AlphaType::Unpremultiplied;
+   * The color type is one of ColorType::ALPHA_8, ColorType::RGBA_8888, and ColorType::BGRA_8888.
+   */
+  static std::shared_ptr<ImageBuffer> MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels);
+
+  /**
+   * Creates an ImageBuffer in the I420 format with the specified YUVData and the YUVColorSpace.
+   */
+  static std::shared_ptr<ImageBuffer> MakeI420(
+      std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED);
+
+  /**
+   * Creates an ImageBuffer in the NV12 format with the specified YUVData and the YUVColorSpace.
+   */
+  static std::shared_ptr<ImageBuffer> MakeNV12(
+      std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED);
 
   virtual ~ImageBuffer() = default;
   /**
@@ -56,13 +85,6 @@ class ImageBuffer {
    * defined by ColorType::ALPHA_8.
    */
   virtual bool isAlphaOnly() const = 0;
-
-  /**
-   * Returns true if the image buffer is a YUVBuffer.
-   */
-  virtual bool isYUV() const {
-    return false;
-  }
 
   /**
    * Creates a new Texture capturing the pixels in this image buffer. The optional mipMapped

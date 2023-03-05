@@ -69,7 +69,7 @@ class Pixmap {
   void reset();
 
   /**
-   * Set the Pixmap to the specified info and pixels. The memory lifetime of pixels is managed by
+   * Sets the Pixmap to the specified info and pixels. The memory lifetime of pixels is managed by
    * the caller. When Pixmap goes out of scope, the memory of pixels is unaffected.
    */
   void reset(const ImageInfo& info, const void* pixels);
@@ -81,6 +81,20 @@ class Pixmap {
   void reset(const ImageInfo& info, void* pixels);
 
   /**
+   * Sets the Pixmap to the specified read-only Bitmap. Pixmap will lock pixels from the Bitmap and
+   * take a reference on its PixelRef object. The Bitmap will remain locked until the Pixmap goes
+   * out of scope or reset.
+   */
+  void reset(const Bitmap& bitmap);
+
+  /**
+   * Sets the Pixmap to the specified writable Bitmap. Pixmap will lock pixels from the Bitmap and
+   * take a reference on its PixelRef object. The Bitmap will remain locked until the Pixmap goes
+   * out of scope or reset.
+   */
+  void reset(Bitmap& bitmap);
+
+  /**
    * Return true if the Pixmap describes an empty area of pixels.
    */
   bool isEmpty() const {
@@ -88,7 +102,7 @@ class Pixmap {
   }
 
   /**
-   * Returns a ImageInfo describing the width, height, color type, alpha type, and row bytes of the
+   * Returns an ImageInfo describing the width, height, color type, alpha type, and row bytes of the
    * pixels.
    */
   const ImageInfo& info() const {

@@ -66,8 +66,7 @@ PAG_API void Java_org_libpag_PAGImage_nativeInit(JNIEnv* env, jclass clazz) {
 }
 
 PAG_API jlong Java_org_libpag_PAGImage_LoadFromBitmap(JNIEnv*, jclass, jobject bitmap) {
-  auto codec = tgfx::ImageCodec::MakeFrom(bitmap);
-  auto image = tgfx::Image::MakeFromGenerator(std::move(codec));
+  auto image = tgfx::Image::MakeFrom(bitmap);
   auto pagImage = StillImage::MakeFrom(std::move(image));
   if (pagImage == nullptr) {
     LOGE("PAGImage.LoadFromBitmap() Invalid bitmap specified.");

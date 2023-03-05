@@ -41,7 +41,7 @@ static std::shared_ptr<tgfx::Image> RescaleImage(tgfx::Context* context,
   auto canvas = surface->getCanvas();
   canvas->setMatrix(tgfx::Matrix::MakeScale(scaleFactor));
   canvas->drawImage(image);
-  return tgfx::Image::MakeFromTexture(surface->getTexture());
+  return tgfx::Image::MakeFrom(surface->getTexture());
 }
 
 //================================= ImageProxyPicture ====================================
@@ -192,8 +192,8 @@ class SnapshotPicture : public Picture {
     auto width = static_cast<int>(ceilf(bounds.width() * scaleFactor));
     auto height = static_cast<int>(ceilf(bounds.height() * scaleFactor));
     tgfx::SurfaceOptions options(tgfx::SurfaceOptions::DisableCacheFlag);
-    auto surface =
-        tgfx::Surface::Make(cache->getContext(), width, height, false, 1, mipMapped, &options);
+    auto surface = tgfx::Surface::Make(cache->getContext(), width, height, false, 1, mipMapped,
+                                       false, &options);
     if (surface == nullptr) {
       return nullptr;
     }
@@ -204,7 +204,7 @@ class SnapshotPicture : public Picture {
     graphic->draw(canvas, cache);
     auto drawingMatrix = tgfx::Matrix::I();
     matrix.invert(&drawingMatrix);
-    auto image = tgfx::Image::MakeFromTexture(surface->getTexture());
+    auto image = tgfx::Image::MakeFrom(surface->getTexture());
     auto snapshot = new Snapshot(std::move(image), drawingMatrix);
     return std::unique_ptr<Snapshot>(snapshot);
   }
@@ -288,7 +288,7 @@ class BackendTextureProxy : public ImageProxy {
     }
     auto texture = tgfx::GLTexture::MakeFrom(context, sampler, backendTexture.width(),
                                              backendTexture.height(), origin);
-    return tgfx::Image::MakeFromTexture(std::move(texture));
+    return tgfx::Image::MakeFrom(std::move(texture));
   }
 
  private:

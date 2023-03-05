@@ -18,7 +18,6 @@
 
 #include "CGLHardwareTexture.h"
 #include "platform/apple/HardwareBuffer.h"
-#include "tgfx/core/YUVBuffer.h"
 #include "tgfx/gpu/YUVTexture.h"
 
 namespace tgfx {
@@ -27,7 +26,8 @@ std::shared_ptr<PixelBuffer> PixelBuffer::MakeHardwareBuffer(int width, int heig
   return HardwareBuffer::Make(width, height, alphaOnly);
 }
 
-std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer) {
+std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer,
+                                                   YUVColorSpace) {
   return HardwareBuffer::MakeFrom(hardwareBuffer);
 }
 
@@ -35,12 +35,7 @@ std::shared_ptr<Texture> Texture::MakeFrom(Context* context, HardwareBufferRef h
   return CGLHardwareTexture::MakeFrom(context, hardwareBuffer);
 }
 
-std::shared_ptr<YUVBuffer> YUVBuffer::MakeFrom(HardwareBufferRef, YUVColorSpace, YUVColorRange) {
-  return nullptr;
-}
-
-std::shared_ptr<YUVTexture> YUVTexture::MakeFrom(Context*, HardwareBufferRef, YUVColorSpace,
-                                                 YUVColorRange) {
+std::shared_ptr<YUVTexture> YUVTexture::MakeFrom(Context*, HardwareBufferRef, YUVColorSpace) {
   return nullptr;
 }
 }  // namespace tgfx

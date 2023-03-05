@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "tgfx/core/PixelBuffer.h"
+#include "core/PixelBuffer.h"
 
 namespace tgfx {
 /**

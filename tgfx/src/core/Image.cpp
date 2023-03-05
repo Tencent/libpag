@@ -22,56 +22,79 @@
 #include "images/ImageSource.h"
 #include "images/MatrixImage.h"
 #include "images/RGBAAAImage.h"
+#include "images/RasterBuffer.h"
+#include "images/RasterGenerator.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
 
 namespace tgfx {
-std::shared_ptr<Image> Image::MakeFromEncoded(const std::string& filePath, bool mipMapped) {
+std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
   auto codec = ImageCodec::MakeFrom(filePath);
   if (codec == nullptr) {
     return nullptr;
   }
-  return MakeFromGenerator(codec, codec->origin(), mipMapped);
+  return MakeFrom(codec, codec->origin());
 }
 
-std::shared_ptr<Image> Image::MakeFromEncoded(std::shared_ptr<Data> encodedData, bool mipMapped) {
+std::shared_ptr<Image> Image::MakeFromEncoded(std::shared_ptr<Data> encodedData) {
   auto codec = ImageCodec::MakeFrom(std::move(encodedData));
   if (codec == nullptr) {
     return nullptr;
   }
-  return MakeFromGenerator(codec, codec->origin(), mipMapped);
+  return MakeFrom(codec, codec->origin());
 }
 
-std::shared_ptr<Image> Image::MakeFromGenerator(std::shared_ptr<ImageGenerator> generator,
-                                                ImageOrigin origin, bool mipMapped) {
-  auto source = ImageSource::MakeFromGenerator(generator, mipMapped);
+std::shared_ptr<Image> Image::MakeFrom(NativeImageRef nativeImage, ImageOrigin origin) {
+  auto codec = ImageCodec::MakeFrom(nativeImage);
+  return MakeFrom(std::move(codec), origin);
+}
+
+std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageGenerator> generator,
+                                       ImageOrigin origin) {
+  auto source = ImageSource::MakeFrom(std::move(generator));
   return MakeFromSource(std::move(source), origin);
 }
 
-std::shared_ptr<Image> Image::MakeRasterCopy(const Pixmap& pixmap, ImageOrigin origin,
-                                             bool mipMapped) {
-  if (pixmap.isEmpty()) {
-    return nullptr;
+std::shared_ptr<Image> Image::MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels,
+                                       ImageOrigin origin) {
+  auto imageBuffer = RasterBuffer::MakeFrom(info, pixels);
+  if (imageBuffer != nullptr) {
+    return MakeFrom(std::move(imageBuffer), origin);
   }
-  Bitmap bitmap(pixmap.width(), pixmap.height(), pixmap.isAlphaOnly());
-  bitmap.writePixels(pixmap.info(), pixmap.pixels());
-  return MakeFromBitmap(bitmap, origin, mipMapped);
+  auto imageGenerator = RasterGenerator::MakeFrom(info, std::move(pixels));
+  return MakeFrom(std::move(imageGenerator), origin);
 }
 
-std::shared_ptr<Image> Image::MakeFromBitmap(const Bitmap& bitmap, ImageOrigin origin,
-                                             bool miMapped) {
-  return MakeFromBuffer(bitmap.makeBuffer(), origin, miMapped);
+std::shared_ptr<Image> Image::MakeFrom(const Bitmap& bitmap, ImageOrigin origin) {
+  return MakeFrom(bitmap.makeBuffer(), origin);
 }
 
-std::shared_ptr<Image> Image::MakeFromBuffer(std::shared_ptr<ImageBuffer> imageBuffer,
-                                             ImageOrigin origin, bool mipMapped) {
-  auto source = ImageSource::MakeFromBuffer(std::move(imageBuffer), mipMapped);
+std::shared_ptr<Image> Image::MakeFrom(HardwareBufferRef hardwareBuffer, YUVColorSpace colorSpace,
+                                       ImageOrigin origin) {
+  auto buffer = ImageBuffer::MakeFrom(hardwareBuffer, colorSpace);
+  return MakeFrom(std::move(buffer), origin);
+}
+
+std::shared_ptr<Image> Image::MakeI420(std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace,
+                                       ImageOrigin origin) {
+  auto buffer = ImageBuffer::MakeI420(std::move(yuvData), colorSpace);
+  return MakeFrom(std::move(buffer), origin);
+}
+
+std::shared_ptr<Image> Image::MakeNV12(std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace,
+                                       ImageOrigin origin) {
+  auto buffer = ImageBuffer::MakeNV12(std::move(yuvData), colorSpace);
+  return MakeFrom(std::move(buffer), origin);
+}
+
+std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageBuffer> imageBuffer,
+                                       ImageOrigin origin) {
+  auto source = ImageSource::MakeFrom(std::move(imageBuffer));
   return MakeFromSource(std::move(source), origin);
 }
 
-std::shared_ptr<Image> Image::MakeFromTexture(std::shared_ptr<Texture> texture,
-                                              ImageOrigin origin) {
-  auto source = ImageSource::MakeFromTexture(std::move(texture));
+std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Texture> texture, ImageOrigin origin) {
+  auto source = ImageSource::MakeFrom(std::move(texture));
   return MakeFromSource(std::move(source), origin);
 }
 

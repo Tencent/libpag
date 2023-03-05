@@ -28,8 +28,6 @@ class StillImage : public PAGImage {
  public:
   static std::shared_ptr<StillImage> MakeFrom(std::shared_ptr<tgfx::Image> image);
 
-  static std::shared_ptr<StillImage> MakeFrom(std::shared_ptr<tgfx::ImageBuffer> imageBuffer);
-
  protected:
   std::shared_ptr<Graphic> getGraphic() override {
     return graphic;

@@ -23,7 +23,6 @@
 #include "pag/pag.h"
 #include "tgfx/core/Clock.h"
 #include "tgfx/core/ImageCodec.h"
-#include "tgfx/core/PixelBuffer.h"
 #include "tgfx/core/Pixmap.h"
 
 namespace pag {

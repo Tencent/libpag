@@ -155,7 +155,8 @@ bool HardwareDecoder::resetVideoToolBox() {
   CFRelease(openGLCompatibilityValue);
   CFRelease(ioSurfaceParam);
 
-  if (colorSpace == tgfx::YUVColorSpace::Rec2020) {
+  if (colorSpace == tgfx::YUVColorSpace::BT2020_LIMITED ||
+      colorSpace == tgfx::YUVColorSpace::BT2020_FULL) {
     CFMutableDictionaryRef pixelTransferProperties = CFDictionaryCreateMutable(
         kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
     CFDictionarySetValue(pixelTransferProperties,

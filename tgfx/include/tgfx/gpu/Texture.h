@@ -20,8 +20,8 @@
 
 #include <string>
 #include "tgfx/core/Point.h"
-#include "tgfx/gpu/SurfaceOrigin.h"
 #include "tgfx/gpu/Resource.h"
+#include "tgfx/gpu/SurfaceOrigin.h"
 #include "tgfx/gpu/TextureSampler.h"
 #include "tgfx/platform/HardwareBuffer.h"
 
@@ -32,11 +32,11 @@ namespace tgfx {
 class Texture : public Resource {
  public:
   /**
-   * Creates a single-plane texture from a platform-specific hardware buffer. The hardwareBuffer
-   * could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on the apple
-   * platform. The returned Texture takes a reference on the hardwareBuffer. Returns nullptr if any
-   * of the parameters is nullptr or the hardwareBuffer is not single-plane. Use the
-   * YUVTexture::MakeFrom() method instead for the hardware buffer with multiple planes.
+   * Creates a single-plane texture from a platform-specific hardware buffer. For example, the
+   * hardware buffer could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on
+   * the apple platform. The returned Texture takes a reference on the hardwareBuffer. Returns
+   * nullptr if any of the parameters are nullptr or the hardwareBuffer is not single-plane. Use the
+   * YUVTexture::MakeFrom() method for the hardware buffer with multiple planes.
    */
   static std::shared_ptr<Texture> MakeFrom(Context* context, HardwareBufferRef hardwareBuffer);
 
@@ -44,8 +44,8 @@ class Texture : public Resource {
    * Creates a new texture from the specified pixel data with each pixel stored as 32-bit RGBA
    * data. Returns nullptr if any of the parameters is invalid.
    */
-  static std::shared_ptr<Texture> MakeRGBA(Context* context, int width, int height, void* pixels,
-                                           size_t rowBytes,
+  static std::shared_ptr<Texture> MakeRGBA(Context* context, int width, int height,
+                                           const void* pixels, size_t rowBytes,
                                            SurfaceOrigin origin = SurfaceOrigin::TopLeft,
                                            bool mipMapped = false) {
     return MakeFormat(context, width, height, pixels, rowBytes, PixelFormat::RGBA_8888, origin,
@@ -67,8 +67,8 @@ class Texture : public Resource {
    * translucency (alpha) channel. Returns nullptr if any of the parameters is invalid or the
    * backend does not support creating alpha only textures.
    */
-  static std::shared_ptr<Texture> MakeAlpha(Context* context, int width, int height, void* pixels,
-                                            size_t rowBytes,
+  static std::shared_ptr<Texture> MakeAlpha(Context* context, int width, int height,
+                                            const void* pixels, size_t rowBytes,
                                             SurfaceOrigin origin = SurfaceOrigin::TopLeft,
                                             bool mipMapped = false) {
     return MakeFormat(context, width, height, pixels, rowBytes, PixelFormat::ALPHA_8, origin,
@@ -90,9 +90,10 @@ class Texture : public Resource {
    * describes. Returns nullptr if any of the parameters is invalid or the backend does not support
    * creating textures of the specified pixelFormat.
    */
-  static std::shared_ptr<Texture> MakeFormat(Context* context, int width, int height, void* pixels,
-                                             size_t rowBytes, PixelFormat pixelFormat,
-                                             SurfaceOrigin origin, bool mipMapped = false);
+  static std::shared_ptr<Texture> MakeFormat(Context* context, int width, int height,
+                                             const void* pixels, size_t rowBytes,
+                                             PixelFormat pixelFormat, SurfaceOrigin origin,
+                                             bool mipMapped = false);
 
   /**
    * Creates a empty texture with each pixel store as the pixelFormat describes. Returns nullptr if

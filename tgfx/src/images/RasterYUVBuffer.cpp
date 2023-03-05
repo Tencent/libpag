@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,35 +16,19 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
+#include "RasterYUVBuffer.h"
 #include "tgfx/gpu/YUVTexture.h"
-#include "tgfx/gpu/opengl/GLSampler.h"
 
 namespace tgfx {
-/**
- * GLYUVTexture wraps separate texture units in the OpenGL backend for Y, U, and V planes.
- */
-class GLYUVTexture : public YUVTexture {
- public:
-  Point getTextureCoord(float x, float y) const override;
+RasterYUVBuffer::RasterYUVBuffer(std::shared_ptr<YUVData> data, YUVPixelFormat format,
+                                 YUVColorSpace colorSpace)
+    : data(std::move(data)), colorSpace(colorSpace), format(format) {
+}
 
-  size_t memoryUsage() const override;
-
-  size_t samplerCount() const override {
-    return samplers.size();
+std::shared_ptr<tgfx::Texture> RasterYUVBuffer::onMakeTexture(tgfx::Context* context, bool) const {
+  if (format == YUVPixelFormat::NV12) {
+    return YUVTexture::MakeNV12(context, data.get(), colorSpace);
   }
-
-  const TextureSampler* getSamplerAt(size_t index) const override;
-
- protected:
-  std::vector<GLSampler> samplers = {};
-
-  GLYUVTexture(int width, int height, YUVColorSpace colorSpace);
-
- private:
-  void onReleaseGPU() override;
-
-  friend class YUVTexture;
-};
+  return YUVTexture::MakeI420(context, data.get(), colorSpace);
+}
 }  // namespace tgfx

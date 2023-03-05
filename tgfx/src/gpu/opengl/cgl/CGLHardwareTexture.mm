@@ -18,6 +18,8 @@
 
 #include "CGLHardwareTexture.h"
 #include <OpenGL/gl3.h>
+#include "platform/apple/CVPixelBufferUtil.h"
+#include "tgfx/core/Pixmap.h"
 #include "tgfx/gpu/opengl/cgl/CGLDevice.h"
 #include "utils/UniqueID.h"
 
@@ -98,5 +100,24 @@ void CGLHardwareTexture::onReleaseGPU() {
   auto cglDevice = static_cast<CGLDevice*>(context->device());
   auto textureCache = cglDevice->getTextureCache();
   CVOpenGLTextureCacheFlush(textureCache, 0);
+}
+
+bool CGLHardwareTexture::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX,
+                                    int srcY) const {
+  if (dstPixels == nullptr) {
+    return false;
+  }
+  dstPixels = dstInfo.computeOffset(dstPixels, -srcX, -srcY);
+  auto outInfo = dstInfo.makeIntersect(-srcX, -srcY, width(), height());
+  if (outInfo.isEmpty()) {
+    return false;
+  }
+  auto srcInfo = GetImageInfo(pixelBuffer);
+  CVPixelBufferLockBaseAddress(pixelBuffer, 0);
+  void* baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer);
+  Pixmap pixmap(srcInfo, baseAddress);
+  bool result = pixmap.readPixels(dstInfo, dstPixels);
+  CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
+  return result;
 }
 }  // namespace tgfx

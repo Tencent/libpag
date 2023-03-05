@@ -20,7 +20,7 @@
 
 #include <android/hardware_buffer.h>
 #include "HardwareBufferInterface.h"
-#include "tgfx/core/PixelBuffer.h"
+#include "core/PixelBuffer.h"
 
 namespace tgfx {
 class HardwareBuffer : public PixelBuffer {
@@ -32,6 +32,10 @@ class HardwareBuffer : public PixelBuffer {
   explicit HardwareBuffer(AHardwareBuffer* hardwareBuffer);
 
   ~HardwareBuffer() override;
+
+  bool isHardwareBacked() const override {
+    return true;
+  }
 
   void* lockPixels() override;
 

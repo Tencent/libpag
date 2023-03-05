@@ -23,27 +23,25 @@
 
 namespace tgfx {
 
-std::shared_ptr<ImageSource> ImageSource::MakeFromGenerator(
-    std::shared_ptr<ImageGenerator> generator, bool mipMapped) {
+std::shared_ptr<ImageSource> ImageSource::MakeFrom(std::shared_ptr<ImageGenerator> generator) {
   if (generator == nullptr) {
     return nullptr;
   }
-  auto source = std::shared_ptr<EncodedSource>(new EncodedSource(std::move(generator), mipMapped));
+  auto source = std::shared_ptr<EncodedSource>(new EncodedSource(std::move(generator)));
   source->weakThis = source;
   return source;
 }
 
-std::shared_ptr<ImageSource> ImageSource::MakeFromBuffer(std::shared_ptr<ImageBuffer> buffer,
-                                                         bool mipMapped) {
+std::shared_ptr<ImageSource> ImageSource::MakeFrom(std::shared_ptr<ImageBuffer> buffer) {
   if (buffer == nullptr) {
     return nullptr;
   }
-  auto source = std::shared_ptr<BufferSource>(new BufferSource(std::move(buffer), mipMapped));
+  auto source = std::shared_ptr<BufferSource>(new BufferSource(std::move(buffer)));
   source->weakThis = source;
   return source;
 }
 
-std::shared_ptr<ImageSource> ImageSource::MakeFromTexture(std::shared_ptr<Texture> texture) {
+std::shared_ptr<ImageSource> ImageSource::MakeFrom(std::shared_ptr<Texture> texture) {
   if (texture == nullptr) {
     return nullptr;
   }
@@ -63,7 +61,7 @@ std::shared_ptr<ImageSource> ImageSource::makeTextureSource(Context* context) co
   auto resourceCache = context->resourceCache();
   texture = std::static_pointer_cast<Texture>(resourceCache->findResourceByOwner(this));
   if (texture != nullptr) {
-    return MakeFromTexture(texture);
+    return MakeFrom(texture);
   }
   auto proxy = lockTextureProxy(context, SurfaceOptions::DisableAsyncTaskFlag);
   if (proxy == nullptr) {
@@ -72,7 +70,7 @@ std::shared_ptr<ImageSource> ImageSource::makeTextureSource(Context* context) co
   if (!proxy->isInstantiated()) {
     proxy->instantiate();
   }
-  return MakeFromTexture(proxy->getTexture());
+  return MakeFrom(proxy->getTexture());
 }
 
 std::shared_ptr<ImageSource> ImageSource::makeDecoded(Context* context) const {

@@ -23,10 +23,8 @@
 #include <android/bitmap.h>
 #include <android/native_window_jni.h>
 #include "GPUDrawable.h"
-#include "HardwareDecoder.h"
 #include "JNIHelper.h"
 #include "NativePlatform.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace pag {
 static jfieldID PAGSurface_nativeSurface;
@@ -187,33 +185,13 @@ extern "C" PAG_API jobject JNICALL Java_org_libpag_PAGSurface_makeSnapshot(JNIEn
   return newBitmap;
 }
 
-extern "C" JNIEXPORT jobject JNICALL Java_org_libpag_PAGSurface_MakeOffscreen(JNIEnv* env, jclass,
-                                                                              jint width,
-                                                                              jint height) {
-  auto buffer = std::static_pointer_cast<tgfx::HardwareBuffer>(
-      tgfx::HardwareBuffer::Make(width, height, false));
-  if (!buffer) {
-    return nullptr;
-  }
-  auto drawable = GPUDrawable::FromHardwareBuffer(buffer);
-  auto surface = PAGSurface::MakeFrom(drawable);
+extern "C" JNIEXPORT jlong JNICALL Java_org_libpag_PAGSurface_SetupOffscreen(JNIEnv*, jclass,
+                                                                             jint width,
+                                                                             jint height) {
+  auto surface = PAGSurface::MakeOffscreen(width, height);
   if (surface == nullptr) {
-    surface = PAGSurface::MakeOffscreen(width, height);
+    LOGE("PAGSurface.SetupOffscreen(): Failed to create a offscreen PAGSurface!");
+    return 0;
   }
-  if (surface == nullptr) {
-    return nullptr;
-  }
-  static Global<jclass> PAGSurface_Class = env->FindClass("org/libpag/PAGSurface");
-  static auto PAGSurface_Constructor = env->GetMethodID(PAGSurface_Class.get(), "<init>", "(J)V");
-  auto surfaceObject = env->NewObject(PAGSurface_Class.get(), PAGSurface_Constructor,
-                                      reinterpret_cast<jlong>(new JPAGSurface(surface)));
-
-  if (drawable != nullptr) {
-    static auto PAGSurface_HardwareBuffer = env->GetFieldID(
-        PAGSurface_Class.get(), "hardwareBuffer", "Landroid/hardware/HardwareBuffer;");
-    env->SetObjectField(surfaceObject, PAGSurface_HardwareBuffer,
-                        tgfx::HardwareBufferInterface::AHardwareBuffer_toHardwareBuffer(
-                            env, buffer->aHardwareBuffer()));
-  }
-  return surfaceObject;
+  return reinterpret_cast<jlong>(new JPAGSurface(surface));
 }

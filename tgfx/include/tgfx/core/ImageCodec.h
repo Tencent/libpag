@@ -48,10 +48,11 @@ class ImageCodec : public ImageGenerator {
   static std::shared_ptr<ImageCodec> MakeFrom(std::shared_ptr<Data> imageBytes);
 
   /**
-   * Creates a new ImageCodec object from a platform-specific image in the CPU. The nativeImage
-   * could be a jobject that represents a java Bitmap on the android platform or a CGImageRef on the
-   * apple platform.The returned ImageCodec object takes a reference on the nativeImage. Returns
-   * nullptr if the nativeImage is nullptr or the current platform has no native image support.
+   * Creates a new ImageCodec object from a platform-specific NativeImage. For example, the
+   * NativeImage could be a jobject that represents a java Bitmap on the android platform or a
+   * CGImageRef on the apple platform.The returned ImageCodec object takes a reference on the
+   * nativeImage. Returns nullptr if the nativeImage is nullptr or the current platform has no
+   * NativeImage support.
    */
   static std::shared_ptr<ImageCodec> MakeFrom(NativeImageRef nativeImage);
 

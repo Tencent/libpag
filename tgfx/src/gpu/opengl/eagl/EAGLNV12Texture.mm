@@ -31,8 +31,7 @@ static GLSampler ToGLSampler(CVOpenGLESTextureRef texture, PixelFormat format) {
 
 std::shared_ptr<EAGLNV12Texture> EAGLNV12Texture::MakeFrom(Context* context,
                                                            CVPixelBufferRef pixelBuffer,
-                                                           YUVColorSpace colorSpace,
-                                                           YUVColorRange colorRange) {
+                                                           YUVColorSpace colorSpace) {
   auto glDevice = std::static_pointer_cast<EAGLDevice>(GLDevice::Current());
   if (glDevice == nullptr) {
     return nullptr;
@@ -63,7 +62,7 @@ std::shared_ptr<EAGLNV12Texture> EAGLNV12Texture::MakeFrom(Context* context,
   if (outputTextureLuma == nil || outputTextureChroma == nil) {
     return nullptr;
   }
-  auto texture = Resource::Wrap(context, new EAGLNV12Texture(pixelBuffer, colorSpace, colorRange));
+  auto texture = Resource::Wrap(context, new EAGLNV12Texture(pixelBuffer, colorSpace));
   texture->lumaTexture = outputTextureLuma;
   texture->samplers.push_back(ToGLSampler(outputTextureLuma, lumaComponentFormat));
   texture->chromaTexture = outputTextureChroma;
@@ -71,10 +70,9 @@ std::shared_ptr<EAGLNV12Texture> EAGLNV12Texture::MakeFrom(Context* context,
   return texture;
 }
 
-EAGLNV12Texture::EAGLNV12Texture(CVPixelBufferRef pixelBuffer, YUVColorSpace colorSpace,
-                                 YUVColorRange colorRange)
+EAGLNV12Texture::EAGLNV12Texture(CVPixelBufferRef pixelBuffer, YUVColorSpace colorSpace)
     : GLYUVTexture(static_cast<int>(CVPixelBufferGetWidth(pixelBuffer)),
-                   static_cast<int>(CVPixelBufferGetHeight(pixelBuffer)), colorSpace, colorRange),
+                   static_cast<int>(CVPixelBufferGetHeight(pixelBuffer)), colorSpace),
       pixelBuffer(pixelBuffer) {
   CFRetain(pixelBuffer);
 }

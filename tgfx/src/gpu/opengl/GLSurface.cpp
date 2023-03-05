@@ -19,6 +19,7 @@
 #include "GLSurface.h"
 #include "GLCaps.h"
 #include "GLContext.h"
+#include "core/PixelBuffer.h"
 
 namespace tgfx {
 std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<RenderTarget> renderTarget,
@@ -45,29 +46,37 @@ std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<Texture> texture, int
 }
 
 std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, bool alphaOnly,
-                                       int sampleCount, bool mipMapped,
+                                       int sampleCount, bool mipMapped, bool tryHardware,
                                        const SurfaceOptions* options) {
-  auto pixelFormat = alphaOnly ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
-  std::shared_ptr<GLTexture> texture;
-  if (alphaOnly) {
-    if (GLCaps::Get(context)->textureRedSupport) {
-      texture = std::static_pointer_cast<GLTexture>(
-          Texture::MakeAlpha(context, width, height, SurfaceOrigin::TopLeft, mipMapped));
+  auto caps = GLCaps::Get(context);
+  if (alphaOnly && !caps->textureRedSupport) {
+    return nullptr;
+  }
+  std::shared_ptr<Texture> texture = nullptr;
+  if (tryHardware && !mipMapped && caps->standard != GLStandard::GL) {
+    // TODO: fix the rendering issue when surface is backed by a rectangle texture.
+    auto hardwareBuffer = PixelBuffer::MakeHardwareBuffer(width, height, alphaOnly);
+    if (hardwareBuffer != nullptr) {
+      texture = hardwareBuffer->makeTexture(context);
     }
-  } else {
-    texture = std::static_pointer_cast<GLTexture>(
-        Texture::MakeRGBA(context, width, height, SurfaceOrigin::TopLeft, mipMapped));
+  }
+  if (texture == nullptr) {
+    if (alphaOnly) {
+      texture = Texture::MakeAlpha(context, width, height, SurfaceOrigin::TopLeft, mipMapped);
+    } else {
+      texture = Texture::MakeRGBA(context, width, height, SurfaceOrigin::TopLeft, mipMapped);
+    }
   }
   if (texture == nullptr) {
     return nullptr;
   }
-  auto caps = GLCaps::Get(context);
+  auto pixelFormat = alphaOnly ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
   sampleCount = caps->getSampleCount(sampleCount, pixelFormat);
-  auto renderTarget = GLRenderTarget::MakeFrom(texture.get(), sampleCount);
+  auto renderTarget = GLRenderTarget::MakeFrom(static_cast<GLTexture*>(texture.get()), sampleCount);
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto surface = new GLSurface(renderTarget, texture, options);
+  auto surface = new GLSurface(renderTarget, std::static_pointer_cast<GLTexture>(texture), options);
   // 对于内部创建的 RenderTarget 默认清屏。
   surface->getCanvas()->clear();
   return std::shared_ptr<Surface>(surface);

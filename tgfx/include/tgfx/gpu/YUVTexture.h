@@ -18,9 +18,10 @@
 
 #pragma once
 
-#include "tgfx/gpu/Texture.h"
+#include "tgfx/core/YUVColorSpace.h"
 #include "tgfx/core/YUVData.h"
-#include "tgfx/core/YUVInfo.h"
+#include "tgfx/gpu/Texture.h"
+#include "tgfx/gpu/YUVPixelFormat.h"
 
 namespace tgfx {
 /**
@@ -31,25 +32,25 @@ class YUVTexture : public Texture {
   /**
    * Creates a new YUV texture in the I420 format from the specified YUVData.
    */
-  static std::shared_ptr<YUVTexture> MakeI420(Context* context, const YUVData* yuvData,
-                                              YUVColorSpace colorSpace = YUVColorSpace::Rec601,
-                                              YUVColorRange colorRange = YUVColorRange::MPEG);
+  static std::shared_ptr<YUVTexture> MakeI420(
+      Context* context, const YUVData* yuvData,
+      YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED);
 
   /**
    * Creates a new YUV texture in the NV12 format from the specified YUVData.
    */
-  static std::shared_ptr<YUVTexture> MakeNV12(Context* context, const YUVData* yuvData,
-                                              YUVColorSpace colorSpace = YUVColorSpace::Rec601,
-                                              YUVColorRange colorRange = YUVColorRange::MPEG);
+  static std::shared_ptr<YUVTexture> MakeNV12(
+      Context* context, const YUVData* yuvData,
+      YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED);
 
   /**
-   * Creates a new YUV texture from a platform-specific hardware buffer. The hardwareBuffer could be
-   * an AHardwareBuffer on the android platform or a CVPixelBufferRef on the apple platform. The
-   * returned YUVTexture takes a reference on the hardwareBuffer.
+   * Creates a new YUV texture from a platform-specific hardware buffer. For example, the hardware
+   * buffer could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on the apple
+   * platform. The returned YUVTexture takes a reference to the hardwareBuffer.
    */
-  static std::shared_ptr<YUVTexture> MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
-                                              YUVColorSpace colorSpace = YUVColorSpace::Rec601,
-                                              YUVColorRange colorRange = YUVColorRange::MPEG);
+  static std::shared_ptr<YUVTexture> MakeFrom(
+      Context* context, HardwareBufferRef hardwareBuffer,
+      YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED);
 
   /**
    * Returns the texture sampler at index 0.
@@ -74,17 +75,10 @@ class YUVTexture : public Texture {
   virtual YUVPixelFormat pixelFormat() const = 0;
 
   /**
-   * The color space of this yuv texture.
+   * The color space of the yuv texture.
    */
   YUVColorSpace colorSpace() const {
     return _colorSpace;
-  }
-
-  /**
-   * The color range of this yuv texture.
-   */
-  YUVColorRange colorRange() const {
-    return _colorRange;
   }
 
   bool isYUV() const final {
@@ -92,14 +86,11 @@ class YUVTexture : public Texture {
   }
 
  protected:
-  YUVTexture(int width, int height, YUVColorSpace colorSpace, YUVColorRange colorRange)
-      : Texture(width, height, SurfaceOrigin::TopLeft),
-        _colorSpace(colorSpace),
-        _colorRange(colorRange) {
+  YUVTexture(int width, int height, YUVColorSpace colorSpace)
+      : Texture(width, height, SurfaceOrigin::TopLeft), _colorSpace(colorSpace) {
   }
 
  private:
-  YUVColorSpace _colorSpace = YUVColorSpace::Rec601;
-  YUVColorRange _colorRange = YUVColorRange::MPEG;
+  YUVColorSpace _colorSpace = YUVColorSpace::BT601_LIMITED;
 };
 }  // namespace tgfx

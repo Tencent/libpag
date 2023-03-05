@@ -98,7 +98,11 @@ bool Bitmap::writePixels(const ImageInfo& srcInfo, const void* srcPixels, int ds
 }
 
 void Bitmap::eraseAll() {
-  Pixmap(*this).eraseAll();
+  auto pixels = lockPixels();
+  if (pixels != nullptr) {
+    memset(pixels, 0, byteSize());
+  }
+  unlockPixels();
 }
 
 std::shared_ptr<ImageBuffer> Bitmap::makeBuffer() const {

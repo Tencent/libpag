@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,33 +18,27 @@
 
 #pragma once
 
-#include "tgfx/gpu/YUVTexture.h"
-#include "tgfx/gpu/opengl/GLSampler.h"
+#include "tgfx/core/Data.h"
+#include "tgfx/core/ImageGenerator.h"
+#include "tgfx/core/ImageInfo.h"
 
 namespace tgfx {
-/**
- * GLYUVTexture wraps separate texture units in the OpenGL backend for Y, U, and V planes.
- */
-class GLYUVTexture : public YUVTexture {
+class RasterGenerator : public ImageGenerator {
  public:
-  Point getTextureCoord(float x, float y) const override;
+  static std::shared_ptr<ImageGenerator> MakeFrom(const ImageInfo& info,
+                                                  std::shared_ptr<Data> pixels);
 
-  size_t memoryUsage() const override;
-
-  size_t samplerCount() const override {
-    return samplers.size();
+  bool isAlphaOnly() const override {
+    return info.isAlphaOnly();
   }
 
-  const TextureSampler* getSamplerAt(size_t index) const override;
-
  protected:
-  std::vector<GLSampler> samplers = {};
-
-  GLYUVTexture(int width, int height, YUVColorSpace colorSpace);
+  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 
  private:
-  void onReleaseGPU() override;
+  ImageInfo info = {};
+  std::shared_ptr<Data> pixels = nullptr;
 
-  friend class YUVTexture;
+  RasterGenerator(const ImageInfo& info, std::shared_ptr<Data> pixels);
 };
 }  // namespace tgfx

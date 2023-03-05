@@ -19,7 +19,7 @@
 #pragma once
 
 #import <CoreVideo/CoreVideo.h>
-#include "tgfx/core/PixelBuffer.h"
+#include "core/PixelBuffer.h"
 
 namespace tgfx {
 class HardwareBuffer : public PixelBuffer {
@@ -29,6 +29,10 @@ class HardwareBuffer : public PixelBuffer {
   static std::shared_ptr<HardwareBuffer> MakeFrom(CVPixelBufferRef pixelBuffer);
 
   ~HardwareBuffer() override;
+
+  bool isHardwareBacked() const override {
+    return true;
+  }
 
   void* lockPixels() override;
 

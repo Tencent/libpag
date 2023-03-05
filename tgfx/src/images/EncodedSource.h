@@ -58,7 +58,7 @@ class EncodedSource : public ImageSource {
   std::shared_ptr<ImageGenerator> generator = nullptr;
   bool mipMapped = false;
 
-  EncodedSource(std::shared_ptr<ImageGenerator> generator, bool mipMapped);
+  EncodedSource(std::shared_ptr<ImageGenerator> generator, bool mipMapped = false);
 
   friend class AsyncSource;
   friend class ImageSource;

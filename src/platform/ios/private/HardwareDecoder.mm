@@ -19,14 +19,12 @@
 #include "HardwareDecoder.h"
 #include "base/utils/Log.h"
 #include "base/utils/USE.h"
-#include "tgfx/core/YUVBuffer.h"
 
 namespace pag {
 
 HardwareDecoder::HardwareDecoder(const VideoFormat& format)
     : sourceColorSpace(format.colorSpace),
       destinationColorSpace(format.colorSpace),
-      colorRange(format.colorRange),
       maxNumReorder(format.maxReorderSize) {
   isInitialized = initVideoToolBox(format.headers, format.mimeType);
 }
@@ -137,9 +135,9 @@ bool HardwareDecoder::resetVideoToolBox() {
                         kCVPixelBufferIOSurfacePropertiesKey};
 
   uint32_t openGLESCompatibility = true;
-  uint32_t pixelFormatType = colorRange == tgfx::YUVColorRange::JPEG
-                                 ? kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
-                                 : kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange;
+  uint32_t pixelFormatType = tgfx::IsLimitedYUVColorRange(sourceColorSpace)
+                                 ? kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
+                                 : kCVPixelFormatType_420YpCbCr8BiPlanarFullRange;
 
   CFNumberRef pixelFormatTypeValue = CFNumberCreate(NULL, kCFNumberSInt32Type, &pixelFormatType);
   CFNumberRef openGLESCompatibilityValue =
@@ -165,7 +163,8 @@ bool HardwareDecoder::resetVideoToolBox() {
   CFRelease(ioSurfaceParam);
 
   if (@available(iOS 10.0, *)) {
-    if (sourceColorSpace == tgfx::YUVColorSpace::Rec2020) {
+    if (sourceColorSpace == tgfx::YUVColorSpace::BT2020_LIMITED ||
+        sourceColorSpace == tgfx::YUVColorSpace::BT2020_FULL) {
       CFStringRef destinationColorPrimaries = CFStringCreateWithCString(
           kCFAllocatorDefault, "DestinationColorPrimaries", kCFStringEncodingUTF8);
       CFStringRef destinationTransferFunction = CFStringCreateWithCString(
@@ -189,8 +188,11 @@ bool HardwareDecoder::resetVideoToolBox() {
       CFRelease(destinationTransferFunction);
       CFRelease(destinationYCbCrMatrix);
       CFRelease(pixelTransferProperties);
-
-      destinationColorSpace = tgfx::YUVColorSpace::Rec709;
+      if (tgfx::IsLimitedYUVColorRange(sourceColorSpace)) {
+        destinationColorSpace = tgfx::YUVColorSpace::BT709_LIMITED;
+      } else {
+        destinationColorSpace = tgfx::YUVColorSpace::BT709_FULL;
+      }
     }
   }
 
@@ -320,7 +322,6 @@ std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
   if (outputFrame == nullptr) {
     return nullptr;
   }
-  return tgfx::YUVBuffer::MakeFrom(outputFrame->outputPixelBuffer, destinationColorSpace,
-                                   colorRange);
+  return tgfx::ImageBuffer::MakeFrom(outputFrame->outputPixelBuffer, destinationColorSpace);
 }
 }  // namespace pag

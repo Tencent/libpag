@@ -45,9 +45,8 @@ class HardwareDecoder : public VideoDecoder {
   bool isInitialized = false;
   VTDecompressionSessionRef session = nullptr;
   CMFormatDescriptionRef videoFormatDescription = nullptr;
-  tgfx::YUVColorSpace sourceColorSpace = tgfx::YUVColorSpace::Rec601;
-  tgfx::YUVColorSpace destinationColorSpace = tgfx::YUVColorSpace::Rec601;
-  tgfx::YUVColorRange colorRange = tgfx::YUVColorRange::MPEG;
+  tgfx::YUVColorSpace sourceColorSpace = tgfx::YUVColorSpace::BT601_LIMITED;
+  tgfx::YUVColorSpace destinationColorSpace = tgfx::YUVColorSpace::BT601_LIMITED;
 
   explicit HardwareDecoder(const VideoFormat& format);
   bool initVideoToolBox(const std::vector<std::shared_ptr<tgfx::Data>>& headers,

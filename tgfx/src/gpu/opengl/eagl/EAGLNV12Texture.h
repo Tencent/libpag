@@ -25,10 +25,9 @@ namespace tgfx {
 class EAGLNV12Texture : public GLYUVTexture {
  public:
   static std::shared_ptr<EAGLNV12Texture> MakeFrom(Context* context, CVPixelBufferRef pixelBuffer,
-                                                   YUVColorSpace colorSpace,
-                                                   YUVColorRange colorRange);
+                                                   YUVColorSpace colorSpace);
 
-  EAGLNV12Texture(CVPixelBufferRef pixelBuffer, YUVColorSpace colorSpace, YUVColorRange colorRange);
+  EAGLNV12Texture(CVPixelBufferRef pixelBuffer, YUVColorSpace colorSpace);
 
   ~EAGLNV12Texture() override;
 

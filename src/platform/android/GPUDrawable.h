@@ -22,7 +22,6 @@
 #include <android/native_window_jni.h>
 #include "rendering/Drawable.h"
 #include "tgfx/gpu/opengl/egl/EGLWindow.h"
-#include "tgfx/src/platform/android/HardwareBuffer.h"
 
 namespace pag {
 
@@ -30,9 +29,6 @@ class GPUDrawable : public Drawable {
  public:
   static std::shared_ptr<GPUDrawable> FromWindow(ANativeWindow* nativeWindow,
                                                  EGLContext sharedContext = EGL_NO_CONTEXT);
-
-  static std::shared_ptr<GPUDrawable> FromHardwareBuffer(
-      std::shared_ptr<tgfx::HardwareBuffer> hardwareBuffer);
 
   ~GPUDrawable() override;
 
@@ -60,11 +56,9 @@ class GPUDrawable : public Drawable {
   int _height = 0;
   ANativeWindow* nativeWindow = nullptr;
   EGLContext sharedContext = nullptr;
-  std::shared_ptr<tgfx::HardwareBuffer> hardwareBuffer;
   int64_t currentTimeStamp = 0;
   std::shared_ptr<tgfx::EGLWindow> window = nullptr;
 
   explicit GPUDrawable(ANativeWindow* nativeWindow, EGLContext eglContext = EGL_NO_CONTEXT);
-  explicit GPUDrawable(std::shared_ptr<tgfx::HardwareBuffer> hardwareBuffer);
 };
 }  // namespace pag
