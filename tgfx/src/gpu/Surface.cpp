@@ -75,8 +75,7 @@ Color Surface::getColor(int x, int y) {
 }
 
 bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) {
-  flush();
-  getContext()->submit();
+  flushAndSubmit();
   return onReadPixels(dstInfo, dstPixels, srcX, srcY);
 }
 }  // namespace tgfx
