@@ -83,6 +83,6 @@ OffscreenDrawable::OffscreenDrawable(int width, int height, std::shared_ptr<tgfx
 }
 
 std::shared_ptr<tgfx::Surface> OffscreenDrawable::createSurface(tgfx::Context* context) {
-  return tgfx::Surface::Make(context, _width, _height, false, 1, false, true);
+  return tgfx::Surface::Make(context, _width, _height);
 }
 }  // namespace pag

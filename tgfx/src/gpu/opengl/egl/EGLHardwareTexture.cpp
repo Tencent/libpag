@@ -123,28 +123,6 @@ void EGLHardwareTexture::onReleaseGPU() {
   auto display = static_cast<EGLDevice*>(context->device())->getDisplay();
   eglext::eglDestroyImageKHR(display, eglImage);
 }
-
-bool EGLHardwareTexture::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX,
-                                    int srcY) const {
-  dstPixels = dstInfo.computeOffset(dstPixels, -srcX, -srcY);
-  auto outInfo = dstInfo.makeIntersect(-srcX, -srcY, width(), height());
-  if (outInfo.isEmpty()) {
-    return false;
-  }
-  uint8_t* srcPixels = nullptr;
-  HardwareBufferInterface::Lock(
-      hardwareBuffer, AHARDWAREBUFFER_USAGE_CPU_READ_OFTEN | AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN,
-      -1, nullptr, reinterpret_cast<void**>(&srcPixels));
-  if (!srcPixels) {
-    return false;
-  }
-  auto srcInfo = GetImageInfo(hardwareBuffer);
-  Pixmap pixmap(srcInfo, srcPixels);
-  pixmap.readPixels(dstInfo, dstPixels);
-  HardwareBufferInterface::Unlock(hardwareBuffer, nullptr);
-  return true;
-}
-
 }  // namespace tgfx
 
 #endif
