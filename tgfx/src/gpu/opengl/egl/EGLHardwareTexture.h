@@ -41,8 +41,6 @@ class EGLHardwareTexture : public GLTexture {
 
   EGLHardwareTexture(AHardwareBuffer* hardwareBuffer, EGLImageKHR eglImage, int width, int height);
 
-  bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) const override;
-
   ~EGLHardwareTexture() override;
 
   void onReleaseGPU() override;

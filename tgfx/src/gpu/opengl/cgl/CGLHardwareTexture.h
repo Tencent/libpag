@@ -41,7 +41,5 @@ class CGLHardwareTexture : public GLTexture {
 
   static void ComputeRecycleKey(BytesKey* recycleKey, CVPixelBufferRef pixelBuffer);
   void onReleaseGPU() override;
-  bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0,
-                  int srcY = 0) const override;
 };
 }  // namespace tgfx

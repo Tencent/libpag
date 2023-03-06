@@ -49,7 +49,7 @@ class Surface {
    */
   static std::shared_ptr<Surface> Make(Context* context, int width, int height,
                                        bool alphaOnly = false, int sampleCount = 1,
-                                       bool mipMapped = false, bool tryHardware = false,
+                                       bool mipMapped = false,
                                        const SurfaceOptions* options = nullptr);
 
   /**

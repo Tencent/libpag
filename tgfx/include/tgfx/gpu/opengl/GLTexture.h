@@ -60,14 +60,6 @@ class GLTexture : public Texture {
 
   GLTexture(int width, int height, SurfaceOrigin origin);
 
- private:
-  /**
-   * Provides a fast path to read pixels directly from the backing hardware buffer. Returns false if the texture is not backed by HardwareBuffer.
-   */
-  virtual bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0,
-                          int srcY = 0) const;
-
   friend class Texture;
-  friend class GLSurface;
 };
 }  // namespace tgfx

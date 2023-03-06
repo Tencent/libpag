@@ -46,20 +46,13 @@ std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<Texture> texture, int
 }
 
 std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, bool alphaOnly,
-                                       int sampleCount, bool mipMapped, bool tryHardware,
+                                       int sampleCount, bool mipMapped,
                                        const SurfaceOptions* options) {
   auto caps = GLCaps::Get(context);
   if (alphaOnly && !caps->textureRedSupport) {
     return nullptr;
   }
   std::shared_ptr<Texture> texture = nullptr;
-  if (tryHardware && !mipMapped && caps->standard != GLStandard::GL) {
-    // TODO: fix the rendering issue when surface is backed by a rectangle texture.
-    auto hardwareBuffer = PixelBuffer::MakeHardwareBuffer(width, height, alphaOnly);
-    if (hardwareBuffer != nullptr) {
-      texture = hardwareBuffer->makeTexture(context);
-    }
-  }
   if (texture == nullptr) {
     if (alphaOnly) {
       texture = Texture::MakeAlpha(context, width, height, SurfaceOrigin::TopLeft, mipMapped);
@@ -90,10 +83,6 @@ GLSurface::GLSurface(std::shared_ptr<GLRenderTarget> renderTarget,
 }
 
 bool GLSurface::onReadPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) {
-  if (texture &&
-      std::static_pointer_cast<GLTexture>(texture)->readPixels(dstInfo, dstPixels, srcX, srcY)) {
-    return true;
-  }
   return std::static_pointer_cast<GLRenderTarget>(renderTarget)
       ->readPixels(dstInfo, dstPixels, srcX, srcY);
 }
