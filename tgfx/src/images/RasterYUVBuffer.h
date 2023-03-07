@@ -18,11 +18,11 @@
 
 #pragma once
 
+#include "gpu/YUVTexture.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/YUVColorSpace.h"
 #include "tgfx/core/YUVData.h"
-#include "tgfx/gpu/YUVPixelFormat.h"
 
 namespace tgfx {
 /**
@@ -51,6 +51,6 @@ class RasterYUVBuffer : public ImageBuffer {
  private:
   std::shared_ptr<YUVData> data = nullptr;
   YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED;
-  YUVPixelFormat format = YUVPixelFormat::Unknown;
+  YUVPixelFormat format = YUVPixelFormat::I420;
 };
 }  // namespace tgfx

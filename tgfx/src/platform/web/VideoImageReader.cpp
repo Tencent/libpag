@@ -18,6 +18,7 @@
 
 #include "tgfx/platform/web/VideoImageReader.h"
 #include "GLVideoTexture.h"
+#include "gpu/opengl/GLSampler.h"
 #include "tgfx/platform/web/WebImage.h"
 #include "utils/Log.h"
 
@@ -65,9 +66,9 @@ bool VideoImageReader::onUpdateTexture(Context* context, bool) {
   if (texture == nullptr) {
     return false;
   }
-  auto& glInfo = std::static_pointer_cast<GLTexture>(texture)->glSampler();
+  auto glInfo = static_cast<const GLSampler*>(texture->getSampler());
   val::module_property("tgfx").call<void>("uploadToTexture", emscripten::val::module_property("GL"),
-                                          video, glInfo.id);
+                                          video, glInfo->id);
   currentPromise = val::null();
   return true;
 }

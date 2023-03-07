@@ -20,8 +20,8 @@
 
 #include "GLInterface.h"
 #include "gpu/SamplerState.h"
+#include "gpu/opengl/GLSampler.h"
 #include "tgfx/gpu/Context.h"
-#include "tgfx/gpu/opengl/GLSampler.h"
 
 namespace tgfx {
 class GLCaps;

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ProxyProvider.h"
+#include "gpu/PlainTexture.h"
 
 namespace tgfx {
 class ImageBufferTextureProxy : public TextureProxy {
@@ -35,7 +36,7 @@ class ImageBufferTextureProxy : public TextureProxy {
   }
 
   bool hasMipmaps() const override {
-    return texture ? texture->getSampler()->mipMapped() : mipMapped;
+    return texture ? texture->getSampler()->hasMipmaps() : mipMapped;
   }
 
  protected:
@@ -71,7 +72,7 @@ class ImageGeneratorTextureProxy : public TextureProxy {
   }
 
   bool hasMipmaps() const override {
-    return texture ? texture->getSampler()->mipMapped() : mipMapped;
+    return texture ? texture->getSampler()->hasMipmaps() : mipMapped;
   }
 
  protected:
@@ -116,7 +117,7 @@ class DeferredTextureProxy : public TextureProxy {
   }
 
   bool hasMipmaps() const override {
-    return texture ? texture->getSampler()->mipMapped() : mipMapped;
+    return texture ? texture->getSampler()->hasMipmaps() : mipMapped;
   }
 
  protected:
@@ -193,7 +194,7 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(int width, int h
                                                                 PixelFormat format,
                                                                 SurfaceOrigin origin,
                                                                 bool mipMapped) {
-  if (!Texture::CheckSizeAndFormat(context, width, height, format)) {
+  if (!PlainTexture::CheckSizeAndFormat(context, width, height, format)) {
     return nullptr;
   }
   auto proxy =

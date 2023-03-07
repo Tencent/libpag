@@ -56,7 +56,7 @@ void GlowMergeFilter::onPrepareProgram(tgfx::Context* context, unsigned int prog
   progressHandle = gl->getUniformLocation(program, "progress");
 }
 
-void GlowMergeFilter::updateTexture(const tgfx::GLSampler& sampler) {
+void GlowMergeFilter::updateTexture(const tgfx::GLTextureInfo& sampler) {
   blurTexture = sampler;
 }
 

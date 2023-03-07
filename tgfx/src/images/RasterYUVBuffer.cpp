@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RasterYUVBuffer.h"
-#include "tgfx/gpu/YUVTexture.h"
 
 namespace tgfx {
 RasterYUVBuffer::RasterYUVBuffer(std::shared_ptr<YUVData> data, YUVPixelFormat format,

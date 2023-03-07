@@ -24,10 +24,10 @@
 #include "GpuBuffer.h"
 #include "Pipeline.h"
 #include "Program.h"
+#include "gpu/RenderTarget.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/gpu/Context.h"
-#include "tgfx/gpu/RenderTarget.h"
 
 namespace tgfx {
 /**

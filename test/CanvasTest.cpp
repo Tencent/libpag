@@ -31,7 +31,6 @@
 #include "tgfx/gpu/Surface.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
-#include "tgfx/gpu/opengl/GLTexture.h"
 
 using namespace pag;
 
@@ -197,10 +196,10 @@ PAG_TEST(CanvasTest, clip) {
   ASSERT_TRUE(context != nullptr);
   auto width = 1080;
   auto height = 1776;
-  tgfx::GLSampler textureInfo;
+  tgfx::GLTextureInfo textureInfo;
   pag::CreateGLTexture(context, width, height, &textureInfo);
   auto glTexture =
-      GLTexture::MakeFrom(context, textureInfo, width, height, SurfaceOrigin::BottomLeft);
+      Texture::MakeFrom(context, {textureInfo, width, height}, SurfaceOrigin::BottomLeft);
   auto surface = Surface::MakeFrom(glTexture);
   auto canvas = surface->getCanvas();
   canvas->clear();

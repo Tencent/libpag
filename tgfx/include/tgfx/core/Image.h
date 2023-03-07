@@ -25,6 +25,7 @@
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/SamplingOptions.h"
 #include "tgfx/core/TileMode.h"
+#include "tgfx/gpu/Backend.h"
 #include "tgfx/platform/HardwareBuffer.h"
 #include "tgfx/platform/NativeImage.h"
 
@@ -96,7 +97,7 @@ class Image {
    * Creates an Image from the platform-specific hardware buffer. For example, the hardware buffer
    * could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on the apple
    * platform. The returned Image takes a reference to the hardwareBuffer. The caller must
-   * ensure the buffer content is always the same for the lifetime of the returned Image. The
+   * ensure the buffer content stays unchanged for the lifetime of the returned Image. The
    * colorSpace is ignored if the hardwareBuffer contains only one plane, which is not in the YUV
    * format. Returns nullptr if the hardwareBuffer is nullptr.
    */
@@ -126,6 +127,25 @@ class Image {
    */
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageBuffer> imageBuffer,
                                          ImageOrigin origin = ImageOrigin::TopLeft);
+
+  /**
+   * Creates an Image from the backendTexture associated with the context. The caller must ensure
+   * the backendTexture stays valid and unchanged for the lifetime of the returned Image. An Image
+   * is returned if the format of the backendTexture is recognized and supported. Recognized formats
+   * vary by GPU back-ends.
+   */
+  static std::shared_ptr<Image> MakeFrom(Context* context, const BackendTexture& backendTexture,
+                                         ImageOrigin origin = ImageOrigin::TopLeft);
+
+  /**
+   * Creates an Image from the backendTexture associated with the context, taking ownership of the
+   * backendTexture. The backendTexture will be released when no longer needed. The caller must
+   * ensure the backendTexture stays unchanged for the lifetime of the returned Image. An Image is
+   * returned if the format of the backendTexture is recognized and supported. Recognized formats
+   * vary by GPU back-ends.
+   */
+  static std::shared_ptr<Image> MakeAdopted(Context* context, const BackendTexture& backendTexture,
+                                            ImageOrigin origin = ImageOrigin::TopLeft);
 
   /**
    * Creates an Image from the Texture, An Image is returned if texture is not nullptr.

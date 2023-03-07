@@ -21,9 +21,9 @@
 #include <array>
 #include <string>
 #include "gpu/opengl/GLContext.h"
+#include "gpu/opengl/GLSampler.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/gpu/SurfaceOrigin.h"
-#include "tgfx/gpu/opengl/GLSampler.h"
 
 namespace tgfx {
 struct GLVersion {
@@ -35,6 +35,10 @@ struct GLVersion {
   GLVersion(int major, int minor) : majorVersion(major), minorVersion(minor) {
   }
 };
+
+PixelFormat GLSizeFormatToPixelFormat(unsigned sizeFormat);
+
+unsigned PixelFormatToGLSizeFormat(PixelFormat pixelFormat);
 
 GLVersion GetGLVersion(const char* versionString);
 

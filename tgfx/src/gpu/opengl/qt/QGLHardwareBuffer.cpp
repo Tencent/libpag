@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/PixelBuffer.h"
-#include "tgfx/gpu/YUVTexture.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 std::shared_ptr<PixelBuffer> PixelBuffer::MakeHardwareBuffer(int, int, bool) {
@@ -28,11 +28,7 @@ std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef, YUVColorSp
   return nullptr;
 }
 
-std::shared_ptr<Texture> Texture::MakeFrom(Context*, HardwareBufferRef) {
-  return nullptr;
-}
-
-std::shared_ptr<YUVTexture> YUVTexture::MakeFrom(Context*, HardwareBufferRef, YUVColorSpace) {
+std::shared_ptr<Texture> Texture::MakeFrom(Context*, HardwareBufferRef, YUVColorSpace) {
   return nullptr;
 }
 }  // namespace tgfx

@@ -19,7 +19,7 @@
 #pragma once
 
 #include "gpu/FragmentProcessor.h"
-#include "tgfx/gpu/YUVTexture.h"
+#include "gpu/YUVTexture.h"
 
 namespace tgfx {
 class YUVTextureEffect : public FragmentProcessor {

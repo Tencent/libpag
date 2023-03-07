@@ -23,20 +23,15 @@
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/Caps.h"
 #include "tgfx/gpu/Device.h"
-#include "tgfx/gpu/Semaphore.h"
 
 namespace tgfx {
 class ProgramCache;
-
 class ResourceCache;
-
 class DrawingManager;
-
 class Gpu;
-
 class ResourceProvider;
-
 class ProxyProvider;
+class Semaphore;
 
 class Context {
  public:

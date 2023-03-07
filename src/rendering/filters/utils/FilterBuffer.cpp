@@ -21,25 +21,34 @@
 
 namespace pag {
 std::shared_ptr<FilterBuffer> FilterBuffer::Make(tgfx::Context* context, int width, int height,
-                                                 bool usesMSAA) {
-  auto sampleCount = usesMSAA ? 4 : 1;
+                                                 bool useMSAA) {
+  auto sampleCount = useMSAA ? 4 : 1;
   auto surface = tgfx::Surface::Make(context, width, height, false, sampleCount);
   if (surface == nullptr) {
     return nullptr;
   }
   auto buffer = new FilterBuffer();
   buffer->surface = surface;
+  buffer->_useMSAA = useMSAA;
   return std::shared_ptr<FilterBuffer>(buffer);
 }
 
-tgfx::GLFrameBuffer FilterBuffer::getFramebuffer() const {
-  auto renderTarget = std::static_pointer_cast<tgfx::GLRenderTarget>(surface->getRenderTarget());
-  return renderTarget->glFrameBuffer();
+tgfx::GLFrameBufferInfo FilterBuffer::getFramebuffer() const {
+  auto renderTarget = surface->getBackendRenderTarget();
+  tgfx::GLFrameBufferInfo glFrameBufferInfo = {};
+  if (!renderTarget.getGLFramebufferInfo(&glFrameBufferInfo)) {
+    return {};
+  }
+  return glFrameBufferInfo;
 }
 
-tgfx::GLSampler FilterBuffer::getTexture() const {
-  auto texture = std::static_pointer_cast<tgfx::GLTexture>(surface->getTexture());
-  return texture->glSampler();
+tgfx::GLTextureInfo FilterBuffer::getTexture() const {
+  auto texture = surface->getBackendTexture();
+  tgfx::GLTextureInfo textureInfo = {};
+  if (!texture.getGLTextureInfo(&textureInfo)) {
+    return {};
+  }
+  return textureInfo;
 }
 
 void FilterBuffer::clearColor() const {

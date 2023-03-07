@@ -16,49 +16,54 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLExternalTexture.h"
+#include "GLExternalOESTexture.h"
+#include "gpu/Gpu.h"
+#include "gpu/opengl/GLSampler.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace tgfx {
-std::shared_ptr<GLExternalTexture> GLExternalTexture::Make(Context* context, int width,
-                                                           int height) {
+std::shared_ptr<GLExternalOESTexture> GLExternalOESTexture::Make(Context* context, int width,
+                                                                 int height) {
   if (context == nullptr || width < 1 || height < 1) {
     return nullptr;
   }
   auto gl = tgfx::GLFunctions::Get(context);
-  tgfx::GLSampler sampler = {};
-  sampler.target = GL_TEXTURE_EXTERNAL_OES;
-  sampler.format = tgfx::PixelFormat::RGBA_8888;
-  gl->genTextures(1, &sampler.id);
-  if (sampler.id == 0) {
+  auto sampler = std::make_unique<GLSampler>();
+  sampler->target = GL_TEXTURE_EXTERNAL_OES;
+  sampler->format = tgfx::PixelFormat::RGBA_8888;
+  gl->genTextures(1, &sampler->id);
+  if (sampler->id == 0) {
     return nullptr;
   }
-  return Resource::Wrap(context, new GLExternalTexture(std::move(sampler), width, height));
+  return Resource::Wrap(context, new GLExternalOESTexture(std::move(sampler), width, height));
 }
 
-GLExternalTexture::GLExternalTexture(GLSampler glSampler, int width, int height)
-    : GLTexture(width, height, SurfaceOrigin::TopLeft), textureWidth(width), textureHeight(height) {
-  sampler = std::move(glSampler);
+GLExternalOESTexture::GLExternalOESTexture(std::unique_ptr<TextureSampler> sampler, int width,
+                                           int height)
+    : Texture(width, height, SurfaceOrigin::TopLeft),
+      sampler(std::move(sampler)),
+      textureWidth(width),
+      textureHeight(height) {
 }
 
-void GLExternalTexture::updateTextureSize(int width, int height) {
+void GLExternalOESTexture::updateTextureSize(int width, int height) {
   textureWidth = width;
   textureHeight = height;
 }
 
-Point GLExternalTexture::getTextureCoord(float x, float y) const {
+Point GLExternalOESTexture::getTextureCoord(float x, float y) const {
   return {x / static_cast<float>(textureWidth), y / static_cast<float>(textureHeight)};
 }
 
-size_t GLExternalTexture::memoryUsage() const {
+BackendTexture GLExternalOESTexture::getBackendTexture() const {
+  return getSampler()->getBackendTexture(textureWidth, textureHeight);
+}
+
+size_t GLExternalOESTexture::memoryUsage() const {
   return textureWidth * textureHeight * 3 / 2;
 }
 
-void GLExternalTexture::onReleaseGPU() {
-  if (sampler.id > 0) {
-    auto gl = tgfx::GLFunctions::Get(context);
-    gl->deleteTextures(1, &sampler.id);
-    sampler.id = 0;
-  }
+void GLExternalOESTexture::onReleaseGPU() {
+  context->gpu()->deleteSampler(sampler.get());
 }
 }  // namespace tgfx

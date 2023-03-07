@@ -19,10 +19,11 @@
 #pragma once
 
 #import <UIKit/UIKit.h>
-#include "tgfx/gpu/opengl/GLTexture.h"
+#include "gpu/TextureSampler.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
-class EAGLHardwareTexture : public GLTexture {
+class EAGLHardwareTexture : public Texture {
  public:
   static std::shared_ptr<EAGLHardwareTexture> MakeFrom(Context* context,
                                                        CVPixelBufferRef pixelBuffer);
@@ -33,10 +34,15 @@ class EAGLHardwareTexture : public GLTexture {
 
   size_t memoryUsage() const override;
 
+  const TextureSampler* getSampler() const override {
+    return sampler.get();
+  }
+
  protected:
   void computeRecycleKey(BytesKey* recycleKey) const override;
 
  private:
+  std::unique_ptr<TextureSampler> sampler = {};
   CVPixelBufferRef pixelBuffer = nullptr;
   CVOpenGLESTextureRef texture = nil;
 

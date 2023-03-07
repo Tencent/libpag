@@ -18,12 +18,30 @@
 
 #pragma once
 
+#include "gpu/TextureSampler.h"
+#include "tgfx/gpu/opengl/GLDefines.h"
+
 namespace tgfx {
 /**
- * Wrapper class for a backend semaphore object.
+ * Defines the sampling parameters for an OpenGL texture uint.
  */
-class Semaphore {
+class GLSampler : public TextureSampler {
  public:
-  virtual ~Semaphore() = default;
+  /**
+   * The OpenGL texture id of the sampler.
+   */
+  unsigned id = 0;
+
+  /**
+   * The OpenGL texture target of the sampler.
+   */
+  unsigned target = GL_TEXTURE_2D;
+
+  TextureType type() const override;
+
+  BackendTexture getBackendTexture(int width, int height) const override;
+
+ protected:
+  void computeKey(Context* context, BytesKey* bytesKey) const override;
 };
 }  // namespace tgfx

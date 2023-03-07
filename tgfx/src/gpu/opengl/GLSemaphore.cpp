@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,20 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "tgfx/gpu/Semaphore.h"
+#include "GLSemaphore.h"
 
 namespace tgfx {
+std::unique_ptr<Semaphore> Semaphore::Wrap(const BackendSemaphore* backendSemaphore) {
+  if (backendSemaphore == nullptr) {
+    return nullptr;
+  }
+  auto semaphore = std::make_unique<GLSemaphore>();
+  semaphore->glSync = backendSemaphore->glSync();
+  return semaphore;
+}
 
-/**
- * Types for interacting with OpenGL semaphore object.
- */
-class GLSemaphore : public Semaphore {
- public:
-  /**
-   * Holds the GLsync as a void*.
-   */
-  void* glSync = nullptr;
-};
+BackendSemaphore GLSemaphore::getBackendSemaphore() const {
+  BackendSemaphore semaphore = {};
+  semaphore.initGL(glSync);
+  return semaphore;
+}
 }  // namespace tgfx

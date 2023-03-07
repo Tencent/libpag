@@ -21,7 +21,7 @@
 #include "ResourceHandle.h"
 #include "ShaderVar.h"
 #include "Swizzle.h"
-#include "tgfx/gpu/TextureSampler.h"
+#include "gpu/TextureSampler.h"
 
 namespace tgfx {
 static constexpr char NO_MANGLE_PREFIX[] = "tgfx_";

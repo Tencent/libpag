@@ -37,7 +37,7 @@ class ImageBuffer {
    * Creates an ImageBuffer from the platform-specific hardware buffer. For example, the hardware
    * buffer could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on the apple
    * platform. The returned ImageBuffer takes a reference to the hardwareBuffer. The caller must
-   * ensure the buffer content is always the same for the lifetime of the returned ImageBuffer. The
+   * ensure the buffer content stays unchanged for the lifetime of the returned ImageBuffer. The
    * colorSpace is ignored if the hardwareBuffer contains only one plane, which is not in the YUV
    * format. Returns nullptr if the hardwareBuffer is nullptr.
    */
@@ -48,9 +48,9 @@ class ImageBuffer {
    * Creates an ImageBuffer from the ImageInfo and shares pixels from the immutable Data object. The
    * pixel data may be copied and converted to a new format which is more efficient for texture
    * uploading. However, if the ImageInfo is suitable for direct texture uploading, the pixel data
-   * will be shared instead of copied. In that case, the caller must ensure the pixel data are
-   * always the same for the lifetime of the returned ImageBuffer. Returns nullptr if the info is
-   * empty or the pixels are nullptr.
+   * will be shared instead of copied. In that case, the caller must ensure the pixel data stay
+   * unchanged for the lifetime of the returned ImageBuffer. Returns nullptr if the info is empty or
+   * the pixels are nullptr.
    * ImageInfo parameters suitable for direct texture uploading include:
    * The alpha type is not AlphaType::Unpremultiplied;
    * The color type is one of ColorType::ALPHA_8, ColorType::RGBA_8888, and ColorType::BGRA_8888.
@@ -58,13 +58,17 @@ class ImageBuffer {
   static std::shared_ptr<ImageBuffer> MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels);
 
   /**
-   * Creates an ImageBuffer in the I420 format with the specified YUVData and the YUVColorSpace.
+   * Creates an ImageBuffer in the I420 format with the specified YUVData and YUVColorSpace. The
+   * caller must ensure the yuvData stays unchanged for the lifetime of the returned ImageBuffer.
+   * Returns nullptr if the yuvData is invalid.
    */
   static std::shared_ptr<ImageBuffer> MakeI420(
       std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED);
 
   /**
-   * Creates an ImageBuffer in the NV12 format with the specified YUVData and the YUVColorSpace.
+   * Creates an ImageBuffer in the NV12 format with the specified YUVData and YUVColorSpace. The
+   * caller must ensure the yuvData stays unchanged for the lifetime of the returned ImageBuffer.
+   * Returns nullptr if the yuvData is invalid.
    */
   static std::shared_ptr<ImageBuffer> MakeNV12(
       std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED);

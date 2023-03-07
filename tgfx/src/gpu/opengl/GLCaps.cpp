@@ -199,6 +199,22 @@ const Swizzle& GLCaps::getWriteSwizzle(PixelFormat pixelFormat) const {
   return pixelFormatMap.at(pixelFormat).writeSwizzle;
 }
 
+bool GLCaps::isFormatRenderable(PixelFormat pixelFormat) const {
+  switch (pixelFormat) {
+    case PixelFormat::RGBA_8888:
+    case PixelFormat::BGRA_8888:
+      return true;
+    case PixelFormat::ALPHA_8:
+      if (textureRedSupport) {
+        return true;
+      }
+      break;
+    default:
+      break;
+  }
+  return false;
+}
+
 int GLCaps::getSampleCount(int requestedCount, PixelFormat pixelFormat) const {
   if (requestedCount <= 1) {
     return 1;

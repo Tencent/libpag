@@ -111,12 +111,11 @@ void DropShadowFilter::updateParamModeFullSpread(const tgfx::Rect& contentBounds
 
 void DropShadowFilter::onDrawModeNotSpread(tgfx::Context* context, const FilterSource* source,
                                            const FilterTarget* target) {
-  auto renderTarget = tgfx::GLRenderTarget::MakeFrom(context, target->frameBuffer, target->width,
-                                                     target->height, tgfx::SurfaceOrigin::TopLeft);
-  auto targetSurface = tgfx::Surface::MakeFrom(renderTarget);
+  tgfx::BackendRenderTarget renderTarget = {target->frameBuffer, target->width, target->height};
+  auto targetSurface = tgfx::Surface::MakeFrom(context, renderTarget, tgfx::SurfaceOrigin::TopLeft);
   auto targetCanvas = targetSurface->getCanvas();
-  auto texture = tgfx::GLTexture::MakeFrom(context, source->sampler, source->width, source->height,
-                                           tgfx::SurfaceOrigin::TopLeft);
+  tgfx::BackendTexture backendTexture = {source->sampler, source->width, source->height};
+  auto texture = tgfx::Texture::MakeFrom(context, backendTexture, tgfx::SurfaceOrigin::TopLeft);
   targetCanvas->setMatrix(ToMatrix(target));
   tgfx::Paint paint;
   paint.setImageFilter(tgfx::ImageFilter::DropShadowOnly(
@@ -151,12 +150,11 @@ void DropShadowFilter::onDrawModeNotFullSpread(tgfx::Context* context, const Fil
 
   auto sourceV = spreadFilterBuffer->toFilterSource(source->scale);
 
-  auto renderTarget = tgfx::GLRenderTarget::MakeFrom(context, target->frameBuffer, target->width,
-                                                     target->height, tgfx::SurfaceOrigin::TopLeft);
-  auto targetSurface = tgfx::Surface::MakeFrom(renderTarget);
+  tgfx::BackendRenderTarget renderTarget = {target->frameBuffer, target->width, target->height};
+  auto targetSurface = tgfx::Surface::MakeFrom(context, renderTarget, tgfx::SurfaceOrigin::TopLeft);
   auto targetCanvas = targetSurface->getCanvas();
-  auto texture = tgfx::GLTexture::MakeFrom(context, sourceV->sampler, sourceV->width,
-                                           sourceV->height, tgfx::SurfaceOrigin::TopLeft);
+  tgfx::BackendTexture backendTexture = {sourceV->sampler, sourceV->width, sourceV->height};
+  auto texture = tgfx::Texture::MakeFrom(context, backendTexture, tgfx::SurfaceOrigin::TopLeft);
   targetCanvas->setMatrix(ToMatrix(target));
   targetCanvas->concat(
       tgfx::Matrix::MakeTrans(static_cast<float>((source->width - sourceV->width)) * 0.5f,

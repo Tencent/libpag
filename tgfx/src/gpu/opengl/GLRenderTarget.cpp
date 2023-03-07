@@ -16,36 +16,33 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/gpu/opengl/GLRenderTarget.h"
+#include "GLRenderTarget.h"
+#include "gpu/TextureSampler.h"
 #include "gpu/opengl/GLContext.h"
+#include "gpu/opengl/GLSampler.h"
 #include "gpu/opengl/GLUtil.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Pixmap.h"
 #include "utils/PixelFormatUtil.h"
 
 namespace tgfx {
-std::shared_ptr<GLRenderTarget> GLRenderTarget::MakeFrom(Context* context,
-                                                         const GLFrameBuffer& frameBuffer,
-                                                         int width, int height,
-                                                         SurfaceOrigin origin, int sampleCount) {
-  if (context == nullptr || width <= 0 || height <= 0) {
+std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
+                                                     const BackendRenderTarget& renderTarget,
+                                                     SurfaceOrigin origin) {
+  if (context == nullptr || !renderTarget.isValid()) {
     return nullptr;
   }
-  auto target = new GLRenderTarget(width, height, origin, sampleCount, frameBuffer);
-  target->renderTargetFBInfo = frameBuffer;
-  target->externalTexture = true;
-  return Resource::Wrap(context, target);
-}
-
-std::shared_ptr<GLRenderTarget> GLRenderTarget::MakeAdopted(Context* context,
-                                                            const GLFrameBuffer& frameBuffer,
-                                                            int width, int height,
-                                                            SurfaceOrigin origin, int sampleCount) {
-  if (context == nullptr || width <= 0 || height <= 0) {
+  GLFrameBufferInfo frameBufferInfo = {};
+  if (!renderTarget.getGLFramebufferInfo(&frameBufferInfo)) {
     return nullptr;
   }
-  auto target = new GLRenderTarget(width, height, origin, sampleCount, frameBuffer);
+  GLFrameBuffer frameBuffer = {};
+  frameBuffer.id = frameBufferInfo.id;
+  frameBuffer.format = GLSizeFormatToPixelFormat(frameBufferInfo.format);
+  auto target =
+      new GLRenderTarget(renderTarget.width(), renderTarget.height(), origin, 1, frameBuffer);
   target->renderTargetFBInfo = frameBuffer;
+  target->externalResource = true;
   return Resource::Wrap(context, target);
 }
 
@@ -110,7 +107,7 @@ static void ReleaseResource(Context* context, GLFrameBuffer* textureFBInfo,
   }
 }
 
-static bool CreateRenderBuffer(const GLTexture* texture, GLFrameBuffer* renderTargetFBInfo,
+static bool CreateRenderBuffer(const Texture* texture, GLFrameBuffer* renderTargetFBInfo,
                                unsigned* msRenderBufferID, int sampleCount) {
   if (texture == nullptr) {
     return false;
@@ -139,22 +136,22 @@ static bool CreateRenderBuffer(const GLTexture* texture, GLFrameBuffer* renderTa
 #endif
 }
 
-std::shared_ptr<GLRenderTarget> GLRenderTarget::MakeFrom(const GLTexture* texture,
-                                                         int sampleCount) {
+std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(const Texture* texture, int sampleCount) {
   if (texture == nullptr) {
     return nullptr;
   }
   auto context = texture->getContext();
   auto gl = GLFunctions::Get(context);
   auto caps = GLCaps::Get(context);
+  auto glSampler = static_cast<const GLSampler*>(texture->getSampler());
   GLFrameBuffer textureFBInfo = {};
-  textureFBInfo.format = texture->glSampler().format;
+  textureFBInfo.format = glSampler->format;
   gl->genFramebuffers(1, &textureFBInfo.id);
   if (textureFBInfo.id == 0) {
     return nullptr;
   }
   GLFrameBuffer renderTargetFBInfo = {};
-  renderTargetFBInfo.format = texture->glSampler().format;
+  renderTargetFBInfo.format = glSampler->format;
   unsigned msRenderBufferID = 0;
   if (sampleCount > 1 && caps->usesMSAARenderBuffers()) {
     if (!CreateRenderBuffer(texture, &renderTargetFBInfo, &msRenderBufferID, sampleCount)) {
@@ -165,17 +162,15 @@ std::shared_ptr<GLRenderTarget> GLRenderTarget::MakeFrom(const GLTexture* textur
     renderTargetFBInfo = textureFBInfo;
   }
   gl->bindFramebuffer(GL_FRAMEBUFFER, textureFBInfo.id);
-  auto textureInfo = texture->glSampler();
-  FrameBufferTexture2D(context, textureInfo.target, textureInfo.id, sampleCount);
+  FrameBufferTexture2D(context, glSampler->target, glSampler->id, sampleCount);
 #ifndef TGFX_BUILD_FOR_WEB
   if (gl->checkFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
     ReleaseResource(context, &textureFBInfo, &renderTargetFBInfo, &msRenderBufferID);
     return nullptr;
   }
 #endif
-  auto textureTarget = texture->glSampler().target;
   auto rt = new GLRenderTarget(texture->width(), texture->height(), texture->origin(), sampleCount,
-                               textureFBInfo, textureTarget);
+                               textureFBInfo, glSampler->target);
   rt->renderTargetFBInfo = renderTargetFBInfo;
   rt->msRenderBufferID = msRenderBufferID;
   return Resource::Wrap(context, rt);
@@ -221,6 +216,13 @@ static void CopyPixels(const ImageInfo& srcInfo, const void* srcPixels, const Im
   pixmap.readPixels(dstInfo, dstPixels);
 }
 
+BackendRenderTarget GLRenderTarget::getBackendRenderTarget() const {
+  GLFrameBufferInfo glInfo = {};
+  glInfo.id = renderTargetFBInfo.id;
+  glInfo.format = PixelFormatToGLSizeFormat(renderTargetFBInfo.format);
+  return {glInfo, width(), height()};
+}
+
 bool GLRenderTarget::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX,
                                 int srcY) const {
   dstPixels = dstInfo.computeOffset(dstPixels, -srcX, -srcY);
@@ -228,11 +230,11 @@ bool GLRenderTarget::readPixels(const ImageInfo& dstInfo, void* dstPixels, int s
   if (outInfo.isEmpty()) {
     return false;
   }
-  auto pixelFormat = renderTargetFBInfo.format;
+  auto pixelFormat = textureFBInfo.format;
   auto gl = GLFunctions::Get(context);
   auto caps = GLCaps::Get(context);
   const auto& format = caps->getTextureFormat(pixelFormat);
-  gl->bindFramebuffer(GL_FRAMEBUFFER, renderTargetFBInfo.id);
+  gl->bindFramebuffer(GL_FRAMEBUFFER, textureFBInfo.id);
 
   auto colorType = PixelFormatToColorType(pixelFormat);
   auto srcInfo =
@@ -296,7 +298,7 @@ void GLRenderTarget::resolve() const {
 }
 
 void GLRenderTarget::onReleaseGPU() {
-  if (externalTexture) {
+  if (externalResource) {
     return;
   }
   if (textureTarget != 0) {

@@ -20,7 +20,6 @@
 
 #include "LayerFilter.h"
 #include "tgfx/core/Size.h"
-#include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace pag {
 class RenderCache;

@@ -20,20 +20,35 @@
 
 namespace tgfx {
 /**
- * Defines pixel formats for YUV textures.
+ * Types for interacting with GL textures created externally to TGFX.
  */
-enum class YUVPixelFormat {
+struct GLTextureInfo {
   /**
-   * uninitialized.
+   * the id of this texture.
    */
-  Unknown,
+  unsigned id = 0;
   /**
-   * 8-bit Y plane followed by 8 bit 2x2 subsampled U and V planes.
+   * The target of this texture.
    */
-  I420,
+  unsigned target = 0x0DE1;  // GL_TEXTURE_2D;
   /**
-   * 8-bit Y plane followed by an interleaved U/V plane with 2x2 subsampling.
+   * The pixel format of this texture.
    */
-  NV12
+  unsigned format = 0x8058;  // GL_RGBA8;
+};
+
+/**
+ * Types for interacting with GL frame buffers created externally to tgfx.
+ */
+struct GLFrameBufferInfo {
+  /**
+   * The id of this frame buffer.
+   */
+  unsigned id = 0;
+
+  /**
+   * The pixel format of this frame buffer.
+   */
+  unsigned format = 0x8058;  // GL_RGBA8;
 };
 }  // namespace tgfx

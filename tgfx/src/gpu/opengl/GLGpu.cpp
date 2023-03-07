@@ -18,7 +18,8 @@
 
 #include "GLGpu.h"
 #include "GLUtil.h"
-#include "tgfx/gpu/opengl/GLSemaphore.h"
+#include "gpu/opengl/GLRenderTarget.h"
+#include "gpu/opengl/GLSemaphore.h"
 #include "utils/PixelFormatUtil.h"
 
 namespace tgfx {
@@ -30,6 +31,9 @@ std::unique_ptr<TextureSampler> GLGpu::createSampler(int width, int height, Pixe
                                                      int mipLevelCount) {
   // Texture memory must be allocated first on the web platform then can write pixels.
   DEBUG_ASSERT(mipLevelCount > 0);
+  // Clear the previously generated GLError, causing the subsequent CheckGLError to return an
+  // incorrect result.
+  CheckGLError(_context);
   auto gl = GLFunctions::Get(_context);
   auto sampler = std::make_unique<GLSampler>();
   gl->genTextures(1, &(sampler->id));
@@ -105,7 +109,7 @@ void GLGpu::writePixels(const TextureSampler* sampler, Rect rect, const void* pi
       }
     }
   }
-  if (sampler->mipMapped()) {
+  if (sampler->hasMipmaps()) {
     onRegenerateMipMapLevels(sampler);
   }
 }
@@ -172,7 +176,7 @@ void GLGpu::bindTexture(int unitIndex, const TextureSampler* sampler, SamplerSta
                     GetGLWrap(glSampler->target, samplerState.wrapModeX));
   gl->texParameteri(glSampler->target, GL_TEXTURE_WRAP_T,
                     GetGLWrap(glSampler->target, samplerState.wrapModeY));
-  if (samplerState.mipMapped() && (!_context->caps()->mipMapSupport || !glSampler->mipMapped())) {
+  if (samplerState.mipMapped() && (!_context->caps()->mipMapSupport || !glSampler->hasMipmaps())) {
     samplerState.mipMapMode = MipMapMode::None;
   }
   gl->texParameteri(glSampler->target, GL_TEXTURE_MIN_FILTER,
@@ -186,12 +190,12 @@ void GLGpu::copyRenderTargetToTexture(RenderTarget* renderTarget, Texture* textu
   auto gl = GLFunctions::Get(_context);
   auto glRenderTarget = static_cast<GLRenderTarget*>(renderTarget);
   gl->bindFramebuffer(GL_FRAMEBUFFER, glRenderTarget->glFrameBuffer().id);
-  auto glSampler = static_cast<GLTexture*>(texture)->glSampler();
-  gl->bindTexture(glSampler.target, glSampler.id);
+  auto glSampler = static_cast<const GLSampler*>(texture->getSampler());
+  gl->bindTexture(glSampler->target, glSampler->id);
   // format != BGRA && !srcHasMSAARenderBuffer && !dstHasMSAARenderBuffer && dstIsTextureable &&
   // dstOrigin == srcOrigin && canConfigBeFBOColorAttachment(srcConfig) && (!srcIsTextureable ||
   // srcIsGLTexture2D)
-  gl->copyTexSubImage2D(glSampler.target, 0, static_cast<int>(dstPoint.x),
+  gl->copyTexSubImage2D(glSampler->target, 0, static_cast<int>(dstPoint.x),
                         static_cast<int>(dstPoint.y), static_cast<int>(srcRect.x()),
                         static_cast<int>(srcRect.y()), static_cast<int>(srcRect.width()),
                         static_cast<int>(srcRect.height()));

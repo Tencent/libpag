@@ -17,15 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "EAGLNV12Texture.h"
-#include "gpu/opengl/GLContext.h"
+#include "gpu/opengl/GLSampler.h"
+#include "gpu/opengl/GLCaps.h"
 #include "tgfx/gpu/opengl/eagl/EAGLDevice.h"
 
 namespace tgfx {
-static GLSampler ToGLSampler(CVOpenGLESTextureRef texture, PixelFormat format) {
-  GLSampler sampler = {};
-  sampler.target = CVOpenGLESTextureGetTarget(texture);
-  sampler.id = CVOpenGLESTextureGetName(texture);
-  sampler.format = format;
+static std::unique_ptr<GLSampler> ToGLSampler(CVOpenGLESTextureRef texture, PixelFormat format) {
+  auto sampler = std::make_unique<GLSampler>();
+  sampler->target = CVOpenGLESTextureGetTarget(texture);
+  sampler->id = CVOpenGLESTextureGetName(texture);
+  sampler->format = format;
   return sampler;
 }
 
@@ -71,8 +72,9 @@ std::shared_ptr<EAGLNV12Texture> EAGLNV12Texture::MakeFrom(Context* context,
 }
 
 EAGLNV12Texture::EAGLNV12Texture(CVPixelBufferRef pixelBuffer, YUVColorSpace colorSpace)
-    : GLYUVTexture(static_cast<int>(CVPixelBufferGetWidth(pixelBuffer)),
-                   static_cast<int>(CVPixelBufferGetHeight(pixelBuffer)), colorSpace),
+    : YUVTexture(static_cast<int>(CVPixelBufferGetWidth(pixelBuffer)),
+                 static_cast<int>(CVPixelBufferGetHeight(pixelBuffer)), YUVPixelFormat::NV12,
+                 colorSpace),
       pixelBuffer(pixelBuffer) {
   CFRetain(pixelBuffer);
 }

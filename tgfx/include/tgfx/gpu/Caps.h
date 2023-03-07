@@ -29,6 +29,10 @@ class Caps {
 
   virtual const Swizzle& getWriteSwizzle(PixelFormat pixelFormat) const = 0;
 
+  virtual bool isFormatRenderable(PixelFormat pixelFormat) const = 0;
+
+  virtual int getSampleCount(int requestedCount, PixelFormat pixelFormat) const = 0;
+
   bool floatIs32Bits = true;
   int maxTextureSize = 0;
   bool semaphoreSupport = false;

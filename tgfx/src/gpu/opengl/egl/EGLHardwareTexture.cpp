@@ -22,6 +22,8 @@
 #include <GLES/gl.h>
 #include <GLES/glext.h>
 #include <android/hardware_buffer.h>
+#include "gpu/Gpu.h"
+#include "gpu/opengl/GLSampler.h"
 #include "platform/android/AHardwareBufferUtil.h"
 #include "platform/android/HardwareBuffer.h"
 #include "platform/android/HardwareBufferInterface.h"
@@ -72,31 +74,32 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(Context* contex
   if (eglImage == EGL_NO_IMAGE_KHR) {
     return nullptr;
   }
-  GLSampler sampler = {};
-  sampler.target = GL_TEXTURE_2D;
-  sampler.format = PixelFormat::RGBA_8888;
-  glGenTextures(1, &sampler.id);
-  if (sampler.id == 0) {
+
+  auto sampler = std::make_unique<GLSampler>();
+  sampler->target = GL_TEXTURE_2D;
+  sampler->format = PixelFormat::RGBA_8888;
+  glGenTextures(1, &sampler->id);
+  if (sampler->id == 0) {
     eglext::eglDestroyImageKHR(display, eglImage);
     return nullptr;
   }
-  glBindTexture(sampler.target, sampler.id);
-  glTexParameteri(sampler.target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(sampler.target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glTexParameteri(sampler.target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri(sampler.target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  eglext::glEGLImageTargetTexture2DOES(sampler.target, (GLeglImageOES)eglImage);
+  glBindTexture(sampler->target, sampler->id);
+  glTexParameteri(sampler->target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(sampler->target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glTexParameteri(sampler->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(sampler->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  eglext::glEGLImageTargetTexture2DOES(sampler->target, (GLeglImageOES)eglImage);
   AHardwareBuffer_Desc desc;
   HardwareBufferInterface::Describe(hardwareBuffer, &desc);
   glTexture = Resource::Wrap(
       context, new EGLHardwareTexture(hardwareBuffer, eglImage, desc.width, desc.height));
-  glTexture->sampler = sampler;
+  glTexture->sampler = std::move(sampler);
   return glTexture;
 }
 
 EGLHardwareTexture::EGLHardwareTexture(AHardwareBuffer* hardwareBuffer, EGLImageKHR eglImage,
                                        int width, int height)
-    : GLTexture(width, height, SurfaceOrigin::TopLeft),
+    : Texture(width, height, SurfaceOrigin::TopLeft),
       hardwareBuffer(hardwareBuffer),
       eglImage(eglImage) {
   HardwareBufferInterface::Acquire(hardwareBuffer);
@@ -119,7 +122,7 @@ size_t EGLHardwareTexture::memoryUsage() const {
 }
 
 void EGLHardwareTexture::onReleaseGPU() {
-  glDeleteTextures(1, &sampler.id);
+  context->gpu()->deleteSampler(sampler.get());
   auto display = static_cast<EGLDevice*>(context->device())->getDisplay();
   eglext::eglDestroyImageKHR(display, eglImage);
 }

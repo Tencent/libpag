@@ -20,7 +20,6 @@
 #include <thread>
 #include "EAGLHardwareTexture.h"
 #include "gpu/opengl/GLContext.h"
-#include "gpu/opengl/GLSurface.h"
 
 namespace tgfx {
 static std::mutex threadCacheLocker = {};
@@ -105,8 +104,7 @@ EAGLWindow::~EAGLWindow() {
 
 std::shared_ptr<Surface> EAGLWindow::onCreateSurface(Context* context) {
   if (pixelBuffer != nil) {
-    auto texture = EAGLHardwareTexture::MakeFrom(context, pixelBuffer);
-    return GLSurface::MakeFrom(texture);
+    return Surface::MakeFrom(context, pixelBuffer);
   }
   auto gl = GLFunctions::Get(context);
   if (frameBufferID > 0) {
@@ -136,12 +134,12 @@ std::shared_ptr<Surface> EAGLWindow::onCreateSurface(Context* context) {
     LOGE("EAGLWindow::onCreateSurface() Framebuffer is not complete!");
     return nullptr;
   }
-  GLFrameBuffer glInfo = {};
+  GLFrameBufferInfo glInfo = {};
   glInfo.id = frameBufferID;
-  glInfo.format = PixelFormat::RGBA_8888;
-  auto renderTarget = GLRenderTarget::MakeFrom(context, glInfo, static_cast<int>(width),
-                                               static_cast<int>(height), SurfaceOrigin::BottomLeft);
-  return Surface::MakeFrom(renderTarget);
+  glInfo.format = GL_RGBA8;
+    BackendRenderTarget renderTarget = {glInfo, static_cast<int>(width),
+        static_cast<int>(height)};
+  return Surface::MakeFrom(context, renderTarget, SurfaceOrigin::BottomLeft);
 }
 
 void EAGLWindow::onPresent(Context* context, int64_t) {

@@ -27,9 +27,6 @@
 #include "tgfx/core/Stroke.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/SurfaceOrigin.h"
-#include "tgfx/gpu/opengl/GLFrameBuffer.h"
-#include "tgfx/gpu/opengl/GLSampler.h"
-#include "tgfx/gpu/opengl/GLSemaphore.h"
 
 namespace pag {
 
@@ -55,13 +52,11 @@ tgfx::ColorType ToTGFX(ColorType colorType);
 
 ColorType ToPAG(tgfx::ColorType colorType);
 
-bool GetGLSampler(const BackendTexture& texture, tgfx::GLSampler* sampler);
+tgfx::BackendTexture ToTGFX(const BackendTexture& texture);
 
-bool GetGLFrameBuffer(const BackendRenderTarget& renderTarget, tgfx::GLFrameBuffer* frameBuffer);
+tgfx::BackendRenderTarget ToTGFX(const BackendRenderTarget& renderTarget);
 
-BackendTexture ToBackendTexture(const tgfx::GLSampler& sampler, int width, int height);
-
-tgfx::GLSemaphore ToTGFX(const BackendSemaphore& semaphore);
+tgfx::BackendSemaphore ToTGFX(const BackendSemaphore& semaphore);
 
 static inline const tgfx::Matrix* ToTGFX(const Matrix* matrix) {
   return reinterpret_cast<const tgfx::Matrix*>(matrix);

@@ -23,7 +23,6 @@
 #endif
 #include <EGL/eglext.h>
 #include <GLES3/gl3.h>
-#include "tgfx/gpu/opengl/GLRenderTarget.h"
 #include "utils/USE.h"
 
 namespace tgfx {
@@ -72,12 +71,12 @@ std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
-  GLFrameBuffer frameBuffer = {};
+
+  tgfx::GLFrameBufferInfo frameBuffer = {};
   frameBuffer.id = 0;
-  frameBuffer.format = PixelFormat::RGBA_8888;
-  auto renderTarget =
-      GLRenderTarget::MakeFrom(context, frameBuffer, width, height, SurfaceOrigin::BottomLeft);
-  return Surface::MakeFrom(renderTarget);
+  frameBuffer.format = GL_RGBA8;
+  tgfx::BackendRenderTarget renderTarget = {frameBuffer, width, height};
+  return Surface::MakeFrom(context, renderTarget, SurfaceOrigin::BottomLeft);
 }
 
 void EGLWindow::onPresent(Context*, int64_t presentationTime) {

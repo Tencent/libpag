@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CoordTransform.h"
+#include "gpu/TextureSampler.h"
 
 namespace tgfx {
 Matrix CoordTransform::getTotalMatrix() const {

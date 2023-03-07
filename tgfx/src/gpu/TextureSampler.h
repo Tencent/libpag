@@ -30,6 +30,13 @@ enum class TextureType { Unknown, TwoD, Rectangle, External };
  */
 class TextureSampler {
  public:
+  /**
+   * Creates a new TextureSampler which wraps the specified backend texture. The caller is
+   * responsible for managing the lifetime of the backendTexture.
+   */
+  static std::unique_ptr<TextureSampler> MakeFrom(Context* context,
+                                                  const BackendTexture& backendTexture);
+
   virtual ~TextureSampler() = default;
 
   /**
@@ -38,19 +45,29 @@ class TextureSampler {
   PixelFormat format = PixelFormat::RGBA_8888;
   int maxMipMapLevel = 0;
 
+  /**
+   * Returns the TextureType of TextureSampler.
+   */
   virtual TextureType type() const {
     return TextureType::TwoD;
   }
 
-  bool mipMapped() const {
+  /**
+   * Returns true if the TextureSampler has mipmap levels.
+   */
+  bool hasMipmaps() const {
     return maxMipMapLevel > 0;
   }
+
+  /**
+   * Retrieves the backend texture with the specified size.
+   */
+  virtual BackendTexture getBackendTexture(int width, int height) const = 0;
 
  protected:
   virtual void computeKey(Context* context, BytesKey* bytesKey) const = 0;
 
   friend class FragmentProcessor;
-
   friend class Pipeline;
 };
 }  // namespace tgfx

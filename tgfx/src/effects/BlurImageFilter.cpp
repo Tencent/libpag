@@ -19,8 +19,8 @@
 #include "BlurImageFilter.h"
 #include "gpu/DualBlurFragmentProcessor.h"
 #include "gpu/SurfaceDrawContext.h"
+#include "gpu/TextureSampler.h"
 #include "gpu/TiledTextureEffect.h"
-#include "tgfx/gpu/TextureSampler.h"
 
 namespace tgfx {
 static const float BLUR_LEVEL_1_LIMIT = 10.0f;

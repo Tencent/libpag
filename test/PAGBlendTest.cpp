@@ -50,9 +50,9 @@ PAG_TEST_F(PAGBlendTest, Blend) {
   }
 }
 
-tgfx::GLSampler GetBottomLeftImage(std::shared_ptr<Device> device, int width, int height) {
+tgfx::GLTextureInfo GetBottomLeftImage(std::shared_ptr<Device> device, int width, int height) {
   auto context = device->lockContext();
-  tgfx::GLSampler textureInfo;
+  tgfx::GLTextureInfo textureInfo;
   CreateGLTexture(context, width, height, &textureInfo);
   auto backendTexture = ToBackendTexture(textureInfo, width, height);
   auto surface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::BottomLeft);
@@ -77,7 +77,7 @@ PAG_TEST_F(PAGBlendTest, CopyDstTexture) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  tgfx::GLSampler textureInfo;
+  tgfx::GLTextureInfo textureInfo;
   CreateGLTexture(context, width, height, &textureInfo);
   auto backendTexture = ToBackendTexture(textureInfo, width, height);
   auto pagSurface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::BottomLeft);
@@ -109,7 +109,7 @@ PAG_TEST_F(PAGBlendTest, TextureBottomLeft) {
   ASSERT_TRUE(context != nullptr);
   auto backendTexture = ToBackendTexture(replaceTextureInfo, width, height);
   auto replaceImage = PAGImage::FromTexture(backendTexture, ImageOrigin::BottomLeft);
-  tgfx::GLSampler textureInfo;
+  tgfx::GLTextureInfo textureInfo;
   CreateGLTexture(context, width, height, &textureInfo);
   backendTexture = ToBackendTexture(textureInfo, width, height);
   auto pagSurface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::TopLeft);
@@ -146,7 +146,7 @@ PAG_TEST_F(PAGBlendTest, BothBottomLeft) {
   auto replaceImage = PAGImage::FromTexture(backendTexture, ImageOrigin::BottomLeft);
   replaceImage->setMatrix(
       Matrix::MakeTrans(static_cast<float>(width) * 0.1, static_cast<float>(height) * 0.2));
-  tgfx::GLSampler textureInfo = {};
+  tgfx::GLTextureInfo textureInfo = {};
   CreateGLTexture(context, width, height, &textureInfo);
   backendTexture = ToBackendTexture(textureInfo, width, height);
   auto pagSurface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::BottomLeft);

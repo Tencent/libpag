@@ -19,10 +19,10 @@
 #pragma once
 
 #include <functional>
+#include "gpu/RenderTarget.h"
 #include "gpu/TextureProxy.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/gpu/Context.h"
-#include "tgfx/gpu/RenderTarget.h"
 
 namespace tgfx {
 class OpsRenderPass;

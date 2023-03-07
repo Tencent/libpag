@@ -21,7 +21,7 @@
 #include <vector>
 #include "Processor.h"
 #include "ShaderVar.h"
-#include "tgfx/gpu/TextureSampler.h"
+#include "gpu/TextureSampler.h"
 
 namespace tgfx {
 class GLGeometryProcessor;

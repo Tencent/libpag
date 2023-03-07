@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,23 +18,30 @@
 
 #pragma once
 
-#include <optional>
-#include "gpu/GLFragmentProcessor.h"
-#include "gpu/YUVTexture.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
-class GLYUVTextureEffect : public GLFragmentProcessor {
+/**
+ * Texture created externally to TGFX
+ */
+class ExternalTexture : public Texture {
  public:
-  void emitCode(EmitArgs& args) override;
+  static std::shared_ptr<Texture> MakeFrom(Context* context, const BackendTexture& backendTexture,
+                                           SurfaceOrigin origin, bool adopted);
+
+  size_t memoryUsage() const override;
+
+  const TextureSampler* getSampler() const override {
+    return sampler.get();
+  }
 
  private:
-  void onSetData(const ProgramDataManager& programDataManager,
-                 const FragmentProcessor& fragmentProcessor) override;
+  std::unique_ptr<TextureSampler> sampler = {};
+  bool adopted = false;
 
-  UniformHandle alphaStartUniform;
-  UniformHandle mat3ColorConversionUniform;
+  ExternalTexture(std::unique_ptr<TextureSampler> sampler, int width, int height,
+                  SurfaceOrigin origin, bool adopted);
 
-  std::optional<Point> alphaStartPrev;
-  std::optional<YUVColorSpace> colorSpacePrev;
+  void onReleaseGPU() override;
 };
 }  // namespace tgfx

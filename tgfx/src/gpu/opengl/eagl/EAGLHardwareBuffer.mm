@@ -39,12 +39,15 @@ std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuf
   return HardwareBuffer::MakeFrom(hardwareBuffer);
 }
 
-std::shared_ptr<Texture> Texture::MakeFrom(Context* context, HardwareBufferRef hardwareBuffer) {
+std::shared_ptr<Texture> Texture::MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
+                                           YUVColorSpace colorSpace) {
+  if (hardwareBuffer == nullptr) {
+    return nullptr;
+  }
+  auto planeCount = CVPixelBufferGetPlaneCount(hardwareBuffer);
+  if (planeCount > 1) {
+    return EAGLNV12Texture::MakeFrom(context, hardwareBuffer, colorSpace);
+  }
   return EAGLHardwareTexture::MakeFrom(context, hardwareBuffer);
-}
-
-std::shared_ptr<YUVTexture> YUVTexture::MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
-                                                 YUVColorSpace colorSpace) {
-  return EAGLNV12Texture::MakeFrom(context, hardwareBuffer, colorSpace);
 }
 }  // namespace tgfx

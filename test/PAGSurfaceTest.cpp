@@ -40,7 +40,7 @@ PAG_TEST(PAGSurfaceTest, FromTexture) {
   ASSERT_TRUE(context != nullptr);
 
   auto glVersion = GLCaps::Get(context)->version;
-  tgfx::GLSampler textureInfo;
+  tgfx::GLTextureInfo textureInfo;
   CreateGLTexture(context, width, height, &textureInfo);
   auto backendTexture = ToBackendTexture(textureInfo, width, height);
   auto pagSurface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::TopLeft);
@@ -49,8 +49,8 @@ PAG_TEST(PAGSurfaceTest, FromTexture) {
   auto glDevice = std::static_pointer_cast<GLDevice>(pagSurface->drawable->getDevice());
   EXPECT_TRUE(glDevice->sharableWith(nativeHandle));
 
-  auto drawable =
-      std::make_shared<TextureDrawable>(device, backendTexture, tgfx::SurfaceOrigin::TopLeft);
+  auto drawable = std::make_shared<TextureDrawable>(device, ToTGFX(backendTexture),
+                                                    tgfx::SurfaceOrigin::TopLeft);
   auto pagSurface2 = PAGSurface::MakeFrom(drawable);
   auto pagPlayer2 = std::make_shared<PAGPlayer>();
   pagPlayer2->setSurface(pagSurface2);
@@ -91,7 +91,7 @@ PAG_TEST(PAGSurfaceTest, Mask) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  tgfx::GLSampler textureInfo;
+  tgfx::GLTextureInfo textureInfo;
   CreateGLTexture(context, width, height, &textureInfo);
   auto backendTexture = ToBackendTexture(textureInfo, width, height);
   auto pagSurface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::BottomLeft);
@@ -122,7 +122,7 @@ PAG_TEST(PAGSurfaceTest, BottomLeftScissor) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  tgfx::GLSampler textureInfo;
+  tgfx::GLTextureInfo textureInfo;
   CreateGLTexture(context, width, height, &textureInfo);
   auto backendTexture = ToBackendTexture(textureInfo, width, height);
   auto pagSurface = PAGSurface::MakeFrom(backendTexture, ImageOrigin::BottomLeft);

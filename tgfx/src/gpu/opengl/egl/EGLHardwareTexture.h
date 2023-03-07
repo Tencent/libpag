@@ -23,17 +23,22 @@
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include "platform/android/HardwareBufferInterface.h"
-#include "tgfx/gpu/opengl/GLTexture.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
-class EGLHardwareTexture : public GLTexture {
+class EGLHardwareTexture : public Texture {
  public:
   static std::shared_ptr<EGLHardwareTexture> MakeFrom(Context* context,
                                                       AHardwareBuffer* hardwareBuffer);
 
   size_t memoryUsage() const override;
 
+  const TextureSampler* getSampler() const override {
+    return sampler.get();
+  }
+
  private:
+  std::unique_ptr<TextureSampler> sampler = {};
   AHardwareBuffer* hardwareBuffer = nullptr;
   EGLImageKHR eglImage = EGL_NO_IMAGE_KHR;
 

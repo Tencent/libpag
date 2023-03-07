@@ -108,10 +108,9 @@ size_t Atlas::memoryUsage() const {
   }
   size_t usage = 0;
   for (auto& texture : textures) {
-    usage += texture->width() * texture->height();
+    usage += texture->memoryUsage();
   }
-  auto bytesPerPixels = textures[0]->getSampler()->format == tgfx::PixelFormat::ALPHA_8 ? 1 : 4;
-  return usage * bytesPerPixels;
+  return usage;
 }
 
 static tgfx::PaintStyle ToTGFX(TextStyle style) {

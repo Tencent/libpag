@@ -302,7 +302,7 @@ void ApplyFilters(tgfx::Context* context, std::vector<FilterNode> filterNodes,
   std::shared_ptr<FilterBuffer> lastBuffer = nullptr;
   std::shared_ptr<FilterSource> lastSource = nullptr;
   auto lastBounds = contentBounds;
-  auto lastUsesMSAA = false;
+  auto lastUseMSAA = false;
   auto size = static_cast<int>(filterNodes.size());
   for (int i = 0; i < size; i++) {
     auto& node = filterNodes[i];
@@ -313,7 +313,7 @@ void ApplyFilters(tgfx::Context* context, std::vector<FilterNode> filterNodes,
     }
     std::shared_ptr<FilterBuffer> currentBuffer = nullptr;
     if (freeBuffer && node.bounds.width() == lastBounds.width() &&
-        node.bounds.height() == lastBounds.height() && node.filter->needsMSAA() == lastUsesMSAA) {
+        node.bounds.height() == lastBounds.height() && node.filter->needsMSAA() == lastUseMSAA) {
       currentBuffer = freeBuffer;
     } else {
       currentBuffer = FilterBuffer::Make(
@@ -332,7 +332,7 @@ void ApplyFilters(tgfx::Context* context, std::vector<FilterNode> filterNodes,
     freeBuffer = lastBuffer;
     lastBuffer = currentBuffer;
     lastBounds = node.bounds;
-    lastUsesMSAA = currentBuffer->usesMSAA();
+    lastUseMSAA = currentBuffer->useMSAA();
   }
 }
 

@@ -17,11 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "EAGLHardwareTexture.h"
-#include "utils/UniqueID.h"
-#include "gpu/opengl/GLContext.h"
-#include "platform/apple/CVPixelBufferUtil.h"
-#include "tgfx/core/Pixmap.h"
+#include "gpu/opengl/GLSampler.h"
+#include "gpu/opengl/GLCaps.h"
 #include "tgfx/gpu/opengl/eagl/EAGLDevice.h"
+#include "utils/UniqueID.h"
 
 namespace tgfx {
 static CVOpenGLESTextureRef GetTextureRef(Context* context, CVPixelBufferRef pixelBuffer,
@@ -70,12 +69,12 @@ std::shared_ptr<EAGLHardwareTexture> EAGLHardwareTexture::MakeFrom(Context* cont
   if (texture == nil) {
     return nullptr;
   }
-  GLSampler glInfo = {};
-  glInfo.format = format;
-  glInfo.target = CVOpenGLESTextureGetTarget(texture);
-  glInfo.id = CVOpenGLESTextureGetName(texture);
+  auto sampler = std::make_unique<GLSampler>();
+  sampler->format = format;
+  sampler->target = CVOpenGLESTextureGetTarget(texture);
+  sampler->id = CVOpenGLESTextureGetName(texture);
   glTexture = Resource::Wrap(context, new EAGLHardwareTexture(pixelBuffer));
-  glTexture->sampler = glInfo;
+  glTexture->sampler = std::move(sampler);
   glTexture->texture = texture;
   return glTexture;
 }
@@ -90,7 +89,7 @@ void EAGLHardwareTexture::ComputeRecycleKey(BytesKey* recycleKey, CVPixelBufferR
 }
 
 EAGLHardwareTexture::EAGLHardwareTexture(CVPixelBufferRef pixelBuffer)
-    : GLTexture(static_cast<int>(CVPixelBufferGetWidth(pixelBuffer)),
+    : Texture(static_cast<int>(CVPixelBufferGetWidth(pixelBuffer)),
                 static_cast<int>(CVPixelBufferGetHeight(pixelBuffer)), SurfaceOrigin::TopLeft),
       pixelBuffer(pixelBuffer) {
   CFRetain(pixelBuffer);

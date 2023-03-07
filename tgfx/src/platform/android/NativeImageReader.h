@@ -20,7 +20,7 @@
 
 #include <condition_variable>
 #include <mutex>
-#include "GLExternalTexture.h"
+#include "GLExternalOESTexture.h"
 #include "HandlerThread.h"
 #include "JNIUtil.h"
 #include "tgfx/platform/android/SurfaceImageReader.h"
