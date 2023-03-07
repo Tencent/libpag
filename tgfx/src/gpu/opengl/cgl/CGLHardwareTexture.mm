@@ -17,9 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CGLHardwareTexture.h"
-#include <OpenGL/gl3.h>
-#include "platform/apple/CVPixelBufferUtil.h"
-#include "tgfx/core/Pixmap.h"
+#include "gpu/opengl/GLSampler.h"
 #include "tgfx/gpu/opengl/cgl/CGLDevice.h"
 #include "utils/UniqueID.h"
 
@@ -47,15 +45,15 @@ std::shared_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(Context* contex
   if (texture == nil) {
     return nullptr;
   }
-  GLSampler glSampler = {};
-  glSampler.target = CVOpenGLTextureGetTarget(texture);
-  glSampler.id = CVOpenGLTextureGetName(texture);
-  glSampler.format =
+  auto glSampler = std::make_unique<GLSampler>();
+  glSampler->target = CVOpenGLTextureGetTarget(texture);
+  glSampler->id = CVOpenGLTextureGetName(texture);
+  glSampler->format =
       CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_OneComponent8
           ? PixelFormat::ALPHA_8
           : PixelFormat::RGBA_8888;
   glTexture = Resource::Wrap(context, new CGLHardwareTexture(pixelBuffer));
-  glTexture->sampler = glSampler;
+  glTexture->sampler = std::move(glSampler);
   glTexture->texture = texture;
   return glTexture;
 }
@@ -70,8 +68,8 @@ void CGLHardwareTexture::ComputeRecycleKey(BytesKey* recycleKey, CVPixelBufferRe
 }
 
 CGLHardwareTexture::CGLHardwareTexture(CVPixelBufferRef pixelBuffer)
-    : GLTexture(static_cast<int>(CVPixelBufferGetWidth(pixelBuffer)),
-                static_cast<int>(CVPixelBufferGetHeight(pixelBuffer)), SurfaceOrigin::TopLeft),
+    : Texture(static_cast<int>(CVPixelBufferGetWidth(pixelBuffer)),
+              static_cast<int>(CVPixelBufferGetHeight(pixelBuffer)), SurfaceOrigin::TopLeft),
       pixelBuffer(pixelBuffer) {
   CFRetain(pixelBuffer);
 }
@@ -83,12 +81,12 @@ CGLHardwareTexture::~CGLHardwareTexture() {
   }
 }
 
-void CGLHardwareTexture::computeRecycleKey(BytesKey* recycleKey) const {
-  ComputeRecycleKey(recycleKey, pixelBuffer);
-}
-
 size_t CGLHardwareTexture::memoryUsage() const {
   return CVPixelBufferGetDataSize(pixelBuffer);
+}
+
+void CGLHardwareTexture::computeRecycleKey(BytesKey* recycleKey) const {
+  ComputeRecycleKey(recycleKey, pixelBuffer);
 }
 
 void CGLHardwareTexture::onReleaseGPU() {

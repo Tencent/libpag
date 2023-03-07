@@ -39,7 +39,7 @@ int TextureProxy::height() const {
 }
 
 bool TextureProxy::hasMipmaps() const {
-  return texture->getSampler()->mipMapped();
+  return texture->getSampler()->hasMipmaps();
 }
 
 std::shared_ptr<Texture> TextureProxy::getTexture() const {

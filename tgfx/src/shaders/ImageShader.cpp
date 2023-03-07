@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ImageShader.h"
+#include "gpu/TextureSampler.h"
 #include "gpu/TiledTextureEffect.h"
-#include "tgfx/gpu/TextureSampler.h"
 
 namespace tgfx {
 std::shared_ptr<Shader> Shader::MakeImageShader(std::shared_ptr<Texture> texture,

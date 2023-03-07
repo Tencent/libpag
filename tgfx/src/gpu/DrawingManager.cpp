@@ -20,6 +20,7 @@
 #include "TextureProxy.h"
 #include "TextureResolveRenderTask.h"
 #include "gpu/Gpu.h"
+#include "gpu/RenderTarget.h"
 #include "utils/Log.h"
 
 namespace tgfx {
@@ -31,7 +32,7 @@ void DrawingManager::closeActiveOpsTask() {
 }
 
 void DrawingManager::newTextureResolveRenderTask(Surface* surface) {
-  if (surface->renderTarget->sampleCount() <= 1 || !surface->requiresManualMSAAResolve) {
+  if (surface->renderTarget->sampleCount() <= 1) {
     return;
   }
   closeActiveOpsTask();

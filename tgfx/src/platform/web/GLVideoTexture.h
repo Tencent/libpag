@@ -18,22 +18,29 @@
 
 #pragma once
 
-#include "tgfx/gpu/opengl/GLTexture.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
-class GLVideoTexture : public tgfx::GLTexture {
+class GLVideoTexture : public Texture {
  public:
   static std::shared_ptr<GLVideoTexture> Make(Context* context, int width, int height);
 
-  Point getTextureCoord(float x, float y) const override;
-
   size_t memoryUsage() const override;
 
+  const TextureSampler* getSampler() const override {
+    return sampler.get();
+  }
+
+  Point getTextureCoord(float x, float y) const override;
+
+  BackendTexture getBackendTexture() const override;
+
  private:
+  std::unique_ptr<TextureSampler> sampler = {};
   int textureWidth = 0;
   int textureHeight = 0;
 
-  GLVideoTexture(const GLSampler& sampler, int width, int height);
+  GLVideoTexture(std::unique_ptr<TextureSampler> sampler, int width, int height);
 
   void onReleaseGPU() override;
 };

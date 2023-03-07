@@ -20,15 +20,13 @@
 
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/ImageInfo.h"
-#include "tgfx/gpu/RenderTarget.h"
-#include "tgfx/gpu/Semaphore.h"
+#include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/SurfaceOptions.h"
 
 namespace tgfx {
-
 class Canvas;
-
 class Context;
+class RenderTarget;
 
 /**
  * Surface is responsible for managing the pixels that a canvas draws into. Surface takes care of
@@ -53,16 +51,33 @@ class Surface {
                                        const SurfaceOptions* options = nullptr);
 
   /**
-   * Wraps a render target into Surface. Returns nullptr if renderTarget is nullptr.
+   * Wraps a backend render target into Surface. The caller must ensure the renderTarget is valid
+   * for the lifetime of the returned Surface. Returns nullptr if the context is nullptr or the
+   * renderTarget is invalid.
    */
-  static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<RenderTarget> renderTarget,
+  static std::shared_ptr<Surface> MakeFrom(Context* context,
+                                           const BackendRenderTarget& renderTarget,
+                                           SurfaceOrigin origin,
                                            const SurfaceOptions* options = nullptr);
 
   /**
-   * Wraps a texture into Surface. A Surface with MSAA enabled is returned if the sampleCount is
-   * greater than 1. Returns nullptr if the specified texture is not renderable.
+   * Wraps a BackendTexture into Surface. The caller must ensure the texture is valid for the
+   * lifetime of the returned Surface. If the sampleCount greater than zero, creates an intermediate
+   * MSAA Surface which is used for drawing backendTexture. Returns nullptr if the context is
+   * nullptr or the texture is invalid.
    */
-  static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<Texture> texture, int sampleCount = 1,
+  static std::shared_ptr<Surface> MakeFrom(Context* context, const BackendTexture& backendTexture,
+                                           SurfaceOrigin origin, int sampleCount = 1,
+                                           const SurfaceOptions* options = nullptr);
+
+  /**
+   * Creates a Surface from the platform-specific hardware buffer. For example, the hardware buffer
+   * could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on the apple
+   * platform. The returned Surface takes a reference to the hardwareBuffer. Returns nullptr if the
+   * context is nullptr or the hardwareBuffer is not renderable.
+   */
+  static std::shared_ptr<Surface> MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
+                                           int sampleCount = 1,
                                            const SurfaceOptions* options = nullptr);
 
   virtual ~Surface();
@@ -70,9 +85,7 @@ class Surface {
   /**
    * Retrieves the context associated with this Surface.
    */
-  Context* getContext() const {
-    return renderTarget->getContext();
-  }
+  Context* getContext() const;
 
   /**
    * Returns the SurfaceOptions of the Surface.
@@ -84,34 +97,36 @@ class Surface {
   /**
    * Returns the width of this surface.
    */
-  int width() const {
-    return renderTarget->width();
-  }
+  int width() const;
 
   /**
    * Returns the height of this surface.
    */
-  int height() const {
-    return renderTarget->height();
-  }
+  int height() const;
 
   /**
    * Returns the origin of this surface, either SurfaceOrigin::TopLeft or SurfaceOrigin::BottomLeft.
    */
-  SurfaceOrigin origin() const {
-    return renderTarget->origin();
-  }
-
-  /**
-   * Retrieves the render target that the surface renders to.
-   */
-  std::shared_ptr<RenderTarget> getRenderTarget();
+  SurfaceOrigin origin() const;
 
   /**
    * Retrieves the texture that the surface renders to. Return nullptr if the surface was made from
    * a RenderTarget.
    */
   std::shared_ptr<Texture> getTexture();
+
+  /**
+   * Retrieves the backend render target that the surface renders to. The returned
+   * BackendRenderTarget should be discarded if the Surface is drawn to or deleted.
+   */
+  BackendRenderTarget getBackendRenderTarget();
+
+  /**
+   * Retrieves the backend texture that the surface renders to. Returns an invalid BackendTexture if
+   * the surface has no backend texture. The returned BackendTexture should be discarded if the
+   * Surface is drawn to or deleted.
+   */
+  BackendTexture getBackendTexture();
 
   /**
    * Returns Canvas that draws into Surface. Subsequent calls return the same Canvas. Canvas
@@ -126,7 +141,7 @@ class Surface {
    * GPU back-end will not wait on the passed semaphore, and the client will still own the
    * semaphore. Returns true if GPU is waiting on the semaphore.
    */
-  bool wait(const Semaphore* waitSemaphore);
+  bool wait(const BackendSemaphore& waitSemaphore);
 
   /**
    * Apply all pending changes to the render target immediately. After issuing all commands, the
@@ -137,7 +152,7 @@ class Surface {
    * If false is returned, the GPU back-end did not create or add a semaphore to signal on the GPU;
    * the caller should not instruct the GPU to wait on the semaphore.
    */
-  bool flush(Semaphore* signalSemaphore = nullptr);
+  bool flush(BackendSemaphore* signalSemaphore = nullptr);
 
   /**
    * Call to ensure all reads/writes of the surface have been issued to the underlying 3D API.
@@ -166,22 +181,22 @@ class Surface {
    */
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0, int srcY = 0);
 
- protected:
-  Surface(std::shared_ptr<RenderTarget> renderTarget, std::shared_ptr<Texture> texture,
-          const SurfaceOptions* options);
-
-  virtual bool onReadPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) = 0;
-
+ private:
   std::shared_ptr<RenderTarget> renderTarget = nullptr;
   std::shared_ptr<Texture> texture = nullptr;
-  bool requiresManualMSAAResolve = false;
-
- private:
   SurfaceOptions surfaceOptions = {};
   Canvas* canvas = nullptr;
 
-  friend class DrawingManager;
+  static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<RenderTarget> renderTarget,
+                                           const SurfaceOptions* options = nullptr);
 
+  static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<Texture> texture, int sampleCount = 1,
+                                           const SurfaceOptions* options = nullptr);
+
+  Surface(std::shared_ptr<RenderTarget> renderTarget, std::shared_ptr<Texture> texture,
+          const SurfaceOptions* options);
+
+  friend class DrawingManager;
   friend class Canvas;
 };
 }  // namespace tgfx

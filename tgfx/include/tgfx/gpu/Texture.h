@@ -18,28 +18,23 @@
 
 #pragma once
 
-#include <string>
+#include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Point.h"
+#include "tgfx/core/YUVColorSpace.h"
+#include "tgfx/core/YUVData.h"
 #include "tgfx/gpu/Resource.h"
 #include "tgfx/gpu/SurfaceOrigin.h"
-#include "tgfx/gpu/TextureSampler.h"
 #include "tgfx/platform/HardwareBuffer.h"
 
 namespace tgfx {
+class BackendTexture;
+class TextureSampler;
+
 /**
- * Texture describes a two dimensional array of pixels in the GPU backend for drawing.
+ * Texture describes a two-dimensional array of pixels in the GPU backend for drawing.
  */
 class Texture : public Resource {
  public:
-  /**
-   * Creates a single-plane texture from a platform-specific hardware buffer. For example, the
-   * hardware buffer could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on
-   * the apple platform. The returned Texture takes a reference on the hardwareBuffer. Returns
-   * nullptr if any of the parameters are nullptr or the hardwareBuffer is not single-plane. Use the
-   * YUVTexture::MakeFrom() method for the hardware buffer with multiple planes.
-   */
-  static std::shared_ptr<Texture> MakeFrom(Context* context, HardwareBufferRef hardwareBuffer);
-
   /**
    * Creates a new texture from the specified pixel data with each pixel stored as 32-bit RGBA
    * data. Returns nullptr if any of the parameters is invalid.
@@ -86,6 +81,17 @@ class Texture : public Resource {
   }
 
   /**
+   * Creates an empty texture with each pixel store as the pixelFormat describes. Returns nullptr if
+   * any of the parameters is invalid or the backend does not support creating textures of the
+   * specified pixelFormat.
+   */
+  static std::shared_ptr<Texture> MakeFormat(Context* context, int width, int height,
+                                             PixelFormat pixelFormat, SurfaceOrigin origin,
+                                             bool mipMapped = false) {
+    return MakeFormat(context, width, height, nullptr, 0, pixelFormat, origin, mipMapped);
+  }
+
+  /**
    * Creates a new texture from the specified pixel data with each pixel store as the pixelFormat
    * describes. Returns nullptr if any of the parameters is invalid or the backend does not support
    * creating textures of the specified pixelFormat.
@@ -96,19 +102,43 @@ class Texture : public Resource {
                                              bool mipMapped = false);
 
   /**
-   * Creates a empty texture with each pixel store as the pixelFormat describes. Returns nullptr if
-   * any of the parameters is invalid or the backend does not support creating textures of the
-   * specified pixelFormat.
+   * Creates a new Texture which wraps the specified backend texture. The caller must ensure the
+   * backend texture is valid for the lifetime of returned Texture.
    */
-  static std::shared_ptr<Texture> MakeFormat(Context* context, int width, int height,
-                                             PixelFormat pixelFormat, SurfaceOrigin origin,
-                                             bool mipMapped = false) {
-    return MakeFormat(context, width, height, nullptr, 0, pixelFormat, origin, mipMapped);
-  }
+  static std::shared_ptr<Texture> MakeFrom(Context* context, const BackendTexture& backendTexture,
+                                           SurfaceOrigin origin = SurfaceOrigin::TopLeft);
 
-  Texture(int width, int height, SurfaceOrigin origin)
-      : _width(width), _height(height), _origin(origin) {
-  }
+  /**
+   * Creates a new Texture which wraps the specified backend texture. The returned Texture takes
+   * ownership of the specified backend texture.
+   */
+  static std::shared_ptr<Texture> MakeAdopted(Context* context,
+                                              const BackendTexture& backendTexture,
+                                              SurfaceOrigin origin = SurfaceOrigin::TopLeft);
+
+  /**
+   * Creates a Texture from the platform-specific hardware buffer. For example, the hardware buffer
+   * could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on the apple
+   * platform. The returned Image takes a reference to the hardwareBuffer. The colorSpace is ignored
+   * if the hardwareBuffer contains only one plane, which means it is not in the YUV format. Returns
+   * nullptr if the context is nullptr or the hardwareBuffer is nullptr.
+   */
+  static std::shared_ptr<Texture> MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
+                                           YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED);
+
+  /**
+   * Creates a new Texture in the I420 format from the specified YUVData and YUVColorSpace. Returns
+   * nullptr if the context is nullptr or the yuvData is invalid;
+   */
+  static std::shared_ptr<Texture> MakeI420(Context* context, const YUVData* yuvData,
+                                           YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED);
+
+  /**
+   * Creates a new Texture in the NV12 format from the specified YUVData and YUVColorSpace. Returns
+   * nullptr if the context is nullptr or the yuvData is invalid;
+   */
+  static std::shared_ptr<Texture> MakeNV12(Context* context, const YUVData* yuvData,
+                                           YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED);
 
   /**
    * Returns the display width of this texture.
@@ -125,21 +155,11 @@ class Texture : public Resource {
   }
 
   /**
-   * Returns the origin of this texture, either SurfaceOrigin::TopLeft or SurfaceOrigin::BottomLeft.
+   * Returns the origin of the texture, either SurfaceOrigin::TopLeft or SurfaceOrigin::BottomLeft.
    */
   SurfaceOrigin origin() const {
     return _origin;
   }
-
-  /**
-   * Returns the texture coordinates in backend units corresponding to specified position in pixels.
-   */
-  virtual Point getTextureCoord(float x, float y) const = 0;
-
-  /**
-   * Returns the default texture sampler.
-   */
-  virtual const TextureSampler* getSampler() const = 0;
 
   /**
    * Returns true if this is a YUVTexture.
@@ -148,16 +168,28 @@ class Texture : public Resource {
     return false;
   }
 
+  /**
+   * Returns the default texture sampler.
+   */
+  virtual const TextureSampler* getSampler() const = 0;
+
+  /**
+   * Returns the texture coordinates in backend units corresponding to specified position in pixels.
+   */
+  virtual Point getTextureCoord(float x, float y) const;
+
+  /**
+   * Retrieves the backend texture. Returns an invalid BackendTexture if the texture is a
+   * YUVTexture.
+   */
+  virtual BackendTexture getBackendTexture() const;
+
+ protected:
+  Texture(int width, int height, SurfaceOrigin origin);
+
  private:
   int _width = 0;
   int _height = 0;
   SurfaceOrigin _origin = SurfaceOrigin::TopLeft;
-
-  /**
-   * Returns true if the specified texture size and format are supported by the GPU backend.
-   */
-  static bool CheckSizeAndFormat(Context* context, int width, int height, PixelFormat format);
-
-  friend class ProxyProvider;
 };
 }  // namespace tgfx

@@ -19,6 +19,7 @@
 #pragma once
 
 #include "ImageSource.h"
+#include "gpu/TextureSampler.h"
 
 namespace tgfx {
 /**
@@ -35,7 +36,7 @@ class TextureSource : public ImageSource {
   }
 
   bool hasMipmaps() const override {
-    return texture->getSampler()->mipMapped();
+    return texture->getSampler()->hasMipmaps();
   }
 
   bool isAlphaOnly() const override {

@@ -20,7 +20,6 @@
 #include "GLGpu.h"
 #include "GLUtil.h"
 #include "gpu/Pipeline.h"
-#include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace tgfx {
 GLProgram::GLProgram(Context* context, BuiltinUniformHandles builtinUniformHandles,

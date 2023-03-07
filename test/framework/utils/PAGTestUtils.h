@@ -28,6 +28,8 @@
 namespace pag {
 std::string ToString(Frame frame);
 
+BackendTexture ToBackendTexture(const tgfx::GLTextureInfo& texture, int width, int height);
+
 void GetAllPAGFiles(const std::string& path, std::vector<std::string>& files);
 
 tgfx::Bitmap MakeSnapshot(std::shared_ptr<PAGSurface> pagSurface);
@@ -35,7 +37,7 @@ tgfx::Bitmap MakeSnapshot(std::shared_ptr<PAGSurface> pagSurface);
 std::shared_ptr<PAGLayer> GetLayer(std::shared_ptr<PAGComposition> root, LayerType type,
                                    int& targetIndex);
 
-bool CreateGLTexture(tgfx::Context* context, int width, int height, tgfx::GLSampler* texture);
+bool CreateGLTexture(tgfx::Context* context, int width, int height, tgfx::GLTextureInfo* texture);
 
 std::shared_ptr<PAGFile> LoadPAGFile(const std::string& path);
 

@@ -221,7 +221,10 @@ void DisplacementMapFilter::onUpdateParams(tgfx::Context* context, const tgfx::R
                                            const tgfx::Point&) {
   std::array<float, 4> flags = {0, 0, 0, 0};
   flags[0] = DisplacementWrapMode(displacementMapBehavior);
-  ActiveGLTexture(context, 1, mapSurface->getTexture()->getSampler());
+  auto texture = mapSurface->getBackendTexture();
+  tgfx::GLTextureInfo glSampler = {};
+  texture.getGLTextureInfo(&glSampler);
+  ActiveGLTexture(context, 1, &glSampler);
   auto gl = tgfx::GLFunctions::Get(context);
   gl->uniform1i(mapTextureHandle, 1);
   flags[1] = InputWrapMode(edgeBehavior);

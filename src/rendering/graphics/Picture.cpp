@@ -23,7 +23,6 @@
 #include "tgfx/core/Clock.h"
 #include "tgfx/gpu/Surface.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
-#include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace pag {
 static std::shared_ptr<tgfx::Image> RescaleImage(tgfx::Context* context,
@@ -282,12 +281,7 @@ class BackendTextureProxy : public ImageProxy {
     if (!checkContext(context)) {
       return nullptr;
     }
-    tgfx::GLSampler sampler = {};
-    if (!GetGLSampler(backendTexture, &sampler)) {
-      return nullptr;
-    }
-    auto texture = tgfx::GLTexture::MakeFrom(context, sampler, backendTexture.width(),
-                                             backendTexture.height(), origin);
+    auto texture = tgfx::Texture::MakeFrom(context, ToTGFX(backendTexture), origin);
     return tgfx::Image::MakeFrom(std::move(texture));
   }
 

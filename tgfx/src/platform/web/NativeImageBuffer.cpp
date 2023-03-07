@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "NativeImageBuffer.h"
+#include "gpu/opengl/GLSampler.h"
 #include "tgfx/core/ImageCodec.h"
-#include "tgfx/gpu/opengl/GLTexture.h"
 
 using namespace emscripten;
 
@@ -39,9 +39,9 @@ std::shared_ptr<Texture> NativeImageBuffer::onMakeTexture(Context* context, bool
   if (texture == nullptr) {
     return nullptr;
   }
-  auto& glInfo = std::static_pointer_cast<GLTexture>(texture)->glSampler();
+  auto glInfo = static_cast<const GLSampler*>(texture->getSampler());
   val::module_property("tgfx").call<void>("uploadToTexture", emscripten::val::module_property("GL"),
-                                          getImage(), glInfo.id);
+                                          getImage(), glInfo->id);
   return texture;
 }
 

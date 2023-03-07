@@ -150,37 +150,32 @@ ColorType ToPAG(tgfx::ColorType colorType) {
   }
 }
 
-tgfx::GLSemaphore ToTGFX(const BackendSemaphore& semaphore) {
-  tgfx::GLSemaphore glSemaphore = {};
-  glSemaphore.glSync = semaphore.glSync();
-  return glSemaphore;
-}
-
-bool GetGLSampler(const BackendTexture& texture, tgfx::GLSampler* sampler) {
+tgfx::BackendTexture ToTGFX(const BackendTexture& texture) {
   GLTextureInfo glInfo = {};
   if (!texture.getGLTextureInfo(&glInfo)) {
-    return false;
+    return {};
   }
-  sampler->id = glInfo.id;
-  sampler->target = glInfo.target;
-  sampler->format = tgfx::PixelFormat::RGBA_8888;
-  return true;
+  tgfx::GLTextureInfo sampler = {};
+  sampler.id = glInfo.id;
+  sampler.target = glInfo.target;
+  sampler.format = glInfo.format;
+  return {sampler, texture.width(), texture.height()};
 }
 
-bool GetGLFrameBuffer(const BackendRenderTarget& renderTarget, tgfx::GLFrameBuffer* frameBuffer) {
+tgfx::BackendRenderTarget ToTGFX(const BackendRenderTarget& renderTarget) {
   GLFrameBufferInfo glInfo = {};
   if (!renderTarget.getGLFramebufferInfo(&glInfo)) {
-    return false;
+    return {};
   }
-  frameBuffer->id = glInfo.id;
-  frameBuffer->format = tgfx::PixelFormat::RGBA_8888;
-  return true;
+  tgfx::GLFrameBufferInfo frameBuffer = {};
+  frameBuffer.id = glInfo.id;
+  frameBuffer.format = glInfo.format;
+  return {frameBuffer, renderTarget.width(), renderTarget.height()};
 }
 
-BackendTexture ToBackendTexture(const tgfx::GLSampler& sampler, int width, int height) {
-  GLTextureInfo glInfo = {};
-  glInfo.id = sampler.id;
-  glInfo.target = sampler.target;
-  return BackendTexture(glInfo, width, height);
+tgfx::BackendSemaphore ToTGFX(const BackendSemaphore& semaphore) {
+  tgfx::BackendSemaphore glSemaphore = {};
+  glSemaphore.initGL(semaphore.glSync());
+  return glSemaphore;
 }
 }  // namespace pag

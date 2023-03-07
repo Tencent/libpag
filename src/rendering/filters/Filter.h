@@ -20,15 +20,15 @@
 
 #include <array>
 #include "tgfx/core/Matrix.h"
-#include "tgfx/gpu/opengl/GLFrameBuffer.h"
-#include "tgfx/gpu/opengl/GLSampler.h"
+#include "tgfx/gpu/Backend.h"
+#include "tgfx/gpu/Context.h"
 
 namespace pag {
 struct FilterSource {
   /**
    * The source texture sampler.
    */
-  tgfx::GLSampler sampler = {};
+  tgfx::GLTextureInfo sampler = {};
 
   /**
    * The width of source texture in pixels after textureMatrix and scale being applied.
@@ -62,15 +62,15 @@ struct FilterTarget {
   /**
    * The target frame buffer.
    */
-  tgfx::GLFrameBuffer frameBuffer = {};
+  tgfx::GLFrameBufferInfo frameBuffer = {};
 
   /**
-   * The width of target frame buffer in pixels.
+   * The width of the target frame buffer in pixels.
    */
   int width = 0;
 
   /**
-   * The height of target frame buffer in pixels.
+   * The height of the target frame buffer in pixels.
    */
   int height = 0;
 

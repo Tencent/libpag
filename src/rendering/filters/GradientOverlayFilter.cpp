@@ -21,7 +21,6 @@
 #include "base/utils/TGFXCast.h"
 #include "rendering/graphics/GradientPaint.h"
 #include "tgfx/gpu/Surface.h"
-#include "tgfx/gpu/opengl/GLRenderTarget.h"
 
 namespace pag {
 GradientOverlayFilter::GradientOverlayFilter(GradientOverlayStyle* layerStyle)
@@ -79,12 +78,11 @@ void GradientOverlayFilter::draw(tgfx::Context* context, const FilterSource* sou
         tgfx::Shader::MakeColorShader(tgfx::Color::FromRGBA(0, 0, 0, opacity)));
   }
 
-  auto renderTarget = tgfx::GLRenderTarget::MakeFrom(context, target->frameBuffer, target->width,
-                                                     target->height, tgfx::SurfaceOrigin::TopLeft);
-  auto targetSurface = tgfx::Surface::MakeFrom(renderTarget);
+  tgfx::BackendRenderTarget renderTarget = {target->frameBuffer, target->width, target->height};
+  auto targetSurface = tgfx::Surface::MakeFrom(context, renderTarget, tgfx::SurfaceOrigin::TopLeft);
   auto targetCanvas = targetSurface->getCanvas();
-  auto texture = tgfx::GLTexture::MakeFrom(context, source->sampler, source->width, source->height,
-                                           tgfx::SurfaceOrigin::TopLeft);
+  tgfx::BackendTexture backendTexture = {source->sampler, source->width, source->height};
+  auto texture = tgfx::Texture::MakeFrom(context, backendTexture, tgfx::SurfaceOrigin::TopLeft);
 
   auto textureShader = tgfx::Shader::MakeImageShader(texture);
 

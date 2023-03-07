@@ -33,6 +33,14 @@ std::string ToString(Frame frame) {
   return result;
 }
 
+BackendTexture ToBackendTexture(const tgfx::GLTextureInfo& texture, int width, int height) {
+  GLTextureInfo glInfo = {};
+  glInfo.id = texture.id;
+  glInfo.target = texture.target;
+  glInfo.format = texture.format;
+  return {glInfo, width, height};
+}
+
 void GetAllPAGFiles(const std::string& path, std::vector<std::string>& files) {
   struct dirent* dirp;
   auto dirPath = TestConstants::PAG_ROOT + path;
@@ -88,9 +96,9 @@ std::shared_ptr<PAGLayer> GetLayer(std::shared_ptr<PAGComposition> root, LayerTy
   return nullptr;
 }
 
-bool CreateGLTexture(Context* context, int width, int height, GLSampler* texture) {
+bool CreateGLTexture(Context* context, int width, int height, tgfx::GLTextureInfo* texture) {
   texture->target = GL_TEXTURE_2D;
-  texture->format = PixelFormat::RGBA_8888;
+  texture->format = GL_RGBA8;
   auto gl = GLFunctions::Get(context);
   gl->genTextures(1, &texture->id);
   if (texture->id <= 0) {

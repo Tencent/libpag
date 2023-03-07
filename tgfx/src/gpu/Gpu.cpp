@@ -21,7 +21,7 @@
 
 namespace tgfx {
 void Gpu::regenerateMipMapLevels(const TextureSampler* sampler) {
-  if (!sampler->mipMapped()) {
+  if (!sampler->hasMipmaps()) {
     return;
   }
   onRegenerateMipMapLevels(sampler);

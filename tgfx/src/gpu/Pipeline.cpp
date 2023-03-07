@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Pipeline.h"
-#include "tgfx/gpu/TextureSampler.h"
+#include "gpu/TextureSampler.h"
 
 namespace tgfx {
 Pipeline::Pipeline(std::vector<std::unique_ptr<FragmentProcessor>> fragmentProcessors,

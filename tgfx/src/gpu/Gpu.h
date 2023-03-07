@@ -19,9 +19,9 @@
 #pragma once
 
 #include <memory>
+#include "gpu/Semaphore.h"
+#include "gpu/TextureSampler.h"
 #include "tgfx/gpu/Context.h"
-#include "tgfx/gpu/Semaphore.h"
-#include "tgfx/gpu/TextureSampler.h"
 
 namespace tgfx {
 class OpsRenderPass;

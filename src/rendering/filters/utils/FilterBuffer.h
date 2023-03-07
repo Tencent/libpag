@@ -22,13 +22,12 @@
 #include "pag/pag.h"
 #include "rendering/filters/Filter.h"
 #include "tgfx/gpu/Surface.h"
-#include "tgfx/gpu/opengl/GLRenderTarget.h"
 
 namespace pag {
 class FilterBuffer {
  public:
   static std::shared_ptr<FilterBuffer> Make(tgfx::Context* context, int width, int height,
-                                            bool usesMSAA = false);
+                                            bool useMSAA = false);
 
   void clearColor() const;
 
@@ -44,15 +43,16 @@ class FilterBuffer {
     return surface->height();
   }
 
-  bool usesMSAA() const {
-    return surface->getRenderTarget()->sampleCount() > 1;
+  bool useMSAA() const {
+    return _useMSAA;
   }
 
-  tgfx::GLFrameBuffer getFramebuffer() const;
+  tgfx::GLFrameBufferInfo getFramebuffer() const;
 
-  tgfx::GLSampler getTexture() const;
+  tgfx::GLTextureInfo getTexture() const;
 
  private:
+  bool _useMSAA = false;
   std::shared_ptr<tgfx::Surface> surface = nullptr;
 
   FilterBuffer() = default;

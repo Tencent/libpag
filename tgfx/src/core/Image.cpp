@@ -26,6 +26,7 @@
 #include "images/RasterGenerator.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
+#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
@@ -91,6 +92,28 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageBuffer> imageBuffer,
                                        ImageOrigin origin) {
   auto source = ImageSource::MakeFrom(std::move(imageBuffer));
   return MakeFromSource(std::move(source), origin);
+}
+
+std::shared_ptr<Image> Image::MakeFrom(Context* context, const BackendTexture& backendTexture,
+                                       ImageOrigin origin) {
+  SurfaceOrigin textureOrigin = SurfaceOrigin::TopLeft;
+  if (origin == ImageOrigin::BottomLeft) {
+    textureOrigin = SurfaceOrigin::BottomLeft;
+    origin = ImageOrigin::TopLeft;
+  }
+  auto texture = Texture::MakeFrom(context, backendTexture, textureOrigin);
+  return MakeFrom(std::move(texture), origin);
+}
+
+std::shared_ptr<Image> Image::MakeAdopted(Context* context, const BackendTexture& backendTexture,
+                                          ImageOrigin origin) {
+  SurfaceOrigin textureOrigin = SurfaceOrigin::TopLeft;
+  if (origin == ImageOrigin::BottomLeft) {
+    textureOrigin = SurfaceOrigin::BottomLeft;
+    origin = ImageOrigin::TopLeft;
+  }
+  auto texture = Texture::MakeAdopted(context, backendTexture, textureOrigin);
+  return MakeFrom(std::move(texture), origin);
 }
 
 std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Texture> texture, ImageOrigin origin) {

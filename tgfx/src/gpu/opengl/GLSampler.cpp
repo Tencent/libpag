@@ -16,10 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/gpu/opengl/GLSampler.h"
-#include "GLContext.h"
+#include "gpu/opengl/GLSampler.h"
+#include "GLCaps.h"
+#include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
+std::unique_ptr<TextureSampler> TextureSampler::MakeFrom(Context* context,
+                                                         const BackendTexture& backendTexture) {
+  GLTextureInfo textureInfo = {};
+  if (context == nullptr || !backendTexture.getGLTextureInfo(&textureInfo)) {
+    return nullptr;
+  }
+  auto sampler = std::make_unique<GLSampler>();
+  sampler->id = textureInfo.id;
+  sampler->target = textureInfo.target;
+  sampler->format = GLSizeFormatToPixelFormat(textureInfo.format);
+  return sampler;
+}
+
 TextureType GLSampler::type() const {
   switch (target) {
     case GL_TEXTURE_2D:
@@ -31,6 +45,14 @@ TextureType GLSampler::type() const {
     default:
       return TextureType::Unknown;
   }
+}
+
+BackendTexture GLSampler::getBackendTexture(int width, int height) const {
+  GLTextureInfo textureInfo = {};
+  textureInfo.id = id;
+  textureInfo.target = target;
+  textureInfo.format = PixelFormatToGLSizeFormat(format);
+  return {textureInfo, width, height};
 }
 
 void GLSampler::computeKey(Context* context, BytesKey* bytesKey) const {

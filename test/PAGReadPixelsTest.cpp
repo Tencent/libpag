@@ -25,7 +25,6 @@
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/gpu/Surface.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
-#include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace pag {
 using namespace tgfx;
@@ -244,11 +243,11 @@ PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
   ASSERT_TRUE(result);
   CHECK_PIXELS(AlphaRectInfo, pixels, "Surface_alpha_to_alpha_100_-100");
 
-  tgfx::GLSampler textureInfo = {};
+  tgfx::GLTextureInfo textureInfo = {};
   result = CreateGLTexture(context, width, height, &textureInfo);
   ASSERT_TRUE(result);
   auto glTexture =
-      GLTexture::MakeFrom(context, textureInfo, width, height, tgfx::SurfaceOrigin::BottomLeft);
+      Texture::MakeFrom(context, {textureInfo, width, height}, tgfx::SurfaceOrigin::BottomLeft);
   surface = Surface::MakeFrom(glTexture);
   ASSERT_TRUE(surface != nullptr);
   canvas = surface->getCanvas();

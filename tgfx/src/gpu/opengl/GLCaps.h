@@ -132,7 +132,9 @@ class GLCaps : public Caps {
 
   const Swizzle& getWriteSwizzle(PixelFormat pixelFormat) const override;
 
-  int getSampleCount(int requestedCount, PixelFormat pixelFormat) const;
+  bool isFormatRenderable(PixelFormat pixelFormat) const override;
+
+  int getSampleCount(int requestedCount, PixelFormat pixelFormat) const override;
 
   /**
    * Does the preferred MSAA FBO extension have MSAA renderBuffers?

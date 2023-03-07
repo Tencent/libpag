@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "tgfx/core/ImageInfo.h"
 #include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
@@ -26,6 +27,21 @@ namespace tgfx {
  */
 class RenderTarget : public Resource {
  public:
+  /**
+   * Wraps a backend renderTarget into RenderTarget. The caller must ensure the backend renderTarget
+   * is valid for the lifetime of the returned RenderTarget. Returns nullptr if the context is
+   * nullptr or the backend renderTarget is invalid.
+   */
+  static std::shared_ptr<RenderTarget> MakeFrom(Context* context,
+                                                const BackendRenderTarget& renderTarget,
+                                                SurfaceOrigin origin);
+
+  /**
+   * Creates a new RenderTarget which uses specified Texture as pixel storage. The caller must
+   * ensure the texture is valid for the lifetime of the returned RenderTarget.
+   */
+  static std::shared_ptr<RenderTarget> MakeFrom(const Texture* texture, int sampleCount = 1);
+
   /**
    * Returns the display width of the render target.
    */
@@ -58,6 +74,19 @@ class RenderTarget : public Resource {
   size_t memoryUsage() const override {
     return 0;
   }
+
+  /**
+   * Retrieves the backend render target.
+   */
+  virtual BackendRenderTarget getBackendRenderTarget() const = 0;
+
+  /**
+   * Copies a rect of pixels to dstPixels with specified color type, alpha type and row bytes. Copy
+   * starts at (srcX, srcY), and does not exceed Surface (width(), height()). Pixels are copied
+   * only if pixel conversion is possible. Returns true if pixels are copied to dstPixels.
+   */
+  virtual bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0,
+                          int srcY = 0) const = 0;
 
  protected:
   RenderTarget(int width, int height, SurfaceOrigin origin, int sampleCount = 1)

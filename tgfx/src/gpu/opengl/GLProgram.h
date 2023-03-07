@@ -26,7 +26,7 @@
 #include "gpu/GLGeometryProcessor.h"
 #include "gpu/GLXferProcessor.h"
 #include "gpu/Program.h"
-#include "tgfx/gpu/opengl/GLRenderTarget.h"
+#include "gpu/opengl/GLRenderTarget.h"
 
 namespace tgfx {
 class GLProgram : public Program {

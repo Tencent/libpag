@@ -19,8 +19,6 @@
 #include "FilterHelper.h"
 #include "base/utils/USE.h"
 #include "tgfx/gpu/Surface.h"
-#include "tgfx/gpu/opengl/GLRenderTarget.h"
-#include "tgfx/gpu/opengl/GLTexture.h"
 
 namespace pag {
 std::array<float, 9> ToGLMatrix(const tgfx::Matrix& matrix) {
@@ -92,8 +90,9 @@ std::unique_ptr<FilterSource> ToFilterSource(const tgfx::Texture* texture,
   if (texture == nullptr) {
     return nullptr;
   }
+  auto backendTexture = texture->getBackendTexture();
   auto filterSource = new FilterSource();
-  filterSource->sampler = *static_cast<const tgfx::GLSampler*>(texture->getSampler());
+  backendTexture.getGLTextureInfo(&filterSource->sampler);
   filterSource->width = texture->width();
   filterSource->height = texture->height();
   filterSource->scale = scale;
@@ -107,9 +106,9 @@ std::unique_ptr<FilterTarget> ToFilterTarget(tgfx::Surface* surface,
   if (surface == nullptr) {
     return nullptr;
   }
-  auto renderTarget = std::static_pointer_cast<tgfx::GLRenderTarget>(surface->getRenderTarget());
+  auto renderTarget = surface->getBackendRenderTarget();
   auto filterTarget = new FilterTarget();
-  filterTarget->frameBuffer = renderTarget->glFrameBuffer();
+  renderTarget.getGLFramebufferInfo(&filterTarget->frameBuffer);
   filterTarget->width = surface->width();
   filterTarget->height = surface->height();
   filterTarget->vertexMatrix =
@@ -183,18 +182,17 @@ unsigned CreateGLProgram(tgfx::Context* context, const std::string& vertex,
   return programHandle;
 }
 
-void ActiveGLTexture(tgfx::Context* context, int unitIndex, const tgfx::TextureSampler* sampler) {
+void ActiveGLTexture(tgfx::Context* context, int unitIndex, const tgfx::GLTextureInfo* sampler) {
   if (sampler == nullptr) {
     return;
   }
-  auto glSampler = static_cast<const tgfx::GLSampler*>(sampler);
   auto gl = tgfx::GLFunctions::Get(context);
   gl->activeTexture(GL_TEXTURE0 + unitIndex);
-  gl->bindTexture(glSampler->target, glSampler->id);
-  gl->texParameteri(glSampler->target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  gl->texParameteri(glSampler->target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  gl->texParameteri(glSampler->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  gl->texParameteri(glSampler->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  gl->bindTexture(sampler->target, sampler->id);
+  gl->texParameteri(sampler->target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  gl->texParameteri(sampler->target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  gl->texParameteri(sampler->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  gl->texParameteri(sampler->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 }
 
 bool CheckGLError(tgfx::Context* context) {

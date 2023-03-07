@@ -53,7 +53,7 @@ void PreConcatMatrix(FilterTarget* target, const tgfx::Matrix& matrix);
 unsigned CreateGLProgram(tgfx::Context* context, const std::string& vertex,
                          const std::string& fragment);
 
-void ActiveGLTexture(tgfx::Context* context, int unitIndex, const tgfx::TextureSampler* sampler);
+void ActiveGLTexture(tgfx::Context* context, int unitIndex, const tgfx::GLTextureInfo* sampler);
 
 bool CheckGLError(tgfx::Context* context);
 

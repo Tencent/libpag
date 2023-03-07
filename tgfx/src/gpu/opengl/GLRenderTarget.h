@@ -18,36 +18,45 @@
 
 #pragma once
 
-#import <AppKit/AppKit.h>
-#include "gpu/TextureSampler.h"
-#include "tgfx/gpu/Texture.h"
+#include "gpu/RenderTarget.h"
+#include "gpu/opengl/GLFrameBuffer.h"
 
 namespace tgfx {
-class CGLHardwareTexture : public Texture {
+class GLInterface;
+
+/**
+ * Represents an OpenGL 2D buffer of pixels that can be rendered to.
+ */
+class GLRenderTarget : public RenderTarget {
  public:
-  static std::shared_ptr<CGLHardwareTexture> MakeFrom(Context* context,
-                                                      CVPixelBufferRef pixelBuffer);
-
-  explicit CGLHardwareTexture(CVPixelBufferRef pixelBuffer);
-
-  ~CGLHardwareTexture() override;
-
-  size_t memoryUsage() const override;
-
-  const TextureSampler* getSampler() const override {
-    return sampler.get();
+  /**
+   * Returns the GLFrameBuffer associated with this render target.
+   */
+  GLFrameBuffer glFrameBuffer() const {
+    return renderTargetFBInfo;
   }
 
- protected:
-  void computeRecycleKey(BytesKey* recycleKey) const override;
+  void resolve() const;
+
+  BackendRenderTarget getBackendRenderTarget() const override;
+
+  bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0,
+                  int srcY = 0) const override;
 
  private:
-  std::unique_ptr<TextureSampler> sampler = {};
-  CVPixelBufferRef pixelBuffer = nullptr;
-  CVOpenGLTextureRef texture = nil;
+  GLFrameBuffer textureFBInfo = {};
+  GLFrameBuffer renderTargetFBInfo = {};
+  unsigned msRenderBufferID = 0;
+  unsigned textureTarget = 0;
+  bool externalResource = false;
 
-  static void ComputeRecycleKey(BytesKey* recycleKey, CVPixelBufferRef pixelBuffer);
+  GLRenderTarget(int width, int height, SurfaceOrigin origin, int sampleCount,
+                 GLFrameBuffer frameBuffer, unsigned textureTarget = 0);
 
   void onReleaseGPU() override;
+
+  const Swizzle& writeSwizzle() const override;
+
+  friend class RenderTarget;
 };
 }  // namespace tgfx

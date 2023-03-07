@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "NV12HardwareBuffer.h"
-#include "tgfx/gpu/YUVTexture.h"
+#include "gpu/YUVTexture.h"
 #include "utils/USE.h"
 
 namespace tgfx {

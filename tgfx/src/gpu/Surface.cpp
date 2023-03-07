@@ -18,9 +18,81 @@
 
 #include "tgfx/gpu/Surface.h"
 #include "DrawingManager.h"
+#include "core/PixelBuffer.h"
+#include "gpu/RenderTarget.h"
 #include "utils/Log.h"
 
 namespace tgfx {
+std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, bool alphaOnly,
+                                       int sampleCount, bool mipMapped,
+                                       const SurfaceOptions* options) {
+  auto caps = context->caps();
+  auto pixelFormat = alphaOnly ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
+  if (!caps->isFormatRenderable(pixelFormat)) {
+    return nullptr;
+  }
+  std::shared_ptr<Texture> texture = nullptr;
+  if (texture == nullptr) {
+    if (alphaOnly) {
+      texture = Texture::MakeAlpha(context, width, height, SurfaceOrigin::TopLeft, mipMapped);
+    } else {
+      texture = Texture::MakeRGBA(context, width, height, SurfaceOrigin::TopLeft, mipMapped);
+    }
+  }
+  if (texture == nullptr) {
+    return nullptr;
+  }
+  sampleCount = caps->getSampleCount(sampleCount, pixelFormat);
+  auto renderTarget = RenderTarget::MakeFrom(texture.get(), sampleCount);
+  if (renderTarget == nullptr) {
+    return nullptr;
+  }
+  auto surface = new Surface(renderTarget, texture, options);
+  // 对于内部创建的 RenderTarget 默认清屏。
+  surface->getCanvas()->clear();
+  return std::shared_ptr<Surface>(surface);
+}
+
+std::shared_ptr<Surface> Surface::MakeFrom(Context* context,
+                                           const BackendRenderTarget& renderTarget,
+                                           SurfaceOrigin origin, const SurfaceOptions* options) {
+  auto rt = RenderTarget::MakeFrom(context, renderTarget, origin);
+  return MakeFrom(std::move(rt), options);
+}
+
+std::shared_ptr<Surface> Surface::MakeFrom(Context* context, const BackendTexture& backendTexture,
+                                           SurfaceOrigin origin, int sampleCount,
+                                           const SurfaceOptions* options) {
+  auto texture = Texture::MakeFrom(context, backendTexture, origin);
+  return MakeFrom(std::move(texture), sampleCount, options);
+}
+
+std::shared_ptr<Surface> Surface::MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
+                                           int sampleCount, const SurfaceOptions* options) {
+  auto texture = Texture::MakeFrom(context, hardwareBuffer);
+  return MakeFrom(std::move(texture), sampleCount, options);
+}
+
+std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<RenderTarget> renderTarget,
+                                           const SurfaceOptions* options) {
+  if (renderTarget == nullptr) {
+    return nullptr;
+  }
+  return std::shared_ptr<Surface>(new Surface(std::move(renderTarget), nullptr, options));
+}
+
+std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<Texture> texture, int sampleCount,
+                                           const SurfaceOptions* options) {
+  if (texture == nullptr || texture->isYUV()) {
+    return nullptr;
+  }
+  auto renderTarget = RenderTarget::MakeFrom(texture.get(), sampleCount);
+  if (renderTarget == nullptr) {
+    return nullptr;
+  }
+  return std::shared_ptr<Surface>(new Surface(renderTarget, std::move(texture), options));
+}
+
 Surface::Surface(std::shared_ptr<RenderTarget> renderTarget, std::shared_ptr<Texture> texture,
                  const SurfaceOptions* options)
     : renderTarget(std::move(renderTarget)), texture(std::move(texture)) {
@@ -34,9 +106,20 @@ Surface::~Surface() {
   delete canvas;
 }
 
-std::shared_ptr<RenderTarget> Surface::getRenderTarget() {
-  flush();
-  return renderTarget;
+Context* Surface::getContext() const {
+  return renderTarget->getContext();
+}
+
+int Surface::width() const {
+  return renderTarget->width();
+}
+
+int Surface::height() const {
+  return renderTarget->height();
+}
+
+SurfaceOrigin Surface::origin() const {
+  return renderTarget->origin();
 }
 
 std::shared_ptr<Texture> Surface::getTexture() {
@@ -44,8 +127,19 @@ std::shared_ptr<Texture> Surface::getTexture() {
   return texture;
 }
 
-bool Surface::wait(const Semaphore* waitSemaphore) {
-  return renderTarget->getContext()->wait(waitSemaphore);
+BackendRenderTarget Surface::getBackendRenderTarget() {
+  flush();
+  return renderTarget->getBackendRenderTarget();
+}
+
+BackendTexture Surface::getBackendTexture() {
+  flush();
+  return texture->getBackendTexture();
+}
+
+bool Surface::wait(const BackendSemaphore& waitSemaphore) {
+  auto semaphore = Semaphore::Wrap(&waitSemaphore);
+  return renderTarget->getContext()->wait(semaphore.get());
 }
 
 Canvas* Surface::getCanvas() {
@@ -55,9 +149,14 @@ Canvas* Surface::getCanvas() {
   return canvas;
 }
 
-bool Surface::flush(Semaphore* signalSemaphore) {
+bool Surface::flush(BackendSemaphore* signalSemaphore) {
+  auto semaphore = Semaphore::Wrap(signalSemaphore);
   renderTarget->getContext()->drawingManager()->newTextureResolveRenderTask(this);
-  return renderTarget->getContext()->drawingManager()->flush(signalSemaphore);
+  auto result = renderTarget->getContext()->drawingManager()->flush(semaphore.get());
+  if (signalSemaphore != nullptr) {
+    *signalSemaphore = semaphore->getBackendSemaphore();
+  }
+  return result;
 }
 
 void Surface::flushAndSubmit(bool syncCpu) {
@@ -76,6 +175,6 @@ Color Surface::getColor(int x, int y) {
 
 bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int srcY) {
   flushAndSubmit();
-  return onReadPixels(dstInfo, dstPixels, srcX, srcY);
+  return renderTarget->readPixels(dstInfo, dstPixels, srcX, srcY);
 }
 }  // namespace tgfx

@@ -32,8 +32,7 @@ std::shared_ptr<GLVideoTexture> GLVideoTexture::Make(Context* context, int width
   if (sampler == nullptr) {
     return nullptr;
   }
-  auto glSampler = static_cast<GLSampler*>(sampler.get());
-  auto texture = Resource::Wrap(context, new GLVideoTexture(*glSampler, width, height));
+  auto texture = Resource::Wrap(context, new GLVideoTexture(std::move(sampler), width, height));
   if (isAndroidMiniprogram) {
     // https://stackoverflow.com/questions/28291204/something-about-stagefright-codec-input-format-in-android
     // Video decoder will align to multiples of 16 on the Android WeChat mini-program.
@@ -43,20 +42,26 @@ std::shared_ptr<GLVideoTexture> GLVideoTexture::Make(Context* context, int width
   return texture;
 }
 
-GLVideoTexture::GLVideoTexture(const GLSampler& glSampler, int width, int height)
-    : GLTexture(width, height, SurfaceOrigin::TopLeft), textureWidth(width), textureHeight(height) {
-  sampler = glSampler;
-}
-
-Point GLVideoTexture::getTextureCoord(float x, float y) const {
-  return {x / static_cast<float>(textureWidth), y / static_cast<float>(textureHeight)};
+GLVideoTexture::GLVideoTexture(std::unique_ptr<TextureSampler> sampler, int width, int height)
+    : Texture(width, height, SurfaceOrigin::TopLeft),
+      sampler(std::move(sampler)),
+      textureWidth(width),
+      textureHeight(height) {
 }
 
 size_t GLVideoTexture::memoryUsage() const {
   return width() * height() * 4;
 }
 
+Point GLVideoTexture::getTextureCoord(float x, float y) const {
+  return {x / static_cast<float>(textureWidth), y / static_cast<float>(textureHeight)};
+}
+
+BackendTexture GLVideoTexture::getBackendTexture() const {
+  return getSampler()->getBackendTexture(textureWidth, textureHeight);
+}
+
 void GLVideoTexture::onReleaseGPU() {
-  context->gpu()->deleteSampler(&sampler);
+  context->gpu()->deleteSampler(sampler.get());
 }
 }  // namespace tgfx

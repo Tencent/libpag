@@ -18,6 +18,7 @@
 
 #include "NativeImageReader.h"
 #include <chrono>
+#include "gpu/opengl/GLSampler.h"
 #include "utils/Log.h"
 
 namespace tgfx {
@@ -225,8 +226,8 @@ bool NativeImageReader::onUpdateTexture(Context* context, bool) {
   auto matrix = env->GetFloatArrayElements(floatArray, nullptr);
   auto textureSize = ComputeTextureSize(matrix, width(), height());
   env->ReleaseFloatArrayElements(floatArray, matrix, 0);
-  std::static_pointer_cast<GLExternalTexture>(texture)->updateTextureSize(textureSize.width,
-                                                                          textureSize.height);
+  std::static_pointer_cast<GLExternalOESTexture>(texture)->updateTextureSize(textureSize.width,
+                                                                             textureSize.height);
   return true;
 }
 
@@ -240,7 +241,7 @@ bool NativeImageReader::attachToContext(JNIEnv* env, Context* context) {
     }
     return true;
   }
-  texture = GLExternalTexture::Make(context, width(), height());
+  texture = GLExternalOESTexture::Make(context, width(), height());
   if (texture == nullptr) {
     return false;
   }
