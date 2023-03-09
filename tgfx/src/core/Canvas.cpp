@@ -696,6 +696,7 @@ bool Canvas::drawAsClear(const Path& path, const GpuPaint& paint) {
   if (!IsPixelAligned(bounds)) {
     return false;
   }
+  surface->aboutToDraw(true);
   auto [rect, useScissor] = getClipRect();
   if (rect.has_value()) {
     if (useScissor) {
@@ -746,6 +747,7 @@ void Canvas::draw(std::unique_ptr<DrawOp> op, GpuPaint paint, bool aa) {
   op->setAA(aaType);
   op->setColors(std::move(paint.colorFragmentProcessors));
   op->setMasks(std::move(masks));
+  surface->aboutToDraw(false);
   drawContext->addOp(std::move(op));
 }
 }  // namespace tgfx

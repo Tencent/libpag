@@ -142,4 +142,52 @@ PAG_TEST(PAGSurfaceTest, BottomLeftScissor) {
   gl->deleteTextures(1, &textureInfo.id);
   device->unlock();
 }
+
+PAG_TEST(PAGSurfaceTest, ImageSnapshot) {
+  auto device = GLDevice::Make();
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  tgfx::GLTextureInfo textureInfo;
+  auto width = 200;
+  auto height = 200;
+  CreateGLTexture(context, width, height, &textureInfo);
+  tgfx::BackendTexture backendTexture = {textureInfo, width, height};
+  auto surface = Surface::MakeFrom(context, backendTexture, SurfaceOrigin::BottomLeft);
+  ASSERT_TRUE(surface != nullptr);
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->drawImage(image);
+  auto snapshotImage = surface->makeImageSnapshot();
+  auto snapshotImage2 = surface->makeImageSnapshot();
+  EXPECT_TRUE(snapshotImage == snapshotImage2);
+  auto compareSurface = Surface::Make(context, width, height);
+  auto compareCanvas = compareSurface->getCanvas();
+  compareCanvas->drawImage(snapshotImage);
+  EXPECT_TRUE(Baseline::Compare(compareSurface, "PAGSurfaceTest/ImageSnapshot"));
+  canvas->drawImage(image, 100, 100);
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGSurfaceTest/ImageSnapshot_Surface"));
+  compareCanvas->clear();
+  compareCanvas->drawImage(snapshotImage);
+  EXPECT_TRUE(Baseline::Compare(compareSurface, "PAGSurfaceTest/ImageSnapshot"));
+
+  surface = Surface::Make(context, width, height);
+  canvas = surface->getCanvas();
+  canvas->drawImage(image);
+  snapshotImage = surface->makeImageSnapshot();
+  snapshotImage2 = surface->makeImageSnapshot();
+  EXPECT_TRUE(snapshotImage == snapshotImage2);
+  compareCanvas->clear();
+  compareCanvas->drawImage(snapshotImage);
+  EXPECT_TRUE(Baseline::Compare(compareSurface, "PAGSurfaceTest/ImageSnapshot"));
+  canvas->drawImage(image, 100, 100);
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGSurfaceTest/ImageSnapshot_Surface"));
+  compareCanvas->clear();
+  compareCanvas->drawImage(snapshotImage);
+  EXPECT_TRUE(Baseline::Compare(compareSurface, "PAGSurfaceTest/ImageSnapshot"));
+
+  auto gl = GLFunctions::Get(context);
+  gl->deleteTextures(1, &textureInfo.id);
+  device->unlock();
+}
 }  // namespace pag

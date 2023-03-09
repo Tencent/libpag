@@ -185,11 +185,11 @@ void GLGpu::bindTexture(int unitIndex, const TextureSampler* sampler, SamplerSta
                     FilterToGLMagFilter(samplerState.filterMode));
 }
 
-void GLGpu::copyRenderTargetToTexture(RenderTarget* renderTarget, Texture* texture,
+void GLGpu::copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture* texture,
                                       const Rect& srcRect, const Point& dstPoint) {
   auto gl = GLFunctions::Get(_context);
-  auto glRenderTarget = static_cast<GLRenderTarget*>(renderTarget);
-  gl->bindFramebuffer(GL_FRAMEBUFFER, glRenderTarget->glFrameBuffer().id);
+  auto glRenderTarget = static_cast<const GLRenderTarget*>(renderTarget);
+  gl->bindFramebuffer(GL_FRAMEBUFFER, glRenderTarget->getFrameBufferID(false));
   auto glSampler = static_cast<const GLSampler*>(texture->getSampler());
   gl->bindTexture(glSampler->target, glSampler->id);
   // format != BGRA && !srcHasMSAARenderBuffer && !dstHasMSAARenderBuffer && dstIsTextureable &&

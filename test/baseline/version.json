@@ -8605,6 +8605,8 @@
     "PAGSurfaceTest": {
         "BottomLeftScissor": "ccc8cae9",
         "FromTexture": "6a420423",
+        "ImageSnapshot": "9ca662f1",
+        "ImageSnapshot_Surface": "9ca662f1",
         "Mask": "ccc8cae9"
     },
     "PAGTextLayerTest": {

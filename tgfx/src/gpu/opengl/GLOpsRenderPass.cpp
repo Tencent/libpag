@@ -147,7 +147,7 @@ bool GLOpsRenderPass::onBindPipelineAndScissorClip(const ProgramInfo& info,
   auto glRT = static_cast<GLRenderTarget*>(_renderTarget.get());
   auto* program = static_cast<GLProgram*>(_program);
   gl->useProgram(program->programID());
-  gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->glFrameBuffer().id);
+  gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->getFrameBufferID());
   gl->viewport(0, 0, glRT->width(), glRT->height());
   UpdateScissor(_context, drawBounds);
   UpdateBlend(_context, info.blendFactors);
@@ -211,7 +211,7 @@ void GLOpsRenderPass::draw(const std::function<void()>& func) {
 void GLOpsRenderPass::onClear(const Rect& scissor, Color color) {
   auto gl = GLFunctions::Get(_context);
   auto glRT = static_cast<GLRenderTarget*>(_renderTarget.get());
-  gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->glFrameBuffer().id);
+  gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->getFrameBufferID());
   gl->viewport(0, 0, glRT->width(), glRT->height());
   UpdateScissor(_context, scissor);
   gl->clearColor(color.red, color.green, color.blue, color.alpha);
