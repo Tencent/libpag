@@ -27,6 +27,8 @@
 #include "nlohmann/json.hpp"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageCodec.h"
+#include "tgfx/gpu/Surface.h"
+#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pag {
 using namespace tgfx;
@@ -120,6 +122,19 @@ bool Baseline::Compare(std::shared_ptr<tgfx::PixelBuffer> pixelBuffer, const std
   auto result = Baseline::Compare(pixmap, key);
   pixelBuffer->unlockPixels();
   return result;
+}
+
+bool Baseline::Compare(const std::shared_ptr<tgfx::Surface> surface, const std::string& key) {
+  if (surface == nullptr) {
+    return false;
+  }
+  Bitmap bitmap(surface->width(), surface->height(), false, false);
+  Pixmap pixmap(bitmap);
+  auto result = surface->readPixels(pixmap.info(), pixmap.writablePixels());
+  if (!result) {
+    return false;
+  }
+  return Baseline::Compare(pixmap, key);
 }
 
 bool Baseline::Compare(const Bitmap& bitmap, const std::string& key) {

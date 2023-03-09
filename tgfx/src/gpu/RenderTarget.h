@@ -71,6 +71,11 @@ class RenderTarget : public Resource {
     return _sampleCount;
   }
 
+  /**
+   * Returns the pixel format of the render target.
+   */
+  virtual PixelFormat format() const = 0;
+
   size_t memoryUsage() const override {
     return 0;
   }
@@ -87,6 +92,11 @@ class RenderTarget : public Resource {
    */
   virtual bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0,
                           int srcY = 0) const = 0;
+
+  /**
+   * Replaces the backing texture of the render target with the specified Texture.
+   */
+  virtual bool replaceTexture(const Texture* texture) = 0;
 
  protected:
   RenderTarget(int width, int height, SurfaceOrigin origin, int sampleCount = 1)

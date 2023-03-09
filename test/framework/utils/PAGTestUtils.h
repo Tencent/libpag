@@ -22,6 +22,7 @@
 #include "base/utils/TGFXCast.h"
 #include "pag/pag.h"
 #include "tgfx/core/Clock.h"
+#include "tgfx/core/Image.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
 
@@ -42,6 +43,8 @@ bool CreateGLTexture(tgfx::Context* context, int width, int height, tgfx::GLText
 std::shared_ptr<PAGFile> LoadPAGFile(const std::string& path);
 
 std::shared_ptr<tgfx::ImageCodec> MakeImageCodec(const std::string& path);
+
+std::shared_ptr<tgfx::Image> MakeImage(const std::string& path);
 
 std::shared_ptr<PAGImage> MakePAGImage(const std::string& path);
 }  // namespace pag

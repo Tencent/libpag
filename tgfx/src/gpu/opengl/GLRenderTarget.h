@@ -29,12 +29,14 @@ class GLInterface;
  */
 class GLRenderTarget : public RenderTarget {
  public:
-  /**
-   * Returns the GLFrameBuffer associated with this render target.
-   */
-  GLFrameBuffer glFrameBuffer() const {
-    return renderTargetFBInfo;
+  PixelFormat format() const override {
+    return frameBufferForDraw.format;
   }
+
+  /**
+   * Returns the frame buffer id associated with this render target.
+   */
+  unsigned getFrameBufferID(bool forDraw = true) const;
 
   void resolve() const;
 
@@ -43,9 +45,11 @@ class GLRenderTarget : public RenderTarget {
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0,
                   int srcY = 0) const override;
 
+  bool replaceTexture(const Texture* texture) override;
+
  private:
-  GLFrameBuffer textureFBInfo = {};
-  GLFrameBuffer renderTargetFBInfo = {};
+  GLFrameBuffer frameBufferForRead = {};
+  GLFrameBuffer frameBufferForDraw = {};
   unsigned msRenderBufferID = 0;
   unsigned textureTarget = 0;
   bool externalResource = false;

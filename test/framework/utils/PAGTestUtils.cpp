@@ -122,6 +122,10 @@ std::shared_ptr<tgfx::ImageCodec> MakeImageCodec(const std::string& path) {
   return ImageCodec::MakeFrom(TestConstants::PAG_ROOT + path);
 }
 
+std::shared_ptr<tgfx::Image> MakeImage(const std::string& path) {
+  return Image::MakeFromFile(TestConstants::PAG_ROOT + path);
+}
+
 std::shared_ptr<PAGImage> MakePAGImage(const std::string& path) {
   return PAGImage::FromPath(TestConstants::PAG_ROOT + path);
 }

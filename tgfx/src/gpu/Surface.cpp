@@ -47,7 +47,7 @@ std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, 
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto surface = new Surface(renderTarget, texture, options);
+  auto surface = new Surface(renderTarget, texture, options, false);
   // 对于内部创建的 RenderTarget 默认清屏。
   surface->getCanvas()->clear();
   return std::shared_ptr<Surface>(surface);
@@ -94,8 +94,10 @@ std::shared_ptr<Surface> Surface::MakeFrom(std::shared_ptr<Texture> texture, int
 }
 
 Surface::Surface(std::shared_ptr<RenderTarget> renderTarget, std::shared_ptr<Texture> texture,
-                 const SurfaceOptions* options)
-    : renderTarget(std::move(renderTarget)), texture(std::move(texture)) {
+                 const SurfaceOptions* options, bool externalTexture)
+    : renderTarget(std::move(renderTarget)),
+      texture(std::move(texture)),
+      externalTexture(externalTexture) {
   DEBUG_ASSERT(this->renderTarget != nullptr);
   if (options != nullptr) {
     surfaceOptions = *options;
@@ -162,6 +164,55 @@ bool Surface::flush(BackendSemaphore* signalSemaphore) {
 void Surface::flushAndSubmit(bool syncCpu) {
   flush();
   renderTarget->getContext()->submit(syncCpu);
+}
+
+static std::shared_ptr<Texture> MakeTextureFromRenderTarget(const RenderTarget* renderTarget,
+                                                            bool discardContent = false) {
+  auto context = renderTarget->getContext();
+  auto width = renderTarget->width();
+  auto height = renderTarget->height();
+  if (discardContent) {
+    return Texture::MakeFormat(context, width, height, renderTarget->format(),
+                               renderTarget->origin());
+  }
+  auto texture =
+      Texture::MakeFormat(context, width, height, renderTarget->format(), renderTarget->origin());
+  if (texture == nullptr) {
+    return nullptr;
+  }
+  context->gpu()->copyRenderTargetToTexture(renderTarget, texture.get(),
+                                            Rect::MakeWH(width, height), Point::Zero());
+  return texture;
+}
+
+std::shared_ptr<Image> Surface::makeImageSnapshot() {
+  flush();
+  if (cachedImage != nullptr) {
+    return cachedImage;
+  }
+  if (texture != nullptr && !externalTexture) {
+    cachedImage = Image::MakeFrom(texture);
+  } else {
+    auto textureCopy = MakeTextureFromRenderTarget(renderTarget.get());
+    cachedImage = Image::MakeFrom(textureCopy);
+  }
+  return cachedImage;
+}
+
+void Surface::aboutToDraw(bool discardContent) {
+  if (cachedImage == nullptr) {
+    return;
+  }
+  cachedImage = nullptr;
+  if (texture == nullptr || externalTexture) {
+    return;
+  }
+  auto newTexture = MakeTextureFromRenderTarget(renderTarget.get(), discardContent);
+  auto success = renderTarget->replaceTexture(newTexture.get());
+  if (!success) {
+    LOGE("Surface::aboutToDraw(): Failed to replace the backing texture of the renderTarget!");
+  }
+  texture = newTexture;
 }
 
 Color Surface::getColor(int x, int y) {

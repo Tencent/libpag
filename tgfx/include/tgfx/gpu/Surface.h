@@ -165,6 +165,14 @@ class Surface {
   void flushAndSubmit(bool syncCpu = false);
 
   /**
+   * Returns an Image capturing the Surface contents. Subsequent drawings to the Surface contents
+   * are not captured. This method would trigger immediate texture copying if the Surface has no
+   * backing texture or the backing texture was allocated externally. For example, the Surface was
+   * created from a BackendRenderTarget, a BackendTexture or a HardwareBuffer.
+   */
+  std::shared_ptr<Image> makeImageSnapshot();
+
+  /**
    * Returns pixel at (x, y) as unpremultiplied color. Some color precision may be lost in the
    * conversion to unpremultiplied color; original pixel data may have additional precision. Returns
    * a transparent color if the point (x, y) is not contained by the Surface bounds.
@@ -185,7 +193,9 @@ class Surface {
   std::shared_ptr<RenderTarget> renderTarget = nullptr;
   std::shared_ptr<Texture> texture = nullptr;
   SurfaceOptions surfaceOptions = {};
+  bool externalTexture = false;
   Canvas* canvas = nullptr;
+  std::shared_ptr<Image> cachedImage = nullptr;
 
   static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<RenderTarget> renderTarget,
                                            const SurfaceOptions* options = nullptr);
@@ -194,7 +204,9 @@ class Surface {
                                            const SurfaceOptions* options = nullptr);
 
   Surface(std::shared_ptr<RenderTarget> renderTarget, std::shared_ptr<Texture> texture,
-          const SurfaceOptions* options);
+          const SurfaceOptions* options, bool externalTexture = true);
+
+  void aboutToDraw(bool discardContent = false);
 
   friend class DrawingManager;
   friend class Canvas;
