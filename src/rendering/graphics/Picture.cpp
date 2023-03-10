@@ -251,7 +251,7 @@ class DefaultImageProxy : public ImageProxy {
 
 class BackendTextureProxy : public ImageProxy {
  public:
-  BackendTextureProxy(ID assetID, const tgfx::BackendTexture& texture, tgfx::SurfaceOrigin origin,
+  BackendTextureProxy(ID assetID, const tgfx::BackendTexture& texture, tgfx::ImageOrigin origin,
                       void* sharedContext)
       : assetID(assetID), backendTexture(texture), origin(origin), sharedContext(sharedContext) {
   }
@@ -287,7 +287,7 @@ class BackendTextureProxy : public ImageProxy {
  private:
   ID assetID = 0;
   tgfx::BackendTexture backendTexture = {};
-  tgfx::SurfaceOrigin origin = tgfx::SurfaceOrigin::TopLeft;
+  tgfx::ImageOrigin origin = tgfx::ImageOrigin::TopLeft;
   void* sharedContext = nullptr;
 
   bool checkContext(tgfx::Context* context) const {
@@ -323,7 +323,7 @@ std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, std::shared_ptr<ImageProx
 }
 
 std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, const tgfx::BackendTexture& texture,
-                                           tgfx::SurfaceOrigin origin) {
+                                           tgfx::ImageOrigin origin) {
   if (!texture.isValid()) {
     return nullptr;
   }

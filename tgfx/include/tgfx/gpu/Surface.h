@@ -21,8 +21,8 @@
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/gpu/Backend.h"
+#include "tgfx/gpu/ImageOrigin.h"
 #include "tgfx/gpu/SurfaceOptions.h"
-#include "tgfx/gpu/SurfaceOrigin.h"
 
 namespace tgfx {
 class Canvas;
@@ -58,7 +58,7 @@ class Surface {
    */
   static std::shared_ptr<Surface> MakeFrom(Context* context,
                                            const BackendRenderTarget& renderTarget,
-                                           SurfaceOrigin origin,
+                                           ImageOrigin origin,
                                            const SurfaceOptions* options = nullptr);
 
   /**
@@ -68,7 +68,7 @@ class Surface {
    * nullptr or the texture is invalid.
    */
   static std::shared_ptr<Surface> MakeFrom(Context* context, const BackendTexture& backendTexture,
-                                           SurfaceOrigin origin, int sampleCount = 1,
+                                           ImageOrigin origin, int sampleCount = 1,
                                            const SurfaceOptions* options = nullptr);
 
   /**
@@ -108,7 +108,7 @@ class Surface {
   /**
    * Returns the origin of this surface, either SurfaceOrigin::TopLeft or SurfaceOrigin::BottomLeft.
    */
-  SurfaceOrigin origin() const;
+  ImageOrigin origin() const;
 
   /**
    * Retrieves the backend render target that the surface renders to. The returned

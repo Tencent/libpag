@@ -23,7 +23,7 @@ namespace tgfx {
  * Textures and Surfaces can be stored such that (0, 0) in texture space may correspond to
  * either the top-left or bottom-left content pixel.
  */
-enum class SurfaceOrigin {
+enum class ImageOrigin {
   /**
    * The default origin of the native coordinate system in the GPU backend. For example, the
    * SurfaceOrigin::TopLeft is actually the bottom-left origin in the OpenGL coordinate system for

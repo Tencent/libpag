@@ -54,7 +54,7 @@ class GLRenderTarget : public RenderTarget {
   unsigned textureTarget = 0;
   bool externalResource = false;
 
-  GLRenderTarget(int width, int height, SurfaceOrigin origin, int sampleCount,
+  GLRenderTarget(int width, int height, ImageOrigin origin, int sampleCount,
                  GLFrameBuffer frameBuffer, unsigned textureTarget = 0);
 
   void onReleaseGPU() override;

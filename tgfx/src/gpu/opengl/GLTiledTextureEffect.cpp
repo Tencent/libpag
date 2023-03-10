@@ -369,7 +369,7 @@ void GLTiledTextureEffect::onSetData(const ProgramDataManager& programDataManage
     }
     prev = subset;
     float rect[4] = {subset.left, subset.top, subset.right, subset.bottom};
-    if (textureFP.texture->origin() == SurfaceOrigin::BottomLeft) {
+    if (textureFP.texture->origin() == ImageOrigin::BottomLeft) {
       auto h = static_cast<float>(textureFP.texture->height());
       rect[1] = h - rect[1];
       rect[3] = h - rect[3];

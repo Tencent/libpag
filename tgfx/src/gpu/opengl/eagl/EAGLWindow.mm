@@ -137,9 +137,8 @@ std::shared_ptr<Surface> EAGLWindow::onCreateSurface(Context* context) {
   GLFrameBufferInfo glInfo = {};
   glInfo.id = frameBufferID;
   glInfo.format = GL_RGBA8;
-    BackendRenderTarget renderTarget = {glInfo, static_cast<int>(width),
-        static_cast<int>(height)};
-  return Surface::MakeFrom(context, renderTarget, SurfaceOrigin::BottomLeft);
+  BackendRenderTarget renderTarget = {glInfo, static_cast<int>(width), static_cast<int>(height)};
+  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
 }
 
 void EAGLWindow::onPresent(Context* context, int64_t) {

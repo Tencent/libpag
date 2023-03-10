@@ -34,9 +34,9 @@ std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, 
   std::shared_ptr<Texture> texture = nullptr;
   if (texture == nullptr) {
     if (alphaOnly) {
-      texture = Texture::MakeAlpha(context, width, height, SurfaceOrigin::TopLeft, mipMapped);
+      texture = Texture::MakeAlpha(context, width, height, ImageOrigin::TopLeft, mipMapped);
     } else {
-      texture = Texture::MakeRGBA(context, width, height, SurfaceOrigin::TopLeft, mipMapped);
+      texture = Texture::MakeRGBA(context, width, height, ImageOrigin::TopLeft, mipMapped);
     }
   }
   if (texture == nullptr) {
@@ -55,13 +55,13 @@ std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, 
 
 std::shared_ptr<Surface> Surface::MakeFrom(Context* context,
                                            const BackendRenderTarget& renderTarget,
-                                           SurfaceOrigin origin, const SurfaceOptions* options) {
+                                           ImageOrigin origin, const SurfaceOptions* options) {
   auto rt = RenderTarget::MakeFrom(context, renderTarget, origin);
   return MakeFrom(std::move(rt), options);
 }
 
 std::shared_ptr<Surface> Surface::MakeFrom(Context* context, const BackendTexture& backendTexture,
-                                           SurfaceOrigin origin, int sampleCount,
+                                           ImageOrigin origin, int sampleCount,
                                            const SurfaceOptions* options) {
   auto texture = Texture::MakeFrom(context, backendTexture, origin);
   return MakeFrom(std::move(texture), sampleCount, options);
@@ -120,7 +120,7 @@ int Surface::height() const {
   return renderTarget->height();
 }
 
-SurfaceOrigin Surface::origin() const {
+ImageOrigin Surface::origin() const {
   return renderTarget->origin();
 }
 

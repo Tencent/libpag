@@ -29,15 +29,15 @@ namespace pag {
 std::array<float, 9> ToGLMatrix(const tgfx::Matrix& matrix);
 
 std::array<float, 9> ToGLVertexMatrix(const tgfx::Matrix& matrix, int width, int height,
-                                      tgfx::SurfaceOrigin origin);
+                                      tgfx::ImageOrigin origin);
 
 std::array<float, 9> ToGLTextureMatrix(const tgfx::Matrix& matrix, int width, int height,
-                                       tgfx::SurfaceOrigin origin);
+                                       tgfx::ImageOrigin origin);
 
 tgfx::Matrix ToMatrix(const FilterTarget* target, bool flipY = false);
 
 std::unique_ptr<FilterSource> ToFilterSource(const tgfx::BackendTexture& texture,
-                                             tgfx::SurfaceOrigin origin, const tgfx::Point& scale);
+                                             tgfx::ImageOrigin origin, const tgfx::Point& scale);
 
 std::unique_ptr<FilterTarget> ToFilterTarget(tgfx::Surface* surface,
                                              const tgfx::Matrix& drawingMatrix);

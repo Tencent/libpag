@@ -196,7 +196,7 @@ PAG_TEST(CanvasTest, clip) {
   tgfx::GLTextureInfo textureInfo;
   pag::CreateGLTexture(context, width, height, &textureInfo);
   auto glTexture =
-      Texture::MakeFrom(context, {textureInfo, width, height}, SurfaceOrigin::BottomLeft);
+      Texture::MakeFrom(context, {textureInfo, width, height}, ImageOrigin::BottomLeft);
   auto surface = Surface::MakeFrom(glTexture);
   auto canvas = surface->getCanvas();
   canvas->clear();

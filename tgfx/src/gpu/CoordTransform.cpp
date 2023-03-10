@@ -56,7 +56,7 @@ Matrix CoordTransform::getTotalMatrix() const {
     auto translate = texture->getTextureCoord(shrinkAmount, shrinkAmount);
     combined.postTranslate(translate.x, translate.y);
   }
-  if (texture->origin() == SurfaceOrigin::BottomLeft) {
+  if (texture->origin() == ImageOrigin::BottomLeft) {
     combined.postScale(1, -1);
     auto translate = texture->getTextureCoord(0, static_cast<float>(texture->height()));
     combined.postTranslate(translate.x, translate.y);

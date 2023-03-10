@@ -91,13 +91,13 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageBuffer> imageBuffer)
 }
 
 std::shared_ptr<Image> Image::MakeFrom(Context* context, const BackendTexture& backendTexture,
-                                       SurfaceOrigin origin) {
+                                       ImageOrigin origin) {
   auto texture = Texture::MakeFrom(context, backendTexture, origin);
   return MakeFrom(std::move(texture));
 }
 
 std::shared_ptr<Image> Image::MakeAdopted(Context* context, const BackendTexture& backendTexture,
-                                          SurfaceOrigin origin) {
+                                          ImageOrigin origin) {
   auto texture = Texture::MakeAdopted(context, backendTexture, origin);
   return MakeFrom(std::move(texture));
 }

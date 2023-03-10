@@ -121,7 +121,7 @@ std::shared_ptr<Texture> HardwareBuffer::onMakeTexture(Context* context, bool mi
                     ? PixelFormat::ALPHA_8
                     : PixelFormat::BGRA_8888;
   auto texture =
-      Texture::MakeFormat(context, width(), height(), format, SurfaceOrigin::TopLeft, true);
+      Texture::MakeFormat(context, width(), height(), format, ImageOrigin::TopLeft, true);
   if (texture == nullptr) {
     return nullptr;
   }

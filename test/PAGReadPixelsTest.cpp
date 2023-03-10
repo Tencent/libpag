@@ -246,7 +246,7 @@ PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
   result = CreateGLTexture(context, width, height, &textureInfo);
   ASSERT_TRUE(result);
   auto glTexture =
-      Texture::MakeFrom(context, {textureInfo, width, height}, tgfx::SurfaceOrigin::BottomLeft);
+      Texture::MakeFrom(context, {textureInfo, width, height}, tgfx::ImageOrigin::BottomLeft);
   surface = Surface::MakeFrom(glTexture);
   ASSERT_TRUE(surface != nullptr);
   canvas = surface->getCanvas();

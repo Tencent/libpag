@@ -28,7 +28,7 @@
 namespace tgfx {
 std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
                                                      const BackendRenderTarget& renderTarget,
-                                                     SurfaceOrigin origin) {
+                                                     ImageOrigin origin) {
   if (context == nullptr || !renderTarget.isValid()) {
     return nullptr;
   }
@@ -173,16 +173,16 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(const Texture* texture, int
   return Resource::Wrap(context, rt);
 }
 
-GLRenderTarget::GLRenderTarget(int width, int height, SurfaceOrigin origin, int sampleCount,
+GLRenderTarget::GLRenderTarget(int width, int height, ImageOrigin origin, int sampleCount,
                                GLFrameBuffer frameBuffer, unsigned textureTarget)
     : RenderTarget(width, height, origin, sampleCount),
       frameBufferForRead(frameBuffer),
       textureTarget(textureTarget) {
 }
 
-static bool CanReadDirectly(Context* context, SurfaceOrigin origin, const ImageInfo& srcInfo,
+static bool CanReadDirectly(Context* context, ImageOrigin origin, const ImageInfo& srcInfo,
                             const ImageInfo& dstInfo) {
-  if (origin != SurfaceOrigin::TopLeft || dstInfo.alphaType() != srcInfo.alphaType() ||
+  if (origin != ImageOrigin::TopLeft || dstInfo.alphaType() != srcInfo.alphaType() ||
       dstInfo.colorType() != srcInfo.colorType()) {
     return false;
   }
@@ -252,7 +252,7 @@ bool GLRenderTarget::readPixels(const ImageInfo& dstInfo, void* dstPixels, int s
   }
   auto alignment = pixelFormat == PixelFormat::ALPHA_8 ? 1 : 4;
   gl->pixelStorei(GL_PACK_ALIGNMENT, alignment);
-  auto flipY = origin() == SurfaceOrigin::BottomLeft;
+  auto flipY = origin() == ImageOrigin::BottomLeft;
   auto readX = std::max(0, srcX);
   auto readY = std::max(0, srcY);
   if (flipY) {

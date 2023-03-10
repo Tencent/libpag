@@ -58,7 +58,7 @@ class Drawable {
 class RenderTargetDrawable : public Drawable {
  public:
   RenderTargetDrawable(std::shared_ptr<tgfx::Device> device,
-                       const tgfx::BackendRenderTarget& renderTarget, tgfx::SurfaceOrigin origin);
+                       const tgfx::BackendRenderTarget& renderTarget, tgfx::ImageOrigin origin);
 
   int width() const override {
     return renderTarget.width();
@@ -83,13 +83,13 @@ class RenderTargetDrawable : public Drawable {
  private:
   std::shared_ptr<tgfx::Device> device = nullptr;
   tgfx::BackendRenderTarget renderTarget = {};
-  tgfx::SurfaceOrigin origin = tgfx::SurfaceOrigin::TopLeft;
+  tgfx::ImageOrigin origin = tgfx::ImageOrigin::TopLeft;
 };
 
 class TextureDrawable : public Drawable {
  public:
   TextureDrawable(std::shared_ptr<tgfx::Device> device, const tgfx::BackendTexture& texture,
-                  tgfx::SurfaceOrigin origin);
+                  tgfx::ImageOrigin origin);
 
   int width() const override {
     return texture.width();
@@ -114,7 +114,7 @@ class TextureDrawable : public Drawable {
  private:
   std::shared_ptr<tgfx::Device> device = nullptr;
   tgfx::BackendTexture texture = {};
-  tgfx::SurfaceOrigin origin = tgfx::SurfaceOrigin::TopLeft;
+  tgfx::ImageOrigin origin = tgfx::ImageOrigin::TopLeft;
 };
 
 class OffscreenDrawable : public Drawable {

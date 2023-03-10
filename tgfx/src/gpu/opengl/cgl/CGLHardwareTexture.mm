@@ -69,7 +69,7 @@ void CGLHardwareTexture::ComputeRecycleKey(BytesKey* recycleKey, CVPixelBufferRe
 
 CGLHardwareTexture::CGLHardwareTexture(CVPixelBufferRef pixelBuffer)
     : Texture(static_cast<int>(CVPixelBufferGetWidth(pixelBuffer)),
-              static_cast<int>(CVPixelBufferGetHeight(pixelBuffer)), SurfaceOrigin::TopLeft),
+              static_cast<int>(CVPixelBufferGetHeight(pixelBuffer)), ImageOrigin::TopLeft),
       pixelBuffer(pixelBuffer) {
   CFRetain(pixelBuffer);
 }

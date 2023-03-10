@@ -40,7 +40,7 @@ std::shared_ptr<GLExternalOESTexture> GLExternalOESTexture::Make(Context* contex
 
 GLExternalOESTexture::GLExternalOESTexture(std::unique_ptr<TextureSampler> sampler, int width,
                                            int height)
-    : Texture(width, height, SurfaceOrigin::TopLeft),
+    : Texture(width, height, ImageOrigin::TopLeft),
       sampler(std::move(sampler)),
       textureWidth(width),
       textureHeight(height) {

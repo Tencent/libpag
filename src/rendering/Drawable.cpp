@@ -48,7 +48,7 @@ void Drawable::freeDevice() {
 
 RenderTargetDrawable::RenderTargetDrawable(std::shared_ptr<tgfx::Device> device,
                                            const tgfx::BackendRenderTarget& renderTarget,
-                                           tgfx::SurfaceOrigin origin)
+                                           tgfx::ImageOrigin origin)
     : device(std::move(device)), renderTarget(renderTarget), origin(origin) {
 }
 
@@ -57,7 +57,7 @@ std::shared_ptr<tgfx::Surface> RenderTargetDrawable::createSurface(tgfx::Context
 }
 
 TextureDrawable::TextureDrawable(std::shared_ptr<tgfx::Device> device,
-                                 const tgfx::BackendTexture& texture, tgfx::SurfaceOrigin origin)
+                                 const tgfx::BackendTexture& texture, tgfx::ImageOrigin origin)
     : device(std::move(device)), texture(texture), origin(origin) {
 }
 

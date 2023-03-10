@@ -26,7 +26,7 @@
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/gpu/Backend.h"
-#include "tgfx/gpu/SurfaceOrigin.h"
+#include "tgfx/gpu/ImageOrigin.h"
 
 namespace pag {
 
@@ -40,9 +40,9 @@ tgfx::Color ToTGFX(Color color, Opacity opacity = Opaque);
 
 float ToAlpha(Opacity opacity);
 
-tgfx::SurfaceOrigin ToTGFX(ImageOrigin origin);
+tgfx::ImageOrigin ToTGFX(ImageOrigin origin);
 
-ImageOrigin ToPAG(tgfx::SurfaceOrigin origin);
+ImageOrigin ToPAG(tgfx::ImageOrigin origin);
 
 tgfx::AlphaType ToTGFX(AlphaType alphaType);
 

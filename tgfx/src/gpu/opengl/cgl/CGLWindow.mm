@@ -111,7 +111,7 @@ std::shared_ptr<Surface> CGLWindow::onCreateSurface(Context* context) {
     frameBuffer.id = 0;
     frameBuffer.format = GL_RGBA8;
     BackendRenderTarget renderTarget(frameBuffer, size.width, size.height);
-    return Surface::MakeFrom(context, renderTarget, SurfaceOrigin::BottomLeft);
+    return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
   }
   return Surface::MakeFrom(context, pixelBuffer);
 }

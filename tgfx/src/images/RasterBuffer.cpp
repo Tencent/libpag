@@ -44,14 +44,14 @@ std::shared_ptr<Texture> RasterBuffer::onMakeTexture(Context* context, bool mipM
   switch (info.colorType()) {
     case ColorType::ALPHA_8:
       return Texture::MakeAlpha(context, info.width(), info.height(), pixels->data(),
-                                info.rowBytes(), SurfaceOrigin::TopLeft, mipMapped);
+                                info.rowBytes(), ImageOrigin::TopLeft, mipMapped);
     case ColorType::BGRA_8888:
       return Texture::MakeFormat(context, info.width(), info.height(), pixels->data(),
-                                 info.rowBytes(), PixelFormat::BGRA_8888, SurfaceOrigin::TopLeft,
+                                 info.rowBytes(), PixelFormat::BGRA_8888, ImageOrigin::TopLeft,
                                  mipMapped);
     case ColorType::RGBA_8888:
       return Texture::MakeRGBA(context, info.width(), info.height(), pixels->data(),
-                               info.rowBytes(), SurfaceOrigin::TopLeft, mipMapped);
+                               info.rowBytes(), ImageOrigin::TopLeft, mipMapped);
     default:
       return nullptr;
   }

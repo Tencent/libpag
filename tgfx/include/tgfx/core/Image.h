@@ -26,7 +26,7 @@
 #include "tgfx/core/SamplingOptions.h"
 #include "tgfx/core/TileMode.h"
 #include "tgfx/gpu/Backend.h"
-#include "tgfx/gpu/SurfaceOrigin.h"
+#include "tgfx/gpu/ImageOrigin.h"
 #include "tgfx/platform/HardwareBuffer.h"
 #include "tgfx/platform/NativeImage.h"
 
@@ -128,7 +128,7 @@ class Image {
    * vary by GPU back-ends.
    */
   static std::shared_ptr<Image> MakeFrom(Context* context, const BackendTexture& backendTexture,
-                                         SurfaceOrigin origin = SurfaceOrigin::TopLeft);
+                                         ImageOrigin origin = ImageOrigin::TopLeft);
 
   /**
    * Creates an Image from the backendTexture associated with the context, taking ownership of the
@@ -138,7 +138,7 @@ class Image {
    * vary by GPU back-ends.
    */
   static std::shared_ptr<Image> MakeAdopted(Context* context, const BackendTexture& backendTexture,
-                                            SurfaceOrigin origin = SurfaceOrigin::TopLeft);
+                                            ImageOrigin origin = ImageOrigin::TopLeft);
 
   virtual ~Image() = default;
 

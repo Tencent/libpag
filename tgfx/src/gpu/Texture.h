@@ -23,8 +23,8 @@
 #include "tgfx/core/Point.h"
 #include "tgfx/core/YUVColorSpace.h"
 #include "tgfx/core/YUVData.h"
+#include "tgfx/gpu/ImageOrigin.h"
 #include "tgfx/gpu/Resource.h"
-#include "tgfx/gpu/SurfaceOrigin.h"
 #include "tgfx/platform/HardwareBuffer.h"
 
 namespace tgfx {
@@ -42,7 +42,7 @@ class Texture : public Resource {
    */
   static std::shared_ptr<Texture> MakeRGBA(Context* context, int width, int height,
                                            const void* pixels, size_t rowBytes,
-                                           SurfaceOrigin origin = SurfaceOrigin::TopLeft,
+                                           ImageOrigin origin = ImageOrigin::TopLeft,
                                            bool mipMapped = false) {
     return MakeFormat(context, width, height, pixels, rowBytes, PixelFormat::RGBA_8888, origin,
                       mipMapped);
@@ -52,7 +52,7 @@ class Texture : public Resource {
    * the parameters is invalid.
    */
   static std::shared_ptr<Texture> MakeRGBA(Context* context, int width, int height,
-                                           SurfaceOrigin origin = SurfaceOrigin::TopLeft,
+                                           ImageOrigin origin = ImageOrigin::TopLeft,
                                            bool mipMapped = false) {
     return MakeFormat(context, width, height, nullptr, 0, PixelFormat::RGBA_8888, origin,
                       mipMapped);
@@ -65,7 +65,7 @@ class Texture : public Resource {
    */
   static std::shared_ptr<Texture> MakeAlpha(Context* context, int width, int height,
                                             const void* pixels, size_t rowBytes,
-                                            SurfaceOrigin origin = SurfaceOrigin::TopLeft,
+                                            ImageOrigin origin = ImageOrigin::TopLeft,
                                             bool mipMapped = false) {
     return MakeFormat(context, width, height, pixels, rowBytes, PixelFormat::ALPHA_8, origin,
                       mipMapped);
@@ -76,7 +76,7 @@ class Texture : public Resource {
    * alpha only textures.
    */
   static std::shared_ptr<Texture> MakeAlpha(Context* context, int width, int height,
-                                            SurfaceOrigin origin = SurfaceOrigin::TopLeft,
+                                            ImageOrigin origin = ImageOrigin::TopLeft,
                                             bool mipMapped = false) {
     return MakeFormat(context, width, height, nullptr, 0, PixelFormat::ALPHA_8, origin, mipMapped);
   }
@@ -87,7 +87,7 @@ class Texture : public Resource {
    * specified pixelFormat.
    */
   static std::shared_ptr<Texture> MakeFormat(Context* context, int width, int height,
-                                             PixelFormat pixelFormat, SurfaceOrigin origin,
+                                             PixelFormat pixelFormat, ImageOrigin origin,
                                              bool mipMapped = false) {
     return MakeFormat(context, width, height, nullptr, 0, pixelFormat, origin, mipMapped);
   }
@@ -99,7 +99,7 @@ class Texture : public Resource {
    */
   static std::shared_ptr<Texture> MakeFormat(Context* context, int width, int height,
                                              const void* pixels, size_t rowBytes,
-                                             PixelFormat pixelFormat, SurfaceOrigin origin,
+                                             PixelFormat pixelFormat, ImageOrigin origin,
                                              bool mipMapped = false);
 
   /**
@@ -107,7 +107,7 @@ class Texture : public Resource {
    * backend texture is valid for the lifetime of returned Texture.
    */
   static std::shared_ptr<Texture> MakeFrom(Context* context, const BackendTexture& backendTexture,
-                                           SurfaceOrigin origin = SurfaceOrigin::TopLeft);
+                                           ImageOrigin origin = ImageOrigin::TopLeft);
 
   /**
    * Creates a new Texture which wraps the specified backend texture. The returned Texture takes
@@ -115,7 +115,7 @@ class Texture : public Resource {
    */
   static std::shared_ptr<Texture> MakeAdopted(Context* context,
                                               const BackendTexture& backendTexture,
-                                              SurfaceOrigin origin = SurfaceOrigin::TopLeft);
+                                              ImageOrigin origin = ImageOrigin::TopLeft);
 
   /**
    * Creates a Texture from the specified ImageBuffer. Returns nullptr if the context is nullptr or
@@ -164,9 +164,9 @@ class Texture : public Resource {
   }
 
   /**
-   * Returns the origin of the texture, either SurfaceOrigin::TopLeft or SurfaceOrigin::BottomLeft.
+   * Returns the origin of the texture, either ImageOrigin::TopLeft or ImageOrigin::BottomLeft.
    */
-  SurfaceOrigin origin() const {
+  ImageOrigin origin() const {
     return _origin;
   }
 
@@ -194,11 +194,11 @@ class Texture : public Resource {
   virtual BackendTexture getBackendTexture() const;
 
  protected:
-  Texture(int width, int height, SurfaceOrigin origin);
+  Texture(int width, int height, ImageOrigin origin);
 
  private:
   int _width = 0;
   int _height = 0;
-  SurfaceOrigin _origin = SurfaceOrigin::TopLeft;
+  ImageOrigin _origin = ImageOrigin::TopLeft;
 };
 }  // namespace tgfx

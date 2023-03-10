@@ -75,7 +75,7 @@ class GLProgram : public Program {
   struct RenderTargetState {
     std::optional<int> width;
     std::optional<int> height;
-    std::optional<SurfaceOrigin> origin;
+    std::optional<ImageOrigin> origin;
   };
 
   // A helper to loop over effects, set the transforms (via subclass) and bind textures

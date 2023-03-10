@@ -76,7 +76,7 @@ std::shared_ptr<Surface> EGLWindow::onCreateSurface(Context* context) {
   frameBuffer.id = 0;
   frameBuffer.format = GL_RGBA8;
   tgfx::BackendRenderTarget renderTarget = {frameBuffer, width, height};
-  return Surface::MakeFrom(context, renderTarget, SurfaceOrigin::BottomLeft);
+  return Surface::MakeFrom(context, renderTarget, ImageOrigin::BottomLeft);
 }
 
 void EGLWindow::onPresent(Context*, int64_t presentationTime) {

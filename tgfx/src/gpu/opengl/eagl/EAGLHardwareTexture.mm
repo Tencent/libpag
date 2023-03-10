@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "EAGLHardwareTexture.h"
-#include "gpu/opengl/GLSampler.h"
 #include "gpu/opengl/GLCaps.h"
+#include "gpu/opengl/GLSampler.h"
 #include "tgfx/gpu/opengl/eagl/EAGLDevice.h"
 #include "utils/UniqueID.h"
 
@@ -90,7 +90,7 @@ void EAGLHardwareTexture::ComputeRecycleKey(BytesKey* recycleKey, CVPixelBufferR
 
 EAGLHardwareTexture::EAGLHardwareTexture(CVPixelBufferRef pixelBuffer)
     : Texture(static_cast<int>(CVPixelBufferGetWidth(pixelBuffer)),
-                static_cast<int>(CVPixelBufferGetHeight(pixelBuffer)), SurfaceOrigin::TopLeft),
+              static_cast<int>(CVPixelBufferGetHeight(pixelBuffer)), ImageOrigin::TopLeft),
       pixelBuffer(pixelBuffer) {
   CFRetain(pixelBuffer);
 }
