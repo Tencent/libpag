@@ -46,7 +46,8 @@ int PAGSurface::height() {
 
 void PAGSurface::updateSize() {
   LockGuard autoLock(rootLocker);
-  updateSizeInternal();
+  freeCacheInternal();
+  drawable->updateSize();
 }
 
 void PAGSurface::freeCache() {
@@ -56,25 +57,17 @@ void PAGSurface::freeCache() {
 
 void PAGSurface::freeCacheInternal() {
   TextShaper::PurgeCaches();
+  onFreeCache();
   if (pagPlayer) {
     pagPlayer->renderCache->releaseAll();
   }
   surface = nullptr;
-  purgeResources();
-  drawable->freeDevice();
-}
-
-void PAGSurface::purgeResources() {
   auto context = drawable->lockContext();
   if (context) {
     context->purgeResourcesNotUsedSince(0);
     drawable->unlockContext();
   }
-}
-
-void PAGSurface::updateSizeInternal() {
-  freeCacheInternal();
-  drawable->updateSize();
+  drawable->freeDevice();
 }
 
 bool PAGSurface::clearAll() {
@@ -126,43 +119,10 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
   if (!context) {
     return false;
   }
-  if (!drawGraphic(context, cache, graphic, autoClear)) {
-    return false;
-  }
-  finishDraw(context, cache, signalSemaphore);
-  unlockContext();
-  return true;
-}
-
-bool PAGSurface::drawGraphic(tgfx::Context* context, RenderCache* cache,
-                             std::shared_ptr<Graphic> graphic, bool autoClear) {
-  cache->prepareLayers();
-  if (surface != nullptr && autoClear && contentVersion == cache->getContentVersion()) {
+  if (!onDraw(context, graphic, cache, autoClear)) {
     unlockContext();
     return false;
   }
-  if (surface == nullptr) {
-    surface = drawable->createSurface(context);
-  }
-  if (surface == nullptr) {
-    unlockContext();
-    return false;
-  }
-  contentVersion = cache->getContentVersion();
-  cache->attachToContext(context);
-  auto canvas = surface->getCanvas();
-  if (autoClear) {
-    canvas->clear();
-  }
-  if (graphic) {
-    graphic->prepare(cache);
-    graphic->draw(canvas, cache);
-  }
-  return true;
-}
-
-void PAGSurface::finishDraw(tgfx::Context* context, RenderCache* cache,
-                            BackendSemaphore* signalSemaphore) {
   if (signalSemaphore == nullptr) {
     surface->flush();
   } else {
@@ -174,6 +134,8 @@ void PAGSurface::finishDraw(tgfx::Context* context, RenderCache* cache,
   context->submit();
   drawable->setTimeStamp(pagPlayer->getTimeStampInternal());
   drawable->present(context);
+  unlockContext();
+  return true;
 }
 
 bool PAGSurface::wait(const BackendSemaphore& waitSemaphore) {
@@ -248,4 +210,33 @@ void PAGSurface::unlockContext() {
   }
   drawable->unlockContext();
 }
+
+bool PAGSurface::onDraw(tgfx::Context* context, std::shared_ptr<Graphic> graphic,
+                        RenderCache* cache, bool autoClear) {
+  cache->prepareLayers();
+  if (surface != nullptr && autoClear && contentVersion == cache->getContentVersion()) {
+    return false;
+  }
+  if (surface == nullptr) {
+    surface = drawable->createSurface(context);
+  }
+  if (surface == nullptr) {
+    return false;
+  }
+  contentVersion = cache->getContentVersion();
+  cache->attachToContext(context);
+  auto canvas = surface->getCanvas();
+  if (autoClear) {
+    canvas->clear();
+  }
+  if (graphic) {
+    graphic->prepare(cache);
+    graphic->draw(canvas, cache);
+  }
+  return true;
+}
+
+void PAGSurface::onFreeCache() {
+}
+
 }  // namespace pag
