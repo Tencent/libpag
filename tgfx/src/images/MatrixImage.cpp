@@ -25,6 +25,19 @@ MatrixImage::MatrixImage(std::shared_ptr<ImageSource> imageSource, int width, in
     : Image(std::move(imageSource)), _width(width), _height(height), localMatrix(localMatrix) {
 }
 
+std::shared_ptr<Image> MatrixImage::applyOrigin(EncodedOrigin origin) const {
+  auto matrix = EncodedOriginToMatrix(origin, width(), height());
+  matrix.invert(&matrix);
+  matrix.postConcat(localMatrix);
+  auto newWidth = width();
+  auto newHeight = height();
+  ApplyEncodedOrigin(origin, &newWidth, &newHeight);
+  auto image =
+      std::shared_ptr<MatrixImage>(new MatrixImage(std::move(source), newWidth, newHeight, matrix));
+  image->weakThis = image;
+  return image;
+}
+
 std::shared_ptr<Image> MatrixImage::onCloneWithSource(
     std::shared_ptr<ImageSource> newSource) const {
   return std::shared_ptr<MatrixImage>(

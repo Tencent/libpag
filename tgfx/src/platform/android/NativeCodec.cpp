@@ -111,18 +111,18 @@ std::shared_ptr<NativeCodec> NativeCodec::Make(JNIEnv* env, jobject sizeObject, 
     return nullptr;
   }
   return std::shared_ptr<NativeCodec>(
-      new NativeCodec(width, height, static_cast<ImageOrigin>(origin)));
+      new NativeCodec(width, height, static_cast<EncodedOrigin>(origin)));
 }
 
-static ImageOrigin GetImageOrigin(JNIEnv* env, jobject exifInterface) {
+static EncodedOrigin GetEncodedOrigin(JNIEnv* env, jobject exifInterface) {
   if (exifInterface == nullptr) {
     env->ExceptionClear();
-    return ImageOrigin::TopLeft;
+    return EncodedOrigin::TopLeft;
   }
   auto key = env->NewStringUTF("Orientation");
   auto origin = env->CallIntMethod(exifInterface, ExifInterfaceClass_getAttributeInt, key,
-                                   static_cast<int>(ImageOrigin::TopLeft));
-  return static_cast<ImageOrigin>(origin);
+                                   static_cast<int>(EncodedOrigin::TopLeft));
+  return static_cast<EncodedOrigin>(origin);
 }
 
 static jobject DecodeBitmap(JNIEnv* env, jobject options, const std::string& filePath) {
@@ -157,7 +157,7 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& fileP
   auto imagePath = SafeToJString(env, filePath);
   auto exifInterface =
       env->NewObject(ExifInterfaceClass.get(), ExifInterface_Constructor_Path, imagePath);
-  auto origin = GetImageOrigin(env, exifInterface);
+  auto origin = GetEncodedOrigin(env, exifInterface);
   auto codec = std::shared_ptr<NativeCodec>(new NativeCodec(width, height, origin));
   codec->imagePath = filePath;
   return codec;
@@ -201,7 +201,7 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> im
       env->NewObject(ByteArrayInputStreamClass.get(), ByteArrayInputStream_Constructor, byteArray);
   auto exifInterface =
       env->NewObject(ExifInterfaceClass.get(), ExifInterface_Constructor_Stream, inputStream);
-  auto origin = GetImageOrigin(env, exifInterface);
+  auto origin = GetEncodedOrigin(env, exifInterface);
   auto codec = std::shared_ptr<NativeCodec>(new NativeCodec(width, height, origin));
   codec->imageBytes = imageBytes;
   return codec;
@@ -218,7 +218,7 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(NativeImageRef nativeImage) {
     return nullptr;
   }
   auto image = std::shared_ptr<NativeCodec>(
-      new NativeCodec(info.width(), info.height(), ImageOrigin::TopLeft));
+      new NativeCodec(info.width(), info.height(), EncodedOrigin::TopLeft));
   image->nativeImage = nativeImage;
   return image;
 }

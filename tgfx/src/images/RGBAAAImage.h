@@ -35,6 +35,10 @@ class RGBAAAImage : public Image {
     return true;
   }
 
+  std::shared_ptr<Image> applyOrigin(EncodedOrigin) const override {
+    return nullptr;
+  }
+
  protected:
   std::shared_ptr<Image> onCloneWithSource(std::shared_ptr<ImageSource> newSource) const override;
 

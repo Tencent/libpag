@@ -16,36 +16,36 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/ImageOrigin.h"
+#include "tgfx/core/EncodedOrigin.h"
 
 namespace tgfx {
-Matrix ImageOriginToMatrix(ImageOrigin origin, int width, int height) {
+Matrix EncodedOriginToMatrix(EncodedOrigin origin, int width, int height) {
   auto w = static_cast<float>(width);
   auto h = static_cast<float>(height);
   switch (origin) {
-    case ImageOrigin::TopLeft:
+    case EncodedOrigin::TopLeft:
       return Matrix::I();
-    case ImageOrigin::TopRight:
+    case EncodedOrigin::TopRight:
       return Matrix::MakeAll(-1, 0, w, 0, 1, 0, 0, 0, 1);
-    case ImageOrigin::BottomRight:
+    case EncodedOrigin::BottomRight:
       return Matrix::MakeAll(-1, 0, w, 0, -1, h, 0, 0, 1);
-    case ImageOrigin::BottomLeft:
+    case EncodedOrigin::BottomLeft:
       return Matrix::MakeAll(1, 0, 0, 0, -1, h, 0, 0, 1);
-    case ImageOrigin::LeftTop:
+    case EncodedOrigin::LeftTop:
       return Matrix::MakeAll(0, 1, 0, 1, 0, 0, 0, 0, 1);
-    case ImageOrigin::RightTop:
+    case EncodedOrigin::RightTop:
       return Matrix::MakeAll(0, -1, h, 1, 0, 0, 0, 0, 1);
-    case ImageOrigin::RightBottom:
+    case EncodedOrigin::RightBottom:
       return Matrix::MakeAll(0, -1, h, -1, 0, w, 0, 0, 1);
-    case ImageOrigin::LeftBottom:
+    case EncodedOrigin::LeftBottom:
       return Matrix::MakeAll(0, 1, 0, -1, 0, w, 0, 0, 1);
   }
   return Matrix::I();
 }
 
-void ApplyImageOrigin(ImageOrigin origin, int* width, int* height) {
-  if (origin == ImageOrigin::LeftTop || origin == ImageOrigin::RightTop ||
-      origin == ImageOrigin::RightBottom || origin == ImageOrigin::LeftBottom) {
+void ApplyEncodedOrigin(EncodedOrigin origin, int* width, int* height) {
+  if (origin == EncodedOrigin::LeftTop || origin == EncodedOrigin::RightTop ||
+      origin == EncodedOrigin::RightBottom || origin == EncodedOrigin::LeftBottom) {
     std::swap(*width, *height);
   }
 }

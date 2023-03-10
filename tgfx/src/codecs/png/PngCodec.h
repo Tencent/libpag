@@ -40,7 +40,7 @@ class PngCodec : public ImageCodec {
   static std::shared_ptr<ImageCodec> MakeFromData(const std::string& filePath,
                                                   std::shared_ptr<Data> byteData);
 
-  PngCodec(int width, int height, ImageOrigin origin, bool isAlphaOnly, std::string filePath,
+  PngCodec(int width, int height, EncodedOrigin origin, bool isAlphaOnly, std::string filePath,
            std::shared_ptr<Data> fileData)
       : ImageCodec(width, height, origin),
         _isAlphaOnly(isAlphaOnly),

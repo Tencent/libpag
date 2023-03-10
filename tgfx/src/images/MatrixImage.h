@@ -32,6 +32,8 @@ class MatrixImage : public Image {
     return _height;
   }
 
+  std::shared_ptr<Image> applyOrigin(EncodedOrigin origin) const override;
+
  protected:
   std::shared_ptr<Image> onCloneWithSource(std::shared_ptr<ImageSource> newSource) const override;
 

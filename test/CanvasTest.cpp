@@ -84,11 +84,11 @@ PAG_TEST(CanvasTest, Blur) {
   ASSERT_TRUE(codec != nullptr);
   auto image = Image::MakeFrom(codec);
   ASSERT_TRUE(image != nullptr);
-  auto imageMatrix = ImageOriginToMatrix(codec->origin(), codec->width(), codec->height());
+  auto imageMatrix = EncodedOriginToMatrix(codec->origin(), codec->width(), codec->height());
   imageMatrix.postScale(0.2, 0.2);
   auto width = codec->width();
   auto height = codec->height();
-  ApplyImageOrigin(codec->origin(), &width, &height);
+  ApplyEncodedOrigin(codec->origin(), &width, &height);
   auto imageWidth = static_cast<float>(width) * 0.2f;
   auto imageHeight = static_cast<float>(height) * 0.2f;
   auto padding = 30.f;
@@ -670,8 +670,7 @@ PAG_TEST(CanvasTest, image) {
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 400, 500);
   auto canvas = surface->getCanvas();
-  auto image =
-      Image::MakeFromFile(TestConstants::PAG_ROOT + "resources/apitest/imageReplacement.png");
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);
   EXPECT_TRUE(image->isLazyGenerated());
   EXPECT_FALSE(image->isTextureBacked());
@@ -707,11 +706,14 @@ PAG_TEST(CanvasTest, image) {
   EXPECT_TRUE(rotationImage->hasMipmaps());
   auto matrix = Matrix::MakeScale(0.05);
   matrix.postTranslate(0, 120);
+  rotationImage = rotationImage->applyOrigin(EncodedOrigin::BottomRight);
+  rotationImage = rotationImage->applyOrigin(EncodedOrigin::BottomRight);
   canvas->drawImage(rotationImage, matrix);
   subset = rotationImage->makeSubset(Rect::MakeXYWH(500, 800, 2000, 2400));
   ASSERT_TRUE(subset != nullptr);
   matrix.postTranslate(160, 25);
   canvas->drawImage(subset, matrix);
+  subset = subset->applyOrigin(EncodedOrigin::RightTop);
   textureImage = subset->makeTextureImage(context);
   ASSERT_TRUE(textureImage != nullptr);
   matrix.postTranslate(110, 0);
@@ -721,10 +723,9 @@ PAG_TEST(CanvasTest, image) {
   canvas->resetMatrix();
   auto rgbAAA = subset->makeRGBAAA(500, 500, 500, 0);
   EXPECT_TRUE(rgbAAA == nullptr);
-  auto codec = MakeImageCodec("resources/apitest/rgbaaa.png");
-  EXPECT_EQ(codec->width(), 1024);
-  EXPECT_EQ(codec->height(), 512);
-  image = Image::MakeFrom(codec, tgfx::ImageOrigin::TopLeft);
+  image = MakeImage("resources/apitest/rgbaaa.png");
+  EXPECT_EQ(image->width(), 1024);
+  EXPECT_EQ(image->height(), 512);
   image = image->makeMipMapped();
   rgbAAA = image->makeRGBAAA(512, 512, 512, 0);
   EXPECT_TRUE(rgbAAA->isRGBAAA());
@@ -734,6 +735,8 @@ PAG_TEST(CanvasTest, image) {
   matrix.postTranslate(0, 330);
   canvas->drawImage(rgbAAA, matrix);
   subset = rgbAAA->makeSubset(Rect::MakeXYWH(50, 50, 400, 400));
+  auto originImage = rgbAAA->applyOrigin(EncodedOrigin::BottomLeft);
+  EXPECT_TRUE(originImage == nullptr);
   matrix.postTranslate(140, 15);
   canvas->drawImage(subset, matrix);
   rgbAAA = image->makeRGBAAA(512, 512, 0, 0);
@@ -741,8 +744,8 @@ PAG_TEST(CanvasTest, image) {
   EXPECT_EQ(rgbAAA->height(), 512);
   matrix.postTranslate(110, -15);
   canvas->drawImage(rgbAAA, matrix);
-  rgbAAA = rgbAAA->makeRGBAAA(256, 512, 256, 0);
-  EXPECT_TRUE(rgbAAA == nullptr);
+  image = rgbAAA->makeRGBAAA(256, 512, 256, 0);
+  EXPECT_TRUE(image == nullptr);
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/drawImage"));
   device->unlock();
 }
