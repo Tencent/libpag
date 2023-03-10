@@ -115,13 +115,13 @@ void DropShadowFilter::onDrawModeNotSpread(tgfx::Context* context, const FilterS
   auto targetSurface = tgfx::Surface::MakeFrom(context, renderTarget, tgfx::SurfaceOrigin::TopLeft);
   auto targetCanvas = targetSurface->getCanvas();
   tgfx::BackendTexture backendTexture = {source->sampler, source->width, source->height};
-  auto texture = tgfx::Texture::MakeFrom(context, backendTexture, tgfx::SurfaceOrigin::TopLeft);
+  auto image = tgfx::Image::MakeFrom(context, backendTexture);
   targetCanvas->setMatrix(ToMatrix(target));
   tgfx::Paint paint;
   paint.setImageFilter(tgfx::ImageFilter::DropShadowOnly(
       offsetX * source->scale.x, offsetY * source->scale.y, blurXSize * source->scale.x,
       blurYSize * source->scale.y, color));
-  targetCanvas->drawTexture(std::move(texture), &paint);
+  targetCanvas->drawImage(std::move(image), &paint);
   targetCanvas->flush();
 }
 
@@ -154,7 +154,7 @@ void DropShadowFilter::onDrawModeNotFullSpread(tgfx::Context* context, const Fil
   auto targetSurface = tgfx::Surface::MakeFrom(context, renderTarget, tgfx::SurfaceOrigin::TopLeft);
   auto targetCanvas = targetSurface->getCanvas();
   tgfx::BackendTexture backendTexture = {sourceV->sampler, sourceV->width, sourceV->height};
-  auto texture = tgfx::Texture::MakeFrom(context, backendTexture, tgfx::SurfaceOrigin::TopLeft);
+  auto image = tgfx::Image::MakeFrom(context, backendTexture);
   targetCanvas->setMatrix(ToMatrix(target));
   targetCanvas->concat(
       tgfx::Matrix::MakeTrans(static_cast<float>((source->width - sourceV->width)) * 0.5f,
@@ -163,7 +163,7 @@ void DropShadowFilter::onDrawModeNotFullSpread(tgfx::Context* context, const Fil
   paint.setImageFilter(tgfx::ImageFilter::DropShadowOnly(
       offsetX * source->scale.x, offsetY * source->scale.y, blurXSize * source->scale.x,
       blurYSize * source->scale.y, color));
-  targetCanvas->drawTexture(std::move(texture), &paint);
+  targetCanvas->drawImage(std::move(image), &paint);
   targetCanvas->flush();
 }
 

@@ -19,8 +19,8 @@
 #pragma once
 
 #import <AppKit/AppKit.h>
+#include "gpu/Texture.h"
 #include "gpu/TextureSampler.h"
-#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 class CGLHardwareTexture : public Texture {

@@ -18,29 +18,26 @@
 
 #pragma once
 
+#include "gpu/Texture.h"
+#include "tgfx/core/Image.h"
 #include "tgfx/core/Shader.h"
-#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 class ImageShader : public Shader {
  public:
-  static std::shared_ptr<Shader> Make(std::shared_ptr<Texture> texture, TileMode tileModeX,
-                                      TileMode tileModeY, SamplingOptions sampling);
-
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(const FPArgs& args) const override;
 
  private:
-  ImageShader(std::shared_ptr<Texture> texture, TileMode tileModeX, TileMode tileModeY,
+  ImageShader(std::shared_ptr<Image> image, TileMode tileModeX, TileMode tileModeY,
               SamplingOptions sampling)
-      : texture(std::move(texture)),
-        tileModeX(tileModeX),
-        tileModeY(tileModeY),
-        sampling(sampling) {
+      : image(std::move(image)), tileModeX(tileModeX), tileModeY(tileModeY), sampling(sampling) {
   }
 
-  std::shared_ptr<Texture> texture;
+  std::shared_ptr<Image> image = nullptr;
   TileMode tileModeX = TileMode::Clamp;
   TileMode tileModeY = TileMode::Clamp;
   SamplingOptions sampling;
+
+  friend class Shader;
 };
 }  // namespace tgfx

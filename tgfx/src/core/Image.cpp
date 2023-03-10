@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Image.h"
+#include "gpu/Texture.h"
 #include "gpu/TextureEffect.h"
 #include "gpu/TiledTextureEffect.h"
 #include "images/ImageSource.h"
@@ -26,7 +27,6 @@
 #include "images/RasterGenerator.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
-#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
@@ -172,8 +172,8 @@ bool Image::isTextureBacked() const {
   return source->isTextureBacked();
 }
 
-std::shared_ptr<Texture> Image::getTexture() const {
-  return source->getTexture();
+BackendTexture Image::getBackendTexture() const {
+  return source->getBackendTexture();
 }
 
 std::shared_ptr<Image> Image::makeTextureImage(Context* context) const {
@@ -250,21 +250,17 @@ std::shared_ptr<Image> Image::onMakeRGBAAA(int displayWidth, int displayHeight, 
       new RGBAAAImage(source, displayWidth, displayHeight, alphaStartX, alphaStartY));
 }
 
-std::unique_ptr<FragmentProcessor> Image::asFragmentProcessor(Context* context,
-                                                              const SamplingOptions& sampling,
-                                                              const Matrix* localMatrix,
-                                                              uint32_t surfaceFlags) {
-  return asFragmentProcessor(context, TileMode::Clamp, TileMode::Clamp, sampling, localMatrix,
-                             surfaceFlags);
-}
-
-std::unique_ptr<FragmentProcessor> Image::asFragmentProcessor(Context* context, TileMode tileModeX,
-                                                              TileMode tileModeY,
-                                                              const SamplingOptions& sampling,
-                                                              const Matrix* localMatrix,
-                                                              uint32_t surfaceFlags) {
+std::unique_ptr<FragmentProcessor> Image::asFragmentProcessor(
+    Context* context, uint32_t surfaceFlags, TileMode tileModeX, TileMode tileModeY,
+    const SamplingOptions& sampling, const Matrix* localMatrix) {
   return TiledTextureEffect::Make(source->lockTextureProxy(context, surfaceFlags), tileModeX,
                                   tileModeY, sampling, localMatrix);
+}
+
+std::unique_ptr<FragmentProcessor> Image::asFragmentProcessor(Context* context,
+                                                              uint32_t surfaceFlags,
+                                                              const SamplingOptions& sampling) {
+  return asFragmentProcessor(context, surfaceFlags, TileMode::Clamp, TileMode::Clamp, sampling);
 }
 
 std::shared_ptr<Image> Image::cloneWithSource(std::shared_ptr<ImageSource> newSource) const {

@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "tgfx/core/Cacheable.h"
 #include "tgfx/gpu/ResourceCache.h"
+#include "tgfx/core/Cacheable.h"
 
 namespace tgfx {
 /**

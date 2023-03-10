@@ -85,19 +85,18 @@ tgfx::Matrix ToMatrix(const FilterTarget* target, bool flipY) {
   return matrix;
 }
 
-std::unique_ptr<FilterSource> ToFilterSource(const tgfx::Texture* texture,
-                                             const tgfx::Point& scale) {
-  if (texture == nullptr) {
+std::unique_ptr<FilterSource> ToFilterSource(const tgfx::BackendTexture& backendTexture,
+                                             tgfx::SurfaceOrigin origin, const tgfx::Point& scale) {
+  if (!backendTexture.isValid()) {
     return nullptr;
   }
-  auto backendTexture = texture->getBackendTexture();
   auto filterSource = new FilterSource();
   backendTexture.getGLTextureInfo(&filterSource->sampler);
-  filterSource->width = texture->width();
-  filterSource->height = texture->height();
+  filterSource->width = backendTexture.width();
+  filterSource->height = backendTexture.height();
   filterSource->scale = scale;
   filterSource->textureMatrix =
-      ToGLTextureMatrix(tgfx::Matrix::I(), texture->width(), texture->height(), texture->origin());
+      ToGLTextureMatrix(tgfx::Matrix::I(), backendTexture.width(), backendTexture.height(), origin);
   return std::unique_ptr<FilterSource>(filterSource);
 }
 
@@ -127,13 +126,6 @@ tgfx::Point ToGLVertexPoint(const FilterTarget* target, const FilterSource* sour
                              (contentPoint.y - contentBounds.top) * source->scale.y};
   return {2.0f * vertexPoint.x / static_cast<float>(target->width) - 1.0f,
           2.0f * vertexPoint.y / static_cast<float>(target->height) - 1.0f};
-}
-
-void PreConcatMatrix(FilterTarget* target, const tgfx::Matrix& matrix) {
-  auto vertexMatrix = ToMatrix(target);
-  vertexMatrix.preConcat(matrix);
-  target->vertexMatrix =
-      ToGLVertexMatrix(vertexMatrix, target->width, target->height, tgfx::SurfaceOrigin::TopLeft);
 }
 
 static unsigned LoadGLShader(tgfx::Context* context, unsigned shaderType,

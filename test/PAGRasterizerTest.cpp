@@ -51,12 +51,12 @@ PAG_TEST(PAGRasterizerTest, TestRasterizer) {
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto texture = mask->updateTexture(context);
-  ASSERT_TRUE(texture != nullptr);
+  auto image = mask->makeImage(context);
+  ASSERT_TRUE(image != nullptr);
   auto surface = Surface::Make(context, mask->width(), mask->height());
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
-  canvas->drawTexture(texture);
+  canvas->drawImage(image);
   Bitmap bitmap(mask->width(), mask->height(), true, false);
   ASSERT_FALSE(bitmap.isEmpty());
   Pixmap pixmap(bitmap);

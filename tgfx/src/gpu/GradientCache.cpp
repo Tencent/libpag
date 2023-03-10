@@ -109,11 +109,11 @@ std::shared_ptr<Texture> GradientCache::getGradient(Context* context, const Colo
   if (pixelBuffer == nullptr) {
     return nullptr;
   }
-  auto tex = pixelBuffer->makeTexture(context);
-  if (tex) {
-    add(bytesKey, tex);
+  texture = Texture::MakeFrom(context, pixelBuffer);
+  if (texture) {
+    add(bytesKey, texture);
   }
-  return tex;
+  return texture;
 }
 
 void GradientCache::releaseAll() {

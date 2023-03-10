@@ -40,11 +40,9 @@ class MatrixImage : public Image {
   std::shared_ptr<Image> onMakeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
                                       int alphaStartY) const override;
 
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(Context* context, TileMode tileModeX,
-                                                         TileMode tileModeY,
-                                                         const SamplingOptions& sampling,
-                                                         const Matrix* localMatrix = nullptr,
-                                                         uint32_t surfaceFlags = 0) override;
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(
+      Context* context, uint32_t surfaceFlags, TileMode tileModeX, TileMode tileModeY,
+      const SamplingOptions& sampling, const Matrix* localMatrix = nullptr) override;
 
  private:
   int _width = 0;

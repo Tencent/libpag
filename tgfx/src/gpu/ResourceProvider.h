@@ -19,8 +19,8 @@
 #pragma once
 
 #include "GpuBuffer.h"
+#include "gpu/Texture.h"
 #include "tgfx/gpu/Context.h"
-#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 class GradientCache;

@@ -18,8 +18,8 @@
 
 #pragma once
 
+#include "gpu/Texture.h"
 #include "tgfx/core/ImageInfo.h"
-#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 /**

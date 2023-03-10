@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <mutex>
 #include "tgfx/platform/android/SurfaceImageReader.h"
 
 namespace pag {

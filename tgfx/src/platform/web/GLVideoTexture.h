@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "tgfx/gpu/Texture.h"
+#include "gpu/Texture.h"
 
 namespace tgfx {
 class GLVideoTexture : public Texture {

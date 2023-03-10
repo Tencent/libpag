@@ -33,13 +33,12 @@ class BlurImageFilter : public ImageFilter {
         tileMode(tileMode) {
   }
 
-  std::pair<std::shared_ptr<Texture>, Point> filterImage(
-      const ImageFilterContext& context) override;
+  std::pair<std::shared_ptr<Image>, Point> filterImage(const ImageFilterContext& context) override;
 
  private:
   Rect onFilterNodeBounds(const Rect& srcRect) const override;
 
-  void draw(std::shared_ptr<Texture> texture, Surface* toSurface, bool isDown);
+  void draw(std::shared_ptr<Image> image, Surface* toSurface, bool isDown);
 
   Point blurOffset;
   float downScaling;

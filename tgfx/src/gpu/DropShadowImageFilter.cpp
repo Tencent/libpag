@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DropShadowImageFilter.h"
+#include "gpu/Texture.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/gpu/Surface.h"
 
@@ -35,7 +36,7 @@ std::shared_ptr<ImageFilter> ImageFilter::DropShadowOnly(float dx, float dy, flo
                                                  cropRect);
 }
 
-std::pair<std::shared_ptr<Texture>, Point> DropShadowImageFilter::filterImage(
+std::pair<std::shared_ptr<Image>, Point> DropShadowImageFilter::filterImage(
     const ImageFilterContext& context) {
   auto image = context.source;
   if (image == nullptr) {
@@ -63,12 +64,12 @@ std::pair<std::shared_ptr<Texture>, Point> DropShadowImageFilter::filterImage(
   canvas->concat(Matrix::MakeTrans(-dstOffset.x, -dstOffset.y));
   canvas->save();
   canvas->concat(Matrix::MakeTrans(dx, dy));
-  canvas->drawTexture(image, &paint);
+  canvas->drawImage(image, &paint);
   canvas->restore();
   if (!shadowOnly) {
-    canvas->drawTexture(image);
+    canvas->drawImage(image);
   }
-  return {surface->getTexture(), dstOffset};
+  return {surface->makeImageSnapshot(), dstOffset};
 }
 
 Rect DropShadowImageFilter::onFilterNodeBounds(const Rect& srcRect) const {

@@ -22,16 +22,10 @@
 #include "tgfx/gpu/Surface.h"
 
 namespace pag {
-void Trace(std::shared_ptr<tgfx::Texture> texture, const std::string& path) {
-  if (texture == nullptr) {
-    return;
-  }
-  auto surface = tgfx::Surface::Make(texture->getContext(), texture->width(), texture->height());
+void Trace(std::shared_ptr<tgfx::Surface> surface, const std::string& path) {
   if (surface == nullptr) {
     return;
   }
-  auto canvas = surface->getCanvas();
-  canvas->drawTexture(std::move(texture));
   tgfx::Bitmap bitmap = {};
   bitmap.allocPixels(surface->width(), surface->height());
   tgfx::Pixmap pixmap(bitmap);

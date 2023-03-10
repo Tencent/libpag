@@ -16,31 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/Texture.h"
-#include "gpu/TextureSampler.h"
+#include "TextureSource.h"
 
 namespace tgfx {
-std::shared_ptr<Texture> Texture::MakeFrom(Context* context,
-                                           std::shared_ptr<ImageBuffer> imageBuffer,
-                                           bool mipMapped) {
-  if (context == nullptr || imageBuffer == nullptr) {
-    return nullptr;
+std::shared_ptr<ImageSource> TextureSource::makeTextureSource(Context* context) const {
+  if (texture->getContext() == context) {
+    return std::static_pointer_cast<ImageSource>(weakThis.lock());
   }
-  return imageBuffer->onMakeTexture(context, mipMapped);
-}
-
-Texture::Texture(int width, int height, SurfaceOrigin origin)
-    : _width(width), _height(height), _origin(origin) {
-}
-
-Point Texture::getTextureCoord(float x, float y) const {
-  if (getSampler()->type() == TextureType::Rectangle) {
-    return {x, y};
-  }
-  return {x / static_cast<float>(width()), y / static_cast<float>(height())};
-}
-
-BackendTexture Texture::getBackendTexture() const {
-  return getSampler()->getBackendTexture(width(), height());
+  return nullptr;
 }
 }  // namespace tgfx

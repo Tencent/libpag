@@ -286,11 +286,11 @@ void MaskModifier::applyToGraphic(tgfx::Canvas* canvas, RenderCache* cache,
   auto maskCanvas = maskSurface->getCanvas();
   maskCanvas->setMatrix(contentMatrix);
   mask->draw(maskCanvas, cache);
-  auto shader = tgfx::Shader::MakeImageShader(maskSurface->getTexture());
+  auto shader = tgfx::Shader::MakeImageShader(maskSurface->makeImageSnapshot());
   if (shader == nullptr) {
     return;
   }
-  auto texture = contentSurface->getTexture();
+  auto image = contentSurface->makeImageSnapshot();
   auto scaleFactor = GetMaxScaleFactor(contentMatrix);
   auto matrix = tgfx::Matrix::MakeScale(1.0f / scaleFactor);
   matrix.postTranslate(bounds.x(), bounds.y());
@@ -301,7 +301,7 @@ void MaskModifier::applyToGraphic(tgfx::Canvas* canvas, RenderCache* cache,
     shader = shader->makeWithColorFilter(tgfx::ColorFilter::MakeLumaColorFilter());
   }
   paint.setMaskFilter(tgfx::MaskFilter::Make(std::move(shader), inverted));
-  canvas->drawTexture(texture, &paint);
+  canvas->drawImage(image, &paint);
   canvas->restore();
 }
 }  // namespace pag

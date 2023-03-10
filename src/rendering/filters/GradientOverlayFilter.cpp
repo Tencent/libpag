@@ -82,14 +82,11 @@ void GradientOverlayFilter::draw(tgfx::Context* context, const FilterSource* sou
   auto targetSurface = tgfx::Surface::MakeFrom(context, renderTarget, tgfx::SurfaceOrigin::TopLeft);
   auto targetCanvas = targetSurface->getCanvas();
   tgfx::BackendTexture backendTexture = {source->sampler, source->width, source->height};
-  auto texture = tgfx::Texture::MakeFrom(context, backendTexture, tgfx::SurfaceOrigin::TopLeft);
-
-  auto textureShader = tgfx::Shader::MakeImageShader(texture);
-
-  shader = tgfx::Shader::MakeBlend(tgfx::BlendMode::DstIn, shader, textureShader);
-
+  auto image = tgfx::Image::MakeFrom(context, backendTexture);
+  auto imageShader = tgfx::Shader::MakeImageShader(image);
+  shader = tgfx::Shader::MakeBlend(tgfx::BlendMode::DstIn, shader, imageShader);
   shader = tgfx::Shader::MakeBlend(ToTGFXBlend(gradStyle->blendMode->getValueAt(layerFrame)),
-                                   textureShader, shader);
+                                   imageShader, shader);
   tgfx::Paint paint;
   paint.setShader(shader);
   targetCanvas->save();
