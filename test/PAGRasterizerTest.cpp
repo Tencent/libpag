@@ -23,7 +23,7 @@
 #include "nlohmann/json.hpp"
 #include "tgfx/core/Mask.h"
 #include "tgfx/gpu/Surface.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
+#include "tgfx/opengl/GLDevice.h"
 #include "vectors/freetype/FTMask.h"
 
 namespace pag {

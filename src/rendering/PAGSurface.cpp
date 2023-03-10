@@ -26,7 +26,7 @@
 #include "rendering/utils/LockGuard.h"
 #include "rendering/utils/shaper/TextShaper.h"
 #include "tgfx/core/Clock.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
+#include "tgfx/opengl/GLDevice.h"
 
 namespace pag {
 

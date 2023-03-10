@@ -18,8 +18,8 @@
 
 #include "GLExternalOESTexture.h"
 #include "gpu/Gpu.h"
-#include "gpu/opengl/GLSampler.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
+#include "opengl/GLSampler.h"
+#include "tgfx/opengl/GLFunctions.h"
 
 namespace tgfx {
 std::shared_ptr<GLExternalOESTexture> GLExternalOESTexture::Make(Context* context, int width,

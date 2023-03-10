@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "EllipseGeometryProcessor.h"
-#include "gpu/opengl/GLEllipseGeometryProcessor.h"
+#include "opengl/GLEllipseGeometryProcessor.h"
 
 namespace tgfx {
 std::unique_ptr<EllipseGeometryProcessor> EllipseGeometryProcessor::Make(

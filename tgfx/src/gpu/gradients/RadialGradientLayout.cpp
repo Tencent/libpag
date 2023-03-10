@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RadialGradientLayout.h"
-#include "gpu/opengl/GLRadialGradientLayout.h"
+#include "opengl/GLRadialGradientLayout.h"
 
 namespace tgfx {
 std::unique_ptr<RadialGradientLayout> RadialGradientLayout::Make(Matrix matrix) {

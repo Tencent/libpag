@@ -29,8 +29,8 @@
 #include "tgfx/core/Mask.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/gpu/Surface.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
+#include "tgfx/opengl/GLDevice.h"
+#include "tgfx/opengl/GLFunctions.h"
 
 using namespace pag;
 

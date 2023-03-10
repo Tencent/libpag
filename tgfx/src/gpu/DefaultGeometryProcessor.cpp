@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DefaultGeometryProcessor.h"
-#include "gpu/opengl/GLDefaultGeometryProcessor.h"
+#include "opengl/GLDefaultGeometryProcessor.h"
 
 namespace tgfx {
 std::unique_ptr<DefaultGeometryProcessor> DefaultGeometryProcessor::Make(

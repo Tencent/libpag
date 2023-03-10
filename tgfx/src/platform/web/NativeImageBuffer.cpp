@@ -18,7 +18,7 @@
 
 #include "NativeImageBuffer.h"
 #include "gpu/Texture.h"
-#include "gpu/opengl/GLSampler.h"
+#include "opengl/GLSampler.h"
 #include "tgfx/core/ImageCodec.h"
 
 using namespace emscripten;

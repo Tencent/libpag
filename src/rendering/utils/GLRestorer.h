@@ -1,7 +1,7 @@
 #ifndef PAG_GLRESTORER_H
 #define PAG_GLRESTORER_H
 
-#include "tgfx/gpu/opengl/GLFunctions.h"
+#include "tgfx/opengl/GLFunctions.h"
 
 namespace pag {
 class GLRestorer {

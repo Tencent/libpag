@@ -22,7 +22,7 @@
 #include "rendering/caches/RenderCache.h"
 #include "tgfx/core/Clock.h"
 #include "tgfx/gpu/Surface.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
+#include "tgfx/opengl/GLDevice.h"
 
 namespace pag {
 static std::shared_ptr<tgfx::Image> RescaleImage(tgfx::Context* context,

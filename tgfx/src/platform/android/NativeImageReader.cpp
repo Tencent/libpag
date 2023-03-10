@@ -18,7 +18,7 @@
 
 #include "NativeImageReader.h"
 #include <chrono>
-#include "gpu/opengl/GLSampler.h"
+#include "opengl/GLSampler.h"
 #include "utils/Log.h"
 
 namespace tgfx {

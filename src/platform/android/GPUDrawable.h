@@ -21,7 +21,7 @@
 #include <android/native_window.h>
 #include <android/native_window_jni.h>
 #include "rendering/Drawable.h"
-#include "tgfx/gpu/opengl/egl/EGLWindow.h"
+#include "tgfx/opengl/egl/EGLWindow.h"
 
 namespace pag {
 

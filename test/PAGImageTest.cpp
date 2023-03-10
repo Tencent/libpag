@@ -23,7 +23,7 @@
 #include "pag/pag.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/gpu/Surface.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
+#include "tgfx/opengl/GLDevice.h"
 
 namespace pag {
 using namespace tgfx;

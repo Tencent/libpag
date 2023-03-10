@@ -18,7 +18,7 @@
 
 #include "QuadPerEdgeAAGeometryProcessor.h"
 #include "gpu/YUVTexture.h"
-#include "gpu/opengl/GLQuadPerEdgeAAGeometryProcessor.h"
+#include "opengl/GLQuadPerEdgeAAGeometryProcessor.h"
 
 namespace tgfx {
 std::unique_ptr<QuadPerEdgeAAGeometryProcessor> QuadPerEdgeAAGeometryProcessor::Make(

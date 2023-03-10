@@ -18,8 +18,8 @@
 
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
-#include "gpu/opengl/GLCaps.h"
-#include "gpu/opengl/GLUtil.h"
+#include "opengl/GLCaps.h"
+#include "opengl/GLUtil.h"
 
 namespace pag {
 using namespace tgfx;

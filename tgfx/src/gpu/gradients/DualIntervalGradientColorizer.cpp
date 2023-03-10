@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DualIntervalGradientColorizer.h"
-#include "gpu/opengl/GLDualIntervalGradientColorizer.h"
+#include "opengl/GLDualIntervalGradientColorizer.h"
 
 namespace tgfx {
 std::unique_ptr<DualIntervalGradientColorizer> DualIntervalGradientColorizer::Make(

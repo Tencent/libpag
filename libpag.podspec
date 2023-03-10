@@ -57,10 +57,8 @@ Pod::Spec.new do |s|
                     'tgfx/src/shapes/**/*.{h,cpp}',
                     'tgfx/src/utils/**/*.{h,cpp}',
                     'tgfx/src/vectors/*.{h,cpp}',
-                    'tgfx/src/gpu/*.{h,cpp}',
-                    'tgfx/src/gpu/gradients/**/*.{h,cpp}',
-                    'tgfx/src/gpu/ops/**/*.{h,cpp}',
-                    'tgfx/src/gpu/opengl/*.{h,cpp,mm}',
+                    'tgfx/src/gpu/**/*.{h,cpp}',
+                    'tgfx/src/opengl/*.{h,cpp,mm}',
                     'tgfx/src/platform/*.{h,cpp}',
                     'tgfx/src/codecs/webp/**/*.{h,cpp,mm}'
 
@@ -71,7 +69,7 @@ Pod::Spec.new do |s|
   if ENV["PAG_USE_QT"] == 'ON'
     s.osx.public_header_files = ['src/platform/qt/*.h']
     s.osx.source_files = 'src/platform/qt/**/*.{h,cpp,mm,m}',
-                         'tgfx/src/gpu/opengl/qt/*.{h,cpp,mm}',
+                         'tgfx/src/opengl/qt/*.{h,cpp,mm}',
                          'tgfx/src/platform/mock/*.{h,cpp,mm}',
                          'tgfx/src/platform/apple/BitmapContextUtil.mm'
   else
@@ -79,7 +77,7 @@ Pod::Spec.new do |s|
                                 'src/platform/cocoa/*.h'
     s.osx.source_files =  'src/platform/mac/**/*.{h,cpp,mm,m}',
                           'src/platform/cocoa/**/*.{h,cpp,mm,m}',
-                          'tgfx/src/gpu/opengl/cgl/*.{h,cpp,mm}',
+                          'tgfx/src/opengl/cgl/*.{h,cpp,mm}',
                           'tgfx/src/platform/apple/**/*.{h,cpp,mm,m}'
   end
 
@@ -92,7 +90,7 @@ Pod::Spec.new do |s|
   s.ios.source_files =  'src/platform/ios/*.{h,cpp,mm,m}',
                           'src/platform/ios/private/*.{h,cpp,mm,m}',
                           'src/platform/cocoa/**/*.{h,cpp,mm,m}',
-                          'tgfx/src/gpu/opengl/eagl/*.{h,cpp,mm}',
+                          'tgfx/src/opengl/eagl/*.{h,cpp,mm}',
                           'tgfx/src/platform/apple/**/*.{h,cpp,mm,m}'
 
   s.ios.frameworks   = ['UIKit', 'CoreFoundation', 'QuartzCore', 'CoreGraphics', 'CoreText', 'OpenGLES', 'VideoToolbox', 'CoreMedia']

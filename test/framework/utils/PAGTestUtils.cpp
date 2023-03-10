@@ -20,7 +20,7 @@
 #include <dirent.h>
 #include "TestConstants.h"
 #include "base/utils/TGFXCast.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
+#include "tgfx/opengl/GLFunctions.h"
 
 namespace pag {
 using namespace tgfx;

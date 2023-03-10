@@ -19,7 +19,7 @@
 #pragma once
 
 #include "rendering/Drawable.h"
-#include "tgfx/gpu/opengl/cgl/CGLWindow.h"
+#include "tgfx/opengl/cgl/CGLWindow.h"
 
 namespace pag {
 class GPUDrawable : public Drawable {

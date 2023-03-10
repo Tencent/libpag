@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LinearGradientLayout.h"
-#include "gpu/opengl/GLLinearGradientLayout.h"
+#include "opengl/GLLinearGradientLayout.h"
 
 namespace tgfx {
 std::unique_ptr<LinearGradientLayout> LinearGradientLayout::Make(Matrix matrix) {

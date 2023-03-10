@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "UnrolledBinaryGradientColorizer.h"
-#include "gpu/opengl/GLUnrolledBinaryGradientColorizer.h"
+#include "opengl/GLUnrolledBinaryGradientColorizer.h"
 #include "utils/MathExtra.h"
 
 namespace tgfx {
