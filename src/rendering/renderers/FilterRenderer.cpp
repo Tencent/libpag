@@ -31,12 +31,12 @@
 
 namespace pag {
 
-float GetScaleFactorLimit(Layer* layer) {
+static float GetScaleFactorLimit(Layer* layer) {
   auto scaleFactorLimit = layer->type() == LayerType::Image ? 1.0f : FLT_MAX;
   return scaleFactorLimit;
 }
 
-bool DoesProcessVisibleAreaOnly(Layer* layer) {
+static bool DoesProcessVisibleAreaOnly(Layer* layer) {
   for (auto& effect : layer->effects) {
     if (!effect->processVisibleAreaOnly()) {
       return false;
@@ -226,7 +226,7 @@ bool FilterRenderer::MakeEffectNode(std::vector<FilterNode>& filterNodes, tgfx::
   return true;
 }
 
-bool NeedToSkipClipBounds(const FilterList* filterList) {
+static bool NeedToSkipClipBounds(const FilterList* filterList) {
   for (auto& effect : filterList->effects) {
     if (effect->type() == EffectType::FastBlur) {
       auto blurEffect = static_cast<FastBlurEffect*>(effect);
@@ -294,9 +294,9 @@ std::vector<FilterNode> FilterRenderer::MakeFilterNodes(const FilterList* filter
   return filterNodes;
 }
 
-void ApplyFilters(tgfx::Context* context, std::vector<FilterNode> filterNodes,
-                  const tgfx::Rect& contentBounds, FilterSource* filterSource,
-                  FilterTarget* filterTarget) {
+static void ApplyFilters(tgfx::Context* context, std::vector<FilterNode> filterNodes,
+                         const tgfx::Rect& contentBounds, FilterSource* filterSource,
+                         FilterTarget* filterTarget) {
   auto scale = filterSource->scale;
   std::shared_ptr<FilterBuffer> freeBuffer = nullptr;
   std::shared_ptr<FilterBuffer> lastBuffer = nullptr;
@@ -356,11 +356,10 @@ static bool HasComplexPaint(tgfx::Canvas* parentCanvas, const tgfx::Rect& drawin
   return false;
 }
 
-std::unique_ptr<FilterTarget> GetDirectFilterTarget(tgfx::Canvas* parentCanvas,
-                                                    const FilterList* filterList,
-                                                    const std::vector<FilterNode>& filterNodes,
-                                                    const tgfx::Rect& contentBounds,
-                                                    const tgfx::Point& sourceScale) {
+static std::unique_ptr<FilterTarget> GetDirectFilterTarget(
+    tgfx::Canvas* parentCanvas, const FilterList* filterList,
+    const std::vector<FilterNode>& filterNodes, const tgfx::Rect& contentBounds,
+    const tgfx::Point& sourceScale) {
   // 在高分辨率下，模糊滤镜的开销会增大，需要降采样降低开销；当模糊为最后一个滤镜时，需要离屏绘制
   if (!filterList->effects.empty() && filterList->effects.back()->type() == EffectType::FastBlur) {
     return nullptr;
@@ -390,10 +389,9 @@ std::unique_ptr<FilterTarget> GetDirectFilterTarget(tgfx::Canvas* parentCanvas,
   return ToFilterTarget(surface, totalMatrix);
 }
 
-std::unique_ptr<FilterTarget> GetOffscreenFilterTarget(tgfx::Surface* surface,
-                                                       const std::vector<FilterNode>& filterNodes,
-                                                       const tgfx::Rect& contentBounds,
-                                                       const tgfx::Point& sourceScale) {
+static std::unique_ptr<FilterTarget> GetOffscreenFilterTarget(
+    tgfx::Surface* surface, const std::vector<FilterNode>& filterNodes,
+    const tgfx::Rect& contentBounds, const tgfx::Point& sourceScale) {
   auto finalBounds = filterNodes.back().bounds;
   auto secondToLastBounds =
       filterNodes.size() > 1 ? filterNodes[filterNodes.size() - 2].bounds : contentBounds;
@@ -403,12 +401,12 @@ std::unique_ptr<FilterTarget> GetOffscreenFilterTarget(tgfx::Surface* surface,
   return ToFilterTarget(surface, totalMatrix);
 }
 
-std::unique_ptr<FilterSource> ToFilterSource(tgfx::Canvas* canvas) {
+static std::unique_ptr<FilterSource> ToFilterSource(tgfx::Canvas* canvas) {
   auto surface = canvas->getSurface();
-  auto texture = surface->getTexture();
+  auto texture = surface->getBackendTexture();
   tgfx::Point scale = {};
   scale.x = scale.y = GetMaxScaleFactor(canvas->getMatrix());
-  return ToFilterSource(texture.get(), scale);
+  return ToFilterSource(texture, surface->origin(), scale);
 }
 
 static float GetScaleFactor(FilterList* filterList, const tgfx::Rect& contentBounds) {
@@ -477,7 +475,7 @@ void FilterRenderer::DrawWithFilter(tgfx::Canvas* parentCanvas, RenderCache* cac
     if (!targetCanvas->getMatrix().invert(&drawingMatrix)) {
       drawingMatrix.setIdentity();
     }
-    parentCanvas->drawTexture(targetSurface->getTexture(), drawingMatrix);
+    parentCanvas->drawImage(targetSurface->makeImageSnapshot(), drawingMatrix);
   }
 }
 }  // namespace pag

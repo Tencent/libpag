@@ -49,11 +49,11 @@ std::shared_ptr<Image> RGBAAAImage::onMakeRGBAAA(int, int, int, int) const {
   return nullptr;
 }
 
-std::unique_ptr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(Context* context, TileMode,
+std::unique_ptr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(Context* context,
+                                                                    uint32_t surfaceFlags, TileMode,
                                                                     TileMode,
                                                                     const SamplingOptions& sampling,
-                                                                    const Matrix* localMatrix,
-                                                                    uint32_t surfaceFlags) {
+                                                                    const Matrix* localMatrix) {
   auto matrix = Matrix::MakeTrans(bounds.x(), bounds.y());
   if (localMatrix != nullptr) {
     matrix.postConcat(*localMatrix);

@@ -22,7 +22,6 @@
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Shape.h"
-#include "tgfx/gpu/Texture.h"
 
 namespace pag {
 class RenderCache;
@@ -34,7 +33,7 @@ class RenderCache;
 class Snapshot {
  public:
   /**
-   * Creates a new Snapshot with specified image and matrix.
+   * Creates a new Snapshot with the specified image and matrix.
    */
   explicit Snapshot(std::shared_ptr<tgfx::Image> image, const tgfx::Matrix& matrix)
       : image(std::move(image)), matrix(matrix) {

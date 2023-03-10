@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Gpu.h"
-#include "tgfx/gpu/Texture.h"
+#include "gpu/Texture.h"
 
 namespace tgfx {
 void Gpu::regenerateMipMapLevels(const TextureSampler* sampler) {

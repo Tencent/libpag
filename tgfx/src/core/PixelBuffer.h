@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "gpu/Texture.h"
 #include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {

@@ -23,14 +23,15 @@
 #include "Processor.h"
 #include "SamplerState.h"
 #include "TextureProxy.h"
-#include "tgfx/gpu/Texture.h"
+#include "gpu/Texture.h"
 
 namespace tgfx {
 struct FPArgs {
-  explicit FPArgs(const Context* context) : context(context) {
+  FPArgs(Context* context, uint32_t surfaceFlags) : context(context), surfaceFlags(surfaceFlags) {
   }
 
-  const Context* context = nullptr;
+  Context* context = nullptr;
+  uint32_t surfaceFlags = 0;
   Matrix preLocalMatrix = Matrix::I();
   Matrix postLocalMatrix = Matrix::I();
 };

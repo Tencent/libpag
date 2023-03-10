@@ -67,7 +67,7 @@ std::shared_ptr<PAGImage> PAGImage::FromTexture(const BackendTexture& texture, I
     return nullptr;
   }
   auto pagImage = std::shared_ptr<StillImage>(new StillImage(texture.width(), texture.height()));
-  auto picture = Picture::MakeFrom(pagImage->uniqueID(), texture, ToTGFX(origin));
+  auto picture = Picture::MakeFrom(pagImage->uniqueID(), ToTGFX(texture), ToTGFX(origin));
   if (!picture) {
     LOGE("PAGImage.MakeFrom() The texture is invalid.");
     return nullptr;

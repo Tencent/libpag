@@ -23,7 +23,6 @@
 #include "pag/pag.h"
 #include "rendering/Performance.h"
 #include "tgfx/core/ImageBuffer.h"
-#include "tgfx/gpu/Texture.h"
 
 namespace pag {
 class SequenceReader {
@@ -31,12 +30,12 @@ class SequenceReader {
   virtual ~SequenceReader() = default;
 
   /**
-   * Returns the width of sequence buffers created from the reader.
+   * Returns the width of the sequence buffers created from the reader.
    */
   virtual int width() const = 0;
 
   /**
-   * Returns the height of sequence buffers created from the reader.
+   * Returns the height of the sequence buffers created from the reader.
    */
   virtual int height() const = 0;
 

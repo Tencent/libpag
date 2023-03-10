@@ -19,6 +19,7 @@
 #include "ShapeRenderer.h"
 #include <algorithm>
 #include <functional>
+#include <unordered_map>
 #include "base/utils/EnumClassHash.h"
 #include "base/utils/Interpolate.h"
 #include "base/utils/MathUtil.h"

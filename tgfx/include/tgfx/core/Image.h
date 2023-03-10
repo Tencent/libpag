@@ -147,12 +147,6 @@ class Image {
   static std::shared_ptr<Image> MakeAdopted(Context* context, const BackendTexture& backendTexture,
                                             ImageOrigin origin = ImageOrigin::TopLeft);
 
-  /**
-   * Creates an Image from the Texture, An Image is returned if texture is not nullptr.
-   */
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Texture> texture,
-                                         ImageOrigin origin = ImageOrigin::TopLeft);
-
   virtual ~Image() = default;
 
   /**
@@ -195,9 +189,10 @@ class Image {
   bool hasMipmaps() const;
 
   /**
-   * Retrieves the backend texture. Returns nullptr if the Image is not backed by texture.
+   * Retrieves the backend texture of the Image. Returns an invalid BackendTexture if the Image is
+   * not backed by a Texture.
    */
-  std::shared_ptr<Texture> getTexture() const;
+  BackendTexture getBackendTexture() const;
 
   /**
    * Returns an Image backed by GPU texture associated with the specified context. If there is a
@@ -256,20 +251,25 @@ class Image {
                                               int alphaStartY) const;
 
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
-      Context* context, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
-      const Matrix* localMatrix = nullptr, uint32_t surfaceFlags = 0);
-
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(Context* context,
-                                                         const SamplingOptions& sampling,
-                                                         const Matrix* localMatrix = nullptr,
-                                                         uint32_t surfaceFlags = 0);
+      Context* context, uint32_t surfaceFlags, TileMode tileModeX, TileMode tileModeY,
+      const SamplingOptions& sampling, const Matrix* localMatrix = nullptr);
 
  private:
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(Context* context, uint32_t surfaceFlags,
+                                                         const SamplingOptions& sampling);
+
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Texture> texture,
+                                         ImageOrigin origin = ImageOrigin::TopLeft);
+
   static std::shared_ptr<Image> MakeFromSource(std::shared_ptr<ImageSource> source,
                                                ImageOrigin origin = ImageOrigin::TopLeft);
 
   std::shared_ptr<Image> cloneWithSource(std::shared_ptr<ImageSource> newSource) const;
 
+  friend class ImageShader;
+  friend class BlurImageFilter;
   friend class Canvas;
+  friend class Surface;
+  friend class Mask;
 };
 }  // namespace tgfx

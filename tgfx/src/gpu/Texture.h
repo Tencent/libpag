@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/YUVColorSpace.h"
@@ -117,11 +118,19 @@ class Texture : public Resource {
                                               SurfaceOrigin origin = SurfaceOrigin::TopLeft);
 
   /**
-   * Creates a Texture from the platform-specific hardware buffer. For example, the hardware buffer
-   * could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on the apple
-   * platform. The returned Image takes a reference to the hardwareBuffer. The colorSpace is ignored
-   * if the hardwareBuffer contains only one plane, which means it is not in the YUV format. Returns
-   * nullptr if the context is nullptr or the hardwareBuffer is nullptr.
+   * Creates a Texture from the specified ImageBuffer. Returns nullptr if the context is nullptr or
+   * the imageBuffer is nullptr.
+   */
+  static std::shared_ptr<Texture> MakeFrom(Context* context,
+                                           std::shared_ptr<ImageBuffer> imageBuffer,
+                                           bool mipMapped = false);
+
+  /**
+   * Creates a Texture from the platform-specific hardware buffer. For example, the hardware
+   * buffer could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on the
+   * apple platform. The returned Image takes a reference to the hardwareBuffer. The colorSpace
+   * is ignored if the hardwareBuffer contains only one plane, which means it is not in the YUV
+   * format. Returns nullptr if the context is nullptr or the hardwareBuffer is nullptr.
    */
   static std::shared_ptr<Texture> MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
                                            YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED);

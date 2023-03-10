@@ -53,4 +53,9 @@ bool Mask::strokeText(const TextBlob* textBlob, const Stroke& stroke) {
   fillPath(path);
   return true;
 }
+
+std::shared_ptr<tgfx::Image> Mask::makeImage(Context* context) {
+  auto texture = updateTexture(context);
+  return Image::MakeFrom(texture);
+}
 }  // namespace tgfx

@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/PixelBuffer.h"
-#include "tgfx/gpu/Texture.h"
+#include "gpu/Texture.h"
 
 #if defined(__ANDROID__) || defined(ANDROID)
 #include "EGLHardwareTexture.h"

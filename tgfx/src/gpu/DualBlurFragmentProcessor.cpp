@@ -21,23 +21,23 @@
 
 namespace tgfx {
 std::unique_ptr<DualBlurFragmentProcessor> DualBlurFragmentProcessor::Make(
-    DualBlurPassMode passMode, std::unique_ptr<FragmentProcessor> texture, Point blurOffset,
+    DualBlurPassMode passMode, std::unique_ptr<FragmentProcessor> processor, Point blurOffset,
     Point texelSize) {
-  if (texture == nullptr) {
+  if (processor == nullptr) {
     return nullptr;
   }
   return std::unique_ptr<DualBlurFragmentProcessor>(
-      new DualBlurFragmentProcessor(passMode, std::move(texture), blurOffset, texelSize));
+      new DualBlurFragmentProcessor(passMode, std::move(processor), blurOffset, texelSize));
 }
 
 DualBlurFragmentProcessor::DualBlurFragmentProcessor(DualBlurPassMode passMode,
-                                                     std::unique_ptr<FragmentProcessor> texture,
+                                                     std::unique_ptr<FragmentProcessor> processor,
                                                      Point blurOffset, Point texelSize)
     : FragmentProcessor(ClassID()),
       passMode(passMode),
       blurOffset(blurOffset),
       texelSize(texelSize) {
-  registerChildProcessor(std::move(texture));
+  registerChildProcessor(std::move(processor));
 }
 
 void DualBlurFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {

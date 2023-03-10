@@ -21,16 +21,16 @@
 #include <memory>
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Color.h"
+#include "tgfx/core/ColorFilter.h"
+#include "tgfx/core/Image.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/SamplingOptions.h"
 #include "tgfx/core/TileMode.h"
-#include "tgfx/core/ColorFilter.h"
-#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 struct FPArgs;
-
+class Texture;
 class FragmentProcessor;
 
 /**
@@ -41,14 +41,18 @@ class FragmentProcessor;
 class Shader {
  public:
   /**
-   * Create a shader that draws the specified color.
+   * Creates a shader that draws the specified color.
    */
   static std::shared_ptr<Shader> MakeColorShader(Color color);
 
-  static std::shared_ptr<Shader> MakeImageShader(std::shared_ptr<Texture> texture,
-                                                   TileMode tileModeX = TileMode::Clamp,
-                                                   TileMode tileModeY = TileMode::Clamp,
-                                                   SamplingOptions sampling = SamplingOptions());
+  /**
+   * Creates a shader that draws the specified image. The tile modes will be ignored if the image is
+   * an RGBAAA Image.
+   */
+  static std::shared_ptr<Shader> MakeImageShader(std::shared_ptr<Image> image,
+                                                 TileMode tileModeX = TileMode::Clamp,
+                                                 TileMode tileModeY = TileMode::Clamp,
+                                                 SamplingOptions sampling = SamplingOptions());
 
   static std::shared_ptr<Shader> MakeBlend(BlendMode mode, std::shared_ptr<Shader> dst,
                                            std::shared_ptr<Shader> src);

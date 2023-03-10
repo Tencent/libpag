@@ -21,25 +21,24 @@
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Mask.h"
 #include "tgfx/gpu/Surface.h"
-#include "tgfx/gpu/Texture.h"
 
 namespace pag {
 class Atlas {
  public:
   static std::unique_ptr<Atlas> Make(tgfx::Context* context, const std::vector<GlyphHandle>& glyphs,
-                                     int maxTextureSize, bool alphaOnly = true);
+                                     int maxPageSize, bool alphaOnly = true);
 
   bool getLocator(const tgfx::BytesKey& bytesKey, AtlasLocator* locator) const;
 
   size_t memoryUsage() const;
 
  private:
-  Atlas(std::vector<std::shared_ptr<tgfx::Texture>> textures,
+  Atlas(std::vector<std::shared_ptr<tgfx::Image>> images,
         std::unordered_map<tgfx::BytesKey, AtlasLocator, tgfx::BytesHasher> glyphLocators)
-      : textures(std::move(textures)), glyphLocators(std::move(glyphLocators)) {
+      : images(std::move(images)), glyphLocators(std::move(glyphLocators)) {
   }
 
-  std::vector<std::shared_ptr<tgfx::Texture>> textures;
+  std::vector<std::shared_ptr<tgfx::Image>> images;
   std::unordered_map<tgfx::BytesKey, AtlasLocator, tgfx::BytesHasher> glyphLocators;
 
   friend class TextAtlas;
@@ -103,14 +102,15 @@ class RectanglePack {
 };
 
 size_t Atlas::memoryUsage() const {
-  if (textures.empty()) {
+  if (images.empty()) {
     return 0;
   }
   size_t usage = 0;
-  for (auto& texture : textures) {
-    usage += texture->memoryUsage();
+  for (auto& image : images) {
+    usage += image->width() * image->height();
   }
-  return usage;
+  auto bytesPerPixels = images[0]->isAlphaOnly() ? 1 : 4;
+  return usage * bytesPerPixels;
 }
 
 static tgfx::PaintStyle ToTGFX(TextStyle style) {
@@ -153,11 +153,10 @@ struct Page {
   std::unordered_map<tgfx::BytesKey, AtlasLocator, tgfx::BytesHasher> locators;
 };
 
-static std::vector<Page> CreatePages(const std::vector<GlyphHandle>& glyphs, int maxTextureSize) {
+static std::vector<Page> CreatePages(const std::vector<GlyphHandle>& glyphs, int maxPageSize) {
   std::vector<Page> pages = {};
   std::vector<tgfx::BytesKey> styleKeys = {};
   std::vector<AtlasTextRun> textRuns = {};
-  auto maxPageSize = maxTextureSize;
   int padding = DefaultPadding;
   RectanglePack pack(padding);
   Page page;
@@ -203,7 +202,7 @@ static std::vector<Page> CreatePages(const std::vector<GlyphHandle>& glyphs, int
     textRun->glyphIDs.push_back(glyph->getGlyphID());
     textRun->positions.push_back({-bounds.x() + point.x, -bounds.y() + point.y});
     AtlasLocator locator;
-    locator.textureIndex = pages.size();
+    locator.imageIndex = pages.size();
     locator.location = tgfx::Rect::MakeXYWH(point.x, point.y, static_cast<float>(width),
                                             static_cast<float>(height));
     locator.glyphBounds = bounds;
@@ -218,7 +217,7 @@ static std::vector<Page> CreatePages(const std::vector<GlyphHandle>& glyphs, int
   return pages;
 }
 
-std::shared_ptr<tgfx::Texture> DrawMask(tgfx::Context* context, const Page& page) {
+std::shared_ptr<tgfx::Image> DrawMask(tgfx::Context* context, const Page& page) {
   auto mask = tgfx::Mask::Make(page.width, page.height);
   if (mask == nullptr) {
     LOGE("Atlas: create mask failed.");
@@ -233,10 +232,10 @@ std::shared_ptr<tgfx::Texture> DrawMask(tgfx::Context* context, const Page& page
       mask->strokeText(blob.get(), *textRun.paint.getStroke());
     }
   }
-  return mask->updateTexture(context);
+  return mask->makeImage(context);
 }
 
-std::shared_ptr<tgfx::Texture> DrawColor(tgfx::Context* context, const Page& page) {
+std::shared_ptr<tgfx::Image> DrawColor(tgfx::Context* context, const Page& page) {
   auto surface = tgfx::Surface::Make(context, page.width, page.height);
   if (surface == nullptr) {
     return nullptr;
@@ -250,28 +249,28 @@ std::shared_ptr<tgfx::Texture> DrawColor(tgfx::Context* context, const Page& pag
     canvas->drawGlyphs(glyphs, positions, textRun.glyphIDs.size(), textRun.textFont, textRun.paint);
   }
   canvas->setMatrix(totalMatrix);
-  return surface->getTexture();
+  return surface->makeImageSnapshot();
 }
 
-static std::vector<std::shared_ptr<tgfx::Texture>> DrawPages(tgfx::Context* context,
-                                                             std::vector<Page>* pages,
-                                                             bool alphaOnly) {
-  std::vector<std::shared_ptr<tgfx::Texture>> textures;
+static std::vector<std::shared_ptr<tgfx::Image>> DrawPages(tgfx::Context* context,
+                                                           std::vector<Page>* pages,
+                                                           bool alphaOnly) {
+  std::vector<std::shared_ptr<tgfx::Image>> images;
   for (auto& page : *pages) {
-    auto texture = alphaOnly ? DrawMask(context, page) : DrawColor(context, page);
-    if (texture) {
-      textures.push_back(texture);
+    auto image = alphaOnly ? DrawMask(context, page) : DrawColor(context, page);
+    if (image) {
+      images.push_back(image);
     }
   }
-  return textures;
+  return images;
 }
 
 std::unique_ptr<Atlas> Atlas::Make(tgfx::Context* context, const std::vector<GlyphHandle>& glyphs,
-                                   int maxTextureSize, bool alphaOnly) {
+                                   int maxPageSize, bool alphaOnly) {
   if (glyphs.empty()) {
     return nullptr;
   }
-  auto pages = CreatePages(glyphs, maxTextureSize);
+  auto pages = CreatePages(glyphs, maxPageSize);
   if (pages.empty()) {
     return nullptr;
   }
@@ -279,8 +278,8 @@ std::unique_ptr<Atlas> Atlas::Make(tgfx::Context* context, const std::vector<Gly
   for (const auto& page : pages) {
     glyphLocators.insert(page.locators.begin(), page.locators.end());
   }
-  auto textures = DrawPages(context, &pages, alphaOnly);
-  return std::unique_ptr<Atlas>(new Atlas(std::move(textures), std::move(glyphLocators)));
+  auto images = DrawPages(context, &pages, alphaOnly);
+  return std::unique_ptr<Atlas>(new Atlas(std::move(images), std::move(glyphLocators)));
 }
 
 bool Atlas::getLocator(const tgfx::BytesKey& bytesKey, AtlasLocator* locator) const {
@@ -299,7 +298,7 @@ static constexpr float MaxAtlasFontSize = 256.f;
 std::unique_ptr<TextAtlas> TextAtlas::Make(const TextBlock* textBlock, RenderCache* renderCache,
                                            float scale) {
   auto context = renderCache->getContext();
-  auto maxTextureSize = context->caps()->maxTextureSize;
+  auto maxPageSize = context->caps()->maxTextureSize;
   auto maxScale = scale * textBlock->maxScale();
   auto maskGlyphs = textBlock->maskAtlasGlyphs(maxScale);
   if (maskGlyphs.empty() || maskGlyphs[0]->getFont().getSize() > MaxAtlasFontSize) {
@@ -309,11 +308,11 @@ std::unique_ptr<TextAtlas> TextAtlas::Make(const TextBlock* textBlock, RenderCac
   if (!colorGlyphs.empty() && colorGlyphs[0]->getFont().getSize() > MaxAtlasFontSize) {
     return nullptr;
   }
-  auto maskAtlas = Atlas::Make(context, maskGlyphs, maxTextureSize).release();
+  auto maskAtlas = Atlas::Make(context, maskGlyphs, maxPageSize).release();
   if (maskAtlas == nullptr) {
     return nullptr;
   }
-  auto colorAtlas = Atlas::Make(context, colorGlyphs, maxTextureSize, false).release();
+  auto colorAtlas = Atlas::Make(context, colorGlyphs, maxPageSize, false).release();
   return std::unique_ptr<TextAtlas>(
       new TextAtlas(textBlock->id(), maskAtlas, colorAtlas, scale, maxScale));
 }
@@ -325,19 +324,19 @@ TextAtlas::~TextAtlas() {
 
 bool TextAtlas::getLocator(const tgfx::BytesKey& bytesKey, AtlasLocator* locator) const {
   if (colorAtlas && colorAtlas->getLocator(bytesKey, locator)) {
-    locator->textureIndex += maskAtlas->textures.size();
+    locator->imageIndex += maskAtlas->images.size();
     return true;
   }
   return maskAtlas->getLocator(bytesKey, locator);
 }
 
-std::shared_ptr<tgfx::Texture> TextAtlas::getAtlasTexture(size_t textureIndex) const {
-  if (0 <= textureIndex && textureIndex < maskAtlas->textures.size()) {
-    return maskAtlas->textures[textureIndex];
+std::shared_ptr<tgfx::Image> TextAtlas::getAtlasImage(size_t imageIndex) const {
+  if (imageIndex < maskAtlas->images.size()) {
+    return maskAtlas->images[imageIndex];
   }
-  textureIndex = textureIndex - maskAtlas->textures.size();
-  if (colorAtlas && 0 <= textureIndex && textureIndex < colorAtlas->textures.size()) {
-    return colorAtlas->textures[textureIndex];
+  imageIndex = imageIndex - maskAtlas->images.size();
+  if (colorAtlas && imageIndex < colorAtlas->images.size()) {
+    return colorAtlas->images[imageIndex];
   }
   return nullptr;
 }
