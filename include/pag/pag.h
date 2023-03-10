@@ -157,15 +157,16 @@ class PAG_API PAGImage {
 
   virtual bool setContentTime(int64_t time) = 0;
 
- private:
   mutable std::mutex locker = {};
+  PAGLayer* _owner = nullptr;
+
+ private:
   ID _uniqueID = 0;
   int _width = 0;
   int _height = 0;
   int _scaleMode = PAGScaleMode::LetterBox;
   Matrix _matrix = Matrix::I();
   bool hasSetScaleMode = false;
-  PAGLayer* _owner = nullptr;
 
   Matrix getContentMatrix(int defaultScaleMode, int contentWidth, int contentHeight);
 
@@ -1186,6 +1187,8 @@ class PAG_API PAGSurface {
    */
   static std::shared_ptr<PAGSurface> MakeOffscreen(int width, int height);
 
+  virtual ~PAGSurface() = default;
+
   /**
    * Returns the width in pixels of the surface.
    */
@@ -1218,23 +1221,32 @@ class PAG_API PAGSurface {
    */
   bool readPixels(ColorType colorType, AlphaType alphaType, void* dstPixels, size_t dstRowBytes);
 
- private:
-  uint32_t contentVersion = 0;
-  PAGPlayer* pagPlayer = nullptr;
-  std::shared_ptr<std::mutex> rootLocker = nullptr;
+ protected:
+  explicit PAGSurface(std::shared_ptr<Drawable> drawable, bool contextAdopted = false);
+
+  virtual bool drawGraphic(tgfx::Context* context, RenderCache* cache,
+                           std::shared_ptr<Graphic> graphic, bool autoClear);
+  virtual void updateSizeInternal();
+  virtual void purgeResources();
+
+  void finishDraw(tgfx::Context* context, RenderCache* cache, BackendSemaphore* signalSemaphore);
+  tgfx::Context* lockContext();
+  void unlockContext();
+
   std::shared_ptr<Drawable> drawable = nullptr;
   std::shared_ptr<tgfx::Surface> surface = nullptr;
+  uint32_t contentVersion = 0;
+  PAGPlayer* pagPlayer = nullptr;
+
+ private:
+  std::shared_ptr<std::mutex> rootLocker = nullptr;
   bool contextAdopted = false;
   GLRestorer* glRestorer = nullptr;
-
-  explicit PAGSurface(std::shared_ptr<Drawable> drawable, bool contextAdopted = false);
 
   bool draw(RenderCache* cache, std::shared_ptr<Graphic> graphic, BackendSemaphore* signalSemaphore,
             bool autoClear = true);
   bool prepare(RenderCache* cache, std::shared_ptr<Graphic> graphic);
   bool hitTest(RenderCache* cache, std::shared_ptr<Graphic> graphic, float x, float y);
-  tgfx::Context* lockContext();
-  void unlockContext();
   bool wait(const BackendSemaphore& waitSemaphore);
   void freeCacheInternal();
 

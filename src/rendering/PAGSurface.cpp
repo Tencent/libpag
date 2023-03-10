@@ -26,61 +26,8 @@
 #include "rendering/utils/LockGuard.h"
 #include "rendering/utils/shaper/TextShaper.h"
 #include "tgfx/core/Clock.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace pag {
-
-std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(std::shared_ptr<Drawable> drawable) {
-  if (drawable == nullptr) {
-    return nullptr;
-  }
-  return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(drawable)));
-}
-
-std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendRenderTarget& renderTarget,
-                                                 ImageOrigin origin) {
-  auto device = tgfx::GLDevice::Current();
-  if (device == nullptr || !renderTarget.isValid()) {
-    return nullptr;
-  }
-  auto drawable =
-      std::make_shared<RenderTargetDrawable>(device, ToTGFX(renderTarget), ToTGFX(origin));
-  if (drawable == nullptr) {
-    return nullptr;
-  }
-  return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(drawable), true));
-}
-
-std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendTexture& texture, ImageOrigin origin,
-                                                 bool forAsyncThread) {
-  std::shared_ptr<tgfx::Device> device = nullptr;
-  bool isAdopted = false;
-  if (forAsyncThread) {
-    auto sharedContext = tgfx::GLDevice::CurrentNativeHandle();
-    device = tgfx::GLDevice::Make(sharedContext);
-  }
-  if (device == nullptr) {
-    device = tgfx::GLDevice::Current();
-    isAdopted = true;
-  }
-  if (device == nullptr || !texture.isValid()) {
-    return nullptr;
-  }
-  auto drawable = std::make_shared<TextureDrawable>(device, ToTGFX(texture), ToTGFX(origin));
-  if (drawable == nullptr) {
-    return nullptr;
-  }
-  return std::shared_ptr<PAGSurface>(new PAGSurface(std::move(drawable), isAdopted));
-}
-
-std::shared_ptr<PAGSurface> PAGSurface::MakeOffscreen(int width, int height) {
-  auto device = tgfx::GLDevice::Make();
-  if (device == nullptr || width <= 0 || height <= 0) {
-    return nullptr;
-  }
-  auto drawable = std::make_shared<OffscreenDrawable>(width, height, device);
-  return std::shared_ptr<PAGSurface>(new PAGSurface(drawable));
-}
 
 PAGSurface::PAGSurface(std::shared_ptr<Drawable> drawable, bool contextAdopted)
     : drawable(std::move(drawable)), contextAdopted(contextAdopted) {
@@ -99,8 +46,7 @@ int PAGSurface::height() {
 
 void PAGSurface::updateSize() {
   LockGuard autoLock(rootLocker);
-  freeCacheInternal();
-  drawable->updateSize();
+  updateSizeInternal();
 }
 
 void PAGSurface::freeCache() {
@@ -114,12 +60,21 @@ void PAGSurface::freeCacheInternal() {
     pagPlayer->renderCache->releaseAll();
   }
   surface = nullptr;
+  purgeResources();
+  drawable->freeDevice();
+}
+
+void PAGSurface::purgeResources() {
   auto context = drawable->lockContext();
   if (context) {
     context->purgeResourcesNotUsedSince(0);
     drawable->unlockContext();
   }
-  drawable->freeDevice();
+}
+
+void PAGSurface::updateSizeInternal() {
+  freeCacheInternal();
+  drawable->updateSize();
 }
 
 bool PAGSurface::clearAll() {
@@ -171,6 +126,16 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
   if (!context) {
     return false;
   }
+  if (!drawGraphic(context, cache, graphic, autoClear)) {
+    return false;
+  }
+  finishDraw(context, cache, signalSemaphore);
+  unlockContext();
+  return true;
+}
+
+bool PAGSurface::drawGraphic(tgfx::Context* context, RenderCache* cache,
+                             std::shared_ptr<Graphic> graphic, bool autoClear) {
   cache->prepareLayers();
   if (surface != nullptr && autoClear && contentVersion == cache->getContentVersion()) {
     unlockContext();
@@ -193,6 +158,11 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
     graphic->prepare(cache);
     graphic->draw(canvas, cache);
   }
+  return true;
+}
+
+void PAGSurface::finishDraw(tgfx::Context* context, RenderCache* cache,
+                            BackendSemaphore* signalSemaphore) {
   if (signalSemaphore == nullptr) {
     surface->flush();
   } else {
@@ -204,8 +174,6 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
   context->submit();
   drawable->setTimeStamp(pagPlayer->getTimeStampInternal());
   drawable->present(context);
-  unlockContext();
-  return true;
 }
 
 bool PAGSurface::wait(const BackendSemaphore& waitSemaphore) {
