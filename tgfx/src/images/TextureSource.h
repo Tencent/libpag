@@ -47,9 +47,11 @@ class TextureSource : public ImageSource {
     return true;
   }
 
-  std::shared_ptr<Texture> getTexture() const override {
-    return texture;
+  BackendTexture getBackendTexture() const override {
+    return texture->getBackendTexture();
   }
+
+  std::shared_ptr<ImageSource> makeTextureSource(Context* context) const override;
 
  protected:
   std::shared_ptr<ImageSource> onMakeMipMapped() const override {

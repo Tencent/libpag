@@ -51,15 +51,8 @@ std::shared_ptr<ImageSource> ImageSource::MakeFrom(std::shared_ptr<Texture> text
 }
 
 std::shared_ptr<ImageSource> ImageSource::makeTextureSource(Context* context) const {
-  auto texture = getTexture();
-  if (texture != nullptr) {
-    if (texture->getContext() == context) {
-      return std::static_pointer_cast<ImageSource>(weakThis.lock());
-    }
-    return nullptr;
-  }
   auto resourceCache = context->resourceCache();
-  texture = std::static_pointer_cast<Texture>(resourceCache->findResourceByOwner(this));
+  auto texture = std::static_pointer_cast<Texture>(resourceCache->findResourceByOwner(this));
   if (texture != nullptr) {
     return MakeFrom(texture);
   }

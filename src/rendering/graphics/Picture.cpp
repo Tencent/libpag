@@ -40,7 +40,7 @@ static std::shared_ptr<tgfx::Image> RescaleImage(tgfx::Context* context,
   auto canvas = surface->getCanvas();
   canvas->setMatrix(tgfx::Matrix::MakeScale(scaleFactor));
   canvas->drawImage(image);
-  return tgfx::Image::MakeFrom(surface->getTexture());
+  return surface->makeImageSnapshot();
 }
 
 //================================= ImageProxyPicture ====================================
@@ -203,7 +203,7 @@ class SnapshotPicture : public Picture {
     graphic->draw(canvas, cache);
     auto drawingMatrix = tgfx::Matrix::I();
     matrix.invert(&drawingMatrix);
-    auto image = tgfx::Image::MakeFrom(surface->getTexture());
+    auto image = surface->makeImageSnapshot();
     auto snapshot = new Snapshot(std::move(image), drawingMatrix);
     return std::unique_ptr<Snapshot>(snapshot);
   }

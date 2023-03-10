@@ -172,8 +172,8 @@ bool Image::isTextureBacked() const {
   return source->isTextureBacked();
 }
 
-std::shared_ptr<Texture> Image::getTexture() const {
-  return source->getTexture();
+BackendTexture Image::getBackendTexture() const {
+  return source->getBackendTexture();
 }
 
 std::shared_ptr<Image> Image::makeTextureImage(Context* context) const {

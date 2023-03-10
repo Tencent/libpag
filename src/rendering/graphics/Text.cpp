@@ -310,10 +310,10 @@ void Text::draw(tgfx::Canvas* canvas, const TextAtlas* textAtlas) const {
       if (!textAtlas->getLocator(bytesKey, &locator)) {
         continue;
       }
-      if (parameters.imageIndex != locator.textureIndex) {
+      if (parameters.imageIndex != locator.imageIndex) {
         Draw(canvas, textAtlas, parameters);
         parameters = {};
-        parameters.imageIndex = locator.textureIndex;
+        parameters.imageIndex = locator.imageIndex;
       }
       auto matrix = tgfx::Matrix::I();
       matrix.postTranslate(locator.glyphBounds.x(), locator.glyphBounds.y());

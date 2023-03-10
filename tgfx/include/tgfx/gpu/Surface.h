@@ -111,12 +111,6 @@ class Surface {
   SurfaceOrigin origin() const;
 
   /**
-   * Retrieves the texture that the surface renders to. Return nullptr if the surface was made from
-   * a RenderTarget.
-   */
-  std::shared_ptr<Texture> getTexture();
-
-  /**
    * Retrieves the backend render target that the surface renders to. The returned
    * BackendRenderTarget should be discarded if the Surface is drawn to or deleted.
    */
@@ -206,6 +200,8 @@ class Surface {
 
   Surface(std::shared_ptr<RenderTarget> renderTarget, std::shared_ptr<Texture> texture,
           const SurfaceOptions* options, bool externalTexture = true);
+
+  std::shared_ptr<Texture> getTexture();
 
   void aboutToDraw(bool discardContent = false);
 

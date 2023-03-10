@@ -16,33 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "TextureSource.h"
 
-#include <mutex>
-#include "tgfx/platform/android/SurfaceImageReader.h"
-
-namespace pag {
-class JVideoSurface {
- public:
-  static std::shared_ptr<tgfx::SurfaceImageReader> GetImageReader(JNIEnv* env,
-                                                                  jobject videoSurface);
-
-  explicit JVideoSurface(std::shared_ptr<tgfx::SurfaceImageReader> imageReader)
-      : imageReader(imageReader) {
+namespace tgfx {
+std::shared_ptr<ImageSource> TextureSource::makeTextureSource(Context* context) const {
+  if (texture->getContext() == context) {
+    return std::static_pointer_cast<ImageSource>(weakThis.lock());
   }
-
-  std::shared_ptr<tgfx::SurfaceImageReader> get() {
-    std::lock_guard<std::mutex> autoLock(locker);
-    return imageReader;
-  }
-
-  void clear() {
-    std::lock_guard<std::mutex> autoLock(locker);
-    imageReader = nullptr;
-  }
-
- private:
-  std::mutex locker;
-  std::shared_ptr<tgfx::SurfaceImageReader> imageReader = nullptr;
-};
-}  // namespace pag
+  return nullptr;
+}
+}  // namespace tgfx

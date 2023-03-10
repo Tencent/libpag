@@ -86,10 +86,11 @@ class ImageSource : public Cacheable {
   }
 
   /**
-   * Retrieves the backend texture. Returns nullptr if ImageSource is not backed by texture.
+   * Retrieves the backend texture. Returns an invalid BackendTexture if the ImageSource is not
+   * backed by a Texture.
    */
-  virtual std::shared_ptr<Texture> getTexture() const {
-    return nullptr;
+  virtual BackendTexture getBackendTexture() const {
+    return {};
   }
 
   /**
@@ -97,7 +98,7 @@ class ImageSource : public Cacheable {
    * ImageSource if context is compatible with backing GPU texture. Returns nullptr if context is
    * nullptr, or if ImageSource was created with another context.
    */
-  std::shared_ptr<ImageSource> makeTextureSource(Context* context) const;
+  virtual std::shared_ptr<ImageSource> makeTextureSource(Context* context) const;
 
   /**
    * Returns a decoded ImageSource from the lazy ImageSource. The returned ImageSource shares the

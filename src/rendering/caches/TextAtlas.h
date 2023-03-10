@@ -28,7 +28,7 @@ class RenderCache;
 class Atlas;
 
 struct AtlasLocator {
-  size_t textureIndex = 0;
+  size_t imageIndex = 0;
   tgfx::Rect location = tgfx::Rect::MakeEmpty();
   tgfx::Rect glyphBounds = tgfx::Rect::MakeEmpty();
 };
