@@ -19,8 +19,8 @@
 #pragma once
 
 #import <UIKit/UIKit.h>
+#include "gpu/Texture.h"
 #include "gpu/TextureSampler.h"
-#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 class EAGLHardwareTexture : public Texture {

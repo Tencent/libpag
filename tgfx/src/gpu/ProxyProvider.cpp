@@ -44,7 +44,7 @@ class ImageBufferTextureProxy : public TextureProxy {
     if (imageBuffer == nullptr) {
       return nullptr;
     }
-    auto texture = imageBuffer->makeTexture(context, mipMapped);
+    auto texture = Texture::MakeFrom(context, imageBuffer, mipMapped);
     if (texture != nullptr) {
       imageBuffer = nullptr;
     }
@@ -84,7 +84,7 @@ class ImageGeneratorTextureProxy : public TextureProxy {
     if (buffer == nullptr) {
       return nullptr;
     }
-    auto texture = buffer->makeTexture(context, mipMapped);
+    auto texture = Texture::MakeFrom(context, buffer, mipMapped);
     if (texture != nullptr) {
       task = nullptr;
     }

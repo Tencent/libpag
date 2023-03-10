@@ -25,9 +25,9 @@ enum class DualBlurPassMode { Up = 0, Down = 1 };
 
 class DualBlurFragmentProcessor : public FragmentProcessor {
  public:
-  static std::unique_ptr<DualBlurFragmentProcessor> Make(DualBlurPassMode passMode,
-                                                         std::unique_ptr<FragmentProcessor> texture,
-                                                         Point blurOffset, Point texelSize);
+  static std::unique_ptr<DualBlurFragmentProcessor> Make(
+      DualBlurPassMode passMode, std::unique_ptr<FragmentProcessor> processor, Point blurOffset,
+      Point texelSize);
 
   std::string name() const override {
     return "DualBlurFragmentProcessor";
@@ -40,7 +40,7 @@ class DualBlurFragmentProcessor : public FragmentProcessor {
  private:
   DEFINE_PROCESSOR_CLASS_ID
 
-  DualBlurFragmentProcessor(DualBlurPassMode passMode, std::unique_ptr<FragmentProcessor> texture,
+  DualBlurFragmentProcessor(DualBlurPassMode passMode, std::unique_ptr<FragmentProcessor> processor,
                             Point blurOffset, Point texelSize);
 
   bool onIsEqual(const FragmentProcessor& processor) const override;

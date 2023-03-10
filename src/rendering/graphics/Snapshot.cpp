@@ -23,7 +23,8 @@
 
 namespace pag {
 size_t Snapshot::memoryUsage() const {
-  return image->getTexture()->memoryUsage();
+  auto byesPerPixel = image->isAlphaOnly() ? 1 : 4;
+  return image->width() * image->height() * byesPerPixel;
 }
 
 bool Snapshot::hitTest(RenderCache* cache, float x, float y) const {

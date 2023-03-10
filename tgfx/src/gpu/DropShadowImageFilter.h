@@ -34,8 +34,7 @@ class DropShadowImageFilter : public ImageFilter {
         shadowOnly(shadowOnly) {
   }
 
-  std::pair<std::shared_ptr<Texture>, Point> filterImage(
-      const ImageFilterContext& context) override;
+  std::pair<std::shared_ptr<Image>, Point> filterImage(const ImageFilterContext& context) override;
 
  private:
   Rect onFilterNodeBounds(const Rect& srcRect) const override;

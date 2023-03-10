@@ -266,7 +266,7 @@ void Text::draw(tgfx::Canvas* canvas, RenderCache* renderCache) const {
 }
 
 struct Parameters {
-  size_t textureIndex = 0;
+  size_t imageIndex = 0;
   std::vector<tgfx::Matrix> matrices;
   std::vector<tgfx::Rect> rects;
   std::vector<tgfx::Color> colors;
@@ -276,10 +276,9 @@ static void Draw(tgfx::Canvas* canvas, const TextAtlas* atlas, const Parameters&
   if (parameters.matrices.empty()) {
     return;
   }
-  canvas->drawAtlas(atlas->getAtlasTexture(parameters.textureIndex), &parameters.matrices[0],
-                    &parameters.rects[0],
-                    parameters.colors.empty() ? nullptr : &parameters.colors[0],
-                    parameters.matrices.size());
+  canvas->drawAtlas(
+      atlas->getAtlasImage(parameters.imageIndex), &parameters.matrices[0], &parameters.rects[0],
+      parameters.colors.empty() ? nullptr : &parameters.colors[0], parameters.matrices.size());
 }
 
 static bool RectStaysRectAndNoScale(const tgfx::Matrix& matrix) {
@@ -311,10 +310,10 @@ void Text::draw(tgfx::Canvas* canvas, const TextAtlas* textAtlas) const {
       if (!textAtlas->getLocator(bytesKey, &locator)) {
         continue;
       }
-      if (parameters.textureIndex != locator.textureIndex) {
+      if (parameters.imageIndex != locator.textureIndex) {
         Draw(canvas, textAtlas, parameters);
         parameters = {};
-        parameters.textureIndex = locator.textureIndex;
+        parameters.imageIndex = locator.textureIndex;
       }
       auto matrix = tgfx::Matrix::I();
       matrix.postTranslate(locator.glyphBounds.x(), locator.glyphBounds.y());

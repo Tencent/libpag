@@ -23,7 +23,6 @@
 #include "pag/file.h"
 #include "pag/pag.h"
 #include "rendering/filters/Filter.h"
-#include "tgfx/gpu/Texture.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace pag {
@@ -37,8 +36,8 @@ std::array<float, 9> ToGLTextureMatrix(const tgfx::Matrix& matrix, int width, in
 
 tgfx::Matrix ToMatrix(const FilterTarget* target, bool flipY = false);
 
-std::unique_ptr<FilterSource> ToFilterSource(const tgfx::Texture* texture,
-                                             const tgfx::Point& scale);
+std::unique_ptr<FilterSource> ToFilterSource(const tgfx::BackendTexture& texture,
+                                             tgfx::SurfaceOrigin origin, const tgfx::Point& scale);
 
 std::unique_ptr<FilterTarget> ToFilterTarget(tgfx::Surface* surface,
                                              const tgfx::Matrix& drawingMatrix);
@@ -47,8 +46,6 @@ tgfx::Point ToGLTexturePoint(const FilterSource* source, const tgfx::Point& text
 
 tgfx::Point ToGLVertexPoint(const FilterTarget* target, const FilterSource* source,
                             const tgfx::Rect& contentBounds, const tgfx::Point& contentPoint);
-
-void PreConcatMatrix(FilterTarget* target, const tgfx::Matrix& matrix);
 
 unsigned CreateGLProgram(tgfx::Context* context, const std::string& vertex,
                          const std::string& fragment);

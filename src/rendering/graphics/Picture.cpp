@@ -251,7 +251,7 @@ class DefaultImageProxy : public ImageProxy {
 
 class BackendTextureProxy : public ImageProxy {
  public:
-  BackendTextureProxy(ID assetID, const BackendTexture& texture, tgfx::SurfaceOrigin origin,
+  BackendTextureProxy(ID assetID, const tgfx::BackendTexture& texture, tgfx::ImageOrigin origin,
                       void* sharedContext)
       : assetID(assetID), backendTexture(texture), origin(origin), sharedContext(sharedContext) {
   }
@@ -281,14 +281,13 @@ class BackendTextureProxy : public ImageProxy {
     if (!checkContext(context)) {
       return nullptr;
     }
-    auto texture = tgfx::Texture::MakeFrom(context, ToTGFX(backendTexture), origin);
-    return tgfx::Image::MakeFrom(std::move(texture));
+    return tgfx::Image::MakeFrom(context, backendTexture, origin);
   }
 
  private:
   ID assetID = 0;
-  BackendTexture backendTexture = {};
-  tgfx::SurfaceOrigin origin = tgfx::SurfaceOrigin::TopLeft;
+  tgfx::BackendTexture backendTexture = {};
+  tgfx::ImageOrigin origin = tgfx::ImageOrigin::TopLeft;
   void* sharedContext = nullptr;
 
   bool checkContext(tgfx::Context* context) const {
@@ -323,7 +322,7 @@ std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, std::shared_ptr<ImageProx
   return std::make_shared<ImageProxyPicture>(assetID, std::move(proxy));
 }
 
-std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, const BackendTexture& texture,
+std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, const tgfx::BackendTexture& texture,
                                            tgfx::SurfaceOrigin origin) {
   if (!texture.isValid()) {
     return nullptr;
@@ -332,7 +331,9 @@ std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, const BackendTexture& tex
   if (context == nullptr) {
     return nullptr;
   }
-  auto proxy = std::make_shared<BackendTextureProxy>(assetID, texture, origin, context);
+  auto imageOrigin = origin == tgfx::SurfaceOrigin::BottomLeft ? tgfx::ImageOrigin::BottomLeft
+                                                               : tgfx::ImageOrigin::TopLeft;
+  auto proxy = std::make_shared<BackendTextureProxy>(assetID, texture, imageOrigin, context);
   return std::make_shared<ImageProxyPicture>(assetID, proxy);
 }
 

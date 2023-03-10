@@ -180,13 +180,12 @@ PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto pixelBuffer = bitmap.makeBuffer();
-  auto texture = pixelBuffer->makeTexture(context);
-  ASSERT_TRUE(texture != nullptr);
-  auto surface = Surface::Make(context, pixelBuffer->width(), pixelBuffer->height());
+  auto image = Image::MakeFrom(bitmap);
+  ASSERT_TRUE(image != nullptr);
+  auto surface = Surface::Make(context, image->width(), image->height());
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
-  canvas->drawTexture(texture);
+  canvas->drawImage(image);
 
   auto width = bitmap.width();
   auto height = bitmap.height();
@@ -224,7 +223,7 @@ PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
   surface = Surface::Make(context, width, height, true);
   ASSERT_TRUE(surface != nullptr);
   canvas = surface->getCanvas();
-  canvas->drawTexture(texture);
+  canvas->drawImage(image);
 
   auto A8Info =
       ImageInfo::Make(width, height, tgfx::ColorType::ALPHA_8, tgfx::AlphaType::Premultiplied);
@@ -252,7 +251,7 @@ PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
   ASSERT_TRUE(surface != nullptr);
   canvas = surface->getCanvas();
   canvas->clear();
-  canvas->drawTexture(texture);
+  canvas->drawImage(image);
 
   result = surface->readPixels(RGBAInfo, pixels);
   ASSERT_TRUE(result);

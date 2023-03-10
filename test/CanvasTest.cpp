@@ -56,15 +56,14 @@ PAG_TEST(CanvasTest, ColorMatrixFilter) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto image =
-      MakeImageCodec("resources/apitest/test_timestretch.png")->makeBuffer()->makeTexture(context);
+  auto image = MakeImage("resources/apitest/test_timestretch.png");
   ASSERT_TRUE(image != nullptr);
   auto surface = Surface::Make(context, image->width(), image->height());
   auto canvas = surface->getCanvas();
   tgfx::Paint paint;
   std::array<float, 20> matrix = {1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0};
   paint.setColorFilter(ColorFilter::Matrix(matrix));
-  canvas->drawTexture(image, &paint);
+  canvas->drawImage(image, &paint);
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/identityMatrix"));
   canvas->clear();
   std::array<float, 20> greyColorMatrix = {0.21f, 0.72f, 0.07f, 0.41f, 0,  // red
@@ -72,7 +71,7 @@ PAG_TEST(CanvasTest, ColorMatrixFilter) {
                                            0.21f, 0.72f, 0.07f, 0.41f, 0,  // blue
                                            0,     0,     0,     1.0f,  0};
   paint.setColorFilter(ColorFilter::Matrix(greyColorMatrix));
-  canvas->drawTexture(image, &paint);
+  canvas->drawImage(image, &paint);
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/greyColorMatrix"));
   device->unlock();
 }
@@ -81,15 +80,15 @@ PAG_TEST(CanvasTest, Blur) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto image = MakeImageCodec("resources/apitest/rotation.jpg");
+  auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
+  ASSERT_TRUE(codec != nullptr);
+  auto image = Image::MakeFrom(codec);
   ASSERT_TRUE(image != nullptr);
-  auto texture = image->makeBuffer()->makeTexture(context);
-  ASSERT_TRUE(texture != nullptr);
-  auto imageMatrix = ImageOriginToMatrix(image->origin(), image->width(), image->height());
+  auto imageMatrix = ImageOriginToMatrix(codec->origin(), codec->width(), codec->height());
   imageMatrix.postScale(0.2, 0.2);
-  auto width = image->width();
-  auto height = image->height();
-  ApplyImageOrigin(image->origin(), &width, &height);
+  auto width = codec->width();
+  auto height = codec->height();
+  ApplyImageOrigin(codec->origin(), &width, &height);
   auto imageWidth = static_cast<float>(width) * 0.2f;
   auto imageHeight = static_cast<float>(height) * 0.2f;
   auto padding = 30.f;
@@ -100,7 +99,7 @@ PAG_TEST(CanvasTest, Blur) {
   canvas->concat(tgfx::Matrix::MakeTrans(padding, padding));
   canvas->save();
   canvas->concat(imageMatrix);
-  canvas->drawTexture(texture, &paint);
+  canvas->drawImage(image, &paint);
   canvas->restore();
   Path path;
   path.addRect(Rect::MakeWH(imageWidth, imageHeight));
@@ -113,7 +112,7 @@ PAG_TEST(CanvasTest, Blur) {
   canvas->save();
   canvas->concat(imageMatrix);
   paint.setImageFilter(ImageFilter::Blur(130, 130, TileMode::Decal));
-  canvas->drawTexture(texture, &paint);
+  canvas->drawImage(image, &paint);
   canvas->restore();
   paint.setImageFilter(nullptr);
   canvas->drawPath(path, paint);
@@ -122,8 +121,8 @@ PAG_TEST(CanvasTest, Blur) {
   canvas->save();
   canvas->concat(imageMatrix);
   paint.setImageFilter(ImageFilter::Blur(130, 130, TileMode::Clamp,
-                                         tgfx::Rect::MakeWH(image->width(), image->height())));
-  canvas->drawTexture(texture, &paint);
+                                         tgfx::Rect::MakeWH(codec->width(), codec->height())));
+  canvas->drawImage(image, &paint);
   canvas->restore();
   paint.setImageFilter(nullptr);
   canvas->drawPath(path, paint);
@@ -133,13 +132,13 @@ PAG_TEST(CanvasTest, Blur) {
   canvas->concat(imageMatrix);
   paint.setImageFilter(
       ImageFilter::Blur(130, 130, TileMode::Clamp, tgfx::Rect::MakeLTRB(-100, -100, 2000, 1000)));
-  canvas->drawTexture(texture, &paint);
+  canvas->drawImage(image, &paint);
   paint.setImageFilter(
       ImageFilter::Blur(130, 130, TileMode::Clamp, tgfx::Rect::MakeXYWH(1000, 1000, 1000, 1000)));
-  canvas->drawTexture(texture, &paint);
+  canvas->drawImage(image, &paint);
   paint.setImageFilter(
       ImageFilter::Blur(130, 130, TileMode::Clamp, tgfx::Rect::MakeXYWH(2000, 1000, 1000, 1000)));
-  canvas->drawTexture(texture, &paint);
+  canvas->drawImage(image, &paint);
   canvas->restore();
   paint.setImageFilter(nullptr);
   canvas->drawPath(path, paint);
@@ -152,10 +151,8 @@ PAG_TEST(CanvasTest, DropShadow) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto image = MakeImageCodec("resources/apitest/image_as_mask.png");
+  auto image = MakeImage("resources/apitest/image_as_mask.png");
   ASSERT_TRUE(image != nullptr);
-  auto texture = image->makeBuffer()->makeTexture(context);
-  ASSERT_TRUE(texture != nullptr);
   auto imageWidth = static_cast<float>(image->width());
   auto imageHeight = static_cast<float>(image->height());
   auto padding = 30.f;
@@ -165,20 +162,20 @@ PAG_TEST(CanvasTest, DropShadow) {
   auto canvas = surface->getCanvas();
   canvas->concat(tgfx::Matrix::MakeTrans(padding, padding));
   paint.setImageFilter(ImageFilter::Blur(15, 15));
-  canvas->drawTexture(texture, &paint);
+  canvas->drawImage(image, &paint);
 
   canvas->concat(tgfx::Matrix::MakeTrans(imageWidth + padding, 0));
   paint.setImageFilter(ImageFilter::DropShadowOnly(0, 0, 15, 15, tgfx::Color::White()));
-  canvas->drawTexture(texture, &paint);
+  canvas->drawImage(image, &paint);
 
   canvas->concat(tgfx::Matrix::MakeTrans(-imageWidth - padding, imageWidth + padding));
   paint.setImageFilter(ImageFilter::DropShadow(0, 0, 15, 15, tgfx::Color::White()));
-  canvas->drawTexture(texture, &paint);
+  canvas->drawImage(image, &paint);
 
   canvas->concat(tgfx::Matrix::MakeTrans(imageWidth + padding, 0));
   auto filter = ImageFilter::DropShadow(3, 3, 0, 0, tgfx::Color::White());
   paint.setImageFilter(filter);
-  canvas->drawTexture(texture, &paint);
+  canvas->drawImage(image, &paint);
 
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/dropShadow"));
   device->unlock();
@@ -232,12 +229,11 @@ PAG_TEST(CanvasTest, TileMode) {
   ASSERT_TRUE(context != nullptr);
   auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
   ASSERT_TRUE(codec != nullptr);
-  auto texture = codec->makeBuffer()->makeTexture(context);
-  ASSERT_TRUE(texture != nullptr);
+  auto image = Image::MakeFrom(codec);
   auto surface = Surface::Make(context, codec->width() / 2, codec->height() / 2);
   auto canvas = surface->getCanvas();
   Paint paint;
-  paint.setShader(Shader::MakeImageShader(texture, TileMode::Repeat, TileMode::Mirror)
+  paint.setShader(Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Mirror)
                       ->makeWithPreLocalMatrix(Matrix::MakeScale(0.125f)));
   canvas->drawRect(Rect::MakeWH(static_cast<float>(surface->width()),
                                 static_cast<float>(surface->height()) * 0.9f),
@@ -292,19 +288,17 @@ PAG_TEST(CanvasTest, merge_draw_call_triangle) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto codec = MakeImageCodec("resources/apitest/imageReplacement.png");
-  ASSERT_TRUE(codec != nullptr);
-  auto texture = codec->makeBuffer()->makeTexture(context);
-  ASSERT_TRUE(texture != nullptr);
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
   int width = 72;
   int height = 72;
   auto surface = Surface::Make(context, width, height);
   auto canvas = surface->getCanvas();
   canvas->clear(Color::White());
   Paint paint;
-  paint.setShader(Shader::MakeImageShader(texture)->makeWithPreLocalMatrix(
-      Matrix::MakeScale(static_cast<float>(width) / static_cast<float>(codec->width()),
-                        static_cast<float>(height) / static_cast<float>(codec->height()))));
+  paint.setShader(Shader::MakeImageShader(image)->makeWithPreLocalMatrix(
+      Matrix::MakeScale(static_cast<float>(width) / static_cast<float>(image->width()),
+                        static_cast<float>(height) / static_cast<float>(image->height()))));
   int tileSize = 8;
   int drawCallCount = 0;
   for (int y = 0; y < height; y += tileSize) {
@@ -522,11 +516,11 @@ PAG_TEST(CanvasTest, updateMask) {
   Path path;
   path.addRect(Rect::MakeXYWH(10, 10, 10, 10));
   mask->fillPath(path);
-  canvas->drawTexture(mask->updateTexture(context));
+  canvas->drawImage(mask->makeImage(context));
   path.reset();
   path.addRoundRect(Rect::MakeXYWH(22, 22, 10, 10), 3, 3);
   mask->fillPath(path);
-  canvas->drawTexture(mask->updateTexture(context));
+  canvas->drawImage(mask->makeImage(context));
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/update_mask"));
   device->unlock();
 }
@@ -538,19 +532,17 @@ PAG_TEST(CanvasTest, filterMode) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto codec = MakeImageCodec("resources/apitest/imageReplacement.png");
-  ASSERT_TRUE(codec != nullptr);
-  auto texture = codec->makeBuffer()->makeTexture(context);
-  ASSERT_TRUE(texture != nullptr);
-  int width = texture->width() * 2;
-  int height = texture->height() * 2;
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+  int width = image->width() * 2;
+  int height = image->height() * 2;
   auto surface = Surface::Make(context, width, height);
   auto canvas = surface->getCanvas();
   canvas->setMatrix(Matrix::MakeScale(2.f));
-  canvas->drawTexture(texture, SamplingOptions(FilterMode::Nearest));
+  canvas->drawImage(image, SamplingOptions(FilterMode::Nearest));
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/filter_mode_nearest"));
   canvas->clear();
-  canvas->drawTexture(texture, SamplingOptions(FilterMode::Linear));
+  canvas->drawImage(image, SamplingOptions(FilterMode::Linear));
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/filter_mode_linear"));
   device->unlock();
 }
@@ -562,22 +554,22 @@ PAG_TEST(CanvasTest, mipmap) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto image = MakeImageCodec("resources/apitest/rotation.jpg");
-  ASSERT_TRUE(image != nullptr);
-  Bitmap bitmap(image->width(), image->height(), false, false);
+  auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
+  ASSERT_TRUE(codec != nullptr);
+  Bitmap bitmap(codec->width(), codec->height(), false, false);
   ASSERT_FALSE(bitmap.isEmpty());
   Pixmap pixmap(bitmap);
-  auto result = image->readPixels(pixmap.info(), pixmap.writablePixels());
+  auto result = codec->readPixels(pixmap.info(), pixmap.writablePixels());
   pixmap.reset();
   ASSERT_TRUE(result);
   auto imageBuffer = bitmap.makeBuffer();
-  auto texture = imageBuffer->makeTexture(context);
-  ASSERT_TRUE(texture != nullptr);
-  auto textureMipMapped = imageBuffer->makeTexture(context, true);
-  ASSERT_TRUE(textureMipMapped != nullptr);
+  auto image = Image::MakeFrom(imageBuffer);
+  ASSERT_TRUE(image != nullptr);
+  auto imageMipMapped = image->makeMipMapped();
+  ASSERT_TRUE(imageMipMapped != nullptr);
   float scale = 0.03f;
-  auto width = image->width();
-  auto height = image->height();
+  auto width = codec->width();
+  auto height = codec->height();
   auto imageWidth = static_cast<float>(width) * scale;
   auto imageHeight = static_cast<float>(height) * scale;
   auto imageMatrix = Matrix::MakeScale(scale);
@@ -586,19 +578,19 @@ PAG_TEST(CanvasTest, mipmap) {
   auto canvas = surface->getCanvas();
   canvas->setMatrix(imageMatrix);
   // 绘制没有 mipmap 的 texture 时，使用 MipmapMode::Linear 会回退到 MipmapMode::None。
-  canvas->drawTexture(texture, SamplingOptions(FilterMode::Linear, MipMapMode::Linear));
+  canvas->drawImage(image, SamplingOptions(FilterMode::Linear, MipMapMode::Linear));
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/mipmap_none"));
   canvas->clear();
-  canvas->drawTexture(textureMipMapped, SamplingOptions(FilterMode::Linear, MipMapMode::Nearest));
+  canvas->drawImage(imageMipMapped, SamplingOptions(FilterMode::Linear, MipMapMode::Nearest));
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/mipmap_nearest"));
   canvas->clear();
-  canvas->drawTexture(textureMipMapped, SamplingOptions(FilterMode::Linear, MipMapMode::Linear));
+  canvas->drawImage(imageMipMapped, SamplingOptions(FilterMode::Linear, MipMapMode::Linear));
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/mipmap_linear"));
   surface = Surface::Make(context, static_cast<int>(imageWidth * 4.f),
                           static_cast<int>(imageHeight * 4.f));
   canvas = surface->getCanvas();
   Paint paint;
-  paint.setShader(Shader::MakeImageShader(textureMipMapped, TileMode::Mirror, TileMode::Repeat,
+  paint.setShader(Shader::MakeImageShader(imageMipMapped, TileMode::Mirror, TileMode::Repeat,
                                           SamplingOptions(FilterMode::Linear, MipMapMode::Linear))
                       ->makeWithPreLocalMatrix(imageMatrix));
   canvas->drawRect(Rect::MakeWH(surface->width(), surface->height()), paint);
@@ -613,20 +605,20 @@ PAG_TEST(CanvasTest, hardwareMipMap) {
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto image = MakeImageCodec("resources/apitest/rotation.jpg");
-  ASSERT_TRUE(image != nullptr);
-  Bitmap bitmap(image->width(), image->height(), false);
+  auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
+  ASSERT_TRUE(codec != nullptr);
+  Bitmap bitmap(codec->width(), codec->height(), false);
   ASSERT_FALSE(bitmap.isEmpty());
   Pixmap pixmap(bitmap);
-  auto result = image->readPixels(pixmap.info(), pixmap.writablePixels());
+  auto result = codec->readPixels(pixmap.info(), pixmap.writablePixels());
   pixmap.reset();
   ASSERT_TRUE(result);
-  auto imageBuffer = bitmap.makeBuffer();
-  auto textureMipMapped = imageBuffer->makeTexture(context, true);
-  ASSERT_TRUE(textureMipMapped != nullptr);
+  auto image = Image::MakeFrom(bitmap);
+  auto imageMipMapped = image->makeMipMapped();
+  ASSERT_TRUE(imageMipMapped != nullptr);
   float scale = 0.03f;
-  auto width = image->width();
-  auto height = image->height();
+  auto width = codec->width();
+  auto height = codec->height();
   auto imageWidth = static_cast<float>(width) * scale;
   auto imageHeight = static_cast<float>(height) * scale;
   auto imageMatrix = Matrix::MakeScale(scale);
@@ -634,7 +626,7 @@ PAG_TEST(CanvasTest, hardwareMipMap) {
       Surface::Make(context, static_cast<int>(imageWidth), static_cast<int>(imageHeight));
   auto canvas = surface->getCanvas();
   canvas->setMatrix(imageMatrix);
-  canvas->drawTexture(textureMipMapped, SamplingOptions(FilterMode::Linear, MipMapMode::Linear));
+  canvas->drawImage(imageMipMapped, SamplingOptions(FilterMode::Linear, MipMapMode::Linear));
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/mipmap_linear_hardware"));
   device->unlock();
 }

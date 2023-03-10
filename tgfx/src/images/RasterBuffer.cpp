@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RasterBuffer.h"
-#include "tgfx/gpu/Texture.h"
+#include "gpu/Texture.h"
 
 namespace tgfx {
 std::shared_ptr<ImageBuffer> RasterBuffer::MakeFrom(const ImageInfo& info,

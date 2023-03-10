@@ -28,7 +28,7 @@ PixelBufferMask::PixelBufferMask(std::shared_ptr<PixelBuffer> buffer)
 
 std::shared_ptr<Texture> PixelBufferMask::updateTexture(Context* context) {
   if (texture == nullptr) {
-    texture = buffer->makeTexture(context);
+    texture = Texture::MakeFrom(context, buffer);
     dirtyRect.setEmpty();
   }
   if (texture && !buffer->isHardwareBacked() && !dirtyRect.isEmpty()) {

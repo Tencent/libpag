@@ -256,20 +256,20 @@ class Image {
                                               int alphaStartY) const;
 
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
-      Context* context, TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
-      const Matrix* localMatrix = nullptr, uint32_t surfaceFlags = 0);
-
-  std::unique_ptr<FragmentProcessor> asFragmentProcessor(Context* context,
-                                                         const SamplingOptions& sampling,
-                                                         const Matrix* localMatrix = nullptr,
-                                                         uint32_t surfaceFlags = 0);
+      Context* context, uint32_t surfaceFlags, TileMode tileModeX, TileMode tileModeY,
+      const SamplingOptions& sampling, const Matrix* localMatrix = nullptr);
 
  private:
+  std::unique_ptr<FragmentProcessor> asFragmentProcessor(Context* context, uint32_t surfaceFlags,
+                                                         const SamplingOptions& sampling);
+
   static std::shared_ptr<Image> MakeFromSource(std::shared_ptr<ImageSource> source,
                                                ImageOrigin origin = ImageOrigin::TopLeft);
 
   std::shared_ptr<Image> cloneWithSource(std::shared_ptr<ImageSource> newSource) const;
 
+  friend class ImageShader;
+  friend class BlurImageFilter;
   friend class Canvas;
 };
 }  // namespace tgfx

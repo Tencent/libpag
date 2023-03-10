@@ -19,10 +19,11 @@
 #pragma once
 
 #include "tgfx/core/Font.h"
+#include "tgfx/core/Image.h"
+#include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/core/TextBlob.h"
-#include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
 /**
@@ -89,8 +90,8 @@ class Mask {
 
   /**
    * Adds the outlines of the given text blob to this mask，with its top-left corner at (0, 0),
-   * using current Matrix. Returns false if the associated typeface has color glyphs and leaves the
-   * mask unchanged.
+   * using the current Matrix. Returns false if the associated typeface has color glyphs and leaves
+   * the mask unchanged.
    */
   virtual bool strokeText(const TextBlob* textBlob, const Stroke& stroke);
 
@@ -102,6 +103,8 @@ class Mask {
    * texture, you can call this method once and use the texture returned before releasing the mask.
    */
   virtual std::shared_ptr<Texture> updateTexture(Context* context) = 0;
+
+  std::shared_ptr<tgfx::Image> makeImage(Context* context);
 
  protected:
   int _width = 0;

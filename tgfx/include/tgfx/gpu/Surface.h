@@ -22,6 +22,7 @@
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/SurfaceOptions.h"
+#include "tgfx/gpu/SurfaceOrigin.h"
 
 namespace tgfx {
 class Canvas;

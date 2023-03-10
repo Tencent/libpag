@@ -19,21 +19,16 @@
 #include "ImageShader.h"
 #include "gpu/TextureSampler.h"
 #include "gpu/TiledTextureEffect.h"
+#include "images/ImageSource.h"
 
 namespace tgfx {
-std::shared_ptr<Shader> Shader::MakeImageShader(std::shared_ptr<Texture> texture,
-                                                TileMode tileModeX, TileMode tileModeY,
-                                                SamplingOptions sampling) {
-  return ImageShader::Make(std::move(texture), tileModeX, tileModeY, sampling);
-}
-
-std::shared_ptr<Shader> ImageShader::Make(std::shared_ptr<Texture> texture, TileMode tileModeX,
-                                          TileMode tileModeY, SamplingOptions sampling) {
-  if (texture == nullptr) {
+std::shared_ptr<Shader> Shader::MakeImageShader(std::shared_ptr<Image> image, TileMode tileModeX,
+                                                TileMode tileModeY, SamplingOptions sampling) {
+  if (image == nullptr) {
     return nullptr;
   }
   auto shader = std::shared_ptr<ImageShader>(
-      new ImageShader(std::move(texture), tileModeX, tileModeY, sampling));
+      new ImageShader(std::move(image), tileModeX, tileModeY, sampling));
   shader->weakThis = shader;
   return shader;
 }
@@ -43,11 +38,14 @@ std::unique_ptr<FragmentProcessor> ImageShader::asFragmentProcessor(const FPArgs
   if (!ComputeTotalInverse(args, &matrix)) {
     return nullptr;
   }
-  auto effect =
-      TiledTextureEffect::Make(texture, SamplerState(tileModeX, tileModeY, sampling), &matrix);
-  if (texture->getSampler()->format == PixelFormat::ALPHA_8) {
-    return effect;
+  auto processor = image->asFragmentProcessor(args.context, args.surfaceFlags, tileModeX, tileModeY,
+                                              sampling, &matrix);
+  if (processor == nullptr) {
+    return nullptr;
   }
-  return FragmentProcessor::MulChildByInputAlpha(std::move(effect));
+  if (image->isAlphaOnly()) {
+    return processor;
+  }
+  return FragmentProcessor::MulChildByInputAlpha(std::move(processor));
 }
 }  // namespace tgfx

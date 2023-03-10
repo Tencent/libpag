@@ -22,22 +22,18 @@
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/SamplingOptions.h"
 #include "tgfx/core/Shape.h"
 #include "tgfx/core/TextBlob.h"
-#include "tgfx/core/Paint.h"
-#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 class Surface;
-
 class SurfaceOptions;
-
+class Texture;
 struct CanvasState;
-
 class SurfaceDrawContext;
-
 class GpuPaint;
 
 /**
@@ -149,27 +145,6 @@ class Canvas {
   void drawRect(const Rect& rect, const Paint& paint);
 
   /**
-   * Draws a Texture, with its top-left corner at (0, 0), using current alpha, blend mode, clip and
-   * matrix premultiplied with existing Matrix.
-   */
-  void drawTexture(std::shared_ptr<Texture> texture, const Matrix& matrix,
-                   SamplingOptions sampling = SamplingOptions());
-
-  /**
-   * Draws a Texture, with its top-left corner at (0, 0), using current alpha, blend mode, clip,
-   * matrix and optional paint.
-   *
-   * If paint is supplied, apply ColorFilter and alpha. If texture is Alpha8, apply Shader. If paint
-   * contains MaskFilter, generate mask from image bounds.
-   */
-  void drawTexture(std::shared_ptr<Texture> texture, const Paint* paint = nullptr) {
-    drawTexture(std::move(texture), SamplingOptions(), paint);
-  }
-
-  void drawTexture(std::shared_ptr<Texture> texture, SamplingOptions sampling,
-                   const Paint* paint = nullptr);
-
-  /**
    * Draws a path with using current clip, matrix and specified paint.
    */
   void drawPath(const Path& path, const Paint& paint);
@@ -218,7 +193,7 @@ class Canvas {
 
   // TODO(pengweilv): Support blend mode, atlas as source, colors as destination, colors can be
   //  nullptr.
-  void drawAtlas(std::shared_ptr<Texture> atlas, const Matrix matrix[], const Rect tex[],
+  void drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], const Rect tex[],
                  const Color colors[], size_t count, SamplingOptions sampling = SamplingOptions());
 
   /**
@@ -227,8 +202,6 @@ class Canvas {
   void flush();
 
  private:
-  void drawTexture(std::shared_ptr<Texture> texture, SamplingOptions sampling, const Paint& paint);
-
   std::shared_ptr<Texture> getClipTexture();
 
   std::pair<std::optional<Rect>, bool> getClipRect();
@@ -236,6 +209,8 @@ class Canvas {
   std::unique_ptr<FragmentProcessor> getClipMask(const Rect& deviceBounds, Rect* scissorRect);
 
   Rect clipLocalBounds(Rect localBounds);
+
+  void drawImage(std::shared_ptr<Image> image, SamplingOptions sampling, const Paint& paint);
 
   void drawMask(const Rect& bounds, std::shared_ptr<Texture> mask, GpuPaint paint);
 

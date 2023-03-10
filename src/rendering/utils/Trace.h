@@ -19,13 +19,13 @@
 #pragma once
 
 #include "tgfx/core/Pixmap.h"
-#include "tgfx/gpu/Texture.h"
+#include "tgfx/gpu/Surface.h"
 
 namespace pag {
 /**
  * Trace() provides a utility to view the texture.
  */
-void Trace(std::shared_ptr<tgfx::Texture> texture, const std::string& path = "");
+void Trace(std::shared_ptr<tgfx::Surface> surface, const std::string& path = "");
 
 /**
  * Trace() provides a utility to view the Bitmap.

@@ -16,10 +16,19 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/gpu/Texture.h"
+#include "gpu/Texture.h"
 #include "gpu/TextureSampler.h"
 
 namespace tgfx {
+std::shared_ptr<Texture> Texture::MakeFrom(Context* context,
+                                           std::shared_ptr<ImageBuffer> imageBuffer,
+                                           bool mipMapped) {
+  if (context == nullptr || imageBuffer == nullptr) {
+    return nullptr;
+  }
+  return imageBuffer->onMakeTexture(context, mipMapped);
+}
+
 Texture::Texture(int width, int height, SurfaceOrigin origin)
     : _width(width), _height(height), _origin(origin) {
 }

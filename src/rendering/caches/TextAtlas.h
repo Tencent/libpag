@@ -21,6 +21,7 @@
 #include "TextBlock.h"
 #include "pag/types.h"
 #include "tgfx/core/BytesKey.h"
+#include "tgfx/core/Image.h"
 
 namespace pag {
 class RenderCache;
@@ -45,7 +46,7 @@ class TextAtlas {
 
   bool getLocator(const tgfx::BytesKey& bytesKey, AtlasLocator* locator) const;
 
-  std::shared_ptr<tgfx::Texture> getAtlasTexture(size_t textureIndex) const;
+  std::shared_ptr<tgfx::Image> getAtlasImage(size_t imageIndex) const;
 
   float scaleFactor() const {
     return scale;

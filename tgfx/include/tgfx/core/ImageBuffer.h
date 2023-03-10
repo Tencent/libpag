@@ -22,11 +22,13 @@
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/YUVColorSpace.h"
 #include "tgfx/core/YUVData.h"
-#include "tgfx/gpu/Texture.h"
 #include "tgfx/platform/HardwareBuffer.h"
 #include "tgfx/platform/NativeImage.h"
 
 namespace tgfx {
+class Context;
+class Texture;
+
 /**
  * ImageBuffer describes a two-dimensional array of pixels which is optimized for creating textures.
  * ImageBuffer is immutable and safe across threads.
@@ -90,17 +92,15 @@ class ImageBuffer {
    */
   virtual bool isAlphaOnly() const = 0;
 
-  /**
-   * Creates a new Texture capturing the pixels in this image buffer. The optional mipMapped
-   * parameter specifies whether created texture must allocate mip map levels.
-   */
-  std::shared_ptr<Texture> makeTexture(Context* context, bool mipMapped = false) const {
-    return onMakeTexture(context, mipMapped);
-  }
-
  protected:
   ImageBuffer() = default;
 
+  /**
+   * Creates a new Texture capturing the pixels in this image buffer. The mipMapped parameter
+   * specifies whether created texture must allocate mip map levels.
+   */
   virtual std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) const = 0;
+
+  friend class Texture;
 };
 }  // namespace tgfx

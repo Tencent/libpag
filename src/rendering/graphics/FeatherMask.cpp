@@ -123,7 +123,7 @@ void FeatherMask::draw(tgfx::Canvas* parentCanvas, RenderCache* cache) const {
     float alpha = ToAlpha(mask->maskOpacity->getValueAt(layerFrame));
     maskPaint.setAlpha(alpha);
     maskCanvas->drawPath(maskPath, maskPaint);
-    auto maskTexture = maskSurface->getTexture();
+    auto maskImage = maskSurface->makeImageSnapshot();
     tgfx::Paint blurPaint;
     if (mask->maskFeather) {
       auto blurrinessX = mask->maskFeather->getValueAt(layerFrame).x;
@@ -132,9 +132,9 @@ void FeatherMask::draw(tgfx::Canvas* parentCanvas, RenderCache* cache) const {
     }
     canvas->save();
     canvas->setMatrix(tgfx::Matrix::MakeTrans(maskBounds.x(), maskBounds.y()));
-    canvas->drawTexture(maskTexture, &blurPaint);
+    canvas->drawImage(maskImage, &blurPaint);
     canvas->restore();
   }
-  parentCanvas->drawTexture(surface->getTexture());
+  parentCanvas->drawImage(surface->makeImageSnapshot());
 }
 }  // namespace pag

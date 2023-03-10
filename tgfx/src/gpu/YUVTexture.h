@@ -18,10 +18,10 @@
 
 #pragma once
 
+#include "gpu/Texture.h"
 #include "gpu/TextureSampler.h"
 #include "tgfx/core/YUVColorSpace.h"
 #include "tgfx/core/YUVData.h"
-#include "tgfx/gpu/Texture.h"
 
 namespace tgfx {
 /**

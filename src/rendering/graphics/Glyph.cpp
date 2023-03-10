@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Glyph.h"
+#include <unordered_map>
 #include "rendering/utils/shaper/TextShaper.h"
 #include "tgfx/core/UTF.h"
 

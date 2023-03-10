@@ -19,20 +19,21 @@
 #pragma once
 
 #include <memory>
-#include "tgfx/gpu/Texture.h"
+#include "tgfx/core/Image.h"
+#include "tgfx/core/Matrix.h"
 #include "tgfx/core/TileMode.h"
+#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 struct ImageFilterContext {
-  ImageFilterContext(Context* context, Matrix matrix, Rect clipBounds,
-                     std::shared_ptr<Texture> texture)
-      : context(context), deviceMatrix(matrix), clipBounds(clipBounds), source(std::move(texture)) {
+  ImageFilterContext(Context* context, Matrix matrix, Rect clipBounds, std::shared_ptr<Image> image)
+      : context(context), deviceMatrix(matrix), clipBounds(clipBounds), source(std::move(image)) {
   }
 
   Context* context = nullptr;
   Matrix deviceMatrix = Matrix::I();
   Rect clipBounds = Rect::MakeEmpty();
-  std::shared_ptr<Texture> source;
+  std::shared_ptr<Image> source;
 };
 
 class ImageFilter {
@@ -51,7 +52,7 @@ class ImageFilter {
 
   virtual ~ImageFilter() = default;
 
-  virtual std::pair<std::shared_ptr<Texture>, Point> filterImage(
+  virtual std::pair<std::shared_ptr<Image>, Point> filterImage(
       const ImageFilterContext& context) = 0;
 
   Rect filterBounds(const Rect& rect) const;
