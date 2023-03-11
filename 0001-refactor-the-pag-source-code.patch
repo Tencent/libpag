@@ -1,0 +1,474 @@
+From 6c1b9f62911dcc49c4ddef4f350d0901d903c893 Mon Sep 17 00:00:00 2001
+From: luckyzhliu <luckyzhliu@tencent.com>
+Date: Sat, 11 Mar 2023 15:09:48 +0800
+Subject: [PATCH] refactor the pag source code
+
+---
+ include/pag/pag.h                             | 10 ++-
+ src/base/File.cpp                             | 54 -------------
+ src/base/FileLoader.cpp                       | 79 +++++++++++++++++++
+ src/rendering/caches/RenderCache.cpp          |  8 ++
+ src/rendering/caches/RenderCache.h            |  3 +
+ .../filters/utils/Filter3DHelper.cpp          | 32 ++++++++
+ src/rendering/filters/utils/Filter3DHelper.h  | 32 ++++++++
+ src/rendering/layers/PAGImageLayer.cpp        | 59 ++++++++------
+ src/rendering/layers/PAGLayer.cpp             | 10 +++
+ 9 files changed, 209 insertions(+), 78 deletions(-)
+ create mode 100644 src/base/FileLoader.cpp
+ create mode 100644 src/rendering/filters/utils/Filter3DHelper.cpp
+ create mode 100644 src/rendering/filters/utils/Filter3DHelper.h
+
+diff --git a/include/pag/pag.h b/include/pag/pag.h
+index 44e9c99b..77cc4d11 100644
+--- a/include/pag/pag.h
++++ b/include/pag/pag.h
+@@ -426,6 +426,7 @@ class PAG_API PAGLayer : public Content {
+   // internal use only.
+   void* externalHandle = nullptr;
+   std::shared_ptr<File> getFile() const;
++  void notifyAudioModified();
+ 
+  protected:
+   std::shared_ptr<std::mutex> rootLocker = nullptr;
+@@ -490,6 +491,7 @@ class PAG_API PAGLayer : public Content {
+   std::shared_ptr<PAGLayer> _trackMatteLayer = nullptr;
+   int _editableIndex = -1;
+   uint32_t contentVersion = 0;
++  std::atomic_uint32_t audioVersion = {0};
+ 
+   void setVisibleInternal(bool value);
+   void setStartTimeInternal(int64_t time);
+@@ -524,6 +526,10 @@ class PAG_API PAGLayer : public Content {
+   friend class PAGImageLayer;
+ 
+   friend class SequenceImageQueue;
++
++  friend class PAGAudioReader;
++
++  friend class AudioClip;
+ };
+ 
+ class SolidLayer;
+@@ -799,6 +805,7 @@ class PAG_API PAGImageLayer : public PAGLayer {
+                               double frameScale, Frame fileEndFrame);
+   Frame getFrameFromTimeRemap(Frame value);
+   void measureBounds(tgfx::Rect* bounds) override;
++  int64_t contentDurationInternal();
+ 
+   friend class RenderCache;
+ 
+@@ -1115,6 +1122,8 @@ class PAG_API PAGFile : public PAGComposition {
+   bool isPAGFile() const override;
+ 
+  protected:
++  static std::shared_ptr<PAGFile> MakeFrom(std::shared_ptr<File> file);
++
+   bool gotoTime(int64_t layerTime) override;
+   Frame childFrameToLocal(Frame childFrame, float childFrameRate) const override;
+   Frame localFrameToChild(Frame localFrame, float childFrameRate) const override;
+@@ -1124,7 +1133,6 @@ class PAG_API PAGFile : public PAGComposition {
+   Frame stretchedContentFrame() const override;
+ 
+  private:
+-  static std::shared_ptr<PAGFile> MakeFrom(std::shared_ptr<File> file);
+   static std::shared_ptr<PAGLayer> BuildPAGLayer(std::shared_ptr<File> file, pag::Layer* layer);
+ 
+   void setDurationInternal(int64_t duration);
+diff --git a/src/base/File.cpp b/src/base/File.cpp
+index 2f398b89..0029b39d 100644
+--- a/src/base/File.cpp
++++ b/src/base/File.cpp
+@@ -22,64 +22,10 @@
+ 
+ namespace pag {
+ 
+-static std::mutex globalLocker = {};
+-static std::unordered_map<std::string, std::weak_ptr<File>> weakFileMap =
+-    std::unordered_map<std::string, std::weak_ptr<File>>();
+-
+-static std::shared_ptr<File> FindFileByPath(const std::string& filePath) {
+-  std::lock_guard<std::mutex> autoLock(globalLocker);
+-  if (filePath.empty()) {
+-    return nullptr;
+-  }
+-  auto result = weakFileMap.find(filePath);
+-  if (result != weakFileMap.end()) {
+-    auto& weak = result->second;
+-    auto file = weak.lock();
+-    if (file) {
+-      return file;
+-    }
+-    weakFileMap.erase(result);
+-    if (weakFileMap.size() > 50) {  // do cleaning.
+-      std::vector<std::string> needRemoveList = {};
+-      for (auto& item : weakFileMap) {
+-        if (item.second.expired()) {
+-          needRemoveList.push_back(item.first);
+-        }
+-      }
+-      for (auto& item : needRemoveList) {
+-        weakFileMap.erase(item);
+-      }
+-    }
+-  }
+-  return nullptr;
+-}
+-
+-std::shared_ptr<File> File::Load(const std::string& filePath) {
+-  auto byteData = ByteData::FromPath(filePath);
+-  if (byteData == nullptr) {
+-    return nullptr;
+-  }
+-  return pag::File::Load(byteData->data(), byteData->length(), filePath);
+-}
+-
+ uint16_t File::MaxSupportedTagLevel() {
+   return Codec::MaxSupportedTagLevel();
+ }
+ 
+-std::shared_ptr<File> File::Load(const void* bytes, size_t length, const std::string& filePath) {
+-  auto file = FindFileByPath(filePath);
+-  if (file != nullptr) {
+-    return file;
+-  }
+-  file = Codec::Decode(bytes, static_cast<uint32_t>(length), filePath);
+-  if (file != nullptr) {
+-    std::lock_guard<std::mutex> autoLock(globalLocker);
+-    std::weak_ptr<File> weak = file;
+-    weakFileMap.insert(std::make_pair(filePath, std::move(weak)));
+-  }
+-  return file;
+-}
+-
+ File::File(std::vector<Composition*> compositionList, std::vector<pag::ImageBytes*> imageList)
+     : images(std::move(imageList)), compositions(std::move(compositionList)) {
+   mainComposition = compositions.back();
+diff --git a/src/base/FileLoader.cpp b/src/base/FileLoader.cpp
+new file mode 100644
+index 00000000..fb093886
+--- /dev/null
++++ b/src/base/FileLoader.cpp
+@@ -0,0 +1,79 @@
++/////////////////////////////////////////////////////////////////////////////////////////////////
++//
++//  Tencent is pleased to support the open source community by making libpag available.
++//
++//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
++//
++//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
++//  except in compliance with the License. You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++//  unless required by applicable law or agreed to in writing, software distributed under the
++//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
++//  either express or implied. see the license for the specific language governing permissions
++//  and limitations under the license.
++//
++/////////////////////////////////////////////////////////////////////////////////////////////////
++
++#include <algorithm>
++#include <unordered_map>
++#include "pag/file.h"
++
++namespace pag {
++
++static std::mutex globalLocker = {};
++static std::unordered_map<std::string, std::weak_ptr<File>> weakFileMap =
++    std::unordered_map<std::string, std::weak_ptr<File>>();
++
++static std::shared_ptr<File> FindFileByPath(const std::string& filePath) {
++  std::lock_guard<std::mutex> autoLock(globalLocker);
++  if (filePath.empty()) {
++    return nullptr;
++  }
++  auto result = weakFileMap.find(filePath);
++  if (result != weakFileMap.end()) {
++    auto& weak = result->second;
++    auto file = weak.lock();
++    if (file) {
++      return file;
++    }
++    weakFileMap.erase(result);
++    if (weakFileMap.size() > 50) {  // do cleaning.
++      std::vector<std::string> needRemoveList = {};
++      for (auto& item : weakFileMap) {
++        if (item.second.expired()) {
++          needRemoveList.push_back(item.first);
++        }
++      }
++      for (auto& item : needRemoveList) {
++        weakFileMap.erase(item);
++      }
++    }
++  }
++  return nullptr;
++}
++
++std::shared_ptr<File> File::Load(const std::string& filePath) {
++  auto byteData = ByteData::FromPath(filePath);
++  if (byteData == nullptr) {
++    return nullptr;
++  }
++  return pag::File::Load(byteData->data(), byteData->length(), filePath);
++}
++
++std::shared_ptr<File> File::Load(const void* bytes, size_t length, const std::string& filePath) {
++  auto file = FindFileByPath(filePath);
++  if (file != nullptr) {
++    return file;
++  }
++  file = Codec::Decode(bytes, static_cast<uint32_t>(length), filePath);
++  if (file != nullptr) {
++    std::lock_guard<std::mutex> autoLock(globalLocker);
++    std::weak_ptr<File> weak = file;
++    weakFileMap.insert(std::make_pair(filePath, std::move(weak)));
++  }
++  return file;
++}
++
++}  // namespace pag
+diff --git a/src/rendering/caches/RenderCache.cpp b/src/rendering/caches/RenderCache.cpp
+index 68ad4a69..05311737 100644
+--- a/src/rendering/caches/RenderCache.cpp
++++ b/src/rendering/caches/RenderCache.cpp
+@@ -22,6 +22,7 @@
+ #include "base/utils/UniqueID.h"
+ #include "rendering/caches/ImageContentCache.h"
+ #include "rendering/caches/LayerCache.h"
++#include "rendering/filters/utils/Filter3DHelper.h"
+ #include "rendering/renderers/FilterRenderer.h"
+ #include "rendering/sequences/SequenceImageProxy.h"
+ #include "rendering/sequences/SequenceInfo.h"
+@@ -639,6 +640,13 @@ LayerFilter* RenderCache::getLayerFilterCache(ID uniqueID,
+   return filter;
+ }
+ 
++Filter* RenderCache::getTransform3DFilter() {
++  if (transform3DFilter == nullptr) {
++    transform3DFilter = Make3DFilter(getContext());
++  }
++  return transform3DFilter;
++}
++
+ MotionBlurFilter* RenderCache::getMotionBlurFilter() {
+   if (motionBlurFilter == nullptr) {
+     motionBlurFilter = new MotionBlurFilter();
+diff --git a/src/rendering/caches/RenderCache.h b/src/rendering/caches/RenderCache.h
+index 1301d7e8..d95acd26 100644
+--- a/src/rendering/caches/RenderCache.h
++++ b/src/rendering/caches/RenderCache.h
+@@ -147,6 +147,8 @@ class RenderCache : public Performance {
+ 
+   MotionBlurFilter* getMotionBlurFilter();
+ 
++  Filter* getTransform3DFilter();
++
+   LayerStylesFilter* getLayerStylesFilter(Layer* layer);
+ 
+   std::shared_ptr<File> getFileByAssetID(ID assetID);
+@@ -181,6 +183,7 @@ class RenderCache : public Performance {
+   std::unordered_map<ID, std::unordered_map<Frame, SequenceImageQueue*>> usedSequences = {};
+   std::unordered_map<ID, Filter*> filterCaches;
+   MotionBlurFilter* motionBlurFilter = nullptr;
++  Filter* transform3DFilter = nullptr;
+ 
+   // decoded image caches:
+   void clearExpiredDecodedImages();
+diff --git a/src/rendering/filters/utils/Filter3DHelper.cpp b/src/rendering/filters/utils/Filter3DHelper.cpp
+new file mode 100644
+index 00000000..7f7865ac
+--- /dev/null
++++ b/src/rendering/filters/utils/Filter3DHelper.cpp
+@@ -0,0 +1,32 @@
++/////////////////////////////////////////////////////////////////////////////////////////////////
++//
++//  Tencent is pleased to support the open source community by making libpag available.
++//
++//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
++//
++//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
++//  except in compliance with the License. You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++//  unless required by applicable law or agreed to in writing, software distributed under the
++//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
++//  either express or implied. see the license for the specific language governing permissions
++//  and limitations under the license.
++//
++/////////////////////////////////////////////////////////////////////////////////////////////////
++
++#include "Filter3DHelper.h"
++
++namespace pag {
++
++bool Make3DLayerNode(std::vector<FilterNode>&, tgfx::Rect&, const FilterList*, RenderCache*,
++                     tgfx::Rect&, tgfx::Point&) {
++  return false;
++}
++
++Filter* Make3DFilter(tgfx::Context*) {
++  return nullptr;
++}
++
++}  // namespace pag
+\ No newline at end of file
+diff --git a/src/rendering/filters/utils/Filter3DHelper.h b/src/rendering/filters/utils/Filter3DHelper.h
+new file mode 100644
+index 00000000..18dca86f
+--- /dev/null
++++ b/src/rendering/filters/utils/Filter3DHelper.h
+@@ -0,0 +1,32 @@
++/////////////////////////////////////////////////////////////////////////////////////////////////
++//
++//  Tencent is pleased to support the open source community by making libpag available.
++//
++//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
++//
++//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
++//  except in compliance with the License. You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++//  unless required by applicable law or agreed to in writing, software distributed under the
++//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
++//  either express or implied. see the license for the specific language governing permissions
++//  and limitations under the license.
++//
++/////////////////////////////////////////////////////////////////////////////////////////////////
++
++#pragma once
++
++#include "rendering/caches/RenderCache.h"
++#include "rendering/renderers/FilterRenderer.h"
++
++namespace pag {
++
++bool Make3DLayerNode(std::vector<FilterNode>& filterNodes, tgfx::Rect& clipBounds,
++                     const FilterList* filterList, RenderCache* renderCache,
++                     tgfx::Rect& filterBounds, tgfx::Point& effectScale);
++
++Filter* Make3DFilter(tgfx::Context* context);
++
++}  // namespace pag
+diff --git a/src/rendering/layers/PAGImageLayer.cpp b/src/rendering/layers/PAGImageLayer.cpp
+index d031e8b1..cfd3e79e 100644
+--- a/src/rendering/layers/PAGImageLayer.cpp
++++ b/src/rendering/layers/PAGImageLayer.cpp
+@@ -80,29 +80,7 @@ Frame CalculateMaxFrame(const std::vector<Keyframe<T>*>& keyframes) {
+ 
+ int64_t PAGImageLayer::contentDuration() {
+   LockGuard autoLock(rootLocker);
+-  Frame maxFrame = 0;
+-  float frameRate = 60;
+-  if (rootFile) {
+-    frameRate = rootFile->frameRateInternal();
+-    auto property = getContentTimeRemap();
+-    if (!property->animatable()) {
+-      return 0;
+-    }
+-    auto timeRemap = static_cast<AnimatableProperty<float>*>(property);
+-    maxFrame = CalculateMaxFrame(timeRemap->keyframes);
+-  } else {
+-    auto imageFillRule = static_cast<ImageLayer*>(layer)->imageFillRule;
+-    if (imageFillRule == nullptr || imageFillRule->timeRemap == nullptr ||
+-        !imageFillRule->timeRemap->animatable()) {
+-      return FrameToTime(layer->duration, frameRate);
+-    }
+-    frameRate = frameRateInternal();
+-    auto timeRemap = static_cast<AnimatableProperty<Frame>*>(imageFillRule->timeRemap);
+-    // timeRemap编码过程中是开区间，实际使用过程中是闭区间，计算完后需要-1
+-    maxFrame = CalculateMaxFrame(timeRemap->keyframes) - 1;
+-  }
+-
+-  return FrameToTime(maxFrame + 1, frameRate);
++  return contentDurationInternal();
+ }
+ 
+ class FrameRange {
+@@ -221,6 +199,11 @@ void PAGImageLayer::setImageInternal(std::shared_ptr<PAGImage> image) {
+       stage->addReference(image.get(), this);
+     }
+   }
++  std::shared_ptr<PAGImage> oldPAGImage = nullptr;
++  if (replacement != nullptr) {
++    oldPAGImage = replacement->getImage();
++    oldPAGImage->setOwner(nullptr);
++  }
+   delete replacement;
+   if (image != nullptr) {
+     replacement = new ImageReplacement(static_cast<ImageLayer*>(layer), image);
+@@ -228,6 +211,10 @@ void PAGImageLayer::setImageInternal(std::shared_ptr<PAGImage> image) {
+   } else {
+     replacement = nullptr;
+   }
++  if ((oldPAGImage != nullptr && !oldPAGImage->isStill()) ||
++      (image != nullptr && !image->isStill())) {
++    notifyAudioModified();
++  }
+   notifyModified(true);
+   invalidateCacheScale();
+ }
+@@ -668,4 +655,30 @@ ByteData* PAGImageLayer::imageBytes() const {
+   return nullptr;
+ }
+ 
++int64_t PAGImageLayer::contentDurationInternal() {
++  Frame maxFrame = 0;
++  float frameRate = 60;
++  if (rootFile) {
++    frameRate = rootFile->frameRateInternal();
++    auto property = getContentTimeRemap();
++    if (!property->animatable()) {
++      return 0;
++    }
++    auto timeRemap = static_cast<AnimatableProperty<float>*>(property);
++    maxFrame = CalculateMaxFrame(timeRemap->keyframes);
++  } else {
++    auto imageFillRule = static_cast<ImageLayer*>(layer)->imageFillRule;
++    if (imageFillRule == nullptr || imageFillRule->timeRemap == nullptr ||
++        !imageFillRule->timeRemap->animatable()) {
++      return FrameToTime(layer->duration, frameRate);
++    }
++    frameRate = frameRateInternal();
++    auto timeRemap = static_cast<AnimatableProperty<Frame>*>(imageFillRule->timeRemap);
++    // timeRemap编码过程中是开区间，实际使用过程中是闭区间，计算完后需要-1
++    maxFrame = CalculateMaxFrame(timeRemap->keyframes) - 1;
++  }
++
++  return FrameToTime(maxFrame + 1, frameRate);
++}
++
+ }  // namespace pag
+diff --git a/src/rendering/layers/PAGLayer.cpp b/src/rendering/layers/PAGLayer.cpp
+index 7fdcdf8b..df1db830 100644
+--- a/src/rendering/layers/PAGLayer.cpp
++++ b/src/rendering/layers/PAGLayer.cpp
+@@ -397,6 +397,15 @@ void PAGLayer::notifyModified(bool contentChanged) {
+   }
+ }
+ 
++void PAGLayer::notifyAudioModified() {
++  audioVersion++;
++  auto parentLayer = getParentOrOwner();
++  while (parentLayer) {
++    parentLayer->audioVersion++;
++    parentLayer = parentLayer->getParentOrOwner();
++  }
++}
++
+ PAGLayer* PAGLayer::getParentOrOwner() const {
+   if (_parent) {
+     return _parent;
+@@ -490,6 +499,7 @@ void PAGLayer::onRemoveFromRootFile() {
+ }
+ 
+ void PAGLayer::onTimelineChanged() {
++  notifyAudioModified();
+ }
+ 
+ void PAGLayer::updateRootLocker(std::shared_ptr<std::mutex> newLocker) {
+-- 
+2.37.1 (Apple Git-137.1)
+
