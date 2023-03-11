@@ -426,6 +426,7 @@ class PAG_API PAGLayer : public Content {
   // internal use only.
   void* externalHandle = nullptr;
   std::shared_ptr<File> getFile() const;
+  void notifyAudioModified();
 
  protected:
   std::shared_ptr<std::mutex> rootLocker = nullptr;
@@ -490,6 +491,7 @@ class PAG_API PAGLayer : public Content {
   std::shared_ptr<PAGLayer> _trackMatteLayer = nullptr;
   int _editableIndex = -1;
   uint32_t contentVersion = 0;
+  std::atomic_uint32_t audioVersion = {0};
 
   void setVisibleInternal(bool value);
   void setStartTimeInternal(int64_t time);
@@ -524,6 +526,10 @@ class PAG_API PAGLayer : public Content {
   friend class PAGImageLayer;
 
   friend class SequenceImageQueue;
+
+  friend class PAGAudioReader;
+
+  friend class AudioClip;
 };
 
 class SolidLayer;
@@ -799,6 +805,7 @@ class PAG_API PAGImageLayer : public PAGLayer {
                               double frameScale, Frame fileEndFrame);
   Frame getFrameFromTimeRemap(Frame value);
   void measureBounds(tgfx::Rect* bounds) override;
+  int64_t contentDurationInternal();
 
   friend class RenderCache;
 
@@ -1115,6 +1122,8 @@ class PAG_API PAGFile : public PAGComposition {
   bool isPAGFile() const override;
 
  protected:
+  static std::shared_ptr<PAGFile> MakeFrom(std::shared_ptr<File> file);
+
   bool gotoTime(int64_t layerTime) override;
   Frame childFrameToLocal(Frame childFrame, float childFrameRate) const override;
   Frame localFrameToChild(Frame localFrame, float childFrameRate) const override;
@@ -1124,7 +1133,6 @@ class PAG_API PAGFile : public PAGComposition {
   Frame stretchedContentFrame() const override;
 
  private:
-  static std::shared_ptr<PAGFile> MakeFrom(std::shared_ptr<File> file);
   static std::shared_ptr<PAGLayer> BuildPAGLayer(std::shared_ptr<File> file, pag::Layer* layer);
 
   void setDurationInternal(int64_t duration);

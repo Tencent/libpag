@@ -80,29 +80,7 @@ Frame CalculateMaxFrame(const std::vector<Keyframe<T>*>& keyframes) {
 
 int64_t PAGImageLayer::contentDuration() {
   LockGuard autoLock(rootLocker);
-  Frame maxFrame = 0;
-  float frameRate = 60;
-  if (rootFile) {
-    frameRate = rootFile->frameRateInternal();
-    auto property = getContentTimeRemap();
-    if (!property->animatable()) {
-      return 0;
-    }
-    auto timeRemap = static_cast<AnimatableProperty<float>*>(property);
-    maxFrame = CalculateMaxFrame(timeRemap->keyframes);
-  } else {
-    auto imageFillRule = static_cast<ImageLayer*>(layer)->imageFillRule;
-    if (imageFillRule == nullptr || imageFillRule->timeRemap == nullptr ||
-        !imageFillRule->timeRemap->animatable()) {
-      return FrameToTime(layer->duration, frameRate);
-    }
-    frameRate = frameRateInternal();
-    auto timeRemap = static_cast<AnimatableProperty<Frame>*>(imageFillRule->timeRemap);
-    // timeRemap编码过程中是开区间，实际使用过程中是闭区间，计算完后需要-1
-    maxFrame = CalculateMaxFrame(timeRemap->keyframes) - 1;
-  }
-
-  return FrameToTime(maxFrame + 1, frameRate);
+  return contentDurationInternal();
 }
 
 class FrameRange {
@@ -221,12 +199,21 @@ void PAGImageLayer::setImageInternal(std::shared_ptr<PAGImage> image) {
       stage->addReference(image.get(), this);
     }
   }
+  std::shared_ptr<PAGImage> oldPAGImage = nullptr;
+  if (replacement != nullptr) {
+    oldPAGImage = replacement->getImage();
+    oldPAGImage->setOwner(nullptr);
+  }
   delete replacement;
   if (image != nullptr) {
     replacement = new ImageReplacement(static_cast<ImageLayer*>(layer), image);
     image->setOwner(this);
   } else {
     replacement = nullptr;
+  }
+  if ((oldPAGImage != nullptr && !oldPAGImage->isStill()) ||
+      (image != nullptr && !image->isStill())) {
+    notifyAudioModified();
   }
   notifyModified(true);
   invalidateCacheScale();
@@ -666,6 +653,32 @@ ByteData* PAGImageLayer::imageBytes() const {
     return imageLayer->imageBytes->fileBytes;
   }
   return nullptr;
+}
+
+int64_t PAGImageLayer::contentDurationInternal() {
+  Frame maxFrame = 0;
+  float frameRate = 60;
+  if (rootFile) {
+    frameRate = rootFile->frameRateInternal();
+    auto property = getContentTimeRemap();
+    if (!property->animatable()) {
+      return 0;
+    }
+    auto timeRemap = static_cast<AnimatableProperty<float>*>(property);
+    maxFrame = CalculateMaxFrame(timeRemap->keyframes);
+  } else {
+    auto imageFillRule = static_cast<ImageLayer*>(layer)->imageFillRule;
+    if (imageFillRule == nullptr || imageFillRule->timeRemap == nullptr ||
+        !imageFillRule->timeRemap->animatable()) {
+      return FrameToTime(layer->duration, frameRate);
+    }
+    frameRate = frameRateInternal();
+    auto timeRemap = static_cast<AnimatableProperty<Frame>*>(imageFillRule->timeRemap);
+    // timeRemap编码过程中是开区间，实际使用过程中是闭区间，计算完后需要-1
+    maxFrame = CalculateMaxFrame(timeRemap->keyframes) - 1;
+  }
+
+  return FrameToTime(maxFrame + 1, frameRate);
 }
 
 }  // namespace pag

@@ -22,6 +22,7 @@
 #include "base/utils/UniqueID.h"
 #include "rendering/caches/ImageContentCache.h"
 #include "rendering/caches/LayerCache.h"
+#include "rendering/filters/utils/Filter3DHelper.h"
 #include "rendering/renderers/FilterRenderer.h"
 #include "rendering/sequences/SequenceImageProxy.h"
 #include "rendering/sequences/SequenceInfo.h"
@@ -637,6 +638,13 @@ LayerFilter* RenderCache::getLayerFilterCache(ID uniqueID,
     filter = static_cast<LayerFilter*>(result->second);
   }
   return filter;
+}
+
+Filter* RenderCache::getTransform3DFilter() {
+  if (transform3DFilter == nullptr) {
+    transform3DFilter = Make3DFilter(getContext());
+  }
+  return transform3DFilter;
 }
 
 MotionBlurFilter* RenderCache::getMotionBlurFilter() {
