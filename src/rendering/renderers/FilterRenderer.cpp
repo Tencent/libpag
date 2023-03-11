@@ -24,6 +24,7 @@
 #include "rendering/filters/FilterModifier.h"
 #include "rendering/filters/LayerStylesFilter.h"
 #include "rendering/filters/MotionBlurFilter.h"
+#include "rendering/filters/utils/Filter3DFactory.h"
 #include "rendering/filters/utils/FilterBuffer.h"
 #include "rendering/filters/utils/FilterHelper.h"
 #include "rendering/utils/SurfaceUtil.h"
@@ -280,6 +281,11 @@ std::vector<FilterNode> FilterRenderer::MakeFilterNodes(const FilterList* filter
 
   if (!MakeEffectNode(filterNodes, clipBounds, filterList, renderCache, filterBounds, effectScale,
                       clipIndex)) {
+    return {};
+  }
+
+  if (!Make3DLayerNode(filterNodes, clipBounds, filterList, renderCache, filterBounds,
+                       effectScale)) {
     return {};
   }
 

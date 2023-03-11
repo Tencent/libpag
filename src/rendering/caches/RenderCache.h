@@ -147,6 +147,8 @@ class RenderCache : public Performance {
 
   MotionBlurFilter* getMotionBlurFilter();
 
+  Filter* getTransform3DFilter();
+
   LayerStylesFilter* getLayerStylesFilter(Layer* layer);
 
   std::shared_ptr<File> getFileByAssetID(ID assetID);
@@ -181,6 +183,7 @@ class RenderCache : public Performance {
   std::unordered_map<ID, std::unordered_map<Frame, SequenceImageQueue*>> usedSequences = {};
   std::unordered_map<ID, Filter*> filterCaches;
   MotionBlurFilter* motionBlurFilter = nullptr;
+  Filter* transform3DFilter = nullptr;
 
   // decoded image caches:
   void clearExpiredDecodedImages();

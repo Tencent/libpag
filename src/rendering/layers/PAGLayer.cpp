@@ -397,6 +397,15 @@ void PAGLayer::notifyModified(bool contentChanged) {
   }
 }
 
+void PAGLayer::notifyAudioModified() {
+  audioVersion++;
+  auto parentLayer = getParentOrOwner();
+  while (parentLayer) {
+    parentLayer->audioVersion++;
+    parentLayer = parentLayer->getParentOrOwner();
+  }
+}
+
 PAGLayer* PAGLayer::getParentOrOwner() const {
   if (_parent) {
     return _parent;
@@ -490,6 +499,7 @@ void PAGLayer::onRemoveFromRootFile() {
 }
 
 void PAGLayer::onTimelineChanged() {
+  notifyAudioModified();
 }
 
 void PAGLayer::updateRootLocker(std::shared_ptr<std::mutex> newLocker) {
