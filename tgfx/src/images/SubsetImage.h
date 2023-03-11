@@ -22,38 +22,43 @@
 #include "tgfx/core/Image.h"
 
 namespace tgfx {
-class MatrixImage : public Image {
+class SubsetImage : public Image {
  public:
+  SubsetImage(std::shared_ptr<ImageSource> source, const Rect& bounds);
+
+  SubsetImage(std::shared_ptr<ImageSource> source, EncodedOrigin origin);
+
   int width() const override {
-    return _width;
+    return bounds.width();
   }
 
   int height() const override {
-    return _height;
+    return bounds.height();
   }
 
-  std::shared_ptr<Image> applyOrigin(EncodedOrigin origin) const override;
-
  protected:
-  std::shared_ptr<Image> onCloneWithSource(std::shared_ptr<ImageSource> newSource) const override;
+  Rect bounds = Rect::MakeEmpty();
+  EncodedOrigin origin = EncodedOrigin::TopLeft;
+
+  SubsetImage(std::shared_ptr<ImageSource> source, const Rect& bounds, EncodedOrigin origin);
+
+  virtual std::shared_ptr<SubsetImage> onCloneWith(const Rect& newBounds,
+                                                   EncodedOrigin newOrigin) const;
+
+  std::shared_ptr<Image> onCloneWith(std::shared_ptr<ImageSource> newSource) const override;
 
   std::shared_ptr<Image> onMakeSubset(const Rect& subset) const override;
 
-  std::shared_ptr<Image> onMakeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
-                                      int alphaStartY) const override;
+  std::shared_ptr<Image> onMakeRGBAAA(int, int, int, int) const override {
+    return nullptr;
+  }
+
+  std::shared_ptr<Image> onApplyOrigin(EncodedOrigin encodedOrigin) const override;
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(
       Context* context, uint32_t surfaceFlags, TileMode tileModeX, TileMode tileModeY,
       const SamplingOptions& sampling, const Matrix* localMatrix = nullptr) override;
 
- private:
-  int _width = 0;
-  int _height = 0;
-  Matrix localMatrix = Matrix::I();
-
-  MatrixImage(std::shared_ptr<ImageSource> source, int width, int height,
-              const Matrix& localMatrix);
-
-  friend class Image;
+  Matrix getTotalMatrix(const Matrix* localMatrix) const;
 };
 }  // namespace tgfx

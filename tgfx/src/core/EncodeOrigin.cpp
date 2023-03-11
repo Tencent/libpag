@@ -42,11 +42,4 @@ Matrix EncodedOriginToMatrix(EncodedOrigin origin, int width, int height) {
   }
   return Matrix::I();
 }
-
-void ApplyEncodedOrigin(EncodedOrigin origin, int* width, int* height) {
-  if (origin == EncodedOrigin::LeftTop || origin == EncodedOrigin::RightTop ||
-      origin == EncodedOrigin::RightBottom || origin == EncodedOrigin::LeftBottom) {
-    std::swap(*width, *height);
-  }
-}
 }  // namespace tgfx

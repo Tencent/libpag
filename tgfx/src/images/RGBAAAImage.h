@@ -18,48 +18,32 @@
 
 #pragma once
 
-#include "tgfx/core/Image.h"
+#include "SubsetImage.h"
 
 namespace tgfx {
-class RGBAAAImage : public Image {
+class RGBAAAImage : public SubsetImage {
  public:
-  int width() const override {
-    return bounds.width();
-  }
-
-  int height() const override {
-    return bounds.height();
-  }
+  RGBAAAImage(std::shared_ptr<ImageSource> source, int displayWidth, int displayHeight,
+              int alphaStartX, int alphaStartY);
 
   bool isRGBAAA() const override {
     return true;
   }
 
-  std::shared_ptr<Image> applyOrigin(EncodedOrigin) const override {
-    return nullptr;
-  }
-
  protected:
-  std::shared_ptr<Image> onCloneWithSource(std::shared_ptr<ImageSource> newSource) const override;
+  std::shared_ptr<SubsetImage> onCloneWith(const Rect& newBounds,
+                                           EncodedOrigin newOrigin) const override;
 
-  std::shared_ptr<Image> onMakeSubset(const Rect& subset) const override;
-
-  std::shared_ptr<Image> onMakeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
-                                      int alphaStartY) const override;
+  std::shared_ptr<Image> onCloneWith(std::shared_ptr<ImageSource> newSource) const override;
 
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(
       Context* context, uint32_t surfaceFlags, TileMode tileModeX, TileMode tileModeY,
       const SamplingOptions& sampling, const Matrix* localMatrix = nullptr) override;
 
  private:
-  Rect bounds = Rect::MakeEmpty();
   Point alphaStart = Point::Zero();
 
-  RGBAAAImage(std::shared_ptr<ImageSource> source, int displayWidth, int displayHeight,
-              int alphaStartX, int alphaStartY);
-
-  RGBAAAImage(std::shared_ptr<ImageSource> source, const Rect& bounds, const Point& alphaStart);
-
-  friend class Image;
+  RGBAAAImage(std::shared_ptr<ImageSource> source, const Rect& bounds, EncodedOrigin origin,
+              const Point& alphaStart);
 };
 }  // namespace tgfx

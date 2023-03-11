@@ -65,11 +65,4 @@ enum class EncodedOrigin {
  * the upper left corner still at [0, 0].
  */
 Matrix EncodedOriginToMatrix(EncodedOrigin origin, int width, int height);
-
-/**
- * Transforms the image size (width, height) to a correctly oriented destination size by the given
- * EncodedOrigin.
- */
-void ApplyEncodedOrigin(EncodedOrigin origin, int* width, int* height);
-
 }  // namespace tgfx

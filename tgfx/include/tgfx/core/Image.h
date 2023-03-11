@@ -197,9 +197,9 @@ class Image {
   std::shared_ptr<Image> makeTextureImage(Context* context) const;
 
   /**
-   * Returns subset of Image. The subset must be fully contained by Image dimensions. The
-   * implementation always shares pixels and caches with the original Image. Returns nullptr if the
-   * subset is empty, or the subset is not contained by bounds.
+   * Returns subset of Image. The subset must be fully contained by Image dimensions. The returned
+   * Image always shares pixels and caches with the original Image. Returns nullptr if the subset is
+   * empty, or the subset is not contained by bounds.
    */
   std::shared_ptr<Image> makeSubset(const Rect& subset) const;
 
@@ -220,8 +220,8 @@ class Image {
   /**
    * Returns an Image with the RGBAAA layout that takes half of the original Image as its RGB
    * channels and the other half as its alpha channel. Returns a subset Image if both alphaStartX
-   * and alphaStartY are zero. Returns nullptr if the original Image has extra transformation or an
-   * RGBAAA layout, or the specified layout is invalid.
+   * and alphaStartY are zero. Returns nullptr if the original Image has an encoded origin, subset
+   * bounds, or an RGBAAA layout.
    * @param displayWidth The display width of the RGBAAA image.
    * @param displayHeight The display height of the RGBAAA image.
    * @param alphaStartX The x position of where alpha area begins in the original image.
@@ -231,10 +231,10 @@ class Image {
                                     int alphaStartY);
 
   /**
-   * Returns an Image with its origin transformed by the given EncodedOrigin. Returns nullptr if the
-   * Image has an RGBAAA layout.
+   * Returns an Image with its origin transformed by the given EncodedOrigin. The returned Image
+   * always shares pixels and caches with the original Image.
    */
-  virtual std::shared_ptr<Image> applyOrigin(EncodedOrigin origin) const;
+  std::shared_ptr<Image> applyOrigin(EncodedOrigin origin) const;
 
  protected:
   std::weak_ptr<Image> weakThis;
@@ -242,12 +242,14 @@ class Image {
 
   explicit Image(std::shared_ptr<ImageSource> source);
 
-  virtual std::shared_ptr<Image> onCloneWithSource(std::shared_ptr<ImageSource> newSource) const;
+  virtual std::shared_ptr<Image> onCloneWith(std::shared_ptr<ImageSource> newSource) const;
 
   virtual std::shared_ptr<Image> onMakeSubset(const Rect& subset) const;
 
   virtual std::shared_ptr<Image> onMakeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
                                               int alphaStartY) const;
+
+  virtual std::shared_ptr<Image> onApplyOrigin(EncodedOrigin encodedOrigin) const;
 
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
       Context* context, uint32_t surfaceFlags, TileMode tileModeX, TileMode tileModeY,

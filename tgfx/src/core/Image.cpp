@@ -21,10 +21,10 @@
 #include "gpu/TextureEffect.h"
 #include "gpu/TiledTextureEffect.h"
 #include "images/ImageSource.h"
-#include "images/MatrixImage.h"
 #include "images/RGBAAAImage.h"
 #include "images/RasterBuffer.h"
 #include "images/RasterGenerator.h"
+#include "images/SubsetImage.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
 
@@ -113,12 +113,7 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageSource> source, Enco
   }
   std::shared_ptr<Image> image = nullptr;
   if (origin != EncodedOrigin::TopLeft) {
-    auto matrix = EncodedOriginToMatrix(origin, source->width(), source->height());
-    matrix.invert(&matrix);
-    auto width = source->width();
-    auto height = source->height();
-    ApplyEncodedOrigin(origin, &width, &height);
-    image = std::shared_ptr<MatrixImage>(new MatrixImage(std::move(source), width, height, matrix));
+    image = std::shared_ptr<SubsetImage>(new SubsetImage(std::move(source), origin));
   } else {
     image = std::shared_ptr<Image>(new Image(std::move(source)));
   }
@@ -172,7 +167,7 @@ std::shared_ptr<Image> Image::makeTextureImage(Context* context) const {
   return cloneWithSource(std::move(textureSource));
 }
 
-std::shared_ptr<Image> Image::onCloneWithSource(std::shared_ptr<ImageSource> newSource) const {
+std::shared_ptr<Image> Image::onCloneWith(std::shared_ptr<ImageSource> newSource) const {
   return std::shared_ptr<Image>(new Image(std::move(newSource)));
 }
 
@@ -192,9 +187,7 @@ std::shared_ptr<Image> Image::makeSubset(const Rect& subset) const {
 }
 
 std::shared_ptr<Image> Image::onMakeSubset(const Rect& subset) const {
-  auto localMatrix = Matrix::MakeTrans(subset.x(), subset.y());
-  return std::shared_ptr<MatrixImage>(new MatrixImage(
-      source, static_cast<int>(subset.width()), static_cast<int>(subset.height()), localMatrix));
+  return std::shared_ptr<SubsetImage>(new SubsetImage(source, subset));
 }
 
 std::shared_ptr<Image> Image::makeDecoded(Context* context) const {
@@ -225,10 +218,6 @@ std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, in
   return image;
 }
 
-std::shared_ptr<Image> Image::applyOrigin(EncodedOrigin origin) const {
-  return MakeFrom(source, origin);
-}
-
 std::shared_ptr<Image> Image::onMakeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
                                            int alphaStartY) const {
   if (alphaStartX + displayWidth > source->width() ||
@@ -237,6 +226,21 @@ std::shared_ptr<Image> Image::onMakeRGBAAA(int displayWidth, int displayHeight, 
   }
   return std::shared_ptr<Image>(
       new RGBAAAImage(source, displayWidth, displayHeight, alphaStartX, alphaStartY));
+}
+
+std::shared_ptr<Image> Image::applyOrigin(EncodedOrigin origin) const {
+  if (origin == EncodedOrigin::TopLeft) {
+    return weakThis.lock();
+  }
+  auto image = onApplyOrigin(origin);
+  if (image != nullptr) {
+    image->weakThis = image;
+  }
+  return image;
+}
+
+std::shared_ptr<Image> Image::onApplyOrigin(EncodedOrigin encodedOrigin) const {
+  return std::shared_ptr<SubsetImage>(new SubsetImage(std::move(source), encodedOrigin));
 }
 
 std::unique_ptr<FragmentProcessor> Image::asFragmentProcessor(
@@ -253,7 +257,7 @@ std::unique_ptr<FragmentProcessor> Image::asFragmentProcessor(Context* context,
 }
 
 std::shared_ptr<Image> Image::cloneWithSource(std::shared_ptr<ImageSource> newSource) const {
-  auto decodedImage = onCloneWithSource(std::move(newSource));
+  auto decodedImage = onCloneWith(std::move(newSource));
   decodedImage->weakThis = decodedImage;
   return decodedImage;
 }
