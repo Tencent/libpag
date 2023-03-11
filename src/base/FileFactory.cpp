@@ -54,15 +54,16 @@ static std::shared_ptr<File> FindFileByPath(const std::string& filePath) {
   return nullptr;
 }
 
-std::shared_ptr<File> File::Load(const std::string& filePath) {
+std::shared_ptr<File> File::Load(const std::string& filePath, const std::string& password) {
   auto byteData = ByteData::FromPath(filePath);
   if (byteData == nullptr) {
     return nullptr;
   }
-  return pag::File::Load(byteData->data(), byteData->length(), filePath);
+  return pag::File::Load(byteData->data(), byteData->length(), filePath, password);
 }
 
-std::shared_ptr<File> File::Load(const void* bytes, size_t length, const std::string& filePath) {
+std::shared_ptr<File> File::Load(const void* bytes, size_t length, const std::string& filePath,
+                                 const std::string&) {
   auto file = FindFileByPath(filePath);
   if (file != nullptr) {
     return file;

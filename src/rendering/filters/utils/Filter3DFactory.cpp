@@ -22,7 +22,7 @@ namespace pag {
 
 bool Make3DLayerNode(std::vector<FilterNode>&, tgfx::Rect&, const FilterList*, RenderCache*,
                      tgfx::Rect&, tgfx::Point&) {
-  return false;
+  return true;
 }
 
 Filter* Make3DFilter(tgfx::Context*) {
