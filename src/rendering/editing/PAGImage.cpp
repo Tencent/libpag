@@ -63,13 +63,13 @@ Matrix PAGImage::getContentMatrix(int defaultScaleMode, int contentWidth, int co
   return matrix;
 }
 
-void PAGImage::setOwner(PAGLayer* owner) {
+void PAGImage::setOwner(PAGLayer* layer) {
   std::lock_guard<std::mutex> autoLock(locker);
-  _owner = owner;
+  owner = layer;
 }
 
 PAGLayer* PAGImage::getOwner() const {
   std::lock_guard<std::mutex> autoLock(locker);
-  return _owner;
+  return owner;
 }
 }  // namespace pag
