@@ -28,13 +28,13 @@ uint16_t PAGFile::MaxSupportedTagLevel() {
 }
 
 std::shared_ptr<PAGFile> PAGFile::Load(const void* bytes, size_t length,
-                                       const std::string& filePath) {
-  auto file = File::Load(bytes, length, filePath);
+                                       const std::string& filePath, const std::string& password) {
+  auto file = File::Load(bytes, length, filePath, password);
   return MakeFrom(file);
 }
 
-std::shared_ptr<PAGFile> PAGFile::Load(const std::string& filePath) {
-  auto file = File::Load(filePath);
+std::shared_ptr<PAGFile> PAGFile::Load(const std::string& filePath, const std::string& password) {
+  auto file = File::Load(filePath, password);
   return MakeFrom(file);
 }
 
