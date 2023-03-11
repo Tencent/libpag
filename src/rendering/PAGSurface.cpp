@@ -46,18 +46,17 @@ int PAGSurface::height() {
 
 void PAGSurface::updateSize() {
   LockGuard autoLock(rootLocker);
-  freeCacheInternal();
+  onFreeCache();
   drawable->updateSize();
 }
 
 void PAGSurface::freeCache() {
   LockGuard autoLock(rootLocker);
-  freeCacheInternal();
+  onFreeCache();
 }
 
-void PAGSurface::freeCacheInternal() {
+void PAGSurface::onFreeCache() {
   TextShaper::PurgeCaches();
-  onFreeCache();
   if (pagPlayer) {
     pagPlayer->renderCache->releaseAll();
   }
@@ -137,7 +136,7 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
   if (autoClear) {
     canvas->clear();
   }
-  onDraw(surface, graphic, cache);
+  onDraw(graphic, surface, cache);
   if (signalSemaphore == nullptr) {
     surface->flush();
   } else {
@@ -226,16 +225,13 @@ void PAGSurface::unlockContext() {
   drawable->unlockContext();
 }
 
-void PAGSurface::onDraw(std::shared_ptr<tgfx::Surface> target, std::shared_ptr<Graphic> graphic,
+void PAGSurface::onDraw(std::shared_ptr<Graphic> graphic, std::shared_ptr<tgfx::Surface> target,
                         RenderCache* cache) {
   auto canvas = target->getCanvas();
   if (graphic) {
     graphic->prepare(cache);
     graphic->draw(canvas, cache);
   }
-}
-
-void PAGSurface::onFreeCache() {
 }
 
 }  // namespace pag

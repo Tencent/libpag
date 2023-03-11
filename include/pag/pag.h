@@ -1224,7 +1224,7 @@ class PAG_API PAGSurface {
  protected:
   explicit PAGSurface(std::shared_ptr<Drawable> drawable, bool contextAdopted = false);
 
-  virtual void onDraw(std::shared_ptr<tgfx::Surface> surface, std::shared_ptr<Graphic> graphic,
+  virtual void onDraw(std::shared_ptr<Graphic> graphic, std::shared_ptr<tgfx::Surface> surface,
                       RenderCache* cache);
   virtual void onFreeCache();
 
@@ -1244,7 +1244,6 @@ class PAG_API PAGSurface {
   tgfx::Context* lockContext();
   void unlockContext();
   bool wait(const BackendSemaphore& waitSemaphore);
-  void freeCacheInternal();
 
   friend class PAGPlayer;
 
