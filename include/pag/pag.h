@@ -491,7 +491,7 @@ class PAG_API PAGLayer : public Content {
   std::shared_ptr<PAGLayer> _trackMatteLayer = nullptr;
   int _editableIndex = -1;
   uint32_t contentVersion = 0;
-  std::atomic_uint32_t audioVersion = {0};
+  std::atomic<uint32_t> audioVersion = {0};
 
   void setVisibleInternal(bool value);
   void setStartTimeInternal(int64_t time);
