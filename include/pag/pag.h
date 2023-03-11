@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <functional>  // for windows
 #include <unordered_map>
 #include "pag/decoder.h"
@@ -491,7 +492,7 @@ class PAG_API PAGLayer : public Content {
   std::shared_ptr<PAGLayer> _trackMatteLayer = nullptr;
   int _editableIndex = -1;
   uint32_t contentVersion = 0;
-  std::atomic<uint32_t> audioVersion = {0};
+  std::atomic_uint32_t audioVersion = {0};
 
   void setVisibleInternal(bool value);
   void setStartTimeInternal(int64_t time);
@@ -1024,12 +1025,14 @@ class PAG_API PAGFile : public PAGComposition {
    * file.
    */
   static std::shared_ptr<PAGFile> Load(const void* bytes, size_t length,
-                                       const std::string& filePath = "");
+                                       const std::string& filePath = "",
+                                       const std::string& password = "");
   /**
    *  Load a pag file from path, return null if the file does not exist or the data is not a pag
    * file.
    */
-  static std::shared_ptr<PAGFile> Load(const std::string& filePath);
+  static std::shared_ptr<PAGFile> Load(const std::string& filePath,
+                                       const std::string& password = "");
 
   PAGFile(std::shared_ptr<File> file, PreComposeLayer* layer);
 
@@ -1122,8 +1125,6 @@ class PAG_API PAGFile : public PAGComposition {
   bool isPAGFile() const override;
 
  protected:
-  static std::shared_ptr<PAGFile> MakeFrom(std::shared_ptr<File> file);
-
   bool gotoTime(int64_t layerTime) override;
   Frame childFrameToLocal(Frame childFrame, float childFrameRate) const override;
   Frame localFrameToChild(Frame localFrame, float childFrameRate) const override;
@@ -1133,6 +1134,7 @@ class PAG_API PAGFile : public PAGComposition {
   Frame stretchedContentFrame() const override;
 
  private:
+  static std::shared_ptr<PAGFile> MakeFrom(std::shared_ptr<File> file);
   static std::shared_ptr<PAGLayer> BuildPAGLayer(std::shared_ptr<File> file, pag::Layer* layer);
 
   void setDurationInternal(int64_t duration);

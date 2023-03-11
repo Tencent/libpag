@@ -22,7 +22,7 @@
 #include "base/utils/UniqueID.h"
 #include "rendering/caches/ImageContentCache.h"
 #include "rendering/caches/LayerCache.h"
-#include "rendering/filters/utils/Filter3DHelper.h"
+#include "rendering/filters/utils/Filter3DFactory.h"
 #include "rendering/renderers/FilterRenderer.h"
 #include "rendering/sequences/SequenceImageProxy.h"
 #include "rendering/sequences/SequenceInfo.h"
