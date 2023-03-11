@@ -1228,11 +1228,11 @@ class PAG_API PAGSurface {
                       bool autoClear);
   virtual void onFreeCache();
 
-  uint32_t contentVersion = 0;
   std::shared_ptr<Drawable> drawable = nullptr;
   std::shared_ptr<tgfx::Surface> surface = nullptr;
 
  private:
+  uint32_t contentVersion = 0;
   PAGPlayer* pagPlayer = nullptr;
   std::shared_ptr<std::mutex> rootLocker = nullptr;
   bool contextAdopted = false;
