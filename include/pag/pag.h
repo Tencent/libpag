@@ -1224,17 +1224,16 @@ class PAG_API PAGSurface {
  protected:
   explicit PAGSurface(std::shared_ptr<Drawable> drawable, bool contextAdopted = false);
 
-  virtual bool onDraw(tgfx::Context* context, std::shared_ptr<Graphic> graphic, RenderCache* cache,
-                      bool autoClear);
+  virtual void onDraw(std::shared_ptr<tgfx::Surface> surface, std::shared_ptr<Graphic> graphic,
+                      RenderCache* cache);
   virtual void onFreeCache();
-
-  std::shared_ptr<Drawable> drawable = nullptr;
-  std::shared_ptr<tgfx::Surface> surface = nullptr;
 
  private:
   uint32_t contentVersion = 0;
   PAGPlayer* pagPlayer = nullptr;
   std::shared_ptr<std::mutex> rootLocker = nullptr;
+  std::shared_ptr<Drawable> drawable = nullptr;
+  std::shared_ptr<tgfx::Surface> surface = nullptr;
   bool contextAdopted = false;
   GLRestorer* glRestorer = nullptr;
 

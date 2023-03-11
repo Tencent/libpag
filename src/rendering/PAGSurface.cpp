@@ -119,10 +119,25 @@ bool PAGSurface::draw(RenderCache* cache, std::shared_ptr<Graphic> graphic,
   if (!context) {
     return false;
   }
-  if (!onDraw(context, graphic, cache, autoClear)) {
+  cache->prepareLayers();
+  if (surface != nullptr && autoClear && contentVersion == cache->getContentVersion()) {
     unlockContext();
     return false;
   }
+  if (surface == nullptr) {
+    surface = drawable->createSurface(context);
+  }
+  if (surface == nullptr) {
+    unlockContext();
+    return false;
+  }
+  contentVersion = cache->getContentVersion();
+  cache->attachToContext(context);
+  auto canvas = surface->getCanvas();
+  if (autoClear) {
+    canvas->clear();
+  }
+  onDraw(surface, graphic, cache);
   if (signalSemaphore == nullptr) {
     surface->flush();
   } else {
@@ -211,29 +226,13 @@ void PAGSurface::unlockContext() {
   drawable->unlockContext();
 }
 
-bool PAGSurface::onDraw(tgfx::Context* context, std::shared_ptr<Graphic> graphic,
-                        RenderCache* cache, bool autoClear) {
-  cache->prepareLayers();
-  if (surface != nullptr && autoClear && contentVersion == cache->getContentVersion()) {
-    return false;
-  }
-  if (surface == nullptr) {
-    surface = drawable->createSurface(context);
-  }
-  if (surface == nullptr) {
-    return false;
-  }
-  contentVersion = cache->getContentVersion();
-  cache->attachToContext(context);
-  auto canvas = surface->getCanvas();
-  if (autoClear) {
-    canvas->clear();
-  }
+void PAGSurface::onDraw(std::shared_ptr<tgfx::Surface> target, std::shared_ptr<Graphic> graphic,
+                        RenderCache* cache) {
+  auto canvas = target->getCanvas();
   if (graphic) {
     graphic->prepare(cache);
     graphic->draw(canvas, cache);
   }
-  return true;
 }
 
 void PAGSurface::onFreeCache() {
