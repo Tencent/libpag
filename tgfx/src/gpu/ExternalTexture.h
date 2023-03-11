@@ -27,7 +27,7 @@ namespace tgfx {
 class ExternalTexture : public Texture {
  public:
   static std::shared_ptr<Texture> MakeFrom(Context* context, const BackendTexture& backendTexture,
-                                           SurfaceOrigin origin, bool adopted);
+                                           ImageOrigin origin, bool adopted);
 
   size_t memoryUsage() const override;
 
@@ -40,7 +40,7 @@ class ExternalTexture : public Texture {
   bool adopted = false;
 
   ExternalTexture(std::unique_ptr<TextureSampler> sampler, int width, int height,
-                  SurfaceOrigin origin, bool adopted);
+                  ImageOrigin origin, bool adopted);
 
   void onReleaseGPU() override;
 };

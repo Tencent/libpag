@@ -23,7 +23,7 @@
 #include "pag/pag.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/gpu/Surface.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
+#include "tgfx/opengl/GLDevice.h"
 
 namespace pag {
 using namespace tgfx;
@@ -107,7 +107,7 @@ PAG_TEST_F(PAGImageTest, image2) {
   ASSERT_EQ(codec->height(), 110);
   ASSERT_EQ(codec->width(), 110);
   ASSERT_EQ(codec->height(), 110);
-  ASSERT_EQ(codec->origin(), tgfx::ImageOrigin::TopLeft);
+  ASSERT_EQ(codec->origin(), tgfx::EncodedOrigin::TopLeft);
   Bitmap bitmap(codec->width(), codec->height(), false, false);
   ASSERT_FALSE(bitmap.isEmpty());
   Pixmap pixmap(bitmap);
@@ -148,9 +148,9 @@ PAG_TEST_F(PAGImageTest, BottomLeftMask) {
   ASSERT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, width, height);
   auto image1 = MakeImage("resources/apitest/imageReplacement.webp");
-  auto imageAsMask = MakeImageCodec("resources/apitest/image_as_mask.png");
+  auto imageAsMask = MakeImage("resources/apitest/image_as_mask.png");
   ASSERT_TRUE(imageAsMask != nullptr);
-  auto image2 = Image::MakeFrom(imageAsMask, tgfx::ImageOrigin::BottomLeft);
+  auto image2 = imageAsMask->applyOrigin(tgfx::EncodedOrigin::BottomLeft);
   ASSERT_TRUE(image2 != nullptr);
   auto canvas = surface->getCanvas();
   tgfx::Paint paint;

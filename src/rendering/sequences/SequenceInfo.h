@@ -20,9 +20,9 @@
 
 #include "pag/file.h"
 #include "rendering/sequences/SequenceReader.h"
+#include "tgfx/core/EncodedOrigin.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageGenerator.h"
-#include "tgfx/core/ImageOrigin.h"
 
 namespace pag {
 class SequenceInfo {

@@ -20,8 +20,8 @@
 #include "WebTextBlob.h"
 #include "WebTypeface.h"
 #include "gpu/Texture.h"
-#include "gpu/opengl/GLContext.h"
-#include "gpu/opengl/GLSampler.h"
+#include "opengl/GLContext.h"
+#include "opengl/GLSampler.h"
 
 using namespace emscripten;
 

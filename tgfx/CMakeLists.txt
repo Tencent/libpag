@@ -67,13 +67,11 @@ file(GLOB_RECURSE TGFX_FILES
         src/shaders/*.*
         src/shapes/*.*
         src/utils/*.*
-        src/gpu/gradients/*.*
-        src/gpu/ops/*.*)
+        src/gpu/*.*)
 
 file(GLOB TGFX_PLATFORM_COMMON_FILES
         src/codecs/*.*
         src/vectors/*.*
-        src/gpu/*.*
         src/platform/*.*)
 list(APPEND TGFX_FILES ${TGFX_PLATFORM_COMMON_FILES})
 
@@ -164,19 +162,19 @@ elseif (APPLE)
 endif ()
 
 if (TGFX_USE_OPENGL)
-    file(GLOB GFX_PLATFORM_FILES src/gpu/opengl/*.*)
+    file(GLOB GFX_PLATFORM_FILES src/opengl/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
 elseif (ANDROID)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES src/gpu/vulkan/*.*)
+    file(GLOB_RECURSE GFX_PLATFORM_FILES src/vulkan/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
 elseif (APPLE)
-    file(GLOB_RECURSE GFX_PLATFORM_FILES src/gpu/metal/*.*)
+    file(GLOB_RECURSE GFX_PLATFORM_FILES src/metal/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
     find_library(Metal_LIBS Metal REQUIRED)
     list(APPEND TGFX_PLATFORM_SHARED_LIBS ${Metal_LIBS})
 endif ()
 
-file(GLOB_RECURSE EGL_PLATFORM_FILES src/gpu/opengl/egl/*.*)
+file(GLOB_RECURSE EGL_PLATFORM_FILES src/opengl/egl/*.*)
 
 if (TGFX_USE_QT)
     # need to set the CMAKE_PREFIX_PATH to local QT installation path, for example :
@@ -186,7 +184,7 @@ if (TGFX_USE_QT)
     find_package(Qt5Quick REQUIRED)
     list(APPEND GPU_PLATFORM_SHARED_LIBS ${Qt5OpenGL_LIBRARIES} ${Qt5Gui_LIBRARIES} ${Qt5Quick_LIBRARIES})
     list(APPEND GPU_PLATFORM_INCLUDES ${Qt5OpenGL_INCLUDE_DIRS} ${Qt5Gui_INCLUDE_DIRS} ${Qt5Quick_INCLUDE_DIRS})
-    file(GLOB_RECURSE GPU_PLATFORM_FILES src/gpu/opengl/qt/*.*)
+    file(GLOB_RECURSE GPU_PLATFORM_FILES src/opengl/qt/*.*)
 elseif (TGFX_USE_SWIFTSHADER)
     list(APPEND GPU_PLATFORM_INCLUDES ../vendor/swiftshader/include)
     file(GLOB SWIFTSHADER_LIBS ../vendor/swiftshader/${LIBRARY_ENTRY}/*${CMAKE_SHARED_LIBRARY_SUFFIX})
@@ -205,7 +203,7 @@ if (WEB)
     file(GLOB_RECURSE PLATFORM_FILES src/platform/web/*.*)
     list(APPEND TGFX_PLATFORM_FILES ${PLATFORM_FILES})
     if (TGFX_USE_NATIVE_GL)
-        file(GLOB_RECURSE GPU_PLATFORM_FILES src/gpu/opengl/webgl/*.*)
+        file(GLOB_RECURSE GPU_PLATFORM_FILES src/opengl/webgl/*.*)
     endif ()
 elseif (IOS)
     # finds all required platform libraries.
@@ -237,7 +235,7 @@ elseif (IOS)
         add_definitions(-DGL_SILENCE_DEPRECATION)
         find_library(OpenGLES_LIBS OpenGLES REQUIRED)
         list(APPEND GPU_PLATFORM_SHARED_LIBS ${OpenGLES_LIBS})
-        file(GLOB_RECURSE GPU_PLATFORM_FILES src/gpu/opengl/eagl/*.*)
+        file(GLOB_RECURSE GPU_PLATFORM_FILES src/opengl/eagl/*.*)
     endif ()
 elseif (MACOS)
     # finds all required platform libraries.
@@ -261,7 +259,7 @@ elseif (MACOS)
         add_definitions(-DGL_SILENCE_DEPRECATION)
         find_library(OpenGL_LIBS OpenGL REQUIRED)
         list(APPEND GPU_PLATFORM_SHARED_LIBS ${OpenGL_LIBS})
-        file(GLOB_RECURSE GPU_PLATFORM_FILES src/gpu/opengl/cgl/*.*)
+        file(GLOB_RECURSE GPU_PLATFORM_FILES src/opengl/cgl/*.*)
     endif ()
 
 elseif (ANDROID)
@@ -281,7 +279,7 @@ elseif (ANDROID)
         list(APPEND GPU_PLATFORM_SHARED_LIBS ${GLESV2_LIB})
         find_library(EGL_LIB EGL)
         list(APPEND GPU_PLATFORM_SHARED_LIBS ${EGL_LIB})
-        file(GLOB_RECURSE GPU_PLATFORM_FILES src/gpu/opengl/egl/*.*)
+        file(GLOB_RECURSE GPU_PLATFORM_FILES src/opengl/egl/*.*)
     endif ()
 
     # optimizes the output size
@@ -303,7 +301,7 @@ elseif (WIN32)
         file(GLOB ANGLE_LIBS ../vendor/angle/${PLATFORM}/${ARCH}/*${CMAKE_STATIC_LIBRARY_SUFFIX})
         list(APPEND GPU_PLATFORM_STATIC_LIBS ${ANGLE_LIBS})
         list(APPEND GPU_PLATFORM_INCLUDES ../vendor/angle/include)
-        file(GLOB_RECURSE GPU_PLATFORM_FILES src/gpu/opengl/egl/*.*)
+        file(GLOB_RECURSE GPU_PLATFORM_FILES src/opengl/egl/*.*)
     endif ()
 elseif (CMAKE_HOST_SYSTEM_NAME MATCHES "Linux")
     find_package(Threads)
@@ -319,7 +317,7 @@ elseif (CMAKE_HOST_SYSTEM_NAME MATCHES "Linux")
         list(APPEND GPU_PLATFORM_SHARED_LIBS ${GLESV2_LIB})
         find_library(EGL_LIB EGL)
         list(APPEND GPU_PLATFORM_SHARED_LIBS ${EGL_LIB})
-        file(GLOB_RECURSE GPU_PLATFORM_FILES src/gpu/opengl/egl/*.*)
+        file(GLOB_RECURSE GPU_PLATFORM_FILES src/opengl/egl/*.*)
     endif ()
 endif ()
 

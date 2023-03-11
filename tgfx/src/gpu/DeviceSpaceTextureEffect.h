@@ -24,7 +24,7 @@ namespace tgfx {
 class DeviceSpaceTextureEffect : public FragmentProcessor {
  public:
   static std::unique_ptr<DeviceSpaceTextureEffect> Make(std::shared_ptr<Texture> texture,
-                                                        SurfaceOrigin deviceOrigin);
+                                                        ImageOrigin deviceOrigin);
 
   std::string name() const override {
     return "DeviceSpaceTextureEffect";
@@ -33,7 +33,7 @@ class DeviceSpaceTextureEffect : public FragmentProcessor {
  private:
   DEFINE_PROCESSOR_CLASS_ID
 
-  DeviceSpaceTextureEffect(std::shared_ptr<Texture> texture, SurfaceOrigin deviceOrigin);
+  DeviceSpaceTextureEffect(std::shared_ptr<Texture> texture, ImageOrigin deviceOrigin);
 
   bool onIsEqual(const FragmentProcessor& processor) const override;
 

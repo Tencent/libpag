@@ -117,7 +117,7 @@ std::shared_ptr<Texture> Texture::MakeNV12(Context* context, const YUVData* yuvD
 }
 
 YUVTexture::YUVTexture(int width, int height, YUVPixelFormat pixelFormat, YUVColorSpace colorSpace)
-    : Texture(width, height, SurfaceOrigin::TopLeft),
+    : Texture(width, height, ImageOrigin::TopLeft),
       _pixelFormat(pixelFormat),
       _colorSpace(colorSpace) {
 }

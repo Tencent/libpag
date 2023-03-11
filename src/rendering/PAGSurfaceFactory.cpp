@@ -19,7 +19,7 @@
 #include "base/utils/TGFXCast.h"
 #include "pag/pag.h"
 #include "rendering/Drawable.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
+#include "tgfx/opengl/GLDevice.h"
 
 namespace pag {
 

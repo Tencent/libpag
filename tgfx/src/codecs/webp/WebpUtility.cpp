@@ -327,7 +327,7 @@ DecodeInfo WebpUtility::getDecodeInfo(const void* fileBytes, size_t byteLength) 
     }
   }
 
-  ImageOrigin origin = ImageOrigin::TopLeft;
+  EncodedOrigin origin = EncodedOrigin::TopLeft;
   {
     WebPChunkIterator chunkIterator;
     if (WebPDemuxGetChunk(demux, "EXIF", 1, &chunkIterator)) {

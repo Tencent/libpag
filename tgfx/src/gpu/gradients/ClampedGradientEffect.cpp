@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ClampedGradientEffect.h"
-#include "gpu/opengl/GLClampedGradientEffect.h"
+#include "opengl/GLClampedGradientEffect.h"
 
 namespace tgfx {
 std::unique_ptr<ClampedGradientEffect> ClampedGradientEffect::Make(

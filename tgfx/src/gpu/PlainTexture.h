@@ -31,8 +31,7 @@ class PlainTexture : public Texture {
    */
   static bool CheckSizeAndFormat(Context* context, int width, int height, PixelFormat format);
 
-  PlainTexture(std::unique_ptr<TextureSampler> sampler, int width, int height,
-               SurfaceOrigin origin);
+  PlainTexture(std::unique_ptr<TextureSampler> sampler, int width, int height, ImageOrigin origin);
 
   size_t memoryUsage() const override;
 

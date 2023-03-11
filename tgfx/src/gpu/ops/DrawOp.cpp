@@ -51,7 +51,7 @@ static std::shared_ptr<Texture> CreateDstTexture(OpsRenderPass* opsRenderPass, R
   }
   auto bounds =
       Rect::MakeWH(opsRenderPass->renderTarget()->width(), opsRenderPass->renderTarget()->height());
-  if (opsRenderPass->renderTarget()->origin() == SurfaceOrigin::BottomLeft) {
+  if (opsRenderPass->renderTarget()->origin() == ImageOrigin::BottomLeft) {
     auto height = dstRect.height();
     dstRect.top = static_cast<float>(opsRenderPass->renderTarget()->height()) - dstRect.bottom;
     dstRect.bottom = dstRect.top + height;

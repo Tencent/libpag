@@ -19,13 +19,14 @@
 #pragma once
 
 #include "tgfx/core/Data.h"
+#include "tgfx/core/EncodedOrigin.h"
 #include "tgfx/core/ImageGenerator.h"
 #include "tgfx/core/ImageInfo.h"
-#include "tgfx/core/ImageOrigin.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/SamplingOptions.h"
 #include "tgfx/core/TileMode.h"
 #include "tgfx/gpu/Backend.h"
+#include "tgfx/gpu/ImageOrigin.h"
 #include "tgfx/platform/HardwareBuffer.h"
 #include "tgfx/platform/NativeImage.h"
 
@@ -64,15 +65,13 @@ class Image {
    * platform. The returned Image object takes a reference to the nativeImage. Returns nullptr if
    * the nativeImage is nullptr or the current platform has no NativeImage support.
    */
-  static std::shared_ptr<Image> MakeFrom(NativeImageRef nativeImage,
-                                         ImageOrigin origin = ImageOrigin::TopLeft);
+  static std::shared_ptr<Image> MakeFrom(NativeImageRef nativeImage);
 
   /**
    * Creates an Image from the image generator. An Image is returned if the generator is not
    * nullptr. The image generator may wrap codec data or custom data.
    */
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageGenerator> generator,
-                                         ImageOrigin origin = ImageOrigin::TopLeft);
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageGenerator> generator);
 
   /**
    * Creates an Image from the ImageInfo and shares pixels from the immutable Data object. The
@@ -82,16 +81,14 @@ class Image {
    * conventing instead of an ImageBuffer. Returns nullptr if the ImageInfo is empty or the pixels
    * are nullptr.
    */
-  static std::shared_ptr<Image> MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels,
-                                         ImageOrigin origin = ImageOrigin::TopLeft);
+  static std::shared_ptr<Image> MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels);
 
   /**
    * Creates an Image from the Bitmap, sharing bitmap pixels. The Bitmap will allocate new internal
    * pixel memory and copy the original pixels into it if there is a subsequent call of pixel
    * writing to the Bitmap. Therefore, the content of the returned Image will always be the same.
    */
-  static std::shared_ptr<Image> MakeFrom(const Bitmap& bitmap,
-                                         ImageOrigin origin = ImageOrigin::TopLeft);
+  static std::shared_ptr<Image> MakeFrom(const Bitmap& bitmap);
 
   /**
    * Creates an Image from the platform-specific hardware buffer. For example, the hardware buffer
@@ -102,31 +99,27 @@ class Image {
    * format. Returns nullptr if the hardwareBuffer is nullptr.
    */
   static std::shared_ptr<Image> MakeFrom(HardwareBufferRef hardwareBuffer,
-                                         YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED,
-                                         ImageOrigin origin = ImageOrigin::TopLeft);
+                                         YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED);
 
   /**
    * Creates an Image in the I420 format with the specified YUVData and the YUVColorSpace. Returns
    * nullptr if the yuvData is invalid.
    */
   static std::shared_ptr<Image> MakeI420(std::shared_ptr<YUVData> yuvData,
-                                         YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED,
-                                         ImageOrigin origin = ImageOrigin::TopLeft);
+                                         YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED);
 
   /**
    * Creates an Image in the NV12 format with the specified YUVData and the YUVColorSpace. Returns
    * nullptr if the yuvData is invalid.
    */
   static std::shared_ptr<Image> MakeNV12(std::shared_ptr<YUVData> yuvData,
-                                         YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED,
-                                         ImageOrigin origin = ImageOrigin::TopLeft);
+                                         YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED);
 
   /**
    * Creates an Image from the ImageBuffer, An Image is returned if the imageBuffer is not nullptr
    * and its dimensions are greater than zero.
    */
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageBuffer> imageBuffer,
-                                         ImageOrigin origin = ImageOrigin::TopLeft);
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageBuffer> imageBuffer);
 
   /**
    * Creates an Image from the backendTexture associated with the context. The caller must ensure
@@ -204,9 +197,9 @@ class Image {
   std::shared_ptr<Image> makeTextureImage(Context* context) const;
 
   /**
-   * Returns subset of Image. The subset must be fully contained by Image dimensions. The
-   * implementation always shares pixels and caches with the original Image. Returns nullptr if the
-   * subset is empty, or the subset is not contained by bounds.
+   * Returns subset of Image. The subset must be fully contained by Image dimensions. The returned
+   * Image always shares pixels and caches with the original Image. Returns nullptr if the subset is
+   * empty, or the subset is not contained by bounds.
    */
   std::shared_ptr<Image> makeSubset(const Rect& subset) const;
 
@@ -227,8 +220,8 @@ class Image {
   /**
    * Returns an Image with the RGBAAA layout that takes half of the original Image as its RGB
    * channels and the other half as its alpha channel. Returns a subset Image if both alphaStartX
-   * and alphaStartY are zero. Returns nullptr if the original Image has an extra matrix or an
-   * RGBAAA layout, or the specified layout is invalid.
+   * and alphaStartY are zero. Returns nullptr if the original Image has an encoded origin, subset
+   * bounds, or an RGBAAA layout.
    * @param displayWidth The display width of the RGBAAA image.
    * @param displayHeight The display height of the RGBAAA image.
    * @param alphaStartX The x position of where alpha area begins in the original image.
@@ -237,18 +230,26 @@ class Image {
   std::shared_ptr<Image> makeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
                                     int alphaStartY);
 
+  /**
+   * Returns an Image with its origin transformed by the given EncodedOrigin. The returned Image
+   * always shares pixels and caches with the original Image.
+   */
+  std::shared_ptr<Image> applyOrigin(EncodedOrigin origin) const;
+
  protected:
   std::weak_ptr<Image> weakThis;
   std::shared_ptr<ImageSource> source = nullptr;
 
   explicit Image(std::shared_ptr<ImageSource> source);
 
-  virtual std::shared_ptr<Image> onCloneWithSource(std::shared_ptr<ImageSource> newSource) const;
+  virtual std::shared_ptr<Image> onCloneWith(std::shared_ptr<ImageSource> newSource) const;
 
   virtual std::shared_ptr<Image> onMakeSubset(const Rect& subset) const;
 
   virtual std::shared_ptr<Image> onMakeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
                                               int alphaStartY) const;
+
+  virtual std::shared_ptr<Image> onApplyOrigin(EncodedOrigin encodedOrigin) const;
 
   virtual std::unique_ptr<FragmentProcessor> asFragmentProcessor(
       Context* context, uint32_t surfaceFlags, TileMode tileModeX, TileMode tileModeY,
@@ -258,11 +259,10 @@ class Image {
   std::unique_ptr<FragmentProcessor> asFragmentProcessor(Context* context, uint32_t surfaceFlags,
                                                          const SamplingOptions& sampling);
 
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Texture> texture,
-                                         ImageOrigin origin = ImageOrigin::TopLeft);
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Texture> texture);
 
-  static std::shared_ptr<Image> MakeFromSource(std::shared_ptr<ImageSource> source,
-                                               ImageOrigin origin = ImageOrigin::TopLeft);
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageSource> source,
+                                         EncodedOrigin origin = EncodedOrigin::TopLeft);
 
   std::shared_ptr<Image> cloneWithSource(std::shared_ptr<ImageSource> newSource) const;
 

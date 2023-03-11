@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SingleIntervalGradientColorizer.h"
-#include "gpu/opengl/GLSingleIntervalGradientColorizer.h"
+#include "opengl/GLSingleIntervalGradientColorizer.h"
 
 namespace tgfx {
 std::unique_ptr<SingleIntervalGradientColorizer> SingleIntervalGradientColorizer::Make(Color start,

@@ -18,7 +18,7 @@
 
 #include "NativeImageBuffer.h"
 #include "gpu/Texture.h"
-#include "gpu/opengl/GLSampler.h"
+#include "opengl/GLSampler.h"
 #include "tgfx/core/ImageCodec.h"
 
 using namespace emscripten;
@@ -36,7 +36,7 @@ std::shared_ptr<ImageBuffer> NativeImageBuffer::MakeFrom(emscripten::val nativeI
 }
 
 std::shared_ptr<Texture> NativeImageBuffer::onMakeTexture(Context* context, bool) const {
-  auto texture = Texture::MakeRGBA(context, width(), height(), nullptr, 0, SurfaceOrigin::TopLeft);
+  auto texture = Texture::MakeRGBA(context, width(), height(), nullptr, 0, ImageOrigin::TopLeft);
   if (texture == nullptr) {
     return nullptr;
   }

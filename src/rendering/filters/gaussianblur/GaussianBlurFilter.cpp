@@ -50,7 +50,7 @@ void GaussianBlurFilter::draw(tgfx::Context* context, const FilterSource* source
   }
   auto blurFilter = tgfx::ImageFilter::Blur(blurrinessX, blurrinessY, tileMode, cropRect);
   tgfx::BackendRenderTarget renderTarget = {target->frameBuffer, target->width, target->height};
-  auto targetSurface = tgfx::Surface::MakeFrom(context, renderTarget, tgfx::SurfaceOrigin::TopLeft);
+  auto targetSurface = tgfx::Surface::MakeFrom(context, renderTarget, tgfx::ImageOrigin::TopLeft);
   auto targetCanvas = targetSurface->getCanvas();
   tgfx::BackendTexture backendTexture = {source->sampler, source->width, source->height};
   auto image = tgfx::Image::MakeFrom(context, backendTexture);

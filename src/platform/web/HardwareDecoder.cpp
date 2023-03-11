@@ -20,7 +20,7 @@
 #include "base/utils/TimeUtil.h"
 #include "codec/mp4/MP4BoxHelper.h"
 #include "rendering/sequences/VideoSequenceDemuxer.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
+#include "tgfx/opengl/GLFunctions.h"
 
 using namespace emscripten;
 

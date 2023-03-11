@@ -64,7 +64,7 @@ std::shared_ptr<Texture> HardwareBuffer::onMakeTexture(Context* context, bool mi
     return Texture::MakeFrom(context, hardwareBuffer);
   }
   auto texture = Texture::MakeFormat(context, width(), height(), PixelFormat::RGBA_8888,
-                                     SurfaceOrigin::TopLeft, true);
+                                     ImageOrigin::TopLeft, true);
   if (texture == nullptr) {
     return nullptr;
   }

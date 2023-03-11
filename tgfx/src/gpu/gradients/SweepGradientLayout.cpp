@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/gradients/SweepGradientLayout.h"
-#include "gpu/opengl/GLSweepGradientLayout.h"
+#include "opengl/GLSweepGradientLayout.h"
 
 namespace tgfx {
 std::unique_ptr<SweepGradientLayout> SweepGradientLayout::Make(Matrix matrix, float bias,

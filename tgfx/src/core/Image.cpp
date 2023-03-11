@@ -21,10 +21,10 @@
 #include "gpu/TextureEffect.h"
 #include "gpu/TiledTextureEffect.h"
 #include "images/ImageSource.h"
-#include "images/MatrixImage.h"
 #include "images/RGBAAAImage.h"
 #include "images/RasterBuffer.h"
 #include "images/RasterGenerator.h"
+#include "images/SubsetImage.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
 
@@ -34,7 +34,8 @@ std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
   if (codec == nullptr) {
     return nullptr;
   }
-  return MakeFrom(codec, codec->origin());
+  auto source = ImageSource::MakeFrom(codec);
+  return MakeFrom(source, codec->origin());
 }
 
 std::shared_ptr<Image> Image::MakeFromEncoded(std::shared_ptr<Data> encodedData) {
@@ -42,98 +43,77 @@ std::shared_ptr<Image> Image::MakeFromEncoded(std::shared_ptr<Data> encodedData)
   if (codec == nullptr) {
     return nullptr;
   }
-  return MakeFrom(codec, codec->origin());
+  auto source = ImageSource::MakeFrom(codec);
+  return MakeFrom(source, codec->origin());
 }
 
-std::shared_ptr<Image> Image::MakeFrom(NativeImageRef nativeImage, ImageOrigin origin) {
+std::shared_ptr<Image> Image::MakeFrom(NativeImageRef nativeImage) {
   auto codec = ImageCodec::MakeFrom(nativeImage);
-  return MakeFrom(std::move(codec), origin);
+  return MakeFrom(std::move(codec));
 }
 
-std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageGenerator> generator,
-                                       ImageOrigin origin) {
+std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageGenerator> generator) {
   auto source = ImageSource::MakeFrom(std::move(generator));
-  return MakeFromSource(std::move(source), origin);
+  return MakeFrom(std::move(source));
 }
 
-std::shared_ptr<Image> Image::MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels,
-                                       ImageOrigin origin) {
+std::shared_ptr<Image> Image::MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels) {
   auto imageBuffer = RasterBuffer::MakeFrom(info, pixels);
   if (imageBuffer != nullptr) {
-    return MakeFrom(std::move(imageBuffer), origin);
+    return MakeFrom(std::move(imageBuffer));
   }
   auto imageGenerator = RasterGenerator::MakeFrom(info, std::move(pixels));
-  return MakeFrom(std::move(imageGenerator), origin);
+  return MakeFrom(std::move(imageGenerator));
 }
 
-std::shared_ptr<Image> Image::MakeFrom(const Bitmap& bitmap, ImageOrigin origin) {
-  return MakeFrom(bitmap.makeBuffer(), origin);
+std::shared_ptr<Image> Image::MakeFrom(const Bitmap& bitmap) {
+  return MakeFrom(bitmap.makeBuffer());
 }
 
-std::shared_ptr<Image> Image::MakeFrom(HardwareBufferRef hardwareBuffer, YUVColorSpace colorSpace,
-                                       ImageOrigin origin) {
+std::shared_ptr<Image> Image::MakeFrom(HardwareBufferRef hardwareBuffer, YUVColorSpace colorSpace) {
   auto buffer = ImageBuffer::MakeFrom(hardwareBuffer, colorSpace);
-  return MakeFrom(std::move(buffer), origin);
+  return MakeFrom(std::move(buffer));
 }
 
-std::shared_ptr<Image> Image::MakeI420(std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace,
-                                       ImageOrigin origin) {
+std::shared_ptr<Image> Image::MakeI420(std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace) {
   auto buffer = ImageBuffer::MakeI420(std::move(yuvData), colorSpace);
-  return MakeFrom(std::move(buffer), origin);
+  return MakeFrom(std::move(buffer));
 }
 
-std::shared_ptr<Image> Image::MakeNV12(std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace,
-                                       ImageOrigin origin) {
+std::shared_ptr<Image> Image::MakeNV12(std::shared_ptr<YUVData> yuvData, YUVColorSpace colorSpace) {
   auto buffer = ImageBuffer::MakeNV12(std::move(yuvData), colorSpace);
-  return MakeFrom(std::move(buffer), origin);
+  return MakeFrom(std::move(buffer));
 }
 
-std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageBuffer> imageBuffer,
-                                       ImageOrigin origin) {
+std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageBuffer> imageBuffer) {
   auto source = ImageSource::MakeFrom(std::move(imageBuffer));
-  return MakeFromSource(std::move(source), origin);
+  return MakeFrom(std::move(source));
 }
 
 std::shared_ptr<Image> Image::MakeFrom(Context* context, const BackendTexture& backendTexture,
                                        ImageOrigin origin) {
-  SurfaceOrigin textureOrigin = SurfaceOrigin::TopLeft;
-  if (origin == ImageOrigin::BottomLeft) {
-    textureOrigin = SurfaceOrigin::BottomLeft;
-    origin = ImageOrigin::TopLeft;
-  }
-  auto texture = Texture::MakeFrom(context, backendTexture, textureOrigin);
-  return MakeFrom(std::move(texture), origin);
+  auto texture = Texture::MakeFrom(context, backendTexture, origin);
+  return MakeFrom(std::move(texture));
 }
 
 std::shared_ptr<Image> Image::MakeAdopted(Context* context, const BackendTexture& backendTexture,
                                           ImageOrigin origin) {
-  SurfaceOrigin textureOrigin = SurfaceOrigin::TopLeft;
-  if (origin == ImageOrigin::BottomLeft) {
-    textureOrigin = SurfaceOrigin::BottomLeft;
-    origin = ImageOrigin::TopLeft;
-  }
-  auto texture = Texture::MakeAdopted(context, backendTexture, textureOrigin);
-  return MakeFrom(std::move(texture), origin);
+  auto texture = Texture::MakeAdopted(context, backendTexture, origin);
+  return MakeFrom(std::move(texture));
 }
 
-std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Texture> texture, ImageOrigin origin) {
+std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Texture> texture) {
   auto source = ImageSource::MakeFrom(std::move(texture));
-  return MakeFromSource(std::move(source), origin);
+  return MakeFrom(std::move(source));
 }
 
-std::shared_ptr<Image> Image::MakeFromSource(std::shared_ptr<ImageSource> source,
-                                             ImageOrigin origin) {
+std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageSource> source, EncodedOrigin origin) {
   if (source == nullptr) {
     return nullptr;
   }
   std::shared_ptr<Image> image = nullptr;
-  if (origin != ImageOrigin::TopLeft) {
-    auto matrix = ImageOriginToMatrix(origin, source->width(), source->height());
-    matrix.invert(&matrix);
-    auto width = source->width();
-    auto height = source->height();
-    ApplyImageOrigin(origin, &width, &height);
-    image = std::shared_ptr<MatrixImage>(new MatrixImage(std::move(source), width, height, matrix));
+  if (origin != EncodedOrigin::TopLeft) {
+    image = std::shared_ptr<SubsetImage>(new SubsetImage(std::move(source), origin));
   } else {
     image = std::shared_ptr<Image>(new Image(std::move(source)));
   }
@@ -187,7 +167,7 @@ std::shared_ptr<Image> Image::makeTextureImage(Context* context) const {
   return cloneWithSource(std::move(textureSource));
 }
 
-std::shared_ptr<Image> Image::onCloneWithSource(std::shared_ptr<ImageSource> newSource) const {
+std::shared_ptr<Image> Image::onCloneWith(std::shared_ptr<ImageSource> newSource) const {
   return std::shared_ptr<Image>(new Image(std::move(newSource)));
 }
 
@@ -207,9 +187,7 @@ std::shared_ptr<Image> Image::makeSubset(const Rect& subset) const {
 }
 
 std::shared_ptr<Image> Image::onMakeSubset(const Rect& subset) const {
-  auto localMatrix = Matrix::MakeTrans(subset.x(), subset.y());
-  return std::shared_ptr<MatrixImage>(new MatrixImage(
-      source, static_cast<int>(subset.width()), static_cast<int>(subset.height()), localMatrix));
+  return std::shared_ptr<SubsetImage>(new SubsetImage(source, subset));
 }
 
 std::shared_ptr<Image> Image::makeDecoded(Context* context) const {
@@ -250,6 +228,21 @@ std::shared_ptr<Image> Image::onMakeRGBAAA(int displayWidth, int displayHeight, 
       new RGBAAAImage(source, displayWidth, displayHeight, alphaStartX, alphaStartY));
 }
 
+std::shared_ptr<Image> Image::applyOrigin(EncodedOrigin origin) const {
+  if (origin == EncodedOrigin::TopLeft) {
+    return weakThis.lock();
+  }
+  auto image = onApplyOrigin(origin);
+  if (image != nullptr) {
+    image->weakThis = image;
+  }
+  return image;
+}
+
+std::shared_ptr<Image> Image::onApplyOrigin(EncodedOrigin encodedOrigin) const {
+  return std::shared_ptr<SubsetImage>(new SubsetImage(std::move(source), encodedOrigin));
+}
+
 std::unique_ptr<FragmentProcessor> Image::asFragmentProcessor(
     Context* context, uint32_t surfaceFlags, TileMode tileModeX, TileMode tileModeY,
     const SamplingOptions& sampling, const Matrix* localMatrix) {
@@ -264,7 +257,7 @@ std::unique_ptr<FragmentProcessor> Image::asFragmentProcessor(Context* context,
 }
 
 std::shared_ptr<Image> Image::cloneWithSource(std::shared_ptr<ImageSource> newSource) const {
-  auto decodedImage = onCloneWithSource(std::move(newSource));
+  auto decodedImage = onCloneWith(std::move(newSource));
   decodedImage->weakThis = decodedImage;
   return decodedImage;
 }

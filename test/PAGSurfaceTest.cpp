@@ -18,10 +18,10 @@
 
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
-#include "gpu/opengl/GLCaps.h"
-#include "gpu/opengl/GLUtil.h"
+#include "opengl/GLCaps.h"
+#include "opengl/GLUtil.h"
 #include "rendering/Drawable.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
+#include "tgfx/opengl/GLDevice.h"
 
 namespace pag {
 using namespace tgfx;
@@ -49,8 +49,8 @@ PAG_TEST(PAGSurfaceTest, FromTexture) {
   auto glDevice = std::static_pointer_cast<GLDevice>(pagSurface->drawable->getDevice());
   EXPECT_TRUE(glDevice->sharableWith(nativeHandle));
 
-  auto drawable = std::make_shared<TextureDrawable>(device, ToTGFX(backendTexture),
-                                                    tgfx::SurfaceOrigin::TopLeft);
+  auto drawable =
+      std::make_shared<TextureDrawable>(device, ToTGFX(backendTexture), tgfx::ImageOrigin::TopLeft);
   auto pagSurface2 = PAGSurface::MakeFrom(drawable);
   auto pagPlayer2 = std::make_shared<PAGPlayer>();
   pagPlayer2->setSurface(pagSurface2);
@@ -152,7 +152,7 @@ PAG_TEST(PAGSurfaceTest, ImageSnapshot) {
   auto height = 200;
   CreateGLTexture(context, width, height, &textureInfo);
   tgfx::BackendTexture backendTexture = {textureInfo, width, height};
-  auto surface = Surface::MakeFrom(context, backendTexture, SurfaceOrigin::BottomLeft);
+  auto surface = Surface::MakeFrom(context, backendTexture, tgfx::ImageOrigin::BottomLeft);
   ASSERT_TRUE(surface != nullptr);
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);

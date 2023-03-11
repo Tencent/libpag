@@ -43,7 +43,7 @@ std::shared_ptr<GLVideoTexture> GLVideoTexture::Make(Context* context, int width
 }
 
 GLVideoTexture::GLVideoTexture(std::unique_ptr<TextureSampler> sampler, int width, int height)
-    : Texture(width, height, SurfaceOrigin::TopLeft),
+    : Texture(width, height, ImageOrigin::TopLeft),
       sampler(std::move(sampler)),
       textureWidth(width),
       textureHeight(height) {

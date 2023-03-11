@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureGradientColorizer.h"
-#include "gpu/opengl/GLTextureGradientColorizer.h"
+#include "opengl/GLTextureGradientColorizer.h"
 
 namespace tgfx {
 std::unique_ptr<TextureGradientColorizer> TextureGradientColorizer::Make(

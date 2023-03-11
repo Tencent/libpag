@@ -21,7 +21,7 @@
 
 namespace tgfx {
 std::unique_ptr<DeviceSpaceTextureEffect> DeviceSpaceTextureEffect::Make(
-    std::shared_ptr<Texture> texture, SurfaceOrigin deviceOrigin) {
+    std::shared_ptr<Texture> texture, ImageOrigin deviceOrigin) {
   if (texture == nullptr) {
     return nullptr;
   }
@@ -30,10 +30,10 @@ std::unique_ptr<DeviceSpaceTextureEffect> DeviceSpaceTextureEffect::Make(
 }
 
 DeviceSpaceTextureEffect::DeviceSpaceTextureEffect(std::shared_ptr<Texture> texture,
-                                                   SurfaceOrigin deviceOrigin)
+                                                   ImageOrigin deviceOrigin)
     : FragmentProcessor(ClassID()), texture(std::move(texture)) {
   setTextureSamplerCnt(1);
-  if (deviceOrigin == SurfaceOrigin::BottomLeft) {
+  if (deviceOrigin == ImageOrigin::BottomLeft) {
     deviceCoordMatrix.postScale(1, -1);
     deviceCoordMatrix.postTranslate(0, 1);
   }

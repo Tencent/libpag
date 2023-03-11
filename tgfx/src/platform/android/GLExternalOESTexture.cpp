@@ -18,8 +18,8 @@
 
 #include "GLExternalOESTexture.h"
 #include "gpu/Gpu.h"
-#include "gpu/opengl/GLSampler.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
+#include "opengl/GLSampler.h"
+#include "tgfx/opengl/GLFunctions.h"
 
 namespace tgfx {
 std::shared_ptr<GLExternalOESTexture> GLExternalOESTexture::Make(Context* context, int width,
@@ -40,7 +40,7 @@ std::shared_ptr<GLExternalOESTexture> GLExternalOESTexture::Make(Context* contex
 
 GLExternalOESTexture::GLExternalOESTexture(std::unique_ptr<TextureSampler> sampler, int width,
                                            int height)
-    : Texture(width, height, SurfaceOrigin::TopLeft),
+    : Texture(width, height, ImageOrigin::TopLeft),
       sampler(std::move(sampler)),
       textureWidth(width),
       textureHeight(height) {

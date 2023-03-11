@@ -35,7 +35,7 @@ static void ComputeRecycleKey(BytesKey* recycleKey, int width, int height, Pixel
 
 std::shared_ptr<Texture> Texture::MakeFormat(Context* context, int width, int height,
                                              const void* pixels, size_t rowBytes,
-                                             PixelFormat pixelFormat, SurfaceOrigin origin,
+                                             PixelFormat pixelFormat, ImageOrigin origin,
                                              bool mipMapped) {
   if (!PlainTexture::CheckSizeAndFormat(context, width, height, pixelFormat)) {
     return nullptr;
@@ -80,7 +80,7 @@ bool PlainTexture::CheckSizeAndFormat(Context* context, int width, int height, P
 }
 
 PlainTexture::PlainTexture(std::unique_ptr<TextureSampler> sampler, int width, int height,
-                           SurfaceOrigin origin)
+                           ImageOrigin origin)
     : Texture(width, height, origin), sampler(std::move(sampler)) {
 }
 

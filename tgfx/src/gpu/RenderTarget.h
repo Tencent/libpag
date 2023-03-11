@@ -34,7 +34,7 @@ class RenderTarget : public Resource {
    */
   static std::shared_ptr<RenderTarget> MakeFrom(Context* context,
                                                 const BackendRenderTarget& renderTarget,
-                                                SurfaceOrigin origin);
+                                                ImageOrigin origin);
 
   /**
    * Creates a new RenderTarget which uses specified Texture as pixel storage. The caller must
@@ -57,10 +57,10 @@ class RenderTarget : public Resource {
   }
 
   /**
-   * Returns the origin of the render target, either SurfaceOrigin::TopLeft or
-   * SurfaceOrigin::BottomLeft.
+   * Returns the origin of the render target, either ImageOrigin::TopLeft or
+   * ImageOrigin::BottomLeft.
    */
-  SurfaceOrigin origin() const {
+  ImageOrigin origin() const {
     return _origin;
   }
 
@@ -99,7 +99,7 @@ class RenderTarget : public Resource {
   virtual bool replaceTexture(const Texture* texture) = 0;
 
  protected:
-  RenderTarget(int width, int height, SurfaceOrigin origin, int sampleCount = 1)
+  RenderTarget(int width, int height, ImageOrigin origin, int sampleCount = 1)
       : _width(width), _height(height), _origin(origin), _sampleCount(sampleCount) {
   }
 
@@ -108,7 +108,7 @@ class RenderTarget : public Resource {
 
   int _width = 0;
   int _height = 0;
-  SurfaceOrigin _origin = SurfaceOrigin::TopLeft;
+  ImageOrigin _origin = ImageOrigin::TopLeft;
   int _sampleCount = 1;
 
   friend class DrawOp;

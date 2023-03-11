@@ -27,7 +27,7 @@
 #include "tgfx/core/FontMetrics.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/PathTypes.h"
-#include "tgfx/gpu/opengl/GLDefines.h"
+#include "tgfx/opengl/GLDefines.h"
 
 using namespace emscripten;
 using namespace pag;

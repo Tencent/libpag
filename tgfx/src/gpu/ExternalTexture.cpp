@@ -22,19 +22,19 @@
 
 namespace tgfx {
 std::shared_ptr<Texture> Texture::MakeFrom(Context* context, const BackendTexture& backendTexture,
-                                           SurfaceOrigin origin) {
+                                           ImageOrigin origin) {
   return ExternalTexture::MakeFrom(context, backendTexture, origin, false);
 }
 
 std::shared_ptr<Texture> Texture::MakeAdopted(Context* context,
                                               const BackendTexture& backendTexture,
-                                              SurfaceOrigin origin) {
+                                              ImageOrigin origin) {
   return ExternalTexture::MakeFrom(context, backendTexture, origin, true);
 }
 
 std::shared_ptr<Texture> ExternalTexture::MakeFrom(Context* context,
                                                    const BackendTexture& backendTexture,
-                                                   SurfaceOrigin origin, bool adopted) {
+                                                   ImageOrigin origin, bool adopted) {
   if (context == nullptr || !backendTexture.isValid()) {
     return nullptr;
   }
@@ -48,7 +48,7 @@ std::shared_ptr<Texture> ExternalTexture::MakeFrom(Context* context,
 }
 
 ExternalTexture::ExternalTexture(std::unique_ptr<TextureSampler> sampler, int width, int height,
-                                 SurfaceOrigin origin, bool adopted)
+                                 ImageOrigin origin, bool adopted)
     : Texture(width, height, origin), sampler(std::move(sampler)), adopted(adopted) {
 }
 

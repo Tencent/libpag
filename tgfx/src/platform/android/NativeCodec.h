@@ -36,7 +36,7 @@ class NativeCodec : public ImageCodec {
   std::shared_ptr<Data> imageBytes;
   Global<jobject> nativeImage;
 
-  NativeCodec(int width, int height, ImageOrigin origin) : ImageCodec(width, height, origin) {
+  NativeCodec(int width, int height, EncodedOrigin origin) : ImageCodec(width, height, origin) {
   }
 
   static std::shared_ptr<NativeCodec> Make(JNIEnv* env, jobject sizeObject, int origin);

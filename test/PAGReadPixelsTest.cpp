@@ -19,12 +19,12 @@
 #include <vector>
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
-#include "gpu/opengl/GLUtil.h"
+#include "opengl/GLUtil.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/gpu/Surface.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
+#include "tgfx/opengl/GLDevice.h"
 
 namespace pag {
 using namespace tgfx;
@@ -246,7 +246,7 @@ PAG_TEST(PAGReadPixelsTest, TestSurfaceReadPixels) {
   result = CreateGLTexture(context, width, height, &textureInfo);
   ASSERT_TRUE(result);
   auto glTexture =
-      Texture::MakeFrom(context, {textureInfo, width, height}, tgfx::SurfaceOrigin::BottomLeft);
+      Texture::MakeFrom(context, {textureInfo, width, height}, tgfx::ImageOrigin::BottomLeft);
   surface = Surface::MakeFrom(glTexture);
   ASSERT_TRUE(surface != nullptr);
   canvas = surface->getCanvas();
@@ -285,7 +285,7 @@ PAG_TEST(PAGReadPixelsTest, PngCodec) {
   ASSERT_TRUE(rgbaCodec != nullptr);
   ASSERT_EQ(rgbaCodec->width(), 1280);
   ASSERT_EQ(rgbaCodec->height(), 720);
-  ASSERT_EQ(rgbaCodec->origin(), tgfx::ImageOrigin::TopLeft);
+  ASSERT_EQ(rgbaCodec->origin(), tgfx::EncodedOrigin::TopLeft);
   auto rowBytes = rgbaCodec->width() * 4;
   Buffer buffer(rowBytes * rgbaCodec->height());
   auto pixels = buffer.data();
@@ -299,7 +299,7 @@ PAG_TEST(PAGReadPixelsTest, PngCodec) {
   ASSERT_TRUE(codec != nullptr);
   ASSERT_EQ(codec->width(), 1280);
   ASSERT_EQ(codec->height(), 720);
-  ASSERT_EQ(codec->origin(), tgfx::ImageOrigin::TopLeft);
+  ASSERT_EQ(codec->origin(), tgfx::EncodedOrigin::TopLeft);
   buffer.clear();
   ASSERT_TRUE(codec->readPixels(RGBAInfo, pixels));
   CHECK_PIXELS(RGBAInfo, pixels, "PngCodec_Encode_RGBA");
@@ -349,7 +349,7 @@ PAG_TEST(PAGReadPixelsTest, WebpCodec) {
   ASSERT_TRUE(rgbaCodec != nullptr);
   ASSERT_EQ(rgbaCodec->width(), 110);
   ASSERT_EQ(rgbaCodec->height(), 110);
-  ASSERT_EQ(rgbaCodec->origin(), tgfx::ImageOrigin::TopLeft);
+  ASSERT_EQ(rgbaCodec->origin(), tgfx::EncodedOrigin::TopLeft);
   auto RGBAInfo = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(),
                                   tgfx::ColorType::RGBA_8888, tgfx::AlphaType::Premultiplied);
 
@@ -364,7 +364,7 @@ PAG_TEST(PAGReadPixelsTest, WebpCodec) {
   ASSERT_TRUE(codec != nullptr);
   ASSERT_EQ(codec->width(), 110);
   ASSERT_EQ(codec->height(), 110);
-  ASSERT_EQ(codec->origin(), tgfx::ImageOrigin::TopLeft);
+  ASSERT_EQ(codec->origin(), tgfx::EncodedOrigin::TopLeft);
   buffer.clear();
   ASSERT_TRUE(codec->readPixels(RGBAInfo, pixels));
   CHECK_PIXELS(RGBAInfo, pixels, "WebpCodec_Encode_RGBA");
@@ -411,7 +411,7 @@ PAG_TEST(PAGReadPixelsTest, JpegCodec) {
   ASSERT_TRUE(rgbaCodec != nullptr);
   ASSERT_EQ(rgbaCodec->width(), 4032);
   ASSERT_EQ(rgbaCodec->height(), 3024);
-  ASSERT_EQ(rgbaCodec->origin(), tgfx::ImageOrigin::RightTop);
+  ASSERT_EQ(rgbaCodec->origin(), tgfx::EncodedOrigin::RightTop);
   auto RGBAInfo = ImageInfo::Make(rgbaCodec->width(), rgbaCodec->height(),
                                   tgfx::ColorType::RGBA_8888, tgfx::AlphaType::Premultiplied);
   Buffer buffer(RGBAInfo.byteSize());
@@ -424,7 +424,7 @@ PAG_TEST(PAGReadPixelsTest, JpegCodec) {
   ASSERT_TRUE(codec != nullptr);
   ASSERT_EQ(codec->width(), 4032);
   ASSERT_EQ(codec->height(), 3024);
-  ASSERT_EQ(codec->origin(), tgfx::ImageOrigin::TopLeft);
+  ASSERT_EQ(codec->origin(), tgfx::EncodedOrigin::TopLeft);
   buffer.clear();
   ASSERT_TRUE(codec->readPixels(RGBAInfo, pixels));
   CHECK_PIXELS(RGBAInfo, pixels, "JpegCodec_Encode_RGBA");

@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "tgfx/gpu/metal/MtlTypes.h"
-#include "tgfx/gpu/opengl/GLTypes.h"
+#include "tgfx/metal/MtlTypes.h"
+#include "tgfx/opengl/GLTypes.h"
 
 namespace tgfx {
 /**

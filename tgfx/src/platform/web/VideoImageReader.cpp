@@ -18,7 +18,7 @@
 
 #include "tgfx/platform/web/VideoImageReader.h"
 #include "GLVideoTexture.h"
-#include "gpu/opengl/GLSampler.h"
+#include "opengl/GLSampler.h"
 #include "tgfx/platform/web/WebImage.h"
 #include "utils/Log.h"
 

@@ -112,7 +112,7 @@ void DropShadowFilter::updateParamModeFullSpread(const tgfx::Rect& contentBounds
 void DropShadowFilter::onDrawModeNotSpread(tgfx::Context* context, const FilterSource* source,
                                            const FilterTarget* target) {
   tgfx::BackendRenderTarget renderTarget = {target->frameBuffer, target->width, target->height};
-  auto targetSurface = tgfx::Surface::MakeFrom(context, renderTarget, tgfx::SurfaceOrigin::TopLeft);
+  auto targetSurface = tgfx::Surface::MakeFrom(context, renderTarget, tgfx::ImageOrigin::TopLeft);
   auto targetCanvas = targetSurface->getCanvas();
   tgfx::BackendTexture backendTexture = {source->sampler, source->width, source->height};
   auto image = tgfx::Image::MakeFrom(context, backendTexture);
@@ -151,7 +151,7 @@ void DropShadowFilter::onDrawModeNotFullSpread(tgfx::Context* context, const Fil
   auto sourceV = spreadFilterBuffer->toFilterSource(source->scale);
 
   tgfx::BackendRenderTarget renderTarget = {target->frameBuffer, target->width, target->height};
-  auto targetSurface = tgfx::Surface::MakeFrom(context, renderTarget, tgfx::SurfaceOrigin::TopLeft);
+  auto targetSurface = tgfx::Surface::MakeFrom(context, renderTarget, tgfx::ImageOrigin::TopLeft);
   auto targetCanvas = targetSurface->getCanvas();
   tgfx::BackendTexture backendTexture = {sourceV->sampler, sourceV->width, sourceV->height};
   auto image = tgfx::Image::MakeFrom(context, backendTexture);

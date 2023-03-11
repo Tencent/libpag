@@ -22,7 +22,7 @@
 #include "rendering/caches/RenderCache.h"
 #include "tgfx/core/Clock.h"
 #include "tgfx/gpu/Surface.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
+#include "tgfx/opengl/GLDevice.h"
 
 namespace pag {
 static std::shared_ptr<tgfx::Image> RescaleImage(tgfx::Context* context,
@@ -323,7 +323,7 @@ std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, std::shared_ptr<ImageProx
 }
 
 std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, const tgfx::BackendTexture& texture,
-                                           tgfx::SurfaceOrigin origin) {
+                                           tgfx::ImageOrigin origin) {
   if (!texture.isValid()) {
     return nullptr;
   }
@@ -331,9 +331,7 @@ std::shared_ptr<Graphic> Picture::MakeFrom(ID assetID, const tgfx::BackendTextur
   if (context == nullptr) {
     return nullptr;
   }
-  auto imageOrigin = origin == tgfx::SurfaceOrigin::BottomLeft ? tgfx::ImageOrigin::BottomLeft
-                                                               : tgfx::ImageOrigin::TopLeft;
-  auto proxy = std::make_shared<BackendTextureProxy>(assetID, texture, imageOrigin, context);
+  auto proxy = std::make_shared<BackendTextureProxy>(assetID, texture, origin, context);
   return std::make_shared<ImageProxyPicture>(assetID, proxy);
 }
 

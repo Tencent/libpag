@@ -29,7 +29,7 @@ std::shared_ptr<Texture> Texture::MakeFrom(Context* context,
   return imageBuffer->onMakeTexture(context, mipMapped);
 }
 
-Texture::Texture(int width, int height, SurfaceOrigin origin)
+Texture::Texture(int width, int height, ImageOrigin origin)
     : _width(width), _height(height), _origin(origin) {
 }
 

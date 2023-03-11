@@ -20,9 +20,9 @@
 
 #include "tgfx/core/Data.h"
 #include "tgfx/core/EncodedFormat.h"
+#include "tgfx/core/EncodedOrigin.h"
 #include "tgfx/core/ImageGenerator.h"
 #include "tgfx/core/ImageInfo.h"
-#include "tgfx/core/ImageOrigin.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/platform/NativeImage.h"
 
@@ -62,9 +62,9 @@ class ImageCodec : public ImageGenerator {
   static std::shared_ptr<Data> Encode(const Pixmap& pixmap, EncodedFormat format, int quality);
 
   /**
-   * Returns the origin of target image.
+   * Returns the encoded origin of the target image.
    */
-  ImageOrigin origin() const {
+  EncodedOrigin origin() const {
     return _origin;
   }
 
@@ -81,24 +81,24 @@ class ImageCodec : public ImageGenerator {
   virtual bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const = 0;
 
  protected:
-  ImageCodec(int width, int height, ImageOrigin origin)
+  ImageCodec(int width, int height, EncodedOrigin origin)
       : ImageGenerator(width, height), _origin(origin) {
   }
 
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 
  private:
-  ImageOrigin _origin = ImageOrigin::TopLeft;
+  EncodedOrigin _origin = EncodedOrigin::TopLeft;
 
   /**
    * If the file path represents an encoded image that the current platform knows how to decode,
-   * returns an ImageCodec that can decode it. Otherwise returns nullptr.
+   * returns an ImageCodec that can decode it. Otherwise, returns nullptr.
    */
   static std::shared_ptr<ImageCodec> MakeNativeCodec(const std::string& filePath);
 
   /**
-   * If the file bytes represents an encoded image that the current platform knows how to decode,
-   * returns an ImageCodec that can decode it. Otherwise returns nullptr.
+   * If the file bytes represent an encoded image that the current platform knows how to decode,
+   * returns an ImageCodec that can decode it. Otherwise, returns nullptr.
    */
   static std::shared_ptr<ImageCodec> MakeNativeCodec(std::shared_ptr<Data> imageBytes);
 

@@ -44,14 +44,16 @@ enum class Backend {
  */
 enum class ImageOrigin {
   /**
-   * The default origin for all off-screen rendering. Use ImageOrigin::TopLeft origin for textures
-   * which are from HardwareBuffers (Android), CVPixelBuffers (iOS), or normally created by backend
-   * APIs. Note: ImageOrigin::TopLeft is actual bottom-left origin for OpenGL backend.
+   * The default origin of the native coordinate system in the GPU backend. For example, the
+   * SurfaceOrigin::TopLeft is actually the bottom-left origin in the OpenGL coordinate system for
+   * textures. Textures newly created by the backend API for off-screen rendering usually have a
+   * SurfaceOrigin::TopLeft origin.
    */
   TopLeft,
+
   /**
-   * Use this origin to flip the content on y-axis if the GPU backend has different origin to your
-   * system views. It is usually used when on-screen rendering.
+   * Use this origin to flip the content on the y-axis if the GPU backend has a different origin to
+   * your system views. It is usually used for on-screen rendering.
    */
   BottomLeft
 };

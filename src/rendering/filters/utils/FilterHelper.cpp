@@ -29,7 +29,7 @@ std::array<float, 9> ToGLMatrix(const tgfx::Matrix& matrix) {
 }
 
 std::array<float, 9> ToGLVertexMatrix(const tgfx::Matrix& matrix, int width, int height,
-                                      tgfx::SurfaceOrigin origin) {
+                                      tgfx::ImageOrigin origin) {
   auto result = matrix;
   auto w = static_cast<float>(width);
   auto h = static_cast<float>(height);
@@ -42,14 +42,14 @@ std::array<float, 9> ToGLVertexMatrix(const tgfx::Matrix& matrix, int width, int
   if (convertMatrix.invert(&convertMatrix)) {
     result.postConcat(convertMatrix);
   }
-  if (origin == tgfx::SurfaceOrigin::BottomLeft) {
+  if (origin == tgfx::ImageOrigin::BottomLeft) {
     result.postScale(1.0f, -1.0f);
   }
   return ToGLMatrix(result);
 }
 
 std::array<float, 9> ToGLTextureMatrix(const tgfx::Matrix& matrix, int width, int height,
-                                       tgfx::SurfaceOrigin origin) {
+                                       tgfx::ImageOrigin origin) {
   auto result = matrix;
   tgfx::Matrix convertMatrix = {};
   convertMatrix.setScale(static_cast<float>(width), static_cast<float>(height));
@@ -57,7 +57,7 @@ std::array<float, 9> ToGLTextureMatrix(const tgfx::Matrix& matrix, int width, in
   if (convertMatrix.invert(&convertMatrix)) {
     result.postConcat(convertMatrix);
   }
-  if (origin == tgfx::SurfaceOrigin::BottomLeft) {
+  if (origin == tgfx::ImageOrigin::BottomLeft) {
     result.postScale(1.0f, -1.0f);
     result.postTranslate(0.0f, 1.0f);
   }
@@ -86,7 +86,7 @@ tgfx::Matrix ToMatrix(const FilterTarget* target, bool flipY) {
 }
 
 std::unique_ptr<FilterSource> ToFilterSource(const tgfx::BackendTexture& backendTexture,
-                                             tgfx::SurfaceOrigin origin, const tgfx::Point& scale) {
+                                             tgfx::ImageOrigin origin, const tgfx::Point& scale) {
   if (!backendTexture.isValid()) {
     return nullptr;
   }

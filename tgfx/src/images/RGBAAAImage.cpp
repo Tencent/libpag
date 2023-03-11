@@ -21,32 +21,24 @@
 #include "gpu/TextureEffect.h"
 
 namespace tgfx {
-
 RGBAAAImage::RGBAAAImage(std::shared_ptr<ImageSource> source, int displayWidth, int displayHeight,
                          int alphaStartX, int alphaStartY)
-    : Image(std::move(source)),
-      bounds(Rect::MakeWH(displayWidth, displayHeight)),
+    : SubsetImage(std::move(source), Rect::MakeWH(displayWidth, displayHeight)),
       alphaStart(Point::Make(alphaStartX, alphaStartY)) {
 }
 
 RGBAAAImage::RGBAAAImage(std::shared_ptr<ImageSource> source, const Rect& bounds,
-                         const Point& alphaStart)
-    : Image(std::move(source)), bounds(bounds), alphaStart(alphaStart) {
+                         EncodedOrigin origin, const Point& alphaStart)
+    : SubsetImage(std::move(source), bounds, origin), alphaStart(alphaStart) {
 }
 
-std::shared_ptr<Image> RGBAAAImage::onCloneWithSource(
-    std::shared_ptr<ImageSource> newSource) const {
-  return std::shared_ptr<Image>(new RGBAAAImage(std::move(newSource), bounds, alphaStart));
+std::shared_ptr<SubsetImage> RGBAAAImage::onCloneWith(const Rect& newBounds,
+                                                      EncodedOrigin newOrigin) const {
+  return std::shared_ptr<RGBAAAImage>(new RGBAAAImage(source, newBounds, newOrigin, alphaStart));
 }
 
-std::shared_ptr<Image> RGBAAAImage::onMakeSubset(const Rect& subset) const {
-  auto newBounds = subset;
-  newBounds.offset(bounds.x(), bounds.y());
-  return std::shared_ptr<Image>(new RGBAAAImage(source, newBounds, alphaStart));
-}
-
-std::shared_ptr<Image> RGBAAAImage::onMakeRGBAAA(int, int, int, int) const {
-  return nullptr;
+std::shared_ptr<Image> RGBAAAImage::onCloneWith(std::shared_ptr<ImageSource> newSource) const {
+  return std::shared_ptr<Image>(new RGBAAAImage(std::move(newSource), bounds, origin, alphaStart));
 }
 
 std::unique_ptr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(Context* context,
@@ -54,10 +46,7 @@ std::unique_ptr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(Context* con
                                                                     TileMode,
                                                                     const SamplingOptions& sampling,
                                                                     const Matrix* localMatrix) {
-  auto matrix = Matrix::MakeTrans(bounds.x(), bounds.y());
-  if (localMatrix != nullptr) {
-    matrix.postConcat(*localMatrix);
-  }
+  auto matrix = getTotalMatrix(localMatrix);
   return TextureEffect::MakeRGBAAA(source->lockTextureProxy(context, surfaceFlags), sampling,
                                    alphaStart, &matrix);
 }

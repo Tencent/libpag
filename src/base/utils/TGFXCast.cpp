@@ -81,13 +81,13 @@ float ToAlpha(Opacity opacity) {
   return static_cast<float>(opacity) / 255.0f;
 }
 
-tgfx::SurfaceOrigin ToTGFX(ImageOrigin origin) {
-  return origin == ImageOrigin::TopLeft ? tgfx::SurfaceOrigin::TopLeft
-                                        : tgfx::SurfaceOrigin::BottomLeft;
+tgfx::ImageOrigin ToTGFX(ImageOrigin origin) {
+  return origin == ImageOrigin::TopLeft ? tgfx::ImageOrigin::TopLeft
+                                        : tgfx::ImageOrigin::BottomLeft;
 }
 
-ImageOrigin ToPAG(tgfx::SurfaceOrigin origin) {
-  return origin == tgfx::SurfaceOrigin::TopLeft ? ImageOrigin::TopLeft : ImageOrigin::BottomLeft;
+ImageOrigin ToPAG(tgfx::ImageOrigin origin) {
+  return origin == tgfx::ImageOrigin::TopLeft ? ImageOrigin::TopLeft : ImageOrigin::BottomLeft;
 }
 
 tgfx::AlphaType ToTGFX(AlphaType alphaType) {

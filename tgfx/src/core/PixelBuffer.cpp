@@ -47,10 +47,10 @@ class RasterPixelBuffer : public PixelBuffer {
     std::lock_guard<std::mutex> autoLock(locker);
     if (isAlphaOnly()) {
       return Texture::MakeAlpha(context, _info.width(), _info.height(), _pixels, _info.rowBytes(),
-                                SurfaceOrigin::TopLeft, mipMapped);
+                                ImageOrigin::TopLeft, mipMapped);
     }
     return Texture::MakeRGBA(context, _info.width(), _info.height(), _pixels, _info.rowBytes(),
-                             SurfaceOrigin::TopLeft, mipMapped);
+                             ImageOrigin::TopLeft, mipMapped);
   }
 
  private:
