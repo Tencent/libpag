@@ -157,15 +157,16 @@ class PAG_API PAGImage {
 
   virtual bool setContentTime(int64_t time) = 0;
 
- private:
   mutable std::mutex locker = {};
+  PAGLayer* owner = nullptr;
+
+ private:
   ID _uniqueID = 0;
   int _width = 0;
   int _height = 0;
   int _scaleMode = PAGScaleMode::LetterBox;
   Matrix _matrix = Matrix::I();
   bool hasSetScaleMode = false;
-  PAGLayer* _owner = nullptr;
 
   Matrix getContentMatrix(int defaultScaleMode, int contentWidth, int contentHeight);
 
@@ -1186,6 +1187,8 @@ class PAG_API PAGSurface {
    */
   static std::shared_ptr<PAGSurface> MakeOffscreen(int width, int height);
 
+  virtual ~PAGSurface() = default;
+
   /**
    * Returns the width in pixels of the surface.
    */
@@ -1218,6 +1221,13 @@ class PAG_API PAGSurface {
    */
   bool readPixels(ColorType colorType, AlphaType alphaType, void* dstPixels, size_t dstRowBytes);
 
+ protected:
+  explicit PAGSurface(std::shared_ptr<Drawable> drawable, bool contextAdopted = false);
+
+  virtual void onDraw(std::shared_ptr<Graphic> graphic, std::shared_ptr<tgfx::Surface> surface,
+                      RenderCache* cache);
+  virtual void onFreeCache();
+
  private:
   uint32_t contentVersion = 0;
   PAGPlayer* pagPlayer = nullptr;
@@ -1227,8 +1237,6 @@ class PAG_API PAGSurface {
   bool contextAdopted = false;
   GLRestorer* glRestorer = nullptr;
 
-  explicit PAGSurface(std::shared_ptr<Drawable> drawable, bool contextAdopted = false);
-
   bool draw(RenderCache* cache, std::shared_ptr<Graphic> graphic, BackendSemaphore* signalSemaphore,
             bool autoClear = true);
   bool prepare(RenderCache* cache, std::shared_ptr<Graphic> graphic);
@@ -1236,7 +1244,6 @@ class PAG_API PAGSurface {
   tgfx::Context* lockContext();
   void unlockContext();
   bool wait(const BackendSemaphore& waitSemaphore);
-  void freeCacheInternal();
 
   friend class PAGPlayer;
 

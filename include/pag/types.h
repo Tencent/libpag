@@ -193,7 +193,6 @@ struct PAG_API Point {
   }
 };
 
-
 /**
  * Point holds three 32-bit floating point coordinates.
  */
