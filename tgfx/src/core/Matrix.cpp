@@ -23,29 +23,25 @@
 namespace tgfx {
 
 void Matrix::reset() {
-  values[SCALE_X] = values[SCALE_Y] = values[PERSP_2] = 1;
-  values[SKEW_X] = values[SKEW_Y] = values[TRANS_X] = values[TRANS_Y] = values[PERSP_0] =
-      values[PERSP_1] = 0;
+  values[SCALE_X] = values[SCALE_Y] = 1;
+  values[SKEW_X] = values[SKEW_Y] = values[TRANS_X] = values[TRANS_Y] = 0;
 }
 
 bool operator==(const Matrix& a, const Matrix& b) {
   const float* ma = a.values;
   const float* mb = b.values;
   return ma[0] == mb[0] && ma[1] == mb[1] && ma[2] == mb[2] && ma[3] == mb[3] && ma[4] == mb[4] &&
-         ma[5] == mb[5] && ma[6] == mb[6] && ma[7] == mb[7] && ma[8] == mb[8];
+         ma[5] == mb[5];
 }
 
 void Matrix::setAll(float scaleX, float skewX, float transX, float skewY, float scaleY,
-                    float transY, float persp0, float persp1, float persp2) {
+                    float transY) {
   values[SCALE_X] = scaleX;
   values[SKEW_X] = skewX;
   values[TRANS_X] = transX;
   values[SKEW_Y] = skewY;
   values[SCALE_Y] = scaleY;
   values[TRANS_Y] = transY;
-  values[PERSP_0] = persp0;
-  values[PERSP_1] = persp1;
-  values[PERSP_2] = persp2;
 }
 
 void Matrix::setAffine(float a, float b, float c, float d, float tx, float ty) {
@@ -55,18 +51,21 @@ void Matrix::setAffine(float a, float b, float c, float d, float tx, float ty) {
   values[SKEW_Y] = b;
   values[SCALE_Y] = d;
   values[TRANS_Y] = ty;
-  values[PERSP_0] = 0;
-  values[PERSP_1] = 0;
-  values[PERSP_2] = 1;
 }
 
-void Matrix::setTranslate(float dx, float dy) {
-  if ((dx != 0) | (dy != 0)) {
-    values[TRANS_X] = dx;
-    values[TRANS_Y] = dy;
+void Matrix::get9(float buffer[9]) const {
+  memcpy(buffer, values, 6 * sizeof(float));
+  buffer[6] = buffer[7] = 0.0f;
+  buffer[8] = 1.0f;
+}
 
-    values[SCALE_X] = values[SCALE_Y] = values[PERSP_2] = 1;
-    values[SKEW_X] = values[SKEW_Y] = values[PERSP_0] = values[PERSP_1] = 0;
+void Matrix::setTranslate(float tx, float ty) {
+  if ((tx != 0) | (ty != 0)) {
+    values[TRANS_X] = tx;
+    values[TRANS_Y] = ty;
+
+    values[SCALE_X] = values[SCALE_Y] = 1;
+    values[SKEW_X] = values[SKEW_Y] = 0;
   } else {
     this->reset();
   }
@@ -76,28 +75,23 @@ static inline float sdot(float a, float b, float c, float d) {
   return a * b + c * d;
 }
 
-void Matrix::preTranslate(float dx, float dy) {
-  values[TRANS_X] += sdot(values[SCALE_X], dx, values[SKEW_X], dy);
-  values[TRANS_Y] += sdot(values[SKEW_Y], dx, values[SCALE_Y], dy);
+void Matrix::preTranslate(float tx, float ty) {
+  values[TRANS_X] += sdot(values[SCALE_X], tx, values[SKEW_X], ty);
+  values[TRANS_Y] += sdot(values[SKEW_Y], tx, values[SCALE_Y], ty);
 }
 
-void Matrix::postTranslate(float dx, float dy) {
-  values[TRANS_X] += dx;
-  values[TRANS_Y] += dy;
+void Matrix::postTranslate(float tx, float ty) {
+  values[TRANS_X] += tx;
+  values[TRANS_Y] += ty;
 }
 
 void Matrix::setScaleTranslate(float sx, float sy, float tx, float ty) {
   values[SCALE_X] = sx;
   values[SKEW_X] = 0;
   values[TRANS_X] = tx;
-
   values[SKEW_Y] = 0;
   values[SCALE_Y] = sy;
   values[TRANS_Y] = ty;
-
-  values[PERSP_0] = 0;
-  values[PERSP_1] = 0;
-  values[PERSP_2] = 1;
 }
 
 void Matrix::setScale(float sx, float sy, float px, float py) {
@@ -107,14 +101,9 @@ void Matrix::setScale(float sx, float sy, float px, float py) {
     values[SCALE_X] = sx;
     values[SKEW_X] = 0;
     values[TRANS_X] = 0;
-
     values[SKEW_Y] = 0;
     values[SCALE_Y] = sy;
     values[TRANS_Y] = 0;
-
-    values[PERSP_0] = 0;
-    values[PERSP_1] = 0;
-    values[PERSP_2] = 1;
     this->setScaleTranslate(sx, sy, px - sx * px, py - sy * py);
   }
 }
@@ -125,10 +114,7 @@ void Matrix::setScale(float sx, float sy) {
   } else {
     values[SCALE_X] = sx;
     values[SCALE_Y] = sy;
-    values[PERSP_2] = 1;
-
-    values[TRANS_X] = values[TRANS_Y] = values[SKEW_X] = values[SKEW_Y] = values[PERSP_0] =
-        values[PERSP_1] = 0;
+    values[TRANS_X] = values[TRANS_Y] = values[SKEW_X] = values[SKEW_Y] = 0;
   }
 }
 
@@ -148,11 +134,8 @@ void Matrix::preScale(float sx, float sy) {
   }
   values[SCALE_X] *= sx;
   values[SKEW_Y] *= sx;
-  values[PERSP_0] *= sx;
-
   values[SKEW_X] *= sy;
   values[SCALE_Y] *= sy;
-  values[PERSP_1] *= sy;
 }
 
 void Matrix::postScale(float sx, float sy, float px, float py) {
@@ -175,30 +158,21 @@ void Matrix::postScale(float sx, float sy) {
 
 void Matrix::setSinCos(float sinV, float cosV, float px, float py) {
   const float oneMinusCosV = 1 - cosV;
-
   values[SCALE_X] = cosV;
   values[SKEW_X] = -sinV;
   values[TRANS_X] = sdot(sinV, py, oneMinusCosV, px);
-
   values[SKEW_Y] = sinV;
   values[SCALE_Y] = cosV;
   values[TRANS_Y] = sdot(-sinV, px, oneMinusCosV, py);
-
-  values[PERSP_0] = values[PERSP_1] = 0;
-  values[PERSP_2] = 1;
 }
 
 void Matrix::setSinCos(float sinV, float cosV) {
   values[SCALE_X] = cosV;
   values[SKEW_X] = -sinV;
   values[TRANS_X] = 0;
-
   values[SKEW_Y] = sinV;
   values[SCALE_Y] = cosV;
   values[TRANS_Y] = 0;
-
-  values[PERSP_0] = values[PERSP_1] = 0;
-  values[PERSP_2] = 1;
 }
 
 void Matrix::setRotate(float degrees, float px, float py) {
@@ -239,26 +213,18 @@ void Matrix::setSkew(float sx, float sy, float px, float py) {
   values[SCALE_X] = 1;
   values[SKEW_X] = sx;
   values[TRANS_X] = -sx * py;
-
   values[SKEW_Y] = sy;
   values[SCALE_Y] = 1;
   values[TRANS_Y] = -sy * px;
-
-  values[PERSP_0] = values[PERSP_1] = 0;
-  values[PERSP_2] = 1;
 }
 
 void Matrix::setSkew(float sx, float sy) {
   values[SCALE_X] = 1;
   values[SKEW_X] = sx;
   values[TRANS_X] = 0;
-
   values[SKEW_Y] = sy;
   values[SCALE_Y] = 1;
   values[TRANS_Y] = 0;
-
-  values[PERSP_0] = values[PERSP_1] = 0;
-  values[PERSP_2] = 1;
 }
 
 void Matrix::preSkew(float sx, float sy, float px, float py) {
@@ -303,16 +269,7 @@ void Matrix::setConcat(const Matrix& first, const Matrix& second) {
     tx += matB[TRANS_Y] * matA[SKEW_X];
     ty += matB[TRANS_X] * matA[SKEW_Y];
   }
-
-  values[SCALE_X] = a;
-  values[SKEW_Y] = b;
-  values[SKEW_X] = c;
-  values[SCALE_Y] = d;
-  values[TRANS_X] = tx;
-  values[TRANS_Y] = ty;
-  values[PERSP_0] = 0;
-  values[PERSP_1] = 0;
-  values[PERSP_2] = 1;
+  setAffine(a, b, c, d, tx, ty);
 }
 
 void Matrix::preConcat(const Matrix& mat) {
@@ -471,11 +428,11 @@ bool Matrix::getMinMaxScaleFactors(float* results) const {
 }
 
 bool Matrix::isFinite() const {
-  return FloatsAreFinite(values, 9);
+  return FloatsAreFinite(values, 6);
 }
 
 const Matrix& Matrix::I() {
-  static const Matrix identity = Matrix::MakeAll(1, 0, 0, 0, 1, 0, 0, 0, 1);
+  static const Matrix identity = Matrix::MakeAll(1, 0, 0, 0, 1, 0);
   return identity;
 }
 }  // namespace tgfx

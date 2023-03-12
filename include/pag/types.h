@@ -711,7 +711,7 @@ class PAG_API Matrix {
    *
    *  @param sx  horizontal scale factor
    *  @param sy  vertical scale factor
-   *  @return    Matrix with scale
+   *  @return    Matrix with the scale factors.
    */
   static Matrix MakeScale(float sx, float sy) {
     Matrix m = {};
@@ -727,7 +727,7 @@ class PAG_API Matrix {
    *      |   0     0   1 |
    *
    * @param scale  horizontal and vertical scale factor
-   * @return       Matrix with scale
+   * @return       Matrix with the scale factors.
    */
   static Matrix MakeScale(float scale) {
     Matrix m = {};
@@ -778,35 +778,28 @@ class PAG_API Matrix {
   }
 
   /**
-   * Returns true if Matrix is identity.  Identity matrix is:
+   * Returns true if Matrix is identity. The identity matrix is:
    *
    *       | 1 0 0 |
    *       | 0 1 0 |
    *       | 0 0 1 |
    *
-   * @return  true if Matrix has no effect
+   * @return  Returns true if the Matrix has no effect
    */
-  bool isIdentity() const {
-    return values[0] == 1 && values[1] == 0 && values[2] == 0 && values[3] == 0 && values[4] == 1 &&
-           values[5] == 0 && values[6] == 0 && values[7] == 0 && values[8] == 1;
-  }
+  bool isIdentity() const;
 
   /**
    * Returns one matrix value.
    */
-  float operator[](int index) const {
-    return values[index];
-  }
+  float operator[](int index) const;
 
   /**
    * Returns one matrix value.
    */
-  float get(int index) const {
-    return values[index];
-  }
+  float get(int index) const;
 
   /**
-   * Returns scale factor multiplied by x-axis input, contributing to x-axis output. With
+   * Returns the scale factor multiplied by x-axis input, contributing to x-axis output. With
    * mapPoints(), scales Point along the x-axis.
    * @return  horizontal scale factor
    */
@@ -815,7 +808,7 @@ class PAG_API Matrix {
   }
 
   /**
-   * Returns scale factor multiplied by y-axis input, contributing to y-axis output. With
+   * Returns the scale factor multiplied by y-axis input, contributing to y-axis output. With
    * mapPoints(), scales Point along the y-axis.
    * @return  vertical scale factor
    */
@@ -824,7 +817,7 @@ class PAG_API Matrix {
   }
 
   /**
-   * Returns scale factor multiplied by x-axis input, contributing to y-axis output. With
+   * Returns the scale factor multiplied by x-axis input, contributing to y-axis output. With
    * mapPoints(), skews Point along the y-axis. Skewing both axes can rotate Point.
    * @return  vertical skew factor
    */
@@ -833,7 +826,7 @@ class PAG_API Matrix {
   }
 
   /**
-   * Returns scale factor multiplied by y-axis input, contributing to x-axis output. With
+   * Returns the scale factor multiplied by y-axis input, contributing to x-axis output. With
    * mapPoints(), skews Point along the x-axis. Skewing both axes can rotate Point.
    * @return  horizontal scale factor
    */
@@ -862,31 +855,27 @@ class PAG_API Matrix {
   /**
    * Returns writable Matrix value.
    */
-  float& operator[](int index) {
-    return values[index];
-  }
+  float& operator[](int index);
 
   /**
    * Sets Matrix value.
    */
-  void set(int index, float value) {
-    values[index] = value;
-  }
+  void set(int index, float value);
 
   /**
    * Sets horizontal scale factor.
    * @param v  horizontal scale factor to store
    */
   void setScaleX(float v) {
-    this->set(SCALE_X, v);
+    values[SCALE_X] = v;
   }
 
   /**
-   * Sets vertical scale factor.
+   * Sets the vertical scale factor.
    * @param v  vertical scale factor to store
    */
   void setScaleY(float v) {
-    this->set(SCALE_Y, v);
+    values[SCALE_Y] = v;
   }
 
   /**
@@ -894,15 +883,15 @@ class PAG_API Matrix {
    * @param v  vertical skew factor to store
    */
   void setSkewY(float v) {
-    this->set(SKEW_Y, v);
+    values[SKEW_Y] = v;
   }
 
   /**
-   * Sets horizontal skew factor.
+   * Sets the horizontal skew factor.
    * @param v  horizontal skew factor to store
    */
   void setSkewX(float v) {
-    this->set(SKEW_X, v);
+    values[SKEW_X] = v;
   }
 
   /**
@@ -910,7 +899,7 @@ class PAG_API Matrix {
    * @param v  horizontal translation to store
    */
   void setTranslateX(float v) {
-    this->set(TRANS_X, v);
+    values[TRANS_X] = v;
   }
 
   /**
@@ -918,7 +907,7 @@ class PAG_API Matrix {
    * @param v  vertical translation to store
    */
   void setTranslateY(float v) {
-    this->set(TRANS_Y, v);
+    values[TRANS_Y] = v;
   }
 
   /**
@@ -941,6 +930,20 @@ class PAG_API Matrix {
   void setAll(float scaleX, float skewX, float transX, float skewY, float scaleY, float transY,
               float persp0, float persp1, float persp2);
 
+  /**
+   * Sets the Matrix to affine values, passed in column major order:
+   *
+   *      | a c tx |
+   *      | b d ty |
+   *      | 0    1 |
+   *
+   * @param a  horizontal scale factor
+   * @param b  vertical skew factor
+   * @param c  horizontal skew factor
+   * @param d  vertical scale factor
+   * @param tx horizontal translation
+   * @param ty vertical translation
+   */
   void setAffine(float a, float b, float c, float d, float tx, float ty);
 
   /**
@@ -948,9 +951,7 @@ class PAG_API Matrix {
    * ScaleX, SkewX, TransX, SkewY, ScaleY, TransY, Persp0, Persp1, Persp2.
    * @param buffer  storage for nine scalar values
    */
-  void get9(float buffer[9]) const {
-    memcpy(buffer, values, 9 * sizeof(float));
-  }
+  void get9(float buffer[9]) const;
 
   /**
    * Sets Matrix to nine scalar values in buffer, in member value ascending order: ScaleX,
@@ -964,9 +965,7 @@ class PAG_API Matrix {
    *
    * @param buffer  nine scalar values
    */
-  void set9(const float buffer[9]) {
-    memcpy(values, buffer, 9 * sizeof(float));
-  }
+  void set9(const float buffer[9]);
 
   /**
    * Sets Matrix to identity; which has no effect on mapped Point. Sets Matrix to:
@@ -1036,14 +1035,14 @@ class PAG_API Matrix {
    * Sets Matrix to rotate by sinValue and cosValue, about a pivot point at (px, py).
    * The pivot point is unchanged when mapped with Matrix.
    * Vector (sinValue, cosValue) describes the angle of rotation relative to (0, 1).
-   * Vector length specifies scale.
+   * Vector length specifies the scale factor.
    */
   void setSinCos(float sinV, float cosV, float px, float py);
 
   /**
    * Sets Matrix to rotate by sinValue and cosValue, about a pivot point at (0, 0).
    * Vector (sinValue, cosValue) describes the angle of rotation relative to (0, 1).
-   * Vector length specifies scale.
+   * Vector length specifies the scale factor.
    */
   void setSinCos(float sinV, float cosV);
 
@@ -1079,8 +1078,8 @@ class PAG_API Matrix {
    *      a * b = | D E F | * | M N O | = | DJ+EM+FP DK+EN+FQ DL+EO+FR |
    *              | G H I |   | P Q R |   | GJ+HM+IP GK+HN+IQ GL+HO+IR |
    *
-   * @param a  Matrix on left side of multiply expression
-   * @param b  Matrix on right side of multiply expression
+   * @param a  Matrix on the left side of multiply expression
+   * @param b  Matrix on the right side of multiply expression
    */
   void setConcat(const Matrix& a, const Matrix& b);
 
@@ -1165,15 +1164,19 @@ class PAG_API Matrix {
   void postConcat(const Matrix& other);
 
   /**
-   * If this matrix can be inverted, return true and if inverse is not null, set inverse to be the
-   * inverse of this matrix. If this matrix cannot be inverted, ignore inverse and return false.
+   * If this matrix can be inverted, return true and if the inverse is not null, set inverse to be
+   * the inverse of this matrix. If this matrix cannot be inverted, ignore the inverse and return false.
    */
   bool invert(Matrix* inverse) const;
 
+  /**
+   * Returns true if the Matrix is invertible.
+   * @return
+   */
   bool invertible() const;
 
   /**
-   * Maps src Point array of length count to dst Point array of equal or greater length. Point are
+   * Maps src Point array of length count to dst Point array of equal or greater length. Points are
    * mapped by multiplying each Point by Matrix. Given:
    *
    *                | A B C |        | x |
@@ -1197,7 +1200,7 @@ class PAG_API Matrix {
    *
    * @param dst    storage for mapped Point
    * @param src    Point to transform
-   * @param count  number of Point to transform
+   * @param count  number of Points to transform
    */
   void mapPoints(Point dst[], const Point src[], int count) const;
 
@@ -1223,7 +1226,7 @@ class PAG_API Matrix {
    *                      |G H I| |1|                               Gx+Hy+I   Gx+Hy+I
    *
    * @param pts    storage for mapped Point
-   * @param count  number of Point to transform
+   * @param count  number of Points to transform
    */
   void mapPoints(Point pts[], int count) const {
     this->mapPoints(pts, pts, count);
@@ -1236,7 +1239,7 @@ class PAG_API Matrix {
    *       Matrix = | D E F |,  pt = | y |
    *                | G H I |        | 1 |
    *
-   * result is computed as:
+   * the result is computed as:
    *
    *                     |A B C| |x|                               Ax+By+C   Dx+Ey+F
    *       Matrix * pt = |D E F| |y| = |Ax+By+C Dx+Ey+F Gx+Hy+I| = ------- , -------
@@ -1255,7 +1258,7 @@ class PAG_API Matrix {
    *       Matrix = | D E F |,  pt = | y |
    *                | G H I |        | 1 |
    *
-   * result is computed as:
+   * the result is computed as:
    *
    *                     |A B C| |x|                               Ax+By+C   Dx+Ey+F
    *       Matrix * pt = |D E F| |y| = |Ax+By+C Dx+Ey+F Gx+Hy+I| = ------- , -------
@@ -1278,7 +1281,7 @@ class PAG_API Matrix {
 
   /**
    * Sets rect to bounds of rect corners mapped by Matrix. Returns true if mapped corners are
-   * computed rect corners. Returned value is the same as calling rectStaysRect().
+   * computed rect corners.
    */
   void mapRect(Rect* rect) const {
     mapRect(rect, *rect);
@@ -1309,20 +1312,20 @@ class PAG_API Matrix {
   }
 
   /**
-   * Returns the minimum scaling factor of Matrix by decomposing the scaling and skewing elements.
-   * Returns -1 if scale factor overflows or Matrix contains perspective.
+   * Returns the minimum scaling factor of the Matrix by decomposing the scaling and skewing
+   * elements. Returns -1 if scale factor overflows.
    */
   float getMinScale() const;
 
   /**
-   * Returns the maximum scaling factor of Matrix by decomposing the scaling and skewing elements.
-   * Returns -1 if scale factor overflows or Matrix contains perspective.
+   * Returns the maximum scaling factor of the Matrix by decomposing the scaling and skewing
+   * elements. Returns -1 if scale factor overflows.
    */
   float getMaxScale() const;
 
   /**
-   * Returns true if all elements of the matrix are finite. Returns false if any
-   * element is infinity, or NaN.
+   * Returns true if all elements of the matrix are finite. Returns false if any element is
+   * infinity, or NaN.
    */
   bool isFinite() const;
 
@@ -1333,7 +1336,7 @@ class PAG_API Matrix {
    *       | 0 1 0 |
    *       | 0 0 1 |
    *
-   *   @return  const identity Matrix
+   * @return  const identity Matrix
    */
   static const Matrix& I();
 
@@ -1342,14 +1345,14 @@ class PAG_API Matrix {
    *
    *    | FLT_MAX FLT_MAX FLT_MAX |
    *    | FLT_MAX FLT_MAX FLT_MAX |
-   *    | FLT_MAX FLT_MAX FLT_MAX |
+   *    |    0       0       1    |
    *
    * @return  const invalid Matrix
    */
   static const Matrix& Invalid();
 
  private:
-  float values[9];
+  float values[6];
   /**
    * Matrix organizes its values in row order. These members correspond to each value in Matrix.
    */
@@ -1359,9 +1362,6 @@ class PAG_API Matrix {
   static constexpr int SKEW_Y = 3;   //!< vertical skew factor
   static constexpr int SCALE_Y = 4;  //!< vertical scale factor
   static constexpr int TRANS_Y = 5;  //!< vertical translation
-  static constexpr int PERSP_0 = 6;  //!< input x perspective factor
-  static constexpr int PERSP_1 = 7;  //!< input y perspective factor
-  static constexpr int PERSP_2 = 8;  //!< perspective bias
 };
 
 /**

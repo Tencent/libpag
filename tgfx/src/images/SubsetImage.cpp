@@ -21,13 +21,13 @@
 
 namespace tgfx {
 static const auto TopLeftMatrix = Matrix::I();
-static const auto TopRightMatrix = Matrix::MakeAll(-1, 0, 1, 0, 1, 0, 0, 0, 1);
-static const auto BottomRightMatrix = Matrix::MakeAll(-1, 0, 1, 0, -1, 1, 0, 0, 1);
-static const auto BottomLeftMatrix = Matrix::MakeAll(1, 0, 0, 0, -1, 1, 0, 0, 1);
-static const auto LeftTopMatrix = Matrix::MakeAll(0, 1, 0, 1, 0, 0, 0, 0, 1);
-static const auto RightTopMatrix = Matrix::MakeAll(0, -1, 1, 1, 0, 0, 0, 0, 1);
-static const auto RightBottomMatrix = Matrix::MakeAll(0, -1, 1, -1, 0, 1, 0, 0, 1);
-static const auto LeftBottomMatrix = Matrix::MakeAll(0, 1, 0, -1, 0, 1, 0, 0, 1);
+static const auto TopRightMatrix = Matrix::MakeAll(-1, 0, 1, 0, 1, 0);
+static const auto BottomRightMatrix = Matrix::MakeAll(-1, 0, 1, 0, -1, 1);
+static const auto BottomLeftMatrix = Matrix::MakeAll(1, 0, 0, 0, -1, 1);
+static const auto LeftTopMatrix = Matrix::MakeAll(0, 1, 0, 1, 0, 0);
+static const auto RightTopMatrix = Matrix::MakeAll(0, -1, 1, 1, 0, 0);
+static const auto RightBottomMatrix = Matrix::MakeAll(0, -1, 1, -1, 0, 1);
+static const auto LeftBottomMatrix = Matrix::MakeAll(0, 1, 0, -1, 0, 1);
 
 static Matrix OriginToMatrix(EncodedOrigin origin) {
   switch (origin) {

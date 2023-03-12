@@ -646,12 +646,12 @@ void SkewFromAxis(tgfx::Matrix* matrix, float skew, float skewAxis) {
   auto u = cosf(skewAxis);
   auto v = sinf(skewAxis);
   tgfx::Matrix temp = {};
-  temp.setAll(u, -v, 0, v, u, 0, 0, 0, 1);
+  temp.setAll(u, -v, 0, v, u, 0);
   matrix->postConcat(temp);
   auto w = tanf(skew);
-  temp.setAll(1, w, 0, 0, 1, 0, 0, 0, 1);
+  temp.setAll(1, w, 0, 0, 1, 0);
   matrix->postConcat(temp);
-  temp.setAll(u, v, 0, -v, u, 0, 0, 0, 1);
+  temp.setAll(u, v, 0, -v, u, 0);
   matrix->postConcat(temp);
 }
 

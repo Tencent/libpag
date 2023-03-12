@@ -26,19 +26,19 @@ Matrix EncodedOriginToMatrix(EncodedOrigin origin, int width, int height) {
     case EncodedOrigin::TopLeft:
       return Matrix::I();
     case EncodedOrigin::TopRight:
-      return Matrix::MakeAll(-1, 0, w, 0, 1, 0, 0, 0, 1);
+      return Matrix::MakeAll(-1, 0, w, 0, 1, 0);
     case EncodedOrigin::BottomRight:
-      return Matrix::MakeAll(-1, 0, w, 0, -1, h, 0, 0, 1);
+      return Matrix::MakeAll(-1, 0, w, 0, -1, h);
     case EncodedOrigin::BottomLeft:
-      return Matrix::MakeAll(1, 0, 0, 0, -1, h, 0, 0, 1);
+      return Matrix::MakeAll(1, 0, 0, 0, -1, h);
     case EncodedOrigin::LeftTop:
-      return Matrix::MakeAll(0, 1, 0, 1, 0, 0, 0, 0, 1);
+      return Matrix::MakeAll(0, 1, 0, 1, 0, 0);
     case EncodedOrigin::RightTop:
-      return Matrix::MakeAll(0, -1, h, 1, 0, 0, 0, 0, 1);
+      return Matrix::MakeAll(0, -1, h, 1, 0, 0);
     case EncodedOrigin::RightBottom:
-      return Matrix::MakeAll(0, -1, h, -1, 0, w, 0, 0, 1);
+      return Matrix::MakeAll(0, -1, h, -1, 0, w);
     case EncodedOrigin::LeftBottom:
-      return Matrix::MakeAll(0, 1, 0, -1, 0, w, 0, 0, 1);
+      return Matrix::MakeAll(0, 1, 0, -1, 0, w);
   }
   return Matrix::I();
 }
