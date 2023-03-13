@@ -29,6 +29,6 @@ bool Make3DLayerNode(std::vector<FilterNode>& filterNodes, tgfx::Rect& clipBound
 
 Filter* Make3DFilter(tgfx::Context* context);
 
-bool isSupport3D();
+bool Has3DSupport();
 
 }  // namespace pag
