@@ -125,6 +125,7 @@ class ImageProxyPicture : public Picture {
       image = RescaleImage(cache->getContext(), image, scaleFactor, mipMapped);
     } else {
       image = image->makeTextureImage(cache->getContext());
+      scaleFactor = 1.0f;
     }
     if (image == nullptr) {
       return nullptr;
