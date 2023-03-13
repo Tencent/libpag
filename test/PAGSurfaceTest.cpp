@@ -157,6 +157,7 @@ PAG_TEST(PAGSurfaceTest, ImageSnapshot) {
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   ASSERT_TRUE(image != nullptr);
   auto canvas = surface->getCanvas();
+  canvas->clear();
   canvas->drawImage(image);
   auto snapshotImage = surface->makeImageSnapshot();
   auto snapshotImage2 = surface->makeImageSnapshot();
@@ -164,12 +165,12 @@ PAG_TEST(PAGSurfaceTest, ImageSnapshot) {
   auto compareSurface = Surface::Make(context, width, height);
   auto compareCanvas = compareSurface->getCanvas();
   compareCanvas->drawImage(snapshotImage);
-  EXPECT_TRUE(Baseline::Compare(compareSurface, "PAGSurfaceTest/ImageSnapshot"));
+  EXPECT_TRUE(Baseline::Compare(compareSurface, "PAGSurfaceTest/ImageSnapshot1"));
   canvas->drawImage(image, 100, 100);
-  EXPECT_TRUE(Baseline::Compare(surface, "PAGSurfaceTest/ImageSnapshot_Surface"));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGSurfaceTest/ImageSnapshot_Surface1"));
   compareCanvas->clear();
   compareCanvas->drawImage(snapshotImage);
-  EXPECT_TRUE(Baseline::Compare(compareSurface, "PAGSurfaceTest/ImageSnapshot"));
+  EXPECT_TRUE(Baseline::Compare(compareSurface, "PAGSurfaceTest/ImageSnapshot1"));
 
   surface = Surface::Make(context, width, height);
   canvas = surface->getCanvas();
@@ -179,12 +180,12 @@ PAG_TEST(PAGSurfaceTest, ImageSnapshot) {
   EXPECT_TRUE(snapshotImage == snapshotImage2);
   compareCanvas->clear();
   compareCanvas->drawImage(snapshotImage);
-  EXPECT_TRUE(Baseline::Compare(compareSurface, "PAGSurfaceTest/ImageSnapshot"));
+  EXPECT_TRUE(Baseline::Compare(compareSurface, "PAGSurfaceTest/ImageSnapshot2"));
   canvas->drawImage(image, 100, 100);
-  EXPECT_TRUE(Baseline::Compare(surface, "PAGSurfaceTest/ImageSnapshot_Surface"));
+  EXPECT_TRUE(Baseline::Compare(surface, "PAGSurfaceTest/ImageSnapshot_Surface2"));
   compareCanvas->clear();
   compareCanvas->drawImage(snapshotImage);
-  EXPECT_TRUE(Baseline::Compare(compareSurface, "PAGSurfaceTest/ImageSnapshot"));
+  EXPECT_TRUE(Baseline::Compare(compareSurface, "PAGSurfaceTest/ImageSnapshot2"));
 
   auto gl = GLFunctions::Get(context);
   gl->deleteTextures(1, &textureInfo.id);

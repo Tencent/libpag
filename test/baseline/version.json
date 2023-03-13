@@ -7,6 +7,7 @@
         "filter_mode_linear": "77181bf9",
         "filter_mode_nearest": "77181bf9",
         "greyColorMatrix": "6a420423",
+        "hardware_render_target_blend": "9ca662f1b",
         "identityMatrix": "6a420423",
         "merge_draw_call_rect": "e2670834",
         "merge_draw_call_rrect": "e2670834",
@@ -8605,8 +8606,10 @@
     "PAGSurfaceTest": {
         "BottomLeftScissor": "ccc8cae9",
         "FromTexture": "6a420423",
-        "ImageSnapshot": "9ca662f1",
-        "ImageSnapshot_Surface": "9ca662f1",
+        "ImageSnapshot1": "e48160e25",
+        "ImageSnapshot2": "e48160e25",
+        "ImageSnapshot_Surface1": "e48160e25",
+        "ImageSnapshot_Surface2": "e48160e25",
         "Mask": "ccc8cae9"
     },
     "PAGTextLayerTest": {

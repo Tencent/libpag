@@ -77,11 +77,20 @@ void GLPorterDuffXferProcessor::setData(const ProgramDataManager& programDataMan
         dstTopLeftPrev = dstTextureOffset;
         programDataManager.set2f(dstTopLeftUniform, dstTextureOffset.x, dstTextureOffset.y);
       }
-      if (dstTexture->width() != widthPrev || dstTexture->height() != heightPrev) {
-        widthPrev = dstTexture->width();
-        heightPrev = dstTexture->height();
-        programDataManager.set2f(dstScaleUniform, 1.f / static_cast<float>(dstTexture->width()),
-                                 1.f / static_cast<float>(dstTexture->height()));
+      int width;
+      int height;
+      if (dstTexture->getSampler()->type() == TextureType::Rectangle) {
+        width = 1;
+        height = 1;
+      } else {
+        width = dstTexture->width();
+        height = dstTexture->height();
+      }
+      if (width != widthPrev || height != heightPrev) {
+        widthPrev = width;
+        heightPrev = height;
+        programDataManager.set2f(dstScaleUniform, 1.f / static_cast<float>(width),
+                                 1.f / static_cast<float>(height));
       }
     }
   }
