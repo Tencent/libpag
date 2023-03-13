@@ -29,4 +29,8 @@ Filter* Make3DFilter(tgfx::Context*) {
   return nullptr;
 }
 
+bool Has3DSupport() {
+  return false;
+}
+
 }  // namespace pag

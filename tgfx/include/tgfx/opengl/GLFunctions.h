@@ -82,6 +82,7 @@ using GLDeleteShader = void GL_FUNCTION_TYPE(unsigned shader);
 using GLDeleteSync = void GL_FUNCTION_TYPE(void* sync);
 using GLDeleteTextures = void GL_FUNCTION_TYPE(int n, const unsigned* textures);
 using GLDeleteVertexArrays = void GL_FUNCTION_TYPE(int n, const unsigned* vertexArrays);
+using GLDepthFunc = void GL_FUNCTION_TYPE(unsigned func);
 using GLDepthMask = void GL_FUNCTION_TYPE(unsigned char flag);
 using GLDisable = void GL_FUNCTION_TYPE(unsigned cap);
 using GLDisableVertexAttribArray = void GL_FUNCTION_TYPE(unsigned index);
@@ -263,6 +264,7 @@ class GLFunctions {
   GLDeleteSync* deleteSync = nullptr;
   GLDeleteTextures* deleteTextures = nullptr;
   GLDeleteVertexArrays* deleteVertexArrays = nullptr;
+  GLDepthFunc* depthFunc = nullptr;
   GLDepthMask* depthMask = nullptr;
   GLDisable* disable = nullptr;
   GLDisableVertexAttribArray* disableVertexAttribArray = nullptr;
