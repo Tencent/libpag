@@ -754,4 +754,32 @@ PAG_TEST(CanvasTest, image) {
   EXPECT_TRUE(Compare(surface.get(), "CanvasTest/drawImage"));
   device->unlock();
 }
+
+/**
+ * 用例描述: rectangle texture 作为 blend dst 时不需要归一化
+ */
+PAG_TEST(CanvasTest, rectangleTextureAsBlendDst) {
+  int size = 110;
+  auto hardwareBuffer = PixelBuffer::MakeHardwareBuffer(size, size, false);
+  if (hardwareBuffer == nullptr) {
+    return;
+  }
+  auto device = GLDevice::Make();
+  auto context = device->lockContext();
+  ASSERT_TRUE(context != nullptr);
+  auto texture = Texture::MakeFrom(context, hardwareBuffer);
+  auto backendTexture = texture->getBackendTexture();
+  auto surface = Surface::MakeFrom(context, backendTexture, tgfx::ImageOrigin::TopLeft);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+  canvas->drawImage(image);
+  image = MakeImage("resources/apitest/image_as_mask.png");
+  ASSERT_TRUE(image != nullptr);
+  canvas->setBlendMode(tgfx::BlendMode::Multiply);
+  canvas->drawImage(image);
+  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/hardware_render_target_blend"));
+  device->unlock();
+}
 }  // namespace tgfx
