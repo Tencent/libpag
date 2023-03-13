@@ -22,6 +22,7 @@
 #include "rendering/caches/ShapeContentCache.h"
 #include "rendering/caches/SolidContentCache.h"
 #include "rendering/caches/TextContentCache.h"
+#include "rendering/filters/utils/Filter3DFactory.h"
 
 namespace pag {
 
@@ -123,6 +124,9 @@ bool LayerCache::checkFrameChanged(Frame contentFrame, Frame lastContentFrame) {
 
 bool LayerCache::contentVisible(Frame contentFrame) {
   if (contentFrame < 0 || contentFrame >= layer->duration) {
+    return false;
+  }
+  if (layer->transform3D && !isSupport3D()) {
     return false;
   }
   auto layerTransform = getTransform(contentFrame);

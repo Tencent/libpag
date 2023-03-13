@@ -140,6 +140,7 @@ std::unique_ptr<const GLInterface> GLInterface::MakeNativeInterface(const GLProc
   functions->deleteSync = reinterpret_cast<GLDeleteSync*>(getter->getProcAddress("glDeleteSync"));
   functions->deleteTextures =
       reinterpret_cast<GLDeleteTextures*>(getter->getProcAddress("glDeleteTextures"));
+  functions->depthFunc = reinterpret_cast<GLDepthFunc*>(getter->getProcAddress("glDepthFunc"));
   functions->depthMask = reinterpret_cast<GLDepthMask*>(getter->getProcAddress("glDepthMask"));
   functions->disable = reinterpret_cast<GLDisable*>(getter->getProcAddress("glDisable"));
   functions->disableVertexAttribArray = reinterpret_cast<GLDisableVertexAttribArray*>(

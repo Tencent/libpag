@@ -20,6 +20,8 @@
 
 namespace pag {
 
+static bool support3D = false;
+
 bool Make3DLayerNode(std::vector<FilterNode>&, tgfx::Rect&, const FilterList*, RenderCache*,
                      tgfx::Rect&, tgfx::Point&) {
   return true;
@@ -27,6 +29,10 @@ bool Make3DLayerNode(std::vector<FilterNode>&, tgfx::Rect&, const FilterList*, R
 
 Filter* Make3DFilter(tgfx::Context*) {
   return nullptr;
+}
+
+bool isSupport3D() {
+  return support3D;
 }
 
 }  // namespace pag
