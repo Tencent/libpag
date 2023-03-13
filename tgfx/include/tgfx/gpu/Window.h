@@ -42,8 +42,8 @@ class Window {
   std::shared_ptr<Surface> createSurface(Context* context);
 
   /**
-   * Applies all pending graphic changes to the window. The presentationTime will be passed to the
-   * SurfaceTexture.getTimestamp() on android platform, ignored by other platforms. It is in
+   * Applies all pending graphics changes to the window. The presentationTime will be passed to the
+   * SurfaceTexture.getTimestamp() on the android platform, ignored by other platforms. It is in
    * microseconds. A system timestamp will be used if presentationTime is not set.
    */
   void present(Context* context, int64_t presentationTime = INT64_MIN);

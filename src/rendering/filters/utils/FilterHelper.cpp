@@ -22,10 +22,9 @@
 
 namespace pag {
 std::array<float, 9> ToGLMatrix(const tgfx::Matrix& matrix) {
-  float values[9];
-  matrix.get9(values);
-  return {values[0], values[3], values[6], values[1], values[4],
-          values[7], values[2], values[5], values[8]};
+  float values[6];
+  matrix.get6(values);
+  return {values[0], values[3], 0, values[1], values[4], 0, values[2], values[5], 1};
 }
 
 std::array<float, 9> ToGLVertexMatrix(const tgfx::Matrix& matrix, int width, int height,
@@ -37,7 +36,7 @@ std::array<float, 9> ToGLVertexMatrix(const tgfx::Matrix& matrix, int width, int
   // The following is equivalent：
   // convertMatrix.setTranslate(1.0f, 1.0f);
   // convertMatrix.postScale(width/2.0f, height/2.0f);
-  convertMatrix.setAll(w * 0.5f, 0.0f, w * 0.5f, 0.0f, h * 0.5f, h * 0.5f, 0.0f, 0.0f, 1.0f);
+  convertMatrix.setAll(w * 0.5f, 0.0f, w * 0.5f, 0.0f, h * 0.5f, h * 0.5f);
   result.preConcat(convertMatrix);
   if (convertMatrix.invert(&convertMatrix)) {
     result.postConcat(convertMatrix);
@@ -67,8 +66,7 @@ std::array<float, 9> ToGLTextureMatrix(const tgfx::Matrix& matrix, int width, in
 tgfx::Matrix ToMatrix(const FilterTarget* target, bool flipY) {
   tgfx::Matrix matrix = {};
   auto values = target->vertexMatrix;
-  matrix.setAll(values[0], values[3], values[6], values[1], values[4], values[7], values[2],
-                values[5], values[8]);
+  matrix.setAll(values[0], values[3], values[6], values[1], values[4], values[7]);
   if (flipY) {
     matrix.postScale(1.0f, -1.0f);
   }
@@ -77,7 +75,7 @@ tgfx::Matrix ToMatrix(const FilterTarget* target, bool flipY) {
   // convertMatrix.setScale(2f/width, 2f/height);
   // convertMatrix.postTranslate(-1.0f, -1.0f);
   convertMatrix.setAll(2.0f / static_cast<float>(target->width), 0.0f, -1.0f, 0.0f,
-                       2.0f / static_cast<float>(target->height), -1.0f, 0.0f, 0.0f, 1.0f);
+                       2.0f / static_cast<float>(target->height), -1.0f);
   matrix.preConcat(convertMatrix);
   if (convertMatrix.invert(&convertMatrix)) {
     matrix.postConcat(convertMatrix);

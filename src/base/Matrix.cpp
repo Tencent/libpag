@@ -20,6 +20,56 @@
 #include "pag/types.h"
 
 namespace pag {
+bool Matrix::isIdentity() const {
+  return ToTGFX(*this).isIdentity();
+}
+
+float Matrix::operator[](int index) const {
+  switch (index) {
+    case 6:
+    case 7:
+      return 0;
+    case 8:
+      return 1;
+    default:
+      break;
+  }
+  return values[index];
+}
+
+float Matrix::get(int index) const {
+  return (*this)[index];
+}
+
+float& Matrix::operator[](int index) {
+  static float persp[3] = {0, 0, 1};
+  switch (index) {
+    case 6:
+      return persp[0];
+    case 7:
+      return persp[1];
+    case 8:
+      return persp[2];
+    default:
+      break;
+  }
+  return values[index];
+}
+
+void Matrix::set(int index, float value) {
+  if (index > 5) {
+    return;
+  }
+  values[index] = value;
+}
+
+void Matrix::get9(float buffer[9]) const {
+  ToTGFX(this)->get9(buffer);
+}
+
+void Matrix::set9(const float buffer[9]) {
+  ToTGFX(this)->set6(buffer);
+}
 
 void Matrix::reset() {
   ToTGFX(this)->reset();
@@ -30,8 +80,8 @@ bool operator==(const Matrix& a, const Matrix& b) {
 }
 
 void Matrix::setAll(float scaleX, float skewX, float transX, float skewY, float scaleY,
-                    float transY, float persp0, float persp1, float persp2) {
-  ToTGFX(this)->setAll(scaleX, skewX, transX, skewY, scaleY, transY, persp0, persp1, persp2);
+                    float transY, float, float, float) {
+  ToTGFX(this)->setAll(scaleX, skewX, transX, skewY, scaleY, transY);
 }
 
 void Matrix::setAffine(float a, float b, float c, float d, float tx, float ty) {
