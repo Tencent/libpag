@@ -35,10 +35,6 @@ class CGLDevice : public GLDevice {
 
   CGLContextObj cglContext() const;
 
-  CVOpenGLTextureCacheRef getTextureCache();
-
-  void releaseTexture(CVOpenGLTextureRef texture);
-
  protected:
   bool onMakeCurrent() override;
   void onClearCurrent() override;
@@ -52,7 +48,10 @@ class CGLDevice : public GLDevice {
 
   explicit CGLDevice(CGLContextObj cglContext);
 
+  CVOpenGLTextureCacheRef getTextureCache();
+
   friend class GLDevice;
   friend class CGLWindow;
+  friend class Texture;
 };
 }  // namespace tgfx

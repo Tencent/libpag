@@ -207,5 +207,6 @@ class Surface {
 
   friend class DrawingManager;
   friend class Canvas;
+  friend class QGLWindow;
 };
 }  // namespace tgfx

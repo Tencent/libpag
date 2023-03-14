@@ -18,7 +18,7 @@
 
 #pragma once
 
-#import <AppKit/AppKit.h>
+#include <CoreVideo/CoreVideo.h>
 #include "gpu/Texture.h"
 #include "gpu/TextureSampler.h"
 
@@ -26,7 +26,8 @@ namespace tgfx {
 class CGLHardwareTexture : public Texture {
  public:
   static std::shared_ptr<CGLHardwareTexture> MakeFrom(Context* context,
-                                                      CVPixelBufferRef pixelBuffer);
+                                                      CVPixelBufferRef pixelBuffer,
+                                                      CVOpenGLTextureCacheRef textureCache);
 
   explicit CGLHardwareTexture(CVPixelBufferRef pixelBuffer);
 
@@ -45,6 +46,7 @@ class CGLHardwareTexture : public Texture {
   std::unique_ptr<TextureSampler> sampler = {};
   CVPixelBufferRef pixelBuffer = nullptr;
   CVOpenGLTextureRef texture = nil;
+  CVOpenGLTextureCacheRef textureCache = nil;
 
   static void ComputeRecycleKey(BytesKey* recycleKey, CVPixelBufferRef pixelBuffer);
 

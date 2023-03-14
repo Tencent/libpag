@@ -118,14 +118,6 @@ CVOpenGLTextureCacheRef CGLDevice::getTextureCache() {
   return textureCache;
 }
 
-void CGLDevice::releaseTexture(CVOpenGLTextureRef texture) {
-  if (texture == nil || textureCache == nil) {
-    return;
-  }
-  CFRelease(texture);
-  CVOpenGLTextureCacheFlush(textureCache, 0);
-}
-
 bool CGLDevice::onMakeCurrent() {
   oldContext = CGLGetCurrentContext();
   CGLRetainContext(oldContext);

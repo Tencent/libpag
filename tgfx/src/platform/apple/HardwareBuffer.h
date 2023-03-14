@@ -18,7 +18,7 @@
 
 #pragma once
 
-#import <CoreVideo/CoreVideo.h>
+#include <CoreVideo/CoreVideo.h>
 #include "core/PixelBuffer.h"
 
 namespace tgfx {

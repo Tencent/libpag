@@ -20,10 +20,10 @@
 #include <QApplication>
 #include <QQuickWindow>
 #include <QThread>
-#include "opengl/GLContext.h"
-#include "opengl/GLSurface.h"
-#include "tgfx/opengl/GLRenderTarget.h"
-#include "tgfx/opengl/GLTexture.h"
+#include "gpu/Texture.h"
+#include "opengl/GLRenderTarget.h"
+#include "opengl/GLSampler.h"
+#include "tgfx/opengl/GLFunctions.h"
 
 namespace tgfx {
 
@@ -67,7 +67,7 @@ QSGTexture* QGLWindow::getTexture() {
       delete outTexture;
       outTexture = nullptr;
     }
-    auto textureID = frontTexture->glSampler().id;
+    auto textureID = static_cast<const GLSampler*>(frontTexture->getSampler())->id;
     auto width = static_cast<int>(ceil(quickItem->width()));
     auto height = static_cast<int>(ceil(quickItem->height()));
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
@@ -97,10 +97,10 @@ std::shared_ptr<Surface> QGLWindow::onCreateSurface(Context* context) {
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
-  frontTexture = std::static_pointer_cast<GLTexture>(Texture::MakeRGBA(context, width, height));
-  backTexture = std::static_pointer_cast<GLTexture>(Texture::MakeRGBA(context, width, height));
+  frontTexture = Texture::MakeRGBA(context, width, height);
+  backTexture = Texture::MakeRGBA(context, width, height);
   auto surface = Surface::MakeFrom(backTexture);
-  renderTarget = std::static_pointer_cast<GLRenderTarget>(surface->getRenderTarget());
+  renderTarget = std::static_pointer_cast<GLRenderTarget>(surface->renderTarget);
   return surface;
 }
 
@@ -110,9 +110,9 @@ void QGLWindow::onPresent(Context* context, int64_t) {
   }
   auto gl = GLFunctions::Get(context);
   std::swap(frontTexture, backTexture);
-  gl->bindFramebuffer(GL_FRAMEBUFFER, renderTarget->glFrameBuffer().id);
-  gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
-                           backTexture->glSampler().id, 0);
+  gl->bindFramebuffer(GL_FRAMEBUFFER, renderTarget->getFrameBufferID());
+  auto textureID = static_cast<const GLSampler*>(backTexture->getSampler())->id;
+  gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureID, 0);
   gl->bindFramebuffer(GL_FRAMEBUFFER, 0);
   invalidateTexture();
 }

@@ -24,5 +24,7 @@ namespace pag {
 class NativePlatform : public Platform {
  public:
   bool registerFallbackFonts() const override;
+
+  std::vector<const VideoDecoderFactory*> getVideoDecoderFactories() const override;
 };
 }  // namespace pag

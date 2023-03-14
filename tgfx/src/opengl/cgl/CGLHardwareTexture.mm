@@ -18,12 +18,11 @@
 
 #include "CGLHardwareTexture.h"
 #include "opengl/GLSampler.h"
-#include "tgfx/opengl/cgl/CGLDevice.h"
 #include "utils/UniqueID.h"
 
 namespace tgfx {
-std::shared_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(Context* context,
-                                                                 CVPixelBufferRef pixelBuffer) {
+std::shared_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(
+    Context* context, CVPixelBufferRef pixelBuffer, CVOpenGLTextureCacheRef textureCache) {
   BytesKey recycleKey = {};
   ComputeRecycleKey(&recycleKey, pixelBuffer);
   auto glTexture = std::static_pointer_cast<CGLHardwareTexture>(
@@ -31,11 +30,6 @@ std::shared_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(Context* contex
   if (glTexture) {
     return glTexture;
   }
-  auto cglDevice = static_cast<CGLDevice*>(context->device());
-  if (cglDevice == nullptr) {
-    return nullptr;
-  }
-  CVOpenGLTextureCacheRef textureCache = cglDevice->getTextureCache();
   if (textureCache == nil) {
     return nullptr;
   }
@@ -55,6 +49,9 @@ std::shared_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(Context* contex
   glTexture = Resource::Wrap(context, new CGLHardwareTexture(pixelBuffer));
   glTexture->sampler = std::move(glSampler);
   glTexture->texture = texture;
+  glTexture->textureCache = textureCache;
+  CFRetain(textureCache);
+
   return glTexture;
 }
 
@@ -76,8 +73,9 @@ CGLHardwareTexture::CGLHardwareTexture(CVPixelBufferRef pixelBuffer)
 
 CGLHardwareTexture::~CGLHardwareTexture() {
   CFRelease(pixelBuffer);
-  if (texture) {
+  if (texture != nil) {
     CFRelease(texture);
+    CFRelease(textureCache);
   }
 }
 
@@ -95,8 +93,8 @@ void CGLHardwareTexture::onReleaseGPU() {
   }
   CFRelease(texture);
   texture = nil;
-  auto cglDevice = static_cast<CGLDevice*>(context->device());
-  auto textureCache = cglDevice->getTextureCache();
   CVOpenGLTextureCacheFlush(textureCache, 0);
+  CFRelease(textureCache);
+  textureCache = nil;
 }
 }  // namespace tgfx
