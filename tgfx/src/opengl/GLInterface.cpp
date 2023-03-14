@@ -111,6 +111,8 @@ std::unique_ptr<const GLInterface> GLInterface::MakeNativeInterface(const GLProc
       getter->getProcAddress("glCheckFramebufferStatus"));
   functions->clear = reinterpret_cast<GLClear*>(getter->getProcAddress("glClear"));
   functions->clearColor = reinterpret_cast<GLClearColor*>(getter->getProcAddress("glClearColor"));
+  functions->clearDepthf =
+      reinterpret_cast<GLClearDepthf*>(getter->getProcAddress("glClearDepthf"));
   functions->clearStencil =
       reinterpret_cast<GLClearStencil*>(getter->getProcAddress("glClearStencil"));
   functions->colorMask = reinterpret_cast<GLColorMask*>(getter->getProcAddress("glColorMask"));
