@@ -26,5 +26,7 @@ class NativePlatform : public Platform {
   bool registerFallbackFonts() const override;
 
   std::vector<const VideoDecoderFactory*> getVideoDecoderFactories() const override;
+
+  NALUType naluType() const override;
 };
 }  // namespace pag
