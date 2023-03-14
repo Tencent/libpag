@@ -56,4 +56,13 @@ std::vector<const VideoDecoderFactory*> NativePlatform::getVideoDecoderFactories
   return Platform::getVideoDecoderFactories();
 #endif
 }
+
+NALUType NativePlatform::naluType() const {
+#ifdef __APPLE__
+  return NALUType::AVCC;
+#else
+  return NALUType::AnnexB;
+#endif
+}
+
 }  // namespace pag
