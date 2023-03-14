@@ -64,4 +64,6 @@
 
 - (NSArray<PAGLayer*>*)getLayersUnderPoint:(CGPoint)point;
 
+- (uint32_t)getContentVersion;
+
 @end

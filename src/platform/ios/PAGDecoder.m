@@ -23,12 +23,20 @@
 #import "PAGPlayer.h"
 #import "PAGSurface.h"
 
+@interface PAGDecoder ()
+@property(atomic, assign) float maxFrameRate;
+@property(atomic, assign) NSInteger frames;
+@end
+
 @implementation PAGDecoder {
   PAGPlayer* pagPlayer;
   PAGSurface* pagSurface;
-  NSInteger numFrames;
   UIImage* lastFrameImage;
+  CGFloat _scale;
+  dispatch_queue_t queue;
 }
+
+@synthesize maxFrameRate = _maxFrameRate;
 
 + (instancetype)Make:(PAGComposition*)pagComposition {
   return [PAGDecoder Make:pagComposition scale:1.0f];
@@ -48,19 +56,26 @@
   }
 
   return [[[PAGDecoder alloc] initWithPAGComposition:pagComposition
-                                          pagSurface:pagSurface] autorelease];
+                                          pagSurface:pagSurface
+                                               scale:scale] autorelease];
 }
 
 - (instancetype)initWithPAGComposition:(PAGComposition*)composition
-                            pagSurface:(PAGSurface*)surface {
+                            pagSurface:(PAGSurface*)surface
+                                 scale:(CGFloat)scale {
   self = [super init];
   if (self) {
     pagSurface = [surface retain];
     pagPlayer = [[PAGPlayer alloc] init];
     [pagPlayer setComposition:composition];
     [pagPlayer setSurface:pagSurface];
-    numFrames = [composition duration] * [composition frameRate] / 1000000;
+    _maxFrameRate = 30.0f;
+    _scale = scale;
+    float frameRate =
+        _maxFrameRate > [composition frameRate] ? [composition frameRate] : _maxFrameRate;
+    self.frames = [composition duration] * frameRate / 1000000;
     lastFrameImage = nil;
+    queue = dispatch_queue_create("pag.art.PAGDecoder", DISPATCH_QUEUE_SERIAL);
   }
   return self;
 }
@@ -74,7 +89,7 @@
 }
 
 - (NSInteger)numFrames {
-  return numFrames;
+  return self.frames;
 }
 
 - (UIImage*)imageFromCVPixelBufferRef:(CVPixelBufferRef)pixelBuffer {
@@ -86,13 +101,7 @@
 }
 
 - (UIImage*)frameAtIndex:(NSInteger)index {
-  if (index < 0 || index >= numFrames) {
-    NSLog(@"Input index is out of bounds!");
-    return nil;
-  }
-  float progress = (index * 1.0 + 0.1) / self.numFrames;
-  [pagPlayer setProgress:progress];
-  BOOL result = [pagPlayer flush];
+  BOOL result = [self renderCurrentFrame:index];
   if (!result && lastFrameImage != nil) {
     return lastFrameImage;
   }
@@ -101,12 +110,63 @@
     [lastFrameImage release];
   }
   lastFrameImage = [image retain];
-  return image;
+  return [[image retain] autorelease];
+}
+
+- (void)setMaxFrameRate:(float)value {
+  if (value > 0) {
+    _maxFrameRate = _maxFrameRate > value ? value : _maxFrameRate;
+    self.frames = [[pagPlayer getComposition] duration] * _maxFrameRate / 1000000;
+  }
+}
+
+- (float)maxFrameRate {
+  return _maxFrameRate;
+}
+
+- (BOOL)renderCurrentFrame:(NSInteger)index {
+  if (index < 0 || index >= self.frames) {
+    NSLog(@"Input index is out of bounds!");
+    return false;
+  }
+  float progress = (index * 1.0 + 0.1) / self.frames;
+  [pagPlayer setProgress:progress];
+  return [pagPlayer flush];
+}
+
+- (void)readPixelsWithColorType:(PAGColorType)colorType
+                      alphaType:(PAGAlphaType)alphaType
+                      dstPixels:(void*)dstPixels
+                    dstRowBytes:(size_t)dstRowBytes
+                          index:(NSInteger)index
+                      withBlock:(nullable void (^)(BOOL status))block {
+  __block __typeof(self) weakSelf = self;
+  dispatch_async(queue, ^{
+    BOOL status = [weakSelf readPixelsWithColorType:colorType
+                                          alphaType:alphaType
+                                          dstPixels:dstPixels
+                                        dstRowBytes:dstRowBytes
+                                              index:index];
+    block(status);
+  });
+}
+
+- (BOOL)readPixelsWithColorType:(PAGColorType)colorType
+                      alphaType:(PAGAlphaType)alphaType
+                      dstPixels:(void*)dstPixels
+                    dstRowBytes:(size_t)dstRowBytes
+                          index:(NSInteger)index {
+  [self renderCurrentFrame:index];
+  return [pagSurface readPixelsWithColorType:colorType
+                                   alphaType:alphaType
+                                   dstPixels:dstPixels
+                                 dstRowBytes:dstRowBytes];
 }
 
 - (void)dealloc {
   [lastFrameImage release];
   lastFrameImage = nil;
+  [pagSurface freeCache];
   [pagSurface release];
   [pagPlayer release];
   [super dealloc];

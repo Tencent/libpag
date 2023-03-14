@@ -109,4 +109,8 @@
 - (NSArray<PAGLayer*>*)getLayersUnderPoint:(CGPoint)point {
   return [(PAGCompositionImpl*)self.impl getLayersUnderPoint:point];
 }
+
+- (uint32_t)getContentVersion {
+  return [(PAGCompositionImpl*)self.impl getContentVersion];
+}
 @end

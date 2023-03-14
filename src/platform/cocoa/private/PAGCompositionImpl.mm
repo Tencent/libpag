@@ -159,4 +159,8 @@
   return [PAGLayerImpl BatchConvertToPAGLayers:layers];
 }
 
+- (uint32_t)getContentVersion {
+  return std::static_pointer_cast<pag::PAGComposition>(self.pagLayer)->getContentVersion();
+}
+
 @end

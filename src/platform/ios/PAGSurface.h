@@ -21,6 +21,7 @@
 #import <Foundation/Foundation.h>
 #import <QuartzCore/QuartzCore.h>
 #import "PAGImageLayer.h"
+#import "PAGPixelsType.h"
 
 PAG_API @interface PAGSurface : NSObject
 
@@ -91,4 +92,14 @@ PAG_API @interface PAGSurface : NSObject
  * the PAGSurface will not be captured.
  */
 - (CVPixelBufferRef)makeSnapshot;
+
+/**
+ * Copies pixels from current PAGSurface to dstPixels with specified color type, alpha type and
+ * row bytes. Returns true if pixels are copied to dstPixels.
+ */
+- (BOOL)readPixelsWithColorType:(PAGColorType)colorType
+                      alphaType:(PAGAlphaType)alphaType
+                      dstPixels:(void*)dstPixels
+                    dstRowBytes:(size_t)dstRowBytes;
+
 @end

@@ -148,4 +148,12 @@
   return pixelBuffer;
 }
 
+- (BOOL)readPixelsWithColorType:(int)colorType
+                      alphaType:(int)alphaType
+                      dstPixels:(void*)dstPixels
+                    dstRowBytes:(size_t)dstRowBytes {
+  return _pagSurface->readPixels(pag::ColorType(colorType), pag::AlphaType(alphaType), dstPixels,
+                                 dstRowBytes);
+}
+
 @end

@@ -49,4 +49,9 @@
 
 - (CVPixelBufferRef)makeSnapshot;
 
+- (BOOL)readPixelsWithColorType:(int)colorType
+                      alphaType:(int)alphaType
+                      dstPixels:(void*)dstPixels
+                    dstRowBytes:(size_t)dstRowBytes;
+
 @end

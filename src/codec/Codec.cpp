@@ -18,7 +18,7 @@
 
 #include <unordered_map>
 #include <unordered_set>
-#include "Compression.h"
+#include "CompressionAlgorithm.h"
 #include "base/utils/USE.h"
 #include "base/utils/Verify.h"
 #include "codec/Version.h"

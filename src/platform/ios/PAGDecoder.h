@@ -19,6 +19,9 @@
 
 #import <Foundation/Foundation.h>
 #import "PAGComposition.h"
+#import "PAGPixelsType.h"
+
+NS_ASSUME_NONNULL_BEGIN
 
 PAG_API @interface PAGDecoder : NSObject
 
@@ -59,4 +62,35 @@ PAG_API @interface PAGDecoder : NSObject
  */
 - (nullable UIImage*)frameAtIndex:(NSInteger)index;
 
+/**
+ * The maximum frame rate for rendering. If set to a value less than the actual frame rate from
+ * PAGFile, it drops frames but increases performance. Otherwise, it has no effect. The default
+ * value is 30.
+ */
+- (float)maxFrameRate;
+
+/**
+ * Set the maximum frame rate for rendering.
+ */
+- (void)setMaxFrameRate:(float)value;
+
+/**
+ * Copies pixels from current PAGSurface to dstPixels with specified color type, alpha type and
+ * row bytes. Returns true if pixels are copied to dstPixels.
+ */
+- (void)readPixelsWithColorType:(PAGColorType)colorType
+                      alphaType:(PAGAlphaType)alphaType
+                      dstPixels:(void*)dstPixels
+                    dstRowBytes:(size_t)dstRowBytes
+                          index:(NSInteger)index
+                      withBlock:(nullable void (^)(BOOL status))block;
+
+- (BOOL)readPixelsWithColorType:(PAGColorType)colorType
+                      alphaType:(PAGAlphaType)alphaType
+                      dstPixels:(void*)dstPixels
+                    dstRowBytes:(size_t)dstRowBytes
+                          index:(NSInteger)index;
+
 @end
+
+NS_ASSUME_NONNULL_END
