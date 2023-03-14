@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "gpu/TextureSampler.h"
 #include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Point.h"
@@ -29,7 +30,6 @@
 
 namespace tgfx {
 class BackendTexture;
-class TextureSampler;
 
 /**
  * Texture describes a two-dimensional array of pixels in the GPU backend for drawing.

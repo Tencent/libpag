@@ -27,6 +27,8 @@
 namespace pag {
 class HardwareDecoder : public VideoDecoder {
  public:
+  static const VideoDecoderFactory* Factory();
+
   ~HardwareDecoder() override;
 
   pag::DecodingResult onSendBytes(void* bytes, size_t length, int64_t time) override;

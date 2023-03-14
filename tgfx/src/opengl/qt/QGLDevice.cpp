@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/opengl/qt/QGLDevice.h"
+#include <OpenGL/OpenGL.h>
+#include <dlfcn.h>
 #include <QApplication>
 #include <QThread>
 #include "QGLProcGetter.h"
@@ -100,6 +102,12 @@ QGLDevice::QGLDevice(void* nativeHandle) : GLDevice(nativeHandle) {
 
 QGLDevice::~QGLDevice() {
   releaseAll();
+#ifdef __APPLE__
+  if (textureCache != nil) {
+    CFRelease(textureCache);
+    textureCache = nil;
+  }
+#endif
   if (isAdopted) {
     return;
   }
@@ -152,4 +160,23 @@ void QGLDevice::onClearCurrent() {
     oldSurface = nullptr;
   }
 }
+
+#ifdef __APPLE__
+CVOpenGLTextureCacheRef QGLDevice::getTextureCache() {
+  if (!textureCache) {
+    // The toolchain of QT does not allow us to access the native OpenGL interface directly.
+    typedef CGLContextObj (*GetCurrentContext)();
+    typedef CGLPixelFormatObj (*GetPixelFormat)(CGLContextObj);
+    auto getCurrentContext =
+        reinterpret_cast<GetCurrentContext>(dlsym(RTLD_DEFAULT, "CGLGetCurrentContext"));
+    auto getPixelFormat =
+        reinterpret_cast<GetPixelFormat>(dlsym(RTLD_DEFAULT, "CGLGetPixelFormat"));
+    auto cglContext = getCurrentContext();
+    auto pixelFormatObj = getPixelFormat(cglContext);
+    CVOpenGLTextureCacheCreate(kCFAllocatorDefault, NULL, cglContext, pixelFormatObj, NULL,
+                               &textureCache);
+  }
+  return textureCache;
+}
+#endif
 }  // namespace tgfx

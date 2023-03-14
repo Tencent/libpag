@@ -19,6 +19,9 @@
 #include "NativePlatform.h"
 #include <vector>
 #include "pag/pag.h"
+#ifdef __APPLE__
+#include "platform/mac/private/HardwareDecoder.h"
+#endif
 
 namespace pag {
 
@@ -29,19 +32,28 @@ const Platform* Platform::Current() {
 
 bool NativePlatform::registerFallbackFonts() const {
   std::vector<std::string> fallbackList;
-#ifdef WIN32
-  fallbackList = {"Microsoft YaHei",    "Times New Roman", "Microsoft Sans Serif",
-                  "Microsoft JhengHei", "Leelawadee UI",   "MS Gothic",
-                  "Malgun Gothic",      "STSong"};
-#else
+#ifdef __APPLE__
   fallbackList = {"PingFang SC",       "Apple SD Gothic Neo",
                   "Apple Color Emoji", "Helvetica",
                   "Myanmar Sangam MN", "Thonburi",
                   "Mishafi",           "Menlo",
                   "Kailasa",           "Kefa",
                   "Kohinoor Telugu",   "Hiragino Maru Gothic ProN"};
+#else
+  fallbackList = {"Microsoft YaHei",    "Times New Roman", "Microsoft Sans Serif",
+                  "Microsoft JhengHei", "Leelawadee UI",   "MS Gothic",
+                  "Malgun Gothic",      "STSong"};
 #endif
   PAGFont::SetFallbackFontNames(fallbackList);
   return true;
+}
+
+std::vector<const VideoDecoderFactory*> NativePlatform::getVideoDecoderFactories() const {
+#ifdef __APPLE__
+  return {HardwareDecoder::Factory(), VideoDecoderFactory::ExternalDecoderFactory(),
+          VideoDecoderFactory::SoftwareAVCDecoderFactory()};
+#else
+  return Platform::getVideoDecoderFactories();
+#endif
 }
 }  // namespace pag

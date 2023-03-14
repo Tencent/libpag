@@ -27,8 +27,7 @@
 #include "tgfx/gpu/Window.h"
 
 namespace tgfx {
-class GLTexture;
-
+class Texture;
 class GLRenderTarget;
 
 class QGLWindow : public Window {
@@ -66,8 +65,8 @@ class QGLWindow : public Window {
   QQuickItem* quickItem = nullptr;
   QSGTexture* outTexture = nullptr;
   std::shared_ptr<GLRenderTarget> renderTarget = nullptr;
-  std::shared_ptr<GLTexture> frontTexture = nullptr;
-  std::shared_ptr<GLTexture> backTexture = nullptr;
+  std::shared_ptr<Texture> frontTexture = nullptr;
+  std::shared_ptr<Texture> backTexture = nullptr;
 
   QGLWindow(std::shared_ptr<Device> device, QQuickItem* quickItem);
   void invalidateTexture();

@@ -19,6 +19,29 @@
 #include "HardwareDecoder.h"
 
 namespace pag {
+class HardwareDecoderFactory : public VideoDecoderFactory {
+ public:
+  bool isHardwareBacked() const override {
+    return true;
+  }
+
+ protected:
+  std::unique_ptr<VideoDecoder> onCreateDecoder(const VideoFormat& format) const override {
+    auto decoder = new HardwareDecoder(format);
+    if (!decoder->isInitialized) {
+      delete decoder;
+      return nullptr;
+    }
+    return std::unique_ptr<VideoDecoder>(decoder);
+  }
+};
+
+static HardwareDecoderFactory hardwareDecoderFactory = {};
+
+const VideoDecoderFactory* HardwareDecoder::Factory() {
+  return &hardwareDecoderFactory;
+}
+
 HardwareDecoder::HardwareDecoder(const VideoFormat& format)
     : colorSpace(format.colorSpace), maxNumReorder(format.maxReorderSize) {
   isInitialized = initVideoToolBox(format.headers, format.mimeType);

@@ -18,6 +18,9 @@
 
 #pragma once
 
+#ifdef __APPLE__
+#include <CoreVideo/CoreVideo.h>
+#endif
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-copy"
 #include <QOffscreenSurface>
@@ -78,7 +81,13 @@ class QGLDevice : public GLDevice {
 
   explicit QGLDevice(void* nativeHandle);
 
+#ifdef __APPLE__
+  CVOpenGLTextureCacheRef textureCache = nil;
+  CVOpenGLTextureCacheRef getTextureCache();
+#endif
+
   friend class GLDevice;
   friend class QGLWindow;
+  friend class Texture;
 };
 }  // namespace tgfx
