@@ -58,6 +58,7 @@ using GLBufferSubData = void GL_FUNCTION_TYPE(unsigned target, GLintptr offset, 
 using GLCheckFramebufferStatus = unsigned GL_FUNCTION_TYPE(unsigned target);
 using GLClear = void GL_FUNCTION_TYPE(unsigned mask);
 using GLClearColor = void GL_FUNCTION_TYPE(float red, float green, float blue, float alpha);
+using GLClearDepthf = void GL_FUNCTION_TYPE(float depth);
 using GLClearStencil = void GL_FUNCTION_TYPE(int s);
 using GLColorMask = void GL_FUNCTION_TYPE(unsigned char red, unsigned char green,
                                           unsigned char blue, unsigned char alpha);
@@ -247,6 +248,7 @@ class GLFunctions {
   GLCheckFramebufferStatus* checkFramebufferStatus = nullptr;
   GLClear* clear = nullptr;
   GLClearColor* clearColor = nullptr;
+  GLClearDepthf* clearDepthf = nullptr;
   GLClearStencil* clearStencil = nullptr;
   GLColorMask* colorMask = nullptr;
   GLCompileShader* compileShader = nullptr;
