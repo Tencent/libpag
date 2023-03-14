@@ -17,12 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/opengl/qt/QGLDevice.h"
-#include <OpenGL/OpenGL.h>
-#include <dlfcn.h>
 #include <QApplication>
 #include <QThread>
 #include "QGLProcGetter.h"
 #include "utils/Log.h"
+#ifdef __APPLE__
+#include <OpenGL/OpenGL.h>
+#include <dlfcn.h>
+#endif
 
 namespace tgfx {
 void* GLDevice::CurrentNativeHandle() {
