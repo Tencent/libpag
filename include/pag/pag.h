@@ -944,6 +944,11 @@ class PAG_API PAGComposition : public PAGLayer {
    */
   std::vector<std::shared_ptr<PAGLayer>> getLayersUnderPoint(float localX, float localY);
 
+  /**
+   * Returns contentVersion of this composition
+   */
+  uint32_t getContentVersion() const;
+
  protected:
   int _width = 0;
   int _height = 0;

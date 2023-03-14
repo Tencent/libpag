@@ -25,11 +25,13 @@
 #include "GPUDrawable.h"
 #include "JNIHelper.h"
 #include "NativePlatform.h"
+#include "base/utils/TGFXCast.h"
 
 namespace pag {
 static jfieldID PAGSurface_nativeSurface;
 static Global<jclass> Bitmap_Class;
 static jmethodID Bitmap_createBitmap;
+static jmethodID Bitmap_isRecycled;
 static Global<jclass> Config_Class;
 static jfieldID Config_ARGB_888;
 }  // namespace pag
@@ -53,6 +55,7 @@ PAG_API void Java_org_libpag_PAGSurface_nativeInit(JNIEnv* env, jclass clazz) {
   Bitmap_createBitmap =
       env->GetStaticMethodID(Bitmap_Class.get(), "createBitmap",
                              "(IILandroid/graphics/Bitmap$Config;)Landroid/graphics/Bitmap;");
+  Bitmap_isRecycled = env->GetMethodID(Bitmap_Class.get(), "isRecycled", "()Z");
   Config_Class = env->FindClass("android/graphics/Bitmap$Config");
   Config_ARGB_888 =
       env->GetStaticFieldID(Config_Class.get(), "ARGB_8888", "Landroid/graphics/Bitmap$Config;");
@@ -194,4 +197,38 @@ extern "C" JNIEXPORT jlong JNICALL Java_org_libpag_PAGSurface_SetupOffscreen(JNI
     return 0;
   }
   return reinterpret_cast<jlong>(new JPAGSurface(surface));
+}
+
+extern "C" JNIEXPORT jboolean JNICALL Java_org_libpag_PAGSurface_readPixels(JNIEnv* env,
+                                                                            jobject thiz,
+                                                                            jobject jBitmap) {
+  if (thiz == nullptr || jBitmap == nullptr) {
+    return false;
+  }
+  auto surface = getPAGSurface(env, thiz);
+  if (surface == nullptr) {
+    return false;
+  }
+  bool isRecycled = env->CallBooleanMethod(jBitmap, Bitmap_isRecycled);
+  if (isRecycled) {
+    return false;
+  }
+  unsigned char* newBitmapPixels;
+  auto imageInfo = GetImageInfo(env, jBitmap);
+  if (imageInfo.width() != surface->width() || imageInfo.height() != surface->height()) {
+    return false;
+  }
+  int ret;
+  if ((ret = AndroidBitmap_lockPixels(env, jBitmap, (void**)&newBitmapPixels)) < 0) {
+    LOGE("AndroidBitmap_lockPixels() failed ! error=%d", ret);
+    return false;
+  }
+  bool status = surface->readPixels(ToPAG(imageInfo.colorType()), ToPAG(imageInfo.alphaType()),
+                                    newBitmapPixels, imageInfo.rowBytes());
+  AndroidBitmap_unlockPixels(env, jBitmap);
+  if (!status) {
+    LOGE("ReadPixels failed!");
+    return false;
+  }
+  return true;
 }

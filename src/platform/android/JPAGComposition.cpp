@@ -271,4 +271,12 @@ PAG_API jobjectArray Java_org_libpag_PAGComposition_getLayersUnderPoint(JNIEnv* 
   auto layers = composition->getLayersUnderPoint(localX, localY);
   return ToPAGLayerJavaObjectList(env, layers);
 }
+
+PAG_API jlong Java_org_libpag_PAGComposition_contentVersion(JNIEnv* env, jobject thiz) {
+  auto composition = GetPAGComposition(env, thiz);
+  if (composition == nullptr) {
+    return 0;
+  }
+  return composition->getContentVersion();
+}
 }

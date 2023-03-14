@@ -6,6 +6,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
 import android.util.Log;
+import android.view.View;
 
 import org.libpag.PAGView;
 
@@ -30,8 +31,8 @@ public class Lifecycle implements Handler.Callback {
         return lifecycle;
     }
 
-    public void addListener(final PAGView pagView) {
-        if (pagView.getContext() instanceof Activity) {
+    public void addListener(final View pagView) {
+        if (pagView.getContext() instanceof Activity && pagView instanceof LifecycleListener) {
             Activity activity = (Activity) pagView.getContext();
             if (activity.isDestroyed()) {
                 return;
@@ -47,7 +48,7 @@ public class Lifecycle implements Handler.Callback {
                     handler.obtainMessage(ID_REMOVE_FRAGMENT_MANAGER, fm).sendToTarget();
                 }
             }
-            current.addListener(pagView);
+            current.addListener((LifecycleListener) pagView);
         }
     }
 

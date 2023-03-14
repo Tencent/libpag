@@ -638,7 +638,8 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
      * Loads a pag file from the specified path, returns false if the file does not exist or the data is not a pag file.
      * The path starts with "assets://" means that it is located in assets directory.
      * Note: All PAGFiles loaded by the same path share the same internal cache. The internal cache is alive until all
-     * PAGFiles are released. Use 'PAGFile.Load(byte[])' instead if you don't want to load a PAGFile from the intenal caches.
+     * PAGFiles are released. Use 'PAGFile.Load(byte[])' instead if you don't want to load a
+     * PAGFile from the internal caches.
      */
     public boolean setPath(String path) {
         PAGFile pagFile;
