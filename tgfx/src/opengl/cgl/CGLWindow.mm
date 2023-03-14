@@ -87,7 +87,10 @@ CGLWindow::~CGLWindow() {
   }
   if (view) {
     auto glContext = static_cast<CGLDevice*>(device.get())->glContext;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     [glContext setView:nil];
+#pragma clang diagnostic pop
     view = nil;
   }
 }
@@ -100,7 +103,10 @@ std::shared_ptr<Surface> CGLWindow::onCreateSurface(Context* context) {
     if (size.width <= 0 || size.height <= 0) {
       return nullptr;
     }
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
     [glContext setView:view];
+#pragma clang diagnostic pop
     GLFrameBufferInfo frameBuffer = {};
     frameBuffer.id = 0;
     frameBuffer.format = GL_RGBA8;
