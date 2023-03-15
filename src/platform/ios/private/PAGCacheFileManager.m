@@ -19,13 +19,13 @@
 #import "PAGCacheFileManager.h"
 
 // The maximum default storage of the Disk: 2GB
-static const long long defaultMaxDiskSize = 1 * 1024 * 1024 * 1024;
+static const NSUInteger defaultMaxDiskSize = 1 * 1024 * 1024 * 1024;
 // When the disk cache exceeds the maximum limit, clean up to remainingRate * _maxDiskSize.
 static const float remainingRate = 0.6;
 
 @implementation PAGCacheFileManager {
   NSString* _diskCachePath;
-  long long _maxDiskSize;
+  NSUInteger _maxDiskSize;
 }
 
 - (instancetype)init {
@@ -61,15 +61,15 @@ static const float remainingRate = 0.6;
   return _diskCachePath ? [[_diskCachePath retain] autorelease] : nil;
 }
 
-- (void)SetMaxDiskSize:(long long)size {
+- (void)SetMaxDiskSize:(NSUInteger)size {
   _maxDiskSize = size;
 }
 
-- (long long)MaxDiskSize {
+- (NSUInteger)MaxDiskSize {
   return _maxDiskSize;
 }
 
-- (long long)totalSize {
+- (NSUInteger)totalSize {
   if (!_diskCachePath) {
     return 0;
   }
@@ -77,7 +77,7 @@ static const float remainingRate = 0.6;
     return 0;
   }
   NSArray* allFilePath = [self getAllFiles:_diskCachePath];
-  long long resultSize = 0;
+  NSUInteger resultSize = 0;
   for (NSString* path in allFilePath) {
     resultSize += [self getFileSize:path];
   }
@@ -96,22 +96,24 @@ static const float remainingRate = 0.6;
   }
 }
 
-- (void)removeFilesToLimit {
-  long long totalSize = [self totalSize];
-  if (totalSize < _maxDiskSize) {
+- (void)removeFilesToSize:(NSUInteger)size {
+  NSUInteger totalSize = [self totalSize];
+  if (totalSize < size) {
     return;
   }
   NSArray* allSortedFiles = [self getAllSortedFiles];
-  long long remainingSize = _maxDiskSize * remainingRate;
   for (NSString* filePath in allSortedFiles) {
     NSInteger fileSize = [self getFileSize:filePath];
     if ([[NSFileManager defaultManager] removeItemAtPath:filePath error:nil]) {
       totalSize -= fileSize;
-      if (totalSize <= remainingSize) {
+      if (totalSize <= size) {
         break;
       }
     }
   }
+}
+
+- (void)removeFilesToLimit {
 }
 
 - (void)removeFileForPath:(NSString*)path {
@@ -190,7 +192,7 @@ static const float remainingRate = 0.6;
   return fileDate;
 }
 
-- (long long)getFileSize:(NSString*)filePath {
+- (NSUInteger)getFileSize:(NSString*)filePath {
   NSFileManager* fileManager = [NSFileManager defaultManager];
   if (![fileManager fileExistsAtPath:filePath]) {
     return 0;

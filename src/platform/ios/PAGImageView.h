@@ -22,6 +22,36 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+PAG_API @interface PAGDiskCacheConfig : NSObject
+
+/**
+ * Set the maximum size of the disk cache, in bytes.
+ * Defaults to 1 GB.
+ */
++ (void)SetMaxDiskSize:(NSUInteger)size;
+
+/**
+ * Get the maximum size of the disk cache, in bytes.
+ */
++ (NSUInteger)MaxDiskSize;
+
+/**
+ * Get the total size of data in the disk cache, in bytes.
+ */
++ (NSUInteger)totalSize;
+
+/**
+ * Clear all disk cache.
+ */
++ (void)removeAllFiles;
+
+/**
+ * Clear the disk cache to the input size, in bytes, using  LRU.
+ */
++ (void)removeFilesToSize:(NSUInteger)size;
+
+@end
+
 @class PAGImageView;
 
 @protocol PAGImageViewListener <NSObject>
@@ -56,38 +86,42 @@ NS_ASSUME_NONNULL_BEGIN
 
 PAG_API @interface PAGImageView : UIImageView
 
-- (NSString* __nullable)getPath;
-
-- (BOOL)setPath:(NSString*)path;
-
 /**
- Pre-load all animated image frame into memory. Then later frame image request can directly return
- the frame for index without decoding. This method may be called on background thread.
-
- @note If one image instance is shared by lots of imageViews, the CPU performance for large animated
- image will drop down because the request frame index will be random (not in order) and the decoder
- should take extra effort to keep it re-entrant. You can use this to reduce CPU usage if need.
- Attention this will consume more memory usage.
- */
-- (void)preloadAllFrames;
-
-/**
- Unload all animated image frame from memory if are already pre-loaded. Then later frame image
- request need decoding. You can use this to free up the memory usage if need.
- */
-- (void)unloadAllFrames;
-
-/**
- * Returns the current PAGComposition for PAGView to render as content.
+ * Returns the current PAGComposition for PAGImageView to render as content.
  */
 - (PAGComposition* __nullable)getComposition;
 
 /**
- * Sets a new PAGComposition for PAGView to render as content.
- * Note: If the composition is already added to another PAGView, it will be removed from the
- * previous PAGView.
+ * Sets a new PAGComposition for PAGImageView to render as content.
+ * Note: If the composition is already added to another PAGImageView, it will be removed from the
+ * previous PAGImageView.
  */
 - (void)setComposition:(PAGComposition*)newComposition;
+
+/**
+ * The path string of a pag file set by setPath.
+ */
+- (NSString*)getPath;
+
+/**
+ * Load a pag file from the specified path, returns false if the file does not exist or the data is
+ * not a pag file. Note: All PAGFiles loaded by the same path share the same internal cache. The
+ * internal cache is alive until all PAGFiles are released.
+ */
+- (BOOL)setPath:(NSString*)filePath;
+
+/**
+ * Pre-load all animated image frame into memory or disk. Then later frame image request can
+ * directly return the frame for index without decoding. This method may be called on background
+ * thread.
+ */
+- (void)preloadAllFrames;
+
+/**
+ * Unload all animated image frame from memory  or disk if are already pre-loaded. Then later frame
+ * image request need decoding. You can use this to free up the memory or disk usage if need.
+ */
+- (void)unloadAllFrames;
 
 /**
  *  Set a switch for the memory cache, the default value is no.
@@ -170,7 +204,7 @@ PAG_API @interface PAGImageView : UIImageView
 - (UIImage*)currentImage;
 
 /**
- * Returns a Boolean value indicating whether the animation is running.
+ * Returns a bool value indicating whether the animation is running.
  */
 - (BOOL)animating;
 

@@ -138,7 +138,7 @@
   CVPixelBufferLockBaseAddress(pixelBuffer, 0);
   size_t bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 0);
   uint8_t* pixelBufferData = (uint8_t*)CVPixelBufferGetBaseAddress(pixelBuffer);
-  BOOL status = _pagSurface->readPixels(pag::ColorType::BGRA_8888, pag::AlphaType::Premultiplied,
+  BOOL status = _pagSurface->readPixels(pag::ColorType::RGBA_8888, pag::AlphaType::Opaque,
                                         pixelBufferData, bytesPerRow);
   CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
   if (!status) {

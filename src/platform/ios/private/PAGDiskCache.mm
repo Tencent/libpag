@@ -43,7 +43,6 @@
   NSInteger scratchEncodeLength;
   void* scratchDecodeBuffer;
   NSInteger scratchDecodeLength;
-  BOOL cacheFinished;
 }
 
 static const int32_t FileHeaderSize = 2 * sizeof(int32_t);
@@ -57,7 +56,6 @@ static const int32_t FileHeaderSize = 2 * sizeof(int32_t);
     _path = [filePath retain];
     numFrames = frameCount;
     _fd = fd;
-    cacheFinished = [self count] == frameCount;
     scratchEncodeLength = compression_encode_scratch_buffer_size(COMPRESSION_LZ4);
     scratchEncodeBuffer = malloc(scratchEncodeLength);
     scratchDecodeLength = compression_decode_scratch_buffer_size(COMPRESSION_LZ4);
@@ -87,7 +85,7 @@ static const int32_t FileHeaderSize = 2 * sizeof(int32_t);
 }
 
 #pragma mark - public
-+ (instancetype)MakeWithName:(NSString*)name frameCount:(NSInteger)frameCount {
++ (instancetype)MakeWithName:(NSString*)name frameCount:(NSUInteger)frameCount {
   if (name.length == 0) {
     return nil;
   }
