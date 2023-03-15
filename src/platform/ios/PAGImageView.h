@@ -45,11 +45,6 @@ PAG_API @interface PAGDiskCacheConfig : NSObject
  */
 + (void)removeAllFiles;
 
-/**
- * Clear the disk cache to the input size, in bytes, using  LRU.
- */
-+ (void)removeFilesToSize:(NSUInteger)size;
-
 @end
 
 @class PAGImageView;

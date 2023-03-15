@@ -45,10 +45,6 @@
   [[PAGCacheFileManager shareInstance] removeAllFiles];
 }
 
-+ (void)removeFilesToSize:(NSUInteger)size {
-  [[PAGCacheFileManager shareInstance] removeFilesToSize:size];
-}
-
 @end
 
 static const float MAX_FRAMERATE = 30.0;
@@ -56,7 +52,6 @@ static const float MAX_FRAMERATE = 30.0;
 @interface PAGImageView ()
 @property(atomic, assign) BOOL isInBackground;
 @property(atomic, assign) BOOL progressExplicitlySet;
-@property(nonatomic, strong) NSRecursiveLock* updateTimeLock;
 @property(atomic, assign) BOOL isVisible;
 @property(atomic, assign) BOOL isPlaying;
 @property(nonatomic, strong) NSLock* listenersLock;
@@ -69,6 +64,7 @@ static const float MAX_FRAMERATE = 30.0;
 @property(atomic, assign) NSInteger uiImagePerBytes;
 @property(nonatomic, assign) NSInteger pagContentVersion;
 @property(atomic, assign) float renderScale;
+@property(atomic, assign) NSInteger currentFrameExplicitlySet;
 @end
 
 @implementation PAGImageView {
@@ -121,7 +117,6 @@ static const float MAX_FRAMERATE = 30.0;
   self.isInBackground =
       [UIApplication sharedApplication].applicationState == UIApplicationStateBackground;
   filePath = nil;
-  _updateTimeLock = [[NSRecursiveLock alloc] init];
   _listenersLock = [[NSLock alloc] init];
   self.contentScaleFactor = [UIScreen mainScreen].scale;
   self.contentScaleFactor = 1;
@@ -147,7 +142,6 @@ static const float MAX_FRAMERATE = 30.0;
   [_listenersLock release];
   [valueAnimator stop:false];
   [valueAnimator release];
-  [_updateTimeLock release];
   [self unloadAllFrames];
   if (_pagDecoder != nil) {
     [_pagDecoder release];
@@ -208,15 +202,24 @@ static NSString* RemovePathVariableComponent(NSString* original) {
   return path;
 }
 
-static NSString* GenerateCacheKey(PAGComposition* pagComposition, CGFloat scale) {
+static void AutomaticCleanDisk() {
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^{
+    [[PAGCacheFileManager shareInstance] automaticCleanWithBlock:^{
+    }];
+  });
+}
+
+- (NSString*)generateCacheKey {
   NSString* cacheKey = nil;
   if ([pagComposition isMemberOfClass:[PAGFile class]] && [pagComposition getContentVersion] == 0) {
-    cacheKey = RemovePathVariableComponent([(PAGFile*)pagComposition path]);
+    filePath = [[(PAGFile*)pagComposition path] retain];
+    cacheKey = RemovePathVariableComponent(filePath);
   } else {
     cacheKey = [NSString stringWithFormat:@"%@", pagComposition];
   }
-  cacheKey =
-      [cacheKey stringByAppendingFormat:@"_%u_%f", [pagComposition getContentVersion], scale];
+  cacheKey = [cacheKey
+      stringByAppendingFormat:@"_%u_%f", [pagComposition getContentVersion], self.scaleFactor];
   return NSStringMD5(cacheKey);
 }
 
@@ -336,9 +339,12 @@ static NSString* GenerateCacheKey(PAGComposition* pagComposition, CGFloat scale)
 - (uint8_t*)getMemorySpaceofCurrentImage {
   uint8_t* rgbaData = nil;
   if (memoryCacheEnabled) {
-    rgbaData = (uint8_t*)malloc(self.uiImagePerBytes);
+    return (uint8_t*)malloc(self.uiImagePerBytes);
   } else {
-    rgbaData = currentImageData ? currentImageData : (uint8_t*)malloc(self.uiImagePerBytes);
+    if (!currentImageData) {
+      currentImageData = (uint8_t*)malloc(self.uiImagePerBytes);
+    }
+    return currentImageData;
   }
   return rgbaData;
 }
@@ -348,26 +354,25 @@ static NSString* GenerateCacheKey(PAGComposition* pagComposition, CGFloat scale)
   __block __typeof(self) weakSelf = self;
   __block uint8_t* rgbaData = [self getMemorySpaceofCurrentImage];
   dispatch_async(flushQueue, ^{
-    if (weakSelf.pagContentVersion != [pagComposition getContentVersion]) {
-      weakSelf.pagContentVersion = [pagComposition getContentVersion];
+    if (weakSelf.pagContentVersion != [weakSelf->pagComposition getContentVersion]) {
+      weakSelf.pagContentVersion = [weakSelf->pagComposition getContentVersion];
       [weakSelf->imagesMap removeAllObjects];
       [weakSelf->imageViewCache removeCaches];
     }
-    if (weakSelf->imageViewCache &&
-        [weakSelf->imageViewCache containsObjectForKey:weakSelf.currentFrameIndex]) {
-      if ([[imagesMap allKeys]
-              containsObject:[NSNumber numberWithInteger:weakSelf.currentFrameIndex]]) {
-        weakSelf.currentImage = [weakSelf->imagesMap
-            objectForKey:[NSNumber numberWithInteger:weakSelf.currentFrameIndex]];
+    if (weakSelf->imageViewCache && [weakSelf->imageViewCache containsObjectForKey:frameIndex]) {
+      if ([[imagesMap allKeys] containsObject:[NSNumber numberWithInteger:frameIndex]]) {
+        weakSelf.currentImage =
+            [weakSelf->imagesMap objectForKey:[NSNumber numberWithInteger:frameIndex]];
         [weakSelf submitToImageView];
       } else {
-        [imageViewCache objectForKey:weakSelf.currentFrameIndex
-                             dstData:rgbaData
-                           dstLength:weakSelf.uiImagePerBytes];
+        [weakSelf->imageViewCache objectForKey:frameIndex
+                                       dstData:rgbaData
+                                     dstLength:weakSelf.uiImagePerBytes];
         UIImage* image = [weakSelf imageForRGBA:rgbaData
                                           width:weakSelf->cacheWidth
                                          height:weakSelf->cacheHeight];
         weakSelf.currentImage = image;
+        NSLog(@"--read--currentFrame:%ld \n", (long)frameIndex);
         [weakSelf submitToImageView];
         if (weakSelf->memoryCacheEnabled) {
           [weakSelf->imagesMap setObject:image forKey:[NSNumber numberWithInteger:frameIndex]];
@@ -383,17 +388,22 @@ static NSString* GenerateCacheKey(PAGComposition* pagComposition, CGFloat scale)
                                     width:weakSelf->cacheWidth
                                    height:weakSelf->cacheHeight];
       weakSelf.currentImage = image;
+      NSLog(@"--save--currentFrame:%ld \n", (long)frameIndex);
       [weakSelf submitToImageView];
       if (weakSelf->memoryCacheEnabled) {
         [weakSelf->imagesMap setObject:image forKey:[NSNumber numberWithInteger:frameIndex]];
       }
       NSData* srcData = [NSData dataWithBytes:rgbaData length:weakSelf.uiImagePerBytes];
-      [imageViewCache setObject:srcData
-                         forKey:frameIndex
-                      withBlock:^{
+      [weakSelf->imageViewCache setObject:srcData
+                                   forKey:frameIndex
+                                withBlock:^{
 
-                      }];
+                                }];
     }
+    //      if (weakSelf.currentFrameExplicitlySet >= 0) {
+    //          [weakSelf->valueAnimator setCurrentPlayTime:((weakSelf.currentFrameExplicitlySet +
+    //          0.1) * 1.0 / frameRate * 1000000)]; weakSelf.currentFrameExplicitlySet = -1;
+    //      }
   });
 }
 
@@ -405,13 +415,10 @@ static NSString* GenerateCacheKey(PAGComposition* pagComposition, CGFloat scale)
   if (self.currentFrameIndex != frameIndex) {
     self.currentFrameIndex = frameIndex;
     [self retain];
-    NSInteger length = cacheWidth * cacheHeight * 4;
-    if (!currentImageData) {
-      currentImageData = (uint8_t*)malloc(length);
-    }
     if (_pagDecoder && [imageViewCache count] == numFrames) {
       [_pagDecoder release];
       _pagDecoder = nil;
+      AutomaticCleanDisk();
     }
     [self updateImageViewData];
   }
@@ -710,10 +717,11 @@ static NSString* GenerateCacheKey(PAGComposition* pagComposition, CGFloat scale)
   }
   pagComposition = [newComposition retain];
   self.pagContentVersion = [pagComposition getContentVersion];
+  self.currentFrameExplicitlySet = 0;
   self.scaleFactor =
       std::max(self.frame.size.width * self.contentScaleFactor / [pagComposition width],
                self.frame.size.height * self.contentScaleFactor / [pagComposition height]);
-  cacheKey = GenerateCacheKey(pagComposition, self.scaleFactor);
+  cacheKey = [self generateCacheKey];
   frameRate = MIN([self maxFrameRate], [pagComposition frameRate]);
   numFrames = [pagComposition duration] * frameRate / 1000000;
   if (imageViewCache) {
