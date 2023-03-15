@@ -44,21 +44,21 @@ HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
   if (isIPhone().as<bool>()) {
     auto videoSequence = *sequence;
     videoSequence.MP4Header = nullptr;
-    std::vector<VideoFrame> videoFrames;
+    std::vector<std::shared_ptr<VideoFrame>> videoFrames;
     for (auto& frame : sequence->frames) {
       if (!videoFrames.empty() && frame->isKeyframe) {
         break;
       }
-      videoFrames.push_back(*frame);
-      auto& videoFrame = videoFrames.back();
-      videoFrame.frame += static_cast<Frame>(sequence->frames.size());
-      videoSequence.frames.emplace_back(&videoFrame);
+      auto videoFrame = std::make_shared<VideoFrame>(*frame);
+      videoFrame->frame += static_cast<Frame>(sequence->frames.size());
+      videoSequence.frames.push_back(videoFrame.get());
+      videoFrames.push_back(videoFrame);
     }
     mp4Data = MP4BoxHelper::CovertToMP4(&videoSequence);
     videoSequence.frames.clear();
     videoSequence.headers.clear();
     for (auto& frame : videoFrames) {
-      frame.fileBytes = nullptr;
+      frame->fileBytes = nullptr;
     }
   } else {
     mp4Data = MP4BoxHelper::CovertToMP4(sequence);
