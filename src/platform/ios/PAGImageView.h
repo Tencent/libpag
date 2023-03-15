@@ -199,6 +199,12 @@ PAG_API @interface PAGImageView : UIImageView
 - (UIImage*)currentImage;
 
 /**
+ * Call this method to render current position immediately.
+ * Returns true if rendering is successful, otherwise false
+ */
+- (BOOL)flush;
+
+/**
  * Returns a bool value indicating whether the animation is running.
  */
 - (BOOL)animating;

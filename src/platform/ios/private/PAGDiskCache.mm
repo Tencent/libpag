@@ -147,17 +147,18 @@ static const int32_t FileHeaderSize = 2 * sizeof(int32_t);
   }
 }
 
-- (void)objectForKey:(NSInteger)index dstData:(uint8_t*)dstData dstLength:(NSInteger)dstLength {
+- (BOOL)objectForKey:(NSInteger)index dstData:(uint8_t*)dstData dstLength:(NSInteger)dstLength {
   __block NSData* srcData = nil;
   dispatch_sync(ioQueue, ^{
     srcData = [self readObjectForKey:index];
   });
   if (srcData) {
-    [self deCompressData:dstData
-               dstLength:dstLength
-               srcBuffer:(uint8_t*)srcData.bytes
-               srcLength:srcData.length];
+    return [self deCompressData:dstData
+                      dstLength:dstLength
+                      srcBuffer:(uint8_t*)srcData.bytes
+                      srcLength:srcData.length];
   }
+  return NO;
 }
 
 - (NSUInteger)count {

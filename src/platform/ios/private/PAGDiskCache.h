@@ -28,7 +28,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)setObject:(NSData*)srcData forKey:(NSInteger)index;
 
-- (void)objectForKey:(NSInteger)index dstData:(uint8_t*)dstData dstLength:(NSInteger)dstLength;
+- (BOOL)objectForKey:(NSInteger)index dstData:(uint8_t*)dstData dstLength:(NSInteger)dstLength;
 
 - (BOOL)containsObjectForKey:(NSInteger)index;
 
