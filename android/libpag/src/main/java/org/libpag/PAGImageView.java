@@ -1094,10 +1094,6 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
                 final String memoryKey = lastKeyItem.keyPrefixMD5 + "_" + frame;
                 BitmapPool.BitmapResource bitmap = memoryLruCache.get(memoryKey);
                 if (bitmap != null) {
-                    // 复用场景
-//                    Log.e("liamcli", "fromMemory:" + _pagFilePath + " frame:" + frame);
-                    Log.e("liamcli",
-                            "fromMemory:" + ((PAGFile)_composition.getLayerAt(0)).path() + " frame:" + frame);
                     putToSelfMemoryCache(lastKeyItem.keyPrefixMD5, frame, bitmap);
                     return bitmap;
                 }
@@ -1136,7 +1132,6 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
             currentImage.release();
             return null;
         }
-        Log.e("liamcli", "fromRuntime:" + _pagFilePath + " frame:" + frame);
         if (currentImage == null) {
             return null;
         } else {
@@ -1205,7 +1200,6 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
     @Override
     protected void onDraw(Canvas canvas) {
         if (_currentImage != null && _currentImage.get() != null && !_currentImage.get().isRecycled()) {
-//            Log.d("liamcli", "ImageView:onDraw" + _currentFrame);
             super.onDraw(canvas);
             canvas.save();
             if (_matrix != null) {

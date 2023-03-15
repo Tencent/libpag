@@ -6,6 +6,7 @@ class PAGImageCache {
  public:
   static std::shared_ptr<PAGImageCache> Make(std::string path, int width, int height,
                                              int frameCount, bool needInit);
+  ~PAGImageCache();
   bool savePixels(int frame, void* bitmapPixels);
   bool inflatePixels(int frame, void* bitmapPixels);
   bool isCached(int frame);

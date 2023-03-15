@@ -156,4 +156,9 @@ void PAGImageCache::release() {
     deCompressBuffer = nullptr;
   }
 }
+
+PAGImageCache::~PAGImageCache() {
+  release();
+}
+
 }  // namespace pag
