@@ -333,20 +333,6 @@ static NSString* GenerateCacheKey(PAGComposition* pagComposition, CGFloat scale)
   }
 }
 
-- (void)doPlay {
-  if (!self.isVisible) {
-    return;
-  }
-  int64_t playTime = (int64_t)([valueAnimator getAnimatedFraction] * [valueAnimator duration]);
-  [valueAnimator setCurrentPlayTime:playTime];
-  [valueAnimator start];
-}
-
-- (void)stop {
-  self.isPlaying = FALSE;
-  [valueAnimator stop];
-}
-
 - (uint8_t*)getMemorySpaceofCurrentImage {
   uint8_t* rgbaData = nil;
   if (memoryCacheEnabled) {
@@ -798,7 +784,7 @@ static NSString* GenerateCacheKey(PAGComposition* pagComposition, CGFloat scale)
 
 - (void)unloadAllFrames {
   [imagesMap removeAllObjects];
-  if (filePath == nil || [pagComposition getContentVersion]) {
+  if (filePath == nil || [pagComposition getContentVersion] > 0) {
     [imageViewCache removeCaches];
   }
 }
