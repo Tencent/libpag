@@ -784,7 +784,7 @@ LZ4_DEPRECATED("use LZ4_compress_default() instead")
 LZ4LIB_API int LZ4_compress(const char* src, char* dest, int srcSize);
 LZ4_DEPRECATED("use LZ4_compress_default() instead")
 LZ4LIB_API
-    int LZ4_compress_limitedOutput(const char* src, char* dest, int srcSize, int maxOutputSize);
+int LZ4_compress_limitedOutput(const char* src, char* dest, int srcSize, int maxOutputSize);
 LZ4_DEPRECATED("use LZ4_compress_fast_extState() instead")
 LZ4LIB_API int LZ4_compress_withState(void* state, const char* source, char* dest, int inputSize);
 LZ4_DEPRECATED("use LZ4_compress_fast_extState() instead")

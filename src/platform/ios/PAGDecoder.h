@@ -78,13 +78,6 @@ PAG_API @interface PAGDecoder : NSObject
  * Copies pixels from current PAGSurface to dstPixels with specified color type, alpha type and
  * row bytes. Returns true if pixels are copied to dstPixels.
  */
-- (void)readPixelsWithColorType:(PAGColorType)colorType
-                      alphaType:(PAGAlphaType)alphaType
-                      dstPixels:(void*)dstPixels
-                    dstRowBytes:(size_t)dstRowBytes
-                          index:(NSInteger)index
-                      withBlock:(nullable void (^)(BOOL status))block;
-
 - (BOOL)readPixelsWithColorType:(PAGColorType)colorType
                       alphaType:(PAGAlphaType)alphaType
                       dstPixels:(void*)dstPixels

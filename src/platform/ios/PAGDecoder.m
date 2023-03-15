@@ -33,7 +33,6 @@
   PAGSurface* pagSurface;
   UIImage* lastFrameImage;
   CGFloat _scale;
-  dispatch_queue_t queue;
 }
 
 @synthesize maxFrameRate = _maxFrameRate;
@@ -75,7 +74,6 @@
         _maxFrameRate > [composition frameRate] ? [composition frameRate] : _maxFrameRate;
     self.frames = [composition duration] * frameRate / 1000000;
     lastFrameImage = nil;
-    queue = dispatch_queue_create("pag.art.PAGDecoder", DISPATCH_QUEUE_SERIAL);
   }
   return self;
 }
@@ -132,23 +130,6 @@
   float progress = (index * 1.0 + 0.1) / self.frames;
   [pagPlayer setProgress:progress];
   return [pagPlayer flush];
-}
-
-- (void)readPixelsWithColorType:(PAGColorType)colorType
-                      alphaType:(PAGAlphaType)alphaType
-                      dstPixels:(void*)dstPixels
-                    dstRowBytes:(size_t)dstRowBytes
-                          index:(NSInteger)index
-                      withBlock:(nullable void (^)(BOOL status))block {
-  __block __typeof(self) weakSelf = self;
-  dispatch_async(queue, ^{
-    BOOL status = [weakSelf readPixelsWithColorType:colorType
-                                          alphaType:alphaType
-                                          dstPixels:dstPixels
-                                        dstRowBytes:dstRowBytes
-                                              index:index];
-    block(status);
-  });
 }
 
 - (BOOL)readPixelsWithColorType:(PAGColorType)colorType

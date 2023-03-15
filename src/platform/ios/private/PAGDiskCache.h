@@ -30,11 +30,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)objectForKey:(NSInteger)index dstData:(uint8_t*)dstData dstLength:(NSInteger)dstLength;
 
-- (void)objectForKey:(NSInteger)index
-             dstData:(uint8_t*)dstData
-           dstLength:(NSInteger)dstLength
-           withBlock:(nullable void (^)(BOOL status))block;
-
 - (BOOL)containsObjectForKey:(NSInteger)index;
 
 - (NSUInteger)count;

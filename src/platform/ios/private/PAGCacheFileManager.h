@@ -26,15 +26,15 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (NSString* __nullable)diskCachePath;
 
-- (void)SetMaxDiskSize:(long long)size;
+- (void)SetMaxDiskSize:(NSUInteger)size;
 
-- (long long)MaxDiskSize;
+- (NSUInteger)MaxDiskSize;
 
-- (long long)totalSize;
+- (NSUInteger)totalSize;
 
 - (void)removeAllFiles;
 
-- (void)removeFilesToLimit;
+- (void)removeFilesToSize:(NSUInteger)size;
 
 - (void)removeFileForPath:(NSString*)path;
 
