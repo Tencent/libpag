@@ -203,7 +203,11 @@ void Surface::aboutToDraw(bool discardContent) {
   if (cachedImage == nullptr) {
     return;
   }
+  auto isUnique = cachedImage.unique();
   cachedImage = nullptr;
+  if (isUnique) {
+    return;
+  }
   if (texture == nullptr || externalTexture) {
     return;
   }

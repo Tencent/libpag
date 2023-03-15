@@ -30,21 +30,19 @@ class Context;
 class RenderTarget;
 
 /**
- * Surface is responsible for managing the pixels that a canvas draws into. Surface takes care of
- * allocating a Canvas that will draw into the surface. Call surface->getCanvas() to use that
- * canvas (but don't delete it, it is owned by the surface). Surface always has non-zero dimensions.
- * If there is a request for a new surface, and either of the requested dimensions are zero,
- * then nullptr will be returned.
+ * The Surface class is responsible for managing the pixels that a Canvas draws into. The Surface
+ * takes care of allocating a Canvas that will draw into the surface. Call surface->getCanvas() to
+ * use that Canvas (but don't delete it, it is owned by the surface). The Surface always has
+ * non-zero dimensions. If there is a request for a new surface, and either of the requested
+ * dimensions is zero, then nullptr will be returned.
  */
 class Surface {
  public:
   /**
    * Creates a new Surface on GPU indicated by context. Allocates memory for pixels based on the
-   * width, height, and color type (alphaOnly). If the sampleCount is greater than 1, the Surface
-   * will have MSAA support enabled. If the tryHardware is true, the Surface will try to allocate a
-   * hardware-backed texture which can speed up the pixel reading process. Note that the tryHardware
-   * will be ignored if the mipMapped is true. Return nullptr if the alphaOnly is not supported or
-   * the size is zero.
+   * width, height, and color type (alpha only). A Surface with MSAA enabled is returned if the
+   * sample count is greater than 1. Return nullptr if the size is invalid or the alpha-only
+   * textures are not renderable in the GPU backend.
    */
   static std::shared_ptr<Surface> Make(Context* context, int width, int height,
                                        bool alphaOnly = false, int sampleCount = 1,
@@ -65,7 +63,7 @@ class Surface {
    * Wraps a BackendTexture into Surface. The caller must ensure the texture is valid for the
    * lifetime of the returned Surface. If the sampleCount greater than zero, creates an intermediate
    * MSAA Surface which is used for drawing backendTexture. Returns nullptr if the context is
-   * nullptr or the texture is invalid.
+   * nullptr or the texture is not renderable in the GPU backend.
    */
   static std::shared_ptr<Surface> MakeFrom(Context* context, const BackendTexture& backendTexture,
                                            ImageOrigin origin, int sampleCount = 1,

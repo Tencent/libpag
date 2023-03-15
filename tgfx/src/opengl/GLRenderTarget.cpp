@@ -138,9 +138,12 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(const Texture* texture, int
     return nullptr;
   }
   auto context = texture->getContext();
-  auto gl = GLFunctions::Get(context);
   auto caps = GLCaps::Get(context);
   auto glSampler = static_cast<const GLSampler*>(texture->getSampler());
+  if (!caps->isFormatRenderable(glSampler->format)) {
+    return nullptr;
+  }
+  auto gl = GLFunctions::Get(context);
   GLFrameBuffer textureFBInfo = {};
   textureFBInfo.format = glSampler->format;
   gl->genFramebuffers(1, &textureFBInfo.id);

@@ -95,9 +95,9 @@ class Canvas {
   void resetMatrix();
 
   /**
-   * Replaces Matrix with matrix premultiplied with existing Matrix. This has the effect of
-   * transforming the drawn geometry by matrix, before transforming the result with existing Matrix.
-   * @param matrix  matrix to premultiply with existing Matrix
+   * Replaces the current Matrix with matrix premultiplied with the existing one. This has the
+   * effect of transforming the drawn geometry by matrix, before transforming the result with the
+   * existing Matrix.
    */
   void concat(const Matrix& matrix);
 

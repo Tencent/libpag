@@ -176,8 +176,8 @@ class Image {
   bool isTextureBacked() const;
 
   /**
-   * Returns true if the Image has mipmap levels. The value was passed in when creating the Image.
-   * It may be ignored if mipmaps are not supported by the GPU or the associated image source.
+   * Returns true if the Image has mipmap levels. The flag was set by the makeMipMapped() method,
+   * which may be ignored if the GPU or the associated image source does not support mipmaps.
    */
   bool hasMipmaps() const;
 
