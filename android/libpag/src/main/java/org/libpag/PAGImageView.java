@@ -79,7 +79,6 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
     private static final int MSG_FLUSH = 0;
     private static final int MSG_INIT_CACHE = 1;
     private static final int MSG_HANDLER_THREAD_QUITE = 2;
-    private static final int ANDROID_SDK_VERSION_O = 26;
     private float animationScale = 1.0f;
     private volatile int width, height;
     private volatile int viewWidth, viewHeight;
@@ -99,6 +98,8 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
     private float renderScale = 1.0f;
     private PAGCacheManager.CacheItem cacheItem;
     private KeyItem lastKeyItem;
+
+    protected static long g_MaxDiskCacheSize = 1 * 1024 * 1024 * 1024;
 
     private class KeyItem {
         private String keyPrefix;
@@ -155,7 +156,6 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
     }
 
     /**
-     *
      * Set the value of renderScale property.
      */
     public void setRenderScale(float renderScale) {
@@ -165,6 +165,23 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
         this.renderScale = renderScale;
         width = (int) (viewWidth * renderScale);
         height = (int) (viewHeight * renderScale);
+    }
+
+    /**
+     * Set the value of maxDiskCache property.
+     */
+    public static void setMaxDiskCache(long maxDiskCache) {
+        g_MaxDiskCacheSize = maxDiskCache;
+    }
+
+    /**
+     * Clear all the disk cache.
+     */
+    public static void clearAllDiskCache(Context context) {
+        if (context == null) {
+            return;
+        }
+        PAGCacheManager.ClearAllDiskCache(context);
     }
 
     /**
@@ -447,7 +464,6 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
         if (!g_PAGViewThread.isAlive()) {
             return;
         }
-
         SendMessage(MSG_HANDLER_THREAD_QUITE, null);
     }
 
@@ -547,6 +563,10 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
                     }
                     break;
                 case MSG_HANDLER_THREAD_QUITE:
+                    PAGCacheManager manager = PAGCacheManager.Get(null);
+                    if (manager != null) {
+                        manager.autoClean();
+                    }
                     new Handler(Looper.getMainLooper()).post(new Runnable() {
                         @Override
                         public void run() {
@@ -890,10 +910,8 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
         isAttachedToWindow = false;
         super.onDetachedFromWindow();
         pauseAnimator();
-        if (Build.VERSION.SDK_INT < ANDROID_SDK_VERSION_O) {
-            synchronized (g_HandlerLock) {
-                DestroyHandlerThread();
-            }
+        synchronized (g_HandlerLock) {
+            DestroyHandlerThread();
         }
         animator.removeUpdateListener(mAnimatorUpdateListener);
         animator.removeListener(mAnimatorListenerAdapter);

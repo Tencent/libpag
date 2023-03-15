@@ -25,19 +25,22 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.os.Build;
 import android.os.Environment;
+import android.text.TextUtils;
 
 import org.extra.tools.LibraryLoadUtils;
 
 import java.io.File;
+import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 class PAGCacheManager {
     static PAGCacheManager pagCacheManager;
     private String cacheDir;
+    private final static float autoCleanThreshold = 0.6f;
     Context context;
 
-    public static class CacheItem {
+    static class CacheItem {
         private PAGImageCache _pagImageCache;
         ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
@@ -75,6 +78,7 @@ class PAGCacheManager {
             readUnlock();
             return inCache;
         }
+
         public boolean isAllCached() {
             readLock();
             boolean allCached = _pagImageCache.isAllCached();
@@ -108,9 +112,12 @@ class PAGCacheManager {
     private PAGCacheManager() {
     }
 
-    public static PAGCacheManager Get(Context context) {
+    protected static PAGCacheManager Get(Context context) {
         if (pagCacheManager != null) {
             return pagCacheManager;
+        }
+        if (context == null) {
+            return null;
         }
         if (!CheckPermission(context)) {
             return null;
@@ -121,12 +128,56 @@ class PAGCacheManager {
             }
             pagCacheManager = new PAGCacheManager();
             pagCacheManager.context = context.getApplicationContext();
-            pagCacheManager.cacheDir = getDefaultDiskCacheDir(context, "libpag");
+            pagCacheManager.cacheDir = GetDefaultDiskCacheDir(pagCacheManager.context, null);
             return pagCacheManager;
         }
     }
 
-    public CacheItem getOrCreate(String key, int width, int height, int frameCount) {
+    protected static void ClearAllDiskCache(Context context) {
+        PAGCacheManager manager = PAGCacheManager.Get(context);
+        if (manager == null) {
+            return;
+        }
+        try {
+            new File(manager.cacheDir).delete();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    protected void autoClean() {
+        try {
+            File[] files = new File(cacheDir).listFiles();
+            if (files.length == 0) {
+                return;
+            }
+            // Avoid large number of query lastModified operations
+            FilePair[] pairs = new FilePair[files.length];
+            long totalSize = 0;
+            for (int i = 0; i < files.length; i++) {
+                totalSize += files[i].length();
+                pairs[i] = new FilePair(files[i]);
+            }
+            if (totalSize < PAGImageView.g_MaxDiskCacheSize) {
+                return;
+            }
+            Arrays.sort(pairs);
+            long deleteSize = 0;
+            long needDeleteSize = (long) (PAGImageView.g_MaxDiskCacheSize * (1.f - autoCleanThreshold));
+            for (FilePair pair : pairs) {
+                deleteSize += pair.f.length();
+                pair.f.delete();
+                if ((totalSize - deleteSize) <= needDeleteSize) {
+                    return;
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    protected CacheItem getOrCreate(String key, int width, int height, int frameCount) {
         CacheItem cacheItem = pagCaches.get(key);
         if (cacheItem != null) {
             return cacheItem;
@@ -144,15 +195,15 @@ class PAGCacheManager {
         return cacheItem;
     }
 
-    public CacheItem get(String key) {
+    protected CacheItem get(String key) {
         return pagCaches.get(key);
     }
 
-    public void put(String key, CacheItem item) {
+    protected void put(String key, CacheItem item) {
         pagCaches.put(key, item);
     }
 
-    public void remove(String key) {
+    protected void remove(String key) {
         CacheItem item = pagCaches.get(key);
         if (item == null) {
             return;
@@ -163,13 +214,16 @@ class PAGCacheManager {
         item.writeUnlock();
     }
 
-    public String getPath(String key) {
+    protected String getPath(String key) {
         return cacheDir + File.separator + key;
     }
 
-    private static String getDefaultDiskCacheDir(Context context, String uniqueName) {
+    private static String GetDefaultDiskCacheDir(Context context, String uniqueName) {
         // Check if media is mounted or storage is built-in, if so, try and use external cache dir
         // otherwise use internal cache dir
+        if (TextUtils.isEmpty(uniqueName)) {
+            uniqueName = "libpag";
+        }
         final String cachePath =
                 Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState()) ||
                         !isExternalStorageRemovable() ?
@@ -235,4 +289,20 @@ class PAGCacheManager {
             nativeInit();
         }
     }
+
+    private static class FilePair implements Comparable {
+        public long t;
+        public File f;
+
+        public FilePair(File file) {
+            f = file;
+            t = file.lastModified();
+        }
+
+        public int compareTo(Object o) {
+            long u = ((FilePair) o).t;
+            return t < u ? -1 : t == u ? 0 : 1;
+        }
+    }
+
 }
