@@ -34,18 +34,18 @@ import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-class PAGCacheManager {
-    static PAGCacheManager pagCacheManager;
+class CacheManager {
+    static CacheManager pagCacheManager;
     private String cacheDir;
     private final static float autoCleanThreshold = 0.6f;
     Context context;
 
     static class CacheItem {
-        private PAGImageCache _pagImageCache;
+        private ImageCache _pagImageCache;
         ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
         static CacheItem Make(String path, int width, int height, int frameCount) {
-            PAGImageCache cache = PAGImageCache.Make(path, width, height, frameCount);
+            ImageCache cache = ImageCache.Make(path, width, height, frameCount);
             if (cache == null) {
                 return null;
             }
@@ -54,7 +54,7 @@ class PAGCacheManager {
             return cacheItem;
         }
 
-        public PAGImageCache pagCache() {
+        public ImageCache pagCache() {
             return _pagImageCache;
         }
 
@@ -109,10 +109,10 @@ class PAGCacheManager {
 
     ConcurrentHashMap<String, CacheItem> pagCaches = new ConcurrentHashMap<>();
 
-    private PAGCacheManager() {
+    private CacheManager() {
     }
 
-    protected static PAGCacheManager Get(Context context) {
+    protected static CacheManager Get(Context context) {
         if (pagCacheManager != null) {
             return pagCacheManager;
         }
@@ -122,11 +122,11 @@ class PAGCacheManager {
         if (!CheckPermission(context)) {
             return null;
         }
-        synchronized (PAGCacheManager.class) {
+        synchronized (CacheManager.class) {
             if (pagCacheManager != null) {
                 return pagCacheManager;
             }
-            pagCacheManager = new PAGCacheManager();
+            pagCacheManager = new CacheManager();
             pagCacheManager.context = context.getApplicationContext();
             pagCacheManager.cacheDir = GetDefaultDiskCacheDir(pagCacheManager.context, null);
             return pagCacheManager;
@@ -134,7 +134,7 @@ class PAGCacheManager {
     }
 
     protected static void ClearAllDiskCache(Context context) {
-        PAGCacheManager manager = PAGCacheManager.Get(context);
+        CacheManager manager = CacheManager.Get(context);
         if (manager == null) {
             return;
         }
@@ -182,7 +182,7 @@ class PAGCacheManager {
         if (cacheItem != null) {
             return cacheItem;
         }
-        synchronized (PAGCacheManager.this) {
+        synchronized (CacheManager.this) {
             cacheItem = pagCaches.get(key);
             if (cacheItem == null) {
                 cacheItem = CacheItem.Make(getPath(key), width, height, frameCount);
@@ -248,10 +248,10 @@ class PAGCacheManager {
         return true;
     }
 
-    private static class PAGImageCache {
+    private static class ImageCache {
         private long nativeContext = 0;
 
-        static PAGImageCache Make(String path, int width, int height, int frameCount) {
+        static ImageCache Make(String path, int width, int height, int frameCount) {
             File file = new File(path);
             boolean needInit = false;
             if (!file.exists()) {
@@ -263,12 +263,34 @@ class PAGCacheManager {
                 file.delete();
                 return null;
             }
-            return new PAGImageCache(nativeHandle);
+            return new ImageCache(nativeHandle);
         }
 
-        native boolean saveBitmap(int frame, Bitmap bitmap);
+        boolean saveBitmap(int frame, Bitmap bitmap) {
+            if (bitmap == null) {
+                return false;
+            }
+            boolean isHardware = false;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                isHardware = bitmap.getConfig() == Bitmap.Config.HARDWARE;
+            }
+            return saveBitmap(frame, bitmap, bitmap.getByteCount(), isHardware);
+        }
 
-        native boolean inflateBitmap(int frame, Bitmap bitmap);
+        native boolean saveBitmap(int frame, Bitmap bitmap, int byteCount, boolean isHardware);
+
+        boolean inflateBitmap(int frame, Bitmap bitmap) {
+            if (bitmap == null) {
+                return false;
+            }
+            boolean isHardware = false;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                isHardware = bitmap.getConfig() == Bitmap.Config.HARDWARE;
+            }
+            return inflateBitmap(frame, bitmap, bitmap.getByteCount(), isHardware);
+        }
+
+        native boolean inflateBitmap(int frame, Bitmap bitmap, int byteCount, boolean isHardware);
 
         native boolean isCached(int frame);
 
@@ -278,7 +300,7 @@ class PAGCacheManager {
 
         private static native long SetupCache(String path, int width, int height, int frameCount, boolean needInit);
 
-        private PAGImageCache(long nativeContext) {
+        private ImageCache(long nativeContext) {
             this.nativeContext = nativeContext;
         }
 

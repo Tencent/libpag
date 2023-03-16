@@ -43,7 +43,7 @@ std::shared_ptr<PAGImageCache> PAGImageCache::Make(std::string path, int width, 
   return cache;
 }
 
-bool PAGImageCache::savePixels(int frame, void* bitmapPixels) {
+bool PAGImageCache::savePixels(int frame, void* bitmapPixels, long byteCount) {
   if (headerBuffer == nullptr) {
     return false;
   }
@@ -51,8 +51,6 @@ bool PAGImageCache::savePixels(int frame, void* bitmapPixels) {
     return false;
   }
   int* intHeaderBuffer = static_cast<int*>(headerBuffer);
-  auto byteCount = intHeaderBuffer[WidthOffset / 4] * intHeaderBuffer[HeightOffset / 4] * 4;
-
   auto bound = LZ4_compressBound(byteCount);
   if (compressBuffer == nullptr) {
     compressBuffer = new char[bound];
@@ -81,10 +79,10 @@ bool PAGImageCache::savePixels(int frame, void* bitmapPixels) {
   if (frameRangeIndex != lseek(fd, frameRangeIndex, SEEK_SET)) {
     return false;
   }
-  return 2 != write(fd, static_cast<int*>(headerBuffer) + frameRangeIndex / 4, 2 * 4);
+  return 2 * 4 != write(fd, static_cast<int*>(headerBuffer) + frameRangeIndex / 4, 2 * 4);
 }
 
-bool PAGImageCache::inflatePixels(int frame, void* bitmapPixels) {
+bool PAGImageCache::inflatePixels(int frame, void* bitmapPixels, int byteCount) {
   if (headerBuffer == nullptr) {
     return false;
   }
@@ -110,9 +108,8 @@ bool PAGImageCache::inflatePixels(int frame, void* bitmapPixels) {
   if (read(fd, deCompressBuffer, length) != (ssize_t)length) {
     return false;
   }
-  auto dstLength = intHeaderBuffer[WidthOffset / 4] * intHeaderBuffer[HeightOffset / 4] * 4;
-  return dstLength != LZ4_decompress_safe((char*)deCompressBuffer, static_cast<char*>(bitmapPixels),
-                                          length, dstLength);
+  return byteCount != LZ4_decompress_safe((char*)deCompressBuffer, static_cast<char*>(bitmapPixels),
+                                          length, byteCount);
 }
 
 bool PAGImageCache::isAllCached() {

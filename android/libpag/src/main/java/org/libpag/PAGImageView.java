@@ -64,7 +64,7 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
     private DecoderInfo decoderInfo = new DecoderInfo();
     private BitmapPool bitmapPool;
     private ValueAnimator animator;
-    private PAGCacheManager cacheManager;
+    private CacheManager cacheManager;
     private boolean isMemoryCacheOpen = false;
     private volatile boolean _isPlaying = false;
     private volatile Boolean _isAnimatorPreRunning = null;
@@ -96,7 +96,7 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
     private ArrayList<WeakReference<Future>> saveCacheTasks = new ArrayList<>();
     private WeakReference<Future> lastFetchCacheTask;
     private float renderScale = 1.0f;
-    private PAGCacheManager.CacheItem cacheItem;
+    private CacheManager.CacheItem cacheItem;
     private KeyItem lastKeyItem;
 
     protected static long g_MaxDiskCacheSize = 1 * 1024 * 1024 * 1024;
@@ -181,7 +181,7 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
         if (context == null) {
             return;
         }
-        PAGCacheManager.ClearAllDiskCache(context);
+        CacheManager.ClearAllDiskCache(context);
     }
 
     /**
@@ -563,7 +563,7 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
                     }
                     break;
                 case MSG_HANDLER_THREAD_QUITE:
-                    PAGCacheManager manager = PAGCacheManager.Get(null);
+                    CacheManager manager = CacheManager.Get(null);
                     if (manager != null) {
                         manager.autoClean();
                     }
@@ -830,7 +830,7 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
         }
         handleCacheStrategyChange(getContext());
         Lifecycle.getInstance().addListener(this);
-        cacheManager = PAGCacheManager.Get(getContext());
+        cacheManager = CacheManager.Get(getContext());
         animator = ValueAnimator.ofFloat(0.0f, 1.0f);
         animator.setRepeatCount(0);
         animator.setInterpolator(new LinearInterpolator());

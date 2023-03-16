@@ -26,14 +26,19 @@
 #include "JNIHelper.h"
 #include "NativePlatform.h"
 #include "base/utils/TGFXCast.h"
+#include "tgfx/src/platform/android/AHardwareBufferUtil.h"
+#include "tgfx/src/platform/android/HardwareBufferInterface.h"
 
 namespace pag {
 static jfieldID PAGSurface_nativeSurface;
 static Global<jclass> Bitmap_Class;
 static jmethodID Bitmap_createBitmap;
 static jmethodID Bitmap_isRecycled;
+static jmethodID Bitmap_getConfig;
+static jmethodID BitmapConfig_equals;
 static Global<jclass> Config_Class;
 static jfieldID Config_ARGB_888;
+static jfieldID Config_HARDWARE;
 }  // namespace pag
 
 using namespace pag;
@@ -56,9 +61,14 @@ PAG_API void Java_org_libpag_PAGSurface_nativeInit(JNIEnv* env, jclass clazz) {
       env->GetStaticMethodID(Bitmap_Class.get(), "createBitmap",
                              "(IILandroid/graphics/Bitmap$Config;)Landroid/graphics/Bitmap;");
   Bitmap_isRecycled = env->GetMethodID(Bitmap_Class.get(), "isRecycled", "()Z");
+  Bitmap_getConfig =
+      env->GetMethodID(Bitmap_Class.get(), "getConfig", "()Landroid/graphics/Bitmap$Config;");
   Config_Class = env->FindClass("android/graphics/Bitmap$Config");
   Config_ARGB_888 =
       env->GetStaticFieldID(Config_Class.get(), "ARGB_8888", "Landroid/graphics/Bitmap$Config;");
+  Config_HARDWARE =
+      env->GetStaticFieldID(Config_Class.get(), "HARDWARE", "Landroid/graphics/Bitmap$Config;");
+  BitmapConfig_equals = env->GetMethodID(Config_Class.get(), "equals", "(Ljava/lang/Object;)Z");
 }
 
 PAG_API void Java_org_libpag_PAGSurface_nativeRelease(JNIEnv* env, jobject thiz) {
@@ -199,6 +209,29 @@ extern "C" JNIEXPORT jlong JNICALL Java_org_libpag_PAGSurface_SetupOffscreen(JNI
   return reinterpret_cast<jlong>(new JPAGSurface(surface));
 }
 
+static bool readPixelsToHardwareBuffer(JNIEnv* env, std::shared_ptr<PAGSurface> surface,
+                                       jobject jBitmap) {
+  auto buffer = tgfx::HardwareBufferInterface::AHardwareBuffer_fromBitmap(env, jBitmap);
+
+  uint8_t* pixels = nullptr;
+  if (0 != tgfx::HardwareBufferInterface::Lock(buffer, AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN, -1,
+                                               nullptr, reinterpret_cast<void**>(&pixels))) {
+    LOGE("Failed to AHardwareBuffer_lock");
+    return false;
+  }
+  bool res = false;
+  if (pixels) {
+    auto imageInfo = tgfx::GetImageInfo(buffer);
+    if (imageInfo.width() != surface->width() || imageInfo.height() != surface->height()) {
+      return false;
+    }
+    res = surface->readPixels(ToPAG(imageInfo.colorType()), ToPAG(imageInfo.alphaType()), pixels,
+                              imageInfo.rowBytes());
+  }
+  tgfx::HardwareBufferInterface::Unlock(buffer, nullptr);
+  return res;
+}
+
 extern "C" JNIEXPORT jboolean JNICALL Java_org_libpag_PAGSurface_readPixels(JNIEnv* env,
                                                                             jobject thiz,
                                                                             jobject jBitmap) {
@@ -212,6 +245,12 @@ extern "C" JNIEXPORT jboolean JNICALL Java_org_libpag_PAGSurface_readPixels(JNIE
   bool isRecycled = env->CallBooleanMethod(jBitmap, Bitmap_isRecycled);
   if (isRecycled) {
     return false;
+  }
+  auto config = env->CallObjectMethod(jBitmap, Bitmap_getConfig);
+  static Global<jobject> HardwareConfig =
+      env->GetStaticObjectField(Config_Class.get(), Config_HARDWARE);
+  if (env->CallBooleanMethod(config, BitmapConfig_equals, HardwareConfig.get())) {
+    return readPixelsToHardwareBuffer(env, surface, jBitmap);
   }
   unsigned char* newBitmapPixels;
   auto imageInfo = GetImageInfo(env, jBitmap);

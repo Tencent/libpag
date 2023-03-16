@@ -19,7 +19,9 @@
 package org.extra.tools;
 
 import android.graphics.Bitmap;
-import android.util.Log;
+import android.graphics.ColorSpace;
+import android.hardware.HardwareBuffer;
+import android.os.Build;
 
 import java.util.ArrayDeque;
 import java.util.HashMap;
@@ -63,7 +65,16 @@ public class BitmapPool {
         if (bitmapHashMap.get(key) == null || bitmapHashMap.get(key).isEmpty()) {
             BitmapResource resource = new BitmapResource();
             resource.bitmapPool = this;
-            resource.bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                HardwareBuffer hardwareBuffer = HardwareBuffer.create(width, height,
+                        HardwareBuffer.RGBA_8888, 1,
+                        HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE | HardwareBuffer.USAGE_CPU_READ_OFTEN | HardwareBuffer.USAGE_CPU_WRITE_OFTEN);
+                resource.bitmap = Bitmap.wrapHardwareBuffer(hardwareBuffer,
+                        ColorSpace.get(ColorSpace.Named.SRGB));
+
+            } else {
+                resource.bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            }
             return resource;
         }
         currentSize--;
