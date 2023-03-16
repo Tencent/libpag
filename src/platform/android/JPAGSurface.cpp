@@ -232,9 +232,9 @@ static bool readPixelsToHardwareBuffer(JNIEnv* env, std::shared_ptr<PAGSurface> 
   return res;
 }
 
-extern "C" JNIEXPORT jboolean JNICALL Java_org_libpag_PAGSurface_readPixels(JNIEnv* env,
-                                                                            jobject thiz,
-                                                                            jobject jBitmap) {
+extern "C" JNIEXPORT jboolean JNICALL Java_org_libpag_PAGSurface_copyImageTo(JNIEnv* env,
+                                                                             jobject thiz,
+                                                                             jobject jBitmap) {
   if (thiz == nullptr || jBitmap == nullptr) {
     return false;
   }

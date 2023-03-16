@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -34,14 +34,14 @@ public class PAGDecoder {
      * Make a decoder from pagComposition.
      */
     public static PAGDecoder Make(PAGComposition pagComposition) {
-        return Make(pagComposition, 30, 1.0f);
+        return Make(pagComposition, 0, 1.0f);
     }
 
     /**
      * Make a decoder from pagComposition.
      * The size of decoder will be scaled.
      */
-    public static PAGDecoder Make(PAGComposition pagComposition, float maxFrameRate, float scale) {
+    public static PAGDecoder Make(PAGComposition pagComposition, float frameRate, float scale) {
         if (pagComposition == null) {
             return null;
         }
@@ -58,7 +58,9 @@ public class PAGDecoder {
             return null;
         }
         pagDecoder.pagPlayer = new PAGPlayer();
-        pagDecoder.pagPlayer.setMaxFrameRate(maxFrameRate);
+        if (frameRate > 0) {
+            pagDecoder.pagPlayer.setMaxFrameRate(frameRate);
+        }
         pagDecoder.pagPlayer.setSurface(pagDecoder.pagSurface);
         pagDecoder.pagPlayer.setComposition(pagComposition);
         return pagDecoder;
@@ -88,21 +90,21 @@ public class PAGDecoder {
     /**
      * Copies pixels from current PAGDecoder to the specified bitmap.
      */
-    public boolean frameAtIndex(Bitmap bitmap, int index) {
-        if (pagSurface == null || bitmap == null || bitmap.isRecycled() || index < 0 || index >= _numFrames) {
+    public boolean copyFrameTo(Bitmap bitmap, int index) {
+        if (bitmap == null || bitmap.isRecycled() || index < 0 || index >= _numFrames) {
             return false;
         }
         float progress = (index * 1.0f + 0.1f) / _numFrames;
         pagPlayer.setProgress(progress);
         pagPlayer.flush();
-        return pagSurface.readPixels(bitmap);
+        return pagSurface.copyImageTo(bitmap);
     }
 
     /**
      * Returns the frame image from a specified index.
      */
     public Bitmap frameAtIndex(int index) {
-        if (pagSurface == null || index < 0 || index >= _numFrames) {
+        if (index < 0 || index >= _numFrames) {
             return null;
         }
         float progress = (index * 1.0f + 0.1f) / _numFrames;
@@ -114,17 +116,15 @@ public class PAGDecoder {
         return lastFrameBitmap;
     }
 
-
-    public void freeCache() {
-        if (pagSurface == null) {
-            return;
-        }
+    /**
+     * Free up resources used by the PAGDecoder instance immediately instead of relying on the
+     * garbage collector to do this for you at some point in the future.
+     */
+    public void release() {
         pagSurface.release();
-        pagSurface = null;
         pagPlayer.setSurface(null);
         pagPlayer.setComposition(null);
         pagPlayer.release();
-        pagPlayer = null;
     }
 
     static {

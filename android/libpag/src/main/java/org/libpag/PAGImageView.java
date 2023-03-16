@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -28,10 +28,7 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Matrix;
 import android.os.Build;
-import android.os.Handler;
-import android.os.HandlerThread;
 import android.os.Looper;
-import android.os.Message;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.AttributeSet;
@@ -51,7 +48,6 @@ import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
@@ -59,100 +55,71 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-public class PAGImageView extends View implements LifecycleListener, ComponentCallbacks2 {
+import org.libpag.PAGImageViewHelper.CacheInfo;
+import org.libpag.PAGImageViewHelper.DecoderInfo;
+
+public class PAGImageView extends View implements ComponentCallbacks2 {
     private final static String TAG = "PAGImageView";
-    private DecoderInfo decoderInfo = new DecoderInfo();
-    private BitmapPool bitmapPool;
+    protected BitmapPool bitmapPool;
     private ValueAnimator animator;
-    private CacheManager cacheManager;
     private boolean isMemoryCacheOpen = false;
     private volatile boolean _isPlaying = false;
     private volatile Boolean _isAnimatorPreRunning = null;
-    private boolean isAttachedToWindow = false;
     private volatile boolean progressExplicitlySet = true;
     private final Object updateTimeLock = new Object();
-
     private static final Object g_HandlerLock = new Object();
-    private static PAGViewHandler g_PAGViewHandler = null;
-    private static HandlerThread g_PAGViewThread = null;
-    private static volatile int g_HandlerThreadCount = 0;
-    private static final int MSG_FLUSH = 0;
-    private static final int MSG_INIT_CACHE = 1;
-    private static final int MSG_HANDLER_THREAD_QUITE = 2;
-    private float animationScale = 1.0f;
-    private volatile int width, height;
-    private volatile int viewWidth, viewHeight;
     private volatile BitmapResource _currentImage;
     private int _currentFrame;
-    private float _maxFrameRate = 60;
+    private float _maxFrameRate = 30;
     private PAGComposition _composition;
     private String _pagFilePath;
     private int _scaleMode = PAGScaleMode.LetterBox;
     private Matrix _matrix;
     private ConcurrentHashMap<String, Set<Integer>> keysInMemoryCacheMap = new ConcurrentHashMap<>();
-    private static ThreadPoolExecutor saveCacheExecutors;
-    private static ThreadPoolExecutor fetchCacheExecutors;
     private ConcurrentHashMap<String, BitmapResource> memoryLruCache = new ConcurrentHashMap<>();
     private ArrayList<WeakReference<Future>> saveCacheTasks = new ArrayList<>();
-    private WeakReference<Future> lastFetchCacheTask;
     private float renderScale = 1.0f;
-    private CacheManager.CacheItem cacheItem;
-    private KeyItem lastKeyItem;
+    protected CacheManager.CacheItem cacheItem;
+    protected KeyItem lastKeyItem;
+    protected DecoderInfo decoderInfo = new DecoderInfo();
+    protected CacheManager cacheManager;
 
     protected static long g_MaxDiskCacheSize = 1 * 1024 * 1024 * 1024;
 
-    private class KeyItem {
-        private String keyPrefix;
-        private String keyPrefixMD5;
-        boolean needAutoClean = false;
+    public interface PAGImageViewListener {
+        /**
+         * Notifies the start of the animation.
+         */
+        void onAnimationStart(PAGImageView view);
+
+        /**
+         * Notifies the end of the animation.
+         */
+        void onAnimationEnd(PAGImageView view);
+
+        /**
+         * Notifies the cancellation of the animation.
+         */
+        void onAnimationCancel(PAGImageView view);
+
+        /**
+         * Notifies the repetition of the animation.
+         */
+        void onAnimationRepeat(PAGImageView view);
+
+        /**
+         * Notifies the occurrence of another frame of the animation.
+         */
+        void onAnimationUpdate(PAGImageView view);
     }
 
-    private class DecoderInfo {
-        int _width;
-        int _height;
-        float realFrameRate;
-        float scale;
-        int numFrames;
-        long duration;
-        PAGDecoder _pagDecoder;
-
-        boolean isValid() {
-            return _width > 0;
-        }
-
-        boolean initDecoder(int width, int height) {
-            if (_composition == null && _pagFilePath == null || width == 0) {
-                return false;
-            }
-            PAGComposition composition = _composition;
-            if (composition == null) {
-                if (_pagFilePath.startsWith("assets://")) {
-                    composition = PAGFile.Load(getContext().getAssets(), _pagFilePath.substring(9));
-                } else {
-                    composition = PAGFile.Load(_pagFilePath);
-                }
-            }
-            if (composition == null) {
-                return false;
-            }
-            float maxScale = Math.max(width * 1.0f / composition.width(),
-                    height * 1.0f / composition.height());
-            _pagDecoder = PAGDecoder.Make(composition, _maxFrameRate, maxScale);
-            realFrameRate = composition.frameRate() > _maxFrameRate ? _maxFrameRate :
-                    composition.frameRate();
-            _width = _pagDecoder.width();
-            _height = _pagDecoder.height();
-            numFrames = _pagDecoder.numFrames();
-            duration = composition.duration();
-            return true;
-        }
-
-        void release() {
-            if (_pagDecoder != null) {
-                _pagDecoder.freeCache();
-            }
-            _pagDecoder = null;
-        }
+    /**
+     * This value defines the scale factor for internal graphics renderer, ranges from 0.0 to 1.0.
+     * The scale factors less than 1.0 may result in blurred output, but it can reduce the usage of
+     * graphics memory which leads to better performance. The default value is 1.0.
+     */
+    public float renderScale() {
+        return renderScale;
     }
 
     /**
@@ -175,6 +142,13 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
     }
 
     /**
+     * Get the value of maxDiskCache property.
+     */
+    public static long maxDiskCache() {
+        return g_MaxDiskCacheSize;
+    }
+
+    /**
      * Clear all the disk cache.
      */
     public static void clearAllDiskCache(Context context) {
@@ -185,10 +159,21 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
     }
 
     /**
-     * Set the value of isMemoryCacheOpen property.
+     * If set to true, the PAGImageView loads all image frames into the memory,
+     * which will significantly increase the rendering performance but may cost lots of additional memory.
+     * Use it when you prefer rendering speed over memory usage.
+     * If set to false, the PAGImageView loads only one image frame at a time into the memory.
+     * The default value is false.
      */
-    public void enableMemoryCache(boolean enable) {
+    public void setMemoryCacheEnabled(boolean enable) {
         isMemoryCacheOpen = enable;
+    }
+
+    /**
+     * Return the value of isMemoryCacheOpen property.
+     */
+    public boolean memoryCacheEnabled() {
+        return isMemoryCacheOpen;
     }
 
     /**
@@ -208,7 +193,7 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
     /**
      * Sets the maximum frame rate for rendering. If set to a value less than the actual frame rate from
      * PAGFile, it drops frames but increases performance. Otherwise, it has no effect. The default
-     * value is 60.
+     * value is from the associated Composition.
      */
     public void setMaxFrameRate(int maxFrameRate) {
         _maxFrameRate = maxFrameRate;
@@ -237,7 +222,7 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
             animator.setCurrentPlayTime(currentPlayTime);
             progressExplicitlySet = true;
         }
-        NeedsUpdateView(this);
+        PAGImageViewHelper.NeedsUpdateView(this);
     }
 
     /**
@@ -272,6 +257,17 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
         return true;
     }
 
+    /**
+     * Sets the number of times the animation will repeat. The default is 1, which means the animation
+     * will play only once. 0 means the animation will play infinity times.
+     */
+    public void setRepeatCount(int value) {
+        if (value < 0) {
+            value = 0;
+        }
+        animator.setRepeatCount(value - 1);
+    }
+
     private void refreshDecodeInfo() {
         progressExplicitlySet = true;
         if (decoderInfo != null) {
@@ -298,8 +294,8 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
     }
 
     /**
-     * Specifies the rule of how to scale the pag content to fit the surface size. The matrix
-     * changes when this method is called.
+     * Specifies the rule of how to scale the pag content to fit the to fit the PAGImageView size.
+     * The current matrix of the PAGImageView changes when this method is called.
      */
     public void setScaleMode(int scaleMode) {
         _scaleMode = scaleMode;
@@ -317,7 +313,9 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
         if (!decoderInfo.isValid()) {
             return new Matrix();
         }
-        return ApplyScaleMode(_scaleMode, decoderInfo._width, decoderInfo._height, width, height);
+        return PAGImageViewHelper.ApplyScaleMode(_scaleMode, decoderInfo._width,
+                decoderInfo._height, width,
+                height);
     }
 
     /**
@@ -359,16 +357,6 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
         }
     }
 
-    @Override
-    public void onResume() {
-        // When the device is locked and then unlocked, the PAGView's content may disappear,
-        // use the following way to make the content appear.
-        if (isAttachedToWindow && getVisibility() == View.VISIBLE) {
-            setVisibility(View.INVISIBLE);
-            setVisibility(View.VISIBLE);
-        }
-    }
-
     public PAGImageView(Context context) {
         super(context);
         init();
@@ -395,6 +383,9 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
         }
     }
 
+    private static ThreadPoolExecutor saveCacheExecutors;
+    private static ThreadPoolExecutor fetchCacheExecutors;
+
     private static void InitCacheExecutors() {
         if (fetchCacheExecutors == null || saveCacheExecutors == null) {
             synchronized (PAGImageView.class) {
@@ -414,17 +405,9 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
         }
     }
 
-    private static void handleDiskCacheStrategyChange(final Context context) {
-        InitCacheExecutors();
-    }
-
-    private void handleMemoryCacheStrategyChange() {
-        clearMemoryCache();
-    }
-
     private void handleCacheStrategyChange(final Context context) {
-        handleDiskCacheStrategyChange(context);
-        handleMemoryCacheStrategyChange();
+        InitCacheExecutors();
+        clearMemoryCache();
     }
 
     private void clearMemoryCache() {
@@ -440,209 +423,6 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
             memoryLruCache.clear();
         }
         keysInMemoryCacheMap.clear();
-    }
-
-    private static synchronized void StartHandlerThread() {
-        g_HandlerThreadCount++;
-        if (g_PAGViewThread == null) {
-            g_PAGViewThread = new HandlerThread("pagImageView-renderer");
-            g_PAGViewThread.start();
-        }
-        if (g_PAGViewHandler == null) {
-            g_PAGViewHandler = new PAGViewHandler(g_PAGViewThread.getLooper());
-        }
-    }
-
-    private static synchronized void DestroyHandlerThread() {
-        g_HandlerThreadCount--;
-        if (g_HandlerThreadCount != 0) {
-            return;
-        }
-        if (g_PAGViewHandler == null || g_PAGViewThread == null) {
-            return;
-        }
-        if (!g_PAGViewThread.isAlive()) {
-            return;
-        }
-        SendMessage(MSG_HANDLER_THREAD_QUITE, null);
-    }
-
-    private static void SendMessage(int msgId, Object obj) {
-        if (g_PAGViewHandler == null) {
-            return;
-        }
-        Message message = g_PAGViewHandler.obtainMessage();
-        message.arg1 = msgId;
-        if (obj != null) {
-            message.obj = obj;
-        }
-        g_PAGViewHandler.sendMessage(message);
-    }
-
-    private static void NeedsUpdateView(PAGImageView pagView) {
-        if (g_PAGViewHandler == null) {
-            return;
-        }
-        g_PAGViewHandler.needsUpdateView(pagView);
-    }
-
-    private static void HandlerThreadQuit() {
-        if (g_HandlerThreadCount != 0) {
-            return;
-        }
-        if (g_PAGViewHandler == null || g_PAGViewThread == null) {
-            return;
-        }
-        if (!g_PAGViewThread.isAlive()) {
-            return;
-        }
-        g_PAGViewHandler.removeCallbacksAndMessages(null);
-        if (Build.VERSION.SDK_INT > 18) {
-            g_PAGViewThread.quitSafely();
-        } else {
-            g_PAGViewThread.quit();
-        }
-        g_PAGViewThread = null;
-        g_PAGViewHandler = null;
-    }
-
-    static class PAGViewHandler extends Handler {
-
-        private final Object lock = new Object();
-        private List<PAGImageView> needsUpdateViews = new ArrayList<>();
-
-        PAGViewHandler(Looper looper) {
-            super(looper);
-        }
-
-        void needsUpdateView(PAGImageView pagView) {
-            synchronized (lock) {
-                if (needsUpdateViews.isEmpty()) {
-                    Message message = obtainMessage();
-                    message.arg1 = MSG_FLUSH;
-                    sendMessage(message);
-                }
-                needsUpdateViews.add(pagView);
-            }
-        }
-
-        @Override
-        public void handleMessage(Message msg) {
-            super.handleMessage(msg);
-            switch (msg.arg1) {
-                case MSG_INIT_CACHE:
-                    PAGImageView imageView = (PAGImageView) msg.obj;
-                    if (!imageView.decoderInfo.isValid()) {
-                        return;
-                    }
-                    imageView.lastKeyItem = imageView.fetchKeyFrame();
-                    if (imageView.cacheItem != null || imageView.lastKeyItem == null) {
-                        return;
-                    }
-                    imageView.cacheItem = imageView.cacheManager.getOrCreate(imageView.lastKeyItem.keyPrefixMD5,
-                            imageView.decoderInfo._width, imageView.decoderInfo._height,
-                            imageView.decoderInfo.numFrames);
-                    break;
-                case MSG_FLUSH:
-                    List<PAGImageView> tempList;
-                    synchronized (lock) {
-                        tempList = new ArrayList<>(needsUpdateViews);
-                        needsUpdateViews.clear();
-                    }
-                    List<PAGImageView> flushedViews = new ArrayList<>();
-                    for (Object object : tempList) {
-                        if (!(object instanceof PAGImageView)) {
-                            continue;
-                        }
-                        PAGImageView pagView = (PAGImageView) object;
-                        if (flushedViews.contains(pagView)) {
-                            continue;
-                        }
-                        pagView.updateView();
-                        flushedViews.add(pagView);
-                    }
-                    break;
-                case MSG_HANDLER_THREAD_QUITE:
-                    CacheManager manager = CacheManager.Get(null);
-                    if (manager != null) {
-                        manager.autoClean();
-                    }
-                    new Handler(Looper.getMainLooper()).post(new Runnable() {
-                        @Override
-                        public void run() {
-                            HandlerThreadQuit();
-                        }
-                    });
-                    break;
-                default:
-                    break;
-            }
-        }
-    }
-
-    private static class CacheInfo {
-        static CacheInfo Make(PAGImageView pagImageView,
-                              String keyPrefix,
-                              int frame,
-                              BitmapPool.BitmapResource bitmap) {
-            CacheInfo cacheInfo = new CacheInfo();
-            cacheInfo.pagImageView = pagImageView;
-            cacheInfo.keyPrefix = keyPrefix;
-            cacheInfo.frame = frame;
-            cacheInfo.bitmap = bitmap;
-            return cacheInfo;
-        }
-
-        PAGImageView pagImageView;
-        String keyPrefix;
-        String key;
-        int frame;
-        BitmapPool.BitmapResource bitmap;
-    }
-
-    private static void executeCache(CacheInfo cacheInfo, boolean notifyView) {
-        if (cacheInfo.pagImageView == null || TextUtils.isEmpty(cacheInfo.keyPrefix)) {
-            if (cacheInfo.bitmap != null) {
-                cacheInfo.bitmap.release();
-            }
-            return;
-        }
-        if (cacheInfo.bitmap != null) {
-            // PutCache;
-            cacheInfo.pagImageView.putBitmapToDiskCache(cacheInfo.frame, cacheInfo.bitmap);
-            cacheInfo.bitmap.release();
-        } else {
-            // GetCache;
-            BitmapPool.BitmapResource bitmap = cacheInfo.pagImageView._currentImage;
-            boolean created = false;
-            if (bitmap == null) {
-                bitmap =
-                        cacheInfo.pagImageView.bitmapPool.get(cacheInfo.pagImageView.decoderInfo._width,
-                                cacheInfo.pagImageView.decoderInfo._height);
-                created = true;
-            }
-
-            if (!cacheInfo.pagImageView.inflateBitmapFromDiskCache(bitmap, cacheInfo) && created) {
-                cacheInfo.pagImageView.bitmapPool.put(bitmap);
-            }
-            if (bitmap != null) {
-                if (created) {
-                    cacheInfo.pagImageView.putToSelfMemoryCache(cacheInfo.keyPrefix, cacheInfo.frame, bitmap);
-                    if (cacheInfo.pagImageView.isMemoryCacheOpen) {
-                        cacheInfo.pagImageView.memoryLruCache.put(cacheInfo.key, bitmap);
-                    } else {
-                        cacheInfo.pagImageView.removeToSelfMemoryCache(cacheInfo.keyPrefix,
-                                cacheInfo.frame,
-                                cacheInfo.pagImageView._currentImage);
-                    }
-                }
-                if (notifyView) {
-                    cacheInfo.pagImageView._currentImage = bitmap;
-                    cacheInfo.pagImageView.notifyAnimationUpdate();
-                    cacheInfo.pagImageView.postInvalidate();
-                }
-            }
-        }
     }
 
     private void putToSelfMemoryCache(String keyPrefix, int frame, BitmapResource bitmapResource) {
@@ -703,34 +483,6 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
         keysInMemoryCacheMap.clear();
     }
 
-    public interface PAGImageViewListener {
-        /**
-         * Notifies the start of the animation.
-         */
-        void onAnimationStart(PAGImageView view);
-
-        /**
-         * Notifies the end of the animation.
-         */
-        void onAnimationEnd(PAGImageView view);
-
-        /**
-         * Notifies the cancellation of the animation.
-         */
-        void onAnimationCancel(PAGImageView view);
-
-        /**
-         * Notifies the repetition of the animation.
-         */
-        void onAnimationRepeat(PAGImageView view);
-
-        /**
-         * Notifies the occurrence of another frame of the animation.
-         */
-        void onAnimationUpdate(PAGImageView view);
-    }
-
-    private ArrayList<PAGImageViewListener> mViewListeners = new ArrayList<>();
     private volatile long currentPlayTime;
 
     private final ValueAnimator.AnimatorUpdateListener mAnimatorUpdateListener = new ValueAnimator.AnimatorUpdateListener() {
@@ -740,9 +492,11 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
                 return;
             }
             PAGImageView.this.currentPlayTime = animation.getCurrentPlayTime();
-            NeedsUpdateView(PAGImageView.this);
+            PAGImageViewHelper.NeedsUpdateView(PAGImageView.this);
         }
     };
+
+    private ArrayList<PAGImageViewListener> mViewListeners = new ArrayList<>();
 
     private final AnimatorListenerAdapter mAnimatorListenerAdapter = new AnimatorListenerAdapter() {
         @Override
@@ -804,6 +558,9 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
         }
     }
 
+    private volatile int width, height;
+    private volatile int viewWidth, viewHeight;
+
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
@@ -817,12 +574,15 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
 
     private void initDecoderInfo() {
         if (!decoderInfo.isValid()) {
-            if (decoderInfo.initDecoder(width, height)) {
+            if (decoderInfo.initDecoder(getContext(), _composition, _pagFilePath, width,
+                    height, _maxFrameRate)) {
                 animator.setDuration(decoderInfo.duration / 1000);
-                SendMessage(MSG_INIT_CACHE, this);
+                PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_INIT_CACHE, this);
             }
         }
     }
+
+    private float animationScale = 1.0f;
 
     private void init() {
         if (bitmapPool == null) {
@@ -854,17 +614,6 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
     }
 
     /**
-     * Sets the number of times the animation will repeat. The default is 1, which means the animation
-     * will play only once. 0 means the animation will play infinity times.
-     */
-    public void setRepeatCount(int value) {
-        if (value < 0) {
-            value = 0;
-        }
-        animator.setRepeatCount(value - 1);
-    }
-
-    /**
      * Adds a PAGViewListener to the set of listeners that are sent events through the life of an
      * animation, such as start, end repeat, and cancel.
      *
@@ -888,6 +637,8 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
         }
     }
 
+    private boolean isAttachedToWindow = false;
+
     @Override
     protected void onAttachedToWindow() {
         isAttachedToWindow = true;
@@ -895,10 +646,10 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
         animator.addUpdateListener(mAnimatorUpdateListener);
         animator.addListener(mAnimatorListenerAdapter);
         synchronized (g_HandlerLock) {
-            StartHandlerThread();
+            PAGImageViewHelper.StartHandlerThread();
         }
         if (cacheManager != null && cacheItem == null) {
-            SendMessage(MSG_INIT_CACHE, this);
+            PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_INIT_CACHE, this);
         }
         resumeAnimator();
         getContext().registerComponentCallbacks(this);
@@ -911,7 +662,7 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
         super.onDetachedFromWindow();
         pauseAnimator();
         synchronized (g_HandlerLock) {
-            DestroyHandlerThread();
+            PAGImageViewHelper.DestroyHandlerThread();
         }
         animator.removeUpdateListener(mAnimatorUpdateListener);
         animator.removeListener(mAnimatorListenerAdapter);
@@ -999,14 +750,14 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
         }
     }
 
-    private boolean updateView() {
+    protected boolean updateView() {
         if (!isAttachedToWindow) {
             return true;
         }
         return flush();
     }
 
-    private KeyItem fetchKeyFrame() {
+    protected KeyItem fetchKeyFrame() {
         if (!decoderInfo.isValid() || _composition == null && _pagFilePath == null) {
             return null;
         }
@@ -1026,12 +777,13 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
         }
         KeyItem keyItem = new KeyItem();
         keyItem.keyPrefix = keyPrefix;
-        keyItem.keyPrefixMD5 = getMD5(keyPrefix);
+        keyItem.keyPrefixMD5 = PAGImageViewHelper.getMD5(keyPrefix);
         keyItem.needAutoClean = autoClean;
         return keyItem;
     }
 
-    private boolean inflateBitmapFromDiskCache(BitmapResource bitmapResource, CacheInfo cacheInfo) {
+    protected boolean inflateBitmapFromDiskCache(BitmapResource bitmapResource,
+                                                 CacheInfo cacheInfo) {
         try {
             if (bitmapResource == null || cacheInfo == null || cacheItem == null) {
                 return false;
@@ -1043,7 +795,7 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
         return false;
     }
 
-    private boolean putBitmapToDiskCache(int frame, BitmapPool.BitmapResource bitmap) {
+    protected boolean putBitmapToDiskCache(int frame, BitmapPool.BitmapResource bitmap) {
         if (cacheItem == null || bitmap == null) {
             return false;
         }
@@ -1051,21 +803,6 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
         return success;
     }
 
-    private static String getMD5(String str) {
-        if (str == null) {
-            return null;
-        }
-        byte[] digest;
-        try {
-            MessageDigest md5 = MessageDigest.getInstance("md5");
-            digest = md5.digest(str.getBytes("utf-8"));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return null;
-        }
-        String md5Str = new BigInteger(1, digest).toString(16);
-        return md5Str;
-    }
 
     private void handleReleaseSurface() {
         if (cacheItem == null ||
@@ -1094,6 +831,8 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
             cacheItem = null;
         }
     }
+
+    private WeakReference<Future> lastFetchCacheTask;
 
     private BitmapPool.BitmapResource handleFrame(final int frame, boolean syncMode) {
         KeyItem keyItem = fetchKeyFrame();
@@ -1145,7 +884,7 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
         }
         currentImage = bitmapPool.get(decoderInfo._width,
                 decoderInfo._height);
-        if (decoderInfo._pagDecoder == null || !decoderInfo._pagDecoder.frameAtIndex(currentImage.get(),
+        if (decoderInfo._pagDecoder == null || !decoderInfo._pagDecoder.copyFrameTo(currentImage.get(),
                 frame)) {
             currentImage.release();
             return null;
@@ -1174,6 +913,51 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
                 removeToSelfMemoryCache(lastKeyItem.keyPrefixMD5, frame, _currentImage);
             }
             return currentImage;
+        }
+    }
+
+    protected static void executeCache(CacheInfo cacheInfo, boolean notifyView) {
+        if (cacheInfo.pagImageView == null || TextUtils.isEmpty(cacheInfo.keyPrefix)) {
+            if (cacheInfo.bitmap != null) {
+                cacheInfo.bitmap.release();
+            }
+            return;
+        }
+        if (cacheInfo.bitmap != null) {
+            // PutCache;
+            cacheInfo.pagImageView.putBitmapToDiskCache(cacheInfo.frame, cacheInfo.bitmap);
+            cacheInfo.bitmap.release();
+        } else {
+            // GetCache;
+            BitmapPool.BitmapResource bitmap = cacheInfo.pagImageView._currentImage;
+            boolean created = false;
+            if (bitmap == null) {
+                bitmap =
+                        cacheInfo.pagImageView.bitmapPool.get(cacheInfo.pagImageView.decoderInfo._width,
+                                cacheInfo.pagImageView.decoderInfo._height);
+                created = true;
+            }
+
+            if (!cacheInfo.pagImageView.inflateBitmapFromDiskCache(bitmap, cacheInfo) && created) {
+                cacheInfo.pagImageView.bitmapPool.put(bitmap);
+            }
+            if (bitmap != null) {
+                if (created) {
+                    cacheInfo.pagImageView.putToSelfMemoryCache(cacheInfo.keyPrefix, cacheInfo.frame, bitmap);
+                    if (cacheInfo.pagImageView.isMemoryCacheOpen) {
+                        cacheInfo.pagImageView.memoryLruCache.put(cacheInfo.key, bitmap);
+                    } else {
+                        cacheInfo.pagImageView.removeToSelfMemoryCache(cacheInfo.keyPrefix,
+                                cacheInfo.frame,
+                                cacheInfo.pagImageView._currentImage);
+                    }
+                }
+                if (notifyView) {
+                    cacheInfo.pagImageView._currentImage = bitmap;
+                    cacheInfo.pagImageView.notifyAnimationUpdate();
+                    cacheInfo.pagImageView.postInvalidate();
+                }
+            }
         }
     }
 
@@ -1224,7 +1008,8 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
                 canvas.concat(_matrix);
             }
             if (_scaleMode != PAGScaleMode.None) {
-                Matrix scaleModeMatrix = ApplyScaleMode(_scaleMode, decoderInfo._width,
+                Matrix scaleModeMatrix = PAGImageViewHelper.ApplyScaleMode(_scaleMode,
+                        decoderInfo._width,
                         decoderInfo._height,
                         width, height);
                 canvas.concat(scaleModeMatrix);
@@ -1255,44 +1040,6 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
         doPlay();
     }
 
-    private static Matrix ApplyScaleMode(int scaleMode, int sourceWidth, int sourceHeight,
-                                         int targetWidth, int targetHeight) {
-        Matrix matrix = new Matrix();
-        if (scaleMode == PAGScaleMode.None || sourceWidth <= 0 || sourceHeight <= 0 ||
-                targetWidth <= 0 || targetHeight <= 0) {
-            return matrix;
-        }
-        float scaleX = targetWidth * 1.0f / sourceWidth;
-        float scaleY = targetHeight * 1.0f / sourceHeight;
-        switch (scaleMode) {
-            case PAGScaleMode.Stretch: {
-                matrix.setScale(scaleX, scaleY);
-            }
-            break;
-            case PAGScaleMode.Zoom: {
-                float scale = Math.max(scaleX, scaleY);
-                matrix.setScale(scale, scale);
-                if (scaleX > scaleY) {
-                    matrix.postTranslate(0, (targetHeight - sourceHeight * scale) * 0.5f);
-                } else {
-                    matrix.postTranslate((targetWidth - sourceWidth * scale) * 0.5f, 0);
-                }
-            }
-            break;
-            default: {
-                float scale = Math.min(scaleX, scaleY);
-                matrix.setScale(scale, scale);
-                if (scaleX < scaleY) {
-                    matrix.postTranslate(0, (targetHeight - sourceHeight * scale) * 0.5f);
-                } else {
-                    matrix.postTranslate((targetWidth - sourceWidth * scale) * 0.5f, 0);
-                }
-            }
-            break;
-        }
-        return matrix;
-    }
-
     @Override
     protected void finalize() throws Throwable {
         super.finalize();
@@ -1316,4 +1063,11 @@ public class PAGImageView extends View implements LifecycleListener, ComponentCa
         int currentFrame = (int) Math.floor(percent * totalFrames);
         return currentFrame == totalFrames ? totalFrames - 1 : currentFrame;
     }
+
+    protected static class KeyItem {
+        String keyPrefix;
+        String keyPrefixMD5;
+        boolean needAutoClean = false;
+    }
+
 }

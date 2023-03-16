@@ -3,7 +3,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <string>
-#include "lz4.h"
+#include "third_party/lz4/lib/lz4.h"
 
 namespace pag {
 
