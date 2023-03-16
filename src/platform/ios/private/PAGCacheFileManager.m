@@ -21,6 +21,9 @@
 // The maximum default storage of the Disk: 2GB
 static const NSUInteger defaultMaxDiskSize = 1 * 1024 * 1024 * 1024;
 
+// When the cache size exceeds the maximum size, clean up 40% of the storage
+static const float cleanRate = 0.4;
+
 @implementation PAGCacheFileManager {
   NSString* _diskCachePath;
   NSUInteger _maxDiskSize;
@@ -94,21 +97,24 @@ static const NSUInteger defaultMaxDiskSize = 1 * 1024 * 1024 * 1024;
   }
 }
 
-- (void)removeFilesToSize:(NSUInteger)size {
-  NSUInteger totalSize = [self totalSize];
-  if (totalSize < size) {
-    return;
-  }
-  NSArray* allSortedFiles = [self getAllSortedFiles];
-  for (NSString* filePath in allSortedFiles) {
-    NSInteger fileSize = [self getFileSize:filePath];
-    if ([[NSFileManager defaultManager] removeItemAtPath:filePath error:nil]) {
-      totalSize -= fileSize;
-      if (totalSize <= size) {
-        break;
+- (void)automaticCleanWithBlock:(void (^)(void))block {
+  dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+    NSUInteger totalSize = [self totalSize];
+    NSUInteger remainingSize = _maxDiskSize * (1 - cleanRate);
+    if (totalSize >= remainingSize) {
+      NSArray* allSortedFiles = [self getAllSortedFiles];
+      for (NSString* filePath in allSortedFiles) {
+        NSInteger fileSize = [self getFileSize:filePath];
+        if ([[NSFileManager defaultManager] removeItemAtPath:filePath error:nil]) {
+          totalSize -= fileSize;
+          if (totalSize <= remainingSize) {
+            break;
+          }
+        }
       }
     }
-  }
+    block();
+  });
 }
 
 - (void)removeFileForPath:(NSString*)path {
