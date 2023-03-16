@@ -29,10 +29,10 @@ class PixelRef;
 
 /**
  * Bitmap describes a two-dimensional raster pixel array. Bitmap points to PixelRef, which describes
- * the physical array of pixels and is optimized for creating textures. If pixel array is primarily
- * read-only, use Image for better performance. Declaring Bitmap const prevents altering ImageInfo:
- * the Bitmap height, width, and so on cannot change. It does not affect PixelRef: a caller may
- * write its pixels. Bitmap is not thread safe.
+ * the physical array of pixels and is optimized for creating textures. If the pixel array is
+ * primarily read-only, use Image for better performance. Declaring Bitmap const prevents altering
+ * ImageInfo: the Bitmap height, width, and so on cannot change. It does not affect PixelRef: a
+ * caller may write its pixels. Bitmap is not thread safe.
  */
 class Bitmap {
  public:
