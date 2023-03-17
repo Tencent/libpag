@@ -72,12 +72,13 @@ class TaskGroup {
   bool exited = false;
   std::list<Task*> tasks = {};
   std::vector<std::thread*> threads = {};
+  std::vector<std::thread::id> timeoutThreads = {};
 
   static TaskGroup* GetInstance();
   static void RunLoop(TaskGroup* taskGroup);
 
   TaskGroup() = default;
-  void initThreads();
+  bool checkThreads();
   void pushTask(Task* task);
   Task* popTask();
   bool removeTask(Task* task);
