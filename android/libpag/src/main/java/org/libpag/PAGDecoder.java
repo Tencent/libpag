@@ -41,14 +41,15 @@ public class PAGDecoder {
      * Make a decoder from pagComposition.
      * The size of decoder will be scaled.
      */
-    public static PAGDecoder Make(PAGComposition pagComposition, float frameRate, float scale) {
+    public static PAGDecoder Make(PAGComposition pagComposition, float maxFrameRate, float scale) {
         if (pagComposition == null) {
             return null;
         }
         if (scale <= 0) {
             scale = 1.0f;
         }
-        if (frameRate < 0) {
+        float frameRate = maxFrameRate;
+        if (frameRate <= 0) {
             frameRate = pagComposition.frameRate();
         } else {
             frameRate = Math.min(pagComposition.frameRate(), frameRate);

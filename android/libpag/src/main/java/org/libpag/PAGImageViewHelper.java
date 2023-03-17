@@ -286,13 +286,12 @@ class PAGImageViewHelper {
         int _width;
         int _height;
         float realFrameRate;
-        float scale;
         int numFrames;
         long duration;
         PAGDecoder _pagDecoder;
 
         boolean isValid() {
-            return _width > 0;
+            return _width > 0 && _height > 0;
         }
 
         boolean initDecoder(Context context, PAGComposition _composition,

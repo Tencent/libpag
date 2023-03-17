@@ -255,7 +255,7 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
         if (path == null) {
             return false;
         }
-        if (path.equals(_pagFilePath)) {
+        if (path.equals(_pagFilePath) && _maxFrameRate == maxFrameRate) {
             return true;
         }
         _pagFilePath = path;
@@ -863,7 +863,7 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
     }
 
 
-    private void handleReleaseSurface() {
+    private void releaseDecoder() {
         if (cacheItem == null ||
                 lastKeyItem == null || TextUtils.isEmpty(lastKeyItem.keyPrefix) || decoderInfo._pagDecoder == null) {
             return;
@@ -906,7 +906,7 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
         }
         lastKeyItem = keyItem;
 
-        handleReleaseSurface();
+        releaseDecoder();
         if (lastKeyItem != null && lastKeyItem.keyPrefixMD5 != null) {
             if (isCacheAllFramesInMemory) {
                 final String memoryKey = lastKeyItem.keyPrefixMD5 + "_" + frame;

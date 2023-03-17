@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PAGImageCache.h"
+#include "ImageCache.h"
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -32,8 +32,8 @@ static const int MaxFrameBufferSizeOffset = 4 * 3;
 static const int FrameRangesOffset = 4 * 4;
 static const int FrameRangeSize = 4 * 2;
 
-std::shared_ptr<PAGImageCache> PAGImageCache::Make(const std::string& path, int width, int height,
-                                                   int frameCount, bool needInit) {
+std::shared_ptr<ImageCache> ImageCache::Make(const std::string& path, int width, int height,
+                                             int frameCount, bool needInit) {
   int fd = open(path.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
   if (fd == -1) {
     return nullptr;
@@ -47,27 +47,23 @@ std::shared_ptr<PAGImageCache> PAGImageCache::Make(const std::string& path, int 
     headerBuffer[HeightOffset / 4] = height;
     headerBuffer[FrameCountOffset / 4] = frameCount;
     if ((ssize_t)headerSize != write(fd, headerBuffer, headerSize)) {
-      if (headerBuffer != nullptr) {
-        delete[] static_cast<int*>(headerBuffer);
-      }
+      delete[] static_cast<int*>(headerBuffer);
       return nullptr;
     }
   } else {
     if ((ssize_t)(headerSize) != read(fd, headerBuffer, headerSize)) {
-      if (headerBuffer != nullptr) {
-        delete[] static_cast<int*>(headerBuffer);
-      }
+      delete[] static_cast<int*>(headerBuffer);
       return nullptr;
     }
   }
-  auto cache = std::make_shared<PAGImageCache>();
+  auto cache = std::make_shared<ImageCache>();
   cache->headerBuffer = headerBuffer;
   cache->fd = fd;
   cache->frameCount = frameCount;
   return cache;
 }
 
-bool PAGImageCache::savePixels(int frame, void* bitmapPixels, long byteCount) {
+bool ImageCache::savePixels(int frame, void* bitmapPixels, long byteCount) {
   if (headerBuffer == nullptr) {
     return false;
   }
@@ -106,7 +102,7 @@ bool PAGImageCache::savePixels(int frame, void* bitmapPixels, long byteCount) {
   return 2 * 4 != write(fd, static_cast<int*>(headerBuffer) + frameRangeIndex / 4, 2 * 4);
 }
 
-bool PAGImageCache::inflatePixels(int frame, void* bitmapPixels, int byteCount) {
+bool ImageCache::inflatePixels(int frame, void* bitmapPixels, int byteCount) {
   if (headerBuffer == nullptr) {
     return false;
   }
@@ -136,7 +132,7 @@ bool PAGImageCache::inflatePixels(int frame, void* bitmapPixels, int byteCount) 
                                           length, byteCount);
 }
 
-bool PAGImageCache::isAllCached() {
+bool ImageCache::isAllCached() {
   if (headerBuffer == nullptr || frameCount <= 0) {
     return false;
   }
@@ -148,7 +144,7 @@ bool PAGImageCache::isAllCached() {
   return true;
 }
 
-bool PAGImageCache::isCached(int frame) {
+bool ImageCache::isCached(int frame) {
   if (headerBuffer == nullptr) {
     return false;
   }
@@ -159,7 +155,7 @@ bool PAGImageCache::isCached(int frame) {
   return false;
 }
 
-void PAGImageCache::release() {
+void ImageCache::release() {
   if (fd > -1) {
     close(fd);
     fd = -1;
@@ -175,11 +171,11 @@ void PAGImageCache::release() {
   releaseSaveBuffer();
 }
 
-PAGImageCache::~PAGImageCache() {
+ImageCache::~ImageCache() {
   release();
 }
 
-void PAGImageCache::releaseSaveBuffer() {
+void ImageCache::releaseSaveBuffer() {
   if (compressBuffer != nullptr) {
     delete[] static_cast<char*>(compressBuffer);
     compressBuffer = nullptr;

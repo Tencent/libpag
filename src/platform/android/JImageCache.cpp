@@ -18,32 +18,32 @@
 
 #include <android/bitmap.h>
 #include <jni.h>
+#include "ImageCache.h"
+#include "JImageCacheHandle.h"
 #include "JNIHelper.h"
-#include "JPAGHandle.h"
-#include "PAGImageCache.h"
 #include "rendering/layers/PAGCompositionUtil.h"
 #include "tgfx/src/platform/android/AHardwareBufferUtil.h"
 #include "tgfx/src/platform/android/HardwareBufferInterface.h"
 
 namespace pag {
-static jfieldID PAGImageCache_nativeHandle;
+static jfieldID ImageCache_nativeHandle;
 }
 
 using namespace pag;
 
-std::shared_ptr<PAGImageCache> get(JNIEnv* env, jobject thiz) {
+std::shared_ptr<ImageCache> get(JNIEnv* env, jobject thiz) {
   if (env == nullptr || thiz == nullptr) {
     return nullptr;
   }
-  auto pagSurface = reinterpret_cast<JPAGHandle<PAGImageCache>*>(
-      env->GetLongField(thiz, PAGImageCache_nativeHandle));
+  auto pagSurface =
+      reinterpret_cast<JImageCacheHandle*>(env->GetLongField(thiz, ImageCache_nativeHandle));
   if (pagSurface == nullptr) {
     return nullptr;
   }
   return pagSurface->get();
 }
 
-static bool SaveHardwarePixels(JNIEnv* env, std::shared_ptr<PAGImageCache> cache, jint frame,
+static bool SaveHardwarePixels(JNIEnv* env, std::shared_ptr<ImageCache> cache, jint frame,
                                jobject bitmap, jint byteCount) {
   auto buffer = tgfx::HardwareBufferInterface::AHardwareBuffer_fromBitmap(env, bitmap);
   uint8_t* pixels = nullptr;
@@ -60,7 +60,7 @@ static bool SaveHardwarePixels(JNIEnv* env, std::shared_ptr<PAGImageCache> cache
   return res;
 }
 
-static bool InflateHardwarePixels(JNIEnv* env, std::shared_ptr<PAGImageCache> cache, jint frame,
+static bool InflateHardwarePixels(JNIEnv* env, std::shared_ptr<ImageCache> cache, jint frame,
                                   jobject bitmap, jint byteCount) {
   auto buffer = tgfx::HardwareBufferInterface::AHardwareBuffer_fromBitmap(env, bitmap);
 
@@ -154,16 +154,16 @@ PAG_API jlong Java_org_libpag_CacheManager_00024ImageCache_SetupCache(JNIEnv* en
                                                                       jstring path, jint width,
                                                                       jint height, jint frame_count,
                                                                       jboolean need_init) {
-  auto cache = PAGImageCache::Make(pag::SafeConvertToStdString(env, path), width, height,
-                                   frame_count, need_init);
+  auto cache = ImageCache::Make(pag::SafeConvertToStdString(env, path), width, height, frame_count,
+                                need_init);
   if (cache == nullptr) {
     return 0;
   }
-  return reinterpret_cast<jlong>(new JPAGHandle<PAGImageCache>(cache));
+  return reinterpret_cast<jlong>(new JImageCacheHandle(cache));
 }
 
 PAG_API void Java_org_libpag_CacheManager_00024ImageCache_nativeInit(JNIEnv* env, jclass clazz) {
-  PAGImageCache_nativeHandle = env->GetFieldID(clazz, "nativeContext", "J");
+  ImageCache_nativeHandle = env->GetFieldID(clazz, "nativeContext", "J");
 }
 
 PAG_API jint Java_org_libpag_CacheManager_ContentVersion(JNIEnv* env, jclass,

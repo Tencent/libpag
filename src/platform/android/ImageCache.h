@@ -20,11 +20,11 @@
 #include <memory>
 namespace pag {
 
-class PAGImageCache {
+class ImageCache {
  public:
-  static std::shared_ptr<PAGImageCache> Make(const std::string& path, int width, int height,
-                                             int frameCount, bool needInit);
-  ~PAGImageCache();
+  static std::shared_ptr<ImageCache> Make(const std::string& path, int width, int height,
+                                          int frameCount, bool needInit);
+  ~ImageCache();
   bool savePixels(int frame, void* bitmapPixels, long byteCount);
   bool inflatePixels(int frame, void* bitmapPixels, int byteCount);
   bool isCached(int frame);

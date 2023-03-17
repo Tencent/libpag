@@ -223,6 +223,7 @@ static bool readPixelsToHardwareBuffer(JNIEnv* env, std::shared_ptr<PAGSurface> 
   if (pixels) {
     auto imageInfo = tgfx::GetImageInfo(buffer);
     if (imageInfo.width() != surface->width() || imageInfo.height() != surface->height()) {
+      tgfx::HardwareBufferInterface::Unlock(buffer, nullptr);
       return false;
     }
     res = surface->readPixels(ToPAG(imageInfo.colorType()), ToPAG(imageInfo.alphaType()), pixels,
@@ -267,7 +268,6 @@ extern "C" JNIEXPORT jboolean JNICALL Java_org_libpag_PAGSurface_copyPixelsTo(JN
   AndroidBitmap_unlockPixels(env, jBitmap);
   if (!status) {
     LOGE("ReadPixels failed!");
-    return false;
   }
-  return true;
+  return status;
 }
