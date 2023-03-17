@@ -473,34 +473,6 @@ static void AutomaticCleanDisk() {
   }
 }
 
-- (UIImage*)imageForRGBA:(uint8_t*)rgbaBuffer width:(NSInteger)width height:(NSInteger)height {
-  size_t bytesPerRow = 4 * width;
-  size_t componentsPerPixel = 4;
-  size_t bitsPerPixel = 8;
-
-  CGBitmapInfo bitmapInfo = kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst;
-  CFDataRef data = CFDataCreateWithBytesNoCopy(
-      kCFAllocatorDefault, rgbaBuffer, width * height * componentsPerPixel, kCFAllocatorNull);
-  UIImage* image = nil;
-  if (!data) {
-    return image;
-  }
-
-  CGDataProviderRef provider = CGDataProviderCreateWithCFData(data);
-  CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
-  CGImageRef cgImage =
-      CGImageCreate(width, height, bitsPerPixel, bitsPerPixel * componentsPerPixel, bytesPerRow,
-                    colorSpace, bitmapInfo, provider, NULL, NO, kCGRenderingIntentDefault);
-  if (cgImage) {
-    image = [UIImage imageWithCGImage:cgImage];
-  }
-  CGColorSpaceRelease(colorSpace);
-  CGImageRelease(cgImage);
-  CGDataProviderRelease(provider);
-  CFRelease(data);
-  return image;
-}
-
 - (UIImage*)imageFromCVPixeBuffer:(CVPixelBufferRef)pixeBuffer {
   CGImageRef imageRef = nil;
   VTCreateCGImageFromCVPixelBuffer(pixeBuffer, nil, &imageRef);
@@ -549,7 +521,6 @@ static void AutomaticCleanDisk() {
     [pagComposition setMatrix:value];
     [self updateSize];
     [self unloadAllFrames];
-    [self preloadAllFrames];
   }
 }
 
