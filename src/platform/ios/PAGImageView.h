@@ -109,12 +109,12 @@ PAG_API @interface PAGImageView : UIImageView
 /**
  * Return memory cache status.
  */
-- (BOOL)memoryCacheEnabled;
+- (BOOL)cacheAllFramesInMemory;
 
 /**
  *  Set a switch for the memory cache, the default value is no.
  */
-- (void)setMemoryCacheEnabled:(BOOL)enable;
+- (void)setCacheAllFramesInMemory:(BOOL)enable;
 
 /**
  * Returns a copy of current matrix.

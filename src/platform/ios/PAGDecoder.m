@@ -31,22 +31,24 @@
   PAGPlayer* pagPlayer;
   PAGSurface* pagSurface;
   UIImage* lastFrameImage;
-  CGFloat _scale;
 }
 
 - (instancetype)initWithPAGComposition:(PAGComposition*)composition
                             pagSurface:(PAGSurface*)surface
-                             frameRate:(CGFloat)frameRate
-                                 scale:(CGFloat)scale {
+                             frameRate:(float)frameRate
+                                 scale:(float)scale {
   self = [super init];
   if (self) {
     pagSurface = [surface retain];
     pagPlayer = [[PAGPlayer alloc] init];
     [pagPlayer setComposition:composition];
     [pagPlayer setSurface:pagSurface];
-    _scale = scale;
-    float rate = [composition frameRate] > frameRate ? frameRate : [composition frameRate];
-    self.frames = [composition duration] * rate / 1000000;
+    if (frameRate <= 0) {
+      frameRate = [composition frameRate];
+    } else {
+      frameRate = frameRate > [composition frameRate] ? [composition frameRate] : frameRate;
+    }
+    self.frames = [composition duration] * frameRate / 1000000;
     lastFrameImage = nil;
   }
   return self;
@@ -60,13 +62,15 @@
 
 #pragma mark - public
 
-+ (instancetype)Make:(PAGComposition*)pagComposition frameRate:(CGFloat)frameRate {
++ (instancetype)Make:(PAGComposition*)pagComposition {
+  return [PAGDecoder Make:pagComposition frameRate:[pagComposition frameRate] scale:1.0];
+}
+
++ (instancetype)Make:(PAGComposition*)pagComposition frameRate:(float)frameRate {
   return [PAGDecoder Make:pagComposition frameRate:frameRate scale:1.0];
 }
 
-+ (instancetype)Make:(PAGComposition*)pagComposition
-           frameRate:(CGFloat)frameRate
-               scale:(CGFloat)scale {
++ (instancetype)Make:(PAGComposition*)pagComposition frameRate:(float)frameRate scale:(float)scale {
   if (pagComposition == nil) {
     return nil;
   }
@@ -90,7 +94,7 @@
   if (!result) {
     return nil;
   }
-  return [pagSurface copyImageTo:pixelBuffer];
+  return [pagSurface copyPixelsTo:pixelBuffer];
 }
 
 - (UIImage*)frameAtIndex:(NSInteger)index {

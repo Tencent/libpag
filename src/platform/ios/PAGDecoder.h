@@ -25,10 +25,16 @@ NS_ASSUME_NONNULL_BEGIN
 PAG_API @interface PAGDecoder : NSObject
 
 /**
+ Convenience method to create a decoder with specified pagComposition.
+ @return A new decoder, or nil if an error occurs.
+ */
++ (nullable instancetype)Make:(nullable PAGComposition*)pagComposition;
+
+/**
  Convenience method to create a decoder with specified pagComposition and frameRate.
  @return A new decoder, or nil if an error occurs.
  */
-+ (nullable instancetype)Make:(nullable PAGComposition*)pagComposition frameRate:(CGFloat)frameRate;
++ (nullable instancetype)Make:(nullable PAGComposition*)pagComposition frameRate:(float)frameRate;
 
 /**
  Convenience method to create a decoder with specified pagComposition and frameRate.
@@ -36,8 +42,8 @@ PAG_API @interface PAGDecoder : NSObject
  @return A new decoder, or nil if an error occurs.
  */
 + (nullable instancetype)Make:(nullable PAGComposition*)pagComposition
-                    frameRate:(CGFloat)frameRate
-                        scale:(CGFloat)scale;
+                    frameRate:(float)frameRate
+                        scale:(float)scale;
 
 /**
  * Returns the width of the output image.
@@ -55,7 +61,7 @@ PAG_API @interface PAGDecoder : NSObject
 - (NSInteger)numFrames;
 
 /**
- * Copy pixel data of the given frame to the  CVPixelBuffer, and return YES if successful or return
+ * Copies pixels of the given frame to the  CVPixelBuffer.
  * NO.
  */
 - (BOOL)copyFrameAt:(NSInteger)index To:(CVPixelBufferRef)pixelBuffer;

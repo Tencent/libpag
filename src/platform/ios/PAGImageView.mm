@@ -19,13 +19,13 @@
 #import "PAGImageView.h"
 
 #import <CommonCrypto/CommonCrypto.h>
-#include <compression.h>
 #import <VideoToolbox/VideoToolbox.h>
+#include <compression.h>
 
-#import "platform/cocoa/private/PAGComposition+Internal.h"
-#import "platform/cocoa/private/PixelBufferUtils.h"
 #import "PAGDecoder.h"
 #import "PAGFile.h"
+#import "platform/cocoa/private/PAGComposition+Internal.h"
+#import "platform/cocoa/private/PixelBufferUtils.h"
 #import "private/PAGCacheManager.h"
 #import "private/PAGDiskCache.h"
 #import "private/PAGValueAnimator.h"
@@ -556,11 +556,11 @@ static void AutomaticCleanDisk() {
   }
 }
 
-- (BOOL)memoryCacheEnabled {
+- (BOOL)cacheAllFramesInMemory {
   return _memoryCacheEnabled;
 }
 
-- (void)setMemoryCacheEnabled:(BOOL)enable {
+- (void)setCacheAllFramesInMemory:(BOOL)enable {
   _memoryCacheEnabled = enable;
   if (_memoryCacheEnabled) {
     if (imagesMap == nil) {

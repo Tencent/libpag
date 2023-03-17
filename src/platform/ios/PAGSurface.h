@@ -95,6 +95,6 @@ PAG_API @interface PAGSurface : NSObject
 /**
  * Copy pixel data to the given CVPixelBuffer, and return YES if successful or return NO.
  */
-- (BOOL)copyImageTo:(CVPixelBufferRef)pixelBuffer;
+- (BOOL)copyPixelsTo:(CVPixelBufferRef)pixelBuffer;
 
 @end

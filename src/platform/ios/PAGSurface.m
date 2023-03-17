@@ -109,7 +109,7 @@
   return [_surface makeSnapshot];
 }
 
-- (BOOL)copyImageTo:(CVPixelBufferRef)pixelBuffer {
+- (BOOL)copyPixelsTo:(CVPixelBufferRef)pixelBuffer {
   return [_surface copyImageTo:pixelBuffer];
 }
 
