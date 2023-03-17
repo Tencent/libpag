@@ -24,7 +24,11 @@
 # hide the original source file name.
 -renamesourcefileattribute SourceFile
 
--keepclasseswithmembernames class * {
+-keep class **.R$* {
+    *;
+}
+
+-keepclasseswithmembers class * {
     native <methods>;
 }
 
@@ -33,18 +37,16 @@
     public <fields>;
 }
 
--keepclasseswithmembernames class org.libpag.PAGLayer {
-    protected long nativeContext;
-}
-
--keepclasseswithmembernames class org.libpag.PAGImage {
+-keep class org.libpag.* {
     long nativeContext;
-}
-
--keepclasseswithmembernames class org.libpag.PAGSurface {
     long nativeSurface;
+    void finalize();
 }
 
--keepclasseswithmembernames class org.libpag.VideoSurface {
-    long nativeContext;
+-keepclasseswithmembers class org.libpag.PAGFont {
+    private static void RegisterFallbackFonts();
+}
+
+-keepclasseswithmembers class org.libpag.HardwareDecoder {
+    <methods>;
 }
