@@ -215,14 +215,6 @@ static NSString* RemovePathVariableComponent(NSString* original) {
   return path;
 }
 
-static void AutomaticCleanDisk() {
-  static dispatch_once_t onceToken;
-  dispatch_once(&onceToken, ^{
-    [[PAGCacheManager shareInstance] automaticCleanWithBlock:^{
-    }];
-  });
-}
-
 - (CVPixelBufferRef)getCVPixelBuffer {
   if (self.memoryCacheEnabled) {
     return pag::PixelBufferUtils::Make((int)cacheWidth, (int)cacheHeight);
@@ -411,8 +403,6 @@ static void AutomaticCleanDisk() {
         [pagComposition release];
         pagComposition = nil;
       }
-
-      AutomaticCleanDisk();
     }
     self.currentFrameIndex = frameIndex;
     __block __typeof(self) weakSelf = self;

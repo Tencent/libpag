@@ -97,26 +97,6 @@ static const float cleanRate = 0.4;
   }
 }
 
-- (void)automaticCleanWithBlock:(void (^)(void))block {
-  dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-    NSUInteger totalSize = [self totalSize];
-    NSUInteger remainingSize = _maxDiskSize * (1 - cleanRate);
-    if (totalSize >= remainingSize) {
-      NSArray* allSortedFiles = [self getAllSortedFiles];
-      for (NSString* filePath in allSortedFiles) {
-        NSInteger fileSize = [self getFileSize:filePath];
-        if ([[NSFileManager defaultManager] removeItemAtPath:filePath error:nil]) {
-          totalSize -= fileSize;
-          if (totalSize <= remainingSize) {
-            break;
-          }
-        }
-      }
-    }
-    block();
-  });
-}
-
 - (void)removeFileForPath:(NSString*)path {
   [[NSFileManager defaultManager] removeItemAtPath:path error:nil];
 }
