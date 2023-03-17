@@ -67,11 +67,12 @@ Pod::Spec.new do |s|
   s.compiler_flags = '-Wno-documentation'
 
   if ENV["PAG_USE_QT"] == 'ON'
-    s.osx.public_header_files = ['src/platform/qt/*.h']
+    s.osx.public_header_files = ['src/platform/qt/*.h', 'tgfx/src/opengl/*.h']
     s.osx.source_files = 'src/platform/qt/**/*.{h,cpp,mm,m}',
+                         'tgfx/src/platform/apple/*.{h,cpp,m,mm}',
                          'tgfx/src/opengl/qt/*.{h,cpp,mm}',
-                         'tgfx/src/platform/mock/*.{h,cpp,mm}',
-                         'tgfx/src/platform/apple/BitmapContextUtil.mm'
+                         'tgfx/src/opengl/cgl/CGLHardwareTexture.mm',
+                         'src/platform/mac/private/HardwareDecoder.mm'
   else
     s.osx.public_header_files = 'src/platform/mac/*.h',
                                 'src/platform/cocoa/*.h'

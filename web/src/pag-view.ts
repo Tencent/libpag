@@ -74,8 +74,6 @@ export class PAGView {
     if (pagView.pagViewOptions.firstFrame) {
       await pagView.flush();
       pagView.playFrame = 0;
-    } else {
-      await pagView.prepare();
     }
     return pagView;
   }

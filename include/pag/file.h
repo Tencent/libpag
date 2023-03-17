@@ -2108,6 +2108,12 @@ class PAG_API ImageBytes {
 
   Cache* cache = nullptr;
   std::mutex locker = {};
+
+ private:
+  bool encrypted = false;
+
+  friend class ImageBytesCache;
+  friend class EncryptedCodec;
 };
 
 class PAG_API BitmapRect {
@@ -2454,6 +2460,7 @@ class PAG_API File {
   Composition* mainComposition = nullptr;
   uint16_t _tagLevel = 1;
   int _numLayers = 0;
+  bool encrypted = false;
 
   // Just references, no need to delete them.
   std::vector<TextLayer*> textLayers = {};
@@ -2465,6 +2472,8 @@ class PAG_API File {
   void updateEditables(Composition* composition);
 
   friend class Codec;
+  friend class SequenceInfo;
+  friend class EncryptedCodec;
 };
 
 /**

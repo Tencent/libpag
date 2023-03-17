@@ -220,7 +220,7 @@ std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, in
 
 std::shared_ptr<Image> Image::onMakeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
                                            int alphaStartY) const {
-  if (alphaStartX + displayWidth > source->width() ||
+  if (isAlphaOnly() || alphaStartX + displayWidth > source->width() ||
       alphaStartY + displayHeight > source->height()) {
     return nullptr;
   }

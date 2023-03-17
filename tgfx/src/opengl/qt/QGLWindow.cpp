@@ -73,6 +73,11 @@ QSGTexture* QGLWindow::getTexture() {
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
     outTexture = QNativeInterface::QSGOpenGLTexture::fromNative(
         textureID, nativeWindow, QSize(width, height), QQuickWindow::TextureHasAlphaChannel);
+
+#elif (QT_VERSION >= QT_VERSION_CHECK(5, 15, 0))
+    outTexture = nativeWindow->createTextureFromNativeObject(QQuickWindow::NativeObjectTexture,
+                                                             &textureID, 0, QSize(width, height),
+                                                             QQuickWindow::TextureHasAlphaChannel);
 #else
     outTexture = nativeWindow->createTextureFromId(textureID, QSize(width, height),
                                                    QQuickWindow::TextureHasAlphaChannel);
