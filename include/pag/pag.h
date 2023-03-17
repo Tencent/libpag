@@ -1013,6 +1013,8 @@ class PAG_API PAGComposition : public PAGLayer {
   friend class FileReporter;
 
   friend class AudioClip;
+
+  friend class PAGCompositionUtil;
 };
 
 class PAG_API PAGFile : public PAGComposition {

@@ -281,15 +281,36 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
         animator.setRepeatCount(value - 1);
     }
 
-    private void refreshDecodeInfo() {
-        progressExplicitlySet = true;
-        if (decoderInfo != null) {
-            decoderInfo.release();
-            decoderInfo = null;
+    /**
+     * Call this method to render current position immediately. If the play() method is already
+     * called, there is no need to call it. Returns true if the content has changed.
+     */
+    public boolean flush() {
+        if (!decoderInfo.isValid()) {
+            return false;
         }
-        releaseCurrentDiskCache();
-        decoderInfo = new DecoderInfo();
-        initDecoderInfo();
+        synchronized (updateTimeLock) {
+            if (progressExplicitlySet) {
+                progressExplicitlySet = false;
+                animator.setCurrentPlayTime((long) (decoderInfo.duration * 0.001f * (_currentFrame * 1.0f + 0.1f) / decoderInfo.numFrames));
+            } else {
+                int currentFrame =
+                        ProgressToFrame(animator.getAnimatedFraction(), decoderInfo.numFrames);
+                if (currentFrame == _currentFrame) {
+                    return false;
+                }
+                _currentFrame = currentFrame;
+            }
+            BitmapResource handledBitmap = handleFrame(_currentFrame, false);
+            if (handledBitmap == null) {
+                return false;
+            }
+            _currentImage = handledBitmap;
+            postInvalidate();
+
+        }
+        notifyAnimationUpdate();
+        return true;
     }
 
     /**
@@ -382,7 +403,7 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
         init();
     }
 
-    public float getAnimationScale(Context context) {
+    private float getAnimationScale(Context context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
             return Settings.Global.getFloat(context.getContentResolver(),
                     Settings.Global.ANIMATOR_DURATION_SCALE, 1.0f);
@@ -391,6 +412,17 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
             return Settings.System.getFloat(context.getContentResolver(),
                     Settings.System.ANIMATOR_DURATION_SCALE, 1.0f);
         }
+    }
+
+    private void refreshDecodeInfo() {
+        progressExplicitlySet = true;
+        if (decoderInfo != null) {
+            decoderInfo.release();
+            decoderInfo = null;
+        }
+        releaseCurrentDiskCache();
+        decoderInfo = new DecoderInfo();
+        initDecoderInfo();
     }
 
     private static ThreadPoolExecutor saveCacheExecutors;
@@ -611,7 +643,7 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
         animationScale = getAnimationScale(getContext());
     }
 
-    public void stop() {
+    public void pause() {
         _isPlaying = false;
         _isAnimatorPreRunning = null;
         cancelAnimator();
@@ -975,34 +1007,6 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
                 }
             }
         }
-    }
-
-    private boolean flush() {
-        if (!decoderInfo.isValid()) {
-            return false;
-        }
-        synchronized (updateTimeLock) {
-            if (progressExplicitlySet) {
-                progressExplicitlySet = false;
-                animator.setCurrentPlayTime((long) (decoderInfo.duration * 0.001f * (_currentFrame * 1.0f + 0.1f) / decoderInfo.numFrames));
-            } else {
-                int currentFrame =
-                        ProgressToFrame(animator.getAnimatedFraction(), decoderInfo.numFrames);
-                if (currentFrame == _currentFrame) {
-                    return false;
-                }
-                _currentFrame = currentFrame;
-            }
-            BitmapResource handledBitmap = handleFrame(_currentFrame, false);
-            if (handledBitmap == null) {
-                return false;
-            }
-            _currentImage = handledBitmap;
-            postInvalidate();
-
-        }
-        notifyAnimationUpdate();
-        return true;
     }
 
     private void notifyAnimationUpdate() {
