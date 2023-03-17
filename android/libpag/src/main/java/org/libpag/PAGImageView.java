@@ -179,13 +179,6 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
     }
 
     /**
-     * Returns the maximum frame rate for rendering.
-     */
-    public float maxFrameRate() {
-        return _maxFrameRate;
-    }
-
-    /**
      * Sets the frame index to render.
      */
     public void setCurrentFrame(int currentFrame) {
