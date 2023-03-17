@@ -112,16 +112,16 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
     }
 
     /**
-     * This value defines the scale factor for internal graphics renderer, ranges from 0.0 to 1.0.
-     * The scale factors less than 1.0 may result in blurred output, but it can reduce the usage of
-     * graphics memory which leads to better performance. The default value is 1.0.
+     * Get the value of renderScale property
      */
     public float renderScale() {
         return renderScale;
     }
 
-    /**
-     * Set the value of renderScale property.
+    /**.
+     * This value defines the scale factor for internal graphics renderer, ranges from 0.0 to 1.0.
+     * The scale factors less than 1.0 may result in blurred output, but it can reduce the usage of
+     * graphics memory which leads to better performance. The default value is 1.0.
      */
     public void setRenderScale(float renderScale) {
         if (renderScale < 0.0f || renderScale > 1.0f) {
@@ -133,17 +133,26 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
     }
 
     /**
-     * Get the value of maxDiskCache property.
+     * Get the maximum size of the disk cache, in bytes.
      */
     public static long MaxDiskCache() {
         return g_MaxDiskCacheSize;
     }
 
     /**
-     * Set the value of maxDiskCache property.
+     * Set the maximum size of the disk cache.
+     * In bytes, which defaults to 1 GB.
+     * When the cache size exceeds the maximum size, clean up to 60% of the maximum storage size.
      */
     public static void SetMaxDiskCache(long maxDiskCache) {
         g_MaxDiskCacheSize = maxDiskCache;
+    }
+
+    /**
+     * Return memory cache status.
+     */
+    public void cacheAllFramesInMemory(boolean enable) {
+        isCacheAllFramesInMemory = enable;
     }
 
     /**
@@ -152,13 +161,6 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
      * Use it when you prefer rendering speed over memory usage.
      * If set to false, the PAGImageView loads only one image frame at a time into the memory.
      * The default value is false.
-     */
-    public void cacheAllFramesInMemory(boolean enable) {
-        isCacheAllFramesInMemory = enable;
-    }
-
-    /**
-     * Return the value of isMemoryCacheOpen property.
      */
     public boolean setCacheAllFramesInMemory() {
         return isCacheAllFramesInMemory;
@@ -205,7 +207,7 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
     }
 
     /**
-     * Sets a new PAGComposition for PAGImageView to render as content.
+     * Sets a new PAGComposition with maximum frame rate for PAGImageView to render as content.
      * Note: If the composition is already added to another View, it will be removed from the
      * previous View.
      * Sets the maximum frame rate for rendering. If set to a value less than the actual frame rate from
@@ -237,7 +239,7 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
     }
 
     /**
-     * Loads a pag file from the specified path, returns false if the file does not exist or the data is not a pag file.
+     * Load a pag file from the specified path with maximum frame rate, returns false if the file does not exist or the data is not a pag file.
      * The path starts with "assets://" means that it is located in assets directory.
      * Note: All PAGFiles loaded by the same path share the same internal cache. The internal cache is alive until all
      * PAGFiles are released. Use 'PAGFile.Load(byte[])' instead if you don't want to load a
@@ -656,6 +658,16 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
             setCurrentFrame(0);
         }
         doPlay();
+    }
+
+    /**
+     * Indicates whether or not this PAGImageView is playing.
+     */
+    public boolean isPlaying() {
+        if (animator != null) {
+            return animator.isRunning();
+        }
+        return false;
     }
 
     /**

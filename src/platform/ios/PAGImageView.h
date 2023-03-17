@@ -61,8 +61,9 @@ PAG_API @interface PAGImageView : UIImageView
 + (NSUInteger)MaxDiskSize;
 
 /**
- * Set the maximum size of the disk cache, in bytes.
- * Defaults to 1 GB.
+ * Set the maximum size of the disk cache.
+ * In bytes, which defaults to 1 GB.
+ * When the cache size exceeds the maximum size, clean up to 60% of the maximum storage size.
  */
 + (void)SetMaxDiskSize:(NSUInteger)size;
 
@@ -72,8 +73,7 @@ PAG_API @interface PAGImageView : UIImageView
 - (PAGComposition* __nullable)getComposition;
 
 /**
- * Sets a new PAGComposition for PAGImageView to render as content. The maximum frame rate
- * for rendering is 30.
+ * Sets a new PAGComposition for PAGImageView to render as content.
  * Note: If the composition is already added to another PAGImageView, it will be removed from the
  * previous PAGImageView.
  */
@@ -93,9 +93,10 @@ PAG_API @interface PAGImageView : UIImageView
 
 /**
  * Load a pag file from the specified path, returns false if the file does not exist or the data is
- * not a pag file. The maximum frame rate for rendering is 30.
+ * not a pag file.
  * Note: All PAGFiles loaded by the same path share the same internal cache. The internal
- * cache is alive until all PAGFiles are released.
+ * cache is alive until all PAGFiles are released. Use '[PAGFile Load:size:]' instead if
+ * you don't want to load a PAGFile from the internal caches.
  */
 - (BOOL)setPath:(NSString*)filePath;
 /**
@@ -112,7 +113,10 @@ PAG_API @interface PAGImageView : UIImageView
 - (BOOL)cacheAllFramesInMemory;
 
 /**
- *  Set a switch for the memory cache, the default value is no.
+ * If set to true, the PAGImageView loads all image frames into the memory,
+ * which will significantly increase the rendering performance but may cost lots of additional
+ * memory. Use it when you prefer rendering speed over memory usage. If set to false, the
+ * PAGImageView loads only one image frame at a time into the memory. The default value is false.
  */
 - (void)setCacheAllFramesInMemory:(BOOL)enable;
 
@@ -122,8 +126,7 @@ PAG_API @interface PAGImageView : UIImageView
 - (CGAffineTransform)matrix;
 
 /**
- * Set the transformation which will be applied to the composition. The method is valid only
- * when the scaleMode is PAGScaleMode.None.
+ * Set the transformation which will be applied to the composition.
  */
 - (void)setMatrix:(CGAffineTransform)value;
 
@@ -133,7 +136,9 @@ PAG_API @interface PAGImageView : UIImageView
 - (float)renderScale;
 
 /**
- * Set the value of renderScale property.
+ * This value defines the scale factor for internal graphics renderer, ranges from 0.0 to 1.0.
+ * The scale factors less than 1.0 may result in blurred output, but it can reduce the usage of
+ * graphics memory which leads to better performance. The default value is 1.0.
  */
 - (void)setRenderScale:(float)scale;
 
@@ -175,13 +180,13 @@ PAG_API @interface PAGImageView : UIImageView
 - (void)pause;
 
 /**
- * The image displayed in the image view.
+ * Returns a UIImage capturing the contents of the PAGImageView.
  */
 - (UIImage*)currentImage;
 
 /**
- * Call this method to render current position immediately.
- * Returns true if rendering is successful, otherwise false
+ * Call this method to render current position immediately. If the play() method is already
+ * called, there is no need to call it. Returns true if the content has changed.
  */
 - (BOOL)flush;
 

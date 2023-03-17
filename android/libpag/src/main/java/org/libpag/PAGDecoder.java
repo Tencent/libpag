@@ -93,7 +93,7 @@ public class PAGDecoder {
     }
 
     /**
-     * Copies pixels from current PAGDecoder to the specified bitmap.
+     * Copies pixels of the given frame to the specified bitmap.
      */
     public boolean copyFrameTo(Bitmap bitmap, int index) {
         if (bitmap == null || bitmap.isRecycled() || index < 0 || index >= _numFrames) {
