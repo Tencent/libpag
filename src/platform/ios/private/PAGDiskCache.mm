@@ -20,7 +20,7 @@
 
 #include <compression.h>
 #include <sys/stat.h>
-#import "PAGCacheFileManager.h"
+#import "PAGCacheManager.h"
 #import "PAGCacheQueueManager.h"
 
 /**
@@ -89,7 +89,7 @@ static const int32_t FileHeaderSize = 2 * sizeof(int32_t);
   if (name.length == 0) {
     return nil;
   }
-  NSString* filePath = [[PAGCacheFileManager shareInstance] diskCachePath];
+  NSString* filePath = [[PAGCacheManager shareInstance] diskCachePath];
   if (filePath.length == 0) {
     return nil;
   }
@@ -123,40 +123,46 @@ static const int32_t FileHeaderSize = 2 * sizeof(int32_t);
   return YES;
 }
 
-- (void)setObject:(NSData*)srcData
-           forKey:(NSInteger)index
-        withBlock:(void (^_Nullable)(void))block {
-  dispatch_async(cacheQueue, ^{
-    NSData* compressData = [self compressRGBAData:(uint8_t*)srcData.bytes length:srcData.length];
-    if (compressData) {
-      dispatch_sync(ioQueue, ^{
-        [self saveObject:compressData forKey:index];
-        block();
-      });
-    }
-  });
-}
-
-- (void)setObject:(NSData*)srcData forKey:(NSInteger)index {
-  NSData* compressData = [self compressRGBAData:(uint8_t*)srcData.bytes length:srcData.length];
+- (void)setObject:(CVPixelBufferRef)pixelBuffer forKey:(NSInteger)index {
+  CVPixelBufferLockBaseAddress(pixelBuffer, 0);
+  uint8_t* pixelBufferData = (uint8_t*)CVPixelBufferGetBaseAddress(pixelBuffer);
+  size_t bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 0);
+  size_t height = CVPixelBufferGetHeight(pixelBuffer);
+  NSData* compressData = [self compressRGBAData:pixelBufferData length:bytesPerRow * height];
   if (compressData) {
     __block __typeof(self) weakSelf = self;
     dispatch_sync(ioQueue, ^{
       [weakSelf saveObject:compressData forKey:index];
     });
   }
+  CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
 }
 
-- (BOOL)objectForKey:(NSInteger)index dstData:(uint8_t*)dstData dstLength:(NSInteger)dstLength {
-  __block NSData* srcData = nil;
-  dispatch_sync(ioQueue, ^{
-    srcData = [self readObjectForKey:index];
+- (void)setObject:(CVPixelBufferRef)pixelBuffer
+           forKey:(NSInteger)index
+        withBlock:(void (^)())block {
+  dispatch_sync(cacheQueue, ^{
+    [self setObject:pixelBuffer forKey:index];
+    block();
   });
-  if (srcData) {
-    return [self deCompressData:dstData
-                      dstLength:dstLength
-                      srcBuffer:(uint8_t*)srcData.bytes
-                      srcLength:srcData.length];
+}
+
+- (BOOL)objectForKey:(NSInteger)index pixelBuffer:(CVPixelBufferRef)pixelBuffer {
+  __block NSData* compressData = nil;
+  dispatch_sync(ioQueue, ^{
+    compressData = [self readObjectForKey:index];
+  });
+  if (compressData) {
+    CVPixelBufferLockBaseAddress(pixelBuffer, 0);
+    uint8_t* pixelBufferData = (uint8_t*)CVPixelBufferGetBaseAddress(pixelBuffer);
+    size_t bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 0);
+    size_t height = CVPixelBufferGetHeight(pixelBuffer);
+    BOOL status = [self deCompressData:pixelBufferData
+                             dstLength:bytesPerRow * height
+                             srcBuffer:(uint8_t*)compressData.bytes
+                             srcLength:compressData.length];
+    CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
+    return status;
   }
   return NO;
 }
@@ -180,7 +186,7 @@ static const int32_t FileHeaderSize = 2 * sizeof(int32_t);
   __block __typeof(self) weakSelf = self;
   dispatch_sync(ioQueue, ^{
     close(weakSelf->_fd);
-    [[PAGCacheFileManager shareInstance] removeFileForPath:weakSelf->_path];
+    [[PAGCacheManager shareInstance] removeFileForPath:weakSelf->_path];
     weakSelf->_fd = open([weakSelf->_path UTF8String], O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
   });
 }
@@ -296,6 +302,8 @@ static const int32_t FileHeaderSize = 2 * sizeof(int32_t);
   NSData* compressData = nil;
   if (resultSize > 0) {
     compressData = [NSData dataWithBytesNoCopy:dstBuffer length:resultSize freeWhenDone:YES];
+  } else {
+    free(dstBuffer);
   }
 
   return compressData;

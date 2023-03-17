@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import "PAGCacheFileManager.h"
+#import "PAGCacheManager.h"
 
 // The maximum default storage of the Disk: 2GB
 static const NSUInteger defaultMaxDiskSize = 1 * 1024 * 1024 * 1024;
@@ -24,7 +24,7 @@ static const NSUInteger defaultMaxDiskSize = 1 * 1024 * 1024 * 1024;
 // When the cache size exceeds the maximum size, clean up 40% of the storage
 static const float cleanRate = 0.4;
 
-@implementation PAGCacheFileManager {
+@implementation PAGCacheManager {
   NSString* _diskCachePath;
   NSUInteger _maxDiskSize;
 }
@@ -50,10 +50,10 @@ static const float cleanRate = 0.4;
 
 #pragma mark - public
 + (instancetype)shareInstance {
-  static PAGCacheFileManager* fileManager;
+  static PAGCacheManager* fileManager;
   static dispatch_once_t onceToken;
   dispatch_once(&onceToken, ^{
-    fileManager = [[PAGCacheFileManager alloc] init];
+    fileManager = [[PAGCacheManager alloc] init];
   });
   return fileManager;
 }

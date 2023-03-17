@@ -20,32 +20,15 @@
 
 #import <CommonCrypto/CommonCrypto.h>
 #include <compression.h>
+#import <VideoToolbox/VideoToolbox.h>
 
+#import "platform/cocoa/private/PAGComposition+Internal.h"
+#import "platform/cocoa/private/PixelBufferUtils.h"
 #import "PAGDecoder.h"
 #import "PAGFile.h"
-#import "private/PAGCacheFileManager.h"
+#import "private/PAGCacheManager.h"
 #import "private/PAGDiskCache.h"
 #import "private/PAGValueAnimator.h"
-
-@implementation PAGDiskCacheConfig
-
-+ (void)SetMaxDiskSize:(NSUInteger)size {
-  [[PAGCacheFileManager shareInstance] SetMaxDiskSize:size];
-}
-
-+ (NSUInteger)MaxDiskSize {
-  return [[PAGCacheFileManager shareInstance] MaxDiskSize];
-}
-
-+ (NSUInteger)totalSize {
-  return [[PAGCacheFileManager shareInstance] totalSize];
-}
-
-+ (void)removeAllFiles {
-  [[PAGCacheFileManager shareInstance] removeAllFiles];
-}
-
-@end
 
 namespace pag {
 static NSOperationQueue* imageViewFlushQueue;
@@ -58,24 +41,25 @@ void DestoryImageViewFlushQueue() {
 }
 }  // namespace pag
 
-static const float MAX_FRAMERATE = 30.0;
+static const float DEFAULT_MAX_FRAMERATE = 30.0;
 
 @interface PAGImageView ()
 @property(atomic, assign) BOOL isInBackground;
 @property(atomic, assign) BOOL progressExplicitlySet;
 @property(atomic, assign) BOOL isVisible;
-@property(atomic, assign) BOOL isPlaying;
+@property(nonatomic, assign) BOOL isPlaying;
 @property(nonatomic, strong) NSLock* listenersLock;
 @property(nonatomic, strong) PAGDecoder* pagDecoder;
 @property(atomic, assign) float scaleFactor;
 @property(atomic, assign) NSUInteger currentFrameIndex;
 @property(nonatomic, strong) UIImage* currentImage;
-@property(atomic, assign) float maxFrameRate;
-@property(atomic, assign) BOOL needPreLoadDatas;
 @property(atomic, assign) NSInteger uiImagePerBytes;
 @property(nonatomic, assign) NSInteger pagContentVersion;
 @property(atomic, assign) float renderScale;
 @property(atomic, assign) NSInteger currentFrameExplicitlySet;
+@property(nonatomic, assign) float frameRate;
+@property(nonatomic, assign) BOOL memoryCacheEnabled;
+
 @end
 
 @implementation PAGImageView {
@@ -85,22 +69,21 @@ static const float MAX_FRAMERATE = 30.0;
   PAGComposition* pagComposition;
   NSUInteger numFrames;
   NSString* cacheKey;
-  float frameRate;
 
   NSInteger cacheWidth;
   NSInteger cacheHeight;
-  BOOL memoryCacheEnabled;
+
   PAGDiskCache* imageViewCache;
-  uint8_t* currentImageData;
   NSMutableDictionary<NSNumber*, UIImage*>* imagesMap;
   NSInteger _repeatCount;
   dispatch_queue_t flushQueue;
+  CVPixelBufferRef pixelBuffer;
 }
 
 @synthesize isPlaying = _isPlaying;
-@synthesize maxFrameRate = _maxFrameRate;
 @synthesize renderScale = _renderScale;
 @synthesize currentImage = _currentImage;
+@synthesize memoryCacheEnabled = _memoryCacheEnabled;
 
 - (instancetype)initWithFrame:(CGRect)frame {
   if (self = [super initWithFrame:frame]) {
@@ -120,11 +103,10 @@ static const float MAX_FRAMERATE = 30.0;
   _pagDecoder = nil;
   self.currentFrameIndex = -1;
   _renderScale = 1.0;
-  memoryCacheEnabled = NO;
+  self.memoryCacheEnabled = NO;
   listeners = [[NSHashTable weakObjectsHashTable] retain];
   self.isPlaying = FALSE;
   self.isVisible = FALSE;
-  self.maxFrameRate = MAX_FRAMERATE;
   self.isInBackground =
       [UIApplication sharedApplication].applicationState == UIApplicationStateBackground;
   filePath = nil;
@@ -136,7 +118,7 @@ static const float MAX_FRAMERATE = 30.0;
   [valueAnimator setRepeatCount:-1];
   [valueAnimator setListener:self];
   [self updateSize];
-  currentImageData = nil;
+
   flushQueue = dispatch_queue_create("pag.art.PAGImageView", DISPATCH_QUEUE_SERIAL);
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(applicationDidBecomeActive:)
@@ -157,6 +139,9 @@ static const float MAX_FRAMERATE = 30.0;
   if (_pagDecoder != nil) {
     [_pagDecoder release];
   }
+  if (pixelBuffer) {
+    CVPixelBufferRelease(pixelBuffer);
+  }
   if (_currentImage) {
     [_currentImage release];
   }
@@ -165,9 +150,6 @@ static const float MAX_FRAMERATE = 30.0;
   }
   if (filePath != nil) {
     [filePath release];
-  }
-  if (currentImageData) {
-    free(currentImageData);
   }
   if (imagesMap) {
     [imagesMap removeAllObjects];
@@ -236,9 +218,19 @@ static NSString* RemovePathVariableComponent(NSString* original) {
 static void AutomaticCleanDisk() {
   static dispatch_once_t onceToken;
   dispatch_once(&onceToken, ^{
-    [[PAGCacheFileManager shareInstance] automaticCleanWithBlock:^{
+    [[PAGCacheManager shareInstance] automaticCleanWithBlock:^{
     }];
   });
+}
+
+- (CVPixelBufferRef)getCVPixelBuffer {
+  if (self.memoryCacheEnabled) {
+    return pag::PixelBufferUtils::Make((int)cacheWidth, (int)cacheHeight);
+  }
+  if (pixelBuffer == nil) {
+    pixelBuffer = pag::PixelBufferUtils::Make((int)cacheWidth, (int)cacheHeight);
+  }
+  return pixelBuffer;
 }
 
 - (NSString*)generateCacheKey {
@@ -256,9 +248,8 @@ static void AutomaticCleanDisk() {
 
 - (PAGDecoder*)pagDecoder {
   if (_pagDecoder == nullptr) {
-    _pagDecoder = [PAGDecoder Make:pagComposition scale:self.scaleFactor];
+    _pagDecoder = [PAGDecoder Make:pagComposition frameRate:self.frameRate scale:self.scaleFactor];
     [_pagDecoder retain];
-    [_pagDecoder setMaxFrameRate:[self maxFrameRate]];
   }
   return _pagDecoder;
 }
@@ -358,7 +349,7 @@ static void AutomaticCleanDisk() {
   self.isVisible = visible;
   if (self.isVisible) {
     if (self.isPlaying) {
-      [self startAnimating];
+      [self play];
     }
   } else {
     if (self.isPlaying) {
@@ -367,64 +358,45 @@ static void AutomaticCleanDisk() {
   }
 }
 
-- (uint8_t*)getMemorySpaceofCurrentImage {
-  uint8_t* rgbaData = nil;
-  if (memoryCacheEnabled) {
-    return (uint8_t*)malloc(self.uiImagePerBytes);
-  } else {
-    if (!currentImageData) {
-      currentImageData = (uint8_t*)malloc(self.uiImagePerBytes);
-    }
-    return currentImageData;
-  }
-  return rgbaData;
-}
-
-- (BOOL)updateImageViewData:(uint8_t*)rgbaData index:(NSInteger)frameIndex {
+- (BOOL)updateImageViewAtIndex:(NSInteger)frameIndex from:(CVPixelBufferRef)pixelBuffer {
   BOOL status = TRUE;
   if (self.pagContentVersion != [self->pagComposition getContentVersion]) {
     self.pagContentVersion = [self->pagComposition getContentVersion];
-    [self->imagesMap removeAllObjects];
-    [self->imageViewCache removeCaches];
+    [self unloadAllFrames];
   }
   if (self->imageViewCache && [self->imageViewCache containsObjectForKey:frameIndex]) {
     if ([[self->imagesMap allKeys] containsObject:[NSNumber numberWithInteger:frameIndex]]) {
+      NSLog(@"-----read--memory---currentFrame:%ld \n", frameIndex);
       self.currentImage = [self->imagesMap objectForKey:[NSNumber numberWithInteger:frameIndex]];
       [self submitToImageView];
     } else {
-      status = [self->imageViewCache objectForKey:frameIndex
-                                          dstData:rgbaData
-                                        dstLength:self.uiImagePerBytes];
+      status = [self->imageViewCache objectForKey:frameIndex pixelBuffer:pixelBuffer];
       if (!status) {
-        return status;
+        return NO;
       }
-      UIImage* image = [self imageForRGBA:rgbaData width:self->cacheWidth height:self->cacheHeight];
+      UIImage* image = [self imageFromCVPixeBuffer:pixelBuffer];
       self.currentImage = image;
-      [self submitToImageView];
-      if (self->memoryCacheEnabled) {
+      if (self.memoryCacheEnabled) {
         [self->imagesMap setObject:image forKey:[NSNumber numberWithInteger:frameIndex]];
       }
+      NSLog(@"-----read-----currentFrame:%ld \n", frameIndex);
+      [self submitToImageView];
     }
   } else {
-    status = [self.pagDecoder readPixelsWithColorType:PAGColorTypeBGRA_8888
-                                            alphaType:PAGAlphaTypePremultiplied
-                                            dstPixels:rgbaData
-                                          dstRowBytes:self->cacheWidth * 4
-                                                index:frameIndex];
-    if (!status) {
-      return status;
+    @autoreleasepool {
+      [self.pagDecoder copyFrameAt:frameIndex To:pixelBuffer];
+      UIImage* image = [self imageFromCVPixeBuffer:pixelBuffer];
+      NSLog(@"-----save-----currentFrame:%ld \n", frameIndex);
+      self.currentImage = image;
+      if (self.memoryCacheEnabled) {
+        [self->imagesMap setObject:image forKey:[NSNumber numberWithInteger:frameIndex]];
+      }
+      [self submitToImageView];
+      [self->imageViewCache setObject:pixelBuffer
+                               forKey:frameIndex
+                            withBlock:^{
+                            }];
     }
-    UIImage* image = [self imageForRGBA:rgbaData width:self->cacheWidth height:self->cacheHeight];
-    self.currentImage = image;
-    [self submitToImageView];
-    if (self->memoryCacheEnabled) {
-      [self->imagesMap setObject:image forKey:[NSNumber numberWithInteger:frameIndex]];
-    }
-    NSData* srcData = [NSData dataWithBytes:rgbaData length:self.uiImagePerBytes];
-    [self->imageViewCache setObject:srcData
-                             forKey:frameIndex
-                          withBlock:^{
-                          }];
   }
   return status;
 }
@@ -438,23 +410,28 @@ static void AutomaticCleanDisk() {
     if (_pagDecoder && [imageViewCache count] == numFrames) {
       [_pagDecoder release];
       _pagDecoder = nil;
+      if (filePath && [pagComposition getContentVersion] == 0) {
+        [pagComposition release];
+        pagComposition = nil;
+      }
+
       AutomaticCleanDisk();
     }
     self.currentFrameIndex = frameIndex;
     __block __typeof(self) weakSelf = self;
-    __block uint8_t* rgbaData = [self getMemorySpaceofCurrentImage];
     NSOperationQueue* flushQueue = [PAGImageView ImageViewFlushQueue];
     [self retain];
     NSBlockOperation* operation = [NSBlockOperation blockOperationWithBlock:^{
       NSInteger frameIndex = weakSelf.currentFrameIndex;
+      CVPixelBufferRef pixelBuffer = [weakSelf getCVPixelBuffer];
       if (weakSelf.currentFrameExplicitlySet >= 0) {
         frameIndex = weakSelf.currentFrameExplicitlySet;
-        [weakSelf updateImageViewData:rgbaData index:frameIndex];
+        [weakSelf updateImageViewAtIndex:frameIndex from:pixelBuffer];
         [weakSelf->valueAnimator
-            setCurrentPlayTime:((frameIndex + 0.1) * 1.0 / frameRate * 1000000)];
+            setCurrentPlayTime:((frameIndex + 0.1) * 1.0 / self.frameRate * 1000000)];
         weakSelf.currentFrameExplicitlySet = -1;
       } else {
-        [weakSelf updateImageViewData:rgbaData index:frameIndex];
+        [weakSelf updateImageViewAtIndex:frameIndex from:pixelBuffer];
       }
     }];
     [flushQueue addOperation:operation];
@@ -483,9 +460,6 @@ static void AutomaticCleanDisk() {
   self.isInBackground = FALSE;
   if (self.isVisible) {
     [PAGImageView RegisterFlushQueueDestoryMethod];
-    if (self.needPreLoadDatas) {
-      [self preloadAllFrames];
-    }
     [self updateView];
   }
 }
@@ -530,38 +504,22 @@ static void AutomaticCleanDisk() {
   return image;
 }
 
-- (NSArray<UIImage*>*)convertAnimationImages:(NSMutableDictionary*)map {
-  if (map) {
-    NSArray* allKeys = [[map allKeys]
-        sortedArrayUsingComparator:^NSComparisonResult(id _Nonnull obj1, id _Nonnull obj2) {
-          return [(NSNumber*)obj1 compare:(NSNumber*)obj2];
-        }];
-    NSMutableArray<UIImage*>* imageArray = [[NSMutableArray new] autorelease];
-    [allKeys enumerateObjectsUsingBlock:^(id _Nonnull obj, NSUInteger idx, BOOL* _Nonnull) {
-      [imageArray insertObject:[map objectForKey:obj] atIndex:idx];
-    }];
-    return imageArray;
-  }
-  return nil;
-}
-
-- (void)readPixelsAndSave:(uint8_t*)srcData index:(NSInteger)index enableMemoryCache:(BOOL)enable {
-  BOOL status = [self.pagDecoder readPixelsWithColorType:PAGColorTypeBGRA_8888
-                                               alphaType:PAGAlphaTypePremultiplied
-                                               dstPixels:srcData
-                                             dstRowBytes:cacheWidth * 4
-                                                   index:index];
-  if (status) {
-    if (enable) {
-      UIImage* image = [self imageForRGBA:srcData width:cacheWidth height:cacheHeight];
-      [imagesMap setObject:image forKey:[NSNumber numberWithInteger:index]];
-    }
-    NSData* data = [NSData dataWithBytes:srcData length:self.uiImagePerBytes];
-    [imageViewCache setObject:data forKey:index];
-  }
+- (UIImage*)imageFromCVPixeBuffer:(CVPixelBufferRef)pixeBuffer {
+  CGImageRef imageRef = nil;
+  VTCreateCGImageFromCVPixelBuffer(pixeBuffer, nil, &imageRef);
+  UIImage* uiImage = [UIImage imageWithCGImage:imageRef];
+  CGImageRelease(imageRef);
+  return uiImage;
 }
 
 #pragma mark - pubic
++ (NSUInteger)MaxDiskSize {
+  return [[PAGCacheManager shareInstance] MaxDiskSize];
+}
+
++ (void)SetMaxDiskSize:(NSUInteger)size {
+  [[PAGCacheManager shareInstance] SetMaxDiskSize:size];
+}
 
 - (void)setBounds:(CGRect)bounds {
   CGRect oldBounds = self.bounds;
@@ -630,24 +588,13 @@ static void AutomaticCleanDisk() {
   }
 }
 
-- (float)maxFrameRate {
-  return _maxFrameRate;
+- (BOOL)memoryCacheEnabled {
+  return _memoryCacheEnabled;
 }
 
-- (void)setMaxFrameRate:(float)value {
-  if (value > 0) {
-    _maxFrameRate = value;
-    frameRate = MIN([self maxFrameRate], [pagComposition frameRate]);
-  }
-  if (pagComposition) {
-    [self unloadAllFrames];
-    [self updateView];
-  }
-}
-
-- (void)enableMemoryCache:(BOOL)enable {
-  memoryCacheEnabled = enable;
-  if (memoryCacheEnabled) {
+- (void)setMemoryCacheEnabled:(BOOL)enable {
+  _memoryCacheEnabled = enable;
+  if (_memoryCacheEnabled) {
     if (imagesMap == nil) {
       imagesMap = [NSMutableDictionary new];
     }
@@ -670,16 +617,9 @@ static void AutomaticCleanDisk() {
   [self checkVisible];
 }
 
-- (void)startAnimating {
+- (void)play {
   _isPlaying = true;
   if (!self.isVisible) {
-    return;
-  }
-  if (listeners.count == 0 && memoryCacheEnabled && [imagesMap count] == numFrames) {
-    [self setAnimationImages:[self convertAnimationImages:imagesMap]];
-    [self setAnimationDuration:([pagComposition duration] * 1.0 / 1000000)];
-    [self setAnimationRepeatCount:_repeatCount];
-    [super startAnimating];
     return;
   }
   int64_t playTime = (int64_t)([valueAnimator getAnimatedFraction] * [valueAnimator duration]);
@@ -687,12 +627,8 @@ static void AutomaticCleanDisk() {
   [valueAnimator start];
 }
 
-- (void)stopAnimating {
+- (void)pause {
   _isPlaying = false;
-  if (listeners.count == 0 && memoryCacheEnabled && [imagesMap count] == numFrames) {
-    [super stopAnimating];
-    return;
-  }
   [valueAnimator stop];
 }
 
@@ -700,7 +636,7 @@ static void AutomaticCleanDisk() {
   return [[_currentImage retain] autorelease];
 }
 
-- (BOOL)animating {
+- (BOOL)isPlaying {
   return _isPlaying;
 }
 
@@ -728,13 +664,17 @@ static void AutomaticCleanDisk() {
   return filePath == nil ? nil : [[filePath retain] autorelease];
 }
 
-- (BOOL)setPath:(NSString*)path {
+- (BOOL)setPath:(NSString*)filePath {
+  return [self setPath:filePath maxFrameRate:DEFAULT_MAX_FRAMERATE];
+}
+
+- (BOOL)setPath:(NSString*)path maxFrameRate:(float)maxFrameRate {
   if (filePath != nil) {
     [filePath release];
     filePath = nil;
   }
   PAGFile* file = [PAGFile Load:path];
-  [self setComposition:file];
+  [self setComposition:file maxFrameRate:maxFrameRate];
   filePath = [path retain];
   return file != nil;
 }
@@ -747,6 +687,10 @@ static void AutomaticCleanDisk() {
 }
 
 - (void)setComposition:(PAGComposition*)newComposition {
+  [self setComposition:newComposition maxFrameRate:DEFAULT_MAX_FRAMERATE];
+}
+
+- (void)setComposition:(PAGComposition*)newComposition maxFrameRate:(float)maxFrameRate {
   if (pagComposition == newComposition) {
     return;
   }
@@ -760,8 +704,8 @@ static void AutomaticCleanDisk() {
       std::max(self.frame.size.width * self.contentScaleFactor / [pagComposition width],
                self.frame.size.height * self.contentScaleFactor / [pagComposition height]);
   cacheKey = [self generateCacheKey];
-  frameRate = MIN([self maxFrameRate], [pagComposition frameRate]);
-  numFrames = [pagComposition duration] * frameRate / 1000000;
+  self.frameRate = MIN(maxFrameRate, [pagComposition frameRate]);
+  numFrames = [pagComposition duration] * self.frameRate / 1000000;
   if (imageViewCache) {
     [imageViewCache release];
     imageViewCache = nil;
@@ -787,52 +731,7 @@ static void AutomaticCleanDisk() {
 }
 
 - (BOOL)flush {
-  return [self updateImageViewData:[self getMemorySpaceofCurrentImage] index:[self currentFrame]];
-}
-
-- (void)preloadAllFrames {
-  self.needPreLoadDatas = YES;
-  if (pagComposition == nil || self.isInBackground) {
-    return;
-  }
-  if (memoryCacheEnabled) {
-    if ([imagesMap count] == (NSUInteger)numFrames) {
-      return;
-    }
-    for (uint i = 0; i < numFrames; i++) {
-      @autoreleasepool {
-        if ([imagesMap objectForKey:[NSNumber numberWithInteger:i]]) {
-          continue;
-        }
-        uint8_t* rgabData = [self getMemorySpaceofCurrentImage];
-        if ([imageViewCache containsObjectForKey:i]) {
-          [imageViewCache objectForKey:i dstData:rgabData dstLength:self.uiImagePerBytes];
-          UIImage* image = [self imageForRGBA:rgabData width:cacheWidth height:cacheHeight];
-          [imagesMap setObject:image forKey:[NSNumber numberWithInteger:i]];
-        } else {
-          [self readPixelsAndSave:rgabData index:i enableMemoryCache:YES];
-        }
-      }
-    }
-  } else {
-    if ([imageViewCache count] == numFrames) {
-      return;
-    }
-    for (uint i = 0; i < numFrames; i++) {
-      @autoreleasepool {
-        if ([imageViewCache containsObjectForKey:i]) {
-          continue;
-        } else {
-          [self readPixelsAndSave:[self getMemorySpaceofCurrentImage] index:i enableMemoryCache:NO];
-        }
-      }
-    }
-  }
-  if (self.pagDecoder && [imageViewCache count] == numFrames) {
-    [_pagDecoder release];
-    _pagDecoder = nil;
-  }
-  self.needPreLoadDatas = NO;
+  return [self updateImageViewAtIndex:[self currentFrame] from:[self getCVPixelBuffer]];
 }
 
 - (void)unloadAllFrames {

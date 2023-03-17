@@ -19,24 +19,25 @@
 
 #import <Foundation/Foundation.h>
 #import "PAGComposition.h"
-#import "PAGPixelsType.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
 PAG_API @interface PAGDecoder : NSObject
 
 /**
- Convenience method to create a decoder with specified pagComposition.
+ Convenience method to create a decoder with specified pagComposition and frameRate.
  @return A new decoder, or nil if an error occurs.
  */
-+ (nullable instancetype)Make:(nullable PAGComposition*)pagComposition;
++ (nullable instancetype)Make:(nullable PAGComposition*)pagComposition frameRate:(CGFloat)frameRate;
 
 /**
- Convenience method to create a decoder with specified pagComposition.
+ Convenience method to create a decoder with specified pagComposition and frameRate.
  @param scale Output image's scale.
  @return A new decoder, or nil if an error occurs.
  */
-+ (nullable instancetype)Make:(nullable PAGComposition*)pagComposition scale:(CGFloat)scale;
++ (nullable instancetype)Make:(nullable PAGComposition*)pagComposition
+                    frameRate:(CGFloat)frameRate
+                        scale:(CGFloat)scale;
 
 /**
  * Returns the width of the output image.
@@ -54,35 +55,19 @@ PAG_API @interface PAGDecoder : NSObject
 - (NSInteger)numFrames;
 
 /**
+ * Copy pixel data of the given frame to the  CVPixelBuffer, and return YES if successful or return
+ * NO.
+ */
+- (BOOL)copyFrameAt:(NSInteger)index To:(CVPixelBufferRef)pixelBuffer;
+
+/**
  Returns the frame image from a specified index.
  @note It's necessary to execute  in the foreground.
        It's recommended to read in order, performance is the best at this point.
  @param index Frame index (zero based).
  @return A new frame with image, or nil if an error occurs.
  */
-- (nullable UIImage*)frameAtIndex:(NSInteger)index;
-
-/**
- * The maximum frame rate for rendering. If set to a value less than the actual frame rate from
- * PAGFile, it drops frames but increases performance. Otherwise, it has no effect. The default
- * value is 30.
- */
-- (float)maxFrameRate;
-
-/**
- * Set the maximum frame rate for rendering.
- */
-- (void)setMaxFrameRate:(float)value;
-
-/**
- * Copies pixels from current PAGSurface to dstPixels with specified color type, alpha type and
- * row bytes. Returns true if pixels are copied to dstPixels.
- */
-- (BOOL)readPixelsWithColorType:(PAGColorType)colorType
-                      alphaType:(PAGAlphaType)alphaType
-                      dstPixels:(void*)dstPixels
-                    dstRowBytes:(size_t)dstRowBytes
-                          index:(NSInteger)index;
+- (UIImage*)frameAtIndex:(NSInteger)index;
 
 @end
 

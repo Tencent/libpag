@@ -18,34 +18,8 @@
 
 #import <UIKit/UIKit.h>
 #import "PAGComposition.h"
-#import "PAGScaleMode.h"
 
 NS_ASSUME_NONNULL_BEGIN
-
-PAG_API @interface PAGDiskCacheConfig : NSObject
-
-/**
- * Set the maximum size of the disk cache, in bytes.
- * Defaults to 1 GB.
- */
-+ (void)SetMaxDiskSize:(NSUInteger)size;
-
-/**
- * Get the maximum size of the disk cache, in bytes.
- */
-+ (NSUInteger)MaxDiskSize;
-
-/**
- * Get the total size of data in the disk cache, in bytes.
- */
-+ (NSUInteger)totalSize;
-
-/**
- * Clear all disk cache.
- */
-+ (void)removeAllFiles;
-
-@end
 
 @class PAGImageView;
 
@@ -82,16 +56,35 @@ PAG_API @interface PAGDiskCacheConfig : NSObject
 PAG_API @interface PAGImageView : UIImageView
 
 /**
+ * Get the maximum size of the disk cache, in bytes.
+ */
++ (NSUInteger)MaxDiskSize;
+
+/**
+ * Set the maximum size of the disk cache, in bytes.
+ * Defaults to 1 GB.
+ */
++ (void)SetMaxDiskSize:(NSUInteger)size;
+
+/**
  * Returns the current PAGComposition for PAGImageView to render as content.
  */
 - (PAGComposition* __nullable)getComposition;
 
 /**
- * Sets a new PAGComposition for PAGImageView to render as content.
+ * Sets a new PAGComposition for PAGImageView to render as content. The maximum frame rate
+ * for rendering is 30.
  * Note: If the composition is already added to another PAGImageView, it will be removed from the
  * previous PAGImageView.
  */
 - (void)setComposition:(PAGComposition*)newComposition;
+
+/**
+ * Sets a new PAGComposition with maximum frame rate for PAGImageView to render as content.
+ * Note: If the composition is already added to another PAGImageView, it will be removed from the
+ * previous PAGImageView.
+ */
+- (void)setComposition:(PAGComposition*)newComposition maxFrameRate:(float)maxFrameRate;
 
 /**
  * The path string of a pag file set by setPath.
@@ -100,40 +93,28 @@ PAG_API @interface PAGImageView : UIImageView
 
 /**
  * Load a pag file from the specified path, returns false if the file does not exist or the data is
- * not a pag file. Note: All PAGFiles loaded by the same path share the same internal cache. The
- * internal cache is alive until all PAGFiles are released.
+ * not a pag file. The maximum frame rate for rendering is 30.
+ * Note: All PAGFiles loaded by the same path share the same internal cache. The internal
+ * cache is alive until all PAGFiles are released.
  */
 - (BOOL)setPath:(NSString*)filePath;
+/**
+ * Load a pag file from the specified path with maximum frame rate, returns false if the file
+ * does not exist or the data is not a pag file.
+ * Note: All PAGFiles loaded by the same path share the same internal cache. The internal
+ * cache is alive until all PAGFiles are released.
+ */
+- (BOOL)setPath:(NSString*)filePath maxFrameRate:(float)maxFrameRate;
 
 /**
- * Pre-load all animated image frame into memory or disk. Then later frame image request can
- * directly return the frame for index without decoding. This method may be called on background
- * thread.
+ * Return memory cache status.
  */
-- (void)preloadAllFrames;
-
-/**
- * Unload all animated image frame from memory  or disk if are already pre-loaded. Then later frame
- * image request need decoding. You can use this to free up the memory or disk usage if need.
- */
-- (void)unloadAllFrames;
+- (BOOL)memoryCacheEnabled;
 
 /**
  *  Set a switch for the memory cache, the default value is no.
  */
-- (void)enableMemoryCache:(BOOL)enable;
-
-/**
- * The maximum frame rate for rendering. If set to a value less than the actual frame rate from
- * PAGFile, it drops frames but increases performance. Otherwise, it has no effect. The default
- * value is 30.
- */
-- (float)maxFrameRate;
-
-/**
- * Set the maximum frame rate for rendering.
- */
-- (void)setMaxFrameRate:(float)value;
+- (void)setMemoryCacheEnabled:(BOOL)enable;
 
 /**
  * Returns a copy of current matrix.
@@ -147,14 +128,14 @@ PAG_API @interface PAGImageView : UIImageView
 - (void)setMatrix:(CGAffineTransform)value;
 
 /**
- * Set the value of renderScale property.
- */
-- (void)setRenderScale:(float)scale;
-
-/**
  * Get the value of renderScale property.
  */
 - (float)renderScale;
+
+/**
+ * Set the value of renderScale property.
+ */
+- (void)setRenderScale:(float)scale;
 
 /**
  * Set the number of times the animation will repeat. The default is 1, which means the animation
@@ -184,14 +165,14 @@ PAG_API @interface PAGImageView : UIImageView
 - (void)setCurrentFrame:(NSUInteger)currentFrame;
 
 /**
- * Starts animating the images in the receiver.
+ * Start the animation.
  */
-- (void)startAnimating;
+- (void)play;
 
 /**
- * Stops animating the images in the receiver.
+ * Pause the animation.
  */
-- (void)stopAnimating;
+- (void)pause;
 
 /**
  * The image displayed in the image view.
@@ -205,9 +186,9 @@ PAG_API @interface PAGImageView : UIImageView
 - (BOOL)flush;
 
 /**
- * Returns a bool value indicating whether the animation is running.
+ * Indicates whether or not this PAGImageView is playing.
  */
-- (BOOL)animating;
+- (BOOL)isPlaying;
 
 @end
 

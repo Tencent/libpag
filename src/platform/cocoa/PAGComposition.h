@@ -150,6 +150,4 @@ PAG_API @interface PAGComposition : PAGLayer
  */
 - (NSArray<PAGLayer*>*)getLayersUnderPoint:(CGPoint)point;
 
-- (uint32_t)getContentVersion;
-
 @end

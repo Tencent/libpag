@@ -20,7 +20,7 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface PAGCacheFileManager : NSObject
+@interface PAGCacheManager : NSObject
 
 + (instancetype)shareInstance;
 

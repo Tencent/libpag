@@ -24,7 +24,6 @@
 #import "PAGSurface.h"
 
 @interface PAGDecoder ()
-@property(atomic, assign) float maxFrameRate;
 @property(atomic, assign) NSInteger frames;
 @end
 
@@ -35,13 +34,39 @@
   CGFloat _scale;
 }
 
-@synthesize maxFrameRate = _maxFrameRate;
-
-+ (instancetype)Make:(PAGComposition*)pagComposition {
-  return [PAGDecoder Make:pagComposition scale:1.0f];
+- (instancetype)initWithPAGComposition:(PAGComposition*)composition
+                            pagSurface:(PAGSurface*)surface
+                             frameRate:(CGFloat)frameRate
+                                 scale:(CGFloat)scale {
+  self = [super init];
+  if (self) {
+    pagSurface = [surface retain];
+    pagPlayer = [[PAGPlayer alloc] init];
+    [pagPlayer setComposition:composition];
+    [pagPlayer setSurface:pagSurface];
+    _scale = scale;
+    float rate = [composition frameRate] > frameRate ? frameRate : [composition frameRate];
+    self.frames = [composition duration] * rate / 1000000;
+    lastFrameImage = nil;
+  }
+  return self;
 }
 
-+ (instancetype)Make:(PAGComposition*)pagComposition scale:(CGFloat)scale {
+- (void)dealloc {
+  [pagSurface release];
+  [pagPlayer release];
+  [super dealloc];
+}
+
+#pragma mark - public
+
++ (instancetype)Make:(PAGComposition*)pagComposition frameRate:(CGFloat)frameRate {
+  return [PAGDecoder Make:pagComposition frameRate:frameRate scale:1.0];
+}
+
++ (instancetype)Make:(PAGComposition*)pagComposition
+           frameRate:(CGFloat)frameRate
+               scale:(CGFloat)scale {
   if (pagComposition == nil) {
     return nil;
   }
@@ -56,26 +81,29 @@
 
   return [[[PAGDecoder alloc] initWithPAGComposition:pagComposition
                                           pagSurface:pagSurface
+                                           frameRate:frameRate
                                                scale:scale] autorelease];
 }
 
-- (instancetype)initWithPAGComposition:(PAGComposition*)composition
-                            pagSurface:(PAGSurface*)surface
-                                 scale:(CGFloat)scale {
-  self = [super init];
-  if (self) {
-    pagSurface = [surface retain];
-    pagPlayer = [[PAGPlayer alloc] init];
-    [pagPlayer setComposition:composition];
-    [pagPlayer setSurface:pagSurface];
-    _maxFrameRate = 30.0f;
-    _scale = scale;
-    float frameRate =
-        _maxFrameRate > [composition frameRate] ? [composition frameRate] : _maxFrameRate;
-    self.frames = [composition duration] * frameRate / 1000000;
-    lastFrameImage = nil;
+- (BOOL)copyFrameAt:(NSInteger)index To:(CVPixelBufferRef)pixelBuffer {
+  BOOL result = [self renderCurrentFrame:index];
+  if (!result) {
+    return nil;
   }
-  return self;
+  return [pagSurface copyImageTo:pixelBuffer];
+}
+
+- (UIImage*)frameAtIndex:(NSInteger)index {
+  BOOL result = [self renderCurrentFrame:index];
+  if (!result && lastFrameImage != nil) {
+    return nil;
+  }
+  UIImage* image = [self imageFromCVPixelBufferRef:[pagSurface makeSnapshot]];
+  if (lastFrameImage) {
+    [lastFrameImage release];
+  }
+  lastFrameImage = [image retain];
+  return [[image retain] autorelease];
 }
 
 - (NSInteger)width {
@@ -90,36 +118,17 @@
   return self.frames;
 }
 
+#pragma mark - private
+
 - (UIImage*)imageFromCVPixelBufferRef:(CVPixelBufferRef)pixelBuffer {
+  if (pixelBuffer == nil) {
+    return nil;
+  }
   CGImageRef imageRef = nil;
   VTCreateCGImageFromCVPixelBuffer(pixelBuffer, nil, &imageRef);
   UIImage* uiImage = [UIImage imageWithCGImage:imageRef];
   CGImageRelease(imageRef);
   return uiImage;
-}
-
-- (UIImage*)frameAtIndex:(NSInteger)index {
-  BOOL result = [self renderCurrentFrame:index];
-  if (!result && lastFrameImage != nil) {
-    return lastFrameImage;
-  }
-  UIImage* image = [self imageFromCVPixelBufferRef:[pagSurface makeSnapshot]];
-  if (lastFrameImage) {
-    [lastFrameImage release];
-  }
-  lastFrameImage = [image retain];
-  return [[image retain] autorelease];
-}
-
-- (void)setMaxFrameRate:(float)value {
-  if (value > 0) {
-    _maxFrameRate = _maxFrameRate > value ? value : _maxFrameRate;
-    self.frames = [[pagPlayer getComposition] duration] * _maxFrameRate / 1000000;
-  }
-}
-
-- (float)maxFrameRate {
-  return _maxFrameRate;
 }
 
 - (BOOL)renderCurrentFrame:(NSInteger)index {
@@ -130,27 +139,6 @@
   float progress = (index * 1.0 + 0.1) / self.frames;
   [pagPlayer setProgress:progress];
   return [pagPlayer flush];
-}
-
-- (BOOL)readPixelsWithColorType:(PAGColorType)colorType
-                      alphaType:(PAGAlphaType)alphaType
-                      dstPixels:(void*)dstPixels
-                    dstRowBytes:(size_t)dstRowBytes
-                          index:(NSInteger)index {
-  [self renderCurrentFrame:index];
-  return [pagSurface readPixelsWithColorType:colorType
-                                   alphaType:alphaType
-                                   dstPixels:dstPixels
-                                 dstRowBytes:dstRowBytes];
-}
-
-- (void)dealloc {
-  [lastFrameImage release];
-  lastFrameImage = nil;
-  [pagSurface freeCache];
-  [pagSurface release];
-  [pagPlayer release];
-  [super dealloc];
 }
 
 @end

@@ -109,14 +109,8 @@
   return [_surface makeSnapshot];
 }
 
-- (BOOL)readPixelsWithColorType:(PAGColorType)colorType
-                      alphaType:(PAGAlphaType)alphaType
-                      dstPixels:(void*)dstPixels
-                    dstRowBytes:(size_t)dstRowBytes {
-  return [_surface readPixelsWithColorType:colorType
-                                 alphaType:alphaType
-                                 dstPixels:dstPixels
-                               dstRowBytes:dstRowBytes];
+- (BOOL)copyImageTo:(CVPixelBufferRef)pixelBuffer {
+  return [_surface copyImageTo:pixelBuffer];
 }
 
 @end
