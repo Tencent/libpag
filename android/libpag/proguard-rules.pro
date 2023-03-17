@@ -18,8 +18,33 @@
 
 # Uncomment this to preserve the line number information for
 # debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+-keepattributes SourceFile,LineNumberTable
 
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
-#-renamesourcefileattribute SourceFile
+-renamesourcefileattribute SourceFile
+
+-keepclasseswithmembernames class * {
+    native <methods>;
+}
+
+-keep public class org.libpag.* {
+    public <methods>;
+    public <fields>;
+}
+
+-keepclasseswithmembernames class org.libpag.PAGLayer {
+    protected long nativeContext;
+}
+
+-keepclasseswithmembernames class org.libpag.PAGImage {
+    long nativeContext;
+}
+
+-keepclasseswithmembernames class org.libpag.PAGSurface {
+    long nativeSurface;
+}
+
+-keepclasseswithmembernames class org.libpag.VideoSurface {
+    long nativeContext;
+}
