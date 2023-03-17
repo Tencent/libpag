@@ -415,7 +415,7 @@ static NSString* RemovePathVariableComponent(NSString* original) {
         frameIndex = weakSelf.currentFrameExplicitlySet;
         [weakSelf updateImageViewAtIndex:frameIndex from:pixelBuffer];
         [weakSelf->valueAnimator
-            setCurrentPlayTime:((frameIndex + 0.1) * 1.0 / self.frameRate * 1000000)];
+            setCurrentPlayTime:((frameIndex + 0.1) * 1.0 / weakSelf.frameRate * 1000000)];
         weakSelf.currentFrameExplicitlySet = -1;
       } else {
         [weakSelf updateImageViewAtIndex:frameIndex from:pixelBuffer];
@@ -629,7 +629,6 @@ static NSString* RemovePathVariableComponent(NSString* original) {
 - (BOOL)setPath:(NSString*)path maxFrameRate:(float)maxFrameRate {
   if (filePath != nil) {
     [filePath release];
-    filePath = nil;
   }
   PAGFile* file = [PAGFile Load:path];
   [self setComposition:file maxFrameRate:maxFrameRate];

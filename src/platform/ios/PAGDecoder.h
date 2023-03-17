@@ -73,7 +73,7 @@ PAG_API @interface PAGDecoder : NSObject
  @param index Frame index (zero based).
  @return A new frame with image, or nil if an error occurs.
  */
-- (UIImage*)frameAtIndex:(NSInteger)index;
+- (nullable UIImage*)frameAtIndex:(NSInteger)index;
 
 @end
 
