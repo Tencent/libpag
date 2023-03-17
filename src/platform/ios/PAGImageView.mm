@@ -45,7 +45,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 
 @interface PAGImageView ()
 @property(atomic, assign) BOOL isInBackground;
-@property(atomic, assign) BOOL progressExplicitlySet;
 @property(atomic, assign) BOOL isVisible;
 @property(nonatomic, assign) BOOL isPlaying;
 @property(nonatomic, strong) NSLock* listenersLock;
@@ -53,7 +52,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 @property(atomic, assign) float scaleFactor;
 @property(atomic, assign) NSUInteger currentFrameIndex;
 @property(nonatomic, strong) UIImage* currentImage;
-@property(atomic, assign) NSInteger uiImagePerBytes;
 @property(nonatomic, assign) NSInteger pagContentVersion;
 @property(atomic, assign) float renderScale;
 @property(atomic, assign) NSInteger currentFrameExplicitlySet;
@@ -112,7 +110,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   filePath = nil;
   _listenersLock = [[NSLock alloc] init];
   self.contentScaleFactor = [UIScreen mainScreen].scale;
-  self.contentScaleFactor = 1;
   self.backgroundColor = [UIColor clearColor];
   valueAnimator = [[PAGValueAnimator alloc] init];
   [valueAnimator setRepeatCount:-1];
@@ -373,7 +370,6 @@ static NSString* RemovePathVariableComponent(NSString* original) {
       [self submitToImageView];
     }
   } else {
-    @autoreleasepool {
       [self.pagDecoder copyFrameAt:frameIndex To:pixelBuffer];
       UIImage* image = [self imageFromCVPixeBuffer:pixelBuffer];
       self.currentImage = image;
@@ -385,7 +381,6 @@ static NSString* RemovePathVariableComponent(NSString* original) {
                                forKey:frameIndex
                             withBlock:^{
                             }];
-    }
   }
   return status;
 }
@@ -459,7 +454,6 @@ static NSString* RemovePathVariableComponent(NSString* original) {
   if (pagComposition) {
     cacheWidth = round(self.scaleFactor * [pagComposition width] * self.renderScale);
     cacheHeight = round(self.scaleFactor * [pagComposition height] * self.renderScale);
-    self.uiImagePerBytes = cacheWidth * cacheHeight * 4;
   }
 }
 
@@ -511,6 +505,7 @@ static NSString* RemovePathVariableComponent(NSString* original) {
     [pagComposition setMatrix:value];
     [self updateSize];
     [self unloadAllFrames];
+    [self updateView];
   }
 }
 
@@ -670,7 +665,6 @@ static NSString* RemovePathVariableComponent(NSString* original) {
   }
   imageViewCache = [PAGDiskCache MakeWithName:cacheKey frameCount:numFrames];
   [imageViewCache retain];
-  self.progressExplicitlySet = TRUE;
   [self updateSize];
   [valueAnimator setDuration:[pagComposition duration]];
 }
