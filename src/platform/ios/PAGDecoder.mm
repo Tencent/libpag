@@ -35,7 +35,7 @@
 
 - (instancetype)initWithPAGComposition:(PAGComposition*)composition
                             pagSurface:(PAGSurface*)surface
-                             frameRate:(float)frameRate
+                          maxFrameRate:(float)maxFrameRate
                                  scale:(float)scale {
   self = [super init];
   if (self) {
@@ -43,11 +43,8 @@
     pagPlayer = [[PAGPlayer alloc] init];
     [pagPlayer setComposition:composition];
     [pagPlayer setSurface:pagSurface];
-    if (frameRate <= 0) {
-      frameRate = [composition frameRate];
-    } else {
-      frameRate = frameRate > [composition frameRate] ? [composition frameRate] : frameRate;
-    }
+    maxFrameRate = MAX(maxFrameRate, 0);
+    float frameRate = MIN(maxFrameRate, [composition frameRate]);
     self.frames = [composition duration] * frameRate / 1000000;
     lastFrameImage = nil;
   }
@@ -63,14 +60,16 @@
 #pragma mark - public
 
 + (instancetype)Make:(PAGComposition*)pagComposition {
-  return [PAGDecoder Make:pagComposition frameRate:[pagComposition frameRate] scale:1.0];
+  return [PAGDecoder Make:pagComposition maxFrameRate:[pagComposition frameRate] scale:1.0];
 }
 
-+ (instancetype)Make:(PAGComposition*)pagComposition frameRate:(float)frameRate {
-  return [PAGDecoder Make:pagComposition frameRate:frameRate scale:1.0];
++ (instancetype)Make:(PAGComposition*)pagComposition maxFrameRate:(float)maxFrameRate {
+  return [PAGDecoder Make:pagComposition maxFrameRate:maxFrameRate scale:1.0];
 }
 
-+ (instancetype)Make:(PAGComposition*)pagComposition frameRate:(float)frameRate scale:(float)scale {
++ (instancetype)Make:(PAGComposition*)pagComposition
+        maxFrameRate:(float)maxFrameRate
+               scale:(float)scale {
   if (pagComposition == nil) {
     return nil;
   }
@@ -85,14 +84,14 @@
 
   return [[[PAGDecoder alloc] initWithPAGComposition:pagComposition
                                           pagSurface:pagSurface
-                                           frameRate:frameRate
+                                        maxFrameRate:maxFrameRate
                                                scale:scale] autorelease];
 }
 
 - (BOOL)copyFrameAt:(NSInteger)index To:(CVPixelBufferRef)pixelBuffer {
   BOOL result = [self renderCurrentFrame:index];
   if (!result) {
-    return nil;
+    return NO;
   }
   return [pagSurface copyPixelsTo:pixelBuffer];
 }

@@ -148,7 +148,7 @@
   return pixelBuffer;
 }
 
-- (BOOL)copyImageTo:(CVPixelBufferRef)pixelBuffer {
+- (BOOL)copyPixelsTo:(CVPixelBufferRef)pixelBuffer {
   if (!pixelBuffer) {
     return NO;
   }

@@ -110,7 +110,7 @@
 }
 
 - (BOOL)copyPixelsTo:(CVPixelBufferRef)pixelBuffer {
-  return [_surface copyImageTo:pixelBuffer];
+  return [_surface copyPixelsTo:pixelBuffer];
 }
 
 @end

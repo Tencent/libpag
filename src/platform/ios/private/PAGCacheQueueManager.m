@@ -40,6 +40,9 @@
 }
 
 - (void)dealloc {
+  for (dispatch_queue_t queue in [cacheQueueDict allValues]) {
+    dispatch_release(queue);
+  }
   [cacheQueueDict release];
   [super dealloc];
 }
@@ -49,10 +52,9 @@
     dispatch_queue_t queue = [cacheQueueDict objectForKey:cachePath];
     if (!queue) {
       static int index = 0;
-      NSString* queueName = [NSString stringWithFormat:@"pag.art.ImageViewCache.%d", index++];
+      NSString* queueName = [NSString stringWithFormat:@"ImageViewCache.art.pag.%d", index++];
       queue = dispatch_queue_create([queueName UTF8String], DISPATCH_QUEUE_SERIAL);
       [cacheQueueDict setObject:queue forKey:cachePath];
-      dispatch_release(queue);
     }
     return queue;
   }

@@ -61,11 +61,12 @@ static const int32_t FileHeaderSize = 2 * sizeof(int32_t);
     scratchEncodeBuffer = malloc(scratchEncodeLength);
     scratchDecodeLength = compression_decode_scratch_buffer_size(COMPRESSION_LZ4);
     scratchDecodeBuffer = malloc(scratchDecodeLength);
-    cacheQueue = dispatch_queue_create("pag.art.PAGDiskFileCache", DISPATCH_QUEUE_SERIAL);
+    cacheQueue = dispatch_queue_create("PAGDiskFileCache.art.pag", DISPATCH_QUEUE_SERIAL);
     ioQueue = queue;
     dispatch_retain(ioQueue);
+    __block __typeof(self) weakSelf = self;
     dispatch_sync(ioQueue, ^{
-      [self initializeCacheFile];
+      [weakSelf initializeCacheFile];
     });
   }
   return self;
@@ -130,13 +131,13 @@ static const int32_t FileHeaderSize = 2 * sizeof(int32_t);
   size_t bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 0);
   size_t height = CVPixelBufferGetHeight(pixelBuffer);
   NSData* compressData = [self compressRGBAData:pixelBufferData length:bytesPerRow * height];
+  CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
   if (compressData) {
     __block __typeof(self) weakSelf = self;
     dispatch_sync(ioQueue, ^{
       [weakSelf saveObject:compressData forKey:index];
     });
   }
-  CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
 }
 
 - (void)setObject:(CVPixelBufferRef)pixelBuffer
@@ -194,27 +195,27 @@ static const int32_t FileHeaderSize = 2 * sizeof(int32_t);
 
 #pragma mark - private
 - (void)initializeCacheFile {
-  if ([self fileSize] < (NSInteger)(FileHeaderSize + numFrames * 2 * sizeof(int32_t))) {
-    ftruncate(_fd, 0);
+  if ([self fileSize] < (NSInteger)(FileHeaderSize + self->numFrames * 2 * sizeof(int32_t))) {
+    ftruncate(self->_fd, 0);
     int32_t zero = 0;
-    write(_fd, &zero, sizeof(int32_t));  // cacheFrames
-    write(_fd, &zero, sizeof(int32_t));  // maxCacheFrameSize
-    for (uint i = 0; i < numFrames; i++) {
-      write(_fd, &zero, sizeof(int32_t));
-      write(_fd, &zero, sizeof(int32_t));
+    write(self->_fd, &zero, sizeof(int32_t));  // cacheFrames
+    write(self->_fd, &zero, sizeof(int32_t));  // maxCacheFrameSize
+    for (uint i = 0; i < self->numFrames; i++) {
+      write(self->_fd, &zero, sizeof(int32_t));
+      write(self->_fd, &zero, sizeof(int32_t));
     }
-    cacheFrameCount = 0;
-    maxCacheFrameSize = 0;
+    self->cacheFrameCount = 0;
+    self->maxCacheFrameSize = 0;
   } else {
-    lseek(_fd, 0, SEEK_SET);
-    read(_fd, &cacheFrameCount, sizeof(int32_t));
-    read(_fd, &maxCacheFrameSize, sizeof(int32_t));
+    lseek(self->_fd, 0, SEEK_SET);
+    read(self->_fd, &self->cacheFrameCount, sizeof(int32_t));
+    read(self->_fd, &self->maxCacheFrameSize, sizeof(int32_t));
   }
 }
 
 - (NSInteger)fileSize {
   struct stat statbuf;
-  fstat(_fd, &statbuf);
+  fstat(self->_fd, &statbuf);
   NSInteger size = statbuf.st_size;
   return size;
 }
@@ -324,8 +325,41 @@ static const int32_t FileHeaderSize = 2 * sizeof(int32_t);
   if (resultLength > 0) {
     return YES;
   }
-
   return NO;
 }
+
+//+ (CVPixelBufferRef)RBGBuffereCopyWithPixelBuffer:(CVPixelBufferRef)pixelBuffer
+//{
+//    CVPixelBufferLockBaseAddress(pixelBuffer, 0);
+//    int bufferWidth = (int)CVPixelBufferGetWidth(pixelBuffer);
+//    int bufferHeight = (int)CVPixelBufferGetHeight(pixelBuffer);
+//    size_t bytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer);
+//    uint8_t *baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer);
+//    OSType pixelFormat = inputPixelFormat();
+//
+//    // Copy the pixel buffer
+//    CVPixelBufferRef pixelBufferCopy = NULL;
+//    CFDictionaryRef empty = CFDictionaryCreate(kCFAllocatorDefault, NULL, NULL, 0,
+//    &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks); // our empty IOSurface
+//    properties dictionary NSDictionary *options = [NSDictionary dictionaryWithObjectsAndKeys:
+//                             [NSNumber numberWithBool:YES], kCVPixelBufferCGImageCompatibilityKey,
+//                             [NSNumber numberWithBool:YES],
+//                             kCVPixelBufferCGBitmapContextCompatibilityKey, empty,
+//                             kCVPixelBufferIOSurfacePropertiesKey, nil];
+//    CVReturn status = CVPixelBufferCreate(kCFAllocatorDefault, bufferWidth, bufferHeight,
+//    pixelFormat, (__bridge CFDictionaryRef) options, &pixelBufferCopy); if (status ==
+//    kCVReturnSuccess) {
+//        CVPixelBufferLockBaseAddress(pixelBufferCopy, 0);
+//        uint8_t *copyBaseAddress = CVPixelBufferGetBaseAddress(pixelBufferCopy);
+//        memcpy(copyBaseAddress, baseAddress, bufferHeight * bytesPerRow);
+//    }else {
+//        NSLog(@"RBGBuffereCopyWithPixelBuffer :: failed");
+//    }
+//
+//    CVPixelBufferUnlockBaseAddress(pixelBufferCopy, 0);
+//    CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
+//
+//    return pixelBufferCopy;
+//}
 
 @end

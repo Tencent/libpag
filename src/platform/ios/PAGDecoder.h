@@ -34,7 +34,8 @@ PAG_API @interface PAGDecoder : NSObject
  Convenience method to create a decoder with specified pagComposition and frameRate.
  @return A new decoder, or nil if an error occurs.
  */
-+ (nullable instancetype)Make:(nullable PAGComposition*)pagComposition frameRate:(float)frameRate;
++ (nullable instancetype)Make:(nullable PAGComposition*)pagComposition
+                 maxFrameRate:(float)maxFrameRate;
 
 /**
  Convenience method to create a decoder with specified pagComposition and frameRate.
@@ -42,7 +43,7 @@ PAG_API @interface PAGDecoder : NSObject
  @return A new decoder, or nil if an error occurs.
  */
 + (nullable instancetype)Make:(nullable PAGComposition*)pagComposition
-                    frameRate:(float)frameRate
+                 maxFrameRate:(float)maxFrameRate
                         scale:(float)scale;
 
 /**

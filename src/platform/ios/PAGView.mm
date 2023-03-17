@@ -26,10 +26,10 @@ namespace pag {
 static NSOperationQueue* flushQueue;
 void DestoryFlushQueue() {
   NSOperationQueue* queue = flushQueue;
-  [queue release];
-  flushQueue = nil;
   [queue cancelAllOperations];
   [queue waitUntilAllOperationsAreFinished];
+  [queue release];
+  queue = nil;
 }
 }  // namespace pag
 
@@ -60,7 +60,7 @@ void DestoryFlushQueue() {
   dispatch_once(&onceToken, ^{
     pag::flushQueue = [[[NSOperationQueue alloc] init] retain];
     pag::flushQueue.maxConcurrentOperationCount = 1;
-    pag::flushQueue.name = @"pag.art.PAGView";
+    pag::flushQueue.name = @"PAGView.art.pag";
   });
   return pag::flushQueue;
 }

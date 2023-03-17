@@ -57,6 +57,8 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 @property(atomic, assign) NSInteger currentFrameExplicitlySet;
 @property(nonatomic, assign) float frameRate;
 @property(nonatomic, assign) BOOL memoryCacheEnabled;
+@property(nonatomic, assign) NSInteger fileWidth;
+@property(nonatomic, assign) NSInteger fileHeight;
 
 @end
 
@@ -66,7 +68,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   NSHashTable* listeners;
   PAGComposition* pagComposition;
   NSUInteger numFrames;
-  NSString* cacheKey;
 
   NSInteger cacheWidth;
   NSInteger cacheHeight;
@@ -116,7 +117,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   [valueAnimator setListener:self];
   [self updateSize];
 
-  flushQueue = dispatch_queue_create("pag.art.PAGImageView", DISPATCH_QUEUE_SERIAL);
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(applicationDidBecomeActive:)
                                                name:UIApplicationDidBecomeActiveNotification
@@ -135,6 +135,9 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   [self unloadAllFrames];
   if (_pagDecoder != nil) {
     [_pagDecoder release];
+  }
+  if (imageViewCache) {
+    [imageViewCache release];
   }
   if (pixelBuffer) {
     CVPixelBufferRelease(pixelBuffer);
@@ -163,7 +166,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   dispatch_once(&onceToken, ^{
     pag::imageViewFlushQueue = [[[NSOperationQueue alloc] init] retain];
     pag::imageViewFlushQueue.maxConcurrentOperationCount = 1;
-    pag::imageViewFlushQueue.name = @"pag.art.PAGImageView";
+    pag::imageViewFlushQueue.name = @"PAGImageView.art.pag";
   });
   return pag::imageViewFlushQueue;
 }
@@ -218,6 +221,7 @@ static NSString* RemovePathVariableComponent(NSString* original) {
   }
   if (pixelBuffer == nil) {
     pixelBuffer = pag::PixelBufferUtils::Make((int)cacheWidth, (int)cacheHeight);
+    CFRetain(pixelBuffer);
   }
   return pixelBuffer;
 }
@@ -225,20 +229,29 @@ static NSString* RemovePathVariableComponent(NSString* original) {
 - (NSString*)generateCacheKey {
   NSString* cacheKey = nil;
   if ([pagComposition isMemberOfClass:[PAGFile class]] && [pagComposition getContentVersion] == 0) {
-    filePath = [[(PAGFile*)pagComposition path] retain];
+    cacheKey = [(PAGFile*)pagComposition path];
     cacheKey = RemovePathVariableComponent(filePath);
   } else {
     cacheKey = [NSString stringWithFormat:@"%@", pagComposition];
   }
-  cacheKey = [cacheKey
-      stringByAppendingFormat:@"_%u_%f", [pagComposition getContentVersion], self.scaleFactor];
+  cacheKey = [cacheKey stringByAppendingFormat:@"_%u_%f_%f", [pagComposition getContentVersion],
+                                               self.frameRate, self.scaleFactor];
   return NSStringMD5(cacheKey);
 }
 
 - (PAGDecoder*)pagDecoder {
   if (_pagDecoder == nullptr) {
-    _pagDecoder = [PAGDecoder Make:pagComposition frameRate:self.frameRate scale:self.scaleFactor];
-    [_pagDecoder retain];
+    if (filePath) {
+      _pagDecoder = [PAGDecoder Make:[PAGFile Load:filePath]
+                        maxFrameRate:self.frameRate
+                               scale:self.scaleFactor];
+      [_pagDecoder retain];
+    } else if (pagComposition) {
+      _pagDecoder = [PAGDecoder Make:pagComposition
+                        maxFrameRate:self.frameRate
+                               scale:self.scaleFactor];
+      [_pagDecoder retain];
+    }
   }
   return _pagDecoder;
 }
@@ -266,9 +279,6 @@ static NSString* RemovePathVariableComponent(NSString* original) {
 - (void)onAnimationUpdate {
   [self updateView];
 }
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
 - (void)onAnimationStart {
   [_listenersLock lock];
@@ -323,8 +333,6 @@ static NSString* RemovePathVariableComponent(NSString* original) {
   [copiedListeners release];
 }
 
-#pragma clang diagnostic pop
-
 - (void)didMoveToWindow {
   [super didMoveToWindow];
   [self checkVisible];
@@ -349,8 +357,8 @@ static NSString* RemovePathVariableComponent(NSString* original) {
 
 - (BOOL)updateImageViewAtIndex:(NSInteger)frameIndex from:(CVPixelBufferRef)pixelBuffer {
   BOOL status = TRUE;
-  if (self.pagContentVersion != [self->pagComposition getContentVersion]) {
-    self.pagContentVersion = [self->pagComposition getContentVersion];
+  if (pagComposition && self.pagContentVersion != [pagComposition getContentVersion]) {
+    self.pagContentVersion = [pagComposition getContentVersion];
     [self unloadAllFrames];
   }
   if (self->imageViewCache && [self->imageViewCache containsObjectForKey:frameIndex]) {
@@ -370,6 +378,7 @@ static NSString* RemovePathVariableComponent(NSString* original) {
       [self submitToImageView];
     }
   } else {
+    @autoreleasepool {
       [self.pagDecoder copyFrameAt:frameIndex To:pixelBuffer];
       UIImage* image = [self imageFromCVPixeBuffer:pixelBuffer];
       self.currentImage = image;
@@ -381,6 +390,7 @@ static NSString* RemovePathVariableComponent(NSString* original) {
                                forKey:frameIndex
                             withBlock:^{
                             }];
+    }
   }
   return status;
 }
@@ -451,10 +461,8 @@ static NSString* RemovePathVariableComponent(NSString* original) {
 }
 
 - (void)updateSize {
-  if (pagComposition) {
-    cacheWidth = round(self.scaleFactor * [pagComposition width] * self.renderScale);
-    cacheHeight = round(self.scaleFactor * [pagComposition height] * self.renderScale);
-  }
+  cacheWidth = round(self.scaleFactor * self.fileWidth * self.renderScale);
+  cacheHeight = round(self.scaleFactor * self.fileHeight * self.renderScale);
 }
 
 - (UIImage*)imageFromCVPixeBuffer:(CVPixelBufferRef)pixeBuffer {
@@ -478,9 +486,8 @@ static NSString* RemovePathVariableComponent(NSString* original) {
   CGRect oldBounds = self.bounds;
   [super setBounds:bounds];
   if (oldBounds.size.width != bounds.size.width || oldBounds.size.height != bounds.size.height) {
-    self.scaleFactor =
-        std::max(bounds.size.width * self.contentScaleFactor / [pagComposition width],
-                 bounds.size.height * self.contentScaleFactor / [pagComposition height]);
+    self.scaleFactor = std::max(bounds.size.width * self.contentScaleFactor / self.fileWidth,
+                                bounds.size.height * self.contentScaleFactor / self.fileHeight);
     [self updateSize];
     [self unloadAllFrames];
     [self updateView];
@@ -491,9 +498,8 @@ static NSString* RemovePathVariableComponent(NSString* original) {
   CGRect oldRect = self.frame;
   [super setFrame:frame];
   if (oldRect.size.width != frame.size.width || oldRect.size.height != frame.size.height) {
-    self.scaleFactor =
-        std::max(frame.size.width * self.contentScaleFactor / [pagComposition width],
-                 frame.size.height * self.contentScaleFactor / [pagComposition height]);
+    self.scaleFactor = std::max(frame.size.width * self.contentScaleFactor / self.fileWidth,
+                                frame.size.height * self.contentScaleFactor / self.fileHeight);
     [self updateSize];
     [self unloadAllFrames];
     [self updateView];
@@ -518,7 +524,7 @@ static NSString* RemovePathVariableComponent(NSString* original) {
 
 - (void)setRenderScale:(float)scale {
   _renderScale = scale;
-  if (pagComposition) {
+  if (pagComposition || filePath) {
     [self updateSize];
     [self unloadAllFrames];
     [self updateView];
@@ -533,7 +539,7 @@ static NSString* RemovePathVariableComponent(NSString* original) {
   CGFloat oldScaleFactor = self.contentScaleFactor;
   [super setContentScaleFactor:scaleFactor];
   if (oldScaleFactor != scaleFactor) {
-    if (pagComposition) {
+    if (pagComposition || filePath) {
       [self updateSize];
       [self unloadAllFrames];
       [self updateView];
@@ -624,14 +630,18 @@ static NSString* RemovePathVariableComponent(NSString* original) {
 - (BOOL)setPath:(NSString*)path maxFrameRate:(float)maxFrameRate {
   if (filePath != nil) {
     [filePath release];
+    filePath = nil;
   }
-  PAGFile* file = [PAGFile Load:path];
-  [self setComposition:file maxFrameRate:maxFrameRate];
   filePath = [path retain];
+  PAGFile* file = [PAGFile Load:filePath];
+  [self setComposition:file maxFrameRate:maxFrameRate];
   return file != nil;
 }
 
 - (PAGComposition*)getComposition {
+  if (filePath) {
+    return nil;
+  }
   if (pagComposition) {
     return [[pagComposition retain] autorelease];
   }
@@ -652,21 +662,29 @@ static NSString* RemovePathVariableComponent(NSString* original) {
   pagComposition = [newComposition retain];
   self.pagContentVersion = [pagComposition getContentVersion];
   self.currentFrameExplicitlySet = 0;
-  self.scaleFactor =
-      std::max(self.frame.size.width * self.contentScaleFactor / [pagComposition width],
-               self.frame.size.height * self.contentScaleFactor / [pagComposition height]);
-  cacheKey = [self generateCacheKey];
+  self.fileWidth = [pagComposition width];
+  self.fileHeight = [pagComposition height];
+  self.scaleFactor = std::max(self.frame.size.width * self.contentScaleFactor / self.fileWidth,
+                              self.frame.size.height * self.contentScaleFactor / self.fileHeight);
+  NSString* cacheKey = [self generateCacheKey];
   self.frameRate = MIN(maxFrameRate, [pagComposition frameRate]);
   numFrames = [pagComposition duration] * self.frameRate / 1000000;
+
   if (imageViewCache) {
     [imageViewCache release];
     imageViewCache = nil;
     imageViewCache = [PAGDiskCache MakeWithName:cacheKey frameCount:numFrames];
+  } else {
+    imageViewCache = [PAGDiskCache MakeWithName:cacheKey frameCount:numFrames];
   }
-  imageViewCache = [PAGDiskCache MakeWithName:cacheKey frameCount:numFrames];
   [imageViewCache retain];
   [self updateSize];
+
   [valueAnimator setDuration:[pagComposition duration]];
+  if (filePath && [imageViewCache count] == numFrames) {
+    [pagComposition release];
+    pagComposition = nil;
+  }
 }
 
 - (void)setCurrentFrame:(NSUInteger)currentFrame {
@@ -687,7 +705,7 @@ static NSString* RemovePathVariableComponent(NSString* original) {
 
 - (void)unloadAllFrames {
   [imagesMap removeAllObjects];
-  if (filePath == nil || [pagComposition getContentVersion] > 0) {
+  if (pagComposition && [pagComposition getContentVersion] > 0) {
     [imageViewCache removeCaches];
   }
 }
