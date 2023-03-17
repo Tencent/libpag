@@ -21,9 +21,6 @@
 // The maximum default storage of the Disk: 1GB
 static const NSUInteger defaultMaxDiskSize = 1 * 1024 * 1024 * 1024;
 
-// When the cache size exceeds the maximum size, clean up to 60% of the maximum storage size.
-static const float cleanRate = 0.4;
-
 @implementation PAGCacheManager {
   NSString* _diskCachePath;
   NSUInteger _maxDiskSize;

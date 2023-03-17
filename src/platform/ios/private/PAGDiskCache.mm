@@ -25,7 +25,8 @@
 
 /**
  * structure of the cache file
- *  width | height | cacheFrames |  maxCacheFrameSize | data range | ... | data range | frame data |
+ * | width | height | cacheFrames |  maxCacheFrameSize | data range | ... | data range | frame data
+ * |
  * ... | frame data |
  */
 

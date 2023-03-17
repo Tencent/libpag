@@ -36,8 +36,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)removeFileForPath:(NSString*)path;
 
-- (void)automaticCleanWithBlock:(void (^)(void))block;
-
 @end
 
 NS_ASSUME_NONNULL_END

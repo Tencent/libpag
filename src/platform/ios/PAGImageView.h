@@ -89,7 +89,7 @@ PAG_API @interface PAGImageView : UIImageView
 /**
  * The path string of a pag file set by setPath.
  */
-- (NSString*)getPath;
+- (nullable NSString*)getPath;
 
 /**
  * Load a pag file from the specified path, returns false if the file does not exist or the data is
