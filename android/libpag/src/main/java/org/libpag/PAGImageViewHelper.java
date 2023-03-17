@@ -284,9 +284,12 @@ class PAGImageViewHelper {
             }
             float maxScale = Math.max(width * 1.0f / composition.width(),
                     height * 1.0f / composition.height());
-            realFrameRate = composition.frameRate() > maxFrameRate ? maxFrameRate :
-                    composition.frameRate();
-            _pagDecoder = PAGDecoder.Make(composition, maxFrameRate, maxScale);
+            if (maxFrameRate <= 0) {
+                realFrameRate = composition.frameRate();
+            } else {
+                realFrameRate = Math.min(composition.frameRate(), maxFrameRate);
+            }
+            _pagDecoder = PAGDecoder.Make(composition, realFrameRate, maxScale);
             _width = _pagDecoder.width();
             _height = _pagDecoder.height();
             numFrames = _pagDecoder.numFrames();

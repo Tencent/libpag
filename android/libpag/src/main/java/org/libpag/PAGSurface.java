@@ -175,7 +175,7 @@ public class PAGSurface {
     /**
      * Copies pixels from current PAGSurface to the specified bitmap.
      */
-    public native boolean copyImageTo(Bitmap bitmap);
+    public native boolean copyPixelsTo(Bitmap bitmap);
 
     /**
      * Free up resources used by the PAGSurface instance immediately instead of relying on the

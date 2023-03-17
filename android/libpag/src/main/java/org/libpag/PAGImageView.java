@@ -60,7 +60,7 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
     private final static float DEFAULT_MAX_FRAMERATE = 30f;
     protected BitmapPool bitmapPool;
     private ValueAnimator animator;
-    private boolean isMemoryCacheOpen = false;
+    private boolean isCacheAllFramesInMemory = false;
     private volatile boolean _isPlaying = false;
     private volatile Boolean _isAnimatorPreRunning = null;
     private volatile boolean progressExplicitlySet = true;
@@ -133,17 +133,17 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
     }
 
     /**
-     * Set the value of maxDiskCache property.
-     */
-    public static void SetMaxDiskCache(long maxDiskCache) {
-        g_MaxDiskCacheSize = maxDiskCache;
-    }
-
-    /**
      * Get the value of maxDiskCache property.
      */
     public static long MaxDiskCache() {
         return g_MaxDiskCacheSize;
+    }
+
+    /**
+     * Set the value of maxDiskCache property.
+     */
+    public static void SetMaxDiskCache(long maxDiskCache) {
+        g_MaxDiskCacheSize = maxDiskCache;
     }
 
     /**
@@ -153,15 +153,15 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
      * If set to false, the PAGImageView loads only one image frame at a time into the memory.
      * The default value is false.
      */
-    public void setMemoryCacheEnabled(boolean enable) {
-        isMemoryCacheOpen = enable;
+    public void cacheAllFramesInMemory(boolean enable) {
+        isCacheAllFramesInMemory = enable;
     }
 
     /**
      * Return the value of isMemoryCacheOpen property.
      */
-    public boolean memoryCacheEnabled() {
-        return isMemoryCacheOpen;
+    public boolean setCacheAllFramesInMemory() {
+        return isCacheAllFramesInMemory;
     }
 
     /**
@@ -198,6 +198,13 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
     }
 
     /**
+     * Returns the current PAGComposition for PAGImageView to render as content.
+     */
+    public PAGComposition composition() {
+        return _composition;
+    }
+
+    /**
      * Sets a new PAGComposition for PAGImageView to render as content.
      * Note: If the composition is already added to another View, it will be removed from the
      * previous View.
@@ -223,10 +230,10 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
     }
 
     /**
-     * Returns the current PAGComposition for PAGImageView to render as content.
+     * The path string of a pag file set by setPath.
      */
-    public PAGComposition composition() {
-        return _composition;
+    public String path() {
+        return _pagFilePath;
     }
 
     /**
@@ -888,7 +895,7 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
 
         handleReleaseSurface();
         if (lastKeyItem != null && lastKeyItem.keyPrefixMD5 != null) {
-            if (isMemoryCacheOpen) {
+            if (isCacheAllFramesInMemory) {
                 final String memoryKey = lastKeyItem.keyPrefixMD5 + "_" + frame;
                 BitmapPool.BitmapResource bitmap = memoryLruCache.get(memoryKey);
                 if (bitmap != null) {
@@ -920,7 +927,7 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
             }
         }
         final BitmapPool.BitmapResource currentImage;
-        if (lastKeyItem != null && !isMemoryCacheOpen) {
+        if (lastKeyItem != null && !isCacheAllFramesInMemory) {
             removeToSelfMemoryCache(lastKeyItem.keyPrefixMD5, frame, _currentImage);
         }
         currentImage = bitmapPool.get(decoderInfo._width,
@@ -947,7 +954,7 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
                     }
                 })));
             }
-            if (lastKeyItem != null && isMemoryCacheOpen && memoryLruCache != null) {
+            if (lastKeyItem != null && isCacheAllFramesInMemory && memoryLruCache != null) {
                 final String memoryKey = lastKeyItem.keyPrefixMD5 + "_" + frame;
                 memoryLruCache.put(memoryKey, currentImage);
             } else {
@@ -985,7 +992,7 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
             if (bitmap != null) {
                 if (created) {
                     cacheInfo.pagImageView.putToSelfMemoryCache(cacheInfo.keyPrefix, cacheInfo.frame, bitmap);
-                    if (cacheInfo.pagImageView.isMemoryCacheOpen) {
+                    if (cacheInfo.pagImageView.isCacheAllFramesInMemory) {
                         cacheInfo.pagImageView.memoryLruCache.put(cacheInfo.key, bitmap);
                     } else {
                         cacheInfo.pagImageView.removeToSelfMemoryCache(cacheInfo.keyPrefix,

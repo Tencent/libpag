@@ -34,7 +34,7 @@ public class PAGDecoder {
      * Make a decoder from pagComposition.
      */
     public static PAGDecoder Make(PAGComposition pagComposition) {
-        return Make(pagComposition, 0, 1.0f);
+        return Make(pagComposition, pagComposition.frameRate(), 1.0f);
     }
 
     /**
@@ -48,11 +48,16 @@ public class PAGDecoder {
         if (scale <= 0) {
             scale = 1.0f;
         }
+        if (frameRate < 0) {
+           frameRate = pagComposition.frameRate();
+        } else {
+            frameRate = Math.min(pagComposition.frameRate(), frameRate);
+        }
         PAGDecoder pagDecoder = new PAGDecoder();
         pagDecoder._width = Math.round(pagComposition.width() * scale);
         pagDecoder._height = Math.round(pagComposition.height() * scale);
         pagDecoder._numFrames =
-                (int) (pagComposition.duration() * pagComposition.frameRate() / 1000000);
+                (int) (pagComposition.duration() * frameRate / 1000000);
         pagDecoder.pagSurface = PAGSurface.MakeOffscreen(pagDecoder._width, pagDecoder._height);
         if (pagDecoder.pagSurface == null) {
             return null;
@@ -97,7 +102,7 @@ public class PAGDecoder {
         float progress = (index * 1.0f + 0.1f) / _numFrames;
         pagPlayer.setProgress(progress);
         pagPlayer.flush();
-        return pagSurface.copyImageTo(bitmap);
+        return pagSurface.copyPixelsTo(bitmap);
     }
 
     /**
