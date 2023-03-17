@@ -49,7 +49,7 @@ public class PAGDecoder {
             scale = 1.0f;
         }
         if (frameRate < 0) {
-           frameRate = pagComposition.frameRate();
+            frameRate = pagComposition.frameRate();
         } else {
             frameRate = Math.min(pagComposition.frameRate(), frameRate);
         }
@@ -99,8 +99,7 @@ public class PAGDecoder {
         if (bitmap == null || bitmap.isRecycled() || index < 0 || index >= _numFrames) {
             return false;
         }
-        float progress = (index * 1.0f + 0.1f) / _numFrames;
-        pagPlayer.setProgress(progress);
+        pagPlayer.setProgress(PAGImageViewHelper.FrameToProgress(index, _numFrames));
         pagPlayer.flush();
         return pagSurface.copyPixelsTo(bitmap);
     }
@@ -112,8 +111,7 @@ public class PAGDecoder {
         if (index < 0 || index >= _numFrames) {
             return null;
         }
-        float progress = (index * 1.0f + 0.1f) / _numFrames;
-        pagPlayer.setProgress(progress);
+        pagPlayer.setProgress(PAGImageViewHelper.FrameToProgress(index, _numFrames));
         if (!pagPlayer.flush() && lastFrameBitmap != null && !lastFrameBitmap.isRecycled()) {
             return lastFrameBitmap;
         }

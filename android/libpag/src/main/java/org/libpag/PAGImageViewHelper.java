@@ -159,6 +159,35 @@ class PAGImageViewHelper {
         return md5Str;
     }
 
+    private static double fmod(double a, double b) {
+        int result = (int) Math.floor(a / b);
+        return a - result * b;
+    }
+
+    protected static int ProgressToFrame(double progress, int totalFrames) {
+        if (totalFrames <= 1) {
+            return 0;
+        }
+        double percent = fmod(progress, 1.0);
+        if (percent <= 0 && progress != 0) {
+            percent += 1.0;
+        }
+        // 'progress' ranges in [0, 1], but 'frame' ranges in [frame, frame+1), so the last frame needs
+        // special handling.
+        int currentFrame = (int) Math.floor(percent * totalFrames);
+        return currentFrame == totalFrames ? totalFrames - 1 : currentFrame;
+    }
+
+    protected static double FrameToProgress(int currentFrame, int totalFrames) {
+        if (totalFrames <= 1 || currentFrame < 0) {
+            return 0;
+        }
+        if (currentFrame >= totalFrames - 1) {
+            return 1;
+        }
+        return (currentFrame * 1.0 + 0.1) / totalFrames;
+    }
+
     protected static class CacheInfo {
         static CacheInfo Make(PAGImageView pagImageView,
                               String keyPrefix,

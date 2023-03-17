@@ -43,7 +43,7 @@ std::shared_ptr<PAGImageCache> get(JNIEnv* env, jobject thiz) {
   return pagSurface->get();
 }
 
-static bool saveHardwarePixels(JNIEnv* env, std::shared_ptr<PAGImageCache> cache, jint frame,
+static bool SaveHardwarePixels(JNIEnv* env, std::shared_ptr<PAGImageCache> cache, jint frame,
                                jobject bitmap, jint byteCount) {
   auto buffer = tgfx::HardwareBufferInterface::AHardwareBuffer_fromBitmap(env, bitmap);
   uint8_t* pixels = nullptr;
@@ -60,7 +60,7 @@ static bool saveHardwarePixels(JNIEnv* env, std::shared_ptr<PAGImageCache> cache
   return res;
 }
 
-static bool inflateHardwarePixels(JNIEnv* env, std::shared_ptr<PAGImageCache> cache, jint frame,
+static bool InflateHardwarePixels(JNIEnv* env, std::shared_ptr<PAGImageCache> cache, jint frame,
                                   jobject bitmap, jint byteCount) {
   auto buffer = tgfx::HardwareBufferInterface::AHardwareBuffer_fromBitmap(env, bitmap);
 
@@ -88,7 +88,7 @@ PAG_API jboolean Java_org_libpag_CacheManager_00024ImageCache_saveBitmap(JNIEnv*
     return false;
   }
   if (isHardware) {
-    return saveHardwarePixels(env, cache, frame, bitmap, byteCount);
+    return SaveHardwarePixels(env, cache, frame, bitmap, byteCount);
   }
   unsigned char* newBitmapPixels;
   int ret;
@@ -110,7 +110,7 @@ PAG_API jboolean Java_org_libpag_CacheManager_00024ImageCache_inflateBitmap(
     return false;
   }
   if (isHardware) {
-    return inflateHardwarePixels(env, cache, frame, bitmap, byteCount);
+    return InflateHardwarePixels(env, cache, frame, bitmap, byteCount);
   }
 
   unsigned char* newBitmapPixels;

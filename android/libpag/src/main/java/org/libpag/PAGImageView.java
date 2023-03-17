@@ -118,7 +118,8 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
         return renderScale;
     }
 
-    /**.
+    /**
+     * .
      * This value defines the scale factor for internal graphics renderer, ranges from 0.0 to 1.0.
      * The scale factors less than 1.0 may result in blurred output, but it can reduce the usage of
      * graphics memory which leads to better performance. The default value is 1.0.
@@ -184,12 +185,13 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
      * Sets the frame index to render.
      */
     public void setCurrentFrame(int currentFrame) {
-        if (!decoderInfo.isValid() || currentFrame < 0 || currentFrame >= decoderInfo.numFrames) {
+        if (!decoderInfo.isValid() || currentFrame < 0 || currentFrame >= decoderInfo.numFrames || cacheItem == null) {
             return;
         }
         _currentFrame = currentFrame;
         float value =
-                decoderInfo.duration * 0.001f * (_currentFrame * 1.0f + 0.1f) / decoderInfo.numFrames;
+                (float) (decoderInfo.duration * 0.001f * PAGImageViewHelper.FrameToProgress(_currentFrame,
+                        decoderInfo.numFrames));
         value = Math.max(0, Math.min(value, 1));
         currentPlayTime = (long) (value * animator.getDuration());
         synchronized (updateTimeLock) {
@@ -219,6 +221,7 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
             return;
         }
         _composition = newComposition;
+        progressExplicitlySet = true;
         refreshDecodeInfo();
     }
 
@@ -257,6 +260,7 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
         }
         _pagFilePath = path;
         _maxFrameRate = maxFrameRate;
+        progressExplicitlySet = true;
         refreshDecodeInfo();
         return true;
     }
@@ -294,10 +298,11 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
         synchronized (updateTimeLock) {
             if (progressExplicitlySet) {
                 progressExplicitlySet = false;
-                animator.setCurrentPlayTime((long) (decoderInfo.duration * 0.001f * (_currentFrame * 1.0f + 0.1f) / decoderInfo.numFrames));
+                animator.setCurrentPlayTime((long) (decoderInfo.duration * 0.001f * PAGImageViewHelper.FrameToProgress(_currentFrame, decoderInfo.numFrames)));
             } else {
                 int currentFrame =
-                        ProgressToFrame(animator.getAnimatedFraction(), decoderInfo.numFrames);
+                        PAGImageViewHelper.ProgressToFrame(animator.getAnimatedFraction(),
+                                decoderInfo.numFrames);
                 if (currentFrame == _currentFrame) {
                     return false;
                 }
@@ -417,7 +422,6 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
     }
 
     private void refreshDecodeInfo() {
-        progressExplicitlySet = true;
         if (decoderInfo != null) {
             decoderInfo.release();
             decoderInfo = null;
@@ -447,11 +451,6 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
                 }
             }
         }
-    }
-
-    private void handleCacheStrategyChange(final Context context) {
-        InitCacheExecutors();
-        clearMemoryCache();
     }
 
     private void clearMemoryCache() {
@@ -532,7 +531,7 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
     private final ValueAnimator.AnimatorUpdateListener mAnimatorUpdateListener = new ValueAnimator.AnimatorUpdateListener() {
         @Override
         public void onAnimationUpdate(ValueAnimator animation) {
-            if (!decoderInfo.isValid()) {
+            if (!decoderInfo.isValid() || cacheItem == null) {
                 return;
             }
             PAGImageView.this.currentPlayTime = animation.getCurrentPlayTime();
@@ -635,7 +634,7 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
         if (bitmapPool == null) {
             bitmapPool = BitmapPool.Make(1);
         }
-        handleCacheStrategyChange(getContext());
+        InitCacheExecutors();
         Lifecycle.getInstance().addListener(this);
         cacheManager = CacheManager.Get(getContext());
         animator = ValueAnimator.ofFloat(0.0f, 1.0f);
@@ -1080,25 +1079,6 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
     @Override
     protected void finalize() throws Throwable {
         super.finalize();
-    }
-
-    private static double fmod(double a, double b) {
-        int result = (int) Math.floor(a / b);
-        return a - result * b;
-    }
-
-    private static int ProgressToFrame(double progress, int totalFrames) {
-        if (totalFrames <= 1) {
-            return 0;
-        }
-        double percent = fmod(progress, 1.0);
-        if (percent <= 0 && progress != 0) {
-            percent += 1.0;
-        }
-        // 'progress' ranges in [0, 1], but 'frame' ranges in [frame, frame+1), so the last frame needs
-        // special handling.
-        int currentFrame = (int) Math.floor(percent * totalFrames);
-        return currentFrame == totalFrames ? totalFrames - 1 : currentFrame;
     }
 
     protected static class KeyItem {
