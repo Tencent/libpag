@@ -29,6 +29,7 @@ class PAGImageCache {
   bool inflatePixels(int frame, void* bitmapPixels, int byteCount);
   bool isCached(int frame);
   bool isAllCached();
+  void releaseSaveBuffer();
   void release();
 
  private:

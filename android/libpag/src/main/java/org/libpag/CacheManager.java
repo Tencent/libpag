@@ -85,6 +85,12 @@ class CacheManager {
             return allCached;
         }
 
+        public void releaseSaveBuffer() {
+            writeLock();
+            _pagImageCache.releaseSaveBuffer();
+            writeUnlock();
+        }
+
         public void readLock() {
             lock.readLock().lock();
         }
@@ -218,7 +224,7 @@ class CacheManager {
         // Check if media is mounted or storage is built-in, if so, try and use external cache dir
         // otherwise use internal cache dir
         if (TextUtils.isEmpty(uniqueName)) {
-            uniqueName = "libpag";
+            uniqueName = "PAGImageViewCache";
         }
         final String cachePath =
                 Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState()) ||
@@ -277,6 +283,8 @@ class CacheManager {
         native boolean isCached(int frame);
 
         native boolean isAllCached();
+
+        native void releaseSaveBuffer();
 
         native void release();
 

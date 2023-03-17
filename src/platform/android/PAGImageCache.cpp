@@ -47,10 +47,16 @@ std::shared_ptr<PAGImageCache> PAGImageCache::Make(const std::string& path, int 
     headerBuffer[HeightOffset / 4] = height;
     headerBuffer[FrameCountOffset / 4] = frameCount;
     if ((ssize_t)headerSize != write(fd, headerBuffer, headerSize)) {
+      if (headerBuffer != nullptr) {
+        delete[] static_cast<int*>(headerBuffer);
+      }
       return nullptr;
     }
   } else {
     if ((ssize_t)(headerSize) != read(fd, headerBuffer, headerSize)) {
+      if (headerBuffer != nullptr) {
+        delete[] static_cast<int*>(headerBuffer);
+      }
       return nullptr;
     }
   }
@@ -162,18 +168,22 @@ void PAGImageCache::release() {
     delete[] static_cast<int*>(headerBuffer);
     headerBuffer = nullptr;
   }
-  if (compressBuffer != nullptr) {
-    delete[] static_cast<char*>(compressBuffer);
-    compressBuffer = nullptr;
-  }
   if (deCompressBuffer != nullptr) {
     delete[] static_cast<int*>(deCompressBuffer);
     deCompressBuffer = nullptr;
   }
+  releaseSaveBuffer();
 }
 
 PAGImageCache::~PAGImageCache() {
   release();
+}
+
+void PAGImageCache::releaseSaveBuffer() {
+  if (compressBuffer != nullptr) {
+    delete[] static_cast<char*>(compressBuffer);
+    compressBuffer = nullptr;
+  }
 }
 
 }  // namespace pag

@@ -871,6 +871,8 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
         if (keysInMemoryCacheMap.get(lastKeyItem.keyPrefixMD5) != null && keysInMemoryCacheMap.get(lastKeyItem.keyPrefixMD5).size() == decoderInfo.numFrames
                 || cacheItem.isAllCached()) {
             decoderInfo.release();
+            cacheItem.releaseSaveBuffer();
+            bitmapPool.clear();
         }
     }
 
@@ -897,7 +899,7 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
         KeyItem keyItem = fetchKeyFrame();
         if (lastKeyItem != null && lastKeyItem.keyPrefix != null && !lastKeyItem.keyPrefix.equals(keyItem.keyPrefix)) {
             releaseCurrentDiskCache();
-            cacheItem = cacheManager.getOrCreate(lastKeyItem.keyPrefixMD5, decoderInfo._width,
+            cacheItem = cacheManager.getOrCreate(keyItem.keyPrefixMD5, decoderInfo._width,
                     decoderInfo._height, decoderInfo.numFrames);
             keysInMemoryCacheMap.remove(lastKeyItem.keyPrefixMD5);
             clearSelfMemoryCache();

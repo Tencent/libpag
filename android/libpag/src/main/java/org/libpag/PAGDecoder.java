@@ -128,6 +128,8 @@ public class PAGDecoder {
         pagPlayer.setSurface(null);
         pagPlayer.setComposition(null);
         pagPlayer.release();
+        pagPlayer = null;
+        pagSurface = null;
     }
 
     static {

@@ -174,4 +174,13 @@ PAG_API jint Java_org_libpag_CacheManager_ContentVersion(JNIEnv* env, jclass,
   }
   return std::make_unique<PAGCompositionUtil>(composition)->getContentVersion();
 }
+
+PAG_API void Java_org_libpag_CacheManager_00024ImageCache_releaseSaveBuffer(JNIEnv* env,
+                                                                            jobject thiz) {
+  auto cache = get(env, thiz);
+  if (cache == nullptr) {
+    return;
+  }
+  cache->releaseSaveBuffer();
+}
 }
