@@ -366,7 +366,6 @@ static void AutomaticCleanDisk() {
   }
   if (self->imageViewCache && [self->imageViewCache containsObjectForKey:frameIndex]) {
     if ([[self->imagesMap allKeys] containsObject:[NSNumber numberWithInteger:frameIndex]]) {
-      NSLog(@"-----read--memory---currentFrame:%ld \n", frameIndex);
       self.currentImage = [self->imagesMap objectForKey:[NSNumber numberWithInteger:frameIndex]];
       [self submitToImageView];
     } else {
@@ -379,14 +378,12 @@ static void AutomaticCleanDisk() {
       if (self.memoryCacheEnabled) {
         [self->imagesMap setObject:image forKey:[NSNumber numberWithInteger:frameIndex]];
       }
-      NSLog(@"-----read-----currentFrame:%ld \n", frameIndex);
       [self submitToImageView];
     }
   } else {
     @autoreleasepool {
       [self.pagDecoder copyFrameAt:frameIndex To:pixelBuffer];
       UIImage* image = [self imageFromCVPixeBuffer:pixelBuffer];
-      NSLog(@"-----save-----currentFrame:%ld \n", frameIndex);
       self.currentImage = image;
       if (self.memoryCacheEnabled) {
         [self->imagesMap setObject:image forKey:[NSNumber numberWithInteger:frameIndex]];
