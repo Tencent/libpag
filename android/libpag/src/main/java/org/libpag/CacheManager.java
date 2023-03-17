@@ -119,9 +119,6 @@ class CacheManager {
         if (context == null) {
             return null;
         }
-        if (!CheckPermission(context)) {
-            return null;
-        }
         synchronized (CacheManager.class) {
             if (pagCacheManager != null) {
                 return pagCacheManager;
@@ -230,22 +227,6 @@ class CacheManager {
                         context.getExternalCacheDir().getPath() :
                         context.getCacheDir().getPath();
         return cachePath + File.separator + uniqueName;
-    }
-
-    private static boolean CheckPermission(Context context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            String[] permissions = new String[]{
-                    "android.permission.READ_EXTERNAL_STORAGE",
-                    "android.permission.WRITE_EXTERNAL_STORAGE"
-            };
-            for (String permission : permissions) {
-                if (context.checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED) {
-                    return false;
-                }
-            }
-
-        }
-        return true;
     }
 
     private static class ImageCache {

@@ -60,6 +60,7 @@ import org.libpag.PAGImageViewHelper.DecoderInfo;
 
 public class PAGImageView extends View implements ComponentCallbacks2 {
     private final static String TAG = "PAGImageView";
+    private final static float DEFAULT_MAX_FRAMERATE = 30f;
     protected BitmapPool bitmapPool;
     private ValueAnimator animator;
     private boolean isMemoryCacheOpen = false;
@@ -137,25 +138,15 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
     /**
      * Set the value of maxDiskCache property.
      */
-    public static void setMaxDiskCache(long maxDiskCache) {
+    public static void SetMaxDiskCache(long maxDiskCache) {
         g_MaxDiskCacheSize = maxDiskCache;
     }
 
     /**
      * Get the value of maxDiskCache property.
      */
-    public static long maxDiskCache() {
+    public static long MaxDiskCache() {
         return g_MaxDiskCacheSize;
-    }
-
-    /**
-     * Clear all the disk cache.
-     */
-    public static void clearAllDiskCache(Context context) {
-        if (context == null) {
-            return;
-        }
-        CacheManager.ClearAllDiskCache(context);
     }
 
     /**
@@ -191,15 +182,6 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
     }
 
     /**
-     * Sets the maximum frame rate for rendering. If set to a value less than the actual frame rate from
-     * PAGFile, it drops frames but increases performance. Otherwise, it has no effect. The default
-     * value is from the associated Composition.
-     */
-    public void setMaxFrameRate(int maxFrameRate) {
-        _maxFrameRate = maxFrameRate;
-    }
-
-    /**
      * Returns the maximum frame rate for rendering.
      */
     public float maxFrameRate() {
@@ -229,13 +211,55 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
      * Sets a new PAGComposition for PAGImageView to render as content.
      * Note: If the composition is already added to another View, it will be removed from the
      * previous View.
+     * Sets the maximum frame rate for rendering. If set to a value less than the actual frame rate from
+     * PAGFile, it drops frames but increases performance. Otherwise, it has no effect. The default
+     * value is from the associated Composition.
      */
-    public void setComposition(PAGComposition newComposition) {
+    public void setComposition(PAGComposition newComposition, float maxFrameRate) {
         if (newComposition == _composition) {
             return;
         }
         _composition = newComposition;
         refreshDecodeInfo();
+    }
+
+    /**
+     * Sets a new PAGComposition for PAGImageView to render as content.
+     * Note: If the composition is already added to another View, it will be removed from the
+     * previous View.
+     */
+    public void setComposition(PAGComposition newComposition) {
+        setComposition(newComposition, DEFAULT_MAX_FRAMERATE);
+    }
+
+    /**
+     * Returns the current PAGComposition for PAGImageView to render as content.
+     */
+    public PAGComposition composition() {
+        return _composition;
+    }
+
+    /**
+     * Loads a pag file from the specified path, returns false if the file does not exist or the data is not a pag file.
+     * The path starts with "assets://" means that it is located in assets directory.
+     * Note: All PAGFiles loaded by the same path share the same internal cache. The internal cache is alive until all
+     * PAGFiles are released. Use 'PAGFile.Load(byte[])' instead if you don't want to load a
+     * PAGFile from the internal caches.
+     * Sets the maximum frame rate for rendering. If set to a value less than the actual frame rate from
+     * PAGFile, it drops frames but increases performance. Otherwise, it has no effect. The default
+     * value is from the associated Composition.
+     */
+    public boolean setPath(String path, float maxFrameRate) {
+        if (path == null) {
+            return false;
+        }
+        if (path.equals(_pagFilePath)) {
+            return true;
+        }
+        _pagFilePath = path;
+        _maxFrameRate = maxFrameRate;
+        refreshDecodeInfo();
+        return true;
     }
 
     /**
@@ -246,15 +270,7 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
      * PAGFile from the internal caches.
      */
     public boolean setPath(String path) {
-        if (path == null) {
-            return false;
-        }
-        if (path.equals(_pagFilePath)) {
-            return true;
-        }
-        _pagFilePath = path;
-        refreshDecodeInfo();
-        return true;
+        return setPath(path, DEFAULT_MAX_FRAMERATE);
     }
 
     /**
@@ -277,13 +293,6 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
         releaseCurrentDiskCache();
         decoderInfo = new DecoderInfo();
         initDecoderInfo();
-    }
-
-    /**
-     * Returns the current PAGComposition for PAGImageView to render as content.
-     */
-    public PAGComposition composition() {
-        return _composition;
     }
 
     /**
@@ -760,6 +769,9 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
     protected KeyItem fetchKeyFrame() {
         if (!decoderInfo.isValid() || _composition == null && _pagFilePath == null) {
             return null;
+        }
+        if (_pagFilePath != null && lastKeyItem != null) {
+            return lastKeyItem;
         }
         String keyPrefix =
                 "_" + (decoderInfo._width << 16 | decoderInfo._height) + "_" + decoderInfo.realFrameRate;
