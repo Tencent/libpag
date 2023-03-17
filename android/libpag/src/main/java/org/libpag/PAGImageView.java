@@ -39,12 +39,9 @@ import android.view.animation.LinearInterpolator;
 import org.extra.tools.BitmapPool;
 import org.extra.tools.BitmapPool.BitmapResource;
 import org.extra.tools.Lifecycle;
-import org.extra.tools.LifecycleListener;
 
 import java.io.File;
 import java.lang.ref.WeakReference;
-import java.math.BigInteger;
-import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -307,8 +304,12 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
      * The current matrix of the PAGImageView changes when this method is called.
      */
     public void setScaleMode(int scaleMode) {
+        if (scaleMode == _scaleMode) {
+            return;
+        }
         _scaleMode = scaleMode;
         _matrix = null;
+        scaleModeMatrix = null;
         postInvalidate();
     }
 
@@ -570,6 +571,8 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
     private volatile int width, height;
     private volatile int viewWidth, viewHeight;
 
+    private Matrix scaleModeMatrix;
+
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
@@ -577,6 +580,7 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
         viewHeight = h;
         width = (int) (renderScale * w);
         height = (int) (renderScale * h);
+        scaleModeMatrix = null;
         initDecoderInfo();
         resumeAnimator();
     }
@@ -778,10 +782,10 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
         boolean autoClean = false;
         if (_pagFilePath != null) {
             keyPrefix = _pagFilePath + keyPrefix;
-        } else if (_composition instanceof PAGFile && _composition.contentVersion() == 0) {
+        } else if (_composition instanceof PAGFile && CacheManager.ContentVersion(_composition) == 0) {
             keyPrefix = ((PAGFile) _composition).path() + keyPrefix;
         } else {
-            keyPrefix = _composition.toString() + "_" + _composition.contentVersion() + keyPrefix;
+            keyPrefix = _composition.toString() + "_" + CacheManager.ContentVersion(_composition) + keyPrefix;
             autoClean = true;
         }
         if (lastKeyItem != null && keyPrefix.equals(lastKeyItem.keyPrefix)) {
@@ -1002,6 +1006,9 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
     }
 
     private void notifyAnimationUpdate() {
+        if (mViewListeners.isEmpty()) {
+            return;
+        }
         ArrayList<PAGImageViewListener> arrayList;
         synchronized (PAGImageView.this) {
             arrayList = new ArrayList<>(mViewListeners);
@@ -1020,10 +1027,12 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
                 canvas.concat(_matrix);
             }
             if (_scaleMode != PAGScaleMode.None) {
-                Matrix scaleModeMatrix = PAGImageViewHelper.ApplyScaleMode(_scaleMode,
-                        decoderInfo._width,
-                        decoderInfo._height,
-                        width, height);
+                if (scaleModeMatrix == null) {
+                    scaleModeMatrix = PAGImageViewHelper.ApplyScaleMode(_scaleMode,
+                            decoderInfo._width,
+                            decoderInfo._height,
+                            width, height);
+                }
                 canvas.concat(scaleModeMatrix);
             }
             canvas.drawBitmap(_currentImage.get(), 0, 0, null);

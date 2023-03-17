@@ -21,6 +21,7 @@
 #include "JNIHelper.h"
 #include "JPAGHandle.h"
 #include "PAGImageCache.h"
+#include "rendering/layers/PAGCompositionUtil.h"
 #include "tgfx/src/platform/android/AHardwareBufferUtil.h"
 #include "tgfx/src/platform/android/HardwareBufferInterface.h"
 
@@ -163,5 +164,14 @@ PAG_API jlong Java_org_libpag_CacheManager_00024ImageCache_SetupCache(JNIEnv* en
 
 PAG_API void Java_org_libpag_CacheManager_00024ImageCache_nativeInit(JNIEnv* env, jclass clazz) {
   PAGImageCache_nativeHandle = env->GetFieldID(clazz, "nativeContext", "J");
+}
+
+PAG_API jint Java_org_libpag_CacheManager_ContentVersion(JNIEnv* env, jclass,
+                                                         jobject jPagComposition) {
+  auto composition = ToPAGCompositionNativeObject(env, jPagComposition);
+  if (composition == nullptr) {
+    return 0;
+  }
+  return std::make_unique<PAGCompositionUtil>(composition)->getContentVersion();
 }
 }

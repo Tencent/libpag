@@ -21,7 +21,6 @@ package org.libpag;
 import static android.os.Environment.isExternalStorageRemovable;
 
 import android.content.Context;
-import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.os.Build;
 import android.os.Environment;
@@ -228,6 +227,8 @@ class CacheManager {
                         context.getCacheDir().getPath();
         return cachePath + File.separator + uniqueName;
     }
+
+    static native int ContentVersion(PAGComposition pagComposition);
 
     private static class ImageCache {
         private long nativeContext = 0;

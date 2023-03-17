@@ -50,11 +50,6 @@ public class PAGComposition extends PAGLayer {
     public native int getLayerIndex(PAGLayer layer);
 
     /**
-     * Returns contentVersion of this composition
-     */
-    public native long contentVersion();
-
-    /**
      * Changes the position of an existing child in the container. This affects the layering of child layers.
      * @param layer The child layer for which you want to change the index number.
      * @param index The resulting index number for the child layer.

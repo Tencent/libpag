@@ -944,11 +944,6 @@ class PAG_API PAGComposition : public PAGLayer {
    */
   std::vector<std::shared_ptr<PAGLayer>> getLayersUnderPoint(float localX, float localY);
 
-  /**
-   * Returns contentVersion of this composition
-   */
-  uint32_t getContentVersion() const;
-
  protected:
   int _width = 0;
   int _height = 0;
@@ -978,6 +973,7 @@ class PAG_API PAGComposition : public PAGLayer {
   void onRemoveFromRootFile() override;
   void onTimelineChanged() override;
   void updateRootLocker(std::shared_ptr<std::mutex> locker) override;
+  uint32_t getContentVersion() const;
   virtual bool doAddLayer(std::shared_ptr<PAGLayer> pagLayer, int index);
   virtual std::shared_ptr<PAGLayer> doRemoveLayer(int index);
 
