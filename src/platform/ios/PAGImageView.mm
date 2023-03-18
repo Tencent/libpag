@@ -372,7 +372,6 @@ static NSString* RemovePathVariableComponent(NSString* original) {
   if (self->imageViewCache && [self->imageViewCache containsObjectForKey:frameIndex]) {
     status = [self->imageViewCache objectForKey:frameIndex pixelBuffer:pixelBuffer];
     UIImage* image = [self imageFromCVPixeBuffer:pixelBuffer];
-    NSLog(@"---------read----currentFrame:%ld \n", frameIndex);
     self.currentUIImage = image;
     if (self.memoryCacheEnabled) {
       [self->imagesMap setObject:image forKey:[NSNumber numberWithInteger:frameIndex]];
@@ -382,7 +381,6 @@ static NSString* RemovePathVariableComponent(NSString* original) {
     @autoreleasepool {
       [[self getPAGDecoder] copyFrameTo:pixelBuffer at:frameIndex];
       UIImage* image = [self imageFromCVPixeBuffer:pixelBuffer];
-      NSLog(@"---------save----currentFrame:%ld \n", frameIndex);
       self.currentUIImage = image;
       if (self.memoryCacheEnabled) {
         [self->imagesMap setObject:image forKey:[NSNumber numberWithInteger:frameIndex]];
@@ -468,25 +466,6 @@ static NSString* RemovePathVariableComponent(NSString* original) {
   CGImageRelease(imageRef);
   return uiImage;
 }
-
-//- (CVPixelBufferRef)rgbCVPixelBufferCopyFrom:(CVPixelBufferRef)pixelBuffer {
-//    int bufferWidth = (int)CVPixelBufferGetWidth(pixelBuffer);
-//    int bufferHeight = (int)CVPixelBufferGetHeight(pixelBuffer);
-//    size_t bytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer);
-//
-//    CVPixelBufferLockBaseAddress(pixelBuffer, 0);
-//    void* baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer);
-//    CVPixelBufferRef pixelBufferCopy = pag::PixelBufferUtils::Make(bufferWidth, bufferHeight);
-//    if (pixelBufferCopy) {
-//        CVPixelBufferLockBaseAddress(pixelBufferCopy, 0);
-//        void* copyBaseAddress = CVPixelBufferGetBaseAddress(pixelBufferCopy);
-//        memcpy(copyBaseAddress, baseAddress, bufferHeight * bytesPerRow);
-//        CVPixelBufferUnlockBaseAddress(pixelBufferCopy, 0);
-//    }
-//    CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
-//
-//    return pixelBufferCopy;
-//}
 
 - (void)freeCache {
   if (pagDecoder && [self->imageViewCache count] == self->numFrames) {
