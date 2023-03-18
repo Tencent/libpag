@@ -67,6 +67,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   PAGComposition* pagComposition;
   PAGDecoder* pagDecoder;
   NSLock* listenersLock;
+  NSLock* flushLock;
 
   NSUInteger numFrames;
   NSInteger cacheWidth;
@@ -109,6 +110,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
       [UIApplication sharedApplication].applicationState == UIApplicationStateBackground;
   filePath = nil;
   listenersLock = [[NSLock alloc] init];
+  flushLock = [[NSLock alloc] init];
   self.contentScaleFactor = [UIScreen mainScreen].scale;
   self.backgroundColor = [UIColor clearColor];
   valueAnimator = [[PAGValueAnimator alloc] init];
@@ -129,6 +131,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 - (void)dealloc {
   [listeners release];
   [listenersLock release];
+  [flushLock release];
   [valueAnimator stop:false];
   [valueAnimator release];
   [self unloadAllFrames];
@@ -359,6 +362,7 @@ static NSString* RemovePathVariableComponent(NSString* original) {
 
 - (BOOL)updateImageViewFrom:(CVPixelBufferRef)pixelBuffer atIndex:(NSInteger)frameIndex {
   BOOL status = TRUE;
+  [flushLock lock];
   [self freeCache];
   if (self.pagContentVersion != [PAGContentVersion Get:self->pagComposition]) {
     self.pagContentVersion = [PAGContentVersion Get:self->pagComposition];
@@ -367,6 +371,7 @@ static NSString* RemovePathVariableComponent(NSString* original) {
   if ([[self->imagesMap allKeys] containsObject:[NSNumber numberWithInteger:frameIndex]]) {
     self.currentUIImage = [self->imagesMap objectForKey:[NSNumber numberWithInteger:frameIndex]];
     [self submitToImageView];
+    [flushLock unlock];
     return status;
   }
   if (self->imageViewCache && [self->imageViewCache containsObjectForKey:frameIndex]) {
@@ -392,6 +397,7 @@ static NSString* RemovePathVariableComponent(NSString* original) {
                             }];
     }
   }
+  [flushLock unlock];
   return status;
 }
 
@@ -670,6 +676,7 @@ static NSString* RemovePathVariableComponent(NSString* original) {
   if (pagComposition == newComposition) {
     return;
   }
+  [flushLock lock];
   if (pagComposition) {
     [pagComposition release];
   }
@@ -680,9 +687,9 @@ static NSString* RemovePathVariableComponent(NSString* original) {
   self.fileHeight = [pagComposition height];
   self.scaleFactor = fmax(self.frame.size.width * self.contentScaleFactor / self.fileWidth,
                           self.frame.size.height * self.contentScaleFactor / self.fileHeight);
-  NSString* cacheKey = [self generateCacheKey];
   self.frameRate = MIN(maxFrameRate, [pagComposition frameRate]);
   numFrames = [pagComposition duration] * self.frameRate / 1000000;
+  NSString* cacheKey = [self generateCacheKey];
 
   if (imageViewCache) {
     [imageViewCache release];
@@ -691,6 +698,10 @@ static NSString* RemovePathVariableComponent(NSString* original) {
   if (pagDecoder) {
     [pagDecoder release];
     pagDecoder = nil;
+  }
+  if (pixelBuffer) {
+    CFRelease(pixelBuffer);
+    pixelBuffer = nil;
   }
   imageViewCache = [PAGDiskCache MakeWithName:cacheKey frameCount:numFrames];
   [imageViewCache retain];
@@ -701,6 +712,7 @@ static NSString* RemovePathVariableComponent(NSString* original) {
     [pagComposition release];
     pagComposition = nil;
   }
+  [flushLock unlock];
 }
 
 - (void)setCurrentFrame:(NSUInteger)currentFrame {

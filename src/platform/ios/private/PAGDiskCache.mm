@@ -25,16 +25,13 @@
 
 /**
  * structure of the cache file
- * | width | height | cacheFrames |  maxCacheFrameSize | data range | ... | data range | frame data
- * |
- * ... | frame data |
+ * | width | height | cacheFrames |  maxCacheFrameSize | data range | ... | data range
+ * | frame data |  ... | frame data |
  */
 
 @implementation PAGDiskCache {
   dispatch_queue_t ioQueue;
   dispatch_queue_t cacheQueue;
-  NSInteger width;
-  NSInteger height;
   NSString* _path;
   int _fd;
   NSInteger numFrames;
@@ -46,7 +43,7 @@
   NSInteger scratchDecodeLength;
 }
 
-static const int32_t FileHeaderSize = 2 * sizeof(int32_t);
+static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
 
 - (instancetype)initWithPath:(NSString*)filePath
                           fd:(int)fd
@@ -150,10 +147,7 @@ static const int32_t FileHeaderSize = 2 * sizeof(int32_t);
 }
 
 - (BOOL)objectForKey:(NSInteger)index pixelBuffer:(CVPixelBufferRef)pixelBuffer {
-  __block NSData* compressData = nil;
-  dispatch_sync(ioQueue, ^{
-    compressData = [self readObjectForKey:index];
-  });
+  NSData* compressData = [self readObjectForKey:index];
   if (compressData) {
     CVPixelBufferLockBaseAddress(pixelBuffer, 0);
     uint8_t* pixelBufferData = (uint8_t*)CVPixelBufferGetBaseAddress(pixelBuffer);
@@ -198,6 +192,8 @@ static const int32_t FileHeaderSize = 2 * sizeof(int32_t);
   if ([self fileSize] < (NSInteger)(FileHeaderSize + self->numFrames * 2 * sizeof(int32_t))) {
     ftruncate(self->_fd, 0);
     int32_t zero = 0;
+    write(self->_fd, &zero, sizeof(int32_t));  // width
+    write(self->_fd, &zero, sizeof(int32_t));  // height
     write(self->_fd, &zero, sizeof(int32_t));  // cacheFrames
     write(self->_fd, &zero, sizeof(int32_t));  // maxCacheFrameSize
     for (uint i = 0; i < self->numFrames; i++) {
@@ -207,7 +203,7 @@ static const int32_t FileHeaderSize = 2 * sizeof(int32_t);
     self->cacheFrameCount = 0;
     self->maxCacheFrameSize = 0;
   } else {
-    lseek(self->_fd, 0, SEEK_SET);
+    lseek(self->_fd, 2 * sizeof(int32_t), SEEK_SET);
     read(self->_fd, &self->cacheFrameCount, sizeof(int32_t));
     read(self->_fd, &self->maxCacheFrameSize, sizeof(int32_t));
   }
@@ -285,7 +281,7 @@ static const int32_t FileHeaderSize = 2 * sizeof(int32_t);
   write(_fd, object.bytes, length);
 
   cacheFrameCount++;
-  lseek(_fd, 0, SEEK_SET);
+  lseek(_fd, 2 * sizeof(int32_t), SEEK_SET);
   write(_fd, &cacheFrameCount, sizeof(int32_t));
   if (length > maxCacheFrameSize) {
     write(_fd, &length, sizeof(int32_t));
