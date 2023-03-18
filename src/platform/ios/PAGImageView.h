@@ -23,11 +23,11 @@ NS_ASSUME_NONNULL_BEGIN
 
 @class PAGImageView;
 
-@protocol PAGImageViewListener <NSObject>
+@protocol PAGImageViewListener<NSObject>
 
 @optional
 /**
- * Notifies the start of the animation.
+ * Notifies the beginning of the animation.
  */
 - (void)onAnimationStart:(PAGImageView*)pagView;
 
@@ -47,7 +47,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)onAnimationRepeat:(PAGImageView*)pagView;
 
 /**
- * Notifies the occurrence of another frame of the animation.
+ * Notifies the frame updating of the animation.
  */
 - (void)onAnimationUpdate:(PAGImageView*)pagView;
 
@@ -56,89 +56,83 @@ NS_ASSUME_NONNULL_BEGIN
 PAG_API @interface PAGImageView : UIImageView
 
 /**
- * Get the maximum size of the disk cache, in bytes.
+ * Returns the size limit of the disk cache in bytes.
  */
 + (NSUInteger)MaxDiskSize;
 
 /**
- * Set the maximum size of the disk cache.
- * In bytes, which defaults to 1 GB.
- * When the cache size exceeds the maximum size, clean up to 60% of the maximum storage size.
+ * Sets the size limit of the disk cache in bytes. The default disk cache limit is 1 GB.
  */
 + (void)SetMaxDiskSize:(NSUInteger)size;
 
 /**
- * Returns the current PAGComposition for PAGImageView to render as content.
+ * Returns the current PAGComposition in the PAGImageView. Returns nil if the internal composition
+ * was loaded from a pag file path.
  */
 - (PAGComposition* __nullable)getComposition;
 
 /**
- * Sets a new PAGComposition for PAGImageView to render as content.
- * Note: If the composition is already added to another PAGImageView, it will be removed from the
- * previous PAGImageView.
+ * Sets a new PAGComposition to the PAGImageView with the maxFrameRate set to 30 fps. Note: If the
+ * composition is already added to another PAGImageView, it will be removed from the previous
+ * PAGImageView.
  */
 - (void)setComposition:(PAGComposition*)newComposition;
 
 /**
- * Sets a new PAGComposition with maximum frame rate for PAGImageView to render as content.
- * Note: If the composition is already added to another PAGImageView, it will be removed from the
- * previous PAGImageView.
+ * Sets a new PAGComposition and the maxFrameRate limit to the PAGImageView. Note: If the
+ * composition is already added to another PAGImageView, it will be removed from the previous
+ * PAGImageView.
  */
 - (void)setComposition:(PAGComposition*)newComposition maxFrameRate:(float)maxFrameRate;
 
 /**
- * The path string of a pag file set by setPath.
+ * Returns the file path set by the setPath() method.
  */
 - (nullable NSString*)getPath;
 
 /**
- * Load a pag file from the specified path, returns false if the file does not exist or the data is
- * not a pag file.
- * Note: All PAGFiles loaded by the same path share the same internal cache. The internal
- * cache is alive until all PAGFiles are released. Use '[PAGFile Load:size:]' instead if
- * you don't want to load a PAGFile from the internal caches.
+ * Loads a pag file from the specified path, returns false if the file does not exist, or it is not
+ * a valid pag file.
  */
 - (BOOL)setPath:(NSString*)filePath;
 /**
- * Load a pag file from the specified path with maximum frame rate, returns false if the file
- * does not exist or the data is not a pag file.
- * Note: All PAGFiles loaded by the same path share the same internal cache. The internal
- * cache is alive until all PAGFiles are released.
+ * Loads a pag file from the specified path with the maxFrameRate limit, returns false if the file
+ * does not exist, or it is not a valid pag file.
  */
 - (BOOL)setPath:(NSString*)filePath maxFrameRate:(float)maxFrameRate;
 
 /**
- * Return memory cache status.
+ * If set to true, the PAGImageView loads all image frames into the memory, which will significantly
+ * increase the rendering performance but may cost lots of additional memory. Use it when you prefer
+ * rendering speed over memory usage. If set to false, the PAGImageView loads only one image frame
+ * at a time into the memory. The default value is false.
  */
 - (BOOL)cacheAllFramesInMemory;
 
 /**
- * If set to true, the PAGImageView loads all image frames into the memory,
- * which will significantly increase the rendering performance but may cost lots of additional
- * memory. Use it when you prefer rendering speed over memory usage. If set to false, the
- * PAGImageView loads only one image frame at a time into the memory. The default value is false.
+ * Sets the value of the cacheAllFramesInMemory property.
  */
 - (void)setCacheAllFramesInMemory:(BOOL)enable;
 
 /**
- * Returns a copy of current matrix.
+ * Returns a copy of the current matrix.
  */
 - (CGAffineTransform)matrix;
 
 /**
- * Set the transformation which will be applied to the composition.
+ * Sets the transformation which will be applied to the composition.
  */
 - (void)setMatrix:(CGAffineTransform)value;
 
 /**
- * Get the value of renderScale property.
+ * This value defines the scale factor for the size of the cached image frames, which ranges from
+ * 0.0 to 1.0. A scale factor less than 1.0 may result in blurred output, but it can reduce graphics
+ * memory usage, increasing the rendering performance. The default value is 1.0.
  */
 - (float)renderScale;
 
 /**
- * This value defines the scale factor for internal graphics renderer, ranges from 0.0 to 1.0.
- * The scale factors less than 1.0 may result in blurred output, but it can reduce the usage of
- * graphics memory which leads to better performance. The default value is 1.0.
+ * Sets the value of the renderScale property.
  */
 - (void)setRenderScale:(float)scale;
 
@@ -155,45 +149,48 @@ PAG_API @interface PAGImageView : UIImageView
 - (void)addListener:(id<PAGImageViewListener>)listener;
 
 /**
- * Removes a listener from the set listening to this animation.
+ * Removes the specified listener from the set of listeners
  */
 - (void)removeListener:(id<PAGImageViewListener>)listener;
 
 /**
- *  Returns the current rendering frame.
+ * Returns the current frame index the PAGImageView is rendering.
  */
 - (NSUInteger)currentFrame;
 
 /**
- * Sets the frame index to render.
+ * Sets the frame index for the PAGImageView to render.
  */
 - (void)setCurrentFrame:(NSUInteger)currentFrame;
 
 /**
- * Start the animation.
- */
-- (void)play;
-
-/**
- * Pause the animation.
- */
-- (void)pause;
-
-/**
- * Returns a UIImage capturing the contents of the PAGImageView.
+ * Returns a UIImage capturing the contents of the current PAGImageView.
  */
 - (UIImage*)currentImage;
 
 /**
- * Call this method to render current position immediately. If the play() method is already
- * called, there is no need to call it. Returns true if the content has changed.
+ * Starts to play the animation.
  */
-- (BOOL)flush;
+- (void)play;
 
 /**
- * Indicates whether or not this PAGImageView is playing.
+ * Pauses the animation at the current playing position. Calling the play method can resume the
+ * animation from the last paused playing position.
+ */
+- (void)pause;
+
+/**
+ * Indicates whether this PAGImageView is playing.
  */
 - (BOOL)isPlaying;
+
+/**
+ * Renders the current image frame immediately. Note that all the changes previously made to the
+ * PAGImageView will only take effect after this method is called. If the play() method is already
+ * called, there is no need to call it manually since it will be automatically called every frame.
+ * Returns true if the content has changed.
+ */
+- (BOOL)flush;
 
 @end
 

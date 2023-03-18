@@ -813,8 +813,10 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
     }
 
     /**
-     * Call this method to render current position immediately. If the play() method is already
-     * called, there is no need to call it. Returns true if the content has changed.
+     * Call this method to render current position immediately. Note that all the changes previously
+     * made to the PAGView will only take effect after this method is called. If the play() method
+     * is already called, there is no need to call it manually since it will be automatically called
+     * every frame. Returns true if the content has changed.
      */
     public boolean flush() {
         boolean result;

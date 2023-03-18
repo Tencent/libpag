@@ -69,10 +69,6 @@
   return [PAGDecoder Make:pagComposition maxFrameRate:[pagComposition frameRate] scale:1.0];
 }
 
-+ (instancetype)Make:(PAGComposition*)pagComposition maxFrameRate:(float)maxFrameRate {
-  return [PAGDecoder Make:pagComposition maxFrameRate:maxFrameRate scale:1.0];
-}
-
 + (instancetype)Make:(PAGComposition*)pagComposition
         maxFrameRate:(float)maxFrameRate
                scale:(float)scale {

@@ -23,26 +23,17 @@
 NS_ASSUME_NONNULL_BEGIN
 
 PAG_API @interface PAGDecoder : NSObject
+/**
+ * Creates a new PAGDecoder with the specified PAGComposition, using the composition's frame rate
+ * and size.Returns nil if the composition is nil.
+ */
++ (nullable instancetype)Make:(nullable PAGComposition*)composition;
 
 /**
- Convenience method to create a decoder with specified pagComposition.
- @return A new decoder, or nil if an error occurs.
+ * Creates a new PAGDecoder with the specified PAGComposition, the frame rate limit, and the scale
+ * factor for the output image size. Returns nil if the composition is nil.
  */
-+ (nullable instancetype)Make:(nullable PAGComposition*)pagComposition;
-
-/**
- Convenience method to create a decoder with specified pagComposition and frameRate.
- @return A new decoder, or nil if an error occurs.
- */
-+ (nullable instancetype)Make:(nullable PAGComposition*)pagComposition
-                 maxFrameRate:(float)maxFrameRate;
-
-/**
- Convenience method to create a decoder with specified pagComposition and frameRate.
- @param scale Output image's scale.
- @return A new decoder, or nil if an error occurs.
- */
-+ (nullable instancetype)Make:(nullable PAGComposition*)pagComposition
++ (nullable instancetype)Make:(nullable PAGComposition*)composition
                  maxFrameRate:(float)maxFrameRate
                         scale:(float)scale;
 
@@ -62,17 +53,14 @@ PAG_API @interface PAGDecoder : NSObject
 - (NSInteger)numFrames;
 
 /**
- * Copies pixels of the given frame to the  CVPixelBuffer.
- * NO.
+ * Copies pixels of the image frame at the given index to the specified CVPixelBuffer.
  */
 - (BOOL)copyFrameTo:(CVPixelBufferRef)pixelBuffer at:(NSInteger)index;
 
 /**
- Returns the frame image from a specified index.
- @note It's necessary to execute  in the foreground.
-       It's recommended to read in order, performance is the best at this point.
- @param index Frame index (zero based).
- @return A new frame with image, or nil if an error occurs.
+ * Returns the image frame at the specified index. Note that this method must be called while the
+ * app is not in the background. Otherwise, it may return nil because the GPU code may not be
+ * executed. It's recommended to read the image frames in forward order for better performance.
  */
 - (nullable UIImage*)frameAtIndex:(NSInteger)index;
 

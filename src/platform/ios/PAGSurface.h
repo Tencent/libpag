@@ -93,7 +93,7 @@ PAG_API @interface PAGSurface : NSObject
 - (CVPixelBufferRef)makeSnapshot;
 
 /**
- * Copies pixels from current PAGSurface to the specified CVPixelBuffer.
+ * Copies the pixels of the PAGSurface to the specified CVPixelBuffer.
  */
 - (BOOL)copyPixelsTo:(CVPixelBufferRef)pixelBuffer;
 

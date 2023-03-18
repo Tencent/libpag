@@ -31,15 +31,16 @@ public class PAGDecoder {
     private Bitmap lastFrameBitmap;
 
     /**
-     * Make a decoder from pagComposition.
+     * Creates a new PAGDecoder with the specified PAGComposition, using the composition's frame
+     * rate and size. Returns null if the composition is null.
      */
     public static PAGDecoder Make(PAGComposition pagComposition) {
         return Make(pagComposition, pagComposition.frameRate(), 1.0f);
     }
 
     /**
-     * Make a decoder from pagComposition.
-     * The size of decoder will be scaled.
+     * Creates a new PAGDecoder with the specified PAGComposition, the frame rate limit, and the
+     * scale factor for the output image size. Returns nil if the composition is nil.
      */
     public static PAGDecoder Make(PAGComposition pagComposition, float maxFrameRate, float scale) {
         if (pagComposition == null) {
@@ -94,7 +95,7 @@ public class PAGDecoder {
     }
 
     /**
-     * Copies pixels of the given frame to the specified bitmap.
+     * Copies pixels of the image frame at the given index to the specified Bitmap.
      */
     public boolean copyFrameTo(Bitmap bitmap, int index) {
         if (bitmap == null || bitmap.isRecycled() || index < 0 || index >= _numFrames) {
@@ -106,7 +107,8 @@ public class PAGDecoder {
     }
 
     /**
-     * Returns the frame image from a specified index.
+     * Returns the image frame at the specified index. It's recommended to read the image frames in
+     * forward order for better performance.
      */
     public Bitmap frameAtIndex(int index) {
         if (index < 0 || index >= _numFrames) {
