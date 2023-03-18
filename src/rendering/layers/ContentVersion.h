@@ -25,6 +25,9 @@ namespace pag {
 class ContentVersion {
  public:
   static uint32_t Get(std::shared_ptr<PAGLayer> pagLayer) {
+    if (pagLayer == nullptr) {
+      return 0;
+    }
     LockGuard autoLock(pagLayer->rootLocker);
     return pagLayer->contentVersion;
   }

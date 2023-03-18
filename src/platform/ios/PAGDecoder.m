@@ -43,8 +43,10 @@
     pagPlayer = [[PAGPlayer alloc] init];
     [pagPlayer setComposition:composition];
     [pagPlayer setSurface:pagSurface];
-    maxFrameRate = MAX(maxFrameRate, 0);
-    float frameRate = MIN(maxFrameRate, [composition frameRate]);
+    float frameRate = [composition frameRate];
+    if (maxFrameRate > 0 && maxFrameRate < frameRate) {
+      frameRate = maxFrameRate;
+    }
     self.frames = [composition duration] * frameRate / 1000000;
     lastFrameImage = nil;
   }
@@ -92,7 +94,7 @@
                                                scale:scale] autorelease];
 }
 
-- (BOOL)copyFrameAt:(NSInteger)index To:(CVPixelBufferRef)pixelBuffer {
+- (BOOL)copyFrameTo:(CVPixelBufferRef)pixelBuffer at:(NSInteger)index {
   BOOL result = [self renderCurrentFrame:index];
   if (!result) {
     return NO;

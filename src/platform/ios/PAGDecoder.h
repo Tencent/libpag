@@ -65,7 +65,7 @@ PAG_API @interface PAGDecoder : NSObject
  * Copies pixels of the given frame to the  CVPixelBuffer.
  * NO.
  */
-- (BOOL)copyFrameAt:(NSInteger)index To:(CVPixelBufferRef)pixelBuffer;
+- (BOOL)copyFrameTo:(CVPixelBufferRef)pixelBuffer at:(NSInteger)index;
 
 /**
  Returns the frame image from a specified index.

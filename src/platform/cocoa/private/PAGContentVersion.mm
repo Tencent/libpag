@@ -24,6 +24,9 @@
 
 @implementation PAGContentVersion
 + (NSInteger)Get:(PAGComposition*)pagComposition {
+  if (pagComposition == nil) {
+    return 0;
+  }
   auto composition = [[pagComposition impl] pagLayer];
   return pag::ContentVersion::Get(composition);
 }
