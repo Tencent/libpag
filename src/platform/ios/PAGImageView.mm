@@ -497,8 +497,8 @@ static NSString* RemovePathVariableComponent(NSString* original) {
   CGRect oldBounds = self.bounds;
   [super setBounds:bounds];
   if (oldBounds.size.width != bounds.size.width || oldBounds.size.height != bounds.size.height) {
-      self.scaleFactor = fmax(bounds.size.width * self.contentScaleFactor / self.fileWidth,
-                                bounds.size.height * self.contentScaleFactor / self.fileHeight);
+    self.scaleFactor = fmax(bounds.size.width * self.contentScaleFactor / self.fileWidth,
+                            bounds.size.height * self.contentScaleFactor / self.fileHeight);
     [self updateSize];
     [self unloadAllFrames];
     [self updateView];
@@ -509,8 +509,8 @@ static NSString* RemovePathVariableComponent(NSString* original) {
   CGRect oldRect = self.frame;
   [super setFrame:frame];
   if (oldRect.size.width != frame.size.width || oldRect.size.height != frame.size.height) {
-      self.scaleFactor = fmax(frame.size.width * self.contentScaleFactor / self.fileWidth,
-                                frame.size.height * self.contentScaleFactor / self.fileHeight);
+    self.scaleFactor = fmax(frame.size.width * self.contentScaleFactor / self.fileWidth,
+                            frame.size.height * self.contentScaleFactor / self.fileHeight);
     [self updateSize];
     [self unloadAllFrames];
     [self updateView];
@@ -678,8 +678,8 @@ static NSString* RemovePathVariableComponent(NSString* original) {
   self.currentFrameExplicitlySet = 0;
   self.fileWidth = [pagComposition width];
   self.fileHeight = [pagComposition height];
-    self.scaleFactor = fmax(self.frame.size.width * self.contentScaleFactor / self.fileWidth,
-                              self.frame.size.height * self.contentScaleFactor / self.fileHeight);
+  self.scaleFactor = fmax(self.frame.size.width * self.contentScaleFactor / self.fileWidth,
+                          self.frame.size.height * self.contentScaleFactor / self.fileHeight);
   NSString* cacheKey = [self generateCacheKey];
   self.frameRate = MIN(maxFrameRate, [pagComposition frameRate]);
   numFrames = [pagComposition duration] * self.frameRate / 1000000;
