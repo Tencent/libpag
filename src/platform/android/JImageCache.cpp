@@ -21,7 +21,7 @@
 #include "ImageCache.h"
 #include "JImageCacheHandle.h"
 #include "JNIHelper.h"
-#include "rendering/layers/PAGCompositionUtil.h"
+#include "rendering/layers/ContentVersion.h"
 #include "tgfx/src/platform/android/AHardwareBufferUtil.h"
 #include "tgfx/src/platform/android/HardwareBufferInterface.h"
 

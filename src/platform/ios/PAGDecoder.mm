@@ -52,6 +52,10 @@
 }
 
 - (void)dealloc {
+  if (lastFrameImage) {
+    [lastFrameImage release];
+    lastFrameImage = nil;
+  }
   [pagSurface release];
   [pagPlayer release];
   [super dealloc];

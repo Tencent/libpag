@@ -24,7 +24,7 @@
 
 #import "PAGDecoder.h"
 #import "PAGFile.h"
-#import "platform/cocoa/private/PAGComposition+Internal.h"
+#import "platform/cocoa/private/PAGContentVersion.h"
 #import "platform/cocoa/private/PixelBufferUtils.h"
 #import "private/PAGCacheManager.h"
 #import "private/PAGDiskCache.h"
@@ -228,14 +228,16 @@ static NSString* RemovePathVariableComponent(NSString* original) {
 
 - (NSString*)generateCacheKey {
   NSString* cacheKey = nil;
-  if ([pagComposition isMemberOfClass:[PAGFile class]] && [pagComposition getContentVersion] == 0) {
+  if ([pagComposition isMemberOfClass:[PAGFile class]] &&
+      [PAGContentVersion Get:pagComposition] == 0) {
     cacheKey = [(PAGFile*)pagComposition path];
-    cacheKey = RemovePathVariableComponent(filePath);
+    cacheKey = RemovePathVariableComponent(cacheKey);
   } else {
     cacheKey = [NSString stringWithFormat:@"%@", pagComposition];
   }
-  cacheKey = [cacheKey stringByAppendingFormat:@"_%u_%f_%f", [pagComposition getContentVersion],
-                                               self.frameRate, self.scaleFactor];
+  cacheKey =
+      [cacheKey stringByAppendingFormat:@"_%ld_%f_%f", [PAGContentVersion Get:pagComposition],
+                                        self.frameRate, self.scaleFactor];
   return NSStringMD5(cacheKey);
 }
 
@@ -357,8 +359,8 @@ static NSString* RemovePathVariableComponent(NSString* original) {
 
 - (BOOL)updateImageViewAtIndex:(NSInteger)frameIndex from:(CVPixelBufferRef)pixelBuffer {
   BOOL status = TRUE;
-  if (pagComposition && self.pagContentVersion != [pagComposition getContentVersion]) {
-    self.pagContentVersion = [pagComposition getContentVersion];
+  if (pagComposition && self.pagContentVersion != [PAGContentVersion Get:pagComposition]) {
+    self.pagContentVersion = [PAGContentVersion Get:pagComposition];
     [self unloadAllFrames];
   }
   if (self->imageViewCache && [self->imageViewCache containsObjectForKey:frameIndex]) {
@@ -404,7 +406,7 @@ static NSString* RemovePathVariableComponent(NSString* original) {
     if (_pagDecoder && [imageViewCache count] == numFrames) {
       [_pagDecoder release];
       _pagDecoder = nil;
-      if (filePath && [pagComposition getContentVersion] == 0) {
+      if (filePath && [PAGContentVersion Get:pagComposition] == 0) {
         [pagComposition release];
         pagComposition = nil;
       }
@@ -660,7 +662,7 @@ static NSString* RemovePathVariableComponent(NSString* original) {
     [pagComposition release];
   }
   pagComposition = [newComposition retain];
-  self.pagContentVersion = [pagComposition getContentVersion];
+  self.pagContentVersion = [PAGContentVersion Get:pagComposition];
   self.currentFrameExplicitlySet = 0;
   self.fileWidth = [pagComposition width];
   self.fileHeight = [pagComposition height];
@@ -705,7 +707,7 @@ static NSString* RemovePathVariableComponent(NSString* original) {
 
 - (void)unloadAllFrames {
   [imagesMap removeAllObjects];
-  if (pagComposition && [pagComposition getContentVersion] > 0) {
+  if (pagComposition && [PAGContentVersion Get:pagComposition] > 0) {
     [imageViewCache removeCaches];
   }
 }

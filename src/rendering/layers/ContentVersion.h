@@ -16,10 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import "platform/cocoa/PAGComposition.h"
+#pragma once
 
-@interface PAGComposition (Internal)
+#include "pag/pag.h"
+#include "rendering/utils/LockGuard.h"
 
-- (uint32_t)getContentVersion;
-
-@end
+namespace pag {
+class ContentVersion {
+ public:
+  static uint32_t Get(std::shared_ptr<PAGLayer> pagLayer) {
+    LockGuard autoLock(pagLayer->rootLocker);
+    return pagLayer->contentVersion;
+  }
+};
+}  // namespace pag

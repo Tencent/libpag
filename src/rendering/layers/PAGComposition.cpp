@@ -677,8 +677,4 @@ void PAGComposition::updateDurationAndFrameRate() {
     _parent->updateDurationAndFrameRate();
   }
 }
-
-uint32_t PAGComposition::getContentVersion() const {
-  return contentVersion;
-}
 }  // namespace pag

@@ -16,14 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PAGCompositionUtil.h"
+#import "PAGContentVersion.h"
 
-namespace pag {
-PAGCompositionUtil::PAGCompositionUtil(std::shared_ptr<PAGComposition> pagComposition)
-    : composition(std::move(pagComposition)) {
-}
+#import "platform/cocoa/private/PAGLayer+Internal.h"
+#import "platform/cocoa/private/PAGLayerImpl+Internal.h"
+#include "rendering/layers/ContentVersion.h"
 
-uint32_t PAGCompositionUtil::getContentVersion() const {
-  return composition->getContentVersion();
+@implementation PAGContentVersion
++ (NSInteger)Get:(PAGComposition*)pagComposition {
+  auto composition = [[pagComposition impl] pagLayer];
+  return pag::ContentVersion::Get(composition);
 }
-}  // namespace pag
+@end

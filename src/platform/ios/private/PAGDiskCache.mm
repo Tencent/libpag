@@ -328,38 +328,4 @@ static const int32_t FileHeaderSize = 2 * sizeof(int32_t);
   return NO;
 }
 
-//+ (CVPixelBufferRef)RBGBuffereCopyWithPixelBuffer:(CVPixelBufferRef)pixelBuffer
-//{
-//    CVPixelBufferLockBaseAddress(pixelBuffer, 0);
-//    int bufferWidth = (int)CVPixelBufferGetWidth(pixelBuffer);
-//    int bufferHeight = (int)CVPixelBufferGetHeight(pixelBuffer);
-//    size_t bytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer);
-//    uint8_t *baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer);
-//    OSType pixelFormat = inputPixelFormat();
-//
-//    // Copy the pixel buffer
-//    CVPixelBufferRef pixelBufferCopy = NULL;
-//    CFDictionaryRef empty = CFDictionaryCreate(kCFAllocatorDefault, NULL, NULL, 0,
-//    &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks); // our empty IOSurface
-//    properties dictionary NSDictionary *options = [NSDictionary dictionaryWithObjectsAndKeys:
-//                             [NSNumber numberWithBool:YES], kCVPixelBufferCGImageCompatibilityKey,
-//                             [NSNumber numberWithBool:YES],
-//                             kCVPixelBufferCGBitmapContextCompatibilityKey, empty,
-//                             kCVPixelBufferIOSurfacePropertiesKey, nil];
-//    CVReturn status = CVPixelBufferCreate(kCFAllocatorDefault, bufferWidth, bufferHeight,
-//    pixelFormat, (__bridge CFDictionaryRef) options, &pixelBufferCopy); if (status ==
-//    kCVReturnSuccess) {
-//        CVPixelBufferLockBaseAddress(pixelBufferCopy, 0);
-//        uint8_t *copyBaseAddress = CVPixelBufferGetBaseAddress(pixelBufferCopy);
-//        memcpy(copyBaseAddress, baseAddress, bufferHeight * bytesPerRow);
-//    }else {
-//        NSLog(@"RBGBuffereCopyWithPixelBuffer :: failed");
-//    }
-//
-//    CVPixelBufferUnlockBaseAddress(pixelBufferCopy, 0);
-//    CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
-//
-//    return pixelBufferCopy;
-//}
-
 @end

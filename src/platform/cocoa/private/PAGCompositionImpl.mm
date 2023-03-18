@@ -20,11 +20,8 @@
 #import "PAGImageLayerImpl.h"
 #import "PAGLayer+Internal.h"
 #import "PAGLayerImpl+Internal.h"
-#include "rendering/layers/PAGCompositionUtil.h"
 
-@implementation PAGCompositionImpl {
-  std::shared_ptr<pag::PAGCompositionUtil> pagCompositionUtil;
-}
+@implementation PAGCompositionImpl
 
 + (PAGComposition*)Make:(CGSize)size {
   auto pagComposition = pag::PAGComposition::Make(size.width, size.height);
@@ -160,14 +157,6 @@
   auto layers = std::static_pointer_cast<pag::PAGComposition>(self.pagLayer)
                     ->getLayersUnderPoint(static_cast<float>(point.x), static_cast<float>(point.y));
   return [PAGLayerImpl BatchConvertToPAGLayers:layers];
-}
-
-- (uint32_t)getContentVersion {
-  if (pagCompositionUtil == nil) {
-    pagCompositionUtil = std::shared_ptr<pag::PAGCompositionUtil>(
-        new pag::PAGCompositionUtil(std::static_pointer_cast<pag::PAGComposition>(self.pagLayer)));
-  }
-  return pagCompositionUtil->getContentVersion();
 }
 
 @end

@@ -16,19 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#import <Foundation/Foundation.h>
 
-#include <utility>
-#include "pag/pag.h"
+#import "platform/cocoa/PAGComposition.h"
 
-namespace pag {
-class PAGCompositionUtil {
- public:
-  explicit PAGCompositionUtil(std::shared_ptr<PAGComposition> pagComposition);
+NS_ASSUME_NONNULL_BEGIN
 
-  uint32_t getContentVersion() const;
+@interface PAGContentVersion : NSObject
++ (NSInteger)Get:(PAGComposition*)pagComposition;
+@end
 
- private:
-  std::shared_ptr<PAGComposition> composition;
-};
-}  // namespace pag
+NS_ASSUME_NONNULL_END
