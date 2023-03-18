@@ -118,6 +118,7 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
         return renderScale;
     }
 
+    private Matrix renderMatrix;
     /**
      * .
      * This value defines the scale factor for internal graphics renderer, ranges from 0.0 to 1.0.
@@ -125,6 +126,9 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
      * graphics memory which leads to better performance. The default value is 1.0.
      */
     public void setRenderScale(float renderScale) {
+        if (this.renderScale == renderScale) {
+            return;
+        }
         if (renderScale < 0.0f || renderScale > 1.0f) {
             renderScale = 1.0f;
         }
@@ -132,6 +136,10 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
         width = (int) (viewWidth * renderScale);
         height = (int) (viewHeight * renderScale);
         refreshMatrixFromScaleMode();
+        if (renderScale < 1.0f) {
+            renderMatrix = new Matrix();
+            renderMatrix.setScale(1 / renderScale, 1 / renderScale);
+        }
     }
 
     /**
@@ -1036,6 +1044,9 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
         if (_currentImage != null && _currentImage.get() != null && !_currentImage.get().isRecycled()) {
             super.onDraw(canvas);
             canvas.save();
+            if (renderMatrix != null) {
+               canvas.concat(renderMatrix);
+            }
             if (_matrix != null) {
                 canvas.concat(_matrix);
             }
