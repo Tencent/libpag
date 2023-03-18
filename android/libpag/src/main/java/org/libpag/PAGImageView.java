@@ -131,6 +131,7 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
         this.renderScale = renderScale;
         width = (int) (viewWidth * renderScale);
         height = (int) (viewHeight * renderScale);
+        refreshMatrixFromScaleMode();
     }
 
     /**
@@ -262,6 +263,7 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
         _maxFrameRate = maxFrameRate;
         progressExplicitlySet = true;
         refreshDecodeInfo();
+        _currentImage = null;
         return true;
     }
 
@@ -336,24 +338,19 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
             return;
         }
         _scaleMode = scaleMode;
-        _matrix = null;
-        scaleModeMatrix = null;
-        postInvalidate();
+        if (hasSize()) {
+            refreshMatrixFromScaleMode();
+            postInvalidate();
+        } else {
+            _matrix = null;
+        }
     }
 
     /**
      * Returns a copy of current matrix.
      */
     public Matrix matrix() {
-        if (_matrix != null) {
-            return _matrix;
-        }
-        if (!decoderInfo.isValid()) {
-            return new Matrix();
-        }
-        return PAGImageViewHelper.ApplyScaleMode(_scaleMode, decoderInfo._width,
-                decoderInfo._height, width,
-                height);
+        return _matrix;
     }
 
     /**
@@ -363,7 +360,9 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
     public void setMatrix(Matrix matrix) {
         _matrix = matrix;
         _scaleMode = PAGScaleMode.None;
-        postInvalidate();
+        if (hasSize()) {
+            postInvalidate();
+        }
     }
 
     @Override
@@ -460,7 +459,7 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
                 BitmapResource bitmap = memoryLruCache.get(key);
                 if (bitmap != null) {
                     bitmap.release();
-                    memoryLruCache.remove(key);
+                    it.remove();
                 }
             }
             memoryLruCache.clear();
@@ -519,7 +518,7 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
                 int key = j.next();
                 BitmapResource bitmapResource = memoryLruCache.get(key);
                 if (bitmapResource != null && bitmapResource.release()) {
-                    memoryLruCache.remove(key);
+                    j.remove();
                 }
             }
         }
@@ -604,8 +603,6 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
     private volatile int width, height;
     private volatile int viewWidth, viewHeight;
 
-    private Matrix scaleModeMatrix;
-
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
@@ -613,7 +610,6 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
         viewHeight = h;
         width = (int) (renderScale * w);
         height = (int) (renderScale * h);
-        scaleModeMatrix = null;
         initDecoderInfo();
         resumeAnimator();
     }
@@ -622,6 +618,7 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
         if (!decoderInfo.isValid()) {
             if (decoderInfo.initDecoder(getContext(), _composition, _pagFilePath, width,
                     height, _maxFrameRate)) {
+                refreshMatrixFromScaleMode();
                 animator.setDuration(decoderInfo.duration / 1000);
                 PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_INIT_CACHE, this);
             }
@@ -737,7 +734,6 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
         _currentImage = null;
         if (decoderInfo != null) {
             decoderInfo.release();
-            decoderInfo = null;
         }
         clearSelfMemoryCache();
         if (bitmapPool != null) {
@@ -1043,15 +1039,6 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
             if (_matrix != null) {
                 canvas.concat(_matrix);
             }
-            if (_scaleMode != PAGScaleMode.None) {
-                if (scaleModeMatrix == null) {
-                    scaleModeMatrix = PAGImageViewHelper.ApplyScaleMode(_scaleMode,
-                            decoderInfo._width,
-                            decoderInfo._height,
-                            width, height);
-                }
-                canvas.concat(scaleModeMatrix);
-            }
             canvas.drawBitmap(_currentImage.get(), 0, 0, null);
             canvas.restore();
         }
@@ -1087,6 +1074,20 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
         String keyPrefix;
         String keyPrefixMD5;
         boolean needAutoClean = false;
+    }
+
+    private boolean hasSize() {
+        return width > 0 && height > 0;
+    }
+
+    private void refreshMatrixFromScaleMode() {
+        if (_scaleMode == PAGScaleMode.None) {
+            return;
+        }
+        _matrix = PAGImageViewHelper.ApplyScaleMode(_scaleMode,
+                decoderInfo._width,
+                decoderInfo._height,
+                width, height);
     }
 
 }
