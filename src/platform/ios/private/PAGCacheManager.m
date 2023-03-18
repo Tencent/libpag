@@ -89,8 +89,7 @@ static const NSUInteger defaultMaxDiskSize = 1 * 1024 * 1024 * 1024;
   }
   NSArray* allFiles = [self getAllFiles:_diskCachePath];
   for (NSString* file in allFiles) {
-    NSError* err = nil;
-    [[NSFileManager defaultManager] removeItemAtPath:file error:&err];
+    [[NSFileManager defaultManager] removeItemAtPath:file error:nil];
   }
 }
 

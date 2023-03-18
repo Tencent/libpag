@@ -76,8 +76,8 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   PAGDiskCache* imageViewCache;
   NSMutableDictionary<NSNumber*, UIImage*>* imagesMap;
   NSInteger _repeatCount;
-  dispatch_queue_t flushQueue;
   CVPixelBufferRef pixelBuffer;
+  CGAffineTransform matrix;
 }
 
 @synthesize isPlaying = _isPlaying;
@@ -102,6 +102,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   pagDecoder = nil;
   self.currentFrameIndex = -1;
   _renderScale = 1.0;
+  matrix = CGAffineTransformIdentity;
   self.memoryCacheEnabled = NO;
   listeners = [[NSHashTable weakObjectsHashTable] retain];
   self.isPlaying = FALSE;
@@ -220,7 +221,9 @@ static NSString* RemovePathVariableComponent(NSString* original) {
 - (CVPixelBufferRef)getDiskCacheCVPixelBuffer {
   if (pixelBuffer == nil) {
     pixelBuffer = pag::PixelBufferUtils::Make((int)cacheWidth, (int)cacheHeight);
-    CFRetain(pixelBuffer);
+    if (pixelBuffer) {
+      CFRetain(pixelBuffer);
+    }
   }
   return pixelBuffer;
 }
@@ -245,7 +248,7 @@ static NSString* RemovePathVariableComponent(NSString* original) {
 }
 
 - (PAGDecoder*)getPAGDecoder {
-  if (pagDecoder == nullptr) {
+  if (pagDecoder == nil) {
     if (filePath) {
       pagDecoder = [PAGDecoder Make:[PAGFile Load:filePath]
                        maxFrameRate:self.frameRate
@@ -368,7 +371,7 @@ static NSString* RemovePathVariableComponent(NSString* original) {
   }
 }
 
-- (BOOL)updateImageViewFrom:(CVPixelBufferRef)pixelBuffer atIndex:(NSInteger)frameIndex {
+- (BOOL)updateImageViewFrom:(CVPixelBufferRef)cvPixelBuffer atIndex:(NSInteger)frameIndex {
   BOOL status = TRUE;
   [flushLock lock];
   [self freeCache];
@@ -377,30 +380,40 @@ static NSString* RemovePathVariableComponent(NSString* original) {
     [self unloadAllFrames];
   }
   if ([[self->imagesMap allKeys] containsObject:[NSNumber numberWithInteger:frameIndex]]) {
-    self.currentUIImage = [self->imagesMap objectForKey:[NSNumber numberWithInteger:frameIndex]];
+    UIImage* image = [self->imagesMap objectForKey:[NSNumber numberWithInteger:frameIndex]];
+    self.currentUIImage = [self imageApplyTransform:self->matrix from:image];
     [self submitToImageView];
     [flushLock unlock];
     return status;
   }
   PAGDiskCache* diskCache = [self getImageViewCache];
-  if (diskCache && [diskCache containsObjectForKey:frameIndex]) {
-    status = [diskCache objectForKey:frameIndex pixelBuffer:pixelBuffer];
-    UIImage* image = [self imageFromCVPixeBuffer:pixelBuffer];
-    self.currentUIImage = image;
+  if ([diskCache containsObjectForKey:frameIndex]) {
+    status = [diskCache objectForKey:frameIndex pixelBuffer:cvPixelBuffer];
+    if (!status) {
+      [flushLock unlock];
+      return status;
+    }
+    UIImage* image = [self imageFromCVPixeBuffer:cvPixelBuffer];
+    self.currentUIImage = [self imageApplyTransform:self->matrix from:image];
     if (self.memoryCacheEnabled) {
       [self->imagesMap setObject:image forKey:[NSNumber numberWithInteger:frameIndex]];
     }
     [self submitToImageView];
   } else {
     @autoreleasepool {
-      [[self getPAGDecoder] copyFrameTo:pixelBuffer at:frameIndex];
-      UIImage* image = [self imageFromCVPixeBuffer:pixelBuffer];
+      status = [[self getPAGDecoder] copyFrameTo:cvPixelBuffer at:frameIndex];
+      if (!status) {
+        [flushLock unlock];
+        return status;
+      }
+      UIImage* image = [self imageFromCVPixeBuffer:cvPixelBuffer];
+      self.currentUIImage = [self imageApplyTransform:self->matrix from:image];
       self.currentUIImage = image;
       if (self.memoryCacheEnabled) {
         [self->imagesMap setObject:image forKey:[NSNumber numberWithInteger:frameIndex]];
       }
       [self submitToImageView];
-      [diskCache setObject:pixelBuffer
+      [diskCache setObject:cvPixelBuffer
                     forKey:frameIndex
                  withBlock:^{
                  }];
@@ -411,28 +424,32 @@ static NSString* RemovePathVariableComponent(NSString* original) {
 }
 
 - (void)updateView {
-  NSUInteger frameIndex = (NSUInteger)(floor([valueAnimator getAnimatedFraction] * numFrames));
-  if (frameIndex >= numFrames) {
-    frameIndex = numFrames - 1;
+  NSUInteger frame = (NSUInteger)(floor([valueAnimator getAnimatedFraction] * numFrames));
+  if (frame >= numFrames) {
+    frame = numFrames - 1;
   }
-  if (self.currentFrameIndex != frameIndex) {
-    self.currentFrameIndex = frameIndex;
-    __block __typeof(self) weakSelf = self;
+  if (self.currentFrameIndex != frame) {
+    self.currentFrameIndex = frame;
     NSOperationQueue* flushQueue = [PAGImageView ImageViewFlushQueue];
     [self retain];
+    __block __typeof(self) weakSelf = self;
+    __block NSInteger frameIndex = frame;
     NSBlockOperation* operation = [NSBlockOperation blockOperationWithBlock:^{
-      NSInteger frameIndex = weakSelf.currentFrameIndex;
-      CVPixelBufferRef pixelBuffer = weakSelf.memoryCacheEnabled
-                                         ? [weakSelf getMemoryCacheCVPixelBuffer]
-                                         : [weakSelf getDiskCacheCVPixelBuffer];
+      CVPixelBufferRef cvPixelBuffer = weakSelf.memoryCacheEnabled
+                                           ? [weakSelf getMemoryCacheCVPixelBuffer]
+                                           : [weakSelf getDiskCacheCVPixelBuffer];
+      if (cvPixelBuffer == nil) {
+        [self release];
+        return;
+      }
       if (weakSelf.currentFrameExplicitlySet >= 0) {
         frameIndex = weakSelf.currentFrameExplicitlySet;
-        [weakSelf updateImageViewFrom:pixelBuffer atIndex:frameIndex];
+        [weakSelf updateImageViewFrom:cvPixelBuffer atIndex:frameIndex];
         [weakSelf->valueAnimator
             setCurrentPlayTime:((frameIndex + 0.1) * 1.0 / weakSelf.frameRate * 1000000)];
         weakSelf.currentFrameExplicitlySet = -1;
       } else {
-        [weakSelf updateImageViewFrom:pixelBuffer atIndex:frameIndex];
+        [weakSelf updateImageViewFrom:cvPixelBuffer atIndex:frameIndex];
       }
     }];
     [flushQueue addOperation:operation];
@@ -486,7 +503,6 @@ static NSString* RemovePathVariableComponent(NSString* original) {
   if (pagDecoder && [self->imageViewCache count] == self->numFrames) {
     [pagDecoder release];
     pagDecoder = nil;
-    ;
     if (self->filePath && [PAGContentVersion Get:pagComposition] == 0) {
       [pagComposition release];
       pagComposition = nil;
@@ -517,6 +533,20 @@ static NSString* RemovePathVariableComponent(NSString* original) {
   }
   [self unloadAllFrames];
   [self updateSize];
+}
+
+- (UIImage*)imageApplyTransform:(CGAffineTransform)transform from:(UIImage*)image {
+  if (CGAffineTransformEqualToTransform(CGAffineTransformIdentity, transform)) {
+    return image;
+  }
+  CGSize size = [image size];
+  UIGraphicsBeginImageContextWithOptions(size, NO, 0);
+  CGContextRef context = UIGraphicsGetCurrentContext();
+  CGContextConcatCTM(context, transform);
+  [image drawAtPoint:CGPointZero];
+  UIImage* imageOut = UIGraphicsGetImageFromCurrentImageContext();
+  UIGraphicsEndImageContext();
+  return imageOut;
 }
 
 #pragma mark - pubic
@@ -552,30 +582,24 @@ static NSString* RemovePathVariableComponent(NSString* original) {
   }
 }
 
-- (void)setMatrix:(CGAffineTransform)value {
-  if (pagComposition) {
-    [pagComposition setMatrix:value];
-    [self updateSize];
-    [self unloadAllFrames];
-    [self updateView];
-  }
+- (CGAffineTransform)matrix {
+  return matrix;
 }
 
-- (CGAffineTransform)matrix {
-  if (pagComposition) {
-    return [pagComposition matrix];
-  }
-  return CGAffineTransformIdentity;
+- (void)setMatrix:(CGAffineTransform)value {
+  matrix = value;
 }
 
 - (void)setRenderScale:(float)scale {
   _renderScale = scale;
   if (pagComposition || filePath) {
+    [flushLock lock];
     [self reset];
     self.scaleFactor =
         scale * fmax(self.frame.size.width * self.contentScaleFactor / self.fileWidth,
                      self.frame.size.height * self.contentScaleFactor / self.fileHeight);
     [self unloadAllFrames];
+    [flushLock unlock];
     [self updateView];
   }
 }
@@ -740,9 +764,9 @@ static NSString* RemovePathVariableComponent(NSString* original) {
 }
 
 - (BOOL)flush {
-  CVPixelBufferRef pixelBuffer = self.memoryCacheEnabled ? [self getMemoryCacheCVPixelBuffer]
-                                                         : [self getDiskCacheCVPixelBuffer];
-  return [self updateImageViewFrom:pixelBuffer atIndex:[self currentFrame]];
+  CVPixelBufferRef cvPixelBuffer = self.memoryCacheEnabled ? [self getMemoryCacheCVPixelBuffer]
+                                                           : [self getDiskCacheCVPixelBuffer];
+  return [self updateImageViewFrom:cvPixelBuffer atIndex:[self currentFrame]];
 }
 
 - (void)unloadAllFrames {
