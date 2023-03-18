@@ -300,9 +300,6 @@ export const enum MatrixIndex {
   b,
   d,
   ty,
-  pers0,
-  pers1,
-  pers2,
 }
 
 export const enum DecoderResult {
