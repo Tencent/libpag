@@ -55,8 +55,8 @@ public class PAGDecoder {
             frameRate = Math.min(pagComposition.frameRate(), frameRate);
         }
         PAGDecoder pagDecoder = new PAGDecoder();
-        pagDecoder._width = 200;//Math.round(pagComposition.width() * scale);
-        pagDecoder._height = 200;//Math.round(pagComposition.height() * scale);
+        pagDecoder._width = Math.round(pagComposition.width() * scale);
+        pagDecoder._height = Math.round(pagComposition.height() * scale);
         pagDecoder._numFrames =
                 (int) (pagComposition.duration() * frameRate / 1000000);
         pagDecoder.pagSurface = PAGSurface.MakeOffscreen(pagDecoder._width, pagDecoder._height);
