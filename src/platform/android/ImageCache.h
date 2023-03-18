@@ -18,6 +18,7 @@
 
 #pragma once
 #include <memory>
+#include <mutex>
 namespace pag {
 
 class ImageCache {
@@ -25,7 +26,8 @@ class ImageCache {
   static std::shared_ptr<ImageCache> Make(const std::string& path, int width, int height,
                                           int frameCount, bool needInit);
   ~ImageCache();
-  bool savePixels(int frame, void* bitmapPixels, long byteCount);
+  bool flushSave();
+  bool putPixelsToSaveBuffer(int frame, void* bitmapPixels, int byteCount);
   bool inflatePixels(int frame, void* bitmapPixels, int byteCount);
   bool isCached(int frame);
   bool isAllCached();
@@ -33,10 +35,14 @@ class ImageCache {
   void release();
 
  private:
+  std::shared_ptr<std::mutex> mutex = nullptr;
   void* compressBuffer = nullptr;
   void* deCompressBuffer = nullptr;
   int deCompressBufferSize = 0;
   void* headerBuffer = nullptr;
+  void* pendingSaveBuffer = nullptr;
+  int pendingSaveBufferSize = 0;
+  int pendingSaveFrame = -1;
   int frameCount = 0;
   int fd = -1;
 };

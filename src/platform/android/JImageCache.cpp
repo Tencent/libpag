@@ -35,12 +35,12 @@ std::shared_ptr<ImageCache> get(JNIEnv* env, jobject thiz) {
   if (env == nullptr || thiz == nullptr) {
     return nullptr;
   }
-  auto pagSurface =
+  auto imageCache =
       reinterpret_cast<JImageCacheHandle*>(env->GetLongField(thiz, ImageCache_nativeHandle));
-  if (pagSurface == nullptr) {
+  if (imageCache == nullptr) {
     return nullptr;
   }
-  return pagSurface->get();
+  return imageCache->get();
 }
 
 static bool SaveHardwarePixels(JNIEnv* env, std::shared_ptr<ImageCache> cache, jint frame,
@@ -54,7 +54,7 @@ static bool SaveHardwarePixels(JNIEnv* env, std::shared_ptr<ImageCache> cache, j
   }
   bool res = false;
   if (pixels) {
-    res = cache->savePixels(frame, pixels, byteCount);
+    res = cache->putPixelsToSaveBuffer(frame, pixels, byteCount);
   }
   tgfx::HardwareBufferInterface::Unlock(buffer, nullptr);
   return res;
@@ -79,10 +79,8 @@ static bool InflateHardwarePixels(JNIEnv* env, std::shared_ptr<ImageCache> cache
 }
 
 extern "C" {
-PAG_API jboolean Java_org_libpag_CacheManager_00024ImageCache_saveBitmap(JNIEnv* env, jobject thiz,
-                                                                         jint frame, jobject bitmap,
-                                                                         jint byteCount,
-                                                                         jboolean isHardware) {
+PAG_API jboolean Java_org_libpag_CacheManager_00024ImageCache_putBitmapToSaveBuffer(
+    JNIEnv* env, jobject thiz, jint frame, jobject bitmap, jint byteCount, jboolean isHardware) {
   auto cache = get(env, thiz);
   if (cache == nullptr) {
     return false;
@@ -96,7 +94,7 @@ PAG_API jboolean Java_org_libpag_CacheManager_00024ImageCache_saveBitmap(JNIEnv*
     LOGE("AndroidBitmap_lockPixels() failed ! error=%d", ret);
     return false;
   }
-  auto res = cache->savePixels(frame, newBitmapPixels, byteCount);
+  auto res = cache->putPixelsToSaveBuffer(frame, newBitmapPixels, byteCount);
   if ((ret = AndroidBitmap_unlockPixels(env, bitmap)) != ANDROID_BITMAP_RESULT_SUCCESS) {
     LOGE("AndroidBitmap_unlockPixels() failed ! error=%d", ret);
   }
@@ -172,7 +170,7 @@ PAG_API jint Java_org_libpag_CacheManager_ContentVersion(JNIEnv* env, jclass,
   if (composition == nullptr) {
     return 0;
   }
-  return std::make_unique<PAGCompositionUtil>(composition)->getContentVersion();
+  return ContentVersion::Get(composition);
 }
 
 PAG_API void Java_org_libpag_CacheManager_00024ImageCache_releaseSaveBuffer(JNIEnv* env,
@@ -182,5 +180,13 @@ PAG_API void Java_org_libpag_CacheManager_00024ImageCache_releaseSaveBuffer(JNIE
     return;
   }
   cache->releaseSaveBuffer();
+}
+
+PAG_API jboolean Java_org_libpag_CacheManager_00024ImageCache_flushSave(JNIEnv* env, jobject thiz) {
+  auto cache = get(env, thiz);
+  if (cache == nullptr) {
+    return false;
+  }
+  return cache->flushSave();
 }
 }

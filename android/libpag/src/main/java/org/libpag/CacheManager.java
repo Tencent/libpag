@@ -64,6 +64,13 @@ class CacheManager {
             return success;
         }
 
+        public boolean flushSave() {
+            writeLock();
+            boolean success = _pagImageCache.flushSave();
+            writeUnlock();
+            return success;
+        }
+
         public boolean inflateBitmap(int frame, Bitmap bitmap) {
             readLock();
             boolean success = _pagImageCache.inflateBitmap(frame, bitmap);
@@ -262,10 +269,12 @@ class CacheManager {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 isHardware = bitmap.getConfig() == Bitmap.Config.HARDWARE;
             }
-            return saveBitmap(frame, bitmap, bitmap.getByteCount(), isHardware);
+            return putBitmapToSaveBuffer(frame, bitmap, bitmap.getByteCount(), isHardware);
         }
 
-        native boolean saveBitmap(int frame, Bitmap bitmap, int byteCount, boolean isHardware);
+        native boolean putBitmapToSaveBuffer(int frame, Bitmap bitmap, int byteCount, boolean isHardware);
+
+        native boolean flushSave();
 
         boolean inflateBitmap(int frame, Bitmap bitmap) {
             if (bitmap == null) {

@@ -59,24 +59,34 @@ std::shared_ptr<ImageCache> ImageCache::Make(const std::string& path, int width,
   auto cache = std::make_shared<ImageCache>();
   cache->headerBuffer = headerBuffer;
   cache->fd = fd;
+  cache->mutex = std::make_shared<std::mutex>();
   cache->frameCount = frameCount;
   return cache;
 }
 
-bool ImageCache::savePixels(int frame, void* bitmapPixels, long byteCount) {
-  if (headerBuffer == nullptr) {
+bool ImageCache::flushSave() {
+  if (headerBuffer == nullptr | pendingSaveFrame < 0) {
     return false;
   }
-  if (frame < 0 | frame >= frameCount) {
-    return false;
+  // From the memory saving point of view, locking is needed here.
+  // But from a performance point of view, a copy is needed here.
+  // Choose performance first for now
+  mutex->lock();
+  if (pendingSaveBuffer == nullptr || pendingSaveBufferSize <= 0 || pendingSaveFrame < 0) {
+    mutex->unlock();
+    return true;
   }
+  auto byteCount = pendingSaveBufferSize;
+  auto frame = pendingSaveFrame;
   int* intHeaderBuffer = static_cast<int*>(headerBuffer);
   auto bound = LZ4_compressBound(byteCount);
   if (compressBuffer == nullptr) {
     compressBuffer = new char[bound];
   }
-  auto compressSize =
-      LZ4_compress_default((const char*)(bitmapPixels), (char*)compressBuffer, byteCount, bound);
+  auto compressSize = LZ4_compress_default((const char*)(pendingSaveBuffer), (char*)compressBuffer,
+                                           byteCount, bound);
+  pendingSaveFrame = -1;
+  mutex->unlock();
   lseek(fd, 0, SEEK_END);
   struct stat statbuf;
   fstat(fd, &statbuf);
@@ -100,6 +110,24 @@ bool ImageCache::savePixels(int frame, void* bitmapPixels, long byteCount) {
     return false;
   }
   return 2 * 4 != write(fd, static_cast<int*>(headerBuffer) + frameRangeIndex / 4, 2 * 4);
+}
+
+bool ImageCache::putPixelsToSaveBuffer(int frame, void* bitmapPixels, int byteCount) {
+  if (bitmapPixels == nullptr || byteCount <= 0 || frame < 0 | frame >= frameCount) {
+    return false;
+  }
+  mutex->lock();
+  if (pendingSaveBufferSize != byteCount) {
+    if (pendingSaveBuffer != nullptr) {
+      delete[] static_cast<char*>(pendingSaveBuffer);
+    }
+    pendingSaveBuffer = new char[byteCount];
+    pendingSaveBufferSize = byteCount;
+  }
+  memcpy(pendingSaveBuffer, bitmapPixels, pendingSaveBufferSize);
+  pendingSaveFrame = frame;
+  mutex->unlock();
+  return true;
 }
 
 bool ImageCache::inflatePixels(int frame, void* bitmapPixels, int byteCount) {
@@ -128,7 +156,7 @@ bool ImageCache::inflatePixels(int frame, void* bitmapPixels, int byteCount) {
   if (read(fd, deCompressBuffer, length) != (ssize_t)length) {
     return false;
   }
-  return byteCount != LZ4_decompress_safe((char*)deCompressBuffer, static_cast<char*>(bitmapPixels),
+  return byteCount == LZ4_decompress_safe((char*)deCompressBuffer, static_cast<char*>(bitmapPixels),
                                           length, byteCount);
 }
 
@@ -179,6 +207,10 @@ void ImageCache::releaseSaveBuffer() {
   if (compressBuffer != nullptr) {
     delete[] static_cast<char*>(compressBuffer);
     compressBuffer = nullptr;
+  }
+  if (pendingSaveBuffer != nullptr) {
+    delete[] static_cast<char*>(pendingSaveBuffer);
+    pendingSaveBuffer = nullptr;
   }
 }
 

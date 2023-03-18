@@ -19,14 +19,15 @@
 package org.libpag;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.ColorSpace;
 import android.graphics.Matrix;
+import android.hardware.HardwareBuffer;
 import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.Message;
-
-import org.extra.tools.BitmapPool;
 
 import java.math.BigInteger;
 import java.security.MessageDigest;
@@ -192,7 +193,7 @@ class PAGImageViewHelper {
         static CacheInfo Make(PAGImageView pagImageView,
                               String keyPrefix,
                               int frame,
-                              BitmapPool.BitmapResource bitmap) {
+                              Bitmap bitmap) {
             CacheInfo cacheInfo = new CacheInfo();
             cacheInfo.pagImageView = pagImageView;
             cacheInfo.keyPrefix = keyPrefix;
@@ -203,9 +204,8 @@ class PAGImageViewHelper {
 
         PAGImageView pagImageView;
         String keyPrefix;
-        String key;
         int frame;
-        BitmapPool.BitmapResource bitmap;
+        Bitmap bitmap;
     }
 
     static class PAGViewHandler extends Handler {

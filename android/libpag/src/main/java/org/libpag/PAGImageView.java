@@ -36,16 +36,12 @@ import android.util.Log;
 import android.view.View;
 import android.view.animation.LinearInterpolator;
 
-import org.extra.tools.BitmapPool;
-import org.extra.tools.BitmapPool.BitmapResource;
 import org.extra.tools.Lifecycle;
 
 import java.io.File;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.Iterator;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -55,10 +51,9 @@ import java.util.concurrent.TimeUnit;
 import org.libpag.PAGImageViewHelper.CacheInfo;
 import org.libpag.PAGImageViewHelper.DecoderInfo;
 
-public class PAGImageView extends View implements ComponentCallbacks2 {
+public class PAGImageView extends View{
     private final static String TAG = "PAGImageView";
     private final static float DEFAULT_MAX_FRAMERATE = 30f;
-    protected BitmapPool bitmapPool;
     private ValueAnimator animator;
     private boolean isCacheAllFramesInMemory = false;
     private volatile boolean _isPlaying = false;
@@ -66,22 +61,20 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
     private volatile boolean progressExplicitlySet = true;
     private final Object updateTimeLock = new Object();
     private static final Object g_HandlerLock = new Object();
-    private volatile BitmapResource _currentImage;
     private int _currentFrame;
     private float _maxFrameRate = 30;
     private PAGComposition _composition;
     private String _pagFilePath;
     private int _scaleMode = PAGScaleMode.LetterBox;
     private Matrix _matrix;
-    private ConcurrentHashMap<String, Set<Integer>> keysInMemoryCacheMap = new ConcurrentHashMap<>();
-    private ConcurrentHashMap<String, BitmapResource> memoryLruCache = new ConcurrentHashMap<>();
     private ArrayList<WeakReference<Future>> saveCacheTasks = new ArrayList<>();
     private float renderScale = 1.0f;
     protected CacheManager.CacheItem cacheItem;
     protected KeyItem lastKeyItem;
     protected DecoderInfo decoderInfo = new DecoderInfo();
     protected CacheManager cacheManager;
-
+    private Bitmap renderBitmap;
+    private ConcurrentHashMap<Integer, Bitmap> bitmapCache = new ConcurrentHashMap<>();
     protected static long g_MaxDiskCacheSize = 1 * 1024 * 1024 * 1024;
 
     public interface PAGImageViewListener {
@@ -119,6 +112,7 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
     }
 
     private Matrix renderMatrix;
+
     /**
      * .
      * This value defines the scale factor for internal graphics renderer, ranges from 0.0 to 1.0.
@@ -180,7 +174,7 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
      * Returns a bitmap capturing the contents of the PAGImageView.
      */
     public Bitmap currentImage() {
-        return _currentImage.get();
+        return renderBitmap;
     }
 
     /**
@@ -231,7 +225,9 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
         }
         _composition = newComposition;
         progressExplicitlySet = true;
+        releaseAllTask();
         refreshDecodeInfo();
+        renderBitmap = null;
     }
 
     /**
@@ -270,8 +266,9 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
         _pagFilePath = path;
         _maxFrameRate = maxFrameRate;
         progressExplicitlySet = true;
+        releaseAllTask();
         refreshDecodeInfo();
-        _currentImage = null;
+        renderBitmap = null;
         return true;
     }
 
@@ -318,11 +315,9 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
                 }
                 _currentFrame = currentFrame;
             }
-            BitmapResource handledBitmap = handleFrame(_currentFrame, false);
-            if (handledBitmap == null) {
+            if (!handleFrame(_currentFrame)) {
                 return false;
             }
-            _currentImage = handledBitmap;
             postInvalidate();
 
         }
@@ -374,20 +369,6 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
     }
 
     @Override
-    public void onTrimMemory(int level) {
-        Log.i(TAG, "onTrimMemory:" + level);
-        clearMemoryCache();
-    }
-
-    @Override
-    public void onConfigurationChanged(Configuration newConfig) {
-    }
-
-    @Override
-    public void onLowMemory() {
-    }
-
-    @Override
     public void onVisibilityAggregated(boolean isVisible) {
         super.onVisibilityAggregated(isVisible);
         if (preAggregatedVisible == isVisible) {
@@ -434,6 +415,7 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
             decoderInfo = null;
         }
         releaseCurrentDiskCache();
+        lastKeyItem = null;
         decoderInfo = new DecoderInfo();
         initDecoderInfo();
     }
@@ -458,79 +440,6 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
                 }
             }
         }
-    }
-
-    private void clearMemoryCache() {
-        if (memoryLruCache != null) {
-            for (Iterator<String> it = memoryLruCache.keySet().iterator(); it.hasNext(); ) {
-                String key = it.next();
-                BitmapResource bitmap = memoryLruCache.get(key);
-                if (bitmap != null) {
-                    bitmap.release();
-                    it.remove();
-                }
-            }
-            memoryLruCache.clear();
-        }
-        keysInMemoryCacheMap.clear();
-    }
-
-    private void putToSelfMemoryCache(String keyPrefix, int frame, BitmapResource bitmapResource) {
-        if (bitmapResource == null) {
-            return;
-        }
-        //Prevent BitmapResource from being recycled in no cache mode
-        if (keyPrefix == null) {
-            keyPrefix = "";
-        }
-        Set<Integer> set = keysInMemoryCacheMap.get(keyPrefix);
-        if (set == null) {
-            set = new HashSet<>();
-            keysInMemoryCacheMap.put(keyPrefix, set);
-        }
-        if (set.add(frame)) {
-            bitmapResource.acquire();
-        }
-    }
-
-    private void removeToSelfMemoryCache(String keyPrefix, int frame, BitmapResource bitmapResource) {
-        if (!TextUtils.isEmpty(keyPrefix)) {
-            if (keysInMemoryCacheMap.get(keyPrefix) != null) {
-                if (keysInMemoryCacheMap.get(keyPrefix).remove(frame)) {
-                    if (bitmapResource != null) {
-                        bitmapResource.release();
-                    }
-                }
-            }
-            return;
-        }
-
-        for (Iterator<String> it = keysInMemoryCacheMap.keySet().iterator(); it.hasNext(); ) {
-            String prefix = it.next();
-            if (keysInMemoryCacheMap.get(prefix) != null
-                    && keysInMemoryCacheMap.get(prefix).remove(frame)) {
-                if (bitmapResource != null) {
-                    bitmapResource.release();
-                    return;
-                }
-            }
-        }
-    }
-
-    private void clearSelfMemoryCache() {
-        if (memoryLruCache == null) {
-            return;
-        }
-        for (Iterator<String> i = keysInMemoryCacheMap.keySet().iterator(); i.hasNext(); ) {
-            for (Iterator<Integer> j = keysInMemoryCacheMap.get(i.next()).iterator(); j.hasNext(); ) {
-                int key = j.next();
-                BitmapResource bitmapResource = memoryLruCache.get(key);
-                if (bitmapResource != null && bitmapResource.release()) {
-                    j.remove();
-                }
-            }
-        }
-        keysInMemoryCacheMap.clear();
     }
 
     private volatile long currentPlayTime;
@@ -636,9 +545,6 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
     private float animationScale = 1.0f;
 
     private void init() {
-        if (bitmapPool == null) {
-            bitmapPool = BitmapPool.Make(1);
-        }
         InitCacheExecutors();
         Lifecycle.getInstance().addListener(this);
         cacheManager = CacheManager.Get(getContext());
@@ -713,8 +619,6 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
             PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_INIT_CACHE, this);
         }
         resumeAnimator();
-        getContext().registerComponentCallbacks(this);
-        clearSelfMemoryCache();
     }
 
     @Override
@@ -727,7 +631,16 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
         }
         animator.removeUpdateListener(mAnimatorUpdateListener);
         animator.removeListener(mAnimatorListenerAdapter);
-        getContext().unregisterComponentCallbacks(this);
+        releaseAllTask();
+        releaseCurrentDiskCache();
+        renderBitmap = null;
+        if (decoderInfo != null) {
+            decoderInfo.release();
+        }
+        bitmapCache.clear();
+    }
+
+    private void releaseAllTask() {
         if (lastFetchCacheTask != null && lastFetchCacheTask.get() != null) {
             lastFetchCacheTask.get().cancel(false);
         }
@@ -738,15 +651,7 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
             }
         }
         saveCacheTasks.clear();
-        releaseCurrentDiskCache();
-        _currentImage = null;
-        if (decoderInfo != null) {
-            decoderInfo.release();
-        }
-        clearSelfMemoryCache();
-        if (bitmapPool != null) {
-            bitmapPool.clear();
-        }
+
     }
 
     private Runnable mAnimatorStartRunnable = new Runnable() {
@@ -845,25 +750,16 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
         return keyItem;
     }
 
-    protected boolean inflateBitmapFromDiskCache(BitmapResource bitmapResource,
-                                                 CacheInfo cacheInfo) {
+    protected boolean inflateBitmapFromDiskCache(CacheInfo cacheInfo) {
         try {
-            if (bitmapResource == null || cacheInfo == null || cacheItem == null) {
+            if (cacheInfo == null || cacheItem == null) {
                 return false;
             }
-            return cacheItem.inflateBitmap(cacheInfo.frame, bitmapResource.get());
+            return cacheItem.inflateBitmap(cacheInfo.frame, cacheInfo.bitmap);
         } catch (Exception e) {
             e.printStackTrace();
         }
         return false;
-    }
-
-    protected boolean putBitmapToDiskCache(int frame, BitmapPool.BitmapResource bitmap) {
-        if (cacheItem == null || bitmap == null) {
-            return false;
-        }
-        boolean success = cacheItem.saveBitmap(frame, bitmap.get());
-        return success;
     }
 
 
@@ -872,11 +768,12 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
                 lastKeyItem == null || TextUtils.isEmpty(lastKeyItem.keyPrefix) || decoderInfo._pagDecoder == null) {
             return;
         }
-        if (keysInMemoryCacheMap.get(lastKeyItem.keyPrefixMD5) != null && keysInMemoryCacheMap.get(lastKeyItem.keyPrefixMD5).size() == decoderInfo.numFrames
-                || cacheItem.isAllCached()) {
+        if (bitmapCache.size() == decoderInfo.numFrames || cacheItem.isAllCached()) {
             decoderInfo.release();
             cacheItem.releaseSaveBuffer();
-            bitmapPool.clear();
+            if (bitmapCache.size() == decoderInfo.numFrames) {
+                cacheItem.release();
+            }
         }
     }
 
@@ -899,131 +796,80 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
 
     private WeakReference<Future> lastFetchCacheTask;
 
-    private BitmapPool.BitmapResource handleFrame(final int frame, boolean syncMode) {
+    private boolean handleFrame(final int frame) {
         KeyItem keyItem = fetchKeyFrame();
         if (lastKeyItem != null && lastKeyItem.keyPrefix != null && !lastKeyItem.keyPrefix.equals(keyItem.keyPrefix)) {
             releaseCurrentDiskCache();
             cacheItem = cacheManager.getOrCreate(keyItem.keyPrefixMD5, decoderInfo._width,
                     decoderInfo._height, decoderInfo.numFrames);
-            keysInMemoryCacheMap.remove(lastKeyItem.keyPrefixMD5);
-            clearSelfMemoryCache();
+            bitmapCache.clear();
         }
         lastKeyItem = keyItem;
 
         releaseDecoder();
         if (lastKeyItem != null && lastKeyItem.keyPrefixMD5 != null) {
-            if (isCacheAllFramesInMemory) {
-                final String memoryKey = lastKeyItem.keyPrefixMD5 + "_" + frame;
-                BitmapPool.BitmapResource bitmap = memoryLruCache.get(memoryKey);
-                if (bitmap != null) {
-                    putToSelfMemoryCache(lastKeyItem.keyPrefixMD5, frame, bitmap);
-                    return bitmap;
-                }
+            Bitmap bitmap = bitmapCache.get(frame);
+            if (bitmap != null) {
+                return true;
             }
             if (cacheItem != null) {
                 try {
-                    if (!syncMode) {
-                        if (lastFetchCacheTask != null && lastFetchCacheTask.get() != null && !lastFetchCacheTask.get().isDone()) {
-                            return null;
+                    if (lastFetchCacheTask != null && lastFetchCacheTask.get() != null && !lastFetchCacheTask.get().isDone()) {
+                        return false;
+                    }
+                    if (cacheItem.isCached(frame)) {
+                        if (renderBitmap == null || isCacheAllFramesInMemory) {
+                            renderBitmap = PAGImageViewHelper.CreateBitmap(decoderInfo._width, decoderInfo._height);
                         }
-                        if (cacheItem.isCached(frame)) {
-                            lastFetchCacheTask =
-                                    new WeakReference<Future>(fetchCacheExecutors.submit(new Runnable() {
-                                        @Override
-                                        public void run() {
-                                            executeCache(CacheInfo.Make(PAGImageView.this,
-                                                    lastKeyItem.keyPrefixMD5, frame, null), true);
-                                        }
-                                    }));
-                            return null;
-                        }
+                        lastFetchCacheTask =
+                                new WeakReference<Future>(fetchCacheExecutors.submit(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        fetchCache(CacheInfo.Make(PAGImageView.this,
+                                                lastKeyItem.keyPrefixMD5, frame, renderBitmap));
+                                    }
+                                }));
+                        return false;
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
             }
         }
-        final BitmapPool.BitmapResource currentImage;
-        if (lastKeyItem != null && !isCacheAllFramesInMemory) {
-            removeToSelfMemoryCache(lastKeyItem.keyPrefixMD5, frame, _currentImage);
+        if (renderBitmap == null || isCacheAllFramesInMemory) {
+            renderBitmap = PAGImageViewHelper.CreateBitmap(decoderInfo._width, decoderInfo._height);
         }
-        currentImage = bitmapPool.get(decoderInfo._width,
-                decoderInfo._height);
-        if (decoderInfo._pagDecoder == null || !decoderInfo._pagDecoder.copyFrameTo(currentImage.get(),
+        if (decoderInfo._pagDecoder == null || !decoderInfo._pagDecoder.copyFrameTo(renderBitmap,
                 frame)) {
-            currentImage.release();
-            return null;
+            return false;
         }
-        if (currentImage == null) {
-            return null;
-        } else {
-            putToSelfMemoryCache(lastKeyItem.keyPrefixMD5, frame, currentImage);
-            currentImage.acquire();
-            if (syncMode) {
-                executeCache(CacheInfo.Make(this, lastKeyItem.keyPrefixMD5, frame, currentImage), false);
-            } else {
-                saveCacheTasks.add(new WeakReference<Future>(saveCacheExecutors.submit(new Runnable() {
-                    @Override
-                    public void run() {
-                        executeCache(CacheInfo.Make(PAGImageView.this, lastKeyItem.keyPrefixMD5, frame,
-                                        currentImage),
-                                true);
+        if (isCacheAllFramesInMemory) {
+            bitmapCache.put(frame, renderBitmap);
+        }
+        if (cacheItem != null && cacheItem.saveBitmap(frame, renderBitmap)) {
+            saveCacheTasks.add(new WeakReference<Future>(saveCacheExecutors.submit(new Runnable() {
+                @Override
+                public void run() {
+                    if (cacheItem != null) {
+                        cacheItem.flushSave();
                     }
-                })));
-            }
-            if (lastKeyItem != null && isCacheAllFramesInMemory && memoryLruCache != null) {
-                final String memoryKey = lastKeyItem.keyPrefixMD5 + "_" + frame;
-                memoryLruCache.put(memoryKey, currentImage);
-            } else {
-                removeToSelfMemoryCache(lastKeyItem.keyPrefixMD5, frame, _currentImage);
-            }
-            return currentImage;
+                }
+            })));
         }
+        return true;
     }
 
-    protected static void executeCache(CacheInfo cacheInfo, boolean notifyView) {
+    protected static void fetchCache(CacheInfo cacheInfo) {
         if (cacheInfo.pagImageView == null || TextUtils.isEmpty(cacheInfo.keyPrefix)) {
-            if (cacheInfo.bitmap != null) {
-                cacheInfo.bitmap.release();
-            }
             return;
         }
-        if (cacheInfo.bitmap != null) {
-            // PutCache;
-            cacheInfo.pagImageView.putBitmapToDiskCache(cacheInfo.frame, cacheInfo.bitmap);
-            cacheInfo.bitmap.release();
-        } else {
-            // GetCache;
-            BitmapPool.BitmapResource bitmap = cacheInfo.pagImageView._currentImage;
-            boolean created = false;
-            if (bitmap == null) {
-                bitmap =
-                        cacheInfo.pagImageView.bitmapPool.get(cacheInfo.pagImageView.decoderInfo._width,
-                                cacheInfo.pagImageView.decoderInfo._height);
-                created = true;
-            }
-
-            if (!cacheInfo.pagImageView.inflateBitmapFromDiskCache(bitmap, cacheInfo) && created) {
-                cacheInfo.pagImageView.bitmapPool.put(bitmap);
-            }
-            if (bitmap != null) {
-                if (created) {
-                    cacheInfo.pagImageView.putToSelfMemoryCache(cacheInfo.keyPrefix, cacheInfo.frame, bitmap);
-                    if (cacheInfo.pagImageView.isCacheAllFramesInMemory) {
-                        cacheInfo.pagImageView.memoryLruCache.put(cacheInfo.key, bitmap);
-                    } else {
-                        cacheInfo.pagImageView.removeToSelfMemoryCache(cacheInfo.keyPrefix,
-                                cacheInfo.frame,
-                                cacheInfo.pagImageView._currentImage);
-                    }
-                }
-                if (notifyView) {
-                    cacheInfo.pagImageView._currentImage = bitmap;
-                    cacheInfo.pagImageView.notifyAnimationUpdate();
-                    cacheInfo.pagImageView.postInvalidate();
-                }
-            }
+        if (!cacheInfo.pagImageView.inflateBitmapFromDiskCache(cacheInfo)) {
+            return;
         }
+        if (cacheInfo.pagImageView.isCacheAllFramesInMemory) {
+            cacheInfo.pagImageView.bitmapCache.put(cacheInfo.frame, cacheInfo.bitmap);
+        }
+        cacheInfo.pagImageView.postInvalidate();
     }
 
     private void notifyAnimationUpdate() {
@@ -1041,16 +887,16 @@ public class PAGImageView extends View implements ComponentCallbacks2 {
 
     @Override
     protected void onDraw(Canvas canvas) {
-        if (_currentImage != null && _currentImage.get() != null && !_currentImage.get().isRecycled()) {
+        if (renderBitmap != null && !renderBitmap.isRecycled()) {
             super.onDraw(canvas);
             canvas.save();
             if (renderMatrix != null) {
-               canvas.concat(renderMatrix);
+                canvas.concat(renderMatrix);
             }
             if (_matrix != null) {
                 canvas.concat(_matrix);
             }
-            canvas.drawBitmap(_currentImage.get(), 0, 0, null);
+            canvas.drawBitmap(renderBitmap, 0, 0, null);
             canvas.restore();
         }
     }
