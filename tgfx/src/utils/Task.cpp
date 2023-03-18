@@ -20,14 +20,14 @@
 
 #include "Task.h"
 #include <algorithm>
+#include "utils/Log.h"
 
 #ifdef __APPLE__
-
 #include <sys/sysctl.h>
-
 #endif
 
 namespace tgfx {
+static constexpr auto THREAD_TIMEOUT = std::chrono::seconds(10);
 
 int GetCPUCores() {
   int cpuCores = 0;
@@ -111,39 +111,59 @@ void TaskGroup::RunLoop(TaskGroup* taskGroup) {
   }
 }
 
+static void ReleaseThread(std::thread* thread) {
+  if (thread->joinable()) {
+    thread->join();
+  }
+  delete thread;
+}
+
 TaskGroup::~TaskGroup() {
   exit();
   for (auto& thread : threads) {
-    if (thread->joinable()) {
-      thread->join();
-    }
-    delete thread;
-    thread = nullptr;
+    ReleaseThread(thread);
   }
   threads.clear();
 }
 
-void TaskGroup::initThreads() {
+bool TaskGroup::checkThreads() {
   static const int CPUCores = GetCPUCores();
-  auto maxThreads = CPUCores > 16 ? 16 : CPUCores;
-  for (int i = 0; i < maxThreads; i++) {
-    auto thread = new (std::nothrow) std::thread(&TaskGroup::RunLoop, this);
-    if (thread) {
-      threads.emplace_back(thread);
-    } else {
-      break;
+  static const int MaxThreads = CPUCores > 16 ? 16 : CPUCores;
+  while (!timeoutThreads.empty()) {
+    auto threadID = timeoutThreads.back();
+    timeoutThreads.pop_back();
+    int index = 0;
+    for (auto& thread : threads) {
+      if (thread->get_id() == threadID) {
+        ReleaseThread(thread);
+        threads.erase(threads.begin() + index);
+        break;
+      }
+      index++;
     }
   }
-  activeThreads = static_cast<int>(threads.size());
+  auto totalThreads = static_cast<int>(threads.size());
+  if (activeThreads < totalThreads || totalThreads >= MaxThreads) {
+    return true;
+  }
+  auto thread = new (std::nothrow) std::thread(&TaskGroup::RunLoop, this);
+  if (thread) {
+    activeThreads++;
+    threads.push_back(thread);
+    //    LOGI("TaskGroup: A task thread is created, the current number of threads : %lld",
+    //         threads.size());
+  }
+  return !threads.empty();
 }
 
 void TaskGroup::pushTask(Task* task) {
   std::lock_guard<std::mutex> autoLock(locker);
-  if (threads.empty()) {
-    initThreads();
+  if (checkThreads()) {
+    tasks.push_back(task);
+    condition.notify_one();
+  } else {
+    task->execute();
   }
-  tasks.push_back(task);
-  condition.notify_one();
 }
 
 Task* TaskGroup::popTask() {
@@ -151,15 +171,20 @@ Task* TaskGroup::popTask() {
   activeThreads--;
   while (true) {
     if (tasks.empty()) {
-      condition.wait(autoLock);
-      if (exited) {
+      condition.wait_for(autoLock, THREAD_TIMEOUT);
+      if (exited || tasks.empty()) {
+        auto threadID = std::this_thread::get_id();
+        timeoutThreads.push_back(threadID);
+        //        LOGI("TaskGroup: A task thread is exited, the current number of threads : %lld",
+        //             threads.size() - expiredThreads.size());
         return nullptr;
       }
     } else {
       auto task = tasks.front();
       tasks.pop_front();
       activeThreads++;
-      // LOGI("TaskGroup.activeThreads : %d", activeThreads);
+      //      LOGI("TaskGroup: A task is running, the current active threads : %lld",
+      //      activeThreads);
       return task;
     }
   }
