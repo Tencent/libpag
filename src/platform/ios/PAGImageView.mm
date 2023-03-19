@@ -408,7 +408,6 @@ static NSString* RemovePathVariableComponent(NSString* original) {
       }
       UIImage* image = [self imageFromCVPixeBuffer:cvPixelBuffer];
       self.currentUIImage = [self imageApplyTransform:self->matrix from:image];
-      self.currentUIImage = image;
       if (self.memoryCacheEnabled) {
         [self->imagesMap setObject:image forKey:[NSNumber numberWithInteger:frameIndex]];
       }
