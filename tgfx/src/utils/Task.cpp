@@ -27,7 +27,20 @@ std::shared_ptr<Task> Task::Run(std::function<void()> block) {
     return nullptr;
   }
   auto task = std::shared_ptr<Task>(new Task(std::move(block)));
-  TaskGroup::GetInstance()->pushTask(task);
+  if (!TaskGroup::GetInstance()->pushTask(task)) {
+    task->execute();
+  }
+  return task;
+}
+
+std::shared_ptr<Task> Task::Run(std::shared_ptr<TaskQueue> queue, std::function<void()> block) {
+  if (queue == nullptr || block == nullptr) {
+    return nullptr;
+  }
+  auto task = std::shared_ptr<Task>(new Task(std::move(block)));
+  if (!queue->pushTask(task)) {
+    task->execute();
+  }
   return task;
 }
 
@@ -52,8 +65,15 @@ void Task::cancel() {
   if (!running) {
     return;
   }
-  if (TaskGroup::GetInstance()->removeTask(this)) {
-    running = false;
+  auto taskQueue = queue.lock();
+  if (taskQueue != nullptr) {
+    if (taskQueue->removeTask(this)) {
+      running = false;
+    }
+  } else {
+    if (TaskGroup::GetInstance()->removeTask(this)) {
+      running = false;
+    }
   }
 }
 

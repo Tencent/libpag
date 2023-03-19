@@ -20,7 +20,9 @@
 
 #include <condition_variable>
 #include <functional>
+#include <memory>
 #include <mutex>
+#include "TaskQueue.h"
 
 namespace tgfx {
 class TaskGroup;
@@ -33,9 +35,16 @@ class Task {
   /**
    * Submits a code block for asynchronous execution immediately and returns a Task wraps the code
    * block. Hold a reference to the returned Task if you want to cancel it or wait for it finishes
-   * execution.
+   * execution. Returns nullptr if the block is nullptr.
    */
   static std::shared_ptr<Task> Run(std::function<void()> block);
+
+  /**
+   * Submits a code block for asynchronous execution immediately on a TaskQueue and returns a Task
+   * wraps the code block. Hold a reference to the returned Task if you want to cancel it or wait
+   * for it finishes execution. Returns nullptr if the queue or the block is nullptr.
+   */
+  static std::shared_ptr<Task> Run(std::shared_ptr<TaskQueue> queue, std::function<void()> block);
 
   /**
    * Returns true if the Task is executing its code block.
@@ -58,12 +67,14 @@ class Task {
   std::mutex locker = {};
   std::condition_variable condition = {};
   bool running = true;
+  std::weak_ptr<TaskQueue> queue;
   std::function<void()> block = nullptr;
 
   explicit Task(std::function<void()> block);
   void execute();
 
   friend class TaskGroup;
+  friend class TaskQueue;
 };
 
 }  // namespace tgfx

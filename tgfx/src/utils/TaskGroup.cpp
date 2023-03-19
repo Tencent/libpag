@@ -99,16 +99,17 @@ bool TaskGroup::checkThreads() {
   return !threads.empty();
 }
 
-void TaskGroup::pushTask(std::shared_ptr<Task> task) {
+bool TaskGroup::pushTask(std::shared_ptr<Task> task) {
   std::lock_guard<std::mutex> autoLock(locker);
-#ifndef TGFX_BUILD_FOR_WEB
-  if (checkThreads()) {
-    tasks.push_back(std::move(task));
-    condition.notify_one();
-    return;
-  }
+#ifdef TGFX_BUILD_FOR_WEB
+  return false;
 #endif
-  task->execute();
+  if (!checkThreads()) {
+    return false;
+  }
+  tasks.push_back(std::move(task));
+  condition.notify_one();
+  return true;
 }
 
 std::shared_ptr<Task> TaskGroup::popTask() {

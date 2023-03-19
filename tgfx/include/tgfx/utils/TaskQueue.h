@@ -18,39 +18,46 @@
 
 #pragma once
 
-#include <condition_variable>
 #include <list>
+#include <memory>
 #include <mutex>
-#include <thread>
-#include <vector>
-#include "tgfx/utils/Task.h"
-#include "tgfx/utils/TaskQueue.h"
+#include <string>
 
 namespace tgfx {
-class TaskGroup {
+class Task;
+
+/**
+ * TaskQueue is a FIFO queue that manages the execution of tasks serially on an asynchronous thread.
+ */
+class TaskQueue {
  public:
-  ~TaskGroup();
+  /**
+   * Creates a new TaskQueue to which you can submit code blocks.
+   * @param name  A string label to attach to the queue to uniquely identify it.
+   */
+  std::shared_ptr<TaskQueue> Make(const std::string& name);
+
+  /**
+   * Returns the string label to attach to the queue to uniquely identify it.
+   */
+  std::string name() const {
+    return _name;
+  }
 
  private:
   std::mutex locker = {};
-  std::condition_variable condition = {};
-  int activeThreads = 0;
-  bool exited = false;
+  std::string _name;
+  std::weak_ptr<TaskQueue> weakThis;
+  std::shared_ptr<Task> runningTask = nullptr;
   std::list<std::shared_ptr<Task>> tasks = {};
-  std::vector<std::thread*> threads = {};
-  std::vector<std::thread::id> timeoutThreads = {};
 
-  static TaskGroup* GetInstance();
-  static void RunLoop(TaskGroup* taskGroup);
-
-  TaskGroup() = default;
-  bool checkThreads();
+  explicit TaskQueue(const std::string& name);
   bool pushTask(std::shared_ptr<Task> task);
   std::shared_ptr<Task> popTask();
   bool removeTask(Task* task);
-  void exit();
+  void execute();
 
   friend class Task;
-  friend class TaskQueue;
+  friend class TaskGroup;
 };
 }  // namespace tgfx
