@@ -19,19 +19,19 @@
 #pragma once
 
 #include "tgfx/core/ImageGenerator.h"
-#include "utils/Task.h"
+#include "tgfx/utils/Task.h"
 
 namespace tgfx {
 /**
  * ImageGeneratorTask wraps an ImageGenerator and schedules an asynchronous decoding task
  * immediately.
  */
-class ImageGeneratorTask : public Executor {
+class ImageGeneratorTask {
  public:
   static std::shared_ptr<ImageGeneratorTask> MakeFrom(std::shared_ptr<ImageGenerator> generator,
                                                       bool tryHardware = true);
 
-  ~ImageGeneratorTask() override;
+  ~ImageGeneratorTask();
 
   int imageWidth() const {
     return imageGenerator->width();
@@ -47,10 +47,7 @@ class ImageGeneratorTask : public Executor {
   std::shared_ptr<Task> task = nullptr;
   std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
   std::shared_ptr<ImageGenerator> imageGenerator = nullptr;
-  bool tryHardware = true;
 
   ImageGeneratorTask(std::shared_ptr<ImageGenerator> generator, bool tryHardware);
-
-  void execute() override;
 };
 }  // namespace tgfx

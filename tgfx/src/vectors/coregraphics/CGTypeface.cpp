@@ -18,7 +18,7 @@
 
 #include "CGTypeface.h"
 #include "CGScalerContext.h"
-#include "tgfx/core/UTF.h"
+#include "tgfx/utils/UTF.h"
 #include "utils/UniqueID.h"
 
 namespace tgfx {
