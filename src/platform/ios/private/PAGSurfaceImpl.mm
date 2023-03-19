@@ -148,28 +148,11 @@
   return pixelBuffer;
 }
 
-- (BOOL)copyPixelsTo:(CVPixelBufferRef)pixelBuffer {
-  if (!pixelBuffer) {
+- (BOOL)copyPixelsTo:(void*)pixels rowBytes:(size_t)rowBytes {
+  if (!pixels) {
     return NO;
   }
-
-  CVPixelBufferLockBaseAddress(pixelBuffer, 0);
-  int width = (int)CVPixelBufferGetWidth(pixelBuffer);
-  int height = (int)CVPixelBufferGetHeight(pixelBuffer);
-  if (width != [self width] || height != [self height]) {
-    CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
-    return NO;
-  }
-  size_t bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 0);
-  uint8_t* pixelBufferData = (uint8_t*)CVPixelBufferGetBaseAddress(pixelBuffer);
-  BOOL status = _pagSurface->readPixels(pag::ColorType::BGRA_8888, pag::AlphaType::Premultiplied,
-                                        pixelBufferData, bytesPerRow);
-  CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
-  if (!status) {
-    LOGE("ReadPixels failed!");
-    return NO;
-  }
-  return YES;
+  return _pagSurface->readPixels(pag::ColorType::BGRA_8888, pag::AlphaType::Premultiplied, pixels,
+                                 rowBytes);
 }
-
 @end

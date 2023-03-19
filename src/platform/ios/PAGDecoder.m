@@ -90,12 +90,9 @@
                                                scale:scale] autorelease];
 }
 
-- (BOOL)copyFrameTo:(CVPixelBufferRef)pixelBuffer at:(NSInteger)index {
-  BOOL result = [self renderCurrentFrame:index];
-  if (!result) {
-    return NO;
-  }
-  return [pagSurface copyPixelsTo:pixelBuffer];
+- (BOOL)copyFrameTo:(void*)pixels rowBytes:(size_t)rowBytes at:(NSInteger)index {
+  [self renderCurrentFrame:index];
+  return [pagSurface copyPixelsTo:pixels rowBytes:rowBytes];
 }
 
 - (UIImage*)frameAtIndex:(NSInteger)index {

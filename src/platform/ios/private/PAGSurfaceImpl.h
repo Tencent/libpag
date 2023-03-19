@@ -48,6 +48,6 @@
 
 - (CVPixelBufferRef)makeSnapshot;
 
-- (BOOL)copyPixelsTo:(CVPixelBufferRef)pixelBuffer;
+- (BOOL)copyPixelsTo:(void*)pixels rowBytes:(size_t)rowBytes;
 
 @end

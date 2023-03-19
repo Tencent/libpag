@@ -53,9 +53,11 @@ PAG_API @interface PAGDecoder : NSObject
 - (NSInteger)numFrames;
 
 /**
- * Copies pixels of the image frame at the given index to the specified CVPixelBuffer.
+ * Copies pixels of the image frame at the given index to the specified memory address. The format
+ * of the copied pixels is in the BGRA color type with the premultiplied alpha type. Returns false
+ * if failed.
  */
-- (BOOL)copyFrameTo:(CVPixelBufferRef)pixelBuffer at:(NSInteger)index;
+- (BOOL)copyFrameTo:(void*)pixels rowBytes:(size_t)rowBytes at:(NSInteger)index;
 
 /**
  * Returns the image frame at the specified index. Note that this method must be called while the

@@ -24,17 +24,13 @@ NS_ASSUME_NONNULL_BEGIN
 
 + (instancetype __nullable)MakeWithName:(NSString*)name frameCount:(NSUInteger)frameCount;
 
-- (BOOL)objectForKey:(NSInteger)index pixelBuffer:(CVPixelBufferRef)pixelBuffer;
-
 - (BOOL)containsObjectForKey:(NSInteger)index;
 
-- (void)setObject:(CVPixelBufferRef)pixelBuffer
-           forKey:(NSInteger)index
-        withBlock:(void (^_Nullable)(void))block;
+- (BOOL)objectForKey:(NSInteger)index to:(uint8_t*)pixels length:(NSInteger)length;
 
-- (void)setObject:(CVPixelBufferRef)pixelBuffer forKey:(NSInteger)index;
+- (void)setObject:(uint8_t*)pixels length:(NSInteger)length forKey:(NSInteger)index;
 
-- (NSUInteger)count;
+- (NSInteger)count;
 
 - (NSString*)path;
 

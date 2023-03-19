@@ -109,8 +109,8 @@
   return [_surface makeSnapshot];
 }
 
-- (BOOL)copyPixelsTo:(CVPixelBufferRef)pixelBuffer {
-  return [_surface copyPixelsTo:pixelBuffer];
+- (BOOL)copyPixelsTo:(void*)pixels rowBytes:(size_t)rowBytes {
+  return [_surface copyPixelsTo:pixels rowBytes:rowBytes];
 }
 
 @end

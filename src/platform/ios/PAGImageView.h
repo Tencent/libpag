@@ -115,16 +115,6 @@ PAG_API @interface PAGImageView : UIImageView
 - (void)setCacheAllFramesInMemory:(BOOL)enable;
 
 /**
- * Returns a copy of the current matrix.
- */
-- (CGAffineTransform)matrix;
-
-/**
- * Sets the transformation which will be applied to the composition.
- */
-- (void)setMatrix:(CGAffineTransform)value;
-
-/**
  * This value defines the scale factor for the size of the cached image frames, which ranges from
  * 0.0 to 1.0. A scale factor less than 1.0 may result in blurred output, but it can reduce graphics
  * memory usage, increasing the rendering performance. The default value is 1.0.

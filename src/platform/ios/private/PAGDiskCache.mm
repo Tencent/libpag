@@ -41,6 +41,11 @@
   NSInteger scratchEncodeLength;
   void* scratchDecodeBuffer;
   NSInteger scratchDecodeLength;
+
+  uint8_t* encodeBuffer;
+  NSInteger encodeLength;
+  uint8_t* decodeBuffer;
+  NSInteger decodeLength;
 }
 
 static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
@@ -55,11 +60,11 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
     numFrames = frameCount;
     _fd = fd;
     scratchEncodeLength = compression_encode_scratch_buffer_size(COMPRESSION_LZ4);
-    scratchEncodeBuffer = malloc(scratchEncodeLength);
     scratchDecodeLength = compression_decode_scratch_buffer_size(COMPRESSION_LZ4);
-    scratchDecodeBuffer = malloc(scratchDecodeLength);
     cacheQueue = dispatch_queue_create("PAGDiskFileCache.art.pag", DISPATCH_QUEUE_SERIAL);
     ioQueue = queue;
+    encodeLength = 0;
+    decodeLength = 0;
     dispatch_retain(ioQueue);
     __block __typeof(self) weakSelf = self;
     dispatch_sync(ioQueue, ^{
@@ -78,6 +83,12 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
   }
   if (scratchDecodeBuffer) {
     free(scratchDecodeBuffer);
+  }
+  if (encodeBuffer) {
+    free(encodeBuffer);
+  }
+  if (decodeBuffer) {
+    free(decodeBuffer);
   }
   close(_fd);
   [super dealloc];
@@ -122,13 +133,23 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
   return YES;
 }
 
-- (void)setObject:(CVPixelBufferRef)pixelBuffer forKey:(NSInteger)index {
-  CVPixelBufferLockBaseAddress(pixelBuffer, 0);
-  uint8_t* pixelBufferData = (uint8_t*)CVPixelBufferGetBaseAddress(pixelBuffer);
-  size_t bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 0);
-  size_t height = CVPixelBufferGetHeight(pixelBuffer);
-  NSData* compressData = [self compressRGBAData:pixelBufferData length:bytesPerRow * height];
-  CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
+- (BOOL)objectForKey:(NSInteger)index to:(uint8_t*)pixels length:(NSInteger)length {
+  if (decodeLength == 0) {
+    decodeLength = length;
+  }
+  NSData* compressData = [self readObjectForKey:index];
+  if (compressData) {
+    return [self deCompressData:pixels
+                      dstLength:length
+                      srcBuffer:(uint8_t*)compressData.bytes
+                      srcLength:compressData.length];
+  }
+  return NO;
+}
+
+- (void)setObject:(uint8_t*)pixels length:(NSInteger)length forKey:(NSInteger)index {
+  encodeLength = length;
+  NSData* compressData = [self compressRGBAData:pixels length:length];
   if (compressData) {
     __block __typeof(self) weakSelf = self;
     dispatch_sync(ioQueue, ^{
@@ -137,33 +158,7 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
   }
 }
 
-- (void)setObject:(CVPixelBufferRef)pixelBuffer
-           forKey:(NSInteger)index
-        withBlock:(void (^)())block {
-  dispatch_sync(cacheQueue, ^{
-    [self setObject:pixelBuffer forKey:index];
-    block();
-  });
-}
-
-- (BOOL)objectForKey:(NSInteger)index pixelBuffer:(CVPixelBufferRef)pixelBuffer {
-  NSData* compressData = [self readObjectForKey:index];
-  if (compressData) {
-    CVPixelBufferLockBaseAddress(pixelBuffer, 0);
-    uint8_t* pixelBufferData = (uint8_t*)CVPixelBufferGetBaseAddress(pixelBuffer);
-    size_t bytesPerRow = CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 0);
-    size_t height = CVPixelBufferGetHeight(pixelBuffer);
-    BOOL status = [self deCompressData:pixelBufferData
-                             dstLength:bytesPerRow * height
-                             srcBuffer:(uint8_t*)compressData.bytes
-                             srcLength:compressData.length];
-    CVPixelBufferUnlockBaseAddress(pixelBuffer, 0);
-    return status;
-  }
-  return NO;
-}
-
-- (NSUInteger)count {
+- (NSInteger)count {
   return cacheFrameCount;
 }
 
@@ -175,6 +170,7 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
   __block __typeof(self) weakSelf = self;
   dispatch_async(cacheQueue, ^{
     [weakSelf removeCaches];
+    block();
   });
 }
 
@@ -253,14 +249,17 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
   if (offsset <= 0) {
     return nil;
   }
-  uint8_t* dataBytes = (uint8_t*)malloc(frameRange.length);
-  memset(dataBytes, 0, frameRange.length);
-  ssize_t dataSize = read(_fd, dataBytes, frameRange.length);
+  uint8_t* buffer = [self getDecoderBuffer];
+  if (buffer == nil) {
+    return nil;
+  }
+  memset(buffer, 0, decodeLength);
+  ssize_t dataSize = read(_fd, buffer, frameRange.length);
   if (dataSize <= 0) {
     return nil;
   }
-  return [[[NSData alloc] initWithBytesNoCopy:dataBytes length:frameRange.length
-                                 freeWhenDone:YES] autorelease];
+  return [[[NSData alloc] initWithBytesNoCopy:buffer length:frameRange.length
+                                 freeWhenDone:NO] autorelease];
 }
 
 - (void)saveObject:(NSData*)object forKey:(NSInteger)index {
@@ -284,7 +283,8 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
   lseek(_fd, 2 * sizeof(int32_t), SEEK_SET);
   write(_fd, &cacheFrameCount, sizeof(int32_t));
   if (length > maxCacheFrameSize) {
-    write(_fd, &length, sizeof(int32_t));
+    maxCacheFrameSize = length;
+    write(_fd, &maxCacheFrameSize, sizeof(int32_t));
   }
 }
 
@@ -292,18 +292,18 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
   if (!rgbaData || length <= 0) {
     return nil;
   }
-  uint8_t* dstBuffer = (uint8_t*)malloc(length);
-  memset(dstBuffer, 0, length);
-  memset(scratchEncodeBuffer, 0, scratchEncodeLength);
-  size_t resultSize = compression_encode_buffer(dstBuffer, length, rgbaData, length,
-                                                scratchEncodeBuffer, COMPRESSION_LZ4);
+  uint8_t* buffer = [self getEncodeBuffer];
+  if (buffer == nil) {
+    return nil;
+  }
+  memset(buffer, 0, encodeLength);
+  memset([self getScratchEncodeBuffer], 0, scratchEncodeLength);
+  size_t resultSize = compression_encode_buffer(buffer, length, rgbaData, length,
+                                                [self getScratchEncodeBuffer], COMPRESSION_LZ4);
   NSData* compressData = nil;
   if (resultSize > 0) {
-    compressData = [NSData dataWithBytesNoCopy:dstBuffer length:resultSize freeWhenDone:YES];
-  } else {
-    free(dstBuffer);
+    compressData = [NSData dataWithBytesNoCopy:buffer length:resultSize freeWhenDone:NO];
   }
-
   return compressData;
 }
 
@@ -315,13 +315,44 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
     return NO;
   }
   memset(dstBuffer, 0, dstLength);
-  memset(scratchDecodeBuffer, 0, scratchDecodeLength);
+  memset([self getScratchDecodeBuffer], 0, scratchDecodeLength);
   ssize_t resultLength = compression_decode_buffer(dstBuffer, dstLength, srcBuffer, srcLength,
-                                                   scratchDecodeBuffer, COMPRESSION_LZ4);
+                                                   [self getScratchDecodeBuffer], COMPRESSION_LZ4);
   if (resultLength > 0) {
     return YES;
   }
   return NO;
+}
+
+- (void*)getScratchEncodeBuffer {
+  if (scratchEncodeBuffer == nil) {
+    scratchEncodeBuffer = (void*)malloc(scratchEncodeLength);
+  }
+  return scratchEncodeBuffer;
+}
+
+- (void*)getScratchDecodeBuffer {
+  if (scratchDecodeBuffer == nil) {
+    scratchDecodeBuffer = (void*)malloc(scratchDecodeLength);
+  }
+  return scratchDecodeBuffer;
+}
+
+- (uint8_t*)getEncodeBuffer {
+  if (encodeBuffer == nil && encodeLength > 0) {
+    encodeBuffer = (uint8_t*)malloc(encodeLength);
+  }
+  return encodeBuffer;
+}
+
+- (uint8_t*)getDecoderBuffer {
+  if (decodeBuffer == nil) {
+    if ([self count] == numFrames) {
+      decodeLength = [self maxFrameSize];
+    }
+    decodeBuffer = (uint8_t*)malloc(decodeLength);
+  }
+  return decodeBuffer;
 }
 
 @end
