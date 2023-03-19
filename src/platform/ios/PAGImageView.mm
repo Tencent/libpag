@@ -391,6 +391,7 @@ static NSString* RemovePathVariableComponent(NSString* original) {
     status = [diskCache objectForKey:frameIndex pixelBuffer:cvPixelBuffer];
     if (!status) {
       [flushLock unlock];
+      [self release];
       return status;
     }
     UIImage* image = [self imageFromCVPixeBuffer:cvPixelBuffer];
@@ -404,6 +405,7 @@ static NSString* RemovePathVariableComponent(NSString* original) {
       status = [[self getPAGDecoder] copyFrameTo:cvPixelBuffer at:frameIndex];
       if (!status) {
         [flushLock unlock];
+        [self release];
         return status;
       }
       UIImage* image = [self imageFromCVPixeBuffer:cvPixelBuffer];
