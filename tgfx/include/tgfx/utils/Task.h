@@ -22,7 +22,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
-#include "TaskQueue.h"
+#include "tgfx/utils/TaskQueue.h"
 
 namespace tgfx {
 class TaskGroup;
@@ -47,9 +47,19 @@ class Task {
   static std::shared_ptr<Task> Run(std::shared_ptr<TaskQueue> queue, std::function<void()> block);
 
   /**
-   * Returns true if the Task is executing its code block.
+   * Returns true if the Task is currently executing its code block.
    */
-  bool isRunning();
+  bool executing();
+
+  /**
+   * Returns true if the Task has been cancelled
+   */
+  bool cancelled();
+
+  /**
+   * Returns true if the Task has finished executing its code block.
+   */
+  bool finished();
 
   /**
    * Advises the Task that it should stop executing its code block. Cancellation does not affect the
@@ -66,7 +76,8 @@ class Task {
  private:
   std::mutex locker = {};
   std::condition_variable condition = {};
-  bool running = true;
+  bool _executing = true;
+  bool _cancelled = false;
   std::weak_ptr<TaskQueue> queue;
   std::function<void()> block = nullptr;
 

@@ -20,6 +20,7 @@
 
 #include "tgfx/utils/Task.h"
 #include "TaskGroup.h"
+#include "utils/TaskGroup.h"
 
 namespace tgfx {
 std::shared_ptr<Task> Task::Run(std::function<void()> block) {
@@ -47,14 +48,24 @@ std::shared_ptr<Task> Task::Run(std::shared_ptr<TaskQueue> queue, std::function<
 Task::Task(std::function<void()> block) : block(std::move(block)) {
 }
 
-bool Task::isRunning() {
+bool Task::executing() {
   std::lock_guard<std::mutex> autoLock(locker);
-  return running;
+  return _executing;
+}
+
+bool Task::cancelled() {
+  std::lock_guard<std::mutex> autoLock(locker);
+  return _cancelled;
+}
+
+bool Task::finished() {
+  std::lock_guard<std::mutex> autoLock(locker);
+  return !_executing && !_cancelled;
 }
 
 void Task::wait() {
   std::unique_lock<std::mutex> autoLock(locker);
-  if (!running) {
+  if (!_executing) {
     return;
   }
   condition.wait(autoLock);
@@ -62,17 +73,19 @@ void Task::wait() {
 
 void Task::cancel() {
   std::unique_lock<std::mutex> autoLock(locker);
-  if (!running) {
+  if (!_executing) {
     return;
   }
   auto taskQueue = queue.lock();
   if (taskQueue != nullptr) {
     if (taskQueue->removeTask(this)) {
-      running = false;
+      _executing = false;
+      _cancelled = true;
     }
   } else {
     if (TaskGroup::GetInstance()->removeTask(this)) {
-      running = false;
+      _executing = false;
+      _cancelled = true;
     }
   }
 }
@@ -80,7 +93,7 @@ void Task::cancel() {
 void Task::execute() {
   block();
   std::lock_guard<std::mutex> auoLock(locker);
-  running = false;
+  _executing = false;
   condition.notify_all();
 }
 }  // namespace tgfx

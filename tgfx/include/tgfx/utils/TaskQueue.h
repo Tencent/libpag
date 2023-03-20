@@ -35,7 +35,7 @@ class TaskQueue {
    * Creates a new TaskQueue to which you can submit code blocks.
    * @param name  A string label to attach to the queue to uniquely identify it.
    */
-  std::shared_ptr<TaskQueue> Make(const std::string& name);
+  static std::shared_ptr<TaskQueue> Make(const std::string& name);
 
   /**
    * Returns the string label to attach to the queue to uniquely identify it.
