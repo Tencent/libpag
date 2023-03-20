@@ -59,7 +59,6 @@ std::shared_ptr<ImageCache> ImageCache::Make(const std::string& path, int width,
   auto cache = std::make_shared<ImageCache>();
   cache->headerBuffer = headerBuffer;
   cache->fd = fd;
-  cache->mutex = std::make_shared<std::mutex>();
   cache->frameCount = frameCount;
   return cache;
 }
@@ -71,9 +70,7 @@ bool ImageCache::flushSave() {
   // From the memory saving point of view, locking is needed here.
   // But from a performance point of view, a copy is needed here.
   // Choose performance first for now
-  mutex->lock();
   if (pendingSaveBuffer == nullptr || pendingSaveBufferSize <= 0 || pendingSaveFrame < 0) {
-    mutex->unlock();
     return true;
   }
   auto byteCount = pendingSaveBufferSize;
@@ -86,7 +83,6 @@ bool ImageCache::flushSave() {
   auto compressSize = LZ4_compress_default((const char*)(pendingSaveBuffer), (char*)compressBuffer,
                                            byteCount, bound);
   pendingSaveFrame = -1;
-  mutex->unlock();
   lseek(fd, 0, SEEK_END);
   struct stat statbuf;
   fstat(fd, &statbuf);
@@ -116,7 +112,6 @@ bool ImageCache::putPixelsToSaveBuffer(int frame, void* bitmapPixels, int byteCo
   if (bitmapPixels == nullptr || byteCount <= 0 || frame < 0 | frame >= frameCount) {
     return false;
   }
-  mutex->lock();
   if (pendingSaveBufferSize != byteCount) {
     if (pendingSaveBuffer != nullptr) {
       delete[] static_cast<char*>(pendingSaveBuffer);
@@ -126,7 +121,6 @@ bool ImageCache::putPixelsToSaveBuffer(int frame, void* bitmapPixels, int byteCo
   }
   memcpy(pendingSaveBuffer, bitmapPixels, pendingSaveBufferSize);
   pendingSaveFrame = frame;
-  mutex->unlock();
   return true;
 }
 
@@ -211,6 +205,8 @@ void ImageCache::releaseSaveBuffer() {
   if (pendingSaveBuffer != nullptr) {
     delete[] static_cast<char*>(pendingSaveBuffer);
     pendingSaveBuffer = nullptr;
+    pendingSaveBufferSize = 0;
+    pendingSaveFrame = -1;
   }
 }
 

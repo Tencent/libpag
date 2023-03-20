@@ -35,7 +35,6 @@ class ImageCache {
   void release();
 
  private:
-  std::shared_ptr<std::mutex> mutex = nullptr;
   void* compressBuffer = nullptr;
   void* deCompressBuffer = nullptr;
   int deCompressBufferSize = 0;

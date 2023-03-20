@@ -228,6 +228,7 @@ public class PAGImageView extends View {
         _composition = newComposition;
         progressExplicitlySet = true;
         releaseAllTask();
+        _matrix = null;
         refreshDecodeInfo();
         renderBitmap = null;
     }
@@ -254,6 +255,7 @@ public class PAGImageView extends View {
         _maxFrameRate = maxFrameRate;
         progressExplicitlySet = true;
         releaseAllTask();
+        _matrix = null;
         refreshDecodeInfo();
         renderBitmap = null;
         return true;
@@ -511,10 +513,11 @@ public class PAGImageView extends View {
     private void initDecoderInfo() {
         if (!decoderInfo.isValid()) {
             if (decoderInfo.initDecoder(getContext(), _composition, _pagFilePath, width, height, _maxFrameRate)) {
-                refreshMatrixFromScaleMode();
                 animator.setDuration(decoderInfo.duration / 1000);
                 PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_INIT_CACHE, this);
             }
+        } else {
+            refreshMatrixFromScaleMode();
         }
     }
 
@@ -747,6 +750,7 @@ public class PAGImageView extends View {
         if (cacheItem == null || lastKeyItem == null || TextUtils.isEmpty(lastKeyItem.keyPrefix) || decoderInfo._pagDecoder == null) {
             return;
         }
+        cacheItem.writeLock();
         if (bitmapCache.size() == decoderInfo.numFrames || cacheItem.isAllCached()) {
             decoderInfo.release();
             cacheItem.releaseSaveBuffer();
@@ -754,6 +758,7 @@ public class PAGImageView extends View {
                 cacheItem.release();
             }
         }
+        cacheItem.writeUnlock();
     }
 
     private void releaseCurrentDiskCache() {
