@@ -51,7 +51,7 @@ Transform* TransformCache::createCache(Frame layerFrame) {
   }
   RenderTransform(transform, layer->transform, layerFrame);
   auto parent = layer->parent;
-  while (parent != nullptr) {
+  while (parent != nullptr && parent->transform != nullptr) {
     Transform parentTransform = {};
     RenderTransform(&parentTransform, parent->transform, layerFrame);
     transform->matrix.postConcat(parentTransform.matrix);
