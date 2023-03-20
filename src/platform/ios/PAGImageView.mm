@@ -252,17 +252,6 @@ static NSString* RemovePathVariableComponent(NSString* original) {
   }
   cacheKey = [cacheKey
       stringByAppendingFormat:@"_%ld_%f_%f", contentVersion, self.frameRate, self.scaleFactor];
-
-  if ([pagComposition isMemberOfClass:[PAGFile class]] &&
-      [PAGContentVersion Get:pagComposition] == 0) {
-    cacheKey = [(PAGFile*)pagComposition path];
-    cacheKey = RemovePathVariableComponent(cacheKey);
-  } else {
-    cacheKey = [NSString stringWithFormat:@"%@", pagComposition];
-  }
-  cacheKey =
-      [cacheKey stringByAppendingFormat:@"_%ld_%f_%f", [PAGContentVersion Get:pagComposition],
-                                        self.frameRate, self.scaleFactor];
   return NSStringMD5(cacheKey);
 }
 
