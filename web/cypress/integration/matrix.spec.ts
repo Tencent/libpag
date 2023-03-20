@@ -18,18 +18,8 @@ describe('Matrix', () => {
   });
 
   it('Make from all', () => {
-    const matrix = PAG.Matrix.makeAll(1, 0, 0, 0, 1, 0, 0, 0, 1);
-    expect([
-      matrix.a,
-      matrix.b,
-      matrix.c,
-      matrix.d,
-      matrix.tx,
-      matrix.ty,
-      matrix.get(PAGTypes.MatrixIndex.pers0),
-      matrix.get(PAGTypes.MatrixIndex.pers1),
-      matrix.get(PAGTypes.MatrixIndex.pers2),
-    ]).to.be.eql([1, 0, 0, 1, 0, 0, 0, 0, 1]);
+    const matrix = PAG.Matrix.makeAll(1, 0, 0, 0, 1, 0);
+    expect([matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx, matrix.ty]).to.be.eql([1, 0, 0, 1, 0, 0]);
   });
 
   it('Make from scale', () => {
@@ -60,18 +50,8 @@ describe('Matrix', () => {
 
   it('Set all', () => {
     const matrix = PAG.Matrix.makeAll(1, 0, 0, 0, 1, 0);
-    matrix.setAll(2, 1, 3, 1, 2, 3, 4, 4, 4);
-    expect([
-      matrix.a,
-      matrix.b,
-      matrix.c,
-      matrix.d,
-      matrix.tx,
-      matrix.ty,
-      matrix.get(PAGTypes.MatrixIndex.pers0),
-      matrix.get(PAGTypes.MatrixIndex.pers1),
-      matrix.get(PAGTypes.MatrixIndex.pers2),
-    ]).to.be.eql([2, 1, 1, 2, 3, 3, 4, 4, 4]);
+    matrix.setAll(2, 1, 3, 1, 2, 3);
+    expect([matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx, matrix.ty]).to.be.eql([2, 1, 1, 2, 3, 3]);
   });
 
   it('Set affine', () => {
