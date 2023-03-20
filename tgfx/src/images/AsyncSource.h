@@ -19,7 +19,6 @@
 #pragma once
 
 #include "EncodedSource.h"
-#include "utils/Task.h"
 
 namespace tgfx {
 /**
