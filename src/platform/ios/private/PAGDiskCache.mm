@@ -36,7 +36,7 @@
   int _fd;
   NSInteger numFrames;
   int32_t cacheFrameCount;
-  int32_t maxCacheFrameSize;
+  int32_t maxCacheEncodedBufferSize;
   void* scratchEncodeBuffer;
   NSInteger scratchEncodeLength;
   void* scratchDecodeBuffer;
@@ -162,8 +162,8 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
   return cacheFrameCount;
 }
 
-- (NSInteger)maxFrameSize {
-  return maxCacheFrameSize;
+- (NSInteger)maxEncodedBufferSize {
+  return maxCacheEncodedBufferSize;
 }
 
 - (void)removeCachesWithBlock:(void (^_Nullable)(void))block {
@@ -197,11 +197,11 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
       write(self->_fd, &zero, sizeof(int32_t));
     }
     self->cacheFrameCount = 0;
-    self->maxCacheFrameSize = 0;
+    self->maxCacheEncodedBufferSize = 0;
   } else {
     lseek(self->_fd, 2 * sizeof(int32_t), SEEK_SET);
     read(self->_fd, &self->cacheFrameCount, sizeof(int32_t));
-    read(self->_fd, &self->maxCacheFrameSize, sizeof(int32_t));
+    read(self->_fd, &self->maxCacheEncodedBufferSize, sizeof(int32_t));
   }
 }
 
@@ -253,7 +253,6 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
   if (buffer == nil) {
     return nil;
   }
-  memset(buffer, 0, decodeLength);
   ssize_t dataSize = read(_fd, buffer, frameRange.length);
   if (dataSize <= 0) {
     return nil;
@@ -282,9 +281,9 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
   cacheFrameCount++;
   lseek(_fd, 2 * sizeof(int32_t), SEEK_SET);
   write(_fd, &cacheFrameCount, sizeof(int32_t));
-  if (length > maxCacheFrameSize) {
-    maxCacheFrameSize = length;
-    write(_fd, &maxCacheFrameSize, sizeof(int32_t));
+  if (length > maxCacheEncodedBufferSize) {
+    maxCacheEncodedBufferSize = length;
+    write(_fd, &maxCacheEncodedBufferSize, sizeof(int32_t));
   }
 }
 
@@ -296,8 +295,6 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
   if (buffer == nil) {
     return nil;
   }
-  memset(buffer, 0, encodeLength);
-  memset([self getScratchEncodeBuffer], 0, scratchEncodeLength);
   size_t resultSize = compression_encode_buffer(buffer, length, rgbaData, length,
                                                 [self getScratchEncodeBuffer], COMPRESSION_LZ4);
   NSData* compressData = nil;
@@ -314,8 +311,6 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
   if (dstLength <= 0) {
     return NO;
   }
-  memset(dstBuffer, 0, dstLength);
-  memset([self getScratchDecodeBuffer], 0, scratchDecodeLength);
   ssize_t resultLength = compression_decode_buffer(dstBuffer, dstLength, srcBuffer, srcLength,
                                                    [self getScratchDecodeBuffer], COMPRESSION_LZ4);
   if (resultLength > 0) {
@@ -348,7 +343,7 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
 - (uint8_t*)getDecoderBuffer {
   if (decodeBuffer == nil) {
     if ([self count] == numFrames) {
-      decodeLength = [self maxFrameSize];
+      decodeLength = [self maxEncodedBufferSize];
     }
     decodeBuffer = (uint8_t*)malloc(decodeLength);
   }

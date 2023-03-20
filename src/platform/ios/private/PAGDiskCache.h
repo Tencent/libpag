@@ -34,7 +34,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (NSString*)path;
 
-- (NSInteger)maxFrameSize;
+- (NSInteger)maxEncodedBufferSize;
 
 - (void)removeCachesWithBlock:(void (^_Nullable)(void))block;
 
