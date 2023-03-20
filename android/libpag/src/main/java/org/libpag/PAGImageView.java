@@ -69,11 +69,11 @@ public class PAGImageView extends View {
     private Matrix _matrix;
     private ArrayList<WeakReference<Future>> saveCacheTasks = new ArrayList<>();
     private float renderScale = 1.0f;
-    protected CacheManager.CacheItem cacheItem;
-    protected KeyItem lastKeyItem;
-    protected DecoderInfo decoderInfo = new DecoderInfo();
-    protected CacheManager cacheManager;
-    private Bitmap renderBitmap;
+    protected volatile CacheManager.CacheItem cacheItem;
+    protected volatile KeyItem lastKeyItem;
+    protected volatile DecoderInfo decoderInfo = new DecoderInfo();
+    protected volatile CacheManager cacheManager;
+    private volatile Bitmap renderBitmap;
     private ConcurrentHashMap<Integer, Bitmap> bitmapCache = new ConcurrentHashMap<>();
     protected static long g_MaxDiskCacheSize = 1 * 1024 * 1024 * 1024;
 
