@@ -18,36 +18,46 @@
 
 #pragma once
 
-#include "tgfx/core/ImageGenerator.h"
-#include "tgfx/utils/Task.h"
+#include <list>
+#include <memory>
+#include <mutex>
+#include <string>
 
 namespace tgfx {
+class Task;
+
 /**
- * ImageGeneratorTask wraps an ImageGenerator and schedules an asynchronous decoding task
- * immediately.
+ * TaskQueue is a FIFO queue that manages the execution of tasks serially on an asynchronous thread.
  */
-class ImageGeneratorTask {
+class TaskQueue {
  public:
-  static std::shared_ptr<ImageGeneratorTask> MakeFrom(std::shared_ptr<ImageGenerator> generator,
-                                                      bool tryHardware = true);
+  /**
+   * Creates a new TaskQueue to which you can submit code blocks.
+   * @param name  A string label to attach to the queue to uniquely identify it.
+   */
+  static std::shared_ptr<TaskQueue> Make(const std::string& name);
 
-  ~ImageGeneratorTask();
-
-  int imageWidth() const {
-    return imageGenerator->width();
+  /**
+   * Returns the string label to attach to the queue to uniquely identify it.
+   */
+  std::string name() const {
+    return _name;
   }
-
-  int imageHeight() const {
-    return imageGenerator->height();
-  }
-
-  std::shared_ptr<ImageBuffer> getBuffer() const;
 
  private:
-  std::shared_ptr<Task> task = nullptr;
-  std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
-  std::shared_ptr<ImageGenerator> imageGenerator = nullptr;
+  std::mutex locker = {};
+  std::string _name;
+  std::weak_ptr<TaskQueue> weakThis;
+  std::shared_ptr<Task> runningTask = nullptr;
+  std::list<std::shared_ptr<Task>> tasks = {};
 
-  ImageGeneratorTask(std::shared_ptr<ImageGenerator> generator, bool tryHardware);
+  explicit TaskQueue(const std::string& name);
+  bool pushTask(std::shared_ptr<Task> task);
+  std::shared_ptr<Task> popTask();
+  bool removeTask(Task* task);
+  void execute();
+
+  friend class Task;
+  friend class TaskGroup;
 };
 }  // namespace tgfx

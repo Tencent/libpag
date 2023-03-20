@@ -28,7 +28,7 @@
 #include "nlohmann/json.hpp"
 #include "rendering/caches/RenderCache.h"
 #include "tgfx/core/Clock.h"
-#include "utils/Task.h"
+#include "tgfx/utils/Task.h"
 
 namespace pag {
 using namespace tgfx;
@@ -43,33 +43,6 @@ struct RenderCost {
   int64_t readPixelsCost = 0;
   int64_t compareCost = 0;
   std::string performance;
-};
-
-class CompareFrameTask : public Executor {
- public:
-  CompareFrameTask(const std::string& fileName, Frame currentFrame, const Bitmap& bitmap)
-      : fileName(fileName), _currentFrame(currentFrame), bitmap(std::move(bitmap)) {
-  }
-
-  Frame currentFrame() const {
-    return _currentFrame;
-  }
-
-  bool isSuccess() {
-    return success;
-  }
-
- private:
-  const std::string fileName = "";
-  Frame _currentFrame = 0;
-  Bitmap bitmap = {};
-  bool success = false;
-
-  void execute() override {
-
-    success = Baseline::Compare(bitmap,
-                                "PAGCompareFrameTest/" + fileName + "/" + ToString(_currentFrame));
-  }
 };
 
 static void CompareFileFrames(Semaphore* semaphore, std::string pagPath) {
@@ -103,7 +76,8 @@ static void CompareFileFrames(Semaphore* semaphore, std::string pagPath) {
 
   Bitmap currentSnapshot = {};
   std::shared_ptr<Task> lastTask = nullptr;
-  std::unique_ptr<CompareFrameTask> lastExecutor = nullptr;
+  Frame lastFrame = 0;
+  bool lastResult = false;
 
   auto CompareFrame = [&](Frame currentFrame) {
     if (lastTask == nullptr) {
@@ -112,16 +86,15 @@ static void CompareFileFrames(Semaphore* semaphore, std::string pagPath) {
     Clock clock = {};
     lastTask->wait();
     auto compareCost = clock.measure();
-    if (currentFrame == lastExecutor->currentFrame()) {
+    if (currentFrame == lastFrame) {
       auto& cost = performanceMap[currentFrame];
       cost.compareCost = compareCost;
       cost.totalTime += compareCost;
     }
-    if (!lastExecutor->isSuccess()) {
+    if (!lastResult) {
       errorMsg += (std::to_string(currentFrame) + ";");
     }
     lastTask = nullptr;
-    lastExecutor = nullptr;
   };
 
   while (currentFrame < totalFrames) {
@@ -138,9 +111,12 @@ static void CompareFileFrames(Semaphore* semaphore, std::string pagPath) {
     }
     CompareFrame(currentFrame - 1);
     if (changed) {
-      lastExecutor = std::make_unique<CompareFrameTask>(fileName, currentFrame, currentSnapshot);
-      lastTask = Task::Make(lastExecutor.get());
-      lastTask->run();
+      lastFrame = currentFrame;
+      lastResult = false;
+      lastTask = Task::Run([=, &lastResult] {
+        lastResult = Baseline::Compare(
+            currentSnapshot, "PAGCompareFrameTest/" + fileName + "/" + ToString(currentFrame));
+      });
     }
     pagPlayer->nextFrame();
     currentFrame++;

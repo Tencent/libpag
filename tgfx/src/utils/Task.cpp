@@ -18,60 +18,54 @@
 
 #ifndef TGFX_BUILD_FOR_WEB
 
-#include "Task.h"
-#include <algorithm>
-#include "utils/Log.h"
-
-#ifdef __APPLE__
-#include <sys/sysctl.h>
-#endif
+#include "tgfx/utils/Task.h"
+#include "TaskGroup.h"
+#include "utils/TaskGroup.h"
 
 namespace tgfx {
-static constexpr auto THREAD_TIMEOUT = std::chrono::seconds(10);
-
-int GetCPUCores() {
-  int cpuCores = 0;
-#ifdef __APPLE__
-  size_t len = sizeof(cpuCores);
-  // We can get the exact number of physical CPUs on apple platforms.
-  sysctlbyname("hw.physicalcpu", &cpuCores, &len, nullptr, 0);
-#else
-  cpuCores = static_cast<int>(std::thread::hardware_concurrency());
-#endif
-  if (cpuCores <= 0) {
-    cpuCores = 8;
+std::shared_ptr<Task> Task::Run(std::function<void()> block) {
+  if (block == nullptr) {
+    return nullptr;
   }
-  return cpuCores;
-}
-
-std::shared_ptr<Task> Task::Make(Executor* executor) {
-  return std::shared_ptr<Task>(new Task(executor));
-}
-
-Task::Task(Executor* executor) : executor(executor) {
-}
-
-Task::~Task() {
-  cancel();
-}
-
-void Task::run() {
-  std::lock_guard<std::mutex> autoLock(locker);
-  if (running) {
-    return;
+  auto task = std::shared_ptr<Task>(new Task(std::move(block)));
+  if (!TaskGroup::GetInstance()->pushTask(task)) {
+    task->execute();
   }
-  running = true;
-  TaskGroup::GetInstance()->pushTask(this);
+  return task;
 }
 
-bool Task::isRunning() {
+std::shared_ptr<Task> Task::Run(std::shared_ptr<TaskQueue> queue, std::function<void()> block) {
+  if (queue == nullptr || block == nullptr) {
+    return nullptr;
+  }
+  auto task = std::shared_ptr<Task>(new Task(std::move(block)));
+  if (!queue->pushTask(task)) {
+    task->execute();
+  }
+  return task;
+}
+
+Task::Task(std::function<void()> block) : block(std::move(block)) {
+}
+
+bool Task::executing() {
   std::lock_guard<std::mutex> autoLock(locker);
-  return running;
+  return _executing;
+}
+
+bool Task::cancelled() {
+  std::lock_guard<std::mutex> autoLock(locker);
+  return _cancelled;
+}
+
+bool Task::finished() {
+  std::lock_guard<std::mutex> autoLock(locker);
+  return !_executing && !_cancelled;
 }
 
 void Task::wait() {
   std::unique_lock<std::mutex> autoLock(locker);
-  if (!running) {
+  if (!_executing) {
     return;
   }
   condition.wait(autoLock);
@@ -79,130 +73,27 @@ void Task::wait() {
 
 void Task::cancel() {
   std::unique_lock<std::mutex> autoLock(locker);
-  if (!running) {
+  if (!_executing) {
     return;
   }
-  if (TaskGroup::GetInstance()->removeTask(this)) {
-    running = false;
-    return;
+  auto taskQueue = queue.lock();
+  if (taskQueue != nullptr) {
+    if (taskQueue->removeTask(this)) {
+      _executing = false;
+      _cancelled = true;
+    }
+  } else {
+    if (TaskGroup::GetInstance()->removeTask(this)) {
+      _executing = false;
+      _cancelled = true;
+    }
   }
-  condition.wait(autoLock);
 }
 
 void Task::execute() {
-  executor->execute();
+  block();
   std::lock_guard<std::mutex> auoLock(locker);
-  running = false;
-  condition.notify_all();
-}
-
-TaskGroup* TaskGroup::GetInstance() {
-  static TaskGroup taskGroup = {};
-  return &taskGroup;
-}
-
-void TaskGroup::RunLoop(TaskGroup* taskGroup) {
-  while (true) {
-    auto task = taskGroup->popTask();
-    if (!task) {
-      break;
-    }
-    task->execute();
-  }
-}
-
-static void ReleaseThread(std::thread* thread) {
-  if (thread->joinable()) {
-    thread->join();
-  }
-  delete thread;
-}
-
-TaskGroup::~TaskGroup() {
-  exit();
-  for (auto& thread : threads) {
-    ReleaseThread(thread);
-  }
-  threads.clear();
-}
-
-bool TaskGroup::checkThreads() {
-  static const int CPUCores = GetCPUCores();
-  static const int MaxThreads = CPUCores > 16 ? 16 : CPUCores;
-  while (!timeoutThreads.empty()) {
-    auto threadID = timeoutThreads.back();
-    timeoutThreads.pop_back();
-    int index = 0;
-    for (auto& thread : threads) {
-      if (thread->get_id() == threadID) {
-        ReleaseThread(thread);
-        threads.erase(threads.begin() + index);
-        break;
-      }
-      index++;
-    }
-  }
-  auto totalThreads = static_cast<int>(threads.size());
-  if (activeThreads < totalThreads || totalThreads >= MaxThreads) {
-    return true;
-  }
-  auto thread = new (std::nothrow) std::thread(&TaskGroup::RunLoop, this);
-  if (thread) {
-    activeThreads++;
-    threads.push_back(thread);
-    //    LOGI("TaskGroup: A task thread is created, the current number of threads : %lld",
-    //         threads.size());
-  }
-  return !threads.empty();
-}
-
-void TaskGroup::pushTask(Task* task) {
-  std::lock_guard<std::mutex> autoLock(locker);
-  if (checkThreads()) {
-    tasks.push_back(task);
-    condition.notify_one();
-  } else {
-    task->execute();
-  }
-}
-
-Task* TaskGroup::popTask() {
-  std::unique_lock<std::mutex> autoLock(locker);
-  activeThreads--;
-  while (true) {
-    if (tasks.empty()) {
-      condition.wait_for(autoLock, THREAD_TIMEOUT);
-      if (exited || tasks.empty()) {
-        auto threadID = std::this_thread::get_id();
-        timeoutThreads.push_back(threadID);
-        //        LOGI("TaskGroup: A task thread is exited, the current number of threads : %lld",
-        //             threads.size() - expiredThreads.size());
-        return nullptr;
-      }
-    } else {
-      auto task = tasks.front();
-      tasks.pop_front();
-      activeThreads++;
-      //      LOGI("TaskGroup: A task is running, the current active threads : %lld",
-      //      activeThreads);
-      return task;
-    }
-  }
-}
-
-bool TaskGroup::removeTask(Task* task) {
-  std::lock_guard<std::mutex> autoLock(locker);
-  auto position = std::find(tasks.begin(), tasks.end(), task);
-  if (position == tasks.end()) {
-    return false;
-  }
-  tasks.erase(position);
-  return true;
-}
-
-void TaskGroup::exit() {
-  std::lock_guard<std::mutex> autoLock(locker);
-  exited = true;
+  _executing = false;
   condition.notify_all();
 }
 }  // namespace tgfx

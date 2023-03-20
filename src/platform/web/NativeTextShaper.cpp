@@ -19,7 +19,7 @@
 #include "NativeTextShaper.h"
 #include "UnicodeEmojiTable.hh"
 #include "rendering/FontManager.h"
-#include "tgfx/core/UTF.h"
+#include "tgfx/utils/UTF.h"
 
 namespace pag {
 template <typename T>
