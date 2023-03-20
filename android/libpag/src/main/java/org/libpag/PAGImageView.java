@@ -21,9 +21,7 @@ package org.libpag;
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.ValueAnimator;
-import android.content.ComponentCallbacks2;
 import android.content.Context;
-import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Matrix;
@@ -35,8 +33,6 @@ import android.util.AttributeSet;
 import android.util.Log;
 import android.view.View;
 import android.view.animation.LinearInterpolator;
-
-import org.extra.tools.Lifecycle;
 
 import java.io.File;
 import java.lang.ref.WeakReference;
@@ -525,7 +521,6 @@ public class PAGImageView extends View {
 
     private void init() {
         InitCacheExecutors();
-        Lifecycle.getInstance().addListener(this);
         cacheManager = CacheManager.Get(getContext());
         animator = ValueAnimator.ofFloat(0.0f, 1.0f);
         animator.setRepeatCount(0);

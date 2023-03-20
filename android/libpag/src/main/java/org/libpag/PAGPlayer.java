@@ -183,7 +183,7 @@ public class PAGPlayer {
      * the passed sync object, and the client will still own the sync object.
      * Usually called before {@link #flush()} and @{@link #flushAndFenceSync(long[])}
      *
-     * @returns true if GPU is waiting on sync object
+     * Returns true if GPU is waiting on sync object
      */
     public native boolean waitSync(long sync);
 

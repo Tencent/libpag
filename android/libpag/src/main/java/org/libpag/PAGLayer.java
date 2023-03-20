@@ -130,7 +130,7 @@ public class PAGLayer {
 
     /**
      * The current time of the layer in microseconds, the layer is invisible if currentTime is not in the visible range
-     * (startTime <= currentTime < startTime + duration).
+     * {@code (startTime <= currentTime < startTime + duration)}.
      */
     public native long currentTime();
 
