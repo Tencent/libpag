@@ -53,68 +53,68 @@ class CacheManager {
             return cacheItem;
         }
 
-        public ImageCache pagCache() {
+        protected ImageCache pagCache() {
             return _pagImageCache;
         }
 
-        public boolean saveBitmap(int frame, Bitmap bitmap) {
+        protected boolean saveBitmap(int frame, Bitmap bitmap) {
             writeLock();
             boolean success = _pagImageCache.saveBitmap(frame, bitmap);
             writeUnlock();
             return success;
         }
 
-        public boolean flushSave() {
+        protected boolean flushSave() {
             writeLock();
             boolean success = _pagImageCache.flushSave();
             writeUnlock();
             return success;
         }
 
-        public boolean inflateBitmap(int frame, Bitmap bitmap) {
+        protected boolean inflateBitmap(int frame, Bitmap bitmap) {
             readLock();
             boolean success = _pagImageCache.inflateBitmap(frame, bitmap);
             readUnlock();
             return success;
         }
 
-        public boolean isCached(int frame) {
+        protected boolean isCached(int frame) {
             readLock();
             boolean inCache = _pagImageCache.isCached(frame);
             readUnlock();
             return inCache;
         }
 
-        public boolean isAllCached() {
+        protected boolean isAllCached() {
             readLock();
             boolean allCached = _pagImageCache.isAllCached();
             readUnlock();
             return allCached;
         }
 
-        public void releaseSaveBuffer() {
+        protected void releaseSaveBuffer() {
             writeLock();
             _pagImageCache.releaseSaveBuffer();
             writeUnlock();
         }
 
-        public void readLock() {
+        protected void readLock() {
             lock.readLock().lock();
         }
 
-        public void readUnlock() {
+        protected void readUnlock() {
             lock.readLock().unlock();
         }
 
-        public void writeLock() {
+        protected void writeLock() {
             lock.writeLock().lock();
         }
 
-        public void writeUnlock() {
+        protected void writeUnlock() {
             lock.writeLock().unlock();
         }
 
-        public void release() {
+        protected void release() {
             _pagImageCache.release();
         }
     }
@@ -312,10 +312,10 @@ class CacheManager {
     }
 
     private static class FilePair implements Comparable {
-        public long t;
-        public File f;
+        protected long t;
+        protected File f;
 
-        public FilePair(File file) {
+        protected FilePair(File file) {
             f = file;
             t = file.lastModified();
         }

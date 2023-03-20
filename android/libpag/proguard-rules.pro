@@ -28,19 +28,24 @@
     *;
 }
 
--keepclasseswithmembers class * {
+-keepclasseswithmembers class ** {
     native <methods>;
 }
 
--keep public class org.libpag.* {
+-keepclasseswithmembers public class org.libpag.** {
     public <methods>;
+}
+
+-keepclasseswithmembers public class org.libpag.** {
     public <fields>;
 }
 
--keep class org.libpag.* {
+-keepclasseswithmembers class org.libpag.** {
     long nativeContext;
+}
+
+-keepclasseswithmembers class org.libpag.** {
     long nativeSurface;
-    void finalize();
 }
 
 -keepclasseswithmembers class org.libpag.PAGFont {
