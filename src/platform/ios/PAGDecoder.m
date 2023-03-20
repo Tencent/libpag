@@ -23,18 +23,55 @@
 #import "PAGPlayer.h"
 #import "PAGSurface.h"
 
+@interface PAGDecoder ()
+@property(atomic, assign) NSInteger frames;
+@end
+
 @implementation PAGDecoder {
   PAGPlayer* pagPlayer;
   PAGSurface* pagSurface;
-  NSInteger numFrames;
   UIImage* lastFrameImage;
 }
 
-+ (instancetype)Make:(PAGComposition*)pagComposition {
-  return [PAGDecoder Make:pagComposition scale:1.0f];
+- (instancetype)initWithPAGComposition:(PAGComposition*)composition
+                            pagSurface:(PAGSurface*)surface
+                          maxFrameRate:(float)maxFrameRate
+                                 scale:(float)scale {
+  self = [super init];
+  if (self) {
+    pagSurface = [surface retain];
+    pagPlayer = [[PAGPlayer alloc] init];
+    [pagPlayer setComposition:composition];
+    [pagPlayer setSurface:pagSurface];
+    float frameRate = [composition frameRate];
+    if (maxFrameRate > 0 && maxFrameRate < frameRate) {
+      frameRate = maxFrameRate;
+    }
+    self.frames = [composition duration] * frameRate / 1000000;
+    lastFrameImage = nil;
+  }
+  return self;
 }
 
-+ (instancetype)Make:(PAGComposition*)pagComposition scale:(CGFloat)scale {
+- (void)dealloc {
+  if (lastFrameImage) {
+    [lastFrameImage release];
+    lastFrameImage = nil;
+  }
+  [pagSurface release];
+  [pagPlayer release];
+  [super dealloc];
+}
+
+#pragma mark - public
+
++ (instancetype)Make:(PAGComposition*)pagComposition {
+  return [PAGDecoder Make:pagComposition maxFrameRate:[pagComposition frameRate] scale:1.0];
+}
+
++ (instancetype)Make:(PAGComposition*)pagComposition
+        maxFrameRate:(float)maxFrameRate
+               scale:(float)scale {
   if (pagComposition == nil) {
     return nil;
   }
@@ -48,21 +85,27 @@
   }
 
   return [[[PAGDecoder alloc] initWithPAGComposition:pagComposition
-                                          pagSurface:pagSurface] autorelease];
+                                          pagSurface:pagSurface
+                                        maxFrameRate:maxFrameRate
+                                               scale:scale] autorelease];
 }
 
-- (instancetype)initWithPAGComposition:(PAGComposition*)composition
-                            pagSurface:(PAGSurface*)surface {
-  self = [super init];
-  if (self) {
-    pagSurface = [surface retain];
-    pagPlayer = [[PAGPlayer alloc] init];
-    [pagPlayer setComposition:composition];
-    [pagPlayer setSurface:pagSurface];
-    numFrames = [composition duration] * [composition frameRate] / 1000000;
-    lastFrameImage = nil;
+- (BOOL)copyFrameTo:(void*)pixels rowBytes:(size_t)rowBytes at:(NSInteger)index {
+  [self renderCurrentFrame:index];
+  return [pagSurface copyPixelsTo:pixels rowBytes:rowBytes];
+}
+
+- (UIImage*)frameAtIndex:(NSInteger)index {
+  BOOL result = [self renderCurrentFrame:index];
+  if (!result && lastFrameImage != nil) {
+    return nil;
   }
-  return self;
+  UIImage* image = [self imageFromCVPixelBufferRef:[pagSurface makeSnapshot]];
+  if (lastFrameImage) {
+    [lastFrameImage release];
+  }
+  lastFrameImage = [image retain];
+  return [[image retain] autorelease];
 }
 
 - (NSInteger)width {
@@ -74,10 +117,15 @@
 }
 
 - (NSInteger)numFrames {
-  return numFrames;
+  return self.frames;
 }
 
+#pragma mark - private
+
 - (UIImage*)imageFromCVPixelBufferRef:(CVPixelBufferRef)pixelBuffer {
+  if (pixelBuffer == nil) {
+    return nil;
+  }
   CGImageRef imageRef = nil;
   VTCreateCGImageFromCVPixelBuffer(pixelBuffer, nil, &imageRef);
   UIImage* uiImage = [UIImage imageWithCGImage:imageRef];
@@ -85,31 +133,14 @@
   return uiImage;
 }
 
-- (UIImage*)frameAtIndex:(NSInteger)index {
-  if (index < 0 || index >= numFrames) {
+- (BOOL)renderCurrentFrame:(NSInteger)index {
+  if (index < 0 || index >= self.frames) {
     NSLog(@"Input index is out of bounds!");
-    return nil;
+    return false;
   }
-  float progress = (index * 1.0 + 0.1) / self.numFrames;
+  float progress = (index * 1.0 + 0.1) / self.frames;
   [pagPlayer setProgress:progress];
-  BOOL result = [pagPlayer flush];
-  if (!result && lastFrameImage != nil) {
-    return lastFrameImage;
-  }
-  UIImage* image = [self imageFromCVPixelBufferRef:[pagSurface makeSnapshot]];
-  if (lastFrameImage) {
-    [lastFrameImage release];
-  }
-  lastFrameImage = [image retain];
-  return image;
-}
-
-- (void)dealloc {
-  [lastFrameImage release];
-  lastFrameImage = nil;
-  [pagSurface release];
-  [pagPlayer release];
-  [super dealloc];
+  return [pagPlayer flush];
 }
 
 @end

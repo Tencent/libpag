@@ -26,10 +26,10 @@ namespace pag {
 static NSOperationQueue* flushQueue;
 void DestoryFlushQueue() {
   NSOperationQueue* queue = flushQueue;
-  [queue release];
-  flushQueue = nil;
   [queue cancelAllOperations];
   [queue waitUntilAllOperationsAreFinished];
+  [queue release];
+  queue = nil;
 }
 }  // namespace pag
 
@@ -50,8 +50,6 @@ void DestoryFlushQueue() {
   PAGFile* pagFile;
   NSString* filePath;
   PAGValueAnimator* valueAnimator;
-  NSMutableDictionary* textReplacementMap;
-  NSMutableDictionary* imageReplacementMap;
   NSHashTable* listeners;
 }
 
@@ -62,7 +60,7 @@ void DestoryFlushQueue() {
   dispatch_once(&onceToken, ^{
     pag::flushQueue = [[[NSOperationQueue alloc] init] retain];
     pag::flushQueue.maxConcurrentOperationCount = 1;
-    pag::flushQueue.name = @"pag.art.PAGView";
+    pag::flushQueue.name = @"PAGView.art.pag";
   });
   return pag::flushQueue;
 }
@@ -86,8 +84,6 @@ void DestoryFlushQueue() {
 
 - (void)initPAG {
   listeners = [[NSHashTable weakObjectsHashTable] retain];
-  textReplacementMap = [[NSMutableDictionary dictionary] retain];
-  imageReplacementMap = [[NSMutableDictionary dictionary] retain];
   self.isPlaying = FALSE;
   self.isVisible = FALSE;
   self.isInBackground =
@@ -119,8 +115,6 @@ void DestoryFlushQueue() {
 - (void)dealloc {
   [listeners release];
   [_listenersLock release];
-  [textReplacementMap release];
-  [imageReplacementMap release];
   [valueAnimator stop:false];  // must stop the animator, or it will not dealloc since it is
                                // referenced by global displayLink.
   [valueAnimator release];

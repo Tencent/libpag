@@ -253,6 +253,8 @@ class Transform;
 
 class PAGFile;
 
+class ContentVersion;
+
 class PAG_API PAGLayer : public Content {
  public:
   PAGLayer(std::shared_ptr<File> file, Layer* layer);
@@ -531,6 +533,8 @@ class PAG_API PAGLayer : public Content {
   friend class PAGAudioReader;
 
   friend class AudioClip;
+
+  friend class ContentVersion;
 };
 
 class SolidLayer;

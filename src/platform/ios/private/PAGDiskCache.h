@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,38 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import <CoreVideo/CoreVideo.h>
 #import <Foundation/Foundation.h>
-#import <QuartzCore/QuartzCore.h>
-#import <UIKit/UIKit.h>
-#import "PAGImageLayerImpl.h"
-#import "PAGLayerImpl.h"
 
-@interface PAGSurfaceImpl : NSObject
+NS_ASSUME_NONNULL_BEGIN
 
-+ (PAGSurfaceImpl*)FromLayer:(CAEAGLLayer*)layer;
+@interface PAGDiskCache : NSObject
 
-+ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer;
++ (instancetype __nullable)MakeWithName:(NSString*)name frameCount:(NSUInteger)frameCount;
 
-+ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer
-                             context:(EAGLContext*)eaglContext;
+- (BOOL)containsObjectForKey:(NSInteger)index;
 
-+ (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size;
+- (BOOL)objectForKey:(NSInteger)index to:(uint8_t*)pixels length:(NSInteger)length;
 
-- (void)updateSize;
+- (void)setObject:(uint8_t*)pixels length:(NSInteger)length forKey:(NSInteger)index;
 
-- (int)width;
+- (NSInteger)count;
 
-- (int)height;
+- (NSString*)path;
 
-- (BOOL)clearAll;
+- (NSInteger)maxEncodedBufferSize;
 
-- (void)freeCache;
+- (void)removeCachesWithBlock:(void (^_Nullable)(void))block;
 
-- (CVPixelBufferRef)getCVPixelBuffer;
-
-- (CVPixelBufferRef)makeSnapshot;
-
-- (BOOL)copyPixelsTo:(void*)pixels rowBytes:(size_t)rowBytes;
+- (void)removeCaches;
 
 @end
+
+NS_ASSUME_NONNULL_END

@@ -109,4 +109,8 @@
   return [_surface makeSnapshot];
 }
 
+- (BOOL)copyPixelsTo:(void*)pixels rowBytes:(size_t)rowBytes {
+  return [_surface copyPixelsTo:pixels rowBytes:rowBytes];
+}
+
 @end

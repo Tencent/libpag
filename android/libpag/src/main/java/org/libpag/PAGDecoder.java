@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -31,33 +31,43 @@ public class PAGDecoder {
     private Bitmap lastFrameBitmap;
 
     /**
-     * Make a decoder from pagComposition.
+     * Creates a new PAGDecoder with the specified PAGComposition, using the composition's frame
+     * rate and size. Returns null if the composition is null.
      */
     public static PAGDecoder Make(PAGComposition pagComposition) {
-        return Make(pagComposition, 1.0f);
+        return Make(pagComposition, pagComposition.frameRate(), 1.0f);
     }
 
     /**
-     * Make a decoder from pagComposition.
-     * The size of decoder will be scaled.
+     * Creates a new PAGDecoder with the specified PAGComposition, the frame rate limit, and the
+     * scale factor for the output image size. Returns nil if the composition is nil.
      */
-    public static PAGDecoder Make(PAGComposition pagComposition, float scale) {
+    public static PAGDecoder Make(PAGComposition pagComposition, float maxFrameRate, float scale) {
         if (pagComposition == null) {
             return null;
         }
         if (scale <= 0) {
             scale = 1.0f;
         }
+        float frameRate = maxFrameRate;
+        if (frameRate <= 0) {
+            frameRate = pagComposition.frameRate();
+        } else {
+            frameRate = Math.min(pagComposition.frameRate(), frameRate);
+        }
         PAGDecoder pagDecoder = new PAGDecoder();
         pagDecoder._width = Math.round(pagComposition.width() * scale);
         pagDecoder._height = Math.round(pagComposition.height() * scale);
         pagDecoder._numFrames =
-                (int) (pagComposition.duration() * pagComposition.frameRate() / 1000000);
+                (int) (pagComposition.duration() * frameRate / 1000000);
         pagDecoder.pagSurface = PAGSurface.MakeOffscreen(pagDecoder._width, pagDecoder._height);
         if (pagDecoder.pagSurface == null) {
             return null;
         }
         pagDecoder.pagPlayer = new PAGPlayer();
+        if (frameRate > 0) {
+            pagDecoder.pagPlayer.setMaxFrameRate(frameRate);
+        }
         pagDecoder.pagPlayer.setSurface(pagDecoder.pagSurface);
         pagDecoder.pagPlayer.setComposition(pagComposition);
         return pagDecoder;
@@ -85,19 +95,42 @@ public class PAGDecoder {
     }
 
     /**
-     * Returns the frame image from a specified index.
+     * Copies pixels of the image frame at the given index to the specified Bitmap.
+     */
+    public boolean copyFrameTo(Bitmap bitmap, int index) {
+        if (bitmap == null || bitmap.isRecycled() || index < 0 || index >= _numFrames) {
+            return false;
+        }
+        pagPlayer.setProgress(PAGImageViewHelper.FrameToProgress(index, _numFrames));
+        pagPlayer.flush();
+        return pagSurface.copyPixelsTo(bitmap);
+    }
+
+    /**
+     * Returns the image frame at the specified index. It's recommended to read the image frames in
+     * forward order for better performance.
      */
     public Bitmap frameAtIndex(int index) {
         if (index < 0 || index >= _numFrames) {
             return null;
         }
-        float progress = (index * 1.0f + 0.1f) / _numFrames;
-        pagPlayer.setProgress(progress);
+        pagPlayer.setProgress(PAGImageViewHelper.FrameToProgress(index, _numFrames));
         if (!pagPlayer.flush() && lastFrameBitmap != null && !lastFrameBitmap.isRecycled()) {
             return lastFrameBitmap;
         }
         lastFrameBitmap = pagSurface.makeSnapshot();
         return lastFrameBitmap;
+    }
+
+    /**
+     * Free up resources used by the PAGDecoder instance immediately instead of relying on the
+     * garbage collector to do this for you at some point in the future.
+     */
+    public void release() {
+        pagSurface.release();
+        pagPlayer.setSurface(null);
+        pagPlayer.setComposition(null);
+        pagPlayer.release();
     }
 
     static {

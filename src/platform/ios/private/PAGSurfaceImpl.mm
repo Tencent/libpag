@@ -148,4 +148,11 @@
   return pixelBuffer;
 }
 
+- (BOOL)copyPixelsTo:(void*)pixels rowBytes:(size_t)rowBytes {
+  if (!pixels) {
+    return NO;
+  }
+  return _pagSurface->readPixels(pag::ColorType::BGRA_8888, pag::AlphaType::Premultiplied, pixels,
+                                 rowBytes);
+}
 @end

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,38 +16,26 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import <CoreVideo/CoreVideo.h>
 #import <Foundation/Foundation.h>
-#import <QuartzCore/QuartzCore.h>
-#import <UIKit/UIKit.h>
-#import "PAGImageLayerImpl.h"
-#import "PAGLayerImpl.h"
 
-@interface PAGSurfaceImpl : NSObject
+NS_ASSUME_NONNULL_BEGIN
 
-+ (PAGSurfaceImpl*)FromLayer:(CAEAGLLayer*)layer;
+@interface PAGCacheManager : NSObject
 
-+ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer;
++ (instancetype)shareInstance;
 
-+ (PAGSurfaceImpl*)FromCVPixelBuffer:(CVPixelBufferRef)pixelBuffer
-                             context:(EAGLContext*)eaglContext;
+- (NSString* __nullable)diskCachePath;
 
-+ (PAGSurfaceImpl*)MakeOffscreen:(CGSize)size;
+- (void)SetMaxDiskSize:(NSUInteger)size;
 
-- (void)updateSize;
+- (NSUInteger)MaxDiskSize;
 
-- (int)width;
+- (NSUInteger)totalSize;
 
-- (int)height;
+- (void)removeAllFiles;
 
-- (BOOL)clearAll;
-
-- (void)freeCache;
-
-- (CVPixelBufferRef)getCVPixelBuffer;
-
-- (CVPixelBufferRef)makeSnapshot;
-
-- (BOOL)copyPixelsTo:(void*)pixels rowBytes:(size_t)rowBytes;
+- (void)removeFileForPath:(NSString*)path;
 
 @end
+
+NS_ASSUME_NONNULL_END

@@ -109,4 +109,5 @@
 - (NSArray<PAGLayer*>*)getLayersUnderPoint:(CGPoint)point {
   return [(PAGCompositionImpl*)self.impl getLayersUnderPoint:point];
 }
+
 @end

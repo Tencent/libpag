@@ -74,6 +74,11 @@
         "url": "https://github.com/harfbuzz/harfbuzz.git",
         "commit": "f1f2be776bcd994fa9262622e1a7098a066e5cf7",
         "dir": "third_party/harfbuzz"
+      },
+      {
+        "url": "https://github.com/lz4/lz4.git",
+        "commit": "5ff839680134437dbf4678f3d0c7b371d84f4964",
+        "dir": "third_party/lz4"
       }
     ]
   },

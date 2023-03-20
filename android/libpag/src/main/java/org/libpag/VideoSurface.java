@@ -29,6 +29,7 @@ class VideoSurface implements SurfaceTexture.OnFrameAvailableListener {
         nativeRelease();
     }
 
+    @Override
     protected void finalize() {
         nativeFinalize();
     }

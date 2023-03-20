@@ -91,4 +91,11 @@ PAG_API @interface PAGSurface : NSObject
  * the PAGSurface will not be captured.
  */
 - (CVPixelBufferRef)makeSnapshot;
+
+/**
+ * Copies the pixels of the PAGSurface to the specified memory address. The format of the copied
+ * pixels is in the BGRA color type with the premultiplied alpha type. Returns false if failed.
+ */
+- (BOOL)copyPixelsTo:(void*)pixels rowBytes:(size_t)rowBytes;
+
 @end
