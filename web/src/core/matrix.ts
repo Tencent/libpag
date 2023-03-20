@@ -163,22 +163,9 @@ export class Matrix {
    * @param skewY   vertical skew factor to store
    * @param scaleY  vertical scale factor to store
    * @param transY  vertical translation to store
-   * @param persp0  input x-axis values perspective factor to store
-   * @param persp1  input y-axis values perspective factor to store
-   * @param persp2  perspective scale factor to store
    */
-  public setAll(
-    scaleX: number,
-    skewX: number,
-    transX: number,
-    skewY: number,
-    scaleY: number,
-    transY: number,
-    pers0 = 0,
-    pers1 = 0,
-    pers2 = 1,
-  ) {
-    this.wasmIns?._setAll(scaleX, skewX, transX, skewY, scaleY, transY, pers0, pers1, pers2);
+  public setAll(scaleX: number, skewX: number, transX: number, skewY: number, scaleY: number, transY: number) {
+    this.wasmIns?._setAll(scaleX, skewX, transX, skewY, scaleY, transY, 0, 0, 1);
   }
 
   public setAffine(a: number, b: number, c: number, d: number, tx: number, ty: number) {
