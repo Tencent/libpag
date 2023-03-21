@@ -197,6 +197,8 @@ void RenderCache::releaseAll() {
   filterCaches.clear();
   delete motionBlurFilter;
   motionBlurFilter = nullptr;
+  delete transform3DFilter;
+  transform3DFilter = nullptr;
   deviceID = 0;
 }
 
