@@ -1,5 +1,6 @@
 import { PAGModule } from './pag-module';
 import { AlphaType, ColorType } from './types';
+import { readBufferFromWasm } from './utils/buffer';
 import { destroyVerify, wasmAwaitRewind } from './utils/decorators';
 
 @destroyVerify
@@ -76,12 +77,11 @@ export class PAGSurface {
     const rowBytes = this.width() * (colorType === ColorType.ALPHA_8 ? 1 : 4);
     const length = rowBytes * this.height();
     const dataUint8Array = new Uint8Array(length);
-    const dataPtr = PAGModule._malloc(dataUint8Array.byteLength);
-    const dataOnHeap = new Uint8Array(PAGModule.HEAPU8.buffer, dataPtr, dataUint8Array.byteLength);
-    const res = this.wasmIns._readPixels(colorType, alphaType, dataPtr, rowBytes) as boolean;
-    dataUint8Array.set(dataOnHeap);
-    PAGModule._free(dataPtr);
-    return res ? dataUint8Array : null;
+    const { data, free } = readBufferFromWasm(PAGModule, dataUint8Array, (dataPtr) => {
+      return this.wasmIns._readPixels(colorType, alphaType, dataPtr, rowBytes) as boolean;
+    });
+    free();
+    return data;
   }
 
   public destroy(): void {

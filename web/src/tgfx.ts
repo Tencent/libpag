@@ -1,5 +1,5 @@
 import { getCanvas2D, releaseCanvas2D } from './utils/canvas';
-import { malloc } from './utils/buffer';
+import { writeBufferToWasm } from './utils/buffer';
 import { BitmapImage } from './core/bitmap-image';
 
 import type { EmscriptenGL, PAG } from './types';
@@ -43,7 +43,7 @@ export const readImagePixels = (module: PAG, image: CanvasImageSource, width: nu
   if (data.length === 0) {
     return null;
   }
-  return malloc(module, data);
+  return writeBufferToWasm(module, data);
 };
 
 export const hasWebpSupport = () => {
@@ -95,5 +95,5 @@ export const releaseNativeImage = (source: TexImageSource | OffscreenCanvas) => 
 
 export const getBytesFromPath = async (module: PAG, path: string) => {
   const buffer = await fetch(path).then((res) => res.arrayBuffer());
-  return malloc(module, buffer);
+  return writeBufferToWasm(module, buffer);
 };

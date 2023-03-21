@@ -2,6 +2,7 @@ import { AlphaType, ColorType, PAGScaleMode } from './types';
 import { wasmAwaitRewind, wasmAsyncMethod, destroyVerify } from './utils/decorators';
 import { PAGModule } from './pag-module';
 import { Matrix } from './core/matrix';
+import { writeBufferToWasm } from './utils/buffer';
 
 @destroyVerify
 @wasmAwaitRewind
@@ -48,10 +49,9 @@ export class PAGImage {
     alphaType: AlphaType,
   ): PAGImage {
     const rowBytes = width * (colorType === ColorType.ALPHA_8 ? 1 : 4);
-    const dataPtr = PAGModule._malloc(pixels.byteLength);
-    const dataOnHeap = new Uint8Array(PAGModule.HEAPU8.buffer, dataPtr, pixels.byteLength);
-    dataOnHeap.set(pixels);
-    const wasmIns = PAGModule._PAGImage._FromPixels(dataPtr, width, height, rowBytes, colorType, alphaType);
+    const { byteOffset, free } = writeBufferToWasm(PAGModule, pixels);
+    const wasmIns = PAGModule._PAGImage._FromPixels(byteOffset, width, height, rowBytes, colorType, alphaType);
+    free();
     if (!wasmIns) throw new Error('Make PAGImage from pixels fail!');
     return new PAGImage(wasmIns);
   }

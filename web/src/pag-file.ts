@@ -6,6 +6,7 @@ import { getLayerTypeName, layer2typeLayer, proxyVector } from './utils/type-uti
 
 import type { PAGImage } from './pag-image';
 import { LayerType, PAGTimeStretchMode, TextDocument } from './types';
+import { writeBufferToWasm } from './utils/buffer';
 
 @destroyVerify
 @wasmAwaitRewind
@@ -27,15 +28,11 @@ export class PAGFile extends PAGComposition {
    */
   public static loadFromBuffer(buffer: ArrayBuffer) {
     if (!buffer || !(buffer.byteLength > 0)) throw new Error('Initialize PAGFile data not be empty!');
-    const dataUint8Array = new Uint8Array(buffer);
-    const numBytes = dataUint8Array.byteLength;
-    const dataPtr = PAGModule._malloc(numBytes);
-    const dataOnHeap = new Uint8Array(PAGModule.HEAPU8.buffer, dataPtr, numBytes);
-    dataOnHeap.set(dataUint8Array);
-    const wasmIns = PAGModule._PAGFile._Load(dataOnHeap.byteOffset, dataOnHeap.length);
+    const { byteOffset, length, free } = writeBufferToWasm(PAGModule, buffer);
+    const wasmIns = PAGModule._PAGFile._Load(byteOffset, length);
+    free();
     if (!wasmIns) throw new Error('Load PAGFile fail!');
     const pagFile = new PAGFile(wasmIns);
-    PAGModule._free(dataPtr);
     return pagFile;
   }
   /**
