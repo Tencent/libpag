@@ -38,8 +38,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)removeCachesWithBlock:(void (^_Nullable)(void))block;
 
-- (void)removeCaches;
-
 @end
 
 NS_ASSUME_NONNULL_END

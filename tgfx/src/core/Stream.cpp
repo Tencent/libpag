@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Stream.h"
+#include "utils/Log.h"
 
 namespace tgfx {
 
@@ -57,6 +58,7 @@ class FileStream : public Stream {
 std::unique_ptr<Stream> Stream::MakeFromFile(const std::string& filePath) {
   auto file = fopen(filePath.c_str(), "rb");
   if (file == nullptr) {
+    LOGE("file open failed! filePath:%s \n", filePath.c_str());
     return nullptr;
   }
   fseek(file, 0, SEEK_END);

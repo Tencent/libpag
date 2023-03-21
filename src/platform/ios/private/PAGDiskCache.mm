@@ -20,8 +20,9 @@
 
 #include <compression.h>
 #include <sys/stat.h>
+#include <mutex>
 #import "PAGCacheManager.h"
-#import "PAGCacheQueueManager.h"
+#import "PAGDiskCacheManager.h"
 
 /**
  * structure of the cache file
@@ -30,10 +31,9 @@
  */
 
 @implementation PAGDiskCache {
-  dispatch_queue_t ioQueue;
   dispatch_queue_t cacheQueue;
   NSString* _path;
-  int _fd;
+  int fd;
   NSInteger numFrames;
   int32_t cacheFrameCount;
   int32_t maxCacheEncodedBufferSize;
@@ -46,38 +46,33 @@
   NSInteger encodeLength;
   uint8_t* decodeBuffer;
   NSInteger decodeLength;
+
+  std::mutex diskLock;
 }
 
 static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
 
-- (instancetype)initWithPath:(NSString*)filePath
-                          fd:(int)fd
-                       queue:(dispatch_queue_t)queue
-                  frameCount:(NSUInteger)frameCount {
+- (instancetype)initWithPath:(NSString*)filePath frameCount:(NSUInteger)frameCount {
   self = [super init];
   if (self) {
     _path = [filePath retain];
     numFrames = frameCount;
-    _fd = fd;
     scratchEncodeLength = compression_encode_scratch_buffer_size(COMPRESSION_LZ4);
     scratchDecodeLength = compression_decode_scratch_buffer_size(COMPRESSION_LZ4);
-    cacheQueue = dispatch_queue_create("PAGDiskFileCache.art.pag", DISPATCH_QUEUE_SERIAL);
-    ioQueue = queue;
     encodeLength = 0;
     decodeLength = 0;
-    dispatch_retain(ioQueue);
-    __block __typeof(self) weakSelf = self;
-    dispatch_sync(ioQueue, ^{
-      [weakSelf initializeCacheFile];
-    });
+    cacheQueue = dispatch_queue_create("PAGDiskFileCache.art.pag", DISPATCH_QUEUE_SERIAL);
+    [self initializeCacheFile];
   }
   return self;
 }
 
 - (void)dealloc {
-  [_path release];
-  dispatch_release(ioQueue);
+  if (fd > 0) {
+    close(fd);
+  }
   dispatch_release(cacheQueue);
+  [_path release];
   if (scratchEncodeBuffer) {
     free(scratchEncodeBuffer);
   }
@@ -90,7 +85,7 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
   if (decodeBuffer) {
     free(decodeBuffer);
   }
-  close(_fd);
+
   [super dealloc];
 }
 
@@ -104,25 +99,16 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
     return nil;
   }
   filePath = [filePath stringByAppendingPathComponent:[name stringByAppendingString:@".cache"]];
-  dispatch_queue_t queue = [[PAGCacheQueueManager shareInstance] queueForPath:filePath];
-  __block int fd = 0;
-  dispatch_sync(queue, ^{
-    fd = open([filePath UTF8String], O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
-    if (fd < 0) {
-      fd = open([filePath UTF8String], O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
-    }
-  });
-  if (fd < 0) {
-    return nil;
-  }
-  return [[[PAGDiskCache alloc] initWithPath:filePath
-                                          fd:fd
-                                       queue:(dispatch_queue_t)queue
-                                  frameCount:frameCount] autorelease];
+
+  return [[[PAGDiskCache alloc] initWithPath:filePath frameCount:frameCount] autorelease];
 }
 
 - (BOOL)containsObjectForKey:(NSInteger)index {
-  if (index < 0 || index >= numFrames) {
+  std::lock_guard<std::mutex> autoLock(diskLock);
+  if (fd <= 0) {
+    return NO;
+  }
+  if (index < 0 || index >= self->numFrames) {
     return NO;
   }
   NSRange frameRange = [self frameRangeAtIndex:index];
@@ -134,6 +120,10 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
 }
 
 - (BOOL)objectForKey:(NSInteger)index to:(uint8_t*)pixels length:(NSInteger)length {
+  std::lock_guard<std::mutex> autoLock(diskLock);
+  if (fd <= 0) {
+    return NO;
+  }
   if (decodeLength == 0) {
     decodeLength = length;
   }
@@ -148,11 +138,15 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
 }
 
 - (void)setObject:(uint8_t*)pixels length:(NSInteger)length forKey:(NSInteger)index {
+  std::lock_guard<std::mutex> autoLock(diskLock);
+  if (fd <= 0) {
+    return;
+  }
   encodeLength = length;
   NSData* compressData = [self compressRGBAData:pixels length:length];
   if (compressData) {
     __block __typeof(self) weakSelf = self;
-    dispatch_sync(ioQueue, ^{
+    dispatch_async(cacheQueue, ^{
       [weakSelf saveObject:compressData forKey:index];
     });
   }
@@ -166,48 +160,51 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
   return maxCacheEncodedBufferSize;
 }
 
-- (void)removeCachesWithBlock:(void (^_Nullable)(void))block {
+- (void)removeCachesWithBlock:(void (^)())block {
   __block __typeof(self) weakSelf = self;
   dispatch_async(cacheQueue, ^{
-    [weakSelf removeCaches];
-    block();
-  });
-}
-
-- (void)removeCaches {
-  __block __typeof(self) weakSelf = self;
-  dispatch_sync(ioQueue, ^{
-    close(weakSelf->_fd);
+    close(weakSelf->fd);
     [[PAGCacheManager shareInstance] removeFileForPath:weakSelf->_path];
-    weakSelf->_fd = open([weakSelf->_path UTF8String], O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+    weakSelf->fd = open([weakSelf->_path UTF8String], O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+    block();
   });
 }
 
 #pragma mark - private
 - (void)initializeCacheFile {
+  if (self->fd <= 0) {
+    self->fd = open([self->_path UTF8String], O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+    if (self->fd <= 0) {
+      self->fd = open([self->_path UTF8String], O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+    }
+  }
+  if (self->fd <= 0) {
+    close(self->fd);
+    return;
+  }
   if ([self fileSize] < (NSInteger)(FileHeaderSize + self->numFrames * 2 * sizeof(int32_t))) {
-    ftruncate(self->_fd, 0);
+    ftruncate(self->fd, 0);
     int32_t zero = 0;
-    write(self->_fd, &zero, sizeof(int32_t));  // width
-    write(self->_fd, &zero, sizeof(int32_t));  // height
-    write(self->_fd, &zero, sizeof(int32_t));  // cacheFrames
-    write(self->_fd, &zero, sizeof(int32_t));  // maxCacheFrameSize
+    write(self->fd, &zero, sizeof(int32_t));  // width
+    write(self->fd, &zero, sizeof(int32_t));  // height
+    write(self->fd, &zero, sizeof(int32_t));  // cacheFrames
+    write(self->fd, &zero, sizeof(int32_t));  // maxCacheFrameSize
     for (uint i = 0; i < self->numFrames; i++) {
-      write(self->_fd, &zero, sizeof(int32_t));
-      write(self->_fd, &zero, sizeof(int32_t));
+      write(self->fd, &zero, sizeof(int32_t));
+      write(self->fd, &zero, sizeof(int32_t));
     }
     self->cacheFrameCount = 0;
     self->maxCacheEncodedBufferSize = 0;
   } else {
-    lseek(self->_fd, 2 * sizeof(int32_t), SEEK_SET);
-    read(self->_fd, &self->cacheFrameCount, sizeof(int32_t));
-    read(self->_fd, &self->maxCacheEncodedBufferSize, sizeof(int32_t));
+    lseek(self->fd, 2 * sizeof(int32_t), SEEK_SET);
+    read(self->fd, &self->cacheFrameCount, sizeof(int32_t));
+    read(self->fd, &self->maxCacheEncodedBufferSize, sizeof(int32_t));
   }
 }
 
 - (NSInteger)fileSize {
   struct stat statbuf;
-  fstat(self->_fd, &statbuf);
+  fstat(self->fd, &statbuf);
   NSInteger size = statbuf.st_size;
   return size;
 }
@@ -217,13 +214,13 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
   if (index < 0 || index >= numFrames) {
     return notFoundRange;
   }
-  lseek(_fd, FileHeaderSize + index * 2 * sizeof(int32_t), SEEK_SET);
+  lseek(fd, FileHeaderSize + index * 2 * sizeof(int32_t), SEEK_SET);
   int32_t offset = 0;
   int32_t length = 0;
-  if (read(_fd, &offset, sizeof(int32_t)) != sizeof(int32_t)) {
+  if (read(fd, &offset, sizeof(int32_t)) != sizeof(int32_t)) {
     return notFoundRange;
   }
-  if (read(_fd, &length, sizeof(int32_t)) != sizeof(int32_t)) {
+  if (read(fd, &length, sizeof(int32_t)) != sizeof(int32_t)) {
     return notFoundRange;
   }
   if (length <= 0 || offset < 0) {
@@ -245,7 +242,7 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
   if (frameRange.location == NSNotFound || frameRange.length == NSNotFound) {
     return nil;
   }
-  off_t offsset = lseek(_fd, frameRange.location, SEEK_SET);
+  off_t offsset = lseek(fd, frameRange.location, SEEK_SET);
   if (offsset <= 0) {
     return nil;
   }
@@ -253,7 +250,7 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
   if (buffer == nil) {
     return nil;
   }
-  ssize_t dataSize = read(_fd, buffer, frameRange.length);
+  ssize_t dataSize = read(fd, buffer, frameRange.length);
   if (dataSize <= 0) {
     return nil;
   }
@@ -262,7 +259,7 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
 }
 
 - (void)saveObject:(NSData*)object forKey:(NSInteger)index {
-  if (!object || [self containsObjectForKey:index]) {
+  if (!object) {
     return;
   }
   NSRange frameRange = [self frameRangeAtIndex:index];
@@ -270,20 +267,20 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
     return;
   }
   NSInteger currentSize = [self fileSize];
-  lseek(_fd, FileHeaderSize + index * 2 * sizeof(int32_t), SEEK_SET);
+  lseek(fd, FileHeaderSize + index * 2 * sizeof(int32_t), SEEK_SET);
   int32_t offset = (int32_t)currentSize;
   int32_t length = (int32_t)object.length;
-  write(_fd, &offset, sizeof(int32_t));
-  write(_fd, &length, sizeof(int32_t));
-  lseek(_fd, currentSize, SEEK_SET);
-  write(_fd, object.bytes, length);
+  write(fd, &offset, sizeof(int32_t));
+  write(fd, &length, sizeof(int32_t));
+  lseek(fd, currentSize, SEEK_SET);
+  write(fd, object.bytes, length);
 
   cacheFrameCount++;
-  lseek(_fd, 2 * sizeof(int32_t), SEEK_SET);
-  write(_fd, &cacheFrameCount, sizeof(int32_t));
+  lseek(fd, 2 * sizeof(int32_t), SEEK_SET);
+  write(fd, &cacheFrameCount, sizeof(int32_t));
   if (length > maxCacheEncodedBufferSize) {
     maxCacheEncodedBufferSize = length;
-    write(_fd, &maxCacheEncodedBufferSize, sizeof(int32_t));
+    write(fd, &maxCacheEncodedBufferSize, sizeof(int32_t));
   }
 }
 
