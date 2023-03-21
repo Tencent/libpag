@@ -89,6 +89,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   NSInteger cacheHeight;
 
   PAGDiskCache* imageViewCache;
+  PAGDiskCacheItem* imageViewCacheItem;
   NSMutableDictionary<NSNumber*, UIImage*>* imagesMap;
 
   CFMutableDataRef currentImageDataRef;
@@ -155,8 +156,8 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   if (pagDecoder != nil) {
     [pagDecoder release];
   }
-  if (imageViewCache) {
-    [imageViewCache release];
+  if (imageViewCacheItem) {
+    [imageViewCacheItem release];
   }
   if (_currentUIImage) {
     [_currentUIImage release];
@@ -308,12 +309,12 @@ static NSString* RemovePathVariableComponent(NSString* original) {
 
 - (PAGDiskCache*)getImageViewCache {
   if (imageViewCache == nil) {
-    PAGDiskCacheItem* diskCacheItem =
+    imageViewCacheItem =
         [[PAGDiskCacheManager shareInstance] objectDiskCacheFor:[self generateCacheKey]
                                                      frameCount:numFrames];
-    if (diskCacheItem) {
-      imageViewCache = diskCacheItem.diskCache;
-      [imageViewCache retain];
+    if (imageViewCacheItem) {
+      imageViewCache = imageViewCacheItem.diskCache;
+      [imageViewCacheItem retain];
     }
   }
   return imageViewCache;
@@ -569,8 +570,8 @@ static NSString* RemovePathVariableComponent(NSString* original) {
     pagDecoder = nil;
   }
   if (self.memoryCacheEnabled && [self->imagesMap count] == (NSUInteger)self->numFrames) {
-    [self->imageViewCache release];
-    self->imageViewCache = nil;
+    [self->imageViewCacheItem release];
+    self->imageViewCacheItem = nil;
   }
 }
 
@@ -580,9 +581,9 @@ static NSString* RemovePathVariableComponent(NSString* original) {
     [pagComposition release];
     pagComposition = nil;
   }
-  if (imageViewCache) {
-    [imageViewCache release];
-    imageViewCache = nil;
+  if (imageViewCacheItem) {
+    [imageViewCacheItem release];
+    imageViewCacheItem = nil;
   }
   if (pagDecoder) {
     [pagDecoder release];
