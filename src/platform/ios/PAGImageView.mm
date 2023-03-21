@@ -245,6 +245,14 @@ static NSString* RemovePathVariableComponent(NSString* original) {
   }
   pagComposition = [newComposition retain];
   self.pagContentVersion = [PAGContentVersion Get:pagComposition];
+  if (self.pagContentVersion == 0 && [pagComposition isKindOfClass:[PAGFile class]]) {
+    if (filePath) {
+      [filePath release];
+      filePath = nil;
+    }
+    filePath = [(PAGFile*)pagComposition path];
+    [filePath retain];
+  }
   self.currentFrameExplicitlySet = 0;
   self.fileWidth = [pagComposition width];
   self.fileHeight = [pagComposition height];
