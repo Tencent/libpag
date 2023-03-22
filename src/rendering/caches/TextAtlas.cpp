@@ -34,12 +34,12 @@ class Atlas {
 
  private:
   Atlas(std::vector<std::shared_ptr<tgfx::Image>> images,
-        std::unordered_map<tgfx::BytesKey, AtlasLocator, tgfx::BytesHasher> glyphLocators)
+        tgfx::BytesKeyMap<AtlasLocator> glyphLocators)
       : images(std::move(images)), glyphLocators(std::move(glyphLocators)) {
   }
 
   std::vector<std::shared_ptr<tgfx::Image>> images;
-  std::unordered_map<tgfx::BytesKey, AtlasLocator, tgfx::BytesHasher> glyphLocators;
+  tgfx::BytesKeyMap<AtlasLocator> glyphLocators;
 
   friend class TextAtlas;
 };
@@ -150,7 +150,7 @@ struct Page {
   std::vector<AtlasTextRun> textRuns;
   int width = 0;
   int height = 0;
-  std::unordered_map<tgfx::BytesKey, AtlasLocator, tgfx::BytesHasher> locators;
+  tgfx::BytesKeyMap<AtlasLocator> locators;
 };
 
 static std::vector<Page> CreatePages(const std::vector<GlyphHandle>& glyphs, int maxPageSize) {
@@ -274,7 +274,7 @@ std::unique_ptr<Atlas> Atlas::Make(tgfx::Context* context, const std::vector<Gly
   if (pages.empty()) {
     return nullptr;
   }
-  std::unordered_map<tgfx::BytesKey, AtlasLocator, tgfx::BytesHasher> glyphLocators;
+  tgfx::BytesKeyMap<AtlasLocator> glyphLocators;
   for (const auto& page : pages) {
     glyphLocators.insert(page.locators.begin(), page.locators.end());
   }

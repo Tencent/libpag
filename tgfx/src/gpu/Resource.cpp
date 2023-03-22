@@ -19,19 +19,19 @@
 #include "tgfx/gpu/Resource.h"
 
 namespace tgfx {
-void Resource::assignCacheOwner(const Cacheable* owner) {
-  if (owner == nullptr) {
-    removeCacheOwner();
+void Resource::assignUniqueKey(const UniqueKey& newKey) {
+  if (newKey.empty()) {
+    removeUniqueKey();
     return;
   }
-  if (cacheOwnerID != owner->uniqueID()) {
-    context->resourceCache()->changeCacheOwner(this, owner);
+  if (newKey != uniqueKey) {
+    context->resourceCache()->changeUniqueKey(this, newKey);
   }
 }
 
-void Resource::removeCacheOwner() {
-  if (cacheOwnerID != 0) {
-    context->resourceCache()->removeCacheOwner(this);
+void Resource::removeUniqueKey() {
+  if (!uniqueKey.empty()) {
+    context->resourceCache()->removeUniqueKey(this);
   }
 }
 }  // namespace tgfx

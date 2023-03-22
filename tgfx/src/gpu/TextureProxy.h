@@ -42,13 +42,13 @@ class TextureProxy {
   virtual int height() const;
 
   /**
-   * If we are instantiated and have a texture, return the mipmap state of that texture. Otherwise
+   * If we are instantiated and have a texture, return the mipmap state of that texture. Otherwise,
    * returns the proxy's mipmap state from creation time.
    */
   virtual bool hasMipmaps() const;
 
   /**
-   * Returns the the Texture of the proxy. Returns nullptr if the proxy is not instantiated yet.
+   * Returns the Texture of the proxy. Returns nullptr if the proxy is not instantiated yet.
    */
   std::shared_ptr<Texture> getTexture() const;
 
@@ -58,26 +58,27 @@ class TextureProxy {
   bool isInstantiated() const;
 
   /**
-   * Actually instantiate the backing texture, if necessary. Returns true if the backing texture is
+   * Instantiates the backing texture, if necessary. Returns true if the backing texture is
    * instantiated.
    */
   bool instantiate();
 
   /**
-   * Assigns a Cacheable owner to the proxy. The proxy will be findable via this owner using
-   * ProxyProvider.findProxyByOwner(). If the updateTextureOwner is true, it will also assign the
-   * owner to the internal texture.
+   * Assigns a UniqueKey to the proxy. The proxy will be findable via this UniqueKey using
+   * ProxyProvider.findProxyByUniqueKey(). If the updateTextureKey is true, it will also assign the
+   * UniqueKey to the target texture.
    */
-  void assignProxyOwner(const Cacheable* owner, bool updateTextureOwner = true);
+  void assignUniqueKey(const UniqueKey& uniqueKey, bool updateTextureKey = true);
 
   /*
-   * Removes the Cacheable owner from the proxy. If the updateTexture is true, it will also remove
-   * the owner from the target texture.
+   * Removes the UniqueKey from the proxy. If the updateTextureKey is true, it will also remove
+   * the UniqueKey from the target texture.
    */
-  void removeProxyOwner(bool updateTexture = true);
+  void removeUniqueKey(bool updateTextureKey = true);
 
  protected:
   ProxyProvider* provider = nullptr;
+  bool setTextureUniqueKey = true;
   std::shared_ptr<Texture> texture = nullptr;
 
   explicit TextureProxy(ProxyProvider* provider, std::shared_ptr<Texture> texture = nullptr);
@@ -88,8 +89,7 @@ class TextureProxy {
   virtual std::shared_ptr<Texture> onMakeTexture(Context* context);
 
  private:
-  uint32_t proxyOwnerID = 0;
-  std::weak_ptr<Cacheable> cacheOwner;
+  UniqueKey uniqueKey = {};
   std::weak_ptr<TextureProxy> weakThis;
 
   friend class ProxyProvider;

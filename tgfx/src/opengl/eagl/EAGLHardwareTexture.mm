@@ -50,10 +50,10 @@ static CVOpenGLESTextureRef GetTextureRef(Context* context, CVPixelBufferRef pix
 std::shared_ptr<EAGLHardwareTexture> EAGLHardwareTexture::MakeFrom(Context* context,
                                                                    CVPixelBufferRef pixelBuffer) {
   std::shared_ptr<EAGLHardwareTexture> glTexture = nullptr;
-  BytesKey recycleKey = {};
-  ComputeRecycleKey(&recycleKey, pixelBuffer);
+  BytesKey scratchKey = {};
+  ComputeScratchKey(&scratchKey, pixelBuffer);
   glTexture = std::static_pointer_cast<EAGLHardwareTexture>(
-      context->resourceCache()->getRecycled(recycleKey));
+      context->resourceCache()->findScratchResource(scratchKey));
   if (glTexture) {
     return glTexture;
   }
@@ -79,13 +79,13 @@ std::shared_ptr<EAGLHardwareTexture> EAGLHardwareTexture::MakeFrom(Context* cont
   return glTexture;
 }
 
-void EAGLHardwareTexture::ComputeRecycleKey(BytesKey* recycleKey, CVPixelBufferRef pixelBuffer) {
+void EAGLHardwareTexture::ComputeScratchKey(BytesKey* scratchKey, CVPixelBufferRef pixelBuffer) {
   static const uint32_t HardwareType = UniqueID::Next();
-  recycleKey->write(HardwareType);
+  scratchKey->write(HardwareType);
   // 这里可以直接用指针做为 key 是因为缓存的 holder 会持有 CVPixelBuffer，只要 holder
   // 缓存存在，对应的 CVPixelBuffer
   // 指针就是有效的，不会出现指针地址被其他新创建对象占用的情况。其他情况下应该避免使用指针做 key。
-  recycleKey->write(pixelBuffer);
+  scratchKey->write(pixelBuffer);
 }
 
 EAGLHardwareTexture::EAGLHardwareTexture(CVPixelBufferRef pixelBuffer)
@@ -102,8 +102,8 @@ EAGLHardwareTexture::~EAGLHardwareTexture() {
   }
 }
 
-void EAGLHardwareTexture::computeRecycleKey(BytesKey* recycleKey) const {
-  ComputeRecycleKey(recycleKey, pixelBuffer);
+void EAGLHardwareTexture::computeScratchKey(BytesKey* scratchKey) const {
+  ComputeScratchKey(scratchKey, pixelBuffer);
 }
 
 size_t EAGLHardwareTexture::memoryUsage() const {

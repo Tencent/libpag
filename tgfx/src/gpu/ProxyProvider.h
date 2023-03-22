@@ -31,9 +31,9 @@ class ProxyProvider {
   explicit ProxyProvider(Context* context);
 
   /*
-   * Finds a proxy by the specified Cacheable owner.
+   * Finds a proxy by the specified UniqueKey.
    */
-  std::shared_ptr<TextureProxy> findProxyByOwner(const Cacheable* owner);
+  std::shared_ptr<TextureProxy> findProxyByUniqueKey(const UniqueKey& uniqueKey);
 
   /*
    * Create a texture proxy for the image buffer. The image buffer will be released after being
@@ -73,9 +73,9 @@ class ProxyProvider {
   Context* context = nullptr;
   std::unordered_map<uint32_t, TextureProxy*> proxyOwnerMap = {};
 
-  void changeProxyOwner(TextureProxy* proxy, uint32_t proxyOwnerID);
+  void changeUniqueKey(TextureProxy* proxy, const UniqueKey& uniqueKey);
 
-  void removeProxyOwner(TextureProxy* proxy);
+  void removeUniqueKey(TextureProxy* proxy);
 
   friend class TextureProxy;
 };

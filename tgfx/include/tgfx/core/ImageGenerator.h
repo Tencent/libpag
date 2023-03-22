@@ -22,7 +22,8 @@
 
 namespace tgfx {
 /**
- * ImageGenerator is the base class for decoding images from codec data or custom data.
+ * ImageGenerator defines the interfaces for generating ImageBuffer objects from encoded images or
+ * custom data.
  */
 class ImageGenerator {
  public:
@@ -49,8 +50,8 @@ class ImageGenerator {
   virtual bool isAlphaOnly() const = 0;
 
   /**
-   * Returns true if ImageGenerator supports asynchronous decoding. If true, the makeBuffer() method
-   * will not block the calling thread.
+   * Returns true if the ImageGenerator has built-in support for asynchronous decoding. If true, the
+   * makeBuffer() method will not block the calling thread.
    */
   virtual bool asyncSupport() const {
     return false;

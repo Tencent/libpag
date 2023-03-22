@@ -20,7 +20,7 @@
 
 #include "base/utils/Log.h"
 #include "pag/types.h"
-#include "tgfx/core/Clock.h"
+#include "tgfx/utils/Clock.h"
 
 namespace pag {
 class Performance {

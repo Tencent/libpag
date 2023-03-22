@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "tgfx/core/BytesKey.h"
+#include "tgfx/utils/BytesKey.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/Caps.h"
@@ -93,20 +93,20 @@ class Context {
   /**
    * Purges GPU resources that haven't been used the passed in time.
    * @param purgeTime A timestamp previously returned by Clock::Now().
-   * @param recycledResourcesOnly If it is true the purgeable resources containing persistent data
-   * are spared. If it is false then all purgeable resources will be deleted.
+   * @param scratchResourcesOnly If true, the purgeable resources containing unique keys are spared.
+   * If false, then all purgeable resources will be deleted.
    */
-  void purgeResourcesNotUsedSince(int64_t purgeTime, bool recycledResourcesOnly = false);
+  void purgeResourcesNotUsedSince(int64_t purgeTime, bool scratchResourcesOnly = false);
 
   /**
-   * Purge unreferenced resources from the cache until the the provided bytesLimit has been reached
-   * or we have purged all unreferenced resources. Returns true if the total resource bytes is not
-   * over the specified bytesLimit after purging.
+   * Purge unreferenced resources from the cache until the provided bytesLimit has been reached, or
+   * we have purged all unreferenced resources. Returns true if the total resource bytes is not over
+   * the specified bytesLimit after purging.
    * @param bytesLimit The desired number of bytes after puring.
-   * @param recycledResourcesOnly If it is true the purgeable resources containing persistent data
-   * are spared. If it is false then all purgeable resources will be deleted.
+   * @param scratchResourcesOnly If true, the purgeable resources containing unique keys are spared.
+   * If false, then all purgeable resources will be deleted.
    */
-  bool purgeResourcesUntilMemoryTo(size_t bytesLimit, bool recycledResourcesOnly = false);
+  bool purgeResourcesUntilMemoryTo(size_t bytesLimit, bool scratchResourcesOnly = false);
 
   /**
    * Inserts a GPU semaphore that the current GPU-backed API must wait on before executing any more
@@ -122,7 +122,7 @@ class Context {
    * semaphore will be signaled by the GPU. If the signalSemaphore is not null and uninitialized,
    * a new semaphore is created and initializes BackendSemaphore. The caller must delete the
    * semaphore returned in signalSemaphore. BackendSemaphore can be deleted as soon as this function
-   * returns. If the back-end API is OpenGL only uninitialized backend semaphores are supported.
+   * returns. If the back-end API is OpenGL, only uninitialized backend semaphores are supported.
    * If false is returned, the GPU back-end did not create or add a semaphore to signal on the GPU;
    * the caller should not instruct the GPU to wait on the semaphore.
    */
@@ -130,16 +130,16 @@ class Context {
 
   /**
    * Submit outstanding work to the gpu from all previously un-submitted flushes. The return
-   * value of the submit will indicate whether or not the submission to the GPU was successful.
+   * value of the submit method will indicate whether the submission to the GPU was successful.
    *
    * If the call returns true, all previously passed in semaphores in flush calls will have been
    * submitted to the GPU and they can safely be waited on. The caller should wait on those
    * semaphores or perform some other global synchronization before deleting the semaphores.
    *
-   * If it returns false, then those same semaphores will not have been submitted and we will not
+   * If it returns false, then those same semaphores will not have been submitted, and we will not
    * try to submit them again. The caller is free to delete the semaphores at any time.
    *
-   * If the syncCpu flag is true this function will return once the gpu has finished with all
+   * If the syncCpu flag is true, this function will return once the gpu has finished with all
    * submitted work.
    */
   bool submit(bool syncCpu = false);
@@ -156,7 +156,7 @@ class Context {
   virtual Backend backend() const = 0;
 
   /**
-   * Returns the capabilities info of this context.
+   * Returns the capability info of this context.
    */
   virtual const Caps* caps() const = 0;
 

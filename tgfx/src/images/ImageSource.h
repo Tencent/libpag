@@ -19,17 +19,18 @@
 #pragma once
 
 #include "gpu/ProxyProvider.h"
-#include "tgfx/core/Cacheable.h"
 #include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/ImageGenerator.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/SurfaceOptions.h"
 
 namespace tgfx {
+class UniqueKey;
+
 /**
  * ImageSource generates texture proxies for images.
  */
-class ImageSource : public Cacheable {
+class ImageSource {
  public:
   /**
    * Creates ImageSource from an image generator. ImageSource is returned if the generator is not
@@ -47,6 +48,8 @@ class ImageSource : public Cacheable {
    * Creates ImageSource from Texture, ImageSource is returned if texture is not nullptr.
    */
   static std::shared_ptr<ImageSource> MakeFrom(std::shared_ptr<Texture> texture);
+
+  virtual ~ImageSource() = default;
 
   /**
    * Returns the width of the target image.
@@ -121,7 +124,11 @@ class ImageSource : public Cacheable {
   std::shared_ptr<TextureProxy> lockTextureProxy(Context* context, uint32_t surfaceFlags = 0) const;
 
  protected:
-  virtual const Cacheable* getCacheOwner() const;
+  std::weak_ptr<ImageSource> weakThis;
+
+  ImageSource();
+
+  virtual UniqueKey getUniqueKey() const;
 
   virtual std::shared_ptr<ImageSource> onMakeDecoded(Context* context) const;
 
@@ -129,5 +136,8 @@ class ImageSource : public Cacheable {
 
   virtual std::shared_ptr<TextureProxy> onMakeTextureProxy(Context* context,
                                                            uint32_t surfaceFlags) const = 0;
+
+ private:
+  UniqueKey uniqueKey = {};
 };
 }  // namespace tgfx

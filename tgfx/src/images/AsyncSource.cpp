@@ -30,8 +30,8 @@ AsyncSource::AsyncSource(std::shared_ptr<EncodedSource> source) : encodedSource(
   }
 }
 
-const Cacheable* AsyncSource::getCacheOwner() const {
-  return encodedSource.get();
+UniqueKey AsyncSource::getUniqueKey() const {
+  return encodedSource->getUniqueKey();
 }
 
 std::shared_ptr<ImageSource> AsyncSource::onMakeMipMapped() const {

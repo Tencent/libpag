@@ -26,8 +26,8 @@ namespace tgfx {
 class SurfaceOptions {
  public:
   /**
-   * If this flag is set, the Surface will skip generating new caches to the associated Context for
-   * Cacheable objects during drawing.
+   * If this flag is set, the Surface will skip generating new caches to the associated Context
+   * during drawing.
    */
   static constexpr uint32_t DisableCacheFlag = 1 << 0;
 

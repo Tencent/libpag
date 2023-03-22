@@ -22,15 +22,15 @@
 #include "utils/UniqueID.h"
 
 namespace tgfx {
-static void ComputeRecycleKey(BytesKey* recycleKey, int width, int height, PixelFormat format,
+static void ComputeScratchKey(BytesKey* scratchKey, int width, int height, PixelFormat format,
                               bool mipMapped) {
   static const uint32_t PlainTextureType = UniqueID::Next();
-  recycleKey->write(PlainTextureType);
-  recycleKey->write(static_cast<uint32_t>(width));
-  recycleKey->write(static_cast<uint32_t>(height));
+  scratchKey->write(PlainTextureType);
+  scratchKey->write(static_cast<uint32_t>(width));
+  scratchKey->write(static_cast<uint32_t>(height));
   auto formatValue = static_cast<uint32_t>(format);
   auto mipMapValue = static_cast<uint32_t>(mipMapped ? 1 : 0);
-  recycleKey->write(formatValue | (mipMapValue << 30));
+  scratchKey->write(formatValue | (mipMapValue << 30));
 }
 
 std::shared_ptr<Texture> Texture::MakeFormat(Context* context, int width, int height,
@@ -42,10 +42,10 @@ std::shared_ptr<Texture> Texture::MakeFormat(Context* context, int width, int he
   }
   auto caps = context->caps();
   bool enableMipMap = mipMapped && caps->mipMapSupport;
-  BytesKey recycleKey = {};
-  ComputeRecycleKey(&recycleKey, width, height, pixelFormat, enableMipMap);
+  BytesKey scratchKey = {};
+  ComputeScratchKey(&scratchKey, width, height, pixelFormat, enableMipMap);
   auto texture =
-      std::static_pointer_cast<Texture>(context->resourceCache()->getRecycled(recycleKey));
+      std::static_pointer_cast<Texture>(context->resourceCache()->findScratchResource(scratchKey));
   if (texture) {
     texture->_origin = origin;
   } else {
@@ -89,8 +89,8 @@ size_t PlainTexture::memoryUsage() const {
   return sampler->hasMipmaps() ? colorSize * 4 / 3 : colorSize;
 }
 
-void PlainTexture::computeRecycleKey(BytesKey* recycleKey) const {
-  ComputeRecycleKey(recycleKey, width(), height(), sampler->format, sampler->hasMipmaps());
+void PlainTexture::computeScratchKey(BytesKey* scratchKey) const {
+  ComputeScratchKey(scratchKey, width(), height(), sampler->format, sampler->hasMipmaps());
 }
 
 void PlainTexture::onReleaseGPU() {

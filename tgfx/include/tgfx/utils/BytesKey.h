@@ -18,36 +18,65 @@
 
 #pragma once
 
-#include <memory>
+#include <cstddef>
+#include <cstdint>
+#include <unordered_map>
+#include <vector>
 
 namespace tgfx {
 /**
- * The base class for CPU objects that can generate GPU caches. The content of a Cacheable is
- * immutable. Releasing an Cacheable will immediately mark the corresponding GPU cache in the
- * context as expired, which becomes recyclable and will be purged at some point in the future.
+ * A key used for hashing a byte stream.
  */
-class Cacheable {
+class BytesKey {
  public:
-  virtual ~Cacheable() = default;
-
   /**
-   * Returns a global unique ID for this Cacheable. The content of a Cacheable cannot change after
-   * it is created. Any operation to create a new Cacheable will receive generate a new unique ID.
+   * Returns true if this key is valid.
    */
-  uint32_t uniqueID() const {
-    return _uniqueID;
+  bool isValid() const {
+    return !values.empty();
   }
 
- protected:
-  std::weak_ptr<Cacheable> weakThis;
+  /**
+   * Writes an uint32 value into the key.
+   */
+  void write(uint32_t value);
 
-  Cacheable();
+  /**
+   * Writes a pointer value into the key.
+   */
+  void write(const void* value);
+
+  /**
+   * Writes a uint32 value into the key.
+   */
+  void write(const uint8_t value[4]);
+
+  /**
+   * Writes a float value into the key.
+   */
+  void write(float value);
+
+  friend bool operator==(const BytesKey& a, const BytesKey& b) {
+    return a.values == b.values;
+  }
+
+  bool operator<(const BytesKey& key) const {
+    return values < key.values;
+  }
 
  private:
-  uint32_t _uniqueID = 0;
+  std::vector<uint32_t> values = {};
 
-  friend class ResourceCache;
-  friend class ProxyProvider;
-  friend class TextureProxy;
+  friend struct BytesKeyHasher;
 };
+
+/**
+ * The hasher for BytesKey.
+ */
+struct BytesKeyHasher {
+  size_t operator()(const BytesKey& key) const;
+};
+
+template <typename T>
+using BytesKeyMap = std::unordered_map<BytesKey, T, BytesKeyHasher>;
 }  // namespace tgfx

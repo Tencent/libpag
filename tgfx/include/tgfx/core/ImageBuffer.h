@@ -30,7 +30,7 @@ class Context;
 class Texture;
 
 /**
- * ImageBuffer describes a two-dimensional array of pixels which is optimized for creating textures.
+ * ImageBuffer describes a two-dimensional array of pixels and is optimized for creating textures.
  * ImageBuffer is immutable and safe across threads.
  */
 class ImageBuffer {
@@ -96,7 +96,7 @@ class ImageBuffer {
   ImageBuffer() = default;
 
   /**
-   * Creates a new Texture capturing the pixels in this image buffer. The mipMapped parameter
+   * Creates a new Texture capturing the pixels of the ImageBuffer. The mipMapped parameter
    * specifies whether created texture must allocate mip map levels.
    */
   virtual std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) const = 0;

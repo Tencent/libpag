@@ -649,6 +649,9 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
     if (colors) {
       processor = FragmentProcessor::MulInputByChildAlpha(std::move(processor));
     }
+    if (processor == nullptr) {
+      return;
+    }
     GpuPaint glPaint;
     glPaint.colorFragmentProcessors.emplace_back(std::move(processor));
     draw(std::move(rectOp), std::move(glPaint), false);

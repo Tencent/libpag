@@ -20,9 +20,9 @@
 #include <unordered_set>
 #include "base/utils/MatrixUtil.h"
 #include "rendering/caches/RenderCache.h"
-#include "tgfx/core/Clock.h"
 #include "tgfx/gpu/Surface.h"
 #include "tgfx/opengl/GLDevice.h"
+#include "tgfx/utils/Clock.h"
 
 namespace pag {
 static std::shared_ptr<tgfx::Image> RescaleImage(tgfx::Context* context,

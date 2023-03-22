@@ -18,11 +18,11 @@
 
 #pragma once
 
-#include "tgfx/core/Cacheable.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/core/TextBlob.h"
+#include "tgfx/gpu/ResourceKey.h"
 #include "tgfx/gpu/SurfaceOptions.h"
 
 namespace tgfx {
@@ -34,13 +34,13 @@ class GpuPaint;
  * Represents a geometric shape that can be used as a drawing mask. Shape is usually used to cache a
  * complex Path or TextBlob for frequent drawing. Unlike Path or TextBlob, Shape's resolution is
  * fixed after it is created unless it represents a simple rect or rrect. Therefore, drawing a Shape
- * with scale factors great than 1.0 may result in blurred output. Shape is thread safe.
+ * with scale factors greater than 1.0 may result in blurred output. Shape is thread safe.
  */
-class Shape : public Cacheable {
+class Shape {
  public:
   /**
    * Creates a Shape from the fills of the given path after being scaled by the resolutionScale.
-   * Returns nullptr if path is empty or resolutionScale is less than 0.
+   * Returns nullptr if the path is empty or resolutionScale is less than 0.
    */
   static std::shared_ptr<Shape> MakeFromFill(const Path& path, float resolutionScale = 1.0f);
 
@@ -66,6 +66,8 @@ class Shape : public Cacheable {
   static std::shared_ptr<Shape> MakeFromStroke(std::shared_ptr<TextBlob> textBlob,
                                                const Stroke& stroke, float resolutionScale = 1.0f);
 
+  virtual ~Shape() = default;
+
   /**
    * Returns the resolutionScale passed in when creating the Shape.
    */
@@ -79,9 +81,12 @@ class Shape : public Cacheable {
   virtual Rect getBounds() const = 0;
 
  protected:
+  UniqueKey uniqueKey = {};
+
   explicit Shape(float resolutionScale);
 
  private:
+  std::weak_ptr<Shape> weakThis;
   float _resolutionScale = 1.0f;
 
   virtual std::unique_ptr<DrawOp> makeOp(GpuPaint* paint, const Matrix& viewMatrix,
