@@ -78,7 +78,6 @@
       diskCacheItem.count--;
       if (diskCacheItem.count == 0) {
         [diskCacheDict removeObjectForKey:cacheName];
-        diskCacheItem = nil;
       }
     }
   }
