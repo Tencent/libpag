@@ -50,7 +50,7 @@ static CVOpenGLESTextureRef GetTextureRef(Context* context, CVPixelBufferRef pix
 std::shared_ptr<EAGLHardwareTexture> EAGLHardwareTexture::MakeFrom(Context* context,
                                                                    CVPixelBufferRef pixelBuffer) {
   std::shared_ptr<EAGLHardwareTexture> glTexture = nullptr;
-  BytesKey scratchKey = {};
+  ScratchKey scratchKey = {};
   ComputeScratchKey(&scratchKey, pixelBuffer);
   glTexture = std::static_pointer_cast<EAGLHardwareTexture>(
       context->resourceCache()->findScratchResource(scratchKey));

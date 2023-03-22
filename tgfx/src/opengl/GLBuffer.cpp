@@ -35,7 +35,7 @@ std::shared_ptr<GpuBuffer> GpuBuffer::Make(Context* context, BufferType bufferTy
     return nullptr;
   }
   auto target = bufferType == BufferType::Index ? GL_ELEMENT_ARRAY_BUFFER : GL_ARRAY_BUFFER;
-  BytesKey scratchKey = {};
+  ScratchKey scratchKey = {};
   ComputeScratchKey(&scratchKey, bufferType);
   auto glBuffer =
       std::static_pointer_cast<GLBuffer>(context->resourceCache()->findScratchResource(scratchKey));

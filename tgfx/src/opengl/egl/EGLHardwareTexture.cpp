@@ -56,10 +56,10 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(Context* contex
   if (!hardwareBuffer || !initialized || !HardwareBufferInterface::Available()) {
     return nullptr;
   }
-  BytesKey scratchKey = {};
+  ScratchKey scratchKey = {};
   ComputeScratchKey(&scratchKey, hardwareBuffer);
   auto glTexture = std::static_pointer_cast<EGLHardwareTexture>(
-      context->resourceCache()->getScratchResource(scratchKey));
+      context->resourceCache()->findScratchResource(scratchKey));
   if (glTexture != nullptr) {
     return glTexture;
   }

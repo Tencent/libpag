@@ -73,7 +73,7 @@ std::shared_ptr<Texture> Texture::MakeI420(Context* context, const YUVData* yuvD
   }
   PixelFormat yuvFormats[YUVData::I420_PLANE_COUNT] = {PixelFormat::GRAY_8, PixelFormat::GRAY_8,
                                                        PixelFormat::GRAY_8};
-  BytesKey scratchKey = {};
+  ScratchKey scratchKey = {};
   ComputeScratchKey(&scratchKey, yuvData->width(), yuvData->height(), YUVPixelFormat::I420);
   auto texture = std::static_pointer_cast<YUVTexture>(
       context->resourceCache()->findScratchResource(scratchKey));
@@ -98,7 +98,7 @@ std::shared_ptr<Texture> Texture::MakeNV12(Context* context, const YUVData* yuvD
     return nullptr;
   }
   PixelFormat yuvFormats[YUVData::NV12_PLANE_COUNT] = {PixelFormat::GRAY_8, PixelFormat::RG_88};
-  BytesKey scratchKey = {};
+  ScratchKey scratchKey = {};
   ComputeScratchKey(&scratchKey, yuvData->width(), yuvData->height(), YUVPixelFormat::NV12);
   auto texture = std::static_pointer_cast<YUVTexture>(
       context->resourceCache()->findScratchResource(scratchKey));

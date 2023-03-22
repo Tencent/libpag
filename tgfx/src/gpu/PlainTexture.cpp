@@ -42,7 +42,7 @@ std::shared_ptr<Texture> Texture::MakeFormat(Context* context, int width, int he
   }
   auto caps = context->caps();
   bool enableMipMap = mipMapped && caps->mipMapSupport;
-  BytesKey scratchKey = {};
+  ScratchKey scratchKey = {};
   ComputeScratchKey(&scratchKey, width, height, pixelFormat, enableMipMap);
   auto texture =
       std::static_pointer_cast<Texture>(context->resourceCache()->findScratchResource(scratchKey));
