@@ -19,9 +19,9 @@
 #include "tgfx/gpu/ResourceCache.h"
 #include <unordered_map>
 #include <unordered_set>
-#include "tgfx/core/BytesKey.h"
-#include "tgfx/core/Clock.h"
 #include "tgfx/gpu/Resource.h"
+#include "tgfx/utils/BytesKey.h"
+#include "tgfx/utils/Clock.h"
 #include "utils/Log.h"
 
 namespace tgfx {
@@ -95,8 +95,8 @@ void ResourceCache::releaseAll(bool releaseGPU) {
     delete resource;
   }
   purgeableResources.clear();
-  recycleKeyMap.clear();
-  cacheOwnerMap.clear();
+  scratchKeyMap.clear();
+  uniqueKeyMap.clear();
   purgeableBytes = 0;
   totalBytes = 0;
 }
@@ -109,16 +109,16 @@ void ResourceCache::setCacheLimit(size_t bytesLimit) {
   purgeUntilMemoryTo(maxBytes);
 }
 
-std::shared_ptr<Resource> ResourceCache::getRecycled(const BytesKey& recycleKey) {
-  auto result = recycleKeyMap.find(recycleKey);
-  if (result == recycleKeyMap.end()) {
+std::shared_ptr<Resource> ResourceCache::findScratchResource(const BytesKey& scratchKey) {
+  auto result = scratchKeyMap.find(scratchKey);
+  if (result == scratchKeyMap.end()) {
     return nullptr;
   }
   auto& list = result->second;
   int index = 0;
   bool found = false;
   for (auto& resource : list) {
-    if (resource->isPurgeable() && !resource->hasCacheOwner()) {
+    if (resource->isPurgeable() && !resource->hasValidUniqueKey()) {
       found = true;
       break;
     }
@@ -133,17 +133,9 @@ std::shared_ptr<Resource> ResourceCache::getRecycled(const BytesKey& recycleKey)
   return wrapResource(resource);
 }
 
-std::shared_ptr<Resource> ResourceCache::findResourceByOwner(const Cacheable* owner) {
-  if (owner == nullptr) {
-    return nullptr;
-  }
-  auto result = cacheOwnerMap.find(owner->uniqueID());
-  if (result == cacheOwnerMap.end()) {
-    return nullptr;
-  }
-  auto resource = result->second;
-  if (!resource->hasCacheOwner()) {
-    cacheOwnerMap.erase(result);
+std::shared_ptr<Resource> ResourceCache::findUniqueResource(const UniqueKey& uniqueKey) {
+  auto resource = getUniqueResource(uniqueKey);
+  if (resource == nullptr) {
     return nullptr;
   }
   if (resource->isPurgeable()) {
@@ -154,11 +146,25 @@ std::shared_ptr<Resource> ResourceCache::findResourceByOwner(const Cacheable* ow
   return resource->weakThis.lock();
 }
 
-bool ResourceCache::hasCache(const Cacheable* owner) {
-  if (owner == nullptr) {
-    return false;
+bool ResourceCache::hasUniqueResource(const UniqueKey& uniqueKey) {
+  return getUniqueResource(uniqueKey) != nullptr;
+}
+
+Resource* ResourceCache::getUniqueResource(const UniqueKey& uniqueKey) {
+  if (uniqueKey.empty()) {
+    return nullptr;
   }
-  return cacheOwnerMap.count(owner->uniqueID()) > 0;
+  auto result = uniqueKeyMap.find(uniqueKey.uniqueID());
+  if (result == uniqueKeyMap.end()) {
+    return nullptr;
+  }
+  auto resource = result->second;
+  if (!resource->hasValidUniqueKey()) {
+    uniqueKeyMap.erase(result);
+    resource->uniqueKey = {};
+    return nullptr;
+  }
+  return resource;
 }
 
 void ResourceCache::AddToList(std::list<Resource*>& list, Resource* resource) {
@@ -195,7 +201,7 @@ void ResourceCache::processUnreferencedResource(Resource* resource) {
   // 触发 NotifyReferenceReachedZero()
   DEBUG_ASSERT(context->device()->contextLocked);
   RemoveFromList(nonpurgeableResources, resource);
-  if (resource->recycleKey.isValid()) {
+  if (resource->scratchKey.isValid()) {
     auto hasBudget = purgeUntilMemoryTo(maxBytes - resource->memoryUsage());
     if (hasBudget) {
       AddToList(purgeableResources, resource);
@@ -207,23 +213,21 @@ void ResourceCache::processUnreferencedResource(Resource* resource) {
   removeResource(resource);
 }
 
-void ResourceCache::changeCacheOwner(Resource* resource, const Cacheable* owner) {
-  auto result = cacheOwnerMap.find(owner->uniqueID());
-  if (result != cacheOwnerMap.end()) {
-    result->second->removeCacheOwner();
+void ResourceCache::changeUniqueKey(Resource* resource, const UniqueKey& uniqueKey) {
+  auto result = uniqueKeyMap.find(uniqueKey.uniqueID());
+  if (result != uniqueKeyMap.end()) {
+    result->second->removeUniqueKey();
   }
-  if (resource->cacheOwnerID > 0) {
-    cacheOwnerMap.erase(resource->cacheOwnerID);
+  if (!resource->uniqueKey.empty()) {
+    uniqueKeyMap.erase(resource->uniqueKey.uniqueID());
   }
-  resource->cacheOwnerID = owner->uniqueID();
-  resource->cacheOwner = owner->weakThis;
-  cacheOwnerMap[owner->uniqueID()] = resource;
+  resource->uniqueKey = uniqueKey;
+  uniqueKeyMap[uniqueKey.uniqueID()] = resource;
 }
 
-void ResourceCache::removeCacheOwner(Resource* resource) {
-  cacheOwnerMap.erase(resource->cacheOwnerID);
-  resource->cacheOwnerID = 0;
-  resource->cacheOwner.reset();
+void ResourceCache::removeUniqueKey(Resource* resource) {
+  uniqueKeyMap.erase(resource->uniqueKey.uniqueID());
+  resource->uniqueKey = {};
 }
 
 std::shared_ptr<Resource> ResourceCache::wrapResource(Resource* resource) {
@@ -234,24 +238,24 @@ std::shared_ptr<Resource> ResourceCache::wrapResource(Resource* resource) {
 }
 
 std::shared_ptr<Resource> ResourceCache::addResource(Resource* resource) {
-  if (resource->recycleKey.isValid()) {
-    recycleKeyMap[resource->recycleKey].push_back(resource);
+  if (resource->scratchKey.isValid()) {
+    scratchKeyMap[resource->scratchKey].push_back(resource);
   }
   totalBytes += resource->memoryUsage();
   return wrapResource(resource);
 }
 
 void ResourceCache::removeResource(Resource* resource) {
-  if (resource->cacheOwnerID > 0) {
-    cacheOwnerMap.erase(resource->cacheOwnerID);
+  if (!resource->uniqueKey.empty()) {
+    removeUniqueKey(resource);
   }
-  if (resource->recycleKey.isValid()) {
-    auto result = recycleKeyMap.find(resource->recycleKey);
-    if (result != recycleKeyMap.end()) {
+  if (resource->scratchKey.isValid()) {
+    auto result = scratchKeyMap.find(resource->scratchKey);
+    if (result != scratchKeyMap.end()) {
       auto& list = result->second;
       list.erase(std::remove(list.begin(), list.end(), resource), list.end());
       if (list.empty()) {
-        recycleKeyMap.erase(resource->recycleKey);
+        scratchKeyMap.erase(resource->scratchKey);
       }
     }
   }
@@ -267,17 +271,17 @@ void ResourceCache::removeResource(Resource* resource) {
   }
 }
 
-void ResourceCache::purgeNotUsedSince(int64_t purgeTime, bool recycledResourcesOnly) {
-  purgeResourcesByLRU(recycledResourcesOnly,
+void ResourceCache::purgeNotUsedSince(int64_t purgeTime, bool scratchResourcesOnly) {
+  purgeResourcesByLRU(scratchResourcesOnly,
                       [&](Resource* resource) { return resource->lastUsedTime >= purgeTime; });
 }
 
-bool ResourceCache::purgeUntilMemoryTo(size_t bytesLimit, bool recycledResourcesOnly) {
-  purgeResourcesByLRU(recycledResourcesOnly, [&](Resource*) { return totalBytes <= bytesLimit; });
+bool ResourceCache::purgeUntilMemoryTo(size_t bytesLimit, bool scratchResourcesOnly) {
+  purgeResourcesByLRU(scratchResourcesOnly, [&](Resource*) { return totalBytes <= bytesLimit; });
   return totalBytes <= bytesLimit;
 }
 
-void ResourceCache::purgeResourcesByLRU(bool recycledResourcesOnly,
+void ResourceCache::purgeResourcesByLRU(bool scratchResourcesOnly,
                                         const std::function<bool(Resource*)>& satisfied) {
   std::vector<Resource*> needToPurge = {};
   for (auto item = purgeableResources.rbegin(); item != purgeableResources.rend(); item++) {
@@ -285,7 +289,7 @@ void ResourceCache::purgeResourcesByLRU(bool recycledResourcesOnly,
     if (satisfied(resource)) {
       break;
     }
-    if (!recycledResourcesOnly || !resource->hasCacheOwner()) {
+    if (!scratchResourcesOnly || !resource->hasValidUniqueKey()) {
       needToPurge.push_back(resource);
     }
   }

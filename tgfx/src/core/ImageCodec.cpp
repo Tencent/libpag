@@ -18,10 +18,10 @@
 
 #include "tgfx/core/ImageCodec.h"
 #include "core/PixelBuffer.h"
-#include "tgfx/core/Buffer.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Pixmap.h"
-#include "tgfx/core/Stream.h"
+#include "tgfx/utils/Buffer.h"
+#include "tgfx/utils/Stream.h"
 #include "utils/USE.h"
 
 #if defined(TGFX_USE_WEBP_DECODE) || defined(TGFX_USE_WEBP_ENCODE)

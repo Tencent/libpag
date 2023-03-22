@@ -18,8 +18,8 @@
 
 #include "codecs/webp/WebpCodec.h"
 #include "codecs/webp/WebpUtility.h"
-#include "tgfx/core/Buffer.h"
 #include "tgfx/core/Pixmap.h"
+#include "tgfx/utils/Buffer.h"
 
 namespace tgfx {
 

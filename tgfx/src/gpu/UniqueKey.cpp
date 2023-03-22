@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,10 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/Cacheable.h"
+#include <memory>
+
+#include "tgfx/gpu/ResourceKey.h"
 #include "utils/UniqueID.h"
 
 namespace tgfx {
-Cacheable::Cacheable() : _uniqueID(UniqueID::Next()) {
+UniqueKey UniqueKey::Next() {
+  UniqueKey uniqueKey = {};
+  uniqueKey.id = std::make_shared<uint32_t>(UniqueID::Next());
+  return uniqueKey;
 }
 }  // namespace tgfx

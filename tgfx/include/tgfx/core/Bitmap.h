@@ -42,11 +42,11 @@ class Bitmap {
   Bitmap() = default;
 
   /**
-   * Creates a new Bitmap and try to allocate its pixels by the specified width, height, and the
-   * native color type. and allocates pixel memory. If the alphaOnly is true, sets ImageInfo to
-   * ColorType::ALPHA_8. If the tryHardware is true and there is hardware buffer support on the
-   * current platform, a hardware backed PixelRef is allocated. Otherwise, a raster PixelRef is
-   * allocated. The isEmpty() method of the Bitmap will return true if allocation fails.
+   * Creates a new Bitmap and tries to allocate its pixels by the specified width, height, and
+   * native color type. If the alphaOnly is true, sets ImageInfo to ColorType::ALPHA_8. If the
+   * tryHardware is true and there is hardware buffer support on the current platform, a hardware
+   * backed PixelRef is allocated. Otherwise, a raster PixelRef is allocated. The isEmpty() method
+   * of the Bitmap will return true if allocation fails.
    */
   Bitmap(int width, int height, bool alphaOnly = false, bool tryHardware = true);
 
@@ -205,7 +205,9 @@ class Bitmap {
 
   /**
    * Returns an ImageBuffer object capturing the pixels in the Bitmap. Subsequent writing of the
-   * Bitmap will not be captured. Returns nullptr if the Bitmap is empty.
+   * Bitmap will not be captured. Instead, the Bitmap will copy its pixels to a new pixel buffer if
+   * there is a subsequent writing call to the Bitmap while the returned ImageBuffer is still alive.
+   * Returns nullptr if the Bitmap is empty.
    */
   std::shared_ptr<ImageBuffer> makeBuffer() const;
 

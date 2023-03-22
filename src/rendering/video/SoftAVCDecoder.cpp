@@ -18,7 +18,7 @@
 
 #include "SoftAVCDecoder.h"
 #include <cstdlib>
-#include "tgfx/core/Buffer.h"
+#include "tgfx/utils/Buffer.h"
 
 #ifdef PAG_USE_LIBAVC
 

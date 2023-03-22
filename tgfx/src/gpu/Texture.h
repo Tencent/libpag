@@ -71,7 +71,7 @@ class Texture : public Resource {
                       mipMapped);
   }
   /**
-   * Creates a empty texture with each pixel stored as a single translucency (alpha) channel.
+   * Creates an empty texture with each pixel stored as a single translucency (alpha) channel.
    * Returns nullptr if any of the parameters is invalid or the backend does not support creating
    * alpha only textures.
    */

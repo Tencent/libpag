@@ -49,8 +49,8 @@ class SurfaceImageReader : public ImageReader {
    * Acquires the next ImageBuffer from the SurfaceImageReader after a new image frame has been
    * rendered into the associated Surface instance. The returned ImageBuffer will be blocked when
    * generating textures until the SurfaceImageReader.notifyFrameAvailable() method is called.
-   * Note that the previously returned image buffers will immediately become invalid after the newly
-   * created ImageBuffer is drawn.
+   * Note that the previously returned image buffers will immediately expire after the newly created
+   * ImageBuffer is drawn.
    */
   virtual std::shared_ptr<ImageBuffer> acquireNextBuffer() = 0;
 

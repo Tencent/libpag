@@ -25,7 +25,7 @@
 #include "rendering/utils/GLRestorer.h"
 #include "rendering/utils/LockGuard.h"
 #include "rendering/utils/shaper/TextShaper.h"
-#include "tgfx/core/Clock.h"
+#include "tgfx/utils/Clock.h"
 
 namespace pag {
 

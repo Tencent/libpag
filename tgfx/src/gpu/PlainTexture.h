@@ -40,7 +40,7 @@ class PlainTexture : public Texture {
   }
 
  protected:
-  void computeRecycleKey(BytesKey* recycleKey) const override;
+  void computeScratchKey(BytesKey* scratchKey) const override;
 
  private:
   std::unique_ptr<TextureSampler> sampler = {};

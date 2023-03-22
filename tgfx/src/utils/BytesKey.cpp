@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/BytesKey.h"
+#include "tgfx/utils/BytesKey.h"
 #include <cstring>
 
 namespace tgfx {
@@ -57,7 +57,7 @@ void BytesKey::write(float value) {
   values.push_back(converter.uintValue);
 }
 
-size_t BytesHasher::operator()(const BytesKey& key) const {
+size_t BytesKeyHasher::operator()(const BytesKey& key) const {
   auto hash = key.values.size();
   for (auto& value : key.values) {
     hash ^= value + 0x9e3779b9 + (hash << 6u) + (hash >> 2u);

@@ -21,7 +21,7 @@
 #include <list>
 #include "VideoDecoder.h"
 #include "pag/decoder.h"
-#include "tgfx/core/Buffer.h"
+#include "tgfx/utils/Buffer.h"
 
 namespace pag {
 class SoftwareDecoderWrapper : public VideoDecoder {

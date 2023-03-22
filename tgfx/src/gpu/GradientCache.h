@@ -22,9 +22,9 @@
 #include <unordered_map>
 
 #include "core/PixelBuffer.h"
-#include "tgfx/core/BytesKey.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Pixmap.h"
+#include "tgfx/utils/BytesKey.h"
 
 namespace tgfx {
 class GradientCache {
@@ -42,6 +42,6 @@ class GradientCache {
   void add(const BytesKey& bytesKey, std::shared_ptr<Texture> texture);
 
   std::list<BytesKey> keys = {};
-  std::unordered_map<BytesKey, std::shared_ptr<Texture>, BytesHasher> textures = {};
+  BytesKeyMap<std::shared_ptr<Texture>> textures = {};
 };
 }  // namespace tgfx

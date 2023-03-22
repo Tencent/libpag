@@ -21,7 +21,7 @@
 #include <memory>
 
 #include "Processor.h"
-#include "tgfx/core/BytesKey.h"
+#include "tgfx/utils/BytesKey.h"
 
 namespace tgfx {
 class GLXferProcessor;

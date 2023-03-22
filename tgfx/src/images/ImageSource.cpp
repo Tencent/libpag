@@ -20,6 +20,7 @@
 #include "BufferSource.h"
 #include "EncodedSource.h"
 #include "TextureSource.h"
+#include "tgfx/gpu/ResourceKey.h"
 
 namespace tgfx {
 
@@ -50,9 +51,14 @@ std::shared_ptr<ImageSource> ImageSource::MakeFrom(std::shared_ptr<Texture> text
   return source;
 }
 
+ImageSource::ImageSource() {
+  uniqueKey = UniqueKey::Next();
+}
+
 std::shared_ptr<ImageSource> ImageSource::makeTextureSource(Context* context) const {
   auto resourceCache = context->resourceCache();
-  auto texture = std::static_pointer_cast<Texture>(resourceCache->findResourceByOwner(this));
+  auto texture =
+      std::static_pointer_cast<Texture>(resourceCache->findUniqueResource(getUniqueKey()));
   if (texture != nullptr) {
     return MakeFrom(texture);
   }
@@ -78,8 +84,8 @@ std::shared_ptr<ImageSource> ImageSource::makeDecoded(Context* context) const {
   return source;
 }
 
-const Cacheable* ImageSource::getCacheOwner() const {
-  return this;
+UniqueKey ImageSource::getUniqueKey() const {
+  return uniqueKey;
 }
 
 std::shared_ptr<ImageSource> ImageSource::onMakeDecoded(Context*) const {
@@ -104,15 +110,15 @@ std::shared_ptr<TextureProxy> ImageSource::lockTextureProxy(Context* context,
     return nullptr;
   }
   auto provider = context->proxyProvider();
-  auto proxy = provider->findProxyByOwner(this);
+  auto proxy = provider->findProxyByUniqueKey(getUniqueKey());
   if (proxy != nullptr) {
     return proxy;
   }
   proxy = onMakeTextureProxy(context, surfaceFlags);
   if (proxy != nullptr) {
-    auto updateTextureOwner =
+    auto updateTextureKey =
         !(surfaceFlags & SurfaceOptions::DisableCacheFlag) && !isTextureBacked();
-    proxy->assignProxyOwner(getCacheOwner(), updateTextureOwner);
+    proxy->assignUniqueKey(getUniqueKey(), updateTextureKey);
   }
   return proxy;
 }

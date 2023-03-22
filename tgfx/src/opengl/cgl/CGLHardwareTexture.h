@@ -40,7 +40,7 @@ class CGLHardwareTexture : public Texture {
   }
 
  protected:
-  void computeRecycleKey(BytesKey* recycleKey) const override;
+  void computeScratchKey(BytesKey* scratchKey) const override;
 
  private:
   std::unique_ptr<TextureSampler> sampler = {};
@@ -48,7 +48,7 @@ class CGLHardwareTexture : public Texture {
   CVOpenGLTextureRef texture = nil;
   CVOpenGLTextureCacheRef textureCache = nil;
 
-  static void ComputeRecycleKey(BytesKey* recycleKey, CVPixelBufferRef pixelBuffer);
+  static void ComputeScratchKey(BytesKey* scratchKey, CVPixelBufferRef pixelBuffer);
 
   void onReleaseGPU() override;
 };

@@ -21,8 +21,8 @@
 #include "opengl/GLContext.h"
 #include "opengl/GLSampler.h"
 #include "opengl/GLUtil.h"
-#include "tgfx/core/Buffer.h"
 #include "tgfx/core/Pixmap.h"
+#include "tgfx/utils/Buffer.h"
 #include "utils/PixelFormatUtil.h"
 
 namespace tgfx {

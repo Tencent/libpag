@@ -19,8 +19,8 @@
 #pragma once
 
 #include "pag/types.h"
-#include "tgfx/core/BytesKey.h"
 #include "tgfx/core/Font.h"
+#include "tgfx/utils/BytesKey.h"
 
 namespace pag {
 /**

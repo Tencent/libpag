@@ -23,8 +23,8 @@
 namespace tgfx {
 /**
  * AsyncSource wraps an existing EncodedSource and schedules an asynchronous decoding task
- * immediately. AsyncSource uses the original EncodedSource as the cache owner for all generated
- * proxies and textures.
+ * immediately. AsyncSource uses the original EncodedSource's UniqueKey for all generated proxies
+ * and textures.
  */
 class AsyncSource : public ImageSource {
  public:
@@ -45,7 +45,7 @@ class AsyncSource : public ImageSource {
   }
 
  protected:
-  const Cacheable* getCacheOwner() const override;
+  UniqueKey getUniqueKey() const override;
 
   std::shared_ptr<ImageSource> onMakeMipMapped() const override;
 

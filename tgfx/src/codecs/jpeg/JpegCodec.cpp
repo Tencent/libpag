@@ -18,8 +18,8 @@
 
 #include "codecs/jpeg/JpegCodec.h"
 #include <csetjmp>
-#include "tgfx/core/Buffer.h"
 #include "tgfx/core/Pixmap.h"
+#include "tgfx/utils/Buffer.h"
 #include "utils/OrientationHelper.h"
 
 extern "C" {

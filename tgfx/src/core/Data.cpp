@@ -18,7 +18,7 @@
 
 #include "tgfx/core/Data.h"
 #include <cstring>
-#include "tgfx/core/Stream.h"
+#include "tgfx/utils/Stream.h"
 
 namespace tgfx {
 std::shared_ptr<Data> Data::MakeFromFile(const std::string& filePath) {

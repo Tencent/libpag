@@ -27,7 +27,7 @@
 #include "framework/utils/Semaphore.h"
 #include "nlohmann/json.hpp"
 #include "rendering/caches/RenderCache.h"
-#include "tgfx/core/Clock.h"
+#include "tgfx/utils/Clock.h"
 #include "tgfx/utils/Task.h"
 
 namespace pag {

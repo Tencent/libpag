@@ -19,21 +19,21 @@
 #pragma once
 
 #include "tgfx/gpu/ResourceCache.h"
-#include "tgfx/core/Cacheable.h"
+#include "tgfx/gpu/ResourceKey.h"
 
 namespace tgfx {
 /**
- * The base class for GPU resource. Overrides the onReleaseGPU() method to to free all GPU
- * resources. No backend API calls should be made during destructuring since there may be no GPU
- * context which is current on the calling thread. Note: Resource is not thread safe, do not access
- * any properties of a Resource unless its associated device is locked.
+ * The base class for GPU resource. Overrides the onReleaseGPU() method to free all GPU resources.
+ * No backend API calls should be made during destructuring since there may be no GPU context which
+ * is current on the calling thread. Note: Resource is not thread safe, do not access any properties
+ * of a Resource unless its associated device is locked.
  */
 class Resource {
  public:
   template <class T>
   static std::shared_ptr<T> Wrap(Context* context, T* resource) {
     resource->context = context;
-    static_cast<Resource*>(resource)->computeRecycleKey(&resource->recycleKey);
+    static_cast<Resource*>(resource)->computeScratchKey(&resource->scratchKey);
     return std::static_pointer_cast<T>(context->resourceCache()->addResource(resource));
   }
 
@@ -52,32 +52,31 @@ class Resource {
   virtual size_t memoryUsage() const = 0;
 
   /**
-   * Assigns a cache owner to the resource. The resource will be findable via this owner using
-   * ResourceCache.findResourceByOwner(). This method is not thread safe, call it only when the
+   * Assigns a UniqueKey to the resource. The resource will be findable via this UniqueKey using
+   * ResourceCache.findUniqueResource(). This method is not thread safe, call it only when the
    * associated context is locked.
    */
-  void assignCacheOwner(const Cacheable* owner);
+  void assignUniqueKey(const UniqueKey& newKey);
 
   /*
-   * Removes the cache owner from the resource. This method is not thread safe, call it only when
+   * Removes the UniqueKey from the resource. This method is not thread safe, call it only when
    * the associated context is locked.
    */
-  void removeCacheOwner();
+  void removeUniqueKey();
 
  protected:
   Context* context = nullptr;
 
   /**
-   * Overridden to compute a recycleKey to make this Resource reusable.
+   * Overridden to compute a scratchKey to make this Resource reusable.
    */
-  virtual void computeRecycleKey(BytesKey*) const {
+  virtual void computeScratchKey(BytesKey*) const {
   }
 
  private:
   std::weak_ptr<Resource> weakThis;
-  BytesKey recycleKey = {};
-  uint32_t cacheOwnerID = 0;
-  std::weak_ptr<Cacheable> cacheOwner;
+  ScratchKey scratchKey = {};
+  UniqueKey uniqueKey = {};
   std::list<Resource*>::iterator cachedPosition;
   int64_t lastUsedTime = 0;
 
@@ -85,8 +84,8 @@ class Resource {
     return weakThis.expired();
   }
 
-  bool hasCacheOwner() const {
-    return !cacheOwner.expired();
+  bool hasValidUniqueKey() const {
+    return !uniqueKey.empty() && !uniqueKey.unique();
   }
 
   /**

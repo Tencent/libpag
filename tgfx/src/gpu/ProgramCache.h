@@ -45,7 +45,7 @@ class ProgramCache {
  private:
   Context* context = nullptr;
   std::list<Program*> programLRU = {};
-  std::unordered_map<BytesKey, Program*, BytesHasher> programMap = {};
+  BytesKeyMap<Program*> programMap = {};
 
   void removeOldestProgram(bool releaseGPU = true);
   void releaseAll(bool releaseGPU);
