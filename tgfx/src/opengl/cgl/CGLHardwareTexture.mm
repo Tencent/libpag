@@ -23,7 +23,7 @@
 namespace tgfx {
 std::shared_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(
     Context* context, CVPixelBufferRef pixelBuffer, CVOpenGLTextureCacheRef textureCache) {
-  BytesKey scratchKey = {};
+  ScratchKey scratchKey = {};
   ComputeScratchKey(&scratchKey, pixelBuffer);
   auto glTexture = std::static_pointer_cast<CGLHardwareTexture>(
       context->resourceCache()->findScratchResource(scratchKey));
