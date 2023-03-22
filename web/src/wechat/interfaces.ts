@@ -41,7 +41,7 @@ export interface VideoDecoder {
     /** 事件名
      *
      * 参数 eventName 可选值：
-     * - 'start': 开始事件。返回 {width, height};
+     * - 'start': 开始事件。返回 \{ width, height \};
      * - 'stop': 结束事件。;
      * - 'seek': seek 完成事件。;
      * - 'bufferchange': 缓冲区变化事件。;
@@ -65,7 +65,7 @@ export interface FrameDataOptions {
   width: number;
 }
 
-interface VideoDecoderStartOption {
+export interface VideoDecoderStartOption {
   /** 需要解码的视频源文件。基础库 2.13.0 以下的版本只支持本地路径。 2.13.0 开始支持 http:// 和 https:// 协议的远程路径。 */
   source: string;
   /** 解码模式。0：按 pts 解码；1：以最快速度解码 */

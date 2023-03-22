@@ -11,12 +11,5 @@
     "outDir": "./lib",
     "resolveJsonModule": true
   },
-  "include": ["src/**/*.ts", "demo/**/*.ts"],
-  "typedocOptions": {
-    "out": "./api-docs",
-    "exclude": "**/**.js",
-    "darkHighlightTheme": "dark-plus",
-    "readme": "none",
-    "sort": "visibility"
-  }
+  "include": ["src/**/*.ts", "demo/**/*.ts"]
 }
