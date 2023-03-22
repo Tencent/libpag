@@ -18,15 +18,23 @@
 
 #import <Foundation/Foundation.h>
 
+#import "PAGDiskCache.h"
+
 NS_ASSUME_NONNULL_BEGIN
 
-@interface PAGCacheQueueManager : NSObject
+@interface PAGDiskCacheItem : NSObject
+@property(nonatomic, retain) PAGDiskCache* diskCache;
+@property(nonatomic, assign) NSInteger count;
+@end
+
+@interface PAGDiskCacheManager : NSObject
 
 + (instancetype)shareInstance;
 
-- (dispatch_queue_t)queueForPath:(NSString* __nonnull)cachePath;
+- (PAGDiskCacheItem* __nullable)objectDiskCacheFor:(NSString* __nonnull)cacheName
+                                        frameCount:(NSInteger)frameCount;
 
-- (void)removeQueueForPath:(NSString* __nonnull)cachePath;
+- (void)removeDiskCacheFrom:(NSString* __nonnull)cacheName;
 
 @end
 
