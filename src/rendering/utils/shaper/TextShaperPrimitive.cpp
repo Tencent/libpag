@@ -37,6 +37,9 @@ PositionedGlyphs TextShaperPrimitive::Shape(const std::string& text,
     if (glyphID == 0) {
       for (const auto& faceHolder : fallbackTypefaces) {
         auto face = faceHolder->getTypeface();
+        if (face == nullptr) {
+          continue;
+        }
         glyphID = face->getGlyphID(str);
         if (glyphID != 0) {
           glyphs.emplace_back(std::move(face), glyphID, oldPosition - &(text[0]));
