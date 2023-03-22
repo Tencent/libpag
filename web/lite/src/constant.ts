@@ -10,7 +10,7 @@ export const WEBGL_CONTEXT_ATTRIBUTES = {
   alpha: true,
   depth: false,
   stencil: false,
-  antialias: false,
+  antialias: true,
 };
 
 // 混合模式
