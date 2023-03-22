@@ -22,6 +22,7 @@
 #include "base/utils/UniqueID.h"
 #include "rendering/caches/ImageContentCache.h"
 #include "rendering/caches/LayerCache.h"
+#include "rendering/editing/ImageReplacement.h"
 #include "rendering/filters/utils/Filter3DFactory.h"
 #include "rendering/renderers/FilterRenderer.h"
 #include "rendering/sequences/SequenceImageProxy.h"
@@ -109,9 +110,9 @@ void RenderCache::preparePreComposeLayer(PreComposeLayer* layer) {
 
 void RenderCache::prepareImageLayer(PAGImageLayer* pagLayer) {
   std::shared_ptr<Graphic> graphic = nullptr;
-  auto pagImage = static_cast<PAGImageLayer*>(pagLayer)->getPAGImage();
-  if (pagImage != nullptr) {
-    graphic = pagImage->getGraphic();
+  auto replacement = static_cast<PAGImageLayer*>(pagLayer)->replacement;
+  if (replacement != nullptr) {
+    graphic = replacement->getGraphic();
   } else {
     auto imageBytes = static_cast<ImageLayer*>(pagLayer->layer)->imageBytes;
     graphic = ImageContentCache::GetGraphic(imageBytes);

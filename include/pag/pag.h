@@ -152,16 +152,14 @@ class PAG_API PAGImage {
  protected:
   PAGImage(int width, int height);
 
-  virtual std::shared_ptr<Graphic> getGraphic() = 0;
+  virtual std::shared_ptr<Graphic> getGraphic(Frame frame) const = 0;
 
   virtual bool isStill() const = 0;
 
-  virtual bool setContentTime(int64_t time) = 0;
-
-  mutable std::mutex locker = {};
-  PAGLayer* owner = nullptr;
+  virtual Frame getContentFrame(int64_t time) const = 0;
 
  private:
+  mutable std::mutex locker = {};
   ID _uniqueID = 0;
   int _width = 0;
   int _height = 0;
@@ -170,10 +168,6 @@ class PAG_API PAGImage {
   bool hasSetScaleMode = false;
 
   Matrix getContentMatrix(int defaultScaleMode, int contentWidth, int contentHeight);
-
-  void setOwner(PAGLayer* owner);
-
-  PAGLayer* getOwner() const;
 
   friend class ImageReplacement;
 
