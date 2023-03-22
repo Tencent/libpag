@@ -583,7 +583,8 @@ static NSString* RemovePathVariableComponent(NSString* original) {
     [pagDecoder release];
     pagDecoder = nil;
   }
-  if (self.memoryCacheEnabled && [self->imagesMap count] == (NSUInteger)self->numFrames) {
+  if (self.memoryCacheEnabled && self->imageViewCacheItem &&
+      [self->imagesMap count] == (NSUInteger)self->numFrames) {
     [[PAGDiskCacheManager shareInstance] removeDiskCacheFrom:cacheKey];
     [self->imageViewCacheItem release];
     self->imageViewCacheItem = nil;
