@@ -32,7 +32,7 @@ ImageReplacement::ImageReplacement(ImageLayer* imageLayer, std::shared_ptr<PAGIm
 
 void ImageReplacement::measureBounds(tgfx::Rect* bounds) {
   tgfx::Rect contentBounds = {};
-  auto graphic = pagImage->getGraphic();
+  auto graphic = pagImage->getGraphic(contentFrame);
   graphic->measureBounds(&contentBounds);
   auto contentMatrix = pagImage->getContentMatrix(defaultScaleMode, contentWidth, contentHeight);
   ToTGFX(contentMatrix).mapRect(&contentBounds);
@@ -46,7 +46,7 @@ void ImageReplacement::draw(Recorder* recorder) {
   recorder->saveClip(0, 0, static_cast<float>(contentWidth), static_cast<float>(contentHeight));
   auto contentMatrix = pagImage->getContentMatrix(defaultScaleMode, contentWidth, contentHeight);
   recorder->concat(ToTGFX(contentMatrix));
-  recorder->drawGraphic(pagImage->getGraphic());
+  recorder->drawGraphic(pagImage->getGraphic(contentFrame));
   recorder->restore();
 }
 
@@ -59,6 +59,19 @@ tgfx::Point ImageReplacement::getScaleFactor() const {
 
 std::shared_ptr<PAGImage> ImageReplacement::getImage() {
   return pagImage;
+}
+
+bool ImageReplacement::setContentTime(int64_t time) {
+  auto currentFrame = pagImage->getContentFrame(time);
+  if (currentFrame == contentFrame) {
+    return false;
+  }
+  contentFrame = currentFrame;
+  return true;
+}
+
+std::shared_ptr<Graphic> ImageReplacement::getGraphic() {
+  return pagImage->getGraphic(contentFrame);
 }
 
 }  // namespace pag

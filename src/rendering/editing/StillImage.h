@@ -29,7 +29,7 @@ class StillImage : public PAGImage {
   static std::shared_ptr<StillImage> MakeFrom(std::shared_ptr<tgfx::Image> image);
 
  protected:
-  std::shared_ptr<Graphic> getGraphic() override {
+  std::shared_ptr<Graphic> getGraphic(int64_t) const override {
     return graphic;
   }
 
@@ -37,8 +37,8 @@ class StillImage : public PAGImage {
     return true;
   }
 
-  bool setContentTime(int64_t) override {
-    return false;
+  Frame getContentFrame(int64_t) const override {
+    return 0;
   }
 
  private:
