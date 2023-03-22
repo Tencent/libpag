@@ -152,15 +152,15 @@ public class PAGImageView extends View {
      * it to true if you prefer rendering speed over memory usage. If set to false, the PAGImageView
      * loads only one image frame at a time into the memory. The default value is false.
      */
-    public void cacheAllFramesInMemory(boolean enable) {
-        isCacheAllFramesInMemory = enable;
+    public boolean cacheAllFramesInMemory() {
+        return isCacheAllFramesInMemory;
     }
 
     /**
      * Sets the value of the cacheAllFramesInMemory property.
      */
-    public boolean setCacheAllFramesInMemory() {
-        return isCacheAllFramesInMemory;
+    public void setCacheAllFramesInMemory(boolean enable) {
+        isCacheAllFramesInMemory = enable;
     }
 
     /**
