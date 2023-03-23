@@ -64,6 +64,17 @@ class Resource {
    */
   void removeUniqueKey();
 
+  /**
+   * Marks the associated UniqueKey as expired. This method is thread safe.
+   */
+  void markUniqueKeyExpired();
+
+  /**
+   * Returns true if the Resource has the same UniqueKey to the newKey and not expired. This method
+   * is thread safe.
+   */
+  bool hasUniqueKey(const UniqueKey& newKey) const;
+
  protected:
   Context* context = nullptr;
 
@@ -77,6 +88,7 @@ class Resource {
   std::weak_ptr<Resource> weakThis;
   ScratchKey scratchKey = {};
   UniqueKey uniqueKey = {};
+  std::atomic_uint32_t uniqueKeyGeneration = 0;
   std::list<Resource*>::iterator cachedPosition;
   int64_t lastUsedTime = 0;
 
@@ -85,7 +97,7 @@ class Resource {
   }
 
   bool hasValidUniqueKey() const {
-    return !uniqueKey.empty() && !uniqueKey.unique();
+    return !uniqueKey.empty() && !uniqueKey.unique() && uniqueKey.uniqueID() == uniqueKeyGeneration;
   }
 
   /**

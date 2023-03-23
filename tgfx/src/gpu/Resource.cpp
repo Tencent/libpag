@@ -34,4 +34,12 @@ void Resource::removeUniqueKey() {
     context->resourceCache()->removeUniqueKey(this);
   }
 }
+
+void Resource::markUniqueKeyExpired() {
+  uniqueKeyGeneration = 0;
+}
+
+bool Resource::hasUniqueKey(const UniqueKey& newKey) const {
+  return !newKey.empty() && newKey.uniqueID() == uniqueKeyGeneration;
+}
 }  // namespace tgfx

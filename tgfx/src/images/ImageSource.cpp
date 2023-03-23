@@ -20,7 +20,7 @@
 #include "BufferSource.h"
 #include "EncodedSource.h"
 #include "TextureSource.h"
-#include "tgfx/gpu/ResourceKey.h"
+#include "gpu/Texture.h"
 
 namespace tgfx {
 
@@ -51,6 +51,7 @@ std::shared_ptr<ImageSource> ImageSource::MakeFrom(UniqueKey uniqueKey,
   if (texture == nullptr) {
     return nullptr;
   }
+  texture->assignUniqueKey(uniqueKey);
   auto source =
       std::shared_ptr<TextureSource>(new TextureSource(std::move(uniqueKey), std::move(texture)));
   source->weakThis = source;
