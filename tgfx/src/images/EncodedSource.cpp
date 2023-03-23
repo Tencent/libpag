@@ -20,21 +20,21 @@
 #include "AsyncSource.h"
 
 namespace tgfx {
-EncodedSource::EncodedSource(std::shared_ptr<ImageGenerator> generator, bool mipMapped)
-    : generator(std::move(generator)), mipMapped(mipMapped) {
+EncodedSource::EncodedSource(UniqueKey uniqueKey, std::shared_ptr<ImageGenerator> generator,
+                             bool mipMapped)
+    : ImageSource(std::move(uniqueKey)), generator(std::move(generator)), mipMapped(mipMapped) {
 }
 
 std::shared_ptr<ImageSource> EncodedSource::onMakeDecoded(Context* context) const {
-  auto uniqueKey = getUniqueKey();
   if (context != nullptr && context->resourceCache()->hasUniqueResource(uniqueKey)) {
     return nullptr;
   }
   auto encodedSource = std::static_pointer_cast<EncodedSource>(weakThis.lock());
-  return std::shared_ptr<AsyncSource>(new AsyncSource(std::move(encodedSource)));
+  return std::shared_ptr<AsyncSource>(new AsyncSource(uniqueKey, generator, mipMapped));
 }
 
 std::shared_ptr<ImageSource> EncodedSource::onMakeMipMapped() const {
-  return std::shared_ptr<EncodedSource>(new EncodedSource(generator, true));
+  return std::shared_ptr<EncodedSource>(new EncodedSource(UniqueKey::Next(), generator, true));
 }
 
 std::shared_ptr<TextureProxy> EncodedSource::onMakeTextureProxy(Context* context,

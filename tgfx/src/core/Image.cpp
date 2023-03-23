@@ -34,7 +34,7 @@ std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
   if (codec == nullptr) {
     return nullptr;
   }
-  auto source = ImageSource::MakeFrom(codec);
+  auto source = ImageSource::MakeFrom(UniqueKey::Next(), codec);
   return MakeFrom(source, codec->origin());
 }
 
@@ -43,7 +43,7 @@ std::shared_ptr<Image> Image::MakeFromEncoded(std::shared_ptr<Data> encodedData)
   if (codec == nullptr) {
     return nullptr;
   }
-  auto source = ImageSource::MakeFrom(codec);
+  auto source = ImageSource::MakeFrom(UniqueKey::Next(), codec);
   return MakeFrom(source, codec->origin());
 }
 
@@ -53,7 +53,7 @@ std::shared_ptr<Image> Image::MakeFrom(NativeImageRef nativeImage) {
 }
 
 std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageGenerator> generator) {
-  auto source = ImageSource::MakeFrom(std::move(generator));
+  auto source = ImageSource::MakeFrom(UniqueKey::Next(), std::move(generator));
   return MakeFrom(std::move(source));
 }
 
@@ -86,7 +86,7 @@ std::shared_ptr<Image> Image::MakeNV12(std::shared_ptr<YUVData> yuvData, YUVColo
 }
 
 std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageBuffer> imageBuffer) {
-  auto source = ImageSource::MakeFrom(std::move(imageBuffer));
+  auto source = ImageSource::MakeFrom(UniqueKey::Next(), std::move(imageBuffer));
   return MakeFrom(std::move(source));
 }
 
@@ -103,7 +103,7 @@ std::shared_ptr<Image> Image::MakeAdopted(Context* context, const BackendTexture
 }
 
 std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Texture> texture) {
-  auto source = ImageSource::MakeFrom(std::move(texture));
+  auto source = ImageSource::MakeFrom(UniqueKey::Next(), std::move(texture));
   return MakeFrom(std::move(source));
 }
 
