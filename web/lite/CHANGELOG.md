@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.0.7
+
+### Feature
+
+- WebGL开启AA和使用线性过滤器
+
 ## 0.0.6
 
 ### Feature
