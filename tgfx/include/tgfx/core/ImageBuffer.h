@@ -31,7 +31,10 @@ class Texture;
 
 /**
  * ImageBuffer describes a two-dimensional array of pixels and is optimized for creating textures.
- * ImageBuffer is immutable and safe across threads.
+ * ImageBuffer is immutable and safe across threads. The content of an ImageBuffer never changes,
+ * but some ImageBuffers may have a limited lifetime and cannot create textures after they expire.
+ * For example, the ImageBuffers generated from an ImageReader. In other cases, ImageBuffers usually
+ * only expire if explicitly stated by the creator.
  */
 class ImageBuffer {
  public:
@@ -91,6 +94,14 @@ class ImageBuffer {
    * defined by ColorType::ALPHA_8.
    */
   virtual bool isAlphaOnly() const = 0;
+
+  /**
+   * Returns true if the ImageBuffer is expired, which means it cannot create any new textures.
+   * However, you can still safely access all of its properties across threads.
+   */
+  virtual bool expired() const {
+    return false;
+  }
 
  protected:
   ImageBuffer() = default;
