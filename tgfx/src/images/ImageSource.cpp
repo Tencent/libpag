@@ -20,41 +20,52 @@
 #include "BufferSource.h"
 #include "EncodedSource.h"
 #include "TextureSource.h"
+#include "gpu/Texture.h"
 
 namespace tgfx {
 
-std::shared_ptr<ImageSource> ImageSource::MakeFrom(std::shared_ptr<ImageGenerator> generator) {
+std::shared_ptr<ImageSource> ImageSource::MakeFrom(UniqueKey uniqueKey,
+                                                   std::shared_ptr<ImageGenerator> generator) {
   if (generator == nullptr) {
     return nullptr;
   }
-  auto source = std::shared_ptr<EncodedSource>(new EncodedSource(std::move(generator)));
+  auto source =
+      std::shared_ptr<EncodedSource>(new EncodedSource(std::move(uniqueKey), std::move(generator)));
   source->weakThis = source;
   return source;
 }
 
-std::shared_ptr<ImageSource> ImageSource::MakeFrom(std::shared_ptr<ImageBuffer> buffer) {
+std::shared_ptr<ImageSource> ImageSource::MakeFrom(UniqueKey uniqueKey,
+                                                   std::shared_ptr<ImageBuffer> buffer) {
   if (buffer == nullptr) {
     return nullptr;
   }
-  auto source = std::shared_ptr<BufferSource>(new BufferSource(std::move(buffer)));
+  auto source =
+      std::shared_ptr<BufferSource>(new BufferSource(std::move(uniqueKey), std::move(buffer)));
   source->weakThis = source;
   return source;
 }
 
-std::shared_ptr<ImageSource> ImageSource::MakeFrom(std::shared_ptr<Texture> texture) {
+std::shared_ptr<ImageSource> ImageSource::MakeFrom(UniqueKey uniqueKey,
+                                                   std::shared_ptr<Texture> texture) {
   if (texture == nullptr) {
     return nullptr;
   }
-  auto source = std::shared_ptr<TextureSource>(new TextureSource(std::move(texture)));
+  texture->assignUniqueKey(uniqueKey);
+  auto source =
+      std::shared_ptr<TextureSource>(new TextureSource(std::move(uniqueKey), std::move(texture)));
   source->weakThis = source;
   return source;
+}
+
+ImageSource::ImageSource(UniqueKey uniqueKey) : uniqueKey(std::move(uniqueKey)) {
 }
 
 std::shared_ptr<ImageSource> ImageSource::makeTextureSource(Context* context) const {
   auto resourceCache = context->resourceCache();
-  auto texture = std::static_pointer_cast<Texture>(resourceCache->findResourceByOwner(this));
+  auto texture = std::static_pointer_cast<Texture>(resourceCache->findUniqueResource(uniqueKey));
   if (texture != nullptr) {
-    return MakeFrom(texture);
+    return MakeFrom(uniqueKey, texture);
   }
   auto proxy = lockTextureProxy(context, SurfaceOptions::DisableAsyncTaskFlag);
   if (proxy == nullptr) {
@@ -63,7 +74,7 @@ std::shared_ptr<ImageSource> ImageSource::makeTextureSource(Context* context) co
   if (!proxy->isInstantiated()) {
     proxy->instantiate();
   }
-  return MakeFrom(proxy->getTexture());
+  return MakeFrom(uniqueKey, proxy->getTexture());
 }
 
 std::shared_ptr<ImageSource> ImageSource::makeDecoded(Context* context) const {
@@ -76,10 +87,6 @@ std::shared_ptr<ImageSource> ImageSource::makeDecoded(Context* context) const {
   }
   source->weakThis = source;
   return source;
-}
-
-const Cacheable* ImageSource::getCacheOwner() const {
-  return this;
 }
 
 std::shared_ptr<ImageSource> ImageSource::onMakeDecoded(Context*) const {
@@ -104,15 +111,15 @@ std::shared_ptr<TextureProxy> ImageSource::lockTextureProxy(Context* context,
     return nullptr;
   }
   auto provider = context->proxyProvider();
-  auto proxy = provider->findProxyByOwner(this);
+  auto proxy = provider->findProxyByUniqueKey(uniqueKey);
   if (proxy != nullptr) {
     return proxy;
   }
   proxy = onMakeTextureProxy(context, surfaceFlags);
   if (proxy != nullptr) {
-    auto updateTextureOwner =
+    auto updateTextureKey =
         !(surfaceFlags & SurfaceOptions::DisableCacheFlag) && !isTextureBacked();
-    proxy->assignProxyOwner(getCacheOwner(), updateTextureOwner);
+    proxy->assignUniqueKey(uniqueKey, updateTextureKey);
   }
   return proxy;
 }

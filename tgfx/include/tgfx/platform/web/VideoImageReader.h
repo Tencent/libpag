@@ -30,7 +30,7 @@ class VideoImageReader : public ImageReader {
  public:
   /**
    * Creates a new BufferQueue from the specified HTMLVideoElement object and the video size.
-   * Returns nullptr if the video is null or the buffer size are zero.
+   * Returns nullptr if the video is null or the buffer size is zero.
    */
   static std::shared_ptr<VideoImageReader> MakeFrom(emscripten::val video, int width, int height);
 
@@ -38,7 +38,7 @@ class VideoImageReader : public ImageReader {
    * Acquires the next ImageBuffer from the VideoImageReader after a new image frame has been
    * rendered into the associated HTMLVideoElement. The returned ImageBuffer will call the
    * promise.await() method before generating textures. Note that the previously returned image
-   * buffers will immediately become invalid after the newly created ImageBuffer is drawn.
+   * buffers will immediately expire after the newly created ImageBuffer is drawn.
    */
   std::shared_ptr<ImageBuffer> acquireNextBuffer(emscripten::val promise);
 

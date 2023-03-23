@@ -21,8 +21,8 @@
 #include "gpu/ProgramCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ResourceProvider.h"
-#include "tgfx/core/Clock.h"
 #include "tgfx/gpu/ResourceCache.h"
+#include "tgfx/utils/Clock.h"
 #include "utils/Log.h"
 
 namespace tgfx {
@@ -91,12 +91,12 @@ void Context::setCacheLimit(size_t bytesLimit) {
   _resourceCache->setCacheLimit(bytesLimit);
 }
 
-void Context::purgeResourcesNotUsedSince(int64_t purgeTime, bool recycledResourcesOnly) {
-  _resourceCache->purgeNotUsedSince(purgeTime, recycledResourcesOnly);
+void Context::purgeResourcesNotUsedSince(int64_t purgeTime, bool scratchResourcesOnly) {
+  _resourceCache->purgeNotUsedSince(purgeTime, scratchResourcesOnly);
 }
 
-bool Context::purgeResourcesUntilMemoryTo(size_t bytesLimit, bool recycledResourcesOnly) {
-  return _resourceCache->purgeUntilMemoryTo(bytesLimit, recycledResourcesOnly);
+bool Context::purgeResourcesUntilMemoryTo(size_t bytesLimit, bool scratchResourcesOnly) {
+  return _resourceCache->purgeUntilMemoryTo(bytesLimit, scratchResourcesOnly);
 }
 
 void Context::releaseAll(bool releaseGPU) {

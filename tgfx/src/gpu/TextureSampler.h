@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "tgfx/core/BytesKey.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/PixelFormat.h"
+#include "tgfx/utils/BytesKey.h"
 
 namespace tgfx {
 enum class TextureType { Unknown, TwoD, Rectangle, External };

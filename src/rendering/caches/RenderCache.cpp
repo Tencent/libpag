@@ -27,7 +27,7 @@
 #include "rendering/renderers/FilterRenderer.h"
 #include "rendering/sequences/SequenceImageProxy.h"
 #include "rendering/sequences/SequenceInfo.h"
-#include "tgfx/core/Clock.h"
+#include "tgfx/utils/Clock.h"
 
 namespace pag {
 // 300M设置的大一些用于兜底，通常在大于20M时就开始随时清理。
@@ -214,7 +214,7 @@ void RenderCache::detachFromContext() {
   clearExpiredDecodedImages();
   clearExpiredSnapshots();
   if (!timestamps.empty()) {
-    // Always purge recycled resources that haven't been used in 1 frame.
+    // Always purge scratch resources that haven't been used in 1 frame.
     context->purgeResourcesNotUsedSince(timestamps.back(), true);
   }
   if (context->memoryUsage() + graphicsMemory > PURGEABLE_GRAPHICS_MEMORY &&

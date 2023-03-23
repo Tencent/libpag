@@ -56,10 +56,10 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(Context* contex
   if (!hardwareBuffer || !initialized || !HardwareBufferInterface::Available()) {
     return nullptr;
   }
-  BytesKey recycleKey = {};
-  ComputeRecycleKey(&recycleKey, hardwareBuffer);
+  ScratchKey scratchKey = {};
+  ComputeScratchKey(&scratchKey, hardwareBuffer);
   auto glTexture = std::static_pointer_cast<EGLHardwareTexture>(
-      context->resourceCache()->getRecycled(recycleKey));
+      context->resourceCache()->findScratchResource(scratchKey));
   if (glTexture != nullptr) {
     return glTexture;
   }
@@ -109,10 +109,10 @@ EGLHardwareTexture::~EGLHardwareTexture() {
   HardwareBufferInterface::Release(hardwareBuffer);
 }
 
-void EGLHardwareTexture::ComputeRecycleKey(BytesKey* recycleKey, void* hardwareBuffer) {
+void EGLHardwareTexture::ComputeScratchKey(BytesKey* scratchKey, void* hardwareBuffer) {
   static const uint32_t BGRAType = UniqueID::Next();
-  recycleKey->write(BGRAType);
-  recycleKey->write(hardwareBuffer);
+  scratchKey->write(BGRAType);
+  scratchKey->write(hardwareBuffer);
 }
 
 size_t EGLHardwareTexture::memoryUsage() const {

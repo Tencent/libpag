@@ -139,21 +139,21 @@ class DeferredTextureProxy : public TextureProxy {
 ProxyProvider::ProxyProvider(Context* context) : context(context) {
 }
 
-std::shared_ptr<TextureProxy> ProxyProvider::findProxyByOwner(const Cacheable* owner) {
-  if (owner == nullptr) {
+std::shared_ptr<TextureProxy> ProxyProvider::findProxyByUniqueKey(const UniqueKey& uniqueKey) {
+  if (uniqueKey.empty()) {
     return nullptr;
   }
-  auto result = proxyOwnerMap.find(owner->uniqueID());
+  auto result = proxyOwnerMap.find(uniqueKey.uniqueID());
   if (result != proxyOwnerMap.end()) {
     return result->second->weakThis.lock();
   }
   auto resourceCache = context->resourceCache();
-  auto texture = std::static_pointer_cast<Texture>(resourceCache->findResourceByOwner(owner));
+  auto texture = std::static_pointer_cast<Texture>(resourceCache->findUniqueResource(uniqueKey));
   if (texture == nullptr) {
     return nullptr;
   }
   auto proxy = wrapTexture(texture);
-  proxy->assignProxyOwner(owner, false);
+  proxy->assignUniqueKey(uniqueKey, false);
   return proxy;
 }
 
@@ -212,21 +212,21 @@ std::shared_ptr<TextureProxy> ProxyProvider::wrapTexture(std::shared_ptr<Texture
   return proxy;
 }
 
-void ProxyProvider::changeProxyOwner(TextureProxy* proxy, uint32_t proxyOwnerID) {
-  auto result = proxyOwnerMap.find(proxyOwnerID);
+void ProxyProvider::changeUniqueKey(TextureProxy* proxy, const UniqueKey& uniqueKey) {
+  auto result = proxyOwnerMap.find(uniqueKey.uniqueID());
   if (result != proxyOwnerMap.end()) {
-    result->second->removeProxyOwner();
+    result->second->removeUniqueKey();
   }
-  if (proxy->proxyOwnerID) {
-    proxyOwnerMap.erase(proxy->proxyOwnerID);
+  if (!proxy->uniqueKey.empty()) {
+    proxyOwnerMap.erase(proxy->uniqueKey.uniqueID());
   }
-  proxy->proxyOwnerID = proxyOwnerID;
-  proxyOwnerMap[proxyOwnerID] = proxy;
+  proxy->uniqueKey = uniqueKey;
+  proxyOwnerMap[uniqueKey.uniqueID()] = proxy;
 }
 
-void ProxyProvider::removeProxyOwner(TextureProxy* proxy) {
-  proxyOwnerMap.erase(proxy->proxyOwnerID);
-  proxy->proxyOwnerID = 0;
+void ProxyProvider::removeUniqueKey(TextureProxy* proxy) {
+  proxyOwnerMap.erase(proxy->uniqueKey.uniqueID());
+  proxy->uniqueKey = {};
 }
 
 }  // namespace tgfx

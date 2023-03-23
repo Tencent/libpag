@@ -19,7 +19,7 @@
 #include "VideoReader.h"
 #include "base/utils/TimeUtil.h"
 #include "platform/Platform.h"
-#include "tgfx/core/Clock.h"
+#include "tgfx/utils/Clock.h"
 
 namespace pag {
 static constexpr int MAX_TRY_DECODE_COUNT = 100;

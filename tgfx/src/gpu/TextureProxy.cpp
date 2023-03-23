@@ -25,8 +25,8 @@ TextureProxy::TextureProxy(ProxyProvider* provider, std::shared_ptr<Texture> tex
 }
 
 TextureProxy::~TextureProxy() {
-  if (proxyOwnerID != 0) {
-    provider->proxyOwnerMap.erase(proxyOwnerID);
+  if (!uniqueKey.empty()) {
+    provider->proxyOwnerMap.erase(uniqueKey.uniqueID());
   }
 }
 
@@ -55,40 +55,32 @@ bool TextureProxy::instantiate() {
     return true;
   }
   texture = onMakeTexture(provider->context);
-  if (texture != nullptr && !cacheOwner.expired()) {
-    auto owner = cacheOwner.lock();
-    texture->assignCacheOwner(owner.get());
+  if (texture != nullptr && setTextureUniqueKey) {
+    texture->assignUniqueKey(uniqueKey);
   }
   return texture != nullptr;
 }
 
-void TextureProxy::assignProxyOwner(const Cacheable* owner, bool updateTextureOwner) {
-  if (owner == nullptr) {
-    removeProxyOwner(updateTextureOwner);
+void TextureProxy::assignUniqueKey(const UniqueKey& newKey, bool updateTextureKey) {
+  if (newKey.empty()) {
+    removeUniqueKey(updateTextureKey);
     return;
   }
-  if (proxyOwnerID != owner->uniqueID()) {
-    provider->changeProxyOwner(this, owner->uniqueID());
+  if (newKey != uniqueKey) {
+    provider->changeUniqueKey(this, newKey);
   }
-  if (!updateTextureOwner) {
-    return;
-  }
-  cacheOwner = owner->weakThis;
-  if (texture != nullptr) {
-    texture->assignCacheOwner(owner);
+  setTextureUniqueKey = updateTextureKey;
+  if (setTextureUniqueKey && texture != nullptr) {
+    texture->assignUniqueKey(newKey);
   }
 }
 
-void TextureProxy::removeProxyOwner(bool updateTexture) {
-  if (proxyOwnerID != 0) {
-    provider->removeProxyOwner(this);
+void TextureProxy::removeUniqueKey(bool updateTextureKey) {
+  if (!uniqueKey.empty()) {
+    provider->removeUniqueKey(this);
   }
-  if (!updateTexture) {
-    return;
-  }
-  cacheOwner.reset();
-  if (texture != nullptr) {
-    texture->removeCacheOwner();
+  if (updateTextureKey && texture != nullptr) {
+    texture->removeUniqueKey();
   }
 }
 

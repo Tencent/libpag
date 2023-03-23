@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/platform/ImageReader.h"
+#include "gpu/Texture.h"
 #include "utils/Log.h"
 
 namespace tgfx {
@@ -36,6 +37,10 @@ class ImageReaderBuffer : public ImageBuffer {
 
   bool isAlphaOnly() const override {
     return false;
+  }
+
+  bool expired() const override {
+    return contentVersion < imageReader->textureVersion;
   }
 
  protected:
@@ -61,6 +66,7 @@ std::shared_ptr<Texture> ImageReader::readTexture(int bufferVersion, Context* co
   if (bufferVersion > textureVersion) {
     auto success = onUpdateTexture(context, mipMapped);
     if (success) {
+      texture->markUniqueKeyExpired();
       textureVersion = bufferVersion;
     }
   }

@@ -20,7 +20,7 @@
 #include "MP4Generator.h"
 #include "base/utils/Log.h"
 #include "codec/utils/EncodeStream.h"
-#include "tgfx/core/Clock.h"
+#include "tgfx/utils/Clock.h"
 
 namespace pag {
 static const int SEQUENCE_NUMBER = 1;

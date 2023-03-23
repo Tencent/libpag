@@ -23,10 +23,10 @@
 #include "utils/UniqueID.h"
 
 namespace tgfx {
-static void ComputeRecycleKey(BytesKey* recycleKey, BufferType bufferType) {
+static void ComputeScratchKey(BytesKey* scratchKey, BufferType bufferType) {
   static const uint32_t Type = UniqueID::Next();
-  recycleKey->write(Type);
-  recycleKey->write(static_cast<uint32_t>(bufferType));
+  scratchKey->write(Type);
+  scratchKey->write(static_cast<uint32_t>(bufferType));
 }
 
 std::shared_ptr<GpuBuffer> GpuBuffer::Make(Context* context, BufferType bufferType,
@@ -35,10 +35,10 @@ std::shared_ptr<GpuBuffer> GpuBuffer::Make(Context* context, BufferType bufferTy
     return nullptr;
   }
   auto target = bufferType == BufferType::Index ? GL_ELEMENT_ARRAY_BUFFER : GL_ARRAY_BUFFER;
-  BytesKey recycleKey = {};
-  ComputeRecycleKey(&recycleKey, bufferType);
+  ScratchKey scratchKey = {};
+  ComputeScratchKey(&scratchKey, bufferType);
   auto glBuffer =
-      std::static_pointer_cast<GLBuffer>(context->resourceCache()->getRecycled(recycleKey));
+      std::static_pointer_cast<GLBuffer>(context->resourceCache()->findScratchResource(scratchKey));
   auto gl = GLFunctions::Get(context);
   if (glBuffer == nullptr) {
     unsigned bufferID = 0;
@@ -60,8 +60,8 @@ std::shared_ptr<GpuBuffer> GpuBuffer::Make(Context* context, BufferType bufferTy
   return glBuffer;
 }
 
-void GLBuffer::computeRecycleKey(BytesKey* bytesKey) const {
-  ComputeRecycleKey(bytesKey, _bufferType);
+void GLBuffer::computeScratchKey(BytesKey* bytesKey) const {
+  ComputeScratchKey(bytesKey, _bufferType);
 }
 
 void GLBuffer::onReleaseGPU() {

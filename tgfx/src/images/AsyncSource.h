@@ -22,32 +22,16 @@
 
 namespace tgfx {
 /**
- * AsyncSource wraps an existing EncodedSource and schedules an asynchronous decoding task
- * immediately. AsyncSource uses the original EncodedSource as the cache owner for all generated
- * proxies and textures.
+ * AsyncSource wraps an ImageGenerator and schedules an asynchronous decoding task immediately.
  */
-class AsyncSource : public ImageSource {
+class AsyncSource : public EncodedSource {
  public:
-  int width() const override {
-    return encodedSource->width();
-  }
-
-  int height() const override {
-    return encodedSource->height();
-  }
-
-  bool hasMipmaps() const override {
-    return encodedSource->hasMipmaps();
-  }
-
-  bool isAlphaOnly() const override {
-    return encodedSource->isAlphaOnly();
+  bool isLazyGenerated() const override {
+    return false;
   }
 
  protected:
-  const Cacheable* getCacheOwner() const override;
-
-  std::shared_ptr<ImageSource> onMakeMipMapped() const override;
+  std::shared_ptr<ImageSource> onMakeDecoded(Context* context) const override;
 
   std::shared_ptr<TextureProxy> onMakeTextureProxy(Context* context,
                                                    uint32_t surfaceFlags) const override;
@@ -55,9 +39,9 @@ class AsyncSource : public ImageSource {
  private:
   std::shared_ptr<ImageGeneratorTask> imageTask = nullptr;
   std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
-  std::shared_ptr<EncodedSource> encodedSource = nullptr;
 
-  explicit AsyncSource(std::shared_ptr<EncodedSource> source);
+  explicit AsyncSource(UniqueKey uniqueKey, std::shared_ptr<ImageGenerator> generator,
+                       bool mipMapped = false);
 
   friend class EncodedSource;
 };

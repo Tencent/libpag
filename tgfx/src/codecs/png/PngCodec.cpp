@@ -18,8 +18,8 @@
 
 #include "codecs/png/PngCodec.h"
 #include "png.h"
-#include "tgfx/core/Buffer.h"
 #include "tgfx/core/Pixmap.h"
+#include "tgfx/utils/Buffer.h"
 
 namespace tgfx {
 std::shared_ptr<ImageCodec> PngCodec::MakeFrom(const std::string& filePath) {

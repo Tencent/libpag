@@ -21,8 +21,8 @@
 #include <functional>
 #include <list>
 #include <unordered_map>
-#include "tgfx/core/Cacheable.h"
 #include "tgfx/gpu/Context.h"
+#include "tgfx/gpu/ResourceKey.h"
 
 namespace tgfx {
 class Resource;
@@ -66,37 +66,37 @@ class ResourceCache {
   void setCacheLimit(size_t bytesLimit);
 
   /**
-   * Returns a reusable resource in the cache by the specified recycleKey.
+   * Returns a scratch resource in the cache by the specified ScratchKey.
    */
-  std::shared_ptr<Resource> getRecycled(const BytesKey& recycleKey);
+  std::shared_ptr<Resource> findScratchResource(const ScratchKey& scratchKey);
 
   /**
-   * Returns a unique resource in the cache by the specified cache owner.
+   * Returns a unique resource in the cache by the specified UniqueKey.
    */
-  std::shared_ptr<Resource> findResourceByOwner(const Cacheable* owner);
+  std::shared_ptr<Resource> findUniqueResource(const UniqueKey& uniqueKey);
 
   /**
-   * Returns true if there is a corresponding resource cache for the specified cache owner.
+   * Returns true if there is a corresponding unique resource for the specified UniqueKey.
    */
-  bool hasCache(const Cacheable* owner);
+  bool hasUniqueResource(const UniqueKey& uniqueKey);
 
   /**
    * Purges GPU resources that haven't been used the passed in time.
    * @param purgeTime A timestamp previously returned by Clock::Now().
-   * @param recycledResourcesOnly If it is true the purgeable resources containing persistent data
-   * are spared. If it is false then all purgeable resources will be deleted.
+   * @param scratchResourcesOnly If true, the purgeable resources containing unique keys are spared.
+   * If false, then all purgeable resources will be deleted.
    */
-  void purgeNotUsedSince(int64_t purgeTime, bool recycledResourcesOnly = false);
+  void purgeNotUsedSince(int64_t purgeTime, bool scratchResourcesOnly = false);
 
   /**
    * Purge unreferenced resources from the cache until the the provided bytesLimit has been reached
    * or we have purged all unreferenced resources. Returns true if the total resource bytes is not
    * over the specified bytesLimit after purging.
    * @param bytesLimit The desired number of bytes after puring.
-   * @param recycledResourcesOnly If it is true the purgeable resources containing persistent data
-   * are spared. If it is false then all purgeable resources will be deleted.
+   * @param scratchResourcesOnly If true, the purgeable resources containing unique keys are spared.
+   * If false, then all purgeable resources will be deleted.
    */
-  bool purgeUntilMemoryTo(size_t bytesLimit, bool recycledResourcesOnly = false);
+  bool purgeUntilMemoryTo(size_t bytesLimit, bool scratchResourcesOnly = false);
 
  private:
   Context* context = nullptr;
@@ -107,8 +107,8 @@ class ResourceCache {
   std::vector<std::shared_ptr<Resource>> strongReferences = {};
   std::list<Resource*> nonpurgeableResources = {};
   std::list<Resource*> purgeableResources = {};
-  std::unordered_map<BytesKey, std::vector<Resource*>, BytesHasher> recycleKeyMap = {};
-  std::unordered_map<uint32_t, Resource*> cacheOwnerMap = {};
+  ScratchKeyMap<std::vector<Resource*>> scratchKeyMap = {};
+  std::unordered_map<uint32_t, Resource*> uniqueKeyMap = {};
   std::mutex removeLocker = {};
   std::vector<Resource*> pendingPurgeableResources = {};
 
@@ -123,11 +123,12 @@ class ResourceCache {
   std::shared_ptr<Resource> wrapResource(Resource* resource);
   std::shared_ptr<Resource> addResource(Resource* resource);
   void removeResource(Resource* resource);
-  void purgeResourcesByLRU(bool recycledResourcesOnly,
+  void purgeResourcesByLRU(bool scratchResourcesOnly,
                            const std::function<bool(Resource*)>& satisfied);
 
-  void changeCacheOwner(Resource* resource, const Cacheable* owner);
-  void removeCacheOwner(Resource* resource);
+  void changeUniqueKey(Resource* resource, const UniqueKey& uniqueKey);
+  void removeUniqueKey(Resource* resource);
+  Resource* getUniqueResource(const UniqueKey& uniqueKey);
 
   friend class Resource;
   friend class Context;

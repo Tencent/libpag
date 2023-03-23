@@ -91,7 +91,7 @@ std::shared_ptr<Graphic> Text::MakeFrom(const std::vector<GlyphHandle>& glyphs,
   // 用 vector 存 key 的目的是让文字叠加顺序固定。
   // 不固定的话叠加区域的像素会不一样，肉眼看不出来，但是测试用例的结果不稳定。
   std::vector<tgfx::BytesKey> styleKeys = {};
-  std::unordered_map<tgfx::BytesKey, std::vector<Glyph*>, tgfx::BytesHasher> styleMap = {};
+  tgfx::BytesKeyMap<std::vector<Glyph*>> styleMap = {};
   for (auto& glyph : glyphs) {
     if (!glyph->isVisible()) {
       continue;

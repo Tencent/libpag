@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "tgfx/core/BytesKey.h"
 #include "tgfx/gpu/Context.h"
+#include "tgfx/utils/BytesKey.h"
 #include "utils/UniqueID.h"
 
 namespace tgfx {

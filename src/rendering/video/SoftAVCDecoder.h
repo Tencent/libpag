@@ -23,8 +23,8 @@
 #include "base/utils/Log.h"
 #include "pag/decoder.h"
 #include "pag/types.h"
-#include "tgfx/core/Buffer.h"
 #include "tgfx/core/Data.h"
+#include "tgfx/utils/Buffer.h"
 
 extern "C" {
 #pragma clang diagnostic push

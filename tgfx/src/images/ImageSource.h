@@ -19,34 +19,41 @@
 #pragma once
 
 #include "gpu/ProxyProvider.h"
-#include "tgfx/core/Cacheable.h"
 #include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/ImageGenerator.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/SurfaceOptions.h"
 
 namespace tgfx {
+class UniqueKey;
+
 /**
  * ImageSource generates texture proxies for images.
  */
-class ImageSource : public Cacheable {
+class ImageSource {
  public:
   /**
    * Creates ImageSource from an image generator. ImageSource is returned if the generator is not
    * nullptr. The image generator may wrap codec data or custom data.
    */
-  static std::shared_ptr<ImageSource> MakeFrom(std::shared_ptr<ImageGenerator> generator);
+  static std::shared_ptr<ImageSource> MakeFrom(UniqueKey uniqueKey,
+                                               std::shared_ptr<ImageGenerator> generator);
 
   /**
    * Creates ImageSource from ImageBuffer, ImageSource is returned if the imageBuffer is not nullptr
    * and its dimensions are greater than zero.
    */
-  static std::shared_ptr<ImageSource> MakeFrom(std::shared_ptr<ImageBuffer> buffer);
+  static std::shared_ptr<ImageSource> MakeFrom(UniqueKey uniqueKey,
+                                               std::shared_ptr<ImageBuffer> buffer);
 
   /**
-   * Creates ImageSource from Texture, ImageSource is returned if texture is not nullptr.
+   * Creates ImageSource from Texture, ImageSource is returned if texture is not nullptr. Note that
+   * this method is not thread safe, must be called while the asscociated context is locked.
    */
-  static std::shared_ptr<ImageSource> MakeFrom(std::shared_ptr<Texture> texture);
+  static std::shared_ptr<ImageSource> MakeFrom(UniqueKey uniqueKey,
+                                               std::shared_ptr<Texture> texture);
+
+  virtual ~ImageSource() = default;
 
   /**
    * Returns the width of the target image.
@@ -121,7 +128,10 @@ class ImageSource : public Cacheable {
   std::shared_ptr<TextureProxy> lockTextureProxy(Context* context, uint32_t surfaceFlags = 0) const;
 
  protected:
-  virtual const Cacheable* getCacheOwner() const;
+  UniqueKey uniqueKey = {};
+  std::weak_ptr<ImageSource> weakThis;
+
+  explicit ImageSource(UniqueKey uniqueKey);
 
   virtual std::shared_ptr<ImageSource> onMakeDecoded(Context* context) const;
 

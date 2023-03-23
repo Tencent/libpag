@@ -52,7 +52,7 @@ class BufferSource : public ImageSource {
   std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
   bool mipMapped = false;
 
-  BufferSource(std::shared_ptr<ImageBuffer> buffer, bool mipMapped = false);
+  BufferSource(UniqueKey uniqueKey, std::shared_ptr<ImageBuffer> buffer, bool mipMapped = false);
 
   friend class ImageSource;
   friend class AsyncSource;

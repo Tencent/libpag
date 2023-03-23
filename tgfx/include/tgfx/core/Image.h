@@ -192,7 +192,8 @@ class Image {
    * corresponding texture cache in the context, returns an Image wraps that texture. Otherwise,
    * creates one immediately, which may block the calling thread. Returns the original Image if the
    * Image is texture backed and the context is compatible with the backing GPU texture. Otherwise,
-   * returns nullptr.
+   * returns nullptr. The associated CPU memory can be freed entirely by setting the original Image
+   * to nullptr, since the returned Image contains only a GPU texture.
    */
   std::shared_ptr<Image> makeTextureImage(Context* context) const;
 

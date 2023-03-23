@@ -30,8 +30,11 @@ class Context;
 class Texture;
 
 /**
- * ImageBuffer describes a two-dimensional array of pixels which is optimized for creating textures.
- * ImageBuffer is immutable and safe across threads.
+ * ImageBuffer describes a two-dimensional array of pixels and is optimized for creating textures.
+ * ImageBuffer is immutable and safe across threads. The content of an ImageBuffer never changes,
+ * but some ImageBuffers may have a limited lifetime and cannot create textures after they expire.
+ * For example, the ImageBuffers generated from an ImageReader. In other cases, ImageBuffers usually
+ * only expire if explicitly stated by the creator.
  */
 class ImageBuffer {
  public:
@@ -92,11 +95,19 @@ class ImageBuffer {
    */
   virtual bool isAlphaOnly() const = 0;
 
+  /**
+   * Returns true if the ImageBuffer is expired, which means it cannot create any new textures.
+   * However, you can still safely access all of its properties across threads.
+   */
+  virtual bool expired() const {
+    return false;
+  }
+
  protected:
   ImageBuffer() = default;
 
   /**
-   * Creates a new Texture capturing the pixels in this image buffer. The mipMapped parameter
+   * Creates a new Texture capturing the pixels of the ImageBuffer. The mipMapped parameter
    * specifies whether created texture must allocate mip map levels.
    */
   virtual std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) const = 0;

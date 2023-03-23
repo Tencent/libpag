@@ -20,11 +20,11 @@
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
 #include "opengl/GLUtil.h"
-#include "tgfx/core/Buffer.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/gpu/Surface.h"
 #include "tgfx/opengl/GLDevice.h"
+#include "tgfx/utils/Buffer.h"
 
 namespace pag {
 using namespace tgfx;

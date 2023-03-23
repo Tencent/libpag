@@ -54,11 +54,12 @@ class EncodedSource : public ImageSource {
   std::shared_ptr<TextureProxy> onMakeTextureProxy(Context* context,
                                                    uint32_t surfaceFlags) const override;
 
- private:
+ protected:
   std::shared_ptr<ImageGenerator> generator = nullptr;
   bool mipMapped = false;
 
-  EncodedSource(std::shared_ptr<ImageGenerator> generator, bool mipMapped = false);
+  EncodedSource(UniqueKey uniqueKey, std::shared_ptr<ImageGenerator> generator,
+                bool mipMapped = false);
 
   friend class AsyncSource;
   friend class ImageSource;

@@ -23,10 +23,10 @@
 namespace tgfx {
 std::shared_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(
     Context* context, CVPixelBufferRef pixelBuffer, CVOpenGLTextureCacheRef textureCache) {
-  BytesKey recycleKey = {};
-  ComputeRecycleKey(&recycleKey, pixelBuffer);
+  ScratchKey scratchKey = {};
+  ComputeScratchKey(&scratchKey, pixelBuffer);
   auto glTexture = std::static_pointer_cast<CGLHardwareTexture>(
-      context->resourceCache()->getRecycled(recycleKey));
+      context->resourceCache()->findScratchResource(scratchKey));
   if (glTexture) {
     return glTexture;
   }
@@ -55,13 +55,13 @@ std::shared_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(
   return glTexture;
 }
 
-void CGLHardwareTexture::ComputeRecycleKey(BytesKey* recycleKey, CVPixelBufferRef pixelBuffer) {
+void CGLHardwareTexture::ComputeScratchKey(BytesKey* scratchKey, CVPixelBufferRef pixelBuffer) {
   static const uint32_t BGRAType = UniqueID::Next();
-  recycleKey->write(BGRAType);
+  scratchKey->write(BGRAType);
   // 这里可以直接用指针做为 key 是因为缓存的 holder 会持有 CVPixelBuffer，只要 holder
   // 缓存存在，对应的 CVPixelBuffer
   // 指针就是有效的，不会出现指针地址被其他新创建对象占用的情况。其他情况下应该避免使用指针做 key。
-  recycleKey->write(pixelBuffer);
+  scratchKey->write(pixelBuffer);
 }
 
 CGLHardwareTexture::CGLHardwareTexture(CVPixelBufferRef pixelBuffer)
@@ -83,8 +83,8 @@ size_t CGLHardwareTexture::memoryUsage() const {
   return CVPixelBufferGetDataSize(pixelBuffer);
 }
 
-void CGLHardwareTexture::computeRecycleKey(BytesKey* recycleKey) const {
-  ComputeRecycleKey(recycleKey, pixelBuffer);
+void CGLHardwareTexture::computeScratchKey(BytesKey* scratchKey) const {
+  ComputeScratchKey(scratchKey, pixelBuffer);
 }
 
 void CGLHardwareTexture::onReleaseGPU() {

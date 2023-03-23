@@ -25,7 +25,7 @@
 #include "rendering/utils/ApplyScaleMode.h"
 #include "rendering/utils/LockGuard.h"
 #include "rendering/utils/ScopedLock.h"
-#include "tgfx/core/Clock.h"
+#include "tgfx/utils/Clock.h"
 
 namespace pag {
 PAGPlayer::PAGPlayer() {
