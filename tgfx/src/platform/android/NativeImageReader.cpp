@@ -178,6 +178,8 @@ std::shared_ptr<ImageBuffer> NativeImageReader::acquireNextBuffer() {
 }
 
 void NativeImageReader::notifyFrameAvailable() {
+  // Note: If there is a pending frame available already, SurfaceTexture will not dispatch any new
+  // frame-available event until you have called the SurfaceTexture.updateTexImage().
   std::lock_guard<std::mutex> autoLock(locker);
   frameAvailable = true;
   condition.notify_all();

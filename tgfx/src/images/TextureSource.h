@@ -65,7 +65,8 @@ class TextureSource : public ImageSource {
  private:
   std::shared_ptr<Texture> texture = nullptr;
 
-  explicit TextureSource(std::shared_ptr<Texture> texture) : texture(std::move(texture)) {
+  explicit TextureSource(UniqueKey uniqueKey, std::shared_ptr<Texture> texture)
+      : ImageSource(std::move(uniqueKey)), texture(std::move(texture)) {
   }
 
   friend class ImageSource;

@@ -19,12 +19,12 @@
 #include "BufferSource.h"
 
 namespace tgfx {
-BufferSource::BufferSource(std::shared_ptr<ImageBuffer> buffer, bool mipMapped)
-    : imageBuffer(std::move(buffer)), mipMapped(mipMapped) {
+BufferSource::BufferSource(UniqueKey uniqueKey, std::shared_ptr<ImageBuffer> buffer, bool mipMapped)
+    : ImageSource(std::move(uniqueKey)), imageBuffer(std::move(buffer)), mipMapped(mipMapped) {
 }
 
 std::shared_ptr<ImageSource> BufferSource::onMakeMipMapped() const {
-  return std::shared_ptr<BufferSource>(new BufferSource(imageBuffer, true));
+  return std::shared_ptr<BufferSource>(new BufferSource(UniqueKey::Next(), imageBuffer, true));
 }
 
 std::shared_ptr<TextureProxy> BufferSource::onMakeTextureProxy(Context* context, uint32_t) const {

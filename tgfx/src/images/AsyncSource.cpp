@@ -20,9 +20,10 @@
 #include "BufferSource.h"
 
 namespace tgfx {
-AsyncSource::AsyncSource(std::shared_ptr<EncodedSource> source) : encodedSource(std::move(source)) {
-  auto generator = encodedSource->generator;
-  auto tryHardware = !encodedSource->mipMapped;
+AsyncSource::AsyncSource(UniqueKey uniqueKey, std::shared_ptr<ImageGenerator> imageGenerator,
+                         bool mipMapped)
+    : EncodedSource(std::move(uniqueKey), std::move(imageGenerator), mipMapped) {
+  auto tryHardware = !mipMapped;
   if (generator->asyncSupport()) {
     imageBuffer = generator->makeBuffer(tryHardware);
   } else {
@@ -30,19 +31,15 @@ AsyncSource::AsyncSource(std::shared_ptr<EncodedSource> source) : encodedSource(
   }
 }
 
-UniqueKey AsyncSource::getUniqueKey() const {
-  return encodedSource->getUniqueKey();
-}
-
-std::shared_ptr<ImageSource> AsyncSource::onMakeMipMapped() const {
-  return encodedSource->onMakeMipMapped();
+std::shared_ptr<ImageSource> AsyncSource::onMakeDecoded(Context*) const {
+  return nullptr;
 }
 
 std::shared_ptr<TextureProxy> AsyncSource::onMakeTextureProxy(Context* context, uint32_t) const {
   auto provider = context->proxyProvider();
   if (imageBuffer) {
-    return provider->createTextureProxy(imageBuffer, encodedSource->mipMapped);
+    return provider->createTextureProxy(imageBuffer, mipMapped);
   }
-  return provider->createTextureProxy(imageTask, encodedSource->mipMapped);
+  return provider->createTextureProxy(imageTask, mipMapped);
 }
 }  // namespace tgfx
