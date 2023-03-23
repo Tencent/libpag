@@ -38,6 +38,10 @@ class ImageReaderBuffer : public ImageBuffer {
     return false;
   }
 
+  bool expired() const override {
+    return contentVersion < imageReader->textureVersion;
+  }
+
  protected:
   std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) const override {
     return imageReader->readTexture(contentVersion, context, mipMapped);
