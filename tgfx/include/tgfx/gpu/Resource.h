@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <atomic>
 #include "tgfx/gpu/ResourceCache.h"
 #include "tgfx/gpu/ResourceKey.h"
 
