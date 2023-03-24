@@ -391,12 +391,10 @@ public class PAGImageView extends View {
 
     private void refreshDecodeInfo() {
         if (decoderInfo != null) {
-            decoderInfo.release();
-            decoderInfo = null;
+            decoderInfo.reset();
         }
         releaseCurrentDiskCache();
         lastKeyItem = null;
-        decoderInfo = new DecoderInfo();
         initDecoderInfo();
     }
 
@@ -614,7 +612,7 @@ public class PAGImageView extends View {
         releaseCurrentDiskCache();
         renderBitmap = null;
         if (decoderInfo != null) {
-            decoderInfo.release();
+            decoderInfo.reset();
         }
         bitmapCache.clear();
     }
@@ -747,7 +745,7 @@ public class PAGImageView extends View {
         }
         cacheItem.writeLock();
         if (bitmapCache.size() == decoderInfo.numFrames || cacheItem.isAllCached()) {
-            decoderInfo.release();
+            decoderInfo.releaseDecoder();
             cacheItem.releaseSaveBuffer();
             if (bitmapCache.size() == decoderInfo.numFrames) {
                 cacheItem.release();
