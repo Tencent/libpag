@@ -338,11 +338,20 @@ class PAGImageViewHelper {
             return true;
         }
 
-        void release() {
+        void releaseDecoder() {
             if (_pagDecoder != null) {
                 _pagDecoder.release();
             }
             _pagDecoder = null;
+        }
+
+        void reset() {
+            releaseDecoder();
+            _width = 0;
+            _height = 0;
+            realFrameRate = 0;
+            numFrames = 0;
+            duration = 0;
         }
     }
 }
