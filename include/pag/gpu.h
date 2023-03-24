@@ -93,13 +93,24 @@ struct GLFrameBufferInfo {
 
 /**
  * Types for interacting with Metal resources created externally to PAG. Holds the MTLTexture as a
- * const void*.
+ * void*.
  */
 struct MtlTextureInfo {
   /**
    * Pointer to MTLTexture.
    */
-  const void* texture = nullptr;
+  void* texture = nullptr;
+};
+
+/**
+ * Types for interacting with Vulkan resources created externally to PAG. Holds the VkImage as a
+ * void*.
+ */
+struct VkImageInfo {
+  /**
+   * Pointer to VkImage.
+   */
+  void* image = nullptr;
 };
 
 class PAG_API BackendTexture {
@@ -116,9 +127,14 @@ class PAG_API BackendTexture {
   BackendTexture(const GLTextureInfo& glInfo, int width, int height);
 
   /**
-   * Creates an Metal backend texture.
+   * Creates a Metal backend texture.
    */
   BackendTexture(const MtlTextureInfo& mtlInfo, int width, int height);
+
+  /**
+   * Creates a Vulkan backend texture.
+   */
+  BackendTexture(const VkImageInfo& vkInfo, int width, int height);
 
   BackendTexture(const BackendTexture& that);
 
@@ -164,6 +180,12 @@ class PAG_API BackendTexture {
    */
   bool getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) const;
 
+  /**
+   * If the backend API is Vulkan, copies a snapshot of the VkImageInfo struct into the passed
+   * in pointer and returns true. Otherwise, returns false if the backend API is not Vulkan.
+   */
+  bool getVkImageInfo(VkImageInfo* vkImageInfo) const;
+
  private:
   Backend _backend = Backend::MOCK;
   int _width = 0;
@@ -172,6 +194,7 @@ class PAG_API BackendTexture {
   union {
     GLTextureInfo glInfo;
     MtlTextureInfo mtlInfo;
+    VkImageInfo vkInfo;
   };
 };
 
@@ -192,6 +215,11 @@ class PAG_API BackendRenderTarget {
    * Creates an Metal backend render target.
    */
   BackendRenderTarget(const MtlTextureInfo& mtlInfo, int width, int height);
+
+  /**
+   * Creates a Vulkan backend render target.
+   */
+  BackendRenderTarget(const VkImageInfo& vkInfo, int width, int height);
 
   BackendRenderTarget(const BackendRenderTarget& that);
 
@@ -237,6 +265,12 @@ class PAG_API BackendRenderTarget {
    */
   bool getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) const;
 
+  /**
+   * If the backend API is Vulkan, copies a snapshot of the VkImageInfo struct into the passed
+   * in pointer and returns true. Otherwise, returns false if the backend API is not Vulkan.
+   */
+  bool getVkImageInfo(VkImageInfo* vkImageInfo) const;
+
  private:
   Backend _backend = Backend::MOCK;
   int _width = 0;
@@ -244,6 +278,7 @@ class PAG_API BackendRenderTarget {
   union {
     GLFrameBufferInfo glInfo;
     MtlTextureInfo mtlInfo;
+    VkImageInfo vkInfo;
   };
 };
 
