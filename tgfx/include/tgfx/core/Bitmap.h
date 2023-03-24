@@ -23,6 +23,7 @@
 #include "tgfx/core/EncodedFormat.h"
 #include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/ImageInfo.h"
+#include "tgfx/core/ImageStream.h"
 
 namespace tgfx {
 class PixelRef;
@@ -173,7 +174,7 @@ class Bitmap {
    * @param format One of: EncodedFormat::JPEG, EncodedFormat::PNG, EncodedFormat::WEBP
    * @param quality A platform and format specific metric trading off size and encoding error. When
    * used, quality equaling 100 encodes with the least error. quality may be ignored by the encoder.
-   * @return Returns nullptr if encoding fails, or if format is not supported.
+   * @return Returns nullptr if encoding fails, or if the format is not supported.
    */
   std::shared_ptr<Data> encode(EncodedFormat format = EncodedFormat::PNG, int quality = 100) const;
 
@@ -207,7 +208,9 @@ class Bitmap {
    * Returns an ImageBuffer object capturing the pixels in the Bitmap. Subsequent writing of the
    * Bitmap will not be captured. Instead, the Bitmap will copy its pixels to a new pixel buffer if
    * there is a subsequent writing call to the Bitmap while the returned ImageBuffer is still alive.
-   * Returns nullptr if the Bitmap is empty.
+   * Returns nullptr if the Bitmap is empty. Use the ImageReader class instead to avoid the
+   * unnecessary pixel copy, which allows you to continuously read the latest content from the
+   * Bitmap with minimal memory copying.
    */
   std::shared_ptr<ImageBuffer> makeBuffer() const;
 
@@ -216,5 +219,6 @@ class Bitmap {
   std::shared_ptr<PixelRef> pixelRef = nullptr;
 
   friend class Pixmap;
+  friend class ImageReader;
 };
 }  // namespace tgfx

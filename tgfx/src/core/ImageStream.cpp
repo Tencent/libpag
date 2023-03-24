@@ -16,32 +16,27 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "tgfx/core/ImageStream.h"
+#include "tgfx/core/ImageReader.h"
 
-#include <mutex>
-#include "tgfx/platform/android/SurfaceTexture.h"
-
-namespace pag {
-class JVideoSurface {
- public:
-  static std::shared_ptr<tgfx::SurfaceTexture> GetImageStream(JNIEnv* env, jobject videoSurface);
-
-  explicit JVideoSurface(std::shared_ptr<tgfx::SurfaceTexture> imageReader)
-      : imageReader(imageReader) {
+namespace tgfx {
+void ImageStream::markContentDirty(const Rect& bounds) {
+  std::lock_guard<std::mutex> autoLock(locker);
+  for (auto& reader : readers) {
+    reader->onContentDirty(bounds);
   }
+}
 
-  std::shared_ptr<tgfx::SurfaceTexture> get() {
-    std::lock_guard<std::mutex> autoLock(locker);
-    return imageReader;
+void ImageStream::attachToStream(ImageReader* imageReader) {
+  std::lock_guard<std::mutex> autoLock(locker);
+  readers.push_back(imageReader);
+}
+
+void ImageStream::detachFromStream(ImageReader* imageReader) {
+  std::lock_guard<std::mutex> autoLock(locker);
+  auto result = std::find(readers.begin(), readers.end(), imageReader);
+  if (result != readers.end()) {
+    readers.erase(result);
   }
-
-  void clear() {
-    std::lock_guard<std::mutex> autoLock(locker);
-    imageReader = nullptr;
-  }
-
- private:
-  std::mutex locker;
-  std::shared_ptr<tgfx::SurfaceTexture> imageReader = nullptr;
-};
-}  // namespace pag
+}
+}  // namespace tgfx

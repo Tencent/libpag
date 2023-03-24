@@ -16,32 +16,25 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <mutex>
+#include "JNIInit.h"
+#include "HandlerThread.h"
+#include "NativeCodec.h"
 #include "tgfx/platform/android/SurfaceTexture.h"
 
-namespace pag {
-class JVideoSurface {
- public:
-  static std::shared_ptr<tgfx::SurfaceTexture> GetImageStream(JNIEnv* env, jobject videoSurface);
-
-  explicit JVideoSurface(std::shared_ptr<tgfx::SurfaceTexture> imageReader)
-      : imageReader(imageReader) {
+namespace tgfx {
+void JNIInit::Run() {
+  static bool initialized = false;
+  if (initialized) {
+    return;
   }
-
-  std::shared_ptr<tgfx::SurfaceTexture> get() {
-    std::lock_guard<std::mutex> autoLock(locker);
-    return imageReader;
+  JNIEnvironment environment;
+  auto env = environment.current();
+  if (env == nullptr) {
+    return;
   }
-
-  void clear() {
-    std::lock_guard<std::mutex> autoLock(locker);
-    imageReader = nullptr;
-  }
-
- private:
-  std::mutex locker;
-  std::shared_ptr<tgfx::SurfaceTexture> imageReader = nullptr;
-};
-}  // namespace pag
+  initialized = true;
+  NativeCodec::JNIInit(env);
+  HandlerThread::JNIInit(env);
+  SurfaceTexture::JNIInit(env);
+}
+}  // namespace tgfx

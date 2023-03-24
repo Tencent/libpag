@@ -23,7 +23,8 @@
 namespace tgfx {
 class GLVideoTexture : public Texture {
  public:
-  static std::shared_ptr<GLVideoTexture> Make(Context* context, int width, int height);
+  static std::shared_ptr<GLVideoTexture> Make(Context* context, int width, int height,
+                                              bool mipMapped = false);
 
   size_t memoryUsage() const override;
 

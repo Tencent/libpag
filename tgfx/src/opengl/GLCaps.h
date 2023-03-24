@@ -136,6 +136,8 @@ class GLCaps : public Caps {
 
   int getSampleCount(int requestedCount, PixelFormat pixelFormat) const override;
 
+  int getMaxMipmapLevel(int width, int height) const override;
+
   /**
    * Does the preferred MSAA FBO extension have MSAA renderBuffers?
    */

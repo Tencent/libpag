@@ -83,14 +83,12 @@ TextLayout CreateTextLayout(const TextDocument* textDocument,
   } else {
     if (isVertical) {
       auto boxRight = textDocument->boxTextPos.x + textDocument->boxTextSize.x;
-      layout.boxRect =
-          tgfx::Rect::MakeXYWH(0, 0, textDocument->boxTextSize.y, textDocument->boxTextSize.x);
+      layout.boxRect = tgfx::Rect::MakeWH(textDocument->boxTextSize.y, textDocument->boxTextSize.x);
       layout.firstBaseLine = boxRight - textDocument->firstBaseLine;
       layout.coordinateMatrix.setRotate(90);
       layout.coordinateMatrix.postTranslate(boxRight, textDocument->boxTextPos.y);
     } else {
-      layout.boxRect =
-          tgfx::Rect::MakeXYWH(0, 0, textDocument->boxTextSize.x, textDocument->boxTextSize.y);
+      layout.boxRect = tgfx::Rect::MakeWH(textDocument->boxTextSize.x, textDocument->boxTextSize.y);
       layout.firstBaseLine = textDocument->firstBaseLine - textDocument->boxTextPos.y;
       layout.coordinateMatrix.setTranslate(textDocument->boxTextPos.x, textDocument->boxTextPos.y);
     }

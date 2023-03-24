@@ -16,8 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/platform/web/VideoImageReader.h"
+#include "tgfx/platform/web/VideoElement.h"
 #include "GLVideoTexture.h"
+#include "gpu/Gpu.h"
 #include "opengl/GLSampler.h"
 #include "tgfx/platform/web/WebImage.h"
 #include "utils/Log.h"
@@ -25,51 +26,50 @@
 namespace tgfx {
 using namespace emscripten;
 
-std::shared_ptr<VideoImageReader> VideoImageReader::MakeFrom(val video, int width, int height) {
+std::shared_ptr<VideoElement> VideoElement::MakeFrom(val video, int width, int height) {
   if (video == val::null() || width < 1 || height < 1) {
     return nullptr;
   }
-  auto reader = std::shared_ptr<VideoImageReader>(new VideoImageReader(video, width, height));
-  reader->weakThis = reader;
-  return reader;
+  return std::shared_ptr<VideoElement>(new VideoElement(video, width, height));
 }
 
-VideoImageReader::VideoImageReader(emscripten::val video, int width, int height)
-    : ImageReader(width, height), video(video) {
+VideoElement::VideoElement(emscripten::val video, int width, int height)
+    : video(video), _width(width), _height(height) {
 }
 
-std::shared_ptr<ImageBuffer> VideoImageReader::acquireNextBuffer(val promise) {
+void VideoElement::notifyFrameChanged(emscripten::val promise) {
   if (promise == val::null()) {
-    return nullptr;
+    return;
   }
   if (!WebImage::AsyncSupport()) {
     promise.await();
   }
   currentPromise = promise;
-  return makeNextBuffer();
+  markContentDirty(Rect::MakeWH(_width, _height));
 }
 
-bool VideoImageReader::onUpdateTexture(Context* context, bool) {
-  if (texture != nullptr && texture->getContext() != context) {
-    LOGE(
-        "VideoImageReader::onUpdateTexture(): NativeImageReader has already attached to a "
-        "Context!");
-    return false;
+std::shared_ptr<Texture> VideoElement::onMakeTexture(Context* context, bool mipMapped) {
+  auto texture = GLVideoTexture::Make(context, width(), height(), mipMapped);
+  if (texture != nullptr) {
+    onUpdateTexture(texture, Rect::MakeWH(_width, _height));
   }
+  return texture;
+}
+
+bool VideoElement::onUpdateTexture(std::shared_ptr<Texture> texture, const Rect&) {
   if (currentPromise == val::null()) {
     return false;
   }
-  currentPromise.await();
-  if (texture == nullptr) {
-    texture = GLVideoTexture::Make(context, width(), height());
+  if (WebImage::AsyncSupport()) {
+    currentPromise.await();
   }
-  if (texture == nullptr) {
-    return false;
-  }
-  auto glInfo = static_cast<const GLSampler*>(texture->getSampler());
+  auto glSampler = static_cast<const GLSampler*>(texture->getSampler());
   val::module_property("tgfx").call<void>("uploadToTexture", emscripten::val::module_property("GL"),
-                                          video, glInfo->id);
-  currentPromise = val::null();
+                                          video, glSampler->id);
+  if (glSampler->hasMipmaps()) {
+    auto gpu = texture->getContext()->gpu();
+    gpu->regenerateMipMapLevels(glSampler);
+  }
   return true;
 }
 

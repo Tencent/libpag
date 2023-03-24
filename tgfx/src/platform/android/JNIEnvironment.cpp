@@ -20,9 +20,7 @@
 #include <pthread.h>
 #include <atomic>
 #include <mutex>
-#include "HandlerThread.h"
-#include "NativeCodec.h"
-#include "NativeImageReader.h"
+#include "JNIInit.h"
 #include "utils/Log.h"
 
 namespace tgfx {
@@ -31,22 +29,6 @@ static constexpr size_t LOCALS_CAPACITY = 64;
 
 static std::atomic<JavaVM*> globalJavaVM = nullptr;
 static pthread_key_t envKey = 0;
-
-static void JNIInit() {
-  static bool initialized = false;
-  if (initialized) {
-    return;
-  }
-  JNIEnvironment environment;
-  auto env = environment.current();
-  if (env == nullptr) {
-    return;
-  }
-  initialized = true;
-  NativeCodec::JNIInit(env);
-  HandlerThread::JNIInit(env);
-  NativeImageReader::JNIInit(env);
-}
 
 static void JNI_Thread_Destroy(void*) {
   JavaVM* javaVM = globalJavaVM;
@@ -66,7 +48,7 @@ bool JNIEnvironment::SetJavaVM(JavaVM* javaVM) {
   globalJavaVM = javaVM;
   if (globalJavaVM != nullptr) {
     pthread_key_create(&envKey, JNI_Thread_Destroy);
-    JNIInit();
+    JNIInit::Run();
   } else {
     pthread_key_delete(envKey);
   }

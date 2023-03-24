@@ -129,7 +129,8 @@ bool HardwareDecoder::initDecoder(JNIEnv* env, const VideoFormat& format) {
     return false;
   }
   auto videoSurface = env->CallObjectMethod(decoder, HardwareDecoder_getVideoSurface);
-  imageReader = JVideoSurface::GetImageReader(env, videoSurface);
+  imageStream = JVideoSurface::GetImageStream(env, videoSurface);
+  imageReader = tgfx::ImageReader::MakeFrom(imageStream);
   if (imageReader == nullptr) {
     env->CallVoidMethod(decoder, HardwareDecoder_onRelease);
     return false;
@@ -201,6 +202,7 @@ std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
   if (!result) {
     return nullptr;
   }
+  imageStream->notifyFrameChanged();
   return imageReader->acquireNextBuffer();
 }
 }  // namespace pag

@@ -22,23 +22,23 @@
 namespace pag {
 static jfieldID VideoSurface_nativeContext;
 
-std::shared_ptr<tgfx::SurfaceImageReader> JVideoSurface::GetImageReader(JNIEnv* env,
-                                                                        jobject videoSurface) {
+std::shared_ptr<tgfx::SurfaceTexture> JVideoSurface::GetImageStream(JNIEnv* env,
+                                                                    jobject videoSurface) {
   if (videoSurface == nullptr) {
     return nullptr;
   }
-  auto surface =
+  auto stream =
       reinterpret_cast<JVideoSurface*>(env->GetLongField(videoSurface, VideoSurface_nativeContext));
-  if (surface == nullptr) {
+  if (stream == nullptr) {
     return nullptr;
   }
-  return surface->get();
+  return stream->get();
 }
 }  // namespace pag
 
 using namespace pag;
 
-void setBufferQueue(JNIEnv* env, jobject thiz, JVideoSurface* surface) {
+void setImageStream(JNIEnv* env, jobject thiz, JVideoSurface* surface) {
   auto old = reinterpret_cast<JVideoSurface*>(env->GetLongField(thiz, VideoSurface_nativeContext));
   delete old;
   env->SetLongField(thiz, VideoSurface_nativeContext, (jlong)surface);
@@ -51,39 +51,39 @@ PAG_API void Java_org_libpag_VideoSurface_nativeInit(JNIEnv* env, jclass clazz) 
 }
 
 PAG_API void Java_org_libpag_VideoSurface_nativeRelease(JNIEnv* env, jobject thiz) {
-  auto surface =
+  auto stream =
       reinterpret_cast<JVideoSurface*>(env->GetLongField(thiz, VideoSurface_nativeContext));
-  if (surface != nullptr) {
-    surface->clear();
+  if (stream != nullptr) {
+    stream->clear();
   }
 }
 
 PAG_API void Java_org_libpag_VideoSurface_nativeFinalize(JNIEnv* env, jobject thiz) {
-  setBufferQueue(env, thiz, nullptr);
+  setImageStream(env, thiz, nullptr);
 }
 
 PAG_API void Java_org_libpag_VideoSurface_nativeSetup(JNIEnv* env, jobject thiz, jint width,
                                                       jint height) {
-  auto imageReader = tgfx::SurfaceImageReader::Make(width, height, thiz);
-  if (imageReader == nullptr) {
+  auto imageStream = tgfx::SurfaceTexture::Make(width, height, thiz);
+  if (imageStream == nullptr) {
     return;
   }
-  setBufferQueue(env, thiz, new JVideoSurface(imageReader));
+  setImageStream(env, thiz, new JVideoSurface(imageStream));
 }
 
 PAG_API jobject Java_org_libpag_VideoSurface_getInputSurface(JNIEnv* env, jobject thiz) {
-  auto reader = JVideoSurface::GetImageReader(env, thiz);
-  if (reader == nullptr) {
+  auto stream = JVideoSurface::GetImageStream(env, thiz);
+  if (stream == nullptr) {
     return nullptr;
   }
-  return reader->getInputSurface();
+  return stream->getInputSurface();
 }
 
 PAG_API void Java_org_libpag_VideoSurface_notifyFrameAvailable(JNIEnv* env, jobject thiz) {
-  auto reader = JVideoSurface::GetImageReader(env, thiz);
-  if (reader == nullptr) {
+  auto stream = JVideoSurface::GetImageStream(env, thiz);
+  if (stream == nullptr) {
     return;
   }
-  reader->notifyFrameAvailable();
+  stream->notifyFrameAvailable();
 }
 }

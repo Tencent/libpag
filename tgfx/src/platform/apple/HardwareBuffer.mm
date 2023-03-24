@@ -129,7 +129,7 @@ std::shared_ptr<Texture> HardwareBuffer::onMakeTexture(Context* context, bool mi
   if (auto* pixels = CVPixelBufferGetBaseAddress(pixelBuffer)) {
     auto rect = Rect::MakeWH(width(), height());
     context->gpu()->writePixels(texture->getSampler(), rect, pixels,
-                                CVPixelBufferGetBytesPerRow(pixelBuffer), PixelFormat::BGRA_8888);
+                                CVPixelBufferGetBytesPerRow(pixelBuffer));
   } else {
     texture = nullptr;
   }

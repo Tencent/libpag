@@ -19,12 +19,13 @@
 #pragma once
 
 #include "core/PixelBuffer.h"
+#include "tgfx/core/ImageStream.h"
 
 namespace tgfx {
 /**
  * This class is the smart container for pixel memory, and is used with Bitmap.
  */
-class PixelRef {
+class PixelRef : public ImageStream {
  public:
   /**
    * Creates a new PixelRef object width specified width and height. Returns nullptr if width or
@@ -47,11 +48,15 @@ class PixelRef {
     return pixelBuffer->info();
   }
 
-  /**
-   * Returns true if the PixelRef is hardware backed. A hardware backed PixelRef allows sharing
-   * buffers across CPU and GPU, which can be used to speed up the texture uploading.
-   */
-  bool isHardwareBacked() const {
+  int width() const override {
+    return pixelBuffer->width();
+  }
+
+  int height() const override {
+    return pixelBuffer->height();
+  }
+
+  bool isHardwareBacked() const override {
     return pixelBuffer->isHardwareBacked();
   }
 
@@ -70,7 +75,7 @@ class PixelRef {
   /**
    * Call this to balance a successful call to lockPixels().
    */
-  void unlockPixels() {
+  void unlockPixels() const {
     pixelBuffer->unlockPixels();
   }
 
@@ -82,11 +87,21 @@ class PixelRef {
     return pixelBuffer;
   }
 
+  /**
+   * Marks the pixels of the specified bounds as dirty.
+   */
+  void notifyPixelsDirty(const Rect& bounds) {
+    markContentDirty(bounds);
+  }
+
+ protected:
+  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) override;
+
+  bool onUpdateTexture(std::shared_ptr<Texture> texture, const Rect& bounds) override;
+
  private:
   std::shared_ptr<PixelBuffer> pixelBuffer = nullptr;
 
-  explicit PixelRef(std::shared_ptr<PixelBuffer> pixelBuffer)
-      : pixelBuffer(std::move(pixelBuffer)) {
-  }
+  explicit PixelRef(std::shared_ptr<PixelBuffer> pixelBuffer);
 };
 }  // namespace tgfx

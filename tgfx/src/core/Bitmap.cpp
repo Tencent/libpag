@@ -60,7 +60,11 @@ void* Bitmap::lockPixels() {
   if (pixelRef == nullptr) {
     return nullptr;
   }
-  return pixelRef->lockWritablePixels();
+  auto pixels = pixelRef->lockWritablePixels();
+  if (pixels != nullptr) {
+    pixelRef->notifyPixelsDirty(Rect::MakeWH(width(), height()));
+  }
+  return pixels;
 }
 
 const void* Bitmap::lockPixels() const {
@@ -94,12 +98,17 @@ bool Bitmap::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int
 }
 
 bool Bitmap::writePixels(const ImageInfo& srcInfo, const void* srcPixels, int dstX, int dstY) {
-  return Pixmap(*this).writePixels(srcInfo, srcPixels, dstX, dstY);
+  auto success = Pixmap(*this).writePixels(srcInfo, srcPixels, dstX, dstY);
+  if (success) {
+    pixelRef->notifyPixelsDirty(Rect::MakeXYWH(dstX, dstY, srcInfo.width(), srcInfo.height()));
+  }
+  return success;
 }
 
 void Bitmap::eraseAll() {
   auto pixels = lockPixels();
   if (pixels != nullptr) {
+    pixelRef->notifyPixelsDirty(Rect::MakeWH(width(), height()));
     memset(pixels, 0, byteSize());
   }
   unlockPixels();
