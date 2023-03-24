@@ -18,8 +18,8 @@
 
 #pragma once
 
+#include "core/ImageStream.h"
 #include "tgfx/platform/android/Global.h"
-#include "tgfx/core/ImageStream.h"
 
 namespace tgfx {
 /**
@@ -67,7 +67,7 @@ class SurfaceTexture : public ImageStream {
 
   /**
    * Notifies the previously returned ImageBuffer is available for generating textures. The method
-   * should be only called by the listener passed in when creating the reader.
+   * should only be called by the listener passed in when creating the reader.
    */
   void notifyFrameAvailable();
 

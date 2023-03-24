@@ -21,7 +21,7 @@
 #include "JNIHelper.h"
 #include "platform/android/JVideoSurface.h"
 #include "rendering/video/VideoDecoder.h"
-#include "tgfx/core/ImageReader.h"
+#include "tgfx/platform/android/SurfaceTextureReader.h"
 
 namespace pag {
 class HardwareDecoder : public VideoDecoder {
@@ -44,8 +44,7 @@ class HardwareDecoder : public VideoDecoder {
 
  private:
   bool isValid = false;
-  std::shared_ptr<tgfx::SurfaceTexture> imageStream = nullptr;
-  std::shared_ptr<tgfx::ImageReader> imageReader = nullptr;
+  std::shared_ptr<tgfx::SurfaceTextureReader> imageReader = nullptr;
   Global<jobject> videoDecoder;
 
   explicit HardwareDecoder(const VideoFormat& format);

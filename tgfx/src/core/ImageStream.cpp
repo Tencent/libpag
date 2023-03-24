@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/ImageStream.h"
+#include "core/ImageStream.h"
 #include "tgfx/core/ImageReader.h"
 
 namespace tgfx {

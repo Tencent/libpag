@@ -18,8 +18,8 @@
 
 #pragma once
 
+#include "core/ImageStream.h"
 #include "core/PixelBuffer.h"
-#include "tgfx/core/ImageStream.h"
 
 namespace tgfx {
 /**

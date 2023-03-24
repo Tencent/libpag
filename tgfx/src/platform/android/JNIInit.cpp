@@ -19,7 +19,7 @@
 #include "JNIInit.h"
 #include "HandlerThread.h"
 #include "NativeCodec.h"
-#include "tgfx/platform/android/SurfaceTexture.h"
+#include "platform/android/SurfaceTexture.h"
 
 namespace tgfx {
 void JNIInit::Run() {

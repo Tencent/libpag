@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/platform/web/VideoElement.h"
+#include "platform/web/VideoElement.h"
 #include "GLVideoTexture.h"
 #include "gpu/Gpu.h"
 #include "opengl/GLSampler.h"
@@ -38,14 +38,11 @@ VideoElement::VideoElement(emscripten::val video, int width, int height)
 }
 
 void VideoElement::notifyFrameChanged(emscripten::val promise) {
-  if (promise == val::null()) {
-    return;
-  }
-  if (!WebImage::AsyncSupport()) {
-    promise.await();
-  }
   currentPromise = promise;
   markContentDirty(Rect::MakeWH(_width, _height));
+  if (currentPromise != val::null() && !WebImage::AsyncSupport()) {
+    currentPromise.await();
+  }
 }
 
 std::shared_ptr<Texture> VideoElement::onMakeTexture(Context* context, bool mipMapped) {

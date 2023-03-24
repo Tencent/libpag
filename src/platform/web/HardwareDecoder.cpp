@@ -70,8 +70,7 @@ HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
                     .await();
   auto video = videoReader.call<val>("getVideo");
   if (!video.isNull()) {
-    videoElement = tgfx::VideoElement::MakeFrom(video, _width, _height);
-    imageReader = tgfx::ImageReader::MakeFrom(videoElement);
+    imageReader = tgfx::VideoElementReader::MakeFrom(video, _width, _height);
   }
 }
 
@@ -114,7 +113,6 @@ std::shared_ptr<tgfx::ImageBuffer> HardwareDecoder::onRenderFrame() {
   }
   auto targetFrame = TimeToFrame(currentTimeStamp, frameRate);
   val promise = videoReader.call<val>("prepare", static_cast<int>(targetFrame), playbackRate);
-  videoElement->notifyFrameChanged(promise);
-  return imageReader->acquireNextBuffer();
+  return imageReader->acquireNextBuffer(promise);
 }
 }  // namespace pag

@@ -22,18 +22,18 @@
 #include <mutex>
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageBuffer.h"
-#include "tgfx/core/ImageStream.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
 class Texture;
+class ImageStream;
 
 /**
- * The ImageReader class allows direct access to ImageBuffers generated from an ImageStream. The
- * ImageStream may come from a Bitmap, a Rasterizer, or a video-related object of the native
- * platform. You should call ImageStream::acquireNextBuffer() to read a new ImageBuffer each time
- * when the ImageStream is modified. All ImageBuffers generated from one ImageReader share the same
- * internal texture, which allows you to continuously read the latest content from the ImageStream
+ * The ImageReader class allows direct access to ImageBuffers generated from an image stream. The
+ * image stream may come from a Bitmap, a Rasterizer, or a video-related object of the native
+ * platform. You should call ImageReader::acquireNextBuffer() to read a new ImageBuffer each time
+ * when the image stream is modified. All ImageBuffers generated from one ImageReader share the same
+ * internal texture, which allows you to continuously read the latest content from the image stream
  * with minimal memory copying. However, there are two limits:
  *
  *    1) The generated ImageBuffers are bound to the associated GPU Context when first being drawn
@@ -41,10 +41,10 @@ class Texture;
  *    2) The generated ImageBuffers may have a limited lifetime and cannot create textures after
  *       expiration. Usually, the previously acquired ImageBuffer will expire after the newly
  *       created ImageBuffer is drawn. So there are only two ImageBuffers that can be accessed
- *       simultaneously. But if the ImageStream is backed by a hardware buffer, the previously
- *       acquired ImageBuffer immediately expires when the ImageStream is being modified.
+ *       simultaneously. But if the image stream is backed by a hardware buffer, the previously
+ *       acquired ImageBuffer immediately expires when the image stream is being modified.
  *
- * You can create multiple ImageReaders from the same ImageStream. ImageStream is safe across
+ * You can create multiple ImageReaders from the same image stream. ImageReader is safe across
  * threads.
  */
 class ImageReader {
@@ -53,12 +53,6 @@ class ImageReader {
    * Creates a new ImageReader from the specified Bitmap. Returns nullptr if the bitmap is empty.
    */
   static std::shared_ptr<ImageReader> MakeFrom(const Bitmap& bitmap);
-
-  /**
-   * Creates a new ImageReader from the specified ImageStream. Returns nullptr if the imageStream is
-   * nullptr.
-   */
-  static std::shared_ptr<ImageReader> MakeFrom(std::shared_ptr<ImageStream> imageStream);
 
   virtual ~ImageReader();
 
@@ -74,23 +68,27 @@ class ImageReader {
 
   /**
    * Acquires the next ImageBuffer from the ImageReader after a new image frame has been rendered
-   * into the associated ImageStream. Usually, the previously acquired ImageBuffer will expire after
-   * the newly created ImageBuffer is drawn. But if the ImageStream is backed by a hardware buffer,
-   * the previously acquired ImageBuffer immediately expires when the ImageStream is being modified.
-   * Returns nullptr if the associated ImageStream has no content changes.
+   * into the associated image stream. Usually, the previously acquired ImageBuffer will expire
+   * after the newly created ImageBuffer is drawn. But if the image stream is backed by a hardware
+   * buffer, the previously acquired ImageBuffer immediately expires when the image stream is being
+   * modified. Returns nullptr if the associated image stream has no content changes.
    */
-  std::shared_ptr<ImageBuffer> acquireNextBuffer();
+  virtual std::shared_ptr<ImageBuffer> acquireNextBuffer();
 
- private:
+ protected:
   std::mutex locker = {};
   std::weak_ptr<ImageReader> weakThis;
   std::shared_ptr<ImageStream> stream = nullptr;
+
+  explicit ImageReader(std::shared_ptr<ImageStream> stream);
+
+ private:
   std::shared_ptr<Texture> texture = nullptr;
   uint64_t bufferVersion = 0;
   uint64_t textureVersion = 0;
   Rect dirtyBounds = Rect::MakeEmpty();
 
-  explicit ImageReader(std::shared_ptr<ImageStream> stream);
+  static std::shared_ptr<ImageReader> MakeFrom(std::shared_ptr<ImageStream> imageStream);
 
   bool checkExpired(uint64_t contentVersion);
 

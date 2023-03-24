@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/platform/android/SurfaceTexture.h"
+#include "platform/android/SurfaceTexture.h"
 #include <chrono>
 #include "GLExternalOESTexture.h"
 #include "HandlerThread.h"

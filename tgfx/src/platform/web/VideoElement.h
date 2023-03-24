@@ -19,7 +19,7 @@
 #pragma once
 
 #include <emscripten/val.h>
-#include "tgfx/core/ImageStream.h"
+#include "core/ImageStream.h"
 
 namespace tgfx {
 /**
@@ -35,11 +35,11 @@ class VideoElement : public ImageStream {
   static std::shared_ptr<VideoElement> MakeFrom(emscripten::val video, int width, int height);
 
   int width() const override {
-    return _height;
+    return _width;
   }
 
   int height() const override {
-    return _width;
+    return _height;
   }
 
   bool isHardwareBacked() const override {
@@ -51,7 +51,7 @@ class VideoElement : public ImageStream {
    * HTMLVideoElement. The next acquired ImageBuffer will call the promise.await() method before
    * generating textures.
    */
-  void notifyFrameChanged(emscripten::val promise);
+  void notifyFrameChanged(emscripten::val promise = emscripten::val::null());
 
  protected:
   std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) override;
