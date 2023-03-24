@@ -76,7 +76,7 @@ void GLGpu::deleteSampler(TextureSampler* sampler) {
 }
 
 void GLGpu::writePixels(const TextureSampler* sampler, Rect rect, const void* pixels,
-                        size_t rowBytes, PixelFormat pixelFormat) {
+                        size_t rowBytes) {
   if (sampler == nullptr) {
     return;
   }
@@ -84,8 +84,8 @@ void GLGpu::writePixels(const TextureSampler* sampler, Rect rect, const void* pi
   auto caps = GLCaps::Get(_context);
   auto glSampler = static_cast<const GLSampler*>(sampler);
   gl->bindTexture(glSampler->target, glSampler->id);
-  const auto& format = caps->getTextureFormat(pixelFormat);
-  auto bytesPerPixel = PixelFormatBytesPerPixel(pixelFormat);
+  const auto& format = caps->getTextureFormat(sampler->format);
+  auto bytesPerPixel = PixelFormatBytesPerPixel(sampler->format);
   gl->pixelStorei(GL_UNPACK_ALIGNMENT, static_cast<int>(bytesPerPixel));
   int x = static_cast<int>(rect.x());
   int y = static_cast<int>(rect.y());

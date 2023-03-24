@@ -22,7 +22,8 @@
 #include <mutex>
 #include "pag/pag.h"
 #include "rendering/video/VideoDecoderFactory.h"
-#include "tgfx/platform/web/VideoImageReader.h"
+#include "tgfx/core/ImageReader.h"
+#include "tgfx/platform/web/VideoElementReader.h"
 
 namespace pag {
 class HardwareDecoder : public VideoDecoder {
@@ -49,7 +50,7 @@ class HardwareDecoder : public VideoDecoder {
   std::shared_ptr<File> file = nullptr;
   PAGFile* rootFile = nullptr;
   emscripten::val videoReader = emscripten::val::null();
-  std::shared_ptr<tgfx::VideoImageReader> videoImageReader = nullptr;
+  std::shared_ptr<tgfx::VideoElementReader> imageReader = nullptr;
   int32_t _width = 0;
   int32_t _height = 0;
   float frameRate = 30.0f;

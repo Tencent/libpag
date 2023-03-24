@@ -25,13 +25,13 @@ namespace tgfx {
 /**
  * A key used for scratch resources. There are three important rules about scratch keys:
  *
- * 1) Multiple resources can share the same scratch key. Therefore, resources assigned the same
- * scratch key should be interchangeable with respect to the code that uses them.
- * 2) A resource can have at most one scratch key, and it is set at resource creation by the
- * resource itself.
- * 3) When a scratch resource is referenced, it will not be returned from the cache for a subsequent
- * cache request until all refs are released. This facilitates using a scratch key for multiple
- * render-to-texture scenarios.
+ *    1) Multiple resources can share the same scratch key. Therefore, resources assigned the same
+ *       scratch key should be interchangeable with respect to the code that uses them.
+ *    2) A resource can have at most one scratch key, and it is set at resource creation by the
+ *       resource itself.
+ *    3) When a scratch resource is referenced, it will not be returned from the cache for a
+ *       subsequent cache request until all refs are released. This facilitates using a scratch key
+ *       for multiple render-to-texture scenarios.
  */
 using ScratchKey = BytesKey;
 
@@ -44,10 +44,10 @@ class UniqueData;
  * A key that allows for exclusive use of a resource for a use case (AKA "domain"). There are three
  * rules governing the use of unique keys:
  *
- * 1) Only one resource can have a given unique key at a time. Hence, "unique".
- * 2) A resource can have at most one unique key at a time.
- * 3) Unlike scratch keys, multiple requests for a unique key will return the same resource even if
- * the resource already has refs.
+ *    1) Only one resource can have a given unique key at a time. Hence, "unique".
+ *    2) A resource can have at most one unique key at a time.
+ *    3) Unlike scratch keys, multiple requests for a unique key will return the same resource even
+ *       if the resource already has refs.
  *
  * This key type allows a code path to create cached resources for which it is the exclusive user.
  * The code path creates a domain which it sets on its keys. This guarantees that there are no

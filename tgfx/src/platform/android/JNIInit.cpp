@@ -16,42 +16,25 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <condition_variable>
-#include <mutex>
-#include "GLExternalOESTexture.h"
+#include "JNIInit.h"
 #include "HandlerThread.h"
-#include "JNIUtil.h"
-#include "tgfx/platform/android/SurfaceImageReader.h"
+#include "NativeCodec.h"
+#include "platform/android/SurfaceTexture.h"
 
 namespace tgfx {
-class NativeImageReader : public SurfaceImageReader {
- public:
-  static void JNIInit(JNIEnv* env);
-
-  NativeImageReader(int width, int height, JNIEnv* env, jobject surfaceTexture);
-
-  ~NativeImageReader() override;
-
-  jobject getInputSurface() const override;
-
-  std::shared_ptr<ImageBuffer> acquireNextBuffer() override;
-
-  void notifyFrameAvailable() override;
-
- protected:
-  bool onUpdateTexture(Context* context, bool mipMapped) override;
-
- private:
-  std::mutex locker = {};
-  std::condition_variable condition = {};
-  Global<jobject> surface;
-  Global<jobject> surfaceTexture;
-  bool frameAvailable = false;
-
-  bool attachToContext(JNIEnv* env, Context* context);
-
-  friend class SurfaceImageReader;
-};
+void JNIInit::Run() {
+  static bool initialized = false;
+  if (initialized) {
+    return;
+  }
+  JNIEnvironment environment;
+  auto env = environment.current();
+  if (env == nullptr) {
+    return;
+  }
+  initialized = true;
+  NativeCodec::JNIInit(env);
+  HandlerThread::JNIInit(env);
+  SurfaceTexture::JNIInit(env);
+}
 }  // namespace tgfx

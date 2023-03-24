@@ -51,7 +51,7 @@ static std::vector<std::unique_ptr<TextureSampler>> MakeTexturePlanes(Context* c
   return texturePlanes;
 }
 
-static void SubmitYUVTexture(Context* context, const YUVData* yuvData, const PixelFormat* formats,
+static void SubmitYUVTexture(Context* context, const YUVData* yuvData,
                              const std::vector<std::unique_ptr<TextureSampler>>* samplers) {
   auto count = static_cast<int>(yuvData->planeCount());
   for (int index = 0; index < count; index++) {
@@ -60,8 +60,7 @@ static void SubmitYUVTexture(Context* context, const YUVData* yuvData, const Pix
     auto h = yuvData->height() >> YUV_SIZE_FACTORS[index];
     auto pixels = yuvData->getBaseAddressAt(index);
     auto rowBytes = yuvData->getRowBytesAt(index);
-    auto format = formats[index];
-    context->gpu()->writePixels(sampler, Rect::MakeWH(w, h), pixels, rowBytes, format);
+    context->gpu()->writePixels(sampler, Rect::MakeWH(w, h), pixels, rowBytes);
   }
 }
 
@@ -87,7 +86,7 @@ std::shared_ptr<Texture> Texture::MakeI420(Context* context, const YUVData* yuvD
         new YUVTexture(yuvData->width(), yuvData->height(), YUVPixelFormat::I420, colorSpace)));
     texture->samplers = std::move(texturePlanes);
   }
-  SubmitYUVTexture(context, yuvData, yuvFormats, &texture->samplers);
+  SubmitYUVTexture(context, yuvData, &texture->samplers);
   return texture;
 }
 
@@ -112,7 +111,7 @@ std::shared_ptr<Texture> Texture::MakeNV12(Context* context, const YUVData* yuvD
         new YUVTexture(yuvData->width(), yuvData->height(), YUVPixelFormat::NV12, colorSpace)));
     texture->samplers = std::move(texturePlanes);
   }
-  SubmitYUVTexture(context, yuvData, yuvFormats, &texture->samplers);
+  SubmitYUVTexture(context, yuvData, &texture->samplers);
   return texture;
 }
 

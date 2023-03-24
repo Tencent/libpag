@@ -75,8 +75,7 @@ std::shared_ptr<Texture> HardwareBuffer::onMakeTexture(Context* context, bool mi
     auto rect = Rect::MakeWH(width(), height());
     AHardwareBuffer_Desc desc;
     HardwareBufferInterface::Describe(hardwareBuffer, &desc);
-    context->gpu()->writePixels(texture->getSampler(), rect, pixels, desc.stride * 4,
-                                PixelFormat::RGBA_8888);
+    context->gpu()->writePixels(texture->getSampler(), rect, pixels, desc.stride * 4);
     context->gpu()->regenerateMipMapLevels(texture->getSampler());
   } else {
     texture = nullptr;
