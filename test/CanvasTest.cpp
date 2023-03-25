@@ -23,6 +23,8 @@
 #include "gpu/ops/FillRectOp.h"
 #include "gpu/ops/RRectOp.h"
 #include "gpu/ops/TriangulatingPathOp.h"
+#include "opengl/GLCaps.h"
+#include "opengl/GLSampler.h"
 #include "platform/apple/HardwareBuffer.h"
 #include "rendering/utils/shaper/TextShaper.h"
 #include "tgfx/core/Canvas.h"
@@ -722,20 +724,35 @@ PAG_TEST(CanvasTest, image) {
   device->unlock();
 }
 
+static tgfx::GLTextureInfo CreateRectangleTexture(Context* context, int width, int heigh) {
+  auto gl = GLFunctions::Get(context);
+  tgfx::GLTextureInfo sampler = {};
+  gl->genTextures(1, &(sampler.id));
+  if (sampler.id == 0) {
+    return {};
+  }
+  sampler.target = GL_TEXTURE_RECTANGLE;
+  gl->bindTexture(sampler.target, sampler.id);
+  gl->texParameteri(sampler.target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  gl->texParameteri(sampler.target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  gl->texParameteri(sampler.target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  gl->texParameteri(sampler.target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  const auto& textureFormat = GLCaps::Get(context)->getTextureFormat(PixelFormat::RGBA_8888);
+  gl->texImage2D(sampler.target, 0, static_cast<int>(textureFormat.internalFormatTexImage), width,
+                 heigh, 0, textureFormat.externalFormat, GL_UNSIGNED_BYTE, nullptr);
+  return sampler;
+}
+
 /**
  * 用例描述: rectangle texture 作为 blend dst 时不需要归一化
  */
 PAG_TEST(CanvasTest, rectangleTextureAsBlendDst) {
-  int size = 110;
-  auto hardwareBuffer = tgfx::HardwareBuffer::Make(size, size, false);
-  if (hardwareBuffer == nullptr) {
-    return;
-  }
   auto device = GLDevice::Make();
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto texture = Texture::MakeFrom(context, hardwareBuffer);
-  auto backendTexture = texture->getBackendTexture();
+  auto sampler = CreateRectangleTexture(context, 110, 110);
+  ASSERT_TRUE(sampler.id > 0);
+  auto backendTexture = tgfx::BackendTexture(sampler, 110, 110);
   auto surface = Surface::MakeFrom(context, backendTexture, tgfx::ImageOrigin::TopLeft);
   auto canvas = surface->getCanvas();
   canvas->clear();
@@ -747,6 +764,7 @@ PAG_TEST(CanvasTest, rectangleTextureAsBlendDst) {
   canvas->setBlendMode(tgfx::BlendMode::Multiply);
   canvas->drawImage(image);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/hardware_render_target_blend"));
+  GLFunctions::Get(context)->deleteTextures(1, &(sampler.id));
   device->unlock();
 }
 }  // namespace tgfx

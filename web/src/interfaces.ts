@@ -62,6 +62,4 @@ export interface WebMask {
 
 export type WebMaskConstructor = new (
   canvas: HTMLCanvasElement | OffscreenCanvas,
-  width: number,
-  height: number,
 ) => WebMask;
