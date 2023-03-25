@@ -20,7 +20,7 @@
 #include "GLVideoTexture.h"
 #include "opengl/GLSampler.h"
 #include "platform/web/VideoElement.h"
-#include "tgfx/platform/web/WebImage.h"
+#include "tgfx/platform/web/WebCodec.h"
 #include "utils/Log.h"
 
 namespace tgfx {
@@ -45,12 +45,12 @@ VideoElementReader::VideoElementReader(std::shared_ptr<ImageStream> stream)
 }
 
 std::shared_ptr<ImageBuffer> VideoElementReader::acquireNextBuffer() {
-  std::static_pointer_cast<VideoElement>(stream)->notifyFrameChanged();
+  stream->markContentDirty(Rect::MakeWH(stream->width(), stream->height()));
   return ImageReader::acquireNextBuffer();
 }
 
 std::shared_ptr<ImageBuffer> VideoElementReader::acquireNextBuffer(val promise) {
-  std::static_pointer_cast<VideoElement>(stream)->notifyFrameChanged(promise);
+  std::static_pointer_cast<VideoElement>(stream)->markFrameChanged(promise);
   return ImageReader::acquireNextBuffer();
 }
 }  // namespace tgfx

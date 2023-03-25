@@ -201,11 +201,11 @@ class Bitmap {
   /**
    * Replaces all pixel values with transparent colors.
    */
-  void eraseAll();
+  void clear();
 
   /**
    * Returns an ImageBuffer object capturing the pixels in the Bitmap. Subsequent writing of the
-   * Bitmap will not be captured. Instead, the Bitmap will copy its pixels to a new pixel buffer if
+   * Bitmap will not be captured. Instead, the Bitmap will copy its pixels to a new memory buffer if
    * there is a subsequent writing call to the Bitmap while the returned ImageBuffer is still alive.
    * If the Bitmap is modified frequently, create an ImageReader from the Bitmap instead, which
    * allows you to continuously read the latest content from the Bitmap with minimal memory copying.

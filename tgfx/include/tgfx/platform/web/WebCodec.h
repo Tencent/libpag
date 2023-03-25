@@ -18,16 +18,27 @@
 
 #pragma once
 
-#include <emscripten/val.h>
-#include <optional>
-#include "ByteBuffer.h"
-#include "tgfx/core/Data.h"
-#include "tgfx/core/Size.h"
-
 namespace tgfx {
-class NativeImageInfo {
+/**
+ * WebImageCodec provides convenience functions to enable/disable the async support for decoding web
+ * images.
+ */
+class WebCodec {
  public:
-  static ISize GetSize(std::shared_ptr<Data> imageBytes);
-};
+  /**
+   * Returns true if the async support for decoding web images is enabled. The default value is
+   * false.
+   */
+  static bool AsyncSupport();
 
+  /**
+   * Enables or disables the async support for decoding web images. If set to true, the ImageBuffers
+   * generated from the web platform will not be fully decoded buffers. Instead, they will trigger
+   * promise-awaiting calls before generating textures, which can speed up the process of decoding
+   * multiple images simultaneously. Do not set it to true if your rendering process may require
+   * multiple flush() calls to the screen Surface during one single frame. Otherwise, it may result
+   * in screen tearing.
+   */
+  static void SetAsyncSupport(bool enabled);
+};
 }  // namespace tgfx

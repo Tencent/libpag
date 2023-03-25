@@ -213,7 +213,7 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(NativeImageRef nativeImage) {
   if (env == nullptr) {
     return nullptr;
   }
-  auto info = NativeImageInfo::GetInfo(env, nativeImage);
+  auto info = WebImageInfo::GetInfo(env, nativeImage);
   if (info.isEmpty()) {
     return nullptr;
   }
@@ -282,7 +282,7 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
       bitmap = DecodeBitmap(env, options, imageBytes);
     }
   }
-  auto info = NativeImageInfo::GetInfo(env, bitmap);
+  auto info = WebImageInfo::GetInfo(env, bitmap);
   if (info.isEmpty()) {
     LOGE("NativeCodec::readPixels(): Failed to decode the image!");
     return false;

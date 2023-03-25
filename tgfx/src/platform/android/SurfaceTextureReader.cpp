@@ -49,7 +49,7 @@ void SurfaceTextureReader::notifyFrameAvailable() {
 }
 
 std::shared_ptr<ImageBuffer> SurfaceTextureReader::acquireNextBuffer() {
-  std::static_pointer_cast<SurfaceTexture>(stream)->notifyFrameChanged();
+  stream->markContentDirty(Rect::MakeWH(stream->width(), stream->height()));
   return ImageReader::acquireNextBuffer();
 }
 }  // namespace tgfx

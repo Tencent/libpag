@@ -48,19 +48,25 @@ class ImageStream {
   virtual int height() const = 0;
 
   /**
+   * Returns true if pixels represent transparency only. If true, each pixel is packed in 8 bits as
+   * defined by ColorType::ALPHA_8.
+   */
+  virtual bool isAlphaOnly() const = 0;
+
+  /**
    * Returns true if the ImageStream is backed by a platform-specified hardware buffer. Hardware
    * buffers allow sharing memory across CPU and GPU, which can be used to speed up the texture
    * uploading.
    */
   virtual bool isHardwareBacked() const = 0;
 
- protected:
   /**
    * Marks the specified bounds as dirty. The next time the texture is updated, the pixels in
    * the specified bounds will be uploaded to the texture.
    */
   void markContentDirty(const Rect& bounds);
 
+ protected:
   /**
    * Creates a new Texture capturing the pixels in the TextureBuffer. The mipMapped parameter
    * specifies whether created texture must allocate mip map levels.

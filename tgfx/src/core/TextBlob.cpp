@@ -40,13 +40,10 @@ Rect TextBlob::getBounds(const Stroke* stroke) const {
 }
 
 bool TextBlob::getPath(Path* path, const Stroke* stroke) const {
-  std::unique_ptr<PathEffect> pathEffect = nullptr;
-  if (stroke != nullptr) {
-    pathEffect = PathEffect::MakeStroke(*stroke);
-    if (pathEffect == nullptr) {
-      return false;
-    }
+  if (hasColor()) {
+    return false;
   }
+  auto pathEffect = PathEffect::MakeStroke(stroke);
   Path totalPath = {};
   auto glyphCount = glyphIDs.size();
   for (size_t i = 0; i < glyphCount; ++i) {

@@ -44,14 +44,14 @@ PAG_TEST(PAGRasterizerTest, TestRasterizer) {
   auto matrix = tgfx::Matrix::MakeTrans(50, 50);
   mask->setMatrix(matrix);
   mask->fillPath(path);
-  auto maskBuffer = std::static_pointer_cast<FTMask>(mask)->getBuffer();
+  auto maskBuffer = std::static_pointer_cast<PixelBuffer>(mask->makeBuffer());
   EXPECT_TRUE(Baseline::Compare(maskBuffer, "PAGRasterizerTest/rasterizer_path"));
 
   auto device = GLDevice::Make();
   ASSERT_TRUE(device != nullptr);
   auto context = device->lockContext();
   ASSERT_TRUE(context != nullptr);
-  auto image = mask->makeImage(context);
+  auto image = Image::MakeFrom(mask->makeBuffer());
   ASSERT_TRUE(image != nullptr);
   auto surface = Surface::Make(context, mask->width(), mask->height());
   ASSERT_TRUE(surface != nullptr);
@@ -60,7 +60,7 @@ PAG_TEST(PAGRasterizerTest, TestRasterizer) {
   Bitmap bitmap(mask->width(), mask->height(), true, false);
   ASSERT_FALSE(bitmap.isEmpty());
   Pixmap pixmap(bitmap);
-  pixmap.eraseAll();
+  pixmap.clear();
   auto result = surface->readPixels(pixmap.info(), pixmap.writablePixels());
   ASSERT_TRUE(result);
   device->unlock();

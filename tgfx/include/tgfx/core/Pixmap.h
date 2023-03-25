@@ -208,7 +208,7 @@ class Pixmap {
    * Replaces all pixel values with transparent colors. Returns false if the Pixmap is constructed
    * from read-only pixels.
    */
-  bool eraseAll();
+  bool clear();
 
  private:
   ImageInfo _info = {};

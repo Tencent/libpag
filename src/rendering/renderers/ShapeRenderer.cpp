@@ -835,7 +835,8 @@ void ApplyStrokeToPath(tgfx::Path* path, const StrokePaint& stroke) {
       effects.emplace_back(std::move(dashEffect));
     }
   }
-  auto strokeEffect = tgfx::PathEffect::MakeStroke(stroke.getStroke());
+  auto strokeData = stroke.getStroke();
+  auto strokeEffect = tgfx::PathEffect::MakeStroke(&strokeData);
   if (strokeEffect) {
     effects.emplace_back(std::move(strokeEffect));
   }

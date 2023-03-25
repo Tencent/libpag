@@ -49,6 +49,10 @@ class SurfaceTexture : public ImageStream {
     return _height;
   }
 
+  bool isAlphaOnly() const override {
+    return false;
+  }
+
   bool isHardwareBacked() const override {
     return false;
   }
@@ -58,12 +62,6 @@ class SurfaceTexture : public ImageStream {
    * the returned Surface will be called when the SurfaceTexture is released.
    */
   jobject getInputSurface() const;
-
-  /**
-   * Notifies the SurfaceTexture that a new image frame has been rendered into the associated
-   * input Surface.
-   */
-  void notifyFrameChanged();
 
   /**
    * Notifies the previously returned ImageBuffer is available for generating textures. The method

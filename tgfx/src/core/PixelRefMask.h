@@ -18,15 +18,41 @@
 
 #pragma once
 
-#include "core/PixelRefMask.h"
+#include "core/PixelRef.h"
+#include "tgfx/core/Mask.h"
 
 namespace tgfx {
-class FTMask : public PixelRefMask {
+class PixelRefMask : public Mask {
  public:
-  explicit FTMask(std::shared_ptr<PixelRef> pixelRef) : PixelRefMask(std::move(pixelRef)) {
+  explicit PixelRefMask(std::shared_ptr<PixelRef> pixelRef);
+
+  int width() const override {
+    return pixelRef->width();
+  }
+
+  int height() const override {
+    return pixelRef->height();
+  }
+
+  bool isHardwareBacked() const override {
+    return pixelRef->width();
+  }
+
+  void clear() override {
+    return pixelRef->clear();
+  }
+
+  std::shared_ptr<ImageBuffer> makeBuffer() const override {
+    return pixelRef->makeBuffer();
   }
 
  protected:
-  void onFillPath(const Path& path, const Matrix& matrix) override;
+  std::shared_ptr<PixelRef> pixelRef = nullptr;
+
+  void markContentDirty(const Rect& bounds, bool flipY);
+
+  std::shared_ptr<ImageStream> getImageStream() const override {
+    return pixelRef;
+  }
 };
 }  // namespace tgfx

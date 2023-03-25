@@ -23,9 +23,11 @@
 #include "gpu/ops/FillRectOp.h"
 #include "gpu/ops/RRectOp.h"
 #include "gpu/ops/TriangulatingPathOp.h"
+#include "platform/apple/HardwareBuffer.h"
 #include "rendering/utils/shaper/TextShaper.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/ImageReader.h"
 #include "tgfx/core/Mask.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/gpu/Surface.h"
@@ -35,20 +37,6 @@
 using namespace pag;
 
 namespace tgfx {
-static bool Compare(Surface* surface, const std::string& key) {
-  Bitmap bitmap(surface->width(), surface->height());
-  if (bitmap.isEmpty()) {
-    return false;
-  }
-  Pixmap pixmap(bitmap);
-  pixmap.eraseAll();
-  auto result = surface->readPixels(pixmap.info(), pixmap.writablePixels());
-  if (!result) {
-    return false;
-  }
-  return pag::Baseline::Compare(pixmap, key);
-}
-
 /**
  * 用例描述: 测试 ColorMatrixFilter
  */
@@ -64,7 +52,7 @@ PAG_TEST(CanvasTest, ColorMatrixFilter) {
   std::array<float, 20> matrix = {1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0};
   paint.setColorFilter(ColorFilter::Matrix(matrix));
   canvas->drawImage(image, &paint);
-  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/identityMatrix"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/identityMatrix"));
   canvas->clear();
   std::array<float, 20> greyColorMatrix = {0.21f, 0.72f, 0.07f, 0.41f, 0,  // red
                                            0.21f, 0.72f, 0.07f, 0.41f, 0,  // green
@@ -72,7 +60,7 @@ PAG_TEST(CanvasTest, ColorMatrixFilter) {
                                            0,     0,     0,     1.0f,  0};
   paint.setColorFilter(ColorFilter::Matrix(greyColorMatrix));
   canvas->drawImage(image, &paint);
-  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/greyColorMatrix"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/greyColorMatrix"));
   device->unlock();
 }
 
@@ -102,7 +90,8 @@ PAG_TEST(CanvasTest, Blur) {
   canvas->restore();
   Path path;
   path.addRect(Rect::MakeWH(imageWidth, imageHeight));
-  PathEffect::MakeStroke(Stroke(1.f))->applyTo(&path);
+  Stroke stroke(1.f);
+  PathEffect::MakeStroke(&stroke)->applyTo(&path);
   paint.setImageFilter(nullptr);
   paint.setColor(Color{1.f, 0.f, 0.f, 1.f});
   canvas->drawPath(path, paint);
@@ -142,7 +131,7 @@ PAG_TEST(CanvasTest, Blur) {
   paint.setImageFilter(nullptr);
   canvas->drawPath(path, paint);
 
-  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/blur"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/blur"));
   device->unlock();
 }
 
@@ -176,7 +165,7 @@ PAG_TEST(CanvasTest, DropShadow) {
   paint.setImageFilter(filter);
   canvas->drawImage(image, &paint);
 
-  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/dropShadow"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/dropShadow"));
   device->unlock();
 
   auto src = Rect::MakeXYWH(10, 10, 10, 10);
@@ -213,7 +202,7 @@ PAG_TEST(CanvasTest, clip) {
   paint.setColor(tgfx::Color::FromRGBA(255, 0, 0));
   paint.setStyle(PaintStyle::Fill);
   canvas->drawPath(drawPath, paint);
-  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/Clip"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/Clip"));
   auto gl = GLFunctions::Get(context);
   gl->deleteTextures(1, &textureInfo.id);
   device->unlock();
@@ -237,7 +226,7 @@ PAG_TEST(CanvasTest, TileMode) {
   canvas->drawRect(Rect::MakeWH(static_cast<float>(surface->width()),
                                 static_cast<float>(surface->height()) * 0.9f),
                    paint);
-  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/tileMode"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/tileMode"));
   device->unlock();
 }
 
@@ -276,7 +265,7 @@ PAG_TEST(CanvasTest, merge_draw_call_rect) {
   EXPECT_TRUE(task->ops.size() == 2);
   EXPECT_EQ(static_cast<FillRectOp*>(task->ops[1].get())->rects.size(), drawCallCount);
   canvas->flush();
-  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/merge_draw_call_rect"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_rect"));
   device->unlock();
 }
 
@@ -325,7 +314,7 @@ PAG_TEST(CanvasTest, merge_draw_call_triangle) {
   EXPECT_TRUE(task->ops.size() == 2);
   EXPECT_EQ(static_cast<TriangulatingPathOp*>(task->ops[1].get())->vertexCount, drawCallCount * 30);
   canvas->flush();
-  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/merge_draw_call_triangle"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_triangle"));
   device->unlock();
 }
 
@@ -368,7 +357,7 @@ PAG_TEST(CanvasTest, merge_draw_call_rrect) {
   EXPECT_TRUE(task->ops.size() == 2);
   EXPECT_EQ(static_cast<RRectOp*>(task->ops[1].get())->rRects.size(), drawCallCount);
   canvas->flush();
-  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/merge_draw_call_rrect"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_rrect"));
   device->unlock();
 }
 
@@ -412,7 +401,7 @@ PAG_TEST(CanvasTest, merge_draw_clear_op) {
   auto task = std::static_pointer_cast<OpsTask>(drawingManager->tasks[0]);
   EXPECT_TRUE(task->ops.size() == drawCallCount + 1);
   canvas->flush();
-  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/merge_draw_clear_op"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_clear_op"));
   device->unlock();
 }
 
@@ -498,29 +487,7 @@ PAG_TEST(CanvasTest, textShape) {
                        paint);
   }
   canvas->flush();
-  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/text_shape"));
-  device->unlock();
-}
-
-/**
- * 用例描述: 测试更新 Mask
- */
-PAG_TEST(CanvasTest, updateMask) {
-  auto device = GLDevice::Make();
-  auto context = device->lockContext();
-  ASSERT_TRUE(context != nullptr);
-  auto mask = Mask::Make(100, 100);
-  auto surface = Surface::Make(context, mask->width(), mask->height());
-  auto canvas = surface->getCanvas();
-  Path path;
-  path.addRect(Rect::MakeXYWH(10, 10, 10, 10));
-  mask->fillPath(path);
-  canvas->drawImage(mask->makeImage(context));
-  path.reset();
-  path.addRoundRect(Rect::MakeXYWH(22, 22, 10, 10), 3, 3);
-  mask->fillPath(path);
-  canvas->drawImage(mask->makeImage(context));
-  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/update_mask"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/text_shape"));
   device->unlock();
 }
 
@@ -539,10 +506,10 @@ PAG_TEST(CanvasTest, filterMode) {
   auto canvas = surface->getCanvas();
   canvas->setMatrix(Matrix::MakeScale(2.f));
   canvas->drawImage(image, SamplingOptions(FilterMode::Nearest));
-  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/filter_mode_nearest"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/filter_mode_nearest"));
   canvas->clear();
   canvas->drawImage(image, SamplingOptions(FilterMode::Linear));
-  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/filter_mode_linear"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/filter_mode_linear"));
   device->unlock();
 }
 
@@ -578,13 +545,13 @@ PAG_TEST(CanvasTest, mipmap) {
   canvas->setMatrix(imageMatrix);
   // 绘制没有 mipmap 的 texture 时，使用 MipmapMode::Linear 会回退到 MipmapMode::None。
   canvas->drawImage(image, SamplingOptions(FilterMode::Linear, MipMapMode::Linear));
-  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/mipmap_none"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/mipmap_none"));
   canvas->clear();
   canvas->drawImage(imageMipMapped, SamplingOptions(FilterMode::Linear, MipMapMode::Nearest));
-  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/mipmap_nearest"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/mipmap_nearest"));
   canvas->clear();
   canvas->drawImage(imageMipMapped, SamplingOptions(FilterMode::Linear, MipMapMode::Linear));
-  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/mipmap_linear"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/mipmap_linear"));
   surface = Surface::Make(context, static_cast<int>(imageWidth * 4.f),
                           static_cast<int>(imageHeight * 4.f));
   canvas = surface->getCanvas();
@@ -593,7 +560,7 @@ PAG_TEST(CanvasTest, mipmap) {
                                           SamplingOptions(FilterMode::Linear, MipMapMode::Linear))
                       ->makeWithPreLocalMatrix(imageMatrix));
   canvas->drawRect(Rect::MakeWH(surface->width(), surface->height()), paint);
-  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/mipmap_linear_texture_effect"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/mipmap_linear_texture_effect"));
   device->unlock();
 }
 
@@ -626,7 +593,7 @@ PAG_TEST(CanvasTest, hardwareMipMap) {
   auto canvas = surface->getCanvas();
   canvas->setMatrix(imageMatrix);
   canvas->drawImage(imageMipMapped, SamplingOptions(FilterMode::Linear, MipMapMode::Linear));
-  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/mipmap_linear_hardware"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/mipmap_linear_hardware"));
   device->unlock();
 }
 
@@ -659,7 +626,7 @@ PAG_TEST(CanvasTest, shape) {
   matrix.postScale(0.5, 0.5, 60, 300);
   canvas->setMatrix(matrix);
   canvas->drawShape(shape, paint);
-  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/shape"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/shape"));
   device->unlock();
 }
 
@@ -751,7 +718,7 @@ PAG_TEST(CanvasTest, image) {
   canvas->drawImage(rgbAAA, matrix);
   image = rgbAAA->makeRGBAAA(256, 512, 256, 0);
   EXPECT_TRUE(image == nullptr);
-  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/drawImage"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawImage"));
   device->unlock();
 }
 
@@ -760,7 +727,7 @@ PAG_TEST(CanvasTest, image) {
  */
 PAG_TEST(CanvasTest, rectangleTextureAsBlendDst) {
   int size = 110;
-  auto hardwareBuffer = PixelBuffer::MakeHardwareBuffer(size, size, false);
+  auto hardwareBuffer = tgfx::HardwareBuffer::Make(size, size, false);
   if (hardwareBuffer == nullptr) {
     return;
   }
@@ -779,7 +746,7 @@ PAG_TEST(CanvasTest, rectangleTextureAsBlendDst) {
   ASSERT_TRUE(image != nullptr);
   canvas->setBlendMode(tgfx::BlendMode::Multiply);
   canvas->drawImage(image);
-  EXPECT_TRUE(Compare(surface.get(), "CanvasTest/hardware_render_target_blend"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/hardware_render_target_blend"));
   device->unlock();
 }
 }  // namespace tgfx

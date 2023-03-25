@@ -18,6 +18,8 @@
 
 #include "PAGTestUtils.h"
 #include <dirent.h>
+#include <fstream>
+#include <iostream>
 #include "TestConstants.h"
 #include "base/utils/TGFXCast.h"
 #include "tgfx/opengl/GLFunctions.h"
@@ -128,5 +130,42 @@ std::shared_ptr<tgfx::Image> MakeImage(const std::string& path) {
 
 std::shared_ptr<PAGImage> MakePAGImage(const std::string& path) {
   return PAGImage::FromPath(TestConstants::PAG_ROOT + path);
+}
+
+void SaveFile(std::shared_ptr<tgfx::Data> data, const std::string& key) {
+  std::filesystem::path path = TestConstants::OUT_ROOT + key + TestConstants::WEBP_FILE_EXT;
+  std::filesystem::create_directories(path.parent_path());
+  std::ofstream out(path);
+  out.write(reinterpret_cast<const char*>(data->data()),
+            static_cast<std::streamsize>(data->size()));
+  out.close();
+}
+
+void SaveImage(const std::shared_ptr<tgfx::PixelBuffer> pixelBuffer, const std::string& key) {
+  if (pixelBuffer == nullptr) {
+    return;
+  }
+  auto pixels = pixelBuffer->lockPixels();
+  SaveImage(Pixmap(pixelBuffer->info(), pixels), key);
+  pixelBuffer->unlockPixels();
+}
+
+void SaveImage(const tgfx::Bitmap& bitmap, const std::string& key) {
+  if (bitmap.isEmpty()) {
+    return;
+  }
+  SaveImage(Pixmap(bitmap), key);
+}
+
+void SaveImage(const Pixmap& pixmap, const std::string& key) {
+  auto data = ImageCodec::Encode(pixmap, EncodedFormat::WEBP, 100);
+  if (data == nullptr) {
+    return;
+  }
+  SaveFile(data, key);
+}
+
+void RemoveImage(const std::string& key) {
+  std::filesystem::remove(TestConstants::OUT_ROOT + key + TestConstants::WEBP_FILE_EXT);
 }
 }  // namespace pag

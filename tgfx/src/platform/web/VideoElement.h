@@ -19,14 +19,14 @@
 #pragma once
 
 #include <emscripten/val.h>
-#include "core/ImageStream.h"
+#include "WebImageStream.h"
 
 namespace tgfx {
 /**
  * The VideoElement class allows direct access to image buffers rendered into a HTMLVideoElement
  * on the web platform. It is typically used with the ImageReader class.
  */
-class VideoElement : public ImageStream {
+class VideoElement : public WebImageStream {
  public:
   /**
    * Creates a new VideoElement from the specified HTMLVideoElement object and the video size.
@@ -34,24 +34,12 @@ class VideoElement : public ImageStream {
    */
   static std::shared_ptr<VideoElement> MakeFrom(emscripten::val video, int width, int height);
 
-  int width() const override {
-    return _width;
-  }
-
-  int height() const override {
-    return _height;
-  }
-
-  bool isHardwareBacked() const override {
-    return false;
-  }
-
   /**
    * Notifies the VideoElement that a new image frame has been rendered into the associated
    * HTMLVideoElement. The next acquired ImageBuffer will call the promise.await() method before
    * generating textures.
    */
-  void notifyFrameChanged(emscripten::val promise = emscripten::val::null());
+  void markFrameChanged(emscripten::val promise);
 
  protected:
   std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) override;
@@ -59,10 +47,7 @@ class VideoElement : public ImageStream {
   bool onUpdateTexture(std::shared_ptr<Texture> texture, const Rect& bounds) override;
 
  private:
-  emscripten::val video = emscripten::val::null();
   emscripten::val currentPromise = emscripten::val::null();
-  int _width = 0;
-  int _height = 0;
 
   VideoElement(emscripten::val video, int width, int height);
 };

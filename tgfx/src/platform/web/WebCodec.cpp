@@ -16,17 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/platform/web/WebImage.h"
+#include "tgfx/platform/web/WebCodec.h"
 #include <atomic>
 
 namespace tgfx {
 static std::atomic_bool AsyncSupportEnabled = false;
 
-bool WebImage::AsyncSupport() {
+bool WebCodec::AsyncSupport() {
   return AsyncSupportEnabled;
 }
 
-void WebImage::SetAsyncSupport(bool enabled) {
+void WebCodec::SetAsyncSupport(bool enabled) {
   AsyncSupportEnabled = enabled;
 }
 }  // namespace tgfx

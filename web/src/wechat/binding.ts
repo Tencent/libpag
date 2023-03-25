@@ -1,6 +1,5 @@
 import { VideoReader } from './video-reader';
 import { ScalerContext } from './scaler-context';
-import { WebMask } from './web-mask';
 import { PAGView } from './pag-view';
 import { PAGFile } from './pag-file';
 import { PAGImage } from './pag-image';
@@ -19,6 +18,7 @@ import { PAGTextLayer } from '../pag-text-layer';
 import { PAGImageLayer } from '../pag-image-layer';
 import { PAGSolidLayer } from '../pag-solid-layer';
 import { Matrix } from '../core/matrix';
+import { WebMask } from '../core/web-mask';
 import { RenderCanvas } from '../core/render-canvas';
 import { setMixin } from '../utils/mixin';
 

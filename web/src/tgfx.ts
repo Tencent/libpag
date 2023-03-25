@@ -30,9 +30,7 @@ export const readImagePixels = (module: PAG, image: CanvasImageSource, width: nu
   if (!image) {
     return null;
   }
-  const canvas = getCanvas2D();
-  canvas.width = width;
-  canvas.height = height;
+  const canvas = getCanvas2D(width, height);
   const ctx = canvas.getContext('2d') as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
   if (!ctx) {
     return null;
@@ -67,16 +65,21 @@ export const getSourceSize = (source: TexImageSource | OffscreenCanvas) => {
 export const uploadToTexture = (
   GL: EmscriptenGL,
   source: TexImageSource | OffscreenCanvas | BitmapImage,
-  textureID: number,
+  textureID: number, alphaOnly: boolean
 ) => {
   const renderSource = source instanceof BitmapImage ? source.bitmap : source;
   if (!renderSource) return;
   const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
   gl.bindTexture(gl.TEXTURE_2D, GL.textures[textureID]);
-  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
-  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
-  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, renderSource);
-  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+  if(alphaOnly){
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.ALPHA, gl.UNSIGNED_BYTE, renderSource);
+  } else {
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, renderSource);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+  }
 };
 
 export const isAndroidMiniprogram = () => {
@@ -97,3 +100,5 @@ export const getBytesFromPath = async (module: PAG, path: string) => {
   const buffer = await fetch(path).then((res) => res.arrayBuffer());
   return writeBufferToWasm(module, buffer);
 };
+
+export {getCanvas2D as createCanvas2D};

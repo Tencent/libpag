@@ -38,7 +38,7 @@ class ImageReaderBuffer : public ImageBuffer {
   }
 
   bool isAlphaOnly() const override {
-    return false;
+    return imageReader->stream->isAlphaOnly();
   }
 
   bool expired() const override {
@@ -57,6 +57,10 @@ class ImageReaderBuffer : public ImageBuffer {
 
 std::shared_ptr<ImageReader> ImageReader::MakeFrom(const Bitmap& bitmap) {
   return ImageReader::MakeFrom(bitmap.pixelRef);
+}
+
+std::shared_ptr<ImageReader> ImageReader::MakeFrom(std::shared_ptr<Mask> mask) {
+  return ImageReader::MakeFrom(mask->getImageStream());
 }
 
 std::shared_ptr<ImageReader> ImageReader::MakeFrom(std::shared_ptr<ImageStream> imageStream) {
@@ -89,9 +93,10 @@ int ImageReader::height() const {
 std::shared_ptr<ImageBuffer> ImageReader::acquireNextBuffer() {
   std::lock_guard<std::mutex> autoLock(locker);
   DEBUG_ASSERT(!weakThis.expired());
-  if (dirtyBounds.isEmpty()) {
+  if (!hasPendingChanges) {
     return nullptr;
   }
+  hasPendingChanges = false;
   bufferVersion++;
   return std::make_shared<ImageReaderBuffer>(weakThis.lock(), bufferVersion);
 }
@@ -108,6 +113,9 @@ std::shared_ptr<Texture> ImageReader::readTexture(uint64_t contentVersion, Conte
     return texture;
   }
   if (contentVersion < bufferVersion) {
+    LOGE(
+        "ImageReader::readTexture(): Failed to read texture, the target ImageBuffer is already "
+        "expired!");
     return nullptr;
   }
   bool success = true;
@@ -115,11 +123,10 @@ std::shared_ptr<Texture> ImageReader::readTexture(uint64_t contentVersion, Conte
     texture = stream->onMakeTexture(context, mipMapped);
     success = texture != nullptr;
   } else if (!stream->isHardwareBacked()) {
-    auto bounds = Rect::MakeEmpty();
-    std::swap(bounds, dirtyBounds);
-    success = stream->onUpdateTexture(texture, bounds);
+    success = stream->onUpdateTexture(texture, dirtyBounds);
   }
   if (success) {
+    dirtyBounds.setEmpty();
     texture->markUniqueKeyExpired();
     textureVersion = contentVersion;
   }
@@ -128,6 +135,7 @@ std::shared_ptr<Texture> ImageReader::readTexture(uint64_t contentVersion, Conte
 
 void ImageReader::onContentDirty(const Rect& bounds) {
   std::lock_guard<std::mutex> autoLock(locker);
+  hasPendingChanges = true;
   dirtyBounds.join(bounds);
   if (stream->isHardwareBacked() && texture != nullptr) {
     texture->markUniqueKeyExpired();

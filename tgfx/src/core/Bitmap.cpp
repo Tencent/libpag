@@ -62,7 +62,7 @@ void* Bitmap::lockPixels() {
   }
   auto pixels = pixelRef->lockWritablePixels();
   if (pixels != nullptr) {
-    pixelRef->notifyPixelsDirty(Rect::MakeWH(width(), height()));
+    pixelRef->markContentDirty(Rect::MakeWH(width(), height()));
   }
   return pixels;
 }
@@ -100,18 +100,16 @@ bool Bitmap::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int
 bool Bitmap::writePixels(const ImageInfo& srcInfo, const void* srcPixels, int dstX, int dstY) {
   auto success = Pixmap(*this).writePixels(srcInfo, srcPixels, dstX, dstY);
   if (success) {
-    pixelRef->notifyPixelsDirty(Rect::MakeXYWH(dstX, dstY, srcInfo.width(), srcInfo.height()));
+    pixelRef->markContentDirty(Rect::MakeXYWH(dstX, dstY, srcInfo.width(), srcInfo.height()));
   }
   return success;
 }
 
-void Bitmap::eraseAll() {
-  auto pixels = lockPixels();
-  if (pixels != nullptr) {
-    pixelRef->notifyPixelsDirty(Rect::MakeWH(width(), height()));
-    memset(pixels, 0, byteSize());
+void Bitmap::clear() {
+  if (pixelRef == nullptr) {
+    return;
   }
-  unlockPixels();
+  pixelRef->clear();
 }
 
 std::shared_ptr<ImageBuffer> Bitmap::makeBuffer() const {

@@ -44,10 +44,4 @@ class Baseline {
 
   friend class PAGTestEnvironment;
 };
-
-void SaveFile(std::shared_ptr<tgfx::Data> data, const std::string& key);
-
-void SaveImage(const tgfx::Pixmap& pixmap, const std::string& key);
-
-void RemoveImage(const std::string& key);
 }  // namespace pag

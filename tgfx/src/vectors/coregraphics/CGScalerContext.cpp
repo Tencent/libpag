@@ -272,7 +272,8 @@ bool CGScalerContext::generatePath(GlyphID glyphID, Path* path) {
     CFRelease(cgPath);
     if (rec.fauxBoldSize != 0) {
       auto strokePath = *path;
-      auto pathEffect = PathEffect::MakeStroke(Stroke(rec.fauxBoldSize));
+      Stroke stroke(rec.fauxBoldSize);
+      auto pathEffect = PathEffect::MakeStroke(&stroke);
       pathEffect->applyTo(&strokePath);
       path->addPath(strokePath, PathOp::Union);
     }

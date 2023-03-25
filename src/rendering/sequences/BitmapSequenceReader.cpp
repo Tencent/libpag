@@ -29,7 +29,7 @@ BitmapSequenceReader::BitmapSequenceReader(std::shared_ptr<File> file, BitmapSeq
   auto staticContent = sequence->composition->staticContent();
   if (staticContent) {
     bitmap.allocPixels(sequence->width, sequence->height, false);
-    bitmap.eraseAll();
+    bitmap.clear();
   } else {
     info = tgfx::ImageInfo::Make(sequence->width, sequence->height, tgfx::ColorType::RGBA_8888);
     tgfx::Buffer buffer(info.byteSize());
@@ -69,7 +69,7 @@ std::shared_ptr<tgfx::ImageBuffer> BitmapSequenceReader::onMakeBuffer(Frame targ
         if (firstRead && bitmapFrame->isKeyframe &&
             !(codec->width() == pixmap.width() && codec->height() == pixmap.height())) {
           // clear the whole screen if the size of the key frame is smaller than the screen.
-          pixmap.eraseAll();
+          pixmap.clear();
         }
         auto offset = pixmap.rowBytes() * bitmapRect->y + bitmapRect->x * 4;
         auto result = codec->readPixels(
