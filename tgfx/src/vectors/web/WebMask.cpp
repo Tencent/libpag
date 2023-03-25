@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WebMask.h"
-#include "WebTextBlob.h"
 #include "WebTypeface.h"
+#include "core/SimpleTextBlob.h"
 #include "platform/web/WebImageBuffer.h"
 #include "platform/web/WebImageStream.h"
 #include "utils/Log.h"
@@ -97,6 +97,18 @@ void WebMask::onFillPath(const Path& path, const Matrix& matrix) {
   webMask.call<void>("fillPath", path2D, path.getFillType());
 }
 
+static void GetTextsAndPositions(const SimpleTextBlob* textBlob, std::vector<std::string>* texts,
+                                 std::vector<Point>* points) {
+  auto& font = textBlob->getFont();
+  auto& glyphIDs = textBlob->getGlyphIDs();
+  auto& positions = textBlob->getPositions();
+  auto typeface = std::static_pointer_cast<WebTypeface>(font.getTypeface());
+  for (size_t i = 0; i < glyphIDs.size(); ++i) {
+    texts->push_back(typeface->getText(glyphIDs[i]));
+    points->push_back(positions[i]);
+  }
+}
+
 bool WebMask::onFillText(const TextBlob* textBlob, const Stroke* stroke, const Matrix& matrix) {
   aboutToFill();
   auto bounds = textBlob->getBounds(stroke);
@@ -104,9 +116,9 @@ bool WebMask::onFillText(const TextBlob* textBlob, const Stroke* stroke, const M
   stream->markContentDirty(bounds);
   std::vector<std::string> texts = {};
   std::vector<Point> points = {};
-  const auto* webTextBlob = static_cast<const WebTextBlob*>(textBlob);
-  webTextBlob->getTextsAndPositions(&texts, &points);
-  const auto& font = webTextBlob->getFont();
+  auto blob = static_cast<const SimpleTextBlob*>(textBlob);
+  GetTextsAndPositions(blob, &texts, &points);
+  const auto& font = blob->getFont();
   const auto* typeFace = static_cast<WebTypeface*>(font.getTypeface().get());
   auto webFont = val::object();
   webFont.set("name", typeFace->fontFamily());

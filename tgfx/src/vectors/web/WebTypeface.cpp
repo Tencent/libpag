@@ -106,18 +106,18 @@ std::string WebTypeface::getText(GlyphID glyphID) const {
   return glyphs.at(glyphID - 1);
 }
 
-Point WebTypeface::getGlyphVerticalOffset(GlyphID glyphID, float size, bool fauxBold,
-                                          bool fauxItalic) const {
+Point WebTypeface::getVerticalOffset(GlyphID glyphID, float size, bool fauxBold,
+                                     bool fauxItalic) const {
   if (glyphID == 0) {
     return Point::Zero();
   }
   auto metrics = getMetrics(size);
-  auto advance = getGlyphAdvance(glyphID, size, fauxBold, fauxItalic, true);
+  auto advance = getAdvance(glyphID, size, fauxBold, fauxItalic, true);
   return {-advance * 0.5f, metrics.capHeight};
 }
 
-float WebTypeface::getGlyphAdvance(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
-                                   bool) const {
+float WebTypeface::getAdvance(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
+                              bool) const {
   if (glyphID == 0) {
     return 0;
   }
@@ -136,12 +136,11 @@ FontMetrics WebTypeface::getMetrics(float size) const {
   return metrics;
 }
 
-bool WebTypeface::getGlyphPath(GlyphID, float, bool, bool, Path*) const {
+bool WebTypeface::getPath(GlyphID, float, bool, bool, Path*) const {
   return false;
 }
 
-Rect WebTypeface::getGlyphBounds(GlyphID glyphID, float size, bool fauxBold,
-                                 bool fauxItalic) const {
+Rect WebTypeface::getBounds(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic) const {
   if (glyphID == 0) {
     return Rect::MakeEmpty();
   }

@@ -457,7 +457,7 @@ PAG_TEST(CanvasTest, textShape) {
     auto glyphID = positionedGlyphs.getGlyphID(i);
     run->ids.emplace_back(glyphID);
     run->positions.push_back(Point{x, height});
-    x += run->font.getGlyphAdvance(glyphID);
+    x += run->font.getAdvance(glyphID);
     path.lineTo(x, height);
     if (width < x) {
       width = x;

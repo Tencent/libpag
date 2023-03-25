@@ -174,7 +174,7 @@ GlyphMetrics CGScalerContext::generateGlyphMetrics(GlyphID glyphID) {
   return glyph;
 }
 
-Point CGScalerContext::getGlyphVerticalOffset(GlyphID glyphID) const {
+Point CGScalerContext::getVerticalOffset(GlyphID glyphID) const {
   // CTFontGetVerticalTranslationsForGlyphs produces cgVertOffset in CG units (pixels, y up).
   CGSize cgVertOffset;
   CTFontGetVerticalTranslationsForGlyphs(ctFont, &glyphID, &cgVertOffset, 1);

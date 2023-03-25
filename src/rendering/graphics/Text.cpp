@@ -180,7 +180,7 @@ bool Text::hitTest(RenderCache*, float x, float y) {
     int index = 0;
     auto& textFont = textRun->textFont;
     for (auto& glyphID : textRun->glyphIDs) {
-      textFont.getGlyphPath(glyphID, &glyphPath);
+      textFont.getPath(glyphID, &glyphPath);
       auto pos = textRun->positions[index++];
       auto localX = local.x - pos.x;
       auto localY = local.y - pos.y;
@@ -210,7 +210,7 @@ bool Text::getPath(tgfx::Path* path) const {
     auto& textFont = textRun->textFont;
     for (auto& glyphID : textRun->glyphIDs) {
       tgfx::Path tempPath = {};
-      if (!textFont.getGlyphPath(glyphID, &tempPath)) {
+      if (!textFont.getPath(glyphID, &tempPath)) {
         return false;
       }
       auto pos = textRun->positions[index];

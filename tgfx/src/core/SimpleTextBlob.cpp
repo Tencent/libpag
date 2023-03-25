@@ -16,7 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "CGTextBlob.h"
+#include "core/SimpleTextBlob.h"
+#include "tgfx/core/PathEffect.h"
 
 namespace tgfx {
 std::shared_ptr<TextBlob> TextBlob::MakeFrom(const GlyphID glyphIDs[], const Point positions[],
@@ -24,17 +25,54 @@ std::shared_ptr<TextBlob> TextBlob::MakeFrom(const GlyphID glyphIDs[], const Poi
   if (glyphCount == 0) {
     return nullptr;
   }
-  auto textBlob = std::make_shared<CGTextBlob>();
+  auto textBlob = std::make_shared<SimpleTextBlob>();
   textBlob->glyphIDs = {glyphIDs, glyphIDs + glyphCount};
   textBlob->positions = {positions, positions + glyphCount};
   textBlob->font = font;
   return textBlob;
 }
 
-std::shared_ptr<ImageBuffer> CGTextBlob::getImage(float /*resolutionScale*/,
-                                                  Matrix* /*matrix*/) const {
-  // TODO(domrjchen): Added the implementation of generating multiple character images at once and
-  //  completed GLCanvas.drawColorGlyphs().
-  return nullptr;
+bool SimpleTextBlob::hasColor() const {
+  return font.getTypeface()->hasColor();
+}
+
+Rect SimpleTextBlob::getBounds(const Stroke* stroke) const {
+  auto totalBounds = Rect::MakeEmpty();
+  int index = 0;
+  for (auto& glyphID : glyphIDs) {
+    auto bounds = font.getBounds(glyphID);
+    bounds.offset(positions[index]);
+    if (stroke) {
+      bounds.outset(stroke->width, stroke->width);
+    }
+    totalBounds.join(bounds);
+    index++;
+  }
+  return totalBounds;
+}
+
+bool SimpleTextBlob::getPath(Path* path, const Stroke* stroke) const {
+  if (hasColor()) {
+    return false;
+  }
+  auto pathEffect = PathEffect::MakeStroke(stroke);
+  Path totalPath = {};
+  auto glyphCount = glyphIDs.size();
+  for (size_t i = 0; i < glyphCount; ++i) {
+    const auto& glyphID = glyphIDs[i];
+    Path glyphPath = {};
+    if (font.getPath(glyphID, &glyphPath)) {
+      const auto& position = positions[i];
+      if (pathEffect) {
+        pathEffect->applyTo(&glyphPath);
+      }
+      glyphPath.transform(Matrix::MakeTrans(position.x, position.y));
+      totalPath.addPath(glyphPath);
+    } else {
+      return false;
+    }
+  }
+  *path = totalPath;
+  return true;
 }
 }  // namespace tgfx

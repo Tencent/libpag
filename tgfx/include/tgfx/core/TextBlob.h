@@ -39,12 +39,12 @@ class TextBlob {
   /**
    * Returns true if this TextBlob has color glyphs, for example, color emojis.
    */
-  bool hasColor() const;
+  virtual bool hasColor() const = 0;
 
   /**
    * Returns the bounds of the text blob's glyphs.
    */
-  Rect getBounds(const Stroke* stroke = nullptr) const;
+  virtual Rect getBounds(const Stroke* stroke = nullptr) const = 0;
 
   /**
    * Creates a path corresponding to glyph shapes in the text blob. Copies the glyph fills to the
@@ -52,23 +52,6 @@ class TextBlob {
    * font is backed by bitmaps or cannot generate outlines, returns false and leaves the path
    * unchanged.
    */
-  bool getPath(Path* path, const Stroke* stroke = nullptr) const;
-
-  /**
-   * Creates an image buffer capturing the pixels in the text blob.
-   * @param resolutionScale The "intended" resolution for the output. Larger values (scale > 1)
-   * indicate that the result should be more precise, smaller values (0 < scale < 1) indicate that
-   * the result can be less precise.
-   * @param matrix The output transformation that should apply to the texture when drawing.
-   * @return An alpha only image buffer is returned if the text font is not backed by bitmaps.
-   */
-  virtual std::shared_ptr<ImageBuffer> getImage(float resolutionScale, Matrix* matrix) const = 0;
-
- protected:
-  Font font = {};
-  std::vector<GlyphID> glyphIDs = {};
-  std::vector<Point> positions = {};
-
-  friend class Mask;
+  virtual bool getPath(Path* path, const Stroke* stroke = nullptr) const = 0;
 };
 }  // namespace tgfx
