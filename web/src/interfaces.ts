@@ -57,7 +57,6 @@ export interface WebMask {
     matrixWasmIns: any,
   ) => void;
   clear: () => void;
-  update: (GL: EmscriptenGL) => void;
 }
 
 export type WebMaskConstructor = new (
