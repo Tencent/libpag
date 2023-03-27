@@ -292,9 +292,10 @@ public class PAGImageView extends View {
                 animator.setCurrentPlayTime((long) (decoderInfo.duration * 0.001f * PAGImageViewHelper.FrameToProgress(_currentFrame, decoderInfo.numFrames)));
             } else {
                 int currentFrame = PAGImageViewHelper.ProgressToFrame(animator.getAnimatedFraction(), decoderInfo.numFrames);
-                if (currentFrame == _currentFrame) {
+                if (currentFrame == _currentFrame && !forceFlush) {
                     return false;
                 }
+                forceFlush = false;
                 _currentFrame = currentFrame;
             }
             if (!handleFrame(_currentFrame)) {
@@ -583,10 +584,12 @@ public class PAGImageView extends View {
 
     private boolean isAttachedToWindow = false;
 
+    private volatile boolean forceFlush = false;
     @Override
     protected void onAttachedToWindow() {
         isAttachedToWindow = true;
         super.onAttachedToWindow();
+        forceFlush = true;
         animator.addUpdateListener(mAnimatorUpdateListener);
         animator.addListener(mAnimatorListenerAdapter);
         synchronized (g_HandlerLock) {
@@ -774,6 +777,9 @@ public class PAGImageView extends View {
     private WeakReference<Future> lastFetchCacheTask;
 
     private boolean handleFrame(final int frame) {
+        if (!decoderInfo.isValid()) {
+            return false;
+        }
         KeyItem keyItem = fetchKeyFrame();
         if (lastKeyItem != null && lastKeyItem.keyPrefix != null && !lastKeyItem.keyPrefix.equals(keyItem.keyPrefix)) {
             releaseCurrentDiskCache();

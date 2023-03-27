@@ -190,6 +190,9 @@ class PAGImageViewHelper {
     }
 
     protected static Bitmap CreateBitmap(int width, int height) {
+        if (width == 0 || height == 0) {
+            return null;
+        }
         if (Build.VERSION.SDK_INT > Build.VERSION_CODES.Q) {
             HardwareBuffer hardwareBuffer = HardwareBuffer.create(width, height,
                     HardwareBuffer.RGBA_8888, 1,
