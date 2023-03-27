@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,29 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "core/PixelBuffer.h"
-#include "tgfx/core/Mask.h"
+#include "tgfx/platform/web/WebCodec.h"
+#include <atomic>
 
 namespace tgfx {
-class PixelBufferMask : public Mask {
- public:
-  explicit PixelBufferMask(std::shared_ptr<PixelBuffer> buffer);
+static std::atomic_bool AsyncSupportEnabled = false;
 
-  void clear() override;
+bool WebCodec::AsyncSupport() {
+  return AsyncSupportEnabled;
+}
 
-  std::shared_ptr<Texture> updateTexture(Context* context) override;
-
-  std::shared_ptr<PixelBuffer> getBuffer() const {
-    return buffer;
-  }
-
- protected:
-  void dirty(Rect rect, bool flipY = true);
-
-  std::shared_ptr<PixelBuffer> buffer = nullptr;
-  std::shared_ptr<Texture> texture;
-  Rect dirtyRect = Rect::MakeEmpty();
-};
+void WebCodec::SetAsyncSupport(bool enabled) {
+  AsyncSupportEnabled = enabled;
+}
 }  // namespace tgfx

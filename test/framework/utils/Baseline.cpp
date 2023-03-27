@@ -22,6 +22,7 @@
 #include <fstream>
 #include <iostream>
 #include <unordered_set>
+#include "PAGTestUtils.h"
 #include "TestConstants.h"
 #include "base/utils/TGFXCast.h"
 #include "nlohmann/json.hpp"
@@ -90,27 +91,6 @@ static void SetJSONValue(nlohmann::json& target, const std::string& key, const s
   std::string jsonKey;
   auto json = FindJSON(target, key, &jsonKey);
   (*json)[jsonKey] = value;
-}
-
-void SaveFile(std::shared_ptr<tgfx::Data> data, const std::string& key) {
-  std::filesystem::path path = TestConstants::OUT_ROOT + key + TestConstants::WEBP_FILE_EXT;
-  std::filesystem::create_directories(path.parent_path());
-  std::ofstream out(path);
-  out.write(reinterpret_cast<const char*>(data->data()),
-            static_cast<std::streamsize>(data->size()));
-  out.close();
-}
-
-void SaveImage(const Pixmap& pixmap, const std::string& key) {
-  auto data = ImageCodec::Encode(pixmap, EncodedFormat::WEBP, 100);
-  if (data == nullptr) {
-    return;
-  }
-  SaveFile(data, key);
-}
-
-void RemoveImage(const std::string& key) {
-  std::filesystem::remove(TestConstants::OUT_ROOT + key + TestConstants::WEBP_FILE_EXT);
 }
 
 bool Baseline::Compare(std::shared_ptr<tgfx::PixelBuffer> pixelBuffer, const std::string& key) {

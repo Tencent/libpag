@@ -55,21 +55,21 @@ class CGTypeface : public Typeface {
   std::shared_ptr<Data> copyTableData(FontTableTag tag) const override;
 
  protected:
-  Rect getGlyphBounds(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic) const override;
+  Rect getBounds(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic) const override;
 
   FontMetrics getMetrics(float size) const override;
 
-  Point getGlyphVerticalOffset(GlyphID glyphID, float size, bool fauxBold,
-                               bool fauxItalic) const override;
+  Point getVerticalOffset(GlyphID glyphID, float size, bool fauxBold,
+                          bool fauxItalic) const override;
 
-  bool getGlyphPath(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
-                    Path* path) const override;
+  bool getPath(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
+               Path* path) const override;
 
   std::shared_ptr<ImageBuffer> getGlyphImage(GlyphID glyphID, float size, bool fauxBold,
                                              bool fauxItalic, Matrix* matrix) const override;
 
-  float getGlyphAdvance(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
-                        bool verticalText) const override;
+  float getAdvance(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
+                   bool verticalText) const override;
 
  private:
   CGTypeface(CTFontRef ctFont, std::shared_ptr<Data> data);

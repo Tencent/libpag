@@ -69,15 +69,15 @@ class EmptyTypeface : public Typeface {
     return {};
   }
 
-  Rect getGlyphBounds(GlyphID, float, bool, bool) const override {
+  Rect getBounds(GlyphID, float, bool, bool) const override {
     return {};
   }
 
-  float getGlyphAdvance(GlyphID, float, bool, bool, bool) const override {
+  float getAdvance(GlyphID, float, bool, bool, bool) const override {
     return 0;
   }
 
-  bool getGlyphPath(GlyphID, float, bool, bool, Path*) const override {
+  bool getPath(GlyphID, float, bool, bool, Path*) const override {
     return false;
   }
 
@@ -85,7 +85,7 @@ class EmptyTypeface : public Typeface {
     return nullptr;
   }
 
-  Point getGlyphVerticalOffset(GlyphID, float, bool, bool) const override {
+  Point getVerticalOffset(GlyphID, float, bool, bool) const override {
     return Point::Zero();
   }
 
@@ -202,7 +202,7 @@ FontMetrics FTTypeface::getMetrics(float size) const {
   return scalerContext->generateFontMetrics();
 }
 
-Rect FTTypeface::getGlyphBounds(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic) const {
+Rect FTTypeface::getBounds(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic) const {
   auto scalerContext = FTScalerContext::Make(weakThis.lock(), size, fauxBold, fauxItalic);
   if (scalerContext == nullptr) {
     return Rect::MakeEmpty();
@@ -218,8 +218,8 @@ Rect FTTypeface::getGlyphBounds(GlyphID glyphID, float size, bool fauxBold, bool
   return bounds;
 }
 
-float FTTypeface::getGlyphAdvance(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
-                                  bool verticalText) const {
+float FTTypeface::getAdvance(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
+                             bool verticalText) const {
   auto scalerContext =
       FTScalerContext::Make(weakThis.lock(), size, fauxBold, fauxItalic, verticalText);
   if (scalerContext == nullptr) {
@@ -229,8 +229,8 @@ float FTTypeface::getGlyphAdvance(GlyphID glyphID, float size, bool fauxBold, bo
   return verticalText ? glyphMetrics.advanceY : glyphMetrics.advanceX;
 }
 
-bool FTTypeface::getGlyphPath(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
-                              Path* path) const {
+bool FTTypeface::getPath(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
+                         Path* path) const {
   auto scalerContext = FTScalerContext::Make(weakThis.lock(), size, fauxBold, fauxItalic);
   if (scalerContext == nullptr) {
     return false;
@@ -247,8 +247,8 @@ std::shared_ptr<ImageBuffer> FTTypeface::getGlyphImage(GlyphID glyphID, float si
   return scalerContext->generateImage(glyphID, matrix);
 }
 
-Point FTTypeface::getGlyphVerticalOffset(GlyphID glyphID, float size, bool fauxBold,
-                                         bool fauxItalic) const {
+Point FTTypeface::getVerticalOffset(GlyphID glyphID, float size, bool fauxBold,
+                                    bool fauxItalic) const {
   auto scalerContext = FTScalerContext::Make(weakThis.lock(), size, fauxBold, fauxItalic);
   if (scalerContext == nullptr) {
     return Point::Zero();

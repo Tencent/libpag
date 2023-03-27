@@ -229,10 +229,11 @@ std::shared_ptr<tgfx::Image> DrawMask(tgfx::Context* context, const Page& page) 
     if (textRun.paint.getStyle() == tgfx::PaintStyle::Fill) {
       mask->fillText(blob.get());
     } else {
-      mask->strokeText(blob.get(), *textRun.paint.getStroke());
+      mask->fillText(blob.get(), textRun.paint.getStroke());
     }
   }
-  return mask->makeImage(context);
+  auto maskImage = tgfx::Image::MakeFrom(mask->makeBuffer());
+  return maskImage->makeTextureImage(context);
 }
 
 std::shared_ptr<tgfx::Image> DrawColor(tgfx::Context* context, const Page& page) {

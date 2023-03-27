@@ -19,36 +19,36 @@
 #pragma once
 
 #include <emscripten/val.h>
-#include "tgfx/platform/ImageReader.h"
+#include "WebImageStream.h"
 
 namespace tgfx {
 /**
- * The VideoImageReader class allows direct access to image buffers rendered into a HTMLVideoElement
- * on the web platform.
+ * The VideoElement class allows direct access to image buffers rendered into a HTMLVideoElement
+ * on the web platform. It is typically used with the ImageReader class.
  */
-class VideoImageReader : public ImageReader {
+class VideoElement : public WebImageStream {
  public:
   /**
-   * Creates a new BufferQueue from the specified HTMLVideoElement object and the video size.
+   * Creates a new VideoElement from the specified HTMLVideoElement object and the video size.
    * Returns nullptr if the video is null or the buffer size is zero.
    */
-  static std::shared_ptr<VideoImageReader> MakeFrom(emscripten::val video, int width, int height);
+  static std::shared_ptr<VideoElement> MakeFrom(emscripten::val video, int width, int height);
 
   /**
-   * Acquires the next ImageBuffer from the VideoImageReader after a new image frame has been
-   * rendered into the associated HTMLVideoElement. The returned ImageBuffer will call the
-   * promise.await() method before generating textures. Note that the previously returned image
-   * buffers will immediately expire after the newly created ImageBuffer is drawn.
+   * Notifies the VideoElement that a new image frame has been rendered into the associated
+   * HTMLVideoElement. The next acquired ImageBuffer will call the promise.await() method before
+   * generating textures.
    */
-  std::shared_ptr<ImageBuffer> acquireNextBuffer(emscripten::val promise);
+  void markFrameChanged(emscripten::val promise);
 
  protected:
-  bool onUpdateTexture(Context* context, bool mipMapped) override;
+  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) override;
 
- protected:
-  emscripten::val video = emscripten::val::null();
+  bool onUpdateTexture(std::shared_ptr<Texture> texture, const Rect& bounds) override;
+
+ private:
   emscripten::val currentPromise = emscripten::val::null();
 
-  VideoImageReader(emscripten::val video, int width, int height);
+  VideoElement(emscripten::val video, int width, int height);
 };
 }  // namespace tgfx

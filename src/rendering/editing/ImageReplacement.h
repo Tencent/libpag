@@ -28,11 +28,14 @@ class ImageReplacement : public Content {
   void draw(Recorder* recorder) override;
   tgfx::Point getScaleFactor() const;
   std::shared_ptr<PAGImage> getImage();
+  bool setContentTime(int64_t time);
+  std::shared_ptr<Graphic> getGraphic();
 
  private:
   std::shared_ptr<PAGImage> pagImage;
   int defaultScaleMode = PAGScaleMode::LetterBox;
   int contentWidth = 0;
   int contentHeight = 0;
+  Frame contentFrame = -1;
 };
 }  // namespace pag

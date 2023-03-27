@@ -326,7 +326,7 @@ void Canvas::drawPath(const Path& path, const Paint& paint) {
     return;
   }
   auto strokePath = path;
-  auto strokeEffect = PathEffect::MakeStroke(*paint.getStroke());
+  auto strokeEffect = PathEffect::MakeStroke(paint.getStroke());
   if (strokeEffect == nullptr) {
     return;
   }
@@ -486,7 +486,7 @@ void Canvas::fillPath(const Path& path, const Paint& paint) {
   totalMatrix.postConcat(matrix);
   mask->setMatrix(totalMatrix);
   mask->fillPath(path);
-  auto texture = mask->updateTexture(getContext());
+  auto texture = Texture::MakeFrom(getContext(), mask->makeBuffer());
   drawMask(deviceBounds, std::move(texture), std::move(glPaint));
 }
 
@@ -600,13 +600,11 @@ void Canvas::drawMaskGlyphs(TextBlob* textBlob, const Paint& paint) {
   totalMatrix.postConcat(matrix);
   mask->setMatrix(totalMatrix);
   if (paint.getStyle() == PaintStyle::Stroke) {
-    if (stroke) {
-      mask->strokeText(textBlob, *stroke);
-    }
+    mask->fillText(textBlob, stroke);
   } else {
     mask->fillText(textBlob);
   }
-  auto texture = mask->updateTexture(getContext());
+  auto texture = Texture::MakeFrom(getContext(), mask->makeBuffer());
   drawMask(deviceBounds, std::move(texture), std::move(glPaint));
 }
 

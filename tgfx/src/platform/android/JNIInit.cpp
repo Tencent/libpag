@@ -16,17 +16,25 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/platform/web/WebImage.h"
-#include <atomic>
+#include "JNIInit.h"
+#include "HandlerThread.h"
+#include "NativeCodec.h"
+#include "platform/android/SurfaceTexture.h"
 
 namespace tgfx {
-static std::atomic_bool AsyncSupportEnabled = false;
-
-bool WebImage::AsyncSupport() {
-  return AsyncSupportEnabled;
-}
-
-void WebImage::SetAsyncSupport(bool enabled) {
-  AsyncSupportEnabled = enabled;
+void JNIInit::Run() {
+  static bool initialized = false;
+  if (initialized) {
+    return;
+  }
+  JNIEnvironment environment;
+  auto env = environment.current();
+  if (env == nullptr) {
+    return;
+  }
+  initialized = true;
+  NativeCodec::JNIInit(env);
+  HandlerThread::JNIInit(env);
+  SurfaceTexture::JNIInit(env);
 }
 }  // namespace tgfx

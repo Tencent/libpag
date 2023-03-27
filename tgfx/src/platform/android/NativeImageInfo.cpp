@@ -24,7 +24,7 @@ static constexpr int BITMAP_FLAGS_ALPHA_UNPREMUL = 2;
 static constexpr int BITMAP_FORMAT_RGBA_F16 = 9;
 static constexpr int BITMAP_FORMAT_RGBA_1010102 = 10;
 
-ImageInfo NativeImageInfo::GetInfo(JNIEnv* env, jobject bitmap) {
+ImageInfo WebImageInfo::GetInfo(JNIEnv* env, jobject bitmap) {
   AndroidBitmapInfo bitmapInfo = {};
   if (bitmap == nullptr || AndroidBitmap_getInfo(env, bitmap, &bitmapInfo) != 0) {
     env->ExceptionClear();

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -17,45 +17,37 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Mask.h"
+#include "core/ImageStream.h"
 #include "tgfx/core/PathEffect.h"
 
 namespace tgfx {
-void Mask::strokePath(const Path& path, const Stroke& stroke) {
-  std::unique_ptr<PathEffect> pathEffect = PathEffect::MakeStroke(stroke);
-  if (pathEffect == nullptr) {
+void Mask::fillPath(const Path& path, const Stroke* stroke) {
+  if (path.isEmpty()) {
     return;
   }
-  auto newPath = path;
-  pathEffect->applyTo(&newPath);
-  fillPath(newPath);
+  auto effect = PathEffect::MakeStroke(stroke);
+  if (effect != nullptr) {
+    auto newPath = path;
+    effect->applyTo(&newPath);
+    onFillPath(newPath, matrix);
+  } else {
+    onFillPath(path, matrix);
+  }
 }
 
-bool Mask::fillText(const TextBlob* textBlob) {
+bool Mask::fillText(const TextBlob* textBlob, const Stroke* stroke) {
   if (textBlob == nullptr || textBlob->hasColor()) {
     return false;
   }
   Path path = {};
-  if (!textBlob->getPath(&path)) {
-    return false;
+  if (textBlob->getPath(&path, stroke)) {
+    onFillPath(path, matrix);
+    return true;
   }
-  fillPath(path);
-  return true;
+  return onFillText(textBlob, stroke, matrix);
 }
 
-bool Mask::strokeText(const TextBlob* textBlob, const Stroke& stroke) {
-  if (textBlob == nullptr || textBlob->hasColor()) {
-    return false;
-  }
-  Path path = {};
-  if (!textBlob->getPath(&path, &stroke)) {
-    return false;
-  }
-  fillPath(path);
-  return true;
-}
-
-std::shared_ptr<tgfx::Image> Mask::makeImage(Context* context) {
-  auto texture = updateTexture(context);
-  return Image::MakeFrom(texture);
+bool Mask::onFillText(const TextBlob*, const Stroke*, const Matrix&) {
+  return false;
 }
 }  // namespace tgfx

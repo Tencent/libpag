@@ -6,8 +6,13 @@ export const isOffscreenCanvas = (element: any) =>
   globalThis.OffscreenCanvas && element instanceof globalThis.OffscreenCanvas;
 export const isCanvas = (element: any) => isOffscreenCanvas(element) || element instanceof globalThis.HTMLCanvasElement;
 
-export const getCanvas2D = () => {
-  return canvasPool.pop() || createCanvas2D();
+export const getCanvas2D = (width: number, height: number) => {
+  let canvas = canvasPool.pop() || createCanvas2D();
+  if(canvas != null){
+    canvas.width = width;
+    canvas.height = height;
+  }
+  return canvas;
 };
 
 export const releaseCanvas2D = (canvas: HTMLCanvasElement | OffscreenCanvas) => {

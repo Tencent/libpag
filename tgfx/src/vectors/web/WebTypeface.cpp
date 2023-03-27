@@ -18,7 +18,7 @@
 
 #include "WebTypeface.h"
 #include <vector>
-#include "platform/web/NativeImageBuffer.h"
+#include "platform/web/WebImageBuffer.h"
 #include "utils/UniqueID.h"
 
 using namespace emscripten;
@@ -106,18 +106,18 @@ std::string WebTypeface::getText(GlyphID glyphID) const {
   return glyphs.at(glyphID - 1);
 }
 
-Point WebTypeface::getGlyphVerticalOffset(GlyphID glyphID, float size, bool fauxBold,
-                                          bool fauxItalic) const {
+Point WebTypeface::getVerticalOffset(GlyphID glyphID, float size, bool fauxBold,
+                                     bool fauxItalic) const {
   if (glyphID == 0) {
     return Point::Zero();
   }
   auto metrics = getMetrics(size);
-  auto advance = getGlyphAdvance(glyphID, size, fauxBold, fauxItalic, true);
+  auto advance = getAdvance(glyphID, size, fauxBold, fauxItalic, true);
   return {-advance * 0.5f, metrics.capHeight};
 }
 
-float WebTypeface::getGlyphAdvance(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
-                                   bool) const {
+float WebTypeface::getAdvance(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
+                              bool) const {
   if (glyphID == 0) {
     return 0;
   }
@@ -136,21 +136,16 @@ FontMetrics WebTypeface::getMetrics(float size) const {
   return metrics;
 }
 
-bool WebTypeface::getGlyphPath(GlyphID, float, bool, bool, Path*) const {
+bool WebTypeface::getPath(GlyphID, float, bool, bool, Path*) const {
   return false;
 }
 
-Rect WebTypeface::getGlyphBounds(GlyphID glyphID, float size, bool fauxBold,
-                                 bool fauxItalic) const {
+Rect WebTypeface::getBounds(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic) const {
   if (glyphID == 0) {
     return Rect::MakeEmpty();
   }
   auto scalerContext = scalerContextClass.new_(name, style, size, fauxBold, fauxItalic);
   return scalerContext.call<Rect>("getTextBounds", getText(glyphID));
-}
-
-static void ReleaseNativeImage(emscripten::val nativeImage) {
-  val::module_property("tgfx").call<void>("releaseNativeImage", nativeImage);
 }
 
 std::shared_ptr<ImageBuffer> WebTypeface::getGlyphImage(GlyphID glyphID, float size, bool fauxBold,
@@ -164,6 +159,6 @@ std::shared_ptr<ImageBuffer> WebTypeface::getGlyphImage(GlyphID glyphID, float s
   if (matrix) {
     matrix->setTranslate(bounds.left, bounds.top);
   }
-  return NativeImageBuffer::MakeFrom(std::move(buffer), ReleaseNativeImage);
+  return WebImageBuffer::MakeAdopted(std::move(buffer));
 }
 }  // namespace tgfx

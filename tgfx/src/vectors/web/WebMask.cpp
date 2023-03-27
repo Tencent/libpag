@@ -17,45 +17,45 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WebMask.h"
-#include "WebTextBlob.h"
 #include "WebTypeface.h"
-#include "gpu/Texture.h"
-#include "opengl/GLContext.h"
-#include "opengl/GLSampler.h"
+#include "core/SimpleTextBlob.h"
+#include "platform/web/WebImageBuffer.h"
+#include "platform/web/WebImageStream.h"
+#include "utils/Log.h"
 
 using namespace emscripten;
 
 namespace tgfx {
 std::shared_ptr<Mask> Mask::Make(int width, int height, bool) {
+  auto canvas = val::module_property("tgfx").call<val>("createCanvas2D", width, height);
+  if (!canvas.as<bool>()) {
+    return nullptr;
+  }
+  auto buffer = WebImageBuffer::MakeAdopted(canvas);
   auto webMaskClass = val::module_property("WebMask");
   if (!webMaskClass.as<bool>()) {
     return nullptr;
   }
-  auto webMask = webMaskClass.call<val>("create", width, height);
+  auto webMask = webMaskClass.call<val>("create", canvas);
   if (!webMask.as<bool>()) {
     return nullptr;
   }
-  return std::make_shared<WebMask>(width, height, webMask);
+  auto stream = WebImageStream::MakeFrom(canvas, width, height, true);
+  if (stream == nullptr) {
+    return nullptr;
+  }
+  return std::make_shared<WebMask>(std::move(buffer), std::move(stream), webMask);
 }
 
-std::shared_ptr<Texture> WebMask::updateTexture(Context* context) {
-  if (texture == nullptr) {
-    texture = Texture::MakeAlpha(context, width(), height(), nullptr, 0);
-  }
-  if (dirty) {
-    if (texture == nullptr) {
-      return nullptr;
-    }
-    auto glInfo = static_cast<const GLSampler*>(texture->getSampler());
-    auto gl = GLFunctions::Get(context);
-    gl->bindTexture(glInfo->target, glInfo->id);
-    webMask.call<void>("update", val::module_property("GL"));
-  }
-  return texture;
+WebMask::WebMask(std::shared_ptr<ImageBuffer> buffer, std::shared_ptr<WebImageStream> stream,
+                 emscripten::val webMask)
+    : buffer(std::move(buffer)), stream(std::move(stream)), webMask(webMask) {
 }
 
-WebMask::~WebMask() {
-  webMask.call<void>("onDestroy");
+void WebMask::clear() {
+  aboutToFill();
+  stream->markContentDirty(Rect::MakeWH(width(), height()));
+  webMask.call<void>("clear");
 }
 
 static void Iterator(PathVerb verb, const Point points[4], void* info) {
@@ -80,7 +80,7 @@ static void Iterator(PathVerb verb, const Point points[4], void* info) {
   }
 }
 
-void WebMask::fillPath(const Path& path) {
+void WebMask::onFillPath(const Path& path, const Matrix& matrix) {
   if (path.isEmpty()) {
     return;
   }
@@ -88,31 +88,37 @@ void WebMask::fillPath(const Path& path) {
   if (!path2DClass.as<bool>()) {
     return;
   }
+  aboutToFill();
   auto finalPath = path;
   finalPath.transform(matrix);
+  stream->markContentDirty(finalPath.getBounds());
   auto path2D = path2DClass.new_();
   finalPath.decompose(Iterator, &path2D);
   webMask.call<void>("fillPath", path2D, path.getFillType());
-  dirty = true;
 }
 
-bool WebMask::fillText(const TextBlob* textBlob) {
-  return drawText(textBlob);
-}
-
-bool WebMask::strokeText(const TextBlob* textBlob, const Stroke& stroke) {
-  return drawText(textBlob, &stroke);
-}
-
-bool WebMask::drawText(const TextBlob* textBlob, const Stroke* stroke) {
-  if (textBlob == nullptr || textBlob->hasColor()) {
-    return false;
+static void GetTextsAndPositions(const SimpleTextBlob* textBlob, std::vector<std::string>* texts,
+                                 std::vector<Point>* points) {
+  auto& font = textBlob->getFont();
+  auto& glyphIDs = textBlob->getGlyphIDs();
+  auto& positions = textBlob->getPositions();
+  auto typeface = std::static_pointer_cast<WebTypeface>(font.getTypeface());
+  for (size_t i = 0; i < glyphIDs.size(); ++i) {
+    texts->push_back(typeface->getText(glyphIDs[i]));
+    points->push_back(positions[i]);
   }
+}
+
+bool WebMask::onFillText(const TextBlob* textBlob, const Stroke* stroke, const Matrix& matrix) {
+  aboutToFill();
+  auto bounds = textBlob->getBounds(stroke);
+  matrix.mapRect(&bounds);
+  stream->markContentDirty(bounds);
   std::vector<std::string> texts = {};
   std::vector<Point> points = {};
-  const auto* webTextBlob = static_cast<const WebTextBlob*>(textBlob);
-  webTextBlob->getTextsAndPositions(&texts, &points);
-  const auto& font = webTextBlob->getFont();
+  auto blob = static_cast<const SimpleTextBlob*>(textBlob);
+  GetTextsAndPositions(blob, &texts, &points);
+  const auto& font = blob->getFont();
   const auto* typeFace = static_cast<WebTypeface*>(font.getTypeface().get());
   auto webFont = val::object();
   webFont.set("name", typeFace->fontFamily());
@@ -125,12 +131,20 @@ bool WebMask::drawText(const TextBlob* textBlob, const Stroke* stroke) {
   } else {
     webMask.call<void>("fillText", webFont, texts, points, matrix);
   }
-  dirty = true;
   return true;
 }
 
-void WebMask::clear() {
-  webMask.call<void>("clear");
-  dirty = true;
+void WebMask::aboutToFill() {
+  if (buffer.unique()) {
+    return;
+  }
+  auto canvas = val::module_property("tgfx").call<val>("createCanvas2D", width(), height());
+  if (!canvas.as<bool>()) {
+    ABORT("WebMask::aboutToFill() : Failed to create new Canvas2D!");
+    return;
+  }
+  buffer = WebImageBuffer::MakeAdopted(canvas);
+  webMask.call<void>("updateCanvas", canvas);
+  stream->source = canvas;
 }
 }  // namespace tgfx

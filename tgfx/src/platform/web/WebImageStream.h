@@ -19,26 +19,21 @@
 #pragma once
 
 #include <emscripten/val.h>
-#include "tgfx/core/ImageBuffer.h"
+#include "core/ImageStream.h"
 
 namespace tgfx {
-class NativeImageBuffer : public ImageBuffer {
+/**
+ * The WebImageStream class allows direct access to image buffers rendered into a TexImageSource
+ * object on the web platform. It is typically used with the ImageReader class.
+ */
+class WebImageStream : public ImageStream {
  public:
   /**
-   * Function that, if provided, will be called when the NativeImageBuffer goes out of scope,
-   * allowing for custom freeing of the nativeImage.
+   * Creates a new WebImageStream from the specified TexImageSource object and the size. Returns
+   * nullptr if the source is null or the buffer size is zero.
    */
-  typedef void (*ReleaseProc)(emscripten::val nativeImage);
-
-  /**
-   * Creates a new ImageBuffer object from the platform-specific nativeImage in the CPU. The
-   * returned ImageBuffer object takes a reference to the nativeImage. Returns nullptr if the
-   * nativeImage is nullptr or has a size of zero.
-   */
-  static std::shared_ptr<ImageBuffer> MakeFrom(emscripten::val nativeImage,
-                                               ReleaseProc releaseProc = nullptr);
-
-  ~NativeImageBuffer() override;
+  static std::shared_ptr<WebImageStream> MakeFrom(emscripten::val source, int width, int height,
+                                                  bool alphaOnly = false);
 
   int width() const override {
     return _width;
@@ -49,23 +44,30 @@ class NativeImageBuffer : public ImageBuffer {
   }
 
   bool isAlphaOnly() const override {
+    return alphaOnly;
+  }
+
+  bool isHardwareBacked() const override {
     return false;
   }
 
+  bool expired() const override {
+    return contentVersion < imageReader->textureVersion;
+  }
+
  protected:
-  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) const override;
+  WebImageStream(emscripten::val source, int width, int height, bool alphaOnly);
+
+  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) override;
+
+  bool onUpdateTexture(std::shared_ptr<Texture> texture, const Rect& bounds) override;
 
  private:
+  emscripten::val source = emscripten::val::null();
   int _width = 0;
   int _height = 0;
-  emscripten::val nativeImage = emscripten::val::null();
-  bool usePromise = false;
-  ReleaseProc releaseProc = nullptr;
+  bool alphaOnly = false;
 
-  NativeImageBuffer(int width, int height, emscripten::val nativeImage, bool usePromise);
-
-  emscripten::val getImage() const;
-
-  friend class NativeCodec;
+  friend class WebMask;
 };
 }  // namespace tgfx

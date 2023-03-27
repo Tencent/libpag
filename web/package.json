@@ -19,7 +19,7 @@
     "test": "node ./script/test.js",
     "cypress": "cypress run --browser chrome",
     "server": "http-server -p 8080 . -c-1 --cors",
-    "doc": "rimraf api-docs && typedoc --entryPointStrategy expand ./src",
+    "doc": "rimraf api-docs && typedoc --entryPointStrategy expand ./src --tsconfig ./tsconfig.doc.json",
     "brotli": "brotli ./lib/libpag.wasm"
   },
   "repository": {

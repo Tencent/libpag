@@ -93,9 +93,7 @@ export class ScalerContext {
   }
 
   public generateImage(text: string, bounds: Rect) {
-    const canvas = getCanvas2D();
-    canvas.width = bounds.right - bounds.left;
-    canvas.height = bounds.bottom - bounds.top;
+    const canvas = getCanvas2D(bounds.right - bounds.left, bounds.bottom - bounds.top);
     const context = canvas.getContext('2d') as CanvasRenderingContext2D;
     context.font = this.fontString();
     context.fillText(text, -bounds.left, -bounds.top);
@@ -104,9 +102,7 @@ export class ScalerContext {
 
   protected loadCanvas() {
     if (!ScalerContext.canvas) {
-      ScalerContext.setCanvas(getCanvas2D());
-      (ScalerContext.canvas as HTMLCanvasElement | OffscreenCanvas).width = 10;
-      (ScalerContext.canvas as HTMLCanvasElement | OffscreenCanvas).height = 10;
+      ScalerContext.setCanvas(getCanvas2D(10, 10));
       // https://html.spec.whatwg.org/multipage/canvas.html#concept-canvas-will-read-frequently
       ScalerContext.setContext(
         (ScalerContext.canvas as HTMLCanvasElement | OffscreenCanvas).getContext('2d', { willReadFrequently: true }) as

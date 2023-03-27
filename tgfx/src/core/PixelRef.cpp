@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PixelRef.h"
+#include "gpu/Gpu.h"
 
 namespace tgfx {
 std::shared_ptr<PixelRef> PixelRef::Make(int width, int height, bool alphaOnly, bool tryHardware) {
@@ -25,6 +26,9 @@ std::shared_ptr<PixelRef> PixelRef::Make(int width, int height, bool alphaOnly, 
     return nullptr;
   }
   return std::shared_ptr<PixelRef>(new PixelRef(pixelBuffer));
+}
+
+PixelRef::PixelRef(std::shared_ptr<PixelBuffer> pixelBuffer) : pixelBuffer(std::move(pixelBuffer)) {
 }
 
 void* PixelRef::lockWritablePixels() {
@@ -47,5 +51,31 @@ void* PixelRef::lockWritablePixels() {
     pixelBuffer = newBuffer;
   }
   return pixels;
+}
+
+void PixelRef::clear() {
+  auto pixels = lockWritablePixels();
+  if (pixels != nullptr) {
+    markContentDirty(Rect::MakeWH(width(), height()));
+    memset(pixels, 0, info().byteSize());
+  }
+  unlockPixels();
+}
+
+std::shared_ptr<Texture> PixelRef::onMakeTexture(Context* context, bool mipMapped) {
+  return Texture::MakeFrom(context, pixelBuffer, mipMapped);
+}
+
+bool PixelRef::onUpdateTexture(std::shared_ptr<Texture> texture, const Rect& bounds) {
+  auto gpu = texture->getContext()->gpu();
+  auto pixels = lockPixels();
+  if (pixels == nullptr) {
+    return false;
+  }
+  pixels =
+      info().computeOffset(pixels, static_cast<int>(bounds.left), static_cast<int>(bounds.top));
+  gpu->writePixels(texture->getSampler(), bounds, pixels, info().rowBytes());
+  unlockPixels();
+  return true;
 }
 }  // namespace tgfx

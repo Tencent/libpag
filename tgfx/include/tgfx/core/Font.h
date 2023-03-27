@@ -112,8 +112,8 @@ class Font {
   /**
    * Returns the bounding box of the specified glyph.
    */
-  Rect getGlyphBounds(GlyphID glyphID) const {
-    return typeface->getGlyphBounds(glyphID, size, fauxBold, fauxItalic);
+  Rect getBounds(GlyphID glyphID) const {
+    return typeface->getBounds(glyphID, size, fauxBold, fauxItalic);
   }
 
   /**
@@ -121,16 +121,16 @@ class Font {
    * @param glyphID The id of specified glyph.
    * @param verticalText The intended drawing orientation of the glyph.
    */
-  float getGlyphAdvance(GlyphID glyphID, bool verticalText = false) const {
-    return typeface->getGlyphAdvance(glyphID, size, fauxBold, fauxItalic, verticalText);
+  float getAdvance(GlyphID glyphID, bool verticalText = false) const {
+    return typeface->getAdvance(glyphID, size, fauxBold, fauxItalic, verticalText);
   }
 
   /**
    * Creates a path corresponding to glyph outline. If glyph has an outline, copies outline to path
    * and returns true. If glyph is described by a bitmap, returns false and ignores path parameter.
    */
-  bool getGlyphPath(GlyphID glyphID, Path* path) const {
-    return typeface->getGlyphPath(glyphID, size, fauxBold, fauxItalic, path);
+  bool getPath(GlyphID glyphID, Path* path) const {
+    return typeface->getPath(glyphID, size, fauxBold, fauxItalic, path);
   }
 
   /**
@@ -145,8 +145,8 @@ class Font {
    * Calculates the offset from the default (horizontal) origin to the vertical origin for specified
    * glyph.
    */
-  Point getGlyphVerticalOffset(GlyphID glyphID) const {
-    return typeface->getGlyphVerticalOffset(glyphID, size, fauxBold, fauxItalic);
+  Point getVerticalOffset(GlyphID glyphID) const {
+    return typeface->getVerticalOffset(glyphID, size, fauxBold, fauxItalic);
   }
 
  private:

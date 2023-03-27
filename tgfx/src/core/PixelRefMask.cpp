@@ -16,29 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "PixelRefMask.h"
+#include "gpu/Gpu.h"
+#include "tgfx/core/Pixmap.h"
+#include "utils/PixelFormatUtil.h"
 
 namespace tgfx {
-/**
- * WebImage provides convenience functions to enable/disable the async support for decoding web
- * images.
- */
-class WebImage {
- public:
-  /**
-   * Returns true if the async support for decoding web images is enabled. The default value is
-   * false.
-   */
-  static bool AsyncSupport();
+PixelRefMask::PixelRefMask(std::shared_ptr<PixelRef> pixelRef) : pixelRef(std::move(pixelRef)) {
+}
 
-  /**
-   * Enables or disables the async support for decoding web images. If set to true, the ImageBuffers
-   * generated from the web platform will not be fully decoded buffers. Instead, they will trigger
-   * promise-awaiting calls before generating textures, which can speed up the process of decoding
-   * multiple images simultaneously. Do not set it to true if your rendering process may require
-   * multiple flush() calls to the screen Surface during one single frame. Otherwise, it may result
-   * in screen tearing.
-   */
-  static void SetAsyncSupport(bool enabled);
-};
+void PixelRefMask::markContentDirty(const Rect& bounds, bool flipY) {
+  if (flipY) {
+    auto rect = bounds;
+    auto height = rect.height();
+    rect.top = static_cast<float>(pixelRef->height()) - rect.bottom;
+    rect.bottom = rect.top + height;
+    pixelRef->markContentDirty(rect);
+  } else {
+    pixelRef->markContentDirty(bounds);
+  }
+}
 }  // namespace tgfx

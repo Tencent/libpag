@@ -27,6 +27,10 @@ BackendTexture::BackendTexture(const MtlTextureInfo& mtlInfo, int width, int hei
     : _backend(Backend::METAL), _width(width), _height(height), mtlInfo(mtlInfo) {
 }
 
+BackendTexture::BackendTexture(const VkImageInfo& vkInfo, int width, int height)
+    : _backend(Backend::VULKAN), _width(width), _height(height), vkInfo(vkInfo) {
+}
+
 BackendTexture::BackendTexture(const BackendTexture& that) {
   *this = that;
 }
@@ -45,6 +49,9 @@ BackendTexture& BackendTexture::operator=(const BackendTexture& that) {
       break;
     case Backend::METAL:
       mtlInfo = that.mtlInfo;
+      break;
+    case Backend::VULKAN:
+      vkInfo = that.vkInfo;
       break;
     default:
       break;
@@ -68,12 +75,24 @@ bool BackendTexture::getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) const {
   return true;
 }
 
+bool BackendTexture::getVkImageInfo(VkImageInfo* vkImageInfo) const {
+  if (!isValid() || _backend != Backend::VULKAN) {
+    return false;
+  }
+  *vkImageInfo = vkInfo;
+  return true;
+}
+
 BackendRenderTarget::BackendRenderTarget(const GLFrameBufferInfo& glInfo, int width, int height)
     : _backend(Backend::OPENGL), _width(width), _height(height), glInfo(glInfo) {
 }
 
 BackendRenderTarget::BackendRenderTarget(const MtlTextureInfo& mtlInfo, int width, int height)
     : _backend(Backend::METAL), _width(width), _height(height), mtlInfo(mtlInfo) {
+}
+
+BackendRenderTarget::BackendRenderTarget(const VkImageInfo& vkInfo, int width, int height)
+    : _backend(Backend::VULKAN), _width(width), _height(height), vkInfo(vkInfo) {
 }
 
 BackendRenderTarget::BackendRenderTarget(const BackendRenderTarget& that) {
@@ -95,6 +114,9 @@ BackendRenderTarget& BackendRenderTarget::operator=(const BackendRenderTarget& t
     case Backend::METAL:
       mtlInfo = that.mtlInfo;
       break;
+    case Backend::VULKAN:
+      vkInfo = that.vkInfo;
+      break;
     default:
       break;
   }
@@ -114,6 +136,14 @@ bool BackendRenderTarget::getMtlTextureInfo(MtlTextureInfo* mtlTextureInfo) cons
     return false;
   }
   *mtlTextureInfo = mtlInfo;
+  return true;
+}
+
+bool BackendRenderTarget::getVkImageInfo(VkImageInfo* vkImageInfo) const {
+  if (!isValid() || _backend != Backend::VULKAN) {
+    return false;
+  }
+  *vkImageInfo = vkInfo;
   return true;
 }
 

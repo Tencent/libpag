@@ -31,8 +31,8 @@ class GLGpu : public Gpu {
 
   void deleteSampler(TextureSampler* sampler) override;
 
-  void writePixels(const TextureSampler* sampler, Rect rect, const void* pixels, size_t rowBytes,
-                   PixelFormat pixelFormat) override;
+  void writePixels(const TextureSampler* sampler, Rect rect, const void* pixels,
+                   size_t rowBytes) override;
 
   void bindTexture(int unitIndex, const TextureSampler* sampler, SamplerState samplerState = {});
 

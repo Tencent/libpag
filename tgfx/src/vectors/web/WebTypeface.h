@@ -64,17 +64,17 @@ class WebTypeface : public Typeface {
   }
 
  protected:
-  Point getGlyphVerticalOffset(GlyphID glyphID, float size, bool fauxBold,
-                               bool fauxItalic) const override;
+  Point getVerticalOffset(GlyphID glyphID, float size, bool fauxBold,
+                          bool fauxItalic) const override;
 
-  float getGlyphAdvance(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
-                        bool verticalText) const override;
+  float getAdvance(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
+                   bool verticalText) const override;
 
   FontMetrics getMetrics(float size) const override;
 
-  bool getGlyphPath(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
-                    Path* path) const override;
-  Rect getGlyphBounds(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic) const override;
+  bool getPath(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
+               Path* path) const override;
+  Rect getBounds(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic) const override;
 
   std::shared_ptr<ImageBuffer> getGlyphImage(GlyphID glyphID, float size, bool fauxBold,
                                              bool fauxItalic, Matrix* matrix) const override;

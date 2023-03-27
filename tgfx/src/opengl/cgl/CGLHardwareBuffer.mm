@@ -21,9 +21,9 @@
 #include "tgfx/opengl/cgl/CGLDevice.h"
 
 namespace tgfx {
-std::shared_ptr<PixelBuffer> PixelBuffer::MakeHardwareBuffer(int width, int height,
-                                                             bool alphaOnly) {
-  return HardwareBuffer::Make(width, height, alphaOnly);
+std::shared_ptr<PixelBuffer> PixelBuffer::MakeHardwareBuffer(int, int, bool) {
+  // The CVPixelBuffer on macOS does not shared memory across GPU and CPU.
+  return nullptr;
 }
 
 std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer,

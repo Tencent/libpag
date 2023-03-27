@@ -46,25 +46,26 @@ static void Iterator(PathVerb verb, const Point points[4], void* info) {
 }
 
 std::shared_ptr<Mask> Mask::Make(int width, int height, bool tryHardware) {
-  auto buffer = PixelBuffer::Make(width, height, true, tryHardware);
-  if (buffer == nullptr) {
+  auto pixelRef = PixelRef::Make(width, height, true, tryHardware);
+  if (pixelRef == nullptr) {
     return nullptr;
   }
-  auto pixels = buffer->lockPixels();
-  Pixmap(buffer->info(), pixels).eraseAll();
-  buffer->unlockPixels();
-  return std::make_shared<CGMask>(buffer);
+  pixelRef->clear();
+  return std::make_shared<CGMask>(std::move(pixelRef));
 }
 
-void CGMask::fillPath(const Path& path) {
+void CGMask::onFillPath(const Path& path, const Matrix& matrix) {
   if (path.isEmpty()) {
     return;
   }
-  const auto& info = buffer->info();
-  auto pixels = buffer->lockPixels();
+  auto pixels = pixelRef->lockWritablePixels();
+  if (pixels == nullptr) {
+    return;
+  }
+  const auto& info = pixelRef->info();
   auto cgContext = CreateBitmapContext(info, pixels);
   if (cgContext == nullptr) {
-    buffer->unlockPixels();
+    pixelRef->unlockPixels();
     return;
   }
 
@@ -73,7 +74,7 @@ void CGMask::fillPath(const Path& path) {
   totalMatrix.postScale(1, -1);
   totalMatrix.postTranslate(0, static_cast<float>(info.height()));
   finalPath.transform(totalMatrix);
-  dirty(finalPath.getBounds());
+  markContentDirty(finalPath.getBounds(), true);
   auto cgPath = CGPathCreateMutable();
   finalPath.decompose(Iterator, cgPath);
 
@@ -102,6 +103,6 @@ void CGMask::fillPath(const Path& path) {
   }
   CGContextRelease(cgContext);
   CGPathRelease(cgPath);
-  buffer->unlockPixels();
+  pixelRef->unlockPixels();
 }
 }  // namespace tgfx

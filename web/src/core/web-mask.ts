@@ -1,8 +1,7 @@
 import { PAGModule } from '../pag-module';
-import { ctor, EmscriptenGL, Point, Vector } from '../types';
+import { ctor, Point, Vector } from '../types';
 import { ScalerContext } from './scaler-context';
 import { Matrix } from './matrix';
-import { getCanvas2D, releaseCanvas2D } from '../utils/canvas';
 
 export interface WebFont {
   name: string;
@@ -13,8 +12,8 @@ export interface WebFont {
 }
 
 export class WebMask {
-  public static create(width: number, height: number) {
-    return new WebMask(getCanvas2D(), width, height);
+  public static create(canvas: HTMLCanvasElement | OffscreenCanvas) {
+    return new WebMask(canvas);
   }
 
   private static getLineCap(cap: ctor): CanvasLineCap {
@@ -39,13 +38,15 @@ export class WebMask {
     }
   }
 
+  public updateCanvas(canvas : HTMLCanvasElement | OffscreenCanvas) {
+    this.canvas = canvas;
+  }
+
   protected canvas: HTMLCanvasElement | OffscreenCanvas;
   private context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
-  public constructor(canvas: HTMLCanvasElement | OffscreenCanvas, width: number, height: number) {
+  public constructor(canvas: HTMLCanvasElement | OffscreenCanvas) {
     this.canvas = canvas;
-    this.canvas.width = width;
-    this.canvas.height = height;
     this.context = this.canvas.getContext('2d') as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
   }
 
@@ -99,15 +100,5 @@ export class WebMask {
 
   public clear() {
     this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
-  }
-
-  public update(GL: EmscriptenGL) {
-    const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
-    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.ALPHA, gl.UNSIGNED_BYTE, this.canvas);
-  }
-
-  public onDestroy() {
-    releaseCanvas2D(this.canvas);
   }
 }

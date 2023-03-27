@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig",
+  "compilerOptions": {
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*.ts"],
+  "typedocOptions": {
+    "out": "./api-docs",
+    "exclude": "**/**.js",
+    "darkHighlightTheme": "dark-plus",
+    "readme": "none",
+    "sort": "visibility"
+  }
+}

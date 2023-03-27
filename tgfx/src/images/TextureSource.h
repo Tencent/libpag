@@ -47,9 +47,7 @@ class TextureSource : public ImageSource {
     return true;
   }
 
-  BackendTexture getBackendTexture() const override {
-    return texture->getBackendTexture();
-  }
+  BackendTexture getBackendTexture() const override;
 
   std::shared_ptr<ImageSource> makeTextureSource(Context* context) const override;
 
@@ -58,9 +56,8 @@ class TextureSource : public ImageSource {
     return nullptr;
   }
 
-  std::shared_ptr<TextureProxy> onMakeTextureProxy(Context* context, uint32_t) const override {
-    return context->proxyProvider()->wrapTexture(texture);
-  }
+  std::shared_ptr<TextureProxy> onMakeTextureProxy(Context* context,
+                                                   uint32_t surfaceFlags) const override;
 
  private:
   std::shared_ptr<Texture> texture = nullptr;

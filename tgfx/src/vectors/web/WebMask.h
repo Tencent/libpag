@@ -19,32 +19,47 @@
 #pragma once
 
 #include <emscripten/val.h>
+#include "platform/web/WebImageStream.h"
 #include "tgfx/core/Mask.h"
 
 namespace tgfx {
 class WebMask : public Mask {
  public:
-  ~WebMask() override;
+  WebMask(std::shared_ptr<ImageBuffer> buffer, std::shared_ptr<WebImageStream> stream,
+          emscripten::val webMask);
 
-  explicit WebMask(int width, int height, emscripten::val webMask)
-      : Mask(width, height), webMask(webMask) {
+  int width() const override {
+    return stream->width();
   }
 
-  void fillPath(const Path& path) override;
+  int height() const override {
+    return stream->height();
+  }
 
-  bool fillText(const TextBlob* textBlob) override;
-
-  bool strokeText(const TextBlob* textBlob, const Stroke& stroke) override;
+  bool isHardwareBacked() const override {
+    return stream->width();
+  }
 
   void clear() override;
 
-  std::shared_ptr<Texture> updateTexture(Context* context) override;
+  std::shared_ptr<ImageBuffer> makeBuffer() const override {
+    return buffer;
+  }
+
+ protected:
+  std::shared_ptr<ImageStream> getImageStream() const override {
+    return stream;
+  }
+
+  void onFillPath(const Path& path, const Matrix& matrix) override;
+
+  bool onFillText(const TextBlob* textBlob, const Stroke* stroke, const Matrix& matrix) override;
 
  private:
-  bool drawText(const TextBlob* textBlob, const Stroke* stroke = nullptr);
-
+  std::shared_ptr<ImageBuffer> buffer = nullptr;
+  std::shared_ptr<WebImageStream> stream = nullptr;
   emscripten::val webMask = emscripten::val::null();
-  std::shared_ptr<Texture> texture;
-  bool dirty = false;
+
+  void aboutToFill();
 };
 }  // namespace tgfx

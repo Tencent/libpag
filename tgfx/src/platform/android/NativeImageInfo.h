@@ -22,7 +22,7 @@
 #include "tgfx/core/ImageInfo.h"
 
 namespace tgfx {
-class NativeImageInfo {
+class WebImageInfo {
  public:
   /**
    * Returns an ImageInfo describing the width, height, color type, alpha type, and row bytes of the

@@ -72,7 +72,7 @@ PAG_TEST_F(PAGImageTest, image) {
   ASSERT_EQ(compare, 0);
   auto emptyData = ByteData::Make(fileData->length());
   memset(emptyData->data(), 0, emptyData->length());
-  pixmap.eraseAll();
+  pixmap.clear();
   compare = memcmp(pixmap.pixels(), emptyData->data(), emptyData->length());
   ASSERT_EQ(compare, 0);
   result = pixmap.writePixels(info, fileData->data(), 20, -10);
@@ -84,7 +84,7 @@ PAG_TEST_F(PAGImageTest, image) {
   memset(emptyData->data(), 1, emptyData->length());
   auto emptyInfo = info.makeWH(100, height);
   Pixmap pixmap2(emptyInfo, emptyData->data());
-  pixmap2.eraseAll();
+  pixmap2.clear();
   auto bytes = reinterpret_cast<uint8_t*>(emptyData->data());
   EXPECT_TRUE(bytes[399] == 0);
   EXPECT_TRUE(bytes[400] == 1);
@@ -159,7 +159,7 @@ PAG_TEST_F(PAGImageTest, BottomLeftMask) {
   Bitmap bitmap(width, height);
   ASSERT_FALSE(bitmap.isEmpty());
   Pixmap pixmap(bitmap);
-  pixmap.eraseAll();
+  pixmap.clear();
   auto result = surface->readPixels(pixmap.info(), pixmap.writablePixels());
   ASSERT_TRUE(result);
   device->unlock();

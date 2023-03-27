@@ -41,18 +41,14 @@ std::shared_ptr<Texture> Texture::MakeFormat(Context* context, int width, int he
     return nullptr;
   }
   auto caps = context->caps();
-  bool enableMipMap = mipMapped && caps->mipMapSupport;
+  int maxMipmapLevel = mipMapped ? caps->getMaxMipmapLevel(width, height) : 0;
   ScratchKey scratchKey = {};
-  ComputeScratchKey(&scratchKey, width, height, pixelFormat, enableMipMap);
+  ComputeScratchKey(&scratchKey, width, height, pixelFormat, maxMipmapLevel > 0);
   auto texture =
       std::static_pointer_cast<Texture>(context->resourceCache()->findScratchResource(scratchKey));
   if (texture) {
     texture->_origin = origin;
   } else {
-    int maxMipmapLevel = 0;
-    if (enableMipMap) {
-      maxMipmapLevel = static_cast<int>(std::floor(std::log2(std::max(width, height))));
-    }
     auto sampler = context->gpu()->createSampler(width, height, pixelFormat, maxMipmapLevel + 1);
     if (sampler == nullptr) {
       return nullptr;
@@ -61,7 +57,7 @@ std::shared_ptr<Texture> Texture::MakeFormat(Context* context, int width, int he
   }
   if (pixels != nullptr) {
     context->gpu()->writePixels(texture->getSampler(), Rect::MakeWH(width, height), pixels,
-                                rowBytes, pixelFormat);
+                                rowBytes);
   }
   return texture;
 }

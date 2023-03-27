@@ -73,7 +73,7 @@ std::shared_ptr<Shape> Shape::MakeFromStroke(const Path& path, const Stroke& str
     return nullptr;
   }
   auto strokePath = path;
-  auto effect = PathEffect::MakeStroke(stroke);
+  auto effect = PathEffect::MakeStroke(&stroke);
   if (effect == nullptr) {
     return nullptr;
   }

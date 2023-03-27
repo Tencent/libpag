@@ -87,6 +87,15 @@ struct Rect {
   }
 
   /**
+   * Returns constructed Rect set to (x, y, x + w, y + h). Does not validate input; w or h may be
+   * negative.
+   */
+  static constexpr Rect MakeXYWH(int x, int y, int w, int h) {
+    return {static_cast<float>(x), static_cast<float>(y), static_cast<float>(x + w),
+            static_cast<float>(y + h)};
+  }
+
+  /**
    * Returns constructed Rect set to (0, 0, size.width, size.height). Does not validate input;
    * size.width or size.height may be negative.
    */

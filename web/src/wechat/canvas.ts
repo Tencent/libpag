@@ -6,8 +6,13 @@ declare const wx: wx;
 
 const canvasPool = new Array<OffscreenCanvas>();
 
-export const getCanvas2D = () => {
-  return canvasPool.pop() || createCanvas2D();
+export const getCanvas2D = (width: number, height: number) => {
+  let canvas = canvasPool.pop() || createCanvas2D();
+  if(canvas != null){
+    canvas.width = width;
+    canvas.height = height;
+  }
+  return canvas;
 };
 
 export const releaseCanvas2D = (canvas: OffscreenCanvas) => {

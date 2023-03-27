@@ -80,16 +80,16 @@ static SkPaint::Join ToSkLineJoin(LineJoin join) {
   }
 }
 
-std::unique_ptr<PathEffect> PathEffect::MakeStroke(const Stroke& stroke) {
-  if (stroke.width <= 0) {
+std::unique_ptr<PathEffect> PathEffect::MakeStroke(const Stroke* stroke) {
+  if (stroke == nullptr || stroke->width <= 0) {
     return nullptr;
   }
   SkPaint paint = {};
   paint.setStyle(SkPaint::kStroke_Style);
-  paint.setStrokeWidth(stroke.width);
-  paint.setStrokeCap(ToSkLineCap(stroke.cap));
-  paint.setStrokeJoin(ToSkLineJoin(stroke.join));
-  paint.setStrokeMiter(stroke.miterLimit);
+  paint.setStrokeWidth(stroke->width);
+  paint.setStrokeCap(ToSkLineCap(stroke->cap));
+  paint.setStrokeJoin(ToSkLineJoin(stroke->join));
+  paint.setStrokeMiter(stroke->miterLimit);
   return std::unique_ptr<PathEffect>(new StrokePathEffect(std::move(paint)));
 }
 

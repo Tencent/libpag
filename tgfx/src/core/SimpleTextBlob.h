@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,16 +18,34 @@
 
 #pragma once
 
-#include <emscripten/val.h>
-#include <optional>
-#include "ByteBuffer.h"
-#include "tgfx/core/Data.h"
-#include "tgfx/core/Size.h"
+#include "tgfx/core/TextBlob.h"
 
 namespace tgfx {
-class NativeImageInfo {
+class SimpleTextBlob : public TextBlob {
  public:
-  static ISize GetSize(std::shared_ptr<Data> imageBytes);
-};
+  bool hasColor() const override;
 
+  Rect getBounds(const Stroke* stroke = nullptr) const override;
+
+  bool getPath(Path* path, const Stroke* stroke = nullptr) const override;
+
+  const Font& getFont() const {
+    return font;
+  }
+
+  const std::vector<GlyphID>& getGlyphIDs() const {
+    return glyphIDs;
+  }
+
+  const std::vector<Point>& getPositions() const {
+    return positions;
+  }
+
+ private:
+  Font font = {};
+  std::vector<GlyphID> glyphIDs = {};
+  std::vector<Point> positions = {};
+
+  friend class TextBlob;
+};
 }  // namespace tgfx

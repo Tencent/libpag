@@ -16,25 +16,29 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "CGTextBlob.h"
+#pragma once
 
 namespace tgfx {
-std::shared_ptr<TextBlob> TextBlob::MakeFrom(const GlyphID glyphIDs[], const Point positions[],
-                                             size_t glyphCount, const Font& font) {
-  if (glyphCount == 0) {
-    return nullptr;
-  }
-  auto textBlob = std::make_shared<CGTextBlob>();
-  textBlob->glyphIDs = {glyphIDs, glyphIDs + glyphCount};
-  textBlob->positions = {positions, positions + glyphCount};
-  textBlob->font = font;
-  return textBlob;
-}
+/**
+ * WebImageCodec provides convenience functions to enable/disable the async support for decoding web
+ * images.
+ */
+class WebCodec {
+ public:
+  /**
+   * Returns true if the async support for decoding web images is enabled. The default value is
+   * false.
+   */
+  static bool AsyncSupport();
 
-std::shared_ptr<ImageBuffer> CGTextBlob::getImage(float /*resolutionScale*/,
-                                                  Matrix* /*matrix*/) const {
-  // TODO(domrjchen): Added the implementation of generating multiple character images at once and
-  //  completed GLCanvas.drawColorGlyphs().
-  return nullptr;
-}
+  /**
+   * Enables or disables the async support for decoding web images. If set to true, the ImageBuffers
+   * generated from the web platform will not be fully decoded buffers. Instead, they will trigger
+   * promise-awaiting calls before generating textures, which can speed up the process of decoding
+   * multiple images simultaneously. Do not set it to true if your rendering process may require
+   * multiple flush() calls to the screen Surface during one single frame. Otherwise, it may result
+   * in screen tearing.
+   */
+  static void SetAsyncSupport(bool enabled);
+};
 }  // namespace tgfx

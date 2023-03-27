@@ -16,25 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "FTTextBlob.h"
+#pragma once
+
+#include <emscripten/val.h>
+#include <optional>
+#include "ByteBuffer.h"
+#include "tgfx/core/Data.h"
+#include "tgfx/core/Size.h"
 
 namespace tgfx {
-std::shared_ptr<TextBlob> TextBlob::MakeFrom(const GlyphID glyphIDs[], const Point positions[],
-                                             size_t glyphCount, const Font& font) {
-  if (glyphCount == 0) {
-    return nullptr;
-  }
-  auto textBlob = std::make_shared<FTTextBlob>();
-  textBlob->glyphIDs = {glyphIDs, glyphIDs + glyphCount};
-  textBlob->positions = {positions, positions + glyphCount};
-  textBlob->font = font;
-  return textBlob;
-}
+class WebImageInfo {
+ public:
+  static ISize GetSize(std::shared_ptr<Data> imageBytes);
+};
 
-std::shared_ptr<ImageBuffer> FTTextBlob::getImage(float /*resolutionScale*/,
-                                                  Matrix* /*matrix*/) const {
-  // TODO(domrjchen): Added the implementation of generating multiple character images at once and
-  //  completed GLCanvas.drawColorGlyphs().
-  return nullptr;
-}
 }  // namespace tgfx

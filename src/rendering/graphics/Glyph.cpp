@@ -49,9 +49,9 @@ std::vector<GlyphHandle> Glyph::BuildFromText(const std::string& text, const tgf
 Glyph::Glyph(tgfx::GlyphID glyphId, std::string name, tgfx::Font font, bool isVertical,
              const TextPaint& textPaint)
     : _glyphId(glyphId), _name(std::move(name)), _font(std::move(font)), _isVertical(isVertical) {
-  horizontalInfo->advance = _font.getGlyphAdvance(_glyphId);
+  horizontalInfo->advance = _font.getAdvance(_glyphId);
   horizontalInfo->originPosition.set(horizontalInfo->advance / 2, 0);
-  horizontalInfo->bounds = _font.getGlyphBounds(_glyphId);
+  horizontalInfo->bounds = _font.getBounds(_glyphId);
   auto metrics = _font.getMetrics();
   horizontalInfo->ascent = metrics.ascent;
   horizontalInfo->descent = metrics.descent;
@@ -59,7 +59,7 @@ Glyph::Glyph(tgfx::GlyphID glyphId, std::string name, tgfx::Font font, bool isVe
     // 空格字符测量的 bounds 比较异常偏上，本身也不可见，这里直接按字幕 A 的上下边界调整一下。
     auto AGlyphID = _font.getGlyphID("A");
     if (AGlyphID > 0) {
-      auto ABounds = _font.getGlyphBounds(AGlyphID);
+      auto ABounds = _font.getBounds(AGlyphID);
       horizontalInfo->bounds.top = ABounds.top;
       horizontalInfo->bounds.bottom = ABounds.bottom;
     }
@@ -75,10 +75,10 @@ Glyph::Glyph(tgfx::GlyphID glyphId, std::string name, tgfx::Font font, bool isVe
       verticalInfo->ascent += offsetX;
       verticalInfo->descent += offsetX;
     } else {
-      auto offset = _font.getGlyphVerticalOffset(_glyphId);
+      auto offset = _font.getVerticalOffset(_glyphId);
       verticalInfo->extraMatrix.postTranslate(offset.x, offset.y);
       auto width = verticalInfo->advance;
-      verticalInfo->advance = _font.getGlyphAdvance(_glyphId, true);
+      verticalInfo->advance = _font.getAdvance(_glyphId, true);
       if (verticalInfo->advance == 0) {
         verticalInfo->advance = width;
       }
