@@ -22,6 +22,7 @@
 #include <mutex>
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageBuffer.h"
+#include "tgfx/core/Mask.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
@@ -30,7 +31,7 @@ class ImageStream;
 
 /**
  * The ImageReader class allows direct access to ImageBuffers generated from an image stream. The
- * image stream may come from a Bitmap, a Rasterizer, or a video-related object of the native
+ * image stream may come from a Bitmap, a Mask, or a video-related object of the native
  * platform. You should call ImageReader::acquireNextBuffer() to read a new ImageBuffer each time
  * when the image stream is modified. All ImageBuffers generated from one ImageReader share the same
  * internal texture, which allows you to continuously read the latest content from the image stream
@@ -53,6 +54,11 @@ class ImageReader {
    * Creates a new ImageReader from the specified Bitmap. Returns nullptr if the bitmap is empty.
    */
   static std::shared_ptr<ImageReader> MakeFrom(const Bitmap& bitmap);
+
+  /**
+   * Creates a new ImageReader from the specified Mask. Returns nullptr if the mask is nullptr.
+   */
+  static std::shared_ptr<ImageReader> MakeFrom(std::shared_ptr<Mask> mask);
 
   virtual ~ImageReader();
 
@@ -86,6 +92,7 @@ class ImageReader {
   std::shared_ptr<Texture> texture = nullptr;
   uint64_t bufferVersion = 0;
   uint64_t textureVersion = 0;
+  bool hasPendingChanges = true;
   Rect dirtyBounds = Rect::MakeEmpty();
 
   static std::shared_ptr<ImageReader> MakeFrom(std::shared_ptr<ImageStream> imageStream);

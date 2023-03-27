@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,25 +16,36 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "FTTextBlob.h"
+#pragma once
+
+#include "tgfx/core/TextBlob.h"
 
 namespace tgfx {
-std::shared_ptr<TextBlob> TextBlob::MakeFrom(const GlyphID glyphIDs[], const Point positions[],
-                                             size_t glyphCount, const Font& font) {
-  if (glyphCount == 0) {
-    return nullptr;
-  }
-  auto textBlob = std::make_shared<FTTextBlob>();
-  textBlob->glyphIDs = {glyphIDs, glyphIDs + glyphCount};
-  textBlob->positions = {positions, positions + glyphCount};
-  textBlob->font = font;
-  return textBlob;
-}
+class SimpleTextBlob : public TextBlob {
+ public:
+  bool hasColor() const override;
 
-std::shared_ptr<ImageBuffer> FTTextBlob::getImage(float /*resolutionScale*/,
-                                                  Matrix* /*matrix*/) const {
-  // TODO(domrjchen): Added the implementation of generating multiple character images at once and
-  //  completed GLCanvas.drawColorGlyphs().
-  return nullptr;
-}
+  Rect getBounds(const Stroke* stroke = nullptr) const override;
+
+  bool getPath(Path* path, const Stroke* stroke = nullptr) const override;
+
+  const Font& getFont() const {
+    return font;
+  }
+
+  const std::vector<GlyphID>& getGlyphIDs() const {
+    return glyphIDs;
+  }
+
+  const std::vector<Point>& getPositions() const {
+    return positions;
+  }
+
+ private:
+  Font font = {};
+  std::vector<GlyphID> glyphIDs = {};
+  std::vector<Point> positions = {};
+
+  friend class TextBlob;
+};
 }  // namespace tgfx

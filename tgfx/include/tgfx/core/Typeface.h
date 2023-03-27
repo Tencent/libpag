@@ -20,8 +20,8 @@
 
 #include "tgfx/core/Data.h"
 #include "tgfx/core/FontMetrics.h"
-#include "tgfx/core/Path.h"
 #include "tgfx/core/ImageBuffer.h"
+#include "tgfx/core/Path.h"
 
 namespace tgfx {
 /**
@@ -116,7 +116,7 @@ class Typeface {
    * Returns the bounding box of the specified glyph. The bounds is specified in glyph space
    * units.
    */
-  virtual Rect getGlyphBounds(GlyphID glyphID, float size, bool fauxBold,
+  virtual Rect getBounds(GlyphID glyphID, float size, bool fauxBold,
                               bool fauxItalic) const = 0;
 
   /**
@@ -124,7 +124,7 @@ class Typeface {
    * @param glyphID The id of specified glyph.
    * @param vertical The intended drawing orientation of the glyph.
    */
-  virtual float getGlyphAdvance(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
+  virtual float getAdvance(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
                                 bool verticalText) const = 0;
 
   /**
@@ -132,7 +132,7 @@ class Typeface {
    * and returns true. If glyph is described by a bitmap, returns false and ignores path parameter.
    * The points in path are specified in glyph space units.
    */
-  virtual bool getGlyphPath(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
+  virtual bool getPath(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
                             Path* path) const = 0;
 
   /**
@@ -140,14 +140,14 @@ class Typeface {
    * should apply to the glyph image when drawing.
    */
   virtual std::shared_ptr<ImageBuffer> getGlyphImage(GlyphID glyphID, float size, bool fauxBold,
-                                                       bool fauxItalic, Matrix* matrix) const = 0;
+                                                      bool fauxItalic, Matrix* matrix) const = 0;
 
   /**
    * Calculates the offset from the default (horizontal) origin to the vertical origin for specified
    * glyph. The offset is specified in glyph space units.
    */
-  virtual Point getGlyphVerticalOffset(GlyphID glyphID, float size, bool fauxBold,
-                                       bool fauxItalic) const = 0;
+  virtual Point getVerticalOffset(GlyphID glyphID, float size, bool fauxBold,
+                                  bool fauxItalic) const = 0;
 
   friend class Font;
 };

@@ -18,9 +18,9 @@
 
 #include "NativeCodec.h"
 #include <atomic>
-#include "NativeImageBuffer.h"
-#include "NativeImageInfo.h"
-#include "tgfx/platform/web/WebImage.h"
+#include "WebImageBuffer.h"
+#include "WebImageInfo.h"
+#include "tgfx/platform/web/WebCodec.h"
 #include "tgfx/utils/Buffer.h"
 #include "tgfx/utils/Stream.h"
 
@@ -55,7 +55,7 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& fileP
 }
 
 std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> imageBytes) {
-  auto imageSize = NativeImageInfo::GetSize(imageBytes);
+  auto imageSize = WebImageInfo::GetSize(imageBytes);
   if (imageSize.isEmpty()) {
     return nullptr;
   }
@@ -85,7 +85,7 @@ NativeCodec::NativeCodec(int width, int height, emscripten::val nativeImage)
 }
 
 bool NativeCodec::asyncSupport() const {
-  return WebImage::AsyncSupport();
+  return WebCodec::AsyncSupport();
 }
 
 bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
@@ -119,12 +119,12 @@ std::shared_ptr<ImageBuffer> NativeCodec::onMakeBuffer(bool) const {
     auto bytes =
         val(typed_memory_view(imageBytes->size(), static_cast<const uint8_t*>(imageBytes->data())));
     image = val::module_property("tgfx").call<val>("createImageFromBytes", bytes);
-    usePromise = WebImage::AsyncSupport();
+    usePromise = WebCodec::AsyncSupport();
     if (!usePromise) {
       image = image.await();
     }
   }
-  return std::shared_ptr<NativeImageBuffer>(
-      new NativeImageBuffer(width(), height(), std::move(image), usePromise));
+  return std::shared_ptr<WebImageBuffer>(
+      new WebImageBuffer(width(), height(), std::move(image), usePromise));
 }
 }  // namespace tgfx

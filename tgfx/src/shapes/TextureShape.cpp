@@ -45,7 +45,7 @@ std::unique_ptr<DrawOp> TextureShape::makeOp(GpuPaint* paint, const Matrix& view
   mask->setMatrix(matrix);
   mask->fillPath(path);
   // TODO(pengweilv): mip map
-  texture = mask->updateTexture(paint->context);
+  texture = Texture::MakeFrom(paint->context, mask->makeBuffer());
   if (texture == nullptr) {
     return nullptr;
   }

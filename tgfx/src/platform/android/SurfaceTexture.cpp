@@ -172,10 +172,6 @@ jobject SurfaceTexture::getInputSurface() const {
   return surface.get();
 }
 
-void SurfaceTexture::notifyFrameChanged() {
-  markContentDirty(Rect::MakeWH(_width, _height));
-}
-
 void SurfaceTexture::notifyFrameAvailable() {
   // Note: If there is a pending frame available already, SurfaceTexture will not dispatch any new
   // frame-available event until you have called the SurfaceTexture.updateTexImage().

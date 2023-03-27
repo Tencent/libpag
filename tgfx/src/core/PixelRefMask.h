@@ -18,16 +18,41 @@
 
 #pragma once
 
-#include <emscripten/val.h>
-#include <optional>
-#include "ByteBuffer.h"
-#include "tgfx/core/Data.h"
-#include "tgfx/core/Size.h"
+#include "core/PixelRef.h"
+#include "tgfx/core/Mask.h"
 
 namespace tgfx {
-class NativeImageInfo {
+class PixelRefMask : public Mask {
  public:
-  static ISize GetSize(std::shared_ptr<Data> imageBytes);
-};
+  explicit PixelRefMask(std::shared_ptr<PixelRef> pixelRef);
 
+  int width() const override {
+    return pixelRef->width();
+  }
+
+  int height() const override {
+    return pixelRef->height();
+  }
+
+  bool isHardwareBacked() const override {
+    return pixelRef->width();
+  }
+
+  void clear() override {
+    return pixelRef->clear();
+  }
+
+  std::shared_ptr<ImageBuffer> makeBuffer() const override {
+    return pixelRef->makeBuffer();
+  }
+
+ protected:
+  std::shared_ptr<PixelRef> pixelRef = nullptr;
+
+  void markContentDirty(const Rect& bounds, bool flipY);
+
+  std::shared_ptr<ImageStream> getImageStream() const override {
+    return pixelRef;
+  }
+};
 }  // namespace tgfx

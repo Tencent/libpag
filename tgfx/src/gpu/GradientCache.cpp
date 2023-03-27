@@ -51,7 +51,7 @@ std::shared_ptr<ImageBuffer> CreateGradient(const Color* colors, const float* po
   if (pixmap.isEmpty()) {
     return nullptr;
   }
-  pixmap.eraseAll();
+  pixmap.clear();
   auto pixels = reinterpret_cast<uint8_t*>(pixmap.writablePixels());
   int prevIndex = 0;
   for (int i = 1; i < count; ++i) {

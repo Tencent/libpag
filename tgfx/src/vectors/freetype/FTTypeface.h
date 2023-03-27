@@ -60,21 +60,21 @@ class FTTypeface : public Typeface {
   std::shared_ptr<Data> copyTableData(FontTableTag tag) const override;
 
  protected:
-  float getGlyphAdvance(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
-                        bool verticalText) const override;
+  float getAdvance(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
+                   bool verticalText) const override;
 
   FontMetrics getMetrics(float size) const override;
 
-  bool getGlyphPath(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
-                    Path* path) const override;
+  bool getPath(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic,
+               Path* path) const override;
 
   std::shared_ptr<ImageBuffer> getGlyphImage(GlyphID glyphID, float size, bool fauxBold,
                                              bool fauxItalic, Matrix* matrix) const override;
 
-  Rect getGlyphBounds(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic) const override;
+  Rect getBounds(GlyphID glyphID, float size, bool fauxBold, bool fauxItalic) const override;
 
-  Point getGlyphVerticalOffset(GlyphID glyphID, float size, bool fauxBold,
-                               bool fauxItalic) const override;
+  Point getVerticalOffset(GlyphID glyphID, float size, bool fauxBold,
+                          bool fauxItalic) const override;
 
  private:
   FTTypeface(FTFontData data, std::unique_ptr<FTFace> face);

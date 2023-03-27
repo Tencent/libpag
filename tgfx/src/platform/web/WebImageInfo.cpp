@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "NativeImageInfo.h"
+#include "WebImageInfo.h"
 
 using namespace emscripten;
 
@@ -113,7 +113,7 @@ static bool CheckWebpSupport() {
   return val::module_property("tgfx").call<val>("hasWebpSupport").as<bool>();
 }
 
-ISize NativeImageInfo::GetSize(std::shared_ptr<Data> imageBytes) {
+ISize WebImageInfo::GetSize(std::shared_ptr<Data> imageBytes) {
   static const bool hasWebpSupport = CheckWebpSupport();
   auto imageSize = ISize::MakeEmpty();
   ByteBuffer buffer(imageBytes->bytes(), imageBytes->size());

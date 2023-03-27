@@ -56,6 +56,10 @@ class PixelRef : public ImageStream {
     return pixelBuffer->height();
   }
 
+  bool isAlphaOnly() const override {
+    return pixelBuffer->isAlphaOnly();
+  }
+
   bool isHardwareBacked() const override {
     return pixelBuffer->isHardwareBacked();
   }
@@ -88,11 +92,9 @@ class PixelRef : public ImageStream {
   }
 
   /**
-   * Marks the pixels of the specified bounds as dirty.
+   * Replaces all pixel values with transparent colors.
    */
-  void notifyPixelsDirty(const Rect& bounds) {
-    markContentDirty(bounds);
-  }
+  void clear();
 
  protected:
   std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) override;

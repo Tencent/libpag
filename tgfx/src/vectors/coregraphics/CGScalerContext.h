@@ -42,7 +42,7 @@ class CGScalerContext {
 
   GlyphMetrics generateGlyphMetrics(GlyphID glyphID);
 
-  Point getGlyphVerticalOffset(GlyphID glyphID) const;
+  Point getVerticalOffset(GlyphID glyphID) const;
 
   bool generatePath(GlyphID glyphID, Path* path);
 

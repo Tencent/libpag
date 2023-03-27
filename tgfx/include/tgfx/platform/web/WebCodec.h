@@ -18,17 +18,27 @@
 
 #pragma once
 
-#include "tgfx/core/TextBlob.h"
-
 namespace tgfx {
-class WebTextBlob : public TextBlob {
+/**
+ * WebImageCodec provides convenience functions to enable/disable the async support for decoding web
+ * images.
+ */
+class WebCodec {
  public:
-  const Font& getFont() const {
-    return font;
-  }
+  /**
+   * Returns true if the async support for decoding web images is enabled. The default value is
+   * false.
+   */
+  static bool AsyncSupport();
 
-  void getTextsAndPositions(std::vector<std::string>* texts, std::vector<Point>* points) const;
-
-  std::shared_ptr<ImageBuffer> getImage(float resolutionScale, Matrix* matrix) const override;
+  /**
+   * Enables or disables the async support for decoding web images. If set to true, the ImageBuffers
+   * generated from the web platform will not be fully decoded buffers. Instead, they will trigger
+   * promise-awaiting calls before generating textures, which can speed up the process of decoding
+   * multiple images simultaneously. Do not set it to true if your rendering process may require
+   * multiple flush() calls to the screen Surface during one single frame. Otherwise, it may result
+   * in screen tearing.
+   */
+  static void SetAsyncSupport(bool enabled);
 };
 }  // namespace tgfx

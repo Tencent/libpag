@@ -137,21 +137,23 @@ void Pixmap::reset(const ImageInfo& info, void* pixels) {
 
 void Pixmap::reset(const Bitmap& bitmap) {
   reset();
-  _pixels = bitmap.lockPixels();
+  pixelRef = bitmap.pixelRef;
+  _pixels = pixelRef ? pixelRef->lockPixels() : nullptr;
   if (_pixels == nullptr) {
+    pixelRef = nullptr;
     return;
   }
-  pixelRef = bitmap.pixelRef;
   _info = pixelRef->info();
 }
 
 void Pixmap::reset(Bitmap& bitmap) {
   reset();
-  _writablePixels = bitmap.lockPixels();
+  pixelRef = bitmap.pixelRef;
+  _writablePixels = pixelRef ? pixelRef->lockWritablePixels() : nullptr;
   if (_writablePixels == nullptr) {
+    pixelRef = nullptr;
     return;
   }
-  pixelRef = bitmap.pixelRef;
   _pixels = _writablePixels;
   _info = pixelRef->info();
 }
@@ -214,7 +216,7 @@ bool Pixmap::writePixels(const ImageInfo& srcInfo, const void* srcPixels, int ds
   return true;
 }
 
-bool Pixmap::eraseAll() {
+bool Pixmap::clear() {
   if (_writablePixels == nullptr) {
     return false;
   }

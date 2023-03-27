@@ -18,10 +18,7 @@
 
 #include "platform/web/VideoElement.h"
 #include "GLVideoTexture.h"
-#include "gpu/Gpu.h"
-#include "opengl/GLSampler.h"
-#include "tgfx/platform/web/WebImage.h"
-#include "utils/Log.h"
+#include "tgfx/platform/web/WebCodec.h"
 
 namespace tgfx {
 using namespace emscripten;
@@ -34,13 +31,13 @@ std::shared_ptr<VideoElement> VideoElement::MakeFrom(val video, int width, int h
 }
 
 VideoElement::VideoElement(emscripten::val video, int width, int height)
-    : video(video), _width(width), _height(height) {
+    : WebImageStream(video, width, height, false) {
 }
 
-void VideoElement::notifyFrameChanged(emscripten::val promise) {
+void VideoElement::markFrameChanged(emscripten::val promise) {
   currentPromise = promise;
-  markContentDirty(Rect::MakeWH(_width, _height));
-  if (currentPromise != val::null() && !WebImage::AsyncSupport()) {
+  markContentDirty(Rect::MakeWH(width(), height()));
+  if (currentPromise != val::null() && !WebCodec::AsyncSupport()) {
     currentPromise.await();
   }
 }
@@ -48,26 +45,16 @@ void VideoElement::notifyFrameChanged(emscripten::val promise) {
 std::shared_ptr<Texture> VideoElement::onMakeTexture(Context* context, bool mipMapped) {
   auto texture = GLVideoTexture::Make(context, width(), height(), mipMapped);
   if (texture != nullptr) {
-    onUpdateTexture(texture, Rect::MakeWH(_width, _height));
+    onUpdateTexture(texture, Rect::MakeWH(width(), height()));
   }
   return texture;
 }
 
-bool VideoElement::onUpdateTexture(std::shared_ptr<Texture> texture, const Rect&) {
-  if (currentPromise == val::null()) {
-    return false;
-  }
-  if (WebImage::AsyncSupport()) {
+bool VideoElement::onUpdateTexture(std::shared_ptr<Texture> texture, const Rect& bounds) {
+  if (currentPromise != val::null() && WebCodec::AsyncSupport()) {
     currentPromise.await();
   }
-  auto glSampler = static_cast<const GLSampler*>(texture->getSampler());
-  val::module_property("tgfx").call<void>("uploadToTexture", emscripten::val::module_property("GL"),
-                                          video, glSampler->id);
-  if (glSampler->hasMipmaps()) {
-    auto gpu = texture->getContext()->gpu();
-    gpu->regenerateMipMapLevels(glSampler);
-  }
-  return true;
+  return WebImageStream::onUpdateTexture(texture, bounds);
 }
 
 }  // namespace tgfx

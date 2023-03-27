@@ -18,14 +18,15 @@
 
 #pragma once
 
-#include "core/PixelBufferMask.h"
+#include "core/PixelRefMask.h"
 
 namespace tgfx {
-class FTMask : public PixelBufferMask {
+class FTMask : public PixelRefMask {
  public:
-  explicit FTMask(std::shared_ptr<PixelBuffer> buffer) : PixelBufferMask(std::move(buffer)) {
+  explicit FTMask(std::shared_ptr<PixelRef> pixelRef) : PixelRefMask(std::move(pixelRef)) {
   }
 
-  void fillPath(const Path& path) override;
+ protected:
+  void onFillPath(const Path& path, const Matrix& matrix) override;
 };
 }  // namespace tgfx

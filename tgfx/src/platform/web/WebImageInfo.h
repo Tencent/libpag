@@ -18,27 +18,16 @@
 
 #pragma once
 
-#include "core/PixelBuffer.h"
-#include "tgfx/core/Mask.h"
+#include <emscripten/val.h>
+#include <optional>
+#include "ByteBuffer.h"
+#include "tgfx/core/Data.h"
+#include "tgfx/core/Size.h"
 
 namespace tgfx {
-class PixelBufferMask : public Mask {
+class WebImageInfo {
  public:
-  explicit PixelBufferMask(std::shared_ptr<PixelBuffer> buffer);
-
-  void clear() override;
-
-  std::shared_ptr<Texture> updateTexture(Context* context) override;
-
-  std::shared_ptr<PixelBuffer> getBuffer() const {
-    return buffer;
-  }
-
- protected:
-  void dirty(Rect rect, bool flipY = true);
-
-  std::shared_ptr<PixelBuffer> buffer = nullptr;
-  std::shared_ptr<Texture> texture;
-  Rect dirtyRect = Rect::MakeEmpty();
+  static ISize GetSize(std::shared_ptr<Data> imageBytes);
 };
+
 }  // namespace tgfx

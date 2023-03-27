@@ -1,5 +1,5 @@
 import { ArrayBufferImage } from './array-buffer-image';
-import { releaseCanvas2D } from './canvas';
+import { getCanvas2D, releaseCanvas2D } from './canvas';
 import { getSourceSize, isAndroidMiniprogram } from '../tgfx';
 
 import type { EmscriptenGL } from '../types';
@@ -7,10 +7,27 @@ import type { EmscriptenGL } from '../types';
 export const uploadToTexture = (
   GL: EmscriptenGL,
   source: TexImageSource | OffscreenCanvas | ArrayBufferImage,
-  textureID: number,
+  textureID: number, alphaOnly: boolean
 ) => {
   const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
   gl.bindTexture(gl.TEXTURE_2D, GL.textures[textureID]);
+  if(alphaOnly && source instanceof OffscreenCanvas){
+    const ctx = source.getContext('2d') as OffscreenCanvasRenderingContext2D;
+    const imgData = ctx.getImageData(0, 0, source.width, source.height);
+    gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA,
+        imgData.width,
+        imgData.height,
+        0,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        new Uint8Array(imgData.data),
+    );
+    return;
+  }
+
   gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
   if (source instanceof ArrayBufferImage) {
     gl.texImage2D(
@@ -31,4 +48,4 @@ export const uploadToTexture = (
   gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
 };
 
-export { getSourceSize, isAndroidMiniprogram, releaseCanvas2D as releaseNativeImage };
+export { getSourceSize, isAndroidMiniprogram, getCanvas2D as createCanvas2D, releaseCanvas2D as releaseNativeImage };

@@ -53,6 +53,15 @@ void* PixelRef::lockWritablePixels() {
   return pixels;
 }
 
+void PixelRef::clear() {
+  auto pixels = lockWritablePixels();
+  if (pixels != nullptr) {
+    markContentDirty(Rect::MakeWH(width(), height()));
+    memset(pixels, 0, info().byteSize());
+  }
+  unlockPixels();
+}
+
 std::shared_ptr<Texture> PixelRef::onMakeTexture(Context* context, bool mipMapped) {
   return Texture::MakeFrom(context, pixelBuffer, mipMapped);
 }
@@ -63,6 +72,8 @@ bool PixelRef::onUpdateTexture(std::shared_ptr<Texture> texture, const Rect& bou
   if (pixels == nullptr) {
     return false;
   }
+  pixels =
+      info().computeOffset(pixels, static_cast<int>(bounds.left), static_cast<int>(bounds.top));
   gpu->writePixels(texture->getSampler(), bounds, pixels, info().rowBytes());
   unlockPixels();
   return true;
