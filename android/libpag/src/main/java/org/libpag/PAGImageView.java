@@ -875,7 +875,11 @@ public class PAGImageView extends View {
             if (_matrix != null) {
                 canvas.concat(_matrix);
             }
-            canvas.drawBitmap(renderBitmap, 0, 0, null);
+            try {
+                canvas.drawBitmap(renderBitmap, 0, 0, null);
+            } catch (Exception e) {
+               e.printStackTrace();
+            }
             canvas.restore();
         }
     }
