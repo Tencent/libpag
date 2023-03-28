@@ -51,10 +51,6 @@ class WebImageStream : public ImageStream {
     return false;
   }
 
-  bool expired() const override {
-    return contentVersion < imageReader->textureVersion;
-  }
-
  protected:
   WebImageStream(emscripten::val source, int width, int height, bool alphaOnly);
 
