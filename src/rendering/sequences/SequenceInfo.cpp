@@ -17,11 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SequenceInfo.h"
-#include "platform/web/WebVideoSequenceDemuxer.h"
 #include "rendering/sequences/BitmapSequenceReader.h"
 #include "rendering/sequences/VideoReader.h"
 #include "rendering/sequences/VideoSequenceDemuxer.h"
 #include "tgfx/core/Image.h"
+#ifdef PAG_BUILD_FOR_WEB
+#include "platform/web/WebVideoSequenceDemuxer.h"
+#endif
 
 namespace pag {
 static std::shared_ptr<tgfx::Image> MakeSequenceImage(
@@ -60,7 +62,8 @@ std::shared_ptr<SequenceReader> SequenceInfo::makeReader(std::shared_ptr<File> f
   } else {
     auto videoSequence = static_cast<VideoSequence*>(sequence);
 #ifdef PAG_BUILD_FOR_WEB
-    auto demuxer = std::make_unique<WebVideoSequenceDemuxer>(std::move(file), videoSequence, pagFile);
+    auto demuxer =
+        std::make_unique<WebVideoSequenceDemuxer>(std::move(file), videoSequence, pagFile);
 #else
     auto demuxer = std::make_unique<VideoSequenceDemuxer>(std::move(file), videoSequence, pagFile);
 #endif

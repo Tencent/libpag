@@ -19,7 +19,6 @@
 #include "HardwareDecoder.h"
 #include "WebVideoSequenceDemuxer.h"
 #include "base/utils/TimeUtil.h"
-#include "codec/mp4/MP4BoxHelper.h"
 #include "rendering/sequences/VideoSequenceDemuxer.h"
 #include "tgfx/opengl/GLFunctions.h"
 
