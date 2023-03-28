@@ -22,7 +22,9 @@
 #include "tgfx/utils/Clock.h"
 
 namespace pag {
+#ifndef PAG_BUILD_FOR_WEB
 static constexpr int MAX_TRY_DECODE_COUNT = 100;
+#endif
 static constexpr int FORCE_SOFTWARE_SIZE = 160000;  // 400x400
 
 VideoReader::VideoReader(std::unique_ptr<VideoDemuxer> videoDemuxer)
@@ -125,6 +127,12 @@ bool VideoReader::sendSampleData() {
 }
 
 bool VideoReader::decodeFrame(int64_t sampleTime) {
+#ifdef PAG_BUILD_FOR_WEB
+  videoDecoder->onFlush();
+  videoDecoder->onSendBytes(nullptr, 0, sampleTime);
+  videoDecoder->onDecodeFrame();
+  return true;
+#else
   if (demuxer->needSeeking(currentDecodedTime, sampleTime)) {
     resetParams();
     videoDecoder->onFlush();
@@ -152,6 +160,7 @@ bool VideoReader::decodeFrame(int64_t sampleTime) {
     }
   }
   return true;
+#endif
 }
 
 bool VideoReader::checkVideoDecoder() {
