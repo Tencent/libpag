@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SequenceInfo.h"
+#include "platform/web/WebVideoSequenceDemuxer.h"
 #include "rendering/sequences/BitmapSequenceReader.h"
 #include "rendering/sequences/VideoReader.h"
 #include "rendering/sequences/VideoSequenceDemuxer.h"
@@ -58,7 +59,11 @@ std::shared_ptr<SequenceReader> SequenceInfo::makeReader(std::shared_ptr<File> f
                                                     static_cast<BitmapSequence*>(sequence));
   } else {
     auto videoSequence = static_cast<VideoSequence*>(sequence);
+#ifdef PAG_BUILD_FOR_WEB
+    auto demuxer = std::make_unique<WebVideoSequenceDemuxer>(std::move(file), videoSequence, pagFile);
+#else
     auto demuxer = std::make_unique<VideoSequenceDemuxer>(std::move(file), videoSequence, pagFile);
+#endif
     reader = std::make_shared<VideoReader>(std::move(demuxer));
   }
   return reader;

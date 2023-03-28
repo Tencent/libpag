@@ -22,7 +22,7 @@
 namespace pag {
 VideoSequenceDemuxer::VideoSequenceDemuxer(std::shared_ptr<File> file, VideoSequence* sequence,
                                            PAGFile* pagFile)
-    : file(std::move(file)), sequence(sequence), pagFile(pagFile) {
+    : sequence(sequence), file(std::move(file)), pagFile(pagFile) {
   format.width = sequence->getVideoWidth();
   format.height = sequence->getVideoHeight();
   for (auto& header : sequence->headers) {
