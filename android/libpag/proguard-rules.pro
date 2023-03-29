@@ -52,6 +52,10 @@
     long nativeSurface;
 }
 
+-keepclasseswithmembers class org.libpag.PAGFile {
+   private <init>(long);
+}
+
 -keepclasseswithmembers class org.libpag.PAGFont {
     private static void RegisterFallbackFonts();
 }
