@@ -152,7 +152,7 @@ When using build.sh to compile libpag.wasm, undefined symbols error was suppress
 emcc -s ERROR_ON_UNDEFINED_SYMBOLS=0
 ```
 
-During the compilation process, it is necessary to pay attention to any warning messages related to std library compatibility to avoid the exposure of undefined symbols errors during runtime.
+During the compilation process, it is necessary to pay attention to any warning messages unrelated to std library to avoid the undefined symbols errors during runtime.
 
 ### Build (Release)
 
