@@ -7,23 +7,24 @@ import type { EmscriptenGL } from '../types';
 export const uploadToTexture = (
   GL: EmscriptenGL,
   source: TexImageSource | OffscreenCanvas | ArrayBufferImage,
-  textureID: number, alphaOnly: boolean
+  textureID: number,
+  alphaOnly: boolean,
 ) => {
   const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
   gl.bindTexture(gl.TEXTURE_2D, GL.textures[textureID]);
-  if(alphaOnly && source instanceof OffscreenCanvas){
+  if (alphaOnly && source instanceof OffscreenCanvas) {
     const ctx = source.getContext('2d') as OffscreenCanvasRenderingContext2D;
     const imgData = ctx.getImageData(0, 0, source.width, source.height);
     gl.texImage2D(
-        gl.TEXTURE_2D,
-        0,
-        gl.RGBA,
-        imgData.width,
-        imgData.height,
-        0,
-        gl.RGBA,
-        gl.UNSIGNED_BYTE,
-        new Uint8Array(imgData.data),
+      gl.TEXTURE_2D,
+      0,
+      gl.RGBA,
+      imgData.width,
+      imgData.height,
+      0,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      new Uint8Array(imgData.data),
     );
     return;
   }

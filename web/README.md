@@ -137,11 +137,22 @@ Start HTTP server.
 
 ```bash
 # ./
-$ emrun --browser chrome --serve_root . --port 8081 ./web/demo/index.html
+$ npm run server
 ```
 Use Chrome to open `http://localhost:8081/web/demo/index.html` to see the demo.
 
 If you need to debug, you can install [C/C++ DevTools Support (DWARF)](https://chrome.google.com/webstore/detail/cc%20%20-devtools-support-dwa/pdcpmagijalfljmkmjngeonclgbbannb), and open Chrome DevTools > Settings > Experiments > Check the "WebAssembly Debugging: Enable DWARF support" option to enable SourceMap support. Now you can debug C++ files in Chrome DevTools.
+
+#### PS
+
+When using build.sh to compile libpag.wasm, undefined symbols error was suppressed due to compatibility issues between emscripten and the system's std library.
+
+```shell
+# build.sh
+emcc -s ERROR_ON_UNDEFINED_SYMBOLS=0
+```
+
+During the compilation process, it is necessary to pay attention to any warning messages unrelated to std library to avoid the undefined symbols errors during runtime.
 
 ### Build (Release)
 

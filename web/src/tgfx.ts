@@ -2,7 +2,7 @@ import { getCanvas2D, releaseCanvas2D } from './utils/canvas';
 import { writeBufferToWasm } from './utils/buffer';
 import { BitmapImage } from './core/bitmap-image';
 
-import type { EmscriptenGL, PAG } from './types';
+import type { EmscriptenGL, PAG, Rect } from './types';
 import type { wx } from './wechat/interfaces';
 
 declare const wx: wx;
@@ -65,13 +65,14 @@ export const getSourceSize = (source: TexImageSource | OffscreenCanvas) => {
 export const uploadToTexture = (
   GL: EmscriptenGL,
   source: TexImageSource | OffscreenCanvas | BitmapImage,
-  textureID: number, alphaOnly: boolean
+  textureID: number,
+  alphaOnly: boolean,
 ) => {
-  const renderSource = source instanceof BitmapImage ? source.bitmap : source;
+  let renderSource = source instanceof BitmapImage ? source.bitmap : source;
   if (!renderSource) return;
   const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
   gl.bindTexture(gl.TEXTURE_2D, GL.textures[textureID]);
-  if(alphaOnly){
+  if (alphaOnly) {
     gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.ALPHA, gl.UNSIGNED_BYTE, renderSource);
   } else {
@@ -101,4 +102,4 @@ export const getBytesFromPath = async (module: PAG, path: string) => {
   return writeBufferToWasm(module, buffer);
 };
 
-export {getCanvas2D as createCanvas2D};
+export { getCanvas2D as createCanvas2D };

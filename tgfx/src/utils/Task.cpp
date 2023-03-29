@@ -16,10 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#ifndef TGFX_BUILD_FOR_WEB
-
 #include "tgfx/utils/Task.h"
-#include "TaskGroup.h"
 #include "utils/TaskGroup.h"
 
 namespace tgfx {
@@ -97,5 +94,3 @@ void Task::execute() {
   condition.notify_all();
 }
 }  // namespace tgfx
-
-#endif
