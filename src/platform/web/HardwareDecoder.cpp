@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "HardwareDecoder.h"
+#include "WebVideoSequenceDemuxer.h"
 #include "base/utils/TimeUtil.h"
-#include "codec/mp4/MP4BoxHelper.h"
 #include "rendering/sequences/VideoSequenceDemuxer.h"
 #include "tgfx/opengl/GLFunctions.h"
 
@@ -26,43 +26,15 @@ using namespace emscripten;
 
 namespace pag {
 HardwareDecoder::HardwareDecoder(const VideoFormat& format) {
-  auto demuxer = static_cast<VideoSequenceDemuxer*>(format.demuxer);
+  auto demuxer = static_cast<WebVideoSequenceDemuxer*>(format.demuxer);
   file = demuxer->file;
   rootFile = demuxer->pagFile;
   auto sequence = demuxer->sequence;
   _width = sequence->getVideoWidth();
   _height = sequence->getVideoHeight();
   frameRate = sequence->frameRate;
-  auto staticTimeRanges = val::array();
-  for (const auto& timeRange : sequence->staticTimeRanges) {
-    auto object = val::object();
-    object.set("start", static_cast<int>(timeRange.start));
-    object.set("end", static_cast<int>(timeRange.end));
-    staticTimeRanges.call<void>("push", object);
-  }
-  val isIPhone = val::module_property("isIPhone");
-  if (isIPhone().as<bool>()) {
-    auto videoSequence = *sequence;
-    videoSequence.MP4Header = nullptr;
-    std::vector<std::shared_ptr<VideoFrame>> videoFrames;
-    for (auto& frame : sequence->frames) {
-      if (!videoFrames.empty() && frame->isKeyframe) {
-        break;
-      }
-      auto videoFrame = std::make_shared<VideoFrame>(*frame);
-      videoFrame->frame += static_cast<Frame>(sequence->frames.size());
-      videoSequence.frames.push_back(videoFrame.get());
-      videoFrames.push_back(videoFrame);
-    }
-    mp4Data = MP4BoxHelper::CovertToMP4(&videoSequence);
-    videoSequence.frames.clear();
-    videoSequence.headers.clear();
-    for (auto& frame : videoFrames) {
-      frame->fileBytes = nullptr;
-    }
-  } else {
-    mp4Data = MP4BoxHelper::CovertToMP4(sequence);
-  }
+  auto staticTimeRanges = demuxer->getStaticTimeRanges();
+  mp4Data = demuxer->getMp4Data();
   auto videoReaderClass = val::module_property("VideoReader");
   videoReader = videoReaderClass
                     .call<val>("create", val(typed_memory_view(mp4Data->length(), mp4Data->data())),

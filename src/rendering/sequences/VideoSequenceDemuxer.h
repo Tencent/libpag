@@ -43,16 +43,18 @@ class VideoSequenceDemuxer : public VideoDemuxer {
 
   void reset() override;
 
+ protected:
+  Frame sampleIndex = 0;
+  VideoSequence* sequence = nullptr;
+  Frame maxPTSFrame = -1;
+
  private:
   // Keep a reference to the File in case the Sequence object is released while we are using it.
   std::shared_ptr<File> file = nullptr;
-  VideoSequence* sequence = nullptr;
   // used by the video decoder on the web platform.
   PAGFile* pagFile = nullptr;
   VideoFormat format = {};
   std::vector<Frame> keyframes = {};
-  Frame maxPTSFrame = -1;
-  Frame sampleIndex = 0;
 
   bool staticContent() const override {
     return sequence->composition->staticContent();

@@ -849,10 +849,11 @@ public class PAGImageView extends View {
             cacheInfo.pagImageView.bitmapCache.put(cacheInfo.frame, cacheInfo.bitmap);
         }
         cacheInfo.pagImageView.postInvalidate();
+        cacheInfo.pagImageView.notifyAnimationUpdate();
     }
 
     private void notifyAnimationUpdate() {
-        if (mViewListeners.isEmpty()) {
+        if (mViewListeners.isEmpty() || !animator.isRunning()) {
             return;
         }
         ArrayList<PAGImageViewListener> arrayList;
