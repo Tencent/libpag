@@ -38,16 +38,16 @@ export class WebMask {
     }
   }
 
-  public updateCanvas(canvas : HTMLCanvasElement | OffscreenCanvas) {
-    this.canvas = canvas;
-  }
-
   protected canvas: HTMLCanvasElement | OffscreenCanvas;
   private context: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
   public constructor(canvas: HTMLCanvasElement | OffscreenCanvas) {
     this.canvas = canvas;
     this.context = this.canvas.getContext('2d') as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+  }
+
+  public updateCanvas(canvas: HTMLCanvasElement | OffscreenCanvas) {
+    this.canvas = canvas;
   }
 
   public fillPath(path: Path2D, fillType: ctor) {

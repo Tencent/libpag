@@ -186,19 +186,6 @@ export class VideoReader {
     return this.videoEl;
   }
 
-  public renderToTexture(GL: EmscriptenGL, textureID: number) {
-    if (!this.videoEl || this.videoEl.readyState < 2) return;
-    if (this.getError() !== null) return;
-    try {
-      const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
-      gl.bindTexture(gl.TEXTURE_2D, GL.textures[textureID]);
-      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
-      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, this.videoEl);
-    } catch (e) {
-      this.setError(e);
-    }
-  }
-
   // Only work in web worker version
   public async generateBitmap() {
     // Batter than createImageBitmap from video element in benchmark
