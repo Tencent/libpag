@@ -66,9 +66,13 @@ PAG_API void Java_org_libpag_PAGSurface_nativeInit(JNIEnv* env, jclass clazz) {
   Config_Class = env->FindClass("android/graphics/Bitmap$Config");
   Config_ARGB_888 =
       env->GetStaticFieldID(Config_Class.get(), "ARGB_8888", "Landroid/graphics/Bitmap$Config;");
+  BitmapConfig_equals = env->GetMethodID(Config_Class.get(), "equals", "(Ljava/lang/Object;)Z");
   Config_HARDWARE =
       env->GetStaticFieldID(Config_Class.get(), "HARDWARE", "Landroid/graphics/Bitmap$Config;");
-  BitmapConfig_equals = env->GetMethodID(Config_Class.get(), "equals", "(Ljava/lang/Object;)Z");
+  // Config_HARDWARE may be nullptr.
+  if (env->ExceptionCheck()) {
+    env->ExceptionClear();
+  }
 }
 
 PAG_API void Java_org_libpag_PAGSurface_nativeRelease(JNIEnv* env, jobject thiz) {
@@ -247,11 +251,13 @@ extern "C" JNIEXPORT jboolean JNICALL Java_org_libpag_PAGSurface_copyPixelsTo(JN
   if (isRecycled) {
     return false;
   }
-  auto config = env->CallObjectMethod(jBitmap, Bitmap_getConfig);
-  static Global<jobject> HardwareConfig =
-      env->GetStaticObjectField(Config_Class.get(), Config_HARDWARE);
-  if (env->CallBooleanMethod(config, BitmapConfig_equals, HardwareConfig.get())) {
-    return readPixelsToHardwareBuffer(env, surface, jBitmap);
+  if (Config_HARDWARE != nullptr) {
+    auto config = env->CallObjectMethod(jBitmap, Bitmap_getConfig);
+    static Global<jobject> HardwareConfig =
+        env->GetStaticObjectField(Config_Class.get(), Config_HARDWARE);
+    if (env->CallBooleanMethod(config, BitmapConfig_equals, HardwareConfig.get())) {
+      return readPixelsToHardwareBuffer(env, surface, jBitmap);
+    }
   }
   unsigned char* newBitmapPixels;
   auto imageInfo = GetImageInfo(env, jBitmap);

@@ -28,6 +28,10 @@
     *;
 }
 
+-keeppackagenames org.libpag.*
+
+-keeppackagenames org.extra.*
+
 -keepclasseswithmembers class ** {
     native <methods>;
 }
