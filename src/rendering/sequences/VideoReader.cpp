@@ -22,6 +22,7 @@
 #include "tgfx/utils/Clock.h"
 
 namespace pag {
+
 static constexpr int MAX_TRY_DECODE_COUNT = 100;
 static constexpr int FORCE_SOFTWARE_SIZE = 160000;  // 400x400
 
