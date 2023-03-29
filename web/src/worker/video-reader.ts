@@ -33,14 +33,6 @@ export class WorkerVideoReader {
     return this.bitmapImage;
   }
 
-  public renderToTexture(GL: EmscriptenGL, textureID: number) {
-    if (!this.bitmap) return;
-    const gl = GL.currentContext?.GLctx as WebGLRenderingContext;
-    gl.bindTexture(gl.TEXTURE_2D, GL.textures[textureID]);
-    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 4);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.bitmap);
-  }
-
   public onDestroy() {
     self.postMessage({ name: 'VideoReader.onDestroy', args: [this.proxyId] });
   }

@@ -8,7 +8,7 @@ export const isCanvas = (element: any) => isOffscreenCanvas(element) || element 
 
 export const getCanvas2D = (width: number, height: number) => {
   let canvas = canvasPool.pop() || createCanvas2D();
-  if(canvas != null){
+  if (canvas !== null) {
     canvas.width = width;
     canvas.height = height;
   }

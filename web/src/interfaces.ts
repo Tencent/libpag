@@ -10,7 +10,6 @@ export interface VideoReader {
   isSought: boolean;
   isPlaying: boolean;
   prepare: (targetFrame: number, playbackRate: number) => Promise<void>;
-  renderToTexture: (GL: EmscriptenGL, textureID: number) => void;
   getError: () => Promise<any>;
   onDestroy: () => void;
   play: () => Promise<void>;
@@ -19,12 +18,12 @@ export interface VideoReader {
 }
 
 export type VideoDecoderConstructor = new (
-    mp4Data: Uint8Array,
-    width: number,
-    height: number,
-    frameRate: number,
-    staticTimeRanges: TimeRange[],
-  ) => VideoReader;
+  mp4Data: Uint8Array,
+  width: number,
+  height: number,
+  frameRate: number,
+  staticTimeRanges: TimeRange[],
+) => VideoReader;
 
 export interface FontMetrics {
   ascent: number;
@@ -59,6 +58,4 @@ export interface WebMask {
   clear: () => void;
 }
 
-export type WebMaskConstructor = new (
-  canvas: HTMLCanvasElement | OffscreenCanvas,
-) => WebMask;
+export type WebMaskConstructor = new (canvas: HTMLCanvasElement | OffscreenCanvas) => WebMask;
