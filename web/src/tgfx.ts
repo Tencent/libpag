@@ -2,7 +2,7 @@ import { getCanvas2D, releaseCanvas2D } from './utils/canvas';
 import { writeBufferToWasm } from './utils/buffer';
 import { BitmapImage } from './core/bitmap-image';
 
-import type { EmscriptenGL, PAG, Rect } from './types';
+import type { EmscriptenGL, PAG } from './types';
 import type { wx } from './wechat/interfaces';
 
 declare const wx: wx;
