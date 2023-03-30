@@ -371,7 +371,7 @@ static NSString* RemovePathVariableComponent(NSString* original) {
 }
 
 - (void)onAnimationEnd {
-  [self pause];
+  self.isPlaying = FALSE;
   [listenersLock lock];
   NSHashTable* copiedListeners = listeners.copy;
   [listenersLock unlock];
