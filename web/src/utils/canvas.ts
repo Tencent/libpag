@@ -1,4 +1,5 @@
 import { CANVAS_POOL_MAX_SIZE } from '../constant';
+import { SAFARI } from './ua';
 
 const canvasPool = new Array<HTMLCanvasElement | OffscreenCanvas>();
 
@@ -22,6 +23,14 @@ export const releaseCanvas2D = (canvas: HTMLCanvasElement | OffscreenCanvas) => 
 };
 
 const createCanvas2D = () => {
+  /**
+   * Safari browser does not support OffscreenCanvas before version 16.4.
+   * After version 16.4, OffscreenCanvas is supported, but type checking errors still exist for WebGL interfaces on OffscreenCanvas.
+   * Therefore, HTMLCanvas Element is used uniformly in Safari.
+   */
+  if (SAFARI) {
+    return document.createElement('canvas');
+  }
   try {
     const offscreenCanvas = new OffscreenCanvas(0, 0);
     const context = offscreenCanvas.getContext('2d') as OffscreenCanvasRenderingContext2D;
