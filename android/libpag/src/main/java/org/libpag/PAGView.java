@@ -671,6 +671,7 @@ public class PAGView extends TextureView implements TextureView.SurfaceTextureLi
         progressExplicitlySet = true;
         long duration = pagPlayer.duration();
         animator.setDuration(duration / 1000);
+        animator.setCurrentPlayTime(0);
     }
 
     /**

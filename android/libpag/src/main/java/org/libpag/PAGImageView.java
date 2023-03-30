@@ -223,6 +223,7 @@ public class PAGImageView extends View {
         }
         _composition = newComposition;
         progressExplicitlySet = true;
+        animator.setCurrentPlayTime(0);
         releaseAllTask();
         _matrix = null;
         refreshDecodeInfo();
@@ -250,6 +251,7 @@ public class PAGImageView extends View {
         _pagFilePath = path;
         _maxFrameRate = maxFrameRate;
         progressExplicitlySet = true;
+        animator.setCurrentPlayTime(0);
         releaseAllTask();
         _matrix = null;
         refreshDecodeInfo();

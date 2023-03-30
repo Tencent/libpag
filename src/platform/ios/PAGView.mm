@@ -354,6 +354,7 @@ void DestoryFlushQueue() {
   }
   [pagPlayer setComposition:newComposition];
   self.progressExplicitlySet = TRUE;
+  [valueAnimator setCurrentPlayTime:0];
   [valueAnimator setDuration:[pagPlayer duration]];
 }
 
