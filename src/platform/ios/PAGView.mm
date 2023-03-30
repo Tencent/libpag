@@ -297,7 +297,8 @@ void DestoryFlushQueue() {
 - (void)play {
   self.isPlaying = TRUE;
   if ([valueAnimator getAnimatedFraction] == 1.0) {
-    [self setProgress:0];
+    int64_t currentPlayTime = (int64_t)([pagPlayer getProgress] * [pagPlayer duration]);
+    [valueAnimator setCurrentPlayTime:currentPlayTime];
   }
   [self doPlay];
 }
