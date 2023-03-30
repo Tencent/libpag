@@ -259,6 +259,7 @@ static NSString* RemovePathVariableComponent(NSString* original) {
   self.fileHeight = [pagComposition height];
   self.frameRate = MIN(maxFrameRate, [pagComposition frameRate]);
   numFrames = [pagComposition duration] * self.frameRate / 1000000;
+  [valueAnimator setCurrentPlayTime:0];
   [valueAnimator setDuration:[pagComposition duration]];
 
   [self reset];
@@ -509,6 +510,9 @@ static NSString* RemovePathVariableComponent(NSString* original) {
   NSBlockOperation* operation = [NSBlockOperation blockOperationWithBlock:^{
     imageViewLock.lock();
     NSInteger frameIndex = floor([valueAnimator getAnimatedFraction] * numFrames);
+    if (frameIndex >= numFrames) {
+      frameIndex = numFrames - 1;
+    }
     if (self.currentFrameIndex == frameIndex) {
       [self releaseSelf];
       imageViewLock.unlock();
@@ -833,7 +837,6 @@ static NSString* RemovePathVariableComponent(NSString* original) {
 }
 
 - (NSUInteger)currentFrame {
-  std::lock_guard<std::mutex> autoLock(imageViewLock);
   if (self.currentFrameExplicitlySet >= 0) {
     return self.currentFrameExplicitlySet;
   }
