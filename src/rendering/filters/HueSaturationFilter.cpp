@@ -76,7 +76,7 @@ static const char FRAGMENT_SHADER[] = R"(
                 rgbColor = HSVtoRGB(hsvColor);
                 rgbColor += mColorizeLightness;
             }
-            gl_FragColor = vec4(rgbColor, color.a);
+            gl_FragColor = vec4(rgbColor * color.a, color.a);
         }
     )";
 
