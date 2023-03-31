@@ -173,6 +173,9 @@ static int64_t GetCurrentTimeUS() {
     lock.unlock();
     return;
   }
+  if (repeatedTimes == (repeatCount + 1)) {
+    repeatedTimes = 0;
+  }
   self.animatorId = [PAGValueAnimator AddAnimator:self];
   startTime = GetCurrentTimeUS() - playTime % duration - repeatedTimes * duration;
   animatedFraction = static_cast<double>(playTime) / duration;
