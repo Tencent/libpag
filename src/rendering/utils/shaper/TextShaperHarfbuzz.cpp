@@ -21,6 +21,7 @@
 #include "TextShaperHarfbuzz.h"
 #include <list>
 #include <map>
+#include "base/utils/Log.h"
 #include "hb.h"
 #include "rendering/FontManager.h"
 
@@ -154,7 +155,9 @@ static std::vector<std::tuple<uint32_t, uint32_t, uint32_t>> Shape(
   }
 
   auto hbBuffer = std::shared_ptr<hb_buffer_t>(hb_buffer_create(), hb_buffer_destroy);
-  if (hbBuffer == nullptr) {
+  if (!hb_buffer_allocation_successful(hbBuffer.get())) {
+    LOGI("TextShaperHarfbuzz::shape text = %s, alloc harfbuzz(%p) failure", text.c_str(),
+         hbBuffer.get());
     return {};
   }
   hb_buffer_add_utf8(hbBuffer.get(), text.data(), -1, 0, -1);
