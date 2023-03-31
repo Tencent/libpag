@@ -709,9 +709,9 @@ static NSString* RemovePathVariableComponent(NSString* original) {
 - (void)setContentScaleFactor:(CGFloat)scaleFactor {
   CGFloat oldScaleFactor = self.contentScaleFactor;
   [super setContentScaleFactor:scaleFactor];
-  std::lock_guard<std::mutex> autoLock(imageViewLock);
   if (oldScaleFactor != scaleFactor) {
     if (pagComposition || filePath) {
+      std::lock_guard<std::mutex> autoLock(imageViewLock);
       [self reset];
     }
   }
@@ -756,7 +756,15 @@ static NSString* RemovePathVariableComponent(NSString* original) {
   if (!self.isVisible) {
     return;
   }
-  int64_t playTime = (int64_t)([valueAnimator getAnimatedFraction] * [valueAnimator duration]);
+  float progress = [valueAnimator getAnimatedFraction];
+  if (progress == 1.0) {
+    if (self.currentFrameExplicitlySet >= 0) {
+      progress = self.currentFrameExplicitlySet * 1.0 / numFrames;
+    } else {
+      progress = 0;
+    }
+  }
+  int64_t playTime = (int64_t)(progress * [valueAnimator duration]);
   [valueAnimator setCurrentPlayTime:playTime];
   [valueAnimator start];
 }
