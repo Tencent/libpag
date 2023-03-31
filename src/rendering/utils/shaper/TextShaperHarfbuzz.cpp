@@ -155,7 +155,7 @@ static std::vector<std::tuple<uint32_t, uint32_t, uint32_t>> Shape(
   }
 
   auto hbBuffer = std::shared_ptr<hb_buffer_t>(hb_buffer_create(), hb_buffer_destroy);
-  if (hb_buffer_allocation_successful(hbBuffer.get())) {
+  if (!hb_buffer_allocation_successful(hbBuffer.get())) {
     LOGI("TextShaperHarfbuzz::shape text = %s, alloc harfbuzz(%p) failure", text.c_str(),
          hbBuffer.get());
     return {};
