@@ -56,10 +56,13 @@ std::shared_ptr<hb_face_t> CreateHBFace(const std::shared_ptr<tgfx::Typeface>& t
                        static_cast<void*>(wrapper),
                        [](void* ctx) { delete reinterpret_cast<PtrWrapper<tgfx::Data>*>(ctx); }),
         hb_blob_destroy);
+    if (hb_blob_get_empty() == blob.get()) {
+      return nullptr;
+    }
     hb_blob_make_immutable(blob.get());
     if (hb_face_count(blob.get()) > 0) {
       hbFace = std::shared_ptr<hb_face_t>(hb_face_create(blob.get(), 0), hb_face_destroy);
-      if (hbFace && hb_face_get_glyph_count(hbFace.get()) == 0) {
+      if (hb_face_get_empty() == hbFace.get() || hb_face_get_glyph_count(hbFace.get()) == 0) {
         hbFace = nullptr;
       }
     }
@@ -71,6 +74,9 @@ std::shared_ptr<hb_face_t> CreateHBFace(const std::shared_ptr<tgfx::Typeface>& t
             HBGetTable, static_cast<void*>(wrapper),
             [](void* ctx) { delete reinterpret_cast<PtrWrapper<tgfx::Typeface>*>(ctx); }),
         hb_face_destroy);
+    if (hb_face_get_empty() == hbFace.get()) {
+      return nullptr;
+    }
     hb_face_set_index(hbFace.get(), 0);
   }
   if (hbFace == nullptr) {
@@ -105,6 +111,9 @@ class HBLockedFontCache {
     return (*cache)[fontId];
   }
   std::shared_ptr<hb_font_t> insert(uint32_t fontId, std::shared_ptr<hb_font_t> hbFont) {
+    if (hb_font_get_empty() == hbFont.get()) {
+      return nullptr;
+    }
     static const int MaxCacheSize = 100;
     cache->insert(std::make_pair(fontId, std::move(hbFont)));
     lru->push_front(fontId);
