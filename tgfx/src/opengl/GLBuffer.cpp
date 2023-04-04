@@ -34,6 +34,9 @@ std::shared_ptr<GpuBuffer> GpuBuffer::Make(Context* context, BufferType bufferTy
   if (buffer == nullptr || size == 0) {
     return nullptr;
   }
+  // 防止前面产生的GLError，导致后面CheckGLError逻辑返回错误结果
+  CheckGLError(context);
+
   auto target = bufferType == BufferType::Index ? GL_ELEMENT_ARRAY_BUFFER : GL_ARRAY_BUFFER;
   ScratchKey scratchKey = {};
   ComputeScratchKey(&scratchKey, bufferType);
