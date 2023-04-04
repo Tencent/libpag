@@ -17,14 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLRestorer.h"
+#include <string>
 #include "base/utils/Log.h"
 
 namespace pag {
 
-static void ClearGLError(const tgfx::GLFunctions* gl, int line) {
+static void ClearGLError(const tgfx::GLFunctions* gl, const std::string& description) {
   unsigned errorCode;
   while ((errorCode = gl->getError()) != GL_NO_ERROR) {
-    LOGE("ClearGLError: %d at GLRestorer: %d", errorCode, line);
+    LOGE("ClearGLError: %d at GLRestorer %s", errorCode, description.c_str());
   }
 }
 
@@ -33,7 +34,7 @@ GLRestorer::GLRestorer(const tgfx::GLFunctions* gl) : gl(gl) {
     return;
   }
   // 同一个Context情况下，防止外部产生的GLError，导致后面CheckGLError逻辑返回错误结果
-  ClearGLError(gl, __LINE__);
+  ClearGLError(gl, "enter");
 
   gl->getIntegerv(GL_VIEWPORT, viewport);
   scissorEnabled = gl->isEnabled(GL_SCISSOR_TEST);
@@ -96,6 +97,6 @@ GLRestorer::~GLRestorer() {
   }
 
   // 同一个Context情况下，防止PAG内部产生的GLError，影响到外部渲染
-  ClearGLError(gl, __LINE__);
+  ClearGLError(gl, "leave");
 }
 }  // namespace pag
