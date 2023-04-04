@@ -165,7 +165,7 @@ Check out the following projects to learn how to use the APIs of libpag:
 - [Android API Reference](https://pag.art/api.html#/apis/android/org/libpag/package-summary.html)
 - [Web API Reference](https://pag.art/api.html#/apis/web/)
 
-You can find other docs on [pag.art](https://github.com/Tencent/libpag/wiki/%E7%A7%BB%E5%8A%A8%E7%AB%AF%E6%8E%A5%E5%85%A5%E6%8C%87%E5%8D%97)
+You can find other docs on [Wiki](https://github.com/Tencent/libpag/wiki)
 
 ## Development
 
