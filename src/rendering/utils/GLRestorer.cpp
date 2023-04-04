@@ -22,18 +22,11 @@
 
 namespace pag {
 
-static bool CheckGLError(const tgfx::GLFunctions* gl, const std::string& file, int line) {
-  bool success = true;
+static void ClearGLError(const tgfx::GLFunctions* gl, int line) {
   unsigned errorCode;
   while ((errorCode = gl->getError()) != GL_NO_ERROR) {
-    success = false;
-    if (file.empty()) {
-      LOGE("CheckGLError: %d", errorCode);
-    } else {
-      LOGE("CheckGLError: %d at %s:%d", errorCode, file.c_str(), line);
-    }
+    LOGE("ClearGLError: %d at GLRestorer: %d", errorCode, line);
   }
-  return success;
 }
 
 GLRestorer::GLRestorer(const tgfx::GLFunctions* gl) : gl(gl) {
@@ -41,7 +34,7 @@ GLRestorer::GLRestorer(const tgfx::GLFunctions* gl) : gl(gl) {
     return;
   }
   // 同一个Context情况下，防止外部产生的GLError，导致后面CheckGLError逻辑返回错误结果
-  CheckGLError(gl, __FILE__, __LINE__);
+  ClearGLError(gl, __LINE__);
 
   gl->getIntegerv(GL_VIEWPORT, viewport);
   scissorEnabled = gl->isEnabled(GL_SCISSOR_TEST);
@@ -104,6 +97,6 @@ GLRestorer::~GLRestorer() {
   }
 
   // 同一个Context情况下，防止PAG内部产生的GLError，影响到外部渲染
-  CheckGLError(gl, __FILE__, __LINE__);
+  ClearGLError(gl, __LINE__);
 }
 }  // namespace pag
