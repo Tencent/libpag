@@ -1,10 +1,41 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making libpag available.
+//
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//
+//  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+//  except in compliance with the License. You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.˙
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
 #include "GLRestorer.h"
+#include <string>
+#include "base/utils/Log.h"
 
 namespace pag {
+
+static void ClearGLError(const tgfx::GLFunctions* gl, const std::string& description) {
+  unsigned errorCode;
+  while ((errorCode = gl->getError()) != GL_NO_ERROR) {
+    LOGE("ClearGLError: %d at GLRestorer %s", errorCode, description.c_str());
+  }
+}
+
 GLRestorer::GLRestorer(const tgfx::GLFunctions* gl) : gl(gl) {
   if (gl == nullptr) {
     return;
   }
+  // 同一个Context情况下，防止外部产生的GLError，导致后面CheckGLError逻辑返回错误结果
+  ClearGLError(gl, "enter");
+
   gl->getIntegerv(GL_VIEWPORT, viewport);
   scissorEnabled = gl->isEnabled(GL_SCISSOR_TEST);
   if (scissorEnabled) {
@@ -64,5 +95,8 @@ GLRestorer::~GLRestorer() {
   } else {
     gl->disable(GL_BLEND);
   }
+
+  // 同一个Context情况下，防止PAG内部产生的GLError，影响到外部渲染
+  ClearGLError(gl, "leave");
 }
 }  // namespace pag
