@@ -30,7 +30,7 @@ import org.extra.tools.LibraryLoadUtils;
 
 import java.io.File;
 import java.util.Arrays;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.HashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 class CacheManager {
@@ -119,7 +119,8 @@ class CacheManager {
         }
     }
 
-    ConcurrentHashMap<String, CacheItem> pagCaches = new ConcurrentHashMap<>();
+    HashMap<String, CacheItem> pagCaches = new HashMap();
+    HashMap<String, Integer> pagCachesReferenceCount = new HashMap();
 
     private CacheManager() {
     }
@@ -187,11 +188,11 @@ class CacheManager {
     }
 
     protected CacheItem getOrCreate(String key, int width, int height, int frameCount) {
-        CacheItem cacheItem = pagCaches.get(key);
-        if (cacheItem != null) {
-            return cacheItem;
-        }
         synchronized (CacheManager.this) {
+            CacheItem cacheItem = pagCaches.get(key);
+            if (cacheItem != null) {
+                return cacheItem;
+            }
             cacheItem = pagCaches.get(key);
             if (cacheItem == null) {
                 cacheItem = CacheItem.Make(getPath(key), width, height, frameCount);
@@ -200,27 +201,36 @@ class CacheManager {
                 return null;
             }
             pagCaches.put(key, cacheItem);
+            Integer i = pagCachesReferenceCount.get(key);
+            if (i == null) {
+                i = 0;
+            }
+            pagCachesReferenceCount.put(key, i + 1);
+            return cacheItem;
         }
-        return cacheItem;
-    }
-
-    protected CacheItem get(String key) {
-        return pagCaches.get(key);
-    }
-
-    protected void put(String key, CacheItem item) {
-        pagCaches.put(key, item);
     }
 
     protected void remove(String key) {
-        CacheItem item = pagCaches.get(key);
-        if (item == null) {
-            return;
+        synchronized (this) {
+            Integer i = pagCachesReferenceCount.get(key);
+            if (i == null) {
+                return;
+            }
+            if (--i <= 0) {
+                pagCachesReferenceCount.remove(key);
+                CacheItem item = pagCaches.get(key);
+                if (item == null) {
+                    return;
+                }
+                item.writeLock();
+                item.release();
+                pagCaches.remove(key);
+                item.writeUnlock();
+                pagCachesReferenceCount.remove(key);
+            } else {
+                pagCachesReferenceCount.put(key, i);
+            }
         }
-        item.writeLock();
-        item.release();
-        pagCaches.remove(key);
-        item.writeUnlock();
     }
 
     protected String getPath(String key) {

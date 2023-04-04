@@ -55,6 +55,7 @@ std::shared_ptr<ImageCache> ImageCache::Make(const std::string& path, int width,
       delete[] static_cast<int*>(headerBuffer);
       return nullptr;
     }
+    utimensat(0, path.c_str(), 0, 0);
   }
   auto cache = std::make_shared<ImageCache>();
   cache->headerBuffer = headerBuffer;
