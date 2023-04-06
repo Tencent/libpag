@@ -67,7 +67,6 @@ void TimeStretchTest(std::string path, std::string methodName, float scaleFactor
   auto pagImage = MakePAGImage("resources/apitest/test_timestretch.png");
   TestPAGFile->replaceImage(0, pagImage);
 
-  int index = 0;
   for (const auto& currentFrame : array) {
     pagPlayer->setProgress((currentFrame + 0.1) * 1.0 / totalFrames);
     pagPlayer->getProgress();
@@ -78,7 +77,6 @@ void TimeStretchTest(std::string path, std::string methodName, float scaleFactor
     if (!compareResult) {
       errorMsg += (std::to_string(currentFrame) + ";");
     }
-    index++;
   }
   EXPECT_EQ(errorMsg, "") << fileName << " frame fail";
 }

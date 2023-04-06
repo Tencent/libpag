@@ -6,7 +6,7 @@
 [![Actions Status](https://github.com/Tencent/libpag/workflows/autotest/badge.svg?branch=main)](https://github.com/Tencent/libpag/actions)
 [![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/Tencent/libpag)](https://github.com/Tencent/libpag/releases)
 
-English | [简体中文](./README.zh_CN.md) | [Homepage](https://pag.art)
+English | [简体中文](https://github.com/Tencent/libpag/wiki) | [Homepage](https://pag.art)
 
 ## Introduction
 
@@ -165,7 +165,7 @@ Check out the following projects to learn how to use the APIs of libpag:
 - [Android API Reference](https://pag.art/api.html#/apis/android/org/libpag/package-summary.html)
 - [Web API Reference](https://pag.art/api.html#/apis/web/)
 
-You can find other docs on [pag.art](https://pag.art/docs/sdk.html)
+You can find other docs on [Wiki](https://github.com/Tencent/libpag/wiki)
 
 ## Development
 

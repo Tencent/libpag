@@ -38,9 +38,11 @@ class PAGImageViewHelper {
     private static PAGViewHandler g_PAGViewHandler = null;
     private static HandlerThread g_PAGViewThread = null;
     private static volatile int g_HandlerThreadCount = 0;
-    private static final int MSG_FLUSH = 0;
-    protected static final int MSG_INIT_CACHE = 1;
-    private static final int MSG_HANDLER_THREAD_QUITE = 2;
+    private static final int MSG_HANDLER_THREAD_QUITE = 0;
+    protected static final int MSG_FLUSH = 1;
+    protected static final int MSG_CLOSE_CACHE = 2;
+    protected static final int MSG_INIT_DECODER = 3;
+    protected static final int MSG_REFRESH_DECODER = 4;
 
     protected static synchronized void StartHandlerThread() {
         g_HandlerThreadCount++;
@@ -65,6 +67,13 @@ class PAGImageViewHelper {
             return;
         }
         SendMessage(MSG_HANDLER_THREAD_QUITE, null);
+    }
+
+    protected static void RemoveMessage(int msgId, Object obj) {
+        if (g_PAGViewHandler == null) {
+            return;
+        }
+        g_PAGViewHandler.removeMessages(msgId, obj);
     }
 
     protected static void SendMessage(int msgId, Object obj) {
@@ -197,8 +206,20 @@ class PAGImageViewHelper {
             HardwareBuffer hardwareBuffer = HardwareBuffer.create(width, height,
                     HardwareBuffer.RGBA_8888, 1,
                     HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE | HardwareBuffer.USAGE_CPU_READ_OFTEN | HardwareBuffer.USAGE_CPU_WRITE_OFTEN);
-            return Bitmap.wrapHardwareBuffer(hardwareBuffer,
+            if (hardwareBuffer == null) {
+                return null;
+            }
+            Bitmap bitmap = Bitmap.wrapHardwareBuffer(hardwareBuffer,
                     ColorSpace.get(ColorSpace.Named.SRGB));
+            try {
+                // HardwareBuffer will automatically close when it is finalized, but StrictMode
+                // will incorrectly think it is not closed.
+                // So we manually call close to avoid printing annoying logs.
+                hardwareBuffer.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return bitmap;
 
         } else {
             return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
@@ -248,20 +269,12 @@ class PAGImageViewHelper {
         public void handleMessage(Message msg) {
             super.handleMessage(msg);
             switch (msg.arg1) {
-                case MSG_INIT_CACHE:
+                case MSG_INIT_DECODER: {
                     PAGImageView imageView = (PAGImageView) msg.obj;
-                    if (!imageView.decoderInfo.isValid()) {
-                        return;
-                    }
-                    imageView.lastKeyItem = imageView.fetchKeyFrame();
-                    if (imageView.cacheItem != null || imageView.lastKeyItem == null) {
-                        return;
-                    }
-                    imageView.cacheItem = imageView.cacheManager.getOrCreate(imageView.lastKeyItem.keyPrefixMD5,
-                            imageView.decoderInfo._width, imageView.decoderInfo._height,
-                            imageView.decoderInfo.numFrames);
+                    imageView.initDecoderInfo();
                     break;
-                case MSG_FLUSH:
+                }
+                case MSG_FLUSH: {
                     List<PAGImageView> tempList;
                     synchronized (lock) {
                         tempList = new ArrayList<>(needsUpdateViews);
@@ -280,7 +293,25 @@ class PAGImageViewHelper {
                         flushedViews.add(pagView);
                     }
                     break;
-                case MSG_HANDLER_THREAD_QUITE:
+                }
+                case MSG_CLOSE_CACHE: {
+                    PAGImageView imageView = (PAGImageView) msg.obj;
+                    if (imageView != null) {
+                        imageView.releaseCurrentDiskCache();
+                        if (imageView.decoderInfo != null) {
+                            imageView.decoderInfo.reset();
+                        }
+                    }
+                    break;
+                }
+                case MSG_REFRESH_DECODER: {
+                    PAGImageView imageView = (PAGImageView) msg.obj;
+                    if (imageView != null) {
+                        imageView.refreshDecodeInfo();
+                    }
+                    break;
+                }
+                case MSG_HANDLER_THREAD_QUITE: {
                     CacheManager manager = CacheManager.Get(null);
                     if (manager != null) {
                         manager.autoClean();
@@ -292,6 +323,7 @@ class PAGImageViewHelper {
                         }
                     });
                     break;
+                }
                 default:
                     break;
             }
