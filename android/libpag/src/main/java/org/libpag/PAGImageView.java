@@ -43,6 +43,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.libpag.PAGImageViewHelper.CacheInfo;
 import org.libpag.PAGImageViewHelper.DecoderInfo;
@@ -62,9 +63,10 @@ public class PAGImageView extends View {
     private PAGComposition _composition;
     private String _pagFilePath;
     private int _scaleMode = PAGScaleMode.LetterBox;
-    private Matrix _matrix;
+    private volatile Matrix _matrix;
     private ArrayList<WeakReference<Future>> saveCacheTasks = new ArrayList<>();
     private float renderScale = 1.0f;
+    private AtomicBoolean freezeDraw = new AtomicBoolean(false);
     protected volatile CacheManager.CacheItem cacheItem;
     protected volatile KeyItem lastKeyItem;
     protected volatile DecoderInfo decoderInfo = new DecoderInfo();
@@ -221,12 +223,13 @@ public class PAGImageView extends View {
         if (newComposition == _composition) {
             return;
         }
+        freezeDraw.set(true);
         _composition = newComposition;
         progressExplicitlySet = true;
         animator.setCurrentPlayTime(0);
         releaseAllTask();
         _matrix = null;
-        refreshDecodeInfo();
+        PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_REFRESH_DECODER, this);
         renderBitmap = null;
     }
 
@@ -245,17 +248,18 @@ public class PAGImageView extends View {
         if (path == null) {
             return false;
         }
-        if (path.equals(_pagFilePath) && _maxFrameRate == maxFrameRate) {
+        if (path.equals(_pagFilePath) && _maxFrameRate == maxFrameRate && decoderInfo.isValid()) {
             return true;
         }
+        freezeDraw.set(true);
         _pagFilePath = path;
         _maxFrameRate = maxFrameRate;
         progressExplicitlySet = true;
         animator.setCurrentPlayTime(0);
         releaseAllTask();
         _matrix = null;
-        refreshDecodeInfo();
         renderBitmap = null;
+        PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_REFRESH_DECODER, this);
         return true;
     }
 
@@ -292,19 +296,17 @@ public class PAGImageView extends View {
             if (progressExplicitlySet) {
                 progressExplicitlySet = false;
                 animator.setCurrentPlayTime((long) (decoderInfo.duration * 0.001f * PAGImageViewHelper.FrameToProgress(_currentFrame, decoderInfo.numFrames)));
-            } else {
-                int currentFrame = PAGImageViewHelper.ProgressToFrame(animator.getAnimatedFraction(), decoderInfo.numFrames);
-                if (currentFrame == _currentFrame && !forceFlush) {
-                    return false;
-                }
-                forceFlush = false;
-                _currentFrame = currentFrame;
             }
+            int currentFrame = PAGImageViewHelper.ProgressToFrame(animator.getAnimatedFraction(), decoderInfo.numFrames);
+            if (currentFrame == _currentFrame && !forceFlush) {
+                return false;
+            }
+            forceFlush = false;
+            _currentFrame = currentFrame;
             if (!handleFrame(_currentFrame)) {
                 return false;
             }
             postInvalidate();
-
         }
         notifyAnimationUpdate();
         return true;
@@ -392,7 +394,7 @@ public class PAGImageView extends View {
         }
     }
 
-    private void refreshDecodeInfo() {
+    protected void refreshDecodeInfo() {
         if (decoderInfo != null) {
             decoderInfo.reset();
         }
@@ -402,15 +404,10 @@ public class PAGImageView extends View {
     }
 
     private static ThreadPoolExecutor saveCacheExecutors;
-    private static ThreadPoolExecutor fetchCacheExecutors;
 
     private static void InitCacheExecutors() {
-        if (fetchCacheExecutors == null || saveCacheExecutors == null) {
+        if (saveCacheExecutors == null) {
             synchronized (PAGImageView.class) {
-                if (fetchCacheExecutors == null) {
-                    fetchCacheExecutors = new ThreadPoolExecutor(1, 1, 2, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
-                    fetchCacheExecutors.allowCoreThreadTimeOut(true);
-                }
                 if (saveCacheExecutors == null) {
                     saveCacheExecutors = new ThreadPoolExecutor(1, 1, 2, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
                     saveCacheExecutors.allowCoreThreadTimeOut(true);
@@ -503,19 +500,29 @@ public class PAGImageView extends View {
         viewHeight = h;
         width = (int) (renderScale * w);
         height = (int) (renderScale * h);
-        initDecoderInfo();
+        PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_INIT_DECODER, this);
         resumeAnimator();
     }
 
-    private void initDecoderInfo() {
+    protected void initDecoderInfo() {
         if (!decoderInfo.isValid()) {
             if (decoderInfo.initDecoder(getContext(), _composition, _pagFilePath, width, height, _maxFrameRate)) {
                 animator.setDuration(decoderInfo.duration / 1000);
-                PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_INIT_CACHE, this);
+                if (!decoderInfo.isValid()) {
+                    return;
+                }
+                lastKeyItem = fetchKeyFrame();
+                if (cacheItem != null || lastKeyItem == null) {
+                    return;
+                }
+                cacheItem = cacheManager.getOrCreate(lastKeyItem.keyPrefixMD5,
+                        decoderInfo._width, decoderInfo._height,
+                        decoderInfo.numFrames);
             }
         } else {
             refreshMatrixFromScaleMode();
         }
+        freezeDraw.set(false);
     }
 
     private float animationScale = 1.0f;
@@ -587,6 +594,7 @@ public class PAGImageView extends View {
     private boolean isAttachedToWindow = false;
 
     private volatile boolean forceFlush = false;
+
     @Override
     protected void onAttachedToWindow() {
         isAttachedToWindow = true;
@@ -597,9 +605,6 @@ public class PAGImageView extends View {
         synchronized (g_HandlerLock) {
             PAGImageViewHelper.StartHandlerThread();
         }
-        if (cacheManager != null && cacheItem == null) {
-            PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_INIT_CACHE, this);
-        }
         resumeAnimator();
     }
 
@@ -607,25 +612,21 @@ public class PAGImageView extends View {
     protected void onDetachedFromWindow() {
         isAttachedToWindow = false;
         super.onDetachedFromWindow();
+        PAGImageViewHelper.RemoveMessage(PAGImageViewHelper.MSG_FLUSH, this);
         pauseAnimator();
-        synchronized (g_HandlerLock) {
-            PAGImageViewHelper.DestroyHandlerThread();
-        }
         animator.removeUpdateListener(mAnimatorUpdateListener);
         animator.removeListener(mAnimatorListenerAdapter);
         releaseAllTask();
-        releaseCurrentDiskCache();
-        renderBitmap = null;
-        if (decoderInfo != null) {
-            decoderInfo.reset();
+        PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_CLOSE_CACHE, this);
+        synchronized (g_HandlerLock) {
+            PAGImageViewHelper.DestroyHandlerThread();
         }
+        renderBitmap = null;
         bitmapCache.clear();
+        freezeDraw.set(false);
     }
 
     private void releaseAllTask() {
-        if (lastFetchCacheTask != null && lastFetchCacheTask.get() != null) {
-            lastFetchCacheTask.get().cancel(false);
-        }
         for (Iterator<WeakReference<Future>> iterator = saveCacheTasks.iterator(); iterator.hasNext(); ) {
             WeakReference<Future> task = iterator.next();
             if (task.get() != null) {
@@ -633,7 +634,6 @@ public class PAGImageView extends View {
             }
         }
         saveCacheTasks.clear();
-
     }
 
     private Runnable mAnimatorStartRunnable = new Runnable() {
@@ -665,7 +665,7 @@ public class PAGImageView extends View {
             Log.e(TAG, "doPlay: The scale of animator duration is turned off");
             return;
         }
-        initDecoderInfo();
+        PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_INIT_DECODER, this);
         Log.i(TAG, "doPlay");
         animator.setCurrentPlayTime(currentPlayTime);
         startAnimator();
@@ -759,7 +759,7 @@ public class PAGImageView extends View {
         cacheItem.writeUnlock();
     }
 
-    private void releaseCurrentDiskCache() {
+    protected void releaseCurrentDiskCache() {
         if (cacheItem != null) {
             cacheManager.remove(lastKeyItem.keyPrefixMD5);
             cacheItem.writeLock();
@@ -776,10 +776,8 @@ public class PAGImageView extends View {
         }
     }
 
-    private WeakReference<Future> lastFetchCacheTask;
-
     private boolean handleFrame(final int frame) {
-        if (!decoderInfo.isValid()) {
+        if (!decoderInfo.isValid() || freezeDraw.get()) {
             return false;
         }
         KeyItem keyItem = fetchKeyFrame();
@@ -790,6 +788,9 @@ public class PAGImageView extends View {
         }
         lastKeyItem = keyItem;
 
+        if (freezeDraw.get()) {
+            return false;
+        }
         releaseDecoder();
         if (lastKeyItem != null && lastKeyItem.keyPrefixMD5 != null) {
             Bitmap bitmap = bitmapCache.get(frame);
@@ -798,25 +799,22 @@ public class PAGImageView extends View {
             }
             if (cacheItem != null) {
                 try {
-                    if (lastFetchCacheTask != null && lastFetchCacheTask.get() != null && !lastFetchCacheTask.get().isDone()) {
-                        return false;
-                    }
                     if (cacheItem.isCached(frame)) {
                         if (renderBitmap == null || isCacheAllFramesInMemory) {
                             renderBitmap = PAGImageViewHelper.CreateBitmap(decoderInfo._width, decoderInfo._height);
                         }
-                        lastFetchCacheTask = new WeakReference<Future>(fetchCacheExecutors.submit(new Runnable() {
-                            @Override
-                            public void run() {
-                                fetchCache(CacheInfo.Make(PAGImageView.this, lastKeyItem.keyPrefixMD5, frame, renderBitmap));
-                            }
-                        }));
-                        return false;
+                        if (fetchCache(CacheInfo.Make(PAGImageView.this, lastKeyItem.keyPrefixMD5,
+                                frame, renderBitmap))) {
+                        }
+                        return true;
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
             }
+        }
+        if (freezeDraw.get()) {
+            return false;
         }
         if (renderBitmap == null || isCacheAllFramesInMemory) {
             renderBitmap = PAGImageViewHelper.CreateBitmap(decoderInfo._width, decoderInfo._height);
@@ -840,18 +838,18 @@ public class PAGImageView extends View {
         return true;
     }
 
-    protected static void fetchCache(CacheInfo cacheInfo) {
+    protected static boolean fetchCache(CacheInfo cacheInfo) {
         if (cacheInfo.pagImageView == null || TextUtils.isEmpty(cacheInfo.keyPrefix)) {
-            return;
+            return false;
         }
         if (!cacheInfo.pagImageView.inflateBitmapFromDiskCache(cacheInfo)) {
-            return;
+            Log.e(TAG, "inflateBitmapFromDiskCache failed:" + cacheInfo.pagImageView._pagFilePath);
+            return false;
         }
         if (cacheInfo.pagImageView.isCacheAllFramesInMemory) {
             cacheInfo.pagImageView.bitmapCache.put(cacheInfo.frame, cacheInfo.bitmap);
         }
-        cacheInfo.pagImageView.postInvalidate();
-        cacheInfo.pagImageView.notifyAnimationUpdate();
+        return true;
     }
 
     private void notifyAnimationUpdate() {
@@ -881,7 +879,7 @@ public class PAGImageView extends View {
             try {
                 canvas.drawBitmap(renderBitmap, 0, 0, null);
             } catch (Exception e) {
-               e.printStackTrace();
+                e.printStackTrace();
             }
             canvas.restore();
         }
