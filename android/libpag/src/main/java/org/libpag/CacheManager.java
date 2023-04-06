@@ -193,7 +193,6 @@ class CacheManager {
             if (cacheItem != null) {
                 return cacheItem;
             }
-            cacheItem = pagCaches.get(key);
             if (cacheItem == null) {
                 cacheItem = CacheItem.Make(getPath(key), width, height, frameCount);
             }
