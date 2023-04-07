@@ -194,6 +194,7 @@ bool EAGLDevice::makeCurrent(bool force) {
   }
   oldContext = [[EAGLContext currentContext] retain];
   if (oldContext == _eaglContext) {
+    [oldContext release];
     return true;
   }
   if (![EAGLContext setCurrentContext:_eaglContext]) {
