@@ -302,10 +302,10 @@ bool PAGPlayer::flushInternal(BackendSemaphore* signalSemaphore) {
                    renderCache->softwareDecodingTime;
   renderCache->presentingTime -= knownTime;
   renderCache->totalTime = clock.measure("", "presenting");
-  //  auto composition = stage->getRootComposition();
-  //  if (composition) {
-  //    renderCache->printPerformance(composition->currentFrameInternal());
-  //  }
+    auto composition = stage->getRootComposition();
+    if (composition) {
+      renderCache->printPerformance(composition->currentFrameInternal());
+    }
   if (reporter) {
     reporter->recordPerformance(renderCache);
   }

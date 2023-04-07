@@ -13,6 +13,8 @@
 		4D72AC7A22C1071600C60D04 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = F2ED88AC1FCBEDF100555707 /* LaunchScreen.storyboard */; };
 		4D72AC7F22C1071600C60D04 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F2ED88AA1FCBEDF100555707 /* Assets.xcassets */; };
 		4D72AC8122C1071600C60D04 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = F2ED88A71FCBEDF100555707 /* Main.storyboard */; };
+		4DA13E7D29E0451300F85AC6 /* bmp_test.pag in Resources */ = {isa = PBXBuildFile; fileRef = 4DA13E7C29E0451300F85AC6 /* bmp_test.pag */; };
+		4DA13E7F29E04C7300F85AC6 /* animtest_bmp.pag in Resources */ = {isa = PBXBuildFile; fileRef = 4DA13E7E29E04C7300F85AC6 /* animtest_bmp.pag */; };
 		4DE99A4E27BFC16F0003AA0A /* BackgroundView.m in Sources */ = {isa = PBXBuildFile; fileRef = 4DE99A4827BFC16F0003AA0A /* BackgroundView.m */; };
 		4DE99A4F27BFC16F0003AA0A /* BackgroundView.m in Sources */ = {isa = PBXBuildFile; fileRef = 4DE99A4827BFC16F0003AA0A /* BackgroundView.m */; };
 		4DE99A5027BFC16F0003AA0A /* PAGPlayerView.m in Sources */ = {isa = PBXBuildFile; fileRef = 4DE99A4927BFC16F0003AA0A /* PAGPlayerView.m */; };
@@ -98,6 +100,8 @@
 		382C49D8F87E5B9D940647B3 /* Pods-PAGViewerSlim.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-PAGViewerSlim.release.xcconfig"; path = "Pods/Target Support Files/Pods-PAGViewerSlim/Pods-PAGViewerSlim.release.xcconfig"; sourceTree = "<group>"; };
 		4D3B24C424051D4C0044EA7D /* libbz2.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libbz2.tbd; path = usr/lib/libbz2.tbd; sourceTree = SDKROOT; };
 		4D72AC9B22C1071600C60D04 /* PAGViewerTest.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PAGViewerTest.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4DA13E7C29E0451300F85AC6 /* bmp_test.pag */ = {isa = PBXFileReference; lastKnownFileType = file; path = bmp_test.pag; sourceTree = "<group>"; };
+		4DA13E7E29E04C7300F85AC6 /* animtest_bmp.pag */ = {isa = PBXFileReference; lastKnownFileType = file; path = animtest_bmp.pag; sourceTree = "<group>"; };
 		4DA8173F2411FA1000C4FBB3 /* libavutil.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libavutil.a; path = PAGViewer/FFmpeg/lib/libavutil.a; sourceTree = "<group>"; };
 		4DA817402411FA1000C4FBB3 /* libavcodec.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libavcodec.a; path = PAGViewer/FFmpeg/lib/libavcodec.a; sourceTree = "<group>"; };
 		4DA817412411FA1000C4FBB3 /* libavdevice.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libavdevice.a; path = PAGViewer/FFmpeg/lib/libavdevice.a; sourceTree = "<group>"; };
@@ -246,6 +250,8 @@
 		4DC5D301239FD95D007DFA8C /* assets */ = {
 			isa = PBXGroup;
 			children = (
+				4DA13E7C29E0451300F85AC6 /* bmp_test.pag */,
+				4DA13E7E29E04C7300F85AC6 /* animtest_bmp.pag */,
 				F2C7AD5327A91FF600DEBEC6 /* rotation.jpg */,
 				545B97C4278F115200A0112E /* 2J.pag */,
 				545B97CF278F115200A0112E /* alpha_matte.pag */,
@@ -493,9 +499,11 @@
 				545B9811278F115400A0112E /* travel.pag in Resources */,
 				545B9825278F115400A0112E /* text1.pag in Resources */,
 				545B983F278F115400A0112E /* MultiVideoSequenceOffset.pag in Resources */,
+				4DA13E7D29E0451300F85AC6 /* bmp_test.pag in Resources */,
 				545B9817278F115400A0112E /* RootLayerBitmap.pag in Resources */,
 				545B985B278F115400A0112E /* TextAnimatorSmooth.pag in Resources */,
 				545B980B278F115400A0112E /* nodegroup_clip2.pag in Resources */,
+				4DA13E7F29E04C7300F85AC6 /* animtest_bmp.pag in Resources */,
 				545B985F278F115400A0112E /* TextDirection.pag in Resources */,
 				545B9837278F115400A0112E /* TextAnimators.pag in Resources */,
 				545B984F278F115400A0112E /* AudioMarker.pag in Resources */,

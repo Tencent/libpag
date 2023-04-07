@@ -526,6 +526,7 @@ static NSString* RemovePathVariableComponent(NSString* original) {
       imageViewLock.unlock();
       return;
     }
+      CFAbsoluteTime start = CFAbsoluteTimeGetCurrent();
     if (self.currentFrameExplicitlySet >= 0) {
       frameIndex = self.currentFrameExplicitlySet;
       [self updateImageViewFrom:dataRef atIndex:frameIndex];
@@ -534,6 +535,8 @@ static NSString* RemovePathVariableComponent(NSString* original) {
     } else {
       [self updateImageViewFrom:dataRef atIndex:frameIndex];
     }
+      CFAbsoluteTime end = CFAbsoluteTimeGetCurrent();
+      NSLog(@"------timecost:%f, frameIndex:%ld \n", (end - start) * 1000, frameIndex);
     [self releaseSelf];
     imageViewLock.unlock();
   }];

@@ -123,19 +123,36 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
   if (decodeLength == 0) {
     decodeLength = length;
   }
-  NSData* compressData = [self readObjectForKey:index];
-  if (compressData) {
-    return [self deCompressData:pixels
-                      dstLength:length
-                      srcBuffer:(uint8_t*)compressData.bytes
-                      srcLength:compressData.length];
-  }
-  return NO;
+    std::lock_guard<std::mutex> autoLock(diskLock);
+    if (index < 0 || index >= numFrames || fd <= 0) {
+      return NO;
+    }
+    NSRange frameRange = [self frameRangeAtIndex:index];
+    if (frameRange.location == NSNotFound || frameRange.length == NSNotFound) {
+      return NO;
+    }
+    off_t offsset = lseek(fd, frameRange.location, SEEK_SET);
+    if (offsset <= 0) {
+      return NO;
+    }
+    ssize_t dataSize = read(fd, pixels, frameRange.length);
+    if (dataSize <= 0) {
+      return NO;
+    }
+//  NSData* compressData = [self readObjectForKey:index];
+//  if (compressData) {
+//    return [self deCompressData:pixels
+//                      dstLength:length
+//                      srcBuffer:(uint8_t*)compressData.bytes
+//                      srcLength:compressData.length];
+//  }
+  return YES;
 }
 
 - (void)setObject:(uint8_t*)pixels length:(NSInteger)length forKey:(NSInteger)index {
   encodeLength = length;
-  NSData* compressData = [self compressRGBAData:pixels length:length];
+//  NSData* compressData = [self compressRGBAData:pixels length:length];
+    NSData* compressData = [NSData dataWithBytesNoCopy:pixels length:length freeWhenDone:NO];
   if (compressData) {
     __block __typeof(self) weakSelf = self;
     dispatch_async(cacheQueue, ^{

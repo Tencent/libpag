@@ -7,6 +7,7 @@
 #import <OpenGLES/ES2/gl.h>
 #import <OpenGLES/ES2/glext.h>
 #import <libpag/PAGImageLayer.h>
+#import <libpag/PAGImageView.h>
 
 @implementation PAGPlayerView {
     PAGView* pagView;
@@ -14,9 +15,17 @@
     EAGLContext *context;
     PAGSurface * surface;
     PAGPlayer * player;
+    PAGFile* pagFile;
+    PAGImageView* pagImageView;
 }
 
 - (void)loadPAGAndPlay: (NSString*)pagPath{
+    self->pagPath = pagPath;
+
+//    [self testMutiThread];
+}
+
+- (void)testPAGView: (NSString*)pagPath {
     if (pagView != nil) {
         [pagView stop];
         [pagView removeFromSuperview];
@@ -27,18 +36,34 @@
     [self testFile: pagPath];
 
     [self addSubview:pagView];
-    pagView.frame = self.frame;
+//    pagView.frame = self.frame;
+    pagView.frame = CGRectMake(0, 0, [pagFile width]/3, [pagFile height]/3);
     [pagView setRepeatCount:-1];
     [pagView play];
+}
 
-//    [self testMutiThread];
+- (void)testPAGImageView: (NSString*)pagPath {
+    if (pagImageView != nil) {
+        [pagImageView pause];
+        [pagImageView removeFromSuperview];
+        pagImageView = nil;
+    }
+    pagImageView = [[PAGImageView alloc] init];
+    [self testFile: pagPath];
+    [pagImageView setComposition:pagFile];
+    [self addSubview:pagImageView];
+//    pagImageView.frame = self.frame;
+    pagImageView.frame = CGRectMake(0, 0, [pagFile width]/3, [pagFile height]/3);
+    [pagImageView setRepeatCount:-1];
+    [pagImageView play];
+    
 }
 
 - (void)testFile: (NSString*)path {
     NSString* fileName = [path substringToIndex:path.length-4];
     NSString* extension = [path substringFromIndex:path.length-3];
     pagPath = [[NSBundle mainBundle] pathForResource:fileName ofType:extension];
-    PAGFile* pagFile = [PAGFile Load:pagPath];
+    pagFile = [PAGFile Load:pagPath];
 
     if ([pagFile numTexts] > 0) {
         PAGText* textData = [pagFile getTextData:0];
@@ -137,11 +162,8 @@
 }
 
 - (void)touchesBegan:(NSSet*)touches withEvent:(UIEvent*)event {
-    if ([pagView isPlaying]) {
-        [pagView stop];
-    } else {
-        [pagView play];
-    }
+//    [self testPAGView:pagPath];
+    [self testPAGImageView:pagPath];
 
 }
 
