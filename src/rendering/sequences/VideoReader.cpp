@@ -205,6 +205,8 @@ std::unique_ptr<VideoDecoder> VideoReader::makeVideoDecoder() {
     }
     factoryIndex++;
   }
+  LOGE("VideoReader::makeVideoDecoder failure, reset factoryIndex");
+  factoryIndex = 0;
   return nullptr;
 }
 }  // namespace pag

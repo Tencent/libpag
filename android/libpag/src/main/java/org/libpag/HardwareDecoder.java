@@ -7,6 +7,7 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.util.Log;
 
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -14,6 +15,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 class HardwareDecoder {
 
+    private static final String TAG = "HardwareDecoder";
     private static final int SUCCESS = 0;
     private static final int TRY_AGAIN_LATER = -1;
     private static final int ERROR = -2;
@@ -66,6 +68,7 @@ class HardwareDecoder {
                     decoder.configure(mediaFormat, videoSurface.getInputSurface(), null, 0);
                     decoder.start();
                 } catch (Exception e) {
+                    Log.e(TAG, "create and config hardware decoder have exception");
                     if (decoder != null) {
                         decoder.release();
                         decoder = null;
