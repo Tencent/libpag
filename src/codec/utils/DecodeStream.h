@@ -94,79 +94,57 @@ class DecodeStream final {
    * Reads a Boolean value from the byte stream. A signed 8-bit integer is read, and true is
    * returned if the integer is nonzero, false otherwise.
    */
-  bool readBoolean() {
-    return read<bool>();
-  }
+  bool readBoolean();
 
   /**
    * Reads a signed 8-bit integer from the byte stream.
    */
-  int8_t readInt8() {
-    return read<int8_t>();
-  }
+  int8_t readInt8();
 
   /**
    * Reads a unsigned 8-bit integer from the byte stream.
    */
-  uint8_t readUint8() {
-    return read<uint8_t>();
-  }
+  uint8_t readUint8();
 
   /**
    * Reads a signed 16-bit integer from the byte stream.
    */
-  int16_t readInt16() {
-    return read<int16_t>();
-  }
+  int16_t readInt16();
 
   /**
    * Reads a unsigned 16-bit integer from the byte stream.
    */
-  uint16_t readUint16() {
-    return read<uint16_t>();
-  }
+  uint16_t readUint16();
 
   /**
    * Reads a signed 32-bit integer from the byte stream.
    */
-  int32_t readInt32() {
-    return read<int32_t>();
-  }
+  int32_t readInt32();
 
   /**
    * Reads a unsigned 32-bit integer from the byte stream.
    */
-  uint32_t readUint32() {
-    return read<uint32_t>();
-  }
+  uint32_t readUint32();
 
   /**
    * Reads a signed 64-bit integer from the byte stream.
    */
-  int64_t readInt64() {
-    return read<int64_t>();
-  }
+  int64_t readInt64();
 
   /**
    * Reads a unsigned 64-bit integer from the byte stream.
    */
-  uint64_t readUint64() {
-    return read<uint64_t>();
-  }
+  uint64_t readUint64();
 
   /**
    * Reads an IEEE 754 single-precision (32-bit) floating-point number from the byte stream.
    */
-  float readFloat() {
-    return read<float>();
-  }
+  float readFloat();
 
   /**
    * Reads an IEEE 754 double-precision (64-bit) floating-point number from the byte stream.
    */
-  double readDouble() {
-    return read<double>();
-  }
+  double readDouble();
 
   /**
    * Reads the number of data bytes, specified by the length parameter, from the byte stream.
@@ -264,16 +242,5 @@ class DecodeStream final {
   void positionChanged(off_t offset);
 
   bool checkEndOfFile(uint32_t bytesToRead);
-
-  template <typename T>
-  T read() {
-    auto byteSize = static_cast<off_t>(sizeof(T));
-    if (!checkEndOfFile(byteSize)) {
-      auto value = dataView.read<T>(_position);
-      positionChanged(byteSize);
-      return value;
-    }
-    return 0;
-  }
 };
 }  // namespace pag

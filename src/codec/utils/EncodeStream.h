@@ -81,79 +81,57 @@ class EncodeStream final {
    * Writes a Boolean value. A signed 8-bit integer is written according to the value parameter,
    * either 1 if true or 0 if false.
    */
-  void writeBoolean(bool value) {
-    write<bool>(value);
-  }
+  void writeBoolean(bool value);
 
   /**
    * Writes an 8-bit signed integer to the byte stream.
    */
-  void writeInt8(int8_t value) {
-    write<int8_t>(value);
-  }
+  void writeInt8(int8_t value);
 
   /**
    * Writes an unsigned 8-bit integer to the byte stream.
    */
-  void writeUint8(uint8_t value) {
-    write<uint8_t>(value);
-  }
+  void writeUint8(uint8_t value);
 
   /**
    * Writes a 16-bit signed integer to the byte stream.
    */
-  void writeInt16(int16_t value) {
-    write<int16_t>(value);
-  }
+  void writeInt16(int16_t value);
 
   /**
    * Writes an unsigned 16-bit integer to the byte stream.
    */
-  void writeUint16(uint16_t value) {
-    write<uint16_t>(value);
-  }
+  void writeUint16(uint16_t value);
 
   /**
    * Writes a 32-bit signed integer to the byte stream.
    */
-  void writeInt32(int32_t value) {
-    write<int32_t>(value);
-  }
+  void writeInt32(int32_t value);
 
   /**
    * Writes an unsigned 32-bit integer to the byte stream.
    */
-  void writeUint32(uint32_t value) {
-    write<uint32_t>(value);
-  }
+  void writeUint32(uint32_t value);
 
   /**
    * Writes a 64-bit signed integer to the byte stream.
    */
-  void writeInt64(int64_t value) {
-    write<int64_t>(value);
-  }
+  void writeInt64(int64_t value);
 
   /**
    * Writes an unsigned 64-bit integer to the byte stream.
    */
-  void writeUint64(uint64_t value) {
-    write<uint64_t>(value);
-  }
+  void writeUint64(uint64_t value);
 
   /**
    * Writes an IEEE 754 single-precision (32-bit) floating-point number to the byte stream.
    */
-  void writeFloat(float value) {
-    write<float>(value);
-  }
+  void writeFloat(float value);
 
   /**
    * Writes an IEEE 754 double-precision (64-bit) floating-point number to the byte stream.
    */
-  void writeDouble(double value) {
-    write<double>(value);
-  }
+  void writeDouble(double value);
 
   /**
    * Writes a sequence of length bytes from the specified stream, bytes, starting
@@ -261,14 +239,5 @@ class EncodeStream final {
   bool expandCapacity(uint32_t length);
   void bitPositionChanged(off_t offset);
   void positionChanged(off_t offset);
-
-  template <typename T>
-  void write(T value) {
-    auto byteSize = static_cast<off_t>(sizeof(T));
-    if (checkCapacity(byteSize)) {
-      dataView.write<T>(_position, value);
-      positionChanged(byteSize);
-    }
-  }
 };
 }  // namespace pag

@@ -32,6 +32,105 @@ void DecodeStream::skip(uint32_t numBytes) {
   }
 }
 
+bool DecodeStream::readBoolean() {
+  if (!checkEndOfFile(1)) {
+    auto value = dataView.readBoolean(_position);
+    positionChanged(1);
+    return value;
+  }
+  return false;
+}
+
+int8_t DecodeStream::readInt8() {
+  if (!checkEndOfFile(1)) {
+    auto value = dataView.readInt8(_position);
+    positionChanged(1);
+    return value;
+  }
+  return 0;
+}
+
+uint8_t DecodeStream::readUint8() {
+  if (!checkEndOfFile(1)) {
+    auto value = dataView.readUint8(_position);
+    positionChanged(1);
+    return value;
+  }
+  return 0;
+}
+
+int16_t DecodeStream::readInt16() {
+  if (!checkEndOfFile(2)) {
+    auto value = dataView.readInt16(_position);
+    positionChanged(2);
+    return value;
+  }
+  return 0;
+}
+
+uint16_t DecodeStream::readUint16() {
+  if (!checkEndOfFile(2)) {
+    auto value = dataView.readUint16(_position);
+    positionChanged(2);
+    return value;
+  }
+  return 0;
+}
+
+int32_t DecodeStream::readInt32() {
+  if (!checkEndOfFile(4)) {
+    auto value = dataView.readInt32(_position);
+    positionChanged(4);
+    return value;
+  }
+  return 0;
+}
+
+uint32_t DecodeStream::readUint32() {
+  if (!checkEndOfFile(4)) {
+    auto value = dataView.readUint32(_position);
+    positionChanged(4);
+    return value;
+  }
+  return 0;
+}
+
+int64_t DecodeStream::readInt64() {
+  if (!checkEndOfFile(8)) {
+    auto value = dataView.readInt64(_position);
+    positionChanged(8);
+    return value;
+  }
+  return 0;
+}
+
+uint64_t DecodeStream::readUint64() {
+  if (!checkEndOfFile(8)) {
+    auto value = dataView.readUint64(_position);
+    positionChanged(8);
+    return value;
+  }
+  return 0;
+}
+
+float DecodeStream::readFloat() {
+  if (!checkEndOfFile(4)) {
+    auto value = dataView.readFloat(_position);
+    positionChanged(4);
+    return value;
+  }
+  return 0;
+}
+
+double DecodeStream::readDouble() {
+  if (!checkEndOfFile(8)) {
+    auto value = dataView.readDouble(_position);
+    positionChanged(8);
+    return value;
+  }
+  return 0;
+}
+
 DecodeStream DecodeStream::readBytes(uint32_t length) {
   if (!checkEndOfFile(length)) {
     DecodeStream stream(context, dataView.bytes() + _position, length);
