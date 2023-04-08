@@ -21,111 +21,28 @@
 
 namespace pag {
 
-EncodeStream::EncodeStream(StreamContext* context, uint32_t capacity) : context(context) {
-  this->capacity = capacity;
-  bytes = new uint8_t[capacity];
+EncodeStream::EncodeStream(StreamContext* context, uint32_t cap) : context(context) {
+  checkCapacity(cap);
 }
 
 EncodeStream::~EncodeStream() {
   delete[] bytes;
 }
 
-ByteOrder EncodeStream::order() const {
-  return _order;
-}
-
-void EncodeStream::setOrder(pag::ByteOrder order) {
-  _order = order;
-}
-
 std::unique_ptr<ByteData> EncodeStream::release() {
   auto data = ByteData::MakeAdopted(bytes, _length);
-  capacity = 256;
+  capacity = 0;
   _position = 0;
   _length = 0;
   _bitPosition = 0;
-  bytes = new uint8_t[capacity];
+  bytes = nullptr;
+  dataView.reset();
   return data;
 }
 
-void EncodeStream::writeBoolean(bool value) {
-  Bit8 data = {};
-  data.boolValue = value;
-  writeBit8(data);
-}
-
-void EncodeStream::writeInt8(int8_t value) {
-  Bit8 data = {};
-  data.intValue = value;
-  writeBit8(data);
-}
-
-void EncodeStream::writeUint8(uint8_t value) {
-  ensureCapacity(_position + 1);
-  bytes[_position++] = value;
-  positionChanged();
-}
-
-void EncodeStream::writeInt16(int16_t value) {
-  Bit16 data = {};
-  data.intValue = value;
-  writeBit16(data);
-}
-
-void EncodeStream::writeUint16(uint16_t value) {
-  Bit16 data = {};
-  data.uintValue = value;
-  writeBit16(data);
-}
-
-void EncodeStream::writeUint24(uint32_t value) {
-  Bit32 data = {};
-  data.uintValue = value;
-  writeBit24(data);
-}
-
-void EncodeStream::writeInt32(int32_t value) {
-  ensureCapacity(_position + 4);
-  if (_order == NATIVE_BYTE_ORDER) {
-    for (int i = 0; i < 4; i++) {
-      bytes[_position++] = value >> i * 8;
-    }
-  } else {
-    for (int i = 3; i >= 0; i--) {
-      bytes[_position++] = value >> i * 8;
-    }
-  }
-  positionChanged();
-}
-
-void EncodeStream::writeUint32(uint32_t value) {
-  Bit32 data = {};
-  data.uintValue = value;
-  writeBit32(data);
-}
-
-void EncodeStream::writeInt64(int64_t value) {
-  Bit64 data = {};
-  data.intValue = value;
-  writeBit64(data);
-}
-
-void EncodeStream::writeUint64(uint64_t value) {
-  Bit64 data = {};
-  data.uintValue = value;
-  writeBit64(data);
-}
-
-void EncodeStream::writeFloat(float value) {
-  Bit32 data = {};
-  data.floatValue = value;
-  writeBit32(data);
-}
-
-void EncodeStream::writeDouble(double value) {
-  Bit64 data = {};
-  data.doubleValue = value;
-  writeBit64(data);
+void EncodeStream::setPosition(uint32_t value) {
+  _position = value;
+  positionChanged(0);
 }
 
 void EncodeStream::writeBytes(EncodeStream* stream, uint32_t length, uint32_t offset) {
@@ -139,10 +56,10 @@ void EncodeStream::writeBytes(EncodeStream* stream, uint32_t length, uint32_t of
 }
 
 void EncodeStream::writeBytes(uint8_t* stream, uint32_t length, uint32_t offset) {
-  ensureCapacity(_position + length);
-  memcpy(bytes + _position, stream + offset, length);
-  _position += length;
-  positionChanged();
+  if (checkCapacity(length)) {
+    memcpy(bytes + _position, stream + offset, length);
+    positionChanged(length);
+  }
 }
 
 void EncodeStream::writeByteData(const pag::ByteData* byteData) {
@@ -156,10 +73,10 @@ void EncodeStream::writeByteData(const pag::ByteData* byteData) {
 
 void EncodeStream::writeUTF8String(const std::string& text) {
   auto textLength = text.size();
-  ensureCapacity(static_cast<uint32_t>(_position + textLength + 1));
-  memcpy(bytes + _position, text.c_str(), textLength + 1);
-  _position += textLength + 1;
-  positionChanged();
+  if (checkCapacity(textLength + 1)) {
+    memcpy(bytes + _position, text.c_str(), textLength + 1);
+    positionChanged(static_cast<off_t>(textLength) + 1);
+  }
 }
 
 void EncodeStream::writeEncodedInt64(int64_t value) {
@@ -179,13 +96,15 @@ void EncodeStream::writeEncodedUint64(uint64_t value) {
     if (value > 0) {
       byte |= hasNext;
     }
-    ensureCapacity(_position + 1);
+    if (!checkCapacity(1)) {
+      break;
+    }
     bytes[_position++] = byte;
-    positionChanged();
     if (value == 0) {
       break;
     }
   }
+  positionChanged(0);
 }
 
 void EncodeStream::writeBits(int32_t value, uint8_t numBits) {
@@ -199,9 +118,12 @@ void EncodeStream::writeBits(int32_t value, uint8_t numBits) {
 
 void EncodeStream::writeUBits(uint32_t value, uint8_t numBits) {
   static const uint8_t bitMasks[9] = {0, 1, 3, 7, 15, 31, 63, 127, 255};
-  ensureCapacity(BitsToBytes(_bitPosition + numBits));
+  auto bytesToWrite = BitsToBytes(_bitPosition + numBits) - _position;
+  if (!checkCapacity(bytesToWrite)) {
+    return;
+  }
   while (numBits > 0) {
-    auto bytePosition = static_cast<uint32_t>(_bitPosition * 0.125);
+    auto bytePosition = static_cast<uint32_t>(_bitPosition / 8);
     auto bitPosition = static_cast<uint32_t>(_bitPosition % 8);
     auto& byte = bytes[bytePosition];
     byte &= bitMasks[bitPosition];
@@ -212,7 +134,7 @@ void EncodeStream::writeUBits(uint32_t value, uint8_t numBits) {
     numBits -= bitLength;
     _bitPosition += bitLength;
   }
-  bitPositionChanged();
+  bitPositionChanged(0);
 }
 
 uint8_t GetBitLength(uint32_t data) {
@@ -308,73 +230,46 @@ void EncodeStream::writePoint3DList(const Point3D* points, uint32_t count, float
   delete[] list;
 }
 
-void EncodeStream::expandCapacity(uint32_t length) {
-  while (capacity < length) {
-    capacity = static_cast<uint32_t>(capacity * 1.5);
+bool EncodeStream::checkCapacity(uint32_t bytesToWrite) {
+  if (_position + bytesToWrite > capacity) {
+    return expandCapacity(_position + bytesToWrite);
   }
-  auto newBytes = new uint8_t[capacity];
-  memcpy(newBytes, bytes, _length);
-  delete[] bytes;
+  return true;
+}
+
+bool EncodeStream::expandCapacity(uint32_t length) {
+  uint32_t newCapacity = capacity == 0 ? 128 : capacity;
+  while (newCapacity < length) {
+    newCapacity = static_cast<uint32_t>(newCapacity * 1.5);
+  }
+  auto newBytes = new (std::nothrow) uint8_t[newCapacity];
+  if (newBytes == nullptr) {
+    PAGThrowError(context, "Failed to allocate memory for EncodedStream!.");
+    return false;
+  }
+  if (bytes != nullptr) {
+    memcpy(newBytes, bytes, _length);
+    delete[] bytes;
+  }
+  capacity = newCapacity;
   bytes = newBytes;
+  dataView.reset(bytes, capacity);
+  return true;
 }
 
-void EncodeStream::writeBit8(Bit8 data) {
-  ensureCapacity(_position + 1);
-  bytes[_position++] = data.uintValue;
-  positionChanged();
-}
-
-void EncodeStream::writeBit16(Bit16 data) {
-  ensureCapacity(_position + 2);
-  if (_order == NATIVE_BYTE_ORDER) {
-    bytes[_position++] = data.bytes[0];
-    bytes[_position++] = data.bytes[1];
-  } else {
-    bytes[_position++] = data.bytes[1];
-    bytes[_position++] = data.bytes[0];
+void EncodeStream::bitPositionChanged(off_t offset) {
+  _bitPosition += offset;
+  _position = BitsToBytes(_bitPosition);
+  if (_position > _length) {
+    _length = _position;
   }
-  positionChanged();
 }
 
-void EncodeStream::writeBit24(Bit32 data) {
-  ensureCapacity(_position + 3);
-  if (_order == NATIVE_BYTE_ORDER) {
-    for (int i = 0; i < 3; i++) {
-      bytes[_position++] = data.bytes[i];
-    }
-  } else {
-    for (int i = 3; i >= 1; i--) {
-      bytes[_position++] = data.bytes[i];
-    }
+void EncodeStream::positionChanged(off_t offset) {
+  _position += offset;
+  _bitPosition = static_cast<uint64_t>(_position) * 8;
+  if (_position > _length) {
+    _length = _position;
   }
-  positionChanged();
-}
-
-void EncodeStream::writeBit32(Bit32 data) {
-  ensureCapacity(_position + 4);
-  if (_order == NATIVE_BYTE_ORDER) {
-    for (int i = 0; i < 4; i++) {
-      bytes[_position++] = data.bytes[i];
-    }
-  } else {
-    for (int i = 3; i >= 0; i--) {
-      bytes[_position++] = data.bytes[i];
-    }
-  }
-  positionChanged();
-}
-
-void EncodeStream::writeBit64(Bit64 data) {
-  ensureCapacity(_position + 8);
-  if (_order == NATIVE_BYTE_ORDER) {
-    for (int i = 0; i < 8; i++) {
-      bytes[_position++] = data.bytes[i];
-    }
-  } else {
-    for (int i = 7; i >= 0; i--) {
-      bytes[_position++] = data.bytes[i];
-    }
-  }
-  positionChanged();
 }
 }  // namespace pag

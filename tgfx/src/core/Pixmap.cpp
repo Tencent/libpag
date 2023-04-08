@@ -115,6 +115,7 @@ void Pixmap::reset() {
     pixelRef = nullptr;
   }
   _pixels = nullptr;
+  _writablePixels = nullptr;
   _info = {};
 }
 

@@ -20,9 +20,9 @@
 
 #include <emscripten/val.h>
 #include <optional>
-#include "ByteBuffer.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Size.h"
+#include "tgfx/utils/DataView.h"
 
 namespace tgfx {
 class WebImageInfo {

@@ -19,17 +19,17 @@
 #pragma once
 
 #include <string>
-#include "ByteOrder.h"
 #include "codec/utils/StreamContext.h"
 #include "pag/types.h"
+#include "tgfx/utils/DataView.h"
 
 namespace pag {
 
 /**
  * The DecodeStream class provides methods and properties to optimize reading and working with
- * binary data. The DecodeStream object does not take ownership of the of the the binary data, The
- * caller must keep the data alive until the DecodeStream object is done with it. Note: The byte
- * order of DecodeStream is little-endian by default.
+ * binary data. The DecodeStream object does not take ownership of the binary data, The caller must
+ * keep the data alive until the DecodeStream object is done with it. Note: The byte order of
+ * DecodeStream is always little-endian.
  */
 class DecodeStream final {
  public:
@@ -37,41 +37,45 @@ class DecodeStream final {
   }
 
   DecodeStream(StreamContext* context, const uint8_t* data, uint32_t length)
-      : context(context), bytes(data), _length(length) {
+      : context(context), dataView(data, length) {
   }
 
   /**
    * This DecodeStream's byte order. The byte order is used when reading or writing multibyte
    * values. The order of a newly-created stream is always ByteOrder::LittleEndian.
    */
-  ByteOrder order() const;
+  tgfx::ByteOrder byteOrder() const {
+    return dataView.byteOrder();
+  }
 
   /**
-   * Modifies this DecodeStream's byte order.
+   * Set this DecodeStream's byte order.
    */
-  void setOrder(ByteOrder order);
+  void setByteOrder(tgfx::ByteOrder order) {
+    dataView.setByteOrder(order);
+  }
 
   /**
-   * The number of bytes of data available for reading from the current position in the stream to
+   * The number of the byte data available for reading from the current position in the stream to
    * the end of the stream.
    */
   uint32_t bytesAvailable() const {
-    return _length - _position;
+    return dataView.size() - _position;
   }
 
   const uint8_t* data() const {
-    return bytes;
+    return dataView.bytes();
   }
 
   /**
    * The length of the DecodeStream object.
    */
   uint32_t length() const {
-    return _length;
+    return dataView.size();
   }
 
   /**
-   * Moves, or returns the current position, of the file pointer into the DecodeStream object. This
+   * Moves or returns the current position, of the file pointer into the DecodeStream object. This
    * is the point at which the next call to a read method starts reading.
    */
   uint32_t position() const {
@@ -91,84 +95,77 @@ class DecodeStream final {
    * returned if the integer is nonzero, false otherwise.
    */
   bool readBoolean() {
-    return readBit8().boolValue;
+    return read<bool>();
   }
 
   /**
    * Reads a signed 8-bit integer from the byte stream.
    */
   int8_t readInt8() {
-    return readBit8().intValue;
+    return read<int8_t>();
   }
 
   /**
    * Reads a unsigned 8-bit integer from the byte stream.
    */
   uint8_t readUint8() {
-    return readBit8().uintValue;
+    return read<uint8_t>();
   }
 
   /**
    * Reads a signed 16-bit integer from the byte stream.
    */
   int16_t readInt16() {
-    return readBit16().intValue;
+    return read<int16_t>();
   }
 
   /**
    * Reads a unsigned 16-bit integer from the byte stream.
    */
   uint16_t readUint16() {
-    return readBit16().uintValue;
-  }
-
-  /**
-   * Reads a unsigned 24-bit integer from the byte stream.
-   */
-  uint32_t readUint24() {
-    return readBit24().uintValue;
+    return read<uint16_t>();
   }
 
   /**
    * Reads a signed 32-bit integer from the byte stream.
    */
   int32_t readInt32() {
-    return readBit32().intValue;
+    return read<int32_t>();
   }
 
   /**
    * Reads a unsigned 32-bit integer from the byte stream.
    */
   uint32_t readUint32() {
-    return readBit32().uintValue;
+    return read<uint32_t>();
   }
 
   /**
    * Reads a signed 64-bit integer from the byte stream.
    */
   int64_t readInt64() {
-    return readBit64().intValue;
+    return read<int64_t>();
   }
 
   /**
    * Reads a unsigned 64-bit integer from the byte stream.
    */
   uint64_t readUint64() {
-    return readBit64().uintValue;
+    return read<uint64_t>();
   }
 
   /**
    * Reads an IEEE 754 single-precision (32-bit) floating-point number from the byte stream.
    */
   float readFloat() {
-    return readBit32().floatValue;
+    return read<float>();
   }
 
   /**
    * Reads an IEEE 754 double-precision (64-bit) floating-point number from the byte stream.
    */
   double readDouble() {
-    return readBit64().doubleValue;
+    return read<double>();
   }
 
   /**
@@ -189,22 +186,22 @@ class DecodeStream final {
   std::string readUTF8String();
 
   /**
-   * Reads a encoded signed 32-bit integer from the byte stream.
+   * Reads an encoded signed 32-bit integer from the byte stream.
    */
   int32_t readEncodedInt32();
 
   /**
-   * Reads a encoded unsigned 32-bit integer from the byte stream.
+   * Reads an encoded unsigned 32-bit integer from the byte stream.
    */
   uint32_t readEncodedUint32();
 
   /**
-   * Reads a encoded signed 64-bit integer from the byte stream.
+   * Reads an encoded signed 64-bit integer from the byte stream.
    */
   int64_t readEncodedInt64();
 
   /**
-   * Reads a encoded unsigned 64-bit integer from the byte stream.
+   * Reads an encoded unsigned 64-bit integer from the byte stream.
    */
   uint64_t readEncodedUint64();
 
@@ -258,24 +255,25 @@ class DecodeStream final {
   mutable StreamContext* context;
 
  private:
-  void bitPositionChanged() {
-    _position = BitsToBytes(_bitPosition);
-  }
-
-  void positionChanged() {
-    _bitPosition = static_cast<uint64_t>(_position) * 8;
-  }
-
-  Bit8 readBit8();
-  Bit16 readBit16();
-  Bit32 readBit24();
-  Bit32 readBit32();
-  Bit64 readBit64();
-
-  ByteOrder _order = ByteOrder::LittleEndian;
-  const uint8_t* bytes = nullptr;
-  uint32_t _length = 0;
+  tgfx::DataView dataView = {};
   uint32_t _position = 0;
   uint64_t _bitPosition = 0;
+
+  void bitPositionChanged(off_t offset);
+
+  void positionChanged(off_t offset);
+
+  bool checkEndOfFile(uint32_t bytesToRead);
+
+  template <typename T>
+  T read() {
+    auto byteSize = static_cast<off_t>(sizeof(T));
+    if (!checkEndOfFile(byteSize)) {
+      auto value = dataView.read<T>(_position);
+      positionChanged(byteSize);
+      return value;
+    }
+    return 0;
+  }
 };
 }  // namespace pag

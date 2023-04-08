@@ -18,11 +18,14 @@
 
 #pragma once
 
+#include <cmath>
 #include <string>
 #include <vector>
 #include "base/utils/Log.h"
 
 namespace pag {
+static constexpr uint8_t LENGTH_FOR_STORE_NUM_BITS = 5;
+
 class StreamContext {
  public:
   virtual ~StreamContext() = default;
@@ -37,6 +40,10 @@ class StreamContext {
 
   std::vector<std::string> errorMessages;
 };
+
+inline uint32_t BitsToBytes(uint64_t capacity) {
+  return static_cast<uint32_t>(ceil(capacity * 0.125));
+}
 
 #ifdef DEBUG
 

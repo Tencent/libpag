@@ -20,41 +20,23 @@
 #include <cstring>
 
 namespace pag {
-
-ByteOrder DecodeStream::order() const {
-  return _order;
-}
-
-void DecodeStream::setOrder(pag::ByteOrder order) {
-  _order = order;
-}
-
 void DecodeStream::setPosition(uint32_t value) {
-  if (value < _length) {
-    _position = value;
-    positionChanged();
-  } else {
-    PAGThrowError(context, "End of file was encountered.");
+  if (!checkEndOfFile(value)) {
+    positionChanged(value - _position);
   }
 }
 
 void DecodeStream::skip(uint32_t numBytes) {
-  if (_position < _length - numBytes + 1) {
-    _position += numBytes;
-    positionChanged();
-  } else {
-    PAGThrowError(context, "End of file was encountered.");
+  if (!checkEndOfFile(numBytes)) {
+    positionChanged(numBytes);
   }
 }
 
 DecodeStream DecodeStream::readBytes(uint32_t length) {
-  if ((_length >= length) && (_position <= _length - length)) {
-    DecodeStream stream(context, bytes + _position, length);
-    _position += length;
-    positionChanged();
+  if (!checkEndOfFile(length)) {
+    DecodeStream stream(context, dataView.bytes() + _position, length);
+    positionChanged(length);
     return stream;
-  } else {
-    PAGThrowError(context, "End of file was encountered.");
   }
   return DecodeStream(context);
 }
@@ -62,7 +44,7 @@ DecodeStream DecodeStream::readBytes(uint32_t length) {
 std::unique_ptr<ByteData> DecodeStream::readByteData() {
   auto length = readEncodedUint32();
   auto bytes = readBytes(length);
-  // must check whether the bytes is valid. otherwise memcpy will crash.
+  // must check whether the byte data is valid. otherwise, memcpy() will crash.
   if (length == 0 || context->hasException()) {
     return nullptr;
   }
@@ -70,17 +52,16 @@ std::unique_ptr<ByteData> DecodeStream::readByteData() {
 }
 
 std::string DecodeStream::readUTF8String() {
-  if (_position < _length) {
-    auto text = reinterpret_cast<const char*>(bytes + _position);
+  if (_position < dataView.size()) {
+    auto text = reinterpret_cast<const char*>(dataView.bytes() + _position);
     auto textLength = strlen(text);
-    if (textLength > _length - _position) {
-      textLength = _length - _position;
-      _position += textLength;
+    if (textLength > dataView.size() - _position) {
+      textLength = dataView.size() - _position;
+      positionChanged(static_cast<off_t>(textLength));
     } else {
-      _position += textLength + 1;
+      positionChanged(static_cast<off_t>(textLength + 1));
     }
-    positionChanged();
-    return std::string(text, textLength);
+    return {text, textLength};
   } else {
     PAGThrowError(context, "End of file was encountered.");
   }
@@ -89,7 +70,7 @@ std::string DecodeStream::readUTF8String() {
 
 int32_t DecodeStream::readEncodedInt32() {
   auto data = readEncodedUint32();
-  int32_t value = data >> 1;
+  auto value = static_cast<int32_t>(data >> 1);
   return (data & 1) > 0 ? -value : value;
 }
 
@@ -98,8 +79,10 @@ uint32_t DecodeStream::readEncodedUint32() {
   static const uint8_t hasNext = 128;
   uint32_t value = 0;
   uint32_t byte = 0;
+  auto length = dataView.size();
+  auto bytes = dataView.bytes();
   for (int i = 0; i < 32; i += 7) {
-    if (_position >= _length) {
+    if (_position >= length) {
       PAGThrowError(context, "End of file was encountered.");
       break;
     }
@@ -109,13 +92,13 @@ uint32_t DecodeStream::readEncodedUint32() {
       break;
     }
   }
-  positionChanged();
+  positionChanged(0);
   return value;
 }
 
 int64_t DecodeStream::readEncodedInt64() {
   auto data = readEncodedUint64();
-  int64_t value = data >> 1;
+  auto value = static_cast<int64_t>(data >> 1);
   return (data & 1) > 0 ? -value : value;
 }
 
@@ -124,18 +107,20 @@ uint64_t DecodeStream::readEncodedUint64() {
   static const uint8_t hasNext = 128;
   uint64_t value = 0;
   uint64_t byte = 0;
+  auto length = dataView.size();
+  auto bytes = dataView.bytes();
   for (int i = 0; i < 64; i += 7) {
-    if (_position >= _length) {
+    if (_position >= length) {
       PAGThrowError(context, "End of file was encountered.");
       break;
     }
     byte = bytes[_position++];
-    positionChanged();
     value |= (byte & valueMask) << i;
     if ((byte & hasNext) == 0) {
       break;
     }
   }
+  positionChanged(0);
   return value;
 }
 
@@ -149,10 +134,12 @@ int32_t DecodeStream::readBits(uint8_t numBits) {
 uint32_t DecodeStream::readUBits(uint8_t numBits) {
   static const uint8_t bitMasks[9] = {0, 1, 3, 7, 15, 31, 63, 127, 255};
   uint32_t value = 0;
-  if ((_length * 8 >= numBits) && (_bitPosition <= static_cast<uint64_t>(_length) * 8 - numBits)) {
+  auto length = dataView.size();
+  auto bytes = dataView.bytes();
+  if ((length * 8 >= numBits) && (_bitPosition <= static_cast<uint64_t>(length) * 8 - numBits)) {
     uint32_t pos = 0;
     while (pos < numBits) {
-      auto bytePosition = static_cast<uint32_t>(_bitPosition * 0.125);
+      auto bytePosition = static_cast<uint32_t>(_bitPosition / 8);
       auto bitPosition = static_cast<uint32_t>(_bitPosition % 8);
       auto byte = bytes[bytePosition] >> bitPosition;
       auto bitLength = std::min(8 - bitPosition, numBits - pos);
@@ -161,7 +148,7 @@ uint32_t DecodeStream::readUBits(uint8_t numBits) {
       pos += bitLength;
       _bitPosition += bitLength;
     }
-    bitPositionChanged();
+    bitPositionChanged(0);
   } else {
     PAGThrowError(context, "End of file was encountered.");
   }
@@ -205,88 +192,21 @@ void DecodeStream::readPoint3DList(Point3D* points, uint32_t count, float precis
   }
 }
 
-Bit8 DecodeStream::readBit8() {
-  Bit8 data = {};
-  if (_position < _length) {
-    data.uintValue = bytes[_position++];
-    positionChanged();
-  } else {
-    PAGThrowError(context, "End of file was encountered.");
-  }
-  return data;
+void DecodeStream::bitPositionChanged(off_t offset) {
+  _bitPosition += offset;
+  _position = BitsToBytes(_bitPosition);
 }
 
-Bit16 DecodeStream::readBit16() {
-  Bit16 data = {};
-  if ((_length > 1) && (_position < _length - 1)) {
-    if (_order == NATIVE_BYTE_ORDER) {
-      data.bytes[0] = bytes[_position++];
-      data.bytes[1] = bytes[_position++];
-    } else {
-      data.bytes[1] = bytes[_position++];
-      data.bytes[0] = bytes[_position++];
-    }
-    positionChanged();
-  } else {
-    PAGThrowError(context, "End of file was encountered.");
-  }
-  return data;
+void DecodeStream::positionChanged(off_t offset) {
+  _position += offset;
+  _bitPosition = static_cast<uint64_t>(_position) * 8;
 }
 
-Bit32 DecodeStream::readBit24() {
-  Bit32 data = {};
-  if ((_length > 2) && (_position < _length - 2)) {
-    if (_order == NATIVE_BYTE_ORDER) {
-      for (int i = 0; i < 3; i++) {
-        data.bytes[i] = bytes[_position++];
-      }
-    } else {
-      for (int i = 3; i >= 1; i--) {
-        data.bytes[i] = bytes[_position++];
-      }
-    }
-    positionChanged();
-  } else {
+bool DecodeStream::checkEndOfFile(uint32_t bytesToRead) {
+  if (_position + bytesToRead > dataView.size()) {
     PAGThrowError(context, "End of file was encountered.");
+    return true;
   }
-  return data;
-}
-
-Bit32 DecodeStream::readBit32() {
-  Bit32 data = {};
-  if ((_length > 3) && (_position < _length - 3)) {
-    if (_order == NATIVE_BYTE_ORDER) {
-      for (int i = 0; i < 4; i++) {
-        data.bytes[i] = bytes[_position++];
-      }
-    } else {
-      for (int i = 3; i >= 0; i--) {
-        data.bytes[i] = bytes[_position++];
-      }
-    }
-    positionChanged();
-  } else {
-    PAGThrowError(context, "End of file was encountered.");
-  }
-  return data;
-}
-
-Bit64 DecodeStream::readBit64() {
-  Bit64 data = {};
-  if ((_length > 7) && (_position < _length - 7)) {
-    if (_order == NATIVE_BYTE_ORDER) {
-      for (int i = 0; i < 8; i++) {
-        data.bytes[i] = bytes[_position++];
-      }
-    } else {
-      for (int i = 7; i >= 0; i--) {
-        data.bytes[i] = bytes[_position++];
-      }
-    }
-    positionChanged();
-  } else {
-    PAGThrowError(context, "End of file was encountered.");
-  }
-  return data;
+  return false;
 }
 }  // namespace pag
