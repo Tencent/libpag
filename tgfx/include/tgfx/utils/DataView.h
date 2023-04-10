@@ -121,131 +121,131 @@ class DataView {
   }
 
   /**
-   * Reads a boolean value from the bytes at the specified byte offset. A signed 8-bit integer is
+   * Returns a boolean value from the bytes at the specified byte offset. A signed 8-bit integer is
    * read, and true is returned if the integer is nonzero, false otherwise.
    */
-  bool readBoolean(size_t offset) const;
+  bool getBoolean(size_t offset) const;
 
   /**
-   * Reads a signed 8-bit integer from the bytes at the specified byte offset.
+   * Returns a signed 8-bit integer from the bytes at the specified byte offset.
    */
-  int8_t readInt8(size_t offset) const;
+  int8_t getInt8(size_t offset) const;
 
   /**
-   * Reads an unsigned 8-bit integer from the bytes at the specified byte offset.
+   * Returns an unsigned 8-bit integer from the bytes at the specified byte offset.
    */
-  uint8_t readUint8(size_t offset) const;
+  uint8_t getUint8(size_t offset) const;
 
   /**
-   * Reads a signed 16-bit integer from the bytes at the specified byte offset.
+   * Returns a signed 16-bit integer from the bytes at the specified byte offset.
    */
-  int16_t readInt16(size_t offset) const;
+  int16_t getInt16(size_t offset) const;
 
   /**
-   * Reads an unsigned 16-bit integer from the bytes at the specified byte offset.
+   * Returns an unsigned 16-bit integer from the bytes at the specified byte offset.
    */
-  uint16_t readUint16(size_t offset) const;
+  uint16_t getUint16(size_t offset) const;
 
   /**
-   * Reads a signed 32-bit integer from the bytes at the specified byte offset.
+   * Returns a signed 32-bit integer from the bytes at the specified byte offset.
    */
-  int32_t readInt32(size_t offset) const;
+  int32_t getInt32(size_t offset) const;
 
   /**
-   * Reads an unsigned 32-bit integer from the bytes at the specified byte offset.
+   * Returns an unsigned 32-bit integer from the bytes at the specified byte offset.
    */
-  uint32_t readUint32(size_t offset) const;
+  uint32_t getUint32(size_t offset) const;
 
   /**
-   * Reads a signed 64-bit integer from the bytes at the specified byte offset.
+   * Returns a signed 64-bit integer from the bytes at the specified byte offset.
    */
-  int64_t readInt64(size_t offset) const;
+  int64_t getInt64(size_t offset) const;
 
   /**
-   * Reads an unsigned 64-bit integer from the bytes at the specified byte offset.
+   * Returns an unsigned 64-bit integer from the bytes at the specified byte offset.
    */
-  uint64_t readUint64(size_t offset) const;
+  uint64_t getUint64(size_t offset) const;
 
   /**
-   * Reads an IEEE 754 single-precision (32-bit) floating-point number from the bytes at the
+   * Returns an IEEE 754 single-precision (32-bit) floating-point number from the bytes at the
    * specified byte offset.
    */
-  float readFloat(size_t offset) const;
+  float getFloat(size_t offset) const;
 
   /**
-   * Reads an IEEE 754 double-precision (64-bit) floating-point number from the bytes at the
+   * Returns an IEEE 754 double-precision (64-bit) floating-point number from the bytes at the
    * specified byte offset.
    */
-  double readDouble(size_t offset) const;
+  double getDouble(size_t offset) const;
 
   /**
-   * Writes a boolean value to the bytes at the specified byte offset. A signed 8-bit integer is
+   * Sets a boolean value to the bytes at the specified byte offset. A signed 8-bit integer is
    * written according to the value parameter, either 1 if true or 0 if false. Returns false if the
    * offset is out of range or the DataView is constructed from read-only bytes.
    */
-  bool writeBoolean(size_t offset, bool value);
+  bool setBoolean(size_t offset, bool value);
 
   /**
-   * Writes an 8-bit signed integer to the bytes at the specified byte offset. Returns false if the
+   * Sets an 8-bit signed integer to the bytes at the specified byte offset. Returns false if the
    * offset is out of range or the DataView is constructed from read-only bytes.
    */
-  bool writeInt8(size_t offset, int8_t value);
+  bool setInt8(size_t offset, int8_t value);
 
   /**
-   * Writes an unsigned 8-bit integer to the bytes at the specified byte offset. Returns false if
+   * Sets an unsigned 8-bit integer to the bytes at the specified byte offset. Returns false if
    * the offset is out of range or the DataView is constructed from read-only bytes.
    */
-  bool writeUint8(size_t offset, uint8_t value);
+  bool setUint8(size_t offset, uint8_t value);
 
   /**
-   * Writes a 16-bit signed integer to the bytes at the specified byte offset. Returns false if the
+   * Sets a 16-bit signed integer to the bytes at the specified byte offset. Returns false if the
    * offset is out of range or the DataView is constructed from read-only bytes.
    */
-  bool writeInt16(size_t offset, int16_t value);
+  bool setInt16(size_t offset, int16_t value);
 
   /**
-   * Writes an unsigned 16-bit integer to the bytes at the specified byte offset. Returns false if
+   * Sets an unsigned 16-bit integer to the bytes at the specified byte offset. Returns false if
    * the offset is out of range or the DataView is constructed from read-only bytes.
    */
-  bool writeUint16(size_t offset, uint16_t value);
+  bool setUint16(size_t offset, uint16_t value);
 
   /**
-   * Writes a 32-bit signed integer to the bytes at the specified byte offset. Returns false if the
+   * Sets a 32-bit signed integer to the bytes at the specified byte offset. Returns false if the
    * offset is out of range or the DataView is constructed from read-only bytes.
    */
-  bool writeInt32(size_t offset, int32_t value);
+  bool setInt32(size_t offset, int32_t value);
 
   /**
-   * Writes an unsigned 32-bit integer to the bytes at the specified byte offset. Returns false if
+   * Sets an unsigned 32-bit integer to the bytes at the specified byte offset. Returns false if
    * the offset is out of range or the DataView is constructed from read-only bytes.
    */
-  bool writeUint32(size_t offset, uint32_t value);
+  bool setUint32(size_t offset, uint32_t value);
 
   /**
-   * Writes a 64-bit signed integer to the bytes at the specified byte offset. Returns false if the
+   * Sets a 64-bit signed integer to the bytes at the specified byte offset. Returns false if the
    * offset is out of range or the DataView is constructed from read-only bytes.
    */
-  bool writeInt64(size_t offset, int64_t value);
+  bool setInt64(size_t offset, int64_t value);
 
   /**
-   * Writes an unsigned 64-bit integer to the bytes at the specified byte offset. Returns false if
+   * Sets an unsigned 64-bit integer to the bytes at the specified byte offset. Returns false if
    * the offset is out of range or the DataView is constructed from read-only bytes.
    */
-  bool writeUint64(size_t offset, uint64_t value);
+  bool setUint64(size_t offset, uint64_t value);
 
   /**
-   * Writes an IEEE 754 single-precision (32-bit) floating-point number to the bytes at the
+   * Sets an IEEE 754 single-precision (32-bit) floating-point number to the bytes at the
    * specified byte offset. Returns false if the offset is out of range or the DataView is
    * constructed from read-only bytes.
    */
-  bool writeFloat(size_t offset, float value);
+  bool setFloat(size_t offset, float value);
 
   /**
-   * Writes an IEEE 754 double-precision (64-bit) floating-point number to the bytes at the
-   * specified byte offset. Returns false if the offset is out of range or the DataView is
-   * constructed from read-only bytes.
+   * Sets an IEEE 754 double-precision (64-bit) floating-point number to the bytes at the specified
+   * byte offset. Returns false if the offset is out of range or the DataView is constructed from
+   * read-only bytes.
    */
-  bool writeDouble(size_t offset, double value);
+  bool setDouble(size_t offset, double value);
 
  private:
   const uint8_t* _bytes = nullptr;

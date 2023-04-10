@@ -47,77 +47,77 @@ void EncodeStream::setPosition(uint32_t value) {
 
 void EncodeStream::writeBoolean(bool value) {
   if (checkCapacity(1)) {
-    dataView.writeBoolean(_position, value);
+    dataView.setBoolean(_position, value);
     positionChanged(1);
   }
 }
 
 void EncodeStream::writeInt8(int8_t value) {
   if (checkCapacity(1)) {
-    dataView.writeInt8(_position, value);
+    dataView.setInt8(_position, value);
     positionChanged(1);
   }
 }
 
 void EncodeStream::writeUint8(uint8_t value) {
   if (checkCapacity(1)) {
-    dataView.writeUint8(_position, value);
+    dataView.setUint8(_position, value);
     positionChanged(1);
   }
 }
 
 void EncodeStream::writeInt16(int16_t value) {
   if (checkCapacity(2)) {
-    dataView.writeInt16(_position, value);
+    dataView.setInt16(_position, value);
     positionChanged(2);
   }
 }
 
 void EncodeStream::writeUint16(uint16_t value) {
   if (checkCapacity(2)) {
-    dataView.writeUint16(_position, value);
+    dataView.setUint16(_position, value);
     positionChanged(2);
   }
 }
 
 void EncodeStream::writeInt32(int32_t value) {
   if (checkCapacity(4)) {
-    dataView.writeInt32(_position, value);
+    dataView.setInt32(_position, value);
     positionChanged(4);
   }
 }
 
 void EncodeStream::writeUint32(uint32_t value) {
   if (checkCapacity(4)) {
-    dataView.writeUint32(_position, value);
+    dataView.setUint32(_position, value);
     positionChanged(4);
   }
 }
 
 void EncodeStream::writeInt64(int64_t value) {
   if (checkCapacity(8)) {
-    dataView.writeInt64(_position, value);
+    dataView.setInt64(_position, value);
     positionChanged(8);
   }
 }
 
 void EncodeStream::writeUint64(uint64_t value) {
   if (checkCapacity(8)) {
-    dataView.writeUint64(_position, value);
+    dataView.setUint64(_position, value);
     positionChanged(8);
   }
 }
 
 void EncodeStream::writeFloat(float value) {
   if (checkCapacity(4)) {
-    dataView.writeFloat(_position, value);
+    dataView.setFloat(_position, value);
     positionChanged(4);
   }
 }
 
 void EncodeStream::writeDouble(double value) {
   if (checkCapacity(8)) {
-    dataView.writeDouble(_position, value);
+    dataView.setDouble(_position, value);
     positionChanged(8);
   }
 }

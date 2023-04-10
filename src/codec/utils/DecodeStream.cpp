@@ -34,7 +34,7 @@ void DecodeStream::skip(uint32_t numBytes) {
 
 bool DecodeStream::readBoolean() {
   if (!checkEndOfFile(1)) {
-    auto value = dataView.readBoolean(_position);
+    auto value = dataView.getBoolean(_position);
     positionChanged(1);
     return value;
   }
@@ -43,7 +43,7 @@ bool DecodeStream::readBoolean() {
 
 int8_t DecodeStream::readInt8() {
   if (!checkEndOfFile(1)) {
-    auto value = dataView.readInt8(_position);
+    auto value = dataView.getInt8(_position);
     positionChanged(1);
     return value;
   }
@@ -52,7 +52,7 @@ int8_t DecodeStream::readInt8() {
 
 uint8_t DecodeStream::readUint8() {
   if (!checkEndOfFile(1)) {
-    auto value = dataView.readUint8(_position);
+    auto value = dataView.getUint8(_position);
     positionChanged(1);
     return value;
   }
@@ -61,7 +61,7 @@ uint8_t DecodeStream::readUint8() {
 
 int16_t DecodeStream::readInt16() {
   if (!checkEndOfFile(2)) {
-    auto value = dataView.readInt16(_position);
+    auto value = dataView.getInt16(_position);
     positionChanged(2);
     return value;
   }
@@ -70,7 +70,7 @@ int16_t DecodeStream::readInt16() {
 
 uint16_t DecodeStream::readUint16() {
   if (!checkEndOfFile(2)) {
-    auto value = dataView.readUint16(_position);
+    auto value = dataView.getUint16(_position);
     positionChanged(2);
     return value;
   }
@@ -79,7 +79,7 @@ uint16_t DecodeStream::readUint16() {
 
 int32_t DecodeStream::readInt32() {
   if (!checkEndOfFile(4)) {
-    auto value = dataView.readInt32(_position);
+    auto value = dataView.getInt32(_position);
     positionChanged(4);
     return value;
   }
@@ -88,7 +88,7 @@ int32_t DecodeStream::readInt32() {
 
 uint32_t DecodeStream::readUint32() {
   if (!checkEndOfFile(4)) {
-    auto value = dataView.readUint32(_position);
+    auto value = dataView.getUint32(_position);
     positionChanged(4);
     return value;
   }
@@ -97,7 +97,7 @@ uint32_t DecodeStream::readUint32() {
 
 int64_t DecodeStream::readInt64() {
   if (!checkEndOfFile(8)) {
-    auto value = dataView.readInt64(_position);
+    auto value = dataView.getInt64(_position);
     positionChanged(8);
     return value;
   }
@@ -106,7 +106,7 @@ int64_t DecodeStream::readInt64() {
 
 uint64_t DecodeStream::readUint64() {
   if (!checkEndOfFile(8)) {
-    auto value = dataView.readUint64(_position);
+    auto value = dataView.getUint64(_position);
     positionChanged(8);
     return value;
   }
@@ -115,7 +115,7 @@ uint64_t DecodeStream::readUint64() {
 
 float DecodeStream::readFloat() {
   if (!checkEndOfFile(4)) {
-    auto value = dataView.readFloat(_position);
+    auto value = dataView.getFloat(_position);
     positionChanged(4);
     return value;
   }
@@ -124,7 +124,7 @@ float DecodeStream::readFloat() {
 
 double DecodeStream::readDouble() {
   if (!checkEndOfFile(8)) {
-    auto value = dataView.readDouble(_position);
+    auto value = dataView.getDouble(_position);
     positionChanged(8);
     return value;
   }
