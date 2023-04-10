@@ -134,18 +134,20 @@ EAGLDevice::EAGLDevice(EAGLContext* eaglContext)
 }
 
 EAGLDevice::~EAGLDevice() {
+  {
+    std::lock_guard<std::mutex> autoLock(deviceLocker);
+    auto tail = *(deviceList.end() - 1);
+    auto index = cacheArrayIndex;
+    deviceList[index] = tail;
+    tail->cacheArrayIndex = index;
+    deviceList.pop_back();
+  }
   releaseAll();
   if (textureCache != nil) {
     CFRelease(textureCache);
     textureCache = nil;
   }
   [_eaglContext release];
-  std::lock_guard<std::mutex> autoLock(deviceLocker);
-  auto tail = *(deviceList.end() - 1);
-  auto index = cacheArrayIndex;
-  deviceList[index] = tail;
-  tail->cacheArrayIndex = index;
-  deviceList.pop_back();
 }
 
 bool EAGLDevice::sharableWith(void* nativeContext) const {
