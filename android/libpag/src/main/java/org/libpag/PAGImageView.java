@@ -220,17 +220,18 @@ public class PAGImageView extends View {
      * PAGImageView.
      */
     public void setComposition(PAGComposition newComposition, float maxFrameRate) {
-        if (newComposition == _composition) {
+        if (newComposition == _composition && _maxFrameRate == maxFrameRate && decoderInfo.isValid()) {
             return;
         }
         freezeDraw.set(true);
         _composition = newComposition;
+        _maxFrameRate = maxFrameRate;
         progressExplicitlySet = true;
         animator.setCurrentPlayTime(0);
         releaseAllTask();
         _matrix = null;
-        PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_REFRESH_DECODER, this);
         renderBitmap = null;
+        PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_REFRESH_DECODER, this);
     }
 
     /**
@@ -632,8 +633,8 @@ public class PAGImageView extends View {
             if (task.get() != null) {
                 task.get().cancel(false);
             }
+            iterator.remove();
         }
-        saveCacheTasks.clear();
     }
 
     private Runnable mAnimatorStartRunnable = new Runnable() {
@@ -793,6 +794,7 @@ public class PAGImageView extends View {
         if (lastKeyItem != null && lastKeyItem.keyPrefixMD5 != null) {
             Bitmap bitmap = bitmapCache.get(frame);
             if (bitmap != null) {
+                renderBitmap = bitmap;
                 return true;
             }
             if (cacheItem != null) {

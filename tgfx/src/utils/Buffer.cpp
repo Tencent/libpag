@@ -65,6 +65,15 @@ std::shared_ptr<Data> Buffer::release() {
   return data;
 }
 
+void Buffer::reset() {
+  if (isEmpty()) {
+    return;
+  }
+  delete[] _data;
+  _data = nullptr;
+  _size = 0;
+}
+
 void Buffer::clear() {
   if (isEmpty()) {
     return;

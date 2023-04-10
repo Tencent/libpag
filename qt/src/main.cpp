@@ -29,7 +29,7 @@
 
 int main(int argc, char* argv[]) {
   QApplication::setApplicationName("PAGViewer");
-  QApplication::setOrganizationName("CCC");
+  QApplication::setOrganizationName("pag.art");
   QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
   QApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
 

@@ -27,7 +27,10 @@ std::unique_ptr<ByteData> ReadByteDataWithStartCode(DecodeStream* stream) {
   if (length == 0 || stream->context->hasException()) {
     return nullptr;
   }
-  auto data = new uint8_t[length + 4];
+  auto data = new (std::nothrow) uint8_t[length + 4];
+  if (data == nullptr) {
+    return nullptr;
+  }
   memcpy(data + 4, bytes.data(), length);
   if (Platform::Current()->naluType() == NALUType::AVCC) {
     // AVCC

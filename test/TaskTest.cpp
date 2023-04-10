@@ -35,7 +35,8 @@ PAG_TEST(TaskTest, Task) {
   for (int i = 0; i < 17; i++) {
     auto task = Task::Run([=] {
       LOGI("Task %d is executing...", i);
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+      LOGI("Task %d is finished", i);
     });
     tasks.push_back(task);
   }

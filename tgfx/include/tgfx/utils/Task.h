@@ -34,7 +34,7 @@ class Task {
  public:
   /**
    * Submits a code block for asynchronous execution immediately and returns a Task wraps the code
-   * block. Hold a reference to the returned Task if you want to cancel it or wait for it finishes
+   * block. Hold a reference to the returned Task if you want to cancel it or wait for it to finish
    * execution. Returns nullptr if the block is nullptr.
    */
   static std::shared_ptr<Task> Run(std::function<void()> block);
@@ -42,7 +42,7 @@ class Task {
   /**
    * Submits a code block for asynchronous execution immediately on a TaskQueue and returns a Task
    * wraps the code block. Hold a reference to the returned Task if you want to cancel it or wait
-   * for it finishes execution. Returns nullptr if the queue or the block is nullptr.
+   * for it to finish execution. Returns nullptr if the queue or the block is nullptr.
    */
   static std::shared_ptr<Task> Run(std::shared_ptr<TaskQueue> queue, std::function<void()> block);
 

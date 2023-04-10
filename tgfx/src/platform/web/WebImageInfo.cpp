@@ -21,88 +21,91 @@
 using namespace emscripten;
 
 namespace tgfx {
-static bool IsPng(ByteBuffer buffer, int& width, int& height) {
-  if (buffer.length() < 4) {
+static std::string ReadString(const DataView& dataView, size_t offset, size_t length) {
+  return std::string(reinterpret_cast<const char*>(dataView.bytes()) + offset, length);
+}
+
+static bool Compare(const DataView& dataView, size_t offset, size_t length,
+                    const std::string& text) {
+  return memcmp(dataView.bytes() + offset, text.c_str(), length) == 0;
+}
+
+static bool CompareAnyOf(const DataView& dataView, size_t offset, size_t length,
+                         const std::vector<std::string>& textList) {
+  return std::any_of(textList.begin(), textList.end(), [&](const std::string& text) {
+    return memcmp(dataView.bytes() + offset, text.c_str(), length) == 0;
+  });
+}
+
+static bool IsPng(std::shared_ptr<Data> imageBytes, int& width, int& height) {
+  DataView dataView(imageBytes->bytes(), imageBytes->size(), ByteOrder::BigEndian);
+  if (dataView.size() < 4) {
     return false;
   }
-  if (buffer.readString(4) != "\x89PNG") {
-    buffer.setPosition(0);
+  if (!Compare(dataView, 0, 4, "\x89PNG")) {
     return false;
   }
-  buffer.skip(8);
-  std::string firstChunkType = buffer.readString(4);
-  if (firstChunkType == "IHDR" && buffer.length() >= 24) {
-    buffer.setOrder(ByteOrder::BigEndian);
-    width = buffer.readUint32();
-    height = buffer.readUint32();
+  std::string firstChunkType = ReadString(dataView, 12, 4);
+  if (firstChunkType == "IHDR" && dataView.size() >= 24) {
+    width = dataView.getUint32(16);
+    height = dataView.getUint32(20);
     return true;
   } else if (firstChunkType == "CgBI") {
-    if (buffer.length() >= 40) {
-      buffer.skip(12);
-      if (buffer.readString(4) == "IHDR") {
-        buffer.setOrder(ByteOrder::BigEndian);
-        width = buffer.readUint32();
-        height = buffer.readUint32();
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
-static bool IsJpeg(ByteBuffer buffer, int& width, int& height) {
-  if (buffer.length() < 2) {
-    return false;
-  }
-  if (buffer.readString(2) != "\xFF\xD8") {
-    return false;
-  }
-  buffer.setOrder(ByteOrder::BigEndian);
-  while (buffer.position() + 9 <= buffer.length()) {
-    auto target = buffer.readString(2);
-    if (target == "\xFF\xC0" || target == "\xFF\xC1" || target == "\xFF\xC2") {
-      buffer.skip(3);
-      height = buffer.readUint16();
-      width = buffer.readUint16();
+    if (Compare(dataView, 28, 4, "IHDR") && dataView.size() >= 40) {
+      width = dataView.getUint32(32);
+      height = dataView.getUint32(36);
       return true;
     }
-    uint16_t sectionSize = buffer.readUint16();
-    buffer.skip(sectionSize - 2);
   }
   return false;
 }
 
-static bool IsWebp(ByteBuffer buffer, int& width, int& height) {
-  if (buffer.length() < 16) {
+static bool IsJpeg(std::shared_ptr<Data> imageBytes, int& width, int& height) {
+  DataView dataView(imageBytes->bytes(), imageBytes->size(), ByteOrder::BigEndian);
+  if (dataView.size() < 2) {
     return false;
   }
-  auto RIFF = buffer.readString(4);
-  buffer.skip((4));
-  auto WEBP = buffer.readString(4);
-  if (RIFF != "RIFF" || WEBP != "WEBP") {
+  if (!Compare(dataView, 0, 2, "\xFF\xD8")) {
     return false;
   }
-  std::string type = buffer.readString(4);
-  if (type == "VP8 " && buffer.length() >= 30) {
-    buffer.skip(10);
-    width = buffer.readUint16() & 0x3FFF;
-    height = buffer.readUint16() & 0x3FFF;
+  off_t offset = 2;
+  while (offset + 9 <= static_cast<long>(dataView.size())) {
+    uint16_t sectionSize = dataView.getUint16(offset + 2);
+    if (CompareAnyOf(dataView, offset, 2, {"\xFF\xC0", "\xFF\xC1", "\xFF\xC2"})) {
+      height = dataView.getUint16(offset + 5);
+      width = dataView.getUint16(offset + 7);
+      return true;
+    }
+    offset += sectionSize + 2;
+  }
+  return false;
+}
+
+static bool IsWebp(std::shared_ptr<Data> imageBytes, int& width, int& height) {
+  DataView dataView(imageBytes->bytes(), imageBytes->size());
+  if (dataView.size() < 16) {
+    return false;
+  }
+  if (!Compare(dataView, 0, 4, "RIFF") || !Compare(dataView, 8, 4, "WEBP")) {
+    return false;
+  }
+  auto type = ReadString(dataView, 12, 4);
+  if (type == "VP8 " && dataView.size() >= 30) {
+    width = dataView.getUint16(26) & 0x3FFF;
+    height = dataView.getUint16(28) & 0x3FFF;
     return true;
-  } else if (type == "VP8L" && buffer.length() >= 25) {
-    buffer.skip(5);
-    uint32_t n = buffer.readUint32();
+  } else if (type == "VP8L" && dataView.size() >= 25) {
+    uint32_t n = dataView.getUint32(21);
     width = (n & 0x3FFF) + 1;
     height = ((n >> 14) & 0x3FFF) + 1;
     return true;
-  } else if (type == "VP8X" && buffer.length() >= 30) {
-    buffer.skip(4);
-    uint8_t extendedHeader = buffer.readUint8();
+  } else if (type == "VP8X" && dataView.size() >= 30) {
+    uint8_t extendedHeader = dataView.getUint8(20);
     bool validStart = (extendedHeader & 0xc0) == 0;
     bool validEnd = (extendedHeader & 0x01) == 0;
     if (validStart && validEnd) {
-      buffer.skip(3);
-      width = buffer.readUint24() + 1;
-      height = buffer.readUint24() + 1;
+      width = (dataView.getUint32(24) & 0x00FFFFFF) + 1;
+      height = (dataView.getUint32(27) & 0x00FFFFFF) + 1;
       return true;
     }
   }
@@ -116,14 +119,13 @@ static bool CheckWebpSupport() {
 ISize WebImageInfo::GetSize(std::shared_ptr<Data> imageBytes) {
   static const bool hasWebpSupport = CheckWebpSupport();
   auto imageSize = ISize::MakeEmpty();
-  ByteBuffer buffer(imageBytes->bytes(), imageBytes->size());
-  if (IsPng(buffer, imageSize.width, imageSize.height)) {
+  if (IsPng(imageBytes, imageSize.width, imageSize.height)) {
     return imageSize;
   }
-  if (IsJpeg(buffer, imageSize.width, imageSize.height)) {
+  if (IsJpeg(imageBytes, imageSize.width, imageSize.height)) {
     return imageSize;
   }
-  if (hasWebpSupport && IsWebp(buffer, imageSize.width, imageSize.height)) {
+  if (hasWebpSupport && IsWebp(imageBytes, imageSize.width, imageSize.height)) {
     return imageSize;
   }
   return imageSize;

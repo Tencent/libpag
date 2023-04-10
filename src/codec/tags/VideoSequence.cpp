@@ -115,7 +115,10 @@ ByteData* ReadMp4Header(DecodeStream* stream) {
   if (length == 0 || stream->context->hasException()) {
     return nullptr;
   }
-  auto data = new uint8_t[length];
+  auto data = new (std::nothrow) uint8_t[length];
+  if (data == nullptr) {
+    return nullptr;
+  }
   memcpy(data, bytes.data(), length);
   return ByteData::MakeAdopted(data, length).release();
 }
