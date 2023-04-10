@@ -56,15 +56,13 @@ bool DrawingManager::flush(Semaphore* signalSemaphore) {
   std::vector<TextureProxy*> proxies;
   std::for_each(tasks.begin(), tasks.end(),
                 [&proxies](std::shared_ptr<RenderTask>& task) { task->gatherProxies(&proxies); });
-  bool allInstantiated = std::all_of(proxies.begin(), proxies.end(), [&](TextureProxy* proxy) {
-    return proxy->isInstantiated() || proxy->instantiate();
+  std::for_each(proxies.begin(), proxies.end(), [](TextureProxy* proxy) {
+    if (!(proxy->isInstantiated() || proxy->instantiate())) {
+      LOGE("Failed to instantiate texture from proxy.");
+    }
   });
-  if (allInstantiated) {
-    std::for_each(tasks.begin(), tasks.end(),
-                  [gpu](std::shared_ptr<RenderTask>& task) { task->execute(gpu); });
-  } else {
-    LOGE("Failed to instantiate texture from proxy.");
-  }
+  std::for_each(tasks.begin(), tasks.end(),
+                [gpu](std::shared_ptr<RenderTask>& task) { task->execute(gpu); });
   removeAllTasks();
   return context->caps()->semaphoreSupport && gpu->insertSemaphore(signalSemaphore);
 }

@@ -187,10 +187,19 @@ class CacheManager {
 
     }
 
+    private void increaseReferenceCount(String key) {
+        Integer i = pagCachesReferenceCount.get(key);
+        if (i == null) {
+            i = 0;
+        }
+        pagCachesReferenceCount.put(key, i + 1);
+    }
+
     protected CacheItem getOrCreate(String key, int width, int height, int frameCount) {
         synchronized (CacheManager.this) {
             CacheItem cacheItem = pagCaches.get(key);
             if (cacheItem != null) {
+                increaseReferenceCount(key);
                 return cacheItem;
             }
             if (cacheItem == null) {
@@ -200,11 +209,7 @@ class CacheManager {
                 return null;
             }
             pagCaches.put(key, cacheItem);
-            Integer i = pagCachesReferenceCount.get(key);
-            if (i == null) {
-                i = 0;
-            }
-            pagCachesReferenceCount.put(key, i + 1);
+            increaseReferenceCount(key);
             return cacheItem;
         }
     }

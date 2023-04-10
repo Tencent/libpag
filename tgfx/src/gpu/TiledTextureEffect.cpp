@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/TiledTextureEffect.h"
+#include "ConstColorProcessor.h"
 #include "TextureEffect.h"
 #include "opengl/GLTiledTextureEffect.h"
 #include "utils/Log.h"
@@ -44,10 +45,16 @@ class TiledTextureEffectProxy : public FragmentProcessorProxy {
     auto texture = textureProxy->getTexture();
     DEBUG_ASSERT(texture != nullptr);
     if ((tileModeX != TileMode::Clamp || tileModeY != TileMode::Clamp) && !texture->isYUV()) {
-      return TiledTextureEffect::Make(std::move(texture),
-                                      SamplerState(tileModeX, tileModeY, sampling), &localMatrix);
+      if (auto proc = TiledTextureEffect::Make(
+              std::move(texture), SamplerState(tileModeX, tileModeY, sampling), &localMatrix)) {
+        return proc;
+      }
+      return ConstColorProcessor::Make(Color::Transparent(), InputMode::Ignore);
     }
-    return TextureEffect::Make(std::move(texture), sampling, &localMatrix);
+    if (auto proc = TextureEffect::Make(std::move(texture), sampling, &localMatrix)) {
+      return proc;
+    }
+    return ConstColorProcessor::Make(Color::Transparent(), InputMode::Ignore);
   }
 
   void onVisitProxies(const std::function<void(TextureProxy*)>& func) const override {

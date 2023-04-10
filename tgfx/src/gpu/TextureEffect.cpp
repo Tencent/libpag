@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureEffect.h"
+#include "ConstColorProcessor.h"
 #include "YUVTextureEffect.h"
 #include "opengl/GLTextureEffect.h"
 
@@ -37,8 +38,11 @@ class TextureEffectProxy : public FragmentProcessorProxy {
   }
 
   std::unique_ptr<FragmentProcessor> instantiate() override {
-    return TextureEffect::MakeRGBAAA(textureProxy->getTexture(), sampling, alphaStart,
-                                     &localMatrix);
+    if (auto proc = TextureEffect::MakeRGBAAA(textureProxy->getTexture(), sampling, alphaStart,
+                                              &localMatrix)) {
+      return proc;
+    }
+    return ConstColorProcessor::Make(Color::Transparent(), InputMode::Ignore);
   }
 
   void onVisitProxies(const std::function<void(TextureProxy*)>& func) const override {

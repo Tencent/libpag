@@ -761,9 +761,7 @@ public class PAGImageView extends View {
 
     protected void releaseCurrentDiskCache() {
         if (cacheItem != null) {
-            cacheManager.remove(lastKeyItem.keyPrefixMD5);
             cacheItem.writeLock();
-            cacheItem.release();
             if (lastKeyItem.needAutoClean) {
                 try {
                     new File(cacheManager.getPath(lastKeyItem.keyPrefixMD5)).delete();
@@ -772,7 +770,7 @@ public class PAGImageView extends View {
                 }
             }
             cacheItem.writeUnlock();
-            cacheItem = null;
+            cacheManager.remove(lastKeyItem.keyPrefixMD5);
         }
     }
 
