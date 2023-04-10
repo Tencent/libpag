@@ -64,7 +64,7 @@ class QGLWindow : public Window {
   bool textureInvalid = true;
   QQuickItem* quickItem = nullptr;
   QSGTexture* outTexture = nullptr;
-  std::shared_ptr<GLRenderTarget> renderTarget = nullptr;
+  std::shared_ptr<Surface> surface = nullptr;
   std::shared_ptr<Texture> frontTexture = nullptr;
   std::shared_ptr<Texture> backTexture = nullptr;
 
