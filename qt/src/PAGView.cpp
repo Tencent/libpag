@@ -22,9 +22,9 @@
 #include <QSGImageNode>
 #include <QScreen>
 #include <QThread>
-#include "tgfx/core/Clock.h"
 #include "pag/file.h"
 #include "platform/qt/GPUDrawable.h"
+#include "tgfx/utils/Clock.h"
 
 namespace pag {
 class RenderThread : public QThread {

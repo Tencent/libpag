@@ -85,6 +85,11 @@ class Buffer {
   }
 
   /**
+   * Sets the Buffer to empty, and deletes the internal byte data.
+   */
+  void reset();
+
+  /**
    * Sets all bytes of the buffer to zero.
    */
   void clear();

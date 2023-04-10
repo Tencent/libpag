@@ -581,7 +581,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 10.13;
 				OTHER_LDFLAGS = "$(inherited)";
-				PRODUCT_BUNDLE_IDENTIFIER = im.pag.viewer;
+				PRODUCT_BUNDLE_IDENTIFIER = art.pag.viewer;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -602,7 +602,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 10.13;
 				OTHER_LDFLAGS = "$(inherited)";
-				PRODUCT_BUNDLE_IDENTIFIER = im.pag.viewer;
+				PRODUCT_BUNDLE_IDENTIFIER = art.pag.viewer;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;

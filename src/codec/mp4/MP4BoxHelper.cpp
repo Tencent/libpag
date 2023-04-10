@@ -132,7 +132,7 @@ static std::unique_ptr<ByteData> ConcatMP4(const VideoSequence* videoSequence) {
   dataSize += mdatSize;
 
   EncodeStream payload(nullptr, static_cast<uint32_t>(dataSize));
-  payload.setOrder(ByteOrder::BigEndian);
+  payload.setByteOrder(tgfx::ByteOrder::BigEndian);
   payload.writeBytes(videoSequence->MP4Header->data(),
                      static_cast<uint32_t>(videoSequence->MP4Header->length()));
   WriteMdatBox(videoSequence, &payload, mdatSize);
@@ -159,7 +159,7 @@ static std::unique_ptr<ByteData> MakeMP4Data(const VideoSequence* videoSequence,
   float sizeFactor = includeMdat ? 1.5f : 0.5f;
   EncodeStream stream(nullptr,
                       static_cast<uint32_t>(static_cast<float>(mp4Track->len) * sizeFactor));
-  stream.setOrder(ByteOrder::BigEndian);
+  stream.setByteOrder(tgfx::ByteOrder::BigEndian);
   MP4Generator mp4Generator(boxParam);
   mp4Generator.ftyp(&stream, true);
   mp4Generator.moov(&stream, true);
