@@ -633,8 +633,8 @@ public class PAGImageView extends View {
             if (task.get() != null) {
                 task.get().cancel(false);
             }
+            iterator.remove();
         }
-        saveCacheTasks.clear();
     }
 
     private Runnable mAnimatorStartRunnable = new Runnable() {
