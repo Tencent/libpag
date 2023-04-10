@@ -793,6 +793,7 @@ public class PAGImageView extends View {
         if (lastKeyItem != null && lastKeyItem.keyPrefixMD5 != null) {
             Bitmap bitmap = bitmapCache.get(frame);
             if (bitmap != null) {
+                renderBitmap = bitmap;
                 return true;
             }
             if (cacheItem != null) {
