@@ -220,17 +220,18 @@ public class PAGImageView extends View {
      * PAGImageView.
      */
     public void setComposition(PAGComposition newComposition, float maxFrameRate) {
-        if (newComposition == _composition) {
+        if (newComposition == _composition && _maxFrameRate == maxFrameRate && decoderInfo.isValid()) {
             return;
         }
         freezeDraw.set(true);
         _composition = newComposition;
+        _maxFrameRate = maxFrameRate;
         progressExplicitlySet = true;
         animator.setCurrentPlayTime(0);
         releaseAllTask();
         _matrix = null;
-        PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_REFRESH_DECODER, this);
         renderBitmap = null;
+        PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_REFRESH_DECODER, this);
     }
 
     /**

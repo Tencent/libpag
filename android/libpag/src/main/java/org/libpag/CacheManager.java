@@ -230,7 +230,6 @@ class CacheManager {
                 item.release();
                 pagCaches.remove(key);
                 item.writeUnlock();
-                pagCachesReferenceCount.remove(key);
             } else {
                 pagCachesReferenceCount.put(key, i);
             }
