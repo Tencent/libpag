@@ -14,7 +14,7 @@ include(./vendor_tools/vendor.cmake)
 
 # Options for building libpag
 option(PAG_USE_OPENGL "allow use of OpenGL as GPU backend" ON)
-option(PAG_USE_SWIFTSHADER "allow build with SwiftShader library" ON)
+option(PAG_USE_SWIFTSHADER "allow build with SwiftShader library" OFF)
 option(PAG_USE_QT "allow build with QT frameworks" OFF)
 option(PAG_USE_RTTR "enable RTTR support" OFF)
 option(PAG_USE_HARFBUZZ "enable HarfBuzz support" OFF)
