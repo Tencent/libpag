@@ -31,7 +31,7 @@ std::string ToString(Frame frame);
 
 BackendTexture ToBackendTexture(const tgfx::GLTextureInfo& texture, int width, int height);
 
-void GetAllPAGFiles(const std::string& path, std::vector<std::string>& files);
+std::vector<std::string> GetAllPAGFiles(const std::string& path);
 
 tgfx::Bitmap MakeSnapshot(std::shared_ptr<PAGSurface> pagSurface);
 

@@ -19,3 +19,4 @@
 *.so filter=lfs diff=lfs merge=lfs -text
 *.lzma2 filter=lfs diff=lfs merge=lfs -text
 *.wasm filter=lfs diff=lfs merge=lfs -text
+*.bin filter=lfs diff=lfs merge=lfs -text

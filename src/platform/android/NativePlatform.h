@@ -32,5 +32,7 @@ class NativePlatform : public Platform {
 
   void traceImage(const tgfx::ImageInfo& info, const void* pixels,
                   const std::string& tag) const override;
+
+  std::string getCacheDir() const override;
 };
 }  // namespace pag

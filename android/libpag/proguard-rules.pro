@@ -60,6 +60,10 @@
     private static void RegisterFallbackFonts();
 }
 
+-keepclasseswithmembers class org.libpag.PAG {
+    private static java.lang.String GetCacheDir();
+}
+
 -keepclasseswithmembers class org.libpag.HardwareDecoder {
     <methods>;
 }

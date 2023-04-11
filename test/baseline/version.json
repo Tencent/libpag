@@ -8307,6 +8307,12 @@
         "composition_swapLayer": "6a420423",
         "composition_swapLayerAt": "6a420423"
     },
+    "PAGDiskCacheTest": {
+        "SequenceFile_10": "db477d13",
+        "SequenceFile_15": "db477d13",
+        "SequenceFile_20": "db477d13",
+        "SequenceFile_22": "db477d13"
+    },
     "PAGFileBaseTest": {
         "EllipseToPath": "6a420423",
         "RectToPath": "48a897dd",

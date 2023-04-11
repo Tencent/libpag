@@ -35,4 +35,8 @@ NALUType Platform::naluType() const {
 
 void Platform::traceImage(const tgfx::ImageInfo&, const void*, const std::string&) const {
 }
+
+std::string Platform::getCacheDir() const {
+  return "";
+}
 }  // namespace pag

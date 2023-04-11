@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CocoaPlatform.h"
+#import <Foundation/Foundation.h>
 #include "TraceImage.h"
 #include "pag/pag.h"
 #ifdef PAG_USE_HARFBUZZ
@@ -59,6 +60,13 @@ bool CocoaPlatform::registerFallbackFonts() const {
 void CocoaPlatform::traceImage(const tgfx::ImageInfo& info, const void* pixels,
                                const std::string& tag) const {
   TraceImage(info, pixels, tag);
+}
+
+std::string CocoaPlatform::getCacheDir() const {
+  NSString* cachePath =
+      [NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES) firstObject];
+  cachePath = [cachePath stringByAppendingPathComponent:@"libpag"];
+  return [cachePath UTF8String];
 }
 
 std::optional<PositionedGlyphs> CocoaPlatform::shapeText(
