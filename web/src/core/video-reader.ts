@@ -11,7 +11,6 @@ import { WorkerMessageType } from '../worker/events';
 import { WorkerVideoReader } from '../worker/video-reader';
 import { postMessage } from '../worker/utils';
 
-import type { EmscriptenGL } from '../types';
 import type { TimeRange, VideoReader as VideoReaderInterfaces } from '../interfaces';
 import type { PAGPlayer } from '../pag-player';
 
@@ -50,7 +49,7 @@ const waitVideoCanPlay = (videoElement: HTMLVideoElement) => {
 
 export class VideoReader {
   public static async create(
-    mp4Data: Uint8Array,
+    source: Uint8Array | HTMLVideoElement,
     width: number,
     height: number,
     frameRate: number,
@@ -58,7 +57,9 @@ export class VideoReader {
   ): Promise<VideoReaderInterfaces> {
     if (WORKER) {
       const proxyId = await new Promise<number>((resolve) => {
-        const buffer = mp4Data.buffer.slice(mp4Data.byteOffset, mp4Data.byteOffset + mp4Data.byteLength);
+        // TODO: source as HTMLVideoElement in WebWorker version.
+        const uint8Array = source as Uint8Array;
+        const buffer = uint8Array.buffer.slice(uint8Array.byteOffset, uint8Array.byteOffset + uint8Array.byteLength);
         postMessage(
           self,
           {
@@ -75,7 +76,7 @@ export class VideoReader {
       PAGModule.currentPlayer?.linkVideoReader(videoReader);
       return videoReader;
     }
-    return new VideoReader(mp4Data, width, height, frameRate, staticTimeRanges);
+    return new VideoReader(source, width, height, frameRate, staticTimeRanges);
   }
 
   public isSought = false;
@@ -95,30 +96,35 @@ export class VideoReader {
   private bitmapCtx: OffscreenCanvasRenderingContext2D | null = null;
 
   public constructor(
-    mp4Data: Uint8Array,
+    source: Uint8Array | HTMLVideoElement,
     width: number,
     height: number,
     frameRate: number,
     staticTimeRanges: TimeRange[],
     isWorker = false,
   ) {
-    this.videoEl = document.createElement('video');
-    this.videoEl.style.display = 'none';
-    this.videoEl.muted = true;
-    this.videoEl.playsInline = true;
-    this.videoEl.preload = 'auto'; // use load() will make a bug on Chrome.
-    this.videoEl.width = width;
-    this.videoEl.height = height;
-    waitVideoCanPlay(this.videoEl).then(() => {
+    if (source instanceof HTMLVideoElement) {
+      this.videoEl = source;
       this.canplay = true;
-    });
-    const blob = new Blob([mp4Data], { type: 'video/mp4' });
-    this.videoEl.src = URL.createObjectURL(blob);
-    this.frameRate = frameRate;
-    if (IPHONE) {
-      // use load() will make a bug on Chrome.
-      this.videoEl.load();
+    } else {
+      this.videoEl = document.createElement('video');
+      this.videoEl.style.display = 'none';
+      this.videoEl.muted = true;
+      this.videoEl.playsInline = true;
+      this.videoEl.preload = 'auto'; // use load() will make a bug on Chrome.
+      this.videoEl.width = width;
+      this.videoEl.height = height;
+      waitVideoCanPlay(this.videoEl).then(() => {
+        this.canplay = true;
+      });
+      const blob = new Blob([source], { type: 'video/mp4' });
+      this.videoEl.src = URL.createObjectURL(blob);
+      if (IPHONE) {
+        // use load() will make a bug on Chrome.
+        this.videoEl.load();
+      }
     }
+    this.frameRate = frameRate;
     this.width = width;
     this.height = height;
     this.staticTimeRanges = new StaticTimeRanges(staticTimeRanges);
