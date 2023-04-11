@@ -56,10 +56,12 @@ std::shared_ptr<SequenceFile> DiskCache::OpenSequence(const std::string& key, ui
 
 DiskCache::DiskCache() {
   auto cacheDir = Platform::Current()->getCacheDir();
-  configPath = Directory::JoinPath(cacheDir, "cache.cfg");
-  cacheFolder = Directory::JoinPath(cacheDir, "caches");
-  Directory::CreateRecursively(cacheFolder);
-  readConfig();
+  if (!cacheDir.empty()) {
+    configPath = Directory::JoinPath(cacheDir, "cache.cfg");
+    cacheFolder = Directory::JoinPath(cacheDir, "caches");
+    Directory::CreateRecursively(cacheFolder);
+    readConfig();
+  }
 }
 
 size_t DiskCache::getMaxDiskSize() {
@@ -82,6 +84,9 @@ std::shared_ptr<SequenceFile> DiskCache::openSequence(const std::string& key, ui
                                                       uint32_t height, uint32_t frameCount,
                                                       float frameRate) {
   std::lock_guard<std::mutex> autoLock(locker);
+  if (cacheFolder.empty()) {
+    return nullptr;
+  }
   auto fileID = getFileID(key);
   auto result = openedFiles.find(fileID);
   if (result != openedFiles.end()) {
