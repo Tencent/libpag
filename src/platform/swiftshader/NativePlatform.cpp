@@ -55,6 +55,6 @@ void NativePlatform::traceImage(const tgfx::ImageInfo& info, const void* pixels,
 }
 
 std::string NativePlatform::getCacheDir() const {
-  return ".Caches/libpag";
+  return "./Caches/libpag";
 }
 }  // namespace pag

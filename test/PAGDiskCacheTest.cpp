@@ -34,6 +34,7 @@ PAG_TEST_SUIT(PAGDiskCacheTest)
 PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
   auto cacheDir = Platform::Current()->getCacheDir();
   std::filesystem::remove_all(cacheDir);
+  std::filesystem::create_directories(cacheDir);
   std::filesystem::copy(TestConstants::PAG_ROOT + "resources/disk/libpag", cacheDir,
                         std::filesystem::copy_options::recursive);
   auto pagFile = LoadPAGFile("resources/apitest/ZC2.pag");
@@ -54,7 +55,7 @@ PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
   EXPECT_TRUE(diskCache->cachedFileMap.size() == 2);
   EXPECT_EQ(diskCache->cachedFiles.size(), 2u);
   EXPECT_EQ(diskCache->fileIDCount, 4u);
-  EXPECT_EQ(diskCache->totalDiskSize, 647606u);
+  EXPECT_EQ(diskCache->totalDiskSize, 509137u);
 
   tgfx::Bitmap bitmap(pagFile->width(), pagFile->height());
   tgfx::Pixmap pixmap(bitmap);
@@ -88,7 +89,7 @@ PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
   EXPECT_TRUE(Baseline::Compare(pixmap, "PAGDiskCacheTest/SequenceFile_15"));
   success = sequenceFile->readFrame(30, pixmap.writablePixels(), pixmap.byteSize());
   EXPECT_FALSE(success);
-  EXPECT_EQ(diskCache->totalDiskSize, 1351397u);
+  EXPECT_EQ(diskCache->totalDiskSize, 1066615u);
 
   int halfWidth = 360;
   int halfHeight = 640;
@@ -116,10 +117,11 @@ PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
   bitmap.allocPixels(newWidth, newHeight);
   pixmap.reset(bitmap);
 
-  DiskCache::SetMaxDiskSize(1642000u);
-  EXPECT_EQ(DiskCache::MaxDiskSize(), 1642000u);
+  DiskCache::SetMaxDiskSize(1297900u);
+  EXPECT_EQ(DiskCache::MaxDiskSize(), 1297900u);
   sequenceFile = DiskCache::OpenSequence("resources/apitest/ZC2.pag.540x960", newWidth, newHeight,
                                          30, pagFile->frameRate());
+  pagPlayer->setProgress(0);
   for (auto i = 0; i < 30; i++) {
     pagPlayer->flush();
     success = pagSurface->readPixels(ColorType::RGBA_8888, AlphaType::Premultiplied,
@@ -131,12 +133,12 @@ PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
   success = sequenceFile->readFrame(22, pixmap.writablePixels(), pixmap.byteSize());
   EXPECT_TRUE(success);
   EXPECT_TRUE(Baseline::Compare(pixmap, "PAGDiskCacheTest/SequenceFile_22"));
-  EXPECT_EQ(diskCache->totalDiskSize, 1641906u);
+  EXPECT_EQ(diskCache->totalDiskSize, 1297836u);
   EXPECT_FALSE(std::filesystem::exists(cacheDir + "/caches/3.bin"));
   EXPECT_TRUE(std::filesystem::exists(cacheDir + "/caches/2.bin"));
 
   DiskCache::SetMaxDiskSize(0);
-  EXPECT_EQ(diskCache->totalDiskSize, 629201u);
+  EXPECT_EQ(diskCache->totalDiskSize, 517646u);
   EXPECT_FALSE(std::filesystem::exists(cacheDir + "/caches/2.bin"));
   EXPECT_TRUE(std::filesystem::exists(cacheDir + "/caches/4.bin"));
   sequenceFile = nullptr;
