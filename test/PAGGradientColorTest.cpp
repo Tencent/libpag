@@ -26,8 +26,7 @@ PAG_TEST_CASE(PAGGradientColorTest)
  * 用例描述: 渐变
  */
 PAG_TEST_F(PAGGradientColorTest, GradientColor_ID84028439) {
-  std::vector<std::string> files;
-  GetAllPAGFiles("resources/gradient", files);
+  auto files = GetAllPAGFiles("resources/gradient");
   for (auto& file : files) {
     auto pagFile = PAGFile::Load(file);
     EXPECT_NE(pagFile, nullptr);

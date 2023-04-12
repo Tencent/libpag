@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <cinttypes>
 #include <cstddef>
+#include <cstring>
 #include "tgfx/core/AlphaType.h"
 #include "tgfx/core/ColorType.h"
 
@@ -161,6 +162,20 @@ class ImageInfo {
    * to the range of [0, height-1].
    */
   void* computeOffset(void* pixels, int x, int y) const;
+
+  /**
+   * Returns true if a is equivalent to b.
+   */
+  friend bool operator==(const ImageInfo& a, const ImageInfo& b) {
+    return memcmp(&a, &b, sizeof(ImageInfo)) == 0;
+  }
+
+  /**
+   * Returns true if a is not equivalent to b.
+   */
+  friend bool operator!=(const ImageInfo& a, const ImageInfo& b) {
+    return !(a == b);
+  }
 
  private:
   ImageInfo(int width, int height, ColorType colorType, AlphaType alphaType, size_t rowBytes)

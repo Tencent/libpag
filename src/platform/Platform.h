@@ -67,6 +67,11 @@ class Platform {
   virtual void traceImage(const tgfx::ImageInfo& info, const void* pixels,
                           const std::string& tag) const;
 
+  /**
+   * Returns the absolute path to the platform-specific cache directory on the filesystem.
+   */
+  virtual std::string getCacheDir() const;
+
   virtual std::optional<PositionedGlyphs> shapeText(const std::string&,
                                                     const std::shared_ptr<tgfx::Typeface>&) const {
     return std::nullopt;

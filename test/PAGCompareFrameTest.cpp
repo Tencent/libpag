@@ -151,9 +151,7 @@ static void CompareFileFrames(Semaphore* semaphore, std::string pagPath) {
  * 用例描述: 校验 compare 文件夹中各个文件渲染结果
  */
 PAG_TEST(PAGFrameCompareTest, RenderFiles) {
-  std::vector<std::string> files;
-  GetAllPAGFiles("resources/compare", files);
-
+  auto files = GetAllPAGFiles("resources/compare");
   Semaphore semaphore(MAX_THREADS);
   std::vector<std::thread> threads = {};
   for (auto& file : files) {

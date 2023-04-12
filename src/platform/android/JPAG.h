@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,28 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "JPAG.h"
+#pragma once
+
+#include "JNIHelper.h"
+#include "pag/pag.h"
 
 namespace pag {
-static Global<jclass> PAGClass;
-static jmethodID PAG_GetCacheDir;
+void InitGetCacheDirJNI(JNIEnv* env);
 
-void InitGetCacheDirJNI(JNIEnv* env) {
-  PAGClass = env->FindClass("org/libpag/PAG");
-  PAG_GetCacheDir = env->GetStaticMethodID(PAGClass.get(), "GetCacheDir", "()Ljava/lang/String;");
-}
-
-std::string GetCacheDir() {
-  JNIEnvironment environment;
-  auto env = environment.current();
-  if (env == nullptr) {
-    return "";
-  }
-  jobject cacheDirPath = env->CallStaticObjectMethod(PAGClass.get(), PAG_GetCacheDir);
-  return SafeConvertToStdString(env, reinterpret_cast<jstring>(cacheDirPath));
-}
+std::string GetCacheDir();
 }  // namespace pag
-
-extern "C" PAG_API jstring JNICALL Java_org_libpag_PAG_SDKVersion(JNIEnv* env, jclass) {
-  return pag::SafeConvertToJString(env, pag::PAG::SDKVersion().c_str());
-}

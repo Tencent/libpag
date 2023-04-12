@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -16,28 +16,22 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "JPAG.h"
+#pragma once
+
+#include <memory>
 
 namespace pag {
-static Global<jclass> PAGClass;
-static jmethodID PAG_GetCacheDir;
+class LZ4Decoder {
+ public:
+  static std::unique_ptr<LZ4Decoder> Make();
 
-void InitGetCacheDirJNI(JNIEnv* env) {
-  PAGClass = env->FindClass("org/libpag/PAG");
-  PAG_GetCacheDir = env->GetStaticMethodID(PAGClass.get(), "GetCacheDir", "()Ljava/lang/String;");
-}
+  virtual ~LZ4Decoder() = default;
 
-std::string GetCacheDir() {
-  JNIEnvironment environment;
-  auto env = environment.current();
-  if (env == nullptr) {
-    return "";
-  }
-  jobject cacheDirPath = env->CallStaticObjectMethod(PAGClass.get(), PAG_GetCacheDir);
-  return SafeConvertToStdString(env, reinterpret_cast<jstring>(cacheDirPath));
-}
+  /**
+   * Decompresses the contents of a source buffer into a destination buffer. Returns the number of
+   * bytes written to the destination buffer after decompressing the input.
+   */
+  virtual size_t decode(uint8_t* dstBuffer, size_t dstSize, const uint8_t* srcBuffer,
+                        size_t srcSize) const = 0;
+};
 }  // namespace pag
-
-extern "C" PAG_API jstring JNICALL Java_org_libpag_PAG_SDKVersion(JNIEnv* env, jclass) {
-  return pag::SafeConvertToJString(env, pag::PAG::SDKVersion().c_str());
-}

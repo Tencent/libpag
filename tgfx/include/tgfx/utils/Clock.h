@@ -49,7 +49,7 @@ class Clock {
   int64_t elapsedTime();
 
   /**
-   * Creates a timestamp in the Clock with the given name. If the specified name is already exist,
+   * Creates a timestamp in the Clock with the given name. If the specified name already exists,
    * throws an error and leaves the markers unchanged.
    */
   void mark(const std::string& name);

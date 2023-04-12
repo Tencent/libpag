@@ -28,5 +28,7 @@ class NativePlatform : public Platform {
   std::vector<const VideoDecoderFactory*> getVideoDecoderFactories() const override;
 
   NALUType naluType() const override;
+
+  std::string getCacheDir() const override;
 };
 }  // namespace pag
