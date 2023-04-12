@@ -28,6 +28,8 @@ namespace pag {
 PAG_TEST_SUIT(PAGDiskCacheTest)
 
 //PAG_TEST_F(PAGDiskCacheTest, GenerateTestCaches) {
+//  auto cacheDir = Platform::Current()->getCacheDir();
+//  std::filesystem::remove_all(cacheDir);
 //  auto pagFile = LoadPAGFile("resources/apitest/ZC2.pag");
 //  tgfx::Bitmap bitmap(pagFile->width(), pagFile->height());
 //  tgfx::Pixmap pixmap(bitmap);
@@ -35,10 +37,12 @@ PAG_TEST_SUIT(PAGDiskCacheTest)
 //  pagPlayer->setComposition(pagFile);
 //  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
 //  pagPlayer->setSurface(pagSurface);
-//  auto sequenceFile = DiskCache::OpenSequence("resources/apitest/ZC2.pag", pagFile->width(),
-//                                              pagFile->height(), 30, pagFile->frameRate());
-//  sequenceFile = DiskCache::OpenSequence("resources/apitest/ZC2.pag.720x1280", pagFile->width(),
-//                                         pagFile->height(), 30, pagFile->frameRate());
+//  auto info =
+//      tgfx::ImageInfo::Make(pagFile->width(), pagFile->height(), tgfx::ColorType::RGBA_8888);
+//  auto sequenceFile =
+//      DiskCache::OpenSequence("resources/apitest/ZC2.pag", info, 30, pagFile->frameRate());
+//  sequenceFile =
+//      DiskCache::OpenSequence("resources/apitest/ZC2.pag.720x1280", info, 30, pagFile->frameRate());
 //  for (auto i = 0; i < 11; i++) {
 //    pagPlayer->flush();
 //    pagSurface->readPixels(ColorType::RGBA_8888, AlphaType::Premultiplied, pixmap.writablePixels(),
@@ -47,21 +51,14 @@ PAG_TEST_SUIT(PAGDiskCacheTest)
 //    pagPlayer->nextFrame();
 //  }
 //
-//  int halfWidth = 360;
-//  int halfHeight = 640;
+//  info = tgfx::ImageInfo::Make(360, 640, tgfx::ColorType::RGBA_8888);
 //  pixmap.reset();
-//  bitmap.allocPixels(halfWidth, halfHeight);
+//  bitmap.allocPixels(info.width(), info.height());
 //  pixmap.reset(bitmap);
-//
-//  int newWidth = 360;
-//  int newHeight = 640;
-//  pagSurface = PAGSurface::MakeOffscreen(newWidth, newHeight);
+//  pagSurface = PAGSurface::MakeOffscreen(info.width(), info.height());
 //  pagPlayer->setSurface(pagSurface);
-//  pixmap.reset();
-//  bitmap.allocPixels(newWidth, newHeight);
-//  pixmap.reset(bitmap);
-//  sequenceFile = DiskCache::OpenSequence("resources/apitest/ZC2.pag.360x640", newWidth, newHeight,
-//                                         30, pagFile->frameRate());
+//  sequenceFile =
+//      DiskCache::OpenSequence("resources/apitest/ZC2.pag.360x640", info, 30, pagFile->frameRate());
 //  pagPlayer->setProgress(0);
 //  for (auto i = 0; i < 30; i++) {
 //    pagPlayer->flush();
@@ -71,7 +68,7 @@ PAG_TEST_SUIT(PAGDiskCacheTest)
 //    pagPlayer->nextFrame();
 //  }
 //  sequenceFile = nullptr;
-//  auto cacheDir = Platform::Current()->getCacheDir();
+//
 //  auto diskDir = TestConstants::PAG_ROOT + "resources/disk/libpag";
 //  std::filesystem::remove_all(diskDir);
 //  std::filesystem::create_directories(diskDir);
@@ -92,12 +89,13 @@ PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
                         std::filesystem::copy_options::recursive);
   auto pagFile = LoadPAGFile("resources/apitest/ZC2.pag");
   ASSERT_TRUE(pagFile != nullptr);
+  auto info =
+      tgfx::ImageInfo::Make(pagFile->width(), pagFile->height(), tgfx::ColorType::RGBA_8888);
   auto sequenceFile =
-      DiskCache::OpenSequence("resources/apitest/ZC2.pag.720x1280", pagFile->width(),
-                              pagFile->height(), 30, pagFile->frameRate());
+      DiskCache::OpenSequence("resources/apitest/ZC2.pag.720x1280", info, 30, pagFile->frameRate());
   ASSERT_TRUE(sequenceFile != nullptr);
-  EXPECT_EQ(sequenceFile->width(), static_cast<uint32_t>(pagFile->width()));
-  EXPECT_EQ(sequenceFile->height(), static_cast<uint32_t>(pagFile->height()));
+  EXPECT_EQ(sequenceFile->width(), pagFile->width());
+  EXPECT_EQ(sequenceFile->height(), pagFile->height());
   EXPECT_EQ(sequenceFile->frameCount(), 30u);
   EXPECT_EQ(sequenceFile->frameRate(), pagFile->frameRate());
   EXPECT_FALSE(sequenceFile->isComplete());
@@ -108,7 +106,7 @@ PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
   EXPECT_TRUE(diskCache->cachedFileMap.size() == 2);
   EXPECT_EQ(diskCache->cachedFiles.size(), 2u);
   EXPECT_EQ(diskCache->fileIDCount, 4u);
-  const auto InitialDiskSize = 647606u;
+  const auto InitialDiskSize = 647620u;
   EXPECT_EQ(diskCache->totalDiskSize, InitialDiskSize);
 
   tgfx::Bitmap bitmap(pagFile->width(), pagFile->height());
@@ -147,16 +145,15 @@ PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
   success = sequenceFile->readFrame(30, pixmap.writablePixels(), pixmap.byteSize());
   EXPECT_FALSE(success);
 
-  int halfWidth = 360;
-  int halfHeight = 640;
+  info = tgfx::ImageInfo::Make(360, 640, tgfx::ColorType::RGBA_8888);
   pixmap.reset();
-  bitmap.allocPixels(halfWidth, halfHeight);
+  bitmap.allocPixels(info.width(), info.height());
   pixmap.reset(bitmap);
-  auto halfSequenceFile = DiskCache::OpenSequence("resources/apitest/ZC2.pag.360x640", halfWidth,
-                                                  halfHeight, 30, pagFile->frameRate());
+  auto halfSequenceFile =
+      DiskCache::OpenSequence("resources/apitest/ZC2.pag.360x640", info, 30, pagFile->frameRate());
   ASSERT_TRUE(halfSequenceFile != nullptr);
-  EXPECT_EQ(halfSequenceFile->width(), 360u);
-  EXPECT_EQ(halfSequenceFile->height(), 640u);
+  EXPECT_EQ(halfSequenceFile->width(), 360);
+  EXPECT_EQ(halfSequenceFile->height(), 640);
   EXPECT_EQ(halfSequenceFile->frameCount(), 30u);
   EXPECT_EQ(halfSequenceFile->frameRate(), pagFile->frameRate());
   EXPECT_TRUE(halfSequenceFile->isComplete());
@@ -166,20 +163,19 @@ PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
   const auto halfSequenceFileSize = halfSequenceFile->fileSize();
   halfSequenceFile = nullptr;
 
-  int newWidth = 540;
-  int newHeight = 960;
-  pagSurface = PAGSurface::MakeOffscreen(newWidth, newHeight);
+  info = tgfx::ImageInfo::Make(540, 960, tgfx::ColorType::RGBA_8888);
+  pagSurface = PAGSurface::MakeOffscreen(info.width(), info.height());
   pagPlayer->setSurface(pagSurface);
   pixmap.reset();
-  bitmap.allocPixels(newWidth, newHeight);
+  bitmap.allocPixels(info.width(), info.height());
   pixmap.reset(bitmap);
 
   const auto lastTotalDiskSize = diskCache->totalDiskSize;
 
   DiskCache::SetMaxDiskSize(1800000u);
   EXPECT_EQ(DiskCache::MaxDiskSize(), 1800000u);
-  sequenceFile = DiskCache::OpenSequence("resources/apitest/ZC2.pag.540x960", newWidth, newHeight,
-                                         30, pagFile->frameRate());
+  sequenceFile =
+      DiskCache::OpenSequence("resources/apitest/ZC2.pag.540x960", info, 30, pagFile->frameRate());
   pagPlayer->setProgress(0);
   for (auto i = 0; i < 30; i++) {
     pagPlayer->flush();

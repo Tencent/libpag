@@ -22,22 +22,42 @@
 
 namespace pag {
 static constexpr uint8_t FILE_VERSION = 1;
-static constexpr uint32_t FILE_HEAD_SIZE = 17;   // [version, width, height, frameCount, frameRate]
-static constexpr uint32_t FRAME_HEAD_SIZE = 12;  // [frameIndex, frameSize]
+/**
+ * [version: uint8_t]
+ * [compression: uint8_t]
+ * [ColorType: uint8_t]
+ * [AlphaType: uint8_t]
+ * [width: uint32_t]
+ * [height: uint32_t]
+ * [rowBytes: uint32_t]
+ * [frameCount: uint32_t]
+ * [frameRate: uint32_t]
+ */
+static constexpr uint32_t FILE_HEAD_SIZE = 24;
+/**
+ * [frameIndex: uint32_t]
+ * [frameSize: uint64_t]
+ */
+static constexpr uint32_t FRAME_HEAD_SIZE = 12;
 
-std::shared_ptr<SequenceFile> SequenceFile::Open(const std::string& filePath, uint32_t width,
-                                                 uint32_t height, uint32_t frameCount,
+std::shared_ptr<SequenceFile> SequenceFile::Open(const std::string& filePath,
+                                                 const tgfx::ImageInfo& info, uint32_t frameCount,
                                                  float frameRate) {
-
-  auto sequenceFile = std::shared_ptr<SequenceFile>(
-      new SequenceFile(filePath, width, height, frameCount, frameRate));
+  if (filePath.empty() || info.isEmpty() || frameCount == 0 || frameRate <= 0) {
+    return nullptr;
+  }
+  auto sequenceFile =
+      std::shared_ptr<SequenceFile>(new SequenceFile(filePath, info, frameCount, frameRate));
   return sequenceFile->file ? sequenceFile : nullptr;
 }
 
-SequenceFile::SequenceFile(const std::string& filePath, uint32_t width, uint32_t height,
+SequenceFile::SequenceFile(const std::string& filePath, const tgfx::ImageInfo& info,
                            uint32_t frameCount, float frameRate)
-    : _width(width), _height(height), _frameCount(frameCount), _frameRate(frameRate) {
+    : _info(info), _frameCount(frameCount), _frameRate(frameRate) {
   decoder = LZ4Decoder::Make();
+#ifdef __APPLE__
+  compressionType = CompressionType::LZ4_APPLE;
+#endif
   frames.resize(frameCount, {0, 0});
   file = fopen(filePath.c_str(), "ab+");
   if (file == nullptr) {
@@ -75,12 +95,19 @@ bool SequenceFile::readFramesFromFile() {
     return false;
   }
   auto version = data.getUint8(0);
-  auto fileWidth = data.getUint32(1);
-  auto fileHeight = data.getUint32(5);
-  auto fileFrameCount = data.getUint32(9);
-  auto fileFrameRate = data.getFloat(13);
-  if (version != FILE_VERSION || fileWidth != _width || fileHeight != _height ||
-      fileFrameCount != _frameCount || fileFrameRate != _frameRate) {
+  auto compression = data.getUint8(1);
+  auto colorType = data.getUint8(2);
+  auto alphaType = data.getUint8(3);
+  auto fileWidth = data.getUint32(4);
+  auto fileHeight = data.getUint32(8);
+  auto rowBytes = data.getUint32(12);
+  auto fileFrameCount = data.getUint32(16);
+  auto fileFrameRate = data.getFloat(20);
+  auto info = tgfx::ImageInfo::Make(static_cast<int>(fileWidth), static_cast<int>(fileHeight),
+                                    static_cast<tgfx::ColorType>(colorType),
+                                    static_cast<tgfx::AlphaType>(alphaType), rowBytes);
+  if (version != FILE_VERSION || compression != static_cast<uint8_t>(compressionType) ||
+      info != _info || fileFrameCount != _frameCount || fileFrameRate != _frameRate) {
     return false;
   }
   while (true) {
@@ -111,10 +138,14 @@ bool SequenceFile::writeFileHead() {
   uint8_t buffer[FILE_HEAD_SIZE] = {};
   auto data = tgfx::DataView(buffer, FILE_HEAD_SIZE);
   data.setUint8(0, FILE_VERSION);
-  data.setUint32(1, _width);
-  data.setUint32(5, _height);
-  data.setUint32(9, _frameCount);
-  data.setFloat(13, _frameRate);
+  data.setUint8(1, static_cast<uint8_t>(compressionType));
+  data.setUint8(2, static_cast<uint8_t>(_info.colorType()));
+  data.setUint8(3, static_cast<uint8_t>(_info.alphaType()));
+  data.setUint32(4, static_cast<uint32_t>(_info.width()));
+  data.setUint32(8, static_cast<uint32_t>(_info.height()));
+  data.setUint32(12, static_cast<uint32_t>(_info.rowBytes()));
+  data.setUint32(16, _frameCount);
+  data.setFloat(20, _frameRate);
   auto writeLength = fwrite(data.bytes(), 1, FILE_HEAD_SIZE, file);
   _fileSize = writeLength;
   return writeLength == data.size();
@@ -132,14 +163,14 @@ bool SequenceFile::isComplete() {
 
 bool SequenceFile::readFrame(uint32_t index, void* pixels, size_t byteSize) {
   std::lock_guard<std::mutex> autoLock(locker);
-  if (index >= _frameCount || byteSize == 0) {
+  if (index >= _frameCount || pixels == nullptr || byteSize != _info.byteSize()) {
     return false;
   }
   const auto& frame = frames[index];
   if (frame.size == 0) {
     return false;
   }
-  if (!checkScratchBuffer(byteSize)) {
+  if (!checkScratchBuffer()) {
     return false;
   }
   if (fseek(file, static_cast<long>(frame.offset), SEEK_SET)) {
@@ -156,15 +187,15 @@ bool SequenceFile::readFrame(uint32_t index, void* pixels, size_t byteSize) {
 
 bool SequenceFile::writeFrame(uint32_t index, const void* pixels, size_t byteSize) {
   std::lock_guard<std::mutex> autoLock(locker);
-  if (index >= _frameCount || byteSize == 0) {
+  if (index >= _frameCount || pixels == nullptr || byteSize != _info.byteSize()) {
     return false;
   }
   auto& frame = frames[index];
   if (frame.size != 0) {
     return false;
   }
-  auto bufferSize = compressFrame(index, pixels, byteSize);
-  if (bufferSize == 0) {
+  auto compressedSize = compressFrame(index, pixels, byteSize);
+  if (compressedSize == 0) {
     return false;
   }
   if (_fileSize == 0 && !writeFileHead()) {
@@ -173,12 +204,12 @@ bool SequenceFile::writeFrame(uint32_t index, const void* pixels, size_t byteSiz
   if (fseek(file, 0, SEEK_END)) {
     return false;
   }
-  if (fwrite(scratchBuffer.bytes(), 1, bufferSize, file) != bufferSize) {
+  if (fwrite(scratchBuffer.bytes(), 1, compressedSize, file) != compressedSize) {
     return false;
   }
   frame.offset = _fileSize + FRAME_HEAD_SIZE;
-  frame.size = bufferSize - FRAME_HEAD_SIZE;
-  _fileSize += bufferSize;
+  frame.size = compressedSize - FRAME_HEAD_SIZE;
+  _fileSize += compressedSize;
   cachedFrames++;
   if (cachedFrames == _frameCount) {
     scratchBuffer.reset();
@@ -191,7 +222,7 @@ bool SequenceFile::writeFrame(uint32_t index, const void* pixels, size_t byteSiz
 }
 
 size_t SequenceFile::compressFrame(uint32_t index, const void* pixels, size_t byteSize) {
-  if (!checkScratchBuffer(byteSize)) {
+  if (!checkScratchBuffer()) {
     return 0;
   }
   if (encoder == nullptr) {
@@ -210,7 +241,7 @@ size_t SequenceFile::compressFrame(uint32_t index, const void* pixels, size_t by
   return encodedLength + FRAME_HEAD_SIZE;
 }
 
-bool SequenceFile::checkScratchBuffer(size_t inputSize) {
+bool SequenceFile::checkScratchBuffer() {
   if (!scratchBuffer.isEmpty()) {
     return true;
   }
@@ -222,7 +253,7 @@ bool SequenceFile::checkScratchBuffer(size_t inputSize) {
       }
     }
   } else {
-    scratchBufferSize = LZ4Encoder::GetMaxOutputSize(inputSize) + FRAME_HEAD_SIZE;
+    scratchBufferSize = LZ4Encoder::GetMaxOutputSize(_info.byteSize()) + FRAME_HEAD_SIZE;
   }
   scratchBuffer.alloc(scratchBufferSize);
   return !scratchBuffer.isEmpty();

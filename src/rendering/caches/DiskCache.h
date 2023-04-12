@@ -42,9 +42,9 @@ class DiskCache {
    * not exist. Returns a temporary sequence file immediately if the key is empty. The temporary
    * file will be deleted automatically when the last reference to it is released.
    */
-  static std::shared_ptr<SequenceFile> OpenSequence(const std::string& key, uint32_t width,
-                                                    uint32_t height, uint32_t frameCount,
-                                                    float frameRate);
+  static std::shared_ptr<SequenceFile> OpenSequence(const std::string& key,
+                                                    const tgfx::ImageInfo& info,
+                                                    uint32_t frameCount, float frameRate);
 
  private:
   std::mutex locker = {};
@@ -64,8 +64,8 @@ class DiskCache {
 
   size_t getMaxDiskSize();
   void setMaxDiskSize(size_t size);
-  std::shared_ptr<SequenceFile> openSequence(const std::string& key, uint32_t width,
-                                             uint32_t height, uint32_t frameCount, float frameRate);
+  std::shared_ptr<SequenceFile> openSequence(const std::string& key, const tgfx::ImageInfo& info,
+                                             uint32_t frameCount, float frameRate);
 
   bool checkDiskSpace();
   void addToCachedFiles(std::shared_ptr<FileInfo> fileInfo);

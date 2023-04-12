@@ -23,6 +23,7 @@
 #include <vector>
 #include "rendering/utils/LZ4Decoder.h"
 #include "rendering/utils/LZ4Encoder.h"
+#include "tgfx/core/ImageInfo.h"
 #include "tgfx/utils/Buffer.h"
 
 namespace pag {
@@ -33,6 +34,11 @@ struct FrameLocation {
   size_t size = 0;
 };
 
+enum class CompressionType {
+  LZ4 = 1,
+  LZ4_APPLE = 2,
+};
+
 /**
  * SequenceFile provides a utility to read and write image frames in a disk file.
  */
@@ -41,17 +47,24 @@ class SequenceFile {
   ~SequenceFile();
 
   /**
+   * Returns the ImageInfo of the sequence.
+   */
+  tgfx::ImageInfo info() const {
+    return _info;
+  }
+
+  /**
    * Returns the width of the sequence.
    */
-  uint32_t width() const {
-    return _width;
+  int width() const {
+    return _info.width();
   }
 
   /**
    * Returns the height of the sequence.
    */
-  uint32_t height() const {
-    return _height;
+  int height() const {
+    return _info.height();
   }
 
   /**
@@ -95,8 +108,8 @@ class SequenceFile {
   uint32_t fileID = 0;
   FILE* file = nullptr;
   size_t _fileSize = 0;
-  uint32_t _width = 0;
-  uint32_t _height = 0;
+  CompressionType compressionType = CompressionType::LZ4;
+  tgfx::ImageInfo _info = {};
   uint32_t _frameCount = 0;
   float _frameRate = 30.0f;
   uint32_t cachedFrames = 0;
@@ -105,16 +118,17 @@ class SequenceFile {
   std::unique_ptr<LZ4Decoder> decoder = nullptr;
   std::unique_ptr<LZ4Encoder> encoder = nullptr;
 
-  static std::shared_ptr<SequenceFile> Open(const std::string& filePath, uint32_t width,
-                                            uint32_t height, uint32_t frameCount, float frameRate);
+  static std::shared_ptr<SequenceFile> Open(const std::string& filePath,
+                                            const tgfx::ImageInfo& info, uint32_t frameCount,
+                                            float frameRate);
 
-  SequenceFile(const std::string& filePath, uint32_t width, uint32_t height, uint32_t frameCount,
+  SequenceFile(const std::string& filePath, const tgfx::ImageInfo& info, uint32_t frameCount,
                float frameRate);
 
   bool readFramesFromFile();
   bool writeFileHead();
   size_t compressFrame(uint32_t index, const void* pixels, size_t byteSize);
-  bool checkScratchBuffer(size_t inputSize);
+  bool checkScratchBuffer();
 
   friend class DiskCache;
 };

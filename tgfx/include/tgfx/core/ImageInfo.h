@@ -162,6 +162,20 @@ class ImageInfo {
    */
   void* computeOffset(void* pixels, int x, int y) const;
 
+  /**
+   * Returns true if a is equivalent to b.
+   */
+  friend bool operator==(const ImageInfo& a, const ImageInfo& b) {
+    return memcmp(&a, &b, sizeof(ImageInfo)) == 0;
+  }
+
+  /**
+   * Returns true if a is not equivalent to b.
+   */
+  friend bool operator!=(const ImageInfo& a, const ImageInfo& b) {
+    return !(a == b);
+  }
+
  private:
   ImageInfo(int width, int height, ColorType colorType, AlphaType alphaType, size_t rowBytes)
       : _width(width),
