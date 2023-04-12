@@ -176,7 +176,7 @@ public class PAGImageView extends View {
      * Sets the frame index for the PAGImageView to render.
      */
     public void setCurrentFrame(int currentFrame) {
-        if (!decoderInfo.isValid() || currentFrame < 0 || currentFrame >= decoderInfo.numFrames || cacheItem == null && !allInMemoryCache()) {
+        if (!decoderInfo.isValid() || currentFrame < 0 || currentFrame >= decoderInfo.numFrames || (cacheItem == null && !allInMemoryCache())) {
             return;
         }
         _currentFrame = currentFrame;
@@ -422,7 +422,7 @@ public class PAGImageView extends View {
     private final ValueAnimator.AnimatorUpdateListener mAnimatorUpdateListener = new ValueAnimator.AnimatorUpdateListener() {
         @Override
         public void onAnimationUpdate(ValueAnimator animation) {
-            if (!decoderInfo.isValid() || cacheItem == null && !allInMemoryCache()) {
+            if (!decoderInfo.isValid() || (cacheItem == null && !allInMemoryCache())) {
                 return;
             }
             PAGImageView.this.currentPlayTime = animation.getCurrentPlayTime();
@@ -767,12 +767,6 @@ public class PAGImageView extends View {
             cacheItem.writeLock();
             decoderInfo.releaseDecoder();
             cacheItem.releaseSaveBuffer();
-            if (allInMemoryCache()) {
-                cacheManager.remove(lastKeyItem.keyPrefixMD5);
-                cacheItem.writeUnlock();
-                cacheItem = null;
-                return;
-            }
             cacheItem.writeUnlock();
         }
     }
