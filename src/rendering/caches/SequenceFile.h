@@ -69,11 +69,14 @@ class SequenceFile {
   }
 
   /**
+   * Returns the file size of the sequence.
+   */
+  size_t fileSize();
+
+  /**
    * Returns true if the sequence file already has all frames cached.
    */
-  bool isComplete() const {
-    return cachedFrames == _frameCount;
-  }
+  bool isComplete();
 
   /**
    * Reads an image frame from the sequence. Returns false if the specified index is empty.
@@ -91,6 +94,7 @@ class SequenceFile {
   DiskCache* diskCache = nullptr;
   uint32_t fileID = 0;
   FILE* file = nullptr;
+  size_t _fileSize = 0;
   uint32_t _width = 0;
   uint32_t _height = 0;
   uint32_t _frameCount = 0;

@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <filesystem>
-#include <fstream>
 #include "framework/pag_test.h"
 #include "framework/utils/PAGTestUtils.h"
 #include "platform/Platform.h"
@@ -50,12 +49,13 @@ PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
   EXPECT_FALSE(sequenceFile->isComplete());
   EXPECT_EQ(sequenceFile->cachedFrames, 11u);
   auto diskCache = sequenceFile->diskCache;
-  EXPECT_FALSE(std::filesystem::exists(cacheDir + "/caches/4.bin"));
+  EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/4.bin"));
   EXPECT_TRUE(diskCache->openedFiles.size() == 1);
   EXPECT_TRUE(diskCache->cachedFileMap.size() == 2);
   EXPECT_EQ(diskCache->cachedFiles.size(), 2u);
   EXPECT_EQ(diskCache->fileIDCount, 4u);
-  EXPECT_EQ(diskCache->totalDiskSize, 509137u);
+  const auto InitialDiskSize = 509137u;
+  EXPECT_EQ(diskCache->totalDiskSize, InitialDiskSize);
 
   tgfx::Bitmap bitmap(pagFile->width(), pagFile->height());
   tgfx::Pixmap pixmap(bitmap);
@@ -71,6 +71,7 @@ PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
   pagPlayer->setComposition(pagFile);
   auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
   pagPlayer->setSurface(pagSurface);
+  auto initialFileSize = sequenceFile->fileSize();
   for (auto i = 0; i < 30; i++) {
     pagPlayer->flush();
     success = pagSurface->readPixels(ColorType::RGBA_8888, AlphaType::Premultiplied,
@@ -79,9 +80,11 @@ PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
     success = sequenceFile->writeFrame(i, pixmap.pixels(), pixmap.byteSize());
     if (i < 11) {
       EXPECT_FALSE(success);
+      EXPECT_EQ(diskCache->totalDiskSize, InitialDiskSize);
     }
     pagPlayer->nextFrame();
   }
+  EXPECT_EQ(diskCache->totalDiskSize, InitialDiskSize + sequenceFile->fileSize() - initialFileSize);
   EXPECT_TRUE(sequenceFile->isComplete());
   EXPECT_TRUE(sequenceFile->encoder == nullptr);
   success = sequenceFile->readFrame(15, pixmap.writablePixels(), pixmap.byteSize());
@@ -89,7 +92,6 @@ PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
   EXPECT_TRUE(Baseline::Compare(pixmap, "PAGDiskCacheTest/SequenceFile_15"));
   success = sequenceFile->readFrame(30, pixmap.writablePixels(), pixmap.byteSize());
   EXPECT_FALSE(success);
-  EXPECT_EQ(diskCache->totalDiskSize, 1066615u);
 
   int halfWidth = 360;
   int halfHeight = 640;
@@ -107,6 +109,7 @@ PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
   success = halfSequenceFile->readFrame(20, pixmap.writablePixels(), pixmap.byteSize());
   EXPECT_TRUE(success);
   EXPECT_TRUE(Baseline::Compare(pixmap, "PAGDiskCacheTest/SequenceFile_20"));
+  const auto halfSequenceFileSize = halfSequenceFile->fileSize();
   halfSequenceFile = nullptr;
 
   int newWidth = 540;
@@ -119,6 +122,7 @@ PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
 
   DiskCache::SetMaxDiskSize(1297900u);
   EXPECT_EQ(DiskCache::MaxDiskSize(), 1297900u);
+  const auto lastTotalDiskSize = diskCache->totalDiskSize;
   sequenceFile = DiskCache::OpenSequence("resources/apitest/ZC2.pag.540x960", newWidth, newHeight,
                                          30, pagFile->frameRate());
   pagPlayer->setProgress(0);
@@ -133,17 +137,18 @@ PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
   success = sequenceFile->readFrame(22, pixmap.writablePixels(), pixmap.byteSize());
   EXPECT_TRUE(success);
   EXPECT_TRUE(Baseline::Compare(pixmap, "PAGDiskCacheTest/SequenceFile_22"));
-  EXPECT_EQ(diskCache->totalDiskSize, 1297836u);
-  EXPECT_FALSE(std::filesystem::exists(cacheDir + "/caches/3.bin"));
-  EXPECT_TRUE(std::filesystem::exists(cacheDir + "/caches/2.bin"));
+  EXPECT_EQ(diskCache->totalDiskSize,
+            lastTotalDiskSize + sequenceFile->fileSize() - halfSequenceFileSize);
+  EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/3.bin"));
+  EXPECT_TRUE(std::filesystem::exists(cacheDir + "/files/2.bin"));
 
   DiskCache::SetMaxDiskSize(0);
-  EXPECT_EQ(diskCache->totalDiskSize, 517646u);
-  EXPECT_FALSE(std::filesystem::exists(cacheDir + "/caches/2.bin"));
-  EXPECT_TRUE(std::filesystem::exists(cacheDir + "/caches/4.bin"));
+  EXPECT_EQ(diskCache->totalDiskSize, sequenceFile->fileSize());
+  EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/2.bin"));
+  EXPECT_TRUE(std::filesystem::exists(cacheDir + "/files/4.bin"));
   sequenceFile = nullptr;
   EXPECT_EQ(diskCache->totalDiskSize, 0u);
-  EXPECT_FALSE(std::filesystem::exists(cacheDir + "/caches/4.bin"));
+  EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/4.bin"));
   std::filesystem::remove_all(cacheDir);
 }
 

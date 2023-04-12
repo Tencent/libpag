@@ -42,14 +42,16 @@ SequenceFile::SequenceFile(const std::string& filePath, uint32_t width, uint32_t
     return;
   }
   decoder = LZ4Decoder::Make();
+  fseek(file, 0, SEEK_END);
+  _fileSize = static_cast<size_t>(ftell(file));
   if (readFramesFromFile()) {
     return;
   }
   cachedFrames = 0;
   frames.resize(frameCount, {0, 0});
-  fseek(file, 0, SEEK_END);
-  if (ftell(file) > 0) {
+  if (_fileSize > 0) {
     fclose(file);
+    _fileSize = 0;
     file = fopen(filePath.c_str(), "wb+");
     if (file == nullptr) {
       return;
@@ -71,10 +73,10 @@ SequenceFile::~SequenceFile() {
 }
 
 bool SequenceFile::readFramesFromFile() {
+  fseek(file, 0, SEEK_SET);
   frames.resize(_frameCount, {0, 0});
   uint8_t buffer[FILE_HEAD_SIZE] = {};
   auto data = tgfx::DataView(buffer, FILE_HEAD_SIZE);
-  fseek(file, 0, SEEK_SET);
   auto readLength = fread(data.writableBytes(), 1, FILE_HEAD_SIZE, file);
   if (readLength != FILE_HEAD_SIZE) {
     return false;
@@ -121,7 +123,18 @@ bool SequenceFile::writeFileHead() {
   data.setUint32(9, _frameCount);
   data.setFloat(13, _frameRate);
   auto writeLength = fwrite(data.bytes(), 1, FILE_HEAD_SIZE, file);
+  _fileSize = writeLength;
   return writeLength == data.size();
+}
+
+size_t SequenceFile::fileSize() {
+  std::lock_guard<std::mutex> autoLock(locker);
+  return _fileSize;
+}
+
+bool SequenceFile::isComplete() {
+  std::lock_guard<std::mutex> autoLock(locker);
+  return cachedFrames == _frameCount;
 }
 
 bool SequenceFile::readFrame(uint32_t index, void* pixels, size_t byteSize) {
@@ -171,12 +184,13 @@ bool SequenceFile::writeFrame(uint32_t index, const void* pixels, size_t byteSiz
   frame.offset = fileEnd + FRAME_HEAD_SIZE;
   frame.size = bufferSize - FRAME_HEAD_SIZE;
   cachedFrames++;
-  if (isComplete()) {
+  if (cachedFrames == _frameCount) {
     scratchBuffer.reset();
     encoder = nullptr;
   }
+  _fileSize = fileEnd + bufferSize;
   if (diskCache) {
-    diskCache->notifyFileSizeChanged(fileID, fileEnd + bufferSize);
+    diskCache->notifyFileSizeChanged(fileID, _fileSize);
   }
   return true;
 }
@@ -206,7 +220,7 @@ bool SequenceFile::checkScratchBuffer(size_t inputSize) {
     return true;
   }
   size_t scratchBufferSize = 0;
-  if (isComplete()) {
+  if (cachedFrames == _frameCount) {
     for (auto& frame : frames) {
       if (frame.size > scratchBufferSize) {
         scratchBufferSize = frame.size;

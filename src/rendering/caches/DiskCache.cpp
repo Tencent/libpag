@@ -58,7 +58,7 @@ DiskCache::DiskCache() {
   auto cacheDir = Platform::Current()->getCacheDir();
   if (!cacheDir.empty()) {
     configPath = Directory::JoinPath(cacheDir, "cache.cfg");
-    cacheFolder = Directory::JoinPath(cacheDir, "caches");
+    cacheFolder = Directory::JoinPath(cacheDir, "files");
     Directory::CreateRecursively(cacheFolder);
     readConfig();
   }
