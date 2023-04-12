@@ -232,7 +232,9 @@ static NSString* RemovePathVariableComponent(NSString* original) {
   return path;
 }
 
-- (void)setCompositionInternal:(PAGComposition*)newComposition maxFrameRate:(float)maxFrameRate {
+- (void)setCompositionInternal:(PAGComposition*)newComposition
+                  maxFrameRate:(float)maxFrameRate
+                  loadFromPath:(BOOL)loadFromPath {
   if (pagComposition == newComposition) {
     return;
   }
@@ -240,24 +242,26 @@ static NSString* RemovePathVariableComponent(NSString* original) {
     [pagComposition release];
     pagComposition = nil;
   }
-  pagComposition = [newComposition retain];
-  self.pagContentVersion = [PAGContentVersion Get:pagComposition];
-  if (self.pagContentVersion == 0 && [pagComposition isKindOfClass:[PAGFile class]]) {
-    if (filePath) {
-      [filePath release];
-      filePath = nil;
-    }
-    filePath = [(PAGFile*)pagComposition path];
-    [filePath retain];
-  }
+  self.pagContentVersion = [PAGContentVersion Get:newComposition];
   self.currentFrameExplicitlySet = 0;
-  self.fileWidth = [pagComposition width];
-  self.fileHeight = [pagComposition height];
-  self.frameRate = MIN(maxFrameRate, [pagComposition frameRate]);
-  numFrames = [pagComposition duration] * self.frameRate / 1000000;
+  self.fileWidth = [newComposition width];
+  self.fileHeight = [newComposition height];
+  self.frameRate = MIN(maxFrameRate, [newComposition frameRate]);
+  numFrames = [newComposition duration] * self.frameRate / 1000000;
   [valueAnimator setCurrentPlayTime:0];
-  [valueAnimator setDuration:[pagComposition duration]];
+  [valueAnimator setDuration:[newComposition duration]];
 
+  if (!loadFromPath) {
+    if (self.pagContentVersion == 0 && [newComposition isKindOfClass:[PAGFile class]]) {
+      if (filePath) {
+        [filePath release];
+        filePath = nil;
+      }
+      filePath = [(PAGFile*)pagComposition path];
+      [filePath retain];
+    }
+    pagComposition = [newComposition retain];
+  }
   [self reset];
 }
 
@@ -295,13 +299,13 @@ static NSString* RemovePathVariableComponent(NSString* original) {
 
 - (PAGDecoder*)getPAGDecoder {
   if (pagDecoder == nil) {
-    if (filePath) {
-      pagDecoder = [PAGDecoder Make:[PAGFile Load:filePath]
+    if (pagComposition) {
+      pagDecoder = [PAGDecoder Make:pagComposition
                        maxFrameRate:self.frameRate
                               scale:self.scaleFactor];
       [pagDecoder retain];
-    } else if (pagComposition) {
-      pagDecoder = [PAGDecoder Make:pagComposition
+    } else if (filePath) {
+      pagDecoder = [PAGDecoder Make:[PAGFile Load:filePath]
                        maxFrameRate:self.frameRate
                               scale:self.scaleFactor];
       [pagDecoder retain];
@@ -598,10 +602,6 @@ static NSString* RemovePathVariableComponent(NSString* original) {
 
 - (void)reset {
   [self unloadAllFrames];
-  if (filePath) {
-    [pagComposition release];
-    pagComposition = nil;
-  }
   if (pagDecoder) {
     [pagDecoder release];
     pagDecoder = nil;
@@ -812,15 +812,16 @@ static NSString* RemovePathVariableComponent(NSString* original) {
   if ([filePath isEqualToString:path]) {
     return YES;
   }
+  if (filePath) {
+    [filePath release];
+    filePath = nil;
+  }
   PAGFile* file = [PAGFile Load:path];
-  [self setCompositionInternal:file maxFrameRate:maxFrameRate];
+  [self setCompositionInternal:file maxFrameRate:maxFrameRate loadFromPath:YES];
   return file != nil;
 }
 
 - (PAGComposition*)getComposition {
-  if (filePath) {
-    return nil;
-  }
   if (pagComposition) {
     return [[pagComposition retain] autorelease];
   }
@@ -833,7 +834,7 @@ static NSString* RemovePathVariableComponent(NSString* original) {
 
 - (void)setComposition:(PAGComposition*)newComposition maxFrameRate:(float)maxFrameRate {
   std::lock_guard<std::mutex> autoLock(imageViewLock);
-  [self setCompositionInternal:newComposition maxFrameRate:maxFrameRate];
+  [self setCompositionInternal:newComposition maxFrameRate:maxFrameRate loadFromPath:NO];
 }
 
 - (void)setCurrentFrame:(NSUInteger)currentFrame {
