@@ -756,14 +756,19 @@ public class PAGImageView extends View {
         if (cacheItem == null || lastKeyItem == null || TextUtils.isEmpty(lastKeyItem.keyPrefix)) {
             return;
         }
-        if (cacheItem != null && allInMemoryCache()) {
+
+        if (allInMemoryCache()) {
             cacheItem.writeLock();
+            if (decoderInfo._pagDecoder != null) {
+                decoderInfo.releaseDecoder();
+            }
             cacheManager.remove(lastKeyItem.keyPrefixMD5);
             cacheItem.writeUnlock();
             cacheItem = null;
             return;
         }
-        if (cacheItem != null && decoderInfo._pagDecoder != null && cacheItem.isAllCached()) {
+
+        if (decoderInfo._pagDecoder != null && cacheItem.isAllCached()) {
             cacheItem.writeLock();
             decoderInfo.releaseDecoder();
             cacheItem.releaseSaveBuffer();
