@@ -18,14 +18,14 @@
 
 #include "LZ4Decoder.h"
 
-#if defined(__APPLE__) && !defined(PAG_USE_EXTERNAL_LZ4)
+#ifdef __APPLE__
 #include <compression.h>
 #else
 #include "lz4.h"
 #endif
 
 namespace pag {
-#if defined(__APPLE__) && !defined(PAG_USE_EXTERNAL_LZ4)
+#ifdef __APPLE__
 class AppleLZ4Decoder : public LZ4Decoder {
  public:
   AppleLZ4Decoder() {
