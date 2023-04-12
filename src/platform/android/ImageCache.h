@@ -35,6 +35,7 @@ class ImageCache {
   void release();
 
  private:
+  ImageCache(void* buffer, int fd, int frameCount);
   void* compressBuffer = nullptr;
   void* deCompressBuffer = nullptr;
   int deCompressBufferSize = 0;
@@ -42,8 +43,8 @@ class ImageCache {
   void* pendingSaveBuffer = nullptr;
   int pendingSaveBufferSize = 0;
   int pendingSaveFrame = -1;
-  int frameCount = 0;
   int fd = -1;
+  int frameCount = 0;
 };
 
 }  // namespace pag
