@@ -50,6 +50,9 @@ static bool SaveHardwarePixels(JNIEnv* env, std::shared_ptr<ImageCache> cache, j
   if (0 != tgfx::HardwareBufferInterface::Lock(buffer, AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN, -1,
                                                nullptr, reinterpret_cast<void**>(&pixels))) {
     LOGE("Failed to AHardwareBuffer_lock");
+    if (buffer != nullptr) {
+      tgfx::HardwareBufferInterface::Release(buffer);
+    }
     return false;
   }
   bool res = false;
@@ -57,6 +60,7 @@ static bool SaveHardwarePixels(JNIEnv* env, std::shared_ptr<ImageCache> cache, j
     res = cache->putPixelsToSaveBuffer(frame, pixels, byteCount);
   }
   tgfx::HardwareBufferInterface::Unlock(buffer, nullptr);
+  tgfx::HardwareBufferInterface::Release(buffer);
   return res;
 }
 
@@ -68,6 +72,9 @@ static bool InflateHardwarePixels(JNIEnv* env, std::shared_ptr<ImageCache> cache
   if (0 != tgfx::HardwareBufferInterface::Lock(buffer, AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN, -1,
                                                nullptr, reinterpret_cast<void**>(&pixels))) {
     LOGE("Failed to AHardwareBuffer_lock");
+    if (buffer != nullptr) {
+      tgfx::HardwareBufferInterface::Release(buffer);
+    }
     return false;
   }
   bool res = false;
@@ -75,6 +82,7 @@ static bool InflateHardwarePixels(JNIEnv* env, std::shared_ptr<ImageCache> cache
     res = cache->inflatePixels(frame, pixels, byteCount);
   }
   tgfx::HardwareBufferInterface::Unlock(buffer, nullptr);
+  tgfx::HardwareBufferInterface::Release(buffer);
   return res;
 }
 

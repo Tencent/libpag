@@ -57,15 +57,11 @@ std::shared_ptr<ImageCache> ImageCache::Make(const std::string& path, int width,
     }
     utimensat(0, path.c_str(), 0, 0);
   }
-  auto cache = std::make_shared<ImageCache>();
-  cache->headerBuffer = headerBuffer;
-  cache->fd = fd;
-  cache->frameCount = frameCount;
-  return cache;
+  return std::shared_ptr<ImageCache>(new ImageCache(headerBuffer, fd, frameCount));
 }
 
 bool ImageCache::flushSave() {
-  if (headerBuffer == nullptr | pendingSaveFrame < 0) {
+  if (headerBuffer == nullptr || pendingSaveFrame < 0) {
     return false;
   }
   // From the memory saving point of view, locking is needed here.
@@ -110,7 +106,7 @@ bool ImageCache::flushSave() {
 }
 
 bool ImageCache::putPixelsToSaveBuffer(int frame, void* bitmapPixels, int byteCount) {
-  if (bitmapPixels == nullptr || byteCount <= 0 || frame < 0 | frame >= frameCount) {
+  if (bitmapPixels == nullptr || byteCount <= 0 || frame < 0 || frame >= frameCount) {
     return false;
   }
   if (pendingSaveBufferSize != byteCount) {
@@ -196,6 +192,10 @@ void ImageCache::release() {
 
 ImageCache::~ImageCache() {
   release();
+}
+
+ImageCache::ImageCache(void* buffer, int fd, int frameCount)
+    : headerBuffer(buffer), fd(fd), frameCount(frameCount) {
 }
 
 void ImageCache::releaseSaveBuffer() {
