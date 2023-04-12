@@ -520,9 +520,8 @@ public class PAGImageView extends View {
                         decoderInfo._width, decoderInfo._height,
                         decoderInfo.numFrames);
             }
-        } else {
-            refreshMatrixFromScaleMode();
         }
+        refreshMatrixFromScaleMode();
         freezeDraw.set(false);
     }
 
@@ -884,7 +883,7 @@ public class PAGImageView extends View {
 
     @Override
     protected void onDraw(Canvas canvas) {
-        if (renderBitmap != null && !renderBitmap.isRecycled()) {
+        if (!freezeDraw.get() && renderBitmap != null && !renderBitmap.isRecycled()) {
             super.onDraw(canvas);
             canvas.save();
             if (renderMatrix != null) {
