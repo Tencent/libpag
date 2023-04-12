@@ -37,29 +37,23 @@ std::shared_ptr<SequenceFile> SequenceFile::Open(const std::string& filePath, ui
 SequenceFile::SequenceFile(const std::string& filePath, uint32_t width, uint32_t height,
                            uint32_t frameCount, float frameRate)
     : _width(width), _height(height), _frameCount(frameCount), _frameRate(frameRate) {
+  decoder = LZ4Decoder::Make();
+  frames.resize(frameCount, {0, 0});
   file = fopen(filePath.c_str(), "ab+");
   if (file == nullptr) {
     return;
   }
-  decoder = LZ4Decoder::Make();
   fseek(file, 0, SEEK_END);
   _fileSize = static_cast<size_t>(ftell(file));
-  if (readFramesFromFile()) {
+  if (_fileSize == 0) {
     return;
   }
-  cachedFrames = 0;
-  frames.resize(frameCount, {0, 0});
-  if (_fileSize > 0) {
-    fclose(file);
+  if (!readFramesFromFile()) {
+    cachedFrames = 0;
+    memset(frames.data(), 0, sizeof(FrameLocation) * frames.size());
     _fileSize = 0;
-    file = fopen(filePath.c_str(), "wb+");
-    if (file == nullptr) {
-      return;
-    }
-  }
-  if (!writeFileHead()) {
     fclose(file);
-    file = nullptr;
+    file = fopen(filePath.c_str(), "wb+");
   }
 }
 
@@ -74,7 +68,6 @@ SequenceFile::~SequenceFile() {
 
 bool SequenceFile::readFramesFromFile() {
   fseek(file, 0, SEEK_SET);
-  frames.resize(_frameCount, {0, 0});
   uint8_t buffer[FILE_HEAD_SIZE] = {};
   auto data = tgfx::DataView(buffer, FILE_HEAD_SIZE);
   auto readLength = fread(data.writableBytes(), 1, FILE_HEAD_SIZE, file);
@@ -174,21 +167,23 @@ bool SequenceFile::writeFrame(uint32_t index, const void* pixels, size_t byteSiz
   if (bufferSize == 0) {
     return false;
   }
+  if (_fileSize == 0 && !writeFileHead()) {
+    return false;
+  }
   if (fseek(file, 0, SEEK_END)) {
     return false;
   }
-  auto fileEnd = static_cast<size_t>(ftell(file));
   if (fwrite(scratchBuffer.bytes(), 1, bufferSize, file) != bufferSize) {
     return false;
   }
-  frame.offset = fileEnd + FRAME_HEAD_SIZE;
+  frame.offset = _fileSize + FRAME_HEAD_SIZE;
   frame.size = bufferSize - FRAME_HEAD_SIZE;
+  _fileSize += bufferSize;
   cachedFrames++;
   if (cachedFrames == _frameCount) {
     scratchBuffer.reset();
     encoder = nullptr;
   }
-  _fileSize = fileEnd + bufferSize;
   if (diskCache) {
     diskCache->notifyFileSizeChanged(fileID, _fileSize);
   }

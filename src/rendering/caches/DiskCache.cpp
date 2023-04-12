@@ -106,20 +106,16 @@ std::shared_ptr<SequenceFile> DiskCache::openSequence(const std::string& key, ui
   sequenceFile->fileID = fileID;
   openedFiles[fileID] = sequenceFile;
   if (!key.empty()) {
-    fseek(sequenceFile->file, 0, SEEK_END);
-    auto fileSize = static_cast<size_t>(ftell(sequenceFile->file));
-    totalDiskSize += fileSize;
     auto oldFileInfo = cachedFileMap[fileID];
     if (oldFileInfo) {
-      totalDiskSize -= oldFileInfo->fileSize;
+      auto fileSize = sequenceFile->fileSize();
+      totalDiskSize += fileSize - oldFileInfo->fileSize;
       oldFileInfo->fileSize = fileSize;
       moveToFront(oldFileInfo);
     } else {
-      addToCachedFiles(std::make_shared<FileInfo>(key, fileID, fileSize));
-    }
-    if (checkDiskSpace() || oldFileInfo == nullptr) {
+      addToCachedFiles(std::make_shared<FileInfo>(key, fileID, 0));
       saveConfig();
-    };
+    }
   }
   return sequenceFile;
 }
