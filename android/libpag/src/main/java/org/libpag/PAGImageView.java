@@ -622,7 +622,6 @@ public class PAGImageView extends View {
         synchronized (g_HandlerLock) {
             PAGImageViewHelper.DestroyHandlerThread();
         }
-        if (renderBitmap != null) renderBitmap.recycle();
         renderBitmap = null;
         bitmapCache.clear();
         freezeDraw.set(false);
