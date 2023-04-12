@@ -152,10 +152,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   if (pagDecoder != nil) {
     [pagDecoder release];
   }
-  if (imageViewCacheItem) {
-    [[PAGDiskCacheManager shareInstance] removeDiskCacheFrom:[self generateCacheKey]];
-    [imageViewCacheItem release];
-  }
   if (_currentUIImage) {
     [_currentUIImage release];
   }
@@ -325,6 +321,11 @@ static NSString* RemovePathVariableComponent(NSString* original) {
     imageViewCacheItem = [[PAGDiskCacheManager shareInstance] objectDiskCacheFor:cacheKey
                                                                       frameCount:numFrames];
     if (imageViewCacheItem) {
+      if (pagComposition && [PAGContentVersion Get:pagComposition] > 0) {
+        imageViewCacheItem.deleteAfterUse = YES;
+      } else {
+        imageViewCacheItem.deleteAfterUse = NO;
+      }
       [imageViewCacheItem retain];
     } else {
       return nil;
@@ -438,7 +439,7 @@ static NSString* RemovePathVariableComponent(NSString* original) {
   if (self->pagComposition &&
       (self.pagContentVersion != [PAGContentVersion Get:self->pagComposition])) {
     self.pagContentVersion = [PAGContentVersion Get:self->pagComposition];
-    [self unloadAllFrames];
+    [self reset];
   }
   if ([[imagesMap allKeys] containsObject:[NSNumber numberWithInteger:frameIndex]]) {
     UIImage* image = [imagesMap objectForKey:[NSNumber numberWithInteger:frameIndex]];
@@ -601,11 +602,6 @@ static NSString* RemovePathVariableComponent(NSString* original) {
     [pagComposition release];
     pagComposition = nil;
   }
-  if (imageViewCacheItem) {
-    [[PAGDiskCacheManager shareInstance] removeDiskCacheFrom:cacheKey];
-    [imageViewCacheItem release];
-    imageViewCacheItem = nil;
-  }
   if (pagDecoder) {
     [pagDecoder release];
     pagDecoder = nil;
@@ -647,9 +643,10 @@ static NSString* RemovePathVariableComponent(NSString* original) {
     [imagesMap removeAllObjects];
     self.memeoryCacheFinished = NO;
   }
-  if (pagComposition && [PAGContentVersion Get:pagComposition] > 0) {
-    [imageViewCacheItem.diskCache removeCachesWithBlock:^{
-    }];
+  if (imageViewCacheItem) {
+    [[PAGDiskCacheManager shareInstance] removeDiskCacheFrom:[self generateCacheKey]];
+    [imageViewCacheItem release];
+    imageViewCacheItem = nil;
   }
 }
 

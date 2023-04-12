@@ -176,7 +176,7 @@ public class PAGImageView extends View {
      * Sets the frame index for the PAGImageView to render.
      */
     public void setCurrentFrame(int currentFrame) {
-        if (!decoderInfo.isValid() || currentFrame < 0 || currentFrame >= decoderInfo.numFrames || cacheItem == null) {
+        if (!decoderInfo.isValid() || currentFrame < 0 || currentFrame >= decoderInfo.numFrames || (cacheItem == null && !allInMemoryCache())) {
             return;
         }
         _currentFrame = currentFrame;
@@ -422,7 +422,7 @@ public class PAGImageView extends View {
     private final ValueAnimator.AnimatorUpdateListener mAnimatorUpdateListener = new ValueAnimator.AnimatorUpdateListener() {
         @Override
         public void onAnimationUpdate(ValueAnimator animation) {
-            if (!decoderInfo.isValid() || cacheItem == null) {
+            if (!decoderInfo.isValid() || (cacheItem == null && !allInMemoryCache())) {
                 return;
             }
             PAGImageView.this.currentPlayTime = animation.getCurrentPlayTime();
@@ -628,12 +628,16 @@ public class PAGImageView extends View {
     }
 
     private void releaseAllTask() {
-        for (Iterator<WeakReference<Future>> iterator = saveCacheTasks.iterator(); iterator.hasNext(); ) {
-            WeakReference<Future> task = iterator.next();
-            if (task.get() != null) {
-                task.get().cancel(false);
+        try {
+            for (Iterator<WeakReference<Future>> iterator = saveCacheTasks.iterator(); iterator.hasNext(); ) {
+                WeakReference<Future> task = iterator.next();
+                if (task.get() != null) {
+                    task.get().cancel(false);
+                }
+                iterator.remove();
             }
-            iterator.remove();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
@@ -744,20 +748,32 @@ public class PAGImageView extends View {
         return false;
     }
 
+    private boolean allInMemoryCache() {
+        return bitmapCache.size() == decoderInfo.numFrames;
+    }
 
     private void releaseDecoder() {
-        if (cacheItem == null || lastKeyItem == null || TextUtils.isEmpty(lastKeyItem.keyPrefix) || decoderInfo._pagDecoder == null) {
+        if (cacheItem == null || lastKeyItem == null || TextUtils.isEmpty(lastKeyItem.keyPrefix)) {
             return;
         }
-        cacheItem.writeLock();
-        if (bitmapCache.size() == decoderInfo.numFrames || cacheItem.isAllCached()) {
+
+        if (allInMemoryCache()) {
+            cacheItem.writeLock();
+            if (decoderInfo._pagDecoder != null) {
+                decoderInfo.releaseDecoder();
+            }
+            cacheManager.remove(lastKeyItem.keyPrefixMD5);
+            cacheItem.writeUnlock();
+            cacheItem = null;
+            return;
+        }
+
+        if (decoderInfo._pagDecoder != null && cacheItem.isAllCached()) {
+            cacheItem.writeLock();
             decoderInfo.releaseDecoder();
             cacheItem.releaseSaveBuffer();
-            if (bitmapCache.size() == decoderInfo.numFrames) {
-                cacheItem.release();
-            }
+            cacheItem.writeUnlock();
         }
-        cacheItem.writeUnlock();
     }
 
     protected void releaseCurrentDiskCache() {
@@ -772,6 +788,7 @@ public class PAGImageView extends View {
             }
             cacheItem.writeUnlock();
             cacheManager.remove(lastKeyItem.keyPrefixMD5);
+            cacheItem = null;
         }
     }
 
