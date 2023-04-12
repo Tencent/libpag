@@ -77,10 +77,9 @@
     PAGDiskCacheItem* diskCacheItem = [diskCacheDict objectForKey:cacheName];
     if (diskCacheItem) {
       diskCacheItem.count--;
-      if (diskCacheItem.count == 0 && diskCacheItem.deleteAfterUse) {
-        NSString* path = [diskCacheItem.diskCache path];
-        if (path.length > 0) {
-          [[PAGCacheManager shareInstance] removeFileForPath:path];
+      if (diskCacheItem.count == 0) {
+        if (diskCacheItem.deleteAfterUse) {
+          [[PAGCacheManager shareInstance] removeFileForPath:[diskCacheItem.diskCache path]];
         }
         [diskCacheDict removeObjectForKey:cacheName];
       }
