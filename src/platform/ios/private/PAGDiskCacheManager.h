@@ -25,6 +25,7 @@ NS_ASSUME_NONNULL_BEGIN
 @interface PAGDiskCacheItem : NSObject
 @property(nonatomic, retain) PAGDiskCache* diskCache;
 @property(nonatomic, assign) NSInteger count;
+@property(nonatomic, assign) BOOL deleteAfterUse;
 @end
 
 @interface PAGDiskCacheManager : NSObject

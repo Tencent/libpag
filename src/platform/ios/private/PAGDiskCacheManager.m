@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGDiskCacheManager.h"
+#import "PAGCacheManager.h"
 
 @implementation PAGDiskCacheItem
 - (void)dealloc {
@@ -76,7 +77,11 @@
     PAGDiskCacheItem* diskCacheItem = [diskCacheDict objectForKey:cacheName];
     if (diskCacheItem) {
       diskCacheItem.count--;
-      if (diskCacheItem.count == 0) {
+      if (diskCacheItem.count == 0 && diskCacheItem.deleteAfterUse) {
+        NSString* path = [diskCacheItem.diskCache path];
+        if (path.length > 0) {
+          [[PAGCacheManager shareInstance] removeFileForPath:path];
+        }
         [diskCacheDict removeObjectForKey:cacheName];
       }
     }
