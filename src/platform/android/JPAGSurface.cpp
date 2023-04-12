@@ -221,19 +221,30 @@ static bool readPixelsToHardwareBuffer(JNIEnv* env, std::shared_ptr<PAGSurface> 
   if (0 != tgfx::HardwareBufferInterface::Lock(buffer, AHARDWAREBUFFER_USAGE_CPU_WRITE_OFTEN, -1,
                                                nullptr, reinterpret_cast<void**>(&pixels))) {
     LOGE("Failed to AHardwareBuffer_lock");
+    if (buffer != nullptr) {
+      tgfx::HardwareBufferInterface::Release(buffer);
+    }
     return false;
   }
   bool res = false;
   if (pixels) {
     auto imageInfo = tgfx::GetImageInfo(buffer);
     if (imageInfo.width() != surface->width() || imageInfo.height() != surface->height()) {
-      tgfx::HardwareBufferInterface::Unlock(buffer, nullptr);
+      auto unlockRes = tgfx::HardwareBufferInterface::Unlock(buffer, nullptr);
+      if (unlockRes != 0) {
+        LOGE("unlock failed!: %d", unlockRes);
+      }
+      tgfx::HardwareBufferInterface::Release(buffer);
       return false;
     }
     res = surface->readPixels(ToPAG(imageInfo.colorType()), ToPAG(imageInfo.alphaType()), pixels,
                               imageInfo.rowBytes());
   }
-  tgfx::HardwareBufferInterface::Unlock(buffer, nullptr);
+  auto unlockRes = tgfx::HardwareBufferInterface::Unlock(buffer, nullptr);
+  if (unlockRes != 0) {
+    LOGE("unlock failed!: %d", unlockRes);
+  }
+  tgfx::HardwareBufferInterface::Release(buffer);
   return res;
 }
 

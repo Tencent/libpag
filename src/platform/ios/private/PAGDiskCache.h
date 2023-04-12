@@ -36,8 +36,6 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (NSInteger)maxEncodedBufferSize;
 
-- (void)removeCachesWithBlock:(void (^_Nullable)(void))block;
-
 @end
 
 NS_ASSUME_NONNULL_END

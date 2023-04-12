@@ -60,17 +60,22 @@ public class PAGDecoder {
         pagDecoder._height = Math.round(pagComposition.height() * scale);
         pagDecoder._numFrames =
                 (int) (pagComposition.duration() * frameRate / 1000000);
-        pagDecoder.pagSurface = PAGSurface.MakeOffscreen(pagDecoder._width, pagDecoder._height);
-        if (pagDecoder.pagSurface == null) {
-            return null;
-        }
         pagDecoder.pagPlayer = new PAGPlayer();
         if (frameRate > 0) {
             pagDecoder.pagPlayer.setMaxFrameRate(frameRate);
         }
-        pagDecoder.pagPlayer.setSurface(pagDecoder.pagSurface);
         pagDecoder.pagPlayer.setComposition(pagComposition);
         return pagDecoder;
+    }
+
+    private boolean checkSurface() {
+        if (pagSurface == null) {
+            pagSurface = PAGSurface.MakeOffscreen(_width, _height);
+        }
+        if (pagSurface != null) {
+            pagPlayer.setSurface(pagSurface);
+        }
+        return pagSurface != null;
     }
 
     /**
@@ -101,6 +106,9 @@ public class PAGDecoder {
         if (bitmap == null || bitmap.isRecycled() || index < 0 || index >= _numFrames) {
             return false;
         }
+        if (!checkSurface()) {
+            return false;
+        }
         pagPlayer.setProgress(PAGImageViewHelper.FrameToProgress(index, _numFrames));
         pagPlayer.flush();
         return pagSurface.copyPixelsTo(bitmap);
@@ -112,6 +120,9 @@ public class PAGDecoder {
      */
     public Bitmap frameAtIndex(int index) {
         if (index < 0 || index >= _numFrames) {
+            return null;
+        }
+        if (!checkSurface()) {
             return null;
         }
         pagPlayer.setProgress(PAGImageViewHelper.FrameToProgress(index, _numFrames));
@@ -127,7 +138,9 @@ public class PAGDecoder {
      * garbage collector to do this for you at some point in the future.
      */
     public void release() {
-        pagSurface.release();
+        if (pagSurface != null) {
+            pagSurface.release();
+        }
         pagPlayer.setSurface(null);
         pagPlayer.setComposition(null);
         pagPlayer.release();

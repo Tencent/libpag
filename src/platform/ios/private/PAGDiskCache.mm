@@ -152,20 +152,6 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
   return maxCacheEncodedBufferSize;
 }
 
-- (void)removeCachesWithBlock:(void (^)())block {
-  __block __typeof(self) weakSelf = self;
-  dispatch_async(cacheQueue, ^{
-    if (weakSelf->fd > 0) {
-      weakSelf->diskLock.lock();
-      close(weakSelf->fd);
-      [[PAGCacheManager shareInstance] removeFileForPath:weakSelf->_path];
-      weakSelf->fd = open([weakSelf->_path UTF8String], O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
-      weakSelf->diskLock.unlock();
-    }
-    block();
-  });
-}
-
 #pragma mark - private
 - (void)initializeCacheFile {
   if (fd <= 0) {

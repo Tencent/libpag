@@ -34,6 +34,7 @@ import java.util.HashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 class CacheManager {
+    static final boolean HARDWARE_CACHE_ENABLE = Build.VERSION.SDK_INT > Build.VERSION_CODES.Q;
     static CacheManager pagCacheManager;
     private String cacheDir;
     private final static float autoCleanThreshold = 0.6f;
@@ -245,6 +246,9 @@ class CacheManager {
         // otherwise use internal cache dir
         if (TextUtils.isEmpty(uniqueName)) {
             uniqueName = "PAGImageViewCache";
+        }
+        if (HARDWARE_CACHE_ENABLE) {
+            uniqueName = uniqueName + "_Hardware";
         }
         final String cachePath =
                 Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState()) ||

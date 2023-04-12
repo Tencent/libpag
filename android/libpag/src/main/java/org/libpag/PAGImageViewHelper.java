@@ -202,7 +202,7 @@ class PAGImageViewHelper {
         if (width == 0 || height == 0) {
             return null;
         }
-        if (Build.VERSION.SDK_INT > Build.VERSION_CODES.Q) {
+        if (CacheManager.HARDWARE_CACHE_ENABLE) {
             HardwareBuffer hardwareBuffer = HardwareBuffer.create(width, height,
                     HardwareBuffer.RGBA_8888, 1,
                     HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE | HardwareBuffer.USAGE_CPU_READ_OFTEN | HardwareBuffer.USAGE_CPU_WRITE_OFTEN);
