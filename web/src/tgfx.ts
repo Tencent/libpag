@@ -1,4 +1,4 @@
-import { getCanvas2D, releaseCanvas2D } from './utils/canvas';
+import { getCanvas2D, releaseCanvas2D, isOffscreenCanvas } from './utils/canvas';
 import { writeBufferToWasm } from './utils/buffer';
 import { BitmapImage } from './core/bitmap-image';
 
@@ -92,8 +92,8 @@ export const isAndroidMiniprogram = () => {
 export const releaseNativeImage = (source: TexImageSource | OffscreenCanvas) => {
   if (source instanceof ImageBitmap) {
     source.close();
-  } else if (source instanceof OffscreenCanvas || source instanceof HTMLCanvasElement) {
-    releaseCanvas2D(source);
+  } else if (isOffscreenCanvas(source) || source instanceof HTMLCanvasElement) {
+    releaseCanvas2D(source as OffscreenCanvas | HTMLCanvasElement);
   }
 };
 
