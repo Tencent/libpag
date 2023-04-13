@@ -1,3 +1,5 @@
+import { isInstanceOf } from './type-utils';
+
 export const readFile = (file: File) =>
   new Promise<ArrayBuffer | null>((resolve) => {
     const reader = new FileReader();
@@ -11,12 +13,12 @@ export const readFile = (file: File) =>
   });
 
 export const transferToArrayBuffer = (data: File | Blob | ArrayBuffer) => {
-  if (data instanceof File) {
-    return readFile(data);
-  } else if (data instanceof Blob) {
-    return readFile(new File([data], ''));
-  } else if (data instanceof ArrayBuffer) {
-    return Promise.resolve(data);
+  if (isInstanceOf(data, globalThis.File)) {
+    return readFile(data as File);
+  } else if (isInstanceOf(data, globalThis.Blob)) {
+    return readFile(new File([data as Blob], ''));
+  } else if (isInstanceOf(data, globalThis.ArrayBuffer)) {
+    return Promise.resolve(data as ArrayBuffer);
   }
   return Promise.resolve(null);
 };

@@ -83,3 +83,5 @@ export const getWasmIns = (value: any) => {
   }
   return value;
 };
+
+export const isInstanceOf = (value: any, type: any) => typeof type !== 'undefined' && value instanceof type;
