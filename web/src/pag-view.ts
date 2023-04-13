@@ -9,6 +9,7 @@ import { PAGModule } from './pag-module';
 import { RenderCanvas } from './core/render-canvas';
 import { Clock } from './utils/clock';
 import { WORKER } from './utils/ua';
+import { isInstanceOf } from './utils/type-utils';
 
 import type { PAGComposition } from './pag-composition';
 import type { Matrix } from './core/matrix';
@@ -46,7 +47,7 @@ export class PAGView {
     let canvasElement: HTMLCanvasElement | OffscreenCanvas | null = null;
     if (typeof canvas === 'string') {
       canvasElement = document.getElementById(canvas.substr(1)) as HTMLCanvasElement;
-    } else if (typeof window !== 'undefined' && canvas instanceof window.HTMLCanvasElement) {
+    } else if (typeof window !== 'undefined' && isInstanceOf(canvas, globalThis.HTMLCanvasElement)) {
       canvasElement = canvas;
     } else if (isOffscreenCanvas(canvas)) {
       canvasElement = canvas;

@@ -1,12 +1,13 @@
 import { PAGModule } from '../pag-module';
 import { WEBGL_CONTEXT_ATTRIBUTES } from '../constant';
+import { isInstanceOf } from '../utils/type-utils';
 
 export class BackendContext {
   public static from(gl: WebGLRenderingContext | WebGL2RenderingContext | BackendContext): BackendContext {
     if (gl instanceof BackendContext) {
       return new BackendContext(gl.handle, true);
     } else {
-      const majorVersion = globalThis.WebGL2RenderingContext && gl instanceof globalThis.WebGL2RenderingContext ? 2 : 1;
+      const majorVersion = isInstanceOf(gl, globalThis.WebGL2RenderingContext) ? 2 : 1;
       const { GL } = PAGModule;
       let id = 0;
       if (GL.contexts.length > 0) {

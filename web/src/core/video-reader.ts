@@ -13,6 +13,7 @@ import { postMessage } from '../worker/utils';
 
 import type { TimeRange, VideoReader as VideoReaderInterfaces } from '../interfaces';
 import type { PAGPlayer } from '../pag-player';
+import { isInstanceOf } from '../utils/type-utils';
 
 const UHD_RESOLUTION = 3840;
 
@@ -103,8 +104,8 @@ export class VideoReader {
     staticTimeRanges: TimeRange[],
     isWorker = false,
   ) {
-    if (source instanceof HTMLVideoElement) {
-      this.videoEl = source;
+    if (isInstanceOf(source, globalThis.HTMLVideoElement)) {
+      this.videoEl = source as HTMLVideoElement;
       this.canplay = true;
     } else {
       this.videoEl = document.createElement('video');
@@ -117,7 +118,7 @@ export class VideoReader {
       waitVideoCanPlay(this.videoEl).then(() => {
         this.canplay = true;
       });
-      const blob = new Blob([source], { type: 'video/mp4' });
+      const blob = new Blob([source as Uint8Array], { type: 'video/mp4' });
       this.videoEl.src = URL.createObjectURL(blob);
       if (IPHONE) {
         // use load() will make a bug on Chrome.
