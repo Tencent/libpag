@@ -1,12 +1,17 @@
 import { destroyVerify } from '../utils/decorators';
+import { isInstanceOf } from '../utils/type-utils';
 import { WorkerMessageType } from './events';
 import { postMessage } from './utils';
 
 @destroyVerify
 export class WorkerPAGImage {
   public static async fromSource(worker: Worker, source: TexImageSource) {
-    const width = window.HTMLVideoElement && source instanceof HTMLVideoElement ? source.videoWidth : source.width;
-    const height = window.HTMLVideoElement && source instanceof HTMLVideoElement ? source.videoHeight : source.height;
+    const width = isInstanceOf(source, globalThis.HTMLVideoElement)
+      ? (source as HTMLVideoElement).videoWidth
+      : source.width;
+    const height = isInstanceOf(source, globalThis.HTMLVideoElement)
+      ? (source as HTMLVideoElement).videoHeight
+      : source.height;
     const canvas = new OffscreenCanvas(width, height);
     canvas.width = source.width;
     canvas.height = source.height;

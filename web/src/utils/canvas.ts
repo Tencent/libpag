@@ -1,11 +1,13 @@
 import { CANVAS_POOL_MAX_SIZE } from '../constant';
+import { isInstanceOf } from './type-utils';
 import { SAFARI } from './ua';
 
 const canvasPool = new Array<HTMLCanvasElement | OffscreenCanvas>();
 
-export const isOffscreenCanvas = (element: any) =>
-  globalThis.OffscreenCanvas && element instanceof globalThis.OffscreenCanvas;
-export const isCanvas = (element: any) => isOffscreenCanvas(element) || element instanceof globalThis.HTMLCanvasElement;
+export const isOffscreenCanvas = (element: any) => isInstanceOf(element, globalThis.OffscreenCanvas);
+
+export const isCanvas = (element: any) =>
+  isOffscreenCanvas(element) || isInstanceOf(element, globalThis.HTMLCanvasElement);
 
 export const getCanvas2D = (width: number, height: number) => {
   let canvas = canvasPool.pop() || createCanvas2D();

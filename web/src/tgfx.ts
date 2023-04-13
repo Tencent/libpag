@@ -1,6 +1,7 @@
-import { getCanvas2D, releaseCanvas2D, isOffscreenCanvas } from './utils/canvas';
+import { getCanvas2D, releaseCanvas2D, isCanvas } from './utils/canvas';
 import { writeBufferToWasm } from './utils/buffer';
 import { BitmapImage } from './core/bitmap-image';
+import { isInstanceOf } from './utils/type-utils';
 
 import type { EmscriptenGL, PAG } from './types';
 import type { wx } from './wechat/interfaces';
@@ -53,10 +54,10 @@ export const hasWebpSupport = () => {
 };
 
 export const getSourceSize = (source: TexImageSource | OffscreenCanvas) => {
-  if (globalThis.HTMLVideoElement && source instanceof HTMLVideoElement) {
+  if (isInstanceOf(source, globalThis.HTMLVideoElement)) {
     return {
-      width: source.videoWidth,
-      height: source.videoHeight,
+      width: (source as HTMLVideoElement).videoWidth,
+      height: (source as HTMLVideoElement).videoHeight,
     };
   }
   return { width: source.width, height: source.height };
@@ -90,9 +91,9 @@ export const isAndroidMiniprogram = () => {
 };
 
 export const releaseNativeImage = (source: TexImageSource | OffscreenCanvas) => {
-  if (source instanceof ImageBitmap) {
-    source.close();
-  } else if (isOffscreenCanvas(source) || source instanceof HTMLCanvasElement) {
+  if (isInstanceOf(source, ImageBitmap)) {
+    (source as ImageBitmap).close();
+  } else if (isCanvas(source)) {
     releaseCanvas2D(source as OffscreenCanvas | HTMLCanvasElement);
   }
 };
