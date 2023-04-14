@@ -816,6 +816,7 @@ static NSString* RemovePathVariableComponent(NSString* original) {
     [filePath release];
     filePath = nil;
   }
+  filePath = [path retain];
   PAGFile* file = [PAGFile Load:path];
   [self setCompositionInternal:file maxFrameRate:maxFrameRate loadFromPath:YES];
   return file != nil;
