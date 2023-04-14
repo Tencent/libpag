@@ -74,6 +74,7 @@ class DiskCache {
   void readConfig();
   void saveConfig();
   uint32_t getFileID(const std::string& key);
+  void changeToTemporary(uint32_t fileID);
   std::string fileIDToPath(uint32_t fileID);
   uint32_t filePathToID(const std::string& path);
   void notifyFileClosed(uint32_t fileID);

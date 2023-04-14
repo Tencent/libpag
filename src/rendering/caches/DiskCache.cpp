@@ -92,10 +92,14 @@ std::shared_ptr<SequenceFile> DiskCache::openSequence(const std::string& key,
   if (result != openedFiles.end()) {
     auto sequenceFile = result->second.lock();
     if (sequenceFile != nullptr) {
-      moveToFront(cachedFileMap[fileID]);
-      return sequenceFile;
+      if (sequenceFile->_info == info && sequenceFile->_frameCount == frameCount &&
+          sequenceFile->_frameRate == frameRate) {
+        moveToFront(cachedFileMap[fileID]);
+        return sequenceFile;
+      }
+      changeToTemporary(fileID);
+      fileID = getFileID(key);
     }
-    openedFiles.erase(fileID);
   }
   auto filePath = fileIDToPath(fileID);
   auto sequenceFile = SequenceFile::Open(filePath, info, frameCount, frameRate);
@@ -247,6 +251,18 @@ uint32_t DiskCache::getFileID(const std::string& key) {
   auto newFileID = fileIDCount++;
   fileIDMap[key] = newFileID;
   return newFileID;
+}
+
+void DiskCache::changeToTemporary(uint32_t fileID) {
+  auto result = cachedFileMap.find(fileID);
+  if (result == cachedFileMap.end()) {
+    return;
+  }
+  auto fileInfo = result->second;
+  cachedFiles.erase(fileInfo->cachedPosition);
+  cachedFileMap.erase(fileID);
+  totalDiskSize -= fileInfo->fileSize;
+  fileIDMap.erase(fileInfo->cacheKey);
 }
 
 std::string DiskCache::fileIDToPath(uint32_t fileID) {
