@@ -23,28 +23,25 @@
             android:layout_width="0dp"
             android:layout_height="40dp"
             android:layout_weight="1"
-            android:autoText="false"
             android:background="@drawable/bt_drawable"
             android:clickable="true"
             android:focusable="true"
             android:gravity="center"
-            android:text="alpha.pag"
+            android:text="PAGView"
             android:textAllCaps="false"
             android:textColor="#ffffff"
             android:textSize="18sp" />
 
-        <libpag.pagviewer.IconButton
+        <Button
             android:id="@+id/play_second"
             android:layout_width="0dp"
             android:layout_height="40dp"
             android:layout_weight="1"
-            android:autoText="false"
             android:background="@drawable/bt_drawable"
             android:clickable="true"
             android:focusable="true"
             android:gravity="center"
-            android:text="particle_video.pag"
-            android:drawableStart="@mipmap/softavc"
+            android:text="PAGImageView"
             android:textAllCaps="false"
             android:textColor="#ffffff"
             android:textSize="18sp" />
