@@ -25,11 +25,11 @@
 #define SCREEN_HEIGHT      [UIScreen mainScreen].bounds.size.height
 
 @interface ViewController ()
-@property (weak, nonatomic) IBOutlet BackgroundView *bgView;
-@property (nonatomic, strong) UIButton *firstButton;
-@property (nonatomic, strong) UIButton *secondButton;
-@property (nonatomic, strong) PAGView *pagView;
-@property (nonatomic, strong) UIView *pagImageViewGroup;
+@property (nonatomic, weak) IBOutlet BackgroundView* bgView;
+@property (nonatomic, strong) UIButton* firstButton;
+@property (nonatomic, strong) UIButton* secondButton;
+@property (nonatomic, strong) PAGView* pagView;
+@property (nonatomic, strong) UIView* pagImageViewGroup;
 
 @end
 
@@ -105,7 +105,8 @@
         float itemHeight = itemWidth;
         for (int i = 0; i < 20; i++) {
             PAGImageView* pagImageView = [[PAGImageView alloc] initWithFrame:CGRectMake(itemWidth * (i % 4), (i / 4) * itemHeight + startY, itemWidth, itemHeight)];
-            [pagImageView setPath:[[NSBundle mainBundle] pathForResource:[NSString stringWithFormat:@"%d", i] ofType:@"pag"]];
+            NSString* path = [[NSBundle mainBundle] pathForResource:[NSString stringWithFormat:@"%d", i] ofType:@"pag" inDirectory:@"list"];
+            [pagImageView setPath:path];
             [pagImageView setCacheAllFramesInMemory:NO];
             [self.pagImageViewGroup addSubview:pagImageView];
             [pagImageView setRepeatCount:-1];
@@ -138,25 +139,26 @@
 }
 
 - (void)firstButtonClicked {
-    if (self.pagImageViewGroup && !self.pagImageViewGroup.isHidden) {
-        [self.pagImageViewGroup setHidden:YES];
+    if (self.pagImageViewGroup) {
+        [self.pagImageViewGroup removeFromSuperview];
+        self.pagImageViewGroup = nil;
         [self.secondButton setBackgroundColor:[UIColor grayColor]];
     }
-    if (self.pagView && self.pagView.isHidden) {
-        [self.pagView setHidden:NO];
+    if (self.pagView == nil) {
+        [self addPAGViewAndPlay];
         [self.firstButton setBackgroundColor:[UIColor colorWithRed:0 green:90.0/255 blue:217.0/255 alpha:1.0]];
     }
 }
 
 - (void)secondButtonClicked{
-    if (self.pagView && !self.pagView.isHidden) {
-        [self.pagView setHidden:YES];
+    if (self.pagView) {
+        [self.pagView removeFromSuperview];
+        [self.pagView freeCache];
+        self.pagView = nil;
         [self.firstButton setBackgroundColor:[UIColor grayColor]];
     }
     if (self.pagImageViewGroup == nil) {
         [self addPAGImageViewsAndPlay];
-    } else if (self.pagImageViewGroup.isHidden) {
-        [self.pagImageViewGroup setHidden:NO];
     }
     [self.secondButton setBackgroundColor:[UIColor colorWithRed:0 green:90.0/255 blue:217.0/255 alpha:1.0]];
 }

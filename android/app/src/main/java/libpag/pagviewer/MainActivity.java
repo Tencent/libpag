@@ -67,25 +67,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
         btPlaySecond.setOnClickListener(this);
 
-        addPAGView();
-        if (pagView != null) {
-            pagView.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    if (pagView.isPlaying()) {
-                        pagView.stop();
-                    } else {
-                        pagView.play();
-                    }
-                }
-            });
-            pagView.play();
-        }
-
+        addPAGViewAndPlay();
         activatedView(btPlayFirst.getId());
     }
 
-    private void addPAGView() {
+    private void addPAGViewAndPlay() {
         if (pagView == null) {
             eglSetup();
             pagView = new PAGView(this, eglContext);
@@ -106,7 +92,18 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
             pagView.setComposition(pagFile);
             pagView.setRepeatCount(-1);
+            pagView.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (pagView.isPlaying()) {
+                        pagView.stop();
+                    } else {
+                        pagView.play();
+                    }
+                }
+            });
             containerView.addView(pagView);
+            pagView.play();
         }
     }
 
@@ -126,7 +123,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
             for (int i = 0; i < 20; i++) {
                 PAGImageView pagImageView = new PAGImageView(this);
-                String path = "assets://" + i + ".pag";
+                String path = "assets://list/" + i + ".pag";
                 pagImageView.setPath(path);
 
                 pagImageViewGroup.addView(pagImageView);
@@ -170,21 +167,23 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     @Override
     public void onClick(View v) {
         if (v.getId() == R.id.play_second) {
-            if (pagView.getVisibility() == View.VISIBLE) {
-                pagView.setVisibility(View.INVISIBLE);
+            if (pagView != null) {
+                containerView.removeView(pagView);
+                pagView.freeCache();
+                pagView = null;
             }
            if (pagImageViewGroup == null) {
                addPAGImageViewsAndPlay();
-           } else if (pagImageViewGroup.getVisibility() == View.INVISIBLE) {
-               pagImageViewGroup.setVisibility(View.VISIBLE);
            }
            activatedView(R.id.play_second);
         } else {
-            if (pagImageViewGroup != null && (pagImageViewGroup.getVisibility() == View.VISIBLE)) {
-                pagImageViewGroup.setVisibility(View.INVISIBLE);
+            if (pagImageViewGroup != null) {
+                containerView.removeView(pagImageViewGroup);
+                pagImageViewGroup.removeAllViews();
+                pagImageViewGroup = null;
             }
-            if (pagView.getVisibility() == View.INVISIBLE) {
-                pagView.setVisibility(View.VISIBLE);
+            if (pagView == null) {
+                addPAGViewAndPlay();
             }
             activatedView(R.id.play_first);
         }
