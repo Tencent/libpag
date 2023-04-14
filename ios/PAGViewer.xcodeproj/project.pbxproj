@@ -13,10 +13,9 @@
 		4D72AC7A22C1071600C60D04 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = F2ED88AC1FCBEDF100555707 /* LaunchScreen.storyboard */; };
 		4D72AC7F22C1071600C60D04 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F2ED88AA1FCBEDF100555707 /* Assets.xcassets */; };
 		4D72AC8122C1071600C60D04 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = F2ED88A71FCBEDF100555707 /* Main.storyboard */; };
+		4DA13EE829E9253300F85AC6 /* list in Resources */ = {isa = PBXBuildFile; fileRef = 4DA13EE729E9253300F85AC6 /* list */; };
 		4DE99A4E27BFC16F0003AA0A /* BackgroundView.m in Sources */ = {isa = PBXBuildFile; fileRef = 4DE99A4827BFC16F0003AA0A /* BackgroundView.m */; };
 		4DE99A4F27BFC16F0003AA0A /* BackgroundView.m in Sources */ = {isa = PBXBuildFile; fileRef = 4DE99A4827BFC16F0003AA0A /* BackgroundView.m */; };
-		4DE99A5027BFC16F0003AA0A /* PAGPlayerView.m in Sources */ = {isa = PBXBuildFile; fileRef = 4DE99A4927BFC16F0003AA0A /* PAGPlayerView.m */; };
-		4DE99A5127BFC16F0003AA0A /* PAGPlayerView.m in Sources */ = {isa = PBXBuildFile; fileRef = 4DE99A4927BFC16F0003AA0A /* PAGPlayerView.m */; };
 		4DE99A5227BFC16F0003AA0A /* ViewController.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4DE99A4C27BFC16F0003AA0A /* ViewController.mm */; };
 		4DE99A5327BFC16F0003AA0A /* ViewController.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4DE99A4C27BFC16F0003AA0A /* ViewController.mm */; };
 		545B97E9278F115300A0112E /* RootLayerBitmapOffset.pag in Resources */ = {isa = PBXBuildFile; fileRef = 545B97A7278F115000A0112E /* RootLayerBitmapOffset.pag */; };
@@ -98,6 +97,7 @@
 		382C49D8F87E5B9D940647B3 /* Pods-PAGViewerSlim.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-PAGViewerSlim.release.xcconfig"; path = "Pods/Target Support Files/Pods-PAGViewerSlim/Pods-PAGViewerSlim.release.xcconfig"; sourceTree = "<group>"; };
 		4D3B24C424051D4C0044EA7D /* libbz2.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libbz2.tbd; path = usr/lib/libbz2.tbd; sourceTree = SDKROOT; };
 		4D72AC9B22C1071600C60D04 /* PAGViewerTest.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PAGViewerTest.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4DA13EE729E9253300F85AC6 /* list */ = {isa = PBXFileReference; lastKnownFileType = folder; name = list; path = ../../assets/list; sourceTree = "<group>"; };
 		4DA8173F2411FA1000C4FBB3 /* libavutil.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libavutil.a; path = PAGViewer/FFmpeg/lib/libavutil.a; sourceTree = "<group>"; };
 		4DA817402411FA1000C4FBB3 /* libavcodec.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libavcodec.a; path = PAGViewer/FFmpeg/lib/libavcodec.a; sourceTree = "<group>"; };
 		4DA817412411FA1000C4FBB3 /* libavdevice.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libavdevice.a; path = PAGViewer/FFmpeg/lib/libavdevice.a; sourceTree = "<group>"; };
@@ -111,11 +111,9 @@
 		4DA817542411FB9300C4FBB3 /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
 		4DA817562411FBA000C4FBB3 /* VideoToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = VideoToolbox.framework; path = System/Library/Frameworks/VideoToolbox.framework; sourceTree = SDKROOT; };
 		4DE99A4827BFC16F0003AA0A /* BackgroundView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = BackgroundView.m; sourceTree = "<group>"; };
-		4DE99A4927BFC16F0003AA0A /* PAGPlayerView.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = PAGPlayerView.m; sourceTree = "<group>"; };
 		4DE99A4A27BFC16F0003AA0A /* ViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ViewController.h; sourceTree = "<group>"; };
 		4DE99A4B27BFC16F0003AA0A /* BackgroundView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = BackgroundView.h; sourceTree = "<group>"; };
 		4DE99A4C27BFC16F0003AA0A /* ViewController.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ViewController.mm; sourceTree = "<group>"; };
-		4DE99A4D27BFC16F0003AA0A /* PAGPlayerView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PAGPlayerView.h; sourceTree = "<group>"; };
 		52E388B434A077E5A9820A34 /* Pods-PAGViewer.dailybuild.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-PAGViewer.dailybuild.xcconfig"; path = "Pods/Target Support Files/Pods-PAGViewer/Pods-PAGViewer.dailybuild.xcconfig"; sourceTree = "<group>"; };
 		545B97A7278F115000A0112E /* RootLayerBitmapOffset.pag */ = {isa = PBXFileReference; lastKnownFileType = file; name = RootLayerBitmapOffset.pag; path = ../../assets/RootLayerBitmapOffset.pag; sourceTree = "<group>"; };
 		545B97A8278F115000A0112E /* Bulge-unpin-s.pag */ = {isa = PBXFileReference; lastKnownFileType = file; name = "Bulge-unpin-s.pag"; path = "../../assets/Bulge-unpin-s.pag"; sourceTree = "<group>"; };
@@ -246,6 +244,7 @@
 		4DC5D301239FD95D007DFA8C /* assets */ = {
 			isa = PBXGroup;
 			children = (
+				4DA13EE729E9253300F85AC6 /* list */,
 				F2C7AD5327A91FF600DEBEC6 /* rotation.jpg */,
 				545B97C4278F115200A0112E /* 2J.pag */,
 				545B97CF278F115200A0112E /* alpha_matte.pag */,
@@ -321,8 +320,6 @@
 			children = (
 				4DE99A4B27BFC16F0003AA0A /* BackgroundView.h */,
 				4DE99A4827BFC16F0003AA0A /* BackgroundView.m */,
-				4DE99A4D27BFC16F0003AA0A /* PAGPlayerView.h */,
-				4DE99A4927BFC16F0003AA0A /* PAGPlayerView.m */,
 				4DE99A4A27BFC16F0003AA0A /* ViewController.h */,
 				4DE99A4C27BFC16F0003AA0A /* ViewController.mm */,
 			);
@@ -507,6 +504,7 @@
 				F2ED88AB1FCBEDF100555707 /* Assets.xcassets in Resources */,
 				545B97F3278F115300A0112E /* cornerpin-bulge.pag in Resources */,
 				545B982B278F115400A0112E /* guide_hand_drag.pag in Resources */,
+				4DA13EE829E9253300F85AC6 /* list in Resources */,
 				545B9853278F115400A0112E /* alpha2.pag in Resources */,
 				545B9859278F115400A0112E /* RootLayerVideoFreeze.pag in Resources */,
 				545B9805278F115400A0112E /* srgb.pag in Resources */,
@@ -646,7 +644,6 @@
 				4D72AC7022C1071600C60D04 /* main.mm in Sources */,
 				4D72AC7522C1071600C60D04 /* AppDelegate.mm in Sources */,
 				4DE99A5327BFC16F0003AA0A /* ViewController.mm in Sources */,
-				4DE99A5127BFC16F0003AA0A /* PAGPlayerView.m in Sources */,
 				4DE99A4F27BFC16F0003AA0A /* BackgroundView.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -658,7 +655,6 @@
 				F2ED88B11FCBEDF100555707 /* main.mm in Sources */,
 				F2ED88A31FCBEDF100555707 /* AppDelegate.mm in Sources */,
 				4DE99A5227BFC16F0003AA0A /* ViewController.mm in Sources */,
-				4DE99A5027BFC16F0003AA0A /* PAGPlayerView.m in Sources */,
 				4DE99A4E27BFC16F0003AA0A /* BackgroundView.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

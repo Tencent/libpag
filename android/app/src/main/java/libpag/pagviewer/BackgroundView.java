@@ -5,17 +5,16 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
-import android.util.AttributeSet;
 import android.view.View;
-import android.widget.RelativeLayout;
 
 public class BackgroundView extends View {
+    private final Path path;
+    private final Paint paint;
+
     public BackgroundView(Context context) {
         super(context);
-    }
-
-    public BackgroundView(Context context, AttributeSet attrs) {
-        super(context, attrs);
+        path = new Path();
+        paint = new Paint();
     }
 
     protected void onDraw(Canvas canvas) {
@@ -24,7 +23,6 @@ public class BackgroundView extends View {
         int width = getWidth();
         int height = getHeight();
         int tileSize = (int)(8 *  getContext().getResources().getDisplayMetrics().density);
-        Path path = new Path();
         for (int y = 0; y < height; y += tileSize) {
             boolean draw = (y / tileSize) % 2 == 1;
             for (int x = 0; x < width; x += tileSize) {
@@ -34,7 +32,6 @@ public class BackgroundView extends View {
                 draw = !draw;
             }
         }
-        Paint paint = new Paint();
         paint.setColor(Color.argb(255, 204, 204, 204));
         canvas.drawPath(path, paint);
     }
