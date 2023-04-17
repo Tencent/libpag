@@ -529,6 +529,8 @@ class PAG_API PAGLayer : public Content {
   friend class AudioClip;
 
   friend class ContentVersion;
+
+  friend class PAGDecoder;
 };
 
 class SolidLayer;
@@ -548,7 +550,7 @@ class PAG_API PAGSolidLayer : public PAGLayer {
   Color solidColor();
 
   /**
-   * Set the the layer's solid color.
+   * Set the layer's solid color.
    */
   void setSolidColor(const Color& value);
 
@@ -716,7 +718,7 @@ class AnimatableProperty;
 class PAG_API PAGImageLayer : public PAGLayer {
  public:
   /**
-   * Make a PAGImageLayer with with, height and duration(in microseconds).
+   * Make a PAGImageLayer with width, height and duration(in microseconds).
    */
   static std::shared_ptr<PAGImageLayer> Make(int width, int height, int64_t duration);
 
@@ -822,7 +824,7 @@ class VectorComposition;
 class PAG_API PAGComposition : public PAGLayer {
  public:
   /**
-   * Make a empty PAGComposition with specified size.
+   * Make an empty PAGComposition with specified size.
    */
   static std::shared_ptr<PAGComposition> Make(int width, int height);
 
@@ -873,26 +875,26 @@ class PAG_API PAGComposition : public PAGLayer {
   void setLayerIndex(std::shared_ptr<PAGLayer> pagLayer, int index);
 
   /**
-   * Add a PAGLayer to current PAGComposition at the top. If you add a layer that already has a
+   * Add a PAGLayer to the current PAGComposition at the top. If you add a layer that already has a
    * different PAGComposition object as a parent, the layer is removed from the other PAGComposition
    * object.
    */
   bool addLayer(std::shared_ptr<PAGLayer> pagLayer);
 
   /**
-   * Add a PAGLayer to current PAGComposition at the specified index. If you add a layer that
+   * Add a PAGLayer to the current PAGComposition at the specified index. If you add a layer that
    * already has a different PAGComposition object as a parent, the layer is removed from the other
    * PAGComposition object.
    */
   bool addLayerAt(std::shared_ptr<PAGLayer> pagLayer, int index);
 
   /**
-   * Check whether current PAGComposition contains the specified pagLayer.
+   * Check whether the current PAGComposition contains the specified pagLayer.
    */
   bool contains(std::shared_ptr<PAGLayer> pagLayer) const;
 
   /**
-   * Remove the specified PAGLayer from current PAGComposition.
+   * Remove the specified PAGLayer from the current PAGComposition.
    */
   std::shared_ptr<PAGLayer> removeLayer(std::shared_ptr<PAGLayer> pagLayer);
 
@@ -1208,12 +1210,12 @@ class PAG_API PAGSurface {
   int height();
 
   /**
-   * Update the size of surface, and reset the internal surface.
+   * Update the size of the surface, and reset the internal surface.
    */
   void updateSize();
 
   /**
-   * Erases all pixels of this surface with transparent color. Returns true if the content has
+   * Erases all pixels of the surface with transparent color. Returns true if the content has
    * changed.
    */
   bool clearAll();
@@ -1517,6 +1519,94 @@ class PAG_API PAGPlayer {
   friend class PAGSurface;
 };
 
+class SequenceFile;
+
+/**
+ * PAGDecoder provides a utility to read image frames directly from a PAGComposition. The decoded
+ * image frames will be cached as a sequence file on the disk, which may significantly speed up the
+ * decoding process depending on the complexity of the PAG files. Use the PAG::SetMaxDiskSize()
+ * method to manage the cache limit of the disk usage. If you want to read the image frames without
+ * allocating extra space on the disk, use the PAGPlayer and PAGSurface classes instead.
+ */
+class PAGDecoder {
+ public:
+  /**
+   * Creates a PAGDecoder with a PAGComposition, a frame rate limit, and a scale factor for the
+   * decoded image size. Returns nil if the composition is nil. Note that the returned PAGDecoder
+   * may become invalid if the associated PAGComposition is added to a PAGPlayer or another
+   * PAGDecoder. And only keep a reference to the PAGComposition after creating the PAGDecoder if
+   * you need to modify it in the feature. Otherwise, the internal composition will not be released
+   * automatically after the associated disk cache is complete, which may cost more memory than
+   * necessary.
+   */
+  static std::shared_ptr<PAGDecoder> MakeFrom(std::shared_ptr<PAGComposition> composition,
+                                              float maxFrameRate = 30.0f, float scale = 1.0f);
+
+  /**
+   * Returns the width of decoded image frames.
+   */
+  int width() const {
+    return _width;
+  }
+
+  /**
+   * Returns the height of decoded image frames.
+   */
+  int height() const {
+    return _height;
+  }
+
+  /**
+   * Returns the number of frames in the PAGDecoder. Note that the value may change if the
+   * associated PAGComposition was modified.
+   */
+  int numFrames();
+
+  /**
+   * Returns the frame rate of decoded image frames. The value may change if the associated
+   * PAGComposition was modified.
+   */
+  float frameRate();
+
+  /**
+   * Copies pixels of the image frame at the given index into the specified memory address. Returns
+   * false if failed. Note that caller must ensure that colorType, alphaType, and dstRowBytes stay
+   * the same throughout every reading call. Otherwise, it returns false.
+   */
+  bool readFrame(int index, void* pixels, size_t rowBytes,
+                 ColorType colorType = ColorType::RGBA_8888,
+                 AlphaType alphaType = AlphaType::Premultiplied);
+
+ private:
+  std::mutex locker = {};
+  int _width = 0;
+  int _height = 0;
+  int _numFrames = 0;
+  float _frameRate = 30.0f;
+  float maxFrameRate = 30.0f;
+  size_t lastRowBytes = 0;
+  ColorType lastColorType = ColorType::RGBA_8888;
+  AlphaType lastAlphaType = AlphaType::Premultiplied;
+  uint32_t lastContentVersion = 0;
+  std::shared_ptr<PAGComposition> container = nullptr;
+  std::shared_ptr<SequenceFile> sequenceFile = nullptr;
+  std::unique_ptr<PAGPlayer> pagPlayer = nullptr;
+
+  static float GetFrameRate(std::shared_ptr<PAGComposition> pagComposition);
+  static std::pair<int, float> GetFrameCountAndRate(std::shared_ptr<PAGComposition> composition,
+                                                    float maxFrameRate);
+
+  PAGDecoder(std::shared_ptr<PAGComposition> composition, int width, int height, int numFrames,
+             float frameRate, float maxFrameRate);
+  bool renderFrame(std::shared_ptr<PAGComposition> composition, int index, void* pixels,
+                   size_t rowBytes, ColorType colorType, AlphaType alphaType);
+  bool checkSequenceFile(std::shared_ptr<PAGComposition> composition, size_t rowBytes,
+                         ColorType colorType, AlphaType alphaType);
+  void checkCompositionChange(std::shared_ptr<PAGComposition> composition);
+  std::string generateCacheKey(std::shared_ptr<PAGComposition> composition);
+  std::shared_ptr<PAGComposition> getComposition();
+};
+
 /**
  * Defines methods to control video decoding capabilities of PAG.
  */
@@ -1540,6 +1630,16 @@ class PAG_API PAG {
    * Get SDK version information.
    */
   static std::string SDKVersion();
+
+  /**
+   * Returns the size limit of the disk cache in bytes.
+   */
+  size_t MaxDiskSize();
+
+  /**
+   * Sets the size limit of the disk cache in bytes. The default disk cache limit is 1 GB.
+   */
+  void SetMaxDiskSize(size_t size);
 };
 
 }  // namespace pag

@@ -70,8 +70,8 @@ class SequenceFile {
   /**
    * Returns the number of frames in the sequence.
    */
-  uint32_t frameCount() const {
-    return _frameCount;
+  uint32_t numFrames() const {
+    return _numFrames;
   }
 
   /**
@@ -92,15 +92,18 @@ class SequenceFile {
   bool isComplete();
 
   /**
-   * Reads an image frame from the sequence. Returns false if the specified index is empty.
+   * Reads an image frame from the sequence into the specified pixel address. The caller must ensure
+   * the pixel address is large enough to hold the image data. Returns false if the specified index
+   * is empty.
    */
-  bool readFrame(uint32_t index, void* pixels, size_t byteSize);
+  bool readFrame(int index, void* pixels);
 
   /**
-   * Writes an image frame to the sequence. Returns false if the specified index is not empty and
-   * leave the sequence unchanged.
+   * Writes an image frame in the pixel address into the sequence.The caller must ensure the pixel
+   * address has the same size as the image data. Returns false if the specified index is not empty
+   * and leave the sequence unchanged.
    */
-  bool writeFrame(uint32_t index, const void* pixels, size_t byteSize);
+  bool writeFrame(int index, const void* pixels);
 
  private:
   std::mutex locker = {};
@@ -110,24 +113,24 @@ class SequenceFile {
   size_t _fileSize = 0;
   CompressionType compressionType = CompressionType::LZ4;
   tgfx::ImageInfo _info = {};
-  uint32_t _frameCount = 0;
+  int _numFrames = 0;
   float _frameRate = 30.0f;
-  uint32_t cachedFrames = 0;
+  int cachedFrames = 0;
   std::vector<FrameLocation> frames = {};
   tgfx::Buffer scratchBuffer = {};
   std::unique_ptr<LZ4Decoder> decoder = nullptr;
   std::unique_ptr<LZ4Encoder> encoder = nullptr;
 
   static std::shared_ptr<SequenceFile> Open(const std::string& filePath,
-                                            const tgfx::ImageInfo& info, uint32_t frameCount,
+                                            const tgfx::ImageInfo& info, int frameCount,
                                             float frameRate);
 
-  SequenceFile(const std::string& filePath, const tgfx::ImageInfo& info, uint32_t frameCount,
+  SequenceFile(const std::string& filePath, const tgfx::ImageInfo& info, int frameCount,
                float frameRate);
 
   bool readFramesFromFile();
   bool writeFileHead();
-  size_t compressFrame(uint32_t index, const void* pixels, size_t byteSize);
+  size_t compressFrame(int index, const void* pixels, size_t byteSize);
   bool checkScratchBuffer();
 
   friend class DiskCache;

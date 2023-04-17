@@ -8311,7 +8311,11 @@
         "SequenceFile_10": "db477d13",
         "SequenceFile_15": "db477d13",
         "SequenceFile_20": "db477d13",
-        "SequenceFile_22": "db477d13"
+        "SequenceFile_22": "db477d13",
+        "decoder_frame_0": "2360cad0",
+        "decoder_frame_12": "2360cad0",
+        "decoder_frame_15": "2360cad0",
+        "decoder_frame_50": "2360cad0"
     },
     "PAGFileBaseTest": {
         "EllipseToPath": "6a420423",
