@@ -718,7 +718,7 @@ class AnimatableProperty;
 class PAG_API PAGImageLayer : public PAGLayer {
  public:
   /**
-   * Make a PAGImageLayer with, height and duration(in microseconds).
+   * Make a PAGImageLayer with width, height and duration(in microseconds).
    */
   static std::shared_ptr<PAGImageLayer> Make(int width, int height, int64_t duration);
 
