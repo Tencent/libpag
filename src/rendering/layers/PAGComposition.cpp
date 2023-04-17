@@ -184,7 +184,7 @@ bool PAGComposition::doAddLayer(std::shared_ptr<PAGLayer> pagLayer, int index) {
   } else if (pagLayer->layerType() == LayerType::PreCompose &&
              std::static_pointer_cast<PAGComposition>(pagLayer)->doContains(this)) {
     LOGE(
-        "A layer cannot be added as a child to one of it's children "
+        "A layer cannot be added as a child to one of its children "
         "(or children's children, etc.).");
     return false;
   } else if (pagLayer->stage == pagLayer.get()) {

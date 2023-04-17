@@ -1532,7 +1532,12 @@ class PAGDecoder {
  public:
   /**
    * Creates a PAGDecoder with a PAGComposition, a frame rate limit, and a scale factor for the
-   * decoded image size. Returns nil if the composition is nil.
+   * decoded image size. Returns nil if the composition is nil. Note that the returned PAGDecoder
+   * may become invalid if the associated PAGComposition is added to a PAGPlayer or another
+   * PAGDecoder. And only keep a reference to the PAGComposition after creating the PAGDecoder if
+   * you need to modify it in the feature. Otherwise, the internal composition will not be released
+   * automatically after the associated disk cache is complete, which may cost more memory than
+   * necessary.
    */
   static std::shared_ptr<PAGDecoder> MakeFrom(std::shared_ptr<PAGComposition> composition,
                                               float maxFrameRate = 30.0f, float scale = 1.0f);
@@ -1574,8 +1579,6 @@ class PAGDecoder {
 
  private:
   std::mutex locker = {};
-  std::shared_ptr<PAGComposition> composition = nullptr;
-  std::weak_ptr<PAGComposition> weakComposition;
   int _width = 0;
   int _height = 0;
   int _numFrames = 0;
@@ -1585,6 +1588,7 @@ class PAGDecoder {
   ColorType lastColorType = ColorType::RGBA_8888;
   AlphaType lastAlphaType = AlphaType::Premultiplied;
   uint32_t lastContentVersion = 0;
+  std::shared_ptr<PAGComposition> container = nullptr;
   std::shared_ptr<SequenceFile> sequenceFile = nullptr;
   std::unique_ptr<PAGPlayer> pagPlayer = nullptr;
 
@@ -1594,11 +1598,13 @@ class PAGDecoder {
 
   PAGDecoder(std::shared_ptr<PAGComposition> composition, int width, int height, int numFrames,
              float frameRate, float maxFrameRate);
-  bool renderFrame(int index, void* pixels, size_t rowBytes, ColorType colorType,
-                   AlphaType alphaType);
-  void checkCompositionChange();
-  void checkCacheComplete();
-  std::string generateCacheKey();
+  bool renderFrame(std::shared_ptr<PAGComposition> composition, int index, void* pixels,
+                   size_t rowBytes, ColorType colorType, AlphaType alphaType);
+  bool checkSequenceFile(std::shared_ptr<PAGComposition> composition, size_t rowBytes,
+                         ColorType colorType, AlphaType alphaType);
+  void checkCompositionChange(std::shared_ptr<PAGComposition> composition);
+  std::string generateCacheKey(std::shared_ptr<PAGComposition> composition);
+  std::shared_ptr<PAGComposition> getComposition();
 };
 
 /**

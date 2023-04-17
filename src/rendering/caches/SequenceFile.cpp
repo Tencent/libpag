@@ -18,6 +18,7 @@
 
 #include "SequenceFile.h"
 #include "DiskCache.h"
+#include "base/utils/Log.h"
 #include "rendering/utils/Directory.h"
 #include "tgfx/utils/DataView.h"
 
@@ -151,7 +152,11 @@ bool SequenceFile::writeFileHead() {
   data.setFloat(20, _frameRate);
   auto writeLength = fwrite(data.bytes(), 1, FILE_HEAD_SIZE, file);
   _fileSize = writeLength;
-  return writeLength == data.size();
+  if (writeLength != data.size()) {
+    LOGE("SequenceFile::writeFileHead() write file head failed!");
+    return false;
+  }
+  return true;
 }
 
 size_t SequenceFile::fileSize() {
@@ -167,6 +172,7 @@ bool SequenceFile::isComplete() {
 bool SequenceFile::readFrame(int index, void* pixels) {
   std::lock_guard<std::mutex> autoLock(locker);
   if (index < 0 || index >= _numFrames || pixels == nullptr) {
+    LOGE("SequenceFile::readFrame() invalid index or pixels!");
     return false;
   }
   const auto& frame = frames[index];
@@ -177,21 +183,29 @@ bool SequenceFile::readFrame(int index, void* pixels) {
     return false;
   }
   if (fseek(file, static_cast<long>(frame.offset), SEEK_SET)) {
+    LOGE("SequenceFile::readFrame() fseek failed! (offset: %zu)", frame.offset);
     return false;
   }
   auto encodedLength = fread(scratchBuffer.bytes(), 1, frame.size, file);
   if (encodedLength != frame.size) {
+    LOGE("SequenceFile::readFrame() fread failed! (size: %zu)", frame.size);
     return false;
   }
   auto byteSize = _info.byteSize();
   auto decodedLength = decoder->decode(reinterpret_cast<uint8_t*>(pixels), byteSize,
                                        scratchBuffer.bytes(), encodedLength);
-  return (decodedLength == byteSize);
+  if (decodedLength != byteSize) {
+    LOGE("SequenceFile::readFrame() decode failed! (decoded: %zu, expected: %zu)", decodedLength,
+         byteSize);
+    return false;
+  }
+  return true;
 }
 
 bool SequenceFile::writeFrame(int index, const void* pixels) {
   std::lock_guard<std::mutex> autoLock(locker);
   if (index < 0 || index >= _numFrames || pixels == nullptr) {
+    LOGE("SequenceFile::writeFrame() invalid index or pixels!");
     return false;
   }
   auto& frame = frames[index];
@@ -206,9 +220,11 @@ bool SequenceFile::writeFrame(int index, const void* pixels) {
     return false;
   }
   if (fseek(file, 0, SEEK_END)) {
+    LOGE("SequenceFile::writeFrame() failed to seek to the end of the file");
     return false;
   }
   if (fwrite(scratchBuffer.bytes(), 1, compressedSize, file) != compressedSize) {
+    LOGE("SequenceFile::writeFrame() failed to write the compressed frame to disk");
     return false;
   }
   frame.offset = _fileSize + FRAME_HEAD_SIZE;
@@ -237,6 +253,7 @@ size_t SequenceFile::compressFrame(int index, const void* pixels, size_t byteSiz
   auto encodedLength =
       encoder->encode(bytes, size, reinterpret_cast<const uint8_t*>(pixels), byteSize);
   if (encodedLength == 0) {
+    LOGE("SequenceFile::compressFrame() failed to encode frame %d!", index);
     return 0;
   }
   tgfx::DataView dataView(scratchBuffer.bytes(), scratchBuffer.size());
@@ -260,6 +277,10 @@ bool SequenceFile::checkScratchBuffer() {
     scratchBufferSize = LZ4Encoder::GetMaxOutputSize(_info.byteSize()) + FRAME_HEAD_SIZE;
   }
   scratchBuffer.alloc(scratchBufferSize);
-  return !scratchBuffer.isEmpty();
+  if (scratchBuffer.isEmpty()) {
+    LOGE("SequenceFile::checkScratchBuffer() failed to alloc scratch buffer!");
+    return false;
+  }
+  return true;
 }
 }  // namespace pag

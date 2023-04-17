@@ -65,65 +65,71 @@ std::shared_ptr<PAGDecoder> PAGDecoder::MakeFrom(std::shared_ptr<PAGComposition>
 
 PAGDecoder::PAGDecoder(std::shared_ptr<PAGComposition> composition, int width, int height,
                        int numFrames, float frameRate, float maxFrameRate)
-    : composition(std::move(composition)), _width(width), _height(height), _numFrames(numFrames),
-      _frameRate(frameRate), maxFrameRate(maxFrameRate) {
+    : _width(width), _height(height), _numFrames(numFrames), _frameRate(frameRate),
+      maxFrameRate(maxFrameRate) {
+  container = PAGComposition::Make(width, height);
+  container->addLayer(composition);
 }
 
 int PAGDecoder::numFrames() {
   std::lock_guard<std::mutex> auoLock(locker);
-  checkCompositionChange();
+  checkCompositionChange(getComposition());
   return _numFrames;
 }
 
 float PAGDecoder::frameRate() {
   std::lock_guard<std::mutex> auoLock(locker);
-  checkCompositionChange();
+  checkCompositionChange(getComposition());
   return _frameRate;
 }
 
 bool PAGDecoder::readFrame(int index, void* pixels, size_t rowBytes, pag::ColorType colorType,
                            pag::AlphaType alphaType) {
   std::lock_guard<std::mutex> auoLock(locker);
-  checkCompositionChange();
-  if (sequenceFile == nullptr) {
-    auto key = generateCacheKey();
-    auto info =
-        tgfx::ImageInfo::Make(_width, _height, ToTGFX(colorType), ToTGFX(alphaType), rowBytes);
-    sequenceFile = DiskCache::OpenSequence(key, info, _numFrames, _frameRate);
-    if (sequenceFile == nullptr) {
-      return false;
-    }
-    lastRowBytes = rowBytes;
-    lastColorType = colorType;
-    lastAlphaType = alphaType;
-    checkCacheComplete();
+  auto composition = getComposition();
+  if (!checkSequenceFile(composition, rowBytes, colorType, alphaType)) {
+    return false;
   }
-  if (rowBytes != lastRowBytes || colorType != lastColorType || alphaType != lastAlphaType) {
+  if (index < 0 || index >= _numFrames) {
+    LOGE("PAGDecoder::readFrame() The index is out of range!");
     return false;
   }
   auto success = sequenceFile->readFrame(index, pixels);
   if (!success) {
-    success = renderFrame(index, pixels, rowBytes, colorType, alphaType);
+    success = renderFrame(composition, index, pixels, rowBytes, colorType, alphaType);
     if (success) {
       success = sequenceFile->writeFrame(index, pixels);
-      if (success) {
-        checkCacheComplete();
-      } else {
-        LOGE("Failed to write frame to SequenceFile!");
+      if (!success) {
+        LOGE("PAGDecoder::readFrame() Failed to write frame to SequenceFile!");
       }
+    }
+  }
+  if (sequenceFile->isComplete() && composition != nullptr) {
+    if (pagPlayer != nullptr) {
+      pagPlayer = nullptr;
+      if (!composition.unique()) {
+        container->addLayer(composition);
+      }
+    } else if (composition.use_count() <= 2) {
+      container->removeAllLayers();
     }
   }
   return success;
 }
 
-bool PAGDecoder::renderFrame(int index, void* pixels, size_t rowBytes, pag::ColorType colorType,
-                             pag::AlphaType alphaType) {
+bool PAGDecoder::renderFrame(std::shared_ptr<PAGComposition> composition, int index, void* pixels,
+                             size_t rowBytes, pag::ColorType colorType, pag::AlphaType alphaType) {
+  if (composition == nullptr) {
+    pagPlayer = nullptr;
+    LOGE(
+        "PAGDecoder: Failed to get PAGComposition! the associated PAGComposition "
+        "may be added to another parent after the PAGDecoder was created.");
+    return false;
+  }
   if (pagPlayer == nullptr) {
-    if (composition == nullptr) {
-      return false;
-    }
     auto pagSurface = PAGSurface::MakeOffscreen(_width, _height);
     if (pagSurface == nullptr) {
+      LOGE("PAGDecoder::renderFrame() Failed to create PAGSurface!");
       return false;
     }
     pagPlayer = std::make_unique<PAGPlayer>();
@@ -137,15 +143,42 @@ bool PAGDecoder::renderFrame(int index, void* pixels, size_t rowBytes, pag::Colo
   return pagSurface->readPixels(colorType, alphaType, pixels, rowBytes);
 }
 
-void PAGDecoder::checkCompositionChange() {
+bool PAGDecoder::checkSequenceFile(std::shared_ptr<PAGComposition> composition, size_t rowBytes,
+                                   ColorType colorType, AlphaType alphaType) {
+  checkCompositionChange(composition);
+  if (sequenceFile != nullptr) {
+    if (rowBytes != lastRowBytes || colorType != lastColorType || alphaType != lastAlphaType) {
+      LOGE(
+          "PAGDecoder::readFrame() The rowBytes, colorType or alphaType is not the same as the "
+          "previous call!");
+      return false;
+    }
+    return true;
+  }
+  if (composition == nullptr) {
+    LOGE(
+        "PAGDecoder: Failed to get PAGComposition! the associated PAGComposition "
+        "may be added to another parent after the PAGDecoder was created.");
+    return false;
+  }
+  auto key = generateCacheKey(composition);
+  auto info =
+      tgfx::ImageInfo::Make(_width, _height, ToTGFX(colorType), ToTGFX(alphaType), rowBytes);
+  sequenceFile = DiskCache::OpenSequence(key, info, _numFrames, _frameRate);
   if (sequenceFile == nullptr) {
+    LOGE("PAGDecoder: Failed to open SequenceFile!");
+    return false;
+  }
+  lastRowBytes = rowBytes;
+  lastColorType = colorType;
+  lastAlphaType = alphaType;
+  return true;
+}
+
+void PAGDecoder::checkCompositionChange(std::shared_ptr<PAGComposition> composition) {
+  if (composition == nullptr || composition->contentVersion == lastContentVersion) {
     return;
   }
-  auto pagComposition = composition ? composition : weakComposition.lock();
-  if (pagComposition == nullptr || pagComposition->contentVersion == lastContentVersion) {
-    return;
-  }
-  composition = pagComposition;
   sequenceFile = nullptr;
   lastContentVersion = composition->contentVersion;
   auto result = GetFrameCountAndRate(composition, maxFrameRate);
@@ -153,22 +186,21 @@ void PAGDecoder::checkCompositionChange() {
   _frameRate = result.second;
 }
 
-void PAGDecoder::checkCacheComplete() {
-  if (!sequenceFile->isComplete()) {
-    return;
-  }
-  pagPlayer = nullptr;
-  if (composition != nullptr) {
-    weakComposition = composition;
-    composition = nullptr;
-  }
-}
-
-std::string PAGDecoder::generateCacheKey() {
-  if (composition == nullptr || !composition->isPAGFile() || composition->contentModified()) {
+std::string PAGDecoder::generateCacheKey(std::shared_ptr<PAGComposition> composition) {
+  if (!composition->isPAGFile() || composition->contentModified()) {
     return "";
   }
   auto filePath = static_cast<PAGFile*>(composition.get())->path();
   return filePath + "." + std::to_string(_width) + "x" + std::to_string(_height);
+}
+
+std::shared_ptr<PAGComposition> PAGDecoder::getComposition() {
+  if (container->numChildren() == 1) {
+    return std::static_pointer_cast<PAGComposition>(container->getLayerAt(0));
+  }
+  if (pagPlayer != nullptr) {
+    return pagPlayer->getComposition();
+  }
+  return nullptr;
 }
 }  // namespace pag
