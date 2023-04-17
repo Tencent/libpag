@@ -49,8 +49,8 @@ void DiskCache::SetMaxDiskSize(size_t size) {
 }
 
 std::shared_ptr<SequenceFile> DiskCache::OpenSequence(const std::string& key,
-                                                      const tgfx::ImageInfo& info,
-                                                      uint32_t frameCount, float frameRate) {
+                                                      const tgfx::ImageInfo& info, int frameCount,
+                                                      float frameRate) {
   return GetInstance()->openSequence(key, info, frameCount, frameRate);
 }
 
@@ -81,8 +81,8 @@ void DiskCache::setMaxDiskSize(size_t size) {
 }
 
 std::shared_ptr<SequenceFile> DiskCache::openSequence(const std::string& key,
-                                                      const tgfx::ImageInfo& info,
-                                                      uint32_t frameCount, float frameRate) {
+                                                      const tgfx::ImageInfo& info, int frameCount,
+                                                      float frameRate) {
   std::lock_guard<std::mutex> autoLock(locker);
   if (cacheFolder.empty()) {
     return nullptr;
@@ -92,7 +92,7 @@ std::shared_ptr<SequenceFile> DiskCache::openSequence(const std::string& key,
   if (result != openedFiles.end()) {
     auto sequenceFile = result->second.lock();
     if (sequenceFile != nullptr) {
-      if (sequenceFile->_info == info && sequenceFile->_frameCount == frameCount &&
+      if (sequenceFile->_info == info && sequenceFile->_numFrames == frameCount &&
           sequenceFile->_frameRate == frameRate) {
         moveToFront(cachedFileMap[fileID]);
         return sequenceFile;

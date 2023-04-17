@@ -664,7 +664,8 @@ void PAGComposition::updateDurationAndFrameRate() {
     }
   }
   bool changed = false;
-  auto layerMaxFrameDuration = TimeToFrame(layerMaxTimeDuration, layerMaxFrameRate);
+  auto layerMaxFrameDuration = static_cast<Frame>(
+      round(static_cast<double>(layerMaxTimeDuration) * layerMaxFrameRate / 1000000.0));
   if (_frameDuration != layerMaxFrameDuration) {
     _frameDuration = layerMaxFrameDuration;
     changed = true;
