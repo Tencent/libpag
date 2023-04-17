@@ -177,11 +177,11 @@ void EncodeStream::writeEncodedUint64(uint64_t value) {
       break;
     }
     bytes[_position++] = byte;
+    positionChanged(0);
     if (value == 0) {
       break;
     }
   }
-  positionChanged(0);
 }
 
 void EncodeStream::writeBits(int32_t value, uint8_t numBits) {
