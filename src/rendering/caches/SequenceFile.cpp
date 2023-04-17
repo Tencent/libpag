@@ -18,6 +18,7 @@
 
 #include "SequenceFile.h"
 #include "DiskCache.h"
+#include "rendering/utils/Directory.h"
 #include "tgfx/utils/DataView.h"
 
 namespace pag {
@@ -55,6 +56,7 @@ SequenceFile::SequenceFile(const std::string& filePath, const tgfx::ImageInfo& i
                            float frameRate)
     : _info(info), _numFrames(frameCount), _frameRate(frameRate) {
   decoder = LZ4Decoder::Make();
+  Directory::CreateRecursively(Directory::GetParentDirectory(filePath));
 #ifdef __APPLE__
   compressionType = CompressionType::LZ4_APPLE;
 #endif

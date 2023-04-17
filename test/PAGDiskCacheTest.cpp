@@ -209,15 +209,11 @@ PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
   sequenceFile = nullptr;
   sequenceFile2 = nullptr;
   EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/4.bin"));
-  DiskCache::SetMaxDiskSize(1073741824); // 1GB
+  DiskCache::SetMaxDiskSize(1073741824);  // 1GB
   std::filesystem::remove_all(cacheDir);
 }
 
-
 PAG_TEST_F(PAGDiskCacheTest, PAGDecoder) {
-  auto cacheDir = Platform::Current()->getCacheDir();
-  std::filesystem::remove_all(cacheDir);
-  std::filesystem::create_directories(cacheDir+"/files");
   auto pagFile = LoadPAGFile("resources/apitest/data_bmp.pag");
   ASSERT_TRUE(pagFile != nullptr);
   auto decoder = PAGDecoder::MakeFrom(pagFile, 30, 0.5f);
@@ -263,12 +259,13 @@ PAG_TEST_F(PAGDiskCacheTest, PAGDecoder) {
 
   auto decoder3 = PAGDecoder::MakeFrom(pagFile, 30, 0.5f);
   EXPECT_TRUE(decoder3 != nullptr);
-  success = decoder3->readFrame(0, pixmap.writablePixels(), pixmap.rowBytes(),
-                                ColorType::BGRA_8888, AlphaType::Unpremultiplied);
+  success = decoder3->readFrame(0, pixmap.writablePixels(), pixmap.rowBytes(), ColorType::BGRA_8888,
+                                AlphaType::Unpremultiplied);
   EXPECT_TRUE(success);
   auto info = tgfx::ImageInfo::Make(pixmap.width(), pixmap.height(), tgfx::ColorType::BGRA_8888,
                                     tgfx::AlphaType::Unpremultiplied);
-  EXPECT_TRUE(Baseline::Compare(tgfx::Pixmap(info, pixmap.pixels()), "PAGDiskCacheTest/decoder_frame_0"));
+  EXPECT_TRUE(
+      Baseline::Compare(tgfx::Pixmap(info, pixmap.pixels()), "PAGDiskCacheTest/decoder_frame_0"));
   EXPECT_NE(decoder->sequenceFile, decoder3->sequenceFile);
   EXPECT_TRUE(decoder3->pagPlayer != nullptr);
   EXPECT_TRUE(decoder3->composition != nullptr);
@@ -278,23 +275,26 @@ PAG_TEST_F(PAGDiskCacheTest, PAGDecoder) {
   auto composition = PAGComposition::Make(pagFile2->width(), pagFile2->height());
   composition->addLayer(pagFile2);
   composition->addLayer(pagFile);
-  auto decoder4 = PAGDecoder::MakeFrom(composition, 20.0f);
+  auto decoder4 = PAGDecoder::MakeFrom(composition);
   ASSERT_TRUE(decoder4 != nullptr);
   EXPECT_EQ(decoder4->height(), pagFile2->height());
   EXPECT_EQ(decoder4->width(), pagFile2->width());
-  EXPECT_EQ(decoder4->numFrames(), 79);
-  EXPECT_EQ(decoder4->frameRate(), 20.0f);
+  EXPECT_EQ(decoder4->numFrames(), 119);
+  EXPECT_EQ(decoder4->frameRate(), 30.0f);
   pixmap.reset();
   bitmap.allocPixels(pagFile2->width(), pagFile2->height());
   pixmap.reset(bitmap);
-  success = decoder4->readFrame(10, pixmap.writablePixels(), pixmap.rowBytes());
+  success = decoder4->readFrame(15, pixmap.writablePixels(), pixmap.rowBytes());
   EXPECT_TRUE(success);
-  EXPECT_TRUE(Baseline::Compare(pixmap, "PAGDiskCacheTest/decoder_frame_10"));
-  composition->removeLayerAt(0);
-  success = decoder4->readFrame(10, pixmap.writablePixels(), pixmap.rowBytes());
-  EXPECT_FALSE(success);
-
-
+  EXPECT_TRUE(Baseline::Compare(pixmap, "PAGDiskCacheTest/decoder_frame_15"));
+  composition->removeLayerAt(1);
+  EXPECT_EQ(decoder4->numFrames(), 30);
+  EXPECT_EQ(decoder4->frameRate(), 24.0f);
+  success = decoder4->readFrame(12, pixmap.writablePixels(), pixmap.rowBytes());
+  EXPECT_TRUE(success);
+  EXPECT_TRUE(Baseline::Compare(pixmap, "PAGDiskCacheTest/decoder_frame_12"));
+  
+  auto cacheDir = Platform::Current()->getCacheDir();
   auto files = Directory::FindFiles(cacheDir + "/files", ".bin");
   auto diskFileCount = files.size();
   decoder = nullptr;

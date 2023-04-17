@@ -44,6 +44,15 @@ std::string Directory::GetFileName(const std::string& filePath) {
   return fileName;
 }
 
+std::string Directory::GetParentDirectory(const std::string& filePath) {
+  auto parentDirectory = filePath;
+  auto pos = parentDirectory.find_last_of(PathSeparator);
+  if (pos != std::string::npos) {
+    parentDirectory = parentDirectory.substr(0, pos);
+  }
+  return parentDirectory;
+}
+
 std::string Directory::JoinPath(const std::string& folder, const std::string& file) {
   std::string path = folder;
   if (path.back() != PathSeparator) {

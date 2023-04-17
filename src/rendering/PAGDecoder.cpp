@@ -41,6 +41,15 @@ float PAGDecoder::GetFrameRate(std::shared_ptr<PAGComposition> pagComposition) {
   return pagComposition->frameRate();
 }
 
+std::pair<int, float> PAGDecoder::GetFrameCountAndRate(std::shared_ptr<PAGComposition> composition,
+                                                       float maxFrameRate) {
+  auto compositionFrameRate = GetFrameRate(composition);
+  auto frameRate = std::min(maxFrameRate, compositionFrameRate);
+  auto duration = composition->duration();
+  auto numFrames = static_cast<int>(round(static_cast<double>(duration) * frameRate / 1000000.0));
+  return {numFrames, frameRate};
+}
+
 std::shared_ptr<PAGDecoder> PAGDecoder::MakeFrom(std::shared_ptr<PAGComposition> composition,
                                                  float maxFrameRate, float scale) {
   if (composition == nullptr) {
@@ -48,25 +57,35 @@ std::shared_ptr<PAGDecoder> PAGDecoder::MakeFrom(std::shared_ptr<PAGComposition>
   }
   auto width = roundf(static_cast<float>(composition->width()) * scale);
   auto height = roundf(static_cast<float>(composition->height()) * scale);
-  auto compositionFrameRate = GetFrameRate(composition);
-  auto frameRate = std::min(maxFrameRate, compositionFrameRate);
-  auto duration = composition->duration();
-  auto numFrames = static_cast<int>(round(static_cast<double>(duration) * frameRate / 1000000.0));
+  auto result = GetFrameCountAndRate(composition, maxFrameRate);
   return std::shared_ptr<PAGDecoder>(new PAGDecoder(std::move(composition), static_cast<int>(width),
-                                                    static_cast<int>(height),
-                                                    static_cast<int>(numFrames), frameRate));
+                                                    static_cast<int>(height), result.first,
+                                                    result.second, maxFrameRate));
 }
 
 PAGDecoder::PAGDecoder(std::shared_ptr<PAGComposition> composition, int width, int height,
-                       int numFrames, float frameRate)
+                       int numFrames, float frameRate, float maxFrameRate)
     : composition(std::move(composition)), _width(width), _height(height), _numFrames(numFrames),
-      _frameRate(frameRate) {
+      _frameRate(frameRate), maxFrameRate(maxFrameRate) {
+}
+
+int PAGDecoder::numFrames() {
+  std::lock_guard<std::mutex> auoLock(locker);
+  checkCompositionChange();
+  return _numFrames;
+}
+
+float PAGDecoder::frameRate() {
+  std::lock_guard<std::mutex> auoLock(locker);
+  checkCompositionChange();
+  return _frameRate;
 }
 
 bool PAGDecoder::readFrame(int index, void* pixels, size_t rowBytes, pag::ColorType colorType,
                            pag::AlphaType alphaType) {
   std::lock_guard<std::mutex> auoLock(locker);
-  if (sequenceFile == nullptr && composition != nullptr) {
+  checkCompositionChange();
+  if (sequenceFile == nullptr) {
     auto key = generateCacheKey();
     auto info =
         tgfx::ImageInfo::Make(_width, _height, ToTGFX(colorType), ToTGFX(alphaType), rowBytes);
@@ -77,13 +96,9 @@ bool PAGDecoder::readFrame(int index, void* pixels, size_t rowBytes, pag::ColorT
     lastRowBytes = rowBytes;
     lastColorType = colorType;
     lastAlphaType = alphaType;
-    lastContentVersion = composition->contentVersion;
     checkCacheComplete();
   }
   if (rowBytes != lastRowBytes || colorType != lastColorType || alphaType != lastAlphaType) {
-    return false;
-  }
-  if (composition != nullptr && lastContentVersion != composition->contentVersion) {
     return false;
   }
   auto success = sequenceFile->readFrame(index, pixels);
@@ -122,12 +137,31 @@ bool PAGDecoder::renderFrame(int index, void* pixels, size_t rowBytes, pag::Colo
   return pagSurface->readPixels(colorType, alphaType, pixels, rowBytes);
 }
 
+void PAGDecoder::checkCompositionChange() {
+  if (sequenceFile == nullptr) {
+    return;
+  }
+  auto pagComposition = composition ? composition : weakComposition.lock();
+  if (pagComposition == nullptr || pagComposition->contentVersion == lastContentVersion) {
+    return;
+  }
+  composition = pagComposition;
+  sequenceFile = nullptr;
+  lastContentVersion = composition->contentVersion;
+  auto result = GetFrameCountAndRate(composition, maxFrameRate);
+  _numFrames = result.first;
+  _frameRate = result.second;
+}
+
 void PAGDecoder::checkCacheComplete() {
   if (!sequenceFile->isComplete()) {
     return;
   }
   pagPlayer = nullptr;
-  composition = nullptr;
+  if (composition != nullptr) {
+    weakComposition = composition;
+    composition = nullptr;
+  }
 }
 
 std::string PAGDecoder::generateCacheKey() {

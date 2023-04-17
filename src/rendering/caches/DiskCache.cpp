@@ -59,7 +59,6 @@ DiskCache::DiskCache() {
   if (!cacheDir.empty()) {
     configPath = Directory::JoinPath(cacheDir, "cache.cfg");
     cacheFolder = Directory::JoinPath(cacheDir, "files");
-    Directory::CreateRecursively(cacheFolder);
     readConfig();
   }
 }
@@ -216,6 +215,7 @@ void DiskCache::readConfig() {
 }
 
 void DiskCache::saveConfig() {
+  Directory::CreateRecursively(Directory::GetParentDirectory(configPath));
   auto file = fopen(configPath.c_str(), "wb");
   if (file == nullptr) {
     return;

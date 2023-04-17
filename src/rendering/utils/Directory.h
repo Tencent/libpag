@@ -27,6 +27,8 @@ class Directory {
  public:
   static std::string GetFileName(const std::string& filePath);
 
+  static std::string GetParentDirectory(const std::string& filePath);
+
   static std::string JoinPath(const std::string& folder, const std::string& file);
 
   static bool CreateRecursively(const std::string& folder);

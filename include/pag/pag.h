@@ -529,7 +529,7 @@ class PAG_API PAGLayer : public Content {
   friend class AudioClip;
 
   friend class ContentVersion;
-  
+
   friend class PAGDecoder;
 };
 
@@ -550,7 +550,7 @@ class PAG_API PAGSolidLayer : public PAGLayer {
   Color solidColor();
 
   /**
-   * Set the the layer's solid color.
+   * Set the layer's solid color.
    */
   void setSolidColor(const Color& value);
 
@@ -1525,7 +1525,7 @@ class SequenceFile;
  * PAGDecoder provides a utility to read image frames directly from a PAGComposition. The decoded
  * image frames will be cached as a sequence file on the disk, which may significantly speed up the
  * decoding process depending on the complexity of the PAG files. Use the PAG::SetMaxDiskSize()
- * method to manage the size limit of the disk cache. If you want to read the image frames without
+ * method to manage the cache limit of the disk usage. If you want to read the image frames without
  * allocating extra space on the disk, use the PAGPlayer and PAGSurface classes instead.
  */
 class PAGDecoder {
@@ -1552,24 +1552,21 @@ class PAGDecoder {
   }
 
   /**
-   * Returns the number of frames in the PAGDecoder.
+   * Returns the number of frames in the PAGDecoder. Note that the value may change if the
+   * associated PAGComposition was modified.
    */
-  int numFrames() const {
-    return _numFrames;
-  }
+  int numFrames();
 
   /**
-   * Returns the frame rate of decoded image frames.
+   * Returns the frame rate of decoded image frames. The value may change if the associated
+   * PAGComposition was modified.
    */
-  float frameRate() const {
-    return _frameRate;
-  }
+  float frameRate();
 
   /**
    * Copies pixels of the image frame at the given index into the specified memory address. Returns
-   * false if failed. Note that caller must ensure that colorType, alphaType, dstRowBytes, and the
-   * associated PAGComposition stay the same throughout every reading call. Otherwise, it returns
-   * false.
+   * false if failed. Note that caller must ensure that colorType, alphaType, and dstRowBytes stay
+   * the same throughout every reading call. Otherwise, it returns false.
    */
   bool readFrame(int index, void* pixels, size_t rowBytes,
                  ColorType colorType = ColorType::RGBA_8888,
@@ -1578,10 +1575,12 @@ class PAGDecoder {
  private:
   std::mutex locker = {};
   std::shared_ptr<PAGComposition> composition = nullptr;
+  std::weak_ptr<PAGComposition> weakComposition;
   int _width = 0;
   int _height = 0;
   int _numFrames = 0;
   float _frameRate = 30.0f;
+  float maxFrameRate = 30.0f;
   size_t lastRowBytes = 0;
   ColorType lastColorType = ColorType::RGBA_8888;
   AlphaType lastAlphaType = AlphaType::Premultiplied;
@@ -1590,11 +1589,14 @@ class PAGDecoder {
   std::unique_ptr<PAGPlayer> pagPlayer = nullptr;
 
   static float GetFrameRate(std::shared_ptr<PAGComposition> pagComposition);
+  static std::pair<int, float> GetFrameCountAndRate(std::shared_ptr<PAGComposition> composition,
+                                                    float maxFrameRate);
 
   PAGDecoder(std::shared_ptr<PAGComposition> composition, int width, int height, int numFrames,
-             float frameRate);
+             float frameRate, float maxFrameRate);
   bool renderFrame(int index, void* pixels, size_t rowBytes, ColorType colorType,
                    AlphaType alphaType);
+  void checkCompositionChange();
   void checkCacheComplete();
   std::string generateCacheKey();
 };
