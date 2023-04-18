@@ -102,7 +102,7 @@ bool ImageCache::flushSave() {
   if (frameRangeIndex != lseek(fd, frameRangeIndex, SEEK_SET)) {
     return false;
   }
-  return 2 * 4 != write(fd, static_cast<int*>(headerBuffer) + frameRangeIndex / 4, 2 * 4);
+  return 2 * 4 == write(fd, static_cast<int*>(headerBuffer) + frameRangeIndex / 4, 2 * 4);
 }
 
 bool ImageCache::putPixelsToSaveBuffer(int frame, void* bitmapPixels, int byteCount) {
