@@ -1,10 +1,8 @@
-import { destroyVerify } from '../utils/decorators';
 import { MP4_CACHE_PATH } from './constant';
-import { touchDirectory, writeFile } from './file-utils';
-
-import type { EmscriptenGL } from '../types';
-import type { FrameDataOptions, VideoDecoder, wx } from './interfaces';
+import { removeFile, touchDirectory, writeFile } from './file-utils';
 import { ArrayBufferImage } from './array-buffer-image';
+
+import type { FrameDataOptions, VideoDecoder, wx } from './interfaces';
 
 declare const wx: wx;
 declare const setInterval: (callback: () => void, delay: number) => number;
@@ -36,7 +34,6 @@ export interface TimeRange {
   end: number;
 }
 
-@destroyVerify
 export class VideoReader {
   public static async create(
     mp4Data: Uint8Array,
@@ -56,7 +53,6 @@ export class VideoReader {
   private mp4Path: string;
   private videoDecoder: VideoDecoder;
   private videoDecoderPromise: Promise<void> | undefined;
-  private frameData: FrameData | null = null;
   private frameDataBuffers: FrameData[] = [];
   private bufferIndex = 0; // next frameData id
   private getFrameDataLooping = false;
@@ -135,7 +131,11 @@ export class VideoReader {
   }
 
   public onDestroy() {
+    this.clearFrameDataLoop();
     this.videoDecoder.remove();
+    if (this.mp4Path) {
+      removeFile(this.mp4Path);
+    }
   }
 
   private getFrameData() {
