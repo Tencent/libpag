@@ -13,7 +13,7 @@ import android.opengl.EGLSurface;
 import android.opengl.GLES20;
 import android.opengl.GLUtils;
 import android.os.Bundle;
-import android.support.v7.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatActivity;
 import android.view.Display;
 import android.view.View;
 import android.view.ViewGroup;
@@ -50,18 +50,18 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 WindowManager.LayoutParams.FLAG_FULLSCREEN);
         setContentView(R.layout.activity_main);
 
-        containerView = (RelativeLayout) findViewById(R.id.container_view);
+        containerView = findViewById(R.id.container_view);
         BackgroundView backgroundView = new BackgroundView(this);
         backgroundView.setLayoutParams(new RelativeLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         containerView.addView(backgroundView);
 
-        btPlayFirst = (Button) findViewById(R.id.play_first);
+        btPlayFirst = findViewById(R.id.play_first);
         if (btPlayFirst == null) {
             return;
         }
         btPlayFirst.setOnClickListener(this);
-        btPlaySecond = (Button) findViewById(R.id.play_second);
+        btPlaySecond = findViewById(R.id.play_second);
         if (btPlaySecond == null) {
             return;
         }
@@ -92,14 +92,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             }
             pagView.setComposition(pagFile);
             pagView.setRepeatCount(-1);
-            pagView.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    if (pagView.isPlaying()) {
-                        pagView.stop();
-                    } else {
-                        pagView.play();
-                    }
+            pagView.setOnClickListener(v -> {
+                if (pagView.isPlaying()) {
+                    pagView.stop();
+                } else {
+                    pagView.play();
                 }
             });
             containerView.addView(pagView);
