@@ -68,6 +68,9 @@ std::shared_ptr<PAGSurface> PAGSurface::MakeFrom(const BackendTexture& texture, 
 
 std::shared_ptr<PAGSurface> PAGSurface::MakeOffscreen(int width, int height) {
   auto device = tgfx::GLDevice::Make();
+  if (device == nullptr) {
+    device = tgfx::GLDevice::Current();
+  }
   if (device == nullptr || width <= 0 || height <= 0) {
     return nullptr;
   }
