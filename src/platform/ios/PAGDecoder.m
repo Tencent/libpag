@@ -98,14 +98,14 @@
 - (UIImage*)frameAtIndex:(NSInteger)index {
   BOOL result = [self renderCurrentFrame:index];
   if (!result && lastFrameImage != nil) {
-    return nil;
+    return [[lastFrameImage retain] autorelease];
   }
   UIImage* image = [self imageFromCVPixelBufferRef:[pagSurface makeSnapshot]];
   if (lastFrameImage) {
     [lastFrameImage release];
   }
   lastFrameImage = [image retain];
-  return [[image retain] autorelease];
+  return image;
 }
 
 - (NSInteger)width {

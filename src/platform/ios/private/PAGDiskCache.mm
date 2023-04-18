@@ -73,19 +73,14 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
   }
   dispatch_release(cacheQueue);
   [_path release];
-  if (scratchEncodeBuffer) {
-    free(scratchEncodeBuffer);
-  }
   if (scratchDecodeBuffer) {
     free(scratchDecodeBuffer);
-  }
-  if (encodeBuffer) {
-    free(encodeBuffer);
   }
   if (decodeBuffer) {
     free(decodeBuffer);
   }
 
+  [self releaseEncodeBuffer];
   [super dealloc];
 }
 
@@ -123,6 +118,9 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
   if (decodeLength == 0) {
     decodeLength = length;
   }
+  if (encodeBuffer && cacheFrameCount == numFrames) {
+    [self releaseEncodeBuffer];
+  }
   NSData* compressData = [self readObjectForKey:index];
   if (compressData) {
     return [self deCompressData:pixels
@@ -137,10 +135,7 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
   encodeLength = length;
   NSData* compressData = [self compressRGBAData:pixels length:length];
   if (compressData) {
-    __block __typeof(self) weakSelf = self;
-    dispatch_async(cacheQueue, ^{
-      [weakSelf saveObject:compressData forKey:index];
-    });
+      [self saveObject:compressData forKey:index];
   }
 }
 
@@ -319,6 +314,18 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
     encodeBuffer = (uint8_t*)malloc(encodeLength);
   }
   return encodeBuffer;
+}
+
+- (void)releaseEncodeBuffer {
+  if (encodeBuffer) {
+    free(encodeBuffer);
+    encodeBuffer = nil;
+  }
+
+  if (scratchEncodeBuffer) {
+    free(scratchEncodeBuffer);
+    scratchEncodeBuffer = nil;
+  }
 }
 
 - (uint8_t*)getDecoderBuffer {
