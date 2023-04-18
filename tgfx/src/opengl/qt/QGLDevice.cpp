@@ -38,7 +38,7 @@ std::shared_ptr<GLDevice> GLDevice::Current() {
 }
 
 std::shared_ptr<GLDevice> GLDevice::Make(void*) {
-  return nullptr;
+  return QGLDevice::Make();
 }
 
 std::shared_ptr<QGLDevice> QGLDevice::Make(QOpenGLContext* sharedContext, QSurfaceFormat* format) {
