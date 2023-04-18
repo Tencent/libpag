@@ -36,10 +36,13 @@ class NativeCodec : public ImageCodec {
   std::shared_ptr<Data> imageBytes;
   Global<jobject> nativeImage;
 
+  static std::shared_ptr<NativeCodec> Make(JNIEnv* env, jobject sizeObject, int origin);
+
   NativeCodec(int width, int height, EncodedOrigin origin) : ImageCodec(width, height, origin) {
   }
 
-  static std::shared_ptr<NativeCodec> Make(JNIEnv* env, jobject sizeObject, int origin);
+  jobject decodeBitmap(JNIEnv* env, ColorType colorType, AlphaType alphaType,
+                       bool tryHardware) const;
 
   friend class ImageCodec;
 };
