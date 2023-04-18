@@ -72,39 +72,37 @@ export class PAGView extends NativePAGView {
     this.pagSurface = pagSurface;
   }
 
-  protected override async flushLoop() {
-    const loop = () => {
-      if (!this.isPlaying) return;
-      this.timer = (this.canvasElement as wxCanvas).requestAnimationFrame(loop);
-      if (this.flushingNextFrame) return;
-      const now = this.getNowTime();
-      const duration = this.duration();
-      this.playTime = now * 1000 - this.startTime;
-      const playFrame = Math.floor((this.playTime / 1000000) * this.frameRate);
-      const count = Math.floor(this.playTime / duration);
-      if (this.repeatedTimes === count && this.playFrame === playFrame) {
-        return;
-      }
-      this.flushNextFrame();
-    };
-    loop();
+  protected override async flushLoop(force = false) {
+    if (!this.isPlaying) return;
+    this.setTimer();
+    if (this.flushingNextFrame) return;
+    try {
+      this.flushingNextFrame = true;
+      await this.flushNextFrame(force);
+      this.flushingNextFrame = false;
+    } catch (e: any) {
+      this.flushingNextFrame = false;
+      throw e;
+    }
   }
 
-  protected override async flushNextFrame() {
-    this.flushingNextFrame = true;
+  protected override async flushNextFrame(force = false) {
     const duration = this.duration();
+    this.playTime = this.getNowTime() * 1000 - this.startTime;
     const playFrame = Math.floor((this.playTime / 1000000) * this.frameRate);
     const count = Math.floor(this.playTime / duration);
-    if (this.repeatCount >= 0 && count > this.repeatCount) {
+    if (!force && this.repeatCount >= 0 && count > this.repeatCount) {
       this.clearTimer();
       this.player.setProgress(1);
       await this.flush();
       this.playTime = 0;
       this.isPlaying = false;
-      this.eventManager.emit('onAnimationEnd', this);
       this.repeatedTimes = 0;
-      this.flushingNextFrame = false;
+      this.eventManager.emit('onAnimationEnd', this);
       return true;
+    }
+    if (!force && this.repeatedTimes === count && this.playFrame === playFrame) {
+      return false;
     }
     if (this.repeatedTimes < count) {
       this.eventManager.emit('onAnimationRepeat', this);
@@ -113,12 +111,17 @@ export class PAGView extends NativePAGView {
     const res = await this.flush();
     this.playFrame = playFrame;
     this.repeatedTimes = count;
-    this.flushingNextFrame = false;
     return res;
   }
 
   protected override getNowTime() {
     return Date.now();
+  }
+
+  protected override setTimer() {
+    this.timer = (this.canvasElement as wxCanvas).requestAnimationFrame(() => {
+      this.flushLoop();
+    });
   }
 
   protected override clearTimer() {
