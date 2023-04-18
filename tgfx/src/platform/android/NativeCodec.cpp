@@ -276,7 +276,11 @@ std::shared_ptr<ImageBuffer> NativeCodec::onMakeBuffer(bool tryHardware) const {
     }
     bitmap = ConvertHardwareBitmap(env, bitmap);
   }
-  return NativePixelBuffer::MakeFrom(env, bitmap);
+  auto pixelBuffer = NativePixelBuffer::MakeFrom(env, bitmap);
+  if (pixelBuffer != nullptr) {
+    return pixelBuffer;
+  }
+  return ImageCodec::onMakeBuffer(tryHardware);
 }
 
 jobject NativeCodec::decodeBitmap(JNIEnv* env, ColorType colorType, AlphaType alphaType,
