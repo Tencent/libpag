@@ -31,7 +31,6 @@
  */
 
 @implementation PAGDiskCache {
-  dispatch_queue_t cacheQueue;
   NSString* _path;
   int fd;
   NSInteger numFrames;
@@ -61,7 +60,6 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
     scratchDecodeLength = compression_decode_scratch_buffer_size(COMPRESSION_LZ4);
     encodeLength = 0;
     decodeLength = 0;
-    cacheQueue = dispatch_queue_create("PAGDiskFileCache.art.pag", DISPATCH_QUEUE_SERIAL);
     [self initializeCacheFile];
   }
   return self;
@@ -71,7 +69,6 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
   if (fd > 0) {
     close(fd);
   }
-  dispatch_release(cacheQueue);
   [_path release];
   if (scratchDecodeBuffer) {
     free(scratchDecodeBuffer);
