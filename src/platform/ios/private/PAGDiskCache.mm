@@ -132,7 +132,7 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
   encodeLength = length;
   NSData* compressData = [self compressRGBAData:pixels length:length];
   if (compressData) {
-      [self saveObject:compressData forKey:index];
+    [self saveObject:compressData forKey:index];
   }
 }
 
