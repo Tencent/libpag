@@ -5,7 +5,7 @@ import {
   VIDEO_PLAYBACK_RATE_MIN,
 } from '../constant';
 import { addListener, removeListener, removeAllListeners } from '../utils/video-listener';
-import { IPHONE, WECHAT, SAFARI, WORKER } from '../utils/ua';
+import { IPHONE, WECHAT, APPLE_WEBKIT, WORKER } from '../utils/ua';
 import { PAGModule } from '../pag-module';
 import { WorkerMessageType } from '../worker/events';
 import { WorkerVideoReader } from '../worker/video-reader';
@@ -143,7 +143,7 @@ export class VideoReader {
     const { currentTime } = this.videoEl!;
     const targetTime = targetFrame / this.frameRate;
     if (currentTime === 0 && targetTime === 0) {
-      if (!this.canplay && !SAFARI) {
+      if (!this.canplay && !APPLE_WEBKIT) {
         await waitVideoCanPlay(this.videoEl!);
       } else {
         try {

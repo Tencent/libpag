@@ -1,6 +1,6 @@
 import { CANVAS_POOL_MAX_SIZE } from '../constant';
 import { isInstanceOf } from './type-utils';
-import { SAFARI } from './ua';
+import { APPLE_WEBKIT } from './ua';
 
 const canvasPool = new Array<HTMLCanvasElement | OffscreenCanvas>();
 
@@ -30,7 +30,7 @@ const createCanvas2D = () => {
    * After version 16.4, OffscreenCanvas is supported, but type checking errors still exist for WebGL interfaces on OffscreenCanvas.
    * Therefore, HTMLCanvas Element is used uniformly in Safari.
    */
-  if (SAFARI) {
+  if (APPLE_WEBKIT) {
     return document.createElement('canvas');
   }
   try {
