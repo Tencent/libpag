@@ -40,6 +40,8 @@ class PixelRef : public ImageStream {
   static std::shared_ptr<PixelRef> Make(int width, int height, bool alphaOnly = false,
                                         bool tryHardware = true);
 
+  static std::shared_ptr<PixelRef> Wrap(std::shared_ptr<PixelBuffer> pixelBuffer);
+
   /**
    * Returns an ImageInfo describing the width, height, color type, alpha type, and row bytes of the
    * PixelRef.

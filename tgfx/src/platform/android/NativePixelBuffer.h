@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -18,37 +18,34 @@
 
 #pragma once
 
-#include <android/hardware_buffer.h>
-#include "HardwareBufferInterface.h"
+#include "JNIUtil.h"
 #include "core/PixelBuffer.h"
 
 namespace tgfx {
-class HardwareBuffer : public PixelBuffer {
+class NativePixelBuffer : public PixelBuffer {
  public:
-  static std::shared_ptr<PixelBuffer> Make(int width, int height, bool alphaOnly);
-
-  static std::shared_ptr<PixelBuffer> MakeFrom(AHardwareBuffer* hardwareBuffer);
-
+  /**
+   * Creates a PixelBuffer from the specified Android Bitmap object. Returns nullptr if the bitmap
+   * is null, has an unpremultiply alpha type, or its color type is neither RGBA_8888 nor ALPHA_8.
+   */
   static std::shared_ptr<PixelBuffer> MakeFrom(JNIEnv* env, jobject bitmap);
 
-  explicit HardwareBuffer(AHardwareBuffer* hardwareBuffer);
-
-  ~HardwareBuffer() override;
-
   bool isHardwareBacked() const override {
-    return true;
+    return false;
   }
 
   void* lockPixels() override;
 
   void unlockPixels() override;
 
-  AHardwareBuffer* aHardwareBuffer();
-
  protected:
   std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) const override;
 
  private:
-  AHardwareBuffer* hardwareBuffer = nullptr;
+  Global<jobject> bitmap = {};
+
+  explicit NativePixelBuffer(const ImageInfo& info) : PixelBuffer(info) {
+  }
 };
+
 }  // namespace tgfx

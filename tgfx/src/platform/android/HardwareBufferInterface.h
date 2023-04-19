@@ -34,6 +34,11 @@ class HardwareBufferInterface {
   static bool Available();
 
   /**
+   * Returns true if the local system has AndroidBitmap_getHardwareBuffer support.
+   */
+  static bool HasBitmapFetchSupport();
+
+  /**
    * Allocates a buffer that backs an AHardwareBuffer using the passed AHardwareBuffer_Desc.
    * Returns 0 on success, or an error number of the allocation fails for any reason. The returned
    * buffer has a reference count of 1.

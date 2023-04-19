@@ -22,10 +22,14 @@
 namespace tgfx {
 std::shared_ptr<PixelRef> PixelRef::Make(int width, int height, bool alphaOnly, bool tryHardware) {
   auto pixelBuffer = PixelBuffer::Make(width, height, alphaOnly, tryHardware);
+  return Wrap(std::move(pixelBuffer));
+}
+
+std::shared_ptr<PixelRef> PixelRef::Wrap(std::shared_ptr<PixelBuffer> pixelBuffer) {
   if (pixelBuffer == nullptr) {
     return nullptr;
   }
-  return std::shared_ptr<PixelRef>(new PixelRef(pixelBuffer));
+  return std::shared_ptr<PixelRef>(new PixelRef((std::move(pixelBuffer))));
 }
 
 PixelRef::PixelRef(std::shared_ptr<PixelBuffer> pixelBuffer) : pixelBuffer(std::move(pixelBuffer)) {

@@ -20,6 +20,7 @@
 #include <android/bitmap.h>
 #include "HardwareBuffer.h"
 #include "NativeImageInfo.h"
+#include "NativePixelBuffer.h"
 #include "tgfx/core/Pixmap.h"
 #include "utils/Log.h"
 
@@ -125,16 +126,6 @@ static EncodedOrigin GetEncodedOrigin(JNIEnv* env, jobject exifInterface) {
   return static_cast<EncodedOrigin>(origin);
 }
 
-static jobject DecodeBitmap(JNIEnv* env, jobject options, const std::string& filePath) {
-  auto imagePath = SafeToJString(env, filePath);
-  auto bitmap = env->CallStaticObjectMethod(BitmapFactoryClass.get(), BitmapFactory_decodeFile,
-                                            imagePath, options);
-  if (env->ExceptionCheck()) {
-    return nullptr;
-  }
-  return bitmap;
-}
-
 std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& filePath) {
   JNIEnvironment environment;
   auto env = environment.current();
@@ -146,7 +137,12 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& fileP
     return nullptr;
   }
   env->SetBooleanField(options, BitmapFactoryOptions_inJustDecodeBounds, true);
-  DecodeBitmap(env, options, filePath);
+  auto imagePath = SafeToJString(env, filePath);
+  env->CallStaticObjectMethod(BitmapFactoryClass.get(), BitmapFactory_decodeFile, imagePath,
+                              options);
+  if (env->ExceptionCheck()) {
+    return nullptr;
+  }
   auto width = env->GetIntField(options, BitmapFactoryOptions_outWidth);
   auto height = env->GetIntField(options, BitmapFactoryOptions_outHeight);
   if (width <= 0 || height <= 0) {
@@ -154,25 +150,12 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& fileP
     LOGE("NativeCodec::readPixels(): Failed to get the size of the image!");
     return nullptr;
   }
-  auto imagePath = SafeToJString(env, filePath);
   auto exifInterface =
       env->NewObject(ExifInterfaceClass.get(), ExifInterface_Constructor_Path, imagePath);
   auto origin = GetEncodedOrigin(env, exifInterface);
   auto codec = std::shared_ptr<NativeCodec>(new NativeCodec(width, height, origin));
   codec->imagePath = filePath;
   return codec;
-}
-
-static jobject DecodeBitmap(JNIEnv* env, jobject options, std::shared_ptr<Data> imageBytes) {
-  auto byteArray = env->NewByteArray(imageBytes->size());
-  env->SetByteArrayRegion(byteArray, 0, imageBytes->size(),
-                          reinterpret_cast<const jbyte*>(imageBytes->data()));
-  auto bitmap = env->CallStaticObjectMethod(BitmapFactoryClass.get(), BitmapFactory_decodeByteArray,
-                                            byteArray, 0, imageBytes->size(), options);
-  if (env->ExceptionCheck()) {
-    return nullptr;
-  }
-  return bitmap;
 }
 
 std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> imageBytes) {
@@ -186,7 +169,14 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> im
     return nullptr;
   }
   env->SetBooleanField(options, BitmapFactoryOptions_inJustDecodeBounds, true);
-  DecodeBitmap(env, options, imageBytes);
+  auto byteArray = env->NewByteArray(imageBytes->size());
+  env->SetByteArrayRegion(byteArray, 0, imageBytes->size(),
+                          reinterpret_cast<const jbyte*>(imageBytes->data()));
+  env->CallStaticObjectMethod(BitmapFactoryClass.get(), BitmapFactory_decodeByteArray, byteArray, 0,
+                              imageBytes->size(), options);
+  if (env->ExceptionCheck()) {
+    return nullptr;
+  }
   auto width = env->GetIntField(options, BitmapFactoryOptions_outWidth);
   auto height = env->GetIntField(options, BitmapFactoryOptions_outHeight);
   if (width <= 0 || height <= 0) {
@@ -194,9 +184,6 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> im
     LOGE("NativeCodec::readPixels(): Failed to get the size of the image!");
     return nullptr;
   }
-  auto byteArray = env->NewByteArray(imageBytes->size());
-  env->SetByteArrayRegion(byteArray, 0, imageBytes->size(),
-                          reinterpret_cast<const jbyte*>(imageBytes->data()));
   auto inputStream =
       env->NewObject(ByteArrayInputStreamClass.get(), ByteArrayInputStream_Constructor, byteArray);
   auto exifInterface =
@@ -213,7 +200,7 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(NativeImageRef nativeImage) {
   if (env == nullptr) {
     return nullptr;
   }
-  auto info = WebImageInfo::GetInfo(env, nativeImage);
+  auto info = NativeImageInfo::GetInfo(env, nativeImage);
   if (info.isEmpty()) {
     return nullptr;
   }
@@ -256,44 +243,16 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (env == nullptr) {
     return false;
   }
-  jobject bitmap;
-  if (!nativeImage.isEmpty()) {
-    bitmap = ConvertHardwareBitmap(env, nativeImage.get());
-  } else {
-    auto options =
-        env->NewObject(BitmapFactoryOptionsClass.get(), BitmapFactoryOptions_Constructor);
-    if (options == nullptr) {
-      env->ExceptionClear();
-      LOGE("NativeCodec::readPixels(): Failed to create a BitmapFactory.Options object!");
-      return false;
-    }
-    jobject config;
-    if (dstInfo.colorType() == ColorType::ALPHA_8) {
-      config = env->GetStaticObjectField(BitmapConfigClass.get(), BitmapConfig_ALPHA_8);
-    } else if (dstInfo.colorType() == ColorType::RGB_565) {
-      config = env->GetStaticObjectField(BitmapConfigClass.get(), BitmapConfig_RGB_565);
-    } else {
-      config = env->GetStaticObjectField(BitmapConfigClass.get(), BitmapConfig_ARGB_8888);
-    }
-    env->SetObjectField(options, BitmapFactoryOptions_inPreferredConfig, config);
-    if (dstInfo.alphaType() == AlphaType::Unpremultiplied) {
-      env->SetBooleanField(options, BitmapFactoryOptions_inPremultiplied, false);
-    }
-    if (!imagePath.empty()) {
-      bitmap = DecodeBitmap(env, options, imagePath);
-    } else {
-      bitmap = DecodeBitmap(env, options, imageBytes);
-    }
-  }
-  auto info = WebImageInfo::GetInfo(env, bitmap);
+  auto bitmap = decodeBitmap(env, dstInfo.colorType(), dstInfo.alphaType(), false);
+  auto info = NativeImageInfo::GetInfo(env, bitmap);
   if (info.isEmpty()) {
-    LOGE("NativeCodec::readPixels(): Failed to decode the image!");
+    LOGE("NativeCodec::readPixels() Failed to read the image info from a Bitmap!");
     return false;
   }
   void* pixels = nullptr;
   if (AndroidBitmap_lockPixels(env, bitmap, &pixels) != 0) {
     env->ExceptionClear();
-    LOGE("NativeCodec::readPixels(): Failed to lockPixels() of a Java Bitmap!");
+    LOGE("NativeCodec::readPixels() Failed to lockPixels() of a Java Bitmap!");
     return false;
   }
   auto result = tgfx::Pixmap(info, pixels).readPixels(dstInfo, dstPixels);
@@ -302,19 +261,75 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
 }
 
 std::shared_ptr<ImageBuffer> NativeCodec::onMakeBuffer(bool tryHardware) const {
-  if (tryHardware && !nativeImage.isEmpty()) {
-    JNIEnvironment environment;
-    auto env = environment.current();
-    if (env == nullptr) {
-      return nullptr;
-    }
-    auto buffer = HardwareBufferInterface::AHardwareBuffer_fromBitmap(env, nativeImage.get());
-    if (buffer != nullptr) {
-      auto hardwareBuffer = HardwareBuffer::MakeFrom(buffer);
-      HardwareBufferInterface::Release(buffer);
+  JNIEnvironment environment;
+  auto env = environment.current();
+  if (env == nullptr) {
+    return nullptr;
+  }
+  auto bitmap = decodeBitmap(env, ColorType::RGBA_8888, AlphaType::Premultiplied, tryHardware);
+  if (tryHardware) {
+    auto hardwareBuffer = HardwareBuffer::MakeFrom(env, nativeImage.get());
+    if (hardwareBuffer != nullptr) {
       return hardwareBuffer;
     }
+    bitmap = ConvertHardwareBitmap(env, bitmap);
+  }
+  auto pixelBuffer = NativePixelBuffer::MakeFrom(env, bitmap);
+  if (pixelBuffer != nullptr) {
+    return pixelBuffer;
   }
   return ImageCodec::onMakeBuffer(tryHardware);
+}
+
+jobject NativeCodec::decodeBitmap(JNIEnv* env, ColorType colorType, AlphaType alphaType,
+                                  bool tryHardware) const {
+  if (!nativeImage.isEmpty()) {
+    if (!tryHardware) {
+      return ConvertHardwareBitmap(env, nativeImage.get());
+    }
+    return nativeImage.get();
+  }
+  auto options = env->NewObject(BitmapFactoryOptionsClass.get(), BitmapFactoryOptions_Constructor);
+  if (options == nullptr) {
+    env->ExceptionClear();
+    LOGE("NativeCodec::decodeBitmap() Failed to create a BitmapFactory.Options object!");
+    return nullptr;
+  }
+  jobject config;
+  if (tryHardware && HardwareBufferInterface::HasBitmapFetchSupport()) {
+    config = env->GetStaticObjectField(BitmapConfigClass.get(), BitmapConfig_HARDWARE);
+  } else if (colorType == ColorType::ALPHA_8) {
+    config = env->GetStaticObjectField(BitmapConfigClass.get(), BitmapConfig_ALPHA_8);
+  } else if (colorType == ColorType::RGB_565) {
+    config = env->GetStaticObjectField(BitmapConfigClass.get(), BitmapConfig_RGB_565);
+  } else {
+    config = env->GetStaticObjectField(BitmapConfigClass.get(), BitmapConfig_ARGB_8888);
+  }
+  env->SetObjectField(options, BitmapFactoryOptions_inPreferredConfig, config);
+  if (alphaType == AlphaType::Unpremultiplied) {
+    env->SetBooleanField(options, BitmapFactoryOptions_inPremultiplied, false);
+  }
+
+  if (!imagePath.empty()) {
+    auto filePath = SafeToJString(env, imagePath);
+    auto bitmap = env->CallStaticObjectMethod(BitmapFactoryClass.get(), BitmapFactory_decodeFile,
+                                              filePath, options);
+    if (env->ExceptionCheck()) {
+      LOGE("NativeCodec::decodeBitmap() Failed to decode a Bitmap from the path: %s!",
+           imagePath.c_str());
+      return nullptr;
+    }
+    return bitmap;
+  }
+  auto byteArray = env->NewByteArray(imageBytes->size());
+  env->SetByteArrayRegion(byteArray, 0, imageBytes->size(),
+                          reinterpret_cast<const jbyte*>(imageBytes->data()));
+  auto bitmap = env->CallStaticObjectMethod(BitmapFactoryClass.get(), BitmapFactory_decodeByteArray,
+                                            byteArray, 0, imageBytes->size(), options);
+  if (env->ExceptionCheck()) {
+    LOGE("NativeCodec::decodeBitmap() Failed to decode a Bitmap from the image bytes!");
+    return nullptr;
+  }
+  return bitmap;
 }
 }  // namespace tgfx

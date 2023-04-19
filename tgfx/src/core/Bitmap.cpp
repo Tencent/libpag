@@ -32,6 +32,12 @@ Bitmap::Bitmap(const Bitmap& src) : _info(src._info), pixelRef(src.pixelRef) {
 Bitmap::Bitmap(Bitmap&& src) : _info(src._info), pixelRef(std::move(src.pixelRef)) {
 }
 
+Bitmap::Bitmap(std::shared_ptr<PixelRef> pixel) : pixelRef(std::move(pixel)) {
+  if (pixelRef != nullptr) {
+    _info = pixelRef->info();
+  }
+}
+
 Bitmap& Bitmap::operator=(const Bitmap& src) {
   if (this != &src) {
     _info = src._info;

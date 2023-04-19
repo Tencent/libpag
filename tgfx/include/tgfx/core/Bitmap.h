@@ -62,6 +62,11 @@ class Bitmap {
   Bitmap(Bitmap&& src);
 
   /**
+   * Creates a new Bitmap from the specified PixelRef object.
+   */
+  explicit Bitmap(std::shared_ptr<PixelRef> pixelRef);
+
+  /**
    * Copies settings from src to returned Bitmap. Shares pixels if src has pixels allocated, so both
    * bitmaps reference the same pixels.
    */
