@@ -268,10 +268,8 @@ std::shared_ptr<ImageBuffer> NativeCodec::onMakeBuffer(bool tryHardware) const {
   }
   auto bitmap = decodeBitmap(env, ColorType::RGBA_8888, AlphaType::Premultiplied, tryHardware);
   if (tryHardware) {
-    auto buffer = HardwareBufferInterface::AHardwareBuffer_fromBitmap(env, nativeImage.get());
-    if (buffer != nullptr) {
-      auto hardwareBuffer = HardwareBuffer::MakeFrom(buffer);
-      HardwareBufferInterface::Release(buffer);
+    auto hardwareBuffer = HardwareBuffer::MakeFrom(env, nativeImage.get());
+    if (hardwareBuffer != nullptr) {
       return hardwareBuffer;
     }
     bitmap = ConvertHardwareBitmap(env, bitmap);

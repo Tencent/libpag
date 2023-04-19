@@ -30,6 +30,19 @@ std::shared_ptr<PixelBuffer> HardwareBuffer::MakeFrom(AHardwareBuffer* hardwareB
   return std::shared_ptr<HardwareBuffer>(new HardwareBuffer(hardwareBuffer));
 }
 
+std::shared_ptr<PixelBuffer> HardwareBuffer::MakeFrom(JNIEnv* env, jobject bitmap) {
+  if (env == nullptr || bitmap == nullptr) {
+    return nullptr;
+  }
+  auto buffer = HardwareBufferInterface::AHardwareBuffer_fromBitmap(env, bitmap);
+  if (buffer == nullptr) {
+    return nullptr;
+  }
+  auto hardwareBuffer = HardwareBuffer::MakeFrom(buffer);
+  HardwareBufferInterface::Release(buffer);
+  return hardwareBuffer;
+}
+
 std::shared_ptr<PixelBuffer> HardwareBuffer::Make(int width, int height, bool alphaOnly) {
   if (alphaOnly || !HardwareBufferInterface::Available()) {
     return nullptr;
