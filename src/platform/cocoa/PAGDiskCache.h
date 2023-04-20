@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making libpag available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2021 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
 //  except in compliance with the License. You may obtain a copy of the License at
@@ -17,26 +17,22 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import <Foundation/Foundation.h>
+#import "PAG.h"
 
-#import "PAGSequenceCache.h"
+/**
+ * Defines methods to manage the disk cache capabilities.
+ */
+PAG_API @interface PAGDiskCache : NSObject
 
-NS_ASSUME_NONNULL_BEGIN
+/**
+ * Returns the size limit of the disk cache in bytes. The default value is 1 GB.
+ */
++ (size_t)MaxDiskSize;
 
-@interface PAGDiskCacheItem : NSObject
-@property(nonatomic, retain) PAGSequenceCache* diskCache;
-@property(nonatomic, assign) NSInteger count;
-@property(nonatomic, assign) BOOL deleteAfterUse;
-@end
-
-@interface PAGDiskCacheManager : NSObject
-
-+ (instancetype)shareInstance;
-
-- (PAGDiskCacheItem* __nullable)objectDiskCacheFor:(NSString* __nonnull)cacheName
-                                        frameCount:(NSInteger)frameCount;
-
-- (void)removeDiskCacheFrom:(NSString* __nonnull)cacheName;
+/**
+ * Sets the size limit of the disk cache in bytes, which will immediately trigger the cache
+ * cleanup if the disk usage exceeds the limit.
+ */
++ (void)SetMaxDiskSize:(size_t)size;
 
 @end
-
-NS_ASSUME_NONNULL_END

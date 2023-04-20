@@ -82,7 +82,7 @@ public class PAGDecoder {
     public native int width();
 
     /**
-     * Returns the height of the decoder.
+     * Returns the height of decoded image frames.
      */
     public native int height();
 
@@ -101,7 +101,7 @@ public class PAGDecoder {
     /**
      * Copies pixels of the image frame at the given index to the specified Bitmap. Returns false if
      * failed. Note that caller must ensure that the config of Bitmap stays the same throughout
-     * every reading call. Otherwise, it may return false.
+     * every copying call. Otherwise, it may return false.
      */
     public native boolean copyFrameTo(Bitmap bitmap, int index);
 

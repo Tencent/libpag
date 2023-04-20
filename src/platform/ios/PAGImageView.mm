@@ -17,18 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "PAGImageView.h"
-
 #import <CommonCrypto/CommonCrypto.h>
 #include <compression.h>
 #include <mutex>
-
 #import "PAGDecoder.h"
 #import "PAGFile.h"
 #import "platform/cocoa/private/PAGContentVersion.h"
 #import "platform/cocoa/private/PixelBufferUtils.h"
 #import "private/PAGCacheManager.h"
-#import "private/PAGDiskCache.h"
 #import "private/PAGDiskCacheManager.h"
+#import "private/PAGSequenceCache.h"
 #import "private/PAGValueAnimator.h"
 
 namespace pag {
@@ -302,19 +300,21 @@ static NSString* RemovePathVariableComponent(NSString* original) {
     if (pagComposition) {
       pagDecoder = [PAGDecoder Make:pagComposition
                        maxFrameRate:self.frameRate
-                              scale:self.scaleFactor];
+                              scale:self.scaleFactor
+                       useDiskCache:NO];
       [pagDecoder retain];
     } else if (filePath) {
       pagDecoder = [PAGDecoder Make:[PAGFile Load:filePath]
                        maxFrameRate:self.frameRate
-                              scale:self.scaleFactor];
+                              scale:self.scaleFactor
+                       useDiskCache:NO];
       [pagDecoder retain];
     }
   }
   return pagDecoder;
 }
 
-- (PAGDiskCache*)getImageViewCache {
+- (PAGSequenceCache*)getImageViewCache {
   if (imageViewCacheItem == nil) {
     if (cacheKey) {
       [cacheKey release];
@@ -455,7 +455,7 @@ static NSString* RemovePathVariableComponent(NSString* original) {
     }
     return YES;
   }
-  PAGDiskCache* diskCache = [self getImageViewCache];
+  PAGSequenceCache* diskCache = [self getImageViewCache];
   uint8_t* rgbaData = CFDataGetMutableBytePtr(dataRef);
   if ([diskCache containsObjectForKey:frameIndex]) {
     status = [diskCache objectForKey:frameIndex to:rgbaData length:cacheImageSize];
