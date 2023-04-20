@@ -516,9 +516,7 @@ public class PAGImageView extends View {
                 if (cacheItem != null || lastKeyItem == null) {
                     return;
                 }
-                cacheItem = cacheManager.getOrCreate(lastKeyItem.keyPrefixMD5,
-                        decoderInfo._width, decoderInfo._height,
-                        decoderInfo.numFrames);
+                cacheItem = cacheManager.getOrCreate(lastKeyItem.keyPrefixMD5, decoderInfo._width, decoderInfo._height, decoderInfo.numFrames);
             }
         }
         refreshMatrixFromScaleMode();
@@ -817,10 +815,9 @@ public class PAGImageView extends View {
                 try {
                     if (cacheItem.isCached(frame)) {
                         if (renderBitmap == null || isCacheAllFramesInMemory) {
-                            renderBitmap = PAGImageViewHelper.CreateBitmap(decoderInfo._width, decoderInfo._height);
+                            renderBitmap = BitmapHelper.CreateBitmap(decoderInfo._width, decoderInfo._height);
                         }
-                        if (fetchCache(CacheInfo.Make(PAGImageView.this, lastKeyItem.keyPrefixMD5,
-                                frame, renderBitmap))) {
+                        if (fetchCache(CacheInfo.Make(PAGImageView.this, lastKeyItem.keyPrefixMD5, frame, renderBitmap))) {
                         }
                         return true;
                     }
@@ -833,7 +830,7 @@ public class PAGImageView extends View {
             return false;
         }
         if (renderBitmap == null || isCacheAllFramesInMemory) {
-            renderBitmap = PAGImageViewHelper.CreateBitmap(decoderInfo._width, decoderInfo._height);
+            renderBitmap = BitmapHelper.CreateBitmap(decoderInfo._width, decoderInfo._height);
         }
         if (decoderInfo._pagDecoder == null || !decoderInfo._pagDecoder.copyFrameTo(renderBitmap, frame)) {
             return false;

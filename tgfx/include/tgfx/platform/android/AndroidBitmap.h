@@ -23,16 +23,23 @@
 
 namespace tgfx {
 /**
- * AndroidBitmap defines method to wrap an android Bitmap into a tgfx::Bitmap.
+ * AndroidBitmap provides a utility to access an Android Bitmap object.
  */
 class AndroidBitmap {
  public:
   /**
-   * Wraps an Android Bitmap into a tgfx::Bitmap object. The returned tgfx::Bitmap shares the same
-   * pixel buffer as the Android Bitmap. Returns an empty tgfx::Bitmap if failed. The Android Bitmap
-   * must have a premultiplied alpha type, and the pixel config must be either ARGB_8888, ALPHA_8,
-   * or HARDWARE(API Level >= 30). Otherwise, the returned tgfx::Bitmap will be empty.
+   * Returns an ImageInfo describing the width, height, color type, alpha type, and row bytes of the
+   * specified Android Bitmap object. Returns an empty ImageInfo if the config of the Android Bitmap
+   * is either 'ARGB_4444' or 'HARDWARE'.
    */
-  static Bitmap Wrap(JNIEnv* env, jobject bitmap);
+  static ImageInfo GetInfo(JNIEnv* env, jobject bitmap);
+
+  /**
+   * Wraps an hardware backed Android Bitmap into a tgfx::Bitmap object. The returned tgfx::Bitmap
+   * shares the same pixel memory as the original Android Bitmap. Returns an empty tgfx::Bitmap if
+   * the config of the Android Bitmap is not 'HARDWARE' or the API Level of the current system is
+   * less than 30.
+   */
+  static Bitmap WrapHardware(JNIEnv* env, jobject bitmap);
 };
 }  // namespace tgfx

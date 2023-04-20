@@ -51,7 +51,8 @@ std::pair<int, float> PAGDecoder::GetFrameCountAndRate(std::shared_ptr<PAGCompos
 }
 
 std::shared_ptr<PAGDecoder> PAGDecoder::MakeFrom(std::shared_ptr<PAGComposition> composition,
-                                                 float maxFrameRate, float scale) {
+                                                 float maxFrameRate, float scale,
+                                                 bool useDiskCache) {
   if (composition == nullptr) {
     return nullptr;
   }
@@ -60,13 +61,13 @@ std::shared_ptr<PAGDecoder> PAGDecoder::MakeFrom(std::shared_ptr<PAGComposition>
   auto result = GetFrameCountAndRate(composition, maxFrameRate);
   return std::shared_ptr<PAGDecoder>(new PAGDecoder(std::move(composition), static_cast<int>(width),
                                                     static_cast<int>(height), result.first,
-                                                    result.second, maxFrameRate));
+                                                    result.second, maxFrameRate, useDiskCache));
 }
 
 PAGDecoder::PAGDecoder(std::shared_ptr<PAGComposition> composition, int width, int height,
-                       int numFrames, float frameRate, float maxFrameRate)
+                       int numFrames, float frameRate, float maxFrameRate, bool useDiskCache)
     : _width(width), _height(height), _numFrames(numFrames), _frameRate(frameRate),
-      maxFrameRate(maxFrameRate) {
+      maxFrameRate(maxFrameRate), useDiskCache(useDiskCache) {
   container = PAGComposition::Make(width, height);
   container->addLayer(composition);
 }
@@ -87,11 +88,15 @@ bool PAGDecoder::readFrame(int index, void* pixels, size_t rowBytes, pag::ColorT
                            pag::AlphaType alphaType) {
   std::lock_guard<std::mutex> auoLock(locker);
   auto composition = getComposition();
-  if (!checkSequenceFile(composition, rowBytes, colorType, alphaType)) {
-    return false;
-  }
+  checkCompositionChange(composition);
   if (index < 0 || index >= _numFrames) {
     LOGE("PAGDecoder::readFrame() The index is out of range!");
+    return false;
+  }
+  if (!useDiskCache) {
+    return renderFrame(composition, index, pixels, rowBytes, colorType, alphaType);
+  }
+  if (!checkSequenceFile(composition, rowBytes, colorType, alphaType)) {
     return false;
   }
   auto success = sequenceFile->readFrame(index, pixels);
@@ -145,7 +150,6 @@ bool PAGDecoder::renderFrame(std::shared_ptr<PAGComposition> composition, int in
 
 bool PAGDecoder::checkSequenceFile(std::shared_ptr<PAGComposition> composition, size_t rowBytes,
                                    ColorType colorType, AlphaType alphaType) {
-  checkCompositionChange(composition);
   if (sequenceFile != nullptr) {
     if (rowBytes != lastRowBytes || colorType != lastColorType || alphaType != lastAlphaType) {
       LOGE(

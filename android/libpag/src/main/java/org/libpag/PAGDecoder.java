@@ -22,115 +22,102 @@ import android.graphics.Bitmap;
 
 import org.extra.tools.LibraryLoadUtils;
 
+/**
+ * PAGDecoder provides a utility to read image frames directly from a PAGComposition.
+ */
 public class PAGDecoder {
-    private int _width;
-    private int _height;
-    private int _numFrames;
-    private PAGSurface pagSurface;
-    private PAGPlayer pagPlayer;
-    private Bitmap lastFrameBitmap;
-
     /**
      * Creates a new PAGDecoder with the specified PAGComposition, using the composition's frame
-     * rate and size. Returns null if the composition is null.
+     * rate and size, and set the useDiskCache to true. You can use PAGDiskCache::SetMaxDiskSize()
+     * to manage the cache limit of the disk usage. Returns null if the composition is null. Note
+     * that the returned PAGDecoder may become invalid if the associated PAGComposition is added to
+     * a PAGPlayer or another PAGDecoder.
      */
     public static PAGDecoder Make(PAGComposition pagComposition) {
         return Make(pagComposition, pagComposition.frameRate(), 1.0f);
     }
 
     /**
-     * Creates a new PAGDecoder with the specified PAGComposition, the frame rate limit, and the
-     * scale factor for the output image size. Returns nil if the composition is nil.
+     * Creates a PAGDecoder with a PAGComposition, a frame rate limit, and a scale factor for the
+     * decoded image size, and set the useDiskCache to true. You can use
+     * PAGDiskCache::SetMaxDiskSize() to manage the cache limit of the disk usage. Returns null if
+     * the composition is null. Note that the returned PAGDecoder may become invalid if the
+     * associated PAGComposition is added to a PAGPlayer or another PAGDecoder.
      */
     public static PAGDecoder Make(PAGComposition pagComposition, float maxFrameRate, float scale) {
-        if (pagComposition == null) {
+        return Make(pagComposition, maxFrameRate, scale, true);
+    }
+
+    /**
+     * Creates a PAGDecoder with a PAGComposition, a frame rate limit, and a scale factor for the
+     * decoded image size. If the useDiskCache is true, the returned PAGDecoder will cache image
+     * frames as a sequence file on the disk, which may significantly speed up the reading process
+     * depending on the complexity of the PAG files. And only keep an external reference to the
+     * PAGComposition if you need to modify it in the feature. Otherwise, the internal composition
+     * will not be released automatically after the associated disk cache is complete, which may
+     * cost more memory than necessary. You can use the PAGDiskCache::SetMaxDiskSize() method
+     * to manage the cache limit of the disk usage. Returns null if the composition is null. Note
+     * that the returned PAGDecoder may become invalid if the associated PAGComposition is added to
+     * a PAGPlayer or another PAGDecoder. And while the useDiskCache is true.
+     */
+    public static PAGDecoder Make(PAGComposition pagComposition, float maxFrameRate, float scale,
+                                  boolean useDiskCache) {
+        long nativeContext = MakeFrom(pagComposition, maxFrameRate, scale, useDiskCache);
+        if (nativeContext == 0) {
             return null;
         }
-        if (scale <= 0) {
-            scale = 1.0f;
-        }
-        float frameRate = maxFrameRate;
-        if (frameRate <= 0) {
-            frameRate = pagComposition.frameRate();
-        } else {
-            frameRate = Math.min(pagComposition.frameRate(), frameRate);
-        }
-        PAGDecoder pagDecoder = new PAGDecoder();
-        pagDecoder._width = Math.round(pagComposition.width() * scale);
-        pagDecoder._height = Math.round(pagComposition.height() * scale);
-        pagDecoder._numFrames =
-                (int) (pagComposition.duration() * frameRate / 1000000);
-        pagDecoder.pagPlayer = new PAGPlayer();
-        if (frameRate > 0) {
-            pagDecoder.pagPlayer.setMaxFrameRate(frameRate);
-        }
-        pagDecoder.pagPlayer.setComposition(pagComposition);
-        return pagDecoder;
+        return new PAGDecoder(nativeContext);
     }
 
-    private boolean checkSurface() {
-        if (pagSurface == null) {
-            pagSurface = PAGSurface.MakeOffscreen(_width, _height);
-        }
-        if (pagSurface != null) {
-            pagPlayer.setSurface(pagSurface);
-        }
-        return pagSurface != null;
+    private static native long MakeFrom(PAGComposition pagComposition, float maxFrameRate,
+                                        float scale, boolean useDiskCache);
+
+    private PAGDecoder(long nativeContext) {
+        this.nativeContext = nativeContext;
     }
 
     /**
-     * Returns the width of the decoder.
+     * Returns the width of decoded image frames.
      */
-    public int width() {
-        return _width;
-    }
+    public native int width();
 
     /**
-     * Returns the height of the decoder.
+     * Returns the height of decoded image frames.
      */
-    public int height() {
-        return _height;
-    }
+    public native int height();
 
     /**
-     * Returns the number of animated frames.
+     * Returns the number of frames in the PAGDecoder. Note that the value may change if the
+     * associated PAGComposition was modified.
      */
-    public int numFrames() {
-        return _numFrames;
-    }
+    public native int numFrames();
 
     /**
-     * Copies pixels of the image frame at the given index to the specified Bitmap.
+     * Returns the frame rate of decoded image frames. The value may change if the associated
+     * PAGComposition was modified.
      */
-    public boolean copyFrameTo(Bitmap bitmap, int index) {
-        if (bitmap == null || bitmap.isRecycled() || index < 0 || index >= _numFrames) {
-            return false;
-        }
-        if (!checkSurface()) {
-            return false;
-        }
-        pagPlayer.setProgress(PAGImageViewHelper.FrameToProgress(index, _numFrames));
-        pagPlayer.flush();
-        return pagSurface.copyPixelsTo(bitmap);
-    }
+    public native float frameRate();
+
+    /**
+     * Copies pixels of the image frame at the given index to the specified Bitmap. Returns false if
+     * failed. Note that caller must ensure that the config of Bitmap stays the same throughout
+     * every copying call. Otherwise, it may return false.
+     */
+    public native boolean copyFrameTo(Bitmap bitmap, int index);
 
     /**
      * Returns the image frame at the specified index. It's recommended to read the image frames in
      * forward order for better performance.
      */
     public Bitmap frameAtIndex(int index) {
-        if (index < 0 || index >= _numFrames) {
+        Bitmap bitmap = BitmapHelper.CreateBitmap(width(), height());
+        if (bitmap == null) {
             return null;
         }
-        if (!checkSurface()) {
-            return null;
+        if (copyFrameTo(bitmap, index)) {
+            return bitmap;
         }
-        pagPlayer.setProgress(PAGImageViewHelper.FrameToProgress(index, _numFrames));
-        if (!pagPlayer.flush() && lastFrameBitmap != null && !lastFrameBitmap.isRecycled()) {
-            return lastFrameBitmap;
-        }
-        lastFrameBitmap = pagSurface.makeSnapshot();
-        return lastFrameBitmap;
+        return null;
     }
 
     /**
@@ -138,15 +125,23 @@ public class PAGDecoder {
      * garbage collector to do this for you at some point in the future.
      */
     public void release() {
-        if (pagSurface != null) {
-            pagSurface.release();
-        }
-        pagPlayer.setSurface(null);
-        pagPlayer.setComposition(null);
-        pagPlayer.release();
+        nativeRelease();
     }
+
+    protected void finalize() {
+        nativeFinalize();
+    }
+
+    private native void nativeRelease();
+
+    private native void nativeFinalize();
+
+    private static native void nativeInit();
 
     static {
         LibraryLoadUtils.loadLibrary("pag");
+        nativeInit();
     }
+
+    private long nativeContext = 0;
 }

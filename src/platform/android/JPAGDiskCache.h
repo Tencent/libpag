@@ -16,27 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import <Foundation/Foundation.h>
+#pragma once
 
-#import "PAGSequenceCache.h"
+#include "JNIHelper.h"
+#include "pag/pag.h"
 
-NS_ASSUME_NONNULL_BEGIN
+namespace pag {
+class JPAGDiskCache {
+ public:
+  static void InitJNI(JNIEnv* env);
 
-@interface PAGDiskCacheItem : NSObject
-@property(nonatomic, retain) PAGSequenceCache* diskCache;
-@property(nonatomic, assign) NSInteger count;
-@property(nonatomic, assign) BOOL deleteAfterUse;
-@end
+  static std::string GetCacheDir();
+};
 
-@interface PAGDiskCacheManager : NSObject
-
-+ (instancetype)shareInstance;
-
-- (PAGDiskCacheItem* __nullable)objectDiskCacheFor:(NSString* __nonnull)cacheName
-                                        frameCount:(NSInteger)frameCount;
-
-- (void)removeDiskCacheFrom:(NSString* __nonnull)cacheName;
-
-@end
-
-NS_ASSUME_NONNULL_END
+}  // namespace pag

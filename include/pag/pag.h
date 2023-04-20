@@ -1522,25 +1522,25 @@ class PAG_API PAGPlayer {
 class SequenceFile;
 
 /**
- * PAGDecoder provides a utility to read image frames directly from a PAGComposition. The decoded
- * image frames will be cached as a sequence file on the disk, which may significantly speed up the
- * decoding process depending on the complexity of the PAG files. Use the PAG::SetMaxDiskSize()
- * method to manage the cache limit of the disk usage. If you want to read the image frames without
- * allocating extra space on the disk, use the PAGPlayer and PAGSurface classes instead.
+ * PAGDecoder provides a utility to read image frames directly from a PAGComposition.
  */
 class PAGDecoder {
  public:
   /**
    * Creates a PAGDecoder with a PAGComposition, a frame rate limit, and a scale factor for the
-   * decoded image size. Returns nil if the composition is nil. Note that the returned PAGDecoder
-   * may become invalid if the associated PAGComposition is added to a PAGPlayer or another
-   * PAGDecoder. And only keep a reference to the PAGComposition after creating the PAGDecoder if
-   * you need to modify it in the feature. Otherwise, the internal composition will not be released
-   * automatically after the associated disk cache is complete, which may cost more memory than
-   * necessary.
+   * decoded image size. If the useDiskCache is true, the returned PAGDecoder will cache image
+   * frames as a sequence file on the disk, which may significantly speed up the reading process
+   * depending on the complexity of the PAG files. And only keep an external reference to the
+   * PAGComposition if you need to modify it in the feature. Otherwise, the internal composition
+   * will not be released automatically after the associated disk cache is complete, which may cost
+   * more memory than necessary. You can use the PAGDiskCache::SetMaxDiskSize() method to manage the
+   * cache limit of the disk usage. Returns nullptr if the composition is nullptr. Note that the
+   * returned PAGDecoder may become invalid if the associated PAGComposition is added to a PAGPlayer
+   * or another PAGDecoder. And while the useDiskCache is true.
    */
   static std::shared_ptr<PAGDecoder> MakeFrom(std::shared_ptr<PAGComposition> composition,
-                                              float maxFrameRate = 30.0f, float scale = 1.0f);
+                                              float maxFrameRate = 30.0f, float scale = 1.0f,
+                                              bool useDiskCache = true);
 
   /**
    * Returns the width of decoded image frames.
@@ -1571,7 +1571,7 @@ class PAGDecoder {
   /**
    * Copies pixels of the image frame at the given index into the specified memory address. Returns
    * false if failed. Note that caller must ensure that colorType, alphaType, and dstRowBytes stay
-   * the same throughout every reading call. Otherwise, it returns false.
+   * the same throughout every reading call. Otherwise, it may return false.
    */
   bool readFrame(int index, void* pixels, size_t rowBytes,
                  ColorType colorType = ColorType::RGBA_8888,
@@ -1584,6 +1584,7 @@ class PAGDecoder {
   int _numFrames = 0;
   float _frameRate = 30.0f;
   float maxFrameRate = 30.0f;
+  bool useDiskCache = true;
   size_t lastRowBytes = 0;
   ColorType lastColorType = ColorType::RGBA_8888;
   AlphaType lastAlphaType = AlphaType::Premultiplied;
@@ -1597,7 +1598,7 @@ class PAGDecoder {
                                                     float maxFrameRate);
 
   PAGDecoder(std::shared_ptr<PAGComposition> composition, int width, int height, int numFrames,
-             float frameRate, float maxFrameRate);
+             float frameRate, float maxFrameRate, bool useDiskCache);
   bool renderFrame(std::shared_ptr<PAGComposition> composition, int index, void* pixels,
                    size_t rowBytes, ColorType colorType, AlphaType alphaType);
   bool checkSequenceFile(std::shared_ptr<PAGComposition> composition, size_t rowBytes,
@@ -1605,6 +1606,23 @@ class PAGDecoder {
   void checkCompositionChange(std::shared_ptr<PAGComposition> composition);
   std::string generateCacheKey(std::shared_ptr<PAGComposition> composition);
   std::shared_ptr<PAGComposition> getComposition();
+};
+
+/**
+ * Defines methods to manage the disk cache capabilities.
+ */
+class PAGDiskCache {
+ public:
+  /**
+   * Returns the size limit of the disk cache in bytes. The default value is 1 GB.
+   */
+  static size_t MaxDiskSize();
+
+  /**
+   * Sets the size limit of the disk cache in bytes, which will immediately trigger the cache
+   * cleanup if the disk usage exceeds the limit.
+   */
+  static void SetMaxDiskSize(size_t size);
 };
 
 /**
@@ -1630,16 +1648,6 @@ class PAG_API PAG {
    * Get SDK version information.
    */
   static std::string SDKVersion();
-
-  /**
-   * Returns the size limit of the disk cache in bytes.
-   */
-  size_t MaxDiskSize();
-
-  /**
-   * Sets the size limit of the disk cache in bytes. The default disk cache limit is 1 GB.
-   */
-  void SetMaxDiskSize(size_t size);
 };
 
 }  // namespace pag

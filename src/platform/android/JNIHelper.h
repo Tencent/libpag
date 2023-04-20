@@ -60,6 +60,4 @@ std::shared_ptr<pag::PAGComposition> ToPAGCompositionNativeObject(JNIEnv* env,
 jobject ToPAGMarkerObject(JNIEnv* env, const pag::Marker* marker);
 
 jobject ToPAGVideoRangeObject(JNIEnv* env, const pag::PAGVideoRange& range);
-
-tgfx::ImageInfo GetImageInfo(JNIEnv* env, jobject bitmap);
 }  // namespace pag

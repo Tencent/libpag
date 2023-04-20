@@ -57,7 +57,7 @@
   @synchronized(diskCacheDict) {
     PAGDiskCacheItem* diskCacheItem = [diskCacheDict objectForKey:cacheName];
     if (!diskCacheItem) {
-      PAGDiskCache* diskCache = [PAGDiskCache MakeWithName:cacheName frameCount:frameCount];
+      PAGSequenceCache* diskCache = [PAGSequenceCache MakeWithName:cacheName frameCount:frameCount];
       if (diskCache == nil) {
         return nil;
       }

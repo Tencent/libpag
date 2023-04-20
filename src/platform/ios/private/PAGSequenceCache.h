@@ -18,24 +18,23 @@
 
 #import <Foundation/Foundation.h>
 
-#import "PAGSequenceCache.h"
-
 NS_ASSUME_NONNULL_BEGIN
 
-@interface PAGDiskCacheItem : NSObject
-@property(nonatomic, retain) PAGSequenceCache* diskCache;
-@property(nonatomic, assign) NSInteger count;
-@property(nonatomic, assign) BOOL deleteAfterUse;
-@end
+@interface PAGSequenceCache : NSObject
 
-@interface PAGDiskCacheManager : NSObject
++ (instancetype __nullable)MakeWithName:(NSString*)name frameCount:(NSUInteger)frameCount;
 
-+ (instancetype)shareInstance;
+- (BOOL)containsObjectForKey:(NSInteger)index;
 
-- (PAGDiskCacheItem* __nullable)objectDiskCacheFor:(NSString* __nonnull)cacheName
-                                        frameCount:(NSInteger)frameCount;
+- (BOOL)objectForKey:(NSInteger)index to:(uint8_t*)pixels length:(NSInteger)length;
 
-- (void)removeDiskCacheFrom:(NSString* __nonnull)cacheName;
+- (void)setObject:(uint8_t*)pixels length:(NSInteger)length forKey:(NSInteger)index;
+
+- (NSInteger)count;
+
+- (NSString*)path;
+
+- (NSInteger)maxEncodedBufferSize;
 
 @end
 

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DiskCache.h"
+#include "pag/pag.h"
 #include "platform/Platform.h"
 #include "rendering/utils/Directory.h"
 #include "tgfx/utils/Buffer.h"
@@ -26,7 +27,7 @@ namespace pag {
 class FileInfo {
  public:
   FileInfo(std::string cacheKey, uint32_t fileID, size_t fileSize = 0)
-      : cacheKey(cacheKey), fileID(fileID), fileSize(fileSize) {
+      : cacheKey(std::move(cacheKey)), fileID(fileID), fileSize(fileSize) {
   }
 
   std::string cacheKey;
@@ -35,17 +36,17 @@ class FileInfo {
   std::list<std::shared_ptr<FileInfo>>::iterator cachedPosition;
 };
 
+size_t PAGDiskCache::MaxDiskSize() {
+  return DiskCache::GetInstance()->getMaxDiskSize();
+}
+
+void PAGDiskCache::SetMaxDiskSize(size_t size) {
+  DiskCache::GetInstance()->setMaxDiskSize(size);
+}
+
 DiskCache* DiskCache::GetInstance() {
   static auto& diskCache = *new DiskCache();
   return &diskCache;
-}
-
-size_t DiskCache::MaxDiskSize() {
-  return GetInstance()->getMaxDiskSize();
-}
-
-void DiskCache::SetMaxDiskSize(size_t size) {
-  GetInstance()->setMaxDiskSize(size);
 }
 
 std::shared_ptr<SequenceFile> DiskCache::OpenSequence(const std::string& key,

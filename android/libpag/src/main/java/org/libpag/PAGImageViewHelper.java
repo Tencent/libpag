@@ -198,33 +198,6 @@ class PAGImageViewHelper {
         return (currentFrame * 1.0 + 0.1) / totalFrames;
     }
 
-    protected static Bitmap CreateBitmap(int width, int height) {
-        if (width == 0 || height == 0) {
-            return null;
-        }
-        if (CacheManager.HARDWARE_CACHE_ENABLE) {
-            HardwareBuffer hardwareBuffer = HardwareBuffer.create(width, height,
-                    HardwareBuffer.RGBA_8888, 1,
-                    HardwareBuffer.USAGE_GPU_SAMPLED_IMAGE | HardwareBuffer.USAGE_CPU_READ_OFTEN | HardwareBuffer.USAGE_CPU_WRITE_OFTEN);
-            if (hardwareBuffer == null) {
-                return null;
-            }
-            Bitmap bitmap = Bitmap.wrapHardwareBuffer(hardwareBuffer,
-                    ColorSpace.get(ColorSpace.Named.SRGB));
-            try {
-                // HardwareBuffer will automatically close when it is finalized, but StrictMode
-                // will incorrectly think it is not closed.
-                // So we manually call close to avoid printing annoying logs.
-                hardwareBuffer.close();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-            return bitmap;
-
-        } else {
-            return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-        }
-    }
 
     protected static class CacheInfo {
         static CacheInfo Make(PAGImageView pagImageView,
@@ -365,7 +338,7 @@ class PAGImageViewHelper {
             } else {
                 realFrameRate = Math.min(composition.frameRate(), maxFrameRate);
             }
-            _pagDecoder = PAGDecoder.Make(composition, realFrameRate, maxScale);
+            _pagDecoder = PAGDecoder.Make(composition, realFrameRate, maxScale, false);
             _width = _pagDecoder.width();
             _height = _pagDecoder.height();
             numFrames = _pagDecoder.numFrames();

@@ -16,27 +16,26 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import <Foundation/Foundation.h>
+#pragma once
 
-#import "PAGSequenceCache.h"
+#include "pag/pag.h"
 
-NS_ASSUME_NONNULL_BEGIN
+class JPAGDecoder {
+ public:
+  explicit JPAGDecoder(std::shared_ptr<pag::PAGDecoder> pagDecoder) : pagDecoder(pagDecoder) {
+  }
 
-@interface PAGDiskCacheItem : NSObject
-@property(nonatomic, retain) PAGSequenceCache* diskCache;
-@property(nonatomic, assign) NSInteger count;
-@property(nonatomic, assign) BOOL deleteAfterUse;
-@end
+  std::shared_ptr<pag::PAGDecoder> get() {
+    std::lock_guard<std::mutex> autoLock(locker);
+    return pagDecoder;
+  }
 
-@interface PAGDiskCacheManager : NSObject
+  void clear() {
+    std::lock_guard<std::mutex> autoLock(locker);
+    pagDecoder = nullptr;
+  }
 
-+ (instancetype)shareInstance;
-
-- (PAGDiskCacheItem* __nullable)objectDiskCacheFor:(NSString* __nonnull)cacheName
-                                        frameCount:(NSInteger)frameCount;
-
-- (void)removeDiskCacheFrom:(NSString* __nonnull)cacheName;
-
-@end
-
-NS_ASSUME_NONNULL_END
+ private:
+  std::shared_ptr<pag::PAGDecoder> pagDecoder;
+  std::mutex locker;
+};

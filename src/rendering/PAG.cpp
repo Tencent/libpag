@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "pag/pag.h"
-#include "rendering/caches/DiskCache.h"
 
 namespace pag {
 
@@ -25,13 +24,5 @@ static const char sdkVersion[] = "4.0.0.1";
 
 std::string PAG::SDKVersion() {
   return sdkVersion;
-}
-
-size_t PAG::MaxDiskSize() {
-  return DiskCache::MaxDiskSize();
-}
-
-void PAG::SetMaxDiskSize(size_t size) {
-  DiskCache::SetMaxDiskSize(size);
 }
 }  // namespace pag

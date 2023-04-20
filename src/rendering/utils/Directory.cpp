@@ -17,9 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Directory.h"
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(__ANDROID__) || defined(ANDROID)
 #include <dirent.h>
 #include <sys/stat.h>
+#include <cerrno>
 #else
 #include <filesystem>
 #endif
@@ -62,7 +63,7 @@ std::string Directory::JoinPath(const std::string& folder, const std::string& fi
   return path;
 }
 
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(__ANDROID__) || defined(ANDROID)
 
 bool Directory::CreateRecursively(const std::string& folder) {
   if (folder.empty()) {

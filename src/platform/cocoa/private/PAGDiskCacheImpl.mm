@@ -16,18 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#import "PAGDiskCacheImpl.h"
+#import "pag/pag.h"
 
-#include "JNIUtil.h"
-#include "tgfx/core/ImageInfo.h"
+@implementation PAGDiskCacheImpl
 
-namespace tgfx {
-class NativeImageInfo {
- public:
-  /**
-   * Returns an ImageInfo describing the width, height, color type, alpha type, and row bytes of the
-   * specified Java Bitmap object.
-   */
-  static ImageInfo GetInfo(JNIEnv* env, jobject bitmap);
-};
-}  // namespace tgfx
++ (size_t)MaxDiskSize {
+  return pag::PAGDiskCache::MaxDiskSize();
+}
+
++ (void)SetMaxDiskSize:(size_t)size {
+  pag::PAGDiskCache::SetMaxDiskSize(size);
+}
+
+@end

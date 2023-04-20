@@ -172,8 +172,8 @@ PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
 
   const auto lastTotalDiskSize = diskCache->totalDiskSize;
 
-  DiskCache::SetMaxDiskSize(1800000u);
-  EXPECT_EQ(DiskCache::MaxDiskSize(), 1800000u);
+  PAGDiskCache::SetMaxDiskSize(1800000u);
+  EXPECT_EQ(PAGDiskCache::MaxDiskSize(), 1800000u);
   sequenceFile =
       DiskCache::OpenSequence("resources/apitest/ZC2.pag.540x960", info, 30, pagFile->frameRate());
   pagPlayer->setProgress(0);
@@ -192,7 +192,7 @@ PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
             lastTotalDiskSize + sequenceFile->fileSize() - halfSequenceFileSize);
   EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/3.bin"));
   EXPECT_TRUE(std::filesystem::exists(cacheDir + "/files/2.bin"));
-  DiskCache::SetMaxDiskSize(0);
+  PAGDiskCache::SetMaxDiskSize(0);
   EXPECT_EQ(diskCache->totalDiskSize, sequenceFile->fileSize());
   EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/2.bin"));
   EXPECT_TRUE(std::filesystem::exists(cacheDir + "/files/4.bin"));
@@ -209,7 +209,7 @@ PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
   sequenceFile = nullptr;
   sequenceFile2 = nullptr;
   EXPECT_FALSE(std::filesystem::exists(cacheDir + "/files/4.bin"));
-  DiskCache::SetMaxDiskSize(1073741824);  // 1GB
+  PAGDiskCache::SetMaxDiskSize(1073741824);  // 1GB
   std::filesystem::remove_all(cacheDir);
 }
 

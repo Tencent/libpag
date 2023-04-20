@@ -16,25 +16,25 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "NativePixelBuffer.h"
+#include "NativeImageBuffer.h"
 #include <android/bitmap.h>
-#include "NativeImageInfo.h"
+#include "tgfx/platform/android/AndroidBitmap.h"
 #include "utils/Log.h"
 
 namespace tgfx {
-std::shared_ptr<PixelBuffer> NativePixelBuffer::MakeFrom(JNIEnv* env, jobject bitmap) {
-  auto info = NativeImageInfo::GetInfo(env, bitmap);
+std::shared_ptr<ImageBuffer> NativeImageBuffer::MakeFrom(JNIEnv* env, jobject bitmap) {
+  auto info = AndroidBitmap::GetInfo(env, bitmap);
   if (info.isEmpty() ||
       (info.colorType() != ColorType::RGBA_8888 && info.colorType() != ColorType::ALPHA_8) ||
       info.alphaType() == AlphaType::Unpremultiplied) {
     return nullptr;
   }
-  auto pixelBuffer = std::shared_ptr<NativePixelBuffer>(new NativePixelBuffer(info));
+  auto pixelBuffer = std::shared_ptr<NativeImageBuffer>(new NativeImageBuffer(info));
   pixelBuffer->bitmap = bitmap;
   return pixelBuffer;
 }
 
-void* NativePixelBuffer::lockPixels() {
+std::shared_ptr<Texture> NativeImageBuffer::onMakeTexture(Context* context, bool mipMapped) const {
   JNIEnvironment environment;
   auto env = environment.current();
   if (env == nullptr) {
@@ -43,39 +43,15 @@ void* NativePixelBuffer::lockPixels() {
   void* pixels = nullptr;
   if (AndroidBitmap_lockPixels(env, bitmap.get(), &pixels) != 0) {
     env->ExceptionClear();
-    LOGE("NativePixelBuffer::lockPixels() Failed to lockPixels() from a Java Bitmap!");
-    return nullptr;
-  }
-  return pixels;
-}
-
-void NativePixelBuffer::unlockPixels() {
-  JNIEnvironment environment;
-  auto env = environment.current();
-  if (env == nullptr) {
-    return;
-  }
-  AndroidBitmap_unlockPixels(env, bitmap.get());
-}
-
-std::shared_ptr<Texture> NativePixelBuffer::onMakeTexture(Context* context, bool mipMapped) const {
-  JNIEnvironment environment;
-  auto env = environment.current();
-  if (env == nullptr) {
-    return nullptr;
-  }
-  void* pixels = nullptr;
-  if (AndroidBitmap_lockPixels(env, bitmap.get(), &pixels) != 0) {
-    env->ExceptionClear();
-    LOGE("NativePixelBuffer::lockPixels() Failed to lockPixels() from a Java Bitmap!");
+    LOGE("NativeImageBuffer::onMakeTexture() Failed to lockPixels() from a Java Bitmap!");
     return nullptr;
   }
   std::shared_ptr<Texture> texture = nullptr;
   if (isAlphaOnly()) {
-    texture = Texture::MakeAlpha(context, _info.width(), _info.height(), pixels, _info.rowBytes(),
+    texture = Texture::MakeAlpha(context, info.width(), info.height(), pixels, info.rowBytes(),
                                  ImageOrigin::TopLeft, mipMapped);
   } else {
-    texture = Texture::MakeRGBA(context, _info.width(), _info.height(), pixels, _info.rowBytes(),
+    texture = Texture::MakeRGBA(context, info.width(), info.height(), pixels, info.rowBytes(),
                                 ImageOrigin::TopLeft, mipMapped);
   }
   AndroidBitmap_unlockPixels(env, bitmap.get());

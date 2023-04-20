@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#import "PAGDiskCache.h"
+#import "PAGSequenceCache.h"
 
 #include <compression.h>
 #include <sys/stat.h>
@@ -30,7 +30,7 @@
  * | frame data |  ... | frame data |
  */
 
-@implementation PAGDiskCache {
+@implementation PAGSequenceCache {
   NSString* _path;
   int fd;
   NSInteger numFrames;
@@ -92,7 +92,7 @@ static const int32_t FileHeaderSize = 4 * sizeof(int32_t);
   }
   filePath = [filePath stringByAppendingPathComponent:[name stringByAppendingString:@".cache"]];
 
-  return [[[PAGDiskCache alloc] initWithPath:filePath frameCount:frameCount] autorelease];
+  return [[[PAGSequenceCache alloc] initWithPath:filePath frameCount:frameCount] autorelease];
 }
 
 - (BOOL)containsObjectForKey:(NSInteger)index {
