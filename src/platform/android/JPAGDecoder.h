@@ -18,34 +18,24 @@
 
 #pragma once
 
-#include "JNIUtil.h"
-#include "core/PixelBuffer.h"
+#include "pag/pag.h"
 
-namespace tgfx {
-class NativePixelBuffer : public PixelBuffer {
+class JPAGDecoder {
  public:
-  /**
-   * Creates a PixelBuffer from the specified Android Bitmap object. Returns nullptr if the bitmap
-   * is null, has an unpremultiply alpha type, or its color type is neither RGBA_8888 nor ALPHA_8.
-   */
-  static std::shared_ptr<PixelBuffer> MakeFrom(JNIEnv* env, jobject bitmap);
-
-  bool isHardwareBacked() const override {
-    return false;
+  explicit JPAGDecoder(std::shared_ptr<pag::PAGDecoder> pagDecoder) : pagDecoder(pagDecoder) {
   }
 
-  void* lockPixels() override;
+  std::shared_ptr<pag::PAGDecoder> get() {
+    std::lock_guard<std::mutex> autoLock(locker);
+    return pagDecoder;
+  }
 
-  void unlockPixels() override;
-
- protected:
-  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipMapped) const override;
+  void clear() {
+    std::lock_guard<std::mutex> autoLock(locker);
+    pagDecoder = nullptr;
+  }
 
  private:
-  Global<jobject> bitmap = {};
-
-  explicit NativePixelBuffer(const ImageInfo& info) : PixelBuffer(info) {
-  }
+  std::shared_ptr<pag::PAGDecoder> pagDecoder;
+  std::mutex locker;
 };
-
-}  // namespace tgfx

@@ -170,7 +170,16 @@ public class PAGSurface {
      * Returns a bitmap capturing the contents of the PAGSurface. Subsequent rendering of the
      * PAGSurface will not be captured.
      */
-    public native Bitmap makeSnapshot();
+    public Bitmap makeSnapshot() {
+        Bitmap bitmap = BitmapHelper.CreateBitmap(width(), height());
+        if (bitmap == null) {
+            return null;
+        }
+        if (copyPixelsTo(bitmap)) {
+            return bitmap;
+        }
+        return null;
+    }
 
     /**
      * Copies pixels from current PAGSurface to the specified bitmap.

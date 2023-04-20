@@ -19,9 +19,9 @@
 #include "NativeCodec.h"
 #include <android/bitmap.h>
 #include "HardwareBuffer.h"
-#include "NativeImageInfo.h"
-#include "NativePixelBuffer.h"
+#include "NativeImageBuffer.h"
 #include "tgfx/core/Pixmap.h"
+#include "tgfx/platform/android/AndroidBitmap.h"
 #include "utils/Log.h"
 
 namespace tgfx {
@@ -200,7 +200,7 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(NativeImageRef nativeImage) {
   if (env == nullptr) {
     return nullptr;
   }
-  auto info = NativeImageInfo::GetInfo(env, nativeImage);
+  auto info = AndroidBitmap::GetInfo(env, nativeImage);
   if (info.isEmpty()) {
     return nullptr;
   }
@@ -244,7 +244,7 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     return false;
   }
   auto bitmap = decodeBitmap(env, dstInfo.colorType(), dstInfo.alphaType(), false);
-  auto info = NativeImageInfo::GetInfo(env, bitmap);
+  auto info = AndroidBitmap::GetInfo(env, bitmap);
   if (info.isEmpty()) {
     LOGE("NativeCodec::readPixels() Failed to read the image info from a Bitmap!");
     return false;
@@ -274,9 +274,9 @@ std::shared_ptr<ImageBuffer> NativeCodec::onMakeBuffer(bool tryHardware) const {
     }
     bitmap = ConvertHardwareBitmap(env, bitmap);
   }
-  auto pixelBuffer = NativePixelBuffer::MakeFrom(env, bitmap);
-  if (pixelBuffer != nullptr) {
-    return pixelBuffer;
+  auto imageBuffer = NativeImageBuffer::MakeFrom(env, bitmap);
+  if (imageBuffer != nullptr) {
+    return imageBuffer;
   }
   return ImageCodec::onMakeBuffer(tryHardware);
 }

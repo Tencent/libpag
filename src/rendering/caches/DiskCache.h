@@ -28,16 +28,6 @@ class FileInfo;
 class DiskCache {
  public:
   /**
-   * Returns the size limit of the disk cache in bytes.
-   */
-  static size_t MaxDiskSize();
-
-  /**
-   * Sets the size limit of the disk cache in bytes. The default disk cache limit is 1 GB.
-   */
-  static void SetMaxDiskSize(size_t size);
-
-  /**
    * Opens a sequence file by the specified key, creates a new one if the corresponding file does
    * not exist. Returns a temporary sequence file immediately if the key is empty. The temporary
    * file will be deleted automatically when the last reference to it is released.
@@ -79,6 +69,8 @@ class DiskCache {
   uint32_t filePathToID(const std::string& path);
   void notifyFileClosed(uint32_t fileID);
   void notifyFileSizeChanged(uint32_t fileID, size_t fileSize);
+
   friend class SequenceFile;
+  friend class PAGDiskCache;
 };
 }  // namespace pag

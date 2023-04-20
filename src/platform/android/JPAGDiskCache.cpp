@@ -16,13 +16,34 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "JNIHelper.h"
-#include "pag/pag.h"
+#include "JPAGDiskCache.h"
 
 namespace pag {
-void InitGetCacheDirJNI(JNIEnv* env);
+static Global<jclass> PAGClass;
+static jmethodID PAG_GetCacheDir;
 
-std::string GetCacheDir();
+void JPAGDiskCache::InitJNI(JNIEnv* env) {
+  PAGClass = env->FindClass("org/libpag/PAGDiskCache");
+  PAG_GetCacheDir = env->GetStaticMethodID(PAGClass.get(), "GetCacheDir", "()Ljava/lang/String;");
+}
+
+std::string JPAGDiskCache::GetCacheDir() {
+  JNIEnvironment environment;
+  auto env = environment.current();
+  if (env == nullptr) {
+    return "";
+  }
+  jobject cacheDirPath = env->CallStaticObjectMethod(PAGClass.get(), PAG_GetCacheDir);
+  return SafeConvertToStdString(env, reinterpret_cast<jstring>(cacheDirPath));
+}
 }  // namespace pag
+
+extern "C" {
+PAG_API jlong JNICALL Java_org_libpag_PAGDiskCache_MaxDiskSize(JNIEnv*, jclass) {
+  return static_cast<jlong>(pag::PAGDiskCache::MaxDiskSize());
+}
+
+PAG_API void JNICALL Java_org_libpag_PAGDiskCache_SetMaxDiskSize(JNIEnv*, jclass, jlong size) {
+  pag::PAGDiskCache::SetMaxDiskSize(size);
+}
+}

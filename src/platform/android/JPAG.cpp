@@ -16,27 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "JPAG.h"
-
-namespace pag {
-static Global<jclass> PAGClass;
-static jmethodID PAG_GetCacheDir;
-
-void InitGetCacheDirJNI(JNIEnv* env) {
-  PAGClass = env->FindClass("org/libpag/PAG");
-  PAG_GetCacheDir = env->GetStaticMethodID(PAGClass.get(), "GetCacheDir", "()Ljava/lang/String;");
-}
-
-std::string GetCacheDir() {
-  JNIEnvironment environment;
-  auto env = environment.current();
-  if (env == nullptr) {
-    return "";
-  }
-  jobject cacheDirPath = env->CallStaticObjectMethod(PAGClass.get(), PAG_GetCacheDir);
-  return SafeConvertToStdString(env, reinterpret_cast<jstring>(cacheDirPath));
-}
-}  // namespace pag
+#include "JNIHelper.h"
+#include "pag/pag.h"
 
 extern "C" PAG_API jstring JNICALL Java_org_libpag_PAG_SDKVersion(JNIEnv* env, jclass) {
   return pag::SafeConvertToJString(env, pag::PAG::SDKVersion().c_str());
