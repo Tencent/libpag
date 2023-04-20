@@ -143,6 +143,7 @@ enum class TagCode {
   CameraOption = 91,
   
   StrokeStyle = 92,
+  OuterGlowStyle = 93,
 
   // add new tags here...
 
@@ -882,7 +883,7 @@ class HueSaturationEffect : public Effect {
   RTTR_ENABLE(Effect)
 };
 
-enum class LayerStyleType { Unknown, DropShadow, Stroke, GradientOverlay };
+enum class LayerStyleType { Unknown, DropShadow, Stroke, GradientOverlay, OuterGlow };
 
 enum class LayerStylePosition { Above, Blow };
 
@@ -933,6 +934,18 @@ class PAG_API StrokePosition {
   static const Enum Outside = 0;
   static const Enum Inside = 1;
   static const Enum Center = 2;
+};
+
+class PAG_API GlowColorType {
+ public:
+  static const Enum SingleColor = 0;
+  static const Enum Gradient = 1;
+};
+
+class PAG_API GlowTechniqueType {
+ public:
+  static const Enum Softer = 0;
+  static const Enum Precise = 1;
 };
 
 class PAG_API DropShadowStyle : public LayerStyle {
@@ -993,6 +1006,43 @@ class PAG_API StrokeStyle : public LayerStyle {
   Property<float>* size = nullptr;
   Property<Opacity>* opacity = nullptr;
   Property<Enum>* position = nullptr;  // StrokePosition
+
+  RTTR_ENABLE(LayerStyle)
+};
+
+class PAG_API OuterGlowStyle : public LayerStyle {
+ public:
+  ~OuterGlowStyle() override;
+
+  LayerStyleType type() const override {
+    return LayerStyleType::OuterGlow;
+  }
+
+  LayerStylePosition drawPosition() const override {
+    return LayerStylePosition::Above;
+  }
+
+  bool visibleAt(Frame layerFrame) const override;
+
+  void transformBounds(Rect* contentBounds, const Point& filterScale,
+                       Frame layerFrame) const override;
+
+  void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const override;
+
+  bool verify() const override;
+
+  Property<Enum>* blendMode = nullptr;  // BlendMode
+  Property<Opacity>* opacity = nullptr;
+  Property<Percent>* noise = nullptr;
+  Property<Enum>* colorType = nullptr;  // GlowColorType
+  Property<Color>* color = nullptr;
+  Property<Opacity>* colors = nullptr;
+  Property<Percent>* gradientSmoothness = nullptr;
+  Property<Enum>* technique = nullptr;  // GlowTechniqueType
+  Property<Percent>* spread = nullptr;
+  Property<float>* size = nullptr;
+  Property<Percent>* range = nullptr;
+  Property<Percent>* jitter = nullptr;
 
   RTTR_ENABLE(LayerStyle)
 };
