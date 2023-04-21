@@ -296,10 +296,6 @@ void DestoryFlushQueue() {
 
 - (void)play {
   self.isPlaying = TRUE;
-  if ([valueAnimator getAnimatedFraction] == 1.0) {
-    int64_t currentPlayTime = (int64_t)([pagPlayer getProgress] * [pagPlayer duration]);
-    [valueAnimator setCurrentPlayTime:currentPlayTime];
-  }
   [self doPlay];
 }
 
@@ -308,8 +304,6 @@ void DestoryFlushQueue() {
   if (!self.isVisible) {
     return;
   }
-  int64_t playTime = (int64_t)([valueAnimator getAnimatedFraction] * [valueAnimator duration]);
-  [valueAnimator setCurrentPlayTime:playTime];
   [valueAnimator start];
 }
 
@@ -354,9 +348,8 @@ void DestoryFlushQueue() {
     pagFile = nil;
   }
   [pagPlayer setComposition:newComposition];
-  self.progressExplicitlySet = TRUE;
-  [valueAnimator setCurrentPlayTime:0];
   [valueAnimator setDuration:[pagPlayer duration]];
+  [self setProgress:0];
 }
 
 - (BOOL)videoEnabled {
