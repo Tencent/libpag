@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "DropShadowStyle.h"
+#include "StrokeStyle.h"
 
 namespace pag {
 std::unique_ptr<BlockConfig> StrokeStyleTag(StrokeStyle* style) {
