@@ -24,9 +24,9 @@
 #import "PAGFile.h"
 #import "platform/cocoa/private/PAGContentVersion.h"
 #import "platform/cocoa/private/PixelBufferUtils.h"
-#import "private/PAGCacheManager.h"
-#import "private/PAGDiskCacheManager.h"
-#import "private/PAGSequenceCache.h"
+//#import "private/PAGCacheManager.h"
+//#import "private/PAGDiskCacheManager.h"
+//#import "private/PAGSequenceCache.h"
 #import "private/PAGValueAnimator.h"
 
 namespace pag {
@@ -83,7 +83,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   NSInteger cacheWidth;
   NSInteger cacheHeight;
 
-  PAGDiskCacheItem* imageViewCacheItem;
+  //  PAGDiskCacheItem* imageViewCacheItem;
   NSMutableDictionary<NSNumber*, UIImage*>* imagesMap;
 
   CFMutableDataRef currentImageDataRef;
@@ -119,7 +119,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   listeners = [[NSHashTable weakObjectsHashTable] retain];
   self.isPlaying = NO;
   self.isVisible = NO;
-  self.memeoryCacheFinished = NO;
+  //  self.memeoryCacheFinished = NO;
   self.isInBackground =
       [UIApplication sharedApplication].applicationState == UIApplicationStateBackground;
   filePath = nil;
@@ -196,39 +196,39 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   });
 }
 
-static NSString* NSStringMD5(NSString* string) {
-  if (!string) {
-    return nil;
-  }
-  NSData* data = [string dataUsingEncoding:NSUTF8StringEncoding];
-  unsigned char result[CC_MD5_DIGEST_LENGTH];
-  CC_MD5(data.bytes, (CC_LONG)data.length, result);
-  return [NSString
-      stringWithFormat:@"%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
-                       result[0], result[1], result[2], result[3], result[4], result[5], result[6],
-                       result[7], result[8], result[9], result[10], result[11], result[12],
-                       result[13], result[14], result[15]];
-}
-
-static NSString* RemovePathVariableComponent(NSString* original) {
-  if (original.length == 0) {
-    return original;
-  }
-  NSMutableArray* mutableArray = [[original pathComponents] mutableCopy];
-  BOOL needRemove = NO;
-  for (id item in mutableArray) {
-    if (needRemove) {
-      [mutableArray removeObject:item];
-      break;
-    }
-    if ([item isEqualToString:@"Application"]) {
-      needRemove = YES;
-    }
-  }
-  NSString* path = [NSString pathWithComponents:mutableArray];
-  [mutableArray release];
-  return path;
-}
+// static NSString* NSStringMD5(NSString* string) {
+//   if (!string) {
+//     return nil;
+//   }
+//   NSData* data = [string dataUsingEncoding:NSUTF8StringEncoding];
+//   unsigned char result[CC_MD5_DIGEST_LENGTH];
+//   CC_MD5(data.bytes, (CC_LONG)data.length, result);
+//   return [NSString
+//       stringWithFormat:@"%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+//                        result[0], result[1], result[2], result[3], result[4], result[5],
+//                        result[6], result[7], result[8], result[9], result[10], result[11],
+//                        result[12], result[13], result[14], result[15]];
+// }
+//
+// static NSString* RemovePathVariableComponent(NSString* original) {
+//   if (original.length == 0) {
+//     return original;
+//   }
+//   NSMutableArray* mutableArray = [[original pathComponents] mutableCopy];
+//   BOOL needRemove = NO;
+//   for (id item in mutableArray) {
+//     if (needRemove) {
+//       [mutableArray removeObject:item];
+//       break;
+//     }
+//     if ([item isEqualToString:@"Application"]) {
+//       needRemove = YES;
+//     }
+//   }
+//   NSString* path = [NSString pathWithComponents:mutableArray];
+//   [mutableArray release];
+//   return path;
+// }
 
 - (void)setCompositionInternal:(PAGComposition*)newComposition
                   maxFrameRate:(float)maxFrameRate
@@ -281,62 +281,66 @@ static NSString* RemovePathVariableComponent(NSString* original) {
   return nil;
 }
 
-- (NSString*)generateCacheKey {
-  NSString* cacheKey = nil;
-  NSInteger contentVersion = 0;
-  if (pagComposition && [PAGContentVersion Get:pagComposition] > 0) {
-    cacheKey = [NSString stringWithFormat:@"%@", pagComposition];
-    contentVersion = [PAGContentVersion Get:pagComposition];
-  } else if (filePath) {
-    cacheKey = RemovePathVariableComponent(filePath);
-  }
-  cacheKey = [cacheKey
-      stringByAppendingFormat:@"_%ld_%f_%f", contentVersion, self.frameRate, self.scaleFactor];
-  return NSStringMD5(cacheKey);
-}
+//- (NSString*)generateCacheKey {
+//  NSString* cacheKey = nil;
+//  NSInteger contentVersion = 0;
+//  if (pagComposition && [PAGContentVersion Get:pagComposition] > 0) {
+//    cacheKey = [NSString stringWithFormat:@"%@", pagComposition];
+//    contentVersion = [PAGContentVersion Get:pagComposition];
+//  } else if (filePath) {
+//    cacheKey = RemovePathVariableComponent(filePath);
+//  }
+//  cacheKey = [cacheKey
+//      stringByAppendingFormat:@"_%ld_%f_%f", contentVersion, self.frameRate, self.scaleFactor];
+//  return NSStringMD5(cacheKey);
+//}
 
 - (PAGDecoder*)getPAGDecoder {
   if (pagDecoder == nil) {
     if (pagComposition) {
+      BOOL useDiskCache = YES;
+      if ([PAGContentVersion Get:pagComposition] > 0) {
+        useDiskCache = NO;
+      }
       pagDecoder = [PAGDecoder Make:pagComposition
                        maxFrameRate:self.frameRate
                               scale:self.scaleFactor
-                       useDiskCache:NO];
+                       useDiskCache:useDiskCache];
       [pagDecoder retain];
     } else if (filePath) {
       pagDecoder = [PAGDecoder Make:[PAGFile Load:filePath]
                        maxFrameRate:self.frameRate
                               scale:self.scaleFactor
-                       useDiskCache:NO];
+                       useDiskCache:YES];
       [pagDecoder retain];
     }
   }
   return pagDecoder;
 }
 
-- (PAGSequenceCache*)getImageViewCache {
-  if (imageViewCacheItem == nil) {
-    if (cacheKey) {
-      [cacheKey release];
-      cacheKey = nil;
-    }
-    cacheKey = [self generateCacheKey];
-    [cacheKey retain];
-    imageViewCacheItem = [[PAGDiskCacheManager shareInstance] objectDiskCacheFor:cacheKey
-                                                                      frameCount:numFrames];
-    if (imageViewCacheItem) {
-      if (pagComposition && [PAGContentVersion Get:pagComposition] > 0) {
-        imageViewCacheItem.deleteAfterUse = YES;
-      } else {
-        imageViewCacheItem.deleteAfterUse = NO;
-      }
-      [imageViewCacheItem retain];
-    } else {
-      return nil;
-    }
-  }
-  return imageViewCacheItem.diskCache;
-}
+//- (PAGSequenceCache*)getImageViewCache {
+//  if (imageViewCacheItem == nil) {
+//    if (cacheKey) {
+//      [cacheKey release];
+//      cacheKey = nil;
+//    }
+//    cacheKey = [self generateCacheKey];
+//    [cacheKey retain];
+//    imageViewCacheItem = [[PAGDiskCacheManager shareInstance] objectDiskCacheFor:cacheKey
+//                                                                      frameCount:numFrames];
+//    if (imageViewCacheItem) {
+//      if (pagComposition && [PAGContentVersion Get:pagComposition] > 0) {
+//        imageViewCacheItem.deleteAfterUse = YES;
+//      } else {
+//        imageViewCacheItem.deleteAfterUse = NO;
+//      }
+//      [imageViewCacheItem retain];
+//    } else {
+//      return nil;
+//    }
+//  }
+//  return imageViewCacheItem.diskCache;
+//}
 
 - (NSString*)removePathVariableItem:(NSString*)original {
   if (original.length == 0) {
@@ -455,39 +459,17 @@ static NSString* RemovePathVariableComponent(NSString* original) {
     }
     return YES;
   }
-  PAGSequenceCache* diskCache = [self getImageViewCache];
   uint8_t* rgbaData = CFDataGetMutableBytePtr(dataRef);
-  if ([diskCache containsObjectForKey:frameIndex]) {
-    status = [diskCache objectForKey:frameIndex to:rgbaData length:cacheImageSize];
-    if (!status) {
-      return status;
-    }
-    UIImage* image = [self imageForCFMutableData:dataRef];
-    if (image) {
-      self.currentUIImage = image;
-      if (self.memoryCacheEnabled) {
-        [self->imagesMap setObject:image forKey:[NSNumber numberWithInteger:frameIndex]];
-      }
-      [self submitToImageView];
-    }
-  } else {
-    @autoreleasepool {
-      status = [[self getPAGDecoder] copyFrameTo:rgbaData
-                                        rowBytes:cacheImageRowBytes
-                                              at:frameIndex];
-      if (!status) {
-        return status;
-      }
-      UIImage* image = [self imageForCFMutableData:dataRef];
-      if (image) {
-        self.currentUIImage = image;
-        [self submitToImageView];
-        if (self.memoryCacheEnabled) {
-          [self->imagesMap setObject:image forKey:[NSNumber numberWithInteger:frameIndex]];
-        }
-
-        [diskCache setObject:rgbaData length:cacheImageSize forKey:frameIndex];
-      }
+  status = [[self getPAGDecoder] copyFrameTo:rgbaData rowBytes:cacheImageRowBytes at:frameIndex];
+  if (!status) {
+    return status;
+  }
+  UIImage* image = [self imageForCFMutableData:dataRef];
+  if (image) {
+    self.currentUIImage = image;
+    [self submitToImageView];
+    if (self.memoryCacheEnabled) {
+      [self->imagesMap setObject:image forKey:[NSNumber numberWithInteger:frameIndex]];
     }
   }
   return status;
@@ -592,11 +574,10 @@ static NSString* RemovePathVariableComponent(NSString* original) {
     [pagDecoder release];
     pagDecoder = nil;
   }
-  if (self.memoryCacheEnabled && self->imageViewCacheItem &&
+  if (self.memoryCacheEnabled && self->pagDecoder &&
       [self->imagesMap count] == (NSUInteger)self->numFrames) {
-    [[PAGDiskCacheManager shareInstance] removeDiskCacheFrom:cacheKey];
-    [self->imageViewCacheItem release];
-    self->imageViewCacheItem = nil;
+    [self->pagDecoder release];
+    self->pagDecoder = nil;
   }
 }
 
@@ -643,20 +624,25 @@ static NSString* RemovePathVariableComponent(NSString* original) {
     [imagesMap removeAllObjects];
     self.memeoryCacheFinished = NO;
   }
-  if (imageViewCacheItem) {
-    [[PAGDiskCacheManager shareInstance] removeDiskCacheFrom:[self generateCacheKey]];
-    [imageViewCacheItem release];
-    imageViewCacheItem = nil;
+  if (pagDecoder) {
+    [pagDecoder release];
+    pagDecoder = nil;
   }
+  //  if (imageViewCacheItem) {
+  //    [[PAGDiskCacheManager shareInstance] removeDiskCacheFrom:[self generateCacheKey]];
+  //    [imageViewCacheItem release];
+  //    imageViewCacheItem = nil;
+  //  }
 }
 
 #pragma mark - pubic
 + (NSUInteger)MaxDiskSize {
-  return [[PAGCacheManager shareInstance] MaxDiskSize];
+  //  return [[PAGCacheManager shareInstance] MaxDiskSize];
+  return 0;
 }
 
 + (void)SetMaxDiskSize:(NSUInteger)size {
-  [[PAGCacheManager shareInstance] SetMaxDiskSize:size];
+  //  [[PAGCacheManager shareInstance] SetMaxDiskSize:size];
 }
 
 - (void)setBounds:(CGRect)bounds {
