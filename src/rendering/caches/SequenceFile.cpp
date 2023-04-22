@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SequenceFile.h"
+#include <cstring>
 #include "DiskCache.h"
 #include "base/utils/Log.h"
 #include "pag/file.h"
@@ -321,5 +322,15 @@ bool SequenceFile::checkScratchBuffer() {
     return false;
   }
   return true;
+}
+
+bool SequenceFile::compatible(const tgfx::ImageInfo& info, int frameCount, float frameRate,
+                              const std::vector<TimeRange>& staticTimeRanges) {
+  if (_info != info || _numFrames != frameCount || _frameRate != frameRate ||
+      _staticTimeRanges.size() != staticTimeRanges.size()) {
+    return false;
+  }
+  return memcmp(&_staticTimeRanges[0], &staticTimeRanges[0],
+                sizeof(TimeRange) * staticTimeRanges.size()) == 0;
 }
 }  // namespace pag

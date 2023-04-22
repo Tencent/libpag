@@ -22,6 +22,7 @@
 #include "rendering/utils/Directory.h"
 #include "tgfx/utils/Buffer.h"
 #include "tgfx/utils/DataView.h"
+#include "tgfx/utils/Stream.h"
 
 namespace pag {
 class FileInfo {
@@ -55,6 +56,14 @@ std::shared_ptr<SequenceFile> DiskCache::OpenSequence(
   return GetInstance()->openSequence(key, info, frameCount, frameRate, staticTimeRanges);
 }
 
+std::shared_ptr<tgfx::Data> DiskCache::ReadFile(const std::string& key) {
+  return GetInstance()->readFile(key);
+}
+
+bool DiskCache::WriteFile(const std::string& key, std::shared_ptr<tgfx::Data> data) {
+  return GetInstance()->writeFile(key, data);
+}
+
 DiskCache::DiskCache() {
   auto cacheDir = Platform::Current()->getCacheDir();
   if (!cacheDir.empty()) {
@@ -75,7 +84,7 @@ void DiskCache::setMaxDiskSize(size_t size) {
     return;
   }
   maxDiskSize = size;
-  if (checkDiskSpace()) {
+  if (checkDiskSpace(maxDiskSize)) {
     saveConfig();
   }
 }
@@ -92,8 +101,7 @@ std::shared_ptr<SequenceFile> DiskCache::openSequence(
   if (result != openedFiles.end()) {
     auto sequenceFile = result->second.lock();
     if (sequenceFile != nullptr) {
-      if (sequenceFile->_info == info && sequenceFile->_numFrames == frameCount &&
-          sequenceFile->_frameRate == frameRate) {
+      if (sequenceFile->compatible(info, frameCount, frameRate, staticTimeRanges)) {
         moveToFront(cachedFileMap[fileID]);
         return sequenceFile;
       }
@@ -124,12 +132,72 @@ std::shared_ptr<SequenceFile> DiskCache::openSequence(
   return sequenceFile;
 }
 
-bool DiskCache::checkDiskSpace() {
+std::shared_ptr<tgfx::Data> DiskCache::readFile(const std::string& key) {
+  std::lock_guard<std::mutex> autoLock(locker);
+  if (cacheFolder.empty() || key.empty()) {
+    return nullptr;
+  }
+  auto fileID = getFileID(key);
+  auto filePath = fileIDToPath(fileID);
+  auto stream = tgfx::Stream::MakeFromFile(filePath);
+  if (stream == nullptr) {
+    return nullptr;
+  }
+  tgfx::Buffer buffer(stream->size());
+  auto readLength = stream->read(buffer.data(), buffer.size());
+  if (readLength != buffer.size()) {
+    return nullptr;
+  }
+  return buffer.release();
+}
+
+bool DiskCache::writeFile(const std::string& key, std::shared_ptr<tgfx::Data> data) {
+  std::lock_guard<std::mutex> autoLock(locker);
+  if (cacheFolder.empty() || key.empty() || data == nullptr) {
+    return false;
+  }
+  auto changed = checkDiskSpace(maxDiskSize - data->size());
+  if (totalDiskSize + data->size() > maxDiskSize) {
+    if (changed) {
+      saveConfig();
+    }
+    return false;
+  }
+  auto fileID = getFileID(key);
+  auto filePath = fileIDToPath(fileID);
+  Directory::CreateRecursively(Directory::GetParentDirectory(filePath));
+  auto file = fopen(filePath.c_str(), "wb");
+  if (file == nullptr) {
+    return false;
+  }
+  auto writeLength = fwrite(data->data(), 1, data->size(), file);
+  fclose(file);
+  if (writeLength != data->size()) {
+    return false;
+  }
+  totalDiskSize += data->size();
+  auto fileInfo = cachedFileMap[fileID];
+  if (fileInfo) {
+    totalDiskSize -= fileInfo->fileSize;
+    fileInfo->fileSize = data->size();
+  } else {
+    addToCachedFiles(std::make_shared<FileInfo>(key, fileID, data->size()));
+    fileInfo = cachedFileMap[fileID];
+    changed = true;
+  }
+  moveToBeforeOpenedFiles(fileInfo);
+  if (changed) {
+    saveConfig();
+  }
+  return true;
+}
+
+bool DiskCache::checkDiskSpace(size_t maxSize) {
   bool changed = false;
-  if (totalDiskSize <= maxDiskSize) {
+  if (totalDiskSize <= maxSize) {
     return changed;
   }
-  while (totalDiskSize > maxDiskSize) {
+  while (totalDiskSize > maxSize) {
     auto fileInfo = cachedFiles.back();
     if (openedFiles.count(fileInfo->fileID) > 0) {
       break;
@@ -158,6 +226,21 @@ void DiskCache::moveToFront(std::shared_ptr<FileInfo> fileInfo) {
   cachedFiles.erase(fileInfo->cachedPosition);
   cachedFiles.push_front(fileInfo);
   fileInfo->cachedPosition = cachedFiles.begin();
+}
+
+void DiskCache::moveToBeforeOpenedFiles(std::shared_ptr<FileInfo> fileInfo) {
+  cachedFiles.erase(fileInfo->cachedPosition);
+  for (auto it = cachedFiles.begin(); it != cachedFiles.end(); ++it) {
+    if (openedFiles.count((*it)->fileID) == 0) {
+      fileInfo->cachedPosition = cachedFiles.insert(it, fileInfo);
+      fileInfo = nullptr;
+      break;
+    }
+  }
+  if (fileInfo) {
+    cachedFiles.push_back(fileInfo);
+    fileInfo->cachedPosition = --cachedFiles.end();
+  }
 }
 
 void DiskCache::readConfig() {
@@ -210,7 +293,7 @@ void DiskCache::readConfig() {
   for (auto& item : expiredFiles) {
     removeFromCachedFiles(item);
   }
-  if (checkDiskSpace() || !expiredFiles.empty()) {
+  if (checkDiskSpace(maxDiskSize) || !expiredFiles.empty()) {
     saveConfig();
   }
 }
@@ -287,19 +370,8 @@ void DiskCache::notifyFileClosed(uint32_t fileID) {
     remove(filePath.c_str());
   } else {
     auto fileInfo = result->second;
-    cachedFiles.erase(fileInfo->cachedPosition);
-    for (auto it = cachedFiles.begin(); it != cachedFiles.end(); ++it) {
-      if (openedFiles.count((*it)->fileID) == 0) {
-        fileInfo->cachedPosition = cachedFiles.insert(it, fileInfo);
-        fileInfo = nullptr;
-        break;
-      }
-    }
-    if (fileInfo) {
-      cachedFiles.push_back(fileInfo);
-      fileInfo->cachedPosition = --cachedFiles.end();
-    }
-    if (checkDiskSpace()) {
+    moveToBeforeOpenedFiles(fileInfo);
+    if (checkDiskSpace(maxDiskSize)) {
       saveConfig();
     }
   }
@@ -311,7 +383,7 @@ void DiskCache::notifyFileSizeChanged(uint32_t fileID, size_t fileSize) {
   if (result != cachedFileMap.end()) {
     totalDiskSize += fileSize - result->second->fileSize;
     result->second->fileSize = fileSize;
-    if (checkDiskSpace()) {
+    if (checkDiskSpace(maxDiskSize)) {
       saveConfig();
     }
   }

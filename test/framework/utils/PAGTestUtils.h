@@ -48,6 +48,8 @@ std::shared_ptr<tgfx::Image> MakeImage(const std::string& path);
 
 std::shared_ptr<PAGImage> MakePAGImage(const std::string& path);
 
+std::shared_ptr<tgfx::Data> ReadFile(const std::string& path);
+
 void SaveFile(std::shared_ptr<tgfx::Data> data, const std::string& key);
 
 void SaveImage(const std::shared_ptr<tgfx::PixelBuffer> pixelBuffer, const std::string& key);

@@ -410,4 +410,21 @@ PAG_TEST_F(PAGDiskCacheTest, PAGDecoder_StaticTimeRanges) {
   std::filesystem::remove_all(cacheDir);
 }
 
+PAG_TEST_F(PAGDiskCacheTest, FileCache) {
+  auto cacheDir = Platform::Current()->getCacheDir();
+  std::filesystem::remove_all(cacheDir);
+
+  auto data = ReadFile("resources/apitest/polygon.pag");
+  ASSERT_TRUE(data != nullptr);
+  std::string cacheKey = "https://pag.art/resources/apitest/polygon.pag";
+  auto success = DiskCache::WriteFile(cacheKey, data);
+  EXPECT_TRUE(success);
+  auto cacheData = DiskCache::ReadFile(cacheKey);
+  ASSERT_TRUE(cacheData != nullptr);
+  EXPECT_EQ(data->size(), cacheData->size());
+  EXPECT_TRUE(memcmp(data->bytes(), cacheData->bytes(), data->size()) == 0);
+
+  std::filesystem::remove_all(cacheDir);
+}
+
 }  // namespace pag

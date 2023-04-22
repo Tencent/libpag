@@ -37,6 +37,18 @@ class DiskCache {
       const std::string& key, const tgfx::ImageInfo& info, int frameCount, float frameRate,
       const std::vector<TimeRange>& staticTimeRanges = {});
 
+  /**
+   * Reads a file from the disk cache by the specified key. Returns nullptr if the key is empty or
+   * the cache does not exist.
+   */
+  static std::shared_ptr<tgfx::Data> ReadFile(const std::string& key);
+
+  /**
+   * Writes a file to the disk cache by the specified key. Returns false if the key is empty, the
+   * data is nullptr, or the cache cannot be written.
+   */
+  static bool WriteFile(const std::string& key, std::shared_ptr<tgfx::Data> data);
+
  private:
   std::mutex locker = {};
   std::string configPath;
@@ -58,11 +70,14 @@ class DiskCache {
   std::shared_ptr<SequenceFile> openSequence(const std::string& key, const tgfx::ImageInfo& info,
                                              int frameCount, float frameRate,
                                              const std::vector<TimeRange>& staticTimeRanges);
+  std::shared_ptr<tgfx::Data> readFile(const std::string& key);
+  bool writeFile(const std::string& key, std::shared_ptr<tgfx::Data> data);
 
-  bool checkDiskSpace();
+  bool checkDiskSpace(size_t maxSize);
   void addToCachedFiles(std::shared_ptr<FileInfo> fileInfo);
   void removeFromCachedFiles(std::shared_ptr<FileInfo> fileInfo);
   void moveToFront(std::shared_ptr<FileInfo> fileInfo);
+  void moveToBeforeOpenedFiles(std::shared_ptr<FileInfo> fileInfo);
   void readConfig();
   void saveConfig();
   uint32_t getFileID(const std::string& key);
