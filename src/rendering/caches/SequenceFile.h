@@ -143,7 +143,7 @@ class SequenceFile {
   size_t compressFrame(int index, const void* pixels, size_t byteSize);
   bool checkScratchBuffer();
   bool compatible(const tgfx::ImageInfo& info, int frameCount, float frameRate,
-               const std::vector<TimeRange>& staticTimeRanges);
+                  const std::vector<TimeRange>& staticTimeRanges);
 
   friend class DiskCache;
 };
