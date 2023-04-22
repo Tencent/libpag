@@ -21,6 +21,7 @@
 #include <list>
 #include <unordered_map>
 #include "SequenceFile.h"
+#include "pag/types.h"
 
 namespace pag {
 class FileInfo;
@@ -32,9 +33,9 @@ class DiskCache {
    * not exist. Returns a temporary sequence file immediately if the key is empty. The temporary
    * file will be deleted automatically when the last reference to it is released.
    */
-  static std::shared_ptr<SequenceFile> OpenSequence(const std::string& key,
-                                                    const tgfx::ImageInfo& info, int frameCount,
-                                                    float frameRate);
+  static std::shared_ptr<SequenceFile> OpenSequence(
+      const std::string& key, const tgfx::ImageInfo& info, int frameCount, float frameRate,
+      const std::vector<TimeRange>& staticTimeRanges = {});
 
  private:
   std::mutex locker = {};
@@ -55,7 +56,8 @@ class DiskCache {
   size_t getMaxDiskSize();
   void setMaxDiskSize(size_t size);
   std::shared_ptr<SequenceFile> openSequence(const std::string& key, const tgfx::ImageInfo& info,
-                                             int frameCount, float frameRate);
+                                             int frameCount, float frameRate,
+                                             const std::vector<TimeRange>& staticTimeRanges);
 
   bool checkDiskSpace();
   void addToCachedFiles(std::shared_ptr<FileInfo> fileInfo);

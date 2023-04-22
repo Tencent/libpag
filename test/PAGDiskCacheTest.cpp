@@ -47,7 +47,7 @@ PAG_TEST_SUIT(PAGDiskCacheTest)
 //    pagPlayer->flush();
 //    pagSurface->readPixels(ColorType::RGBA_8888, AlphaType::Premultiplied, pixmap.writablePixels(),
 //                           pixmap.rowBytes());
-//    sequenceFile->writeFrame(i, pixmap.pixels(), pixmap.byteSize());
+//    sequenceFile->writeFrame(i, pixmap.pixels());
 //    pagPlayer->nextFrame();
 //  }
 //
@@ -64,7 +64,7 @@ PAG_TEST_SUIT(PAGDiskCacheTest)
 //    pagPlayer->flush();
 //    pagSurface->readPixels(ColorType::RGBA_8888, AlphaType::Premultiplied, pixmap.writablePixels(),
 //                           pixmap.rowBytes());
-//    sequenceFile->writeFrame(i, pixmap.pixels(), pixmap.byteSize());
+//    sequenceFile->writeFrame(i, pixmap.pixels());
 //    pagPlayer->nextFrame();
 //  }
 //  sequenceFile = nullptr;
@@ -106,7 +106,7 @@ PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
   EXPECT_TRUE(diskCache->cachedFileMap.size() == 2);
   EXPECT_EQ(diskCache->cachedFiles.size(), 2u);
   EXPECT_EQ(diskCache->fileIDCount, 4u);
-  const auto InitialDiskSize = 647620u;
+  const auto InitialDiskSize = 647628u;
   EXPECT_EQ(diskCache->totalDiskSize, InitialDiskSize);
 
   tgfx::Bitmap bitmap(pagFile->width(), pagFile->height());
@@ -214,6 +214,9 @@ PAG_TEST_F(PAGDiskCacheTest, SequenceFile) {
 }
 
 PAG_TEST_F(PAGDiskCacheTest, PAGDecoder) {
+  auto cacheDir = Platform::Current()->getCacheDir();
+  std::filesystem::remove_all(cacheDir);
+
   auto pagFile = LoadPAGFile("resources/apitest/data_bmp.pag");
   ASSERT_TRUE(pagFile != nullptr);
   auto decoder = PAGDecoder::MakeFrom(pagFile, 30, 0.5f);
@@ -311,7 +314,6 @@ PAG_TEST_F(PAGDiskCacheTest, PAGDecoder) {
   success = decoder5->readFrame(12, pixmap.writablePixels(), pixmap.rowBytes());
   EXPECT_TRUE(success);
 
-  auto cacheDir = Platform::Current()->getCacheDir();
   auto files = Directory::FindFiles(cacheDir + "/files", ".bin");
   auto diskFileCount = files.size();
   decoder = nullptr;
@@ -329,6 +331,81 @@ PAG_TEST_F(PAGDiskCacheTest, PAGDecoder) {
   decoder5 = nullptr;
   files = Directory::FindFiles(cacheDir + "/files", ".bin");
   EXPECT_EQ(files.size(), diskFileCount - 3);
+
+  std::filesystem::remove_all(cacheDir);
+}
+
+PAG_TEST_F(PAGDiskCacheTest, PAGDecoder_StaticTimeRanges) {
+  auto cacheDir = Platform::Current()->getCacheDir();
+  std::filesystem::remove_all(cacheDir);
+
+  auto pagFile = LoadPAGFile("resources/apitest/polygon.pag");
+  ASSERT_TRUE(pagFile != nullptr);
+  auto decoder = PAGDecoder::MakeFrom(pagFile);
+  ASSERT_TRUE(decoder != nullptr);
+  pagFile = nullptr;
+  tgfx::Bitmap bitmap(decoder->width(), decoder->height());
+  tgfx::Pixmap pixmap(bitmap);
+  auto success = decoder->readFrame(5, pixmap.writablePixels(), pixmap.rowBytes());
+  EXPECT_TRUE(success);
+  EXPECT_TRUE(Baseline::Compare(pixmap, "PAGDiskCacheTest/decoder_polygon_5"));
+  EXPECT_TRUE(decoder->sequenceFile != nullptr);
+  EXPECT_TRUE(decoder->sequenceFile->isComplete());
+  EXPECT_TRUE(decoder->pagPlayer == nullptr);
+  EXPECT_TRUE(decoder->getComposition() == nullptr);
+  success = decoder->readFrame(55, pixmap.writablePixels(), pixmap.rowBytes());
+  EXPECT_TRUE(success);
+  EXPECT_TRUE(Baseline::Compare(pixmap, "PAGDiskCacheTest/decoder_polygon_5"));
+
+  pagFile = LoadPAGFile("resources/apitest/ImageDecodeTest.pag");
+  ASSERT_TRUE(pagFile != nullptr);
+  decoder = PAGDecoder::MakeFrom(pagFile, 24.0f);
+  ASSERT_TRUE(decoder != nullptr);
+  EXPECT_EQ(decoder->frameRate(), 24.0f);
+  pixmap.reset();
+  bitmap.allocPixels(decoder->width(), decoder->height());
+  pixmap.reset(bitmap);
+  success = decoder->readFrame(0, pixmap.writablePixels(), pixmap.rowBytes());
+  EXPECT_TRUE(success);
+  EXPECT_TRUE(Baseline::Compare(pixmap, "PAGDiskCacheTest/decoder_Image_0"));
+  EXPECT_FALSE(decoder->sequenceFile->isComplete());
+  EXPECT_EQ(decoder->sequenceFile->staticTimeRanges().size(), 5u);
+  EXPECT_EQ(decoder->sequenceFile->cachedFrames, 8);
+  EXPECT_FALSE(decoder->checkFrameChanged(5));
+  EXPECT_FALSE(decoder->checkFrameChanged(7));
+  EXPECT_TRUE(decoder->checkFrameChanged(8));
+  success = decoder->readFrame(11, pixmap.writablePixels(), pixmap.rowBytes());
+  EXPECT_TRUE(success);
+  EXPECT_TRUE(Baseline::Compare(pixmap, "PAGDiskCacheTest/decoder_Image_11"));
+  EXPECT_EQ(decoder->sequenceFile->cachedFrames, 12);
+  EXPECT_FALSE(decoder->checkFrameChanged(8));
+  EXPECT_FALSE(decoder->checkFrameChanged(10));
+  EXPECT_TRUE(decoder->checkFrameChanged(0));
+  pagFile->removeAllLayers();
+  EXPECT_TRUE(decoder->checkFrameChanged(11));
+  EXPECT_TRUE(decoder->checkFrameChanged(8));
+  EXPECT_TRUE(decoder->checkFrameChanged(10));
+  decoder = nullptr;
+
+  pagFile = LoadPAGFile("resources/apitest/ImageDecodeTest.pag");
+  ASSERT_TRUE(pagFile != nullptr);
+  decoder = PAGDecoder::MakeFrom(pagFile, 24.0f);
+  ASSERT_TRUE(decoder != nullptr);
+  pagFile = nullptr;
+  success = decoder->readFrame(7, pixmap.writablePixels(), pixmap.rowBytes());
+  EXPECT_TRUE(success);
+  EXPECT_TRUE(Baseline::Compare(pixmap, "PAGDiskCacheTest/decoder_Image_0"));
+  EXPECT_FALSE(decoder->sequenceFile->isComplete());
+  EXPECT_EQ(decoder->sequenceFile->cachedFrames, 12);
+  success = decoder->readFrame(8, pixmap.writablePixels(), pixmap.rowBytes());
+  EXPECT_TRUE(success);
+  EXPECT_TRUE(Baseline::Compare(pixmap, "PAGDiskCacheTest/decoder_Image_11"));
+  EXPECT_EQ(decoder->sequenceFile->cachedFrames, 12);
+  success = decoder->readFrame(15, pixmap.writablePixels(), pixmap.rowBytes());
+  EXPECT_TRUE(success);
+  EXPECT_TRUE(Baseline::Compare(pixmap, "PAGDiskCacheTest/decoder_Image_15"));
+  EXPECT_EQ(decoder->sequenceFile->cachedFrames, 28);
+  decoder = nullptr;
 
   std::filesystem::remove_all(cacheDir);
 }

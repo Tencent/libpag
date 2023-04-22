@@ -49,10 +49,10 @@ DiskCache* DiskCache::GetInstance() {
   return &diskCache;
 }
 
-std::shared_ptr<SequenceFile> DiskCache::OpenSequence(const std::string& key,
-                                                      const tgfx::ImageInfo& info, int frameCount,
-                                                      float frameRate) {
-  return GetInstance()->openSequence(key, info, frameCount, frameRate);
+std::shared_ptr<SequenceFile> DiskCache::OpenSequence(
+    const std::string& key, const tgfx::ImageInfo& info, int frameCount, float frameRate,
+    const std::vector<TimeRange>& staticTimeRanges) {
+  return GetInstance()->openSequence(key, info, frameCount, frameRate, staticTimeRanges);
 }
 
 DiskCache::DiskCache() {
@@ -80,9 +80,9 @@ void DiskCache::setMaxDiskSize(size_t size) {
   }
 }
 
-std::shared_ptr<SequenceFile> DiskCache::openSequence(const std::string& key,
-                                                      const tgfx::ImageInfo& info, int frameCount,
-                                                      float frameRate) {
+std::shared_ptr<SequenceFile> DiskCache::openSequence(
+    const std::string& key, const tgfx::ImageInfo& info, int frameCount, float frameRate,
+    const std::vector<TimeRange>& staticTimeRanges) {
   std::lock_guard<std::mutex> autoLock(locker);
   if (cacheFolder.empty()) {
     return nullptr;
@@ -102,7 +102,7 @@ std::shared_ptr<SequenceFile> DiskCache::openSequence(const std::string& key,
     }
   }
   auto filePath = fileIDToPath(fileID);
-  auto sequenceFile = SequenceFile::Open(filePath, info, frameCount, frameRate);
+  auto sequenceFile = SequenceFile::Open(filePath, info, frameCount, frameRate, staticTimeRanges);
   if (sequenceFile == nullptr) {
     return nullptr;
   }

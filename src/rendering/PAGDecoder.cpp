@@ -21,33 +21,64 @@
 #include "base/utils/TimeUtil.h"
 #include "pag/pag.h"
 #include "rendering/caches/DiskCache.h"
+#include "rendering/utils/LockGuard.h"
 
 namespace pag {
-float PAGDecoder::GetFrameRate(std::shared_ptr<PAGComposition> pagComposition) {
+Composition* PAGDecoder::GetSingleComposition(std::shared_ptr<PAGComposition> pagComposition) {
   auto numChildren = pagComposition->numChildren();
   if (numChildren == 0) {
     auto composition = static_cast<PreComposeLayer*>(pagComposition->layer)->composition;
     if (composition->type() == CompositionType::Bitmap ||
         composition->type() == CompositionType::Video) {
-      return composition->frameRate;
+      return composition;
     }
   }
   if (numChildren == 1) {
     auto firstLayer = pagComposition->getLayerAt(0);
     if (firstLayer->layerType() == LayerType::PreCompose) {
-      return GetFrameRate(std::static_pointer_cast<PAGComposition>(firstLayer));
+      return GetSingleComposition(std::static_pointer_cast<PAGComposition>(firstLayer));
     }
   }
-  return pagComposition->frameRate();
+  return nullptr;
 }
 
-std::pair<int, float> PAGDecoder::GetFrameCountAndRate(std::shared_ptr<PAGComposition> composition,
-                                                       float maxFrameRate) {
-  auto compositionFrameRate = GetFrameRate(composition);
+std::pair<int, float> PAGDecoder::GetFrameCountAndRate(
+    std::shared_ptr<PAGComposition> pagComposition, float maxFrameRate) {
+  auto composition = GetSingleComposition(pagComposition);
+  auto compositionFrameRate =
+      composition != nullptr ? composition->frameRate : pagComposition->frameRate();
   auto frameRate = std::min(maxFrameRate, compositionFrameRate);
-  auto duration = composition->duration();
+  auto duration = pagComposition->duration();
   auto numFrames = static_cast<int>(round(static_cast<double>(duration) * frameRate / 1000000.0));
   return {numFrames, frameRate};
+}
+
+std::vector<TimeRange> PAGDecoder::GetStaticTimeRange(std::shared_ptr<PAGComposition> composition,
+                                                      int numFrames) {
+  LockGuard autoLock(composition->rootLocker);
+  std::vector<TimeRange> timeRanges = {};
+  auto startTime = composition->startTimeInternal();
+  auto duration = composition->durationInternal();
+  auto oldLayerTime = composition->currentTimeInternal();
+  composition->gotoTime(startTime);
+  TimeRange timeRange = {0, 0};
+  for (int i = 1; i < numFrames; i++) {
+    auto progress = FrameToProgress(static_cast<Frame>(i), numFrames);
+    auto layerTime = startTime + ProgressToTime(progress, duration);
+    if (!composition->gotoTime(layerTime)) {
+      timeRange.end++;
+      continue;
+    }
+    if (timeRange.duration() > 1) {
+      timeRanges.push_back(timeRange);
+    }
+    timeRange = {i, i};
+  }
+  if (timeRange.duration() > 1) {
+    timeRanges.push_back(timeRange);
+  }
+  composition->gotoTime(oldLayerTime);
+  return timeRanges;
 }
 
 std::shared_ptr<PAGDecoder> PAGDecoder::MakeFrom(std::shared_ptr<PAGComposition> composition,
@@ -70,6 +101,7 @@ PAGDecoder::PAGDecoder(std::shared_ptr<PAGComposition> composition, int width, i
       maxFrameRate(maxFrameRate), useDiskCache(useDiskCache) {
   container = PAGComposition::Make(width, height);
   container->addLayer(composition);
+  staticTimeRanges = GetStaticTimeRange(composition, _numFrames);
 }
 
 int PAGDecoder::numFrames() {
@@ -82,6 +114,19 @@ float PAGDecoder::frameRate() {
   std::lock_guard<std::mutex> auoLock(locker);
   checkCompositionChange(getComposition());
   return _frameRate;
+}
+
+bool PAGDecoder::checkFrameChanged(int index) {
+  if (index < 0 || index >= _numFrames) {
+    LOGE("PAGDecoder::readFrame() The index is out of range!");
+    return false;
+  }
+  checkCompositionChange(getComposition());
+  if (index == lastReadIndex) {
+    return false;
+  }
+  auto timeRange = GetTimeRangeContains(staticTimeRanges, index);
+  return !timeRange.contains(lastReadIndex);
 }
 
 bool PAGDecoder::readFrame(int index, void* pixels, size_t rowBytes, pag::ColorType colorType,
@@ -118,6 +163,9 @@ bool PAGDecoder::readFrame(int index, void* pixels, size_t rowBytes, pag::ColorT
     } else if (composition.use_count() <= 2) {
       container->removeAllLayers();
     }
+  }
+  if (success) {
+    lastReadIndex = index;
   }
   return success;
 }
@@ -168,7 +216,7 @@ bool PAGDecoder::checkSequenceFile(std::shared_ptr<PAGComposition> composition, 
   auto key = generateCacheKey(composition);
   auto info =
       tgfx::ImageInfo::Make(_width, _height, ToTGFX(colorType), ToTGFX(alphaType), rowBytes);
-  sequenceFile = DiskCache::OpenSequence(key, info, _numFrames, _frameRate);
+  sequenceFile = DiskCache::OpenSequence(key, info, _numFrames, _frameRate, staticTimeRanges);
   if (sequenceFile == nullptr) {
     LOGE("PAGDecoder: Failed to open SequenceFile!");
     return false;
@@ -185,9 +233,11 @@ void PAGDecoder::checkCompositionChange(std::shared_ptr<PAGComposition> composit
   }
   sequenceFile = nullptr;
   lastContentVersion = composition->contentVersion;
+  lastReadIndex = -1;
   auto result = GetFrameCountAndRate(composition, maxFrameRate);
   _numFrames = result.first;
   _frameRate = result.second;
+  staticTimeRanges = GetStaticTimeRange(composition, _numFrames);
 }
 
 std::string PAGDecoder::generateCacheKey(std::shared_ptr<PAGComposition> composition) {
