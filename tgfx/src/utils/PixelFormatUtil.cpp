@@ -21,6 +21,8 @@
 namespace tgfx {
 PixelFormat ColorTypeToPixelFormat(ColorType type) {
   switch (type) {
+    case ColorType::RGBA_8888:
+      return PixelFormat::RGBA_8888;
     case ColorType::ALPHA_8:
       return PixelFormat::ALPHA_8;
     case ColorType::BGRA_8888:
@@ -28,12 +30,14 @@ PixelFormat ColorTypeToPixelFormat(ColorType type) {
     case ColorType::Gray_8:
       return PixelFormat::GRAY_8;
     default:
-      return PixelFormat::RGBA_8888;
+      return PixelFormat::Unknown;
   }
 }
 
 ColorType PixelFormatToColorType(PixelFormat format) {
   switch (format) {
+    case PixelFormat::RGBA_8888:
+      return ColorType::RGBA_8888;
     case PixelFormat::ALPHA_8:
       return ColorType::ALPHA_8;
     case PixelFormat::BGRA_8888:
@@ -41,7 +45,7 @@ ColorType PixelFormatToColorType(PixelFormat format) {
     case PixelFormat::GRAY_8:
       return ColorType::Gray_8;
     default:
-      return ColorType::RGBA_8888;
+      return ColorType::Unknown;
   }
 }
 
