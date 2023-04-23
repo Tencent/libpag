@@ -91,7 +91,7 @@ export const isAndroidMiniprogram = () => {
 };
 
 export const releaseNativeImage = (source: TexImageSource | OffscreenCanvas) => {
-  if (isInstanceOf(source, ImageBitmap)) {
+  if (isInstanceOf(source, globalThis.ImageBitmap)) {
     (source as ImageBitmap).close();
   } else if (isCanvas(source)) {
     releaseCanvas2D(source as OffscreenCanvas | HTMLCanvasElement);
