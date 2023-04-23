@@ -1010,43 +1010,6 @@ class PAG_API StrokeStyle : public LayerStyle {
   RTTR_ENABLE(LayerStyle)
 };
 
-class PAG_API OuterGlowStyle : public LayerStyle {
- public:
-  ~OuterGlowStyle() override;
-
-  LayerStyleType type() const override {
-    return LayerStyleType::OuterGlow;
-  }
-
-  LayerStylePosition drawPosition() const override {
-    return LayerStylePosition::Above;
-  }
-
-  bool visibleAt(Frame layerFrame) const override;
-
-  void transformBounds(Rect* contentBounds, const Point& filterScale,
-                       Frame layerFrame) const override;
-
-  void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const override;
-
-  bool verify() const override;
-
-  Property<Enum>* blendMode = nullptr;  // BlendMode
-  Property<Opacity>* opacity = nullptr;
-  Property<Percent>* noise = nullptr;
-  Property<Enum>* colorType = nullptr;  // GlowColorType
-  Property<Color>* color = nullptr;
-  Property<Opacity>* colors = nullptr;
-  Property<Percent>* gradientSmoothness = nullptr;
-  Property<Enum>* technique = nullptr;  // GlowTechniqueType
-  Property<Percent>* spread = nullptr;
-  Property<float>* size = nullptr;
-  Property<Percent>* range = nullptr;
-  Property<Percent>* jitter = nullptr;
-
-  RTTR_ENABLE(LayerStyle)
-};
-
 struct AlphaStop {
   float position = 0.0f;
   float midpoint = 0.5f;
@@ -1100,6 +1063,43 @@ class PAG_API GradientOverlayStyle : public LayerStyle {
   Property<bool>* alignWithLayer = nullptr;
   Property<float>* scale = nullptr;
   Property<Point>* offset = nullptr;
+
+  RTTR_ENABLE(LayerStyle)
+};
+
+class PAG_API OuterGlowStyle : public LayerStyle {
+ public:
+  ~OuterGlowStyle() override;
+
+  LayerStyleType type() const override {
+    return LayerStyleType::OuterGlow;
+  }
+
+  LayerStylePosition drawPosition() const override {
+    return LayerStylePosition::Above;
+  }
+
+  bool visibleAt(Frame layerFrame) const override;
+
+  void transformBounds(Rect* contentBounds, const Point& filterScale,
+                       Frame layerFrame) const override;
+
+  void excludeVaryingRanges(std::vector<TimeRange>* timeRanges) const override;
+
+  bool verify() const override;
+
+  Property<Enum>* blendMode = nullptr;  // BlendMode
+  Property<Opacity>* opacity = nullptr;
+  Property<Percent>* noise = nullptr;
+  Property<Enum>* colorType = nullptr;  // GlowColorType
+  Property<Color>* color = nullptr;
+  Property<GradientColorHandle>* colors = nullptr;
+  Property<Percent>* gradientSmoothness = nullptr;
+  Property<Enum>* technique = nullptr;  // GlowTechniqueType
+  Property<Percent>* spread = nullptr;
+  Property<float>* size = nullptr;
+  Property<Percent>* range = nullptr;
+  Property<Percent>* jitter = nullptr;
 
   RTTR_ENABLE(LayerStyle)
 };
