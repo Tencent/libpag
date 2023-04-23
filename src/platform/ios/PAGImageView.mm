@@ -318,30 +318,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   return pagDecoder;
 }
 
-//- (PAGSequenceCache*)getImageViewCache {
-//  if (imageViewCacheItem == nil) {
-//    if (cacheKey) {
-//      [cacheKey release];
-//      cacheKey = nil;
-//    }
-//    cacheKey = [self generateCacheKey];
-//    [cacheKey retain];
-//    imageViewCacheItem = [[PAGDiskCacheManager shareInstance] objectDiskCacheFor:cacheKey
-//                                                                      frameCount:numFrames];
-//    if (imageViewCacheItem) {
-//      if (pagComposition && [PAGContentVersion Get:pagComposition] > 0) {
-//        imageViewCacheItem.deleteAfterUse = YES;
-//      } else {
-//        imageViewCacheItem.deleteAfterUse = NO;
-//      }
-//      [imageViewCacheItem retain];
-//    } else {
-//      return nil;
-//    }
-//  }
-//  return imageViewCacheItem.diskCache;
-//}
-
 - (NSString*)removePathVariableItem:(NSString*)original {
   if (original.length == 0) {
     return original;
@@ -391,6 +367,8 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     }
   }
   [copiedListeners release];
+//    [pagDecoder release];
+//    pagDecoder = nil;
 }
 
 - (void)onAnimationCancel {
@@ -459,19 +437,22 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     }
     return YES;
   }
-  uint8_t* rgbaData = CFDataGetMutableBytePtr(dataRef);
-  status = [[self getPAGDecoder] copyFrameTo:rgbaData rowBytes:cacheImageRowBytes at:frameIndex];
-  if (!status) {
-    return status;
-  }
-  UIImage* image = [self imageForCFMutableData:dataRef];
-  if (image) {
-    self.currentUIImage = image;
-    [self submitToImageView];
-    if (self.memoryCacheEnabled) {
-      [self->imagesMap setObject:image forKey:[NSNumber numberWithInteger:frameIndex]];
+    @autoreleasepool {
+        uint8_t* rgbaData = CFDataGetMutableBytePtr(dataRef);
+        status = [[self getPAGDecoder] copyFrameTo:rgbaData rowBytes:cacheImageRowBytes at:frameIndex];
+        if (!status) {
+          return status;
+        }
+        UIImage* image = [self imageForCFMutableData:dataRef];
+        if (image) {
+          self.currentUIImage = image;
+          [self submitToImageView];
+          if (self.memoryCacheEnabled) {
+            [self->imagesMap setObject:image forKey:[NSNumber numberWithInteger:frameIndex]];
+          }
+        }
     }
-  }
+  
   return status;
 }
 
@@ -570,10 +551,6 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 }
 
 - (void)freeCache {
-  if (pagDecoder && [[self getImageViewCache] count] == self->numFrames) {
-    [pagDecoder release];
-    pagDecoder = nil;
-  }
   if (self.memoryCacheEnabled && self->pagDecoder &&
       [self->imagesMap count] == (NSUInteger)self->numFrames) {
     [self->pagDecoder release];

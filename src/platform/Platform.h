@@ -76,5 +76,12 @@ class Platform {
                                                     const std::shared_ptr<tgfx::Typeface>&) const {
     return std::nullopt;
   }
+
+  /**
+   * Get the relative path of the file, which contains variable factors in the iOS platform.
+   */
+  virtual std::string getRelativePathFrom(std::string filePath) const {
+    return filePath;
+  }
 };
 }  // namespace pag

@@ -81,17 +81,17 @@
                 [pagFile replaceImage:0 data:pagImage];
             }
         }
-        self.pagView = [[PAGView alloc] init];
-        [self.view addSubview:self.pagView];
-        [self bringButtonsToFront];
-        
-        self.pagView.frame = self.view.frame;
-        [self.pagView setComposition:pagFile];
-        [self.pagView setRepeatCount:-1];
-        UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(pagViewClicked)];
-        [self.pagView addGestureRecognizer:tap];
-
-        [self.pagView play];
+//        self.pagView = [[PAGView alloc] init];
+//        [self.view addSubview:self.pagView];
+//        [self bringButtonsToFront];
+//        
+//        self.pagView.frame = self.view.frame;
+//        [self.pagView setComposition:pagFile];
+//        [self.pagView setRepeatCount:-1];
+//        UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(pagViewClicked)];
+//        [self.pagView addGestureRecognizer:tap];
+//
+//        [self.pagView play];
     }
 }
 
