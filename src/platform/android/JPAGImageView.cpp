@@ -16,35 +16,19 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-#include <memory>
-#include <mutex>
-namespace pag {
+#include <android/bitmap.h>
+#include <jni.h>
+#include "JNIHelper.h"
+#include "rendering/layers/ContentVersion.h"
 
-class ImageCache {
- public:
-  static std::shared_ptr<ImageCache> Make(const std::string& path, int width, int height,
-                                          int frameCount, bool needInit);
-  ~ImageCache();
-  bool flushSave();
-  bool putPixelsToSaveBuffer(int frame, void* bitmapPixels, int byteCount);
-  bool inflatePixels(int frame, void* bitmapPixels, int byteCount);
-  bool isCached(int frame);
-  bool isAllCached();
-  void releaseSaveBuffer();
-  void release();
+extern "C" {
 
- private:
-  ImageCache(void* buffer, int fd, int frameCount);
-  void* compressBuffer = nullptr;
-  void* deCompressBuffer = nullptr;
-  int deCompressBufferSize = 0;
-  void* headerBuffer = nullptr;
-  void* pendingSaveBuffer = nullptr;
-  int pendingSaveBufferSize = 0;
-  int pendingSaveFrame = -1;
-  int fd = -1;
-  int frameCount = 0;
-};
-
-}  // namespace pag
+PAG_API jint Java_org_libpag_PAGImageView_ContentVersion(JNIEnv* env, jclass,
+                                                         jobject jPagComposition) {
+  auto composition = pag::ToPAGCompositionNativeObject(env, jPagComposition);
+  if (composition == nullptr) {
+    return 0;
+  }
+  return pag::ContentVersion::Get(composition);
+}
+}

@@ -18,11 +18,8 @@
 
 package org.libpag;
 
-import android.content.Context;
 import android.graphics.Bitmap;
-import android.graphics.ColorSpace;
 import android.graphics.Matrix;
-import android.hardware.HardwareBuffer;
 import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -270,7 +267,6 @@ class PAGImageViewHelper {
                 case MSG_CLOSE_CACHE: {
                     PAGImageView imageView = (PAGImageView) msg.obj;
                     if (imageView != null) {
-                        imageView.releaseCurrentDiskCache();
                         if (imageView.decoderInfo != null) {
                             imageView.decoderInfo.reset();
                         }
@@ -285,10 +281,6 @@ class PAGImageViewHelper {
                     break;
                 }
                 case MSG_HANDLER_THREAD_QUITE: {
-                    CacheManager manager = CacheManager.Get(null);
-                    if (manager != null) {
-                        manager.autoClean();
-                    }
                     new Handler(Looper.getMainLooper()).post(new Runnable() {
                         @Override
                         public void run() {
@@ -315,20 +307,9 @@ class PAGImageViewHelper {
             return _width > 0 && _height > 0;
         }
 
-        boolean initDecoder(Context context, PAGComposition _composition,
-                            String pagFilePath, int width, int height, float maxFrameRate) {
-            if (_composition == null && pagFilePath == null || width == 0) {
-                return false;
-            }
-            PAGComposition composition = _composition;
-            if (composition == null) {
-                if (pagFilePath.startsWith("assets://")) {
-                    composition = PAGFile.Load(context.getAssets(), pagFilePath.substring(9));
-                } else {
-                    composition = PAGFile.Load(pagFilePath);
-                }
-            }
-            if (composition == null) {
+        boolean initDecoder(PAGComposition composition,
+                            int width, int height, float maxFrameRate, boolean usdDiskCache) {
+            if (composition == null || width == 0) {
                 return false;
             }
             float maxScale = Math.max(width * 1.0f / composition.width(),
@@ -338,7 +319,7 @@ class PAGImageViewHelper {
             } else {
                 realFrameRate = Math.min(composition.frameRate(), maxFrameRate);
             }
-            _pagDecoder = PAGDecoder.Make(composition, realFrameRate, maxScale, false);
+            _pagDecoder = PAGDecoder.Make(composition, realFrameRate, maxScale, usdDiskCache);
             _width = _pagDecoder.width();
             _height = _pagDecoder.height();
             numFrames = _pagDecoder.numFrames();

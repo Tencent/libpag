@@ -28,24 +28,16 @@ import android.graphics.Matrix;
 import android.os.Build;
 import android.os.Looper;
 import android.provider.Settings;
-import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.View;
 import android.view.animation.LinearInterpolator;
 
-import java.io.File;
-import java.lang.ref.WeakReference;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Future;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.libpag.PAGImageViewHelper.CacheInfo;
+import org.extra.tools.LibraryLoadUtils;
 import org.libpag.PAGImageViewHelper.DecoderInfo;
 
 public class PAGImageView extends View {
@@ -59,21 +51,16 @@ public class PAGImageView extends View {
     private final Object updateTimeLock = new Object();
     private static final Object g_HandlerLock = new Object();
     private int _currentFrame;
-    private float _maxFrameRate = 30;
+    private float _maxFrameRate = DEFAULT_MAX_FRAMERATE;
     private PAGComposition _composition;
     private String _pagFilePath;
     private int _scaleMode = PAGScaleMode.LetterBox;
     private volatile Matrix _matrix;
-    private ArrayList<WeakReference<Future>> saveCacheTasks = new ArrayList<>();
     private float renderScale = 1.0f;
-    private AtomicBoolean freezeDraw = new AtomicBoolean(false);
-    protected volatile CacheManager.CacheItem cacheItem;
-    protected volatile KeyItem lastKeyItem;
+    private final AtomicBoolean freezeDraw = new AtomicBoolean(false);
     protected volatile DecoderInfo decoderInfo = new DecoderInfo();
-    protected volatile CacheManager cacheManager;
     private volatile Bitmap renderBitmap;
-    private ConcurrentHashMap<Integer, Bitmap> bitmapCache = new ConcurrentHashMap<>();
-    protected static long g_MaxDiskCacheSize = 1 * 1024 * 1024 * 1024;
+    private final ConcurrentHashMap<Integer, Bitmap> bitmapCache = new ConcurrentHashMap<>();
 
     public interface PAGImageViewListener {
         /**
@@ -135,20 +122,6 @@ public class PAGImageView extends View {
     }
 
     /**
-     * Returns the size limit of the disk cache in bytes.
-     */
-    public static long MaxDiskCache() {
-        return g_MaxDiskCacheSize;
-    }
-
-    /**
-     * Sets the size limit of the disk cache in bytes. The default disk cache limit is 1 GB.
-     */
-    public static void SetMaxDiskCache(long maxDiskCache) {
-        g_MaxDiskCacheSize = maxDiskCache;
-    }
-
-    /**
      * If set to true, the PAGImageView loads all image frames into the memory, which will
      * significantly increase the rendering performance but may cost lots of additional memory. Set
      * it to true if you prefer rendering speed over memory usage. If set to false, the PAGImageView
@@ -176,7 +149,7 @@ public class PAGImageView extends View {
      * Sets the frame index for the PAGImageView to render.
      */
     public void setCurrentFrame(int currentFrame) {
-        if (!decoderInfo.isValid() || currentFrame < 0 || currentFrame >= decoderInfo.numFrames || (cacheItem == null && !allInMemoryCache())) {
+        if (!decoderInfo.isValid() || currentFrame < 0 || currentFrame >= decoderInfo.numFrames) {
             return;
         }
         _currentFrame = currentFrame;
@@ -197,13 +170,6 @@ public class PAGImageView extends View {
         return renderBitmap;
     }
 
-    /**
-     * Returns the current PAGComposition in the PAGImageView. Returns nil if the internal
-     * composition was loaded from a pag file path.
-     */
-    public PAGComposition getComposition() {
-        return _composition;
-    }
 
     /**
      * Sets a new PAGComposition to the PAGImageView with the maxFrameRate set to 30 fps. Note: If
@@ -214,6 +180,8 @@ public class PAGImageView extends View {
         setComposition(newComposition, DEFAULT_MAX_FRAMERATE);
     }
 
+    int lastContentVersion = -1;
+
     /**
      * Sets a new PAGComposition and the maxFrameRate limit to the PAGImageView. Note: If the
      * composition is already added to another PAGImageView, it will be removed from the previous
@@ -223,15 +191,7 @@ public class PAGImageView extends View {
         if (newComposition == _composition && _maxFrameRate == maxFrameRate && decoderInfo.isValid()) {
             return;
         }
-        freezeDraw.set(true);
-        _composition = newComposition;
-        _maxFrameRate = maxFrameRate;
-        progressExplicitlySet = true;
-        animator.setCurrentPlayTime(0);
-        releaseAllTask();
-        _matrix = null;
-        renderBitmap = null;
-        PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_REFRESH_DECODER, this);
+        refreshResource(null, newComposition, maxFrameRate);
     }
 
     /**
@@ -241,27 +201,47 @@ public class PAGImageView extends View {
         return _pagFilePath;
     }
 
+    private PAGComposition getCompositionFromPath(String path) {
+        if (path == null) {
+            return null;
+        }
+        PAGComposition composition;
+        if (path.startsWith("assets://")) {
+            composition = PAGFile.Load(getContext().getAssets(), path.substring(9));
+        } else {
+            composition = PAGFile.Load(path);
+        }
+        return composition;
+    }
+
     /**
      * Loads a pag file from the specified path with the maxFrameRate limit, returns false if the
      * file does not exist, or it is not a valid pag file.
      */
     public boolean setPath(String path, float maxFrameRate) {
-        if (path == null) {
-            return false;
-        }
-        if (path.equals(_pagFilePath) && _maxFrameRate == maxFrameRate && decoderInfo.isValid()) {
-            return true;
-        }
+        PAGComposition composition = getCompositionFromPath(path);
+        refreshResource(path, composition, maxFrameRate);
+        return composition != null;
+    }
+
+    private void refreshResource(String path, PAGComposition composition, float maxFrameRate) {
         freezeDraw.set(true);
-        _pagFilePath = path;
         _maxFrameRate = maxFrameRate;
-        progressExplicitlySet = true;
-        animator.setCurrentPlayTime(0);
-        releaseAllTask();
+        PAGImageViewHelper.RemoveMessage(PAGImageViewHelper.MSG_REFRESH_DECODER, this);
         _matrix = null;
         renderBitmap = null;
+        _pagFilePath = path;
+        _composition = composition;
+        _currentFrame = 0;
+        progressExplicitlySet = true;
+        currentPlayTime = 0;
+        if (animator != null) {
+            animator.setCurrentPlayTime(0);
+        }
+        if (!decoderInfo.isValid()) {
+            return;
+        }
         PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_REFRESH_DECODER, this);
-        return true;
     }
 
     /**
@@ -294,6 +274,7 @@ public class PAGImageView extends View {
             return false;
         }
         synchronized (updateTimeLock) {
+            boolean pr = progressExplicitlySet;
             if (progressExplicitlySet) {
                 progressExplicitlySet = false;
                 animator.setCurrentPlayTime((long) (decoderInfo.duration * 0.001f * PAGImageViewHelper.FrameToProgress(_currentFrame, decoderInfo.numFrames)));
@@ -302,11 +283,12 @@ public class PAGImageView extends View {
             if (currentFrame == _currentFrame && !forceFlush) {
                 return false;
             }
-            forceFlush = false;
             _currentFrame = currentFrame;
             if (!handleFrame(_currentFrame)) {
+                forceFlush = false;
                 return false;
             }
+            forceFlush = false;
             postInvalidate();
         }
         notifyAnimationUpdate();
@@ -399,38 +381,21 @@ public class PAGImageView extends View {
         if (decoderInfo != null) {
             decoderInfo.reset();
         }
-        releaseCurrentDiskCache();
-        lastKeyItem = null;
+        bitmapCache.clear();
         initDecoderInfo();
-    }
-
-    private static ThreadPoolExecutor saveCacheExecutors;
-
-    private static void InitCacheExecutors() {
-        if (saveCacheExecutors == null) {
-            synchronized (PAGImageView.class) {
-                if (saveCacheExecutors == null) {
-                    saveCacheExecutors = new ThreadPoolExecutor(1, 1, 2, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>());
-                    saveCacheExecutors.allowCoreThreadTimeOut(true);
-                }
-            }
-        }
     }
 
     private volatile long currentPlayTime;
 
-    private final ValueAnimator.AnimatorUpdateListener mAnimatorUpdateListener = new ValueAnimator.AnimatorUpdateListener() {
-        @Override
-        public void onAnimationUpdate(ValueAnimator animation) {
-            if (!decoderInfo.isValid() || (cacheItem == null && !allInMemoryCache())) {
-                return;
-            }
-            PAGImageView.this.currentPlayTime = animation.getCurrentPlayTime();
-            PAGImageViewHelper.NeedsUpdateView(PAGImageView.this);
+    private final ValueAnimator.AnimatorUpdateListener mAnimatorUpdateListener = animation -> {
+        if (!decoderInfo.isValid() || freezeDraw.get()) {
+            return;
         }
+        PAGImageView.this.currentPlayTime = animation.getCurrentPlayTime();
+        PAGImageViewHelper.NeedsUpdateView(PAGImageView.this);
     };
 
-    private ArrayList<PAGImageViewListener> mViewListeners = new ArrayList<>();
+    private final ArrayList<PAGImageViewListener> mViewListeners = new ArrayList<>();
 
     private final AnimatorListenerAdapter mAnimatorListenerAdapter = new AnimatorListenerAdapter() {
         @Override
@@ -501,22 +466,24 @@ public class PAGImageView extends View {
         viewHeight = h;
         width = (int) (renderScale * w);
         height = (int) (renderScale * h);
+        renderBitmap = null;
         PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_INIT_DECODER, this);
         resumeAnimator();
     }
 
     protected void initDecoderInfo() {
         if (!decoderInfo.isValid()) {
-            if (decoderInfo.initDecoder(getContext(), _composition, _pagFilePath, width, height, _maxFrameRate)) {
+            if (_composition == null) {
+                _composition = getCompositionFromPath(_pagFilePath);
+            }
+            if (decoderInfo.initDecoder(_composition, width, height, _maxFrameRate, !(ContentVersion(_composition) > 0 && allInMemoryCache()))) {
+                if (_pagFilePath != null) {
+                    _composition = null;
+                }
                 animator.setDuration(decoderInfo.duration / 1000);
                 if (!decoderInfo.isValid()) {
                     return;
                 }
-                lastKeyItem = fetchKeyFrame();
-                if (cacheItem != null || lastKeyItem == null) {
-                    return;
-                }
-                cacheItem = cacheManager.getOrCreate(lastKeyItem.keyPrefixMD5, decoderInfo._width, decoderInfo._height, decoderInfo.numFrames);
             }
         }
         refreshMatrixFromScaleMode();
@@ -526,12 +493,9 @@ public class PAGImageView extends View {
     private float animationScale = 1.0f;
 
     private void init() {
-        InitCacheExecutors();
-        cacheManager = CacheManager.Get(getContext());
         animator = ValueAnimator.ofFloat(0.0f, 1.0f);
         animator.setRepeatCount(0);
         animator.setInterpolator(new LinearInterpolator());
-        animator.addUpdateListener(mAnimatorUpdateListener);
         animationScale = getAnimationScale(getContext());
     }
 
@@ -589,7 +553,7 @@ public class PAGImageView extends View {
         }
     }
 
-    private boolean isAttachedToWindow = false;
+    private volatile boolean isAttachedToWindow = false;
 
     private volatile boolean forceFlush = false;
 
@@ -614,31 +578,18 @@ public class PAGImageView extends View {
         pauseAnimator();
         animator.removeUpdateListener(mAnimatorUpdateListener);
         animator.removeListener(mAnimatorListenerAdapter);
-        releaseAllTask();
         PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_CLOSE_CACHE, this);
         synchronized (g_HandlerLock) {
             PAGImageViewHelper.DestroyHandlerThread();
         }
-        renderBitmap = null;
+        if (_isAnimatorPreRunning == null || _isAnimatorPreRunning) {
+            renderBitmap = null;
+        }
         bitmapCache.clear();
         freezeDraw.set(false);
     }
 
-    private void releaseAllTask() {
-        try {
-            for (Iterator<WeakReference<Future>> iterator = saveCacheTasks.iterator(); iterator.hasNext(); ) {
-                WeakReference<Future> task = iterator.next();
-                if (task.get() != null) {
-                    task.get().cancel(false);
-                }
-                iterator.remove();
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    private Runnable mAnimatorStartRunnable = new Runnable() {
+    private final Runnable mAnimatorStartRunnable = new Runnable() {
         @Override
         public void run() {
             if (isAttachedToWindow) {
@@ -649,7 +600,7 @@ public class PAGImageView extends View {
         }
     };
 
-    private Runnable mAnimatorCancelRunnable = new Runnable() {
+    private final Runnable mAnimatorCancelRunnable = new Runnable() {
         @Override
         public void run() {
             currentPlayTime = animator.getCurrentPlayTime();
@@ -706,161 +657,58 @@ public class PAGImageView extends View {
         return flush();
     }
 
-    protected KeyItem fetchKeyFrame() {
-        if (!decoderInfo.isValid() || _composition == null && _pagFilePath == null) {
-            return null;
-        }
-        if (_pagFilePath != null && lastKeyItem != null) {
-            return lastKeyItem;
-        }
-        String keyPrefix = "_" + (decoderInfo._width << 16 | decoderInfo._height) + "_" + decoderInfo.realFrameRate;
-        boolean autoClean = false;
-        if (_pagFilePath != null) {
-            keyPrefix = _pagFilePath + keyPrefix;
-        } else if (_composition instanceof PAGFile && CacheManager.ContentVersion(_composition) == 0) {
-            keyPrefix = ((PAGFile) _composition).path() + keyPrefix;
-        } else {
-            keyPrefix = _composition.toString() + "_" + CacheManager.ContentVersion(_composition) + keyPrefix;
-            autoClean = true;
-        }
-        if (lastKeyItem != null && keyPrefix.equals(lastKeyItem.keyPrefix)) {
-            return lastKeyItem;
-        }
-        KeyItem keyItem = new KeyItem();
-        keyItem.keyPrefix = keyPrefix;
-        keyItem.keyPrefixMD5 = PAGImageViewHelper.getMD5(keyPrefix);
-        keyItem.needAutoClean = autoClean;
-        return keyItem;
-    }
-
-    protected boolean inflateBitmapFromDiskCache(CacheInfo cacheInfo) {
-        try {
-            if (cacheInfo == null || cacheItem == null) {
-                return false;
-            }
-            return cacheItem.inflateBitmap(cacheInfo.frame, cacheInfo.bitmap);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return false;
-    }
-
     private boolean allInMemoryCache() {
         return bitmapCache.size() == decoderInfo.numFrames;
     }
 
     private void releaseDecoder() {
-        if (cacheItem == null || lastKeyItem == null || TextUtils.isEmpty(lastKeyItem.keyPrefix)) {
-            return;
-        }
-
         if (allInMemoryCache()) {
-            cacheItem.writeLock();
             if (decoderInfo._pagDecoder != null) {
                 decoderInfo.releaseDecoder();
             }
-            cacheManager.remove(lastKeyItem.keyPrefixMD5);
-            cacheItem.writeUnlock();
-            cacheItem = null;
-            return;
-        }
-
-        if (decoderInfo._pagDecoder != null && cacheItem.isAllCached()) {
-            cacheItem.writeLock();
-            decoderInfo.releaseDecoder();
-            cacheItem.releaseSaveBuffer();
-            cacheItem.writeUnlock();
         }
     }
 
-    protected void releaseCurrentDiskCache() {
-        if (cacheItem != null) {
-            cacheItem.writeLock();
-            if (lastKeyItem.needAutoClean) {
-                try {
-                    new File(cacheManager.getPath(lastKeyItem.keyPrefixMD5)).delete();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-            cacheItem.writeUnlock();
-            cacheManager.remove(lastKeyItem.keyPrefixMD5);
-            cacheItem = null;
+
+    private void checkContentChange() {
+        if (_pagFilePath != null || _composition == null) {
+            return;
         }
+        int nVersion = ContentVersion(_composition);
+        if (lastContentVersion >= 0 && lastContentVersion != nVersion) {
+            bitmapCache.clear();
+        }
+        lastContentVersion = nVersion;
     }
 
     private boolean handleFrame(final int frame) {
         if (!decoderInfo.isValid() || freezeDraw.get()) {
             return false;
         }
-        KeyItem keyItem = fetchKeyFrame();
-        if (lastKeyItem != null && lastKeyItem.keyPrefix != null && !lastKeyItem.keyPrefix.equals(keyItem.keyPrefix)) {
-            releaseCurrentDiskCache();
-            cacheItem = cacheManager.getOrCreate(keyItem.keyPrefixMD5, decoderInfo._width, decoderInfo._height, decoderInfo.numFrames);
-            bitmapCache.clear();
-        }
-        lastKeyItem = keyItem;
-
-        if (freezeDraw.get()) {
-            return false;
-        }
+        checkContentChange();
         releaseDecoder();
-        if (lastKeyItem != null && lastKeyItem.keyPrefixMD5 != null) {
-            Bitmap bitmap = bitmapCache.get(frame);
-            if (bitmap != null) {
-                renderBitmap = bitmap;
-                return true;
-            }
-            if (cacheItem != null) {
-                try {
-                    if (cacheItem.isCached(frame)) {
-                        if (renderBitmap == null || isCacheAllFramesInMemory) {
-                            renderBitmap = BitmapHelper.CreateBitmap(decoderInfo._width, decoderInfo._height);
-                        }
-                        if (fetchCache(CacheInfo.Make(PAGImageView.this, lastKeyItem.keyPrefixMD5, frame, renderBitmap))) {
-                        }
-                        return true;
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
+        Bitmap bitmap = bitmapCache.get(frame);
+        if (bitmap != null) {
+            renderBitmap = bitmap;
+            return true;
         }
         if (freezeDraw.get()) {
             return false;
+        }
+        if (decoderInfo._pagDecoder == null) {
+            return false;
+        }
+        if (!forceFlush && !decoderInfo._pagDecoder.checkFrameChanged(frame)) {
+            return true;
         }
         if (renderBitmap == null || isCacheAllFramesInMemory) {
             renderBitmap = BitmapHelper.CreateBitmap(decoderInfo._width, decoderInfo._height);
         }
-        if (decoderInfo._pagDecoder == null || !decoderInfo._pagDecoder.copyFrameTo(renderBitmap, frame)) {
+        if (!decoderInfo._pagDecoder.copyFrameTo(renderBitmap, frame)) {
             return false;
         }
-        if (isCacheAllFramesInMemory) {
+        if (isCacheAllFramesInMemory && renderBitmap != null) {
             bitmapCache.put(frame, renderBitmap);
-        }
-        if (cacheItem != null && cacheItem.saveBitmap(frame, renderBitmap)) {
-            saveCacheTasks.add(new WeakReference<Future>(saveCacheExecutors.submit(new Runnable() {
-                @Override
-                public void run() {
-                    if (cacheItem != null) {
-                        cacheItem.flushSave();
-                    }
-                }
-            })));
-        }
-        return true;
-    }
-
-    protected static boolean fetchCache(CacheInfo cacheInfo) {
-        if (cacheInfo.pagImageView == null || TextUtils.isEmpty(cacheInfo.keyPrefix)) {
-            return false;
-        }
-        if (!cacheInfo.pagImageView.inflateBitmapFromDiskCache(cacheInfo)) {
-            Log.e(TAG, "inflateBitmapFromDiskCache failed:" + cacheInfo.pagImageView._pagFilePath);
-            return false;
-        }
-        if (cacheInfo.pagImageView.isCacheAllFramesInMemory) {
-            cacheInfo.pagImageView.bitmapCache.put(cacheInfo.frame, cacheInfo.bitmap);
         }
         return true;
     }
@@ -923,12 +771,6 @@ public class PAGImageView extends View {
         super.finalize();
     }
 
-    protected static class KeyItem {
-        String keyPrefix;
-        String keyPrefixMD5;
-        boolean needAutoClean = false;
-    }
-
     private boolean hasSize() {
         return width > 0 && height > 0;
     }
@@ -940,4 +782,9 @@ public class PAGImageView extends View {
         _matrix = PAGImageViewHelper.ApplyScaleMode(_scaleMode, decoderInfo._width, decoderInfo._height, width, height);
     }
 
+    private static native int ContentVersion(PAGComposition pagComposition);
+
+    static {
+        LibraryLoadUtils.loadLibrary("pag");
+    }
 }
