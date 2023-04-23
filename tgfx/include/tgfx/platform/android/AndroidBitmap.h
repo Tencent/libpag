@@ -35,7 +35,7 @@ class AndroidBitmap {
   static ImageInfo GetInfo(JNIEnv* env, jobject bitmap);
 
   /**
-   * Wraps an hardware backed Android Bitmap into a tgfx::Bitmap object. The returned tgfx::Bitmap
+   * Wraps a hardware-backed Android Bitmap into a tgfx::Bitmap object. The returned tgfx::Bitmap
    * shares the same pixel memory as the original Android Bitmap. Returns an empty tgfx::Bitmap if
    * the config of the Android Bitmap is not 'HARDWARE' or the API Level of the current system is
    * less than 30.

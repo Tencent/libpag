@@ -99,6 +99,13 @@ public class PAGDecoder {
     public native float frameRate();
 
     /**
+     * Returns true if the frame at the given index has changed since the last copyFrameTo() or
+     * frameAtIndex() call. The caller should skip the corresponding reading call if the frame has
+     * not changed.
+     */
+    public native boolean checkFrameChanged(int index);
+
+    /**
      * Copies pixels of the image frame at the given index to the specified Bitmap. Returns false if
      * failed. Note that caller must ensure that the config of Bitmap stays the same throughout
      * every copying call. Otherwise, it may return false.
