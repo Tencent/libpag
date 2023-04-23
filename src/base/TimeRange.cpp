@@ -168,6 +168,14 @@ int FindTimeRangeAt(const std::vector<TimeRange>& timeRanges, Frame position, in
   }
 }
 
+TimeRange GetTimeRangeContains(const std::vector<TimeRange>& timeRanges, Frame frame) {
+  auto index = FindTimeRangeAt(timeRanges, frame, 0, static_cast<int>(timeRanges.size() - 1));
+  if (index != -1) {
+    return timeRanges[index];
+  }
+  return {frame, frame};
+}
+
 Frame ConvertFrameByStaticTimeRanges(const std::vector<TimeRange>& timeRanges, Frame frame) {
   auto index = FindTimeRangeAt(timeRanges, frame, 0, static_cast<int>(timeRanges.size() - 1));
   return index != -1 ? timeRanges[index].start : frame;

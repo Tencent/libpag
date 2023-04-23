@@ -1012,6 +1012,8 @@ class PAG_API PAGComposition : public PAGLayer {
   friend class FileReporter;
 
   friend class AudioClip;
+
+  friend class PAGDecoder;
 };
 
 class PAG_API PAGFile : public PAGComposition {
@@ -1569,6 +1571,12 @@ class PAGDecoder {
   float frameRate();
 
   /**
+   * Returns true if the frame at the given index has changed since the last readFrame() call. The
+   * caller should skip the corresponding reading call if the frame has not changed.
+   */
+  bool checkFrameChanged(int index);
+
+  /**
    * Copies pixels of the image frame at the given index into the specified memory address. Returns
    * false if failed. Note that caller must ensure that colorType, alphaType, and dstRowBytes stay
    * the same throughout every reading call. Otherwise, it may return false.
@@ -1585,6 +1593,7 @@ class PAGDecoder {
   float _frameRate = 30.0f;
   float maxFrameRate = 30.0f;
   bool useDiskCache = true;
+  int lastReadIndex = -1;
   size_t lastRowBytes = 0;
   ColorType lastColorType = ColorType::RGBA_8888;
   AlphaType lastAlphaType = AlphaType::Premultiplied;
@@ -1592,10 +1601,13 @@ class PAGDecoder {
   std::shared_ptr<PAGComposition> container = nullptr;
   std::shared_ptr<SequenceFile> sequenceFile = nullptr;
   std::unique_ptr<PAGPlayer> pagPlayer = nullptr;
+  std::vector<TimeRange> staticTimeRanges = {};
 
-  static float GetFrameRate(std::shared_ptr<PAGComposition> pagComposition);
-  static std::pair<int, float> GetFrameCountAndRate(std::shared_ptr<PAGComposition> composition,
+  static Composition* GetSingleComposition(std::shared_ptr<PAGComposition> pagComposition);
+  static std::pair<int, float> GetFrameCountAndRate(std::shared_ptr<PAGComposition> pagComposition,
                                                     float maxFrameRate);
+  static std::vector<TimeRange> GetStaticTimeRange(std::shared_ptr<PAGComposition> composition,
+                                                   int numFrames);
 
   PAGDecoder(std::shared_ptr<PAGComposition> composition, int width, int height, int numFrames,
              float frameRate, float maxFrameRate, bool useDiskCache);

@@ -36,6 +36,8 @@
 
 - (float)frameRate;
 
+- (BOOL)checkFrameChanged:(int)index;
+
 - (BOOL)copyFrameTo:(void*)pixels rowBytes:(size_t)rowBytes at:(NSInteger)index;
 
 - (nullable UIImage*)frameAtIndex:(NSInteger)index;
