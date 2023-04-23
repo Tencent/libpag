@@ -56,22 +56,6 @@ NS_ASSUME_NONNULL_BEGIN
 PAG_API @interface PAGImageView : UIImageView
 
 /**
- * Returns the size limit of the disk cache in bytes.
- */
-+ (NSUInteger)MaxDiskSize;
-
-/**
- * Sets the size limit of the disk cache in bytes. The default disk cache limit is 1 GB.
- */
-+ (void)SetMaxDiskSize:(NSUInteger)size;
-
-/**
- * Returns the current PAGComposition in the PAGImageView. Returns nil if the internal composition
- * was loaded from a pag file path.
- */
-- (PAGComposition* __nullable)getComposition;
-
-/**
  * Sets a new PAGComposition to the PAGImageView with the maxFrameRate set to 30 fps. Note: If the
  * composition is already added to another PAGImageView, it will be removed from the previous
  * PAGImageView.
