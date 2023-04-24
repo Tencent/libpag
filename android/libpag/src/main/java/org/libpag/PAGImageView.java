@@ -122,6 +122,22 @@ public class PAGImageView extends View {
     }
 
     /**
+     * Returns the size limit of the disk cache in bytes.
+     */
+    @Deprecated
+    public static long MaxDiskCache() {
+        return PAGDiskCache.MaxDiskSize();
+    }
+
+    /**
+     * Sets the size limit of the disk cache in bytes. The default disk cache limit is 1 GB.
+     */
+    @Deprecated
+    public static void SetMaxDiskCache(long maxDiskCache) {
+        PAGDiskCache.SetMaxDiskSize(maxDiskCache);
+    }
+
+    /**
      * If set to true, the PAGImageView loads all image frames into the memory, which will
      * significantly increase the rendering performance but may cost lots of additional memory. Set
      * it to true if you prefer rendering speed over memory usage. If set to false, the PAGImageView
@@ -170,6 +186,13 @@ public class PAGImageView extends View {
         return renderBitmap;
     }
 
+    /**
+     * Returns the current PAGComposition in the PAGImageView. Returns null if the internal
+     * composition was loaded from a pag file path.
+     */
+    public PAGComposition getComposition() {
+        return _pagFilePath != null ? null : _composition;
+    }
 
     /**
      * Sets a new PAGComposition to the PAGImageView with the maxFrameRate set to 30 fps. Note: If
