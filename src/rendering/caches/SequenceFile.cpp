@@ -167,18 +167,9 @@ bool SequenceFile::readFramesFromFile() {
     auto& firstFrame = frames[timeRange.start];
     if (firstFrame.size > 0) {
       cachedFrames += static_cast<int>(timeRange.duration()) - 1;
-    }
-    for (auto i = timeRange.start + 1; i <= timeRange.end; i++) {
-      frames[i] = firstFrame;
-    }
-  }
-  for (auto& timeRange : _staticTimeRanges) {
-    auto& firstFrame = frames[timeRange.start];
-    if (firstFrame.size > 0) {
-      cachedFrames += static_cast<int>(timeRange.duration()) - 1;
-    }
-    for (auto i = timeRange.start + 1; i <= timeRange.end; i++) {
-      frames[i] = firstFrame;
+      for (auto i = timeRange.start + 1; i <= timeRange.end; i++) {
+        frames[i] = firstFrame;
+      }
     }
   }
   return true;
