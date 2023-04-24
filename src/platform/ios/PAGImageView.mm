@@ -656,6 +656,13 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   return file != nil;
 }
 
+- (PAGComposition*)getComposition {
+  if (pagComposition) {
+    return [[pagComposition retain] autorelease];
+  }
+  return nil;
+}
+
 - (void)setComposition:(PAGComposition*)newComposition {
   [self setComposition:newComposition maxFrameRate:DEFAULT_MAX_FRAMERATE];
 }
