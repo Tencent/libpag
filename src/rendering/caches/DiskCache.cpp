@@ -315,7 +315,7 @@ void DiskCache::saveConfig() {
     auto& fileInfo = *item;
     auto& cacheKey = fileInfo->cacheKey;
     dataView.setUint32(pos, fileInfo->fileID);
-    dataView.setUint32(pos + 4, cacheKey.size());
+    dataView.setUint32(pos + 4, static_cast<uint32_t>(cacheKey.size()));
     pos += 8;
     memcpy(dataView.writableBytes() + pos, cacheKey.data(), cacheKey.size());
     pos += cacheKey.size();

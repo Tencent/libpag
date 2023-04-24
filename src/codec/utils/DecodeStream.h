@@ -60,7 +60,7 @@ class DecodeStream final {
    * the end of the stream.
    */
   uint32_t bytesAvailable() const {
-    return dataView.size() - _position;
+    return static_cast<uint32_t>(dataView.size()) - _position;
   }
 
   const uint8_t* data() const {
@@ -71,7 +71,7 @@ class DecodeStream final {
    * The length of the DecodeStream object.
    */
   uint32_t length() const {
-    return dataView.size();
+    return static_cast<uint32_t>(dataView.size());
   }
 
   /**
