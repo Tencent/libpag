@@ -23,7 +23,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @class PAGImageView;
 
-@protocol PAGImageViewListener<NSObject>
+@protocol PAGImageViewListener <NSObject>
 
 @optional
 /**

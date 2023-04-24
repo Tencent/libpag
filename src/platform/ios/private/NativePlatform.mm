@@ -64,7 +64,8 @@ std::string NativePlatform::getSandboxPath(std::string filePath) const {
 
   NSString* homeDir = NSHomeDirectory();
   if ([filePathStr containsString:homeDir]) {
-    return [[filePathStr stringByReplacingOccurrencesOfString:homeDir withString:@"home:/"] UTF8String];
+    return [[filePathStr stringByReplacingOccurrencesOfString:homeDir
+                                                   withString:@"home:/"] UTF8String];
   }
 
   NSString* mainBundlePath = [[NSBundle mainBundle] bundlePath];
