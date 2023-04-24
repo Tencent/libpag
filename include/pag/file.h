@@ -272,6 +272,7 @@ std::vector<TimeRange> PAG_API OffsetTimeRanges(const std::vector<TimeRange>& ti
                                                 Frame offsetTime);
 bool PAG_API HasVaryingTimeRange(const std::vector<TimeRange>* staticTimeRanges, Frame startTime,
                                  Frame duration);
+TimeRange PAG_API GetTimeRangeContains(const std::vector<TimeRange>& timeRanges, Frame frame);
 
 template <typename T>
 class AnimatableProperty : public Property<T> {
@@ -2011,6 +2012,9 @@ class PAG_API Composition {
    */
   Frame audioStartTime = ZeroFrame;
 
+  /**
+   * [FrameStart, FrameEnd(included)], [FrameStar, FrameEnd]...
+   */
   std::vector<TimeRange> staticTimeRanges;
   Cache* cache = nullptr;
   std::mutex locker = {};

@@ -23,6 +23,8 @@
 #include "base/utils/TGFXCast.h"
 #include "rendering/utils/Directory.h"
 #include "tgfx/opengl/GLFunctions.h"
+#include "tgfx/utils/Buffer.h"
+#include "tgfx/utils/Stream.h"
 
 namespace pag {
 using namespace tgfx;
@@ -116,6 +118,16 @@ std::shared_ptr<tgfx::Image> MakeImage(const std::string& path) {
 
 std::shared_ptr<PAGImage> MakePAGImage(const std::string& path) {
   return PAGImage::FromPath(TestConstants::PAG_ROOT + path);
+}
+
+std::shared_ptr<tgfx::Data> ReadFile(const std::string& path) {
+  auto stream = tgfx::Stream::MakeFromFile(TestConstants::PAG_ROOT + path);
+  if (stream == nullptr) {
+    return nullptr;
+  }
+  tgfx::Buffer buffer(stream->size());
+  stream->read(buffer.data(), buffer.size());
+  return buffer.release();
 }
 
 void SaveFile(std::shared_ptr<tgfx::Data> data, const std::string& key) {

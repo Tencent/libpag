@@ -67,12 +67,21 @@ static constexpr Color Red = {255, 0, 0};
 static constexpr Color Green = {0, 255, 0};
 static constexpr Color Blue = {0, 0, 255};
 
+/**
+ * TimeRange represents a range of frames.
+ */
 struct TimeRange {
+  /**
+   * The start frame of the time range, which is included.
+   */
   Frame start;
+  /**
+   * The end frame of the time range, which is also included.
+   */
   Frame end;
 
   Frame duration() const {
-    return end - start;
+    return end - start + 1;
   }
 
   bool isValid() const {
@@ -80,7 +89,7 @@ struct TimeRange {
   }
 
   bool contains(Frame frame) const {
-    return start <= frame && frame < end;
+    return start <= frame && frame <= end;
   }
 };
 

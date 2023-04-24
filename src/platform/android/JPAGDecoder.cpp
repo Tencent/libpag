@@ -103,6 +103,15 @@ PAG_API jfloat Java_org_libpag_PAGDecoder_frameRate(JNIEnv* env, jobject thiz) {
   return decoder->frameRate();
 }
 
+PAG_API jboolean Java_org_libpag_PAGDecoder_checkFrameChanged(JNIEnv* env, jobject thiz,
+                                                              jint index) {
+  auto decoder = getPAGDecoder(env, thiz);
+  if (decoder == nullptr) {
+    return 0;
+  }
+  return decoder->checkFrameChanged(index);
+}
+
 PAG_API jboolean Java_org_libpag_PAGDecoder_copyFrameTo(JNIEnv* env, jobject thiz,
                                                         jobject bitmapObject, jint index) {
   auto decoder = getPAGDecoder(env, thiz);

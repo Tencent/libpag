@@ -21,6 +21,7 @@
 #include <mutex>
 #include <string>
 #include <vector>
+#include "pag/types.h"
 #include "rendering/utils/LZ4Decoder.h"
 #include "rendering/utils/LZ4Encoder.h"
 #include "tgfx/core/ImageInfo.h"
@@ -82,6 +83,13 @@ class SequenceFile {
   }
 
   /**
+   * Returns the static time ranges of the sequence.
+   */
+  const std::vector<TimeRange>& staticTimeRanges() const {
+    return _staticTimeRanges;
+  }
+
+  /**
    * Returns the file size of the sequence.
    */
   size_t fileSize();
@@ -115,6 +123,7 @@ class SequenceFile {
   tgfx::ImageInfo _info = {};
   int _numFrames = 0;
   float _frameRate = 30.0f;
+  std::vector<TimeRange> _staticTimeRanges = {};
   int cachedFrames = 0;
   std::vector<FrameLocation> frames = {};
   tgfx::Buffer scratchBuffer = {};
@@ -123,15 +132,18 @@ class SequenceFile {
 
   static std::shared_ptr<SequenceFile> Open(const std::string& filePath,
                                             const tgfx::ImageInfo& info, int frameCount,
-                                            float frameRate);
+                                            float frameRate,
+                                            const std::vector<TimeRange>& staticTimeRanges);
 
   SequenceFile(const std::string& filePath, const tgfx::ImageInfo& info, int frameCount,
-               float frameRate);
+               float frameRate, std::vector<TimeRange> staticTimeRanges);
 
   bool readFramesFromFile();
   bool writeFileHead();
   size_t compressFrame(int index, const void* pixels, size_t byteSize);
   bool checkScratchBuffer();
+  bool compatible(const tgfx::ImageInfo& info, int frameCount, float frameRate,
+                  const std::vector<TimeRange>& staticTimeRanges);
 
   friend class DiskCache;
 };

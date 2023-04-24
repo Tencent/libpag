@@ -200,7 +200,7 @@ void PAGFile::setDurationInternal(int64_t duration) {
     _parent->updateDurationAndFrameRate();
   }
   onTimelineChanged();
-  notifyModified();
+  notifyModified(true);
 }
 
 std::shared_ptr<PAGFile> PAGFile::copyOriginal() {

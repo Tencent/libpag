@@ -17,9 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SequenceFile.h"
+#include <cstring>
 #include "DiskCache.h"
 #include "base/utils/Log.h"
+#include "pag/file.h"
 #include "rendering/utils/Directory.h"
+#include "tgfx/utils/Buffer.h"
 #include "tgfx/utils/DataView.h"
 
 namespace pag {
@@ -34,8 +37,14 @@ static constexpr uint8_t FILE_VERSION = 1;
  * [rowBytes: uint32_t]
  * [frameCount: uint32_t]
  * [frameRate: uint32_t]
+ * [staticTimeRangeCount: uint32_t]
  */
-static constexpr uint32_t FILE_HEAD_SIZE = 24;
+static constexpr uint32_t FILE_HEAD_SIZE = 28;
+/**
+ * [start: uint32_t]
+ * [end: uint32_t]
+ */
+static constexpr uint32_t TIME_RANGE_SIZE = 8;
 /**
  * [frameIndex: uint32_t]
  * [frameSize: uint64_t]
@@ -44,18 +53,20 @@ static constexpr uint32_t FRAME_HEAD_SIZE = 12;
 
 std::shared_ptr<SequenceFile> SequenceFile::Open(const std::string& filePath,
                                                  const tgfx::ImageInfo& info, int frameCount,
-                                                 float frameRate) {
+                                                 float frameRate,
+                                                 const std::vector<TimeRange>& staticTimeRanges) {
   if (filePath.empty() || info.isEmpty() || frameCount == 0 || frameRate <= 0) {
     return nullptr;
   }
-  auto sequenceFile =
-      std::shared_ptr<SequenceFile>(new SequenceFile(filePath, info, frameCount, frameRate));
+  auto sequenceFile = std::shared_ptr<SequenceFile>(
+      new SequenceFile(filePath, info, frameCount, frameRate, staticTimeRanges));
   return sequenceFile->file ? sequenceFile : nullptr;
 }
 
 SequenceFile::SequenceFile(const std::string& filePath, const tgfx::ImageInfo& info, int frameCount,
-                           float frameRate)
-    : _info(info), _numFrames(frameCount), _frameRate(frameRate) {
+                           float frameRate, std::vector<TimeRange> staticTimeRanges)
+    : _info(info), _numFrames(frameCount), _frameRate(frameRate),
+      _staticTimeRanges(std::move(staticTimeRanges)) {
   decoder = LZ4Decoder::Make();
   Directory::CreateRecursively(Directory::GetParentDirectory(filePath));
 #ifdef __APPLE__
@@ -91,10 +102,10 @@ SequenceFile::~SequenceFile() {
 
 bool SequenceFile::readFramesFromFile() {
   fseek(file, 0, SEEK_SET);
-  uint8_t buffer[FILE_HEAD_SIZE] = {};
-  auto data = tgfx::DataView(buffer, FILE_HEAD_SIZE);
-  auto readLength = fread(data.writableBytes(), 1, FILE_HEAD_SIZE, file);
-  if (readLength != FILE_HEAD_SIZE) {
+  tgfx::Buffer buffer(FILE_HEAD_SIZE);
+  auto data = tgfx::DataView(buffer.bytes(), buffer.size());
+  auto readLength = fread(data.writableBytes(), 1, data.size(), file);
+  if (readLength != data.size()) {
     return false;
   }
   auto version = data.getUint8(0);
@@ -106,13 +117,24 @@ bool SequenceFile::readFramesFromFile() {
   auto rowBytes = data.getUint32(12);
   auto fileFrameCount = data.getUint32(16);
   auto fileFrameRate = data.getFloat(20);
+  auto staticTimeRangeCount = data.getUint32(24);
   auto info = tgfx::ImageInfo::Make(static_cast<int>(fileWidth), static_cast<int>(fileHeight),
                                     static_cast<tgfx::ColorType>(colorType),
                                     static_cast<tgfx::AlphaType>(alphaType), rowBytes);
   if (version != FILE_VERSION || compression != static_cast<uint8_t>(compressionType) ||
       info != _info || fileFrameCount != static_cast<uint32_t>(_numFrames) ||
-      fileFrameRate != _frameRate) {
+      fileFrameRate != _frameRate || staticTimeRangeCount != _staticTimeRanges.size()) {
     return false;
+  }
+  for (uint32_t i = 0; i < staticTimeRangeCount; i++) {
+    readLength = fread(data.writableBytes(), 1, TIME_RANGE_SIZE, file);
+    if (readLength != TIME_RANGE_SIZE) {
+      return false;
+    }
+    const auto& timeRange = _staticTimeRanges[i];
+    if (timeRange.start != data.getUint32(0) || timeRange.end != data.getUint32(4)) {
+      return false;
+    }
   }
   while (true) {
     readLength = fread(data.writableBytes(), 1, FRAME_HEAD_SIZE, file);
@@ -135,12 +157,21 @@ bool SequenceFile::readFramesFromFile() {
       return false;
     }
   }
+  for (auto& timeRange : _staticTimeRanges) {
+    auto& firstFrame = frames[timeRange.start];
+    if (firstFrame.size > 0) {
+      cachedFrames += static_cast<int>(timeRange.duration()) - 1;
+    }
+    for (auto i = timeRange.start + 1; i <= timeRange.end; i++) {
+      frames[i] = firstFrame;
+    }
+  }
   return true;
 }
 
 bool SequenceFile::writeFileHead() {
-  uint8_t buffer[FILE_HEAD_SIZE] = {};
-  auto data = tgfx::DataView(buffer, FILE_HEAD_SIZE);
+  tgfx::Buffer buffer(FILE_HEAD_SIZE + _staticTimeRanges.size() * 8);
+  auto data = tgfx::DataView(buffer.bytes(), buffer.size());
   data.setUint8(0, FILE_VERSION);
   data.setUint8(1, static_cast<uint8_t>(compressionType));
   data.setUint8(2, static_cast<uint8_t>(_info.colorType()));
@@ -150,7 +181,13 @@ bool SequenceFile::writeFileHead() {
   data.setUint32(12, static_cast<uint32_t>(_info.rowBytes()));
   data.setUint32(16, _numFrames);
   data.setFloat(20, _frameRate);
-  auto writeLength = fwrite(data.bytes(), 1, FILE_HEAD_SIZE, file);
+  data.setUint32(24, static_cast<uint32_t>(_staticTimeRanges.size()));
+  for (size_t i = 0; i < _staticTimeRanges.size(); i++) {
+    auto offset = 28 + i * 8;
+    data.setUint32(offset, static_cast<uint32_t>(_staticTimeRanges[i].start));
+    data.setUint32(offset + 4, static_cast<uint32_t>(_staticTimeRanges[i].end));
+  }
+  auto writeLength = fwrite(data.bytes(), 1, data.size(), file);
   _fileSize = writeLength;
   if (writeLength != data.size()) {
     LOGE("SequenceFile::writeFileHead() write file head failed!");
@@ -208,11 +245,11 @@ bool SequenceFile::writeFrame(int index, const void* pixels) {
     LOGE("SequenceFile::writeFrame() invalid index or pixels!");
     return false;
   }
-  auto& frame = frames[index];
-  if (frame.size != 0) {
+  auto timeRange = GetTimeRangeContains(_staticTimeRanges, index);
+  if (frames[timeRange.start].size != 0) {
     return false;
   }
-  auto compressedSize = compressFrame(index, pixels, _info.byteSize());
+  auto compressedSize = compressFrame(static_cast<int>(timeRange.start), pixels, _info.byteSize());
   if (compressedSize == 0) {
     return false;
   }
@@ -227,10 +264,13 @@ bool SequenceFile::writeFrame(int index, const void* pixels) {
     LOGE("SequenceFile::writeFrame() failed to write the compressed frame to disk");
     return false;
   }
-  frame.offset = _fileSize + FRAME_HEAD_SIZE;
-  frame.size = compressedSize - FRAME_HEAD_SIZE;
+  for (auto i = timeRange.start; i <= timeRange.end; i++) {
+    auto& frame = frames[i];
+    frame.offset = _fileSize + FRAME_HEAD_SIZE;
+    frame.size = compressedSize - FRAME_HEAD_SIZE;
+    cachedFrames++;
+  }
   _fileSize += compressedSize;
-  cachedFrames++;
   if (cachedFrames == _numFrames) {
     scratchBuffer.reset();
     encoder = nullptr;
@@ -282,5 +322,15 @@ bool SequenceFile::checkScratchBuffer() {
     return false;
   }
   return true;
+}
+
+bool SequenceFile::compatible(const tgfx::ImageInfo& info, int frameCount, float frameRate,
+                              const std::vector<TimeRange>& staticTimeRanges) {
+  if (_info != info || _numFrames != frameCount || _frameRate != frameRate ||
+      _staticTimeRanges.size() != staticTimeRanges.size()) {
+    return false;
+  }
+  return memcmp(&_staticTimeRanges[0], &staticTimeRanges[0],
+                sizeof(TimeRange) * staticTimeRanges.size()) == 0;
 }
 }  // namespace pag
