@@ -56,4 +56,23 @@ std::vector<const VideoDecoderFactory*> NativePlatform::getVideoDecoderFactories
           VideoDecoderFactory::SoftwareAVCDecoderFactory()};
 }
 
+std::string NativePlatform::getSandboxPath(std::string filePath) const {
+  if (filePath.empty()) {
+    return filePath;
+  }
+  NSString* filePathStr = [NSString stringWithUTF8String:filePath.c_str()];
+
+  NSString* homeDir = NSHomeDirectory();
+  if ([filePathStr containsString:homeDir]) {
+    return [[filePathStr stringByReplacingOccurrencesOfString:homeDir withString:@""] UTF8String];
+  }
+
+  NSString* mainBundlePath = [[NSBundle mainBundle] bundlePath];
+  if ([filePathStr containsString:mainBundlePath]) {
+    return [[filePathStr stringByReplacingOccurrencesOfString:mainBundlePath
+                                                   withString:@""] UTF8String];
+  }
+  return filePath;
+}
+
 }  // namespace pag

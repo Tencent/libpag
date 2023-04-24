@@ -80,7 +80,7 @@ class Platform {
   /**
    * Get the relative path of the file, which contains variable factors in the iOS platform.
    */
-  virtual std::string getRelativePathFrom(std::string filePath) const {
+  virtual std::string getSandboxPath(std::string filePath) const {
     return filePath;
   }
 };

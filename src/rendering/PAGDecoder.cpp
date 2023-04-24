@@ -246,7 +246,7 @@ std::string PAGDecoder::generateCacheKey(std::shared_ptr<PAGComposition> composi
     return "";
   }
   auto filePath = static_cast<PAGFile*>(composition.get())->path();
-  filePath = Platform::Current()->getRelativePathFrom(filePath);
+  filePath = Platform::Current()->getSandboxPath(filePath);
   return filePath + "." + std::to_string(_width) + "x" + std::to_string(_height);
 }
 
