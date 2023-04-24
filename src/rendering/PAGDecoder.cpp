@@ -22,6 +22,7 @@
 #include "base/utils/TimeUtil.h"
 #include "pag/pag.h"
 #include "rendering/caches/DiskCache.h"
+#include "rendering/layers/ContentVersion.h"
 #include "rendering/utils/LockGuard.h"
 
 namespace pag {
@@ -229,11 +230,15 @@ bool PAGDecoder::checkSequenceFile(std::shared_ptr<PAGComposition> composition, 
 }
 
 void PAGDecoder::checkCompositionChange(std::shared_ptr<PAGComposition> composition) {
-  if (composition == nullptr || composition->contentVersion == lastContentVersion) {
+  if (composition == nullptr) {
+    return;
+  }
+  auto contentVersion = ContentVersion::Get(composition);
+  if (contentVersion == lastContentVersion) {
     return;
   }
   sequenceFile = nullptr;
-  lastContentVersion = composition->contentVersion;
+  lastContentVersion = contentVersion;
   lastReadIndex = -1;
   auto result = GetFrameCountAndRate(composition, maxFrameRate);
   _numFrames = result.first;
