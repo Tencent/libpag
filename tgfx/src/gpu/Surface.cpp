@@ -21,24 +21,26 @@
 #include "core/PixelBuffer.h"
 #include "gpu/RenderTarget.h"
 #include "utils/Log.h"
+#include "utils/PixelFormatUtil.h"
 
 namespace tgfx {
 std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, bool alphaOnly,
                                        int sampleCount, bool mipMapped,
                                        const SurfaceOptions* options) {
+  return Make(context, width, height, alphaOnly ? ColorType::ALPHA_8 : ColorType::RGBA_8888,
+              sampleCount, mipMapped, options);
+}
+
+std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, ColorType colorType,
+                                       int sampleCount, bool mipMapped,
+                                       const SurfaceOptions* options) {
   auto caps = context->caps();
-  auto pixelFormat = alphaOnly ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
+  auto pixelFormat = ColorTypeToPixelFormat(colorType);
   if (!caps->isFormatRenderable(pixelFormat)) {
     return nullptr;
   }
-  std::shared_ptr<Texture> texture = nullptr;
-  if (texture == nullptr) {
-    if (alphaOnly) {
-      texture = Texture::MakeAlpha(context, width, height, ImageOrigin::TopLeft, mipMapped);
-    } else {
-      texture = Texture::MakeRGBA(context, width, height, ImageOrigin::TopLeft, mipMapped);
-    }
-  }
+  auto texture =
+      Texture::MakeFormat(context, width, height, pixelFormat, ImageOrigin::TopLeft, mipMapped);
   if (texture == nullptr) {
     return nullptr;
   }

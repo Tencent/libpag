@@ -56,16 +56,21 @@ NS_ASSUME_NONNULL_BEGIN
 PAG_API @interface PAGImageView : UIImageView
 
 /**
+ * [Deprecated]
+ * Please use PAGDiskCache's method.
  * Returns the size limit of the disk cache in bytes.
  */
 + (NSUInteger)MaxDiskSize;
 
 /**
+ * [Deprecated]
+ * Please use PAGDiskCache's method.
  * Sets the size limit of the disk cache in bytes. The default disk cache limit is 1 GB.
  */
 + (void)SetMaxDiskSize:(NSUInteger)size;
 
 /**
+ * [Deprecated]
  * Returns the current PAGComposition in the PAGImageView. Returns nil if the internal composition
  * was loaded from a pag file path.
  */

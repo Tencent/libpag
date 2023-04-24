@@ -48,7 +48,7 @@ class Texture : public Resource {
                       mipMapped);
   }
   /**
-   * Creates a empty texture with each pixel stored as 32-bit RGBA data. Returns nullptr if any of
+   * Creates an empty texture with each pixel stored as 32-bit RGBA data. Returns nullptr if any of
    * the parameters is invalid.
    */
   static std::shared_ptr<Texture> MakeRGBA(Context* context, int width, int height,
