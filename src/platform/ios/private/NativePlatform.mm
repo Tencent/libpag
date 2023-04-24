@@ -64,13 +64,13 @@ std::string NativePlatform::getSandboxPath(std::string filePath) const {
 
   NSString* homeDir = NSHomeDirectory();
   if ([filePathStr containsString:homeDir]) {
-    return [[filePathStr stringByReplacingOccurrencesOfString:homeDir withString:@""] UTF8String];
+    return [[filePathStr stringByReplacingOccurrencesOfString:homeDir withString:@"home:/"] UTF8String];
   }
 
   NSString* mainBundlePath = [[NSBundle mainBundle] bundlePath];
   if ([filePathStr containsString:mainBundlePath]) {
     return [[filePathStr stringByReplacingOccurrencesOfString:mainBundlePath
-                                                   withString:@""] UTF8String];
+                                                   withString:@"app:/"] UTF8String];
   }
   return filePath;
 }
