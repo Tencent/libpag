@@ -68,6 +68,10 @@
   return pagDecoder->frameRate();
 }
 
+- (BOOL)checkFrameChanged:(int)index {
+  return pagDecoder->checkFrameChanged(index);
+}
+
 - (BOOL)copyFrameTo:(void*)pixels rowBytes:(size_t)rowBytes at:(NSInteger)index {
   return pagDecoder->readFrame(index, pixels, rowBytes, pag::ColorType::BGRA_8888,
                                pag::AlphaType::Premultiplied);

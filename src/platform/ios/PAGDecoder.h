@@ -86,6 +86,13 @@ PAG_API @interface PAGDecoder : NSObject
 - (float)frameRate;
 
 /**
+ * Returns true if the frame at the given index has changed since the last copyFrameTo() or
+ * frameAtIndex() call. The caller should skip the corresponding reading call if the frame has not
+ * changed.
+ */
+- (BOOL)checkFrameChanged:(int)index;
+
+/**
  * Copies pixels of the image frame at the given index to the specified memory address. The format
  * of the copied pixels is in the BGRA color type with the premultiplied alpha type. Returns false
  * if failed. Note that caller must ensure that the rowBytes stays the same throughout every copying

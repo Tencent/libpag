@@ -18,6 +18,7 @@
 
 #include "base/utils/MatrixUtil.h"
 #include "base/utils/TimeUtil.h"
+#include "pag/file.h"
 #include "pag/pag.h"
 #include "rendering/caches/CompositionCache.h"
 #include "rendering/caches/LayerCache.h"
