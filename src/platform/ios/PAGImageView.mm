@@ -185,6 +185,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   }
   self.fileWidth = [newComposition width];
   self.fileHeight = [newComposition height];
+  self.pagContentVersion = [PAGContentVersion Get:newComposition];
   self.maxFrameRate = maxFrameRate;
   self.currentFrameExplicitlySet = 0;
   [valueAnimator setCurrentPlayTime:0];
@@ -678,12 +679,12 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   if (self.currentFrameIndex == frameIndex) {
     return NO;
   }
+  [self checkPAGCompositionChanged];
   CFMutableDataRef dataRef =
       self.memoryCacheEnabled ? [self getMemoryCacheData] : [self getDiskCacheData];
   if (dataRef == nil) {
     return NO;
   }
-  [self checkPAGCompositionChanged];
   BOOL status = YES;
   if (self.currentFrameExplicitlySet >= 0) {
     self.currentFrameExplicitlySet = -1;
