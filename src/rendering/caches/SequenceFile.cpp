@@ -88,6 +88,7 @@ SequenceFile::SequenceFile(const std::string& filePath, const tgfx::ImageInfo& i
     _fileSize = 0;
     fclose(file);
     file = fopen(filePath.c_str(), "wb+");
+    LOGE("The existing sequence file has been reset, which may be corrupted!");
   }
 }
 
@@ -136,6 +137,7 @@ bool SequenceFile::readFramesFromFile() {
       return false;
     }
   }
+  long position = 0;
   while (true) {
     readLength = fread(data.writableBytes(), 1, FRAME_HEAD_SIZE, file);
     if (readLength == 0) {
@@ -156,6 +158,10 @@ bool SequenceFile::readFramesFromFile() {
     if (fseek(file, static_cast<long>(frameSize), SEEK_CUR)) {
       return false;
     }
+    position = ftell(file);
+  }
+  if (position != static_cast<long>(_fileSize)) {
+    return false;
   }
   for (auto& timeRange : _staticTimeRanges) {
     auto& firstFrame = frames[timeRange.start];

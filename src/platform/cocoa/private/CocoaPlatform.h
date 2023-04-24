@@ -36,7 +36,7 @@ class CocoaPlatform : public Platform {
       const std::string& text, const std::shared_ptr<tgfx::Typeface>& typeface) const override;
 
   std::string getCacheDir() const override;
-  
-  std::string getRelativePathFrom(std::string filePath)const override;
+
+  std::string getRelativePathFrom(std::string filePath) const override;
 };
 }  // namespace pag
