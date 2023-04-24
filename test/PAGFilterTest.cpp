@@ -405,4 +405,20 @@ PAG_TEST(PAGFilterTest, BrightnessContrast) {
   pagPlayer->flush();
   EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFilterTest/BrightnessContrast"));
 }
+
+/**
+ * 用例描述: Logo with mipmap
+ */
+PAG_TEST(PAGFilterTest, LogoMipmap) {
+  auto pagFile = LoadPAGFile("resources/filter/LogoMipmap.pag");
+  ASSERT_NE(pagFile, nullptr);
+  auto pagSurface = PAGSurface::MakeOffscreen(pagFile->width(), pagFile->height());
+  ASSERT_NE(pagSurface, nullptr);
+  auto pagPlayer = std::make_shared<PAGPlayer>();
+  pagPlayer->setSurface(pagSurface);
+  pagPlayer->setComposition(pagFile);
+  pagPlayer->setProgress(0.5);
+  pagPlayer->flush();
+  EXPECT_TRUE(Baseline::Compare(pagSurface, "PAGFilterTest/LogoMipmap"));
+}
 }  // namespace pag

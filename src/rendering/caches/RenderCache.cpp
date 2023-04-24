@@ -35,7 +35,7 @@ static constexpr int MAX_GRAPHICS_MEMORY = 314572800;
 static constexpr int PURGEABLE_GRAPHICS_MEMORY = 20971520;  // 20M
 static constexpr int PURGEABLE_EXPIRED_FRAME = 10;
 static constexpr float SCALE_FACTOR_PRECISION = 0.001f;
-static constexpr float MIPMAP_ENABLED_THRESHOLD = 0.4f;
+static constexpr float MIPMAP_ENABLED_THRESHOLD = -1.0f; // 临时关闭 mipmap
 static constexpr int64_t DECODING_VISIBLE_DISTANCE = 500000;  // 提前 500ms 开始解码。
 
 RenderCache::RenderCache(PAGStage* stage) : _uniqueID(UniqueID::Next()), stage(stage) {
