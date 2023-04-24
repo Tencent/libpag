@@ -23,7 +23,7 @@
 #import "PAGSurface+Internal.h"
 #include "PixelBufferUtils.h"
 #include "base/utils/Log.h"
-#include "types.h"
+#include "pag/types.h"
 
 @interface PAGSurfaceImpl ()
 
