@@ -190,6 +190,7 @@ public class PAGImageView extends View {
      * Returns the current PAGComposition in the PAGImageView. Returns null if the internal
      * composition was loaded from a pag file path.
      */
+    @Deprecated
     public PAGComposition getComposition() {
         return _pagFilePath != null ? null : _composition;
     }
