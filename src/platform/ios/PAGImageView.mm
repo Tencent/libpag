@@ -657,10 +657,10 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 }
 
 - (PAGComposition*)getComposition {
-  if (pagComposition) {
-    return [[pagComposition retain] autorelease];
+  if (filePath) {
+    return nil;
   }
-  return nil;
+  return pagComposition ? [[pagComposition retain] autorelease] : nil;
 }
 
 - (void)setComposition:(PAGComposition*)newComposition {
