@@ -462,12 +462,15 @@ public class PAGImageView extends View {
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
+        freezeDraw.set(true);
+        PAGImageViewHelper.RemoveMessage(PAGImageViewHelper.MSG_REFRESH_DECODER, this);
         viewWidth = w;
         viewHeight = h;
         width = (int) (renderScale * w);
         height = (int) (renderScale * h);
         renderBitmap = null;
-        PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_INIT_DECODER, this);
+        forceFlush = true;
+        PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_REFRESH_DECODER, this);
         resumeAnimator();
     }
 
@@ -578,6 +581,7 @@ public class PAGImageView extends View {
         pauseAnimator();
         animator.removeUpdateListener(mAnimatorUpdateListener);
         animator.removeListener(mAnimatorListenerAdapter);
+        PAGImageViewHelper.RemoveMessage(PAGImageViewHelper.MSG_CLOSE_CACHE, this);
         PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_CLOSE_CACHE, this);
         synchronized (g_HandlerLock) {
             PAGImageViewHelper.DestroyHandlerThread();
@@ -586,6 +590,7 @@ public class PAGImageView extends View {
             renderBitmap = null;
         }
         bitmapCache.clear();
+        lastContentVersion = -1;
         freezeDraw.set(false);
     }
 
@@ -618,6 +623,7 @@ public class PAGImageView extends View {
             Log.e(TAG, "doPlay: The scale of animator duration is turned off");
             return;
         }
+        PAGImageViewHelper.RemoveMessage(PAGImageViewHelper.MSG_INIT_DECODER, this);
         PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_INIT_DECODER, this);
         Log.i(TAG, "doPlay");
         animator.setCurrentPlayTime(currentPlayTime);
