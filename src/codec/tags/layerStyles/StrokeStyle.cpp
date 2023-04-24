@@ -25,7 +25,8 @@ std::unique_ptr<BlockConfig> StrokeStyleTag(StrokeStyle* style) {
   AddAttribute(tagConfig, &style->color, AttributeType::SimpleProperty, Red);
   AddAttribute(tagConfig, &style->size, AttributeType::SimpleProperty, 3.0f);
   AddAttribute(tagConfig, &style->opacity, AttributeType::SimpleProperty, Opaque);
-  AddAttribute(tagConfig, &style->position, AttributeType::DiscreteProperty, StrokePosition::Outside);
+  AddAttribute(tagConfig, &style->position, AttributeType::DiscreteProperty,
+               StrokePosition::Outside);
   return std::unique_ptr<BlockConfig>(tagConfig);
 }
 }  // namespace pag
