@@ -122,6 +122,7 @@ public class PAGImageView extends View {
     }
 
     /**
+     * [Deprecated](Please use PAGDiskCache.MaxDiskSize() instead.)
      * Returns the size limit of the disk cache in bytes.
      */
     @Deprecated
@@ -130,6 +131,7 @@ public class PAGImageView extends View {
     }
 
     /**
+     * [Deprecated](Please use PAGDiskCache.SetMaxDiskSize() instead.)
      * Sets the size limit of the disk cache in bytes. The default disk cache limit is 1 GB.
      */
     @Deprecated
@@ -190,7 +192,6 @@ public class PAGImageView extends View {
      * Returns the current PAGComposition in the PAGImageView. Returns null if the internal
      * composition was loaded from a pag file path.
      */
-    @Deprecated
     public PAGComposition getComposition() {
         return _pagFilePath != null ? null : _composition;
     }

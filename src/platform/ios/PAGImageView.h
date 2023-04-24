@@ -23,7 +23,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @class PAGImageView;
 
-@protocol PAGImageViewListener <NSObject>
+@protocol PAGImageViewListener<NSObject>
 
 @optional
 /**
@@ -57,20 +57,18 @@ PAG_API @interface PAGImageView : UIImageView
 
 /**
  * [Deprecated]
- * Please use PAGDiskCache's method.
  * Returns the size limit of the disk cache in bytes.
  */
-+ (NSUInteger)MaxDiskSize;
++ (NSUInteger)MaxDiskSize DEPRECATED_MSG_ATTRIBUTE("Please use [PAGDiskCache MaxDiskSize] instead");
 
 /**
  * [Deprecated]
- * Please use PAGDiskCache's method.
  * Sets the size limit of the disk cache in bytes. The default disk cache limit is 1 GB.
  */
-+ (void)SetMaxDiskSize:(NSUInteger)size;
++ (void)SetMaxDiskSize:(NSUInteger)size
+    DEPRECATED_MSG_ATTRIBUTE("Please use [PAGDiskCache SetMaxDiskSize] instead");
 
 /**
- * [Deprecated]
  * Returns the current PAGComposition in the PAGImageView. Returns nil if the internal composition
  * was loaded from a pag file path.
  */
