@@ -24,4 +24,6 @@
 
 + (void)SetMaxDiskSize:(size_t)size;
 
++ (void)RemoveAll;
+
 @end

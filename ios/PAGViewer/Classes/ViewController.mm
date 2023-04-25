@@ -20,6 +20,7 @@
 #import "BackgroundView.h"
 #import <libpag/PAGView.h>
 #import <libpag/PAGImageView.h>
+#import <libpag/PAGDiskCache.h>
 
 #define SCREEN_WIDTH       [UIScreen mainScreen].bounds.size.width
 #define SCREEN_HEIGHT      [UIScreen mainScreen].bounds.size.height
@@ -40,7 +41,7 @@
     self.view.tintColor = [UIColor colorWithRed:0.00 green:0.35 blue:0.85 alpha:1.00];
     
     CGFloat safeDistanceBottom = [self getSafeDistanceBottom];
-    CGFloat buttonHeight = 40;
+    CGFloat buttonHeight = 50;
     self.firstButton = [[UIButton alloc] init];
     self.firstButton.frame = CGRectMake(0, SCREEN_HEIGHT- safeDistanceBottom - buttonHeight, SCREEN_WIDTH / 2 , buttonHeight);
     [self.firstButton setTitle:@"PAGView" forState:UIControlStateNormal];
@@ -113,6 +114,8 @@
             [pagImageView play];
         }
         [self.view addSubview:self.pagImageViewGroup];
+        UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(pagImageViewClicked)];
+        [self.pagImageViewGroup addGestureRecognizer:tap];
         [self bringButtonsToFront];
     }
 }
@@ -136,6 +139,20 @@
     } else {
         [self.pagView play];
     }
+}
+
+- (void)pagImageViewClicked{
+    [PAGDiskCache RemoveAll];
+    
+    NSString *message = @"Disk Cache Removed!";
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:nil
+                                                                   message:message
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    [self presentViewController:alert animated:YES completion:nil];
+    int duration = 1; // duration in seconds
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, duration * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+        [alert dismissViewControllerAnimated:YES completion:nil];
+    });
 }
 
 - (void)firstButtonClicked {

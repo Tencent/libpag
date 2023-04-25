@@ -30,9 +30,16 @@ PAG_API @interface PAGDiskCache : NSObject
 + (size_t)MaxDiskSize;
 
 /**
- * Sets the size limit of the disk cache in bytes, which will immediately trigger the cache
- * cleanup if the disk usage exceeds the limit.
+ * Sets the size limit of the disk cache in bytes, which will triggers the cache cleanup if the
+ * disk usage exceeds the limit. The opened files are not removed immediately, even if their disk
+ * usage exceeds the limit, and they will be rechecked after they are closed.
  */
 + (void)SetMaxDiskSize:(size_t)size;
+
+/**
+ * Removes all cached files from the disk. All the opened files will be also removed after they
+ * are closed.
+ */
++ (void)RemoveAll;
 
 @end
