@@ -97,7 +97,7 @@ PAG_API @interface PAGImageView : UIImageView
  * Loads a pag file from the specified path, returns false if the file does not exist, or it is not
  * a valid pag file.
  */
-- (BOOL)setPath:(NSString*)filePath;
+- (BOOL)setPath:(NSString*)path;
 /**
  * Loads a pag file from the specified path with the maxFrameRate limit, returns false if the file
  * does not exist, or it is not a valid pag file.

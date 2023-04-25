@@ -41,26 +41,6 @@ import org.extra.tools.LibraryLoadUtils;
 import org.libpag.PAGImageViewHelper.DecoderInfo;
 
 public class PAGImageView extends View {
-    private final static String TAG = "PAGImageView";
-    private final static float DEFAULT_MAX_FRAMERATE = 30f;
-    private ValueAnimator animator;
-    private boolean isCacheAllFramesInMemory = false;
-    private volatile boolean _isPlaying = false;
-    private volatile Boolean _isAnimatorPreRunning = null;
-    private volatile boolean progressExplicitlySet = true;
-    private final Object updateTimeLock = new Object();
-    private static final Object g_HandlerLock = new Object();
-    private int _currentFrame;
-    private float _maxFrameRate = DEFAULT_MAX_FRAMERATE;
-    private PAGComposition _composition;
-    private String _pagFilePath;
-    private int _scaleMode = PAGScaleMode.LetterBox;
-    private volatile Matrix _matrix;
-    private float renderScale = 1.0f;
-    private final AtomicBoolean freezeDraw = new AtomicBoolean(false);
-    protected volatile DecoderInfo decoderInfo = new DecoderInfo();
-    private volatile Bitmap renderBitmap;
-    private final ConcurrentHashMap<Integer, Bitmap> bitmapCache = new ConcurrentHashMap<>();
 
     public interface PAGImageViewListener {
         /**
@@ -89,37 +69,20 @@ public class PAGImageView extends View {
         void onAnimationUpdate(PAGImageView view);
     }
 
-
+    private final static String TAG = "PAGImageView";
+    private final static float DEFAULT_MAX_FRAMERATE = 30f;
+    private ValueAnimator animator;
+    private volatile boolean _isPlaying = false;
+    private volatile Boolean _isAnimatorPreRunning = null;
+    private volatile boolean progressExplicitlySet = true;
+    private final Object updateTimeLock = new Object();
+    private static final Object g_HandlerLock = new Object();
+    private float _maxFrameRate = DEFAULT_MAX_FRAMERATE;
+    private final AtomicBoolean freezeDraw = new AtomicBoolean(false);
+    protected volatile DecoderInfo decoderInfo = new DecoderInfo();
+    private volatile Bitmap renderBitmap;
     private Matrix renderMatrix;
-
-    /**
-     * This value defines the scale factor for the size of the cached image frames, which ranges
-     * from 0.0 to 1.0. A scale factor less than 1.0 may result in blurred output, but it can reduce
-     * graphics memory usage, increasing the rendering performance. The default value is 1.0.
-     */
-    public float renderScale() {
-        return renderScale;
-    }
-
-    /**
-     * Sets the value of the renderScale property.
-     */
-    public void setRenderScale(float renderScale) {
-        if (this.renderScale == renderScale) {
-            return;
-        }
-        if (renderScale < 0.0f || renderScale > 1.0f) {
-            renderScale = 1.0f;
-        }
-        this.renderScale = renderScale;
-        width = (int) (viewWidth * renderScale);
-        height = (int) (viewHeight * renderScale);
-        refreshMatrixFromScaleMode();
-        if (renderScale < 1.0f) {
-            renderMatrix = new Matrix();
-            renderMatrix.setScale(1 / renderScale, 1 / renderScale);
-        }
-    }
+    private final ConcurrentHashMap<Integer, Bitmap> bitmapCache = new ConcurrentHashMap<>();
 
     /**
      * [Deprecated](Please use PAGDiskCache.MaxDiskSize() instead.)
@@ -139,54 +102,50 @@ public class PAGImageView extends View {
         PAGDiskCache.SetMaxDiskSize(maxDiskCache);
     }
 
+
+    public PAGImageView(Context context) {
+        super(context);
+        init();
+    }
+
+    public PAGImageView(Context context, AttributeSet attrs) {
+        super(context, attrs);
+        init();
+    }
+
+    public PAGImageView(Context context, AttributeSet attrs, int defStyleAttr) {
+        super(context, attrs, defStyleAttr);
+        init();
+    }
+
+    private String _pagFilePath;
+
     /**
-     * If set to true, the PAGImageView loads all image frames into the memory, which will
-     * significantly increase the rendering performance but may cost lots of additional memory. Set
-     * it to true if you prefer rendering speed over memory usage. If set to false, the PAGImageView
-     * loads only one image frame at a time into the memory. The default value is false.
+     * Returns the file path set by the setPath() method.
      */
-    public boolean cacheAllFramesInMemory() {
-        return isCacheAllFramesInMemory;
+    public String getPath() {
+        return _pagFilePath;
     }
 
     /**
-     * Sets the value of the cacheAllFramesInMemory property.
+     * Loads a pag file from the specified path, returns false if the file does not exist, or it is
+     * not a valid pag file.
      */
-    public void setCacheAllFramesInMemory(boolean enable) {
-        isCacheAllFramesInMemory = enable;
+    public boolean setPath(String path) {
+        return setPath(path, DEFAULT_MAX_FRAMERATE);
     }
 
     /**
-     * Returns the current frame index the PAGImageView is rendering.
+     * Loads a pag file from the specified path with the maxFrameRate limit, returns false if the
+     * file does not exist, or it is not a valid pag file.
      */
-    public int currentFrame() {
-        return _currentFrame;
+    public boolean setPath(String path, float maxFrameRate) {
+        PAGComposition composition = getCompositionFromPath(path);
+        refreshResource(path, composition, maxFrameRate);
+        return composition != null;
     }
 
-    /**
-     * Sets the frame index for the PAGImageView to render.
-     */
-    public void setCurrentFrame(int currentFrame) {
-        if (!decoderInfo.isValid() || currentFrame < 0 || currentFrame >= decoderInfo.numFrames) {
-            return;
-        }
-        _currentFrame = currentFrame;
-        float value = (float) (decoderInfo.duration * 0.001f * PAGImageViewHelper.FrameToProgress(_currentFrame, decoderInfo.numFrames));
-        value = Math.max(0, Math.min(value, 1));
-        currentPlayTime = (long) (value * animator.getDuration());
-        synchronized (updateTimeLock) {
-            animator.setCurrentPlayTime(currentPlayTime);
-            progressExplicitlySet = true;
-        }
-        PAGImageViewHelper.NeedsUpdateView(this);
-    }
-
-    /**
-     * Returns a bitmap capturing the contents of the current PAGImageView.
-     */
-    public Bitmap currentImage() {
-        return renderBitmap;
-    }
+    private PAGComposition _composition;
 
     /**
      * Returns the current PAGComposition in the PAGImageView. Returns null if the internal
@@ -205,8 +164,6 @@ public class PAGImageView extends View {
         setComposition(newComposition, DEFAULT_MAX_FRAMERATE);
     }
 
-    int lastContentVersion = -1;
-
     /**
      * Sets a new PAGComposition and the maxFrameRate limit to the PAGImageView. Note: If the
      * composition is already added to another PAGImageView, it will be removed from the previous
@@ -219,106 +176,8 @@ public class PAGImageView extends View {
         refreshResource(null, newComposition, maxFrameRate);
     }
 
-    /**
-     * Returns the file path set by the setPath() method.
-     */
-    public String getPath() {
-        return _pagFilePath;
-    }
-
-    private PAGComposition getCompositionFromPath(String path) {
-        if (path == null) {
-            return null;
-        }
-        PAGComposition composition;
-        if (path.startsWith("assets://")) {
-            composition = PAGFile.Load(getContext().getAssets(), path.substring(9));
-        } else {
-            composition = PAGFile.Load(path);
-        }
-        return composition;
-    }
-
-    /**
-     * Loads a pag file from the specified path with the maxFrameRate limit, returns false if the
-     * file does not exist, or it is not a valid pag file.
-     */
-    public boolean setPath(String path, float maxFrameRate) {
-        PAGComposition composition = getCompositionFromPath(path);
-        refreshResource(path, composition, maxFrameRate);
-        return composition != null;
-    }
-
-    private void refreshResource(String path, PAGComposition composition, float maxFrameRate) {
-        freezeDraw.set(true);
-        _maxFrameRate = maxFrameRate;
-        PAGImageViewHelper.RemoveMessage(PAGImageViewHelper.MSG_REFRESH_DECODER, this);
-        _matrix = null;
-        renderBitmap = null;
-        _pagFilePath = path;
-        _composition = composition;
-        _currentFrame = 0;
-        progressExplicitlySet = true;
-        currentPlayTime = 0;
-        if (animator != null) {
-            animator.setCurrentPlayTime(0);
-        }
-        if (!decoderInfo.isValid()) {
-            return;
-        }
-        PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_REFRESH_DECODER, this);
-    }
-
-    /**
-     * Loads a pag file from the specified path, returns false if the file does not exist, or it is
-     * not a valid pag file.
-     */
-    public boolean setPath(String path) {
-        return setPath(path, DEFAULT_MAX_FRAMERATE);
-    }
-
-    /**
-     * Sets the number of times the animation will repeat. The default is 1, which means the
-     * animation will play only once. 0 means the animation will play infinity times.
-     */
-    public void setRepeatCount(int value) {
-        if (value < 0) {
-            value = 0;
-        }
-        animator.setRepeatCount(value - 1);
-    }
-
-    /**
-     * Renders the current image frame immediately. Note that all the changes previously made to the
-     * PAGImageView will only take effect after this method is called. If the play() method is
-     * already called, there is no need to call it manually since it will be automatically called
-     * every frame. Returns true if the content has changed.
-     */
-    public boolean flush() {
-        if (!decoderInfo.isValid()) {
-            return false;
-        }
-        synchronized (updateTimeLock) {
-            boolean pr = progressExplicitlySet;
-            if (progressExplicitlySet) {
-                progressExplicitlySet = false;
-                animator.setCurrentPlayTime((long) (decoderInfo.duration * 0.001f * PAGImageViewHelper.FrameToProgress(_currentFrame, decoderInfo.numFrames)));
-            }
-            int currentFrame = PAGImageViewHelper.ProgressToFrame(animator.getAnimatedFraction(), decoderInfo.numFrames);
-            if (currentFrame == _currentFrame && !forceFlush) {
-                return false;
-            }
-            _currentFrame = currentFrame;
-            if (!handleFrame(_currentFrame)) {
-                forceFlush = false;
-                return false;
-            }
-            forceFlush = false;
-            postInvalidate();
-        }
-        notifyAnimationUpdate();
-        return true;
-    }
+    private int _scaleMode = PAGScaleMode.LetterBox;
+    private volatile Matrix _matrix;
 
     /**
      * Returns the current scale mode.
@@ -363,6 +222,226 @@ public class PAGImageView extends View {
         }
     }
 
+
+    private float _renderScale = 1.0f;
+
+    /**
+     * This value defines the scale factor for the size of the cached image frames, which ranges
+     * from 0.0 to 1.0. A scale factor less than 1.0 may result in blurred output, but it can reduce
+     * graphics memory usage, increasing the rendering performance. The default value is 1.0.
+     */
+    public float renderScale() {
+        return _renderScale;
+    }
+
+    /**
+     * Sets the value of the renderScale property.
+     */
+    public void setRenderScale(float renderScale) {
+        if (this._renderScale == renderScale) {
+            return;
+        }
+        if (renderScale < 0.0f || renderScale > 1.0f) {
+            renderScale = 1.0f;
+        }
+        this._renderScale = renderScale;
+        width = (int) (viewWidth * renderScale);
+        height = (int) (viewHeight * renderScale);
+        refreshMatrixFromScaleMode();
+        if (renderScale < 1.0f) {
+            renderMatrix = new Matrix();
+            renderMatrix.setScale(1 / renderScale, 1 / renderScale);
+        }
+    }
+
+    private boolean _cacheAllFramesInMemory = false;
+
+    /**
+     * If set to true, the PAGImageView loads all image frames into the memory, which will
+     * significantly increase the rendering performance but may cost lots of additional memory. Set
+     * it to true if you prefer rendering speed over memory usage. If set to false, the PAGImageView
+     * loads only one image frame at a time into the memory. The default value is false.
+     */
+    public boolean cacheAllFramesInMemory() {
+        return _cacheAllFramesInMemory;
+    }
+
+    /**
+     * Sets the value of the cacheAllFramesInMemory property.
+     */
+    public void setCacheAllFramesInMemory(boolean enable) {
+        _cacheAllFramesInMemory = enable;
+    }
+
+    private int _currentFrame;
+
+    /**
+     * Returns the current frame index the PAGImageView is rendering.
+     */
+    public int currentFrame() {
+        return _currentFrame;
+    }
+
+    /**
+     * Sets the frame index for the PAGImageView to render.
+     */
+    public void setCurrentFrame(int currentFrame) {
+        if (!decoderInfo.isValid() || currentFrame < 0 || currentFrame >= decoderInfo.numFrames) {
+            return;
+        }
+        _currentFrame = currentFrame;
+        float value = (float) (decoderInfo.duration * 0.001f * PAGImageViewHelper.FrameToProgress(_currentFrame, decoderInfo.numFrames));
+        value = Math.max(0, Math.min(value, 1));
+        currentPlayTime = (long) (value * animator.getDuration());
+        synchronized (updateTimeLock) {
+            animator.setCurrentPlayTime(currentPlayTime);
+            progressExplicitlySet = true;
+        }
+        PAGImageViewHelper.NeedsUpdateView(this);
+    }
+
+    /**
+     * Returns a bitmap capturing the contents of the current PAGImageView.
+     */
+    public Bitmap currentImage() {
+        return renderBitmap;
+    }
+
+    /**
+     * Starts to play the animation.
+     */
+    public void play() {
+        _isPlaying = true;
+        _isAnimatorPreRunning = null;
+        if (animator.getAnimatedFraction() == 1.0) {
+            setCurrentFrame(0);
+        }
+        doPlay();
+    }
+
+    /**
+     * Indicates whether this PAGImageView is playing.
+     */
+    public boolean isPlaying() {
+        if (animator != null) {
+            return animator.isRunning();
+        }
+        return false;
+    }
+
+    /**
+     * Pauses the animation at the current playing position. Calling the play method can resume the
+     * animation from the last paused playing position.
+     */
+    public void pause() {
+        _isPlaying = false;
+        _isAnimatorPreRunning = null;
+        cancelAnimator();
+    }
+
+    /**
+     * Sets the number of times the animation will repeat. The default is 1, which means the
+     * animation will play only once. 0 means the animation will play infinity times.
+     */
+    public void setRepeatCount(int value) {
+        if (value < 0) {
+            value = 0;
+        }
+        animator.setRepeatCount(value - 1);
+    }
+
+    /**
+     * Adds a PAGViewListener to the set of listeners that are sent events through the life of an
+     * animation, such as start, end repeat, and cancel.
+     *
+     * @param listener the PAGViewListener to be added to the current set of listeners for this
+     *                 animation.
+     */
+    public void addListener(PAGImageViewListener listener) {
+        synchronized (this) {
+            mViewListeners.add(listener);
+        }
+    }
+
+    /**
+     * Removes the specified listener from the set of listeners.
+     */
+    public void removeListener(PAGImageViewListener listener) {
+        synchronized (this) {
+            mViewListeners.remove(listener);
+        }
+    }
+
+    /**
+     * Renders the current image frame immediately. Note that all the changes previously made to the
+     * PAGImageView will only take effect after this method is called. If the play() method is
+     * already called, there is no need to call it manually since it will be automatically called
+     * every frame. Returns true if the content has changed.
+     */
+    public boolean flush() {
+        if (!decoderInfo.isValid()) {
+            return false;
+        }
+        synchronized (updateTimeLock) {
+            boolean pr = progressExplicitlySet;
+            if (progressExplicitlySet) {
+                progressExplicitlySet = false;
+                animator.setCurrentPlayTime((long) (decoderInfo.duration * 0.001f * PAGImageViewHelper.FrameToProgress(_currentFrame, decoderInfo.numFrames)));
+            }
+            int currentFrame = PAGImageViewHelper.ProgressToFrame(animator.getAnimatedFraction(), decoderInfo.numFrames);
+            if (currentFrame == _currentFrame && !forceFlush) {
+                return false;
+            }
+            _currentFrame = currentFrame;
+            if (!handleFrame(_currentFrame)) {
+                forceFlush = false;
+                return false;
+            }
+            forceFlush = false;
+            postInvalidate();
+        }
+        notifyAnimationUpdate();
+        return true;
+    }
+
+
+    int lastContentVersion = -1;
+
+    private PAGComposition getCompositionFromPath(String path) {
+        if (path == null) {
+            return null;
+        }
+        PAGComposition composition;
+        if (path.startsWith("assets://")) {
+            composition = PAGFile.Load(getContext().getAssets(), path.substring(9));
+        } else {
+            composition = PAGFile.Load(path);
+        }
+        return composition;
+    }
+
+
+    private void refreshResource(String path, PAGComposition composition, float maxFrameRate) {
+        freezeDraw.set(true);
+        _maxFrameRate = maxFrameRate;
+        PAGImageViewHelper.RemoveMessage(PAGImageViewHelper.MSG_REFRESH_DECODER, this);
+        _matrix = null;
+        renderBitmap = null;
+        _pagFilePath = path;
+        _composition = composition;
+        _currentFrame = 0;
+        progressExplicitlySet = true;
+        currentPlayTime = 0;
+        if (animator != null) {
+            animator.setCurrentPlayTime(0);
+        }
+        if (!decoderInfo.isValid()) {
+            return;
+        }
+        PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_REFRESH_DECODER, this);
+    }
+
+
     @Override
     public void onVisibilityAggregated(boolean isVisible) {
         super.onVisibilityAggregated(isVisible);
@@ -376,21 +455,6 @@ public class PAGImageView extends View {
         } else {
             pauseAnimator();
         }
-    }
-
-    public PAGImageView(Context context) {
-        super(context);
-        init();
-    }
-
-    public PAGImageView(Context context, AttributeSet attrs) {
-        super(context, attrs);
-        init();
-    }
-
-    public PAGImageView(Context context, AttributeSet attrs, int defStyleAttr) {
-        super(context, attrs, defStyleAttr);
-        init();
     }
 
     private float getAnimationScale(Context context) {
@@ -491,8 +555,8 @@ public class PAGImageView extends View {
         PAGImageViewHelper.RemoveMessage(PAGImageViewHelper.MSG_REFRESH_DECODER, this);
         viewWidth = w;
         viewHeight = h;
-        width = (int) (renderScale * w);
-        height = (int) (renderScale * h);
+        width = (int) (_renderScale * w);
+        height = (int) (_renderScale * h);
         renderBitmap = null;
         forceFlush = true;
         PAGImageViewHelper.SendMessage(PAGImageViewHelper.MSG_REFRESH_DECODER, this);
@@ -525,60 +589,6 @@ public class PAGImageView extends View {
         animator.setRepeatCount(0);
         animator.setInterpolator(new LinearInterpolator());
         animationScale = getAnimationScale(getContext());
-    }
-
-    /**
-     * Starts to play the animation.
-     */
-    public void play() {
-        _isPlaying = true;
-        _isAnimatorPreRunning = null;
-        if (animator.getAnimatedFraction() == 1.0) {
-            setCurrentFrame(0);
-        }
-        doPlay();
-    }
-
-    /**
-     * Indicates whether this PAGImageView is playing.
-     */
-    public boolean isPlaying() {
-        if (animator != null) {
-            return animator.isRunning();
-        }
-        return false;
-    }
-
-    /**
-     * Pauses the animation at the current playing position. Calling the play method can resume the
-     * animation from the last paused playing position.
-     */
-    public void pause() {
-        _isPlaying = false;
-        _isAnimatorPreRunning = null;
-        cancelAnimator();
-    }
-
-    /**
-     * Adds a PAGViewListener to the set of listeners that are sent events through the life of an
-     * animation, such as start, end repeat, and cancel.
-     *
-     * @param listener the PAGViewListener to be added to the current set of listeners for this
-     *                 animation.
-     */
-    public void addListener(PAGImageViewListener listener) {
-        synchronized (this) {
-            mViewListeners.add(listener);
-        }
-    }
-
-    /**
-     * Removes the specified listener from the set of listeners.
-     */
-    public void removeListener(PAGImageViewListener listener) {
-        synchronized (this) {
-            mViewListeners.remove(listener);
-        }
     }
 
     private volatile boolean isAttachedToWindow = false;
@@ -732,13 +742,13 @@ public class PAGImageView extends View {
         if (!forceFlush && !decoderInfo._pagDecoder.checkFrameChanged(frame)) {
             return true;
         }
-        if (renderBitmap == null || isCacheAllFramesInMemory) {
+        if (renderBitmap == null || _cacheAllFramesInMemory) {
             renderBitmap = BitmapHelper.CreateBitmap(decoderInfo._width, decoderInfo._height);
         }
         if (!decoderInfo._pagDecoder.copyFrameTo(renderBitmap, frame)) {
             return false;
         }
-        if (isCacheAllFramesInMemory && renderBitmap != null) {
+        if (_cacheAllFramesInMemory && renderBitmap != null) {
             bitmapCache.put(frame, renderBitmap);
         }
         return true;

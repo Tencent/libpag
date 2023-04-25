@@ -29,6 +29,7 @@
 
 namespace pag {
 static NSOperationQueue* imageViewFlushQueue;
+
 void DestoryImageViewFlushQueue() {
   NSOperationQueue* queue = imageViewFlushQueue;
   [queue cancelAllOperations];
@@ -153,6 +154,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 }
 
 #pragma mark - private
+
 + (NSOperationQueue*)ImageViewFlushQueue {
   static dispatch_once_t onceToken;
   dispatch_once(&onceToken, ^{
@@ -218,9 +220,9 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 
 - (PAGDecoder*)getPAGDecoder {
   if (pagDecoder == nil) {
-    self.scaleFactor =
+    self.scaleFactor = static_cast<float>(
         _renderScale * fmax(self.viewSize.width * [UIScreen mainScreen].scale / self.fileWidth,
-                            self.viewSize.height * [UIScreen mainScreen].scale / self.fileHeight);
+                            self.viewSize.height * [UIScreen mainScreen].scale / self.fileHeight));
     if (pagComposition) {
       BOOL useDiskCache = YES;
       if ([PAGContentVersion Get:pagComposition] > 0) {
@@ -255,7 +257,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   NSHashTable* copiedListeners = listeners.copy;
   [listenersLock unlock];
   for (id item in copiedListeners) {
-    id<PAGImageViewListener> listener = (id<PAGImageViewListener>)item;
+    auto listener = (id<PAGImageViewListener>)item;
     if ([listener respondsToSelector:@selector(onAnimationStart:)]) {
       [listener onAnimationStart:self];
     }
@@ -269,7 +271,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   NSHashTable* copiedListeners = listeners.copy;
   [listenersLock unlock];
   for (id item in copiedListeners) {
-    id<PAGImageViewListener> listener = (id<PAGImageViewListener>)item;
+    auto listener = (id<PAGImageViewListener>)item;
     if ([listener respondsToSelector:@selector(onAnimationEnd:)]) {
       [listener onAnimationEnd:self];
     }
@@ -282,7 +284,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   NSHashTable* copiedListeners = listeners.copy;
   [listenersLock unlock];
   for (id item in copiedListeners) {
-    id<PAGImageViewListener> listener = (id<PAGImageViewListener>)item;
+    auto listener = (id<PAGImageViewListener>)item;
     if ([listener respondsToSelector:@selector(onAnimationCancel:)]) {
       [listener onAnimationCancel:self];
     }
@@ -295,7 +297,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   NSHashTable* copiedListeners = listeners.copy;
   [listenersLock unlock];
   for (id item in copiedListeners) {
-    id<PAGImageViewListener> listener = (id<PAGImageViewListener>)item;
+    auto listener = (id<PAGImageViewListener>)item;
     if ([listener respondsToSelector:@selector(onAnimationRepeat:)]) {
       [listener onAnimationRepeat:self];
     }
@@ -327,8 +329,8 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 
 - (BOOL)updateImageViewFrom:(CFMutableDataRef)dataRef atIndex:(NSInteger)frameIndex {
   [self freeCache];
-  if ([[imagesMap allKeys] containsObject:[NSNumber numberWithInteger:frameIndex]]) {
-    UIImage* image = [imagesMap objectForKey:[NSNumber numberWithInteger:frameIndex]];
+  if ([[imagesMap allKeys] containsObject:@(frameIndex)]) {
+    UIImage* image = imagesMap[@(frameIndex)];
     self.currentUIImage = image;
     [self submitToImageView];
     if ([imagesMap count] == (NSUInteger)[[self getPAGDecoder] numFrames]) {
@@ -339,7 +341,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   if ([[self getPAGDecoder] checkFrameChanged:(int)frameIndex]) {
     uint8_t* rgbaData = CFDataGetMutableBytePtr(dataRef);
     BOOL status = [[self getPAGDecoder] copyFrameTo:rgbaData
-                                           rowBytes:cacheImageRowBytes
+                                           rowBytes:static_cast<size_t>(cacheImageRowBytes)
                                                  at:frameIndex];
     if (!status) {
       return status;
@@ -351,7 +353,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     }
   }
   if (self.memoryCacheEnabled && self.currentUIImage) {
-    [self->imagesMap setObject:self.currentUIImage forKey:[NSNumber numberWithInteger:frameIndex]];
+    self->imagesMap[@(frameIndex)] = self.currentUIImage;
   }
 
   return YES;
@@ -371,7 +373,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
     if ([self checkPAGCompositionChanged] == NO) {
       NSInteger frame = [self nextFrame];
       if (self.currentFrameIndex != frame) {
-        UIImage* image = [imagesMap objectForKey:[NSNumber numberWithInteger:frame]];
+        UIImage* image = imagesMap[@(frame)];
         if (image) {
           self.currentFrameIndex = frame;
           self.currentUIImage = image;
@@ -397,7 +399,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   NSHashTable* copiedListeners = listeners.copy;
   [listenersLock unlock];
   for (id item in copiedListeners) {
-    id<PAGImageViewListener> listener = (id<PAGImageViewListener>)item;
+    auto listener = (id<PAGImageViewListener>)item;
     if ([listener respondsToSelector:@selector(onAnimationUpdate:)]) {
       [listener onAnimationUpdate:self];
     }
@@ -445,9 +447,10 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
   CGDataProviderRef provider = CGDataProviderCreateWithCFData(dataRef);
   CGImageRef cgImage =
-      CGImageCreate([[self getPAGDecoder] width], [[self getPAGDecoder] height], bitsPerPixel,
-                    bitsPerPixel * componentsPerPixel, cacheImageRowBytes, colorSpace, bitmapInfo,
-                    provider, NULL, NO, kCGRenderingIntentDefault);
+      CGImageCreate(static_cast<size_t>([[self getPAGDecoder] width]),
+                    static_cast<size_t>([[self getPAGDecoder] height]), bitsPerPixel,
+                    bitsPerPixel * componentsPerPixel, static_cast<size_t>(cacheImageRowBytes),
+                    colorSpace, bitmapInfo, provider, NULL, NO, kCGRenderingIntentDefault);
   UIImage* image = [UIImage imageWithCGImage:cgImage];
   CGColorSpaceRelease(colorSpace);
   CGImageRelease(cgImage);
@@ -463,7 +466,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
       return 0;
     }
   }
-  return ((frame + 0.1) * 1.0 / frameRate * 1000000);
+  return static_cast<int64_t>((frame + 0.1) * 1.0 / frameRate * 1000000);
 }
 
 - (NSInteger)nextFrame {
@@ -473,7 +476,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   if (numFrames == 0) {
     numFrames = [[self getPAGDecoder] numFrames];
   }
-  NSInteger frame = floor([valueAnimator getAnimatedFraction] * numFrames);
+  NSInteger frame = static_cast<NSInteger>(floor([valueAnimator getAnimatedFraction] * numFrames));
   return MAX(MIN(frame, numFrames - 1), 0);
 }
 
@@ -498,6 +501,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 }
 
 #pragma mark - pubic
+
 + (NSUInteger)MaxDiskSize {
   return [PAGDiskCache MaxDiskSize];
 }
@@ -637,8 +641,8 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
   return filePath == nil ? nil : [[filePath retain] autorelease];
 }
 
-- (BOOL)setPath:(NSString*)filePath {
-  return [self setPath:filePath maxFrameRate:DEFAULT_MAX_FRAMERATE];
+- (BOOL)setPath:(NSString*)newPath {
+  return [self setPath:newPath maxFrameRate:DEFAULT_MAX_FRAMERATE];
 }
 
 - (BOOL)setPath:(NSString*)path maxFrameRate:(float)maxFrameRate {
@@ -683,7 +687,7 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 
 - (NSUInteger)currentFrame {
   if (self.currentFrameExplicitlySet >= 0) {
-    return self.currentFrameExplicitlySet;
+    return static_cast<NSUInteger>(self.currentFrameExplicitlySet);
   }
   return MAX(self.currentFrameIndex, 0);
 }

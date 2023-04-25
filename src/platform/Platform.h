@@ -78,7 +78,8 @@ class Platform {
   }
 
   /**
-   * Get the relative path of the file, which contains variable factors in the iOS platform.
+   * Returns the corresponding sandbox path from the absolute file path, which usually starts with
+   * "app://" or "home://". Returns the original path if the platform does not support sandbox.
    */
   virtual std::string getSandboxPath(std::string filePath) const {
     return filePath;
