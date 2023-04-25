@@ -498,11 +498,13 @@ static const float DEFAULT_MAX_FRAMERATE = 30.0;
 }
 
 - (float)getScreenScale {
-  float scale;
+  float scale = 3.0;
   if (@available(iOS 13.0, *)) {
     UIWindowScene* windowScene = static_cast<UIWindowScene*>(
         [[[UIApplication sharedApplication] connectedScenes] anyObject]);
-    scale = static_cast<float>(windowScene.screen.scale);
+    if (windowScene) {
+      scale = static_cast<float>(windowScene.screen.scale);
+    }
   } else {
     scale = static_cast<float>([UIScreen mainScreen].scale);
   }
